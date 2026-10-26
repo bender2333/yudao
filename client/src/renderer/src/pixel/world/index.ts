@@ -8,4 +8,4 @@ export * as signals from "./signals.ts";
 export * as say from "./say.ts";
 export * as scene from "./scene.ts";
 export * as floor from "./floor.ts";
-export { buildCatalog, TASKS, IDLE, ROOMS, LINKS, deptRest, roleRest, keyOf, sayCatalogTypes, eventActionTypes } from "./floor-decl.ts";
+export { buildCatalog, TASKS, IDLE, KINDS, EFFECTS, ROOMS, LINKS, deptRest, roleRest, sayCatalogTypes, eventActionTypes } from "./floor-decl.ts";

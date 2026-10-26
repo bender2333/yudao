@@ -1,18 +1,26 @@
-// 项目楼层的声明（原型 v10 floor-decl.js，设计说明第 3 节，工单 #82）。
+// 项目楼层的声明（原型 v13 floor-decl.js，设计说明第 3 节，工单 #82、#953）。
 //
-// 世界与系统只用数据与规则：房间与管道的结构、任务目录、待机活动由构建期脚本从原型导出
-// （generated/floor-decl.json）；持续状态的规则（deptRest、roleRest）与事件到任务的解析（keyOf）
-// 是纯函数，按原型逐行改写。房间自己的陈设画法（props、lit、tint）需要画布原语，
-// 放在渲染层 render-decl.ts 里，与这里的声明一一对应。
+// 世界与系统只用数据与规则：房间与管道的结构、任务目录、动作种类（带级别与声明时长）、待机活动由构建期脚本
+// 从原型导出（generated/floor-decl.json）；持续状态的规则（deptRest、roleRest）是纯函数，按原型逐行改写。
+// 房间自己的陈设画法（props、lit、tint）需要画布原语，放在渲染层 render-decl.ts 里，与这里的声明一一对应。
+//
+// 任务的键就是画面的动作种类（原型 v13 的 TASKS 以动作为键）：翻译层翻出来的动作按 kind 落在任务目录上，
+// 事件种类与任务键之间不再有对照表（工单 #953 删掉了 keyOf）。
 
 import decl from "../generated/floor-decl.json" with { type: "json" };
-import type { Catalog, DeclContext, IdleDef, LinkDef, PixelFloorEvent, RestFn, RestState, RoleRestFn, RoomDef, RoomVisual, TaskDef } from "./types.ts";
+import type { Catalog, DeclContext, IdleDef, LinkDef, RestFn, RestState, RoleRestFn, RoomDef, RoomVisual, TaskDef } from "./types.ts";
 
-/** 任务目录（数据来自原型 floor-decl.js 的 TASKS）。 */
+/** 任务目录（数据来自原型 v13 floor-decl.js 的 TASKS）。 */
 export const TASKS = decl.tasks as unknown as Record<string, TaskDef>;
 
-/** 待机活动（数据来自原型 floor-decl.js 的 IDLE）。 */
+/** 待机活动（数据来自原型 v13 floor-decl.js 的 IDLE）。 */
 export const IDLE = decl.idle as unknown as IdleDef[];
+
+/** 不是角色一件事的动作（交接、传信、决定单、闪光……）的级别与时长（原型 v13 floor-decl.js 的 EFFECTS）。 */
+export const EFFECTS = decl.effects as unknown as Record<string, { tier: "key" | "normal" | "progress"; ms: number }>;
+
+/** 画面上认的动作种类：级别与声明时长（原型 v13 floor-decl.js 的 KINDS）。 */
+export const KINDS = decl.kinds as unknown as Record<string, { tier: "key" | "normal" | "progress"; ms: number }>;
 
 export const DEPT_PORTS = ["in", "out", "tubeIn", "tubeOut"];
 
@@ -44,27 +52,32 @@ export const ROOMS: RoomDef[] = [
   },
 ];
 
-/** 管道声明（数据来自原型 floor-decl.js 的 LINKS）。 */
+/** 管道声明（数据来自原型 v13 floor-decl.js 的 LINKS）。 */
 export const LINKS = decl.links as unknown as LinkDef[];
 
-/** 快照对应的持续状态（v8 设计说明第 8.3 节的状态行）。 */
+/**
+ * 快照对应的持续状态（原型 v13 floor-decl.js 的 deptRest）：按事项在画面上的状态给姿势。
+ * 状态是画面合同的取值（翻译层已经翻好）；事项停在别的房间、这个部门同时在为它做事时也坐在桌前打字。
+ */
 export const deptRest: RestFn = (ctx, d, it) => {
   const seat = (pose: string, icon?: string | null, iconText?: string | null): RestState => ({
     spot: "desk", pose, icon: icon ?? null, iconText: iconText ?? null,
   });
   if (!it) return seat("tea");
+  // 事项停在别的房间，这个部门同时在工作中或回答询问：坐在桌前打字
+  if (it.department !== d && it.departments && it.departments[d]) return seat("type");
   const openFrom = ctx.model.open_requests.find((q) => q.from === d && q.work_item_id === it.work_item_id);
   switch (it.status) {
-    case "running":
+    case "working":
       return seat("type");
     case "asking": {
       const target = openFrom ? openFrom.to : null;
       const right = target ? ctx.order.indexOf(target) > ctx.order.indexOf(d) : false;
       return { spot: right ? "port_out" : "port_in", pose: "wait", facing: right ? 1 : -1 };
     }
-    case "waiting_provider": {
+    case "waiting_model": {
       const w = ctx.waitingDept(d);
-      return seat("sit_wait", "hourglass", w && w.next_retry_at ? `${ctx.time.clock(w.next_retry_at)} 重试` : "等待");
+      return seat("sit_wait", "hourglass", w && w.retry_text ? w.retry_text : "等待");
     }
     case "paused":
       return seat("sit_relax", "zzz");
@@ -76,9 +89,9 @@ export const deptRest: RestFn = (ctx, d, it) => {
       return { spot: "stand", pose: "idle" };
     case "waiting_resume":
       return seat("sit_wait", "text", "待恢复");
-    case "waiting_decision":
+    case "waiting_user":
       return seat("sit_wait", "text", "待你决定");
-    case "stopped_for_upgrade":
+    case "upgrade_stopped":
       return { spot: "stand", pose: "idle" };
     default:
       return seat("sit");
@@ -92,12 +105,12 @@ export const roleRest: RoleRestFn = (ctx, d, it, role, isPrimary, roomRest) => {
   if (role.status === "away") return { away: true };
   const seat = (pose: string, extra?: Partial<RestState>): RestState => ({ spot: "desk", pose, ...(extra ?? {}) });
   const st = it && it.status;
-  if (st && st !== "running") {
+  if (st && st !== "working") {
     if (isPrimary) return base;
     if (st === "paused") return seat("sit_relax");
     if (st === "failed") return seat("slump");
     if (st === "done") return { spot: "stand", pose: "idle_happy" };
-    if (st === "cancelled" || st === "stopped_for_upgrade") return { spot: "stand", pose: "idle" };
+    if (st === "cancelled" || st === "upgrade_stopped") return { spot: "stand", pose: "idle" };
   }
   if (!it) return seat("tea");
   switch (role.status) {
@@ -114,34 +127,13 @@ export const roleRest: RoleRestFn = (ctx, d, it, role, isPrimary, roomRest) => {
   }
 };
 
-/** 事件落在哪个任务上：大多数事件类型本身就是任务键；少数按载荷再分支。 */
-export function keyOf(ev: Pick<PixelFloorEvent, "type" | "department" | "tool" | "payload">): string {
-  const pl = (ev.payload ?? {}) as Record<string, unknown>;
-  if (ev.type === "qa_submitted") return pl.verdict === "release" ? "qa_submitted_release" : "qa_submitted_rework";
-  if (ev.type === "x_review_recorded") return pl.verdict === "passed" ? "x_review_recorded_passed" : "x_review_recorded_returned";
-  if (ev.type === "tool_started") {
-    const tool = String(ev.tool ?? pl.tool ?? "");
-    if (tool === "search") return "tool_started_search";
-    if (tool === "bash") return "tool_started_run_command";
-    if (tool === "run_check") return "qa_started";
-    if (/write|edit/.test(tool)) return "tool_started_write";
-    if (/fetch|http|net|url/.test(tool)) return "tool_started_fetch";
-    if (/mcp/.test(tool)) return "tool_started_mcp";
-    if (/browser|computer/.test(tool)) return ev.department === "quality" ? "tool_started_browser" : "tool_started_test";
-    if (/scan|legacy|repo/.test(tool)) return "tool_started_scan";
-    return "tool_started_read";
-  }
-  if (ev.type === "model_request_serialized") return "model_requested";
-  return ev.type;
-}
-
 /** 项目楼层的任务目录（世界与系统共用）。 */
 export function buildCatalog(visuals: Record<string, RoomVisual>): Catalog {
   const rooms = ROOMS.map((room) => (visuals[room.id] ? { ...room, ...visuals[room.id] } : room));
   return {
     tasks: TASKS,
     idle: IDLE,
-    keyOf,
+    kinds: KINDS,
     roomDefs: rooms,
     linkDefs: LINKS,
     flags: decl.flags,
@@ -151,8 +143,8 @@ export function buildCatalog(visuals: Record<string, RoomVisual>): Catalog {
   };
 }
 
-/** 原型声明的说话目录登记的事件类型（测试核对齐全）。 */
+/** 原型 translate/say.js 的说话目录登记的事件类型（画面 3 的动作表按它核对每种动作有没有话）。 */
 export const sayCatalogTypes: string[] = decl.sayCatalog;
-/** 原型 engine.js 列出的会引起动作的事件类型。 */
+/** 原型 translate/translate.js 的覆盖里翻成动作的事件类型（三个场景的并集）。 */
 export const eventActionTypes: string[] = decl.eventActions;
 export type { DeclContext };

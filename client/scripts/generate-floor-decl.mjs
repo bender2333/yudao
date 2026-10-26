@@ -1,6 +1,7 @@
-// 由原型 v10 的 floor-decl.js 与 say.js 导出项目楼层的声明数据（工单 #82）。
+// 由原型 v13 的 floor-decl.js 与 translate/ 导出项目楼层的声明数据（工单 #953，改自 v10 的那一版）。
 // 原型代码自定稿起不再修改（ADR-0021）；这里只读取，把「数据与规则」导出为 JSON：
-// 房间与管道的声明、任务目录、待机活动、事件到任务的解析（keyOf）、持续状态表、说话目录。
+// 房间与管道的声明、任务目录、不是角色一件事的动作（effects）、画面认的动作种类（kinds，带级别与时长）、
+// 待机活动、持续状态表与说话目录的登记、翻译覆盖。
 // 输出：src/renderer/src/pixel/generated/floor-decl.json
 // 用法：node scripts/generate-floor-decl.mjs
 
@@ -13,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientRoot = path.resolve(__dirname, '..');
-const v10Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v10', 'js');
+const v13Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v13', 'js');
 
 // 最小的浏览器环境：与 generate-pixel-registry.mjs 同一做法，原型代码不改。
 function makeCtx2d() {
@@ -82,6 +83,8 @@ const sandbox = {
   Map,
   Set,
   RegExp,
+  Promise,
+  Symbol,
   document: {
     createElement: canvasStub,
     addEventListener: () => {},
@@ -104,26 +107,35 @@ const sandbox = {
   clearInterval,
   addEventListener: () => {},
   removeEventListener: () => {},
+  innerWidth: 1440,
+  innerHeight: 900,
+  location: { hash: '' },
 };
 sandbox.window = sandbox;
 sandbox.self = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
-// 按 index.html 的脚本顺序执行：y10.js → sprites.js → engine.js → ecs.js → say.js → floor-decl.js
+// 按 index.html 的脚本顺序执行：声明表要用到 Y13 的取色、画布原语与 ecs 的几何，
+// 翻译层导出说话目录与覆盖核对。
 for (const [label, file] of [
-  ['y10.js', path.join(v10Root, 'y10.js')],
-  ['sprites.js', path.join(v10Root, 'pixel', 'sprites.js')],
-  ['engine.js', path.join(v10Root, 'pixel', 'engine.js')],
-  ['ecs.js', path.join(v10Root, 'pixel', 'ecs.js')],
-  ['say.js', path.join(v10Root, 'pixel', 'say.js')],
-  ['floor-decl.js', path.join(v10Root, 'pixel', 'floor-decl.js')],
+  ['y13.js', path.join(v13Root, 'y13.js')],
+  ['contract/registry.js', path.join(v13Root, 'contract', 'registry.js')],
+  ['pixel/sprites.js', path.join(v13Root, 'pixel', 'sprites.js')],
+  ['pixel/engine.js', path.join(v13Root, 'pixel', 'engine.js')],
+  ['pixel/ecs.js', path.join(v13Root, 'pixel', 'ecs.js')],
+  ['pixel/say.js', path.join(v13Root, 'pixel', 'say.js')],
+  ['pixel/floor-decl.js', path.join(v13Root, 'pixel', 'floor-decl.js')],
+  ['translate/say.js', path.join(v13Root, 'translate', 'say.js')],
+  ['translate/translate.js', path.join(v13Root, 'translate', 'translate.js')],
 ]) {
   vm.runInContext(readFileSync(file, 'utf8'), sandbox, { filename: label });
 }
 
-const P = sandbox.window.Y10.pixel;
-if (!P.floorDecl || !P.say) throw new Error('原型没有导出 floorDecl 或 say');
+const P = sandbox.window.Y13.pixel;
+const T = sandbox.window.Y13.translate;
+if (!P.floorDecl) throw new Error('原型没有导出 floorDecl');
+if (!T || !T.coverage || !T.say || !T.say.catalog) throw new Error('原型没有导出 translate 的覆盖核对或说话目录');
 
 // ---------------------------------------------------------------------------
 // 导出：房间与管道声明里的 props/lit/tint/rest 是函数（画法与规则），不进 JSON；
@@ -143,19 +155,25 @@ const links = D.links.map((d) => ({
 }));
 
 const out = {
-  generatedFrom: 'docs/prototypes/v10/js/pixel/{floor-decl.js,say.js,ecs.js}',
+  generatedFrom: 'docs/prototypes/v13/js/pixel/{floor-decl.js,say.js,ecs.js}、js/translate/{say.js,translate.js}',
   // 房间与管道的声明：函数字段（props、lit、tint、rest）在 TS 一侧改写，这里只记录结构。
   rooms,
   links,
-  // 任务目录与待机活动是纯数据，整份搬过来。
+  // 任务目录、不是角色一件事的动作与画面上认的动作种类（带级别与时长）都是纯数据，整份搬过来。
   tasks: JSON.parse(JSON.stringify(D.tasks)),
+  effects: JSON.parse(JSON.stringify(D.effects)),
+  kinds: JSON.parse(JSON.stringify(D.kinds)),
   idle: JSON.parse(JSON.stringify(D.idle)),
   flags: D.flags.slice(),
   // 说话目录是「事件类型 → 一句话」的规则（函数），不进 JSON；这里只导出它登记的事件类型，
-  // TS 一侧按 say.js 逐行改写规则，测试按这份清单核对目录齐全。
-  sayCatalog: Object.keys(P.say.catalog).sort(),
-  // 会引起动作的事件类型（engine.js 的 P.EVENT_ACTIONS）：说话目录应当覆盖它们
-  eventActions: Object.keys(P.EVENT_ACTIONS).sort(),
+  // TS 一侧按 translate/say.js 逐行改写规则（translate/say.ts），测试按这份清单核对目录齐全。
+  sayCatalog: Object.keys(T.say.catalog).sort(),
+  // 翻译覆盖：三个场景里每种事件是翻成动作、转交实时内容还是不画（画面与播放设计说明第 6 节）。
+  coverage: JSON.parse(JSON.stringify(T.coverage)),
+  // 会引起动作的事件类型：楼、楼层与房间三个场景的覆盖里翻成动作的那些
+  eventActions: [...new Set([
+    ...T.coverage.floor.drawn, ...T.coverage.room.drawn, ...T.coverage.building.drawn,
+  ])].sort(),
   geo: P.ecs.GEO,
   // 任务目录与待机活动里出现过的字段名，TS 类型按它核对
   taskKeys: [...new Set(Object.values(D.tasks).flatMap((t) => Object.keys(t)))].sort(),
@@ -169,5 +187,6 @@ writeFileSync(target, JSON.stringify(out, null, 1) + '\n', 'utf8');
 
 console.log(
   `floor-decl.json 已生成：房间 ${rooms.length}、管道 ${links.length}、任务 ${Object.keys(out.tasks).length}、` +
-  `待机活动 ${out.idle.length}、说话目录 ${out.sayCatalog.length}、会引起动作的事件 ${out.eventActions.length}`,
+  `动作种类 ${Object.keys(out.kinds).length}、待机活动 ${out.idle.length}、说话目录 ${out.sayCatalog.length}、` +
+  `会引起动作的事件 ${out.eventActions.length}`,
 );

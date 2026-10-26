@@ -100,19 +100,51 @@ async function canvasSignature(page: Page): Promise<string> {
   });
 }
 
-/** 画面里世界的当前状态（经页面上给端到端测试的只读入口）：角色的任务与事项的状态。 */
+/** 画面里世界的当前状态（经页面上给端到端测试的只读入口）：角色的任务、事项的状态与播放时间线的读数。 */
 async function floorState(page: Page): Promise<FloorWorldState> {
   return page.evaluate(() => {
-    const hooks = (window as unknown as { __floorViewForTest?: { state: () => FloorWorldState } }).__floorViewForTest;
+    const hooks = (window as unknown as { __floorViewForTest?: { state: () => FloorWorldState; timeline: () => FloorTimeline } }).__floorViewForTest;
     if (!hooks) throw new Error("页面没有画面的读取入口");
-    return hooks.state();
+    return { ...hooks.state(), timeline: hooks.timeline() };
   });
+}
+
+interface FloorTimeline {
+  shown: number | null;
+  pending: number;
+  lag: number;
+  queued: number;
+  playing: string[];
 }
 
 interface FloorWorldState {
   characters: { id: string; department: string | null; task: string | null; bubble: string | null; pose: string | null }[];
   items: { id: string; status: string; department: string | null }[];
+  timeline?: FloorTimeline;
 }
+
+/**
+ * 服务端的事项状态 → 画面合同的事项状态（测试自己写死的期望，不复用实现）。
+ * 进行中还要按恢复观察状态分开：中断、待恢复、已暂停各有画法（工单 #900 的行为，搬到翻译层以后不变）。
+ */
+const EXPECTED_STATUS: Record<string, string> = {
+  not_started: "queued",
+  in_progress: "working",
+  awaiting_initial_prd: "asking",
+  adopted: "adopted",
+  released_unsettled: "done",
+  stopped: "cancelled",
+  held: "paused",
+};
+
+function expectedStatus(row: { status: string; recovery_state?: string | null }): string {
+  if (row.status === "in_progress") {
+    const recovery = row.recovery_state ?? null;
+    if (recovery === "interrupted" || recovery === "waiting_resume" || recovery === "paused") return recovery;
+  }
+  return EXPECTED_STATUS[row.status] ?? row.status;
+}
+
 
 /** 等某个条件成立（页面按事件流自动重查询，不刷新页面）。 */
 async function waitUntil(check: () => Promise<boolean>, description: string, timeoutMs = 60_000): Promise<void> {
@@ -220,32 +252,73 @@ test("画面的状态来自查询：事项的每个状态都对应事件日志�
   }
 });
 
-test("断线重连（重新订阅）以后画面回到查询给出的状态", async () => {
+test("断线重连（重新订阅）以后画面回到查询给出的状态，不补播", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = watchErrors(client);
   const page = client.page;
   try {
     const id = await projectId(SAMPLE);
     await openFloor(page, id);
-    // 画面里配置的事项状态与 project.loop 一致：状态来自查询
-    const loop = await query<{ work_items: { work_item_id: string; status: string }[] }>(
+    // 画面里的事项状态是查询结果翻成画面合同的取值（服务端 in_progress → 画面的 working）
+    const loop = await query<{ work_items: { work_item_id: string; status: string; recovery_state: string | null }[] }>(
       "project.loop", { project_id: id });
     expect(loop.work_items.length).toBeGreaterThan(0);
-    const fromQuery = JSON.stringify(loop.work_items.map((it) => [it.work_item_id, it.status]));
-    await waitUntil(async () => {
+    const expected = JSON.stringify(loop.work_items.map((it) => [it.work_item_id, expectedStatus(it)]));
+    const matches = async (): Promise<boolean> => {
       const now = await floorState(page);
-      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === fromQuery;
-    }, "画面里的事项状态与查询一致");
+      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === expected;
+    };
+    await waitUntil(matches, "画面里的事项状态与查询结果一致");
+    // 打开画面就跳到最新：没有排着的状态，也没有在演的动作（不补播）
+    const opened = await floorState(page);
+    expect(opened.timeline?.pending).toBe(0);
+    expect(opened.timeline?.playing).toEqual([]);
     // 断线：停掉事件流连接（主进程的窗口关闭再打开时由客户端自己重连；这里用重新连接设置模拟）
     await page.evaluate(() => { window.location.hash = "#/home"; });
     await expect(page.locator(".floor-screen canvas")).toHaveCount(0);
     await openFloor(page, id);
-    // 重新打开以后画面按查询给出的状态配置：事项的状态逐项与 project.loop 一致
-    // （动作不补播，事项状态才由查询给出）
+    // 重新打开（重新同步）以后画面按查询给出的状态配置：事项的状态逐项一致，不补播
+    await waitUntil(matches, "画面回到查询给出的状态");
+    const again = await floorState(page);
+    expect(again.timeline?.pending).toBe(0);
+    expect(again.timeline?.playing).toEqual([]);
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
+
+// 回放拖动时间轴（工单 #953 验收标准 3）：拖到哪个位置就直接显示那个位置的状态，不播动作。
+// 时间轴把位置写进地址（?at=），概览页按位置读 project.loop，画面用 jump 直接显示。
+test("回放拖动时间轴：画面直接显示那个位置的状态，不播动作", async () => {
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const id = await projectId(SAMPLE);
+    const loop = await query<{ work_items: { work_item_id: string; status: string; recovery_state: string | null }[] }>(
+      "project.loop", { project_id: id });
+    expect(loop.work_items.length).toBeGreaterThan(0);
+    // 取一个过去的位置：查询给出这份状态来自的快照位置
+    const flow = await query<{ records: { position: number }[] }>("project.flow", { project_id: id });
+    const positions = flow.records.map((row) => row.position).filter((p) => Number.isFinite(p));
+    expect(positions.length).toBeGreaterThan(0);
+    const at = Math.max(...positions);
+    await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${id}/overview?at=${at}`);
+    await expect(page.locator(".floor-screen canvas")).toHaveCount(1);
+    await openTextList(page);
+    // 那个位置的查询结果翻成的状态：与画面里的事项状态逐项一致
+    const past = await query<{ work_items: { work_item_id: string; status: string; recovery_state: string | null }[] }>(
+      "project.loop", { project_id: id, at });
+    const expected = JSON.stringify(past.work_items.map((it) => [it.work_item_id, expectedStatus(it)]));
     await waitUntil(async () => {
       const now = await floorState(page);
-      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === fromQuery;
-    }, "画面回到查询给出的状态");
+      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === expected;
+    }, "画面显示那个位置的状态");
+    // 回放模式不播动作：时间线里没有在演的动作，也没有排着的状态
+    const state = await floorState(page);
+    expect(state.timeline?.playing).toEqual([]);
+    expect(state.timeline?.pending).toBe(0);
     expect(errors).toEqual([]);
   } finally {
     await client.close();

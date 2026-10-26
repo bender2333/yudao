@@ -101,6 +101,7 @@ export function createBuildingDriver(opts: BuildingDriverOptions): BuildingDrive
       spot: { x, y },
       queue: [],
       current: null,
+      progress: null,
       rest: null,
       bubble: null,
       item: null,
