@@ -133,7 +133,7 @@ export async function createRoomView(opts: RoomViewOptions): Promise<RoomView> {
   const renderer = new RoomRenderer(driver, driver.scene);
   driver.jump(emptyRoomData(opts.department));
 
-  let last = 0;
+  let last = opts.clock.now();
 
   function draw(): void {
     renderer.draw(surface.frame());

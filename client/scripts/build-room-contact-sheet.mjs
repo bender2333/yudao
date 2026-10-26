@@ -2,6 +2,9 @@
 // 回放录下的部门房间调用序列，在指定事件之后每隔一段时间截一帧，拼成一张联系表，
 // 交给用户查看画风与动作。输出在 client/.tmp/ 下，不进入提交。
 //
+// 录下的调用是原型 v13 的页面上录的（client/scripts/record-room-calls.mjs，工单 #1069）：
+// 查询结果是 department.workspace 的结果，事件是页面收到的原始事件，回放时两边各走一次翻译层。
+//
 // 用法：node client/scripts/build-room-contact-sheet.mjs [--rec 场景编号] [--event 事件类型] [--nth 1] [--frames 12] [--interval 300]
 // 输出：client/.tmp/room-life/room-<场景>-<事件>-<序号>.png
 // 依赖：Playwright 的 Chromium（CHROMIUM_EXE 可以指定位置）。
@@ -23,7 +26,7 @@ const arg = (name, dflt) => {
   return i >= 0 ? process.argv[i + 1] : dflt;
 };
 const REC = arg("rec", "sc-todo-loop__engineering");
-const EVENT = arg("event", "collaboration_requested");
+const EVENT = arg("event", "tool_started");
 const NTH = Number(arg("nth", 1));
 const FRAMES = Number(arg("frames", 12));
 const INTERVAL = Number(arg("interval", 300));
@@ -33,32 +36,54 @@ const OUT = arg("out", `room-${REC}-${EVENT}-${NTH}.png`);
 async function driver(input) {
   const P = await import("/src/pixel/room/view.ts");
   const clockMod = await import("/src/pixel/clock.ts");
+  const tr = await import("/src/translate/room.ts");
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:480px;height:240px;z-index:9999;background:#000";
   document.body.appendChild(host);
   const clock = clockMod.createManualClock();
   let seed = 987654321;
   const random = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  Math.random = random;
   const view = await P.createRoomView({ host, clock, department: input.department, random, tween: null });
   const canvas = host.querySelector("canvas");
   const frames = [];
   let seen = 0;
+  let pos = 0;
   const shoot = (t, note) => frames.push({ t, note, url: canvas.toDataURL("image/png") });
   const advance = (ms) => {
     const n = Math.max(1, Math.round(ms / 50));
     for (let i = 0; i < n; i++) clock.advance(Math.round(clock.now()) + 50);
   };
+  const playOneEvent = (raw) => {
+    const ev = {
+      type: String(raw.type ?? ""),
+      position: Number(raw.position ?? (++pos)),
+      department: raw.department ?? null,
+      role: raw.role ?? null,
+      tool: raw.tool ?? null,
+      label: raw.label ?? null,
+      work_item_id: raw.work_item_id ?? null,
+      payload: raw.payload ?? null,
+    };
+    const stream = tr.streamOfEvent(ev);
+    if (stream && stream.who.room === input.department) view.stream(stream.who, stream.text);
+    for (const a of tr.actions(ev, input.department)) view.play(a);
+  };
   for (let i = 0; i < input.ops.length; i++) {
     const op = input.ops[i];
     if (op.op === "mount" || op.op === "destroy") continue;
-    if (op.op === "setModel") view.setModel(op.arg);
-    else if (op.op === "playEvent") {
-      if (op.arg.type === input.event) {
+    if (op.op === "workspace") {
+      const ws = op.arg && op.arg.room ? op.arg : { room: op.arg };
+      const state = tr.state({ position: op.position ?? (++pos), workspace: ws });
+      if (op.jump) view.jump(state);
+      else view.setState(state);
+    } else if (op.op === "event") {
+      if (op.arg && op.arg.type === input.event) {
         seen += 1;
         if (seen === input.nth) {
           advance(1000);
           shoot(0, op.arg.type);
-          view.playEvent(op.arg);
+          playOneEvent(op.arg);
           for (let k = 1; k <= input.frames; k++) {
             advance(input.interval);
             if (k < input.frames) shoot(k * input.interval, op.arg.type);
@@ -68,9 +93,9 @@ async function driver(input) {
           return frames;
         }
       }
-      view.playEvent(op.arg);
+      playOneEvent(op.arg ?? {});
     }
-    if (op.op === "setModel" || op.op === "playEvent") advance(500);
+    advance(op.op === "event" ? (input.gapMs?.event ?? 500) : (input.gapMs?.other ?? 500));
   }
   view.destroy();
   host.remove();
@@ -93,13 +118,17 @@ async function main() {
   const browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
   try {
     const page = await browser.newPage({ viewport: { width: 1000, height: 300 } });
+    await page.addInitScript(() => {
+      window.__name = (target) => target;
+    });
     await page.goto(`${address}index.html`);
     await page.evaluate((fnSource) => {
+      window.__name = (target) => target;
       window.__roomLife = (0, eval)(`(${fnSource})`);
     }, driver.toString());
     const frames = await page.evaluate(
       (input) => window.__roomLife(input),
-      { ops: scenario.ops, department: scenario.department, event: EVENT, nth: NTH, frames: FRAMES, interval: INTERVAL },
+      { ops: scenario.ops, department: scenario.department, gapMs: recording.gapMs, event: EVENT, nth: NTH, frames: FRAMES, interval: INTERVAL },
     );
     if (!frames.length) {
       console.log("没有找到事件", EVENT, NTH);

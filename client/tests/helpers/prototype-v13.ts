@@ -79,6 +79,12 @@ async function v13Driver(input: {
   const Y = (window as unknown as { Y13: Record<string, any> }).Y13;
   const P = Y.pixel;
   const T = Y.translate;
+  await Promise.all([1, 2, 3, 4, 5, 6].map((i) => new Promise((resolve) => {
+    P.shotImage(`todo-trial-${i}.png`);
+    const img = new Image();
+    img.onload = img.onerror = resolve;
+    img.src = `assets/todo-trial-${i}.png`;
+  })));
   const errors: string[] = [];
   // 确定的时钟与随机数：rAF 的回调收进队列，由 step 按 50 毫秒一帧推进
   let t = 0;
@@ -87,7 +93,10 @@ async function v13Driver(input: {
   window.cancelAnimationFrame = (): void => {};
   performance.now = (): number => t;
   let seed = 987654321;
-  Math.random = (): number => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  Math.random = (): number => {
+    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
   const step = (ms: number): void => {
     const n = Math.max(1, Math.round(ms / 50));
     for (let i = 0; i < n; i++) {
@@ -167,7 +176,7 @@ async function v13Driver(input: {
       anim: a.anim, facing: a.facing, icon: a.icon ? { kind: a.icon.kind, text: a.icon.text ?? null } : null,
       visible: a.visible, dim: a.dim, hold: a.hold ?? null, sign: a.sign ?? null, script: Boolean(a.script),
     }));
-    return { png: canvas.toDataURL("image/png"), actors, size: [canvas.width, canvas.height], errors };
+    return { png: canvas.toDataURL("image/png"), actors, size: [canvas.width, canvas.height], errors } as CheckpointShot;
   } finally {
     host.remove();
   }
@@ -276,7 +285,10 @@ export function compareActors(expected: readonly ActorShot[], actual: readonly A
 
 /** 起一个浏览器：打开 v13 的页面与一个做像素减法的空白页。 */
 export async function launch(): Promise<{ browser: Browser; proto: Page; diff: Page }> {
-  const browser = await chromium.launch(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {});
+  const browser = await chromium.launch({
+    ...(process.env.CHROMIUM_EXE ? { executablePath: process.env.CHROMIUM_EXE } : {}),
+    args: ["--allow-file-access-from-files", "--disable-web-security"],
+  });
   const proto = await openPrototype(browser);
   const diff = await openDiffPage(browser);
   return { browser, proto, diff };

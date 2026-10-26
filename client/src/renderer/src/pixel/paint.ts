@@ -12,7 +12,7 @@ export interface PaintOptions {
   [key: string]: unknown;
 }
 
-export type PaintFn = (c: CanvasRenderingContext2D, x: number, y: number, o?: PaintOptions, t?: number) => void;
+export type PaintFn = (c: CanvasRenderingContext2D, x: number, y: number, ...args: any[]) => any;
 
 const optBool = (o: PaintOptions | undefined, name: string, fallback: boolean): boolean => {
   const v = o?.[name];
@@ -174,11 +174,11 @@ function deskItems(c: CanvasRenderingContext2D, x0: number, y0: number, o?: Pain
   if (optBool(o, "box", false)) drawBitmap(c, "box_open", x + 4, y - 10);
   if (optBool(o, "card", false)) drawBitmap(c, "card", x + Math.round(w / 2) + 6, y - 5);
   if (optBool(o, "cardResult", false)) drawBitmap(c, "card_result", x + Math.round(w / 2) + 6, y - 5);
-  if (optBool(o, "monitor", true)) {
+  if (o?.monitor !== false) {
     const mx = x + w - 22;
     const my = y - 19;
     drawBitmap(c, "deskMonitor", mx, my);
-    screen(c, mx + 3, my + 2, 14, 9, optStr(o, "monitor", "off"), t, { seed: optNum(o, "seed", 0), k: o?.bootK });
+    screen(c, mx + 3, my + 2, 14, 9, (o?.monitor as string) || "off", t, { seed: optNum(o, "seed", 0), k: o?.bootK });
     if (optBool(o, "monitorBlink", false) && Math.floor(t / 300) % 2 === 0) fillPixel(c, mx + 3, my + 2, 14, 9, "rgba(247,203,70,0.55)");
   }
   if (o?.lamp) {
@@ -1000,65 +1000,151 @@ export function shotImage(file: string | null): HTMLImageElement | null {
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
+/** 预加载截图至 shotCache，确保首帧同步渲染。 */
+export function preloadShotImage(file: string | null): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    if (!file) return resolve(null);
+    let img = shotCache.get(file);
+    if (!img) {
+      img = new Image();
+      img.src = `assets/${file}`;
+      shotCache.set(file, img);
+    }
+    if (img.complete && img.naturalWidth > 0) return resolve(img);
+    img.addEventListener("load", () => resolve(img), { once: true });
+    img.addEventListener("error", () => resolve(null), { once: true });
+  });
+}
+
 /**
  * 陈设画法表：房间陈设、管道、包裹、设备、屏幕、终端、白板、架子、警示灯等。
  * 键与原型 paint 表一致；图鉴页按这个表逐项列出。
  */
 export const paint: Record<string, PaintFn> = {
-  screen: (c, x, y, o, t = 0) => screen(c, x, y, Number(o?.w) || 22, Number(o?.h) || 13, String(o?.mode ?? "idle"), t, o),
-  scanlines: (c, x, y, o) => scanlines(c, x, y, Number(o?.w ?? 22), Number(o?.h ?? 13), Number(o?.a ?? 0.22)),
+  screen: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [w, h, mode, t, o] = args;
+      screen(c, x, y, w as number, h as number, String(mode ?? "idle"), Number(t) || 0, o as PaintOptions);
+    } else {
+      const [o, t = 0] = args as [PaintOptions | undefined, number | undefined];
+      screen(c, x, y, Number(o?.w) || 22, Number(o?.h) || 13, String(o?.mode ?? "idle"), Number(t) || 0, o);
+    }
+  },
+  scanlines: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [w, h, a] = args;
+      scanlines(c, x, y, w as number, h as number, a as number | undefined);
+    } else {
+      const [o] = args as [PaintOptions | undefined];
+      scanlines(c, x, y, Number(o?.w ?? 22), Number(o?.h ?? 13), Number(o?.a ?? 0.22));
+    }
+  },
   desk,
   deskItems,
   chair,
   cabinet,
   blinkFrame: (c, x, y, o) => blinkFrame(c, x, y, optNum(o, "w", 220), optNum(o, "h", 170)),
-  terminal: (c, x, y, o, t = 0) => {
-    terminal(c, x, y, o, t);
-  },
-  door: (c, x, y, o) => {
-    door(c, x, y, o);
-  },
+  terminal: (c, x, y, o, t = 0) => terminal(c, x, y, o, t),
+  door: (c, x, y, o) => door(c, x, y, o),
   whiteboard,
   corkboard,
   crt,
   window: windowPaint,
-  clock: (c, x, y, o) => {
-    clockPaint(c, x, y, Number(o?.time) || 0, o);
+  clock: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      clockPaint(c, x, y, args[0], args[1] as PaintOptions | undefined);
+    } else {
+      const o = args[0] as PaintOptions | undefined;
+      clockPaint(c, x, y, Number(o?.time) || 0, o);
+    }
   },
   lamp: (c, cx, y, o) => {
-    lamp(c, cx, y, optBool(o, "on", false), o?.from === undefined ? undefined : Number(o.from));
+    lamp(c, cx, y, typeof o === "boolean" ? o : optBool(o, "on", false), (o as PaintOptions)?.from === undefined ? undefined : Number((o as PaintOptions).from));
   },
-  lightCone: (c, x, y, o) => lightCone(c, x, y, optNum(o, "len", 40), optNum(o, "w", 30), optStr(o, "color", PAL.yellow2), optNum(o, "alpha", 0.3)),
-  glow: (c, x, y, o) => glow(c, x, y, optNum(o, "r", 16), optStr(o, "color", PAL.yellow2), optNum(o, "alpha", 0.5)),
+  lightCone: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [len, w, color, alpha] = args;
+      lightCone(c, x, y, len as number, w as number, String(color ?? PAL.yellow2), Number(alpha ?? 0.3));
+    } else {
+      const [o] = args as [PaintOptions | undefined];
+      lightCone(c, x, y, optNum(o, "len", 40), optNum(o, "w", 30), optStr(o, "color", PAL.yellow2), optNum(o, "alpha", 0.3));
+    }
+  },
+  glow: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [r, color, alpha] = args;
+      glow(c, x, y, r as number, String(color ?? PAL.yellow2), Number(alpha ?? 0.5));
+    } else {
+      const [o] = args as [PaintOptions | undefined];
+      glow(c, x, y, optNum(o, "r", 16), optStr(o, "color", PAL.yellow2), optNum(o, "alpha", 0.5));
+    }
+  },
   tray,
   bin,
   archive,
-  mailbox: (c, x, y, o, t = 0) => {
-    mailbox(c, x, y, o, t);
-  },
+  mailbox: (c, x, y, o, t = 0) => mailbox(c, x, y, o, t),
   scrollRack,
-  table: (c, x, y, o) => {
-    const w = optNum(o, "w", 64);
-    table(c, x, y, w, o);
+  table: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [w, o] = args as [number, PaintOptions | undefined];
+      table(c, x, y, w, o);
+    } else {
+      const [o] = args as [PaintOptions | undefined];
+      const w = optNum(o, "w", 64);
+      table(c, x, y, w, o);
+    }
   },
   rack,
-  shelf: (c, x, y, o) => {
-    const w = optNum(o, "w", 64);
-    shelf(c, x, y, w, o);
+  shelf: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [w, o] = args as [number, PaintOptions | undefined];
+      shelf(c, x, y, w, o);
+    } else {
+      const [o] = args as [PaintOptions | undefined];
+      const w = optNum(o, "w", 64);
+      shelf(c, x, y, w, o);
+    }
   },
   beacon,
   beaconLight,
   cardCabinet,
   cart,
   plant: (c, x, y) => plant(c, x, y),
-  rug: (c, x, y, o) => {
-    rug(c, x, y, optNum(o, "w", 32), optNum(o, "h", 12), optStr(o, "col", PAL.rug), optStr(o, "col2", PAL.rug2));
+  rug: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [w, h, col, col2] = args as [number, number, string, string];
+      rug(c, x, y, w, h, col, col2);
+    } else {
+      const [o] = args as [PaintOptions | undefined];
+      rug(c, x, y, optNum(o, "w", 32), optNum(o, "h", 12), optStr(o, "col", PAL.rug), optStr(o, "col2", PAL.rug2));
+    }
   },
-  poster: (c, x, y, o) => {
-    poster(c, x, y, optNum(o, "w", 24), optNum(o, "h", 32), optStr(o, "bg", PAL.paper), o?.draw as ((cx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number) => void) | undefined);
+  poster: (c, x, y, ...args: unknown[]) => {
+    if (typeof args[0] === "number") {
+      const [w, h, bg, draw] = args as [number, number, string, ((cx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number) => void) | undefined];
+      poster(c, x, y, w, h, bg, draw);
+    } else {
+      const [o] = args as [PaintOptions | undefined];
+      poster(c, x, y, optNum(o, "w", 24), optNum(o, "h", 32), optStr(o, "bg", PAL.paper), o?.draw as ((cx: CanvasRenderingContext2D, px: number, py: number, pw: number, ph: number) => void) | undefined);
+    }
   },
-  shot: (c, x, y, o, t = 0) => {
-    shot(c, x, y, optNum(o, "w", 32), optNum(o, "h", 20), o, t);
+  shot: (c, x, y, ...args: unknown[]) => {
+    let w = 32;
+    let h = 20;
+    let o: PaintOptions = {};
+    let t = 0;
+    if (typeof args[0] === "number" && typeof args[1] === "number") {
+      w = args[0];
+      h = args[1];
+      o = (args[2] as PaintOptions) || {};
+      t = typeof args[3] === "number" ? args[3] : 0;
+    } else {
+      o = (args[0] as PaintOptions) || {};
+      t = typeof args[1] === "number" ? args[1] : 0;
+      w = optNum(o, "w", 32);
+      h = optNum(o, "h", 20);
+    }
+    shot(c, x, y, w, h, o, t);
   },
   pipe,
   tube,

@@ -87,6 +87,7 @@ export type RoomStep =
 
 /** 工位（渲染与坐姿用）。 */
 export interface RoomSeat {
+  i?: number;
   x: number;
   w: number;
   seatX: number;
