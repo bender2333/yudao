@@ -1,6 +1,6 @@
-// 动作图鉴的数据层：列出原型 sprites.js 与 engine.js 的全部公开画法，一项不少（工单 #176 验收标准 1）。
-// 公开成员来自生成脚本导出的登记表（generated/registry.json），与原型运行时逐项对照；
-// 每个成员给出一个可运行的示例，图鉴页面照此渲染，方便逐项与原型对照画风。
+// 动作图鉴的数据层：列出原型 v13 的 y13.js、sprites.js 与 engine.js 的全部公开画法，一项不少
+// （工单 #176 验收标准 1、#956）。公开成员来自生成脚本导出的登记表（generated/registry.json），
+// 与原型运行时逐项对照；每个成员给出一个可运行的示例，图鉴页面照此渲染，方便逐项与原型对照画风。
 
 import { EASE, animDuration, animFrameAt, ease, hash, reducedMotion } from "./anims.ts";
 import { bitmapGrid, composeChar, resolveSpriteKey, rolePalette } from "./char.ts";
@@ -16,7 +16,6 @@ import {
   CHAR_H,
   CHAR_W,
   DEPTS,
-  EVENT_ACTIONS,
   FONT3,
   HAIRS,
   ITEM_COLORS,
@@ -28,8 +27,8 @@ import {
   ROLE_NAMES,
   SKINS,
   SPRITE_LEVELS,
-  STATUS_ACTIONS,
   VIGNETTE_SPRITES,
+  registry,
 } from "./registry.ts";
 
 export type MemberKind = "function" | "data";
@@ -72,9 +71,9 @@ function bitmapSample(name: string, caption: string): GallerySample {
 const dataSample = (count: number, entries: string[], caption: string): GallerySample => ({ type: "data", count, entries, caption });
 const valueSample = (value: string, caption: string): GallerySample => ({ type: "value", value, caption });
 
-/** 每一项的说明与取样：engine.js 的 39 个函数与 25 个数据，共 64 项。 */
+/** 每一项的说明与取样：原型 v13 的 engine.js 38 个函数与 24 个数据，共 62 项。 */
 export const GALLERY_MEMBERS: GalleryMember[] = [
-  // ---- engine.js 的函数（39 个） ----
+  // ---- engine.js 的函数（38 个） ----
   { name: "R", kind: "function", sampler: "RB", note: "实心矩形，坐标取整到像素（房间陈设的基本笔）", sample: valueSample("fillRect(取整坐标)", "实心矩形") },
   { name: "RB", kind: "function", sampler: "RB", note: "带墨色外框的实心矩形", sample: valueSample("矩形 + 1 像素墨色描边", "描边矩形") },
   { name: "actorFrame", kind: "function", note: "取某个小人在某时刻该画的姿势与表情（待机时按固定间隔眨眼）", sample: valueSample(animFrameAt("walk", 190), "walk + 190ms") },
@@ -106,7 +105,6 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "pixText", kind: "function", sampler: "pixText", note: "3×5 像素字模画数字与符号（信箱未读数、设备计数）", sample: valueSample("3×5 字模逐像素", "3×5 字模") },
   { name: "reducedMotion", kind: "function", note: "读系统的「减少动效」偏好（命中时只画静止帧）", sample: valueSample(String(reducedMotion()), "减少动效") },
   { name: "renderSprite", kind: "function", note: "把一个动作的某一帧渲染成单张图（缩略图与图鉴用）", sample: charSample("quality.reviewer", "inspect0", "质检审查者检查") },
-  { name: "resolveAction", kind: "function", note: "把状态名或事件名解析成对应动作", sample: valueSample("state / event → action", "解析动作") },
   { name: "rgba", kind: "function", note: "十六进制颜色加透明度（阴影、玻璃、屏幕高光）", sample: valueSample(rgba(PAL.ink, 0.28), "ink 28%") },
   { name: "rolePalette", kind: "function", note: "角色配色表：皮肤、发色、衣服、袖标、事项色（按角色种类逐项改色）", sample: valueSample(`${Object.keys(rolePalette("engineering", "lead", 0).map).length} 个颜色键`, "主程配色") },
   { name: "shotImage", kind: "function", note: "取 assets/ 下的一张截图；没加载出来时调用方画占位", sample: valueSample("Image 缓存", "截图加载") },
@@ -115,8 +113,8 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "stampMark", kind: "function", sampler: "stampMark", note: "印章印记：双线方框加文字（有效、放行、返工、封存）", sample: bitmapSample("stamp", "印章位图") },
   { name: "text", kind: "function", note: "用微软雅黑画一段文字，支持描边与发光", sample: valueSample("微软雅黑 + 描边 + 发光", "像素文字") },
 
-  // ---- engine.js 与 sprites.js 的数据（25 个） ----
-  { name: "ACTIONS", kind: "data", note: "事实与动作的对照表：什么事实对应哪个动作、在哪个画面里", sample: dataSample(Object.keys(ACTIONS).length, Object.entries(ACTIONS).slice(0, 8).map(([k, v]) => `${k}：${v.label}`), "事实 → 动作") },
+  // ---- engine.js 与 sprites.js 的数据（24 个） ----
+  { name: "ACTIONS", kind: "data", note: "动作的说明：每个动作由什么事实驱动、小人做什么、在哪个画面里", sample: dataSample(Object.keys(ACTIONS).length, Object.entries(ACTIONS).slice(0, 8).map(([k, v]) => `${k}：${v.label}`), "动作说明") },
   { name: "ANIMS", kind: "data", note: "动作帧序列：每个动作由哪些姿势、每帧多少毫秒组成", sample: dataSample(Object.keys(ANIMS).length, Object.entries(ANIMS).slice(0, 8).map(([k, v]) => `${k}：${v.frames.length} 帧 / ${v.total}ms`), "动作帧序列") },
   { name: "BASE_MOTIONS", kind: "data", note: "基础动作：待机、走路、搬运、跑步、坐、打字", sample: dataSample(Object.keys(BASE_MOTIONS).length, Object.entries(BASE_MOTIONS).map(([k, v]) => `${k}：${v.label}`), "基础动作") },
   { name: "BITMAPS", kind: "data", note: "位图：手持物件、图标与小物件的点阵定义（点阵 + 颜色表 + 是否描边）", sample: dataSample(Object.keys(BITMAPS).length, Object.keys(BITMAPS).slice(0, 12), "位图") },
@@ -124,7 +122,6 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "CHAR_H", kind: "data", note: "小人帧缓冲高：40 像素，脚底在第 37 行", sample: valueSample(`${CHAR_H} 像素`, "帧高") },
   { name: "CHAR_W", kind: "data", note: "小人帧缓冲宽：32 像素", sample: valueSample(`${CHAR_W} 像素`, "帧宽") },
   { name: "DEPTS", kind: "data", note: "部门：衣服颜色、墙面、地面与地毯颜色", sample: dataSample(Object.keys(DEPTS).length, Object.entries(DEPTS).map(([k, v]) => `${k}：${v.name} ${v.main}`), "部门") },
-  { name: "EVENT_ACTIONS", kind: "data", note: "事件名到动作的映射（工具调用、提案、交付、恢复）", sample: dataSample(Object.keys(EVENT_ACTIONS).length, Object.keys(EVENT_ACTIONS).slice(0, 12), "事件 → 动作") },
   { name: "FONT", kind: "data", note: "字体栈：画面文字用微软雅黑（ADR-0021 第 4 条）", sample: valueSample("Microsoft YaHei UI", "画面字体栈") },
   { name: "FONT3", kind: "data", note: "3×5 像素字模：数字与符号", sample: dataSample(Object.keys(FONT3).length, Object.keys(FONT3), "3×5 字模") },
   { name: "HAIRS", kind: "data", note: "发色表（每种两个色：主色与暗色）", sample: dataSample(Object.keys(HAIRS).length, Object.entries(HAIRS).map(([k, v]) => `${k} ${v[0]}`), "发色") },
@@ -136,7 +133,7 @@ export const GALLERY_MEMBERS: GalleryMember[] = [
   { name: "ROLE_NAMES", kind: "data", note: "角色的中文名称", sample: dataSample(Object.keys(ROLE_NAMES).length, Object.values(ROLE_NAMES), "角色名称") },
   { name: "SKINS", kind: "data", note: "肤色表（每种两个色：主色与暗色）", sample: dataSample(SKINS.length, SKINS.map((s, i) => `肤色 ${i} ${s[0]}`), "肤色") },
   { name: "SPRITE_LEVELS", kind: "data", note: "角色标识的档位（ui 界面工作线 / S4 / S5）", sample: dataSample(Object.keys(SPRITE_LEVELS).length, Object.entries(SPRITE_LEVELS).slice(0, 8).map(([k, v]) => `${k}：${v}`), "角色档位") },
-  { name: "STATUS_ACTIONS", kind: "data", note: "运行状态到动作的映射（暂停、失败、完成、取消、待恢复）", sample: dataSample(Object.keys(STATUS_ACTIONS).length, Object.entries(STATUS_ACTIONS).map(([k, v]) => `${k} → ${v}`), "状态 → 动作") },
+  { name: "STATUS_ACTIONS", kind: "data", note: "运行状态到姿势的对应（暂停、失败、完成、取消、中断、待恢复）", sample: dataSample(Object.keys(registry.registries.STATUS_ACTIONS).length, Object.entries(registry.registries.STATUS_ACTIONS).map(([k, v]) => `${k} → ${v}`), "状态 → 姿势") },
   { name: "VIGNETTES", kind: "data", note: "每个动作的循环小画面脚本：走位、播放动作、等待、拿物件、转头、图标、坐下、淡入淡出", sample: dataSample(Object.keys(VIGNETTE_SPRITES).length, Object.keys(VIGNETTE_SPRITES).slice(0, 12), "小画面脚本") },
   { name: "VIGNETTE_SPRITES", kind: "data", note: "每个动作小画面默认用哪个小人", sample: dataSample(Object.keys(VIGNETTE_SPRITES).length, Object.entries(VIGNETTE_SPRITES).slice(0, 8).map(([k, v]) => `${k} → ${v}`), "小画面小人") },
   { name: "ease", kind: "data", note: "缓动曲线：linear、inOut、out、in、outBack、bounce（小画面移动用）", sample: dataSample(Object.keys(EASE).length, Object.keys(EASE).map((k) => `${k}(0.5) = ${ease(k, 0.5).toFixed(4)}`), "缓动曲线") },

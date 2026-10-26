@@ -1,6 +1,7 @@
-// 由原型 v11 的 sprites.js 与 engine.js 生成像素画法的登记表 JSON（工单 #176）。
+// 由原型 v13 的 y13.js、pixel/sprites.js 与 pixel/engine.js 生成像素画法的登记表 JSON（工单 #176、#956）。
 // 原型代码自定稿起不再修改（ADR-0021）；这里只读取，把纯数据的注册表导出为 JSON，
 // 作为客户端的单一事实来源：画法、姿势、动作、位图、配色与图鉴「一项不少」的核对基准都取自这份导出。
+// 从 v13 起 engine.js 不再有事件对照表（EVENT_ACTIONS、resolveAction）：事件翻成动作写在翻译层。
 // 输出：src/renderer/src/pixel/generated/registry.json
 // 用法：node scripts/generate-pixel-registry.mjs
 
@@ -13,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const clientRoot = path.resolve(__dirname, '..');
-const v11Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v11', 'js');
+const v13Root = path.resolve(clientRoot, '..', 'docs', 'prototypes', 'v13', 'js');
 
 // ---------------------------------------------------------------------------
 // 最小的浏览器环境：原型只用 document.createElement('canvas') 与窗口尺寸相关的全局，
@@ -113,17 +114,17 @@ sandbox.self = sandbox;
 sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 
-// 按原型的加载顺序执行（index.html 第 36、48、49 行）：y11.js → sprites.js → engine.js
+// 按原型的加载顺序执行（index.html）：y13.js → sprites.js → engine.js
 for (const [label, file] of [
-  ['y11.js', path.join(v11Root, 'y11.js')],
-  ['sprites.js', path.join(v11Root, 'pixel', 'sprites.js')],
-  ['engine.js', path.join(v11Root, 'pixel', 'engine.js')],
+  ['y13.js', path.join(v13Root, 'y13.js')],
+  ['sprites.js', path.join(v13Root, 'pixel', 'sprites.js')],
+  ['engine.js', path.join(v13Root, 'pixel', 'engine.js')],
 ]) {
   vm.runInContext(readFileSync(file, 'utf8'), sandbox, { filename: label });
 }
 
-const Y11 = sandbox.window.Y11;
-const P = Y11.pixel;
+const Y13 = sandbox.window.Y13;
+const P = Y13.pixel;
 
 // ---------------------------------------------------------------------------
 // 导出：纯数据的注册表 + 公开成员清单。
@@ -134,8 +135,8 @@ const DATA_REGISTRIES = [
   // sprites.js：色板、部门与角色、小人部件、位图、配色与档位
   'PAL', 'CHAR', 'DEPTS', 'SKINS', 'HAIRS', 'ROLE_KINDS', 'ROLE_NAMES', 'ITEM_COLORS', 'ITEM_SHADES',
   'SPRITE_LEVELS', 'BITMAPS',
-  // engine.js：姿势、动作帧序列、事实与动作对照表、3×5 字体、循环画面默认小人
-  'POSES', 'ANIMS', 'ACTIONS', 'BASE_MOTIONS', 'STATUS_ACTIONS', 'EVENT_ACTIONS', 'VIGNETTE_SPRITES', 'FONT3',
+  // engine.js：姿势、动作帧序列、动作说明、3×5 字体、循环画面默认小人
+  'POSES', 'ANIMS', 'ACTIONS', 'BASE_MOTIONS', 'STATUS_ACTIONS', 'VIGNETTE_SPRITES', 'FONT3',
 ];
 
 const functionMembers = Object.keys(P).filter((k) => typeof P[k] === 'function').sort();
@@ -148,15 +149,15 @@ for (const name of DATA_REGISTRIES) {
 }
 
 const out = {
-  generatedFrom: 'docs/prototypes/v11/js/pixel/{sprites.js,engine.js}',
+  generatedFrom: 'docs/prototypes/v13/js/{y13.js,pixel/sprites.js,pixel/engine.js}',
   inventory: {
     functions: functionMembers,
     data: dataMembers,
     all: [...functionMembers, ...dataMembers].sort(),
   },
-  levels: Y11.LEVELS,
-  levelLabels: Y11.LEVEL_LABELS,
-  levelTags: Y11.LEVEL_TAGS,
+  levels: Y13.LEVELS,
+  levelLabels: Y13.LEVEL_LABELS,
+  levelTags: Y13.LEVEL_TAGS,
   charW: P.CHAR_W,
   charH: P.CHAR_H,
   font: P.FONT,

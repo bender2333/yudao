@@ -1,12 +1,12 @@
-// 动作图鉴页（工单 #176 验收标准 1）：列出原型 sprites.js 与 engine.js 的全部公开画法，一项不少。
-// 每个画法都用同一套 TypeScript 画法渲染一张点阵预览（整数倍最近邻放大，像素不模糊），
+// 动作图鉴页（工单 #176 验收标准 1、#956）：列出原型 v13 的 y13.js、sprites.js 与 engine.js 的全部公开画法，
+// 一项不少。每个画法都用同一套 TypeScript 画法渲染一张点阵预览（整数倍最近邻放大，像素不模糊），
 // 与原型逐项对照画风。页面只在开发时使用：路径 #/gallery 不进入正式的页面入口（页签与侧栏）。
 
 import { useEffect, useMemo, useRef } from "react";
 import { GALLERY_MEMBERS, type GalleryMember, type GallerySample } from "../../pixel/gallery-data";
 import { paletteSwatch } from "../../pixel/preview";
 import { sampleDrawing } from "../../pixel/samples";
-import { ACTIONS, BASE_MOTIONS, PIXEL_FONT_STACK, PUBLIC_MEMBERS, ROLE_NAMES, STATUS_ACTIONS } from "../../pixel/registry";
+import { ACTIONS, BASE_MOTIONS, PIXEL_FONT_STACK, PUBLIC_MEMBERS, ROLE_NAMES, registry } from "../../pixel/registry";
 import type { Grid } from "../../pixel/grid";
 
 /** 把点阵画到底图上，按整数倍放大，采样最近邻。 */
@@ -106,7 +106,7 @@ export function GalleryPage(): React.JSX.Element {
       <header className="gallery-head">
         <h1>动作图鉴</h1>
         <p>
-          列出原型 <code>sprites.js</code> 与 <code>engine.js</code> 的全部公开画法，一项不少：
+          列出原型 v13 的 <code>y13.js</code>、<code>sprites.js</code> 与 <code>engine.js</code> 的全部公开画法，一项不少：
           共 <strong>{PUBLIC_MEMBERS.all.length}</strong> 项（函数 {PUBLIC_MEMBERS.functions.length}、
           数据 {PUBLIC_MEMBERS.data.length}）。每项用同一套 TypeScript 画法渲染，画风与原型一致。
         </p>
@@ -151,24 +151,24 @@ export function GalleryPage(): React.JSX.Element {
   );
 }
 
-/** 部门房间与项目楼层里的动作：事件到动作的对照表、状态姿势与基础动作，一项不漏（v8 设计说明第 8.3、8.4 节）。 */
+/** 部门房间与项目楼层里的动作：动作说明、状态姿势与基础动作，一项不漏（v13 设计说明、设计说明第 8.3、8.4 节）。 */
 function ActionGallery(): React.JSX.Element {
   const actions = Object.entries(ACTIONS);
   const motions = Object.entries(BASE_MOTIONS);
-  const statuses = Object.entries(STATUS_ACTIONS);
+  // 原型仍导出 STATUS_ACTIONS，画面 3、4 以后没有画法用它：这里按登记表读，只为图鉴「一项不少」
+  const statuses = Object.entries(registry.registries.STATUS_ACTIONS);
   return (
     <section className="gallery-section">
       <h2>部门房间的动作（{actions.length + motions.length}）</h2>
       <p className="gallery-caption">
-        每项写明驱动它的事实、来源事件、小人动作、房间变化与所属档位；小人的行为由事件驱动（设计说明第 8.3 节）。
-        当前客户端实现全部动作的解析与播放，Stage 4 与 Stage 5 的动作随对应工作包加入画面。
+        每项写明驱动它的事实、小人动作、房间变化与所属档位；每个动作由哪种事件给出写在翻译层（v13 设计说明第 4 节）。
+        当前客户端实现全部动作的播放，Stage 4 与 Stage 5 的动作随对应工作包加入画面。
       </p>
       <table className="gallery-actions">
         <thead>
           <tr>
             <th>动作</th>
             <th>事实</th>
-            <th>来源</th>
             <th>小人动作</th>
             <th>房间变化</th>
             <th>档位</th>
@@ -179,7 +179,6 @@ function ActionGallery(): React.JSX.Element {
             <tr key={name} data-action={name}>
               <td>{a.label}</td>
               <td>{a.fact}</td>
-              <td><code>{a.source}</code></td>
               <td>{a.action}</td>
               <td>{a.room ?? "—"}</td>
               <td>{a.level === "ui" ? "界面工作线" : a.level}</td>
@@ -189,7 +188,6 @@ function ActionGallery(): React.JSX.Element {
             <tr key={name} data-action={name}>
               <td>{m.label}</td>
               <td>{m.fact}</td>
-              <td><code>基础动作</code></td>
               <td>{m.anim}</td>
               <td>—</td>
               <td>界面工作线</td>
