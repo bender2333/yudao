@@ -229,11 +229,12 @@ test("询问与回答：两端的小人各说一句", async () => {
 
 test("工具类与盖章类的说明：小人头顶说出目录里对应的那句话", async () => {
   test.setTimeout(600_000);
-  // 工程房间里读文件、跑登记命令；质检房间里盖章。两处都从真实事件流里取事件，
-  // 房间的读取入口给出小人头顶当前的话，采样收集这一轮里出现过的每一句。
-  // 工单 #319 第 3 项：房间脚本里工程先调用一次 list_files，工具类说明因此有真实来源，
-  // 断言核对的是具体那句话（含工具名与文件名），不只核对开头两个字
-  const collected = async (department: string, pattern: RegExp, description: string): Promise<string[]> => {
+  // 工单 #319 第 3 项、工单 #954 按画面合同改写：房间按播放时间线演动作——关键一级（交接、盖章、询问与回答）
+  // 一定演，普通一级（读文件、跑命令、改文件）在画面落后时按设计丢掉（H8），头顶的进度只保留最近一项。
+  // 所以端到端能稳定核对的是：关键一级的说明就是说话目录里那句；堆积时关键动作一个也不丢、也不被截断。
+  // 工具类那句话的内容（工具名、文件名、命令名）由 tests/unit/pixel-room.test.ts 与
+  // tests/unit/translate-room.test.ts 用真实载荷核对，不在端到端里强制它出现。
+  const collected = async (department: string, pattern: RegExp, description: string): Promise<{ hits: string[]; stats: Record<string, number> }> => {
     backend = await startBackend({ room: true });
     const client = await startClient(backend, { width: 1440, height: 900 });
     const errors = watchErrors(client);
@@ -257,22 +258,33 @@ test("工具类与盖章类的说明：小人头顶说出目录里对应的那�
       if (hits.length === 0) {
         throw new Error(`${description}：房间里出现过的说明是 ${[...seen].join(" / ") || "（一句也没有）"}`);
       }
-      return hits;
+      const timeline = await page.evaluate(() => {
+        const hooks = (window as unknown as { __roomViewForTest?: { timeline: () => { stats: Record<string, number> } } }).__roomViewForTest;
+        return hooks ? hooks.timeline().stats : null;
+      });
+      expect(timeline).not.toBeNull();
+      return { hits, stats: timeline! };
     } finally {
       await client.close();
       await backend.stop();
     }
   };
 
-  // 工程房间：工具类的事件（列出文件、读文件、跑命令）说出工具名
-  for (const line of await collected("engineering", /^现在(看看有什么文件|执行|阅读|编辑|翻找|检查)/,
-                                     "工程房间的工具类说明")) {
-    expect(line).toMatch(/^现在(看看有什么文件|执行|阅读|编辑|翻找|检查)/);
+  // 工程房间：交接的两端与装箱封存都是关键一级，说的话是目录里那句
+  const engineeringRun = await collected("engineering", /^(现在装箱封存|现在把交付箱送给质检|收到PRD，来自产品)/,
+                                        "工程房间的交接口令");
+  for (const line of engineeringRun.hits) {
+    expect(line).toMatch(/^(现在装箱封存|现在把交付箱送给质检|收到PRD，来自产品)$/);
   }
+  // 堆积时普通一级的动作被丢掉，关键一级一个也不丢、正在演的不截断（H9）
+  expect(engineeringRun.stats.droppedKey).toBe(0);
+  expect(engineeringRun.stats.cutKey).toBe(0);
   // 质检房间：盖章类的事件说出盖的是哪一章
-  for (const line of await collected("quality", /^现在盖/, "质检房间的盖章类说明")) {
+  const qualityRun = await collected("quality", /^现在盖/, "质检房间的盖章类说明");
+  for (const line of qualityRun.hits) {
     expect(line).toMatch(/^现在盖(上有效章|放行章|返工章)/);
   }
+  expect(qualityRun.stats.droppedKey).toBe(0);
 });
 
 test("部门页签之间直接切换：每个页签的房间画面属于该部门，页面不出现加载失败", async () => {

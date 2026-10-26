@@ -10,7 +10,6 @@ import { DEPTS, PAL } from "../registry.ts";
 import { drawActor, drawBitmap, drawIcon, drawSign, drawStampMark, drawText, headTop } from "../shapes.ts";
 import { drawSpeeches } from "../floor/render.ts";
 import type { Actor, SceneLike } from "../world/types.ts";
-import { poseAnim } from "./decl.ts";
 import { BASE, BENCH_LABEL, H, L, ROW_A, ROW_B, STATUS_COLOR, STATUS_TEXT, W } from "./layout.ts";
 import type { RoomDriver } from "./driver.ts";
 
@@ -331,5 +330,3 @@ export class RoomRenderer {
     return cv;
   }
 }
-
-export { poseAnim };

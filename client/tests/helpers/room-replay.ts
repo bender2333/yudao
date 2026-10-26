@@ -91,11 +91,23 @@ async function driver(input: { ops: RoomRecording["ops"]; department: string; sa
     const frames = Math.max(1, Math.round(ms / 50));
     for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
   };
+  // 录下的是原型时代的调用形状（setModel 的房间数据与 playEvent 的事件）：
+  // 经翻译层换成画面合同的状态与动作，就是画面上现在走的那条路（画面 7 换录制以后重写这一段）。
+  const T = await import(/* @vite-ignore */ "/src/translate/room.ts" as string) as typeof import("../../src/renderer/src/translate/room.ts");
+  let pos = 0;
   for (let i = 0; i < input.ops.length; i++) {
     const op = input.ops[i];
     if (op.op === "mount" || op.op === "destroy") continue;
-    if (op.op === "setModel") view.setModel(op.arg as never);
-    else if (op.op === "playEvent") view.playEvent(op.arg as never);
+    try {
+      if (op.op === "setModel") view.jump(T.state({ position: ++pos, workspace: { room: op.arg } }));
+      else if (op.op === "playEvent") {
+        const ev = op.arg as Record<string, unknown>;
+        const event = { ...ev, position: typeof ev.position === "number" ? ev.position : ++pos } as never;
+        for (const a of T.actions(event, input.department)) view.play(a);
+      }
+    } catch (e) {
+      errors.push(String((e as Error)?.message ?? e));
+    }
     for (const ms of input.sampleMs) {
       advance(ms);
       samples.push({ after: i, ms, state: snapshot() });

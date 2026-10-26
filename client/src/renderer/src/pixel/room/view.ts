@@ -1,26 +1,37 @@
-// 部门房间的画面对象：画布挂在宿主元素上，提供 setModel、playEvent、resize、destroy、inspect
-// （原型 v10 room.js 的对外接口与设计说明第 1 节，工单 #177）。
+// 部门房间的画面对象：画布挂在宿主元素上，提供 setState、jump、play、stream、resize、destroy、inspect
+// （原型 v13 js/pixel/room.js 的接口与画面与播放设计说明第 3 至 5 节，工单 #954）。
 //
 // 世界的推进（driver.ts）与绘制（render.ts）都不依赖画布与 WebGL；这里只把画好的画布挂到页面上，
 // 画布按设备分辨率绘制（surface.ts：像素尺寸为逻辑尺寸乘整数倍 k，先设缩放再按逻辑坐标绘制，
-// 工单 #365），每帧由共用的时钟驱动。
+// 工单 #365），每帧由共用的时钟驱动。画面时间的加快倍率由驱动的播放时间线给出。
 
 import type { Clock } from "../clock.ts";
 import { createPixelSurface } from "../surface.ts";
 import { createRoomDriver, type RoomDriver } from "./driver.ts";
 import { RoomRenderer } from "./render.ts";
-import { emptyRoomModel, type RoomModel } from "./room.ts";
+import { emptyRoomData } from "./room.ts";
 import { H, W } from "./layout.ts";
-import type { PixelFloorEvent, SceneLike } from "../world/types.ts";
+import type { PixelAction, PixelState } from "../contract.ts";
+import type { SceneLike } from "../world/types.ts";
 
-export type { RoomModel } from "./room.ts";
+export type { RoomData } from "./room.ts";
 
-/** 部门房间画面对象。 */
+/** 流式文字接在哪个角色头上（room 为部门，role 为角色 id、种类或名称）。 */
+export interface RoomStreamWho {
+  room?: string | null;
+  role?: string | null;
+}
+
+/** 部门房间画面对象：只认画面合同（状态、动作）与实时内容（流式文字）。 */
 export interface RoomView {
-  setModel(model: RoomModel): void;
-  playEvent(event: PixelFloorEvent): void;
-  /** 流式输出：把 attempt.live 已收到的文字交给正在做模型请求的角色（设计说明第 6 节）。 */
-  setStreamText(text: string): void;
+  /** 一份状态：等它之前的动作演完再上画面。 */
+  setState(state: PixelState): void;
+  /** 跳到最新：清空时间线，直接显示给出的状态（打开、重新同步、切换部门、标签页切回）。 */
+  jump(state: PixelState): void;
+  /** 一个动作：按位置进入播放时间线。 */
+  play(action: PixelAction): void;
+  /** 实时内容：流式文字，到了就显示，不进时间线。 */
+  stream(who: RoomStreamWho, text: string): void;
   resize(): void;
   destroy(): void;
   /** 画面逻辑尺寸，供宿主与测试读取。 */
@@ -56,7 +67,7 @@ export async function createRoomView(opts: RoomViewOptions): Promise<RoomView> {
     },
   });
   const renderer = new RoomRenderer(driver, driver.scene);
-  driver.setModel(emptyRoomModel(opts.department));
+  driver.jump(emptyRoomData(opts.department));
 
   let last = 0;
 
@@ -69,8 +80,8 @@ export async function createRoomView(opts: RoomViewOptions): Promise<RoomView> {
   const offTick = opts.clock.onTick((elapsed) => {
     const delta = Math.max(0, elapsed - last);
     last = elapsed;
-    driver.scene.stepScene(delta);
-    driver.step();
+    // 推进一帧：画面时间按时间线给出的加快倍率前进，再把本帧新建的补间落到当前时间上
+    driver.step(delta);
     driver.scene.reapply();
     draw();
   });
@@ -88,16 +99,20 @@ export async function createRoomView(opts: RoomViewOptions): Promise<RoomView> {
 
   return {
     size: { W, H },
-    setModel(model) {
-      driver.setModel(model);
+    setState(state) {
+      driver.setState(state);
       draw();
     },
-    playEvent(event) {
-      driver.playEvent(event);
+    jump(state) {
+      driver.jump(state);
       draw();
     },
-    setStreamText(text) {
-      driver.setStreamText(text);
+    play(action) {
+      driver.play(action);
+      draw();
+    },
+    stream(who, text) {
+      driver.stream(who, text);
       draw();
     },
     resize() {
