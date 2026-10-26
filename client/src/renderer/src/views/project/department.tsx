@@ -5,11 +5,13 @@
 // 部门设置弹窗只改部门 Prompt，模型与档位由 #95 加入。标题区与询问的写法按原型 v12 第 3.1、3.3 节（工单 #905）。
 
 import { Fragment, useState } from "react";
+import type { ReactNode } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
   BackgroundCommandView,
   DepartmentWorkspaceResult,
   EventDetailResult,
+  GuidanceRecord,
   ProjectOverviewResult,
   RunActionsResult,
   RunAsksResult,
@@ -447,7 +449,8 @@ function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
   );
 }
 
-// 部门消息与指导：询问一节列出本部门发出与收到的询问；消息日志每条可打开原始事件；指导记录列出状态与回应
+// 部门消息与指导：询问一节列出本部门发出与收到的询问；消息日志每条可打开原始事件；
+// 指导记录列出状态与原文，状态只有三种（已接收、已进入模型输入、已回答，工单 #906）
 function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceResult; command: CommandState }) {
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const data = props.data;
@@ -509,7 +512,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
           </Section>
         </div>
         <div className="y10-ws-col">
-          <Section title="部门指导" note="已接收的指导在下一次安全激活进入模型输入">
+          <GuidanceSection guidance={data.guidance} onOpenEvent={setOpenEvent}>
             {data.work_item_id && hasCommand(props.app, "guidance.send") ? (
               <div className="y10-ws-composer composer">
                 <TextArea label={`向${departmentName(data.department)}下达指导`} value={draft} onInput={setDraft} />
@@ -532,26 +535,45 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
                 {data.work_item_id === null ? "这个范围没有事项，不能发送指导" : "这台主机没有提供发送指导的操作"}
               </p>
             )}
-            {data.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
-              <ul className="y10-ws-guidance guidance-list">
-                {data.guidance.map((record) => (
-                  <li key={record.guidance_id}>
-                    <div className="y10-ws-log-meta input-head">
-                      <strong>{label(GUIDANCE_STATUS, record.status)}</strong>
-                      <span className="y10-code byte-range">第 {record.version} 版</span>
-                      {record.applied_activation_id ? <span className="y10-code byte-range">已用于激活 {record.applied_activation_id}</span> : null}
-                      <button type="button" className="y10-link link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
-                    </div>
-                    <p className="y10-ws-guidance p msg-text">{record.text}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Section>
+          </GuidanceSection>
         </div>
       </div>
       {openEvent ? <EventDetail eventId={openEvent} onClose={() => setOpenEvent(null)} snapshot={detail} /> : null}
     </>
+  );
+}
+
+// 指导一节（原型 v12 设计说明第 3.4 节、工单 #906）：说明写「部门正在工作时，指导在它的下一步作为通知加入；
+// 部门在等待工作时，以这段指导开始一轮工作」。记录只写状态与原文，没有单独一行写部门的回答：
+// 第三种状态「已回答」就是部门的回答，由主机在收到它的那一轮正常结束时写（#1039）。
+// 发送框由调用处作为 children 传进来；这一节自己只认指导记录，单元测试按接口夹具直接渲染它。
+export function GuidanceSection(props: {
+  guidance: GuidanceRecord[];
+  onOpenEvent: (eventId: string) => void;
+  children?: ReactNode;
+}) {
+  return (
+    <Section
+      title="部门指导"
+      note="部门正在工作时，指导在它的下一步作为通知加入；部门在等待工作时，以这段指导开始一轮工作"
+    >
+      {props.children}
+      {props.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
+        <ul className="y10-ws-guidance guidance-list">
+          {props.guidance.map((record) => (
+            <li key={record.guidance_id}>
+              <div className="y10-ws-log-meta input-head">
+                <strong>{label(GUIDANCE_STATUS, record.status)}</strong>
+                <span className="y10-code byte-range">第 {record.version} 版</span>
+                {record.applied_activation_id ? <span className="y10-code byte-range">已用于激活 {record.applied_activation_id}</span> : null}
+                <button type="button" className="y10-link link" onClick={() => props.onOpenEvent(record.created_event_id)}>查看原始事件</button>
+              </div>
+              <p className="y10-ws-guidance p msg-text">{record.text}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Section>
   );
 }
 
