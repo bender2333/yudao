@@ -1,5 +1,5 @@
 {
- "generatedFrom": "docs/prototypes/v10/js/pixel/{floor-decl.js,say.js,ecs.js}",
+ "generatedFrom": "docs/prototypes/v13/js/pixel/{floor-decl.js,say.js,ecs.js}、js/translate/{say.js,translate.js}",
  "rooms": [
   {
    "id": "hall",
@@ -156,29 +156,24 @@
   }
  ],
  "tasks": {
-  "context_assembled": {
+  "gather": {
+   "tier": "progress",
    "label": "整理资料",
-   "spot": "cabinet",
-   "pose": "read_sit",
+   "spot": "desk",
+   "pose": "type",
    "bubble": "say",
    "ms": 900
   },
-  "model_requested": {
+  "think": {
+   "tier": "progress",
    "label": "打字",
    "spot": "desk",
    "pose": "type",
    "bubble": "say",
    "ms": 1400
   },
-  "model_stream_progress": {
-   "label": "",
-   "spot": "desk",
-   "pose": "type",
-   "bubble": "say",
-   "ms": 1,
-   "streaming": true
-  },
-  "model_attempt_finished": {
+  "idea": {
+   "tier": "progress",
    "label": "有想法了",
    "spot": "desk",
    "pose": "sit_happy",
@@ -186,7 +181,8 @@
    "ms": 600,
    "icon": "bulb"
   },
-  "model_retry_scheduled": {
+  "retry": {
+   "tier": "progress",
    "label": "等待重试",
    "spot": "desk",
    "pose": "sit_wait",
@@ -194,7 +190,8 @@
    "ms": 1400,
    "icon": "hourglass"
   },
-  "model_attempt_failed": {
+  "request_failed": {
+   "tier": "normal",
    "label": "失败了",
    "spot": "desk",
    "pose": "slump",
@@ -202,70 +199,88 @@
    "ms": 900,
    "icon": "cross"
   },
-  "tool_started_search": {
+  "search": {
+   "tier": "normal",
    "label": "翻找资料",
    "spot": "cabinet",
    "pose": "magnify",
    "bubble": "say",
    "ms": 1200
   },
-  "tool_started_read": {
+  "read": {
+   "tier": "normal",
    "label": "阅读文件",
    "spot": "cabinet",
    "pose": "read_sit",
    "bubble": "say",
    "ms": 1100
   },
-  "tool_started_write": {
+  "write": {
+   "tier": "normal",
    "label": "编辑",
    "spot": "desk",
    "pose": "type",
    "bubble": "say",
    "ms": 1200
   },
-  "tool_started_run_command": {
-   "label": "执行登记命令",
+  "command": {
+   "tier": "normal",
+   "label": "执行命令",
    "spot": "terminal",
    "pose": "lever",
    "bubble": "say",
    "ms": 1600
   },
-  "tool_started_fetch": {
+  "fetch": {
+   "tier": "normal",
    "label": "网络取回",
    "spot": "port_in",
    "pose": "side_place",
    "bubble": "say",
    "ms": 1200
   },
-  "tool_started_mcp": {
+  "tool": {
+   "tier": "normal",
    "label": "调用工具",
    "spot": "terminal",
    "pose": "lever",
    "bubble": "say",
    "ms": 1200
   },
-  "tool_started_browser": {
+  "browse": {
+   "tier": "normal",
    "label": "试用网页",
    "spot": "desk",
    "pose": "type",
    "bubble": "say",
    "ms": 1400
   },
-  "tool_started_test": {
+  "self_test": {
+   "tier": "normal",
    "label": "自测网页",
    "spot": "desk",
    "pose": "type",
    "bubble": "say",
    "ms": 1400
   },
-  "tool_started_scan": {
+  "scan": {
+   "tier": "normal",
    "label": "阅读旧档案",
    "spot": "cabinet",
    "pose": "read_sit",
    "bubble": "say",
    "ms": 1200
   },
-  "tool_skipped": {
+  "inspect": {
+   "tier": "normal",
+   "label": "放大镜检查",
+   "spot": "inspect",
+   "pose": "magnify",
+   "bubble": "say",
+   "ms": 1200
+  },
+  "tool_denied": {
+   "tier": "normal",
    "label": "工具没有获准",
    "spot": "desk",
    "pose": "sit_scratch",
@@ -273,7 +288,8 @@
    "ms": 700,
    "icon": "cross"
   },
-  "proposal_submitted": {
+  "submit": {
+   "tier": "normal",
    "label": "提交提案",
    "by": "manager",
    "spot": "port_out",
@@ -281,7 +297,8 @@
    "bubble": "say",
    "ms": 900
   },
-  "proposal_rejected": {
+  "rejected": {
+   "tier": "normal",
    "label": "提案被退回",
    "spot": "desk",
    "pose": "sit_scratch",
@@ -289,63 +306,8 @@
    "ms": 900,
    "icon": "question"
   },
-  "spec_accepted": {
-   "label": "盖上有效章",
-   "spot": "desk",
-   "pose": "sit_happy",
-   "bubble": "say",
-   "ms": 800,
-   "icon": "check"
-  },
-  "contract_accepted": {
-   "label": "盖上有效章",
-   "spot": "desk",
-   "pose": "sit_happy",
-   "bubble": "say",
-   "ms": 800,
-   "icon": "check"
-  },
-  "plan_accepted": {
-   "label": "贴上白板",
-   "spot": "cabinet",
-   "pose": "read_sit",
-   "bubble": "say",
-   "ms": 800,
-   "icon": "check"
-  },
-  "delivery_accepted": {
-   "label": "装箱封存",
-   "by": "manager",
-   "spot": "port_out",
-   "pose": "side_place",
-   "bubble": "say",
-   "ms": 900,
-   "icon": "check"
-  },
-  "qa_started": {
-   "label": "放大镜检查",
-   "spot": "inspect",
-   "pose": "magnify",
-   "bubble": "say",
-   "ms": 1200
-  },
-  "qa_submitted_release": {
-   "label": "放行",
-   "spot": "inspect",
-   "pose": "stamp_once",
-   "bubble": "say",
-   "ms": 1100,
-   "icon": "check"
-  },
-  "qa_submitted_rework": {
-   "label": "打回返工",
-   "spot": "inspect",
-   "pose": "stamp_once",
-   "bubble": "say",
-   "ms": 1100,
-   "icon": "exclaim"
-  },
-  "department_guidance_received": {
+  "note_in": {
+   "tier": "normal",
    "label": "门缝塞进纸条",
    "by": "manager",
    "spot": "port_in",
@@ -354,28 +316,32 @@
    "ms": 700,
    "icon": "exclaim"
   },
-  "department_guidance_applied": {
+  "note_read": {
+   "tier": "normal",
    "label": "阅读指导",
    "spot": "cabinet",
    "pose": "read_sit",
    "bubble": "say",
    "ms": 900
   },
-  "department_guidance_responded": {
+  "note_reply": {
+   "tier": "normal",
    "label": "写回复",
    "spot": "desk",
    "pose": "type",
    "bubble": "say",
    "ms": 900
   },
-  "compaction_recorded": {
+  "compact": {
+   "tier": "normal",
    "label": "整理摘要",
    "spot": "cabinet",
    "pose": "sit_up",
    "bubble": "say",
    "ms": 900
   },
-  "compaction_failed": {
+  "compact_fail": {
+   "tier": "normal",
    "label": "重新整理",
    "spot": "desk",
    "pose": "sit_scratch",
@@ -383,7 +349,45 @@
    "ms": 900,
    "icon": "cross"
   },
-  "run_paused": {
+  "stamp_valid": {
+   "tier": "key",
+   "label": "盖上有效章",
+   "spot": "desk",
+   "pose": "sit_happy",
+   "bubble": "say",
+   "ms": 800,
+   "icon": "check"
+  },
+  "seal": {
+   "tier": "key",
+   "label": "装箱封存",
+   "by": "manager",
+   "spot": "port_out",
+   "pose": "side_place",
+   "bubble": "say",
+   "ms": 900,
+   "icon": "check"
+  },
+  "stamp_release": {
+   "tier": "key",
+   "label": "放行",
+   "spot": "inspect",
+   "pose": "stamp_once",
+   "bubble": "say",
+   "ms": 1100,
+   "icon": "check"
+  },
+  "stamp_defect": {
+   "tier": "key",
+   "label": "打回返工",
+   "spot": "inspect",
+   "pose": "stamp_once",
+   "bubble": "say",
+   "ms": 1100,
+   "icon": "exclaim"
+  },
+  "paused": {
+   "tier": "key",
    "label": "事项暂停",
    "spot": "desk",
    "pose": "sit_relax",
@@ -391,7 +395,8 @@
    "ms": 1200,
    "icon": "zzz"
   },
-  "run_failed": {
+  "failed": {
+   "tier": "key",
    "label": "事项失败",
    "spot": "desk",
    "pose": "slump",
@@ -399,35 +404,32 @@
    "ms": 1200,
    "icon": "cross"
   },
-  "run_done": {
+  "done": {
+   "tier": "key",
    "label": "事项完成",
    "spot": "stand",
    "pose": "cheer",
    "bubble": "say",
    "ms": 1200
   },
-  "x_run_stopped_for_upgrade": {
+  "upgrade_stop": {
+   "tier": "key",
    "label": "收拾桌面",
    "spot": "stand",
    "pose": "tidy",
    "bubble": "say",
    "ms": 1200
   },
-  "x_run_auto_resumed": {
-   "label": "伸懒腰",
-   "spot": "desk",
-   "pose": "stretch_sit",
-   "bubble": null,
-   "ms": 800
-  },
-  "x_provider_wait_left": {
+  "model_back": {
+   "tier": "key",
    "label": "模型服务恢复",
    "spot": "desk",
    "pose": "sit_up",
    "bubble": "say",
    "ms": 700
   },
-  "x_auto_repair_stopped": {
+  "repair_stop": {
+   "tier": "key",
    "dept": "operations",
    "label": "停止自动修复",
    "spot": "desk",
@@ -436,7 +438,16 @@
    "ms": 1200,
    "icon": "cross"
   },
+  "stretch": {
+   "part": true,
+   "label": "伸懒腰",
+   "spot": "desk",
+   "pose": "stretch_sit",
+   "bubble": null,
+   "ms": 800
+  },
   "package_handoff_out": {
+   "part": true,
    "label": "放进管道口",
    "by": "manager",
    "spot": "port_out",
@@ -446,6 +457,7 @@
    "facing": 1
   },
   "package_handoff_in": {
+   "part": true,
    "label": "从管道口取出",
    "by": "manager",
    "spot": "port_in",
@@ -455,6 +467,7 @@
    "facing": -1
   },
   "package_return_out": {
+   "part": true,
    "label": "放进回流口",
    "by": "manager",
    "spot": "port_in",
@@ -464,6 +477,7 @@
    "facing": -1
   },
   "package_return_in": {
+   "part": true,
    "label": "从回流口取出",
    "by": "manager",
    "spot": "port_out",
@@ -473,6 +487,7 @@
    "facing": 1
   },
   "letter_out": {
+   "part": true,
    "label": "发出询问",
    "by": "manager",
    "spot": "port_out",
@@ -482,6 +497,7 @@
    "facing": 1
   },
   "letter_in": {
+   "part": true,
    "label": "回答询问",
    "by": "manager",
    "spot": "port_in",
@@ -491,6 +507,7 @@
    "facing": -1
   },
   "letter_arrive_in": {
+   "part": true,
    "label": "收到来信",
    "by": "manager",
    "spot": "port_in",
@@ -500,6 +517,7 @@
    "facing": -1
   },
   "letter_arrive_out": {
+   "part": true,
    "label": "收到来信",
    "by": "manager",
    "spot": "port_out",
@@ -508,43 +526,26 @@
    "ms": 520,
    "facing": 1
   },
-  "x_decision_issued": {
+  "decision_give": {
+   "part": true,
    "label": "现在送出决定单",
    "by": "manager",
    "spot": "door",
    "pose": "give",
    "bubble": "say",
-   "ms": 600,
-   "must": true
+   "ms": 600
   },
-  "project_decision_requested": {
-   "label": "现在送出决定单",
-   "by": "manager",
-   "spot": "door",
-   "pose": "give",
-   "bubble": "say",
-   "ms": 600,
-   "must": true
-  },
-  "x_decision_answered": {
+  "decision_take": {
+   "part": true,
    "label": "收到你的回答",
    "by": "manager",
    "spot": "door",
    "pose": "take",
    "bubble": "say",
-   "ms": 600,
-   "must": true
+   "ms": 600
   },
-  "project_decision_answered": {
-   "label": "收到你的回答",
-   "by": "manager",
-   "spot": "door",
-   "pose": "take",
-   "bubble": "say",
-   "ms": 600,
-   "must": true
-  },
-  "x_role_task_assigned": {
+  "assign": {
+   "tier": "normal",
    "label": "分派任务",
    "actor": "manager",
    "spot": "peer",
@@ -555,13 +556,15 @@
    "then": "role_task_received"
   },
   "role_task_received": {
+   "part": true,
    "label": "收到任务",
    "spot": "desk",
    "pose": "take",
    "bubble": "say",
    "ms": 600
   },
-  "x_role_result_returned": {
+  "hand_back": {
+   "tier": "normal",
    "label": "交回结果",
    "by": "manager",
    "spot": "peer",
@@ -572,13 +575,15 @@
    "then": "role_result_received"
   },
   "role_result_received": {
+   "part": true,
    "label": "收到结果",
    "spot": "desk",
    "pose": "take",
    "bubble": "say",
    "ms": 600
   },
-  "x_review_recorded_passed": {
+  "review_pass": {
+   "tier": "normal",
    "label": "审查通过",
    "spot": "desk",
    "pose": "stamp_once",
@@ -586,7 +591,8 @@
    "ms": 1100,
    "icon": "check"
   },
-  "x_review_recorded_returned": {
+  "review_return": {
+   "tier": "normal",
    "label": "审查退回",
    "spot": "desk",
    "pose": "stamp_once",
@@ -594,16 +600,17 @@
    "ms": 1100,
    "icon": "exclaim"
   },
-  "x_explorer_fetch": {
+  "explore": {
+   "tier": "normal",
    "label": "查资料",
    "spot": "cabinet",
    "pose": "rummage",
    "bubble": "say",
    "ms": 1400
   },
-  "x_deployed": {
+  "deploy": {
+   "tier": "key",
    "dept": "operations",
-   "must": true,
    "label": "发布",
    "spot": "port_out",
    "pose": "side_place",
@@ -626,9 +633,9 @@
     }
    ]
   },
-  "x_rolled_back": {
+  "rollback": {
+   "tier": "key",
    "dept": "operations",
-   "must": true,
    "label": "回滚",
    "spot": "port_out",
    "pose": "side_place",
@@ -655,9 +662,9 @@
     }
    ]
   },
-  "x_fault_recorded": {
+  "fault": {
+   "tier": "key",
    "dept": "operations",
-   "must": true,
    "label": "发现故障",
    "spot": "monitor",
    "pose": "watch_r",
@@ -728,6 +735,286 @@
    "idle": true
   }
  },
+ "effects": {
+  "handoff": {
+   "tier": "key",
+   "ms": 1800
+  },
+  "letter": {
+   "tier": "key",
+   "ms": 1800
+  },
+  "decision_out": {
+   "tier": "key",
+   "ms": 1600
+  },
+  "decision_back": {
+   "tier": "key",
+   "ms": 1600
+  },
+  "adopt": {
+   "tier": "key",
+   "ms": 1800
+  },
+  "parcel_enter": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "resume": {
+   "tier": "key",
+   "ms": 800
+  },
+  "model_wait": {
+   "tier": "key",
+   "ms": 900
+  },
+  "mail": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "parcel_in": {
+   "tier": "normal",
+   "ms": 700
+  },
+  "queue_moved": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "room_light": {
+   "tier": "normal",
+   "ms": 700
+  },
+  "unsure": {
+   "tier": "normal",
+   "ms": 1400
+  },
+  "remote": {
+   "tier": "normal",
+   "ms": 1400
+  }
+ },
+ "kinds": {
+  "gather": {
+   "tier": "progress",
+   "ms": 900
+  },
+  "think": {
+   "tier": "progress",
+   "ms": 1400
+  },
+  "idea": {
+   "tier": "progress",
+   "ms": 600
+  },
+  "retry": {
+   "tier": "progress",
+   "ms": 1400
+  },
+  "request_failed": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "search": {
+   "tier": "normal",
+   "ms": 1200
+  },
+  "read": {
+   "tier": "normal",
+   "ms": 1100
+  },
+  "write": {
+   "tier": "normal",
+   "ms": 1200
+  },
+  "command": {
+   "tier": "normal",
+   "ms": 1600
+  },
+  "fetch": {
+   "tier": "normal",
+   "ms": 1200
+  },
+  "tool": {
+   "tier": "normal",
+   "ms": 1200
+  },
+  "browse": {
+   "tier": "normal",
+   "ms": 1400
+  },
+  "self_test": {
+   "tier": "normal",
+   "ms": 1400
+  },
+  "scan": {
+   "tier": "normal",
+   "ms": 1200
+  },
+  "inspect": {
+   "tier": "normal",
+   "ms": 1200
+  },
+  "tool_denied": {
+   "tier": "normal",
+   "ms": 700
+  },
+  "submit": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "rejected": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "note_in": {
+   "tier": "normal",
+   "ms": 700
+  },
+  "note_read": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "note_reply": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "compact": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "compact_fail": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "stamp_valid": {
+   "tier": "key",
+   "ms": 800
+  },
+  "seal": {
+   "tier": "key",
+   "ms": 900
+  },
+  "stamp_release": {
+   "tier": "key",
+   "ms": 1100
+  },
+  "stamp_defect": {
+   "tier": "key",
+   "ms": 1100
+  },
+  "paused": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "failed": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "done": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "upgrade_stop": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "model_back": {
+   "tier": "key",
+   "ms": 700
+  },
+  "repair_stop": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "assign": {
+   "tier": "normal",
+   "ms": 700
+  },
+  "hand_back": {
+   "tier": "normal",
+   "ms": 600
+  },
+  "review_pass": {
+   "tier": "normal",
+   "ms": 1100
+  },
+  "review_return": {
+   "tier": "normal",
+   "ms": 1100
+  },
+  "explore": {
+   "tier": "normal",
+   "ms": 1400
+  },
+  "deploy": {
+   "tier": "key",
+   "ms": 700
+  },
+  "rollback": {
+   "tier": "key",
+   "ms": 700
+  },
+  "fault": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "handoff": {
+   "tier": "key",
+   "ms": 1800
+  },
+  "letter": {
+   "tier": "key",
+   "ms": 1800
+  },
+  "decision_out": {
+   "tier": "key",
+   "ms": 1600
+  },
+  "decision_back": {
+   "tier": "key",
+   "ms": 1600
+  },
+  "adopt": {
+   "tier": "key",
+   "ms": 1800
+  },
+  "parcel_enter": {
+   "tier": "key",
+   "ms": 1200
+  },
+  "resume": {
+   "tier": "key",
+   "ms": 800
+  },
+  "model_wait": {
+   "tier": "key",
+   "ms": 900
+  },
+  "mail": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "parcel_in": {
+   "tier": "normal",
+   "ms": 700
+  },
+  "queue_moved": {
+   "tier": "normal",
+   "ms": 900
+  },
+  "room_light": {
+   "tier": "normal",
+   "ms": 700
+  },
+  "unsure": {
+   "tier": "normal",
+   "ms": 1400
+  },
+  "remote": {
+   "tier": "normal",
+   "ms": 1400
+  }
+ },
  "idle": [
   {
    "key": "idle_stretch_seat",
@@ -757,9 +1044,6 @@
   "ops"
  ],
  "sayCatalog": [
-  "collaboration_closed",
-  "collaboration_requested",
-  "collaboration_responded",
   "compaction_failed",
   "compaction_recorded",
   "context_assembled",
@@ -774,13 +1058,10 @@
   "model_request_serialized",
   "model_requested",
   "model_retry_scheduled",
-  "model_stream_progress",
-  "plan_accepted",
   "project_decision_answered",
   "project_decision_requested",
   "proposal_rejected",
   "proposal_submitted",
-  "qa_started",
   "qa_submitted",
   "run_done",
   "run_failed",
@@ -789,9 +1070,7 @@
   "tool_called",
   "tool_skipped",
   "tool_started",
-  "transition",
   "x_action_unknown",
-  "x_backup_taken",
   "x_decision_answered",
   "x_decision_issued",
   "x_deployed",
@@ -809,18 +1088,359 @@
   "x_role_task_assigned",
   "x_rolled_back",
   "x_run_auto_resumed",
-  "x_run_interrupted",
   "x_run_stopped_for_upgrade",
   "x_semantic_recorded",
   "x_trial_step"
  ],
+ "coverage": {
+  "floor": {
+   "drawn": [
+    "user_input_received",
+    "work_item_created",
+    "department_activated",
+    "context_assembled",
+    "model_requested",
+    "model_request_serialized",
+    "model_attempt_finished",
+    "model_retry_scheduled",
+    "model_attempt_failed",
+    "tool_started",
+    "tool_skipped",
+    "proposal_submitted",
+    "proposal_rejected",
+    "spec_accepted",
+    "contract_accepted",
+    "delivery_accepted",
+    "structure_accepted",
+    "qa_submitted",
+    "ask_started",
+    "ask_answered",
+    "department_guidance_received",
+    "department_guidance_applied",
+    "department_guidance_responded",
+    "compaction_recorded",
+    "compaction_failed",
+    "run_paused",
+    "run_failed",
+    "run_done",
+    "deliverable_adopted",
+    "baseline_adopted",
+    "x_decision_issued",
+    "project_decision_requested",
+    "x_decision_answered",
+    "project_decision_answered",
+    "x_run_auto_resumed",
+    "x_action_unknown",
+    "x_remote_action_started",
+    "x_remote_action_finished",
+    "x_late_receipt",
+    "x_queued",
+    "x_repair_created",
+    "x_slot_acquired",
+    "x_queue_reordered",
+    "x_provider_wait_entered",
+    "x_provider_wait_left",
+    "x_run_stopped_for_upgrade",
+    "x_auto_repair_stopped",
+    "x_deployed",
+    "x_rolled_back",
+    "x_fault_recorded",
+    "x_role_task_assigned",
+    "x_role_result_returned",
+    "x_review_recorded",
+    "x_explorer_fetch"
+   ],
+   "realtime": [
+    "model_stream_progress"
+   ],
+   "none": {
+    "project_registered": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_renamed": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_pinned": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_archived": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_restored": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "material_recorded": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "department_prompt_configured": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "project_goal_changed": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_home_seen": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_department_settings_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_source_directory_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_machine_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_machine_authorization_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "execution_placement_configured": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_role_settings_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_slots_set": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "catalog_revised": "模型目录的变化，不属于项目的画面",
+    "catalog_candidates_collected": "模型目录的变化，不属于项目的画面",
+    "catalog_test_finished": "模型目录的变化，不属于项目的画面",
+    "credential_changed": "模型目录的变化，不属于项目的画面",
+    "x_scenario_setup": "原型场景的准备，不推送",
+    "writeback_completed": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_verified": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_stopped": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_held": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_not_needed": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "onboarding_revision_started": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "action_verified": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_drain_started": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_upgrade_forced": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_evidence_checked": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_check_in": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_backup_taken": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "run_created": "由状态表示，没有一次性的动作（事项出现、重新计时）",
+    "x_wait_restarted": "由状态表示，没有一次性的动作（事项出现、重新计时）",
+    "x_decision_withdrawn": "撤回的决定请求从实时的决定卡片里去掉",
+    "project_decision_withdrawn": "撤回的决定请求从实时的决定卡片里去掉",
+    "x_run_interrupted": "由状态表示，没有一次性的动作：整层变暗、时钟停住、管道停止",
+    "tool_called": "由状态表示，没有一次性的动作：工具结束、机器上下线、取消排队、修复失败与建档的提案与审查在楼层上没有一次性的动作（门上的问号、包裹离开队列由状态给出）",
+    "x_machine_offline": "由状态表示，没有一次性的动作：工具结束、机器上下线、取消排队、修复失败与建档的提案与审查在楼层上没有一次性的动作（门上的问号、包裹离开队列由状态给出）",
+    "x_machine_online": "由状态表示，没有一次性的动作：工具结束、机器上下线、取消排队、修复失败与建档的提案与审查在楼层上没有一次性的动作（门上的问号、包裹离开队列由状态给出）",
+    "x_queue_cancelled": "由状态表示，没有一次性的动作：工具结束、机器上下线、取消排队、修复失败与建档的提案与审查在楼层上没有一次性的动作（门上的问号、包裹离开队列由状态给出）",
+    "x_repair_failed": "由状态表示，没有一次性的动作：工具结束、机器上下线、取消排队、修复失败与建档的提案与审查在楼层上没有一次性的动作（门上的问号、包裹离开队列由状态给出）",
+    "baseline_review_accepted": "由状态表示，没有一次性的动作：工具结束、机器上下线、取消排队、修复失败与建档的提案与审查在楼层上没有一次性的动作（门上的问号、包裹离开队列由状态给出）",
+    "initial_prd_proposed": "由状态表示，没有一次性的动作：工具结束、机器上下线、取消排队、修复失败与建档的提案与审查在楼层上没有一次性的动作（门上的问号、包裹离开队列由状态给出）",
+    "x_network_fetch": "部门内部的细节只在部门房间里演（邮筒、工具面板、试用台、白板、语义记录柜），楼层上没有这些陈设",
+    "x_mcp_called": "部门内部的细节只在部门房间里演（邮筒、工具面板、试用台、白板、语义记录柜），楼层上没有这些陈设",
+    "x_trial_step": "部门内部的细节只在部门房间里演（邮筒、工具面板、试用台、白板、语义记录柜），楼层上没有这些陈设",
+    "x_replanned": "部门内部的细节只在部门房间里演（邮筒、工具面板、试用台、白板、语义记录柜），楼层上没有这些陈设",
+    "x_semantic_recorded": "部门内部的细节只在部门房间里演（邮筒、工具面板、试用台、白板、语义记录柜），楼层上没有这些陈设"
+   }
+  },
+  "room": {
+   "drawn": [
+    "department_activated",
+    "context_assembled",
+    "model_requested",
+    "model_request_serialized",
+    "model_attempt_finished",
+    "model_retry_scheduled",
+    "model_attempt_failed",
+    "tool_started",
+    "tool_called",
+    "tool_skipped",
+    "proposal_submitted",
+    "proposal_rejected",
+    "spec_accepted",
+    "contract_accepted",
+    "delivery_accepted",
+    "structure_accepted",
+    "qa_submitted",
+    "ask_started",
+    "ask_answered",
+    "department_guidance_received",
+    "department_guidance_applied",
+    "department_guidance_responded",
+    "compaction_recorded",
+    "compaction_failed",
+    "run_paused",
+    "run_failed",
+    "run_done",
+    "x_run_auto_resumed",
+    "x_action_unknown",
+    "x_decision_issued",
+    "x_remote_action_started",
+    "x_machine_offline",
+    "x_network_fetch",
+    "x_mcp_called",
+    "x_trial_step",
+    "x_deployed",
+    "x_rolled_back",
+    "x_fault_recorded",
+    "x_provider_wait_entered",
+    "x_role_task_assigned",
+    "x_role_result_returned",
+    "x_review_recorded",
+    "x_explorer_fetch",
+    "x_replanned",
+    "x_semantic_recorded"
+   ],
+   "realtime": [
+    "model_stream_progress"
+   ],
+   "none": {
+    "project_registered": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_renamed": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_pinned": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_archived": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_restored": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "material_recorded": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "department_prompt_configured": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "project_goal_changed": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_home_seen": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_department_settings_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_source_directory_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_machine_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_machine_authorization_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "execution_placement_configured": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_role_settings_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_slots_set": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "catalog_revised": "模型目录的变化，不属于项目的画面",
+    "catalog_candidates_collected": "模型目录的变化，不属于项目的画面",
+    "catalog_test_finished": "模型目录的变化，不属于项目的画面",
+    "credential_changed": "模型目录的变化，不属于项目的画面",
+    "x_scenario_setup": "原型场景的准备，不推送",
+    "writeback_completed": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_verified": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_stopped": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_held": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_not_needed": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "onboarding_revision_started": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "action_verified": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_drain_started": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_upgrade_forced": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_evidence_checked": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_check_in": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_backup_taken": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "run_created": "由状态表示，没有一次性的动作（事项出现、重新计时）",
+    "x_wait_restarted": "由状态表示，没有一次性的动作（事项出现、重新计时）",
+    "x_decision_withdrawn": "撤回的决定请求从实时的决定卡片里去掉",
+    "project_decision_withdrawn": "撤回的决定请求从实时的决定卡片里去掉",
+    "x_run_interrupted": "由状态表示，没有一次性的动作：中断时灯灭、时钟停住；因升级停止时门口立牌",
+    "x_run_stopped_for_upgrade": "由状态表示，没有一次性的动作：中断时灯灭、时钟停住；因升级停止时门口立牌",
+    "user_input_received": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "work_item_created": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "deliverable_adopted": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "baseline_adopted": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_queued": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_slot_acquired": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_queue_cancelled": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_queue_reordered": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_repair_created": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_repair_failed": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_auto_repair_stopped": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "initial_prd_proposed": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "baseline_review_accepted": "发生在大厅、成果库或运维的修复流程里，部门房间里没有对应物（楼层上画）",
+    "x_decision_answered": "由状态表示，没有一次性的动作：决定单在楼层大厅的板上来回；等待结束、远程动作结束与机器恢复由下一份状态给出（灯亮起、终端回到平常）",
+    "project_decision_requested": "由状态表示，没有一次性的动作：决定单在楼层大厅的板上来回；等待结束、远程动作结束与机器恢复由下一份状态给出（灯亮起、终端回到平常）",
+    "project_decision_answered": "由状态表示，没有一次性的动作：决定单在楼层大厅的板上来回；等待结束、远程动作结束与机器恢复由下一份状态给出（灯亮起、终端回到平常）",
+    "x_provider_wait_left": "由状态表示，没有一次性的动作：决定单在楼层大厅的板上来回；等待结束、远程动作结束与机器恢复由下一份状态给出（灯亮起、终端回到平常）",
+    "x_remote_action_finished": "由状态表示，没有一次性的动作：决定单在楼层大厅的板上来回；等待结束、远程动作结束与机器恢复由下一份状态给出（灯亮起、终端回到平常）",
+    "x_late_receipt": "由状态表示，没有一次性的动作：决定单在楼层大厅的板上来回；等待结束、远程动作结束与机器恢复由下一份状态给出（灯亮起、终端回到平常）",
+    "x_machine_online": "由状态表示，没有一次性的动作：决定单在楼层大厅的板上来回；等待结束、远程动作结束与机器恢复由下一份状态给出（灯亮起、终端回到平常）"
+   }
+  },
+  "building": {
+   "drawn": [
+    "department_activated",
+    "qa_submitted",
+    "ask_started",
+    "ask_answered",
+    "deliverable_adopted",
+    "baseline_adopted",
+    "x_decision_issued",
+    "x_decision_answered",
+    "project_decision_requested",
+    "project_decision_answered",
+    "x_provider_wait_entered",
+    "x_provider_wait_left",
+    "x_repair_created",
+    "x_repair_failed",
+    "x_auto_repair_stopped",
+    "x_machine_offline",
+    "x_machine_online",
+    "x_action_unknown",
+    "x_late_receipt",
+    "x_remote_action_started",
+    "x_remote_action_finished",
+    "x_deployed",
+    "x_rolled_back",
+    "x_fault_recorded"
+   ],
+   "realtime": [],
+   "none": {
+    "project_registered": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_renamed": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_pinned": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_archived": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "project_restored": "项目的登记、改名、置顶、归档与恢复：楼的层数、名牌与顺序由状态给出",
+    "material_recorded": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "department_prompt_configured": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "project_goal_changed": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_home_seen": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_department_settings_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_source_directory_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_machine_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_machine_authorization_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "execution_placement_configured": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_role_settings_saved": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "x_slots_set": "设置与登记的修改，画面里没有对应物；改变了的事实由下一份状态给出",
+    "catalog_revised": "模型目录的变化，不属于项目的画面",
+    "catalog_candidates_collected": "模型目录的变化，不属于项目的画面",
+    "catalog_test_finished": "模型目录的变化，不属于项目的画面",
+    "credential_changed": "模型目录的变化，不属于项目的画面",
+    "x_scenario_setup": "原型场景的准备，不推送",
+    "writeback_completed": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_verified": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_stopped": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_held": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "writeback_not_needed": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "onboarding_revision_started": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "action_verified": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_drain_started": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_upgrade_forced": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_evidence_checked": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_check_in": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "x_backup_taken": "只在页面文字里（资料、恢复页、设置页、写回记录），画面里没有对应物",
+    "run_created": "由状态表示，没有一次性的动作（事项出现、重新计时）",
+    "x_wait_restarted": "由状态表示，没有一次性的动作（事项出现、重新计时）",
+    "x_decision_withdrawn": "撤回的决定请求从实时的决定卡片里去掉",
+    "project_decision_withdrawn": "撤回的决定请求从实时的决定卡片里去掉",
+    "x_run_interrupted": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "x_run_auto_resumed": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "x_run_stopped_for_upgrade": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "x_queue_cancelled": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "x_queued": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "x_slot_acquired": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "x_queue_reordered": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "user_input_received": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "work_item_created": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "tool_called": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "baseline_review_accepted": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "initial_prd_proposed": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "spec_accepted": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "contract_accepted": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "delivery_accepted": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "structure_accepted": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "run_paused": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "run_failed": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "run_done": "由状态表示，没有一次性的动作：楼里每层只画状态灯、亮灯的房间、小旗与阀门，只在关键事实上闪一下（交接由接收的部门亮灯表示）",
+    "context_assembled": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "model_requested": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "model_request_serialized": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "model_stream_progress": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "model_attempt_finished": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "model_retry_scheduled": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "model_attempt_failed": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "tool_started": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "tool_skipped": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "proposal_submitted": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "proposal_rejected": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "department_guidance_received": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "department_guidance_applied": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "department_guidance_responded": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "compaction_recorded": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "compaction_failed": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_network_fetch": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_mcp_called": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_trial_step": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_role_task_assigned": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_role_result_returned": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_review_recorded": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_explorer_fetch": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_replanned": "部门里的进度与细节：楼太小，只看哪个房间亮灯",
+    "x_semantic_recorded": "部门里的进度与细节：楼太小，只看哪个房间亮灯"
+   }
+  }
+ },
  "eventActions": [
-  "collaboration_requested",
-  "collaboration_responded",
+  "ask_answered",
+  "ask_started",
+  "baseline_adopted",
   "compaction_failed",
   "compaction_recorded",
   "context_assembled",
   "contract_accepted",
+  "deliverable_adopted",
   "delivery_accepted",
   "department_activated",
   "department_guidance_applied",
@@ -831,8 +1451,8 @@
   "model_request_serialized",
   "model_requested",
   "model_retry_scheduled",
-  "model_stream_progress",
-  "plan_accepted",
+  "project_decision_answered",
+  "project_decision_requested",
   "proposal_rejected",
   "proposal_submitted",
   "qa_submitted",
@@ -840,28 +1460,41 @@
   "run_failed",
   "run_paused",
   "spec_accepted",
+  "structure_accepted",
   "tool_called",
   "tool_skipped",
   "tool_started",
+  "user_input_received",
+  "work_item_created",
   "x_action_unknown",
+  "x_auto_repair_stopped",
   "x_decision_answered",
   "x_decision_issued",
   "x_deployed",
   "x_explorer_fetch",
   "x_fault_recorded",
+  "x_late_receipt",
   "x_machine_offline",
+  "x_machine_online",
   "x_mcp_called",
   "x_network_fetch",
   "x_provider_wait_entered",
+  "x_provider_wait_left",
+  "x_queue_reordered",
+  "x_queued",
+  "x_remote_action_finished",
   "x_remote_action_started",
+  "x_repair_created",
+  "x_repair_failed",
   "x_replanned",
   "x_review_recorded",
   "x_role_result_returned",
   "x_role_task_assigned",
   "x_rolled_back",
   "x_run_auto_resumed",
-  "x_run_interrupted",
+  "x_run_stopped_for_upgrade",
   "x_semantic_recorded",
+  "x_slot_acquired",
   "x_trial_step"
  ],
  "geo": {
@@ -888,11 +1521,11 @@
   "idle",
   "label",
   "ms",
-  "must",
+  "part",
   "pose",
   "spot",
-  "streaming",
   "then",
+  "tier",
   "toward"
  ],
  "idleKeys": [

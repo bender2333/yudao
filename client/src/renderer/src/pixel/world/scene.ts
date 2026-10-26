@@ -306,6 +306,7 @@ export function syncCharacters(
           seatIndex: i,
           queue: [],
           current: null,
+          progress: null,
           rest: null,
           bubble: null,
           item: null,

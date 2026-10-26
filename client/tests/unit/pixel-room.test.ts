@@ -12,7 +12,8 @@ import { createRoomDriver } from "../../src/renderer/src/pixel/room/driver.ts";
 import { emptyRoomModel, letterSides, quoted } from "../../src/renderer/src/pixel/room/room.ts";
 import { layoutDesks, poseAnim, resolveAction, spriteForRole, toolSpot } from "../../src/renderer/src/pixel/room/decl.ts";
 import { say, sayMs } from "../../src/renderer/src/pixel/world/say.ts";
-import { eventActionTypes, sayCatalogTypes } from "../../src/renderer/src/pixel/world/floor-decl.ts";
+import { sayCatalogTypes } from "../../src/renderer/src/pixel/world/floor-decl.ts";
+import { COVERAGE } from "../../src/renderer/src/translate/coverage.ts";
 import type { RoomModel } from "../../src/renderer/src/pixel/room/room.ts";
 import type { RoomRole } from "../../src/renderer/src/pixel/room/layout.ts";
 import type { PixelFloorEvent } from "../../src/renderer/src/pixel/world/types.ts";
@@ -108,7 +109,11 @@ test("房间：工具种类对应房间里的位置", () => {
 // 说话气泡（部门房间）
 
 test("说话气泡：目录里每个会引起动作的事件类型都在说话目录里", () => {
-  const missing = eventActionTypes.filter((k) => !sayCatalogTypes.includes(k));
+  // 原型 v13 的同一条检查（checks/behaviors.js）：房间里翻成动作的每种事件，话在目录里或者由翻译层单独写。
+  // 真实系统里新增的几种事件（原型里是 x_ 开头的名字）由翻译层按事件说明写（工单 #953）。
+  const silent = ["model_stream_progress", "structure_accepted", "ask_started", "ask_answered",
+    "run_resumed", "run_continued", "product_decision_accepted", "decision_requested", "decision_answered"];
+  const missing = COVERAGE.room.drawn.filter((k) => !silent.includes(k) && !sayCatalogTypes.includes(k));
   assert.deepEqual(missing, [], `说话目录缺少：${missing.join(",")}`);
 });
 

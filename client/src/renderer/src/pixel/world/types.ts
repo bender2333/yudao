@@ -1,8 +1,11 @@
-// 项目楼层的世界与系统的数据形状（原型 v10 设计说明第 3 至 6 节，工单 #82）。
+// 项目楼层的世界与系统的数据形状（原型 v13 design.md 第 3 至 6 节，工单 #82、#953）。
 // 这里只放类型：实体、组件、任务目录、待机活动、信号与画面数据。
 // 世界与系统不依赖渲染与 PixiJS，可以直接在 node --test 下驱动。
+//
+// 楼层的数据形状就是画面合同的楼层状态（pixel/contract.ts 的 FloorState）加上画面上还要用的几个字段
+// （执行槽位、运维、机器、决定卡片）：世界与系统不导入 api/generated 里的服务端类型（工单 #953）。
 
-import type { WorkItemProgress } from "../../api/generated/types.gen.ts";
+import type { FloorItem, FloorState, RoleState } from "../contract.ts";
 
 /** 任务里的命名位置（原型 floor-decl.js 的 spot 字段）。 */
 export type SpotKind =
@@ -27,8 +30,12 @@ export interface TaskFx {
   send?: { link: string; bmp: string; color?: string; reverse?: boolean; then?: TaskFx[] };
 }
 
-/** 任务目录里的一项（原型 floor-decl.js 的 TASKS）。 */
+/** 任务目录里的一项（原型 v13 floor-decl.js 的 TASKS；键就是画面的动作种类）。 */
 export interface TaskDef {
+  /** 动作的级别：关键、普通、进度（画面与播放设计说明第 5.1 节）。 */
+  tier?: "key" | "normal" | "progress";
+  /** 为真时是一个动作里的一步（交接的放下与取出、传信、决定单的送出与收下、分派与交回），不单独作为动作。 */
+  part?: boolean;
   label: string;
   spot: SpotKind;
   pose: string;
@@ -47,10 +54,6 @@ export interface TaskDef {
   then?: string;
   /** spot 为 'dept' 时由哪个部门做（事件没有部门字段时用）。 */
   dept?: string;
-  /** 不会被队列上限挤掉，也不会被插队放弃。 */
-  must?: boolean;
-  /** 流式输出：文字接在正在做的模型请求上。 */
-  streaming?: boolean;
   /** 待机活动。 */
   idle?: boolean;
   fx?: TaskFx[];
@@ -76,6 +79,11 @@ export interface Character {
   spot: { x: number; y: number };
   queue: Task[];
   current: Task | null;
+  /**
+   * 进度一级的动作合并成的持续姿势（原型 v13 ecs.js 的 ch.progress）：不排队，到达就换上，
+   * 没有任务在做时取代持续状态；until 过后不再保持。
+   */
+  progress: Task | null;
   rest: RestState | null;
   bubble: Bubble | null;
   /** 本次快照对应的主事项（渲染用）。 */
@@ -100,6 +108,8 @@ export interface Goal {
   /** 任务自带的坐标（spot 为 'at' 时）。 */
   at?: { x: number; y: number };
   idle?: boolean;
+  /** 进度动作的姿势保持到什么时候（毫秒）；只在进度动作上有。 */
+  until?: number;
 }
 
 /** 持续状态：形状与任务相同，只在没有任务在做时生效。 */
@@ -113,7 +123,9 @@ export interface Task extends Omit<TaskDef, "spot" | "pose" | "label" | "facing"
   pose: string;
   withId?: string;
   workItemId?: string | null;
-  streaming?: boolean;
+  /** 这个任务属于播放时间线上的哪一个动作（立刻结束这个动作时按它清掉队列里的步骤）。 */
+  actionId?: number;
+  /** 头顶的气泡是流式文字（气泡带一个小尾巴）。 */
   streamed?: boolean;
   /** 到达位置的时刻（毫秒）；走路的时间不算在动作里。 */
   _t0: number | null;
@@ -130,6 +142,8 @@ export interface Package {
   workItemId: string | null;
   colorIndex: number | null;
   artifact: string | null;
+  /** 这个包裹属于播放时间线上的哪一个动作（立刻结束这个动作时一起清掉）。 */
+  actionId?: number;
   /** 画出这个包裹所用的位图与颜色（画面在生成时写上）。 */
   bmp?: string;
   color?: string | null;
@@ -275,7 +289,8 @@ export interface World {
 export interface Catalog {
   tasks: Record<string, TaskDef>;
   idle: IdleDef[];
-  keyOf: (event: Pick<PixelFloorEvent, "type" | "department" | "tool" | "payload">) => string;
+  /** 画面上认的动作种类：级别与声明时长（原型 v13 floor-decl.js 的 KINDS，来自 TASKS 与 EFFECTS）。 */
+  kinds: Record<string, { tier: "key" | "normal" | "progress"; ms: number }>;
   /** 部门声明（运维房间的声明也在这里）。 */
   roomDefs: RoomDef[];
   linkDefs: LinkDef[];
@@ -327,44 +342,44 @@ export interface Bubble {
 }
 
 // ---------------------------------------------------------------------------
-// 画面数据：setModel 传入的项目楼层数据（查询 project.loop 的结果加上部门角色列表与决定请求）
+// 画面数据：楼层驱动拿到的画面合同的楼层状态（pixel/contract.ts 的 FloorState）加上画面要用的几个字段。
+// 服务端的说法（状态词、查询名与事件种类）只出现在翻译层（translate/floor.ts），这里只有画面的说法。
 
 export interface RoleInfo {
   id: string;
   name: string;
   kind: string;
-  status: string;
+  /** 角色的状态（画面合同的取值，翻译层翻好）。 */
+  status: RoleState;
   task?: string | null;
 }
 
-export interface LoopItem {
+/**
+ * 楼层上的一个事项：画面合同的事项（id、状态、各部门在这个事项上的状态、来源）加上画面上还要画的几个字段
+ * （标题、颜色、轮次与用时）。状态是画面合同的取值（working、waiting_model 等），不是服务端的说法。
+ */
+export interface LoopItem extends FloorItem {
+  /** 事项的标识；画面上按它找包裹与队列位置（与 id 相同）。 */
   work_item_id: string;
   kind: string;
   sign: string;
   color_index: number;
-  status: string;
   department: string | null;
-  // 事项的进度：从成果推算（循环结构第 2 节、工单 #556）
-  progress: WorkItemProgress | null;
   round: number;
-  started_at: string | null;
+  started_at?: string | null;
   elapsed_sec: number | null;
   time_limit_sec: number;
-  pending_question: string | null;
-  run_id: string;
-  adoption_id: string | null;
-  recovery_state: string | null;
-  version: number;
-  /** 画面的附加字段：排队位置与剩余时间与停止原因的说明（原型示例数据里有）。 */
+  /** 排队位置与等待模型服务的时间（原型示例数据里有）。 */
   queue_pos?: number;
   waiting_provider_sec?: number;
   url?: string;
-  [key: string]: unknown;
 }
 
 export interface WaitingProvider {
   department: string;
-  next_retry_at: string | null;
+  /** 已经写好的重试文字（例如「12:30 重试」）。 */
+  retry_text: string | null;
+  work_item_id?: string | null;
 }
 
 export interface OpenRequest {
@@ -373,7 +388,7 @@ export interface OpenRequest {
   work_item_id: string;
 }
 
-/** 决定请求在画面上的内容（原型 Y10.cards.face 的纯文字版本，与页面卡片同一份材料，工单 #179）。 */
+/** 决定请求在画面上的内容（原型 Y13.cards.face 的纯文字版本，与页面卡片同一份材料，工单 #179；#953 由翻译层写好）。 */
 export interface DecisionFace {
   id: string;
   kind: string;
@@ -385,7 +400,14 @@ export interface DecisionFace {
   blocks: string;
   rows: { term: string; value: string }[];
   links: { label: string; href: string }[];
-  options: { id: string; label: string; kind?: string | null; note_required?: boolean }[];
+  options: {
+    id: string;
+    label: string;
+    kind?: string | null;
+    note_required?: boolean;
+    /** 需要说明而没有写时卡片上显示的提示（文字由翻译层写好）。 */
+    note_missing_text?: string | null;
+  }[];
 }
 
 export interface MachineView {
@@ -396,8 +418,12 @@ export interface MachineView {
   online?: boolean;
 }
 
-/** 项目楼层的画面数据（原型 floor.js 的 model；由查询结果组装）。 */
-export interface FloorModel {
+/**
+ * 项目楼层的画面数据：画面合同的楼层状态（带位置）加上画面上还要用的几个字段
+ * （未回答的询问、成果库、执行槽位、等待模型服务、运维、机器、部门里的角色、决定请求）。
+ * 由翻译层从查询结果写出来（translate/floor.ts），世界与系统只读它。
+ */
+export interface FloorModel extends Omit<FloorState, "roles"> {
   items: LoopItem[];
   open_requests: OpenRequest[];
   shelves: { adopted: string[] };
@@ -529,6 +555,11 @@ export interface SceneLike {
   reduced: boolean;
   frozen: boolean;
   autonomy: boolean;
+  /**
+   * 画面时间要比真实时间快几倍（播放时间线的 rate()）：关键动作被要求限时演完时大于 1。
+   * 场景按它推进画面里的时间；没有设置时是 1（工单 #953 只把读数放上场景，演法由后续工单接）。
+   */
+  rate?: number;
   actors: Actor[];
   /** 正在飞行的纸与信件（原型 scene.flyers）。 */
   flyers: FlyerModel[];
@@ -602,6 +633,8 @@ export interface PackageVisual {
   itemId?: string | null;
   small?: boolean;
   artifact?: string | null;
+  /** 这个包裹属于播放时间线上的哪一个动作（立刻结束这个动作时一起清掉）。 */
+  actionId?: number;
   ms?: number;
   onDone?: () => void;
 }
