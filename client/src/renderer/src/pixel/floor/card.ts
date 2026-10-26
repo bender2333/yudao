@@ -71,13 +71,17 @@ export interface DecisionCard {
   inspect(): { openId: string | null; submitted: string[]; message: string | null; stamp: DecisionStamp | null };
 }
 
-/** 卡片左边的色条：需要马上处理的种类偏橙，会造成损失的偏红，通知类偏蓝，其余是琥珀色。 */
+/** 卡片左边的色条：需要马上处理的种类偏橙，会造成损失的偏红，通知类偏蓝，其余是琥珀色。
+ * 种类名是服务端的决定种类（原型 v13 decision-card.js 的 KIND_COLOR 用画面自己的名字）：
+ * 暂停以后继续（暂停、工作区无法表示）与定义版本不同按 v13 用橙色（v12 设计说明第 2.4、6 节第 3 条），
+ * 等待超过时长上限用蓝色——服务端还没有这种决定，先不登记。 */
 const KIND_COLOR: Record<string, string> = {
   model_unavailable: PAL.orange2,
+  no_tool_call: PAL.orange2,
+  workspace_unrepresentable: PAL.orange2,
+  definitions_changed: PAL.orange2,
   rollback_restore: PAL.red2,
   repair_stopped: PAL.red2,
-  no_tool_call: PAL.blue2,
-  workspace_unrepresentable: PAL.blue2,
 };
 
 const BAR = 18;

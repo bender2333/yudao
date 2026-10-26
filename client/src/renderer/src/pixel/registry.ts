@@ -1,5 +1,9 @@
-// 像素画登记表：由 scripts/generate-pixel-registry.mjs 从冻结的原型 v10 导出生成（工单 #176）。
+// 像素画登记表：由 scripts/generate-pixel-registry.mjs 从冻结的原型 v13（y13.js、pixel/sprites.js、
+// pixel/engine.js）导出生成（工单 #176、#956）。
 // 本文件只做类型化再导出与常量，不重复登记数据；改画法请改生成脚本并 `npm run generate:pixel`。
+// v13 起 engine.js 不再有事件对照表（EVENT_ACTIONS、resolveAction）：事件翻成动作写在翻译层（ADR-0043）。
+// 画面 3、4（#953、#954）以后没人再用的 EVENT_ACTIONS、STATUS_ACTIONS 不再从这里再导出：
+// 原型仍导出 STATUS_ACTIONS，图鉴按登记表读 registry.registries.STATUS_ACTIONS。
 
 import data from "./generated/registry.json" with { type: "json" };
 
@@ -49,11 +53,11 @@ export interface Anim {
   total: number;
 }
 
-/** 事实与动作的对照表（设计说明书第 3.5、3.9 节）。 */
+/** 动作说明（设计说明书第 3.5、3.9 节）：驱动它的事实、在哪个画面里、小人做什么。
+ * v13 起不再写「来源事件」一列：事件由哪种事件给出写在翻译层（js/translate/sources.js）。 */
 export interface ActionInfo {
   label: string;
   fact: string;
-  source: string;
   action: string;
   room?: string;
   level: "ui" | "S4" | "S5";
@@ -133,8 +137,8 @@ export interface Registries {
   ANIMS: Record<string, Anim>;
   ACTIONS: Record<string, ActionInfo>;
   BASE_MOTIONS: Record<string, { label: string; fact: string; anim: string }>;
+  /** 运行状态到姿势的对应（原型 engine.js 的 P.STATUS_ACTIONS）：只有图鉴按登记表读它。 */
   STATUS_ACTIONS: Record<string, string>;
-  EVENT_ACTIONS: Record<string, string | { by: string; map: Record<string, string> }>;
   /** 循环画面默认用哪个小人：动作名 → 角色标识。 */
   VIGNETTE_SPRITES: Record<string, string>;
   FONT3: Record<string, string[]>;
@@ -169,8 +173,6 @@ export const POSES = registry.registries.POSES;
 export const ANIMS = registry.registries.ANIMS;
 export const ACTIONS = registry.registries.ACTIONS;
 export const BASE_MOTIONS = registry.registries.BASE_MOTIONS;
-export const STATUS_ACTIONS = registry.registries.STATUS_ACTIONS;
-export const EVENT_ACTIONS = registry.registries.EVENT_ACTIONS;
 export const VIGNETTE_SPRITES = registry.registries.VIGNETTE_SPRITES;
 export const FONT3 = registry.registries.FONT3;
 
@@ -181,7 +183,7 @@ export const CHAR_H = registry.charH;
 /** 原型正文用的字体栈。 */
 export const PROTOTYPE_FONT = registry.font;
 
-/** 画面文字的字体栈（ADR-0021 第 4 条：微软雅黑，与原型 v10 engine.js 的 P.FONT 相同）。 */
+/** 画面文字的字体栈（ADR-0021 第 4 条：微软雅黑，与原型 v13 engine.js 的 P.FONT 相同）。 */
 export const PIXEL_FONT_FAMILY = '"Microsoft YaHei UI"';
 export const PIXEL_FONT_STACK = '"Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", "Source Han Sans SC", sans-serif';
 
@@ -190,5 +192,5 @@ export const LEVELS = registry.levels;
 export const LEVEL_LABELS = registry.levelLabels;
 export const LEVEL_TAGS = registry.levelTags;
 
-/** 原型公开的全部画法成员（64 个），图鉴与测试按它核对「一项不少」。 */
+/** 原型公开的全部画法成员（62 个），图鉴与测试按它核对「一项不少」。 */
 export const PUBLIC_MEMBERS = registry.inventory;
