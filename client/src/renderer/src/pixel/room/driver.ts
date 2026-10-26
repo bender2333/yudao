@@ -217,11 +217,46 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   /** 墙钟时间（毫秒）：时间线的时钟，不受画面加快倍率影响。 */
   let wallT = 0;
 
+  interface TweenItem {
+    obj: Record<string, unknown>;
+    key: string;
+    from: number;
+    to: number;
+    t0: number;
+    ms: number;
+    ease: "linear" | "inOut" | "out" | "in";
+    done?: boolean;
+  }
+  let tweens: TweenItem[] = [];
+  const easeMap: Record<string, (t: number) => number> = {
+    linear: (t) => t,
+    inOut: (t) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
+    out: (t) => 1 - Math.pow(1 - t, 3),
+    in: (t) => t * t * t,
+  };
+  function sceneTween(obj: Record<string, unknown>, key: string, to: number, ms: number, ease: "linear" | "inOut" | "out" | "in" = "inOut"): void {
+    tweens = tweens.filter((tw) => !(tw.obj === obj && tw.key === key));
+    if (scene.reduced || ms <= 0) {
+      obj[key] = to;
+      return;
+    }
+    tweens.push({ obj, key, from: Number(obj[key] ?? 0), to, t0: scene.realT, ms, ease });
+  }
+  function updateTweens(): void {
+    for (const tw of tweens) {
+      const k = Math.min(1, (scene.realT - tw.t0) / tw.ms);
+      const fn = easeMap[tw.ease] || easeMap.inOut;
+      tw.obj[tw.key] = tw.from + (tw.to - tw.from) * fn(k);
+      tw.done = k >= 1;
+    }
+    tweens = tweens.filter((tw) => !tw.done);
+  }
+
   function actorOf(id: string): Actor | null {
     return scene.actors.find((x) => x.id === `ch-${id}`) ?? null;
   }
   function roleActors(): RoomActor[] {
-    return [...actors.values()];
+    return state.desks.map((d) => actors.get(d.roleId)).filter((a): a is RoomActor => Boolean(a));
   }
   function primary(): RoomActor | null {
     const centerKind = dept === "quality" ? "tester" : dept === "operations" ? "ops" : "architect";
@@ -283,9 +318,26 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     const s = effStatus();
     const target = s === "interrupted" ? 0.74 : waitingProvider() ? 0.42
       : (s === "working" || s === "asking" || s === "done") ? 0 : 0.36;
-    state.darkTarget = target;
-    state.dark = target;
+    if (target !== state.darkTarget) {
+      state.darkTarget = target;
+      if (s === "interrupted" && !scene.reduced) {
+        state.dark = 0.5;
+        scene.after(90, () => { state.dark = 0.1; });
+        scene.after(180, () => { state.dark = 0.6; });
+        scene.after(260, () => { state.dark = 0.3; });
+        scene.after(360, () => { state.dark = target; });
+      } else {
+        sceneTween(state as unknown as Record<string, unknown>, "dark", target, 600, "inOut");
+      }
+    }
     state.yellow = false;
+    // 整层静止（中断）时，演到一半的动作停在原处，时间线不再等它们
+    if (s === "interrupted" && !scene.frozen) {
+      Array.from(runs.keys()).forEach((id) => {
+        runs.delete(id);
+        tl.done(id);
+      });
+    }
     scene.frozen = s === "interrupted";
   }
   function syncRoles(): void {
@@ -300,7 +352,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     }
     const lay = layoutDesks(dept, list, level);
     state.desks = list.map((r, i) => ({
-      x: lay[i].x, w: lay[i].w, seatX: lay[i].x + 18, seatY: ROW_B, roleId: r.id, role: r,
+      i, x: lay[i].x, w: lay[i].w, seatX: lay[i].x + 18, seatY: ROW_B, roleId: r.id, role: r,
     }));
     list.forEach((r, i) => {
       const d = state.desks[i];
@@ -386,6 +438,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     if (waitingProvider() && isPrim && (s === "working" || s === "idle")) return seatRest("sit_up");
     if (remoteUnknown() && isPrim) {
       return standRest(SPOT.terminal[0], SPOT.terminal[1], "watch_r", { icon: { kind: "question" }, facing: 1 });
+    }
+    // 试用台：测试工程师坐在试用台前（3.2D）
+    if (state.trialSeat && model.trial && r.kind === "tester") {
+      return { x: state.trialSeat.seatX, y: state.trialSeat.seatY, seat: state.trialSeat, anim: "type", facing: 1 };
     }
     if (s === "idle") return seatRest("tea");
     if (s === "paused") return seatRest("sit_relax", { icon: isPrim ? { kind: "zzz" } : null });
@@ -498,7 +554,10 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
     const hits = name === "stamp" ? [450 + 380, 380 + 70 + 450 + 300 + 70 + 450] : [400 + 70 + 10];
     return [
       S.hold(item),
-      S.call(() => hits.forEach((ms, i) => scene.after(scene.reduced ? 0 : ms, () => hitFn(i)))),
+      S.call(() => hits.forEach((ms, i) => scene.after(scene.reduced ? 0 : ms, () => {
+        scene.emit("dust", SPOT.bench[0] - 3, ROW_A - 5, 14);
+        hitFn(i);
+      }))),
       S.anim(name, undefined, true),
       S.hold(null),
     ];
@@ -595,7 +654,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       const actor = actorOf(a.id)!;
       p.add(S.anim(actor.seat ? "sit_up" : "look_up", 300));
       p.to(SPOT.crtLook[0], SPOT.crtLook[1]);
-      p.add(S.anim("look_up", 1300, true), S.anim("idle_happy", 500));
+      p.add(S.call(() => sceneTween(state as unknown as Record<string, unknown>, "crtBoot", 1, 1000, "linear")), S.anim("look_up", 1300, true), S.anim("idle_happy", 500));
       p.sit();
       p.add(S.anim("type", 500));
       p.run(() => { state.crtBoot = 1; });
@@ -680,6 +739,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
       p.add(S.call(() => scene.after(scene.reduced ? 0 : 450, () => {
         state.lever = 1;
         state.termRun = true;
+        scene.emit("dust", L.terminal.x - 8, L.terminal.base - 8, 5);
       })), S.anim("lever", 1000, true));
       p.mark();
       p.add(S.anim("watch_r", 14000));
@@ -957,7 +1017,7 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
         if (actor?.script) scene.cancel(actor);
         setPersist(x, null);
         const p = plan(x);
-        p.add(S.anim(x === a ? "stretch_sit" : "stretch", undefined, x === a));
+        p.add(S.anim(actor?.seat ? "stretch_sit" : "stretch", undefined, x === a));
         p.back();
         p.run();
       }
@@ -1394,40 +1454,46 @@ export function createRoomDriver(opts: { department: string; sceneOptions: Scene
   /** 推进一帧：画面时间按加快倍率推进，时间线按墙钟推进。 */
   function step(deltaMs = 0): void {
     const delta = Math.max(0, deltaMs);
-    scene.stepScene(delta * tl.rate());
+    scene.wallT = (scene.wallT ?? 0) + delta;
     wallT += delta;
-    tl.tick();
-    if (effStatus() !== "interrupted") state.clock += scene.reduced ? 0 : 16.7;
-    // 时间线上正在演的动作：做它的小人进入收尾步骤（或换了动作、被撤走）就算演完
-    runs.forEach((run, id) => {
-      const a = run.actor;
-      const actor = actorOf(a.id);
-      if (!actor || !scene.actors.includes(actor) || a.runId !== id || scene.inTail(actor)) {
-        runs.delete(id);
-        tl.done(id);
-        // 演的时候到达的进度，演完以后接上最近的一项
-        if (a.pendingProgress) {
-          const next = a.pendingProgress;
-          a.pendingProgress = null;
-          showProgress(next, a);
+    const n = Math.max(1, Math.ceil((delta * (scene.rate || 1)) / 50));
+    for (let stepIdx = 0; stepIdx < n; stepIdx++) {
+      scene.stepScene((delta * (scene.rate || 1)) / n);
+      updateTweens();
+      tl.tick();
+      scene.rate = tl.rate();
+      if (effStatus() !== "interrupted") state.clock += scene.reduced ? 0 : 16.7;
+      // 时间线上正在演的动作：做它的小人进入收尾步骤（或换了动作、被撤走）就算演完
+      runs.forEach((run, id) => {
+        const a = run.actor;
+        const actor = actorOf(a.id);
+        if (!actor || !scene.actors.includes(actor) || a.runId !== id || scene.inTail(actor)) {
+          runs.delete(id);
+          tl.done(id);
+          // 演的时候到达的进度，演完以后接上最近的一项
+          if (a.pendingProgress) {
+            const next = a.pendingProgress;
+            a.pendingProgress = null;
+            showProgress(next, a);
+          }
         }
+      });
+      for (const a of roleActors()) {
+        const actor = actorOf(a.id);
+        if (actor && !actor.script) applyRest(a);
       }
-    });
-    for (const a of roleActors()) {
-      const actor = actorOf(a.id);
-      if (actor && !actor.script) applyRest(a);
-    }
-    tickBench();
-    // 与原型 room.js 的 update 一致：终端冒烟与茶水台蒸汽（同时保持随机数的消耗顺序一致）
-    if (state.smokeUntil > scene.realT && !scene.reduced && scene.random() < 0.3) {
-      scene.emit("smoke", L.terminal.x + 14, L.terminal.base - 38, 1);
-    }
-    if (!scene.frozen && scene.random() < 0.035) scene.emit("steam", 413, ROW_B - 15, 1);
-    for (const a of roleActors()) {
-      const actor = actorOf(a.id);
-      if (actor && actor.anim === "tea" && actor.seat && !scene.frozen && scene.random() < 0.03) {
-        const [hx, hy] = headTop(scene, actor);
-        scene.emit("steam", hx + 2, hy + 12, 1);
+      tickBench();
+      // 与原型 room.js 的 update 一致：终端冒烟与茶水台蒸汽（同时保持随机数的消耗顺序一致）
+      if (state.smokeUntil > scene.realT && !scene.reduced && scene.random() < 0.3) {
+        scene.emit("smoke", L.terminal.x + 14, L.terminal.base - 38, 1);
+      }
+      if (!scene.frozen && scene.random() < 0.035) scene.emit("steam", 413, ROW_B - 15, 1);
+      for (const a of roleActors()) {
+        const actor = actorOf(a.id);
+        if (actor && actor.anim === "tea" && actor.seat && !scene.frozen && scene.random() < 0.03) {
+          const [hx, hy] = headTop(scene, actor);
+          scene.emit("steam", hx + 2, hy + 12, 1);
+        }
       }
     }
   }

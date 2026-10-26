@@ -91,6 +91,7 @@ export interface RoomState {
   smokeUntil: number;
   trayPaper: boolean;
   scrollFlash: number;
+  scrollHide: number;
   noteHide: number;
   replyUntil: number;
   cardHide: number;
@@ -108,6 +109,7 @@ export interface RoomState {
   wbDone: Record<string, boolean>;
   wbExisting: boolean;
   binUntil: number;
+  alarmUntil: number;
   cart: { x: number; box: string | null; pushed: boolean };
   backupLit: number;
   backupFlash: number;
@@ -131,11 +133,11 @@ export interface RoomState {
 export function createRoomState(): RoomState {
   return {
     clock: 15.5 * 3600000, dark: 0.36, darkTarget: 0.36, yellow: false, crtBoot: 1, drawer: 0, lever: 0,
-    exit: null, termRun: false, smokeUntil: 0, trayPaper: false, scrollFlash: 0,
+    exit: null, termRun: false, smokeUntil: 0, trayPaper: false, scrollFlash: 0, scrollHide: 0,
     noteHide: 0, replyUntil: 0, cardHide: 0, cardFlash: 0, archiveFlash: 0, door: 0, doorEvent: null,
     eventStatus: null, eventCard: null,
     bench: { item: null, mark: null, slip: null, slipMark: null, ticks: 0, tape: 0, until: 0 },
-    wbSheetUntil: 0, wbErase: 0, wbSeed: 1, wbTags: {}, wbDone: {}, wbExisting: false, binUntil: 0,
+    wbSheetUntil: 0, wbErase: 0, wbSeed: 1, wbTags: {}, wbDone: {}, wbExisting: false, binUntil: 0, alarmUntil: 0,
     cart: { x: 296, box: null, pushed: false }, backupLit: 0, backupFlash: 0,
     mdoorGlow: 0, monitorAlarmUntil: 0, postFlag: 0, toolLit: -1, eventRemote: false, eventMachine: null,
     eventWaiting: false, eventStep: 0, eventLines: null, selfShot: false, desks: [], deskState: {},

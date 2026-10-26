@@ -97,7 +97,11 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
   if (lastDataRef.current !== null && lastDataRef.current.department !== props.department) {
     lastDataRef.current = null;
   }
-  if (props.data !== null && props.data.department === props.department) {
+  const deptOf = (d: DepartmentWorkspaceResult): string =>
+    typeof d.department === "string"
+      ? d.department
+      : ((d.department as unknown as { id?: string })?.id ?? (d as unknown as { room?: { department?: string } }).room?.department ?? "");
+  if (props.data !== null && deptOf(props.data) === props.department) {
     lastDataRef.current = { department: props.department, data: props.data };
   }
   const last = lastDataRef.current;

@@ -270,6 +270,29 @@ const ROOM: Readonly<Record<string, (ev: RoomEvent, dept: string, ctx: RoomConte
   run_done: own("done"),
   run_resumed: own("resume"),
   run_continued: own("resume"),
+  x_run_auto_resumed: own("resume"),
+  x_action_unknown: own("puzzled"),
+  x_decision_issued: (ev, dept, ctx) => {
+    const k = pl(ev).kind;
+    if (k === "external_action") return own("hold_form", () => ({ text: str(pl(ev).action) || "外部动作" }))(ev, dept, ctx);
+    if (k === "waiting_resume") return own("hold_card", () => ({ text: str(pl(ev).missing) || str(pl(ev).text) || quoted(ev.label) || "待恢复" }))(ev, dept, ctx);
+    return [];
+  },
+  x_remote_action_started: own("remote_run", (ev) => ({ text: str(pl(ev).machine_name) || str(pl(ev).label) || null })),
+  x_machine_offline: own("remote_unknown", (ev) => ({ text: str(pl(ev).machine_name) || null })),
+  x_network_fetch: own("net_fetch"),
+  x_mcp_called: own("mcp_press", (ev) => ({ index: pl(ev).index !== undefined ? Number(pl(ev).index) : pl(ev).button !== undefined ? Number(pl(ev).button) : 0 })),
+  x_trial_step: own("trial", (ev) => ({ step: str(pl(ev).step) || null, lines: (pl(ev).text_lines as string[]) || null })),
+  x_deployed: own("deploy"),
+  x_rolled_back: own("rollback"),
+  x_fault_recorded: own("fault"),
+  x_provider_wait_entered: own("wait_provider"),
+  x_role_task_assigned: (ev, dept, ctx) => (mine(ev, dept) ? [one("assign", ev, ctx, { role: str(pl(ev).to) || ev.role || null, sayTo: say(ev, { side: "to", roleName: ctx.roleName }) })] : []),
+  x_role_result_returned: (ev, dept, ctx) => (mine(ev, dept) ? [one("hand_back", ev, ctx, { sayTo: say(ev, { side: "to", roleName: ctx.roleName }) })] : []),
+  x_review_recorded: own("review", (ev) => ({ verdict: ["passed", "pass"].includes(str(pl(ev).verdict)) ? "pass" : "return" })),
+  x_explorer_fetch: own("explore"),
+  x_replanned: own("replan"),
+  x_semantic_recorded: own("semantic"),
   decision_requested: decisionAction,
 };
 
@@ -296,7 +319,7 @@ export function actions(ev: RoomEvent, dept: string, ctx: RoomContext = {}): Pix
 }
 
 /** 翻成动作的事件种类（与 translate/coverage.ts 里房间的 drawn 是同一组，测试核对两边一致）。 */
-export const ROOM_ACTION_TYPES: readonly string[] = Object.keys(ROOM);
+export const ROOM_ACTION_TYPES: readonly string[] = Object.keys(ROOM).filter((k) => !k.startsWith("x_"));
 
 // ---------------------------------------------------------------------------
 // 实时内容：流式文字

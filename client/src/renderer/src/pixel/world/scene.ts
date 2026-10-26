@@ -7,6 +7,7 @@
 
 import { createActor } from "xstate";
 import { animDuration as animTotal, hash } from "../anims.ts";
+import { PAL } from "../registry.ts";
 import { characterMachine, pipeMachine } from "./state.ts";
 import type {
   Actor, ActorInit, Character, Geo, HeadIconKind, PackageVisual, ParticleModel, Pipe, SceneLike, SceneOptions, Seat, Step, World,
@@ -123,12 +124,12 @@ export function createScene(opts: SceneOptions): SceneLike {
         switch (kind) {
           case "dust":
             p.vx = (r1 - 0.5) * 70; p.vy = -r2 * 30 - 6; p.g = 90; p.life = 420 + r3 * 250;
-            p.color = r3 > 0.5 ? "#d8cfbd" : "#f4efe6"; p.size = r2 > 0.6 ? 2 : 1;
+            p.color = r3 > 0.5 ? PAL.paper3 : PAL.white2; p.size = r2 > 0.6 ? 2 : 1;
             break;
           case "confetti":
             p.x = x + (r1 - 0.5) * (opt.spread ?? 120); p.y = y - r2 * 20;
             p.vx = (r2 - 0.5) * 20; p.vy = 10 + r3 * 20; p.g = 8; p.life = 2200 + r1 * 1200;
-            p.color = ["#d9534f", "#ffd66b", "#4a90d9", "#5cb85c", "#e88fb8", "#e67e22"][Math.floor(r3 * 6)];
+            p.color = [PAL.red2, PAL.yellow2, PAL.blue2, PAL.green2, PAL.pink2, PAL.orange2][Math.floor(r3 * 6)];
             p.size = 2; p.sway = r1 * 6.28;
             break;
           case "smoke":
@@ -136,10 +137,17 @@ export function createScene(opts: SceneOptions): SceneLike {
             break;
           case "spark":
             p.vx = Math.cos(r1 * 6.28) * (20 + r2 * 25); p.vy = Math.sin(r1 * 6.28) * (20 + r2 * 25); p.life = 380 + r3 * 200;
-            p.color = r3 > 0.5 ? "#ffd66b" : "#ffffff";
+            p.color = r3 > 0.5 ? PAL.yellow1 : PAL.white;
             break;
           case "steam":
-            p.x = x + (r1 - 0.5) * 3; p.vx = (r2 - 0.5) * 3; p.vy = -6 - r3 * 4; p.life = 900 + r1 * 400; p.color = "#f4efe6";
+            p.x = x + (r1 - 0.5) * 3; p.vx = (r2 - 0.5) * 3; p.vy = -6 - r3 * 4; p.life = 900 + r1 * 400; p.color = PAL.white2;
+            break;
+          case "paper":
+            p.vx = (r1 - 0.5) * 90; p.vy = -30 - r2 * 40; p.g = 110; p.life = 900 + r3 * 400; p.color = PAL.white; p.size = 3; p.drag = 0.96;
+            p.floor = opt.floor;
+            break;
+          case "glow":
+            p.vx = (r1 - 0.5) * 8; p.vy = -r2 * 10; p.life = 600; p.color = opt.color ?? PAL.yellow1; p.size = 1;
             break;
           default:
             throw new Error(`未知粒子：${kind}`);

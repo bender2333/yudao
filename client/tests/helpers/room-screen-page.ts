@@ -40,13 +40,10 @@ export interface RoomSwitchReport {
 export function roomWorkspaceFixture(department: string): RoomWorkspaceFixture {
   const recording = loadRoomRecordings();
   const scenario = recording.scenarios.find((s) => s.department === department);
-  const room = scenario?.ops.find((op) => op.op === "setModel")?.arg;
-  if (!scenario || !room) {
-    throw new Error(`录下的场景里没有部门 ${department} 的房间模型`);
-  }
-  // 录下的是驱动收到的房间模型，与查询结果里的房间数据同一个类型；查询结果的其余字段
-  // 房间组件不读，这里不填
-  return { department, room } as unknown as DepartmentWorkspaceResult;
+  if (!scenario) throw new Error(`录下的场景里没有部门 ${department} 的房间查询结果`);
+  const workspace = scenario.ops.find((op) => op.op === "workspace" && op.arg !== null && op.arg !== undefined);
+  if (!workspace) throw new Error(`录下的场景里没有部门 ${department} 的房间数据`);
+  return workspace.arg as RoomWorkspaceFixture;
 }
 
 /** 数据从空到有的存活观测：挂载计数与画面容器节点在前后两步是否同一个 DOM 节点。 */
@@ -146,6 +143,7 @@ export async function runRoomSwitch(steps: { department: string; data: RoomWorks
     // 驱动的源码与步骤一次送进页面（page.evaluate 只收一个参数；驱动经字符串化以后在页面里求值）
     const result = await page.evaluate(async (input: { fnSource: string; steps: typeof steps }) => {
       try {
+        (window as unknown as { __name: (fn: unknown) => unknown }).__name = (fn: unknown): unknown => fn;
         const fn = (0, eval)(`(${input.fnSource})`) as (i: { steps: typeof steps }) => Promise<{ states: RoomTabState[] }>;
         return { ok: await fn({ steps: input.steps }) };
       } catch (e) {
@@ -253,6 +251,7 @@ export async function runRoomSurvival(department: string, datas: (RoomWorkspaceF
     await page.goto(address + "room-survival.html");
     const result = await page.evaluate(async (input: { fnSource: string; department: string; datas: typeof datas }) => {
       try {
+        (window as unknown as { __name: (fn: unknown) => unknown }).__name = (fn: unknown): unknown => fn;
         const fn = (0, eval)(`(${input.fnSource})`) as (i: { department: string; datas: typeof datas }) => Promise<{ mountCounts: number[]; stageCounts: number[]; sameHost: boolean; errorText: string | null }>;
         return { ok: await fn({ department: input.department, datas: input.datas }) };
       } catch (e) {
