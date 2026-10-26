@@ -562,7 +562,8 @@ def _current_work(projection: RunProjection, department: str,
                  "然后用 submit_guidance_response 逐条回应：explained 表示已解释或无需新动作，"
                  "completed 表示本指导被采用后的动作已有主机结果。"
                  "guidance_results 只列出本指导被采用后可由宿主绑定的结果；completed 时宿主绑定这些结果，不必手抄事件 id；"
-                 "指导不能替代产品要求、交付说明或质检放行。")
+                 "指导不能替代产品要求、交付说明或质检放行。"
+                 "这一轮只有指导、没有要做的工作时，直接用文字回答即可。")
     for item in notifications or []:
         work += " " + _notification_text(item)
     return {
