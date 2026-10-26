@@ -329,3 +329,79 @@ test("部门页签之间直接切换：每个页签的房间画面属于该部�
   }
 });
 
+
+// 部门工作间的部门状态、三个部门一行与询问（原型 v12 设计说明第 3.1、3.3 节、三部门的循环结构第 2.1 节，
+// 工单 #905）：用种子里的两个项目核对真后端下的页面。
+// 「交付历史」的事项已经结束：工程部门页的询问一节列出本部门发出与收到的两次询问，其中一次是收到的
+// （质检 → 工程）与它的回答；没有部门状态，标题区按事项的结束方式写；传信管上没有等待回答的询问，这一行不写。
+// 「文本工具」的事项停在模型不可用：被模型挡住的工程部门标题区是「等用户」，三个部门一行里本部门加粗。
+// 两页都不出现「正在工作 · …」「这次运行不在本部门」这两种旧写法，也没有阶段名称与协作请求。
+test("部门页：三个部门的状态、本部门的询问与传信管", async () => {
+  test.setTimeout(600_000);
+  backend = await startBackend();
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    const projects = await query<{ projects: { name: string; project_id: string }[] }>("projects.list");
+    const projectOf = (name: string): string => {
+      const row = projects.projects.find((project) => project.name === name);
+      if (row === undefined) {
+        throw new Error(`projects.list 里没有项目 ${name}（现有：${projects.projects.map((project) => project.name).join("、")}）`);
+      }
+      return row.project_id;
+    };
+    const head = (title: string) =>
+      page.locator("section.card").filter({ has: page.getByRole("heading", { name: title, exact: true }) }).first();
+    const asksSection = () =>
+      page.locator("section.card").filter({ has: page.getByRole("heading", { name: "询问", exact: true }) }).first();
+    const openDepartment = async (project: string, department: string): Promise<void> => {
+      await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${project}/dept/${department}`);
+    };
+
+    // 交付历史：工程部门页的询问一节列出本部门发出与收到的询问，收到的那次有回答
+    await openDepartment(projectOf("交付历史"), "engineering");
+    const historyAsks = asksSection();
+    await expect(historyAsks).toBeVisible();
+    await expect(historyAsks).toContainText("质检 → 工程");
+    await expect(historyAsks).toContainText("Which acceptance line governs the rework?");
+    await expect(historyAsks).toContainText("回答：Follow the acceptance line recorded in the requirement.");
+    // 本部门发出的那次也在这张页上（工程 → 产品）
+    await expect(historyAsks).toContainText("工程 → 产品");
+    // 事项已经结束：没有三个部门一行，标题区按结束方式写（放行）
+    const historyHead = head("工程部门");
+    await expect(historyHead).toContainText("已完成并放行");
+    await expect(historyHead.locator(".department-line")).toHaveCount(0);
+    // 传信管上没有等待本部门回答的询问：这一行不写
+    await expect(page.locator("[data-ws-tube]")).toHaveCount(0);
+    const historyText = await page.locator(".page").innerText();
+    expect(historyText).not.toContain("正在工作 ·");
+    expect(historyText).not.toContain("这次运行不在本部门");
+    expect(historyText).not.toContain("阶段");
+    expect(historyText).not.toContain("协作请求");
+
+    // 文本工具：被模型挡住的工程部门标题区状态是「等用户」
+    await openDepartment(projectOf("文本工具"), "engineering");
+    const blockedHead = head("工程部门");
+    await expect(blockedHead).toBeVisible();
+    await expect(blockedHead.locator(".y10-status").first()).toHaveText("等用户");
+    // 三个部门一行：本部门那一段加粗，其余部门不加粗
+    const states = blockedHead.locator(".department-line");
+    await expect(states).toContainText("三个部门");
+    await expect(states).toContainText("产品 等待工作");
+    await expect(states).toContainText("质检 等待工作");
+    await expect(states.locator("strong")).toHaveText("工程 等用户");
+    // 这个事项还没有询问：询问一节写没有询问，传信管那一行不写
+    await expect(asksSection()).toContainText("这个事项里本部门还没有发出或收到询问");
+    await expect(page.locator("[data-ws-tube]")).toHaveCount(0);
+    const blockedText = await page.locator(".page").innerText();
+    expect(blockedText).not.toContain("正在工作 ·");
+    expect(blockedText).not.toContain("这次运行不在本部门");
+    expect(blockedText).not.toContain("阶段");
+    expect(blockedText).not.toContain("协作请求");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});

@@ -560,6 +560,16 @@ claude-opus-5-5（子架构师） / 2026-10-26 00:50 / docs/design/test-pyramid.
 
 claude-fable-5-1（总架构师） / 2026-10-26 00:30 / `docs/decision.md` 把插在顶部的两条 10-25 条目（最小投影、内核工单批准）挪到末尾按正序，只动位置；`docs/agents/shared-rules.md`「文档与记录」补一条：decision.md 按时间正序追加末尾 / 10-25 23:30 已改为正序，我后来两条又插了顶部；子架构师问顺序，定下来写进规则。
 
+solo-deepseek-v4.1-flash / 2026-10-26 01:10 / 工单 #904 [M0] 概览与看板写三个部门各自的状态、按成果写的进度与询问列表：`client/src/renderer/src/views/project/labels.ts` 新增部门状态五个词（等用户、一轮工作中、询问中、核验中、等待工作）与所在部门一行、按成果写的进度行，`client/src/renderer/src/views/project/asks-text.ts` 新建（询问一行的文字，部门工作间的工单 #905 共用），`overview.tsx` 的当前事项写三个部门各自的状态与原因、新增「询问」一节、看板卡片写正在工作的部门，单元测试（`board-columns.test.ts`、新建的 `asks-text.test.ts`、`cancelled-item-status.test.ts`）与 `client/tests/e2e/project.spec.ts` 跟上；本行以外 `docs/` 没有别的改动；依据的原型 v12 设计说明已由 e2e75ad7 归档到 `docs/archive/prototypes/v12/`（git mv，内容未变），按归档路径读第 3.1 至 3.3 节 / 完成工单 #904 的验收标准
+
 claude-sonnet-5-5 / 2026-10-26 01:10 / docs/design/test-pyramid.md 新增第 13 节「测试按三环留」，状态行记一句，第 4.4 节第 1 条与第 10 节第 5 条改为「用例只由架构师删」；CLAUDE.md「角色」加删除用例的例外、「工单规范」删减功能的工单一条改为用例由架构师先删；AGENTS.md 执行者（测试写法、交付说明）与审查者（内容核对）改为不删用例、新增用例写明守第 13 节的哪一条；.claude/skills/to-children/SKILL.md 同步；新增 docs/evaluation/test-subtraction-2026-10-26.md（删前删后数字、裁定、逐文件清单） / 用户要对测试做减法，只留符合新总图与路线图的，并指出由执行者删测试有逻辑冲突
 
 solo-deepseek-v4.1-flash / 2026-10-26 01:31 / docs/architecture-issues.md 登记工单 #952 的一条设计问题：画面 2 的验收标准 2（对应表输出画面合同的值）与验收标准 3（改用对应表以后现有楼层与楼的单元测试照常通过、画面行为不变）互相矛盾，因为楼层与楼的场景仍认旧词，场景文件属于画面 3、5 / 工单做不下去，按《solo 工人协议》「三条通道」交回架构师，同时留下不依赖这个决定的部分（位置、对应表、说话、覆盖核对、夹具与服务端测试）
+
+solo-deepseek-v4.1-flash / 2026-10-26 02:20 / 工单 #905 [M0] 部门工作间写三个部门各自的状态、本部门的询问与传信数：`client/src/renderer/src/views/project/labels.ts` 新增部门状态的标记表（`DEPARTMENT_STATE_KIND`）、部门页标题区的状态与结束方式（`departmentStatusView`）、把三个部门一行拆成一段段（`departmentsLineParts`，概览的 `departmentsText` 改为用它、输出不变）、传信管一行（`lettersWaitingText`）；`client/src/renderer/src/views/project/department.tsx` 的标题区写本部门的状态与原因、另起一行列出三个部门（本部门加粗）、「询问」一节读 `run.asks` 并共用 #904 的 `asks-text.ts`、房间信息写传信管上等待本部门回答的询问数，删掉「正在工作 · …」与「这次运行不在本部门 · …」两句；新增单元测试 `client/tests/unit/department-states.test.ts`，`client/tests/e2e/room.spec.ts` 与 `client/tests/e2e/project.spec.ts` 跟上（后者原来断言旧写法的那一处）；本行以外 `docs/` 没有别的改动；依据的原型 v12 设计说明已由 e2e75ad7 归档到 `docs/archive/prototypes/v12/`（内容未变），按归档路径读第 3.1、3.3 节 / 完成工单 #905 的验收标准
+
+claude-sonnet-5-5 / 2026-10-26 02:10 / docs/decision.md 追加 2026-10-26「像素画面继续逐像素对照原型」；docs/evaluation/test-subtraction-2026-10-26.md 第 4 节第 1 条记用户的决定 / 用户回答：继续守，#951 至 #959 照做
+
+claude-sonnet-5-5 / 2026-10-26 / docs/design/department-guidance.md：状态行改为已实现与待实现的现状；新增第 2.1 节「放行怎么等」；第 3 节补「处理完只有一个说法」「已回答由主机写」「用文字回答用户」。docs/design/department-loop.md 第 6 节：回答用户限于指导独占的一轮，回答由主机写，放行等待的做法指向指导设计说明第 2.1 节。docs/decision.md 追加 2026-10-26 一条 / #561 被交回，设计里缺回答用户怎么结束一轮和放行等待的做法，补定后拆成四张
+
+claude-sonnet-5-5 / 2026-10-26 / docs/decision.md 追加 2026-10-26「画面翻译层先建表、后接线」/ #952 被交回，对应表与接线在当前 main 上互相矛盾，定先建表后接线，并定 held、released_unsettled 的画面取值

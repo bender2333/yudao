@@ -33,11 +33,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#1>",
-    "effective_contract_hash": null,
-    "guidance_ids": [],
-    "guidance_version": 0,
-    "input_version": 1,
-    "prompt_version": 0
+    "input_version": 1
    }
   },
   {
@@ -68,10 +64,8 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "delivery_spec_hash": null,
     "id": "<lesson#1>",
     "kind": "lesson_candidate",
-    "product_spec_hash": null,
     "source_event_id": "__run__#2",
     "status": "unverified"
    }
@@ -89,12 +83,9 @@
    "error": null,
    "payload": {
     "activation_id": "<act#1>",
-    "guidance_ids": [],
     "input_version": 1,
-    "prompt_version": 0,
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
-    "session_model_steps": 0,
     "stop_reason": "context_overflow"
    }
   }
@@ -112,7 +103,6 @@
   "input_version": 1,
   "processed_input_version": 0,
   "product_work_input_version": 1,
-  "run_event_version": 10,
   "stream_version": 5,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"

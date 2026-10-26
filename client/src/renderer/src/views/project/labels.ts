@@ -9,6 +9,26 @@ export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   quality: { name: "质检", role: "按验收条件核验并给出放行或缺陷记录" },
 };
 
+// 部门状态的中文名（三部门的循环结构第 2.1 节，工单 #904）：总图第三节外环的五个词，页面上只写这一处。
+// 外环另外四个词（接纳、返工、排空中、停止）在成果驱动下不作为部门的持续状态显示，这里不列。
+export const DEPARTMENT_STATE: Record<string, string> = {
+  waiting_user: "等用户",
+  working: "一轮工作中",
+  asking: "询问中",
+  verifying: "核验中",
+  waiting: "等待工作",
+};
+
+// 一个部门在这个事项上的状态与原因（work_item.departments 的取值）：state 是上面五个词之一，
+// note 是一句原因，没有原因时不存在（工单 #903 的查询结果就是这个形状）
+export interface DepartmentStateView {
+  state: string;
+  note?: string | null;
+}
+
+// 页面上列部门的顺序：产品、工程、质检（部门表本身的顺序，工单 #904）
+const DEPARTMENT_ORDER = Object.keys(DEPARTMENTS);
+
 export const WORK_ITEM_STATUS: Record<string, string> = {
   // not_started 是「已登记、还没开始运行」——排队等开始时也是它，页面上叫「排队中」（工单 #733）
   not_started: "排队中",
@@ -166,24 +186,179 @@ const CONCLUSION_LABELS: Record<string, string> = {
   release: "放行",
 };
 
+// 进度行（三部门的循环结构第 2 节，工单 #904 按原型 v12 第 3.2 节改写）：
+// 「PRD r2 · 交付 r1（依据 PRD r2）· 结论：放行」；还没有交付时写「PRD r2 · 还没有交付」；没有结论不写。
+// 什么都不写时不写这一行（还没有成果）。
 export function progressLabel(progress: WorkItemProgressView | null | undefined): string | null {
   if (!progress) {
     return null;
   }
   const parts: string[] = [];
   if (progress.product_spec_revision !== null) {
-    parts.push(`PRD 第 ${progress.product_spec_revision} 版`);
+    parts.push(`PRD r${progress.product_spec_revision}`);
   }
   if (progress.delivery_revision !== null) {
     const basis = progress.delivery_product_spec_revision !== null
-      ? `（依据 PRD 第 ${progress.delivery_product_spec_revision} 版）`
+      ? `（依据 PRD r${progress.delivery_product_spec_revision}）`
       : "";
-    parts.push(`交付第 ${progress.delivery_revision} 版${basis}`);
+    parts.push(`交付 r${progress.delivery_revision}${basis}`);
+  } else if (parts.length > 0) {
+    parts.push("还没有交付");
   }
+  const head = parts.join(" · ");
   if (progress.conclusion) {
-    parts.push(`结论：${CONCLUSION_LABELS[progress.conclusion] ?? progress.conclusion}`);
+    // 结论紧接在前一项后面，与原型 v12 第 3.2 节的写法一致（「…（依据 PRD r2）· 结论：放行」）
+    const conclusion = `结论：${CONCLUSION_LABELS[progress.conclusion] ?? progress.conclusion}`;
+    return head === "" ? conclusion : `${head}· ${conclusion}`;
   }
-  return parts.length === 0 ? null : parts.join("，");
+  return head === "" ? null : head;
+}
+
+// 部门状态对应的状态标记（原型 v12 第 3.1 节、工单 #905）：等用户要用户处理，一轮工作中在转，
+// 询问中在等对方的回答，核验中等下游的结论，等待工作在等成果
+export const DEPARTMENT_STATE_KIND: Record<string, string> = {
+  waiting_user: "waiting",
+  working: "running",
+  asking: "asking",
+  verifying: "queued",
+  waiting: "idle",
+};
+
+// 一个部门的状态与原因（原型 v12 第 3.1 节）：状态词，有原因时写在括号里，例如
+// 「询问中（在等待产品的回答）」。原因只有四种，见三部门的循环结构第 2.1 节。
+export function departmentStateText(state: DepartmentStateView): string {
+  const name = DEPARTMENT_STATE[state.state] ?? state.state;
+  return state.note ? `${name}（${state.note}）` : name;
+}
+
+// 部门页标题区的部门状态（原型 v12 第 3.1 节、三部门的循环结构第 2.1 节，工单 #905）：
+// 事项进行中时用 departments[本部门]，写状态与原因；没有部门状态（事项还没有开始、已经结束，
+// 或者进程中断以后还没有继续）时按事项的结束方式写，不再写「正在工作」与「这次运行不在本部门」。
+// text 是状态词，note 是原因（没有时为空串），kind 是页面上那个状态标记的样式。
+export interface DepartmentStatusView {
+  text: string;
+  note: string;
+  kind: string;
+}
+
+export function departmentStatusView(data: {
+  department: string;
+  run_id: string | null;
+  run_status: string | null;
+  status: string | null;
+  stop_reason?: string | null;
+  departments?: Record<string, DepartmentStateView> | null;
+}): DepartmentStatusView {
+  const own = data.departments?.[data.department];
+  if (own) {
+    return {
+      text: DEPARTMENT_STATE[own.state] ?? own.state,
+      note: own.note ?? "",
+      kind: DEPARTMENT_STATE_KIND[own.state] ?? "idle",
+    };
+  }
+  if (data.run_id === null) {
+    return { text: "空闲（这个范围里没有运行）", note: "", kind: "idle" };
+  }
+  // 用户停止的事项写「已停止」，与概览看板一致（工单 #319）
+  if (data.status === "stopped") {
+    return { text: "已停止", note: "", kind: "cancelled" };
+  }
+  // 暂停是终态，没有部门状态；写「已暂停」，不猜具体原因
+  if (data.run_status === "paused") {
+    return { text: "已暂停", note: "", kind: "paused" };
+  }
+  // run 还在进行中而没有部门状态：进程中断以后还没有继续（第 2.1 节最后一段的「中断」）
+  if (data.run_status === "running") {
+    return { text: "中断", note: "", kind: "cancelled" };
+  }
+  // 已经结束的事项按结束方式写：有停止原因时写原因（例如「已完成并放行」），没有时写 run 的状态
+  if (data.stop_reason) {
+    return {
+      text: label(STOP_REASON, data.stop_reason),
+      note: "",
+      kind: data.run_status === "failed" ? "failed" : "succeeded",
+    };
+  }
+  return {
+    text: label(RUN_STATUS_LABELS, data.run_status),
+    note: "",
+    kind: data.run_status === "failed" ? "failed" : "succeeded",
+  };
+}
+
+// 三个部门各自的状态与原因拆成一段段（三部门的循环结构第 2.1 节，工单 #904）：
+// 「产品 一轮工作中（回答工程的询问） · 工程 询问中（在等待产品的回答） · 质检 等待工作」。
+// 只写查询结果里有的部门，按产品、工程、质检的顺序；current 标出本部门那一段，
+// 部门工作间把它加粗（工单 #905）。没有 departments（事项没有进行中的 run）时返回 null。
+export interface DepartmentsLinePart {
+  text: string;
+  current: boolean;
+}
+
+export function departmentsLineParts(
+  departments: Record<string, DepartmentStateView> | null | undefined,
+  current: string | null,
+): DepartmentsLinePart[] | null {
+  if (!departments || Object.keys(departments).length === 0) {
+    return null;
+  }
+  const order = [
+    ...DEPARTMENT_ORDER.filter((department) => department in departments),
+    ...Object.keys(departments).filter((department) => !DEPARTMENT_ORDER.includes(department)),
+  ];
+  return order.map((department) => ({
+    text: `${departmentName(department)} ${departmentStateText(departments[department])}`,
+    current: department === current,
+  }));
+}
+
+// 三个部门各自的状态写成一行（概览「当前事项」的那一行，工单 #904）。
+// 没有 departments（事项没有进行中的 run）时返回 null，由调用处照旧写「所在部门：X」。
+export function departmentsText(
+  departments: Record<string, DepartmentStateView> | null | undefined,
+): string | null {
+  return departmentsLineParts(departments, null)?.map((part) => part.text).join(" · ") ?? null;
+}
+
+// 房间信息里的传信管一行（原型 v12 第 3.3 节、工单 #905）：N 封询问等待本部门回答，
+// N 取房间里管道状态的 letters_waiting；为 0 时不写这一行（返回 null）。
+export function lettersWaitingText(letters: number | null | undefined): string | null {
+  const count = letters === null || letters === undefined || !Number.isFinite(letters)
+    ? 0
+    : Math.max(0, Math.trunc(letters));
+  return count === 0 ? null : `传信管：${count} 封询问等待本部门回答`;
+}
+
+// 概览「当前事项」里写部门状态的那一行（工单 #904）：有 departments 时写三个部门各自的状态与原因，
+// 没有时照旧写「所在部门：X」，X 取 department，没有时写「大厅」。
+export function departmentLine(
+  departments: Record<string, DepartmentStateView> | null | undefined,
+  department: string | null | undefined,
+): string {
+  return departmentsText(departments) ?? `所在部门：${departmentName(department) || "大厅"}`;
+}
+
+// 看板卡片上写正在工作的部门（三部门的循环结构第 3.1 节，工单 #904）：状态是一轮工作中或询问中的部门，
+// 按产品、工程、质检的顺序写成「工程、质检在工作」。有这样的部门时写它；没有时不写这句话
+// （返回空串，调用处这一格不出现）；查询结果里没有 departments（旧数据、没有进行中的 run）时
+// 退回事项所在的部门（工单 #842 的行为：没有部门的事项，这一格不写）。
+export function workingDepartmentsText(item: {
+  departments?: Record<string, DepartmentStateView> | null;
+  department?: string | null;
+}): string {
+  const departments = item.departments ?? null;
+  if (departments === null) {
+    return departmentName(item.department ?? null);
+  }
+  const working = DEPARTMENT_ORDER.filter((department) => {
+    const state = departments[department];
+    return state !== undefined && (state.state === "working" || state.state === "asking");
+  });
+  if (working.length === 0) {
+    return "";
+  }
+  return `${working.map((department) => departmentName(department)).join("、")}在工作`;
 }
 
 export function departmentName(value: string | null | undefined): string {

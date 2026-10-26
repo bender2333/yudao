@@ -20,7 +20,7 @@
 | 客户端端到端 | 157 / 26 | 71 / 16 | −86 |
 | evals/tests | 158 / 11 | 125 / 9 | −33 |
 
-集成层按 CI 的逐项用时估算：串行合计约 3750 秒降到约 2740 秒（约 62 分钟到约 46 分钟），CI 四路并行约 16 分钟到约 12 分钟。降得比用例数少，因为最慢的两块没有动：`test_release_script.py` 一个文件 432 秒（时间花在夹具里装 wheel，删用例不省时间），事件序列基准 157 秒（基准这套机制是骨架重写的验收依据，只删了 8 个重复场景）。再往下降靠 #598（往下层移）和发布脚本夹具的改写，不靠删。
+集成层按 CI 的逐项用时估算：串行合计约 3750 秒降到约 2740 秒（约 62 分钟到约 46 分钟），CI 四路并行的实测：合并前约 16 分钟，合并后 main（c5f86025）上的集成层 10 分 15 秒，全部通过。降得比用例数少，因为最慢的两块没有动：`test_release_script.py` 一个文件 432 秒（时间花在夹具里装 wheel，删用例不省时间），事件序列基准 157 秒（基准这套机制是骨架重写的验收依据，只删了 8 个重复场景）。再往下降靠 #598（往下层移）和发布脚本夹具的改写，不靠删。
 
 事件序列基准删了 8 个场景：`http_chat_cancel_while_provider_holds`、`http_messages_cancel_while_provider_holds`（与 responses 版逐字相同）、`http_chat_stream_broken_then_success`、`http_messages_stream_broken_then_success`、`http_responses_retry_after_then_success`、`http_responses_server_error_then_success`、`http_responses_timeout_then_success`、`text_only_reply`（协议级的失败与重试由 `test_provider_protocols.py`、`test_responses.py` 守着）。终态基准剩 31 个，满足内核测试的 `> 30`。
 
@@ -55,7 +55,7 @@
 
 ## 4. 留给用户的
 
-1. **像素逐像素对照原型要不要一直守**（ADR-0021）。要守，#956、#957 照做，那几个文件由它们改写；不要守，这些测试连同 #956、#957 的大部分一起可以删，画面验收改靠 #959 的诚实性检查和端到端。我没删，因为这是画面验收办法的取舍。
+1. **像素逐像素对照原型要不要一直守**（ADR-0021）。**已定（用户，2026-10-26）：继续守，验收办法不变，#951 至 #959 照做。**下面是当时的取舍。要守，#956、#957 照做，那几个文件由它们改写；不要守，这些测试连同 #956、#957 的大部分一起可以删，画面验收改靠 #959 的诚实性检查和端到端。我没删，因为这是画面验收办法的取舍。
 2. **内核测试的下限 `> 30`**（`harness/tests/kernel/test_every_stop_has_reason.py`，只由用户改）。降到 `> 25` 才能再删 4 个重复的终态场景（`concurrent_departments`、`http_chat_credential_rejected_then_continue`、`http_messages_credential_rejected_then_continue`、`history_exceeds_the_window`），每个是一次完整循环。
 3. **`harness smoke` 要不要退役**。工具与测试里留下的 2 个正向用例没动；README、AGENTS.md、测试分层第 4 节都提到它，另有 6 个测试文件导入它。退役要另开工单改这些地方，评测验收运行器（#830）建成后更自然。
 
