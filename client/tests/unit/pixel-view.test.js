@@ -5,8 +5,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { parseRoute, paths } from "../../src/renderer/src/shell/routing.ts";
-import { integerScale, layoutFor } from "../../src/renderer/src/pixel/scale.ts";
-import { createPixelViewState } from "../../src/renderer/src/pixel/view-state.ts";
 
 test("动作图鉴只在开发路径上可达：#/gallery 解析为 gallery，正式路径表里没有它", () => {
   assert.equal(parseRoute("#/gallery").name, "gallery");

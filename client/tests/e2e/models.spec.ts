@@ -12,7 +12,7 @@ const KEY = "sk-e2e-opencode-go-8f3a1c";
 
 // 每条用例各自启动一份后端与客户端：用例会修改目录（保存连接、部门默认、凭据），
 // 共用一份后端会让用例之间互相影响。后端启动用时由 git 子进程与目录种子决定（#107 裁定，
-// 见 docs/architecture-issues.md），这里单独放宽每条用例的时限
+// 见 docs/archive/architecture-issues-2026-09-10.md），这里单独放宽每条用例的时限
 async function openModels(
   size: { width: number; height: number },
   options: { admitAndBind?: boolean; rejectUpstream?: boolean } = {},
