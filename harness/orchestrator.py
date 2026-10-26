@@ -692,7 +692,7 @@ class Orchestrator:
             self.interactions.receive(transaction, text, command=False, base_version=base_version)
 
         self.writes.transact(run_stream(run_id), receive, command=command)
-        self._wake(run_id)
+        self._wake(run_id, restart=True)
         return self.project(run_id)
 
     def _stop_by_command(self, run_id: str, text: str) -> RunProjection:
@@ -807,7 +807,7 @@ class Orchestrator:
             self.interactions.receive_guidance(transaction, department, text, base_version=base_version)
 
         self.writes.transact(run_stream(run_id), receive, command=command)
-        self._wake(run_id)
+        self._wake(run_id, restart=True)
         return self.project(run_id)
 
     def _require_open(self, run_id: str, projection: RunProjection, message: str) -> None:
@@ -993,15 +993,19 @@ class Orchestrator:
         finally:
             activation.wakeup = None
 
-    def _wake(self, run_id: str) -> None:
+    def _wake(self, run_id: str, *, restart: bool = False) -> None:
         # 在安全节点等待重试的激活立即回到安全节点判断；在改变提交以后调用。
         # 同时运行（工单 #557）：这个 run 的每一个会话都醒过来。
-        # 运行到停止的循环也在等（工单 #561）：提交新输入、指导或取消以后，没有会话在跑时由它重新找部门
         for activation in list(self._active.get(run_id, {}).values()):
             wakeup = activation.wakeup
             if wakeup is not None:
                 loop, changed = wakeup
                 loop.call_soon_threadsafe(changed.set)
+        if not restart:
+            return
+        # 运行到停止的循环也在等（工单 #561）：新输入、指导或取消可能在没有会话运行时带来可以开始的部门，
+        # 由它醒来重新找一遍。部门提交提案时不叫醒它：那时正在工作的部门还没结束这一轮，
+        # 这时重新判断会把别的工作切在半途（harness/tests/test_context.py 的旧交付用例）。
         waiting = self._run_wakeups.get(run_id)
         if waiting is not None:
             loop, changed = waiting
@@ -1242,7 +1246,7 @@ class Orchestrator:
             if activation.driver is not None:
                 activation.driver.cancel()
         finally:
-            self._wake(activation.run_id)
+            self._wake(activation.run_id, restart=True)
 
     async def run_until_stop(self, run_id: str) -> RunProjection:
         # 运行到终态，或者到 run 被未回答的决定请求阻塞、等待用户回答为止。
