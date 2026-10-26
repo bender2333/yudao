@@ -595,3 +595,5 @@ claude-opus-5-5（总架构师） / 2026-10-26 15:39 / CONTEXT.md 补上午与�
 claude-sonnet-5-5（总架构师） / 2026-10-26 16:28 / docs/design/department-guidance.md 开头状态行收成一行，第 2、2.1、4 节补三处：放行被接纳的口径（产品决定也改有效合同，只有产品以文字回答结束才算合同没变）、等待期间运行循环醒来重新找可以开始的部门、询问分支的历史排除「模型已发出工具调用而没有结果」的步；docs/design/visualization.md 开头状态行收成一行，第 8 节加「逐像素回放核对比什么」与范围规则；docs/prototypes/CHANGELOG.md 的 v14 待办加第 13 条（模拟接口的形状向真实接口靠拢） / #561 被 solo 第二次交回、#957 逐像素达不到，都在当时的 main 上核对属实，做法写进设计说明（docs/decision.md 同日两条）
 
 claude-sonnet-5-5（总架构师） / 2026-10-26 17:02 / docs/design/skeleton-and-application.md 开头的更新段收成一行状态，第 12 节「用户批准」改为「批准」，写明要改内核清单或 harness/tests/kernel/ 的四张（S1d、S2a、S5a、S6a）在 AGENTS.md 开例外以前按现有规则交回 / 用户 2026-10-26 决定改内核路径的七张由总架构师事前批准、solo 合并（docs/decision.md 同日一条）；AGENTS.md 与 .claude/skills/solo-worker/SKILL.md 的例外没有推送，等用户定
+
+claude-sonnet-5-5（总架构师） / 2026-10-26 17:22 / AGENTS.md：Solo 模式删去 solo 执行者不修改可信内核清单与 harness/tests/kernel/ 的规定（隐藏检查、参考解法、评分器、发布检查改为列明），共同要求加「内核路径的测试覆盖」，solo 合并前的核对与审查流程第 2 步各加一句；.claude/skills/solo-worker/SKILL.md 同步；docs/design/skeleton-and-application.md 第 12 节「批准」、docs/design/test-pyramid.md 第 13 节特别规则第 1 条随之改 / 用户 2026-10-26 决定（docs/decision.md 同日一条）
