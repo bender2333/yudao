@@ -24,16 +24,18 @@ const TUBE_Y = 104;
 const TUBE = "#7fc3e8";
 const TUBE_D = "#3f86b0";
 
+// 状态词与状态色：键是画面合同的事项状态（pixel/contract.ts 的 ITEM_STATES），翻译层已经把服务端的说法
+// 翻成这些取值（工单 #953）。服务端的 running、waiting_provider 这些词不再出现在画面层。
 const STATUS_TEXT: Record<string, string> = {
-  queued: "排队中", waiting_slot: "等待执行槽位", running: "运行中", asking: "询问中", waiting_provider: "等待模型服务", paused: "已暂停",
-  failed: "失败", done: "已完成", cancelled: "已取消", interrupted: "中断", waiting_resume: "待恢复",
-  stopped: "已停止", stopped_for_upgrade: "因 Yudao 升级停止", adopted: "已采纳", waiting_decision: "等待你的决定", released_unsettled: "已放行",
+  queued: "排队中", waiting_slot: "等待执行槽位", working: "运行中", asking: "询问中", waiting_model: "等待模型服务",
+  waiting_resume: "待恢复", waiting_user: "等待你的决定", paused: "已暂停", interrupted: "中断", failed: "失败",
+  done: "已完成", cancelled: "已取消", upgrade_stopped: "因 Yudao 升级停止", adopted: "已采纳",
 };
 const STATUS_CHIP: Record<string, string> = {
-  waiting_decision: PAL.yellow2,
-  running: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_provider: PAL.grey3, paused: PAL.blue1,
+  waiting_user: PAL.yellow2,
+  working: PAL.green2, asking: PAL.blue2, queued: PAL.grey2, waiting_slot: PAL.grey2, waiting_model: PAL.grey3, paused: PAL.blue1,
   failed: PAL.red2, done: PAL.green1, cancelled: PAL.grey2, interrupted: PAL.grey3,
-  stopped: PAL.grey3, waiting_resume: PAL.yellow2, stopped_for_upgrade: PAL.orange2, adopted: PAL.green3, released_unsettled: PAL.green3,
+  waiting_resume: PAL.yellow2, upgrade_stopped: PAL.orange2, adopted: PAL.green3,
 };
 
 /** 房间外壳的画法配色（部门配色取 DEPTS 的子集）。 */
@@ -202,7 +204,7 @@ export class FloorRenderer {
     for (const w of this.driver.model.waiting_provider) {
       const r = roomOf(world, w.department);
       if (!r) continue;
-      const text = `等待模型服务${w.next_retry_at ? " · 重试中" : ""}`;
+      const text = `等待模型服务${w.retry_text ? " · " + w.retry_text : ""}`;
       drawSign(c, r.x + r.w / 2, PIPE_Y - 12, text, { size: 5.5, bg: PAL.grey1, stripe: PAL.grey3, maxW: r.w + 20 });
     }
     // 未回答的询问：信件停在接收方的传信管出口
@@ -425,7 +427,7 @@ export class FloorRenderer {
     const info = ch.roleInfo;
     if (info && primary && primary !== ch) return info.status === "working" ? "code" : "idle";
     const it = ch.item;
-    return it && it.status === "running" ? "code" : it && it.status === "failed" ? "error" : "idle";
+    return it && ACTIVE.includes(it.status) ? "code" : it && it.status === "failed" ? "error" : "idle";
   }
 
   private door(c: CanvasRenderingContext2D, r: Room): void {
@@ -674,7 +676,7 @@ export class FloorRenderer {
     const focus = this.scene.focusId;
     const items = this.driver.model.items;
     const it = (focus ? items.find((x) => x.work_item_id === focus) : null)
-      ?? items.find((x) => ACTIVE.includes(x.status) || x.status === "waiting_provider")
+      ?? items.find((x) => ACTIVE.includes(x.status) || x.status === "waiting_model")
       ?? items.find((x) => IN_ROOM.includes(x.status))
       ?? null;
     if (!it) {
@@ -695,7 +697,7 @@ export class FloorRenderer {
     if (it.round) chip(`第 ${it.round} 轮`, PAL.paper);
     const dept = it.department ? DEPT_SHELL[it.department] : null;
     if (dept) chip(`当前部门：${dept.name}`, dept.light);
-    chip(STATUS_TEXT[it.status] ?? it.status, STATUS_CHIP[it.status] ?? PAL.grey2, ["running", "failed", "adopted", "asking"].includes(it.status) ? PAL.white : PAL.ink);
+    chip(STATUS_TEXT[it.status] ?? it.status, STATUS_CHIP[it.status] ?? PAL.grey2, ["working", "failed", "adopted", "asking"].includes(it.status) ? PAL.white : PAL.ink);
     if (it.time_limit_sec) {
       const k = Math.min(1, (it.elapsed_sec ?? 0) / it.time_limit_sec);
       const bw = 110;

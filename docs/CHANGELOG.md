@@ -581,3 +581,5 @@ claude-opus-5-5 / 2026-10-26 10:40 / docs/program-roadmap.md 第 1.4 节阶段�
 claude-opus-5-5 / 2026-10-26 11:00 / docs/program-roadmap.md 第 1.4 节、docs/current-baseline.md、README.md 的真实走查改为架构师走查、并入 #994；docs/decision.md 追加一条 / 用户决定 #629 并入 #994，只试用一次
 
 claude-opus-5-5 / 2026-10-26 11:45 / docs/agents/autopilot-runtime.md 第 7 节删「同时进行的 touches-core 工单」一行；docs/agents/dispatcher.md 第 3 节流程图与第 1 步删 touches-core 上限，派发前核对改为一项，第 4 节说法改为由工单依赖错开；docs/agents/triage-labels.md 的 touches-core 改为「合并前跑集成层、不改只改以外的文件、不限同时张数」；docs/design/skeleton-and-application.md 第 12 节去掉「一次只进行一张」与「由派发者错开」；docs/decision.md 追加一条。另改 CLAUDE.md、AGENTS.md 与 .claude/skills 下 to-children、solo、solo-worker（含 solo 脚本 state.mjs 的互斥判断） / 用户决定不做 touches-core 的同时张数限制，冲突按拆分问题处理
+
+claude-opus-5-5 / 2026-10-26 11:10 / docs/design/skeleton-and-application.md 第 12 节：「两条贯穿的约束」改为「几条」，加一条「同一份文件分块改」（`orchestrator.py`、`models.py`、`recording.py` 各块归哪张工单）；S3 行去掉「一轮的结果不写死种类」，移到 S2b 行（只改加 `engine.py`、`orchestrator.py` 拿到一轮结果以后的处理）；S4b 前置加 S1e；docs/decision.md 追加一条 / 重叠扫描（Discussions #1042）按函数核对后，真正改到同一块的两处重切

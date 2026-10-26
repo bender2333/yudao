@@ -55,11 +55,16 @@ export function loadRecordings(): RecordingFile {
 /**
  * 在页面里运行的驱动：把调用序列送进客户端的画面，按固定时刻取状态。
  * 注册进页面以后由 replayScenario 调用（函数体在浏览器里执行，只能引用浏览器里可用的模块）。
+ *
+ * 工单 #953 起画面只收画面合同的状态与动作：录下的 setModel 换成 jump（带一个递增的位置，
+ * 直接显示那份状态），录下的 playEvent 先经翻译层翻成动作再交给画面。录制还是 v10 的形状，
+ * 翻不出动作的事件不会演出，所以与旧录制的比较会有差异（画面 7 换录制以后恢复）。
  */
 async function driver(input: { ops: RecordedScenario["ops"]; models: Record<string, unknown>[]; sampleMs: number[] }): Promise<{ samples: RecordedSample[]; errors: string[] }> {
-  // 驱动在浏览器里执行：这两个模块经开发服务器的绝对路径加载（不在 Node 的类型系统里）
+  // 驱动在浏览器里执行：这几个模块经开发服务器的绝对路径加载（不在 Node 的类型系统里）
   const P = await import(/* @vite-ignore */ "/src/pixel/floor/view.ts" as string) as typeof import("../../src/renderer/src/pixel/floor/view.ts");
   const clockMod = await import(/* @vite-ignore */ "/src/pixel/clock.ts" as string) as typeof import("../../src/renderer/src/pixel/clock.ts");
+  const tr = await import(/* @vite-ignore */ "/src/translate/floor.ts" as string) as typeof import("../../src/renderer/src/translate/floor.ts");
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:640px;height:320px;z-index:9999;background:#000";
   document.body.appendChild(host);
@@ -73,6 +78,8 @@ async function driver(input: { ops: RecordedScenario["ops"]; models: Record<stri
     errors.push(a.map(String).join(" "));
     origError.apply(console, a);
   };
+  // 录下的调用没有位置：状态与动作按调用顺序给一个递增的位置（画面合同要求带位置）
+  let position = 0;
   function snapshot(): RecordedSample["state"] & { realT: number } {
     const world = view.inspect().driver.world;
     const scene = view.inspect().scene;
@@ -100,9 +107,25 @@ async function driver(input: { ops: RecordedScenario["ops"]; models: Record<stri
   for (let i = 0; i < input.ops.length; i++) {
     const op = input.ops[i];
     if (op.op === "mount") continue;
-    if (op.op === "setModel") view.setModel(input.models[op.model as number] as never);
-    else if (op.op === "playEvent") view.playEvent(op.arg as never);
-    else if (op.op === "focus") view.focus(op.arg as string | null);
+    position += 1;
+    if (op.op === "setModel") {
+      view.jump({ position, ...(input.models[op.model as number] as Record<string, unknown>) } as never);
+    } else if (op.op === "playEvent") {
+      // 录下的是 v10 的事件形状：经翻译层翻成动作，翻不出来的（原型才有的 transition、x_ 事件）不演出
+      const raw = (op.arg ?? {}) as Record<string, unknown>;
+      const ev = {
+        type: String(raw.type ?? ""),
+        position,
+        event_id: raw.event_id as string | undefined,
+        department: raw.department as string | undefined,
+        role: raw.role as string | undefined,
+        tool: raw.tool as string | undefined,
+        label: raw.label as string | undefined,
+        work_item_id: raw.work_item_id as string | undefined,
+        payload: raw.payload as Record<string, unknown> | undefined,
+      };
+      for (const action of tr.floorActions(ev)) view.play(action);
+    } else if (op.op === "focus") view.focus(op.arg as string | null);
     else if (op.op === "setOverlay") view.setOverlay((op.arg as { id: string }).id, (op.arg as { data: unknown }).data);
     // 与原型一致：只在 setModel、playEvent、focus 之后取状态
     if (op.op === "setModel" || op.op === "playEvent" || op.op === "focus") {

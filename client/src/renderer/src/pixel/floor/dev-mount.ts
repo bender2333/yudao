@@ -1,4 +1,4 @@
-// 开发构建里的像素画面测试入口（对应原型 checks/behaviors.js 在浏览器里驱动画面的做法，工单 #179）。
+// 开发构建里的像素画面测试入口（对应原型 v13 checks/behaviors.js 在浏览器里驱动画面的做法，工单 #179、#953）。
 // 端到端测试用它把项目楼层画面用给定的数据挂到一个独立容器上，再直接驱动世界、卡片与点击。
 // 只在开发构建里由 main.tsx 安装（import.meta.env.DEV），构建产物里不出现。
 
@@ -6,16 +6,21 @@ import { createManualClock, type Clock } from "../clock.ts";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "./view.ts";
 import { H, W } from "./render.ts";
 import type { DecisionAnswer, DecisionResult } from "./card.ts";
-import type { FloorModel, PixelFloorEvent } from "../world/types.ts";
+import type { DecisionFace, FloorModel } from "../world/types.ts";
+import type { PixelAction } from "../contract.ts";
 
 /** 挂载一个楼层画面并返回驱动它的句柄。 */
 export interface PixelFloorTestMount {
   view: FloorView;
   hooks: FloorTestHooks;
-  /** 换成新的画面数据（与 FloorScreen 的 setModel 同一入口）。 */
+  /** 换成新的状态（与 FloorScreen 的 setState 同一入口：等它之前的动作演完再上画面）。 */
   setModel: (model: FloorModel) => void;
-  /** 播一条事件。 */
-  playEvent: (event: PixelFloorEvent) => void;
+  /** 换成新的状态并直接显示（跳到最新）。 */
+  jump: (model: FloorModel) => void;
+  /** 播一个动作。 */
+  play: (action: PixelAction) => void;
+  /** 换成新的决定卡片（实时内容）。 */
+  setDecisions: (list: DecisionFace[]) => void;
   /** 推进给定的毫秒数（手动时钟）。 */
   step: (ms: number) => void;
   /** 在画面逻辑坐标上点一下（与真实点击同一条路）。 */
@@ -51,8 +56,11 @@ async function mountFloor(model: FloorModel, opts?: { answer?: (payload: Decisio
     },
     onGo: () => {},
   });
-  view.setModel(model);
-  const hooks = floorTestHooks(view, () => view.setModel(model));
+  // 测试给的模型可能没有位置（画面合同要求带位置）：补上 0，其余原样
+  const positioned = (m: FloorModel): FloorModel => ({ ...m, position: Number.isFinite(m.position) ? m.position : 0 });
+  view.jump(positioned(model));
+  view.setDecisions(model.decisions ?? []);
+  const hooks = floorTestHooks(view, () => view.jump(positioned(model)));
 
   const rectOf = (): DOMRect => {
     const canvas = host.querySelector("canvas");
@@ -64,8 +72,13 @@ async function mountFloor(model: FloorModel, opts?: { answer?: (payload: Decisio
     view,
     hooks,
     answers,
-    setModel: (next) => view.setModel(next),
-    playEvent: (event) => view.playEvent(event),
+    setModel: (next) => {
+      view.setState(positioned(next));
+      view.setDecisions(next.decisions ?? []);
+    },
+    jump: (next) => view.jump(positioned(next)),
+    play: (action) => view.play(action),
+    setDecisions: (list) => view.setDecisions(list),
     step: (ms) => {
       elapsed += ms;
       clock.advance(elapsed);

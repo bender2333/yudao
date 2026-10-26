@@ -1,23 +1,34 @@
-// 项目楼层的驱动：按快照配置世界（声明、角色、持续状态），把事件变成任务、包裹与信号（原型 v10 floor.js
-// 与设计说明第 4、5 节，工单 #82）。
+// 项目楼层的驱动：按状态配置世界（声明、角色、持续状态），按动作演出（原型 v13 js/pixel/floor.js 与
+// 画面与播放设计说明第 4 至 6 节，工单 #82、#953）。
+//
+// 状态与动作都来自画面合同（pixel/contract.ts），由翻译层翻好（translate/floor.ts）：
+//   - 状态进播放时间线，等它之前的动作演完再上画面（apply）；
+//   - 动作进时间线，按它的 kind 在楼层的声明表里找到级别、时长与做它的角色，然后演（perform）；
+//   - 决定卡片与流式文字是实时内容，到了就显示，不进时间线。
+// 打开画面、重新同步、标签页切回与回放拖动都用 jump：清空时间线，直接显示最新状态，不补播。
 //
 // 世界与系统都在这里维护；画面渲染只读这里给出的世界与状态。驱动不依赖 PixiJS：
 // 飞行物、粒子与说话停留都记在驱动自己的状态里，渲染层照读。
 
+import { action as checkAction, floorState as checkFloorState, type ItemState, type PixelAction, type PixelState } from "../contract.ts";
+import { create as createTimeline, type Timeline, type TimelineEntry, type TimelineInspect } from "../timeline.ts";
+import { asText, dispatch, dropAction, enqueue, nextPackageId, progressOf, sendPackage, spawnPackage, stepCharacters, stepPackages, stepPipes } from "./characters.ts";
 import { declareLinks, declareRooms, linkBetween, route, roomOf } from "./declare.ts";
-import { dispatch, enqueue, nextPackageId, sendPackage, spawnPackage, stepCharacters, stepPackages, stepPipes } from "./characters.ts";
 import { actorOf, charFor, primaryOf, syncCharacters, mountMachines } from "./scene.ts";
-import { say, sayMs } from "./say.ts";
+import { sayMs } from "./say.ts";
 import { signal, signalOn } from "./signals.ts";
 import type {
-  Catalog, Character, DecisionFace, DeclContext, FloorModel, LoopItem, PackageVisual, PixelFloorEvent, SceneLike, Task, TaskDef, TaskFx, World,
+  Catalog, Character, DecisionFace, DeclContext, FloorModel, LoopItem, PackageVisual, SceneLike, Task, TaskDef, TaskFx, World,
 } from "./types.ts";
 import { createWorld } from "./declare.ts";
 
-/** 会待在房间内的事项状态（原型 floor.js 的 IN_ROOM）。 */
-export const IN_ROOM = ["running", "asking", "waiting_provider", "paused", "failed", "done", "cancelled", "interrupted", "waiting_resume", "waiting_decision", "stopped_for_upgrade"];
+/** 会待在房间内的事项状态（画面合同的事项状态；进行中的事项在房间里，工单 #900）。 */
+export const IN_ROOM: readonly ItemState[] = [
+  "working", "asking", "waiting_model", "paused", "failed", "done", "cancelled", "interrupted", "waiting_resume", "waiting_user",
+  "upgrade_stopped",
+];
 /** 房间亮灯与管道流动对应的活跃事项状态。 */
-export const ACTIVE = ["running", "asking"];
+export const ACTIVE: readonly ItemState[] = ["working", "asking"];
 
 const PIPE_Y = 138;
 const TOP = 50;
@@ -31,6 +42,7 @@ const ITEM_COLORS = ["#d9534f", "#4a90d9", "#5cb85c", "#f0ad4e", "#9b59b6", "#e6
 const PAL_MAP: Record<string, string> = {
   red2: "#d9534f", red3: "#b52b27", green2: "#5cb85c", green3: "#3d8b40", orange1: "#e67e22",
   orange2: "#f0ad4e", yellow1: "#ffd66b", yellow2: "#f7e07a", white: "#ffffff", blue1: "#6ba8d9", blue2: "#4a90d9",
+  grey3: "#8a90a0",
 };
 
 /** 大厅的决定板矩形。 */
@@ -86,15 +98,31 @@ export interface FloorDriverOptions {
   time: { clock: (iso: string | null) => string; duration: (sec: number) => string };
 }
 
+/** 时间线上的一个动作在这里演：run = { id, action, alive(), finish() }。 */
+interface Run {
+  id: number;
+  action: PixelAction;
+  lanes: string[];
+  dead: boolean;
+  alive: () => boolean;
+  finish: () => void;
+}
+
 export interface FloorDriver {
   world: World;
   model: FloorModel;
   state: FloorState;
-  /** 重新按快照配置世界与角色。 */
-  setModel: (model: FloorModel) => void;
-  /** 把一条事件变成任务、包裹与信号。 */
-  playEvent: (event: PixelFloorEvent) => void;
-  /** 每帧推进：包裹、管道、角色。 */
+  /** 一份状态上画面（由播放时间线决定什么时候）。 */
+  setState: (state: FloorModel) => void;
+  /** 跳到最新：清空时间线，正在演的立刻结束，直接显示给出的状态。 */
+  jump: (state: FloorModel) => void;
+  /** 一个动作进播放时间线（按位置排队，按声明演出）。 */
+  play: (action: PixelAction) => void;
+  /** 流式文字：实时内容，到了就显示，不进时间线。 */
+  stream: (who: { room: string | null; role?: string | null }, text: string) => void;
+  /** 决定卡片（实时内容）：大厅的板上贴着的几张，点开可以回答。 */
+  setDecisions: (list: DecisionFace[]) => void;
+  /** 每帧推进：时间线、包裹、管道、角色。 */
   step: () => void;
   /** 决定板的矩形（画面与点击共用）。 */
   boardRect: () => BoardRect;
@@ -104,14 +132,17 @@ export interface FloorDriver {
   saidOf: (id: string, now: number) => { text: string; until: number } | null;
   /** 房间声明的 props、lit、tint 读取画面数据的窗口。 */
   declCtx: () => DeclContext;
+  /** 时间线此刻的读数（测试与调节面板）。 */
+  inspectTimeline: () => TimelineInspect;
 }
 
-/** 建立一个楼层驱动：世界、角色与画面状态都在这里维护。 */
+/** 建立一个楼层驱动：世界、角色、播放时间线与画面状态都在这里维护。 */
 export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
   const scene = opts.scene;
   const state = opts.state;
   const catalog = opts.catalog;
   let model = opts.model;
+  let decisions: DecisionFace[] = model.decisions ?? [];
   let flags = flagsOf(model, catalog);
   let world = declareWorld(model, catalog);
 
@@ -128,22 +159,24 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     return w;
   }
 
-  function rooms(): { hall: NonNullable<ReturnType<typeof roomOf>>; lib: NonNullable<ReturnType<typeof roomOf>> | null; depts: NonNullable<ReturnType<typeof roomOf>>[]; out: World["links"][string]; door: NonNullable<World["machineDoor"]> } {
+  function rooms(): { hall: NonNullable<ReturnType<typeof roomOf>>; lib: NonNullable<ReturnType<typeof roomOf>>; depts: NonNullable<ReturnType<typeof roomOf>>[]; out: World["links"][string]; door: NonNullable<World["machineDoor"]> } {
     const list = world.roomOrder.map((id) => world.rooms[id]);
     const hall = list.find((r) => r.roomKind === "hall");
     if (!hall) throw new Error("楼层没有声明大厅");
     const out = Object.values(world.links).find((l) => l.from === hall.id && l.linkKind === "handoff");
     if (!out) throw new Error("大厅没有交接管道");
     if (!world.machineDoor) throw new Error("楼层没有声明通往机房的门");
-    return { hall, lib: list.find((r) => r.roomKind === "shelf") ?? null, depts: list.filter((r) => r.roomKind === "dept"), out, door: world.machineDoor };
+    const lib = list.find((r) => r.roomKind === "shelf");
+    if (!lib) throw new Error("楼层没有声明成果库");
+    return { hall, lib, depts: list.filter((r) => r.roomKind === "dept"), out, door: world.machineDoor };
   }
 
   const itemsIn = (department: string): LoopItem[] => model.items.filter((it) => it.department === department && IN_ROOM.includes(it.status));
-  const waitingDept = (department: string): { department: string; next_retry_at: string | null } | null =>
+  const waitingDept = (department: string): { department: string; retry_text: string | null } | null =>
     model.waiting_provider.find((w) => w.department === department) ?? null;
   const primaryItem = (department: string): LoopItem | null => {
     const here = itemsIn(department);
-    return here.find((it) => ACTIVE.includes(it.status)) ?? here.find((it) => it.status === "waiting_provider") ?? here[0] ?? null;
+    return here.find((it) => ACTIVE.includes(it.status)) ?? here.find((it) => it.status === "waiting_model") ?? here[0] ?? null;
   };
 
   const ctx = {
@@ -186,45 +219,60 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     }
   }
 
-  /** 小人头顶说的话（来自 say.ts）；目录里没有这类事件时任务用自己声明的标签。 */
-  function sayOf(ev: PixelFloorEvent, department: string, side: "to" | "from" | null): Partial<Task> {
-    const text = say(ev, { dept: department, side, roleName: (id) => world.characters[id ?? ""]?.name ?? null });
-    return text ? { label: text } : {};
+  // ---------------------------------------------------------------------------
+  // 动作：播放时间线决定什么时候开始；一个动作的演出在几个角色、管道与飞行物之间接力，
+  // 最后一步做完时告诉时间线。
+
+  /** 小人头顶说的话：动作带着的话由翻译层写好（say 是做事的一方，sayTo 是收东西的一方）。 */
+  function sayOf(a: PixelAction, side: "to" | "from" | null): Partial<Task> {
+    const text = side === "to" ? a.sayTo : a.say;
+    return typeof text === "string" && text ? { label: text } : {};
   }
 
-  /** 小人走到管道口放下或取出包裹：任务放到队首（交接不排队），做完以后执行 after。 */
-  function trip(department: string, key: string, after?: (() => void) | null, extra?: Partial<Task> | null): void {
+  function said(ch: Character, text: string): void {
+    state.said[ch.id] = { text, until: scene.realT + sayMs(text) };
+  }
+
+  /** 小人走到管道口放下或取出包裹：做完以后执行 after；没有角色时直接执行。减少动画时小人不走动，只在原处说话。 */
+  function trip(run: Run, department: string, key: string, after?: (() => void) | null, extra?: Partial<Task> | null): void {
+    const next = (): void => {
+      if (run.alive()) after?.();
+    };
     if (scene.reduced) {
       const def = catalog.tasks[key];
       const ch = def ? charFor(world, department, null, def.actor ?? def.by ?? null) : null;
-      if (ch && extra?.label) state.said[ch.id] = { text: extra.label, until: scene.realT + sayMs(extra.label) };
-      after?.();
+      if (ch && extra?.label) said(ch, extra.label);
+      next();
       return;
     }
-    const task = enqueue(world, department, key, { front: true, must: true, onDone: after ?? undefined, ...(extra ?? {}) });
-    if (!task) after?.();
+    const task = enqueue(world, department, key, { onDone: next, actionId: run.id, ...(extra ?? {}) });
+    if (!task) next();
   }
 
-  /** 包裹沿管道走：减少动画时改成管道上的箭头。 */
-  function send(pts: [number, number][] | null, bmp: string, opt: Partial<PackageVisual>): void {
+  /** 包裹沿管道走；option.run 是这个包裹属于的演出，截断以后不再执行 onDone。减少动画时改成管道上的箭头。 */
+  function send(pts: [number, number][] | null, bmp: string, opt: Partial<PackageVisual> & { run?: Run }): void {
+    const run = opt.run;
+    const next = (): void => {
+      if ((!run || run.alive()) && opt.onDone) opt.onDone();
+    };
     if (!pts) {
-      opt.onDone?.();
+      next();
       return;
     }
     if (scene.reduced) {
       state.arrows.push({ pts, color: opt.color ?? "#ffffff", bmp, itemId: opt.itemId ?? null, dash: Boolean(opt.small), until: scene.realT + 3600 });
-      opt.onDone?.();
+      next();
       return;
     }
     const id = nextPackageId();
-    spawnPackage(world, id, opt.itemId ?? null, null, opt.artifact ?? null, null);
-    const pk = world.packages[id];
+    const pk = spawnPackage(world, id, opt.itemId ?? null, null, opt.artifact ?? null, null);
     pk.bmp = bmp;
     pk.color = opt.color ?? null;
     pk.small = opt.small;
+    pk.actionId = run ? run.id : undefined;
     sendPackage(world, scene, id, opt.linkKey ?? null, pts, opt.ms, () => {
       delete world.packages[id];
-      opt.onDone?.();
+      next();
     });
   }
 
@@ -232,227 +280,390 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     state.flash[roomId] = { color, until: scene.realT + ms };
   };
 
-  /** 任务声明里的效果：信号、房间闪光、包裹沿管道走。 */
-  function applyFx(fx: TaskFx, department: string): void {
+  /** 任务声明里的效果（floor-decl.js 的 fx）：信号、房间闪光、包裹沿管道走。 */
+  function applyFx(fx: TaskFx, a: PixelAction, ch: Character, run: Run, after?: (() => void) | null): void {
     if (fx.signal) signal(world, scene, fx.signal, fx.ms ?? 0);
-    if (fx.flash) flash(fx.flash.room === "self" ? department : fx.flash.room, PAL_MAP[fx.flash.color] ?? "#ffffff", fx.flash.ms ?? 900);
+    if (fx.flash) flash(fx.flash.room === "self" ? (ch.department ?? "") : fx.flash.room, PAL_MAP[fx.flash.color] ?? "#ffffff", fx.flash.ms ?? 900);
     if (fx.send) {
       const link = world.links[fx.send.link];
-      if (!link) return;
+      if (!link) {
+        after?.();
+        return;
+      }
       send(fx.send.reverse ? link.pts.slice().reverse() : link.pts, fx.send.bmp, {
         color: fx.send.color ? (PAL_MAP[fx.send.color] ?? "#ffffff") : null,
         linkKey: link.id,
+        run,
         onDone: () => {
-          for (const next of fx.send!.then ?? []) applyFx(next, department);
+          for (const next of fx.send!.then ?? []) applyFx(next, a, ch, run);
+          after?.();
         },
       });
+      return;
     }
+    after?.();
   }
 
-  /** 交给 dispatch 的 make：任务头顶说的内容与声明里的效果。 */
-  function extrasOf(def: TaskDef, ev: PixelFloorEvent, ch: Character, side?: "to" | "from"): Partial<Task> {
-    const out: Partial<Task> = sayOf(ev, ch.department!, side ?? null);
-    if (def.fx) {
-      const run = (when: string) => (): void => {
-        for (const fx of def.fx!.filter((x) => x.when === when)) applyFx(fx, ch.department!);
+  /** 交给 dispatch 的 make：任务头顶说的内容、声明里的效果、属于哪个动作；动作的最后一步做完时告诉时间线。 */
+  function extrasOf(run: Run) {
+    return (def: TaskDef, a: PixelAction, ch: Character, side?: "to" | "from"): Partial<Task> => {
+      const out: Partial<Task> = { ...sayOf(a, side ?? null), actionId: run.id };
+      const last = side === "to" || !def.then;
+      const sends = Boolean(def.fx && def.fx.some((f) => f.when === "done" && f.send));
+      if (def.fx) {
+        out.start = () => {
+          for (const fx of def.fx!.filter((f) => f.when === "start")) applyFx(fx, a, ch, run);
+        };
+      }
+      out.done = () => {
+        const list = def.fx ? def.fx.filter((f) => f.when === "done") : [];
+        // 做完以后有包裹要走的，等包裹走完再算这个动作演完
+        for (const fx of list) applyFx(fx, a, ch, run, fx.send && last ? run.finish : null);
+        if (last && !sends) run.finish();
       };
-      out.start = run("start");
-      out.done = run("done");
-    }
-    return out;
+      return out;
+    };
   }
 
-  const dispatchTask = (ev: PixelFloorEvent): boolean => dispatch(world, ev, extrasOf);
+  /** 一个角色的任务：找不到做它的角色时这个动作没有可演的。 */
+  function task(run: Run): void {
+    if (!dispatch(world, run.action, extrasOf(run))) run.finish();
+  }
 
-  function playEvent(ev: PixelFloorEvent): void {
-    if (!ev || !ev.type) throw new Error("playEvent 需要事件对象");
-    const pl = (ev.payload ?? {}) as Record<string, unknown>;
-    const wid = ev.work_item_id ?? null;
-    // 原型 floor.js 的 itemById 按事项的 id 查；快照里的事项同时带 work_item_id
-    const item = wid ? (model.items.find((x) => x.id === wid || x.work_item_id === wid) ?? null) : null;
-    const color = item ? ITEM_COLORS[item.color_index % ITEM_COLORS.length] : null;
+  /** 时间线上的一个动作在这里演（按动作的 kind，不再按事件种类分支）。 */
+  function perform(run: Run): void {
+    const a = run.action;
+    const it = itemById(asText(a.item));
+    const color = it ? ITEM_COLORS[(Number(it.color_index) || 0) % ITEM_COLORS.length] : null;
     const lay = rooms();
     const order = world.roomOrder;
-    switch (ev.type) {
-      case "user_input_received":
-      case "work_item_created":
+    // 整层静止（中断）时不演动作；自动继续本身让画面重新动起来
+    if (scene.frozen && a.kind !== "resume") {
+      run.finish();
+      return;
+    }
+    switch (a.kind) {
+      case "mail":
         if (!scene.reduced) {
-          scene.fly({ bmp: "letter", from: [-6, PIPE_Y - 20], to: [lay.hall.x + 16, PIPE_Y + 6], ms: 900, arc: 20, onDone: () => signal(world, scene, "mail", 1500) });
+          scene.fly({ bmp: "letter", from: [-6, PIPE_Y - 20], to: [lay.hall.x + 16, PIPE_Y + 6], ms: 900, arc: 20, onDone: () => { signal(world, scene, "mail", 1500); run.finish(); } });
         } else {
           signal(world, scene, "mail", 1500);
+          run.finish();
         }
         return;
-      case "department_activated":
-        if (ev.department && world.rooms[ev.department]) flash(ev.department, "#ffd66b", 700);
+      case "room_light":
+        if (a.room) flash(String(a.room), PAL_MAP.yellow1, 700);
+        run.finish();
         return;
-      case "transition": {
-        let to = pl.to as string;
-        if (to === "adopted" || to === "adoption") to = lay.lib!.id;
-        const from = pl.from as string;
+      case "handoff": {
+        const to = asText(a.to) ?? "";
+        const from = asText(a.from) ?? "";
         // 两个房间之间没有直接的管道时，包裹沿声明的管道一段一段走过去
         const hops = route(world, from, to);
-        if (!hops.length) return;
+        if (!hops.length) {
+          run.finish();
+          return;
+        }
         const ids = lay.depts.map((r) => r.id);
-        const rework = pl.artifact === "defect" || hops[0].link.linkKind === "return" || (ids.includes(from) && ids.includes(to) && order.indexOf(from) > order.indexOf(to));
-        if (rework) for (const hop of hops) state.pipeFlash[hop.key] = scene.realT + 2600;
-        const bmp = ART_BMP[pl.artifact as string] ?? "box_sealed";
-        // 交出方走到管道口放下包裹，包裹沿管道移动，接收方走到管道口取出：两端各是一个任务
+        const rework = a.artifact === "defect" || hops[0].link.linkKind === "return" || (ids.includes(from) && ids.includes(to) && order.indexOf(from) > order.indexOf(to));
+        if (rework) hops.forEach((h) => { state.pipeFlash[h.key] = scene.realT + 2600; });
+        const bmp = ART_BMP[asText(a.artifact) ?? ""] ?? "box_sealed";
+        // 交出方走到管道口放下包裹，包裹沿管道移动，接收方走到管道口取出：两端各是一步
         const arrive = (): void => {
           flash(to, "#ffffff", 500);
-          trip(to, rework ? "package_return_in" : "package_handoff_in", null, sayOf(ev, to, "to"));
+          trip(run, to, rework ? "package_return_in" : "package_handoff_in", run.finish, sayOf(a, "to"));
         };
         const leg = (i: number): void => send(hops[i].pts, bmp, {
-          itemId: wid, color, linkKey: hops[i].key,
+          itemId: asText(a.item), color, linkKey: hops[i].key, run,
           onDone: () => (i + 1 < hops.length ? leg(i + 1) : arrive()),
         });
-        trip(from, rework ? "package_return_out" : "package_handoff_out", () => leg(0), sayOf(ev, from, "from"));
+        trip(run, from, rework ? "package_return_out" : "package_handoff_out", () => leg(0), sayOf(a, "from"));
         return;
       }
-      case "qa_submitted":
-        if (ev.department) flash(ev.department, pl.verdict === "release" ? "#5cb85c" : "#d9534f", 1200);
-        dispatchTask(ev);
+      case "stamp_release":
+      case "stamp_defect":
+        if (a.room) flash(String(a.room), a.kind === "stamp_release" ? PAL_MAP.green2 : PAL_MAP.red2, 1200);
+        task(run);
         return;
-      // 传信：发信的经理走到管口塞进信，信沿传信管走，收信的经理走到信来的那一侧管口取信
-      case "collaboration_requested": {
-        const from = pl.from as string;
-        const to = pl.to as string;
+      // 传信：发信的经理走到管口塞进信，信沿传信管走，收信的经理走到信来的那一侧管口取信；回答的信是绿色
+      case "letter": {
+        const from = asText(a.from) ?? "";
+        const to = asText(a.to) ?? "";
+        const pts = tubeFor(world, from, to);
         const forward = order.indexOf(to) > order.indexOf(from);
-        trip(from, forward ? "letter_out" : "letter_in", () => send(tubeFor(world, from, to), "letter", {
-          small: true, itemId: wid, color: "#4a90d9", linkKey: tubeKeyOf(world, from, to) ?? undefined,
-          onDone: () => trip(to, forward ? "letter_arrive_in" : "letter_arrive_out", null, sayOf(ev, to, "to")),
-        }), sayOf(ev, from, "from"));
+        trip(run, from, forward ? "letter_out" : "letter_in", () => send(pts, "letter", {
+          small: true, itemId: asText(a.item), color: a.answer ? PAL_MAP.green2 : PAL_MAP.blue2, linkKey: tubeKeyOf(world, from, to) ?? undefined, run,
+          onDone: () => trip(run, to, forward ? "letter_arrive_in" : "letter_arrive_out", run.finish, sayOf(a, "to")),
+        }), sayOf(a, "from"));
         return;
       }
-      case "collaboration_responded": {
-        // 回答方是事件所在的部门（示例数据里 from 是回答方，v8 构建约定里 to 是回答方），另一头是发问方
-        const answerer = (ev.department ?? pl.to) as string;
-        const asker = pl.from === answerer ? (pl.to as string) : (pl.from as string);
-        const forward = order.indexOf(asker) > order.indexOf(answerer);
-        trip(answerer, forward ? "letter_out" : "letter_in", () => send(tubeFor(world, answerer, asker), "letter", {
-          small: true, itemId: wid, color: "#5cb85c", linkKey: tubeKeyOf(world, answerer, asker) ?? undefined,
-          onDone: () => trip(asker, forward ? "letter_arrive_in" : "letter_arrive_out", null, sayOf(ev, asker, "to")),
-        }), sayOf(ev, answerer, "from"));
-        return;
-      }
-      case "deliverable_adopted":
+      case "adopt":
         signal(world, scene, "shelf", 1800);
-        scene.emit("spark", lay.lib!.x + lay.lib!.w / 2, 110, 16);
+        scene.emit("spark", lay.lib.x + lay.lib.w / 2, 110, 16);
+        run.finish();
         return;
-      case "x_queued":
-      case "x_repair_created":
+      case "parcel_in":
         signal(world, scene, "mail", 1500);
         if (!scene.reduced) {
-          scene.fly({ bmp: ev.type === "x_repair_created" ? "box_rework" : "box", from: [lay.hall.x + 16, PIPE_Y + 10], to: [lay.hall.x + 50, PIPE_Y - 4], ms: 700, arc: 14 });
+          scene.fly({ bmp: a.repair ? "box_rework" : "box", from: [lay.hall.x + 16, PIPE_Y + 10], to: [lay.hall.x + 50, PIPE_Y - 4], ms: 700, arc: 14, onDone: run.finish });
+        } else {
+          run.finish();
         }
         return;
-      case "x_slot_acquired":
-        flash(lay.hall.id, "#5cb85c", 900);
-        send(lay.out.pts, "box", { itemId: wid, color, linkKey: lay.out.id, onDone: () => trip(lay.out.to, "package_handoff_in") });
+      case "parcel_enter":
+        flash(lay.hall.id, PAL_MAP.green2, 900);
+        send(lay.out.pts, "box", { itemId: asText(a.item), color, linkKey: lay.out.id, run, onDone: () => trip(run, lay.out.to, "package_handoff_in", run.finish) });
         return;
-      case "x_queue_reordered":
-        flash(lay.hall.id, "#6ba8d9", 900);
+      case "queue_moved":
+        flash(lay.hall.id, PAL_MAP.blue1, 900);
+        run.finish();
         return;
-      case "x_run_interrupted":
+      case "resume": {
+        // 自动继续：画面重新动起来，每个角色伸一个懒腰，部门房间亮一下；都伸完了才算演完
+        scene.frozen = false;
+        const ids = Object.keys(world.characters);
+        let left = ids.length;
+        const one = (): void => {
+          left -= 1;
+          if (left <= 0) run.finish();
+        };
+        ids.forEach((id) => {
+          if (!enqueue(world, id, "stretch", { actionId: run.id, onDone: one })) one();
+        });
+        if (!ids.length) run.finish();
+        lay.depts.forEach((r) => flash(r.id, PAL_MAP.yellow1, 700));
         return;
-      case "x_run_auto_resumed":
-        for (const id of Object.keys(world.characters)) enqueue(world, id, "x_run_auto_resumed");
-        for (const room of lay.depts) flash(room.id, "#ffd66b", 700);
+      }
+      case "unsure":
+        if (a.room) flash(String(a.room), PAL_MAP.yellow2, 1400);
+        run.finish();
         return;
-      case "x_action_unknown":
-        if (ev.department) flash(ev.department, "#f0c040", 1400);
-        return;
-      case "x_remote_action_started":
-      case "x_remote_action_finished":
-      case "x_late_receipt": {
-        signal(world, scene, "door", 1800);
-        const room = ev.department ? roomOf(world, ev.department) : null;
-        if (room && !scene.reduced) {
-          const from: [number, number] = ev.type === "x_remote_action_started" ? [room.door, ROOM_B + 6] : [lay.door.x, CORR_Y];
-          const to: [number, number] = ev.type === "x_remote_action_started" ? [lay.door.x, CORR_Y] : [room.door, ROOM_B + 6];
+      case "remote": {
+        const r = a.room ? roomOf(world, String(a.room)) : null;
+        if (r && !scene.reduced) {
+          signal(world, scene, "door", 1800);
+          const from: [number, number] = a.out ? [r.door, ROOM_B + 6] : [lay.door.x, CORR_Y];
+          const to: [number, number] = a.out ? [lay.door.x, CORR_Y] : [r.door, ROOM_B + 6];
           state.remoteDots.push({ from, to, t0: scene.realT, ms: 1400 });
         }
+        run.finish();
         return;
       }
-      case "decision_requested":
-      case "x_decision_issued":
-      case "project_decision_requested": {
-        // 提出决定的部门的小人走到门口送出决定单，决定单飞到大厅的板上；决定单在路上的时候板上还看不到它。
-        // 决定的身份是事件的 event_id（投影按它登记决定请求）；没有部门的决定请求（初始 PRD）从大厅上方飞进来
-        // 事件没有部门时按它所属事项的部门承担动作（原型 floor.js：ev.department || it.department）
-        const department = (ev.department ?? item?.department ?? null) as string | null;
-        const room = department && world.rooms[department] && world.rooms[department].roomKind === "dept" ? world.rooms[department] : null;
-        const board = boardRectOf(lay);
-        const decisionId = (ev.event_id ?? (pl.decision_id as string | undefined)) ?? null;
-        if (decisionId) state.hidden[decisionId] = scene.realT + 12000;
-        let posted = false;
+      case "decision_out": {
+        // 提出决定的部门的小人走到门口送出决定单，决定单飞到大厅的板上（板上的决定单是实时内容，已经贴着）
+        const roomId = asText(a.room);
+        const room = roomId && world.rooms[roomId] && world.rooms[roomId].roomKind === "dept" ? world.rooms[roomId] : null;
+        const b = boardRectOf(lay);
         const post = (): void => {
-          if (posted) return;
-          posted = true;
           scene.fly({
-            bmp: "decision",
-            from: room ? [room.door, ROOM_B + 4] : [board.x + board.w / 2, TOP - 6],
-            to: [board.x + board.w / 2, board.y + board.h / 2],
-            ms: 1000, arc: 26,
-            onDone: () => {
-              if (decisionId) delete state.hidden[decisionId];
-              signal(world, scene, "board", 1600);
-            },
+            bmp: "decision", from: room ? [room.door, ROOM_B + 4] : [b.x + b.w / 2, TOP - 6], to: [b.x + b.w / 2, b.y + b.h / 2], ms: 1000, arc: 26,
+            onDone: () => { signal(world, scene, "board", 1600); run.finish(); },
           });
         };
-        // 送单由经理做：任务键用事件本身的类型（原型 floor.js 只补部门），
-        // 事件类型是 decision_requested 时才换成原型声明里的 x_decision_issued。
-        // 说话用任务声明里的标签（原型 floor.js：make 只带 done，不按事件的 kind 换词）
-        const postKey = ev.type === "decision_requested" ? "x_decision_issued" : ev.type;
-        const postEvent = { ...ev, type: postKey, department } as PixelFloorEvent;
-        const postMake = (): Partial<Task> => ({ done: post });
-        if (room && !scene.reduced && dispatch(world, postEvent, postMake)) {
-          scene.after(8000, post);
-        } else post();
+        if (room && !scene.reduced) trip(run, roomId!, "decision_give", post, sayOf(a, null));
+        else if (!scene.reduced) post();
+        else run.finish();
         return;
       }
-      case "decision_answered":
-      case "x_decision_answered":
-      case "project_decision_answered": {
-        // 回答过的决定单从板上飞回提出决定的部门的门口，经理在门口收下；正在展开的那张纸盖上章
-        // 事件没有部门时按它所属事项的部门承担动作（原型 floor.js：ev.department || it.department）
-        const department = (ev.department ?? item?.department ?? null) as string | null;
-        const room = department && world.rooms[department] && world.rooms[department].roomKind === "dept" ? world.rooms[department] : null;
-        const board = boardRectOf(lay);
-        const decisionId = pl.decision_id as string | undefined;
+      case "decision_back": {
+        // 回答过的决定单从板上飞回提出决定的部门的门口，小人在门口收下
+        const roomId = asText(a.room);
+        const room = roomId && world.rooms[roomId] && world.rooms[roomId].roomKind === "dept" ? world.rooms[roomId] : null;
+        const b = boardRectOf(lay);
+        const decisionId = asText(a.decision);
         if (decisionId && scene.cardStamped) scene.cardStamped(decisionId, "已回答");
-        // 任务键用事件本身的类型（原型 floor.js 只补部门）；decision_answered 换成原型声明里的 x_decision_answered
-        const answerEvent = { ...ev, type: ev.type === "decision_answered" ? "x_decision_answered" : ev.type, department } as PixelFloorEvent;
-        if (room) {
-          scene.fly({
-            bmp: "decision",
-            from: [board.x + board.w / 2, board.y + board.h / 2],
-            to: [room.door, ROOM_B + 4],
-            ms: 1000, arc: 26,
-            onDone: () => {
-              if (!scene.reduced) dispatch(world, answerEvent, (def, event, ch) => extrasOf(def, event, ch, "to"));
-            },
-          });
+        if (!room || scene.reduced) {
+          run.finish();
+          return;
         }
+        scene.fly({
+          bmp: "decision", from: [b.x + b.w / 2, b.y + b.h / 2], to: [room.door, ROOM_B + 4], ms: 1000, arc: 26,
+          onDone: () => trip(run, roomId!, "decision_take", run.finish, sayOf(a, null)),
+        });
         return;
       }
-      case "decision_withdrawn": {
-        // 决定请求被撤销：板上不再有它（快照刷新以后由查询结果决定），画面上只把板子闪一下
-        signal(world, scene, "board", 900);
+      case "model_wait":
+        if (a.room) flash(String(a.room), PAL_MAP.grey3, 900);
+        run.finish();
         return;
-      }
-      case "x_provider_wait_entered":
-      case "x_provider_wait_left":
-        if (ev.department) flash(ev.department, ev.type === "x_provider_wait_entered" ? "#8a90a0" : "#ffd66b", 900);
-        if (ev.type === "x_provider_wait_left") dispatchTask(ev);
+      case "model_back":
+        if (a.room) flash(String(a.room), PAL_MAP.yellow1, 900);
+        task(run);
         return;
-      case "run_done":
+      case "done":
         scene.emit("confetti", opts.W / 2, 60, 40, { spread: 560 });
-        dispatchTask(ev);
+        task(run);
         return;
       default:
-        // 其余事件由任务目录决定：命中的事件变成角色的任务，没有命中的事件在画面上没有小人的动作
-        dispatchTask(ev);
+        // 其余动作是任务目录里的一件事：变成做它的角色的任务
+        task(run);
     }
+  }
+
+  /** 进度：不排队，合并成做它的角色的一个持续姿势，头顶写最近的一项（原型 v13 floor.js 的 progress）。 */
+  function progress(a: PixelAction): void {
+    if (scene.frozen) return;
+    const ch = doerOf(world, a);
+    if (!ch) return;
+    const def = catalog.tasks[a.kind];
+    if (!def) return;
+    // 真正的事情优先：正在做和排着的待机活动放弃
+    if (ch.current && ch.current.idle) ch.current = null;
+    ch.queue = ch.queue.filter((t) => !t.idle);
+    const base: Task = { ...def, taskKey: a.kind, _t0: null, ...sayOf(a, null), until: scene.realT + def.ms };
+    if (a.count !== undefined && a.count !== null) base.iconText = String(a.count);
+    ch.progress = base;
+  }
+
+  /** 流式文字：接在正在做的进度姿势上（第一段文字取代默认的标签），不进时间线。 */
+  function stream(who: { room: string | null; role?: string | null }, text: string): void {
+    const ch = charFor(world, who.room ?? "", who.role ?? null, null);
+    if (!ch || scene.frozen) return;
+    const def = catalog.tasks.think;
+    const base: Task = progressOf(ch, scene) ?? { ...def, taskKey: "think", _t0: null };
+    const label = ((base.streamed ? base.label : "") + text).slice(-120);
+    ch.progress = { ...base, label, streamed: true, until: scene.realT + def.ms };
+  }
+
+  /** 做这个动作的角色。 */
+  function doerOf(w: World, a: PixelAction): Character | null {
+    const def = catalog.tasks[a.kind];
+    const department = def?.dept ?? asText(a.room);
+    if (!department) return null;
+    return charFor(w, department, def && def.actor ? null : asText(a.role), def ? (def.actor ?? def.by ?? null) : null);
+  }
+
+  /** 时间线：动作的级别与时长来自声明表，参与方是做这件事的角色（大厅与成果库按房间算）。 */
+  const laneOf = (room: string | null, by?: string | null): string | null => {
+    const id = room ?? "";
+    if (!id) return null;
+    if (!world.rooms[id] || world.rooms[id].roomKind !== "dept") return "room:" + id;
+    const ch = charFor(world, id, null, by || "manager");
+    return ch ? ch.id : "room:" + id;
+  };
+
+  function lanesOf(a: PixelAction): string[] {
+    const def = catalog.tasks[a.kind];
+    if (def) {
+      const ch = doerOf(world, a);
+      const peer = peerOf(world, a);
+      return [ch && ch.id, peer && peer.id].filter((x): x is string => typeof x === "string");
+    }
+    switch (a.kind) {
+      case "handoff":
+      case "letter":
+        return [laneOf(asText(a.from)), laneOf(asText(a.to))].filter((x): x is string => typeof x === "string");
+      case "decision_out":
+      case "decision_back":
+        return [laneOf(asText(a.room))].filter((x): x is string => typeof x === "string");
+      case "adopt":
+        return ["room:" + rooms().lib.id];
+      case "mail":
+      case "parcel_in":
+      case "queue_moved":
+        return ["room:" + rooms().hall.id];
+      case "parcel_enter":
+        return ["room:" + rooms().hall.id, laneOf(rooms().out.to)].filter((x): x is string => typeof x === "string");
+      case "resume":
+        return Object.keys(world.characters);
+      default:
+        return [];
+    }
+  }
+
+  /** 动作走向的另一个角色（分派与交回）。 */
+  function peerOf(w: World, a: PixelAction): Character | null {
+    const def = catalog.tasks[a.kind];
+    if (!def || def.spot !== "peer") return null;
+    const department = def.dept ?? asText(a.room);
+    if (!department) return null;
+    const ch = doerOf(w, a);
+    const to = def.toward === "role" ? charFor(w, department, asText(a.role), null) : charFor(w, department, null, def.toward ?? null);
+    return to && to !== ch ? to : null;
+  }
+
+  const runs = new Map<number, Run>();
+  const tl: Timeline = createTimeline({
+    clock: () => scene.realT,
+    classify(a) {
+      const k = catalog.kinds[a.kind];
+      if (!k) throw new Error("楼层的声明表里没有这种动作：" + a.kind);
+      return { tier: k.tier, ms: k.ms, lanes: lanesOf(a) };
+    },
+    begin(e: TimelineEntry) {
+      const run: Run = {
+        id: e.id,
+        action: e.action,
+        lanes: e.lanes,
+        dead: false,
+        alive: () => !run.dead,
+        finish: () => {
+          if (!run.dead && runs.has(e.id)) {
+            runs.delete(e.id);
+            tl.done(e.id);
+          }
+        },
+      };
+      runs.set(e.id, run);
+      perform(run);
+    },
+    cut(e: TimelineEntry) {
+      const run = runs.get(e.id);
+      if (run) run.dead = true;
+      runs.delete(e.id);
+      dropAction(world, e.id);
+    },
+    apply(s: PixelState) {
+      applyState(s as unknown as FloorModel);
+    },
+    progress,
+  });
+
+  function applyState(next: FloorModel): void {
+    model = { ...next, decisions };
+    const nextFlags = flagsOf(model, catalog);
+    if (JSON.stringify(nextFlags) !== JSON.stringify(flags)) {
+      // 快照里的运维数据出现或消失：房间与管道按新的条件重新声明，角色、包裹、信号与管道的流动状态原样带过去
+      flags = nextFlags;
+      const old = world;
+      world = declareWorld(model, catalog);
+      world.characters = old.characters;
+      world.packages = old.packages;
+      world.signals = old.signals;
+      for (const key of Object.keys(world.links)) {
+        if (old.links[key]) world.links[key].flow = old.links[key].flow;
+      }
+    }
+    syncWorkers();
+    // 角色被撤走（状态里的角色变了）：用到它们的动作不会再演完，时间线不再等它们
+    for (const run of Array.from(runs.values())) {
+      if (run.lanes.some((l) => !l.startsWith("room:") && !world.characters[l])) run.finish();
+    }
+    // 整层静止（中断）时，演到一半的动作停在原处，时间线不再等它们
+    if (model.interrupted && !scene.frozen) Array.from(runs.values()).forEach((run) => run.finish());
+    scene.frozen = Boolean(model.interrupted);
+  }
+
+  function setState(next: FloorModel): void {
+    tl.state(checkFloorState(next));
+  }
+
+  function jump(next: FloorModel): void {
+    tl.jump(checkFloorState(next));
+  }
+
+  function play(a: PixelAction): void {
+    tl.push(checkAction("楼层", a, catalog.kinds));
+  }
+
+  function setDecisions(list: DecisionFace[]): void {
+    decisions = list ?? [];
+    model = { ...model, decisions };
+  }
+
+  function itemById(id: string | null): LoopItem | null {
+    if (!id) return null;
+    return model.items.find((x) => x.id === id || x.work_item_id === id) ?? null;
   }
 
   /** 管道通不通：快照里两端有活跃事项，或者管道上有包裹在移动。 */
@@ -467,6 +678,8 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
   }
 
   function step(): void {
+    tl.tick();
+    scene.rate = tl.rate();
     if (!model.interrupted) state.clock += scene.reduced ? 0 : 16.7;
     stepPackages(world, scene);
     stepPipes(world, scene, pipeState);
@@ -484,30 +697,11 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
     return focus && itemId && itemId !== focus ? 0.3 : 1;
   }
 
-  function setModel(next: FloorModel): void {
-    model = next;
-    const nextFlags = flagsOf(model, catalog);
-    if (JSON.stringify(nextFlags) !== JSON.stringify(flags)) {
-      // 快照里的运维数据出现或消失：房间与管道按新的条件重新声明，角色、包裹、信号与管道的流动状态原样带过去
-      flags = nextFlags;
-      const old = world;
-      world = declareWorld(model, catalog);
-      world.characters = old.characters;
-      world.packages = old.packages;
-      world.signals = old.signals;
-      for (const key of Object.keys(world.links)) {
-        if (old.links[key]) world.links[key].flow = old.links[key].flow;
-      }
-    }
-    syncWorkers();
-    scene.frozen = Boolean(model.interrupted);
-  }
-
   function boardRectOf(lay: { hall: NonNullable<ReturnType<typeof roomOf>> }): BoardRect {
     return { x: lay.hall.x + 62, y: 160, w: 32, h: 24 };
   }
 
-  setModel(model);
+  applyState(model);
 
   return {
     get world(): World {
@@ -517,8 +711,11 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
       return model;
     },
     state,
-    setModel,
-    playEvent,
+    setState,
+    jump,
+    play,
+    stream,
+    setDecisions,
     step,
     boardRect: () => boardRectOf(rooms()),
     decisionHidden: (id, now) => (state.hidden[id] ?? 0) > now,
@@ -527,17 +724,18 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
       return s && s.until > now ? s : null;
     },
     declCtx: () => ctx as DeclContext,
+    inspectTimeline: () => tl.inspect(),
   };
 }
 
-/** 大厅的决定板上的决定请求：还在路上的不算；最多画 6 张。 */
+/** 大厅的决定板上的决定请求：还在路上的不算。 */
 export function visibleDecisions(decisions: DecisionFace[], hidden: HiddenMap, now: number): DecisionFace[] {
   return decisions.filter((d) => !((hidden[d.id] ?? 0) > now));
 }
 
 /** 事项的颜色序号到色板。 */
-export function itemColor(item: LoopItem): string {
-  return ITEM_COLORS[item.color_index % ITEM_COLORS.length];
+export function itemColor(item: { color_index?: number }): string {
+  return ITEM_COLORS[(Number(item.color_index) || 0) % ITEM_COLORS.length];
 }
 
 function tubeFor(world: World, from: string, to: string): [number, number][] | null {

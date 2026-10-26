@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import uuid
 
-from harness.collaboration import has_new_work
+from harness.collaboration import has_new_work, is_waiting
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace
@@ -382,4 +382,64 @@ def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
     assert result.department_guidance[0].status != "completed"
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
+
+
+def test_a_guidance_only_round_ends_with_a_text_reply(tmp_path):
+    # 验收第 1 条（工单 #1037）：工程在等待工作时收到一段指导，这一轮关注的成果里只有指导；
+    # 脚本回复纯文字，这一轮正常结束，部门回到等待，没有 tool_call_required 事件，事项继续运行
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    delivered = system.activate_once(run_id)
+    assert delivered.delivery_spec is not None and is_waiting(delivered, "engineering")
+
+    system.add_guidance(run_id, "engineering", "请说明错误输出的边界行为，不需要改文件。")
+    adapter.scripts["engineering"].append(
+        lambda request: FakeTurn(transcript="错误输出写到 stderr，退出码为 1。"))
+    result = system.activate_once(run_id)
+
+    assert adapter.invocations[-1].department == "engineering"
+    # 这一轮只有一次模型调用：文字回复以后不追加提醒，也不再调用模型
+    assert [call.department for call in adapter.invocations].count("engineering") == 2
+    assert result.status == "running"
+    assert is_waiting(result, "engineering")
+    assert not any(event.type == EventType.TOOL_CALL_REQUIRED
+                   for event in system.store.list_events(run_id))
+    # 回答由主机在 #1039 写：这一轮结束不写「已回答」事件，指导停在已进入模型输入
+    assert result.department_guidance[0].status == "in_input"
+
+
+def test_guidance_arriving_during_an_ongoing_round_does_not_end_it_with_a_text_reply(tmp_path):
+    # 验收第 3 条（工单 #1037）：指导作为通知送达一轮正在进行的工作时，纯文字回复不结束这一轮；
+    # 这一轮开始时还有新的 PRD，关注的成果不只有指导，仍按「要求调用工具」处理
+    holder = {}
+    seen = {}
+
+    def reply_text_while_guidance_arrives(request):
+        holder["system"].add_guidance(request.run_id, "engineering", "交付前说明错误输出的边界。")
+        return FakeTurn(transcript="我先说明边界，然后继续交付。")
+
+    def deliver_after_the_notification(request):
+        seen["guidance"] = prompt_part(request, "department_guidance")
+        return delivery_turn()(request)
+
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [reply_text_while_guidance_arrives, deliver_after_the_notification],
+        "quality": [],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    result = system.activate_once(run_id)
+
+    # 文字回复不结束这一轮：工程在下一步收到提醒与指导，接着交付
+    assert result.delivery_spec is not None
+    assert [item["text"] for item in json.loads(seen["guidance"])] == ["交付前说明错误输出的边界。"]
+    required = [event for event in system.store.list_events(run_id)
+                if event.type == EventType.TOOL_CALL_REQUIRED]
+    assert [(event.department, event.payload["count"]) for event in required] == [("engineering", 1)]
+    assert is_waiting(result, "engineering")
 
