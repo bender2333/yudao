@@ -5,13 +5,14 @@
 // 显示（floor-view.ts），最近邻放大到容器宽度。
 
 import { bitmapDef } from "../char.ts";
+import { rgba } from "../grid.ts";
 import { paint } from "../paint.ts";
 import { DEPTS, ITEM_COLORS, ITEM_SHADES, PAL, PIXEL_FONT_STACK } from "../registry.ts";
 import {
-  drawActor, drawArrow, drawBitmap, drawBubble, drawIcon, drawPixelText, drawSign, drawText, headTop, measure,
+  drawActor, drawArrow, drawBitmap, drawBubble, drawIcon, drawPixelText, drawSign, drawText, headTop, measure, signStyle,
 } from "../shapes.ts";
 import { polyLength, pointAt, roomOf } from "../world/declare.ts";
-import { ACTIVE, IN_ROOM, busyItems, itemColor, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
+import { ACTIVE, IN_ROOM, busyItems, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
 import { actorOf, charsOf, primaryOf } from "../world/scene.ts";
 import type { Character, LoopItem, MachineView, Room, SceneLike, World } from "../world/types.ts";
 
@@ -23,6 +24,8 @@ const PIPE_Y = 138;
 const TUBE_Y = 104;
 const TUBE = "#7fc3e8";
 const TUBE_D = "#3f86b0";
+
+const noSource = (refs?: Record<string, unknown> | null, key?: string): boolean => Boolean(refs) && Boolean(key) && !refs![key!];
 
 // 状态词与状态色：键是画面合同的事项状态（pixel/contract.ts 的 ITEM_STATES），翻译层已经把服务端的说法
 // 翻成这些取值（工单 #953）。服务端的 running、waiting_provider 这些词不再出现在画面层。
@@ -252,7 +255,7 @@ export class FloorRenderer {
       alpha = 1;
     }
     c.globalAlpha = alpha;
-    c.fillStyle = tube ? TUBE_D : "rgba(74,144,217,0.55)";
+    c.fillStyle = tube ? TUBE_D : rgba(PAL.blue2, 0.55);
     for (let d = off; d < len; d += gap) {
       const [x, y] = pointAt(p.pts, d);
       c.fillRect(Math.round(x) - 1, Math.round(y) - (tube ? 0 : 1), 2, tube ? 1 : 2);
@@ -359,7 +362,7 @@ export class FloorRenderer {
       const ny = b.y + 3 + Math.floor(i / 3) * 12;
       RB(c, nx, ny, 8, 10, PAL.white);
       const item = d.work_item_id ? this.driver.model.items.find((x) => x.work_item_id === d.work_item_id) : null;
-      R(c, nx, ny, 8, 2, item ? itemColor(item) : PAL.grey2);
+      R(c, nx, ny, 8, 2, item ? ITEM_COLORS[(Number(item.color_index) || 0) % ITEM_COLORS.length] : PAL.grey2);
       R(c, nx + 2, ny + 4, 4, 1, PAL.grey2);
       R(c, nx + 2, ny + 6, 4, 1, PAL.grey2);
     });
@@ -380,7 +383,7 @@ export class FloorRenderer {
     const sy = 68;
     RB(c, sx - 2, sy - 2, 32, 22, PAL.beige2);
     paint.screen(c, sx, sy, { w: 28, h: 18, mode: this.driver.model.interrupted ? "off" : working ? "code" : "idle", seed: r.x }, t);
-    paint.scanlines(c, sx, sy, { a: 0.18 });
+    paint.scanlines(c, sx, sy, { w: 28, h: 18, a: 0.18 });
     paint.lamp(c, r.x + r.w - 30, 58, { on: working, from: 50 });
     r.def.props?.(c, r, t, this.driver.declCtx());
     const chars = charsOf(world, r.id).sort((p, q) => p.seatIndex - q.seatIndex);
@@ -469,7 +472,7 @@ export class FloorRenderer {
     R(c, d.x + d.w - 7, d.y + d.h / 2, 2, 3, PAL.yellow2);
     if (acts || this.sig("door")) {
       const k = this.scene.reduced ? 0.8 : 0.5 + 0.3 * Math.sin(t / 200);
-      c.fillStyle = `rgba(255,214,107,${k.toFixed(3)})`;
+      c.fillStyle = rgba(PAL.yellow1, k);
       c.fillRect(d.x + 2, d.y + d.h - 2, d.w - 4, 2);
       c.fillRect(d.x + d.w - 3, d.y + 4, 1, d.h - 6);
     }
@@ -573,10 +576,26 @@ export class FloorRenderer {
     for (const r of this.rooms().depts) {
       const dept = DEPT_SHELL[r.id];
       drawSign(c, r.x + r.w / 2, 54, dept?.name ?? r.label, { size: 7, bg: dept?.main ?? PAL.paper, fg: PAL.white, hi: dept?.light, lo: dept?.shade, minW: 30 });
-      this.itemsIn(r.id).forEach((it, i) => {
-        drawBitmap(c, (Math.floor(t / 320) + i) % 2 && !this.scene.reduced ? "flag2" : "flag", r.door - 22 - i * 9, 218, {
+      const here = this.itemsIn(r.id);
+      here.forEach((it, i) => {
+        if (noSource(it.refs as Record<string, unknown> | undefined, "parcel")) return;
+        c.globalAlpha = this.dimFor(it.work_item_id);
+        const fx = r.door - 22 - i * 9;
+        drawBitmap(c, (Math.floor(t / 320) + i) % 2 && !this.scene.reduced ? "flag2" : "flag", fx, 218, {
           recolor: { X: ITEM_COLORS[it.color_index % 6], x: ITEM_SHADES[it.color_index % 6] },
         });
+        c.globalAlpha = 1;
+      });
+      let row = 0;
+      here.forEach((it) => {
+        if (!it.sign || noSource(it.refs as Record<string, unknown> | undefined, "sign")) return;
+        const ss = signStyle(it.sign);
+        const maxW = r.w - 6;
+        const w = Math.min(maxW, Math.max(18, measure(c, it.sign, 6, 600) + 8));
+        c.globalAlpha = this.dimFor(it.work_item_id);
+        drawSign(c, r.door + 12 + w / 2 - 20, 232 + row * 12, it.sign, { size: 6, bg: ss.bg, fg: ss.fg, stripe: ss.stripe, maxW, nail: row === 0 ? 217 : undefined });
+        c.globalAlpha = 1;
+        row += 1;
       });
     }
   }
@@ -687,7 +706,7 @@ export class FloorRenderer {
     R(c, 6, 5, 8, 8, PAL.ink);
     R(c, 7, 6, 6, 6, ITEM_COLORS[it.color_index % 6]);
     let x = 18;
-    x += drawText(c, it.sign || it.work_item_id, x, 9, { size: 7, weight: 700, color: PAL.white, max: 170 }) + 8;
+    x += drawText(c, it.title || it.work_item_id, x, 9, { size: 7, weight: 700, color: PAL.white, max: 170 }) + 8;
     const chip = (text: string, bg: string, fg?: string): void => {
       c.font = `700 6.5px ${PIXEL_FONT_STACK}`;
       const w = c.measureText(text).width + 8;
@@ -722,6 +741,11 @@ export class FloorRenderer {
   }
 
   // -------------------------------------------------------------------------
+
+  private dimFor(itemId: string | null | undefined): number {
+    const focus = this.scene.focusId;
+    return focus && itemId && itemId !== focus ? 0.3 : 1;
+  }
 
   private itemsIn(department: string): LoopItem[] {
     return this.driver.model.items.filter((it) => it.department === department && IN_ROOM.includes(it.status));

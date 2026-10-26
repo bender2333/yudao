@@ -3,7 +3,7 @@
 // 文字按屏幕的实际分辨率绘制（画布先乘整数倍并设缩放），字体为微软雅黑（ADR-0021 第 4 条）。
 
 import { animFrameAt } from "./anims.ts";
-import { bitmapDef, charFrame, flipGrid, type CharFrame } from "./char.ts";
+import { bitmapGrid, charFrame, flipGrid, type CharFrame } from "./char.ts";
 import { linePts, mix, rgba, type ColorMap, type Grid } from "./grid.ts";
 import { CHAR_H, CHAR_W, FONT3, PAL, POSES, PIXEL_FONT_STACK, type Pose } from "./registry.ts";
 
@@ -21,36 +21,20 @@ export function fillPixelOutlined(c: CanvasRenderingContext2D, x: number, y: num
 
 /** 位图绘制（原型 drawBitmap）：(x, y) 是位图自身第一个像素的位置，不含描边。 */
 export function drawBitmap(c: CanvasRenderingContext2D, name: string, x: number, y: number, opts?: { recolor?: ColorMap; flip?: boolean; alpha?: number }): void {
-  const d = bitmapDef(name);
-  const map = opts?.recolor ? Object.assign({}, d.map, opts.recolor) : d.map;
-  const pad = d.outline ? 1 : 0;
-  const grid = blitToGrid(d.rows, map, opts?.flip);
+  const b = bitmapGrid(name, opts?.recolor);
+  const grid = opts?.flip ? flipGrid(b.grid, b.w, b.h) : b.grid;
   if (opts?.alpha !== undefined) c.globalAlpha = opts.alpha;
-  for (let r = 0; r < d.rows.length; r++) {
-    for (let q = 0; q < d.rows[0].length; q++) {
-      const col = grid[(r * d.rows[0].length + q) as number];
+  const x0 = Math.round(x) - b.pad;
+  const y0 = Math.round(y) - b.pad;
+  for (let r = 0; r < b.h; r++) {
+    for (let q = 0; q < b.w; q++) {
+      const col = grid[(r * b.w + q) as number];
       if (!col) continue;
       c.fillStyle = col;
-      c.fillRect(Math.round(x) - pad + q, Math.round(y) - pad + r, 1, 1);
+      c.fillRect(x0 + q, y0 + r, 1, 1);
     }
   }
   if (opts?.alpha !== undefined) c.globalAlpha = 1;
-}
-
-/** 位图行 → 点阵（不描边；描边由 char.ts 的 bitmapGrid 处理，这里只取本体颜色）。 */
-function blitToGrid(rows: string[], map: ColorMap, flip?: boolean): Grid {
-  const w = rows[0].length;
-  const grid: Grid = new Array<string | null>(w * rows.length).fill(null);
-  for (let r = 0; r < rows.length; r++) {
-    for (let q = 0; q < w; q++) {
-      const ch = flip ? rows[r][w - 1 - q] : rows[r][q];
-      if (ch === ".") continue;
-      const col = map[ch];
-      if (!col) throw new Error(`位图字符没有颜色：${ch}`);
-      grid[r * w + q] = col;
-    }
-  }
-  return grid;
 }
 
 // ---------------------------------------------------------------------------

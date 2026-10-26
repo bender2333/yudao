@@ -600,7 +600,7 @@ export function createFloorDriver(opts: FloorDriverOptions): FloorDriver {
 
   const runs = new Map<number, Run>();
   const tl: Timeline = createTimeline({
-    clock: () => scene.realT,
+    clock: () => scene.wallT ?? scene.realT,
     classify(a) {
       const k = catalog.kinds[a.kind];
       if (!k) throw new Error("楼层的声明表里没有这种动作：" + a.kind);

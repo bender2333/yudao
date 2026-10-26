@@ -342,7 +342,7 @@ export function stepPackages(world: World, scene: SceneLike): void {
       pk.transit.t0 = scene.realT;
       pk.transit.tweenStart?.(scene);
     }
-    const k = pk.transit.tweenKill ? pk.transit.k : Math.min(1, (scene.realT - pk.transit.t0) / pk.transit.ms);
+    const k = Math.min(1, (scene.realT - pk.transit.t0) / pk.transit.ms);
     pk.transit.k = k;
     pk.transit.pos = pointAt(pk.transit.pts, polyLength(pk.transit.pts) * scene.easeInOut(k));
     if (k >= 1) {

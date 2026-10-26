@@ -287,7 +287,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   renderer.card = card;
   scene.cardStamped = (id, text) => card.stamp(id, text);
 
-  let last = 0;
+  let last = opts.clock.now();
 
   function draw(): void {
     renderer.draw(surface.frame());
@@ -321,11 +321,17 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
   surface.resize();
   draw();
   const offTick = opts.clock.onTick((elapsed) => {
-    // 缓动与行走由 GSAP 的补间按共用时钟的位置计算，这里只把时钟的经过时间交给场景
+    // 缓动与行走由 GSAP 的补间按共用时钟的位置计算，这里把时钟的经过时间交给场景与驱动
     const delta = Math.max(0, elapsed - last);
     last = elapsed;
-    scene.stepScene(delta);
-    driver.step();
+    scene.wallT = (scene.wallT ?? 0) + delta;
+    const rate = scene.rate ?? 1;
+    const n = Math.max(1, Math.ceil((delta * rate) / 50));
+    for (let i = 0; i < n; i++) {
+      const stepDt = (delta * (scene.rate ?? 1)) / n;
+      scene.stepScene(stepDt);
+      driver.step();
+    }
     // 本次推进里新建的补间（走动、包裹移动）立刻落到当前时间上：位置与「推进到第几毫秒」一致
     scene.reapply();
     draw();

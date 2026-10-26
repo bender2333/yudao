@@ -132,6 +132,7 @@ export interface RoleInfo {
 export interface LoopItem extends FloorItem {
   /** 事项的标识；画面上按它找包裹与队列位置（与 id 相同）。 */
   work_item_id: string;
+  title?: string | null;
   kind: string;
   sign: string;
   color_index: number;

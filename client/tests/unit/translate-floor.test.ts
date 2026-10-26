@@ -149,6 +149,7 @@ test("状态：project.loop 的样例结果翻出的状态通过画面合同的�
   assert.deepEqual(state.items.map((it) => it.status), ["working", "asking", "adopted", "interrupted", "cancelled", "paused", "done"]);
   assert.equal(state.items[0].id, "w1");
   assert.equal(state.items[0].work_item_id, "w1");
+  assert.equal(state.items[0].title, "测试事项");
   assert.equal(state.roles?.engineering[0].status, "working");
   assert.deepEqual(state.shelves.adopted, ["w1"]);
   assert.equal(state.focus_id, "w1");

@@ -83,6 +83,7 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
   return {
     id: row.work_item_id,
     work_item_id: row.work_item_id,
+    title: row.sign,
     status: itemState(row),
     kind: row.kind,
     sign: row.sign,

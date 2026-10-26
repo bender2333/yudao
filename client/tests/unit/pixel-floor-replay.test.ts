@@ -15,13 +15,13 @@ test("录制来自原型 v13：不加 --write 时与提交的录制相同", () =
   assert.ok(recording.scenarios.length >= 18, `录下的场景 ${recording.scenarios.length} 个`);
 });
 
-test("回放：每段录制的最后一个检查点小人逐个字段与原型 v13 相同，打印像素差", async () => {
+test("回放：每段录制的最后一个检查点小人逐个字段与原型 v13 相同，像素差为 0", async () => {
   const results = await replayAll();
   for (const r of results) {
     const diffInfo = r.pixelDiff.count === 0 ? "0" : `${r.pixelDiff.count}（外接矩形 ${JSON.stringify(r.pixelDiff.bbox)}）`;
     console.log(`[楼层场景 ${r.scenario}] 像素差：${diffInfo}`);
   }
-  const failed = results.filter((r) => r.mismatches.length > 0 || r.clientErrors.length > 0);
-  const detail = failed.map((r) => `${r.scenario}：\n  ${[...r.mismatches.slice(0, 6), ...r.clientErrors.slice(0, 3)].join("\n  ")}`).join("\n");
+  const failed = results.filter((r) => r.mismatches.length > 0 || r.clientErrors.length > 0 || r.pixelDiff.count !== 0);
+  const detail = failed.map((r) => `${r.scenario}：\n  ${[...r.mismatches.slice(0, 6), ...r.clientErrors.slice(0, 3), r.pixelDiff.count !== 0 ? `像素差 ${r.pixelDiff.count}` : ""].filter(Boolean).join("\n  ")}`).join("\n");
   assert.deepEqual(failed.map((r) => r.scenario), [], `回放与原型 v13 不一致：\n${detail}`);
 });
