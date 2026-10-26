@@ -84,6 +84,50 @@ from .workspace import WorkspaceSnapshot
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
 _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED})
 
+# 不算「这一轮正常结束」的运行状态（部门指导设计说明第 3 节，工单 #1039）：取消与运行时间用完以 failed 结束，
+# 上限停下与暂停是 paused；这些情形不写已回答，指导停在已进入模型输入。暂停以后继续的是同一轮，
+# 它在继续以后正常结束时才算（那时由新的激活写）。
+_NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
+
+
+def _round_applied_guidance(events: list[Any], projection: RunProjection,
+                            scope: ActivationScope) -> list[str]:
+    # 这一轮结束时要写已回答的指导：这一轮的 department_guidance_applied 带进模型输入、此刻停在已进入模型输入的。
+    # 指导作为通知在轮中到达时，它的应用事件也带这一轮的激活编号，所以不是只有「以指导开始的一轮」才算
+    ids: list[str] = []
+    for event in events:
+        if event.type != EventType.DEPARTMENT_GUIDANCE_APPLIED:
+            continue
+        payload = event.payload or {}
+        if payload.get("activation_id") != scope.activation_id:
+            continue
+        for guidance_id in payload.get("guidance_ids") or []:
+            if guidance_id not in ids:
+                ids.append(guidance_id)
+    entered = {item.id for item in projection.department_guidance
+               if item.department == scope.department and item.status == "in_input"}
+    return [guidance_id for guidance_id in ids if guidance_id in entered]
+
+
+def _round_outcome(events: list[Any], scope: ActivationScope) -> str:
+    # 这一轮怎么结束的：提交被接纳记 proposal_accepted，其余正常结束记 text_reply（载荷只有这两个取值）。
+    # 提交以后被拒绝的这一轮，部门还没有交下正式成果，按文字回答记
+    start = None
+    for index, event in enumerate(events):
+        if (event.type == EventType.DEPARTMENT_ACTIVATED and event.session_id == scope.session_id
+                and (event.payload or {}).get("activation_id") == scope.activation_id):
+            start = index
+            break
+    submitted = False
+    for event in ([] if start is None else events[start + 1:]):
+        if event.session_id != scope.session_id:
+            continue
+        if event.type == EventType.PROPOSAL_SUBMITTED:
+            submitted = True
+        elif event.type == EventType.PROPOSAL_REJECTED:
+            submitted = False
+    return "proposal_accepted" if submitted else "text_reply"
+
 
 @dataclass
 class _Activation:
@@ -1411,6 +1455,28 @@ class Orchestrator:
                             "stop_reason": current.stop_reason,
                         },
                     ))
+                    # 这一轮收到的指导在这一轮正常结束时由主机写已回答（部门指导设计说明第 3 节，工单 #1039）：
+                    # 与激活结束在同一个事务里，部门不提交。事件记下是哪一轮、这一轮怎么结束的；
+                    # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入
+                    if current.status in _NOT_A_NORMAL_ROUND_END:
+                        return
+                    answered = _round_applied_guidance(happened, current, scope)
+                    if not answered:
+                        return
+                    outcome = _round_outcome(happened, scope)
+                    for guidance_id in answered:
+                        transaction.append(NewEvent(
+                            EventType.DEPARTMENT_GUIDANCE_RESPONDED,
+                            actor="system",
+                            department=scope.department,
+                            parent_event_id=scope.parent_event_id,
+                            state_before=current.status,
+                            state_after=current.status,
+                            session_id=scope.session_id,
+                            payload={"guidance_id": guidance_id,
+                                     "activation_id": scope.activation_id,
+                                     "outcome": outcome},
+                        ))
 
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
                 await asyncio.to_thread(self._await_cancellers, run_id)
