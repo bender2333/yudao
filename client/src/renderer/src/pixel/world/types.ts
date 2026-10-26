@@ -458,6 +458,7 @@ export interface SceneLike {
   W: number;
   H: number;
   realT: number;
+  wallT?: number;
   animT: number;
   reduced: boolean;
   frozen: boolean;

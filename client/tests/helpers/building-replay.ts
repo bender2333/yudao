@@ -41,6 +41,8 @@ export interface BuildingCompareResult {
   actorMismatches: string[];
   mismatches: string[];
   clientErrors: string[];
+  expectedPng?: string;
+  actualPng?: string;
 }
 
 export function loadBuildingRecordings(): BuildingRecordingFile {
@@ -133,6 +135,7 @@ export async function replayBuildingScenario(serverUrl: string, browser: Browser
   try {
     await page.goto(serverUrl + "index.html");
     await page.evaluate((fnSource) => {
+      (window as any).__name = (target: any) => target;
       (window as unknown as { __buildingDriver: unknown }).__buildingDriver = (0, eval)(`(${fnSource})`);
     }, driver.toString());
     const result = await page.evaluate(async (input) => {
@@ -190,6 +193,8 @@ export async function replayBuildingAll(options: { only?: string[] } = {}): Prom
         actorMismatches,
         mismatches,
         clientErrors: [...expected.errors, ...actual.errors],
+        expectedPng: expected.png,
+        actualPng: actual.png,
       });
     }
   } finally {

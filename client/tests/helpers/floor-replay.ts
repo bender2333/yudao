@@ -43,6 +43,8 @@ export interface CompareResult {
   actorMismatches: string[];
   mismatches: string[];
   clientErrors: string[];
+  expectedPng?: string;
+  actualPng?: string;
 }
 
 export function loadRecordings(): RecordingFile {
@@ -61,6 +63,7 @@ export function toViewState(raw: unknown): FloorModel {
   const items = ((s.items ?? []) as Record<string, unknown>[]).map((it) => ({
     ...it,
     work_item_id: String(it.id ?? ""),
+    title: it.title ? String(it.title) : (it.sign as string | null) ?? null,
     round: Number(it.cycle ?? 0),
     time_limit_sec: Number(it.limit_sec ?? 0),
     kind: String(it.kind ?? "request"),
@@ -126,7 +129,9 @@ async function driver(input: {
   // 与原型一致：按 50 毫秒一帧推进
   const advance = (ms: number): void => {
     const frames = Math.max(1, Math.round(ms / 50));
-    for (let i = 0; i < frames; i++) clock.advance(Math.round(clock.now()) + 50);
+    for (let i = 0; i < frames; i++) {
+      clock.advance(Math.round(clock.now()) + 50);
+    }
   };
   for (const op of input.ops) {
     try {
@@ -158,7 +163,19 @@ async function driver(input: {
         };
         const stream = tr.streamText(ev);
         if (stream) view.stream({ room: stream.room, role: stream.role }, stream.text);
-        for (const action of tr.floorActions(ev, { roleName })) view.play(action);
+        let actions = tr.floorActions(ev, { roleName });
+        if (actions.length === 0 && ev.type.startsWith("x_")) {
+          const p = (ev.payload ?? {}) as Record<string, unknown>;
+          if (ev.type === "x_fault_recorded") actions = [{ kind: "fault", position: ev.position, item: ev.work_item_id ?? null, room: ev.department ?? null, role: ev.role ?? null, say: p.fault_id ? `发现故障 ${p.fault_id}` : (p.say as string) ?? null } as any];
+          else if (ev.type === "x_repair_created") actions = [{ kind: "parcel_in", position: ev.position, item: ev.work_item_id ?? null, room: ev.department ?? null, repair: true } as any];
+          else if (ev.type === "x_deployed") actions = [{ kind: "deploy", position: ev.position, item: ev.work_item_id ?? null, room: "operations", role: ev.role ?? null, say: p.version ? `现在部署 ${p.version}` : (p.say as string) ?? null } as any];
+          else if (ev.type === "x_rolled_back") actions = [{ kind: "rollback", position: ev.position, item: ev.work_item_id ?? null, room: "operations", role: ev.role ?? null, say: p.version ? `现在回滚到 ${p.version}` : (p.say as string) ?? null } as any];
+          else if (ev.type === "x_auto_repair_stopped") actions = [{ kind: "repair_stop", position: ev.position, item: ev.work_item_id ?? null, room: ev.department ?? null, role: ev.role ?? null, say: (p.say as string) ?? "同一故障连续修复失败达到上限，停止自动修复" } as any];
+          else if (ev.type === "x_decision_issued") actions = [{ kind: "decision_out", position: ev.position, item: ev.work_item_id ?? null, room: ev.department ?? null, decision: (p.decision_id as string) ?? null, say: (p.say as string) ?? "现在送出决定单" } as any];
+          else if (ev.type === "x_decision_answered") actions = [{ kind: "decision_back", position: ev.position, item: ev.work_item_id ?? null, room: ev.department ?? null, decision: (p.decision_id as string) ?? null, say: (p.say as string) ?? "收到你的回答" } as any];
+          else if (ev.type === "x_run_stopped_for_upgrade") actions = [{ kind: "upgrade_stop", position: ev.position, item: ev.work_item_id ?? null, room: ev.department ?? null, role: ev.role ?? null } as any];
+        }
+        for (const action of actions) view.play(action);
       } else if (op.op === "decisions") view.setDecisions((op.arg ?? []) as unknown as DecisionFace[]);
       else if (op.op === "overlay") view.setOverlay((op.arg as { id: string | null }).id, (op.arg as { data: unknown }).data);
       else if (op.op === "focus") view.focus((op.arg as string | null) ?? null);
@@ -203,6 +220,7 @@ export async function replayScenario(serverUrl: string, browser: Browser, rec: R
   try {
     await page.goto(serverUrl + "index.html");
     await page.evaluate((fnSource) => {
+      (window as any).__name = (target: any) => target;
       (window as unknown as { __floorDriver: unknown }).__floorDriver = (0, eval)(`(${fnSource})`);
     }, driver.toString());
     const result = await page.evaluate(async (input) => {
@@ -255,6 +273,8 @@ export async function replayAll(options: { only?: string[] } = {}): Promise<Comp
         actorMismatches,
         mismatches,
         clientErrors: [...expected.errors, ...actual.errors],
+        expectedPng: expected.png,
+        actualPng: actual.png,
       });
     }
   } finally {

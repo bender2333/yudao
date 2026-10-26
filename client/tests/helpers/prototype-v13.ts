@@ -176,10 +176,14 @@ async function v13Driver(input: {
 /** 打开原型 v13 的页面（档位 S5，与录制时相同），装好驱动。 */
 export async function openPrototype(browser: Browser): Promise<Page> {
   const page = await browser.newPage();
-  await page.addInitScript(() => sessionStorage.setItem("y13.level", JSON.stringify("S5")));
+  await page.addInitScript(() => {
+    (window as any).__name = (target: any) => target;
+    sessionStorage.setItem("y13.level", JSON.stringify("S5"));
+  });
   await page.goto(prototypeUrl() + "#/sys/machines");
   await page.waitForTimeout(500);
   await page.evaluate((fnSource) => {
+    (window as any).__name = (target: any) => target;
     (window as unknown as { __v13Driver: unknown }).__v13Driver = (0, eval)(`(${fnSource})`);
   }, v13Driver.toString());
   return page;
@@ -210,7 +214,13 @@ export async function v13Checkpoint(page: Page, input: {
 /** 一张空白页，用来做像素减法（两边都是 data URL 的 PNG）。 */
 export async function openDiffPage(browser: Browser): Promise<Page> {
   const page = await browser.newPage();
+  await page.addInitScript(() => {
+    (window as any).__name = (target: any) => target;
+  });
   await page.goto("about:blank");
+  await page.evaluate(() => {
+    (window as any).__name = (target: any) => target;
+  });
   return page;
 }
 

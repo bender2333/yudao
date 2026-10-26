@@ -1006,7 +1006,7 @@ export function shotImage(file: string | null): HTMLImageElement | null {
  */
 export const paint: Record<string, PaintFn> = {
   screen: (c, x, y, o, t = 0) => screen(c, x, y, Number(o?.w) || 22, Number(o?.h) || 13, String(o?.mode ?? "idle"), t, o),
-  scanlines: (c, x, y, o) => scanlines(c, x, y, 22, 13, Number(o?.a ?? 0.22)),
+  scanlines: (c, x, y, o) => scanlines(c, x, y, Number(o?.w ?? 22), Number(o?.h ?? 13), Number(o?.a ?? 0.22)),
   desk,
   deskItems,
   chair,

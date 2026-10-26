@@ -8,7 +8,7 @@
 
 import { mix, rgba } from "../grid.ts";
 import { DEPTS, ITEM_COLORS, ITEM_SHADES, PAL } from "../registry.ts";
-import { drawActor, drawBitmap, drawPixelText, drawSign, drawText, fillPixel, fillPixelOutlined } from "../shapes.ts";
+import { drawActor, drawBitmap, drawSign, drawText, fillPixel, fillPixelOutlined } from "../shapes.ts";
 import { BUILDING_STATUS } from "./status-text.ts";
 import type { SceneLike } from "../world/types.ts";
 import { BUILDING_GEO, type BuildingDriver, type BuildingFloor, type FlashColor } from "../world/building.ts";
@@ -49,7 +49,6 @@ export class BuildingRenderer {
     c.imageSmoothingEnabled = false;
     c.drawImage(this.background(), 0, 0);
     this.driver.model.floors.forEach((f, i) => this.floor(c, f, i, t));
-    this.shafts(c);
     const walkers = this.scene.actors.filter((a) => a.data.walker).sort((p, q) => p.y - q.y);
     for (const a of walkers) drawActor(c, this.scene, a);
     this.particles(c);
@@ -105,7 +104,7 @@ export class BuildingRenderer {
     drawText(c, st.text, 32, y + 25.5, { size: 5.5, weight: 700, color: PAL.ink2, max: 88 });
     if (f.decisions) {
       fillPixelOutlined(c, 106, y + 5, 14, 9, PAL.yellow2);
-      drawPixelText(c, String(f.decisions), 113, y + 9.5, PAL.ink, "center");
+      drawText(c, String(f.decisions), 113, y + 9.5, { size: 6, weight: 800, align: "center", color: PAL.ink });
     }
     // 入口阀门：等待执行槽位时关闭
     fillPixelOutlined(c, 128, y + 32, 14, 6, PAL.metal3);
@@ -136,34 +135,37 @@ export class BuildingRenderer {
       });
       if (k < 3 && (!f.has_ops ? k < 2 : true)) fillPixel(c, x + 80, y + 26, 16, 3, PAL.glass2);
     });
+    // 管线出口：通往机房的管线沿右侧竖井下到地下室，管线里有光点在流动
+    const pipe = this.driver.world.links[`floor:${f.project_id}>basement`]
+      ?? Object.values(this.driver.world.links).find((p) => p.from === `floor:${f.project_id}`);
+    if (pipe) {
+      const x0 = 150 + 3 * 96 + (f.has_ops ? 82 : 0);
+      const sx = W - 22 - (i % 6) * 3;
+      const drop = (this.driver.model.floors.length - i) * FH - 30;
+      const col = LINK_COLORS[i % LINK_COLORS.length];
+      fillPixel(c, x0, y + 30, sx - x0, 2, col);
+      fillPixel(c, sx, y + 30, 2, drop + BASE, col);
+      if (!this.scene.reduced) {
+        const flow = pipe.flow;
+        if (this.scene.autonomy) {
+          if (flow && flow.load > 0.02) {
+            const k = (flow.phase / 900 + i * 0.3) % 1;
+            c.globalAlpha = flow.load;
+            fillPixel(c, sx - 1, y + 30 + k * drop, 4, 3, PAL.yellow2);
+            c.globalAlpha = 1;
+          }
+        } else if (f.link_active) {
+          const k = (t / 900 + i * 0.3) % 1;
+          fillPixel(c, sx - 1, y + 30 + k * drop, 4, 3, PAL.yellow2);
+        }
+      }
+    }
     // 这一层的闪光：关键事实时闪一下（颜色写在动作里），采纳时闪绿光并撒彩带（原型 v13 drawFloor 的 flashes）
     const flash = this.driver.flashOf(f.project_id);
     if (flash) {
       const left = Math.max(0, flash.until - this.scene.realT);
       c.fillStyle = rgba(FLASH_COLORS[flash.color], Math.min(0.3, (left / 1200) * 0.3));
       c.fillRect(12, y + 2, W - 24, FH - 2);
-    }
-  }
-
-  /** 通往机房的管线：从这一层的出口横着走到右侧竖井，再沿竖井下到地下室的位置（原型 drawFloor 的管线出口）。 */
-  private shafts(c: CanvasRenderingContext2D): void {
-    for (const pipe of Object.values(this.driver.world.links)) {
-      const i = this.driver.model.floors.findIndex((f) => pipe.from === `floor:${f.project_id}`);
-      if (i < 0) continue;
-      const floor = this.driver.model.floors[i];
-      const y = ROOF + i * FH;
-      const x0 = 150 + 3 * 96 + (floor.has_ops ? 82 : 0);
-      const sx = W - 22 - (i % 6) * 3;
-      const drop = (this.driver.model.floors.length - i) * FH - 30;
-      const col = LINK_COLORS[i % LINK_COLORS.length];
-      fillPixel(c, x0, y + 30, sx - x0, 2, col);
-      fillPixel(c, sx, y + 30, 2, drop + BASE, col);
-      const flow = pipe.flow;
-      if (this.scene.reduced || !flow || flow.load <= 0.02) continue;
-      const k = (flow.phase / 900 + i * 0.3) % 1;
-      c.globalAlpha = flow.load;
-      fillPixel(c, sx - 1, y + 30 + k * drop, 4, 3, PAL.yellow2);
-      c.globalAlpha = 1;
     }
   }
 
