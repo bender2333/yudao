@@ -2182,6 +2182,8 @@ class Orchestrator:
                          "definitions_version": DEFINITIONS.version,
                          "parameters_version": current.parameters_version},
             ))
+            # 提交被写入以后唤醒正在安全节点等待的会话（工单 #561）：质检的放行可能正等着产品这一轮处理完输入
+            transaction.on_commit(lambda: self._wake(run_id))
         if not judged.accepted:
             transaction.append(NewEvent(
                 EventType.PROPOSAL_REJECTED, actor=f"department:{department}", department=department,

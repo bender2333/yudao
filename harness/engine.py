@@ -50,6 +50,12 @@ COMPACTION_REQUEST_TIER = "minimal"
 COMPACTION_REQUEST_TIER = "minimal"
 
 
+# 放行等输入处理完（工单 #561）：在安全节点等待时最多等这么久，醒来以后重新做工具许可。
+# 产品那一轮结束、提交被写入时会唤醒它；没有收到唤醒（例如那一轮以文字回答结束）时也按这个间隔重新核对。
+# 等待计入运行时间，运行时间用完时安全节点照常结束等待并停止这一轮
+RELEASE_WAIT_INTERVAL_SEC = 0.5
+
+
 @dataclass(frozen=True)
 class Judgment:
     # 安全节点的回答：是否继续，以及作出判断时 run 流的版本；
@@ -568,8 +574,8 @@ class StepDriver:
                     ok, output, error = False, None, f"invalid tool arguments: {exc}"
                 else:
                     try:
-                        permission, facts = self._begin_tool(request, {"id": identity, "name": name, "args": args,
-                                                                       "step_id": step_id})
+                        permission, facts = await self._begin_tool_waiting_for_input(
+                            request, {"id": identity, "name": name, "args": args, "step_id": step_id})
                     except UnrepresentableWorkspace as exc:
                         # 工具许可需要工作区事实时发现无法表示的条目：以 workspace_unrepresentable 暂停运行
                         raise ProviderError(str(exc), reason="workspace_unrepresentable", facts=list(exc.paths)) from exc
@@ -756,7 +762,7 @@ class StepDriver:
             ok, output, error = False, None, f"invalid tool arguments: {exc}"
         else:
             call = {"id": identity, "name": name, "args": args, "step_id": request.step_id}
-            permission, facts = self._begin_tool(request, call)
+            permission, facts = await self._begin_tool_waiting_for_input(request, call)
             if permission.stopped or not permission.allowed:
                 return
             if name == "ask":
@@ -1040,6 +1046,7 @@ class StepDriver:
             permission = tool_permission(
                 projection, call, department=scope.department, session_id=scope.session_id,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
+                events=transaction.events(),
             )
             if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":
                 rel = str(call.get("args", {}).get("path") or "")
@@ -1063,6 +1070,20 @@ class StepDriver:
             return permission, facts
 
         return self._writes.transact(self._stream, begin)
+
+    async def _begin_tool_waiting_for_input(
+        self, request: ModelRequest | _RecoveredCall, call: dict[str, Any]
+    ) -> tuple[ToolPermission, WorkspaceFacts]:
+        # 工具许可：质检提交放行时还有没处理完的输入，就在安全节点上等到处理完再重新做一次许可
+        # （部门指导设计说明第 2.1 节，工单 #561）。等待发生在 tool_started 写入之前，这一次调用不返回模型、
+        # 不写事件、不占步数；重新启动以后没有处置的工具调用照常重新执行，重新进入同一个等待。
+        # 取消、暂停、运行时间用完照常生效：安全节点回答停止时这一段按停止结果交回
+        while True:
+            permission, facts = self._begin_tool(request, call)
+            if not permission.wait_for_input:
+                return permission, facts
+            if not await self._wait(RELEASE_WAIT_INTERVAL_SEC):
+                return ToolPermission(stopped=True), facts
 
     async def _perform(self, action: Action) -> ActionReceipt:
         # 先登记正在进行的动作，再看取消信号：取消落在登记之前时在这里交给执行环境，动作不开始；

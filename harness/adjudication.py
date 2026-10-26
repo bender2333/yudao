@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
-from .collaboration import tool_error
+from .collaboration import pending_product_input, tool_error
 from .contracts import current_contract_hash
 from .definitions import DEFINITIONS
 from .models import TERMINAL_STATUSES, Event, RunProjection, hash_bytes
@@ -61,13 +61,16 @@ class ToolPermission:
     # 工具许可的三种结果：允许；拒绝并说明原因，原因作为工具结果交回模型；停止
     # deferred：这次拒绝只是推迟（工单 #964）——模型还没有看见新的用户输入，提交推迟到下一步，
     # 通知在下一步送达，部门接着工作，这一轮不因此结束
+    # wait_for_input：等输入处理完（工单 #561）——质检提交放行时发给产品的输入还没有处理完，
+    # 这次调用在安全节点上等到处理完再重新做工具许可；不返回模型、不写事件、不占步数
     stopped: bool = False
     reason: str | None = None
     deferred: bool = False
+    wait_for_input: bool = False
 
     @property
     def allowed(self) -> bool:
-        return not self.stopped and self.reason is None
+        return not self.stopped and self.reason is None and not self.wait_for_input
 
 def ask_chain_decision(position: int, limit: int) -> tuple[bool, str | None]:
     # 询问链能不能再问一层（工单 #473）：position 是这个会话在链上的位置，
@@ -151,6 +154,7 @@ def tool_permission(
     basis: WorkBasis,
     aborted: bool,
     facts: WorkspaceFacts,
+    events: list[Event] | None = None,
 ) -> ToolPermission:
     # facts 是执行环境按 facts_query(call) 查询的结果
     # 有效合同、指导与用户输入变了都不再停止这次激活：它们作为通知送达，部门接着工作，
@@ -174,6 +178,12 @@ def tool_permission(
     reason = tool_error(projection, department, name, args)
     if reason:
         return ToolPermission(reason=reason)
+    # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：还有没处理完的输入时，
+    # 这一次调用在安全节点上等，醒来以后按此刻的 PRD 与交付重新做许可。只有质检的放行等，缺陷记录不等；
+    # 还没有交付的预测性探索也不等：没有可以放行的交付，这次提交本来就只会被拒绝
+    if (_is_release_submission(department, name, args) and projection.delivery_spec is not None
+            and pending_product_input(projection, list(events or ()))):
+        return ToolPermission(wait_for_input=True)
     if _is_write(name):
         reason = _write_path_error(name, args, facts)
         if reason:
@@ -211,6 +221,11 @@ def commit_decision(
         return proposal_decision(current, department=department, proposal=proposal,
                                  facts=current_facts, events=events)
     return decision
+
+
+def _is_release_submission(department: str, name: str, args: dict[str, Any]) -> bool:
+    # 只有质检的放行（submit_review，结论是 release）等输入处理完；质检提交缺陷记录不等（工单 #561）
+    return department == "quality" and name == "submit_review" and args.get("verdict") == "release"
 
 
 def _is_write(name: str) -> bool:
