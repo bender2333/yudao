@@ -1,6 +1,9 @@
-// 部门房间的过程联系表（工单 #177 验收标准 3，#82 的联系表做法）：
+// 部门房间画面的过程联系表（工单 #177 验收标准 3，#82 的联系表做法；工单 #1069 换成原型 v13 的录制）：
 // 回放录下的部门房间调用序列，在指定事件之后每隔一段时间截一帧，拼成一张联系表，
 // 交给用户查看画风与动作。输出在 client/.tmp/ 下，不进入提交。
+//
+// 录下的调用来自 tests/fixtures/room/recordings.json（client/scripts/record-room-calls.mjs 从 v13 录），
+// 与回放测试走同一条路：查询结果经 translate/room.ts 翻成画面的状态，事件翻成动作。
 //
 // 用法：node client/scripts/build-room-contact-sheet.mjs [--rec 场景编号] [--event 事件类型] [--nth 1] [--frames 12] [--interval 300]
 // 输出：client/.tmp/room-life/room-<场景>-<事件>-<序号>.png
@@ -23,7 +26,7 @@ const arg = (name, dflt) => {
   return i >= 0 ? process.argv[i + 1] : dflt;
 };
 const REC = arg("rec", "sc-todo-loop__engineering");
-const EVENT = arg("event", "collaboration_requested");
+const EVENT = arg("event", "proposal_submitted");
 const NTH = Number(arg("nth", 1));
 const FRAMES = Number(arg("frames", 12));
 const INTERVAL = Number(arg("interval", 300));
@@ -33,6 +36,7 @@ const OUT = arg("out", `room-${REC}-${EVENT}-${NTH}.png`);
 async function driver(input) {
   const P = await import("/src/pixel/room/view.ts");
   const clockMod = await import("/src/pixel/clock.ts");
+  const tr = await import("/src/translate/room.ts");
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:0;top:0;width:480px;height:240px;z-index:9999;background:#000";
   document.body.appendChild(host);
@@ -48,29 +52,41 @@ async function driver(input) {
     const n = Math.max(1, Math.round(ms / 50));
     for (let i = 0; i < n; i++) clock.advance(Math.round(clock.now()) + 50);
   };
+  let roles = [];
+  const roleName = (id) => {
+    const hit = roles.find((r) => r.id === id || r.kind === id);
+    return hit ? hit.name : null;
+  };
   for (let i = 0; i < input.ops.length; i++) {
     const op = input.ops[i];
     if (op.op === "mount" || op.op === "destroy") continue;
-    if (op.op === "setModel") view.setModel(op.arg);
-    else if (op.op === "playEvent") {
-      if (op.arg.type === input.event) {
+    if (op.op === "workspace") {
+      const state = tr.state({ position: op.position ?? 0, workspace: op.arg ?? { room: null } });
+      roles = (state.roles ?? []).slice();
+      if (op.jump) view.jump(state); else view.setState(state);
+    } else if (op.op === "event") {
+      const ev = Object.assign({}, op.arg, { position: Number(op.arg.position ?? 0) });
+      const stream = tr.streamOfEvent(ev);
+      if (stream) view.stream(stream.who, stream.text);
+      const actions = tr.actions(ev, input.department, { roleName });
+      if (ev.type === input.event) {
         seen += 1;
         if (seen === input.nth) {
           advance(1000);
-          shoot(0, op.arg.type);
-          view.playEvent(op.arg);
+          shoot(0, ev.type);
+          for (const a of actions) view.play(a);
           for (let k = 1; k <= input.frames; k++) {
             advance(input.interval);
-            if (k < input.frames) shoot(k * input.interval, op.arg.type);
+            if (k < input.frames) shoot(k * input.interval, ev.type);
           }
           view.destroy();
           host.remove();
           return frames;
         }
       }
-      view.playEvent(op.arg);
+      for (const a of actions) view.play(a);
     }
-    if (op.op === "setModel" || op.op === "playEvent") advance(500);
+    advance(500);
   }
   view.destroy();
   host.remove();

@@ -40,11 +40,12 @@ export interface RoomSwitchReport {
 export function roomWorkspaceFixture(department: string): RoomWorkspaceFixture {
   const recording = loadRoomRecordings();
   const scenario = recording.scenarios.find((s) => s.department === department);
-  const room = scenario?.ops.find((op) => op.op === "setModel")?.arg;
+  // 录制里存的是 department.workspace 结果里房间的那一块（工单 #1069 起录制改在原型 v13 上录）
+  const room = (scenario?.ops.find((op) => op.op === "workspace")?.arg as { room?: unknown } | undefined)?.room;
   if (!scenario || !room) {
     throw new Error(`录下的场景里没有部门 ${department} 的房间模型`);
   }
-  // 录下的是驱动收到的房间模型，与查询结果里的房间数据同一个类型；查询结果的其余字段
+  // 录下的是查询结果里房间的那一块，与查询结果里的房间数据同一个类型；查询结果的其余字段
   // 房间组件不读，这里不填
   return { department, room } as unknown as DepartmentWorkspaceResult;
 }
