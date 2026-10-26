@@ -7639,7 +7639,7 @@
             ],
             "title": "Applied Activation Id"
           },
-          "response_status": {
+          "answered_activation_id": {
             "anyOf": [
               {
                 "type": "string"
@@ -7648,9 +7648,9 @@
                 "type": "null"
               }
             ],
-            "title": "Response Status"
+            "title": "Answered Activation Id"
           },
-          "response_text": {
+          "outcome": {
             "anyOf": [
               {
                 "type": "string"
@@ -7659,7 +7659,7 @@
                 "type": "null"
               }
             ],
-            "title": "Response Text"
+            "title": "Outcome"
           },
           "created_event_id": {
             "type": "string",
@@ -7674,8 +7674,8 @@
           "text",
           "status",
           "applied_activation_id",
-          "response_status",
-          "response_text",
+          "answered_activation_id",
+          "outcome",
           "created_event_id"
         ],
         "title": "GuidanceRecord"
@@ -18628,74 +18628,23 @@
             "title": "Guidance Id",
             "type": "string"
           },
-          "guidance_version": {
-            "title": "Guidance Version",
-            "type": "integer"
-          },
-          "guidance_created_event_id": {
-            "title": "Guidance Created Event Id",
+          "activation_id": {
+            "title": "Activation Id",
             "type": "string"
           },
-          "department": {
+          "outcome": {
             "enum": [
-              "product",
-              "engineering",
-              "quality"
+              "proposal_accepted",
+              "text_reply"
             ],
-            "title": "Department",
-            "type": "string"
-          },
-          "status": {
-            "enum": [
-              "explained",
-              "completed",
-              "declined",
-              "needs_work"
-            ],
-            "title": "Status",
-            "type": "string"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          },
-          "result_event_ids": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Result Event Ids",
-            "type": "array"
-          },
-          "kind": {
-            "const": "department_guidance_response",
-            "title": "Kind",
-            "type": "string"
-          },
-          "issuer": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
-            "title": "Issuer",
-            "type": "string"
-          },
-          "content_hash": {
-            "title": "Content Hash",
+            "title": "Outcome",
             "type": "string"
           }
         },
         "required": [
           "guidance_id",
-          "guidance_version",
-          "guidance_created_event_id",
-          "department",
-          "status",
-          "text",
-          "result_event_ids",
-          "kind",
-          "issuer",
-          "content_hash"
+          "activation_id",
+          "outcome"
         ],
         "title": "DepartmentGuidanceRespondedPayload",
         "type": "object"

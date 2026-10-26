@@ -543,7 +543,6 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
                       <button type="button" className="y10-link link" onClick={() => setOpenEvent(record.created_event_id)}>查看原始事件</button>
                     </div>
                     <p className="y10-ws-guidance p msg-text">{record.text}</p>
-                    {record.response_status ? <p className="y10-muted card-note">部门的回应：{show(record.response_text, record.response_status)}</p> : null}
                   </li>
                 ))}
               </ul>

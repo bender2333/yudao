@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 import json
+import time
 import uuid
 
 from harness.collaboration import has_new_work, is_waiting
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace
+from harness.engine import StepLimits
 from harness.models import EventType
 from harness.proposals import (
     answer_turn, ask_turn, delivery_turn,
     product_spec, product_spec_turn, review_turn,
 )
-from harness.providers.call import ModelStreamEvent
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import guidance_reply, quality_turns
@@ -43,28 +45,73 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
     system.activate_once(run_id)
 
     system.add_guidance(run_id, "engineering", "请优先检查错误输出的边界行为。")
+    # 发出以后是已接收：还没有进入任何一轮的模型输入
+    assert system.project(run_id).department_guidance[0].status == "received"
     adapter.scripts["engineering"].append(guidance_reply("已检查边界行为，当前指导不改变产品合同。"))
     result = system.activate_once(run_id)
 
     guidance = result.department_guidance[0]
     assert guidance.department == "engineering"
-    # 收到它的那一轮工作就是它的处理：指导停在已进入模型输入，没有单独的回应记录（工单 #1038、#1039）
-    assert guidance.status == "in_input"
-    assert guidance.response_text is None
+    # 收到它的那一轮工作正常结束（以文字回答）以后是已回答，主机在同一个事务里写（工单 #1039）
+    assert guidance.status == "answered"
+    assert guidance.outcome == "text_reply"
     assert guidance.text in prompt_part(adapter.invocations[-1], "department_guidance")
     events = system.store.list_events(run_id)
     assert any(event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED for event in events)
     applied = next(event for event in events if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED)
     assert guidance.id in applied.payload["guidance_ids"]
-    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED for event in events)
+    [responded] = [event for event in events if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert responded.payload == {
+        "guidance_id": guidance.id,
+        "activation_id": applied.payload["activation_id"],
+        "outcome": "text_reply",
+    }
 
     application = Application(system)
     engineering = application.query("department.workspace", DepartmentWorkspace(
         project_id=project_id, department="engineering", work_item=work_item_id))
     assert engineering.data.guidance[0].text == guidance.text
+    assert engineering.data.guidance[0].status == "answered"
+    assert engineering.data.guidance[0].outcome == "text_reply"
     product = application.query("department.workspace", DepartmentWorkspace(
         project_id=project_id, department="product", work_item=work_item_id))
     assert not any(message.get("text") == guidance.text for message in product.data.messages)
+
+
+def test_guidance_goes_from_received_to_in_input_to_answered(tmp_path):
+    # 验收第 1 条：指导的三个状态各有证据。发出以后是已接收；进入部门的模型输入以后是已进入模型输入；
+    # 收到它的那一轮正常结束以后是已回答，事件记 activation_id 与 outcome（工单 #1039）
+    holder = {}
+    seen = {}
+
+    def record_the_state_during_the_request(request):
+        # 模型调用开始时指导的应用事件已经写好，此刻读投影就是已进入模型输入
+        seen["status"] = holder["system"].project(request.run_id).department_guidance[0].status
+        return guidance_reply("当前合同已覆盖该边界，无需变更。")(request)
+
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn(), record_the_state_during_the_request],
+                           "quality": []})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+
+    system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
+    assert system.project(run_id).department_guidance[0].status == "received"
+    result = system.activate_once(run_id)
+
+    assert seen["status"] == "in_input"
+    guidance = result.department_guidance[0]
+    assert guidance.status == "answered"
+    assert guidance.outcome == "text_reply"
+    applied = next(event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED)
+    assert guidance.answered_activation_id == applied.payload["activation_id"]
+    [responded] = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert responded.payload["activation_id"] == applied.payload["activation_id"]
+    assert responded.payload["outcome"] == "text_reply"
 
 
 def test_guidance_for_a_waiting_department_starts_a_full_round(tmp_path):
@@ -84,7 +131,8 @@ def test_guidance_for_a_waiting_department_starts_a_full_round(tmp_path):
 
     assert has_new_work(result, "quality")
     assert result.active_department == "engineering"
-    assert result.department_guidance[0].status == "in_input"
+    # 这一轮以文字回答结束：主机写已回答（工单 #1039）
+    assert result.department_guidance[0].status == "answered"
     names = _tool_names(adapter.invocations[-1])
     assert {"read_file", "write_file", "run_check", "ask", "submit_delivery"} <= set(names)
     # 待处理指导不再带来额外的提交工具：这一轮提供的工具正好是角色的工具清单（工单 #1038）
@@ -107,7 +155,11 @@ def test_guidance_received_during_model_request_becomes_a_notification(tmp_path)
     result = system.activate_once(run_id)
 
     assert result.product_spec is not None
-    assert result.department_guidance[0].status in {"received", "in_input"}
+    # 指导在这一轮提交以后才作为通知送达，这一轮没有把它送进模型输入：它停在已接收，
+    # 由收到它的下一轮工作结束时的已回答接上（工单 #1039）
+    assert result.department_guidance[0].status == "received"
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
     assert any(event.type == EventType.SPEC_ACCEPTED for event in system.store.list_events(run_id))
     assert any(event.type == EventType.PROPOSAL_SUBMITTED for event in system.store.list_events(run_id))
 
@@ -144,7 +196,9 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     assert "submit_product_spec" in names
     # 待处理指导不再带来额外的提交工具：这一轮提供的工具正好是角色的工具清单（工单 #1038）
     assert names == list(tools_for("product"))
-    assert result.department_guidance[0].status == "in_input"
+    # 这一轮以文字回答结束，主机写已回答（工单 #1039）
+    assert result.department_guidance[0].status == "answered"
+    assert result.department_guidance[0].outcome == "text_reply"
     assert has_new_work(result, "engineering")
 
     adapter.scripts["engineering"].append(delivery_turn())
@@ -181,8 +235,9 @@ def test_product_guidance_revises_the_prd_and_engineering_starts_a_new_round(tmp
     assert revised.delivery_specs[-1].status == "superseded"
     assert revised.delivery_specs[-1].content_hash == old_delivery
     assert has_new_work(revised, "quality")
-    # 收到指导的那一轮以提交接纳收尾：指导停在已进入模型输入，没有单独的回应用例（工单 #1038）
-    assert revised.department_guidance[0].status == "in_input"
+    # 收到指导的那一轮以提交被接纳结束：主机写已回答，事件记 proposal_accepted（工单 #1039）
+    assert revised.department_guidance[0].status == "answered"
+    assert revised.department_guidance[0].outcome == "proposal_accepted"
 
     # 由关注的成果决定下一个谁工作：PRD 有了新版本，工程开始一轮返工（工单 #556）
     adapter.scripts["engineering"].append(delivery_turn())
@@ -213,8 +268,9 @@ def test_guidance_round_changes_the_running_workspace_and_delivers(tmp_path):
     assert changed != original and "upper" in changed
     assert result.delivery_spec is not None and result.delivery_spec.status == "active"
     assert has_new_work(result, "quality")
-    # 这一轮就是指导的处理：指导停在已进入模型输入，工程不再为它开始第二轮（工单 #1038）
-    assert result.department_guidance[0].status == "in_input"
+    # 这一轮就是指导的处理：交付被接纳以后主机写已回答，工程不再为它开始第二轮（工单 #1039）
+    assert result.department_guidance[0].status == "answered"
+    assert result.department_guidance[0].outcome == "proposal_accepted"
 
     adapter.scripts["quality"].append(review_turn("release", "checks passed on the current delivery"))
     released = system.activate_once(run_id)
@@ -251,6 +307,82 @@ def test_guidance_arriving_while_a_round_waits_for_an_answer_is_delivered_at_its
     delivered = json.loads(seen["guidance"])
     assert [item["text"] for item in delivered] == ["拿到回答以后先核对输出边界。"]
     assert result.delivery_spec is not None
+    # 验收第 3 条（工单 #1039）：询问分支的会话结束不写已回答；写它的是收到指导的那一轮主线会话。
+    # 分支里结束的那一次激活是另一个会话，没有它的回答记录
+    assert result.department_guidance[0].status == "answered"
+    assert result.department_guidance[0].outcome == "proposal_accepted"
+    applied = next(event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED)
+    branch_activations = {event.payload["activation_id"] for event in system.store.list_events(run_id)
+                          if event.type == EventType.ACTIVATION_FINISHED
+                          and event.payload["activation_id"] != applied.payload["activation_id"]}
+    assert branch_activations
+    responded = [event.payload["activation_id"] for event in system.store.list_events(run_id)
+                 if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert responded == [applied.payload["activation_id"]]
+    assert not branch_activations & set(responded)
+
+
+def test_a_round_that_ends_the_item_still_writes_answered(tmp_path):
+    # 验收第 1 条：收到指导的那一轮以放行结束、事项随这一轮完成，同样写已回答。
+    # 这一轮的结束状态是已完成，不是暂停或失败，所以不算「这一轮没有正常结束」
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()],
+                           "quality": [review_turn("release", "checks passed on the current delivery")]})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "quality", "请按当前交付核验并放行。")
+    result = system.activate_once(run_id)
+
+    assert result.status == "done"
+    assert result.last_review.verdict == "release"
+    assert result.department_guidance[0].status == "answered"
+    assert result.department_guidance[0].outcome == "proposal_accepted"
+    [responded] = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert responded.payload["outcome"] == "proposal_accepted"
+
+
+def test_a_limit_that_stops_the_round_does_not_write_answered(tmp_path):
+    # 验收第 3 条（工单 #1039）：模型步数上限让这一轮停下不算正常结束，指导停在已进入模型输入
+    def list_files(request):
+        identity = f"list-{request.activation_id}-{request.step_id}"
+        return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call",
+                                      "name": "list_files", "arguments": "{}"}])
+
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn(), list_files], "quality": []})
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=1))
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请核对错误输出的边界。")
+    result = system.activate_once(run_id)
+
+    assert result.status == "paused"
+    assert result.stop_reason == "model_steps_exhausted"
+    assert result.department_guidance[0].status == "in_input"
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
+
+
+def test_running_out_of_time_does_not_write_answered(tmp_path):
+    # 验收第 3 条（工单 #1039）：运行时间用完不算这一轮正常结束，指导停在已进入模型输入
+    def slow_spec(request):
+        time.sleep(3.2)
+        return product_spec()
+
+    adapter = FakeAdapter({"product": [slow_spec], "engineering": [delivery_turn()], "quality": []})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo", run_time_limit_sec=3)
+    system.add_guidance(run_id, "product", "请补充输入校验的处理说明。")
+    result = system.activate_once(run_id)
+
+    assert result.status == "failed"
+    assert result.stop_reason == "time_limit"
+    assert result.department_guidance[0].status == "in_input"
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
 
 
 def test_guidance_for_one_department_is_delivered_in_receive_order(tmp_path):
@@ -269,7 +401,16 @@ def test_guidance_for_one_department_is_delivered_in_receive_order(tmp_path):
     delivered = json.loads(prompt_part(adapter.invocations[-1], "department_guidance"))
     assert [item["text"] for item in delivered] == ["先核对错误输出的边界。", "再核对空输入的边界。"]
     assert [item["version"] for item in delivered] == [1, 2]
-    assert [item.status for item in result.department_guidance] == ["in_input", "in_input"]
+    # 验收第 4 条：一轮里收到两条指导，结束时各写一条已回答（工单 #1039）
+    assert [item.status for item in result.department_guidance] == ["answered", "answered"]
+    assert [item.outcome for item in result.department_guidance] == ["text_reply", "text_reply"]
+    responded = [event.payload for event in system.store.list_events(run_id)
+                 if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert [(item["guidance_id"], item["outcome"]) for item in responded] == [
+        (result.department_guidance[0].id, "text_reply"),
+        (result.department_guidance[1].id, "text_reply"),
+    ]
+    assert len({item["activation_id"] for item in responded}) == 1
 
 
 def test_guidance_to_a_finished_item_is_rejected(data_dir):
@@ -336,7 +477,7 @@ def test_product_guidance_revision_is_delivered_to_the_working_department_and_st
 
 
 def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
-    # 取消不算处理完：已经接收的指导保留可查，停在已进入模型输入，没有已回答的记录（工单 #1039 才写）
+    # 验收第 3 条：取消不算处理完。已经接收的指导保留可查，停在已进入模型输入，没有已回答的记录
     holder = {}
 
     def cancel_during(request):
@@ -353,7 +494,10 @@ def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
 
     assert result.stop_reason == "cancelled"
     assert result.status == "failed"
-    assert result.department_guidance[0].status in {"received", "in_input"}
+    # 取消以后指导停在已进入模型输入：它已经在这一次的模型输入里，但这一轮没有正常结束
+    assert result.department_guidance[0].status == "in_input"
+    assert any(event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED
+               for event in system.store.list_events(run_id))
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
 
@@ -380,8 +524,14 @@ def test_a_guidance_only_round_ends_with_a_text_reply(tmp_path):
     assert is_waiting(result, "engineering")
     assert not any(event.type == EventType.TOOL_CALL_REQUIRED
                    for event in system.store.list_events(run_id))
-    # 回答由主机在 #1039 写：这一轮结束不写「已回答」事件，指导停在已进入模型输入
-    assert result.department_guidance[0].status == "in_input"
+    # 这一轮正常结束，主机写已回答：指导从已进入模型输入变成已回答，事件记 activation_id 与 outcome
+    assert result.department_guidance[0].status == "answered"
+    assert result.department_guidance[0].outcome == "text_reply"
+    assert result.department_guidance[0].answered_activation_id
+    [responded] = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert responded.payload["guidance_id"] == result.department_guidance[0].id
+    assert responded.payload["outcome"] == "text_reply"
 
 
 def test_guidance_arriving_during_an_ongoing_round_does_not_end_it_with_a_text_reply(tmp_path):
@@ -416,4 +566,14 @@ def test_guidance_arriving_during_an_ongoing_round_does_not_end_it_with_a_text_r
                 if event.type == EventType.TOOL_CALL_REQUIRED]
     assert [(event.department, event.payload["count"]) for event in required] == [("engineering", 1)]
     assert is_waiting(result, "engineering")
+    # 验收第 2 条（工单 #1039）：指导作为通知送达一轮正在进行的工作，那一轮正常结束时同样写已回答，
+    # 不是只有「以指导开始的一轮」才写；这一轮以交付被接纳结束
+    assert result.department_guidance[0].status == "answered"
+    assert result.department_guidance[0].outcome == "proposal_accepted"
+    applied = next(event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED)
+    [responded] = [event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
+    assert responded.payload["activation_id"] == applied.payload["activation_id"]
+    assert responded.payload["outcome"] == "proposal_accepted"
 

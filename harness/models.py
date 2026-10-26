@@ -213,12 +213,14 @@ class DepartmentGuidance:
     text: str
     guidance_ref: ArtifactRef
     created_event_id: str
+    # 三种状态（部门指导设计说明第 3 节，工单 #1039）：received 已接收、in_input 已进入模型输入、
+    # answered 已回答。已回答由主机在收到它的那一轮工作正常结束时写入，部门不提交（工单 #1038、#1039）
     status: str
     applied_activation_id: str | None = None
     applied_context_event_id: str | None = None
-    response_event_id: str | None = None
-    response_status: str | None = None
-    response_text: str | None = None
+    answered_event_id: str | None = None
+    answered_activation_id: str | None = None
+    outcome: str | None = None
 
 
 @dataclass(frozen=True)

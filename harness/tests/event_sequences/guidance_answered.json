@@ -1,6 +1,6 @@
 {
- "scenario": "guidance_response_explained",
- "covers": "产品规格接纳后工程交付；用户随后给工程部门写指导，指导进入它的一轮工作（标记已进入输入），这一轮只有指导、以文字回答结束，之后放行。",
+ "scenario": "guidance_answered",
+ "covers": "产品规格接纳后工程交付；用户随后给工程部门写指导，指导进入它的一轮工作（标记已进入输入），这一轮只有指导、以文字回答结束，主机在这一轮结束时写已回答，之后放行。",
  "events": [
   {
    "event": "<evt#1>",
@@ -1221,6 +1221,23 @@
   },
   {
    "event": "<evt#56>",
+   "type": "department_guidance_responded",
+   "actor": "system",
+   "department": "engineering",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_eng#1>#19",
+   "session_id": "<ses_eng#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#3>",
+    "guidance_id": "<guidance#1>",
+    "outcome": "text_reply"
+   }
+  },
+  {
+   "event": "<evt#57>",
    "type": "proposal_submitted",
    "actor": "department:quality",
    "department": "quality",
@@ -1238,7 +1255,7 @@
    }
   },
   {
-   "event": "<evt#57>",
+   "event": "<evt#58>",
    "type": "proposal_rejected",
    "actor": "department:quality",
    "department": "quality",
@@ -1270,7 +1287,7 @@
    }
   },
   {
-   "event": "<evt#58>",
+   "event": "<evt#59>",
    "type": "activation_finished",
    "actor": "system",
    "department": "quality",
@@ -1289,7 +1306,7 @@
    }
   },
   {
-   "event": "<evt#59>",
+   "event": "<evt#60>",
    "type": "department_activated",
    "actor": "system",
    "department": "quality",
@@ -1306,7 +1323,7 @@
    }
   },
   {
-   "event": "<evt#60>",
+   "event": "<evt#61>",
    "type": "department_input",
    "actor": "department:quality",
    "department": "quality",
@@ -1324,7 +1341,7 @@
    }
   },
   {
-   "event": "<evt#61>",
+   "event": "<evt#62>",
    "type": "context_assembled",
    "actor": "department:quality",
    "department": "quality",
@@ -1348,7 +1365,7 @@
    }
   },
   {
-   "event": "<evt#62>",
+   "event": "<evt#63>",
    "type": "model_requested",
    "actor": "department:quality",
    "department": "quality",
@@ -1370,28 +1387,6 @@
     "logical_call_id": "<act#5>:root-1:work",
     "max_attempts": 3,
     "parameters_version": "<parameters>",
-    "purpose": "work",
-    "step_id": 1
-   }
-  },
-  {
-   "event": "<evt#63>",
-   "type": "model_message",
-   "actor": "department:quality",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "running",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": null,
-   "error": null,
-   "payload": {
-    "activation_id": "<act#5>",
-    "attempt_id": "<act#5>:root-1:work:attempt-1",
-    "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#27>",
-    "input_version": 1,
-    "logical_call_id": "<act#5>:root-1:work",
     "purpose": "work",
     "step_id": 1
    }
@@ -1420,6 +1415,28 @@
   },
   {
    "event": "<evt#65>",
+   "type": "model_message",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#17",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#5>",
+    "attempt_id": "<act#5>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#19",
+    "effective_contract_hash": "<sha256#27>",
+    "input_version": 1,
+    "logical_call_id": "<act#5>:root-1:work",
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#66>",
    "type": "tool_called",
    "actor": "department:quality",
    "department": "quality",
@@ -1439,7 +1456,7 @@
    }
   },
   {
-   "event": "<evt#66>",
+   "event": "<evt#67>",
    "type": "model_attempt_finished",
    "actor": "department:quality",
    "department": "quality",
@@ -1462,7 +1479,7 @@
    }
   },
   {
-   "event": "<evt#67>",
+   "event": "<evt#68>",
    "type": "tool_started",
    "actor": "department:quality",
    "department": "quality",
@@ -1486,7 +1503,7 @@
    }
   },
   {
-   "event": "<evt#68>",
+   "event": "<evt#69>",
    "type": "tool_called",
    "actor": "department:quality",
    "department": "quality",
@@ -1516,7 +1533,7 @@
    }
   },
   {
-   "event": "<evt#69>",
+   "event": "<evt#70>",
    "type": "tool_started",
    "actor": "department:quality",
    "department": "quality",
@@ -1540,7 +1557,7 @@
    }
   },
   {
-   "event": "<evt#70>",
+   "event": "<evt#71>",
    "type": "tool_called",
    "actor": "department:quality",
    "department": "quality",
@@ -1565,7 +1582,7 @@
    }
   },
   {
-   "event": "<evt#71>",
+   "event": "<evt#72>",
    "type": "proposal_submitted",
    "actor": "department:quality",
    "department": "quality",
@@ -1583,7 +1600,7 @@
    }
   },
   {
-   "event": "<evt#72>",
+   "event": "<evt#73>",
    "type": "qa_submitted",
    "actor": "department:quality",
    "department": "quality",
@@ -1608,7 +1625,7 @@
    }
   },
   {
-   "event": "<evt#73>",
+   "event": "<evt#74>",
    "type": "run_done",
    "actor": "system",
    "department": "quality",
@@ -1623,7 +1640,7 @@
    }
   },
   {
-   "event": "<evt#74>",
+   "event": "<evt#75>",
    "type": "activation_finished",
    "actor": "system",
    "department": "quality",
@@ -1656,7 +1673,7 @@
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "stream_version": 74,
+  "stream_version": 75,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
  },

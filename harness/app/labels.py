@@ -44,6 +44,18 @@ def decision_kind_name(kind: Any) -> str:
     return DECISION_KIND_NAMES.get(str(kind or ""), str(kind or ""))
 
 
+# 收到指导的那一轮工作怎么结束的（部门指导设计说明第 3 节，工单 #1039）：提交被接纳，或者用文字回答
+GUIDANCE_OUTCOME_NAMES: dict[str, str] = {
+    "proposal_accepted": "提交被接纳",
+    "text_reply": "用文字回答",
+}
+
+
+def guidance_outcome_name(outcome: Any) -> str:
+    # 指导的回答方式的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
+    return GUIDANCE_OUTCOME_NAMES.get(str(outcome or ""), str(outcome or ""))
+
+
 # 说明里出现的部门标识按中文写，机器标识不直接出现
 def department_name(department: Any) -> str:
     value = str(department or "")
@@ -110,6 +122,7 @@ class _Translated(dict):
         "guidance_ids": item_count, "candidate_ids": item_count, "running_runs": item_count,
         "stopped_runs": item_count, "restarted_work_items": item_count,
         "kind": decision_kind_name,
+        "outcome": guidance_outcome_name,
         "modified_by": modifier_name,
     }
 
@@ -125,7 +138,7 @@ _LABELS: dict[str, str] = {
     EventType.PRODUCT_INPUT_ASSIGNED: "把用户输入分配给产品部门（到第 {through_version} 版）",
     EventType.DEPARTMENT_GUIDANCE_RECEIVED: "收到定向指导：{text}",
     EventType.DEPARTMENT_GUIDANCE_APPLIED: "定向指导已被采用：{guidance_ids}",
-    EventType.DEPARTMENT_GUIDANCE_RESPONDED: "对定向指导作出回应：{status}",
+    EventType.DEPARTMENT_GUIDANCE_RESPONDED: "这一轮结束，回答了定向指导：{outcome}",
     EventType.DEPARTMENT_ACTIVATED: "第 {cycle} 次激活部门",
     EventType.DEPARTMENT_INPUT: "把材料交给部门（第 {step_id} 步）",
     EventType.TOOL_CALL_REQUIRED: "部门没有调用工具，主机提示第 {count} 次",
