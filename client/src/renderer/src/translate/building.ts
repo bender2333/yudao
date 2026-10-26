@@ -31,7 +31,8 @@ const ACTIVE: readonly ItemState[] = ["working", "asking"];
 /**
  * 会待在房间里的状态（原型 scenes.js 的 IN_ROOM）：
  * 排队与等待执行槽位的事项还在大厅，采纳的不再回房间，用户停止的事项不再待在房间里（工单 #319）。
- * held 按 paused 画（服务端的 held 翻成 paused，#952），因此与原来的 held 一样留在房间里。
+ * held 按 #952 的结论翻成 paused，因此停在房间里（原来只有带等待回答的 held 才在房间里，
+ * 与「成果已挂起」不再是单独一句话一起，是 #952 已被接受的可见变化）。
  */
 const IN_ROOM: readonly ItemState[] = [
   "working", "asking", "waiting_model", "waiting_user", "waiting_resume", "interrupted", "paused", "failed", "done", "upgrade_stopped",
