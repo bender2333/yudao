@@ -1,5 +1,6 @@
-// 像素画基础的单元测试（工单 #176）：node --test 运行，不需要 Electron、浏览器与网络。
-// 覆盖：登记表完整性（图鉴「一项不少」的核对基准）、小人合成的确定性（同输入同输出）、
+// 像素画基础的单元测试（工单 #176、#956）：node --test 运行，不需要 Electron、浏览器与网络。
+// 对照的原型是 v13（y13.js、pixel/sprites.js、pixel/engine.js），与客户端逐项比较：
+// 登记表完整性（图鉴「一项不少」的核对基准）、注册表内容逐项相同、小人合成的确定性（同输入同输出）、
 // 动作帧序列的取值、整数倍最近邻缩放的排布、GSAP 确定时钟的可重复性。
 
 import { test } from "node:test";
@@ -14,10 +15,10 @@ import { integerScale, layoutFor } from "../../src/renderer/src/pixel/scale.ts";
 
 const require = createRequire(import.meta.url);
 
-test("登记表列出原型 sprites.js 与 engine.js 的全部公开成员：64 个（39 函数 + 25 数据）", () => {
-  assert.equal(registry.inventory.functions.length, 39);
-  assert.equal(registry.inventory.data.length, 25);
-  assert.equal(registry.inventory.all.length, 64);
+test("登记表列出原型 v13 sprites.js 与 engine.js 的全部公开成员：62 个（38 函数 + 24 数据）", () => {
+  assert.equal(registry.inventory.functions.length, 38);
+  assert.equal(registry.inventory.data.length, 24);
+  assert.equal(registry.inventory.all.length, 62);
   // 抽查几个画法名，确认清单是真实导出而不是写死的数字
   for (const fn of ["drawActor", "drawBitmap", "drawIcon", "renderSprite", "createVignette", "rolePalette", "box", "bubble", "sign"]) {
     assert.ok(registry.inventory.functions.includes(fn), `缺少函数 ${fn}`);
@@ -25,16 +26,32 @@ test("登记表列出原型 sprites.js 与 engine.js 的全部公开成员：64 
   for (const d of ["PAL", "CHAR", "BITMAPS", "POSES", "ANIMS", "ACTIONS", "VIGNETTES", "paint", "ease"]) {
     assert.ok(registry.inventory.data.includes(d), `缺少数据表 ${d}`);
   }
+  // v13 的 engine.js 不再有事件对照表：事件翻成动作写在翻译层
+  assert.ok(!registry.inventory.functions.includes("resolveAction"), "v13 没有 resolveAction");
+  assert.ok(!registry.inventory.data.includes("EVENT_ACTIONS"), "v13 没有 EVENT_ACTIONS");
 });
 
-test("登记表的数据与原型运行时一致（按锁定依赖生成，内容照原型搬）", () => {
-  // 用与生成脚本相同的沙箱再跑一次原型，比较注册表规模（防止登记表与原型脱节）
+test("登记表的数据与原型 v13 运行时逐项相同（按锁定依赖生成，内容照原型搬）", () => {
+  // 用与生成脚本相同的沙箱再跑一次原型，逐项比较注册表的内容（不只是条数）
   const proto = loadPrototypePixel();
-  for (const name of ["PAL", "CHAR", "DEPTS", "SKINS", "HAIRS", "ROLE_KINDS", "ROLE_NAMES", "ITEM_COLORS", "ITEM_SHADES", "SPRITE_LEVELS", "BITMAPS", "POSES", "ANIMS", "ACTIONS", "BASE_MOTIONS", "STATUS_ACTIONS", "EVENT_ACTIONS", "VIGNETTE_SPRITES", "FONT3"]) {
-    const a = Object.keys(proto[name]).length;
-    const b = Object.keys(registry.registries[name]).length;
-    assert.equal(b, a, `${name} 数量不一致：客户端 ${b}，原型 ${a}`);
+  const names = ["PAL", "CHAR", "DEPTS", "SKINS", "HAIRS", "ROLE_KINDS", "ROLE_NAMES", "ITEM_COLORS", "ITEM_SHADES", "SPRITE_LEVELS", "BITMAPS", "POSES", "ANIMS", "ACTIONS", "BASE_MOTIONS", "STATUS_ACTIONS", "VIGNETTE_SPRITES", "FONT3"];
+  assert.equal(registry.generatedFrom, "docs/prototypes/v13/js/{y13.js,pixel/sprites.js,pixel/engine.js}");
+  for (const name of names) {
+    // 原型在另一个 vm 上下文里，对象原型不同：先按生成脚本的同一做法序列化再比较内容
+    const theirs = JSON.parse(JSON.stringify(proto[name]));
+    assert.equal(Object.keys(registry.registries[name]).length, Object.keys(theirs).length, `${name} 数量不一致：客户端 ${Object.keys(registry.registries[name]).length}，原型 ${Object.keys(theirs).length}`);
+    assert.deepEqual(registry.registries[name], theirs, `${name} 内容与原型 v13 不同`);
   }
+  // 清单、档位、字体也逐项相同
+  const functions = Object.keys(proto).filter((k) => typeof proto[k] === "function").sort();
+  const dataMembers = Object.keys(proto).filter((k) => typeof proto[k] !== "function").sort();
+  assert.deepEqual(registry.inventory.functions, functions, "函数清单与原型不同");
+  assert.deepEqual(registry.inventory.data, dataMembers, "数据清单与原型不同");
+  assert.deepEqual(registry.levels, JSON.parse(JSON.stringify(protoLevels())), "档位顺序与原型不同");
+  assert.deepEqual(registry.levelLabels, JSON.parse(JSON.stringify(protoLevelLabels())), "档位标签与原型不同");
+  assert.equal(registry.charW, proto.CHAR_W);
+  assert.equal(registry.charH, proto.CHAR_H);
+  assert.equal(registry.font, proto.FONT);
 });
 
 test("角色配色表逐字对照原型 rolePalette", () => {
@@ -137,15 +154,15 @@ test("位图画法全部可解析：BITMAPS 的每一张位图行等宽、字符
 });
 
 // ---------------------------------------------------------------------------
-// 用与生成脚本相同的沙箱把原型加载进内存，作为「与原型一致」的对照（只读原型，不修改）。
+// 用与生成脚本相同的沙箱把原型 v13 加载进内存，作为「与原型一致」的对照（只读原型，不修改）。
 
 let protoCache = null;
-function loadPrototypePixel() {
+function loadPrototypeNamespace() {
   if (protoCache) return protoCache;
   const fs = require("node:fs");
   const vm = require("node:vm");
   const path = require("node:path");
-  const v11 = path.resolve(import.meta.dirname, "..", "..", "..", "docs", "prototypes", "v11", "js");
+  const v13 = path.resolve(import.meta.dirname, "..", "..", "..", "docs", "prototypes", "v13", "js");
   const noop = () => {};
   const makeCtx2d = () => ({
     createImageData: (w, h) => ({ data: new Uint8ClampedArray(Math.max(0, w * h * 4)) }),
@@ -170,9 +187,25 @@ function loadPrototypePixel() {
   };
   sandbox.window = sandbox; sandbox.self = sandbox; sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
-  for (const [label, file] of [["y11.js", path.join(v11, "y11.js")], ["sprites.js", path.join(v11, "pixel", "sprites.js")], ["engine.js", path.join(v11, "pixel", "engine.js")]]) {
+  for (const [label, file] of [
+    ["y13.js", path.join(v13, "y13.js")],
+    ["sprites.js", path.join(v13, "pixel", "sprites.js")],
+    ["engine.js", path.join(v13, "pixel", "engine.js")],
+  ]) {
     vm.runInContext(fs.readFileSync(file, "utf8"), sandbox, { filename: label });
   }
-  protoCache = sandbox.window.Y11.pixel;
+  protoCache = sandbox.window.Y13;
   return protoCache;
+}
+
+function loadPrototypePixel() {
+  return loadPrototypeNamespace().pixel;
+}
+
+function protoLevels() {
+  return loadPrototypeNamespace().LEVELS;
+}
+
+function protoLevelLabels() {
+  return loadPrototypeNamespace().LEVEL_LABELS;
 }

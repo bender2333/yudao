@@ -53,8 +53,8 @@ for (const size of [
       const errors = watchErrors(page);
       try {
         await expect(page.locator(".gallery-page")).toBeVisible();
-        // 图鉴列出全部 64 项公开画法，一项不少
-        await expect(page.locator(".gallery-item")).toHaveCount(64);
+        // 图鉴列出全部 62 项公开画法（原型 v13 的 38 个函数与 24 个数据），一项不少
+        await expect(page.locator(".gallery-item")).toHaveCount(62);
         await expect(page.locator(".gallery-item[data-member='drawActor']")).toBeVisible();
         await expect(page.locator(".gallery-item[data-member='paint']")).toBeVisible();
         await expect(page.locator(".gallery-item[data-member='VIGNETTES']")).toBeVisible();
