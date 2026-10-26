@@ -1,9 +1,12 @@
-// 项目楼层的画面对象：画布挂在宿主元素上，提供 setModel、playEvent、focus、setOverlay、resize、destroy
-// （原型 v10 floor.js 的对外接口与设计说明第 5.2 至 5.7 节，工单 #82）。
+// 项目楼层的画面对象：画布挂在宿主元素上，提供 setState、jump、play、setDecisions、stream、focus、
+// setOverlay、resize、destroy（原型 v13 js/pixel/floor.js 的 createFloorScene 与画面与播放设计说明第 4、5 节，
+// 工单 #82、#953）。
+//
+// 画面的输入只有画面合同（pixel/contract.ts）：状态带位置、动作带位置与 kind，实时内容（决定卡片、流式文字）
+// 到了就显示。打开画面、重新同步、标签页切回与回放拖动都用 jump：清空时间线，直接显示最新状态，不补播。
 //
 // 世界的推进（floor.ts）与绘制（render.ts）都不依赖画布与 WebGL；这里只把画好的画布挂到页面上，
-// 画布按设备分辨率绘制（surface.ts：像素尺寸为逻辑尺寸乘整数倍 k，先设缩放再按逻辑坐标绘制，
-// 工单 #365），每帧由共用的时钟驱动。
+// 画布按设备分辨率绘制（surface.ts），每帧由共用的时钟驱动。
 
 import type { Clock } from "../clock.ts";
 import { createPixelSurface } from "../surface.ts";
@@ -14,12 +17,10 @@ import { FloorRenderer, H, W } from "./render.ts";
 import { createDecisionCard, type DecisionCard } from "./card.ts";
 import { ROOM_VISUALS } from "./render-decl.ts";
 import type { DecisionAnswer, DecisionResult } from "./card.ts";
-import type { FloorModel, PixelFloorEvent, SceneLike } from "../world/types.ts";
-import type { TimeText } from "../world/types.ts";
+import type { DecisionFace, FloorModel, SceneLike, TimeText } from "../world/types.ts";
+import type { PixelAction } from "../contract.ts";
 
-export type { FloorModel, PixelFloorEvent } from "../world/types.ts";
-
-/** 概览页与测试共用的时间写法（原型 Y10.time）。 */
+/** 概览页与测试共用的时间写法（原型 Y13.time）。 */
 export const FLOOR_TIME: TimeText = {
   clock: (iso) => {
     if (!iso) return "";
@@ -34,10 +35,27 @@ export const FLOOR_TIME: TimeText = {
   },
 };
 
+/** 没有数据时的空状态：带位置 0，事项为空。 */
+export function emptyFloorModel(): FloorModel {
+  return {
+    position: 0,
+    items: [], open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [],
+    machines: null, ops: null, interrupted: false, roles: null, decisions: [],
+  };
+}
+
 /** 项目楼层画面对象。 */
 export interface FloorView {
-  setModel(model: FloorModel): void;
-  playEvent(event: PixelFloorEvent): void;
+  /** 一份状态：等它之前的动作演完再上画面（由播放时间线决定）。 */
+  setState(state: FloorModel): void;
+  /** 跳到最新：清空时间线，正在演的立刻结束，直接显示给出的状态，不补播。 */
+  jump(state: FloorModel): void;
+  /** 一个动作：进播放时间线，按声明演出。 */
+  play(action: PixelAction): void;
+  /** 决定卡片（实时内容，不进时间线）。 */
+  setDecisions(list: DecisionFace[]): void;
+  /** 流式文字（实时内容，不进时间线）。 */
+  stream(who: { room: string | null; role?: string | null }, text: string): void;
   focus(id: string | null): void;
   setOverlay(id: string | null, data: unknown): void;
   resize(): void;
@@ -63,6 +81,8 @@ export interface FloorTestHooks {
     reduced: boolean;
     canvasWidth: number;
   };
+  /** 时间线此刻的读数：画面上状态的位置、还排着几份状态、落后多少（工单 #953 的「不补播」核对）。 */
+  timeline: () => { shown: number | null; pending: number; lag: number; queued: number; playing: string[] };
   /** 当前画在画布上的覆盖层，供真实系统端到端测试核对查询结果。 */
   overlay: () => { id: string | null; data: Record<string, unknown> | null };
   overlayLabels: () => { x: number; y: number; w: number; h: number; key: string }[];
@@ -87,8 +107,6 @@ export function floorTestHooks(view: FloorView, onResync: () => void): FloorTest
     state: () => {
       const { driver, scene } = view.inspect();
       const world = driver.world;
-      const canvas = view.inspect().renderer;
-      void canvas;
       return {
         characters: Object.values(world.characters).map((c) => ({
           id: c.id,
@@ -101,17 +119,21 @@ export function floorTestHooks(view: FloorView, onResync: () => void): FloorTest
         packages: Object.values(world.packages).map((pk) => ({ id: pk.id, link: pk.transit ? pk.transit.linkKey : null })),
         pipes: Object.entries(world.links).map(([key, p]) => [key, p.flow ? p.flow.state : null] as [string, string | null]),
         signals: Object.keys(world.signals).filter((name) => world.signals[name].until > scene.realT),
-        items: driver.model.items.map((it) => ({ id: it.work_item_id, status: it.status, department: it.department })),
+        items: driver.model.items.map((it) => ({ id: it.id, status: it.status, department: it.department })),
         reduced: scene.reduced,
         canvasWidth: 0,
       };
+    },
+    timeline: () => {
+      const info = view.inspect().driver.inspectTimeline();
+      return { shown: info.shown, pending: info.pending, lag: info.lag, queued: info.queued, playing: info.playing.map((p) => p.kind) };
     },
     decisions: () => {
       const { driver, card } = view.inspect();
       const info = card.inspect();
       return {
         board: view.boardRect(),
-        faces: driver.model.decisions.map((d) => ({ id: d.id, kind: d.kind, version: d.version, title: d.title })),
+        faces: (driver.model.decisions ?? []).map((d) => ({ id: d.id, kind: d.kind, version: d.version, title: d.title })),
         card: { openId: info.openId, submitted: info.submitted, message: info.message, stamp: info.stamp ? { id: info.stamp.id, text: info.stamp.text } : null },
       };
     },
@@ -125,7 +147,7 @@ export interface FloorViewOptions {
   host: HTMLElement;
   clock: Clock;
   /** 决定卡的挂载容器（说明栏的输入框加在这里）。 */
-  cardHost?: HTMLElement;
+  cardHost?: HTMLElement | null;
   /** 点选项时的回答：带上决定的版本与说明，返回命令的结果（被拒绝时给出原因）。 */
   onDecide?: (payload: DecisionAnswer) => Promise<DecisionResult> | DecisionResult;
   onGo?: (target: string) => void;
@@ -147,11 +169,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
     tween: (target, vars) => opts.clock.tween(target, vars),
     reapply: () => opts.clock.reapply(),
   });
-  const emptyModel: FloorModel = {
-    items: [], open_requests: [], shelves: { adopted: [] }, slots: null, waiting_provider: [],
-    machines: null, ops: null, interrupted: false, roles: null, decisions: [],
-  };
-  const driver = createFloorDriver({ model: emptyModel, scene, state: createFloorState(), catalog, W, H, time: FLOOR_TIME });
+  const driver = createFloorDriver({ model: emptyFloorModel(), scene, state: createFloorState(), catalog, W, H, time: FLOOR_TIME });
   const renderer = new FloorRenderer(driver, scene);
   // 世界里的决定卡片：点大厅的板子打开，回答调用 onDecide（工单 #179）
   const card = createDecisionCard(canvas, {
@@ -180,7 +198,7 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
 
   /** 决定板的命中范围：板子与它上方的「待你决定」牌子；没有等待回答的决定请求时不命中。 */
   function overBoard(x: number, y: number): boolean {
-    if (driver.model.decisions.length === 0) return false;
+    if ((driver.model.decisions ?? []).length === 0) return false;
     const b = driver.boardRect();
     return x >= b.x - 2 && x <= b.x + b.w + 2 && y >= b.y - 12 && y <= b.y + b.h + 10;
   }
@@ -218,13 +236,25 @@ export async function createFloorView(opts: FloorViewOptions): Promise<FloorView
 
   return {
     size: { W, H },
-    setModel(model) {
-      driver.setModel(model);
-      card.setDecisions(model.decisions);
+    setState(state) {
+      driver.setState(state);
       draw();
     },
-    playEvent(event) {
-      driver.playEvent(event);
+    jump(state) {
+      driver.jump(state);
+      draw();
+    },
+    play(action) {
+      driver.play(action);
+      draw();
+    },
+    setDecisions(list) {
+      driver.setDecisions(list);
+      card.setDecisions(list);
+      draw();
+    },
+    stream(who, text) {
+      driver.stream(who, text);
       draw();
     },
     focus(id) {

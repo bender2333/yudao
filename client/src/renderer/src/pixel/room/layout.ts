@@ -1,7 +1,7 @@
 // 部门房间的布局常量与位置表（原型 v10 room.js 的 W、H、BASE、L、SPOT、STATUS_TEXT、POSE_ALIAS、
 // BENCH_LABEL、S，工单 #177）。这些是数据与坐标，渲染层按它们画、驱动器按它们走位。
 
-import { PAL } from "../registry.ts";
+import { LEVELS, PAL } from "../registry.ts";
 
 export const W = 480;
 export const H = 240;
@@ -60,12 +60,13 @@ export const STATUS_COLOR: Record<string, string> = {
   idle: PAL.screen2,
 };
 
-/** roomModel.pose.action 到动画名的别名（原型 room.js 的 POSE_ALIAS）。 */
-export const POSE_ALIAS: Record<string, string> = {
-  typing: "type", type: "type", reading: "read_sit", read: "read_sit", writing: "write", write: "write",
-  thinking: "think", think: "think", searching: "rummage", waiting: "sit_wait", tea: "tea", idle: "sit",
-  inspecting: "inspect",
-};
+/** 档位比较（原型 engine.js 的 levelAtLeast）：ui ≤ 3.1 ≤ 3.2C ≤ … ≤ S5。陈设与试用的有无按档位决定。 */
+export function levelAtLeast(level: string | undefined, min: string): boolean {
+  const a = LEVELS.indexOf(level || "ui");
+  const b = LEVELS.indexOf(min);
+  if (a < 0 || b < 0) throw new Error(`未知档位：${level} / ${min}`);
+  return a >= b;
+}
 
 /** 各部门工作台的名字（原型 room.js 的 BENCH_LABEL）。 */
 export const BENCH_LABEL: Record<string, string> = {

@@ -10,9 +10,17 @@ import { PAL, PIXEL_FONT_STACK } from "../registry.ts";
 import { mix } from "../grid.ts";
 import { R, RB } from "./render.ts";
 import type { DecisionFace } from "../world/types.ts";
-import { missingNoteText } from "../../views/decisions/card-logic.ts";
 
 export type { DecisionFace };
+
+/**
+ * 需要说明的选项没有写说明时的提示。文字由翻译层写在选项的 note_missing_text 上
+ * （画面层不写页面的文字，工单 #953）；没有写时用一句通用的提示。
+ */
+function missingNoteText(option: DecisionFace["options"][number], note: string): string {
+  if (option.note_required && note.trim() === "") return option.note_missing_text || "这个选项需要在说明里写明原因";
+  return "";
+}
 
 export type DecisionAnswer = { decision_id: string; option: string; note: string; base_version: number };
 

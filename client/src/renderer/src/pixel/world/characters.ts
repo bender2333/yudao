@@ -1,24 +1,25 @@
-// 角色、包裹与管道的推进，任务派发与队列规则（原型 v10 设计说明第 4、5 节与 ecs.js 第 3.3 至 3.6 节，
-// 工单 #82）。世界与系统不依赖渲染：角色空着时取队首、走到 spot、做 ms 毫秒的 pose；
-// 事件按规则找到做事的角色；包裹沿管道的折线移动；管道带着惯性流动。每个角色与每根管道各有一个状态机。
+// 角色、包裹与管道的推进，任务派发与队列规则（原型 v13 ecs.js 第 3.3 至 3.6 节与 design.md 第 5 节，
+// 工单 #82、#953）。世界与系统不依赖渲染：角色空着时取队首、走到 spot、做 ms 毫秒的 pose；
+// 画面的动作按 kind 找到做它的角色；包裹沿管道的折线移动；管道带着惯性流动。每个角色与每根管道各有一个状态机。
+//
+// 排队与丢弃不在这里：演什么、什么时候演、丢什么由播放时间线决定（pixel/timeline.ts）。
+// 一个角色的队列里只有时间线交给它的那几个动作的步骤；一个动作被立刻结束（跳到最新、普通动作到了上限）时，
+// 由 dropAction 把这些步骤与它沿管道走的包裹一起清掉。
 
 import { roomOf } from "./declare.ts";
 import { actorOf, charsOf, charFor } from "./scene.ts";
 import { polyLength, pointAt } from "./declare.ts";
-import type { Character, HeadIconKind, IdleDef, PixelFloorEvent, RestState, Seat, SpotKind, Step, Task, TaskDef, World } from "./types.ts";
+import type { PixelAction } from "../contract.ts";
+import type { Character, HeadIconKind, IdleDef, RestState, Seat, SpotKind, Step, Task, TaskDef, World } from "./types.ts";
 import type { SceneLike } from "./types.ts";
-
-/** 队列里最多留几个可以被挤掉的任务（must 的任务不受限制）。 */
-const MAX_QUEUE = 3;
 
 const GEO = {
   TOP: 50, ROOM_B: 214, FLOOR_LINE: 150, DESK_Y: 196, PORT_STAND: 176, PIPE_Y: 138, TUBE_Y: 104,
   DUCT_Y: 30, DUCT_TUBE_Y: 42, UNDER_Y: 276, GAP: 6,
 };
 
-/** 放进队列时的附加字段：front 插到队首，roleId 指定事件的接任务角色。 */
+/** 放进队列时的附加字段：roleId 指定做这件事的角色（按角色 id 或角色种类取）。 */
 export interface EnqueueExtra extends Partial<Task> {
-  front?: boolean;
   roleId?: string;
 }
 
@@ -35,59 +36,64 @@ export function enqueue(world: World, who: string, key: string, extra?: EnqueueE
     if (ch.current && ch.current.idle) ch.current = null;
     ch.queue = ch.queue.filter((t) => !t.idle);
   }
-  if (e.front) {
-    ch.queue.unshift(task);
-    if (ch.current && !ch.current.must) ch.current = null;
-  } else {
-    ch.queue.push(task);
-  }
-  while (ch.queue.filter((t) => !t.must).length > MAX_QUEUE) {
-    ch.queue.splice(ch.queue.findIndex((t) => !t.must), 1);
-  }
+  ch.queue.push(task);
   return task;
 }
 
-/** 事件到达：命中任务目录则入队并返回真；没有命中返回假，由调用方按信号处理。 */
+/**
+ * 一个由角色做的动作（画面合同的动作，kind 是任务目录里的键）：找到做它的角色，放进它的队列。
+ * 返回放进去的任务；找不到角色时为 null（调用方据此把动作立刻演完）。
+ * make 为任务装上动作相关的字段（效果回调、气泡文字、actionId……）；side 为 'to' 表示这个任务是动作里
+ * 收东西的一方做的（任务的 then 后续步骤）。
+ */
 export function dispatch(
   world: World,
-  event: PixelFloorEvent,
-  make?: (def: TaskDef, event: PixelFloorEvent, character: Character, side?: "to" | "from") => Partial<Task> | null,
-): boolean {
-  if (!event || !event.type) throw new Error("dispatch 需要事件对象");
-  const key = world.catalog.keyOf(event);
-  const def = world.catalog.tasks[key];
-  if (!def) return false;
-  // 任务声明了 dept 就由那个部门做（事件本身可以没有部门字段），否则是事件的部门
-  const department = def.dept ?? event.department ?? null;
-  if (!department) return false;
-  const ch = charFor(world, department, def.actor ? null : (event.role ?? null), def.actor ?? def.by ?? null);
-  if (!ch) return false;
-  const payload = event.payload ?? {};
-  if (def.streaming) {
-    // 流式输出：文字接在正在做的模型请求上（第一段文字取代默认的标签）；没有正在做的请求就不产生任务
-    const cur = ch.current;
-    if (cur && cur.taskKey === "model_requested") {
-      cur.label = ((cur.streamed ? cur.label : "") + String(payload.text ?? "")).slice(-120);
-      cur.streamed = true;
-      cur._t0 = null;
-      return true;
-    }
-    return false;
-  }
-  const extra: Partial<Task> = { workItemId: event.work_item_id ?? null };
-  if (payload.n !== undefined && payload.of !== undefined) extra.iconText = `${payload.n}/${payload.of}`;
+  action: PixelAction,
+  make?: (def: TaskDef, action: PixelAction, character: Character, side?: "to" | "from") => Partial<Task> | null,
+): Task | null {
+  if (!action || !action.kind) throw new Error("dispatch 需要画面合同的动作");
+  const def = world.catalog.tasks[action.kind];
+  if (!def) throw new Error("任务目录里没有这种动作：" + action.kind);
+  // 任务声明了 dept 就由那个部门做，否则是动作所在的房间
+  const department = def.dept ?? asText(action.room) ?? null;
+  if (!department) return null;
+  const ch = charFor(world, department, def.actor ? null : asText(action.role), def.actor ?? def.by ?? null);
+  if (!ch) return null;
+  const extra: Partial<Task> = { workItemId: asText(action.item) ?? null };
+  if (action.count !== undefined && action.count !== null) extra.iconText = String(action.count);
   if (def.spot === "peer") {
-    const toward = def.toward === "role" ? charFor(world, department, event.role ?? null, null) : charFor(world, department, null, def.toward ?? null);
-    if (!toward || toward === ch) return false;
+    // 走向另一个角色的任务：对象是动作指定的角色，或者部门里某种角色
+    const toward = def.toward === "role" ? charFor(world, department, asText(action.role), null) : charFor(world, department, null, def.toward ?? null);
+    if (!toward || toward === ch) return null;
     extra.withId = toward.id;
     if (def.then) {
       extra.onDone = () => {
-        enqueue(world, toward.id, def.then!, make ? make(world.catalog.tasks[def.then!], event, toward, "to") : null);
+        enqueue(world, toward.id, def.then!, make ? make(world.catalog.tasks[def.then!], action, toward, "to") : null);
       };
     }
   }
-  if (make) Object.assign(extra, make(def, event, ch));
-  return Boolean(enqueue(world, ch.id, key, extra));
+  if (make) Object.assign(extra, make(def, action, ch));
+  return enqueue(world, ch.id, action.kind, extra);
+}
+
+/** 动作的字段可能来自画面合同的额外字段（`[key: string]: unknown`），取值时先收窄。 */
+export function asText(value: unknown): string | null {
+  return typeof value === "string" && value !== "" ? value : null;
+}
+
+/**
+ * 时间线立刻结束一个动作（跳到最新、普通动作到了上限、整层的动作被丢掉）：
+ * 它在各个角色队列里的步骤与沿管道走的包裹立刻去掉，不再执行做完以后的效果。
+ * 关键动作不走这里，它们限时演完（pixel/timeline.ts 的 rate()）。
+ */
+export function dropAction(world: World, actionId: number): void {
+  for (const ch of Object.values(world.characters)) {
+    if (ch.current && ch.current.actionId === actionId) ch.current = null;
+    ch.queue = ch.queue.filter((t) => t.actionId !== actionId);
+  }
+  for (const id of Object.keys(world.packages)) {
+    if (world.packages[id].actionId === actionId) delete world.packages[id];
+  }
 }
 
 /** 命名位置在画面上的坐标与朝向。 */
@@ -170,13 +176,18 @@ function idleFree(ch: Character): boolean {
   return !ch.current && !ch.queue.length && ch.rest !== null && ch.rest.pose === "tea" && !ch.rest.away;
 }
 
-/** 当前应显示的气泡：说话气泡是正在做的任务，思考气泡是队列里的下一项（只读）。 */
-export function bubbleFor(ch: Character): Character["bubble"] {
-  const cur = ch.current;
+/** 当前应显示的气泡：说话气泡是正在做（或正在保持的进度姿势）的那一项，思考气泡是队列里的下一项（只读）。 */
+export function bubbleFor(ch: Character, scene?: SceneLike): Character["bubble"] {
+  const cur = ch.current ?? (scene ? progressOf(ch, scene) : ch.progress);
   if (cur && cur.bubble === "say" && cur.label) return { text: cur.label, kind: "say", tail: Boolean(cur.streamed) };
   const next = ch.queue[0];
   if (next && next.bubble === "say" && next.label) return { text: next.label, kind: "think" };
   return null;
+}
+
+/** 还在保持的进度姿势（原型 v13 ecs.js 的 progressOf）：进度动作不排队，到达就换上，until 过后不再保持。 */
+export function progressOf(ch: Character, scene: SceneLike): Task | null {
+  return ch.progress && (ch.progress.until ?? 0) > scene.realT ? ch.progress : null;
 }
 
 /** 每帧推进一步：取队首、走到目标、播放姿势与计时。角色与管道的状态机在这里被驱动。 */
@@ -199,7 +210,8 @@ function stepOne(world: World, scene: SceneLike, ch: Character): void {
     ch.current._t0 = null;
   }
   const task = ch.current;
-  const goal: Task | RestState | null = task ?? ch.rest;
+  // 没有任务在做时，持续姿势可以由进度动作（整理资料、思考）暂时取代（原型 v13 ecs.js 的 goal）
+  const goal: Task | RestState | null = task ?? progressOf(ch, scene) ?? ch.rest;
   const room = ch.department === null ? null : roomOf(world, ch.department);
   // 不在房间里（外出）：从画面上消失，回来时从门口走进来
   if (goal && goal.away) {
@@ -230,7 +242,7 @@ function stepOne(world: World, scene: SceneLike, ch: Character): void {
       scene.run(actor, steps, {});
       actor.data.idleWalk = Boolean(task && task.idle);
     }
-    ch.bubble = bubbleFor(ch);
+    ch.bubble = bubbleFor(ch, scene);
     return;
   }
   if (!actor.script) {
@@ -273,18 +285,19 @@ function stepOne(world: World, scene: SceneLike, ch: Character): void {
       startIdle(world, ch, scene);
     }
   }
-  ch.bubble = bubbleFor(ch);
+  ch.bubble = bubbleFor(ch, scene);
 }
 
 // ---------------------------------------------------------------------------
 // 包裹：沿管道的折线移动，到达终点后销毁并执行回调
 
-/** 生成一个包裹；画面在生成时写上画法字段（bmp、color、small）。 */
-export function spawnPackage(world: World, id: string, workItemId: string | null, colorIndex: number | null, artifact: string | null, roomId: string | null): void {
+/** 生成一个包裹；画面在生成时写上画法字段（bmp、color、small、actionId）。 */
+export function spawnPackage(world: World, id: string, workItemId: string | null, colorIndex: number | null, artifact: string | null, roomId: string | null): World["packages"][string] {
   world.packages[id] = {
     kind: "package", id, workItemId, colorIndex, artifact,
     atRest: { roomId: roomId ?? null, spotKind: "port_in" }, transit: null,
   };
+  return world.packages[id];
 }
 
 let packageSeq = 0;
