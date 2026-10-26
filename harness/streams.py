@@ -25,7 +25,9 @@ from .models import TERMINAL_STATUSES
 # 版本 9：activation_finished 新增会话级累计已用量字段 session_elapsed_ms、session_activations、
 # session_model_steps；核实记录（action_verified）带上发出它的会话编号（#475）
 # 版本 10：删除事件种类 transition（阶段状态机删掉，部门按关注的成果开始工作，#556）
-RUN_EVENT_VERSION = 10
+# 版本 11：department_guidance_responded 改为由主机在一轮正常结束时写，载荷换成 guidance_id、activation_id、
+# 与这一轮怎么结束的 outcome；指导的状态只剩已接收、已进入模型输入、已回答（#1039）
+RUN_EVENT_VERSION = 11
 
 # run 流：事项的进行过程（每次 run 的交接、询问、尝试与动作）
 RUN_EVENT_TYPES = frozenset({

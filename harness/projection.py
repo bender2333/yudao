@@ -297,15 +297,16 @@ def apply_event(state: RunProjection, event: Event) -> None:
         return
 
     if etype == EventType.DEPARTMENT_GUIDANCE_RESPONDED:
+        # 主机在一轮工作正常结束时写：指导从已进入模型输入变成已回答，事件记下是哪一轮、怎么结束的（工单 #1039）
         guidance_id = payload.get("guidance_id")
         for index, guidance in enumerate(state.department_guidance):
-            if guidance.id == guidance_id:
+            if guidance.id == guidance_id and guidance.status in {"received", "in_input"}:
                 state.department_guidance[index] = replace(
                     guidance,
-                    status=payload.get("status", "needs_work"),
-                    response_event_id=event.event_id,
-                    response_status=payload.get("status"),
-                    response_text=payload.get("text"),
+                    status="answered",
+                    answered_event_id=event.event_id,
+                    answered_activation_id=payload.get("activation_id"),
+                    outcome=payload.get("outcome"),
                 )
                 break
         return
@@ -692,9 +693,9 @@ def _guidance_from_payload(payload: dict[str, Any], event: Event) -> DepartmentG
         status=payload.get("status", "received"),
         applied_activation_id=payload.get("applied_activation_id"),
         applied_context_event_id=payload.get("applied_context_event_id"),
-        response_event_id=payload.get("response_event_id"),
-        response_status=payload.get("response_status"),
-        response_text=payload.get("response_text"),
+        answered_event_id=payload.get("answered_event_id"),
+        answered_activation_id=payload.get("answered_activation_id"),
+        outcome=payload.get("outcome"),
     )
 
 

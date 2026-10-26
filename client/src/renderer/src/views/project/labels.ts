@@ -125,10 +125,7 @@ export const ATTEMPT_STATUS: Record<string, string> = {
 export const GUIDANCE_STATUS: Record<string, string> = {
   received: "已接收",
   in_input: "已进入模型输入",
-  explained: "已解释",
-  completed: "动作已核实",
-  declined: "已说明边界",
-  needs_work: "需要后续处理",
+  answered: "已回答",
 };
 
 export const DECISION_KIND: Record<string, string> = {

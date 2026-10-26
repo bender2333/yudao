@@ -751,13 +751,15 @@ class DepartmentSettingState(Contract):
 
 
 class GuidanceRecord(Contract):
+    # 指导的三种状态（部门指导设计说明第 3 节，工单 #1039）：received 已接收、in_input 已进入模型输入、
+    # answered 已回答。已回答由主机在收到它的那一轮正常结束时写，事件记下那一轮与怎么结束的
     guidance_id: str
     version: int
     text: str
     status: str
     applied_activation_id: str | None
-    response_status: str | None
-    response_text: str | None
+    answered_activation_id: str | None
+    outcome: str | None
     created_event_id: str
 
 
@@ -884,8 +886,8 @@ ROOM_STATUS_TEXT = {
     "done": "已完成", "cancelled": "已取消", "interrupted": "中断",
     "waiting_resume": "待恢复",
 }
-# 钉在指导板上的指导状态（原型 PINNED）
-ROOM_PINNED_GUIDANCE = frozenset({"in_input", "explained", "completed", "declined", "needs_work"})
+# 钉在指导板上的指导状态（原型 PINNED）：已进入模型输入与已回答的指导还在板上
+ROOM_PINNED_GUIDANCE = frozenset({"in_input", "answered"})
 
 def _room_status(run: Any, department: str, observation: str | None) -> str:
     # 房间状态（原型 roomStatus）：本部门正在工作时按恢复观察状态、未回答的询问、run 阶段取值；
@@ -1003,8 +1005,9 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
     guidance = [
         GuidanceRecord(
             guidance_id=value.id, version=value.version, text=value.text, status=value.status,
-            applied_activation_id=value.applied_activation_id, response_status=value.response_status,
-            response_text=value.response_text, created_event_id=value.created_event_id,
+            applied_activation_id=value.applied_activation_id,
+            answered_activation_id=value.answered_activation_id, outcome=value.outcome,
+            created_event_id=value.created_event_id,
         )
         for value in ([] if run is None else run.department_guidance)
         if value.department == request.department

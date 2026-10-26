@@ -19,7 +19,7 @@ from harness.streams import RUN_EVENT_VERSION
 # 投影里的事件版本号不进每个场景的比对（工单 #1019）：升版不让全部基准一起重写，由下面这一条
 # 单独核对当前值。升版时把这里的数字一起改，改动本身就是要评审的那一处。
 # 基准的投影里没有它（生成规则）、只差这一项时比对通过，各自在 test_event_sequence_compare.py。
-EXPECTED_RUN_EVENT_VERSION = 10
+EXPECTED_RUN_EVENT_VERSION = 11
 
 
 def test_the_current_run_event_version_is_the_expected_one():
@@ -44,7 +44,7 @@ def test_event_sequence_matches_its_baseline(name, data_dir, request):
 # 事件序列基准里不再出现它们的全文。故意改变时用 --write-event-baselines 重写。
 # 只回应指导的那种轮次随工单 #560 删除，tool_denied_guidance_only 场景随之删除。
 SNAPSHOT_SCENARIOS = ("handoff_release", "compaction_success",
-                      "guidance_response_explained",
+                      "guidance_answered",
                       "ask_answer_with_spec_revision")
 
 

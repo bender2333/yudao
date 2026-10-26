@@ -289,16 +289,11 @@ class DepartmentGuidanceAppliedPayload(Payload):
 
 
 class DepartmentGuidanceRespondedPayload(Payload):
+    # 主机写：收到这条指导的那一轮工作正常结束（部门指导设计说明第 3 节，工单 #1039）。
+    # activation_id 是那一轮的激活编号，outcome 是这一轮怎么结束的：提交被接纳，或者用文字回答
     guidance_id: str
-    guidance_version: int
-    guidance_created_event_id: str
-    department: Department
-    status: Literal["explained", "completed", "declined", "needs_work"]
-    text: str
-    result_event_ids: list[str]
-    kind: Literal["department_guidance_response"]
-    issuer: Department
-    content_hash: str
+    activation_id: str
+    outcome: Literal["proposal_accepted", "text_reply"]
 
 
 class DepartmentActivatedPayload(Versions, WorkBasis):

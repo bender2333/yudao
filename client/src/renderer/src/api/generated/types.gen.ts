@@ -2267,13 +2267,13 @@ export type GuidanceRecord = {
      */
     applied_activation_id: string | null;
     /**
-     * Response Status
+     * Answered Activation Id
      */
-    response_status: string | null;
+    answered_activation_id: string | null;
     /**
-     * Response Text
+     * Outcome
      */
-    response_text: string | null;
+    outcome: string | null;
     /**
      * Created Event Id
      */
@@ -8260,41 +8260,13 @@ export type DepartmentGuidanceRespondedPayload = {
      */
     guidance_id: string;
     /**
-     * Guidance Version
+     * Activation Id
      */
-    guidance_version: number;
+    activation_id: string;
     /**
-     * Guidance Created Event Id
+     * Outcome
      */
-    guidance_created_event_id: string;
-    /**
-     * Department
-     */
-    department: 'product' | 'engineering' | 'quality';
-    /**
-     * Status
-     */
-    status: 'explained' | 'completed' | 'declined' | 'needs_work';
-    /**
-     * Text
-     */
-    text: string;
-    /**
-     * Result Event Ids
-     */
-    result_event_ids: Array<string>;
-    /**
-     * Kind
-     */
-    kind: 'department_guidance_response';
-    /**
-     * Issuer
-     */
-    issuer: 'product' | 'engineering' | 'quality';
-    /**
-     * Content Hash
-     */
-    content_hash: string;
+    outcome: 'proposal_accepted' | 'text_reply';
 };
 
 /**
