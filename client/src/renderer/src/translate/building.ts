@@ -13,9 +13,8 @@
 // 哪些事件在楼上翻成动作、哪些不画，写在 translate/coverage.ts；这个文件只实现其中楼「翻成动作」的那一组。
 
 import type { EventObject, ProjectLoopResult, ProjectRow, WorkItemLoop } from "../api/generated/types.gen.ts";
-import type { ItemState, PixelAction } from "../pixel/contract.ts";
+import type { BuildingFloor, BuildingModel, FlashColor, ItemState, PixelAction } from "../pixel/contract.ts";
 import { buildingState as checkBuildingState } from "../pixel/contract.ts";
-import type { BuildingFloor, BuildingModel, FlashColor } from "../pixel/world/building.ts";
 import { busyOf } from "./floor.ts";
 import { floorSignOf, itemStateOf } from "./tables.ts";
 

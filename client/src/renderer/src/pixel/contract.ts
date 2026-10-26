@@ -111,17 +111,149 @@ export interface FloorState extends PixelState {
   stamp?: Stamp;
 }
 
-/** 楼里一层（楼的状态里的一项）。 */
+// ---------------------------------------------------------------------------
+// 楼层状态的完整形状：翻译层按这些字段给出状态，画面层按同一份形状画（设计说明第 4.1 节）。
+// 形状放在合同里，翻译层只从合同取状态，不导入画面层的实现（第 3 节的依赖方向、第 8 节 H3）。
+
+/** 楼层上的一个部门角色。 */
+export interface RoleInfo {
+  id: string;
+  name: string;
+  kind: string;
+  /** 角色的状态（取 ROLE_STATES 里的一种，翻译层翻好）。 */
+  status: RoleState;
+  task?: string | null;
+}
+
+/**
+ * 楼层上的一个事项：画面合同的事项加上画面上还要画的几个字段
+ * （标题、颜色、轮次与用时）。状态取 ITEM_STATES 里的一种，不是服务端的说法。
+ */
+export interface LoopItem extends FloorItem {
+  /** 事项的标识；画面上按它找包裹与队列位置（与 id 相同）。 */
+  work_item_id: string;
+  kind: string;
+  sign: string;
+  color_index: number;
+  department: string | null;
+  round: number;
+  started_at?: string | null;
+  elapsed_sec: number | null;
+  time_limit_sec: number;
+  /** 排队位置与等待模型服务的时间。 */
+  queue_pos?: number;
+  waiting_provider_sec?: number;
+  url?: string;
+}
+
+/** 一个部门在等模型服务：管道口挂一块牌子。 */
+export interface WaitingProvider {
+  department: string;
+  /** 已经写好的重试文字（例如「12:30 重试」）。 */
+  retry_text: string | null;
+  work_item_id?: string | null;
+}
+
+/** 一封还没有回答的询问：信停在被询问部门的传信管口。 */
+export interface OpenRequest {
+  from: string;
+  to: string;
+  work_item_id: string;
+}
+
+/** 大厅板上的一个决定请求：卡片上的文字由翻译层写好（原型 v13 的 face）。 */
+export interface DecisionFace {
+  id: string;
+  kind: string;
+  version: number;
+  title: string;
+  work_item_id: string | null;
+  where: string;
+  waited: string;
+  blocks: string;
+  rows: { term: string; value: string }[];
+  links: { label: string; href: string }[];
+  options: {
+    id: string;
+    label: string;
+    kind?: string | null;
+    note_required?: boolean;
+    /** 需要说明而没有写时卡片上显示的提示（文字由翻译层写好）。 */
+    note_missing_text?: string | null;
+  }[];
+}
+
+/** 机房门口列着的一台机器。 */
+export interface MachineView {
+  id: string;
+  name: string;
+  actions: number;
+  unknown?: boolean;
+  online?: boolean;
+}
+
+/** 运维的状态（机房门口与运维房间用）。 */
+export interface OpsView {
+  version?: string;
+  fault?: boolean;
+  auto_repair_stopped?: boolean;
+}
+
+/**
+ * 项目楼层的画面状态：楼层的状态加上画面上还要用的几个字段
+ * （未回答的询问、成果库、执行槽位、等待模型服务、运维、机器、部门里的角色、决定请求）。
+ * 由翻译层从查询结果写出来，世界与系统只读它。
+ */
+export interface FloorModel extends Omit<FloorState, "roles"> {
+  items: LoopItem[];
+  open_requests: OpenRequest[];
+  shelves: { adopted: string[] };
+  slots: { total: number; used: number } | null;
+  waiting_provider: WaitingProvider[];
+  machines: MachineView[] | null;
+  ops: OpsView | null;
+  interrupted: boolean;
+  roles: Record<string, RoleInfo[]> | null;
+  decisions: DecisionFace[];
+}
+
+/** 楼里闪光的颜色名（动作的 color 上写的就是这几种；不在表里的按白光画）。 */
+export const FLASH_COLORS = ["white", "green", "yellow", "red"] as const;
+export type FlashColor = (typeof FLASH_COLORS)[number];
+
+/** 楼里一层（楼的状态里的一项）：状态灯、亮灯的房间、小旗与名牌。 */
 export interface BuildingFloor {
   project_id: string;
+  /** 楼层的状态灯：取 FLOOR_SIGNS 里的一种。 */
   status: FloorSign;
+  /** 项目名称（名牌上写）。 */
+  name: string;
+  /** 四个部门房间的灯：亮灯表示该部门正在工作。 */
+  lit: { product: boolean; engineering: boolean; quality: boolean; operations: boolean };
+  /** 有没有运维（机房与运行环境）：客户端没有，属于 3.2C。 */
+  has_ops: boolean;
+  /** 事项的小旗：在本层房间里的事项，按部门挂在房门口。 */
+  flags: { work_item_id: string; color_index: number; department: string }[];
+  /** 入口阀门：等待执行槽位时关闭。 */
+  valve_closed: boolean;
+  /** 用着机器的设备编号：通往机房的管线按它画。 */
+  machine_ids: string[];
+  /** 通往机房的管线是否在流动。 */
+  link_active: boolean;
+  /** 本层等待回答的决定请求数（名牌右上角的计数）。 */
+  decisions: number;
   [key: string]: unknown;
 }
 
 /** 楼（项目与它们的楼层）的状态。 */
 export interface BuildingState extends PixelState {
   floors: BuildingFloor[];
+  /** 底部是否留出地下室的位置（机房属于 3.2C，现在不画）。 */
+  show_basement: boolean;
 }
+
+/** 楼的画面状态：楼的状态就是它（名字与原型 v13 的 buildingModels 一致）。 */
+export type BuildingModel = BuildingState;
 
 /** 房间里状态的姿势。 */
 export interface RoomPose {

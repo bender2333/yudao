@@ -13,11 +13,11 @@
 // 说话的话术用 translate/say.ts（画面 2 的成果）。
 
 import type { AskView, DecisionView, EventObject, ProjectLoopResult, WorkItemLoop } from "../api/generated/types.gen.ts";
-import type { Artifact, BusyState, ItemState, PixelAction } from "../pixel/contract.ts";
-import { floorState as checkFloorState } from "../pixel/contract.ts";
 import type {
-  DecisionFace, FloorModel, LoopItem, MachineView, OpenRequest, OpsView, RoleInfo, WaitingProvider,
-} from "../pixel/world/types.ts";
+  Artifact, BusyState, DecisionFace, FloorModel, ItemState, LoopItem, MachineView, OpenRequest, OpsView, PixelAction, RoleInfo,
+  WaitingProvider,
+} from "../pixel/contract.ts";
+import { floorState as checkFloorState } from "../pixel/contract.ts";
 import { face } from "../views/decisions/card-logic.ts";
 import { cut, say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
 import { itemStateOf, roleStatus } from "./tables.ts";

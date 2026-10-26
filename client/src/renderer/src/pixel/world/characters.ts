@@ -176,6 +176,11 @@ function idleFree(ch: Character): boolean {
   return !ch.current && !ch.queue.length && ch.rest !== null && ch.rest.pose === "tea" && !ch.rest.away;
 }
 
+/** 一句话在头顶停留的毫秒数：读得完一句话，最长 4.6 秒（原型 v10 say.js 的时长，工单 #82）。 */
+export function sayMs(text: string): number {
+  return Math.min(4600, 1800 + String(text).length * 170);
+}
+
 /** 当前应显示的气泡：说话气泡是正在做（或正在保持的进度姿势）的那一项，思考气泡是队列里的下一项（只读）。 */
 export function bubbleFor(ch: Character, scene?: SceneLike): Character["bubble"] {
   const cur = ch.current ?? (scene ? progressOf(ch, scene) : ch.progress);
