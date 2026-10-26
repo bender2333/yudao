@@ -23,6 +23,41 @@ import type { SceneLike } from "../world/types.ts";
 
 export type { BuildingFloor, BuildingModel } from "../world/building.ts";
 
+/**
+ * 楼承载事实的视觉通道（画面与播放设计说明第 8.1 节的楼那一行）：每层的状态灯、亮灯的房间、小旗，
+ * 以及同一幅画上的名牌、入口阀门与决定计数。只读状态给出的东西：闪光、彩带与小人的走位属于表演层。
+ */
+export interface BuildingChannels {
+  /** 上画面的状态来自的查询快照的位置。 */
+  position: number;
+  floors: {
+    project_id: string;
+    name: string;
+    status: string;
+    lit: Record<string, boolean>;
+    valve_closed: boolean;
+    decisions: number;
+    flags: { work_item_id: string; department: string; color_index: number }[];
+  }[];
+}
+
+/** 读一份状态承载事实的视觉通道。 */
+function buildingChannels(driver: BuildingDriver): BuildingChannels {
+  const model = driver.model;
+  return {
+    position: model.position,
+    floors: model.floors.map((f) => ({
+      project_id: f.project_id,
+      name: f.name,
+      status: f.status,
+      lit: { ...f.lit },
+      valve_closed: f.valve_closed,
+      decisions: f.decisions,
+      flags: f.flags.map((fl) => ({ work_item_id: fl.work_item_id, department: fl.department, color_index: fl.color_index })),
+    })),
+  };
+}
+
 /** 首页楼的画面对象：只认画面合同（状态、动作）。 */
 export interface BuildingView {
   /** 一份状态：等它之前的动作演完再上画面（由播放时间线决定）。 */
@@ -33,10 +68,19 @@ export interface BuildingView {
   play(action: PixelAction): void;
   resize(): void;
   destroy(): void;
+  /**
+   * 关掉或打开表演层（待机活动与动作）的测试入口（设计说明第 8.1 节的 H2）。
+   * 关掉以后动作与特效不演，画面只画状态给出的样子；承载事实的通道不受影响。
+   */
+  performance(on: boolean): void;
   /** 画面逻辑尺寸，供宿主与测试读取。 */
   readonly size: { W: number; H: number };
-  /** 世界的当前状态、驱动、场景与绘制（测试与回放读取）。 */
-  inspect(): { driver: BuildingDriver; scene: SceneLike; renderer: BuildingRenderer };
+  /** 世界的当前状态、驱动、场景与绘制（测试与回放读取），以及承载事实的视觉通道。 */
+  inspect(): {
+    driver: BuildingDriver; scene: SceneLike; renderer: BuildingRenderer;
+    /** 承载事实的视觉通道（设计说明第 8.1 节的楼那一行）。 */
+    channels: () => BuildingChannels;
+  };
 }
 
 export interface BuildingViewOptions {
@@ -140,6 +184,13 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
       surface.resize();
       draw();
     },
+    performance(on) {
+      // 待机活动与动作一起关掉：动作停在原处，不再开始新的步子（承载事实的通道只由状态决定）
+      scene.performance = on;
+      scene.autonomy = on;
+      if (!on) for (const actor of scene.actors.slice()) scene.cancel(actor);
+      draw();
+    },
     destroy() {
       offTick();
       window.removeEventListener("resize", onResize);
@@ -147,7 +198,7 @@ export async function createBuildingView(opts: BuildingViewOptions): Promise<Bui
       canvas.removeEventListener("mousemove", onMove);
       if (canvas.parentNode === opts.host) opts.host.removeChild(canvas);
     },
-    inspect: () => ({ driver, scene, renderer }),
+    inspect: () => ({ driver, scene, renderer, channels: () => buildingChannels(driver) }),
   };
 }
 

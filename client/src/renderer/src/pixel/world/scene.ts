@@ -15,6 +15,14 @@ import type {
 /** 角色实体对应的 actor 的 id 前缀。 */
 export const CHAR_ACTOR_PREFIX = "ch-";
 
+/**
+ * 表演层开着吗（设计说明第 8.1 节的 H2）：关掉以后动作与特效都不演，只画状态给出的样子。
+ * 待机活动由 scene.autonomy 控制（行为开关），两者一起关掉就是「只画状态」。
+ */
+function performing(scene: SceneLike): boolean {
+  return scene.performance !== false;
+}
+
 /** 建立一个场景：actor 的脚本按帧推进，走路的耗时由距离与速度决定。 */
 export function createScene(opts: SceneOptions): SceneLike {
   const scene: SceneLike = {
@@ -25,6 +33,7 @@ export function createScene(opts: SceneOptions): SceneLike {
     reduced: opts.reduced,
     frozen: false,
     autonomy: true,
+    performance: true,
     actors: [],
     flyers: [],
     particles: [],
@@ -97,14 +106,14 @@ export function createScene(opts: SceneOptions): SceneLike {
       scene.afterCallbacks.push({ at: scene.realT + ms, fn });
     },
     fly(o) {
-      if (scene.reduced) {
+      if (scene.reduced || !performing(scene)) {
         if (o.onDone) scene.after(0, o.onDone);
         return;
       }
       scene.flyers.push({ bmp: o.bmp, from: o.from, to: o.to, t0: scene.realT, ms: o.ms, arc: o.arc ?? 10, onDone: o.onDone });
     },
     emit(kind, x, y, n, o) {
-      if (scene.reduced) return;
+      if (scene.reduced || !performing(scene)) return;
       const opt = o ?? {};
       for (let i = 0; i < n; i++) {
         const r1 = scene.random();
@@ -161,7 +170,7 @@ export function createScene(opts: SceneOptions): SceneLike {
     },
     stepScene(deltaMs) {
       scene.realT += deltaMs;
-      if (!scene.frozen && !scene.reduced) scene.animT += deltaMs;
+      if (!scene.frozen && !scene.reduced && performing(scene)) scene.animT += deltaMs;
       // 一帧里的顺序与原型 engine.js 的 frame 一致：先到点的回调，再小人，再粒子与飞行物。
       // 回调先跑，定时开始的脚本才能在同一帧里迈出第一步，与原型一样。
       for (const timer of scene.afterCallbacks.filter((x) => x.at <= scene.realT)) timer.fn();
@@ -392,7 +401,7 @@ function startStep(scene: SceneLike, actor: Actor, st: Step): void {
 
 /** 飞行物走到终点：执行一次 onDone 并移除（原型 updateFlyers）。 */
 function advanceFlyers(scene: SceneLike): void {
-  if (scene.frozen) return;
+  if (scene.frozen || !performing(scene)) return;
   for (const f of scene.flyers) {
     const k = Math.min(1, (scene.realT - f.t0) / f.ms);
     if (k >= 1 && !f.done) {
@@ -404,7 +413,7 @@ function advanceFlyers(scene: SceneLike): void {
 }
 
 function advanceParticles(scene: SceneLike, dt: number): void {
-  if (scene.frozen) return;
+  if (scene.frozen || !performing(scene)) return;
   const s = dt / 1000;
   for (const p of scene.particles) {
     p.age += dt;
@@ -425,7 +434,8 @@ function advanceParticles(scene: SceneLike, dt: number): void {
 
 function advanceActor(scene: SceneLike, actor: Actor, dt: number): void {
   if (!scene.reduced && !scene.frozen) actor.clock += dt;
-  if (scene.frozen || !actor.script) return;
+  // 表演层关掉时动作不推进：正在演的停在原处，不再开始新的步子
+  if (scene.frozen || !performing(scene) || !actor.script) return;
   let guard = 0;
   while (actor.script && guard++ < 40) {
     if (!actor.step) {

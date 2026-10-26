@@ -510,6 +510,11 @@ export interface SceneLike {
   emit: (kind: string, x: number, y: number, n: number, o?: { spread?: number; color?: string; floor?: number }) => void;
   /** 当前聚焦的事项（其它事项的小人与包裹调暗）。 */
   focusId: string | null;
+  /**
+   * 表演层开关（默认为开）：关掉以后待机活动与动作都不演，只画状态给出的样子
+   * （画面与播放设计说明第 8.1 节的 H2：关掉表演层前后，承载事实的视觉通道的取值相同）。
+   */
+  performance?: boolean;
   /** 决定卡片上的盖章（画面提供；驱动在收到回答事件时调用）。 */
   cardStamped?: (id: string, text: string) => void;
   makeCharacterMachine: (input: CharacterMachineInput) => unknown;

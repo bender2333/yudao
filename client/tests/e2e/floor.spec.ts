@@ -332,37 +332,62 @@ test("断线重连（重新订阅）以后画面回到查询给出的状态，�
   }
 });
 
-// 回放拖动时间轴（工单 #953 验收标准 3）：拖到哪个位置就直接显示那个位置的状态，不播动作。
-// 时间轴把位置写进地址（?at=），概览页按位置读 project.loop，画面用 jump 直接显示。
-test("回放拖动时间轴：画面直接显示那个位置的状态，不播动作", async () => {
+// H7 回放一致（画面与播放设计说明第 8 节的 H7、第 5.2 节；工单 #959）：时间轴上某个位置的事实层，
+// 等于当时那段事件前缀的计算结果。拖到位置 p，画面显示的是位置 p 的查询结果翻出的状态，不播动作。
+// 时间轴把位置写进地址（?at=），概览页按位置读 project.loop，画面用 jump 直接显示那个位置的状态。
+test("回放拖动时间轴（H7）：画面显示那个位置的查询结果翻出的状态，不播动作", async () => {
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = watchErrors(client);
   const page = client.page;
   try {
     const id = await projectId(SAMPLE);
-    const loop = await query<{ work_items: { work_item_id: string; status: string; recovery_state: string | null }[] }>(
-      "project.loop", { project_id: id });
+    type LoopRows = { work_items: { work_item_id: string; status: string; recovery_state: string | null }[] };
+    // 画面上的事项状态是查询结果翻成画面合同的取值：把查询结果写成同一份键再比较
+    const statusKey = (rows: LoopRows["work_items"]): string =>
+      JSON.stringify(rows.map((it) => [it.work_item_id, expectedStatus(it)]));
+    const loop = await query<LoopRows>("project.loop", { project_id: id });
     expect(loop.work_items.length).toBeGreaterThan(0);
-    // 取一个过去的位置：查询给出这份状态来自的快照位置
+    const latestKey = statusKey(loop.work_items);
+    // 事件日志里的位置：从早到晚各查一次，取第一个与最新状态不同的位置
+    // （画面必须换成过去的状态，否则「拖到 p」与看直播分不开）
     const flow = await query<{ records: { position: number }[] }>("project.flow", { project_id: id });
-    const positions = flow.records.map((row) => row.position).filter((p) => Number.isFinite(p));
+    const positions = [...new Set(flow.records.map((row) => row.position).filter((p) => Number.isFinite(p)))]
+      .sort((a, b) => a - b);
     expect(positions.length).toBeGreaterThan(0);
-    const at = Math.max(...positions);
-    await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${id}/overview?at=${at}`);
+    const latest = positions[positions.length - 1];
+    let past: { at: number; key: string } | null = null;
+    for (const p of positions) {
+      if (p >= latest) continue;
+      const rows = await query<LoopRows>("project.loop", { project_id: id, at: p });
+      const key = statusKey(rows.work_items);
+      if (key !== latestKey) {
+        past = { at: p, key };
+        break;
+      }
+    }
+    expect(past, "事件日志里没有与最新状态不同的位置，核对不了回放").not.toBeNull();
+    const target = past!;
+    await page.evaluate((hash) => { window.location.hash = hash; }, `#/p/${id}/overview?at=${target.at}`);
     await expect(page.locator(".floor-screen canvas")).toHaveCount(1);
     await openTextList(page);
-    // 那个位置的查询结果翻成的状态：与画面里的事项状态逐项一致
-    const past = await query<{ work_items: { work_item_id: string; status: string; recovery_state: string | null }[] }>(
-      "project.loop", { project_id: id, at });
-    const expected = JSON.stringify(past.work_items.map((it) => [it.work_item_id, expectedStatus(it)]));
+    // 画面显示的是位置 p 的查询结果翻出的状态，并且确实不是最新的状态
     await waitUntil(async () => {
       const now = await floorState(page);
-      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === expected;
-    }, "画面显示那个位置的状态");
-    // 回放模式不播动作：时间线里没有在演的动作，也没有排着的状态
+      return JSON.stringify(now.items.map((it) => [it.id, it.status])) === target.key;
+    }, `画面显示位置 ${target.at} 的状态`);
     const state = await floorState(page);
+    expect(JSON.stringify(state.items.map((it) => [it.id, it.status]))).not.toBe(latestKey);
+    // 上画面的状态来自一个不大于 p 的查询快照，回放不播动作：没有在演的动作，也没有排着的状态
+    expect(state.timeline?.shown).not.toBeNull();
+    expect(state.timeline!.shown!).toBeLessThanOrEqual(target.at);
     expect(state.timeline?.playing).toEqual([]);
     expect(state.timeline?.pending).toBe(0);
+    expect(state.timeline?.queued).toBe(0);
+    // 等一会儿再看：回放期间照旧不演出任何动作（不补播）
+    await page.waitForTimeout(1200);
+    const later = await floorState(page);
+    expect(later.timeline?.playing).toEqual([]);
+    expect(later.timeline?.pending).toBe(0);
     expect(errors).toEqual([]);
   } finally {
     await client.close();

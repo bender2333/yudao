@@ -204,7 +204,7 @@ export interface OpsView {
  * （未回答的询问、成果库、执行槽位、等待模型服务、运维、机器、部门里的角色、决定请求）。
  * 由翻译层从查询结果写出来，世界与系统只读它。
  */
-export interface FloorModel extends Omit<FloorState, "roles"> {
+export interface FloorModel extends PixelState {
   items: LoopItem[];
   open_requests: OpenRequest[];
   shelves: { adopted: string[] };
@@ -215,6 +215,8 @@ export interface FloorModel extends Omit<FloorState, "roles"> {
   interrupted: boolean;
   roles: Record<string, RoleInfo[]> | null;
   decisions: DecisionFace[];
+  /** 楼层的盖章（原型 v13 的 stamp）。 */
+  stamp?: Stamp;
 }
 
 /** 楼里闪光的颜色名（动作的 color 上写的就是这几种；不在表里的按白光画）。 */
