@@ -37,7 +37,21 @@ if (existsSync(playwrightPath)) {
 } else {
   ({ chromium } = await import("@playwright/test"));
 }
-const EXE = process.env.CHROMIUM_EXE || "C:/Users/BA_H3C_Pad/AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe";
+// 浏览器不写死路径：给了 CHROMIUM_EXE 才用它，否则用装好的 Playwright Chromium
+// （写死别人的用户目录时 chromium.launch 立刻报错退出，而不是卡住）。
+const EXE = process.env.CHROMIUM_EXE || null;
+
+/** 一段录制最长允许的时间：超时报出这一段的名字，不再出现「半小时零输出」。 */
+const SEGMENT_TIMEOUT_MS = 120000;
+
+/** 给一段录制加超时：超过 SEGMENT_TIMEOUT_MS 还没有结果时抛错，带上这一段的名字。 */
+function withTimeout(promise, label) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`录制超时（${SEGMENT_TIMEOUT_MS / 1000} 秒）：${label}`)), SEGMENT_TIMEOUT_MS);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
 
 /** 录下的部门：产品房间接收与项目全局有关的事件（交接、传信、提案、状态），最能反映房间的行为。 */
 const DEPARTMENTS = ["product", "engineering", "quality"];
@@ -140,7 +154,7 @@ const DRIVER = () => {
 };
 
 async function main() {
-  const browser = await chromium.launch({ executablePath: EXE });
+  const browser = await chromium.launch(EXE ? { executablePath: EXE } : {});
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
   const errors = [];
@@ -168,7 +182,12 @@ async function main() {
       continue;
     }
     for (const dept of DEPARTMENTS) {
-      const ops = await page.evaluate(({ id, pid, department }) => window.__room.play(id, pid, department), { id: sc.id, pid: sc.pid, department: dept });
+      // 开播前先打印这一段的抬头：卡住时看得到卡在哪一段，而不是等到整段播完才有输出
+      console.log(`[record-room-calls] 录制 ${sc.id} / ${dept} …`);
+      const ops = await withTimeout(
+        page.evaluate(({ id, pid, department }) => window.__room.play(id, pid, department), { id: sc.id, pid: sc.pid, department: dept }),
+        `${sc.id} / ${dept}`,
+      );
       // 只有房间画面挂上过（有 workspace 或事件）才留一份录制
       if (!ops.some((o) => o.op === "workspace" || o.op === "event")) continue;
       recordings.push({ id: `${sc.id}__${dept}`, name: sc.name, level: sc.level, department: dept, project: sc.pid, ops });
