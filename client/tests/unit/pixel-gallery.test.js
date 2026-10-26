@@ -1,5 +1,5 @@
-// 动作图鉴与确定时钟的单元测试（工单 #176 验收标准 1、2）。
-// 图鉴「一项不少」：列出原型 sprites.js 与 engine.js 的全部公开画法，与生成脚本导出的登记表逐一对照。
+// 动作图鉴与确定时钟的单元测试（工单 #176 验收标准 1、2，#956）。
+// 图鉴「一项不少」：列出原型 v13（y13.js、sprites.js、engine.js）的全部公开画法，与生成脚本导出的登记表逐一对照。
 // 时钟：GSAP 与 PixiJS 共用一个时钟，换成手动时钟后推进同样的时间必得同样的补间位置。
 
 import { test } from "node:test";
@@ -18,7 +18,9 @@ test("动作图鉴列出全部公开画法，一项不少：与原型成员表�
   assert.deepEqual(gaps.missing, [], `图鉴缺少：${gaps.missing.join("、")}`);
   assert.deepEqual(gaps.extra, [], `图鉴多出：${gaps.extra.join("、")}`);
   assert.equal(GALLERY_MEMBERS.length, PUBLIC_MEMBERS.all.length);
-  assert.equal(GALLERY_MEMBERS.length, 64);
+  assert.equal(GALLERY_MEMBERS.length, 62);
+  // 登记表来自原型 v13
+  assert.equal(registry.generatedFrom, "docs/prototypes/v13/js/{y13.js,pixel/sprites.js,pixel/engine.js}");
 });
 
 test("动作图鉴的每一项都有说明与可渲染的取样（点阵、数据或数值）", () => {

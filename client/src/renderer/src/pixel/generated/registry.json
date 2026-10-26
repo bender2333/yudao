@@ -1,5 +1,5 @@
 {
- "generatedFrom": "docs/prototypes/v11/js/pixel/{sprites.js,engine.js}",
+ "generatedFrom": "docs/prototypes/v13/js/{y13.js,pixel/sprites.js,pixel/engine.js}",
  "inventory": {
   "functions": [
    "R",
@@ -33,7 +33,6 @@
    "pixText",
    "reducedMotion",
    "renderSprite",
-   "resolveAction",
    "rgba",
    "rolePalette",
    "shotImage",
@@ -51,7 +50,6 @@
    "CHAR_H",
    "CHAR_W",
    "DEPTS",
-   "EVENT_ACTIONS",
    "FONT",
    "FONT3",
    "HAIRS",
@@ -78,7 +76,6 @@
    "CHAR_H",
    "CHAR_W",
    "DEPTS",
-   "EVENT_ACTIONS",
    "FONT",
    "FONT3",
    "HAIRS",
@@ -126,7 +123,6 @@
    "pixText",
    "reducedMotion",
    "renderSprite",
-   "resolveAction",
    "rgba",
    "rolePalette",
    "shotImage",
@@ -7051,7 +7047,6 @@
    "tea": {
     "label": "喝茶与伸懒腰",
     "fact": "部门未工作",
-    "source": "部门状态",
     "action": "坐在工位喝茶，偶尔起身在房间里走动、伸懒腰",
     "room": "灯光调暗",
     "level": "ui",
@@ -7060,7 +7055,6 @@
    "activate": {
     "label": "起身走到工位",
     "fact": "部门开始工作",
-    "source": "department_activated",
     "action": "起身走到工位",
     "room": "屏幕亮起，CRT 显示目标",
     "level": "ui",
@@ -7069,7 +7063,6 @@
    "fetch_folder": {
     "label": "取出文件夹",
     "fact": "装配上下文",
-    "source": "context_assembled",
     "action": "从文件柜取出文件夹放到桌上",
     "room": "—",
     "level": "ui",
@@ -7078,7 +7071,6 @@
    "type_think": {
     "label": "打字与思考气泡",
     "fact": "模型请求中",
-    "source": "model_requested、model_request_serialized",
     "action": "打字，头顶思考气泡",
     "room": "屏幕滚动字符",
     "level": "ui",
@@ -7087,7 +7079,6 @@
    "stream_text": {
     "label": "气泡逐字出现",
     "fact": "流式输出",
-    "source": "model_stream_progress",
     "action": "气泡中逐字出现文字",
     "room": "—",
     "level": "ui",
@@ -7096,7 +7087,6 @@
    "idea": {
     "label": "气泡变成灯泡",
     "fact": "请求完成",
-    "source": "model_attempt_finished",
     "action": "气泡变成灯泡",
     "room": "—",
     "level": "ui",
@@ -7105,7 +7095,6 @@
    "retry_wait": {
     "label": "沙漏与重试次数",
     "fact": "等待重试",
-    "source": "model_retry_scheduled",
     "action": "头顶沙漏与「第 n/m 次」",
     "room": "—",
     "level": "ui",
@@ -7114,7 +7103,6 @@
    "slump": {
     "label": "趴在桌上",
     "fact": "请求失败",
-    "source": "model_attempt_failed",
     "action": "趴在桌上",
     "room": "桌上红灯",
     "level": "ui",
@@ -7123,7 +7111,6 @@
    "search": {
     "label": "翻文件柜举放大镜",
     "fact": "搜索",
-    "source": "tool_started（search）",
     "action": "翻文件柜，举放大镜",
     "room": "文件柜抽屉打开",
     "level": "ui",
@@ -7132,7 +7119,6 @@
    "read": {
     "label": "捧着文件阅读",
     "fact": "按区间阅读",
-    "source": "tool_started（read_range、read_file）",
     "action": "捧着文件阅读",
     "room": "—",
     "level": "ui",
@@ -7141,7 +7127,6 @@
    "write": {
     "label": "在文件上写字",
     "fact": "编辑",
-    "source": "tool_started（edit_range、write_file）",
     "action": "在文件上写字",
     "room": "屏幕显示增删的行",
     "level": "ui",
@@ -7150,7 +7135,6 @@
    "run_command": {
     "label": "走到终端拉下拉杆",
     "fact": "执行命令",
-    "source": "tool_started（run_command）到 tool_called",
     "action": "走到终端拉下拉杆",
     "room": "终端滚动输出；结束时退出状态灯亮绿灯或红灯；超时时终端冒烟",
     "level": "ui",
@@ -7159,7 +7143,6 @@
    "toss": {
     "label": "摇头扔纸团",
     "fact": "工具被拒绝",
-    "source": "tool_skipped",
     "action": "摇头，把纸团扔进废纸篓",
     "room": "—",
     "level": "ui",
@@ -7168,7 +7151,6 @@
    "submit": {
     "label": "放进提案托盘",
     "fact": "提交提案",
-    "source": "proposal_submitted",
     "action": "把文件放进提案托盘",
     "room": "—",
     "level": "ui",
@@ -7177,7 +7159,6 @@
    "returned": {
     "label": "文件退回挠头",
     "fact": "提案被退回",
-    "source": "proposal_rejected",
     "action": "文件被退回，小人挠头",
     "room": "—",
     "level": "ui",
@@ -7186,25 +7167,14 @@
    "stamp_valid": {
     "label": "卷轴盖「有效」章",
     "fact": "需求接纳",
-    "source": "spec_accepted、contract_accepted",
     "action": "产品在卷轴上盖「有效」章，卷起后放进管道口",
     "room": "卷轴放上卷轴架",
     "level": "ui",
     "anim": "stamp"
    },
-   "pin_plan": {
-    "label": "计划贴上白板",
-    "fact": "计划接纳",
-    "source": "plan_accepted",
-    "action": "工程把计划贴上白板",
-    "room": "—",
-    "level": "ui",
-    "anim": "board_pin"
-   },
    "seal": {
     "label": "装箱贴封条盖章",
     "fact": "交付封存",
-    "source": "delivery_accepted",
     "action": "工程装箱、贴封条、盖封存章，把箱子推进管道口",
     "room": "—",
     "level": "ui",
@@ -7213,7 +7183,6 @@
    "take_box": {
     "label": "从管道口取出箱子",
     "fact": "质检取件",
-    "source": "交接到达质检（transition，to 为 quality）",
     "action": "从管道口取出箱子放上检验台",
     "room": "—",
     "level": "ui",
@@ -7222,7 +7191,6 @@
    "inspect": {
     "label": "放大镜检查箱子",
     "fact": "质检核验",
-    "source": "质检的检查动作（tool_started：run_check）",
     "action": "用放大镜检查箱子，清单逐项打勾",
     "room": "—",
     "level": "ui",
@@ -7231,7 +7199,6 @@
    "stamp_release": {
     "label": "盖绿色「放行」章",
     "fact": "放行",
-    "source": "qa_submitted（release）",
     "action": "盖绿色「放行」章，把放行单与箱子放进通往成果库的管道",
     "room": "—",
     "level": "ui",
@@ -7239,8 +7206,7 @@
    },
    "stamp_rework": {
     "label": "盖红色「返工」章",
-    "fact": "返工",
-    "source": "qa_submitted（rework_engineering）",
+    "fact": "缺陷记录",
     "action": "盖红色「返工」章，把箱子放进回流管道",
     "room": "—",
     "level": "ui",
@@ -7249,7 +7215,6 @@
    "send_letter": {
     "label": "写纸条塞进传信管口",
     "fact": "发出询问",
-    "source": "collaboration_requested",
     "action": "写纸条装进信筒，塞进传信管口，在管道口等待",
     "room": "—",
     "level": "ui",
@@ -7258,7 +7223,6 @@
    "answer_letter": {
     "label": "取出信筒并回答",
     "fact": "收到询问并回答",
-    "source": "collaboration_responded",
     "action": "从传信管口取出信筒，写回答后塞回",
     "room": "—",
     "level": "ui",
@@ -7267,7 +7231,6 @@
    "guidance_in": {
     "label": "门缝塞进纸条",
     "fact": "收到指导",
-    "source": "department_guidance_received",
     "action": "—",
     "room": "门缝塞进纸条，信箱灯亮",
     "level": "ui",
@@ -7276,7 +7239,6 @@
    "guidance_read": {
     "label": "阅读并钉上纸条",
     "fact": "指导进入输入",
-    "source": "department_guidance_applied",
     "action": "拿起纸条阅读，钉在墙上",
     "room": "—",
     "level": "ui",
@@ -7285,7 +7247,6 @@
    "guidance_reply": {
     "label": "在纸条上写回复",
     "fact": "回应指导",
-    "source": "department_guidance_responded",
     "action": "在纸条上写回复",
     "room": "—",
     "level": "ui",
@@ -7294,7 +7255,6 @@
    "compact": {
     "label": "纸堆整理进档案盒",
     "fact": "压缩",
-    "source": "compaction_recorded",
     "action": "把桌上成堆的纸整理进「摘要」档案盒",
     "room": "档案盒上的编号加一",
     "level": "ui",
@@ -7303,7 +7263,6 @@
    "compact_fail": {
     "label": "纸堆散落重新整理",
     "fact": "压缩未生效",
-    "source": "compaction_failed",
     "action": "纸堆散落，小人重新整理",
     "room": "—",
     "level": "ui",
@@ -7312,7 +7271,6 @@
    "paused": {
     "label": "坐下",
     "fact": "暂停",
-    "source": "run_paused",
     "action": "坐下",
     "room": "门口立「已暂停」牌",
     "level": "ui",
@@ -7321,7 +7279,6 @@
    "failed": {
     "label": "趴下",
     "fact": "失败",
-    "source": "run_failed",
     "action": "趴下",
     "room": "门口立「失败」牌与停止原因",
     "level": "ui",
@@ -7330,7 +7287,6 @@
    "done": {
     "label": "举手欢呼",
     "fact": "完成",
-    "source": "run_done",
     "action": "举手欢呼",
     "room": "门口立「已完成」牌",
     "level": "ui",
@@ -7339,7 +7295,6 @@
    "cancelled": {
     "label": "收拾桌面",
     "fact": "取消",
-    "source": "run_failed（reason 为 cancelled）",
     "action": "收拾桌面",
     "room": "门口立「已取消」牌",
     "level": "ui",
@@ -7348,7 +7303,6 @@
    "hold_card": {
     "label": "举牌写明缺少的项",
     "fact": "待恢复",
-    "source": "模型引用无法使用（waiting_resume）",
     "action": "举牌，牌上写缺少的项",
     "room": "门口立「待恢复」牌",
     "level": "ui",
@@ -7357,7 +7311,6 @@
    "freeze": {
     "label": "静止不动",
     "fact": "中断",
-    "source": "恢复观察状态（x_run_interrupted）",
     "action": "静止不动",
     "room": "灯灭，墙上时钟停住",
     "level": "3.1",
@@ -7366,7 +7319,6 @@
    "resume": {
     "label": "伸懒腰回到工位",
     "fact": "自动继续",
-    "source": "Yudao 启动时自动继续（x_run_auto_resumed）",
     "action": "伸懒腰后回到工位",
     "room": "灯亮起，时钟继续走",
     "level": "3.1",
@@ -7374,26 +7326,15 @@
    },
    "puzzled": {
     "label": "头顶黄色问号",
-    "fact": "待核实",
-    "source": "恢复观察状态与未完成动作（x_action_unknown）",
-    "action": "站在未完成动作的物件旁，头顶黄色问号",
-    "room": "物件闪烁",
+    "fact": "结果未知的动作",
+    "action": "站在原处，头顶黄色问号",
+    "room": "—",
     "level": "3.1",
     "anim": "puzzled"
-   },
-   "decided": {
-    "label": "接过决定单照着做",
-    "fact": "用户对结果未知的动作作出决定",
-    "source": "决定请求的回答（x_decision_answered）",
-    "action": "从门缝接过决定单，读完后按决定走向终端重新执行、回到工位继续或收拾桌面",
-    "room": "物件停止闪烁",
-    "level": "3.1",
-    "anim": "read_stand"
    },
    "remote_run": {
     "label": "终端显示机器名称与线",
     "fact": "远程执行",
-    "source": "动作在登记的机器上执行（x_remote_action_started）",
     "action": "走到终端，终端屏幕上显示机器名称与一根通往门外的线",
     "room": "动作结束前线上有流动的光点",
     "level": "3.2C",
@@ -7402,7 +7343,6 @@
    "remote_unknown": {
     "label": "盯着终端头顶问号",
     "fact": "远程动作结果未知",
-    "source": "执行代理心跳超时（x_machine_offline）",
     "action": "盯着终端，头顶黄色问号",
     "room": "终端屏幕变为雪花",
     "level": "3.2C",
@@ -7411,7 +7351,6 @@
    "read_existing": {
     "label": "搬旧档案逐本阅读",
     "fact": "阅读已有项目",
-    "source": "建档事项中的 tool_started（read_file、read_range、search）",
     "action": "从大厅搬来一摞旧档案，逐本阅读并做摘录",
     "room": "白板上出现「现有行为」清单",
     "level": "3.8",
@@ -7420,7 +7359,6 @@
    "net_fetch": {
     "label": "邮筒寄出请求取回资料",
     "fact": "网络取回",
-    "source": "网络取回工具（x_network_fetch）",
     "action": "走到门口的邮筒寄出请求，取回资料",
     "room": "—",
     "level": "3.2B",
@@ -7429,7 +7367,6 @@
    "mcp_press": {
     "label": "按下工具面板的按钮",
     "fact": "调用 MCP 工具",
-    "source": "MCP 工具调用（x_mcp_called）",
     "action": "在墙上的工具面板上按下对应的按钮",
     "room": "面板上该按钮亮灯",
     "level": "3.2B",
@@ -7438,7 +7375,6 @@
    "trial": {
     "label": "坐在试用台前点击与输入",
     "fact": "试用网页或桌面程序",
-    "source": "浏览器与 computer use 工具调用（x_trial_step）",
     "action": "测试工程师坐在试用台前点击与输入",
     "room": "试用台显示器嵌入最近一张真实截图的缩略图（像素边框）；模型不能看图时显示可访问性结构的文字行",
     "level": "3.2D",
@@ -7447,7 +7383,6 @@
    "self_test": {
     "label": "在自己的显示器前点击",
     "fact": "工程自测网页",
-    "source": "工程的浏览器工具调用（tool_started：browser）",
     "action": "工程在自己的显示器前点击",
     "room": "显示器嵌入截图缩略图",
     "level": "3.2D",
@@ -7456,7 +7391,6 @@
    "deploy": {
     "label": "推车把箱子推进门",
     "fact": "部署",
-    "source": "运维的部署记录（x_deployed）",
     "action": "运维推车把箱子推进通往机房的门",
     "room": "备份柜先亮一格（部署前备份）",
     "level": "S4",
@@ -7465,7 +7399,6 @@
    "rollback": {
     "label": "从门里取回旧版本",
     "fact": "回滚",
-    "source": "运维的回滚记录（x_rolled_back）",
     "action": "运维从门里取回旧版本的箱子",
     "room": "—",
     "level": "S4",
@@ -7474,7 +7407,6 @@
    "fault": {
     "label": "跑向监控屏写故障信",
     "fact": "发现故障",
-    "source": "故障记录（x_fault_recorded）",
     "action": "运维跑向监控屏，写故障信件放进通往大厅的管道",
     "room": "监控屏变红",
     "level": "S4",
@@ -7483,7 +7415,6 @@
    "wait_provider": {
     "label": "坐着看墙上的时钟",
     "fact": "等待模型服务",
-    "source": "进入等待模型服务（x_provider_wait_entered）",
     "action": "坐在工位上看着墙上的时钟",
     "room": "灯光调暗，管道停止流动",
     "level": "S4",
@@ -7492,7 +7423,6 @@
    "hold_form": {
     "label": "举着申请单在门口等待",
     "fact": "外部动作待授权",
-    "source": "运维对常设授权清单以外动作的决定请求（external_action）",
     "action": "举着申请单在门口等待",
     "room": "—",
     "level": "S4",
@@ -7501,7 +7431,6 @@
    "assign": {
     "label": "递任务卡",
     "fact": "分派角色任务",
-    "source": "角色任务事件（x_role_task_assigned）",
     "action": "中心角色把任务卡递到工具角色的桌上",
     "room": "白板上的计划条目标上分派对象",
     "level": "S5",
@@ -7510,7 +7439,6 @@
    "hand_back": {
     "label": "交回结果卡",
     "fact": "角色交回结果",
-    "source": "角色结果事件（x_role_result_returned）",
     "action": "工具角色把结果卡交回中心角色",
     "room": "条目改为已交回",
     "level": "S5",
@@ -7519,7 +7447,6 @@
    "review": {
     "label": "红笔批注盖章",
     "fact": "审查",
-    "source": "审查任务（x_review_recorded）",
     "action": "审查者拿红笔在成果上批注，盖「通过」或「退回」",
     "room": "—",
     "level": "S5",
@@ -7528,7 +7455,6 @@
    "explore": {
     "label": "背包出门查资料",
     "fact": "探索者查资料",
-    "source": "探索者的网络取回（x_explorer_fetch）",
     "action": "背上背包走出门，回来时抱着资料",
     "room": "—",
     "level": "S5",
@@ -7537,7 +7463,6 @@
    "replan": {
     "label": "擦掉计划重写",
     "fact": "停滞后重新规划",
-    "source": "部门账本的进展判断（x_replanned）",
     "action": "中心角色在白板上擦掉计划重写",
     "room": "—",
     "level": "S5",
@@ -7546,7 +7471,6 @@
    "manager_out": {
     "label": "经理走到管道口",
     "fact": "经理对外",
-    "source": "经理转交询问、提交部门成果（Stage 5）",
     "action": "经理走到管道口与传信管口",
     "room": "—",
     "level": "S5",
@@ -7555,7 +7479,6 @@
    "semantic": {
     "label": "卡片放进语义记录柜",
     "fact": "语义整理",
-    "source": "语义整理事件（x_semantic_recorded）",
     "action": "—",
     "room": "墙边的语义记录柜里卡片增加",
     "level": "S5",
@@ -7601,101 +7524,7 @@
    "done": "done",
    "cancelled": "cancelled",
    "interrupted": "freeze",
-   "pending_verification": "puzzled",
    "waiting_resume": "hold_card"
-  },
-  "EVENT_ACTIONS": {
-   "department_activated": "activate",
-   "context_assembled": "fetch_folder",
-   "model_requested": "type_think",
-   "model_request_serialized": "type_think",
-   "model_stream_progress": "stream_text",
-   "model_attempt_finished": "idea",
-   "model_retry_scheduled": "retry_wait",
-   "model_attempt_failed": "slump",
-   "tool_started": {
-    "by": "tool",
-    "map": {
-     "search": "search",
-     "read_range": "read",
-     "read_file": "read",
-     "edit_range": "write",
-     "write_file": "write",
-     "run_command": "run_command",
-     "run_check": "inspect",
-     "browser": "self_test"
-    }
-   },
-   "tool_called": {
-    "by": "tool",
-    "map": {
-     "run_command": "run_command",
-     "browser": "self_test"
-    }
-   },
-   "tool_skipped": "toss",
-   "proposal_submitted": "submit",
-   "proposal_rejected": "returned",
-   "spec_accepted": "stamp_valid",
-   "contract_accepted": "stamp_valid",
-   "plan_accepted": "pin_plan",
-   "delivery_accepted": "seal",
-   "qa_submitted": {
-    "by": "verdict",
-    "map": {
-     "release": "stamp_release",
-     "rework_engineering": "stamp_rework"
-    }
-   },
-   "collaboration_requested": "send_letter",
-   "collaboration_responded": "answer_letter",
-   "department_guidance_received": "guidance_in",
-   "department_guidance_applied": "guidance_read",
-   "department_guidance_responded": "guidance_reply",
-   "compaction_recorded": "compact",
-   "compaction_failed": "compact_fail",
-   "run_paused": "paused",
-   "run_failed": {
-    "by": "reason",
-    "map": {
-     "cancelled": "cancelled"
-    },
-    "default": "failed"
-   },
-   "run_done": "done",
-   "x_run_interrupted": "freeze",
-   "x_run_auto_resumed": "resume",
-   "x_action_unknown": "puzzled",
-   "x_decision_answered": {
-    "by": "kind",
-    "map": {
-     "unknown_action": "decided"
-    },
-    "default": null
-   },
-   "x_decision_issued": {
-    "by": "kind",
-    "map": {
-     "external_action": "hold_form",
-     "waiting_resume": "hold_card"
-    },
-    "default": null
-   },
-   "x_remote_action_started": "remote_run",
-   "x_machine_offline": "remote_unknown",
-   "x_network_fetch": "net_fetch",
-   "x_mcp_called": "mcp_press",
-   "x_trial_step": "trial",
-   "x_deployed": "deploy",
-   "x_rolled_back": "rollback",
-   "x_fault_recorded": "fault",
-   "x_provider_wait_entered": "wait_provider",
-   "x_role_task_assigned": "assign",
-   "x_role_result_returned": "hand_back",
-   "x_review_recorded": "review",
-   "x_explorer_fetch": "explore",
-   "x_replanned": "replan",
-   "x_semantic_recorded": "semantic"
   },
   "VIGNETTE_SPRITES": {
    "tea": "product.agent",
