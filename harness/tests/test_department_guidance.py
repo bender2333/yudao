@@ -9,13 +9,14 @@ from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace
 from harness.models import EventType
 from harness.proposals import (
-    answer_turn, ask_turn, delivery_turn, guidance_response,
+    answer_turn, ask_turn, delivery_turn,
     product_spec, product_spec_turn, review_turn,
 )
 from harness.providers.call import ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import guidance_reply, quality_turns
+from harness.tools import tools_for
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 ECHO_UPPER = "import sys\nprint(sys.argv[1].upper())\n"
@@ -23,10 +24,8 @@ ECHO_UPPER = "import sys\nprint(sys.argv[1].upper())\n"
 # 这个文件里的脚本按部门给出，三个部门都写上（工单 #943）：质检在这些用例里不工作，给它的是空脚本。
 # 脚本里没有它的名字时，假模型在它真的发请求时报「脚本用尽」，整个 run 以 provider_error 提前结束，
 # 用例在到达要核对的那一步以前就失败（工单 #935 查出的成因，工单 #943 收尾）
-
-
-def _guidance_id(request):
-    return json.loads(prompt_part(request, "department_guidance"))[0]["id"]
+# 指导不再由部门提交正式回应（工单 #1038）：它作为关注的成果让部门开始一轮工作，这一轮正常结束时
+# 主机写已回答事件（工单 #1039）；只有指导、没有要做的工作时，不调用工具的文字回复就是这一轮的收尾。
 
 
 def _tool_names(request):
@@ -36,28 +35,28 @@ def _tool_names(request):
 def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_path):
     # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     project_id = system.projects.register("指导", "把文本按行处理清楚")
     work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
     system.activate_once(run_id)
+    system.activate_once(run_id)
 
     system.add_guidance(run_id, "engineering", "请优先检查错误输出的边界行为。")
-    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), status="explained", text="已检查边界行为，当前指导不改变产品合同。"
-    )))
+    adapter.scripts["engineering"].append(guidance_reply("已检查边界行为，当前指导不改变产品合同。"))
     result = system.activate_once(run_id)
 
     guidance = result.department_guidance[0]
     assert guidance.department == "engineering"
-    assert guidance.status == "explained"
-    assert guidance.response_text == "已检查边界行为，当前指导不改变产品合同。"
+    # 收到它的那一轮工作就是它的处理：指导停在已进入模型输入，没有单独的回应记录（工单 #1038、#1039）
+    assert guidance.status == "in_input"
+    assert guidance.response_text is None
     assert guidance.text in prompt_part(adapter.invocations[-1], "department_guidance")
     events = system.store.list_events(run_id)
     assert any(event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED for event in events)
     applied = next(event for event in events if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED)
     assert guidance.id in applied.payload["guidance_ids"]
-    assert any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED for event in events)
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED for event in events)
 
     application = Application(system)
     engineering = application.query("department.workspace", DepartmentWorkspace(
@@ -71,7 +70,7 @@ def test_guidance_is_persisted_bound_to_target_and_entered_before_request(tmp_pa
 def test_guidance_for_a_waiting_department_starts_a_full_round(tmp_path):
     # 验收第 1 条（在等待工作）：指导是接收部门关注的成果，它在这一轮开始一轮完整的工作，
     # 可以读取、写入、运行检查、询问与提交正式成果（循环结构第 6 节，工单 #560）；
-    # 不为它另设一种只回应指导的轮次（工单 #556 的过渡做法已删除）
+    # 不为它另设一种只回应指导的轮次（工单 #556 的过渡做法已删除），也没有提交回应的工具（工单 #1038）
     adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
@@ -80,17 +79,16 @@ def test_guidance_for_a_waiting_department_starts_a_full_round(tmp_path):
     assert has_new_work(system.project(run_id), "quality")
 
     system.add_guidance(run_id, "engineering", "请说明本次交付的错误处理边界。")
-    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), status="explained", text="已说明错误处理边界；该指导不改变产品要求。"
-    )))
+    adapter.scripts["engineering"].append(guidance_reply("已说明错误处理边界；该指导不改变产品要求。"))
     result = system.activate_once(run_id)
 
     assert has_new_work(result, "quality")
     assert result.active_department == "engineering"
-    assert result.department_guidance[0].status == "explained"
+    assert result.department_guidance[0].status == "in_input"
     names = _tool_names(adapter.invocations[-1])
-    assert {"read_file", "write_file", "run_check", "ask", "submit_delivery",
-            "submit_guidance_response"} <= set(names)
+    assert {"read_file", "write_file", "run_check", "ask", "submit_delivery"} <= set(names)
+    # 待处理指导不再带来额外的提交工具：这一轮提供的工具正好是角色的工具清单（工单 #1038）
+    assert names == list(tools_for("engineering"))
 
 
 def test_guidance_received_during_model_request_becomes_a_notification(tmp_path):
@@ -138,16 +136,15 @@ def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
     assert has_new_work(system.project(run_id), "engineering")
 
     system.add_guidance(run_id, "product", "请确认未知参数是否需要写入验收。")
-    adapter.scripts["product"].append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), status="explained", text="当前合同已覆盖该行为，无需改需求。",
-    )))
+    adapter.scripts["product"].append(guidance_reply("当前合同已覆盖该行为，无需改需求。"))
     result = system.activate_once(run_id)
     request = adapter.invocations[-1]
     names = _tool_names(request)
     assert request.department == "product"
     assert "submit_product_spec" in names
-    assert "submit_guidance_response" in names
-    assert result.department_guidance[0].status == "explained"
+    # 待处理指导不再带来额外的提交工具：这一轮提供的工具正好是角色的工具清单（工单 #1038）
+    assert names == list(tools_for("product"))
+    assert result.department_guidance[0].status == "in_input"
     assert has_new_work(result, "engineering")
 
     adapter.scripts["engineering"].append(delivery_turn())
@@ -184,18 +181,10 @@ def test_product_guidance_revises_the_prd_and_engineering_starts_a_new_round(tmp
     assert revised.delivery_specs[-1].status == "superseded"
     assert revised.delivery_specs[-1].content_hash == old_delivery
     assert has_new_work(revised, "quality")
-    assert revised.department_guidance[0].status in {"received", "in_input"}
+    # 收到指导的那一轮以提交接纳收尾：指导停在已进入模型输入，没有单独的回应用例（工单 #1038）
+    assert revised.department_guidance[0].status == "in_input"
 
-    adapter.scripts["product"].append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), text="已把大写输出写入产品要求。",
-    )))
-    responded = system.activate_once(run_id)
-    assert responded.department_guidance[0].status == "completed"
-    # 回应以后 PRD 有了新版本，工程开始一轮返工（工单 #556：工程关注 PRD 的新版本）
-    assert has_new_work(responded, "engineering")
-    assert responded.delivery_spec is None
-
-    # 回应以后由关注的成果决定下一个谁工作：PRD 有了新版本，工程开始一轮返工（工单 #556）
+    # 由关注的成果决定下一个谁工作：PRD 有了新版本，工程开始一轮返工（工单 #556）
     adapter.scripts["engineering"].append(delivery_turn())
     next_work = system.activate_once(run_id)
     assert adapter.invocations[-1].department == "engineering"
@@ -224,11 +213,8 @@ def test_guidance_round_changes_the_running_workspace_and_delivers(tmp_path):
     assert changed != original and "upper" in changed
     assert result.delivery_spec is not None and result.delivery_spec.status == "active"
     assert has_new_work(result, "quality")
-
-    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), status="explained", text="已按指导修改运行工作区并重新交付。",
-    )))
-    system.activate_once(run_id)
+    # 这一轮就是指导的处理：指导停在已进入模型输入，工程不再为它开始第二轮（工单 #1038）
+    assert result.department_guidance[0].status == "in_input"
 
     adapter.scripts["quality"].append(review_turn("release", "checks passed on the current delivery"))
     released = system.activate_once(run_id)
@@ -268,32 +254,22 @@ def test_guidance_arriving_while_a_round_waits_for_an_answer_is_delivered_at_its
 
 
 def test_guidance_for_one_department_is_delivered_in_receive_order(tmp_path):
-    # 验收第 4 条：同一个部门连续收到两段指导，按接收的顺序处理
-    adapter = FakeAdapter({"product": [product_spec()], "engineering": [], "quality": []})
+    # 验收第 4 条：同一个部门连续收到两段指导，按接收的顺序进入它的模型输入；
+    # 收到它们的那一轮工作就是它们的处理（工单 #1038）
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
+    system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "先核对错误输出的边界。")
     system.add_guidance(run_id, "engineering", "再核对空输入的边界。")
 
-    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), status="explained", text="先处理第一段指导。",
-    )))
-    first = system.activate_once(run_id)
+    adapter.scripts["engineering"].append(guidance_reply("两段指导都已核对。"))
+    result = system.activate_once(run_id)
     delivered = json.loads(prompt_part(adapter.invocations[-1], "department_guidance"))
     assert [item["text"] for item in delivered] == ["先核对错误输出的边界。", "再核对空输入的边界。"]
     assert [item["version"] for item in delivered] == [1, 2]
-    # 两段指导按接收的顺序进入这一轮的模型输入；这一轮先处理了第一段
-    assert [item.status for item in first.department_guidance] == ["explained", "in_input"]
-
-    adapter.scripts["engineering"].append(lambda request: FakeTurn(proposal=guidance_response(
-        _guidance_id(request), status="explained", text="再处理第二段指导。",
-    )))
-    second = system.activate_once(run_id)
-    assert adapter.invocations[-1].department == "engineering"
-    remaining = json.loads(prompt_part(adapter.invocations[-1], "department_guidance"))
-    assert [item["text"] for item in remaining] == ["再核对空输入的边界。"]
-    assert [item.status for item in second.department_guidance] == ["explained", "explained"]
+    assert [item.status for item in result.department_guidance] == ["in_input", "in_input"]
 
 
 def test_guidance_to_a_finished_item_is_rejected(data_dir):
@@ -360,13 +336,12 @@ def test_product_guidance_revision_is_delivered_to_the_working_department_and_st
 
 
 def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
+    # 取消不算处理完：已经接收的指导保留可查，停在已进入模型输入，没有已回答的记录（工单 #1039 才写）
     holder = {}
 
     def cancel_during(request):
         holder["system"].cancel(request.run_id)
-        return FakeTurn(proposal=guidance_response(
-            _guidance_id(request), text="迟到的指导回应不能在取消后生效。",
-        ))
+        return FakeTurn(transcript="取消以后这段回复不改变指导的状态。")
 
     adapter = FakeAdapter([])
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -379,7 +354,6 @@ def test_cancel_during_pending_guidance_does_not_mark_processed(tmp_path):
     assert result.stop_reason == "cancelled"
     assert result.status == "failed"
     assert result.department_guidance[0].status in {"received", "in_input"}
-    assert result.department_guidance[0].status != "completed"
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))
 

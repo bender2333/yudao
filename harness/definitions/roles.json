@@ -12,8 +12,7 @@
       "run_check",
       "submit_product_spec",
       "submit_product_decision",
-      "ask",
-      "submit_guidance_response"
+      "ask"
     ],
     "visibility": [
       "qa_defects"
@@ -35,7 +34,6 @@
       "read_output",
       "stop_job",
       "ask",
-      "submit_guidance_response",
       "submit_delivery"
     ],
     "visibility": [
@@ -57,7 +55,6 @@
       "stop_job",
       "run_check",
       "ask",
-      "submit_guidance_response",
       "submit_review"
     ],
     "visibility": [

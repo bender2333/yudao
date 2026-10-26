@@ -655,45 +655,6 @@
       "required": []
     }
   },
-  "submit_guidance_response": {
-    "kind": "host",
-    "proposal": "department_guidance_response",
-    "description": "Respond to one persisted department guidance item. Use explained when the handling is an explanation, no change is required, or this department cannot apply it. Use completed only when host-verified actions after this guidance was adopted are listed in guidance_results; the host binds those results and result_event_ids cannot enlarge that set. Empty, rejected, failed, or earlier-unrelated results cannot complete an action. This response does not change the contract, files, or QA result by itself.",
-    "parameters": {
-      "type": "object",
-      "properties": {
-        "guidance_id": {
-          "type": "string"
-        },
-        "status": {
-          "type": "string",
-          "enum": [
-            "explained",
-            "completed",
-            "declined",
-            "needs_work"
-          ]
-        },
-        "text": {
-          "type": "string"
-        },
-        "result_event_ids": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Optional. completed must be a subset of guidance_results; the host binds those results. explained, declined, and needs_work do not require results."
-        }
-      },
-      "additionalProperties": false,
-      "required": [
-        "guidance_id",
-        "status",
-        "text",
-        "result_event_ids"
-      ]
-    }
-  },
   "submit_delivery": {
     "kind": "host",
     "proposal": "delivery_spec",

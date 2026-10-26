@@ -8,7 +8,7 @@ from typing import Any
 
 from .adjudication import offered_tools
 from .contracts import current_contract_hash
-from .collaboration import guidance_result_summaries, has_new_baseline_review
+from .collaboration import has_new_baseline_review
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
 from .event_store import EventStore
@@ -296,14 +296,6 @@ class ContextAssembler:
             # 质检对当前交付下结论以后，工程在问答里的解释部分进入它之后的请求（工单 #554）
             parts.append(ContextPart("engineering_explanation", None,
                                      json_dumps(engineering["explanations"])))
-        pending_for_results = [item for item in projection.department_guidance
-                               if item.department == department and item.status in {"received", "in_input"}]
-        if pending_for_results and events:
-            parts.append(ContextPart(
-                "guidance_results",
-                None,
-                json_dumps(guidance_result_summaries(projection, department, events, snapshot_hash or "")),
-            ))
         if projection.product_spec and projection.product_spec.status == "active":
             spec = projection.product_spec
             parts.append(
@@ -558,10 +550,7 @@ def _current_work(projection: RunProjection, department: str,
     pending_guidance = [item for item in projection.department_guidance
                         if item.department == department and item.status in {"received", "in_input"}]
     if pending_guidance:
-        work += (f" 当前有 {len(pending_guidance)} 条待处理部门指导。先阅读 department_guidance 中的原文，"
-                 "然后用 submit_guidance_response 逐条回应：explained 表示已解释或无需新动作，"
-                 "completed 表示本指导被采用后的动作已有主机结果。"
-                 "guidance_results 只列出本指导被采用后可由宿主绑定的结果；completed 时宿主绑定这些结果，不必手抄事件 id；"
+        work += (f" 当前有 {len(pending_guidance)} 条待处理部门指导。先阅读 department_guidance 中的原文。"
                  "指导不能替代产品要求、交付说明或质检放行。"
                  "这一轮只有指导、没有要做的工作时，直接用文字回答即可。")
     for item in notifications or []:
