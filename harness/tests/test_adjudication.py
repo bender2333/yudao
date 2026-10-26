@@ -3,7 +3,7 @@ from dataclasses import replace
 from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
-from harness.collaboration import has_new_work
+from harness.collaboration import has_new_work, pending_product_input
 from harness.environment import LocalEnvironment
 from harness.models import SessionRecord
 from harness.proposals import delivery, product_spec
@@ -94,5 +94,21 @@ def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
                               **arguments)
     assert not changed.accepted
     assert changed.errors[0].message.startswith("The workspace snapshot changed")
+
+
+def test_pending_product_input_counts_a_finished_or_empty_item_as_processed(tmp_path):
+    # 工单 #561：放行等输入处理完的只读判断（工具许可按它决定等不等）在两种边界上不等——
+    # 事项已经结束当作处理完（部门指导设计说明第 3 节），以及没有任何发给产品的输入与指导时
+    # 没有要等的。守 R3（写到设计说明里的行为），只读投影与事件，不写事件
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
+    run_id = system.create_run("echo")
+    projection = system.activate_once(run_id)
+    events = system.store.list_events(run_id)
+
+    finished = replace(projection, status="done")
+    assert pending_product_input(finished, events) is False
+    empty = replace(projection, inputs=[], department_guidance=[])
+    assert pending_product_input(empty, events) is False
+
 
 
