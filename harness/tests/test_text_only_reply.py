@@ -9,7 +9,7 @@ from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import tool_call_required_text
 from harness.models import ArtifactRef, EventType, json_dumps
-from harness.proposals import product_spec
+from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.smoke import isolation_fields
@@ -231,3 +231,46 @@ def test_a_model_declared_without_a_required_tool_call_sends_auto_and_pauses(dat
     assert result.status == "paused" and result.stop_reason == "no_tool_call"
     assert len(provider.requests) == LIMIT + 1
     assert all("tool_choice" not in (body or {}) for body in provider.requests)
+
+
+def test_text_only_replies_in_a_round_with_new_work_still_pause_the_run(tmp_path):
+    # 验收第 2 条（工单 #1037）：一轮里同时有新的 PRD 与一段指导，关注的成果不只有指导；
+    # 没有工具调用的回复照旧追加提醒，连续超过上限照旧暂停
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [FakeTurn(transcript=f"第 {index} 次只回复文字") for index in range(1, LIMIT + 2)],
+        "quality": [],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请说明错误输出的边界行为。")
+    result = system.activate_once(run_id)
+
+    assert result.status == "paused" and result.stop_reason == "no_tool_call"
+    # 产品一次；工程连续 LIMIT + 1 次，只在文字回复的轮里
+    assert len(adapter.invocations) == LIMIT + 2
+    required = [event for event in _events(system, run_id, EventType.TOOL_CALL_REQUIRED)]
+    assert [event.department for event in required] == ["engineering"] * LIMIT
+    assert [event.payload["count"] for event in required] == list(range(1, LIMIT + 1))
+    _assert_replayable(system, run_id, result)
+
+
+def test_an_empty_reply_to_a_guidance_only_round_is_not_an_answer(tmp_path):
+    # 空回复里没有给用户的文字：这一轮只有指导也不当作回答用户，照旧追加提醒并接着工作（#1037）
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn(), ModelResponse(), FakeTurn(transcript="错误输出写到 stderr。")],
+        "quality": [],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "engineering", "请说明错误输出的边界行为。")
+    result = system.activate_once(run_id)
+
+    assert [call.department for call in adapter.invocations].count("engineering") == 3
+    [required] = _events(system, run_id, EventType.TOOL_CALL_REQUIRED)
+    assert required.department == "engineering" and required.payload["count"] == 1
+    assert result.status == "running" and not _events(system, run_id, EventType.RUN_PAUSED)
