@@ -23,6 +23,7 @@ from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
+from .collaboration import watched_new_work
 from .compaction import CompactionError
 from .contracts import current_contract_hash
 from .definitions import DEFINITIONS
@@ -112,6 +113,27 @@ def tool_call_required_text(count: int) -> str:
         "工作没有完成时，调用下一个需要的工具；工作已经完成时，用本部门的提交工具提交提案。"
         f"连续第 {limit + 1} 次仍然没有调用工具时，运行暂停，等待用户处理。"
     )
+
+
+def _guidance_only_round(projection: RunProjection, scope: ActivationScope) -> bool:
+    # 一轮开始时只有指导是新的工作，而且这段指导是这一轮收到的：这一轮没有要做的工作，
+    # 模型不调用工具的文字回复就是回答用户（部门指导设计说明第 3 节，工单 #1037）。
+    # 询问分支不是部门的一轮工作，它的文字回复仍按「要求调用工具」处理。
+    if not scope.guidance_ids or scope.session_id in projection.branch_sessions:
+        return False
+    return watched_new_work(projection, scope.department) == ["guidance"]
+
+
+def _text_reply(response: ModelResponse) -> bool:
+    # 回复里给用户看的文字：输出条目 content 里的文本。空回复没有回答用户，仍按没有工具调用的回复处理
+    for item in response.output:
+        content = item.get("content")
+        if isinstance(content, str) and content.strip():
+            return True
+        if isinstance(content, list) and any(
+                isinstance(part, dict) and str(part.get("text") or "").strip() for part in content):
+            return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -254,6 +276,12 @@ class StepDriver:
         self._cancelled = cancelled
         self._limits = limits
         self._deltas = deltas
+        # 这一轮只有指导、没有要做的工作：模型不调用工具的文字回复就是回答用户，这一轮正常结束。
+        # 判断在轮开始时做一次，轮内保持，不因为指导随后进入模型输入或有了别的新工作而重算。
+        # shortcut: 这个判断不持久化；进程重新启动以后同一轮由新会话接着做的，丢掉它并退回要求调用工具，
+        # 这是可以接受的限制（工单 #1037）
+        self._text_reply_answers = _guidance_only_round(
+            writes.read(run_stream(scope.run_id)).projection, scope)
         # 检查工作区按会话保留（工单 #558）：新交付封存以后质检的检查工作区要重建，
         # 由编排层给出重建好的工作区，这里只接着用
         self._refresh_workspace = refresh_workspace
@@ -499,6 +527,10 @@ class StepDriver:
                 self._finish_compaction(request, response)
                 continue
             if not any(item.get("type") == "function_call" for item in response.output):
+                # 这一轮只有指导、没有要做的工作：文字回复就是对用户的回答，这一轮在这里正常结束。
+                # 不追加提醒，也不写 tool_call_required；回复的文字已经记在模型消息里，不另存（工单 #1037）
+                if self._text_reply_answers and _text_reply(response):
+                    return Stopped(self._version)
                 # 回复已记入历史；追加一条 user 消息，下一次请求不以助手消息结尾
                 replies_without_tool_call += 1
                 if replies_without_tool_call > DEFINITIONS.rule_value("tool_call_required_limit"):
