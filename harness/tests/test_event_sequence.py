@@ -21,6 +21,11 @@ from harness.streams import RUN_EVENT_VERSION
 # 基准的投影里没有它（生成规则）、只差这一项时比对通过，各自在 test_event_sequence_compare.py。
 EXPECTED_RUN_EVENT_VERSION = 11
 
+# 假模型的脚本用完时的错误文字（harness/adapters/fake.py 的 FakeAdapter.stream，工单 #1061）：
+# 脚本用完说明场景比脚本多跑了一轮，不是行为变化；把它当成正常结论记进基准，就成了把失败当成通过。
+# ask_answer_with_spec_revision 与 proposal_rejected 两份基准一直记着这种结局（#557 起）。
+EXHAUSTED_SCRIPT = "fake adapter script exhausted"
+
 
 def test_the_current_run_event_version_is_the_expected_one():
     assert RUN_EVENT_VERSION == EXPECTED_RUN_EVENT_VERSION, (
@@ -32,6 +37,11 @@ def test_the_current_run_event_version_is_the_expected_one():
 def test_event_sequence_matches_its_baseline(name, data_dir, request):
     scenario = SCENARIOS[name]
     system, run_id, replacements = scenario.run(data_dir)
+    # 防回退护栏（工单 #1061）：场景跑完不该留下假模型脚本用完的失败。脚本用完说明驱动比脚本多跑了
+    # 一轮（ask_answer_with_spec_revision 的旧基准就是这样），这一条与基准内容无关，重写基准绕不过去。
+    exhausted = [event.error for event in system.store.list_events(run_id)
+                 if event.error and EXHAUSTED_SCRIPT in event.error]
+    assert not exhausted, f"场景 {name} 的假模型脚本不够，驱动多跑了一轮：{exhausted}"
     assert system.project(run_id).canonical_state() == system.replay(run_id).canonical_state()
     # 每条事件的载荷都符合应用层合同中的载荷类型
     assert_payloads_follow_contract(system.store.list_events(run_id))

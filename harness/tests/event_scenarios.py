@@ -26,7 +26,7 @@ from harness.providers.call import ModelCall, ModelResponse
 from harness.proposals import (
     answer_turn, ask_turn,
     delivery_turn,
-    product_spec, review, review_turn,
+    product_spec, product_spec_turn, review, review_turn,
 )
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
@@ -183,6 +183,12 @@ def invalid_tool_arguments(data_dir):
 
 
 def ask_answer_with_spec_revision(data_dir):
+    # 单步驱动（工单 #1061）：质检关注的成果里「PRD 被接纳」也算新的工作，产品在分支里修订 PRD 就是
+    # PRD 的一个新版本，因此它会让质检在工程交付之前就开始一轮。同时运行时这一轮落在交付之前还是之后
+    # 由两个会话的先后决定：落在交付之前时它装配到的材料里没有交付，放行被拒绝，要等交付到达再开一轮
+    # （脚本里只有两轮，第三轮没有脚本，运行以 provider_error 失败）；落在交付之后时当轮就放行。
+    # 本场景覆盖的是询问、PRD 修订与交付，质检的预测性探索由 concurrent_departments 覆盖，所以这里
+    # 按单步驱动：产品提交 PRD、工程询问并交付、质检核验放行，轮次与事件序列固定（工单 #469）。
     system, _, run_id = _system(data_dir, {
         "product": [product_spec()],
         "engineering": [
@@ -195,9 +201,12 @@ def ask_answer_with_spec_revision(data_dir):
                         change_record={"changed": ["print the given argument in uppercase to stdout"],
                                        "retained": ["single file implementation"]}),
         ],
-        "quality": [_explore(), _release()],
+        "quality": [_release()],
     })
-    system.run_until_stop(run_id)
+    system.activate_once(run_id)  # 产品提交 PRD
+    system.activate_once(run_id)  # 工程询问产品，收到修订后的 PRD 与新合同，接着交付
+    system.activate_once(run_id)  # 质检核验并放行
+    assert system.project(run_id).status == "done"
     return system, run_id, {}
 
 
@@ -232,9 +241,15 @@ def guidance_answered(data_dir):
 
 
 def proposal_rejected(data_dir):
+    # 产品的脚本两轮（工单 #1061）：第一轮缺少目标被拒绝，第二轮补上目标（要求与验收标准不变），
+    # 拒绝原因作为 validation_feedback 进入第二轮。原来只给了一轮，第二轮没有脚本，运行以
+    # provider_error 结束，基准记的就是这个结局，与下面 covers 写的「修正后接纳，走完交付与放行」不符。
+    # 修正的那一轮按请求里的当前 PRD 填依据版本（product_spec_turn）：还没有接纳过 PRD 时依据为空。
     system, _, run_id = _system(data_dir, {
         "product": [{"kind": "product_spec", "goal": "", "requirements": ["print the argument"],
-                     "acceptance_criteria": ["prints it"]}],
+                     "acceptance_criteria": ["prints it"]},
+                    product_spec_turn(goal="print the argument", requirements=["print the argument"],
+                                      acceptance=["prints it"])],
         "engineering": [_deliver()],
         "quality": [_explore(), _release()],
     })
@@ -681,7 +696,8 @@ SCENARIOS: dict[str, Scenario] = {
         "模型给出无法解析的工具参数：工具不启动，错误作为工具结果返回模型，记入历史的参数换成 {}；下一步提交成功。",
         invalid_tool_arguments),
     "ask_answer_with_spec_revision": Scenario(
-        "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检放行。",
+        "工程询问产品，产品在分支里修订 PRD 并回答，工程收到回答与 PRD 新版本，接着交付，质检核验后放行"
+        "（单步驱动，工单 #1061；质检的预测性探索在 concurrent_departments 覆盖）。",
         ask_answer_with_spec_revision),
     "ask_branch_exhausted": Scenario(
         "分支达到上限时以没能回答结束（unable），提问方收到原因后接着工作，事项运行到放行。",
