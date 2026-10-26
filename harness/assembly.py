@@ -182,6 +182,22 @@ class ContextAssembly:
             for key, identities in started.items():
                 if identities - answered.get(key, set()):
                     unfinished_steps.add(key)
+            # 模型输出里带工具调用、还没有对应结果的整一步同样不进分支的历史（工单 #561）：
+            # 别的会话的这一步可能还没有任何工具开始，只有模型输出那一半（等待放行的调用、或者并发时
+            # 恰好停在输出与工具开始之间）。工具调用写在模型输出的内容里，所以要看输出的每一项
+            for event in events:
+                if event.type != EventType.MODEL_MESSAGE or event.session_id == session_id:
+                    continue
+                if event.payload.get("purpose") == "compaction":
+                    continue
+                key = (event.session_id, event.payload.get("activation_id"), event.payload.get("step_id"))
+                if key in unfinished_steps:
+                    continue
+                ref = ArtifactRef(**event.payload["message_ref"])
+                item = json.loads(self.artifacts.get_for_run(event.run_id, ref))
+                if isinstance(item, dict) and item.get("type") == "function_call" \
+                        and str(item.get("id")) not in disposed:
+                    unfinished_steps.add(key)
 
         failed_steps = {
             (event.payload.get("activation_id"), event.payload.get("step_id"))

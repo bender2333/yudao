@@ -17,6 +17,8 @@ from .validation import FieldError, ProposalDecision, evaluate_proposal
 _STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
                 "stale results cannot be rebound.")
 _STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; stale results cannot be rebound."
+_PENDING_INPUT_RELEASE = ("New user input is waiting for the product; the release is judged after the product "
+                          "round that received it has ended.")
 
 
 def submission_basis(projection: RunProjection) -> dict[str, Any]:
@@ -218,14 +220,28 @@ def commit_decision(
     if current_facts != facts:
         return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
     if decision.accepted:
-        return proposal_decision(current, department=department, proposal=proposal,
-                                 facts=current_facts, events=events)
+        decision = proposal_decision(current, department=department, proposal=proposal,
+                                     facts=current_facts, events=events)
+    if decision.accepted and _is_pending_release(department, proposal, current, events):
+        # 新输入在工具许可之后、提交之前到达：这次放行不当场生效，交回质检，等产品处理完再提交
+        # （部门指导设计说明第 2.1 节，工单 #561）
+        return ProposalDecision(False, [FieldError("kind", _PENDING_INPUT_RELEASE)])
     return decision
 
 
 def _is_release_submission(department: str, name: str, args: dict[str, Any]) -> bool:
     # 只有质检的放行（submit_review，结论是 release）等输入处理完；质检提交缺陷记录不等（工单 #561）
     return department == "quality" and name == "submit_review" and args.get("verdict") == "release"
+
+
+def _is_pending_release(department: str, proposal: dict[str, Any] | None, projection: RunProjection,
+                        events: list[Event]) -> bool:
+    # 同样只有放行：产品还没有处理完的输入（用户输入或发给产品的指导）让这次放行交回质检
+    if department != "quality" or not isinstance(proposal, dict):
+        return False
+    if proposal.get("kind") != "qa_review" or proposal.get("verdict") != "release":
+        return False
+    return pending_product_input(projection, list(events))
 
 
 def _is_write(name: str) -> bool:
