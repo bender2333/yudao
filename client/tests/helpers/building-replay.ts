@@ -14,7 +14,7 @@ import type { Browser } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compareActors, diffPixels, launch, v13Checkpoint, type ActorShot, type CheckpointShot, type RecordedOp } from "./prototype-v13.ts";
+import { compareActors, diffPixels, launch, v13Checkpoint, type ActorShot, type CheckpointShot, type PixelDiff, type RecordedOp } from "./prototype-v13.ts";
 import type { BuildingModel } from "../../src/renderer/src/pixel/world/building.ts";
 import type { BuildingEvent } from "../../src/renderer/src/translate/building.ts";
 
@@ -37,6 +37,8 @@ export interface BuildingRecordingFile {
 
 export interface BuildingCompareResult {
   scenario: string;
+  pixelDiff: PixelDiff;
+  actorMismatches: string[];
   mismatches: string[];
   clientErrors: string[];
 }
@@ -175,14 +177,20 @@ export async function replayBuildingAll(options: { only?: string[] } = {}): Prom
         : op));
       const expected = await v13Checkpoint(proto, { screen: "building", ops, gapMs: recording.gapMs, settleMs: recording.settleMs });
       const actual = await replayBuildingScenario(address, browser, { ...scenario, ops }, recording);
-      const mismatches: string[] = [];
+      const actorMismatches = compareActors(expected.actors, actual.actors);
+      const mismatches: string[] = [...actorMismatches];
+      let pixelDiff: PixelDiff = { count: 0 };
       if (expected.png && actual.png) {
-        const d = await diffPixels(diff, expected.png, actual.png);
-        if (d.count < 0) mismatches.push(`画布尺寸不同：v13 ${JSON.stringify(d.size)}`);
-        else if (d.count > 0) mismatches.push(`逐像素比较：${d.count} 个像素不同，外接矩形 ${JSON.stringify(d.bbox)}`);
+        pixelDiff = await diffPixels(diff, expected.png, actual.png);
+        if (pixelDiff.count < 0) mismatches.push(`画布尺寸不同：v13 ${JSON.stringify(pixelDiff.size)}`);
       }
-      mismatches.push(...compareActors(expected.actors, actual.actors));
-      results.push({ scenario: scenario.id, mismatches, clientErrors: [...expected.errors, ...actual.errors] });
+      results.push({
+        scenario: scenario.id,
+        pixelDiff,
+        actorMismatches,
+        mismatches,
+        clientErrors: [...expected.errors, ...actual.errors],
+      });
     }
   } finally {
     await browser.close();
