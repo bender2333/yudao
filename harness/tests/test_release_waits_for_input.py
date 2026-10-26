@@ -10,9 +10,11 @@ import json
 import time
 from dataclasses import asdict
 
+from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import run_stream
 from harness.models import EventType, json_dumps
+from harness.projection import saved_decisions
 from harness.proposals import (
     answer_turn, ask_turn, delivery_turn, product_decision, product_spec, product_spec_turn, review_turn,
 )
@@ -27,6 +29,7 @@ CHANGE_RECORD = {
     "retired": ["Preserve original letter casing"],
     "rationale": "The user asked for uppercase output.",
 }
+UNAVAILABLE = "Missing configuration: provider credential"
 
 
 def _events(system: LoopSystem, run_id: str):
@@ -258,6 +261,44 @@ def test_running_out_of_time_while_the_release_waits_ends_the_run(tmp_path):
     assert holder.get("release_attempted")
     assert projection.status == "failed"
     assert projection.stop_reason == "time_limit"
+    assert projection.last_review is None
+    assert _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
+
+
+def test_a_model_unavailable_stops_the_wait_without_a_release(tmp_path):
+    # 验收第 2 条：等待期间产品那一轮遇到模型不可用，写出阻塞整个事项的决定请求，
+    # 质检的等待停下、没有放行（工单 #561 第三次分诊第 2 条，参照工单 #856 的用例）。
+    # 等待用的安全节点与等待模型服务重试是同一个，停止判断读阻塞整个事项的决定请求
+    # （部门指导设计说明第 2.1 节第 1 点）；步数上限不在等待期间判，因为等待不调用模型
+    holder: dict[str, object] = {}
+
+    def model_unavailable_while_the_release_waits(request):
+        # 等质检的放行确实走进等待，这一轮再遇到模型不可用：决定请求写出时放行正在等
+        yield from _wait_for_the_release_attempt(holder, request.run_id)
+        raise ProviderError(UNAVAILABLE, reason="provider_unavailable")
+
+    adapter = FakeAdapter({
+        "product": [product_spec(), model_unavailable_while_the_release_waits],
+        "engineering": [delivery_turn()],
+        "quality": quality_turns("release", "checks passed on the current delivery"),
+    }, stream_gap_sec=0.01)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("build echo", max_cycles=16)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请确认输出保持小写，产品要求不变。")
+    projection = system.run_until_stop(run_id)
+
+    assert holder.get("release_attempted")
+    # 产品那一轮写出了阻塞整个事项的决定请求：范围是整个事项，部门的模型不可用
+    _position, decisions = saved_decisions(system.store, statuses=("open",))
+    assert len(decisions) == 1, [decision.decision_id for decision in decisions]
+    [decision] = decisions
+    assert (decision.request["kind"], decision.request["blocks"]) == ("model_unavailable", "run")
+    assert decision.request["department"] == "product"
+    # 等待停下：放行没有裁决、没有放行，事项也没有以取消或运行时间用完结束
+    assert projection.status == "running", projection.stop_reason
     assert projection.last_review is None
     assert _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
 
