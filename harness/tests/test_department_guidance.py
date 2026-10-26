@@ -17,7 +17,7 @@ from harness.proposals import (
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
-from harness.tests.helpers import guidance_reply, quality_turns
+from harness.tests.helpers import after_event, from_another_thread, guidance_reply, quality_turns
 from harness.tools import tools_for
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
@@ -576,4 +576,77 @@ def test_guidance_arriving_during_an_ongoing_round_does_not_end_it_with_a_text_r
                    if event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED]
     assert responded.payload["activation_id"] == applied.payload["activation_id"]
     assert responded.payload["outcome"] == "proposal_accepted"
+
+
+def test_guidance_arriving_during_a_write_keeps_the_write_and_reaches_the_next_step(tmp_path):
+    # 反例 2：模型要求写入文件、写入工具正在进行时收到指导——已经写入的内容保留，
+    # 下一步看到真实的工作区与这条指导
+    holder = {}
+    seen = {}
+    written = "import sys\nprint(sys.argv[1].upper())\n"
+
+    def deliver_after_the_notification(request):
+        seen["guidance"] = prompt_part(request, "department_guidance")
+        seen["workspace"] = holder["system"].workspace(request.run_id).read_file("src/echo.py")
+        # 交付只补一个说明文件：这一轮不再改写 src/echo.py，写入的内容留在工作区里
+        return delivery_turn(summary="uppercase output", files={"src/notes.txt": "输出改为大写。\n"})(request)
+
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [FakeTurn(writes={"src/echo.py": written}), deliver_after_the_notification],
+        "quality": [],
+    })
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+
+    # 写入工具开始时把指导交给工程：这时写入还在进行，指导已经到达
+    after_event(system, EventType.TOOL_STARTED,
+                lambda event: from_another_thread(
+                    lambda: system.add_guidance(run_id, "engineering", "请把输出改为大写并重新交付。"))
+                if (event.department, (event.payload or {}).get("name")) == ("engineering", "write_file")
+                else None)
+    result = system.activate_once(run_id)
+
+    # 写入保留：工作区里就是这次写入的内容，下一步看到的也是它
+    assert seen["workspace"] == written
+    assert system.workspace(run_id).read_file("src/echo.py") == written
+    written_events = [event for event in system.store.list_events(run_id)
+                      if event.type == EventType.TOOL_CALLED
+                      and (event.payload or {}).get("name") == "write_file"]
+    assert written_events[0].payload["args"] == {"path": "src/echo.py", "content": written}
+    assert all(event.payload["ok"] for event in written_events)
+    # 指导在写入这条调用之后才进入模型输入
+    applied = next(event for event in system.store.list_events(run_id)
+                   if event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED)
+    assert applied.position > written_events[0].position
+    # 指导在下一步的模型输入里，这一轮正常结束以后写已回答
+    assert [item["text"] for item in json.loads(seen["guidance"])] == ["请把输出改为大写并重新交付。"]
+    assert result.department_guidance[0].status == "answered"
+    assert result.delivery_spec is not None and result.delivery_spec.status == "active"
+
+
+def test_cancel_arriving_with_guidance_cancels_at_once_and_keeps_the_guidance(tmp_path):
+    # 反例 6：取消与指导几乎同时到达——取消立即生效，已经接收的指导保留可查，不算处理过
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+
+    after_event(system, EventType.DEPARTMENT_GUIDANCE_RECEIVED,
+                lambda event: from_another_thread(lambda: system.cancel(run_id)))
+    system.add_guidance(run_id, "engineering", "请把输出改为大写并重新交付。")
+    result = system.run_until_stop(run_id)
+
+    # 取消立即生效：事项以取消结束，工程与质检都没有再开始工作
+    assert result.status == "failed"
+    assert result.stop_reason == "cancelled"
+    assert not any(event.type == EventType.MODEL_REQUESTED and event.department != "product"
+                   for event in system.store.list_events(run_id))
+    # 已经接收的指导保留可查：没有丢掉，也没有被当成处理过
+    assert result.department_guidance[0].status == "received"
+    assert result.department_guidance[0].text == "请把输出改为大写并重新交付。"
+    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
+                   for event in system.store.list_events(run_id))
 

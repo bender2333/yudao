@@ -83,8 +83,8 @@ def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
     assert commit_decision(first, current=projection, current_facts=facts, **arguments).accepted
     newer_input = replace(projection, input_version=projection.input_version + 1)
     carried = commit_decision(first, current=newer_input, current_facts=facts, **arguments)
-    # 输入变了不再让这次提交作废（工单 #964）：拒绝的理由换成「输入还没有被产品处理」
-    assert [error.field for error in carried.errors] == ["kind"]
+    # 输入变了不再让这次提交作废（工单 #964、#561）：新的输入作为通知送达，这次提交照常接纳
+    assert carried.accepted, carried.error_dicts
     other_contract = replace(projection, effective_contract=replace(projection.effective_contract,
                                                                      content_hash="sha256:other"))
     rebound = commit_decision(first, current=other_contract, current_facts=facts, **arguments)
