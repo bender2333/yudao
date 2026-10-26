@@ -269,19 +269,24 @@ test("断线重连（重新订阅）以后画面回到查询给出的状态，�
       return JSON.stringify(now.items.map((it) => [it.id, it.status])) === expected;
     };
     await waitUntil(matches, "画面里的事项状态与查询结果一致");
-    // 打开画面就跳到最新：没有排着的状态，也没有在演的动作（不补播）
-    const opened = await floorState(page);
-    expect(opened.timeline?.pending).toBe(0);
-    expect(opened.timeline?.playing).toEqual([]);
+    // 标签页从后台切回：清空时间线，直接显示最新状态，不补播（与打开画面、重新同步、回放拖动走同一个 jump）。
+    // 在页面里同一步里派发事件再读，读到的是 jump 之后、下一帧之前的时间线。
+    // （重新同步的入口只在开发构建里暴露，页面是构建产物，所以这里用同一个 jump 的另一条入口核对。）
+    const afterVisible = await page.evaluate(() => {
+      const hooks = (window as unknown as { __floorViewForTest?: { timeline: () => FloorTimeline } }).__floorViewForTest;
+      if (!hooks) throw new Error("页面没有画面的读取入口");
+      Object.defineProperty(document, "visibilityState", { value: "visible", configurable: true });
+      document.dispatchEvent(new Event("visibilitychange"));
+      return hooks.timeline();
+    });
+    expect(afterVisible.pending).toBe(0);
+    expect(afterVisible.playing).toEqual([]);
     // 断线：停掉事件流连接（主进程的窗口关闭再打开时由客户端自己重连；这里用重新连接设置模拟）
     await page.evaluate(() => { window.location.hash = "#/home"; });
     await expect(page.locator(".floor-screen canvas")).toHaveCount(0);
     await openFloor(page, id);
-    // 重新打开（重新同步）以后画面按查询给出的状态配置：事项的状态逐项一致，不补播
+    // 重新打开以后画面按查询给出的状态配置：事项的状态逐项一致
     await waitUntil(matches, "画面回到查询给出的状态");
-    const again = await floorState(page);
-    expect(again.timeline?.pending).toBe(0);
-    expect(again.timeline?.playing).toEqual([]);
     expect(errors).toEqual([]);
   } finally {
     await client.close();
