@@ -2,6 +2,7 @@
   "action_verified",
   "activation_finished",
   "adoption_held",
+  "artifact_invalidated",
   "ask_answered",
   "ask_started",
   "baseline_adopted",

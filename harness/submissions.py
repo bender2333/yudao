@@ -50,6 +50,16 @@ def acceptance_fields(kind: str, artifact: dict[str, Any], *, version: int,
     return fields
 
 
+def invalidation(current: RunProjection, reason: str) -> tuple[str, dict[str, Any]] | None:
+    # 接纳以后当前交付失效的一条事件（骨架事件「成果失效」，S1b，设计说明第 4 节）：
+    # 载荷给出成果种类、版本与原因。没有当前交付时没有要失效的成果，这一刻不记事件
+    delivery = current.delivery_spec
+    if delivery is None:
+        return None
+    return EventType.ARTIFACT_INVALIDATED, {"artifact_kind": "delivery_spec",
+                                            "artifact_version": delivery.revision, "reason": reason}
+
+
 @dataclass(frozen=True)
 class Acceptance:
     # 准备好的一次接纳：要追加的全部事件、其中承载接纳结果的那一条，以及恢复原来材料的补偿
@@ -97,13 +107,22 @@ class SubmissionWriter:
             apply_event(current, event)
             return len(prepared) - 1
 
+        def invalidate(reason: str) -> None:
+            # 接纳以后当前交付失效：记一条成果失效事件（S1b，设计说明第 4 节）。没有当前交付时不记
+            event = invalidation(current, reason)
+            if event is not None:
+                append(*event)
+
         def product_spec(spec: dict[str, Any]) -> int:
             spec = {**spec, "id": new_id("spec")}
             if projection.product_spec:
                 append(EventType.SPEC_SUPERSEDED, {"content_hash": projection.product_spec.content_hash,
                                                  "revision": projection.product_spec.revision})
             spec.update(acceptance_fields("product_spec", spec, version=int(spec["revision"])))
-            return append(EventType.SPEC_ACCEPTED, spec, [spec["content_hash"]])
+            index = append(EventType.SPEC_ACCEPTED, spec, [spec["content_hash"]])
+            # 新的 PRD 被接纳，当前交付失效（紧接着契约也会重新签发，那一条失效事件不再重复记）
+            invalidate("product_spec_changed")
+            return index
 
         kind = artifact["kind"]
         if kind == "product_spec":
@@ -123,6 +142,8 @@ class SubmissionWriter:
             artifact["tree_ref"] = asdict(ref)
             artifact.update(acceptance_fields("delivery_spec", artifact, version=int(artifact["revision"]),
                                               ref=asdict(ref)))
+            # 新交付被接纳，它之前的那一版失效（事件记在接纳之前，投影按顺序折叠）
+            invalidate("replaced")
             event = append(EventType.DELIVERY_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/delivery.json"] = _json_bytes(prepared[event][1])
             updates["specs/delivery-tree.json"] = _json_bytes(snapshot.tree.manifest)
@@ -147,6 +168,9 @@ class SubmissionWriter:
                                               ref=asdict(ref)))
             event = append(EventType.QA_SUBMITTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/qa.json"] = _json_bytes(prepared[event][1])
+            if artifact.get("verdict") == "rework_engineering":
+                # 质检退回工程：工程要重新交付，当前交付失效（S1b）
+                invalidate("qa_rework_engineering")
         elif kind == "structure":
             # 建档事项的现有结构说明：接纳时再核对一次工作区的树摘要与快照相同（设计第 4.1 节）
             if projection.snapshot is None or artifact["code_tree_digest"] != projection.snapshot["tree_digest"]:
@@ -168,6 +192,10 @@ class SubmissionWriter:
             artifact.update(acceptance_fields("baseline_review", artifact, version=int(artifact["revision"])))
             event = append(EventType.BASELINE_REVIEW_ACCEPTED, artifact, [artifact["content_hash"]])
             updates["specs/baseline.json"] = _json_bytes(prepared[event][1])
+            if artifact.get("verdict") == "rework_product":
+                # 基线核验退回产品：产品要重写初始 PRD，当前交付失效（S1b）。
+                # 建档事项的工程部门没有提交交付的工具，这一刻通常没有当前交付，也就不记事件
+                invalidate("baseline_rework_product")
         else:
             raise ValueError(f"unhandled artifact kind {kind}")
 
@@ -180,10 +208,13 @@ class SubmissionWriter:
                 contract["prd_ref"] = asdict(ref)
                 contract.update(acceptance_fields("contract", contract, version=int(contract["revision"]),
                                                   ref=asdict(ref)))
-                append(EventType.CONTRACT_ACCEPTED, contract, [contract["content_hash"], ref.content_hash])
+                contract_event = append(EventType.CONTRACT_ACCEPTED, contract,
+                                        [contract["content_hash"], ref.content_hash])
+                # 新合同被接纳，当前交付失效（S1b）
+                invalidate("effective_contract_changed")
                 decisions = [{key: value for key, value in asdict(item).items()
                               if key not in {"run_id", "created_event_id"}} for item in current.effective_decisions]
-                updates["specs/contract.json"] = _json_bytes({**prepared[-1][1], "decisions": decisions})
+                updates["specs/contract.json"] = _json_bytes({**prepared[contract_event][1], "decisions": decisions})
                 updates["PRD.md"] = materials["PRD.md"] = self.artifacts.get_for_run(run_id, ref)
         if updates:
             revision = self.git_versions.prepare(
@@ -192,7 +223,7 @@ class SubmissionWriter:
                 code_tree=snapshot.tree if kind == "delivery_spec" else None,
             )
             for event_type, payload, _hashes in prepared:
-                if event_type != EventType.SPEC_SUPERSEDED:
+                if event_type not in {EventType.SPEC_SUPERSEDED, EventType.ARTIFACT_INVALIDATED}:
                     payload["git_version"] = revision
         if kind in {"delivery_spec", "qa_review", "structure", "baseline_review"}:
             environment.verify_tree(snapshot)

@@ -18,6 +18,7 @@
 "test_activation_responses.py" = "integration"
 "test_adjudication.py" = "module"
 "test_api.py" = "integration"
+"test_artifact_invalidation.py" = "integration"
 "test_ask_branch.py" = "integration"
 "test_ask_chain.py" = "integration"
 "test_ask_chain_rules.py" = "unit"

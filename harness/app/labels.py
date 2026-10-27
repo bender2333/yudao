@@ -82,7 +82,25 @@ WRITEBACK_REASON_NAMES = {
 # user_cancelled 已经是停止原因，中文名在 models.py 的停止原因表里（工单 #707）
 OTHER_VALUE_NAMES = {"baseline_changed": "基线已经变化",
                      "superseded_by_hand_back": "已交还模型",
+                     # 成果失效的原因（骨架事件，S1b，工单 #858）
+                     "workspace_changed": "工作区被改动",
+                     "product_spec_changed": "产品规格换了版本",
+                     "effective_contract_changed": "有效合同换了版本",
+                     "replaced": "被新的交付取代",
+                     "baseline_rework_product": "基线核验退回产品",
+                     "qa_rework_engineering": "质检退回工程",
                      **WRITEBACK_REASON_NAMES}
+
+# 成果失效事件里的成果种类：说明里写中文名（骨架事件，S1b）
+ARTIFACT_KIND_NAMES = {"delivery_spec": "交付", "product_spec": "产品规格", "contract": "有效合同",
+                       "qa_review": "质检结论", "structure": "现有结构说明",
+                       "baseline_review": "基线核验", "product_decision": "产品决策"}
+
+
+def artifact_kind_name(value: Any) -> str:
+    # 成果种类：登记过的写中文名，没有登记的照原样写（第二种路由可以带自己的成果种类）
+    text = str(value or "")
+    return ARTIFACT_KIND_NAMES.get(text, text)
 
 
 def value_name(value: Any) -> str:
@@ -122,6 +140,7 @@ class _Translated(dict):
         "guidance_ids": item_count, "candidate_ids": item_count, "running_runs": item_count,
         "stopped_runs": item_count, "restarted_work_items": item_count,
         "kind": decision_kind_name,
+        "artifact_kind": artifact_kind_name,
         "outcome": guidance_outcome_name,
         "modified_by": modifier_name,
     }
@@ -165,6 +184,7 @@ _LABELS: dict[str, str] = {
     EventType.ASK_STARTED: "{requester}向{recipient}发问：{question}",
     EventType.ASK_ANSWERED: "回答了询问",
     EventType.PRODUCT_DECISION_ACCEPTED: "采纳了产品决策（{kind}）",
+    EventType.ARTIFACT_INVALIDATED: "成果失效：{artifact_kind}第 {artifact_version} 版（{reason}）",
     EventType.DELIVERY_ACCEPTED: "采纳了交付（第 {revision} 版）：{summary}",
     EventType.QA_SUBMITTED: "质检提交了结论：{verdict}",
     EventType.QA_TESTS_SAVED: "保存了质检的测试材料（第 {version} 版）",

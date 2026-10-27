@@ -691,6 +691,14 @@ class ProductDecisionAcceptedPayload(AcceptanceFields):
     git_version: GitVersion | None = None
 
 
+class ArtifactInvalidatedPayload(Payload):
+    # 成果失效（骨架事件，S1b，工单 #858）：哪一种成果的哪一版因为什么失效。
+    # 失效是记下来的事实，投影只折叠这一条，不从工具调用与其他接纳事件推出
+    artifact_kind: str
+    artifact_version: int
+    reason: str
+
+
 class AskStartedPayload(Payload):
     requester: Department
     recipient: Department
@@ -1525,6 +1533,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.ASK_STARTED: AskStartedPayload,
     EventType.ASK_ANSWERED: AskAnsweredPayload,
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
+    EventType.ARTIFACT_INVALIDATED: ArtifactInvalidatedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,
     EventType.QA_SUBMITTED: QaSubmittedPayload,
     EventType.QA_TESTS_SAVED: QaTestsSavedPayload,

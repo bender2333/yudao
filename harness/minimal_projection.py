@@ -6,6 +6,8 @@
 # 三条不按事件种类逐个写的规则（设计说明第 4 节末尾与第 5.4 节第 6 条）：
 # 1. 成果按接纳事件的统一字段（成果种类、版本、依据、内容摘要）折叠，加一种成果种类不改这里的代码，
 #    内核也不认识具体有哪几种；契约（contract_accepted）同样是这些字段里的一种。
+#    成果失效按「成果失效」事件（artifact_invalidated）折叠：失效是记下来的事实，不从这里从别的事件推出，
+#    失效以后这种成果没有当前版本，直到它被重新接纳（S1b，工单 #858）。
 # 2. 模型步数按「模型请求」事件一条条数（2026-10-25 第 1 条），不读一轮结束事件里的用量字段：
 #    进程在一轮中间崩溃时没有结束事件，按请求数算中断以后上限仍然准确。时间与激活次数仍来自一轮工作
 #    开始与结束事件里的用量字段，中断那一轮还没结算的运行时间不计（第 2 条）。
@@ -96,6 +98,12 @@ def fold_events(events: Iterable[Event]) -> MinimalProjection:
         if accepted is not None:
             kind, artifact = accepted
             artifacts[kind] = artifact
+        invalidated = _invalidated_artifact(event)
+        if invalidated is not None:
+            kind, version = invalidated
+            known = artifacts.get(kind)
+            if known is not None and known.version == version:
+                artifacts.pop(kind, None)
     return replace(state, execution_right=execution_right, stream_versions=stream_versions, used=used,
                    sessions=sessions, artifacts=artifacts, pending_decisions=tuple(pending))
 
@@ -191,3 +199,16 @@ def _accepted_artifact(event: Event) -> tuple[str, AcceptedArtifact] | None:
         basis={str(name): str(value) for name, value in basis.items()} if isinstance(basis, dict) else {},
         ref=dict(ref) if isinstance(ref, dict) else None,
     )
+
+
+def _invalidated_artifact(event: Event) -> tuple[str, int] | None:
+    # 成果失效事件（骨架事件，S1b）：成果种类与版本。失效是记下来的事实，不由这里从别的事件推出；
+    # 失效以后这种成果没有当前版本，直到它被重新接纳。没有这两个字段的事件不是成果失效
+    if event.type != EventType.ARTIFACT_INVALIDATED:
+        return None
+    payload = event.payload if isinstance(event.payload, dict) else {}
+    kind = payload.get("artifact_kind")
+    version = payload.get("artifact_version")
+    if not isinstance(kind, str) or not kind or version is None:
+        return None
+    return kind, int(version)

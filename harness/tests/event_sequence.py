@@ -171,6 +171,9 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "ask_started": ("branch_session_id", "question", "recipient", "requester"),
     "ask_answered": ("answer", "reason", "recipient", "requester", "revision", "status", "with_spec_revision"),
     "product_decision_accepted": ("content_hash", "id", "kind", "product_spec_hash"),
+    # 成果失效（骨架事件，S1b，工单 #858）：成果种类、版本与原因都进基准——失效改由事件给出、
+    # 不再由投影从别的事件推出，这三项变化就是行为变化
+    "artifact_invalidated": ("artifact_kind", "artifact_version", "reason"),
     "delivery_accepted": ("check_names", "code_tree_digest", "content_hash", "effective_contract_hash", "id",
                           "issuer", "kind", "parent_hash", "product_spec_hash", "revision", "status"),
     "qa_submitted": ("code_snapshot_hash", "content_hash", "delivery_spec_hash", "effective_contract_hash", "id",

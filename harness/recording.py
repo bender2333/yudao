@@ -24,14 +24,17 @@ from .models import Event, EventType, Usage, canonical_hash, json_dumps, utc_now
 from .providers.call import ModelResponse, ModelStreamEvent
 from .redact import redact_tool_args
 
-# 一条待追加的记录：阶段在追加的事务中填入
-Draft = Callable[[str], NewEvent]
+# 一条待追加的记录：阶段在追加的事务中填入。返回 None 表示按事务里的运行状态这一刻没有要记的事实
+Draft = Callable[[Transaction], NewEvent | None]
 
 _SENSITIVE_OBSERVATION_KEYS = frozenset({
     "authorization", "api_key", "apikey", "access_token", "refresh_token",
     "client_secret", "password", "cookie", "set_cookie", "credential",
     "credentials", "headers", "proxy_authorization",
 })
+
+# 改了工作区的工具（工单 #858）：结果成功时当前交付失效，由成果驱动记一条成果失效事件
+_WRITE_TOOLS = frozenset({"write_file", "delete_file", "move_file"})
 
 _COLLECTION_SCOPE = {
     "request": "SDK request JSON object captured from the prepared HTTP request; authentication headers and raw HTTP bytes are excluded.",
@@ -578,9 +581,29 @@ class StepRecorder:
         # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入。
         # 角色任务中的记录由部门提出（设计第 5.2 节）
         scope = self.scope
-        return lambda status: NewEvent(type, state_before=status, state_after=status,
-                                      actor=f"department:{scope.department}", department=scope.department,
-                                      parent_event_id=scope.parent_event_id, session_id=scope.session_id, **fields)
+        return lambda transaction: NewEvent(type, state_before=transaction.projection.status,
+                                           state_after=transaction.projection.status,
+                                           actor=f"department:{scope.department}", department=scope.department,
+                                           parent_event_id=scope.parent_event_id, session_id=scope.session_id,
+                                           **fields)
+
+    def _delivery_invalidated(self, reason: str) -> Draft:
+        # 成果失效事件（骨架事件，S1b，设计说明第 4 节）：工作区被这个部门改了以后当前交付失效。
+        # 没有当前交付时没有要失效的成果，那一刻不记事件。
+        # 记的是事务里的那一版交付：它与这条工具结果在同一个事务里，先后由事件的顺序决定
+        scope = self.scope
+
+        def build(transaction: Transaction) -> NewEvent | None:
+            delivery = transaction.projection.delivery_spec
+            if delivery is None:
+                return None
+            return NewEvent(EventType.ARTIFACT_INVALIDATED, state_before=transaction.projection.status,
+                            state_after=transaction.projection.status,
+                            actor=f"department:{scope.department}", department=scope.department,
+                            parent_event_id=scope.parent_event_id, session_id=scope.session_id,
+                            payload={"artifact_kind": "delivery_spec", "artifact_version": delivery.revision,
+                                     "reason": reason})
+        return build
 
     def _call_target(self, request: ModelRequest) -> dict[str, Any]:
         # 这次逻辑调用解析出的调用目标公开部分：写入请求、尝试与压缩事件，不含密钥
@@ -603,9 +626,12 @@ class StepRecorder:
 
     @staticmethod
     def _record_in(transaction: Transaction, *drafts: Draft) -> list[Event]:
-        # 在调用方的事务中追加记录，状态取这个事务中的运行状态
-        status = transaction.projection.status
-        return transaction.append(*(draft(status) for draft in drafts))
+        # 在调用方的事务中追加记录，状态取这个事务中的运行状态；
+        # 这一刻没有要记的事实的草稿（例如没有当前交付时的成果失效）不追加
+        entries = [entry for entry in (draft(transaction) for draft in drafts) if entry is not None]
+        if not entries:
+            return []
+        return transaction.append(*entries)
 
     def _capture(self, request: ModelRequest) -> _AttemptCapture:
         capture = self._captures.get(request.attempt_id)
@@ -775,6 +801,11 @@ class StepRecorder:
         payload.update(scope.versions())
         payload.update(self._call_target(request))
         drafts = [self._draft(event_type, provider=provider, model=model, payload=payload)]
+        if (event_type == EventType.TOOL_CALLED and scope.department != "quality"
+                and payload.get("ok") and payload.get("name") in _WRITE_TOOLS):
+            # 非质检部门写了文件：当前交付失效，紧跟着这条工具结果记一条成果失效事件（S1b，设计说明第 4 节）。
+            # 质检改的是自己的检查工作区，运行工作区与交付不变
+            drafts.append(self._delivery_invalidated("workspace_changed"))
         if observation.usage is not None and (observation.usage.reported or observation.usage.total_tokens
                                               or observation.usage.cost):
             self._step_usage = observation.usage
