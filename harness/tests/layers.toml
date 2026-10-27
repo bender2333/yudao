@@ -102,6 +102,8 @@
 "test_materials.py" = "module"
 "test_materials_status.py" = "integration"
 "test_message_protocol_contract.py" = "unit"
+"test_minimal_projection.py" = "module"
+"test_minimal_projection_baselines.py" = "integration"
 "test_model_capabilities.py" = "module"
 "test_observability.py" = "integration"
 "test_observability_module.py" = "module"
