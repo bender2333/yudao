@@ -42,7 +42,7 @@ from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog
                           project_stream, run_stream)
 from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
 from .tree_archive import artifact_run, load_tree
-from .engine import Answered, Judgment, StepDriver, StepLimits, StepResult, Stopped
+from .engine import Judgment, StepDriver, StepLimits
 from .streams import (
     RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
 )
@@ -1734,11 +1734,12 @@ class Orchestrator:
             execution_contract.accept(StepDriver)
             assembly_contract.accept(self.assembly)
             # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
-            # 剩余步数决定；路由的工作引用还没有这一项（成果驱动路由在 #825、#861 接上），这一版传空
+            # 剩余步数决定；路由自己的工作引用经契约原样交给装配（设计说明第 5.4 节第 4 条），
+            # 成果驱动不用它时为空（工单 #861）
             request = execution_contract.RoundRequest(
                 scope=scope, prompt=activation.prompt,
                 limits=self._session_limits(run_id, scope.session_id),
-                work_ref=None,
+                work_ref=self._routing.work_reference(projection, department=department),
             )
             activation.driver = StepDriver.start(
                 request, writes=self.writes, artifacts=self.artifacts,
@@ -1759,19 +1760,28 @@ class Orchestrator:
             # 步骤驱动没有开始：依据是激活开始时的运行状态
             self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
             return
-        if isinstance(result, Stopped) and result.reason is not None:
-            self._end_run(activation, result.reason, result.message, result.version,
-                          target=result.target, facts=result.facts)
+        # 一轮工作的结果只剩这一轮写下的事件范围与停止原因（设计说明第 5.3 节，#861）：
+        # 有停止原因的是这个会话停下或失败，按原因暂停或结束运行
+        if result.stop_reason is not None:
+            self._end_run(activation, result.stop_reason, result.message, result.version,
+                          target=result.target, facts=list(result.facts) or None)
             return
 
         current = self.project(run_id)
         if current.status in TERMINAL_STATUSES:
             return
-        if isinstance(result, Stopped):
+        if result.submission is None:
+            # 这一轮没有经提议方式交上东西（在安全节点停下，或只有文字回答）：按当时的运行状态收尾
             elapsed = self._elapsed_sec(run_id)
             minimal = self.writes.minimal(run_stream(run_id))
             if time_used_up(minimal, elapsed):
                 self._end_run(activation, TIME_BOUND, time_limit_message(minimal, elapsed), result.version)
+            return
+        # 薄驱动拿到一轮结果以后问路由这一轮以什么结束，再按回答经写入口提交（设计说明第 5.3 节输出、
+        # 第 5.4 节第 5 条；工单 #861）：路由说这一轮不是正常结束时不提交
+        ended = self._routing.round_end(current, list(result.events), department=department,
+                                        session_id=scope.session_id, activation_id=scope.activation_id)
+        if ended is None:
             return
         submission = result
 
@@ -1781,7 +1791,7 @@ class Orchestrator:
                 ref = self.artifacts.put(run_id, "transcript", submission.transcript, media_type="text/plain")
                 transcript_ref = ref.__dict__
             self._apply_proposal(
-                run_id, department=department, projection=current, proposal=submission.proposal,
+                run_id, department=department, projection=current, proposal=submission.submission,
                 transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
                 session_id=scope.session_id,
                 provider=submission.response.provider or self._activation_provider(activation.adapter),
@@ -1915,8 +1925,9 @@ class Orchestrator:
         events_after = self.writes.read(run_stream(scope.run_id)).events()
         branch_steps = self._branch_steps(events_after, branch_session_id)
 
-        if isinstance(result, Answered):
-            ans_args = result.args
+        if result.submission is not None:
+            # 分支这一轮经提议方式交上了东西：成果驱动里询问分支只交回答
+            ans_args = result.submission
             ans_text = ans_args.get("answer") or ans_args.get("text") or ans_args.get("facts") or ""
             ans_facts = ans_args.get("facts") or None
             ans_explanation = ans_args.get("explanation") or None
@@ -1994,10 +2005,10 @@ class Orchestrator:
             )
             if time_exhausted:
                 reason = "department reached the time limit without submitting an answer"
-            elif isinstance(result, Stopped) and result.message:
+            elif result.message:
                 reason = result.message
-            elif isinstance(result, Stopped) and result.reason:
-                reason = result.reason
+            elif result.stop_reason:
+                reason = result.stop_reason
             else:
                 # 分支没有做出回答就结束：写明原因，提问方才知道接下来怎么做
                 # （设计说明第 4.5 节）。工作依据变了不再算：PRD 的新版本、新的指导与新的用户输入
@@ -2052,7 +2063,7 @@ class Orchestrator:
         parent_event_id: str,
         max_model_steps: int | None = None,
         deadline: float | None = None,
-    ) -> StepResult:
+    ) -> execution_contract.RoundResult:
         projection = self.project(run_id)
         prompt = self._department_prompt(projection, department)
         basis = work_basis(projection, department)
@@ -2109,7 +2120,7 @@ class Orchestrator:
         execution_contract.accept(StepDriver)
         assembly_contract.accept(self.assembly)
         # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，上限由调用方给出；
-        # 路由的工作引用来自开始这一轮工作的请求，还没有这一项时为空（#825、#861）
+        # 路由自己的工作引用来自开始这一轮工作的请求（设计说明第 5.4 节第 4 条，工单 #861）
         driver = StepDriver.start(
             execution_contract.RoundRequest(
                 scope=branch_scope, prompt=prompt,
@@ -2119,7 +2130,7 @@ class Orchestrator:
                     department_max_model_steps=self.step_limits.department_max_model_steps,
                     department_max_time_sec=self.step_limits.department_max_time_sec,
                 ),
-                work_ref=None,
+                work_ref=self._routing.work_reference(projection, department=department),
             ),
             writes=self.writes, artifacts=self.artifacts,
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
