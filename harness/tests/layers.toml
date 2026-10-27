@@ -118,6 +118,8 @@
 "test_project_stream_fields.py" = "module"
 "test_project_parameters.py" = "integration"
 "test_projects.py" = "integration"
+"test_proposal_conditions.py" = "unit"
+"test_proposal_conditions_contract.py" = "module"
 "test_proposal_version_check.py" = "module"
 "test_protocol_belongs_to_definition.py" = "integration"
 "test_redact.py" = "module"

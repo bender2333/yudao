@@ -109,6 +109,67 @@
       ]
     }
   },
+  "conditions": {
+    "product_spec": [
+      {"condition": "basis_current", "field": "basis_product_spec_hash", "target": "product_spec"}
+    ],
+    "product_decision": [
+      {"condition": "no_duplicate_content", "collection": "product_decisions", "content": ["statement", "rationale"],
+       "bind": [{"field": "product_spec_hash", "target": "product_spec"}],
+       "field": "statement", "message": "this product decision has already been accepted"}
+    ],
+    "delivery_spec": [
+      {"condition": "basis_current", "field": "basis_product_spec_hash", "target": "product_spec"},
+      {"condition": "check_receipts", "department": "engineering", "names": {"field": "check_names"},
+       "bind": [{"field": "product_spec_hash", "target": "product_spec"},
+                {"field": "effective_contract_hash", "target": "contract"}],
+       "activation": true,
+       "message": "no run_check receipt named {name} in this activation for the current snapshot and effective contract. Call run_check with the name {name} on the current workspace, then submit_delivery again; bash results are action receipts and do not count as check receipts."}
+    ],
+    "qa_review": [
+      {"condition": "basis_current", "field": "basis_delivery_spec_hash", "target": "delivery_spec"},
+      {"condition": "referenced_current", "artifact": "delivery_spec",
+       "missing": {"field": "delivery_spec", "message": "no active DeliverySpec"},
+       "referenced": [
+         {"field": "product_spec_hash", "target": "product_spec", "message": "delivery is not bound to the current ProductSpec"},
+         {"field": "effective_contract_hash", "target": "contract", "message": "delivery is not bound to the current effective contract"}
+       ]},
+      {"condition": "tree_matches", "recorded_in": "delivery_spec", "field": "code_snapshot_hash",
+       "message": "workspace snapshot no longer matches the current delivery"},
+      {"condition": "check_receipts", "department": "quality", "names": {"field": "checks", "trim": true},
+       "bind": [{"field": "product_spec_hash", "target": "product_spec"},
+                {"field": "effective_contract_hash", "target": "contract"},
+                {"field": "delivery_spec_hash", "target": "delivery_spec"}],
+       "activation": true,
+       "message": "quality must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"},
+      {"condition": "author_separation", "evaluated": "delivery_spec", "field": "issuer",
+       "message": "the department {department} authored the delivery it is evaluating; a department cannot evaluate its own artifact"}
+    ],
+    "structure": [
+      {"condition": "tree_matches", "recorded_in": "snapshot", "field": "code_snapshot_hash",
+       "missing": {"field": "snapshot", "message": "an onboarding proposal requires the code snapshot recorded when the run was created"},
+       "message": "the workspace tree {actual} no longer matches the snapshot {recorded}"},
+      {"condition": "check_receipts", "department": "engineering", "names": {"items": "build_and_test", "item": "name", "trim": true},
+       "bind": [{"field": "product_spec_hash", "target": "product_spec"}],
+       "activation": true,
+       "message": "no run_check receipt named {name} in this activation bound to the current snapshot and ProductSpec; call run_check with this name, then submit_structure again"}
+    ],
+    "baseline_review": [
+      {"condition": "referenced_current", "artifact": "structure",
+       "missing": {"field": "structure", "message": "the baseline review requires a structure description of the current ProductSpec"},
+       "referenced": [{"field": "product_spec_hash", "target": "product_spec", "error_field": "structure",
+                       "message": "the baseline review requires a structure description of the current ProductSpec"}]},
+      {"condition": "tree_matches", "recorded_in": "snapshot", "field": "code_snapshot_hash",
+       "missing": {"field": "snapshot", "message": "an onboarding proposal requires the code snapshot recorded when the run was created"},
+       "message": "the workspace tree {actual} no longer matches the snapshot {recorded}"},
+      {"condition": "check_receipts", "department": "quality", "names": {"field": "checks", "trim": true},
+       "bind": [{"field": "product_spec_hash", "target": "product_spec"}],
+       "activation": true,
+       "message": "quality must run {name} against the current snapshot and ProductSpec in this activation; prior receipts and engineering receipts are not reused"},
+      {"condition": "author_separation", "evaluated": "structure", "field": "issuer",
+       "message": "the department {department} authored the structure it is evaluating; a department cannot evaluate its own artifact"}
+    ]
+  },
   "shared": {
     "submit_tools": [],
     "kinds": {},

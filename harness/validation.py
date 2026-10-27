@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -18,7 +19,7 @@ from .models import (
     spec_content_hash,
 )
 from .actions import TreeFacts
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, ConditionNames, ProposalCondition
 from .projection import RunProjection
 
 # 建档初始 PRD 的边界条目用它标明「设计与需求文档描述而代码尚未实现」（设计第 4.2、4.3 节）。
@@ -96,6 +97,164 @@ def evaluate_proposal(
         )
 
 
+@dataclass
+class ConditionOutcome:
+    # 通用条件的结果：错误、绑定的检查回执（按检查名），以及 no_duplicate_content 算出的内容与摘要
+    errors: list[FieldError] = field(default_factory=list)
+    receipts: dict[str, dict[str, Any]] = field(default_factory=dict)
+    content: dict[str, Any] | None = None
+    content_hash: str | None = None
+
+
+@dataclass
+class _ConditionContext:
+    department: str
+    proposal: dict[str, Any]
+    projection: RunProjection
+    facts: TreeFacts
+
+
+# 条件读的当前成果：名称与 definitions/__init__.py 的 ArtifactName 一一对应
+_ARTIFACTS = {
+    "product_spec": lambda projection: projection.product_spec,
+    "delivery_spec": lambda projection: projection.delivery_spec,
+    "contract": lambda projection: projection.effective_contract,
+    "structure": lambda projection: projection.structure,
+    "snapshot": lambda projection: projection.snapshot,
+    "product_decisions": lambda projection: projection.product_decisions,
+}
+
+
+def evaluate_conditions(kind: str, *, department: str, proposal: dict[str, Any], projection: RunProjection,
+                        facts: TreeFacts) -> ConditionOutcome:
+    """按提案合同核对一种提案的通用条件（设计说明第 5.5 节）。
+
+    条件与参数来自 proposal_contracts.json，内核只按条件名分派：改合同数据就能放宽或收紧这条规则，
+    代码里不再写死哪一种成果要绑定哪一份当前版本。条件按合同里列出的顺序核对。
+    """
+    context = _ConditionContext(department=department, proposal=proposal, projection=projection, facts=facts)
+    outcome = ConditionOutcome()
+    for condition in DEFINITIONS.proposal_conditions(kind):
+        _CONDITION_CHECKS[condition.condition](condition, context, outcome)
+    return outcome
+
+
+def _current_artifact(projection: RunProjection, name: str) -> Any:
+    return _ARTIFACTS[name](projection)
+
+
+def _content_hash(value: Any) -> str | None:
+    # 当前成果的版本摘要：字典（结构说明、快照）与对象（正式成果的 dataclass）两种读法
+    return None if value is None else _artifact_field(value, "content_hash")
+
+
+def _artifact_field(value: Any, name: str) -> Any:
+    if isinstance(value, Mapping):
+        return value.get(name)
+    return getattr(value, name, None)
+
+
+def _missing_error(condition: ProposalCondition) -> list[FieldError]:
+    # 条件引用的成果不存在时的错误，由合同给出字段与理由
+    missing = condition.missing
+    return [] if missing is None else [FieldError(missing.field, missing.message)]
+
+
+def _condition_basis_current(condition: ProposalCondition, context: _ConditionContext, outcome: ConditionOutcome) -> None:
+    # 通用条件 1：引用的成果是当前版本（提案声明的依据版本与当前版本相同）
+    current = _content_hash(_current_artifact(context.projection, condition.target))
+    outcome.errors.extend(_basis_hash_errors(context.proposal, condition.field, current))
+
+
+def _condition_referenced_current(condition: ProposalCondition, context: _ConditionContext, outcome: ConditionOutcome) -> None:
+    # 通用条件 2：引用的成果所依据的成果也是当前版本
+    artifact = _current_artifact(context.projection, condition.artifact)
+    if artifact is None:
+        outcome.errors.extend(_missing_error(condition))
+        return
+    for item in condition.referenced:
+        current = _content_hash(_current_artifact(context.projection, item.target))
+        if _artifact_field(artifact, item.field) != current:
+            outcome.errors.append(FieldError(item.error_field or item.field, item.message))
+
+
+def _recorded_tree(projection: RunProjection, recorded_in: str) -> str | None:
+    # 成果记下的树摘要：建档时的快照或当前交付
+    if recorded_in == "snapshot":
+        snapshot = projection.snapshot
+        return None if snapshot is None else snapshot.get("tree_digest")
+    delivery = projection.delivery_spec
+    return None if delivery is None else delivery.code_tree_digest
+
+
+def _condition_tree_matches(condition: ProposalCondition, context: _ConditionContext, outcome: ConditionOutcome) -> None:
+    # 通用条件 4：工作区的树与引用的成果记下的树一致
+    recorded = _recorded_tree(context.projection, condition.recorded_in)
+    if recorded is None:
+        outcome.errors.extend(_missing_error(condition))
+        return
+    if context.facts.digest != recorded:
+        outcome.errors.append(FieldError(
+            condition.field, condition.message.format(actual=context.facts.digest, recorded=recorded)))
+
+
+def _condition_author_separation(condition: ProposalCondition, context: _ConditionContext, outcome: ConditionOutcome) -> None:
+    # 通用条件 5：提出评价类成果的部门不是被评价成果的作者部门（基础规则 3）
+    artifact = _current_artifact(context.projection, condition.evaluated)
+    if artifact is None:
+        return
+    author = _artifact_field(artifact, "issuer")
+    if author is not None and author == context.department:
+        outcome.errors.append(FieldError(
+            condition.field, condition.message.format(department=context.department)))
+
+
+def _condition_check_receipts(condition: ProposalCondition, context: _ConditionContext, outcome: ConditionOutcome) -> None:
+    # 通用条件 3：列出的检查都有主机执行的回执，回执来自这个会话的这一轮，并绑定当前的依据
+    names = _condition_check_names(condition.names, context.proposal)
+    activation = context.projection.last_activations.get(condition.department) if condition.activation else None
+    bindings = {item.field: _content_hash(_current_artifact(context.projection, item.target))
+                for item in condition.bind}
+    for name, field_name in names:
+        receipt = context.facts.latest_check(condition.department, name, activation_id=activation, **bindings)
+        if receipt is None:
+            outcome.errors.append(FieldError(field_name, condition.message.format(name=name)))
+            continue
+        outcome.receipts[name] = _receipt_evidence(receipt)
+
+
+def _condition_check_names(names: ConditionNames, proposal: dict[str, Any]) -> list[tuple[str, str]]:
+    # 提案里列出的检查名与它的错误字段：字符串列表，或对象列表里的名称字段
+    if names.field is not None:
+        values = proposal.get(names.field) or []
+        return [((item.strip() if names.trim else item), names.field) for item in values]
+    items = proposal.get(names.items) or []
+    return [((item[names.item].strip() if names.trim else item[names.item]),
+             f"{names.items}[{index}].{names.item}") for index, item in enumerate(items)]
+
+
+def _condition_no_duplicate_content(condition: ProposalCondition, context: _ConditionContext, outcome: ConditionOutcome) -> None:
+    # 通用条件 6：同样内容的成果不重复接纳；内容由合同列出，绑定当前版本的部分算在摘要里
+    content = {name: context.proposal[name].strip() for name in condition.content}
+    content.update({item.field: _content_hash(_current_artifact(context.projection, item.target))
+                    for item in condition.bind})
+    content_hash = canonical_hash(content)
+    if any(item.content_hash == content_hash for item in _current_artifact(context.projection, condition.collection)):
+        outcome.errors.append(FieldError(condition.field, condition.message))
+    outcome.content = content
+    outcome.content_hash = content_hash
+
+
+_CONDITION_CHECKS = {
+    "basis_current": _condition_basis_current,
+    "referenced_current": _condition_referenced_current,
+    "check_receipts": _condition_check_receipts,
+    "tree_matches": _condition_tree_matches,
+    "author_separation": _condition_author_separation,
+    "no_duplicate_content": _condition_no_duplicate_content,
+}
+
+
 def _evaluate_proposal(
     *,
     department: str,
@@ -125,17 +284,17 @@ def _evaluate_proposal(
         return ProposalDecision(False, errors)
 
     if kind == "product_spec":
-        return _accept_product_spec(proposal, projection)
+        return _accept_product_spec(proposal, projection, facts, department)
     if kind == "product_decision":
-        return _accept_product_decision(proposal, projection)
+        return _accept_product_decision(proposal, projection, facts, department)
     if kind == "delivery_spec":
-        return _accept_delivery(proposal, projection, facts)
+        return _accept_delivery(proposal, projection, facts, department)
     if kind == "qa_review":
-        return _accept_review(proposal, projection, facts)
+        return _accept_review(proposal, projection, facts, department)
     if kind == "structure":
-        return _accept_structure(proposal, projection, facts)
+        return _accept_structure(proposal, projection, facts, department)
     if kind == "baseline_review":
-        return _accept_baseline_review(proposal, projection, facts)
+        return _accept_baseline_review(proposal, projection, facts, department)
     return ProposalDecision(False, [FieldError("kind", "unhandled kind")])
 
 
@@ -251,17 +410,6 @@ def _record_list_errors(proposal: dict[str, Any], field: str, allowed: set[str],
     return errors
 
 
-def _unchanged_tree_errors(projection: RunProjection, facts: TreeFacts) -> list[FieldError]:
-    # 建档事项中部门没有写入工具，工作区的树摘要必须始终等于快照摘要（设计第 4.1、10 节第 6 项）
-    snapshot = projection.snapshot
-    if snapshot is None:
-        return [FieldError("snapshot", "an onboarding proposal requires the code snapshot recorded when the run was created")]
-    if facts.digest != snapshot["tree_digest"]:
-        return [FieldError("code_snapshot_hash",
-                           f"the workspace tree {facts.digest} no longer matches the snapshot {snapshot['tree_digest']}")]
-    return []
-
-
 def _location_errors(field: str, values: list[Any], facts: TreeFacts) -> list[FieldError]:
     # 结构说明里写出的位置必须是工作区公开树中真实存在的路径（文件或目录前缀）
     errors: list[FieldError] = []
@@ -359,13 +507,14 @@ def _baseline_omission_records(proposal: dict[str, Any], facts: TreeFacts) -> tu
     return records, errors
 
 
-def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
+def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
+                         department: str) -> ProposalDecision:
     if projection.input_version != projection.product_work_input_version:
         return ProposalDecision(False, [FieldError("input_version", "new user input must enter product work before requirements can be accepted")])
-    current_hash = None if projection.product_spec is None else projection.product_spec.content_hash
-    basis_errors = _basis_hash_errors(proposal, "basis_product_spec_hash", current_hash)
-    if basis_errors:
-        return ProposalDecision(False, basis_errors)
+    outcome = evaluate_conditions("product_spec", department=department, proposal=proposal,
+                                  projection=projection, facts=facts)
+    if outcome.errors:
+        return ProposalDecision(False, outcome.errors)
     if projection.product_spec is not None and proposal.get("change_record") is None:
         return ProposalDecision(False, [FieldError("change_record", "a revised ProductSpec must explain changed, retained, and retired behavior and its rationale")])
     active_hashes = {item.content_hash for item in projection.effective_decisions}
@@ -390,50 +539,34 @@ def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection) ->
     return ProposalDecision(True, artifact=artifact)
 
 
-def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection) -> ProposalDecision:
+def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
+                             department: str) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "a product decision requires an active ProductSpec")])
-    payload = {"statement": proposal["statement"].strip(), "rationale": proposal["rationale"].strip(),
-               "product_spec_hash": projection.product_spec.content_hash}
-    content_hash = canonical_hash(payload)
-    if any(item.content_hash == content_hash for item in projection.product_decisions):
-        return ProposalDecision(False, [FieldError("statement", "this product decision has already been accepted")])
-    return ProposalDecision(True, artifact={**payload, "kind": "product_decision", "content_hash": content_hash})
+    outcome = evaluate_conditions("product_decision", department=department, proposal=proposal,
+                                  projection=projection, facts=facts)
+    if outcome.errors:
+        return ProposalDecision(False, outcome.errors)
+    return ProposalDecision(True, artifact={**(outcome.content or {}), "kind": "product_decision",
+                                            "content_hash": outcome.content_hash})
 
 
-def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
+def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
+                     department: str) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     contract = projection.effective_contract
     if contract is None:
         return ProposalDecision(False, [FieldError("effective_contract", "delivery requires a current effective contract")])
-    errors: list[FieldError] = []
-    errors.extend(_basis_hash_errors(proposal, "basis_product_spec_hash", projection.product_spec.content_hash))
+    # 依据版本与检查回执由合同里的通用条件核对（设计说明第 5.5 节）：绑定当前 ProductSpec 与合同、来自这一轮
+    outcome = evaluate_conditions("delivery_spec", department=department, proposal=proposal,
+                                  projection=projection, facts=facts)
+    if outcome.errors:
+        return ProposalDecision(False, outcome.errors)
     # 交付的文件清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）。
     # 工程不再填清单——三份真实交付的清单只写了「这次改的那个文件」，用户按清单下载拿不全成果。
     files = sorted(item.replace("\\", "/") for item in facts.files)
-    checks = []
-    for name in proposal["check_names"]:
-        receipt = facts.latest_check(
-            "engineering",
-            name,
-            product_spec_hash=projection.product_spec.content_hash,
-            effective_contract_hash=contract.content_hash,
-            activation_id=projection.last_activations.get("engineering"),
-        )
-        if receipt is None:
-            errors.append(
-                FieldError(
-                    "check_names",
-                    f"no run_check receipt named {name} in this activation for the current snapshot and effective contract. "
-                    f"Call run_check with the name {name} on the current workspace, then submit_delivery again; "
-                    "bash results are action receipts and do not count as check receipts.",
-                )
-            )
-            continue
-        checks.append(_receipt_evidence(receipt))
-    if errors:
-        return ProposalDecision(False, errors)
+    checks = [outcome.receipts[name] for name in proposal["check_names"] if name in outcome.receipts]
     previous = projection.delivery_specs[-1] if projection.delivery_specs else None
     parent = previous.content_hash if previous else None
     revision = (previous.revision + 1) if previous else 1
@@ -459,7 +592,8 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
     return ProposalDecision(True, artifact=artifact)
 
 
-def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
+def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
+                   department: str) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象。
@@ -472,35 +606,14 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
     contract = projection.effective_contract
     if contract is None:
         return ProposalDecision(False, [FieldError("effective_contract", "quality review requires a current contract")])
-    errors: list[FieldError] = []
-    errors.extend(_basis_hash_errors(proposal, "basis_delivery_spec_hash", projection.delivery_spec.content_hash))
-    if projection.delivery_spec.product_spec_hash != projection.product_spec.content_hash:
-        errors.append(FieldError("product_spec_hash", "delivery is not bound to the current ProductSpec"))
-    if projection.delivery_spec.effective_contract_hash != contract.content_hash:
-        errors.append(FieldError("effective_contract_hash", "delivery is not bound to the current effective contract"))
-    if projection.delivery_spec.code_tree_digest != facts.digest:
-        errors.append(FieldError("code_snapshot_hash", "workspace snapshot no longer matches the current delivery"))
+    # 依据版本、交付绑定的当前版本、工作区的树与检查回执都由合同里的通用条件核对（设计说明第 5.5 节），
+    # 提出评价的部门与交付的作者部门分开也由通用条件核对（基础规则 3）
+    outcome = evaluate_conditions("qa_review", department=department, proposal=proposal,
+                                  projection=projection, facts=facts)
+    errors: list[FieldError] = list(outcome.errors)
     check_names, name_errors = _qa_check_names(proposal)
     errors.extend(name_errors)
-    bound_checks = []
-    for name in check_names:
-        receipt = facts.latest_check(
-            "quality",
-            name,
-            product_spec_hash=projection.product_spec.content_hash,
-            effective_contract_hash=contract.content_hash,
-            delivery_spec_hash=projection.delivery_spec.content_hash,
-            activation_id=projection.last_activations.get("quality"),
-        )
-        if receipt is None:
-            errors.append(
-                FieldError(
-                    "checks",
-                    f"quality must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused",
-                )
-            )
-            continue
-        bound_checks.append(_receipt_evidence(receipt))
+    bound_checks = [outcome.receipts[name] for name in check_names if name in outcome.receipts]
     verdict = proposal["verdict"]
     if verdict == "release":
         if any(item["exit_code"] != 0 for item in bound_checks):
@@ -539,13 +652,17 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
     return ProposalDecision(True, artifact=artifact, ends_run=verdict == "release")
 
 
-def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
+def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
+                      department: str) -> ProposalDecision:
     # 现有结构说明（docs/design/existing-project-onboarding.md 第 4.4 节）：构建与测试的每一项都要有本次激活中
-    # 绑定当前快照与当前初始 PRD 的 run_check 回执，退出状态照实记录（不要求为 0）；建档中工作区的树不变
+    # 绑定当前快照与当前初始 PRD 的 run_check 回执，退出状态照实记录（不要求为 0）；建档中工作区的树不变。
+    # 树与回执由合同里的通用条件核对（设计说明第 5.5 节）
     spec = projection.product_spec
     if spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
-    errors = _unchanged_tree_errors(projection, facts)
+    outcome = evaluate_conditions("structure", department=department, proposal=proposal,
+                                  projection=projection, facts=facts)
+    errors: list[FieldError] = list(outcome.errors)
     for index, item in enumerate(proposal["modules"]):
         errors.extend(_location_errors(f"modules[{index}].path", [item["path"]], facts))
     for index, item in enumerate(proposal["entry_points"]):
@@ -562,23 +679,13 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
         errors.append(FieldError("requirement_locations",
                                  "requirement_locations must record every requirement of the current ProductSpec exactly once; "
                                  f"missing: {missing or 'none'}; not in the current ProductSpec: {extra or 'none'}"))
-    activation_id = projection.last_activations.get("engineering")
-    build_and_test = []
-    for index, item in enumerate(proposal["build_and_test"]):
-        receipt = facts.latest_check("engineering", item["name"].strip(), product_spec_hash=spec.content_hash,
-                                     activation_id=activation_id)
-        if receipt is None:
-            errors.append(FieldError(
-                f"build_and_test[{index}].name",
-                f"no run_check receipt named {item['name'].strip()} in this activation bound to the current snapshot and "
-                "ProductSpec; call run_check with this name, then submit_structure again",
-            ))
-            continue
-        build_and_test.append({**item, "name": item["name"].strip(), "purpose": item["purpose"].strip(),
-                               "command": item["command"].strip(),
-                               "receipt": _receipt_evidence(receipt)})
     if errors:
         return ProposalDecision(False, errors)
+    build_and_test = []
+    for item in proposal["build_and_test"]:
+        name = item["name"].strip()
+        build_and_test.append({**item, "name": name, "purpose": item["purpose"].strip(),
+                               "command": item["command"].strip(), "receipt": outcome.receipts[name]})
     previous = projection.structures[-1] if projection.structures else None
     parent = previous["content_hash"] if previous else None
     revision = (previous["revision"] + 1) if previous else 1
@@ -608,30 +715,22 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
     return ProposalDecision(True, artifact=artifact)
 
 
-def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts) -> ProposalDecision:
+def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
+                            department: str) -> ProposalDecision:
     # 基线核验（docs/design/existing-project-onboarding.md 第 4.5 节）：逐条结论覆盖初始 PRD 的每条要求，
-    # 基线检查绑定当前快照与当前 ProductSpec，退出状态不为 0 的检查都有说明；这里不使用普通事项的放行规则
+    # 基线检查绑定当前快照与当前 ProductSpec，退出状态不为 0 的检查都有说明；这里不使用普通事项的放行规则。
+    # 结构说明对应当前 PRD、工作区的树与检查回执由合同里的通用条件核对（设计说明第 5.5 节）
     spec = projection.product_spec
     if spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     structure = projection.structure
-    if structure is None or structure["product_spec_hash"] != spec.content_hash:
-        return ProposalDecision(False, [FieldError("structure", "the baseline review requires a structure description of the current ProductSpec")])
-    errors = _unchanged_tree_errors(projection, facts)
+    outcome = evaluate_conditions("baseline_review", department=department, proposal=proposal,
+                                  projection=projection, facts=facts)
+    errors: list[FieldError] = list(outcome.errors)
     check_names, name_errors = _qa_check_names(proposal)
     errors.extend(name_errors)
-    activation_id = projection.last_activations.get("quality")
-    bound: dict[str, dict[str, Any]] = {}
-    for name in check_names:
-        receipt = facts.latest_check("quality", name, product_spec_hash=spec.content_hash, activation_id=activation_id)
-        if receipt is None:
-            errors.append(FieldError(
-                "checks",
-                f"quality must run {name} against the current snapshot and ProductSpec in this activation; "
-                "prior receipts and engineering receipts are not reused",
-            ))
-            continue
-        bound[name] = _receipt_evidence(receipt)
+    bound: dict[str, dict[str, Any]] = {name: outcome.receipts[name] for name in check_names
+                                        if name in outcome.receipts}
     conclusions, conclusion_errors = _baseline_conclusions(proposal, spec, bound, facts)
     errors.extend(conclusion_errors)
     omissions, omission_errors = _baseline_omission_records(proposal, facts)
@@ -669,7 +768,7 @@ def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection,
         "other_failures": [{"check": item["check"].strip(), "reason": item["reason"].strip()}
                            for item in proposal.get("other_failures", [])],
         "product_spec_hash": spec.content_hash,
-        "structure_hash": structure["content_hash"],
+        "structure_hash": None if structure is None else structure["content_hash"],
         "code_snapshot_hash": facts.digest,
     }
     artifact = {

@@ -188,12 +188,126 @@ class ProposalContract(_Definition):
     freeze_kinds = _frozen("kinds")
 
 
+# 提案合同里的通用条件（设计说明第 5.5 节）：内核按合同核对，成果驱动写死的关系规则改写成这几种。
+# 条件名与参数是封闭清单，装载定义时逐条核对；写错的条件在程序启动时以 DefinitionError 报出。
+ConditionName = Literal["basis_current", "referenced_current", "check_receipts", "tree_matches",
+                        "author_separation", "no_duplicate_content"]
+# 条件读的成果：名称与运行状态投影里的当前版本一一对应（validation.py 的条件实现）
+ArtifactName = Literal["product_spec", "delivery_spec", "contract", "structure", "snapshot", "product_decisions"]
+
+
+class ConditionBinding(_Definition):
+    # 绑定到当前版本的一处：field 是登记在回执或内容摘要上的字段名，target 是取当前版本的成果
+    field: Identifier
+    target: ArtifactName
+
+
+class ReferencedField(_Definition):
+    # 被引用的成果里要等于当前版本的字段，与不相等时的拒绝理由；错误指向哪一字段可以另写
+    field: Identifier
+    target: ArtifactName
+    message: str = Field(min_length=1)
+    error_field: Identifier | None = None
+
+
+class ConditionFailure(_Definition):
+    # 被引用的成果不存在时的错误字段与理由
+    field: str = Field(min_length=1)
+    message: str = Field(min_length=1)
+
+
+class ConditionNames(_Definition):
+    # 列出的检查名在提案里的位置：field 是字符串列表，items + item 是对象列表里的名称字段
+    field: Identifier | None = None
+    items: Identifier | None = None
+    item: Identifier | None = None
+    # 名称去掉首尾空白以后再核对（两种提交工具的提案合同写法不同）
+    trim: bool = False
+
+    @model_validator(mode="after")
+    def _shape(self) -> "ConditionNames":
+        if self.field is not None and (self.items is not None or self.item is not None):
+            raise ValueError("names names either a string list field or an object list with an item field")
+        if self.field is None and (self.items is None or self.item is None):
+            raise ValueError("names requires field, or items together with item")
+        return self
+
+
+# 每种条件用到哪些参数：装载时按它核对，多写的参数与缺少的参数各自报出（设计说明第 5.5 节）
+_CONDITION_PARAMETERS: dict[str, frozenset[str]] = {
+    "basis_current": frozenset({"field", "target"}),
+    "referenced_current": frozenset({"artifact", "referenced", "missing"}),
+    "check_receipts": frozenset({"department", "names", "bind", "activation", "message"}),
+    "tree_matches": frozenset({"recorded_in", "field", "message", "missing"}),
+    "author_separation": frozenset({"evaluated", "field", "message"}),
+    "no_duplicate_content": frozenset({"collection", "content", "bind", "field", "message"}),
+}
+# 其中必须写出的参数：引用的成果一定存在时（例如有前置检查保证）可以不写 missing
+_CONDITION_REQUIRED: dict[str, frozenset[str]] = {
+    "basis_current": frozenset({"field", "target"}),
+    "referenced_current": frozenset({"artifact", "referenced"}),
+    "check_receipts": frozenset({"department", "names", "bind"}),
+    "tree_matches": frozenset({"recorded_in", "field", "message"}),
+    "author_separation": frozenset({"evaluated", "field", "message"}),
+    "no_duplicate_content": frozenset({"collection", "content", "bind", "field", "message"}),
+}
+
+
+class ProposalCondition(_Definition):
+    # 一条通用条件：条件名决定用到哪些参数，其余字段留空
+    condition: ConditionName
+    # basis_current：提案里声明依据版本的字段；tree_matches、author_separation：错误指向的字段；
+    # no_duplicate_content：错误指向的提案字段
+    field: str = ""
+    # basis_current：依据的是哪一份成果
+    target: ArtifactName | None = None
+    # referenced_current：引用的是哪一份成果
+    artifact: ArtifactName | None = None
+    # referenced_current：被引用的成果里要求等于当前版本的字段
+    referenced: tuple[ReferencedField, ...] = ()
+    # referenced_current：被引用的成果不存在时怎么写错误
+    missing: ConditionFailure | None = None
+    # tree_matches：树摘要是哪一份成果记下的（建档时的快照或当前交付）
+    recorded_in: Literal["snapshot", "delivery_spec"] | None = None
+    # author_separation：评价的是哪一份成果
+    evaluated: ArtifactName | None = None
+    # check_receipts：列出的检查名在提案里的位置、在哪个部门取回执、回执绑定哪些当前版本、是否必须是这一轮
+    names: ConditionNames | None = None
+    department: Identifier | None = None
+    bind: tuple[ConditionBinding, ...] = ()
+    activation: bool = False
+    # no_duplicate_content：与哪一份已接纳成果的历史比较，内容由哪些提案字段组成
+    collection: ArtifactName | None = None
+    content: tuple[str, ...] = ()
+    # 不满足时的拒绝理由（check_receipts 里 {name} 换成检查名）
+    message: str = ""
+
+    @model_validator(mode="after")
+    def _parameters(self) -> "ProposalCondition":
+        parameters = _CONDITION_PARAMETERS[self.condition]
+        provided = set(self.model_fields_set) - {"condition"}
+        unknown = sorted(provided - parameters)
+        if unknown:
+            raise ValueError(f"{self.condition} does not take {', '.join(unknown)}")
+        absent = sorted(_CONDITION_REQUIRED[self.condition] - provided)
+        if absent:
+            raise ValueError(f"{self.condition} requires {', '.join(absent)}")
+        if "message" in parameters and not self.message.strip():
+            raise ValueError("message must be a non-empty string")
+        if "field" in parameters and not self.field.strip():
+            raise ValueError("field must be a non-empty string")
+        return self
+
+
 class ProposalContracts(_Definition):
     # 各角色自己的部分；shared 是每个角色都有的部分（协作请求、回应与指导的回应），接在角色自己的部分之后
     roles: Mapping[Identifier, ProposalContract]
     shared: ProposalContract
+    # 各提案种类的通用条件（设计说明第 5.5 节）：键是提案种类，值是按顺序核对的条件
+    conditions: Mapping[Identifier, tuple[ProposalCondition, ...]] = Field(default_factory=dict)
 
     freeze_roles = _frozen("roles")
+    freeze_conditions = _frozen("conditions")
 
 
 Protocol = Literal["responses", "chat_completions", "messages"]
@@ -373,6 +487,10 @@ class Definitions(_Definition):
         notes = [*own_notes, *(work.notes if work is not None else ()), *shared.notes]
         return {"submit_tools": submit_tools, "kinds": thaw(kinds), "notes": notes}
 
+    def proposal_conditions(self, kind: str) -> tuple[ProposalCondition, ...]:
+        # 一种提案的通用条件（设计说明第 5.5 节）：按合同里列出的顺序由内核核对；没有列出时没有通用条件
+        return self.proposal_contracts.conditions.get(kind, ())
+
     def stop_reason(self, reason: str) -> StopReason:
         # 停止原因只来自定义中的清单
         definition = self.stop_reasons.get(reason)
@@ -505,6 +623,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         elif tool.proposal is not None:
             submitters[tool.proposal] = name
     issues.extend(_contract_references(parts["proposal_contracts"], roles, tools, parts["work_items"]))
+    issues.extend(_condition_references(parts["proposal_contracts"], organization))
     presets: ServicePresets = parts["service_presets"]
     identities = [preset.id for preset in presets.presets]
     for index, identity in enumerate(identities):
@@ -601,6 +720,20 @@ def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], t
         elif described != kinds:
             issues.append((file, f"roles.{name}.kinds",
                            "与共同部分合起来必须恰好说明这些提案种类：" + "、".join(sorted(kinds))))
+    return issues
+
+
+def _condition_references(contracts: ProposalContracts, organization: Organization) -> list[tuple[str, str, str]]:
+    # 提案合同里的通用条件（设计说明第 5.5 节）：取回执的部门在组织里。条件的种类与提案字段
+    # 与其他定义的关系不在这里核对：条件只在内核核对一种提案时按名字查，取不到时提交被拒绝，不会静默放过
+    issues: list[tuple[str, str, str]] = []
+    file = "proposal_contracts.json"
+    members = {department.id for department in organization.departments}
+    for kind, conditions in contracts.conditions.items():
+        for index, condition in enumerate(conditions):
+            if condition.department is not None and condition.department not in members:
+                issues.append((file, f"conditions.{kind}[{index}].department",
+                               f"部门 {condition.department} 不属于任何组织"))
     return issues
 
 
