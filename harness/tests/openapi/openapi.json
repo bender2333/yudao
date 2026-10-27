@@ -14475,6 +14475,45 @@
       "BaselineReviewAcceptedPayload": {
         "additionalProperties": false,
         "properties": {
+          "artifact_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Version"
+          },
+          "artifact_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Artifact Basis",
+            "type": "object"
+          },
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "verdict": {
             "enum": [
               "consistent",
@@ -16733,6 +16772,45 @@
       "ContractAcceptedPayload": {
         "additionalProperties": false,
         "properties": {
+          "artifact_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Version"
+          },
+          "artifact_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Artifact Basis",
+            "type": "object"
+          },
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "product_spec_hash": {
             "title": "Product Spec Hash",
             "type": "string"
@@ -17798,6 +17876,45 @@
       "DeliveryAcceptedPayload": {
         "additionalProperties": false,
         "properties": {
+          "artifact_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Version"
+          },
+          "artifact_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Artifact Basis",
+            "type": "object"
+          },
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "summary": {
             "title": "Summary",
             "type": "string"
@@ -24842,6 +24959,45 @@
       "ProductDecisionAcceptedPayload": {
         "additionalProperties": false,
         "properties": {
+          "artifact_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Version"
+          },
+          "artifact_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Artifact Basis",
+            "type": "object"
+          },
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "statement": {
             "title": "Statement",
             "type": "string"
@@ -27183,6 +27339,45 @@
       "QaSubmittedPayload": {
         "additionalProperties": false,
         "properties": {
+          "artifact_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Version"
+          },
+          "artifact_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Artifact Basis",
+            "type": "object"
+          },
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "product_spec_hash": {
             "title": "Product Spec Hash",
             "type": "string"
@@ -29508,6 +29703,45 @@
       "SpecAcceptedPayload": {
         "additionalProperties": false,
         "properties": {
+          "artifact_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Version"
+          },
+          "artifact_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Artifact Basis",
+            "type": "object"
+          },
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "goal": {
             "title": "Goal",
             "type": "string"
@@ -29938,6 +30172,45 @@
       "StructureAcceptedPayload": {
         "additionalProperties": false,
         "properties": {
+          "artifact_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Kind"
+          },
+          "artifact_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Version"
+          },
+          "artifact_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Artifact Basis",
+            "type": "object"
+          },
+          "artifact_ref": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "overall": {
             "title": "Overall",
             "type": "string"

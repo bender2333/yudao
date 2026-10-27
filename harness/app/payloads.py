@@ -41,6 +41,18 @@ class ArtifactRef(Payload):
     media_type: str | None
 
 
+class AcceptanceFields(Payload):
+    # 成果接纳事件的统一字段（骨架与应用设计说明第 4 节、第 5.4 节第 6 条）：成果种类、版本、依据与
+    # 内容摘要。只增不改；最小投影按这组字段折叠，加一种成果种类不改最小投影的代码。旧事件没有这几个
+    # 字段，所以都有缺省值：没有 artifact_kind 的事件不是按统一字段接纳的成果。
+    artifact_kind: str | None = None
+    artifact_version: int | None = None
+    # 这一版依据的成果版本：成果种类 → 内容摘要
+    artifact_basis: dict[str, str] = Field(default_factory=dict)
+    # 这一版内容的工件引用（内容摘要），按它取内容；内容就在载荷里时为空
+    artifact_ref: ArtifactRef | None = None
+
+
 class GitVersion(Payload):
     commit: str
     parent_commit: str | None
@@ -637,7 +649,7 @@ class ChangeRecord(Payload):
     rationale: str
 
 
-class SpecAcceptedPayload(Payload):
+class SpecAcceptedPayload(AcceptanceFields):
     goal: str
     requirements: list[str]
     boundaries: list[str]
@@ -658,7 +670,7 @@ class SpecAcceptedPayload(Payload):
     git_version: GitVersion
 
 
-class ContractAcceptedPayload(Payload):
+class ContractAcceptedPayload(AcceptanceFields):
     product_spec_hash: str
     decision_hashes: list[str]
     input_version: int
@@ -668,7 +680,7 @@ class ContractAcceptedPayload(Payload):
     git_version: GitVersion
 
 
-class ProductDecisionAcceptedPayload(Payload):
+class ProductDecisionAcceptedPayload(AcceptanceFields):
     # git_version 在同一次接纳改变了有效合同时出现
     statement: str
     rationale: str
@@ -705,7 +717,7 @@ class AskAnsweredPayload(Payload):
 
 
 
-class DeliveryAcceptedPayload(Payload):
+class DeliveryAcceptedPayload(AcceptanceFields):
     summary: str
     files: list[str]
     check_names: list[str]
@@ -730,7 +742,7 @@ class Defect(Payload):
     summary: str
 
 
-class QaSubmittedPayload(Payload):
+class QaSubmittedPayload(AcceptanceFields):
     product_spec_hash: str
     effective_contract_hash: str
     delivery_spec_hash: str
@@ -781,7 +793,7 @@ class StructureRequirementLocation(Payload):
     locations: list[str]
 
 
-class StructureAcceptedPayload(Payload):
+class StructureAcceptedPayload(AcceptanceFields):
     overall: str
     modules: list[StructureModule]
     entry_points: list[StructureEntryPoint]
@@ -818,7 +830,7 @@ class BaselineOtherFailure(Payload):
     reason: str
 
 
-class BaselineReviewAcceptedPayload(Payload):
+class BaselineReviewAcceptedPayload(AcceptanceFields):
     verdict: Literal["consistent", "rework_product"]
     conclusions: list[BaselineConclusion]
     omissions: list[BaselineOmission]
