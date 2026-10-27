@@ -7,6 +7,7 @@ import uuid
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.collaboration import is_working
 from harness.environment import QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
 from harness.models import ArtifactRef, EventType, json_dumps
@@ -15,6 +16,7 @@ from harness.proposals import (
     answer_turn,
     ask_turn,
     delivery_turn,
+    product_decision,
     product_spec,
     product_spec_turn,
     review,
@@ -456,6 +458,90 @@ def test_engineering_receives_the_new_prd_version_and_delivers_against_it(tmp_pa
     assert delivery.payload["effective_contract_hash"] == projection.effective_contract.content_hash
     released = [event for event in events if event.type == EventType.QA_SUBMITTED]
     assert released and released[0].payload.get("verdict") == "release"
+
+
+def test_a_product_decision_is_a_notification_to_the_other_departments(tmp_path: Path) -> None:
+    # 验收第 2 条（#1079，部门指导设计说明第 2.1 节第 2 点）：产品记录了补充决定以后，
+    # 正在一轮工作中的工程与质检在下一步的 work_notification 里收到新种类的通知，
+    # 内容含决定的陈述与理由；写下这条决定的产品会话不收到
+    holder: dict[str, object] = {}
+    seen: dict[str, object] = {}
+    statement = "Uppercase all output"
+    rationale = "输入要求输出大写，作为补充决定写进合同。"
+
+    def decide_while_the_others_work(call):
+        # 产品这一轮等工程与质检都在一轮工作中，再提交决定（两个部门一开始就在工作）；
+        # 随后加一条指导，让产品在决定之后另有一轮，那一步核对它不收到自己的决定
+        for _ in range(200):
+            projection = holder["system"].project(call.run_id)
+            if is_working(projection, "engineering") and is_working(projection, "quality"):
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
+        holder["system"].add_guidance(call.run_id, "product", "请确认这条决定已经记下。")
+        return product_decision(statement, rationale)
+
+    def engineering_keeps_working(call):
+        # 工程这一轮先不结束：等产品决定记下以后，下一步收到通知再交付
+        for _ in range(200):
+            if holder["system"].project(call.run_id).product_decisions:
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
+        return FakeTurn(writes={"src/echo.py": ECHO})
+
+    def engineering_delivers(call):
+        seen["engineering"] = prompt_part(call, "work_notification")
+        return delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)(call)
+
+    def quality_keeps_working(call):
+        # 质检这一轮同样等到决定记下，下一步收到通知
+        for _ in range(200):
+            if holder["system"].project(call.run_id).product_decisions:
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
+        identity = f"read-{call.activation_id}-{call.step_id}"
+        return ModelResponse(output=[_call(identity, "list_files", {})])
+
+    def quality_explores(call):
+        seen["quality"] = prompt_part(call, "work_notification")
+        return _explore()
+
+    def product_after_the_decision(call):
+        seen["product"] = prompt_part(call, "work_notification")
+        return guidance_reply()(call)
+
+    adapter = FakeAdapter({
+        "product": [product_spec(), decide_while_the_others_work, product_after_the_decision],
+        "engineering": [engineering_keeps_working, engineering_delivers],
+        "quality": [quality_keeps_working, quality_explores,
+                    *quality_turns("release", "checks passed on the current snapshot")],
+    }, stream_gap_sec=0.01)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("build an echo CLI")
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请把输出改为大写，作为补充决定写下来。")
+    projection = system.run_until_stop(run_id)
+    assert projection.status == "done", projection.stop_reason
+
+    events = _events(system, run_id)
+    [accepted] = [event for event in events if event.type == EventType.PRODUCT_DECISION_ACCEPTED]
+
+    # 工程在下一步收到新种类的通知，内容是决定的陈述与理由
+    assert seen["engineering"], "工程没有收到通知"
+    notification = json.loads(seen["engineering"])
+    recorded = [item for item in notification if item["kind"] == "product_decision_recorded"]
+    assert len(recorded) == 1, notification
+    assert recorded[0]["statement"] == statement
+    assert recorded[0]["rationale"] == rationale
+    assert recorded[0]["content_hash"] == accepted.payload["content_hash"]
+    # 质检在下一步同样收到
+    assert seen["quality"], "质检没有收到通知"
+    notification = json.loads(seen["quality"])
+    assert [item for item in notification if item["kind"] == "product_decision_recorded"] == recorded
+    # 写下这条决定的产品会话在自己的下一步不收到它
+    product_notification = seen["product"]
+    kinds = [item["kind"] for item in json.loads(product_notification)] if product_notification else []
+    assert "product_decision_recorded" not in kinds, kinds
 
 
 def test_the_inspection_workspace_survives_the_ask_and_is_rebuilt_by_a_new_delivery(tmp_path: Path) -> None:
