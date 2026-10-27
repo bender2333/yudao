@@ -8,7 +8,7 @@
 #
 # 不做：不写事件（结果经薄驱动交给写入口）、不调模型、不核对边界、不执行工具。
 #
-# 本模块只导入内核（models、definitions）与标准库，以及契约圈的 contract_versions；实现（这一版是
+# 本模块只导入内核（kernel_events、definitions）与标准库，以及契约圈的 contract_versions；实现（这一版是
 # harness/watched_outputs.py）声明它实现的版本，薄驱动在一个发布里接受当前版与上一版。第二种路由是同一副
 # 骨架上的另一个实现：它自己登记名称与一份定义，不改这个模块（设计说明第 5.4 节）。
 #
@@ -23,7 +23,10 @@ from typing import Any, Protocol
 
 from . import contract_versions
 from .definitions import DEFINITIONS
-from .models import Event, RunProjection
+# 事件信封从内核事件模块导入。运行流的投影与部门 Prompt 是应用侧的类（harness/models.py），
+# 契约模块不导入应用（harness/tests/test_contract_modules.py 的导入方向），所以这两处按 Any 标注，
+# 具体的类型由实现（这一版是 orchestrator.py 与 assembly.py）给出。
+from .kernel_events import Event
 
 # 这一版契约的版本号；上一版是第一版（结果的种类还写在执行契约里，工单 #826）
 CURRENT_VERSION = 2
@@ -115,29 +118,29 @@ class Routing(Protocol):
         # 几种名称互相对得上。不合格时抛出 InvalidRoutingDefinition，逐项写明是哪一项
         ...
 
-    def ready_departments(self, view: RunProjection, *, waiting: set[str] | None = None) -> list[str]:
+    def ready_departments(self, view: Any, *, waiting: set[str] | None = None) -> list[str]:
         # 现在让哪些部门开始一轮工作（按定义里的部门顺序）
         ...
 
-    def next_department(self, view: RunProjection, *, waiting: set[str] | None = None) -> str | None:
+    def next_department(self, view: Any, *, waiting: set[str] | None = None) -> str | None:
         # 下一个开始一轮工作的部门（单步入口用一次一个；同一时刻一个部门最多一轮工作）
         ...
 
-    def department_ready(self, view: RunProjection, *, department: str,
+    def department_ready(self, view: Any, *, department: str,
                          waiting: set[str] | None = None) -> bool:
         # 这个部门现在能不能开始一轮工作：准备激活的事务里由薄驱动再问一次
         ...
 
-    def work_reference(self, view: RunProjection, *, department: str) -> Any:
+    def work_reference(self, view: Any, *, department: str) -> Any:
         # 这一轮工作的路由自己的工作引用（例如任务池的任务），原样交给装配与执行（设计说明第 5.1 节输出、
         # 第 5.4 节第 4 条）；不用它时为空。任务池不在这里：成果驱动不用
         ...
 
-    def round_end(self, view: RunProjection, events: list[Event], *, department: str, session_id: str | None,
+    def round_end(self, view: Any, events: list[Event], *, department: str, session_id: str | None,
                   activation_id: str) -> RoundEnd | None:
         # 这一轮以什么结束；不是正常结束的一轮（暂停、失败）返回 None
         ...
 
-    def item_end(self, view: RunProjection) -> ItemEnd | None:
+    def item_end(self, view: Any) -> ItemEnd | None:
         # 事项以什么结束；还可以继续时返回 None
         ...

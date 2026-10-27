@@ -26,7 +26,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .models import Event, EventType
+from .kernel_events import Event, SkeletonEventType
 
 # 事项创建事件里记下的代码树快照在这种成果种类下折叠：建档的树一致条件（通用条件 4）读它的树摘要
 SNAPSHOT_KIND = "snapshot"
@@ -182,7 +182,7 @@ class _Fold:
         payload = event.payload if isinstance(event.payload, dict) else {}
         etype = event.type
         session_id = event.session_id or ""
-        if etype == EventType.DEPARTMENT_ACTIVATED:
+        if etype == SkeletonEventType.DEPARTMENT_ACTIVATED:
             # 一轮工作的开始：轮次编号由主线会话递增，询问分支沿用当前的轮次，所以事项一级的激活次数
             # 取出现过的最大轮次编号与主线会话的激活次数里较大的那一个（工单 #857）
             cycle = int(payload.get("cycle") or 0)
@@ -197,23 +197,23 @@ class _Fold:
             self.sessions[session_id] = replace(session, activations=session.activations + 1,
                                                 round_id=payload.get("activation_id") or session.round_id)
             return
-        if etype == EventType.ACTIVATION_FINISHED:
+        if etype == SkeletonEventType.ACTIVATION_FINISHED:
             # 一轮工作的结束：已结算的运行时间与模型步数是这一刻为止的累计值，中断的那一段不计
             self.used = replace(self.used, settled_ms=max(self.used.settled_ms, int(payload.get("elapsed_ms") or 0)))
             session = self.sessions.get(session_id, SessionState())
             self.sessions[session_id] = replace(session, settled_ms=max(
                 session.settled_ms, int(payload.get("session_elapsed_ms") or 0)), settled_steps=session.model_steps)
             return
-        if etype == EventType.MODEL_REQUESTED:
+        if etype == SkeletonEventType.MODEL_REQUESTED:
             # 模型步数按请求一条条数（设计说明第 4 节 2026-10-25 第 1 条）
             self.used = replace(self.used, model_steps=self.used.model_steps + 1)
             session = self.sessions.get(session_id, SessionState())
             self.sessions[session_id] = replace(session, model_steps=session.model_steps + 1)
             return
-        if etype == EventType.DECISION_REQUESTED:
+        if etype == SkeletonEventType.DECISION_REQUESTED:
             self.pending.append(event.event_id)
             return
-        if etype in (EventType.DECISION_ANSWERED, EventType.DECISION_WITHDRAWN):
+        if etype in (SkeletonEventType.DECISION_ANSWERED, SkeletonEventType.DECISION_WITHDRAWN):
             decision_id = payload.get("decision_id")
             if isinstance(decision_id, str) and decision_id in self.pending:
                 self.pending.remove(decision_id)
@@ -231,7 +231,7 @@ def _fold_run(state: MinimalProjection, event: Event) -> MinimalProjection:
     # 状态只看事项的状态事件（设计说明第 4 节）：其他事件的前后状态不在这里重新推断
     payload = event.payload if isinstance(event.payload, dict) else {}
     etype = event.type
-    if etype == EventType.RUN_CREATED:
+    if etype == SkeletonEventType.RUN_CREATED:
         return replace(
             state,
             run_id=state.run_id or event.run_id,
@@ -245,13 +245,13 @@ def _fold_run(state: MinimalProjection, event: Event) -> MinimalProjection:
             max_cycles=int(payload.get("max_cycles") or 0),
             run_time_limit_sec=int(payload.get("run_time_limit_sec") or 0),
         )
-    if etype == EventType.RUN_DONE:
+    if etype == SkeletonEventType.RUN_DONE:
         return replace(state, status="done", stop_reason=event.stop_reason)
-    if etype == EventType.RUN_PAUSED:
+    if etype == SkeletonEventType.RUN_PAUSED:
         return replace(state, status="paused", stop_reason=event.stop_reason)
-    if etype == EventType.RUN_FAILED:
+    if etype == SkeletonEventType.RUN_FAILED:
         return replace(state, status="failed", stop_reason=event.stop_reason)
-    if etype == EventType.RUN_CONTINUED:
+    if etype == SkeletonEventType.RUN_CONTINUED:
         # 用户处理完暂停的原因以后继续：已用量保持在暂停时的值，不在这里重置
         return replace(state, status="running", stop_reason=None)
     return state
@@ -260,7 +260,7 @@ def _fold_run(state: MinimalProjection, event: Event) -> MinimalProjection:
 def _created_snapshot(event: Event) -> AcceptedArtifact | None:
     # 事项创建事件里记下的代码树快照（建档时的工作区）：树摘要供通用条件 4 核对，
     # 不让最小投影读成果的内容。还没有快照的事项没有这一项
-    if event.type != EventType.RUN_CREATED:
+    if event.type != SkeletonEventType.RUN_CREATED:
         return None
     payload = event.payload if isinstance(event.payload, dict) else {}
     snapshot = payload.get("snapshot")
@@ -277,7 +277,7 @@ def _created_snapshot(event: Event) -> AcceptedArtifact | None:
 def _created_sessions(event: Event) -> dict[str, str]:
     # 事项创建事件里记下的会话：部门 → 会话编号。这些是部门的主线会话，
     # 询问分支是另一条会话（它不在这一组里），它的激活不推进轮次、不改这一轮的编号（工单 #473、#857）
-    if event.type != EventType.RUN_CREATED:
+    if event.type != SkeletonEventType.RUN_CREATED:
         return {}
     payload = event.payload if isinstance(event.payload, dict) else {}
     created = payload.get("sessions")
@@ -312,7 +312,7 @@ def _accepted_artifact(event: Event) -> tuple[str, AcceptedArtifact, bool] | Non
 def _invalidated_artifact(event: Event) -> tuple[str, int] | None:
     # 成果失效事件（骨架事件，S1b）：成果种类与版本。失效是记下来的事实，不由这里从别的事件推出；
     # 失效以后这一版不再有效，这种成果没有当前版本时一直空着，直到它被重新接纳。没有这两个字段的事件不是成果失效
-    if event.type != EventType.ARTIFACT_INVALIDATED:
+    if event.type != SkeletonEventType.ARTIFACT_INVALIDATED:
         return None
     payload = event.payload if isinstance(event.payload, dict) else {}
     kind = payload.get("artifact_kind")

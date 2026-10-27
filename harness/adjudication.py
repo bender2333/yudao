@@ -10,8 +10,8 @@ from typing import Any
 
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .definitions import DEFINITIONS
+from .kernel_events import TERMINAL_STATUSES, Event
 from .minimal_projection import MinimalProjection
-from .models import TERMINAL_STATUSES, Event
 from .tools import has_tool, tool_action
 from .validation import (
     AdjudicationView, FieldError, ProposalDecision, TightenRequest, Tightening, evaluate_proposal,

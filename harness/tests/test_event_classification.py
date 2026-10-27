@@ -17,8 +17,13 @@ from harness.streams import (
     RUN_EVENT_TYPES,
 )
 
+
 def _kinds(cls) -> frozenset[str]:
-    return frozenset({value for name, value in vars(cls).items() if not name.startswith("_")})
+    # 一份事件种类声明里的全部取值。应用的 EventType 在骨架事件的种类上接着声明（S5a 工单 #828），
+    # 继承下来的骨架事件也算这份声明的一部分，所以按继承顺序合并
+    return frozenset({value for declaration in reversed(cls.__mro__)
+                      for name, value in vars(declaration).items()
+                      if not name.startswith("_") and isinstance(value, str)})
 
 def test_models_event_kinds_match_the_run_declaration():
     # run 流的声明与 models.EventType 的种类完全相同：多出的种类没有声明分类，清单中缺的种类已经不存在
