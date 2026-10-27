@@ -11,6 +11,7 @@
 #
 # 守 R2（缝的交换字段：TightenRequest 进去、Tightened 出来，只有通过、拒绝、等待三种，带上契约版本）
 # 与 R3（设计说明第 5.5 节写明的行为，经这条缝检查，不看收紧检查内部怎么组织）。
+from harness.tests.helpers import adjudication_view, work_basis
 
 from dataclasses import replace
 
@@ -40,7 +41,7 @@ def _working(projection, department: str):
 
 
 def _structured(projection, department: str, proposal: dict, **extra) -> TightenRequest:
-    return TightenRequest(department=department, projection=projection, proposal=proposal, **extra)
+    return TightenRequest(department=department, state=projection, proposal=proposal, **extra)
 
 
 def _errors(tightened) -> list[tuple[str, str]]:
@@ -57,11 +58,11 @@ def test_the_kinds_a_department_can_submit_come_from_the_tightening_check(tmp_pa
     # R3：部门此刻能交的种类按调度算出来的当前工作决定（清点第 D 类）
     system, run_id = _accepted(tmp_path)
     projection = _working(system.project(run_id), "product")
-    assert "product_spec" in WATCHED_OUTPUTS.kinds(TightenRequest(department="product", projection=projection))
+    assert "product_spec" in WATCHED_OUTPUTS.kinds(TightenRequest(department="product", state=projection))
     # 终态的 run 谁都不能再交；不认识的部门也没有种类
     assert WATCHED_OUTPUTS.kinds(TightenRequest(department="product",
-                                                projection=replace(projection, status="done"))) == set()
-    assert WATCHED_OUTPUTS.kinds(TightenRequest(department="nobody", projection=projection)) == set()
+                                                state=replace(projection, status="done"))) == set()
+    assert WATCHED_OUTPUTS.kinds(TightenRequest(department="nobody", state=projection)) == set()
 
 
 def test_a_submission_outside_the_current_work_is_refused_by_the_tightening_check(tmp_path):
@@ -70,7 +71,7 @@ def test_a_submission_outside_the_current_work_is_refused_by_the_tightening_chec
     projection = system.project(run_id)
     # 产品此刻能交的是 PRD（可以在回答询问时修订），交付不是它这一刻的种类
     tightened = WATCHED_OUTPUTS.tool(TightenRequest(
-        department="product", projection=projection,
+        department="product", state=projection,
         tool={"id": "call", "name": "submit_delivery", "args": {}}))
     assert tightened.reason == "This proposal is not permitted in the current department work."
     assert not tightened.accepted and not tightened.wait and not tightened.deferred
@@ -82,10 +83,10 @@ def test_a_stale_basis_defers_a_proposal_inside_the_tightening_check(tmp_path):
 
     system, run_id = _accepted(tmp_path)
     projection = _working(system.project(run_id), "engineering")
-    basis = replace(WorkBasis.current(projection, "engineering"),
+    basis = replace(work_basis(projection, "engineering"),
                     input_version=projection.input_version - 1)
     tightened = WATCHED_OUTPUTS.tool(TightenRequest(
-        department="engineering", projection=projection, basis=basis,
+        department="engineering", state=projection, basis=basis,
         tool={"id": "call", "name": "submit_delivery", "args": {}}))
     assert tightened.deferred and not tightened.accepted and not tightened.wait
     assert "not accepted now" in (tightened.reason or "")
@@ -142,7 +143,7 @@ def test_a_release_waits_for_the_product_input_inside_the_commit(tmp_path):
     events = tuple(system.store.list_events(run_id))
     assert pending_product_input(projection, list(events))
     tightened = WATCHED_OUTPUTS.submission(TightenRequest(
-        department="quality", projection=projection, proposal=review("release", "verified"),
+        department="quality", state=projection, proposal=review("release", "verified"),
         events=events, commit=True))
     assert tightened.wait and not tightened.accepted
 
@@ -159,8 +160,10 @@ def test_every_requirement_of_the_product_spec_is_recorded_exactly_once(tmp_path
 
 def test_a_boundary_marked_design_not_implemented_is_not_an_existing_defect(tmp_path):
     # R3：带标记的边界条目是设计里描述、代码尚未实现的能力，不能记成现有缺陷
-    system, run_id = _accepted(tmp_path, boundaries=[f"login flow: {MARK}"])
+    system, run_id = _accepted(tmp_path, requirements=["login flow"],
+                               boundaries=[f"login flow: {MARK}"])
     projection = system.project(run_id)
+    # 逐条结论覆盖当前 PRD 的每条要求（S1d 起这条检查也在这里）：这一条要求对应的能力还只是设计
     tightened = WATCHED_OUTPUTS.submission(_structured(projection, "quality", baseline_review(
         conclusions=[{"requirement": "login flow", "status": "existing_defect", "evidence": "smoke"}])))
     assert [field for field, _message in _errors(tightened)] == ["conclusions[0].status"]
@@ -182,7 +185,7 @@ def test_a_submission_that_the_kernel_rejects_is_never_accepted_by_the_tightenin
     proposal = product_spec(basis_product_spec_hash="sha256:not-current",
                             change_record={"rationale": "changed the goal", "changed": [], "retained": [],
                                            "retired": []})
-    decision = proposal_decision(projection, department="product", proposal=proposal, facts=facts,
+    decision = proposal_decision(adjudication_view(projection), department="product", proposal=proposal, facts=facts,
                                  events=system.store.list_events(run_id), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert decision.errors and decision.errors[0].field == "basis_product_spec_hash"

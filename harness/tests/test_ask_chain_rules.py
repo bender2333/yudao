@@ -4,6 +4,7 @@
 # 链已有几层、上限是多少，并提示把要问的内容写进回答。
 #
 # 单元层：只用内存里的投影与纯函数，不起目录、不起进程。
+from harness.tests.helpers import adjudication_view, work_basis
 
 from harness.actions import WorkspaceFacts
 from harness.adjudication import WorkBasis, ask_chain_decision, ask_chain_max_depth, tool_permission
@@ -29,12 +30,11 @@ def _chain(depth: int) -> RunProjection:
 
 
 def _permission(projection: RunProjection, session_id: str):
-    return tool_permission(
-        projection,
+    return tool_permission(adjudication_view(projection),
         {"name": "ask", "args": {"recipient": "quality", "question": "还能问吗？"}},
         department="engineering",
         session_id=session_id,
-        basis=WorkBasis.current(projection, "engineering"),
+        basis=work_basis(projection, "engineering"),
         aborted=False,
         facts=WorkspaceFacts(),
      tightening=WATCHED_OUTPUTS)
@@ -85,23 +85,21 @@ def test_the_branch_is_denied_beyond_the_chain_limit():
 def test_the_main_session_keeps_its_own_tools_while_a_branch_is_open():
     # 分支的约束只作用在分支会话上：主线会话不受分支的约束
     projection = _chain(1)
-    write = tool_permission(
-        projection,
+    write = tool_permission(adjudication_view(projection),
         {"name": "write_file", "args": {"path": "src/echo.py", "content": "print(1)\n"}},
         department="engineering",
         session_id="ses_main",
-        basis=WorkBasis.current(projection, "engineering"),
+        basis=work_basis(projection, "engineering"),
         aborted=False,
         facts=WorkspaceFacts(),
      tightening=WATCHED_OUTPUTS)
     assert write.allowed
     # 分支会话不能改运行工作区
-    branch_write = tool_permission(
-        projection,
+    branch_write = tool_permission(adjudication_view(projection),
         {"name": "write_file", "args": {"path": "src/echo.py", "content": "print(1)\n"}},
         department="engineering",
         session_id="ses_ask_0",
-        basis=WorkBasis.current(projection, "engineering"),
+        basis=work_basis(projection, "engineering"),
         aborted=False,
         facts=WorkspaceFacts(),
      tightening=WATCHED_OUTPUTS)

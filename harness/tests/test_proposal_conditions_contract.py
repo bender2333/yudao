@@ -9,6 +9,7 @@
 # - R3（不放宽既有许可）：发布的合同里六种通用条件都在，删掉任何一种都要有意识地改数据。
 #
 # 这一层用临时目录复制定义文件、按新合同重新装载，属于模块层。
+from harness.tests.helpers import adjudication_view
 
 import json
 import shutil
@@ -114,11 +115,11 @@ def test_removing_the_duplicate_check_from_the_contract_accepts_the_same_decisio
                                statement=content["statement"], rationale=content["rationale"])
     projection = _projection("product", product_spec=_spec(), product_decisions=[existing])
     proposal = product_decision(content["statement"], content["rationale"])
-    assert not evaluate_proposal(department="product", projection=projection, facts=_facts(),
+    assert not evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(),
                                  proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
     monkeypatch.setattr(validation, "DEFINITIONS",
                         _definitions(tmp_path, _without("product_decision", "no_duplicate_content")))
-    decision = evaluate_proposal(department="product", projection=projection, facts=_facts(), proposal=proposal, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(), proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
@@ -129,9 +130,9 @@ def test_removing_the_referenced_version_check_accepts_a_review_of_a_superseded_
                              last_activations={"quality": "act_q"})
     facts = _facts(_receipt("quality", activation="act_q", delivery_hash=DELIVERY_HASH))
     proposal = review("release", "the delivery passes", checks=["smoke"], basis_delivery_spec_hash=DELIVERY_HASH)
-    assert not evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
+    assert not evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
     monkeypatch.setattr(validation, "DEFINITIONS", _definitions(tmp_path, _without("qa_review", "referenced_current")))
-    decision = evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
@@ -142,9 +143,9 @@ def test_removing_the_structure_check_accepts_a_baseline_review_without_a_struct
     facts = _facts(_receipt("quality", activation="act_q"))
     proposal = baseline_review(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
                                checks=["smoke"])
-    assert not evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
+    assert not evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
     monkeypatch.setattr(validation, "DEFINITIONS", _definitions(tmp_path, _without("baseline_review", "referenced_current")))
-    decision = evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
@@ -154,11 +155,11 @@ def test_clearing_the_activation_requirement_accepts_a_receipt_from_an_earlier_a
                              last_activations={"engineering": "act_now"})
     facts = _facts(_receipt("engineering", activation="act_before"))
     proposal = delivery(basis_product_spec_hash=SPEC_HASH)
-    assert not evaluate_proposal(department="engineering", projection=projection, facts=facts,
+    assert not evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts,
                                  proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
     monkeypatch.setattr(validation, "DEFINITIONS", _definitions(
         tmp_path, lambda conditions: conditions["delivery_spec"][1].update({"activation": False})))
-    decision = evaluate_proposal(department="engineering", projection=projection, facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
@@ -168,10 +169,10 @@ def test_removing_the_tree_check_accepts_an_onboarding_proposal_over_a_changed_t
                              snapshot={"tree_digest": TREE}, last_activations={"engineering": "act"})
     facts = _facts(_receipt("engineering", activation="act", snapshot=OTHER_TREE), digest=OTHER_TREE)
     proposal = structure(requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}])
-    assert not evaluate_proposal(department="engineering", projection=projection, facts=facts,
+    assert not evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts,
                                  proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
     monkeypatch.setattr(validation, "DEFINITIONS", _definitions(tmp_path, _without("structure", "tree_matches")))
-    decision = evaluate_proposal(department="engineering", projection=projection, facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 

@@ -11,6 +11,7 @@ from harness import assembly_contract, execution_contract
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis
 from harness.assembly import ContextAssembly
+from harness.tests.helpers import work_basis
 from harness.engine import StepDriver, StepLimits
 from harness.models import EventType, new_id
 from harness.proposals import product_spec
@@ -79,7 +80,7 @@ def _round_request(system, run_id, work_ref):
     scope = execution_contract.ActivationScope(
         run_id, "product", session_id, new_id("act"), parent,
         prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=(),
-        basis=WorkBasis.current(projection, "product"), provider="test",
+        basis=work_basis(projection, "product"), provider="test",
     )
     return execution_contract.RoundRequest(
         scope, prompt, StepLimits(max_model_steps=1), work_ref=work_ref)

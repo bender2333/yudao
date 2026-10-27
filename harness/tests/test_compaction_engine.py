@@ -4,7 +4,7 @@ from threading import Event
 from harness.collaboration import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.compaction import SUMMARY_OUTPUT_TOKENS
-from harness.contracts import current_contract_hash
+from harness.contracts import artifact_hash
 from harness.definitions import DEFINITIONS
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.engine import StepLimits
@@ -369,7 +369,7 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
 
     compactions = second.compactions
     assert len(compactions) >= 2, compactions
-    contract = current_contract_hash(system.project(run_id))
+    contract = artifact_hash(system.project(run_id).effective_contract)
     events = system.store.list_events(run_id)
     order = {event.event_id: event.stream_version for event in events}
     covered = []
