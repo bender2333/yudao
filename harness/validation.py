@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from .contracts import current_contract_hash, normalize_scope
-from .collaboration import allowed_proposal_kinds
 from .models import (
     BASELINE_STATUSES,
     DEPARTMENTS,
@@ -22,20 +21,8 @@ from .actions import TreeFacts
 from .definitions import DEFINITIONS, ConditionNames, ProposalCondition
 from .projection import RunProjection
 
-# 建档初始 PRD 的边界条目用它标明「设计与需求文档描述而代码尚未实现」（设计第 4.2、4.3 节）。
-# 这样的条目不是现有行为：质检不把它记为现有缺陷。
-DESIGN_PENDING_MARK = "设计中，未实施"
-
-
-def marked_boundaries(spec: ProductSpec | None) -> list[str]:
-    # 带标记的边界条目（工单 #346）：条目文字含标记串
-    return [] if spec is None else [item for item in spec.boundaries if DESIGN_PENDING_MARK in item]
-
-
-def _covers_marked_boundary(requirement: str, spec: ProductSpec | None) -> bool:
-    # 结论指向的要求与某条带标记的边界条目是同一项能力：条目可以带说明文字，两者方向都可能是包含
-    return any(item == requirement or item in requirement or requirement in item
-               for item in marked_boundaries(spec))
+if TYPE_CHECKING:  # 工作依据住在 adjudication.py，它导入这里：只在类型检查时导入，避免循环导入
+    from .adjudication import WorkBasis
 
 
 @dataclass
@@ -74,12 +61,75 @@ class ProposalDecision:
         return [item.to_dict() for item in self.errors]
 
 
+# 路由的收紧检查（工单 #1095，设计说明第 5.5 节）：内核的通用检查通过以后，在同一个写入事务里再问一次路由。
+# 结果只有三种：通过、拒绝（写明原因）、等待（写入口按安全节点等待，工单 #561）；收紧检查不能放行内核已经
+# 拒绝的东西。接口放在这里是因为 validation 是 adjudication 的下游，放到那边反向导入会成环；
+# 实现是应用层的事（现在是一份成果驱动的收紧检查，见 harness/tightening.py），版本与接受实现放在
+# 契约圈的 harness/tightening_contract.py：内核文件不导入契约圈以外的模块。
+
+
+@dataclass(frozen=True)
+class TightenRequest:
+    # 收紧检查的输入：这一轮的运行状态、正在做的工具或者要提交的提案，以及内核已经核对过的支撑材料
+    department: str
+    projection: RunProjection
+    session_id: str | None = None
+    basis: WorkBasis | None = None
+    tool: dict[str, Any] | None = None
+    proposal: dict[str, Any] | None = None
+    evidence: tuple[dict[str, Any], ...] = ()
+    # 收据、结论这些支撑材料之外，检查「产品还有没有没处理完的输入」要看事件日志本身（工单 #561）
+    events: tuple[Event, ...] = ()
+    input_modalities: tuple[str, ...] = ("text",)
+    # 这次检查在提交事务里跑：工具许可已经通过，输入可能在两者之间到达（工单 #561 的那次竞态）
+    commit: bool = False
+
+
+@dataclass(frozen=True)
+class Tightened:
+    # 收紧检查的结果：三项都为空是通过；reason 或 errors 是拒绝；wait 是等待；
+    # deferred 是推迟（模型还没有看见新的输入，下一步再提交，工单 #964）
+    reason: str | None = None
+    errors: tuple[FieldError, ...] = ()
+    wait: bool = False
+    deferred: bool = False
+    # 部门工具清单里没有这个工具，由收紧检查放行：询问分支里的回答不属于任何部门的工具（工单 #473）
+    permitted: bool = False
+
+    @property
+    def accepted(self) -> bool:
+        return self.reason is None and not self.errors and not self.wait
+
+
+class Tightening(Protocol):
+    # 路由实现的收紧检查：内核在同一个写入事务里调用它，三种结果由调用方分别处理。
+    # 契约版本由契约圈的 harness/tightening_contract.py 声明与核对，这里只有调用的形状
+    CONTRACT_VERSION: int
+
+    def kinds(self, request: TightenRequest) -> set[str]:
+        # 这个部门此刻能提交的提案种类（不含询问分支里为回答询问而修订 PRD 的那一种）
+        ...
+
+    def offered(self, request: TightenRequest) -> list[str]:
+        # 请求中提供给模型的工具
+        ...
+
+    def tool(self, request: TightenRequest) -> Tightened:
+        # 一次工具调用的许可
+        ...
+
+    def submission(self, request: TightenRequest) -> Tightened:
+        # 一次提案提交的检查
+        ...
+
+
 def evaluate_proposal(
     *,
     department: str,
     proposal: dict[str, Any] | None,
     projection: RunProjection,
     facts: TreeFacts,
+    tightening: Tightening,
     events: list[Event] | None = None,
 ) -> ProposalDecision:
     try:
@@ -88,6 +138,7 @@ def evaluate_proposal(
             proposal=proposal,
             projection=projection,
             facts=facts,
+            tightening=tightening,
             events=events or [],
         )
     except Exception as exc:
@@ -255,12 +306,25 @@ _CONDITION_CHECKS = {
 }
 
 
+def _tightening_errors(tightened: Tightened, field: str = "proposal") -> list[FieldError]:
+    # 收紧检查的拒绝转成字段错误，通过时是空清单。等待在提案校验这一步同样当作拒绝：
+    # 这次提交不当场生效，原因写明（新输入在许可之后、提交之前到达，工单 #561）
+    if tightened.errors:
+        return list(tightened.errors)
+    if tightened.wait:
+        return [FieldError("kind", tightened.reason or "the submission must wait for the product input")]
+    if tightened.reason is not None:
+        return [FieldError(field, tightened.reason)]
+    return []
+
+
 def _evaluate_proposal(
     *,
     department: str,
     proposal: dict[str, Any] | None,
     projection: RunProjection,
     facts: TreeFacts,
+    tightening: Tightening,
     events: list[Event],
 ) -> ProposalDecision:
     if not proposal or not isinstance(proposal, dict):
@@ -270,12 +334,9 @@ def _evaluate_proposal(
         return ProposalDecision(False, [FieldError("kind", f"unknown proposal kind: {kind!r}")])
     if department not in DEPARTMENTS:
         return ProposalDecision(False, [FieldError("issuer", f"unknown department: {department}")])
-    allowed = allowed_proposal_kinds(projection, department)
-    if department == "product" and any(ask.get("recipient") == "product" for ask in projection.ask_stack):
-        # 产品在回答一次询问：可以在回答里修订 PRD（循环结构第 4.3 节）。
-        # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着产品回答，
-        # 不是最后发起的那一条
-        allowed = allowed | {"product_spec"}
+    # 这个部门此刻能提交哪些种类是成果驱动的：问路由的收紧检查（不能放行内核拒绝的东西，
+    # 内核先判过上面的格式与部门，再按收紧检查给出的种类收窄）
+    allowed = tightening.kinds(TightenRequest(department=department, projection=projection))
     if kind not in allowed:
         return ProposalDecision(False, [FieldError("kind", f"{department} cannot issue {kind} in the current work")])
 
@@ -284,17 +345,17 @@ def _evaluate_proposal(
         return ProposalDecision(False, errors)
 
     if kind == "product_spec":
-        return _accept_product_spec(proposal, projection, facts, department)
+        return _accept_product_spec(proposal, projection, facts, department, tightening, events)
     if kind == "product_decision":
         return _accept_product_decision(proposal, projection, facts, department)
     if kind == "delivery_spec":
         return _accept_delivery(proposal, projection, facts, department)
     if kind == "qa_review":
-        return _accept_review(proposal, projection, facts, department)
+        return _accept_review(proposal, projection, facts, department, tightening, events)
     if kind == "structure":
-        return _accept_structure(proposal, projection, facts, department)
+        return _accept_structure(proposal, projection, facts, department, tightening, events)
     if kind == "baseline_review":
-        return _accept_baseline_review(proposal, projection, facts, department)
+        return _accept_baseline_review(proposal, projection, facts, department, tightening, events)
     return ProposalDecision(False, [FieldError("kind", "unhandled kind")])
 
 
@@ -462,12 +523,6 @@ def _baseline_conclusions(proposal: dict[str, Any], spec: ProductSpec, bound: di
             if not _location_known(evidence.replace("\\", "/"), facts):
                 errors.append(FieldError(field, "read_only requires evidence naming a location in the snapshot"))
         elif status == "existing_defect":
-            # 带标记的边界条目不是现有行为（设计第 4.3 节）：要求文档描述而代码尚未实现的能力不记为现有缺陷
-            if _covers_marked_boundary(requirement, spec):
-                errors.append(FieldError(f"conclusions[{index}].status",
-                                         f"a boundary entry marked {DESIGN_PENDING_MARK} is not existing behavior and cannot "
-                                         "be an existing_defect; write it into the initial PRD boundaries with that mark"))
-                continue
             errors.extend(_check_evidence_error(field, evidence, bound, expect_exit=None,
                                                 label="existing_defect requires evidence naming a failing baseline check"))
         elif status == "unsupported":
@@ -508,20 +563,22 @@ def _baseline_omission_records(proposal: dict[str, Any], facts: TreeFacts) -> tu
 
 
 def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                         department: str) -> ProposalDecision:
-    if projection.input_version != projection.product_work_input_version:
-        return ProposalDecision(False, [FieldError("input_version", "new user input must enter product work before requirements can be accepted")])
+                         department: str, tightening: Tightening, events: list[Event]) -> ProposalDecision:
+    # 输入版本、修订说明、有效决定逐条处置都是成果驱动的检查：经路由的收紧检查（工单 #1095）。
+    # 输入版本最先判（新输入还没进产品这一轮时只报这一条），修订说明与有效决定排在通用条件之后，
+    # 与搬动以前各条报错的先后一致
+    untimely = _tightening_errors(tightening.submission(TightenRequest(
+        department=department, projection=projection, proposal=proposal, events=tuple(events))))
+    stale_input = [error for error in untimely if error.field == "input_version"]
+    if stale_input:
+        return ProposalDecision(False, stale_input)
     outcome = evaluate_conditions("product_spec", department=department, proposal=proposal,
                                   projection=projection, facts=facts)
     if outcome.errors:
         return ProposalDecision(False, outcome.errors)
-    if projection.product_spec is not None and proposal.get("change_record") is None:
-        return ProposalDecision(False, [FieldError("change_record", "a revised ProductSpec must explain changed, retained, and retired behavior and its rationale")])
-    active_hashes = {item.content_hash for item in projection.effective_decisions}
-    changes = proposal.get("decision_changes", [])
-    declared = [item["decision_hash"] for item in changes]
-    if set(declared) != active_hashes or len(declared) != len(active_hashes):
-        return ProposalDecision(False, [FieldError("decision_changes", "explicitly retain, integrate, or retire every current product decision exactly once")])
+    errors = [error for error in untimely if error.field != "input_version"]
+    if errors:
+        return ProposalDecision(False, errors)
     parent = projection.product_spec.content_hash if projection.product_spec else None
     revision = (projection.product_spec.revision + 1) if projection.product_spec else 1
     payload = _product_payload(proposal)
@@ -593,14 +650,15 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
 
 
 def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                   department: str) -> ProposalDecision:
+                   department: str, tightening: Tightening, events: list[Event]) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象。
-    # 预测性探索的一轮（工单 #557）没有交付，提交结论在这里被拒绝。
-    if projection.department_bases.get("quality") is not None \
-            and projection.department_delivery_bases.get("quality") is None:
-        return ProposalDecision(False, [FieldError("delivery_spec", "this work has no delivery to review")])
+    # 预测性探索的一轮（工单 #557）没有交付，提交结论在这里被拒绝（成果驱动的检查，经收紧检查，工单 #1095）
+    untimely = _tightening_errors(tightening.submission(TightenRequest(
+        department=department, projection=projection, proposal=proposal, events=tuple(events))))
+    if untimely:
+        return ProposalDecision(False, untimely)
     if projection.delivery_spec is None:
         return ProposalDecision(False, [FieldError("delivery_spec", "no active DeliverySpec")])
     contract = projection.effective_contract
@@ -620,8 +678,10 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
             errors.append(FieldError("checks", "release requires all quality checks to exit 0"))
         if not bound_checks:
             errors.append(FieldError("checks", "release requires quality-run evidence bound to the current snapshot"))
-        if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in bound_checks):
-            errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
+        # 放行要用当前的质检测试材料：材料摘要的比较读的是内容，属于成果驱动的检查（工单 #1095）
+        errors.extend(_tightening_errors(tightening.submission(TightenRequest(
+            department=department, projection=projection, proposal=proposal,
+            evidence=tuple(bound_checks), events=tuple(events)))))
     defects, defect_errors = _qa_defects(proposal)
     errors.extend(defect_errors)
     if errors:
@@ -653,7 +713,7 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
 
 
 def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                      department: str) -> ProposalDecision:
+                      department: str, tightening: Tightening, events: list[Event]) -> ProposalDecision:
     # 现有结构说明（docs/design/existing-project-onboarding.md 第 4.4 节）：构建与测试的每一项都要有本次激活中
     # 绑定当前快照与当前初始 PRD 的 run_check 回执，退出状态照实记录（不要求为 0）；建档中工作区的树不变。
     # 树与回执由合同里的通用条件核对（设计说明第 5.5 节）
@@ -669,16 +729,9 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
         errors.extend(_location_errors(f"entry_points[{index}].path", [item["path"]], facts))
     for index, item in enumerate(proposal["requirement_locations"]):
         errors.extend(_location_errors(f"requirement_locations[{index}].locations", item["locations"], facts))
-    requirements = [item.strip() for item in spec.requirements]
-    declared = [item["requirement"].strip() for item in proposal["requirement_locations"]]
-    if len(declared) != len(set(declared)):
-        errors.append(FieldError("requirement_locations", "each requirement may be recorded only once"))
-    if set(declared) != set(requirements):
-        missing = [item for item in requirements if item not in declared]
-        extra = [item for item in declared if item not in requirements]
-        errors.append(FieldError("requirement_locations",
-                                 "requirement_locations must record every requirement of the current ProductSpec exactly once; "
-                                 f"missing: {missing or 'none'}; not in the current ProductSpec: {extra or 'none'}"))
+    # 每条要求覆盖一次读的是 PRD 的内容，属于成果驱动的检查（工单 #1095），经收紧检查
+    errors.extend(_tightening_errors(tightening.submission(TightenRequest(
+        department=department, projection=projection, proposal=proposal, events=tuple(events)))))
     if errors:
         return ProposalDecision(False, errors)
     build_and_test = []
@@ -716,7 +769,7 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
 
 
 def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                            department: str) -> ProposalDecision:
+                            department: str, tightening: Tightening, events: list[Event]) -> ProposalDecision:
     # 基线核验（docs/design/existing-project-onboarding.md 第 4.5 节）：逐条结论覆盖初始 PRD 的每条要求，
     # 基线检查绑定当前快照与当前 ProductSpec，退出状态不为 0 的检查都有说明；这里不使用普通事项的放行规则。
     # 结构说明对应当前 PRD、工作区的树与检查回执由合同里的通用条件核对（设计说明第 5.5 节）
@@ -733,6 +786,10 @@ def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection,
                                         if name in outcome.receipts}
     conclusions, conclusion_errors = _baseline_conclusions(proposal, spec, bound, facts)
     errors.extend(conclusion_errors)
+    # 标「设计中，未实施」的边界不是现有行为，不能记为现有缺陷：读的是 PRD 内容，属于成果驱动的检查
+    # （工单 #1095），经收紧检查
+    errors.extend(_tightening_errors(tightening.submission(TightenRequest(
+        department=department, projection=projection, proposal=proposal, events=tuple(events)))))
     omissions, omission_errors = _baseline_omission_records(proposal, facts)
     errors.extend(omission_errors)
     failed = sorted(name for name, receipt in bound.items() if receipt["exit_code"] != 0)

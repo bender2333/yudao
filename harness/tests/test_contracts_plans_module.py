@@ -15,6 +15,7 @@ from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import guidance_reply
 from harness.validation import evaluate_proposal
+from harness.tightening import WATCHED_OUTPUTS
 
 
 def test_supplementary_decision_changes_contract_without_new_spec(tmp_path):
@@ -44,7 +45,7 @@ def test_supplementary_decision_changes_contract_without_new_spec(tmp_path):
     # 旧合同下的检查回执属于早先激活：新激活直接交付因缺少本次激活的回执被拒绝
     facts = system.workspace(run_id).snapshot().facts
     decision = evaluate_proposal(department="engineering", projection=new,
-                                 facts=facts, proposal=delivery(check_names=["smoke"]))
+                                 facts=facts, proposal=delivery(check_names=["smoke"]), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert any(error.field == "check_names" for error in decision.errors)
 
@@ -121,7 +122,7 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
                                      facts=facts, proposal=product_spec(decision_changes=changes, change_record={
                                          "changed": [], "retained": ["Echo behavior"], "retired": [],
                                          "rationale": "Review earlier decisions",
-                                     }, basis_product_spec_hash=dec.product_spec.content_hash))
+                                     }, basis_product_spec_hash=dec.product_spec.content_hash), tightening=WATCHED_OUTPUTS)
         assert not decision.accepted and decision.errors[0].field == "decision_changes"
 
     revised = system.activate_once(run_id)  # engineering runs, asks product, product answers in branch

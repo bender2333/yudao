@@ -27,6 +27,7 @@ from harness.environment import LocalEnvironment, QA_TESTS_DIR
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tools import tool_action
+from harness.tightening import WATCHED_OUTPUTS
 
 # 测试中的重试间隔缩短到毫秒级，其余参数与正式运行相同
 FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02)
@@ -266,7 +267,7 @@ def developer_text(call: ModelCall) -> str:
 
 def department_history(system: LoopSystem, run_id: str, department: str) -> list[dict]:
     # 部门历史，按事件由上下文装配（P）重建
-    return ContextAssembly(system.artifacts, system.store).department_history(system.store.list_events(run_id), department)
+    return ContextAssembly(system.artifacts, system.store, tightening=WATCHED_OUTPUTS).department_history(system.store.list_events(run_id), department)
 
 
 def after_event(system: LoopSystem, event_type: str, action: Callable[[Event], None]) -> None:
@@ -384,7 +385,7 @@ def pinned_input_tokens(system: LoopSystem, run_id: str, department: str = "prod
     prompt = DepartmentPrompt(department, 0, text, prompt_ref, "")
     projection = system.project(run_id)
     session = projection.sessions[department]
-    assembled = ContextAssembler(system.artifacts).assemble(
+    assembled = ContextAssembler(system.artifacts, tightening=WATCHED_OUTPUTS).assemble(
         projection, department=department, session_id=session.session_id, activation_id="pinned",
         prompt=prompt, context_window=1_000_000, max_output_tokens=1_000_000)
     return assembled.manifest.input_token_estimate

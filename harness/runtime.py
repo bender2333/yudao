@@ -20,6 +20,7 @@ from .projection import RunNotFoundError, RunProjection, project_run
 from .project_projection import catalog_handler, handler_for
 from .projects import ProjectService, project_projection
 from .providers import ProviderFacade
+from .tightening import WATCHED_OUTPUTS
 from .streams import (
     DRAIN_DRAINING, DRAIN_FINISHED, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED,
     DrainState, classify_startup_runs, last_drain_event,
@@ -91,6 +92,7 @@ class LoopSystem:
             test_model=(getattr(test_adapter, "model", "fake-script") if test_adapter is not None else "fake-script"),
             step_limits=step_limits,
             deltas=self.deltas,
+            tightening=WATCHED_OUTPUTS,
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
