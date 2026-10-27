@@ -284,6 +284,9 @@ class Orchestrator:
         # 会话结束（事务 on_commit）执行后留下的清理错误：Windows 句柄长期占用时会出现，
         # 留给运维或下一次启动扫描处理，不阻塞 run 的正常退出
         self._close_errors: dict[str, list[Exception]] = {}
+        # 运行到停止的循环在等会话时同时等新工作：run_id -> (循环, 事件)。
+        # 没有会话在跑而新输入、指导或取消提交时，由 _wake 打开它，循环醒来重新找可以开始的部门（工单 #561）
+        self._run_wakeups: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
         # 每个 run 累计的已用运行时间（毫秒，重启时从事件恢复）与当前运行段的起点（单调时钟）：
         # 等待期间段计时暂停，等待的时间不计入（工单 #350）
         self._run_elapsed_ms: dict[str, int] = {}
@@ -689,7 +692,7 @@ class Orchestrator:
             self.interactions.receive(transaction, text, command=False, base_version=base_version)
 
         self.writes.transact(run_stream(run_id), receive, command=command)
-        self._wake(run_id)
+        self._wake(run_id, restart=True)
         return self.project(run_id)
 
     def _stop_by_command(self, run_id: str, text: str) -> RunProjection:
@@ -804,7 +807,7 @@ class Orchestrator:
             self.interactions.receive_guidance(transaction, department, text, base_version=base_version)
 
         self.writes.transact(run_stream(run_id), receive, command=command)
-        self._wake(run_id)
+        self._wake(run_id, restart=True)
         return self.project(run_id)
 
     def _require_open(self, run_id: str, projection: RunProjection, message: str) -> None:
@@ -963,6 +966,7 @@ class Orchestrator:
 
     def _time_left(self, run_id: str, projection: RunProjection) -> float:
         return time_left_sec(projection, self._elapsed_sec(run_id))
+
     async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
         # 醒来以后回到安全节点判断。唤醒在判断之前登记：判断之后才提交的改变，提交方调用 _wake 时一定看到这次登记
@@ -989,14 +993,23 @@ class Orchestrator:
         finally:
             activation.wakeup = None
 
-    def _wake(self, run_id: str) -> None:
+    def _wake(self, run_id: str, *, restart: bool = False) -> None:
         # 在安全节点等待重试的激活立即回到安全节点判断；在改变提交以后调用。
-        # 同时运行（工单 #557）：这个 run 的每一个会话都醒过来
+        # 同时运行（工单 #557）：这个 run 的每一个会话都醒过来。
         for activation in list(self._active.get(run_id, {}).values()):
             wakeup = activation.wakeup
             if wakeup is not None:
                 loop, changed = wakeup
                 loop.call_soon_threadsafe(changed.set)
+        if not restart:
+            return
+        # 运行到停止的循环也在等（工单 #561）：新输入、指导或取消可能在没有会话运行时带来可以开始的部门，
+        # 由它醒来重新找一遍。部门提交提案时不叫醒它：那时正在工作的部门还没结束这一轮，
+        # 这时重新判断会把别的工作切在半途（harness/tests/test_context.py 的旧交付用例）。
+        waiting = self._run_wakeups.get(run_id)
+        if waiting is not None:
+            loop, changed = waiting
+            loop.call_soon_threadsafe(changed.set)
 
     def _on_close_run(self, run_id: str) -> None:
         # 会话结束（事务提交以后）执行的副作用：关闭会话并清理检查工作区。
@@ -1233,19 +1246,26 @@ class Orchestrator:
             if activation.driver is not None:
                 activation.driver.cancel()
         finally:
-            self._wake(activation.run_id)
+            self._wake(activation.run_id, restart=True)
 
     async def run_until_stop(self, run_id: str) -> RunProjection:
         # 运行到终态，或者到 run 被未回答的决定请求阻塞、等待用户回答为止。
         # 一次运行期间的模型调用复用同一组连接，连接只在这个事件循环中使用。
         # 同时运行（工单 #557）：等待工作的部门各开始一轮工作，各自一个会话，
         # 这个循环等全部会话结束或事项到终态。
+        # 等会话的同时也等唤醒（工单 #561）：新输入、指导与取消提交以后，即使没有会话结束，
+        # 这个循环也醒过来重新找一遍可以开始的部门；部门的判断本身不变
         # 停下其余会话只停这些会话，不改变事项的状态（工单 #856）：
         # 停下以后重新读取再交回，交回的投影里被停下的会话已经收尾
         connections = ProviderConnections()
         tasks: dict[str, asyncio.Task[RunProjection]] = {}
+        loop = asyncio.get_running_loop()
+        changed = asyncio.Event()
+        # 唤醒在寻找部门之前登记：登记之后提交的改变，提交方调用 _wake 时一定看到这次登记
+        self._run_wakeups[run_id] = (loop, changed)
         try:
             while True:
+                changed.clear()
                 snapshot = self.writes.read(run_stream(run_id))
                 projection = snapshot.projection
                 if not projection.run_id:
@@ -1263,16 +1283,24 @@ class Orchestrator:
                     task = tasks.get(department)
                     if task is not None and not task.done():
                         continue
-                    tasks[department] = asyncio.get_running_loop().create_task(
+                    tasks[department] = loop.create_task(
                         self._activate_department(run_id, department, connections))
                 pending = [task for task in tasks.values() if not task.done()]
                 if not pending:
                     # 没有部门在工作，也没有可以开始的部门：没有新的工作
                     return await self._no_new_work(run_id)
-                done, _pending = await asyncio.wait(pending, return_when=asyncio.FIRST_COMPLETED)
+                waiter = loop.create_task(changed.wait())
+                try:
+                    done, _pending = await asyncio.wait(
+                        [*pending, waiter], return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    waiter.cancel()
+                    await asyncio.gather(waiter, return_exceptions=True)
                 for task in done:
-                    task.result()
+                    if task is not waiter:
+                        task.result()
         finally:
+            self._run_wakeups.pop(run_id, None)
             await self._stop_sessions(run_id, tasks)
             await connections.aclose()
 
@@ -2182,6 +2210,8 @@ class Orchestrator:
                          "definitions_version": DEFINITIONS.version,
                          "parameters_version": current.parameters_version},
             ))
+            # 提交被写入以后唤醒正在安全节点等待的会话（工单 #561）：质检的放行可能正等着产品这一轮处理完输入
+            transaction.on_commit(lambda: self._wake(run_id))
         if not judged.accepted:
             transaction.append(NewEvent(
                 EventType.PROPOSAL_REJECTED, actor=f"department:{department}", department=department,

@@ -137,6 +137,7 @@
 "test_release_script.py" = "integration"
 "test_release_check.py" = "module"
 "test_release_sha256.py" = "unit"
+"test_release_waits_for_input.py" = "integration"
 "test_release_wheel_contents.py" = "module"
 "test_replay.py" = "module"
 "test_request_time_limit.py" = "integration"
