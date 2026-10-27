@@ -36,6 +36,8 @@
 "test_concurrent_commands.py" = "integration"
 "test_concurrent_departments.py" = "integration"
 "test_context.py" = "integration"
+"test_contract_modules.py" = "unit"
+"test_contract_seams.py" = "module"
 "test_contracts_plans_module.py" = "module"
 "test_data_directory.py" = "module"
 "test_decision_api.py" = "integration"
