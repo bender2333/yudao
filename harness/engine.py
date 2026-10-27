@@ -43,7 +43,7 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
                                  event_call_target)
 from .recording import StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
-from .validation import PRD_REVISION_FIELDS, evaluate_proposal
+from .validation import PRD_REVISION_FIELDS, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
@@ -201,12 +201,12 @@ class StepDriver:
     def start(cls, request: RoundRequest, *, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
               facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-              cancelled: Event, deltas: DeltaChannel,
+              cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
               refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(request, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
-                     cancelled=cancelled, deltas=deltas,
+                     cancelled=cancelled, deltas=deltas, tightening=tightening,
                      refresh_workspace=refresh_workspace)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
@@ -214,7 +214,7 @@ class StepDriver:
     def __init__(self, request: RoundRequest, *, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-                 cancelled: Event, deltas: DeltaChannel,
+                 cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
                  refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> None:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
@@ -236,6 +236,7 @@ class StepDriver:
         self._cancelled = cancelled
         self._limits = limits
         self._deltas = deltas
+        self._tightening = tightening
         # 这一轮只有指导、没有要做的工作：模型不调用工具的文字回复就是回答用户，这一轮正常结束。
         # 判断在轮开始时做一次，轮内保持，不因为指导随后进入模型输入或有了别的新工作而重算。
         # shortcut: 这个判断不持久化；进程重新启动以后同一轮由新会话接着做的，丢掉它并退回要求调用工具，
@@ -576,6 +577,7 @@ class StepDriver:
                                     proposal=spec_proposal,
                                     projection=projection,
                                     facts=facts,
+                                    tightening=self._tightening,
                                     events=events,
                                 )
                                 if not decision.accepted:
@@ -1000,7 +1002,7 @@ class StepDriver:
             permission = tool_permission(
                 projection, call, department=scope.department, session_id=scope.session_id,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
-                events=transaction.events(),
+                tightening=self._tightening, events=transaction.events(),
             )
             if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":
                 rel = str(call.get("args", {}).get("path") or "")

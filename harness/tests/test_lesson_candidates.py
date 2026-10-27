@@ -6,6 +6,7 @@ from harness.definitions import DEFINITIONS
 from harness.models import DEPARTMENTS, ArtifactRef, DepartmentPrompt, json_dumps
 from harness.proposals import delivery_turn, product_spec
 from harness.tests.helpers import quality_turns, recorded_context, run_scripted
+from harness.tightening import WATCHED_OUTPUTS
 
 def rework_script():
     # 质检的结论只有缺陷记录与放行（工单 #555）：缺陷记录之后工程返工一轮，候选记的是这次结论
@@ -28,7 +29,7 @@ def test_candidate_is_never_injected_into_department_context(tmp_path):
     system, result = run_scripted(tmp_path, rework_script())
     candidate = result.lesson_candidates[0]
     for department in DEPARTMENTS:
-        assembler = ContextAssembler()
+        assembler = ContextAssembler( tightening=WATCHED_OUTPUTS)
         prompt = DepartmentPrompt(department, 0, DEFINITIONS.role(department).prompt,
                                   ArtifactRef(kind="department_prompt", content_hash="", path=""), "")
         args = {"department": department, "session_id": "test-session", "activation_id": "test-activation",
