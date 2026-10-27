@@ -613,3 +613,5 @@ solo-deepseek-v4.1-flash / 2026-10-27 12:03 / docs/architecture-issues.md 登记
 claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `docs/design/skeleton-and-application.md` 状态行，第 5.4 节第 3 条加「做法」，第 5.5 节加「成果的内容由路由组装，内核盖统一字段」，第 12 节表加 S2c（#1098）与一直缺的 S6c（#979）、S6b 的前置加 S2c，顺序行同步；`docs/architecture-issues.md` #952 一条补处理行；`docs/current-baseline.md` 阶段一两行与更新行；`docs/design/README.md` 循环结构、画面与播放、部门指导三条的状态；`docs/requirements/README.md` D20；`docs/decision.md` 新增一条 / 阶段一工单诊断：第 5.4 节第 3 条没有工单，S6b 做不到不改骨架；父工单 #466、#476、#477、#950 核对后关闭
 
 claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `CLAUDE.md`「工单规范」环一条删「用例只由架构师删」；`.claude/skills/to-children/SKILL.md` 删减功能一段改为执行者随工单删用例；`docs/design/test-pyramid.md` 第 10 节第 5 条同步 / 同日 PR #1097 已把删用例改为执行者随工单删，这三处漏改
+
+solo-deepseek-v4.1-flash / 2026-10-28 01:35 / docs/architecture-issues.md 登记工单 #860 的一条：S1d 落地时设计说明没有写到的两处边界（PRD 记下的输入版本不进最小投影，由收紧检查的 `Tightened.facts` 一并给回；「逐条结论覆盖每条要求」这条读 PRD 内容的检查从 validation.py 搬进成果驱动的收紧检查），并写明 S2c（#1098）把它们并入「通过时给出成果的内容」 / 工单 #860 落地「内核改读最小投影」，设计说明第 4、5.5 节没有覆盖这两样的去向，先登记做法再继续做
