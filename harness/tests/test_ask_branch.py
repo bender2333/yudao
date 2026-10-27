@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from harness.adapters.fake import FakeAdapter, prompt_part
+from harness.minimal_projection import fold_events
 from harness.models import EventType
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse, ModelStreamEvent
@@ -607,10 +608,9 @@ def test_ask_branch_finished_restart_retains_accumulated_elapsed_time(tmp_path: 
         branch_elapsed = branch_finished[0].payload.get("elapsed_ms", 0)
         assert branch_elapsed > 0
 
-        # 重启恢复后的 run 已用时间包含分支时段
-        assert run.after.orchestrator._run_elapsed_ms[run.run_id] >= branch_elapsed
-
         after_events = run.after.store.list_events(run.run_id)
+        # 重启恢复后的 run 已用时间包含分支时段：已用时间读最小投影里已结算的那一部分（S1e 工单 #1015）
+        assert fold_events(after_events).used.settled_ms >= branch_elapsed
         elapsed_list = [e.payload["elapsed_ms"] for e in after_events if e.type == EventType.ACTIVATION_FINISHED]
         # 各激活结束事件记下的已用时间单调不减：同时运行的会话各自记下自己结束时刻的累计值（工单 #557）
         assert all(x <= y for x, y in zip(elapsed_list, elapsed_list[1:]))
