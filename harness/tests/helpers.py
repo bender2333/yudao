@@ -138,6 +138,21 @@ def pid_alive(pid: int) -> bool:
     return True
 
 
+def delete_watched_file(path: Path, *, timeout_sec: float = 5.0, interval_sec: float = 0.05) -> None:
+    # 删除应用正在监视的配置文件（目录文件、准入文件、.env）：应用每约 1 秒读一次这些文件，
+    # Windows 上文件正被读取时删除会报 PermissionError（WinError 32，文件被占用）。
+    # 短时间重试到删除成功；超时仍失败时照常抛出原来的错误，调用方的断言不因此放宽（工单 #1091）
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        try:
+            path.unlink()
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(interval_sec)
+
+
 def wait_until_stopped(pid: int) -> bool:
     for _ in range(100):
         if not pid_alive(pid):
