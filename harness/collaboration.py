@@ -2,14 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from .contracts import current_contract_hash
-from .models import (
-    DEPARTMENTS, TERMINAL_STATUSES, Event, EventType, RunProjection,
-)
+from .models import RunProjection
 from .definitions import DEFINITIONS
-from .tools import proposal_kind, proposal_kinds
 
 
 # ---------------------------------------------------------------------------
@@ -41,58 +36,6 @@ def is_waiting(projection: RunProjection, department: str) -> bool:
 def _has_new_user_input(projection: RunProjection) -> bool:
     """用户的输入：还有没被产品处理的输入。"""
     return projection.input_version > projection.processed_input_version
-
-
-# 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
-# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）
-_NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
-
-
-def pending_product_input(projection: RunProjection, events: list[Event]) -> bool:
-    """发给产品的输入里，还有没处理完的：质检放行等它处理完再裁决（部门指导设计说明第 2.1、3 节，工单 #561）。
-
-    「处理完」只有一个说法：收到这条输入的那一轮主线工作正常结束了。输入进入模型输入时由这一轮的工作消息
-    （部门输入事件）或者装配好的请求（上下文清单里的输入版本）记下，一轮正常结束时由轮结束事件接上；
-    取消、暂停、上限与运行时间用完不算正常结束，事项已结束当作处理完。
-
-    不用 ``processed_input_version``：它只在 PRD 被接纳时前进，产品决定不改 PRD 时永远不前进，
-    放行会一直等。只看产品的输入：用户输入（``input_version``）与发给产品的指导（它的「已回答」读的是同一件事）。
-    """
-    if projection.status in TERMINAL_STATUSES:
-        return False
-    inputs = [item.version for item in projection.inputs]
-    guidance = [item.id for item in projection.department_guidance if item.department == "product"]
-    if not inputs and not guidance:
-        return False
-    branches = set(projection.branch_sessions)
-    # 产品这一次主线工作收到的输入与指导：进入模型输入时的版本与指导编号，按激活归在一起
-    entered: dict[str, tuple[int, set[str]]] = {}
-    for event in events:
-        if event.department != "product" or event.session_id in branches:
-            continue
-        payload = event.payload or {}
-        activation_id = str(payload.get("activation_id") or "")
-        if not activation_id:
-            continue
-        version, ids = entered.get(activation_id, (0, set()))
-        if event.type in (EventType.DEPARTMENT_INPUT, EventType.CONTEXT_ASSEMBLED):
-            version = max(version, int(payload.get("input_version") or 0))
-        elif event.type == EventType.DEPARTMENT_GUIDANCE_APPLIED:
-            ids = ids | {str(item) for item in payload.get("guidance_ids") or []}
-        entered[activation_id] = (version, ids)
-    processed_inputs = 0
-    processed_guidance: set[str] = set()
-    for event in events:
-        if event.type != EventType.ACTIVATION_FINISHED or event.department != "product":
-            continue
-        if event.session_id in branches or event.state_after in _NOT_A_NORMAL_ROUND_END:
-            continue
-        payload = event.payload or {}
-        version, ids = entered.get(str(payload.get("activation_id") or ""), (0, set()))
-        processed_inputs = max(processed_inputs, version)
-        processed_guidance |= ids
-    return (any(version > processed_inputs for version in inputs)
-            or any(item not in processed_guidance for item in guidance))
 
 
 def _has_new_guidance(projection: RunProjection, department: str) -> bool:
@@ -278,21 +221,3 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
         if _free(projection, waiting, department) and has_new_work(projection, department):
             take(department)
     return ready
-
-
-def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[str]:
-    if projection.status in TERMINAL_STATUSES or department not in DEPARTMENTS:
-        return set()
-    # 部门这一轮正在工作：它主线会话的记录是「工作中」，或它在回答一个询问
-    if is_working(projection, department) or has_new_work(projection, department):
-        # 本部门在这一轮工作：可提交的种类按定义给出（工单 #134）；普通事项与建档事项的清单不同
-        return proposal_kinds(department, projection.kind)
-    return set()
-
-
-def tool_error(projection: RunProjection, department: str, name: str,
-               args: dict[str, Any]) -> str | None:
-    kind = proposal_kind(name)
-    if kind is not None and kind not in allowed_proposal_kinds(projection, department):
-        return "This proposal is not permitted in the current department work."
-    return None

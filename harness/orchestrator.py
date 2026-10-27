@@ -22,7 +22,7 @@ from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
 from .artifacts import ArtifactStore
-from . import assembly_contract, execution_contract
+from . import assembly_contract, execution_contract, tightening_contract
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
@@ -78,7 +78,7 @@ from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .tools import tool_action
-from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
+from .validation import PRD_REVISION_FIELDS, ProposalDecision, Tightening, evaluate_proposal
 from .collaboration import has_new_work, next_department, ready_departments
 from .workspace import WorkspaceSnapshot
 
@@ -252,6 +252,7 @@ class Orchestrator:
         sessions: SessionFactory | None = None,
         step_limits: StepLimits = StepLimits(),
         deltas: DeltaChannel | None = None,
+        tightening: Tightening,
     ) -> None:
         self.store = store
         self.writes = writes
@@ -268,7 +269,11 @@ class Orchestrator:
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
         self.test_model = test_model
-        self.assembly = ContextAssembly(artifacts, store)
+        # 路由的收紧检查（成果驱动）：内核的通用检查通过以后由它决定拒绝或等待（工单 #1095）；
+        # 组装时核对它声明的契约版本，不合格就在开始一轮工作之前失败（与执行、装配两份契约同一个做法）
+        self._tightening = tightening
+        tightening_contract.accept(tightening)
+        self.assembly = ContextAssembly(artifacts, store, tightening=tightening)
         self.sessions = sessions or SessionFactory(self.workspace_root)
         # 事项自己的停止开关：用户取消（cancel、_abort_run）打开它，之后的核对都得到停止，
         # 事项以取消结束；停下一个会话不用它（工单 #856）
@@ -1735,7 +1740,7 @@ class Orchestrator:
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
                 nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
-                deltas=self.deltas,
+                deltas=self.deltas, tightening=self._tightening,
                 refresh_workspace=self._workspace_refresh(activation),
             )
             result = await activation.driver.result()
@@ -1927,6 +1932,7 @@ class Orchestrator:
                         proposal=spec_proposal,
                         projection=projection,
                         facts=env.query(FactsQuery(tree=True)).tree,
+                        tightening=self._tightening,
                         events=transaction.events(),
                     )
                     if not decision.accepted:
@@ -2113,7 +2119,7 @@ class Orchestrator:
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
             environment=environment,
             nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
-            deltas=self.deltas,
+            deltas=self.deltas, tightening=self._tightening,
             refresh_workspace=self._workspace_refresh(branch_activation),
         )
         started = time.monotonic()
@@ -2181,7 +2187,7 @@ class Orchestrator:
             evaluated = self.writes.read(run_stream(run_id))
             facts = environment.query(FactsQuery(tree=True)).tree
             decision = proposal_decision(evaluated.projection, department=department, proposal=proposal,
-                                         facts=facts, events=evaluated.events())
+                                         facts=facts, tightening=self._tightening, events=evaluated.events())
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
                     transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
@@ -2219,7 +2225,7 @@ class Orchestrator:
         judged = commit_decision(
             decision, department=department, proposal=proposal,
             evaluated=evaluated.projection, facts=facts, current=current, current_facts=snapshot.facts,
-            events=transaction.events(),
+            events=transaction.events(), tightening=self._tightening,
         )
         if proposal is not None:
             transaction.append(NewEvent(

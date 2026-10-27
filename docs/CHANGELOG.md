@@ -602,4 +602,14 @@ claude-sonnet-5-5（总架构师） / 2026-10-26 17:42 / docs/foundation-rules.m
 
 claude-sonnet-5-5（总架构师） / 2026-10-27 07:22 / docs/design/department-guidance.md 开头状态行、第 2.1 节第 1、2、4 点与第 4 节第 9 条（停止判断与模型服务重试相同、产品决定改了合同以后的去向、部门提交只叫醒等待的会话）；docs/design/department-loop.md 开头收成一行状态，第 2 节表工程一行、第 5 节第一段、第 6 节放行一条同步 / #561 被 solo 第三次交回，三处在当时的 main 与分支上核对（docs/decision.md 同日一条）
 
+claude（总架构师） / 2026-10-27 10:10 / 改内核路径的工单不再事前批准：`docs/design/skeleton-and-application.md` 第 3.1 节最小投影一行改「字段只增、不含成果内容」、第 4 节「按版本取内容」改「按版本取摘要」并补通用条件要的接纳字段、第 5.5 节收紧检查的结果加「等待」并注明 M0 已删的两条不搬、第 12 节「批准」改写、表里 S1d 拆成 S1d-1（#1095）与 S1d（#860）、顺序行同步；`docs/design/trusted-kernel.md` 状态行与第 3 节末条、`docs/design/architecture/overall-architecture.md` 状态行与两处可信内核、`CONTEXT.md` 可信内核词条、ADR-0027 加 10-27 一条；`docs/architecture.html` 第二节「只由你批准」加一句阶段一不生效的注记；`docs/agents/triage-labels.md` 去掉等批准的 `waiting` 情形，`kernel-approved` 一节改为不再使用；`docs/decision.md` 新增 2026-10-27 一条 / 用户决定内核模块只要求测试覆盖与结束条件，不在工单上限制执行者能不能做；#860 交回查出最小投影缺通用条件要的字段、设计说明两句相抵
+
+claude（总架构师） / 2026-10-27 10:08 / docs/foundation-rules.md 基础规则 4 的具体规则：开发仓库里改内核清单与内核路径不事前批准，经 CI 里的内核测试与测试覆盖核对；运行中的实例仍经决定请求；更新行加 2026-10-27；ADR-0027 与 docs/decision.md 的「等用户动手」改为已改 / 用户授权总架构师修改并合并 PR #1096
+
+claude（总架构师） / 2026-10-27 10:40 / 让工作停下来等人的规则改掉九条：`docs/agents/dispatcher.md` 删派发前的依据核对、一轮做不完再派同一张、三轮才搁置；`docs/agents/triage-labels.md` 三次改三轮、`touches-core` 清单外文件补记后改；`docs/agents/acceptance-evidence.md` 第 2 节既有失败写证据即可批准；`docs/design/test-pyramid.md` 第 4.4 节执行者随工单删用例；`docs/decision.md` 新增一条 / 用户要求把阻碍工作流的规则都改掉
+
 solo-deepseek-v4.1-flash / 2026-10-27 12:03 / docs/architecture-issues.md 登记工单 #860 的一条：最小投影缺内核通用条件要的字段（`issuer`、按部门的这一轮编号、`qa_tests_hash` 等），设计说明第 4 节「裁决只读这一份」与第 80 行「裁决按版本取内容」待定一句为准；内核清单 `rules` 一节的登记与「不改已有的内核测试」冲突；「只改」漏了 `engine.py`、`context.py`、`smoke.py`、`submissions.py` 四个必须改的调用方；另记录拆单建议与行数读数（内核 5191 行、上限 5471，最小投影 214 行）/ 工单 #860 手写文件至少 30 个（运行配置第 7 节上限 15），按「工单太大」交回并给四张拆法；最小投影的字段边界与 #561 的第三种结果要架构师定
+
+claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `docs/design/skeleton-and-application.md` 状态行，第 5.4 节第 3 条加「做法」，第 5.5 节加「成果的内容由路由组装，内核盖统一字段」，第 12 节表加 S2c（#1098）与一直缺的 S6c（#979）、S6b 的前置加 S2c，顺序行同步；`docs/architecture-issues.md` #952 一条补处理行；`docs/current-baseline.md` 阶段一两行与更新行；`docs/design/README.md` 循环结构、画面与播放、部门指导三条的状态；`docs/requirements/README.md` D20；`docs/decision.md` 新增一条 / 阶段一工单诊断：第 5.4 节第 3 条没有工单，S6b 做不到不改骨架；父工单 #466、#476、#477、#950 核对后关闭
+
+claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `CLAUDE.md`「工单规范」环一条删「用例只由架构师删」；`.claude/skills/to-children/SKILL.md` 删减功能一段改为执行者随工单删用例；`docs/design/test-pyramid.md` 第 10 节第 5 条同步 / 同日 PR #1097 已把删用例改为执行者随工单删，这三处漏改

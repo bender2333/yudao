@@ -1,0 +1,188 @@
+# 工单 #1095：成果驱动特有的检查搬进应用层的收紧检查（harness/tightening.py）。
+#
+# 内核的通用检查（流版本、执行权、运行状态、边界、工具许可、提案合同）通过以后，写入口在同一个事务里
+# 问收紧检查一次；结果只有三种：通过、拒绝（写明原因）、等待（写入口按安全节点等，工单 #561）。
+# 这里逐条核对设计说明第 5.5 节列出的每一项成果驱动检查都经过这条缝运行，读的是成果的当前内容与
+# 应用状态，不是内核的通用规则：
+#   - 这个部门此刻能交哪些种类、询问分支的工具限制与回问深度；
+#   - 工作依据里的输入版本、放行等产品处理完输入；
+#   - 探索轮不能交质检结论、放行用当前质检测试材料；
+#   - 按 PRD 内容的检查：每条要求覆盖一次、有效决定逐条保留或退役、「设计中，未实施」的边界不是现有缺陷。
+#
+# 守 R2（缝的交换字段：TightenRequest 进去、Tightened 出来，只有通过、拒绝、等待三种，带上契约版本）
+# 与 R3（设计说明第 5.5 节写明的行为，经这条缝检查，不看收紧检查内部怎么组织）。
+
+from dataclasses import replace
+
+from harness.adapters.fake import FakeAdapter
+from harness.models import SessionRecord
+from harness.proposals import baseline_review, product_spec, review, structure
+from harness.runtime import LoopSystem
+from harness.tightening import WATCHED_OUTPUTS, pending_product_input
+from harness.tightening_contract import accept
+from harness.validation import TightenRequest
+
+MARK = "设计中，未实施"
+
+
+def _accepted(tmp_path, **extra) -> tuple[LoopSystem, str]:
+    # 产品提交第一次 PRD 并让它被接纳：投影里有一份当前的 PRD
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec(**extra)]))
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    return system, run_id
+
+
+def _working(projection, department: str):
+    # 这个部门正在工作：会话的记录是「工作中」（按调度算出来的当前工作由既有用例覆盖）
+    return replace(projection, sessions={**projection.sessions, department: SessionRecord(
+        session_id=f"ses_{department}", department=department, status="active")})
+
+
+def _structured(projection, department: str, proposal: dict, **extra) -> TightenRequest:
+    return TightenRequest(department=department, projection=projection, proposal=proposal, **extra)
+
+
+def _errors(tightened) -> list[tuple[str, str]]:
+    return [(error.field, error.message) for error in tightened.errors]
+
+
+def test_the_tightening_check_declares_the_contract_version():
+    # R2：这道缝是内核与路由之间的合同，实现声明契约版本，薄的一侧按版本接受
+    assert WATCHED_OUTPUTS.CONTRACT_VERSION == 1
+    assert accept(WATCHED_OUTPUTS) == 1
+
+
+def test_the_kinds_a_department_can_submit_come_from_the_tightening_check(tmp_path):
+    # R3：部门此刻能交的种类按调度算出来的当前工作决定（清点第 D 类）
+    system, run_id = _accepted(tmp_path)
+    projection = _working(system.project(run_id), "product")
+    assert "product_spec" in WATCHED_OUTPUTS.kinds(TightenRequest(department="product", projection=projection))
+    # 终态的 run 谁都不能再交；不认识的部门也没有种类
+    assert WATCHED_OUTPUTS.kinds(TightenRequest(department="product",
+                                                projection=replace(projection, status="done"))) == set()
+    assert WATCHED_OUTPUTS.kinds(TightenRequest(department="nobody", projection=projection)) == set()
+
+
+def test_a_submission_outside_the_current_work_is_refused_by_the_tightening_check(tmp_path):
+    # R3：这一轮不该交的东西由收紧检查拒绝，内核只问一次
+    system, run_id = _accepted(tmp_path)
+    projection = system.project(run_id)
+    # 产品此刻能交的是 PRD（可以在回答询问时修订），交付不是它这一刻的种类
+    tightened = WATCHED_OUTPUTS.tool(TightenRequest(
+        department="product", projection=projection,
+        tool={"id": "call", "name": "submit_delivery", "args": {}}))
+    assert tightened.reason == "This proposal is not permitted in the current department work."
+    assert not tightened.accepted and not tightened.wait and not tightened.deferred
+
+
+def test_a_stale_basis_defers_a_proposal_inside_the_tightening_check(tmp_path):
+    # R3：模型还没看见新输入时正式成果推迟到下一步（工单 #964），不是停止这一轮
+    from harness.adjudication import WorkBasis
+
+    system, run_id = _accepted(tmp_path)
+    projection = _working(system.project(run_id), "engineering")
+    basis = replace(WorkBasis.current(projection, "engineering"),
+                    input_version=projection.input_version - 1)
+    tightened = WATCHED_OUTPUTS.tool(TightenRequest(
+        department="engineering", projection=projection, basis=basis,
+        tool={"id": "call", "name": "submit_delivery", "args": {}}))
+    assert tightened.deferred and not tightened.accepted and not tightened.wait
+    assert "not accepted now" in (tightened.reason or "")
+
+
+def test_a_product_spec_waits_for_the_input_to_enter_product_work(tmp_path):
+    # R3：新输入要先进入产品这一轮的模型输入，之后才能改要求
+    system, run_id = _accepted(tmp_path)
+    projection = system.project(run_id)
+    newer = replace(projection, input_version=projection.input_version + 1)
+    tightened = WATCHED_OUTPUTS.submission(_structured(newer, "product", product_spec(change_record="changed")))
+    assert [field for field, _message in _errors(tightened)] == ["input_version"]
+
+
+def test_a_revised_product_spec_must_explain_and_dispose_every_decision(tmp_path):
+    # R3：修订要写改动说明，当前有效决定逐条保留、并入或退役（读 PRD 内容）
+    system, run_id = _accepted(tmp_path)
+    projection = system.project(run_id)
+    missing_record = WATCHED_OUTPUTS.submission(_structured(projection, "product", product_spec()))
+    assert [field for field, _message in _errors(missing_record)] == ["change_record"]
+    undeclared = WATCHED_OUTPUTS.submission(_structured(
+        projection, "product",
+        product_spec(change_record="changed", decision_changes=[{"decision_hash": "sha256:unknown",
+                                                                 "action": "retain"}])))
+    assert [field for field, _message in _errors(undeclared)] == ["decision_changes"]
+
+
+def test_a_review_without_a_delivery_is_refused_as_an_exploration_round(tmp_path):
+    # R3：探索轮没有可以核验的交付，交质检结论被拒绝
+    system, run_id = _accepted(tmp_path)
+    projection = replace(system.project(run_id),
+                         department_bases={"quality": "sha256:basis"},
+                         department_delivery_bases={"quality": None})
+    tightened = WATCHED_OUTPUTS.submission(_structured(projection, "quality", review("reject", "exploring")))
+    assert _errors(tightened) == [("delivery_spec", "this work has no delivery to review")]
+
+
+def test_a_release_must_use_the_current_quality_test_material(tmp_path):
+    # R3：测试材料变了以后，旧的检查回执不能拿来放行
+    system, run_id = _accepted(tmp_path)
+    projection = replace(system.project(run_id), qa_tests_hash="sha256:current")
+    tightened = WATCHED_OUTPUTS.submission(_structured(
+        projection, "quality", review("release", "verified"),
+        evidence=({"qa_tests_hash": "sha256:older"},)))
+    assert _errors(tightened) == [("checks", "测试材料已经改变，用当前的测试材料重新运行检查")]
+
+
+def test_a_release_waits_for_the_product_input_inside_the_commit(tmp_path):
+    # R3（工单 #561）：工具许可之后、提交之前产品又收到输入时，提交事务里再判一次，结果是等待；
+    # 写入口按安全节点等，醒来以后按此刻的 PRD 与交付重新裁决
+    system, run_id = _accepted(tmp_path)
+    system.add_input(run_id, "one more requirement")
+    projection = system.project(run_id)
+    events = tuple(system.store.list_events(run_id))
+    assert pending_product_input(projection, list(events))
+    tightened = WATCHED_OUTPUTS.submission(TightenRequest(
+        department="quality", projection=projection, proposal=review("release", "verified"),
+        events=events, commit=True))
+    assert tightened.wait and not tightened.accepted
+
+
+def test_every_requirement_of_the_product_spec_is_recorded_exactly_once(tmp_path):
+    # R3：现有结构说明按当前 PRD 的每条要求各记一次
+    system, run_id = _accepted(tmp_path)
+    projection = system.project(run_id)
+    tightened = WATCHED_OUTPUTS.submission(_structured(projection, "engineering", structure(
+        requirement_locations=[{"requirement": "something else", "locations": ["src/echo.py"]}])))
+    assert [field for field, _message in _errors(tightened)] == ["requirement_locations"]
+    assert "missing:" in tightened.errors[0].message
+
+
+def test_a_boundary_marked_design_not_implemented_is_not_an_existing_defect(tmp_path):
+    # R3：带标记的边界条目是设计里描述、代码尚未实现的能力，不能记成现有缺陷
+    system, run_id = _accepted(tmp_path, boundaries=[f"login flow: {MARK}"])
+    projection = system.project(run_id)
+    tightened = WATCHED_OUTPUTS.submission(_structured(projection, "quality", baseline_review(
+        conclusions=[{"requirement": "login flow", "status": "existing_defect", "evidence": "smoke"}])))
+    assert [field for field, _message in _errors(tightened)] == ["conclusions[0].status"]
+    assert MARK in tightened.errors[0].message
+
+
+def test_a_submission_that_the_kernel_rejects_is_never_accepted_by_the_tightening_check(tmp_path):
+    # R2：收紧检查只收窄：它放行的那一次，内核的拒绝照样生效（内核先判，这里只多拒绝）
+    from harness.actions import FactsQuery
+    from harness.adjudication import proposal_decision
+    from harness.environment import LocalEnvironment
+
+    system, run_id = _accepted(tmp_path)
+    projection = _working(system.project(run_id), "product")
+    environment = LocalEnvironment(system.workspace(run_id))
+    facts = environment.query(FactsQuery(tree=True)).tree
+    # 依据的 PRD 版本不是当前版本：内核的提案合同拒绝；收紧检查自己的三条都通过（输入版本已进来、
+    # 修订写了改动说明、有效决定为空也声明了空），所以这一次只有内核在拒绝
+    proposal = product_spec(basis_product_spec_hash="sha256:not-current",
+                            change_record={"rationale": "changed the goal", "changed": [], "retained": [],
+                                           "retired": []})
+    decision = proposal_decision(projection, department="product", proposal=proposal, facts=facts,
+                                 events=system.store.list_events(run_id), tightening=WATCHED_OUTPUTS)
+    assert not decision.accepted
+    assert decision.errors and decision.errors[0].field == "basis_product_spec_hash"

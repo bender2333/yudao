@@ -15,6 +15,7 @@ from harness.engine import StepDriver, StepLimits
 from harness.models import EventType, new_id
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
+from harness.tightening import WATCHED_OUTPUTS
 
 # 测试里的薄驱动一侧：开始一轮工作，第一步继续、第二步停下；提供步骤驱动要问的两样设置
 class _ThinDriver:
@@ -102,6 +103,7 @@ def test_the_route_work_reference_reaches_the_assembly_input(tmp_path):
             adapter=adapter, facade=system.facade,
             environment=system.orchestrator._environment_for(run_id, "product", refresh=True),
             nodes=node, cancelled=Event(), deltas=system.deltas,
+            tightening=WATCHED_OUTPUTS,
         )
         return await driver.result()
 

@@ -10,6 +10,7 @@ from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import quality_turns
+from harness.tightening import WATCHED_OUTPUTS
 
 
 def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path):
@@ -197,7 +198,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         basis=basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_write.allowed
 
     # 工程分支试图提交交付
@@ -209,7 +210,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         basis=basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_del.allowed
 
     # 质检分支试图提交放行或缺陷记录
@@ -227,7 +228,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         basis=qa_basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_rev.allowed
 
     # 产品分支试图执行除 answer 之外的工具被拒绝
@@ -245,7 +246,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         basis=prod_basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_prod_read.allowed
 
 

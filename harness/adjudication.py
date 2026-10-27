@@ -7,12 +7,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
-from .collaboration import pending_product_input, tool_error
 from .contracts import current_contract_hash
 from .definitions import DEFINITIONS
 from .models import TERMINAL_STATUSES, Event, RunProjection, hash_bytes
-from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for
-from .validation import FieldError, ProposalDecision, evaluate_proposal
+from .tools import has_tool, tool_action
+from .validation import (FieldError, ProposalDecision, TightenRequest, Tightening, evaluate_proposal)
 
 _STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
                 "stale results cannot be rebound.")
@@ -89,52 +88,12 @@ def ask_chain_max_depth() -> int:
     return int(DEFINITIONS.rule_value("organization.ask_chain_max_depth"))
 
 
-def _ask_branch_permission(projection: RunProjection, session_id: str | None, department: str,
-                            name: str) -> ToolPermission | None:
-    # 分支会话的许可按会话判定：这个会话是不是某个询问的分支（工单 #473 的嵌套询问）。
-    # 同一个部门的主线会话与分支会话是两回事，只有分支会话受分支的约束。
-    if projection.ask_by_branch(session_id) is None:
-        if name == "answer":
-            return ToolPermission(reason="answer tool is only available in an ask branch session")
-        return None
-    if name == "answer":
-        return ToolPermission()
-    if name == "ask":
-        # 回问：在被问部门那里另开一个询问分支，层数不超过上限（工单 #473）
-        if projection.ask_by_origin(session_id) is not None:
-            # 这个会话自己那次询问还没结束：继续这一层，不新开一层
-            return None
-        allowed, reason = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
-        return None if allowed else ToolPermission(reason=reason)
-    if department == "product":
-        return ToolPermission(reason="Product ask branch can only submit answer")
-    if _is_write(name):
-        return ToolPermission(reason="The branch session cannot modify files in the running workspace")
-    if name == "submit_delivery":
-        return ToolPermission(reason="The branch session cannot submit delivery")
-    if name == "submit_review":
-        return ToolPermission(reason="The branch session cannot submit QA review")
-    if proposal_kind(name) is not None:
-        return ToolPermission(reason=f"The branch session cannot submit proposal {name}")
-    return None
-
-
-def offered_tools(projection: RunProjection, department: str, *, session_id: str | None = None,
-                  input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
-    # 请求中提供给模型的工具：部门的工具去掉当前工作不允许的提交，
-    # 最后按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具（设计说明第 5.6 节）
-    available = tools_for(department, projection.kind)
-    if projection.ask_by_branch(session_id) is not None:
-        # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案（工单 #473）
-        chain_allowed, _ = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
-        nested = ["ask"] if chain_allowed else []
-        if department == "product":
-            return ["answer"] + nested
-        allowed = [name for name in available
-                   if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
-        return allowed + ["answer"] + nested
-    return [name for name in offers_with_input(available, input_modalities)
-            if tool_error(projection, department, name, {}) is None]
+def offered_tools(projection: RunProjection, department: str, *, tightening: Tightening,
+                  session_id: str | None = None, input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
+    # 请求中提供给模型的工具：内核给出部门完整的工具清单，由路由的收紧检查按这一轮的工作与询问分支取舍，
+    # 再按调用目标的输入方式去掉声明需要图像输入的工具（设计说明第 5.6 节，工单 #1095）
+    return tightening.offered(TightenRequest(department=department, projection=projection,
+                                             session_id=session_id, input_modalities=input_modalities))
 
 
 def facts_query(call: dict[str, Any]) -> FactsQuery:
@@ -152,10 +111,11 @@ def tool_permission(
     call: dict[str, Any],
     *,
     department: str,
-    session_id: str | None = None,
+    tightening: Tightening,
     basis: WorkBasis,
     aborted: bool,
     facts: WorkspaceFacts,
+    session_id: str | None = None,
     events: list[Event] | None = None,
 ) -> ToolPermission:
     # facts 是执行环境按 facts_query(call) 查询的结果
@@ -164,28 +124,20 @@ def tool_permission(
     if projection.status in TERMINAL_STATUSES or aborted:
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
-    # 正式成果要等模型看见新输入以后再提交：这次提交先不做，下一步的通知里写明新输入
-    # （工单 #964）。工具许可的依据是这次请求装配时的输入版本（basis），
-    # 它比当前版本旧就说明模型还没有看到这条输入。
-    if proposal_kind(name) is not None and projection.input_version != basis.input_version:
-        return ToolPermission(reason=(
-            "new user input arrived and has not entered this session's model input yet; "
-            "this proposal is not accepted now. Read the work_notification of the next step, then submit again"
-        ), deferred=True)
-    branch_perm = _ask_branch_permission(projection, session_id, department, name)
-    if branch_perm is not None:
-        return branch_perm
-    if not has_tool(department, name, projection.kind):
-        return ToolPermission(reason=f"{department} cannot use {name}")
-    reason = tool_error(projection, department, name, args)
-    if reason:
-        return ToolPermission(reason=reason)
-    # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：还有没处理完的输入时，
-    # 这一次调用在安全节点上等，醒来以后按此刻的 PRD 与交付重新做许可。只有质检的放行等，缺陷记录不等；
-    # 还没有交付的预测性探索也不等：没有可以放行的交付，这次提交本来就只会被拒绝
-    if (_is_release_submission(department, name, args) and projection.delivery_spec is not None
-            and pending_product_input(projection, list(events or ()))):
+    # 成果驱动的取舍交给路由的收紧检查（工单 #1095）：推迟、询问分支、这个部门此刻能交的种类、放行等输入处理完。
+    # 内核自己判的是运行状态（上面）、部门有没有这个工具与写入目标的规范形式（下面）
+    tight = tightening.tool(TightenRequest(department=department, projection=projection,
+                                           session_id=session_id, basis=basis, tool=call,
+                                           events=tuple(events or ())))
+    if tight.wait:
+        # 等待由步骤驱动的安全节点处理（工单 #561）：不写事件、不占步数、不返回模型
         return ToolPermission(wait_for_input=True)
+    if tight.errors:
+        return ToolPermission(reason=tight.errors[0].message)
+    if tight.reason is not None:
+        return ToolPermission(reason=tight.reason, deferred=tight.deferred)
+    if not tight.permitted and not has_tool(department, name, projection.kind):
+        return ToolPermission(reason=f"{department} cannot use {name}")
     if _is_write(name):
         reason = _write_path_error(name, args, facts)
         if reason:
@@ -194,10 +146,10 @@ def tool_permission(
 
 
 def proposal_decision(projection: RunProjection, *, department: str, proposal: dict[str, Any] | None,
-                      facts: TreeFacts, events: list[Event]) -> ProposalDecision:
+                      facts: TreeFacts, tightening: Tightening, events: list[Event]) -> ProposalDecision:
     # 提案校验：按投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误
-    return evaluate_proposal(department=department, proposal=proposal,
-                             projection=projection, facts=facts, events=events)
+    return evaluate_proposal(department=department, proposal=proposal, projection=projection,
+                             facts=facts, tightening=tightening, events=events)
 
 
 def commit_decision(
@@ -210,6 +162,7 @@ def commit_decision(
     current: RunProjection,
     current_facts: TreeFacts,
     events: list[Event],
+    tightening: Tightening,
 ) -> ProposalDecision:
     # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。校验以后工作区改变，
     # 或者当前工作已经不是校验时的那一份，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
@@ -221,27 +174,15 @@ def commit_decision(
         return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
     if decision.accepted:
         decision = proposal_decision(current, department=department, proposal=proposal,
-                                     facts=current_facts, events=events)
-    if decision.accepted and _is_pending_release(department, proposal, current, events):
-        # 新输入在工具许可之后、提交之前到达：这次放行不当场生效，交回质检，等产品处理完再提交
-        # （部门指导设计说明第 2.1 节，工单 #561）
-        return ProposalDecision(False, [FieldError("kind", _PENDING_INPUT_RELEASE)])
+                                     facts=current_facts, tightening=tightening, events=events)
+    if decision.accepted:
+        # 新输入在工具许可之后、提交之前到达：这次提交不当场生效，交回部门，等产品处理完再提交
+        # （部门指导设计说明第 2.1 节，工单 #561）。这件事由路由的收紧检查在提交事务里再判一次（工单 #1095）
+        tight = tightening.submission(TightenRequest(department=department, projection=current, proposal=proposal,
+                                                     events=tuple(events), commit=True))
+        if tight.wait:
+            return ProposalDecision(False, [FieldError("kind", _PENDING_INPUT_RELEASE)])
     return decision
-
-
-def _is_release_submission(department: str, name: str, args: dict[str, Any]) -> bool:
-    # 只有质检的放行（submit_review，结论是 release）等输入处理完；质检提交缺陷记录不等（工单 #561）
-    return department == "quality" and name == "submit_review" and args.get("verdict") == "release"
-
-
-def _is_pending_release(department: str, proposal: dict[str, Any] | None, projection: RunProjection,
-                        events: list[Event]) -> bool:
-    # 同样只有放行：产品还没有处理完的输入（用户输入或发给产品的指导）让这次放行交回质检
-    if department != "quality" or not isinstance(proposal, dict):
-        return False
-    if proposal.get("kind") != "qa_review" or proposal.get("verdict") != "release":
-        return False
-    return pending_product_input(projection, list(events))
 
 
 def _is_write(name: str) -> bool:

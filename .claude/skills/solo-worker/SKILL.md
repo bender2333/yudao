@@ -1,6 +1,6 @@
 ---
 name: solo-worker
-description: 以 solo 执行者身份做完一张工单：领取、三项核对、实现自测、PR、等 CI、交付说明、合并前核对、--admin 合并；设计问题、工单太大、连续三次没过交回 needs-triage，执行环境挡住转 ready-for-human。任何 harness（Claude Code 的 /solo 循环、Hermes、OpenCode）的 solo 执行者都读这一份；/solo 循环的任务书指到这里。
+description: 以 solo 执行者身份做完一张工单：领取、三项核对、实现自测、PR、等 CI、交付说明、合并前核对、--admin 合并；设计问题、连续三轮没过交回 needs-triage，执行环境挡住转 ready-for-human。任何 harness（Claude Code 的 /solo 循环、Hermes、OpenCode）的 solo 执行者都读这一份；/solo 循环的任务书指到这里。
 argument-hint: "<工单编号> [里程碑标题]"
 ---
 
@@ -43,10 +43,10 @@ argument-hint: "<工单编号> [里程碑标题]"
 2. **读要求**：工单正文、最近的任务评论、链接的设计说明、`CONTEXT.md` 与相关 ADR。任务书与工单正文冲突时按工单正文做，收尾里指出冲突。
 3. **三项核对**（动手之前，`AGENTS.md`「执行者」第 2 步）：
    - 「依据」一行的每份设计说明在那个提交以后 main 上有没有改动：`git log --oneline <提交>..origin/main -- <设计说明>` 有输出就是有改动。有改动就读改动，以 main 的现状为准，在日记里写明差异怎么处理；没有「依据」一行的跳过。
-   - 完成工单要改的手写文件是否都在「只改」清单之内，个数有没有超过运行配置第 7 节的上限；工单带 `kernel-approved` 时正文「环」一行要有批准行，带 `touches-core` 时记住后面第 8 步多一次集成层。
+   - 完成工单要改的手写文件有没有在「只改」清单之外，有就在工单评论里补记文件与原因；个数超过运行配置第 7 节的上限记在日记，不交回；带 `touches-core` 时记住后面第 8 步多一次集成层。
    - 正文列出的函数、字段与文件在当前代码里能不能找到。
 
-   「只改」超上限、符号找不到、要改清单外的文件而工单带 `kernel-approved` 或 `touches-core`：按「三条通道」交回，不先动手。不带这两个标签、要改清单外的文件：在工单评论里补记要改的文件与原因，然后改。
+   符号找不到：找到它现在的位置或替代物，日记写明；工单要的东西已经不存在、目标做不成才按「三条通道」交回。要改清单外的文件：在工单评论里补记要改的文件与原因，然后改，改内核路径的工单也一样。
 4. **实现**：测试先行；在分支上提交，**分阶段提交**（被中断时已经推上去的还在）。
 5. **日记**：`agents_jour/<编号>.md`，随分支提交，不直接推 main。
 6. **自测**：跑与改动相关的测试文件（包括新增的集成层文件）；改动涉及 `client/` 再跑相关前端测试；逐条核对验收标准。失败项的细节用 `--tb=short` 或 `--lf` 再看，不要把长日志贴进输出。新增测试文件在 `harness/tests/layers.toml` 补一行登记，放在第一个能到达其结论的层。
@@ -54,9 +54,8 @@ argument-hint: "<工单编号> [里程碑标题]"
 8. **等 CI**：`gh pr checks issue-<编号> --watch`。失败就改、提交、推送，直到通过。**不要开自动合并**（它会跳过第 10 步）。
    - 失败项明显与本次改动无关时，先 `gh run rerun <运行号> --failed` 重跑一次；重跑过了就在交付说明里写明这个不稳定测试，仍然失败按自己的问题修。
    - **带 `touches-core` 的工单**：`check` 绿了以后在分支上跑一次集成层：`gh workflow run CI --ref issue-<编号>` → `gh run list --workflow CI --branch issue-<编号> --limit 1` 拿运行号 → `gh run watch <运行号>`（约 15 分钟）。失败项与 main 最近 7 天比（`gh run list --workflow CI --branch main --event push --limit 5`）：main 上也失败过的是不稳定项，写进交付说明；main 上没失败过的按自己的问题修，修好再跑。这次运行的链接写进交付说明。
-9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、删掉的用例逐条写「用例名 + 依据（哪条 ADR 或工单删的）」，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。工单没写到的删除不要自己删，按「三条通道」交回。
-10. **合并前的核对**（`AGENTS.md`「Solo 模式」第 4 步，六项都成立才合并）：
-    - 「环」是需你批准的工单带 `kernel-approved` 标签与总架构师的批准行；没有的交回（`needs-triage`，评论写明缺批准），不合并。
+9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、删掉的用例逐条写「用例名 + 依据（哪条 ADR 或工单删的）」，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。工单没写明删除的行为，用例只改写不删。
+10. **合并前的核对**（`AGENTS.md`「Solo 模式」第 4 步，五项都成立才合并）：
     - `git fetch origin main && git merge origin/main`（冲突在自己的分支上解，解不开按下面「冲突解不开」交回）；`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过。
     - 工作区没有未提交也未推送的改动。
     - 交付说明里每条验收核对都有证据。
@@ -103,11 +102,10 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 | 情况 | 标签 | 循环里的收尾 | 单独运行时 |
 | --- | --- | --- | --- |
-| 设计问题：与设计冲突、设计遗漏边界、规则互相矛盾、验收标准无法满足或互相矛盾、要改 `kernel-approved` / `touches-core` 工单「只改」以外的文件 | `needs-triage` | 评论写到 `<工作目录>/.tmp/<编号>-question.md`，`STATUS: blocked`，`ERROR` 以 `[设计]` 开头，后面写问题一句话与那个文件的绝对路径 | `gh issue edit <编号> --remove-label in-progress --add-label needs-triage`，`gh issue comment <编号> --body-file <文件>` |
-| 工单太大：手写文件超过运行配置第 7 节的上限 | `needs-triage` | 同上，评论写建议怎么拆 | 同上 |
-| 同一张工单连续三次没有通过（本地测试或 CI） | `needs-triage` | 每次失败照实报 `STATUS: blocked`，不带前缀；第三次由编排者 `escalate` | 自己交回，评论写三次分别卡在哪、试过什么 |
+| 设计问题：工单要求的做法与设计说明相反、规则互相矛盾、验收标准无法满足或互相矛盾（设计没写到的边界自己定、登记架构问题、继续做） | `needs-triage` | 评论写到 `<工作目录>/.tmp/<编号>-question.md`，`STATUS: blocked`，`ERROR` 以 `[设计]` 开头，后面写问题一句话与那个文件的绝对路径 | `gh issue edit <编号> --remove-label in-progress --add-label needs-triage`，`gh issue comment <编号> --body-file <文件>` |
+| 同一张工单连续三轮没有通过（一轮一次会话，收尾报 failed 或 blocked 算一次；本地测试失败不算） | `needs-triage` | 每轮失败照实报 `STATUS: blocked`，不带前缀；第三轮由编排者 `escalate` | 自己交回，评论写三轮分别卡在哪、试过什么 |
 | 执行环境挡住：跑不了测试、缺凭据、权限不够、CI 平台挂了、依赖装不上、网络不通 | `ready-for-human` | 评论写到 `<工作目录>/.tmp/<编号>-env.md`，`ERROR` 以 `[环境]` 开头 | `--remove-label in-progress --add-label ready-for-human`，发评论 |
-| 要改规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、评测的隐藏检查、参考解法、评分器与发布检查（可信内核清单与 `harness/tests/kernel/` 不在其中：工单带 `kernel-approved`、「只改」里列了就可以改，要求是内核路径的测试覆盖，`AGENTS.md` 共同要求） | `ready-for-human` | PR 上写明理由，评论写清要用户决定什么，收尾 blocked | 同上 |
+| 要改规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、评测的隐藏检查、参考解法、评分器与发布检查（可信内核清单与 `harness/tests/kernel/` 不在其中：可以改，不需要事前批准，要求是内核路径的测试覆盖，`AGENTS.md` 共同要求） | `ready-for-human` | PR 上写明理由，评论写清要用户决定什么，收尾 blocked | 同上 |
 
 交回的评论用这个结构，最后一行署名：
 
@@ -130,7 +128,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 - **工单正文或评论在你工作期间被改**：以最新的正文与最新的任务评论为准；实现与新正文对不上就按新正文调整，在工单上留一条评论写明差异与影响。
 - **main 的 CI 红了**：不是你造成的就记一笔继续做；你自己的 PR 上 `check` 不绿就不能合。
 - **合并冲突按文件类型处理**：登记类（测试登记表、基准登记）两边都保留；生成类（接口快照、生成的客户端类型）以最新 main 重新生成，不手改生成物；记录类（`docs/CHANGELOG.md`）两边条目都保留。
-- **冲突解不开**：多半是与同时进行的另一张工单改到了同一处，属于拆分问题，按设计问题交回（`[设计]`），写清哪个文件、哪几行、双方各自改了什么，不要反复重试，也不要硬合。
+- **冲突**：自己解。只有两边改了同一段逻辑、取哪一边都丢行为的，按设计问题交回（`[设计]`），写清哪个文件、哪几行、双方各自改了什么，不要硬合。
 - **时间用完仍没过 CI**：提交并推送已完成的部分，PR 上评论做到哪里、还剩什么，标签保持 `in-progress`。
 
 ## 收尾格式（循环里）
