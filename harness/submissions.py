@@ -24,6 +24,32 @@ from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
 
 
+# 成果接纳事件的统一字段（设计说明第 4 节、第 5.4 节第 6 条）：成果种类、版本、依据与内容摘要。
+# 最小投影按这组字段折叠，不按事件种类逐个写，加一种成果种类不改最小投影的代码。
+# 「依据」按「成果种类 → 内容摘要」记下这一版建立在哪些成果版本上：载荷里指名所依据成果版本的字段
+# 就是这几种；上一版（parent_hash）的依据是同一类成果的上一版。
+_BASIS_FIELDS = (
+    ("product_spec_hash", "product_spec"),
+    ("effective_contract_hash", "contract"),
+    ("structure_hash", "structure"),
+    ("delivery_spec_hash", "delivery_spec"),
+)
+
+
+def acceptance_fields(kind: str, artifact: dict[str, Any], *, version: int,
+                      ref: dict[str, Any] | None = None) -> dict[str, Any]:
+    # 写进接纳事件的那一组统一字段。只增不改：已有的字段不动，内容摘要仍是各自的 content_hash
+    basis = {name: artifact[key] for key, name in _BASIS_FIELDS
+             if isinstance(artifact.get(key), str) and artifact[key]}
+    parent = artifact.get("parent_hash")
+    if isinstance(parent, str) and parent:
+        basis.setdefault(kind, parent)
+    fields: dict[str, Any] = {"artifact_kind": kind, "artifact_version": version, "artifact_basis": basis}
+    if ref is not None:
+        fields["artifact_ref"] = ref
+    return fields
+
+
 @dataclass(frozen=True)
 class Acceptance:
     # 准备好的一次接纳：要追加的全部事件、其中承载接纳结果的那一条，以及恢复原来材料的补偿
@@ -76,6 +102,7 @@ class SubmissionWriter:
             if projection.product_spec:
                 append(EventType.SPEC_SUPERSEDED, {"content_hash": projection.product_spec.content_hash,
                                                  "revision": projection.product_spec.revision})
+            spec.update(acceptance_fields("product_spec", spec, version=int(spec["revision"])))
             return append(EventType.SPEC_ACCEPTED, spec, [spec["content_hash"]])
 
         kind = artifact["kind"]
@@ -84,6 +111,8 @@ class SubmissionWriter:
             updates["specs/product.json"] = _json_bytes(prepared[event][1])
         elif kind == "product_decision":
             artifact["id"] = new_id("decision")
+            # 产品决策各自是一件成果，没有版本号：记作它的第一版
+            artifact.update(acceptance_fields("product_decision", artifact, version=1))
             event = append(EventType.PRODUCT_DECISION_ACCEPTED, artifact, [artifact["content_hash"]])
         elif kind == "delivery_spec":
             if artifact["code_tree_digest"] != snapshot.digest:
@@ -92,6 +121,8 @@ class SubmissionWriter:
             ref = store_tree(self.artifacts, run_id, snapshot.tree)
             environment.verify_tree(snapshot)
             artifact["tree_ref"] = asdict(ref)
+            artifact.update(acceptance_fields("delivery_spec", artifact, version=int(artifact["revision"]),
+                                              ref=asdict(ref)))
             event = append(EventType.DELIVERY_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/delivery.json"] = _json_bytes(prepared[event][1])
             updates["specs/delivery-tree.json"] = _json_bytes(snapshot.tree.manifest)
@@ -112,6 +143,8 @@ class SubmissionWriter:
             ref = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
             environment.verify_tree(snapshot)
             artifact["evidence_refs"] = [asdict(ref)]
+            artifact.update(acceptance_fields("qa_review", artifact, version=int(artifact["revision"]),
+                                              ref=asdict(ref)))
             event = append(EventType.QA_SUBMITTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/qa.json"] = _json_bytes(prepared[event][1])
         elif kind == "structure":
@@ -122,6 +155,8 @@ class SubmissionWriter:
             artifact["id"] = new_id("structure")
             ref = self.artifacts.put(run_id, "structure", render_structure(artifact), media_type="text/markdown")
             artifact["structure_ref"] = asdict(ref)
+            artifact.update(acceptance_fields("structure", artifact, version=int(artifact["revision"]),
+                                              ref=asdict(ref)))
             event = append(EventType.STRUCTURE_ACCEPTED, artifact, [artifact["content_hash"], ref.content_hash])
             updates["specs/structure.json"] = _json_bytes(prepared[event][1])
             updates["STRUCTURE.md"] = materials["STRUCTURE.md"] = self.artifacts.get_for_run(run_id, ref)
@@ -130,6 +165,7 @@ class SubmissionWriter:
                 raise ValueError("Baseline review does not match the snapshot of the onboarding run")
             environment.verify_tree(snapshot)
             artifact["id"] = new_id("baseline")
+            artifact.update(acceptance_fields("baseline_review", artifact, version=int(artifact["revision"])))
             event = append(EventType.BASELINE_REVIEW_ACCEPTED, artifact, [artifact["content_hash"]])
             updates["specs/baseline.json"] = _json_bytes(prepared[event][1])
         else:
@@ -142,6 +178,8 @@ class SubmissionWriter:
                 markdown = render_prd(current, contract)
                 ref = self.artifacts.put(run_id, "prd", markdown, media_type="text/markdown")
                 contract["prd_ref"] = asdict(ref)
+                contract.update(acceptance_fields("contract", contract, version=int(contract["revision"]),
+                                                  ref=asdict(ref)))
                 append(EventType.CONTRACT_ACCEPTED, contract, [contract["content_hash"], ref.content_hash])
                 decisions = [{key: value for key, value in asdict(item).items()
                               if key not in {"run_id", "created_event_id"}} for item in current.effective_decisions]

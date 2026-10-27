@@ -13,7 +13,7 @@ from harness.runtime import LoopSystem
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 本文件里等待一次激活收尾或等待对方线程到达会合点的墙钟界限只用来防止测试一直等待，按 #107 的裁定
-# （架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常用时的值。
+# （架构师 2026-09-27 16:55，docs/archive/architecture-issues-2026-09-10.md）设为远大于正常用时的值。
 # 收尾包含 Git 版本库写入一次版本，正常用时数秒；这些界限不判定被测行为，
 # 被等待的动作是否发生由收尾之后的断言核对。
 _WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
@@ -109,7 +109,7 @@ def test_completed_observations_are_live_and_survive_later_stop(tmp_path, finish
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_provider_usage_does_not_interrupt_a_model_call_or_handoff(tmp_path):
+def test_provider_usage_does_not_interrupt_a_model_call_or_the_round_of_work(tmp_path):
     observed, release = Event(), Event()
     continued = []
 
