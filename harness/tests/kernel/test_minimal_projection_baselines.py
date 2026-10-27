@@ -65,6 +65,18 @@ def test_the_minimal_projection_matches_the_run_projection(name, data_dir):
     assert projection.pending_decisions == pending, name
 
     # 每种正式成果的当前版本与工件引用
+    # 2026-10-27 补的字段（S1d，工单 #860）：作者部门与记下的树摘要，与运行状态投影里这些成果的字段一致
+    assert _issuers(projection) == _expected_issuers(state), name
+    assert _trees(projection) == _expected_trees(state), name
+    # 按部门的本轮编号：主线会话这一轮的编号与运行状态投影记下的最近激活相同
+    assert {department: value for department, value in projection.rounds.items() if value} == state.last_activations, name
+    # 多版并存的清单：产品决定按接纳顺序都在清单里，单版的种类只有当前这一版
+    assert [item.content_hash for item in projection.versions_of("product_decision")] == [
+        item.content_hash for item in state.product_decisions], name
+    for kind, items in projection.versions.items():
+        if kind != "product_decision":
+            assert [item.content_hash for item in items] == [projection.artifacts[kind].content_hash], name
+
     spec = state.product_spec
     _the_artifact_is(projection, "product_spec", spec and (spec.revision, spec.content_hash), name)
     contract = state.effective_contract
@@ -87,8 +99,59 @@ def test_the_minimal_projection_matches_the_run_projection(name, data_dir):
     _the_artifact_is(projection, "delivery_spec",
                      delivery and (delivery.revision, delivery.content_hash), name,
                      ref=delivery and delivery.tree_ref.content_hash)
+    # 事项创建事件里记下的代码树快照（S1d，工单 #860）：它不是运行状态投影里的一种成果，
+    # 只提供通用条件 4 要的树摘要，这里单独核对以后从对照清单里取掉
+    snapshot = state.snapshot
+    if isinstance(snapshot, dict) and snapshot.get("tree_digest"):
+        assert projection.artifacts.pop("snapshot", None) is not None, f"{name}: 快照没有折进最小投影"
+    else:
+        assert "snapshot" not in projection.artifacts, f"{name}: 最小投影里多出快照"
     # 每一种成果都有对应的运行状态项，没有多出来的
     assert projection.artifacts == {}, f"{name}: 最小投影里多出没有对照的成果 {sorted(projection.artifacts)}"
+
+
+def _issuers(projection) -> dict[str, str | None]:
+    # 最小投影里每种成果的作者部门
+    return {kind: artifact.issuer for kind, artifact in projection.artifacts.items()}
+
+
+def _expected_issuers(state) -> dict[str, str | None]:
+    # 运行状态投影里这些成果各自的作者部门：接纳事件的统一字段与它们同一个来源
+    expected: dict[str, str | None] = {}
+    for kind, value in (("product_spec", state.product_spec), ("delivery_spec", state.delivery_spec),
+                        ("qa_review", state.last_review), ("structure", state.structure),
+                        ("baseline_review", state.baseline_review)):
+        if value is not None:
+            expected[kind] = value["issuer"] if isinstance(value, dict) else value.issuer
+    if state.effective_contract is not None:
+        # 合同由主机签发，没有作者部门这一项
+        expected["contract"] = None
+    return expected
+
+
+def _trees(projection) -> dict[str, str | None]:
+    # 最小投影里每种成果记下的树摘要
+    return {kind: artifact.tree_digest for kind, artifact in projection.artifacts.items()}
+
+
+def _expected_trees(state) -> dict[str, str | None]:
+    # 运行状态投影里这些成果记下的树摘要：交付记代码树、建档记快照的树，其余为空
+    expected: dict[str, str | None] = {}
+    if state.product_spec is not None:
+        expected["product_spec"] = None
+    if state.effective_contract is not None:
+        expected["contract"] = None
+    if state.delivery_spec is not None:
+        expected["delivery_spec"] = state.delivery_spec.code_tree_digest
+    if state.last_review is not None:
+        expected["qa_review"] = state.last_review.code_snapshot_hash
+    if state.structure is not None:
+        expected["structure"] = state.structure["code_tree_digest"]
+    if state.baseline_review is not None:
+        expected["baseline_review"] = state.baseline_review["code_snapshot_hash"]
+    if isinstance(state.snapshot, dict) and state.snapshot.get("tree_digest"):
+        expected["snapshot"] = state.snapshot["tree_digest"]
+    return expected
 
 
 def _the_artifact_is(projection, kind, expected, name, *, ref=None):

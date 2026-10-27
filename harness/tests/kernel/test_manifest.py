@@ -30,21 +30,6 @@ def _modules(manifest: dict) -> list[str]:
             if entry["kind"] == "module" and entry["path"].endswith(".py") and (REPO_ROOT / entry["path"]).exists()]
 
 
-def _material_paths(manifest: dict) -> list[str]:
-    # 清单里 kind 为 material 的路径展开（隐藏检查与参考解法按场景名展开），不参加两项检查
-    paths = []
-    for entry in manifest["paths"]:
-        if entry["kind"] != "material":
-            continue
-        path = entry["path"]
-        if _is_glob(path):
-            paths.extend(sorted(str(item.relative_to(REPO_ROOT)).replace("\\", "/")
-                                for item in REPO_ROOT.glob(path) if item.is_file()))
-        else:
-            paths.append(path)
-    return paths
-
-
 def _module_of(relative: str) -> str:
     stem = relative[len("harness/"):]
     if stem.endswith("/__init__.py"):
