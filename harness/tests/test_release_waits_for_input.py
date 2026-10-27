@@ -70,6 +70,20 @@ def _wait_for_the_defect_record(holder, run_id):
         yield ModelStreamEvent(kind="stream_event", id="evt-wait")
 
 
+def _wait_for_the_release_rejection(holder, run_id):
+    # 工程按新合同重新交付的时机由这里定：等放行先因交付不再有效被拒绝，再交付。
+    # 放行的裁决与工程的重新交付是同时进行的两个会话，先后随调度变化；这条用例要验的是
+    # 「拒绝一次、然后重新交付」，因此让工程等到拒绝以后
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        if any(event.type == EventType.PROPOSAL_REJECTED and event.department == "quality"
+               for event in _events(holder["system"], run_id)):
+            holder["release_rejected"] = True
+            return
+        yield ModelStreamEvent(kind="stream_event", id="evt-wait")
+    raise AssertionError("放行没有被拒绝")
+
+
 def test_a_release_waits_until_the_product_round_ends(tmp_path):
     # 验收第 1 条（1）：质检提交放行时产品正在一轮工作中处理用户的新输入，放行等到这一轮结束再裁决；
     # 产品没有修订 PRD，放行被接纳（反例 8 的前两句）
@@ -494,9 +508,15 @@ def test_a_release_is_rejected_after_the_product_makes_a_decision(tmp_path):
             "输入要求输出大写，作为补充决定写进合同。",
         )
 
+    def deliver_after_the_release_is_rejected(request):
+        # 工程按新合同重新交付放在拒绝之后：两个会话同时进行，先后随调度变化，
+        # 这条用例验的是「放行先被拒绝」（#1079）
+        yield from _wait_for_the_release_rejection(holder, request.run_id)
+        return delivery_turn()(request)
+
     adapter = FakeAdapter({
         "product": [product_spec(), decide_while_the_release_waits],
-        "engineering": [delivery_turn(), delivery_turn()],
+        "engineering": [delivery_turn(), deliver_after_the_release_is_rejected],
         "quality": [review_turn("release", "checks passed on the current delivery")]
                    + quality_turns("release", "checks passed on the current delivery"),
     }, stream_gap_sec=0.01)
@@ -523,3 +543,77 @@ def test_a_release_is_rejected_after_the_product_makes_a_decision(tmp_path):
     assert rejected.payload["errors"][0]["message"] == "no active DeliverySpec"
     assert projection.stop_reason == "cancelled"
     assert projection.last_review is None
+
+
+def test_the_item_finishes_after_the_product_makes_a_decision(tmp_path):
+    # 验收第 1 条（#1079，部门指导设计说明第 2.1 节第 2 点、第 4 节第 9 条）：产品决定改了
+    # 有效合同，PRD 没有新版本。放行因交付不再有效被拒绝一次；工程按新合同重新交付；
+    # 质检在下一步收到新增决定的通知；新交付上的放行被接纳，事项以 done 结束，
+    # 不空转到循环上限。守 R3（写到设计说明里的行为）：只经事件流与投影检查做成了什么
+    holder: dict[str, object] = {}
+    seen: dict[str, object] = {}
+
+    def decide_while_the_release_waits(request):
+        yield from _wait_for_the_release_attempt(holder, request.run_id)
+        return product_decision(
+            "Uppercase all output",
+            "输入要求输出大写，作为补充决定写进合同。",
+        )
+
+    quality_round = quality_turns("release", "checks passed on the current delivery")[0]
+
+    def observe_the_decision(request):
+        # 放行被拒绝以后质检开始新的轮次：这一步的上下文装配在拒绝之后，记下收到的通知。
+        # 这一轮开始时有交付就核验它，没有就是预测性探索（新交付可能还没有到达）
+        seen["notification"] = prompt_part(request, "work_notification")
+        return quality_round(request)
+
+    def deliver_after_the_release_is_rejected(request):
+        yield from _wait_for_the_release_rejection(holder, request.run_id)
+        return delivery_turn()(request)
+
+    adapter = FakeAdapter({
+        "product": [product_spec(), decide_while_the_release_waits],
+        "engineering": [delivery_turn(), deliver_after_the_release_is_rejected],
+        "quality": [review_turn("release", "checks passed on the current delivery"),
+                    observe_the_decision]
+                   + quality_turns("release", "checks passed on the new delivery"),
+    }, stream_gap_sec=0.01)
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    holder["system"] = system
+    run_id = system.create_run("build echo", max_cycles=16)
+    system.activate_once(run_id)
+    system.activate_once(run_id)
+    system.add_guidance(run_id, "product", "请把输出改为大写，作为补充决定写下来。")
+    projection = system.run_until_stop(run_id)
+
+    events = _events(system, run_id)
+    # 放行先确实发出了；产品决定在这一轮里被接纳，这一轮随后结束
+    assert holder.get("release_attempted")
+    [decision] = [event for event in events if event.type == EventType.PRODUCT_DECISION_ACCEPTED]
+    product_end = max(event.position for event in events
+                      if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
+    assert decision.position < product_end
+    # 放行等到这一轮结束才裁决：合同重算，交付随之不再有效，被拒绝一次；
+    # 拒绝的理由是当时没有有效的交付，不是别的（预测性探索的一轮另有它自己的理由）
+    rejected = _quality_events(system, run_id, EventType.PROPOSAL_REJECTED)
+    gone = [event for event in rejected
+            if event.payload["errors"][0]["message"] == "no active DeliverySpec"]
+    assert len(gone) == 1, [event.payload["errors"] for event in rejected]
+    assert gone[0].position > product_end
+    assert [error["field"] for error in gone[0].payload["errors"]] == ["delivery_spec"]
+    # 没有新的 PRD 版本：工程按新的有效合同重新交付，第二份交付依据当前合同
+    assert projection.product_spec.revision == 1
+    assert len([event for event in events if event.type == EventType.DELIVERY_ACCEPTED]) == 2
+    [active] = [delivery for delivery in projection.delivery_specs if delivery.status == "active"]
+    assert active.effective_contract_hash == projection.effective_contract.content_hash
+    # 质检在下一步收到新增决定的通知：决定与理由都写明（新的交付可能同时到达，也一并通知）
+    notification = json.loads(seen["notification"])
+    decided = [item for item in notification if item["kind"] == "product_decision_recorded"]
+    assert len(decided) == 1
+    assert decided[0]["statement"] == "Uppercase all output"
+    assert decided[0]["rationale"] == "输入要求输出大写，作为补充决定写进合同。"
+    # 新交付上的放行被接纳，事项以 done 结束，不空转到循环上限
+    assert projection.status == "done", projection.error
+    assert projection.stop_reason != "max_cycles"
+    assert projection.last_review.verdict == "release"

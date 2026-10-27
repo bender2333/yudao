@@ -123,6 +123,21 @@ def work_notifications(projection: RunProjection, events: list[Any] | None, depa
                 "files": delivery.files,
                 "product_spec_hash": delivery.product_spec_hash,
             })
+    # 产品决定（工单 #1079）：判据与 PRD 新版本相同，通知给所有部门。决定只重算有效合同、
+    # 不产生新的 PRD 版本，没有这一条通知，部门不知道放行为什么被拒绝、交付为什么过期
+    for decision in projection.product_decisions:
+        position = positions.get(decision.created_event_id)
+        if position is None or position <= seen:
+            continue
+        if producers.get(decision.created_event_id) == session_id:
+            # 这个会话自己写下的决定：不用通知自己
+            continue
+        notifications.append({
+            "kind": "product_decision_recorded",
+            "statement": decision.statement,
+            "rationale": decision.rationale,
+            "content_hash": decision.content_hash,
+        })
     return notifications
 
 
@@ -139,6 +154,12 @@ def _notification_text(item: dict[str, Any]) -> str:
         detail = f"；改动：{'；'.join(changed)}" if changed else ""
         return (f"产品要求有了新版本 r{item['revision']}{detail}。"
                 "这份要求现在有效，已经做的工作还算不算数由你自己判断，接着当前工作。")
+    if item["kind"] == "product_decision_recorded":
+        # 产品决定只重算有效合同，不产生新的 PRD 版本（工单 #1079）：写明决定与理由，
+        # 让收到的部门知道交付为什么过期、放行为什么被拒绝
+        return (f"产品记录了补充决定：{item.get('statement') or ''}。理由：{item.get('rationale') or ''}。"
+                "有效合同因此重算，在此之前依据旧合同的交付不再有效；"
+                "按新的有效合同接着当前工作。")
     # 交付到达的通知只给事实部分（工单 #554）：交付说明里的解释部分在质检下结论以前不给
     return (f"新的交付到达了（r{item['revision']}，{len(item.get('files') or [])} 个文件）。"
             "检查工作区已经从这份交付重建，交付之前写的测试材料仍然在；接着当前工作。")

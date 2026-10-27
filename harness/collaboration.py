@@ -127,17 +127,19 @@ def _latest_engineering_basis(projection: RunProjection) -> str | None:
 
 
 def _has_new_product_spec(projection: RunProjection, department: str) -> bool:
-    """PRD 的新版本。
+    """PRD 的新版本，或者产品决定改了有效合同。
 
-    工程关注的是 PRD 与它最近一次成果依据的版本不同（还没有成果时为真）。
+    工程关注的是 PRD 与它最近一次成果依据的版本不同（还没有成果时为真）；PRD 没有新版本时，
+    它最近一份交付依据的合同不是当前有效合同也算新工作：产品决定只重算合同、不产生新的 PRD
+    版本，过期的交付要按新合同重新交付（部门指导设计说明第 2.1 节第 2 点、工单 #1079）。
     质检关注的是「PRD 被接纳」：当前有效合同与质检上一次工作的依据不同，
     并且还没有交付要核验（有交付时质检核验交付，预测性探索在交付到达以前做，
     循环结构第 3.1 节）。
     """
     if projection.product_spec is None:
         return False
+    contract = current_contract_hash(projection)
     if department == "quality":
-        contract = current_contract_hash(projection)
         if contract is None:
             return False
         if projection.department_bases.get(department) == contract:
@@ -146,7 +148,13 @@ def _has_new_product_spec(projection: RunProjection, department: str) -> bool:
     basis = _latest_engineering_basis(projection)
     if basis is None:
         return True
-    return basis != projection.product_spec.content_hash
+    if basis != projection.product_spec.content_hash:
+        return True
+    # 建档的结构说明与还没有成果的情形不变：只有交付记着它依据的合同
+    delivery = latest_delivery(projection)
+    if delivery is None or contract is None:
+        return False
+    return delivery.effective_contract_hash != contract
 
 
 def _has_new_defect_record(projection: RunProjection) -> bool:
