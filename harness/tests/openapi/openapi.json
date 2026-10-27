@@ -13601,6 +13601,168 @@
         "title": "AdoptionHeldPayload",
         "type": "object"
       },
+      "ArtifactInvalidatedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "artifact_invalidated",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ArtifactInvalidatedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ArtifactInvalidatedEvent",
+        "type": "object"
+      },
+      "ArtifactInvalidatedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "artifact_kind": {
+            "title": "Artifact Kind",
+            "type": "string"
+          },
+          "artifact_version": {
+            "title": "Artifact Version",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "artifact_kind",
+          "artifact_version",
+          "reason"
+        ],
+        "title": "ArtifactInvalidatedPayload",
+        "type": "object"
+      },
       "AskAnsweredEvent": {
         "additionalProperties": false,
         "properties": {
@@ -33925,6 +34087,7 @@
             "action_verified": "#/components/schemas/ActionVerifiedEvent",
             "activation_finished": "#/components/schemas/ActivationFinishedEvent",
             "adoption_held": "#/components/schemas/AdoptionHeldEvent",
+            "artifact_invalidated": "#/components/schemas/ArtifactInvalidatedEvent",
             "ask_answered": "#/components/schemas/AskAnsweredEvent",
             "ask_started": "#/components/schemas/AskStartedEvent",
             "baseline_adopted": "#/components/schemas/BaselineAdoptedEvent",
@@ -34104,6 +34267,9 @@
           },
           {
             "$ref": "#/components/schemas/ProductDecisionAcceptedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ArtifactInvalidatedEvent"
           },
           {
             "$ref": "#/components/schemas/DeliveryAcceptedEvent"

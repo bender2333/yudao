@@ -2300,7 +2300,10 @@ RUN_EVENT_KINDS: tuple[str, ...] = (
     EventType.TOOL_CALLED, EventType.TOOL_STARTED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED,
     EventType.PROPOSAL_SUBMITTED, EventType.PROPOSAL_REJECTED, EventType.SPEC_ACCEPTED,
     EventType.SPEC_SUPERSEDED, EventType.CONTRACT_ACCEPTED, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
-    EventType.PRODUCT_DECISION_ACCEPTED, EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+    EventType.PRODUCT_DECISION_ACCEPTED,
+    # 成果失效（骨架事件，S1b，工单 #858）
+    EventType.ARTIFACT_INVALIDATED,
+    EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
     EventType.QA_TESTS_SAVED, EventType.STRUCTURE_ACCEPTED, EventType.BASELINE_REVIEW_ACCEPTED,
     EventType.LESSON_CANDIDATE_RECORDED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
     EventType.RUN_RESUMED, EventType.RUN_CONTINUED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
@@ -2411,6 +2414,8 @@ WORK_ITEM_MATERIALS = QueryDefinition(
     handle=_work_item_materials,
     changed_by=(EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.CONTRACT_ACCEPTED,
                 EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED,
+                # 成果失效（S1b，工单 #858）：交付的失效状态在这一页的交付清单里
+                EventType.ARTIFACT_INVALIDATED,
                 ProjectEventType.MATERIAL_RECORDED, ProjectEventType.INITIAL_PRD_PROPOSED,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN),

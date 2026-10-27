@@ -5725,6 +5725,91 @@ export type AdoptionHeldPayload = {
 };
 
 /**
+ * ArtifactInvalidatedEvent
+ */
+export type ArtifactInvalidatedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'artifact_invalidated';
+    payload: ArtifactInvalidatedPayload;
+};
+
+/**
+ * ArtifactInvalidatedPayload
+ */
+export type ArtifactInvalidatedPayload = {
+    /**
+     * Artifact Kind
+     */
+    artifact_kind: string;
+    /**
+     * Artifact Version
+     */
+    artifact_version: number;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
  * AskAnsweredEvent
  */
 export type AskAnsweredEvent = {
@@ -15952,6 +16037,8 @@ export type EventObject = ({
 } & AskAnsweredEvent) | ({
     type: 'product_decision_accepted';
 } & ProductDecisionAcceptedEvent) | ({
+    type: 'artifact_invalidated';
+} & ArtifactInvalidatedEvent) | ({
     type: 'delivery_accepted';
 } & DeliveryAcceptedEvent) | ({
     type: 'qa_submitted';

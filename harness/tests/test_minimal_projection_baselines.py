@@ -3,11 +3,9 @@
 # 再与 RunProjection 里对应的值逐项比较。守 R1（第三环的不变式：同样的事件重放出同样的状态）：
 # 两份投影折的是同一组事件，对应项的结论必须相同。
 #
-# 已知的例外（工单正文写明，留给 S1b）：当前交付的失效。现在的投影除了被新的接纳事件取代，
-# 还会被别的事件清掉（非质检部门写了文件、PRD 或契约被接纳、返工结论），只按接纳事件折叠复现不了它。
-# 这一项在运行状态投影里为空时跳过，由 S1b 改成「成果失效」事件以后按事件折叠。现有的事件序列基准
-# 没有一份落在这种情形里（35 份里每一份的当前交付都与最小投影一致），所以逐项一致是全部基准上的结论。
-# 其余各项都要一致，包括契约（contract_accepted）算的一种成果、工件引用与已用量。
+# 全部基准上逐项一致，没有例外：当前交付的失效也由事件给出（工单 #858 的 S1b：成果失效事件
+# artifact_invalidated），两份投影都只按那条事件折叠，不再从工具调用、PRD 与合同被接纳、返工结论推出。
+# 其余各项同样要一致，包括契约（contract_accepted）算的一种成果、工件引用与已用量。
 
 import pytest
 
@@ -84,13 +82,11 @@ def test_the_minimal_projection_matches_the_run_projection(name, data_dir):
                      baseline and (baseline["revision"], baseline["content_hash"]), name)
     decision = state.product_decisions[-1] if state.product_decisions else None
     _the_artifact_is(projection, "product_decision", decision and (1, decision.content_hash), name)
-    # 当前交付：失效的情形是已知的例外（见文件开头），留给 S1b
+    # 当前交付：失效也是一条事件（成果失效，S1b），没有当前交付时最小投影里也没有它
     delivery = state.delivery_spec
-    if delivery is not None:
-        _the_artifact_is(projection, "delivery_spec", (delivery.revision, delivery.content_hash), name,
-                         ref=delivery.tree_ref.content_hash)
-    else:
-        projection.artifacts.pop("delivery_spec", None)
+    _the_artifact_is(projection, "delivery_spec",
+                     delivery and (delivery.revision, delivery.content_hash), name,
+                     ref=delivery and delivery.tree_ref.content_hash)
     # 每一种成果都有对应的运行状态项，没有多出来的
     assert projection.artifacts == {}, f"{name}: 最小投影里多出没有对照的成果 {sorted(projection.artifacts)}"
 

@@ -19,7 +19,7 @@ from harness.streams import RUN_EVENT_VERSION
 # 投影里的事件版本号不进每个场景的比对（工单 #1019）：升版不让全部基准一起重写，由下面这一条
 # 单独核对当前值。升版时把这里的数字一起改，改动本身就是要评审的那一处。
 # 基准的投影里没有它（生成规则）、只差这一项时比对通过，各自在 test_event_sequence_compare.py。
-EXPECTED_RUN_EVENT_VERSION = 11
+EXPECTED_RUN_EVENT_VERSION = 12
 
 # 假模型的脚本用完时的错误文字（harness/adapters/fake.py 的 FakeAdapter.stream，工单 #1061）：
 # 脚本用完说明场景比脚本多跑了一轮，不是行为变化；把它当成正常结论记进基准，就成了把失败当成通过。

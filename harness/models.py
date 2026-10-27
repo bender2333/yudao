@@ -61,6 +61,9 @@ class EventType:
     ASK_STARTED = "ask_started"
     ASK_ANSWERED = "ask_answered"
     PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
+    # 成果失效（骨架事件，S1b，工单 #858）：哪一种成果的哪一版因为什么失效。投影只折叠这一条，
+    # 不再从工具调用与其他接纳事件推出失效
+    ARTIFACT_INVALIDATED = "artifact_invalidated"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
     QA_TESTS_SAVED = "qa_tests_saved"

@@ -455,9 +455,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
     if etype == EventType.TOOL_CALLED:
         if payload.get("name") != "provider_usage":
             state.tool_count += 1
-            if (payload.get("ok") and payload.get("name") in {"write_file", "delete_file", "move_file"}
-                    and event.department != "quality"):
-                _supersede_active_deliveries(state, "workspace_changed")
         else:
             state.token_used += int(payload.get("tokens_charged", 0))
         state.cost += float(payload.get("cost", 0.0))
@@ -507,7 +504,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.product_specs.append(spec)
         state.product_spec = spec
         state.processed_input_version = spec.input_version
-        _supersede_active_deliveries(state, "product_spec_changed")
         _refresh_effective_decisions(state)
         return
 
@@ -527,8 +523,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
             input_version=payload["input_version"],
             created_event_id=event.event_id, prd_ref=ArtifactRef(**payload["prd_ref"]),
         )
-        if state.effective_contract is None or state.effective_contract.content_hash != contract.content_hash:
-            _supersede_active_deliveries(state, "effective_contract_changed")
         state.effective_contracts.append(contract)
         state.effective_contract = contract
         return
@@ -569,9 +563,13 @@ def apply_event(state: RunProjection, event: Event) -> None:
         _refresh_effective_decisions(state)
         return
 
+    if etype == EventType.ARTIFACT_INVALIDATED:
+        # 成果失效事件（骨架事件，S1b）：当前交付的失效只折叠这一条，不再从工具调用与其他接纳事件推出
+        _invalidate_artifact(state, payload)
+        return
+
     if etype == EventType.DELIVERY_ACCEPTED:
         _clear_feedback(state, event.department)
-        _supersede_active_deliveries(state, "replaced")
         delivery = _delivery_from_payload(payload, event)
         state.delivery_specs.append(delivery)
         state.delivery_spec = delivery
@@ -605,7 +603,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.baseline_review = record
         if record["verdict"] == "rework_product":
             state.rework_count += 1
-            _supersede_active_deliveries(state, "baseline_rework_product")
         state.evidence.append({"kind": "baseline_review", "verdict": record["verdict"],
                                "content_hash": record["content_hash"], "checks": record["checks"],
                                "product_spec_hash": record["product_spec_hash"],
@@ -619,7 +616,6 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.last_review = review
         if review.verdict == "rework_engineering":
             state.rework_count += 1
-            _supersede_active_deliveries(state, "qa_rework_engineering")
         state.evidence.append(
             {
                 "kind": "qa_review",
@@ -799,6 +795,18 @@ def _delivery_from_payload(payload: dict[str, Any], event: Event) -> DeliverySpe
 def _clear_feedback(state: RunProjection, role: str | None) -> None:
     if role:
         state.pending_feedback.pop(role, None)
+
+
+def _invalidate_artifact(state: RunProjection, payload: dict[str, Any]) -> None:
+    # 一条成果失效事件折叠成什么（设计说明第 4 节、第 7 节）：载荷给出成果种类、版本与原因，
+    # 指名的那一版不再是当前版本。现在会失效的成果只有当前交付：换了一版交付、PRD 或合同变了、
+    # 返工，或者非质检部门改动了工作区，都由成果驱动记下原因
+    if payload.get("artifact_kind") != "delivery_spec":
+        return
+    version = payload.get("artifact_version")
+    if state.delivery_spec is not None and version is not None and state.delivery_spec.revision != int(version):
+        return
+    _supersede_active_deliveries(state, str(payload.get("reason") or "invalidated"))
 
 
 def _supersede_active_deliveries(state: RunProjection, reason: str) -> None:
