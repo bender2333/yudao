@@ -9,8 +9,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..definitions import DEFINITIONS
-from ..models import (RUN_STATUSES, STOP_REASON_LABELS, CatalogEventType, EventType, ProjectEventType,
-                     stop_reason_name)
+from ..models import (RUN_STATUSES, CatalogEventType, EventType, ProjectEventType, stop_reason_name)
 
 
 # run 状态的中文名（harness/models.py 的 RUN_STATUSES 是同一份取值）：事件说明里的状态按中文写
@@ -23,7 +22,8 @@ STATUS_NAMES: dict[str, str] = {
 if set(STATUS_NAMES) != set(RUN_STATUSES):
     raise KeyError("状态的中文名必须与控制核心的状态取值相同：" + "、".join(RUN_STATUSES))
 
-STOP_REASON_NAMES = STOP_REASON_LABELS
+# 停止原因的中文名来自定义（stop_reasons.json 与路由自己的结束原因，工单 #861）
+STOP_REASON_NAMES = {reason: definition.label for reason, definition in DEFINITIONS.stop_reasons.items()}
 DECISION_KIND_NAMES: dict[str, str] = {
     "model_unavailable": "模型引用无法使用，等待恢复",
     "no_tool_call": "已暂停（模型没有调用工具），等待继续",
