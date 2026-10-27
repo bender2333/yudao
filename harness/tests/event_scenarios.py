@@ -16,7 +16,7 @@ import pytest
 
 from harness.adapters.base import Availability, ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.decisions import DecisionClosed
 from harness.engine import StepLimits
 from harness.environment import QA_TESTS_DIR

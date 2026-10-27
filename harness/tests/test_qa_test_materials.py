@@ -3,7 +3,7 @@ import json
 import sys
 from pathlib import Path
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.actions import Action
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.environment import QA_TESTS_DIR

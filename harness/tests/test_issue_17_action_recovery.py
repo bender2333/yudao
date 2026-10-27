@@ -6,7 +6,7 @@ import json
 from dataclasses import asdict
 from typing import Any
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.project_queries import RunActions

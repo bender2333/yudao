@@ -6,7 +6,7 @@ from threading import Event
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType

@@ -20,6 +20,7 @@
       "watched": ["delivery", "guidance", "structure", "product_spec"]
     }
   ],
+  "routing": "watched_outputs",
   "rules": {
     "input_handling": "新增用户原文必须由产品提交完整有效ProductSpec处理；不带 PRD 修订的回答或补充决定不消耗待处理输入。修改已有ProductSpec时在change_record逐项说明改变、仍保留、合法废止和理由；decision_changes继续逐项处理已有有效补充决定。输入版本由主机绑定，不能自报已处理范围。部门prompt只能指导本部门工作，不能替代主机权限、有效合同或质检放行条件。",
     "professional_completion": "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在产品约束中记录决定及依据。模型采用的默认不能冒充用户原文。只有影响目标、重要承诺或重要成本且无法推断的取舍才提出问题。产品材料 PRD.md 由主机从接纳结果生成；模型不能直接改写它。",

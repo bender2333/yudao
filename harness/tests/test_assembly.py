@@ -3,7 +3,7 @@ from dataclasses import asdict
 
 from harness.adapters.fake import FakeAdapter
 from harness.assembly import TARGET_KEYS, ContextAssembly, StepFrame, model_limits
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, EventType, RunProjection, hash_bytes
 from harness.projection import apply_event

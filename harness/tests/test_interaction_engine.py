@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.compaction import visible_history
 from harness.definitions import DEFINITIONS

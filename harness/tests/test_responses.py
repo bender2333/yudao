@@ -11,7 +11,7 @@ from threading import Event, Thread
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.providers import ResponsesConfig
 from harness.tests.protocol_helpers import (

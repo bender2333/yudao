@@ -5,7 +5,7 @@
 
 import uuid
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.models import ArtifactRef, ProjectEventType
