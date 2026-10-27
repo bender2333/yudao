@@ -144,7 +144,7 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
 @contextmanager
 def _bound_system(tmp_path, *, context_window, max_output_tokens):
     # 三个部门绑定测试内启动的 HTTP 服务上的模型（Responses 协议），模型声明给定的窗口与输出上限；
-    # 服务按部门回放交接脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
+    # 服务按部门回放各自的脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
     # （工单 #557：同时运行的会话各自取用自己的脚本，按请求里的工具分派到部门）
     state = {"product": 0, "engineering": 0, "quality": 0}
 

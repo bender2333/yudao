@@ -66,7 +66,7 @@ def _post(client, command, **body):
     return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
 
 # 等待一次建档 run 结束（`_wait_for`）的墙钟界限只用来防止测试一直等待，按 #107 的裁定
-# （架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常用时的值。
+# （架构师 2026-09-27 16:55，docs/archive/architecture-issues-2026-09-10.md）设为远大于正常用时的值。
 # 建档 run 含多次版本存储写入，正常用时数秒、并发负载下更慢；
 # run 是否按预期结束由等待之后的阶段与停止原因断言核对。
 _WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC

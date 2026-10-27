@@ -1,6 +1,6 @@
 # 工单 #204 的验收：run 因模型连续不调用工具（no_tool_call）或者工作区出现无法表示的条目
 # （workspace_unrepresentable）而暂停时发出决定请求，用户回答以后从暂停位置继续，或者停止事项。
-# 测试从 LoopSystem 整体驱动，使用真实的文件系统、真实的 Git 与真实的登记命令进程；FakeAdapter 只给出模型的回答。
+# 测试从 LoopSystem 整体驱动，使用真实的文件系统、真实的 Git 与真实的 bash 命令进程；FakeAdapter 只给出模型的回答。
 
 from __future__ import annotations
 

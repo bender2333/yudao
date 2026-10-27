@@ -16,7 +16,7 @@ from harness.tests.helpers import after_event
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 等待一次激活收尾或等待对方线程到达会合点的墙钟界限只用来防止测试一直等待，按 #107 的裁定
-# （架构师 2026-09-27 16:55，docs/architecture-issues.md）设为远大于正常用时的值。
+# （架构师 2026-09-27 16:55，docs/archive/architecture-issues-2026-09-10.md）设为远大于正常用时的值。
 # 收尾含一次版本存储写入，正常用时数秒。
 _WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
 
@@ -119,7 +119,7 @@ def test_cancel_wakes_a_long_retry_wait_even_when_cancelling_the_attempt_fails(t
 
     # 界限 20 秒明显小于配置的 30 秒等待：要证明的是等待没有被走满，结束以后由阶段与停止原因核对；
     # 20 秒同时远大于正常用时（唤醒到激活结束含一次版本存储写入，并发负载下数秒），
-    # 按 #107 的裁定（docs/architecture-issues.md，架构师 2026-09-27 16:55）取这一数量级
+    # 按 #107 的裁定（docs/archive/architecture-issues-2026-09-10.md，架构师 2026-09-27 16:55）取这一数量级
     assert time.monotonic() - started < 20
     assert len(adapter.invocations) == 1
 
