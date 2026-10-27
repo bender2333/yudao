@@ -137,4 +137,25 @@ def test_engineering_has_new_work_until_a_delivery_matches_the_current_contract(
     assert not has_new_work(redelivered, "engineering")
 
 
+def test_the_new_work_checks_hold_when_there_is_no_effective_contract(tmp_path):
+    # 边界（工单 #1079，部门指导设计说明第 2.1 节第 2 点）：比合同的这一支只在
+    # 合同与交付都算出来的时候决定；有效合同还没有算出来时工程与质检都没有这一项新工作，
+    # PRD 的内容变了工程照旧有新工作。守 R3：直接对投影断言，只读
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    projection = system.activate_once(run_id)
+
+    # 交付依据的 PRD 内容与当前 PRD 不同：工程照旧有新工作（PRD 新版本的路径不变）
+    other_spec = replace(projection.product_spec, content_hash="sha256:other")
+    assert has_new_work(replace(projection, product_spec=other_spec), "engineering")
+
+    # 有效合同还没有算出来：工程（交付与合同都算不出来）与质检都没有这一项新工作
+    assert not has_new_work(replace(projection, effective_contract=None), "engineering")
+    # 质检看的是「有没有交付要核验」：这里把交付也去掉，只看合同这一支
+    no_delivery = replace(projection, effective_contract=None, delivery_spec=None, delivery_specs=[])
+    assert not has_new_work(no_delivery, "quality")
+
+
 

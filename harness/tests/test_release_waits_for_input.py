@@ -608,6 +608,7 @@ def test_the_item_finishes_after_the_product_makes_a_decision(tmp_path):
     [active] = [delivery for delivery in projection.delivery_specs if delivery.status == "active"]
     assert active.effective_contract_hash == projection.effective_contract.content_hash
     # 质检在下一步收到新增决定的通知：决定与理由都写明（新的交付可能同时到达，也一并通知）
+    assert seen["notification"], "质检没有收到通知"
     notification = json.loads(seen["notification"])
     decided = [item for item in notification if item["kind"] == "product_decision_recorded"]
     assert len(decided) == 1
