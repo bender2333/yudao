@@ -17,6 +17,11 @@ const SAMPLE_ITEM = "实现回声工具";
 const ADOPTED_SUMMARY = "implemented echo CLI";
 const DELIVERY_FILE = "src/echo.py";
 const SEEDED_MATERIAL = "回声工具要能在终端里逐行回显输入。";
+// 进行中的询问（工单 #477 的验收第 2 条）：与 backend.py 的 PENDING_ASK_ITEM、PENDING_ASK_QUESTION 一致，
+// 后端脚本按事项原文认出这个项目，工程问产品以后产品的回答分支流式返回一分钟
+const PENDING_PROJECT = "进行中的询问";
+const PENDING_ITEM = "实现等待回答的事项";
+const PENDING_QUESTION = "未知参数怎么处理？";
 
 const VIEWS = ["overview", "dept/product", "dept/engineering", "dept/quality", "materials", "observe", "settings"] as const;
 type View = (typeof VIEWS)[number];
@@ -164,10 +169,11 @@ async function waitUntil(check: () => Promise<boolean>, page: Page, description:
   }
 }
 
-// 用户主动停止的事项会改变服务端状态，这条用例用自己的一份后端，共用的那份不受影响
-async function withOwnBackend<T>(run: () => Promise<T>): Promise<T> {
+// 用户主动停止的事项会改变服务端状态，这条用例用自己的一份后端，共用的那份不受影响。
+// options 给这条用例自己的后端选项（工单 #477 的验收第 2 条用 pending 脚本起一份不预置项目的后端）
+async function withOwnBackend<T>(run: () => Promise<T>, options: Parameters<typeof startBackend>[0] = {}): Promise<T> {
   const previous = backend;
-  const own = await startBackend();
+  const own = await startBackend(options);
   backend = own;
   try {
     return await run();
@@ -322,7 +328,62 @@ test.describe("项目页面（1440×900）", () => {
     }
   });
 
-  
+  // 工单 #477 的验收第 2 条：工程询问产品、询问还没有回答时，项目页与部门页显示这次询问与等待原因；
+  // 「回答以后显示回答」由上面那条用例用种子里的「交付历史」核对。这里用一份自己的后端让这次询问停在
+  // 进行中：pending 脚本不预置项目（执行槽位空着），产品的回答分支流式返回一分钟、片段之间停 0.5 秒
+  // （client/tests/e2e/backend.py 的 pending_ask_script）。两个页面的文字都来自 run.asks 与部门状态。
+  test("概览与工程部门页：询问进行中时显示这次询问与等待原因", async () => {
+    test.setTimeout(300_000);
+    await withOwnBackend(async () => {
+      const client = await startClient(backend, { width: 1440, height: 900 });
+      const errors = watchErrors(client);
+      const page = client.page;
+      try {
+        await expect(page.locator(".brand .y10-brand-name")).toContainText("Yudao");
+        // 这个后端不预置项目：自己建一个项目与一个事项，事项随即开始，工程问产品
+        await expectAccepted(page, "project.create", { name: PENDING_PROJECT, goal: "确认询问进行中时两个页面显示什么" });
+        const id = await projectId(page, PENDING_PROJECT);
+        await expectAccepted(page, "work_item.create", { project_id: id, text: PENDING_ITEM });
+        // 概览：部门一行写状态与等待原因，询问一节列出这次询问（进行中、没有回答）
+        await gotoView(page, id, "overview");
+        const current = await section(page, "当前事项");
+        await waitUntil(async () => (await current.innerText()).includes("在等待产品的回答"), page,
+          "概览显示工程在等待产品的回答");
+        const states = current.locator(".department-line");
+        await expect(states).toContainText("工程 询问中（在等待产品的回答）");
+        await expect(states).toContainText("产品 一轮工作中（回答工程的询问）");
+        const asks = await section(page, "询问");
+        const rows = asks.locator("li");
+        await expect(rows).toHaveCount(1);
+        await expect(rows.first()).toContainText("进行中");
+        await expect(rows.first()).toContainText("工程 → 产品");
+        await expect(rows.first()).toContainText(PENDING_QUESTION);
+        await expect(rows.first()).not.toContainText("回答：");
+        // 部门页：标题区的状态词与原因、检查区的部门状态，本部门的询问一节列出这次询问
+        await gotoView(page, id, "dept/engineering");
+        const titleRow = page.locator("#ws-head-block .y10-ws-title-row");
+        await expect(titleRow.locator(".y10-status")).toHaveText("询问中");
+        await expect(titleRow.locator("small.y10-muted")).toHaveText("在等待产品的回答");
+        const check = page.locator("#ws-head-block .y10-ws-model");
+        await expect(check).toContainText("部门状态");
+        await expect(check).toContainText("询问中（在等待产品的回答）");
+        const ownAsks = await section(page, "询问");
+        await expect(ownAsks.locator("li").first()).toContainText("进行中");
+        await expect(ownAsks.locator("li").first()).toContainText("工程 → 产品");
+        await expect(ownAsks.locator("li").first()).toContainText(PENDING_QUESTION);
+        // 两个页面都不写单一阶段、工程计划与协作请求
+        const text = await bodyText(page);
+        expect(text).not.toContain("阶段");
+        expect(text).not.toContain("协作请求");
+        expect(text).not.toContain("计划");
+        expect(errors).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    }, { script: "pending" });
+  });
+
+
   // 工单 #652：「记录原文」与「新的要求」各有各的状态与草稿。
   // 这条用例新建事项（改变服务端状态），用自己的一份后端，共用的那份不受影响。
   test("概览：记录原文与新的要求各有各的状态，提交记录原文不影响新的要求", async () => {

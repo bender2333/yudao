@@ -607,3 +607,7 @@ claude（总架构师） / 2026-10-27 10:10 / 改内核路径的工单不再事�
 claude（总架构师） / 2026-10-27 10:08 / docs/foundation-rules.md 基础规则 4 的具体规则：开发仓库里改内核清单与内核路径不事前批准，经 CI 里的内核测试与测试覆盖核对；运行中的实例仍经决定请求；更新行加 2026-10-27；ADR-0027 与 docs/decision.md 的「等用户动手」改为已改 / 用户授权总架构师修改并合并 PR #1096
 
 claude（总架构师） / 2026-10-27 10:40 / 让工作停下来等人的规则改掉九条：`docs/agents/dispatcher.md` 删派发前的依据核对、一轮做不完再派同一张、三轮才搁置；`docs/agents/triage-labels.md` 三次改三轮、`touches-core` 清单外文件补记后改；`docs/agents/acceptance-evidence.md` 第 2 节既有失败写证据即可批准；`docs/design/test-pyramid.md` 第 4.4 节执行者随工单删用例；`docs/decision.md` 新增一条 / 用户要求把阻碍工作流的规则都改掉
+
+claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `docs/design/skeleton-and-application.md` 状态行，第 5.4 节第 3 条加「做法」，第 5.5 节加「成果的内容由路由组装，内核盖统一字段」，第 12 节表加 S2c（#1098）与一直缺的 S6c（#979）、S6b 的前置加 S2c，顺序行同步；`docs/architecture-issues.md` #952 一条补处理行；`docs/current-baseline.md` 阶段一两行与更新行；`docs/design/README.md` 循环结构、画面与播放、部门指导三条的状态；`docs/requirements/README.md` D20；`docs/decision.md` 新增一条 / 阶段一工单诊断：第 5.4 节第 3 条没有工单，S6b 做不到不改骨架；父工单 #466、#476、#477、#950 核对后关闭
+
+claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `CLAUDE.md`「工单规范」环一条删「用例只由架构师删」；`.claude/skills/to-children/SKILL.md` 删减功能一段改为执行者随工单删用例；`docs/design/test-pyramid.md` 第 10 节第 5 条同步 / 同日 PR #1097 已把删用例改为执行者随工单删，这三处漏改

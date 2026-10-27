@@ -67,6 +67,14 @@ HISTORY_ITEM = "实现交付历史"
 BLOCKED_ITEM = "实现逐行处理"
 LIVE_GOAL = "在界面上走完一个事项"
 
+# 进行中的询问（工单 #477 的验收第 2 条）：用例自己建项目并开始这个事项，工程问产品，
+# 产品的回答分支流式返回一段时间，询问因此在页面上停在进行中
+PENDING_ASK_ITEM = "实现等待回答的事项"
+PENDING_ASK_QUESTION = "未知参数怎么处理？"
+# 回答分支分成的片段数：每段之间停顿 0.5 秒（见 pending_ask_script），120 段约一分钟，
+# 浏览器用例在这段时间里核对项目页与部门页显示的进行中的询问与等待原因
+SLOW_ANSWER_DELTAS = 120
+
 
 def lan_address() -> str:
     # 本机的局域网地址：从另一台机器访问控制主机时用的就是它；没有时用回环
@@ -186,6 +194,48 @@ def script():
         "quality": [project_quality_turn] * 16,
         "product:ask": [answer_product_turn] * 4,
         "engineering:ask": [answer_engineering_turn] * 4,
+    }
+
+
+def pending_ask_script():
+    # 进行中的询问的端到端验收（工单 #477 的验收第 2 条）：工程询问产品以后，产品的回答分支
+    # 分成许多片段流式返回，片段之间停顿（启动参数 --script pending 把停顿设为 0.5 秒），
+    # 询问因此在页面上停在进行中，浏览器用例据此核对项目页与部门页显示的这次询问与等待原因。
+    # 其余轮次沿用默认脚本；这个模式不预置项目与事项，用例在页面打开以后自己建，执行槽位因此是空的
+    from harness.providers.call import ModelDelta, ModelStreamEvent
+
+    base = script()
+    default_engineering_turn = base["engineering"][0]
+    asked = False
+
+    def slow_answer(call):
+        # 回答分支：每段是一条解码后的流事件（与 room_script 的 answer_stream 同一写法），
+        # 片段之间的停顿由 FakeAdapter 的 stream_gap_sec 给出，停顿期间这次询问一直是进行中
+        offset = 0
+        for sequence in range(SLOW_ANSWER_DELTAS):
+            text = f"正在核对需求第 {sequence + 1} 条"
+            yield ModelStreamEvent(kind="stream_event", id=f"stream-pending-{sequence}",
+                                   payload={"type": "response.output_text.delta", "delta": text},
+                                   text=text, sequence=sequence, stage="output", source="provider_sdk",
+                                   deltas=(ModelDelta(channel="output", offset=offset, text=text),))
+            offset += len(text)
+        fn = answer_turn("Print the argument as defined in the current requirement.")
+        return fn(call) if callable(fn) else fn
+
+    def pending_engineering_turn(call):
+        # 这个事项只有一次询问；回答以后按默认脚本交付。别的项目沿用默认轮次
+        nonlocal asked
+        if prompt_part(call, "intend") == PENDING_ASK_ITEM and not asked:
+            asked = True
+            return ask_turn("product", PENDING_ASK_QUESTION,
+                            background="工程要实现这个事项，需要产品确认参数的写法。",
+                            expected="给出参数的写法，或者确认按当前需求实现。")
+        return default_engineering_turn(call)
+
+    return {
+        **base,
+        "engineering": [pending_engineering_turn] * 16,
+        "product:ask": [slow_answer],
     }
 
 
@@ -565,7 +615,7 @@ def main() -> int:
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
     # initial 是从想法新建带起始文件夹用的脚本（工单 #323）；waiting 是等待模型服务用的脚本（工单 #375，
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）。它们需要的轮次与预置事项不同，因此由用例选择
-    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel"),
+    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending"),
                         default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
@@ -616,8 +666,13 @@ def main() -> int:
         adapter_script = waiting_script()
     elif args.script == "kernel":
         adapter_script = kernel_script()
+    elif args.script == "pending":
+        adapter_script = pending_ask_script()
     else:
         adapter_script = script()
+    # 流式片段的停顿（秒）：进行中的询问模式要有一段够长的窗口，回答分支每段停 0.5 秒，
+    # 120 段约一分钟（工单 #477 的验收第 2 条）；房间模式按 2.5 秒；其余模式不停顿
+    stream_gap = 2.5 if args.room else (0.5 if args.script == "pending" else 0.0)
     if args.catalog_driven:
         # 工单 #319 第 6 项：用例要在界面上核对「缺少部门默认」的真实拒绝。
         # 就绪检查只按目录里的部门默认判断（LoopSystem.provider_status），单适配器方式直接返回
@@ -626,7 +681,7 @@ def main() -> int:
         adapter = FakeAdapter(adapter_script)
         system = LoopSystem(data_dir, test_adapter_factory=lambda _department: adapter)
     else:
-        system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=2.5 if args.room else 0.0))
+        system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap))
     application = VersionedApplication(system)
     if args.api_version is not None:
         application.reported_api_version = args.api_version
@@ -681,9 +736,10 @@ def main() -> int:
             asyncio.run(seed_onboarding(application))
         elif args.script == "kernel":
             asyncio.run(seed_kernel(application, system))
-        elif args.script not in ("initial", "waiting"):
-            # 起始文件夹的用例（工单 #323）与等待模型服务的用例（工单 #375）自己在界面上建项目并开始事项，
-            # 不需要预置的项目与事项
+        elif args.script not in ("initial", "waiting", "pending"):
+            # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）与进行中的询问的用例
+            # （工单 #477 的验收第 2 条）自己在界面上建项目并开始事项，不需要预置的项目与事项；
+            # 进行中的询问还要求执行槽位空着，预置的「文本工具」会占着它
             asyncio.run(seed(application, system))
     if args.catalog_driven:
         os.environ.pop("OPENCODE_GO_KEY", None)
