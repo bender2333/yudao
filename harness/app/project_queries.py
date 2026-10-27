@@ -14,6 +14,7 @@ from pydantic import Field, field_validator
 
 from ..git_versions import GitVersionError
 from ..event_store import run_stream
+from ..minimal_projection import MinimalProjection, fold_events
 from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_STATUSES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
     ProjectEventType, hash_bytes, stop_reason_name,
@@ -2573,10 +2574,13 @@ _NEXT_ACTION = {
 }
 
 def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[RunRecoveryResult]:
-    # 只读取：run 的事件与决定请求、投影与保存的限额计数。不写入，不触发结算，不调用模型与工具
+    # 只读取：run 的事件与决定请求、投影与最小投影里的已用量。不写入，不触发结算，不调用模型与工具
     store = application.system.store
     run = _run(application, request.run_id)
     events = store.list_events(request.run_id)
+    # 已用量读最小投影（骨架与应用设计说明第 4 节第 4 条，S1e 工单 #1015）：
+    # 激活次数、模型步数与执行权都由它折出来，不在这里从事件数一遍
+    minimal = fold_events(events)
     decisions = _run_decisions(application, request.run_id)
     terminal = run.status in TERMINAL_STATUSES
     state = observation_state(events, decisions.values(), status=run.status, stop_reason=run.stop_reason)
@@ -2600,10 +2604,11 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
             can_continue=_can_continue(state, terminal),
             cannot_continue_reason=_cannot_continue_reason(run, state, terminal, resume_requests),
             unusable=_unusable_target(resume_requests),
-            limits=RecoveryLimits(activations=_activation_count(events),
-                                  model_steps=_model_step_count(events),
+            # 重试次数不是上限，不进最小投影，仍在这里从事件数（设计说明第 4 节第 4 条）
+            limits=RecoveryLimits(activations=minimal.used.activations,
+                                  model_steps=minimal.used.model_steps,
                                   retries=_retry_count(events), cycle_count=run.cycle_count),
-            owner=_owner(run, events),
+            owner=_execution_owner(minimal, events),
             # 迟到结果：3.1 的执行权在写入口拦住旧执行者的写入（write_path 的 claim_execution_right 与
             # StaleExecutionRight），被拒的写入不落盘，因此 3.1 没有迟到结果可列。远程执行代理上的迟到回执
             # 由 3.2C 在 run.actions 上补齐
@@ -2726,23 +2731,20 @@ def _verification_records(events: list[Any], decisions: Any) -> list[Verificatio
     return records
 
 
-def _activation_count(events: list[Any]) -> int:
-    return len([event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED])
-
-def _model_step_count(events: list[Any]) -> int:
-    return len([event for event in events if event.type == EventType.MODEL_REQUESTED])
-
 def _retry_count(events: list[Any]) -> int:
     return len([event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED])
 
-def _owner(run: Any, events: list[Any]) -> RecoveryOwner | None:
-    # 执行所有权：最后一次取得执行权的事件（run_resumed）给出编号与时间；没有恢复过时没有执行者。
-    resumed = [event for event in events if event.type == EventType.RUN_RESUMED]
-    if not resumed:
+def _execution_owner(minimal: MinimalProjection, events: list[Any]) -> RecoveryOwner | None:
+    # 执行所有权读最小投影（S1e 工单 #1015）：编号是投影里的执行权编号，没有取得过执行权时为空。
+    # 取得的时间不是投影的内容（内核不为应用加字段），仍取自记下这一次取得的那个事件
+    epoch = minimal.execution_right
+    if epoch <= 0:
         return None
-    last = resumed[-1]
-    return RecoveryOwner(epoch=int(last.payload.get("acquired_epoch") or 0), since=last.created_at,
-                         holds_slot=True)
+    resumed = next((event for event in reversed(events)
+                    if event.type == EventType.RUN_RESUMED
+                    and int((event.payload or {}).get("acquired_epoch") or 0) == epoch), None)
+    since = resumed.created_at if resumed is not None else ""
+    return RecoveryOwner(epoch=epoch, since=since, holds_slot=True)
 
 RUN_RECOVERY = QueryDefinition(
     name="run.recovery", request=RunRecovery, result=RunRecoveryResult, handle=_run_recovery,

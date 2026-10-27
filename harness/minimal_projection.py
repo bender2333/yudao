@@ -42,9 +42,10 @@ class UsedAmount:
 
 @dataclass(frozen=True)
 class SessionState:
-    # 一个会话的已用量、当前这一轮的编号与它属于哪个部门：
-    # 检查回执要来自这一轮，所以记下最近一次激活的编号；事项创建时记下的会话是部门的主线会话
+    # 一个会话的已用量与结算值、当前这一轮的编号与它属于哪个部门：settled_ms 与 settled_steps 是上一次
+    # 一轮工作结束时已结算的那一份（S1e，工单 #1015）；检查回执要来自这一轮，所以留着最近一次激活的编号
     settled_ms: int = 0
+    settled_steps: int = 0
     activations: int = 0
     model_steps: int = 0
     round_id: str | None = None
@@ -139,8 +140,7 @@ class _Fold:
         self.used = state.used
         self.execution_right = state.execution_right
         self.pending = list(state.pending_decisions)
-        # 部门主线会话的激活次数：询问分支的激活不算轮次（工单 #857），只由主线会话的激活推进
-        self.main_activations = max(state.used.activations, 0)
+        self.main_activations = max(state.used.activations, 0)  # 主线会话的激活数：询问分支不算轮次（#857）
 
     def feed(self, event: Event) -> None:
         if event.stream and event.stream_version:
@@ -198,11 +198,11 @@ class _Fold:
                                                 round_id=payload.get("activation_id") or session.round_id)
             return
         if etype == EventType.ACTIVATION_FINISHED:
-            # 一轮工作的结束：已结算的运行时间是这一刻为止的累计值，中断的那一段不计
+            # 一轮工作的结束：已结算的运行时间与模型步数是这一刻为止的累计值，中断的那一段不计
             self.used = replace(self.used, settled_ms=max(self.used.settled_ms, int(payload.get("elapsed_ms") or 0)))
             session = self.sessions.get(session_id, SessionState())
             self.sessions[session_id] = replace(session, settled_ms=max(
-                session.settled_ms, int(payload.get("session_elapsed_ms") or 0)))
+                session.settled_ms, int(payload.get("session_elapsed_ms") or 0)), settled_steps=session.model_steps)
             return
         if etype == EventType.MODEL_REQUESTED:
             # 模型步数按请求一条条数（设计说明第 4 节 2026-10-25 第 1 条）

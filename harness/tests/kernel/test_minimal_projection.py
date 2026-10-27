@@ -96,6 +96,8 @@ def test_the_minimal_projection_folds_the_items_the_design_lists():
     assert projection.used.settled_ms == 2500
     session = projection.sessions["ses_pro"]
     assert (session.activations, session.model_steps, session.settled_ms) == (1, 2, 2500)
+    # 上一次结算时的模型步数也记着（S1e 工单 #1015）：驱动按「累计的步数减去它」算中断那一轮还剩多少步
+    assert session.settled_steps == 2
     assert session.round_id == "act_1"
     assert projection.artifacts["product_spec"] == AcceptedArtifact(version=1, content_hash="sha256:spec1")
     contract = projection.artifacts["contract"]
@@ -298,6 +300,29 @@ def test_folding_later_events_on_a_folded_projection_matches_a_full_replay():
     ]
     partial = fold_events(events[:2])
     assert fold_more(partial, events[2:]) == fold_events(events)
+
+
+def test_the_settled_steps_stay_at_the_last_round_end():
+    # 一轮工作结束时记下那一刻累计的模型步数（S1e 工单 #1015）：中断那一轮后来又用掉的步数不算已结算，
+    # 驱动按「累计的步数减去已结算的步数」算这一轮还剩多少步，重新启动以后不多给
+    events = [
+        _run_created(),
+        _event(EventType.DEPARTMENT_ACTIVATED, 2, session="ses_pro", department="product",
+               payload={"activation_id": "act_1", "cycle": 1}),
+        _event(EventType.MODEL_REQUESTED, 3, session="ses_pro", department="product"),
+        _event(EventType.ACTIVATION_FINISHED, 4, session="ses_pro", department="product",
+               payload={"activation_id": "act_1", "elapsed_ms": 800, "session_elapsed_ms": 800}),
+    ]
+    settled = fold_events(events).sessions["ses_pro"]
+    assert (settled.model_steps, settled.settled_steps) == (1, 1)
+    # 下一轮工作开始、又用掉一步以后还没有结束：累计的步数是 2，已结算的还是 1，剩下来的这一步要扣
+    interrupted = fold_more(fold_events(events), [
+        _event(EventType.DEPARTMENT_ACTIVATED, 5, session="ses_pro", department="product",
+               payload={"activation_id": "act_2", "cycle": 2}),
+        _event(EventType.MODEL_REQUESTED, 6, session="ses_pro", department="product"),
+    ]).sessions["ses_pro"]
+    assert (interrupted.model_steps, interrupted.settled_steps) == (2, 1)
+    assert interrupted.model_steps - interrupted.settled_steps == 1
 
 
 def _resolve(module: str) -> str | None:
