@@ -13,12 +13,12 @@ import tempfile
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .contracts import contract_payload, render_prd, render_structure
+from .contracts import render_structure
 from .event_store import run_stream
 from .write_path import NewEvent, Transaction
 from .environment import LocalEnvironment
 from .git_versions import GitVersionStore
-from .models import ArtifactRef, Event, EventType, RunProjection, new_id, utc_now
+from .models import ArtifactRef, Event, EventType, RunProjection, canonical_hash, new_id, utc_now
 from .projection import apply_event
 from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
@@ -35,19 +35,87 @@ _BASIS_FIELDS = (
     ("delivery_spec_hash", "delivery_spec"),
 )
 
+# 一种成果可以多版并存（设计说明第 4 节 2026-10-27 补）：产品决定各自是一件成果，新的决定不让旧的失效，
+# 最小投影按种类记当前有效各版的摘要清单（通用条件 6 的不重复接纳读它）
+_MULTIPLE_KINDS = frozenset({"product_decision"})
+# 成果记下的树摘要：交付记代码树、建档记快照的树；没有这一项的成果不带
+_TREE_FIELDS = ("code_tree_digest", "code_snapshot_hash")
+
 
 def acceptance_fields(kind: str, artifact: dict[str, Any], *, version: int,
                       ref: dict[str, Any] | None = None) -> dict[str, Any]:
-    # 写进接纳事件的那一组统一字段。只增不改：已有的字段不动，内容摘要仍是各自的 content_hash
+    # 写进接纳事件的那一组统一字段。只增不改：已有的字段不动，内容摘要仍是各自的 content_hash。
+    # 2026-10-27（S1d）补作者部门、记下的树摘要与「这一种成果多版并存」三个字段（工单 #860）
     basis = {name: artifact[key] for key, name in _BASIS_FIELDS
              if isinstance(artifact.get(key), str) and artifact[key]}
     parent = artifact.get("parent_hash")
     if isinstance(parent, str) and parent:
         basis.setdefault(kind, parent)
     fields: dict[str, Any] = {"artifact_kind": kind, "artifact_version": version, "artifact_basis": basis}
+    issuer = artifact.get("issuer")
+    if isinstance(issuer, str) and issuer:
+        fields["artifact_issuer"] = issuer
+    for name in _TREE_FIELDS:
+        tree = artifact.get(name)
+        if isinstance(tree, str) and tree:
+            fields["artifact_tree_digest"] = tree
+            break
+    if kind in _MULTIPLE_KINDS:
+        fields["artifact_multiple"] = True
     if ref is not None:
         fields["artifact_ref"] = ref
     return fields
+
+
+def contract_payload(projection: RunProjection) -> dict[str, Any]:
+    # 有效合同的身份：它记下的 PRD 与有效决定的摘要，加上进入了模型输入的用户输入版本（设计说明第 3.1 节）。
+    # 读的是成果的内容，住在应用侧（S1d 从内核的 contracts.py 搬来，工单 #860）
+    spec = projection.product_spec
+    if spec is None or spec.status != "active":
+        raise ValueError("an active ProductSpec is required")
+    basis = {
+        "product_spec_hash": spec.content_hash,
+        "decision_hashes": [item.content_hash for item in projection.effective_decisions],
+        "input_version": spec.input_version,
+    }
+    return {**basis, "content_hash": canonical_hash(basis)}
+
+
+def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
+    # PRD 的 Markdown：主机由接纳的 PRD、有效决定与有效合同生成（材料之一）。读的是成果的内容，住在应用侧
+    spec = projection.product_spec
+    if spec is None:
+        raise ValueError("PRD requires an active ProductSpec")
+    lines = ["# PRD", "", f"Effective contract: {contract['content_hash']}",
+             f"ProductSpec: {spec.content_hash}", f"Accepted user input through version: {spec.input_version}",
+             "", "## Goal", "", spec.goal]
+    for title, values in (
+        ("Requirements", spec.requirements), ("Boundaries", spec.boundaries),
+        ("Constraints and recorded defaults", spec.constraints), ("Acceptance Criteria", spec.acceptance_criteria),
+        ("Fatal Conditions", spec.fatal_conditions), ("Non-goals", spec.non_goals),
+    ):
+        lines.extend(["", f"## {title}", ""])
+        lines.extend(f"- {item}" for item in values)
+        if not values:
+            lines.append("None.")
+    lines.extend(["", "## Effective Product Decisions", ""])
+    for index, decision in enumerate(projection.effective_decisions, 1):
+        lines.extend([f"### {index}. {decision.statement}", "", f"Rationale: {decision.rationale}",
+                      "", f"Source: {decision.content_hash}", f"Original ProductSpec: {decision.product_spec_hash}", ""])
+    if not projection.effective_decisions:
+        lines.append("None.")
+    if spec.decision_changes:
+        lines.extend(["", "## Treatment of Earlier Decisions", ""])
+        lines.extend(f"- {item['decision_hash']}: {item['disposition']}. {item['rationale']}" for item in spec.decision_changes)
+    if spec.change_record is not None:
+        lines.extend(["", "## Requirement Changes", "", f"Previous ProductSpec: {spec.parent_hash}",
+                      f"Rationale: {spec.change_record['rationale']}"])
+        for field in ("changed", "retained", "retired"):
+            lines.extend(["", f"### {field.title()}", ""])
+            lines.extend(f"- {item}" for item in spec.change_record[field])
+            if not spec.change_record[field]:
+                lines.append("None.")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def invalidation(current: RunProjection, reason: str) -> tuple[str, dict[str, Any]] | None:

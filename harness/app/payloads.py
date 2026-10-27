@@ -51,6 +51,11 @@ class AcceptanceFields(Payload):
     artifact_basis: dict[str, str] = Field(default_factory=dict)
     # 这一版内容的工件引用（内容摘要），按它取内容；内容就在载荷里时为空
     artifact_ref: ArtifactRef | None = None
+    # 2026-10-27 补（S1d，工单 #860）：作者部门、记下的树摘要（交付记代码树、建档记快照的树，没有这一项的
+    # 成果为空）与「这一种成果多版并存」（产品决定各自是一件成果，新的不让旧的失效）。只增不改
+    artifact_issuer: str | None = None
+    artifact_tree_digest: str | None = None
+    artifact_multiple: bool | None = None
 
 
 class GitVersion(Payload):

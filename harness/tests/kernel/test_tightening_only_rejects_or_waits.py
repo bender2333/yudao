@@ -7,13 +7,13 @@
 #   ②收紧检查拒绝时提交被拒，原因取它给出的那一条；
 #   ③收紧检查要等待时，提交不当场生效、工具调用不执行（等待由写入口的安全节点处理）。
 # 用真实存储（LoopSystem.for_testing）与受控的收紧检查实现，不重跑运行、不开子进程，属于模块层。
+from harness.tests.helpers import adjudication_view, work_basis
 
 import pytest
 
 from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import commit_decision, proposal_decision, tool_permission
-from harness.adjudication import WorkBasis
 from harness.contract_versions import ContractVersionError
 from harness.environment import LocalEnvironment
 from harness.proposals import product_spec
@@ -152,7 +152,7 @@ def test_a_kernel_rejection_stands_when_the_tightening_check_passes(tmp_path):
     # ①内核先判：提案依据的 PRD 版本不是当前版本，收紧检查放行也不改变这个结果
     system, run_id, projection = _system(tmp_path)
     facts = _facts(system, run_id)
-    rejected = proposal_decision(projection, department="product",
+    rejected = proposal_decision(adjudication_view(projection), department="product",
                                  proposal=product_spec(basis_product_spec_hash="sha256:not-current"),
                                  facts=facts, events=system.store.list_events(run_id), tightening=_Passes())
     assert not rejected.accepted
@@ -163,7 +163,7 @@ def test_a_rejection_from_the_tightening_check_is_reported_with_its_own_reason(t
     # ②收紧检查拒绝时提交被拒，原因取它给出的那一条：内核通用检查全部通过也不行
     system, run_id, projection = _system(tmp_path)
     facts = _facts(system, run_id)
-    rejected = proposal_decision(projection, department="product", proposal=product_spec(),
+    rejected = proposal_decision(adjudication_view(projection), department="product", proposal=product_spec(),
                                  facts=facts, events=system.store.list_events(run_id), tightening=_Refuses())
     assert not rejected.accepted
     assert [error.message for error in rejected.errors] == ["the routing does not allow this submission now"]
@@ -173,8 +173,8 @@ def test_a_tool_the_tightening_check_refuses_is_not_allowed(tmp_path):
     # ②工具许可同样只看结果：拒绝就是不允许执行，原因取收紧检查给出的那一条
     system, run_id, projection = _system(tmp_path)
     call = {"id": "call", "name": "write_file", "args": {"path": "src/echo.py", "content": "print(1)\n"}}
-    permission = tool_permission(projection, call, department="engineering",
-                                 basis=WorkBasis.current(projection, "engineering"), aborted=False,
+    permission = tool_permission(adjudication_view(projection), call, department="engineering",
+                                 basis=work_basis(projection, "engineering"), aborted=False,
                                  facts=_facts(system, run_id), events=system.store.list_events(run_id),
                                  tightening=_Refuses())
     assert not permission.allowed and not permission.stopped
@@ -185,8 +185,8 @@ def test_a_waiting_tightening_check_makes_the_tool_wait_at_the_safe_node(tmp_pat
     # ③要等待时工具调用不执行：许可表达为等待，写入口在安全节点上等，醒来以后重新许可（工单 #561）
     system, run_id, projection = _system(tmp_path)
     call = {"id": "call", "name": "submit_review", "args": {"verdict": "release"}}
-    permission = tool_permission(projection, call, department="quality",
-                                 basis=WorkBasis.current(projection, "quality"), aborted=False,
+    permission = tool_permission(adjudication_view(projection), call, department="quality",
+                                 basis=work_basis(projection, "quality"), aborted=False,
                                  facts=_facts(system, run_id), events=system.store.list_events(run_id),
                                  tightening=_Waits())
     assert permission.wait_for_input and not permission.allowed and not permission.stopped
@@ -198,11 +198,11 @@ def test_a_waiting_tightening_check_at_commit_time_is_never_accepted(tmp_path):
     facts = _facts(system, run_id)
     events = system.store.list_events(run_id)
     proposal = product_spec()
-    first = proposal_decision(projection, department="product", proposal=proposal, facts=facts,
+    first = proposal_decision(adjudication_view(projection), department="product", proposal=proposal, facts=facts,
                               events=events, tightening=_Passes())
     assert first.accepted, first.error_dicts
-    committed = commit_decision(first, department="product", proposal=proposal, evaluated=projection,
-                                facts=facts, current=projection, current_facts=facts, events=events,
+    committed = commit_decision(first, department="product", proposal=proposal, evaluated=adjudication_view(projection),
+                                facts=facts, current=adjudication_view(projection), current_facts=facts, events=events,
                                 tightening=_Waits())
     assert not committed.accepted
     assert committed.errors and committed.errors[0].field == "kind"
@@ -212,8 +212,8 @@ def test_a_tool_refused_with_field_errors_is_not_allowed(tmp_path):
     # ②拒绝也可以给字段错误：内核取第一条错误的原因拒绝，不因为它的形状不同就放行
     system, run_id, projection = _system(tmp_path)
     call = {"id": "call", "name": "write_file", "args": {"path": "src/echo.py", "content": "print(1)\n"}}
-    permission = tool_permission(projection, call, department="engineering",
-                                 basis=WorkBasis.current(projection, "engineering"), aborted=False,
+    permission = tool_permission(adjudication_view(projection), call, department="engineering",
+                                 basis=work_basis(projection, "engineering"), aborted=False,
                                  facts=_facts(system, run_id), events=system.store.list_events(run_id),
                                  tightening=_RefusesWithErrors())
     assert not permission.allowed and not permission.stopped
@@ -224,7 +224,7 @@ def test_a_submission_the_tightening_check_defers_is_reported_as_a_field_error(t
     # ②一次推迟在提案校验这一步同样不当场生效，原因写成字段错误交给部门
     system, run_id, projection = _system(tmp_path)
     facts = _facts(system, run_id)
-    deferred = proposal_decision(projection, department="product", proposal=product_spec(), facts=facts,
+    deferred = proposal_decision(adjudication_view(projection), department="product", proposal=product_spec(), facts=facts,
                                  events=system.store.list_events(run_id), tightening=_DefersAtTheStart())
     assert not deferred.accepted
     assert [(error.field, error.message) for error in deferred.errors] == [
@@ -237,11 +237,11 @@ def test_a_wait_that_only_appears_at_commit_time_leaves_the_submission_unapplied
     facts = _facts(system, run_id)
     events = system.store.list_events(run_id)
     proposal = product_spec()
-    first = proposal_decision(projection, department="product", proposal=proposal, facts=facts,
+    first = proposal_decision(adjudication_view(projection), department="product", proposal=proposal, facts=facts,
                               events=events, tightening=_WaitsAtCommit())
     assert first.accepted, first.error_dicts
-    committed = commit_decision(first, department="product", proposal=proposal, evaluated=projection,
-                                facts=facts, current=projection, current_facts=facts, events=events,
+    committed = commit_decision(first, department="product", proposal=proposal, evaluated=adjudication_view(projection),
+                                facts=facts, current=adjudication_view(projection), current_facts=facts, events=events,
                                 tightening=_WaitsAtCommit())
     assert not committed.accepted
     assert committed.errors and committed.errors[0].field == "kind"

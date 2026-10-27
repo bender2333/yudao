@@ -10,7 +10,7 @@ from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.public_tree import CapturedFile, CapturedTree
 from harness.tests.helpers import system_on_copy
-from harness.tests.saved_rewrite import rewrite_saved_projection
+from harness.tests.saved_rewrite import rewrite_saved_events, rewrite_saved_projection
 
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次停在等质检让步的运行并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上放行交付与检查。数据来自真实运行，登记为集成层。
@@ -88,8 +88,15 @@ def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(re
     system, run_ids = ready_run
     run_id = run_ids[0]
     projection = system.project(run_id)
-    delivery = replace(projection.delivery_spec, code_tree_digest="sha256:" + "0" * 64)
-    # 保存的运行状态中，当前交付的摘要与工作区不同：写回这个流保存的投影
+    wrong = "sha256:" + "0" * 64
+    # 交付记下的树摘要与工作区不同：裁决读最小投影，它由接纳事件折叠而成，所以改的是那条事件记下的摘要
+    # （S1d，工单 #860）；保存的运行状态一起改写，两侧读到的是同一个摘要
+    accepted = [event for event in _events(system, run_id) if event.type == EventType.DELIVERY_ACCEPTED]
+    rewrite_saved_events(system.store, [
+        replace(event, payload={**event.payload, "code_tree_digest": wrong, "artifact_tree_digest": wrong})
+        for event in accepted
+    ])
+    delivery = replace(projection.delivery_spec, code_tree_digest=wrong)
     rewrite_saved_projection(system.store, run_id, replace(projection, delivery_spec=delivery))
     result = system.activate_once(run_id)
     recorded = system.project(run_id)

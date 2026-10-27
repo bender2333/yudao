@@ -7,15 +7,16 @@
 
 import ast
 import json
+from dataclasses import replace
 import shutil
 import sys
 from pathlib import Path
 
 from harness.definitions import DEFINITIONS_DIR, load_definitions
-from harness.minimal_projection import AcceptedArtifact, fold_events
+from harness.minimal_projection import AcceptedArtifact, fold_events, fold_more
 from harness.models import Event, EventType
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[3]  # harness/tests/kernel/ 往上三层是仓库根
 MODULE = REPO_ROOT / "harness" / "minimal_projection.py"
 MANIFEST = REPO_ROOT / "harness" / "definitions" / "kernel-manifest.json"
 RUN_STREAM = "run:run_824"
@@ -177,6 +178,126 @@ def test_the_module_imports_only_kernel_files_stdlib_and_pydantic():
         elif top not in sys.stdlib_module_names and module != "__future__" and top != "pydantic":
             offenders.append((line, module, "不是内核文件、标准库或 pydantic"))
     assert offenders == []
+
+
+def test_the_acceptance_fields_carry_the_author_department_and_the_recorded_tree():
+    # 2026-10-27 补的接纳字段（S1d，工单 #860）：作者部门与记下的树摘要随接纳事件折进成果，
+    # 通用条件 5 的作者分离与条件 4 的树一致读它们；没有这一项的成果为空
+    events = [
+        _run_created(),
+        _event(EventType.DELIVERY_ACCEPTED, 2, session="ses_eng", department="engineering", payload={
+            "content_hash": "sha256:delivery1", "artifact_kind": "delivery_spec", "artifact_version": 1,
+            "artifact_basis": {"product_spec": "sha256:spec1"},
+            "artifact_issuer": "engineering", "artifact_tree_digest": "sha256:tree1",
+        }),
+        _event(EventType.SPEC_ACCEPTED, 3, session="ses_pro", department="product", payload={
+            "content_hash": "sha256:spec1", "artifact_kind": "product_spec", "artifact_version": 1,
+            "artifact_basis": {}, "artifact_issuer": "product",
+        }),
+    ]
+    projection = fold_events(events)
+    delivery = projection.artifact("delivery_spec")
+    assert (delivery.issuer, delivery.tree_digest) == ("engineering", "sha256:tree1")
+    # PRD 没有记树：这一项为空，而不是空串
+    spec = projection.artifact("product_spec")
+    assert (spec.issuer, spec.tree_digest) == ("product", None)
+
+
+def test_a_kind_that_keeps_several_versions_records_every_current_one():
+    # 一种成果多版并存时（现在只有产品决定）按种类记当前有效各版的摘要清单（S1d，工单 #860）：
+    # 单版的种类只有最新这一版，多版的种类积累；失效事件只去掉那一版
+    events = [
+        _run_created(),
+        _event(EventType.PRODUCT_DECISION_ACCEPTED, 2, session="ses_pro", department="product", payload={
+            "content_hash": "sha256:decision1", "artifact_kind": "product_decision", "artifact_version": 1,
+            "artifact_basis": {"product_spec": "sha256:spec1"}, "artifact_multiple": True,
+        }),
+        _event(EventType.PRODUCT_DECISION_ACCEPTED, 3, session="ses_pro", department="product", payload={
+            "content_hash": "sha256:decision2", "artifact_kind": "product_decision", "artifact_version": 1,
+            "artifact_basis": {"product_spec": "sha256:spec1"}, "artifact_multiple": True,
+        }),
+        _event(EventType.SPEC_ACCEPTED, 4, session="ses_pro", department="product", payload={
+            "content_hash": "sha256:spec1", "artifact_kind": "product_spec", "artifact_version": 1,
+            "artifact_basis": {},
+        }),
+        _event(EventType.SPEC_ACCEPTED, 5, session="ses_pro", department="product", payload={
+            "content_hash": "sha256:spec2", "artifact_kind": "product_spec", "artifact_version": 2,
+            "artifact_basis": {"product_spec": "sha256:spec1"},
+        }),
+    ]
+    projection = fold_events(events)
+    assert [item.content_hash for item in projection.versions_of("product_decision")] == [
+        "sha256:decision1", "sha256:decision2"]
+    assert projection.artifact("product_decision").content_hash == "sha256:decision2"
+    assert [item.content_hash for item in projection.versions_of("product_spec")] == ["sha256:spec2"]
+    invalidated = fold_more(projection, [_event(EventType.ARTIFACT_INVALIDATED, 6, payload={
+        "artifact_kind": "product_spec", "artifact_version": 2, "reason": "replaced"})])
+    # 失效事件按版本去掉那一版：当前的 PRD 失效以后这一种成果没有当前版本，多版并存的清单不受影响
+    assert invalidated.versions_of("product_spec") == ()
+    assert invalidated.artifact("product_spec") is None
+    assert [item.content_hash for item in invalidated.versions_of("product_decision")] == [
+        "sha256:decision1", "sha256:decision2"]
+
+
+def test_the_round_of_each_department_is_read_by_department():
+    # 每个部门主线会话当前这一轮的编号按部门取（S1d，工单 #860）：通用条件 3 的「回执来自这一轮」读它。
+    # 询问分支是另一条会话，它的激活不改主线这一轮的编号（工单 #473、#857）
+    created = _event(EventType.RUN_CREATED, 1, payload={
+        "kind": "change", "project_id": "prj_824", "work_item_id": "wi_824",
+        "definitions_version": "sha256:definitions", "parameters_version": "sha256:parameters",
+        "max_cycles": 7, "run_time_limit_sec": 900,
+        "sessions": {"product": "ses_pro", "quality": "ses_qua"},
+    })
+    events = [
+        created,
+        _event(EventType.DEPARTMENT_ACTIVATED, 2, session="ses_pro", department="product",
+               payload={"activation_id": "act_main", "cycle": 1}),
+        _event(EventType.ASK_STARTED, 3, session="ses_pro", department="product",
+               payload={"branch_session_id": "ses_branch", "requester": "product", "recipient": "quality",
+                        "question": "why"}),
+        _event(EventType.DEPARTMENT_ACTIVATED, 4, session="ses_branch", department="quality",
+               payload={"activation_id": "act_branch", "cycle": 1}),
+        _event(EventType.DEPARTMENT_ACTIVATED, 5, session="ses_qua", department="quality",
+               payload={"activation_id": "act_quality", "cycle": 2}),
+    ]
+    projection = fold_events(events)
+    assert projection.rounds == {"product": "act_main", "quality": "act_quality"}
+    # 分支会话的激活不推进轮次：事项一级的激活次数取主线会话的激活次数（工单 #857）
+    assert projection.used.activations == 2
+
+
+def test_the_snapshot_of_the_created_work_item_is_the_recorded_tree():
+    # 建档事项在创建时记下代码树快照：通用条件 4 的树一致读它记下的树摘要（S1d，工单 #860）
+    created = _event(EventType.RUN_CREATED, 1, payload={
+        "kind": "onboarding", "project_id": "prj_824", "work_item_id": "wi_824",
+        "definitions_version": "sha256:definitions", "parameters_version": "sha256:parameters",
+        "max_cycles": 7, "run_time_limit_sec": 900,
+        "snapshot": {"tree_digest": "sha256:snapshot_tree", "files": 3},
+    })
+    projection = fold_events([created])
+    assert projection.artifact("snapshot").tree_digest == "sha256:snapshot_tree"
+    # 没有快照的事项没有这一项；有快照但没有树摘要时同样没有（快照不完整不折）
+    assert fold_events([_run_created()]).artifact("snapshot") is None
+    incomplete = replace(created, payload={**created.payload, "snapshot": {"files": 3}})
+    assert fold_events([incomplete]).artifact("snapshot") is None
+
+
+def test_folding_later_events_on_a_folded_projection_matches_a_full_replay():
+    # R1：后面的事件接在已经折好的结果上折（写入口在同一个事务里折一份交给裁决，S1d），
+    # 结果与整条流重算相同
+    events = [
+        _run_created(),
+        _event(EventType.DEPARTMENT_ACTIVATED, 2, session="ses_eng", department="engineering",
+               payload={"activation_id": "act_2", "cycle": 1}),
+        _event(EventType.DELIVERY_ACCEPTED, 3, session="ses_eng", department="engineering", payload={
+            "content_hash": "sha256:delivery1", "artifact_kind": "delivery_spec", "artifact_version": 1,
+            "artifact_basis": {"product_spec": "sha256:spec1"}, "artifact_issuer": "engineering",
+            "artifact_tree_digest": "sha256:tree1",
+        }),
+        _event(EventType.RUN_DONE, 4, stop_reason="released", state="done"),
+    ]
+    partial = fold_events(events[:2])
+    assert fold_more(partial, events[2:]) == fold_events(events)
 
 
 def _resolve(module: str) -> str | None:

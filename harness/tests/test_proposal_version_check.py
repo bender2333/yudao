@@ -15,6 +15,7 @@ from harness.proposals import (
 )
 from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
+from harness.tests.helpers import adjudication_view
 from harness.validation import evaluate_proposal
 from harness.tightening import WATCHED_OUTPUTS
 
@@ -147,8 +148,7 @@ def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path)
         assert projection.status not in ("done", "failed"), projection.stop_reason
     projection = system.project(run_id)
     superseded = replace(projection.delivery_spec, product_spec_hash="sha256:" + "0" * 64)
-    decision = evaluate_proposal(department="quality",
-                                 projection=replace(projection, delivery_spec=superseded),
+    decision = evaluate_proposal(adjudication_view(replace(projection, delivery_spec=superseded)),department="quality",
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=review("release", "releasing a stale-bound delivery",
                                                  checks=["smoke"],

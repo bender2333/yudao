@@ -6,7 +6,9 @@
 #
 # 例外：应用层保存的读取模型（app/read_models.py，应用层与接口层设计说明第 4.2 节）有自己的、
 # 可以删除后重建的数据库；它不写事件日志的 events、projections、commands 三张表，
-# 也不作为事件的读取来源。架构问题已登记在 docs/architecture-issues.md，等待架构师确认。
+# 也不作为事件的读取来源。这条检查按原意保留（只有 write_path.py 调用 commit 与 replace_projection，
+# 三张日志表只由 event_store.py 写），读取模型是写入口事务之外的可重建派生数据（工单 #73 已处理，
+# 记录在 docs/archive/architecture-issues-2026-09-10.md）。
 #
 # 读仓库里的静态文件，不开数据库、不用子进程、不用网络，属于单元层。
 

@@ -6,6 +6,7 @@ from harness.models import ArtifactRef, DEPARTMENTS, EventType
 from harness.proposals import baseline_review_turn, product_spec, product_spec_turn, structure_turn
 from harness.runtime import LoopSystem
 from harness.snapshot import ingest_snapshot
+from harness.tests.helpers import adjudication_view
 from harness.tightening import WATCHED_OUTPUTS
 from harness.tools import tools_for
 
@@ -239,14 +240,12 @@ def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
         "conclusions": [{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
         "omissions": [], "checks": ["slow"], "other_failures": [],
     }
-    decision = evaluate_proposal(department="quality", proposal=unexplained,
-                                 projection=projection, facts=facts, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", proposal=unexplained, facts=facts, tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert any("failing check" in error.message for error in decision.errors)
     explained = {**unexplained,
                  "conclusions": [{"requirement": REQUIREMENT, "status": "existing_defect", "evidence": "slow"}]}
-    decision = evaluate_proposal(department="quality", proposal=explained,
-                                 projection=projection, facts=facts, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", proposal=explained, facts=facts, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, [error.message for error in decision.errors]
     assert decision.artifact["checks"][0]["exit_code"] == TIMEOUT_EXIT_CODE
     assert structure is not None
@@ -310,8 +309,7 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
         "conventions": [],
     }
     changed = facts.model_copy(update={"digest": "sha256:" + "0" * 64})
-    decision = evaluate_proposal(department="engineering", proposal=proposal,
-                                 projection=projection, facts=changed, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering", proposal=proposal, facts=changed, tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert any("no longer matches the snapshot" in error.message for error in decision.errors)
 
@@ -347,7 +345,6 @@ def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
         "conclusions": [{"requirement": DESIGN_CAPABILITY, "status": "existing_defect", "evidence": "smoke"}],
         "omissions": [], "checks": ["smoke"], "other_failures": [],
     }
-    decision = evaluate_proposal(department="quality", proposal=proposal,
-                                 projection=projection, facts=facts, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", proposal=proposal, facts=facts, tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert any("设计中，未实施" in error.message for error in decision.errors)

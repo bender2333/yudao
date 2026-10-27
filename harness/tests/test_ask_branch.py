@@ -10,6 +10,7 @@ from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import quality_turns
+from harness.tests.helpers import adjudication_view, work_basis
 from harness.tightening import WATCHED_OUTPUTS
 
 
@@ -187,11 +188,10 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         status="running",
         ask_stack=[{"requester": "product", "recipient": "engineering", "branch_session_id": "ses_ask_eng"}],
     )
-    basis = WorkBasis.current(projection, "engineering")
+    basis = work_basis(projection, "engineering")
 
     # 工程分支试图写入
-    perm_write = tool_permission(
-        projection,
+    perm_write = tool_permission(adjudication_view(projection),
         {"name": "write_file", "args": {"path": "src/new.py", "content": "x"}},
         department="engineering",
         session_id="ses_ask_eng",
@@ -202,8 +202,7 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
     assert not perm_write.allowed
 
     # 工程分支试图提交交付
-    perm_del = tool_permission(
-        projection,
+    perm_del = tool_permission(adjudication_view(projection),
         {"name": "submit_delivery", "args": {"summary": "done", "check_names": []}},
         department="engineering",
         session_id="ses_ask_eng",
@@ -219,9 +218,8 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         status="running",
         ask_stack=[{"requester": "engineering", "recipient": "quality", "branch_session_id": "ses_ask_qa"}],
     )
-    qa_basis = WorkBasis.current(qa_projection, "quality")
-    perm_rev = tool_permission(
-        qa_projection,
+    qa_basis = work_basis(qa_projection, "quality")
+    perm_rev = tool_permission(adjudication_view(qa_projection),
         {"name": "submit_review", "args": {"verdict": "release", "rationale": "ok", "checks": []}},
         department="quality",
         session_id="ses_ask_qa",
@@ -237,9 +235,8 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         status="running",
         ask_stack=[{"requester": "engineering", "recipient": "product", "branch_session_id": "ses_ask_pro"}],
     )
-    prod_basis = WorkBasis.current(prod_projection, "product")
-    perm_prod_read = tool_permission(
-        prod_projection,
+    prod_basis = work_basis(prod_projection, "product")
+    perm_prod_read = tool_permission(adjudication_view(prod_projection),
         {"name": "read_file", "args": {"path": "src/echo.py"}},
         department="product",
         session_id="ses_ask_pro",

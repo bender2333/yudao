@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .contracts import current_contract_hash
+from .contracts import artifact_hash
 from .models import RunProjection
 from .definitions import DEFINITIONS
 
@@ -81,7 +81,7 @@ def _has_new_product_spec(projection: RunProjection, department: str) -> bool:
     """
     if projection.product_spec is None:
         return False
-    contract = current_contract_hash(projection)
+    contract = artifact_hash(projection.effective_contract)
     if department == "quality":
         if contract is None:
             return False

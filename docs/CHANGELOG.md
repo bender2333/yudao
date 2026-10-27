@@ -608,6 +608,10 @@ claude（总架构师） / 2026-10-27 10:08 / docs/foundation-rules.md 基础规
 
 claude（总架构师） / 2026-10-27 10:40 / 让工作停下来等人的规则改掉九条：`docs/agents/dispatcher.md` 删派发前的依据核对、一轮做不完再派同一张、三轮才搁置；`docs/agents/triage-labels.md` 三次改三轮、`touches-core` 清单外文件补记后改；`docs/agents/acceptance-evidence.md` 第 2 节既有失败写证据即可批准；`docs/design/test-pyramid.md` 第 4.4 节执行者随工单删用例；`docs/decision.md` 新增一条 / 用户要求把阻碍工作流的规则都改掉
 
+solo-deepseek-v4.1-flash / 2026-10-27 12:03 / docs/architecture-issues.md 登记工单 #860 的一条：最小投影缺内核通用条件要的字段（`issuer`、按部门的这一轮编号、`qa_tests_hash` 等），设计说明第 4 节「裁决只读这一份」与第 80 行「裁决按版本取内容」待定一句为准；内核清单 `rules` 一节的登记与「不改已有的内核测试」冲突；「只改」漏了 `engine.py`、`context.py`、`smoke.py`、`submissions.py` 四个必须改的调用方；另记录拆单建议与行数读数（内核 5191 行、上限 5471，最小投影 214 行）/ 工单 #860 手写文件至少 30 个（运行配置第 7 节上限 15），按「工单太大」交回并给四张拆法；最小投影的字段边界与 #561 的第三种结果要架构师定
+
 claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `docs/design/skeleton-and-application.md` 状态行，第 5.4 节第 3 条加「做法」，第 5.5 节加「成果的内容由路由组装，内核盖统一字段」，第 12 节表加 S2c（#1098）与一直缺的 S6c（#979）、S6b 的前置加 S2c，顺序行同步；`docs/architecture-issues.md` #952 一条补处理行；`docs/current-baseline.md` 阶段一两行与更新行；`docs/design/README.md` 循环结构、画面与播放、部门指导三条的状态；`docs/requirements/README.md` D20；`docs/decision.md` 新增一条 / 阶段一工单诊断：第 5.4 节第 3 条没有工单，S6b 做不到不改骨架；父工单 #466、#476、#477、#950 核对后关闭
 
 claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `CLAUDE.md`「工单规范」环一条删「用例只由架构师删」；`.claude/skills/to-children/SKILL.md` 删减功能一段改为执行者随工单删用例；`docs/design/test-pyramid.md` 第 10 节第 5 条同步 / 同日 PR #1097 已把删用例改为执行者随工单删，这三处漏改
+
+solo-deepseek-v4.1-flash / 2026-10-28 01:35 / docs/architecture-issues.md 登记工单 #860 的一条：S1d 落地时设计说明没有写到的两处边界（PRD 记下的输入版本不进最小投影，由收紧检查的 `Tightened.facts` 一并给回；「逐条结论覆盖每条要求」这条读 PRD 内容的检查从 validation.py 搬进成果驱动的收紧检查），并写明 S2c（#1098）把它们并入「通过时给出成果的内容」 / 工单 #860 落地「内核改读最小投影」，设计说明第 4、5.5 节没有覆盖这两样的去向，先登记做法再继续做

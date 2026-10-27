@@ -7,6 +7,7 @@
 # - R2（不放过错的）：引用的版本不是当前版本、回执不是这一轮、树不一致、作者与评价者同一部门、
 #   内容重复的提案被拒绝，理由指向对应的字段；
 # - R3（不放宽既有许可）：六条关系规则一条都不缺（改合同数据放宽的用例在 test_proposal_conditions_contract.py）。
+from harness.tests.helpers import adjudication_view
 
 from harness.actions import TreeFacts
 from harness.models import (ArtifactRef, CheckReceipt, DeliverySpec, EffectiveContract, ProductDecision, ProductSpec,
@@ -120,7 +121,7 @@ def _review_proposal(**overrides) -> dict:
 def _stale_product_spec_is_rejected():
     # 通用条件 1：产品修订 PRD 时声明的依据版本与当前版本不同就拒绝
     projection = _projection("product", product_spec=_spec())
-    stale = evaluate_proposal(department="product", projection=projection, facts=_facts(),
+    stale = evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(),
                               proposal=product_spec(basis_product_spec_hash=OTHER_SPEC_HASH), tightening=WATCHED_OUTPUTS)
     assert not stale.accepted
     assert [error.field for error in stale.errors] == ["basis_product_spec_hash"]
@@ -132,7 +133,7 @@ def test_a_product_spec_with_the_current_basis_is_accepted():
     revision = product_spec(basis_product_spec_hash=SPEC_HASH, decision_changes=[],
                             change_record={"changed": [], "retained": [REQUIREMENT], "retired": [],
                                            "rationale": "keep the requirement"})
-    decision = evaluate_proposal(department="product", projection=projection, facts=_facts(), proposal=revision, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(), proposal=revision, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
@@ -143,7 +144,7 @@ def test_a_product_spec_with_a_stale_basis_is_rejected():
 def test_the_first_product_spec_declares_a_null_basis():
     # 还没有当前版本：声明 null 通过，条件不把第一次接纳当成过期依据
     projection = _projection("product")
-    decision = evaluate_proposal(department="product", projection=projection, facts=_facts(),
+    decision = evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(),
                                  proposal=product_spec(basis_product_spec_hash=None), tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
@@ -156,11 +157,11 @@ def test_a_product_decision_with_the_same_content_is_rejected():
                                created_event_id="evt_decision", product_spec_hash=SPEC_HASH,
                                statement=content["statement"], rationale=content["rationale"])
     projection = _projection("product", product_spec=_spec(), product_decisions=[existing])
-    duplicate = evaluate_proposal(department="product", projection=projection, facts=_facts(),
+    duplicate = evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(),
                                   proposal=product_decision(content["statement"], content["rationale"]), tightening=WATCHED_OUTPUTS)
     assert not duplicate.accepted
     assert [error.field for error in duplicate.errors] == ["statement"]
-    fresh = evaluate_proposal(department="product", projection=projection, facts=_facts(),
+    fresh = evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(),
                               proposal=product_decision("use exit code 3 for unknown flags", content["rationale"]), tightening=WATCHED_OUTPUTS)
     assert fresh.accepted, fresh.error_dicts
 
@@ -168,7 +169,7 @@ def test_a_product_decision_with_the_same_content_is_rejected():
 def test_a_delivery_with_a_stale_basis_is_rejected():
     projection = _projection("engineering", product_spec=_spec(), effective_contract=_contract(),
                              last_activations={"engineering": "act"})
-    decision = evaluate_proposal(department="engineering", projection=projection, facts=_facts(_receipt("engineering")),
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering", facts=_facts(_receipt("engineering")),
                                  proposal=delivery(basis_product_spec_hash=OTHER_SPEC_HASH), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert [error.field for error in decision.errors] == ["basis_product_spec_hash"]
@@ -177,7 +178,7 @@ def test_a_delivery_with_a_stale_basis_is_rejected():
 def test_a_delivery_with_the_current_basis_and_receipt_is_accepted():
     projection = _projection("engineering", product_spec=_spec(), effective_contract=_contract(),
                              last_activations={"engineering": "act"})
-    decision = evaluate_proposal(department="engineering", projection=projection, facts=_facts(_receipt("engineering")),
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering", facts=_facts(_receipt("engineering")),
                                  proposal=delivery(basis_product_spec_hash=SPEC_HASH), tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
@@ -186,7 +187,7 @@ def test_a_check_receipt_from_another_activation_is_rejected():
     # 通用条件 3：列出的检查要有这个部门这一轮回执；上一轮的回执不算
     projection = _projection("engineering", product_spec=_spec(), effective_contract=_contract(),
                              last_activations={"engineering": "act_now"})
-    decision = evaluate_proposal(department="engineering", projection=projection,
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering",
                                  facts=_facts(_receipt("engineering", activation="act_before")),
                                  proposal=delivery(basis_product_spec_hash=SPEC_HASH), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
@@ -195,7 +196,7 @@ def test_a_check_receipt_from_another_activation_is_rejected():
 
 
 def test_a_review_of_a_current_delivery_is_accepted():
-    decision = evaluate_proposal(department="quality", projection=_review_projection(), facts=_facts(_quality_receipt()),
+    decision = evaluate_proposal(adjudication_view(_review_projection()),department="quality", facts=_facts(_quality_receipt()),
                                  proposal=_review_proposal(), tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
     assert decision.ends_run
@@ -204,7 +205,7 @@ def test_a_review_of_a_current_delivery_is_accepted():
 def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected():
     # 通用条件 2：引用的交付所依据的 PRD 也必须是当前版本
     projection = _review_projection(delivery_spec=_delivery(product_spec_hash=OTHER_SPEC_HASH))
-    decision = evaluate_proposal(department="quality", projection=projection, facts=_facts(_quality_receipt()),
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=_facts(_quality_receipt()),
                                  proposal=_review_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert "product_spec_hash" in [error.field for error in decision.errors]
@@ -212,7 +213,7 @@ def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected():
 
 def test_a_review_requires_the_workspace_tree_to_match_the_delivery():
     # 通用条件 4：工作区的树与交付记下的树一致
-    decision = evaluate_proposal(department="quality", projection=_review_projection(),
+    decision = evaluate_proposal(adjudication_view(_review_projection()),department="quality",
                                  facts=_facts(_quality_receipt(), digest=OTHER_TREE),
                                  proposal=_review_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
@@ -223,7 +224,7 @@ def test_a_review_requires_a_quality_receipt_from_this_activation():
     # 通用条件 3：回执来自质检这一轮，工程的回执不能顶替
     projection = _review_projection()
     previous = _facts(_quality_receipt(activation="act_before"))
-    decision = evaluate_proposal(department="quality", projection=projection, facts=previous,
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=previous,
                                  proposal=_review_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert any(error.field == "checks" for error in decision.errors)
@@ -232,7 +233,7 @@ def test_a_review_requires_a_quality_receipt_from_this_activation():
 def test_a_department_cannot_evaluate_an_artifact_it_authored():
     # 通用条件 5（基础规则 3）：提出评价类成果的部门不是被评价成果的作者部门
     projection = _review_projection(delivery_spec=_delivery(issuer="quality"))
-    decision = evaluate_proposal(department="quality", projection=projection, facts=_facts(_quality_receipt()),
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=_facts(_quality_receipt()),
                                  proposal=_review_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     [error] = decision.errors
@@ -240,14 +241,14 @@ def test_a_department_cannot_evaluate_an_artifact_it_authored():
 
 
 def test_an_onboarding_structure_with_a_current_receipt_is_accepted():
-    decision = evaluate_proposal(department="engineering", projection=_structure_projection(),
+    decision = evaluate_proposal(adjudication_view(_structure_projection()),department="engineering",
                                  facts=_facts(_receipt("engineering")), proposal=_structure_proposal(), tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
 def test_an_onboarding_structure_requires_the_snapshot_tree():
     # 通用条件 4：建档提案的工作区的树等于建档时的快照
-    decision = evaluate_proposal(department="engineering", projection=_structure_projection(),
+    decision = evaluate_proposal(adjudication_view(_structure_projection()),department="engineering",
                                  facts=_facts(_receipt("engineering"), digest=OTHER_TREE),
                                  proposal=_structure_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
@@ -257,14 +258,14 @@ def test_an_onboarding_structure_requires_the_snapshot_tree():
 
 def test_an_onboarding_structure_requires_the_snapshot_to_record_the_tree():
     # 通用条件 4：没有记下树摘要（建档前的快照缺失）时拒绝，理由与字段由合同给出
-    decision = evaluate_proposal(department="engineering", projection=_structure_projection(snapshot=None),
+    decision = evaluate_proposal(adjudication_view(_structure_projection(snapshot=None)),department="engineering",
                                  facts=_facts(_receipt("engineering")), proposal=_structure_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert [error.field for error in decision.errors] == ["snapshot"]
 
 
 def test_an_onboarding_structure_requires_a_receipt_from_this_activation():
-    decision = evaluate_proposal(department="engineering", projection=_structure_projection(),
+    decision = evaluate_proposal(adjudication_view(_structure_projection()),department="engineering",
                                  facts=_facts(_receipt("engineering", activation="act_before")),
                                  proposal=_structure_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
@@ -272,7 +273,7 @@ def test_an_onboarding_structure_requires_a_receipt_from_this_activation():
 
 
 def test_a_baseline_review_of_the_current_structure_is_accepted():
-    decision = evaluate_proposal(department="quality", projection=_baseline_projection(),
+    decision = evaluate_proposal(adjudication_view(_baseline_projection()),department="quality",
                                  facts=_facts(_quality_receipt()), proposal=_baseline_proposal(), tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
     assert decision.ends_run
@@ -280,20 +281,19 @@ def test_a_baseline_review_of_the_current_structure_is_accepted():
 
 def test_a_baseline_review_requires_a_structure_of_the_current_spec():
     # 通用条件 2：基线核验要有当前 PRD 的结构说明
-    missing = evaluate_proposal(department="quality", projection=_baseline_projection(structure=None),
+    missing = evaluate_proposal(adjudication_view(_baseline_projection(structure=None)),department="quality",
                                 facts=_facts(_quality_receipt()), proposal=_baseline_proposal(), tightening=WATCHED_OUTPUTS)
     assert not missing.accepted
     assert any(error.field == "structure" for error in missing.errors)
-    stale = evaluate_proposal(department="quality",
-                              projection=_baseline_projection(
-                                  structure={**STRUCTURE, "product_spec_hash": OTHER_SPEC_HASH}),
+    stale = evaluate_proposal(adjudication_view(_baseline_projection(
+                                  structure={**STRUCTURE, "product_spec_hash": OTHER_SPEC_HASH})),department="quality",
                               facts=_facts(_quality_receipt()), proposal=_baseline_proposal(), tightening=WATCHED_OUTPUTS)
     assert not stale.accepted
     assert any(error.field == "structure" for error in stale.errors)
 
 
 def test_a_baseline_review_requires_the_snapshot_tree():
-    decision = evaluate_proposal(department="quality", projection=_baseline_projection(),
+    decision = evaluate_proposal(adjudication_view(_baseline_projection()),department="quality",
                                  facts=_facts(_quality_receipt(), digest=OTHER_TREE),
                                  proposal=_baseline_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
@@ -301,7 +301,7 @@ def test_a_baseline_review_requires_the_snapshot_tree():
 
 
 def test_a_baseline_review_requires_a_receipt_from_this_activation():
-    decision = evaluate_proposal(department="quality", projection=_baseline_projection(),
+    decision = evaluate_proposal(adjudication_view(_baseline_projection()),department="quality",
                                  facts=_facts(_quality_receipt(activation="act_before")),
                                  proposal=_baseline_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
@@ -311,7 +311,7 @@ def test_a_baseline_review_requires_a_receipt_from_this_activation():
 def test_a_baseline_review_of_a_structure_authored_by_quality_is_rejected():
     # 通用条件 5：提出核验的部门不是结构说明的作者部门
     projection = _baseline_projection(structure={**STRUCTURE, "issuer": "quality"})
-    decision = evaluate_proposal(department="quality", projection=projection, facts=_facts(_quality_receipt()),
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=_facts(_quality_receipt()),
                                  proposal=_baseline_proposal(), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert any(error.field == "issuer" for error in decision.errors)

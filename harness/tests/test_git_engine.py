@@ -1,5 +1,6 @@
 import threading
 from pathlib import Path
+from harness.tests.helpers import adjudication_view
 
 import pytest
 
@@ -34,7 +35,7 @@ def _formal(system, run_id):
 def _commit_spec(system, run_id, proposal):
     projection = system.project(run_id)
     snapshot = system.workspace(run_id).snapshot()
-    decision = evaluate_proposal(department="product", projection=projection,
+    decision = evaluate_proposal(adjudication_view(projection),department="product",
                                  facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id), tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
     return system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(

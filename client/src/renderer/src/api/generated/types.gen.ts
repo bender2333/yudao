@@ -6262,6 +6262,18 @@ export type BaselineReviewAcceptedPayload = {
     };
     artifact_ref?: ArtifactRef | null;
     /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
+    /**
      * Verdict
      */
     verdict: 'consistent' | 'rework_product';
@@ -7417,6 +7429,18 @@ export type ContractAcceptedPayload = {
     };
     artifact_ref?: ArtifactRef | null;
     /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
+    /**
      * Product Spec Hash
      */
     product_spec_hash: string;
@@ -7958,6 +7982,18 @@ export type DeliveryAcceptedPayload = {
         [key: string]: string;
     };
     artifact_ref?: ArtifactRef | null;
+    /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
     /**
      * Summary
      */
@@ -11429,6 +11465,18 @@ export type ProductDecisionAcceptedPayload = {
     };
     artifact_ref?: ArtifactRef | null;
     /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
+    /**
      * Statement
      */
     statement: string;
@@ -12627,6 +12675,18 @@ export type QaSubmittedPayload = {
     };
     artifact_ref?: ArtifactRef | null;
     /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
+    /**
      * Product Spec Hash
      */
     product_spec_hash: string;
@@ -13817,6 +13877,18 @@ export type SpecAcceptedPayload = {
     };
     artifact_ref?: ArtifactRef | null;
     /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
+    /**
      * Goal
      */
     goal: string;
@@ -14051,6 +14123,18 @@ export type StructureAcceptedPayload = {
         [key: string]: string;
     };
     artifact_ref?: ArtifactRef | null;
+    /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
     /**
      * Overall
      */
