@@ -10,8 +10,6 @@ from .contracts import current_contract_hash, normalize_scope
 from .collaboration import allowed_proposal_kinds
 from .models import (
     BASELINE_STATUSES,
-    DEPARTMENTS,
-    PROPOSAL_KINDS,
     QA_VERDICTS,
     Event,
     ProductSpec,
@@ -19,7 +17,8 @@ from .models import (
     spec_content_hash,
 )
 from .actions import TreeFacts
-from .definitions import DEFINITIONS, ConditionNames, ProposalCondition
+from .definitions import ConditionNames, Definitions, ProposalCondition
+from .tools import in_force
 from .projection import RunProjection
 
 # 建档初始 PRD 的边界条目用它标明「设计与需求文档描述而代码尚未实现」（设计第 4.2、4.3 节）。
@@ -81,7 +80,10 @@ def evaluate_proposal(
     projection: RunProjection,
     facts: TreeFacts,
     events: list[Event] | None = None,
+    definitions: Definitions | None = None,
 ) -> ProposalDecision:
+    # definitions 是这个事项所用的那份定义（组织定义与它引用的路由定义所在的那个定义版本，工单 #1098）：
+    # 提案种类、部门与通用条件都按它判断；没有交的时候是当前加载的那一份
     try:
         return _evaluate_proposal(
             department=department,
@@ -89,6 +91,7 @@ def evaluate_proposal(
             projection=projection,
             facts=facts,
             events=events or [],
+            definitions=definitions,
         )
     except Exception as exc:
         return ProposalDecision(
@@ -126,15 +129,16 @@ _ARTIFACTS = {
 
 
 def evaluate_conditions(kind: str, *, department: str, proposal: dict[str, Any], projection: RunProjection,
-                        facts: TreeFacts) -> ConditionOutcome:
+                        facts: TreeFacts, definitions: Definitions | None = None) -> ConditionOutcome:
     """按提案合同核对一种提案的通用条件（设计说明第 5.5 节）。
 
     条件与参数来自 proposal_contracts.json，内核只按条件名分派：改合同数据就能放宽或收紧这条规则，
     代码里不再写死哪一种成果要绑定哪一份当前版本。条件按合同里列出的顺序核对。
+    提案合同取自这个事项所用的那份定义（工单 #1098）。
     """
     context = _ConditionContext(department=department, proposal=proposal, projection=projection, facts=facts)
     outcome = ConditionOutcome()
-    for condition in DEFINITIONS.proposal_conditions(kind):
+    for condition in in_force(definitions).proposal_conditions(kind):
         _CONDITION_CHECKS[condition.condition](condition, context, outcome)
     return outcome
 
@@ -255,6 +259,12 @@ _CONDITION_CHECKS = {
 }
 
 
+def _proposal_kinds(definitions: Definitions) -> frozenset[str]:
+    # 定义里声明的提案种类：由定义的工具里的提交类工具给出（工单 #1098：不再读模块加载时的
+    # models.PROPOSAL_KINDS，事项所用的定义里没有的种类就是没有）
+    return frozenset(tool.proposal for tool in definitions.tools.values() if tool.proposal is not None)
+
+
 def _evaluate_proposal(
     *,
     department: str,
@@ -262,15 +272,17 @@ def _evaluate_proposal(
     projection: RunProjection,
     facts: TreeFacts,
     events: list[Event],
+    definitions: Definitions | None = None,
 ) -> ProposalDecision:
+    definitions = in_force(definitions)
     if not proposal or not isinstance(proposal, dict):
         return ProposalDecision(False, [FieldError("proposal", "structured proposal is required; natural language cannot change state")])
     kind = proposal.get("kind")
-    if kind not in PROPOSAL_KINDS:
+    if kind not in _proposal_kinds(definitions):
         return ProposalDecision(False, [FieldError("kind", f"unknown proposal kind: {kind!r}")])
-    if department not in DEPARTMENTS:
+    if department not in definitions.departments:
         return ProposalDecision(False, [FieldError("issuer", f"unknown department: {department}")])
-    allowed = allowed_proposal_kinds(projection, department)
+    allowed = allowed_proposal_kinds(projection, department, definitions=definitions)
     if department == "product" and any(ask.get("recipient") == "product" for ask in projection.ask_stack):
         # 产品在回答一次询问：可以在回答里修订 PRD（循环结构第 4.3 节）。
         # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着产品回答，
@@ -284,17 +296,17 @@ def _evaluate_proposal(
         return ProposalDecision(False, errors)
 
     if kind == "product_spec":
-        return _accept_product_spec(proposal, projection, facts, department)
+        return _accept_product_spec(proposal, projection, facts, department, definitions=definitions)
     if kind == "product_decision":
-        return _accept_product_decision(proposal, projection, facts, department)
+        return _accept_product_decision(proposal, projection, facts, department, definitions=definitions)
     if kind == "delivery_spec":
-        return _accept_delivery(proposal, projection, facts, department)
+        return _accept_delivery(proposal, projection, facts, department, definitions=definitions)
     if kind == "qa_review":
-        return _accept_review(proposal, projection, facts, department)
+        return _accept_review(proposal, projection, facts, department, definitions=definitions)
     if kind == "structure":
-        return _accept_structure(proposal, projection, facts, department)
+        return _accept_structure(proposal, projection, facts, department, definitions=definitions)
     if kind == "baseline_review":
-        return _accept_baseline_review(proposal, projection, facts, department)
+        return _accept_baseline_review(proposal, projection, facts, department, definitions=definitions)
     return ProposalDecision(False, [FieldError("kind", "unhandled kind")])
 
 
@@ -508,11 +520,12 @@ def _baseline_omission_records(proposal: dict[str, Any], facts: TreeFacts) -> tu
 
 
 def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                         department: str) -> ProposalDecision:
+                         department: str,
+                         definitions: Definitions | None = None) -> ProposalDecision:
     if projection.input_version != projection.product_work_input_version:
         return ProposalDecision(False, [FieldError("input_version", "new user input must enter product work before requirements can be accepted")])
     outcome = evaluate_conditions("product_spec", department=department, proposal=proposal,
-                                  projection=projection, facts=facts)
+                                  projection=projection, facts=facts, definitions=definitions)
     if outcome.errors:
         return ProposalDecision(False, outcome.errors)
     if projection.product_spec is not None and proposal.get("change_record") is None:
@@ -540,11 +553,12 @@ def _accept_product_spec(proposal: dict[str, Any], projection: RunProjection, fa
 
 
 def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                             department: str) -> ProposalDecision:
+                             department: str,
+                             definitions: Definitions | None = None) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "a product decision requires an active ProductSpec")])
     outcome = evaluate_conditions("product_decision", department=department, proposal=proposal,
-                                  projection=projection, facts=facts)
+                                  projection=projection, facts=facts, definitions=definitions)
     if outcome.errors:
         return ProposalDecision(False, outcome.errors)
     return ProposalDecision(True, artifact={**(outcome.content or {}), "kind": "product_decision",
@@ -552,7 +566,8 @@ def _accept_product_decision(proposal: dict[str, Any], projection: RunProjection
 
 
 def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                     department: str) -> ProposalDecision:
+                     department: str,
+                     definitions: Definitions | None = None) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     contract = projection.effective_contract
@@ -560,7 +575,7 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
         return ProposalDecision(False, [FieldError("effective_contract", "delivery requires a current effective contract")])
     # 依据版本与检查回执由合同里的通用条件核对（设计说明第 5.5 节）：绑定当前 ProductSpec 与合同、来自这一轮
     outcome = evaluate_conditions("delivery_spec", department=department, proposal=proposal,
-                                  projection=projection, facts=facts)
+                                  projection=projection, facts=facts, definitions=definitions)
     if outcome.errors:
         return ProposalDecision(False, outcome.errors)
     # 交付的文件清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）。
@@ -593,7 +608,8 @@ def _accept_delivery(proposal: dict[str, Any], projection: RunProjection, facts:
 
 
 def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                   department: str) -> ProposalDecision:
+                   department: str,
+                   definitions: Definitions | None = None) -> ProposalDecision:
     if projection.product_spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象。
@@ -609,7 +625,7 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
     # 依据版本、交付绑定的当前版本、工作区的树与检查回执都由合同里的通用条件核对（设计说明第 5.5 节），
     # 提出评价的部门与交付的作者部门分开也由通用条件核对（基础规则 3）
     outcome = evaluate_conditions("qa_review", department=department, proposal=proposal,
-                                  projection=projection, facts=facts)
+                                  projection=projection, facts=facts, definitions=definitions)
     errors: list[FieldError] = list(outcome.errors)
     check_names, name_errors = _qa_check_names(proposal)
     errors.extend(name_errors)
@@ -653,7 +669,8 @@ def _accept_review(proposal: dict[str, Any], projection: RunProjection, facts: T
 
 
 def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                      department: str) -> ProposalDecision:
+                      department: str,
+                      definitions: Definitions | None = None) -> ProposalDecision:
     # 现有结构说明（docs/design/existing-project-onboarding.md 第 4.4 节）：构建与测试的每一项都要有本次激活中
     # 绑定当前快照与当前初始 PRD 的 run_check 回执，退出状态照实记录（不要求为 0）；建档中工作区的树不变。
     # 树与回执由合同里的通用条件核对（设计说明第 5.5 节）
@@ -661,7 +678,7 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
     if spec is None:
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     outcome = evaluate_conditions("structure", department=department, proposal=proposal,
-                                  projection=projection, facts=facts)
+                                  projection=projection, facts=facts, definitions=definitions)
     errors: list[FieldError] = list(outcome.errors)
     for index, item in enumerate(proposal["modules"]):
         errors.extend(_location_errors(f"modules[{index}].path", [item["path"]], facts))
@@ -716,7 +733,8 @@ def _accept_structure(proposal: dict[str, Any], projection: RunProjection, facts
 
 
 def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection, facts: TreeFacts,
-                            department: str) -> ProposalDecision:
+                            department: str,
+                            definitions: Definitions | None = None) -> ProposalDecision:
     # 基线核验（docs/design/existing-project-onboarding.md 第 4.5 节）：逐条结论覆盖初始 PRD 的每条要求，
     # 基线检查绑定当前快照与当前 ProductSpec，退出状态不为 0 的检查都有说明；这里不使用普通事项的放行规则。
     # 结构说明对应当前 PRD、工作区的树与检查回执由合同里的通用条件核对（设计说明第 5.5 节）
@@ -725,7 +743,7 @@ def _accept_baseline_review(proposal: dict[str, Any], projection: RunProjection,
         return ProposalDecision(False, [FieldError("product_spec", "no active ProductSpec")])
     structure = projection.structure
     outcome = evaluate_conditions("baseline_review", department=department, proposal=proposal,
-                                  projection=projection, facts=facts)
+                                  projection=projection, facts=facts, definitions=definitions)
     errors: list[FieldError] = list(outcome.errors)
     check_names, name_errors = _qa_check_names(proposal)
     errors.extend(name_errors)

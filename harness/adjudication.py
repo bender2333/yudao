@@ -9,9 +9,9 @@ from typing import Any
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .collaboration import pending_product_input, tool_error
 from .contracts import current_contract_hash
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, Definitions
 from .models import TERMINAL_STATUSES, Event, RunProjection, hash_bytes
-from .tools import has_tool, offers_with_input, proposal_kind, tool_action, tools_for
+from .tools import has_tool, in_force, offers_with_input, proposal_kind, tool_action, tools_for
 from .validation import FieldError, ProposalDecision, evaluate_proposal
 
 _STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
@@ -90,7 +90,7 @@ def ask_chain_max_depth() -> int:
 
 
 def _ask_branch_permission(projection: RunProjection, session_id: str | None, department: str,
-                            name: str) -> ToolPermission | None:
+                            name: str, definitions: Definitions) -> ToolPermission | None:
     # 分支会话的许可按会话判定：这个会话是不是某个询问的分支（工单 #473 的嵌套询问）。
     # 同一个部门的主线会话与分支会话是两回事，只有分支会话受分支的约束。
     if projection.ask_by_branch(session_id) is None:
@@ -108,22 +108,25 @@ def _ask_branch_permission(projection: RunProjection, session_id: str | None, de
         return None if allowed else ToolPermission(reason=reason)
     if department == "product":
         return ToolPermission(reason="Product ask branch can only submit answer")
-    if _is_write(name):
+    if _is_write(name, definitions):
         return ToolPermission(reason="The branch session cannot modify files in the running workspace")
     if name == "submit_delivery":
         return ToolPermission(reason="The branch session cannot submit delivery")
     if name == "submit_review":
         return ToolPermission(reason="The branch session cannot submit QA review")
-    if proposal_kind(name) is not None:
+    if proposal_kind(name, definitions=definitions) is not None:
         return ToolPermission(reason=f"The branch session cannot submit proposal {name}")
     return None
 
 
 def offered_tools(projection: RunProjection, department: str, *, session_id: str | None = None,
-                  input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
+                  input_modalities: tuple[str, ...] = ("text",),
+                  definitions: Definitions | None = None) -> list[str]:
     # 请求中提供给模型的工具：部门的工具去掉当前工作不允许的提交，
     # 最后按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具（设计说明第 5.6 节）
-    available = tools_for(department, projection.kind)
+    # 工具清单读这个事项所用的那份定义（工单 #1098）；没有交的时候是当前加载的那一份
+    definitions = in_force(definitions)
+    available = tools_for(department, projection.kind, definitions=definitions)
     if projection.ask_by_branch(session_id) is not None:
         # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案（工单 #473）
         chain_allowed, _ = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
@@ -131,18 +134,19 @@ def offered_tools(projection: RunProjection, department: str, *, session_id: str
         if department == "product":
             return ["answer"] + nested
         allowed = [name for name in available
-                   if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
+                   if name != "ask" and not _is_write(name, definitions)
+                   and proposal_kind(name, definitions=definitions) is None]
         return allowed + ["answer"] + nested
-    return [name for name in offers_with_input(available, input_modalities)
-            if tool_error(projection, department, name, {}) is None]
+    return [name for name in offers_with_input(available, input_modalities, definitions=definitions)
+            if tool_error(projection, department, name, {}, definitions=definitions) is None]
 
 
-def facts_query(call: dict[str, Any]) -> FactsQuery:
+def facts_query(call: dict[str, Any], *, definitions: Definitions | None = None) -> FactsQuery:
     # 工具许可依据的工作区事实：写入的目标路径在工作区中的规范形式，命令执行依据中的公开树摘要
     name, args = call["name"], call["args"]
-    if tool_action(name) == "command":
+    if tool_action(name, definitions=definitions) == "command":
         return FactsQuery(tree=True)
-    if _is_write(name):
+    if _is_write(name, definitions):
         return FactsQuery(paths=tuple(target for target in _write_targets(name, args) if isinstance(target, str)))
     return FactsQuery()
 
@@ -157,27 +161,31 @@ def tool_permission(
     aborted: bool,
     facts: WorkspaceFacts,
     events: list[Event] | None = None,
+    definitions: Definitions | None = None,
 ) -> ToolPermission:
     # facts 是执行环境按 facts_query(call) 查询的结果
+    # 工具许可读这个事项所用的那份定义（工单 #1098）：部门能不能用这个工具、它提交什么种类按它判断；
+    # 没有交的时候是当前加载的那一份
     # 有效合同、指导与用户输入变了都不再停止这次激活：它们作为通知送达，部门接着工作，
     # 这一轮不因此结束（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
+    definitions = in_force(definitions)
     if projection.status in TERMINAL_STATUSES or aborted:
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
     # 正式成果要等模型看见新输入以后再提交：这次提交先不做，下一步的通知里写明新输入
     # （工单 #964）。工具许可的依据是这次请求装配时的输入版本（basis），
     # 它比当前版本旧就说明模型还没有看到这条输入。
-    if proposal_kind(name) is not None and projection.input_version != basis.input_version:
+    if proposal_kind(name, definitions=definitions) is not None and projection.input_version != basis.input_version:
         return ToolPermission(reason=(
             "new user input arrived and has not entered this session's model input yet; "
             "this proposal is not accepted now. Read the work_notification of the next step, then submit again"
         ), deferred=True)
-    branch_perm = _ask_branch_permission(projection, session_id, department, name)
+    branch_perm = _ask_branch_permission(projection, session_id, department, name, definitions)
     if branch_perm is not None:
         return branch_perm
-    if not has_tool(department, name, projection.kind):
+    if not has_tool(department, name, projection.kind, definitions=definitions):
         return ToolPermission(reason=f"{department} cannot use {name}")
-    reason = tool_error(projection, department, name, args)
+    reason = tool_error(projection, department, name, args, definitions=definitions)
     if reason:
         return ToolPermission(reason=reason)
     # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：还有没处理完的输入时，
@@ -186,7 +194,7 @@ def tool_permission(
     if (_is_release_submission(department, name, args) and projection.delivery_spec is not None
             and pending_product_input(projection, list(events or ()))):
         return ToolPermission(wait_for_input=True)
-    if _is_write(name):
+    if _is_write(name, definitions):
         reason = _write_path_error(name, args, facts)
         if reason:
             return ToolPermission(reason=reason)
@@ -194,10 +202,12 @@ def tool_permission(
 
 
 def proposal_decision(projection: RunProjection, *, department: str, proposal: dict[str, Any] | None,
-                      facts: TreeFacts, events: list[Event]) -> ProposalDecision:
-    # 提案校验：按投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误
-    return evaluate_proposal(department=department, proposal=proposal,
-                             projection=projection, facts=facts, events=events)
+                      facts: TreeFacts, events: list[Event],
+                      definitions: Definitions | None = None) -> ProposalDecision:
+    # 提案校验：按投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误。
+    # 提案种类、部门与通用条件读这个事项所用的那份定义（工单 #1098）
+    return evaluate_proposal(department=department, proposal=proposal, projection=projection, facts=facts,
+                             events=events, definitions=definitions)
 
 
 def commit_decision(
@@ -210,6 +220,7 @@ def commit_decision(
     current: RunProjection,
     current_facts: TreeFacts,
     events: list[Event],
+    definitions: Definitions | None = None,
 ) -> ProposalDecision:
     # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。校验以后工作区改变，
     # 或者当前工作已经不是校验时的那一份，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
@@ -221,7 +232,7 @@ def commit_decision(
         return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
     if decision.accepted:
         decision = proposal_decision(current, department=department, proposal=proposal,
-                                     facts=current_facts, events=events)
+                                     facts=current_facts, events=events, definitions=definitions)
     if decision.accepted and _is_pending_release(department, proposal, current, events):
         # 新输入在工具许可之后、提交之前到达：这次放行不当场生效，交回质检，等产品处理完再提交
         # （部门指导设计说明第 2.1 节，工单 #561）
@@ -244,8 +255,8 @@ def _is_pending_release(department: str, proposal: dict[str, Any] | None, projec
     return pending_product_input(projection, list(events))
 
 
-def _is_write(name: str) -> bool:
-    return tool_action(name) == "write"
+def _is_write(name: str, definitions: Definitions | None = None) -> bool:
+    return tool_action(name, definitions=definitions) == "write"
 
 
 def _write_path_error(name: str, args: dict[str, Any], facts: WorkspaceFacts) -> str | None:

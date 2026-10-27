@@ -6,10 +6,10 @@ from typing import Any
 
 from .contracts import current_contract_hash
 from .models import (
-    DEPARTMENTS, TERMINAL_STATUSES, Event, EventType, RunProjection,
+    TERMINAL_STATUSES, Event, EventType, RunProjection,
 )
-from .definitions import DEFINITIONS
-from .tools import proposal_kind, proposal_kinds
+from .definitions import DEFINITIONS, Definitions
+from .tools import in_force, proposal_kind, proposal_kinds
 
 
 # ---------------------------------------------------------------------------
@@ -280,19 +280,24 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     return ready
 
 
-def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[str]:
-    if projection.status in TERMINAL_STATUSES or department not in DEPARTMENTS:
+def allowed_proposal_kinds(projection: RunProjection, department: str,
+                           *, definitions: Definitions | None = None) -> set[str]:
+    # 部门与可提交的种类都按交进来的那份定义算（工单 #1098）：一个事项所用定义里的部门与提案种类，
+    # 不是模块加载时的那一份（roles.json 与 tools.json 指向的那份定义版本）
+    definition = in_force(definitions)
+    if projection.status in TERMINAL_STATUSES or department not in definition.departments:
         return set()
     # 部门这一轮正在工作：它主线会话的记录是「工作中」，或它在回答一个询问
     if is_working(projection, department) or has_new_work(projection, department):
         # 本部门在这一轮工作：可提交的种类按定义给出（工单 #134）；普通事项与建档事项的清单不同
-        return proposal_kinds(department, projection.kind)
+        return proposal_kinds(department, projection.kind, definitions=definition)
     return set()
 
 
 def tool_error(projection: RunProjection, department: str, name: str,
-               args: dict[str, Any]) -> str | None:
-    kind = proposal_kind(name)
-    if kind is not None and kind not in allowed_proposal_kinds(projection, department):
+               args: dict[str, Any], *, definitions: Definitions | None = None) -> str | None:
+    kind = proposal_kind(name, definitions=definitions)
+    if kind is not None and kind not in allowed_proposal_kinds(projection, department,
+                                                              definitions=definitions):
         return "This proposal is not permitted in the current department work."
     return None

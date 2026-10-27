@@ -28,7 +28,7 @@ from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .collaboration import watched_new_work
 from .compaction import CompactionError
 from .contracts import current_contract_hash
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, Definitions
 from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
 from .event_store import run_stream
@@ -42,7 +42,7 @@ from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
                                  event_call_target)
 from .recording import StepRecorder
-from .tools import proposal_kind, tool_action, tool_kind
+from .tools import in_force, proposal_kind, tool_action, tool_kind
 from .validation import PRD_REVISION_FIELDS, evaluate_proposal
 from .tree_archive import store_tree
 
@@ -202,12 +202,13 @@ class StepDriver:
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
               facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
               cancelled: Event, deltas: DeltaChannel,
-              refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> StepDriver:
+              refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
+              definitions: Definitions | None = None) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(request, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
                      cancelled=cancelled, deltas=deltas,
-                     refresh_workspace=refresh_workspace)
+                     refresh_workspace=refresh_workspace, definitions=definitions)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
@@ -215,7 +216,8 @@ class StepDriver:
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
                  cancelled: Event, deltas: DeltaChannel,
-                 refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> None:
+                 refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
+                 definitions: Definitions | None = None) -> None:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
@@ -224,6 +226,9 @@ class StepDriver:
                                 basis.effective_contract_hash, basis.input_version,
                                 work_ref=request.work_ref)
         self._stream = run_stream(scope.run_id)
+        # 这次激活的工具许可与提案校验所用的定义（工单 #1098）：事项所用的那一份；
+        # 编排层没有交给它的时候是当前加载的那一份
+        self._definitions = in_force(definitions)
         self._writes = writes
         self._artifacts = artifacts
         self._assembly = assembly
@@ -577,6 +582,7 @@ class StepDriver:
                                     projection=projection,
                                     facts=facts,
                                     events=events,
+                                    definitions=self._definitions,
                                 )
                                 if not decision.accepted:
                                     ok, output, error = False, None, "; ".join(e.message for e in decision.errors)
@@ -584,14 +590,14 @@ class StepDriver:
                                     ok, output, error = True, text, None
                         else:
                             ok, output, error = True, text, None
-                    elif tool_kind(name) == "host":
-                        ok, output, error = True, _run_host_tool(name, args), None
+                    elif tool_kind(name, definitions=self._definitions) == "host":
+                        ok, output, error = True, _run_host_tool(name, args, self._definitions), None
                     else:
                         # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要；
                         # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行
                         try:
                             receipt = await self._perform(Action(
-                                action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name),
+                                action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name, definitions=self._definitions),
                                 tool=name, department=request.department, input=args,
                                 preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                             ))
@@ -619,7 +625,7 @@ class StepDriver:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
                     return Stopped(self._version)
-                kind = proposal_kind(name)
+                kind = proposal_kind(name, definitions=self._definitions)
                 if kind is not None:
                     if deferred:
                         # 这次提交推迟：模型还没有看见新的用户输入，通知在下一步送达，
@@ -732,12 +738,12 @@ class StepDriver:
                 ok, output, error = ask_ok, ask_output, ask_error
                 if ok and new_contract_hash is not None:
                     self._adopt_contract(new_contract_hash)
-            elif tool_kind(name) == "host":
-                ok, output, error = True, _run_host_tool(name, args), None
+            elif tool_kind(name, definitions=self._definitions) == "host":
+                ok, output, error = True, _run_host_tool(name, args, self._definitions), None
             else:
                 receipt = await self._perform(Action(
                     action_id=f"{request.activation_id}:recovered:{identity}",
-                    kind=tool_action(name),
+                    kind=tool_action(name, definitions=self._definitions),
                     tool=name, department=request.department, input=args,
                     preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                 ))
@@ -996,11 +1002,11 @@ class StepDriver:
 
         def begin(transaction: Transaction) -> tuple[ToolPermission, WorkspaceFacts]:
             projection = self._settle(transaction)
-            facts = self._environment.query(facts_query(call))
+            facts = self._environment.query(facts_query(call, definitions=self._definitions))
             permission = tool_permission(
                 projection, call, department=scope.department, session_id=scope.session_id,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
-                events=transaction.events(),
+                events=transaction.events(), definitions=self._definitions,
             )
             if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":
                 rel = str(call.get("args", {}).get("path") or "")
@@ -1012,7 +1018,7 @@ class StepDriver:
                     for e in transaction.events()
                 )
                 if not already_started:
-                    if tool_kind(call["name"]) != "host":
+                    if tool_kind(call["name"], definitions=self._definitions) != "host":
                         tree = facts.tree
                         if tree is None:
                             tree = self._environment.query(FactsQuery(tree=True)).tree
@@ -1068,10 +1074,10 @@ def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
         return None
     return {"digest": tree.digest, "entries": [list(item) for item in zip(tree.files, tree.hashes)]}
 
-def _run_host_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
+def _run_host_tool(name: str, args: dict[str, Any], definitions: Definitions | None = None) -> dict[str, Any]:
     # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据
     payload = dict(args)
-    payload["kind"] = proposal_kind(name)
+    payload["kind"] = proposal_kind(name, definitions=definitions)
     payload.pop("exit_code", None)
     return payload
 
