@@ -2,14 +2,22 @@
 # tool_started 在工具许可允许以后、执行之前写入，tool_called/tool_skipped 在执行以后写入。根据这两类事件、
 # 以及保存的模型响应中尚未得到处置的工具调用，把每个动作分成三类：未发送、已完成、结果未知。
 # 恢复观察状态（工单 #18）由 run 的事实与未回答的决定请求得出，不读取时钟、不调用模型。
+# 启动时继续一个未结束的 run 也在这一层（`RunRecovery`，S4c 工单 #863 从薄驱动搬来）：核对定义版本、
+# 核实结果未知的动作、取得执行权。
 
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any
 
-from .models import TERMINAL_STATUSES, ArtifactRef, DecisionRequest, Event, EventType, hash_bytes
+from .actions import FactsQuery
+from .decisions import DEFINITIONS_CHANGED, blocks_run
+from .definitions import DEFINITIONS
+from .event_store import run_stream
+from .models import TERMINAL_STATUSES, ArtifactRef, DecisionRequest, Event, EventType, hash_bytes, json_dumps
+from .streams import RUN_EVENT_VERSION
+from .write_path import NewEvent, Transaction
 
 # 动作的三类处置（恢复契约第 4 节）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
 # 交给用户；还有一类是没有发出任何事件的调用，由步骤驱动按保存的模型响应补执行，见 engine 的补执行。
@@ -303,3 +311,225 @@ def observation_state(events: Sequence[Event], decisions: Iterable[DecisionReque
     if _live_activation(events):
         return OBSERVATION_RUNNING
     return OBSERVATION_INTERRUPTED
+
+
+# ---------------------------------------------------------------------------
+# 启动时继续一个未结束的 run（恢复契约第 5.2 节，工单 #16、#17、#581）
+#
+# 这一块从薄驱动搬来（S4c 工单 #863）：薄驱动只把它接上并转交（`Orchestrator.resume_incomplete_run`），
+# 自己不再写「核对定义版本、核实结果未知的动作、取得执行权」这三步。这里用到的薄驱动只有三件事：
+# 读运行状态投影、读运行工作区、唤醒等待的会话；其余是写入口、工件库与事件。
+#
+# 定义版本不同时发出的决定请求留在这里：它只在继续一个 run 的时候发（ADR-0014），
+# 与决定请求的处理（应用层 `decision_flow.py`，工单 #827）不是同一件事。
+# ---------------------------------------------------------------------------
+
+
+class RunRecovery:
+    """恢复的零件：继续一个因进程中断而未结束的 run。
+
+    依赖按职责分开给：`view` 读运行状态投影、`run_environment` 打开运行工作区（核对结果未知的
+    文件动作要读当前公开树）、`wake` 唤醒等待的会话；事实与写入经 `writes` 与 `store`。
+    """
+
+    def __init__(self, *, writes: Any, store: Any, view: Callable[[str], Any], artifacts: Any,
+                 run_environment: Callable[[str], Any], wake: Callable[[str], None]) -> None:
+        self._writes = writes
+        self._store = store
+        self._view = view
+        self._artifacts = artifacts
+        self._run_environment = run_environment
+        self._wake = wake
+
+    def resume(self, run_id: str) -> tuple[int, Any] | None:
+        # 启动时自动继续一个因进程中断而未结束的 run（ADR-0018、恢复契约第 5.2 节）：
+        # run 事件版本与当前不同的 run 在启动序列里已经按强制升级处理（工单 #322），这里核对事项记录的
+        # 定义版本，与当前不同就发出 definitions_changed 决定请求交给用户（ADR-0014，总体架构第 7.4 节），
+        # 用户选择「按新版本继续」以前不取得执行权；核对通过以后原子取得这个 run 的执行权，
+        # 记下中断位置与继续的依据，再从已提交的状态继续运行到终态。
+        # 已经结束的 run 不取得执行权、不写事件；有未回答、阻塞整个 run 的决定请求时不继续，交给用户回答
+        projection = self._view(run_id)
+        if projection.status in TERMINAL_STATUSES:
+            return None
+        decisions = self._writes.read(run_stream(run_id)).decisions.values()
+        if blocks_run(decisions):
+            return None
+        if projection.definitions_version != DEFINITIONS.version:
+            self.await_definitions(run_id)
+            return None
+        # 工单 #17：检查是否有未确认的动作，为结果未知的动作写核实记录
+        self.await_unknown_actions(run_id)
+        return self.claim_and_resume(run_id)
+
+    def await_definitions(self, run_id: str) -> None:
+        # 事项记录的定义版本与当前加载的版本不同（ADR-0014，#48 登记的架构问题的处理）：
+        # 发出一个阻塞整个 run 的决定请求，选项为「按新版本继续」与「停止事项」；选择写入事件。
+        # 选择「按新版本继续」以后，这个 run 照常取得执行权并继续运行，后续事件记录新版本；
+        # 请求只发一次：已经有过一个定义版本不同的请求时不重复
+        def request(transaction: Transaction) -> None:
+            current = transaction.projection
+            if current.status in TERMINAL_STATUSES or blocks_run(transaction.decisions.values()):
+                return
+            if any(decision.request.get("kind") == DEFINITIONS_CHANGED.name
+                   for decision in transaction.decisions.values()):
+                return
+            transaction.append(NewEvent(
+                EventType.DECISION_REQUESTED, actor="system", department=current.active_department,
+                state_before=current.status, state_after=current.status,
+                payload={
+                    "kind": DEFINITIONS_CHANGED.name, "blocks": DEFINITIONS_CHANGED.blocks,
+                    "options": [{"id": option.id, "label": option.label} for option in DEFINITIONS_CHANGED.options],
+                    "facts": [], "department": current.active_department,
+                    "reason": "definitions_version_changed",
+                    "recorded_definitions_version": current.definitions_version,
+                    "current_definitions_version": DEFINITIONS.version,
+                    "description": (
+                        f"事项使用的定义版本 {current.definitions_version or '（未记录）'} 与当前加载的版本 "
+                        f"{DEFINITIONS.version} 不同。按新版本继续以后，后续的模型请求与裁决记录新版本；"
+                        "选择停止事项则运行结束。"),
+                },
+            ))
+            transaction.on_commit(lambda: self._wake(run_id))
+
+        self._writes.transact(run_stream(run_id), request)
+
+    def await_unknown_actions(self, run_id: str) -> None:
+        # 工单 #581（ADR-0038，恢复契约第 4 节）：恢复时找出结果未知的动作。
+        # 文件动作（写入、编辑、删除、移动）先按动作前的公开树快照与当前公开树自动核实：
+        # 已经完成的记一条 resolution="auto_verify" 的核实记录；没有发生的记一条 resolution="handed_back"
+        # 的核实记录，说明核实确认没有发生；unclear 或无法核实的按非文件动作处理。
+        # 其余结果未知的动作（命令、检查、读取等）记一条 resolution="handed_back" 的核实记录交还会话，
+        # 说明执行被中断、结果未知，由模型检查后决定是否重新执行。
+        # 不再发出任何 unknown_action 决定请求，事项直接继续。
+        def request(transaction: Transaction) -> None:
+            projection = transaction.projection
+            if projection.status in TERMINAL_STATUSES:
+                return
+            for decision in transaction.decisions.values():
+                if decision.status == "open" and decision.kind == "unknown_action":
+                    transaction.append(NewEvent(
+                        EventType.DECISION_WITHDRAWN,
+                        actor="system",
+                        department=decision.request.get("department") or projection.active_department,
+                        parent_event_id=decision.decision_id,
+                        state_before=projection.status,
+                        state_after=projection.status,
+                        payload={
+                            "decision_id": decision.decision_id,
+                            "reason": "superseded_by_hand_back",
+                        },
+                    ))
+            events = transaction.events()
+            actions = classify_actions(events)
+            # 文件动作的对比结论一次算完（工单 #308）：当前公开树在这一个事务里读一次
+            comparisons: dict[str, dict[str, Any]] = {}
+            if any(info["status"] == ACTION_UNKNOWN and info["tool"] in FILE_ACTION_TOOLS
+                   and info["started_event"] is not None for info in actions.values()):
+                tree = self._run_environment(run_id).query(FactsQuery(tree=True)).tree
+                if tree is not None:
+                    comparisons = file_action_comparisons(
+                        events, artifacts=self._artifacts, run_id=run_id,
+                        current_entries=list(zip(tree.files, tree.hashes)))
+            for identity, info in actions.items():
+                started = info["started_event"]
+                if info["status"] != ACTION_UNKNOWN or started is None:
+                    continue
+                if info["tool"] == "ask":
+                    continue
+                action_id = identity[2]
+                comparison = comparisons.get(action_id)
+                if comparison is not None and comparison["verdict"] == "completed":
+                    transaction.append(self._auto_verified(started, projection.status, comparison))
+                    continue
+                if comparison is not None and comparison["verdict"] == "not_happened":
+                    transaction.append(self._handed_back_action(
+                        started, projection.status,
+                        error="执行被中断，核实确认没有发生",
+                        comparison=comparison,
+                    ))
+                    continue
+                transaction.append(self._handed_back_action(
+                    started, projection.status,
+                    error="执行被中断，结果未知，由模型检查以后决定是否重新执行；没有收到输出",
+                    comparison=comparison,
+                ))
+
+        self._writes.transact(run_stream(run_id), request)
+
+    def _handed_back_action(self, started: Any, status: str, *,
+                            error: str,
+                            comparison: dict[str, Any] | None = None) -> NewEvent:
+        # 结果未知的动作交还会话（工单 #581）：写一条 resolution="handed_back" 的核实记录，
+        # input_item 带原动作的调用编号进入部门历史，模型下一次运行时读到并决定如何处理
+        payload = started.payload or {}
+        action_id = str(payload.get("id") or "")
+        result = {"ok": False, "output": None, "error": error}
+        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
+        event_payload: dict[str, Any] = {
+            "id": action_id,
+            "name": str(payload.get("name") or ""),
+            "step_id": payload.get("step_id"),
+            "activation_id": payload.get("activation_id"),
+            "purpose": payload.get("purpose", "work"),
+            "input_item": input_item,
+            "ok": False,
+            "error": error,
+            "resolution": "handed_back",
+        }
+        if comparison is not None:
+            event_payload["verification"] = comparison
+        # 交还给发出这个动作的会话（工单 #475）：会话编号取自发这个动作的 tool_started，
+        # 核实记录因此进入那个会话的历史（分支会话的核实结果不进入部门主线）
+        return NewEvent(
+            EventType.ACTION_VERIFIED, actor="system", department=started.department,
+            state_before=status, state_after=status, parent_event_id=started.event_id,
+            session_id=started.session_id,
+            payload=event_payload,
+        )
+
+    def _auto_verified(self, started: Any, status: str, comparison: dict[str, Any]) -> NewEvent:
+        # 自动核实（工单 #308）：对比确认动作已经完成时记一条核实记录，不补造原来的 tool_called 回执。
+        # 结果进入部门历史：input_item 按原来的动作编号给出，与同一条结果的其它记录共享这个编号
+        payload = started.payload or {}
+        action_id = str(payload.get("id") or "")
+        result = {"ok": True, "output": {"resolved": "auto_verify", "verification": comparison}, "error": None}
+        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
+        return NewEvent(
+            EventType.ACTION_VERIFIED, actor="system", department=started.department,
+            state_before=status, state_after=status, parent_event_id=started.event_id,
+            session_id=started.session_id,
+            payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
+                     "activation_id": payload.get("activation_id"),
+                     "purpose": payload.get("purpose", "work"), "input_item": input_item,
+                     "ok": True, "resolution": "auto_verify", "verification": comparison},
+        )
+
+    def claim_and_resume(self, run_id: str) -> tuple[int, Any]:
+        # 取得执行权并写入 run_resumed：中断位置与继续的依据取自取得执行权时的投影。
+        # 恢复不写限额与计数字段（激活次数、模型步数、重试与已用运行时间保持中断时的值），
+        # 也不新增部门激活：之后开始的激活由激活本身写入
+        def claim(transaction: Transaction) -> int:
+            projection = transaction.projection
+            previous = self._store.projection(run_stream(run_id))
+            # 执行权编号在写入口以已记录的编号加一确定；另一方先取得时流版本同时改变，
+            # 这里的依据过期，事务因版本不符重新判断，因此这个编号与写入口确定的编号相同
+            transaction.append(NewEvent(
+                EventType.RUN_RESUMED, department=projection.active_department, actor="system",
+                state_before=projection.status, state_after=projection.status,
+                parent_event_id=projection.last_event_id,
+                payload={
+                    "basis": {
+                        "interrupted_at_status": projection.status,
+                        "interrupted_at_version": projection.stream_version,
+                        "interrupted_at_event_id": projection.last_event_id,
+                        "recorded_run_event_version": projection.run_event_version,
+                        "current_run_event_version": RUN_EVENT_VERSION,
+                    },
+                    "acquired_epoch": (0 if previous is None or previous.epoch is None else previous.epoch) + 1,
+                    "previous_epoch": None if previous is None else previous.epoch,
+                },
+            ))
+            return (0 if previous is None or previous.epoch is None else previous.epoch) + 1
+
+        epoch, _ = self._writes.claim_execution_right(run_stream(run_id), claim)
+        return epoch, self._view(run_id)
