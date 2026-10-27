@@ -1,9 +1,11 @@
-# 路由契约与成果驱动路由（工单 #825；骨架与应用设计说明第 3.2、5.1、12 节；总图第四节「路由」缝）。
+# 路由契约与成果驱动路由（工单 #825 建、#861 第二版；骨架与应用设计说明第 3.2、5.1、5.4、12 节；
+# 总图第四节「路由」缝）。
 #
 # 守的是 R2：契约的公开名称与版本、定义文件的格式（组织定义的 routing 与 routings.json 的对应）、
 # 路由实现的导入方向；以及 R3：事项以什么结束只来自路由或边界的核对——路由给出停止原因，
-# 薄驱动不再自己写这个判断。行为本身（关注的成果决定谁开工、一轮怎么结束）由现有的
-# test_watched_relations.py 与事件序列基准守住，这里只补契约与那一条搬家。
+# 薄驱动不再自己写这个判断；一轮以什么结束由路由按事件判断，执行契约的结果里没有结果种类。
+# 行为本身（关注的成果决定谁开工、一轮怎么结束）由现有的 test_watched_relations.py 与事件序列基准守住，
+# 这里只补契约与那几条搬家。
 #
 # 读源码文件与投影对象，不起服务、不写文件，属于单元层。
 
@@ -13,7 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from harness import contract_versions, routing_contract, watched_outputs
+from harness import contract_versions, execution_contract, routing_contract, watched_outputs
 from harness.definitions import DEFINITIONS
 from harness.models import EventType, RunProjection
 from harness.watched_outputs import ROUTING
@@ -35,8 +37,13 @@ def _imported(relative: str) -> set[str]:
     return found
 
 
-def _event(kind: str, *, session_id: str | None = None, activation_id: str | None = None) -> object:
-    payload = {"activation_id": activation_id} if activation_id is not None else {}
+def _event(kind: str, *, session_id: str | None = None, activation_id: str | None = None,
+           name: str | None = None) -> object:
+    payload: dict[str, object] = {}
+    if activation_id is not None:
+        payload["activation_id"] = activation_id
+    if name is not None:
+        payload["name"] = name
     return SimpleNamespace(type=kind, session_id=session_id, payload=payload)
 
 
@@ -90,15 +97,20 @@ def test_the_routing_implementation_does_not_import_the_thin_driver_or_the_minim
     imports = _imported("watched_outputs.py")
     assert "orchestrator" not in imports
     assert "minimal_projection" not in imports
-    # 契约模块只导入内核与标准库（契约圈自己那一层由 test_contract_modules.py 核对）
-    assert _imported("routing_contract.py") <= {"contract_versions", "models"}
+    # 契约模块只导入内核（定义与事件）与标准库（契约圈自己那一层由 test_contract_modules.py 核对）
+    assert _imported("routing_contract.py") <= {"contract_versions", "definitions", "models"}
 
 
 def test_the_item_end_judgment_comes_from_the_routing():
-    # R3：事项以什么结束由路由给出；薄驱动只把它的判断写成停止，不再自己写这个判断与这句话
+    # R3：事项以什么结束由路由给出；薄驱动只把它的判断写成停止，不再自己写这个判断与这句话。
+    # 原因出自路由自己的一份定义（设计说明第 5.4 节第 7 条，工单 #861），不在内核的停止原因清单里
     judgment = ROUTING.item_end(_running())
-    assert judgment.stop_reason == "provider_error"
+    assert judgment.stop_reason == "no_new_work"
     assert judgment.message == "no department has new work"
+    declared = DEFINITIONS.routing_definition().end_reasons
+    assert judgment.stop_reason in declared
+    assert judgment.stop_reason not in DEFINITIONS.stop_reasons
+    assert DEFINITIONS.stop_reason(judgment.stop_reason).outcome == declared[judgment.stop_reason].outcome
     driver = (HARNESS / "orchestrator.py").read_text(encoding="utf-8")
     assert "no department has new work" not in driver
     assert judgment.message in (HARNESS / "watched_outputs.py").read_text(encoding="utf-8")
@@ -150,3 +162,39 @@ def test_a_round_ends_by_an_accepted_proposal_or_a_text_reply():
     ended = ROUTING.round_end(view, [started], department="engineering",
                               session_id="ses_eng", activation_id="act_1")
     assert ended.outcome == "text_reply"
+
+
+def test_a_round_that_called_a_proposal_method_has_submitted_a_formal_output():
+    # R3：薄驱动拿到一轮结果以后先问路由这一轮以什么结束、再经写入口提交（设计说明第 5.3、5.4 节第 5 条，
+    # 工单 #861）：提交还没有写入时，这一轮记下的提议方式（提交类工具的调用）就是「交了正式成果」的依据。
+    # 别的工具调用不算
+    view = _running()
+    started = _event(EventType.DEPARTMENT_ACTIVATED, session_id="ses_eng", activation_id="act_1")
+    submitted = [_event(EventType.TOOL_CALLED, session_id="ses_eng", name="submit_delivery")]
+    ended = ROUTING.round_end(view, [started, *submitted], department="engineering",
+                              session_id="ses_eng", activation_id="act_1")
+    assert ended.outcome == "proposal_accepted"
+    other = [_event(EventType.TOOL_CALLED, session_id="ses_eng", name="read_file")]
+    ended = ROUTING.round_end(view, [started, *other], department="engineering",
+                              session_id="ses_eng", activation_id="act_1")
+    assert ended.outcome == "text_reply"
+
+
+def test_the_routing_work_reference_is_empty_for_watched_outputs():
+    # R2：开始一轮工作的请求带路由自己的工作引用（设计说明第 5.4 节第 4 条，工单 #861）；
+    # 成果驱动不用它时为空
+    assert ROUTING.work_reference(_running(), department="product") is None
+    # 执行契约的请求与结果都带这一项：请求里的工作引用原样交给装配（工单 #826）
+    assert "work_ref" in execution_contract.RoundRequest.__dataclass_fields__
+    assert {"events", "stop_reason", "version"} <= set(execution_contract.RoundResult.__dataclass_fields__)
+
+
+def test_the_execution_result_has_no_outcome_kinds():
+    # R2：执行契约的结果只剩这一轮写下的事件范围与停止原因（设计说明第 5.3 节输出，工单 #861）：
+    # 「提交了正式成果」「回答了询问」不是契约里的种类，是成果驱动路由按事件作的判断
+    contract = (HARNESS / "execution_contract.py").read_text(encoding="utf-8")
+    engine = (HARNESS / "engine.py").read_text(encoding="utf-8")
+    assert "RoundResult" in contract and "RoundResult" in engine
+    for removed in ("class Submitted", "class Answered", "class Stopped", "StepResult"):
+        assert removed not in contract.replace("RoundResult", ""), removed
+        assert removed not in engine, removed

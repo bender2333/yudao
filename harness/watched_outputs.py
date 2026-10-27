@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 from . import routing_contract
 from .contracts import artifact_hash
@@ -22,6 +23,13 @@ from .models import Event, EventType, RunProjection
 
 # 组织定义 organization.json 的 routing 里写这个名称
 ROUTING_NAME = "watched_outputs"
+
+# 成果驱动的一份定义（routings.json 的那个条目，工单 #861）：部门、成果种类、提议方式、路由自己的上限与
+# 结束原因都按名称写在那里，内容就是现有的定义文件，不搬动。内核只核对那份定义的结构，内容由下面的
+# check_definition 自己校验。事项结束用的那个原因写在它的定义里，属于那份定义版本的封闭清单
+ITEM_END_REASON = "no_new_work"
+# 提议方式：提交类工具。这一轮记下了其中一次的调用，就是「这一轮交上了正式成果」这件事
+_PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
 
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
 # 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）。
@@ -270,6 +278,8 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
 def _round_outcome(events: list[Event], department: str, session_id: str | None, activation_id: str) -> str:
     """这一轮怎么结束的：提交被接纳记 proposal_accepted，其余正常结束记 text_reply（载荷只有这两个取值）。
 
+    判据是这一轮写下的事件：提交经写入口写入时看提交与拒绝的事件；提交还没有写入时（薄驱动拿到一轮结果
+    以后先问路由这一轮以什么结束，再经写入口提交），看这一轮记下的提议方式 —— 提交类工具的调用。
     提交以后被拒绝的这一轮，部门还没有交下正式成果，按文字回答记。
     """
     started = None
@@ -286,6 +296,9 @@ def _round_outcome(events: list[Event], department: str, session_id: str | None,
             submitted = True
         elif event.type == EventType.PROPOSAL_REJECTED:
             submitted = False
+        elif (event.type == EventType.TOOL_CALLED
+              and (event.payload or {}).get("name") in _PROPOSAL_METHODS):
+            submitted = True
     return "proposal_accepted" if submitted else "text_reply"
 
 
@@ -302,12 +315,52 @@ def round_end(projection: RunProjection, events: list[Event], *, department: str
 
 
 def item_end(projection: RunProjection) -> routing_contract.ItemEnd | None:
-    """事项以什么结束：没有部门可以开始一轮工作时，成果驱动的事项没有新的工作，运行以 provider_error 结束。
-
-    这是现在（S2a）的口径，与搬来以前写在流程编排里的那一条逐字相同。路由自己的结束原因是它自己的一份定义，
-    归 #861（S2b）：那以后这个判断从路由的定义里取原因，不写在这里。
+    """事项以什么结束：没有部门可以开始一轮工作时，成果驱动的事项没有新的工作，运行以路由自己声明的
+    结束原因结束（设计说明第 5.4 节第 7 条：路由自己的结束原因写在它自己的一份定义里，工单 #861）。
     """
-    return routing_contract.ItemEnd(stop_reason="provider_error", message="no department has new work")
+    return routing_contract.ItemEnd(stop_reason=ITEM_END_REASON, message="no department has new work")
+
+
+def work_reference(projection: RunProjection, department: str) -> Any:
+    """这一轮工作的路由自己的工作引用（设计说明第 5.1 节输出、第 5.4 节第 4 条）：成果驱动不用它，为空。"""
+    return None
+
+
+def check_definition(definitions: Any) -> None:
+    """校验成果驱动这份定义的内容（设计说明第 5.4 节第 2 条）：内核只核对结构，内容归路由自己。
+
+    部门、成果种类与提议方式都是按名称引用现有定义的，几种名称互相对得上；路由自己的结束原因不能与内核的
+    停止原因同名，事项结束用的那一个要声明。不合格时抛出 InvalidRoutingDefinition，逐项写明是哪一项。
+    """
+    declared = routing_contract.definition_of(definitions, ROUTING_NAME)
+    if declared is None:
+        raise routing_contract.InvalidRoutingDefinition(ROUTING_NAME, ["routings.json：没有这一种路由的定义"])
+    issues: list[str] = []
+    departments = tuple(item.id for item in definitions.organization.departments)
+    for index, department in enumerate(declared.departments):
+        if department not in departments:
+            issues.append(f"departments[{index}]：部门 {department} 不在组织定义里")
+    for department in departments:
+        if department not in declared.departments:
+            issues.append(f"departments：组织定义里的部门 {department} 没有列进路由的部门清单")
+    submitted = [definitions.tools[method].proposal for index, method in enumerate(declared.proposal_methods)
+                 if method in definitions.tools and definitions.tools[method].proposal is not None]
+    for index, method in enumerate(declared.proposal_methods):
+        if method not in definitions.tools or definitions.tools[method].proposal is None:
+            issues.append(f"proposal_methods[{index}]：工具 {method} 不是定义里的提交类工具")
+    for index, kind in enumerate(declared.outcome_kinds):
+        if kind not in submitted:
+            issues.append(f"outcome_kinds[{index}]：成果种类 {kind} 没有由这里列出的提议方式提交")
+    for kind in [tool.proposal for tool in definitions.tools.values() if tool.proposal is not None]:
+        if kind not in declared.outcome_kinds:
+            issues.append(f"outcome_kinds：提交类工具提交的成果种类 {kind} 没有列进成果种类")
+    for reason in declared.end_reasons:
+        if reason in definitions.stop_reasons:
+            issues.append(f"end_reasons.{reason}：与内核的停止原因同名")
+    if ITEM_END_REASON not in declared.end_reasons:
+        issues.append(f"end_reasons：没有声明事项结束用的原因 {ITEM_END_REASON}")
+    if issues:
+        raise routing_contract.InvalidRoutingDefinition(ROUTING_NAME, issues)
 
 
 class WatchedOutputs:
@@ -315,6 +368,9 @@ class WatchedOutputs:
     # 实现在应用层；薄驱动只按契约的三个问题调用它
     NAME = ROUTING_NAME
     CONTRACT_VERSION = routing_contract.CURRENT_VERSION
+
+    def check_definition(self, definitions: Any) -> None:
+        check_definition(definitions)
 
     def ready_departments(self, view: RunProjection, *, waiting: set[str] | None = None) -> list[str]:
         return ready_departments(view, waiting)
@@ -325,6 +381,9 @@ class WatchedOutputs:
     def department_ready(self, view: RunProjection, *, department: str,
                          waiting: set[str] | None = None) -> bool:
         return department_ready(view, department, waiting)
+
+    def work_reference(self, view: RunProjection, *, department: str) -> Any:
+        return work_reference(view, department)
 
     def round_end(self, view: RunProjection, events: list[Event], *, department: str,
                   session_id: str | None, activation_id: str) -> routing_contract.RoundEnd | None:
