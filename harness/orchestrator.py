@@ -75,7 +75,7 @@ from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .tools import tool_action
-from .validation import PRD_REVISION_FIELDS, AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
+from .validation import AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
 from .watched_outputs import waiting_departments
 from .workspace import WorkspaceSnapshot
 
@@ -1649,16 +1649,19 @@ class Orchestrator:
             "sent_tier": None,
         }
 
-    def _session_limits(self, run_id: str, session_id: str) -> StepLimits:
+    def _session_limits(self, run_id: str, session_id: str, *, max_model_steps: int | None = None) -> StepLimits:
         # 这个会话这一步的步数上限（工单 #475）：会话上一次没有结束的激活用掉的模型步数
         # 从它自己的上限里扣掉，重新启动以后连续累计，不因中断清零。
         # 已经结束的激活不算在内：下一轮工作重新按上限开始。
-        # 两个数都读最小投影（S1e 工单 #1015）：累计的模型步数减去上一次结算时的步数
+        # 两个数都读最小投影（S1e 工单 #1015）：累计的模型步数减去上一次结算时的步数。
+        # max_model_steps 给出时不按运行配置的全局上限，按这个数（询问分支的这一轮由路由给上限）
+        base = self.step_limits if max_model_steps is None else replace(
+            self.step_limits, max_model_steps=max_model_steps)
         session = self._session_used(run_id, session_id)
         used = max(0, session.model_steps - session.settled_steps)
         if used <= 0:
-            return self.step_limits
-        return replace(self.step_limits, max_model_steps=max(0, self.step_limits.max_model_steps - used))
+            return base
+        return replace(base, max_model_steps=max(0, base.max_model_steps - used))
 
     async def _invoke_activation(self, activation: _Activation) -> None:
         scope = activation.scope
@@ -1767,32 +1770,32 @@ class Orchestrator:
         scope: ActivationScope,
         call: dict[str, Any],
     ) -> tuple[bool, Any, str | None, str | None, int]:
-        args = call.get("args") or {}
-        # 这个会话自己那次没结束的询问：恢复时继续这一层，不新开一层（工单 #473 的嵌套询问）
-        pending = self.project(scope.run_id).ask_by_origin(scope.session_id)
-        if pending is not None:
-            branch_session_id = str(pending["branch_session_id"])
-            recipient = str(pending["recipient"])
-            question = str(pending["question"])
-            background = str(pending.get("background") or "")
-            expected = str(pending.get("expected") or "")
-        else:
-            recipient = args.get("recipient")
-            question = args.get("question")
-            background = args.get("background", "")
-            expected = args.get("expected", "")
-            facts = args.get("facts") or ""
-            explanation = args.get("explanation") or ""
-
-            if recipient not in ("product", "engineering", "quality") or recipient == scope.department:
-                return False, None, f"invalid recipient {recipient}", None, 0
-            # 工程询问质检时问题与背景分两部分：facts 与 explanation 至少给一份（工单 #554）
-            if not (isinstance(question, str) and question.strip()) \
-                    and not (isinstance(facts, str) and facts.strip()):
-                return False, None, "question must be a non-empty string", None, 0
-
-            branch_session_id = new_id(f"ses_ask_{recipient[:3]}")
-
+        # 询问分支由路由请求一轮工作（工单 #862，骨架与应用设计说明第 5.1 节）：询问的开始、回问、
+        # 回复给谁与这一轮的上限都归路由；薄驱动照常把这一轮交给执行契约运行。写事件、跑这一轮，
+        # 以及把这个分支会话已经用掉的步数与时间从这一轮的上限里扣掉，归薄驱动（工单 #1015 的读法）
+        stream = run_stream(scope.run_id)
+        asked = self._routing.ask_branch(
+            self.project(scope.run_id), list(self.writes.read(stream).events()),
+            requester=scope.department, session_id=scope.session_id, call=call,
+            limits=routing_contract.AskLimits(
+                max_model_steps=self.step_limits.max_model_steps,
+                department_max_model_steps=self.step_limits.department_max_model_steps,
+                department_max_time_sec=self.step_limits.department_max_time_sec,
+            ),
+        )
+        if isinstance(asked, routing_contract.AskRejection):
+            # 这次询问的调用不合法（回复的部门不在定义里、问题为空）：不运行、不写事件，
+            # 原因作为这次工具调用的错误交回提问方
+            return False, None, asked.message, None, 0
+        if isinstance(asked, routing_contract.AskOutcome):
+            # 这一层询问已经答过（重新启动以后接着同一次询问）：结果照原样交回提问方，不再跑一轮
+            steps = self._branch_steps(self.writes.read(stream).events(), asked.session_id)
+            if asked.status == "answered":
+                return True, asked.answer, None, None, steps
+            return False, None, asked.reason, None, steps
+        branch = asked
+        if branch.start is not None:
+            # 询问的开始：这一层是新开的一层，薄驱动把路由组好的这一层写进事件日志
             def start_ask(transaction: Transaction) -> None:
                 transaction.append(NewEvent(
                     EventType.ASK_STARTED,
@@ -1802,196 +1805,118 @@ class Orchestrator:
                     session_id=scope.session_id,
                     state_before=transaction.projection.status,
                     state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "question": question or "",
-                        "background": background,
-                        "expected": expected,
-                        "facts": facts or None,
-                        "explanation": explanation or None,
-                        "branch_session_id": branch_session_id,
-                    },
+                    payload=branch.start,
                 ))
 
-            self.writes.transact(run_stream(scope.run_id), start_ask)
-
-        events = self.writes.read(run_stream(scope.run_id)).events()
-        prior_answered = next(
-            (e for e in reversed(events) if e.type == EventType.ASK_ANSWERED and e.session_id == branch_session_id),
-            None
-        )
-        if prior_answered is not None:
-            p = prior_answered.payload or {}
-            branch_steps = self._branch_steps(events, branch_session_id)
-            if p.get("status") == "answered":
-                return True, p.get("answer", ""), None, None, branch_steps
-            else:
-                return False, None, p.get("reason", "branch unable to answer"), None, branch_steps
-
-        remaining_steps = call.get("remaining_steps")
-        if remaining_steps is None:
-            remaining_steps = self.step_limits.max_model_steps
-        declared_steps = self.step_limits.department_max_model_steps.get(
-            recipient, self.step_limits.max_model_steps
-        )
-        # 这个分支会话已经用过的模型步数从它自己的上限里扣掉（工单 #475）：分支会话有自己的步骤上限，
-        # 中断以后继续时用掉的步数不清零。已用步数读最小投影（S1e 工单 #1015）
-        used_steps = self._session_used(scope.run_id, branch_session_id).model_steps
-        branch_max_steps = min(declared_steps, remaining_steps) - used_steps
-
-        if branch_max_steps <= 0:
-            reason = "department reached the model step limit without submitting a proposal"
-            def record_ask_unable(transaction: Transaction) -> None:
-                transaction.append(NewEvent(
-                    EventType.ASK_ANSWERED,
-                    actor=f"department:{recipient}",
-                    department=recipient,
-                    parent_event_id=scope.parent_event_id,
-                    session_id=branch_session_id,
-                    state_before=transaction.projection.status,
-                    state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "status": "unable",
-                        "answer": "",
-                        "reason": reason,
-                        "with_spec_revision": False,
-                        "revision": None,
-                    },
-                ))
-            self.writes.transact(run_stream(scope.run_id), record_ask_unable)
-            return False, None, reason, None, 0
-
-        projection = self.project(scope.run_id)
-        declared_time = self.step_limits.department_max_time_sec.get(
-            recipient, float(projection.run_time_limit_sec)
-        )
+            self.writes.transact(stream, start_ask)
+        # 这个分支会话之前几轮用掉的步数从这一轮的上限里扣（工单 #475）：路由给的只是这一轮的上限，
+        # 扣法与其他会话一致——最小投影里的累计步数减去已结算的那一部分（工单 #1015）
+        branch_limits = self._session_limits(scope.run_id, branch.session_id,
+                                             max_model_steps=branch.max_model_steps)
         # 这个分支会话已经用掉的时间从它自己的时限里扣掉（工单 #475）：
         # 中断以后继续时，剩余时间按已用时间连续累计
-        used_time = self._session_elapsed_sec(scope.run_id, branch_session_id)
-        deadline = time.monotonic() + max(0.0, declared_time - used_time)
-
-        result = await self._run_ask_branch(
-            activation, scope.run_id, recipient, branch_session_id, question,
-            parent_event_id=scope.parent_event_id,
-            max_model_steps=branch_max_steps,
-            deadline=deadline,
-        )
-        events_after = self.writes.read(run_stream(scope.run_id)).events()
-        branch_steps = self._branch_steps(events_after, branch_session_id)
-
-        if result.submission is not None:
-            # 分支这一轮经提议方式交上了东西：成果驱动里询问分支只交回答
-            ans_args = result.submission
-            ans_text = ans_args.get("answer") or ans_args.get("text") or ans_args.get("facts") or ""
-            ans_facts = ans_args.get("facts") or None
-            ans_explanation = ans_args.get("explanation") or None
-            with_spec_revision = False
-            revision = None
-            new_contract_hash = None
-
-            if recipient == "product" and any(ans_args.get(f) is not None for f in PRD_REVISION_FIELDS):
-                def commit_prd_revision(transaction: Transaction) -> tuple[int, str]:
-                    projection = transaction.projection
-                    env = self._new_inspection_environment(scope.run_id, "product", session_id=branch_session_id)
-                    spec_proposal = {
-                        **{k: v for k, v in ans_args.items() if k not in ("answer", "text") and v is not None},
-                        "kind": "product_spec",
-                        "issuer": "product",
-                    }
-                    decision = evaluate_proposal(
-                        AdjudicationView(minimal=transaction.minimal(), state=projection),
-                        department="product",
-                        proposal=spec_proposal,
-                        facts=env.query(FactsQuery(tree=True)).tree,
-                        tightening=self._tightening,
-                        events=transaction.events(),
-                    )
-                    if not decision.accepted:
-                        raise RuntimeError(f"invalid prd revision: {decision.errors}")
-
-                    self._commit_accepted(
-                        transaction,
-                        department="product",
-                        snapshot=env.snapshot(),
-                        environment=env,
-                        artifact=decision.artifact,
-                        ends_run=decision.ends_run,
-                        parent_event_id=scope.parent_event_id,
-                        session_id=branch_session_id,
-                        provider=result.response.provider or self._activation_provider(activation.adapter),
-                        model=result.response.model,
-                    )
-                    curr = transaction.projection
-                    return decision.artifact["revision"], artifact_hash(curr.effective_contract)
-
-                revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
-                with_spec_revision = True
-                activation.scope = replace(activation.scope, basis=replace(activation.scope.basis, effective_contract_hash=new_contract_hash))
-
-            def record_ask_answered(transaction: Transaction) -> None:
-                transaction.append(NewEvent(
-                    EventType.ASK_ANSWERED,
-                    actor=f"department:{recipient}",
-                    department=recipient,
-                    parent_event_id=scope.parent_event_id,
-                    session_id=branch_session_id,
-                    state_before=transaction.projection.status,
-                    state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "status": "answered",
-                        "answer": ans_text,
-                        "reason": "",
-                        "with_spec_revision": with_spec_revision,
-                        "revision": revision,
-                        "facts": ans_facts,
-                        "explanation": ans_explanation,
-                    },
-                ))
-
-            self.writes.transact(run_stream(scope.run_id), record_ask_answered)
-            return True, ans_text, None, new_contract_hash, branch_steps
+        used_time = self._session_elapsed_sec(scope.run_id, branch.session_id)
+        deadline = time.monotonic() + max(0.0, branch.max_time_sec - used_time)
+        if branch_limits.max_model_steps > 0:
+            result = await self._run_ask_branch(activation, scope, branch, limits=branch_limits,
+                                                deadline=deadline)
+            submission, stop_reason, message = result.submission, result.stop_reason, result.message
+            response = result.response
+            events_after = list(self.writes.read(stream).events())
+            steps = self._branch_steps(events_after, branch.session_id)
         else:
-            time_exhausted = (
-                time.monotonic() >= deadline
-                or time_used_up(self.writes.minimal(run_stream(scope.run_id)), self._elapsed_sec(scope.run_id))
+            # 一步也走不了：这一轮不开，回答事件写明原因
+            submission, stop_reason, message, response, steps = None, None, "", None, 0
+        time_exhausted = (
+            time.monotonic() >= deadline
+            or time_used_up(self.writes.minimal(stream), self._elapsed_sec(scope.run_id))
+        )
+        outcome = self._routing.ask_outcome(
+            self.project(scope.run_id), branch=branch,
+            result=routing_contract.AskRoundResult(
+                submission=submission, stop_reason=stop_reason, message=message,
+                time_exhausted=time_exhausted, steps_left=branch_limits.max_model_steps,
+            ),
+        )
+        revision = None
+        new_contract_hash = None
+        if outcome.revises is not None:
+            # 这一回答同时交上了正式成果（产品回答询问时修订 PRD）：成果的内容由路由组装，
+            # 薄驱动照常经裁决入口核对、经写入口提交
+            revision, new_contract_hash = self._commit_answer_revision(
+                activation, scope, branch, outcome.revises, response)
+        with_spec_revision = outcome.revises is not None
+
+        def record_ask_answered(transaction: Transaction) -> None:
+            payload = {
+                "requester": scope.department,
+                "recipient": branch.recipient,
+                "status": outcome.status,
+                "answer": outcome.answer,
+                "reason": outcome.reason,
+                "with_spec_revision": with_spec_revision,
+                "revision": revision,
+            }
+            if outcome.status == "answered":
+                payload["facts"] = outcome.facts
+                payload["explanation"] = outcome.explanation
+            transaction.append(NewEvent(
+                EventType.ASK_ANSWERED,
+                actor=f"department:{branch.recipient}",
+                department=branch.recipient,
+                parent_event_id=scope.parent_event_id,
+                session_id=branch.session_id,
+                state_before=transaction.projection.status,
+                state_after=transaction.projection.status,
+                payload=payload,
+            ))
+
+        self.writes.transact(stream, record_ask_answered)
+        if outcome.status == "answered":
+            return True, outcome.answer, None, new_contract_hash, steps
+        return False, None, outcome.reason, None, steps
+
+    def _commit_answer_revision(self, activation: _Activation, scope: ActivationScope,
+                                branch: routing_contract.AskBranch, proposal: dict[str, Any],
+                                response: Any) -> tuple[int, str]:
+        # 回答同时交上的正式成果（循环结构第 4.3 节）：提案与提出它的部门都由路由组装（`issuer`），
+        # 薄驱动按读取时的运行状态与工作区事实校验，经写入口提交，并把新的合同带回这一步的提问方
+        issuer = str(proposal["issuer"])
+
+        def commit_prd_revision(transaction: Transaction) -> tuple[int, str]:
+            projection = transaction.projection
+            env = self._new_inspection_environment(scope.run_id, issuer, session_id=branch.session_id)
+            decision = evaluate_proposal(
+                AdjudicationView(minimal=transaction.minimal(), state=projection),
+                department=issuer,
+                proposal=proposal,
+                facts=env.query(FactsQuery(tree=True)).tree,
+                tightening=self._tightening,
+                events=transaction.events(),
             )
-            if time_exhausted:
-                reason = "department reached the time limit without submitting an answer"
-            elif result.message:
-                reason = result.message
-            elif result.stop_reason:
-                reason = result.stop_reason
-            else:
-                # 分支没有做出回答就结束：写明原因，提问方才知道接下来怎么做
-                # （设计说明第 4.5 节）。工作依据变了不再算：PRD 的新版本、新的指导与新的用户输入
-                # 都作为通知送达，分支接着工作（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
-                reason = "branch failed to answer"
-            def record_ask_unable(transaction: Transaction) -> None:
-                transaction.append(NewEvent(
-                    EventType.ASK_ANSWERED,
-                    actor=f"department:{recipient}",
-                    department=recipient,
-                    parent_event_id=scope.parent_event_id,
-                    session_id=branch_session_id,
-                    state_before=transaction.projection.status,
-                    state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "status": "unable",
-                        "answer": "",
-                        "reason": reason,
-                        "with_spec_revision": False,
-                        "revision": None,
-                    },
-                ))
-            self.writes.transact(run_stream(scope.run_id), record_ask_unable)
-            return False, None, reason, None, branch_steps
+            if not decision.accepted:
+                raise RuntimeError(f"invalid prd revision: {decision.errors}")
+
+            self._commit_accepted(
+                transaction,
+                department=issuer,
+                snapshot=env.snapshot(),
+                environment=env,
+                artifact=decision.artifact,
+                ends_run=decision.ends_run,
+                parent_event_id=scope.parent_event_id,
+                session_id=branch.session_id,
+                provider=response.provider or self._activation_provider(activation.adapter),
+                model=response.model,
+            )
+            curr = transaction.projection
+            return decision.artifact["revision"], artifact_hash(curr.effective_contract)
+
+        revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
+        activation.scope = replace(activation.scope, basis=replace(
+            activation.scope.basis, effective_contract_hash=new_contract_hash))
+        return revision, new_contract_hash
+
 
     def _branch_steps(self, events: list[Any], branch_session_id: str) -> int:
         # 这个分支会话用掉的模型步数：分支里再问一层时，回问的分支是它的下一层，
@@ -2014,14 +1939,14 @@ class Orchestrator:
     async def _run_ask_branch(
         self,
         activation: _Activation,
-        run_id: str,
-        department: str,
-        session_id: str,
-        question: str,
-        parent_event_id: str,
-        max_model_steps: int | None = None,
-        deadline: float | None = None,
+        scope: ActivationScope,
+        branch: routing_contract.AskBranch,
+        *,
+        limits: StepLimits,
+        deadline: float,
     ) -> execution_contract.RoundResult:
+        run_id, department, session_id = scope.run_id, branch.recipient, branch.session_id
+        parent_event_id = scope.parent_event_id
         projection = self.project(run_id)
         prompt = self._department_prompt(projection, department)
         basis = work_basis(projection, department)
@@ -2077,18 +2002,12 @@ class Orchestrator:
         # 薄驱动只经执行契约与装配契约调用实现：核对两个实现声明的版本，版本不合时这一轮不开始
         execution_contract.accept(StepDriver)
         assembly_contract.accept(self.assembly)
-        # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，上限由调用方给出；
-        # 路由自己的工作引用来自开始这一轮工作的请求（设计说明第 5.4 节第 4 条，工单 #861）
+        # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，这一轮的上限来自路由的请求
+        # （薄驱动已经把这个分支会话之前用掉的步数扣掉）；路由自己的工作引用指向这次询问
+        # （设计说明第 5.4 节第 4 条，工单 #861、#862）
         driver = StepDriver.start(
             execution_contract.RoundRequest(
-                scope=branch_scope, prompt=prompt,
-                limits=StepLimits(
-                    max_provider_attempts=self.step_limits.max_provider_attempts,
-                    max_model_steps=max_model_steps if max_model_steps is not None else self.step_limits.max_model_steps,
-                    department_max_model_steps=self.step_limits.department_max_model_steps,
-                    department_max_time_sec=self.step_limits.department_max_time_sec,
-                ),
-                work_ref=self._routing.work_reference(projection, department=department),
+                scope=branch_scope, prompt=prompt, limits=limits, work_ref=branch.work_ref,
             ),
             writes=self.writes, artifacts=self.artifacts,
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
