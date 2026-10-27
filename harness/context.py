@@ -7,7 +7,7 @@ from copy import deepcopy
 from typing import Any
 
 from .adjudication import offered_tools
-from .contracts import current_contract_hash
+from .contracts import artifact_hash
 from .collaboration import has_new_baseline_review
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
@@ -444,7 +444,7 @@ class ContextAssembler:
             truncated=False,
             step_id=step_id,
             compaction_event_id=compaction_event_id,
-            effective_contract_hash=current_contract_hash(projection),
+            effective_contract_hash=artifact_hash(projection.effective_contract),
             input_version=projection.input_version,
             prompt_version=prompt.version,
             prompt_hash=prompt.prompt_ref.content_hash,
@@ -595,7 +595,7 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
         "product_spec_id": None if spec is None else spec.id,
         "product_spec_hash": None if spec is None else spec.content_hash,
         "product_spec_revision": None if spec is None else spec.revision,
-        "effective_contract_hash": current_contract_hash(projection),
+        "effective_contract_hash": artifact_hash(projection.effective_contract),
         "delivery_spec_id": None if delivery is None else delivery.id,
         "delivery_spec_hash": None if delivery is None else delivery.content_hash,
         "delivery_code_tree_digest": None if delivery is None else delivery.code_tree_digest,

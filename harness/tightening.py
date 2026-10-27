@@ -125,7 +125,7 @@ class WatchedOutputsTightening:
     def kinds(self, request: TightenRequest) -> set[str]:
         # 这个部门此刻能提交的提案种类。产品在回答一次询问时可以修订 PRD（循环结构第 4.3 节）；
         # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着产品回答
-        projection, department = request.projection, request.department
+        projection, department = request.state, request.department
         allowed = allowed_proposal_kinds(projection, department)
         if department == "product" and any(ask.get("recipient") == "product" for ask in projection.ask_stack):
             allowed = allowed | {"product_spec"}
@@ -133,7 +133,7 @@ class WatchedOutputsTightening:
 
     def offered(self, request: TightenRequest) -> list[str]:
         # 请求中提供给模型的工具：按这一轮的工作与询问分支取舍，再按调用目标的输入方式去掉需要图像输入的工具
-        projection, department = request.projection, request.department
+        projection, department = request.state, request.department
         available = tools_for(department, projection.kind)
         if projection.ask_by_branch(request.session_id) is not None:
             # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案（工单 #473）
@@ -150,7 +150,7 @@ class WatchedOutputsTightening:
 
     def tool(self, request: TightenRequest) -> Tightened:
         # 一次工具调用的收紧检查：输入版本、询问分支、部门此刻能交的种类、放行等输入处理完
-        projection, department = request.projection, request.department
+        projection, department = request.state, request.department
         call = request.tool or {}
         name = call.get("name")
         args = call.get("args") or {}
@@ -222,7 +222,7 @@ class WatchedOutputsTightening:
 
     def _product_spec(self, request: TightenRequest) -> Tightened:
         # 输入版本、修订说明、有效决定逐条处置：PRD 是读内容才能判断的对象（设计说明第 5.5 节）
-        projection = request.projection
+        projection = request.state
         proposal = request.proposal or {}
         errors: list[FieldError] = []
         if projection.input_version != projection.product_work_input_version:
@@ -237,12 +237,13 @@ class WatchedOutputsTightening:
         if set(declared) != active_hashes or len(declared) != len(active_hashes):
             errors.append(FieldError("decision_changes", "explicitly retain, integrate, or retire every current product "
                                                           "decision exactly once"))
-        return Tightened(errors=tuple(errors))
+        # 输入版本是成果的内容，不进最小投影：内核组装 PRD 的内容时需要它，通过这里一并给回（S1d，工单 #860）
+        return Tightened(errors=tuple(errors), facts={"input_version": projection.input_version})
 
     def _review(self, request: TightenRequest) -> Tightened:
         # 质检的结论是对当前交付的核验：探索轮没有交付，提交结论被拒绝；放行要用当前的质检测试材料；
         # 提交事务里再判一次输入有没有处理完（工具许可之后、提交之前新输入到达，工单 #561）
-        projection = request.projection
+        projection = request.state
         errors: list[FieldError] = []
         if projection.department_bases.get("quality") is not None \
                 and projection.department_delivery_bases.get("quality") is None:
@@ -258,7 +259,7 @@ class WatchedOutputsTightening:
 
     def _structure(self, request: TightenRequest) -> Tightened:
         # 现有结构说明的每条要求都来自当前 PRD，各记一次（读 PRD 内容）
-        spec = request.projection.product_spec
+        spec = request.state.product_spec
         if spec is None:
             return Tightened()
         requirements = [item.strip() for item in spec.requirements]
@@ -276,13 +277,25 @@ class WatchedOutputsTightening:
         return Tightened(errors=tuple(errors))
 
     def _baseline_review(self, request: TightenRequest) -> Tightened:
-        # 带标记的边界条目不是现有行为（设计第 4.3 节）：要求文档描述而代码尚未实现的能力不记为现有缺陷
-        spec = request.projection.product_spec
+        # 带标记的边界条目不是现有行为（设计第 4.3 节）：要求文档描述而代码尚未实现的能力不记为现有缺陷；
+        # 逐条结论覆盖初始 PRD 的每条要求，不许多也不重复——两条都读 PRD 的内容（S1d 从内核搬来，工单 #860）
+        spec = request.state.product_spec
         if spec is None:
             return Tightened()
         errors: list[FieldError] = []
-        for index, item in enumerate((request.proposal or {}).get("conclusions", [])):
-            if not isinstance(item, dict) or item.get("status") != "existing_defect":
+        conclusions = [item for item in (request.proposal or {}).get("conclusions", []) if isinstance(item, dict)]
+        requirements = [item.strip() for item in spec.requirements]
+        declared = [str(item.get("requirement", "")).strip() for item in conclusions]
+        missing = [item for item in requirements if item not in declared]
+        extra = [item for item in declared if item not in requirements]
+        if set(declared) != set(requirements):
+            errors.append(FieldError(
+                "conclusions",
+                "conclusions must cover every requirement of the current ProductSpec exactly once; "
+                f"missing: {missing or 'none'}; not in the current ProductSpec: {extra or 'none'}",
+            ))
+        for index, item in enumerate(conclusions):
+            if item.get("status") != "existing_defect":
                 continue
             if _covers_marked_boundary(str(item.get("requirement", "")).strip(), spec):
                 errors.append(FieldError(f"conclusions[{index}].status",

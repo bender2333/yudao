@@ -20,14 +20,14 @@ from typing import Any
 from .actions import FactsQuery, TreeFacts
 from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
-from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
+from .adjudication import WorkBasis, commit_decision, proposal_decision
 from .artifacts import ArtifactStore
 from . import assembly_contract, execution_contract, tightening_contract
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
-from .contracts import current_contract_hash
+from .contracts import artifact_hash
 from .decisions import (
     DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
     DecisionClosed,
@@ -52,6 +52,7 @@ from .definitions import DEFINITIONS
 from .department_prompts import save_department_prompt
 from .overview import repository_overview
 from . import parameters as parameter_values
+from .minimal_projection import MinimalProjection
 from .models import (
     ArtifactRef,
     CatalogEventType,
@@ -78,7 +79,7 @@ from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .tools import tool_action
-from .validation import PRD_REVISION_FIELDS, ProposalDecision, Tightening, evaluate_proposal
+from .validation import PRD_REVISION_FIELDS, AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
 from .collaboration import has_new_work, next_department, ready_departments
 from .workspace import WorkspaceSnapshot
 
@@ -89,6 +90,22 @@ _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GU
 # 上限停下与暂停是 paused；这些情形不写已回答，指导停在已进入模型输入。暂停以后继续的是同一轮，
 # 它在继续以后正常结束时才算（那时由新的激活写）。
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
+
+
+def guidance_version(projection: RunProjection, department: str) -> int:
+    # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（设计说明第 4 节，S1d），
+    # 所以由薄驱动按运行状态投影给出，随一轮工作的开始事件记下
+    return max((item.version for item in projection.department_guidance
+                if item.department == department), default=0)
+
+
+def work_basis(projection: RunProjection, department: str) -> WorkBasis:
+    # 一轮工作开始时采用的工作依据：有效合同的摘要取自最小投影（裁决读的那一份），
+    # 用户输入与指导的版本是应用的数据，由这里一并填进来（S1d，工单 #860）
+    return WorkBasis(effective_contract_hash=artifact_hash(projection.effective_contract),
+                     input_version=projection.input_version,
+                     guidance_version=guidance_version(projection, department))
+
 
 
 def _round_applied_guidance(events: list[Any], projection: RunProjection,
@@ -842,10 +859,10 @@ class Orchestrator:
             if not (activation.stop_flag.is_set()
                     or self._aborted(activation.run_id)
                     or (activation.deadline is not None and time.monotonic() >= activation.deadline)
-                    or time_used_up(projection, self._elapsed_sec(activation.run_id))):
+                    or time_used_up(transaction.minimal(), self._elapsed_sec(activation.run_id))):
                 projection = self._assign_new_inputs(transaction)
             decisions = list(transaction.decisions.values())
-            stop = self._stop_requested(activation, projection, decisions)
+            stop = self._stop_requested(activation, projection, transaction.minimal(), decisions)
             # 别的会话已经写下待恢复的决定请求：这个会话照常停下（事项的状态不变，工单 #856）；
             # 它自己也被挡住时（这次的模型请求发不出去），它要写下自己的那一条，
             # 各写明自己的部门、模型与问题（模型管理设计说明第 5.5 节）
@@ -854,7 +871,7 @@ class Orchestrator:
 
         return self.writes.transact(run_stream(activation.run_id), judge)
 
-    def _stop_requested(self, activation: _Activation, projection: RunProjection,
+    def _stop_requested(self, activation: _Activation, projection: RunProjection, minimal: MinimalProjection,
                         decisions: Iterable[DecisionRequest]) -> bool:
         # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求；
         # 只读取，不写入。
@@ -866,7 +883,7 @@ class Orchestrator:
         return (activation.stop_flag.is_set()
                 or self._aborted(activation.run_id)
                 or (activation.deadline is not None and time.monotonic() >= activation.deadline)
-                or time_used_up(projection, self._elapsed_sec(activation.run_id))
+                or time_used_up(minimal, self._elapsed_sec(activation.run_id))
                 or projection.status in TERMINAL_STATUSES or blocks_run(decisions))
 
     def _elapsed_sec(self, run_id: str) -> float:
@@ -971,8 +988,9 @@ class Orchestrator:
                 elapsed_ms = int((event.payload or {}).get("elapsed_ms", 0) or 0)
         self._run_elapsed_ms[run_id] = elapsed_ms
 
-    def _time_left(self, run_id: str, projection: RunProjection) -> float:
-        return time_left_sec(projection, self._elapsed_sec(run_id))
+    def _time_left(self, run_id: str) -> float:
+        # 剩余运行时间读最小投影（设计说明第 4 节，S1d 工单 #860）
+        return time_left_sec(self.writes.minimal(run_stream(run_id)), self._elapsed_sec(run_id))
 
     async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
@@ -989,7 +1007,7 @@ class Orchestrator:
                 judgment = self._at_safe_node(activation)
                 if not judgment.proceed:
                     return judgment
-                time_left = self._time_left(activation.run_id, self.project(activation.run_id))
+                time_left = self._time_left(activation.run_id)
                 remaining = deadline - loop.time()
                 if remaining <= 0:
                     return judgment
@@ -1543,10 +1561,11 @@ class Orchestrator:
         projection = self._assign_new_inputs(transaction)
         if projection.status in TERMINAL_STATUSES:
             return None
-        bound = activation_bound(projection, self._elapsed_sec(run_id))
+        minimal = transaction.minimal()
+        bound = activation_bound(minimal, self._elapsed_sec(run_id))
         if bound is not None:
             if bound == TIME_BOUND:
-                self._fail(transaction, bound, time_limit_message(projection, self._elapsed_sec(run_id)))
+                self._fail(transaction, bound, time_limit_message(minimal, self._elapsed_sec(run_id)))
             else:
                 self._pause(transaction, bound)
             return None
@@ -1593,7 +1612,7 @@ class Orchestrator:
         transaction.on_commit(lambda: session.activate(activation_id))
         # 部门 Prompt 每次激活从项目部门设置读取，run 内没有副本；没有写入时使用内置默认 Prompt（第 5.3 节）
         prompt = self._department_prompt(projection, department)
-        basis = WorkBasis.current(projection, department)
+        basis = work_basis(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
         provider_name = self._activation_provider(adapter)
         parent = transaction.append(NewEvent(
@@ -1764,8 +1783,9 @@ class Orchestrator:
             return
         if isinstance(result, Stopped):
             elapsed = self._elapsed_sec(run_id)
-            if time_used_up(current, elapsed):
-                self._end_run(activation, TIME_BOUND, time_limit_message(current, elapsed), result.version)
+            minimal = self.writes.minimal(run_stream(run_id))
+            if time_used_up(minimal, elapsed):
+                self._end_run(activation, TIME_BOUND, time_limit_message(minimal, elapsed), result.version)
             return
         submission = result
 
@@ -1928,9 +1948,9 @@ class Orchestrator:
                         "issuer": "product",
                     }
                     decision = evaluate_proposal(
+                        AdjudicationView(minimal=transaction.minimal(), state=projection),
                         department="product",
                         proposal=spec_proposal,
-                        projection=projection,
                         facts=env.query(FactsQuery(tree=True)).tree,
                         tightening=self._tightening,
                         events=transaction.events(),
@@ -1951,7 +1971,7 @@ class Orchestrator:
                         model=result.response.model,
                     )
                     curr = transaction.projection
-                    return decision.artifact["revision"], current_contract_hash(curr)
+                    return decision.artifact["revision"], artifact_hash(curr.effective_contract)
 
                 revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
                 with_spec_revision = True
@@ -1984,7 +2004,7 @@ class Orchestrator:
         else:
             time_exhausted = (
                 time.monotonic() >= deadline
-                or time_used_up(self.project(scope.run_id), self._elapsed_sec(scope.run_id))
+                or time_used_up(self.writes.minimal(run_stream(scope.run_id)), self._elapsed_sec(scope.run_id))
             )
             if time_exhausted:
                 reason = "department reached the time limit without submitting an answer"
@@ -2049,7 +2069,7 @@ class Orchestrator:
     ) -> StepResult:
         projection = self.project(run_id)
         prompt = self._department_prompt(projection, department)
-        basis = WorkBasis.current(projection, department)
+        basis = work_basis(projection, department)
         activation_id = new_id("act_ask")
 
         def activate_branch(transaction: Transaction) -> Event:
@@ -2064,7 +2084,7 @@ class Orchestrator:
                 payload={
                     "activation_id": activation_id,
                     "cycle": transaction.projection.cycle_count,
-                    "effective_contract_hash": current_contract_hash(transaction.projection),
+                    "effective_contract_hash": artifact_hash(transaction.projection.effective_contract),
                     "input_version": transaction.projection.input_version,
                     "guidance_version": guidance_version(transaction.projection, department),
                     "prompt_version": prompt.version,
@@ -2186,7 +2206,8 @@ class Orchestrator:
             environment = self._environment_for(run_id, department)
             evaluated = self.writes.read(run_stream(run_id))
             facts = environment.query(FactsQuery(tree=True)).tree
-            decision = proposal_decision(evaluated.projection, department=department, proposal=proposal,
+            view = AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection)
+            decision = proposal_decision(view, department=department, proposal=proposal,
                                          facts=facts, tightening=self._tightening, events=evaluated.events())
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
@@ -2224,7 +2245,8 @@ class Orchestrator:
         snapshot = environment.snapshot()
         judged = commit_decision(
             decision, department=department, proposal=proposal,
-            evaluated=evaluated.projection, facts=facts, current=current, current_facts=snapshot.facts,
+            evaluated=AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection), facts=facts,
+            current=AdjudicationView(minimal=transaction.minimal(), state=current), current_facts=snapshot.facts,
             events=transaction.events(), tightening=self._tightening,
         )
         if proposal is not None:

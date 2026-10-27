@@ -27,7 +27,7 @@ from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
 from .collaboration import watched_new_work
 from .compaction import CompactionError
-from .contracts import current_contract_hash
+from .contracts import artifact_hash
 from .definitions import DEFINITIONS
 from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
@@ -43,7 +43,7 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
                                  event_call_target)
 from .recording import StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
-from .validation import PRD_REVISION_FIELDS, Tightening, evaluate_proposal
+from .validation import PRD_REVISION_FIELDS, AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
@@ -563,7 +563,8 @@ class StepDriver:
                             if request.department != "product":
                                 ok, output, error = False, None, "only product can revise product_spec"
                             else:
-                                projection = self._writes.read(self._stream).projection
+                                snapshot = self._writes.read(self._stream)
+                                projection = snapshot.projection
                                 spec_proposal = {
                                     **{k: v for k, v in args.items()
                                        if k not in ("answer", "text", "facts", "explanation") and v is not None},
@@ -571,11 +572,11 @@ class StepDriver:
                                     "issuer": "product",
                                 }
                                 facts = self._environment.query(FactsQuery(tree=True)).tree
-                                events = self._writes.read(self._stream).events()
+                                events = snapshot.events()
                                 decision = evaluate_proposal(
+                                    AdjudicationView(minimal=snapshot.minimal(), state=projection),
                                     department="product",
                                     proposal=spec_proposal,
-                                    projection=projection,
                                     facts=facts,
                                     tightening=self._tightening,
                                     events=events,
@@ -968,7 +969,7 @@ class StepDriver:
         # 这一轮不因此结束（工单 #558，循环结构第 5 节）。采用以后检查回执绑定新的合同，
         # 部门按新版本重做的检查才能被交付与放行认下。
         projection = self._writes.read(self._stream).projection
-        current = current_contract_hash(projection)
+        current = artifact_hash(projection.effective_contract)
         if current == self._scope.basis.effective_contract_hash:
             return
         self._adopt_contract(current)
@@ -1000,7 +1001,8 @@ class StepDriver:
             projection = self._settle(transaction)
             facts = self._environment.query(facts_query(call))
             permission = tool_permission(
-                projection, call, department=scope.department, session_id=scope.session_id,
+                AdjudicationView(minimal=transaction.minimal(), state=projection), call,
+                department=scope.department, session_id=scope.session_id,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
                 tightening=self._tightening, events=transaction.events(),
             )

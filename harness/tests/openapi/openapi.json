@@ -14676,6 +14676,39 @@
               }
             ]
           },
+          "artifact_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Issuer"
+          },
+          "artifact_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Tree Digest"
+          },
+          "artifact_multiple": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Multiple"
+          },
           "verdict": {
             "enum": [
               "consistent",
@@ -16973,6 +17006,39 @@
               }
             ]
           },
+          "artifact_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Issuer"
+          },
+          "artifact_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Tree Digest"
+          },
+          "artifact_multiple": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Multiple"
+          },
           "product_spec_hash": {
             "title": "Product Spec Hash",
             "type": "string"
@@ -18076,6 +18142,39 @@
                 "type": "null"
               }
             ]
+          },
+          "artifact_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Issuer"
+          },
+          "artifact_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Tree Digest"
+          },
+          "artifact_multiple": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Multiple"
           },
           "summary": {
             "title": "Summary",
@@ -25160,6 +25259,39 @@
               }
             ]
           },
+          "artifact_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Issuer"
+          },
+          "artifact_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Tree Digest"
+          },
+          "artifact_multiple": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Multiple"
+          },
           "statement": {
             "title": "Statement",
             "type": "string"
@@ -27540,6 +27672,39 @@
               }
             ]
           },
+          "artifact_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Issuer"
+          },
+          "artifact_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Tree Digest"
+          },
+          "artifact_multiple": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Multiple"
+          },
           "product_spec_hash": {
             "title": "Product Spec Hash",
             "type": "string"
@@ -29904,6 +30069,39 @@
               }
             ]
           },
+          "artifact_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Issuer"
+          },
+          "artifact_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Tree Digest"
+          },
+          "artifact_multiple": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Multiple"
+          },
           "goal": {
             "title": "Goal",
             "type": "string"
@@ -30372,6 +30570,39 @@
                 "type": "null"
               }
             ]
+          },
+          "artifact_issuer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Issuer"
+          },
+          "artifact_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Tree Digest"
+          },
+          "artifact_multiple": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Multiple"
           },
           "overall": {
             "title": "Overall",

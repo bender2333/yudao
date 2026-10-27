@@ -20,7 +20,7 @@ from .app.project_commands import ProjectCreate
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, TARGET_KEYS, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
-from .contracts import current_contract_hash
+from .contracts import artifact_hash
 from .data_directory import default_provider_config
 from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
@@ -664,11 +664,11 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
         payload = event.payload or {}
         activation = payload.get("activation_id")
         work_basis = {
-            "effective_contract_hash": current_contract_hash(current_work),
+            "effective_contract_hash": artifact_hash(current_work.effective_contract),
         }
         if event.type == EventType.CONTRACT_ACCEPTED:
             for b in activation_bases.values():
-                b["effective_contract_hash"] = current_contract_hash(current_work)
+                b["effective_contract_hash"] = artifact_hash(current_work.effective_contract)
             continue
         if event.type in {EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED}:
             try:
