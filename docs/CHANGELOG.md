@@ -601,3 +601,5 @@ claude-sonnet-5-5（总架构师） / 2026-10-26 17:22 / AGENTS.md：Solo 模式
 claude-sonnet-5-5（总架构师） / 2026-10-26 17:42 / docs/foundation-rules.md 基础规则 4：「内核清单只由用户修改」改为经批准修改，加内核路径的测试覆盖一行；docs/design/trusted-kernel.md 开头收成一行状态、第 3 节末条分开运行中的实例与开发仓库；docs/design/architecture/overall-architecture.md 两处、CONTEXT.md「可信内核」同步；docs/adr/0027 后果加一条 2026-10-26 的修订 / 用户 2026-10-26 决定（docs/decision.md 同日一条）
 
 claude-sonnet-5-5（总架构师） / 2026-10-27 07:22 / docs/design/department-guidance.md 开头状态行、第 2.1 节第 1、2、4 点与第 4 节第 9 条（停止判断与模型服务重试相同、产品决定改了合同以后的去向、部门提交只叫醒等待的会话）；docs/design/department-loop.md 开头收成一行状态，第 2 节表工程一行、第 5 节第一段、第 6 节放行一条同步 / #561 被 solo 第三次交回，三处在当时的 main 与分支上核对（docs/decision.md 同日一条）
+
+solo-deepseek-v4.1-flash / 2026-10-27 12:03 / docs/architecture-issues.md 登记工单 #860 的一条：最小投影缺内核通用条件要的字段（`issuer`、按部门的这一轮编号、`qa_tests_hash` 等），设计说明第 4 节「裁决只读这一份」与第 80 行「裁决按版本取内容」待定一句为准；内核清单 `rules` 一节的登记与「不改已有的内核测试」冲突；「只改」漏了 `engine.py`、`context.py`、`smoke.py`、`submissions.py` 四个必须改的调用方；另记录拆单建议与行数读数（内核 5191 行、上限 5471，最小投影 214 行）/ 工单 #860 手写文件至少 30 个（运行配置第 7 节上限 15），按「工单太大」交回并给四张拆法；最小投影的字段边界与 #561 的第三种结果要架构师定
