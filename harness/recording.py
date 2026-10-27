@@ -13,11 +13,12 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from .adapters.base import ModelRequest, ProviderError
-from .adjudication import WorkBasis
 from .artifacts import ArtifactStore
 from .assembly import CompactionResult, StepRequest
 from .definitions import DEFINITIONS
 from .event_store import run_stream
+# 激活的范围（身份、版本与工作依据）是执行契约的输入，定义在契约模块里；这里照旧导出同一个名字
+from .execution_contract import ActivationScope
 from .write_path import NewEvent, Transaction, WritePath
 from .models import Event, EventType, Usage, canonical_hash, json_dumps, utc_now
 from .providers.call import ModelResponse, ModelStreamEvent
@@ -38,28 +39,6 @@ _COLLECTION_SCOPE = {
     "events": "SDK decoded stream event JSON objects captured as JSON Lines with credential and header fields redacted; raw HTTP/SSE bytes are not available.",
     "credentials": "excluded",
 }
-
-
-@dataclass(frozen=True)
-class ActivationScope:
-    # 记录所属的激活：身份、激活采用的版本与工作依据，以及激活开始时配置的提供方名称（解析发生在每次逻辑调用）
-    run_id: str
-    department: str
-    session_id: str
-    activation_id: str
-    parent_event_id: str
-    prompt_version: int
-    prompt_hash: str | None
-    guidance_ids: tuple[str, ...]
-    basis: WorkBasis
-    provider: str
-
-    def versions(self) -> dict[str, Any]:
-        return {"input_version": self.basis.input_version, "prompt_version": self.prompt_version,
-                "prompt_hash": self.prompt_hash, "guidance_ids": list(self.guidance_ids)}
-
-    def work_basis(self) -> dict[str, Any]:
-        return {"effective_contract_hash": self.basis.effective_contract_hash}
 
 
 @dataclass

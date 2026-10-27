@@ -6,10 +6,9 @@
 # 单元层：只用内存里的投影与纯函数，不起目录、不起进程。
 
 from harness.actions import WorkspaceFacts
-from harness.adjudication import ask_chain_decision, ask_chain_max_depth, tool_permission
+from harness.adjudication import WorkBasis, ask_chain_decision, ask_chain_max_depth, tool_permission
 from harness.definitions import DEFINITIONS
 from harness.models import RunProjection
-from harness.recording import WorkBasis
 
 
 def _chain(depth: int) -> RunProjection:
