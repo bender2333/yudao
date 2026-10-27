@@ -260,8 +260,9 @@ def test_running_out_of_time_while_the_release_waits_ends_the_run(tmp_path):
     def keep_the_round_open(request):
         yield from _wait_for_the_release_attempt(holder, request.run_id)
         # 放行的调用已经排在检查之后，马上要在安全节点上等这一轮结束：把已用的运行时间设到只差 left_ms，
-        # 剩下的这一段由这一轮与等待一起用掉
-        holder["system"].orchestrator._run_elapsed_ms[request.run_id] = limit * 1000 - left_ms
+        # 剩下的这一段由这一轮与等待一起用掉。已用时间读最小投影、当前这一段由驱动记（S1e 工单 #1015），
+        # 因此这里设的是驱动记的「投影还没有结算的那几段」：投影里的已结算量加上它就是已用的运行时间
+        holder["system"].orchestrator._run_segment_ms[request.run_id] = limit * 1000 - left_ms
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             if holder["system"].project(request.run_id).status in {"done", "paused", "failed"}:
