@@ -5,20 +5,12 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from .minimal_projection import MinimalProjection
 from .path_rules import validate_public_path
 
 
 def artifact_hash(artifact: Any) -> str | None:
     # 当前成果的版本摘要：最小投影里的成果与应用侧运行状态投影里的成果都读同名的字段
     return None if artifact is None else getattr(artifact, "content_hash", None)
-
-
-def current_contract_hash(projection: MinimalProjection) -> str | None:
-    # 当前有效合同的版本摘要：裁决只读最小投影（设计说明第 4 节，S1d 工单 #860）。
-    # 合同的身份由它记下的成果版本算出，读的是摘要不是内容，所以留在内核；
-    # 合同的呈现（PRD 的 Markdown）读成果的内容，搬到应用侧（harness/submissions.py）
-    return projection.artifact_hash("contract")
 
 
 def normalize_scope(value: str) -> str:

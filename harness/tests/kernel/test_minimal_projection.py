@@ -7,6 +7,7 @@
 
 import ast
 import json
+from dataclasses import replace
 import shutil
 import sys
 from pathlib import Path
@@ -275,8 +276,10 @@ def test_the_snapshot_of_the_created_work_item_is_the_recorded_tree():
     })
     projection = fold_events([created])
     assert projection.artifact("snapshot").tree_digest == "sha256:snapshot_tree"
-    # 没有快照的事项没有这一项
+    # 没有快照的事项没有这一项；有快照但没有树摘要时同样没有（快照不完整不折）
     assert fold_events([_run_created()]).artifact("snapshot") is None
+    incomplete = replace(created, payload={**created.payload, "snapshot": {"files": 3}})
+    assert fold_events([incomplete]).artifact("snapshot") is None
 
 
 def test_folding_later_events_on_a_folded_projection_matches_a_full_replay():
