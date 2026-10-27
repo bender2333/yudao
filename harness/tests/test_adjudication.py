@@ -6,7 +6,7 @@ from harness.adjudication import WorkBasis, commit_decision, facts_query, propos
 from harness.collaboration import has_new_work, pending_product_input
 from harness.environment import LocalEnvironment
 from harness.models import SessionRecord
-from harness.proposals import delivery, product_spec
+from harness.proposals import delivery, delivery_turn, product_spec
 from harness.runtime import LoopSystem
 
 
@@ -109,6 +109,53 @@ def test_pending_product_input_counts_a_finished_or_empty_item_as_processed(tmp_
     assert pending_product_input(finished, events) is False
     empty = replace(projection, inputs=[], department_guidance=[])
     assert pending_product_input(empty, events) is False
+
+
+def test_engineering_has_new_work_until_a_delivery_matches_the_current_contract(tmp_path):
+    # 验收第 3 条（#1079，部门指导设计说明第 2.1 节第 2 点）：产品决定只重算合同、不产生
+    # 新的 PRD 版本；工程最近一份交付依据的合同不是当前有效合同时它有新工作，按当前合同
+    # 重新交付以后不再有新工作。守 R3：直接对投影断言，只读，不写事件
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    projection = system.activate_once(run_id)
+    [delivered] = projection.delivery_specs
+    assert delivered.effective_contract_hash == projection.effective_contract.content_hash
+    # 交付依据当前合同：工程没有新工作
+    assert not has_new_work(projection, "engineering")
+
+    # 产品决定重算合同（PRD 没有新版本）：交付依据的是旧合同，工程有新工作
+    decided = replace(projection, effective_contract=replace(projection.effective_contract,
+                                                             content_hash="sha256:decided"))
+    assert decided.product_spec == projection.product_spec
+    assert has_new_work(decided, "engineering")
+
+    # 工程按新的合同重新交付以后不再有新工作
+    redelivered = replace(decided, delivery_specs=[
+        replace(delivered, content_hash="sha256:second", effective_contract_hash="sha256:decided")])
+    assert not has_new_work(redelivered, "engineering")
+
+
+def test_the_new_work_checks_hold_when_there_is_no_effective_contract(tmp_path):
+    # 边界（工单 #1079，部门指导设计说明第 2.1 节第 2 点）：比合同的这一支只在
+    # 合同与交付都算出来的时候决定；有效合同还没有算出来时工程与质检都没有这一项新工作，
+    # PRD 的内容变了工程照旧有新工作。守 R3：直接对投影断言，只读
+    adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
+    system = LoopSystem.for_testing(tmp_path, adapter)
+    run_id = system.create_run("echo")
+    system.activate_once(run_id)
+    projection = system.activate_once(run_id)
+
+    # 交付依据的 PRD 内容与当前 PRD 不同：工程照旧有新工作（PRD 新版本的路径不变）
+    other_spec = replace(projection.product_spec, content_hash="sha256:other")
+    assert has_new_work(replace(projection, product_spec=other_spec), "engineering")
+
+    # 有效合同还没有算出来：工程（交付与合同都算不出来）与质检都没有这一项新工作
+    assert not has_new_work(replace(projection, effective_contract=None), "engineering")
+    # 质检看的是「有没有交付要核验」：这里把交付也去掉，只看合同这一支
+    no_delivery = replace(projection, effective_contract=None, delivery_spec=None, delivery_specs=[])
+    assert not has_new_work(no_delivery, "quality")
 
 
 
