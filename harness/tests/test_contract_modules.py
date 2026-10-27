@@ -11,12 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from harness import assembly_contract, contract_versions, execution_contract, tightening_contract
+from harness import assembly_contract, contract_versions, execution_contract, routing_contract, tightening_contract
 
 HARNESS = Path(__file__).resolve().parents[1]
 MANIFEST = HARNESS / "definitions" / "kernel-manifest.json"
-# 契约圈的四个模块：它们属于总图第二节的第二环，彼此可以互相导入
-CONTRACT_MODULES = ("contract_versions", "execution_contract", "assembly_contract", "tightening_contract")
+# 契约圈的五个模块：它们属于总图第二节的第二环，彼此可以互相导入
+CONTRACT_MODULES = ("contract_versions", "execution_contract", "assembly_contract", "tightening_contract",
+                    "routing_contract")
 
 
 def _kernel_modules() -> set[str]:
@@ -75,14 +76,17 @@ def test_each_implementation_declares_the_version_the_thin_driver_accepts():
     from harness.assembly import ContextAssembly
     from harness.engine import StepDriver
     from harness.tightening import WATCHED_OUTPUTS
+    from harness.watched_outputs import ROUTING
 
     assert StepDriver.CONTRACT_VERSION == execution_contract.CURRENT_VERSION
     assert ContextAssembly.CONTRACT_VERSION == assembly_contract.CURRENT_VERSION
     assert WATCHED_OUTPUTS.CONTRACT_VERSION == tightening_contract.CURRENT_VERSION
-    # 薄驱动接受两个实现声明的版本
+    assert ROUTING.CONTRACT_VERSION == routing_contract.CURRENT_VERSION
+    # 薄驱动接受四个实现声明的版本
     assert execution_contract.accept(StepDriver) == execution_contract.CURRENT_VERSION
     assert assembly_contract.accept(ContextAssembly) == assembly_contract.CURRENT_VERSION
     assert tightening_contract.accept(WATCHED_OUTPUTS) == tightening_contract.CURRENT_VERSION
+    assert routing_contract.accept(ROUTING) == routing_contract.CURRENT_VERSION
 
 
 def test_a_version_the_thin_driver_does_not_accept_fails_and_says_why():

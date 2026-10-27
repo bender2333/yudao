@@ -12,7 +12,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.engine import StepDriver, StepLimits
 from harness.models import DEPARTMENTS, EventType
 from harness.proposals import product_spec

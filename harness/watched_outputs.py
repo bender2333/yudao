@@ -1,19 +1,38 @@
-"""Pure rules for department requests, result ownership, and work resumption."""
+# 成果驱动的路由实现（应用层；工单 #825，骨架与应用设计说明第 5.1 节、ADR-0039、三部门的循环结构）。
+#
+# 调度住在这里：谁在等、谁能开工、一轮以什么结束、事项以什么结束。它由内核的 collaboration.py（S1d 之前列在内核清单里）
+# 与流程编排的对应部分搬来，行为不变，事件序列基准不变。
+#
+# 它读运行流的投影（从事件日志折叠而来）与组织定义里写明的关注关系，不保存事件之外的状态，不读最小投影，
+# 不写事件、不调模型、不核对边界、不执行工具（设计说明第 5.1 节）。换一种路由（任务池）时整体换掉这一份，
+# 内核不改：名称写在组织定义的 routing 里，实现在模块加载时用 routing_contract.register 登记，启动时按名称接上。
+#
+# 每个部门在组织定义里写明关注的成果；这里只有一条通用规则：关注的成果有了新东西、部门在等待工作时，它开始一轮工作。
+# 关注关系来自定义，代码里不按部门写死。「有新东西」按成果的种类分别判断，判断的是成果本身与它上一次被处理到的版本，
+# 不记录额外的状态：项目推算进度时读的是同一批成果。
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+
+from . import routing_contract
 from .contracts import artifact_hash
-from .models import RunProjection
 from .definitions import DEFINITIONS
+from .models import Event, EventType, RunProjection
+
+# 组织定义 organization.json 的 routing 里写这个名称
+ROUTING_NAME = "watched_outputs"
+
+# 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
+# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）。
+# 这两种不算正常结束，这一轮不写指导的已回答、也没有结束结果（工单 #1039、#825）：暂停以后继续的是同一轮，
+# 它在继续以后正常结束时才算。
+_NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
 
 # ---------------------------------------------------------------------------
-# 部门按关注的成果开始一轮工作（循环结构第 2 节、ADR-0039）
-#
-# 每个部门在组织定义里写明关注的成果；这里只有一条通用规则：关注的成果有了新东西、
-# 部门在等待工作时，它开始一轮工作。关注关系来自定义，代码里不按部门写死。
-# 「有新东西」按成果的种类分别判断，判断的是成果本身与它上一次被处理到的版本，
-# 不记录额外的状态：项目推算进度时读的是同一批成果。
+# 谁能开工
+# ---------------------------------------------------------------------------
 
 
 def is_working(projection: RunProjection, department: str) -> bool:
@@ -31,6 +50,16 @@ def is_working(projection: RunProjection, department: str) -> bool:
 def is_waiting(projection: RunProjection, department: str) -> bool:
     """部门在等待工作：它这一轮已经结束（或还没开始过）。"""
     return not is_working(projection, department)
+
+
+def waiting_departments(statuses: Mapping[str, str | None]) -> set[str]:
+    """在等待工作的部门：这个进程里没有正在工作的会话的那些。
+
+    会话状态是薄驱动的事实（它在进程里持有会话），判断归路由：进程中断以后会话是新开的，
+    投影里那条「工作中」的记录不再算数（工单 #16 的恢复口径），这时还没有会话的部门同样在等待，
+    它可以被重新激活。statuses 没有列出的部门按等待处理。
+    """
+    return {department for department in DEFINITIONS.departments if statuses.get(department) != "active"}
 
 
 def _has_new_user_input(projection: RunProjection) -> bool:
@@ -181,6 +210,16 @@ def _free(projection: RunProjection, waiting: set[str] | None, department: str) 
     return department in waiting if waiting is not None else is_waiting(projection, department)
 
 
+def department_ready(projection: RunProjection, department: str, waiting: set[str] | None = None) -> bool:
+    """这个部门现在可以开始一轮工作：在等待工作，并且关注的成果有了新东西。
+
+    同时运行（工单 #557）：准备激活的事务里由薄驱动重新问一次，别的会话在这期间做完了就开始。
+    """
+    if not _free(projection, waiting, department):
+        return False
+    return has_new_work(projection, department)
+
+
 def next_department(projection: RunProjection, waiting: set[str] | None = None) -> str | None:
     """下一个开始一轮工作的部门：先看还没回答的询问，再按定义里的部门顺序取第一个
     在等待且有新的工作的。
@@ -221,3 +260,79 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
         if _free(projection, waiting, department) and has_new_work(projection, department):
             take(department)
     return ready
+
+
+# ---------------------------------------------------------------------------
+# 一轮以什么结束、事项以什么结束
+# ---------------------------------------------------------------------------
+
+
+def _round_outcome(events: list[Event], department: str, session_id: str | None, activation_id: str) -> str:
+    """这一轮怎么结束的：提交被接纳记 proposal_accepted，其余正常结束记 text_reply（载荷只有这两个取值）。
+
+    提交以后被拒绝的这一轮，部门还没有交下正式成果，按文字回答记。
+    """
+    started = None
+    for index, event in enumerate(events):
+        if (event.type == EventType.DEPARTMENT_ACTIVATED and event.session_id == session_id
+                and (event.payload or {}).get("activation_id") == activation_id):
+            started = index
+            break
+    submitted = False
+    for event in ([] if started is None else events[started + 1:]):
+        if event.session_id != session_id:
+            continue
+        if event.type == EventType.PROPOSAL_SUBMITTED:
+            submitted = True
+        elif event.type == EventType.PROPOSAL_REJECTED:
+            submitted = False
+    return "proposal_accepted" if submitted else "text_reply"
+
+
+def round_end(projection: RunProjection, events: list[Event], *, department: str, session_id: str | None,
+              activation_id: str) -> routing_contract.RoundEnd | None:
+    """这一轮以什么结束：正常结束的一轮交出结果（提交被接纳，或是文字回答）；暂停与失败不算正常结束。
+
+    成果驱动只认这两种正常结束（设计说明第 5.1 节：一轮以提交正式成果或回答用户结束）。
+    """
+    if projection.status in _NOT_A_NORMAL_ROUND_END:
+        return None
+    return routing_contract.RoundEnd(
+        outcome=_round_outcome(events, department, session_id, activation_id))
+
+
+def item_end(projection: RunProjection) -> routing_contract.ItemEnd | None:
+    """事项以什么结束：没有部门可以开始一轮工作时，成果驱动的事项没有新的工作，运行以 provider_error 结束。
+
+    这是现在（S2a）的口径，与搬来以前写在流程编排里的那一条逐字相同。路由自己的结束原因是它自己的一份定义，
+    归 #861（S2b）：那以后这个判断从路由的定义里取原因，不写在这里。
+    """
+    return routing_contract.ItemEnd(stop_reason="provider_error", message="no department has new work")
+
+
+class WatchedOutputs:
+    # 成果驱动的路由（设计说明第 5.1 节）：默认路由，组织定义的 routing 写 watched_outputs。
+    # 实现在应用层；薄驱动只按契约的三个问题调用它
+    NAME = ROUTING_NAME
+    CONTRACT_VERSION = routing_contract.CURRENT_VERSION
+
+    def ready_departments(self, view: RunProjection, *, waiting: set[str] | None = None) -> list[str]:
+        return ready_departments(view, waiting)
+
+    def next_department(self, view: RunProjection, *, waiting: set[str] | None = None) -> str | None:
+        return next_department(view, waiting)
+
+    def department_ready(self, view: RunProjection, *, department: str,
+                         waiting: set[str] | None = None) -> bool:
+        return department_ready(view, department, waiting)
+
+    def round_end(self, view: RunProjection, events: list[Event], *, department: str,
+                  session_id: str | None, activation_id: str) -> routing_contract.RoundEnd | None:
+        return round_end(view, events, department=department, session_id=session_id,
+                         activation_id=activation_id)
+
+    def item_end(self, view: RunProjection) -> routing_contract.ItemEnd | None:
+        return item_end(view)
+
+
+ROUTING = routing_contract.register(WatchedOutputs())

@@ -8,7 +8,7 @@ from typing import Any
 
 from .adjudication import offered_tools
 from .contracts import artifact_hash
-from .collaboration import has_new_baseline_review
+from .watched_outputs import has_new_baseline_review
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
 from .event_store import EventStore

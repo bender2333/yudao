@@ -7,8 +7,8 @@ import json
 import shutil
 from pathlib import Path
 
-from harness import collaboration
-from harness.collaboration import has_new_work
+from harness import watched_outputs
+from harness.watched_outputs import has_new_work
 from harness.definitions import DEFINITIONS_DIR, load_definitions
 from harness.models import (
     ArtifactRef, DeliverySpec, EffectiveContract, ProductSpec, QAReview, RunProjection, SessionRecord,
@@ -70,7 +70,7 @@ def test_the_engineering_starts_a_rework_when_the_defect_record_is_watched():
 
 def test_removing_the_watch_in_the_definition_stops_the_rework(tmp_path, monkeypatch):
     definitions = _definitions_without_defect_watch(tmp_path / "definitions")
-    monkeypatch.setattr(collaboration, "DEFINITIONS", definitions)
+    monkeypatch.setattr(watched_outputs, "DEFINITIONS", definitions)
     projection = _with_defect_record()
     assert not has_new_work(projection, "engineering")
     # 只少了这一条关注关系：其它部门的关注关系照旧

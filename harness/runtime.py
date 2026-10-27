@@ -9,7 +9,7 @@ from .adapters.base import ModelAdapter
 from .artifacts import ArtifactStore
 from .deltas import DeltaChannel
 from .definitions import DEFINITIONS
-from . import parameters
+from . import parameters, routing_contract
 from .engine import StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
 from .event_store import Command, EventStore, catalog_stream
@@ -93,6 +93,9 @@ class LoopSystem:
             step_limits=step_limits,
             deltas=self.deltas,
             tightening=WATCHED_OUTPUTS,
+            # 路由实现按组织定义里的名称接上（工单 #825）：watched_outputs 在模块加载时登记名称，
+            # 定义加载时已经核对过这个名字在 routings.json 里；这里接上并再核对一次契约版本
+            routing=routing_contract.select(DEFINITIONS.routing),
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)

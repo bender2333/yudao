@@ -1,7 +1,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.compaction import SUMMARY_OUTPUT_TOKENS
 from harness.contracts import artifact_hash

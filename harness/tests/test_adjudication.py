@@ -4,7 +4,7 @@ from harness.tests.helpers import adjudication_view, work_basis
 from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.environment import LocalEnvironment
 from harness.models import SessionRecord
 from harness.proposals import delivery, delivery_turn, product_spec

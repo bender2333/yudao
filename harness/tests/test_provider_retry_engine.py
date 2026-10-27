@@ -6,7 +6,7 @@ import pytest
 
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import product_spec

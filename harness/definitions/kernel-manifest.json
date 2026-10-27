@@ -47,11 +47,6 @@
       "why": "有效合同身份；交付按合同版本绑定"
     },
     {
-      "path": "harness/collaboration.py",
-      "kind": "module",
-      "why": "协作规则：未结协作的工作依据与回应范围"
-    },
-    {
       "path": "harness/path_rules.py",
       "kind": "module",
       "why": "公开路径规则：可移植相对路径与主机私有路径，裁决与执行层共用"
@@ -112,7 +107,7 @@
       "why": "六条基础规则的原文，高于任何具体设计；守卫自身，只由用户修改"
     }
   ],
-  "python_lines_max": 5471,
+  "python_lines_max": 5241,
   "allowed_imports": [
     "内核文件",
     "标准库",

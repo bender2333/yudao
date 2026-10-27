@@ -4,7 +4,7 @@ from threading import Event
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.providers.call import ModelResponse
 from harness.adapters.fake import FakeAdapter

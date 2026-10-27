@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import tool_call_required_text
 from harness.models import ArtifactRef, EventType, json_dumps

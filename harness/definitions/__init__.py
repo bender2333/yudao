@@ -141,6 +141,9 @@ class OrganizationRules(_Definition):
 class Organization(_Definition):
     # 部门按这个顺序排列
     departments: tuple[Department, ...] = Field(min_length=1)
+    # 路由实现的名称（骨架与应用设计说明第 5.1 节、工单 #825）：启动时按这个名称接上实现，
+    # 名称必须是 routings.json 里登记的其中一个。默认是成果驱动
+    routing: Identifier = "watched_outputs"
     rules: OrganizationRules
 
 
@@ -406,6 +409,23 @@ class WorkItems(_Definition):
     freeze_work_items = _frozen("kinds", "repository_overview")
 
 
+class Routing(_Definition):
+    # 一种路由实现（routings.json，工单 #825）：编号是组织定义的 routing 可以写的名称，
+    # 说明这一种路由是什么。启动时按名称接上实现（ADR-0042 修订里的插件加载，见 harness/routing_contract.py）
+    id: Identifier
+    # 中文名，给用户看
+    label: str = ""
+    # 这一种路由是什么：开始一轮工作、一轮怎么结束、事项怎么结束的口径
+    why: str = ""
+
+
+class Routings(_Definition):
+    # routings.json：可用的路由实现是封闭的清单，组织定义的 routing 不在里面时加载失败
+    routings: tuple[Routing, ...] = Field(min_length=1)
+
+    freeze_routings = _frozen("routings")
+
+
 class Definitions(_Definition):
     version: str
     organization: Organization
@@ -423,8 +443,15 @@ class Definitions(_Definition):
     model_capabilities: ModelCapabilities
     # 事项种类与仓库概况的模式表，来自 work_items.json
     work_items: WorkItems
+    # 可用的路由实现，来自 routings.json（工单 #825）
+    routings: Routings
 
     freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items", "rules")
+
+    @property
+    def routing(self) -> str:
+        # 路由实现的名称（组织定义里的 routing）：加载时核对过它在 routings.json 里
+        return self.organization.routing
 
     @property
     def departments(self) -> tuple[str, ...]:
@@ -521,6 +548,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "service_presets.json": ("service_presets", TypeAdapter(ServicePresets)),
     "model_capabilities.json": ("model_capabilities", TypeAdapter(ModelCapabilities)),
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
+    "routings.json": ("routings", TypeAdapter(Routings)),
 }
 
 
@@ -614,6 +642,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
             if tool not in tools:
                 issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
     issues.extend(_work_item_references(parts["work_items"], organization, tools, parts["stop_reasons"]))
+    issues.extend(_routing_references(organization, parts["routings"]))
     issues.extend(_rule_references(parts["rules"], roles))
     submitters: dict[str, str] = {}
     for name, tool in tools.items():
@@ -685,6 +714,16 @@ def _work_item_references(work_items: WorkItems, organization: Organization, too
                     issues.append((file, f"kinds.{name}.departments.{department}.tools[{index}]",
                                    f"工具 {tool} 没有定义"))
     return issues
+
+
+def _routing_references(organization: Organization, routings: Routings) -> list[tuple[str, str, str]]:
+    # 组织定义写明的路由实现必须在 routings.json 里（工单 #825）：不在里面时加载失败，
+    # 写明是哪个字段、写了什么名称、有哪些可用的名称
+    available = [item.id for item in routings.routings]
+    if organization.routing in available:
+        return []
+    return [("organization.json", "routing",
+             f"路由实现 {organization.routing} 不存在；可用的是：{'、'.join(available)}")]
 
 
 def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], tools: dict[str, Tool],

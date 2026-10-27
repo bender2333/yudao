@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.models import EventType, json_dumps
 from harness.proposals import (
     delivery,

@@ -42,10 +42,8 @@ class UsedAmount:
 
 @dataclass(frozen=True)
 class SessionState:
-    # 一个会话的已用量、当前这一轮的编号与它属于哪个部门：
-    # 检查回执要来自这一轮，所以记下最近一次激活的编号；事项创建时记下的会话是部门的主线会话。
-    # settled_ms 与 settled_steps 是上一次一轮工作结束时已经结算的那一份：中断的那一轮没有结束事件，
-    # 它的时间与步数不计在这里，驱动按「累计值减去已结算值」算这一轮还剩多少（S1e，工单 #1015）
+    # 一个会话的已用量与结算值、当前这一轮的编号与它属于哪个部门：settled_ms 与 settled_steps 是上一次
+    # 一轮工作结束时已结算的那一份（S1e，工单 #1015）；检查回执要来自这一轮，所以留着最近一次激活的编号
     settled_ms: int = 0
     settled_steps: int = 0
     activations: int = 0
@@ -142,8 +140,7 @@ class _Fold:
         self.used = state.used
         self.execution_right = state.execution_right
         self.pending = list(state.pending_decisions)
-        # 部门主线会话的激活次数：询问分支的激活不算轮次（工单 #857），只由主线会话的激活推进
-        self.main_activations = max(state.used.activations, 0)
+        self.main_activations = max(state.used.activations, 0)  # 主线会话的激活数：询问分支不算轮次（#857）
 
     def feed(self, event: Event) -> None:
         if event.stream and event.stream_version:

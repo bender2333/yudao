@@ -25,7 +25,7 @@ from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
-from .collaboration import watched_new_work
+from .watched_outputs import watched_new_work
 from .compaction import CompactionError
 from .contracts import artifact_hash
 from .definitions import DEFINITIONS
