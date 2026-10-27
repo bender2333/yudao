@@ -72,7 +72,7 @@ disable-model-invocation: true
 
 ### 6. 发布
 
-按依赖顺序创建或改写父工单，用下面的模板；依赖用 GitHub 原生依赖，有阶段工单时挂成它的子工单，命令见 `docs/agents/issue-tracker.md`。父工单标 `waiting`（等子工单，`docs/agents/triage-labels.md`）；需你批准一环的父工单另在评论写清要用户批准什么。再按第 3 步执行旧工单的去向，把单独的缺陷挂到阶段工单下。完成：表里每一行都在 GitHub 上落实，把编号列给用户，并提示下一步对每张父工单运行 `/to-children <编号>`。
+按依赖顺序创建或改写父工单，用下面的模板；依赖用 GitHub 原生依赖，有阶段工单时挂成它的子工单，命令见 `docs/agents/issue-tracker.md`。父工单标 `waiting`（等子工单，`docs/agents/triage-labels.md`）；需你批准一环的父工单在正文写清改的是哪些内核路径，不另等批准（用户 2026-10-27 决定）。再按第 3 步执行旧工单的去向，把单独的缺陷挂到阶段工单下。完成：表里每一行都在 GitHub 上落实，把编号列给用户，并提示下一步对每张父工单运行 `/to-children <编号>`。
 
 ## 父工单模板
 
