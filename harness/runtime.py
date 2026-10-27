@@ -8,6 +8,7 @@ from typing import Any
 from .adapters.base import ModelAdapter
 from .artifacts import ArtifactStore
 from .deltas import DeltaChannel
+from .decision_flow import DECISION_FLOW
 from .definitions import DEFINITIONS
 from . import parameters, routing_contract
 from .engine import StepLimits
@@ -96,6 +97,8 @@ class LoopSystem:
             # 路由实现按组织定义里的名称接上（工单 #825）：watched_outputs 在模块加载时登记名称，
             # 定义加载时已经核对过这个名字在 routings.json 里；这里接上并再核对一次契约版本
             routing=routing_contract.select(DEFINITIONS.routing),
+            # 决定请求的处理与建档的流转在应用层（工单 #827）：薄驱动接上它，只转交
+            decision_flow=DECISION_FLOW,
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
