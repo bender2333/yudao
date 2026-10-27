@@ -15,7 +15,7 @@ from harness.projection import saved_decisions
 from harness.proposals import delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import after_event, from_another_thread
+from harness.tests.helpers import after_event, from_another_thread, run_wait_command
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 CHECKS = {"smoke": {"command": "python -c \"print('smoke ok')\""}}
@@ -61,19 +61,19 @@ def _position_of_cancelled(events: list) -> int:
 
 
 def test_answering_continue_after_a_pause_keeps_the_item_working(tmp_path: Path) -> None:
-    # 工程暂停（连续只回复文字）时质检正在跑一项要几秒的检查：
+    # 工程暂停（连续只回复文字）时质检正在跑一项检查：
     # 回答「继续」以后事项接着工作并照常完成，没有 run_failed cancelled；
-    # 两个部门都从各自的历史接着工作
-    state = {"quality_check_started": False}
-
-    def note_check_started(event) -> None:
-        if event.department == "quality" and (event.payload or {}).get("name") == "run_check":
-            state["quality_check_started"] = True
+    # 两个部门都从各自的历史接着工作。
+    # 这项检查等取消才结束（信号文件 started 与 release），它自己不会先跑完，于是「暂停落下时
+    # 质检还在跑检查」由信号决定，不由检查有多快、运行机有多忙决定（工单 #1116）
+    signals = tmp_path / "check-signals"
+    signals.mkdir()
+    started = signals / "started"
 
     def text_after_quality_started(call):
-        # 等质检的检查确实开始以后再只回复文字：暂停发生时质检确定在工作（不靠时序碰运气）
+        # 等质检的检查进程确实开始（信号文件）以后再只回复文字：暂停发生时质检确定在工作
         for _ in range(600):
-            if state["quality_check_started"]:
+            if started.exists():
                 break
             yield ModelStreamEvent(kind="stream_event", id="evt-wait")
         return FakeTurn(transcript="我先想想。")
@@ -82,14 +82,16 @@ def test_answering_continue_after_a_pause_keeps_the_item_working(tmp_path: Path)
         "product": [product_spec()],
         "engineering": [text_after_quality_started] * 4
                        + [delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
-        "quality": [FakeTurn(checks={"slow": SLOW_CHECK}),
+        "quality": [FakeTurn(checks={"slow": {"command": run_wait_command(signals)}}),
                     review_turn("release", "checks passed on the current snapshot", checks=CHECKS)],
     }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)
-    after_event(system, EventType.TOOL_STARTED, note_check_started)
     run_id = system.create_run("build an echo CLI")
 
     paused = system.run_until_stop(run_id)
+    # 暂停已经写进事件日志（run_until_stop 返回时其余会话已经收尾），这时才放行检查：
+    # 放行只让继续以后可能重跑的这项检查不再等满自己的上限，暂停时它还在运行、由取消结束
+    (signals / "release").write_text("released")
     assert (paused.status, paused.stop_reason) == ("paused", "no_tool_call")
     events = _events(system, run_id)
     # 暂停不是取消：事项没有以 cancelled 结束
