@@ -22,6 +22,7 @@ from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
 from .artifacts import ArtifactStore
+from . import assembly_contract, execution_contract
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
@@ -154,7 +155,8 @@ class _Activation:
 
 
 class _SafeNode:
-    # 流程编排为一次激活实现的安全节点接口 engine.SafeNode。接口由下层的步骤驱动定义，这里实现并在开始时交给它（依赖倒置）
+    # 流程编排为一次激活实现的安全节点接口（执行契约第一版的 SafeNode）。接口由契约定义、步骤驱动在安全节点上调用，
+    # 这里实现并在开始一轮工作时交给它（依赖倒置）：每一步先经这里问薄驱动继续还是停止
     def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
         self._orchestrator = orchestrator
         self._activation = activation
@@ -1717,12 +1719,22 @@ class Orchestrator:
                 delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
                 effective_contract_hash=scope.basis.effective_contract_hash,
             )
+            # 薄驱动只经执行契约与装配契约调用实现：先核对两个实现声明的版本（当前版与上一版），
+            # 版本不合时在开始这一轮之前失败，说明里写明实现的声明与薄驱动接受的版本
+            execution_contract.accept(StepDriver)
+            assembly_contract.accept(self.assembly)
+            # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
+            # 剩余步数决定；路由的工作引用还没有这一项（成果驱动路由在 #825、#861 接上），这一版传空
+            request = execution_contract.RoundRequest(
+                scope=scope, prompt=activation.prompt,
+                limits=self._session_limits(run_id, scope.session_id),
+                work_ref=None,
+            )
             activation.driver = StepDriver.start(
-                scope, activation.prompt, writes=self.writes, artifacts=self.artifacts,
+                request, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
                 nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
-                limits=self._session_limits(run_id, scope.session_id),
                 deltas=self.deltas,
                 refresh_workspace=self._workspace_refresh(activation),
             )
@@ -2081,17 +2093,27 @@ class Orchestrator:
             branch_scope, prompt, activation.stop_flag, activation.adapter, None, projection.stream_version,
             deadline=deadline,
         )
+        # 薄驱动只经执行契约与装配契约调用实现：核对两个实现声明的版本，版本不合时这一轮不开始
+        execution_contract.accept(StepDriver)
+        assembly_contract.accept(self.assembly)
+        # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，上限由调用方给出；
+        # 路由的工作引用来自开始这一轮工作的请求，还没有这一项时为空（#825、#861）
         driver = StepDriver.start(
-            branch_scope, prompt, writes=self.writes, artifacts=self.artifacts,
+            execution_contract.RoundRequest(
+                scope=branch_scope, prompt=prompt,
+                limits=StepLimits(
+                    max_provider_attempts=self.step_limits.max_provider_attempts,
+                    max_model_steps=max_model_steps if max_model_steps is not None else self.step_limits.max_model_steps,
+                    department_max_model_steps=self.step_limits.department_max_model_steps,
+                    department_max_time_sec=self.step_limits.department_max_time_sec,
+                ),
+                work_ref=None,
+            ),
+            writes=self.writes, artifacts=self.artifacts,
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
             environment=environment,
             nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
-            limits=StepLimits(
-                max_provider_attempts=self.step_limits.max_provider_attempts,
-                max_model_steps=max_model_steps if max_model_steps is not None else self.step_limits.max_model_steps,
-                department_max_model_steps=self.step_limits.department_max_model_steps,
-                department_max_time_sec=self.step_limits.department_max_time_sec,
-            ), deltas=self.deltas,
+            deltas=self.deltas,
             refresh_workspace=self._workspace_refresh(branch_activation),
         )
         started = time.monotonic()

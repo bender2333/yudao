@@ -5,6 +5,8 @@
 # 其间另一方的写入使提交被拒绝时按写入以后的状态重新判断。
 # 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：提交或停止原因）；
 # 步骤驱动向上只经过安全节点接口（SafeNode）。
+# 这一份是执行契约第一版（execution_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
+# 接口（开始一轮工作的请求、安全节点、上下限）在契约模块里，这里只实现。
 
 from __future__ import annotations
 
@@ -12,11 +14,11 @@ import asyncio
 import json
 import math
 import time
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Sequence
 from contextlib import aclosing
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, replace
 from threading import Event
-from typing import Any, Protocol
+from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, Preconditions, TreeFacts, WorkspaceFacts
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
@@ -30,6 +32,8 @@ from .definitions import DEFINITIONS
 from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
 from .event_store import run_stream
+from . import execution_contract
+from .execution_contract import ActivationScope, Judgment, RoundRequest, SafeNode, StepLimits
 from .write_path import Transaction, WritePath
 from .models import TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
 from .public_tree import UnrepresentableWorkspace
@@ -37,8 +41,7 @@ from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
                                  event_call_target)
-from .providers.selection import ModelSelection
-from .recording import ActivationScope, StepRecorder
+from .recording import StepRecorder
 from .tools import proposal_kind, tool_action, tool_kind
 from .validation import PRD_REVISION_FIELDS, evaluate_proposal
 from .tree_archive import store_tree
@@ -55,61 +58,6 @@ COMPACTION_REQUEST_TIER = "minimal"
 # 等待计入运行时间，运行时间用完时安全节点照常结束等待并停止这一轮
 RELEASE_WAIT_INTERVAL_SEC = 0.5
 
-
-@dataclass(frozen=True)
-class Judgment:
-    # 安全节点的回答：是否继续，以及作出判断时 run 流的版本；
-    # blocked_by_other_session 说明别的会话已经写下待恢复的决定请求（模型管理设计说明第 5.5 节）：
-    # 这个会话照常停下（事项的状态不变，工单 #856），它自己也被挡住时它要写下自己的那一条
-    proceed: bool
-    version: int
-    blocked_by_other_session: bool = False
-
-
-class SafeNode(Protocol):
-    # 安全节点接口：步骤驱动在安全节点调用它，流程编排在这里分派新输入、关闭因此过时的协作请求，回答继续还是停止。
-    # 这是唯一一处由下层调用上层的接口，按依赖倒置处理：接口在步骤驱动一侧定义，流程编排实现并在开始时交给步骤驱动，
-    # 步骤驱动不引用流程编排
-
-    def proceed(self) -> Judgment:
-        # 分派新输入，回答是否继续
-        ...
-
-    def settle(self, transaction: Transaction) -> RunProjection:
-        # 在调用方的事务中分派新输入并关闭过时的协作请求，返回事务中当前的运行状态；调用方随后判断并写入
-        ...
-
-    async def wait(self, seconds: float) -> Judgment:
-        # 在安全节点等待至多 seconds 秒，其间有新输入、指导或取消时提前回答；回答是否继续
-        ...
-
-    def end(self, transaction: Transaction, reason: str, message: str) -> None:
-        # 以停止原因结束运行：运行的结束与调用方在同一事务中刚写下的记录一起提交
-        ...
-
-    def department_selection(self, department: str) -> ModelSelection | None:
-        # 设置来源（项目层）：本次请求该项目该部门的项目部门设置中的模型选择；
-        # 不属于项目的运行时为空，全部使用部门默认（设计说明第 6 节）
-        ...
-
-    def department_prompt(self, department: str) -> DepartmentPrompt:
-        # 部门 Prompt 每次请求从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）
-        ...
-    async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None, int]:
-        # 开一个询问分支，等待分支回答，返回 (ok, output, error, new_contract_hash, branch_steps)
-        ...
-
-
-
-@dataclass(frozen=True)
-class StepLimits:
-    # 步骤驱动的重试与步数参数；默认值取规则登记中的现值，正式运行使用默认值
-    retry_initial_delay_sec: float = DEFINITIONS.rule_value("retry_initial_delay_sec")
-    retry_max_delay_sec: float = DEFINITIONS.rule_value("retry_max_delay_sec")
-    max_provider_attempts: int = DEFINITIONS.rule_value("max_provider_attempts")
-    max_model_steps: int = DEFINITIONS.rule_value("max_model_steps")
-    department_max_model_steps: Mapping[str, int] = field(default_factory=dict)
-    department_max_time_sec: Mapping[str, float] = field(default_factory=dict)
 
 def tool_call_required_text(count: int) -> str:
     limit = DEFINITIONS.rule_value("tool_call_required_limit")
@@ -245,30 +193,36 @@ def recovered_call_target(events: Sequence[Any], activation_id: str, step_id: in
 
 
 class StepDriver:
-    # 一次激活的步骤驱动。cancelled 是这次激活的取消信号，由流程编排持有；cancel() 可以从任何线程调用
+    # 一次激活的步骤驱动，执行契约第一版的实现。cancelled 是这次激活的取消信号，由流程编排持有；
+    # cancel() 可以从任何线程调用。薄驱动在开始一轮工作之前核对下面这一版
+    CONTRACT_VERSION = execution_contract.CURRENT_VERSION
+
     @classmethod
-    def start(cls, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
+    def start(cls, request: RoundRequest, *, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
               facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-              cancelled: Event, limits: StepLimits, deltas: DeltaChannel,
+              cancelled: Event, deltas: DeltaChannel,
               refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
-        driver = cls(scope, prompt, writes=writes, artifacts=artifacts, assembly=assembly,
+        driver = cls(request, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
-                     cancelled=cancelled, limits=limits, deltas=deltas,
+                     cancelled=cancelled, deltas=deltas,
                      refresh_workspace=refresh_workspace)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
-    def __init__(self, scope: ActivationScope, prompt: DepartmentPrompt, *, writes: WritePath,
+    def __init__(self, request: RoundRequest, *, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-                 cancelled: Event, limits: StepLimits, deltas: DeltaChannel,
+                 cancelled: Event, deltas: DeltaChannel,
                  refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> None:
+        scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
+        # 这一步交给装配的输入：身份、提示与采用的版本，以及路由的工作引用（原样带过去，第 5.4 节第 4 条）
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt,
-                                basis.effective_contract_hash, basis.input_version)
+                                basis.effective_contract_hash, basis.input_version,
+                                work_ref=request.work_ref)
         self._stream = run_stream(scope.run_id)
         self._writes = writes
         self._artifacts = artifacts

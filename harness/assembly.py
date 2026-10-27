@@ -1,5 +1,7 @@
 # 上下文装配（P）：部门历史的重建、每一步的请求装配（压缩计划、装配、请求构造与上下文清单）、
 # 压缩完成以后的检查点。只读取投影、事件与工件，不写入；需要写入的内容交回调用方，由调用方写入。
+# 这一份是装配契约第一版（assembly_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
+# 输入与不变量在契约模块里，这里只实现。
 
 from __future__ import annotations
 
@@ -7,13 +9,16 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
+from . import assembly_contract
 from .adapters.base import ProviderError
 from .artifacts import ArtifactStore
+# 每一步装配的输入（身份、版本、路由的工作引用）与窗口的取值是装配契约的输入，定义在契约模块里；这里照旧导出
+from .assembly_contract import ModelLimits, StepFrame
 from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, finish_compaction, plan_compaction,
                          response_reserve, visible_history)
 from .context import AssembledContext, ContextAssembler, department_work_text
 from .event_store import EventStore
-from .models import (ArtifactRef, DepartmentGuidance, DepartmentPrompt, Event, EventType, RunProjection,
+from .models import (ArtifactRef, DepartmentGuidance, Event, EventType, RunProjection,
                      canonical_hash, estimate_tokens, json_dumps)
 
 PENDING_GUIDANCE = frozenset({"received", "in_input"})
@@ -51,31 +56,12 @@ def pending_guidance(projection: RunProjection, department: str) -> list[Departm
             if item.department == department and item.status in PENDING_GUIDANCE]
 
 
-@dataclass(frozen=True)
-class ModelLimits:
-    # 按调用目标计算的有效窗口、模型声明的输出上限与为回复保留的空间；保留空间决定何时压缩历史
-    context_window: int
-    output_limit: int | None
-    reserve: int
-
-
 def model_limits(target_window: int, output_limit: int | None = None) -> ModelLimits:
     # 阈值只用本次调用目标的窗口。事项级 context_window 不再参与，字段的删除由 #74 完成
     reserve = response_reserve(target_window, output_limit)
     if reserve < 1:
         raise ValueError("the effective context window leaves no room for model output")
     return ModelLimits(target_window, output_limit, reserve)
-
-
-@dataclass(frozen=True)
-class StepFrame:
-    # 一次激活装配每一步所需的身份与激活时采用的版本；压缩检查点按这些版本选取
-    department: str
-    session_id: str
-    activation_id: str
-    prompt: DepartmentPrompt
-    effective_contract_hash: str | None
-    input_version: int
 
 
 @dataclass(frozen=True)
@@ -132,6 +118,9 @@ class CompactionResult:
 
 
 class ContextAssembly:
+    # 装配契约第一版的实现；薄驱动在开始一轮工作之前核对下面这一版
+    CONTRACT_VERSION = assembly_contract.CURRENT_VERSION
+
     def __init__(self, artifacts: ArtifactStore, store: EventStore) -> None:
         self.artifacts = artifacts
         self.assembler = ContextAssembler(artifacts, store)
