@@ -21,6 +21,7 @@ from typing import Any
 from harness.app.application import Application
 from harness.models import DEPARTMENTS, CatalogEventType
 from harness.tests.api_helpers import running_api
+from harness.tests.helpers import delete_watched_file
 from harness.tests.protocol_helpers import serve, sse
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
@@ -346,7 +347,8 @@ def test_deleting_the_catalog_file_clears_defaults_and_recovers_after_answer(tmp
             if parked.get("record") is not None:
                 opened.system.facade._admissions["model-a"] = parked["record"]
 
-            opened.config.unlink()
+            # 应用正在轮询这个文件，Windows 上删除可能撞上「文件被占用」：由重试函数删到成功（工单 #1091）
+            delete_watched_file(opened.config)
             event = _wait_catalog_reload(opened.system.store, operation="reload")
             assert event.actor == "system"
             # 目录、部门默认与角色默认一起清空

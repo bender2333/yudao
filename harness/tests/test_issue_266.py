@@ -15,6 +15,7 @@ from typing import Any
 from harness.models import DEPARTMENTS
 from harness.runtime import LoopSystem
 from harness.smoke import run_smoke
+from harness.tests.helpers import delete_watched_file
 from harness.tests.protocol_helpers import serve, sse
 
 KEY_A = "issue266-key-a"
@@ -158,7 +159,8 @@ def test_restart_after_deleting_the_catalog_clears_admissions(tmp_path):
         assert first.facade.model_test("provider-a", "model-a")["admitted"] is True
         first.store.close()
 
-        opened.config.unlink()
+        # 目录文件与准入文件在同一次读取里读；统一走重试函数，避开 Windows 上的「文件被占用」（工单 #1091）
+        delete_watched_file(opened.config)
         restarted = opened.start()
         assert restarted.facade.model_admissions() == []
         assert restarted.facade.describe_readiness()["available"] is False
