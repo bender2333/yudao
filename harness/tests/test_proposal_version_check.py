@@ -16,6 +16,7 @@ from harness.proposals import (
 from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
 from harness.validation import evaluate_proposal
+from harness.tightening import WATCHED_OUTPUTS
 
 # 提案校验与提交：流程编排校验提案时记下读取的流版本，提交以它作为期望版本追加；校验以后另一方写入了这个 run，
 # 写入口拒绝提交，流程编排按写入以后的状态重新校验与判断。测试包装公开的 WritePath.transact：记下每次判断使用的
@@ -151,7 +152,7 @@ def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path)
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=review("release", "releasing a stale-bound delivery",
                                                  checks=["smoke"],
-                                                 basis_delivery_spec_hash=projection.delivery_spec.content_hash))
+                                                 basis_delivery_spec_hash=projection.delivery_spec.content_hash), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert "product_spec_hash" in [error["field"] for error in decision.error_dicts]
 

@@ -31,6 +31,7 @@ from .projection import apply_event, project_run
 from .providers import ProviderFacade
 from .public_tree import capture_public_tree, materialize_tree
 from .runtime import LoopSystem
+from .tightening import WATCHED_OUTPUTS
 from .tree_archive import load_tree
 
 
@@ -646,7 +647,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     intend_bytes = b""
     received_version = 0
     current_work = RunProjection()
-    assembly = ContextAssembly(artifacts, store)
+    assembly = ContextAssembly(artifacts, store, tightening=WATCHED_OUTPUTS)
     events = store.list_events(run_id)
     # 重新装配使用当前加载的定义，只能审计按同一版本定义发出的请求；版本不同时先写明，之后的不一致由它引起
     recorded = {event.payload.get("definitions_version") for event in events
@@ -930,7 +931,9 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if items[1:] != expected.payload["input"][1:]:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    offered = set(offered_tools(current_work, event.department, session_id=event.session_id,
+                    offered = set(offered_tools(current_work, event.department,
+                                               tightening=WATCHED_OUTPUTS,
+                                               session_id=event.session_id,
                                                input_modalities=tuple(target_modalities or ())))
                     if len(names) != len(set(names)) or set(names) != offered:
                         raise ValueError("actual tool schemas do not match the department's tools")

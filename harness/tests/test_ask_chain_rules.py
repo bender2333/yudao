@@ -9,6 +9,7 @@ from harness.actions import WorkspaceFacts
 from harness.adjudication import WorkBasis, ask_chain_decision, ask_chain_max_depth, tool_permission
 from harness.definitions import DEFINITIONS
 from harness.models import RunProjection
+from harness.tightening import WATCHED_OUTPUTS
 
 
 def _chain(depth: int) -> RunProjection:
@@ -36,7 +37,7 @@ def _permission(projection: RunProjection, session_id: str):
         basis=WorkBasis.current(projection, "engineering"),
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
 
 
 def test_the_chain_limit_comes_from_the_rule_registry():
@@ -92,7 +93,7 @@ def test_the_main_session_keeps_its_own_tools_while_a_branch_is_open():
         basis=WorkBasis.current(projection, "engineering"),
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert write.allowed
     # 分支会话不能改运行工作区
     branch_write = tool_permission(
@@ -103,5 +104,5 @@ def test_the_main_session_keeps_its_own_tools_while_a_branch_is_open():
         basis=WorkBasis.current(projection, "engineering"),
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert branch_write.allowed is False

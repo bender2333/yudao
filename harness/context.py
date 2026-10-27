@@ -30,6 +30,7 @@ from .models import (
     hash_bytes,
     json_dumps,
 )
+from .validation import Tightening
 
 # 调用目标没有给出窗口时按这个值处理（工单 #669）：窗口是调用目标的属性，run 不再冻结它
 DEFAULT_CONTEXT_WINDOW = 32_000
@@ -166,10 +167,13 @@ def _notification_text(item: dict[str, Any]) -> str:
 
 
 class ContextAssembler:
-    def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None) -> None:
+    def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None, *,
+                 tightening: Tightening) -> None:
         self.artifacts = artifacts
         # 修改轮的上一轮候选属于项目流，只能按事件编号取（设计第 4.7 节）
         self.store = store
+        # 请求里提供哪些工具由路由的收紧检查取舍（工单 #1095）
+        self.tightening = tightening
 
 
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
@@ -195,8 +199,8 @@ class ContextAssembler:
         guidance_items = list(guidance or [])
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
-        tool_names = offered_tools(projection, department, session_id=session_id,
-                                   input_modalities=input_modalities)
+        tool_names = offered_tools(projection, department, tightening=self.tightening,
+                                   session_id=session_id, input_modalities=input_modalities)
         # 全体角色共同的规则文字与本角色的可见范围取自定义
         rules = DEFINITIONS.organization.rules
         visible = DEFINITIONS.role(department).visibility

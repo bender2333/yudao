@@ -13,6 +13,7 @@ from harness.proposals import product_spec
 from harness.public_tree import TreeError
 from harness.runtime import CancelledInputSaveError, LoopSystem, RunTerminalError
 from harness.validation import evaluate_proposal
+from harness.tightening import WATCHED_OUTPUTS
 
 CHANGE_RECORD = {
     "changed": ["Print the argument in uppercase"],
@@ -34,7 +35,7 @@ def _commit_spec(system, run_id, proposal):
     projection = system.project(run_id)
     snapshot = system.workspace(run_id).snapshot()
     decision = evaluate_proposal(department="product", projection=projection,
-                                 facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id))
+                                 facts=snapshot.facts, proposal=proposal, events=system.store.list_events(run_id), tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
     return system.writes.transact(run_stream(run_id), lambda transaction: system.orchestrator.submissions.prepare(
         transaction, projection=projection, snapshot=snapshot, environment=system.environment(run_id),

@@ -20,6 +20,7 @@ from .context import AssembledContext, ContextAssembler, department_work_text
 from .event_store import EventStore
 from .models import (ArtifactRef, DepartmentGuidance, Event, EventType, RunProjection,
                      canonical_hash, estimate_tokens, json_dumps)
+from .validation import Tightening
 
 PENDING_GUIDANCE = frozenset({"received", "in_input"})
 
@@ -121,9 +122,9 @@ class ContextAssembly:
     # 装配契约第一版的实现；薄驱动在开始一轮工作之前核对下面这一版
     CONTRACT_VERSION = assembly_contract.CURRENT_VERSION
 
-    def __init__(self, artifacts: ArtifactStore, store: EventStore) -> None:
+    def __init__(self, artifacts: ArtifactStore, store: EventStore, *, tightening: Tightening) -> None:
         self.artifacts = artifacts
-        self.assembler = ContextAssembler(artifacts, store)
+        self.assembler = ContextAssembler(artifacts, store, tightening=tightening)
 
     def department_history(self, events: list[Event], department: str, *, session_id: str | None = None) -> list[dict[str, Any]]:
         # 部门历史按事件顺序排列：本部门的工作消息、模型输出、主机提示与工具结果；

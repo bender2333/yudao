@@ -10,6 +10,7 @@ from harness.projection import apply_event
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import compacted_runner as _runner, list_files_turn
+from harness.tightening import WATCHED_OUTPUTS
 
 
 def _rebuild_recorded_steps(system, run_id):
@@ -19,7 +20,7 @@ def _rebuild_recorded_steps(system, run_id):
         return json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**ref)))
 
     events = system.store.list_events(run_id)
-    assembly = ContextAssembly(system.artifacts, system.store)
+    assembly = ContextAssembly(system.artifacts, system.store, tightening=WATCHED_OUTPUTS)
     projection = RunProjection()
     frames, steps, outputs = {}, {}, {}
     counts = {"work": 0, "compaction": 0, "recorded": 0}
