@@ -1,60 +1,48 @@
-# 裁决规则（U）：工具许可，以及提案校验与提交的判断。只读取投影、事件与交给它的工作区事实（由执行环境查询，
+# 裁决规则（U）：工具许可，以及提案校验与提交的判断。只读最小投影、事件与交给它的工作区事实（由执行环境查询，
 # 见 actions.py），不写入，不调用模型；许可规则可以增加，只能收紧。
+# 项目里有内容的判断（输入与指导的版本、这个部门此刻能交什么、按成果内容的检查）归路由的收紧检查，
+# 内核把应用的状态原样交给它（设计说明第 5.5 节，S1d 工单 #860）。
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
-from .contracts import current_contract_hash
 from .definitions import DEFINITIONS
-from .models import TERMINAL_STATUSES, Event, RunProjection, hash_bytes
+from .minimal_projection import MinimalProjection
+from .models import TERMINAL_STATUSES, Event
 from .tools import has_tool, tool_action
-from .validation import (FieldError, ProposalDecision, TightenRequest, Tightening, evaluate_proposal)
+from .validation import (
+    AdjudicationView, FieldError, ProposalDecision, TightenRequest, Tightening, evaluate_proposal,
+)
 
-_STALE_BASIS = ("The input, contract, or current work changed after this activation began; "
+_STALE_BASIS = ("The contract or current work changed after this activation began; "
                 "stale results cannot be rebound.")
 _STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; stale results cannot be rebound."
 _PENDING_INPUT_RELEASE = ("New user input is waiting for the product; the release is judged after the product "
                           "round that received it has ended.")
 
 
-def submission_basis(projection: RunProjection) -> dict[str, Any]:
-    # 一次提交所依据的东西：用户的意图、当前有效合同与当前交付。
-    # 校验以后这几样里任何一样变了，这次提交就不能再按原来的依据接纳
+def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
+    # 一次提交所依据的成果版本：当前有效合同与当前交付（设计说明第 4 节，S1d 工单 #860）。
+    # 校验以后这两样里任何一样变了，这次提交就不能再按原来的依据接纳。
+    # 用户输入与指导的版本读的是成果的内容，不在这里（归路由的收紧检查，工单 #1095）
     return {
-        "intend_hash": hash_bytes(projection.task.encode("utf-8")),
-        "effective_contract_hash": _content_hash(projection.effective_contract),
-        "delivery_spec_hash": _content_hash(projection.delivery_spec),
+        "effective_contract_hash": projection.artifact_hash("contract"),
+        "delivery_spec_hash": projection.artifact_hash("delivery_spec"),
     }
-
-
-def _content_hash(value: Any) -> str | None:
-    return None if value is None else value.content_hash
-
-
-def guidance_version(projection: RunProjection, department: str) -> int:
-    return max((item.version for item in projection.department_guidance
-                if item.department == department), default=0)
 
 
 @dataclass(frozen=True)
 class WorkBasis:
     # 激活开始时采用的工作依据；有效合同、指导与用户输入变了以后，这个会话在下一步收到通知
     # （新版本与改动、新的输入），接着工作，一轮工作不因此结束（工单 #558、工单 #964，
-    # 循环结构第 5 节与第 6 节）。
+    # 循环结构第 5 节与第 6 节）。合同摘要来自最小投影，输入与指导的版本是应用的数据，
+    # 由流程编排在开始一轮工作时填进来（S1d，工单 #860）
     effective_contract_hash: str | None
     input_version: int
     guidance_version: int
-
-    @classmethod
-    def current(cls, projection: RunProjection, department: str) -> WorkBasis:
-        return cls(
-            effective_contract_hash=current_contract_hash(projection),
-            input_version=projection.input_version,
-            guidance_version=guidance_version(projection, department),
-        )
 
 
 @dataclass(frozen=True)
@@ -88,11 +76,12 @@ def ask_chain_max_depth() -> int:
     return int(DEFINITIONS.rule_value("organization.ask_chain_max_depth"))
 
 
-def offered_tools(projection: RunProjection, department: str, *, tightening: Tightening,
+def offered_tools(state: Any, department: str, *, tightening: Tightening,
                   session_id: str | None = None, input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
     # 请求中提供给模型的工具：内核给出部门完整的工具清单，由路由的收紧检查按这一轮的工作与询问分支取舍，
-    # 再按调用目标的输入方式去掉声明需要图像输入的工具（设计说明第 5.6 节，工单 #1095）
-    return tightening.offered(TightenRequest(department=department, projection=projection,
+    # 再按调用目标的输入方式去掉声明需要图像输入的工具（设计说明第 5.6 节，工单 #1095）。
+    # state 是应用侧的运行状态投影：提供的工具由收紧检查按内容判断，内核不读它，原样交过去
+    return tightening.offered(TightenRequest(department=department, state=state,
                                              session_id=session_id, input_modalities=input_modalities))
 
 
@@ -107,7 +96,7 @@ def facts_query(call: dict[str, Any]) -> FactsQuery:
 
 
 def tool_permission(
-    projection: RunProjection,
+    view: AdjudicationView,
     call: dict[str, Any],
     *,
     department: str,
@@ -121,14 +110,14 @@ def tool_permission(
     # facts 是执行环境按 facts_query(call) 查询的结果
     # 有效合同、指导与用户输入变了都不再停止这次激活：它们作为通知送达，部门接着工作，
     # 这一轮不因此结束（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
+    projection = view.minimal
     if projection.status in TERMINAL_STATUSES or aborted:
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
     # 成果驱动的取舍交给路由的收紧检查（工单 #1095）：推迟、询问分支、这个部门此刻能交的种类、放行等输入处理完。
     # 内核自己判的是运行状态（上面）、部门有没有这个工具与写入目标的规范形式（下面）
-    tight = tightening.tool(TightenRequest(department=department, projection=projection,
-                                           session_id=session_id, basis=basis, tool=call,
-                                           events=tuple(events or ())))
+    tight = tightening.tool(TightenRequest(department=department, state=view.state, session_id=session_id,
+                                           basis=basis, tool=call, events=tuple(events or ())))
     if tight.wait:
         # 等待由步骤驱动的安全节点处理（工单 #561）：不写事件、不占步数、不返回模型
         return ToolPermission(wait_for_input=True)
@@ -136,7 +125,7 @@ def tool_permission(
         return ToolPermission(reason=tight.errors[0].message)
     if tight.reason is not None:
         return ToolPermission(reason=tight.reason, deferred=tight.deferred)
-    if not tight.permitted and not has_tool(department, name, projection.kind):
+    if not tight.permitted and not has_tool(department, name, projection.work_item_kind):
         return ToolPermission(reason=f"{department} cannot use {name}")
     if _is_write(name):
         reason = _write_path_error(name, args, facts)
@@ -145,10 +134,10 @@ def tool_permission(
     return ToolPermission()
 
 
-def proposal_decision(projection: RunProjection, *, department: str, proposal: dict[str, Any] | None,
+def proposal_decision(view: AdjudicationView, *, department: str, proposal: dict[str, Any] | None,
                       facts: TreeFacts, tightening: Tightening, events: list[Event]) -> ProposalDecision:
-    # 提案校验：按投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误
-    return evaluate_proposal(department=department, proposal=proposal, projection=projection,
+    # 提案校验：按最小投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误
+    return evaluate_proposal(view=view, department=department, proposal=proposal,
                              facts=facts, tightening=tightening, events=events)
 
 
@@ -157,9 +146,9 @@ def commit_decision(
     *,
     department: str,
     proposal: dict[str, Any] | None,
-    evaluated: RunProjection,
+    evaluated: AdjudicationView,
     facts: TreeFacts,
-    current: RunProjection,
+    current: AdjudicationView,
     current_facts: TreeFacts,
     events: list[Event],
     tightening: Tightening,
@@ -168,7 +157,7 @@ def commit_decision(
     # 或者当前工作已经不是校验时的那一份，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
     # 有效合同、指导与用户输入变了不再让这次提交作废：它们作为通知送达，部门接着工作，
     # 提交的成果按当前版本核对（工单 #558、工单 #964，循环结构第 5 节、第 6 节与第 7 节）
-    if submission_basis(current) != submission_basis(evaluated):
+    if submission_basis(current.minimal) != submission_basis(evaluated.minimal):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
     if current_facts != facts:
         return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
@@ -178,7 +167,7 @@ def commit_decision(
     if decision.accepted:
         # 新输入在工具许可之后、提交之前到达：这次提交不当场生效，交回部门，等产品处理完再提交
         # （部门指导设计说明第 2.1 节，工单 #561）。这件事由路由的收紧检查在提交事务里再判一次（工单 #1095）
-        tight = tightening.submission(TightenRequest(department=department, projection=current, proposal=proposal,
+        tight = tightening.submission(TightenRequest(department=department, state=current.state, proposal=proposal,
                                                      events=tuple(events), commit=True))
         if tight.wait:
             return ProposalDecision(False, [FieldError("kind", _PENDING_INPUT_RELEASE)])
@@ -202,5 +191,3 @@ def _write_path_error(name: str, args: dict[str, Any], facts: WorkspaceFacts) ->
 
 def _write_targets(name: str, args: dict[str, Any]) -> list[Any]:
     return [args.get("source"), args.get("destination")] if name == "move_file" else [args.get("path")]
-
-

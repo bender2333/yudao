@@ -5,25 +5,20 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from .models import RunProjection, canonical_hash
+from .minimal_projection import MinimalProjection
 from .path_rules import validate_public_path
 
 
-def contract_payload(projection: RunProjection) -> dict[str, Any]:
-    spec = projection.product_spec
-    if spec is None or spec.status != "active":
-        raise ValueError("an active ProductSpec is required")
-    basis = {
-        "product_spec_hash": spec.content_hash,
-        "decision_hashes": [item.content_hash for item in projection.effective_decisions],
-        "input_version": spec.input_version,
-    }
-    return {**basis, "content_hash": canonical_hash(basis)}
+def artifact_hash(artifact: Any) -> str | None:
+    # 当前成果的版本摘要：最小投影里的成果与应用侧运行状态投影里的成果都读同名的字段
+    return None if artifact is None else getattr(artifact, "content_hash", None)
 
 
-def current_contract_hash(projection: RunProjection) -> str | None:
-    contract = projection.effective_contract
-    return None if contract is None else contract.content_hash
+def current_contract_hash(projection: MinimalProjection) -> str | None:
+    # 当前有效合同的版本摘要：裁决只读最小投影（设计说明第 4 节，S1d 工单 #860）。
+    # 合同的身份由它记下的成果版本算出，读的是摘要不是内容，所以留在内核；
+    # 合同的呈现（PRD 的 Markdown）读成果的内容，搬到应用侧（harness/submissions.py）
+    return projection.artifact_hash("contract")
 
 
 def normalize_scope(value: str) -> str:
@@ -46,44 +41,6 @@ def path_in_scope(path: str, scope: list[str]) -> bool:
     return any(item == "." or relative == item or (item.endswith("/") and relative.startswith(item)) for item in scope)
 
 
-def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
-    spec = projection.product_spec
-    if spec is None:
-        raise ValueError("PRD requires an active ProductSpec")
-    lines = ["# PRD", "", f"Effective contract: {contract['content_hash']}",
-             f"ProductSpec: {spec.content_hash}", f"Accepted user input through version: {spec.input_version}",
-             "", "## Goal", "", spec.goal]
-    for title, values in (
-        ("Requirements", spec.requirements), ("Boundaries", spec.boundaries),
-        ("Constraints and recorded defaults", spec.constraints), ("Acceptance Criteria", spec.acceptance_criteria),
-        ("Fatal Conditions", spec.fatal_conditions), ("Non-goals", spec.non_goals),
-    ):
-        lines.extend(["", f"## {title}", ""])
-        lines.extend(f"- {item}" for item in values)
-        if not values:
-            lines.append("None.")
-    lines.extend(["", "## Effective Product Decisions", ""])
-    for index, decision in enumerate(projection.effective_decisions, 1):
-        lines.extend([f"### {index}. {decision.statement}", "", f"Rationale: {decision.rationale}",
-                      "", f"Source: {decision.content_hash}", f"Original ProductSpec: {decision.product_spec_hash}", ""])
-    if not projection.effective_decisions:
-        lines.append("None.")
-    if spec.decision_changes:
-        lines.extend(["", "## Treatment of Earlier Decisions", ""])
-        lines.extend(f"- {item['decision_hash']}: {item['disposition']}. {item['rationale']}" for item in spec.decision_changes)
-    if spec.change_record is not None:
-        lines.extend(["", "## Requirement Changes", "", f"Previous ProductSpec: {spec.parent_hash}",
-                      f"Rationale: {spec.change_record['rationale']}"])
-        for field in ("changed", "retained", "retired"):
-            lines.extend(["", f"### {field.title()}", ""])
-            lines.extend(f"- {item}" for item in spec.change_record[field])
-            if not spec.change_record[field]:
-                lines.append("None.")
-    return "\n".join(lines).rstrip() + "\n"
-
-
-
-
 def render_structure(structure: dict[str, Any]) -> str:
     # 现有结构说明的材料（docs/design/existing-project-onboarding.md 第 4.4 节）：主机由接纳结果生成
     lines = ["# 现有结构说明", "",
@@ -93,7 +50,7 @@ def render_structure(structure: dict[str, Any]) -> str:
              "## 总体说明", "", structure["overall"], "", "## 模块", ""]
     lines.extend(f"- `{item['path']}`：{item['responsibility']}" for item in structure["modules"])
     lines.extend(["", "## 入口", ""])
-    lines.extend(f"- {item['kind']}：`{item['path']}`，运行方式：{item['how_to_run']}"
+    lines.extend(f"- {item['kind']}：`{item['path']}`，运行方式：`{item['how_to_run']}`"
                  for item in structure["entry_points"])
     lines.extend(["", "## 构建与测试", ""])
     for item in structure["build_and_test"]:
