@@ -1,73 +1,91 @@
 {
   "released": {
+    "label": "已完成并放行",
     "outcome": "done",
     "human_action": null
   },
   "baseline_verified": {
+    "label": "已完成基线核验",
     "outcome": "done",
     "human_action": null
   },
   "max_cycles": {
+    "label": "循环次数已达上限",
     "outcome": "paused",
     "human_action": "循环次数已达上限。检查最后一次部门输出与事件后，提高循环次数上限并作为新事项继续，或在当前阶段人工介入。"
   },
   "model_steps_exhausted": {
+    "label": "部门步数已达上限",
     "outcome": "paused",
     "human_action": "部门连续调用模型仍未提交有效提案。检查最后一次模型输出与工具回执后，调整任务并新建运行。"
   },
   "no_tool_call": {
+    "label": "部门连续多次没有调用工具",
     "outcome": "paused",
     "human_action": "部门模型连续多次只回复文字，没有调用工具或提交提案。检查这几次模型输出后，调整任务或更换部门模型并新建运行。"
   },
   "workspace_unrepresentable": {
+    "label": "工作区有无法表示的条目",
     "outcome": "paused",
     "human_action": "工作区中有公开树无法表示的条目（链接、特殊文件等），停止说明列出了它们在工作区内的相对路径。把这些路径加入项目的忽略规则或者删除它们以后新建运行。"
   },
   "time_limit": {
+    "label": "运行时间已达上限",
     "outcome": "failed",
     "human_action": "运行时间已达上限。检查事件记录后，提高运行时间上限并作为新事项继续，或在当前阶段人工介入。"
   },
   "cancelled": {
+    "label": "运行已被取消",
     "outcome": "failed",
     "human_action": "运行已被取消。如需继续，作为新事项重新开始。"
   },
   "user_cancelled": {
+    "label": "用户已取消",
     "outcome": "failed",
     "human_action": "已放弃这次建档。如需继续，重新开始建档。"
   },
   "provider_error": {
+    "label": "模型服务失败",
     "outcome": "failed",
     "human_action": "模型服务失败。查看错误事件后，作为新事项重新开始或更换模型服务。"
   },
   "provider_timeout": {
+    "label": "模型服务请求超时",
     "outcome": "failed",
     "human_action": "模型提供方请求超时。本次未结协作已结束，查看超时事件后重新运行。"
   },
   "provider_protocol": {
+    "label": "模型服务协议不符",
     "outcome": "failed",
     "human_action": null
   },
   "unsupported_protocol": {
+    "label": "不支持的协议",
     "outcome": "failed",
     "human_action": null
   },
   "retry_after_too_long": {
+    "label": "要求等待的时间过长",
     "outcome": "failed",
     "human_action": null
   },
   "context_overflow": {
+    "label": "上下文超过窗口",
     "outcome": "failed",
     "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。"
   },
   "compaction_failed": {
+    "label": "上下文压缩失败",
     "outcome": "failed",
     "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。"
   },
   "host_commit_error": {
+    "label": "主机保存失败",
     "outcome": "failed",
     "human_action": "主机未能保存本次提交所需的工件、材料或事件。查看失败原因并处理存储或交付文件问题后重新运行。"
   },
   "run_event_version_changed": {
+    "label": "因 Yudao 升级停止",
     "outcome": "failed",
     "human_action": "Yudao 升级以后这个运行的事件版本与当前版本不同，运行已记为因升级停止；对应的事项已用当前采纳成果重新开始，旧的运行事件保留供查阅。"
   }

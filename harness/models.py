@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from .definitions import DEFINITIONS, DefinitionError
+from .definitions import DEFINITIONS, UnknownStopReason
 
 # 部门来自定义中的组织
 DEPARTMENTS = DEFINITIONS.departments
@@ -663,11 +663,6 @@ class RunProjection:
         # 正在被回答的那一次询问：链上最内层的那一个（工单 #473 的嵌套询问）
         return self.ask_stack[-1] if self.ask_stack else None
 
-    @property
-    def ask_depth(self) -> int:
-        # 询问链的层数：还没回答的询问有几个（工单 #473）
-        return len(self.ask_stack)
-
     def ask_by_origin(self, session_id: str | None) -> dict[str, Any] | None:
         # 这个会话发出的、还没回答的询问：恢复时继续这一层，不新开一层（工单 #473）
         if not session_id:
@@ -704,35 +699,14 @@ class RunProjection:
 
 
 
-# 停止原因的中文名：等待说明与事件说明按中文写，机器标识不直接出现在给用户看的文字里
-STOP_REASON_LABELS = {
-    "released": "已完成并放行",
-    "baseline_verified": "已完成基线核验",
-    "max_cycles": "循环次数已达上限",
-    "model_steps_exhausted": "部门步数已达上限",
-    "no_tool_call": "部门连续多次没有调用工具",
-    "workspace_unrepresentable": "工作区有无法表示的条目",
-    "time_limit": "运行时间已达上限",
-    "cancelled": "运行已被取消",
-    "user_cancelled": "用户已取消",
-    "provider_error": "模型服务失败",
-    "provider_timeout": "模型服务请求超时",
-    "provider_protocol": "模型服务协议不符",
-    "unsupported_protocol": "不支持的协议",
-    "retry_after_too_long": "要求等待的时间过长",
-    "context_overflow": "上下文超过窗口",
-    "compaction_failed": "上下文压缩失败",
-    "host_commit_error": "主机保存失败",
-    "run_event_version_changed": "因 Yudao 升级停止",
-}
-if set(STOP_REASON_LABELS) != set(DEFINITIONS.stop_reasons):
-    raise DefinitionError([("stop_reasons.json", "stop_reasons",
-                            "停止原因的中文名必须与定义的停止原因相同：" + "、".join(STOP_REASON_LABELS))])
-
-
+# 停止原因的中文名与结束方式都在定义里：内核的清单在 stop_reasons.json，路由自己的结束原因在
+# 它自己的一份定义里（routings.json，工单 #861），两者都按定义查，不在代码里另写一份
 def stop_reason_name(reason: str | None) -> str:
     # 停止原因的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
-    return STOP_REASON_LABELS.get(reason or "", reason or "")
+    try:
+        return DEFINITIONS.stop_reason(reason or "").label
+    except UnknownStopReason:
+        return reason or ""
 
 
 def waiting_reason_for(status: str, stop_reason: str | None = None) -> str | None:

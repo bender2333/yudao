@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from .path_rules import validate_public_path
@@ -19,18 +18,6 @@ def normalize_scope(value: str) -> str:
         return relative
     validate_public_path(relative[:-1] if relative.endswith("/") else relative)
     return relative
-
-
-def path_in_scope(path: str, scope: list[str]) -> bool:
-    try:
-        relative = normalize_scope(path)
-    except (AttributeError, ValueError):
-        return False
-    if relative == "." or relative.endswith("/"):
-        return False
-    if os.name == "nt":
-        relative, scope = relative.casefold(), [item.casefold() for item in scope]
-    return any(item == "." or relative == item or (item.endswith("/") and relative.startswith(item)) for item in scope)
 
 
 def render_structure(structure: dict[str, Any]) -> str:
