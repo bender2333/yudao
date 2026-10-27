@@ -52,7 +52,7 @@ from .definitions import DEFINITIONS
 from .department_prompts import save_department_prompt
 from .overview import repository_overview
 from . import parameters as parameter_values
-from .minimal_projection import MinimalProjection
+from .minimal_projection import MinimalProjection, SessionState, fold_events
 from .models import (
     ArtifactRef,
     CatalogEventType,
@@ -291,17 +291,15 @@ class Orchestrator:
         # 运行到停止的循环在等会话时同时等新工作：run_id -> (循环, 事件)。
         # 没有会话在跑而新输入、指导或取消提交时，由 _wake 打开它，循环醒来重新找可以开始的部门（工单 #561）
         self._run_wakeups: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
-        # 每个 run 累计的已用运行时间（毫秒，重启时从事件恢复）与当前运行段的起点（单调时钟）：
-        # 等待期间段计时暂停，等待的时间不计入（工单 #350）
-        self._run_elapsed_ms: dict[str, int] = {}
+        # 运行时间的计时（设计说明第 4 节第 3 条，S1e 工单 #1015）：已经结算的量读最小投影，
+        # 正在跑的那一段只有驱动知道，所以驱动只记这一段从什么时候开始（单调时钟）。
+        # 等待期间段计时暂停，等待的时间不计入（工单 #350）：停表时把这一段折进 _run_segment_ms，
+        # 醒来重新记起点；这一轮结束、累计量写进事件以后，投影给出已结算量，这一段清零
+        self._run_segment_ms: dict[str, int] = {}
         self._run_segment_start: dict[str, float] = {}
-        # 每个会话累计的已用运行时间（毫秒，工单 #475）：键是 (run 编号, 会话编号)。
-        # 会话自己的累计值在重新启动以后从事件恢复，连续累计，不因中断清零；
-        # _session_base_ms 记下这次激活开始时 run 的累计已用时间，用来算这个会话这一段用掉多少
-        self._session_elapsed_ms: dict[tuple[str, str], int] = {}
+        # 每个会话这一段的起点（run 的已用毫秒，工单 #475）：键是 (run 编号, 会话编号)。
+        # 会话自己的累计已用时间读最小投影的会话一级用量，这一段用掉多少由这个起点算
         self._session_base_ms: dict[tuple[str, str], int] = {}
-        # 已经从事件恢复过会话用量的 run：恢复只做一次
-        self._recovered_session_runs: set[str] = set()
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
         # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
@@ -869,66 +867,36 @@ class Orchestrator:
         return self._elapsed_ms(run_id) / 1000.0
 
     def _elapsed_ms(self, run_id: str) -> int:
-        # 这个 run 已经用的运行时间（毫秒）：已持久化的累计加上当前运行段
-        total_ms = self._run_elapsed_ms.get(run_id, 0)
+        # 这个 run 已经用的运行时间（毫秒）：最小投影里已结算的那一部分加上当前这一段
+        total_ms = self.writes.minimal(run_stream(run_id)).used.settled_ms + self._run_segment_ms.get(run_id, 0)
         started = self._run_segment_start.get(run_id)
         if started is not None:
             total_ms += max(0, int((time.monotonic() - started) * 1000))
         return total_ms
 
-    def _recover_session_usage(self, run_id: str, events: Sequence[Any]) -> None:
-        # 会话自己的累计已用时间（工单 #475）：从事件恢复，重新启动以后连续累计。
-        # 每个会话最后一条 activation_finished 记下的累计值就是它到那一刻的总量；
-        # 计数（激活次数与模型步数）由事件数得出，不依赖这个字段
-        if run_id in self._recovered_session_runs:
-            return
-        self._recovered_session_runs.add(run_id)
-        for event in events:
-            if event.type != EventType.ACTIVATION_FINISHED or not event.session_id:
-                continue
-            key = (run_id, event.session_id)
-            elapsed = int((event.payload or {}).get("session_elapsed_ms", 0) or 0)
-            self._session_elapsed_ms[key] = max(self._session_elapsed_ms.get(key, 0), elapsed)
+    def _session_used(self, run_id: str, session_id: str) -> SessionState:
+        # 一个会话的已用量（设计说明第 4 节第 4 条，S1e 工单 #1015）：驱动与应用都读最小投影，
+        # 不各自从事件数一遍；没有激活过的会话在投影里没有条目，按全零处理
+        return self.writes.minimal(run_stream(run_id)).sessions.get(session_id, SessionState())
 
     def _start_session_segment(self, run_id: str, session_id: str) -> None:
         # 会话这一段工作的起点：记下 run 此刻的累计已用时间（工单 #475）
         self._session_base_ms[(run_id, session_id)] = self._elapsed_ms(run_id)
 
     def _settle_session_segment(self, run_id: str, session_id: str, run_elapsed_ms: int) -> int:
-        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点。
+        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点，加上投影里已结算的那一部分。
         # 一个部门会话包含它等待的分支会话的时间（用量计入提问方），因此各会话的用时之和可以大于事项的用时
         key = (run_id, session_id)
+        settled = self._session_used(run_id, session_id).settled_ms
         base = self._session_base_ms.pop(key, None)
         if base is None:
-            return self._session_elapsed_ms.get(key, 0)
-        used = max(0, run_elapsed_ms - base)
-        total = self._session_elapsed_ms.get(key, 0) + used
-        self._session_elapsed_ms[key] = total
-        return total
-
-    def _session_model_steps(self, run_id: str, session_id: str, events: Sequence[Any]) -> int:
-        # 这个会话已经用过的模型步数（工单 #475）：按这个会话的 model_requested 事件数算。
-        # 重新启动以后从事件重算，连续累计：分支会话中断以后继续，用掉的步数不从上限里清零
-        return len([event for event in events
-                    if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id])
-
-    def _session_unfinished_model_steps(self, run_id: str, session_id: str, events: Sequence[Any]) -> int:
-        # 这个会话还没有结束的激活用掉的模型步数（工单 #475）：上一次激活结束以后
-        # （activation_finished）这个会话又用掉的步数。中断时那次激活没有结束事件，
-        # 它用掉的步数算在这里，重新启动以后从它自己的步骤上限里扣掉
-        last_finished = None
-        for event in events:
-            if event.type == EventType.ACTIVATION_FINISHED and event.session_id == session_id:
-                last_finished = event.stream_version
-        return len([event for event in events
-                    if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id
-                    and (last_finished is None or event.stream_version > last_finished)])
+            return settled
+        return settled + max(0, run_elapsed_ms - base)
 
     def _session_elapsed_sec(self, run_id: str, session_id: str) -> float:
-        # 这个会话已经用的运行时间（秒）：累计值加上当前这一段
-        key = (run_id, session_id)
-        total = self._session_elapsed_ms.get(key, 0)
-        base = self._session_base_ms.get(key)
+        # 这个会话已经用的运行时间（秒）：投影里已结算的那一部分加上当前这一段（设计说明第 4 节第 3 条）
+        total = self._session_used(run_id, session_id).settled_ms
+        base = self._session_base_ms.get((run_id, session_id))
         if base is not None:
             total += max(0, self._elapsed_ms(run_id) - base)
         return total / 1000.0
@@ -941,7 +909,7 @@ class Orchestrator:
             return
         started = self._run_segment_start.pop(run_id, None)
         if started is not None:
-            self._run_elapsed_ms[run_id] = self._run_elapsed_ms.get(run_id, 0) + max(
+            self._run_segment_ms[run_id] = self._run_segment_ms.get(run_id, 0) + max(
                 0, int((time.monotonic() - started) * 1000))
 
     def _resume_run_clock(self, run_id: str) -> None:
@@ -949,21 +917,17 @@ class Orchestrator:
         self._run_segment_start.setdefault(run_id, time.monotonic())
 
     def _settle_run_segment(self, run_id: str, department: str | None = None) -> int:
-        # 激活结束：结算当前段，返回累计的已用毫秒。
-        # 同时运行（工单 #557）：这个会话结束时别的会话还在工作，run 的计时继续
+        # 激活结束：结算当前段，返回累计的已用毫秒：投影里已结算的那一部分加上停过表、投影还没有结算的那些段。
+        # 同时运行（工单 #557）：这个会话结束时别的会话还在工作，run 的计时继续，这一段不折进去
         self._pause_run_clock(run_id, exclude=department)
-        return self._run_elapsed_ms.get(run_id, 0)
+        return self.writes.minimal(run_stream(run_id)).used.settled_ms + self._run_segment_ms.get(run_id, 0)
 
-    def _recover_run_usage(self, run_id: str, events: Sequence[Any]) -> None:
-        # 从事件恢复累计已用量：最后一个 activation_finished 记下的累计值；
-        # 这个版本以前的旧事件没有这些字段，按 0 处理（语义变更先提高 run 事件版本，ADR-0019）
-        if run_id in self._run_elapsed_ms:
-            return
-        elapsed_ms = 0
-        for event in events:
-            if event.type == EventType.ACTIVATION_FINISHED:
-                elapsed_ms = int((event.payload or {}).get("elapsed_ms", 0) or 0)
-        self._run_elapsed_ms[run_id] = elapsed_ms
+    def _rebase_run_clock(self, run_id: str) -> None:
+        # 一轮工作的累计量写进事件以后：已结算量改由投影给出，停过表的那些段清零；
+        # 别的会话还在工作时这一段的起点从这里重新记，不把已经结算的那一段时间再算一遍
+        self._run_segment_ms[run_id] = 0
+        if run_id in self._run_segment_start:
+            self._run_segment_start[run_id] = time.monotonic()
 
     def _time_left(self, run_id: str) -> float:
         # 剩余运行时间读最小投影（设计说明第 4 节，S1d 工单 #860）
@@ -1458,18 +1422,12 @@ class Orchestrator:
                     current = transaction.projection
                     elapsed_ms = self._settle_run_segment(run_id, scope.department)
                     happened = transaction.events()
-                    activations = len([event for event in happened
-                                       if event.type == EventType.DEPARTMENT_ACTIVATED])
-                    model_steps = len([event for event in happened
-                                       if event.type == EventType.MODEL_REQUESTED])
-                    # 这个会话自己的累计用量（工单 #475）：重新启动以后从事件连续累计
+                    # 这一轮结束时的已用量读最小投影（S1e 工单 #1015）：事项一级与会话一级的激活次数与
+                    # 模型步数都由投影折出来，不在这里从事件数一遍。会话的已用时间含当前这一段，
+                    # 投影要等这条事件写进去才结算，所以由驱动算好写进事件
+                    measured = transaction.minimal()
+                    session = measured.sessions.get(scope.session_id, SessionState())
                     session_elapsed_ms = self._settle_session_segment(run_id, scope.session_id, elapsed_ms)
-                    session_activations = len([event for event in happened
-                                               if event.type == EventType.DEPARTMENT_ACTIVATED
-                                               and event.session_id == scope.session_id])
-                    session_model_steps = len([event for event in happened
-                                               if event.type == EventType.MODEL_REQUESTED
-                                               and event.session_id == scope.session_id])
                     transaction.append(NewEvent(
                         EventType.ACTIVATION_FINISHED,
                         actor="system",
@@ -1483,11 +1441,11 @@ class Orchestrator:
                             **scope.versions(),
                             "latency_ms": int((time.monotonic() - started) * 1000),
                             "elapsed_ms": elapsed_ms,
-                            "activations": activations,
-                            "model_steps": model_steps,
+                            "activations": measured.used.activations,
+                            "model_steps": measured.used.model_steps,
                             "session_elapsed_ms": session_elapsed_ms,
-                            "session_activations": session_activations,
-                            "session_model_steps": session_model_steps,
+                            "session_activations": session.activations,
+                            "session_model_steps": session.model_steps,
                             "stop_reason": current.stop_reason,
                         },
                     ))
@@ -1520,6 +1478,8 @@ class Orchestrator:
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
                 await asyncio.to_thread(self._await_cancellers, run_id)
                 self.writes.transact(run_stream(run_id), finish)
+                # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
+                self._rebase_run_clock(run_id)
                 self.sessions.get(run_id, scope.department).idle()
                 active = self._active.get(run_id)
                 if active is not None:
@@ -1535,9 +1495,7 @@ class Orchestrator:
         projection = transaction.projection
         if not projection.run_id:
             raise RunNotFoundError(run_id)
-        self._recover_run_usage(run_id, transaction.events())
-        # 会话自己的累计用量同样从事件恢复（工单 #475）：重新启动以后各会话的已用时间与次数连续累计
-        self._recover_session_usage(run_id, transaction.events())
+        # 已用量不在这里恢复：运行时间、激活次数与模型步数都读最小投影（S1e 工单 #1015）
         self._resume_run_clock(run_id)
         if self._aborted(run_id):
             return None
@@ -1694,9 +1652,10 @@ class Orchestrator:
     def _session_limits(self, run_id: str, session_id: str) -> StepLimits:
         # 这个会话这一步的步数上限（工单 #475）：会话上一次没有结束的激活用掉的模型步数
         # 从它自己的上限里扣掉，重新启动以后连续累计，不因中断清零。
-        # 已经结束的激活不算在内：下一轮工作重新按上限开始
-        events = self.writes.read(run_stream(run_id)).events()
-        used = self._session_unfinished_model_steps(run_id, session_id, events)
+        # 已经结束的激活不算在内：下一轮工作重新按上限开始。
+        # 两个数都读最小投影（S1e 工单 #1015）：累计的模型步数减去上一次结算时的步数
+        session = self._session_used(run_id, session_id)
+        used = max(0, session.model_steps - session.settled_steps)
         if used <= 0:
             return self.step_limits
         return replace(self.step_limits, max_model_steps=max(0, self.step_limits.max_model_steps - used))
@@ -1876,11 +1835,9 @@ class Orchestrator:
         declared_steps = self.step_limits.department_max_model_steps.get(
             recipient, self.step_limits.max_model_steps
         )
-        # 这个分支会话已经用过的模型步数从它自己的上限里扣掉（工单 #475）：
-        # 分支会话有自己的步骤上限，中断以后继续时用掉的步数不清零
-        used_steps = self._session_model_steps(
-            scope.run_id, branch_session_id,
-            self.writes.read(run_stream(scope.run_id)).events())
+        # 这个分支会话已经用过的模型步数从它自己的上限里扣掉（工单 #475）：分支会话有自己的步骤上限，
+        # 中断以后继续时用掉的步数不清零。已用步数读最小投影（S1e 工单 #1015）
+        used_steps = self._session_used(scope.run_id, branch_session_id).model_steps
         branch_max_steps = min(declared_steps, remaining_steps) - used_steps
 
         if branch_max_steps <= 0:
@@ -2038,7 +1995,8 @@ class Orchestrator:
 
     def _branch_steps(self, events: list[Any], branch_session_id: str) -> int:
         # 这个分支会话用掉的模型步数：分支里再问一层时，回问的分支是它的下一层，
-        # 那一层的步数逐层计入最初的提问方（工单 #473 的嵌套询问）
+        # 那一层的步数逐层计入最初的提问方（工单 #473 的嵌套询问）。
+        # 步数读最小投影里各会话的模型步数（S1e 工单 #1015），不在这里按事件一条条数
         sessions = {branch_session_id}
         grew = True
         while grew:
@@ -2050,8 +2008,8 @@ class Orchestrator:
                 if isinstance(branch, str) and branch not in sessions:
                     sessions.add(branch)
                     grew = True
-        return len([e for e in events
-                    if e.type == EventType.MODEL_REQUESTED and e.session_id in sessions])
+        minimal = fold_events(events)
+        return sum(minimal.sessions.get(session_id, SessionState()).model_steps for session_id in sessions)
 
     async def _run_ask_branch(
         self,
@@ -2144,10 +2102,9 @@ class Orchestrator:
             result = await driver.result()
         finally:
             def finish_branch(transaction: Transaction) -> None:
-                happened = transaction.events()
-                activations = len([e for e in happened if e.type == EventType.DEPARTMENT_ACTIVATED and e.session_id == session_id])
-                model_steps = len([e for e in happened if e.type == EventType.MODEL_REQUESTED and e.session_id == session_id])
-                # 这个分支会话自己的累计用量（工单 #475）：重新启动以后从事件连续累计
+                # 这个分支会话的累计用量读最小投影（S1e 工单 #1015）；它自己的已用时间含当前这一段，
+                # 投影要等这条事件写进去才结算，所以由驱动算好写进事件
+                session = transaction.minimal().sessions.get(session_id, SessionState())
                 session_elapsed_ms = self._settle_session_segment(run_id, session_id, self._elapsed_ms(run_id))
                 transaction.append(NewEvent(
                     EventType.ACTIVATION_FINISHED,
@@ -2162,15 +2119,17 @@ class Orchestrator:
                         **branch_scope.versions(),
                         "latency_ms": int((time.monotonic() - started) * 1000),
                         "elapsed_ms": int(self._elapsed_sec(run_id) * 1000),
-                        "activations": activations,
-                        "model_steps": model_steps,
+                        "activations": session.activations,
+                        "model_steps": session.model_steps,
                         "session_elapsed_ms": session_elapsed_ms,
-                        "session_activations": activations,
-                        "session_model_steps": model_steps,
+                        "session_activations": session.activations,
+                        "session_model_steps": session.model_steps,
                         "stop_reason": None,
                     },
                 ))
             self.writes.transact(run_stream(run_id), finish_branch)
+            # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
+            self._rebase_run_clock(run_id)
             try:
                 cleanup_inspection_workspace(self.workspace_root / run_id, session_id)
             except Exception:
