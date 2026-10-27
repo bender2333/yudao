@@ -188,10 +188,10 @@ def json_dumps(value: Any) -> str:
 
 
 def _json_default(value: Any) -> Any:
+    # 数据类按它的字段写。元组不在这里处理：json 自己就把元组写成数组（搬过来时这里有一支元组分支，
+    # 从来没有被调用过，models.py 里它历来也是没有覆盖的一行）
     if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
-    if isinstance(value, tuple):
-        return list(value)
     raise TypeError(f"not json serializable: {type(value)!r}")
 
 
