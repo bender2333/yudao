@@ -1,4 +1,4 @@
-# 事件序列按会话比较的探针（#469 验收 3）：跨会话交错通过，会话内 swap、交接边反向、
+# 事件序列按会话比较的探针（#469 验收 3）：跨会话交错通过，会话内 swap、成果到下一个部门开始的边反向、
 # 工具结果提前到回答之前失败并写明差异。比较器见 harness/tests/event_sequence.py 末尾的 compare_documents。
 # 前三个探针直接读基准 JSON，在内存里变换事件数组的顺序后调 compare_documents：不重写基准文件，
 # 不重新走事件规整，shared 与 artifacts 的标签编号保持稳定，只断言分组比较与因果边的差异点。
@@ -89,7 +89,7 @@ def test_intra_session_swap_fails_with_diff():
     assert "differs" in message, message
 
 
-def test_handoff_edge_reversed_fails_with_diff():
+def test_outcome_edge_reversed_fails_with_diff():
     # 让交付的接纳落在下一个部门开始之后：把交付以后的质检部门激活搬到交付被接纳之前。
     # 搬家跨过的事件里没有质检组的事件，每个会话内部的相对顺序都不变，分组比较通过；
     # 但成果 → 下一个部门开始的因果边反向，应失败并点名因果边（工单 #556：没有阶段迁移事件，

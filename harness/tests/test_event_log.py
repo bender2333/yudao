@@ -171,7 +171,7 @@ def test_every_event_declares_its_actor_and_the_department_lives_in_the_departme
             assert event.actor == "user:local", event.type
             seen_user = True
         elif event.type in system_events:
-            # 流程编排与控制核心自己的判断：激活的开始与结束、交接、停止、结算
+            # 流程编排与控制核心自己的判断：事项的创建、部门开始一轮工作与这一轮结束、输入分派、结束、暂停、失败、决定请求
             assert event.actor == "system", event.type
             seen_system = True
         else:

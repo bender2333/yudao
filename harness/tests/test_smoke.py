@@ -83,7 +83,7 @@ def test_model_input_audit_tracks_new_input_and_prompt_versions(ask_run, ask_inv
     assert {manifest.prompt_version for department, manifest in manifests if department == "product"} == {0, 1}
 
 
-# 同一个脚本被两项检查共用：请求让出以后回到产品部门，两项检查各在自己的副本上改写与检查
+# 工程询问产品、产品在询问分支里回答的一份运行记录；用到它的用例已随测试减法删除（#1024），脚本与夹具暂留
 # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本）
 _PRODUCT_RETURN_SCRIPT = {
     "product": [product_spec()],

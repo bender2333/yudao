@@ -400,8 +400,8 @@ def test_requests_outside_the_contract_are_refused_and_documentation_pages_are_c
         assert client.get("/openapi.json").status_code == 200
 
 
-def test_queries_for_a_missing_target_answer_404_like_the_old_read_routes(data_dir):
-    # 旧路由对不存在的运行、事件与交付文件返回 404；已登记的查询在目标不存在时同样给出 404
+def test_queries_for_a_missing_target_answer_404(data_dir):
+    # 查询的目标不存在时返回 404，并带上错误说明
     opened = _Opened(data_dir)
     with running_api(opened) as client:
         for name, params in (("project.overview", {"project_id": "missing"}),
