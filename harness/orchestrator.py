@@ -1,5 +1,6 @@
 # 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、运行到停止、作为任务开始）、激活的准备与收尾、
-# 新输入的分派、提案接纳以后的流转、用户决定（发出决定请求、按回答解除阻塞、运行结束时撤销）、暂停与失败。
+# 新输入的分派、提案接纳以后的流转、发出决定请求与运行结束时撤销它们、暂停与失败。
+# 回答决定请求与建档的流转在应用层（`decision_flow.py`，工单 #827）：薄驱动只转交。
 # 一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；同时为步骤驱动实现安全节点接口。
 # 流程编排不调用模型。
 # 每一处「读取运行状态、判断、写入」都是写入口的一个事务（WritePath.transact）：判断期间不持有锁，
@@ -29,18 +30,15 @@ from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
 from .contracts import artifact_hash
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
-    DecisionClosed,
-    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocked_by_other_session,
+    DEFINITIONS_CHANGED, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, DecisionKind, blocked_by_other_session,
     blocks_run,
 )
 from .environment import (
     LocalEnvironment, QA_TESTS_DIR, cleanup_inspection_workspace, inspection_root, workspace_tree,
 )
 from .deltas import DeltaChannel
-from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog_stream, is_run_stream,
-                          project_stream, run_stream)
-from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
+from .event_store import (Command, EventStore, StreamVersionConflict, project_stream, run_stream)
+from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .tree_archive import artifact_run, load_tree
 from .engine import Answered, Judgment, StepDriver, StepLimits, StepResult, Stopped
 from .streams import (
@@ -55,14 +53,12 @@ from . import parameters as parameter_values
 from .minimal_projection import MinimalProjection, SessionState, fold_events
 from .models import (
     ArtifactRef,
-    CatalogEventType,
     Event as RunEvent,
     DEPARTMENTS,
     DecisionRequest,
     DepartmentPrompt,
     EventType,
     ProjectEvent,
-    ProjectEventType,
     TERMINAL_STATUSES,
     json_dumps,
     new_id,
@@ -70,7 +66,7 @@ from .models import (
 )
 from .providers import ProviderConnections, ProviderFacade
 from .providers.selection import ModelSelection
-from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
+from .projection import RunNotFoundError, RunProjection, project_run
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
@@ -246,6 +242,7 @@ class Orchestrator:
         deltas: DeltaChannel | None = None,
         tightening: Tightening,
         routing: routing_contract.Routing,
+        decision_flow: Any,
     ) -> None:
         self.store = store
         self.writes = writes
@@ -270,6 +267,9 @@ class Orchestrator:
         # 薄驱动只按契约的三个问题调用它，组装时核对它声明的契约版本
         self._routing = routing
         routing_contract.accept(routing)
+        # 决定请求的处理与建档的流转在应用层（工单 #827，设计说明第 6 节「薄驱动只连接」）：这里接上它，
+        # 调用时把自己作为 driver 交进去，薄驱动自己不再写这些处理
+        self.decision_flow = decision_flow
         self.assembly = ContextAssembly(artifacts, store, tightening=tightening)
         self.sessions = sessions or SessionFactory(self.workspace_root)
         # 事项自己的停止开关：用户取消（cancel、_abort_run）打开它，之后的核对都得到停止，
@@ -2367,204 +2367,24 @@ class Orchestrator:
 
     def answer_decision(self, decision_id: str, option: str, note: str | None, *, base_version: int,
                         command: Command) -> str | None:
-        # 回答一个决定请求：在写入口的一个事务中登记命令身份，核对请求仍未回答、基准版本等于请求的版本、选项是
-        # 请求给出的选项，追加回答，并按回答解除阻塞（待恢复选择停止事项时在同一事务中结束运行）。
-        # 核对不通过时抛出 DecisionClosed、StaleDecision 或 InvalidOption，什么也不写，命令不登记。
-        # 返回回答以后需要继续执行的 run，由调用方开始（start）；没有时为空
-        # 命令身份先于决定请求核对：同一身份、内容不同时按 command_id_reused 拒绝，与请求是否存在无关
-        self.store.check_command(command)
-        saved = saved_decision(self.store, decision_id)
-        if saved is None:
-            raise DecisionNotFound(decision_id)
-
-        def answer(transaction: Transaction) -> str | None:
-            decision = transaction.decisions[decision_id]
-            if decision.status != "open":
-                raise DecisionClosed(decision)
-            if base_version != decision.version:
-                raise StaleDecision(decision, base_version)
-            if option not in [item["id"] for item in decision.request["options"]]:
-                raise InvalidOption(decision, option)
-            if is_catalog_stream(saved.stream):
-                # 目录流中的决定请求（工单 #355）：不属于任何 run 或项目，回答只是记下用户的决定
-                transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_ANSWERED, {
-                    "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
-                }, actor="system"))
-                return None
-            if is_run_stream(saved.stream):
-                return self._answer_run_decision(transaction, decision, option, note, base_version, decision_id)
-            return self._answer_project_decision(transaction, decision, option, note, base_version, decision_id)
-
-        revision_run_id = self.writes.transact(saved.stream, answer, command=command)
-        if revision_run_id is not None and not self.store.stream_events(run_stream(revision_run_id), after_version=0):
-            # 建档修改轮：run 在回答事务提交以后单独建立，进程在两者之间中断时启动时按事件补建（设计第 6 节）
-            self._create_missing_revision_run(revision_run_id)
-        return revision_run_id
-
-    def _create_missing_revision_run(self, run_id: str) -> None:
-        # 按 onboarding_revision_started 事件建立缺少的 run；run 流从版本 0 开始，重复创建被拒绝
-        for project_id in self.store.list_project_ids():
-            for event in self.store.list_project_events(project_id):
-                if event.type != ProjectEventType.ONBOARDING_REVISION_STARTED or event.payload["run_id"] != run_id:
-                    continue
-                state = self.projects.projection(project_id)
-                candidate = next((entry for entry in state.initial_prd_candidates
-                                  if entry.event_id == event.payload["candidate_event_id"]), None)
-                if candidate is None:
-                    raise ValueError(f"onboarding candidate {event.payload['candidate_event_id']} is gone")
-                self.create_revision_run(project_id, candidate, run_id, int(event.payload["round"]),
-                                          event.payload.get("note"))
-                return
-        raise ValueError(f"no onboarding revision event names run {run_id}")
-
-    def _answer_run_decision(self, transaction: Transaction, decision: DecisionRequest, option: str, note: str | None,
-                             base_version: int, decision_id: str) -> str | None:
-        # run 流中的决定请求：追加回答，并按回答解除阻塞
-        projection = transaction.projection
-        transaction.append(NewEvent(
-            EventType.DECISION_ANSWERED, department=decision.request["department"], parent_event_id=decision_id,
-            state_before=projection.status, state_after=projection.status,
-            payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
-        ))
-        transaction.on_commit(lambda: self._wake(projection.run_id))
-        if decision.kind in RESUMABLE_PAUSE_KINDS:
-            # 暂停以后继续（工单 #204）：继续时从暂停位置恢复阶段并让 run 接着执行；停止时 run 保持暂停，
-            # 停止原因就是暂停时的原因，什么都不改写。已用的激活次数、模型步数与运行时间不重新计算
-            if option == "continue":
-                self._continue_paused_run(transaction, decision_id, decision)
-                if blocks_run(transaction.decisions.values()):
-                    return None
-                return transaction.projection.run_id
-            return None
-        if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
-            self._fail(transaction, "cancelled", "run stopped by the user's decision")
-            return None
-        if blocks_run(transaction.decisions.values()):
-            return None
-        return projection.run_id
-
-    def _answer_project_decision(self, transaction: Transaction, decision: DecisionRequest, option: str,
-                                 note: str | None, base_version: int, decision_id: str) -> str | None:
-        # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted；
-        # 提出修改时在同一个事务中追加回答与 onboarding_revision_started，返回新 run 编号，
-        # 由调用方 start：run 在事务提交以后单独建立（设计第 4.7、6 节）
-        if option == "revise" and not (note or "").strip():
-            raise NoteRequired(decision, option)
-        request = decision.request
-        work_item_id = request["work_item_id"]
-        candidate_run_id = request.get("candidate_run_id")
-        transaction.append(NewProjectEvent(ProjectEventType.PROJECT_DECISION_ANSWERED, {
-            "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
-            "work_item_id": work_item_id, "run_id": candidate_run_id,
-        }, actor="system"))
-        if decision.kind == KERNEL_MODIFICATION.name:
-            self._settle_kernel_modification(transaction, decision, option)
-            return None
-        if decision.kind != INITIAL_PRD.name:
-            return None
-        candidate = next((item for item in transaction.projection.initial_prd_candidates
-                          if item.run_id == candidate_run_id), None)
-        if candidate is None:
-            return None
-        if option == "confirm":
-            self._adopt_baseline(transaction, candidate, decision_id)
-            return None
-        return self._start_onboarding_revision(transaction, candidate, note)
-
-    def _settle_kernel_modification(self, transaction: Transaction, decision: DecisionRequest, option: str) -> None:
-        # 内核修改的批准与拒绝（受控内核设计说明第 4.2 节，工单 #354）：批准时把请求携带的采纳载荷写入
-        # 项目流，交付自此成为当前采纳成果；拒绝时什么都不写，交付保持未采纳
-        if option != "approve":
-            return
-        current = transaction.projection.current_adoption
-        adoption = dict(decision.request["held_adoption"],
-                        previous_adoption_id=None if current is None else current.adoption_id)
-        transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, adoption, actor="system"))
-
-    def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
-        # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
-        # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险
-        snapshot = candidate.snapshot
-        defects = [item["requirement"] for item in candidate.baseline_review["conclusions"]
-                   if item["status"] == "existing_defect"]
-        known_risks = [f'现有缺陷：{item["requirement"]}（{item["evidence"]}）'
-                       for item in candidate.baseline_review["conclusions"]
-                       if item["status"] == "existing_defect"]
-        known_risks += [f'检查 {item["check"]} 未通过：{item["reason"]}'
-                        for item in candidate.baseline_review["other_failures"]]
-        transaction.append(NewProjectEvent(ProjectEventType.BASELINE_ADOPTED, {
-            "adoption_id": new_id("adopt"), "work_item_id": candidate.work_item_id, "run_id": candidate.run_id,
-            "candidate_event_id": candidate.event_id, "tree_ref": snapshot["tree_ref"],
-            "code_tree_digest": snapshot["tree_digest"], "summary": _onboarding_summary(candidate),
-            "prd_ref": candidate.prd["prd_ref"], "product_spec_hash": candidate.prd["content_hash"],
-            "structure_ref": candidate.structure["structure_ref"], "files": list(snapshot.get("files") or []),
-            "check_names": [item["name"] for item in candidate.baseline_review["checks"]],
-            "checks": list(candidate.baseline_review["checks"]), "known_risks": known_risks,
-            "snapshot": snapshot, "previous_adoption_id": None, "existing_defects": defects,
-        }, actor="system"))
-
-    def _start_onboarding_revision(self, transaction: Transaction, candidate: Any, note: str | None) -> str:
-        # 建档修改轮（工单 #136，设计第 3.3、4.7、6 节）：修改轮事件与回答在同一个事务中写入，返回新 run 编号；
-        # run 在事务提交以后单独一步建立（事务之间中断时，启动时按 onboarding_revision_started 补建）。
-        # 事务提交到 run 建立之间是一个可以单独被终止的窗口
-        round_number = candidate.round + 1
-        run_id = new_id("run")
-        transaction.append(NewProjectEvent(ProjectEventType.ONBOARDING_REVISION_STARTED, {
-            "work_item_id": candidate.work_item_id, "run_id": run_id,
-            "candidate_event_id": candidate.event_id, "round": round_number,
-            "note": None if note is None else note.strip(),
-        }, actor="system"))
-        return run_id
+        # 决定请求的处理在应用层（工单 #827）：薄驱动只转交。返回回答以后需要继续执行的 run，由调用方开始
+        # （start）；没有时为空。核对不通过时的 DecisionNotFound、DecisionClosed、StaleDecision、
+        # InvalidOption 与 NoteRequired 照旧向上抛出
+        return self.decision_flow.answer_decision(self, decision_id, option, note, base_version=base_version,
+                                                  command=command)
 
     def create_revision_run(self, project_id: str, candidate: Any, run_id: str, round_number: int,
                             note: str | None) -> None:
-        # 建立修改轮的 run：从同一个快照建立工作区，run_created 的 onboarding_basis 记下这一轮的依据，
-        # 修改意见的工件按这一轮 run 的目录存放，并与 run 的创建在同一步作为它的第二项输入写入。
-        # 启动补做按同一条 onboarding_revision_started 事件再调一次，run 流从版本 0 开始，重复创建被拒绝
-        snapshot = candidate.snapshot
-        tree_ref = ArtifactRef(**snapshot["tree_ref"])
-        tree = load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
-        # 项目上下文、限额与部门 Prompt 版本取自同一个建档事项（这一轮仍是它）；
-        # 冻结的登记命令取自上一轮 run 的 run_created：事项创建时的副本，命令版本仍随项目后续变化
-        prior = project_run(self.store, candidate.run_id)
-        item = self.projects.projection(project_id).work_item(candidate.work_item_id)
-        if item is None or prior.project_context_ref is None:
-            raise ValueError(f"work item {candidate.work_item_id} is gone")
-        round_limit = self.projects.onboarding_round_limit(project_id)
-        note_ref = None
-        if (note or "").strip():
-            ref = self.artifacts.put(run_id, "revision_note", note.strip(), media_type="text/markdown")
-            note_ref = asdict(ref)
-        self.create_run(
-            item.text, max_cycles=item.max_cycles,
-            run_time_limit_sec=round_limit,
-            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, candidate.run_id),
-            context_window=item.context_window, run_id=run_id,
-            kind="onboarding", initial_tree=tree, code_snapshot=snapshot,
-            project_id=project_id, work_item_id=candidate.work_item_id,
-            project_context=self.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),
-            prompt_config_versions=dict(item.prompt_config_versions),
-            round=round_number,
-            onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
-                              "note_ref": note_ref},
-            additional_input=note.strip() if note_ref is not None else None,
-        )
+        # 建档修改轮的 run 在应用层建立（工单 #827）：进程在回答事务与 run 之间中断以后，项目服务补建时经这里
+        self.decision_flow.create_revision_run(self, project_id, candidate, run_id, round_number, note)
 
-    def _continue_paused_run(self, transaction: Transaction, decision_id: str, decision: DecisionRequest) -> None:
-        # 用户回答「处理以后继续执行」：把 run 从暂停恢复成进行中，下一次激活由流程编排接着开始
-        # （下一个谁工作由关注的成果决定，工单 #556）。
-        # 不写限额与计数字段（激活次数、模型步数、运行时间保持暂停时的值）；连续不调用工具的计数属于步骤驱动的
-        # 一次激活内部状态，暂停时激活已经结束，继续以后的第一次激活从零开始
-        projection = transaction.projection
-        if projection.status != "paused":
-            return
-        transaction.append(NewEvent(
-            EventType.RUN_CONTINUED, actor="system", department=decision.request["department"],
-            parent_event_id=decision_id,
-            state_before="paused", state_after="running",
-            payload={"decision_id": decision_id, "stop_reason": decision.request["stop_reason"]},
-        ))
-        transaction.on_commit(lambda: self._wake(projection.run_id))
+    def wake(self, run_id: str) -> None:
+        # 应用层的流转写完事实以后唤醒等新工作的会话（工单 #827）：这是它要薄驱动做的两件事之一
+        self._wake(run_id)
+
+    def fail_run(self, transaction: Transaction, reason: str, message: str) -> None:
+        # 应用层的流转要结束一次运行时经这里记成失败（工单 #827）：撤销待回答的决定请求、写停止原因
+        self._fail(transaction, reason, message)
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
         # 停止判断过期：这次激活的工作期间有新的用户输入到达（输入版本变了），
@@ -2674,9 +2494,3 @@ class Orchestrator:
         if reason != "cancelled":
             self._record_lesson_candidate(transaction, source_event, projection)
 
-
-def _onboarding_summary(candidate: Any) -> str:
-    # 建档基线的摘要（工单 #136）：把这一轮的轮次与三条产物的内容摘要写成一句话
-    return (f"第 {candidate.round} 轮建档的初始 PRD 已确认：PRD {candidate.prd['content_hash']}、"
-            f"现有结构说明 {candidate.structure['content_hash']}、"
-            f"基线核验 {candidate.baseline_review['content_hash']}")
