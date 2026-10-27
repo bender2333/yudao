@@ -247,11 +247,21 @@ def test_cancel_while_the_release_waits_cancels_the_item_without_a_release(tmp_p
 
 
 def test_running_out_of_time_while_the_release_waits_ends_the_run(tmp_path):
-    # 验收第 2 条：运行时间用完在等待期间照常生效，事项以 time_limit 结束，没有放行
+    # 验收第 2 条：运行时间用完在等待期间照常生效，事项以 time_limit 结束，没有放行。
+    # 上限给足，准备阶段吃不掉它：两次准备激活在有负载的运行机上要一到两秒（工单 #1106 的复现记录，
+    # 48 个并发进程下是 0.5 至 2.4 秒），用两秒的上限时它们自己就会把上限用完，运行在放行之前
+    # 以 time_limit 结束，用例等不到放行。剩下的一段运行时间由用例设进已用量，等待本身照常计入
+    # 运行时间（等的时候运行段没有暂停），上限在等的过程中用完；什么时候进入等待由「放行已经排在
+    # 检查之后」这个事件决定，不由准备阶段花了多久决定
     holder: dict[str, object] = {}
+    limit = 60
+    left_ms = 2_000
 
     def keep_the_round_open(request):
         yield from _wait_for_the_release_attempt(holder, request.run_id)
+        # 放行的调用已经排在检查之后，马上要在安全节点上等这一轮结束：把已用的运行时间设到只差 left_ms，
+        # 剩下的这一段由这一轮与等待一起用掉
+        holder["system"].orchestrator._run_elapsed_ms[request.run_id] = limit * 1000 - left_ms
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
             if holder["system"].project(request.run_id).status in {"done", "paused", "failed"}:
@@ -266,7 +276,7 @@ def test_running_out_of_time_while_the_release_waits_ends_the_run(tmp_path):
     }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)
     holder["system"] = system
-    run_id = system.create_run("build echo", run_time_limit_sec=2)
+    run_id = system.create_run("build echo", run_time_limit_sec=limit)
     system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请确认输出保持小写，产品要求不变。")
@@ -277,6 +287,13 @@ def test_running_out_of_time_while_the_release_waits_ends_the_run(tmp_path):
     assert projection.stop_reason == "time_limit"
     assert projection.last_review is None
     assert _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
+    # 运行时间是在放行等着的安全节点上用完了：这次提交放行的调用被停下、没有执行
+    # （引擎在安全节点上停止时跳过没开始的调用，理由写明是这次激活不能再开始工具）
+    [skipped] = [event for event in _quality_events(system, run_id, EventType.TOOL_SKIPPED)
+                 if (event.payload or {}).get("name") == "submit_review"]
+    assert skipped.payload["error"] == (
+        "Not executed because the current activation can no longer start tools."), \
+        "放行不是在安全节点上被停下的"
 
 
 def test_a_model_unavailable_stops_the_wait_without_a_release(tmp_path):
