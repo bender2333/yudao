@@ -14,7 +14,7 @@
 from __future__ import annotations
 
 from .adjudication import ask_chain_decision, ask_chain_max_depth
-from .collaboration import has_new_work, is_working
+from .watched_outputs import has_new_work, is_working
 from .models import DEPARTMENTS, TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
 from .tools import offers_with_input, proposal_kind, proposal_kinds, tool_action, tools_for
 from . import tightening_contract

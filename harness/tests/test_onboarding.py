@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, DEPARTMENTS, EventType
 from harness.proposals import baseline_review_turn, product_spec, product_spec_turn, structure_turn

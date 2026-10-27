@@ -22,7 +22,7 @@ from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, proposal_decision
 from .artifacts import ArtifactStore
-from . import assembly_contract, execution_contract, tightening_contract
+from . import assembly_contract, execution_contract, routing_contract, tightening_contract
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
@@ -80,16 +80,11 @@ from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
 from .tools import tool_action
 from .validation import PRD_REVISION_FIELDS, AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
-from .collaboration import has_new_work, next_department, ready_departments
+from .watched_outputs import waiting_departments
 from .workspace import WorkspaceSnapshot
 
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
 _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED})
-
-# 不算「这一轮正常结束」的运行状态（部门指导设计说明第 3 节，工单 #1039）：取消与运行时间用完以 failed 结束，
-# 上限停下与暂停是 paused；这些情形不写已回答，指导停在已进入模型输入。暂停以后继续的是同一轮，
-# 它在继续以后正常结束时才算（那时由新的激活写）。
-_NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
 
 def guidance_version(projection: RunProjection, department: str) -> int:
@@ -125,26 +120,6 @@ def _round_applied_guidance(events: list[Any], projection: RunProjection,
     entered = {item.id for item in projection.department_guidance
                if item.department == scope.department and item.status == "in_input"}
     return [guidance_id for guidance_id in ids if guidance_id in entered]
-
-
-def _round_outcome(events: list[Any], scope: ActivationScope) -> str:
-    # 这一轮怎么结束的：提交被接纳记 proposal_accepted，其余正常结束记 text_reply（载荷只有这两个取值）。
-    # 提交以后被拒绝的这一轮，部门还没有交下正式成果，按文字回答记
-    start = None
-    for index, event in enumerate(events):
-        if (event.type == EventType.DEPARTMENT_ACTIVATED and event.session_id == scope.session_id
-                and (event.payload or {}).get("activation_id") == scope.activation_id):
-            start = index
-            break
-    submitted = False
-    for event in ([] if start is None else events[start + 1:]):
-        if event.session_id != scope.session_id:
-            continue
-        if event.type == EventType.PROPOSAL_SUBMITTED:
-            submitted = True
-        elif event.type == EventType.PROPOSAL_REJECTED:
-            submitted = False
-    return "proposal_accepted" if submitted else "text_reply"
 
 
 @dataclass
@@ -270,6 +245,7 @@ class Orchestrator:
         step_limits: StepLimits = StepLimits(),
         deltas: DeltaChannel | None = None,
         tightening: Tightening,
+        routing: routing_contract.Routing,
     ) -> None:
         self.store = store
         self.writes = writes
@@ -290,6 +266,10 @@ class Orchestrator:
         # 组装时核对它声明的契约版本，不合格就在开始一轮工作之前失败（与执行、装配两份契约同一个做法）
         self._tightening = tightening
         tightening_contract.accept(tightening)
+        # 路由实现（成果驱动）：谁在等、谁能开工、一轮以什么结束、事项以什么结束由它判断（工单 #825）；
+        # 薄驱动只按契约的三个问题调用它，组装时核对它声明的契约版本
+        self._routing = routing
+        routing_contract.accept(routing)
         self.assembly = ContextAssembly(artifacts, store, tightening=tightening)
         self.sessions = sessions or SessionFactory(self.workspace_root)
         # 事项自己的停止开关：用户取消（cancel、_abort_run）打开它，之后的核对都得到停止，
@@ -512,26 +492,23 @@ class Orchestrator:
         )
 
     def _waiting_departments(self, run_id: str) -> set[str]:
-        # 在等待工作的部门：这个进程里没有正在工作的会话的那些。
-        # 进程中断以后会话是新开的，投影里那条「工作中」的记录不再算数（工单 #16 的恢复口径）：
-        # 这时还没有会话的部门同样在等待，它可以被重新激活。
-        waiting: set[str] = set()
-        for department in DEPARTMENTS:
-            try:
-                session = self.sessions.get(run_id, department)
-            except KeyError:
-                waiting.add(department)
-                continue
-            if session.status != "active":
-                waiting.add(department)
-        return waiting
+        # 在等待工作的部门：这个进程里没有正在工作的会话的那些（工单 #16 的恢复口径）。
+        # 「谁在等」的判断归路由实现（工单 #825），薄驱动只交出会话状态这份事实
+        return waiting_departments({department: self._session_status(run_id, department)
+                                    for department in DEPARTMENTS})
+
+    def _session_status(self, run_id: str, department: str) -> str | None:
+        # 这个进程里这个部门会话的状态；还没有会话时为空（那时它同样在等待，可以被重新激活）
+        try:
+            return self.sessions.get(run_id, department).status
+        except KeyError:
+            return None
 
     def _department_ready(self, run_id: str, projection: RunProjection, department: str) -> bool:
-        # 这个部门现在可以开始一轮工作：在等待工作，并且关注的成果有了新东西。
+        # 这个部门现在可以开始一轮工作：由路由判断（在等待工作，并且关注的成果有了新东西）。
         # 同时运行（工单 #557）：准备激活的事务里重新核对，别的会话在这期间做完了就开始
-        if department not in self._waiting_departments(run_id):
-            return False
-        return has_new_work(projection, department)
+        return self._routing.department_ready(
+            projection, department=department, waiting=self._waiting_departments(run_id))
 
     def _is_handoff_session(self, department: str, session_id: str, projection: RunProjection) -> bool:
         # 持有交接的工程：工程部门的主线会话，它这次激活产出的东西进入运行工作区。
@@ -1330,9 +1307,10 @@ class Orchestrator:
             await connections.aclose()
 
     def _ready_departments(self, run_id: str) -> list[str]:
-        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些（工单 #557）
+        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些（工单 #557）。
+        # 判断归路由实现（工单 #825）
         projection = self.project(run_id)
-        return ready_departments(projection, waiting=self._waiting_departments(run_id))
+        return self._routing.ready_departments(projection, waiting=self._waiting_departments(run_id))
 
     async def _stop_sessions(self, run_id: str, tasks: dict[str, asyncio.Task[RunProjection]]) -> None:
         # 事项到终态或被未回答的决定请求阻塞：其余会话停止并收尾。
@@ -1349,9 +1327,14 @@ class Orchestrator:
         await asyncio.gather(*pending, return_exceptions=True)
 
     async def _no_new_work(self, run_id: str) -> RunProjection:
-        # 没有部门可以开始一轮工作：没有新的工作，结束这个 run
-        self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
-            transaction, "provider_error", "no department has new work"))
+        # 没有部门可以开始一轮工作：事项以什么结束由路由判断（工单 #825），薄驱动只把它的判断写成停止
+        def end(transaction: Transaction) -> None:
+            judgment = self._routing.item_end(transaction.projection)
+            if judgment is None:
+                return
+            self._fail(transaction, judgment.stop_reason, judgment.message)
+
+        self.writes.transact(run_stream(run_id), end)
         return await asyncio.to_thread(self._settled, run_id)
 
     def start(self, run_id: str) -> asyncio.Task[RunProjection]:
@@ -1442,7 +1425,7 @@ class Orchestrator:
 
     async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
         projection = self.project(run_id)
-        department = next_department(projection, waiting=self._waiting_departments(run_id))
+        department = self._routing.next_department(projection, waiting=self._waiting_departments(run_id))
         if department is None:
             return await self._no_new_work(run_id)
         return await self._activate_department(run_id, department, connections)
@@ -1510,13 +1493,16 @@ class Orchestrator:
                     ))
                     # 这一轮收到的指导在这一轮正常结束时由主机写已回答（部门指导设计说明第 3 节，工单 #1039）：
                     # 与激活结束在同一个事务里，部门不提交。事件记下是哪一轮、这一轮怎么结束的；
-                    # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入
-                    if current.status in _NOT_A_NORMAL_ROUND_END:
+                    # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入。
+                    # 一轮以什么结束由路由判断（工单 #825）：不是正常结束的一轮没有结果，也照旧不写已回答
+                    ended = self._routing.round_end(
+                        current, happened, department=scope.department, session_id=scope.session_id,
+                        activation_id=scope.activation_id)
+                    if ended is None:
                         return
                     answered = _round_applied_guidance(happened, current, scope)
                     if not answered:
                         return
-                    outcome = _round_outcome(happened, scope)
                     for guidance_id in answered:
                         transaction.append(NewEvent(
                             EventType.DEPARTMENT_GUIDANCE_RESPONDED,
@@ -1528,7 +1514,7 @@ class Orchestrator:
                             session_id=scope.session_id,
                             payload={"guidance_id": guidance_id,
                                      "activation_id": scope.activation_id,
-                                     "outcome": outcome},
+                                     "outcome": ended.outcome},
                         ))
 
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话

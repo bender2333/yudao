@@ -4,7 +4,7 @@ import ssl
 import pytest
 import trustme
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.models import EventType
 from harness.providers import ProviderDefinition, refresh_candidates, ssl_context
 from harness.tests.helpers import FAST_RETRIES

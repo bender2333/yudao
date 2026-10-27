@@ -3,7 +3,7 @@ import json
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec, review_turn

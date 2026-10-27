@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.collaboration import is_working
+from harness.watched_outputs import is_working
 from harness.environment import QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
 from harness.models import ArtifactRef, EventType, json_dumps

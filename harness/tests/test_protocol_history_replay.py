@@ -5,7 +5,7 @@ import threading
 from collections import Counter
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.models import json_dumps
 from harness.proposals import product_spec
 from harness.providers import CredentialChain, ProviderFacade

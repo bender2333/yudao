@@ -10,7 +10,7 @@ import sys
 import time
 from pathlib import Path
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.environment import BackgroundJobTable, LocalEnvironment
 from harness.runtime import LoopSystem
