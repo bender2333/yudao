@@ -172,6 +172,7 @@
 "test_terminal_checks.py" = "module"
 "test_test_imports.py" = "unit"
 "test_text_only_reply.py" = "integration"
+"test_thin_driver_names.py" = "unit"
 "test_tightening.py" = "module"
 "test_tool_contracts.py" = "unit"
 "test_tools.py" = "integration"

@@ -38,6 +38,11 @@ _BASIS_FIELDS = (
 # 一种成果可以多版并存（设计说明第 4 节 2026-10-27 补）：产品决定各自是一件成果，新的决定不让旧的失效，
 # 最小投影按种类记当前有效各版的摘要清单（通用条件 6 的不重复接纳读它）
 _MULTIPLE_KINDS = frozenset({"product_decision"})
+
+# 质检退回工程的放行结论（S4c 工单 #863 从薄驱动搬来）：接纳的一方认成果种类与结论取值，
+# 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用设计说明第 6 节）
+REVIEW_KIND = "qa_review"
+REWORK_VERDICT = "rework_engineering"
 # 成果记下的树摘要：交付记代码树、建档记快照的树；没有这一项的成果不带
 _TREE_FIELDS = ("code_tree_digest", "code_snapshot_hash")
 
@@ -339,6 +344,53 @@ class SubmissionWriter:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
 
+    def record_accepted_lesson(self, transaction: Transaction, source: Event, projection: RunProjection,
+                               artifact: dict[str, Any]) -> None:
+        # 接纳以后的记录：质检退回工程的放行结论另记一条经验教训候选。
+        # 成果种类与结论取值由这里认——薄驱动不含这两样（骨架与应用设计说明第 6 节），
+        # 只把这次接纳转交过来（S4c 工单 #863）
+        if artifact.get("kind") != REVIEW_KIND or artifact.get("verdict") != REWORK_VERDICT:
+            return
+        self.record_lesson_candidate(transaction, source, projection)
+
+    def record_lesson_candidate(self, transaction: Transaction, source: Event,
+                                projection: RunProjection) -> None:
+        # 一条经验教训候选：观察、建议与它依据的成果摘要。来自质检的退回记观察到的结论与检查，
+        # 来自失败记停止原因与说明
+        if source.type == EventType.QA_SUBMITTED:
+            observed = source.payload
+            observation = {key: observed[key] for key in ("verdict", "rationale", "defects")}
+            suggestion = "根据本次质检记录，补充能复现所述问题的检查，验证修复是否满足原验收条件。"
+            spec_hash = observed["product_spec_hash"]
+            delivery_hash = observed["delivery_spec_hash"]
+            checks = observed["checks"]
+            refs = observed["evidence_refs"]
+        else:
+            observation = {"stop_reason": source.stop_reason, "message": source.error}
+            suggestion = "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
+            spec = projection.product_spec
+            delivery = projection.delivery_spec
+            if delivery is not None and delivery.status != "active":
+                delivery = None
+            spec_hash = spec.content_hash if spec is not None else None
+            delivery_hash = delivery.content_hash if delivery is not None else None
+            checks = delivery.checks if delivery is not None else []
+            refs = [asdict(delivery.tree_ref)] if delivery is not None else []
+        transaction.append(NewEvent(
+            EventType.LESSON_CANDIDATE_RECORDED,
+            actor="system", department=source.department, parent_event_id=source.event_id,
+            state_before=source.state_after, state_after=source.state_after,
+            session_id=source.session_id,
+            payload={
+                "kind": "lesson_candidate", "id": new_id("lesson"), "status": "unverified",
+                "source_event_id": source.event_id, "source_type": source.type,
+                "observation": observation, "suggestion": suggestion,
+                "product_spec_hash": spec_hash, "delivery_spec_hash": delivery_hash,
+                "checks": checks, "evidence_refs": refs,
+            },
+        ))
+
 
 def _json_bytes(value: dict[str, Any]) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+

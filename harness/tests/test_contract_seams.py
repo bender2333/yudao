@@ -102,7 +102,7 @@ def test_the_route_work_reference_reaches_the_assembly_input(tmp_path):
         driver = StepDriver.start(
             request, writes=system.writes, artifacts=system.artifacts, assembly=recording,
             adapter=adapter, facade=system.facade,
-            environment=system.orchestrator._environment_for(run_id, "product", refresh=True),
+            environment=system.orchestrator._workspaces.environment_for(run_id, "product", refresh=True),
             nodes=node, cancelled=Event(), deltas=system.deltas,
             tightening=WATCHED_OUTPUTS,
         )
