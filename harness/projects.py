@@ -50,6 +50,9 @@ RECENT_LIMIT = 20
 RECENT_RUN_EVENTS = frozenset({EventType.DELIVERY_ACCEPTED, EventType.QA_SUBMITTED, EventType.RUN_DONE,
                                EventType.RUN_FAILED, EventType.RUN_PAUSED})
 REWORK_VERDICTS = frozenset({"rework_engineering"})
+# 用户自己让事项停下的两种停止原因：结束事件里写的是这次决定（"run cancelled"，
+# "run cancelled by user command"），不是让事项自己停下的错误，因此不带停止说明（工单 #1162）
+USER_STOP_REASONS = frozenset({"cancelled", "user_cancelled"})
 
 
 class ProjectNotFoundError(KeyError):
@@ -188,6 +191,10 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
         item.status = "stopped"
     else:
         item.status = "in_progress"
+    # 停止说明（工单 #1162）：停止的事项写让事项停下的那条错误的原文，取自事项结束的事件（run 投影的 error）；
+    # 询问分支的失败原因不是事项结束的原因，留在询问记录里，不进这里。用户自己让事项停下不是错误，不写
+    item.stop_note = (run.error if item.status == "stopped" and item.stop_reason not in USER_STOP_REASONS
+                      else None)
     if include_history:
         events = store.list_events(item.run_id, through_position=through)
         item.rework = [

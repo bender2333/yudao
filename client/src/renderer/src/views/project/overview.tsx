@@ -20,7 +20,7 @@ import { paths } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import type { Route } from "../../shell/routing";
 import { emptyOrFailureText, readFailureText } from "../../contract/read-failure";
-import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, SubmitButton, Table, TextArea,
+import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, StopNote, SubmitButton, Table, TextArea,
   TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
@@ -266,6 +266,8 @@ function CurrentItem(props: {
           ["状态", <span key="status" className="y10-row">{itemStatus(item.status)}{progress === null ? null : <span className="y10-muted"> · {progress}</span>}</span>],
           ["待决问题", show(item.pending_question, "没有")],
           ["停止原因", item.stop_reason === null || item.stop_reason === "" ? "没有" : label(STOP_REASON, item.stop_reason)],
+          // 停止说明（工单 #1162）：让事项停下的那条错误的原文，写在停止原因下面
+          ["停止说明", <StopNote key="stop-note" note={item.stop_note} empty="没有" />],
           ["未能开始", show(item.start_error, "没有")],
           ["处理进度", processing],
         ]}
@@ -497,6 +499,8 @@ export function Board(props: { items: WorkItemCard[] }) {
                   </div>
                   {item.pending_question ? <p className="y10-muted card-note">待决问题：{item.pending_question}</p> : null}
                   {item.stop_reason ? <p className="y10-muted card-note">停止原因：{label(STOP_REASON, item.stop_reason)}</p> : null}
+                  {/* 停止说明（工单 #1162）：停在停止原因下面，长的折起来可以展开 */}
+                  <StopNote note={item.stop_note} block />
                   {item.start_error ? <p className="y10-muted card-note">未能开始：{item.start_error}</p> : null}
                 </article>
               ))}
