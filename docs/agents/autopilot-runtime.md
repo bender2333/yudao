@@ -25,7 +25,7 @@ Claude 担任派发者时使用这里的路径。
 | --- | --- |
 | 工单的 worktree | `C:\project\yudao-worktrees\issue-<编号>`，分支 `issue-<编号>` |
 | 集成层的 worktree | `C:\project\yudao-worktrees\integration` |
-| 被唤醒的架构师的 worktree | `C:\project\yudao-worktrees\architect`，不建分支，每次启动前检出 main 的当前提交 |
+| 被唤醒的架构师的 worktree | `C:\project\yudao-worktrees\architect`，不建分支，每次启动前检出 main 的当前提交；架构师循环长期占用这一个 worktree |
 | 较长的评论与审查（`--body-file`） | `C:\project\yudao-worktrees\issue-<编号>\.tmp\` 下，文件名带工单号，`--body-file` 给这个绝对路径 |
 | 真实评测 | `C:\project\yudao-worktrees\eval-<提交前 8 位>`：检出被测的提交，运行期间不切换，结束以后删除；运行目录与原始证据在仓库之外；长时间运行用 `Start-Process pwsh -File <脚本>` 启动，不用会话里的后台命令（会话空闲、内存不足时会被结束） |
 | OMP（oh-my-pi） | `C:\project\codes\oh-my-pi` |
@@ -83,6 +83,18 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
     > .tmp/architect-<日期时刻>.json
   ```
 
+- 启动架构师循环（用户不在场时接住 solo 交回的工单、子工单已关闭的父工单与已经达到的薄片，做法见 [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md)）：在架构师的 worktree 里开一个不需要逐条确认权限的会话，进程环境与下面启动被唤醒的架构师相同，然后在会话里起循环：
+
+  ```bash
+  git fetch origin main
+  git checkout --detach origin/main
+  claude --model <架构师模型> --effort <架构师 effort> --dangerously-skip-permissions
+  # 会话里输入（范围写法与 solo 相同）：
+  /loop 30m /architect-loop <范围>
+  ```
+
+  循环跑在这个会话里，会话关掉就停；重新打开会话、再输入一次启动命令即接着做，状态全在 GitHub 与 `.ralph/architect/heartbeat.json`。宿主没有 `/loop` 时用它的定时机制按第 7 节的间隔叫起同一个技能（这个仓库常用的 DSH 会话用定时提醒），间隔与上下文换法不变。
+
 - 启动 solo 执行者（用户指定 solo 范围时，在主工作区或工单的 worktree 中运行；进程环境使用开发 App，按第 2 节设置，并设置署名 `GIT_AUTHOR_NAME`、`GIT_COMMITTER_NAME` 为 `solo-<模型 ID>`）。合并要用仓库所有者的豁免，所以 solo 执行者的 `gh` 使用 `bender2333` 登录的身份，不设置开发 App 的两个变量；开发 App 没有豁免权限：
   `claude -p --model <solo 模型> --dangerously-skip-permissions --output-format json "你是 solo 执行者，按 AGENTS.md「Solo 模式」处理范围 <范围> 内的工单"`
   solo 范围内没有派发者，一次启动处理到范围内没有可以领取的工单为止，或者到第 7 节的执行者一轮时长。
@@ -124,6 +136,8 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 执行者 | omp 配置的默认模型，当前 `9router ag/gemini-3.8-flash-high` | 按配置使用 prewalk |
 | 审查者 | `9router/oro` | 用 `--model` 指定，与执行者的模型不同 |
 | 被唤醒的架构师 | `claude-opus-5-5`，effort `xhigh` | Claude Code，用 `--model` 与 `--effort` 指定 |
+| 架构师循环的子代理 | `claude-opus-5-5`，effort `xhigh` | 与上表同一行：这一层做设计判断，判断错了比多用的量贵；它与 solo 执行者用不同的模型，判断才独立 |
+| 试用的两个模型 | model1 `wb/cn:deepseek-v4.1-flash` 给产品与工程；model2 `ag/gemini-3.8-flash-high` 给质检、找问题与看图 | 分工见 [`/trial`](../../.claude/skills/trial/SKILL.md)第 1 节的表；地址与凭据取下面的 `YUDAO_EVAL_*` |
 | 备用链 | `9router/ds`| 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
 | 真实模型测试与评测 | `qhub/Qwen3.8-Flash`（9router，Chat Completions，2026-10-19） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)第 4.3 节 |
 
@@ -176,6 +190,9 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 同一个 PR 要求修改的上限 | 3 次，第 3 次时搁置 | 派发者规则第 3 节第 4、5 步 |
 | 工单大小的上限 | 「只改」清单中手写文件 15 个；生成的客户端类型、接口快照、事件序列基准与日记不计 | `CLAUDE.md`「工单规范」；`AGENTS.md` 执行者第 2 步 |
 | 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/`；可信内核：`harness/definitions/kernel-manifest.json` 里 `kind` 为 `module` 的路径 | `CLAUDE.md`「工单规范」 |
-| 唤醒架构师 | 关 | 派发者规则第 3 节第 7 步；用户在场的会话做大的设计修改时改为关，做完改回 |
+| 唤醒架构师 | 关 | 派发者规则第 3 节第 7 步；`CLAUDE.md`「Solo 模式」要求 solo 与架构师循环运行期间保持开，架构师循环也读这一个开关，关着时整轮不做。用户在场的会话做大的设计修改时改为关，做完改回开 |
 | 被唤醒的架构师一次运行的时长 | 4 小时 | 派发者规则第 3 节第 7 步 |
-| 同一张工单唤醒架构师的上限 | 2 次，第 3 次直接交给用户 | `CLAUDE.md`「被唤醒的架构师」 |
+| 架构师循环的间隔 | 30 分钟 | 第 3 节启动命令；一轮只做一个子代理，做完结束回合 |
+| 同一张工单唤醒或分诊的上限 | 2 次，第 3 次直接交给用户 | 派发者规则第 3 节第 7 步；`CLAUDE.md`「被唤醒的架构师」与 [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md) |
+| 一个薄片交给用户之前的缺陷修复上限 | 2 轮，第 3 轮连同两轮的证据交给用户 | [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md)「薄片推进」 |
+| 后台长运行算作失败的超时 | 各自预算加 1 小时，重跑一次，再失败交给用户 | [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md)「长运行与心跳」 |
