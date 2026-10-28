@@ -1,0 +1,933 @@
+{
+ "ages": {
+  "0-1": {
+   "entries": 2027,
+   "referenced": 248,
+   "referenced_tokens": 123635,
+   "tokens": 738721
+  },
+  "16-31": {
+   "entries": 556,
+   "referenced": 63,
+   "referenced_tokens": 90103,
+   "tokens": 217637
+  },
+  "2-3": {
+   "entries": 1155,
+   "referenced": 206,
+   "referenced_tokens": 118573,
+   "tokens": 433665
+  },
+  "32+": {
+   "entries": 188,
+   "referenced": 24,
+   "referenced_tokens": 51096,
+   "tokens": 98305
+  },
+  "4-7": {
+   "entries": 1282,
+   "referenced": 213,
+   "referenced_tokens": 151143,
+   "tokens": 504532
+  },
+  "8-15": {
+   "entries": 1037,
+   "referenced": 141,
+   "referenced_tokens": 158026,
+   "tokens": 476235
+  }
+ },
+ "by_department": {
+  "engineering": {
+   "fill": {
+    "max": 0.0398,
+    "mean": 0.013,
+    "median": 0.0104,
+    "n": 311,
+    "p10": 0.0052,
+    "p90": 0.0236
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9734,
+    "median": 1.0,
+    "n": 311,
+    "p10": 0.9167,
+    "p90": 1.0
+   },
+   "steps": 311,
+   "tokens": 4051482,
+   "waste_ratio": 0.4894,
+   "waste_tokens": 1982815
+  },
+  "product": {
+   "fill": {
+    "max": 0.0125,
+    "mean": 0.0047,
+    "median": 0.0043,
+    "n": 97,
+    "p10": 0.0026,
+    "p90": 0.0069
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.983,
+    "median": 1.0,
+    "n": 97,
+    "p10": 0.9444,
+    "p90": 1.0
+   },
+   "steps": 97,
+   "tokens": 457403,
+   "waste_ratio": 0.3791,
+   "waste_tokens": 173403
+  },
+  "quality": {
+   "fill": {
+    "max": 0.0502,
+    "mean": 0.0161,
+    "median": 0.0134,
+    "n": 238,
+    "p10": 0.0061,
+    "p90": 0.0289
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9662,
+    "median": 1.0,
+    "n": 238,
+    "p10": 0.8889,
+    "p90": 1.0
+   },
+   "steps": 238,
+   "tokens": 3822753,
+   "waste_ratio": 0.5253,
+   "waste_tokens": 2008279
+  }
+ },
+ "by_fill": {
+  "<=10%": {
+   "fill": {
+    "max": 0.0502,
+    "mean": 0.0502,
+    "median": 0.0502,
+    "n": 1,
+    "p10": 0.0502,
+    "p90": 0.0502
+   },
+   "recall": {
+    "max": 0.8276,
+    "mean": 0.8276,
+    "median": 0.8276,
+    "n": 1,
+    "p10": 0.8276,
+    "p90": 0.8276
+   },
+   "steps": 1,
+   "tokens": 50233,
+   "waste_ratio": 0.7281,
+   "waste_tokens": 36577
+  },
+  "<=2%": {
+   "fill": {
+    "max": 0.02,
+    "mean": 0.0093,
+    "median": 0.009,
+    "n": 522,
+    "p10": 0.0037,
+    "p90": 0.0158
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9716,
+    "median": 1.0,
+    "n": 522,
+    "p10": 0.9,
+    "p90": 1.0
+   },
+   "steps": 522,
+   "tokens": 4854077,
+   "waste_ratio": 0.4523,
+   "waste_tokens": 2195565
+  },
+  "<=5%": {
+   "fill": {
+    "max": 0.0495,
+    "mean": 0.0279,
+    "median": 0.0245,
+    "n": 123,
+    "p10": 0.0208,
+    "p90": 0.0371
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9757,
+    "median": 1.0,
+    "n": 123,
+    "p10": 0.913,
+    "p90": 1.0
+   },
+   "steps": 123,
+   "tokens": 3427328,
+   "waste_ratio": 0.5638,
+   "waste_tokens": 1932355
+  }
+ },
+ "by_kind": {
+  "call": {
+   "entries": 4958,
+   "tokens": 1544449
+  },
+  "input": {
+   "entries": 830,
+   "tokens": 1813796
+  },
+  "message": {
+   "entries": 45,
+   "tokens": 320
+  },
+  "pinned": {
+   "entries": 646,
+   "tokens": 2503978
+  },
+  "tool": {
+   "entries": 6245,
+   "tokens": 2469095
+  }
+ },
+ "by_model": {
+  "9router/ds": {
+   "fill": {
+    "max": 0.0502,
+    "mean": 0.0129,
+    "median": 0.0103,
+    "n": 646,
+    "p10": 0.004,
+    "p90": 0.024
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9722,
+    "median": 1.0,
+    "n": 646,
+    "p10": 0.9091,
+    "p90": 1.0
+   },
+   "steps": 646,
+   "tokens": 8331638,
+   "waste_ratio": 0.4998,
+   "waste_tokens": 4164497
+  }
+ },
+ "by_step": {
+  "1-1": {
+   "fill": {
+    "max": 0.0405,
+    "mean": 0.01,
+    "median": 0.0075,
+    "n": 105,
+    "p10": 0.0026,
+    "p90": 0.0225
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9953,
+    "median": 1.0,
+    "n": 105,
+    "p10": 1.0,
+    "p90": 1.0
+   },
+   "steps": 105,
+   "tokens": 1049534,
+   "waste_ratio": 0.5203,
+   "waste_tokens": 546023
+  },
+  "16+": {
+   "fill": {
+    "max": 0.0502,
+    "mean": 0.0284,
+    "median": 0.0255,
+    "n": 63,
+    "p10": 0.0169,
+    "p90": 0.0423
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.969,
+    "median": 1.0,
+    "n": 63,
+    "p10": 0.9,
+    "p90": 1.0
+   },
+   "steps": 63,
+   "tokens": 1787171,
+   "waste_ratio": 0.522,
+   "waste_tokens": 932885
+  },
+  "2-3": {
+   "fill": {
+    "max": 0.0418,
+    "mean": 0.01,
+    "median": 0.0074,
+    "n": 163,
+    "p10": 0.0035,
+    "p90": 0.0215
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9802,
+    "median": 1.0,
+    "n": 163,
+    "p10": 0.9231,
+    "p90": 1.0
+   },
+   "steps": 163,
+   "tokens": 1622820,
+   "waste_ratio": 0.5003,
+   "waste_tokens": 811924
+  },
+  "4-7": {
+   "fill": {
+    "max": 0.0358,
+    "mean": 0.0108,
+    "median": 0.0094,
+    "n": 190,
+    "p10": 0.0048,
+    "p90": 0.0193
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9702,
+    "median": 1.0,
+    "n": 190,
+    "p10": 0.9,
+    "p90": 1.0
+   },
+   "steps": 190,
+   "tokens": 2051049,
+   "waste_ratio": 0.4747,
+   "waste_tokens": 973714
+  },
+  "8-15": {
+   "fill": {
+    "max": 0.0396,
+    "mean": 0.0146,
+    "median": 0.0134,
+    "n": 125,
+    "p10": 0.0082,
+    "p90": 0.0212
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9468,
+    "median": 1.0,
+    "n": 125,
+    "p10": 0.8125,
+    "p90": 1.0
+   },
+   "steps": 125,
+   "tokens": 1821064,
+   "waste_ratio": 0.4942,
+   "waste_tokens": 899951
+  }
+ },
+ "by_window": {
+  "1000000": {
+   "fill": {
+    "max": 0.0502,
+    "mean": 0.0129,
+    "median": 0.0103,
+    "n": 646,
+    "p10": 0.004,
+    "p90": 0.024
+   },
+   "recall": {
+    "max": 1.0,
+    "mean": 0.9722,
+    "median": 1.0,
+    "n": 646,
+    "p10": 0.9091,
+    "p90": 1.0
+   },
+   "steps": 646,
+   "tokens": 8331638,
+   "waste_ratio": 0.4998,
+   "waste_tokens": 4164497
+  }
+ },
+ "duplicate_in_view": {
+  "edit_range": {
+   "extra": 28,
+   "groups": 20,
+   "tokens": 700
+  },
+  "list_files": {
+   "extra": 5,
+   "groups": 5,
+   "tokens": 105
+  },
+  "read_file": {
+   "extra": 40,
+   "groups": 31,
+   "tokens": 16563
+  },
+  "run_check": {
+   "extra": 55,
+   "groups": 45,
+   "tokens": 22720
+  },
+  "submit_baseline_review": {
+   "extra": 3,
+   "groups": 3,
+   "tokens": 1686
+  }
+ },
+ "duplicate_in_view_tokens": 41774,
+ "errors": {
+  "error": {
+   "entries": 355,
+   "referenced": 0,
+   "referenced_tokens": 0,
+   "tokens": 10076
+  },
+  "ok": {
+   "entries": 5890,
+   "referenced": 895,
+   "referenced_tokens": 692576,
+   "tokens": 2459019
+  }
+ },
+ "inputs": {
+  "current_work": {
+   "distinct": 103,
+   "entries": 830,
+   "tokens": 1813796
+  }
+ },
+ "missing_top": {
+  "ident:Alternatively": 7,
+  "ident:FileNotFoundError": 3,
+  "ident:abbreviation": 5,
+  "ident:abbreviations": 2,
+  "ident:authoritative": 4,
+  "ident:contradiction": 4,
+  "ident:contradictory": 5,
+  "ident:evt_4c602003": 2,
+  "ident:expected_digest": 4,
+  "ident:implementation": 5,
+  "ident:inconsistency": 3,
+  "ident:inconsistent": 4,
+  "ident:independently": 5,
+  "ident:interpretation": 2,
+  "ident:normalization": 4,
+  "ident:reconfigured": 3,
+  "ident:substitution": 2,
+  "ident:verification": 3,
+  "path:0/1/2": 4,
+  "quote:usage: python textstats.py [--json] [...": 2
+ },
+ "recall": {
+  "max": 1.0,
+  "mean": 0.9722,
+  "median": 1.0,
+  "n": 646,
+  "p10": 0.9091,
+  "p90": 1.0
+ },
+ "recall_covered_total": 6023,
+ "recall_needed_total": 6308,
+ "repeat_reads": {
+  "read_file:PRD.md": 72,
+  "read_file:README.md": 418,
+  "read_file:head.py": 105,
+  "read_file:interface_agreement.md": 71,
+  "read_file:selfcheck.py": 59,
+  "read_file:src/fare_calculator.py": 49,
+  "read_file:textstats.py": 256,
+  "read_file:wordcount.py": 91,
+  "read_range:README.md": 57,
+  "read_range:head.py": 20,
+  "read_range:selfcheck.py": 34,
+  "read_range:src/fare_calculator.py": 81,
+  "read_range:tests/test_subway.py": 29,
+  "read_range:textstats.py": 98,
+  "read_range:wordcount.py": 32
+ },
+ "resend": {
+  "bash": {
+   "tokens": 781191,
+   "views": 2010
+  },
+  "edit_range": {
+   "tokens": 36597,
+   "views": 726
+  },
+  "list_files": {
+   "tokens": 7231,
+   "views": 350
+  },
+  "read_file": {
+   "tokens": 938233,
+   "views": 1267
+  },
+  "read_output": {
+   "tokens": 188,
+   "views": 1
+  },
+  "read_range": {
+   "tokens": 138589,
+   "views": 356
+  },
+  "run_check": {
+   "tokens": 480005,
+   "views": 972
+  },
+  "search": {
+   "tokens": 280,
+   "views": 4
+  },
+  "submit_baseline_review": {
+   "tokens": 27392,
+   "views": 50
+  },
+  "submit_delivery": {
+   "tokens": 7018,
+   "views": 37
+  },
+  "submit_guidance_response": {
+   "tokens": 344,
+   "views": 2
+  },
+  "submit_product_decision": {
+   "tokens": 251,
+   "views": 6
+  },
+  "submit_product_spec": {
+   "tokens": 9697,
+   "views": 21
+  },
+  "submit_request": {
+   "tokens": 1064,
+   "views": 7
+  },
+  "submit_response": {
+   "tokens": 796,
+   "views": 4
+  },
+  "submit_review": {
+   "tokens": 14511,
+   "views": 30
+  },
+  "submit_structure": {
+   "tokens": 20757,
+   "views": 16
+  },
+  "write_file": {
+   "tokens": 4951,
+   "views": 386
+  }
+ },
+ "runs": 22,
+ "section_use": {
+  "allowed_tools": {
+   "chars": 97962,
+   "covered_chars": 23190,
+   "steps": 646,
+   "tokens": 24730
+  },
+  "binding_refs": {
+   "chars": 312172,
+   "covered_chars": 43556,
+   "steps": 646,
+   "tokens": 78292
+  },
+  "causal_chain": {
+   "chars": 256194,
+   "covered_chars": 39038,
+   "steps": 646,
+   "tokens": 64444
+  },
+  "collaboration_rules": {
+   "chars": 116508,
+   "covered_chars": 0,
+   "steps": 646,
+   "tokens": 29450
+  },
+  "current_contract": {
+   "chars": 293439,
+   "covered_chars": 25197,
+   "steps": 560,
+   "tokens": 73774
+  },
+  "current_delivery_spec": {
+   "chars": 833859,
+   "covered_chars": 48708,
+   "steps": 172,
+   "tokens": 208534
+  },
+  "current_product_decisions": {
+   "chars": 17319,
+   "covered_chars": 1581,
+   "steps": 23,
+   "tokens": 4347
+  },
+  "current_product_spec": {
+   "chars": 3254895,
+   "covered_chars": 132642,
+   "steps": 560,
+   "tokens": 813971
+  },
+  "current_work": {
+   "chars": 238353,
+   "covered_chars": 15981,
+   "steps": 646,
+   "tokens": 59807
+  },
+  "department_guidance": {
+   "chars": 1414,
+   "covered_chars": 200,
+   "steps": 3,
+   "tokens": 354
+  },
+  "department_rules": {
+   "chars": 73142,
+   "covered_chars": 2691,
+   "steps": 646,
+   "tokens": 18296
+  },
+  "existing_overview": {
+   "chars": 126324,
+   "covered_chars": 5319,
+   "steps": 132,
+   "tokens": 31680
+  },
+  "guidance_results": {
+   "chars": 961,
+   "covered_chars": 229,
+   "steps": 12,
+   "tokens": 241
+  },
+  "input_handling": {
+   "chars": 124260,
+   "covered_chars": 4276,
+   "steps": 646,
+   "tokens": 31388
+  },
+  "input_progress": {
+   "chars": 44574,
+   "covered_chars": 3456,
+   "steps": 646,
+   "tokens": 11628
+  },
+  "intend": {
+   "chars": 76964,
+   "covered_chars": 12066,
+   "steps": 646,
+   "tokens": 19582
+  },
+  "latest_response": {
+   "chars": 14763,
+   "covered_chars": 345,
+   "steps": 7,
+   "tokens": 3696
+  },
+  "pending_inputs": {
+   "chars": 75968,
+   "covered_chars": 2368,
+   "steps": 86,
+   "tokens": 19018
+  },
+  "pending_request": {
+   "chars": 5270,
+   "covered_chars": 363,
+   "steps": 5,
+   "tokens": 1320
+  },
+  "prior_delivery": {
+   "chars": 131525,
+   "covered_chars": 5800,
+   "steps": 29,
+   "tokens": 32890
+  },
+  "prior_initial_prd": {
+   "chars": 20415,
+   "covered_chars": 2045,
+   "steps": 5,
+   "tokens": 5105
+  },
+  "prior_structure": {
+   "chars": 36114,
+   "covered_chars": 3434,
+   "steps": 6,
+   "tokens": 9030
+  },
+  "professional_completion": {
+   "chars": 78166,
+   "covered_chars": 216,
+   "steps": 646,
+   "tokens": 20026
+  },
+  "project": {
+   "chars": 2423481,
+   "covered_chars": 52364,
+   "steps": 646,
+   "tokens": 606169
+  },
+  "proposal_contract": {
+   "chars": 1009293,
+   "covered_chars": 56365,
+   "steps": 646,
+   "tokens": 252524
+  },
+  "qa_defects": {
+   "chars": 31157,
+   "covered_chars": 1132,
+   "steps": 20,
+   "tokens": 7796
+  },
+  "request_results": {
+   "chars": 1708,
+   "covered_chars": 566,
+   "steps": 5,
+   "tokens": 428
+  },
+  "revision_note": {
+   "chars": 425,
+   "covered_chars": 65,
+   "steps": 5,
+   "tokens": 110
+  },
+  "validation_feedback": {
+   "chars": 44707,
+   "covered_chars": 2896,
+   "steps": 42,
+   "tokens": 11192
+  },
+  "work_item_guidance": {
+   "chars": 255158,
+   "covered_chars": 21453,
+   "steps": 646,
+   "tokens": 64156
+  }
+ },
+ "sections": {
+  "_pinned_steps": {
+   "steps": 646,
+   "tokens": 0
+  },
+  "allowed_tools": {
+   "steps": 0,
+   "tokens": 24730
+  },
+  "binding_refs": {
+   "steps": 0,
+   "tokens": 78292
+  },
+  "causal_chain": {
+   "steps": 0,
+   "tokens": 64444
+  },
+  "collaboration_rules": {
+   "steps": 0,
+   "tokens": 29450
+  },
+  "current_contract": {
+   "steps": 0,
+   "tokens": 73774
+  },
+  "current_delivery_spec": {
+   "steps": 0,
+   "tokens": 208534
+  },
+  "current_product_decisions": {
+   "steps": 0,
+   "tokens": 4347
+  },
+  "current_product_spec": {
+   "steps": 0,
+   "tokens": 813971
+  },
+  "current_work": {
+   "steps": 0,
+   "tokens": 59807
+  },
+  "department_guidance": {
+   "steps": 0,
+   "tokens": 354
+  },
+  "department_rules": {
+   "steps": 0,
+   "tokens": 18296
+  },
+  "existing_overview": {
+   "steps": 0,
+   "tokens": 31680
+  },
+  "guidance_results": {
+   "steps": 0,
+   "tokens": 241
+  },
+  "input_handling": {
+   "steps": 0,
+   "tokens": 31388
+  },
+  "input_progress": {
+   "steps": 0,
+   "tokens": 11628
+  },
+  "intend": {
+   "steps": 0,
+   "tokens": 19582
+  },
+  "latest_response": {
+   "steps": 0,
+   "tokens": 3696
+  },
+  "pending_inputs": {
+   "steps": 0,
+   "tokens": 19018
+  },
+  "pending_request": {
+   "steps": 0,
+   "tokens": 1320
+  },
+  "prior_delivery": {
+   "steps": 0,
+   "tokens": 32890
+  },
+  "prior_initial_prd": {
+   "steps": 0,
+   "tokens": 5105
+  },
+  "prior_structure": {
+   "steps": 0,
+   "tokens": 9030
+  },
+  "professional_completion": {
+   "steps": 0,
+   "tokens": 20026
+  },
+  "project": {
+   "steps": 0,
+   "tokens": 606169
+  },
+  "proposal_contract": {
+   "steps": 0,
+   "tokens": 252524
+  },
+  "qa_defects": {
+   "steps": 0,
+   "tokens": 7796
+  },
+  "request_results": {
+   "steps": 0,
+   "tokens": 428
+  },
+  "revision_note": {
+   "steps": 0,
+   "tokens": 110
+  },
+  "validation_feedback": {
+   "steps": 0,
+   "tokens": 11192
+  },
+  "work_item_guidance": {
+   "steps": 0,
+   "tokens": 64156
+  }
+ },
+ "sessions": 64,
+ "source": {
+  "artifacts": "C:\\code\\yudao",
+  "db": "C:\\Users\\dengx\\AppData\\Local\\Yudao\\events.sqlite"
+ },
+ "steps": 646,
+ "tokens": 8331638,
+ "tool_sizes": {
+  "1001-4000": {
+   "entries": 596,
+   "referenced": 236,
+   "referenced_tokens": 443022,
+   "tokens": 953088
+  },
+  "201-1000": {
+   "entries": 2789,
+   "referenced": 459,
+   "referenced_tokens": 229435,
+   "tokens": 1244402
+  },
+  "<=200": {
+   "entries": 2850,
+   "referenced": 200,
+   "referenced_tokens": 20119,
+   "tokens": 229385
+  },
+  ">4000": {
+   "entries": 10,
+   "referenced": 0,
+   "referenced_tokens": 0,
+   "tokens": 42220
+  }
+ },
+ "waste_by_kind": {
+  "call": {
+   "entries": 3930,
+   "tokens": 708805
+  },
+  "input": {
+   "entries": 746,
+   "tokens": 1676082
+  },
+  "message": {
+   "entries": 45,
+   "tokens": 320
+  },
+  "pinned": {
+   "entries": 1,
+   "tokens": 2771
+  },
+  "tool": {
+   "entries": 5350,
+   "tokens": 1776519
+  }
+ },
+ "waste_by_source": {
+  "allowed_tools": 35,
+  "binding_refs": 79,
+  "call": 708805,
+  "causal_chain": 14,
+  "collaboration_rules": 45,
+  "current_work": 38,
+  "department_rules": 34,
+  "input:current_work": 1676082,
+  "input_handling": 48,
+  "input_progress": 18,
+  "intend": 28,
+  "message": 320,
+  "pending_inputs": 375,
+  "professional_completion": 31,
+  "project": 1466,
+  "proposal_contract": 505,
+  "tool:bash": 740567,
+  "tool:edit_range": 33469,
+  "tool:list_files": 5665,
+  "tool:read_file": 371886,
+  "tool:read_output": 188,
+  "tool:read_range": 132525,
+  "tool:run_check": 429755,
+  "tool:search": 280,
+  "tool:submit_baseline_review": 20080,
+  "tool:submit_delivery": 7018,
+  "tool:submit_guidance_response": 344,
+  "tool:submit_product_decision": 251,
+  "tool:submit_product_spec": 9697,
+  "tool:submit_request": 1064,
+  "tool:submit_response": 796,
+  "tool:submit_review": 14511,
+  "tool:submit_structure": 3472,
+  "tool:write_file": 4951,
+  "work_item_guidance": 55
+ },
+ "waste_ratio": 0.4998,
+ "waste_tokens": 4164497
+}
