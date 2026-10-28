@@ -463,7 +463,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `run.recovery` | 恢复观察状态、待恢复原因、最后已确认位置、未完成动作、核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果 | | 新增（#16 至 #18） |
+| `run.recovery` | 恢复观察状态、待恢复原因、最后已确认位置、未完成动作、核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果；2026-10-29 按 v13 恢复页补的字段：最后已确认位置的文字与时间（`last_confirmed_text`，来自最后一条事件）、执行权的中断位置（`owner.interrupted_at_event_id` 与文字，来自 `run_resumed` 的依据）、未完成动作的处理方式与核实依据（`unknown_actions[]`：`handling`、`session_id`、`purpose`、`input_version`、`before`、`returned`、`at`，来自 `tool_started` 与 `action_verified`）、各会话的用量（`sessions[]`：部门、主线或分支、已用秒、轮数、步数，来自最小投影）、因升级停止的新旧 run 关联（`upgrade`：旧新 run、事件版本、起点；来自 `run_failed` 的停止原因与 `work_item_created.restarted_from_run_id`，该字段只增） | | 新增（#16 至 #18），字段补充见 #181 的拆分 |
 
 **资料**
 
@@ -549,6 +549,14 @@ sequenceDiagram
 | `replay.check` | 删除保存的投影后在内存中重放一个 run 或项目，与保存的投影比较，返回是否一致与差异 | | 已有 `POST /api/runs/{id}/replay` 与命令行 `replay`，改为查询 |
 
 查询共 41 个：由已有路由改成或合并的 14 个，其余为新增。
+
+2026-10-29 补充（恢复页按 v13 补齐，工单 #181 的拆分）：
+
+- `project.loop` 每个事项加 `stop_reason`（来自 run 的停止原因）与 `last_department`（来自最后活动的部门），画面的「门口牌子」与概览入口读它们；卡片不另存 `recovery_state`。
+- `system.status.drain` 加 `since`（来自 `runtime_drain_started`）与 `running[]`（未结束的 run 与事项标题）。
+- `work_item_created` 加字段 `restarted_from_run_id`（只增）：强制升级以后事项用已采纳成果重新开始，新旧 run 的关联由它给出；队列里的位置没有实现，页面不显示「第几位」。
+- 整层「中断」（画面变暗、时钟停住）的取值：事件流断开，或任一事项的 `recovery.state` 是 `interrupted`。服务进程被强行结束时读不到 `interrupted`（未结束的激活在 `finally` 才结束），所以以事件流断开为准；服务回来、页面重新连接并看到自动继续以后恢复。
+- 强制升级与开始排空一样，执行前有确认框，说明会让正在进行的 run 记为因升级停止。
 
 ### 4.4 删除的读取路由
 
