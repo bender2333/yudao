@@ -1,6 +1,6 @@
 # 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
 # 测试按层与时机运行（docs/design/test-pyramid.md 第 4 节）：
-#   合并前（PR、main 的推送与手动触发）：① 单元层、② 模块层、评测工具、客户端四个作业并行，check 汇总四项的结果
+#   合并前（PR、main 的推送与手动触发）：① 单元层、② 模块层、评测工具、客户端、工作台脚本五个作业并行，check 汇总五项的结果
 #     并在运行摘要里写出各层的表；PR 上另有「用例变化」，列出合并前后各层用例的增减，只显示，不挡合并
 #   合并以后（main 的推送与手动触发）：③ 集成层，不挡合并
 #   发布之前（架构师手动运行，不在 CI 中）：真实模型冒烟与桌面测试
@@ -185,11 +185,33 @@ jobs:
         working-directory: client
         run: npm run typecheck
 
-  # 合并必须通过的检查（main 的规则要求名为 check 的检查）：上面四个作业都成功才成功。
-  # 无论四个作业结果如何都运行，在运行摘要里写出各层的表
+  # 工作台的脚本：solo 循环与架构师循环用的调度脚本（.claude/skills/*/scripts），只有 Node 内置模块，不需要装依赖。
+  # 这些脚本决定派哪张工单、谁在做、收账成不成立，判断一旦错整个交付队列都跟着错，所以与产品代码同样进 CI
+  workbench:
+    name: 工作台脚本
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: 单元测试
+        run: node --test --test-reporter=spec .claude/skills/solo/scripts/test/*.test.mjs
+
+      - name: 语法检查
+        run: |
+          node --check .claude/skills/solo/scripts/solo.mjs
+          node --check .claude/skills/solo/scripts/hook.mjs
+          node --check .claude/skills/solo/scripts/state.mjs
+
+  # 合并必须通过的检查（main 的规则要求名为 check 的检查）：上面五个作业都成功才成功。
+  # 无论五个作业结果如何都运行，在运行摘要里写出各层的表
   check:
     if: ${{ always() }}
-    needs: [unit, module, evals, client]
+    needs: [unit, module, evals, client, workbench]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -207,13 +229,14 @@ jobs:
             --junit unit=.tmp/test-results/unit.xml --junit module=.tmp/test-results/module.xml \
             --junit evals=.tmp/test-results/evals.xml --pending integration | tee -a "$GITHUB_STEP_SUMMARY"
 
-      - name: 四项都通过
+      - name: 五项都通过
         run: |
-          echo "① 单元层：${{ needs.unit.result }}；② 模块层：${{ needs.module.result }}；评测工具：${{ needs.evals.result }}；客户端：${{ needs.client.result }}"
+          echo "① 单元层：${{ needs.unit.result }}；② 模块层：${{ needs.module.result }}；评测工具：${{ needs.evals.result }}；客户端：${{ needs.client.result }}；工作台脚本：${{ needs.workbench.result }}"
           test "${{ needs.unit.result }}" = success
           test "${{ needs.module.result }}" = success
           test "${{ needs.evals.result }}" = success
           test "${{ needs.client.result }}" = success
+          test "${{ needs.workbench.result }}" = success
 
   # PR 合并前后的用例清单（只收集，不运行），按层列出新增、删除与换层（docs/design/test-pyramid.md 第 4.4 节）。
   # 只显示，不是合并必须通过的检查；删除的用例由审查者与交付说明逐条核对
