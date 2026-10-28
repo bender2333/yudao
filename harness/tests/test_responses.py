@@ -360,11 +360,42 @@ def test_unknown_provider_error_code_is_not_persisted():
         with pytest.raises(ProviderError) as caught:
             ResponsesAdapter(config).complete(_request())
     assert caught.value.retryable is True
+    # 未知的错误码不进 error_code，上游的原文另记（工单 #1157）
     assert caught.value.diagnostics == {
         "status_code": 500,
         "request_observation_id": "activation:1:attempt-1",
+        "error_message": "opaque",
     }
     assert leaked_code not in str(caught.value)
+
+
+def test_upstream_error_text_is_redacted_and_truncated():
+    # 上游给出的错误原文记进失败尝试的诊断：先替换本次请求的 Key，再截断到 2000 字符（设计说明第 13.4 节）
+    def failure(handler, _body):
+        body = {"error": {"code": "server_error", "type": "server_error",
+                          "message": KEY + " " + "长" * 5000}}
+        _send(handler, json.dumps(body).encode(), status=500, content_type="application/json")
+
+    with _server([failure]) as (config, *_):
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(_request())
+    message = caught.value.diagnostics["error_message"]
+    assert len(message) <= 2000
+    assert KEY not in message and "[REDACTED]" in message
+
+
+def test_upstream_error_text_falls_back_to_the_plain_text_body():
+    # 没有错误对象时取文本回应体：中转服务用纯文本、不是 JSON 的错误拒绝请求（设计说明第 13.4 节）
+    def failure(handler, _body):
+        _send(handler, b"prompt is too long: 241669 tokens > 128000 maximum", status=400,
+              content_type="text/plain")
+
+    with _server([failure]) as (config, *_):
+        with pytest.raises(ProviderError) as caught:
+            ResponsesAdapter(config).complete(_request())
+    error = caught.value
+    assert error.reason == "context_overflow"
+    assert error.diagnostics["error_message"] == "prompt is too long: 241669 tokens > 128000 maximum"
 
 
 @pytest.mark.parametrize("status", ["incomplete", "failed"])

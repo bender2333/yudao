@@ -308,8 +308,10 @@ async def invoke_responses(
     except APIStatusError as exc:
         code = _error_code(exc.body)
         status_reason = _http_status_reason(exc.status_code)
-        reason = status_reason or ("context_overflow" if _is_context_overflow(code) else "provider_error")
-        diagnostics = _http_status_diagnostics(exc, _request_observation_id(invocation), secrets=(config.api_key,))
+        error_text = _upstream_error_text(exc, secrets=(config.api_key,))
+        reason = status_reason or ("context_overflow" if _is_context_overflow(code, error_text) else "provider_error")
+        diagnostics = _http_status_diagnostics(exc, _request_observation_id(invocation),
+                                              secrets=(config.api_key,), error_text=error_text)
         retry_after = _retry_after(getattr(getattr(exc, "response", None), "headers", None))
         if retry_after is not None:
             diagnostics["retry_after_sec"] = retry_after
@@ -754,7 +756,9 @@ def _http_status_diagnostics(
     observation_id: str,
     *,
     secrets: tuple[str, ...] = (),
+    error_text: str | None = None,
 ) -> dict[str, Any]:
+    # 上游以 HTTP 状态拒绝请求时的诊断：状态码，加上它给出的错误码、错误类型、参数与错误原文（设计说明第 13.4 节）
     error = _error_object(exc.body)
     diagnostics: dict[str, Any] = {
         "status_code": exc.status_code,
@@ -769,7 +773,49 @@ def _http_status_diagnostics(
     param = _sanitized_error_param(error.get("param"))
     if param is not None:
         diagnostics["param"] = param
+    if error_text:
+        diagnostics["error_message"] = error_text
     return _redact_sdk_json(diagnostics, secrets=secrets)
+
+
+# 上游拒绝请求时记下的错误原文的长度上限（设计说明第 13.4 节）
+_UPSTREAM_ERROR_TEXT_LIMIT = 2000
+
+
+def _upstream_error_text(exc: openai.APIStatusError, *, secrets: tuple[str, ...] = ()) -> str | None:
+    # 上游给出的错误原文：错误对象的 message，没有错误对象时取文本回应体。
+    # 先替换凭据再截断（设计说明第 13.4 节）；401 与 403 的回应体不记，因为它可能回显凭据
+    if exc.status_code in _CREDENTIAL_REJECTED_STATUSES:
+        return None
+    raw = _raw_upstream_error_text(exc.body, getattr(exc, "response", None))
+    if raw is None:
+        return None
+    redacted = _redact_credentials(raw, secrets=secrets).strip()
+    if not redacted:
+        return None
+    return redacted[:_UPSTREAM_ERROR_TEXT_LIMIT]
+
+
+def _redact_credentials(text: str, *, secrets: tuple[str, ...]) -> str:
+    # 先替换本次请求的 Key，再替换环境里的密钥。harness.redact 到这里才导入：
+    # 导入 Provider 模块只加载模块自身与定义（设计说明第 2 节），这一点由 test_providers_module 检查
+    from ..redact import redact_text
+
+    return redact_text(_redact_sdk_json(text, secrets=secrets))
+
+
+def _raw_upstream_error_text(body: Any, response: Any) -> str | None:
+    # 有错误对象时取它的 message；没有错误对象时取文本回应体（纯文本的中转服务、不是 JSON 的错误）
+    error = _error_object(body)
+    message = error.get("message") if error else None
+    if isinstance(message, str) and message.strip():
+        return message
+    if error:
+        return None
+    text = getattr(response, "text", None)
+    if isinstance(text, str) and text.strip():
+        return text
+    return body if isinstance(body, str) and body.strip() else None
 
 
 def _actual_model(value: Any) -> str | None:
@@ -901,8 +947,24 @@ def _safe_error_code(code: Any) -> str | None:
     return normalized if normalized in _KNOWN_ERROR_CODES else None
 
 
-def _is_context_overflow(code: Any) -> bool:
-    return _safe_error_code(code) == "context_length_exceeded"
+# 上下文超限在错误原文里的写法（设计说明第 8.7 节），大小写不敏感
+_CONTEXT_OVERFLOW_TEXT_MARKERS = (
+    "context_length_exceeded",
+    "prompt is too long",
+    "maximum context length",
+    "exceeds the context window",
+    "model_context_window_exceeded",
+)
+
+
+def _is_context_overflow(code: Any, error_text: str | None = None) -> bool:
+    # 上下文超限按错误码与错误原文识别（设计说明第 8.7 节）：OpenAI 兼容的中转服务常常只给一个 400 与一段文字
+    if _safe_error_code(code) == "context_length_exceeded":
+        return True
+    if isinstance(error_text, str):
+        lowered = error_text.casefold()
+        return any(marker in lowered for marker in _CONTEXT_OVERFLOW_TEXT_MARKERS)
+    return False
 
 
 def _diagnostic_code(code: Any, fallback: str) -> dict[str, str]:
