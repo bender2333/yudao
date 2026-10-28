@@ -26,7 +26,8 @@ argument-hint: "<工单编号> [里程碑标题]"
 - 读写文件用那个目录下的路径；跑命令先 `cd` 过去。
 - **不要动主工作区**（仓库根）：那里是编排者与架构师在用的，同一批里别的工人也在别的目录里干活。
 - 临时文件、探针脚本、临时输出放 `<工作目录>/.tmp/`。
-- 依赖复用主仓库那份：Python 用 `UV_PROJECT_ENVIRONMENT=<主仓库>/.venv`（`handoff.md` 里给了值就照它），客户端复用主仓库的 `client/node_modules`。每个 worktree 各装一份会把目录撑到几千文件，建得慢、删的时候被进程锁住。
+- Python 的依赖复用主仓库那份：`UV_PROJECT_ENVIRONMENT=<主仓库>/.venv`（`handoff.md` 里给了值就照它）。
+- 客户端的依赖不共用：要运行客户端测试或接口合同检查时，在自己的 worktree 里 `npm ci`（`client` 与 `harness/tests/openapi` 各一次）。不建指向主仓库 `client/node_modules` 的链接：通过链接共用时，任何一处的 npm 安装改的都是同一个目录。
 - 不要合并别人的 PR、不要动别人的工单、不要强推主分支。
 
 ## 开工前先看三样
@@ -48,7 +49,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
    符号找不到：找到它现在的位置或替代物，日记写明；工单要的东西已经不存在、目标做不成才按「三条通道」交回。要改清单外的文件：在工单评论里补记要改的文件与原因，然后改，改内核路径的工单也一样。
 4. **实现**：测试先行；在分支上提交，**分阶段提交**（被中断时已经推上去的还在）。
-5. **日记**：`agents_jour/<编号>.md`，随分支提交，不直接推 main。
+5. **日记**：`agents_jour/<编号>.md`，随分支提交，不直接推 main；在合并之前写完，合并以后不再补记（合并提交与 main 上的 CI 在 GitHub 上查得到）。
 6. **自测**：跑与改动相关的测试文件（包括新增的集成层文件）；改动涉及 `client/` 再跑相关前端测试；逐条核对验收标准。失败项的细节用 `--tb=short` 或 `--lf` 再看，不要把长日志贴进输出。新增测试文件在 `harness/tests/layers.toml` 补一行登记，放在第一个能到达其结论的层。
 7. **推送与 PR**：正文写 `Closes #<编号>`、`Solo: 无独立审查，由 solo 执行者自行合并`、一句摘要、署名。一张工单只开一个 PR。
 8. **等 CI**：`gh pr checks issue-<编号> --watch`。失败就改、提交、推送，直到通过。**不要开自动合并**（它会跳过第 10 步）。
@@ -56,7 +57,7 @@ argument-hint: "<工单编号> [里程碑标题]"
    - **带 `touches-core` 的工单**：`check` 绿了以后在分支上跑一次集成层：`gh workflow run CI --ref issue-<编号>` → `gh run list --workflow CI --branch issue-<编号> --limit 1` 拿运行号 → `gh run watch <运行号>`（约 15 分钟）。失败项与 main 最近 7 天比（`gh run list --workflow CI --branch main --event push --limit 5`）：main 上也失败过的是不稳定项，写进交付说明；main 上没失败过的按自己的问题修，修好再跑。这次运行的链接写进交付说明。
 9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、删掉的用例逐条写「用例名 + 依据（哪条 ADR 或工单删的）」，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。工单没写明删除的行为，用例只改写不删。
 10. **合并前的核对**（`AGENTS.md`「Solo 模式」第 4 步，五项都成立才合并）：
-    - `git fetch origin main && git merge origin/main`（冲突在自己的分支上解，解不开按下面「冲突解不开」交回）；`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过。
+    - `git fetch origin main && git merge origin/main`（冲突在自己的分支上解，两边改了同一段逻辑的按下面「前提变了」交回）；`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过。
     - 工作区没有未提交也未推送的改动。
     - 交付说明里每条验收核对都有证据。
     - 带 `touches-core` 时，交付说明里有分支集成层运行的链接，失败项都是 main 上最近 7 天失败过的。
@@ -64,7 +65,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
     任何一项不满足：标签改回 `in-progress`，修好、过 CI 以后回到第 9 步，没有例外。
 11. **合并**：`gh pr merge issue-<编号> --admin --squash`。合并时标签是 `needs-review`。`--admin` 是仓库所有者的豁免，solo 唯一允许用的场合，它绕开所有规则（包括 `check`），所以第 10 步只能由你自己做。
-12. **合并以后**：确认 PR 已合并、工单随 `Closes` 关闭（没关就 `gh issue close <编号>` 并说明原因）；去掉 `needs-review`；把合并提交号写进日记。
+12. **合并以后**：确认 PR 已合并、工单随 `Closes` 关闭（没关就 `gh issue close <编号>` 并说明原因）；去掉 `needs-review`。
 13. **清理**（在删 worktree **之前**）：关掉你开的网页与浏览器；按**进程号**结束自己起的进程（起的时候记下进程号）；删掉自己建的临时目录与文件（`.tmp/` 里给编排者用的评论文件与截图留着）。
 14. **不要删 worktree**：在循环里由编排者的 `solo.mjs gc` 统一清（先归档 `.tmp/` 的证据再删），收尾报告「worktree 保留：<路径>」；单独运行时工单关闭以后自己 `git worktree remove`。沙箱对工作区外目录的删除常常被拦，删一半会留下坏目录。
 

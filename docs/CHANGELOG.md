@@ -624,3 +624,17 @@ solo-deepseek-v4.1-flash / 2026-10-28 07:40 / 工单 #863（骨架与应用 S4c�
 claude-opus-5-5 / 2026-10-28 09:10 / `docs/design/skeleton-and-application.md`：状态行；第 3.1 节插件加载改为路由按名字、装配与执行由组装处经构造参数接上；第 3.2 节三道契约与骨架事件写现在的模块；第 4 节补 `settled_steps`；第 5.1 节写 `routings.json` 封闭清单与路由的两半；第 5.2、5.3 节加「接法」，第 5.3 节输出写三样中性的观察；第 5.5 节加 `facts` 的去向与「新种类的成果写通用的接纳事件」；第 6 节写薄驱动的身份从定义推；第 7 节 `model_requested` 移到骨架事件、加通用的成果接纳、写内核事件模块放哪些东西；第 8 节写应用模块放在 `harness/` 顶层、「应用」与「应用层」的区别；第 12 节 S2c、S6a、S6c 三行与排序。`docs/design/README.md` 骨架与应用的状态改为实施中。`docs/architecture-issues.md` 七条「待架构师决定」写处理行 / 阶段一工单分诊：#979、#1098 交回的两处设计缺口，solo 执行者登记的七条边界（决定记录 2026-10-28）
 
 solo-deepseek-v4.1-flash / 2026-10-28 09:58 / 工单 #829（骨架与应用 S6a）：`docs/architecture-issues.md` 追加两条——① 应用层可以导入的控制核心公开接口只有八类、没有模块清单（#620 记的同一处），本单按 main `c21c5e94` 逐个归类，25 个模块里 15 个归进八类、10 个定为公开接口并写进 import-linter 的第三条合同，请架构师把清单写进设计说明第 2.4 节；② 设计说明第 12 节把 S6c（#979）排在 S6a 之前，而 #979 仍未做、本单的五条验收不依赖它，差别写进交付说明 / 记录设计没写到的这一处边界与前置顺序的差别，按「自己定、登记、继续做」处置
+
+claude-opus-5-5 / 2026-10-28 11:25 / `AGENTS.md` 共同要求的日记一条加「日记在合并之前写完，合并以后不再补记」，「Solo 模式」第 6 步删去「记录合并提交号写入日记」；`.claude/skills/solo-worker/SKILL.md` 第 5、12 步随之改；`.claude/skills/solo/SKILL.md` 收账一节删去补记日记的小 PR 的说法 / 合并以后补记日记要再开一张 PR，10-25 以来合并的 130 张 PR 里 56 张标题带「日记」；合并提交与 main 上的 CI 在 GitHub 上查得到（solo 复盘，用户确认，决定记录同日一条）
+
+claude-opus-5-5 / 2026-10-28 11:25 / `docs/design/test-pyramid.md`：状态行收成一行；第 10 节加第 7 条（两件同时进行的事谁先谁后由事件、信号文件或提交通知决定，等待有上限，Windows 上被占用的文件做有次数上限的重试），第 5 节第 5 条改为引用它；`AGENTS.md` 常用命令里测试写法的摘要加一句 / 这一段修好的五个不稳定项（#1100、#1101、#1108、#1117、#1134）都是测试用时长去赌先后；原有的一条在第 5 节，执行者被指去读的是第 10 节
+
+claude-opus-5-5 / 2026-10-28 11:25 / `.claude/skills/solo/SKILL.md` 机器配置与 `.claude/skills/solo-worker/SKILL.md` 工作目录：客户端的依赖不共用，不建指向主仓库 `client/node_modules` 的链接，要用的 worktree 自己 `npm ci` / 通过链接共用时，worktree 里的 npm 安装改的是主仓库那份（复盘记了主工作区的 `node_modules` 被清空）；`C:\w` 下 issue-1098、561、618、619 四个这样的链接已删除，主仓库的目录未动
+
+claude-opus-5-5 / 2026-10-28 11:25 / `docs/agents/autopilot-runtime.md` 第 1.3 节：`PYTHONUTF8=1` 改为两台机器的用户环境变量（`setx PYTHONUTF8 1`） / 原句只要求 PowerShell 的测试终端设置，DSH 的终端没有设，`test_layer_boundaries.py` 三条按 GBK 解码失败；架构师的电脑已设置
+
+claude-opus-5-5 / 2026-10-28 11:25 / `.claude/skills/to-children/SKILL.md` 第 3 步：写阻塞边的一句加例子，正文里点名的、还开着的工单都要设阻塞边 / #1098 的「只改」写着「#1095 建的」模块，却没有这条阻塞边
+
+claude-opus-5-5 / 2026-10-28 11:25 / `.claude/skills/solo/SKILL.md`「一张工单的完整链路」删去 `kernel-approved`；`.claude/skills/solo-worker/SKILL.md` 第 10 步交回冲突的指向改为「前提变了」 / 前者 10-27 已取消，后者原来指向的小节不存在
+
+claude-opus-5-5 / 2026-10-28 11:25 / `docs/architecture-issues.md`：#828 一条写处理行，三处按实现定 / 结论已在骨架与应用设计说明第 7 节

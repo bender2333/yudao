@@ -35,7 +35,7 @@ Claude 担任派发者时使用这里的路径。
 
 ### 1.3 两台机器共同的约束
 
-PowerShell 的测试终端先设置 `$env:PYTHONUTF8='1'`，让 Python 及其测试子进程统一输出 UTF-8；pytester 的子进程输出按 UTF-8 读取。
+两台机器把 `PYTHONUTF8=1` 设成用户环境变量（Windows：`setx PYTHONUTF8 1`，之后新开的终端生效），任何终端与 harness 里的 Python 及其测试子进程都输出 UTF-8；pytester 的子进程输出按 UTF-8 读取。
 
 各角色只使用第 1 节列出的目录。架构师在会话中临时建的 worktree，会话结束之前删除。
 
