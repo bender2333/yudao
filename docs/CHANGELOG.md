@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 05:23 / 工单 #1209 [界面 · 用例]：本文件加这一条，`docs/` 下的文档都没有改——工单写明「用例期望值随行为改动更新」，依据一栏就是「无设计说明」、总图无位置；改的是 `client/tests/e2e/models.spec.ts` 里那条端到端用例的断言：上游那次失败给出的原文抽成一个常量、测试内的上游与断言共用它，断言从写死 `Model provider returned HTTP 500` 改成「该行出现上游原文 + 没有退回状态码那句」，与 `docs/design/model-management.md` 第 9.1 节「模型那一行写上游原因」一致（该节由 #1157 落地，代码未改） / #1158 交回的第 1 件事：这条用例自 #1157（PR #1204）起在 main 上一直红，期望值落后于已确认的行为
+
 claude-架构师 / 2026-10-29 05:15 / 本次复盘没有改 `docs/` 下的文件（只发帖与写日记），按 `/retro` 第 10 步记录一句：阶段一薄片「核心打通与换骨架」的复盘帖子 https://github.com/bender2333/yudao/discussions/1210（Announcements），含「改动与预期」8 条，其中 4 条等用户确认（R2 客户端端到端进 CI、R4 solo 并发 4 -> 5、R5 交付说明以 PR 正文为准、R8 记录类文件按月分文件）/ 复盘本身就是记录，不改文档
 
 solo-deepseek-v4.1-flash / 2026-10-29 02:20 / 工单 #1158 [模型 · 凭据]：README 的「配置 Provider」与凭据那两段补上 `.env` 的键名规则（字母、数字与下划线，不以数字开头），写明勾选持久化时保存前按它核对、来源显示 `.env`、失败什么都不改 / 落实 `docs/design/model-management.md` 第 4.2 节「凭据引用的写法」与「写入 .env 以后的来源」两条（设计说明未改，代码与用例同单改动，只补读者看得见的规则）
@@ -727,4 +729,5 @@ claude-架构师 / 2026-10-29 03:25 / `.claude/skills/solo/SKILL.md` 每轮第 2
 claude-架构师 / 2026-10-29 03:25 / `.claude/skills/solo/SKILL.md` 每轮第 2 步与 `.claude/skills/architect-loop/SKILL.md` 第 4 步：`reap` 之前先查这个分支上有没有在跑的 CI 运行、PR 上的检查在不在 `in_progress`，三样都静止才回收；`architect-loop` 的一轮从五步改成六步 / 2026-10-29 在 #1162 上误判过一次「卡住」：原工人其实在等一趟挂住的集成层（xdist 进程挂掉、作业超时取消），`reap` 之后重派，两个活着的工人写了同一个 worktreeclaude-架构师 / 2026-10-29 03:45 / `.claude/skills/trial/scripts/preflight.ps1` 两处改正：python 经 `uv run --no-sync python` 起得来也算通过（这台机器上裸 python 是占位程序）；凭据在进程里没有时读用户级 `YUDAO_EVAL_API_KEY` 并在读数里写明取自哪一级 / 试用的预检对本机误报两项阻断，预检不过会让薄片在到达时停在原处；改完 0 阻断、1 警告（工作区有未提交改动）
 claude-架构师 / 2026-10-29 05:00 / `docs/agents/autopilot-runtime.md` 第 1.3 节补一段：共享 `.venv` 是 editable 安装、`harness` 指向最近一次 `uv sync` 的 worktree，会随别的会话变；工人在自己 worktree 里跑导入 `harness` 的脚本或嵌套子进程用例时带 `PYTHONPATH=<worktree 根>` / #1158 交回的第 2 件事；症状是「莫名 import 错」或与本单无关的怪失败
 
-claude-架构师 / 2026-10-29 05:00 / 新开 #1209（`client/tests/e2e/models.spec.ts` 的期望值跟上 #1157 的「写上游原文」）与 #1208 的第三次同形证据 / #1158 交回的第 1 件事与今天第三次集成层挂住claude-架构师 / 2026-10-29 05:25 / `.claude/skills/trial/SKILL.md` 第 7 节：每条问题的复现步骤要写清点的是哪一处（选择器、可见文字或坐标，连同那一步的页面读数）/ 复盘帖 R7；帖子说不清点哪里，维护者与复现子代理会各点一个地方
+claude-架构师 / 2026-10-29 05:00 / 新开 #1209（`client/tests/e2e/models.spec.ts` 的期望值跟上 #1157 的「写上游原文」）与 #1208 的第三次同形证据 / #1158 交回的第 1 件事与今天第三次集成层挂住
+claude-架构师 / 2026-10-29 05:25 / `.claude/skills/trial/SKILL.md` 第 7 节：每条问题的复现步骤要写清点的是哪一处（选择器、可见文字或坐标，连同那一步的页面读数）/ 复盘帖 R7；帖子说不清点哪里，维护者与复现子代理会各点一个地方

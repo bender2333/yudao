@@ -346,6 +346,10 @@ test("新建自定义连接，获取候选，勾选两个模型（带容量与�
   }
 });
 
+// 上游这次失败给出的错误原文（工单 #1209）：模型测试失败时界面写的是上游给的这一句，
+// 断言与测试内的上游共用同一个变量，上游换一句话时用例跟着走，不必再改第二处
+const UPSTREAM_ERROR_MESSAGE = "upstream internal failure";
+
 // 工单 #385 / #563 验收第 2 条：手动添加模型保存后自动测试一次，失败留在候选，修正后通过
 test("手动添加一个模型并保存自动测试一次；上游返回错误该行显示原因并留在候选，修正后测试通过", async () => {
   test.setTimeout(300_000);
@@ -353,7 +357,7 @@ test("手动添加一个模型并保存自动测试一次；上游返回错误�
   const upstream = createServer((_request, response) => {
     if (failUpstream) {
       response.writeHead(500, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ error: { message: "upstream internal failure", type: "server_error" } }));
+      response.end(JSON.stringify({ error: { message: UPSTREAM_ERROR_MESSAGE, type: "server_error" } }));
     } else {
       response.writeHead(200, { "Content-Type": "text/event-stream" });
       const chunk = `data: ${JSON.stringify({
@@ -398,11 +402,17 @@ test("手动添加一个模型并保存自动测试一次；上游返回错误�
     await expect(form).toHaveCount(0);
     await expect(client.page.getByTestId("page-notice")).toHaveText("已添加 Provider 配置。");
 
-    // 展开连接：保存后自动测试一次，上游返回错误，该行显示原因并留在候选
+    // 展开连接：保存后自动测试一次，上游返回错误，该行显示上游给出的原因并留在候选
     const card = client.page.getByTestId("provider-fail-test-p");
     await card.getByRole("button", { name: "展开" }).click();
     await expect(card.getByTestId("model-manual-fail")).toBeVisible();
-    await expect(card.getByTestId("model-result-manual-fail")).toContainText("模型测试未通过：Model provider returned HTTP 500");
+    // 断言落在「这一行写的是上游原文」上，不钉死某一个英文字句（工单 #1209）：前缀与原文分开核对，
+    // 界面以后在原文前后多写一句、或上游换一句原文，这条用例都不必改
+    const result = card.getByTestId("model-result-manual-fail");
+    await expect(result).toContainText("模型测试未通过");
+    await expect(result).toContainText(UPSTREAM_ERROR_MESSAGE);
+    // 反向：界面写死成状态码那句（不再写上游原文）时，上面一条会红，这里也再核对它没有退回那句
+    await expect(result).not.toContainText("Model provider returned HTTP");
     await expect(card.getByTestId("model-manual-fail")).toContainText("候选");
     // 未准入的模型不在部门默认下拉中
     await expect(client.page.getByTestId("default-model-product").locator("option", { hasText: "manual-fail" })).toHaveCount(0);
