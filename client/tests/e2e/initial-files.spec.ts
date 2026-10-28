@@ -79,7 +79,7 @@ async function newProjectForm(page: Page): Promise<Locator> {
 async function fillNewProjectForm(form: Locator, name: string, directory: string): Promise<void> {
   await form.getByLabel("项目名称").fill(name);
   await form.getByLabel("长期目标").fill(GOAL);
-  await form.getByLabel("起始文件夹").fill(directory);
+  await form.getByLabel("起始文件夹（可选）").fill(directory);
 }
 
 // 起始文件夹里的文件：工作区相对路径，用「/」连接（list_files 的输出与概览的文件数都按这个口径）
@@ -166,21 +166,27 @@ test.describe("起始文件夹（1440×900）", () => {
       const files = listedFiles(source);
       const name = `起点项目 ${Date.now()}`;
       const form = await newProjectForm(page);
+      // 表单的说明照原型 v13（工单 #1160）：起始文件夹是可选项，是一份快照；新建项目不调用模型
+      await expect(form).toContainText("起始文件夹（可选）");
+      await expect(form).toContainText("填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。");
+      await expect(form).toContainText("新建项目不调用模型；之后在概览中记录原文或作为新事项开始。");
       await fillNewProjectForm(form, name, source);
       expect(await overflowReport(page)).toEqual([]);
       await form.getByRole("button", { name: "新建项目" }).click();
-      await waitUntil(async () => (await page.locator(".project-entry").allInnerTexts()).join().includes(name),
-        page, "侧栏出现新建的项目");
+
+      // 新建成功以后停在新项目的概览（工单 #1160）：不用再点侧栏，地址就是这个项目的概览
+      const id = await projectId(page, name);
+      await waitUntil(async () => (await page.evaluate(() => window.location.hash)) === `#/p/${id}/overview`,
+        page, "新建成功以后转到新项目的概览");
+      await expect(page.locator(".project-entry").filter({ hasText: name })).toBeVisible();
 
       // 概览：起点说明写在项目摘要里，文件数与目录里的实际文件数相同
-      const id = await projectId(page, name);
-      await navigate(page, id, "overview");
       const summary = await section(page, "项目摘要");
       await expect(summary).toContainText(`起点：起始文件夹（${files.length} 个文件）`);
       expect(await overflowReport(page)).toEqual([]);
 
-      // 开始事项：概览的「新的要求」提交为新事项
-      await page.getByLabel("新的要求").fill("在起始文件夹的基础上继续做");
+      // 开始事项：概览的那一个框提交为新事项
+      await page.getByLabel("新的想法或材料").fill("在起始文件夹的基础上继续做");
       await page.getByRole("button", { name: "作为新事项开始" }).click();
 
       // 部门工作间的动作与回执：产品先列出工作区里的文件、再读起点文件夹里的一个文件，
