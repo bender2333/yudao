@@ -1,7 +1,7 @@
 # 工单 #308：恢复契约第 4 节第 1 步。Yudao 自己的文件工具（write_file、edit_range、delete_file、
 # move_file）结果未知时自动核实：按动作前的公开树快照、动作参数与当前公开树对比，
-# 工作区与动作前相同就以新的尝试重新执行，只有目标路径变成目标内容就记一条自动核实记录，
-# 其余情况交给用户决定。
+# 只有目标路径变成目标内容才记一条自动核实记录，其余情况作为工具结果交还发出它的会话
+# （工单 #581：不再以新的尝试重新执行这个动作，也不发决定请求）。
 # 四个场景都用真实的子进程运行系统，在工具执行中被终止。写入、编辑、删除、移动在执行环境里是
 # 同步的、没有可等待的进程，「没有发生」用 tool_started 提交以后停住来制造（执行前终止），
 # 「已经发生」用工作区文件变成目标内容以后子进程自己终止来制造（写入已落盘、回执未写）。
@@ -25,7 +25,7 @@ def _settle() -> dict:
             "checks": {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}}
 
 def _tool_started(system, run_id: str, action_id: str) -> list[dict]:
-    # 整个 run 里这一个调用编号的 tool_started（工单 #943）：
+    # 整个 run 里这一个调用编号的 tool_started（工单 #943）：恢复不再自动重新执行动作（工单 #581），
     # 动作被重新执行时这里会多出几条——结果没有交还、命令被再运行，用例要在它上面失败
     return [event.payload for event in killed.events(system, run_id, "tool_started")
             if (event.payload or {}).get("id") == action_id]
@@ -52,7 +52,6 @@ def test_other_changes_after_the_snapshot_ask_the_user(tmp_path):
         run.before.workspace(run.run_id).write_file("src/other.txt", "someone else\n")
         run.after.resume_startup_runs()
 
-        assert killed.unknown_action_requests(run.after, run.run_id) == []
         attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
         assert len(attempts) == 1
 
@@ -101,8 +100,8 @@ def test_an_edit_delete_and_move_are_verified_the_same_way(tmp_path):
                                                      ["src/other.txt", "hash-b"]])
         assert result["verdict"] == "not_happened", tool
 
-    # 另有改动：判为 unclear，交给用户决定
+    # 另有改动：判为 unclear，作为工具结果交还发出它的会话
     unclear = verify_file_action("delete_file", {"path": "src/note.txt"}, before_snapshot=before,
                                  current_entries=[["src/note.txt", "hash-a"], ["src/other.txt", "hash-z"]])
-    assert unclear["verdict"] == "unclear", "只有目标路径变化才能确认，另有改动交给用户"
+    assert unclear["verdict"] == "unclear", "只有目标路径变化才能确认，另有改动交还发出它的会话"
 
