@@ -684,3 +684,17 @@ claude-架构师 / 2026-10-29 01:10 / 新开 #1169：写入口与薄驱动核对
 claude-架构师 / 2026-10-29 01:35 / `docs/agents/autopilot-runtime.md` 第 4 节补一段实测：会话进程里没有 `YUDAO_EVAL_API_KEY`（用户级有、进程没继承）、`YUDAO_VISION_API_KEY` 也没有，`vision.mjs` 在没有 `SOLO_VISION_*` 时沿用 `YUDAO_EVAL_API_KEY`；用到凭据的命令先在本进程里从用户级补一行 / #1160 的交付说明写着「未识图」，查下来是这一处进程环境，不是缺凭据本身
 
 claude-架构师 / 2026-10-29 01:35 / 新开 #1185：成果挂起的计数补一条能造出 held 事项的验收（`ready-for-agent`，不挂里程碑）/ #1160 的收尾建议；「成果挂起」这一格现在只有代码核对
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:00 / `docs/design/app-and-interface.md` 第 2.4 节写入应用层可导入的控制核心公开接口的模块清单（九类，`models` 归应用）；第 4.3 节 `run.recovery` 一行补 v13 恢复页要的字段，表后加 `project.loop`、`system.status.drain`、`work_item_created` 的补充与整层中断的取值 / #829 的架构问题登记；#181 拆分之前设计要先有
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:00 / `docs/design/skeleton-and-application.md` 第 5.1 节「输入」补路由读事件的可选入口 `use_facts`（契约版本 3）；`docs/architecture-issues.md` 四条登记各加处理行 / #864 与 #829 的架构问题登记
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:05 / `docs/program-roadmap.md` 阶段二一行的先后改正：④ 在 ② 与 ③ 之后，状态行收成一行 / 工单的真实依赖：#990 依赖 #123，#358、#397、#399 依赖 #151
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:05 / `docs/requirements/self-hosting.md` 加「第一层试点的配对验收约定」（从已归档的旧路线图搬入，试点的六张题改为薄片 ⑤ 开始时选）；`docs/evaluation/baseline-omp-stage3.md`、`docs/prototypes/v10/design.md` 里指向旧路线图第 6.1 节的链接改指它 / 阶段二进入包第 4 项；#395 的六张画面工单是薄片 ④ 的交付
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:10 / `docs/design/independent-verification.md` 加第 7.1 节「口径」；`docs/design/browser-and-computer-use.md` 第 8.3 节放行规则与返工结论改成与它一致、核对位置改为 `tightening.py` / #151 的核对：放行规则与「含开环条件可放行」互相矛盾，三个数的口径各处不一
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:15 / `docs/design/network-and-mcp.md` 第 16 节工单拆分整段重排，加第 18 节「本机的做法」 / 去掉对阶段四 #128 的依赖；#68、#236 超过工单大小上限
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:20 / `docs/current-baseline.md` 头部更新段收成一行状态，换骨架、恢复、接入已有项目、评测工作线四行与共享上下文、网络与 MCP 两个开放项按核对改；`docs/agents/acceptance-evidence.md` 第 65 行对路线图第 1.4 节的引用改为 `CLAUDE.md`「工单规范」 / 核对 main 时发现这些行与现状不符；路线图已没有第 1.4 节
