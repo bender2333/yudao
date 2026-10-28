@@ -287,15 +287,19 @@ class ContextAssembly:
         return PinnedStep(projection, frame, limits, step_id, guidance, events, snapshot_hash,
                           input_modalities, context, dict(call_target or {}))
 
-    def request(self, pinned: PinnedStep, history: list[dict[str, Any]]) -> StepRequest:
+    def request(self, pinned: PinnedStep, history: list[dict[str, Any]], *,
+                defer_compaction: bool = False) -> StepRequest:
         # 在固定部分之后接上部门历史：按激活采用的版本取最近一次压缩的检查点，
         # 历史放不进窗口时装配一次压缩请求，否则装配工作请求。
+        # defer_compaction：上一次整理请求失败过，这一步按未压缩的历史照常交出工作请求，整理放到下一步
+        # （设计说明第 8.7 节，工单 #1155）
         # 回放前按本次调用目标筛掉来源不同的推理内容与该协议专用的条目 ID（设计说明第 7.6 节）
         frame, limits = pinned.frame, pinned.limits
         replay_history = replayable_history(history, pinned.call_target)
         checkpoint, checkpoint_id = self._checkpoint(pinned)
-        plan = plan_compaction(replay_history, checkpoint, limits.context_window, pinned.context.input_items,
-                               pinned.context.tools, output_limit=limits.output_limit)
+        plan = None if defer_compaction else plan_compaction(
+            replay_history, checkpoint, limits.context_window, pinned.context.input_items,
+            pinned.context.tools, output_limit=limits.output_limit)
         if plan is not None:
             context = self.assembler.assemble_compaction(
                 pinned.context, input_items=plan.input_items, source_refs=plan.source_refs,

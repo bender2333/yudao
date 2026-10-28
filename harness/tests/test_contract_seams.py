@@ -63,8 +63,8 @@ class _RecordingAssembly:
         self.frames.append(frame)
         return self.inner.pin(projection, frame, limits, **kwargs)
 
-    def request(self, pinned, history):
-        return self.inner.request(pinned, history)
+    def request(self, pinned, history, **kwargs):
+        return self.inner.request(pinned, history, **kwargs)
 
     def finish_compaction(self, step, output):
         return self.inner.finish_compaction(step, output)

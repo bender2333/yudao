@@ -3,8 +3,8 @@
 #
 # 证明的样子：同一副骨架（写入口、裁决、边界、薄驱动、最小投影、定义加载）接上另一套应用——
 # `second_routing.TaskPool` 与它的收紧检查 `TaskPoolTightening`，配上只在测试目录里的那一整份定义
-# （`task_pool_definitions/`，用 `load_definitions(<测试目录>)` 加载）。骨架的模块与契约模块一行不改，
-# 产品的 `harness/definitions/` 一个条目也不加，产品代码不导入它们。
+# （`task_pool_definitions/`，用 `load_definitions(<测试目录>)` 加载）。骨架的模块一行不改（契约模块按
+# 工单 #1164 补了可选的读事件入口，其余照旧），产品的 `harness/definitions/` 一个条目也不加，产品代码不导入它们。
 #
 # 这个文件查五件事：
 # 1. 假模型跑完一个事项：发布任务、指派、完成、打回各至少一次；事项以**它自己那份定义里声明的**结束原因结束
@@ -31,6 +31,7 @@ from typing import Any
 import pytest
 
 from harness import kernel_events, orchestrator as orchestrator_module, routing_contract
+from harness import runtime as runtime_module
 from harness import write_path as write_path_module
 from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS as PRODUCT_DEFINITIONS
@@ -66,6 +67,12 @@ SCRIPT = {
 }
 
 
+class _FakeStore:
+    # 只读事件库的替身：组装处接上这个路由时只要事件库有这个读法（工单 #1164），这里不跑任何事项
+    def list_events(self, run_id: str) -> list[Any]:
+        return []
+
+
 def _turn(calls: list[list[Any]]):
     # 一次回答里的一组函数调用：名字与参数由脚本给出，调用身份按激活与步骤编，不同部门的身份不重复
     def turn(call):
@@ -91,15 +98,14 @@ def _system(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
     definitions = second_routing.DEFINITIONS
     monkeypatch.setattr(write_path_module, "DEFINITIONS", definitions)
     monkeypatch.setattr(orchestrator_module, "DEFINITIONS", definitions)
+    # 组装处（runtime.py）按组织定义里的名称接上路由：把事项所用的这份定义交给它的读取处，任务池因此按名称
+    # 接上，并从组装处拿到只读的事件读取器（契约第三版，工单 #1164）。测试不自己给路由接事件库
+    monkeypatch.setattr(runtime_module, "DEFINITIONS", definitions)
     adapter = FakeAdapter(_script() if script is None else script)
     system = LoopSystem.for_testing(tmp_path, adapter, assembly=task_pool_assembly.TaskPoolAssembly())
-    # 组装处把三个槽位的实现接上薄驱动：路由按组织定义里的名称接上（这里换成任务池），
-    # 收紧检查是它的另一半，事项所用的定义也交给薄驱动
-    system.orchestrator._routing = second_routing.ROUTING
+    # 收紧检查是这条路由的另一半，事项所用的定义也交给薄驱动
     system.orchestrator._tightening = second_routing.TIGHTENING
     system.orchestrator._definitions = definitions
-    # 路由从事件折叠自己的状态：测试的组装处把只读的事件库交给它（契约的入口只有运行流的投影）
-    second_routing.ROUTING.bind(system.store)
     return system, adapter
 
 
@@ -152,6 +158,27 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path, monkeypatch):
     # 这条原因不在内核的停止原因清单里：它是那份路由定义版本的封闭清单里的一条
     assert projection.stop_reason not in PRODUCT_DEFINITIONS.stop_reasons
     assert projection.stop_reason not in second_routing.DEFINITIONS.stop_reasons
+
+
+def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path, monkeypatch):
+    # 组装处把只读的事件读取器交给路由（契约第三版，工单 #1164）：测试代码里没有自己给路由接事件库的调用，
+    # 路由按定义里的名称由组装处接上，读取器是同一处交出来的
+    system, _adapter = _system(tmp_path, monkeypatch)
+    assert system.orchestrator._routing is second_routing.ROUTING
+    # 路由不再有自己接线的入口
+    assert not hasattr(second_routing.TaskPool, "bind")
+
+    reader = second_routing.ROUTING._facts
+    # 读取器只有 list_events：写事件仍然只经薄驱动交给写入口（设计说明第 5.1 节「不做」）
+    assert {name for name in dir(reader) if not name.startswith("_")} == {"list_events"}
+    for writing in ("commit", "append", "replace_projection", "claim_execution_right", "close"):
+        assert not hasattr(reader, writing)
+
+    run_id = system.create_run("把 README 的用法一节整理清楚")
+    system.run_until_stop(run_id)
+    # 读到的是这个事项事件库里的那些事件
+    assert [event.event_id for event in reader.list_events(run_id)] == [
+        event.event_id for event in system.store.list_events(run_id)]
 
 
 def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_path, monkeypatch):
@@ -208,8 +235,9 @@ def test_the_task_pool_definitions_live_only_in_the_test_directory():
     assert loaded.routing == second_routing.ROUTING_NAME
     assert [item.id for item in loaded.routings.routings] == [second_routing.ROUTING_NAME]
     assert loaded.version == second_routing.DEFINITIONS.version
-    # 路由实现按名称接上骨架（组织定义的 routing -> routings.json 的那一条 -> 模块加载时登记的实现）
-    assert routing_contract.select(loaded.routing, loaded) is second_routing.ROUTING
+    # 路由实现按名称接上骨架（组织定义的 routing -> routings.json 的那一条 -> 模块加载时登记的实现）；
+    # 这个路由声明了 use_facts，接上时要有事件库可交（工单 #1164），这里给它一个只读事件库的替身
+    assert routing_contract.select(loaded.routing, loaded, store=_FakeStore()) is second_routing.ROUTING
     # 产品的定义与成果驱动的合同没有被改动：名称、成果种类与工具都是原来那几样
     assert PRODUCT_DEFINITIONS.routing == "watched_outputs"
     assert [item.id for item in PRODUCT_DEFINITIONS.routings.routings] == ["watched_outputs"]

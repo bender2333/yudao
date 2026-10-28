@@ -1,6 +1,6 @@
 {
  "scenario": "compaction_failed",
- "covers": "压缩请求连续三次返回未声明的工具调用：每次作为可重试失败记录，工具不执行，尝试次数用完后运行以 compaction_failed 失败。",
+ "covers": "整理连续三次没有推进：先是同一逻辑调用的三次尝试都回未声明的工具调用（工具不执行，工作请求按未压缩的历史照常发出），之后两次整理各回一次空摘要，达到 compaction.stalled_limit 时运行以 compaction_failed 失败，停止说明写明连续的次数与最后一次的原因。",
  "events": [
   {
    "event": "<evt#1>",
@@ -568,6 +568,332 @@
   },
   {
    "event": "<evt#25>",
+   "type": "context_assembled",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "admitted": true,
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-5:work:attempt-1",
+    "department": "product",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-5:work",
+    "purpose": "work",
+    "step_id": 5
+   }
+  },
+  {
+   "event": "<evt#26>",
+   "type": "model_requested",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-5:work:attempt-1",
+    "attempted": true,
+    "context_event_id": "<ses_pro#1>#24",
+    "definitions_version": "<definitions>",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-5:work",
+    "max_attempts": 3,
+    "parameters_version": "<parameters>",
+    "purpose": "work",
+    "step_id": 5
+   }
+  },
+  {
+   "event": "<evt#27>",
+   "type": "model_message",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt_id": "<act#1>:root-5:work:attempt-1",
+    "context_event_id": "<ses_pro#1>#24",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-5:work",
+    "purpose": "work",
+    "step_id": 5
+   }
+  },
+  {
+   "event": "<evt#28>",
+   "type": "model_attempt_finished",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-5:work:attempt-1",
+    "context_event_id": "<ses_pro#1>#24",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-5:work",
+    "purpose": "work",
+    "status": "completed",
+    "step_id": 5
+   }
+  },
+  {
+   "event": "<evt#29>",
+   "type": "tool_started",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-5:work:attempt-1",
+    "context_event_id": "<ses_pro#1>#24",
+    "id": "read-<act#1>-5",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-5:work",
+    "name": "read_file",
+    "step_id": 5
+   }
+  },
+  {
+   "event": "<evt#30>",
+   "type": "tool_called",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt_id": "<act#1>:root-5:work:attempt-1",
+    "context_event_id": "<ses_pro#1>#24",
+    "id": "read-<act#1>-5",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-5:work",
+    "name": "read_file",
+    "ok": true,
+    "purpose": "work",
+    "step_id": 5
+   }
+  },
+  {
+   "event": "<evt#31>",
+   "type": "context_assembled",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "admitted": true,
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-6:compaction:attempt-1",
+    "department": "product",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-6:compaction",
+    "purpose": "compaction",
+    "step_id": 6
+   }
+  },
+  {
+   "event": "<evt#32>",
+   "type": "model_requested",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-6:compaction:attempt-1",
+    "attempted": true,
+    "context_event_id": "<ses_pro#1>#30",
+    "definitions_version": "<definitions>",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-6:compaction",
+    "max_attempts": 3,
+    "parameters_version": "<parameters>",
+    "purpose": "compaction",
+    "step_id": 6
+   }
+  },
+  {
+   "event": "<evt#33>",
+   "type": "model_message",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt_id": "<act#1>:root-6:compaction:attempt-1",
+    "context_event_id": "<ses_pro#1>#30",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-6:compaction",
+    "purpose": "compaction",
+    "step_id": 6
+   }
+  },
+  {
+   "event": "<evt#34>",
+   "type": "model_attempt_finished",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-6:compaction:attempt-1",
+    "context_event_id": "<ses_pro#1>#30",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-6:compaction",
+    "purpose": "compaction",
+    "status": "completed",
+    "step_id": 6
+   }
+  },
+  {
+   "event": "<evt#35>",
+   "type": "context_assembled",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "admitted": true,
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-7:compaction:attempt-1",
+    "department": "product",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-7:compaction",
+    "purpose": "compaction",
+    "step_id": 7
+   }
+  },
+  {
+   "event": "<evt#36>",
+   "type": "model_requested",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-7:compaction:attempt-1",
+    "attempted": true,
+    "context_event_id": "<ses_pro#1>#34",
+    "definitions_version": "<definitions>",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-7:compaction",
+    "max_attempts": 3,
+    "parameters_version": "<parameters>",
+    "purpose": "compaction",
+    "step_id": 7
+   }
+  },
+  {
+   "event": "<evt#37>",
+   "type": "model_message",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt_id": "<act#1>:root-7:compaction:attempt-1",
+    "context_event_id": "<ses_pro#1>#34",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-7:compaction",
+    "purpose": "compaction",
+    "step_id": 7
+   }
+  },
+  {
+   "event": "<evt#38>",
+   "type": "model_attempt_finished",
+   "actor": "department:product",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_pro#1>#1",
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>",
+    "attempt": 1,
+    "attempt_id": "<act#1>:root-7:compaction:attempt-1",
+    "context_event_id": "<ses_pro#1>#34",
+    "input_version": 1,
+    "logical_call_id": "<act#1>:root-7:compaction",
+    "purpose": "compaction",
+    "status": "completed",
+    "step_id": 7
+   }
+  },
+  {
+   "event": "<evt#39>",
    "type": "run_failed",
    "actor": "system",
    "department": "product",
@@ -576,14 +902,14 @@
    "parent_event_id": null,
    "session_id": null,
    "stop_reason": "compaction_failed",
-   "error": "model returned tool calls although the request declared no tools",
+   "error": "压缩连续 3 次没有推进（整理没有生效：摘要为空或超过上限），达到 compaction.stalled_limit=3，以压缩失败停止。",
    "payload": {
     "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
     "stop_reason": "compaction_failed"
    }
   },
   {
-   "event": "<evt#26>",
+   "event": "<evt#40>",
    "type": "lesson_candidate_recorded",
    "actor": "system",
    "department": "product",
@@ -601,7 +927,7 @@
    }
   },
   {
-   "event": "<evt#27>",
+   "event": "<evt#41>",
    "type": "activation_finished",
    "actor": "system",
    "department": "product",
@@ -616,7 +942,7 @@
     "input_version": 1,
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
-    "session_model_steps": 4,
+    "session_model_steps": 7,
     "stop_reason": "compaction_failed"
    }
   }
@@ -624,7 +950,7 @@
  "projection": {
   "status": "failed",
   "stop_reason": "compaction_failed",
-  "error": "model returned tool calls although the request declared no tools",
+  "error": "压缩连续 3 次没有推进（整理没有生效：摘要为空或超过上限），达到 compaction.stalled_limit=3，以压缩失败停止。",
   "waiting_reason": "未能完成：上下文压缩失败",
   "active_department": null,
   "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
@@ -634,7 +960,7 @@
   "input_version": 1,
   "processed_input_version": 0,
   "product_work_input_version": 1,
-  "stream_version": 27,
+  "stream_version": 41,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
  },

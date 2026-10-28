@@ -1,6 +1,6 @@
 # 网络取回与 MCP 工具设计说明
 
-状态：设计已确认（2026-10-01 用户逐轮采纳推荐，第 14 节），未实施；最近一次改动 2026-10-28，去掉已删除的 ADR 的引用，把 OAuth 登录、提示与资源、服务器向用户请求输入这些 MCP 扩展改写为路线图里还没有落点（#494）。依据：[ADR-0018](../adr/0018-single-control-host-remote-execution.md)；[ADR-0019](../adr/0019-project-stream-across-versions.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)；[总体架构](architecture/overall-architecture.md)第 5、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4 节；[本地通用工具设计说明](local-tools.md)；[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 4 节；[语义系统设计说明](semantic-system.md)的证据；[模型管理设计说明](model-management.md)的凭据。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。用词以 `CONTEXT.md` 为准。
+状态：设计已确认（2026-10-01 用户逐轮采纳推荐，第 14 节），未实施；最近一次改动 2026-10-29，第 16 节工单拆分按 main 的核对重排，加第 18 节「本机的做法」。依据：[ADR-0018](../adr/0018-single-control-host-remote-execution.md)；[ADR-0019](../adr/0019-project-stream-across-versions.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)；[总体架构](architecture/overall-architecture.md)第 5、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4 节；[本地通用工具设计说明](local-tools.md)；[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 4 节；[语义系统设计说明](semantic-system.md)的证据；[模型管理设计说明](model-management.md)的凭据。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。用词以 `CONTEXT.md` 为准。
 
 ## 1. 范围
 
@@ -279,19 +279,26 @@ flowchart LR
 
 ## 16. 工单拆分
 
-全部属于父工单 #122，里程碑 M3。
+全部属于父工单 #122（阶段二薄片 ③）。2026-10-29 按 main 68118c4a 的核对重排：去掉对阶段四 #128 的依赖，原 #68 与 #236 各拆成多张，#495 并入 #155（真实验收）。
 
 | 工单 | 内容 | 阻塞 |
 | --- | --- | --- |
-| #68 网络取回 | `fetch_url` 与 `read_external_source`、拒绝 Yudao 服务自己的地址、回执、外部来源工件、结果未知的交还 | #18、#128、#242 |
-| #69 MCP 客户端模块 | 官方 SDK 的会话、进程管理、取消、凭据替换、标准错误输出文件，放在执行代码包中；3.2D 的 #149 依赖它 | #128 |
-| #236 项目设置中的 MCP 服务器 | 服务器设置与探测、工具清单快照、MCP 设置版本、动作回执与结果未知的交还、运行规则 | #68、#69、#18、#242 |
-| #237 界面：项目设置的「MCP 服务器」一节 | 第 11.1 节 | #80、#236 |
-| #238 界面：取回与 MCP 调用的显示 | 第 11.2 节 | #175、#177、#80、#236 |
-| #239 界面：系统「工具与扩展」页 | 第 11.3 节；#154 在其中增加内置工具一节 | #80、#236 |
-| #495 3.2B 的真实验收 | 第 13 节的场景在真实控制主机与真实模型上运行，报告写在 `docs/stage-3/`；阻塞 M3 试用 #185 | #68、#236 至 #239 |
+| #1170 动作的缝 | 动作请求带核实方法与能否取消，类别加 `fetch`、`mcp`、`trial`、`browser`，回执带被拒绝标记 | 无 |
+| #1171 读已保存的外部来源 | `read_external_source`、外部来源工件、读取查询 `evidence.external_source` | 无 |
+| #68 取回一个网页 | `fetch_url`、拒绝服务自己的地址、回执与外部来源工件 | #1171、#1170 |
+| #1172 关闭取回的启动参数 | `--no-fetch`，评测运行器改用 | #68 |
+| #1173 取回中途终止 | 结果交还发出它的会话的真实终止验收 | #68 |
+| #69 MCP 客户端模块 | `harness/mcp_client.py`，官方 SDK 的会话、进程管理、取消、凭据替换 | 无 |
+| #236 项目设置里的 MCP 服务器 | `mcp_servers.save`、版本、事项创建时冻结 | #69 |
+| #1174 探测 | `tool_server.probe`、工具清单快照 | #236、#69 |
+| #1175 部门调用 MCP 工具 | 事项自己的工具定义（第 18 节）、结果与工件、回执 | #236、#69、#1171、#1170 |
+| #1176 生命周期与中断 | run 结束关闭、超时与取消、遗留进程、中断以后交还 | #1175 |
+| #1177 `tools.registry` 查询 | 各项目的取回记录、MCP 服务器与最近一次状态 | #236、#68 |
+| #237 界面：项目设置的「MCP 服务器」一节 | 第 11.1 节 | #236、#1174 |
+| #238 界面：取回与 MCP 调用的显示 | 第 11.2 节 | #68、#1175、#1171 |
+| #239 界面：系统「工具与扩展」页 | 第 11.3 节（页面外壳已在）；#154 在其中增加内置工具一节 | #1177 |
 
-同时修改的工单：#122（子工单与验收）、#189（OpenCode 的运行配置关闭取回与搜索）、#192（评测项目不设置 MCP 服务器、以关闭取回的启动参数启动被测的 Yudao）、#154（被 #239 阻塞）、#185（M3 试用内容）。
+真实验收见 #155（取回、MCP、浏览器与质检核验网页合在一张）。同时修改的工单：#122（子工单与验收）、#189（OpenCode 的运行配置关闭取回与搜索）、#1172（评测项目以关闭取回的启动参数启动被测的 Yudao）、#154（不再被 #239 阻塞）。
 
 ## 17. 使用的技术
 
@@ -302,3 +309,16 @@ flowchart LR
 | HTML 转文本 | 成熟的转换库，参照 OMP 使用的 html-to-markdown（Rust 实现的转换库，有 Python 包） | 实现时核对 Windows x64 的安装包 |
 | 进程 | 命令使用的进程树管理 | 3.2A 已有，Windows 与 POSIX 分别验证 |
 | 凭据 | Provider 的凭据来源 | 进程内存、进程环境、数据目录的 `.env` |
+
+## 18. 本机的做法（2026-10-29 总架构师定，按 #122 下各工单的核对）
+
+阶段二只做本机；远程执行代理与执行代码独立成包（阶段四）时，这里的模块搬位置，合同不变。
+
+1. **位置**：MCP 客户端放 `harness/mcp_client.py`，不导入 Yudao 的其他模块，用 `pyproject.toml` 里一条 import-linter 合同守住；取回的处理放独立模块 `harness/fetch.py`，不导入 `environment.py`，`LocalEnvironment` 只为 `fetch`、`mcp` 两个类别各注册一行。
+2. **动作合同**：动作请求带 `verification`（核实方法）与 `cancellable`（取消能否确认停止），回执带 `refused` 与 `refused_reason`；类别取值加 `fetch`、`mcp`、`trial`、`browser`（#1170）。
+3. **限额**：取回的时限、大小上限、重定向次数与 MCP 的启动时限、调用时限、输出上限写在工具定义或设置文档里，不登记成可改参数；以后要界内可改时再接入参数的冻结机制。
+4. **动态工具**：项目设置里的 MCP 服务器提供的工具，在事项创建时叠加到该事项所用的那份定义上，生成事项自己的 `Definitions`（工具许可、提案校验与装配都读事项所用的那份定义，S2c 已是这个读法）。MCP 工具名 `mcp__服务器名__工具名` 的标识规则在叠加时放宽（允许连字符与大小写，总长不超过 64，超过时截短并附哈希），静态定义的 `Identifier` 规则不变；`tool_action` 对 MCP 工具名返回 `mcp`。
+5. **事件版本**：运行流里新增的事件是应用事件（`register_application_event_types`），不升 `RUN_EVENT_VERSION`；项目流事件 `mcp_servers_configured`、`tool_server_probe_finished` 是骨架事件，登记在 `harness/kernel_events.py`，客户端两端清单同步。
+6. **服务自己的地址**：接口层在启动时把监听地址与端口交给应用，应用交给控制核心的取回动作与浏览器导航检查；取回与浏览器都只拒绝这些地址与端口。
+7. **依赖项**：`mcp>=2.2,<3`（官方 SDK）、`html-to-markdown`（HTML 转文本）、`psutil`（进程创建时间与结束遗留进程树）。
+8. **图像**：MCP 与浏览器返回的图像存成工件；放进模型请求的办法（最近 3 张、占位文字）是装配的一项通用机制，由 #149 负责。
