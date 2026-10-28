@@ -8,6 +8,7 @@
 import { drawBitmap, drawText, measure } from "../shapes.ts";
 import { PAL, PIXEL_FONT_STACK } from "../registry.ts";
 import { mix } from "../grid.ts";
+import { LINK_HIT_PAD, hitRect } from "./card-hit.ts";
 import { R, RB } from "./render.ts";
 import type { DecisionFace } from "../world/types.ts";
 
@@ -67,9 +68,27 @@ export interface DecisionCard {
   /** 按选项标识回答当前打开的决定（点击章走同一条路）；需要说明而没有写时不提交。 */
   answer(option: string): Promise<void>;
   destroy(): void;
-  /** 测试读取：当前画出的状态。 */
-  inspect(): { openId: string | null; submitted: string[]; message: string | null; stamp: DecisionStamp | null };
+  /** 测试读取：当前画出的状态，以及这一帧的可点击区域（端到端在画布上真的点一下，工单 #1161）。 */
+  inspect(): {
+    openId: string | null;
+    submitted: string[];
+    message: string | null;
+    stamp: DecisionStamp | null;
+    hits: CardHit[];
+  };
 }
+
+/** 一帧里的可点击区域（画面逻辑坐标）：点这一块要做的事与它的参数。 */
+export type CardHit = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  act: "close" | "prev" | "next" | "go" | "option";
+  arg?: string;
+  /** 点击区比画出来的按钮放宽了多少个逻辑像素（每边），见 card-hit.ts。 */
+  pad?: number;
+};
 
 /** 卡片左边的色条：需要马上处理的种类偏橙，会造成损失的偏红，通知类偏蓝，其余是琥珀色。
  * 种类名是服务端的决定种类（原型 v13 decision-card.js 的 KIND_COLOR 用画面自己的名字）：
@@ -88,14 +107,7 @@ const BAR = 18;
 const PAPER = { x: 92, y: 26, w: 456, h: 270 };
 const LABEL_W = 78;
 
-interface Hit {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  act: "close" | "prev" | "next" | "go" | "option";
-  arg?: string;
-}
+type Hit = CardHit;
 
 /** 建立一张决定卡片：内容来自 faces，画到给定的 2D 画布上。 */
 export function createDecisionCard(canvas: HTMLCanvasElement, opts: DecisionCardOptions): DecisionCard {
@@ -267,6 +279,7 @@ export function createDecisionCard(canvas: HTMLCanvasElement, opts: DecisionCard
   // ---------------------------------------------------------------------------
   // 绘制
 
+  // hitPad：点击区比画出来的按钮每边放宽的逻辑像素（链接用得着，见 LINK_HIT_PAD）；画法不变
   function button(
     c: CanvasRenderingContext2D,
     x: number,
@@ -278,13 +291,14 @@ export function createDecisionCard(canvas: HTMLCanvasElement, opts: DecisionCard
     act: Hit["act"],
     arg?: string,
     disabled?: boolean,
+    hitPad = 0,
   ): void {
     const bg = disabled ? PAL.grey1 : style === "primary" ? PAL.green2 : style === "danger" ? PAL.red2 : PAL.white;
     const fg = disabled ? PAL.grey3 : style === "primary" || style === "danger" ? PAL.white : PAL.ink;
     RB(c, x, y, w, h, bg);
     R(c, x + 1, y + 1, w - 2, 1, disabled ? PAL.grey1 : mix(bg, PAL.white, 0.35));
     drawText(c, text, x + w / 2, y + h / 2 + 0.5, { size: 6.5, weight: 700, align: "center", color: fg, max: w - 6 });
-    if (!disabled && act) hits.push({ x, y, w, h, act, arg });
+    if (!disabled && act) hits.push({ ...hitRect(x, y, w, h, hitPad), act, arg, pad: hitPad });
   }
 
   function draw(c: CanvasRenderingContext2D): void {
@@ -344,11 +358,12 @@ export function createDecisionCard(canvas: HTMLCanvasElement, opts: DecisionCard
       y += fit * 8 + 3;
     });
     if (cut) drawText(c, "材料较长，其余内容在页面下方的文字列表里", px + pw - 14, noteY - 5, { size: 6, align: "right", color: PAL.grey3 });
-    // 材料里的链接（去别的页面）
+    // 材料里的链接（去别的页面）：画的是这一小块按钮，点的是这一行文字（工单 #1161，
+    // 点击区按 LINK_HIT_PAD 放宽，画的像素不变，所以回放的逐像素对照不受影响）
     let lx = px + 14;
     face.links.forEach((l) => {
       const w = Math.min(150, Math.ceil(measure(c, l.label, 6.5, 700)) + 14);
-      button(c, lx, linksY, w, 12, l.label, null, "go", l.href);
+      button(c, lx, linksY, w, 12, l.label, null, "go", l.href, false, LINK_HIT_PAD);
       lx += w + 6;
     });
     // 说明
@@ -469,6 +484,12 @@ export function createDecisionCard(canvas: HTMLCanvasElement, opts: DecisionCard
       if (face && op) await answer(face, op);
     },
     destroy,
-    inspect: () => ({ openId, submitted: Object.keys(submitted), message: msg ? msg.text : null, stamp }),
+    inspect: () => ({
+      openId,
+      submitted: Object.keys(submitted),
+      message: msg ? msg.text : null,
+      stamp,
+      hits: hits.map((hit) => ({ ...hit })),
+    }),
   };
 }
