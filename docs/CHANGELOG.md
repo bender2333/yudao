@@ -9,11 +9,16 @@
 
 solo-deepseek-v4.1-flash / 2026-10-29 02:20 / 工单 #1158 [模型 · 凭据]：README 的「配置 Provider」与凭据那两段补上 `.env` 的键名规则（字母、数字与下划线，不以数字开头），写明勾选持久化时保存前按它核对、来源显示 `.env`、失败什么都不改 / 落实 `docs/design/model-management.md` 第 4.2 节「凭据引用的写法」与「写入 .env 以后的来源」两条（设计说明未改，代码与用例同单改动，只补读者看得见的规则）
 
+solo-deepseek-v4.1-flash / 2026-10-29 03:52 / 工单 #1161 [界面]：本文件加这一条，`docs/` 下的文档都没有改——依据是当前定稿原型 v13 的 `docs/prototypes/v13/js/ui/cards.js`（第 19 至 24 行 `linkLabel`：`/settings$` 那一处叫「前往本项目的部门设置」）与 `docs/design/web-interface-and-release.md` 第 5.1 节（路径写在地址 `#` 之后），这次按它们实现并补端到端用例：五处决定卡片上的两个链接点了都到对应的页面，「前往本项目的部门设置」落在设置页的部门设置那一节（路径参数 `?section=departments`），画面里链接的点击区放大到这一行文字（画法不变，回放的逐像素对照不受影响） / 试用问题 Tf61ac6a6-06：决定卡片上点「前往模型管理」与「前往本项目的部门设置」，地址、hash、标题与滚动位置都不变
+
+solo-deepseek-v4.1-flash / 2026-10-29 03:10 / 工单 #1159 [接口 · 页面同步]：本文件加这一条，`docs/` 下的设计说明不改——`docs/design/app-and-interface.md` 第 6.1 节最后第二条「本次启动的身份改变时（服务重启），页面重新读取能力清单并重新同步」就是要落实的那一句，代码补上断线重连这一处触发点 / 试用问题 Tf61ac6a6-03 后半：服务重启以后页面不硬刷新还是旧状态（模型管理页的凭据来源与版本停在重启以前），因为事件流重连时只更新连接状态、不核对启动身份
 solo-deepseek-v4.1-flash / 2026-10-29 02:05 / 工单 #1156 [执行] docs/architecture-issues.md 追加一条（第 8.2 节没写到的两处边界：「上一次」只指同一会话上一次工作请求、它的回报用量在压缩以后作废；上游没有回报的判据取 `usage.reported`） / 设计问题按 AGENTS.md「设计没写到的边界自己定、登记、继续做」登记，建议把这两条写进 model-management 第 8.2 与 8.7 节
 
 solo-deepseek-v4.1-flash / 2026-10-29 02:05 / 工单 #1156 [执行] README「模型配置」两处改成实际的行为：目录说明那句「有效窗口取任务限制与模型窗口较小值」改为「有效窗口等于调用目标的模型窗口、压缩阈值取窗口减预留量与 `context.work_limit_tokens` 中较小的一个」，部门历史那句「SDK 返回的用量仅作只读记录，不估算、不用于暂停任务」改为「用量取上一次工作请求的上游回报用量与本地估算（UTF-8 字节数除以 4）中较大的一个、两项数值记在请求事件里，用量用于判断与显示、不用于暂停任务也不设 token 预算」 / 落实 `docs/design/model-management.md` 第 8.2 与 8.3 节（试用问题 Tf61ac6a6-07：128000 的窗口下 241669 的请求照常发出，压缩触发点落在窗口之外）
 
 solo-deepseek-v4.1-flash / 2026-10-29 02:25 / 工单 #1157 [模型]：本文件加这一条，`docs/` 下的设计说明不改——第 8.7 节的超限写法、第 9.1 节模型那一行写上游原因（#294）、第 13.4 节第四条（PR #1154 已进 main `2ffb3b4b`）就是这次的依据，代码按它们补齐 / 试用问题 Tf61ac6a6-02：上游 400 时事件里只有状态码、没有返回体，事后判断不了原因，也判断不了它与请求长度有没有关系
+
+solo-deepseek-v4.1-flash / 2026-10-29 00:56 / 工单 #1162 [投影 · 界面]：本文件加这一条。`docs/` 下的文档都没有改——`docs/design/app-and-interface.md` 第 4.3 节 `project.overview` 一行在 main 上已经写明「停止的事项另带停止说明，即让事项停下的那条错误的原文，取自事项结束的事件，询问分支的失败原因不算，页面在停止原因下面原样写出」，这次按它实现（事项投影与事项卡片的 `stop_note`，看板卡片、当前事项与恢复页三处显示），设计说明那一行与代码一致，不需要补写 / 试用问题 Tf61ac6a6-09：R1 终态页的停止原因写「模型服务失败」，旁边像错误的那段却是询问分支的失败原因，真正让事项停下的 HTTP 400 页面上看不到
 
 solo-deepseek-v4.1-flash / 2026-10-29 00:25 / 工单 #1155 [执行] 整理请求失败不再结束事项：README「停止与后续范围」改写压缩那一句——整理请求自己失败（重试耗尽，或回应不是摘要文字）时同样不写检查点、这一步的工作请求按未压缩的历史照常发出（放不进窗口时以上下文超限结束）、下一次再整理，回应里带文字就用文字、未声明的工具调用不执行也不进入历史；连续 `compaction.stalled_limit` 次没有推进的原因里加上「整理请求失败」 / 落实 `docs/design/model-management.md` 第 8.7 节第一条与第二条（代码与用例同单改动，文档只改这一句读者看得见的停止规则）
 
@@ -712,3 +717,9 @@ claude-架构师 / 2026-10-29 02:05 / `docs/design/skeleton-and-application.md` 
 claude-架构师 / 2026-10-29 02:12 / 新增 `docs/design/context-assembly.md`（把上下文装配写成纯函数 `view(events, rules)`：方法、646 步的召回与浪费分布、七条减法规则、装入顺序、三项证明的结果与缺口、与 OMP/OpenCode 的对照、未决问题、三张工单草案）；`docs/design/README.md` 加索引一条；`CONTEXT.md` 加「视图」「折叠」「占位」三个术语；`evals/README.md` 加 `context/` 一行；新增 `evals/context/`（回放、测量、重放、参数扫描、忠实性核对、反事实回放）与 `evals/tests/test_context_view.py`；读数写进 `docs/evaluation/context-assembly-2026-10-29.{md,json}`、`context-assembly-replay-2026-10-29.{md,json}`、`context-assembly-counterfactual-2026-10-29.json` / #912：量出 50% 的输入用量此后从未被引用，按数据定出七条减法规则并在回放里省 16.7%，反事实回放这条证明在这批模型上没有区分力（同一请求问两次只有 6.3% 动作相同），端到端要等实现
 claude-架构师 / 2026-10-29 02:25 / `docs/design/context-assembly.md` 与回放读数按重新生成的产物改：省量 16.7% → 16.8%（1,400,755 token）、浪费 40.5% → 40.1%、R5 的边际 248,730 → 259,715；`docs/evaluation/context-assembly-replay-2026-10-29.{md,json}` 重新生成，`rules_path` 指向改名后的 `evals/context/rule-set.json` / R5 加了「换成摘要必须确实更省」的守卫以后旧读数不再成立；同一批事件的召回 0.9448 与 18 个下降的步不变
 claude-架构师 / 2026-10-29 02:35 / `docs/design/context-assembly.md` 第 6.2 节：反事实回放不作为通过条件，改成「引用材料可及性」与端到端两条（前者确定性、不调模型，后者由 #1202 的三个固定场景承接）；`docs/design/architecture/overall-architecture.md` 第 1.3 节装配契约一行按 #912 的产出改；#1202 的验收补上引用材料可及性一条；#912 关闭（产出已交，剩下的事在 #1200 至 #1202） / 架构师循环第 1 类：#912 交回时带来的两处判断，旧对旧基线证明原判据没有区分力，不为一条判据去换确定性模型
+
+claude-架构师 / 2026-10-29 03:25 / `docs/design/model-management.md` 第 8.2 节补两处边界（#1156 交回的登记）：「上一次请求」只取同一会话的工作请求、压缩生效后作废；上游没有回报用量时按 `usage.reported` 判，不拿 0 当「回报了 0」 / 不写清楚会让压缩成功后立刻再压一次，历史全是摘要时整理回应变成「History is already summarized…」，把事项停下来
+
+claude-架构师 / 2026-10-29 03:25 / `.claude/skills/solo/SKILL.md` 每轮第 2 步与 `.claude/skills/architect-loop/SKILL.md` 第 4 步：`reap` 之前先查这个分支上有没有在跑的 CI 运行、PR 上的检查在不在 `in_progress`，三样都静止才回收；`architect-loop` 的一轮从五步改成六步 / 2026-10-29 在 #1162 上误判过一次「卡住」：原工人其实在等一趟挂住的集成层（xdist 进程挂掉、作业超时取消），`reap` 之后重派，两个活着的工人写了同一个 worktree
+
+claude-架构师 / 2026-10-29 03:25 / `.claude/skills/solo/SKILL.md` 每轮第 2 步与 `.claude/skills/architect-loop/SKILL.md` 第 4 步：`reap` 之前先查这个分支上有没有在跑的 CI 运行、PR 上的检查在不在 `in_progress`，三样都静止才回收；`architect-loop` 的一轮从五步改成六步 / 2026-10-29 在 #1162 上误判过一次「卡住」：原工人其实在等一趟挂住的集成层（xdist 进程挂掉、作业超时取消），`reap` 之后重派，两个活着的工人写了同一个 worktreeclaude-架构师 / 2026-10-29 03:45 / `.claude/skills/trial/scripts/preflight.ps1` 两处改正：python 经 `uv run --no-sync python` 起得来也算通过（这台机器上裸 python 是占位程序）；凭据在进程里没有时读用户级 `YUDAO_EVAL_API_KEY` 并在读数里写明取自哪一级 / 试用的预检对本机误报两项阻断，预检不过会让薄片在到达时停在原处；改完 0 阻断、1 警告（工作区有未提交改动）

@@ -236,6 +236,9 @@ class WorkItemCard(Contract):
     departments: dict[str, DepartmentState] | None = None
     round: int
     stop_reason: str | None
+    # 停止说明（工单 #1162）：让事项停下的那条错误的原文，取自事项结束的事件；只有停止的事项有，
+    # 询问分支的失败原因不算，用户自己让事项停下时为空
+    stop_note: str | None = None
     human_action: str | None
     pending_question: str | None
     adoption_id: str | None
@@ -281,7 +284,7 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
             progress=progress,
             departments=_departments(run, progress, _observation(run, decisions, events), decisions),
             round=item.cycle_count,
-            stop_reason=item.stop_reason, human_action=item.human_action,
+            stop_reason=item.stop_reason, stop_note=item.stop_note, human_action=item.human_action,
             pending_question=item.pending_question, adoption_id=item.adoption_id,
             start_error=item.start_error,
         ))

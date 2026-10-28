@@ -20,6 +20,11 @@ export type Route = {
   at: number | null;
   // 资料页选中的建档轮次（工单 #573，设计第 3.4 节写在 ?round= 中）：进入资料页时滚到对应轮次
   round: number | null;
+  /**
+   * 设置页要滚到的那一节（工单 #1161，写在 ?section= 中）：决定卡片上的「前往本项目的部门设置」
+   * 落到部门设置那一节，不停在设置页的顶部；没有指定时是 null。
+   */
+  settingsSection: string | null;
 };
 
 const SYSTEM_PAGES: Record<string, string> = {
@@ -66,7 +71,7 @@ export function parseRoute(hash: string): Route {
   const [pathPart, queryPart] = text.split("?", 2);
   const query = new URLSearchParams(queryPart ?? "");
   const segments = pathPart.split("/").filter(Boolean);
-  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, departmentFilter: departmentFilter(query), systemPage: null, attemptId: null, runId: null, at: replayPosition(query), round: parseRound(query) };
+  const route: Route = { name: "home", projectId: null, workItemId: null, department: null, departmentFilter: departmentFilter(query), systemPage: null, attemptId: null, runId: null, at: replayPosition(query), round: parseRound(query), settingsSection: sectionOf(query) };
   if (segments.length === 0 || segments[0] === "home") {
     route.name = "home";
     return route;
@@ -135,6 +140,13 @@ function departmentFilter(query: URLSearchParams): string | null {
     return null;
   }
   return text;
+}
+
+// 路径参数里的设置页节名（工单 #1161）：按原样读出来，由设置页决定认不认它；
+// 空串按没有指定处理，地址里不留空的 ?section=
+function sectionOf(query: URLSearchParams): string | null {
+  const text = query.get("section");
+  return text === null || text.trim() === "" ? null : text.trim();
 }
 
 // 事项范围（作用域）：项目内的一份，写在路径参数 ?w= 中（原型第 3.3 节）。
@@ -211,8 +223,18 @@ export const paths = {
     const suffix = query.toString();
     return `#/p/${projectId}/overview${suffix ? `?${suffix}` : ""}`;
   },
-  settings: (projectId: string, options: { workItem?: string | null } = {}) =>
-    `#/p/${projectId}/settings${scopeQuery(options.workItem)}`,
+  settings: (projectId: string, options: { workItem?: string | null; section?: string | null } = {}) => {
+    const query = new URLSearchParams();
+    if (options.workItem) {
+      query.set("w", options.workItem);
+    }
+    // 要滚到的那一节（工单 #1161）：「前往本项目的部门设置」直接落在部门设置那一节上
+    if (options.section) {
+      query.set("section", options.section);
+    }
+    const suffix = query.toString();
+    return `#/p/${projectId}/settings${suffix ? `?${suffix}` : ""}`;
+  },
   sys: (page: string) => `#/sys/${page}`,
 };
 
@@ -236,7 +258,8 @@ export function withScope(route: Route, workItemId: string | null): string {
     case "recovery":
       return workItemId === null ? paths.overview(projectId) : paths.recovery(projectId, workItemId);
     case "settings":
-      return paths.settings(projectId, { workItem: workItemId });
+      // 要滚到的那一节跟着留着：换范围不动这一页落在哪一节（工单 #1161）
+      return paths.settings(projectId, { workItem: workItemId, section: route.settingsSection });
     default:
       return paths.overview(projectId, { workItem: workItemId });
   }

@@ -1010,3 +1010,70 @@ def test_recovery_reports_the_position_of_this_items_last_event(data_dir):
     assert recovery.data.last_confirmed_event_id == own_last.event_id
     assert recovery.data.last_confirmed_position == own_last.position
     assert recovery.data.last_confirmed_position < system.store.end_position()
+
+
+# 询问分支没能回答的原因与让事项停下的那条错误很容易看混：分支的原因是旁支自己的失败，
+# 停止说明只取事项结束的那条事件（工单 #1162，试用 Tf61ac6a6-09 的截图上正是这两句挨在一起）
+BRANCH_FAILURE = "分支没能回答的原因 A：模型服务返回 HTTP 400（回答的请求被拒绝）"
+STOP_FAILURE = "主干停下的原因 B：模型服务返回 HTTP 400（输入超过上下文长度）"
+
+
+def _stop_note_system(data_dir):
+    # 工程先问产品一次，产品的回答分支失败（A）；拿到结果以后工程的下一次请求失败（B），事项因此停下。
+    # 质检的脚本按 PRD 被接纳以后同时开始的那一轮准备（工单 #557）：没有它，先失败的是质检
+    system = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn(recipient="product", question="输出要不要改成大写？", background="实现中需要明确",
+                     expected="确认输出形式", call_id="ask-stop-note"),
+            ProviderError(STOP_FAILURE),
+        ],
+        "quality": [explore_turn(), review_turn("release", "ok")],
+        "product:ask": [ProviderError(BRANCH_FAILURE)],
+    })
+    project_id = system.projects.register("停止说明", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "验证停止说明")
+    system.run_until_stop(run_id)
+    return system, project_id, work_item_id, run_id
+
+
+def test_the_stop_note_is_the_error_that_stopped_the_item_not_the_asking_branch(data_dir):
+    # 验收一（工单 #1162）：先有一次询问分支没能回答（失败原因 A），然后主干以 provider_error 停止（错误 B）；
+    # project.overview 里这张卡片的停止说明是 B，不是 A
+    system, project_id, work_item_id, run_id = _stop_note_system(data_dir)
+    application = _application(system)
+    overview = application.query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "stopped"
+    assert card.stop_reason == "provider_error"
+    assert card.stop_note == STOP_FAILURE
+    assert BRANCH_FAILURE not in card.stop_note
+    # 询问记录照旧留着分支自己的原因：不改询问列表与流转记录
+    asks = application.query("run.asks", RunAsks(run_id=run_id)).data.asks
+    assert [ask.reason for ask in asks if ask.status == "没能回答"] == [BRANCH_FAILURE]
+
+
+def test_a_released_item_has_no_stop_note(data_dir):
+    # 验收二（工单 #1162）：放行完成的事项没有停止说明
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("没有停止说明", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "released_unsettled"
+    assert card.stop_note is None
+
+
+def test_a_cancelled_item_has_no_stop_note(data_dir):
+    # 用户自己让事项停下不是错误：结束事件里写的是这次决定，不写进停止说明（工单 #1162）
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("用户取消", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.activate_once(run_id)
+    system.cancel(run_id)
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "stopped"
+    assert card.stop_reason == "cancelled"
+    assert card.stop_note is None
