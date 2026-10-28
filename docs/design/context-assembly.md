@@ -1,6 +1,6 @@
 # 上下文装配：把视图当作事件日志上的纯函数
 
-状态：设计（2026-10-29 子架构师按 #912 写出，未实施）。依据：#912；回放读数在 [docs/evaluation/context-assembly-2026-10-29.md](../evaluation/context-assembly-2026-10-29.md)、[context-assembly-replay-2026-10-29.md](../evaluation/context-assembly-replay-2026-10-29.md)、[context-assembly-counterfactual-2026-10-29.json](../evaluation/context-assembly-counterfactual-2026-10-29.json)；规则清单的机器可读版本是 [evals/context/rules.json](../../evals/context/rules.json)。路线位置：路线图第 3 节「装配与语义」道，阶段未定（#912 的评论：暂不挂里程碑）。总图位置：第四节「装配」缝（装配契约：执行实现 ↔ 装配实现，`ContextAssembly` 的四个方法），第一节「装配实现」方框（第 3 圈「可以整体重写」）。
+状态：设计（2026-10-29 子架构师按 #912 写出，未实施）。依据：#912；回放读数在 [docs/evaluation/context-assembly-2026-10-29.md](../evaluation/context-assembly-2026-10-29.md)、[context-assembly-replay-2026-10-29.md](../evaluation/context-assembly-replay-2026-10-29.md)、[context-assembly-counterfactual-2026-10-29.json](../evaluation/context-assembly-counterfactual-2026-10-29.json)；规则清单的机器可读版本是 [evals/context/rule-set.json](../../evals/context/rule-set.json)。路线位置：路线图第 3 节「装配与语义」道，阶段未定（#912 的评论：暂不挂里程碑）。总图位置：第四节「装配」缝（装配契约：执行实现 ↔ 装配实现，`ContextAssembly` 的四个方法），第一节「装配实现」方框（第 3 圈「可以整体重写」）。
 
 ## 1. 问题、现状与方法
 
