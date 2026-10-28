@@ -78,10 +78,13 @@ export function summarize({ state, tasks, now, flight, openIssues }) {
 
   const idOf = (t) => t.id + (t.issue ? ' #' + t.issue : '');
 
-  const forUser = list.filter((t) => taskState[t.id] && taskState[t.id].waitFor === 'user');
+  // 已完成的单子不再印进「等你」「交回」：台账里留着这两样的旧标记，人看到会以为还要处理。
+  const live = list.filter((t) => t.status !== 'done');
+
+  const forUser = live.filter((t) => taskState[t.id] && taskState[t.id].waitFor === 'user');
   if (forUser.length) lines.push('等你: ' + forUser.map(idOf).join(' '));
 
-  const escalated = list.filter((t) => taskState[t.id] && taskState[t.id].escalated);
+  const escalated = live.filter((t) => taskState[t.id] && taskState[t.id].escalated);
   if (escalated.length) lines.push('交回: ' + escalated.map((t) => idOf(t) + ' 第 ' + asNum(taskState[t.id].fails, 0) + ' 次').join('；'));
 
   // 台账里记得住的阻塞：行内依赖（after）与 refresh 写下的外部阻塞方。

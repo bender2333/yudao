@@ -223,20 +223,20 @@
         </div>
         <div class="arrows">产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门</div>
         <div class="slots">
-          <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：薄驱动、插件加载。
-状态：流程编排正在拆成薄驱动与路由实现。">
+          <div class="box fixed" data-status="3" tabindex="0" data-tech="技术名词：薄驱动、插件加载。
+状态：已建。只做连接，部门名与实现类名零命中；三道契约的版本在构造时核对。">
             <b>薄驱动</b><small>只做连接：读事实、问路由、问装配、交执行、经写入口写回。不认识部门的名字。</small>
           </div>
           <div class="box" data-status="2" tabindex="0" data-tech="技术名词：路由实现（成果驱动）。
-状态：正从流程编排里抽出来。">
+状态：按成果的路由已建；第二种路由（任务池）只有测试用的一份。">
             <b>槽位：路由</b><small>谁开工、一轮怎么结束、事项怎么结束。</small>
           </div>
-          <div class="box" data-status="2" tabindex="0" data-tech="技术名词：上下文装配、压缩、上下文清单。
-状态：装配与压缩已建；按契约抽成槽位半建。">
+          <div class="box" data-status="3" tabindex="0" data-tech="技术名词：上下文装配、压缩、上下文清单。
+状态：已建。装配与压缩按契约抽成槽位，第二种实现在测试里跑通。">
             <b>槽位：装配</b><small>从事实减出这一轮要看的，交给模型的那份记进事实。</small>
           </div>
           <div class="box" data-status="2" tabindex="0" data-tech="技术名词：步骤驱动、外包角色派发。
-状态：本机步骤驱动已建；外包未建。">
+状态：已按契约抽成槽位，本机步骤驱动可用；外包角色未建。">
             <b>槽位：执行</b><small>一轮里的每一步：问边界、调模型、发工具请求。</small>
           </div>
         </div>
@@ -247,8 +247,8 @@
       </div>
 
       <div class="col">
-        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同、停止原因清单。
-状态：裁决与边界已建；裁决改读最小投影未建。">
+        <div class="box fixed" data-status="3" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同、停止原因清单。
+状态：已建。裁决读最小投影，边界与停止原因清单来自定义。">
           <b>裁决与边界</b><small>每次写入先过这里：有没有资格、引用的是不是最新、到没到上限。保证一定会停。</small>
         </div>
         <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：评价材料（评测场景与隐藏检查、评分器、发布检查、内核清单）。
@@ -500,7 +500,7 @@
     </table>
   </section>
 
-  <footer>第一节的状态按 main 2026-10-25。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。二至六节写的是应当如此，没有状态；缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
+  <footer>第一节的状态按 main 2026-10-29。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。二至六节写的是应当如此，没有状态；缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
 </main>
 </body>
 </html>
