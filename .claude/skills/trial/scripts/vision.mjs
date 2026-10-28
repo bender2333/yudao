@@ -51,6 +51,29 @@ function fail(message) {
 
 const MIME = { ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif" };
 
+// 模型接口对单张图有体积上限（实测整页长图会得到 413）；从文件头读出像素数，过大就当场报清楚怎么缩
+function imagePixels(bytes, mime) {
+  if (mime === "image/png" && bytes.length > 24 && bytes.toString("latin1", 12, 16) === "IHDR") {
+    return { width: bytes.readUInt32BE(16), height: bytes.readUInt32BE(20) };
+  }
+  if (mime === "image/jpeg") {
+    let offset = 2;
+    while (offset < bytes.length - 9) {
+      if (bytes[offset] !== 0xff) { offset += 1; continue; }
+      const marker = bytes[offset + 1];
+      const size = bytes.readUInt16BE(offset + 2);
+      if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) {
+        return { width: bytes.readUInt16BE(offset + 7), height: bytes.readUInt16BE(offset + 5) };
+      }
+      offset += 2 + size;
+    }
+  }
+  return null;
+}
+
+const MAX_BYTES = 4 * 1024 * 1024;
+const MAX_PIXELS = 25 * 1000 * 1000;
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
@@ -76,6 +99,16 @@ async function main() {
       bytes = await readFile(absolute);
     } catch (error) {
       fail(`读不到图片 ${image}：${error.message}`);
+    }
+    const dims = imagePixels(bytes, mime);
+    const pixels = dims ? dims.width * dims.height : 0;
+    if (bytes.length > MAX_BYTES || pixels > MAX_PIXELS) {
+      const size = `${Math.round(bytes.length / 1024)} KB${dims ? `，${dims.width}×${dims.height} 像素` : ""}`;
+      fail(
+        `图太大（${size}）：模型接口会返回 413。先缩图再送——` +
+          `重截用 \`node browser.mjs shot --out x.jpg --jpeg --max-height 3000\`，` +
+          `或用 python PIL 裁小（PIL 读长图要先设 Image.MAX_IMAGE_PIXELS = None）`,
+      );
     }
     parts.push({ type: "image_url", image_url: { url: `data:${mime};base64,${bytes.toString("base64")}` } });
   }

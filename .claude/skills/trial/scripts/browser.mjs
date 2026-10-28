@@ -8,7 +8,7 @@
 //   node browser.mjs tabs   [--port 9222]
 //   node browser.mjs open   --url <地址>           打开或复用标签页
 //   node browser.mjs url                           当前地址
-//   node browser.mjs shot   --out <文件.png> [--full]
+//   node browser.mjs shot   --out <文件> [--full] [--jpeg] [--quality 72] [--max-height 4000]
 //   node browser.mjs text   [--css <选择器>]       页面可见文字（或某个元素的文字）
 //   node browser.mjs audit                         视觉与结构的读数：横向溢出、画布是否空白、对比度、图片、被截断的文字
 //   node browser.mjs click  --css <选择器> | --text <文字>
@@ -300,6 +300,9 @@ async function shot(args) {
   if (!args.out) fail('缺少 --out');
   const p = port(args);
   const file = path.resolve(args.out);
+  const format = args.jpeg || args.jpg ? 'jpeg' : 'png';
+  const quality = Number(args.quality ?? 72);
+  const maxHeight = Number(args['max-height'] ?? 4000);
   await withPage(p, async (cdp) => {
     await cdp.send('Page.bringToFront').catch(() => {});
     const metrics = await cdp.send('Page.getLayoutMetrics');
@@ -307,7 +310,9 @@ async function shot(args) {
     if (args.full) {
       // Chrome 155 上 captureBeyondViewport 配 clip 会一直不返回；改为临时把视口撑到整页高度
       const width = Math.ceil(metrics.cssLayoutViewport?.clientWidth ?? content.width);
-      const height = Math.ceil(content.height);
+      const pageHeight = Math.ceil(content.height);
+      // 长页面（如观测）整页高度可达二十万像素，图会过不了模型接口的上限；按 --max-height 截断
+      const height = Math.min(pageHeight, maxHeight);
       await cdp.send('Emulation.setDeviceMetricsOverride', {
         width,
         height,
@@ -315,17 +320,36 @@ async function shot(args) {
         mobile: false,
       });
       await new Promise((resolve) => setTimeout(resolve, 200));
-      const result = await cdp.send('Page.captureScreenshot', { format: 'png' });
+      const result = await cdp.send('Page.captureScreenshot', format === 'jpeg' ? { format, quality } : { format });
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, Buffer.from(result.data, 'base64'));
       await cdp.send('Emulation.clearDeviceMetricsOverride').catch(() => {});
-      out({ ok: true, file, width, height, full: true });
+      out({
+        ok: true,
+        file,
+        width,
+        height,
+        pageHeight,
+        clipped: pageHeight > height,
+        format,
+        kb: Math.round(fs.statSync(file).size / 1024),
+        full: true,
+      });
       return;
     }
-    const result = await cdp.send('Page.captureScreenshot', { format: 'png' });
+    const result = await cdp.send('Page.captureScreenshot', format === 'jpeg' ? { format, quality } : { format });
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, Buffer.from(result.data, 'base64'));
-    out({ ok: true, file, width: content.width, height: content.height, full: false });
+    out({
+      ok: true,
+      file,
+      width: metrics.cssLayoutViewport?.clientWidth ?? content.width,
+      height: metrics.cssLayoutViewport?.clientHeight ?? content.height,
+      pageHeight: Math.ceil(content.height),
+      format,
+      kb: Math.round(fs.statSync(file).size / 1024),
+      full: false,
+    });
   });
 }
 
