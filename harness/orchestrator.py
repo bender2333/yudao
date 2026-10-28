@@ -1,5 +1,10 @@
 # 流程编排：运行的生命周期（创建、输入、指导、提示词、取消、运行到停止、作为任务开始）、激活的准备与收尾、
-# 新输入的分派、提案接纳以后的流转、用户决定（发出决定请求、按回答解除阻塞、运行结束时撤销）、暂停与失败。
+# 新输入的分派、提案接纳以后的流转、发出决定请求与运行结束时撤销它们、暂停与失败。
+# 回答决定请求与建档的流转在应用层（`decision_flow.py`，工单 #827）：薄驱动只转交。
+# 运行工作区与会话的检查工作区在执行环境（`environment.py` 的 `Workspaces`，工单 #863）；
+# 恢复的零件在 `recovery.py` 的 `RunRecovery`（工单 #863）：薄驱动只把继续一个 run 转交过去。
+# 部门与成果的名称不在这个文件里：部门标识、关注的成果与成果种类一律从定义取（设计说明第 6 节），
+# `harness/tests/test_thin_driver_names.py` 检索这个文件，命中即失败。
 # 一次激活内的步骤交给步骤驱动，只调用它的开始、取消与取得结果；同时为步骤驱动实现安全节点接口。
 # 流程编排不调用模型。
 # 每一处「读取运行状态、判断、写入」都是写入口的一个事务（WritePath.transact）：判断期间不持有锁，
@@ -10,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -20,29 +25,24 @@ from typing import Any
 from .actions import FactsQuery, TreeFacts
 from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
-from .adjudication import WorkBasis, commit_decision, guidance_version, proposal_decision
+from .adjudication import WorkBasis, commit_decision, proposal_decision
 from .artifacts import ArtifactStore
-from . import assembly_contract, execution_contract
+from . import assembly_contract, execution_contract, routing_contract, tightening_contract
 from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
-from .contracts import current_contract_hash
+from .contracts import artifact_hash
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
-    DecisionClosed,
-    DecisionKind, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocked_by_other_session,
-    blocks_run,
+    MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, DecisionKind, blocked_by_other_session, blocks_run,
 )
 from .environment import (
-    LocalEnvironment, QA_TESTS_DIR, cleanup_inspection_workspace, inspection_root, workspace_tree,
+    LocalEnvironment, RoundWorkspace, Workspaces, cleanup_inspection_workspace,
 )
 from .deltas import DeltaChannel
-from .event_store import (Command, EventStore, StreamVersionConflict, is_catalog_stream, is_run_stream,
-                          project_stream, run_stream)
-from .write_path import NewCatalogEvent, NewEvent, NewProjectEvent, Snapshot, Transaction, WritePath
-from .tree_archive import artifact_run, load_tree
-from .engine import Answered, Judgment, StepDriver, StepLimits, StepResult, Stopped
+from .event_store import (Command, EventStore, StreamVersionConflict, project_stream, run_stream)
+from .write_path import NewEvent, Snapshot, Transaction, WritePath
+from .engine import Judgment, StepDriver, StepLimits
 from .streams import (
     RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
 )
@@ -52,43 +52,48 @@ from .definitions import DEFINITIONS
 from .department_prompts import save_department_prompt
 from .overview import repository_overview
 from . import parameters as parameter_values
+from .minimal_projection import MinimalProjection, SessionState, fold_events
 from .models import (
     ArtifactRef,
-    CatalogEventType,
-    Event as RunEvent,
-    DEPARTMENTS,
     DecisionRequest,
     DepartmentPrompt,
     EventType,
     ProjectEvent,
-    ProjectEventType,
     TERMINAL_STATUSES,
-    json_dumps,
     new_id,
     spec_content_hash,
 )
 from .providers import ProviderConnections, ProviderFacade
 from .providers.selection import ModelSelection
-from .projection import RunNotFoundError, RunProjection, project_run, saved_decision
+from .projection import RunNotFoundError, RunProjection, project_run
 from .public_tree import CapturedTree, UnrepresentableWorkspace
 from .recording import ActivationScope
-from .recovery import (ACTION_UNKNOWN, FILE_ACTION_TOOLS,
-                       classify_actions, file_action_comparisons)
+from .recovery import RunRecovery
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
-from .tools import tool_action
-from .validation import PRD_REVISION_FIELDS, ProposalDecision, evaluate_proposal
-from .collaboration import has_new_work, next_department, ready_departments
+from .validation import AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
+from .watched_outputs import waiting_departments
 from .workspace import WorkspaceSnapshot
 
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
 _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED})
 
-# 不算「这一轮正常结束」的运行状态（部门指导设计说明第 3 节，工单 #1039）：取消与运行时间用完以 failed 结束，
-# 上限停下与暂停是 paused；这些情形不写已回答，指导停在已进入模型输入。暂停以后继续的是同一轮，
-# 它在继续以后正常结束时才算（那时由新的激活写）。
-_NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
+
+def guidance_version(projection: RunProjection, department: str) -> int:
+    # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（设计说明第 4 节，S1d），
+    # 所以由薄驱动按运行状态投影给出，随一轮工作的开始事件记下
+    return max((item.version for item in projection.department_guidance
+                if item.department == department), default=0)
+
+
+def work_basis(projection: RunProjection, department: str) -> WorkBasis:
+    # 一轮工作开始时采用的工作依据：有效合同的摘要取自最小投影（裁决读的那一份），
+    # 用户输入与指导的版本是应用的数据，由这里一并填进来（S1d，工单 #860）
+    return WorkBasis(effective_contract_hash=artifact_hash(projection.effective_contract),
+                     input_version=projection.input_version,
+                     guidance_version=guidance_version(projection, department))
+
 
 
 def _round_applied_guidance(events: list[Any], projection: RunProjection,
@@ -108,26 +113,6 @@ def _round_applied_guidance(events: list[Any], projection: RunProjection,
     entered = {item.id for item in projection.department_guidance
                if item.department == scope.department and item.status == "in_input"}
     return [guidance_id for guidance_id in ids if guidance_id in entered]
-
-
-def _round_outcome(events: list[Any], scope: ActivationScope) -> str:
-    # 这一轮怎么结束的：提交被接纳记 proposal_accepted，其余正常结束记 text_reply（载荷只有这两个取值）。
-    # 提交以后被拒绝的这一轮，部门还没有交下正式成果，按文字回答记
-    start = None
-    for index, event in enumerate(events):
-        if (event.type == EventType.DEPARTMENT_ACTIVATED and event.session_id == scope.session_id
-                and (event.payload or {}).get("activation_id") == scope.activation_id):
-            start = index
-            break
-    submitted = False
-    for event in ([] if start is None else events[start + 1:]):
-        if event.session_id != scope.session_id:
-            continue
-        if event.type == EventType.PROPOSAL_SUBMITTED:
-            submitted = True
-        elif event.type == EventType.PROPOSAL_REJECTED:
-            submitted = False
-    return "proposal_accepted" if submitted else "text_reply"
 
 
 @dataclass
@@ -223,7 +208,7 @@ def _validate_run_ownership(
         for name in ("project_id", "work_item_id", "project_context"):
             if not isinstance(ownership[name], str) or not ownership[name].strip():
                 raise ValueError(f"{name} must be a non-empty string")
-        if not isinstance(prompt_config_versions, dict) or set(prompt_config_versions) != set(DEPARTMENTS):
+        if not isinstance(prompt_config_versions, dict) or set(prompt_config_versions) != set(DEFINITIONS.departments):
             raise ValueError("prompt_config_versions must cover exactly the three departments")
         if any(type(version) is not int or version < 0 for version in prompt_config_versions.values()):
             raise ValueError("prompt_config_versions must be non-negative integers")
@@ -252,6 +237,9 @@ class Orchestrator:
         sessions: SessionFactory | None = None,
         step_limits: StepLimits = StepLimits(),
         deltas: DeltaChannel | None = None,
+        tightening: Tightening,
+        routing: routing_contract.Routing,
+        decision_flow: Any,
     ) -> None:
         self.store = store
         self.writes = writes
@@ -268,14 +256,41 @@ class Orchestrator:
         self.test_provider = test_provider
         self.test_adapter_name = test_adapter_name
         self.test_model = test_model
-        self.assembly = ContextAssembly(artifacts, store)
+        # 路由的收紧检查（成果驱动）：内核的通用检查通过以后由它决定拒绝或等待（工单 #1095）；
+        # 组装时核对它声明的契约版本，不合格就在开始一轮工作之前失败（与执行、装配两份契约同一个做法）
+        self._tightening = tightening
+        tightening_contract.accept(tightening)
+        # 路由实现（成果驱动）：谁在等、谁能开工、一轮以什么结束、事项以什么结束由它判断（工单 #825）；
+        # 薄驱动只按契约的三个问题调用它，组装时核对它声明的契约版本
+        self._routing = routing
+        routing_contract.accept(routing)
+        # 决定请求的处理与建档的流转在应用层（工单 #827，设计说明第 6 节「薄驱动只连接」）：这里接上它，
+        # 调用时把自己作为 driver 交进去，薄驱动自己不再写这些处理
+        self.decision_flow = decision_flow
+        self.assembly = ContextAssembly(artifacts, store, tightening=tightening)
         self.sessions = sessions or SessionFactory(self.workspace_root)
         # 事项自己的停止开关：用户取消（cancel、_abort_run）打开它，之后的核对都得到停止，
         # 事项以取消结束；停下一个会话不用它（工单 #856）
         self._abort: dict[str, Event] = {}
-        # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：
-        # 新的交付封存以后，质检的会话在下一步从这份交付重建
-        self._inspection_source: dict[tuple[str, str], str | None] = {}
+        # 运行工作区与会话的检查工作区在工作的一层（`environment.py`，S4c 工单 #863）：薄驱动只问
+        # 「这个会话用哪份工作区」「这一轮进行中要不要换成新的交付」，两种工作区的来源与重建都在那里
+        self._workspaces = Workspaces(
+            self.workspace_root,
+            view=self.project,
+            writes=self.writes,
+            artifacts=self.artifacts,
+            sessions=self.sessions,
+            check_timeout=lambda run_id: parameter_values.frozen_check_timeout(self.store, run_id),
+        )
+        # 恢复的零件在 `recovery.py`（S4c 工单 #863）：核对定义版本、核实结果未知的动作、取得执行权
+        self._recovery = RunRecovery(
+            writes=self.writes,
+            store=self.store,
+            view=self.project,
+            artifacts=self.artifacts,
+            run_environment=self._workspaces.run_environment,
+            wake=self._wake,
+        )
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
         self._cancellers_changed = Condition()
@@ -289,17 +304,15 @@ class Orchestrator:
         # 运行到停止的循环在等会话时同时等新工作：run_id -> (循环, 事件)。
         # 没有会话在跑而新输入、指导或取消提交时，由 _wake 打开它，循环醒来重新找可以开始的部门（工单 #561）
         self._run_wakeups: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
-        # 每个 run 累计的已用运行时间（毫秒，重启时从事件恢复）与当前运行段的起点（单调时钟）：
-        # 等待期间段计时暂停，等待的时间不计入（工单 #350）
-        self._run_elapsed_ms: dict[str, int] = {}
+        # 运行时间的计时（设计说明第 4 节第 3 条，S1e 工单 #1015）：已经结算的量读最小投影，
+        # 正在跑的那一段只有驱动知道，所以驱动只记这一段从什么时候开始（单调时钟）。
+        # 等待期间段计时暂停，等待的时间不计入（工单 #350）：停表时把这一段折进 _run_segment_ms，
+        # 醒来重新记起点；这一轮结束、累计量写进事件以后，投影给出已结算量，这一段清零
+        self._run_segment_ms: dict[str, int] = {}
         self._run_segment_start: dict[str, float] = {}
-        # 每个会话累计的已用运行时间（毫秒，工单 #475）：键是 (run 编号, 会话编号)。
-        # 会话自己的累计值在重新启动以后从事件恢复，连续累计，不因中断清零；
-        # _session_base_ms 记下这次激活开始时 run 的累计已用时间，用来算这个会话这一段用掉多少
-        self._session_elapsed_ms: dict[tuple[str, str], int] = {}
+        # 每个会话这一段的起点（run 的已用毫秒，工单 #475）：键是 (run 编号, 会话编号)。
+        # 会话自己的累计已用时间读最小投影的会话一级用量，这一段用掉多少由这个起点算
         self._session_base_ms: dict[tuple[str, str], int] = {}
-        # 已经从事件恢复过会话用量的 run：恢复只做一次
-        self._recovered_session_runs: set[str] = set()
         # 作为任务开始（start）的 run 与它的任务；任务结束时移除
         self._tasks: dict[str, asyncio.Task[RunProjection]] = {}
         # 事项的执行任务与结算：run_id -> 任务；由 start_work_item 建立，任务结束时移除
@@ -395,7 +408,7 @@ class Orchestrator:
         run_created = NewEvent(
             EventType.RUN_CREATED,
             actor="system",
-            department="product",
+            department=self._input_department,
             state_before="running",
             state_after="running",
             payload={
@@ -425,7 +438,7 @@ class Orchestrator:
             },
         )
         note_received = (NewEvent(
-            EventType.USER_INPUT_RECEIVED, actor="user:local", department="product",
+            EventType.USER_INPUT_RECEIVED, actor="user:local", department=self._input_department,
             state_before="running", state_after="running",
             payload=follow_up,
             artifact_hashes=[follow_up["input_ref"]["content_hash"], follow_up["intend_ref"]["content_hash"]],
@@ -473,214 +486,51 @@ class Orchestrator:
             # fake 模型的窗口是这一次声明的（工单 #669）：同一个 fake 模型登记过的窗口要跟着这一次走
             existing["context_window"] = context_window
             existing["max_output_tokens"] = response_reserve(context_window, None)
-        for department in DEPARTMENTS:
+        for department in DEFINITIONS.departments:
             bindings.setdefault(department, {"provider_id": provider_id, "model_id": model_id})
         self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
         if self.facade.config_path is not None:
             # 调用目标随数据目录一起落盘：重开数据目录以后按同一个调用目标继续（工单 #669）
             self.facade.persist_document(self.facade.config_path)
 
-    def _environment(self, run_id: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
-        # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351），不跟随之后的修改
-        return LocalEnvironment.open(
-            self.workspace_root / run_id,
-            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id),
-            jobs=jobs,
-            session_id=session_id,
+    @property
+    def _input_department(self) -> str:
+        # 开始在哪个部门处理用户输入：组织定义里关注用户输入的那一个（watched 含 user_input）。
+        # 薄驱动不含部门的名称（设计说明第 6 节），部门身份从定义取
+        for department in DEFINITIONS.departments:
+            if "user_input" in DEFINITIONS.watched_outputs(department):
+                return department
+        raise ValueError("organization.json declares no department that watches user input")
+
+    @staticmethod
+    def _round_workspace(activation: _Activation) -> RoundWorkspace:
+        # 这一轮工作用哪份工作区（S4c 工单 #863）：身份取自已开始的一轮，检查工作区在交付到达时换新的
+        scope = activation.scope
+        return RoundWorkspace(
+            run_id=scope.run_id, department=scope.department, session_id=scope.session_id,
+            activation_id=scope.activation_id,
+            effective_contract_hash=scope.basis.effective_contract_hash,
         )
 
     def _waiting_departments(self, run_id: str) -> set[str]:
-        # 在等待工作的部门：这个进程里没有正在工作的会话的那些。
-        # 进程中断以后会话是新开的，投影里那条「工作中」的记录不再算数（工单 #16 的恢复口径）：
-        # 这时还没有会话的部门同样在等待，它可以被重新激活。
-        waiting: set[str] = set()
-        for department in DEPARTMENTS:
-            try:
-                session = self.sessions.get(run_id, department)
-            except KeyError:
-                waiting.add(department)
-                continue
-            if session.status != "active":
-                waiting.add(department)
-        return waiting
+        # 在等待工作的部门：这个进程里没有正在工作的会话的那些（工单 #16 的恢复口径）。
+        # 「谁在等」的判断归路由实现（工单 #825），薄驱动只交出会话状态这份事实
+        return waiting_departments({department: self._session_status(run_id, department)
+                                    for department in DEFINITIONS.departments})
+
+    def _session_status(self, run_id: str, department: str) -> str | None:
+        # 这个进程里这个部门会话的状态；还没有会话时为空（那时它同样在等待，可以被重新激活）
+        try:
+            return self.sessions.get(run_id, department).status
+        except KeyError:
+            return None
 
     def _department_ready(self, run_id: str, projection: RunProjection, department: str) -> bool:
-        # 这个部门现在可以开始一轮工作：在等待工作，并且关注的成果有了新东西。
+        # 这个部门现在可以开始一轮工作：由路由判断（在等待工作，并且关注的成果有了新东西）。
         # 同时运行（工单 #557）：准备激活的事务里重新核对，别的会话在这期间做完了就开始
-        if department not in self._waiting_departments(run_id):
-            return False
-        return has_new_work(projection, department)
+        return self._routing.department_ready(
+            projection, department=department, waiting=self._waiting_departments(run_id))
 
-    def _is_handoff_session(self, department: str, session_id: str, projection: RunProjection) -> bool:
-        # 持有交接的工程：工程部门的主线会话，它这次激活产出的东西进入运行工作区。
-        # 询问分支与产品要求都由各自的部门在检查工作区里回答，它们才是 local-tools 第 2 节
-        # 「在询问分支里回答的工程」那一格
-        if department != "engineering":
-            return False
-        if session_id in projection.branch_sessions:
-            return False
-        return True
-
-    def _inspection_source_tree(self, department: str, projection: RunProjection) -> CapturedTree:
-        # 每个会话检查工作区的建立源：质检从它当前面对的快照建立——最新的封存交付，
-        # 还没有交付时是事项开始时的项目起点（采纳成果或项目的起始文件夹快照，都没有时为空树），
-        # 不读运行工作区（local-tools 第 2 节）；其他会话从当前运行工作区快照建立。
-        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 第 2 节
-        # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
-        # host_commit_error 正式报告
-        if department == "quality":
-            if projection.delivery_spec is not None and projection.delivery_spec.tree_ref is not None:
-                tree_ref = projection.delivery_spec.tree_ref
-                return load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
-            for record in (projection.baseline, projection.snapshot):
-                # 事项开始时的项目起点：run_created 写下的采纳成果或起始文件夹快照，两者都没有时为空树
-                if not record:
-                    continue
-                start_ref = ArtifactRef(**record["tree_ref"])
-                return load_tree(self.artifacts, artifact_run(start_ref.path), start_ref)
-            return CapturedTree(directories=(), files=())
-        return workspace_tree(self.workspace_root / projection.run_id)
-
-    def _inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
-        # 会话的检查工作区（工单 #481）：根在运行工作区以外，按会话一个（工单 #473）：
-        # 主线会话与它在询问分支里的会话各用各的。
-        # 检查工作区按会话保留（工单 #558）：激活开始与提案提交都按同一根打开，不重新建立，
-        # 激活里写入的文件与检查回执在提交判断时仍然可见。
-        if not session_id:
-            raise RuntimeError(f"inspection workspace for {department} needs a session id")
-        root = inspection_root(self.workspace_root / run_id, session_id)
-        return LocalEnvironment.open(
-            root,
-            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id),
-            jobs=jobs,
-            session_id=session_id,
-        )
-
-    def _session_inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None,
-                                         jobs: Any | None = None) -> LocalEnvironment:
-        # 会话的检查工作区（工单 #558，本地通用工具设计说明第 2 节）：
-        # 会话还没有用过文件工具或命令时，每次激活都从当前源建立（会话建立阶段，
-        # 源是最新的）；会话用过以后就保留，不再每次激活重建；
-        # 质检的会话进行中有新的交付封存时，在质检的下一步从这份交付重建（_workspace_refresh）。
-        # 询问与通知都不重建。工作区不在了（会话结束清理过）时重新建立：来源是当前源。
-        if not session_id:
-            raise RuntimeError(f"inspection workspace for {department} needs a session id")
-        root = inspection_root(self.workspace_root / run_id, session_id)
-        if root.exists() and self._session_used_inspection(run_id, session_id):
-            return self._inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
-        return self._new_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
-
-    def _session_used_inspection(self, run_id: str, session_id: str) -> bool:
-        # 这个会话用过文件工具或命令没有：用过以后它的检查工作区按会话保留（工单 #558）
-        events = self.writes.read(run_stream(run_id)).events()
-        return any(event.type == EventType.TOOL_CALLED and event.session_id == session_id
-                   and tool_action(str((event.payload or {}).get("name") or "")) is not None
-                   for event in events)
-
-    def _inspection_source_hash(self, department: str, projection: RunProjection) -> str | None:
-        # 质检的检查工作区从它当前面对的交付建立：这份交付的摘要就是工作区的来源；
-        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）
-        if department != "quality":
-            return None
-        delivery = projection.delivery_spec
-        return None if delivery is None else delivery.content_hash
-
-    def _new_inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None, jobs: Any | None = None) -> LocalEnvironment:
-        # 激活开始：旧的检查工作区按工单的重试清理删除，再按当前源建立；
-        # 源可能在上一次激活后被新交付覆盖，质检必须看到最新交付而不是上一次的副本
-        projection = self.project(run_id)
-        run_root = self.workspace_root / run_id
-        if session_id is None and self.sessions is not None:
-            try:
-                session_id = self.sessions.get(run_id, department).session_id
-            except KeyError:
-                ids = {item.department: item.session_id for item in projection.sessions.values()} if projection.sessions else None
-                sessions = self.sessions.create_run_sessions(run_id, ids)
-                session_id = sessions[department].session_id
-        if session_id is None:
-            raise RuntimeError(f"inspection workspace for {department} needs a session id")
-        root = inspection_root(run_root, session_id)
-        if jobs is None and self.sessions is not None:
-            jobs = getattr(self.sessions, "jobs", None)
-
-        if jobs is not None:
-            jobs.stop_and_remove_for_workspace(session_id, root)
-
-        if root.exists():
-            cleanup_inspection_workspace(run_root, session_id)
-        tree = self._inspection_source_tree(department, projection)
-        env = LocalEnvironment.establish(
-            root,
-            tree,
-            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, run_id),
-            jobs=jobs,
-            session_id=session_id,
-        )
-        if department == "quality":
-            if projection.qa_tests_archive_ref is not None:
-                ref = projection.qa_tests_archive_ref
-                if isinstance(ref, dict):
-                    ref = ArtifactRef(**ref)
-                qa_tree = load_tree(self.artifacts, artifact_run(ref.path), ref)
-                env.place_qa_tests(qa_tree)
-            else:
-                env.place_qa_tests(None)
-        # 这份工作区是从哪一份交付建立的：新的交付封存以后据此判断要不要重建（工单 #558）
-        self._inspection_source[(run_id, session_id)] = self._inspection_source_hash(department, projection)
-        return env
-
-    def _workspace_refresh(self, activation: _Activation) -> Callable[[], LocalEnvironment | None]:
-        # 检查工作区按会话保留（工单 #558）：质检的会话进行中有新的交付封存时，
-        # 在质检的下一步从这份交付重建（本地通用工具设计说明第 2 节）；
-        # 询问与通知都不重建
-        run_id = activation.run_id
-        department = activation.scope.department
-        session_id = activation.scope.session_id
-
-        def refresh() -> LocalEnvironment | None:
-            if department != "quality":
-                return None
-            projection = self.project(run_id)
-            current = self._inspection_source_hash(department, projection)
-            if current is None:
-                return None
-            if self._inspection_source.get((run_id, session_id)) == current:
-                return None
-            environment = self._new_inspection_environment(run_id, department, session_id=session_id)
-            environment.bind_check(
-                activation_id=activation.scope.activation_id,
-                product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
-                delivery_spec_hash=current,
-                effective_contract_hash=activation.scope.basis.effective_contract_hash,
-            )
-            return environment
-
-        return refresh
-
-    def _environment_for(self, run_id: str, department: str, *, refresh: bool = False) -> LocalEnvironment:
-        # 给定部门在当前阶段下的执行环境：持有交接的工程使用运行工作区，其他会话使用检查工作区。
-        # refresh 只在激活开始时为真：按会话保留检查工作区（会话建立阶段从当前源建立，
-        # 用过以后保留）；提案提交时为假，沿用激活内的同一份工作区，
-        # 使写入与检查回执在提交判断时仍然可见
-        projection = self.project(run_id)
-        session_id = None
-        jobs = None
-        if self.sessions is not None:
-            try:
-                session = self.sessions.get(run_id, department)
-            except KeyError:
-                ids = {item.department: item.session_id for item in projection.sessions.values()} if projection.sessions else None
-                sessions = self.sessions.create_run_sessions(run_id, ids)
-                session = sessions[department]
-            session_id = session.session_id
-            jobs = getattr(self.sessions, "jobs", None)
-
-        if self._is_handoff_session(department, session_id, projection):
-            return self._environment(run_id, session_id=session_id, jobs=jobs)
-        if refresh:
-            # 激活开始：检查工作区按会话保留，只在会话建立时建立（工单 #558）
-            return self._session_inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
-        return self._inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
 
     def add_input(self, run_id: str, text: str, *, base_version: int | None = None,
                   command: Command | None = None) -> RunProjection:
@@ -801,7 +651,7 @@ class Orchestrator:
 
     def add_guidance(self, run_id: str, department: str, text: str, *,
                      base_version: int | None = None, command: Command | None = None) -> RunProjection:
-        if department not in DEPARTMENTS:
+        if department not in DEFINITIONS.departments:
             raise ValueError("unknown department")
 
         def receive(transaction: Transaction) -> None:
@@ -824,7 +674,7 @@ class Orchestrator:
         if projection.status in TERMINAL_STATUSES or projection.input_version <= projection.product_work_input_version:
             return projection
         transaction.append(NewEvent(
-            EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department="product",
+            EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department=self._input_department,
             state_before=projection.status, state_after="PRODUCT_SPEC",
             payload={"through_version": projection.input_version},
         ))
@@ -837,10 +687,10 @@ class Orchestrator:
             if not (activation.stop_flag.is_set()
                     or self._aborted(activation.run_id)
                     or (activation.deadline is not None and time.monotonic() >= activation.deadline)
-                    or time_used_up(projection, self._elapsed_sec(activation.run_id))):
+                    or time_used_up(transaction.minimal(), self._elapsed_sec(activation.run_id))):
                 projection = self._assign_new_inputs(transaction)
             decisions = list(transaction.decisions.values())
-            stop = self._stop_requested(activation, projection, decisions)
+            stop = self._stop_requested(activation, projection, transaction.minimal(), decisions)
             # 别的会话已经写下待恢复的决定请求：这个会话照常停下（事项的状态不变，工单 #856）；
             # 它自己也被挡住时（这次的模型请求发不出去），它要写下自己的那一条，
             # 各写明自己的部门、模型与问题（模型管理设计说明第 5.5 节）
@@ -849,7 +699,7 @@ class Orchestrator:
 
         return self.writes.transact(run_stream(activation.run_id), judge)
 
-    def _stop_requested(self, activation: _Activation, projection: RunProjection,
+    def _stop_requested(self, activation: _Activation, projection: RunProjection, minimal: MinimalProjection,
                         decisions: Iterable[DecisionRequest]) -> bool:
         # 停止判断：这个会话自己的停止开关、事项被中止、运行时间用完、终态、有未回答的阻塞 run 的决定请求；
         # 只读取，不写入。
@@ -861,7 +711,7 @@ class Orchestrator:
         return (activation.stop_flag.is_set()
                 or self._aborted(activation.run_id)
                 or (activation.deadline is not None and time.monotonic() >= activation.deadline)
-                or time_used_up(projection, self._elapsed_sec(activation.run_id))
+                or time_used_up(minimal, self._elapsed_sec(activation.run_id))
                 or projection.status in TERMINAL_STATUSES or blocks_run(decisions))
 
     def _elapsed_sec(self, run_id: str) -> float:
@@ -870,66 +720,36 @@ class Orchestrator:
         return self._elapsed_ms(run_id) / 1000.0
 
     def _elapsed_ms(self, run_id: str) -> int:
-        # 这个 run 已经用的运行时间（毫秒）：已持久化的累计加上当前运行段
-        total_ms = self._run_elapsed_ms.get(run_id, 0)
+        # 这个 run 已经用的运行时间（毫秒）：最小投影里已结算的那一部分加上当前这一段
+        total_ms = self.writes.minimal(run_stream(run_id)).used.settled_ms + self._run_segment_ms.get(run_id, 0)
         started = self._run_segment_start.get(run_id)
         if started is not None:
             total_ms += max(0, int((time.monotonic() - started) * 1000))
         return total_ms
 
-    def _recover_session_usage(self, run_id: str, events: Sequence[Any]) -> None:
-        # 会话自己的累计已用时间（工单 #475）：从事件恢复，重新启动以后连续累计。
-        # 每个会话最后一条 activation_finished 记下的累计值就是它到那一刻的总量；
-        # 计数（激活次数与模型步数）由事件数得出，不依赖这个字段
-        if run_id in self._recovered_session_runs:
-            return
-        self._recovered_session_runs.add(run_id)
-        for event in events:
-            if event.type != EventType.ACTIVATION_FINISHED or not event.session_id:
-                continue
-            key = (run_id, event.session_id)
-            elapsed = int((event.payload or {}).get("session_elapsed_ms", 0) or 0)
-            self._session_elapsed_ms[key] = max(self._session_elapsed_ms.get(key, 0), elapsed)
+    def _session_used(self, run_id: str, session_id: str) -> SessionState:
+        # 一个会话的已用量（设计说明第 4 节第 4 条，S1e 工单 #1015）：驱动与应用都读最小投影，
+        # 不各自从事件数一遍；没有激活过的会话在投影里没有条目，按全零处理
+        return self.writes.minimal(run_stream(run_id)).sessions.get(session_id, SessionState())
 
     def _start_session_segment(self, run_id: str, session_id: str) -> None:
         # 会话这一段工作的起点：记下 run 此刻的累计已用时间（工单 #475）
         self._session_base_ms[(run_id, session_id)] = self._elapsed_ms(run_id)
 
     def _settle_session_segment(self, run_id: str, session_id: str, run_elapsed_ms: int) -> int:
-        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点。
+        # 会话这一段工作用掉的毫秒数：run 的累计已用时间减去这一段的起点，加上投影里已结算的那一部分。
         # 一个部门会话包含它等待的分支会话的时间（用量计入提问方），因此各会话的用时之和可以大于事项的用时
         key = (run_id, session_id)
+        settled = self._session_used(run_id, session_id).settled_ms
         base = self._session_base_ms.pop(key, None)
         if base is None:
-            return self._session_elapsed_ms.get(key, 0)
-        used = max(0, run_elapsed_ms - base)
-        total = self._session_elapsed_ms.get(key, 0) + used
-        self._session_elapsed_ms[key] = total
-        return total
-
-    def _session_model_steps(self, run_id: str, session_id: str, events: Sequence[Any]) -> int:
-        # 这个会话已经用过的模型步数（工单 #475）：按这个会话的 model_requested 事件数算。
-        # 重新启动以后从事件重算，连续累计：分支会话中断以后继续，用掉的步数不从上限里清零
-        return len([event for event in events
-                    if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id])
-
-    def _session_unfinished_model_steps(self, run_id: str, session_id: str, events: Sequence[Any]) -> int:
-        # 这个会话还没有结束的激活用掉的模型步数（工单 #475）：上一次激活结束以后
-        # （activation_finished）这个会话又用掉的步数。中断时那次激活没有结束事件，
-        # 它用掉的步数算在这里，重新启动以后从它自己的步骤上限里扣掉
-        last_finished = None
-        for event in events:
-            if event.type == EventType.ACTIVATION_FINISHED and event.session_id == session_id:
-                last_finished = event.stream_version
-        return len([event for event in events
-                    if event.type == EventType.MODEL_REQUESTED and event.session_id == session_id
-                    and (last_finished is None or event.stream_version > last_finished)])
+            return settled
+        return settled + max(0, run_elapsed_ms - base)
 
     def _session_elapsed_sec(self, run_id: str, session_id: str) -> float:
-        # 这个会话已经用的运行时间（秒）：累计值加上当前这一段
-        key = (run_id, session_id)
-        total = self._session_elapsed_ms.get(key, 0)
-        base = self._session_base_ms.get(key)
+        # 这个会话已经用的运行时间（秒）：投影里已结算的那一部分加上当前这一段（设计说明第 4 节第 3 条）
+        total = self._session_used(run_id, session_id).settled_ms
+        base = self._session_base_ms.get((run_id, session_id))
         if base is not None:
             total += max(0, self._elapsed_ms(run_id) - base)
         return total / 1000.0
@@ -942,7 +762,7 @@ class Orchestrator:
             return
         started = self._run_segment_start.pop(run_id, None)
         if started is not None:
-            self._run_elapsed_ms[run_id] = self._run_elapsed_ms.get(run_id, 0) + max(
+            self._run_segment_ms[run_id] = self._run_segment_ms.get(run_id, 0) + max(
                 0, int((time.monotonic() - started) * 1000))
 
     def _resume_run_clock(self, run_id: str) -> None:
@@ -950,24 +770,21 @@ class Orchestrator:
         self._run_segment_start.setdefault(run_id, time.monotonic())
 
     def _settle_run_segment(self, run_id: str, department: str | None = None) -> int:
-        # 激活结束：结算当前段，返回累计的已用毫秒。
-        # 同时运行（工单 #557）：这个会话结束时别的会话还在工作，run 的计时继续
+        # 激活结束：结算当前段，返回累计的已用毫秒：投影里已结算的那一部分加上停过表、投影还没有结算的那些段。
+        # 同时运行（工单 #557）：这个会话结束时别的会话还在工作，run 的计时继续，这一段不折进去
         self._pause_run_clock(run_id, exclude=department)
-        return self._run_elapsed_ms.get(run_id, 0)
+        return self.writes.minimal(run_stream(run_id)).used.settled_ms + self._run_segment_ms.get(run_id, 0)
 
-    def _recover_run_usage(self, run_id: str, events: Sequence[Any]) -> None:
-        # 从事件恢复累计已用量：最后一个 activation_finished 记下的累计值；
-        # 这个版本以前的旧事件没有这些字段，按 0 处理（语义变更先提高 run 事件版本，ADR-0019）
-        if run_id in self._run_elapsed_ms:
-            return
-        elapsed_ms = 0
-        for event in events:
-            if event.type == EventType.ACTIVATION_FINISHED:
-                elapsed_ms = int((event.payload or {}).get("elapsed_ms", 0) or 0)
-        self._run_elapsed_ms[run_id] = elapsed_ms
+    def _rebase_run_clock(self, run_id: str) -> None:
+        # 一轮工作的累计量写进事件以后：已结算量改由投影给出，停过表的那些段清零；
+        # 别的会话还在工作时这一段的起点从这里重新记，不把已经结算的那一段时间再算一遍
+        self._run_segment_ms[run_id] = 0
+        if run_id in self._run_segment_start:
+            self._run_segment_start[run_id] = time.monotonic()
 
-    def _time_left(self, run_id: str, projection: RunProjection) -> float:
-        return time_left_sec(projection, self._elapsed_sec(run_id))
+    def _time_left(self, run_id: str) -> float:
+        # 剩余运行时间读最小投影（设计说明第 4 节，S1d 工单 #860）
+        return time_left_sec(self.writes.minimal(run_stream(run_id)), self._elapsed_sec(run_id))
 
     async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
@@ -984,7 +801,7 @@ class Orchestrator:
                 judgment = self._at_safe_node(activation)
                 if not judgment.proceed:
                     return judgment
-                time_left = self._time_left(activation.run_id, self.project(activation.run_id))
+                time_left = self._time_left(activation.run_id)
                 remaining = deadline - loop.time()
                 if remaining <= 0:
                     return judgment
@@ -1048,196 +865,9 @@ class Orchestrator:
 
     def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
         # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约第 5.2 节）：
-        # run 事件版本与当前不同的 run 在启动序列里已经按强制升级处理（工单 #322），这里核对事项记录的
-        # 定义版本，与当前不同就发出 definitions_changed 决定请求交给用户（ADR-0014，总体架构第 7.4 节），
-        # 用户选择「按新版本继续」以前不取得执行权；核对通过以后原子取得这个 run 的执行权，
-        # 记下中断位置与继续的依据，再从已提交的状态继续运行到终态。
-        # 已经结束的 run 不取得执行权、不写事件；有未回答、阻塞整个 run 的决定请求时不继续，交给用户回答
-        projection = self.project(run_id)
-        if projection.status in TERMINAL_STATUSES:
-            return None
-        decisions = self.writes.read(run_stream(run_id)).decisions.values()
-        if blocks_run(decisions):
-            return None
-        if projection.definitions_version != DEFINITIONS.version:
-            self._await_definitions(run_id)
-            return None
-        # 工单 #17：检查是否有未确认的动作，为 unknown 动作发出决定请求
-        self._await_unknown_actions(run_id)
-        return self._claim_and_resume(run_id)
-
-    def _await_definitions(self, run_id: str) -> None:
-        # 事项记录的定义版本与当前加载的版本不同（ADR-0014，#48 登记的架构问题的处理）：
-        # 发出一个阻塞整个 run 的决定请求，选项为「按新版本继续」与「停止事项」；选择写入事件。
-        # 选择「按新版本继续」以后，这个 run 照常取得执行权并继续运行，后续事件记录新版本；
-        # 请求只发一次：已经有过一个定义版本不同的请求时不重复
-        def request(transaction: Transaction) -> None:
-            current = transaction.projection
-            if current.status in TERMINAL_STATUSES or blocks_run(transaction.decisions.values()):
-                return
-            if any(decision.request.get("kind") == DEFINITIONS_CHANGED.name
-                   for decision in transaction.decisions.values()):
-                return
-            transaction.append(NewEvent(
-                EventType.DECISION_REQUESTED, actor="system", department=current.active_department,
-                state_before=current.status, state_after=current.status,
-                payload={
-                    "kind": DEFINITIONS_CHANGED.name, "blocks": DEFINITIONS_CHANGED.blocks,
-                    "options": [{"id": option.id, "label": option.label} for option in DEFINITIONS_CHANGED.options],
-                    "facts": [], "department": current.active_department,
-                    "reason": "definitions_version_changed",
-                    "recorded_definitions_version": current.definitions_version,
-                    "current_definitions_version": DEFINITIONS.version,
-                    "description": (
-                        f"事项使用的定义版本 {current.definitions_version or '（未记录）'} 与当前加载的版本 "
-                        f"{DEFINITIONS.version} 不同。按新版本继续以后，后续的模型请求与裁决记录新版本；"
-                        "选择停止事项则运行结束。"),
-                },
-            ))
-            transaction.on_commit(lambda: self._wake(run_id))
-
-        self.writes.transact(run_stream(run_id), request)
-
-    def _await_unknown_actions(self, run_id: str) -> None:
-        # 工单 #581（ADR-0038，恢复契约第 4 节）：恢复时找出结果未知的动作。
-        # 文件动作（写入、编辑、删除、移动）先按动作前的公开树快照与当前公开树自动核实：
-        # 已经完成的记一条 resolution="auto_verify" 的核实记录；没有发生的记一条 resolution="handed_back"
-        # 的核实记录，说明核实确认没有发生；unclear 或无法核实的按非文件动作处理。
-        # 其余结果未知的动作（命令、检查、读取等）记一条 resolution="handed_back" 的核实记录交还会话，
-        # 说明执行被中断、结果未知，由模型检查后决定是否重新执行。
-        # 不再发出任何 unknown_action 决定请求，事项直接继续。
-        def request(transaction: Transaction) -> None:
-            projection = transaction.projection
-            if projection.status in TERMINAL_STATUSES:
-                return
-            for decision in transaction.decisions.values():
-                if decision.status == "open" and decision.kind == "unknown_action":
-                    transaction.append(NewEvent(
-                        EventType.DECISION_WITHDRAWN,
-                        actor="system",
-                        department=decision.request.get("department") or projection.active_department,
-                        parent_event_id=decision.decision_id,
-                        state_before=projection.status,
-                        state_after=projection.status,
-                        payload={
-                            "decision_id": decision.decision_id,
-                            "reason": "superseded_by_hand_back",
-                        },
-                    ))
-            events = transaction.events()
-            actions = classify_actions(events)
-            # 文件动作的对比结论一次算完（工单 #308）：当前公开树在这一个事务里读一次
-            comparisons: dict[str, dict[str, Any]] = {}
-            if any(info["status"] == ACTION_UNKNOWN and info["tool"] in FILE_ACTION_TOOLS
-                   and info["started_event"] is not None for info in actions.values()):
-                tree = self._environment(run_id).query(FactsQuery(tree=True)).tree
-                if tree is not None:
-                    comparisons = file_action_comparisons(
-                        events, artifacts=self.artifacts, run_id=run_id,
-                        current_entries=list(zip(tree.files, tree.hashes)))
-            for identity, info in actions.items():
-                started = info["started_event"]
-                if info["status"] != ACTION_UNKNOWN or started is None:
-                    continue
-                if info["tool"] == "ask":
-                    continue
-                action_id = identity[2]
-                comparison = comparisons.get(action_id)
-                if comparison is not None and comparison["verdict"] == "completed":
-                    transaction.append(self._auto_verified(started, projection.status, comparison))
-                    continue
-                if comparison is not None and comparison["verdict"] == "not_happened":
-                    transaction.append(self._handed_back_action(
-                        started, projection.status,
-                        error="执行被中断，核实确认没有发生",
-                        comparison=comparison,
-                    ))
-                    continue
-                transaction.append(self._handed_back_action(
-                    started, projection.status,
-                    error="执行被中断，结果未知，由模型检查以后决定是否重新执行；没有收到输出",
-                    comparison=comparison,
-                ))
-
-        self.writes.transact(run_stream(run_id), request)
-
-    def _handed_back_action(self, started: Any, status: str, *,
-                            error: str,
-                            comparison: dict[str, Any] | None = None) -> NewEvent:
-        # 结果未知的动作交还会话（工单 #581）：写一条 resolution="handed_back" 的核实记录，
-        # input_item 带原动作的调用编号进入部门历史，模型下一次运行时读到并决定如何处理
-        payload = started.payload or {}
-        action_id = str(payload.get("id") or "")
-        result = {"ok": False, "output": None, "error": error}
-        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
-        event_payload: dict[str, Any] = {
-            "id": action_id,
-            "name": str(payload.get("name") or ""),
-            "step_id": payload.get("step_id"),
-            "activation_id": payload.get("activation_id"),
-            "purpose": payload.get("purpose", "work"),
-            "input_item": input_item,
-            "ok": False,
-            "error": error,
-            "resolution": "handed_back",
-        }
-        if comparison is not None:
-            event_payload["verification"] = comparison
-        # 交还给发出这个动作的会话（工单 #475）：会话编号取自发这个动作的 tool_started，
-        # 核实记录因此进入那个会话的历史（分支会话的核实结果不进入部门主线）
-        return NewEvent(
-            EventType.ACTION_VERIFIED, actor="system", department=started.department,
-            state_before=status, state_after=status, parent_event_id=started.event_id,
-            session_id=started.session_id,
-            payload=event_payload,
-        )
-
-    def _auto_verified(self, started: Any, status: str, comparison: dict[str, Any]) -> NewEvent:
-        # 自动核实（工单 #308）：对比确认动作已经完成时记一条核实记录，不补造原来的 tool_called 回执。
-        # 结果进入部门历史：input_item 按原来的动作编号给出，与同一条结果的其它记录共享这个编号
-        payload = started.payload or {}
-        action_id = str(payload.get("id") or "")
-        result = {"ok": True, "output": {"resolved": "auto_verify", "verification": comparison}, "error": None}
-        input_item = {"type": "function_call_output", "call_id": action_id, "output": json_dumps(result)}
-        return NewEvent(
-            EventType.ACTION_VERIFIED, actor="system", department=started.department,
-            state_before=status, state_after=status, parent_event_id=started.event_id,
-            session_id=started.session_id,
-            payload={"id": action_id, "name": str(payload.get("name") or ""), "step_id": payload.get("step_id"),
-                     "activation_id": payload.get("activation_id"),
-                     "purpose": payload.get("purpose", "work"), "input_item": input_item,
-                     "ok": True, "resolution": "auto_verify", "verification": comparison},
-        )
-
-    def _claim_and_resume(self, run_id: str) -> tuple[int, RunProjection]:
-        # 取得执行权并写入 run_resumed：中断位置与继续的依据取自取得执行权时的投影。
-        # 恢复不写限额与计数字段（激活次数、模型步数、重试与已用运行时间保持中断时的值），
-        # 也不新增部门激活：之后开始的激活由激活本身写入
-        def claim(transaction: Transaction) -> int:
-            projection = transaction.projection
-            previous = self.store.projection(run_stream(run_id))
-            # 执行权编号在写入口以已记录的编号加一确定；另一方先取得时流版本同时改变，
-            # 这里的依据过期，事务因版本不符重新判断，因此这个编号与写入口确定的编号相同
-            transaction.append(NewEvent(
-                EventType.RUN_RESUMED, department=projection.active_department, actor="system",
-                state_before=projection.status, state_after=projection.status,
-                parent_event_id=projection.last_event_id,
-                payload={
-                    "basis": {
-                        "interrupted_at_status": projection.status,
-                        "interrupted_at_version": projection.stream_version,
-                        "interrupted_at_event_id": projection.last_event_id,
-                        "recorded_run_event_version": projection.run_event_version,
-                        "current_run_event_version": RUN_EVENT_VERSION,
-                    },
-                    "acquired_epoch": (0 if previous is None or previous.epoch is None else previous.epoch) + 1,
-                    "previous_epoch": None if previous is None else previous.epoch,
-                },
-            ))
-            return (0 if previous is None or previous.epoch is None else previous.epoch) + 1
-
-        epoch, _ = self.writes.claim_execution_right(run_stream(run_id), claim)
-        return epoch, self.project(run_id)
+        # 核对定义版本、核实结果未知的动作、取得执行权这三步在 `recovery.py`（S4c 工单 #863），
+        # 薄驱动只把它接上并转交
+        return self._recovery.resume(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
         # 停下这个会话：打开它自己的停止开关，正在进行的步骤立即取消；
@@ -1307,9 +937,10 @@ class Orchestrator:
             await connections.aclose()
 
     def _ready_departments(self, run_id: str) -> list[str]:
-        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些（工单 #557）
+        # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些（工单 #557）。
+        # 判断归路由实现（工单 #825）
         projection = self.project(run_id)
-        return ready_departments(projection, waiting=self._waiting_departments(run_id))
+        return self._routing.ready_departments(projection, waiting=self._waiting_departments(run_id))
 
     async def _stop_sessions(self, run_id: str, tasks: dict[str, asyncio.Task[RunProjection]]) -> None:
         # 事项到终态或被未回答的决定请求阻塞：其余会话停止并收尾。
@@ -1326,9 +957,14 @@ class Orchestrator:
         await asyncio.gather(*pending, return_exceptions=True)
 
     async def _no_new_work(self, run_id: str) -> RunProjection:
-        # 没有部门可以开始一轮工作：没有新的工作，结束这个 run
-        self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
-            transaction, "provider_error", "no department has new work"))
+        # 没有部门可以开始一轮工作：事项以什么结束由路由判断（工单 #825），薄驱动只把它的判断写成停止
+        def end(transaction: Transaction) -> None:
+            judgment = self._routing.item_end(transaction.projection)
+            if judgment is None:
+                return
+            self._fail(transaction, judgment.stop_reason, judgment.message)
+
+        self.writes.transact(run_stream(run_id), end)
         return await asyncio.to_thread(self._settled, run_id)
 
     def start(self, run_id: str) -> asyncio.Task[RunProjection]:
@@ -1419,7 +1055,7 @@ class Orchestrator:
 
     async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
         projection = self.project(run_id)
-        department = next_department(projection, waiting=self._waiting_departments(run_id))
+        department = self._routing.next_department(projection, waiting=self._waiting_departments(run_id))
         if department is None:
             return await self._no_new_work(run_id)
         return await self._activate_department(run_id, department, connections)
@@ -1452,18 +1088,12 @@ class Orchestrator:
                     current = transaction.projection
                     elapsed_ms = self._settle_run_segment(run_id, scope.department)
                     happened = transaction.events()
-                    activations = len([event for event in happened
-                                       if event.type == EventType.DEPARTMENT_ACTIVATED])
-                    model_steps = len([event for event in happened
-                                       if event.type == EventType.MODEL_REQUESTED])
-                    # 这个会话自己的累计用量（工单 #475）：重新启动以后从事件连续累计
+                    # 这一轮结束时的已用量读最小投影（S1e 工单 #1015）：事项一级与会话一级的激活次数与
+                    # 模型步数都由投影折出来，不在这里从事件数一遍。会话的已用时间含当前这一段，
+                    # 投影要等这条事件写进去才结算，所以由驱动算好写进事件
+                    measured = transaction.minimal()
+                    session = measured.sessions.get(scope.session_id, SessionState())
                     session_elapsed_ms = self._settle_session_segment(run_id, scope.session_id, elapsed_ms)
-                    session_activations = len([event for event in happened
-                                               if event.type == EventType.DEPARTMENT_ACTIVATED
-                                               and event.session_id == scope.session_id])
-                    session_model_steps = len([event for event in happened
-                                               if event.type == EventType.MODEL_REQUESTED
-                                               and event.session_id == scope.session_id])
                     transaction.append(NewEvent(
                         EventType.ACTIVATION_FINISHED,
                         actor="system",
@@ -1477,23 +1107,26 @@ class Orchestrator:
                             **scope.versions(),
                             "latency_ms": int((time.monotonic() - started) * 1000),
                             "elapsed_ms": elapsed_ms,
-                            "activations": activations,
-                            "model_steps": model_steps,
+                            "activations": measured.used.activations,
+                            "model_steps": measured.used.model_steps,
                             "session_elapsed_ms": session_elapsed_ms,
-                            "session_activations": session_activations,
-                            "session_model_steps": session_model_steps,
+                            "session_activations": session.activations,
+                            "session_model_steps": session.model_steps,
                             "stop_reason": current.stop_reason,
                         },
                     ))
                     # 这一轮收到的指导在这一轮正常结束时由主机写已回答（部门指导设计说明第 3 节，工单 #1039）：
                     # 与激活结束在同一个事务里，部门不提交。事件记下是哪一轮、这一轮怎么结束的；
-                    # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入
-                    if current.status in _NOT_A_NORMAL_ROUND_END:
+                    # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入。
+                    # 一轮以什么结束由路由判断（工单 #825）：不是正常结束的一轮没有结果，也照旧不写已回答
+                    ended = self._routing.round_end(
+                        current, happened, department=scope.department, session_id=scope.session_id,
+                        activation_id=scope.activation_id)
+                    if ended is None:
                         return
                     answered = _round_applied_guidance(happened, current, scope)
                     if not answered:
                         return
-                    outcome = _round_outcome(happened, scope)
                     for guidance_id in answered:
                         transaction.append(NewEvent(
                             EventType.DEPARTMENT_GUIDANCE_RESPONDED,
@@ -1505,12 +1138,14 @@ class Orchestrator:
                             session_id=scope.session_id,
                             payload={"guidance_id": guidance_id,
                                      "activation_id": scope.activation_id,
-                                     "outcome": outcome},
+                                     "outcome": ended.outcome},
                         ))
 
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
                 await asyncio.to_thread(self._await_cancellers, run_id)
                 self.writes.transact(run_stream(run_id), finish)
+                # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
+                self._rebase_run_clock(run_id)
                 self.sessions.get(run_id, scope.department).idle()
                 active = self._active.get(run_id)
                 if active is not None:
@@ -1526,9 +1161,7 @@ class Orchestrator:
         projection = transaction.projection
         if not projection.run_id:
             raise RunNotFoundError(run_id)
-        self._recover_run_usage(run_id, transaction.events())
-        # 会话自己的累计用量同样从事件恢复（工单 #475）：重新启动以后各会话的已用时间与次数连续累计
-        self._recover_session_usage(run_id, transaction.events())
+        # 已用量不在这里恢复：运行时间、激活次数与模型步数都读最小投影（S1e 工单 #1015）
         self._resume_run_clock(run_id)
         if self._aborted(run_id):
             return None
@@ -1538,10 +1171,11 @@ class Orchestrator:
         projection = self._assign_new_inputs(transaction)
         if projection.status in TERMINAL_STATUSES:
             return None
-        bound = activation_bound(projection, self._elapsed_sec(run_id))
+        minimal = transaction.minimal()
+        bound = activation_bound(minimal, self._elapsed_sec(run_id))
         if bound is not None:
             if bound == TIME_BOUND:
-                self._fail(transaction, bound, time_limit_message(projection, self._elapsed_sec(run_id)))
+                self._fail(transaction, bound, time_limit_message(minimal, self._elapsed_sec(run_id)))
             else:
                 self._pause(transaction, bound)
             return None
@@ -1588,7 +1222,7 @@ class Orchestrator:
         transaction.on_commit(lambda: session.activate(activation_id))
         # 部门 Prompt 每次激活从项目部门设置读取，run 内没有副本；没有写入时使用内置默认 Prompt（第 5.3 节）
         prompt = self._department_prompt(projection, department)
-        basis = WorkBasis.current(projection, department)
+        basis = work_basis(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
         provider_name = self._activation_provider(adapter)
         parent = transaction.append(NewEvent(
@@ -1681,22 +1315,26 @@ class Orchestrator:
             "sent_tier": None,
         }
 
-    def _session_limits(self, run_id: str, session_id: str) -> StepLimits:
+    def _session_limits(self, run_id: str, session_id: str, *, max_model_steps: int | None = None) -> StepLimits:
         # 这个会话这一步的步数上限（工单 #475）：会话上一次没有结束的激活用掉的模型步数
         # 从它自己的上限里扣掉，重新启动以后连续累计，不因中断清零。
-        # 已经结束的激活不算在内：下一轮工作重新按上限开始
-        events = self.writes.read(run_stream(run_id)).events()
-        used = self._session_unfinished_model_steps(run_id, session_id, events)
+        # 已经结束的激活不算在内：下一轮工作重新按上限开始。
+        # 两个数都读最小投影（S1e 工单 #1015）：累计的模型步数减去上一次结算时的步数。
+        # max_model_steps 给出时不按运行配置的全局上限，按这个数（询问分支的这一轮由路由给上限）
+        base = self.step_limits if max_model_steps is None else replace(
+            self.step_limits, max_model_steps=max_model_steps)
+        session = self._session_used(run_id, session_id)
+        used = max(0, session.model_steps - session.settled_steps)
         if used <= 0:
-            return self.step_limits
-        return replace(self.step_limits, max_model_steps=max(0, self.step_limits.max_model_steps - used))
+            return base
+        return replace(base, max_model_steps=max(0, base.max_model_steps - used))
 
     async def _invoke_activation(self, activation: _Activation) -> None:
         scope = activation.scope
         run_id, department = scope.run_id, scope.department
         projection = self.project(run_id)
         try:
-            environment = self._environment_for(run_id, department, refresh=True)
+            environment = self._workspaces.environment_for(run_id, department, refresh=True)
         except UnrepresentableWorkspace as exc:
             # 非质检会话的检查工作区从运行工作区建立，建立源里的无法表示条目与激活开始后发现的同类：
             # 以 workspace_unrepresentable 暂停，而不是当作存储故障终止
@@ -1713,30 +1351,27 @@ class Orchestrator:
                           activation.version)
             return
         try:
-            environment.bind_check(
-                activation_id=scope.activation_id,
-                product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
-                delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
-                effective_contract_hash=scope.basis.effective_contract_hash,
-            )
+            self._workspaces.bind(environment, projection, activation_id=scope.activation_id,
+                                  effective_contract_hash=scope.basis.effective_contract_hash)
             # 薄驱动只经执行契约与装配契约调用实现：先核对两个实现声明的版本（当前版与上一版），
             # 版本不合时在开始这一轮之前失败，说明里写明实现的声明与薄驱动接受的版本
             execution_contract.accept(StepDriver)
             assembly_contract.accept(self.assembly)
             # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
-            # 剩余步数决定；路由的工作引用还没有这一项（成果驱动路由在 #825、#861 接上），这一版传空
+            # 剩余步数决定；路由自己的工作引用经契约原样交给装配（设计说明第 5.4 节第 4 条），
+            # 成果驱动不用它时为空（工单 #861）
             request = execution_contract.RoundRequest(
                 scope=scope, prompt=activation.prompt,
                 limits=self._session_limits(run_id, scope.session_id),
-                work_ref=None,
+                work_ref=self._routing.work_reference(projection, department=department),
             )
             activation.driver = StepDriver.start(
                 request, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
                 nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
-                deltas=self.deltas,
-                refresh_workspace=self._workspace_refresh(activation),
+                deltas=self.deltas, tightening=self._tightening,
+                refresh_workspace=self._workspaces.refresh_for(self._round_workspace(activation)),
             )
             result = await activation.driver.result()
         except UnrepresentableWorkspace as exc:
@@ -1749,18 +1384,28 @@ class Orchestrator:
             # 步骤驱动没有开始：依据是激活开始时的运行状态
             self._end_run(activation, "provider_error", f"{type(exc).__name__}: {exc}", activation.version)
             return
-        if isinstance(result, Stopped) and result.reason is not None:
-            self._end_run(activation, result.reason, result.message, result.version,
-                          target=result.target, facts=result.facts)
+        # 一轮工作的结果只剩这一轮写下的事件范围与停止原因（设计说明第 5.3 节，#861）：
+        # 有停止原因的是这个会话停下或失败，按原因暂停或结束运行
+        if result.stop_reason is not None:
+            self._end_run(activation, result.stop_reason, result.message, result.version,
+                          target=result.target, facts=list(result.facts) or None)
             return
 
         current = self.project(run_id)
         if current.status in TERMINAL_STATUSES:
             return
-        if isinstance(result, Stopped):
+        if result.submission is None:
+            # 这一轮没有经提议方式交上东西（在安全节点停下，或只有文字回答）：按当时的运行状态收尾
             elapsed = self._elapsed_sec(run_id)
-            if time_used_up(current, elapsed):
-                self._end_run(activation, TIME_BOUND, time_limit_message(current, elapsed), result.version)
+            minimal = self.writes.minimal(run_stream(run_id))
+            if time_used_up(minimal, elapsed):
+                self._end_run(activation, TIME_BOUND, time_limit_message(minimal, elapsed), result.version)
+            return
+        # 薄驱动拿到一轮结果以后问路由这一轮以什么结束，再按回答经写入口提交（设计说明第 5.3 节输出、
+        # 第 5.4 节第 5 条；工单 #861）：路由说这一轮不是正常结束时不提交
+        ended = self._routing.round_end(current, list(result.events), department=department,
+                                        session_id=scope.session_id, activation_id=scope.activation_id)
+        if ended is None:
             return
         submission = result
 
@@ -1770,7 +1415,7 @@ class Orchestrator:
                 ref = self.artifacts.put(run_id, "transcript", submission.transcript, media_type="text/plain")
                 transcript_ref = ref.__dict__
             self._apply_proposal(
-                run_id, department=department, projection=current, proposal=submission.proposal,
+                run_id, department=department, projection=current, proposal=submission.submission,
                 transcript_ref=transcript_ref, parent_event_id=scope.parent_event_id,
                 session_id=scope.session_id,
                 provider=submission.response.provider or self._activation_provider(activation.adapter),
@@ -1787,32 +1432,32 @@ class Orchestrator:
         scope: ActivationScope,
         call: dict[str, Any],
     ) -> tuple[bool, Any, str | None, str | None, int]:
-        args = call.get("args") or {}
-        # 这个会话自己那次没结束的询问：恢复时继续这一层，不新开一层（工单 #473 的嵌套询问）
-        pending = self.project(scope.run_id).ask_by_origin(scope.session_id)
-        if pending is not None:
-            branch_session_id = str(pending["branch_session_id"])
-            recipient = str(pending["recipient"])
-            question = str(pending["question"])
-            background = str(pending.get("background") or "")
-            expected = str(pending.get("expected") or "")
-        else:
-            recipient = args.get("recipient")
-            question = args.get("question")
-            background = args.get("background", "")
-            expected = args.get("expected", "")
-            facts = args.get("facts") or ""
-            explanation = args.get("explanation") or ""
-
-            if recipient not in ("product", "engineering", "quality") or recipient == scope.department:
-                return False, None, f"invalid recipient {recipient}", None, 0
-            # 工程询问质检时问题与背景分两部分：facts 与 explanation 至少给一份（工单 #554）
-            if not (isinstance(question, str) and question.strip()) \
-                    and not (isinstance(facts, str) and facts.strip()):
-                return False, None, "question must be a non-empty string", None, 0
-
-            branch_session_id = new_id(f"ses_ask_{recipient[:3]}")
-
+        # 询问分支由路由请求一轮工作（工单 #862，骨架与应用设计说明第 5.1 节）：询问的开始、回问、
+        # 回复给谁与这一轮的上限都归路由；薄驱动照常把这一轮交给执行契约运行。写事件、跑这一轮，
+        # 以及把这个分支会话已经用掉的步数与时间从这一轮的上限里扣掉，归薄驱动（工单 #1015 的读法）
+        stream = run_stream(scope.run_id)
+        asked = self._routing.ask_branch(
+            self.project(scope.run_id), list(self.writes.read(stream).events()),
+            requester=scope.department, session_id=scope.session_id, call=call,
+            limits=routing_contract.AskLimits(
+                max_model_steps=self.step_limits.max_model_steps,
+                department_max_model_steps=self.step_limits.department_max_model_steps,
+                department_max_time_sec=self.step_limits.department_max_time_sec,
+            ),
+        )
+        if isinstance(asked, routing_contract.AskRejection):
+            # 这次询问的调用不合法（回复的部门不在定义里、问题为空）：不运行、不写事件，
+            # 原因作为这次工具调用的错误交回提问方
+            return False, None, asked.message, None, 0
+        if isinstance(asked, routing_contract.AskOutcome):
+            # 这一层询问已经答过（重新启动以后接着同一次询问）：结果照原样交回提问方，不再跑一轮
+            steps = self._branch_steps(self.writes.read(stream).events(), asked.session_id)
+            if asked.status == "answered":
+                return True, asked.answer, None, None, steps
+            return False, None, asked.reason, None, steps
+        branch = asked
+        if branch.start is not None:
+            # 询问的开始：这一层是新开的一层，薄驱动把路由组好的这一层写进事件日志
             def start_ask(transaction: Transaction) -> None:
                 transaction.append(NewEvent(
                     EventType.ASK_STARTED,
@@ -1822,200 +1467,123 @@ class Orchestrator:
                     session_id=scope.session_id,
                     state_before=transaction.projection.status,
                     state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "question": question or "",
-                        "background": background,
-                        "expected": expected,
-                        "facts": facts or None,
-                        "explanation": explanation or None,
-                        "branch_session_id": branch_session_id,
-                    },
+                    payload=branch.start,
                 ))
 
-            self.writes.transact(run_stream(scope.run_id), start_ask)
-
-        events = self.writes.read(run_stream(scope.run_id)).events()
-        prior_answered = next(
-            (e for e in reversed(events) if e.type == EventType.ASK_ANSWERED and e.session_id == branch_session_id),
-            None
-        )
-        if prior_answered is not None:
-            p = prior_answered.payload or {}
-            branch_steps = self._branch_steps(events, branch_session_id)
-            if p.get("status") == "answered":
-                return True, p.get("answer", ""), None, None, branch_steps
-            else:
-                return False, None, p.get("reason", "branch unable to answer"), None, branch_steps
-
-        remaining_steps = call.get("remaining_steps")
-        if remaining_steps is None:
-            remaining_steps = self.step_limits.max_model_steps
-        declared_steps = self.step_limits.department_max_model_steps.get(
-            recipient, self.step_limits.max_model_steps
-        )
-        # 这个分支会话已经用过的模型步数从它自己的上限里扣掉（工单 #475）：
-        # 分支会话有自己的步骤上限，中断以后继续时用掉的步数不清零
-        used_steps = self._session_model_steps(
-            scope.run_id, branch_session_id,
-            self.writes.read(run_stream(scope.run_id)).events())
-        branch_max_steps = min(declared_steps, remaining_steps) - used_steps
-
-        if branch_max_steps <= 0:
-            reason = "department reached the model step limit without submitting a proposal"
-            def record_ask_unable(transaction: Transaction) -> None:
-                transaction.append(NewEvent(
-                    EventType.ASK_ANSWERED,
-                    actor=f"department:{recipient}",
-                    department=recipient,
-                    parent_event_id=scope.parent_event_id,
-                    session_id=branch_session_id,
-                    state_before=transaction.projection.status,
-                    state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "status": "unable",
-                        "answer": "",
-                        "reason": reason,
-                        "with_spec_revision": False,
-                        "revision": None,
-                    },
-                ))
-            self.writes.transact(run_stream(scope.run_id), record_ask_unable)
-            return False, None, reason, None, 0
-
-        projection = self.project(scope.run_id)
-        declared_time = self.step_limits.department_max_time_sec.get(
-            recipient, float(projection.run_time_limit_sec)
-        )
+            self.writes.transact(stream, start_ask)
+        # 这个分支会话之前几轮用掉的步数从这一轮的上限里扣（工单 #475）：路由给的只是这一轮的上限，
+        # 扣法与其他会话一致——最小投影里的累计步数减去已结算的那一部分（工单 #1015）
+        branch_limits = self._session_limits(scope.run_id, branch.session_id,
+                                             max_model_steps=branch.max_model_steps)
         # 这个分支会话已经用掉的时间从它自己的时限里扣掉（工单 #475）：
         # 中断以后继续时，剩余时间按已用时间连续累计
-        used_time = self._session_elapsed_sec(scope.run_id, branch_session_id)
-        deadline = time.monotonic() + max(0.0, declared_time - used_time)
-
-        result = await self._run_ask_branch(
-            activation, scope.run_id, recipient, branch_session_id, question,
-            parent_event_id=scope.parent_event_id,
-            max_model_steps=branch_max_steps,
-            deadline=deadline,
-        )
-        events_after = self.writes.read(run_stream(scope.run_id)).events()
-        branch_steps = self._branch_steps(events_after, branch_session_id)
-
-        if isinstance(result, Answered):
-            ans_args = result.args
-            ans_text = ans_args.get("answer") or ans_args.get("text") or ans_args.get("facts") or ""
-            ans_facts = ans_args.get("facts") or None
-            ans_explanation = ans_args.get("explanation") or None
-            with_spec_revision = False
-            revision = None
-            new_contract_hash = None
-
-            if recipient == "product" and any(ans_args.get(f) is not None for f in PRD_REVISION_FIELDS):
-                def commit_prd_revision(transaction: Transaction) -> tuple[int, str]:
-                    projection = transaction.projection
-                    env = self._new_inspection_environment(scope.run_id, "product", session_id=branch_session_id)
-                    spec_proposal = {
-                        **{k: v for k, v in ans_args.items() if k not in ("answer", "text") and v is not None},
-                        "kind": "product_spec",
-                        "issuer": "product",
-                    }
-                    decision = evaluate_proposal(
-                        department="product",
-                        proposal=spec_proposal,
-                        projection=projection,
-                        facts=env.query(FactsQuery(tree=True)).tree,
-                        events=transaction.events(),
-                    )
-                    if not decision.accepted:
-                        raise RuntimeError(f"invalid prd revision: {decision.errors}")
-
-                    self._commit_accepted(
-                        transaction,
-                        department="product",
-                        snapshot=env.snapshot(),
-                        environment=env,
-                        artifact=decision.artifact,
-                        ends_run=decision.ends_run,
-                        parent_event_id=scope.parent_event_id,
-                        session_id=branch_session_id,
-                        provider=result.response.provider or self._activation_provider(activation.adapter),
-                        model=result.response.model,
-                    )
-                    curr = transaction.projection
-                    return decision.artifact["revision"], current_contract_hash(curr)
-
-                revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
-                with_spec_revision = True
-                activation.scope = replace(activation.scope, basis=replace(activation.scope.basis, effective_contract_hash=new_contract_hash))
-
-            def record_ask_answered(transaction: Transaction) -> None:
-                transaction.append(NewEvent(
-                    EventType.ASK_ANSWERED,
-                    actor=f"department:{recipient}",
-                    department=recipient,
-                    parent_event_id=scope.parent_event_id,
-                    session_id=branch_session_id,
-                    state_before=transaction.projection.status,
-                    state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "status": "answered",
-                        "answer": ans_text,
-                        "reason": "",
-                        "with_spec_revision": with_spec_revision,
-                        "revision": revision,
-                        "facts": ans_facts,
-                        "explanation": ans_explanation,
-                    },
-                ))
-
-            self.writes.transact(run_stream(scope.run_id), record_ask_answered)
-            return True, ans_text, None, new_contract_hash, branch_steps
+        used_time = self._session_elapsed_sec(scope.run_id, branch.session_id)
+        deadline = time.monotonic() + max(0.0, branch.max_time_sec - used_time)
+        if branch_limits.max_model_steps > 0:
+            result = await self._run_ask_branch(activation, scope, branch, limits=branch_limits,
+                                                deadline=deadline)
+            submission, stop_reason, message = result.submission, result.stop_reason, result.message
+            response = result.response
+            events_after = list(self.writes.read(stream).events())
+            steps = self._branch_steps(events_after, branch.session_id)
         else:
-            time_exhausted = (
-                time.monotonic() >= deadline
-                or time_used_up(self.project(scope.run_id), self._elapsed_sec(scope.run_id))
+            # 一步也走不了：这一轮不开，回答事件写明原因
+            submission, stop_reason, message, response, steps = None, None, "", None, 0
+        time_exhausted = (
+            time.monotonic() >= deadline
+            or time_used_up(self.writes.minimal(stream), self._elapsed_sec(scope.run_id))
+        )
+        outcome = self._routing.ask_outcome(
+            self.project(scope.run_id), branch=branch,
+            result=routing_contract.AskRoundResult(
+                submission=submission, stop_reason=stop_reason, message=message,
+                time_exhausted=time_exhausted, steps_left=branch_limits.max_model_steps,
+            ),
+        )
+        revision = None
+        new_contract_hash = None
+        if outcome.revises is not None:
+            # 这一回答同时交上了正式成果（产品回答询问时修订 PRD）：成果的内容由路由组装，
+            # 薄驱动照常经裁决入口核对、经写入口提交
+            revision, new_contract_hash = self._commit_answer_revision(
+                activation, scope, branch, outcome.revises, response)
+        with_spec_revision = outcome.revises is not None
+
+        def record_ask_answered(transaction: Transaction) -> None:
+            payload = {
+                "requester": scope.department,
+                "recipient": branch.recipient,
+                "status": outcome.status,
+                "answer": outcome.answer,
+                "reason": outcome.reason,
+                "with_spec_revision": with_spec_revision,
+                "revision": revision,
+            }
+            if outcome.status == "answered":
+                payload["facts"] = outcome.facts
+                payload["explanation"] = outcome.explanation
+            transaction.append(NewEvent(
+                EventType.ASK_ANSWERED,
+                actor=f"department:{branch.recipient}",
+                department=branch.recipient,
+                parent_event_id=scope.parent_event_id,
+                session_id=branch.session_id,
+                state_before=transaction.projection.status,
+                state_after=transaction.projection.status,
+                payload=payload,
+            ))
+
+        self.writes.transact(stream, record_ask_answered)
+        if outcome.status == "answered":
+            return True, outcome.answer, None, new_contract_hash, steps
+        return False, None, outcome.reason, None, steps
+
+    def _commit_answer_revision(self, activation: _Activation, scope: ActivationScope,
+                                branch: routing_contract.AskBranch, proposal: dict[str, Any],
+                                response: Any) -> tuple[int, str]:
+        # 回答同时交上的正式成果（循环结构第 4.3 节）：提案与提出它的部门都由路由组装（`issuer`），
+        # 薄驱动按读取时的运行状态与工作区事实校验，经写入口提交，并把新的合同带回这一步的提问方
+        issuer = str(proposal["issuer"])
+
+        def commit_prd_revision(transaction: Transaction) -> tuple[int, str]:
+            projection = transaction.projection
+            env = self._workspaces.new_inspection(scope.run_id, issuer, session_id=branch.session_id)
+            decision = evaluate_proposal(
+                AdjudicationView(minimal=transaction.minimal(), state=projection),
+                department=issuer,
+                proposal=proposal,
+                facts=env.query(FactsQuery(tree=True)).tree,
+                tightening=self._tightening,
+                events=transaction.events(),
             )
-            if time_exhausted:
-                reason = "department reached the time limit without submitting an answer"
-            elif isinstance(result, Stopped) and result.message:
-                reason = result.message
-            elif isinstance(result, Stopped) and result.reason:
-                reason = result.reason
-            else:
-                # 分支没有做出回答就结束：写明原因，提问方才知道接下来怎么做
-                # （设计说明第 4.5 节）。工作依据变了不再算：PRD 的新版本、新的指导与新的用户输入
-                # 都作为通知送达，分支接着工作（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
-                reason = "branch failed to answer"
-            def record_ask_unable(transaction: Transaction) -> None:
-                transaction.append(NewEvent(
-                    EventType.ASK_ANSWERED,
-                    actor=f"department:{recipient}",
-                    department=recipient,
-                    parent_event_id=scope.parent_event_id,
-                    session_id=branch_session_id,
-                    state_before=transaction.projection.status,
-                    state_after=transaction.projection.status,
-                    payload={
-                        "requester": scope.department,
-                        "recipient": recipient,
-                        "status": "unable",
-                        "answer": "",
-                        "reason": reason,
-                        "with_spec_revision": False,
-                        "revision": None,
-                    },
-                ))
-            self.writes.transact(run_stream(scope.run_id), record_ask_unable)
-            return False, None, reason, None, branch_steps
+            if not decision.accepted:
+                raise RuntimeError(f"invalid prd revision: {decision.errors}")
+
+            self._commit_accepted(
+                transaction,
+                department=issuer,
+                snapshot=env.snapshot(),
+                environment=env,
+                artifact=decision.artifact,
+                ends_run=decision.ends_run,
+                parent_event_id=scope.parent_event_id,
+                session_id=branch.session_id,
+                provider=response.provider or self._activation_provider(activation.adapter),
+                model=response.model,
+            )
+            curr = transaction.projection
+            return decision.artifact["revision"], artifact_hash(curr.effective_contract)
+
+        revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
+        activation.scope = replace(activation.scope, basis=replace(
+            activation.scope.basis, effective_contract_hash=new_contract_hash))
+        return revision, new_contract_hash
+
 
     def _branch_steps(self, events: list[Any], branch_session_id: str) -> int:
         # 这个分支会话用掉的模型步数：分支里再问一层时，回问的分支是它的下一层，
-        # 那一层的步数逐层计入最初的提问方（工单 #473 的嵌套询问）
+        # 那一层的步数逐层计入最初的提问方（工单 #473 的嵌套询问）。
+        # 步数读最小投影里各会话的模型步数（S1e 工单 #1015），不在这里按事件一条条数
         sessions = {branch_session_id}
         grew = True
         while grew:
@@ -2027,23 +1595,23 @@ class Orchestrator:
                 if isinstance(branch, str) and branch not in sessions:
                     sessions.add(branch)
                     grew = True
-        return len([e for e in events
-                    if e.type == EventType.MODEL_REQUESTED and e.session_id in sessions])
+        minimal = fold_events(events)
+        return sum(minimal.sessions.get(session_id, SessionState()).model_steps for session_id in sessions)
 
     async def _run_ask_branch(
         self,
         activation: _Activation,
-        run_id: str,
-        department: str,
-        session_id: str,
-        question: str,
-        parent_event_id: str,
-        max_model_steps: int | None = None,
-        deadline: float | None = None,
-    ) -> StepResult:
+        scope: ActivationScope,
+        branch: routing_contract.AskBranch,
+        *,
+        limits: StepLimits,
+        deadline: float,
+    ) -> execution_contract.RoundResult:
+        run_id, department, session_id = scope.run_id, branch.recipient, branch.session_id
+        parent_event_id = scope.parent_event_id
         projection = self.project(run_id)
         prompt = self._department_prompt(projection, department)
-        basis = WorkBasis.current(projection, department)
+        basis = work_basis(projection, department)
         activation_id = new_id("act_ask")
 
         def activate_branch(transaction: Transaction) -> Event:
@@ -2058,7 +1626,7 @@ class Orchestrator:
                 payload={
                     "activation_id": activation_id,
                     "cycle": transaction.projection.cycle_count,
-                    "effective_contract_hash": current_contract_hash(transaction.projection),
+                    "effective_contract_hash": artifact_hash(transaction.projection.effective_contract),
                     "input_version": transaction.projection.input_version,
                     "guidance_version": guidance_version(transaction.projection, department),
                     "prompt_version": prompt.version,
@@ -2079,13 +1647,9 @@ class Orchestrator:
             provider=self._activation_provider(activation.adapter),
         )
 
-        environment = self._new_inspection_environment(run_id, department, session_id=session_id)
-        environment.bind_check(
-            activation_id=activation_id,
-            product_spec_hash=None if projection.product_spec is None else projection.product_spec.content_hash,
-            delivery_spec_hash=None if projection.delivery_spec is None else projection.delivery_spec.content_hash,
-            effective_contract_hash=basis.effective_contract_hash,
-        )
+        environment = self._workspaces.new_inspection(run_id, department, session_id=session_id)
+        self._workspaces.bind(environment, projection, activation_id=activation_id,
+                              effective_contract_hash=basis.effective_contract_hash)
 
         branch_activation = _Activation(
             # 询问分支属于提问方的那个会话：它的停止开关就是那个会话的（工单 #856），
@@ -2096,35 +1660,28 @@ class Orchestrator:
         # 薄驱动只经执行契约与装配契约调用实现：核对两个实现声明的版本，版本不合时这一轮不开始
         execution_contract.accept(StepDriver)
         assembly_contract.accept(self.assembly)
-        # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，上限由调用方给出；
-        # 路由的工作引用来自开始这一轮工作的请求，还没有这一项时为空（#825、#861）
+        # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，这一轮的上限来自路由的请求
+        # （薄驱动已经把这个分支会话之前用掉的步数扣掉）；路由自己的工作引用指向这次询问
+        # （设计说明第 5.4 节第 4 条，工单 #861、#862）
         driver = StepDriver.start(
             execution_contract.RoundRequest(
-                scope=branch_scope, prompt=prompt,
-                limits=StepLimits(
-                    max_provider_attempts=self.step_limits.max_provider_attempts,
-                    max_model_steps=max_model_steps if max_model_steps is not None else self.step_limits.max_model_steps,
-                    department_max_model_steps=self.step_limits.department_max_model_steps,
-                    department_max_time_sec=self.step_limits.department_max_time_sec,
-                ),
-                work_ref=None,
+                scope=branch_scope, prompt=prompt, limits=limits, work_ref=branch.work_ref,
             ),
             writes=self.writes, artifacts=self.artifacts,
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
             environment=environment,
             nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
-            deltas=self.deltas,
-            refresh_workspace=self._workspace_refresh(branch_activation),
+            deltas=self.deltas, tightening=self._tightening,
+            refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
         )
         started = time.monotonic()
         try:
             result = await driver.result()
         finally:
             def finish_branch(transaction: Transaction) -> None:
-                happened = transaction.events()
-                activations = len([e for e in happened if e.type == EventType.DEPARTMENT_ACTIVATED and e.session_id == session_id])
-                model_steps = len([e for e in happened if e.type == EventType.MODEL_REQUESTED and e.session_id == session_id])
-                # 这个分支会话自己的累计用量（工单 #475）：重新启动以后从事件连续累计
+                # 这个分支会话的累计用量读最小投影（S1e 工单 #1015）；它自己的已用时间含当前这一段，
+                # 投影要等这条事件写进去才结算，所以由驱动算好写进事件
+                session = transaction.minimal().sessions.get(session_id, SessionState())
                 session_elapsed_ms = self._settle_session_segment(run_id, session_id, self._elapsed_ms(run_id))
                 transaction.append(NewEvent(
                     EventType.ACTIVATION_FINISHED,
@@ -2139,17 +1696,20 @@ class Orchestrator:
                         **branch_scope.versions(),
                         "latency_ms": int((time.monotonic() - started) * 1000),
                         "elapsed_ms": int(self._elapsed_sec(run_id) * 1000),
-                        "activations": activations,
-                        "model_steps": model_steps,
+                        "activations": session.activations,
+                        "model_steps": session.model_steps,
                         "session_elapsed_ms": session_elapsed_ms,
-                        "session_activations": activations,
-                        "session_model_steps": model_steps,
+                        "session_activations": session.activations,
+                        "session_model_steps": session.model_steps,
                         "stop_reason": None,
                     },
                 ))
             self.writes.transact(run_stream(run_id), finish_branch)
+            # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
+            self._rebase_run_clock(run_id)
             try:
                 cleanup_inspection_workspace(self.workspace_root / run_id, session_id)
+                self._workspaces.forget(run_id, session_id)
             except Exception:
                 pass
         return result
@@ -2177,11 +1737,12 @@ class Orchestrator:
         while True:
             # 每次尝试按当前运行状态解析执行环境：取消等结束路径可能已经删除了检查工作区，
             # 重试时按同一根重新打开，读到的是这份工作区此刻的样子
-            environment = self._environment_for(run_id, department)
+            environment = self._workspaces.environment_for(run_id, department)
             evaluated = self.writes.read(run_stream(run_id))
             facts = environment.query(FactsQuery(tree=True)).tree
-            decision = proposal_decision(evaluated.projection, department=department, proposal=proposal,
-                                         facts=facts, events=evaluated.events())
+            view = AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection)
+            decision = proposal_decision(view, department=department, proposal=proposal,
+                                         facts=facts, tightening=self._tightening, events=evaluated.events())
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
                     transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
@@ -2218,8 +1779,9 @@ class Orchestrator:
         snapshot = environment.snapshot()
         judged = commit_decision(
             decision, department=department, proposal=proposal,
-            evaluated=evaluated.projection, facts=facts, current=current, current_facts=snapshot.facts,
-            events=transaction.events(),
+            evaluated=AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection), facts=facts,
+            current=AdjudicationView(minimal=transaction.minimal(), state=current), current_facts=snapshot.facts,
+            events=transaction.events(), tightening=self._tightening,
         )
         if proposal is not None:
             transaction.append(NewEvent(
@@ -2286,8 +1848,7 @@ class Orchestrator:
             self._fail(transaction, "host_commit_error", f"{type(exc).__name__}: {exc}")
             return
         source_event = acceptance.append(transaction)
-        if artifact["kind"] == "qa_review" and artifact["verdict"] == "rework_engineering":
-            self._record_lesson_candidate(transaction, source_event, projection)
+        self.submissions.record_accepted_lesson(transaction, source_event, projection, artifact)
         # 只有质检的放行与基线核验的一致结论结束事项（工单 #556）：结束以后控制核心不再决定下一个谁工作
         if ends_run:
             # 进入完成状态的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
@@ -2305,41 +1866,6 @@ class Orchestrator:
                 payload={"stop_reason": stop_reason},
             ))
             transaction.on_commit(lambda: self._on_close_run(run_id))
-
-    @staticmethod
-    def _record_lesson_candidate(transaction: Transaction, source: RunEvent, projection: RunProjection) -> None:
-        if source.type == EventType.QA_SUBMITTED:
-            observed = source.payload
-            observation = {key: observed[key] for key in ("verdict", "rationale", "defects")}
-            suggestion = "根据本次质检记录，补充能复现所述问题的检查，验证修复是否满足原验收条件。"
-            spec_hash = observed["product_spec_hash"]
-            delivery_hash = observed["delivery_spec_hash"]
-            checks = observed["checks"]
-            refs = observed["evidence_refs"]
-        else:
-            observation = {"stop_reason": source.stop_reason, "message": source.error}
-            suggestion = "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
-            spec = projection.product_spec
-            delivery = projection.delivery_spec
-            if delivery is not None and delivery.status != "active":
-                delivery = None
-            spec_hash = spec.content_hash if spec is not None else None
-            delivery_hash = delivery.content_hash if delivery is not None else None
-            checks = delivery.checks if delivery is not None else []
-            refs = [asdict(delivery.tree_ref)] if delivery is not None else []
-        transaction.append(NewEvent(
-            EventType.LESSON_CANDIDATE_RECORDED,
-            actor="system", department=source.department, parent_event_id=source.event_id,
-            state_before=source.state_after, state_after=source.state_after,
-            session_id=source.session_id,
-            payload={
-                "kind": "lesson_candidate", "id": new_id("lesson"), "status": "unverified",
-                "source_event_id": source.event_id, "source_type": source.type,
-                "observation": observation, "suggestion": suggestion,
-                "product_spec_hash": spec_hash, "delivery_spec_hash": delivery_hash,
-                "checks": checks, "evidence_refs": refs,
-            },
-        ))
 
     def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None,
                  *, target: dict[str, Any] | None = None, facts: list[str] | None = None) -> None:
@@ -2394,204 +1920,24 @@ class Orchestrator:
 
     def answer_decision(self, decision_id: str, option: str, note: str | None, *, base_version: int,
                         command: Command) -> str | None:
-        # 回答一个决定请求：在写入口的一个事务中登记命令身份，核对请求仍未回答、基准版本等于请求的版本、选项是
-        # 请求给出的选项，追加回答，并按回答解除阻塞（待恢复选择停止事项时在同一事务中结束运行）。
-        # 核对不通过时抛出 DecisionClosed、StaleDecision 或 InvalidOption，什么也不写，命令不登记。
-        # 返回回答以后需要继续执行的 run，由调用方开始（start）；没有时为空
-        # 命令身份先于决定请求核对：同一身份、内容不同时按 command_id_reused 拒绝，与请求是否存在无关
-        self.store.check_command(command)
-        saved = saved_decision(self.store, decision_id)
-        if saved is None:
-            raise DecisionNotFound(decision_id)
-
-        def answer(transaction: Transaction) -> str | None:
-            decision = transaction.decisions[decision_id]
-            if decision.status != "open":
-                raise DecisionClosed(decision)
-            if base_version != decision.version:
-                raise StaleDecision(decision, base_version)
-            if option not in [item["id"] for item in decision.request["options"]]:
-                raise InvalidOption(decision, option)
-            if is_catalog_stream(saved.stream):
-                # 目录流中的决定请求（工单 #355）：不属于任何 run 或项目，回答只是记下用户的决定
-                transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_ANSWERED, {
-                    "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
-                }, actor="system"))
-                return None
-            if is_run_stream(saved.stream):
-                return self._answer_run_decision(transaction, decision, option, note, base_version, decision_id)
-            return self._answer_project_decision(transaction, decision, option, note, base_version, decision_id)
-
-        revision_run_id = self.writes.transact(saved.stream, answer, command=command)
-        if revision_run_id is not None and not self.store.stream_events(run_stream(revision_run_id), after_version=0):
-            # 建档修改轮：run 在回答事务提交以后单独建立，进程在两者之间中断时启动时按事件补建（设计第 6 节）
-            self._create_missing_revision_run(revision_run_id)
-        return revision_run_id
-
-    def _create_missing_revision_run(self, run_id: str) -> None:
-        # 按 onboarding_revision_started 事件建立缺少的 run；run 流从版本 0 开始，重复创建被拒绝
-        for project_id in self.store.list_project_ids():
-            for event in self.store.list_project_events(project_id):
-                if event.type != ProjectEventType.ONBOARDING_REVISION_STARTED or event.payload["run_id"] != run_id:
-                    continue
-                state = self.projects.projection(project_id)
-                candidate = next((entry for entry in state.initial_prd_candidates
-                                  if entry.event_id == event.payload["candidate_event_id"]), None)
-                if candidate is None:
-                    raise ValueError(f"onboarding candidate {event.payload['candidate_event_id']} is gone")
-                self.create_revision_run(project_id, candidate, run_id, int(event.payload["round"]),
-                                          event.payload.get("note"))
-                return
-        raise ValueError(f"no onboarding revision event names run {run_id}")
-
-    def _answer_run_decision(self, transaction: Transaction, decision: DecisionRequest, option: str, note: str | None,
-                             base_version: int, decision_id: str) -> str | None:
-        # run 流中的决定请求：追加回答，并按回答解除阻塞
-        projection = transaction.projection
-        transaction.append(NewEvent(
-            EventType.DECISION_ANSWERED, department=decision.request["department"], parent_event_id=decision_id,
-            state_before=projection.status, state_after=projection.status,
-            payload={"decision_id": decision_id, "option": option, "note": note, "base_version": base_version},
-        ))
-        transaction.on_commit(lambda: self._wake(projection.run_id))
-        if decision.kind in RESUMABLE_PAUSE_KINDS:
-            # 暂停以后继续（工单 #204）：继续时从暂停位置恢复阶段并让 run 接着执行；停止时 run 保持暂停，
-            # 停止原因就是暂停时的原因，什么都不改写。已用的激活次数、模型步数与运行时间不重新计算
-            if option == "continue":
-                self._continue_paused_run(transaction, decision_id, decision)
-                if blocks_run(transaction.decisions.values()):
-                    return None
-                return transaction.projection.run_id
-            return None
-        if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
-            self._fail(transaction, "cancelled", "run stopped by the user's decision")
-            return None
-        if blocks_run(transaction.decisions.values()):
-            return None
-        return projection.run_id
-
-    def _answer_project_decision(self, transaction: Transaction, decision: DecisionRequest, option: str,
-                                 note: str | None, base_version: int, decision_id: str) -> str | None:
-        # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted；
-        # 提出修改时在同一个事务中追加回答与 onboarding_revision_started，返回新 run 编号，
-        # 由调用方 start：run 在事务提交以后单独建立（设计第 4.7、6 节）
-        if option == "revise" and not (note or "").strip():
-            raise NoteRequired(decision, option)
-        request = decision.request
-        work_item_id = request["work_item_id"]
-        candidate_run_id = request.get("candidate_run_id")
-        transaction.append(NewProjectEvent(ProjectEventType.PROJECT_DECISION_ANSWERED, {
-            "decision_id": decision_id, "option": option, "note": note, "base_version": base_version,
-            "work_item_id": work_item_id, "run_id": candidate_run_id,
-        }, actor="system"))
-        if decision.kind == KERNEL_MODIFICATION.name:
-            self._settle_kernel_modification(transaction, decision, option)
-            return None
-        if decision.kind != INITIAL_PRD.name:
-            return None
-        candidate = next((item for item in transaction.projection.initial_prd_candidates
-                          if item.run_id == candidate_run_id), None)
-        if candidate is None:
-            return None
-        if option == "confirm":
-            self._adopt_baseline(transaction, candidate, decision_id)
-            return None
-        return self._start_onboarding_revision(transaction, candidate, note)
-
-    def _settle_kernel_modification(self, transaction: Transaction, decision: DecisionRequest, option: str) -> None:
-        # 内核修改的批准与拒绝（受控内核设计说明第 4.2 节，工单 #354）：批准时把请求携带的采纳载荷写入
-        # 项目流，交付自此成为当前采纳成果；拒绝时什么都不写，交付保持未采纳
-        if option != "approve":
-            return
-        current = transaction.projection.current_adoption
-        adoption = dict(decision.request["held_adoption"],
-                        previous_adoption_id=None if current is None else current.adoption_id)
-        transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, adoption, actor="system"))
-
-    def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
-        # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
-        # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险
-        snapshot = candidate.snapshot
-        defects = [item["requirement"] for item in candidate.baseline_review["conclusions"]
-                   if item["status"] == "existing_defect"]
-        known_risks = [f'现有缺陷：{item["requirement"]}（{item["evidence"]}）'
-                       for item in candidate.baseline_review["conclusions"]
-                       if item["status"] == "existing_defect"]
-        known_risks += [f'检查 {item["check"]} 未通过：{item["reason"]}'
-                        for item in candidate.baseline_review["other_failures"]]
-        transaction.append(NewProjectEvent(ProjectEventType.BASELINE_ADOPTED, {
-            "adoption_id": new_id("adopt"), "work_item_id": candidate.work_item_id, "run_id": candidate.run_id,
-            "candidate_event_id": candidate.event_id, "tree_ref": snapshot["tree_ref"],
-            "code_tree_digest": snapshot["tree_digest"], "summary": _onboarding_summary(candidate),
-            "prd_ref": candidate.prd["prd_ref"], "product_spec_hash": candidate.prd["content_hash"],
-            "structure_ref": candidate.structure["structure_ref"], "files": list(snapshot.get("files") or []),
-            "check_names": [item["name"] for item in candidate.baseline_review["checks"]],
-            "checks": list(candidate.baseline_review["checks"]), "known_risks": known_risks,
-            "snapshot": snapshot, "previous_adoption_id": None, "existing_defects": defects,
-        }, actor="system"))
-
-    def _start_onboarding_revision(self, transaction: Transaction, candidate: Any, note: str | None) -> str:
-        # 建档修改轮（工单 #136，设计第 3.3、4.7、6 节）：修改轮事件与回答在同一个事务中写入，返回新 run 编号；
-        # run 在事务提交以后单独一步建立（事务之间中断时，启动时按 onboarding_revision_started 补建）。
-        # 事务提交到 run 建立之间是一个可以单独被终止的窗口
-        round_number = candidate.round + 1
-        run_id = new_id("run")
-        transaction.append(NewProjectEvent(ProjectEventType.ONBOARDING_REVISION_STARTED, {
-            "work_item_id": candidate.work_item_id, "run_id": run_id,
-            "candidate_event_id": candidate.event_id, "round": round_number,
-            "note": None if note is None else note.strip(),
-        }, actor="system"))
-        return run_id
+        # 决定请求的处理在应用层（工单 #827）：薄驱动只转交。返回回答以后需要继续执行的 run，由调用方开始
+        # （start）；没有时为空。核对不通过时的 DecisionNotFound、DecisionClosed、StaleDecision、
+        # InvalidOption 与 NoteRequired 照旧向上抛出
+        return self.decision_flow.answer_decision(self, decision_id, option, note, base_version=base_version,
+                                                  command=command)
 
     def create_revision_run(self, project_id: str, candidate: Any, run_id: str, round_number: int,
                             note: str | None) -> None:
-        # 建立修改轮的 run：从同一个快照建立工作区，run_created 的 onboarding_basis 记下这一轮的依据，
-        # 修改意见的工件按这一轮 run 的目录存放，并与 run 的创建在同一步作为它的第二项输入写入。
-        # 启动补做按同一条 onboarding_revision_started 事件再调一次，run 流从版本 0 开始，重复创建被拒绝
-        snapshot = candidate.snapshot
-        tree_ref = ArtifactRef(**snapshot["tree_ref"])
-        tree = load_tree(self.artifacts, artifact_run(tree_ref.path), tree_ref)
-        # 项目上下文、限额与部门 Prompt 版本取自同一个建档事项（这一轮仍是它）；
-        # 冻结的登记命令取自上一轮 run 的 run_created：事项创建时的副本，命令版本仍随项目后续变化
-        prior = project_run(self.store, candidate.run_id)
-        item = self.projects.projection(project_id).work_item(candidate.work_item_id)
-        if item is None or prior.project_context_ref is None:
-            raise ValueError(f"work item {candidate.work_item_id} is gone")
-        round_limit = self.projects.onboarding_round_limit(project_id)
-        note_ref = None
-        if (note or "").strip():
-            ref = self.artifacts.put(run_id, "revision_note", note.strip(), media_type="text/markdown")
-            note_ref = asdict(ref)
-        self.create_run(
-            item.text, max_cycles=item.max_cycles,
-            run_time_limit_sec=round_limit,
-            check_timeout_sec=parameter_values.frozen_check_timeout(self.store, candidate.run_id),
-            context_window=item.context_window, run_id=run_id,
-            kind="onboarding", initial_tree=tree, code_snapshot=snapshot,
-            project_id=project_id, work_item_id=candidate.work_item_id,
-            project_context=self.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),
-            prompt_config_versions=dict(item.prompt_config_versions),
-            round=round_number,
-            onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
-                              "note_ref": note_ref},
-            additional_input=note.strip() if note_ref is not None else None,
-        )
+        # 建档修改轮的 run 在应用层建立（工单 #827）：进程在回答事务与 run 之间中断以后，项目服务补建时经这里
+        self.decision_flow.create_revision_run(self, project_id, candidate, run_id, round_number, note)
 
-    def _continue_paused_run(self, transaction: Transaction, decision_id: str, decision: DecisionRequest) -> None:
-        # 用户回答「处理以后继续执行」：把 run 从暂停恢复成进行中，下一次激活由流程编排接着开始
-        # （下一个谁工作由关注的成果决定，工单 #556）。
-        # 不写限额与计数字段（激活次数、模型步数、运行时间保持暂停时的值）；连续不调用工具的计数属于步骤驱动的
-        # 一次激活内部状态，暂停时激活已经结束，继续以后的第一次激活从零开始
-        projection = transaction.projection
-        if projection.status != "paused":
-            return
-        transaction.append(NewEvent(
-            EventType.RUN_CONTINUED, actor="system", department=decision.request["department"],
-            parent_event_id=decision_id,
-            state_before="paused", state_after="running",
-            payload={"decision_id": decision_id, "stop_reason": decision.request["stop_reason"]},
-        ))
-        transaction.on_commit(lambda: self._wake(projection.run_id))
+    def wake(self, run_id: str) -> None:
+        # 应用层的流转写完事实以后唤醒等新工作的会话（工单 #827）：这是它要薄驱动做的两件事之一
+        self._wake(run_id)
+
+    def fail_run(self, transaction: Transaction, reason: str, message: str) -> None:
+        # 应用层的流转要结束一次运行时经这里记成失败（工单 #827）：撤销待回答的决定请求、写停止原因
+        self._fail(transaction, reason, message)
 
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
         # 停止判断过期：这次激活的工作期间有新的用户输入到达（输入版本变了），
@@ -2699,11 +2045,4 @@ class Orchestrator:
         ))[0]
         transaction.on_commit(lambda: self._on_close_run(projection.run_id))
         if reason != "cancelled":
-            self._record_lesson_candidate(transaction, source_event, projection)
-
-
-def _onboarding_summary(candidate: Any) -> str:
-    # 建档基线的摘要（工单 #136）：把这一轮的轮次与三条产物的内容摘要写成一句话
-    return (f"第 {candidate.round} 轮建档的初始 PRD 已确认：PRD {candidate.prd['content_hash']}、"
-            f"现有结构说明 {candidate.structure['content_hash']}、"
-            f"基线核验 {candidate.baseline_review['content_hash']}")
+            self.submissions.record_lesson_candidate(transaction, source_event, projection)

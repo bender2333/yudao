@@ -3,10 +3,11 @@
 # 以后执行：主机工具（提交）由步骤驱动执行，环境工具作为动作交给执行环境；压缩请求的回答经 P 生成检查点；
 # 提交提案时结束。所有记录经过记录接口；需要核对运行状态的记录在写入口的一个事务中读取运行状态、判断并写入，
 # 其间另一方的写入使提交被拒绝时按写入以后的状态重新判断。
-# 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：提交或停止原因）；
+# 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：这一轮写下的事件范围与停止原因）；
 # 步骤驱动向上只经过安全节点接口（SafeNode）。
-# 这一份是执行契约第一版（execution_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
-# 接口（开始一轮工作的请求、安全节点、上下限）在契约模块里，这里只实现。
+# 这一份是执行契约第二版（execution_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
+# 接口（开始一轮工作的请求、安全节点、上下限、结果）在契约模块里，这里只实现。结果的种类不写死：
+# 这一轮算不算结束、结束成什么，由薄驱动问路由（工单 #861）。
 
 from __future__ import annotations
 
@@ -25,25 +26,25 @@ from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
 from .assembly import ContextAssembly, StepFrame, StepRequest, model_limits
-from .collaboration import watched_new_work
+from .watched_outputs import watched_new_work
 from .compaction import CompactionError
-from .contracts import current_contract_hash
-from .definitions import DEFINITIONS, Definitions
+from .contracts import artifact_hash
+from .definitions import DEFINITIONS
 from .deltas import DeltaChannel, DeltaScope
 from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
 from .event_store import run_stream
 from . import execution_contract
-from .execution_contract import ActivationScope, Judgment, RoundRequest, SafeNode, StepLimits
+from .execution_contract import ActivationScope, Judgment, RoundRequest, RoundResult, SafeNode, StepLimits
 from .write_path import Transaction, WritePath
-from .models import TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, EventType, RunProjection, json_dumps
+from .models import TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, Event, EventType, RunProjection, json_dumps
 from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
                                  event_call_target)
 from .recording import StepRecorder
-from .tools import in_force, proposal_kind, tool_action, tool_kind
-from .validation import PRD_REVISION_FIELDS, evaluate_proposal
+from .tools import proposal_kind, tool_action, tool_kind
+from .validation import PRD_REVISION_FIELDS, AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
@@ -88,38 +89,6 @@ def _text_reply(response: ModelResponse) -> bool:
                 isinstance(part, dict) and str(part.get("text") or "").strip() for part in content):
             return True
     return False
-
-
-@dataclass(frozen=True)
-class Submitted:
-    # 部门提交了提案：提案、带来提案的这次回答，以及本次激活成功步骤中模型的发言
-    proposal: dict[str, Any]
-    response: ModelResponse
-    transcript: str
-
-
-@dataclass(frozen=True)
-class Stopped:
-    # 步骤驱动停止。reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由流程编排按当时的
-    # 运行状态收尾；否则是停止原因与说明，由流程编排暂停或结束运行。
-    # version 是步骤驱动作出停止判断时（最后一次核对运行状态时）run 流的版本。
-    # target 是这次失败对应的调用目标公开部分（不含密钥）：模型不可用时写进待恢复的决定请求。
-    # facts 是停止原因要带给决定请求的事实引用（workspace_unrepresentable 的条目相对路径）
-    version: int
-    reason: str | None = None
-    message: str = ""
-    target: dict[str, Any] | None = None
-    facts: list[str] | None = None
-@dataclass(frozen=True)
-class Answered:
-    # 询问分支提交了回答：回答参数、带来回答的模型响应与发言
-    args: dict[str, Any]
-    response: ModelResponse
-    transcript: str
-
-
-
-StepResult = Submitted | Stopped | Answered
 
 
 @dataclass(frozen=True)
@@ -201,23 +170,21 @@ class StepDriver:
     def start(cls, request: RoundRequest, *, writes: WritePath,
               artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
               facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-              cancelled: Event, deltas: DeltaChannel,
-              refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
-              definitions: Definitions | None = None) -> StepDriver:
+              cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
+              refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(request, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
-                     cancelled=cancelled, deltas=deltas,
-                     refresh_workspace=refresh_workspace, definitions=definitions)
+                     cancelled=cancelled, deltas=deltas, tightening=tightening,
+                     refresh_workspace=refresh_workspace)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
     def __init__(self, request: RoundRequest, *, writes: WritePath,
                  artifacts: ArtifactStore, assembly: ContextAssembly, adapter: ModelAdapter,
                  facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
-                 cancelled: Event, deltas: DeltaChannel,
-                 refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
-                 definitions: Definitions | None = None) -> None:
+                 cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
+                 refresh_workspace: Callable[[], LocalEnvironment | None] | None = None) -> None:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
@@ -226,9 +193,6 @@ class StepDriver:
                                 basis.effective_contract_hash, basis.input_version,
                                 work_ref=request.work_ref)
         self._stream = run_stream(scope.run_id)
-        # 这次激活的工具许可与提案校验所用的定义（工单 #1098）：事项所用的那一份；
-        # 编排层没有交给它的时候是当前加载的那一份
-        self._definitions = in_force(definitions)
         self._writes = writes
         self._artifacts = artifacts
         self._assembly = assembly
@@ -241,12 +205,15 @@ class StepDriver:
         self._cancelled = cancelled
         self._limits = limits
         self._deltas = deltas
+        self._tightening = tightening
         # 这一轮只有指导、没有要做的工作：模型不调用工具的文字回复就是回答用户，这一轮正常结束。
         # 判断在轮开始时做一次，轮内保持，不因为指导随后进入模型输入或有了别的新工作而重算。
         # shortcut: 这个判断不持久化；进程重新启动以后同一轮由新会话接着做的，丢掉它并退回要求调用工具，
         # 这是可以接受的限制（工单 #1037）
-        self._text_reply_answers = _guidance_only_round(
-            writes.read(run_stream(scope.run_id)).projection, scope)
+        opened = writes.read(run_stream(scope.run_id))
+        self._text_reply_answers = _guidance_only_round(opened.projection, scope)
+        # 这一轮写下的事件范围从这个版本往后算（工单 #861）：结果里的范围由它确定
+        self._start_version = opened.version
         # 检查工作区按会话保留（工单 #558）：新交付封存以后质检的检查工作区要重建，
         # 由编排层给出重建好的工作区，这里只接着用
         self._refresh_workspace = refresh_workspace
@@ -255,7 +222,7 @@ class StepDriver:
         self._step: StepRequest | None = None
         # 这次逻辑调用读取的部门 Prompt；每次新的逻辑调用从项目部门设置重新读取
         self._prompt: DepartmentPrompt = prompt
-        self._task: asyncio.Task[StepResult] | None = None
+        self._task: asyncio.Task[RoundResult] | None = None
         # 这次逻辑调用在 Provider 模块保留的句柄与公开部分；重试沿用，调用结束以后丢弃
         self._call_handle: str | None = None
         self._call_key: str | None = None
@@ -298,26 +265,36 @@ class StepDriver:
         if request is not None and request.attempt_id:
             self._adapter.cancel(request.attempt_id)
 
-    async def result(self) -> StepResult:
+    async def result(self) -> RoundResult:
         return await self._task
 
-    async def _run(self) -> StepResult:
+    async def _run(self) -> RoundResult:
         try:
-            return await self._steps()
+            result = await self._steps()
         except ProviderError as exc:
-            return Stopped(self._version, exc.reason, str(exc),
-                           decision_call_target(self._call_public or {}), list(exc.facts))
+            result = RoundResult(stop_reason=exc.reason, message=str(exc),
+                                 target=decision_call_target(self._call_public or {}), facts=tuple(exc.facts))
         except UnrepresentableWorkspace as exc:
             # 工作区在记录或其他主机工作中出现无法表示的条目：以 workspace_unrepresentable 暂停
-            return Stopped(self._version, "workspace_unrepresentable", str(exc), None, list(exc.paths))
+            result = RoundResult(stop_reason="workspace_unrepresentable", message=str(exc),
+                                 facts=tuple(exc.paths))
         except Exception as exc:
             # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类
-            return Stopped(self._version, "provider_error", f"{type(exc).__name__}: {exc}")
+            result = RoundResult(stop_reason="provider_error", message=f"{type(exc).__name__}: {exc}")
         finally:
             self._release_call()
             self._recorder.close()
+        # 一轮工作的结果（设计说明第 5.3 节输出）：这一轮写下的事件范围、停止判断时的版本与停止原因。
+        # 这一轮算不算结束、结束成什么，由薄驱动问路由（工单 #861）
+        return replace(result, version=self._version, events=self._written())
 
-    def _begin_call(self, requested_tier: str | None = None) -> Stopped | None:
+    def _written(self) -> tuple[Event, ...]:
+        # 这一轮写下的事件范围：这一轮开始以来 run 流上新增的那些。别的会话同时写入的也在范围里，
+        # 按会话分开由路由自己做（路由按会话判断一轮的事件）
+        return tuple(event for event in self._writes.read(self._stream).events()
+                     if event.stream_version > self._start_version)
+
+    def _begin_call(self, requested_tier: str | None = None) -> RoundResult | None:
         # 新的逻辑调用：读取该项目该部门当前的部门设置（模型选择与部门 Prompt），交 Provider 解析调用目标；
         # 请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
         # 给出请求档位时按它解析，实际发送的档位由 Provider 按模型声明限制。
@@ -331,8 +308,8 @@ class StepDriver:
         resolution = self._facade.resolve_department_default(
             self._scope.department, requested_tier, project=project)
         if not resolution.available:
-            return Stopped(self._version, resolution.reason, resolution.message,
-                           decision_call_target(resolution.public))
+            return RoundResult(version=self._version, stop_reason=resolution.reason,
+                               message=resolution.message, target=decision_call_target(resolution.public))
         self._call_handle = resolution.handle_id
         self._call_public = event_call_target(resolution.public,
                                               selection_source=resolution.selection_source)
@@ -361,7 +338,7 @@ class StepDriver:
         self._version = judgment.version
         return judgment
 
-    def _stop_now(self, judgment: Judgment) -> Stopped:
+    def _stop_now(self, judgment: Judgment) -> RoundResult:
         # 这个会话停下。别的会话已经写下待恢复的决定请求时，它照常停下（事项的状态不变，工单 #856）；
         # 它自己也被挡住时（这次的模型请求发不出去），它写下自己的那一条决定请求，
         # 各写明自己的部门、模型与问题（模型管理设计说明第 5.5 节）。
@@ -370,7 +347,7 @@ class StepDriver:
             unavailable = self._begin_call()
             if unavailable is not None:
                 return unavailable
-        return Stopped(judgment.version)
+        return RoundResult(version=judgment.version)
 
     async def _wait(self, seconds: float) -> bool:
         judgment = await self._nodes.wait(seconds)
@@ -383,7 +360,7 @@ class StepDriver:
         self._version = projection.stream_version
         return projection
 
-    async def _steps(self) -> StepResult:
+    async def _steps(self) -> RoundResult:
         limits = self._limits
         self._consumed_steps = 0
         # 工单 #17：上一次激活的完整模型响应里还有没执行的合法动作时，先补执行这些动作，不重新调用模型
@@ -404,11 +381,11 @@ class StepDriver:
             self._refresh_workspace_now()
             prepared = self._prepare(step_id, attempt, root_step_id, retry_of_step_id,
                                      replies_without_tool_call)
-            if isinstance(prepared, Stopped):
+            if isinstance(prepared, RoundResult):
                 return prepared
             request = prepared
             if request is None or not self._start_request(request):
-                return Stopped(self._version)
+                return RoundResult(version=self._version)
             request.attempt_started_monotonic = time.monotonic()
             try:
                 response = await self._call_model(request)
@@ -444,7 +421,7 @@ class StepDriver:
                 will_retry = can_retry and self._proceed().proceed
                 self._recorder.attempt_failed(request, retry_error, will_retry)
                 if not self._proceed().proceed:
-                    return Stopped(self._version)
+                    return RoundResult(version=self._version)
                 if not will_retry:
                     if retry_error.retryable and self._consumed_steps >= limits.max_model_steps:
                         raise ProviderError(
@@ -459,9 +436,9 @@ class StepDriver:
                         diagnostics=diagnostics,
                     ) from retry_error
                 if not self._schedule_retry(request, retry_error, delay, step_id + 1):
-                    return Stopped(self._version)
+                    return RoundResult(version=self._version)
                 if not await self._wait(delay):
-                    return Stopped(self._version)
+                    return RoundResult(version=self._version)
                 attempt += 1
                 retry_of_step_id = step_id
                 continue
@@ -487,7 +464,7 @@ class StepDriver:
             if not self._proceed().proceed:
                 self._skip(request, response.output,
                            "Not executed because this activation ended or its input changed during the model request.")
-                return Stopped(self._version)
+                return RoundResult(version=self._version)
             if request.purpose == "compaction":
                 self._finish_compaction(request, response)
                 continue
@@ -495,7 +472,7 @@ class StepDriver:
                 # 这一轮只有指导、没有要做的工作：文字回复就是对用户的回答，这一轮在这里正常结束。
                 # 不追加提醒，也不写 tool_call_required；回复的文字已经记在模型消息里，不另存（工单 #1037）
                 if self._text_reply_answers and _text_reply(response):
-                    return Stopped(self._version)
+                    return RoundResult(version=self._version)
                 # 回复已记入历史；追加一条 user 消息，下一次请求不以助手消息结尾
                 replies_without_tool_call += 1
                 if replies_without_tool_call > DEFINITIONS.rule_value("tool_call_required_limit"):
@@ -517,7 +494,7 @@ class StepDriver:
                 if not self._proceed().proceed:
                     self._skip(request, response.output[index:],
                                "Not executed because this activation ended or its input changed before these tools started.")
-                    return Stopped(self._version)
+                    return RoundResult(version=self._version)
                 identity = str(item.get("call_id") or "")
                 name = str(item.get("name") or "")
                 raw_args = item.get("arguments")
@@ -541,7 +518,7 @@ class StepDriver:
                     if permission.stopped:
                         self._skip(request, response.output[index:],
                                    "Not executed because the current activation can no longer start tools.")
-                        return Stopped(self._version)
+                        return RoundResult(version=self._version)
                     if not permission.allowed:
                         ok, output, error = False, None, permission.reason
                         deferred = permission.deferred
@@ -567,7 +544,8 @@ class StepDriver:
                             if request.department != "product":
                                 ok, output, error = False, None, "only product can revise product_spec"
                             else:
-                                projection = self._writes.read(self._stream).projection
+                                snapshot = self._writes.read(self._stream)
+                                projection = snapshot.projection
                                 spec_proposal = {
                                     **{k: v for k, v in args.items()
                                        if k not in ("answer", "text", "facts", "explanation") and v is not None},
@@ -575,14 +553,14 @@ class StepDriver:
                                     "issuer": "product",
                                 }
                                 facts = self._environment.query(FactsQuery(tree=True)).tree
-                                events = self._writes.read(self._stream).events()
+                                events = snapshot.events()
                                 decision = evaluate_proposal(
+                                    AdjudicationView(minimal=snapshot.minimal(), state=projection),
                                     department="product",
                                     proposal=spec_proposal,
-                                    projection=projection,
                                     facts=facts,
+                                    tightening=self._tightening,
                                     events=events,
-                                    definitions=self._definitions,
                                 )
                                 if not decision.accepted:
                                     ok, output, error = False, None, "; ".join(e.message for e in decision.errors)
@@ -590,14 +568,14 @@ class StepDriver:
                                     ok, output, error = True, text, None
                         else:
                             ok, output, error = True, text, None
-                    elif tool_kind(name, definitions=self._definitions) == "host":
-                        ok, output, error = True, _run_host_tool(name, args, self._definitions), None
+                    elif tool_kind(name) == "host":
+                        ok, output, error = True, _run_host_tool(name, args), None
                     else:
                         # 环境工具：一次动作，前置条件是工具许可所依据的公开树摘要；
                         # 执行后立即核对（例如登记命令结束后的读取）发现无法表示的条目时暂停运行
                         try:
                             receipt = await self._perform(Action(
-                                action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name, definitions=self._definitions),
+                                action_id=f"{request.activation_id}:{step_id}:{identity}", kind=tool_action(name),
                                 tool=name, department=request.department, input=args,
                                 preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                             ))
@@ -624,8 +602,8 @@ class StepDriver:
                 if not self._proceed().proceed:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because this activation ended or its input changed after the current tool.")
-                    return Stopped(self._version)
-                kind = proposal_kind(name, definitions=self._definitions)
+                    return RoundResult(version=self._version)
+                kind = proposal_kind(name)
                 if kind is not None:
                     if deferred:
                         # 这次提交推迟：模型还没有看见新的用户输入，通知在下一步送达，
@@ -634,11 +612,13 @@ class StepDriver:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because the department already submitted its proposal.")
                     proposal = output if ok else {**args, "kind": kind}
-                    return Submitted(proposal, response, self._recorder.transcript)
+                    return RoundResult(version=self._version, submission=proposal, response=response,
+                                       transcript=self._recorder.transcript)
                 if name == "answer" and ok:
                     self._skip(request, response.output[index + 1:],
                                "Not executed because the branch session already submitted its answer.")
-                    return Answered(args, response, self._recorder.transcript)
+                    return RoundResult(version=self._version, submission=args, response=response,
+                                       transcript=self._recorder.transcript)
         raise ProviderError("department reached the model step limit without submitting a proposal",
                             reason="model_steps_exhausted")
 
@@ -738,12 +718,12 @@ class StepDriver:
                 ok, output, error = ask_ok, ask_output, ask_error
                 if ok and new_contract_hash is not None:
                     self._adopt_contract(new_contract_hash)
-            elif tool_kind(name, definitions=self._definitions) == "host":
-                ok, output, error = True, _run_host_tool(name, args, self._definitions), None
+            elif tool_kind(name) == "host":
+                ok, output, error = True, _run_host_tool(name, args), None
             else:
                 receipt = await self._perform(Action(
                     action_id=f"{request.activation_id}:recovered:{identity}",
-                    kind=tool_action(name, definitions=self._definitions),
+                    kind=tool_action(name),
                     tool=name, department=request.department, input=args,
                     preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                 ))
@@ -790,7 +770,7 @@ class StepDriver:
 
     def _prepare(self, step_id: int, attempt: int, root_step_id: int,
                  retry_of_step_id: int | None,
-                 replies_without_tool_call: int) -> Stopped | ModelRequest | None:
+                 replies_without_tool_call: int) -> RoundResult | ModelRequest | None:
         # 由 P 装配这一步；装配失败的原因换成停止原因。激活第一步的部门工作消息先写成事件，部门历史再从事件读出。
         # 装配失败时，分派新输入与关闭协作请求的记录照常提交，然后停止。
         # 新的逻辑调用按「项目部门设置、部门默认」合并后解析（Provider 在同一把锁内读取，
@@ -972,7 +952,7 @@ class StepDriver:
         # 这一轮不因此结束（工单 #558，循环结构第 5 节）。采用以后检查回执绑定新的合同，
         # 部门按新版本重做的检查才能被交付与放行认下。
         projection = self._writes.read(self._stream).projection
-        current = current_contract_hash(projection)
+        current = artifact_hash(projection.effective_contract)
         if current == self._scope.basis.effective_contract_hash:
             return
         self._adopt_contract(current)
@@ -1002,11 +982,12 @@ class StepDriver:
 
         def begin(transaction: Transaction) -> tuple[ToolPermission, WorkspaceFacts]:
             projection = self._settle(transaction)
-            facts = self._environment.query(facts_query(call, definitions=self._definitions))
+            facts = self._environment.query(facts_query(call))
             permission = tool_permission(
-                projection, call, department=scope.department, session_id=scope.session_id,
+                AdjudicationView(minimal=transaction.minimal(), state=projection), call,
+                department=scope.department, session_id=scope.session_id,
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
-                events=transaction.events(), definitions=self._definitions,
+                tightening=self._tightening, events=transaction.events(),
             )
             if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":
                 rel = str(call.get("args", {}).get("path") or "")
@@ -1018,7 +999,7 @@ class StepDriver:
                     for e in transaction.events()
                 )
                 if not already_started:
-                    if tool_kind(call["name"], definitions=self._definitions) != "host":
+                    if tool_kind(call["name"]) != "host":
                         tree = facts.tree
                         if tree is None:
                             tree = self._environment.query(FactsQuery(tree=True)).tree
@@ -1074,10 +1055,10 @@ def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
         return None
     return {"digest": tree.digest, "entries": [list(item) for item in zip(tree.files, tree.hashes)]}
 
-def _run_host_tool(name: str, args: dict[str, Any], definitions: Definitions | None = None) -> dict[str, Any]:
+def _run_host_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
     # 主机工具由控制核心执行。现在只有提交类工具：提交的内容就是提案，模型自报的 exit_code 不是证据
     payload = dict(args)
-    payload["kind"] = proposal_kind(name, definitions=definitions)
+    payload["kind"] = proposal_kind(name)
     payload.pop("exit_code", None)
     return payload
 

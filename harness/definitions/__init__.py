@@ -56,9 +56,13 @@ class DefinitionError(ValueError):
 
 
 class UnknownStopReason(ValueError):
-    # 停止原因不在定义的清单中
-    def __init__(self, reason: str) -> None:
-        super().__init__(f"stop reason {reason!r} is not in the stop reason definitions (stop_reasons.json)")
+    # 停止原因不在定义的清单中：内核的清单（stop_reasons.json）与组织定义所选的路由自己声明的
+    # 结束原因（routings.json 的 end_reasons，工单 #861）都没有它
+    def __init__(self, reason: str, routing: str | None = None) -> None:
+        places = "the stop reason definitions (stop_reasons.json)"
+        if routing is not None:
+            places = f"{places} nor the end reasons the routing {routing!r} declares (routings.json end_reasons)"
+        super().__init__(f"stop reason {reason!r} is not in {places}")
         self.reason = reason
 
 
@@ -141,6 +145,9 @@ class OrganizationRules(_Definition):
 class Organization(_Definition):
     # 部门按这个顺序排列
     departments: tuple[Department, ...] = Field(min_length=1)
+    # 路由实现的名称（骨架与应用设计说明第 5.1 节、工单 #825）：启动时按这个名称接上实现，
+    # 名称必须是 routings.json 里登记的其中一个。默认是成果驱动
+    routing: Identifier = "watched_outputs"
     rules: OrganizationRules
 
 
@@ -367,6 +374,8 @@ class ModelCapabilities(_Definition):
 
 
 class StopReason(_Definition):
+    # 停止原因的中文名：等待说明与事件说明按中文写，机器标识不直接出现在给用户看的文字里
+    label: str = Field(min_length=1)
     # 运行以这个原因结束的方式：done 放行结束，paused 暂停，failed 失败
     outcome: Literal["done", "paused", "failed"]
     # 写进暂停或失败事件的处理说明；没有说明时为 null
@@ -406,6 +415,45 @@ class WorkItems(_Definition):
     freeze_work_items = _frozen("kinds", "repository_overview")
 
 
+class RoutingEndReason(_Definition):
+    # 路由自己的结束原因（设计说明第 5.4 节第 7 条）：属于那份路由定义版本的封闭清单，与内核的停止原因分开；
+    # 内核的停止原因（上限、取消、升级等）对所有路由相同
+    label: str = Field(min_length=1)
+    outcome: Literal["done", "paused", "failed"]
+    human_action: str | None = None
+
+
+class Routing(_Definition):
+    # 一种路由实现（routings.json，工单 #825），下面一段是它自己的一份定义（设计说明第 5.4 节第 2 条）：
+    # 部门、成果种类、提议方式、路由自己的上限与结束原因。内核只核对这份定义的结构（字段、类型与非空），
+    # 名称指向的内容由路由实现自己校验（routing_contract.select）；成果驱动的这一份按名称引用现有的定义文件，
+    # 内容不搬动（工单 #861）。组织定义的 routing 写的名称就是这里的 id
+    id: Identifier
+    # 中文名，给用户看
+    label: str = ""
+    # 这一种路由是什么：开始一轮工作、一轮怎么结束、事项怎么结束的口径
+    why: str = ""
+    # 部门：按名称引用组织定义里的部门
+    departments: tuple[Identifier, ...] = Field(min_length=1)
+    # 成果种类：这种路由认得的正式成果，按名称引用提交类工具提交的提案种类
+    outcome_kinds: tuple[Identifier, ...] = Field(min_length=1)
+    # 提议方式：提交类工具的名称，按名称引用工具定义
+    proposal_methods: tuple[Identifier, ...] = Field(min_length=1)
+    # 路由自己的上限（例如任务数、打回次数）：数值，归路由，不进最小投影
+    limits: Mapping[Identifier, Annotated[int, Field(ge=0)]] = Field(default_factory=dict)
+    # 路由自己的结束原因：编号到这个原因的中文名、结束方式与处理说明，封闭清单
+    end_reasons: Mapping[Identifier, RoutingEndReason] = Field(min_length=1)
+
+    freeze_routing = _frozen("limits", "end_reasons")
+
+
+class Routings(_Definition):
+    # routings.json：可用的路由实现是封闭的清单，组织定义的 routing 不在里面时加载失败
+    routings: tuple[Routing, ...] = Field(min_length=1)
+
+    freeze_routings = _frozen("routings")
+
+
 class Definitions(_Definition):
     version: str
     organization: Organization
@@ -423,8 +471,15 @@ class Definitions(_Definition):
     model_capabilities: ModelCapabilities
     # 事项种类与仓库概况的模式表，来自 work_items.json
     work_items: WorkItems
+    # 可用的路由实现，来自 routings.json（工单 #825）
+    routings: Routings
 
     freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items", "rules")
+
+    @property
+    def routing(self) -> str:
+        # 路由实现的名称（组织定义里的 routing）：加载时核对过它在 routings.json 里
+        return self.organization.routing
 
     @property
     def departments(self) -> tuple[str, ...]:
@@ -491,12 +546,19 @@ class Definitions(_Definition):
         # 一种提案的通用条件（设计说明第 5.5 节）：按合同里列出的顺序由内核核对；没有列出时没有通用条件
         return self.proposal_contracts.conditions.get(kind, ())
 
+    def routing_definition(self) -> Routing:
+        # 组织定义写明的路由自己的一份定义（设计说明第 5.4 节第 2 条）：加载时核对过它在 routings.json 里
+        return next(item for item in self.routings.routings if item.id == self.routing)
+
     def stop_reason(self, reason: str) -> StopReason:
-        # 停止原因只来自定义中的清单
+        # 停止原因来自定义中的清单；组织定义所选的路由自己声明的结束原因同样可以写入（设计说明第 5.4 节第 7 条）
         definition = self.stop_reasons.get(reason)
-        if definition is None:
-            raise UnknownStopReason(reason)
-        return definition
+        if definition is not None:
+            return definition
+        declared = self.routing_definition().end_reasons.get(reason)
+        if declared is None:
+            raise UnknownStopReason(reason, self.routing)
+        return StopReason(label=declared.label, outcome=declared.outcome, human_action=declared.human_action)
 
     def rule(self, name: str) -> Rule:
         # 规则登记中的一个条目；条目不在登记里直接报错，调用方不留回退取值
@@ -521,6 +583,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "service_presets.json": ("service_presets", TypeAdapter(ServicePresets)),
     "model_capabilities.json": ("model_capabilities", TypeAdapter(ModelCapabilities)),
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
+    "routings.json": ("routings", TypeAdapter(Routings)),
 }
 
 
@@ -614,6 +677,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
             if tool not in tools:
                 issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
     issues.extend(_work_item_references(parts["work_items"], organization, tools, parts["stop_reasons"]))
+    issues.extend(_routing_references(organization, parts["routings"]))
     issues.extend(_rule_references(parts["rules"], roles))
     submitters: dict[str, str] = {}
     for name, tool in tools.items():
@@ -685,6 +749,16 @@ def _work_item_references(work_items: WorkItems, organization: Organization, too
                     issues.append((file, f"kinds.{name}.departments.{department}.tools[{index}]",
                                    f"工具 {tool} 没有定义"))
     return issues
+
+
+def _routing_references(organization: Organization, routings: Routings) -> list[tuple[str, str, str]]:
+    # 组织定义写明的路由实现必须在 routings.json 里（工单 #825）：不在里面时加载失败，
+    # 写明是哪个字段、写了什么名称、有哪些可用的名称
+    available = [item.id for item in routings.routings]
+    if organization.routing in available:
+        return []
+    return [("organization.json", "routing",
+             f"路由实现 {organization.routing} 不存在；可用的是：{'、'.join(available)}")]
 
 
 def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], tools: dict[str, Tool],

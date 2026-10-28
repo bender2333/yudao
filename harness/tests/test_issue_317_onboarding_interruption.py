@@ -79,9 +79,9 @@ def _candidates(system, project_id: str) -> list:
 
 
 
-def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
-    # 验收一：建档 run 在 run_check 的真实进程执行中被终止，重启后自动重新执行一次
-    # （检查的契约声明可以重复，不发决定请求），建档照常走完第一轮
+def test_a_killed_onboarding_check_is_handed_back_and_the_round_finishes(tmp_path):
+    # 验收一：建档 run 在 run_check 的真实进程执行中被终止，重启后这个结果未知的检查作为工具结果
+    # 交还发出它的会话（工单 #581：不再自动重新执行，也不发决定请求），建档照常走完第一轮
     data_dir = tmp_path / "data"
     signals = tmp_path / "signals"
     signals.mkdir()
@@ -98,7 +98,7 @@ def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
     assert len(_attempts(first, action_id)) == 1, "第一次执行只留下一条 tool_started"
     assert _attempts(first, action_id)[0]["result_type"] is None, "被终止的检查没有落盘结果"
 
-    # 重启：放行检查，启动恢复自动重新执行它（用记录下来的 argv），跑完以后结构说明重新提交，
+    # 重启：放行检查，启动恢复把这个结果未知的检查交还发出它的会话，跑完以后结构说明重新提交，
     # 基线核验的回答由恢复的脚本给出；子进程直接运行到停止
     (signals / "release").write_text("go", encoding="utf-8")
     second = killed.restarted(data_dir, _sessions([], [_structure_turn()], [_review_turn(), _review_turn()]),
@@ -108,8 +108,6 @@ def test_a_killed_onboarding_check_is_retried_and_the_round_finishes(tmp_path):
     assert len(verified) == 1, "结果未知的检查交还会话"
     assert verified[0].payload["resolution"] == "handed_back"
     assert verified[0].payload["ok"] is False
-    assert killed.unknown_action_requests(second.after, first.run_id) == [], \
-        "检查交还会话，不需要问用户"
 
     # 重启的子进程跑完这一轮并结算：基线核验通过以后有一个候选与一个决定请求
     after = second.after

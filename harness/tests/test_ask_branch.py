@@ -5,11 +5,14 @@ from typing import Any
 import pytest
 
 from harness.adapters.fake import FakeAdapter, prompt_part
+from harness.minimal_projection import fold_events
 from harness.models import EventType
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import quality_turns
+from harness.tests.helpers import adjudication_view, work_basis
+from harness.tightening import WATCHED_OUTPUTS
 
 
 def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path):
@@ -186,30 +189,28 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         status="running",
         ask_stack=[{"requester": "product", "recipient": "engineering", "branch_session_id": "ses_ask_eng"}],
     )
-    basis = WorkBasis.current(projection, "engineering")
+    basis = work_basis(projection, "engineering")
 
     # 工程分支试图写入
-    perm_write = tool_permission(
-        projection,
+    perm_write = tool_permission(adjudication_view(projection),
         {"name": "write_file", "args": {"path": "src/new.py", "content": "x"}},
         department="engineering",
         session_id="ses_ask_eng",
         basis=basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_write.allowed
 
     # 工程分支试图提交交付
-    perm_del = tool_permission(
-        projection,
+    perm_del = tool_permission(adjudication_view(projection),
         {"name": "submit_delivery", "args": {"summary": "done", "check_names": []}},
         department="engineering",
         session_id="ses_ask_eng",
         basis=basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_del.allowed
 
     # 质检分支试图提交放行或缺陷记录
@@ -218,16 +219,15 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         status="running",
         ask_stack=[{"requester": "engineering", "recipient": "quality", "branch_session_id": "ses_ask_qa"}],
     )
-    qa_basis = WorkBasis.current(qa_projection, "quality")
-    perm_rev = tool_permission(
-        qa_projection,
+    qa_basis = work_basis(qa_projection, "quality")
+    perm_rev = tool_permission(adjudication_view(qa_projection),
         {"name": "submit_review", "args": {"verdict": "release", "rationale": "ok", "checks": []}},
         department="quality",
         session_id="ses_ask_qa",
         basis=qa_basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_rev.allowed
 
     # 产品分支试图执行除 answer 之外的工具被拒绝
@@ -236,16 +236,15 @@ def test_ask_branch_tool_permissions_rejected(tmp_path: Path):
         status="running",
         ask_stack=[{"requester": "engineering", "recipient": "product", "branch_session_id": "ses_ask_pro"}],
     )
-    prod_basis = WorkBasis.current(prod_projection, "product")
-    perm_prod_read = tool_permission(
-        prod_projection,
+    prod_basis = work_basis(prod_projection, "product")
+    perm_prod_read = tool_permission(adjudication_view(prod_projection),
         {"name": "read_file", "args": {"path": "src/echo.py"}},
         department="product",
         session_id="ses_ask_pro",
         basis=prod_basis,
         aborted=False,
         facts=WorkspaceFacts(),
-    )
+     tightening=WATCHED_OUTPUTS)
     assert not perm_prod_read.allowed
 
 
@@ -609,10 +608,9 @@ def test_ask_branch_finished_restart_retains_accumulated_elapsed_time(tmp_path: 
         branch_elapsed = branch_finished[0].payload.get("elapsed_ms", 0)
         assert branch_elapsed > 0
 
-        # 重启恢复后的 run 已用时间包含分支时段
-        assert run.after.orchestrator._run_elapsed_ms[run.run_id] >= branch_elapsed
-
         after_events = run.after.store.list_events(run.run_id)
+        # 重启恢复后的 run 已用时间包含分支时段：已用时间读最小投影里已结算的那一部分（S1e 工单 #1015）
+        assert fold_events(after_events).used.settled_ms >= branch_elapsed
         elapsed_list = [e.payload["elapsed_ms"] for e in after_events if e.type == EventType.ACTIVATION_FINISHED]
         # 各激活结束事件记下的已用时间单调不减：同时运行的会话各自记下自己结束时刻的累计值（工单 #557）
         assert all(x <= y for x, y in zip(elapsed_list, elapsed_list[1:]))

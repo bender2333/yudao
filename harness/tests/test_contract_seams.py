@@ -11,10 +11,12 @@ from harness import assembly_contract, execution_contract
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis
 from harness.assembly import ContextAssembly
+from harness.tests.helpers import work_basis
 from harness.engine import StepDriver, StepLimits
 from harness.models import EventType, new_id
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
+from harness.tightening import WATCHED_OUTPUTS
 
 # 测试里的薄驱动一侧：开始一轮工作，第一步继续、第二步停下；提供步骤驱动要问的两样设置
 class _ThinDriver:
@@ -78,7 +80,7 @@ def _round_request(system, run_id, work_ref):
     scope = execution_contract.ActivationScope(
         run_id, "product", session_id, new_id("act"), parent,
         prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=(),
-        basis=WorkBasis.current(projection, "product"), provider="test",
+        basis=work_basis(projection, "product"), provider="test",
     )
     return execution_contract.RoundRequest(
         scope, prompt, StepLimits(max_model_steps=1), work_ref=work_ref)
@@ -100,8 +102,9 @@ def test_the_route_work_reference_reaches_the_assembly_input(tmp_path):
         driver = StepDriver.start(
             request, writes=system.writes, artifacts=system.artifacts, assembly=recording,
             adapter=adapter, facade=system.facade,
-            environment=system.orchestrator._environment_for(run_id, "product", refresh=True),
+            environment=system.orchestrator._workspaces.environment_for(run_id, "product", refresh=True),
             nodes=node, cancelled=Event(), deltas=system.deltas,
+            tightening=WATCHED_OUTPUTS,
         )
         return await driver.result()
 

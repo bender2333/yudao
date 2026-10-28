@@ -1,27 +1,30 @@
-# 执行契约第一版（骨架与应用设计说明第 3.2、5.3 节；总图第四节「执行」缝）：
+# 执行契约第二版（骨架与应用设计说明第 3.2、5.3 节；总图第四节「执行」缝）：
 # 输入一轮工作（部门、会话、提示、这一轮的上限、路由的工作引用；工作引用原样交给装配）；
-# 每一步经安全节点问薄驱动继续或停止；工具调用经裁决入口；输出一轮工作的结果，这一版沿用现在的结果种类
-# （取得调用目标、装配请求、记录与写入仍由实现自己按内核的接口做）。
+# 每一步经安全节点问薄驱动继续或停止；工具调用经裁决入口；输出一轮工作的结果：这一轮写下的事件的范围与
+# 停止原因。这一轮算不算结束、结束成什么，由路由按事件判断，契约不写死「提交了正式成果」「回答了询问」
+# 这类结果种类（第二版：#861 从第一版改形状；阶段一首次发布以后按字段只增）。
 # 本模块只导入内核与标准库，以及契约圈的 contract_versions；实现（engine.py 的 StepDriver）声明实现这一版，
-# 薄驱动接受当前版与上一版。结果的种类不写死：去掉「提交了正式成果」「回答了询问」这些种类、
-# 改由路由按事件判断一轮的结束，归 #861（S2b，设计说明第 5.3 节输出、第 5.4 节第 4、5 条）。
+# 薄驱动接受当前版与上一版。
 
 from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from threading import Event
+from threading import Event as CancelEvent
 from typing import Any, Protocol
 
 from . import contract_versions
 from .adjudication import WorkBasis
 from .definitions import DEFINITIONS
-from .models import DepartmentPrompt, RunProjection
+# 事件信封从内核事件模块导入。运行流的投影与部门 Prompt 是应用侧的类（harness/models.py），
+# 契约模块不导入应用（harness/tests/test_contract_modules.py 的导入方向），所以这两处按 Any 标注，
+# 具体的类型由实现（这一版是 orchestrator.py 与 assembly.py）给出。
+from .kernel_events import Event
 from .write_path import Transaction
 
-# 这一版契约的版本号；上一版是第一版之前的空位，没有实现声明它
-CURRENT_VERSION = 1
-PREVIOUS_VERSION: int | None = None
+# 这一版契约的版本号；上一版是第一版（结果的种类还写死成「提交了正式成果」与「回答了询问」，工单 #826）
+CURRENT_VERSION = 2
+PREVIOUS_VERSION: int | None = 1
 
 
 def accept(implementation: Any) -> int:
@@ -82,7 +85,7 @@ class RoundRequest:
     # limits 是这一轮的上限，work_ref 是路由自己的工作引用（例如任务池的任务）。
     # work_ref 原样交给装配（第 5.4 节第 4 条），骨架不解释它
     scope: ActivationScope
-    prompt: DepartmentPrompt
+    prompt: Any
     limits: StepLimits
     work_ref: Any = None
 
@@ -96,7 +99,7 @@ class SafeNode(Protocol):
         # 分派新输入，回答是否继续
         ...
 
-    def settle(self, transaction: Transaction) -> RunProjection:
+    def settle(self, transaction: Transaction) -> Any:
         # 在调用方的事务中分派新输入并关闭过时的协作请求，返回事务中当前的运行状态；调用方随后判断并写入
         ...
 
@@ -114,7 +117,7 @@ class SafeNode(Protocol):
         # （providers.selection.ModelSelection），契约原样交回实现
         ...
 
-    def department_prompt(self, department: str) -> DepartmentPrompt:
+    def department_prompt(self, department: str) -> Any:
         # 部门 Prompt 每次请求从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）
         ...
 
@@ -123,13 +126,34 @@ class SafeNode(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class RoundResult:
+    # 一轮工作的结果（设计说明第 5.3 节输出）：这一轮写下的事件范围与停止原因。这一轮算不算正常结束、
+    # 结束成什么，由路由按事件判断（第 5.4 节第 5 条；routing_contract.RoundEnd），契约里没有结果种类。
+    # stop_reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由薄驱动按当时的运行状态
+    # 收尾；否则是停止原因的编号与说明，由薄驱动暂停或结束运行。version 是作出停止判断时 run 流的版本。
+    # target 是这次失败对应的调用目标公开部分（不含密钥）；facts 是停止原因要带给决定请求的事实引用
+    events: tuple[Event, ...] = ()
+    version: int = 0
+    stop_reason: str | None = None
+    message: str = ""
+    target: dict[str, Any] | None = None
+    facts: tuple[str, ...] = ()
+    # 这一轮里模型用提交类工具交上来的参数（原样的工具回执，或参数加上工具声明的种类），带来它的这次回答，
+    # 以及这一轮的发言：薄驱动经写入口提交时用（转录存成工件）。是不是提交、是哪一种，由路由按它自己的定义判断；
+    # response 是 Provider 的回答对象，原样交回实现，契约不解释它
+    submission: dict[str, Any] | None = None
+    response: Any = None
+    transcript: str = ""
+
+
 class StepDriver(Protocol):
     # 执行契约的实现（这一版是 engine.py 的 StepDriver）：一轮工作的步骤循环。
-    # 薄驱动只调 start、cancel 与 result；一轮的结果是驱动自己的类型，这一版沿用现在的结果种类
+    # 薄驱动只调 start、cancel 与 result；结果是一轮工作写下的事件范围与停止原因（RoundResult）
     CONTRACT_VERSION: int
 
     @classmethod
-    def start(cls, request: RoundRequest, *, nodes: SafeNode, cancelled: Event,
+    def start(cls, request: RoundRequest, *, nodes: SafeNode, cancelled: CancelEvent,
               **dependencies: Any) -> "StepDriver":
         # 在当前事件循环中开始这次激活的步骤循环；dependencies 由实现按自己的需要取用，不属于契约
         ...
@@ -138,6 +162,6 @@ class StepDriver(Protocol):
         # 取消这一轮：之后的核对都得到停止，正在进行的动作与调用尝试按身份取消
         ...
 
-    async def result(self) -> Any:
+    async def result(self) -> RoundResult:
         # 等这一轮结束并交回结果
         ...

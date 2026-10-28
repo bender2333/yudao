@@ -11,7 +11,7 @@ from threading import Event, Thread
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.providers import ResponsesConfig
 from harness.tests.protocol_helpers import (
@@ -35,6 +35,7 @@ from harness.definitions import DEFINITIONS
 from harness.models import ArtifactRef, DepartmentPrompt, RunProjection, hash_bytes
 from harness.runtime import LoopSystem
 from harness.tests.helpers import FAST_RETRIES
+from harness.tightening import WATCHED_OUTPUTS
 
 
 def _request(*, session_id="session", history=None, max_output_tokens=None, attempt_id="activation:1:attempt-1"):
@@ -43,7 +44,7 @@ def _request(*, session_id="session", history=None, max_output_tokens=None, atte
     prompt_ref = ArtifactRef("department_prompt", prompt_hash, f"run/{prompt_hash[7:9]}/{prompt_hash[7:]}")
     projection = RunProjection(task="local request")
     prompt = DepartmentPrompt("product", 1, prompt_text, prompt_ref, "initial-prompt")
-    context = ContextAssembler().assemble(
+    context = ContextAssembler( tightening=WATCHED_OUTPUTS).assemble(
         projection, department="product", session_id=session_id, activation_id="activation", prompt=prompt,
     )
     return model_call([*context.input_items, *(history or [])], TOOLS, session_id=session_id,

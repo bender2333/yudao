@@ -13,14 +13,14 @@ from typing import Any, TypeVar
 
 from .definitions import DEFINITIONS
 from .event_store import (
-    Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, is_catalog_stream, is_run_stream,
+    Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, dump_decision, is_catalog_stream,
+    is_run_stream, load_decisions,
 )
-from .models import (
-    DEPARTMENTS, CatalogEvent, DecisionRequest, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now,
+from .kernel_events import (
+    CatalogEvent, DecisionRequest, Event, ProjectEvent, SkeletonEventType, StreamHandler, apply_decision_event,
+    json_dumps, new_id, replay_decisions, utc_now,
 )
-from .projection import (
-    StreamHandler, apply_decision_event, dump_decision, load_decisions, replay_decisions,
-)
+from .minimal_projection import MinimalProjection, fold_events, fold_more
 
 T = TypeVar("T")
 
@@ -29,8 +29,8 @@ T = TypeVar("T")
 MAX_JUDGMENTS = 100
 
 # 结束运行的事件：它承载的停止原因规定的结束方式，与事件写入的终态
-_STOP_EVENTS = {EventType.RUN_DONE: ("done", "done"), EventType.RUN_PAUSED: ("paused", "paused"),
-                EventType.RUN_FAILED: ("failed", "failed")}
+_STOP_EVENTS = {SkeletonEventType.RUN_DONE: ("done", "done"), SkeletonEventType.RUN_PAUSED: ("paused", "paused"),
+                SkeletonEventType.RUN_FAILED: ("failed", "failed")}
 
 
 @dataclass(frozen=True)
@@ -72,14 +72,17 @@ class NewCatalogEvent:
 class Snapshot:
     # 一个流在某个版本的只读视图：保存的投影与它的流版本、这个流中的决定请求（按身份），以及到这个版本为止的事件
     def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
-                 handler: StreamHandler) -> None:
+                 handler: StreamHandler, minimal_of: Callable[[str, int, list[Any]], MinimalProjection] | None = None
+                 ) -> None:
         self.stream = stream
         self.version = 0 if saved is None else saved.version
         self.projection: Any = handler.empty() if saved is None else handler.load(saved)
         self.decisions: dict[str, DecisionRequest] = load_decisions(saved)
         self.handler = handler
         self._store = store
+        self._minimal_of = minimal_of
         self._committed: list[Any] | None = None
+        self._minimal: MinimalProjection | None = None
 
     def events(self) -> list[Any]:
         # 流中到读取时的版本为止的全部事件
@@ -93,19 +96,31 @@ class Snapshot:
             return [event for event in self._committed if event.stream_version > version]
         return self._store.stream_events(self.stream, after_version=version, through_version=self.version)
 
+    def minimal(self) -> MinimalProjection:
+        # 到这个版本为止的最小投影（设计说明第 4 节）：裁决只读这一份，由骨架事件折叠而成。
+        # 只看已提交的事件，事务里追加的事件由 Transaction 接着折
+        if self._minimal is None:
+            events = Snapshot.events(self)
+            folded = fold_events(events) if self._minimal_of is None else self._minimal_of(self.stream, self.version,
+                                                                                          events)
+            self._minimal = folded
+        return self._minimal
+
 
 class Transaction(Snapshot):
     # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection、decisions 与 events()，提交时一起写入。
     # 判断可能因为版本冲突重新进行，判断中只做可以重复的事；只应在提交以后发生的进程内效果用 on_commit 登记，
     # 没有提交（判断出错、版本冲突或存储失败）时要撤回的外部效果用 on_abort 登记
     def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
-                 handler: StreamHandler, command: Command | None = None) -> None:
-        super().__init__(store, stream, saved, handler)
+                 handler: StreamHandler, command: Command | None = None,
+                 minimal_of: Callable[[str, int, list[Any]], MinimalProjection] | None = None) -> None:
+        super().__init__(store, stream, saved, handler, minimal_of)
         self.appended: list[Any] = []
         self._command = command
         self._changed_decisions: list[str] = []
         self._compensations: list[Callable[[], None]] = []
         self._committed_effects: list[Callable[[], None]] = []
+        self._appended_minimal: MinimalProjection | None = None
 
     def append(self, *entries: NewEvent | NewProjectEvent) -> list[Any]:
         # 先得出全部事件（载荷无法保存时在这里失败，什么也不追加），再依次并入投影与决定请求。
@@ -121,7 +136,16 @@ class Transaction(Snapshot):
             if changed is not None and changed not in self._changed_decisions:
                 self._changed_decisions.append(changed)
             self.appended.append(event)
+        if self._appended_minimal is not None:
+            # 事务里已经折过一份最小投影：这次追加的事件接在后面折，不必整条流重算
+            self._appended_minimal = fold_more(self._appended_minimal, events)
         return events
+
+    def minimal(self) -> MinimalProjection:
+        # 到这个事务此刻的状态（含已追加、还没提交的事件）为止的最小投影：裁决在一个事务里读这一份
+        if self._appended_minimal is None:
+            self._appended_minimal = fold_more(Snapshot.minimal(self), self.appended)
+        return self._appended_minimal
 
     def changed_decisions(self) -> list[SavedDecision]:
         # 这次事务改变的决定请求要保存的投影
@@ -156,10 +180,29 @@ class WritePath:
     def __init__(self, store: EventStore, handler_for: Callable[[str], StreamHandler]) -> None:
         self._store = store
         self._handler_for = handler_for
+        # 按流的版本记住折好的最小投影：流只追加，同一版本的结果不变，后面的事件在它上面接着折
+        self._minimals: dict[str, tuple[int, MinimalProjection]] = {}
+
+    def minimal(self, stream: str) -> MinimalProjection:
+        # 一个流当前的最小投影：裁决只读这一份（设计说明第 4 节，S1d 工单 #860）
+        saved = self._store.projection(stream)
+        version = 0 if saved is None else saved.version
+        return self._minimal_at(stream, version, self._store.stream_events(stream, through_version=version))
+
+    def _minimal_at(self, stream: str, version: int, events: list[Any]) -> MinimalProjection:
+        # 到这个版本为止的最小投影：有更早版本的缓存时只折后面的事件
+        cached = self._minimals.get(stream)
+        if cached is not None and cached[0] <= version:
+            state = fold_more(cached[1], [event for event in events if event.stream_version > cached[0]])
+        else:
+            state = fold_events(events)
+        self._minimals[stream] = (version, state)
+        return state
 
     def read(self, stream: str) -> Snapshot:
         # 读取流保存的投影与流版本，用于之后以这个版本作为期望版本提交的判断
-        return Snapshot(self._store, stream, self._store.projection(stream), self._handler_for(stream))
+        return Snapshot(self._store, stream, self._store.projection(stream), self._handler_for(stream),
+                        self._minimal_at)
 
     def transact(self, stream: str, decide: Callable[[Transaction], T], *, expected_version: int | None = None,
                  command: Command | None = None, epoch: int | None = None) -> T:
@@ -176,7 +219,7 @@ class WritePath:
             if command is not None:
                 self._store.check_command(command)
             transaction = Transaction(self._store, stream, self._store.projection(stream),
-                                      self._handler_for(stream), command)
+                                      self._handler_for(stream), command, self._minimal_at)
             if expected_version is not None and transaction.version != expected_version:
                 raise StreamVersionConflict(stream, expected_version, transaction.version)
             try:
@@ -213,7 +256,8 @@ class WritePath:
         attempt = 0
         while True:
             attempt += 1
-            transaction = Transaction(self._store, stream, self._store.projection(stream), self._handler_for(stream))
+            transaction = Transaction(self._store, stream, self._store.projection(stream), self._handler_for(stream),
+                                      None, self._minimal_at)
             if expected_version is not None and transaction.version != expected_version:
                 raise StreamVersionConflict(stream, expected_version, transaction.version)
             try:
@@ -282,7 +326,7 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, ver
         raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
     if isinstance(entry, NewEvent):
         _check_stop_reason(entry)
-        if entry.department is not None and entry.department not in DEPARTMENTS:
+        if entry.department is not None and entry.department not in DEFINITIONS.departments:
             raise ValueError(f"unknown department {entry.department!r} on a run event")
         return Event(
             event_id=new_id("evt"), run_id=identity, type=entry.type, role=None,

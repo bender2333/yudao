@@ -15,24 +15,117 @@ from typing import Any
 
 from harness.actions import Action, ActionReceipt, Preconditions
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.adjudication import WorkBasis
 from harness.assembly import ContextAssembly
 from harness.context import ContextAssembler, ContextPart
 from harness.definitions import DEFINITIONS
 from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
-from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, json_dumps
+from harness.minimal_projection import AcceptedArtifact, MinimalProjection, SessionState, UsedAmount
+from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, RunProjection, json_dumps
 from harness.proposals import (delivery_turn, product_spec, review,
                         review_turn)
 from harness.environment import LocalEnvironment, QA_TESTS_DIR
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tools import tool_action
+from harness.tightening import WATCHED_OUTPUTS
+from harness.validation import AdjudicationView
 
 # 测试中的重试间隔缩短到毫秒级，其余参数与正式运行相同
 FAST_RETRIES = StepLimits(retry_initial_delay_sec=0.01, retry_max_delay_sec=0.02)
 
 # 连续只回复文字、没有调用工具时最多追加说明的次数，取规则登记中的现值
 TOOL_CALL_REQUIRED_LIMIT = DEFINITIONS.rule_value("tool_call_required_limit")
+
+# 每种正式成果的作者部门：接纳事件的统一字段记下它（通用条件 5 读它）
+_ARTIFACT_ISSUERS = {"product_spec": "product", "delivery_spec": "engineering", "structure": "engineering",
+                     "qa_review": "quality", "baseline_review": "quality"}
+
+
+def minimal_of(projection: RunProjection) -> MinimalProjection:
+    # 测试用：按运行状态投影填一份裁决读的最小投影。生产代码里由写入口从骨架事件折叠
+    # （harness/minimal_projection.py 的 fold_events），测试直接构造或替换投影字段时用这一份，
+    # 填的字段与折叠出来的相同（版本、摘要、依据、作者部门与记下的树摘要）
+    artifacts: dict[str, AcceptedArtifact] = {}
+    versions: dict[str, tuple[AcceptedArtifact, ...]] = {}
+    accepted: dict[str, AcceptedArtifact] = {}
+
+    def accept(kind: str, value: Any, basis: dict[str, str] | None = None, *,
+               tree: str | None = None, multiple: bool = False) -> None:
+        if value is None:
+            return
+        if isinstance(value, dict):
+            version, content_hash, issuer = value.get("revision"), value["content_hash"], value.get("issuer")
+        else:
+            version, content_hash = getattr(value, "revision", 1), value.content_hash
+            issuer = getattr(value, "issuer", None)
+        artifact = AcceptedArtifact(version=int(version or 1), content_hash=content_hash,
+                                    issuer=issuer or _ARTIFACT_ISSUERS.get(kind), tree_digest=tree,
+                                    basis={name: item for name, item in (basis or {}).items()
+                                           if isinstance(item, str) and item})
+        artifacts[kind] = artifact
+        accepted[kind] = artifact
+        versions[kind] = (versions.get(kind, ()) if multiple else ()) + (artifact,)
+
+    spec = projection.product_spec
+    accept("product_spec", spec, {"product_spec": None if spec is None else spec.parent_hash})
+    contract = projection.effective_contract
+    accept("contract", contract, {"product_spec": None if contract is None else contract.product_spec_hash})
+    delivery = projection.delivery_spec
+    accept("delivery_spec", delivery,
+           {"product_spec": None if delivery is None else delivery.product_spec_hash,
+            "contract": None if delivery is None else delivery.effective_contract_hash},
+           tree=None if delivery is None else delivery.code_tree_digest)
+    structure = projection.structure
+    accept("structure", structure,
+           {"product_spec": None if structure is None else structure.get("product_spec_hash")},
+           tree=None if structure is None else structure.get("code_tree_digest"))
+    review_artifact = projection.last_review
+    accept("qa_review", review_artifact,
+           {"product_spec": None if review_artifact is None else review_artifact.product_spec_hash,
+            "contract": None if review_artifact is None else review_artifact.effective_contract_hash,
+            "delivery_spec": None if review_artifact is None else review_artifact.delivery_spec_hash},
+           tree=None if review_artifact is None else review_artifact.code_snapshot_hash)
+    for decision in projection.product_decisions:
+        accept("product_decision", {"revision": 1, "content_hash": decision.content_hash},
+               {"product_spec": decision.product_spec_hash}, multiple=True)
+    baseline = projection.baseline_review
+    accept("baseline_review", baseline,
+           {"product_spec": None if not isinstance(baseline, dict) else baseline.get("product_spec_hash"),
+            "structure": None if not isinstance(baseline, dict) else baseline.get("structure_hash")},
+           tree=None if not isinstance(baseline, dict) else baseline.get("code_snapshot_hash"))
+    snapshot = projection.snapshot
+    if isinstance(snapshot, dict) and snapshot.get("tree_digest"):
+        accept("snapshot", {"revision": 1, "content_hash": snapshot.get("content_hash") or snapshot["tree_digest"]},
+               tree=snapshot["tree_digest"])
+    return MinimalProjection(
+        run_id=projection.run_id, project_id=projection.project_id, work_item_id=projection.work_item_id,
+        work_item_kind=projection.kind, status=projection.status, stop_reason=projection.stop_reason,
+        definitions_version=projection.definitions_version, parameters_version=projection.parameters_version,
+        max_cycles=projection.max_cycles, run_time_limit_sec=projection.run_time_limit_sec,
+        stream_versions={f"run:{projection.run_id}": projection.stream_version},
+        used=UsedAmount(activations=projection.cycle_count, model_steps=len(projection.model_requests)),
+        sessions={item.session_id: SessionState(department=item.department, activations=item.activations)
+                  for item in projection.sessions.values()},
+        artifacts=artifacts, versions=versions, accepted=accepted, rounds=dict(projection.last_activations),
+    )
+
+
+def adjudication_view(projection: RunProjection) -> AdjudicationView:
+    # 测试用：裁决要读的两份一起给（最小投影与应用侧的运行状态投影）
+    return AdjudicationView(minimal=minimal_of(projection), state=projection)
+
+
+def work_basis(projection: RunProjection, department: str):
+    # 测试用：一轮工作开始时采用的工作依据（有效合同摘要取自最小投影，输入与指导的版本取自运行状态投影）
+    return WorkBasis(
+        effective_contract_hash=None if projection.effective_contract is None
+        else projection.effective_contract.content_hash,
+        input_version=projection.input_version,
+        guidance_version=max((item.version for item in projection.department_guidance
+                              if item.department == department), default=0),
+    )
 
 
 def guidance_reply(text: str = "已按新的要求处理。"):
@@ -135,6 +228,21 @@ def pid_alive(pid: int) -> bool:
     except PermissionError:
         return True
     return True
+
+
+def delete_watched_file(path: Path, *, timeout_sec: float = 5.0, interval_sec: float = 0.05) -> None:
+    # 删除应用正在监视的配置文件（目录文件、准入文件、.env）：应用每约 1 秒读一次这些文件，
+    # Windows 上文件正被读取时删除会报 PermissionError（WinError 32，文件被占用）。
+    # 短时间重试到删除成功；超时仍失败时照常抛出原来的错误，调用方的断言不因此放宽（工单 #1091）
+    deadline = time.monotonic() + timeout_sec
+    while True:
+        try:
+            path.unlink()
+            return
+        except PermissionError:
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(interval_sec)
 
 
 def wait_until_stopped(pid: int) -> bool:
@@ -251,7 +359,7 @@ def developer_text(call: ModelCall) -> str:
 
 def department_history(system: LoopSystem, run_id: str, department: str) -> list[dict]:
     # 部门历史，按事件由上下文装配（P）重建
-    return ContextAssembly(system.artifacts, system.store).department_history(system.store.list_events(run_id), department)
+    return ContextAssembly(system.artifacts, system.store, tightening=WATCHED_OUTPUTS).department_history(system.store.list_events(run_id), department)
 
 
 def after_event(system: LoopSystem, event_type: str, action: Callable[[Event], None]) -> None:
@@ -369,7 +477,7 @@ def pinned_input_tokens(system: LoopSystem, run_id: str, department: str = "prod
     prompt = DepartmentPrompt(department, 0, text, prompt_ref, "")
     projection = system.project(run_id)
     session = projection.sessions[department]
-    assembled = ContextAssembler(system.artifacts).assemble(
+    assembled = ContextAssembler(system.artifacts, tightening=WATCHED_OUTPUTS).assemble(
         projection, department=department, session_id=session.session_id, activation_id="pinned",
         prompt=prompt, context_window=1_000_000, max_output_tokens=1_000_000)
     return assembled.manifest.input_token_estimate

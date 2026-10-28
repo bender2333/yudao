@@ -17,7 +17,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from .models import CatalogEvent, Event, ProjectEvent, json_dumps, new_id, utc_now
+from pydantic import TypeAdapter
+
+from .kernel_events import CatalogEvent, DecisionRequest, Event, ProjectEvent, json_dumps, new_id, utc_now
 
 
 SCHEMA = """
@@ -192,6 +194,25 @@ class SavedProjection:
     epoch: int | None
     state: str
     decisions: tuple[SavedDecision, ...] = ()
+
+
+# 决定请求保存的投影以 JSON 存放，由 pydantic 按数据类的类型序列化与还原
+_DECISION_STATE = TypeAdapter(DecisionRequest)
+
+
+def load_decision(saved: SavedDecision) -> DecisionRequest:
+    return _DECISION_STATE.validate_json(saved.state)
+
+
+def load_decisions(saved: SavedProjection | None) -> dict[str, DecisionRequest]:
+    # 一个流保存的决定请求，按身份
+    return {} if saved is None else {item.decision_id: load_decision(item) for item in saved.decisions}
+
+
+def dump_decision(decision: DecisionRequest) -> SavedDecision:
+    return SavedDecision(decision.decision_id, decision.stream, decision.project_id, decision.work_item_id,
+                         decision.run_id, decision.kind, decision.status,
+                         _DECISION_STATE.dump_json(decision).decode("utf-8"))
 
 
 class EventStore:

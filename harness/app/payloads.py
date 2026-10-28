@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..definitions import DEFINITIONS
+from ..kernel_events import SKELETON_EVENTS, register_application_event_types
 from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
 from ..streams import PRIORITY_USER
 
@@ -51,6 +52,11 @@ class AcceptanceFields(Payload):
     artifact_basis: dict[str, str] = Field(default_factory=dict)
     # 这一版内容的工件引用（内容摘要），按它取内容；内容就在载荷里时为空
     artifact_ref: ArtifactRef | None = None
+    # 2026-10-27 补（S1d，工单 #860）：作者部门、记下的树摘要（交付记代码树、建档记快照的树，没有这一项的
+    # 成果为空）与「这一种成果多版并存」（产品决定各自是一件成果，新的不让旧的失效）。只增不改
+    artifact_issuer: str | None = None
+    artifact_tree_digest: str | None = None
+    artifact_multiple: bool | None = None
 
 
 class GitVersion(Payload):
@@ -1617,3 +1623,15 @@ def is_known_event_type(event_type: str) -> bool:
     # 这个事件种类现在还有载荷类型：已经被删掉的种类（旧版本的协作请求）读的时候跳过，
     # 事件日志里仍然留着，事件详情照旧能查
     return event_type in PAYLOADS
+
+
+# ---------------------------------------------------------------------------
+# 应用登记自己的事件种类（设计说明第 5.4 节第 1 条，S5a 工单 #828）：内核只认识骨架事件，
+# 其余的 run 流事件是应用事件，种类由应用在这份载荷声明里给出，并登记到内核的登记表。
+# 增加一种应用事件只改这里与它的载荷类型，不改内核文件；骨架事件的种类由内核给出，不在这里登记。
+
+APPLICATION_EVENT_OWNER = "成果驱动路由（三部门的循环结构）"
+
+APPLICATION_EVENT_TYPES: tuple[str, ...] = tuple(kind for kind in PAYLOADS if kind not in SKELETON_EVENTS)
+
+register_application_event_types(APPLICATION_EVENT_OWNER, APPLICATION_EVENT_TYPES)

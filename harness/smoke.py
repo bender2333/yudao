@@ -20,7 +20,7 @@ from .app.project_commands import ProjectCreate
 from .artifacts import ArtifactStore
 from .assembly import PENDING_GUIDANCE, TARGET_KEYS, ContextAssembly, StepFrame, model_limits, pending_guidance
 from .compaction import SUMMARY_PREFACE, SUMMARY_RULES
-from .contracts import current_contract_hash
+from .contracts import artifact_hash
 from .data_directory import default_provider_config
 from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
@@ -31,6 +31,7 @@ from .projection import apply_event, project_run
 from .providers import ProviderFacade
 from .public_tree import capture_public_tree, materialize_tree
 from .runtime import LoopSystem
+from .tightening import WATCHED_OUTPUTS
 from .tree_archive import load_tree
 
 
@@ -646,7 +647,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
     intend_bytes = b""
     received_version = 0
     current_work = RunProjection()
-    assembly = ContextAssembly(artifacts, store)
+    assembly = ContextAssembly(artifacts, store, tightening=WATCHED_OUTPUTS)
     events = store.list_events(run_id)
     # 重新装配使用当前加载的定义，只能审计按同一版本定义发出的请求；版本不同时先写明，之后的不一致由它引起
     recorded = {event.payload.get("definitions_version") for event in events
@@ -663,11 +664,11 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
         payload = event.payload or {}
         activation = payload.get("activation_id")
         work_basis = {
-            "effective_contract_hash": current_contract_hash(current_work),
+            "effective_contract_hash": artifact_hash(current_work.effective_contract),
         }
         if event.type == EventType.CONTRACT_ACCEPTED:
             for b in activation_bases.values():
-                b["effective_contract_hash"] = current_contract_hash(current_work)
+                b["effective_contract_hash"] = artifact_hash(current_work.effective_contract)
             continue
         if event.type in {EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED}:
             try:
@@ -930,7 +931,9 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     if items[1:] != expected.payload["input"][1:]:
                         raise ValueError("input history differs from this department's recorded outputs")
                     names = [item.get("name") for item in schemas]
-                    offered = set(offered_tools(current_work, event.department, session_id=event.session_id,
+                    offered = set(offered_tools(current_work, event.department,
+                                               tightening=WATCHED_OUTPUTS,
+                                               session_id=event.session_id,
                                                input_modalities=tuple(target_modalities or ())))
                     if len(names) != len(set(names)) or set(names) != offered:
                         raise ValueError("actual tool schemas do not match the department's tools")

@@ -1,13 +1,15 @@
 from dataclasses import replace
+from harness.tests.helpers import adjudication_view, work_basis
 
 from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
 from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
-from harness.collaboration import has_new_work, pending_product_input
+from harness.watched_outputs import has_new_work
 from harness.environment import LocalEnvironment
 from harness.models import SessionRecord
 from harness.proposals import delivery, delivery_turn, product_spec
 from harness.runtime import LoopSystem
+from harness.tightening import WATCHED_OUTPUTS, pending_product_input
 
 
 def _engineering(tmp_path):
@@ -29,11 +31,10 @@ def _environment(system, projection):
 def _permission(system, projection, name, args, *, basis=None, aborted=False):
     # 工具许可依据的工作区事实由执行环境按 U 给出的查询取得
     call = {"id": "call", "name": name, "args": args}
-    return tool_permission(
-        projection, call, department="engineering",
-        basis=basis or WorkBasis.current(projection, "engineering"),
+    return tool_permission(adjudication_view(projection), call, department="engineering",
+        basis=basis or work_basis(projection, "engineering"),
         aborted=aborted, facts=_environment(system, projection).query(facts_query(call)),
-    )
+     tightening=WATCHED_OUTPUTS)
 
 def test_tool_permission_stops_after_cancel_end_and_defers_a_proposal_before_the_new_input(tmp_path):
     # 工单 #558：有效合同与指导变了不再停止这次激活（它们作为通知送达，部门接着工作）；
@@ -44,11 +45,11 @@ def test_tool_permission_stops_after_cancel_end_and_defers_a_proposal_before_the
     assert _permission(system, projection, *write).allowed
     assert _permission(system, projection, *write, aborted=True).stopped
     assert _permission(system, replace(projection, status="failed"), *write).stopped
-    newer_input = replace(WorkBasis.current(projection, "engineering"), input_version=projection.input_version - 1)
+    newer_input = replace(work_basis(projection, "engineering"), input_version=projection.input_version - 1)
     assert _permission(system, projection, *write, basis=newer_input).allowed
-    other_contract = replace(WorkBasis.current(projection, "engineering"), effective_contract_hash="sha256:other")
+    other_contract = replace(work_basis(projection, "engineering"), effective_contract_hash="sha256:other")
     assert _permission(system, projection, *write, basis=other_contract).allowed
-    other_guidance = replace(WorkBasis.current(projection, "engineering"), guidance_version=99)
+    other_guidance = replace(work_basis(projection, "engineering"), guidance_version=99)
     assert _permission(system, projection, *write, basis=other_guidance).allowed
     # 正式成果等模型看见新输入以后再提交
     deferred = _permission(system, projection, "submit_delivery", {}, basis=newer_input)
@@ -75,23 +76,23 @@ def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
                         basis_product_spec_hash=projection.product_spec.content_hash)
     facts = environment.query(FactsQuery(tree=True)).tree
     events = system.store.list_events(projection.run_id)
-    first = proposal_decision(projection, department="engineering", proposal=proposal, facts=facts,
-                              events=events)
+    first = proposal_decision(adjudication_view(projection), department="engineering", proposal=proposal, facts=facts,
+                              events=events, tightening=WATCHED_OUTPUTS)
     assert first.accepted, first.error_dicts
     arguments = dict(department="engineering", proposal=proposal,
-                     evaluated=projection, facts=facts, events=events)
-    assert commit_decision(first, current=projection, current_facts=facts, **arguments).accepted
+                     evaluated=adjudication_view(projection), facts=facts, events=events)
+    assert commit_decision(first, current=adjudication_view(projection), current_facts=facts, **arguments, tightening=WATCHED_OUTPUTS).accepted
     newer_input = replace(projection, input_version=projection.input_version + 1)
-    carried = commit_decision(first, current=newer_input, current_facts=facts, **arguments)
+    carried = commit_decision(first, current=adjudication_view(newer_input), current_facts=facts, **arguments, tightening=WATCHED_OUTPUTS)
     # 输入变了不再让这次提交作废（工单 #964、#561）：新的输入作为通知送达，这次提交照常接纳
     assert carried.accepted, carried.error_dicts
     other_contract = replace(projection, effective_contract=replace(projection.effective_contract,
                                                                      content_hash="sha256:other"))
-    rebound = commit_decision(first, current=other_contract, current_facts=facts, **arguments)
+    rebound = commit_decision(first, current=adjudication_view(other_contract), current_facts=facts, **arguments, tightening=WATCHED_OUTPUTS)
     assert not rebound.accepted, "当前工作变了仍然拒绝"
     system.workspace(projection.run_id).write_file("src/echo.py", "print('changed after validation')\n")
-    changed = commit_decision(first, current=projection, current_facts=environment.query(FactsQuery(tree=True)).tree,
-                              **arguments)
+    changed = commit_decision(first, current=adjudication_view(projection), current_facts=environment.query(FactsQuery(tree=True)).tree,
+                              **arguments, tightening=WATCHED_OUTPUTS)
     assert not changed.accepted
     assert changed.errors[0].message.startswith("The workspace snapshot changed")
 

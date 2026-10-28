@@ -1,11 +1,11 @@
-# 恢复观察与故障矩阵验收（工单 #18，应用层与接口层设计说明第 4.3 节「恢复与动作核实（3.1）」）。
+# 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵第 4 节「动作分类与处置」、第 6 节「故障矩阵」）。
 # 数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，模型回答由 FakeAdapter 给出；
 # 中断由「进程关闭、重新以新的系统打开同一数据目录」表示。查询只读取，事件流重连只补观察事实。
 
 import json
 from dataclasses import asdict
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.project_queries import (
@@ -258,7 +258,8 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
     restarted.orchestrator.resume_incomplete_run(run_id)
     application = _application(restarted)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    # 动作得到交还处置：未完成动作消失，核实记录写出依据与结果
+    # 动作得到交还处置：状态是中断或运行中，未完成动作消失，核实记录写出依据与结果
+    assert recovery.state in ("interrupted", "running"), recovery
     assert recovery.unfinished_actions == []
     assert len(recovery.verifications) == 1
     record = recovery.verifications[0]

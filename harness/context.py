@@ -7,8 +7,8 @@ from copy import deepcopy
 from typing import Any
 
 from .adjudication import offered_tools
-from .contracts import current_contract_hash
-from .collaboration import has_new_baseline_review
+from .contracts import artifact_hash
+from .watched_outputs import has_new_baseline_review
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
 from .event_store import EventStore
@@ -30,6 +30,7 @@ from .models import (
     hash_bytes,
     json_dumps,
 )
+from .validation import Tightening
 
 # 调用目标没有给出窗口时按这个值处理（工单 #669）：窗口是调用目标的属性，run 不再冻结它
 DEFAULT_CONTEXT_WINDOW = 32_000
@@ -166,10 +167,13 @@ def _notification_text(item: dict[str, Any]) -> str:
 
 
 class ContextAssembler:
-    def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None) -> None:
+    def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None, *,
+                 tightening: Tightening) -> None:
         self.artifacts = artifacts
         # 修改轮的上一轮候选属于项目流，只能按事件编号取（设计第 4.7 节）
         self.store = store
+        # 请求里提供哪些工具由路由的收紧检查取舍（工单 #1095）
+        self.tightening = tightening
 
 
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
@@ -195,8 +199,8 @@ class ContextAssembler:
         guidance_items = list(guidance or [])
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
-        tool_names = offered_tools(projection, department, session_id=session_id,
-                                   input_modalities=input_modalities)
+        tool_names = offered_tools(projection, department, tightening=self.tightening,
+                                   session_id=session_id, input_modalities=input_modalities)
         # 全体角色共同的规则文字与本角色的可见范围取自定义
         rules = DEFINITIONS.organization.rules
         visible = DEFINITIONS.role(department).visibility
@@ -440,7 +444,7 @@ class ContextAssembler:
             truncated=False,
             step_id=step_id,
             compaction_event_id=compaction_event_id,
-            effective_contract_hash=current_contract_hash(projection),
+            effective_contract_hash=artifact_hash(projection.effective_contract),
             input_version=projection.input_version,
             prompt_version=prompt.version,
             prompt_hash=prompt.prompt_ref.content_hash,
@@ -591,7 +595,7 @@ def _binding_refs(projection: RunProjection, department: str) -> dict[str, Any]:
         "product_spec_id": None if spec is None else spec.id,
         "product_spec_hash": None if spec is None else spec.content_hash,
         "product_spec_revision": None if spec is None else spec.revision,
-        "effective_contract_hash": current_contract_hash(projection),
+        "effective_contract_hash": artifact_hash(projection.effective_contract),
         "delivery_spec_id": None if delivery is None else delivery.id,
         "delivery_spec_hash": None if delivery is None else delivery.content_hash,
         "delivery_code_tree_digest": None if delivery is None else delivery.code_tree_digest,

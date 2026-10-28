@@ -608,6 +608,19 @@ claude（总架构师） / 2026-10-27 10:08 / docs/foundation-rules.md 基础规
 
 claude（总架构师） / 2026-10-27 10:40 / 让工作停下来等人的规则改掉九条：`docs/agents/dispatcher.md` 删派发前的依据核对、一轮做不完再派同一张、三轮才搁置；`docs/agents/triage-labels.md` 三次改三轮、`touches-core` 清单外文件补记后改；`docs/agents/acceptance-evidence.md` 第 2 节既有失败写证据即可批准；`docs/design/test-pyramid.md` 第 4.4 节执行者随工单删用例；`docs/decision.md` 新增一条 / 用户要求把阻碍工作流的规则都改掉
 
+solo-deepseek-v4.1-flash / 2026-10-27 12:03 / docs/architecture-issues.md 登记工单 #860 的一条：最小投影缺内核通用条件要的字段（`issuer`、按部门的这一轮编号、`qa_tests_hash` 等），设计说明第 4 节「裁决只读这一份」与第 80 行「裁决按版本取内容」待定一句为准；内核清单 `rules` 一节的登记与「不改已有的内核测试」冲突；「只改」漏了 `engine.py`、`context.py`、`smoke.py`、`submissions.py` 四个必须改的调用方；另记录拆单建议与行数读数（内核 5191 行、上限 5471，最小投影 214 行）/ 工单 #860 手写文件至少 30 个（运行配置第 7 节上限 15），按「工单太大」交回并给四张拆法；最小投影的字段边界与 #561 的第三种结果要架构师定
+
 claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `docs/design/skeleton-and-application.md` 状态行，第 5.4 节第 3 条加「做法」，第 5.5 节加「成果的内容由路由组装，内核盖统一字段」，第 12 节表加 S2c（#1098）与一直缺的 S6c（#979）、S6b 的前置加 S2c，顺序行同步；`docs/architecture-issues.md` #952 一条补处理行；`docs/current-baseline.md` 阶段一两行与更新行；`docs/design/README.md` 循环结构、画面与播放、部门指导三条的状态；`docs/requirements/README.md` D20；`docs/decision.md` 新增一条 / 阶段一工单诊断：第 5.4 节第 3 条没有工单，S6b 做不到不改骨架；父工单 #466、#476、#477、#950 核对后关闭
 
 claude-opus-5-5（总架构师） / 2026-10-27 19:45 / `CLAUDE.md`「工单规范」环一条删「用例只由架构师删」；`.claude/skills/to-children/SKILL.md` 删减功能一段改为执行者随工单删用例；`docs/design/test-pyramid.md` 第 10 节第 5 条同步 / 同日 PR #1097 已把删用例改为执行者随工单删，这三处漏改
+
+solo-deepseek-v4.1-flash / 2026-10-28 01:35 / docs/architecture-issues.md 登记工单 #860 的一条：S1d 落地时设计说明没有写到的两处边界（PRD 记下的输入版本不进最小投影，由收紧检查的 `Tightened.facts` 一并给回；「逐条结论覆盖每条要求」这条读 PRD 内容的检查从 validation.py 搬进成果驱动的收紧检查），并写明 S2c（#1098）把它们并入「通过时给出成果的内容」 / 工单 #860 落地「内核改读最小投影」，设计说明第 4、5.5 节没有覆盖这两样的去向，先登记做法再继续做
+
+solo-deepseek-v4.1-flash / 2026-10-28 03:40 / docs/architecture-issues.md 登记工单 #1015 的一条：最小投影里会话一级的模型步数只有累计值、没有「上一次一轮工作结束时已结算的步数」，而主线的步数上限是「一轮」的上限，中断那一轮要扣掉的步数从投影算不出来；本轮给 `SessionState` 补对称的 `settled_steps`（与 `settled_ms` 同一处更新；合并 #825 以后内核合计与清单上限都是 5241 行，本轮把新增行并进原有注释，合计仍是 5241） / 工单 #1015 落地「驱动计时与恢复页读数改读最小投影」，设计说明第 4 节那张表在这一格不完整，先登记做法再继续做
+solo-deepseek-v4.1-flash / 2026-10-28 05:55 / 工单 #827（骨架与应用 S4a）：`docs/architecture-issues.md` 追加一条——决定请求的处理与建档的流转放在 `harness/` 顶层的应用模块（`harness/decision_flow.py`）而不是 `harness/app/` 下，原因是分层契约（`pyproject.toml` 的 importlinter「控制核心不导入应用层与接口层」）只许接口层导入 `harness.app`，而这一份要由 `harness/runtime.py` 组装、由薄驱动转交；与 `harness/tightening.py`、`harness/watched_outputs.py` 同一层 / 记录设计没写到的这一处边界，按「自己定、登记、继续做」处置
+
+solo-deepseek-v4.1-flash / 2026-10-28 07:40 / 工单 #863（骨架与应用 S4c）：`docs/architecture-issues.md` 追加一条——薄驱动里部门与成果的身份改从定义取的三个方面（检查工作区的政策留在执行实现、按 `delivery_spec` 提议与 `watched` 的 `delivery` 推；事项开始时的部门取 `watched` 含 `user_input` 的那一个；定义版本不同的决定请求留在 `harness/recovery.py`） / 记录设计没写到的这三处边界，按「自己定、登记、继续做」处置
+
+claude-opus-5-5 / 2026-10-28 09:10 / `docs/design/skeleton-and-application.md`：状态行；第 3.1 节插件加载改为路由按名字、装配与执行由组装处经构造参数接上；第 3.2 节三道契约与骨架事件写现在的模块；第 4 节补 `settled_steps`；第 5.1 节写 `routings.json` 封闭清单与路由的两半；第 5.2、5.3 节加「接法」，第 5.3 节输出写三样中性的观察；第 5.5 节加 `facts` 的去向与「新种类的成果写通用的接纳事件」；第 6 节写薄驱动的身份从定义推；第 7 节 `model_requested` 移到骨架事件、加通用的成果接纳、写内核事件模块放哪些东西；第 8 节写应用模块放在 `harness/` 顶层、「应用」与「应用层」的区别；第 12 节 S2c、S6a、S6c 三行与排序。`docs/design/README.md` 骨架与应用的状态改为实施中。`docs/architecture-issues.md` 七条「待架构师决定」写处理行 / 阶段一工单分诊：#979、#1098 交回的两处设计缺口，solo 执行者登记的七条边界（决定记录 2026-10-28）
+
+solo-deepseek-v4.1-flash / 2026-10-28 09:58 / 工单 #829（骨架与应用 S6a）：`docs/architecture-issues.md` 追加两条——① 应用层可以导入的控制核心公开接口只有八类、没有模块清单（#620 记的同一处），本单按 main `c21c5e94` 逐个归类，25 个模块里 15 个归进八类、10 个定为公开接口并写进 import-linter 的第三条合同，请架构师把清单写进设计说明第 2.4 节；② 设计说明第 12 节把 S6c（#979）排在 S6a 之前，而 #979 仍未做、本单的五条验收不依赖它，差别写进交付说明 / 记录设计没写到的这一处边界与前置顺序的差别，按「自己定、登记、继续做」处置

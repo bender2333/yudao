@@ -1,137 +1,75 @@
-# Loop System 领域对象：工件、事件与阶段。停止原因的清单在定义中（definitions/stop_reasons.json）
+# Loop System 应用侧的领域对象：工件、成果、投影与阶段。停止原因的清单在定义中（definitions/stop_reasons.json）
+#
+# 事件信封与骨架事件在内核事件模块（harness/kernel_events.py，S5a 工单 #828）：它们由内核写入与读取，
+# 种类与字段只增。这个文件把信封、骨架事件的种类与算摘要的辅助从这里转出，应用的导入照旧；
+# 与 projection.py 一起，S5a 起它们不再算内核（不再列入 harness/definitions/kernel-manifest.json），
+# 产品的 17 个模块与 45 个测试文件继续按原样导入它们。
 
 from __future__ import annotations
 
 import hashlib
 import json
 from dataclasses import asdict, dataclass, field, is_dataclass
-from datetime import datetime, timezone
 from typing import Any
-from uuid import uuid4
 
-from .definitions import DEFINITIONS, DefinitionError
+from .actions import CheckReceipt
+from .definitions import DEFINITIONS, UnknownStopReason
+from .kernel_events import (
+    BASELINE_STATUSES,
+    RUN_STATUSES,
+    TERMINAL_STATUSES,
+    CatalogEvent,
+    CatalogEventType,
+    DecisionRequest,
+    Event,
+    ProjectEvent,
+    ProjectEventType,
+    QA_VERDICTS,
+    SkeletonEventType,
+    canonical_hash,
+    json_dumps,
+    new_id,
+    spec_content_hash,
+    utc_now,
+)
 
 # 部门来自定义中的组织
 DEPARTMENTS = DEFINITIONS.departments
 
-# run 的状态：进行中与三个终态（工单 #556）。
-# 部门进行到哪一步不单独记录：阶段状态机删掉以后，事项的进度从成果推算
-# （当前有效的 PRD、最新一份交付与它依据的 PRD 版本、对最新交付的结论）。
-RUN_STATUSES = ("running", "done", "paused", "failed")
+# run 的状态与骨架事件载荷里的封闭取值都由内核事件模块给出（它们是事件信封与骨架事件的一部分），
+# 这里随其他导入一起转出给应用用
 
-TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
-
-QA_VERDICTS = ("rework_engineering", "release")
-# 基线核验逐条结论的状态（工单 #134，docs/design/existing-project-onboarding.md 第 4.5 节）
-BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
 # 提案种类：定义中提交类工具提交的种类
 PROPOSAL_KINDS = tuple(tool.proposal for tool in DEFINITIONS.tools.values() if tool.proposal is not None)
 
 
-class EventType:
-    RUN_CREATED = "run_created"
+class EventType(SkeletonEventType):
+    # run 流的事件种类：骨架事件的种类由内核事件模块给出（SkeletonEventType），这里接着声明应用事件的部分。
+    # 应用事件由应用登记（设计说明第 5.4 节第 1 条，S5a 工单 #828），骨架事件不在这里重复写一遍
     USER_INPUT_RECEIVED = "user_input_received"
     PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
     DEPARTMENT_GUIDANCE_RECEIVED = "department_guidance_received"
     DEPARTMENT_GUIDANCE_APPLIED = "department_guidance_applied"
     DEPARTMENT_GUIDANCE_RESPONDED = "department_guidance_responded"
-    DEPARTMENT_ACTIVATED = "department_activated"
     DEPARTMENT_INPUT = "department_input"
     TOOL_CALL_REQUIRED = "tool_call_required"
-    ACTIVATION_FINISHED = "activation_finished"
     CONTEXT_ASSEMBLED = "context_assembled"
     MODEL_REQUEST_SERIALIZED = "model_request_serialized"
     MODEL_REASONING = "model_reasoning"
     MODEL_MESSAGE = "model_message"
-    MODEL_REQUESTED = "model_requested"
     MODEL_STREAM_PROGRESS = "model_stream_progress"
     MODEL_ATTEMPT_FINISHED = "model_attempt_finished"
     MODEL_ATTEMPT_FAILED = "model_attempt_failed"
     MODEL_RETRY_SCHEDULED = "model_retry_scheduled"
     COMPACTION_RECORDED = "compaction_recorded"
-    TOOL_CALLED = "tool_called"
-    TOOL_STARTED = "tool_started"
     TOOL_SKIPPED = "tool_skipped"
     ACTION_VERIFIED = "action_verified"
-    PROPOSAL_SUBMITTED = "proposal_submitted"
-    PROPOSAL_REJECTED = "proposal_rejected"
-    SPEC_ACCEPTED = "spec_accepted"
-    SPEC_SUPERSEDED = "spec_superseded"
-    CONTRACT_ACCEPTED = "contract_accepted"
     ASK_STARTED = "ask_started"
     ASK_ANSWERED = "ask_answered"
-    PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
-    # 成果失效（骨架事件，S1b，工单 #858）：哪一种成果的哪一版因为什么失效。投影只折叠这一条，
-    # 不再从工具调用与其他接纳事件推出失效
-    ARTIFACT_INVALIDATED = "artifact_invalidated"
-    DELIVERY_ACCEPTED = "delivery_accepted"
-    QA_SUBMITTED = "qa_submitted"
     QA_TESTS_SAVED = "qa_tests_saved"
-    STRUCTURE_ACCEPTED = "structure_accepted"
-    BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
-    RUN_DONE = "run_done"
-    RUN_PAUSED = "run_paused"
-    RUN_FAILED = "run_failed"
-    RUN_RESUMED = "run_resumed"
-    RUN_CONTINUED = "run_continued"
-    DECISION_REQUESTED = "decision_requested"
-    DECISION_ANSWERED = "decision_answered"
-    DECISION_WITHDRAWN = "decision_withdrawn"
 
-class ProjectEventType:
-    PROJECT_REGISTERED = "project_registered"
-    PROJECT_RENAMED = "project_renamed"
-    PROJECT_GOAL_CHANGED = "project_goal_changed"
-    PROJECT_PINNED = "project_pinned"
-    PROJECT_ARCHIVED = "project_archived"
-    PROJECT_RESTORED = "project_restored"
-    WORK_ITEM_CREATED = "work_item_created"
-    WORK_ITEM_START_FAILED = "work_item_start_failed"
-    DELIVERABLE_ADOPTED = "deliverable_adopted"
-    ADOPTION_HELD = "adoption_held"
-    # 部门设置事件跨版本保持 department_prompt_configured（ADR-0019）
-    DEPARTMENT_SETTINGS_CONFIGURED = "department_prompt_configured"
-    MATERIAL_RECORDED = "material_recorded"
-    SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
-    # 建档候选（设计第 3.2 节）：记下候选引用与核验结论
-    INITIAL_PRD_PROPOSED = "initial_prd_proposed"
-    # 确认初始 PRD 可能等待数天，run 已结束，请求与回答记在项目流，字段与 run 流相同
-    PROJECT_DECISION_REQUESTED = "project_decision_requested"
-    PROJECT_DECISION_ANSWERED = "project_decision_answered"
-    PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
-    # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
-    ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
-    # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
-    BASELINE_ADOPTED = "baseline_adopted"
-    # 项目级参数（迭代底座 B3，工单 #351）：project_parameter_set
-    PARAMETER_SET = "project_parameter_set"
-    WRITEBACK_COMPLETED = "writeback_completed"
-    WRITEBACK_STOPPED = "writeback_stopped"
-    WRITEBACK_NOT_NEEDED = "writeback_not_needed"
-    WRITEBACK_HELD = "writeback_held"
-    WRITEBACK_VERIFIED = "writeback_verified"
-
-class CatalogEventType:
-    # 模型目录与凭据事件（设计第 10 节）：内容由 Provider 保存，事件不含 Key
-    CATALOG_REVISED = "catalog_revised"
-    CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
-    CATALOG_TEST_FINISHED = "catalog_test_finished"
-    CREDENTIAL_CHANGED = "credential_changed"
-    # 排空与强制升级（3.1）：与目录事件同流，是控制主机长期事实（ADR-0019）
-    RUNTIME_DRAIN_STARTED = "runtime_drain_started"
-    # 排空结束：升级完成（换了版本）以后记下，此后这个实例重新开始新事项（工单 #731）
-    RUNTIME_DRAIN_FINISHED = "runtime_drain_finished"
-    RUNTIME_FORCE_UPGRADE_REQUESTED = "runtime_force_upgrade_requested"
-    # 用户查看过的全局位置（界面工作线，工单 #127）：控制主机上只有一个，随部署长期保存
-    HOME_SEEN = "home_seen"
-    # 参数修改（迭代底座 B3，工单 #349）：参数是全局的，事件写进目录流，随部署长期保存
-    PARAMETER_SET = "parameter_set"
-    # 实例升级的决定请求（工单 #355）：升级已安装的实例是一次用户决定，随部署长期保存
-    INSTANCE_UPGRADE_REQUESTED = "instance_upgrade_requested"
-    INSTANCE_UPGRADE_ANSWERED = "instance_upgrade_answered"
-    INSTANCE_UPGRADE_WITHDRAWN = "instance_upgrade_withdrawn"
-
+# ProjectEventType 与 CatalogEventType 由内核事件模块给出：项目流与目录流的事件全部是骨架事件
 
 GIT_VERSION_EVENTS = frozenset({
     EventType.RUN_CREATED, EventType.USER_INPUT_RECEIVED, EventType.SPEC_ACCEPTED,
@@ -140,30 +78,6 @@ GIT_VERSION_EVENTS = frozenset({
     EventType.BASELINE_REVIEW_ACCEPTED,
 })
 
-
-def new_id(prefix: str) -> str:
-    return f"{prefix}_{uuid4().hex[:16]}"
-
-
-def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
-def json_dumps(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=_json_default)
-
-
-def _json_default(value: Any) -> Any:
-    if is_dataclass(value) and not isinstance(value, type):
-        return asdict(value)
-    if isinstance(value, tuple):
-        return list(value)
-    raise TypeError(f"not json serializable: {type(value)!r}")
-
-
-def canonical_hash(value: Any) -> str:
-    data = json_dumps(value).encode("utf-8")
-    return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
 def hash_bytes(data: bytes) -> str:
@@ -225,20 +139,6 @@ class DepartmentGuidance:
     answered_activation_id: str | None = None
     outcome: str | None = None
 
-
-@dataclass(frozen=True)
-class CheckReceipt:
-    name: str
-    department: str
-    exit_code: int
-    summary: str
-    snapshot_hash: str
-    product_spec_hash: str | None = None
-    delivery_spec_hash: str | None = None
-    activation_id: str | None = None
-    tree_changed: bool = False
-    effective_contract_hash: str | None = None
-    qa_tests_hash: str | None = None
 
 @dataclass(frozen=True)
 class ProductSpec:
@@ -389,126 +289,6 @@ class ContextManifest:
     output_reserve_tokens: int = 0
     parts_ref: dict[str, Any] | None = None
     guidance_ids: list[str] = field(default_factory=list)
-
-
-@dataclass
-class Event:
-    # run 流中的一条事件。position、stream、stream_version 是它在事件日志中的全局位置、所属的流与流内版本；
-    # project_id、work_item_id、department 是日志为范围读取保存的列；epoch 是写入方的执行权编号；
-    # command_id 是写入它的命令，不是由命令写入时为空；actor 是提出者：命令写入的事件为命令的提出者，
-    # 其余事件为写入方声明的提出者，没有声明时为空
-    event_id: str
-    run_id: str
-    type: str
-    role: str | None
-    parent_event_id: str | None
-    state_before: str
-    state_after: str
-    payload: dict[str, Any]
-    artifact_hashes: list[str]
-    session_id: str | None
-    provider: str | None
-    model: str | None
-    context_digest: str | None
-    stop_reason: str | None
-    error: str | None
-    created_at: str
-    position: int
-    stream: str
-    stream_version: int
-    project_id: str | None
-    work_item_id: str | None
-    department: str | None
-    epoch: int | None = None
-    command_id: str | None = None
-    actor: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-    def summary(self) -> dict[str, Any]:
-        payload = self.payload
-        brief = {
-            "kind": payload.get("kind"),
-            "decision": payload.get("decision"),
-            "verdict": payload.get("verdict"),
-            "goal": payload.get("goal"),
-            "question": payload.get("question"),
-            "summary": payload.get("summary"),
-            "errors": payload.get("errors"),
-            "human_action": payload.get("human_action"),
-        }
-        return {key: value for key, value in brief.items() if value not in (None, [], {})}
-
-
-@dataclass
-class ProjectEvent:
-    # 项目流中的一条事件，与 run 事件在同一份事件日志中；日志中的位置与范围列同 Event
-    event_id: str
-    project_id: str
-    type: str
-    payload: dict[str, Any]
-    created_at: str
-    position: int
-    stream: str
-    stream_version: int
-    work_item_id: str | None
-    run_id: str | None
-    department: str | None
-    epoch: int | None = None
-    command_id: str | None = None
-    actor: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass
-class CatalogEvent:
-    # 目录流中的一条事件。目录不属于项目或 run，范围列为空；日志中的位置与命令列同项目事件
-    event_id: str
-    type: str
-    payload: dict[str, Any]
-    created_at: str
-    position: int
-    stream: str
-    stream_version: int
-    project_id: str | None = None
-    work_item_id: str | None = None
-    run_id: str | None = None
-    department: str | None = None
-    epoch: int | None = None
-    command_id: str | None = None
-    actor: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
-
-
-@dataclass
-class DecisionRequest:
-    # 一个等待用户回答的决定请求（总体架构第 7.4 节），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。
-    # 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）；
-    # version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
-    decision_id: str
-    stream: str
-    run_id: str | None
-    project_id: str | None
-    work_item_id: str | None
-    requested_at: str
-    request: dict[str, Any]
-    version: int = 1
-    status: str = "open"
-    answer: dict[str, Any] | None = None
-    withdrawal: dict[str, Any] | None = None
-
-    @property
-    def kind(self) -> str:
-        return self.request["kind"]
-
-    @property
-    def blocks(self) -> str:
-        return self.request["blocks"]
 
 
 @dataclass
@@ -663,11 +443,6 @@ class RunProjection:
         # 正在被回答的那一次询问：链上最内层的那一个（工单 #473 的嵌套询问）
         return self.ask_stack[-1] if self.ask_stack else None
 
-    @property
-    def ask_depth(self) -> int:
-        # 询问链的层数：还没回答的询问有几个（工单 #473）
-        return len(self.ask_stack)
-
     def ask_by_origin(self, session_id: str | None) -> dict[str, Any] | None:
         # 这个会话发出的、还没回答的询问：恢复时继续这一层，不新开一层（工单 #473）
         if not session_id:
@@ -704,35 +479,14 @@ class RunProjection:
 
 
 
-# 停止原因的中文名：等待说明与事件说明按中文写，机器标识不直接出现在给用户看的文字里
-STOP_REASON_LABELS = {
-    "released": "已完成并放行",
-    "baseline_verified": "已完成基线核验",
-    "max_cycles": "循环次数已达上限",
-    "model_steps_exhausted": "部门步数已达上限",
-    "no_tool_call": "部门连续多次没有调用工具",
-    "workspace_unrepresentable": "工作区有无法表示的条目",
-    "time_limit": "运行时间已达上限",
-    "cancelled": "运行已被取消",
-    "user_cancelled": "用户已取消",
-    "provider_error": "模型服务失败",
-    "provider_timeout": "模型服务请求超时",
-    "provider_protocol": "模型服务协议不符",
-    "unsupported_protocol": "不支持的协议",
-    "retry_after_too_long": "要求等待的时间过长",
-    "context_overflow": "上下文超过窗口",
-    "compaction_failed": "上下文压缩失败",
-    "host_commit_error": "主机保存失败",
-    "run_event_version_changed": "因 Yudao 升级停止",
-}
-if set(STOP_REASON_LABELS) != set(DEFINITIONS.stop_reasons):
-    raise DefinitionError([("stop_reasons.json", "stop_reasons",
-                            "停止原因的中文名必须与定义的停止原因相同：" + "、".join(STOP_REASON_LABELS))])
-
-
+# 停止原因的中文名与结束方式都在定义里：内核的清单在 stop_reasons.json，路由自己的结束原因在
+# 它自己的一份定义里（routings.json，工单 #861），两者都按定义查，不在代码里另写一份
 def stop_reason_name(reason: str | None) -> str:
     # 停止原因的中文名；没有登记的取值原样返回，说明里不丢掉这个事实
-    return STOP_REASON_LABELS.get(reason or "", reason or "")
+    try:
+        return DEFINITIONS.stop_reason(reason or "").label
+    except UnknownStopReason:
+        return reason or ""
 
 
 def waiting_reason_for(status: str, stop_reason: str | None = None) -> str | None:
@@ -744,14 +498,3 @@ def waiting_reason_for(status: str, stop_reason: str | None = None) -> str | Non
         reason = {"paused": "已暂停", "failed": "未能完成"}[status]
         return f"{reason}：{stop_reason_name(stop_reason)}" if stop_reason else reason
     return None
-
-
-def spec_content_hash(kind: str, payload: dict[str, Any], *, parent_hash: str | None, revision: int) -> str:
-    return canonical_hash(
-        {
-            "kind": kind,
-            "parent_hash": parent_hash,
-            "payload": payload,
-            "revision": revision,
-        }
-    )

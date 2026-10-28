@@ -14,7 +14,9 @@ from harness.proposals import (ask_turn, delivery, delivery_turn,
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import guidance_reply
+from harness.tests.helpers import adjudication_view
 from harness.validation import evaluate_proposal
+from harness.tightening import WATCHED_OUTPUTS
 
 
 def test_supplementary_decision_changes_contract_without_new_spec(tmp_path):
@@ -43,8 +45,8 @@ def test_supplementary_decision_changes_contract_without_new_spec(tmp_path):
     assert new.effective_contract.content_hash != old.effective_contract.content_hash
     # 旧合同下的检查回执属于早先激活：新激活直接交付因缺少本次激活的回执被拒绝
     facts = system.workspace(run_id).snapshot().facts
-    decision = evaluate_proposal(department="engineering", projection=new,
-                                 facts=facts, proposal=delivery(check_names=["smoke"]))
+    decision = evaluate_proposal(adjudication_view(new),department="engineering",
+                                 facts=facts, proposal=delivery(check_names=["smoke"]), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert any(error.field == "check_names" for error in decision.errors)
 
@@ -117,11 +119,11 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
                       sessions={**dec.sessions, "product": replace(dec.sessions["product"], status="active")})
     for changes in ([], [{"decision_hash": "unknown", "disposition": "retain", "rationale": "Unknown"}],
                     [{"decision_hash": original_decision.content_hash, "disposition": "retain", "rationale": "Keep"}] * 2):
-        decision = evaluate_proposal(department="product", projection=working,
+        decision = evaluate_proposal(adjudication_view(working),department="product",
                                      facts=facts, proposal=product_spec(decision_changes=changes, change_record={
                                          "changed": [], "retained": ["Echo behavior"], "retired": [],
                                          "rationale": "Review earlier decisions",
-                                     }, basis_product_spec_hash=dec.product_spec.content_hash))
+                                     }, basis_product_spec_hash=dec.product_spec.content_hash), tightening=WATCHED_OUTPUTS)
         assert not decision.accepted and decision.errors[0].field == "decision_changes"
 
     revised = system.activate_once(run_id)  # engineering runs, asks product, product answers in branch

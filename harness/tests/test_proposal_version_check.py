@@ -3,7 +3,7 @@ from dataclasses import replace
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.models import EventType, json_dumps
 from harness.proposals import (
     delivery,
@@ -15,7 +15,9 @@ from harness.proposals import (
 )
 from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
+from harness.tests.helpers import adjudication_view
 from harness.validation import evaluate_proposal
+from harness.tightening import WATCHED_OUTPUTS
 
 # 提案校验与提交：流程编排校验提案时记下读取的流版本，提交以它作为期望版本追加；校验以后另一方写入了这个 run，
 # 写入口拒绝提交，流程编排按写入以后的状态重新校验与判断。测试包装公开的 WritePath.transact：记下每次判断使用的
@@ -146,12 +148,11 @@ def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path)
         assert projection.status not in ("done", "failed"), projection.stop_reason
     projection = system.project(run_id)
     superseded = replace(projection.delivery_spec, product_spec_hash="sha256:" + "0" * 64)
-    decision = evaluate_proposal(department="quality",
-                                 projection=replace(projection, delivery_spec=superseded),
+    decision = evaluate_proposal(adjudication_view(replace(projection, delivery_spec=superseded)),department="quality",
                                  facts=system.workspace(run_id).snapshot().facts,
                                  proposal=review("release", "releasing a stale-bound delivery",
                                                  checks=["smoke"],
-                                                 basis_delivery_spec_hash=projection.delivery_spec.content_hash))
+                                                 basis_delivery_spec_hash=projection.delivery_spec.content_hash), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert "product_spec_hash" in [error["field"] for error in decision.error_dicts]
 

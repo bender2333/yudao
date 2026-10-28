@@ -4,7 +4,7 @@ import json
 import time
 import uuid
 
-from harness.collaboration import has_new_work, is_waiting
+from harness.watched_outputs import has_new_work, is_waiting
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace

@@ -290,9 +290,11 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert deployment["version"] == document["info"]["version"]
     assert deployment["api_version"] == API_VERSION
     assert deployment["access"] == "local"
-    # 事件种类：现有全部 run 事件、项目事件与目录事件，与 OpenAPI 中事件对象的联合一致
+    # 事件种类：现有全部 run 事件、项目事件与目录事件，与 OpenAPI 中事件对象的联合一致。
+    # 应用的 EventType 在骨架事件的种类上接着声明（S5a 工单 #828），继承下来的骨架事件也算它声明的，按继承顺序合并
     known = {value for owner in (EventType, ProjectEventType, CatalogEventType)
-             for key, value in vars(owner).items() if not key.startswith("_")}
+             for declaration in reversed(owner.__mro__)
+             for key, value in vars(declaration).items() if not key.startswith("_") and isinstance(value, str)}
     assert set(capabilities["event_types"]) == known == set(EVENT_TYPES)
     mapping = document["components"]["schemas"]["EventObject"]["discriminator"]["mapping"]
     assert set(mapping) == known

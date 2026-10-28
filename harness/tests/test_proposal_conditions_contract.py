@@ -1,7 +1,6 @@
 # 提案合同里的通用条件是合同数据（设计说明第 5.5 节，工单 #859）：五条写死在 validation.py 里的关系规则
 # 改写成 proposal_contracts.json 里的条件以后，只改合同数据就能放宽它，代码不用动。
 # 每个用例先按发布的合同拒绝同一份提案，再把定义复制到临时目录、改一处合同数据、重新装载，同一份提案被接纳。
-# 装载出来的那份定义按参数交给校验（工单 #1098：校验读事项所用的那份定义，不读模块加载时的那一份）。
 # 另外核对合同的结构校验：条件名、参数与缺少的参数在装载时报出（definitions/__init__.py）。
 #
 # 守的是：
@@ -10,18 +9,21 @@
 # - R3（不放宽既有许可）：发布的合同里六种通用条件都在，删掉任何一种都要有意识地改数据。
 #
 # 这一层用临时目录复制定义文件、按新合同重新装载，属于模块层。
+from harness.tests.helpers import adjudication_view
 
 import json
 import shutil
 
 import pytest
 
+import harness.validation as validation
 from harness.actions import TreeFacts
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, load_definitions
 from harness.models import (ArtifactRef, CheckReceipt, DeliverySpec, EffectiveContract, ProductDecision, ProductSpec,
                             RunProjection, SessionRecord, canonical_hash)
 from harness.proposals import baseline_review, delivery, product_decision, review, structure
 from harness.validation import evaluate_proposal
+from harness.tightening import WATCHED_OUTPUTS
 
 RUN = "run_contract"
 SPEC_HASH = "sha256:" + "a" * 64
@@ -104,7 +106,7 @@ def test_the_shipped_contract_declares_every_generic_condition():
     assert DEFINITIONS.proposal_conditions("qa_review"), "读出来的条件应当与文件一致"
 
 
-def test_removing_the_duplicate_check_from_the_contract_accepts_the_same_decision(tmp_path):
+def test_removing_the_duplicate_check_from_the_contract_accepts_the_same_decision(tmp_path, monkeypatch):
     # 第五条第 1 项：拒绝与已接纳过的产品决定内容相同的决定
     content = {"statement": "use exit code 2", "rationale": "keep failures distinguishable",
                "product_spec_hash": SPEC_HASH}
@@ -113,68 +115,64 @@ def test_removing_the_duplicate_check_from_the_contract_accepts_the_same_decisio
                                statement=content["statement"], rationale=content["rationale"])
     projection = _projection("product", product_spec=_spec(), product_decisions=[existing])
     proposal = product_decision(content["statement"], content["rationale"])
-    assert not evaluate_proposal(department="product", projection=projection, facts=_facts(),
-                                 proposal=proposal).accepted
-    # 事项所用的那份定义改了合同（工单 #1098）：按定义校验，不靠模块加载时的那一份
-    matter = _definitions(tmp_path, _without("product_decision", "no_duplicate_content"))
-    decision = evaluate_proposal(department="product", projection=projection, facts=_facts(),
-                                 proposal=proposal, definitions=matter)
+    assert not evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(),
+                                 proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
+    monkeypatch.setattr(validation, "DEFINITIONS",
+                        _definitions(tmp_path, _without("product_decision", "no_duplicate_content")))
+    decision = evaluate_proposal(adjudication_view(projection),department="product", facts=_facts(), proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
-def test_removing_the_referenced_version_check_accepts_a_review_of_a_superseded_delivery(tmp_path):
+def test_removing_the_referenced_version_check_accepts_a_review_of_a_superseded_delivery(tmp_path, monkeypatch):
     # 第五条第 2 项：质检结论依据的交付要基于当前的 PRD 与契约
     projection = _projection("quality", product_spec=_spec(), effective_contract=_contract(),
                              delivery_spec=_delivery(product_spec_hash=OTHER_SPEC_HASH),
                              last_activations={"quality": "act_q"})
     facts = _facts(_receipt("quality", activation="act_q", delivery_hash=DELIVERY_HASH))
     proposal = review("release", "the delivery passes", checks=["smoke"], basis_delivery_spec_hash=DELIVERY_HASH)
-    assert not evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal).accepted
-    matter = _definitions(tmp_path, _without("qa_review", "referenced_current"))
-    decision = evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal,
-                                 definitions=matter)
+    assert not evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
+    monkeypatch.setattr(validation, "DEFINITIONS", _definitions(tmp_path, _without("qa_review", "referenced_current")))
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
-def test_removing_the_structure_check_accepts_a_baseline_review_without_a_structure(tmp_path):
+def test_removing_the_structure_check_accepts_a_baseline_review_without_a_structure(tmp_path, monkeypatch):
     # 第五条第 3 项：基线核验要有当前 PRD 的结构说明
     projection = _projection("quality", kind="onboarding", product_spec=_spec(), snapshot={"tree_digest": TREE},
                              last_activations={"quality": "act_q"})
     facts = _facts(_receipt("quality", activation="act_q"))
     proposal = baseline_review(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
                                checks=["smoke"])
-    assert not evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal).accepted
-    matter = _definitions(tmp_path, _without("baseline_review", "referenced_current"))
-    decision = evaluate_proposal(department="quality", projection=projection, facts=facts, proposal=proposal,
-                                 definitions=matter)
+    assert not evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
+    monkeypatch.setattr(validation, "DEFINITIONS", _definitions(tmp_path, _without("baseline_review", "referenced_current")))
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
-def test_clearing_the_activation_requirement_accepts_a_receipt_from_an_earlier_activation(tmp_path):
+def test_clearing_the_activation_requirement_accepts_a_receipt_from_an_earlier_activation(tmp_path, monkeypatch):
     # 第五条第 4 项：回执来自这一轮；把合同里的 activation 改成 false 以后，上一轮的回执也算
     projection = _projection("engineering", product_spec=_spec(), effective_contract=_contract(),
                              last_activations={"engineering": "act_now"})
     facts = _facts(_receipt("engineering", activation="act_before"))
     proposal = delivery(basis_product_spec_hash=SPEC_HASH)
-    assert not evaluate_proposal(department="engineering", projection=projection, facts=facts,
-                                 proposal=proposal).accepted
-    matter = _definitions(tmp_path, lambda conditions: conditions["delivery_spec"][1].update({"activation": False}))
-    decision = evaluate_proposal(department="engineering", projection=projection, facts=facts, proposal=proposal,
-                                 definitions=matter)
+    assert not evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts,
+                                 proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
+    monkeypatch.setattr(validation, "DEFINITIONS", _definitions(
+        tmp_path, lambda conditions: conditions["delivery_spec"][1].update({"activation": False})))
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 
-def test_removing_the_tree_check_accepts_an_onboarding_proposal_over_a_changed_tree(tmp_path):
+def test_removing_the_tree_check_accepts_an_onboarding_proposal_over_a_changed_tree(tmp_path, monkeypatch):
     # 第五条第 5 项：建档提案的树等于快照
     projection = _projection("engineering", kind="onboarding", product_spec=_spec(),
                              snapshot={"tree_digest": TREE}, last_activations={"engineering": "act"})
     facts = _facts(_receipt("engineering", activation="act", snapshot=OTHER_TREE), digest=OTHER_TREE)
     proposal = structure(requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}])
-    assert not evaluate_proposal(department="engineering", projection=projection, facts=facts,
-                                 proposal=proposal).accepted
-    matter = _definitions(tmp_path, _without("structure", "tree_matches"))
-    decision = evaluate_proposal(department="engineering", projection=projection, facts=facts, proposal=proposal,
-                                 definitions=matter)
+    assert not evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts,
+                                 proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
+    monkeypatch.setattr(validation, "DEFINITIONS", _definitions(tmp_path, _without("structure", "tree_matches")))
+    decision = evaluate_proposal(adjudication_view(projection),department="engineering", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
     assert decision.accepted, decision.error_dicts
 
 

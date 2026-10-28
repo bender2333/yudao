@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, UnknownStopReason, load_definitions
@@ -87,6 +87,31 @@ def test_invalid_stop_reason_names_the_file_and_the_field(tmp_path):
         load_definitions(directory)
     [issue] = raised.value.issues
     assert issue[:2] == ("stop_reasons.json", "max_cycles.outcome") and "'done', 'paused' or 'failed'" in issue[2]
+
+
+def test_a_routing_name_outside_the_routings_definition_fails_naming_the_field_and_the_names(tmp_path):
+    # 组织定义的 routing 要按名称接上路由实现（工单 #825）：名称不在 routings.json 里时加载失败，
+    # 写明是哪个字段、写了什么名称、有哪些可用的名称
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["routing"] = "task_pool"
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("organization.json", "routing")
+    assert "task_pool" in issue[2] and "watched_outputs" in issue[2]
+
+
+def test_the_default_routing_is_the_watched_outputs_routing(tmp_path):
+    # 默认值是成果驱动（设计说明第 5.1 节），它在 routings.json 里；不写 routing 的组织定义照常加载
+    assert DEFINITIONS.routing == "watched_outputs"
+    assert [item.id for item in DEFINITIONS.routings.routings] == ["watched_outputs"]
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    del organization["routing"]
+    _write(directory, "organization.json", organization)
+    assert load_definitions(directory).routing == "watched_outputs"
 
 
 def test_departments_and_roles_must_refer_to_each_other(tmp_path):

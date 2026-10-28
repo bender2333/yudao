@@ -12,7 +12,7 @@ from typing import Any, Callable, Iterator
 
 from openai import DEFAULT_CONNECTION_LIMITS
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade, ResponsesConfig

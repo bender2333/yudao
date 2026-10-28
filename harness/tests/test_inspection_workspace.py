@@ -10,7 +10,7 @@ import asyncio
 from pathlib import Path
 
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.actions import Action, ActionReceipt
 from harness.adapters.fake import FakeAdapter
 from harness.environment import LocalEnvironment, inspection_root
@@ -142,8 +142,8 @@ def test_two_sessions_do_not_share_their_inspection_workspace(tmp_path: Path) ->
     system.activate_once(run_id)
     assert has_new_work(system.project(run_id), "engineering")
     orchestrator = system.orchestrator
-    quality = orchestrator._environment_for(run_id, "quality", refresh=True)
-    product = orchestrator._environment_for(run_id, "product", refresh=True)
+    quality = orchestrator._workspaces.environment_for(run_id, "quality", refresh=True)
+    product = orchestrator._workspaces.environment_for(run_id, "product", refresh=True)
 
     assert asyncio.run(_run_bash(quality, "quality", "printf quality-only > only_quality.txt")).ok
     cross = asyncio.run(_run_bash(product, "product", "cat only_quality.txt"))
@@ -205,11 +205,11 @@ def test_quality_before_any_delivery_starts_from_the_work_item(tmp_path: Path) -
     system.workspace(run_id).write_file("src/echo.py", "NOT_DELIVERED\n")
     orchestrator = system.orchestrator
 
-    quality = orchestrator._environment_for(run_id, "quality", refresh=True)
+    quality = orchestrator._workspaces.environment_for(run_id, "quality", refresh=True)
     assert quality.workspace.root == inspection_root(
         run_root, _session_id(system, run_id, "quality"))
     assert [item.path for item in quality.snapshot().tree.files] == []
 
-    product = orchestrator._environment_for(run_id, "product", refresh=True)
+    product = orchestrator._workspaces.environment_for(run_id, "product", refresh=True)
     assert [item.path for item in product.snapshot().tree.files] == ["src/echo.py"]
     assert (run_root / "src" / "echo.py").read_text(encoding="utf-8") == "NOT_DELIVERED\n"

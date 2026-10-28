@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
-from harness.collaboration import is_working
+from harness.watched_outputs import is_working
 from harness.environment import QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
 from harness.models import ArtifactRef, EventType, json_dumps
@@ -671,18 +671,39 @@ def test_two_checks_at_the_same_time_run_in_their_own_workspaces(tmp_path: Path)
     # 验收第 6 条（工单 #559）：两个同时进行的检查各自使用自己的检查工作区与检查副本。
     # 质检的主线会话在预测性探索里跑检查，它在回答工程询问的分支里同时跑另一个检查：
     # 两条会话写同一个相对路径的标记文件，各自的检查副本里读到的都是自己写的那份。
+    # 两个检查各在自己的副本里跑，互相看不见，所以在检查工作区以外放两个信号文件，
+    # 让两条检查互相等对方开始：主线的检查等分支的检查开始以后才结束（工单 #1089）。
     holder: dict[str, object] = {}
+    signals = tmp_path / "check-signals"
+    signals.mkdir()
+    # 文件名不带 main / branch：回执的 summary 里有检查命令全文，带这两个词会让
+    # 「各自读到自己那份标记」的断言变成恒真
+    one_started = (signals / "check-one-started").as_posix()
+    two_started = (signals / "check-two-started").as_posix()
+
+    def read_own_mark_after_the_other(own: str, other: str) -> str:
+        # 一条检查的命令：先写下自己已经开始，再等对面那条检查的信号文件，然后才读自己的标记。
+        # 等待有上限（200 × 0.05 秒），sleep 只作轮询间隔，先后由信号文件决定，不由时长决定；
+        # 等不到时以非零退出并写明在等什么，不把「对面没开始」静默当成已经开始
+        return ("printf 'started' > '{own}'; "
+                "i=0; while [ ! -f '{other}' ] && [ $i -lt 200 ]; do sleep 0.05; i=$((i+1)); done; "
+                "[ -f '{other}' ] || {{ echo 'no signal from the other check'; exit 1; }}; "
+                "cat notes/marker.txt").format(own=own, other=other)
 
     def main_check(call):
-        # 主线会话：在自己的检查工作区写下标记，检查在副本里运行并占住一段时间，
-        # 分支的检查在这段时间里开始
+        # 主线会话：在自己的检查工作区写下标记；检查在副本里报「已开始」，等分支的检查真的开始
+        # 以后才读自己的标记——主线的检查到那时还在运行，两个检查在时间上重叠
         return ModelResponse(output=[
             _call("main-mark", "bash", {"command": "mkdir -p notes && printf 'main\\n' > notes/marker.txt"}),
-            _call("main-check", "run_check", {"name": "smoke", "command": "sleep 0.5; cat notes/marker.txt"}),
+            _call("main-check", "run_check", {
+                "name": "smoke",
+                "command": read_own_mark_after_the_other(one_started, two_started),
+            }),
         ])
 
     def branch_check(call):
-        # 分支会话：等主线会话的检查已经开始，再在自己的工作区写下同名标记并跑检查
+        # 分支会话：等主线会话的检查已经开始（事件流里的 TOOL_STARTED），再在自己的工作区写下
+        # 同名标记，然后在自己的副本里跑检查：先报「已开始」，再等主线的检查也报过开始
         for _ in range(600):
             events = holder["system"].store.list_events(holder["run_id"])
             if any(event.type == EventType.TOOL_STARTED
@@ -692,7 +713,10 @@ def test_two_checks_at_the_same_time_run_in_their_own_workspaces(tmp_path: Path)
             yield ModelStreamEvent(kind="stream_event", id="evt-wait")
         return ModelResponse(output=[
             _call("branch-mark", "bash", {"command": "mkdir -p notes && printf 'branch\\n' > notes/marker.txt"}),
-            _call("branch-check", "run_check", {"name": "smoke", "command": "cat notes/marker.txt"}),
+            _call("branch-check", "run_check", {
+                "name": "smoke",
+                "command": read_own_mark_after_the_other(two_started, one_started),
+            }),
             _call("branch-answer", "answer", {"answer": "检查项不用改。"}),
         ])
 
@@ -734,8 +758,17 @@ def test_two_checks_at_the_same_time_run_in_their_own_workspaces(tmp_path: Path)
     assert receipt(by_session[main_session])["snapshot_hash"] != receipt(by_session[branch_session])["snapshot_hash"]
     assert (receipt(by_session[main_session])["activation_id"]
             != receipt(by_session[branch_session])["activation_id"])
-    # 两个检查同时在运行：分支的检查在主线的检查开始之后、结束之前完成
+    # 两个检查在时间上重叠：分支的检查在主线的检查开始之后开始，主线的检查在分支的检查开始之后才结束。
+    # 先后由两个检查副本以外的信号文件决定，不由固定时长决定：主线的检查命令在副本里等到分支的信号
+    # 文件才读自己的标记，所以它结束（tool_called）一定在分支开始（tool_started）之后——
+    # tool_started 在工具执行之前写入，tool_called 在执行以后写入
     main_started = next(event for event in events
                         if event.type == EventType.TOOL_STARTED and event.session_id == main_session
                         and (event.payload or {}).get("name") == "run_check")
-    assert main_started.position < by_session[branch_session].position < by_session[main_session].position
+    branch_started = next(event for event in events
+                          if event.type == EventType.TOOL_STARTED and event.session_id == branch_session
+                          and (event.payload or {}).get("name") == "run_check")
+    assert main_started.position < branch_started.position, "分支的检查在主线的检查开始之后开始"
+    assert branch_started.position < by_session[main_session].position, "主线的检查在分支开始之后才结束"
+    # 两个检查同时在运行：主线的检查开始时分支的检查还没结束
+    assert main_started.position < by_session[branch_session].position

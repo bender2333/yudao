@@ -2,7 +2,7 @@
 
 import json
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.tests.helpers import FAST_RETRIES
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec

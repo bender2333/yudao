@@ -13,12 +13,12 @@ import tempfile
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .contracts import contract_payload, render_prd, render_structure
+from .contracts import render_structure
 from .event_store import run_stream
 from .write_path import NewEvent, Transaction
 from .environment import LocalEnvironment
 from .git_versions import GitVersionStore
-from .models import ArtifactRef, Event, EventType, RunProjection, new_id, utc_now
+from .models import ArtifactRef, Event, EventType, RunProjection, canonical_hash, new_id, utc_now
 from .projection import apply_event
 from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
@@ -35,19 +35,92 @@ _BASIS_FIELDS = (
     ("delivery_spec_hash", "delivery_spec"),
 )
 
+# 一种成果可以多版并存（设计说明第 4 节 2026-10-27 补）：产品决定各自是一件成果，新的决定不让旧的失效，
+# 最小投影按种类记当前有效各版的摘要清单（通用条件 6 的不重复接纳读它）
+_MULTIPLE_KINDS = frozenset({"product_decision"})
+
+# 质检退回工程的放行结论（S4c 工单 #863 从薄驱动搬来）：接纳的一方认成果种类与结论取值，
+# 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用设计说明第 6 节）
+REVIEW_KIND = "qa_review"
+REWORK_VERDICT = "rework_engineering"
+# 成果记下的树摘要：交付记代码树、建档记快照的树；没有这一项的成果不带
+_TREE_FIELDS = ("code_tree_digest", "code_snapshot_hash")
+
 
 def acceptance_fields(kind: str, artifact: dict[str, Any], *, version: int,
                       ref: dict[str, Any] | None = None) -> dict[str, Any]:
-    # 写进接纳事件的那一组统一字段。只增不改：已有的字段不动，内容摘要仍是各自的 content_hash
+    # 写进接纳事件的那一组统一字段。只增不改：已有的字段不动，内容摘要仍是各自的 content_hash。
+    # 2026-10-27（S1d）补作者部门、记下的树摘要与「这一种成果多版并存」三个字段（工单 #860）
     basis = {name: artifact[key] for key, name in _BASIS_FIELDS
              if isinstance(artifact.get(key), str) and artifact[key]}
     parent = artifact.get("parent_hash")
     if isinstance(parent, str) and parent:
         basis.setdefault(kind, parent)
     fields: dict[str, Any] = {"artifact_kind": kind, "artifact_version": version, "artifact_basis": basis}
+    issuer = artifact.get("issuer")
+    if isinstance(issuer, str) and issuer:
+        fields["artifact_issuer"] = issuer
+    for name in _TREE_FIELDS:
+        tree = artifact.get(name)
+        if isinstance(tree, str) and tree:
+            fields["artifact_tree_digest"] = tree
+            break
+    if kind in _MULTIPLE_KINDS:
+        fields["artifact_multiple"] = True
     if ref is not None:
         fields["artifact_ref"] = ref
     return fields
+
+
+def contract_payload(projection: RunProjection) -> dict[str, Any]:
+    # 有效合同的身份：它记下的 PRD 与有效决定的摘要，加上进入了模型输入的用户输入版本（设计说明第 3.1 节）。
+    # 读的是成果的内容，住在应用侧（S1d 从内核的 contracts.py 搬来，工单 #860）
+    spec = projection.product_spec
+    if spec is None or spec.status != "active":
+        raise ValueError("an active ProductSpec is required")
+    basis = {
+        "product_spec_hash": spec.content_hash,
+        "decision_hashes": [item.content_hash for item in projection.effective_decisions],
+        "input_version": spec.input_version,
+    }
+    return {**basis, "content_hash": canonical_hash(basis)}
+
+
+def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
+    # PRD 的 Markdown：主机由接纳的 PRD、有效决定与有效合同生成（材料之一）。读的是成果的内容，住在应用侧
+    spec = projection.product_spec
+    if spec is None:
+        raise ValueError("PRD requires an active ProductSpec")
+    lines = ["# PRD", "", f"Effective contract: {contract['content_hash']}",
+             f"ProductSpec: {spec.content_hash}", f"Accepted user input through version: {spec.input_version}",
+             "", "## Goal", "", spec.goal]
+    for title, values in (
+        ("Requirements", spec.requirements), ("Boundaries", spec.boundaries),
+        ("Constraints and recorded defaults", spec.constraints), ("Acceptance Criteria", spec.acceptance_criteria),
+        ("Fatal Conditions", spec.fatal_conditions), ("Non-goals", spec.non_goals),
+    ):
+        lines.extend(["", f"## {title}", ""])
+        lines.extend(f"- {item}" for item in values)
+        if not values:
+            lines.append("None.")
+    lines.extend(["", "## Effective Product Decisions", ""])
+    for index, decision in enumerate(projection.effective_decisions, 1):
+        lines.extend([f"### {index}. {decision.statement}", "", f"Rationale: {decision.rationale}",
+                      "", f"Source: {decision.content_hash}", f"Original ProductSpec: {decision.product_spec_hash}", ""])
+    if not projection.effective_decisions:
+        lines.append("None.")
+    if spec.decision_changes:
+        lines.extend(["", "## Treatment of Earlier Decisions", ""])
+        lines.extend(f"- {item['decision_hash']}: {item['disposition']}. {item['rationale']}" for item in spec.decision_changes)
+    if spec.change_record is not None:
+        lines.extend(["", "## Requirement Changes", "", f"Previous ProductSpec: {spec.parent_hash}",
+                      f"Rationale: {spec.change_record['rationale']}"])
+        for field in ("changed", "retained", "retired"):
+            lines.extend(["", f"### {field.title()}", ""])
+            lines.extend(f"- {item}" for item in spec.change_record[field])
+            if not spec.change_record[field]:
+                lines.append("None.")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def invalidation(current: RunProjection, reason: str) -> tuple[str, dict[str, Any]] | None:
@@ -271,6 +344,53 @@ class SubmissionWriter:
             if temporary is not None:
                 temporary.unlink(missing_ok=True)
 
+    def record_accepted_lesson(self, transaction: Transaction, source: Event, projection: RunProjection,
+                               artifact: dict[str, Any]) -> None:
+        # 接纳以后的记录：质检退回工程的放行结论另记一条经验教训候选。
+        # 成果种类与结论取值由这里认——薄驱动不含这两样（骨架与应用设计说明第 6 节），
+        # 只把这次接纳转交过来（S4c 工单 #863）
+        if artifact.get("kind") != REVIEW_KIND or artifact.get("verdict") != REWORK_VERDICT:
+            return
+        self.record_lesson_candidate(transaction, source, projection)
+
+    def record_lesson_candidate(self, transaction: Transaction, source: Event,
+                                projection: RunProjection) -> None:
+        # 一条经验教训候选：观察、建议与它依据的成果摘要。来自质检的退回记观察到的结论与检查，
+        # 来自失败记停止原因与说明
+        if source.type == EventType.QA_SUBMITTED:
+            observed = source.payload
+            observation = {key: observed[key] for key in ("verdict", "rationale", "defects")}
+            suggestion = "根据本次质检记录，补充能复现所述问题的检查，验证修复是否满足原验收条件。"
+            spec_hash = observed["product_spec_hash"]
+            delivery_hash = observed["delivery_spec_hash"]
+            checks = observed["checks"]
+            refs = observed["evidence_refs"]
+        else:
+            observation = {"stop_reason": source.stop_reason, "message": source.error}
+            suggestion = "根据本次失败事件复现失败条件，验证调整是否消除该条件；原因尚待确认。"
+            spec = projection.product_spec
+            delivery = projection.delivery_spec
+            if delivery is not None and delivery.status != "active":
+                delivery = None
+            spec_hash = spec.content_hash if spec is not None else None
+            delivery_hash = delivery.content_hash if delivery is not None else None
+            checks = delivery.checks if delivery is not None else []
+            refs = [asdict(delivery.tree_ref)] if delivery is not None else []
+        transaction.append(NewEvent(
+            EventType.LESSON_CANDIDATE_RECORDED,
+            actor="system", department=source.department, parent_event_id=source.event_id,
+            state_before=source.state_after, state_after=source.state_after,
+            session_id=source.session_id,
+            payload={
+                "kind": "lesson_candidate", "id": new_id("lesson"), "status": "unverified",
+                "source_event_id": source.event_id, "source_type": source.type,
+                "observation": observation, "suggestion": suggestion,
+                "product_spec_hash": spec_hash, "delivery_spec_hash": delivery_hash,
+                "checks": checks, "evidence_refs": refs,
+            },
+        ))
+
 
 def _json_bytes(value: dict[str, Any]) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
+

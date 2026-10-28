@@ -4,7 +4,7 @@
 
 import uuid
 
-from harness.collaboration import has_new_work
+from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, ProjectEventType
 from harness.projection import project_run
