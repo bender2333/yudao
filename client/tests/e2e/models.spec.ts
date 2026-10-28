@@ -150,6 +150,52 @@ for (const size of [{ width: 1440, height: 900 }]) {
     }
   });
 
+  test(`${label}：勾「写入 .env」时不合规的凭据引用让保存不可用并写明原因`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    try {
+      // 连接表单：勾「写入 .env」时凭据引用旁写出键名规则，不合规时「保存 Key」不可用并写明原因
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
+      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
+      const form = client.page.locator(".mm-form");
+      const refInput = form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input");
+      await refInput.fill("trial-model-key");
+      await form.getByTestId("credential-secret").fill(KEY);
+      await form.getByTestId("credential-persist").check();
+      await expect(form.getByTestId("credential-ref-rule")).toContainText("字母、数字与下划线");
+      await expect(form.getByTestId("credential-ref-issue")).toContainText("TRIAL_MODEL_KEY");
+      await expect(form.getByTestId("save-credential")).toBeDisabled();
+      await expect(form.getByTestId("save-credential-hint")).toContainText("不能写进 .env");
+
+      // 换成合规的写法：原因消失，「保存 Key」可用
+      await refInput.fill("TRIAL_MODEL_KEY");
+      await expect(form.getByTestId("credential-ref-issue")).toHaveCount(0);
+      await expect(form.getByTestId("save-credential")).toBeEnabled();
+      await form.getByRole("button", { name: "取消" }).click();
+
+      // 页面上「凭据」那一节：选「只在本进程有效」时写重启后要重新提供
+      await client.page.getByTestId("page-cred-memory").check();
+      await expect(client.page.getByTestId("page-cred-restart-hint")).toContainText("重启后需要重新提供");
+      await client.page.getByTestId("page-cred-ref").fill("trial-model-key");
+      await client.page.getByTestId("page-cred-secret").fill(KEY);
+      // 只写内存时没有键名要求：可以保存
+      await expect(client.page.getByTestId("page-cred-ref-rule")).toHaveCount(0);
+      await expect(client.page.getByTestId("page-cred-save")).toBeEnabled();
+      // 勾「写入 .env」：规则出现，不合规的引用让「保存凭据」不可用并写明原因
+      await client.page.getByTestId("page-cred-dotenv").check();
+      await expect(client.page.getByTestId("page-cred-restart-hint")).toHaveCount(0);
+      await expect(client.page.getByTestId("page-cred-ref-rule")).toContainText("字母、数字与下划线");
+      await expect(client.page.getByTestId("page-cred-save")).toBeDisabled();
+      await expect(client.page.getByTestId("page-cred-ref-issue")).toContainText("TRIAL_MODEL_KEY");
+      await expect(client.page.getByTestId("page-cred-save-hint")).toContainText("不能写进 .env");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
   test(`${label}：部门默认只列出已准入的定义，保存以后生效`, async () => {
     test.setTimeout(300_000);
     const { backend, client } = await openModels(size);

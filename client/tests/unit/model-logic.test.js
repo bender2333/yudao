@@ -43,6 +43,11 @@ import {
   testText,
   tierOptions,
   credentialStatusLabel,
+  credentialRefIssue,
+  credentialSaveDisabledReason,
+  isDotenvKey,
+  suggestedDotenvKey,
+  DOTENV_KEY_EXAMPLE,
   admissionSummary,
   admissionFor,
   admissionLabel,
@@ -109,6 +114,30 @@ test("凭据状态用词（设计说明第 9.1 节）：缺失、内存、环境
   assert.equal(credentialStatusLabel({ configured: true, source: "override" }), "来源：内存");
   assert.equal(credentialStatusLabel({ configured: true, source: "env" }), "来源：环境");
   assert.equal(credentialStatusLabel({ configured: true, source: "dotenv" }), "来源：.env");
+});
+
+test("写入 .env 的键名规则：不合规的引用写明规则并举一个合规的写法（工单 #1158）", () => {
+  // 合规的写法原样通过；没有勾写入 .env 时不检查
+  assert.equal(isDotenvKey("TRIAL_MODEL_KEY"), true);
+  assert.equal(isDotenvKey("trial-model-key"), false);
+  assert.equal(credentialRefIssue("TRIAL_MODEL_KEY", true), "");
+  assert.equal(credentialRefIssue("trial-model-key", false), "");
+  // 不合规：说明里有规则与一个可用的写法
+  const issue = credentialRefIssue("trial-model-key", true);
+  assert.equal(issue, "凭据引用 trial-model-key 不能写进 .env：键名只用字母、数字与下划线，不以数字开头，例如 TRIAL_MODEL_KEY");
+  assert.equal(suggestedDotenvKey("9lives-key"), "KEY_9LIVES_KEY");
+  assert.equal(suggestedDotenvKey("---"), DOTENV_KEY_EXAMPLE);
+});
+
+test("「保存凭据」不可用时写明缺哪一项（工单 #1158）", () => {
+  assert.equal(credentialSaveDisabledReason({ ref: "", secret: "k", persist: false }), "填写凭据引用");
+  assert.equal(credentialSaveDisabledReason({ ref: "TRIAL_MODEL_KEY", secret: "", persist: true }), "填写 API Key");
+  assert.match(credentialSaveDisabledReason({ ref: "trial-model-key", secret: "k", persist: true }),
+    /不能写进 \.env/);
+  // 引用不合规时先说引用这一项，不再说缺 Key
+  assert.match(credentialSaveDisabledReason({ ref: "trial-model-key", secret: "", persist: true }),
+    /不能写进 \.env/);
+  assert.equal(credentialSaveDisabledReason({ ref: "TRIAL_MODEL_KEY", secret: "k", persist: true }), "");
 });
 
 test("准入摘要按连接统计「已准入 x · 候选 y」", () => {
