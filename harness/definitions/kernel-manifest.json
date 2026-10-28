@@ -17,14 +17,9 @@
       "why": "事件日志的追加与投影替换，事实唯一的落盘面"
     },
     {
-      "path": "harness/projection.py",
+      "path": "harness/kernel_events.py",
       "kind": "module",
-      "why": "裁决读取的运行状态投影，由事件折叠而成"
-    },
-    {
-      "path": "harness/models.py",
-      "kind": "module",
-      "why": "事件与投影的数据结构、序列化与哈希，裁决与事件日志共用"
+      "why": "事件信封、骨架事件的种类与数据结构、骨架事件的登记表；内核模块只从它导入事件（S5a，工单 #828）"
     },
     {
       "path": "harness/adjudication.py",
@@ -107,7 +102,7 @@
       "why": "六条基础规则的原文，高于任何具体设计；守卫自身，只由用户修改"
     }
   ],
-  "python_lines_max": 5241,
+  "python_lines_max": 4096,
   "allowed_imports": [
     "内核文件",
     "标准库",

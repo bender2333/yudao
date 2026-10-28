@@ -13,15 +13,14 @@ from typing import Any, TypeVar
 
 from .definitions import DEFINITIONS
 from .event_store import (
-    Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, is_catalog_stream, is_run_stream,
+    Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, dump_decision, is_catalog_stream,
+    is_run_stream, load_decisions,
+)
+from .kernel_events import (
+    CatalogEvent, DecisionRequest, Event, ProjectEvent, SkeletonEventType, StreamHandler, apply_decision_event,
+    json_dumps, new_id, replay_decisions, utc_now,
 )
 from .minimal_projection import MinimalProjection, fold_events, fold_more
-from .models import (
-    DEPARTMENTS, CatalogEvent, DecisionRequest, Event, EventType, ProjectEvent, json_dumps, new_id, utc_now,
-)
-from .projection import (
-    StreamHandler, apply_decision_event, dump_decision, load_decisions, replay_decisions,
-)
 
 T = TypeVar("T")
 
@@ -30,8 +29,8 @@ T = TypeVar("T")
 MAX_JUDGMENTS = 100
 
 # 结束运行的事件：它承载的停止原因规定的结束方式，与事件写入的终态
-_STOP_EVENTS = {EventType.RUN_DONE: ("done", "done"), EventType.RUN_PAUSED: ("paused", "paused"),
-                EventType.RUN_FAILED: ("failed", "failed")}
+_STOP_EVENTS = {SkeletonEventType.RUN_DONE: ("done", "done"), SkeletonEventType.RUN_PAUSED: ("paused", "paused"),
+                SkeletonEventType.RUN_FAILED: ("failed", "failed")}
 
 
 @dataclass(frozen=True)
@@ -327,7 +326,7 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, ver
         raise TypeError(f"{type(entry).__name__} cannot be appended to {stream}")
     if isinstance(entry, NewEvent):
         _check_stop_reason(entry)
-        if entry.department is not None and entry.department not in DEPARTMENTS:
+        if entry.department is not None and entry.department not in DEFINITIONS.departments:
             raise ValueError(f"unknown department {entry.department!r} on a run event")
         return Event(
             event_id=new_id("evt"), run_id=identity, type=entry.type, role=None,

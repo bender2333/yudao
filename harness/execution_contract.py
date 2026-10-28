@@ -10,13 +10,16 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from threading import Event
+from threading import Event as CancelEvent
 from typing import Any, Protocol
 
 from . import contract_versions
 from .adjudication import WorkBasis
 from .definitions import DEFINITIONS
-from .models import DepartmentPrompt, Event, RunProjection
+# 事件信封从内核事件模块导入。运行流的投影与部门 Prompt 是应用侧的类（harness/models.py），
+# 契约模块不导入应用（harness/tests/test_contract_modules.py 的导入方向），所以这两处按 Any 标注，
+# 具体的类型由实现（这一版是 orchestrator.py 与 assembly.py）给出。
+from .kernel_events import Event
 from .write_path import Transaction
 
 # 这一版契约的版本号；上一版是第一版（结果的种类还写死成「提交了正式成果」与「回答了询问」，工单 #826）
@@ -82,7 +85,7 @@ class RoundRequest:
     # limits 是这一轮的上限，work_ref 是路由自己的工作引用（例如任务池的任务）。
     # work_ref 原样交给装配（第 5.4 节第 4 条），骨架不解释它
     scope: ActivationScope
-    prompt: DepartmentPrompt
+    prompt: Any
     limits: StepLimits
     work_ref: Any = None
 
@@ -96,7 +99,7 @@ class SafeNode(Protocol):
         # 分派新输入，回答是否继续
         ...
 
-    def settle(self, transaction: Transaction) -> RunProjection:
+    def settle(self, transaction: Transaction) -> Any:
         # 在调用方的事务中分派新输入并关闭过时的协作请求，返回事务中当前的运行状态；调用方随后判断并写入
         ...
 
@@ -114,7 +117,7 @@ class SafeNode(Protocol):
         # （providers.selection.ModelSelection），契约原样交回实现
         ...
 
-    def department_prompt(self, department: str) -> DepartmentPrompt:
+    def department_prompt(self, department: str) -> Any:
         # 部门 Prompt 每次请求从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）
         ...
 
@@ -150,7 +153,7 @@ class StepDriver(Protocol):
     CONTRACT_VERSION: int
 
     @classmethod
-    def start(cls, request: RoundRequest, *, nodes: SafeNode, cancelled: Event,
+    def start(cls, request: RoundRequest, *, nodes: SafeNode, cancelled: CancelEvent,
               **dependencies: Any) -> "StepDriver":
         # 在当前事件循环中开始这次激活的步骤循环；dependencies 由实现按自己的需要取用，不属于契约
         ...

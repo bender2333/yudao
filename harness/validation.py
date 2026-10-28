@@ -11,18 +11,13 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
 from .contracts import artifact_hash, normalize_scope
+from .kernel_events import BASELINE_STATUSES, QA_VERDICTS, Event, canonical_hash, spec_content_hash
 from .minimal_projection import MinimalProjection
-from .models import (
-    BASELINE_STATUSES,
-    DEPARTMENTS,
-    PROPOSAL_KINDS,
-    QA_VERDICTS,
-    Event,
-    canonical_hash,
-    spec_content_hash,
-)
 from .actions import TreeFacts
 from .definitions import DEFINITIONS, ConditionNames, ProposalCondition
+
+# 提案种类：提交类工具在定义里提交的种类。提案校验按这份清单判断种类认不认识（S2c 改为读事项所用的定义）
+PROPOSAL_KINDS = tuple(tool.proposal for tool in DEFINITIONS.tools.values() if tool.proposal is not None)
 
 if TYPE_CHECKING:  # 工作依据住在 adjudication.py，它导入这里：只在类型检查时导入，避免循环导入
     from .adjudication import WorkBasis
@@ -335,7 +330,7 @@ def _evaluate_proposal(
     kind = proposal.get("kind")
     if kind not in PROPOSAL_KINDS:
         return ProposalDecision(False, [FieldError("kind", f"unknown proposal kind: {kind!r}")])
-    if department not in DEPARTMENTS:
+    if department not in DEFINITIONS.departments:
         return ProposalDecision(False, [FieldError("issuer", f"unknown department: {department}")])
     # 这个部门此刻能提交哪些种类是成果驱动的：问路由的收紧检查（不能放行内核拒绝的东西，
     # 内核先判过上面的格式与部门，再按收紧检查给出的种类收窄）

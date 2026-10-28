@@ -1,7 +1,7 @@
 # 装配契约第一版（骨架与应用设计说明第 3.2、5.2 节；总图第四节「装配」缝）：
 # 输入事件日志里这个部门与会话的历史、定义、材料、调用目标的窗口与输出上限，以及路由的工作引用；
 # 输出装配好的请求与上下文清单，两者都记进日志；不改事实。
-# 本模块只导入内核与标准库，以及契约圈的 contract_versions；实现（assembly.py 的 ContextAssembly）声明实现这一版，
+# 本模块只导入内核（kernel_events、definitions）与标准库，以及契约圈的 contract_versions；实现（assembly.py 的 ContextAssembly）声明实现这一版，
 # 薄驱动接受当前版与上一版。装配出来的请求与固定部分的形状是实现自己的，契约这一版只固定输入与不变量。
 
 from __future__ import annotations
@@ -10,7 +10,10 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from . import contract_versions
-from .models import DepartmentPrompt, Event, RunProjection
+# 事件信封从内核事件模块导入。运行流的投影与部门 Prompt 是应用侧的类（harness/models.py），
+# 契约模块不导入应用（harness/tests/test_contract_modules.py 的导入方向），所以这两处按 Any 标注，
+# 具体的类型由实现（这一版是 orchestrator.py 与 assembly.py）给出。
+from .kernel_events import Event
 
 # 这一版契约的版本号；上一版是第一版之前的空位，没有实现声明它
 CURRENT_VERSION = 1
@@ -40,7 +43,7 @@ class StepFrame:
     department: str
     session_id: str
     activation_id: str
-    prompt: DepartmentPrompt
+    prompt: Any
     effective_contract_hash: str | None
     input_version: int
     work_ref: Any = None
@@ -55,7 +58,7 @@ class ContextAssembly(Protocol):
         # 这个部门（与这个会话）的历史，按事件顺序排列
         ...
 
-    def pin(self, projection: RunProjection, frame: StepFrame, limits: ModelLimits, *, step_id: int,
+    def pin(self, projection: Any, frame: StepFrame, limits: ModelLimits, *, step_id: int,
             events: list[Event], snapshot_hash: str, call_target: dict[str, Any] | None = None,
             input_modalities: tuple[str, ...] = ("text",)) -> Any:
         # 这一步固定的部分：部门材料、工具定义与上下文清单的前一半

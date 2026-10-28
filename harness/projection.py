@@ -7,11 +7,16 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import Any, Protocol
+from typing import Any
 
 from pydantic import TypeAdapter
 
-from .event_store import EventStore, SavedDecision, SavedProjection, run_stream
+from .event_store import (
+    EventStore, SavedDecision, SavedProjection, dump_decision, load_decision, load_decisions, run_stream,
+)
+from .kernel_events import (
+    StreamHandler, apply_decision_event, replay_decisions,
+)
 from .models import (
     CatalogEventType,
     DecisionRequest,
@@ -41,21 +46,9 @@ from .models import (
 
 # 保存的投影以 JSON 存放，由 pydantic 按数据类的类型序列化与还原
 _RUN_STATE = TypeAdapter(RunProjection)
-_DECISION_STATE = TypeAdapter(DecisionRequest)
 
-
-class StreamHandler(Protocol):
-    # 一种流的投影的处理者：空投影、保存的投影的还原与序列化、并入一条事件、从头重放。
-    # run 流的处理者在内核里（run_handler），项目流与目录流的处理者在内核以外，由写入口的构造者注入
-    def empty(self) -> Any: ...
-
-    def load(self, saved: SavedProjection) -> Any: ...
-
-    def dump(self, state: Any) -> str: ...
-
-    def fold(self, state: Any, event: Any) -> None: ...
-
-    def replay(self, stream: str, events: list[Any]) -> Any: ...
+# 流的处理者接口、决定请求与它的折叠在内核事件模块里（S5a 工单 #828），保存的投影的还原与序列化在
+# 事件日志里；这里转出给应用用，应用的导入照旧。这个文件自此不再算内核
 
 
 class RunHandler:
@@ -126,69 +119,6 @@ def saved_decisions(store: EventStore, *, projects: tuple[str, ...] = (), work_i
     # 按项目、事项、种类与状态列出决定请求保存的投影，与它们所反映的日志末尾位置
     position, rows = store.decisions(projects=projects, work_items=work_items, kinds=kinds, statuses=statuses)
     return position, [load_decision(row) for row in rows]
-
-
-def load_decision(saved: SavedDecision) -> DecisionRequest:
-    return _DECISION_STATE.validate_json(saved.state)
-
-
-def load_decisions(saved: SavedProjection | None) -> dict[str, DecisionRequest]:
-    # 一个流保存的决定请求，按身份
-    return {} if saved is None else {item.decision_id: load_decision(item) for item in saved.decisions}
-
-
-def dump_decision(decision: DecisionRequest) -> SavedDecision:
-    return SavedDecision(decision.decision_id, decision.stream, decision.project_id, decision.work_item_id,
-                         decision.run_id, decision.kind, decision.status,
-                         _DECISION_STATE.dump_json(decision).decode("utf-8"))
-
-
-def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | ProjectEvent) -> str | None:
-    # 把一条事件并入这个流的决定请求，返回改变的决定请求的身份；不是决定事件时什么也不改变，返回空
-    payload = event.payload
-    if event.type == EventType.DECISION_REQUESTED:
-        decisions[event.event_id] = DecisionRequest(
-            decision_id=event.event_id, stream=event.stream, run_id=event.run_id, project_id=event.project_id,
-            work_item_id=event.work_item_id, requested_at=event.created_at, request=dict(payload),
-        )
-        return event.event_id
-    if event.type in (EventType.DECISION_ANSWERED, ProjectEventType.PROJECT_DECISION_ANSWERED,
-                      CatalogEventType.INSTANCE_UPGRADE_ANSWERED):
-        decision = decisions[payload["decision_id"]]
-        decision.status = "answered"
-        decision.answer = {"event_id": event.event_id, "option": payload["option"], "note": payload["note"],
-                           "base_version": payload["base_version"], "actor": event.actor,
-                           "command_id": event.command_id, "answered_at": event.created_at}
-        return decision.decision_id
-    if event.type in (EventType.DECISION_WITHDRAWN, ProjectEventType.PROJECT_DECISION_WITHDRAWN,
-                      CatalogEventType.INSTANCE_UPGRADE_WITHDRAWN):
-        decision = decisions[payload["decision_id"]]
-        decision.status = "withdrawn"
-        decision.withdrawal = {"event_id": event.event_id, "reason": payload["reason"],
-                               "withdrawn_at": event.created_at}
-        return decision.decision_id
-    if event.type == ProjectEventType.PROJECT_DECISION_REQUESTED:
-        # 项目流中的决定请求（工单 #136）：不属于任何 run，run_id 为空，所属事项与候选 run 在载荷里
-        decisions[event.event_id] = DecisionRequest(
-            decision_id=event.event_id, stream=event.stream, run_id=None,
-            project_id=event.project_id, work_item_id=payload.get("work_item_id"),
-            requested_at=event.created_at, request=dict(payload),
-        )
-        return event.event_id
-    if event.type == CatalogEventType.INSTANCE_UPGRADE_REQUESTED:
-        # 目录流中的决定请求（工单 #355）：不属于任何项目或 run，范围列为空
-        decisions[event.event_id] = DecisionRequest(
-            decision_id=event.event_id, stream=event.stream, run_id=None, project_id=None, work_item_id=None,
-            requested_at=event.created_at, request=dict(payload))
-        return event.event_id
-    return None
-
-
-def replay_decisions(events: list[Event] | list[ProjectEvent]) -> dict[str, DecisionRequest]:
-    decisions: dict[str, DecisionRequest] = {}
-    for event in events:
-        apply_decision_event(decisions, event)
-    return decisions
 
 
 def _settle_run_state(state: RunProjection) -> None:
