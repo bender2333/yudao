@@ -12280,6 +12280,17 @@
             ],
             "title": "Stop Reason"
           },
+          "stop_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Note"
+          },
           "human_action": {
             "anyOf": [
               {

@@ -5044,6 +5044,10 @@ export type WorkItemCard = {
      */
     stop_reason: string | null;
     /**
+     * Stop Note
+     */
+    stop_note?: string | null;
+    /**
      * Human Action
      */
     human_action: string | null;
