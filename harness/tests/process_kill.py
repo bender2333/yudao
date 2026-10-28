@@ -132,7 +132,7 @@ def _hold_after(system: LoopSystem, event_type: str, directory: Path, *,
     # 给出 action_id 时只在这个调用编号的那次事件上停（同一个工具的前几次调用不算）。
     # 给出 session_prefix 时只在这个会话的事件上停（工单 #475：停住某个会话的一次模型请求，
     # 用来观察会话进行中重新启动以后这个会话怎样继续）。
-    # 恢复途中注册这个钩子时，停住的是恢复自动重新执行的那一次尝试
+    # 恢复途中注册这个钩子时，停住的是恢复处置那一步；恢复不再自动重新执行动作（工单 #581）
     marker = directory / "hold"
 
     def hold(event: Any) -> None:
@@ -252,7 +252,7 @@ def main() -> None:
 
     items = json.loads(args.script.read_text(encoding="utf-8"))
     # 挂起钩子要在系统开始运行以前注册。恢复发生在打开数据目录的时候，因此挂起时先不自动恢复，
-    # 注册完钩子再恢复：这样恢复途中自动重新执行的那一次尝试也能在指定事件上停住
+    # 注册完钩子再恢复：这样恢复处置的那一步也能在指定事件上停住（恢复不再自动重新执行动作，工单 #581）
     system = LoopSystem.for_testing(args.data_dir, FakeAdapter(build_script(items)),
                                     resume_on_startup=args.hold_after is None)
     if args.hold_after is not None:
@@ -344,7 +344,7 @@ def _spawn(data_dir: Path, script: Path, task: str, log: Path, *,
 
 def _kill(process: subprocess.Popen, signals: Path | None = None) -> None:
     # 先终止 Yudao 进程本身、等它退出，再收掉它留下的子进程（工单 #338）。
-    # 检查与登记命令的子进程由执行环境另起进程组启动，与 Yudao 进程不同组：一次性按进程树
+    # 检查与 bash 命令的子进程由执行环境另起进程组启动，与 Yudao 进程不同组：一次性按进程树
     # 终止时谁先死是不确定的，子进程先死会让 Yudao 进程活着走完执行后的路径，把这一次动作的
     # 回执写下来，测试就看不到「结果未知」。先终止 Yudao 进程并等它退出，再收掉子进程，
     # 两者之间就不再有竞争
@@ -608,11 +608,11 @@ def restarted(data_dir: Path, script: Sequence[dict[str, Any]] | Mapping[str, Se
               hold_after: str | None = None,
               hold_action: str | None = None) -> Interrupted:
     # 重新启动一个已经存在的数据目录：启动恢复继续未结束的 run，在指定的时刻终止它。
-    # 用于连续中断：一次自动重新执行以后再次中断，重启后观察有没有新的尝试或者决定请求。
+    # 用于连续中断：一次恢复处置以后再次中断，重启后观察有没有新的尝试或者决定请求。
     # script 是这一次重启以后模型继续用的脚本；kill 为假时让子进程运行到停止（不终止）。
     # resume_after 为假时 after 打开以后不走启动恢复（父进程不再碰这份日志，避免重复恢复污染事件）。
     # revision 为真时 run_id 取修改轮的 run（建档场景，见 interrupted）。
-    # hold_after 与 hold_action 让恢复途中（自动重新执行的那一次尝试）在指定事件上停住再被终止
+    # hold_after 与 hold_action 让恢复处置中的那一步在指定事件上停住再被终止（恢复不再自动重新执行动作）
     data_dir = Path(data_dir)
     work = data_dir.parent
     log = work / f"restart-{restart_round}.log"

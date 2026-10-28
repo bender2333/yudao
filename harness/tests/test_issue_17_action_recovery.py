@@ -45,7 +45,7 @@ def _engineering_run(data_dir, script):
 
 def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-write", before=None):
     # 追加一条动作前快照与一条没有结果的 tool_started：表示「写入效果已经写入、完成确认没有保存」的中断状态。
-    # 挂在这个 run 最后一次激活的第 1 步上：那一步的装配记录真实存在，自动重新执行照抄它的调用目标
+    # 挂在这个 run 最后一次激活的第 1 步上：那一步的装配记录真实存在，动作带着真实的激活与步骤位置
     before = {"digest": "sha256:" + action_id, "files": []} if before is None else before
     ref = system.artifacts.put(run_id, "snapshot/before", json.dumps(before, ensure_ascii=False),
                                media_type="application/json")
@@ -182,7 +182,7 @@ def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
 
 def test_an_adoption_settlement_is_idempotent_across_recovery(data_dir):
     # 窄场景三：交付与质检已接纳、项目采纳前进程退出；恢复补一次合法采纳，重复恢复不再补第二次
-    from harness.proposals import delivery_turn, review_turn
+    from harness.proposals import delivery_turn
 
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
     system = LoopSystem.for_testing(data_dir, FakeAdapter({
