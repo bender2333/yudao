@@ -106,7 +106,24 @@ flowchart TB
 
 ### 2.4 依赖规则
 
-- 接口层只导入应用层；应用层只导入控制核心的公开接口（流程编排的入口、写入口、事件日志的读取与订阅、保存的投影、输出片段通道）、知识层的查询、Provider 模块的管理接口与执行环境池的只读接口（机器状态，3.2C）；控制核心不导入应用层。三条规则用 import-linter 的层次合同在测试中检查。
+- 接口层只导入应用层；应用层只导入控制核心的公开接口、知识层的查询、Provider 模块的管理接口与执行环境池的只读接口（机器状态，3.2C）；控制核心不导入应用层。三条规则用 import-linter 的层次合同在测试中检查。
+- 控制核心的公开接口分十一类，`harness/app/` 实际导入的 25 个模块全部有归属（2026-10-29 按 S6a 的实测归类，#829）：
+
+  | 类 | 模块 |
+  | --- | --- |
+  | 流程编排的入口 | `runtime`、`recovery` |
+  | 写入口 | `write_path`、`writeback`（采纳写回的状态） |
+  | 事件日志的读取与订阅 | `event_store`、`kernel_events`、`streams`、`models`（事件种类与名词的声明） |
+  | 保存的投影 | `projection`、`project_projection`、`minimal_projection` |
+  | 输出片段通道 | `deltas` |
+  | 知识层的查询 | `projects`、`observability`、`parameters`、`interactions` |
+  | Provider 模块的管理接口 | `providers`（含 `providers.errors`、`providers.selection`） |
+  | 执行环境池的只读接口 | 机器状态（3.2C） |
+  | 定义的加载与校验 | `definitions` |
+  | 工件、封存树与 Git 版本 | `artifacts`、`tree_archive`、`git_versions` |
+  | 决定、路径规则、脱敏与重放核对 | `decisions`、`path_rules`、`redact`、`replay_check` |
+
+- `pyproject.toml` 的合同「应用层只导入控制核心的公开接口」按这张表列全部 25 个模块：清单以外多一行导入即失败，并报出是哪一个。
 - 命令行在进程内调用应用层的同一套命令与查询，输出查询结果（快照与位置）或命令结果的 JSON。
 - 单机部署时接口层、应用层与控制核心在一个进程、一个事件循环中运行（[总体架构](architecture/overall-architecture.md)第 3 节第 2 条）；uvicorn 的事件循环就是控制核心的事件循环。
 - 3.2C 把执行环境放到登记的其他机器上时，接口层、应用层与接口合同不变（[ADR-0018](../adr/0018-single-control-host-remote-execution.md)）。
