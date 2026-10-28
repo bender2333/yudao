@@ -7396,6 +7396,10 @@ export type ContextAssembledPayload = {
      * Output Reserve Tokens
      */
     output_reserve_tokens: number;
+    /**
+     * Previous Usage Tokens
+     */
+    previous_usage_tokens?: number | null;
     parts_ref: ArtifactRef;
     /**
      * Run Id
