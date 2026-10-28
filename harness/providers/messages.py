@@ -35,6 +35,7 @@ from .responses import (
     _created_stream,
     _diagnostic_code,
     _error_object,
+    _http_status_diagnostics,
     _http_status_reason,
     _is_context_overflow,
     _provider_events,
@@ -43,6 +44,7 @@ from .responses import (
     _retryable_http_status,
     _sdk_json,
     _transport_diagnostics,
+    _upstream_error_text,
 )
 from .sdk import anthropic_base_url
 from .tls import ssl_context
@@ -89,12 +91,11 @@ async def invoke_messages(
     except APIStatusError as exc:
         code = _error_type(exc.body)
         status_reason = _http_status_reason(exc.status_code)
-        reason = status_reason or ("context_overflow" if _is_context_overflow(code) else "provider_error")
-        diagnostics = {
-            "status_code": exc.status_code,
-            "request_observation_id": _observation_id(invocation),
-        }
-        diagnostics.update(_diagnostic_code(code, "http_status"))
+        secrets = (frozen_target.api_key,)
+        error_text = _upstream_error_text(exc, secrets=secrets)
+        reason = status_reason or ("context_overflow" if _is_context_overflow(code, error_text) else "provider_error")
+        diagnostics = _http_status_diagnostics(exc, _observation_id(invocation),
+                                              secrets=secrets, error_text=error_text)
         retry_after = _retry_after(getattr(getattr(exc, "response", None), "headers", None))
         if retry_after is not None:
             diagnostics["retry_after_sec"] = retry_after

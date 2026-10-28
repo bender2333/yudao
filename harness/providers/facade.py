@@ -871,7 +871,7 @@ class ProviderFacade:
         except ProviderError as exc:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
             return {
-                "ok": False, "error": str(exc), "model": None, "admitted": False,
+                "ok": False, "error": _model_test_failure_reason(exc), "model": None, "admitted": False,
                 "protocol": model.protocol, "revision": self.revision,
                 "elapsed_ms": elapsed_ms, "usage_reported": False,
             }
@@ -1591,6 +1591,13 @@ def _require_capacity(rows: Sequence[Mapping[str, Any]], provider_id: Any,
 def _admission_state_text(record: AdmissionRecord | None) -> str:
     # 未写记录与已作废分开表述，各处解析入口共用同一措辞
     return "尚未通过模型测试准入" if record is None else "准入已作废"
+
+
+def _model_test_failure_reason(error: ProviderError) -> str:
+    # 模型测试失败时写上游给出的原因（设计说明第 9.1 节，工单 #294）：上游有错误原文时写原文，
+    # 没有时照旧写状态码那句（401 与 403 不记回应体，见第 13.4 节）
+    message = (error.diagnostics or {}).get("error_message")
+    return message if isinstance(message, str) and message.strip() else str(error)
 
 
 def _provider_dependents(store: ProviderStore, bindings: Mapping[str, Mapping[str, str]],

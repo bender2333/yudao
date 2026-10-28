@@ -104,8 +104,9 @@ class LoopSystem:
             deltas=self.deltas,
             tightening=WATCHED_OUTPUTS,
             # 路由实现按组织定义里的名称接上（工单 #825）：watched_outputs 在模块加载时登记名称，
-            # 定义加载时已经核对过这个名字在 routings.json 里；这里接上并再核对一次契约版本
-            routing=routing_contract.select(DEFINITIONS.routing),
+            # 定义加载时已经核对过这个名字在 routings.json 里；这里接上、核对契约版本、让它校验同一份定义，
+            # 并把事件库的只读读取器交给声明了 use_facts 的路由（契约第三版，工单 #1164）
+            routing=routing_contract.select(DEFINITIONS.routing, DEFINITIONS, store=self.store),
             # 决定请求的处理与建档的流转在应用层（工单 #827）：薄驱动接上它，只转交
             decision_flow=DECISION_FLOW,
             assembly=assembly_implementation,
