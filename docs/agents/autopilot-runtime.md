@@ -151,6 +151,13 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | `YUDAO_EVAL_API_KEY` | 凭据，不写进仓库、工单、PR、日志与日记 |
 | `YUDAO_EVAL_MODEL` | 模型名，与上表一致；换模型时两处一起改 |
 
+2026-10-29 实测：会话进程里可能没有 `YUDAO_EVAL_API_KEY`（用户级有、这个进程没继承），`YUDAO_VISION_API_KEY` 也没有；`vision.mjs` 在没有 `SOLO_VISION_*` 时沿用 `YUDAO_EVAL_API_KEY`，所以看图只缺这一样。用到凭据的命令，先在本进程里补一行再跑，值只在进程里存在，不写进文件、评论与日记：
+
+```powershell
+$env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_KEY', 'User')
+```
+
+
 - 不用 9router 上 `cc/` 分组的模型（用户，2026-10-18）。
 - 不放进 CI：CI 没有这三个变量，需要模型的测试在 CI 中不运行。
 - 用户级的环境变量只对设置以后启动的进程生效；修改以后，派发者重新启动，执行者与审查者从下一次派发起读到。
@@ -190,7 +197,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 同一个 PR 要求修改的上限 | 3 次，第 3 次时搁置 | 派发者规则第 3 节第 4、5 步 |
 | 工单大小的上限 | 「只改」清单中手写文件 15 个；生成的客户端类型、接口快照、事件序列基准与日记不计 | `CLAUDE.md`「工单规范」；`AGENTS.md` 执行者第 2 步 |
 | 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/`；可信内核：`harness/definitions/kernel-manifest.json` 里 `kind` 为 `module` 的路径 | `CLAUDE.md`「工单规范」 |
-| 唤醒架构师 | 关 | 派发者规则第 3 节第 7 步；`CLAUDE.md`「Solo 模式」要求 solo 与架构师循环运行期间保持开，架构师循环也读这一个开关，关着时整轮不做。用户在场的会话做大的设计修改时改为关，做完改回开 |
+| 唤醒架构师 | 开 | 派发者规则第 3 节第 7 步；`CLAUDE.md`「Solo 模式」要求 solo 与架构师循环运行期间保持开，架构师循环也读这一个开关，关着时整轮不做。用户在场的会话做大的设计修改时改为关，做完改回开 |
 | 被唤醒的架构师一次运行的时长 | 4 小时 | 派发者规则第 3 节第 7 步 |
 | 架构师循环的间隔 | 30 分钟 | 第 3 节启动命令；一轮只做一个子代理，做完结束回合 |
 | 同一张工单唤醒或分诊的上限 | 2 次，第 3 次直接交给用户 | 派发者规则第 3 节第 7 步；`CLAUDE.md`「被唤醒的架构师」与 [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md) |

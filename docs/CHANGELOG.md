@@ -7,7 +7,11 @@
 
 ---
 
-solo-deepseek-v4.1-flash / 2026-10-29 00:25 / 工单 #1155 [执行] 整理请求失败不再结束事项：README「停止与后续范围」改写压缩那一句——整理请求自己失败（重试耗尽，或回应不是摘要文字）时同样不写检查点、这一步的工作请求按未压缩的历史照常发出（放不进窗口时以上下文超限结束）、下一次再整理，回应里带文字就用文字、未声明的工具调用不执行也不进入历史；连续 `compaction.stalled_limit` 次没有推进的原因里加上「整理请求失败」 / 落实 `docs/design/model-management.md` 第 8.7 节第一条（代码与用例同单改动，文档只改这一句读者看得见的停止规则）
+solo-deepseek-v4.1-flash / 2026-10-29 00:25 / 工单 #1155 [执行] 整理请求失败不再结束事项：README「停止与后续范围」改写压缩那一句——整理请求自己失败（重试耗尽，或回应不是摘要文字）时同样不写检查点、这一步的工作请求按未压缩的历史照常发出（放不进窗口时以上下文超限结束）、下一次再整理，回应里带文字就用文字、未声明的工具调用不执行也不进入历史；连续 `compaction.stalled_limit` 次没有推进的原因里加上「整理请求失败」 / 落实 `docs/design/model-management.md` 第 8.7 节第一条与第二条（代码与用例同单改动，文档只改这一句读者看得见的停止规则）
+
+claude-架构师 / 2026-10-29 00:10 / docs/program-roadmap.md、docs/current-baseline.md、docs/requirements/README.md 的 D40 一行、docs/design/README.md 的骨架与应用设计说明一行：把阶段一「换骨架」的状态与日期改到本次核对（父工单 #823 子工单 22/22 关闭，七条验收在 main a5b5a3c7 上逐条核对，第 6 条后半的场景 3 读数由 #994 在阶段一发布提交上跑），内容未重写 / 父工单按验收证据规则第 4 节核对后关闭，证据写在 #823 的评论 https://github.com/bender2333/yudao/issues/823#issuecomment-6474145556；总图的建设状态与缝的已定未定仍由总架构师改，需要改的行写在同一条评论里
+
+solo-deepseek-v4.1-flash / 2026-10-29 00:05 / 工单 #1160 [界面]：本文件加这一条。界面按当前定稿 v13 改了三处（概览的新事项输入一个框配两个按钮、事项统计那一行的名字、新建项目表单的说明），`docs/` 下的设计说明与原型都没有改：v13 的 `docs/prototypes/v13/js/ui/views/overview.js`（`composerHtml`）与 `docs/prototypes/v13/js/ui/shell.js`（`shell.newProject`）就是这次的依据，`docs/design/project-initial-files.md` 第 3、5 节写的起始文件夹快照与「从想法新建不调用模型」没有变 / 试用问题 Tf61ac6a6-05（两个文本框不知该填哪个）与 Tf61ac6a6-08（事项统计叫「已放行」实际是放行了还没采纳、漏了成果挂起），另补 Tf61ac6a6-10 分诊后剩下的那处表单说明
 
 claude-架构师 / 2026-10-28 18:55 / .claude/skills/trial/ 三处改动：SKILL.md 新增 3.1 节「把两个模型配进产品」并改掉单 agent 对照（用户决定不跑）、第 5 节与第 13 节的看图改成 scripts/vision.mjs、两个模型的部门分工改为产品与工程 model1 加质检 model2；新增 scripts/vision.mjs（把截图发给 ag/gemini-3.8-flash-high，Node 内置模块）；preflight.ps1 的模型检查改为 YUDAO_VISION_* 并去掉三项 YUDAO_EVAL_MODEL_* 警告 / 用户 2026-10-28 指定运行模型用 model1、需要视觉判断用 gemini 3.8 flash high、OpenCode 对照不用跑；实测下来会话里的看图子代理走不通（harness 的模型声明只有文本输入），改用脚本直接调同一模型的接口，已实测能读出页面细节
 
@@ -666,4 +670,33 @@ claude-opus-5-5（总架构师） / 2026-10-28 23:40 / 新增 `.claude/skills/ar
 
 claude-opus-5-5（总架构师） / 2026-10-28 23:40 / `.github/workflows/ci.yml` 新增作业「工作台脚本」：`node --test` 跑 `.claude/skills/solo/scripts/test/` 的用例，并对 `solo.mjs`、`hook.mjs`、`state.mjs` 做语法检查；`check` 改为五项都成功才成功 / 工作台的判断第一次进 CI，这一层判错了整个交付队列都跟着错claude-opus-5-5（总架构师） / 2026-10-28 23:45 / `.claude/skills/solo/scripts/`：新增 `lib/`（`select` 选活与阻塞、`labels` 补标签与分支名、`tasks-format` tasks.md 解析、`check-rules` 收账的检查汇总、`report` 一屏状态），用例在 `test/` 共 56 条（选活 24、一屏 12、tasks 解析 9、标签 7、收账 4），`solo.mjs` 加 `report` 命令、`saveLedger` 顺带写 `beatAt` 心跳，`reap --stale` 与 `report` 的「卡住」共用一份阈值；`state.mjs` 改为从 `lib/` 导入并重新导出，对外符号不减 / 工作台的判断第一次能被单独验证：这一层判错，整个交付队列都跟着错；`next` 与 `report` 的「下一步」按同一次拉到的开放工单算，台账里 pending、GitHub 上已关的单子不再被当成下一步（实测 #477 就属于这种）
 
-claude-opus-5-5（总架构师） / 2026-10-28 23:45 / 第二层：新增 `.claude/skills/architect-loop/SKILL.md`，`CLAUDE.md` 的「子架构师」「工作流程」第 7 步、「达到检查」「被唤醒的架构师」「Solo 模式」接上它，「被唤醒的架构师」加「不放宽验收」；`docs/agents/` 四处（triage-labels、autopilot-runtime、shared-rules 第 11 条、acceptance-evidence 第 5 节）与 `docs/design/web-interface-and-release.md` 第 6.4 节、`.claude/skills/trial`、`trial-intake`、`solo` 三处技能按新分工改；`#994` 的「先后」与第一条验收改为 agent 试用 / 用户要求继续优化 solo 工作台；讨论 #1145 是方案来源，采纳时改了三处（薄片状态靠 GitHub 事实与固定首行的评论、不押未验证的手机推送、不新开账本），记在 `docs/decision.md` 同日一条
+claude-opus-5-5（总架构师） / 2026-10-28 23:45 / 第二层：新增 `.claude/skills/architect-loop/SKILL.md`，`CLAUDE.md` 的「子架构师」「工作流程」第 7 步、「达到检查」「被唤醒的架构师」「Solo 模式」接上它，「被唤醒的架构师」加「不放宽验收」；`docs/agents/` 四处（triage-labels、autopilot-runtime、shared-rules 第 11 条、acceptance-evidence 第 5 节）与 `docs/design/web-interface-and-release.md` 第 6.4 节、`.claude/skills/trial`、`trial-intake`、`solo` 三处技能按新分工改；`#994` 的「先后」与第一条验收改为 agent 试用 / 用户要求继续优化 solo 工作台；讨论 #1145 是方案来源，采纳时改了三处（薄片状态靠 GitHub 事实与固定首行的评论、不押未验证的手机推送、不新开账本），记在 `docs/decision.md` 同日一条claude-架构师 / 2026-10-29 00:25 / `docs/agents/autopilot-runtime.md` 第 7 节「唤醒架构师」改为开 / 用户要求参与循环并按讨论 #1145 的做法全程推进（「尽可能不要让我定，参与循环」），架构师循环读这个开关，关着整轮不做
+
+claude-架构师 / 2026-10-29 00:25 / 没有改文档：solo 账本进入第 12 轮，收进 9 张工单（#1164、#1155、#1157、#1158、#1159、#1160、#1161、#1162 与一张已关闭的），派出 3 张；父工单 #823 的验收开始核对 / 见 `claude_jour.md` 同日一条
+
+claude-opus-5-5 / 2026-10-28 23:30 / `docs/design/model-management.md` 第 4.2 节补凭据引用的键名规则与写入 `.env` 以后的来源，第 8.7 节补整理回应带工具调用时的处理，第 13.4 节补失败尝试记上游的错误原文；`docs/design/app-and-interface.md` 第 4.1 节写明以事项为对象的查询的参数名，第 4.3 节 `project.overview` 的卡片带停止说明；两份的状态行随之改；`docs/decision.md` 追加一条 / 试用 #1153 的分诊（工单 #1155 至 #1162）
+claude-架构师 / 2026-10-29 00:45 / 总图第一节：薄驱动、槽位——装配、裁决与边界三个方框从「建了一半」改为「已建」，槽位——路由与槽位——执行仍为「建了一半」但文字说准（按成果的路由已建、第二种路由只有测试用的一份；执行已按契约抽成槽位、外包角色未建）；页脚日期改为 main 2026-10-29 / 架构师循环核对 #823 的七条验收全部有证据（内核 3571 行、四道契约版本与实现声明、薄驱动 2070 行零部门名、两种反向核对、第二种路由与第二种装配执行实现），状态按 main 改
+
+claude-架构师 / 2026-10-29 00:45 / `docs/design/skeleton-and-application.md` 第 15 节：验收第 6 条只留「换骨架期间事件序列基准不变」，阶段一发布提交上跑场景 3、记「无对照（首个发布）」另起一段写成阶段发布时的版本回归、由试用工单承接（#994 第 2 条）/ 原来把发布时的读数写进工作包关闭条件，与「工作包先关、发布在后」的顺序相抵；#823 已按前半过、后半交 #994
+
+claude-架构师 / 2026-10-29 01:10 / `docs/design/app-and-interface.md` 第 2.4 节：控制核心公开接口从八类补成十一类，`harness/app/` 导入的 25 个模块逐个归位，`pyproject.toml` 的合同按这张表列；`docs/architecture-issues.md` 给 #829 的两条与 #864 的两条补处理行 / 架构师循环第 5 类（没写处理行的登记）；八类原样是 S6a 之前的说法，#829 实测多出 10 个模块
+
+claude-架构师 / 2026-10-29 01:10 / 新开 #1169：写入口与薄驱动核对停止原因、部门时读事项所用的那份定义，`ready-for-agent`，不挂里程碑 / #864 的第二条登记（`harness/write_path.py` 第 329、357 行仍读模块级 `DEFINITIONS`）；它在 solo 的范围之外，等阶段二的第二种路由要做时再领
+
+claude-架构师 / 2026-10-29 01:35 / `docs/agents/autopilot-runtime.md` 第 4 节补一段实测：会话进程里没有 `YUDAO_EVAL_API_KEY`（用户级有、进程没继承）、`YUDAO_VISION_API_KEY` 也没有，`vision.mjs` 在没有 `SOLO_VISION_*` 时沿用 `YUDAO_EVAL_API_KEY`；用到凭据的命令先在本进程里从用户级补一行 / #1160 的交付说明写着「未识图」，查下来是这一处进程环境，不是缺凭据本身
+
+claude-架构师 / 2026-10-29 01:35 / 新开 #1185：成果挂起的计数补一条能造出 held 事项的验收（`ready-for-agent`，不挂里程碑）/ #1160 的收尾建议；「成果挂起」这一格现在只有代码核对
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:00 / `docs/design/app-and-interface.md` 第 2.4 节写入应用层可导入的控制核心公开接口的模块清单（九类，`models` 归应用）；第 4.3 节 `run.recovery` 一行补 v13 恢复页要的字段，表后加 `project.loop`、`system.status.drain`、`work_item_created` 的补充与整层中断的取值 / #829 的架构问题登记；#181 拆分之前设计要先有
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:00 / `docs/design/skeleton-and-application.md` 第 5.1 节「输入」补路由读事件的可选入口 `use_facts`（契约版本 3）；`docs/architecture-issues.md` 四条登记各加处理行 / #864 与 #829 的架构问题登记
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:05 / `docs/program-roadmap.md` 阶段二一行的先后改正：④ 在 ② 与 ③ 之后，状态行收成一行 / 工单的真实依赖：#990 依赖 #123，#358、#397、#399 依赖 #151
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:05 / `docs/requirements/self-hosting.md` 加「第一层试点的配对验收约定」（从已归档的旧路线图搬入，试点的六张题改为薄片 ⑤ 开始时选）；`docs/evaluation/baseline-omp-stage3.md`、`docs/prototypes/v10/design.md` 里指向旧路线图第 6.1 节的链接改指它 / 阶段二进入包第 4 项；#395 的六张画面工单是薄片 ④ 的交付
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:10 / `docs/design/independent-verification.md` 加第 7.1 节「口径」；`docs/design/browser-and-computer-use.md` 第 8.3 节放行规则与返工结论改成与它一致、核对位置改为 `tightening.py` / #151 的核对：放行规则与「含开环条件可放行」互相矛盾，三个数的口径各处不一
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:15 / `docs/design/network-and-mcp.md` 第 16 节工单拆分整段重排，加第 18 节「本机的做法」 / 去掉对阶段四 #128 的依赖；#68、#236 超过工单大小上限
+
+claude-sonnet-5-5（总架构师） / 2026-10-29 01:20 / `docs/current-baseline.md` 头部更新段收成一行状态，换骨架、恢复、接入已有项目、评测工作线四行与共享上下文、网络与 MCP 两个开放项按核对改；`docs/agents/acceptance-evidence.md` 第 65 行对路线图第 1.4 节的引用改为 `CLAUDE.md`「工单规范」 / 核对 main 时发现这些行与现状不符；路线图已没有第 1.4 节

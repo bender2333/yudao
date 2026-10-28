@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-状态：设计说明，依据总体架构编写，第 10 节的事项由架构师决定，未实施；最近一次改动 2026-10-28，去掉已删除的 ADR 的引用，第 3.3 节决定种类表中的「判定点升级以后仍然不确定」改为「判定点不确定」。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（删除命令登记、一次性批准与动作核实的决定）、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../archive/prototypes/v7/design.md)第 7 节、[构建约定](../archive/prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../archive/prototypes/v9/design.md)与[构建约定](../archive/prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../archive/prototypes/v8/design.md)与[构建约定](../archive/prototypes/v8/BUILD.md)），系统首页、机器页与系统通知以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../archive/research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。总图位置：第四节「接口」的缝；第一节「界面」方框。
+状态：设计说明，依据总体架构编写，第 10 节的事项由架构师决定，未实施；最近一次改动 2026-10-28，按试用 #1153 在第 4.1 节写明以事项为对象的查询的参数名，第 4.3 节 `project.overview` 的卡片带停止说明。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（删除命令登记、一次性批准与动作核实的决定）、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../archive/prototypes/v7/design.md)第 7 节、[构建约定](../archive/prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../archive/prototypes/v9/design.md)与[构建约定](../archive/prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../archive/prototypes/v8/design.md)与[构建约定](../archive/prototypes/v8/BUILD.md)），系统首页、机器页与系统通知以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../archive/research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。总图位置：第四节「接口」的缝；第一节「界面」方框。
 
 ## 1. 要解决的问题
 
@@ -106,7 +106,24 @@ flowchart TB
 
 ### 2.4 依赖规则
 
-- 接口层只导入应用层；应用层只导入控制核心的公开接口（流程编排的入口、写入口、事件日志的读取与订阅、保存的投影、输出片段通道）、知识层的查询、Provider 模块的管理接口与执行环境池的只读接口（机器状态，3.2C）；控制核心不导入应用层。三条规则用 import-linter 的层次合同在测试中检查。
+- 接口层只导入应用层；应用层只导入控制核心的公开接口、知识层的查询、Provider 模块的管理接口与执行环境池的只读接口（机器状态，3.2C）；控制核心不导入应用层。三条规则用 import-linter 的层次合同在测试中检查。
+- 控制核心的公开接口分十一类，`harness/app/` 实际导入的 25 个模块全部有归属（2026-10-29 按 S6a 的实测归类，#829）：
+
+  | 类 | 模块 |
+  | --- | --- |
+  | 流程编排的入口 | `runtime`、`recovery` |
+  | 写入口 | `write_path`、`writeback`（采纳写回的状态） |
+  | 事件日志的读取与订阅 | `event_store`、`kernel_events`、`streams`、`models`（事件种类与名词的声明） |
+  | 保存的投影 | `projection`、`project_projection`、`minimal_projection` |
+  | 输出片段通道 | `deltas` |
+  | 知识层的查询 | `projects`、`observability`、`parameters`、`interactions` |
+  | Provider 模块的管理接口 | `providers`（含 `providers.errors`、`providers.selection`） |
+  | 执行环境池的只读接口 | 机器状态（3.2C） |
+  | 定义的加载与校验 | `definitions` |
+  | 工件、封存树与 Git 版本 | `artifacts`、`tree_archive`、`git_versions` |
+  | 决定、路径规则、脱敏与重放核对 | `decisions`、`path_rules`、`redact`、`replay_check` |
+
+- `pyproject.toml` 的合同「应用层只导入控制核心的公开接口」按这张表列全部 25 个模块：清单以外多一行导入即失败，并报出是哪一个。
 - 命令行在进程内调用应用层的同一套命令与查询，输出查询结果（快照与位置）或命令结果的 JSON。
 - 单机部署时接口层、应用层与控制核心在一个进程、一个事件循环中运行（[总体架构](architecture/overall-architecture.md)第 3 节第 2 条）；uvicorn 的事件循环就是控制核心的事件循环。
 - 3.2C 把执行环境放到登记的其他机器上时，接口层、应用层与接口合同不变（[ADR-0018](../adr/0018-single-control-host-remote-execution.md)）。
@@ -355,6 +372,7 @@ sequenceDiagram
 - `position` 是这份快照已经包含的最大全局位置。页面据此从事件流的 `position` 之后续上（第 5.4 节）。
 - 快照中每个可以修改的对象带自己的 `version`，作为命令的基准版本。
 - 项目内的查询都接受事项范围参数 `work_item`（原型第 3.3 节的 `?w=`）。
+- 以一个事项为对象的查询（`work_item.inputs`、`work_item.materials`）用同一个参数名 `work_item`；命令的参数、结果与事件里的字段叫 `work_item_id`。查询参数不为了统一后缀而改名（2026-10-28 试用 Tf61ac6a6-12：改名要升接口版本、改接口快照与评测运行器，换来的只是名字一致）。
 - **事项范围是项目级的一份作用域**，只写在地址的 `?w=` 里，页面按需读它（工单 #746）：不是每页各存一份，界面上也不再另存一份状态。
   - 顶栏的范围选择框换范围时**留在当前页**，只改这一个参数（原型 v10 的 `Y10.paths.withScope`）：概览、部门工作间、资料、观测按所选范围显示。
   - 页签的地址带着当前的 `?w=`，切页签不丢范围；没有范围时不带这个参数（地址里不留空的 `?w=`）。
@@ -422,7 +440,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `project.overview` | 长期目标、当前成果（采纳版本与摘要；建档采纳时显示「建档基线」、快照来源与现有缺陷数）、事项统计、事项列表（看板的列、卡片的状态、事项的种类、所在部门、按成果推算的进度、三个部门各自的状态与原因（`departments`，[三部门的循环结构](department-loop.md)第 2.1 节）、第几轮、待决问题或停止原因） | | 已有 `GET /api/projects/{id}` 与 `/board`，合并；删除读取时的结算；建档基线与事项的种类新增（3.8） |
+| `project.overview` | 长期目标、当前成果（采纳版本与摘要；建档采纳时显示「建档基线」、快照来源与现有缺陷数）、事项统计、事项列表（看板的列、卡片的状态、事项的种类、所在部门、按成果推算的进度、三个部门各自的状态与原因（`departments`，[三部门的循环结构](department-loop.md)第 2.1 节）、第几轮、待决问题或停止原因；停止的事项另带停止说明，即让事项停下的那条错误的原文，取自事项结束的事件，询问分支的失败原因不算，页面在停止原因下面原样写出（2026-10-28 试用 Tf61ac6a6-09）） | | 已有 `GET /api/projects/{id}` 与 `/board`，合并；删除读取时的结算；建档基线与事项的种类新增（3.8） |
 | `project.loop` | 每个事项的颜色序号（按创建顺序）、种类与建档事项等待确认时的状态（3.8）、状态、当前部门、按成果推算的进度、三个部门各自的状态与原因（`departments`，循环结构第 2.1 节）、第几轮、已用时间与时间上限、门牌文字、恢复观察状态（3.1）、排队顺序（3.4A）；进行中的询问；成果库的采纳版本；执行槽位（3.4A）；本项目正在使用的机器与其上的动作（3.2C）；运维状态（Stage 4）与判定记录（Stage 6）；每个事实元素（门牌、轮次、已用时间、包裹、盖章、成果库的箱子）带给出它的事件位置与来源种类（自举试点的首批工单，第 5.2 节、[画面与播放设计说明](visualization.md)第 8 节 H4） | 可回放（第 4.1 节 `at`） | 新增；当前档的内容取自运行状态投影与项目投影 |
 | `project.flow` | 流转记录：时间、方向、类型（PRD 新版本、版本交付、询问、问题反馈）、内容、状态、原始事件；每接纳一版 PRD 有两条「PRD 新版本」，产品→工程与产品→质检，因为两个部门都关注它；询问的记录来自询问的开始与结束事件，质检提交缺陷记录让工程返工，这一类流转的种类是问题反馈（[三部门的循环结构](department-loop.md)第 2、4.7 节）。种类按成果命名，不用「交接」 | 流转记录读取模型的位置 | 新增；数据现在散在 `GET /api/runs/{id}` 的 `timeline` 与 `GET /api/projects/{id}/work-items/{wid}` 的 `handoffs` |
 | `work_item.inputs` | 输入记录：版本、来源、原文、接收时间、处理进度（已接收、已交给产品处理、已由有效需求接纳） | | 已有，在 `GET /api/runs/{id}` 的 `inputs` 中 |
@@ -445,7 +463,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `run.recovery` | 恢复观察状态、待恢复原因、最后已确认位置、未完成动作、核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果 | | 新增（#16 至 #18） |
+| `run.recovery` | 恢复观察状态、待恢复原因、最后已确认位置、未完成动作、核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果；2026-10-29 按 v13 恢复页补的字段：最后已确认位置的文字与时间（`last_confirmed_text`，来自最后一条事件）、执行权的中断位置（`owner.interrupted_at_event_id` 与文字，来自 `run_resumed` 的依据）、未完成动作的处理方式与核实依据（`unknown_actions[]`：`handling`、`session_id`、`purpose`、`input_version`、`before`、`returned`、`at`，来自 `tool_started` 与 `action_verified`）、各会话的用量（`sessions[]`：部门、主线或分支、已用秒、轮数、步数，来自最小投影）、因升级停止的新旧 run 关联（`upgrade`：旧新 run、事件版本、起点；来自 `run_failed` 的停止原因与 `work_item_created.restarted_from_run_id`，该字段只增） | | 新增（#16 至 #18），字段补充见 #181 的拆分 |
 
 **资料**
 
@@ -531,6 +549,14 @@ sequenceDiagram
 | `replay.check` | 删除保存的投影后在内存中重放一个 run 或项目，与保存的投影比较，返回是否一致与差异 | | 已有 `POST /api/runs/{id}/replay` 与命令行 `replay`，改为查询 |
 
 查询共 41 个：由已有路由改成或合并的 14 个，其余为新增。
+
+2026-10-29 补充（恢复页按 v13 补齐，工单 #181 的拆分）：
+
+- `project.loop` 每个事项加 `stop_reason`（来自 run 的停止原因）与 `last_department`（来自最后活动的部门），画面的「门口牌子」与概览入口读它们；卡片不另存 `recovery_state`。
+- `system.status.drain` 加 `since`（来自 `runtime_drain_started`）与 `running[]`（未结束的 run 与事项标题）。
+- `work_item_created` 加字段 `restarted_from_run_id`（只增）：强制升级以后事项用已采纳成果重新开始，新旧 run 的关联由它给出；队列里的位置没有实现，页面不显示「第几位」。
+- 整层「中断」（画面变暗、时钟停住）的取值：事件流断开，或任一事项的 `recovery.state` 是 `interrupted`。服务进程被强行结束时读不到 `interrupted`（未结束的激活在 `finally` 才结束），所以以事件流断开为准；服务回来、页面重新连接并看到自动继续以后恢复。
+- 强制升级与开始排空一样，执行前有确认框，说明会让正在进行的 run 记为因升级停止。
 
 ### 4.4 删除的读取路由
 

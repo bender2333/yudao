@@ -126,7 +126,9 @@ export function Sidebar(props: SidebarProps) {
             busy={command.busy}
             submitted={command.submitted}
             problem={command.problem}
+            accepted={command.accepted}
             onClose={() => setCreating(null)}
+            onNavigate={props.onNavigate}
             onSubmit={(name, body) => command.submit(name, body)}
           />
         ) : null}
@@ -215,14 +217,29 @@ export function Sidebar(props: SidebarProps) {
   );
 }
 
+// 命令受理回执里的标识：project.create 与 project.onboard 都带 refs.project_id，
+// 新建成功以后用它转到新项目的概览（工单 #1160）；没有这一项时返回空串
+function receiptId(accepted: Record<string, unknown> | null, key: string): string {
+  const refs = accepted?.["refs"];
+  if (refs === null || refs === undefined || typeof refs !== "object") {
+    return "";
+  }
+  const value = (refs as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : "";
+}
+
 // 新建项目：名称与长期目标必填；从想法新建可以另填一个起始文件夹（留空则从空项目开始），
-// 接入已有项目另登记源目录的名称与路径
+// 接入已有项目另登记源目录的名称与路径。说明照原型 v13（工单 #1160）：起始文件夹是一份快照，
+// 新建项目不调用模型；新建成功以后转到新项目的概览（原型 v13 的 shell.createProject）。
 function NewProject(props: {
   mode: "idea" | "existing";
   busy: boolean;
   submitted: boolean;
   problem: CommandProblem | null;
+  /** 最近一次被接受的受理回执：新建成功以后从它的 refs.project_id 转到新项目 */
+  accepted: Record<string, unknown> | null;
   onClose: () => void;
+  onNavigate: (hash: string) => void;
   onSubmit: (name: string, body: Record<string, unknown>) => Promise<boolean>;
 }) {
   const [name, setName] = useState("");
@@ -234,13 +251,17 @@ function NewProject(props: {
   const commandName = props.mode === "idea" ? "project.create" : "project.onboard";
 
   // 本次提交被接受以后等事件到达：项目列表由事件到达时重新查询，列表出现新内容以后「已提交」消失，
-  // 这时关闭表单，各字段随表单一起清空（工单 #295 第 1 项）。
+  // 这时关闭表单，各字段随表单一起清空（工单 #295 第 1 项），并转到新项目的概览（工单 #1160）。
   // 被拒绝时 submit 返回假，表单保留已填字段并显示原因；等待只记在这一次挂载上，
   // 取消以后重新打开的表单不会因为上一次提交的余波自己关闭
   const [waitingWrite, setWaitingWrite] = useState(false);
   useEffect(() => {
     if (waitingWrite && !props.submitted) {
+      const projectId = receiptId(props.accepted, "project_id");
       props.onClose();
+      if (projectId !== "") {
+        props.onNavigate(`#/p/${projectId}/overview`);
+      }
     }
   }, [waitingWrite, props.submitted]);
 
@@ -280,7 +301,7 @@ function NewProject(props: {
         </label>
         {props.mode === "idea" ? (
           <label className="y10-field field">
-            <span>起始文件夹</span>
+            <span>起始文件夹（可选）</span>
             <input
               className="y10-input"
               type="text"
@@ -288,6 +309,8 @@ function NewProject(props: {
               placeholder="控制主机上的文件夹路径，留空则从空项目开始"
               onChange={(event) => setInitialDirectory(event.target.value)}
             />
+            {/* 起始文件夹是一份快照（项目的起始文件夹设计说明第 5 节）：原型 v13 的说明，工单 #1160 */}
+            <small className="y10-muted">填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。</small>
           </label>
         ) : null}
         {props.mode === "existing" ? (
@@ -302,6 +325,9 @@ function NewProject(props: {
             </label>
             <p className="y10-note note">接入以后会登记源目录、采集代码快照并开始建档事项（3.8）。</p>
           </>
+        ) : null}
+        {props.mode === "idea" ? (
+          <p className="y10-note note">新建项目不调用模型；之后在概览中记录原文或作为新事项开始。</p>
         ) : null}
         <div className="y10-row">
           <button type="submit" className="y10-btn primary" disabled={props.busy || !ready}>
