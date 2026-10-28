@@ -9,6 +9,7 @@
  *   node .claude/skills/solo/scripts/solo.mjs <命令> [选项]
  *
  *   state                                      一行摘要（轮次、计数、并发位置、失败中的任务）
+ *   report                                     一屏现状：在跑、卡住、等你、交回、依赖、下一步、心跳
  *   tasks [--json]                             任务清单
  *   next [--max N] [--dry-run]                 挑出可以派的任务
  *   refresh [--dry-run]                        按外部工单的真实状态刷新台账
@@ -38,7 +39,6 @@ import { createHash } from 'node:crypto';
 import {
   LEDGER_DIR,
   FLOW_LABELS,
-  PARKED_LABELS,
   readJson,
   writeJson,
   num,
@@ -53,6 +53,10 @@ import {
   parseTasksText,
   safeFileName,
 } from './state.mjs';
+import { openBlockers, isSelectable, pickUpTo } from './lib/select.mjs';
+import { labelsToDrop, branchFor } from './lib/labels.mjs';
+import { checkRollup, checkLabels } from './lib/check-rules.mjs';
+import { summarize, scopeDisplay, beatLine, STALE_MINUTES } from './lib/report.mjs';
 
 const NOW = () => new Date().toISOString();
 const CHECKBOX_LINE = /^([ \t]*[-*][ \t]*\[)( |x|X|~|-)(\])(.*)$/;
@@ -118,6 +122,7 @@ function ensureSchema(loop) {
 function saveLedger(loop) {
   ensureSchema(loop);
   loop.state.updatedAt = NOW();
+  loop.state.beatAt = NOW();
   writeJson(loop.stateFile, loop.state);
 }
 
@@ -301,10 +306,6 @@ function fetchIssues(repo, maxPages = 8) {
   return { issues, complete, pages, lastError };
 }
 
-function openBlockers(issue) {
-  return (issue.blockedBy || []).filter((b) => b.state === 'OPEN').map((b) => b.number);
-}
-
 /** 单张工单的状态（OPEN / CLOSED）。fetchIssues 只拉开放的工单，台账里的单子不在其中时用它查；查不到返回空串。 */
 function issueState(loop, number) {
   const view = ghJson(['issue', 'view', String(number), '--json', 'state'], null, loop.root);
@@ -383,14 +384,9 @@ function scopeConfig(loop, args) {
   return scope;
 }
 
+/** 范围一句话：report 一屏用的是同一份拼法，见 lib/report.mjs。 */
 function scopeLabel(scope) {
-  const bits = [];
-  if (scope.milestoneIds.length) {
-    bits.push('里程碑 ' + scope.milestoneIds.map((id) => '#' + id + (scope.milestoneTitles[id] ? '（' + scope.milestoneTitles[id] + '）' : '')).join(' '));
-  }
-  if (scope.labels.length) bits.push('标签 ' + scope.labels.join('/'));
-  if (scope.prefixes.length) bits.push('标题前缀 ' + scope.prefixes.join('/'));
-  return bits.join('，') || '（全部开放工单）';
+  return scopeDisplay(scope);
 }
 
 function inScopeOf(issue, scope) {
@@ -649,6 +645,40 @@ function commandState(args) {
   if (summary.forUser.length) lines.push('等用户: ' + summary.forUser.join(', '));
   if (summary.failing.length) lines.push('失败中: ' + summary.failing.join(', '));
   if (stalled.length) lines.push('可能停住的并发位置（先跑 reap）: ' + stalled.map((a) => a.task + ' ' + a.minutes + ' 分钟').join(', '));
+  const beat = beatLine(loop.state, now);
+  if (beat) lines.push(beat);
+  process.stdout.write(lines.join('\n') + '\n');
+}
+
+/**
+ * 一屏现状，给编排者与用户看。判断都在 lib/report.mjs，这里只读账本、现算在跑的人的进度。
+ * 不写账本：心跳由别的命令写盘时顺带更新。
+ */
+function commandReport(args) {
+  const loop = openLedger(args);
+  const tasks = parseTasks(loop);
+  const conc = concurrencyOf(loop);
+  const now = Date.now();
+  const flight = conc.active.map((a) => {
+    const target = worktreeTarget(loop, { id: a.task, issue: a.issue });
+    const dir = a.worktree || target.dir;
+    let sinceCommitMin = null;
+    if (fs.existsSync(dir)) {
+      const ts = num(git(dir, ['log', '-1', '--format=%ct']).stdout.trim(), 0);
+      if (ts) sinceCommitMin = Math.max(0, Math.round((now / 1000 - ts) / 60));
+    }
+    return {
+      task: a.task,
+      issue: a.issue,
+      branch: a.branch || target.branch,
+      minutes: Math.round((now - Date.parse(a.startedAt || 0)) / 60000),
+      sinceCommitMin,
+    };
+  });
+  const state = Object.assign({ loop: loop.name }, loop.state);
+  // 「下一步」要按 GitHub 上的现状判断：台账里 pending、GitHub 上已经关掉的单子不能当成下一步。
+  const { issues } = fetchIssues(detectRepo(loop), 2);
+  const { lines } = summarize({ state, tasks, now, flight, openIssues: issues });
   process.stdout.write(lines.join('\n') + '\n');
 }
 
@@ -708,38 +738,22 @@ function commandNext(args) {
     const byIssue = new Map(issues.map((i) => [i.number, i]));
     const max = Math.max(0, num(args.max, conc.max));
 
-    const candidates = tasks.filter((t) => {
-      if (t.status !== 'pending') return false;
-      if (activeIds.has(t.id)) return false;
-      if (inScopeAnnotated(t)) return false;
-      if (state[t.id] && state[t.id].escalated) return false;
-      if (state[t.id] && state[t.id].external) return false;
-      const issue = byIssue.get(t.issue);
-      if (!issue) return false;
-      // 阻塞方按这一次拉到的 blockedBy 判断：刚收进台账的工单没有 refresh 写的记录，阻塞方刚关闭时那份记录也是旧的。
-      if (openBlockers(issue).length) return false;
-      if (issue.labels.some((l) => PARKED_LABELS.includes(l))) return false;
-      return t.after.every((id) => doneIds.has(id));
-    });
+    // 阻塞方按这一次拉到的 blockedBy 判断：刚收进台账的工单没有 refresh 写的记录，阻塞方刚关闭时那份记录也是旧的。
+    const candidates = tasks.filter((t) => isSelectable(t, { activeIds, taskState: state, doneIds, issue: byIssue.get(t.issue) }));
 
     const activeExclusive = conc.active.filter((a) => {
       const t = taskById(tasks, a.task);
       return t && t.exclusive;
     }).length;
 
-    const picked = [];
-    const pickedIssues = new Set();
-    let exclusiveUsed = activeExclusive;
-    for (const t of candidates) {
-      if (picked.length >= max) break;
-      if (t.issue && pickedIssues.has(t.issue)) continue;
-      if (t.exclusive) {
-        if (exclusiveUsed >= conc.exclusiveLimit) continue;
-        exclusiveUsed += 1;
-      }
+    // 互斥名额减去在跑的人已经占掉的那几个；worktree 是 I/O，挑出来以后由这里补。
+    const picked = pickUpTo(candidates, {
+      max,
+      exclusiveLimit: Math.max(0, conc.exclusiveLimit - activeExclusive),
+      takenIssues: new Set(),
+    }).map((t) => {
       const target = worktreeTarget(loop, t);
-      if (t.issue) pickedIssues.add(t.issue);
-      picked.push({
+      return {
         task: t.id,
         issue: t.issue,
         exclusive: t.exclusive,
@@ -747,8 +761,8 @@ function commandNext(args) {
         worktree: target.dir,
         branch: target.branch,
         text: t.text,
-      });
-    }
+      };
+    });
 
     if (args.json) return emit(args, { scope: scopeLabel(scope), reconciled, picked, concurrency: conc, remaining: candidates.length - picked.length });
     const lines = [
@@ -773,9 +787,8 @@ function commandNext(args) {
 
 function worktreeTarget(loop, task) {
   const cfg = worktreeOf(loop);
-  const prefix = cfg.branchPrefix || 'issue-';
   const key = task.issue ? String(task.issue) : task.id;
-  const branch = prefix + key;
+  const branch = branchFor(cfg.branchPrefix, key);
   const root = cfg.root || defaultWorktreeRoot(loop);
   return { root, branch, dir: path.join(root, branch), base: cfg.base || 'origin/main' };
 }
@@ -868,7 +881,7 @@ function commandClaim(args) {
 
   const current = ghJson(['issue', 'view', String(issue), '--json', 'labels'], { labels: [] }, loop.root);
   const present = ((current && current.labels) || []).map((l) => l.name);
-  const drop = FLOW_LABELS.filter((l) => present.includes(l) && l !== 'in-progress');
+  const drop = labelsToDrop(present, 'in-progress');
   const ghArgs = ['issue', 'edit', String(issue), '--add-assignee', '@me', '--add-label', 'in-progress'];
   if (drop.length) ghArgs.push('--remove-label', drop.join(','));
   let result = gh(ghArgs, loop.root);
@@ -977,7 +990,7 @@ function hashText(text) {
 function verifyDone(loop, task) {
   const problems = [];
   const active = concurrencyOf(loop).active.find((a) => a.task === task.id);
-  const branch = active && active.branch ? active.branch : 'issue-' + task.issue;
+  const branch = active && active.branch ? active.branch : branchFor(worktreeOf(loop).branchPrefix, task.issue);
 
   const issue = ghJson(['issue', 'view', String(task.issue), '--json', 'state'], {}, loop.root);
   if (!issue || !issue.state) problems.push('读不到工单 #' + task.issue);
@@ -1003,10 +1016,9 @@ function verifyDone(loop, task) {
     problems.push('PR #' + pr.number + ' 还没合并（' + pr.state + '）');
   } else {
     const detail = ghJson(['pr', 'view', String(pr.number), '--json', 'statusCheckRollup'], {}, loop.root);
-    const checks = ((detail && detail.statusCheckRollup) || []).filter((c) => c && c.conclusion);
-    const bad = checks.filter((c) => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.conclusion));
-    if (!checks.length) problems.push('PR #' + pr.number + ' 上没看到检查结果');
-    else if (bad.length) problems.push('PR #' + pr.number + ' 的检查没全绿：' + bad.map((c) => (c.name || c.context || '检查') + ':' + c.conclusion).join(' '));
+    const rollup = checkRollup((detail && detail.statusCheckRollup) || []);
+    if (!rollup.total) problems.push('PR #' + pr.number + ' 上没看到检查结果');
+    else if (!rollup.green) problems.push('PR #' + pr.number + ' 的检查没全绿：' + checkLabels(rollup.bad));
   }
   return problems;
 }
@@ -1149,9 +1161,8 @@ function commandCheck(args) {
   }
   if (pr) {
     if (pr.state === 'OPEN') ok(pr.mergeable !== 'CONFLICTING', 'PR 没有冲突' + (pr.mergeable ? '（' + pr.mergeable + '）' : ''));
-    const checks = (pr.statusCheckRollup || []).filter((c) => c && c.conclusion);
-    const bad = checks.filter((c) => !['SUCCESS', 'NEUTRAL', 'SKIPPED'].includes(c.conclusion));
-    ok(checks.length > 0 && bad.length === 0, 'PR 的检查全绿' + (bad.length ? '（' + bad.map((c) => (c.name || c.context || '检查') + ':' + c.conclusion).join(' ') + '）' : ''));
+    const rollup = checkRollup(pr.statusCheckRollup);
+    ok(rollup.green, 'PR 的检查全绿' + (rollup.bad.length ? '（' + checkLabels(rollup.bad) + '）' : ''));
     const detail = prDetail0;
     const delivery = ((detail && detail.comments) || []).filter((c) => (c.body || '').trim().startsWith('DELIVERY:'));
     ok(delivery.length > 0, 'PR 上有 DELIVERY 交付说明');
@@ -1232,7 +1243,7 @@ function signedBody(loop, body) {
 function relabel(loop, issue, addLabel) {
   const current = ghJson(['issue', 'view', String(issue), '--json', 'labels'], { labels: [] }, loop.root);
   const present = ((current && current.labels) || []).map((l) => l.name);
-  const drop = FLOW_LABELS.filter((l) => present.includes(l) && l !== addLabel);
+  const drop = labelsToDrop(present, addLabel);
   const ghArgs = ['issue', 'edit', String(issue), '--add-label', addLabel];
   if (drop.length) ghArgs.push('--remove-label', drop.join(','));
   const result = gh(ghArgs, loop.root);
@@ -1444,7 +1455,7 @@ function commandRefresh(args) {
       }
       if (issue.labels.includes('ready-for-agent')) {
         if (state[task.id]) delete state[task.id].external;
-        const blockers = openBlockers(issue);
+        const blockers = openBlockers(issue.blockedBy);
         if (blockers.length) {
           state[task.id] = Object.assign({}, state[task.id] || {}, { blockedBy: blockers });
           changes.push({ task: task.id, issue: task.issue, to: 'blocked', note: '被 #' + blockers.join(' #') + ' 挡着' });
@@ -1588,7 +1599,7 @@ function commandHandover(args) {
   const repo = detectRepo(loop);
   const conc = concurrencyOf(loop);
   const active = conc.active.find((a) => a.task === task.id);
-  const branch = active && active.branch ? active.branch : 'issue-' + task.issue;
+  const branch = active && active.branch ? active.branch : branchFor(worktreeOf(loop).branchPrefix, task.issue);
   const root = repoRoot(loop);
   const state = taskStateOf(loop)[task.id] || {};
   const lines = ['任务 ' + task.id + (task.issue ? '（工单 #' + task.issue + '）' : '') + '：' + task.text];
@@ -1646,7 +1657,7 @@ function commandReap(args) {
   const loop = openLedger(args);
   return withLock(loop, () => {
     const conc = concurrencyOf(loop);
-    const staleMin = Math.max(1, num(args.stale, 90));
+    const staleMin = Math.max(1, num(args.stale, STALE_MINUTES));
     const state = taskStateOf(loop);
     const reaped = [];
     for (const entry of conc.active.slice()) {
@@ -1970,7 +1981,7 @@ function emit(args, value, text) {
 const USAGE = [
   'solo — solo 模式的账本命令（完整说明见 ../SKILL.md）',
   '',
-  '  state | tasks | summary | note --text "..."',
+  '  state | report | tasks | summary | note --text "..."',
   '  refresh | sync [--apply] | next [--max N] [--concurrency N] [--dry-run]',
   '  claim --task T-004 | worktree --task T-004 [--remove] | start --task T-004 | attach --task T-004 --session <id>',
   '  finish --task T-004 --status done|failed|blocked | check --task T-004',
@@ -1988,6 +1999,7 @@ const command = args._[0];
 
 switch (command) {
   case 'state': commandState(args); break;
+  case 'report': commandReport(args); break;
   case 'tasks': commandTasks(args); break;
   case 'next': commandNext(args); break;
   case 'refresh': commandRefresh(args); break;

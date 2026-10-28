@@ -11,30 +11,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { FLOW_LABELS, PARKED_LABELS, DEFAULT_BRANCH_PREFIX } from './lib/labels.mjs';
+import { parseTasksText } from './lib/tasks-format.mjs';
 
 export const LEDGER_DIR = '.ralph';
 
 export const DEFAULT_CONCURRENCY = 4;
 export const DEFAULT_EXCLUSIVE_LIMIT = 1;
 export const DEFAULT_MAX_FAILS = 3;
-export const DEFAULT_BRANCH_PREFIX = 'issue-';
 
-/** 流程标签：同一时刻只带一个。流转时先全部摘掉，再加新的那个。 */
-export const FLOW_LABELS = [
-  'ready-for-agent',
-  'in-progress',
-  'needs-review',
-  'needs-triage',
-  'waiting',
-  'ready-for-human',
-];
-
-/** 表示「这张单现在不派」的标签。in-progress / needs-review 不在这里：
- * 属于谁由 assignee 判断，见 solo.mjs 的 refresh。 */
-export const PARKED_LABELS = ['needs-triage', 'waiting', 'ready-for-human'];
-
-const CHECKBOX = /^[ \t]*[-*][ \t]*\[( |x|X|~|-)\][ \t]*(.*)$/;
-const TABLE_ROW = /^[ \t]*\|[ \t]*([A-Za-z0-9._-]+)[ \t]*\|/;
+// 标签与默认分支前缀归 lib/labels.mjs，这里只重新导出，外部的导入写法不变。
+export { FLOW_LABELS, PARKED_LABELS, DEFAULT_BRANCH_PREFIX };
+export { parseTasksText, parseAfter } from './lib/tasks-format.mjs';
 
 export function readJson(file) {
   try {
@@ -134,81 +122,12 @@ export function taskStateOf(loop) {
   return s && typeof s === 'object' && !Array.isArray(s) ? s : {};
 }
 
-/** 解析 tasks.md：一条复选框一行；旧的表格行按已完成算。 */
-export function parseTasksText(text) {
-  const tasks = [];
-  text.split(/\r?\n/).forEach((raw, index) => {
-    const line = raw.replace(/\s+$/, '');
-    const box = CHECKBOX.exec(line);
-    if (box) {
-      const marker = box[1].toLowerCase();
-      const body = box[2];
-      const idMatch = /^([A-Za-z0-9._-]+)/.exec(body);
-      const issueMatch = /#(\d+)/.exec(body);
-      const waiting = /[（(][^）)]*(\bwaiting\b|等用户|等前提条件|中断)[^）)]*[)）]/i.test(body);
-      const status = marker === 'x' ? 'done'
-        : marker === '~' ? 'escalated'
-          : waiting ? 'waiting'
-            : 'pending';
-      tasks.push({
-        id: idMatch ? idMatch[1] : '',
-        issue: issueMatch ? Number(issueMatch[1]) : null,
-        status,
-        blocked: waiting,
-        exclusive: /@exclusive/i.test(body),
-        after: parseAfter(body),
-        text: body,
-        lineNo: index + 1,
-        raw: line,
-      });
-      return;
-    }
-    const row = TABLE_ROW.exec(line);
-    if (row && !/^[-.]+$/.test(row[1])) {
-      tasks.push({
-        id: row[1],
-        issue: null,
-        status: 'done',
-        blocked: false,
-        exclusive: false,
-        after: [],
-        text: line.trim(),
-        lineNo: index + 1,
-        raw: line,
-      });
-    }
-  });
-  return tasks;
-}
-
 export function parseTasks(loop) {
   try {
     return parseTasksText(fs.readFileSync(loop.tasksFile, 'utf8'));
   } catch {
     return [];
   }
-}
-
-/** 任务行里认得的依赖写法：(after T-030)、依赖 T-030、blocked by #42。 */
-function parseAfter(body) {
-  const ids = new Set();
-  const patterns = [
-    /\(\s*after\s+([^)]+)\)/gi,
-    /（\s*after\s+([^)）]+)）/gi,
-    /\bdepends on\s+([^)]+)/gi,
-    /\bblocked by\s+([^,;)\]]+)/gi,
-    /依赖\s+([^，,；;）)]+)/g,
-  ];
-  for (const re of patterns) {
-    let m;
-    while ((m = re.exec(body)) !== null) {
-      for (const token of m[1].split(/[\s,;、]+/)) {
-        const id = token.trim();
-        if (/^[A-Za-z0-9._-]+$/.test(id)) ids.add(id);
-      }
-    }
-  }
-  return [...ids];
 }
 
 export function countPendingTasks(loop) {
