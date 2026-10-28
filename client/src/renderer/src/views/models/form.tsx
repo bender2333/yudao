@@ -9,6 +9,8 @@ import type { CatalogAdmission, CatalogCredential } from "../../api/generated/ty
 import {
   CUSTOM_PRESET_ID,
   DEFAULT_PROTOCOL,
+  DOTENV_KEY_EXAMPLE,
+  DOTENV_KEY_RULE,
   PROTOCOL_LABELS,
   REASONING_MODE_LABELS,
   REASONING_LEVELS,
@@ -17,6 +19,8 @@ import {
   capacityIssueText,
   collectCandidatesHint,
   connectionTestable,
+  credentialRefIssue,
+  credentialSaveDisabledReason,
   defaultModelsUrl,
   effectiveModelsUrl,
   formPatchForBaseUrl,
@@ -121,6 +125,11 @@ export function ProviderForm(props: ProviderFormProps) {
 
   const canSubmit = state.id.trim() !== "" && state.name.trim() !== "" && state.base_url.trim() !== ""
     && !props.busy;
+  // 勾「写入 .env」时按 .env 的键名规则核对凭据引用（设计说明第 4.2 节，工单 #1158）
+  const refIssue = credentialRefIssue(state.credential_ref, persist);
+  const saveKeyReason = credentialSaveDisabledReason({
+    ref: state.credential_ref, secret, persist,
+  });
 
   return (
     <form className="y10-block y10-form-block mm-form" onSubmit={(event) => {
@@ -201,9 +210,19 @@ export function ProviderForm(props: ProviderFormProps) {
 
       <label className="y10-field mm-field">
         <span className="mm-label">凭据引用</span>
-        <input className="y10-input" value={state.credential_ref} placeholder="OPENCODE_GO_KEY"
+        <input className="y10-input" value={state.credential_ref} placeholder={DOTENV_KEY_EXAMPLE}
+               data-testid="credential-ref"
                onChange={(event) => props.onPatch({ credential_ref: event.target.value })} />
       </label>
+      {/* 勾「写入 .env」时在凭据引用旁写出键名规则；不合规时说明原因，「保存 Key」随之不可用 */}
+      {persist && (
+        <p className="y10-small y10-muted mm-hint" data-testid="credential-ref-rule">
+          写入 .env 时，键名只用{DOTENV_KEY_RULE}，例如 {DOTENV_KEY_EXAMPLE}。
+        </p>
+      )}
+      {refIssue !== "" && (
+        <p className="y10-warn-text mm-warn" role="status" data-testid="credential-ref-issue">{refIssue}</p>
+      )}
 
       <details className="y10-details mm-advanced">
         <summary>高级选项</summary>
@@ -236,7 +255,8 @@ export function ProviderForm(props: ProviderFormProps) {
         </label>
         <p className="y10-small y10-muted mm-hint">不勾选时只在本进程有效，重启后需重新提供。</p>
         <div className="y10-row mm-actions">
-          <button type="button" className="y10-btn" disabled={!editing || secret.trim() === "" || props.busy}
+          <button type="button" className="y10-btn" data-testid="save-credential"
+                  disabled={!editing || secret.trim() === "" || props.busy || refIssue !== ""}
                   onClick={() => {
                     props.onCredential("set", secret, persist);
                     setSecret("");
@@ -252,6 +272,12 @@ export function ProviderForm(props: ProviderFormProps) {
             删除持久凭据
           </button>
         </div>
+        {/* 「保存 Key」不可用时写明缺哪一项（工单 #1158） */}
+        {editing && saveKeyReason !== "" && (
+          <p className="y10-small y10-muted mm-hint" role="status" data-testid="save-credential-hint">
+            还不能保存 Key：{saveKeyReason}。
+          </p>
+        )}
       </section>
 
       <section className="y10-candidates mm-candidates" data-testid="candidate-section">
@@ -339,13 +365,15 @@ export function ProviderForm(props: ProviderFormProps) {
                 </select>
               </label>
               <label className="y10-field mm-field">
-                <span className="mm-label">窗口</span>
-                <input className="y10-input" type="number" min="1" value={row.context_window} data-testid={`row-window-${rowKey}`}
+                <span className="mm-label">窗口（必填）</span>
+                <input className="y10-input" type="number" min="1" required aria-required="true"
+                       value={row.context_window} data-testid={`row-window-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "context_window", event.target.value))} />
               </label>
               <label className="y10-field mm-field">
-                <span className="mm-label">输出上限</span>
-                <input className="y10-input" type="number" min="1" value={row.max_output_tokens} data-testid={`row-output-${rowKey}`}
+                <span className="mm-label">输出上限（必填）</span>
+                <input className="y10-input" type="number" min="1" required aria-required="true"
+                       value={row.max_output_tokens} data-testid={`row-output-${rowKey}`}
                        onChange={(event) => props.onPatchRow(row.key, patchRowCapacity(row, "max_output_tokens", event.target.value))} />
               </label>
               <div className="y10-row y10-row-actions mm-actions mm-row-actions">

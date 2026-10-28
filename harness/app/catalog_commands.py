@@ -565,16 +565,28 @@ def _credential_event(action: str, status: dict[str, Any], version: int, persist
             "persisted": persisted}
 
 
+def _credential_stale_base(facade, ref: str, base_version: int) -> None:
+    # 凭据命令的基准版本是目录查询里这个引用自己的 credential.version，不是目录修订号
+    # （设计说明 app-and-interface 第 3.1 节）；拒绝时写明比的是哪一个版本与当前值（工单 #1158）
+    current = facade.credential_version(ref)
+    if base_version != current:
+        raise Rejection(
+            "stale_base",
+            f"凭据命令的基准版本是目录查询里这个引用 {ref} 的 credential.version，当前是 {current}",
+            current_version=current)
+
+
 async def _set_credential(application: Application, command: Command, request: CredentialSet) -> None:
     facade = application.system.facade
     _check_not_registered(application, command)
-    current = facade.credential_version(request.ref)
-    if request.base_version != current:
-        raise Rejection("stale_base", "凭据已经变化，请重新读取以后再提交", current_version=current)
+    _credential_stale_base(facade, request.ref, request.base_version)
     try:
         result = await asyncio.to_thread(facade.set_credential, request.ref, request.secret,
                                          persist=request.persist)
     except CatalogValidationError as exc:
+        raise Rejection("catalog_invalid", str(exc))
+    except ValueError as exc:
+        # 兜底：写入路径上的校验都应当以目录校验失败的回答出现，不漏成服务的 500（工单 #1158）
         raise Rejection("catalog_invalid", str(exc))
     _credential_changed(application, command, "set", result, persisted=result["persisted"])
 
@@ -582,9 +594,7 @@ async def _set_credential(application: Application, command: Command, request: C
 async def _clear_credential_override(application: Application, command: Command, request: CredentialClearOverride) -> None:
     facade = application.system.facade
     _check_not_registered(application, command)
-    current = facade.credential_version(request.ref)
-    if request.base_version != current:
-        raise Rejection("stale_base", "凭据已经变化，请重新读取以后再提交", current_version=current)
+    _credential_stale_base(facade, request.ref, request.base_version)
     result = await asyncio.to_thread(facade.clear_credential, request.ref)
     _credential_changed(application, command, "clear_override", result, persisted=False)
 
@@ -593,9 +603,7 @@ async def _remove_persisted_credential(application: Application, command: Comman
                                        request: CredentialRemovePersisted) -> None:
     facade = application.system.facade
     _check_not_registered(application, command)
-    current = facade.credential_version(request.ref)
-    if request.base_version != current:
-        raise Rejection("stale_base", "凭据已经变化，请重新读取以后再提交", current_version=current)
+    _credential_stale_base(facade, request.ref, request.base_version)
     try:
         result = await asyncio.to_thread(facade.remove_persisted_credential, request.ref)
     except CatalogValidationError as exc:

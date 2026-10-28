@@ -503,6 +503,24 @@ def test_credentials_chain(tmp_path, monkeypatch):
         facade.save_dotenv_value(dir_path, "KEY", "value")
 
 
+def test_persisted_credential_stays_the_dotenv_source_across_reload(tmp_path):
+    """写入 .env 以后不留内存覆盖：来源是 .env，重新载入与重启以后仍是 .env（工单 #1158）。"""
+    dotenv_path = tmp_path / ".env"
+    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
+    facade.configure_paths(None, dotenv_path)
+    facade.set_credential("TRIAL_MODEL_KEY", "trial-secret-1", persist=True)
+    status = facade.credential_status("TRIAL_MODEL_KEY")
+    assert (status["source"], status["has_override"]) == ("dotenv", False)
+    facade.reload()
+    assert facade.credential_status("TRIAL_MODEL_KEY")["source"] == "dotenv"
+
+    # 服务重启：新的一份凭据链从同一个 .env 读到同一个值，内存里没有留下什么
+    reopened = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
+    reopened.configure_paths(None, dotenv_path)
+    reopened.reload()
+    assert reopened.credential_status("TRIAL_MODEL_KEY")["source"] == "dotenv"
+
+
 # ---------------------------------------------------------------------------
 # 10. 密钥卫生
 # ---------------------------------------------------------------------------

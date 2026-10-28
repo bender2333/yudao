@@ -15,7 +15,7 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
-from .credentials import CredentialChain, CredentialMaterial
+from .credentials import CredentialChain, CredentialMaterial, dotenv_key_problem
 from .discovery import effective_models_url, probe_connection as _probe_connection
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
@@ -454,19 +454,30 @@ class ProviderFacade:
             return self._credentials.clear_override(ref)
 
     def save_dotenv_value(self, dotenv_path: str | Path, ref: str, secret: str) -> dict[str, object]:
-        # 持久化单个凭据到独立 .env：先原子落盘，成功才更新内存文件源；
-        # 落盘失败时不报成功，也不悄悄降级为只在内存生效
+        # 持久化单个凭据到独立 .env：先按 .env 的键名规则核对引用，再用读 .env 的同一个解析器
+        # 核对要写的内容，都通过了才原子替换文件；不落盘时文件与内存都不动，
+        # 也不悄悄降级为只在内存生效（模型管理设计说明第 4.2 节，工单 #1158）
         key = str(ref).strip()
         if not key:
             raise CatalogValidationError((ValidationIssue("credentials.ref", "凭据引用不能为空"),))
         if not isinstance(secret, str) or not secret.strip():
             raise CatalogValidationError((ValidationIssue("credentials.secret", "凭据内容不能为空"),))
+        problem = dotenv_key_problem(key)
+        if problem is not None:
+            raise CatalogValidationError((ValidationIssue("credentials.ref", problem),))
         target = Path(dotenv_path)
         with self._lock:
-            current = _read_dotenv_strict(target)
-            current[key] = secret
-            _atomic_write_dotenv(target, current)
-            data = _read_dotenv_strict(target)
+            try:
+                current = _read_dotenv_strict(target)
+            except ValueError as exc:
+                raise CatalogValidationError((ValidationIssue(
+                    "credentials.ref", f"现有的 .env 读不了：{exc}；请先修正这一行再保存"),))
+            try:
+                payload = _dotenv_payload_readable({**current, key: secret})
+            except ValueError as exc:
+                raise CatalogValidationError((ValidationIssue("credentials.ref", str(exc)),))
+            _write_dotenv_payload(target, payload)
+            data = _parse_dotenv_or_raise(payload)
             self._credentials.replace_dotenv_dict(data)
             self._note_dotenv_written(target, data)
             return self._credentials.describe(key)
@@ -501,22 +512,25 @@ class ProviderFacade:
             return status
 
     def set_credential(self, ref: str, secret: str, *, persist: bool) -> dict[str, Any]:
-        # 保存 Key：只在本进程内覆盖，或同时写入独立 .env；落盘失败时不报成功
+        # 保存 Key：只在本进程内覆盖，或写入独立 .env，两种写入方式二选一（设计说明第 9.1 节）。
+        # 写入 .env 成功以后不留内存覆盖，来源显示 .env；写入失败时文件、内存与来源都不改，
+        # 不悄悄改成只在内存生效（设计说明第 4.2 节、D22 第 5 节，工单 #1158）
         with self._lock:
             key = str(ref)
-            self._credentials.set_override(key, secret)
             persisted = False
             if persist:
                 if self._dotenv_path is None:
-                    self._credentials.clear_override(key)
                     raise CatalogValidationError((ValidationIssue("credentials.ref", "未配置凭据文件路径"),))
                 try:
                     self.save_dotenv_value(self._dotenv_path, key, secret)
                 except OSError as exc:
-                    self._credentials.clear_override(key)
                     raise CatalogValidationError((ValidationIssue(
-                        "credentials.ref", f"持凭据写入失败：{exc}"),))
+                        "credentials.ref", f"持久凭据写入失败：{exc}"),))
+                # 写进 .env 以后清掉这个引用上残留的内存覆盖：覆盖优先级最高，留着就盖住了 .env
+                self._credentials.clear_override(key)
                 persisted = True
+            else:
+                self._credentials.set_override(key, secret)
             version = self._credential_versions[key] = self._credential_versions.get(key, 0) + 1
             return {"status": dict(self._credentials.describe(key)), "version": version, "persisted": persisted}
 
@@ -1667,15 +1681,34 @@ def _read_dotenv_strict(path: Path) -> dict[str, str]:
     return _parse_dotenv_or_raise(text)
 
 
+def _dotenv_text(data: Mapping[str, str]) -> str:
+    # 写出的 .env 形状：一行一个 KEY=VALUE，按键名排序
+    lines = [f"{key}={value}" for key, value in sorted(data.items(), key=lambda item: str(item[0]))]
+    return "".join(line + "\n" for line in lines)
+
+
+def _dotenv_payload_readable(data: Mapping[str, str]) -> str:
+    # 要写的内容先用读 .env 的同一个解析器解析一遍，再核对读回来的值就是写进去的值：
+    # 读不回来就不写，Yudao 不写出自己读不回的 .env（工单 #1158）
+    payload = _dotenv_text(data)
+    parsed = _parse_dotenv_or_raise(payload)
+    for key, value in data.items():
+        if parsed.get(str(key)) != value:
+            raise ValueError(f"凭据内容写进 .env 以后读不回来：{key} 的值里有换行、引号或首尾空格")
+    return payload
+
+
 def _atomic_write_dotenv(path: Path, data: Mapping[str, str]) -> Path:
+    return _write_dotenv_payload(path, _dotenv_text(data))
+
+
+def _write_dotenv_payload(path: Path, payload: str) -> Path:
     # 原子替换写 .env：临时文件同目录创建，成功才替换；保持文件权限语义，
     # 已有文件沿用原权限，新文件使用用户私有权限；Windows 下 ACL 由目录继承，
     # 不把数字模式当成权限已受保护的证明
     parent = path.parent
     if str(parent) not in ("", "."):
         parent.mkdir(parents=True, exist_ok=True)
-    lines = [f"{key}={value}" for key, value in sorted(data.items(), key=lambda item: str(item[0]))]
-    payload = "".join(line + "\n" for line in lines)
     existing_mode = None
     try:
         existing_mode = path.stat().st_mode & 0o777

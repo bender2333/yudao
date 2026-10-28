@@ -102,6 +102,53 @@ export function credentialStatusLabel(credential: CatalogCredential): string {
   }
 }
 
+// .env 的键名规则（模型管理设计说明第 4.2 节）：勾「写入 .env」时按这条规则核对凭据引用，
+// 与 Provider 模块保存前的核对是同一条规则；服务端拒绝时给出的说明也照这个写法（工单 #1158）
+export const DOTENV_KEY_RULE = "字母、数字与下划线，不以数字开头";
+
+export const DOTENV_KEY_EXAMPLE = "OPENCODE_GO_KEY";
+
+// 引用能不能当 .env 的键名
+export function isDotenvKey(ref: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(ref.trim());
+}
+
+// 给不合规的引用举一个合规的写法：字母数字以外换成下划线，转大写，开头是数字时补 KEY_ 前缀
+export function suggestedDotenvKey(ref: string): string {
+  const cleaned = ref.trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase();
+  if (cleaned === "") {
+    return DOTENV_KEY_EXAMPLE;
+  }
+  return /^[0-9]/.test(cleaned) ? `KEY_${cleaned}` : cleaned;
+}
+
+// 勾「写入 .env」时引用不合规的说明（写明规则并举一个合规的写法）；可以写时为空
+export function credentialRefIssue(ref: string, persist: boolean): string {
+  if (!persist) {
+    return "";
+  }
+  const key = ref.trim();
+  if (key === "" || isDotenvKey(key)) {
+    return "";
+  }
+  return `凭据引用 ${key} 不能写进 .env：键名只用${DOTENV_KEY_RULE}，例如 ${suggestedDotenvKey(key)}`;
+}
+
+// 「保存凭据」不可用时写明缺哪一项（工单 #1158）
+export function credentialSaveDisabledReason(input: { ref: string; secret: string; persist: boolean }): string {
+  if (input.ref.trim() === "") {
+    return "填写凭据引用";
+  }
+  const issue = credentialRefIssue(input.ref, input.persist);
+  if (issue !== "") {
+    return issue;
+  }
+  if (input.secret.trim() === "") {
+    return "填写 API Key";
+  }
+  return "";
+}
+
 // 准入摘要（设计说明第 9.1 节）：按连接统计「已准入 x · 候选 y」。
 // 已准入且未作废的定义计入已准入，其余定义计入候选
 export function admissionSummary(provider: CatalogProvider, admissions: CatalogAdmission[]): { admitted: number; candidates: number } {

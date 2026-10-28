@@ -22,6 +22,8 @@ import { Block, Icon, PageHead, StatusMark } from "../../shell/kit";
 import {
   CONFIG_STATE_LABELS,
   DEPARTMENT_LABELS,
+  DOTENV_KEY_EXAMPLE,
+  DOTENV_KEY_RULE,
   PREFILL_SOURCE_LABELS,
   PROTOCOL_LABELS,
   STALE_ADMISSION_LABEL,
@@ -35,6 +37,8 @@ import {
   collectCandidatesAction,
   collectImpact,
   confirmImpactText,
+  credentialRefIssue,
+  credentialSaveDisabledReason,
   credentialStatusLabel,
   emptyFormState,
   formDocumentValid,
@@ -122,6 +126,11 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [pageCredRef, setPageCredRef] = useState("");
   const [pageCredSecret, setPageCredSecret] = useState("");
   const [pageCredPersist, setPageCredPersist] = useState(false);
+  // 写入 .env 的键名规则与「保存凭据」缺的那一项（工单 #1158）
+  const pageCredIssue = credentialRefIssue(pageCredRef, pageCredPersist);
+  const pageCredReason = credentialSaveDisabledReason({
+    ref: pageCredRef, secret: pageCredSecret, persist: pageCredPersist,
+  });
 
   const capabilityRows = useMemo(() => {
     if (!catalog?.capability_table?.presets) return [];
@@ -1110,8 +1119,9 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                 className="y10-input"
                 type="text"
                 list="y10-cred-refs-list"
+                data-testid="page-cred-ref"
                 value={pageCredRef}
-                placeholder="例如 OPENCODE_GO_KEY"
+                placeholder={DOTENV_KEY_EXAMPLE}
                 onChange={(e) => setPageCredRef(e.target.value)}
               />
               <datalist id="y10-cred-refs-list">
@@ -1120,12 +1130,22 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                 ))}
               </datalist>
             </label>
+            {/* 勾「写入 .env」时在凭据引用旁写出键名规则，不合规时写明原因（工单 #1158） */}
+            {pageCredPersist && (
+              <p className="y10-small y10-muted" data-testid="page-cred-ref-rule">
+                写入 .env 时，键名只用{DOTENV_KEY_RULE}，例如 {DOTENV_KEY_EXAMPLE}。
+              </p>
+            )}
+            {pageCredIssue !== "" && (
+              <p className="y10-warn-text" role="status" data-testid="page-cred-ref-issue">{pageCredIssue}</p>
+            )}
             <label className="y10-field">
               <span>API Key</span>
               <input
                 className="y10-input"
                 type="password"
                 autoComplete="new-password"
+                data-testid="page-cred-secret"
                 value={pageCredSecret}
                 placeholder="Key 不回填，也不进入事件"
                 onChange={(e) => setPageCredSecret(e.target.value)}
@@ -1138,6 +1158,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   <input
                     type="radio"
                     name="page-cred-persist"
+                    data-testid="page-cred-memory"
                     checked={!pageCredPersist}
                     onChange={() => setPageCredPersist(false)}
                   />
@@ -1147,6 +1168,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                   <input
                     type="radio"
                     name="page-cred-persist"
+                    data-testid="page-cred-dotenv"
                     checked={pageCredPersist}
                     onChange={() => setPageCredPersist(true)}
                   />
@@ -1154,10 +1176,17 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                 </label>
               </div>
             </fieldset>
+            {/* 只在本进程有效的 Key 重启以后要重新提供（D22 第 5 节，工单 #1158） */}
+            {!pageCredPersist && (
+              <p className="y10-small y10-muted" data-testid="page-cred-restart-hint">
+                只在本进程有效：重启后需要重新提供。
+              </p>
+            )}
             <button
               type="button"
               className="y10-btn primary"
-              disabled={busy || !pageCredRef.trim() || !pageCredSecret.trim()}
+              data-testid="page-cred-save"
+              disabled={busy || pageCredReason !== ""}
               onClick={() => {
                 const cred = credentialsList.find((c) => c.ref === pageCredRef.trim())?.credential;
                 void saveCredential(pageCredRef.trim(), pageCredSecret.trim(), pageCredPersist, cred?.version ?? 0);
@@ -1166,6 +1195,12 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
             >
               保存凭据
             </button>
+            {/* 「保存凭据」不可用时写明缺哪一项（工单 #1158） */}
+            {pageCredReason !== "" && (
+              <p className="y10-small y10-muted" role="status" data-testid="page-cred-save-hint">
+                还不能保存：{pageCredReason}。
+              </p>
+            )}
           </div>
         </div>
       </Block>
