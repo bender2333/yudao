@@ -96,7 +96,9 @@ class SecondAssembly:
         return SecondPinnedStep(projection, frame, limits, step_id,
                                 _context(projection, frame, limits, step_id=step_id, history=[]))
 
-    def request(self, pinned: SecondPinnedStep, history: list[dict[str, Any]]) -> SecondStepRequest:
+    def request(self, pinned: SecondPinnedStep, history: list[dict[str, Any]], *,
+                defer_compaction: bool = False) -> SecondStepRequest:
+        # defer_compaction（工单 #1155）：这一版从不压缩，放不放整理请求都一样，照常接上整段历史
         context = _context(pinned.projection, pinned.frame, pinned.limits,
                            step_id=pinned.step_id, history=history)
         payload: dict[str, Any] = {"input": context.input_items, "tools": context.tools}

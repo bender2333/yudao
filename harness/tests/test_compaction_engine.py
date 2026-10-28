@@ -8,7 +8,7 @@ from harness.contracts import artifact_hash
 from harness.definitions import DEFINITIONS
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.engine import StepLimits
-from harness.proposals import delivery_turn, product_spec
+from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (
@@ -192,31 +192,219 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_three_undeclared_tool_calls_fail_compaction_and_keep_every_attempt_as_evidence(tmp_path):
-    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=_undeclared_tool_call, step_limits=FAST_RETRIES)
-    result = system.activate_once(run_id)
+def _tight_window_runner(tmp_path, respond, *, headroom=1600, task="Original intent",
+                         keys=("product", "engineering", "quality")):
+    """窗口按固定材料的实测 token 数加余量推出（测试分层设计第 10 节第 3 条，不写死窗口）：
 
-    assert result.status == "failed" and result.stop_reason == "compaction_failed"
-    assert not result.compactions
-    attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
-    assert [request.attempt for request in attempts] == [1, 2, 3]
-    assert len({request.logical_call_id for request in attempts}) == 1
+    历史超过压缩阈值，而未压缩的工作请求仍放得下。余量低于实测的可行区间时未压缩的工作请求放不下
+    （这一步以 context_overflow 结束），高于区间时压缩不会被触发。假模型按脚本位取用，
+    询问分支的脚本位是「部门:ask」（工单 #473）。
+    """
+    adapter = FakeAdapter({key: [respond] * 200 for key in keys})
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
+    measure_id = system.create_run(task, context_window=1_000_000)
+    run_id = system.create_run(task, context_window=pinned_input_tokens(system, measure_id) + headroom)
+    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 340)
+    system.workspace(run_id).write_file("small.txt", "SMALL_TOOL_OUTPUT " * 4)
+    return system, adapter, run_id
+
+
+def test_a_compaction_failure_in_an_ask_branch_does_not_make_it_unanswerable(tmp_path):
+    """询问分支里的整理失败一次、下一次成功：询问拿到回答，不是「没能回答」（工单 #1155）。"""
+    work_counts = {}
+    branch_compactions = 0
+
+    def respond(request):
+        nonlocal branch_compactions
+        branch = request.session_id.startswith("ses_ask_")
+        if request.purpose == "compaction":
+            if branch:
+                branch_compactions += 1
+                return _undeclared_tool_call(request) if branch_compactions <= 3 \
+                    else ModelResponse(output=[_message(request)])
+            return ModelResponse(output=[_message(request)])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        if request.department == "engineering":
+            if count == 0:
+                return ask_turn("product", "Is uppercase output required?")
+            return delivery_turn()(request)
+        if request.department == "quality":
+            return review_turn("release", "checks passed on the current snapshot")(request)
+        if branch:
+            # 分支的工具里没有读取，历史从产品主线接过来：主线读过一次大文件，分支的第一步就要整理
+            return answer_turn("Yes, print in uppercase.")(request)
+        return _read(request, "large.txt") if count == 0 else product_spec()
+
+    system, adapter, run_id = _tight_window_runner(
+        tmp_path, respond, keys=("product", "engineering", "quality", "product:ask"))
+    # PRD 被接纳以后工程才开始一轮，询问在那里发出（工单 #557）
+    result = system.activate_once(run_id)
+    assert result.product_spec is not None
+    for _ in range(4):
+        if any(event.type == EventType.ASK_ANSWERED for event in system.store.list_events(run_id)):
+            break
+        result = system.activate_once(run_id)
+        assert result.status != "failed", result.error
+
+    events = system.store.list_events(run_id)
+    answered = [event for event in events if event.type == EventType.ASK_ANSWERED]
+    assert answered, "询问没有写下回答"
+    assert answered[-1].payload["status"] == "answered", answered[-1].payload
+    assert answered[-1].payload["answer"] == "Yes, print in uppercase."
+    # 分支的整理失败过（三次尝试用完），下一步按未压缩的历史照常发工作请求，回答照常交回
+    branch_failures = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED
+                       and event.payload.get("purpose") == "compaction"
+                       and str(event.session_id).startswith("ses_ask_")]
+    assert [event.payload["will_retry"] for event in branch_failures] == [True, True, False]
+    branch_work = [request for request in adapter.invocations
+                   if request.session_id.startswith("ses_ask_") and request.purpose == "work"]
+    assert branch_work and "TOOL_OUTPUT " in json_dumps(branch_work[0].input_items)
+    assert "department_memory" not in json_dumps(branch_work[0].input_items)
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_compaction_request_failure_keeps_the_step_and_sends_the_work_request_uncompressed(tmp_path):
+    """整理请求三次尝试都回未声明的工具调用、没有文字：没有写检查点，这一步的工作请求按未压缩的历史
+    照常发出，事项不停止；下一步再次发出整理请求（工单 #1155，设计说明第 8.7 节）。"""
+    work_counts = {}
+    compactions = 0
+
+    def respond(request):
+        nonlocal compactions
+        if request.purpose == "compaction":
+            compactions += 1
+            return _undeclared_tool_call(request) if compactions <= 3 else ModelResponse(output=[_message(request)])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        return _read(request, "large.txt") if count == 0 else _read(request, "small.txt") if count == 1 \
+            else product_spec()
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+    assert result.status != "failed", result.error
+
+    product = [request for request in adapter.invocations if request.department == "product"]
+    # 三次尝试都没有文字：作为可重试失败记录，用尽以后这一步照常发工作请求，再下一步重新整理并成功
+    assert [request.purpose for request in product] == ["work", "compaction", "compaction", "compaction",
+                                                       "work", "compaction", "work"]
+    assert [request.attempt for request in product if request.purpose == "compaction"][:3] == [1, 2, 3]
     events = system.store.list_events(run_id)
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
-    assert [event.payload["will_retry"] for event in failed] == [True, True, False]
-    assert all(event.payload["reason"] == "compaction_failed" and event.payload["retryable"] is True for event in failed)
-    assert len([event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]) == 2
+    assert [(event.payload["purpose"], event.payload["will_retry"]) for event in failed] == [
+        ("compaction", True), ("compaction", True), ("compaction", False)]
+    assert all(event.payload["reason"] == "compaction_failed" for event in failed)
+    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == CORRUPT_TOOL_NAME
+                   for event in events)
+    # 这一步的工作请求按未压缩的历史装配：原始工具输出在，摘要不在
+    kept = product[4]
+    assert "TOOL_OUTPUT " in json_dumps(kept.input_items)
+    assert "department_memory" not in json_dumps(kept.input_items)
+    # 那几次没有写检查点：这次激活只记下延迟以后成功的那一次压缩，它在工作请求之后
+    assert len(result.compactions) == 1
+    recorded = next(event for event in events if event.type == EventType.COMPACTION_RECORDED)
+    requested = next(event for event in events if event.type == EventType.MODEL_REQUESTED
+                     and event.payload["purpose"] == "work" and event.stream_version > failed[-1].stream_version)
+    assert recorded.stream_version > requested.stream_version
+    # 下一个工作请求接着用摘要
+    assert "department_memory" in json_dumps(product[-1].input_items)
+    assert has_new_work(result, "engineering")
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_summary_text_with_an_undeclared_tool_call_is_kept_without_retry(tmp_path):
+    """整理回应同时带文字与一个 bash 调用：文字成为检查点，bash 没有执行、不在下一步的有效历史里，
+    原始回应能从事件里查到；这一次不重试（工单 #1155，设计说明第 8.7 节）。"""
+    summary_text = "Product memory: the large file was read; keep the original requirements."
+
+    def respond(request):
+        identity = f"corrupt-{request.activation_id}-{request.step_id}"
+        return ModelResponse(output=[_message(request, summary_text),
+                                     {"id": identity, "call_id": identity, "type": "function_call",
+                                      "name": "bash", "arguments": json_dumps({"command": "echo hi"})}])
+
+    system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=respond, step_limits=FAST_RETRIES)
+    result = system.activate_once(run_id)
+
+    attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
+    # 每次整理都直接拿文字作数，没有重试：每次都是新逻辑调用的第一次尝试
+    assert attempts and all(request.attempt == 1 for request in attempts)
+    assert result.compactions
+    assert all(record["checkpoint"]["summary"] == summary_text for record in result.compactions)
+    events = system.store.list_events(run_id)
+    assert not any(event.type == EventType.MODEL_ATTEMPT_FAILED and event.payload.get("purpose") == "compaction"
+                   for event in events)
+    # 工具调用没有执行，也不在下一步的有效历史里
+    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == "bash" for event in events)
+    assert "corrupt-" not in json_dumps(department_history(system, run_id, "product"))
+    assert "corrupt-" not in json_dumps(adapter.invocations[-1].input_items)
+    # 原始回应留作证据：丢掉了哪一个工具调用查得到
     evidence = [event for event in events if event.type == EventType.MODEL_MESSAGE
                 and event.payload.get("response_id", "").startswith("corrupt-")]
-    assert len(evidence) == 3
-    assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("name") == CORRUPT_TOOL_NAME for event in events)
-    assert all(event.payload.get("name") == "provider_usage" for event in events
-               if event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED} and event.payload.get("purpose") == "compaction")
-    raw_tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
-    assert system.artifacts.get_text(raw_tool.payload["output_ref"]["content_hash"]).count("FIRST_TOOL_ORIGINAL") == 2200
-    history = department_history(system, run_id, "product")
-    assert raw_tool.event_id in {record["event_id"] for record in history}
-    assert "corrupt-" not in json_dumps(history)
+    assert len(evidence) == len(attempts)
+    saved = [json.loads(system.artifacts.get_text(event.payload["message_ref"]["content_hash"]))
+             for event in evidence]
+    assert all(item["type"] == "function_call" and item["name"] == "bash" for item in saved)
+    assert not any(event.type == EventType.TOOL_CALLED and event.payload.get("name") == "bash" for event in events)
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_mixed_compaction_failures_stop_at_the_stall_limit_with_the_last_reason(tmp_path):
+    """同一会话的整理连续失败（请求失败与「摘要为空」混在一起）达到 compaction.stalled_limit：
+    事项以 compaction_failed 停止，停止说明写明连续的次数与最后一次的原因（工单 #1155）。"""
+    limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+    compactions = 0
+
+    def respond(request):
+        nonlocal compactions
+        if request.purpose == "compaction":
+            compactions += 1
+            # 前三次是同一逻辑调用的三次尝试，都回未声明的工具调用；之后每次整理都回空摘要
+            return _undeclared_tool_call(request) if compactions <= 3 else ModelResponse(output=[_message(request, "")])
+        return _read(request, "large.txt")
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+
+    assert result.status == "failed" and result.stop_reason == "compaction_failed", result.error
+    assert f"连续 {limit} 次没有推进" in (result.error or "")
+    assert "摘要为空或超过上限" in (result.error or "")
+    # 请求失败的那一次与两次空摘要计入同一个次数；停止以后不再发出新的整理请求
+    assert compactions == 3 + limit - 1
+    assert not result.compactions
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_a_compaction_that_progresses_clears_the_stall_count(tmp_path):
+    """中间有一次推进时计数归零：不生效的次数加起来超过 compaction.stalled_limit，但中间推进过一次，
+    事项不因此停止（工单 #1155）。"""
+    limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+    work_counts = {}
+    logical_calls = 0
+
+    def respond(request):
+        nonlocal logical_calls
+        if request.purpose == "compaction":
+            if request.attempt == 1:
+                logical_calls += 1
+            # 第一次整理失败，第二次推进，第三次与第四次不生效，第五次起再推进
+            if logical_calls == 1:
+                return _undeclared_tool_call(request)
+            if logical_calls == 2 or logical_calls >= 5:
+                return ModelResponse(output=[_message(request)])
+            return ModelResponse(output=[_message(request, "")])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        return _read(request, "large.txt") if count < 3 else product_spec()
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+
+    assert result.status != "failed", result.error
+    # 失败的次数加起来超过上限，中间那一次推进把计数清零
+    assert logical_calls >= limit + 2
+    assert result.compactions
+    assert has_new_work(result, "engineering")
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
