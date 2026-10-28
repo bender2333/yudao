@@ -61,6 +61,8 @@ class SecondStepRequest:
     parts: list[dict[str, Any]]
     input_token_estimate: int
     output_reserve_tokens: int
+    # 判断要不要压缩用的两项数值之一（工单 #1156）：这一版不压缩，也没有上一次的上游回报用量
+    previous_usage_tokens: int | None = None
     # 这一版不压缩：压缩计划是实现的形状，这里永远是空，执行实现的 finish_compaction 因此总回答空
     compaction_plan: None = None
 
