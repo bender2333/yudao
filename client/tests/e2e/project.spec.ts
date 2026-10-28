@@ -384,9 +384,9 @@ test.describe("项目页面（1440×900）", () => {
   });
 
 
-  // 工单 #652：「记录原文」与「新的要求」各有各的状态与草稿。
+  // 工单 #1160（原型 v13 的 composerHtml）：概览的新事项输入是一个框配两个按钮，换掉 #652 的两个框。
   // 这条用例新建事项（改变服务端状态），用自己的一份后端，共用的那份不受影响。
-  test("概览：记录原文与新的要求各有各的状态，提交记录原文不影响新的要求", async () => {
+  test("概览：一个框配两个按钮，记录原文只记材料，作为新事项开始以后转到这个事项", async () => {
     test.setTimeout(300_000);
     await withOwnBackend(async () => {
       const client = await startClient(backend, { width: 1440, height: 900 });
@@ -411,31 +411,51 @@ test.describe("项目页面（1440×900）", () => {
         const current = await section(page, "当前事项");
         await expect(current).toContainText("项目没有进行中的事项");
 
-        const material = "概览里记录的材料文字";
-        const requirement = "概览里写下的新要求";
-        const recordBox = current.getByLabel("记录原文（保存为本项目的材料）");
-        const requirementBox = current.getByLabel("新的要求");
-        await recordBox.fill(material);
-        await requirementBox.fill(requirement);
-        // 两个框各自装各自的内容：一个框里的文字不出现在另一个框里
-        expect(await recordBox.inputValue()).toBe(material);
-        expect(await requirementBox.inputValue()).toBe(requirement);
+        // 一个框：#652 的两个框（「记录原文（保存为本项目的材料）」与「新的要求」）没有了，
+        // 换成一个「新的想法或材料」加一个「事项标题（可选）」
+        await expect(current.getByLabel("新的要求")).toHaveCount(0);
+        await expect(current.getByLabel("新的想法或材料")).toHaveCount(1);
+        await expect(current.getByLabel("事项标题（可选）")).toHaveCount(1);
+        // v13 那一句说明写在两个按钮旁边
+        await expect(current).toContainText("「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品部门");
 
-        // 提交「记录原文」：只清它自己那个框，「新的要求」里的文字留着
-        await current.getByRole("button", { name: "记录原文" }).click();
-        await waitUntil(async () => (await recordBox.inputValue()) === "", page, "记录原文提交以后那个框清空");
-        expect(await requirementBox.inputValue()).toBe(requirement);
+        // 框为空时两个按钮都不可用（两个按钮读同一个框）
+        const record = current.getByRole("button", { name: "记录原文" });
+        const create = current.getByRole("button", { name: "作为新事项开始" });
+        await expect(record).toBeDisabled();
+        await expect(create).toBeDisabled();
 
-        // 提交「作为新事项开始」：新事项真的建起来了
-        // 事项统计在摘要的「事项统计」那一行里，标题本身不变，要看整行的文字
+        // 事项统计那一行：名字只说这一种状态，各项加起来是「共 N」（工单 #1160）。
+        // 示例项目里那一个事项已经放行并被采纳，所以是已采纳 1、放行待采纳 0、成果挂起 0
         const statsLine = (await section(page, "项目摘要")).locator(".line").filter({ hasText: "事项统计" }).first();
-        const stats = await statsLine.innerText();
-        await current.getByRole("button", { name: "作为新事项开始" }).click();
-        await waitUntil(
-          async () => (await statsLine.innerText()) !== stats,
-          page,
-          "新事项建起来以后事项统计改变",
-        );
+        await expect(statsLine).toContainText("共 1：进行中 0、排队中 0、已采纳 1、放行待采纳 0、成果挂起 0、已停止 0");
+
+        // 只填这一个框，点「记录原文」：记成材料，不建事项，框清空
+        const box = current.getByLabel("新的想法或材料");
+        await box.fill("概览里记录的材料文字");
+        await expect(record).toBeEnabled();
+        await expect(create).toBeEnabled();
+        await record.click();
+        await waitUntil(async () => (await box.inputValue()) === "", page, "记录原文提交以后那个框清空");
+        await expect(statsLine).toContainText("共 1：");
+
+        // 还是这一个框，填好以后点「作为新事项开始」：事项建出来，页面转到这个事项（地址带 ?w=）
+        const title = `界面新建的事项 ${Date.now()}`;
+        await box.fill("从概览开始的新事项原文");
+        await current.getByLabel("事项标题（可选）").fill(title);
+        await create.click();
+        await waitUntil(async () => /[?&]w=/.test(await page.evaluate(() => window.location.hash)), page,
+          "作为新事项开始以后转到这个事项（地址带 ?w=）", 120_000);
+        const workItem = new URLSearchParams((await page.evaluate(() => window.location.hash)).split("?")[1] ?? "").get("w") ?? "";
+        expect(workItem).not.toBe("");
+        // 服务端真的建出了这个事项，页面上它的标题就是刚才填的
+        const overview = await fetchQuery<{ work_items: { work_item_id: string; title: string }[] }>(
+          page, "project.overview", { project_id: id });
+        expect(overview.work_items.some((item) => item.work_item_id === workItem && item.title === title)).toBe(true);
+        await expect(await section(page, "当前事项")).toContainText(title);
+        // 回到整个项目的概览（不带 ?w=）：事项统计算的是这个项目的全部事项，刚建的那个也在里面
+        await gotoView(page, id, "overview");
+        await expect(statsLine).toContainText("共 2：");
         expect(errors).toEqual([]);
       } finally {
         await client.close();

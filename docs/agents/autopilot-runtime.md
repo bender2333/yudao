@@ -151,6 +151,13 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | `YUDAO_EVAL_API_KEY` | 凭据，不写进仓库、工单、PR、日志与日记 |
 | `YUDAO_EVAL_MODEL` | 模型名，与上表一致；换模型时两处一起改 |
 
+2026-10-29 实测：会话进程里可能没有 `YUDAO_EVAL_API_KEY`（用户级有、这个进程没继承），`YUDAO_VISION_API_KEY` 也没有；`vision.mjs` 在没有 `SOLO_VISION_*` 时沿用 `YUDAO_EVAL_API_KEY`，所以看图只缺这一样。用到凭据的命令，先在本进程里补一行再跑，值只在进程里存在，不写进文件、评论与日记：
+
+```powershell
+$env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_KEY', 'User')
+```
+
+
 - 不用 9router 上 `cc/` 分组的模型（用户，2026-10-18）。
 - 不放进 CI：CI 没有这三个变量，需要模型的测试在 CI 中不运行。
 - 用户级的环境变量只对设置以后启动的进程生效；修改以后，派发者重新启动，执行者与审查者从下一次派发起读到。

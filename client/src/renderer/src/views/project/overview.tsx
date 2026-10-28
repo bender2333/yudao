@@ -4,7 +4,7 @@
 // 页面上方不放决定区块：决定请求在大厅的板与文字列表里（v10 第 9 节，#175）。
 // 数据只来自 project.overview、work_item.inputs、project.flow 与 event.detail 这几个已登记的查询。
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
   AwayReport,
@@ -14,6 +14,7 @@ import type {
   RunAsksResult,
   WorkItemCard,
   WorkItemInputsResult,
+  WorkItemStats,
 } from "../../api/generated/types.gen";
 import { paths } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
@@ -107,7 +108,14 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
               />
             ) : null}
           </Section>
-          <CurrentItem app={props.app} projectId={projectId} item={current} command={command} startPoint={data.start_point ?? null} />
+          <CurrentItem
+            app={props.app}
+            projectId={projectId}
+            item={current}
+            command={command}
+            startPoint={data.start_point ?? null}
+            onNavigate={props.onNavigate}
+          />
           <Asks app={props.app} item={current} />
           <RestartOnboarding app={props.app} projectId={projectId} />
           <Board items={items} />
@@ -155,7 +163,7 @@ function Summary(props: { app: ClientApp; projectId: string; data: ProjectOvervi
             ["快照提交", provenanceText(adoption.snapshot_provenance)],
             ["现有缺陷", `现有缺陷 ${adoption.existing_defect_count} 项`],
           ] as [string, string][] : []),
-          ["事项统计", `共 ${props.data.stats.total}：进行中 ${props.data.stats.in_progress}、排队中 ${props.data.stats.not_started}、已采纳 ${props.data.stats.adopted}、已放行 ${props.data.stats.released_unsettled}、已停止 ${props.data.stats.stopped}`],
+          ["事项统计", statsText(props.data.stats)],
         ]}
       />
       {/* 起点只在项目还没有采纳成果时写明：project.overview 在有采纳成果时不返回起点说明 */}
@@ -168,6 +176,27 @@ function Summary(props: { app: ClientApp; projectId: string; data: ProjectOvervi
 function startPointText(value: string | null | undefined): string {
   const text = value ?? "";
   return text.startsWith("起点：") ? text.slice("起点：".length) : text;
+}
+
+// 事项统计那一行（工单 #1160）：每一项只写这一种状态，不写累计。
+// released_unsettled 是「放行了、还没采纳」这一个状态，所以写「放行待采纳」，不写「已放行」；
+// held（成果挂起）也要有一项，否则各项加起来不等于「共 N」。看板的列名另有一套，不跟这一行。
+// 服务端的统计没有 awaiting_initial_prd（要改接口快照才能加，本工单不加）：等待确认初始 PRD 的事项
+// 因此只计入「共 N」，这一行不单列它，界面不猜它的数量。
+export function statsText(stats: WorkItemStats): string {
+  return `共 ${stats.total}：进行中 ${stats.in_progress}、排队中 ${stats.not_started}、已采纳 ${stats.adopted}`
+    + `、放行待采纳 ${stats.released_unsettled}、成果挂起 ${stats.held}、已停止 ${stats.stopped}`;
+}
+
+// 命令受理回执里的标识：project.create 带 project_id、work_item.create 带 work_item_id（都在 refs 里），
+// 没有这一项时返回空串（工单 #1160 用它转到刚建好的项目与事项）
+function receiptId(accepted: Record<string, unknown> | null, key: string): string {
+  const refs = accepted?.["refs"];
+  if (refs === null || refs === undefined || typeof refs !== "object") {
+    return "";
+  }
+  const value = (refs as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : "";
 }
 
 // 快照的 git 来源（与决定卡片同一份文案）：没有仓库时写明采集时的目录内容
@@ -195,6 +224,7 @@ function CurrentItem(props: {
   item: WorkItemCard | null;
   command: CommandState;
   startPoint: string | null;
+  onNavigate: (hash: string) => void;
 }) {
   const item = props.item;
   const inputs = useSnapshot<WorkItemInputsResult>(props.app, "page.inputs", "work_item.inputs", {
@@ -212,6 +242,7 @@ function CurrentItem(props: {
           canRecord={hasCommand(props.app, "material.record")}
           canCreate={hasCommand(props.app, "work_item.create")}
           startPoint={props.startPoint}
+          onNavigate={props.onNavigate}
         />
       </Section>
     );
@@ -304,9 +335,10 @@ function Asks(props: { app: ClientApp; item: WorkItemCard | null }) {
   );
 }
 
-// 没有进行中的事项时的两个输入框：「记录原文」把文字存成本项目的材料，
-// 「新的要求」用它开始一个新事项。两个框各有各的草稿与各自的状态：
-// 写在一个框里的文字不会出现在另一个框里，提交一个框只清空那个框（工单 #652）。
+// 没有进行中的事项时的输入（原型 v13 的 composerHtml，工单 #1160）：一个框「新的想法或材料」加一个
+// 「事项标题（可选）」，一句说明写清两个按钮各做什么，两个按钮读同一个框。框为空时两个按钮都不可用
+// （不说原因，原型的做法就是不填不能点）。草稿按项目保存，换项目以后各是各的。
+// 「作为新事项开始」成功以后转到这个事项（地址带 ?w=，原型 v13 的 ov.create）。
 export function NewItemComposer(props: {
   projectId: string;
   command: CommandState;
@@ -314,63 +346,89 @@ export function NewItemComposer(props: {
   canCreate: boolean;
   /** 项目的起点说明（project.overview 的 start_point，以「起点：」开头）；没有时新建事项处不写这句话 */
   startPoint?: string | null;
+  onNavigate: (hash: string) => void;
 }) {
-  const [recordText, setRecordText] = useDraft(`input/${props.projectId}/none/record`);
-  const [requirementText, setRequirementText] = useDraft(`input/${props.projectId}/none/requirement`);
-  const [newTitle, setNewTitle] = useState("");
+  const [text, setText] = useDraft(`input/${props.projectId}/none/new`);
+  const [title, setTitle] = useDraft(`input/${props.projectId}/none/title`);
+  const empty = text.trim() === "";
+  // 转事项看的是受理回执里的 work_item_id：提交之前先立一个标记，回执换成新的一份时转一次，
+  // 不因为页面上还留着上一次的回执而自己跳走
+  const creating = useRef(false);
+  const usedReceipt = useRef<Record<string, unknown> | null>(null);
+  const accepted = props.command.accepted;
+  useEffect(() => {
+    if (!creating.current || accepted === null || accepted === usedReceipt.current) {
+      return;
+    }
+    const workItemId = receiptId(accepted, "work_item_id");
+    if (workItemId === "") {
+      return;
+    }
+    creating.current = false;
+    usedReceipt.current = accepted;
+    props.onNavigate(paths.overview(props.projectId, { workItem: workItemId }));
+  }, [accepted]);
 
   return (
-    <>
-      <div className="y10-ov-composer composer">
-        <TextArea label="记录原文（保存为本项目的材料）" value={recordText} onInput={setRecordText} />
+    <div className="y10-ov-composer composer">
+      <TextArea label="新的想法或材料" value={text} onInput={setText} />
+      <TextInput label="事项标题（可选）" value={title} onInput={setTitle} placeholder="留空时取原文第一行" />
+      {/* 新事项从项目的起点开始（工单 #907）：起点说明取自概览已有的 start_point，去掉前面的「起点：」 */}
+      {startPointText(props.startPoint) === "" ? null : (
+        <p className="y10-note note">新事项从{startPointText(props.startPoint)}开始</p>
+      )}
+      <p className="y10-note note">「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品部门</p>
+      <div className="y10-row row-actions">
         {props.canRecord ? (
           <SubmitButton
             label="记录原文"
             busy={props.command.busy}
-            disabled={recordText.trim() === ""}
+            disabled={empty}
             onClick={() => {
-              void props.command.submit("material.record", { project_id: props.projectId, text: recordText.trim() })
-                .then((ok) => { if (ok) setRecordText(""); });
+              void props.command.submit("material.record", { project_id: props.projectId, text: text.trim() })
+                .then((ok) => { if (ok) setText(""); });
             }}
           />
         ) : <p className="y10-note note">这台主机没有提供记录原文的操作</p>}
-      </div>
-      <div className="y10-ov-composer composer">
-        <TextArea label="新的要求" value={requirementText} onInput={setRequirementText} />
-        <TextInput label="事项标题（可以留空）" value={newTitle} onInput={setNewTitle} />
         {props.canCreate ? (
           <SubmitButton
             label="作为新事项开始"
             busy={props.command.busy}
-            disabled={requirementText.trim() === ""}
+            disabled={empty}
             onClick={() => {
-              const body: Record<string, unknown> = { project_id: props.projectId, text: requirementText.trim() };
-              if (newTitle.trim() !== "") {
-                body.title = newTitle.trim();
+              const body: Record<string, unknown> = { project_id: props.projectId, text: text.trim() };
+              if (title.trim() !== "") {
+                body.title = title.trim();
               }
-              void props.command.submit("work_item.create", body).then((ok) => { if (ok) { setRequirementText(""); setNewTitle(""); } });
+              creating.current = true;
+              void props.command.submit("work_item.create", body)
+                .then((ok) => {
+                  // 被拒绝时不转（回执没有换成新的一份，转不上去）；框里的文字留着，改完可以再提交
+                  if (!ok) {
+                    creating.current = false;
+                    return;
+                  }
+                  setText("");
+                  setTitle("");
+                });
             }}
           />
         ) : <p className="y10-note note">这台主机没有提供新建事项的操作</p>}
-        {/* 新事项从项目的起点开始（工单 #907）：起点说明取自概览已有的 start_point，去掉前面的「起点：」 */}
-        {startPointText(props.startPoint) === "" ? null : (
-          <p className="y10-note note">新事项从{startPointText(props.startPoint)}开始</p>
-        )}
-        <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
-        {(() => {
-          const links = rejectionLinks(props.command.problem, props.projectId);
-          return links.length > 0 ? (
-            <div className="y10-row row-actions">
-              {links.map((link) => (
-                <button key={link.hash} type="button" className="y10-link link" onClick={() => { window.location.hash = link.hash; }}>
-                  {link.label}
-                </button>
-              ))}
-            </div>
-          ) : null;
-        })()}
       </div>
-    </>
+      <CommandFeedback submitted={props.command.submitted} problem={props.command.problem} />
+      {(() => {
+        const links = rejectionLinks(props.command.problem, props.projectId);
+        return links.length > 0 ? (
+          <div className="y10-row row-actions">
+            {links.map((link) => (
+              <button key={link.hash} type="button" className="y10-link link" onClick={() => { window.location.hash = link.hash; }}>
+                {link.label}
+              </button>
+            ))}
+          </div>
+        ) : null;
+      })()}
+    </div>
   );
 }
 
