@@ -719,3 +719,4 @@ claude-架构师 / 2026-10-29 03:25 / `docs/design/model-management.md` 第 8.2 
 
 claude-架构师 / 2026-10-29 03:25 / `.claude/skills/solo/SKILL.md` 每轮第 2 步与 `.claude/skills/architect-loop/SKILL.md` 第 4 步：`reap` 之前先查这个分支上有没有在跑的 CI 运行、PR 上的检查在不在 `in_progress`，三样都静止才回收；`architect-loop` 的一轮从五步改成六步 / 2026-10-29 在 #1162 上误判过一次「卡住」：原工人其实在等一趟挂住的集成层（xdist 进程挂掉、作业超时取消），`reap` 之后重派，两个活着的工人写了同一个 worktree
 
+claude-架构师 / 2026-10-29 03:25 / `.claude/skills/solo/SKILL.md` 每轮第 2 步与 `.claude/skills/architect-loop/SKILL.md` 第 4 步：`reap` 之前先查这个分支上有没有在跑的 CI 运行、PR 上的检查在不在 `in_progress`，三样都静止才回收；`architect-loop` 的一轮从五步改成六步 / 2026-10-29 在 #1162 上误判过一次「卡住」：原工人其实在等一趟挂住的集成层（xdist 进程挂掉、作业超时取消），`reap` 之后重派，两个活着的工人写了同一个 worktreeclaude-架构师 / 2026-10-29 03:45 / `.claude/skills/trial/scripts/preflight.ps1` 两处改正：python 经 `uv run --no-sync python` 起得来也算通过（这台机器上裸 python 是占位程序）；凭据在进程里没有时读用户级 `YUDAO_EVAL_API_KEY` 并在读数里写明取自哪一级 / 试用的预检对本机误报两项阻断，预检不过会让薄片在到达时停在原处；改完 0 阻断、1 警告（工作区有未提交改动）
