@@ -1,0 +1,132 @@
+{
+  "version": "1",
+  "design": "docs/design/context-assembly.md",
+  "values": {
+    "input_single_copy": true,
+    "superseded_read_collapse": true,
+    "tool_result_keep_tokens": 16000,
+    "tool_result_clear_min_tokens": 4000,
+    "error_result_keep": true,
+    "pinned_reference_gate": true,
+    "pinned_stub_chars": 400,
+    "round_fold_granularity": true,
+    "work_limit_tokens": 100000,
+    "gated_sections": [
+      "current_delivery_spec",
+      "prior_delivery",
+      "existing_overview",
+      "causal_chain",
+      "binding_refs",
+      "prior_structure",
+      "prior_initial_prd",
+      "current_product_decisions"
+    ],
+    "superseded_input_stub": "（第 {step} 步的旧输入已折叠：同一部门输入只保留最新一份原文）"
+  },
+  "records": [
+    {
+      "name": "input_single_copy",
+      "form": "admission",
+      "kind": "structure",
+      "input": "部门历史里的输入条目（激活的部门输入与通知）及它们的正文",
+      "output": "保留的输入条目集合：同一段正文只留最新的一份",
+      "default": "开",
+      "origin": "设计说明第 4 节 R1；回放数据：830 条输入只有 31 段不同的正文，占全部输入 21.8%，其中 92.4% 的用量此后从未被引用",
+      "guards": "同一段部门输入在后续每一步重复装入，占满请求、推高费用",
+      "cost": "被丢掉的是旧副本；旧副本与最新一份正文相同时不丢信息",
+      "relax_when": "新视图上出现「模型重读旧输入里的某项」的召回缺口",
+      "tighten_when": "回放中同一正文仍出现多份"
+    },
+    {
+      "name": "superseded_read_collapse",
+      "form": "admission",
+      "kind": "structure",
+      "input": "工具结果条目、它们的工具名与调用参数里的路径",
+      "output": "折叠集合：同一路径的读取结果只留最新一版原文，旧的换成一行占位",
+      "default": "开",
+      "origin": "设计说明第 4 节 R2；回放数据：read_file 读到同一路径最多 418 次（README.md）、256 次（textstats.py），被取代的旧读取是最容易证明作废的一类",
+      "guards": "同一文件被反复读取，历史里留下多份旧内容",
+      "cost": "旧版本的内容不再在视图里，要旧内容时需要重新读取",
+      "relax_when": "模型需要对比同一文件的先后版本",
+      "tighten_when": "回放里同一路径仍保留多份原文"
+    },
+    {
+      "name": "tool_result_keep_tokens",
+      "form": "boundary",
+      "kind": "parameter",
+      "input": "历史工具结果按新到旧累计的用量",
+      "output": "超出保留量时从最旧的一轮开始折叠",
+      "default": 40000,
+      "origin": "规则登记里已有这一条（context.tool_result_keep_tokens，40000，来源为语义系统设计说明第 525 行 OMP 与 opencode 保护最近 40000 token），但装配实现没有读它；设计说明第 4 节 R3 把它接到视图上",
+      "guards": "旧工具结果占满请求",
+      "cost": "能节省的上下文量减少",
+      "relax_when": "新视图出现召回缺口的时候",
+      "tighten_when": "折叠以后请求仍然超过工作上限"
+    },
+    {
+      "name": "tool_result_clear_min_tokens",
+      "form": "boundary",
+      "kind": "parameter",
+      "input": "这一轮折叠能省下的用量",
+      "output": "省不下这么多就不折叠",
+      "default": 20000,
+      "origin": "规则登记里已有的 context.tool_result_clear_min_tokens（20000），装配实现没有读它；设计说明第 4 节 R3",
+      "guards": "为了很少的用量把一轮拆碎、多出占位",
+      "cost": "少省一些用量",
+      "relax_when": "折叠以后的请求仍然超过工作上限",
+      "tighten_when": "折叠以后通常已经低于工作上限"
+    },
+    {
+      "name": "error_result_keep",
+      "form": "permission",
+      "kind": "structure",
+      "input": "工具结果的 ok/error 字段",
+      "output": "失败的结果不折叠，也不计入保留量",
+      "default": "开",
+      "origin": "设计说明第 4 节 R4；回放数据：失败结果 355 条、10076 token（占全部输入 0.12%），词面引用率为 0——错误文字短而通用，模型用了也不复述，所以这一条按「便宜且承载状态」定，不按引用率定",
+      "guards": "失败原因被折叠以后，部门重复同样的失败",
+      "cost": "占用保留量（实测很小）",
+      "relax_when": "失败结果用量占比上升",
+      "tighten_when": "失败结果长期不被读取也不被引用"
+    },
+    {
+      "name": "pinned_reference_gate",
+      "form": "admission",
+      "kind": "structure",
+      "input": "部门材料的各段与这一次的工作引用（current_work 段里点名的来源）",
+      "output": "契约段整段装入；引证段在工作引用没有指向它时只装一段摘要与查询方式",
+      "default": "开",
+      "origin": "设计说明第 4 节 R5；回放数据：引证类材料（current_product_spec、project、current_delivery_spec、proposal_contract 相邻段等）占部门材料的大部分，被引用记号覆盖的字符只占 2%至6%",
+      "guards": "每一步都整段装入几万字符的引证材料，模型只用到其中几个词",
+      "cost": "需要引证内容时多一次读取",
+      "relax_when": "新视图出现引证内容缺失导致的召回缺口",
+      "tighten_when": "摘要段落长期不被读取"
+    },
+    {
+      "name": "round_fold_granularity",
+      "form": "boundary",
+      "kind": "structure",
+      "input": "历史按轮切分（一次模型输出与它的工具结果为一轮）",
+      "output": "折叠以整轮为单位，调用与结果成对折叠成一条注记",
+      "default": "开",
+      "origin": "设计说明第 4 节 R6；回放数据：工具调用条目占 18.5%、其中 45.9% 此后从未被引用；协议要求 function_call 与它的结果成对出现，按条折叠会留下配不上的调用",
+      "guards": "只折叠一半，请求被模型服务拒绝",
+      "cost": "折叠粒度粗，一轮里的一条有用结果跟着一起折叠",
+      "relax_when": "一轮里有必须保留的失败结果（由 error_result_keep 兜住）",
+      "tighten_when": "不需要"
+    },
+    {
+      "name": "work_limit_tokens",
+      "form": "boundary",
+      "kind": "parameter",
+      "input": "装配出来的请求的估算用量",
+      "output": "超过工作上限时继续折叠，直到低于上限；窗口减预留是更硬的上限",
+      "default": 100000,
+      "origin": "规则登记里已有的 context.work_limit_tokens（100000），装配实现没有读它；设计说明第 5 节装入顺序",
+      "guards": "请求过长、缓存失效",
+      "cost": "窄于模型窗口时提前压缩",
+      "relax_when": "按模型与任务的实际请求长度分布调整",
+      "tighten_when": "实际请求长度分布长期低于现值的一半"
+    }
+  ]
+}
