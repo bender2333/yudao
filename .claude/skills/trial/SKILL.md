@@ -90,8 +90,9 @@ $env:TEMP\yudao-trial-venv\Scripts\python.exe -m harness api --data-dir $env:TEM
 ```
 
 - 其他系统解释器在 `bin/`；不用默认数据目录。
+- 起服务时把当前目录设在仓库之外（`-WorkingDirectory $env:TEMP` 或先 `cd` 出去）。在仓库根目录下运行会导入仓库里的 `harness` 包，页面文件找不到，服务只回「没有页面文件」。
 - 一次试用固定一个数据目录，重启服务时用同一个，R1 第 3 步要的就是这一点。
-- `release.py` 要求工作区干净、`node` ≥ 22.12、版本号对应的标签不存在；标签已存在时按它的提示改版本号并在帖子里说明，不改发布脚本。
+- 不带 `--publish` 时 `release.py` 只核对工作区干净、这个提交在 main 上并已推送、`node` ≥ 22.12，然后构建并输出 wheel 的路径与 SHA-256。带 `--publish` 才打标签、推送并上传 Release，标签已存在会报错。试用一律不加 `--publish`，不改发布脚本。
 - 起服务以后核对一次 `http://127.0.0.1:8766/api/capabilities` 返回 200 才继续。构建失败就停：源码直跑没有页面文件。
 - 服务进程号、端口、数据目录、wheel 与 SHA-256 写进 `state.md`（第 12 节）。
 
