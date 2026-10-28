@@ -1,14 +1,14 @@
 {
  "ablations": {
   "error_result_keep": {
-   "after_tokens": 6935436,
+   "after_tokens": 6924451,
    "before_tokens": 8331638,
    "marginal_recall": -0.0002,
    "marginal_saved_tokens": -6432,
    "recall": 0.9447
   },
   "input_single_copy": {
-   "after_tokens": 7236898,
+   "after_tokens": 7225913,
    "before_tokens": 8331638,
    "marginal_recall": -0.0006,
    "marginal_saved_tokens": 295030,
@@ -18,98 +18,98 @@
    "after_tokens": 7190598,
    "before_tokens": 8331638,
    "marginal_recall": 0.0,
-   "marginal_saved_tokens": 248730,
+   "marginal_saved_tokens": 259715,
    "recall": 0.9448
   },
   "round_fold_granularity": {
-   "after_tokens": 6941868,
+   "after_tokens": 6930883,
    "before_tokens": 8331638,
    "marginal_recall": 0.0,
    "marginal_saved_tokens": 0,
    "recall": 0.9448
   },
   "superseded_read_collapse": {
-   "after_tokens": 7061812,
+   "after_tokens": 7050827,
    "before_tokens": 8331638,
    "marginal_recall": 0.0025,
    "marginal_saved_tokens": 119944,
    "recall": 0.9474
   },
   "tool_result_age_budget": {
-   "after_tokens": 7565931,
+   "after_tokens": 7554946,
    "before_tokens": 8331638,
    "marginal_recall": 0.0071,
    "marginal_saved_tokens": 624063,
    "recall": 0.952
   }
  },
- "after_tokens": 6941868,
+ "after_tokens": 6930883,
  "before_tokens": 8331638,
  "by_department": {
   "engineering": {
-   "after_tokens": 3431245,
+   "after_tokens": 3424994,
    "before_tokens": 4051482,
    "recall_after": 0.966,
    "recall_before": 0.9734,
-   "saved_ratio": 0.1531,
+   "saved_ratio": 0.1546,
    "steps": 311
   },
   "product": {
-   "after_tokens": 424932,
+   "after_tokens": 421504,
    "before_tokens": 457403,
    "recall_after": 0.983,
    "recall_before": 0.983,
-   "saved_ratio": 0.071,
+   "saved_ratio": 0.0785,
    "steps": 97
   },
   "quality": {
-   "after_tokens": 3085691,
+   "after_tokens": 3084385,
    "before_tokens": 3822753,
    "recall_after": 0.9648,
    "recall_before": 0.9662,
-   "saved_ratio": 0.1928,
+   "saved_ratio": 0.1932,
    "steps": 238
   }
  },
  "by_step": {
   "1": {
-   "after_tokens": 830239,
+   "after_tokens": 828250,
    "before_tokens": 1049534,
    "recall_after": 0.9953,
    "recall_before": 0.9953,
-   "saved_ratio": 0.2089,
+   "saved_ratio": 0.2108,
    "steps": 105
   },
   "16+": {
-   "after_tokens": 1258551,
+   "after_tokens": 1257195,
    "before_tokens": 1787171,
    "recall_after": 0.9337,
    "recall_before": 0.969,
-   "saved_ratio": 0.2958,
+   "saved_ratio": 0.2965,
    "steps": 63
   },
   "2-3": {
-   "after_tokens": 1355431,
+   "after_tokens": 1352549,
    "before_tokens": 1622820,
    "recall_after": 0.9802,
    "recall_before": 0.9802,
-   "saved_ratio": 0.1648,
+   "saved_ratio": 0.1665,
    "steps": 163
   },
   "4-7": {
-   "after_tokens": 1847533,
+   "after_tokens": 1844656,
    "before_tokens": 2051049,
    "recall_after": 0.9689,
    "recall_before": 0.9702,
-   "saved_ratio": 0.0992,
+   "saved_ratio": 0.1006,
    "steps": 190
   },
   "8-15": {
-   "after_tokens": 1650114,
+   "after_tokens": 1648233,
    "before_tokens": 1821064,
    "recall_after": 0.9455,
    "recall_before": 0.9468,
-   "saved_ratio": 0.0939,
+   "saved_ratio": 0.0949,
    "steps": 125
   }
  },
@@ -400,10 +400,10 @@
   "tool_result_keep_tokens": 16000,
   "work_limit_tokens": 100000
  },
- "rules_path": "C:\\code\\yudao\\evals\\context\\rules.json",
+ "rules_path": "C:\\code\\yudao\\evals\\context\\rule-set.json",
  "rules_version": "sha256:6d66cca8e0935b187fb1b2580dcdcda1b4ee60fe3948894bb7f225790f3b369b",
- "saved_ratio": 0.1668,
- "saved_tokens": 1389770,
+ "saved_ratio": 0.1681,
+ "saved_tokens": 1400755,
  "sections": {
   "binding_refs": {
    "lost_steps": 0.0,
@@ -455,6 +455,6 @@
   }
  },
  "steps": 646,
- "waste_after": 0.4053,
+ "waste_after": 0.4006,
  "waste_before": 0.4998
 }
