@@ -22,7 +22,8 @@
 #
 # 状态从事件折叠：路由自己从运行流的事件折出池子的现状（设计说明第 5.1 节输入），不保存事件之外的状态。
 # 契约给的入口是运行流的投影，而投影不折叠通用的成果接纳事件（见 docs/architecture-issues.md 2026-10-28
-# 的一条），所以这里让组装处在测试里把只读的事件库交给它：`bind(store)`。
+# 的一条），所以这里声明契约第三版的可选方法 `use_facts`（工单 #1164）：组装处 select 接上这个路由以后，
+# 把事件库的只读读取器交给它，池子的现状就从那里的事件折出来。
 
 from __future__ import annotations
 
@@ -285,7 +286,7 @@ def check_definition(definitions: Any) -> None:
 
 
 class TaskPool:
-    """任务池路由（路由契约第二版的第二种实现）。
+    """任务池路由（路由契约第三版的第二种实现）。
 
     实现在测试里；薄驱动只按契约的三个问题调用它。它读运行流的事件折出池子的现状，不写事件、不调模型、
     不核对边界、不执行工具（设计说明第 5.1 节「不做」）。
@@ -295,13 +296,12 @@ class TaskPool:
     CONTRACT_VERSION = routing_contract.CURRENT_VERSION
 
     def __init__(self) -> None:
-        # 只读事件库由组装处在测试里交给它：契约给的入口只有运行流的投影，投影不折叠通用的成果接纳事件
-        self._store: Any = None
+        # 只读事件读取器由组装处交给它（契约第三版的 use_facts）：契约给的投影不折叠通用的成果接纳事件
+        self._facts: Any = None
 
-    def bind(self, store: Any) -> "TaskPool":
-        """把只读的事件库交给这个路由（测试的组装处做这件事；产品里由运行时的组装处做）。"""
-        self._store = store
-        return self
+    def use_facts(self, reader: Any) -> None:
+        """组装处交给它的只读事件读取器（工单 #1164）：只有 list_events(run_id)，没有写事件的出路。"""
+        self._facts = reader
 
     # ---- 配置 ----
 
@@ -309,9 +309,10 @@ class TaskPool:
         return DEFINITIONS
 
     def state(self, run_id: str) -> PoolState:
-        if self._store is None:
-            raise RuntimeError("the task pool routing needs the read-only event store: bind(store) first")
-        return fold(list(self._store.list_events(run_id)))
+        if self._facts is None:
+            raise RuntimeError("the task pool routing needs its read-only event reader: "
+                               "the assembly hands it over through use_facts(reader)")
+        return fold(list(self._facts.list_events(run_id)))
 
     # ---- 契约 ----
 
