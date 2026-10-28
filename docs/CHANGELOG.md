@@ -9,6 +9,8 @@
 
 claude-架构师 / 2026-10-29 00:10 / docs/program-roadmap.md、docs/current-baseline.md、docs/requirements/README.md 的 D40 一行、docs/design/README.md 的骨架与应用设计说明一行：把阶段一「换骨架」的状态与日期改到本次核对（父工单 #823 子工单 22/22 关闭，七条验收在 main a5b5a3c7 上逐条核对，第 6 条后半的场景 3 读数由 #994 在阶段一发布提交上跑），内容未重写 / 父工单按验收证据规则第 4 节核对后关闭，证据写在 #823 的评论 https://github.com/bender2333/yudao/issues/823#issuecomment-6474145556；总图的建设状态与缝的已定未定仍由总架构师改，需要改的行写在同一条评论里
 
+solo-deepseek-v4.1-flash / 2026-10-29 00:05 / 工单 #1160 [界面]：本文件加这一条。界面按当前定稿 v13 改了三处（概览的新事项输入一个框配两个按钮、事项统计那一行的名字、新建项目表单的说明），`docs/` 下的设计说明与原型都没有改：v13 的 `docs/prototypes/v13/js/ui/views/overview.js`（`composerHtml`）与 `docs/prototypes/v13/js/ui/shell.js`（`shell.newProject`）就是这次的依据，`docs/design/project-initial-files.md` 第 3、5 节写的起始文件夹快照与「从想法新建不调用模型」没有变 / 试用问题 Tf61ac6a6-05（两个文本框不知该填哪个）与 Tf61ac6a6-08（事项统计叫「已放行」实际是放行了还没采纳、漏了成果挂起），另补 Tf61ac6a6-10 分诊后剩下的那处表单说明
+
 claude-架构师 / 2026-10-28 18:55 / .claude/skills/trial/ 三处改动：SKILL.md 新增 3.1 节「把两个模型配进产品」并改掉单 agent 对照（用户决定不跑）、第 5 节与第 13 节的看图改成 scripts/vision.mjs、两个模型的部门分工改为产品与工程 model1 加质检 model2；新增 scripts/vision.mjs（把截图发给 ag/gemini-3.8-flash-high，Node 内置模块）；preflight.ps1 的模型检查改为 YUDAO_VISION_* 并去掉三项 YUDAO_EVAL_MODEL_* 警告 / 用户 2026-10-28 指定运行模型用 model1、需要视觉判断用 gemini 3.8 flash high、OpenCode 对照不用跑；实测下来会话里的看图子代理走不通（harness 的模型声明只有文本输入），改用脚本直接调同一模型的接口，已实测能读出页面细节
 
 claude-opus-5-5 / 2026-10-21 01:25 / docs/decision.md 新增 2026-10-21 一条：询问分支的时间上限在安全节点检查，事项剩余时间由已有的运行时间检查负责，回答交回就记为已回答，用量恢复取最后一个累计值 / #553 的 PR #641 第 3 次要求修改达到上限，第 3 轮审查的三条都出在分支用硬期限的做法上
