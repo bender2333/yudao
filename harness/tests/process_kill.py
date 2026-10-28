@@ -34,6 +34,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+import traceback
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -450,35 +451,52 @@ def _open_after_kill(path: Path) -> EventStore:
             time.sleep(0.2)
 
 
-def _open_writable_after_kill(data_dir: Path) -> None:
-    # 进程刚被终止时，GitHub 的 Windows 运行机上事件库的文件还会被短暂占用（同上，2026-10-18
-    # run 39103301202）：只读打开能重试过去，紧接着的可写打开（含设置 WAL，harness/event_store.py）
-    # 没有重试，失败在 PRAGMA journal_mode=WAL，报 disk I/O error（2026-10-23 run 39998093540：
-    # 集成层两条用例因此失败）。这里先把事件库可写地打开一次（含设置 WAL），能打开才继续；
-    # 等待上限与只读打开一样，超过上限照常抛出原来的错误，不吞掉。
-    # 只打开一次就够：这一步不写事件（建表与 log 登记都是 IF NOT EXISTS / OR IGNORE），
-    # 系统随后打开事件库时不会因此多出内容
-    path = Path(data_dir) / "events.sqlite"
-    deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
-    while True:
-        try:
-            store = EventStore(path)
-        except sqlite3.OperationalError:
-            if time.monotonic() >= deadline:
-                raise
-            time.sleep(0.2)
+_SYSTEM_INIT_FILE = Path(LoopSystem.__init__.__code__.co_filename).name
+_STORE_INIT_FILE = Path(EventStore.__init__.__code__.co_filename).name
+
+
+def _failed_on_the_store_open(error: BaseException) -> bool:
+    # 这次失败发生在「构造系统时第一次打开事件库」这一步吗。构造系统的调用链是
+    # for_testing → LoopSystem.__init__ → EventStore.__init__，紧跟 __init__ 的下一帧在
+    # event_store.py 里就是这一步失败。启动序列里的某一步失败时（补做结算、补建 run、启动恢复）
+    # 中间还会多一层，那时重来会让这些步骤做两次，因此不重试
+    frames = traceback.extract_tb(error.__traceback__)
+    for index, frame in enumerate(frames):
+        if frame.name != "__init__" or Path(frame.filename).name != _SYSTEM_INIT_FILE:
             continue
-        store.close()
-        return
+        following = frames[index + 1] if index + 1 < len(frames) else None
+        return following is not None and Path(following.filename).name == _STORE_INIT_FILE
+    return False
 
 
 def _open_system_after_kill(data_dir: Path, adapter: FakeAdapter, *,
                             resume_on_startup: bool) -> LoopSystem:
-    # 系统打开数据目录时会以可写方式打开事件库（含设置 WAL）：先等到这一次可写打开能成功，
-    # 再打开系统。系统在启动序列里做的事（补做结算、补建 run、启动恢复）因此仍然只做一次，
-    # 不会因为重试而重复
-    _open_writable_after_kill(data_dir)
-    return LoopSystem.for_testing(data_dir, adapter, resume_on_startup=resume_on_startup)
+    # 进程刚被终止时，GitHub 的 Windows 运行机上事件库的文件还会被短暂占用（2026-10-18
+    # run 39103301202）。探测性的只读打开与可写打开各自重试（_open_after_kill，以及 2026-10-23
+    # run 39998093540 加的可写探测）都只包住「探测」那一次：探测成功、关掉以后，系统自己打开
+    # 事件库（同样是可写打开，含设置 WAL）照样会失败（2026-10-28 的两条：main 6eaf09ec
+    # run 40596572672 与 main 30ed23a3 run 40606862926，都在 PRAGMA journal_mode=WAL 上报
+    # disk I/O error）。所以重试放在系统打开事件库这一步上，不再赌「探测成功以后文件就不再被占用」。
+    #
+    # 等的是：被终止的进程留下的占用释放。Windows 上进程退出与被它占着的文件真正可以再打开
+    # 之间有一小段间隔（句柄回收、WAL 的 -wal 与 -shm 文件收尾都晚于进程退出）。每 0.2 秒试
+    # 一次，等到 STARTUP_TIMEOUT_SEC 为止；超过上限照常抛出原来的错误，不吞掉。
+    #
+    # 这样重试不会让启动序列做两次：打开事件库是 LoopSystem 启动序列里第一件有副作用的事
+    # （在它以前只有 data_dir 的 mkdir，幂等），这一步失败时补做结算、补建 run 与启动恢复
+    # 都还没有开始，整个构造可以重来。失败在启动序列里的某一步时不重试（见
+    # _failed_on_the_store_open），那种情况下重来才会让它们做两次
+    deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
+    retries = 0
+    while True:
+        try:
+            return LoopSystem.for_testing(data_dir, adapter, resume_on_startup=resume_on_startup)
+        except sqlite3.OperationalError as error:
+            if not _failed_on_the_store_open(error) or time.monotonic() >= deadline:
+                raise
+            retries += 1
+            print(f"打开事件库失败，第 {retries} 次重试：{error}", file=sys.stderr, flush=True)
+            time.sleep(0.2)
 
 
 def _observe(data_dir: Path, onboarding: bool, revision: bool) -> dict[str, Any]:
