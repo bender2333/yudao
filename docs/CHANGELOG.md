@@ -700,3 +700,4 @@ claude-sonnet-5-5（总架构师） / 2026-10-29 01:10 / `docs/design/independen
 claude-sonnet-5-5（总架构师） / 2026-10-29 01:15 / `docs/design/network-and-mcp.md` 第 16 节工单拆分整段重排，加第 18 节「本机的做法」 / 去掉对阶段四 #128 的依赖；#68、#236 超过工单大小上限
 
 claude-sonnet-5-5（总架构师） / 2026-10-29 01:20 / `docs/current-baseline.md` 头部更新段收成一行状态，换骨架、恢复、接入已有项目、评测工作线四行与共享上下文、网络与 MCP 两个开放项按核对改；`docs/agents/acceptance-evidence.md` 第 65 行对路线图第 1.4 节的引用改为 `CLAUDE.md`「工单规范」 / 核对 main 时发现这些行与现状不符；路线图已没有第 1.4 节
+claude-架构师 / 2026-10-29 02:05 / `docs/design/skeleton-and-application.md` 第 5.1 节的「输入」一条，另一个总架构师会话已在 `98113ca1` 里按 #864 补写过 `use_facts(reader)` 与只读事件读取器，核对一致，本会话不再重复改；`docs/architecture-issues.md` 里 #864 的处理行补记 #1164 已合并（`e8f71a7e`）、写法成立 / 执行者交回的建议已经落在文档上
