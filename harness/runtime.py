@@ -7,11 +7,12 @@ from typing import Any
 
 from .adapters.base import ModelAdapter
 from .artifacts import ArtifactStore
+from .assembly import ContextAssembly
 from .deltas import DeltaChannel
 from .decision_flow import DECISION_FLOW
 from .definitions import DEFINITIONS
 from . import parameters, routing_contract
-from .engine import StepLimits
+from .engine import StepDriver, StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
 from .event_store import Command, EventStore, catalog_stream
 from .models import CatalogEventType, ProjectEventType, TERMINAL_STATUSES
@@ -51,6 +52,8 @@ class LoopSystem:
         dotenv_path: str | Path | None = None,
         step_limits: StepLimits = StepLimits(),
         resume_on_startup: bool = True,
+        assembly: Any | None = None,
+        execution: Any | None = None,
     ) -> None:
         # 数据目录可能以 8.3 短路径给出（工单 #250）：在这里解析一次，工作区根、材料根与其余由它派生的根都从解析后的路径派生
         self.data_dir = Path(data_dir).absolute().resolve()
@@ -81,6 +84,12 @@ class LoopSystem:
             # 启动读取一致版本：缺文件空态，有效修订与重载错误由模块记录，不抛错
             self.facade.reload()
         self.workspace_root = self.data_dir / "workspaces"
+        # 装配实现与执行实现由组装处接上（工单 #979，骨架与应用设计说明第 5.2、5.3 节「接法」）：
+        # 现在各只有一种产品实现，定义里不写它们的名字，默认接上的就是这一种；测试入口（for_testing）
+        # 用同一个构造参数换成第二种。薄驱动不认这两个类的名字，只经装配契约与执行契约调用它们
+        assembly_implementation = (ContextAssembly(self.artifacts, self.store, tightening=WATCHED_OUTPUTS)
+                                   if assembly is None else assembly)
+        execution_implementation = StepDriver if execution is None else execution
         self.orchestrator = Orchestrator(
             self.store,
             self.writes,
@@ -99,6 +108,8 @@ class LoopSystem:
             routing=routing_contract.select(DEFINITIONS.routing),
             # 决定请求的处理与建档的流转在应用层（工单 #827）：薄驱动接上它，只转交
             decision_flow=DECISION_FLOW,
+            assembly=assembly_implementation,
+            execution=execution_implementation,
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
@@ -360,14 +371,19 @@ class LoopSystem:
     @classmethod
     def for_testing(cls, data_dir: str | Path, adapter: ModelAdapter, *,
                     step_limits: StepLimits = StepLimits(),
-                    resume_on_startup: bool = True) -> "LoopSystem":
+                    resume_on_startup: bool = True,
+                    assembly: Any | None = None,
+                    execution: Any | None = None) -> "LoopSystem":
         # 显式提供的确定性适配器只用于确定性测试。resume_on_startup=False 用于测试自己控制激活的时机，
         # 打开数据目录时不自动继续未结束的 run（工单 #16）。
         # 模型目录放在数据目录里：调用目标（fake 模型定义）随数据目录一起保留，
         # 重开数据目录以后这一次运行按同一个调用目标继续，窗口不随进程消失（工单 #669）
+        # assembly 与 execution 是装配实现与执行实现（工单 #979）：不给时由组装处接上默认的那一种，
+        # 测试给第二种实现时走同一个构造参数，其余什么也不变
         config = Path(data_dir).absolute().resolve() / "providers.json"
         return cls(data_dir, test_adapter=adapter, step_limits=step_limits,
-                   resume_on_startup=resume_on_startup, provider_config_path=config)
+                   resume_on_startup=resume_on_startup, provider_config_path=config,
+                   assembly=assembly, execution=execution)
 
     def start_provider_watching(self, interval_sec: float = 1.0) -> None:
         # 文件重载由系统装配启动，Web 只提交命令和读取状态

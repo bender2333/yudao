@@ -28,7 +28,7 @@ from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, proposal_decision
 from .artifacts import ArtifactStore
 from . import assembly_contract, execution_contract, routing_contract, tightening_contract
-from .assembly import PENDING_GUIDANCE, ContextAssembly, pending_guidance
+from .assembly import PENDING_GUIDANCE, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
@@ -42,7 +42,7 @@ from .environment import (
 from .deltas import DeltaChannel
 from .event_store import (Command, EventStore, StreamVersionConflict, project_stream, run_stream)
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
-from .engine import Judgment, StepDriver, StepLimits
+from .engine import Judgment, StepLimits
 from .streams import (
     RUN_EVENT_VERSION, STOP_REASON_UPGRADE, classify_startup_runs,
 )
@@ -126,7 +126,8 @@ class _Activation:
     stop_flag: Event
     adapter: ModelAdapter
     version: int
-    driver: StepDriver | None = None
+    # 步骤驱动由执行实现交出（执行契约第二版）：薄驱动只经契约调 start、cancel 与 result，不认它的类
+    driver: Any = None
     wakeup: tuple[asyncio.AbstractEventLoop, asyncio.Event] | None = None
     deadline: float | None = None
 
@@ -240,6 +241,8 @@ class Orchestrator:
         tightening: Tightening,
         routing: routing_contract.Routing,
         decision_flow: Any,
+        assembly: Any,
+        execution: Any,
     ) -> None:
         self.store = store
         self.writes = writes
@@ -267,7 +270,14 @@ class Orchestrator:
         # 决定请求的处理与建档的流转在应用层（工单 #827，设计说明第 6 节「薄驱动只连接」）：这里接上它，
         # 调用时把自己作为 driver 交进去，薄驱动自己不再写这些处理
         self.decision_flow = decision_flow
-        self.assembly = ContextAssembly(artifacts, store, tightening=tightening)
+        # 装配实现与执行实现由组装处（`runtime.py`）经构造参数接上（工单 #979，骨架与应用设计说明第
+        # 5.2、5.3 节「接法」）：薄驱动不自己构造装配实现、也不按类名调用执行实现，源码里没有两者的名字，
+        # 换实现只换构造参数。这里按契约核对两者声明的版本，不在接受范围时构造就失败（与收紧检查、
+        # 路由同一个位置、同一个做法）：先核对再开始，不带着版本不合的实现在跑
+        self.assembly = assembly
+        assembly_contract.accept(self.assembly)
+        self._execution = execution
+        execution_contract.accept(self._execution)
         self.sessions = sessions or SessionFactory(self.workspace_root)
         # 事项自己的停止开关：用户取消（cancel、_abort_run）打开它，之后的核对都得到停止，
         # 事项以取消结束；停下一个会话不用它（工单 #856）
@@ -1353,9 +1363,10 @@ class Orchestrator:
         try:
             self._workspaces.bind(environment, projection, activation_id=scope.activation_id,
                                   effective_contract_hash=scope.basis.effective_contract_hash)
-            # 薄驱动只经执行契约与装配契约调用实现：先核对两个实现声明的版本（当前版与上一版），
-            # 版本不合时在开始这一轮之前失败，说明里写明实现的声明与薄驱动接受的版本
-            execution_contract.accept(StepDriver)
+            # 薄驱动只经执行契约与装配契约调用实现：先核对两个实现声明的版本（构造时已核对过，
+            # 这里再看一眼这一轮开始时的引用没有被换掉），版本不合时在开始这一轮之前失败，
+            # 说明里写明实现的声明与薄驱动接受的版本
+            execution_contract.accept(self._execution)
             assembly_contract.accept(self.assembly)
             # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
             # 剩余步数决定；路由自己的工作引用经契约原样交给装配（设计说明第 5.4 节第 4 条），
@@ -1365,7 +1376,7 @@ class Orchestrator:
                 limits=self._session_limits(run_id, scope.session_id),
                 work_ref=self._routing.work_reference(projection, department=department),
             )
-            activation.driver = StepDriver.start(
+            activation.driver = self._execution.start(
                 request, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
@@ -1657,13 +1668,14 @@ class Orchestrator:
             branch_scope, prompt, activation.stop_flag, activation.adapter, None, projection.stream_version,
             deadline=deadline,
         )
-        # 薄驱动只经执行契约与装配契约调用实现：核对两个实现声明的版本，版本不合时这一轮不开始
-        execution_contract.accept(StepDriver)
+        # 薄驱动只经执行契约与装配契约调用实现：核对两个实现声明的版本（构造时已核对过），
+        # 版本不合时这一轮不开始
+        execution_contract.accept(self._execution)
         assembly_contract.accept(self.assembly)
         # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，这一轮的上限来自路由的请求
         # （薄驱动已经把这个分支会话之前用掉的步数扣掉）；路由自己的工作引用指向这次询问
         # （设计说明第 5.4 节第 4 条，工单 #861、#862）
-        driver = StepDriver.start(
+        driver = self._execution.start(
             execution_contract.RoundRequest(
                 scope=branch_scope, prompt=prompt, limits=limits, work_ref=branch.work_ref,
             ),
