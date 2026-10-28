@@ -1,4 +1,4 @@
-# 路由契约与成果驱动路由（工单 #825 建、#861 第二版；骨架与应用设计说明第 3.2、5.1、5.4、12 节；
+# 路由契约与成果驱动路由（工单 #825 建、#861 第二版、#1164 第三版；骨架与应用设计说明第 3.2、5.1、5.4、12 节；
 # 总图第四节「路由」缝）。
 #
 # 守的是 R2：契约的公开名称与版本、定义文件的格式（组织定义的 routing 与 routings.json 的对应）、
@@ -51,6 +51,53 @@ def _running() -> RunProjection:
     return RunProjection(run_id="run", task="Build a CLI.")
 
 
+@pytest.fixture
+def probe_registry(monkeypatch):
+    # 探针实现登记在一份临时的登记表里：这些用例不改模块加载时的那一份（工单 #1164 的用例用）
+    monkeypatch.setattr(routing_contract, "_REGISTRY", dict(routing_contract._REGISTRY))
+
+    def register(implementation: object) -> object:
+        return routing_contract.register(implementation)
+
+    return register
+
+
+class _Events:
+    # 事件库的替身：组装处交给路由的只读读取器只要事件库有 list_events(run_id) 这个读法
+    def __init__(self, events: list[object] | None = None) -> None:
+        self.events = list(events or [])
+
+    def list_events(self, run_id: str) -> list[object]:
+        return list(self.events)
+
+    def commit(self, *args: object, **kwargs: object) -> None:
+        raise AssertionError("the read-only reader must not write events")
+
+
+class _WithFacts:
+    # 声明了 use_facts 的探针路由：契约第三版的第二种路由就是这样拿到只读的事件读取器（工单 #1164）
+    NAME = "with_facts"
+    CONTRACT_VERSION = 3
+
+    def __init__(self) -> None:
+        self.reader: object | None = None
+
+    def check_definition(self, definitions: object) -> None:
+        return None
+
+    def use_facts(self, reader: object) -> None:
+        self.reader = reader
+
+
+class _WithoutFacts:
+    # 没有声明 use_facts 的探针路由：第二版的实现，照旧被接受，组装处不调用这个方法
+    NAME = "without_facts"
+    CONTRACT_VERSION = 2
+
+    def check_definition(self, definitions: object) -> None:
+        return None
+
+
 def test_the_routing_implementation_declares_the_version_the_thin_driver_accepts():
     # R2：契约带版本，实现声明它实现哪一版，薄驱动在一个发布里接受当前版与上一版
     assert ROUTING.CONTRACT_VERSION == routing_contract.CURRENT_VERSION
@@ -70,6 +117,72 @@ def test_a_version_the_thin_driver_does_not_accept_fails_and_says_why():
     assert "the routing implementation" in message
     assert str(Future.CONTRACT_VERSION) in message
     assert f"current {routing_contract.CURRENT_VERSION}" in message
+
+
+def test_the_contract_accepts_the_previous_version_and_rejects_the_others():
+    # R2（第三版，工单 #1164）：契约版本是 3；声明第二版的实现仍被接受（一版兼容），更早的与更高的都拒绝
+    assert routing_contract.CURRENT_VERSION == 3
+    assert routing_contract.PREVIOUS_VERSION == 2
+    # 成果驱动的实现声明的就是这一版
+    assert ROUTING.CONTRACT_VERSION == 3
+
+    class Previous:
+        NAME = "previous"
+        CONTRACT_VERSION = 2
+
+    class TooOld:
+        NAME = "too_old"
+        CONTRACT_VERSION = 1
+
+    class Future:
+        NAME = "future"
+        CONTRACT_VERSION = 4
+
+    assert routing_contract.accept(Previous) == 2
+    for rejected in (TooOld, Future):
+        with pytest.raises(contract_versions.ContractVersionError) as raised:
+            routing_contract.accept(rejected)
+        assert str(rejected.CONTRACT_VERSION) in str(raised.value)
+
+
+def test_the_assembly_hands_a_read_only_event_reader_to_a_routing_that_declares_use_facts(probe_registry):
+    # R2（第三版，工单 #1164）：组装处接上声明了 use_facts 的路由以后，把事件库的只读读取器交给它；
+    # 读取器只有 list_events，没有写事件的方法，事件库本身也不交出去
+    event = _event(EventType.ARTIFACT_ACCEPTED)
+    implementation = _WithFacts()
+    probe_registry(implementation)
+    store = _Events([event])
+
+    assert routing_contract.select(implementation.NAME, DEFINITIONS, store=store) is implementation
+    reader = implementation.reader
+    assert {name for name in dir(reader) if not name.startswith("_")} == {"list_events"}
+    for writing in ("commit", "append", "replace_projection", "claim_execution_right", "close", "notify"):
+        assert not hasattr(reader, writing), writing
+    assert reader is not store
+    assert reader.list_events("run") == [event]
+
+
+def test_a_routing_that_does_not_declare_use_facts_is_not_called(probe_registry):
+    # R2（第三版，工单 #1164）：没有声明的路由不受影响，组装处不调用这个方法，有没有事件库都照常接上
+    implementation = _WithoutFacts()
+    probe_registry(implementation)
+    assert routing_contract.select(implementation.NAME, DEFINITIONS, store=_Events()) is implementation
+    assert routing_contract.select(implementation.NAME, DEFINITIONS) is implementation
+    # 成果驱动就没有这个方法
+    assert not hasattr(ROUTING, "use_facts")
+    assert routing_contract.select(DEFINITIONS.routing) is ROUTING
+
+
+def test_a_routing_that_needs_the_event_log_cannot_be_selected_without_an_event_store(probe_registry):
+    # R2（第三版，工单 #1164）：声明了 use_facts 而组装处没有事件库可交时，在开始一轮工作之前失败，
+    # 不留下一个读不到事件的路由
+    implementation = _WithFacts()
+    probe_registry(implementation)
+    with pytest.raises(routing_contract.UnavailableRouting) as raised:
+        routing_contract.select(implementation.NAME, DEFINITIONS)
+    message = str(raised.value)
+    assert "use_facts" in message and implementation.NAME in message
+    assert implementation.reader is None
 
 
 def test_the_organization_definition_selects_the_implementation_by_name():

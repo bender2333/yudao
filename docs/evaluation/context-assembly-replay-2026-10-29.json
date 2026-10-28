@@ -1,0 +1,460 @@
+{
+ "ablations": {
+  "error_result_keep": {
+   "after_tokens": 6924451,
+   "before_tokens": 8331638,
+   "marginal_recall": -0.0002,
+   "marginal_saved_tokens": -6432,
+   "recall": 0.9447
+  },
+  "input_single_copy": {
+   "after_tokens": 7225913,
+   "before_tokens": 8331638,
+   "marginal_recall": -0.0006,
+   "marginal_saved_tokens": 295030,
+   "recall": 0.9442
+  },
+  "pinned_reference_gate": {
+   "after_tokens": 7190598,
+   "before_tokens": 8331638,
+   "marginal_recall": 0.0,
+   "marginal_saved_tokens": 259715,
+   "recall": 0.9448
+  },
+  "round_fold_granularity": {
+   "after_tokens": 6930883,
+   "before_tokens": 8331638,
+   "marginal_recall": 0.0,
+   "marginal_saved_tokens": 0,
+   "recall": 0.9448
+  },
+  "superseded_read_collapse": {
+   "after_tokens": 7050827,
+   "before_tokens": 8331638,
+   "marginal_recall": 0.0025,
+   "marginal_saved_tokens": 119944,
+   "recall": 0.9474
+  },
+  "tool_result_age_budget": {
+   "after_tokens": 7554946,
+   "before_tokens": 8331638,
+   "marginal_recall": 0.0071,
+   "marginal_saved_tokens": 624063,
+   "recall": 0.952
+  }
+ },
+ "after_tokens": 6930883,
+ "before_tokens": 8331638,
+ "by_department": {
+  "engineering": {
+   "after_tokens": 3424994,
+   "before_tokens": 4051482,
+   "recall_after": 0.966,
+   "recall_before": 0.9734,
+   "saved_ratio": 0.1546,
+   "steps": 311
+  },
+  "product": {
+   "after_tokens": 421504,
+   "before_tokens": 457403,
+   "recall_after": 0.983,
+   "recall_before": 0.983,
+   "saved_ratio": 0.0785,
+   "steps": 97
+  },
+  "quality": {
+   "after_tokens": 3084385,
+   "before_tokens": 3822753,
+   "recall_after": 0.9648,
+   "recall_before": 0.9662,
+   "saved_ratio": 0.1932,
+   "steps": 238
+  }
+ },
+ "by_step": {
+  "1": {
+   "after_tokens": 828250,
+   "before_tokens": 1049534,
+   "recall_after": 0.9953,
+   "recall_before": 0.9953,
+   "saved_ratio": 0.2108,
+   "steps": 105
+  },
+  "16+": {
+   "after_tokens": 1257195,
+   "before_tokens": 1787171,
+   "recall_after": 0.9337,
+   "recall_before": 0.969,
+   "saved_ratio": 0.2965,
+   "steps": 63
+  },
+  "2-3": {
+   "after_tokens": 1352549,
+   "before_tokens": 1622820,
+   "recall_after": 0.9802,
+   "recall_before": 0.9802,
+   "saved_ratio": 0.1665,
+   "steps": 163
+  },
+  "4-7": {
+   "after_tokens": 1844656,
+   "before_tokens": 2051049,
+   "recall_after": 0.9689,
+   "recall_before": 0.9702,
+   "saved_ratio": 0.1006,
+   "steps": 190
+  },
+  "8-15": {
+   "after_tokens": 1648233,
+   "before_tokens": 1821064,
+   "recall_after": 0.9455,
+   "recall_before": 0.9468,
+   "saved_ratio": 0.0949,
+   "steps": 125
+  }
+ },
+ "loss_count": 18,
+ "losses": [
+  {
+   "after": 0.9474,
+   "before": 1.0,
+   "department": "engineering",
+   "missing": [
+    "usr/bin/env"
+   ],
+   "run_id": "run_487814ceab394396",
+   "step_id": 11
+  },
+  {
+   "after": 0.9167,
+   "before": 1.0,
+   "department": "engineering",
+   "missing": [
+    "serialization"
+   ],
+   "run_id": "run_487814ceab394396",
+   "step_id": 20
+  },
+  {
+   "after": 0.381,
+   "before": 0.5714,
+   "department": "engineering",
+   "missing": [
+    "). Prints a usage line on stderr. -",
+    "error: bad.txt: 'utf-8' codec can't decode byte 0xff in position 2: invalid start byte",
+    "error: missing.txt: [Errno 2] No such file or directory: 'missing.txt' 1",
+    "line, no traceback.",
+    "lines: 2 words: 2 chars: 4 file: sample.txt 0",
+    "sh python textstats.py missing.txt; echo $?",
+    "sh python textstats.py sample.txt; echo $?",
+    "sh python textstats.py; echo $?",
+    "usage: python textstats.py [--json] <file> 2",
+    "— file error  Path missing or unreadable, or the bytes are not valid UTF-8. stdout stays empty, stderr is exactly one line"
+   ],
+   "run_id": "run_d50eaf60623e42d6",
+   "step_id": 7
+  },
+  {
+   "after": 0.7143,
+   "before": 1.0,
+   "department": "engineering",
+   "missing": [
+    "ArgumentParser",
+    "parse_known_args"
+   ],
+   "run_id": "run_22dfbdc3050c4b8a",
+   "step_id": 21
+  },
+  {
+   "after": 0.7778,
+   "before": 0.8333,
+   "department": "engineering",
+   "missing": [
+    "Standard library only. Exit codes: 0 success, 1 file error, 2 wrong arguments.\",\"new_text\":\"## Usage",
+    "sh $ printf 'l1\\ l2\\ l3\\ ' > /tmp/t.txt $ python head.py /tmp/t.txt 文件: /tmp/t.txt l1 l2 l3",
+    "sh python head.py <file> python head.py -n 20 <file>",
+    "the content line count is 10."
+   ],
+   "run_id": "run_062b44be06ff46bc",
+   "step_id": 5
+  },
+  {
+   "after": 0.75,
+   "before": 0.875,
+   "department": "engineering",
+   "missing": [
+    "Comprehensive",
+    "sp.dist_to[dest]"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 29
+  },
+  {
+   "after": 0.6667,
+   "before": 1.0,
+   "department": "engineering",
+   "missing": [
+    "dev/null"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 35
+  },
+  {
+   "after": 0.6212,
+   "before": 0.8333,
+   "department": "engineering",
+   "missing": [
+    "--line_preference",
+    "<meters> meters (<km> km)",
+    "Connectivity",
+    "PathfindingConfig().preferred_lines == []",
+    "_SOURCE_SIDE_PATH",
+    "__post_init__",
+    "_best_key",
+    "_node_state",
+    "best_key",
+    "construction"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 43
+  },
+  {
+   "after": 0.875,
+   "before": 1.0,
+   "department": "engineering",
+   "missing": [
+    "src/data_loader.py"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 44
+  },
+  {
+   "after": 0.7872,
+   "before": 0.9362,
+   "department": "engineering",
+   "missing": [
+    "Comprehensive",
+    "_check_data",
+    "args.c",
+    "documentation",
+    "duplicate/self",
+    "instructions",
+    "next_state",
+    "optimisation",
+    "pref_pen",
+    "validate_data"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 47
+  },
+  {
+   "after": 0.9091,
+   "before": 0.9545,
+   "department": "engineering",
+   "missing": [
+    "--format json",
+    "heapq.h"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 48
+  },
+  {
+   "after": 0.8,
+   "before": 0.9,
+   "department": "engineering",
+   "missing": [
+    "__init__",
+    "tests/__init__.py"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 49
+  },
+  {
+   "after": 0.8696,
+   "before": 0.913,
+   "department": "engineering",
+   "missing": [
+    "--format json",
+    "authoritative",
+    "continuation",
+    "inconsistent",
+    "src/models.py",
+    "src/pathfinding.py"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 50
+  },
+  {
+   "after": 0.7273,
+   "before": 0.8409,
+   "department": "quality",
+   "missing": [
+    "--line_preference",
+    "--max_transfers",
+    "Alternatively",
+    "Contradiction",
+    "Implementation",
+    "contradicting",
+    "contradiction",
+    "contradictory",
+    "for one transfer and",
+    "independently"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 11
+  },
+  {
+   "after": 0.6981,
+   "before": 0.8302,
+   "department": "quality",
+   "missing": [
+    "Alternatively",
+    "Contradiction",
+    "Requirements",
+    "Rework_product",
+    "__post_init__",
+    "authoritative",
+    "contradiction",
+    "contradictory",
+    "fare/time",
+    "functionality"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 19
+  },
+  {
+   "after": 0.6,
+   "before": 0.6571,
+   "department": "quality",
+   "missing": [
+    "Professional",
+    "Rework_product",
+    "authoritative",
+    "automatically",
+    "contradiction",
+    "contradictions",
+    "contradictory",
+    "fare/time",
+    "functionally",
+    "instructions"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 20
+  },
+  {
+   "after": 0.7931,
+   "before": 0.8276,
+   "department": "quality",
+   "missing": [
+    "Alternatively",
+    "authoritative",
+    "contradiction",
+    "contradictory",
+    "inconsistency",
+    "verification"
+   ],
+   "run_id": "run_11cbb348bbb54e93",
+   "step_id": 22
+  },
+  {
+   "after": 0.4545,
+   "before": 0.9545,
+   "department": "engineering",
+   "missing": [
+    "__file__",
+    "a.txt",
+    "capture_output",
+    "emoji.txt",
+    "empty.txt",
+    "exist_ok",
+    "nonl.txt",
+    "nonl2.txt",
+    "nope.txt",
+    "sub/a"
+   ],
+   "run_id": "run_7be8a0074290452c",
+   "step_id": 16
+  }
+ ],
+ "recall_after": 0.9448,
+ "recall_before": 0.9548,
+ "rules": {
+  "error_result_keep": true,
+  "gated_sections": [
+   "current_delivery_spec",
+   "prior_delivery",
+   "existing_overview",
+   "causal_chain",
+   "binding_refs",
+   "prior_structure",
+   "prior_initial_prd",
+   "current_product_decisions"
+  ],
+  "input_single_copy": true,
+  "pinned_reference_gate": true,
+  "pinned_stub_chars": 400,
+  "round_fold_granularity": true,
+  "superseded_input_stub": "（第 {step} 步的旧输入已折叠：同一部门输入只保留最新一份原文）",
+  "superseded_read_collapse": true,
+  "tool_result_clear_min_tokens": 4000,
+  "tool_result_keep_tokens": 16000,
+  "work_limit_tokens": 100000
+ },
+ "rules_path": "C:\\code\\yudao\\evals\\context\\rule-set.json",
+ "rules_version": "sha256:6d66cca8e0935b187fb1b2580dcdcda1b4ee60fe3948894bb7f225790f3b369b",
+ "saved_ratio": 0.1681,
+ "saved_tokens": 1400755,
+ "sections": {
+  "binding_refs": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 15588.0,
+   "steps": 646
+  },
+  "causal_chain": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 16329.0,
+   "steps": 646
+  },
+  "current_delivery_spec": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 191334.0,
+   "steps": 172
+  },
+  "current_product_decisions": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 2047.0,
+   "steps": 23
+  },
+  "existing_overview": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 18480.0,
+   "steps": 132
+  },
+  "prior_delivery": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 29990.0,
+   "steps": 29
+  },
+  "prior_initial_prd": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 4605.0,
+   "steps": 5
+  },
+  "prior_structure": {
+   "lost_steps": 0.0,
+   "lost_tokens": 0.0,
+   "saved_tokens": 8430.0,
+   "steps": 6
+  }
+ },
+ "steps": 646,
+ "waste_after": 0.4006,
+ "waste_before": 0.4998
+}
