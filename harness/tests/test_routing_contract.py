@@ -97,8 +97,9 @@ def test_the_routing_implementation_does_not_import_the_thin_driver_or_the_minim
     imports = _imported("watched_outputs.py")
     assert "orchestrator" not in imports
     assert "minimal_projection" not in imports
-    # 契约模块只导入内核（定义与事件）与标准库（契约圈自己那一层由 test_contract_modules.py 核对）
-    assert _imported("routing_contract.py") <= {"contract_versions", "definitions", "models"}
+    # 契约模块只导入内核（定义、事件信封所在的 kernel_events）与标准库（契约圈自己那一层由
+    # test_contract_modules.py 核对）；事件信封随 S5a（工单 #828）从 models.py 搬进内核事件模块
+    assert _imported("routing_contract.py") <= {"contract_versions", "definitions", "kernel_events"}
 
 
 def test_the_item_end_judgment_comes_from_the_routing():

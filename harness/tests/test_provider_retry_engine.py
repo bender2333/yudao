@@ -13,6 +13,7 @@ from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import FAST_RETRIES, after_event, department_history
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
@@ -96,22 +97,61 @@ def test_nonretryable_provider_error_is_never_retried(tmp_path, reason):
     assert not any(item.type == EventType.MODEL_RETRY_SCHEDULED for item in events)
 
 
+# 工单 #1133：这条用例原先用「取消到这一轮结束不到 1 秒」证明取消打断了重试的退避等待，
+# 运行机负载下一次测到 1.34 秒就失败。现在判定落在事件上：这一轮自己记下的用时
+# （ACTIVATION_FINISHED 的 latency_ms）小于它自己安排的退避（MODEL_RETRY_SCHEDULED 的 delay_sec），
+# 就是「退避没有被走满」；取消写进了事件、事件里没有第二次尝试，就是「取消打断了等待、没有下一次尝试」。
+# 两处间隔都不判定被测行为：等事件的上限只用来防止测试一直等待（#107 的裁定、#233 集中的口径）；
+# 会合界限给「立即」一个量级上限，比配置的退避小、比负载下正常用时大两个数量级
+# （与 test_retry_input_boundaries.py 的 30 秒等待配 20 秒界限同一口径）。
+_BACKOFF_SEC = 30.0
+_INTERRUPTED_WITHIN_SEC = 20.0
+
+
 def test_cancel_interrupts_retry_backoff_without_next_attempt(tmp_path):
     scheduled = Event()
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
-    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(retry_initial_delay_sec=5.0))
+    system = LoopSystem.for_testing(
+        tmp_path, adapter,
+        step_limits=StepLimits(retry_initial_delay_sec=_BACKOFF_SEC, retry_max_delay_sec=_BACKOFF_SEC))
     run_id = system.create_run("echo")
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
-        assert scheduled.wait(3)
-        started = time.monotonic()
+        assert scheduled.wait(WAIT_FOR_HOST_WORK_SEC)
         system.cancel(run_id)
-        result = future.result(timeout=2)
+        try:
+            result = future.result(timeout=_INTERRUPTED_WITHIN_SEC)
+        except TimeoutError:
+            # 会合不到就是等待没有被提前结束：退避会自己走满，这一轮才结束
+            result = None
 
+    assert result is not None, (f"取消没有在 {_INTERRUPTED_WITHIN_SEC} 秒内结束这一轮："
+                                f"{_BACKOFF_SEC} 秒的退避等待没有被提前结束")
     assert result.stop_reason == "cancelled"
-    assert time.monotonic() - started < 1.0
     assert len(adapter.invocations) == 1
+
+    events = system.store.list_events(run_id)
+    kinds = [item.type for item in events]
+    requested = [item.payload for item in events if item.type == EventType.MODEL_REQUESTED]
+    failed = [item.payload for item in events if item.type == EventType.MODEL_ATTEMPT_FAILED]
+    retry = [item.payload for item in events if item.type == EventType.MODEL_RETRY_SCHEDULED]
+    cancelled = [item.payload for item in events if item.type == EventType.RUN_FAILED]
+    finished = [item.payload for item in events if item.type == EventType.ACTIVATION_FINISHED]
+    # 只发起过第一次尝试，重试已经安排：第二次尝试排在退避之后
+    assert [item["attempt"] for item in requested] == [1]
+    assert [item["attempt"] for item in failed] == [1] and failed[0]["will_retry"] is True
+    assert [(item["attempt"], item["next_attempt"], item["delay_sec"]) for item in retry] == [
+        (1, 2, _BACKOFF_SEC)]
+    # 取消的结果写进了事件，位置在重试安排之后、这一轮的结束之前
+    assert [item["stop_reason"] for item in cancelled] == ["cancelled"]
+    assert kinds.index(EventType.MODEL_RETRY_SCHEDULED) < kinds.index(EventType.RUN_FAILED)
+    assert kinds.index(EventType.RUN_FAILED) < kinds.index(EventType.ACTIVATION_FINISHED)
+    # 退避没有被走满：这一轮自己记下的用时小于它自己安排的退避
+    assert finished[-1]["stop_reason"] == "cancelled"
+    assert finished[-1]["latency_ms"] < retry[0]["delay_sec"] * 1000
+    # 取消之后没有发起下一次尝试：整个事件流里没有 attempt 大于 1 的请求或失败
+    assert [item["attempt"] for item in requested + failed if item["attempt"] > 1] == []
 
 
 def test_failed_stream_observations_and_tool_calls_are_audit_only(tmp_path):

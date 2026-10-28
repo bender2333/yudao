@@ -7,13 +7,31 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import CheckReceipt
-
 ActionKind = Literal["read", "write", "check", "command"]
+
+
+@dataclass(frozen=True)
+class CheckReceipt:
+    # 一次检查的回执，属于工作区事实：部门、检查名、退出码、结论摘要、检查时工作区的树摘要，
+    # 以及这次检查依据的成果与执行权编号；tree_changed 表示检查自己改动了树，
+    # 这样的回执不能作为通过的依据（工单 #308）。它随工作区事实交给裁决（S5a 起住在这里，
+    # 内核的裁决模块要用它，而 models.py 不再算内核）
+    name: str
+    department: str
+    exit_code: int
+    summary: str
+    snapshot_hash: str
+    product_spec_hash: str | None = None
+    delivery_spec_hash: str | None = None
+    activation_id: str | None = None
+    tree_changed: bool = False
+    effective_contract_hash: str | None = None
+    qa_tests_hash: str | None = None
 
 
 class Preconditions(BaseModel):

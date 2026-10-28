@@ -7,12 +7,15 @@
 # #406 按固定做法逐个文件降到能通过检查的最低一层（第 9 节第 2 步），
 # #437 的审计钩子放行事件循环的自管道以后再按同一个做法重试一次（第 9 节第 3 步）。
 [layers]
+"kernel/test_contract_surface.py" = "unit"
 "kernel/test_every_stop_has_reason.py" = "unit"
 "kernel/test_limits_survive_restart.py" = "integration"
 "kernel/test_manifest.py" = "unit"
 "kernel/test_minimal_projection.py" = "module"
 "kernel/test_minimal_projection_baselines.py" = "integration"
+"kernel/test_only_grows.py" = "unit"
 "kernel/test_single_write_path.py" = "unit"
+"kernel/test_skeleton_events.py" = "unit"
 "kernel/test_tightening_only_rejects_or_waits.py" = "module"
 "kernel/test_tool_needs_permission.py" = "unit"
 "test_access.py" = "integration"
@@ -59,6 +62,7 @@
 "test_environment_establish.py" = "module"
 "test_engineering_facts.py" = "unit"
 "test_event_classification.py" = "unit"
+"test_event_kind_registration.py" = "module"
 "test_event_log.py" = "integration"
 "test_event_payloads.py" = "integration"
 "test_event_sequence_compare.py" = "unit"

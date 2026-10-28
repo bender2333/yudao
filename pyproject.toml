@@ -61,6 +61,107 @@ type = "protected"
 protected_modules = ["harness.app", "harness.api"]
 allowed_importers = ["harness.api", "harness.__main__", "harness.demo", "harness.smoke", "harness.tests"]
 
+# S6a（工单 #829）：契约的导入方向。契约模块（路由、装配、执行与收紧检查的契约，加共用的版本核对）
+# 只导入内核与标准库（骨架与应用设计说明第 3.2、5 节；总图第二节第二环「契约」），
+# 每一行放行都对应一个内核模块或契约圈里的一个模块，多出来的导入由这条合同报出
+[[tool.importlinter.contracts]]
+name = "契约模块只导入内核与标准库"
+type = "forbidden"
+source_modules = [
+  "harness.routing_contract",
+  "harness.assembly_contract",
+  "harness.execution_contract",
+  "harness.tightening_contract",
+  "harness.contract_versions",
+]
+forbidden_modules = ["harness.*"]
+ignore_imports = [
+  # 内核模块（kernel-manifest.json 里 kind 为 module 的路径）：契约里出现的应用侧类型按 Any 标注，
+  # 具体类型由实现给出；契约用到的只有事件信封、定义、写入口与裁决的合同
+  "harness.* -> harness.kernel_events",
+  "harness.* -> harness.adjudication",
+  "harness.* -> harness.write_path",
+  "harness.* -> harness.definitions",
+  # 契约圈自己：这几份模块属于同一环，彼此可以互相导入
+  "harness.* -> harness.contract_versions",
+  "harness.* -> harness.routing_contract",
+  "harness.* -> harness.assembly_contract",
+  "harness.* -> harness.execution_contract",
+  "harness.* -> harness.tightening_contract",
+]
+
+# S6a（工单 #829，与 #620 合并处理）：应用层只导入控制核心的公开接口（应用层与接口层设计说明第 2.4 节）。
+# 下面是放出这一版时的公开接口模块清单，按第 2.4 节的几类分组；清单以外多一行导入，这条合同失败并报出
+# 是哪一个导入。归不进第 2.4 节那八类、由执行者定作公开接口的几组注明「补」，
+# 清单与登记见交付说明与 docs/architecture-issues.md（由架构师事后写进设计说明）
+[[tool.importlinter.contracts]]
+name = "应用层只导入控制核心的公开接口"
+type = "forbidden"
+source_modules = ["harness.app"]
+forbidden_modules = ["harness.*"]
+# 只查直接导入：公开接口模块自己再往下导入内核的哪几块，是那一份模块的事
+#（`harness.runtime` 导入薄驱动、`harness.projects` 导入工件与 Git 版本都在这一层之外）
+allow_indirect_imports = true
+ignore_imports = [
+  # 流程编排的入口：组装处（LoopSystem）与继续一个 run 时的恢复
+  "harness.app.** -> harness.runtime",
+  "harness.app.** -> harness.recovery",
+  # 写入口
+  "harness.app.** -> harness.write_path",
+  # 事件日志的读取与订阅：日志、事件信封与骨架事件的种类、流与停止原因的常量
+  "harness.app.** -> harness.event_store",
+  "harness.app.** -> harness.kernel_events",
+  "harness.app.** -> harness.streams",
+  # 保存的投影：run 流、项目流与内核的最小投影
+  "harness.app.** -> harness.projection",
+  "harness.app.** -> harness.project_projection",
+  "harness.app.** -> harness.minimal_projection",
+  # 输出片段通道
+  "harness.app.** -> harness.deltas",
+  # 知识层的查询：项目与事项、观察与统计、参数、交互记录
+  "harness.app.** -> harness.projects",
+  "harness.app.** -> harness.observability",
+  "harness.app.** -> harness.parameters",
+  "harness.app.** -> harness.interactions",
+  # Provider 模块的管理接口：目录、凭据与调用目标的选择
+  "harness.app.** -> harness.providers",
+  "harness.app.** -> harness.providers.**",
+  # 补：定义的加载与结构校验
+  "harness.app.** -> harness.definitions",
+  # 补：事件种类与界面用的名词声明（S5a 以后由应用自己持有）
+  "harness.app.** -> harness.models",
+  # 补：工件引用与树的封存
+  "harness.app.** -> harness.artifacts",
+  "harness.app.** -> harness.tree_archive",
+  # 补：用户决定的读取
+  "harness.app.** -> harness.decisions",
+  # 补：Git 版本与回写
+  "harness.app.** -> harness.git_versions",
+  "harness.app.** -> harness.writeback",
+  # 补：公开路径规则与工具参数的脱敏
+  "harness.app.** -> harness.path_rules",
+  "harness.app.** -> harness.redact",
+  # 补：重放核对的读取
+  "harness.app.** -> harness.replay_check",
+]
+
+# S6a（工单 #829）：应用（应用层、路由实现、装配实现、执行实现）不导入薄驱动的内部
+# （骨架与应用设计说明第 5.1、5.2、5.3、6 节；总图第四节「执行」「装配」缝）：这三道缝的实现由组装处
+# 经构造参数交给薄驱动，实现要用薄驱动时由薄驱动把自己作为参数交进去。只查直接导入：
+# 组装处导入薄驱动是它的职责，反过来不行
+[[tool.importlinter.contracts]]
+name = "应用不导入薄驱动的内部"
+type = "forbidden"
+source_modules = [
+  "harness.app",
+  "harness.watched_outputs",
+  "harness.tightening",
+  "harness.assembly",
+  "harness.engine",
+]
+forbidden_modules = ["harness.orchestrator"]
+allow_indirect_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["harness/tests"]
 pythonpath = ["."]
