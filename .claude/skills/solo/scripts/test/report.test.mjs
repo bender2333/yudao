@@ -104,6 +104,13 @@ test('report 下一步：排到依赖已经满足的那张，并说明依赖已�
   assert.equal(lines.find((l) => l.startsWith('下一步')), '下一步: T-011 #1126（依赖已满足）');
 });
 
+test('report 等你与交回：已经完成的单子不印，台账里留着的旧标记不算还要处理', () => {
+  const tasks = tasksOf().map((t) => (t.id === 'T-008' || t.id === 'T-012' ? Object.assign(t, { status: 'done' }) : t));
+  const { lines } = summarize({ state: ledgerState(), tasks, now: NOW, flight: [], openIssues: openIssuesOf(tasks) });
+  assert.equal(lines.some((l) => l.startsWith('等你')), false, '已完成的那张还带着 waitFor=user，也不能印');
+  assert.equal(lines.some((l) => l.startsWith('交回')), false, '已完成的那张还带着 escalated，也不能印');
+});
+
 test('report 下一步：台账里 pending 但 GitHub 上已经关掉的单子不当成下一步', () => {
   const tasks = [
     { id: 'T-024', issue: 477, status: 'pending', after: [], text: 'T-024 #477 台账里还开着' },
