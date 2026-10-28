@@ -1,7 +1,8 @@
 # 本机执行环境：run 的工作区所在的环境。控制核心经合同与它往来（actions.py），不直接读写工作区文件：
 # establish 从封存快照建立工作区，open 打开已经建立的工作区，perform 执行环境工具的动作并交回回执，
 # cancel 按动作身份取消，query 提供工作区事实的只读查询，snapshot 交回交付封存所需的带文件内容的公开树，
-# verify_tree 核对当前公开树仍与判断所依据的快照一致。
+# verify_tree 核对当前公开树仍与判断所依据的快照一致。运行工作区与会话的检查工作区的来源、什么时候
+# 建立或换成新的交付也在这一层（`Workspaces`，S4c 工单 #863）：薄驱动只问它这个会话用哪份工作区。
 # 进程类动作（检查、bash 命令）以异步方式启动与等待；超时或取消时结束整个进程树，回执带截至结束时的输出；
 # 取消在动作开始之前到达时不启动进程。
 
@@ -27,11 +28,14 @@ from threading import Lock
 from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
-from .models import hash_bytes, json_dumps, new_id
+from .event_store import run_stream
+from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import QA_TESTS_DIR, CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import TreeError
 from .redact import redact_text
+from .tools import tool_action
+from .tree_archive import artifact_run, load_tree
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 # 一次工具结果的输出上限，取规则登记中的现值
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
@@ -116,6 +120,262 @@ def cleanup_inspection_workspace(run_root: str | Path, session_id: str) -> None:
             backoff *= 2
     _prune_empty_inspection_parents(root)
 
+
+# ---------------------------------------------------------------------------
+# 运行工作区与会话的检查工作区（骨架与应用设计说明第 6 节、本地通用工具设计说明第 2 节；S4c 工单 #863）
+#
+# 这一块从薄驱动搬来（工单 #473、#481、#558）：薄驱动只问两件事——这个部门在这个会话里用哪份工作区，
+# 这一轮进行中检查工作区要不要换成新的交付。来源是哪份快照、什么时候建立或重建、检查回执绑定哪几样，
+# 都在执行实现这里。
+#
+# 部门按两件定义事实分，代码里不写部门的名称（薄驱动不含部门与成果的名称，设计说明第 6 节）：
+#   · 交出交付的部门（它的工具清单里有提议成「交付」的那件工具）的主线会话用运行工作区；
+#   · 关注交付的部门（组织定义的 watched 里有「交付」）的检查工作区从最新的封存交付建立，
+#     有新的交付封存时在它的下一步重建；其余部门的检查工作区从当前运行工作区建立。
+# ---------------------------------------------------------------------------
+
+# 成果驱动的两件定义事实：交付这件提议的种类与组织定义里「关注交付」这一项
+DELIVERY_KIND = "delivery_spec"
+DELIVERY_WATCHED = "delivery"
+
+
+def handing_over_departments(definitions: Any = None) -> frozenset[str]:
+    # 交出交付的部门（持有交接）：它的工具清单里有提议成交付的那件提交工具
+    definitions = DEFINITIONS if definitions is None else definitions
+    return frozenset(
+        department for department in definitions.departments
+        if any(tool in definitions.tools and definitions.tools[tool].proposal == DELIVERY_KIND
+               for tool in definitions.tools_for(department))
+    )
+
+
+def delivery_inspecting_departments(definitions: Any = None) -> frozenset[str]:
+    # 检查工作区从封存的交付建立的部门：组织定义里关注交付的那一个
+    definitions = DEFINITIONS if definitions is None else definitions
+    return frozenset(department for department in definitions.departments
+                     if DELIVERY_WATCHED in definitions.watched_outputs(department))
+
+
+@dataclass(frozen=True)
+class RoundWorkspace:
+    # 一轮工作的会话用哪份工作区：这一轮的身份（检查回执要绑定的激活）、依据的合同，
+    # 以及它有没有可能在进行中换成新的交付
+    run_id: str
+    department: str
+    session_id: str
+    activation_id: str
+    effective_contract_hash: str | None = None
+
+
+class Workspaces:
+    """运行工作区与会话的检查工作区（执行实现的一部分）。
+
+    薄驱动在 `__init__` 里接上它，之后只调 `environment_for`（这个会话用哪份工作区）与
+    `refresh_for`（这一轮进行中检查工作区要不要换成新的交付），以及 `bind`（检查回执绑定哪几样）。
+    """
+
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        view: Callable[[str], Any],
+        writes: Any,
+        artifacts: Any,
+        sessions: Any = None,
+        check_timeout: Callable[[str], int] | None = None,
+        definitions: Any = None,
+    ) -> None:
+        self.root = Path(root)
+        # 运行状态投影由薄驱动给（它只读最小投影，运行状态投影是它自己的事实）
+        self._view = view
+        # 读运行流的事件：会话用过文件工具或命令没有，决定检查工作区按会话保留还是每次建立
+        self._writes = writes
+        # 封存交付与项目起点的树
+        self._artifacts = artifacts
+        self.sessions = sessions
+        # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351）
+        self._check_timeout = check_timeout or (lambda run_id: DEFINITIONS.rule_value("check_timeout_sec"))
+        self.handing_over = handing_over_departments(definitions)
+        self.delivery_inspecting = delivery_inspecting_departments(definitions)
+        # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
+        self._source: dict[tuple[str, str], str | None] = {}
+
+    # ---- 运行工作区 ----
+    def run_environment(self, run_id: str, *, session_id: str | None = None,
+                        jobs: Any | None = None) -> LocalEnvironment:
+        return LocalEnvironment.open(
+            self.root / run_id,
+            check_timeout_sec=self._check_timeout(run_id),
+            jobs=jobs,
+            session_id=session_id,
+        )
+
+    # ---- 会话用哪份工作区 ----
+    def environment_for(self, run_id: str, department: str, *, refresh: bool = False) -> LocalEnvironment:
+        # 持有交接的部门的主线会话使用运行工作区，其他会话使用检查工作区。
+        # refresh 只在激活开始时为真：按会话保留检查工作区（会话建立阶段从当前源建立，
+        # 用过以后保留）；提案提交时为假，沿用激活内的同一份工作区，
+        # 使写入与检查回执在提交判断时仍然可见
+        projection = self._view(run_id)
+        session_id, jobs = self.session_of(run_id, department)
+        if self.hands_over(department, session_id, projection):
+            return self.run_environment(run_id, session_id=session_id, jobs=jobs)
+        if refresh:
+            return self.session_inspection(run_id, department, session_id=session_id, jobs=jobs)
+        return self.inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+
+    def session_of(self, run_id: str, department: str) -> tuple[str | None, Any]:
+        # 这个部门在这个 run 里的会话与它自己的后台命令表；还没有会话时按事实里的会话编号建立
+        if self.sessions is None:
+            return None, None
+        try:
+            session = self.sessions.get(run_id, department)
+        except KeyError:
+            projection = self._view(run_id)
+            ids = ({item.department: item.session_id for item in projection.sessions.values()}
+                   if projection.sessions else None)
+            sessions = self.sessions.create_run_sessions(run_id, ids)
+            session = sessions[department]
+        return session.session_id, getattr(self.sessions, "jobs", None)
+
+    def hands_over(self, department: str, session_id: str | None, projection: Any) -> bool:
+        # 产出进入运行工作区的主线会话：交出交付的部门，且不在询问分支里
+        if department not in self.handing_over:
+            return False
+        return session_id not in projection.branch_sessions
+
+    # ---- 检查工作区 ----
+    def inspection_environment(self, run_id: str, department: str, *, session_id: str | None = None,
+                               jobs: Any | None = None) -> LocalEnvironment:
+        # 打开会话已经有的检查工作区：激活开始与提案提交都按同一根打开，不重新建立，
+        # 激活里写入的文件与检查回执在提交判断时仍然可见
+        if not session_id:
+            raise RuntimeError(f"inspection workspace for {department} needs a session id")
+        return LocalEnvironment.open(
+            inspection_root(self.root / run_id, session_id),
+            check_timeout_sec=self._check_timeout(run_id),
+            jobs=jobs,
+            session_id=session_id,
+        )
+
+    def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
+                           jobs: Any | None = None) -> LocalEnvironment:
+        # 会话还没有用过文件工具或命令时，每次激活都从当前源建立（会话建立阶段，源是最新的）；
+        # 会话用过以后就保留，不再每次激活重建；工作区不在了（会话结束清理过）时重新建立
+        if not session_id:
+            raise RuntimeError(f"inspection workspace for {department} needs a session id")
+        root = inspection_root(self.root / run_id, session_id)
+        if root.exists() and self.used_inspection(run_id, session_id):
+            return self.inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+        return self.new_inspection(run_id, department, session_id=session_id, jobs=jobs)
+
+    def used_inspection(self, run_id: str, session_id: str) -> bool:
+        # 这个会话用过文件工具或命令没有：用过以后它的检查工作区按会话保留（工单 #558）
+        events = self._writes.read(run_stream(run_id)).events()
+        return any(event.type == EventType.TOOL_CALLED and event.session_id == session_id
+                   and tool_action(str((event.payload or {}).get("name") or "")) is not None
+                   for event in events)
+
+    def source_hash(self, department: str, projection: Any) -> str | None:
+        # 从封存交付建立的部门（质检）的检查工作区：这份交付的摘要就是工作区的来源；
+        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）
+        if department not in self.delivery_inspecting:
+            return None
+        delivery = projection.delivery_spec
+        return None if delivery is None else delivery.content_hash
+
+    def source_tree(self, department: str, projection: Any) -> CapturedTree:
+        # 检查工作区的建立源：从封存交付建立的部门取它当前面对的快照——最新的封存交付，
+        # 还没有交付时是事项开始时的项目起点（采纳成果或项目的起始文件夹快照，都没有时为空树），
+        # 不读运行工作区；其他会话从当前运行工作区快照建立。
+        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 第 2 节
+        # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
+        # host_commit_error 正式报告
+        if department in self.delivery_inspecting:
+            if projection.delivery_spec is not None and projection.delivery_spec.tree_ref is not None:
+                tree_ref = projection.delivery_spec.tree_ref
+                return load_tree(self._artifacts, artifact_run(tree_ref.path), tree_ref)
+            for record in (projection.baseline, projection.snapshot):
+                # 事项开始时的项目起点：run_created 写下的采纳成果或起始文件夹快照，两者都没有时为空树
+                if not record:
+                    continue
+                start_ref = ArtifactRef(**record["tree_ref"])
+                return load_tree(self._artifacts, artifact_run(start_ref.path), start_ref)
+            return CapturedTree(directories=(), files=())
+        return workspace_tree(self.root / projection.run_id)
+
+    def new_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
+                       jobs: Any | None = None) -> LocalEnvironment:
+        # 旧的检查工作区按工单的重试清理删除，再按当前源建立；源可能在上一次激活后被新交付覆盖，
+        # 从交付建立的部门必须看到最新交付而不是上一次的副本
+        projection = self._view(run_id)
+        run_root = self.root / run_id
+        if session_id is None:
+            session_id, table = self.session_of(run_id, department)
+            jobs = jobs if jobs is not None else table
+        if session_id is None:
+            raise RuntimeError(f"inspection workspace for {department} needs a session id")
+        root = inspection_root(run_root, session_id)
+        if jobs is None and self.sessions is not None:
+            jobs = getattr(self.sessions, "jobs", None)
+        if jobs is not None:
+            jobs.stop_and_remove_for_workspace(session_id, root)
+        if root.exists():
+            cleanup_inspection_workspace(run_root, session_id)
+        env = LocalEnvironment.establish(
+            root,
+            self.source_tree(department, projection),
+            check_timeout_sec=self._check_timeout(run_id),
+            jobs=jobs,
+            session_id=session_id,
+        )
+        if department in self.delivery_inspecting:
+            ref = projection.qa_tests_archive_ref
+            if ref is not None:
+                if isinstance(ref, dict):
+                    ref = ArtifactRef(**ref)
+                env.place_qa_tests(load_tree(self._artifacts, artifact_run(ref.path), ref))
+            else:
+                env.place_qa_tests(None)
+        self._source[(run_id, session_id)] = self.source_hash(department, projection)
+        return env
+
+    def forget(self, run_id: str, session_id: str) -> None:
+        # 检查工作区删掉以后不再记它的来源
+        self._source.pop((run_id, session_id), None)
+
+    # ---- 检查回执绑定的身份与交付到达时的重建 ----
+    def bind(self, environment: LocalEnvironment, projection: Any, *, activation_id: str | None,
+             effective_contract_hash: str | None = None) -> None:
+        # 检查回执随这一刻的运行状态身份记录：哪一份合同、哪一份产品合同与哪一份交付。
+        # 薄驱动不知道哪几份成果参与，这里按运行状态投影取
+        environment.bind_check(
+            activation_id=activation_id,
+            product_spec_hash=(None if projection.product_spec is None
+                               else projection.product_spec.content_hash),
+            delivery_spec_hash=(None if projection.delivery_spec is None
+                                else projection.delivery_spec.content_hash),
+            effective_contract_hash=effective_contract_hash,
+        )
+
+    def refresh_for(self, round: RoundWorkspace) -> Callable[[], LocalEnvironment | None]:
+        # 检查工作区按会话保留（工单 #558）：从封存交付建立的部门进行中有新的交付封存时，
+        # 在它的下一步从这份交付重建；询问与通知都不重建
+        def refresh() -> LocalEnvironment | None:
+            if round.department not in self.delivery_inspecting:
+                return None
+            projection = self._view(round.run_id)
+            current = self.source_hash(round.department, projection)
+            if current is None:
+                return None
+            if self._source.get((round.run_id, round.session_id)) == current:
+                return None
+            environment = self.new_inspection(round.run_id, round.department, session_id=round.session_id)
+            self.bind(environment, projection, activation_id=round.activation_id,
+                      effective_contract_hash=round.effective_contract_hash)
+            return environment
+
+        return refresh
 
 
 def _bash_slice(full: str, start: int) -> tuple[str, int | None]:

@@ -618,3 +618,5 @@ solo-deepseek-v4.1-flash / 2026-10-28 01:35 / docs/architecture-issues.md 登记
 
 solo-deepseek-v4.1-flash / 2026-10-28 03:40 / docs/architecture-issues.md 登记工单 #1015 的一条：最小投影里会话一级的模型步数只有累计值、没有「上一次一轮工作结束时已结算的步数」，而主线的步数上限是「一轮」的上限，中断那一轮要扣掉的步数从投影算不出来；本轮给 `SessionState` 补对称的 `settled_steps`（与 `settled_ms` 同一处更新；合并 #825 以后内核合计与清单上限都是 5241 行，本轮把新增行并进原有注释，合计仍是 5241） / 工单 #1015 落地「驱动计时与恢复页读数改读最小投影」，设计说明第 4 节那张表在这一格不完整，先登记做法再继续做
 solo-deepseek-v4.1-flash / 2026-10-28 05:55 / 工单 #827（骨架与应用 S4a）：`docs/architecture-issues.md` 追加一条——决定请求的处理与建档的流转放在 `harness/` 顶层的应用模块（`harness/decision_flow.py`）而不是 `harness/app/` 下，原因是分层契约（`pyproject.toml` 的 importlinter「控制核心不导入应用层与接口层」）只许接口层导入 `harness.app`，而这一份要由 `harness/runtime.py` 组装、由薄驱动转交；与 `harness/tightening.py`、`harness/watched_outputs.py` 同一层 / 记录设计没写到的这一处边界，按「自己定、登记、继续做」处置
+
+solo-deepseek-v4.1-flash / 2026-10-28 07:40 / 工单 #863（骨架与应用 S4c）：`docs/architecture-issues.md` 追加一条——薄驱动里部门与成果的身份改从定义取的三个方面（检查工作区的政策留在执行实现、按 `delivery_spec` 提议与 `watched` 的 `delivery` 推；事项开始时的部门取 `watched` 含 `user_input` 的那一个；定义版本不同的决定请求留在 `harness/recovery.py`） / 记录设计没写到的这三处边界，按「自己定、登记、继续做」处置

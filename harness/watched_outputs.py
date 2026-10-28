@@ -19,7 +19,8 @@ from typing import Any
 from . import routing_contract
 from .contracts import artifact_hash
 from .definitions import DEFINITIONS
-from .models import Event, EventType, RunProjection
+from .models import Event, EventType, RunProjection, new_id
+from .validation import PRD_REVISION_FIELDS
 
 # 组织定义 organization.json 的 routing 里写这个名称
 ROUTING_NAME = "watched_outputs"
@@ -30,6 +31,8 @@ ROUTING_NAME = "watched_outputs"
 ITEM_END_REASON = "no_new_work"
 # 提议方式：提交类工具。这一轮记下了其中一次的调用，就是「这一轮交上了正式成果」这件事
 _PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
+# 这个路由的部门清单：它自己的一份定义里写的（设计说明第 5.4 节第 2 条），一次询问只能问清单里的部门
+_DEPARTMENTS = tuple(DEFINITIONS.routing_definition().departments)
 
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
 # 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）。
@@ -326,6 +329,124 @@ def work_reference(projection: RunProjection, department: str) -> Any:
     return None
 
 
+# ---------------------------------------------------------------------------
+# 询问分支（工单 #862）：询问的开始、回问、这一轮的上限、答没答出来
+# ---------------------------------------------------------------------------
+
+# 分支没能回答的三种原因（写进回答事件的 reason，也作为这次工具调用的错误交回提问方）：
+# 一步也走不了、时间用完、跑完这一轮还是没交上回答
+_STEP_LIMIT_REASON = "department reached the model step limit without submitting a proposal"
+_TIME_LIMIT_REASON = "department reached the time limit without submitting an answer"
+_BRANCH_FAILED_REASON = "branch failed to answer"
+
+
+def _answered_branch(events: list[Event], session_id: str) -> dict[str, Any] | None:
+    """这一层询问已经写下的回答：重新启动以后接着同一次询问时读它，不再跑一轮（工单 #473）。"""
+    for event in reversed(events):
+        if event.type == EventType.ASK_ANSWERED and event.session_id == session_id:
+            return event.payload or {}
+    return None
+
+
+def ask_branch(projection: RunProjection, events: list[Event], *, requester: str, session_id: str,
+               call: dict[str, Any], limits: routing_contract.AskLimits):
+    """提问方这个会话的这次询问：开一轮分支工作、直接给出结果，还是这次调用不合法。
+
+    询问的开始归路由：这个会话自己那次没结束的询问接着那一层，不新开一层（工单 #473 的嵌套询问）；
+    新开一层时回复的部门要在这个路由自己的部门清单里、不是提问方自己，问题与背景至少给一份（工单 #554）。
+    这一轮的上限取被问部门的声明量与提问方这一步剩下的量里小的那个；已经用掉的量由薄驱动扣，
+    路由不读最小投影（设计说明第 5.1 节）。
+    """
+    args = call.get("args") or {}
+    pending = projection.ask_by_origin(session_id)
+    if pending is not None:
+        branch_session_id = str(pending["branch_session_id"])
+        recipient = str(pending["recipient"])
+        start = None
+    else:
+        recipient = args.get("recipient")
+        question = args.get("question")
+        facts = args.get("facts") or ""
+        if recipient not in _DEPARTMENTS or recipient == requester:
+            return routing_contract.AskRejection(message=f"invalid recipient {recipient}")
+        # 工程询问质检时问题与背景分两部分：facts 与 explanation 至少给一份（工单 #554）
+        if not (isinstance(question, str) and question.strip()) \
+                and not (isinstance(facts, str) and facts.strip()):
+            return routing_contract.AskRejection(message="question must be a non-empty string")
+        branch_session_id = new_id(f"ses_ask_{recipient[:3]}")
+        start = {
+            "requester": requester,
+            "recipient": recipient,
+            "question": question or "",
+            "background": args.get("background", ""),
+            "expected": args.get("expected", ""),
+            "facts": args.get("facts") or None,
+            "explanation": args.get("explanation") or None,
+            "branch_session_id": branch_session_id,
+        }
+    answered = _answered_branch(events, branch_session_id)
+    if answered is not None:
+        # 这一层询问已经答过：结果照原样交回提问方，不再跑一轮（重新启动以后接着同一次询问）
+        return routing_contract.AskOutcome(
+            status=str(answered.get("status") or "unable"),
+            session_id=branch_session_id,
+            answer=str(answered.get("answer") or ""),
+            reason=str(answered.get("reason") or "branch unable to answer"),
+            recorded=True,
+        )
+    remaining = call.get("remaining_steps")
+    if remaining is None:
+        remaining = limits.max_model_steps
+    declared_steps = limits.department_max_model_steps.get(recipient, limits.max_model_steps)
+    declared_time = limits.department_max_time_sec.get(recipient, float(projection.run_time_limit_sec))
+    return routing_contract.AskBranch(
+        recipient=recipient,
+        session_id=branch_session_id,
+        max_model_steps=min(declared_steps, remaining),
+        max_time_sec=float(declared_time),
+        start=start,
+        # 这一轮工作的路由自己的工作引用指向这次询问（设计说明第 5.1 节输出、第 5.4 节第 4 条）
+        work_ref={"ask": {"branch_session_id": branch_session_id, "requester": requester,
+                          "recipient": recipient}},
+    )
+
+
+def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch,
+                result: routing_contract.AskRoundResult) -> routing_contract.AskOutcome:
+    """分支这一轮以什么结束：把回答交回提问方，还是没能回答与原因。
+
+    回答的内容、回答同时交上的成果由路由组装（设计说明第 5.5 节）：产品在回答一次询问时可以修订 PRD
+    （循环结构第 4.3 节），修订的提案参数随结果交给薄驱动，由它经写入口提交。
+    没能回答的原因按这一轮的实际情形取：一步也走不了、时间用完、这一轮的说明或停止原因、跑完没交上回答。
+    """
+    if result.submission is None:
+        if result.steps_left <= 0:
+            reason = _STEP_LIMIT_REASON
+        elif result.time_exhausted:
+            reason = _TIME_LIMIT_REASON
+        elif result.message:
+            reason = result.message
+        elif result.stop_reason:
+            reason = result.stop_reason
+        else:
+            reason = _BRANCH_FAILED_REASON
+        return routing_contract.AskOutcome(status="unable", session_id=branch.session_id, reason=reason)
+    args = result.submission
+    revises = None
+    if branch.recipient == "product" and any(args.get(field) is not None for field in PRD_REVISION_FIELDS):
+        revises = {**{key: value for key, value in args.items()
+                      if key not in ("answer", "text") and value is not None},
+                   "kind": "product_spec", "issuer": "product"}
+    return routing_contract.AskOutcome(
+        status="answered",
+        session_id=branch.session_id,
+        answer=args.get("answer") or args.get("text") or args.get("facts") or "",
+        facts=args.get("facts") or None,
+        explanation=args.get("explanation") or None,
+        revises=revises,
+    )
+
+
 def check_definition(definitions: Any) -> None:
     """校验成果驱动这份定义的内容（设计说明第 5.4 节第 2 条）：内核只核对结构，内容归路由自己。
 
@@ -392,6 +513,14 @@ class WatchedOutputs:
 
     def item_end(self, view: RunProjection) -> routing_contract.ItemEnd | None:
         return item_end(view)
+
+    def ask_branch(self, view: RunProjection, events: list[Event], *, requester: str, session_id: str,
+                   call: dict[str, Any], limits: routing_contract.AskLimits):
+        return ask_branch(view, events, requester=requester, session_id=session_id, call=call, limits=limits)
+
+    def ask_outcome(self, view: RunProjection, *, branch: routing_contract.AskBranch,
+                    result: routing_contract.AskRoundResult) -> routing_contract.AskOutcome:
+        return ask_outcome(view, branch=branch, result=result)
 
 
 ROUTING = routing_contract.register(WatchedOutputs())

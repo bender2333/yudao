@@ -15,10 +15,15 @@
 # 第二版（#861）：组织定义的 routing 指向路由自己的一份定义（部门、成果种类、提议方式、路由自己的上限与
 # 结束原因，routings.json），由路由实现自己校验、内核只核对名称与结构；一轮的结束由路由按事件判断，
 # 执行契约的结果不再写死「提交了正式成果」「回答了询问」这类种类；开始一轮工作的请求带路由自己的工作引用。
+#
+# 第二版的输出里补一件（#862）：询问分支也由路由请求一轮工作。路由判断这次询问要不要开一层分支、
+# 接着上次没结束的那一层、回复给谁、这一轮的上限，以及分支这一轮答没答出来；分支的一轮由薄驱动按执行契约
+# 照常运行，已用掉的步数与时间由薄驱动自己扣（路由不读最小投影）。
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from typing import Any, Protocol
 
 from . import contract_versions
@@ -107,6 +112,66 @@ class ItemEnd:
     message: str
 
 
+# ---------------------------------------------------------------------------
+# 询问分支（#862）：路由判断这一层询问，薄驱动照常运行这一轮
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class AskLimits:
+    # 薄驱动给的运行配置上限：路由按被问的部门与提问方这一步剩下的量算出这一次询问这一轮的上限
+    # （设计说明第 5.1 节输出里的「这一轮的上限」）。已经用掉的步数与时间由薄驱动扣，路由不读最小投影
+    max_model_steps: int
+    department_max_model_steps: Mapping[str, int] = field(default_factory=dict)
+    department_max_time_sec: Mapping[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class AskBranch:
+    # 这一次询问要开的一轮分支工作：回复的部门、分支会话、这一轮的上限，以及路由自己的工作引用
+    # （指向这次询问，原样交给装配与执行）。start 是要写下的询问开始事件的载荷；接着上次没结束的
+    # 那一层时为空，那一层已经开始过了（设计说明第 5.1 节「询问的开始归路由」）
+    recipient: str
+    session_id: str
+    max_model_steps: int
+    max_time_sec: float
+    start: dict[str, Any] | None = None
+    work_ref: Any = None
+
+
+@dataclass(frozen=True)
+class AskRoundResult:
+    # 分支这一轮的结果里路由要看的几样：交上来的回答（原样的工具参数）或为空、停止原因与说明，
+    # 以及薄驱动按这一轮的上限算出的两件事——时间是否用完、还剩几步可走（0 表示这一轮没有跑）
+    submission: dict[str, Any] | None = None
+    stop_reason: str | None = None
+    message: str = ""
+    time_exhausted: bool = False
+    steps_left: int = 1
+
+
+@dataclass(frozen=True)
+class AskOutcome:
+    # 询问的结果：status 是 answered（回答交回提问方）或 unable（没能回答，原因写在 reason）；
+    # revises 是这一回答同时交上的成果（路由组装的提案参数），薄驱动经写入口提交。
+    # recorded 为真表示这条结果已经写在事件日志里（重新启动以后接着同一次询问），薄驱动不再写事件
+    status: str
+    session_id: str
+    answer: str = ""
+    reason: str = ""
+    facts: str | None = None
+    explanation: str | None = None
+    revises: dict[str, Any] | None = None
+    recorded: bool = False
+
+
+@dataclass(frozen=True)
+class AskRejection:
+    # 这次询问的调用不合法（回复的部门不在路由的部门清单里、问题为空）：不运行、不写事件，
+    # 原因作为这次工具调用的错误交回提问方
+    message: str
+
+
 class Routing(Protocol):
     # 路由契约的实现（这一版是 watched_outputs.py 的 WatchedOutputs）。
     # 三个问题各是方法名里的一件事：谁现在开始一轮工作、一轮以什么结束、事项以什么结束。
@@ -143,4 +208,17 @@ class Routing(Protocol):
 
     def item_end(self, view: Any) -> ItemEnd | None:
         # 事项以什么结束；还可以继续时返回 None
+        ...
+
+    def ask_branch(self, view: Any, events: list[Event], *, requester: str, session_id: str,
+                   call: dict[str, Any], limits: AskLimits) -> AskBranch | AskOutcome | AskRejection:
+        # 提问方这个会话的这次询问：要开一轮分支工作就给这一轮（AskBranch），已经答过或一步也走不了
+        # 就给结果（AskOutcome），调用不合法就给原因（AskRejection）。询问的开始与回问都在这里判断，
+        # 回问的层数上限按路由自己的定义算（设计说明第 5.1 节）
+        ...
+
+    def ask_outcome(self, view: Any, *, branch: AskBranch,
+                    result: AskRoundResult) -> AskOutcome:
+        # 分支这一轮以什么结束：把回答交回提问方（answered），还是没能回答与原因（unable）。
+        # 回答的内容、回答同时交上的成果、没能回答的原因都由路由按自己的定义判断
         ...

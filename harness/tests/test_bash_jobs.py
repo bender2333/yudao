@@ -115,7 +115,7 @@ def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path
     assert has_new_work(proj, "engineering")
 
     # 激活 1：持有运行工作区的工程获取环境并启动持续输出的后台命令
-    env1 = system.orchestrator._environment_for(run_id, "engineering", refresh=True)
+    env1 = system.orchestrator._workspaces.environment_for(run_id, "engineering", refresh=True)
     server_cmd = (
         f'"{_python()}" -c "import time\nfor i in range(600):\n    print(\'tick %d\' % i, flush=True)\n    time.sleep(0.1)"'
     )
@@ -124,7 +124,7 @@ def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path
     job_id = start_receipt.output["job_id"]
 
     # 激活 2：再取一次，得到新的 LocalEnvironment 实例
-    env2 = system.orchestrator._environment_for(run_id, "engineering", refresh=True)
+    env2 = system.orchestrator._workspaces.environment_for(run_id, "engineering", refresh=True)
     assert env2 is not env1
 
     # 用这个编号 read_output 读到新的输出
@@ -138,7 +138,7 @@ def test_cross_activation_read_output_stop_job_and_department_isolation(tmp_path
     assert read_receipt.output["status"] == "running"
 
     # 另一个部门（质检）的会话用该编号 read_output 与 stop_job 得到 ended，进程不受影响
-    env_qa = system.orchestrator._environment_for(run_id, "quality", refresh=True)
+    env_qa = system.orchestrator._workspaces.environment_for(run_id, "quality", refresh=True)
     qa_read = perform(env_qa, "read_output", {"job_id": job_id})
     assert qa_read.ok is True and qa_read.output["status"] == "ended"
     assert qa_read.output["output"] == ""
@@ -163,7 +163,7 @@ def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     # 1. 事项取消 (cancelled)
     sys_cancel = LoopSystem.for_testing(tmp_path / "sys_cancel", FakeAdapter([]))
     run_cancel = sys_cancel.create_run("cancel test")
-    env_cancel = sys_cancel.orchestrator._environment_for(run_cancel, "engineering")
+    env_cancel = sys_cancel.orchestrator._workspaces.environment_for(run_cancel, "engineering")
     marker_cancel = tmp_path / "marker_cancel"
     rec_cancel = perform(env_cancel, "bash", {"command": _tree_command(str(marker_cancel)), "background": True})
     wait_for_file(marker_cancel)
@@ -177,7 +177,7 @@ def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     # 2. 事项暂停 (paused)
     sys_pause = LoopSystem.for_testing(tmp_path / "sys_pause", FakeAdapter(happy_script()))
     run_pause = sys_pause.create_run("pause test", max_cycles=1)
-    env_pause = sys_pause.orchestrator._environment_for(run_pause, "engineering")
+    env_pause = sys_pause.orchestrator._workspaces.environment_for(run_pause, "engineering")
     marker_pause = tmp_path / "marker_pause"
     rec_pause = perform(env_pause, "bash", {"command": _tree_command(str(marker_pause)), "background": True})
     wait_for_file(marker_pause)
@@ -191,7 +191,7 @@ def test_loop_system_real_paths_stop_background_process_tree(tmp_path: Path):
     # 3. 运行到放行 (released)
     sys_release = LoopSystem.for_testing(tmp_path / "sys_release", FakeAdapter(happy_script()))
     run_release = sys_release.create_run("release test")
-    env_release = sys_release.orchestrator._environment_for(run_release, "engineering")
+    env_release = sys_release.orchestrator._workspaces.environment_for(run_release, "engineering")
     marker_release = tmp_path / "marker_release"
     rec_release = perform(env_release, "bash", {"command": _tree_command(str(marker_release)), "background": True})
     wait_for_file(marker_release)
@@ -207,14 +207,14 @@ def test_recreate_loop_system_returns_ended_for_old_job_id(tmp_path: Path):
     data_dir = tmp_path / "data_restart"
     sys1 = LoopSystem.for_testing(data_dir, FakeAdapter([]))
     run_id = sys1.create_run("restart test")
-    env1 = sys1.orchestrator._environment_for(run_id, "engineering")
+    env1 = sys1.orchestrator._workspaces.environment_for(run_id, "engineering")
     receipt = perform(env1, "bash", {"command": "echo test_old_job", "background": True})
     job_id = receipt.output["job_id"]
     sys1.close()
 
     # 在同一个数据目录上重新建立 LoopSystem（Yudao 重新启动）
     sys2 = LoopSystem.for_testing(data_dir, FakeAdapter([]), resume_on_startup=False)
-    env2 = sys2.orchestrator._environment_for(run_id, "engineering")
+    env2 = sys2.orchestrator._workspaces.environment_for(run_id, "engineering")
     read_receipt = perform(env2, "read_output", {"job_id": job_id})
     assert read_receipt.ok is True and read_receipt.status == "completed"
     assert read_receipt.output["status"] == "ended"
