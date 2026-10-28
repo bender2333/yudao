@@ -109,7 +109,7 @@ pause | resume [--no-auto] [--wait hook|notify] | auto on|off | budget --iterati
 | --- | --- | --- |
 | worktree 根目录 | `state.json` 的 `worktrees.root`，用 `solo.mjs worktrees --root <路径>` 改 | Windows 用短路径 **`C:/w`**（`C:/w/issue-559` 比 `C:/project/yudao-worktrees/issue-559` 少 20 多个字符，`node_modules` 的深路径才不会撞 260 的上限）；类 Unix 用 `/tmp/w` |
 | 这个目录的写权限 | `.codebuddy/settings.json` 的 `permissions.allow` | `Edit(//C:/w/**)` 与 `Read(//C:/w/**)`（`//` 开头表示文件系统绝对路径）。沙箱默认只允许写当前工作目录，不放行的话 subagent 在 worktree 里写文件、删临时文件都会被拦——**这是 subagent 报“权限不够”的最常见原因** |
-| 依赖复用 | 写进 `handoff.md`，任务书里带一句 | `UV_PROJECT_ENVIRONMENT=C:/code/yudao/.venv`（Python）与主仓库的 `client/node_modules`（前端）。每个 worktree 各装一份会把目录撑到几千文件，建得慢、删的时候被进程锁住 |
+| 依赖 | 写进 `handoff.md`，任务书里带一句 | Python 复用主仓库的环境：`UV_PROJECT_ENVIRONMENT=C:/code/yudao/.venv`。客户端的依赖不共用：要运行客户端测试或接口合同检查的 worktree 自己 `npm ci`，不建指向主仓库 `client/node_modules` 的链接（通过链接共用时，任何一处的 npm 安装改的都是同一个目录） |
 | 账本保护 | `hook.mjs` 已内置 | `state.json`、`tasks.md`、`active.json`、`.lock`、`.owner.json`、`.stop-guard.json` 只由命令改；`goal.md`、`handoff.md`、`notes/` 人可以改 |
 
 换过根目录以后，旧目录里的 worktree 用 `solo.mjs gc --from <旧根目录>` 清（按已关闭工单逐张删，正在跑的跳过）。
@@ -158,7 +158,7 @@ pause | resume [--no-auto] [--wait hook|notify] | auto on|off | budget --iterati
 11. **收账**：逐个收结果，收一个记一个，收完立刻用 `next` 补一个。
     - 先 `solo.mjs check --task T-004`：工作区干净、没有未推送的提交、分支含 `origin/main`、PR 开着没冲突、检查全绿、有 `DELIVERY:` 交付说明且带署名、标签是 `needs-review`。有一条 ✗ 就不许合并。
     - 再 `solo.mjs finish --task T-004 --status done`：`done` 会自己核对工单已关、PR 已合并、检查全绿，不成立就退出、不写 `[x]`。父工单随子单被 GitHub 关闭（没有分支也没有 PR）时直接认，不必加 `--no-verify`。记完 done 会顺手 `gc --task` 清这一张的 worktree（先归档 `.tmp` 证据；删不掉只提示，不拦收账）。
-- `check` 认得「工单已关闭 + PR 已合并」这种形状：合并以后工人又开了一张补记日记的小 PR，不会因为它而判成「没交付」；它按正文里的 `Closes #<编号>` 认本单那张 PR。
+- `check` 认得「工单已关闭 + PR 已合并」这种形状：它按正文里的 `Closes #<编号>` 认本单那张 PR。
     - 工人报 `ERROR` 行带前缀时按前缀分流：`[环境]` → `askhuman`，`[设计]` → `question`，没有前缀 → 算一次失败。
     - 顺手核对资源有没有释放（进程、浏览器）；**worktree 不在这里逐张删**：收账以后跑 `solo.mjs gc` 统一清——它先把 `.tmp/` 的证据归档到 `.ralph/<循环>/evidence/<编号>/`，再删；删不掉的重试，还不行就留在残留清单里，不影响工单。
     - `refresh` 报「工单正文在工作中被改过」时，让下一轮的工人按最新正文重核。
@@ -189,7 +189,7 @@ NEXT: 建议的下一轮任务；没有写 none
 
 ## 一张工单的完整链路
 
-工人按 [`/solo-worker`](../solo-worker/SKILL.md)「一张工单的完整做法」做，编排者收账时按它的步骤核对：领取与 `in-progress`（第 1 步）、三项核对（第 3 步）、PR 正文带 `Solo:` 一行（第 7 步）、CI 与 `touches-core` 的分支集成层（第 8 步）、`DELIVERY:` 交付说明与 `needs-review`（第 9 步）、合并前五项核对含 `kernel-approved`（第 10 步）、`--admin --squash` 合并（第 11 步）、工单关闭与去标签（第 12 步）、清理但不删 worktree（第 13、14 步）。
+工人按 [`/solo-worker`](../solo-worker/SKILL.md)「一张工单的完整做法」做，编排者收账时按它的步骤核对：领取与 `in-progress`（第 1 步）、三项核对（第 3 步）、PR 正文带 `Solo:` 一行（第 7 步）、CI 与 `touches-core` 的分支集成层（第 8 步）、`DELIVERY:` 交付说明与 `needs-review`（第 9 步）、合并前五项核对（第 10 步）、`--admin --squash` 合并（第 11 步）、工单关闭与去标签（第 12 步）、清理但不删 worktree（第 13、14 步）。
 ## UI 工单
 
 界面工单多两步：**对着原型核**、**留机器可查的证据**。无人值守时没有人替你看页面，所以「看起来对」不算完成。
