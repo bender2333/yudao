@@ -37,6 +37,8 @@ Claude 担任派发者时使用这里的路径。
 
 两台机器把 `PYTHONUTF8=1` 设成用户环境变量（Windows：`setx PYTHONUTF8 1`，之后新开的终端生效），任何终端与 harness 里的 Python 及其测试子进程都输出 UTF-8；pytester 的子进程输出按 UTF-8 读取。
 
+共享的 `C:/code/yudao/.venv` 是 editable 安装，它的 `harness` 指向最近一次 `uv sync` 的那个 worktree，会随别的会话的同步而变（2026-10-29 实测从 `C:\w\issue-1162` 变成 `C:\w\issue-1161`）。工人在自己的 worktree 里跑「导入 `harness` 的脚本」或嵌套起子进程的用例时，带 `PYTHONPATH=<worktree 根>`，否则导入会落到别人那一份上；报错形态是「莫名 import 错」或与本单无关的怪失败。
+
 各角色只使用第 1 节列出的目录。架构师在会话中临时建的 worktree，会话结束之前删除。
 
 机器上同时运行着多个执行者、审查者与集成层测试。只能结束自己启动、并且记下了进程号的进程（`kill <进程号>`），不允许按进程名结束进程（例如 `taskkill /IM python.exe`），也不允许结束不是自己启动的进程。
