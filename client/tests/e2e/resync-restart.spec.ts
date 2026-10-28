@@ -44,7 +44,20 @@ test("服务重启以后页面不刷新，凭据来源自己变成重启以后�
   test.setTimeout(300_000);
   // 这个用例自己起服务：重启要真的停掉它，再用同一端口与数据目录起回来
   const own = await startBackend();
-  const client = await startClient(own, { width: 1440, height: 900 });
+  // 页面每次读取能力清单都记下它报告的启动身份：重连时核对身份会再读一次
+  const bootReads: string[] = [];
+  const client = await startClient(own, { width: 1440, height: 900 }, {
+    intercept: async (page) => {
+      page.on("response", (response) => {
+        if (new URL(response.url()).pathname !== "/api/capabilities") {
+          return;
+        }
+        void response.text()
+          .then((text) => bootReads.push((JSON.parse(text) as { deployment: { boot_id: string } }).deployment.boot_id))
+          .catch(() => undefined);
+      });
+    },
+  });
   let again: Backend | null = null;
   try {
     await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
@@ -61,6 +74,7 @@ test("服务重启以后页面不刷新，凭据来源自己变成重启以后�
     await own.stop();
     await expect(client.page.locator("body")).toHaveClass(/is-disconnected/, { timeout: 60_000 });
     await expect(client.page.locator(".path")).toHaveText("模型管理");
+    expect(bootReads.length).toBe(1);
 
     // 同一个端口与数据目录再起一次服务：内存里的 Key 与新进程的凭据版本都没有了
     again = await startBackend({ port: own.port, dataDir: own.dataDir });
@@ -69,6 +83,10 @@ test("服务重启以后页面不刷新，凭据来源自己变成重启以后�
     await expect(client.page.locator("body")).not.toHaveClass(/is-disconnected/);
     // 凭据表显示的是重启以后的来源，而不是重启以前那一份「来源 内存」
     await expect(credentialRow(client)).toContainText("缺失，请填写 API Key", { timeout: 60_000 });
+    // 页面重连时又读了一次能力清单，读到的是另一个启动身份（这一条是这一段的做法本身：
+    // 只用上面那条「凭据表变了」不够——重启时预置的目录又会写事件，光靠事件重查也会变）
+    await expect.poll(() => bootReads.length, { timeout: 30_000 }).toBe(2);
+    expect(bootReads[0]).not.toBe(bootReads[1]);
   } finally {
     await client.close();
     await again?.stop();
