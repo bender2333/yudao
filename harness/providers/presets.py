@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from ..definitions import DEFINITIONS, ServicePreset, thaw
 
 # 服务方案预置表是带版本的定义（definitions/service_presets.json），整张表带 revision 与来源，
-# 不做远端热更（ADR-0003）；新增服务方案等于在定义中新增一项
+# 不做远端热更（模型管理设计说明第 4.1 节）；新增服务方案等于在定义中新增一项
 _TABLE = DEFINITIONS.service_presets
 PRESET_TABLE_VERSION = _TABLE.revision
 PRESET_TABLE_SOURCE = _TABLE.source
@@ -19,7 +19,7 @@ USER_AGENT = "Yudao-Loop-System/0.1 (+https://github.com/bender2333/yudao)"
 
 
 def list_presets() -> list[dict[str, Any]]:
-    # 与 get_preset 读同一份索引，测试替换其中一项时公开视图同步（ADR-0033）
+    # 与 get_preset 读同一份索引，测试替换其中一项时公开视图同步
     return [_public_preset(item) for item in _PRESET_INDEX.values()]
 
 
@@ -50,14 +50,14 @@ def preset_default_protocol(preset_id: str) -> str:
 
 
 def preset_base_url(preset_id: str, protocol: str) -> str:
-    # 内置服务方案按访问定义的协议取请求基址（ADR-0033）；没有该协议的基址或不是预置方案时返回空串，
+    # 内置服务方案按访问定义的协议取请求基址（模型管理设计说明第 4.2 节）；没有该协议的基址或不是预置方案时返回空串，
     # 由调用方回落到连接的地址
     item = _PRESET_INDEX.get(str(preset_id))
     return "" if item is None else item.base_urls.get(str(protocol), "")
 
 
 def preset_auth(preset_id: str) -> str:
-    # 服务方案要求的认证方式，供连接测试与候选采集按方案取（ADR-0033）
+    # 服务方案要求的认证方式，供连接测试与候选采集按方案取（模型管理设计说明第 4.1 节）
     item = _PRESET_INDEX.get(str(preset_id))
     return "" if item is None else item.auth
 

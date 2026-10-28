@@ -1,5 +1,5 @@
 # 服务的停止方式与 system.status 的字段（设计说明第 4.2、4.4 节）。
-# 删除桌面客户端以后（ADR-0032），停止服务就是结束这个进程（Ctrl+C）；POST /api/system/stop 不再存在，
+# 删除桌面客户端以后（网页界面的提供与发布设计说明第 4.2 节），停止服务就是结束这个进程（Ctrl+C）；POST /api/system/stop 不再存在，
 # 接口层没有这条路由，请求应当返回 404。system.status 仍然报告发布版本号与运行中的 run。
 #
 # 测试使用真实的 uvicorn 服务（running_server）。

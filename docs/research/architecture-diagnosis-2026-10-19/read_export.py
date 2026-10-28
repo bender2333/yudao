@@ -3,14 +3,14 @@
 
 用法：uv run python docs/research/architecture-diagnosis-2026-10-19/read_export.py <证据目录>
 证据目录是 .yudao/evals/scenario-3/yudao/<运行编号>，里面有 run-export.json 与 metrics.json。
-只读文件，不导入 harness。层的对应按总体架构说明与 ADR-0031 的四层：角色的步骤循环、部门激活、部门之间的循环、项目循环。
+只读文件，不导入 harness。层的对应按总体架构说明与循环与收敛设计说明第 2 节，取其中四层：角色的步骤循环、部门激活、部门之间的循环、项目循环。
 """
 import collections
 import json
 import pathlib
 import sys
 
-# 停止原因属于哪一层（定义里没有循环层，ADR-0031 未实施，这张表是手工对应）：步数、不调用工具与模型故障发生在角色的步骤循环里；循环次数是部门之间的循环；
+# 停止原因属于哪一层（定义里没有循环层，循环与收敛设计说明第 2 节还没有实施，这张表是手工对应）：步数、不调用工具与模型故障发生在角色的步骤循环里；循环次数是部门之间的循环；
 # 时间、取消与放行是整个 run（项目循环里的一个事项）。未列出的原样报告
 LAYER = {"no_tool_call": "角色的步骤循环", "model_steps_exhausted": "角色的步骤循环",
          "provider_error": "角色的步骤循环", "provider_timeout": "角色的步骤循环",

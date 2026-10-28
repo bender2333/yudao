@@ -119,7 +119,7 @@ def _run_product_activation(tmp_path, responder, protocol: str):
                          for department in ("product", "engineering", "quality")},
         })
         facade.record_admission("go", "m-go", admitted_model="target-model")
-        # 与正式运行同一装配路径：每次模型请求按部门设置解析调用目标（ADR-0005），请求带模型输出上限
+        # 与正式运行同一装配路径：每次模型请求按部门设置解析调用目标（模型管理设计说明第 5.4 节），请求带模型输出上限
         system = LoopSystem(tmp_path, facade=facade)
         run_id = system.create_run("echo")
         result = system.activate_once(run_id)

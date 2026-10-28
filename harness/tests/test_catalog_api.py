@@ -25,7 +25,7 @@ def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url=""):
 
 
 def _model(model_id="m1", *, model="model-x", protocol="responses"):
-    # 连接保存用的模型访问定义：所属连接由命令参数给出，调用协议必填（ADR-0033）；
+    # 连接保存用的模型访问定义：所属连接由命令参数给出，调用协议必填（模型管理设计说明第 4.3 节）；
     return {"id": model_id, "model": model, "protocol": protocol,
             "context_window": 32000, "max_output_tokens": 2048}
 

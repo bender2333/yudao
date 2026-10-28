@@ -228,7 +228,7 @@
     "cost": "更深的拆分不可用",
     "relax_when": "数值随子循环的运行记录调整，经用户批准",
     "tighten_when": "子循环的运行记录显示更深处的记录无法审计",
-    "origin": "ADR-0031，嵌套深度的上限是内核常量，现值为 2"
+    "origin": "循环与收敛设计说明第 4 节；总图第三节：嵌套深度的上限来自定义，由内核的边界核对"
   },
   "organization.ask_chain_max_depth": {
     "value": 3,
@@ -239,7 +239,7 @@
     "cost": "超过层数的追问被拒绝，提问方要把问题写进回答",
     "relax_when": "被层数上限拒绝的询问记录显示挡住了需要的追问",
     "tighten_when": "询问链的花费记录显示深链很少带来新信息",
-    "origin": "ADR-0039，默认 3 覆盖质检询问工程、工程询问产品、产品再询问质检"
+    "origin": "三部门的循环结构第 4 节，默认 3 覆盖质检询问工程、工程询问产品、产品再询问质检"
   },
   "stall.rounds": {
     "value": 3,
@@ -525,7 +525,7 @@
     "cost": "每次提交多一次审查请求",
     "relax_when": "连续一致以后按比例抽审",
     "tighten_when": "抽审发现未通过的成果",
-    "origin": "ADR-0016；部门内多角色设计说明第 21 行，下界大于 0"
+    "origin": "部门内多角色设计说明第 2 节：每个部门设审查者，下界大于 0"
   },
   "execution.slots": {
     "value": 3,
@@ -547,7 +547,7 @@
     "cost": "任一角色的引用失效都挡住整个项目",
     "relax_when": "只解析本事项种类会用到的角色",
     "tighten_when": "只解析用到的角色以后仍然频繁失败",
-    "origin": "ADR-0017，新建事项之前解析每个部门的每个角色"
+    "origin": "模型管理设计说明第 5 节，新建事项之前解析每个部门的每个角色"
   },
   "compaction.min_reasoning_effort": {
     "value": "minimal",
@@ -558,7 +558,7 @@
     "cost": "摘要质量",
     "relax_when": "压缩失败率与压缩后的返工率下降",
     "tighten_when": "摘要质量不足导致返工",
-    "origin": "ADR-0006，摘要与整理请求使用模型声明的最低推理档位"
+    "origin": "模型管理设计说明第 7.5 节，摘要与整理请求使用模型声明的最低推理档位"
   },
   "compaction.stalled_limit": {
     "value": 3,
@@ -580,7 +580,7 @@
     "cost": "细节丢失",
     "relax_when": "按模型的图像输入能力调整",
     "tighten_when": "模型的图像输入能力下降",
-    "origin": "ADR-0026，截图等比缩小到 1280×800 以内"
+    "origin": "浏览器与 computer use 设计说明第 5.2 节，截图等比缩小到 1280×800 以内"
   },
   "screenshot.max_height": {
     "value": 800,
@@ -591,7 +591,7 @@
     "cost": "细节丢失",
     "relax_when": "按模型的图像输入能力调整",
     "tighten_when": "模型的图像输入能力下降",
-    "origin": "ADR-0026，截图等比缩小到 1280×800 以内"
+    "origin": "浏览器与 computer use 设计说明第 5.2 节，截图等比缩小到 1280×800 以内"
   },
   "desktop.consent_per_session": {
     "value": true,
@@ -602,18 +602,7 @@
     "cost": "等待用户",
     "relax_when": "在用户不在场的时段可以改为常设授权",
     "tighten_when": "会话期间用户正在操作同一个桌面",
-    "origin": "ADR-0026，每个桌面会话开始前经用户同意"
-  },
-  "mcp.server_env_allowlist": {
-    "value": true,
-    "bounds": [0, 1],
-    "kind": "structure",
-    "form": "permission",
-    "guards": "凭据泄漏到第三方进程",
-    "cost": "登记时逐个写明变量",
-    "relax_when": "属于授权边界，由用户决定",
-    "tighten_when": "子进程需要的基础变量没有登记",
-    "origin": "ADR-0025，登记的 MCP 服务器子进程只拿到登记写明的环境变量"
+    "origin": "浏览器与 computer use 设计说明第 5.1 节，每个桌面会话开始前经用户同意"
   },
   "execution.readiness_timeout_sec": {
     "value": 300,
@@ -701,7 +690,7 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "ADR-0031 与 D17；浏览器与 computer use 设计说明第 231 行"
+    "origin": "循环与收敛设计说明第 3 节与 D17；浏览器与 computer use 设计说明第 5.1 节"
   },
   "wait.machine.max_sec": {
     "value": 86400,
@@ -712,7 +701,7 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "ADR-0031；执行环境服务设计说明第 282 行"
+    "origin": "循环与收敛设计说明第 3 节；执行环境服务设计说明第 6.5 节"
   },
   "wait.desktop.max_sec": {
     "value": 28800,
@@ -723,7 +712,7 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "ADR-0031；浏览器与 computer use 设计说明第 231 行"
+    "origin": "循环与收敛设计说明第 3 节；浏览器与 computer use 设计说明第 5.1 节"
   },
   "wait.desktop_unlock.max_sec": {
     "value": 28800,
@@ -734,6 +723,6 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "ADR-0031；浏览器与 computer use 设计说明第 232 行"
+    "origin": "循环与收敛设计说明第 3 节；浏览器与 computer use 设计说明第 5.1 节"
   }
 }

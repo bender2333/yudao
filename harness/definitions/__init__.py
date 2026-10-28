@@ -1,4 +1,4 @@
-# 带版本的定义（ADR-0014）：随系统发布的 JSON 数据文件，放在本目录。
+# 带版本的定义（总图第四节「定义」的缝）：随系统发布的 JSON 数据文件，放在本目录。
 # 导入本模块时读取并校验全部定义文件：标准库解析 JSON（重复的键不合法），pydantic 类型校验每个文件的结构，
 # 任何一项不合法都抛出 DefinitionError，写明文件与字段，导入本模块的程序因此无法启动。
 # 定义的版本是全部定义文件内容的摘要：每个文件解析以后按原来的键顺序写成紧凑的 JSON，只改格式不改变版本。
@@ -129,7 +129,7 @@ class Department(_Definition):
     # 本部门模型的建议能力（设计说明第 5.6 节）：取值来自模型访问定义的输入方式。
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
-    # 部门关注的成果（循环结构第 2 节、ADR-0039）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
+    # 部门关注的成果（三部门的循环结构第 2 节）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
     # 关注关系写在定义里，代码里只有一条通用规则
     watched: tuple[Literal["user_input", "guidance", "product_spec", "defect_record", "delivery",
                           "structure", "baseline_review"], ...] = ()
@@ -324,7 +324,7 @@ class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（ADR-0033）；默认协议：模型没有单独声明协议时预填（设计说明第 4.1 节）
+    # 获取模型列表与连接测试使用的认证方式（设计说明第 4.3 节）；默认协议：模型没有单独声明协议时预填（设计说明第 4.1 节）
     default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
@@ -341,7 +341,7 @@ class ServicePreset(_Definition):
 
 
 class ServicePresets(_Definition):
-    # 服务方案预置表（ADR-0003）：整张表的 revision 与来源随界面显示；每个服务方案一项
+    # 服务方案预置表（设计说明第 4.1 节）：整张表的 revision 与来源随界面显示；每个服务方案一项
     revision: str = Field(min_length=1)
     source: str = Field(min_length=1)
     presets: tuple[ServicePreset, ...]
@@ -362,7 +362,7 @@ class ModelCapability(_Definition):
 
 
 class ModelCapabilities(_Definition):
-    # 模型能力表（ADR-0003）：只收录预置表中服务方案的模型，整张表带 revision、快照日期与来源；
+    # 模型能力表（设计说明第 4.1 节）：只收录预置表中服务方案的模型，整张表带 revision、快照日期与来源；
     # 运行时不从远端刷新，只用于新建模型访问定义时的预填（设计说明第 4.1 节）。
     # 键是预置表中的服务方案 ID（取值与 ServicePreset.id 一致，可以含连字符）
     presets: Mapping[str, tuple[ModelCapability, ...]]
@@ -391,7 +391,7 @@ class DepartmentWork(_Definition):
 
 
 class WorkItemKind(_Definition):
-    # 事项种类（ADR-0014）：部门说明与工具清单按种类定义
+    # 事项种类（总图第四节「定义」的缝）：部门说明与工具清单按种类定义
     label: str = Field(min_length=1)
     # 本种类的 run 进入完成状态时的停止原因，必须是 stop_reasons.json 中的编号
     stop_reason: Identifier

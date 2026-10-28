@@ -417,7 +417,7 @@ class RunProjection:
     stream_version: int = 0
     # 创建这个 run 时记录的 run 事件版本（ADR-0019）；旧 run 没有这个字段时为 0，与当前版本不同
     run_event_version: int = 0
-    # 创建这个 run 时记录的定义版本（ADR-0014）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
+    # 创建这个 run 时记录的定义版本（总体架构第 3 节第 7 条）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
     definitions_version: str = ""
     # 创建这个 run 时冻结的参数版本（工单 #349）：运行中不跟随参数修改
     parameters_version: str = ""

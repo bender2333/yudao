@@ -1244,3 +1244,14 @@ Argon 的工作流建议（四条）对照仓库后的取舍：
 - 留待以后：需求记录里几处「升级给更强的模型」（D38 第 62 行是用户原话）、D11 里「一次一个未结请求」、语义系统与循环收敛设计说明里以工程计划为前提的要求链与进展度量。它们与总图不一致，按共同规则第 1 条以总图为准，改这几份需求或重写这几块设计时一起处理。
 - 撤回：从本次提交之前的版本取回删除的 ADR，各处引用、总图与基础规则的出处恢复原句。
 - 落点：`docs/adr/`；`docs/agents/domain.md`；`docs/foundation-rules.md`；`docs/architecture.html` 第二、六节；`docs/program-roadmap.md` 第 3 节第 10 道；`docs/design/`、`docs/requirements/`、`docs/research/`、`CONTEXT.md`、`README.md`、`client/README.md`、`docs/current-baseline.md`、`docs/prototypes/` 的说明与 `docs/architecture-issues.md` 里的引用。
+
+## 2026-10-28 - 代码与定义数据里的 ADR 引用由总架构师直接改完
+
+- 用户：「不需要开清理单，你需要全部做好」。已经开的 #1148 至 #1151 按不做关闭；同日上一条第 8 项「另开清理单」不再适用。
+- 改了什么：
+  - `harness/`、`client/`、`scripts/` 与调研脚本里 42 个文件的注释：指向已删除 ADR 的出处改为设计说明或总图的节，行数不变。
+  - `harness/definitions/rules.json`：出处改为设计说明的节（原来按行号引用的一并改为节号）；删去已被 ADR-0038 取代、代码里没有用到的 `mcp.server_env_allowlist`；「嵌套深度的上限是内核常量」按总图第三节改为「来自定义，由内核的边界核对」，取值不变。
+  - `routings.json`、`kernel-manifest.json` 的说明同样改指；内核清单写的「三条权威关系校验」代码里没有，去掉这半句。
+  - 原型 v13 的代码注释按「原型的代码从定稿起不再修改」不动。
+- 核对：定义测试与内核测试、单元层与模块层在本地通过（接口合同的客户端类型检查装上 `openapi-ts` 以后通过）；定义文件的内容变了，定义版本随之改变，事件序列基准里定义版本是占位写法，不受影响。没有改 `.github/workflows/`。
+- 撤回：从本次提交之前的版本恢复这些文件。

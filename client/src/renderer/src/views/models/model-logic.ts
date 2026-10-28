@@ -25,7 +25,7 @@ export type ServicePreset = {
   notes: string;
 };
 
-// 推理档位全集，由低到高（ADR-0006，与后端 REASONING_LEVELS 一致）
+// 推理档位全集，由低到高（模型管理设计说明第 7.1 节，与后端 REASONING_LEVELS 一致）
 export const REASONING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 // 推理参数方式与它相符的协议（设计说明第 7.4 节）
@@ -73,7 +73,7 @@ export const CONFIG_STATE_LABELS: Record<string, string> = {
 export const CUSTOM_PRESET_ID = "";
 
 // 一份服务方案在某协议下的请求基址；自定义方案没有预置地址。
-// 协议属于访问定义（ADR-0033），连接表单里的地址按定义行的协议取：
+// 协议属于访问定义（模型管理设计说明第 4.2 节），连接表单里的地址按定义行的协议取：
 // 没有行时用新建定义的预填协议
 export function presetBaseUrlFor(preset: ServicePreset | null, protocol: string): string {
   return preset?.base_urls?.[protocol] ?? "";
@@ -466,7 +466,7 @@ export type FormRow = {
   key: string;
   id: string;
   model: string;
-  // 调用协议属于访问定义（ADR-0033），新建的定义预填 Chat Completions
+  // 调用协议属于访问定义（模型管理设计说明第 4.3 节），新建的定义预填 Chat Completions
   protocol: string;
   // 窗口与输出上限保存为文本，空字符串表示没有值
   context_window: string;

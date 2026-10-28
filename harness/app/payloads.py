@@ -995,7 +995,7 @@ class ModelUnavailableRequested(Payload):
 
 
 class DefinitionsChangedRequested(Payload):
-    # 继续旧事项时事项记录的定义版本与当前加载的不同（ADR-0014，工单 #16、#894；设计说明第 3.3 节、
+    # 继续旧事项时事项记录的定义版本与当前加载的不同（工单 #16、#894；设计说明第 3.3 节、
     # 总体架构第 7.4 节）：回答之前这个 run 不推进。recorded_definitions_version 是事项开始时记录的版本
     # （旧事项没有记录时为空），current_definitions_version 是当前加载的版本；reason 恒为
     # definitions_version_changed；facts 为空，请求不引用事实

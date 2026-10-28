@@ -9,7 +9,7 @@
     {
       "path": "harness/write_path.py",
       "kind": "module",
-      "why": "写入口：事实只从这里进入事件日志（ADR-0013）"
+      "why": "写入口：事实只从这里进入事件日志（总图第四节「写入口」的缝）"
     },
     {
       "path": "harness/event_store.py",
@@ -64,7 +64,7 @@
     {
       "path": "harness/definitions/__init__.py",
       "kind": "module",
-      "why": "定义的加载与结构校验，含组织候选的三条权威关系校验（ADR-0014、ADR-0020）"
+      "why": "定义的加载与结构校验（总图第四节「定义」的缝）"
     },
     {
       "path": "harness/definitions/kernel-manifest.json",

@@ -93,7 +93,7 @@ export function ProviderForm(props: ProviderFormProps) {
     props.onPatch(patch);
   };
 
-  // 切换一行定义上的调用协议（ADR-0033）：内置服务方案的地址按协议取预置表基址；
+  // 切换一行定义上的调用协议（模型管理设计说明第 4.2 节）：内置服务方案的地址按协议取预置表基址；
   // 推理参数方式与协议不符时清空推理档位声明（第 7.1、7.4 节）：支持档位、默认档位与推理参数方式
   // 三项一起声明，缺任一项时请求不带推理参数，所以清空方式时三项一起清空
   const chooseProtocol = (row: FormRow, protocol: string) => {

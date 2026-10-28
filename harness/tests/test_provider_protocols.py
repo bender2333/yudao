@@ -211,7 +211,7 @@ def test_undeclared_model_sends_no_reasoning_parameters():
 
 
 def test_one_preset_connections_keep_their_own_credentials_and_identity():
-    # 同一服务方案下两份连接：请求地址都取该方案按协议的基址（ADR-0033），凭据与会话身份各自独立
+    # 同一服务方案下两份连接：请求地址都取该方案按协议的基址（模型管理设计说明第 4.2 节），凭据与会话身份各自独立
     server, capture, base = serve(responses_responder)
     with preset_base_urls(base + "/v1"):
         try:

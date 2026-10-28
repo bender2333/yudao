@@ -71,7 +71,7 @@ def _unfinished_run(data_dir, script=None, *, to_stop=False):
 
 
 def _older_definitions_version(data_dir, version="sha256:定义版本在升级之前的内容"):
-    # 模拟一次升级：把 run_created 记录的定义版本改成另一个版本。ADR-0014 的定义版本只有发布新版本时改变，
+    # 模拟一次升级：把 run_created 记录的定义版本改成另一个版本。定义版本只有发布新版本时改变（总体架构第 3 节），
     # 因此测试改写事件库中的事实，不加载第二套定义文件
     connection = sqlite3.connect(data_dir / "events.sqlite")
     try:
@@ -217,7 +217,7 @@ def test_two_processes_recovering_the_same_run_only_one_advances(data_dir):
     second.close()
 
 def test_a_run_with_an_older_definitions_version_asks_the_user_before_continuing(data_dir):
-    # 升级以后继续旧事项：定义版本不同时发出决定请求，取得执行权之前交给用户决定（ADR-0014，工单 #16）
+    # 升级以后继续旧事项：定义版本不同时发出决定请求，取得执行权之前交给用户决定（总体架构第 7.4 节，工单 #16）
     _system, _project_id, run_id = _unfinished_run(data_dir)
     recorded = _older_definitions_version(data_dir)
 
@@ -292,7 +292,7 @@ def test_the_two_definition_versions_survive_reading_the_event_stream(data_dir):
     assert payload.current_definitions_version == DEFINITIONS.version
 
 def test_continuing_on_the_new_definitions_version_records_it_in_later_events(data_dir):
-    # 选择「按新版本继续」以后，后续的模型请求与裁决照常记录新版本（ADR-0014）
+    # 选择「按新版本继续」以后，后续的模型请求与裁决照常记录新版本（总体架构第 3 节）
     _system, _project_id, run_id = _unfinished_run(data_dir)
     _older_definitions_version(data_dir)
 
@@ -328,7 +328,7 @@ def test_stopping_on_a_changed_definitions_version_ends_the_run(data_dir):
     restarted.close()
 
 def test_credentials_are_resolved_from_the_host_again_and_not_written_into_events(data_dir):
-    # 凭据按原引用从宿主重新解析、不写入事件与工件；缺失时说明缺哪一项（ADR-0005，工单 #16）
+    # 凭据按原引用从宿主重新解析、不写入事件与工件；缺失时说明缺哪一项（模型管理设计说明第 5.4 节，工单 #16）
     secret = "host-only-secret-value"
     server, _capture, base = serve(_spec_reply())
     try:

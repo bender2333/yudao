@@ -411,7 +411,7 @@ def facade_with(base_url: str, *, protocol: str, preset_id: str = "",
 @contextmanager
 def preset_base_urls(base_url: str | Mapping[str, str], *, preset_id: str = "opencode-go",
                      models_url: str = ""):
-    # 内置服务方案的请求基址与模型列表地址都来自预置表（ADR-0033）。测试要让带服务方案的连接打到
+    # 内置服务方案的请求基址与模型列表地址都来自预置表（模型管理设计说明第 4.1 节）。测试要让带服务方案的连接打到
     # 本机上游时临时改这两项：base_url 给字符串时该方案的每个协议都用同一个地址，给按协议的字典时
     # 每个协议各用一项（不同协议的请求由不同的本机服务记录）。其余字段（认证方式、身份头、来源）保持原值
     from harness.providers import presets

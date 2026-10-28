@@ -32,7 +32,7 @@ class CatalogCredential(Contract):
 
 
 class CatalogModel(Contract):
-    # 模型访问定义；调用协议是定义自己的字段（ADR-0033）。准入记录由 catalog.admissions 单独返回（工单 #86）
+    # 模型访问定义；调用协议是定义自己的字段（模型管理设计说明第 4.3 节）。准入记录由 catalog.admissions 单独返回（工单 #86）
     id: str
     provider_id: str
     model: str

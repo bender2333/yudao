@@ -1,4 +1,4 @@
-# 模型能力表（工单 #146，设计说明第 4.1 节、ADR-0003）：提取脚本的取材规则与运行时访问。
+# 模型能力表（工单 #146，模型管理设计说明第 4.1 节）：提取脚本的取材规则与运行时访问。
 # 提取脚本用仓库内的真实数据 fixtures（harness/tests/data/models_dev_snapshot.json，
 # 从 models.dev 的 api.json 裁剪，含一个未被任何预置服务方案引用的 provider）；不使用假数据。
 

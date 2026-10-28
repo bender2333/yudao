@@ -1,7 +1,7 @@
 // 像素画登记表：由 scripts/generate-pixel-registry.mjs 从冻结的原型 v13（y13.js、pixel/sprites.js、
 // pixel/engine.js）导出生成（工单 #176、#956）。
 // 本文件只做类型化再导出与常量，不重复登记数据；改画法请改生成脚本并 `npm run generate:pixel`。
-// v13 起 engine.js 不再有事件对照表（EVENT_ACTIONS、resolveAction）：事件翻成动作写在翻译层（ADR-0043）。
+// v13 起 engine.js 不再有事件对照表（EVENT_ACTIONS、resolveAction）：事件翻成动作写在翻译层（画面与播放设计说明第 6 节）。
 // 画面 3、4（#953、#954）以后没人再用的 EVENT_ACTIONS、STATUS_ACTIONS 不再从这里再导出：
 // 原型仍导出 STATUS_ACTIONS，图鉴按登记表读 registry.registries.STATUS_ACTIONS。
 

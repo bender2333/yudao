@@ -789,7 +789,7 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
     with _provider_server("provider-p", "unused", product) as (config_p, captures_p, errors_p), \
             _provider_server("provider-e", "unused", engineering) as (config_e, captures_e, errors_e), \
             _provider_server("provider-q", "unused", quality) as (config_q, captures_q, errors_q):
-        # 三条连接都带服务方案：请求基址按各自访问定义的协议取自预置表（ADR-0033），
+        # 三条连接都带服务方案：请求基址按各自访问定义的协议取自预置表（模型管理设计说明第 4.2 节），
         # 测试把预置表中这三种协议的基址分别指向各自部门的本机上游
         with preset_base_urls({"messages": config_p.base_url,
                                "chat_completions": config_e.base_url,
