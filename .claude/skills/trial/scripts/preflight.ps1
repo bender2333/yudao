@@ -48,6 +48,9 @@ Add-Row '分支与提交' "$branch @ $commit" '信息'
 Add-Row '工作区' $dirtyText ($(if ($dirty) { '警告' } else { '通过' })) '发布包要求工作区干净；有改动时先提交或另用干净克隆'
 
 # 2. 工具
+# python 用 uv 起的解释器也算：这台机器上裸 python 是 Microsoft Store 的占位程序，
+# 项目里所有 Python 命令都经 `uv run`，所以有 uv 就算通过（2026-10-29 实测）
+$uvOk = [bool](Get-ToolVersion 'uv' @('--version'))
 foreach ($tool in @(
     @{ Name = 'git'; Args = @('--version') },
     @{ Name = 'python'; Args = @('--version') },
@@ -57,12 +60,16 @@ foreach ($tool in @(
     @{ Name = 'gh'; Args = @('--version') },
     @{ Name = 'omp'; Args = @('--version') })) {
   $version = Get-ToolVersion $tool.Name $tool.Args
+  if ($tool.Name -eq 'uv' -and $version) { $uvOk = $true }
   if ($version) {
     $level = '通过'
     if ($tool.Name -eq 'node' -and $version -match 'v(\d+)\.') {
       if ([int]$Matches[1] -lt 22) { $level = '阻断'; $version = "$version（发布要 22.12 以上）" }
     }
     Add-Row "工具 $($tool.Name)" $version $level
+  } elseif ($tool.Name -eq 'python' -and $uvOk) {
+    $viaUv = Get-ToolVersion 'uv' @('run', '--no-sync', 'python', '--version')
+    Add-Row '工具 python' ($(if ($viaUv) { "$viaUv（经 uv；裸 python 是占位程序）" } else { '经 uv 也起不来' })) ($(if ($viaUv) { '通过' } else { '阻断' }))
   } else {
     $level = if ($tool.Name -in @('git', 'python', 'uv', 'gh')) { '阻断' } else { '警告' }
     Add-Row "工具 $($tool.Name)" '没有找到' $level
@@ -73,11 +80,14 @@ foreach ($tool in @(
 $ghUser = (& gh api user --jq .login 2>$null)
 if ($ghUser) { Add-Row 'gh 账号' $ghUser '通过' } else { Add-Row 'gh 账号' '没有登录' '阻断' '发帖与发工单要用' }
 
-# 4. 模型与凭据（环境变量）
+# 4. 模型与凭据（环境变量；进程里没有时读用户级的那一份，与运行配置第 4 节一致）
 $baseUrl = $env:YUDAO_VISION_BASE_URL; if (-not $baseUrl) { $baseUrl = $env:YUDAO_EVAL_BASE_URL }
 $apiKey = $env:YUDAO_VISION_API_KEY; if (-not $apiKey) { $apiKey = $env:YUDAO_EVAL_API_KEY }
+$keySource = '进程'
+if (-not $apiKey) { $apiKey = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_KEY', 'User'); if ($apiKey) { $keySource = '用户级 YUDAO_EVAL_API_KEY' } }
+if (-not $baseUrl) { $baseUrl = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_BASE_URL', 'User') }
 if ($baseUrl) { Add-Row '模型服务地址' $baseUrl '通过' } else { Add-Row '模型服务地址' 'YUDAO_VISION_BASE_URL 没设' '阻断' '默认 https://9router.huiju.asia/v1，可用 --base-url 给 vision.mjs' }
-if ($apiKey) { Add-Row '凭据' "已设（长度 $($apiKey.Length)）" '通过' } else { Add-Row '凭据' 'YUDAO_VISION_API_KEY 没设' '阻断' '部门跑真实模型与 vision.mjs 看图都要用' }
+if ($apiKey) { Add-Row '凭据' "已设（长度 $($apiKey.Length)，取自 $keySource）" '通过' } else { Add-Row '凭据' 'YUDAO_VISION_API_KEY 与 YUDAO_EVAL_API_KEY 都没设（进程与用户级）' '阻断' '部门跑真实模型与 vision.mjs 看图都要用' }
 Add-Row '部门模型计划' '产品与工程 model1；质检 model2（声明图像输入）' '信息' '在页面 #/sys/models 里绑定，见技能第 3.1 节'
 
 # 5. 端口

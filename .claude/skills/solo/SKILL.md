@@ -145,7 +145,7 @@ pause | resume [--no-auto] [--wait hook|notify] | auto on|off | budget --iterati
 
 0. **读 `handoff.md`**：worktree 根目录、gh 身份、这台机器的环境坑，每轮都以它为准。
 1. **读账**：`solo.mjs state`。以文件为准，不以记忆为准。
-2. **回收停住的位置**：`state` 报「可能停住的并发位置」时，先 `solo.mjs reap`，再对每张 `solo.mjs handover --task T-004`，把「上一次做到哪」写进新任务书。被取消的子会话不等于进程已停：`handover` 会看远端分支、PR、未提交改动与没解决的 merge。
+2. **回收停住的位置**：`state` 或 `report` 报「可能停住的并发位置」时，**先查这个分支上有没有在跑的 CI 运行**：`gh run list --branch issue-<编号> --limit 3 --json status,conclusion,workflowName`。集成层一趟 15 到 45 分钟，正在跑的那一趟会让最后一次提交看起来静止，`reap` 一用就会留下两个活着的工人写同一个 worktree（2026-10-29 在 #1162 上发生过：原工人其实在等一趟挂住的集成层，被误判成卡住）。提交静止、这个分支上没有在跑的运行、PR 上的检查也不在 `in_progress`，三样都成立才 `reap`；否则下一轮再看。回收以后对每张 `solo.mjs handover --task T-004`，把「上一次做到哪」写进新任务书。被取消的子会话不等于进程已停：`handover` 会看远端分支、PR、未提交改动与没解决的 merge；原工人可能还活着，任务书里写明「若发现已被别人合并，只留一行说明、不要提交」。
 3. **刷新**：`solo.mjs refresh`。关掉的标完成，交回的标 `[~]`，等条件的标 waiting，别人领走的记成 `external`；**我们自己的 `in-progress` / `needs-review` 记成「待续」，不会当成别人的**。
    刷新也会报「同时带多个流程标签」：一张工单挂两个流程标签时，`claim` 只会顺手修，之前没人发现。
 4. **对账**：`solo.mjs sync`。看外部有没有台账没覆盖的、标签对不对、有没有已经离开范围的。报「外部 0 张」时先怀疑 `scope` 过期（里程碑改过名）。
