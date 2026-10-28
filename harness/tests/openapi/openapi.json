@@ -16932,6 +16932,17 @@
             "title": "Output Reserve Tokens",
             "type": "integer"
           },
+          "previous_usage_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Usage Tokens"
+          },
           "parts_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
           },

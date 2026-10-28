@@ -384,6 +384,8 @@ class ContextAssembledPayload(Versions, WorkBasis, CallTarget):
     compaction_event_id: str | None
     input_token_estimate: int
     output_reserve_tokens: int
+    # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量（模型管理设计说明第 8.2 节）
+    previous_usage_tokens: int | None = None
     parts_ref: ArtifactRef
     run_id: str
     tokens_charged: int

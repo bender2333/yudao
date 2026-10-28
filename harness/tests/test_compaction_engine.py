@@ -9,7 +9,7 @@ from harness.definitions import DEFINITIONS
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.engine import StepLimits
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
-from harness.providers.call import ModelResponse, ModelStreamEvent
+from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (
     FAST_RETRIES,
@@ -579,6 +579,46 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
     for event in tool_results:
         assert event.payload["effective_contract_hash"] == contract
     assert second.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_reported_upstream_usage_triggers_compaction_when_the_local_estimate_does_not(tmp_path):
+    """上一次工作请求上游回报的用量超过压缩阈值、本地估算没有超过：下一步先发出整理请求；
+    压缩以后历史换成摘要，不再因为压缩之前的回报用量重复压缩（设计说明第 8.2 节、第 8.4 节）。"""
+    window = {}
+    work_counts = {}
+
+    def respond(request):
+        if request.purpose == "compaction":
+            return ModelResponse(output=[_message(request)])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        if count == 0:
+            # 上游回报：这次请求用满了窗口；本地估算远低于阈值（只读了小文件）
+            return _read(request, "small.txt").model_copy(
+                update={"usage": CallUsage(input_tokens=window["value"], reported=True)})
+        return product_spec()
+
+    adapter = FakeAdapter({"product": [respond] * 200})
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
+    measure_id = system.create_run("Original intent", context_window=1_000_000)
+    window["value"] = pinned_input_tokens(system, measure_id) + 1600
+    run_id = system.create_run("Original intent", context_window=window["value"])
+    system.workspace(run_id).write_file("small.txt", "SMALL_TOOL_OUTPUT " * 4)
+    result = system.activate_once(run_id)
+
+    product = [request for request in adapter.invocations if request.department == "product"]
+    assert [request.purpose for request in product] == ["work", "compaction", "work"]
+    assert result.compactions and result.product_spec is not None
+    # 请求事件记下判断用的两项数值：本地估算与上一次工作请求的上游回报用量
+    assembled = [event.payload for event in system.store.list_events(run_id)
+                 if event.type == EventType.CONTEXT_ASSEMBLED and event.department == "product"]
+    assert assembled[0]["previous_usage_tokens"] is None
+    assert assembled[1]["purpose"] == "compaction"
+    assert assembled[1]["previous_usage_tokens"] == window["value"]
+    assert assembled[1]["input_token_estimate"] < window["value"] * 85 // 100
+    # 压缩以后这一步只用本地估算：压缩之前的回报用量不再算进来
+    assert assembled[2]["purpose"] == "work" and assembled[2]["previous_usage_tokens"] is None
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
 def test_repeated_empty_summaries_stop_the_run_with_compaction_failed(tmp_path):
