@@ -569,7 +569,7 @@ def _audit_compaction_output(event: Any, artifacts: ArtifactStore, audit: dict[s
             if part.get("type") != "output_text" or not isinstance(part.get("text"), str):
                 raise ValueError("compaction output contains non-summary content")
             paragraphs.append(part["text"])
-    if not summary or summary != "\n".join(paragraphs).strip() or (len(summary) + 3) // 4 > limit:
+    if not summary or summary != "\n".join(paragraphs).strip() or estimate_tokens(summary) > limit:
         raise ValueError("summary artifact does not match the bounded model output")
     expected = {**audit["next_checkpoint"], "summary": summary}
     if payload["checkpoint"] != expected:
@@ -944,6 +944,8 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 if request != expected.payload:
                     raise ValueError("model request differs from the request rebuilt from the recorded events")
                 if (payload.get("input_token_estimate") != expected.input_token_estimate
+                        or payload.get("previous_usage_tokens", expected.previous_usage_tokens)
+                        != expected.previous_usage_tokens
                         or payload.get("token_estimate") != manifest.token_estimate
                         or payload.get("output_reserve_tokens") != expected.output_reserve_tokens
                         or payload.get("budget") != limits.context_window
