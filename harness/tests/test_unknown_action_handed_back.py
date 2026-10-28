@@ -90,21 +90,27 @@ def test_a_killed_bash_is_handed_back_to_model(tmp_path):
                             started=signals / "started") as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
 
-        started = [
-            e.payload
+        started_events = [
+            e
             for e in killed.events(run.after, run.run_id, "tool_started")
             if (e.payload or {}).get("id") == "call-bash"
         ]
-        assert len(started) == 1
+        assert len(started_events) == 1
+        started = [event.payload for event in started_events]
 
-        verified = [
-            e.payload
+        verified_events = [
+            e
             for e in killed.events(run.after, run.run_id, "action_verified")
             if (e.payload or {}).get("id") == "call-bash"
         ]
-        assert len(verified) == 1
+        assert len(verified_events) == 1
+        verified = [event.payload for event in verified_events]
         assert verified[0]["resolution"] == "handed_back"
         assert verified[0]["ok"] is False
+        # 交还的是发出这个动作的那个会话（工单 #475）：核实记录带着这个会话的编号
+        session = started_events[0].session_id
+        assert session, "动作没有记下发出它的会话"
+        assert verified_events[0].session_id == session
         assert verified[0]["activation_id"] == started[0]["activation_id"]
         assert verified[0]["step_id"] == started[0]["step_id"]
         assert verified[0]["activation_id"] is not None
@@ -267,6 +273,22 @@ def test_d_file_action_completed_receives_confirmed_result(tmp_path):
         output_data = json.loads(output_item["output"])
         assert output_data["ok"] is True
         assert output_data["output"]["resolved"] == "auto_verify"
+        # 核实记录与动作状态（工单 #308 的验收二：原来由 test_issue_308 的同结论用例断言）
+        actions = [
+            action
+            for action in killed.run_actions(run.after, run.run_id)
+            if action.action_id == "call-write"
+        ]
+        assert [action.status for action in actions] == ["completed"]
+
+        records = [
+            record
+            for record in killed.run_recovery(run.after, run.run_id).verifications
+            if record.action_id == "call-write"
+        ]
+        assert len(records) == 1
+        assert records[0].basis == "自动核实（已完成）"
+        assert records[0].decided_by == "system"
 
 
 def test_d_file_action_not_happened_receives_handed_back(tmp_path):
@@ -288,6 +310,11 @@ def test_d_file_action_not_happened_receives_handed_back(tmp_path):
                                                      "quality": [{"proposal": {"kind": "quality_auto"}}]},
                             hold_after="tool_started", hold_action="call-write") as run:
         assert killed.unknown_action_requests(run.after, run.run_id) == []
+
+        # 原来那一次尝试没有回执，恢复也没有补出第二次尝试（工单 #581：不再自动重新执行）
+        attempts = killed.tool_attempts(run.after, run.run_id, "call-write")
+        assert len(attempts) == 1, "没有发生时交还发出它的会话，不再自动重新执行"
+        assert attempts[0]["result_type"] is None
 
         started = [
             e.payload
