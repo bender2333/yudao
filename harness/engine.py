@@ -100,9 +100,11 @@ class _Unassembled:
 
 @dataclass(frozen=True)
 class _CompactionOutcome:
-    # 一次压缩的结果：没有推进时的原因（推进时为空），以及这次压缩覆盖的范围摘要
+    # 一次压缩的结果：没有推进时的原因（推进时为空）、这次压缩覆盖的范围摘要，
+    # 以及整理请求自己失败时要做的处理——这一步的工作请求按未压缩的历史照常发出，下一步再次整理（工单 #1155）
     stalled: str | None = None
     covered_digest: str | None = None
+    retry_as_work: bool = False
 
 
 class _LiveScope:
@@ -239,6 +241,8 @@ class StepDriver:
         self._compaction_reason = ""
         self._compaction_coverage: str | None = None
         self._compaction_contract: str | None = None
+        # 整理请求刚失败过：这一步的请求按未压缩的历史装配，不另发整理请求；工作请求装配好以后清掉（工单 #1155）
+        self._compaction_deferred = False
 
     @property
     def scope(self) -> ActivationScope:
@@ -397,7 +401,11 @@ class StepDriver:
                 _validate_response(response)
                 request.attempt_finished_monotonic = time.monotonic()
                 undeclared = _undeclared_tool_calls(request, response)
-                if undeclared:
+                # 整理请求没有声明工具、回应里却带了工具调用：回应里有文字时，文字照常经校验作为整理结果，
+                # 工具调用不执行、不进入有效历史（工单 #1155，设计说明第 8.7 节）
+                summary_with_tool_calls = bool(undeclared) and request.purpose == "compaction" \
+                    and _text_reply(response)
+                if undeclared and not summary_with_tool_calls:
                     # Provider-side corruption: tool calls arrived although the request declared no
                     # tools. Keep the output as audit evidence (failed steps never enter effective
                     # history) and treat the attempt as a retryable failure; nothing executes.
@@ -433,6 +441,17 @@ class StepDriver:
                             "department reached the model step limit during provider retries",
                             reason="model_steps_exhausted",
                         ) from retry_error
+                    if request.purpose == "compaction" and retry_error.reason == "compaction_failed":
+                        # 整理请求失败（尝试次数用完）：这一次压缩不生效，不写检查点。这一步的工作请求按
+                        # 未压缩的历史照常发送，下一步再次尝试压缩；连续没有推进的次数达到上限时在这里
+                        # 以压缩失败停止（设计说明第 8.7 节，工单 #1155）
+                        self._compaction_request_failed(f"整理请求失败：{retry_error}")
+                        self._compaction_deferred = True
+                        attempt = 1
+                        root_step_id = step_id + 1
+                        retry_of_step_id = None
+                        self._release_call()
+                        continue
                     diagnostics = dict(retry_error.diagnostics or {})
                     diagnostics.update(attempts=attempt, max_attempts=limits.max_provider_attempts)
                     raise ProviderError(
@@ -449,8 +468,10 @@ class StepDriver:
                 continue
             try:
                 # 截断流产生的无效参数不得进入有效历史，否则下次回放即被上游拒绝；
-                # 工具循环仍用原始输出，保证具体参数错误回传模型且不启动工具
-                self._recorder.response(request, _sanitized_response(response))
+                # 工具循环仍用原始输出，保证具体参数错误回传模型且不启动工具。
+                # 整理请求的回应带未声明的工具调用时原样记录：丢掉了哪些工具调用要能从事件里查到（工单 #1155）
+                self._recorder.response(request, response if summary_with_tool_calls
+                                        else _sanitized_response(response))
             except Exception as exc:
                 host_error = ProviderError(
                     f"model observation persistence failed: {type(exc).__name__}",
@@ -464,6 +485,8 @@ class StepDriver:
             attempt = 1
             root_step_id = step_id + 1
             retry_of_step_id = None
+            # 上一次整理请求失败换来的这一次工作请求已经发出去了：下一步重新排整理请求（工单 #1155）
+            self._compaction_deferred = False
             # 这次逻辑调用成功，凭据材料不再保留；下一次逻辑调用重新解析
             self._release_call()
             if not self._proceed().proceed:
@@ -471,7 +494,11 @@ class StepDriver:
                            "Not executed because this activation ended or its input changed during the model request.")
                 return RoundResult(version=self._version)
             if request.purpose == "compaction":
-                self._finish_compaction(request, response)
+                outcome = self._finish_compaction(request, response)
+                if outcome is not None and outcome.retry_as_work:
+                    # 整理请求自己失败：这一次压缩不生效，不写检查点。这一步的工作请求按未压缩的历史
+                    # 照常发送（放不进窗口时装配那一步以 context_overflow 结束），下一步再次尝试压缩
+                    self._compaction_deferred = True
                 continue
             if not any(item.get("type") == "function_call" for item in response.output):
                 # 这一轮只有指导、没有要做的工作：文字回复就是对用户的回答，这一轮在这里正常结束。
@@ -787,6 +814,8 @@ class StepDriver:
             unavailable = self._begin_call()
             if unavailable is not None:
                 return unavailable
+        # 上一步的整理请求失败过：这一步不另发整理请求，按未压缩的历史装配工作请求（工单 #1155）
+        deferred = self._compaction_deferred
 
         def prepare(transaction: Transaction) -> tuple[ModelRequest, StepRequest] | _Unassembled | None:
             projection = transaction.projection
@@ -811,11 +840,15 @@ class StepDriver:
                 self._recorder.department_input(transaction, step_id, department_input)
             history = self._assembly.department_history(transaction.events(), scope.department, session_id=scope.session_id)
             try:
-                step = self._assembly.request(pinned, history)
+                step = self._assembly.request(pinned, history, defer_compaction=deferred)
             except UnrepresentableWorkspace as exc:
                 return _Unassembled("workspace_unrepresentable", exc)
-            except (CompactionError, ValueError, FileNotFoundError) as exc:
+            except CompactionError as exc:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
+            except (ValueError, FileNotFoundError) as exc:
+                # 按未压缩的历史装配工作请求时放不下：按上下文超限结束（设计说明第 8.7 节，工单 #1155）
+                return _Unassembled("context_overflow" if (deferred or pinned.fills_window)
+                                    else "compaction_failed", exc)
             assembled = step.context
             # 用户追加的输入在这个会话的下一步作为通知送达（工单 #964，循环结构第 5 节与第 6 节）：
             # 这个会话采用新的输入版本并接着工作，一轮工作不因此结束。
@@ -905,7 +938,11 @@ class StepDriver:
 
         return self._writes.transact(self._stream, schedule)
 
-    def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> None:
+    def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> _CompactionOutcome | None:
+        # 整理请求的回答生成检查点。请求没有声明工具，回应里的工具调用不执行、不进入有效历史；
+        # 文字才经 finish_compaction 校验（工单 #1155）
+        summary_items = [item for item in response.output if item.get("type") != "function_call"]
+
         def finish(transaction: Transaction) -> _CompactionOutcome | None:
             # 压缩请求的回答生成检查点。这次压缩不生效或者覆盖范围没有往前走时，
             # 结果里写明没有推进的原因；连续没有推进的次数由调用方在事务提交以后判断
@@ -914,9 +951,11 @@ class StepDriver:
             if projection.status in TERMINAL_STATUSES or self._cancelled.is_set():
                 return None
             try:
-                result = self._assembly.finish_compaction(self._step, response.output)
+                result = self._assembly.finish_compaction(self._step, summary_items)
             except CompactionError as exc:
-                raise ProviderError(str(exc), reason="compaction_failed") from exc
+                # 回应不是摘要文字：这一次压缩不生效，不写检查点。这一步的工作请求按未压缩的历史照常
+                # 发送，下一次再整理；与「整理不生效」计入同一个连续不推进的次数（工单 #1155）
+                return _CompactionOutcome(stalled=f"整理没有通过校验：{exc}", retry_as_work=True)
             if result is None:
                 # 摘要为空或超过上限：这次压缩不生效，下一步还会再压同一段历史
                 return _CompactionOutcome(stalled="整理没有生效：摘要为空或超过上限")
@@ -927,11 +966,20 @@ class StepDriver:
         message = self._advance_compaction(outcome)
         if message is not None:
             raise ProviderError(message, reason="compaction_failed")
+        return outcome
+
+    def _compaction_request_failed(self, reason: str) -> None:
+        # 整理请求自己失败（尝试次数用完）：这一次压缩不生效，不写检查点。它与「整理不生效」「覆盖范围
+        # 没有往前走」计入同一个连续不推进的次数，达到上限时以压缩失败停止（设计说明第 8.7 节，工单 #1155）
+        message = self._advance_compaction(_CompactionOutcome(stalled=reason, retry_as_work=True))
+        if message is not None:
+            raise ProviderError(message, reason="compaction_failed")
 
     def _advance_compaction(self, outcome: _CompactionOutcome | None) -> str | None:
         # 压缩连续没有推进时计数，达到上限就以压缩失败停止（设计说明第 8.7 节，工单 #840）。
-        # 没有推进有两种：整理不生效（摘要为空或超过上限），或者这一次压缩的覆盖范围与上一次相同
-        # （下一次压缩没有被上一次接上）。合同变了以后检查点作废、从原始记录重建是现在的行为，不算没有推进。
+        # 没有推进有三种：整理请求自己失败（尝试次数用完，或回应不是摘要文字），整理不生效
+        # （摘要为空或超过上限），或者这一次压缩的覆盖范围与上一次相同（下一次压缩没有被上一次接上）。
+        # 合同变了以后检查点作废、从原始记录重建是现在的行为，不算没有推进。
         # 返回停止说明（写明连续的次数与最后一次的原因），没有达到上限时返回空
         if outcome is None:
             return None
