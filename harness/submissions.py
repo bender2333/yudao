@@ -44,7 +44,7 @@ _MULTIPLE_KINDS = frozenset({"product_decision"})
 REVIEW_KIND = "qa_review"
 REWORK_VERDICT = "rework_engineering"
 # 成果记下的树摘要：交付记代码树、建档记快照的树；没有这一项的成果不带
-_TREE_FIELDS = ("code_tree_digest", "code_snapshot_hash")
+_TREE_FIELDS = ("code_tree_digest", "code_snapshot_hash", "tree_digest")
 
 
 def acceptance_fields(kind: str, artifact: dict[str, Any], *, version: int,
@@ -121,6 +121,18 @@ def render_prd(projection: RunProjection, contract: dict[str, Any]) -> str:
             if not spec.change_record[field]:
                 lines.append("None.")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def generic_acceptance(artifact: dict[str, Any], *,
+                       tree_digest: str | None = None) -> tuple[str, dict[str, Any], list[str]]:
+    # 通用种类的接纳事件（S2c，工单 #1098）：内容就是收紧检查给出的那一份，再盖上统一字段
+    # （种类、版本、依据、作者部门、记下的树摘要）。内核不认识这一类成果的内容，最小投影按统一字段折叠；
+    # 记下的树摘要由接纳时的工作区快照给出——成果的内容里带了自己的树摘要时用它
+    artifact["id"] = new_id("artifact")
+    if tree_digest and not artifact.get("tree_digest"):
+        artifact["tree_digest"] = tree_digest
+    artifact.update(acceptance_fields(str(artifact["kind"]), artifact, version=int(artifact["revision"])))
+    return EventType.ARTIFACT_ACCEPTED, artifact, [artifact["content_hash"]]
 
 
 def invalidation(current: RunProjection, reason: str) -> tuple[str, dict[str, Any]] | None:
@@ -270,7 +282,10 @@ class SubmissionWriter:
                 # 建档事项的工程部门没有提交交付的工具，这一刻通常没有当前交付，也就不记事件
                 invalidate("baseline_rework_product")
         else:
-            raise ValueError(f"unhandled artifact kind {kind}")
+            # 新种类的成果写一种通用的接纳事件（S2c，工单 #1098，设计说明第 5.5 节）：载荷是收紧检查给出的
+            # 内容加统一字段。材料文件、Git 版本与 PRD 渲染这些附带写入仍按上面的种类做，
+            # 通用种类只写这一条事件
+            event = append(*generic_acceptance(artifact, tree_digest=snapshot.digest))
 
         if kind in {"product_spec", "product_decision"}:
             contract = contract_payload(current)

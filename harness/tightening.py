@@ -10,15 +10,25 @@
 #   - 按 PRD 内容的检查：每条要求覆盖一次、有效决定逐条保留或退役、「设计中，未实施」的边界不是现有缺陷。
 # 它不能放行内核已经拒绝的东西：内核先判，这里只收窄。换一份收紧检查（另一种路由）时整体换掉这一份，
 # 内核不改。
+#
+# S2c（工单 #1098）：六种成果驱动的形状检查（原 validation.py 的 _validate_schema）与成果内容的组装也在这里。
+# 通过时 submission 一并给出成果的内容（Tightened.content），内核在它之外盖统一字段、算内容摘要、写接纳事件；
+# 路由不组装的种类不给内容，内核按提案的参数当内容写通用的接纳事件。
 
 from __future__ import annotations
 
+from typing import Any
+
+from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .watched_outputs import has_new_work, is_working
-from .models import DEPARTMENTS, TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
-from .tools import offers_with_input, proposal_kind, proposal_kinds, tool_action, tools_for
+from .contracts import normalize_scope
+from .definitions import Definitions
+from .kernel_events import BASELINE_STATUSES, QA_VERDICTS
+from .models import TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
+from .tools import in_force, offers_with_input, proposal_kind, proposal_kinds, tool_action, tools_for
 from . import tightening_contract
-from .validation import FieldError, TightenRequest, Tightened
+from .validation import ConditionOutcome, FieldError, TightenRequest, Tightened, evaluate_conditions
 
 # 建档时写进边界条目的标记（工单 #346）：这条边界是设计里描述、代码尚未实现的能力，
 # 不是现有行为，质检的结论不能把它记成 existing_defect
@@ -92,25 +102,31 @@ def _covers_marked_boundary(requirement: str, spec: ProductSpec | None) -> bool:
                for item in marked_boundaries(spec))
 
 
-def allowed_proposal_kinds(projection: RunProjection, department: str) -> set[str]:
-    # 部门此刻能提交的提案种类：正在工作的部门、或者有新工作可以开始的部门，按调度算出来的种类
-    if projection.status in TERMINAL_STATUSES or department not in DEPARTMENTS:
+def allowed_proposal_kinds(projection: RunProjection, department: str,
+                           *, definitions: Definitions | None = None) -> set[str]:
+    # 部门此刻能提交的提案种类：正在工作的部门、或者有新工作可以开始的部门，按调度算出来的种类。
+    # 部门与种类都按交进来的那份定义算（工单 #1098）：事项所用定义里的部门与提案种类，
+    # 不是模块加载时的那一份
+    definition = in_force(definitions)
+    if projection.status in TERMINAL_STATUSES or department not in definition.departments:
         return set()
     if is_working(projection, department) or has_new_work(projection, department):
-        return proposal_kinds(department, projection.kind)
+        return proposal_kinds(department, projection.kind, definitions=definition)
     return set()
 
 
-def tool_error(projection: RunProjection, department: str, name: str, args: dict[str, object]) -> str | None:
-    # 这个工具是不是这个部门此刻能做的提交
-    kind = proposal_kind(name)
-    if kind is not None and kind not in allowed_proposal_kinds(projection, department):
+def tool_error(projection: RunProjection, department: str, name: str, args: dict[str, object],
+               *, definitions: Definitions | None = None) -> str | None:
+    # 这个工具是不是这个部门此刻能做的提交；「这个工具提交的是提案」也按事项所用的那份定义判（工单 #1098）
+    kind = proposal_kind(name, definitions=definitions)
+    if kind is not None and kind not in allowed_proposal_kinds(projection, department,
+                                                              definitions=definitions):
         return "This proposal is not permitted in the current department work."
     return None
 
 
-def _is_write(name: str) -> bool:
-    return tool_action(name) == "write"
+def _is_write(name: str, definitions: Definitions | None = None) -> bool:
+    return tool_action(name, definitions=definitions) == "write"
 
 
 def _is_release_submission(department: str, name: str, args: dict[str, object]) -> bool:
@@ -126,7 +142,7 @@ class WatchedOutputsTightening:
         # 这个部门此刻能提交的提案种类。产品在回答一次询问时可以修订 PRD（循环结构第 4.3 节）；
         # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着产品回答
         projection, department = request.state, request.department
-        allowed = allowed_proposal_kinds(projection, department)
+        allowed = allowed_proposal_kinds(projection, department, definitions=request.definitions)
         if department == "product" and any(ask.get("recipient") == "product" for ask in projection.ask_stack):
             allowed = allowed | {"product_spec"}
         return allowed
@@ -134,7 +150,8 @@ class WatchedOutputsTightening:
     def offered(self, request: TightenRequest) -> list[str]:
         # 请求中提供给模型的工具：按这一轮的工作与询问分支取舍，再按调用目标的输入方式去掉需要图像输入的工具
         projection, department = request.state, request.department
-        available = tools_for(department, projection.kind)
+        definitions = request.definitions
+        available = tools_for(department, projection.kind, definitions=definitions)
         if projection.ask_by_branch(request.session_id) is not None:
             # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案（工单 #473）
             chain_allowed, _ = ask_chain_decision(projection.ask_position(request.session_id), ask_chain_max_depth())
@@ -142,29 +159,31 @@ class WatchedOutputsTightening:
             if department == "product":
                 return ["answer"] + nested
             allowed = [name for name in available
-                       if name != "ask" and not _is_write(name) and proposal_kind(name) is None]
+                       if name != "ask" and not _is_write(name, definitions)
+                       and proposal_kind(name, definitions=definitions) is None]
             return allowed + ["answer"] + nested
-        result = [name for name in offers_with_input(available, request.input_modalities)
-                  if tool_error(projection, department, name, {}) is None]
+        result = [name for name in offers_with_input(available, request.input_modalities, definitions=definitions)
+                  if tool_error(projection, department, name, {}, definitions=definitions) is None]
         return result
 
     def tool(self, request: TightenRequest) -> Tightened:
         # 一次工具调用的收紧检查：输入版本、询问分支、部门此刻能交的种类、放行等输入处理完
         projection, department = request.state, request.department
+        definitions = request.definitions
         call = request.tool or {}
         name = call.get("name")
         args = call.get("args") or {}
-        if proposal_kind(name) is not None and request.basis is not None \
+        if proposal_kind(name, definitions=definitions) is not None and request.basis is not None \
                 and projection.input_version != request.basis.input_version:
             # 正式成果要等模型看见新输入以后再提交（工单 #964）：模型还没有看到这条输入，这次提交推迟到下一步
             return Tightened(reason=(
                 "new user input arrived and has not entered this session's model input yet; "
                 "this proposal is not accepted now. Read the work_notification of the next step, then submit again"
             ), deferred=True)
-        branch = self._branch_permission(projection, request.session_id, department, name)
+        branch = self._branch_permission(projection, request.session_id, department, name, definitions)
         if branch is not None:
             return branch
-        reason = tool_error(projection, department, name, args)
+        reason = tool_error(projection, department, name, args, definitions=definitions)
         if reason:
             return Tightened(reason=reason)
         # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：还有没处理完的输入时，
@@ -175,24 +194,8 @@ class WatchedOutputsTightening:
             return Tightened(wait=True)
         return Tightened()
 
-    def submission(self, request: TightenRequest) -> Tightened:
-
-        # 一次提案提交的收紧检查：按提案的种类分开检查，读的都是成果的当前内容与应用状态
-        proposal = request.proposal
-        if not isinstance(proposal, dict):
-            return Tightened()
-        if proposal.get("kind") == "product_spec":
-            return self._product_spec(request)
-        if proposal.get("kind") == "qa_review":
-            return self._review(request)
-        if proposal.get("kind") == "structure":
-            return self._structure(request)
-        if proposal.get("kind") == "baseline_review":
-            return self._baseline_review(request)
-        return Tightened()
-
     def _branch_permission(self, projection: RunProjection, session_id: str | None, department: str,
-                           name: str) -> Tightened | None:
+                           name: str, definitions: Definitions | None = None) -> Tightened | None:
         # 分支会话的许可按会话判定：这个会话是不是某个询问的分支（工单 #473 的嵌套询问）。
         # 同一个部门的主线会话与分支会话是两回事，只有分支会话受分支的约束。
         if projection.ask_by_branch(session_id) is None:
@@ -210,99 +213,639 @@ class WatchedOutputsTightening:
             return None if allowed else Tightened(reason=reason)
         if department == "product":
             return Tightened(reason=PRODUCT_BRANCH_ANSWER_ONLY)
-        if _is_write(name):
+        if _is_write(name, definitions):
             return Tightened(reason=BRANCH_CANNOT_WRITE)
         if name == "submit_delivery":
             return Tightened(reason=BRANCH_CANNOT_DELIVER)
         if name == "submit_review":
             return Tightened(reason=BRANCH_CANNOT_REVIEW)
-        if proposal_kind(name) is not None:
+        if proposal_kind(name, definitions=definitions) is not None:
             return Tightened(reason=f"The branch session cannot submit proposal {name}")
         return None
 
+    # 这一版路由自己组装的成果种类：其余种类（第二种路由带来的新种类）只按提案的参数当内容，
+    # 形状由带它来的那份定义给出，这里不判（S2c，工单 #1098，设计说明第 5.5 节）
+    BUILDERS = {
+        "product_spec": "_product_spec",
+        "product_decision": "_product_decision",
+        "delivery_spec": "_delivery",
+        "qa_review": "_review",
+        "structure": "_structure",
+        "baseline_review": "_baseline_review",
+    }
+
+    def submission(self, request: TightenRequest) -> Tightened:
+        # 一次提案提交的检查与内容组装（S2c，工单 #1098，设计说明第 5.5 节「成果的内容由路由组装」）：
+        # 先按种类查提案的形状，再按成果的内容判、把成果的内容组装出来。路由不组装的种类不给内容——
+        # 内核按提案的参数当内容，照常写通用的接纳事件。内核不再按成果种类写分支
+        proposal = request.proposal
+        if not isinstance(proposal, dict):
+            return Tightened()
+        name = self.BUILDERS.get(str(proposal.get("kind")))
+        if name is None:
+            return Tightened()
+        errors = _schema_errors(str(proposal.get("kind")), proposal)
+        if errors:
+            return Tightened(errors=tuple(errors))
+        return getattr(self, name)(request)
+
+    def _conditions(self, kind: str, request: TightenRequest) -> ConditionOutcome:
+        # 提案合同里的通用条件：条件是内核的数据与核对（evaluate_conditions），由这里在需要的地方问一次，
+        # 结果既是拒绝的理由，也是组装内容时要用的检查回执（设计说明第 5.5 节）
+        return evaluate_conditions(kind, department=request.department, proposal=request.proposal or {},
+                                   minimal=request.minimal, facts=request.facts,
+                                   definitions=request.definitions)
+
     def _product_spec(self, request: TightenRequest) -> Tightened:
-        # 输入版本、修订说明、有效决定逐条处置：PRD 是读内容才能判断的对象（设计说明第 5.5 节）
+        # 输入版本、修订说明、有效决定逐条处置都是成果驱动的检查：PRD 是读内容才能判断的对象（第 5.5 节）。
+        # 输入版本最先判（新输入还没进产品这一轮时只报这一条），修订说明与有效决定排在通用条件之后，
+        # 与搬动以前各条报错的先后一致。输入版本是成果的内容，不进最小投影，由这里并进内容给回（S1d）
         projection = request.state
         proposal = request.proposal or {}
-        errors: list[FieldError] = []
         if projection.input_version != projection.product_work_input_version:
-            errors.append(FieldError("input_version",
-                                     "new user input must enter product work before requirements can be accepted"))
-        elif projection.product_spec is not None and proposal.get("change_record") is None:
+            return Tightened(errors=(FieldError(
+                "input_version", "new user input must enter product work before requirements can be accepted"),))
+        outcome = self._conditions("product_spec", request)
+        if outcome.errors:
+            return Tightened(errors=tuple(outcome.errors))
+        errors: list[FieldError] = []
+        if projection.product_spec is not None and proposal.get("change_record") is None:
             errors.append(FieldError("change_record", "a revised ProductSpec must explain changed, retained, and retired "
                                                       "behavior and its rationale"))
+        # 有效决定逐条处置：每条当前有效的决定都要在这一版里明确保留、并入或退役一次
         active_hashes = {item.content_hash for item in projection.effective_decisions}
-        changes = proposal.get("decision_changes", [])
-        declared = [item["decision_hash"] for item in changes]
+        declared = [item["decision_hash"] for item in proposal.get("decision_changes", [])]
         if set(declared) != active_hashes or len(declared) != len(active_hashes):
             errors.append(FieldError("decision_changes", "explicitly retain, integrate, or retire every current product "
                                                           "decision exactly once"))
-        # 输入版本是成果的内容，不进最小投影：内核组装 PRD 的内容时需要它，通过这里一并给回（S1d，工单 #860）
-        return Tightened(errors=tuple(errors), facts={"input_version": projection.input_version})
-
-    def _review(self, request: TightenRequest) -> Tightened:
-        # 质检的结论是对当前交付的核验：探索轮没有交付，提交结论被拒绝；放行要用当前的质检测试材料；
-        # 提交事务里再判一次输入有没有处理完（工具许可之后、提交之前新输入到达，工单 #561）
-        projection = request.state
-        errors: list[FieldError] = []
-        if projection.department_bases.get("quality") is not None \
-                and projection.department_delivery_bases.get("quality") is None:
-            errors.append(FieldError("delivery_spec", "this work has no delivery to review"))
         if errors:
             return Tightened(errors=tuple(errors))
-        if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in request.evidence):
-            errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
-        if request.commit and (request.proposal or {}).get("verdict") == "release" \
-                and pending_product_input(projection, list(request.events)):
+        # PRD 被接纳以后由关注的成果决定下一个谁工作（工单 #556）：这里不再写阶段迁移
+        return Tightened(content={**_product_payload(proposal), "input_version": int(projection.input_version)})
+
+    def _product_decision(self, request: TightenRequest) -> Tightened:
+        if request.minimal.artifact("product_spec") is None:
+            return Tightened(errors=(FieldError(
+                "product_spec", "a product decision requires an active ProductSpec"),))
+        outcome = self._conditions("product_decision", request)
+        if outcome.errors:
+            return Tightened(errors=tuple(outcome.errors))
+        # 产品决定按内容去重：内容与摘要都由通用条件给出，内核不重算（工单 #1098）
+        return Tightened(content=dict(outcome.content or {}), content_hash=outcome.content_hash)
+
+    def _delivery(self, request: TightenRequest) -> Tightened:
+        minimal, facts = request.minimal, request.facts
+        proposal = request.proposal or {}
+        spec_hash = minimal.artifact_hash("product_spec")
+        if spec_hash is None:
+            return Tightened(errors=(FieldError("product_spec", "no active ProductSpec"),))
+        contract_hash = minimal.artifact_hash("contract")
+        if contract_hash is None:
+            return Tightened(errors=(FieldError(
+                "effective_contract", "delivery requires a current effective contract"),))
+        # 依据版本与检查回执由合同里的通用条件核对：绑定当前 ProductSpec 与合同、来自这一轮
+        outcome = self._conditions("delivery_spec", request)
+        if outcome.errors:
+            return Tightened(errors=tuple(outcome.errors))
+        # 交付的文件清单由主机从封存的交付快照得出：公开树的全部文件，按路径排序（工单 #677）。
+        # 工程不再填清单——三份真实交付的清单只写了「这次改的那个文件」，用户按清单下载拿不全成果。
+        files = sorted(item.replace("\\", "/") for item in facts.files)
+        checks = [outcome.receipts[name] for name in proposal["check_names"] if name in outcome.receipts]
+        return Tightened(content={
+            "summary": proposal["summary"].strip(),
+            "files": files,
+            "check_names": list(proposal["check_names"]),
+            "checks": checks,
+            "known_risks": [item.strip() for item in proposal.get("known_risks", [])],
+            "product_spec_hash": spec_hash,
+            "effective_contract_hash": contract_hash,
+            "code_tree_digest": facts.digest,
+        })
+
+    def _review(self, request: TightenRequest) -> Tightened:
+        # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象；
+        # 放行要用当前的质检测试材料；提交事务里再判一次输入有没有处理完（工具许可之后、提交之前新输入到达）
+        minimal, facts = request.minimal, request.facts
+        projection = request.state
+        proposal = request.proposal or {}
+        spec_hash = minimal.artifact_hash("product_spec")
+        if spec_hash is None:
+            return Tightened(errors=(FieldError("product_spec", "no active ProductSpec"),))
+        # 预测性探索的一轮（工单 #557）没有交付，提交结论在这里被拒绝
+        if projection.department_bases.get("quality") is not None \
+                and projection.department_delivery_bases.get("quality") is None:
+            return Tightened(errors=(FieldError("delivery_spec", "this work has no delivery to review"),))
+        delivery_hash = minimal.artifact_hash("delivery_spec")
+        if delivery_hash is None:
+            return Tightened(errors=(FieldError("delivery_spec", "no active DeliverySpec"),))
+        contract_hash = minimal.artifact_hash("contract")
+        if contract_hash is None:
+            return Tightened(errors=(FieldError(
+                "effective_contract", "quality review requires a current contract"),))
+        # 依据版本、交付绑定的当前版本、工作区的树与检查回执都由合同里的通用条件核对（设计说明第 5.5 节），
+        # 提出评价的部门与交付的作者部门分开也由通用条件核对（基础规则 3）
+        outcome = self._conditions("qa_review", request)
+        errors: list[FieldError] = list(outcome.errors)
+        check_names, name_errors = _qa_check_names(proposal)
+        errors.extend(name_errors)
+        bound_checks = [outcome.receipts[name] for name in check_names if name in outcome.receipts]
+        verdict = proposal["verdict"]
+        if verdict == "release":
+            if any(item["exit_code"] != 0 for item in bound_checks):
+                errors.append(FieldError("checks", "release requires all quality checks to exit 0"))
+            if not bound_checks:
+                errors.append(FieldError("checks", "release requires quality-run evidence bound to the current snapshot"))
+            # 放行要用当前的质检测试材料：材料摘要的比较读的是内容
+            if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in bound_checks):
+                errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
+        defects, defect_errors = _qa_defects(proposal)
+        errors.extend(defect_errors)
+        if errors:
+            return Tightened(errors=tuple(errors))
+        # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：在提交事务里再判一次
+        if request.commit and verdict == "release" and pending_product_input(projection, list(request.events)):
             return Tightened(wait=True)
-        return Tightened(errors=tuple(errors))
+        # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
+        return Tightened(content={
+            "product_spec_hash": spec_hash,
+            "effective_contract_hash": contract_hash,
+            "delivery_spec_hash": delivery_hash,
+            "code_snapshot_hash": facts.digest,
+            "verdict": verdict,
+            "rationale": proposal["rationale"].strip(),
+            "checks": bound_checks,
+            "defects": defects,
+            "evidence_refs": [],
+        }, ends_run=verdict == "release")
 
     def _structure(self, request: TightenRequest) -> Tightened:
-        # 现有结构说明的每条要求都来自当前 PRD，各记一次（读 PRD 内容）
-        spec = request.state.product_spec
-        if spec is None:
-            return Tightened()
-        requirements = [item.strip() for item in spec.requirements]
-        declared = [item["requirement"].strip() for item in (request.proposal or {}).get("requirement_locations", [])]
-        errors: list[FieldError] = []
-        if len(declared) != len(set(declared)):
-            errors.append(FieldError("requirement_locations", "each requirement may be recorded only once"))
-        if set(declared) != set(requirements):
-            missing = [item for item in requirements if item not in declared]
-            extra = [item for item in declared if item not in requirements]
-            errors.append(FieldError("requirement_locations",
-                                     "requirement_locations must record every requirement of the current ProductSpec "
-                                     f"exactly once; missing: {missing or 'none'}; "
-                                     f"not in the current ProductSpec: {extra or 'none'}"))
-        return Tightened(errors=tuple(errors))
+        # 现有结构说明（docs/design/existing-project-onboarding.md 第 4.4 节）：构建与测试的每一项都要有本次
+        # 激活中绑定当前快照与当前初始 PRD 的 run_check 回执，退出状态照实记录（不要求为 0）；建档中工作区的树不变。
+        # 树与回执由合同里的通用条件核对（设计说明第 5.5 节）
+        minimal, facts = request.minimal, request.facts
+        proposal = request.proposal or {}
+        spec_hash = minimal.artifact_hash("product_spec")
+        if spec_hash is None:
+            return Tightened(errors=(FieldError("product_spec", "no active ProductSpec"),))
+        outcome = self._conditions("structure", request)
+        errors: list[FieldError] = list(outcome.errors)
+        for index, item in enumerate(proposal["modules"]):
+            errors.extend(_location_errors(f"modules[{index}].path", [item["path"]], facts))
+        for index, item in enumerate(proposal["entry_points"]):
+            errors.extend(_location_errors(f"entry_points[{index}].path", [item["path"]], facts))
+        for index, item in enumerate(proposal["requirement_locations"]):
+            errors.extend(_location_errors(f"requirement_locations[{index}].locations", item["locations"], facts))
+        # 每条要求覆盖一次读的是 PRD 的内容
+        errors.extend(_requirement_location_errors(request))
+        if errors:
+            return Tightened(errors=tuple(errors))
+        build_and_test = []
+        for item in proposal["build_and_test"]:
+            name = item["name"].strip()
+            build_and_test.append({**item, "name": name, "purpose": item["purpose"].strip(),
+                                   "command": item["command"].strip(), "receipt": outcome.receipts[name]})
+        return Tightened(content={
+            "overall": proposal["overall"].strip(),
+            "modules": [{"path": item["path"].strip(), "responsibility": item["responsibility"].strip()}
+                        for item in proposal["modules"]],
+            "entry_points": [{"kind": item["kind"], "path": item["path"].strip(), "how_to_run": item["how_to_run"].strip()}
+                             for item in proposal["entry_points"]],
+            "build_and_test": build_and_test,
+            "requirement_locations": [{"requirement": item["requirement"].strip(),
+                                       "locations": [path.strip() for path in item["locations"]]}
+                                      for item in proposal["requirement_locations"]],
+            "conventions": [item.strip() for item in proposal.get("conventions", [])],
+            "product_spec_hash": spec_hash,
+            "code_tree_digest": facts.digest,
+        })
 
     def _baseline_review(self, request: TightenRequest) -> Tightened:
-        # 带标记的边界条目不是现有行为（设计第 4.3 节）：要求文档描述而代码尚未实现的能力不记为现有缺陷；
-        # 逐条结论覆盖初始 PRD 的每条要求，不许多也不重复——两条都读 PRD 的内容（S1d 从内核搬来，工单 #860）
-        spec = request.state.product_spec
-        if spec is None:
-            return Tightened()
-        errors: list[FieldError] = []
-        conclusions = [item for item in (request.proposal or {}).get("conclusions", []) if isinstance(item, dict)]
-        requirements = [item.strip() for item in spec.requirements]
-        declared = [str(item.get("requirement", "")).strip() for item in conclusions]
+        # 基线核验（docs/design/existing-project-onboarding.md 第 4.5 节）：逐条结论覆盖初始 PRD 的每条要求，
+        # 基线检查绑定当前快照与当前 ProductSpec，退出状态不为 0 的检查都有说明；这里不使用普通事项的放行规则。
+        # 结构说明对应当前 PRD、工作区的树与检查回执由合同里的通用条件核对（设计说明第 5.5 节）
+        minimal, facts = request.minimal, request.facts
+        proposal = request.proposal or {}
+        spec_hash = minimal.artifact_hash("product_spec")
+        if spec_hash is None:
+            return Tightened(errors=(FieldError("product_spec", "no active ProductSpec"),))
+        structure = minimal.artifact("structure")
+        outcome = self._conditions("baseline_review", request)
+        errors: list[FieldError] = list(outcome.errors)
+        check_names, name_errors = _qa_check_names(proposal)
+        errors.extend(name_errors)
+        bound: dict[str, dict[str, Any]] = {name: outcome.receipts[name] for name in check_names
+                                            if name in outcome.receipts}
+        conclusions, conclusion_errors = _baseline_conclusions(proposal, bound, facts)
+        errors.extend(conclusion_errors)
+        # 标「设计中，未实施」的边界不是现有行为，不能记为现有缺陷，逐条结论覆盖每条要求：都读 PRD 的内容
+        errors.extend(_baseline_requirement_errors(request))
+        omissions, omission_errors = _baseline_omission_records(proposal, facts)
+        errors.extend(omission_errors)
+        failed = sorted(name for name, receipt in bound.items() if receipt["exit_code"] != 0)
+        referenced = {item["evidence"] for item in conclusions if item["status"] == "existing_defect"}
+        explained = {item["check"] for item in proposal.get("other_failures", []) if isinstance(item, dict)}
+        for item in proposal.get("other_failures", []):
+            name = item.get("check") if isinstance(item, dict) else None
+            if name not in bound:
+                errors.append(FieldError("other_failures", f"other_failures must name a baseline check: {name!r}"))
+            elif bound[name]["exit_code"] == 0:
+                errors.append(FieldError("other_failures", f"check {name} exited 0; only failing checks need an explanation"))
+        unexplained = [name for name in failed if name not in referenced and name not in explained]
+        if unexplained:
+            errors.append(FieldError("checks", "every failing check must be referenced by an existing_defect conclusion or explained "
+                                               f"in other_failures: {unexplained}"))
+        verdict = proposal["verdict"]
+        unsupported = [item["requirement"] for item in conclusions if item["status"] == "unsupported"]
+        if verdict == "consistent" and (unsupported or omissions):
+            errors.append(FieldError("verdict", f"consistent requires no unsupported conclusion and no omission; got "
+                                               f"{len(unsupported)} unsupported and {len(omissions)} omission(s)"))
+        if verdict == "rework_product" and not unsupported and not omissions:
+            errors.append(FieldError("verdict", "rework_product requires at least one unsupported conclusion or one omission"))
+        if errors:
+            return Tightened(errors=tuple(errors))
+        # 基线核验的一致结论结束建档事项；要求产品修改时产品开始一轮工作（工单 #556）
+        return Tightened(content={
+            "verdict": verdict,
+            "conclusions": conclusions,
+            "omissions": omissions,
+            "checks": [bound[name] for name in check_names],
+            "other_failures": [{"check": item["check"].strip(), "reason": item["reason"].strip()}
+                               for item in proposal.get("other_failures", [])],
+            "product_spec_hash": spec_hash,
+            "structure_hash": None if structure is None else structure.content_hash,
+            "code_snapshot_hash": facts.digest,
+        }, ends_run=verdict == "consistent")
+
+
+def _requirement_location_errors(request: TightenRequest) -> list[FieldError]:
+    # 现有结构说明的每条要求都来自当前 PRD，各记一次（读 PRD 内容）
+    spec = request.state.product_spec
+    if spec is None:
+        return []
+    requirements = [item.strip() for item in spec.requirements]
+    declared = [item["requirement"].strip() for item in (request.proposal or {}).get("requirement_locations", [])]
+    errors: list[FieldError] = []
+    if len(declared) != len(set(declared)):
+        errors.append(FieldError("requirement_locations", "each requirement may be recorded only once"))
+    if set(declared) != set(requirements):
         missing = [item for item in requirements if item not in declared]
         extra = [item for item in declared if item not in requirements]
-        if set(declared) != set(requirements):
-            errors.append(FieldError(
-                "conclusions",
-                "conclusions must cover every requirement of the current ProductSpec exactly once; "
-                f"missing: {missing or 'none'}; not in the current ProductSpec: {extra or 'none'}",
-            ))
-        for index, item in enumerate(conclusions):
-            if item.get("status") != "existing_defect":
-                continue
-            if _covers_marked_boundary(str(item.get("requirement", "")).strip(), spec):
-                errors.append(FieldError(f"conclusions[{index}].status",
-                                         f"a boundary entry marked {DESIGN_PENDING_MARK} is not existing behavior and "
-                                         "cannot be an existing_defect; write it into the initial PRD boundaries with "
-                                         "that mark"))
-        return Tightened(errors=tuple(errors))
+        errors.append(FieldError("requirement_locations",
+                                 "requirement_locations must record every requirement of the current ProductSpec "
+                                 f"exactly once; missing: {missing or 'none'}; "
+                                 f"not in the current ProductSpec: {extra or 'none'}"))
+    return errors
+
+
+def _baseline_requirement_errors(request: TightenRequest) -> list[FieldError]:
+    # 带标记的边界条目不是现有行为（设计第 4.3 节）：要求文档描述而代码尚未实现的能力不记为现有缺陷；
+    # 逐条结论覆盖初始 PRD 的每条要求，不许多也不重复——两条都读 PRD 的内容（S1d 从内核搬来，工单 #860）
+    spec = request.state.product_spec
+    if spec is None:
+        return []
+    errors: list[FieldError] = []
+    conclusions = [item for item in (request.proposal or {}).get("conclusions", []) if isinstance(item, dict)]
+    requirements = [item.strip() for item in spec.requirements]
+    declared = [str(item.get("requirement", "")).strip() for item in conclusions]
+    missing = [item for item in requirements if item not in declared]
+    extra = [item for item in declared if item not in requirements]
+    if set(declared) != set(requirements):
+        errors.append(FieldError(
+            "conclusions",
+            "conclusions must cover every requirement of the current ProductSpec exactly once; "
+            f"missing: {missing or 'none'}; not in the current ProductSpec: {extra or 'none'}",
+        ))
+    for index, item in enumerate(conclusions):
+        if item.get("status") != "existing_defect":
+            continue
+        if _covers_marked_boundary(str(item.get("requirement", "")).strip(), spec):
+            errors.append(FieldError(f"conclusions[{index}].status",
+                                     f"a boundary entry marked {DESIGN_PENDING_MARK} is not existing behavior and "
+                                     "cannot be an existing_defect; write it into the initial PRD boundaries with "
+                                     "that mark"))
+    return errors
 
 
 WATCHED_OUTPUTS = WatchedOutputsTightening()
+
+
+
+# ---------------------------------------------------------------------------
+# 六种成果驱动的形状检查、按内容的检查与内容组装的辅助函数（S2c，工单 #1098，从 validation.py 搬来）。
+# 它们只读提案的内容、最小投影与工作区事实，内核不再调用它们：内核只做通用检查、盖统一字段、算内容摘要。
+
+
+def _schema_errors(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
+    if kind == "product_decision":
+        return _require_text(proposal, "statement") + _require_text(proposal, "rationale")
+    if kind == "product_spec":
+        return _require_text(proposal, "goal") + _require_string_list(proposal, "requirements", min_items=1) + _require_string_list(
+            proposal, "acceptance_criteria", min_items=1
+        ) + _optional_string_list(proposal, "boundaries") + _optional_string_list(proposal, "constraints") + _optional_string_list(
+            proposal, "fatal_conditions"
+        ) + _optional_string_list(proposal, "non_goals") + _decision_change_errors(proposal) + _change_record_errors(proposal)
+    if kind == "delivery_spec":
+        return (
+            _require_text(proposal, "summary")
+            + _require_string_list(proposal, "check_names", min_items=1)
+            + _optional_string_list(proposal, "known_risks")
+        )
+    if kind == "qa_review":
+        errors = _require_text(proposal, "rationale")
+        verdict = proposal.get("verdict")
+        if verdict not in QA_VERDICTS:
+            errors.append(FieldError("verdict", "verdict must be rework_engineering or release"))
+        errors.extend(_qa_defects_errors(proposal))
+        errors.extend(_qa_check_name_errors(proposal))
+        defects = [] if "defects" not in proposal else proposal.get("defects")
+        if verdict == "release" and isinstance(defects, list) and defects:
+            errors.append(FieldError("defects", "release requires an empty defect list"))
+        if verdict == "rework_engineering" and isinstance(defects, list) and not defects:
+            errors.append(FieldError("defects", "rework requires at least one defect"))
+        return errors
+    if kind == "structure":
+        return _structure_schema_errors(proposal)
+    if kind == "baseline_review":
+        return _baseline_review_schema_errors(proposal)
+    return [FieldError("kind", "unknown kind")]
+
+
+
+
+def _structure_schema_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    # submit_structure 的参数形状（definitions/tools.json）：五组必填，约定与注意事项可省略
+    allowed = {"kind", "overall", "modules", "entry_points", "build_and_test", "requirement_locations", "conventions"}
+    errors = [FieldError(str(key), "unknown field") for key in proposal if key not in allowed]
+    errors.extend(_require_text(proposal, "overall"))
+    errors.extend(_record_list_errors(proposal, "modules", {"path", "responsibility"}, ("path", "responsibility")))
+    entry_errors = _record_list_errors(proposal, "entry_points", {"kind", "path", "how_to_run"}, ("kind", "path", "how_to_run"))
+    for index, item in enumerate(proposal.get("entry_points", [])):
+        if isinstance(item, dict) and item.get("kind") not in {"program", "command_line", "service"}:
+            entry_errors.append(FieldError(f"entry_points[{index}].kind", "kind must be program, command_line, or service"))
+    errors.extend(entry_errors)
+    errors.extend(_record_list_errors(proposal, "build_and_test", {"name", "command", "purpose"}, ("name", "purpose")))
+    for index, item in enumerate(proposal.get("build_and_test", [])):
+        if isinstance(item, dict):
+            errors.extend(FieldError(f"build_and_test[{index}].command", error.message)
+                          for error in _require_text(item, "command"))
+    errors.extend(_record_list_errors(proposal, "requirement_locations", {"requirement", "locations"},
+                                      ("requirement",)))
+    for index, item in enumerate(proposal.get("requirement_locations", [])):
+        if isinstance(item, dict):
+            errors.extend(FieldError(f"requirement_locations[{index}].{error.field}", error.message)
+                          for error in _require_string_list(item, "locations", min_items=1))
+    for field in ("modules", "entry_points", "build_and_test", "requirement_locations"):
+        value = proposal.get(field)
+        if isinstance(value, list) and not value:
+            errors.append(FieldError(field, f"{field} must contain at least one entry"))
+    return errors + _optional_string_list(proposal, "conventions")
+
+
+def _baseline_review_schema_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    # submit_baseline_review 的参数形状（definitions/tools.json）：结论必填，遗漏与其他失败可省略
+    allowed = {"kind", "verdict", "conclusions", "omissions", "checks", "other_failures"}
+    errors = [FieldError(str(key), "unknown field") for key in proposal if key not in allowed]
+    if proposal.get("verdict") not in {"consistent", "rework_product"}:
+        errors.append(FieldError("verdict", "verdict must be consistent or rework_product"))
+    errors.extend(_record_list_errors(proposal, "conclusions", {"requirement", "status", "evidence"},
+                                     ("requirement", "status", "evidence")))
+    for index, item in enumerate(proposal.get("conclusions", [])):
+        if isinstance(item, dict) and item.get("status") not in BASELINE_STATUSES:
+            errors.append(FieldError(f"conclusions[{index}].status",
+                                     "status must be verified, read_only, existing_defect, or unsupported"))
+    conclusions = proposal.get("conclusions")
+    if isinstance(conclusions, list) and not conclusions:
+        errors.append(FieldError("conclusions", "conclusions must cover every requirement of the initial PRD"))
+    errors.extend(_qa_check_name_errors(proposal))
+    errors.extend(_record_list_errors(proposal, "omissions", {"capability", "location"}, ("capability", "location"),
+                                      required_field=False))
+    errors.extend(_record_list_errors(proposal, "other_failures", {"check", "reason"}, ("check", "reason"),
+                                      required_field=False))
+    return errors
+
+
+def _record_list_errors(proposal: dict[str, Any], field: str, allowed: set[str], texts: tuple[str, ...],
+                       *, required_field: bool = True) -> list[FieldError]:
+    # 对象清单的通用形状校验：多余的字段名、必填的文字字段；argv 与 locations 这类字符串清单由调用方另行校验
+    value = proposal.get(field)
+    if value is None and not required_field:
+        if field in proposal:
+            proposal[field] = []
+        return []
+    if not isinstance(value, list):
+        return [FieldError(field, f"{field} must be a list of objects")]
+    errors: list[FieldError] = []
+    for index, item in enumerate(value):
+        if not isinstance(item, dict):
+            errors.append(FieldError(f"{field}[{index}]", f"{field} items must be objects"))
+            continue
+        errors.extend(FieldError(f"{field}[{index}].{key}", "unknown field")
+                      for key in item if key not in allowed)
+        for name in texts:
+            errors.extend(FieldError(f"{field}[{index}].{error.field}", error.message)
+                          for error in _require_text(item, name))
+    return errors
+
+
+def _location_errors(field: str, values: list[Any], facts: TreeFacts) -> list[FieldError]:
+    # 结构说明里写出的位置必须是工作区公开树中真实存在的路径（文件或目录前缀）
+    errors: list[FieldError] = []
+    for value in values:
+        if not isinstance(value, str) or not value.strip():
+            errors.append(FieldError(field, "locations must be non-empty workspace-relative strings"))
+            continue
+        try:
+            relative = normalize_scope(value)
+        except ValueError:
+            errors.append(FieldError(field, f"invalid workspace location: {value!r}"))
+            continue
+        errors.extend([] if _location_known(relative, facts) else
+                      [FieldError(field, f"unknown workspace location: {value!r}")])
+    return errors
+
+
+def _location_known(relative: str, facts: TreeFacts) -> bool:
+    if relative == ".":
+        return True
+    if relative.endswith("/"):
+        return any(item.startswith(relative) for item in facts.files)
+    return any(item == relative or item.startswith(relative + "/") for item in facts.files)
+
+
+def _baseline_conclusions(proposal: dict[str, Any], bound: dict[str, dict[str, Any]],
+                          facts: TreeFacts) -> tuple[list[dict[str, str]], list[FieldError]]:
+    # 每条结论的依据按状态检查（设计第 4.5 节）。逐条结论覆盖初始 PRD 的每条要求读的是 PRD 的内容，
+    # 不在这里：由路由的收紧检查核对（S1d，工单 #860）
+    declared = [item["requirement"].strip() for item in proposal["conclusions"]]
+    errors: list[FieldError] = []
+    if len(declared) != len(set(declared)):
+        errors.append(FieldError("conclusions", "each requirement may carry only one conclusion"))
+    conclusions: list[dict[str, str]] = []
+    for index, item in enumerate(proposal["conclusions"]):
+        requirement, status, evidence = item["requirement"].strip(), item["status"], item["evidence"].strip()
+        field = f"conclusions[{index}].evidence"
+        if status == "verified":
+            errors.extend(_check_evidence_error(field, evidence, bound, expect_exit=0,
+                                                label="verified requires evidence naming a passing baseline check"))
+        elif status == "read_only":
+            if not _location_known(evidence.replace("\\", "/"), facts):
+                errors.append(FieldError(field, "read_only requires evidence naming a location in the snapshot"))
+        elif status == "existing_defect":
+            errors.extend(_check_evidence_error(field, evidence, bound, expect_exit=None,
+                                                label="existing_defect requires evidence naming a failing baseline check"))
+        elif status == "unsupported":
+            if evidence in bound:
+                errors.append(FieldError(field, "unsupported must not name a baseline check; it states that nothing supports "
+                                                "the requirement"))
+            elif evidence.lower() in {"none", "n/a", "no basis", ""}:
+                errors.append(FieldError(field, "unsupported must state why code, documentation and tests none of them support "
+                                                 "the requirement"))
+        conclusions.append({"requirement": requirement, "status": status, "evidence": evidence})
+    return conclusions, errors
+
+
+def _check_evidence_error(field: str, evidence: str, bound: dict[str, dict[str, Any]], *, expect_exit: int | None,
+                         label: str) -> list[FieldError]:
+    # 结论的依据指向本次激活中真实运行过的基线检查；verified 要求退出状态为 0，existing_defect 要求不为 0
+    if evidence not in bound:
+        if expect_exit is None:
+            return [FieldError(field, "existing_defect requires evidence naming a baseline check run in this activation")]
+        return [FieldError(field, label)]
+    exit_code = bound[evidence]["exit_code"]
+    if expect_exit is not None and exit_code != expect_exit:
+        return [FieldError(field, f"check {evidence} exited {exit_code}; {label}")]
+    if expect_exit is None and exit_code == 0:
+        return [FieldError(field, f"check {evidence} exited 0; {label}")]
+    return []
+
+
+def _baseline_omission_records(proposal: dict[str, Any], facts: TreeFacts) -> tuple[list[dict[str, str]], list[FieldError]]:
+    # 遗漏必须写出仓库中真实存在的所在
+    errors: list[FieldError] = []
+    records: list[dict[str, str]] = []
+    for index, item in enumerate(proposal.get("omissions", [])):
+        capability, location = item["capability"].strip(), item["location"].strip()
+        records.append({"capability": capability, "location": location})
+        errors.extend(_location_errors(f"omissions[{index}].location", [location], facts))
+    return records, errors
+
+
+def _product_payload(proposal: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "goal": proposal["goal"].strip(),
+        "requirements": [item.strip() for item in proposal["requirements"]],
+        "boundaries": [item.strip() for item in proposal.get("boundaries", [])],
+        "constraints": [item.strip() for item in proposal.get("constraints", [])],
+        "acceptance_criteria": [item.strip() for item in proposal["acceptance_criteria"]],
+        "fatal_conditions": [item.strip() for item in proposal.get("fatal_conditions", [])],
+        "non_goals": [item.strip() for item in proposal.get("non_goals", [])],
+        "decision_changes": [{"decision_hash": item["decision_hash"], "disposition": item["disposition"],
+                              "rationale": item["rationale"].strip()} for item in proposal.get("decision_changes", [])],
+        "change_record": None if proposal.get("change_record") is None else {
+            **{field: [item.strip() for item in proposal["change_record"][field]] for field in ("changed", "retained", "retired")},
+            "rationale": proposal["change_record"]["rationale"].strip(),
+        },
+    }
+
+
+def _change_record_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    record = proposal.get("change_record")
+    if record is None:
+        return []
+    if not isinstance(record, dict):
+        return [FieldError("change_record", "change_record must describe changed, retained, and retired behavior and rationale")]
+    errors = _require_text(record, "rationale")
+    for field in ("changed", "retained", "retired"):
+        errors.extend(_require_string_list(record, field, min_items=0))
+    return [FieldError(f"change_record.{item.field}", item.message) for item in errors]
+
+
+def _decision_change_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    changes = proposal.get("decision_changes", [])
+    if not isinstance(changes, list):
+        return [FieldError("decision_changes", "decision_changes must be a list")]
+    errors = []
+    for index, item in enumerate(changes):
+        if not isinstance(item, dict):
+            errors.append(FieldError(f"decision_changes[{index}]", "each earlier decision requires a disposition and rationale"))
+            continue
+        errors.extend(FieldError(f"decision_changes[{index}].{error.field}", error.message)
+                      for error in _require_text(item, "decision_hash") + _require_text(item, "rationale"))
+        if item.get("disposition") not in {"retain", "integrate", "retire"}:
+            errors.append(FieldError(f"decision_changes[{index}].disposition", "disposition must be retain, integrate, or retire"))
+    return errors
+
+
+def _qa_check_name_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    return _qa_check_names(proposal)[1]
+
+
+def _qa_check_names(proposal: dict[str, Any]) -> tuple[list[str], list[FieldError]]:
+    raw = proposal["checks"] if "checks" in proposal else proposal.get("check_names", [])
+    if raw is None or not isinstance(raw, list):
+        return [], [FieldError("checks", "checks must be a list of names")]
+    if not raw:
+        return [], [FieldError("checks", "at least one check name is required")]
+    names: list[str] = []
+    errors: list[FieldError] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, str) or not item.strip():
+            errors.append(FieldError(f"checks[{index}]", "check name must be a non-empty string"))
+            continue
+        names.append(item.strip())
+    return names, errors
+
+
+def _qa_defects_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    return _qa_defects(proposal)[1]
+
+
+def _qa_defects(proposal: dict[str, Any]) -> tuple[list[dict[str, str]], list[FieldError]]:
+    if "defects" not in proposal:
+        return [], []
+    raw = proposal.get("defects")
+    if raw is None or not isinstance(raw, list):
+        return [], [FieldError("defects", "defects must be a list")]
+    defects: list[dict[str, str]] = []
+    errors: list[FieldError] = []
+    for index, defect in enumerate(raw):
+        if not isinstance(defect, dict):
+            errors.append(FieldError(f"defects[{index}]", "defect must be an object"))
+            continue
+        summary = defect.get("summary")
+        if not isinstance(summary, str) or not summary.strip():
+            errors.append(FieldError(f"defects[{index}].summary", "defect summary is required"))
+        severity = defect.get("severity")
+        if severity not in {"blocker", "major", "minor"}:
+            errors.append(FieldError(f"defects[{index}].severity", "severity must be blocker, major, or minor"))
+        if isinstance(summary, str) and summary.strip() and severity in {"blocker", "major", "minor"}:
+            defects.append({"severity": severity, "summary": summary.strip()})
+    return defects, errors
+
+
+def _require_text(payload: dict[str, Any], field: str) -> list[FieldError]:
+    value = payload.get(field)
+    if not isinstance(value, str) or not value.strip():
+        return [FieldError(field, f"{field} must be a non-empty string")]
+    return []
+
+
+def _require_string_list(payload: dict[str, Any], field: str, *, min_items: int) -> list[FieldError]:
+    value = payload.get(field)
+    if not isinstance(value, list) or len(value) < min_items:
+        return [FieldError(field, f"{field} must contain at least {min_items} item(s)")]
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        return [FieldError(field, f"{field} items must be non-empty strings")]
+    return []
+
+
+def _optional_string_list(payload: dict[str, Any], field: str) -> list[FieldError]:
+    if field not in payload or payload[field] is None:
+        payload[field] = []
+        return []
+    value = payload[field]
+    if not isinstance(value, list):
+        return [FieldError(field, f"{field} must be a list")]
+    if any(not isinstance(item, str) or not item.strip() for item in value):
+        return [FieldError(field, f"{field} items must be non-empty strings")]
+    return []

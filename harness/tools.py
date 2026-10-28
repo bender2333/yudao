@@ -38,6 +38,11 @@ def proposal_kinds(department: str, kind: str = "change", *,
             if name in definition.tools and definition.tools[name].proposal is not None}
 
 
+def proposal_kinds_of(*, definitions: Definitions | None = None) -> frozenset[str]:
+    # 这份定义里的全部提案种类：提案校验判断「种类认不认识」用它，不读模块加载时算好的常量（工单 #1098）
+    return frozenset(tool.proposal for tool in in_force(definitions).tools.values() if tool.proposal is not None)
+
+
 def tool_kind(name: str, *, definitions: Definitions | None = None) -> str | None:
     # host：主机工具；environment：环境工具；没有定义的工具为 None
     tool = in_force(definitions).tools.get(name)

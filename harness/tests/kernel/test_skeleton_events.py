@@ -35,7 +35,7 @@ DESIGN_SKELETON_RUN_EVENTS = frozenset({
     "model_requested",
     "artifact_invalidated", "proposal_submitted", "proposal_rejected",
     "spec_accepted", "spec_superseded", "contract_accepted", "delivery_accepted", "qa_submitted",
-    "structure_accepted", "baseline_review_accepted", "product_decision_accepted",
+    "structure_accepted", "baseline_review_accepted", "artifact_accepted", "product_decision_accepted",
     "decision_requested", "decision_answered", "decision_withdrawn",
 })
 

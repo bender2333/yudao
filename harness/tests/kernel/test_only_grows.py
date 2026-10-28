@@ -37,7 +37,7 @@ SKELETON_EVENT_SNAPSHOT = {
         "proposal_submitted", "proposal_rejected",
         "spec_accepted", "spec_superseded", "contract_accepted", "product_decision_accepted",
         "artifact_invalidated", "delivery_accepted", "qa_submitted", "structure_accepted",
-        "baseline_review_accepted",
+        "baseline_review_accepted", "artifact_accepted",
         "run_done", "run_paused", "run_failed", "run_resumed", "run_continued",
         "decision_requested", "decision_answered", "decision_withdrawn",
     }),

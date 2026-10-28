@@ -863,6 +863,19 @@ class BaselineReviewAcceptedPayload(AcceptanceFields):
     git_version: GitVersion
 
 
+class ArtifactAcceptedPayload(AcceptanceFields):
+    # 通用种类的成果接纳（S2c，工单 #1098，设计说明第 5.5 节）：内容就是路由的收紧检查给出的那一份，
+    # 内核不认识这一类成果的字段，所以这里按开放字段收下内容；统一字段与其余接纳事件相同
+    model_config = ConfigDict(extra="allow", frozen=True)
+    kind: str
+    issuer: str
+    parent_hash: str | None
+    revision: int
+    status: Literal["active"]
+    content_hash: str
+    id: str
+
+
 class ReviewObservation(Payload):
     # 教训候选来自质检退回
     verdict: str
@@ -1545,6 +1558,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.QA_TESTS_SAVED: QaTestsSavedPayload,
     EventType.STRUCTURE_ACCEPTED: StructureAcceptedPayload,
     EventType.BASELINE_REVIEW_ACCEPTED: BaselineReviewAcceptedPayload,
+    EventType.ARTIFACT_ACCEPTED: ArtifactAcceptedPayload,
     EventType.LESSON_CANDIDATE_RECORDED: LessonCandidateRecordedPayload,
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,

@@ -52,6 +52,9 @@ class SkeletonEventType:
     QA_SUBMITTED = "qa_submitted"
     STRUCTURE_ACCEPTED = "structure_accepted"
     BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
+    # 通用的成果接纳（S2c，工单 #1098）：路由带来新种类时内核写这一条，载荷是收紧检查给出的内容加统一字段。
+    # 成果驱动的六种成果与契约仍写各自的接纳事件，已经写入的事件不重新解释
+    ARTIFACT_ACCEPTED = "artifact_accepted"
     # 第 4 节 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它，
     # 所以它从此是骨架事件，只加字段（第 7 节的表把 model_* 列在应用事件里，按这一条据以修正）
     MODEL_REQUESTED = "model_requested"
