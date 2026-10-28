@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 00:56 / 工单 #1162 [投影 · 界面]：本文件加这一条。`docs/` 下的文档都没有改——`docs/design/app-and-interface.md` 第 4.3 节 `project.overview` 一行在 main 上已经写明「停止的事项另带停止说明，即让事项停下的那条错误的原文，取自事项结束的事件，询问分支的失败原因不算，页面在停止原因下面原样写出」，这次按它实现（事项投影与事项卡片的 `stop_note`，看板卡片、当前事项与恢复页三处显示），设计说明那一行与代码一致，不需要补写 / 试用问题 Tf61ac6a6-09：R1 终态页的停止原因写「模型服务失败」，旁边像错误的那段却是询问分支的失败原因，真正让事项停下的 HTTP 400 页面上看不到
+
 claude-架构师 / 2026-10-29 00:10 / docs/program-roadmap.md、docs/current-baseline.md、docs/requirements/README.md 的 D40 一行、docs/design/README.md 的骨架与应用设计说明一行：把阶段一「换骨架」的状态与日期改到本次核对（父工单 #823 子工单 22/22 关闭，七条验收在 main a5b5a3c7 上逐条核对，第 6 条后半的场景 3 读数由 #994 在阶段一发布提交上跑），内容未重写 / 父工单按验收证据规则第 4 节核对后关闭，证据写在 #823 的评论 https://github.com/bender2333/yudao/issues/823#issuecomment-6474145556；总图的建设状态与缝的已定未定仍由总架构师改，需要改的行写在同一条评论里
 
 solo-deepseek-v4.1-flash / 2026-10-29 00:05 / 工单 #1160 [界面]：本文件加这一条。界面按当前定稿 v13 改了三处（概览的新事项输入一个框配两个按钮、事项统计那一行的名字、新建项目表单的说明），`docs/` 下的设计说明与原型都没有改：v13 的 `docs/prototypes/v13/js/ui/views/overview.js`（`composerHtml`）与 `docs/prototypes/v13/js/ui/shell.js`（`shell.newProject`）就是这次的依据，`docs/design/project-initial-files.md` 第 3、5 节写的起始文件夹快照与「从想法新建不调用模型」没有变 / 试用问题 Tf61ac6a6-05（两个文本框不知该填哪个）与 Tf61ac6a6-08（事项统计叫「已放行」实际是放行了还没采纳、漏了成果挂起），另补 Tf61ac6a6-10 分诊后剩下的那处表单说明

@@ -19,7 +19,7 @@ import type { ClientApp } from "../../contract/client-app";
 import type { Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import { DecisionCardList } from "../decisions/card";
-import { Empty, KeyValue, Loading, Section, Tag, show } from "./common";
+import { Empty, KeyValue, Loading, Section, StopNote, Tag, show } from "./common";
 import { ACTION_STATUS, RECOVERY_STATE, RECOVERY_STATE_KIND, STOP_REASON, departmentName, formatDuration, formatTime, label } from "./labels";
 import { RestartOnboarding } from "./restart-onboarding";
 import { useSnapshot } from "./use-snapshot";
@@ -211,6 +211,8 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
         <KeyValue
           items={[
             ["停止原因", item?.stop_reason ? label(STOP_REASON, item.stop_reason) : "未上报"],
+            // 停止说明（工单 #1162）：让事项停下的那条错误的原文，写在停止原因下面；用户自己停下时没有
+            ["停止说明", <StopNote key="stop-note" note={item?.stop_note ?? null} empty="没有" />],
             ["所在部门", item?.department ? departmentName(item.department) : "没有在部门里执行"],
           ]}
         />

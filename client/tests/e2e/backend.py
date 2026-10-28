@@ -75,6 +75,12 @@ PENDING_ASK_QUESTION = "未知参数怎么处理？"
 # 浏览器用例在这段时间里核对项目页与部门页显示的进行中的询问与等待原因
 SLOW_ANSWER_DELTAS = 120
 
+# 停止说明（工单 #1162）：让事项停下的那条错误与询问分支自己的失败原因，两句要能分清，
+# 页面上的停止说明只写前者；用例按这两个字面值核对（见 stop_note_script）
+STOP_NOTE_QUESTION = "输出要不要改成大写？"
+STOP_NOTE_ERROR = "模型服务返回 HTTP 400：input length 131072 exceeds the maximum context length"
+BRANCH_ERROR = "回答的请求被拒绝：HTTP 400 invalid_request_error"
+
 
 def lan_address() -> str:
     # 本机的局域网地址：从另一台机器访问控制主机时用的就是它；没有时用回环
@@ -342,6 +348,22 @@ def waiting_script():
         ProviderError(UNAVAILABLE, reason="provider_unavailable", retryable=True),
         ProviderError(UNAVAILABLE, reason="provider_unavailable"),
     ]
+
+
+def stop_note_script():
+    # 停止说明的端到端验收（工单 #1162）：工程先问产品一次，产品的回答分支失败（分支自己的原因），
+    # 工程拿到结果以后下一次请求被上游拒绝（HTTP 400），事项因此停下；页面的停止说明写的是这一条，
+    # 不是询问分支的原因。这个脚本不预置项目与事项：用例在页面打开以后自己建项目并开始事项
+    return {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn("product", STOP_NOTE_QUESTION, background="实现中需要明确", expected="确认输出形式"),
+            ProviderError(STOP_NOTE_ERROR, reason="provider_error"),
+        ],
+        "product:ask": [ProviderError(BRANCH_ERROR, reason="provider_error")],
+        # 质检在交付到达以前的预测性探索按事实决定做什么，轮次给得够用，免得它先因为脚本用完而失败
+        "quality": script()["quality"],
+    }
 
 
 def kernel_script():
@@ -615,7 +637,8 @@ def main() -> int:
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
     # initial 是从想法新建带起始文件夹用的脚本（工单 #323）；waiting 是等待模型服务用的脚本（工单 #375，
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）。它们需要的轮次与预置事项不同，因此由用例选择
-    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending"),
+    parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
+                                             "stopnote"),
                         default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
@@ -668,6 +691,8 @@ def main() -> int:
         adapter_script = kernel_script()
     elif args.script == "pending":
         adapter_script = pending_ask_script()
+    elif args.script == "stopnote":
+        adapter_script = stop_note_script()
     else:
         adapter_script = script()
     # 流式片段的停顿（秒）：进行中的询问模式要有一段够长的窗口，回答分支每段停 0.5 秒，
@@ -736,10 +761,10 @@ def main() -> int:
             asyncio.run(seed_onboarding(application))
         elif args.script == "kernel":
             asyncio.run(seed_kernel(application, system))
-        elif args.script not in ("initial", "waiting", "pending"):
-            # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）与进行中的询问的用例
-            # （工单 #477 的验收第 2 条）自己在界面上建项目并开始事项，不需要预置的项目与事项；
-            # 进行中的询问还要求执行槽位空着，预置的「文本工具」会占着它
+        elif args.script not in ("initial", "waiting", "pending", "stopnote"):
+            # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
+            # （工单 #477 的验收第 2 条）与停止说明的用例（工单 #1162）自己在界面上建项目并开始事项，
+            # 不需要预置的项目与事项；进行中的询问还要求执行槽位空着，预置的「文本工具」会占着它
             asyncio.run(seed(application, system))
     if args.catalog_driven:
         os.environ.pop("OPENCODE_GO_KEY", None)

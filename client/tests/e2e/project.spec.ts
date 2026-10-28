@@ -5,12 +5,27 @@
 // 本文件正在按页面逐节编写，节与节之间的公共函数在下面集中定义。
 
 import { expect,test,type Page } from "@playwright/test";
+import { join } from "node:path";
 import { startBackend,startClient,type Backend,type ClientApp } from "./fixtures";
 
 const SAMPLE = "示例项目";
 const BLOCKED = "文本工具";
 const LIVE = "实时项目";
 // room 脚本预置的项目（client/tests/e2e/backend.py 的 seed_room）
+
+// 截图只在本机留证据时写（环境变量 YUDAO_SHOTS 给出目录，与 building.spec.ts 同一做法），CI 里不写文件
+const SHOTS = process.env.YUDAO_SHOTS ?? "";
+
+async function shot(page: Page, name: string): Promise<void> {
+  if (!SHOTS) return;
+  await page.screenshot({ path: join(SHOTS, name) });
+}
+
+// 停止说明（工单 #1162）：用例自己建这个项目与事项，与 backend.py 的 STOP_NOTE_ERROR、
+// BRANCH_ERROR 一致——前者让事项停下，后者只是回答分支自己的失败原因
+const STOP_NOTE_PROJECT = "停止说明";
+const STOP_NOTE_ITEM = "验证停止说明";
+const STOP_NOTE_ERROR = "模型服务返回 HTTP 400：input length 131072 exceeds the maximum context length";
 
 const SAMPLE_GOAL = "实现一个回声工具";
 const SAMPLE_ITEM = "实现回声工具";
@@ -326,6 +341,68 @@ test.describe("项目页面（1440×900）", () => {
     } finally {
       await client.close();
     }
+  });
+
+  // 工单 #1162：停止的事项写出让事项停下的那条错误——看板卡片、当前事项与恢复页都写它。
+  // 试用里看混的那两句在这里分开：询问记录写的是回答分支自己的失败原因（A），
+  // 停止说明写的是让事项停下的那条 HTTP 400（B）。这条用例新建项目并让事项真的停下（改变服务端状态），
+  // 用自己的一份后端：stopnote 脚本不预置项目，工程问产品一次以后请求被拒，事项因此停下。
+  test("概览与恢复页：停止的事项在停止原因下面写出停止说明", async () => {
+    test.setTimeout(300_000);
+    await withOwnBackend(async () => {
+      const client = await startClient(backend, { width: 1440, height: 900 });
+      const errors = watchErrors(client);
+      const page = client.page;
+      try {
+        await expect(page.locator(".brand .y10-brand-name")).toContainText("Yudao");
+        await expectAccepted(page, "project.create", { name: STOP_NOTE_PROJECT, goal: "核对停止说明" });
+        const id = await projectId(page, STOP_NOTE_PROJECT);
+        await expectAccepted(page, "work_item.create", { project_id: id, text: STOP_NOTE_ITEM });
+        await waitUntil(async () => {
+          const data = await fetchQuery<{ work_items: { status: string }[] }>(
+            page, "project.overview", { project_id: id });
+          return data.work_items.some((row) => row.status === "stopped");
+        }, page, "事项以模型服务失败停下");
+
+        // 停止的事项不是进行中的事项：概览要选中它才写当前事项（与「交付历史」那条用例同一做法）
+        const items = await fetchQuery<{ work_items: { work_item_id: string; title: string }[] }>(
+          page, "project.overview", { project_id: id });
+        const stopped = items.work_items.find((row) => row.title === STOP_NOTE_ITEM);
+        expect(stopped).toBeDefined();
+        await page.evaluate((hash) => { window.location.hash = hash; },
+          `${navHash(id, "overview")}?w=${stopped?.work_item_id ?? ""}`);
+        const current = await section(page, "当前事项");
+        await expect(current).toContainText("模型服务失败");
+        // 停止原因下面写的是让事项停下的那条错误（B），不是回答分支的失败原因（A）。
+        // 当前事项与恢复页的这两项在表格里（名一列、值一列），名称与原文分开核对
+        await expect(current).toContainText("停止说明");
+        await expect(current).toContainText(STOP_NOTE_ERROR);
+        await expect(current).not.toContainText("invalid_request_error");
+        // 询问记录照旧写分支自己的原因：这一节不改（工单 #1162 的「要做的」第 3 条）
+        const asks = await section(page, "询问");
+        await expect(asks).toContainText("没能回答");
+        await expect(asks).toContainText("invalid_request_error");
+        // 看板卡片同样写在停止原因下面
+        const card = (await section(page, "事项看板")).locator(".board-card").filter({ hasText: STOP_NOTE_ITEM });
+        await expect(card).toContainText("停止原因：模型服务失败");
+        await expect(card).toContainText(`停止说明：${STOP_NOTE_ERROR}`);
+        await expect(card).not.toContainText("invalid_request_error");
+        await shot(page, "overview-stop-note.png");
+
+        // 恢复页：停止原因下面写同一条错误
+        await page.evaluate((hash) => { window.location.hash = hash; },
+          `#/p/${id}/w/${stopped?.work_item_id ?? ""}/recovery`);
+        const reasonBlock = page.locator("#rc-reason");
+        await expect(reasonBlock).toContainText("停止原因");
+        await expect(reasonBlock).toContainText("停止说明");
+        await expect(reasonBlock).toContainText(STOP_NOTE_ERROR);
+        await expect(reasonBlock).not.toContainText("invalid_request_error");
+        await shot(page, "recovery-stop-note.png");
+        expect(errors).toEqual([]);
+      } finally {
+        await client.close();
+      }
+    }, { script: "stopnote" });
   });
 
   // 工单 #477 的验收第 2 条：工程询问产品、询问还没有回答时，项目页与部门页显示这次询问与等待原因；
