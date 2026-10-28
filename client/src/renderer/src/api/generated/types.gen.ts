@@ -5044,6 +5044,10 @@ export type WorkItemCard = {
      */
     stop_reason: string | null;
     /**
+     * Stop Note
+     */
+    stop_note?: string | null;
+    /**
      * Human Action
      */
     human_action: string | null;
@@ -7396,6 +7400,10 @@ export type ContextAssembledPayload = {
      * Output Reserve Tokens
      */
     output_reserve_tokens: number;
+    /**
+     * Previous Usage Tokens
+     */
+    previous_usage_tokens?: number | null;
     parts_ref: ArtifactRef;
     /**
      * Run Id

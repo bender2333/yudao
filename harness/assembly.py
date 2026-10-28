@@ -17,6 +17,7 @@ from .assembly_contract import ModelLimits, StepFrame
 from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, finish_compaction, plan_compaction,
                          response_reserve, visible_history)
 from .context import AssembledContext, ContextAssembler, department_work_text
+from .definitions import DEFINITIONS
 from .event_store import EventStore
 from .models import (ArtifactRef, DepartmentGuidance, Event, EventType, RunProjection,
                      canonical_hash, estimate_tokens, json_dumps)
@@ -65,6 +66,38 @@ def model_limits(target_window: int, output_limit: int | None = None) -> ModelLi
     return ModelLimits(target_window, output_limit, reserve)
 
 
+def work_limit_tokens() -> int:
+    # 工作上限取规则登记中的现值（模型管理设计说明第 8.3 节）：窗口很大时压缩阈值也不超过它
+    return int(DEFINITIONS.rule_value("context.work_limit_tokens"))
+
+
+def previous_usage_tokens(events: list[Event], *, department: str,
+                          session_id: str | None = None) -> int | None:
+    # 上一次请求的上游回报用量：输入、缓存读写与输出之和（模型管理设计说明第 8.2 节）。
+    # 只看同一部门、同一会话的工作请求：整理请求的用量反映的是整理材料的大小，不是这一步的工作历史，
+    # 拿它判断会在压缩成功以后立刻再压一次。上游没有回报时返回空，判断只用本地估算。
+    # 压缩以后部门历史换成摘要（第 8.4 节），压缩之前那次请求的回报用量不再代表这一步的输入：
+    # 遇到比它更晚的压缩记录就返回空，回到只用本地估算
+    for event in reversed(events):
+        if event.department != department:
+            continue
+        if session_id is not None and event.session_id != session_id:
+            continue
+        if event.type == EventType.COMPACTION_RECORDED:
+            return None
+        if event.type != EventType.MODEL_ATTEMPT_FINISHED:
+            continue
+        payload = event.payload or {}
+        if payload.get("purpose") != "work":
+            continue
+        usage = payload.get("usage")
+        if not isinstance(usage, dict) or not usage.get("reported"):
+            continue
+        total = int(usage.get("input_tokens") or 0) + int(usage.get("output_tokens") or 0)
+        return total or None
+    return None
+
+
 @dataclass(frozen=True)
 class PinnedStep:
     # 一步中固定的部分：部门材料与工具定义，不含部门历史
@@ -104,6 +137,8 @@ class StepRequest:
     parts: list[dict[str, Any]]
     input_token_estimate: int
     output_reserve_tokens: int
+    # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量，没有时为 None（设计说明第 8.2 节）
+    previous_usage_tokens: int | None = None
 
     @property
     def admitted(self) -> bool:
@@ -297,9 +332,13 @@ class ContextAssembly:
         frame, limits = pinned.frame, pinned.limits
         replay_history = replayable_history(history, pinned.call_target)
         checkpoint, checkpoint_id = self._checkpoint(pinned)
+        # 判断要不要压缩用的用量：上一次工作请求的上游回报用量与本次本地估算中较大的一个（设计说明第 8.2 节）
+        previous = previous_usage_tokens(pinned.events, department=frame.department,
+                                        session_id=frame.session_id)
         plan = None if defer_compaction else plan_compaction(
             replay_history, checkpoint, limits.context_window, pinned.context.input_items,
-            pinned.context.tools, output_limit=limits.output_limit)
+            pinned.context.tools, output_limit=limits.output_limit,
+            previous_usage_tokens=previous, work_limit_tokens=work_limit_tokens())
         if plan is not None:
             context = self.assembler.assemble_compaction(
                 pinned.context, input_items=plan.input_items, source_refs=plan.source_refs,
@@ -322,6 +361,7 @@ class ContextAssembly:
             context=context, compaction_plan=plan, limits=limits, payload=payload, parts=_context_parts(context),
             input_token_estimate=estimate_tokens(json_dumps({"input": context.input_items, "tools": context.tools})),
             output_reserve_tokens=context.manifest.max_output_tokens or 0,
+            previous_usage_tokens=previous,
         )
 
     def finish_compaction(self, step: StepRequest, output: list[dict[str, Any]]) -> CompactionResult | None:

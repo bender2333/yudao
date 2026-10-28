@@ -369,6 +369,26 @@ export function departmentName(value: string | null | undefined): string {
   return DEPARTMENTS[value]?.name ?? value;
 }
 
+// 停止说明（工单 #1162）：让事项停下的那条错误的原文，取自事项结束的事件，页面原样写出，不改写。
+// 服务端只给停止的事项这一项，询问分支的失败原因不在其中；空白的当没有。
+// 短的一行写完，长的折起来（原样保留全文，点开看），免得一条 400 的应答把卡片撑满。
+export const STOP_NOTE_INLINE_LIMIT = 120;
+
+export type StopNoteView =
+  | { kind: "none" }
+  | { kind: "inline"; text: string }
+  | { kind: "folded"; text: string };
+
+export function stopNoteView(note: string | null | undefined): StopNoteView {
+  const text = note ?? "";
+  if (text.trim() === "") {
+    return { kind: "none" };
+  }
+  return text.length <= STOP_NOTE_INLINE_LIMIT
+    ? { kind: "inline", text }
+    : { kind: "folded", text };
+}
+
 export function formatTime(value: string | null | undefined): string {
   if (!value) {
     return "未知时间";

@@ -12280,6 +12280,17 @@
             ],
             "title": "Stop Reason"
           },
+          "stop_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Note"
+          },
           "human_action": {
             "anyOf": [
               {
@@ -16920,6 +16931,17 @@
           "output_reserve_tokens": {
             "title": "Output Reserve Tokens",
             "type": "integer"
+          },
+          "previous_usage_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Usage Tokens"
           },
           "parts_ref": {
             "$ref": "#/components/schemas/ArtifactRef"

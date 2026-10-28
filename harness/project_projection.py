@@ -192,6 +192,8 @@ class WorkItem:
     status: str = "not_started"
     department: str | None = None
     stop_reason: str | None = None
+    # 停止说明（工单 #1162）：让事项停下的那条错误的原文，取自事项结束的事件；只有停止的事项有
+    stop_note: str | None = None
     human_action: str | None = None
     cycle_count: int = 0
     rework: list[dict[str, Any]] = field(default_factory=list)

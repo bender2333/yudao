@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boardColumns } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_REASON,departmentLine,departmentName,departmentsText,label,progressLabel,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,label,progressLabel,stopNoteView,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
 import type { WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 
@@ -30,6 +30,7 @@ function item(overrides: Partial<WorkItemCard> & { work_item_id: string }): Work
     progress: null,
     round: 1,
     stop_reason: null,
+    stop_note: null,
     human_action: null,
     pending_question: null,
     adoption_id: null,
@@ -195,4 +196,37 @@ test("没有部门在工作时看板卡片不写这一格", () => {
 test("查询结果里没有 departments 时看板卡片照旧写事项所在的部门", () => {
   assert.equal(workingDepartmentsText({ department: "engineering" }), "工程");
   assert.equal(workingDepartmentsText({ department: null }), "");
+});
+
+// ---------------------------------------------------------------------------
+// 停止说明（工单 #1162）：停止原因下面写让事项停下的那条错误的原文，原样显示；
+// 空白当作没有这一项；太长时折起来。期望值写成字面值。
+
+test("停止说明原样写错误原文，不改写也不截断", () => {
+  const stopped = item({
+    work_item_id: "w1",
+    status: "stopped",
+    stop_reason: "provider_error",
+    stop_note: "模型服务返回 HTTP 400：input length 131072 exceeds the maximum",
+  });
+  assert.deepEqual(stopNoteView(stopped.stop_note), {
+    kind: "inline",
+    text: "模型服务返回 HTTP 400：input length 131072 exceeds the maximum",
+  });
+});
+
+test("没有停止说明时不写这一项：放行完成、用户自己停下、字段缺失与空白都一样", () => {
+  assert.deepEqual(stopNoteView(item({ work_item_id: "w1", status: "released_unsettled" }).stop_note), { kind: "none" });
+  assert.deepEqual(stopNoteView(item({ work_item_id: "w2", status: "stopped", stop_reason: "cancelled" }).stop_note), { kind: "none" });
+  assert.deepEqual(stopNoteView(null), { kind: "none" });
+  assert.deepEqual(stopNoteView(undefined), { kind: "none" });
+  assert.deepEqual(stopNoteView("   "), { kind: "none" });
+});
+
+test("停止说明太长时折起来，全文照旧保留", () => {
+  const long = `上游返回 400：${"x".repeat(200)}`;
+  assert.deepEqual(stopNoteView(long), { kind: "folded", text: long });
+  // 恰好到那一个字数的仍然一行写完
+  assert.equal(stopNoteView("x".repeat(STOP_NOTE_INLINE_LIMIT)).kind, "inline");
+  assert.equal(stopNoteView("x".repeat(STOP_NOTE_INLINE_LIMIT + 1)).kind, "folded");
 });

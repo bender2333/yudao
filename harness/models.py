@@ -85,9 +85,11 @@ def hash_bytes(data: bytes) -> str:
 
 
 def estimate_tokens(text: str) -> int:
+    # 本地估算按 UTF-8 字节数除以 4（模型管理设计说明第 8.2 节）：中文一个字至少三个字节，
+    # 按字符数除以 4 会把以中文为主的材料估成实际用量的一半以下。
     if not text:
         return 0
-    return max(1, (len(text) + 3) // 4)
+    return max(1, (len(text.encode("utf-8")) + 3) // 4)
 
 
 @dataclass(frozen=True)

@@ -225,6 +225,8 @@ class StepRecorder:
                        effective_context_window=step.limits.context_window,
                        input_token_estimate=step.input_token_estimate,
                        output_reserve_tokens=step.output_reserve_tokens,
+                       # 判断要不要压缩用的两项数值（设计说明第 8.2 节）：本次本地估算与上一次的上游回报用量
+                       previous_usage_tokens=step.previous_usage_tokens,
                        parts_ref=asdict(parts_ref),
                        snapshot_hash=snapshot_hash)
         payload.update(attempt_id=request.attempt_id, logical_call_id=request.logical_call_id)

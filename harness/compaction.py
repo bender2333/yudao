@@ -102,6 +102,9 @@ def plan_compaction(
     pinned_input: list[dict[str, Any]],
     tools: list[dict[str, Any]],
     output_limit: int | None = None,
+    *,
+    previous_usage_tokens: int | None = None,
+    work_limit_tokens: int | None = None,
 ) -> CompactionPlan | None:
     """Plan exactly one bounded summary call; the engine drives subsequent calls."""
     if not isinstance(context_window, int) or isinstance(context_window, bool) or context_window < 1:
@@ -109,6 +112,13 @@ def plan_compaction(
     if output_limit is not None and (
             not isinstance(output_limit, int) or isinstance(output_limit, bool) or output_limit < 1):
         raise CompactionError("output_limit must be a positive integer")
+    if previous_usage_tokens is not None and (
+            not isinstance(previous_usage_tokens, int) or isinstance(previous_usage_tokens, bool)
+            or previous_usage_tokens < 0):
+        raise CompactionError("previous_usage_tokens must be a non-negative integer")
+    if work_limit_tokens is not None and (
+            not isinstance(work_limit_tokens, int) or isinstance(work_limit_tokens, bool) or work_limit_tokens < 1):
+        raise CompactionError("work_limit_tokens must be a positive integer")
     texts, boundaries = _validate_records(records)
     start, offset = _cursor(records, texts, boundaries, checkpoint)
     # One reserve rule for the whole run: history is compacted once the input would eat
@@ -116,7 +126,10 @@ def plan_compaction(
     output_reserve = response_reserve(context_window, output_limit)
     if output_reserve < 1:
         raise CompactionError("The model output limit leaves no room for a compaction summary")
+    # 压缩阈值 = min(窗口 − 预留量, 工作上限)（设计说明第 8.3 节）：窗口很大时也在工作上限处压缩
     threshold = context_window - output_reserve
+    if work_limit_tokens is not None:
+        threshold = min(threshold, work_limit_tokens)
     pinned_tokens = _request_tokens(pinned_input, tools, output_limit)
     if pinned_tokens >= threshold:
         raise CompactionError("Pinned intend/current work and tool schemas leave no room for history and a response")
@@ -124,8 +137,11 @@ def plan_compaction(
         record["item"] for record in records[start:]
     ]
     before = _request_tokens([*pinned_input, *active], tools, output_limit)
+    # 用量取上一次请求的上游回报用量与本次本地估算中较大的一个（设计说明第 8.2 节）；
+    # 没有上一次或上游没有回报时只用估算
+    used = before if previous_usage_tokens is None else max(before, previous_usage_tokens)
     unfinished = checkpoint is not None and not checkpoint.boundary
-    if not unfinished and before <= threshold:
+    if not unfinished and used <= threshold:
         return None
     if start >= len(records):
         raise CompactionError("History is already summarized and still does not fit the model window")
