@@ -217,19 +217,6 @@ function detectRepo(loop) {
   return match ? match[1] + '/' + match[2] : '';
 }
 
-/** 本机的 gh 登录名。用来区分「我刚开过工的单子」与「别人在做」。 */
-function selfLogin(loop) {
-  const cached = str(loop.state.self, '');
-  if (cached) return cached;
-  const result = gh(['api', 'user', '--jq', '.login'], loop.root);
-  if (result.status !== 0) return '';
-  const login = result.stdout.trim();
-  if (login) {
-    loop.state.self = login;
-    saveLedger(loop);
-  }
-  return login;
-}
 /* ------------------------------------------------------------ external data */
 
 const ISSUE_FIELDS = `
@@ -316,6 +303,12 @@ function fetchIssues(repo, maxPages = 8) {
 
 function openBlockers(issue) {
   return (issue.blockedBy || []).filter((b) => b.state === 'OPEN').map((b) => b.number);
+}
+
+/** 单张工单的状态（OPEN / CLOSED）。fetchIssues 只拉开放的工单，台账里的单子不在其中时用它查；查不到返回空串。 */
+function issueState(loop, number) {
+  const view = ghJson(['issue', 'view', String(number), '--json', 'state'], null, loop.root);
+  return view && typeof view.state === 'string' ? view.state : '';
 }
 
 /* ------------------------------------------------------------------- scope */
@@ -721,9 +714,10 @@ function commandNext(args) {
       if (inScopeAnnotated(t)) return false;
       if (state[t.id] && state[t.id].escalated) return false;
       if (state[t.id] && state[t.id].external) return false;
-      if (state[t.id] && state[t.id].blockedBy && state[t.id].blockedBy.length) return false;
       const issue = byIssue.get(t.issue);
       if (!issue) return false;
+      // 阻塞方按这一次拉到的 blockedBy 判断：刚收进台账的工单没有 refresh 写的记录，阻塞方刚关闭时那份记录也是旧的。
+      if (openBlockers(issue).length) return false;
       if (issue.labels.some((l) => PARKED_LABELS.includes(l))) return false;
       return t.after.every((id) => doneIds.has(id));
     });
@@ -888,6 +882,7 @@ function commandClaim(args) {
   const state = taskStateOf(loop);
   state[task.id] = Object.assign({}, state[task.id] || {}, { claimedAt: NOW() });
   delete state[task.id].external;
+  delete state[task.id].releasedAt;
   loop.state.taskState = state;
   saveLedger(loop);
 
@@ -1257,6 +1252,15 @@ function clearActive(loop, taskId) {
   loop.state.concurrency = { max: conc.max, exclusiveLimit: conc.exclusiveLimit, active: conc.active };
 }
 
+/** 账本放手：交回、转给用户或被外部挂起以后，这张单不再算这个账本领取的，别的会话接手时才不会被当成我们的。 */
+function releaseClaim(entry) {
+  if (entry && entry.claimedAt) {
+    delete entry.claimedAt;
+    entry.releasedAt = NOW();
+  }
+  return entry;
+}
+
 /** 三条通道共用：把任务从候选里拿掉、摘牌换牌、把说明发到工单上。 */
 function handOff(args, kind) {
   const loop = openLedger(args);
@@ -1301,6 +1305,7 @@ function handOff(args, kind) {
       entry.reason = body.slice(0, 400);
       markTask(loop, task.id, '~', args.force);
     }
+    releaseClaim(entry);
     state[task.id] = entry;
     loop.state.taskState = state;
     clearActive(loop, task.id);
@@ -1331,16 +1336,15 @@ function handOff(args, kind) {
  * 台账跟外部工单对齐：关掉的标完成，交回的标 [~]，等条件的标 waiting，
  * 别人领走的记成 external。
  *
- * 关键一条：solo 里没有「别人」，只有「别人领走」和「我们自己的单子」。
- * 工单带 in-progress / needs-review、负责人是我或者没人——这是我们自己
- * 上一轮没来得及收账的单子，下一轮要能重新派它，不能当成别人的。
+ * 关键一条：自己的单子只认账本。工单带 in-progress / needs-review，并且这个账本
+ * 领取过、还没有放手——这是我们自己上一轮没来得及收账的单子，下一轮要能重新派它；
+ * 其余的记成别人在做（同一个 gh 账号下的其他会话，负责人一栏分不出是谁）。
  */
 function commandRefresh(args) {
   const loop = openLedger(args);
   return withLock(loop, () => {
     const repo = detectRepo(loop);
     if (!repo) fail('找不到外部仓库：origin 不是 GitHub 仓库');
-    const self = selfLogin(loop);
     const { issues, complete, lastError } = fetchIssues(repo);
     if (!complete) fail('外部工单没有拉全，这一轮不动台账：' + (lastError || '分页中断'));
 
@@ -1355,13 +1359,15 @@ function commandRefresh(args) {
       if (!task.issue || task.status === 'done') continue;
       const issue = byNumber.get(task.issue);
       if (!issue) {
-        changes.push({ task: task.id, issue: task.issue, to: 'missing', note: '外部找不到这张单（关了或者转走了）' });
-        continue;
-      }
-      if (issue.state === 'CLOSED') {
-        markTask(loop, task.id, 'x', args.force);
-        state[task.id] = Object.assign({}, state[task.id] || {}, { done: true, closedOutside: true, doneAt: NOW() });
-        changes.push({ task: task.id, issue: task.issue, to: 'done', note: '外部已关闭，台账标完成' });
+        // 开放列表里没有：逐张查一次状态。关闭的标完成，并让出它占着的并发位置；查不到的才报找不到。
+        if (issueState(loop, task.issue) === 'CLOSED') {
+          markTask(loop, task.id, 'x', args.force);
+          state[task.id] = Object.assign({}, state[task.id] || {}, { done: true, closedOutside: true, doneAt: NOW() });
+          clearActive(loop, task.id);
+          changes.push({ task: task.id, issue: task.issue, to: 'done', note: '外部已关闭，台账标完成' });
+          continue;
+        }
+        changes.push({ task: task.id, issue: task.issue, to: 'missing', note: '外部找不到这张单（转走了，或者没查到状态）' });
         continue;
       }
 
@@ -1382,7 +1388,7 @@ function commandRefresh(args) {
           markTask(loop, task.id, ' ', args.force);
           stripAnnotation(loop, task.id, '（等用户）', args.force);
           stripAnnotation(loop, task.id, '（waiting）', args.force);
-          state[task.id] = Object.assign({}, state[task.id] || {}, { fails: 0 });
+          state[task.id] = releaseClaim(Object.assign({}, state[task.id] || {}, { fails: 0 }));
           delete state[task.id].escalated;
           delete state[task.id].waitFor;
           delete state[task.id].kind;
@@ -1400,7 +1406,7 @@ function commandRefresh(args) {
       }
 
       const owner = (issue.assignees || [])[0] || '';
-      const ours = !owner || (Boolean(self) && owner === self);
+      const ours = Boolean(state[task.id] && state[task.id].claimedAt);
       if (issue.labels.includes('in-progress') || issue.labels.includes('needs-review')) {
         const label = issue.labels.includes('in-progress') ? 'in-progress' : 'needs-review';
         if (active) {
@@ -1420,18 +1426,19 @@ function commandRefresh(args) {
 
       if (issue.labels.includes('needs-triage')) {
         markTask(loop, task.id, '~', args.force);
-        state[task.id] = Object.assign({}, state[task.id] || {}, { escalated: true, escalatedAt: NOW() });
+        state[task.id] = releaseClaim(Object.assign({}, state[task.id] || {}, { escalated: true, escalatedAt: NOW() }));
         changes.push({ task: task.id, issue: task.issue, to: 'escalated', note: '已交回架构师' });
         continue;
       }
       if (issue.labels.includes('ready-for-human')) {
         annotateTask(loop, task.id, '（等用户）', args.force);
-        state[task.id] = Object.assign({}, state[task.id] || {}, { waitFor: 'user' });
+        state[task.id] = releaseClaim(Object.assign({}, state[task.id] || {}, { waitFor: 'user' }));
         changes.push({ task: task.id, issue: task.issue, to: 'waiting', note: '等用户处理' });
         continue;
       }
       if (issue.labels.includes('waiting')) {
         annotateTask(loop, task.id, '（waiting）', args.force);
+        if (state[task.id]) releaseClaim(state[task.id]);
         changes.push({ task: task.id, issue: task.issue, to: 'waiting', note: '等前提条件' });
         continue;
       }
