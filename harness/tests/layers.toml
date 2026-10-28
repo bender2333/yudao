@@ -167,6 +167,7 @@
 "test_runtime_drain.py" = "integration"
 "test_saved_projections.py" = "integration"
 "test_search_tools.py" = "module"
+"test_second_routing.py" = "module"
 "test_second_slot_implementations.py" = "module"
 "test_service_lock.py" = "integration"
 "test_slot_contracts.py" = "module"
