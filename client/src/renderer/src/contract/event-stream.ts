@@ -10,7 +10,9 @@ import { nextPosition, parseFrame, streamUrl, type StreamMessage, type StreamSco
 export type { StreamMessage, StreamScope } from "./stream-frames";
 
 export type StreamHandlers = {
-  onConnected: () => void;
+  // reconnected 表示这是断开以后的重新连接，不是刚订阅上（工单 #1159）：
+  // 页面据此核对一次本次启动的身份，换了服务就重新同步
+  onConnected: (info: { reconnected: boolean }) => void;
   onMessage: (message: StreamMessage) => void;
   // 发现缺口或收到 resync：客户端把已打开的视图标为「数据可能过时」并重新同步快照
   onResync: (reason: string) => void;
@@ -24,6 +26,8 @@ export class EventStreamClient {
   private source: EventSource | null = null;
   private lastPosition = 0;
   private closed = false;
+  // 断开以后又连上过（工单 #1159）：这一次连上要核对本次启动的身份
+  private retried = false;
   private readonly backoff = new ReconnectBackoff();
   private timer: NodeJS.Timeout | null = null;
   private readonly baseUrl: string;
@@ -42,6 +46,7 @@ export class EventStreamClient {
   start(after: number): void {
     this.stop();
     this.closed = false;
+    this.retried = false;
     this.backoff.stoodUp();
     this.lastPosition = after;
     this.connect();
@@ -66,7 +71,7 @@ export class EventStreamClient {
         return;
       }
       // 打开不算站得住（工单 #679）：退避在收到帧以后才清零
-      this.handlers.onConnected();
+      this.handlers.onConnected({ reconnected: this.retried });
     });
     for (const name of ["event", "checkpoint", "delta", "resync"]) {
       source.addEventListener(name, (message) => this.onFrame(name, message as MessageEvent));
@@ -77,6 +82,8 @@ export class EventStreamClient {
       }
       source.close();
       this.source = null;
+      // 断开过：下一次连上时报给页面，让它核对一次本次启动的身份（工单 #1159）
+      this.retried = true;
       if (this.backoff.count === 0) {
         this.handlers.onInterrupted();
       }
