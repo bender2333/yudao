@@ -160,11 +160,32 @@ def compaction_success(data_dir):
 
 
 def compaction_failed(data_dir):
-    def undeclared(request):
-        identity = f"corrupt-{request.activation_id}-{request.step_id}"
-        return ModelResponse(output=[_call(identity, "list_files", {})])
+    # 整理连续 compaction.stalled_limit 次没有推进，事项以 compaction_failed 停止（工单 #1155）：
+    # 第一次是同一逻辑调用的三次尝试都回未声明的工具调用（工具不执行，尝试用完以后工作请求按未压缩的
+    # 历史照常发出），之后两次整理各回一次空摘要。窗口按固定材料的实测 token 数加余量推出，
+    # 使历史超过压缩阈值而未压缩的工作请求仍放得下。
+    task = "build an echo CLI"
+    work_counts: dict[str, int] = {}
+    compactions = 0
 
-    system, run_id = _compaction_system(data_dir, undeclared, step_limits=FAST_RETRIES)
+    def respond(request):
+        nonlocal compactions
+        if request.purpose == "compaction":
+            compactions += 1
+            if compactions <= 3:
+                identity = f"corrupt-{request.activation_id}-{request.step_id}"
+                return ModelResponse(output=[_call(identity, "list_files", {})])
+            return ModelResponse(output=[_summary(request, "")])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        identity = f"read-{request.activation_id}-{request.step_id}"
+        return ModelResponse(output=[_call(identity, "read_file", {"path": "large.txt"})])
+
+    adapter = FakeAdapter([respond] * 20)
+    system = LoopSystem.for_testing(data_dir, adapter, step_limits=FAST_RETRIES)
+    measure_id = system.create_run(task, context_window=1_000_000)
+    run_id = system.create_run(task, context_window=pinned_input_tokens(system, measure_id) + 1600)
+    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 340)
     system.run_until_stop(run_id)
     return system, run_id, {}
 
@@ -690,7 +711,9 @@ SCENARIOS: dict[str, Scenario] = {
         "读取大文件后上下文接近窗口：先发出没有工具的压缩请求，摘要记为压缩检查点，之后的工作请求带着摘要继续，产品规格被接纳。",
         compaction_success),
     "compaction_failed": Scenario(
-        "压缩请求连续三次返回未声明的工具调用：每次作为可重试失败记录，工具不执行，尝试次数用完后运行以 compaction_failed 失败。",
+        "整理连续三次没有推进：先是同一逻辑调用的三次尝试都回未声明的工具调用（工具不执行，"
+        "工作请求按未压缩的历史照常发出），之后两次整理各回一次空摘要，达到 compaction.stalled_limit 时"
+        "运行以 compaction_failed 失败，停止说明写明连续的次数与最后一次的原因。",
         compaction_failed),
     "invalid_tool_arguments": Scenario(
         "模型给出无法解析的工具参数：工具不启动，错误作为工具结果返回模型，记入历史的参数换成 {}；下一步提交成功。",

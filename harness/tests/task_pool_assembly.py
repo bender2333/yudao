@@ -24,9 +24,9 @@ class TaskPoolAssembly(second_assembly.SecondAssembly):
 
     CONTRACT_VERSION = second_assembly.SecondAssembly.CONTRACT_VERSION
 
-    def request(self, pinned: second_assembly.SecondPinnedStep,
-                history: list[dict[str, Any]]) -> second_assembly.SecondStepRequest:
-        step = super().request(pinned, history)
+    def request(self, pinned: second_assembly.SecondPinnedStep, history: list[dict[str, Any]], *,
+                defer_compaction: bool = False) -> second_assembly.SecondStepRequest:
+        step = super().request(pinned, history, defer_compaction=defer_compaction)
         tools = _tools(pinned.projection, pinned.frame.department)
         if not tools:
             return step

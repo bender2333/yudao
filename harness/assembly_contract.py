@@ -64,8 +64,10 @@ class ContextAssembly(Protocol):
         # 这一步固定的部分：部门材料、工具定义与上下文清单的前一半
         ...
 
-    def request(self, pinned: Any, history: list[dict[str, Any]]) -> Any:
-        # 在固定部分之后接上部门历史，得到装配好的请求与上下文清单
+    def request(self, pinned: Any, history: list[dict[str, Any]], *,
+                defer_compaction: bool = False) -> Any:
+        # 在固定部分之后接上部门历史，得到装配好的请求与上下文清单。
+        # defer_compaction 为真时，这一次不另发整理请求，按未压缩的历史交出工作请求（第 8.7 节，工单 #1155）
         ...
 
     def finish_compaction(self, step: Any, output: list[dict[str, Any]]) -> Any | None:

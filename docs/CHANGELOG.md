@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 00:25 / 工单 #1155 [执行] 整理请求失败不再结束事项：README「停止与后续范围」改写压缩那一句——整理请求自己失败（重试耗尽，或回应不是摘要文字）时同样不写检查点、这一步的工作请求按未压缩的历史照常发出（放不进窗口时以上下文超限结束）、下一次再整理，回应里带文字就用文字、未声明的工具调用不执行也不进入历史；连续 `compaction.stalled_limit` 次没有推进的原因里加上「整理请求失败」 / 落实 `docs/design/model-management.md` 第 8.7 节第一条与第二条（代码与用例同单改动，文档只改这一句读者看得见的停止规则）
+
 claude-架构师 / 2026-10-29 00:10 / docs/program-roadmap.md、docs/current-baseline.md、docs/requirements/README.md 的 D40 一行、docs/design/README.md 的骨架与应用设计说明一行：把阶段一「换骨架」的状态与日期改到本次核对（父工单 #823 子工单 22/22 关闭，七条验收在 main a5b5a3c7 上逐条核对，第 6 条后半的场景 3 读数由 #994 在阶段一发布提交上跑），内容未重写 / 父工单按验收证据规则第 4 节核对后关闭，证据写在 #823 的评论 https://github.com/bender2333/yudao/issues/823#issuecomment-6474145556；总图的建设状态与缝的已定未定仍由总架构师改，需要改的行写在同一条评论里
 
 solo-deepseek-v4.1-flash / 2026-10-29 00:05 / 工单 #1160 [界面]：本文件加这一条。界面按当前定稿 v13 改了三处（概览的新事项输入一个框配两个按钮、事项统计那一行的名字、新建项目表单的说明），`docs/` 下的设计说明与原型都没有改：v13 的 `docs/prototypes/v13/js/ui/views/overview.js`（`composerHtml`）与 `docs/prototypes/v13/js/ui/shell.js`（`shell.newProject`）就是这次的依据，`docs/design/project-initial-files.md` 第 3、5 节写的起始文件夹快照与「从想法新建不调用模型」没有变 / 试用问题 Tf61ac6a6-05（两个文本框不知该填哪个）与 Tf61ac6a6-08（事项统计叫「已放行」实际是放行了还没采纳、漏了成果挂起），另补 Tf61ac6a6-10 分诊后剩下的那处表单说明
