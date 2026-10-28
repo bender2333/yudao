@@ -1,0 +1,34 @@
+{
+  "departments": [
+    {
+      "id": "product",
+      "label": "发任务的部门",
+      "roles": [
+        "product"
+      ],
+      "watched": [
+        "user_input"
+      ]
+    },
+    {
+      "id": "engineering",
+      "label": "领任务并完成的部门",
+      "roles": [
+        "engineering"
+      ]
+    },
+    {
+      "id": "quality",
+      "label": "验收与打回的部门",
+      "roles": [
+        "quality"
+      ]
+    }
+  ],
+  "routing": "task_pool",
+  "rules": {
+    "input_handling": "任务池的输入由发任务的部门读：用户的输入先变成池子里的一条任务。",
+    "professional_completion": "完成一件任务要写清做了什么；能不能验收由另一个部门判断。",
+    "collaboration_rules": "任务由池子指派给能做的人；完成的人不能自己验收自己。"
+  }
+}

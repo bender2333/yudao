@@ -1,0 +1,17 @@
+{
+  "kinds": {
+    "change": {
+      "label": "任务池事项",
+      "stop_reason": "released",
+      "departments": {}
+    }
+  },
+  "repository_overview": {
+    "sources": {
+      "patterns": [
+        "*.py"
+      ],
+      "limit": 20
+    }
+  }
+}

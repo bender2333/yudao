@@ -73,13 +73,15 @@ def test_a_version_the_thin_driver_does_not_accept_fails_and_says_why():
 
 
 def test_the_organization_definition_selects_the_implementation_by_name():
-    # R2：定义里写明的名称按名称接上实现；名称没有实现时失败，写明有哪些可用的名称
+    # R2：定义里写明的名称按名称接上实现；名称没有实现时失败，写明有哪些可用的名称。
+    # 例子里用的名称是「没有实现的那个」：task_pool 这个名称由只在测试里用的第二种路由登记（工单 #864），
+    # 收集到这个仓库的测试时它已经接上了，不能拿它当没有实现的名称
     assert routing_contract.select(DEFINITIONS.routing) is ROUTING
     assert "watched_outputs" in routing_contract.registered()
     with pytest.raises(routing_contract.UnavailableRouting) as raised:
-        routing_contract.select("task_pool")
+        routing_contract.select("task_board")
     message = str(raised.value)
-    assert "task_pool" in message and "watched_outputs" in message
+    assert "task_board" in message and "watched_outputs" in message
 
 
 def test_an_implementation_without_a_name_cannot_be_registered():

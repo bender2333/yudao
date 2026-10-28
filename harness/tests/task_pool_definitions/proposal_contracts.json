@@ -1,0 +1,55 @@
+{
+  "roles": {
+    "product": {
+      "submit_tools": [
+        "submit_task"
+      ],
+      "kinds": {
+        "pool_task": {
+          "description": "池子里的一条任务：标题写清要什么，池子把它指派给能做的人",
+          "field": "title"
+        }
+      },
+      "notes": [
+        "一次交一条任务；任务由池子指派，不能自己完成它。"
+      ]
+    },
+    "engineering": {
+      "submit_tools": [
+        "complete_task"
+      ],
+      "kinds": {
+        "task_completion": {
+          "description": "交给你的那件任务的完成说明：说清做了什么",
+          "field": "summary"
+        }
+      },
+      "notes": [
+        "完成说明不是验收结论：能不能验收由另一个部门判断，完成的部门不能自己验收自己。"
+      ]
+    },
+    "quality": {
+      "submit_tools": [
+        "judge_task"
+      ],
+      "kinds": {
+        "task_verdict": {
+          "description": "对别人交上来的完成说明的结论：接纳或者打回，并写清理由",
+          "fields": [
+            "verdict",
+            "reason"
+          ]
+        }
+      },
+      "notes": [
+        "只验收别人交上来的完成说明；打回以后任务回到池子，由完成它的部门重做。"
+      ]
+    }
+  },
+  "shared": {
+    "submit_tools": [],
+    "kinds": {},
+    "notes": []
+  },
+  "conditions": {}
+}
