@@ -5,7 +5,7 @@
 
 # 共同要求
 - 严格遵循既定的系统分层与边界，控制代码复杂度，保持模块化与低耦合。边界的正本是总图 `docs/architecture.html`（共同规则「总图是正本」）：工单「依据」一行写明总图位置时，先读那一节；改到一道缝时按第四节那张卡的规矩做。执行者与审查者不改总图。
-- 执行者有日记本，把行动、思考过程与关键状态记录在 `agents_jour/<工单编号>.md` 中（格式见共同规则「文档与记录」），随工单的分支提交，不直接推送到 main。审查者的记录就是 PR 上的审查，不写日记文件。
+- 执行者有日记本，把行动、思考过程与关键状态记录在 `agents_jour/<工单编号>.md` 中（格式见共同规则「文档与记录」），随工单的分支提交，不直接推送到 main。日记在合并之前写完，合并以后不再补记：合并提交与 main 上的 CI 在 GitHub 上查得到，合并以后发生的事写在工单评论里。审查者的记录就是 PR 上的审查，不写日记文件。
 - 交付、审查、处理既有失败或更新测试基准时，读取 [验收证据规则](docs/agents/acceptance-evidence.md)，按其中的版本身份、未解决问题与角色权限执行。
 - 你有无限的时间和资源去做事情，所以不用着急结束，高质量做完事情更重要。时间不限，指的是一张工单可以分多轮做完；单独一轮的时长有上限（[运行配置](docs/agents/autopilot-runtime.md)第 7 节）。一轮做不完时，提交并推送已完成的部分，在 PR 上写明做到哪里、还剩什么，结束这一轮；下一轮从这张工单接着做（自主推进由派发者再派同一张），不等架构师。
 - 内核路径的测试覆盖：「只改」里有内核模块（`harness/definitions/kernel-manifest.json` 里 kind 为 `module` 的文件）、可信内核清单本身或 `harness/tests/kernel/` 的工单，可以改它们，不需要事前批准（用户 2026-10-27 决定，取代 2026-10-26 的批准行与 `kernel-approved`）；要求是保持这部分的测试覆盖（用户 2026-10-26 决定，取代 solo 执行者不修改可信内核清单与内核测试的规定），工单验收里写了更高的覆盖数时按工单的数：
@@ -43,7 +43,7 @@ Python 包 `harness/`，按[总体架构](docs/design/architecture/overall-archi
 - 安装依赖（Python 3.11 或更新版本）：`uv sync --frozen`，按锁文件在仓库内建立项目环境 `.venv`，包含测试依赖。
 - 启动服务：`uv run python -m harness api`（无参 `uv run python -m harness` 相同，默认端口 8765）；无需凭据的演示：`uv run python -m harness demo`
 - 测试：开发中与交付前运行与本次改动相关的测试文件（包括本次改动或新增的集成层文件），以及 CI 报告失败的测试。单元层与模块层全部（包括下面两项固定检查）、客户端的类型检查与单元测试、页面与 wheel 的编译由 CI 在每次推送时运行（`.github/workflows/ci.yml`），本地不反复运行全部。分层定义见 `docs/design/test-pyramid.md`；新增测试文件时在登记表中加一行，放在第一个能到达其结论的层；越界使用子进程、网络或临时目录的测试会被该层的检查判为失败。
-  - 测试的写法见 `docs/design/test-pyramid.md` 第 10 节：提案用 `harness/proposals.py` 的构造函数生成；断言结果，不数模型调用的次数，次数本身是被测的行为时除外；测试不决定产品的文字。新增的测试按第 13 节写明它守的是哪一条（R1、R2、R3），写不出来就不加。用例的删除（第 4.4 节）：工单写明删除的行为时，删守着这些行为的用例，交付说明逐条列出；工单没有写的改写用例，不删；`harness/tests/kernel/` 只增不删。
+  - 测试的写法见 `docs/design/test-pyramid.md` 第 10 节：提案用 `harness/proposals.py` 的构造函数生成；断言结果，不数模型调用的次数，次数本身是被测的行为时除外；测试不决定产品的文字；两件同时进行的事谁先谁后，由事件或信号决定，不用时长去赌（第 10 节第 7 条）。新增的测试按第 13 节写明它守的是哪一条（R1、R2、R3），写不出来就不加。用例的删除（第 4.4 节）：工单写明删除的行为时，删守着这些行为的用例，交付说明逐条列出；工单没有写的改写用例，不删；`harness/tests/kernel/` 只增不删。
   - 前端测试：`cd client && npm test`（客户端单元）；端到端为 `cd client && npm run test:e2e`。只在本次改动涉及 `client/` 或接口合同时运行，并且只运行相关的测试文件；客户端单元里的逐场景回放测试单独运行。
   - 两项固定检查：`uv run python -m pytest harness/tests/test_layers.py harness/tests/test_openapi_snapshot.py`，检查整个仓库的模块导入关系与接口合同，CI 每次都运行；改动模块导入或接口合同时本地也运行。`test_openapi_snapshot.py` 里的两项检查分别核对运行中的服务与 `harness/tests/openapi/openapi.json` 相同、按快照重新生成的客户端类型与提交的 `client/src/renderer/src/api/generated/` 逐文件相同；它需要 `harness/tests/openapi` 与 `client` 各安装一次依赖（各自的 `npm install`），未安装时报错写明缺少哪个文件。改动接口合同的工单在用 `--write-openapi-snapshot` 重写快照以后，在 `client` 中运行 `npm run generate:api` 重新生成客户端类型并提交，两项检查才会都通过。
   - 只用单进程运行，不加 `-n`。集成层全部由 CI 在每次合并以后运行（`docs/design/test-pyramid.md` 第 4.2 节），执行者与审查者不运行全量测试：不运行 `harness/tests` 整个目录，也不把全部测试文件分批逐个运行一遍；单条命令不超过 10 分钟。
@@ -138,7 +138,7 @@ solo 模式下没有独立审查，质量由两道检查承担：你自己对照
 3. 交付：CI 通过以后在 PR 上评论，格式与「执行者」第 6 步相同，第一行写 `DELIVERY: 第 <k> 轮`，逐条验收核对要写出每条验收标准对应的证据；然后把工单标签从 `in-progress` 改为 `needs-review`，表示交付已写好、正在做合并前的自我核对。
 4. 合并前的核对：`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过；工作区没有未提交也未推送的改动；交付说明里的每条验收核对都有证据；工单带 `touches-core` 时，交付说明里有分支上集成层运行的链接，失败项都是 main 上最近 7 天失败过的（「执行者」第 5 步）；「只改」含内核路径时，交付说明里有改动前后的覆盖读数，并且符合共同要求「内核路径的测试覆盖」的三条。各项都满足才合并，任何一项不满足就把标签改回 `in-progress`，继续修改，修好并通过 CI 以后回到第 3 步，没有例外。
 5. 合并：`gh pr merge issue-<编号> --admin --squash`。main 的规则要求一个其他人的批准，solo 模式没有这个批准，所以合并使用仓库所有者的豁免，这是 solo 模式唯一允许使用豁免的场合。`--admin` 绕开所有规则，包括 `check`，所以第 4 步的核对只能由你自己做，规则不会替你拦住。合并时标签应当是 `needs-review`。
-6. 合并以后：确认 PR 已合并、工单已随 `Closes` 关闭；未关闭时 `gh issue close <编号>` 并评论原因。工单关闭以后去掉 `needs-review` 标签（`gh issue edit <编号> --remove-label needs-review`）。记录合并提交号写入日记。
+6. 合并以后：确认 PR 已合并、工单已随 `Closes` 关闭；未关闭时 `gh issue close <编号>` 并评论原因。工单关闭以后去掉 `needs-review` 标签（`gh issue edit <编号> --remove-label needs-review`）。
 7. 卡住：时间用完仍然没有通过 CI，在 PR 上评论卡在哪里，标签保持 `in-progress`，结束这一轮；下一轮从这张工单继续。遇到的问题按「交回与自己解决的问题」处理，只有那里写明交给用户的情形才改为 `ready-for-human`。
 8. main 上的 CI：每次领取工单之前和结束一轮之前，运行 `gh run list --workflow CI --branch main --event push --limit 5`。
    - `check` 失败：暂停领取新工单，重新打开引起失败的那张工单（合并提交所属的 PR 正文里有 `Closes #<编号>`），评论失败的检查与运行链接，标签改为 `ready-for-agent`，先修好。
