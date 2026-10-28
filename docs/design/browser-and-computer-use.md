@@ -1,8 +1,6 @@
 # 浏览器与 computer use 设计说明
 
-更新：2026-10-13 按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)：试用启动命令的环境与命令相同，桌面会话的同意单独说明；2026-10-02；2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md) 与 [ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md)：试用浏览器拒绝 Yudao 服务自己的地址，试用用例分可执行检验与模型阅读，等待桌面与等待桌面解锁有时长上限；同日按 [ADR-0032](../adr/0032-interface-served-as-web-pages.md)：Yudao 服务由用户在登录会话中手动启动（第 5.1 节），界面工单用 Playwright 驱动浏览器验证（第 17 节），资料页的逐条结论表增加检验方式与开环标记（第 7.3 节）；同日，computer use 的部分（第 5 节、第 11.2 节、第 16 节第 6 至 10 项与第 12 项，以及其余各节中的屏幕工具 `screen_*`、桌面种类的试用会话与启动方式、「使用本机桌面」决定请求、`trial.stop_desktop`、等待桌面与等待桌面解锁、桌面程序的无法核验与故障，第 14 节场景 2 与场景 3 中桌面程序的部分，第 17 节的 #246、#150、#247）不在 Stage 3 实施，作为以后阶段的专题重新审视（[D34](../requirements/browser-and-computer-use.md)「computer use 专题待重新确定的事项」，[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md) 的 Status 行）；Stage 3 实施浏览器的部分。状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定，第 3 项 2026-09-30 按 ADR-0022 修改；2026-10-01 按 3.2B 的设计，#69 是 MCP 客户端模块，见第 4.1 节；2026-10-02 专题 2 决定 computer use 在控制主机的交互桌面上用真实输入进行（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)），启动命令按系统给出，见第 16 节第 7 至 12 项）；Stage 3 实施浏览器的部分，computer use 的部分属于以后阶段的专题，本文中它的设计作为专题讨论的材料。路线位置：浏览器的部分在 [Stage 3 计划](../archive/stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)「[3.2D] 浏览器：质检操作交付的网页」，属于里程碑 M4；computer use 的部分放在哪个阶段在专题讨论时确定。子工单见第 17 节。 总图位置：第四节「动作」的缝（浏览器与桌面是动作的两个类别）；第一节「模型与工具」方框。
-
-依据：需求 [D34](../requirements/browser-and-computer-use.md)；[ADR-0022](../adr/0022-run-directly-without-containers.md)（代码在执行位置上直接运行）；[执行环境服务设计说明](execution-environment.md)（3.2C：执行环境服务、执行代理、执行位置、执行位置上的程序、动作回执）；[模型管理设计说明](model-management.md)第 4.3、5.6、6 节（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)第 6.3、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4.3 节；[本地通用工具设计说明](local-tools.md)第 2 节；[语义系统设计说明](semantic-system.md)第 5.5、13 节；[评测场景](evaluation-scenarios.md)场景 1；[原型 v9 设计说明](../archive/prototypes/v9/design.md)（沿用 [v8 设计说明](../archive/prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节）。调研：[浏览器与 computer use 调研](../archive/research/browser-and-computer-use.md)、[computer use 实现调研](../archive/research/computer-use-implementations.md)。工单：[#122](https://github.com/bender2333/yudao/issues/122)（3.2B）、[#69](https://github.com/bender2333/yudao/issues/69)（MCP 客户端模块）、[#146](https://github.com/bender2333/yudao/issues/146)（输入方式与建议能力）、[#128](https://github.com/bender2333/yudao/issues/128)（执行环境的合同）。用词以 `CONTEXT.md` 为准。
+状态：设计已确认，未实施（2026-09-29 用户确认第 16 节的决定）；Stage 3 实施浏览器的部分；computer use 的部分（第 5 节、第 11.2 节、第 16 节第 6 至 10 项与第 12 项，以及其余各节中的屏幕工具 `screen_*`、桌面种类的试用会话与启动方式、「使用本机桌面」决定请求、`trial.stop_desktop`、等待桌面与等待桌面解锁、桌面程序的无法核验与故障，第 14 节场景 2 与场景 3 中桌面程序的部分，第 17 节的 #246、#150、#247）不在 Stage 3 实施，作为以后阶段的专题重新审视（[D34](../requirements/browser-and-computer-use.md)「computer use 专题待重新确定的事项」），本文中它的设计作为专题讨论的材料；最近一次改动 2026-10-28，去掉已删除的 ADR 的引用。依据：需求 [D34](../requirements/browser-and-computer-use.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（试用启动命令的环境与命令相同，桌面会话的同意单独说明）；[执行环境服务设计说明](execution-environment.md)（3.2C：执行环境服务、执行代理、执行位置、执行位置上的程序、动作回执）；[模型管理设计说明](model-management.md)第 4.3、5.6、6 节（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)第 6.3、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4.3 节；[本地通用工具设计说明](local-tools.md)第 2 节；[语义系统设计说明](semantic-system.md)第 5.5、13 节；[评测场景](evaluation-scenarios.md)场景 1；[原型 v9 设计说明](../archive/prototypes/v9/design.md)（沿用 [v8 设计说明](../archive/prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节）。调研：[浏览器与 computer use 调研](../archive/research/browser-and-computer-use.md)、[computer use 实现调研](../archive/research/computer-use-implementations.md)。工单：[#122](https://github.com/bender2333/yudao/issues/122)（3.2B）、[#69](https://github.com/bender2333/yudao/issues/69)（MCP 客户端模块）、[#146](https://github.com/bender2333/yudao/issues/146)（输入方式与建议能力）、[#128](https://github.com/bender2333/yudao/issues/128)（执行环境的合同）。用词以 `CONTEXT.md` 为准。路线位置：浏览器的部分在 [Stage 3 计划](../archive/stage-3-plan.md) 3.2D，父工单 [#123](https://github.com/bender2333/yudao/issues/123)「[3.2D] 浏览器：质检操作交付的网页」，属于里程碑 M4；computer use 的部分放在哪个阶段在专题讨论时确定。子工单见第 17 节。总图位置：第四节「动作」的缝（浏览器与桌面是动作的两个类别）；第一节「模型与工具」方框。
 
 参照实现的提交号：Playwright MCP `microsoft/playwright-mcp` v0.0.83（2026-09-28，`main` 提交 `f183dad`，依赖 Playwright `1.64.0-alpha-1790635538000`）；Anthropic `claude-quickstarts` 提交 `dee7116`；OMP `C:\project\codes\oh-my-pi` 提交 `fdfeef1f78`；OpenCode `C:\project\codes\opencode` 提交 `0027387`。
 
@@ -45,7 +43,7 @@ flowchart TB
 
 | 层 | 模块 | 3.2D 增加的职责 | 边界 |
 | --- | --- | --- | --- |
-| 定义 | `harness/definitions/` | 试用工具、浏览器工具与屏幕工具的定义，每个工具的动作类别、恢复契约与是否需要图像输入；各部门可用的工具；交付说明的提案合同增加启动方式；限额（屏幕尺寸、截图前的等待、就绪时限的默认值与上限）；工程的内置 Prompt 中写启动方式的规则，质检的内置 Prompt 中生成测试的规则 | 随系统发布，运行中不可修改（ADR-0014） |
+| 定义 | `harness/definitions/` | 试用工具、浏览器工具与屏幕工具的定义，每个工具的动作类别、恢复契约与是否需要图像输入；各部门可用的工具；交付说明的提案合同增加启动方式；限额（屏幕尺寸、截图前的等待、就绪时限的默认值与上限）；工程的内置 Prompt 中写启动方式的规则，质检的内置 Prompt 中生成测试的规则 | 随系统发布，运行中不可修改（[总体架构](architecture/overall-architecture.md)第 3 节） |
 | 控制核心 · 步骤驱动 | `engine.py` | 按调用目标的输入方式选出这次请求提供的工具（#146 的机制）；把回执中的截图交给 P | 不读取截图内容 |
 | 控制核心 · P | `assembly.py` | 调用目标包含图像时，把最近 3 张截图放进请求，更早的换成带证据编号的占位文字 | 只读取事件与工件 |
 | 控制核心 · U | `adjudication.py`、`validation.py` | 工具许可：质检只能使用当前交付说明中的启动方式，模型不含图像或执行位置不是控制主机时拒绝桌面种类的试用会话；交付说明中启动方式的核对；试用用例的开始与结束；QAReview 的逐条结论与放行规则 | 不调用模型 |
@@ -221,13 +219,13 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 ## 5. computer use
 
-本节属于以后阶段的 computer use 专题，Stage 3 不实施（见文件开头的更新行）。
+本节属于以后阶段的 computer use 专题，Stage 3 不实施（见文件开头的状态行）。
 
 ### 5.1 屏幕与桌面会话
 
-桌面程序在控制主机上、用户已经登录的交互桌面上试用，输入是真实输入（[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)）。这与 Codex 在 Windows 上的做法相同：在当前桌面上运行，移动真实光标，占用前台，要求桌面没有锁定（[computer use 调研](../archive/research/computer-use-without-containers.md)第 2.3 节）。
+桌面程序在控制主机上、用户已经登录的交互桌面上试用，输入是真实输入。这与 Codex 在 Windows 上的做法相同：在当前桌面上运行，移动真实光标，占用前台，要求桌面没有锁定（[computer use 调研](../archive/research/computer-use-without-containers.md)第 2.3 节）。
 
-- **只在控制主机上**：Yudao 服务由用户在自己的登录会话中手动启动（[ADR-0032](../adr/0032-interface-served-as-web-pages.md)），能看到交互桌面。开发板没有屏幕；登记的 Windows 机器上执行代理以服务运行，处在 Session 0，没有交互桌面。执行位置不是本机进程时，桌面种类的 `trial_start` 被工具许可拒绝，原因写明「桌面程序只能在控制主机上试用」；质检把依赖它的条目记为无法核验，决定请求的说明写明要把质检的检查位置改为控制主机以后重新开始事项（执行位置在创建 run 时冻结）。
+- **只在控制主机上**：Yudao 服务由用户在自己的登录会话中手动启动（[网页界面的提供与发布设计说明](web-interface-and-release.md)第 4.2 节），能看到交互桌面。开发板没有屏幕；登记的 Windows 机器上执行代理以服务运行，处在 Session 0，没有交互桌面。执行位置不是本机进程时，桌面种类的 `trial_start` 被工具许可拒绝，原因写明「桌面程序只能在控制主机上试用」；质检把依赖它的条目记为无法核验，决定请求的说明写明要把质检的检查位置改为控制主机以后重新开始事项（执行位置在创建 run 时冻结）。
 - **只用真实输入**：输入用 `SendInput`，不使用后台投递（`PostMessage`）。后台投递对 Tk 的按键与文字、Chromium 的全部事件、WPF 的大部分事件无效（OMP `fdfeef1f78` 的 `crates/pi-natives/src/desktop/win32/delivery.rs` 第 63–88 行）；试用记录要反映用户能完成的操作，这与第 4.2 节不提供脚本工具的理由相同。
 - **开始前经用户同意**：桌面种类的 `trial_start` 先发出决定请求「使用本机桌面」，阻塞范围为这个动作，其他动作照常进行。说明写明部门、要启动的程序、期间会移动鼠标与输入文字。选项：「开始」（本次会话）、「本事项内都允许」（同一事项之后的桌面会话不再询问，从决定事件重建，重新启动以后仍然有效）、「拒绝」（`trial_start` 的结果写明用户没有交出桌面，质检把依赖它的条目记为无法核验）。
 - **同一时刻只有一个桌面会话**：范围是整台控制主机的全部项目、run 与部门。已有桌面会话时，另一个桌面种类的 `trial_start` 在同意以后排队，按请求的先后取得桌面，run 显示「等待桌面」，不报错；等待的时长上限是 `wait.desktop.max_sec`（暂定默认值，见规则登记），超过时发出决定请求并通知用户一次。网页种类的会话使用 headless 浏览器，不受影响。
@@ -421,7 +419,7 @@ QAReview 工件的 `evidence_refs` 写入逐条结论引用的检查回执与试
 
 按用户决定（D34），与普通浏览器 MCP 的默认做法相同，不另加限制，只有一项例外：浏览器拒绝访问 Yudao 服务自己监听的地址与端口，规则与网络取回相同；其余来源不设限制，浏览器可以访问外网；Chromium 使用自己的沙箱。Playwright MCP 的 README 写明它不是安全边界。
 
-代码在执行位置上直接运行（ADR-0022，3.2C 第 8 节），Yudao 不提供操作系统层面的沙箱：交付的软件、Playwright MCP 与浏览器以所在账户的权限运行，在控制主机上是运行 Yudao 的账户，在登记的机器上是执行代理所在的账户，能读写这个账户能访问的全部文件。启动方式中的命令由工程写出，它运行的是工程交付的代码，这与命令运行工程写的构建与测试脚本相同。Yudao 保证的范围与命令相同：模型凭据只在控制主机上，不进入试用副本，也不发给执行代理。来源不明的项目，把执行位置设到另一台登记的机器。
+代码在执行位置上直接运行（3.2C 第 8 节），Yudao 不提供操作系统层面的沙箱：交付的软件、Playwright MCP 与浏览器以所在账户的权限运行，在控制主机上是运行 Yudao 的账户，在登记的机器上是执行代理所在的账户，能读写这个账户能访问的全部文件。启动方式中的命令由工程写出，它运行的是工程交付的代码，这与命令运行工程写的构建与测试脚本相同。Yudao 保证的范围与命令相同：模型凭据只在控制主机上，不进入试用副本，也不发给执行代理。来源不明的项目，把执行位置设到另一台登记的机器。
 
 ## 11. 时序
 
@@ -585,7 +583,6 @@ sequenceDiagram
 ## 15. 相关文档中的 3.2D 内容
 
 - `CONTEXT.md`：试用会话、试用副本、试用用例、试用记录、启动方式、无法核验；决定请求包括质检无法核验。
-- [ADR-0022](../adr/0022-run-directly-without-containers.md)：试用在 run 的执行位置上直接进行，每个试用会话由 Yudao 分配端口。
 - [执行环境服务设计说明](execution-environment.md)第 4.1、5.2 节：环境信息列出试用需要的程序与版本。
 - [应用层与接口层设计说明](app-and-interface.md)第 3.3 节的决定种类「质检无法核验」；第 4.3 节的 `run.trials`、`evidence.screenshot` 与四个查询的增加内容；第 7.5 节。
 - [模型管理设计说明](model-management.md)第 5.6 节：工具定义的 `requires_image_input`。
@@ -594,7 +591,6 @@ sequenceDiagram
 - [语义系统设计说明](semantic-system.md)第 13 节：放行规则在 3.2D 实施。
 - [评测场景](evaluation-scenarios.md)第 9 节：场景 1 的启动方式由工程写在交付说明中，端口从 `PORT` 读取。
 - [D34](../requirements/browser-and-computer-use.md)「computer use 专题待重新确定的事项」：computer use 的专题（2026-10-02 的决定在专题讨论时重新审视）。
-- [ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)：桌面程序在控制主机的交互桌面上用真实输入试用。
 - [执行环境服务设计说明](execution-environment.md)第 7.2 节：冻结执行位置时记录每个位置的系统。
 - [应用层与接口层设计说明](app-and-interface.md)：决定种类「使用本机桌面」，命令 `trial.stop_desktop`，run 的等待原因「等待桌面」「等待桌面解锁」。
 - [网页界面的提供与发布设计说明](web-interface-and-release.md)第 4.5 节：托盘菜单「停止使用桌面」与桌面会话的提示框。
@@ -609,14 +605,14 @@ sequenceDiagram
 
 1. **验收条件的引用与放行规则。** 试用记录与 QAReview 用「ProductSpec 摘要 + 验收条件序号」引用验收条件（第 8.1 节）；3.2D 实施语义系统第 13 节已经确认的放行规则：每条验收条件都有绑定当前交付快照的通过证据才能放行（第 8.3 节）。理由：试用记录只针对一份交付与一份 ProductSpec，序号在绑定的摘要下已经唯一；这条放行规则就是 D34「没有核验的条目不能放行」的具体做法。语义系统的项目内稳定编号（Stage 5，#27）实施时，引用改用稳定编号。
 2. **质检结论「无法核验」与决定请求。** 新增 QAReview 结论 `cannot_verify` 与决定请求「质检无法核验」，选项为重新核验、停止事项（第 8.4 节）。理由：质检因为自己条件不够（例如模型不能看图）而没能核验时，返工会把责任放到工程或产品，循环不会结束。
-3. **试用在 run 的执行位置上直接进行，执行位置上需要的程序由用户安装**（2026-09-30，ADR-0022）。质检在检查位置上试用，工程在运行工作区的位置上试用；Node.js、Playwright MCP、Playwright 安装的 Chromium 与字体由用户在这台机器上安装，环境信息列出它们与版本，缺少时质检把依赖试用的条目报告为无法核验（第 3.1、3.2 节）；每个试用会话由 Yudao 分配一个空闲端口，经环境变量 `PORT` 交给交付的软件（第 3.3 节）。理由：单人在局域网内使用，安全放低优先级（D34）；按执行位置选择机器已经能把来源不明的代码放到另一台机器上运行（第 10 节）。
+3. **试用在 run 的执行位置上直接进行，执行位置上需要的程序由用户安装**（2026-09-30）。质检在检查位置上试用，工程在运行工作区的位置上试用；Node.js、Playwright MCP、Playwright 安装的 Chromium 与字体由用户在这台机器上安装，环境信息列出它们与版本，缺少时质检把依赖试用的条目报告为无法核验（第 3.1、3.2 节）；每个试用会话由 Yudao 分配一个空闲端口，经环境变量 `PORT` 交给交付的软件（第 3.3 节）。理由：单人在局域网内使用，安全放低优先级（D34）；按执行位置选择机器已经能把来源不明的代码放到另一台机器上运行（第 10 节）。
 4. **启动方式由工程写在交付说明中。** 网页应用写启动命令与就绪条件（一个地址有 HTTP 响应），桌面程序写启动命令与就绪条件（出现可见窗口），就绪时限默认 300 秒、包含安装与构建；质检按交付说明启动，用户不需要另外登记启动命令（第 3.3 节）。交付说明没有写启动方式、而验收条件需要试用时，质检退回工程补写，理由见第 3.3 节。
 5. **不提供 `browser_evaluate` 与 `browser_run_code_unsafe`**（第 4.2 节）。理由是核验的有效性：脚本可以绕过界面直接修改页面状态。这项取舍与安全无关，安全仍按默认做法。
 6. **屏幕工具使用 Yudao 自己的 8 个函数工具**（第 5.3 节），提供给所有能看图的模型。代价：原生工具经过厂商的专门训练，同一个模型使用原生工具可能更准确；好处是一套工具、一种坐标空间、一套恢复契约适用于用户提供的任何模型。
 
 2026-10-02 专题 2，用户决定 computer use 现阶段只考虑 Windows，参照 Codex、OMP 等第三方 agent 的做法；对以下各项回答「采纳建议」：
 
-7. **桌面程序在控制主机的交互桌面上用真实输入试用**（第 5.1 节，[ADR-0026](../adr/0026-desktop-trials-on-control-host-desktop.md)）。不使用后台投递；控制主机以外的执行位置不提供桌面种类。
+7. **桌面程序在控制主机的交互桌面上用真实输入试用**（第 5.1 节）。不使用后台投递；控制主机以外的执行位置不提供桌面种类。
 8. **开始前经用户同意，整台控制主机同一时刻只有一个桌面会话**（第 5.1 节）。决定请求「使用本机桌面」的选项为开始、本事项内都允许、拒绝；其余的桌面会话排队。
 9. **锁屏与用户操作时等待，提示框与托盘停止**（第 5.1 节）。锁定或安全桌面时等待解锁；用户 3 秒内有输入时等用户停下；提示框不出现在截图中；托盘菜单「停止使用桌面」。
 10. **截图与坐标**（第 5.2 节）。会话期间最小化其他窗口、结束时恢复；截取主显示器并等比缩小到 1280×800 以内，坐标按比例换算，进程声明 per-monitor DPI awareness v2。

@@ -24,10 +24,10 @@
 
 ## 处理约定
 
-处理时机、处理结果与放行的关系见[部门指导的处理设计](../design/department-guidance.md)与[三部门的循环结构](../design/department-loop.md)第 6 节（2026-10-12，[ADR-0036](../adr/0036-concurrent-departments-and-nested-asks.md)）：接收部门正在工作或在询问链上等待时，指导作为通知加入它的历史；不在工作时，在询问分支里处理，回答交给用户；发给产品的指导就是新输入，原文保存进 intend。
+处理时机、处理结果与放行的关系见[部门指导的处理设计](../design/department-guidance.md)与[三部门的循环结构](../design/department-loop.md)第 6 节（2026-10-12）：接收部门正在工作或在询问链上等待时，指导作为通知加入它的历史；不在工作时，在询问分支里处理，回答交给用户；发给产品的指导就是新输入，原文保存进 intend。
 
 ## 验收与状态
 
-状态：接收与查询已实现（`fe78667`、`fcb06ab`），命令 `guidance.send` 接收指导，`harness/interactions.py` 保存原文并写入 `department_guidance_received` 事件，指导记录由 `department.workspace` 查询读取。2026-10-12 按 ADR-0036 修改送达与处理结果，删除部门的正式回应与放行前的核对，这部分未实施。真实运行：3.0B 场景 B 中指导 `guidance_c0f7c8ea684b4e48` 在返工激活中处理，事项完成到 release（[3.0B 场景报告](../archive/stage-3/3.0b-scenarios-report-2026-09-21.md)）。
+状态：接收与查询已实现（`fe78667`、`fcb06ab`），命令 `guidance.send` 接收指导，`harness/interactions.py` 保存原文并写入 `department_guidance_received` 事件，指导记录由 `department.workspace` 查询读取。送达与处理结果见[三部门的循环结构](../design/department-loop.md)第 6 节：部门没有正式回应，放行前也没有核对；这部分未实施。真实运行：3.0B 场景 B 中指导 `guidance_c0f7c8ea684b4e48` 在返工激活中处理，事项完成到 release（[3.0B 场景报告](../archive/stage-3/3.0b-scenarios-report-2026-09-21.md)）。
 
 验收至少覆盖三个部门的定向发送、活跃与非活跃接收、工具及模型在途、返工与询问、终态边界、刷新重连、原文保真和处理来源审计。模型的实际输入必须含目标指导，其他部门收到的内容限于可见范围规定的部分。

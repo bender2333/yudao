@@ -294,7 +294,7 @@
 状态：已建；参数事件、路由自己的定义、判定点、登记的机器、限定采用未建。">
           <b>定义</b><small>带版本的数据。部门与角色、谁能拒绝谁、判定点、登记的机器、路由实现与它自己的定义、工作单元的大小、限定采用的范围、上限、停止原因清单，都住在这里。改定义不改代码，能撤回。</small>
         </div>
-        <p class="muted" style="font-size:12.5px"><b>交叉演进</b>：谁的定义与角色材料不由谁自己改。工程改质检的材料，质检核验工程的交付。</p>
+        <p class="muted" style="font-size:12.5px"><b>交叉演进</b>：谁的定义与角色材料不由谁自己改；谁改谁从谁评价谁反推，被谁评价就不能改谁。工程被质检评价，所以工程不改质检的材料。</p>
       </div>
     </div>
   </section>
@@ -480,7 +480,7 @@
     </svg>
     </div>
     <div class="legend" style="margin-top:10px">
-      <span><i style="background:var(--s3)"></i>只有一份</span><span><i style="background:var(--s2)"></i>可以多份，放哪都行</span><span><i class="solid" style="border-width:1.5px"></i>只读，随便几份</span><span><i class="dash"></i>一台机器或一个容器</span>
+      <span><i style="background:var(--s3)"></i>只有一份</span><span><i style="background:var(--s2)"></i>可以多份，放哪都行</span><span><i class="solid" style="border-width:1.5px"></i>只读，随便几份</span><span><i class="dash"></i>任何登记的机器</span>
     </div>
     <ul class="rules">
       <li><b>只有一份</b>：一份事实与它的写入口、裁决、边界、薄驱动，模型凭据也只在这里。拆开时它是一个服务，别的都经网络来写；它不复制，所以不用分布式锁，认领也不用锁：向那条流写一个事件，写入口核对版本，两个认领只有一个成功。</li>

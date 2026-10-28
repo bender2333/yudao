@@ -1,8 +1,6 @@
 # D23 统一 Provider 层与 OpenCode Go 接入
 
-确认时间：2026-09-19。状态：Stage 2.7 已实现（提交 `50fd2e1`，[执行报告](../archive/stage-2-7-provider-report.md)）：独立 Provider 模块、三协议适配、预置表、候选与准入贯通；真实 Go 在 Responses 与 Chat Completions 上各自完成模型测试与三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制；执行报告中没有与既有服务混合使用的真实任务。按每次模型请求解析调用目标由 #45 实施。所属新增阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。
-
-> 2026-09-24：调用目标按每次模型请求解析（用户决定，见 [D24 模型管理](model-management.md) 与 [ADR-0005](../adr/0005-resolve-call-target-per-request.md)），取代 2026-09-19 确认的任务级冻结；调用协议属于模型访问定义（2026-10-07，[ADR-0033](../adr/0033-protocol-belongs-to-model-access.md)），连接地址保存请求基址，以[模型管理设计说明](../design/model-management.md)为准。
+确认时间：2026-09-19。状态：Stage 2.7 已实现（提交 `50fd2e1`，[执行报告](../archive/stage-2-7-provider-report.md)）：独立 Provider 模块、三协议适配、预置表、候选与准入贯通；真实 Go 在 Responses 与 Chat Completions 上各自完成模型测试与三部门任务，Anthropic Messages 对当前两个模型受区域与端点限制；执行报告中没有与既有服务混合使用的真实任务。按每次模型请求解析调用目标由 #45 实施（用户决定，见 [D24 模型管理](model-management.md)），取代 2026-09-19 确认的任务级冻结；调用协议属于模型访问定义，连接地址保存请求基址，以[模型管理设计说明](../design/model-management.md)为准。所属新增阶段：[Stage 2.7](../archive/stage-2-provider-plan.md)。最近一次改动：2026-10-28 去掉已删除的 ADR 的引用。
 
 ## 1. 用户原话与首批范围
 
@@ -61,7 +59,7 @@ Go 的认证、模型协议和请求身份由独立 Provider 模块处理；三�
 
 ## 6. 与既有约束的关系
 
-- 调用目标按每次模型请求解析（ADR-0005）；D18 的部门隔离与一次请求内的重试不更换调用目标继续有效。调用协议属于模型访问定义，同一服务方案下不同协议的模型属于同一份连接（ADR-0033）。
+- 调用目标按每次模型请求解析（[模型管理设计说明](../design/model-management.md)第 5.3、6 节）；D18 的部门隔离与一次请求内的重试不更换调用目标继续有效。调用协议属于模型访问定义，同一服务方案下不同协议的模型属于同一份连接（同一份设计说明第 4.2、4.3 节）。
 - D22 的启动与凭据选择保持，配置实现归属独立模块。
 - D09 的用量只读、D17 的内核有界重试保持；既有原生 loop 与事件事实来源不迁移给 SDK。
 - Stage 3 原“第二协议”中 Go 必需部分前移至 2.7；其余订阅、推理设置与更多服务后置。

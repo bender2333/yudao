@@ -1,6 +1,6 @@
 # D38 系统意图与基础规则
 
-确认时间：2026-10-07。状态：意图已校准；各项需求由路线图的工作包与阶段分别实现，位置见[总体路线图](../program-roadmap.md)。设计：[可信内核](../design/trusted-kernel.md)、[规则登记与参数](../design/rules-and-parameters.md)、[循环与收敛](../design/loops-and-convergence.md)、[验证的独立性](../design/independent-verification.md)四份设计说明；ADR：[0027](../adr/0027-trusted-kernel-outside-self-modification.md) 至 [0031](../adr/0031-declared-loop-layers-and-sub-loops.md)。
+确认时间：2026-10-07。状态：意图已校准；各项需求由路线图的工作包与阶段分别实现，位置见[总体路线图](../program-roadmap.md)。设计：[可信内核](../design/trusted-kernel.md)、[规则登记与参数](../design/rules-and-parameters.md)、[循环与收敛](../design/loops-and-convergence.md)、[验证的独立性](../design/independent-verification.md)四份设计说明。
 
 本记录是 Yudao 的总体意图。其他需求记录与它冲突时，以本记录为准。
 
@@ -184,7 +184,7 @@
 | N-I4 | 上下文边界的宽度是可以调整的参数 | 两套可见范围的取值可以各自运行同一个评测场景，不修改代码 |
 | N-I5 | 验证密度随记录调整：连续可靠时减少核验，出现意外时增加核验 | 同一快照上重复运行的检查比例随一致记录下降，出现不一致以后恢复全量；调整写成事件 |
 | N-I6 | 新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程，由此说明它新增的独立性 | 定义校验拒绝没有填写目标函数与证据来源的新增项；三项都与已有成员相同的新增项由用户决定是否保留 |
-| N-I7 | 部门在循环之内，按关注的成果工作并产出成果（[ADR-0039](../adr/0039-departments-work-from-watched-outputs.md)）；观察者在循环之外，只按读取范围订阅事件，结果只以提案形式提交 | 去掉观察者以后，同一份记录的模型输出产生相同的事实事件 |
+| N-I7 | 部门在循环之内，按关注的成果工作并产出成果（[三部门的循环结构](../design/department-loop.md)第 2 节）；观察者在循环之外，只按读取范围订阅事件，结果只以提案形式提交 | 去掉观察者以后，同一份记录的模型输出产生相同的事实事件 |
 
 ### 裁决
 
@@ -256,7 +256,7 @@
 | run 流不跨版本保存，升级前排空 | 保持；它让控制核心的修改不背旧格式 |
 | 角色清单随系统版本发布，还没有子循环 | 组织与角色的候选、结构校验与用户批准的流程；子循环的合同 |
 | 只使用 1M 窗口的模型 | 压缩阈值与工作上限成为参数以后，小窗口模型按参数运行 |
-| 不签名；computer use 只考虑 Windows；只在局域网内使用 | 各自的 ADR 写明的放开条件（ADR-0023、ADR-0026、ADR-0015） |
+| computer use 只考虑 Windows；只在局域网内使用 | 各自的设计说明写明的放开条件（computer use：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)第 5 节；认证与局域网：[应用层与接口层设计说明](../design/app-and-interface.md)第 6.2、6.3 节） |
 
 ## 实现状态
 

@@ -1,6 +1,6 @@
 # Yudao 网页界面
 
-React + TypeScript + Vite 构建的页面文件，由 Yudao 服务提供（[ADR-0032](../docs/adr/0032-interface-served-as-web-pages.md)、[应用层与接口层设计说明](../docs/design/app-and-interface.md)）。
+React + TypeScript + Vite 构建的页面文件，由 Yudao 服务提供（[网页界面的提供与发布设计说明](../docs/design/web-interface-and-release.md)、[应用层与接口层设计说明](../docs/design/app-and-interface.md)）。
 界面代码在这个独立目录中，构建产物经发布脚本复制进 `harness/release_assets/`，随 wheel 一起发布。
 
 使用的技术：React 19、TypeScript、Vite、

@@ -1,15 +1,15 @@
 # 部门内多角色设计说明
 
-日期：2026-09-25；2026-09-26 按总体架构与用户的决定修改，同日补全计划的更新、执行槽位的计数、停滞时的历史、交出检查的审查记录与自测、专家请求期间的角色任务、验收对照与角色任务的恢复这几项规则；2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md)、[ADR-0030](../adr/0030-rules-are-provisional-defaults.md)、[ADR-0031](../adr/0031-declared-loop-layers-and-sub-loops.md) 修改第 2、4、9、10、11、12、13、16 节。状态：设计草案，规则已由用户确认（[D26](../requirements/department-roles.md) 2026-09-25 至 2026-09-26），未实施。需求：[D26 部门内多角色与多循环](../requirements/department-roles.md)。调研：[语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)。前置设计：[总体架构：职责分层](architecture/overall-architecture.md)、[语义系统设计说明](semantic-system.md)、[模型管理设计说明](model-management.md)。ADR：[0010](../adr/0010-control-core-drives-role-steps.md)、[0016](../adr/0016-center-role-collaboration.md)、[0017](../adr/0017-role-settings-override-department.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。 总图位置：第一节「产品」「工程」「质检」方框；第二节「定义」里的角色材料。
+状态：设计草案，规则已由用户确认（[D26](../requirements/department-roles.md) 2026-09-25 至 2026-09-26），未实施；最近一次改动 2026-10-28，去掉已删除的 ADR 的引用。依据：需求 [D26 部门内多角色与多循环](../requirements/department-roles.md)；调研 [语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)；前置设计 [总体架构：职责分层](architecture/overall-architecture.md)、[语义系统设计说明](semantic-system.md)、[模型管理设计说明](model-management.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。总图位置：第一节「产品」「工程」「质检」方框；第二节「定义」里的角色材料。
 
-2026-10-13 状态补充：本文以下规则已被[三部门的循环结构](department-loop.md)（[ADR-0036](../adr/0036-concurrent-departments-and-nested-asks.md)、[ADR-0037](../adr/0037-engineering-plan-stays-with-engineering.md)）取代，进入 Stage 5 时先按它们修改本文，再拆分工单；#50、#55、#56、#61、#66 的正文同样不能直接作为执行规格：
+2026-10-13 状态补充：本文以下规则已被[三部门的循环结构](department-loop.md)取代，进入 Stage 5 时先按它修改本文，再拆分工单；#50、#55、#56、#61、#66 的正文同样不能直接作为执行规格：
 
 - 工程计划是正式成果，计划被接纳之前主程的写入被拒绝，交出检查按计划条目核对 → 部门内是否制订计划、怎样分解任务由部门自己决定；正式接纳只看有效 PRD、交付快照与独立证据。
 - PRD 更新后预测性任务取消、结果全部作废 → 送达通知，由部门判断已有工作还算不算数。
 - 同一事项一次一个未结请求、不嵌套 → 询问是一次工具调用，可以同时有多个、可以嵌套，按询问链规则限制。
-- 经理是部门唯一的对外接口，转交询问、指导与通知 → 询问是工具调用，部门随时可以询问另一个部门（总图第一节）；Stage 5 重写本文时，在角色定义里写部门内哪些角色带询问与提交工具，不设唯一的对外角色（2026-10-25 记，ADR-0016 状态行同日补）。第 2 节表的「对外」一行、第 7 节与第 13 节的「部门之间」一条按这一条读。
+- 经理是部门唯一的对外接口，转交询问、指导与通知 → 询问是工具调用，部门随时可以询问另一个部门（总图第一节）；Stage 5 重写本文时，在角色定义里写部门内哪些角色带询问与提交工具，不设唯一的对外角色（2026-10-25 记）。第 2 节表的「对外」一行、第 7 节与第 13 节的「部门之间」一条按这一条读。
 - 嵌套深度的上限是定义里的数值（`loop.nesting_max`），由内核核对，不是内核常量（总图第三节，2026-10-25 记）；第 2 节表的「嵌套」一行按这一条读。
-- 同一事项同一时刻一个部门持有交接，交接的去向由控制核心决定 → 部门按关注的成果开始工作，轨迹的「交接」一层改称「一轮工作」（2026-10-14，[ADR-0039](../adr/0039-departments-work-from-watched-outputs.md)）；询问链允许回问，层数上限是规则参数。
+- 同一事项同一时刻一个部门持有交接，交接的去向由控制核心决定 → 部门按关注的成果开始工作，轨迹的「交接」一层改称「一轮工作」（2026-10-14，[三部门的循环结构](department-loop.md)第 2 节）；询问链允许回问，层数上限是规则参数。
 
 每个新增角色写明它内聚的目标函数、证据来源与工作过程，由此说明它新增的独立性（D38 N-I6），由对照结果决定是否保留它带来的成本。
 
@@ -95,7 +95,7 @@ flowchart TB
 
 部门内多角色的层次沿用[总体架构：职责分层](architecture/overall-architecture.md)：客户端与接口层、应用层、控制核心、知识层、观察层、执行层。本说明中的「主机」指控制核心。
 
-每次模型请求都由控制核心装配，控制核心驱动每个角色任务的步骤（[ADR-0010](../adr/0010-control-core-drives-role-steps.md)）：装配请求（P），经 Provider 调用模型（f），每个工具调用先经过工具许可（U），主机工具由控制核心执行、环境工具在执行环境中执行，记录结果并附加内容，然后进入下一步。中心角色、经理与工具角色的步骤都由步骤驱动执行，区别只在工具、上下文（第 10 节）与 Prompt。执行层只有 Provider、执行环境与工具、外包 agent。控制核心内部的模块与一步的顺序见总体架构第 5 节。
+每次模型请求都由控制核心装配，控制核心驱动每个角色任务的步骤（[骨架与应用设计说明](skeleton-and-application.md)第 5.3、6 节）：装配请求（P），经 Provider 调用模型（f），每个工具调用先经过工具许可（U），主机工具由控制核心执行、环境工具在执行环境中执行，记录结果并附加内容，然后进入下一步。中心角色、经理与工具角色的步骤都由步骤驱动执行，区别只在工具、上下文（第 10 节）与 Prompt。执行层只有 Provider、执行环境与工具、外包 agent。控制核心内部的模块与一步的顺序见总体架构第 5 节。
 
 ```mermaid
 flowchart TB
@@ -384,7 +384,7 @@ stateDiagram-v2
 
 ## 14. 模型与 Prompt 设置
 
-[模型管理设计说明](model-management.md)第 5 节在部门设置之上有角色一层（[ADR-0017](../adr/0017-role-settings-override-department.md)）：
+[模型管理设计说明](model-management.md)第 5 节在部门设置之上有角色一层：
 
 - **角色默认**：全局，每个角色一份，包含模型访问定义与请求档位，可以为未设置。
 - **项目角色设置**：每个项目的每个角色一份，包含模型访问定义、请求档位与角色 Prompt，只写入覆盖的项。
@@ -443,4 +443,3 @@ stateDiagram-v2
 | [D31](../requirements/outsourced-agent-roles.md) | 自有角色的步骤由控制核心驱动；外包角色由控制核心派发给外部 agent |
 | [界面原型 v7](../archive/prototypes/v7/design.md)、[D30](../requirements/web-game-frontend.md) | 房间围绕中心角色布置，增加审查者，「开发者」改为「主程」；角色详情显示每一步的模型请求、工具调用及工具许可的结果；通知增加反复退回的提醒 |
 | [总体路线图](../program-roadmap.md) | Stage 5（部门内协作、上下文与界面）包含本设计，对产品、工程、质检、运维四个部门一起引入，运维部门的角色在 Stage 5 设计时确定；本阶段内各项工作的先后由 [D32](../requirements/comparison-experiment.md) 对照实验的结果决定 |
-| ADR | [ADR-0010](../adr/0010-control-core-drives-role-steps.md) 记录每次模型请求在控制核心装配、自有角色的步骤由控制核心驱动；[ADR-0016](../adr/0016-center-role-collaboration.md) 记录部门采用中心型协作，经理是部门唯一的对外接口，工具角色经中心角色的分派接受任务；[ADR-0017](../adr/0017-role-settings-override-department.md) 记录模型选择中角色设置优先于部门设置 |

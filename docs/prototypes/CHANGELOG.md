@@ -2,7 +2,7 @@
 
 本文档记录 Yudao 原型设计各版本的演化历程、核心设计决策与交互改进。
 
-**当前定稿：[v13](v13/index.html)**（2026-10-25 用户确认）。界面的结构、行为与外观以它为准，截图对照与录制也用它（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）；像素画面从 v13 起按画面合同与播放时间线工作（[ADR-0043](../adr/0043-scene-contract-and-playback-belong-to-the-view.md)）。每一版的设计说明与构建约定只写与前一版不同的地方：v13 沿用 [v12](../archive/prototypes/v12/design.md)，v12 沿用 [v11](v11/design.md)，v11 沿用 [v10](v10/design.md)，v10 沿用 [v9](../archive/prototypes/v9/design.md)，v9 沿用 [v8](../archive/prototypes/v8/design.md)。设计文档里写明版本号的引用，指的是那一版首次给出的内容。原型定稿时改这一行，并把开放的工单中引用旧版本代码的路径改为新版本。
+**当前定稿：[v13](v13/index.html)**（2026-10-25 用户确认）。界面的结构、行为与外观以它为准，截图对照与录制也用它（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）；像素画面从 v13 起按画面合同与播放时间线工作（[画面与播放设计说明](../design/visualization.md)）。每一版的设计说明与构建约定只写与前一版不同的地方：v13 沿用 [v12](../archive/prototypes/v12/design.md)，v12 沿用 [v11](v11/design.md)，v11 沿用 [v10](v10/design.md)，v10 沿用 [v9](../archive/prototypes/v9/design.md)，v9 沿用 [v8](../archive/prototypes/v8/design.md)。设计文档里写明版本号的引用，指的是那一版首次给出的内容。原型定稿时改这一行，并把开放的工单中引用旧版本代码的路径改为新版本。
 
 **下一版原型（v14）的待办**（2026-10-25，由 v13 的待办转来）：v13 只做了画面与数据解耦，下面几处都照 v12 画。第 1 至 9 条是 v12 设计说明第 5 节没有定的，括号里是架构师的推荐，等用户确认；第 10 至 12 条是 2026-10-25 对照路线图第 4 节步 0 与阶段一补的，用户已定记在这里、不开工单；第 13 条是 2026-10-26 补的，也是架构师的推荐，等用户确认。确认了的在 v14 里画：
 
@@ -27,7 +27,7 @@
 ### 原型交付
 - 原型文件：[v13/index.html](v13/index.html)（浏览器直接打开，档位切到「Stage 5」，场景 24、25 在「选择场景」里）
 - 设计文档：[v13/design.md](v13/design.md)；构建约定：[v13/BUILD.md](v13/BUILD.md)；验收脚本：[v13/checks/](v13/checks/)
-- 依据：[ADR-0043](../adr/0043-scene-contract-and-playback-belong-to-the-view.md)、[画面与播放设计说明](../design/visualization.md)第 10 节第 1 条
+- 依据：[画面与播放设计说明](../design/visualization.md)第 10 节第 1 条
 - 状态：2026-10-25 用户确认，按下面第 7 条的暂定值定稿（PR #948，合并提交 c40c3c6e）
 
 ### 变更明细

@@ -1,8 +1,6 @@
 # 网络取回与 MCP 工具设计说明
 
-更新：2026-10-13 按 [ADR-0035](../adr/0035-mcp-and-skills-move-into-stage-3.md) 修改第 1、4.1、14、16 节：OAuth、提示与资源、向用户请求输入移到 M5，新增真实验收 #495；同日按 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)：三个部门取回任何 http 与 https 地址（只拒绝 Yudao 服务自己的地址），项目设置中的 MCP 服务器提供的工具全部直接提供，结果未知交还模型；2026-10-02，第 8 节结果未知的处理按恢复契约第 4 节的通用规则（第 14 节第 13 项）。状态：设计已确认（2026-10-01 用户逐轮采纳推荐，第 14 节），未实施。路线位置：[Stage 3 计划](../archive/stage-3-plan.md) 3.2B，里程碑 M3，父工单 [#122](https://github.com/bender2333/yudao/issues/122)。需求：[D36](../requirements/network-and-mcp.md)。工单见第 16 节。 总图位置：第四节「动作」的缝（网络取回与 MCP 是动作的类别）。
-
-依据：[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)（取回与项目设置中的 MCP 服务器固定在控制主机上运行）；[ADR-0022](../adr/0022-run-directly-without-containers.md)；[ADR-0018](../adr/0018-single-control-host-remote-execution.md)；[ADR-0019](../adr/0019-project-stream-across-versions.md)；[总体架构](architecture/overall-architecture.md)第 5、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4 节；[本地通用工具设计说明](local-tools.md)；[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 4 节；[语义系统设计说明](semantic-system.md)的证据；[模型管理设计说明](model-management.md)的凭据。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。用词以 `CONTEXT.md` 为准。
+状态：设计已确认（2026-10-01 用户逐轮采纳推荐，第 14 节），未实施；最近一次改动 2026-10-28，去掉已删除的 ADR 的引用，把 OAuth 登录、提示与资源、服务器向用户请求输入这些 MCP 扩展改写为路线图里还没有落点（#494）。依据：[ADR-0018](../adr/0018-single-control-host-remote-execution.md)；[ADR-0019](../adr/0019-project-stream-across-versions.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)；[总体架构](architecture/overall-architecture.md)第 5、7.3、7.4 节；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)第 4 节；[应用层与接口层设计说明](app-and-interface.md)第 3.2、3.3、4 节；[本地通用工具设计说明](local-tools.md)；[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 4 节；[语义系统设计说明](semantic-system.md)的证据；[模型管理设计说明](model-management.md)的凭据。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。用词以 `CONTEXT.md` 为准。
 
 ## 1. 范围
 
@@ -17,9 +15,9 @@
 不在范围内：
 
 - 搜索工具：搜索经项目设置中的搜索类 MCP 服务器提供（第 12.1 节）。
-- 远程服务器的 OAuth 登录、MCP 的提示与资源、服务器向用户请求输入：不在 3.2B，按 [ADR-0035](../adr/0035-mcp-and-skills-move-into-stage-3.md) 作为 MCP 扩展放在 Stage 3 的 M5（#494），设计在拆分时补充。
+- 远程服务器的 OAuth 登录、MCP 的提示与资源、服务器向用户请求输入：不在 3.2B，作为 MCP 扩展，路线图里还没有落点（#494），设计在拆分时补充。
 - SSE 传输、采样与 roots：不支持（第 4.1 节）。
-- 必须运行在登记的机器上的 MCP 服务器（[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)）。
+- 必须运行在登记的机器上的 MCP 服务器。
 - PDF、图片等非文本内容的取回：需要时在项目设置中写明一个文档类的 MCP 服务器。
 - Playwright MCP：属于 3.2D，随试用会话运行，不写在项目设置中。
 - 外部动作（部署、回滚、重启）：Stage 4。
@@ -59,7 +57,7 @@ flowchart LR
 
 ## 3. 放置
 
-动作类别按放置分两种（[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)）：
+动作类别按放置分两种：
 
 | 动作类别 | 放置 |
 | --- | --- |
@@ -75,7 +73,7 @@ flowchart LR
 | 项 | 说明 |
 | --- | --- |
 | 名称 | 小写字母、数字与连字符；同一项目内唯一；作为工具名的前缀 |
-| 传输 | 本机进程（stdio）或 streamable HTTP。不支持 SSE；OAuth 登录在 M5 加入（#494），在那之前需要令牌的服务把令牌写在请求头里 |
+| 传输 | 本机进程（stdio）或 streamable HTTP。不支持 SSE；OAuth 登录作为 MCP 扩展，路线图里还没有落点（#494），在那之前需要令牌的服务把令牌写在请求头里 |
 | stdio | 命令、参数、环境变量；不经过 shell；命令名按操作系统的规则补全扩展名（`npx` 在 Windows 上是 `npx.CMD`） |
 | streamable HTTP | 地址、请求头 |
 | 变量与请求头的值 | 固定文本，或凭据名称（取值时读取当前的凭据来源） |
@@ -83,7 +81,7 @@ flowchart LR
 | 时限与输出上限 | 启动时限、调用时限、返回给模型的输出上限，有默认值（第 7.2 节），设置里可以修改 |
 | 工具清单 | 读取到的快照：每个工具的名称、说明、参数结构，以及服务器自己标注的只读、幂等、破坏性提示（只显示给用户参考） |
 
-3.2B 只使用服务器的「工具」，服务器提供的工具全部直接提供给可以使用的部门。资源、提示、采样、roots 与向用户请求输入都不声明（提示、资源与向用户请求输入在 M5 加入，#494）；服务器发来这类请求时由 SDK 以 -32600 拒绝，调用返回错误。
+3.2B 只使用服务器的「工具」，服务器提供的工具全部直接提供给可以使用的部门。资源、提示、采样、roots 与向用户请求输入都不声明（提示、资源与向用户请求输入作为 MCP 扩展，路线图里还没有落点，#494）；服务器发来这类请求时由 SDK 以 -32600 拒绝，调用返回错误。
 
 ### 4.2 读取工具清单（探测）
 
@@ -233,7 +231,7 @@ flowchart LR
 
 1. **搜索**：不内置搜索工具。部门的探索者查资料需要的搜索由项目设置中的一个搜索类 MCP 服务器提供；M3 试用与 #236 的验收使用 Exa 官方 MCP（第 13 节）。
 2. **3.2D**：浏览器经 Playwright MCP，使用本设计的 MCP 客户端模块（#69），不写在项目设置中（[浏览器与 computer use 设计说明](browser-and-computer-use.md)第 4 节）。
-3. **3.2C**：取回与 MCP 固定在控制主机，不进入执行代理（[ADR-0025](../adr/0025-network-and-mcp-run-on-control-host.md)）。
+3. **3.2C**：取回与 MCP 固定在控制主机，不进入执行代理。
 4. **评测**：评测期间两边都不联网。评测运行器以关闭取回的启动参数启动被测的 Yudao，评测项目不设置 MCP 服务器（第 5.1 节）；OpenCode 的运行配置关闭取回与搜索（[评测场景设计](evaluation-scenarios.md)）。两边的命令都能访问网络，条件相同，运行器在两边的命令记录中查找对任务上游仓库的访问，找到时这次运行无效。
 5. **D25 语义系统**：外部来源工件作为证据（第 9 节）。
 6. **D26**：探索者引入以后，取回与 MCP 只给探索者（#62）。
@@ -255,7 +253,7 @@ flowchart LR
 2026-10-01，用户逐轮采纳推荐：
 
 1. 搜索经 MCP 提供，Yudao 不内置搜索工具；Yudao 自带的 MCP 服务只有 3.2D 的 Playwright MCP。
-2. 取回与登记的 MCP 服务器一律在控制主机上运行，与 run 的执行位置无关（ADR-0025）。
+2. 取回与登记的 MCP 服务器一律在控制主机上运行，与 run 的执行位置无关。
 3. 每个项目各自登记（项目流、带版本、事项创建时固定版本）；凭据按名称引用，使用与 Provider 相同的凭据来源。
 4. 授权与批准：登记就是常设授权；登记之外的取回发出一次性批准；MCP 工具三种处理方式，新读取到的默认「不提供」；批准在本事项内对同一个主机或同一个工具有效，重启以后仍然有效；拒绝时工具结果写明原因；项目没有登记时部门没有这两类工具。
 5. 评测期间两边都不联网。
@@ -271,7 +269,7 @@ flowchart LR
 
 14. 2026-10-13 按 ADR-0038：取代第 4 项中的「登记就是常设授权」、登记之外的取回发出一次性批准、MCP 工具三种处理方式与新读取到的默认「不提供」、批准的有效范围与重启后有效、项目没有登记时部门没有这两类工具；第 6 项中默认拒绝回环、内网与链路本地地址与 198.18.0.0/15 的说明、明确登记的内网来源允许；第 7 项中每个工具的处理方式与「结果未知时可以重新执行」两项；第 8 项中子进程的环境变量只有登记写明的与基础变量；第 9 项中取回以新的尝试重新取回、MCP 没有声明可以重新执行的工具按 #17 发出决定请求；第 11 项中批准卡片；第 13 项中自动重新执行一次与决定请求；补充的约定中「按登记提供」与决定种类。新的规定：取回三个部门始终都有，任何 http 与 https 地址都可以取回，仍然拒绝 Yudao 服务自己监听的地址与端口；MCP 服务器写在项目设置中，服务器提供的工具全部直接提供给可以使用的部门，子进程得到 Yudao 进程的全部环境变量加项目设置中写明的变量；取回与 MCP 工具结果未知时作为工具结果交还发出它的会话，由模型决定是否重新执行。
 
-15. 2026-10-12 按 ADR-0035：第 7 项中的「不支持 OAuth」与「只使用工具」只是 3.2B 的范围；OAuth 登录、提示与资源、服务器向用户请求输入作为 MCP 扩展放在 Stage 3 的 M5（#494）；SSE、采样与 roots 继续不支持。3.2B 在真实控制主机上的验收单独建工单 #495。
+15. 2026-10-12：第 7 项中的「不支持 OAuth」与「只使用工具」只是 3.2B 的范围；OAuth 登录、提示与资源、服务器向用户请求输入作为 MCP 扩展，路线图里还没有落点（#494）；SSE、采样与 roots 继续不支持。3.2B 在真实控制主机上的验收单独建工单 #495。
 
 补充的约定（由已定的规则推出，用户确认清单时一并确认）：取回与 MCP 各自按登记提供；Stage 3 三个部门都可以使用取回；工具名 `fetch_url`、`read_external_source`、`mcp__登记名__工具名`；应用层的命令、事件与决定种类（第 10 节）；使用的技术（第 17 节）；取回的请求头固定，重定向最多 5 次。
 

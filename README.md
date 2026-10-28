@@ -96,7 +96,7 @@ uv sync --frozen
 }
 ```
 
-调用协议（`responses` / `chat_completions` / `messages`）在每个模型访问定义上声明，一份 Provider 配置（连接）只有一个服务方案下的地址与凭据引用，不声明协议（[ADR-0033](docs/adr/0033-protocol-belongs-to-model-access.md)）；在连接上声明协议会在读取目录时报错并指出字段位置。请求时基址取所属连接的地址，请求路径由协议适配器拼接（Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`）。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
+调用协议（`responses` / `chat_completions` / `messages`）在每个模型访问定义上声明，一份 Provider 配置（连接）只有一个服务方案下的地址与凭据引用，不声明协议（[模型管理设计说明](docs/design/model-management.md)第 4.3 节）；在连接上声明协议会在读取目录时报错并指出字段位置。请求时基址取所属连接的地址，请求路径由协议适配器拼接（Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`）。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
 
 Provider 连接只信任操作系统的证书库：私有 CA 与企业代理的证书装在系统证书库中即可；`SSL_CERT_FILE`、`SSL_CERT_DIR` 这两个环境变量对 Provider 连接不起作用。
 

@@ -1,10 +1,6 @@
 # 语义系统设计说明
 
-日期：2026-09-26。状态：设计说明，规则已由用户确认（[D25](../requirements/semantic-system.md) 2026-09-25 至 2026-09-26）；2026-09-26 按[总体架构](architecture/overall-architecture.md)与用户的决定修改：第 4 节写明语义系统在总体架构中的位置，教训与洞见由教训发现模块找出（第 8、15 节）。未实施；路线位置为 Stage 5（部门内协作、上下文与界面）。2026-10-07 按 [ADR-0029](../adr/0029-departments-form-by-information-cohesion.md) 与 [ADR-0030](../adr/0030-rules-are-provisional-defaults.md)：第 7.2 节证据核对按判定点合同，第 9 节可见范围，第 10.8 节审查者，第 10、11 节的上限与阈值进入规则登记。需求：[D25 语义系统](../requirements/semantic-system.md)。调研：[Semantica 参照调研](../archive/research/semantica-reference.md)、[上下文组装：参照调研](../archive/research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)、[惊讶与预测误差](../archive/research/surprise-and-prediction-error.md)、[语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)。ADR：[0008](../adr/0008-trajectory-and-graph-as-event-projections.md)、[0009](../adr/0009-deterministic-context-assembly.md)、[0010](../adr/0010-control-core-drives-role-steps.md)、[0019](../adr/0019-project-stream-across-versions.md)。相关设计：[总体架构：职责分层](architecture/overall-architecture.md)、[模型管理设计说明](model-management.md)第 8 节、[部门内多角色设计说明](department-roles.md)。术语以 [CONTEXT.md](../../CONTEXT.md) 为准。 总图位置：第四节「投影」的缝（图谱是应用投影）与「装配」的缝；第一节「观察者」方框（教训发现）。
-
-2026-10-14 状态补充：交接已改为部门按关注的成果开始工作（[ADR-0039](../adr/0039-departments-work-from-watched-outputs.md)），轨迹的「交接」一层改称「一轮工作」；本文的用语在实施语义系统之前按[术语表](../../CONTEXT.md)修改。
-
-2026-10-25 状态补充：本文第 4 节等处的层名（知识层、控制核心的 P 与 U、观察层、执行层）是技术对照里的说法，总图不用它们，对应见[总体架构](architecture/overall-architecture.md)第 1.4 节的对照表：知识层是投影缝里「应用的投影」，P 是装配槽位的实现，U 是内核里的裁决，观察层是判定点（定义里的规矩，不是一层），教训发现模块是系统之外的观察者，经接口读、经写入口写。实施本文之前按总图改写层次的说法。
+状态：设计说明，规则已由用户确认（[D25](../requirements/semantic-system.md) 2026-09-25 至 2026-09-26），未实施；路线位置为 Stage 5（部门内协作、上下文与界面）。交接已改为部门按关注的成果开始工作（见[三部门的循环结构](department-loop.md)第 2 节），轨迹的「交接」一层改称「一轮工作」，本文的用语在实施语义系统之前按[术语表](../../CONTEXT.md)修改；本文第 4 节等处的层名（知识层、控制核心的 P 与 U、观察层、执行层）是技术对照里的说法，总图不用它们，对应见[总体架构](architecture/overall-architecture.md)第 1.4 节的对照表：知识层是投影缝里「应用的投影」，P 是装配槽位的实现，U 是内核里的裁决，观察层是判定点（定义里的规矩，不是一层），教训发现模块是系统之外的观察者，经接口读、经写入口写，实施本文之前按总图改写层次的说法。最近一次改动 2026-10-28，去掉已删除的 ADR 的引用；第 2 节选择方式一行与第 10 节开头的「不调用模型」按总图改写。依据：需求 [D25 语义系统](../requirements/semantic-system.md)；调研 [Semantica 参照调研](../archive/research/semantica-reference.md)、[上下文组装：参照调研](../archive/research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)、[惊讶与预测误差](../archive/research/surprise-and-prediction-error.md)、[语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)；ADR [0019](../adr/0019-project-stream-across-versions.md)；相关设计 [总体架构：职责分层](architecture/overall-architecture.md)、[模型管理设计说明](model-management.md)第 8 节、[部门内多角色设计说明](department-roles.md)；术语以 [CONTEXT.md](../../CONTEXT.md) 为准。总图位置：第四节「投影」的缝（图谱是应用投影）与「装配」的缝；第一节「观察者」方框（教训发现）。
 
 ## 1. 要解决的问题
 
@@ -29,12 +25,12 @@ Agent 最重要的是上下文管理。一个长任务运行很久以后，只�
 
 | 方面 | 参照 | Yudao |
 | --- | --- | --- |
-| 图谱的存放 | Semantica 的 ContextGraph 在进程内，来源模块另用 SQLite 保存版本链，写入不经许可 | 轨迹与图谱是事件的投影，存放在现有 SQLite 中；角色只提交记录，主机按本体校验后写成事件（[ADR-0008](../adr/0008-trajectory-and-graph-as-event-projections.md)） |
+| 图谱的存放 | Semantica 的 ContextGraph 在进程内，来源模块另用 SQLite 保存版本链，写入不经许可 | 轨迹与图谱是事件的投影，存放在现有 SQLite 中；角色只提交记录，主机按本体校验后写成事件 |
 | 来源与时间 | Semantica 借用 W3C PROV-O；Zep 的事实带现实中成立的时间与系统中写入、失效的时间 | 来源关系对应 PROV-O；每条内容有有效开始、有效结束、记录时间、被取代时间 |
 | 本体 | Semantica 用类与属性定义本体，约束写成形状 | 本体由系统定义，随系统版本发布；主机按本体校验每次记录 |
 | 常驻与按需 | Claude Code 预先放入 CLAUDE.md，文件即时取得；OMP 规则只列名称与描述，全文用 `rule://` 读取；Letta 常驻块有上限，存档按需搜索 | 常驻栏目、目录、按需取得、接触时附加四种方式配合使用 |
 | 按接触的文件附加 | opencode 读取文件时附加该目录的 AGENTS.md；OMP 按编辑路径注入规则 | 角色读取或修改文件时，附加关联在这个文件实体上的要求与本部门内容 |
-| 选择方式 | Zep 用向量、全文与图关系混合召回再重新排序；OMP、opencode 的规则放入按固定规则 | 只按结构关系与固定规则，不调用模型，不使用向量检索（[ADR-0009](../adr/0009-deterministic-context-assembly.md)） |
+| 选择方式 | Zep 用向量、全文与图关系混合召回再重新排序；OMP、opencode 的规则放入按固定规则 | 只按结构关系与固定规则选择，不使用向量检索；挑上下文这类需要判断的小问题可以问判定点上的一个小模型，答案先写成事件再被使用，重放时读事件，不再问模型（总图第三节「判定点」、第四节「装配」缝） |
 | 缓存 | Manus 把 KV 缓存命中率作为最重要的指标，前段稳定、只追加；Zep 把上下文块放在历史之后 | 栏目按变化频率排列，历史只追加，当前状态栏目放在末尾 |
 | 旧工具结果 | Anthropic 清理旧工具结果；OMP、opencode 保护最近 40000 token；Manus 换成只含路径的紧凑表示 | 达到压缩阈值时，先把旧工具结果换成带取回地址的占位 |
 | 压缩 | OMP 与 opencode 生成文字摘要；Anthropic 的长时运行 harness 用进度文件与功能清单在窗口之间交接状态 | 由角色整理的尝试与图谱内容代替被移出的历史，历史开头放主机生成的轨迹节录 |
@@ -77,7 +73,7 @@ flowchart LR
 
 ## 4. 分层与模块关系
 
-层次沿用[总体架构：职责分层](architecture/overall-architecture.md)。每次模型请求都由控制核心装配。自有角色不设单独的会话执行者，控制核心驱动每个角色任务的步骤：装配请求（P），经 Provider 调用模型（f），每个工具调用先经过 U 的工具许可，主机工具由控制核心执行、环境工具在执行环境中执行，记录结果并附加内容，进入下一步（[ADR-0010](../adr/0010-control-core-drives-role-steps.md)，总体架构第 5 节）。执行层只有 Provider、执行环境与工具、外包 agent（[D31](../requirements/outsourced-agent-roles.md)）。控制核心的每个决定只依据已记录的事实与事先规定的去向，判定点上的模型判断先写成事件再被使用（[ADR-0028](../adr/0028-three-means-of-adjudication.md)）。本说明其余各节中的「主机」指控制核心。
+层次沿用[总体架构：职责分层](architecture/overall-architecture.md)。每次模型请求都由控制核心装配。自有角色不设单独的会话执行者，控制核心驱动每个角色任务的步骤：装配请求（P），经 Provider 调用模型（f），每个工具调用先经过 U 的工具许可，主机工具由控制核心执行、环境工具在执行环境中执行，记录结果并附加内容，进入下一步（[骨架与应用设计说明](skeleton-and-application.md)第 5、6 节，总体架构第 5 节）。执行层只有 Provider、执行环境与工具、外包 agent（[D31](../requirements/outsourced-agent-roles.md)）。控制核心的每个决定只依据已记录的事实与事先规定的去向，判定点上的模型判断先写成事件再被使用（总图第三节「判定点」，总体架构第 7.5 节）。本说明其余各节中的「主机」指控制核心。
 
 语义系统在总体架构中分布在四个位置（总体架构第 3 节）：
 
@@ -157,7 +153,7 @@ flowchart TB
 - 角色只提交记录与尝试，由 U 按本体校验后写成事件。需要调用模型的整理工作（压缩之前的整理请求、复盘）由角色自己的请求完成，产出作为提案经过 U；教训发现模块找出的教训与洞见同样经过 U。知识层只保留确定的派生内容。
 - 工具分两类（总体架构第 5.3 节）：主机工具（提交、记录、查询、读取材料、分派）由控制核心执行，查询范围由核心按角色身份填入，模型给出的参数不能扩大范围；环境工具（读写文件、运行命令）在执行环境中执行，结果回到核心后由 P 附加内容。
 - P 与查询只读取知识层、材料与事件，不写入任何内容。
-- 证据核对与模型请求都只通过 Provider 模块（[ADR-0007](../adr/0007-boundaries-for-distributed-deployment.md) 第 6 条）。
+- 证据核对与模型请求都只通过 Provider 模块（总图第四节「模型」的缝）。
 - 数据类型用 pydantic 定义，与 D30 的接口合同一起导出。
 
 **事件流**（[ADR-0019](../adr/0019-project-stream-across-versions.md)）：事件日志中的流分项目流与 run 流。跨事项延续的语义内容写入项目流，跨 Yudao 版本保存；只在一次 run 中使用的内容写入 run 流，跟随应用版本。
@@ -305,7 +301,7 @@ sequenceDiagram
 
 **适用范围**：证据种类为外部文档或需要解读的运行输出的事实。推测、阅读代码得出的判断、主机能精确计算的内容（检查是否通过、文件版本、引用是否存在）与跨多步的因果判断不做证据核对。
 
-证据核对是第一个判定点，按[总体架构](architecture/overall-architecture.md)第 7.2、7.5 节的合同声明：问题（Noul）、参照材料（证据片段与陈述）、固定版本的模型、两个阈值、三种结果的去向、校准状态、拦截什么与花费多少。三种结果的去向：支持，事实保持不变；不支持，事实变为待复核；不确定，升级给更强的、与记录这条事实所用模型不同的模型，仍然不确定时只显示「不确定」标记，不改变事实的状态，并作为开环列出（判定点声明的去向）。
+证据核对是第一个判定点，按[总体架构](architecture/overall-architecture.md)第 7.2、7.5 节的合同声明：问题（Noul）、参照材料（证据片段与陈述）、固定版本的模型、两个阈值、三种结果的去向、校准状态、拦截什么与花费多少。三种结果的去向：支持，事实保持不变；不支持，事实变为待复核；不确定，只显示「不确定」标记，不改变事实的状态，并作为开环列出（判定点声明的去向）。
 
 **做法**：
 
@@ -315,7 +311,7 @@ sequenceDiagram
 - JEV 请求失败时按 D17 的规则有界重试，仍然失败时写入核对失败事件并附原因，该事实显示为「未核对」。
 - 组装时只读取记录的结果，每次请求不调用 JEV。
 
-**接入**：JEV 的 systemone 接口作为 Provider 模块的一种协议接入（[ADR-0001](../adr/0001-endpoints-by-protocol-not-vendor.md)、[ADR-0033](../adr/0033-protocol-belongs-to-model-access.md)），在 Stage 5 完成；准入以判定点为单位，依靠校准。
+**接入**：JEV 的 systemone 接口作为 Provider 模块的一种协议接入（[模型管理设计说明](model-management.md)第 2、4.1、4.3 节），在 Stage 5 完成；准入以判定点为单位，依靠校准。
 
 **校准**（D28 的规则）：
 
@@ -390,7 +386,7 @@ sequenceDiagram
 
 ## 10. 上下文组装
 
-上下文组装在每次模型请求时由主机完成，只按结构关系与固定规则选择内容，不调用任何模型（[ADR-0009](../adr/0009-deterministic-context-assembly.md)）。同样的事件得到同样的请求内容。
+上下文组装在每次模型请求时由主机完成，只按结构关系与固定规则选择内容；挑上下文这类需要判断的小问题可以问判定点上的一个小模型，答案先写成事件再被使用，重放时读事件，不再问模型（总图第三节「判定点」）。同样的事件得到同样的请求内容（总图第四节「装配」缝）。
 
 ### 10.1 栏目与顺序
 
