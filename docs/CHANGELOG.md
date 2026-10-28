@@ -7,6 +7,8 @@
 
 ---
 
+claude-架构师 / 2026-10-28 18:55 / .claude/skills/trial/ 三处改动：SKILL.md 新增 3.1 节「把两个模型配进产品」并改掉单 agent 对照（用户决定不跑）、第 5 节与第 13 节的看图改成 scripts/vision.mjs、两个模型的部门分工改为产品与工程 model1 加质检 model2；新增 scripts/vision.mjs（把截图发给 ag/gemini-3.8-flash-high，Node 内置模块）；preflight.ps1 的模型检查改为 YUDAO_VISION_* 并去掉三项 YUDAO_EVAL_MODEL_* 警告 / 用户 2026-10-28 指定运行模型用 model1、需要视觉判断用 gemini 3.8 flash high、OpenCode 对照不用跑；实测下来会话里的看图子代理走不通（harness 的模型声明只有文本输入），改用脚本直接调同一模型的接口，已实测能读出页面细节
+
 claude-opus-5-5 / 2026-10-21 01:25 / docs/decision.md 新增 2026-10-21 一条：询问分支的时间上限在安全节点检查，事项剩余时间由已有的运行时间检查负责，回答交回就记为已回答，用量恢复取最后一个累计值 / #553 的 PR #641 第 3 次要求修改达到上限，第 3 轮审查的三条都出在分支用硬期限的做法上
 
 执行者 9router/ag/gemini-3.8-flash-high / 2026-10-21 02:30 / 工单 #553 [循环结构] 询问分支的用量上限、没能回答与重新启动（第 4 轮）：harness/orchestrator.py 分支激活增加 deadline 并在安全节点统一检查期限与事项运行时间，删除 asyncio.wait_for 硬超时与吞异常逻辑，Answered 直接交回；_recover_run_usage 还原为 main 写法取最后一个 activation_finished 累计值；harness/tests/test_ask_branch.py 调整 run 时间耗尽用例等待时长以消除墙钟余量不足抖动，删除已废弃的提前结束用例 test_ask_branch_zero_remaining_time_does_not_open_branch / 落实架构师第 4 轮处理与 2026-10-21 决策记录

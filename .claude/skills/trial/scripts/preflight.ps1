@@ -74,15 +74,11 @@ $ghUser = (& gh api user --jq .login 2>$null)
 if ($ghUser) { Add-Row 'gh 账号' $ghUser '通过' } else { Add-Row 'gh 账号' '没有登录' '阻断' '发帖与发工单要用' }
 
 # 4. 模型与凭据（环境变量）
-$baseUrl = $env:YUDAO_EVAL_BASE_URL
-$apiKey = $env:YUDAO_EVAL_API_KEY
-if ($baseUrl) { Add-Row '评测服务地址' $baseUrl '通过' } else { Add-Row '评测服务地址' 'YUDAO_EVAL_BASE_URL 没设' '阻断' }
-if ($apiKey) { Add-Row '凭据' "已设（长度 $($apiKey.Length)）" '通过' } else { Add-Row '凭据' 'YUDAO_EVAL_API_KEY 没设' '阻断' '产品部门与工程部门跑真实模型要用' }
-foreach ($name in @('YUDAO_EVAL_MODEL_PRODUCT', 'YUDAO_EVAL_MODEL_ENGINEERING', 'YUDAO_EVAL_MODEL_QUALITY')) {
-  $value = [Environment]::GetEnvironmentVariable($name)
-  $level = if ($value) { '通过' } else { '警告' }
-  Add-Row $name ($(if ($value) { $value } else { '没设，按仓库默认' })) $level
-}
+$baseUrl = $env:YUDAO_VISION_BASE_URL; if (-not $baseUrl) { $baseUrl = $env:YUDAO_EVAL_BASE_URL }
+$apiKey = $env:YUDAO_VISION_API_KEY; if (-not $apiKey) { $apiKey = $env:YUDAO_EVAL_API_KEY }
+if ($baseUrl) { Add-Row '模型服务地址' $baseUrl '通过' } else { Add-Row '模型服务地址' 'YUDAO_VISION_BASE_URL 没设' '阻断' '默认 https://9router.huiju.asia/v1，可用 --base-url 给 vision.mjs' }
+if ($apiKey) { Add-Row '凭据' "已设（长度 $($apiKey.Length)）" '通过' } else { Add-Row '凭据' 'YUDAO_VISION_API_KEY 没设' '阻断' '部门跑真实模型与 vision.mjs 看图都要用' }
+Add-Row '部门模型计划' '产品与工程 model1；质检 model2（声明图像输入）' '信息' '在页面 #/sys/models 里绑定，见技能第 3.1 节'
 
 # 5. 端口
 foreach ($candidate in @(
