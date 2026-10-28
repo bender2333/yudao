@@ -480,6 +480,68 @@ def test_credential_rejection_is_unavailable_and_never_retried(protocol, status)
     assert len(provider.requests) == 1
 
 
+# 上下文超限：中转服务常常只给一个 400 与一段文字，没有错误码（工单 #1157、设计说明第 8.7 节）
+CONTEXT_OVERFLOW_MESSAGE = (
+    "This model's maximum context length is 131072 tokens, however you requested 241669 tokens"
+)
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_context_overflow_is_recognised_from_the_upstream_error_text(protocol):
+    # 400 带一段写明最大上下文长度的原文：停止原因是上下文超限（不再是模型服务失败），诊断里留下原文、
+    # 错误类型与参数（设计说明第 8.7 节、第 13.4 节）
+    def overflowed(_provider: ScriptedProvider, handler) -> None:
+        body = json.dumps({"error": {"message": CONTEXT_OVERFLOW_MESSAGE,
+                                     "type": "invalid_request_error", "param": "messages"}})
+        send_reply(handler, 400, "application/json", body.encode("utf-8"))
+
+    provider = ScriptedProvider([overflowed])
+    try:
+        facade = facade_with(provider.base + "/v1", protocol=protocol)
+        with pytest.raises(ProviderError) as caught:
+            invoke(facade, bound_target(facade), model_call(HI, max_output_tokens=64,
+                                                            session_id="s", attempt_id="a"))
+    finally:
+        provider.close()
+    error = caught.value
+    assert error.reason == "context_overflow"
+    assert error.retryable is False
+    assert error.diagnostics["status_code"] == 400
+    assert error.diagnostics["error_message"] == CONTEXT_OVERFLOW_MESSAGE
+    assert error.diagnostics["error_type"] == "invalid_request_error"
+    assert error.diagnostics["param"] == "messages"
+    # 错误消息的字符串不变：事件序列基准比较它
+    assert str(error) == "Model provider returned HTTP 400"
+    assert len(provider.requests) == 1
+
+
+@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
+def test_model_test_failure_writes_the_upstream_reason(protocol):
+    # 模型测试失败时该模型那一行写上游给出的原因（设计说明第 9.1 节，工单 #294）；
+    # 401 与 403 不记回应体，照旧写状态码那句
+    denied_reason = "unknown model: target-model"
+
+    def rejected(_provider: ScriptedProvider, handler) -> None:
+        body = json.dumps({"error": {"message": denied_reason, "type": "invalid_request_error"}})
+        send_reply(handler, 400, "application/json", body.encode("utf-8"))
+
+    def credential_rejected(_provider: ScriptedProvider, handler) -> None:
+        body = json.dumps({"error": {"message": "credential-echoed-by-provider", "type": "authentication_error"}})
+        send_reply(handler, 401, "application/json", body.encode("utf-8"))
+
+    provider = ScriptedProvider([rejected, credential_rejected])
+    try:
+        facade = facade_with(provider.base + "/v1", protocol=protocol)
+        failed = facade.model_test("go", "m-go")
+        unauthorized = facade.model_test("go", "m-go")
+    finally:
+        provider.close()
+    assert failed["ok"] is False and failed["admitted"] is False
+    assert failed["error"] == denied_reason
+    assert unauthorized["ok"] is False
+    assert unauthorized["error"] == "Model provider returned HTTP 401"
+
+
 # 空输出（工单 #305）：流正常结束、没有任何可见输出项。结束原因按各协议自己的写法给出，
 # Responses 走 completed 且 incomplete_details 为空，Chat 与 Messages 各用一个终态结束原因
 EMPTY_OUTPUT_FINISH_REASONS = {"responses": "completed", "chat_completions": "length",
