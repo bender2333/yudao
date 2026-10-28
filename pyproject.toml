@@ -74,7 +74,7 @@ source_modules = [
   "harness.tightening_contract",
   "harness.contract_versions",
 ]
-forbidden_modules = ["harness"]
+forbidden_modules = ["harness.*"]
 ignore_imports = [
   # 内核模块（kernel-manifest.json 里 kind 为 module 的路径）：契约里出现的应用侧类型按 Any 标注，
   # 具体类型由实现给出；契约用到的只有事件信封、定义、写入口与裁决的合同
@@ -98,7 +98,10 @@ ignore_imports = [
 name = "应用层只导入控制核心的公开接口"
 type = "forbidden"
 source_modules = ["harness.app"]
-forbidden_modules = ["harness"]
+forbidden_modules = ["harness.*"]
+# 只查直接导入：公开接口模块自己再往下导入内核的哪几块，是那一份模块的事
+#（`harness.runtime` 导入薄驱动、`harness.projects` 导入工件与 Git 版本都在这一层之外）
+allow_indirect_imports = true
 ignore_imports = [
   # 流程编排的入口：组装处（LoopSystem）与继续一个 run 时的恢复
   "harness.app.** -> harness.runtime",
