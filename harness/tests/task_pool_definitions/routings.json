@@ -1,0 +1,32 @@
+{
+  "routings": [
+    {
+      "id": "task_pool",
+      "label": "任务池",
+      "why": "任务池里有一条待办的任务时，路由把它指派给能做的人开始一轮工作；一轮以交上任务、完成或验收结论结束；池子里没有待办的任务时事项结束（只在测试里用，工单 #864）",
+      "departments": [
+        "product",
+        "engineering",
+        "quality"
+      ],
+      "outcome_kinds": [
+        "pool_task",
+        "task_completion",
+        "task_verdict"
+      ],
+      "proposal_methods": [
+        "submit_task",
+        "complete_task",
+        "judge_task"
+      ],
+      "limits": {},
+      "end_reasons": {
+        "pool_drained": {
+          "label": "任务池里没有待办的任务",
+          "outcome": "failed",
+          "human_action": "任务池里每一件任务都有了验收结论，没有待办的任务：这件事项到此结束，不需要处理。"
+        }
+      }
+    }
+  ]
+}

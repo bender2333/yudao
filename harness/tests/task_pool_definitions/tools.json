@@ -1,0 +1,82 @@
+{
+  "read_file": {
+    "kind": "environment",
+    "action": "read",
+    "description": "Return the entire content of one public workspace file as a single UTF-8 string.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "Workspace-relative file path"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ]
+    }
+  },
+  "submit_task": {
+    "kind": "host",
+    "proposal": "pool_task",
+    "description": "Publish one task into the task pool. The pool assigns it to a department that can do it.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "What the task asks for"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "title"
+      ]
+    }
+  },
+  "complete_task": {
+    "kind": "host",
+    "proposal": "task_completion",
+    "description": "Hand in the task you were assigned: say what you did. A completion is not a verdict; another department decides whether it is accepted.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "What was done for this task"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "summary"
+      ]
+    }
+  },
+  "judge_task": {
+    "kind": "host",
+    "proposal": "task_verdict",
+    "description": "Judge a completion handed in by another department: accept it or return it to its author.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "accept",
+            "return"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why this completion is accepted or returned"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "verdict",
+        "reason"
+      ]
+    }
+  }
+}
