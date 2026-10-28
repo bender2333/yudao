@@ -3,7 +3,7 @@
 // 过期时拒绝并提示重新读取（工单验收第 3 条）。部门设置里的模型与档位由 #95 加入，
 // 机器授权（3.2C）的命令尚未登记，入口按能力清单不出现。
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type { Catalog, ProjectSettingsResult } from "../../api/generated/types.gen";
 import type { Route } from "../../shell/routing";
@@ -28,6 +28,16 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
   const data = settings.data;
   // 提交提示跟随快照：事件到达、快照出现新内容以后由数据本身显示最终状态
   const command = useCommand(props.app, pageKey([data?.version, data?.name, data?.goal, data?.pinned, data?.archived]));
+  // 决定卡片上的「前往本项目的部门设置」落在部门设置那一节，不停在设置页的顶部（工单 #1161）：
+  // 路径参数 ?section= 给出节名，内容画出来以后滚到那里；认不出的节名不动，停在页首
+  const section = props.route.settingsSection;
+  const loaded = data !== null;
+  useEffect(() => {
+    if (!loaded || section === null) {
+      return;
+    }
+    document.getElementById(section)?.scrollIntoView({ block: "start" });
+  }, [loaded, section, projectId]);
 
   return (
     <div className="page y10-set">
@@ -184,7 +194,8 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
   const models = catalog.data?.models ?? [];
 
   return (
-    <Section title="部门设置" note="本项目各部门的项目部门设置：模型、推理档位与部门 Prompt">
+    // id 是这一节的路径参数取值：决定卡片上的「前往本项目的部门设置」按它滚到这里（工单 #1161）
+    <Section id="departments" title="部门设置" note="本项目各部门的项目部门设置：模型、推理档位与部门 Prompt">
       {entries.length === 0 ? <Empty text="没有登记部门设置" /> : null}
       {entries.map(([key, setting]) => {
         const effectiveId = mergedModelId(setting.model_id, key, bindings);

@@ -24,6 +24,7 @@ import type { PixelAction } from "../../src/renderer/src/pixel/contract.ts";
 import { COVERAGE } from "../../src/renderer/src/translate/coverage.ts";
 import { floorActions, type FloorEvent } from "../../src/renderer/src/translate/floor.ts";
 import { say } from "../../src/renderer/src/translate/say.ts";
+import { LINK_HIT_PAD, hitRect } from "../../src/renderer/src/pixel/floor/card-hit.ts";
 
 // ---------------------------------------------------------------------------
 // 确定时钟与手写数据
@@ -572,6 +573,23 @@ test("系统：管道的流动由 stateOf 决定，停止以后光点留在原�
 
 // ---------------------------------------------------------------------------
 // 决定单与大厅的板（工单 #179、#953）
+
+// 材料里链接的点击区（工单 #1161）：画出来的是 12 像素高的按钮，点击区放大到这一行文字。
+// 只放宽点击区、不动画法，所以回放的逐像素对照不受影响；相邻链接的点击区相接而不互相覆盖。
+test("决定卡片里链接的点击区：放大到这一行的文字，相邻链接不互相覆盖", () => {
+  const drawn = { x: 106, y: 188, w: 53, h: 12 };
+  const hit = hitRect(drawn.x, drawn.y, drawn.w, drawn.h, LINK_HIT_PAD);
+  // 上下各放宽 LINK_HIT_PAD：这一行文字的 18 个像素都算点中画出来的按钮
+  assert.equal(hit.y, drawn.y - LINK_HIT_PAD);
+  assert.equal(hit.h, drawn.h + LINK_HIT_PAD * 2);
+  assert.equal(hit.h, 18, "点击区应当占满这一行文字的 18 个像素");
+  // 左右各放宽一半的链接间距（6 个像素）：点击区相接，不覆盖旁边那个链接
+  assert.equal(hit.w, drawn.w + LINK_HIT_PAD * 2);
+  const next = hitRect(drawn.x + drawn.w + 6, drawn.y, 79, 12, LINK_HIT_PAD);
+  assert.equal(hit.x + hit.w, next.x, "相邻链接的点击区重叠了");
+  // 不放宽时就是画出来的按钮本身（其余按钮与原来一样）
+  assert.deepEqual(hitRect(drawn.x, drawn.y, drawn.w, drawn.h), drawn);
+});
 
 const decisionFace = (id: string): DecisionFace => ({
   id, kind: "model_unavailable", version: 3, title: "模型引用无法使用", work_item_id: "w1", where: "项目 · 测试事项",

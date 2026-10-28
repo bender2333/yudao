@@ -159,11 +159,12 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
 export function decisionLinks(decision: DecisionView): MaterialLink[] {
   const request = (decision.request ?? {}) as Payload;
   const links: MaterialLink[] = [];
-  // 待恢复的决定：前往模型管理与本项目的部门设置（原型 v8 第 6 节的材料表）
+  // 待恢复的决定：前往模型管理与本项目的部门设置（原型 v8 第 6 节的材料表）。
+  // 部门设置落在设置页的那一节上（工单 #1161）：路径带上节名，设置页据此滚到部门设置
   if (decision.kind === "model_unavailable") {
     links.push({ label: "前往模型管理", href: "#/sys/models" });
     if (decision.project_id) {
-      links.push({ label: "前往本项目的部门设置", href: `#/p/${decision.project_id}/settings` });
+      links.push({ label: "前往本项目的部门设置", href: `#/p/${decision.project_id}/settings?section=departments` });
     }
   }
   // 初始 PRD 的两个工件：PRD.md 与 STRUCTURE.md 指向资料页，资料页按轮展示的正是这两个工件的内容

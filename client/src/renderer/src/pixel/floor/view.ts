@@ -197,6 +197,17 @@ export interface FloorTestHooks {
   };
   /** 打开指定决定的卡片（端到端测试直接打开，绕过点击坐标的缩放）。 */
   openCard: (id: string) => void;
+  /**
+   * 卡片这一帧里链接的两块位置（画面逻辑坐标）：drawn 是画出来的按钮，hit 是它的点击区
+   * （工单 #1161：点击区放大到这一行文字，画的像素不变）。端到端按缩放换成页面坐标，在画布上真的点一下。
+   */
+  cardLinks: () => {
+    href: string;
+    drawn: { x: number; y: number; w: number; h: number };
+    hit: { x: number; y: number; w: number; h: number };
+  }[];
+  /** 画面的逻辑尺寸：端到端把逻辑坐标换成画布上的页面坐标用。 */
+  size: () => { W: number; H: number };
   /** 点一个选项（端到端测试在真实画布上点章，这里给直接入口）。 */
   answer: (option: string) => Promise<void>;
   resync: () => void;
@@ -241,6 +252,17 @@ export function floorTestHooks(view: FloorView, onResync: () => void): FloorTest
       };
     },
     openCard: (id) => view.card().open(id),
+    cardLinks: () => view.card().inspect().hits
+      .filter((hit) => hit.act === "go" && typeof hit.arg === "string")
+      .map((hit) => {
+        const pad = hit.pad ?? 0;
+        return {
+          href: hit.arg as string,
+          hit: { x: hit.x, y: hit.y, w: hit.w, h: hit.h },
+          drawn: { x: hit.x + pad, y: hit.y + pad, w: hit.w - pad * 2, h: hit.h - pad * 2 },
+        };
+      }),
+    size: () => view.size,
     answer: (option) => view.card().answer(option),
     resync: () => onResync(),
   };
