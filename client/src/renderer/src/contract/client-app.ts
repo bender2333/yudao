@@ -2,11 +2,12 @@
 // 状态：连接中 / 已连接 / 接口版本不同 / 连接失败。
 // 已连接以后：保持一条不按项目筛选的事件流连接；收到事件按视图同步规则重新查询；
 // 发现缺口或收到 resync 时重新查询已打开的视图，再按快照位置中最小的一个重新订阅；
-// 本次启动的身份改变（服务重启）时重新读取能力清单并重新同步。
+// 本次启动的身份改变（服务重启）时重新读取能力清单并重新同步——发现缺口、收到 resync 与
+// 断线以后重新连上（工单 #1159）这三处都核对一次身份。
 
 import type { Capabilities, DecisionList, EventObject, OutputDelta } from "../api/generated/types.gen";
-import { connect, interfaceFor, type Interface } from "./connection";
-import { EventStreamClient } from "./event-stream";
+import { connect, interfaceFor, type Connection, type Interface } from "./connection";
+import { EventStreamClient, type StreamHandlers, type StreamScope } from "./event-stream";
 import { callCommand, type CommandOutcome } from "./invoke";
 import { pendingDecisionEventTypes } from "./pending-decisions";
 import { nextStreamState, type StreamState } from "./stream-state";
@@ -32,9 +33,36 @@ export type ClientListeners = {
 // 把查询与命令交给生成的应用层接口；外壳提供它们，以便单元测试注入替身
 export type QueryRunner = <T>(client: Interface["client"], name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
 
+// 连上以后的事件流：能停、能读已读到的位置。正式运行时是 EventStreamClient（工单 #1159）
+export type StreamHandle = {
+  start(after: number): void;
+  stop(): void;
+  readonly position: number;
+};
+
+// 页面对服务的两次访问：读取能力清单与打开事件流。单元测试注入替身，
+// 不连网络、不起事件流，也能核对断线重连时核对启动身份的做法（工单 #1159）
+export type ClientAppDeps = {
+  connect: (address: string, token?: string) => Promise<Connection>;
+  openStream: (baseUrl: string, scope: StreamScope, handlers: StreamHandlers, token: string) => StreamHandle;
+};
+
+const defaultDeps: ClientAppDeps = {
+  connect,
+  openStream: (baseUrl, scope, handlers, token) => new EventStreamClient(baseUrl, scope, handlers, token),
+};
+
+/**
+ * 断线以后重新连上时，本次启动的身份是否变了（设计说明第 6.1 节）。
+ * 变了（服务重启）：页面重新读取能力清单并重新同步；没变：照旧从原位置续上，不整页重读。
+ */
+export function bootIdentityChanged(before: string | null, next: string | null): boolean {
+  return before !== next;
+}
+
 export class ClientApp {
   private iface: Interface | null = null;
-  private stream: EventStreamClient | null = null;
+  private stream: StreamHandle | null = null;
   private views: ViewSync | null = null;
   private boot: string | null = null;
   private capabilities: Capabilities | null = null;
@@ -49,11 +77,15 @@ export class ClientApp {
   private readonly resyncSubscribers = new Set<() => void>();
   // 输出片段订阅：部门房间的思考气泡按 offset 拼接模型输出（工单 #177）。片段不写入事件日志，只经流送达
   private readonly deltaListeners = new Set<(delta: OutputDelta) => void>();
+  private readonly deps: ClientAppDeps;
 
   constructor(
     private readonly runQuery: QueryRunner,
     private readonly listeners: ClientListeners,
-  ) {}
+    deps: Partial<ClientAppDeps> = {},
+  ) {
+    this.deps = { ...defaultDeps, ...deps };
+  }
 
   /** 订阅重新同步：收到时画面回到查询给出的状态，不补播已经播放过的动作。 */
   subscribeResync(fn: () => void): () => void {
@@ -88,7 +120,7 @@ export class ClientApp {
     this.closeStream();
     this.token = token;
     this.listeners.onState({ kind: "connecting" });
-    const result = await connect(address, token);
+    const result = await this.deps.connect(address, token);
     if (result.state === "outdated") {
       this.listeners.onState({
         kind: "outdated", address: result.address, clientVersion: result.clientVersion,
@@ -133,8 +165,14 @@ export class ClientApp {
   // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）。
   // live=1：连接接收模型输出片段（delta 帧），部门房间的思考气泡据此逐字显示（工单 #177）
   private startStream(after: number): void {
-    this.stream = new EventStreamClient(this.iface!.baseUrl, { live: true }, {
-      onConnected: () => this.setStreamConnected(true),
+    this.stream = this.deps.openStream(this.iface!.baseUrl, { live: true }, {
+      onConnected: (info) => {
+        this.setStreamConnected(true);
+        // 断开以后重新连上：核对一次本次启动的身份（工单 #1159，设计说明第 6.1 节）
+        if (info.reconnected) {
+          void this.checkBootIdentity();
+        }
+      },
       onInterrupted: () => this.setStreamConnected(false),
       onResync: () => void this.resync(),
       onMessage: (message) => {
@@ -196,30 +234,68 @@ export class ClientApp {
   // 缺口或 resync：把视图标为「数据可能过时」，重新查询它们的快照，再从快照位置中最小的一个重新订阅。
   // 查询失败（服务不可达）时保留旧流：流自身的退避重连会继续尝试，服务恢复以后自动恢复
   private async resync(): Promise<void> {
-    if (!this.iface) {
+    if (!this.iface || !this.views) {
       return;
     }
     try {
-      const before = this.boot;
-      const result = await connect(this.iface.baseUrl, this.token);
+      const result = await this.deps.connect(this.iface.baseUrl, this.token);
       if (result.state !== "connected") {
         return;
       }
       // 本次启动的身份改变：重新读取能力清单（设计说明第 6.1 节）
-      if (result.capabilities.deployment.boot_id !== before) {
-        this.boot = result.capabilities.deployment.boot_id;
-        this.capabilities = result.capabilities;
+      if (bootIdentityChanged(this.boot, result.capabilities.deployment.boot_id)) {
+        this.adoptCapabilities(result.capabilities);
       }
-      // 重新订阅的起点：视图位置与事件流已读到的位置里更晚的那个（工单 #659），
-      // 不往回退——退回去会重放整段历史，页面反复重新同步
-      const position = resubscribePosition(await this.views!.refreshAll(), this.stream?.position ?? 0);
-      this.closeStream();
-      this.startStream(position);
-      // 画面回到查询给出的状态，不补播已经播放过的动作
-      for (const fn of [...this.resyncSubscribers]) fn();
+      await this.refreshAndResubscribe();
     } catch {
       return;
     }
+  }
+
+  // 断线以后重新连上：核对一次本次启动的身份（工单 #1159，设计说明第 6.1 节）。
+  // 同一次启动就照旧从原位置续上，不整页重读；换了服务（重启）就与发现缺口时一样重新同步
+  private async checkBootIdentity(): Promise<void> {
+    if (!this.iface || !this.views) {
+      return;
+    }
+    let result: Connection;
+    try {
+      result = await this.deps.connect(this.iface.baseUrl, this.token);
+    } catch {
+      return;
+    }
+    if (result.state !== "connected" || !bootIdentityChanged(this.boot, result.capabilities.deployment.boot_id)) {
+      return;
+    }
+    this.adoptCapabilities(result.capabilities);
+    await this.refreshAndResubscribe();
+  }
+
+  // 本次启动的身份变了（服务重启）：换上它的能力清单，并通知外壳（能力清单决定显示哪些页面与区块）。
+  // 视图同步的登记不重建：打开的视图随重新同步一起重新查询，不丢已打开的页面
+  private adoptCapabilities(capabilities: Capabilities): void {
+    this.boot = capabilities.deployment.boot_id;
+    this.capabilities = capabilities;
+    if (this.iface) {
+      this.listeners.onState({
+        kind: "connected", address: this.iface.baseUrl, capabilities, stream: this.streamState,
+      });
+    }
+  }
+
+  // 重新同步的做法：重新查询全部已打开的视图，从快照位置里更晚的那个重新订阅事件流，
+  // 再让画面回到查询给出的状态（设计说明第 5.5 节）
+  private async refreshAndResubscribe(): Promise<void> {
+    if (!this.views) {
+      return;
+    }
+    // 重新订阅的起点：视图位置与事件流已读到的位置里更晚的那个（工单 #659），
+    // 不往回退——退回去会重放整段历史，页面反复重新同步
+    const position = resubscribePosition(await this.views.refreshAll(), this.stream?.position ?? 0);
+    this.closeStream();
+    this.startStream(position);
+    // 画面回到查询给出的状态，不补播已经播放过的动作
+    for (const fn of [...this.resyncSubscribers]) fn();
   }
 
   async refreshPendingDecisions(): Promise<void> {
