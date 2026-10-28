@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
+
+
+# .env 的键名规则：字母、数字与下划线，不以数字开头（工单 #1158）
+DOTENV_KEY_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+DOTENV_KEY_RULE = "字母、数字与下划线，不以数字开头"
 
 
 # 内存中的凭据材料，secret 与 version 均不进入 repr/比较/导出
@@ -13,12 +19,33 @@ class CredentialMaterial:
     version: str | None = field(default=None, repr=False, compare=False)
 
 
+def is_dotenv_key(value: str) -> bool:
+    # 这段文字能不能当 .env 的键名
+    return bool(DOTENV_KEY_PATTERN.fullmatch(str(value)))
+
+
+def suggested_dotenv_key(ref: str) -> str:
+    # 给不合规的引用举一个合规的写法：字母数字以外换成下划线，转大写；
+    # 开头是数字或什么都不剩时补上 KEY_ 前缀
+    cleaned = re.sub(r"[^A-Za-z0-9]+", "_", str(ref).strip()).strip("_").upper()
+    suggested = f"KEY_{cleaned}" if cleaned == "" or cleaned[0].isdigit() else cleaned
+    return suggested or "PROVIDER_KEY"
+
+
+def dotenv_key_problem(ref: str) -> str | None:
+    # 引用不能写进 .env 时的说明：写明规则并举一个合规的写法；可以用时返回空。
+    # 保存之前按它拒绝，文件与内存都不动：Yudao 不写出自己读不回的 .env（工单 #1158）
+    key = str(ref).strip()
+    if is_dotenv_key(key):
+        return None
+    return (f"凭据引用 {key or '（空）'} 不能写进 .env：.env 的键名只用{DOTENV_KEY_RULE}，"
+            f"例如 {suggested_dotenv_key(key)}")
+
+
 def parse_dotenv_text(text: str) -> dict[str, str]:
     # 最小兼容解析：空行与 # 注释跳过，可选 export 前缀，KEY=VALUE 单行形状，
     # 值两侧成对单双引号剥离。不支持多行值、转义序列、行内注释剥离、命令替换等
     # 语法；遇到不支持或畸形的行直接报错，不静默误读。不写 os.environ。
-    import re
-    key_pattern = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
     result: dict[str, str] = {}
     for line_number, raw_line in enumerate(text.splitlines(), start=1):
         line = raw_line.strip()
@@ -31,7 +58,7 @@ def parse_dotenv_text(text: str) -> dict[str, str]:
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip()
-        if not key_pattern.fullmatch(key):
+        if not is_dotenv_key(key):
             raise ValueError(f".env 第 {line_number} 行键名非法：{key}")
         if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
             value = value[1:-1]

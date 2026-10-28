@@ -19,9 +19,9 @@ DEPARTMENTS = ("product", "engineering", "quality")
 UPSTREAM_BASE = "http://127.0.0.1:9/v1"
 
 
-def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url=""):
+def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url="", ref=REF):
     return {"id": provider_id, "name": provider_id, "base_url": base_url,
-            "credential_ref": REF, "timeout_sec": 20.0, "preset_id": "", "models_url": models_url}
+            "credential_ref": ref, "timeout_sec": 20.0, "preset_id": "", "models_url": models_url}
 
 
 def _model(model_id="m1", *, model="model-x", protocol="responses"):
@@ -34,8 +34,9 @@ def _document_model(provider_id, model_id="m1"):
     return {**_model(model_id), "provider_id": provider_id}
 
 
-def _document(*, provider_id="p1", model_id="m1", base_url=UPSTREAM_BASE, models_url="", bindings=None):
-    return {"providers": [_provider(provider_id, base_url=base_url, models_url=models_url)],
+def _document(*, provider_id="p1", model_id="m1", base_url=UPSTREAM_BASE, models_url="", bindings=None,
+              ref=REF):
+    return {"providers": [_provider(provider_id, base_url=base_url, models_url=models_url, ref=ref)],
             "models": [_document_model(provider_id, model_id)],
             "bindings": dict(bindings or {})}
 
@@ -348,7 +349,10 @@ def test_credential_commands_keep_keys_out_of_events_and_queries(tmp_path):
             REF, "set", True)
         assert changed.payload["version"] == 1
         assert replacement in opened.dotenv.read_text(encoding="utf-8")
-        assert _catalog(client)["providers"][0]["credential"]["version"] == 1
+        # 写入 .env 成功以后不留内存覆盖，来源直接是 .env（工单 #1158 改掉的行为：
+        # 以前这一步要再发一条 clear_override 才看得到 dotenv）
+        stored = _catalog(client)["providers"][0]["credential"]
+        assert (stored["source"], stored["has_override"], stored["version"]) == ("dotenv", False, 1)
         _assert_no_secret(client, opened, secret=replacement)
 
         # 过期凭据版本被拒绝
@@ -356,21 +360,86 @@ def test_credential_commands_keep_keys_out_of_events_and_queries(tmp_path):
         assert stale.status_code == 409, stale.text
         assert stale.json()["reason"] == "stale_base" and stale.json()["current_version"] == 1
 
-        cleared = _command(client, "credential.clear_override", base_version=1, ref=REF)
+        # 只在本进程有效时留下内存覆盖，清除覆盖以后回到 .env
+        memory_only = _command(client, "credential.set", base_version=1, ref=REF, secret=replacement,
+                               persist=False)
+        assert memory_only.status_code == 200, memory_only.text
+        assert _catalog(client)["providers"][0]["credential"]["source"] == "override"
+        cleared = _command(client, "credential.clear_override", base_version=2, ref=REF)
         assert cleared.status_code == 200, cleared.text
         [cleared_event] = _wait_for(opened.store, lambda item: item.payload.get("action") == "clear_override",
                                     description="credential_changed (clear_override)")
-        assert cleared_event.payload["version"] == 2
+        assert cleared_event.payload["version"] == 3
         assert _catalog(client)["providers"][0]["credential"]["source"] == "dotenv"
 
-        removed = _command(client, "credential.remove_persisted", base_version=2, ref=REF)
+        removed = _command(client, "credential.remove_persisted", base_version=3, ref=REF)
         assert removed.status_code == 200, removed.text
         [removed_event] = _wait_for(opened.store, lambda item: item.payload.get("action") == "remove_persisted",
                                     description="credential_changed (remove_persisted)")
-        assert removed_event.payload["version"] == 3 and removed_event.payload["persisted"] is True
+        assert removed_event.payload["version"] == 4 and removed_event.payload["persisted"] is True
         final = _catalog(client)["providers"][0]["credential"]
-        assert final["configured"] is False and final["version"] == 3
+        assert final["configured"] is False and final["version"] == 4
         _assert_no_secret(client, opened, secret=replacement)
+
+
+def test_persisting_a_ref_that_dotenv_cannot_read_is_rejected_before_writing(tmp_path):
+    # 工单 #1158 验收：引用 trial-model-key 勾写入 .env 时在写入之前拒绝，文件、内存与版本都不动；
+    # 之后用合规的键名保存成功
+    opened = _Opened(tmp_path, _document(ref="trial-model-key"))
+    opened.dotenv.unlink()
+    with running_api(opened) as client:
+        credential = _catalog(client)["providers"][0]["credential"]
+        assert (credential["ref"], credential["configured"], credential["version"]) == ("trial-model-key", False, 0)
+
+        rejected = _command(client, "credential.set", base_version=credential["version"],
+                            ref="trial-model-key", secret="trial-secret-key-1", persist=True)
+        assert rejected.status_code == 409, rejected.text
+        body = rejected.json()
+        assert body["reason"] == "catalog_invalid"
+        # 说明里有规则，并举了一个合规的写法
+        assert "字母、数字与下划线" in body["message"] and "不以数字开头" in body["message"]
+        assert "TRIAL_MODEL_KEY" in body["message"]
+        assert not opened.dotenv.exists()
+        assert _catalog(client)["providers"][0]["credential"] == credential
+
+        saved = _command(client, "credential.set", base_version=credential["version"],
+                         ref="TRIAL_MODEL_KEY", secret="trial-secret-key-1", persist=True)
+        assert saved.status_code == 200, saved.text
+        assert opened.dotenv.read_text(encoding="utf-8") == "TRIAL_MODEL_KEY=trial-secret-key-1\n"
+        stored = opened.application.system.facade.credential_status("TRIAL_MODEL_KEY")
+        assert (stored["source"], stored["has_override"]) == ("dotenv", False)
+        assert "trial-secret-key-1" not in json.dumps(_catalog(client), ensure_ascii=False)
+
+
+def test_persisting_a_credential_rejects_an_unreadable_dotenv_with_the_line_number(tmp_path):
+    # 工单 #1158 验收：.env 已经有非法键名时保存返回 409 catalog_invalid，说明写明第几行，不是 500
+    opened = _Opened(tmp_path, _document(ref="trial-model-key"))
+    opened.dotenv.write_text("trial-model-key=trial-secret-key-1\n", encoding="utf-8")
+    with running_api(opened) as client:
+        credential = _catalog(client)["providers"][0]["credential"]
+        rejected = _command(client, "credential.set", base_version=credential["version"],
+                            ref="TRIAL_MODEL_KEY", secret="trial-secret-key-2", persist=True)
+        assert rejected.status_code == 409, rejected.text
+        assert rejected.json()["reason"] == "catalog_invalid"
+        assert "第 1 行" in rejected.json()["message"]
+        # 坏掉的 .env 不被覆盖，也不留下内存覆盖
+        assert opened.dotenv.read_text(encoding="utf-8") == "trial-model-key=trial-secret-key-1\n"
+        assert _catalog(client)["providers"][0]["credential"]["has_override"] is False
+
+
+def test_credential_commands_compare_the_refs_own_version(tmp_path):
+    # 工单 #1158 验收：拿目录修订号提交凭据命令时说明写清比的是凭据版本，当前值一并给出
+    opened = _Opened(tmp_path)
+    with running_api(opened) as client:
+        revision = _catalog(client)["revision"]
+        assert revision >= 1
+        rejected = _command(client, "credential.set", base_version=revision, ref=REF,
+                            secret="catalog-secret-key-9", persist=False)
+        assert rejected.status_code == 409, rejected.text
+        body = rejected.json()
+        assert body["reason"] == "stale_base" and body["current_version"] == 0
+        assert "credential.version" in body["message"] and "当前是 0" in body["message"]
+        assert opened.dotenv.read_text(encoding="utf-8") == f"{REF}={SECRET}\n"
 
 
 def test_external_file_change_is_appended_as_catalog_revised(tmp_path):
