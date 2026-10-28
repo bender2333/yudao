@@ -39,8 +39,8 @@ DEPARTMENTS = DEFINITIONS.departments
 # run 的状态与骨架事件载荷里的封闭取值都由内核事件模块给出（它们是事件信封与骨架事件的一部分），
 # 这里随其他导入一起转出给应用用
 
-# 提案种类：定义中提交类工具提交的种类
-PROPOSAL_KINDS = tuple(tool.proposal for tool in DEFINITIONS.tools.values() if tool.proposal is not None)
+# 提案种类的清单不再在这里算（S2c，工单 #1098）：工具许可与提案校验按这个事项所用的那份定义读，
+# 读法在 harness/tools.py 的 proposal_kinds_of；模块加载时算好的那份清单会让第二种路由带来的种类看不到
 
 
 class EventType(SkeletonEventType):

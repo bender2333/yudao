@@ -8,6 +8,7 @@
 # #437 的审计钩子放行事件循环的自管道以后再按同一个做法重试一次（第 9 节第 3 步）。
 [layers]
 "kernel/test_contract_surface.py" = "unit"
+"kernel/test_definitions_decide.py" = "unit"
 "kernel/test_every_stop_has_reason.py" = "unit"
 "kernel/test_limits_survive_restart.py" = "integration"
 "kernel/test_manifest.py" = "unit"

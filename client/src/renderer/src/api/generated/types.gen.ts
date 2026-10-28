@@ -5725,6 +5725,135 @@ export type AdoptionHeldPayload = {
 };
 
 /**
+ * ArtifactAcceptedEvent
+ */
+export type ArtifactAcceptedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'artifact_accepted';
+    payload: ArtifactAcceptedPayload;
+};
+
+/**
+ * ArtifactAcceptedPayload
+ */
+export type ArtifactAcceptedPayload = {
+    /**
+     * Artifact Kind
+     */
+    artifact_kind?: string | null;
+    /**
+     * Artifact Version
+     */
+    artifact_version?: number | null;
+    /**
+     * Artifact Basis
+     */
+    artifact_basis?: {
+        [key: string]: string;
+    };
+    artifact_ref?: ArtifactRef | null;
+    /**
+     * Artifact Issuer
+     */
+    artifact_issuer?: string | null;
+    /**
+     * Artifact Tree Digest
+     */
+    artifact_tree_digest?: string | null;
+    /**
+     * Artifact Multiple
+     */
+    artifact_multiple?: boolean | null;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Issuer
+     */
+    issuer: string;
+    /**
+     * Parent Hash
+     */
+    parent_hash: string | null;
+    /**
+     * Revision
+     */
+    revision: number;
+    /**
+     * Status
+     */
+    status: 'active';
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Id
+     */
+    id: string;
+    [key: string]: unknown;
+};
+
+/**
  * ArtifactInvalidatedEvent
  */
 export type ArtifactInvalidatedEvent = {
@@ -16133,6 +16262,8 @@ export type EventObject = ({
 } & StructureAcceptedEvent) | ({
     type: 'baseline_review_accepted';
 } & BaselineReviewAcceptedEvent) | ({
+    type: 'artifact_accepted';
+} & ArtifactAcceptedEvent) | ({
     type: 'lesson_candidate_recorded';
 } & LessonCandidateRecordedEvent) | ({
     type: 'run_done';

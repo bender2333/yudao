@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, Definitions
 from .kernel_events import TERMINAL_STATUSES, Event
 from .minimal_projection import MinimalProjection
-from .tools import has_tool, tool_action
+from .tools import has_tool, in_force, tool_action
 from .validation import (
     AdjudicationView, FieldError, ProposalDecision, TightenRequest, Tightening, evaluate_proposal,
 )
@@ -77,20 +77,22 @@ def ask_chain_max_depth() -> int:
 
 
 def offered_tools(state: Any, department: str, *, tightening: Tightening,
-                  session_id: str | None = None, input_modalities: tuple[str, ...] = ("text",)) -> list[str]:
+                  session_id: str | None = None, input_modalities: tuple[str, ...] = ("text",),
+                  definitions: Definitions | None = None) -> list[str]:
     # 请求中提供给模型的工具：内核给出部门完整的工具清单，由路由的收紧检查按这一轮的工作与询问分支取舍，
     # 再按调用目标的输入方式去掉声明需要图像输入的工具（设计说明第 5.6 节，工单 #1095）。
-    # state 是应用侧的运行状态投影：提供的工具由收紧检查按内容判断，内核不读它，原样交过去
-    return tightening.offered(TightenRequest(department=department, state=state,
-                                             session_id=session_id, input_modalities=input_modalities))
+    # state 是应用侧的运行状态投影：提供的工具由收紧检查按内容判断，内核不读它，原样交过去。
+    # 部门的工具清单读这个事项所用的那份定义（工单 #1098），不读模块加载时的那一份
+    return tightening.offered(TightenRequest(department=department, state=state, session_id=session_id,
+                                             input_modalities=input_modalities, definitions=in_force(definitions)))
 
 
-def facts_query(call: dict[str, Any]) -> FactsQuery:
+def facts_query(call: dict[str, Any], *, definitions: Definitions | None = None) -> FactsQuery:
     # 工具许可依据的工作区事实：写入的目标路径在工作区中的规范形式，命令执行依据中的公开树摘要
     name, args = call["name"], call["args"]
-    if tool_action(name) == "command":
+    if tool_action(name, definitions=definitions) == "command":
         return FactsQuery(tree=True)
-    if _is_write(name):
+    if _is_write(name, definitions):
         return FactsQuery(paths=tuple(target for target in _write_targets(name, args) if isinstance(target, str)))
     return FactsQuery()
 
@@ -106,18 +108,23 @@ def tool_permission(
     facts: WorkspaceFacts,
     session_id: str | None = None,
     events: list[Event] | None = None,
+    definitions: Definitions | None = None,
 ) -> ToolPermission:
     # facts 是执行环境按 facts_query(call) 查询的结果
+    # 工具许可读这个事项所用的那份定义（工单 #1098）：部门有没有这个工具、这个工具提交什么种类按它判；
+    # 没有交的时候是当前加载的那一份
     # 有效合同、指导与用户输入变了都不再停止这次激活：它们作为通知送达，部门接着工作，
     # 这一轮不因此结束（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
     projection = view.minimal
+    definition = in_force(definitions)
     if projection.status in TERMINAL_STATUSES or aborted:
         return ToolPermission(stopped=True)
     name, args = call["name"], call["args"]
     # 成果驱动的取舍交给路由的收紧检查（工单 #1095）：推迟、询问分支、这个部门此刻能交的种类、放行等输入处理完。
     # 内核自己判的是运行状态（上面）、部门有没有这个工具与写入目标的规范形式（下面）
     tight = tightening.tool(TightenRequest(department=department, state=view.state, session_id=session_id,
-                                           basis=basis, tool=call, events=tuple(events or ())))
+                                           basis=basis, tool=call, events=tuple(events or ()),
+                                           definitions=definition))
     if tight.wait:
         # 等待由步骤驱动的安全节点处理（工单 #561）：不写事件、不占步数、不返回模型
         return ToolPermission(wait_for_input=True)
@@ -125,9 +132,9 @@ def tool_permission(
         return ToolPermission(reason=tight.errors[0].message)
     if tight.reason is not None:
         return ToolPermission(reason=tight.reason, deferred=tight.deferred)
-    if not tight.permitted and not has_tool(department, name, projection.work_item_kind):
+    if not tight.permitted and not has_tool(department, name, projection.work_item_kind, definitions=definition):
         return ToolPermission(reason=f"{department} cannot use {name}")
-    if _is_write(name):
+    if _is_write(name, definition):
         reason = _write_path_error(name, args, facts)
         if reason:
             return ToolPermission(reason=reason)
@@ -135,9 +142,11 @@ def tool_permission(
 
 
 def proposal_decision(view: AdjudicationView, *, department: str, proposal: dict[str, Any] | None,
-                      facts: TreeFacts, tightening: Tightening, events: list[Event]) -> ProposalDecision:
-    # 提案校验：按最小投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误
-    return evaluate_proposal(view=view, department=department, proposal=proposal,
+                      facts: TreeFacts, tightening: Tightening, events: list[Event],
+                      definitions: Definitions | None = None) -> ProposalDecision:
+    # 提案校验：按最小投影、工作区事实与事件判断提案能否接纳；自然语言与格式错误都成为字段错误。
+    # 种类与部门读这个事项所用的那份定义（工单 #1098）
+    return evaluate_proposal(view=view, department=department, proposal=proposal, definitions=definitions,
                              facts=facts, tightening=tightening, events=events)
 
 
@@ -152,30 +161,33 @@ def commit_decision(
     current_facts: TreeFacts,
     events: list[Event],
     tightening: Tightening,
+    definitions: Definitions | None = None,
 ) -> ProposalDecision:
     # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。校验以后工作区改变，
     # 或者当前工作已经不是校验时的那一份，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
     # 有效合同、指导与用户输入变了不再让这次提交作废：它们作为通知送达，部门接着工作，
     # 提交的成果按当前版本核对（工单 #558、工单 #964，循环结构第 5 节、第 6 节与第 7 节）
+    definition = in_force(definitions)
     if submission_basis(current.minimal) != submission_basis(evaluated.minimal):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
     if current_facts != facts:
         return ProposalDecision(False, [FieldError("execution_basis", _STALE_SNAPSHOT)])
     if decision.accepted:
-        decision = proposal_decision(current, department=department, proposal=proposal,
+        decision = proposal_decision(current, department=department, proposal=proposal, definitions=definition,
                                      facts=current_facts, tightening=tightening, events=events)
     if decision.accepted:
         # 新输入在工具许可之后、提交之前到达：这次提交不当场生效，交回部门，等产品处理完再提交
         # （部门指导设计说明第 2.1 节，工单 #561）。这件事由路由的收紧检查在提交事务里再判一次（工单 #1095）
         tight = tightening.submission(TightenRequest(department=department, state=current.state, proposal=proposal,
-                                                     events=tuple(events), commit=True))
+                                                     events=tuple(events), commit=True, definitions=definition,
+                                                     minimal=current.minimal, facts=current_facts))
         if tight.wait:
             return ProposalDecision(False, [FieldError("kind", _PENDING_INPUT_RELEASE)])
     return decision
 
 
-def _is_write(name: str) -> bool:
-    return tool_action(name) == "write"
+def _is_write(name: str, definitions: Definitions | None = None) -> bool:
+    return tool_action(name, definitions=definitions) == "write"
 
 
 def _write_path_error(name: str, args: dict[str, Any], facts: WorkspaceFacts) -> str | None:

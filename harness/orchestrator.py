@@ -48,7 +48,7 @@ from .streams import (
 )
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, Definitions
 from .department_prompts import save_department_prompt
 from .overview import repository_overview
 from . import parameters as parameter_values
@@ -72,6 +72,7 @@ from .recovery import RunRecovery
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
 from .submissions import SubmissionWriter
+from .tools import in_force
 from .validation import AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
 from .watched_outputs import waiting_departments
 from .workspace import WorkspaceSnapshot
@@ -243,6 +244,7 @@ class Orchestrator:
         decision_flow: Any,
         assembly: Any,
         execution: Any,
+        definitions: Definitions | None = None,
     ) -> None:
         self.store = store
         self.writes = writes
@@ -263,6 +265,9 @@ class Orchestrator:
         # 组装时核对它声明的契约版本，不合格就在开始一轮工作之前失败（与执行、装配两份契约同一个做法）
         self._tightening = tightening
         tightening_contract.accept(tightening)
+        # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判；
+        # 没有交的时候是当前加载的那一份
+        self._definitions = in_force(definitions)
         # 路由实现（成果驱动）：谁在等、谁能开工、一轮以什么结束、事项以什么结束由它判断（工单 #825）；
         # 薄驱动只按契约的三个问题调用它，组装时核对它声明的契约版本
         self._routing = routing
@@ -1383,6 +1388,7 @@ class Orchestrator:
                 nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
                 deltas=self.deltas, tightening=self._tightening,
                 refresh_workspace=self._workspaces.refresh_for(self._round_workspace(activation)),
+                definitions=self._definitions,
             )
             result = await activation.driver.result()
         except UnrepresentableWorkspace as exc:
@@ -1566,6 +1572,7 @@ class Orchestrator:
                 facts=env.query(FactsQuery(tree=True)).tree,
                 tightening=self._tightening,
                 events=transaction.events(),
+                definitions=self._definitions,
             )
             if not decision.accepted:
                 raise RuntimeError(f"invalid prd revision: {decision.errors}")
@@ -1685,6 +1692,7 @@ class Orchestrator:
             nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
             deltas=self.deltas, tightening=self._tightening,
             refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
+            definitions=self._definitions,
         )
         started = time.monotonic()
         try:
@@ -1753,8 +1761,9 @@ class Orchestrator:
             evaluated = self.writes.read(run_stream(run_id))
             facts = environment.query(FactsQuery(tree=True)).tree
             view = AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection)
-            decision = proposal_decision(view, department=department, proposal=proposal,
-                                         facts=facts, tightening=self._tightening, events=evaluated.events())
+            decision = proposal_decision(view, department=department, proposal=proposal, facts=facts,
+                                         tightening=self._tightening, events=evaluated.events(),
+                                         definitions=self._definitions)
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
                     transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
@@ -1794,6 +1803,7 @@ class Orchestrator:
             evaluated=AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection), facts=facts,
             current=AdjudicationView(minimal=transaction.minimal(), state=current), current_facts=snapshot.facts,
             events=transaction.events(), tightening=self._tightening,
+            definitions=self._definitions,
         )
         if proposal is not None:
             transaction.append(NewEvent(

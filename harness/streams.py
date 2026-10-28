@@ -73,6 +73,7 @@ RUN_EVENT_TYPES = frozenset({
     "lesson_candidate_recorded",
     "structure_accepted",
     "baseline_review_accepted",
+    "artifact_accepted",
     "run_resumed",
     "run_continued",
     "run_done",
