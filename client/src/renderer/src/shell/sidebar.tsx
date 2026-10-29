@@ -12,6 +12,7 @@ import { visibleProjects } from "../views/project/project-list";
 import { drainNoticeText } from "../views/system/drain-text";
 import { emptyOrFailureText } from "../contract/read-failure";
 import { Icon, StatusMark } from "./kit";
+import { projectEntryNote, projectFormNote } from "./new-project-text";
 import { onboardingProblemText, projectOnboardingMark, sourceInvalidLines } from "../views/project/onboarding";
 
 export type SidebarProps = {
@@ -108,16 +109,23 @@ export function Sidebar(props: SidebarProps) {
         </button>
         <div className="y10-side-actions">
           {can("project.create") ? (
-            <button type="button" className="y10-btn primary y10-new-project nav-item" onClick={() => setCreating(creating === "idea" ? null : "idea")}>
-              <Icon name="plus" />
-              <span>从想法新建</span>
-            </button>
+            <div className="y10-side-action">
+              <button type="button" className="y10-btn primary y10-new-project nav-item" onClick={() => setCreating(creating === "idea" ? null : "idea")}>
+                <Icon name="plus" />
+                <span>从想法新建</span>
+              </button>
+              {/* 入口旁的场景说明（工单 #1240）：哪个入口从材料开始、哪个从已有代码目录开始 */}
+              <small className="y10-entry-note">{projectEntryNote("idea")}</small>
+            </div>
           ) : null}
           {can("project.onboard") ? (
-            <button type="button" className="y10-btn y10-onboard nav-item" onClick={() => setCreating(creating === "existing" ? null : "existing")}>
-              <Icon name="import" />
-              <span>接入已有项目</span>
-            </button>
+            <div className="y10-side-action">
+              <button type="button" className="y10-btn y10-onboard nav-item" onClick={() => setCreating(creating === "existing" ? null : "existing")}>
+                <Icon name="import" />
+                <span>接入已有项目</span>
+              </button>
+              <small className="y10-entry-note">{projectEntryNote("existing")}</small>
+            </div>
           ) : null}
         </div>
         {creating ? (
@@ -231,6 +239,7 @@ function receiptId(accepted: Record<string, unknown> | null, key: string): strin
 // 新建项目：名称与长期目标必填；从想法新建可以另填一个起始文件夹（留空则从空项目开始），
 // 接入已有项目另登记源目录的名称与路径。说明照原型 v13（工单 #1160）：起始文件夹是一份快照，
 // 新建项目不调用模型；新建成功以后转到新项目的概览（原型 v13 的 shell.createProject）。
+// 表单里「需求材料在下一步作为事项输入提交」的那一段见 new-project-text.ts（工单 #1240）。
 function NewProject(props: {
   mode: "idea" | "existing";
   busy: boolean;
@@ -327,7 +336,7 @@ function NewProject(props: {
           </>
         ) : null}
         {props.mode === "idea" ? (
-          <p className="y10-note note">新建项目不调用模型；之后在概览中记录原文或作为新事项开始。</p>
+          <p className="y10-note note">{projectFormNote("idea")}</p>
         ) : null}
         <div className="y10-row">
           <button type="submit" className="y10-btn primary" disabled={props.busy || !ready}>
