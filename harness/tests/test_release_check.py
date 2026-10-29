@@ -1,5 +1,5 @@
-# 发布检查（可信内核设计说明第 4.4 节，工单 #355）：在临时 git 仓库里植入四类问题，
-# 每类都被报成对应的不通过项；干净的仓库通过；改待发布提交里的清单与内核测试不改变结果。
+# 发布检查：内核差异列入报告，三类技术失败阻止发布；
+# 干净的仓库通过；改待发布提交里的清单与内核测试不改变结果。
 # 目录流中的决定请求「实例升级」带着检查结果。
 
 import json
@@ -109,12 +109,13 @@ def test_a_clean_pending_commit_passes(repository):
 
 
 def test_a_changed_kernel_path_is_reported(repository):
-    # 改动内核清单里的路径：报成内核差异，位置是改动的路径
+    # R2：内核差异列入发布报告，符合其余检查的提交可以发布。
     repository.write(KERNEL_MODULE, KERNEL_SOURCE + "\nEXTRA = 2\n")
     repository.commit("change the kernel")
     report = check_repository(repository.path)
     assert KERNEL_MODULE in report.kernel_changes
-    assert KERNEL_MODULE in [item.where for item in _findings(report).get("内核差异", [])]
+    assert KERNEL_MODULE in report.text
+    assert report.passed, report.text
 
 
 def test_kernel_python_lines_over_the_cap_are_reported(repository, tmp_path):
@@ -125,6 +126,7 @@ def test_kernel_python_lines_over_the_cap_are_reported(repository, tmp_path):
     report = check_repository(repository.path)
     assert report.kernel_python_lines > report.python_lines_max
     assert any(item.check == "行数" for item in report.findings)
+    assert not report.passed
 
 
 def test_an_import_outside_the_allowed_direction_is_reported(repository):
@@ -134,6 +136,7 @@ def test_an_import_outside_the_allowed_direction_is_reported(repository):
     report = check_repository(repository.path)
     assert any(item.check == "导入方向" and item.where.startswith(f"{KERNEL_MODULE}:")
                for item in report.findings)
+    assert not report.passed
 
 
 def test_eval_proprietary_content_in_a_department_prompt_is_reported(repository):
@@ -144,6 +147,32 @@ def test_eval_proprietary_content_in_a_department_prompt_is_reported(repository)
     report = check_repository(repository.path)
     proprietary = _findings(report).get("评测专有内容", [])
     assert any(item.where.startswith("harness/definitions/roles.json") for item in proprietary)
+    assert not report.passed
+
+
+@pytest.mark.parametrize("invalid_import", [False, True])
+def test_release_check_cli_is_readonly_and_returns_the_check_status(repository, tmp_path, capsys, invalid_import):
+    # R2：重复发布检查返回实际检查结果，使用中的实例目录不受检查命令影响。
+    from harness.__main__ import main
+
+    repository.write(KERNEL_MODULE, "import pygit2\n" if invalid_import else KERNEL_SOURCE + "EXTRA = 2\n")
+    repository.commit("change kernel for release")
+    data_dir = tmp_path / "live-instance"
+    system = LoopSystem(data_dir)
+    try:
+        before = {path.relative_to(data_dir): path.read_bytes()
+                  for path in data_dir.rglob("*") if path.is_file()}
+        for _ in range(2):
+            assert main(["release-check", str(repository.path), "--data-dir", str(data_dir)]) == (
+                1 if invalid_import else 0)
+            output = capsys.readouterr().out
+            assert KERNEL_MODULE in output
+            assert "决定请求" not in output
+            after = {path.relative_to(data_dir): path.read_bytes()
+                     for path in data_dir.rglob("*") if path.is_file()}
+            assert after == before
+    finally:
+        system.close()
 
 
 def test_eval_proprietary_content_in_a_skill_is_reported(repository):
@@ -181,13 +210,15 @@ def test_eval_proprietary_content_in_a_definition_is_reported(repository):
 
 def test_editing_the_pending_manifest_does_not_change_the_result(repository):
     # 待发布提交里的清单与内核测试改不动结果：检查用的是实例自带的清单与检查。
-    # 把待发布提交里的行数上限改成 1，结果仍然只有内核差异这两项，行数上限仍按实例自带的算
+    # 把待发布提交里的行数上限改成 1，行数上限仍按实例自带的算，差异记录在报告中。
     repository.write("harness/definitions/kernel-manifest.json", _manifest_payload(python_lines_max=1))
     repository.write("harness/tests/kernel/test_manifest.py",
                      "def test_manifest():\n    assert True  # 待发布提交里改成一律通过\n")
     repository.commit("rewrite the manifest in the pending commit")
     report = check_repository(repository.path)
-    assert [item.check for item in report.findings] == ["内核差异", "内核差异"]
+    assert report.passed, report.text
+    assert set(report.kernel_changes) == {
+        "harness/definitions/kernel-manifest.json", "harness/tests/kernel/test_manifest.py"}
     assert report.python_lines_max == load_manifest().python_lines_max
     assert report.kernel_python_lines > 1
 

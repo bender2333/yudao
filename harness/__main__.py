@@ -23,7 +23,7 @@ from .data_directory import default_dotenv as default_dotenv_path
 from .data_directory import default_provider_config as default_provider_config_path
 from .demo import run_demo
 from .models import utc_now
-from .release_check import check_repository, request_instance_upgrade
+from .release_check import check_repository
 from .runtime import LoopSystem
 from .smoke import DEFAULT_DIR as SMOKE_DIR
 from .smoke import run_smoke, smoke_exit_code
@@ -93,8 +93,8 @@ def build_parser() -> argparse.ArgumentParser:
     token_revoke = token_sub.add_parser("revoke", help="revoke a token by name")
     token_revoke.add_argument("name")
     token_revoke.add_argument("--data-dir", default=argparse.SUPPRESS)
-    # 发布检查（工单 #355）：待发布的仓库是位置参数，结果写进决定请求「实例升级」
-    release_check = sub.add_parser("release-check", help="check a pending release commit and request the upgrade")
+    # 发布检查：待发布的仓库是位置参数，输出报告与检查的退出状态。
+    release_check = sub.add_parser("release-check", help="check a pending release commit")
     release_check.add_argument("repository", help="the repository holding the pending release commit")
     release_check.add_argument("--data-dir", default=argparse.SUPPRESS)
     return parser
@@ -213,16 +213,9 @@ def _token_command(args: argparse.Namespace) -> int:
 
 def _release_check_command(args: argparse.Namespace) -> int:
     # 发布检查（可信内核设计说明第 4.4 节，工单 #355）：用这一份实例的清单与检查检查待发布的提交，
-    # 把结果写进决定请求「实例升级」，由用户在界面上批准或拒绝。检查不通过时状态为非零，
-    # 发布脚本据此拒绝上传；决定请求照旧写入，用户看到的是不通过的结果
+    # 输出报告，检查不通过时状态为非零，发布脚本据此拒绝上传。
     report = check_repository(Path(args.repository).resolve())
     print(report.text)
-    system = LoopSystem(args.data_dir)
-    try:
-        decision_id = request_instance_upgrade(system, report)
-    finally:
-        system.close()
-    print(f"决定请求「实例升级」：{decision_id}")
     return 0 if report.passed else 1
 
 def _print_query(data_dir: str | Path, name: str, request: Any) -> int:

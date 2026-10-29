@@ -277,7 +277,7 @@ def _check_release(repo_root: Path) -> None:
     result = subprocess.run([yudao, "release-check", str(repo_root)], cwd=repo_root, check=False,
                             capture_output=True, text=True, encoding="utf-8", errors="replace")
     if result.returncode != 0:
-        raise ReleaseError("发布检查不通过，先让用户经决定请求「实例升级」批准，再发布：\n"
+        raise ReleaseError("发布检查不通过，请修复报告中的失败项后重新发布：\n"
                            + (result.stdout or "").strip())
 
 def release(repo_root: Path, *, publish_flag: bool, output_dir: Path, branch: str,

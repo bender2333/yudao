@@ -812,3 +812,5 @@ claude-sonnet-5-5 / 2026-10-29 19:31 / `docs/design/` 下 25 份设计说明按�
 claude-sonnet-5-5 / 2026-10-29 19:31 / `docs/requirements/README.md` 删「状态」列，27 份需求记录删「实现状态」小节；D19、D39 在细节格补上归档与暂缓的说明，`provider-retries.md`、`department-history.md` 补回被连带删掉的两处需求内容 / 进度只在 GitHub 与 git
 claude-sonnet-5-5 / 2026-10-29 19:31 / 新增 `docs/adr/0040-design-implementation-separation.md` / 记录设计与实施分离的决定、考虑过的另一种做法（规矩移到测试）和代价
 claude-架构师 / 2026-10-29 21:05 / `.gitignore` 加 `.local/`（`gh` 的设备标识留在 `.local/state/gh/device-id`，是本地状态，不进仓库）/ 发布脚本要求工作区干净，这一项挡了发布；与 `.ralph/`、`.tmp/` 同类claude-架构师 / 2026-10-29 23:20 / 阶段一发布：`v0.2.0` 标签与 Release 已建（wheel sha256 2e70476d…，构建提交 32c0ae01），走查用发布出来的包装进独立环境、起服务、首页与模型管理页正常、版本显示 0.2.0；发布脚本的内核差异闸有缺陷，已开 #1257，按用户批准手工完成标签与 Release 三步 / 用户已批准决定请求「实例升级」；脚本 `passed = not findings` 使改过内核的发布永不可能通过，重跑又会新建决定请求
+
+GPT-6 / 2026-10-29 23:20 / 修改发布设计与可信内核设计，记录发布检查无需审批、内核差异只作报告及检查命令只读的决定 / 用户要求删除造成阶段一发布受阻的规则（#1257）

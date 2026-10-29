@@ -4,10 +4,10 @@
 #   2. 行数：内核清单里的 Python 文件的总行数不超过清单的上限；
 #   3. 导入方向：内核清单里的模块只导入内核文件、标准库与 pydantic；
 #   4. 评测专有内容：部门 Prompt、定义、工具说明、技能里出现评测场景专有内容即为不通过。
-# 检查结果写进决定请求「实例升级」（目录流），由用户批准或拒绝；升级已安装的那一份是一次用户决定。
+# 内核差异列入报告；行数、导入方向与评测专有内容决定是否通过发布检查。
 #
 # 清单、上限与检查都取自运行的这一份实例：待发布提交里的清单与检查改不动这次的结果，
-# 改清单是内核修改，本身要经决定请求「内核修改」由用户批准。
+# 升级用户已经安装的实例仍由用户经决定请求「实例升级」批准。
 
 from __future__ import annotations
 
@@ -334,8 +334,6 @@ def check_repository(repo_root: Path, manifest: _Manifest | None = None) -> Rele
                                if _tree_entry(repository, tree, path) is not None)
 
     findings: list[Finding] = []
-    findings += [Finding("内核差异", "内核路径发生改动，改动需要经决定请求「内核修改」由用户批准", path)
-                 for path in kernel_changes]
 
     lines = 0
     for path in manifest.modules:
@@ -378,7 +376,7 @@ def report_text(*, repository: str, pending_commit: str, base_tag: str | None, k
         lines.append("不通过项：")
         lines += [f"  [{item.check}] {item.where}：{item.reason}" for item in findings]
     else:
-        lines.append("四项检查（内核差异、行数、导入方向、评测专有内容）全部通过。")
+        lines.append("三项检查（行数、导入方向、评测专有内容）全部通过。")
     return "\n".join(lines)
 
 
