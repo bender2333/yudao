@@ -2,10 +2,19 @@
 // （FakeAdapter 驱动的服务，见 tests/e2e/backend.py）。视口尺寸 1440×900 与 1920×1080，控制台错误为零。
 
 import { expect, test } from "@playwright/test";
+import { join } from "node:path";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 import { CLIENT_API_VERSION } from "../../src/renderer/src/api/interface-version";
 
 let backend: Backend;
+
+// 本机留证据时的截图目录（环境变量 YUDAO_SHOTS 给出，交付说明里列路径）；CI 里不设，不写文件
+const SHOTS = process.env.YUDAO_SHOTS ?? "";
+
+async function shot(page: ClientApp["page"], name: string): Promise<void> {
+  if (SHOTS === "") return;
+  await page.screenshot({ path: join(SHOTS, name), fullPage: false });
+}
 
 // 启动后端（FakeAdapter 驱动的服务）到首行输出的用时由后端的 git 子进程决定：本机空闲时 18 至 25 秒，
 // 并发负载下 60 至 75 秒（#214）。这个界限只用来防止后端不输出时一直等待，按 #107 的裁定
@@ -116,6 +125,50 @@ test("事件流驱动视图刷新：经命令新建项目以后，左侧栏无�
   }
 });
 
+
+
+// 首页两个入口各带一行场景说明，新建项目表单写清需求材料在下一步作为事项输入提交（工单 #1240，
+// 试用问题 Te28ea596-04）：拿 16KB 需求正文的新手原来从首页看不出走哪个入口、材料放在哪一步。
+test("首页两个入口各带场景说明，新建项目表单说明需求材料在下一步作为事项提交", async () => {
+  const client = await openClient({ width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  try {
+    await page.evaluate(() => {
+      window.location.hash = "#/home";
+    });
+    await expect(page.locator(".page.home")).toBeVisible();
+
+    // 两个入口在这里能看到，各自带一句说明
+    const notes = page.locator(".sidebar .y10-entry-note");
+    await expect(notes).toHaveText([
+      "从一段想法或需求文字开始，可以先建一个空项目。",
+      "把电脑上已有的代码目录接进来，先建档再做事项。",
+    ]);
+    // 每条说明跟着自己的入口按钮：说明写在按钮所在的那一格里，不会串到另一个入口
+    const ideaEntry = page.locator(".y10-side-actions .y10-side-action").filter({ hasText: "从想法新建" });
+    const onboardEntry = page.locator(".y10-side-actions .y10-side-action").filter({ hasText: "接入已有项目" });
+    await expect(ideaEntry.locator(".y10-new-project")).toBeVisible();
+    await expect(onboardEntry.locator(".y10-onboard")).toBeVisible();
+    await expect(ideaEntry.locator(".y10-entry-note")).toHaveText("从一段想法或需求文字开始，可以先建一个空项目。");
+    await expect(onboardEntry.locator(".y10-entry-note")).toHaveText("把电脑上已有的代码目录接进来，先建档再做事项。");
+
+    // 打开「从想法新建」的表单：说明里写清项目不调用模型、材料在建好项目以后到概览里作为新事项开始时提交
+    await page.getByRole("button", { name: "从想法新建" }).click();
+    const form = page.locator("form.card").filter({ has: page.getByRole("heading", { name: "从想法新建项目" }) });
+    await expect(form).toBeVisible();
+    const note = form.locator("p.y10-note");
+    await expect(note).toContainText("新建项目不调用模型");
+    await expect(note).toContainText("需求材料");
+    await expect(note).toContainText("作为新事项开始时提交");
+    await expect(note).toContainText("概览");
+
+    await shot(page, "shell-home-entries-and-new-project-note.png");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+  }
+});
 
 
 test("接口版本不同时页面只显示版本不同的提示（写明两边的版本），不打开页面、不执行命令", async () => {

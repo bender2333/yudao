@@ -156,6 +156,28 @@ def _default_settings(state: ProjectProjection) -> ProjectProjection:
     return state
 
 
+def _kept_delivery(store: EventStore, run: RunProjection, status: str, *,
+                   through: int | None = None) -> dict[str, Any] | None:
+    # 事项停止时已经收下的那一版交付：版本取自收下它的那份成果，时间取自收下它的那条事件的提交时间。
+    # 只看停止的事项：放行完成的事项走正常的进度，不重复写这一句（工单 #1239）
+    if status != "stopped":
+        return None
+    if through is not None:
+        # 按位置读取：收下交付的那条事件也在位置之内才算
+        accepted = [event for event in store.list_events(run.run_id, through_position=through)
+                    if event.type == EventType.DELIVERY_ACCEPTED]
+        if not accepted:
+            return None
+        return {"version": int(accepted[-1].payload["revision"]), "accepted_at": accepted[-1].created_at}
+    if not run.delivery_specs:
+        return None
+    delivery = run.delivery_specs[-1]
+    event = store.get_event(delivery.created_event_id)
+    if event is None:
+        return None
+    return {"version": delivery.revision, "accepted_at": event.created_at}
+
+
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
                       held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True,
                       through: int | None = None, awaiting_initial_prd: bool = False,
@@ -195,6 +217,9 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     # 询问分支的失败原因不是事项结束的原因，留在询问记录里，不进这里。用户自己让事项停下不是错误，不写
     item.stop_note = (run.error if item.status == "stopped" and item.stop_reason not in USER_STOP_REASONS
                       else None)
+    # 已收下的交付（工单 #1239）：事项停止时，把「这个 run 里已经收下一版交付」这件事写在停止说明旁边，
+    # 否则页面上只有一句失败原因，看不出这件事已经有一份可用的交付。用户自己取消时也写，交付仍然在
+    item.kept_delivery = _kept_delivery(store, run, item.status, through=through)
     if include_history:
         events = store.list_events(item.run_id, through_position=through)
         item.rework = [

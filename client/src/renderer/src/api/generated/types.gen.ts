@@ -2589,6 +2589,25 @@ export type InstanceUpgradeRequested = {
 };
 
 /**
+ * KeptDelivery
+ *
+ * 已收下的交付（工单 #1239）：事项停止时，这个 run 里已经收下的那一版交付与收下的时间。
+ *
+ * 事项因为别的原因停下时，已收下的交付仍然在，页面在停止说明下面写出这一句，
+ * 免得用户看不出这件事已经有一份可用的交付。
+ */
+export type KeptDelivery = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Accepted At
+     */
+    accepted_at: string;
+};
+
+/**
  * KernelModificationRequested
  */
 export type KernelModificationRequested = {
@@ -5047,6 +5066,7 @@ export type WorkItemCard = {
      * Stop Note
      */
     stop_note?: string | null;
+    kept_delivery?: KeptDelivery | null;
     /**
      * Human Action
      */
