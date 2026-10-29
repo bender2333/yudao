@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import { type CommandProblem, commandProblemText } from "../../contract/command-problem.ts";
-import { stopNoteView } from "./labels";
+import { type KeptDeliveryView, stopNoteView } from "./labels";
 
 export type Field = Record<string, unknown>;
 
@@ -113,22 +113,41 @@ export function Tag(props: { tone?: "ok" | "warn" | "danger" | "muted"; children
 // 停止说明（工单 #1162）：停止原因下面原样写出让事项停下的那条错误，不改写、不截断。
 // 短的写成一行；长的折起来，点开看全文。没有停止说明时写 empty（不传就整块不出现）。
 // block 是看板卡片那一格（自己带「停止说明」这个标题），其余用在 KeyValue 的取值里（标题由左侧一列给）。
-export function StopNote(props: { note: string | null | undefined; empty?: string; block?: boolean }) {
-  const view = stopNoteView(props.note);
+// 已收下的交付（工单 #1239）：给 kept 时在停止说明下面多写一行（交付版本与收下的时间），
+// 没有停止说明（例如用户自己取消）也照样写——交付仍然在。
+export function StopNote(props: {
+  note: string | null | undefined;
+  kept?: KeptDeliveryView;
+  empty?: string;
+  block?: boolean;
+}) {
+  const view = stopNoteView(props.note, props.kept);
+  const parts: React.ReactNode[] = [];
   if (view.kind === "none") {
-    return props.empty === undefined ? null : <span className="y10-muted">{props.empty}</span>;
+    if (props.empty !== undefined) {
+      parts.push(<span key="empty" className="y10-muted">{props.empty}</span>);
+    }
+  } else if (view.kind === "inline") {
+    parts.push(props.block === true
+      ? <p key="note" className="y10-muted card-note stop-note">停止说明：{view.text}</p>
+      : <span key="note" className="stop-note">{view.text}</span>);
+  } else {
+    parts.push(
+      <details key="note" className="y10-details stop-note">
+        <summary>{props.block === true ? "停止说明：展开看全文" : "展开看全文"}</summary>
+        <p className="y10-code raw-text">{view.text}</p>
+      </details>,
+    );
   }
-  if (view.kind === "inline") {
-    return props.block === true
-      ? <p className="y10-muted card-note stop-note">停止说明：{view.text}</p>
-      : <span className="stop-note">{view.text}</span>;
+  if (view.keptDelivery !== undefined) {
+    parts.push(props.block === true
+      ? <p key="kept" className="y10-muted card-note kept-delivery">{view.keptDelivery}</p>
+      : <span key="kept" className="kept-delivery"><br />{view.keptDelivery}</span>);
   }
-  return (
-    <details className="y10-details stop-note">
-      <summary>{props.block === true ? "停止说明：展开看全文" : "展开看全文"}</summary>
-      <p className="y10-code raw-text">{view.text}</p>
-    </details>
-  );
+  if (parts.length === 0) {
+    return null;
+  }
+  return <>{parts}</>;
 }
 
 export function Tabs(props: { items: { id: string; label: string }[]; active: string; onPick: (id: string) => void }) {
