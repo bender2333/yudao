@@ -4,7 +4,7 @@
 // 页面上方不放决定区块：决定请求在大厅的板与文字列表里（v10 第 9 节，#175）。
 // 数据只来自 project.overview、work_item.inputs、project.flow 与 event.detail 这几个已登记的查询。
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
   AwayReport,
@@ -24,7 +24,7 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, StopNo
   TextInput, hasCommand, optionalText, pageKey, show, useDraft } from "./common";
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
-import { ticksOf } from "../timeline/logic";
+import { scopeAtTick, ticksOf } from "../timeline/logic";
 import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, departmentLine, formatTime, label,
   progressLabel, workingDepartmentsText } from "./labels";
 import { askIndent, askLine } from "./asks-text";
@@ -68,6 +68,11 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
   const report = useSnapshot<AwayReport>(props.app, "page.overview.timeline", "home.away_report", {
     range: "7d", project: projectId,
   });
+  // 刻度带着各自所属的事项（ticksOf 从关键事实带过来），点刻度时按它决定范围（工单 #1217）
+  const ticks = useMemo(
+    () => (report.data === null ? [] : ticksOf(report.data.facts, projectId)),
+    [report.data, projectId],
+  );
 
   const data = overview.data;
   const items = data === null ? [] : data.work_items;
@@ -101,10 +106,12 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
                 fromAt={report.data.range.from_at}
                 project={projectId}
                 at={at}
-                onPosition={(next) => props.onNavigate(paths.overviewAt(projectId, next, { workItem }))}
+                // 换范围与换位置在同一次导航里完成（工单 #1217）：刻度的位置属于时间轴，事项范围
+                // 取刻度自己的事项；两者一起写进地址，页面不先按当前范围发出一次读不到的请求再纠正
+                onPosition={(next) => props.onNavigate(paths.overviewAt(projectId, next, { workItem: scopeAtTick(ticks, workItem, next) }))}
                 onSelect={() => undefined}
                 highlight={[]}
-                liveNote={`实时画面 · ${ticksOf(report.data.facts, projectId).length} 条关键事实`}
+                liveNote={`实时画面 · ${ticks.length} 条关键事实`}
               />
             ) : null}
           </Section>
