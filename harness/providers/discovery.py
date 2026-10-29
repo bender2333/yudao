@@ -110,6 +110,36 @@ def effective_models_url(provider: ProviderDefinition, override: str | None = No
     return provider.base_url.rstrip("/") + "/models"
 
 
+# 上游模型列表描述容量（窗口与输出上限）的四种写法，按次序取到第一个有效的就停（设计说明第 4.3 节）：
+# limit.context / limit.output（OpenCode 一类）、context_length / max_completion_tokens（OpenRouter 一类的顶层写法）、
+# top_provider 下的同名字段、capabilities.contextWindow / capabilities.maxOutput
+_UPSTREAM_LIMIT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "context_window": (("limit", "context"), ("context_length",),
+                       ("top_provider", "context_length"), ("capabilities", "contextWindow")),
+    "max_output_tokens": (("limit", "output"), ("max_completion_tokens",),
+                          ("top_provider", "max_completion_tokens"), ("capabilities", "maxOutput")),
+}
+
+
+def _first_positive_int(item: Mapping[str, Any], paths: tuple[tuple[str, ...], ...]) -> int | None:
+    # 按次序取第一个有效的正整数字：布尔、小数、0 与负数都当没有，取不到时返回 None
+    for path in paths:
+        value = _value_at(item, path)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    return None
+
+
+def _value_at(item: Mapping[str, Any], path: tuple[str, ...]) -> Any:
+    # 按路径取嵌套字段；中间任一层不是对象时当作没有这个字段
+    value: Any = item
+    for key in path:
+        if not isinstance(value, Mapping):
+            return None
+        value = value.get(key)
+    return value
+
+
 def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
     # 候选带预填值与来源（设计说明第 4.3 节）：协议先取能力表（来源 capability_table），
     # 其次取服务方案的默认协议（来源 preset_default），自定义服务预填 Chat Completions（来源 default）；
@@ -130,23 +160,19 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         if model_id in seen:
             continue
         seen.add(model_id)
-        # 上游列表带窗口与输出上限时（limit.context 与 limit.output）带上这两项，来源是上游模型列表
+        # 上游列表带窗口与输出上限时带上这两项，来源是上游模型列表。上游的写法有四种，按
+        # _UPSTREAM_LIMIT_PATHS 的次序取到第一个有效的就停；窗口与输出上限各自独立取
         candidate: dict[str, Any] = {"id": model_id}
         entry = capabilities.capability(preset_id, model_id) if preset_id else None
         candidate["protocol"], candidate["protocol_source"] = (
             (entry.protocol, "capability_table") if entry is not None
             else (preset_default_protocol(preset_id), "preset_default") if preset_id
             else ("chat_completions", "default"))
-        limits = item.get("limit") if isinstance(item, dict) else None
-        if isinstance(limits, Mapping):
-            window = limits.get("context")
-            output = limits.get("output")
-            if isinstance(window, int) and not isinstance(window, bool) and window > 0:
-                candidate["context_window"] = window
-                candidate["context_window_source"] = "models_url"
-            if isinstance(output, int) and not isinstance(output, bool) and output > 0:
-                candidate["max_output_tokens"] = output
-                candidate["max_output_tokens_source"] = "models_url"
+        for field, paths in _UPSTREAM_LIMIT_PATHS.items():
+            value = _first_positive_int(item, paths)
+            if value is not None:
+                candidate[field] = value
+                candidate[f"{field}_source"] = "models_url"
 
         for field in ("context_window", "max_output_tokens"):
             if field not in candidate and entry is not None and getattr(entry, field) is not None:

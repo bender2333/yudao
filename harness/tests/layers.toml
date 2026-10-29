@@ -138,6 +138,8 @@
 "test_redact.py" = "module"
 "test_protocol_history_replay.py" = "integration"
 "test_protocol_reasoning.py" = "integration"
+"test_provider_candidate_capacity.py" = "unit"
+"test_provider_candidate_collection.py" = "integration"
 "test_provider_catalog.py" = "module"
 "test_provider_protocols.py" = "integration"
 "test_provider_retry_engine.py" = "module"
