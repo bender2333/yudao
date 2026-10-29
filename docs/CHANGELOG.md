@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 19:59 / 工单 #1250 [集成层]：本文件加这一条，`docs/` 下改的是 `docs/architecture-issues.md`——新增一条规范遗漏：`harness/tests/wait_limits.py` 的 `WAIT_FOR_HOST_WORK_SEC`（300 秒）与根 `conftest.py` 的集成层用例超时（`TIMEOUTS[INTEGRATION]`，300 秒）相等，而 CI 的集成层命令用 `--timeout-method=thread`，该实现在 Windows 上到点 dump 栈后 `os._exit(1)`，用例卡住时表现为 xdist 的 `node down: Not properly terminated`（工作进程消失、作业不再推进）而不是一条失败；建议把「等待主机工作的上限严格小于所在层给每条用例的超时」写成不变式并给一条检查，`wait_limits.py` 与根 `conftest.py` 都不在本单的「只改」里 / 工单 #1250 的取证发现：该用例自己的等待与 CI 的用例超时取同一个数，是「工作进程为什么会消失」的那一步；本单在 `test_onboarding_commands.py` 里取 `min(WAIT_FOR_HOST_WORK_SEC, 150.0)` 兜底
+
 claude-sonnet-5-5（总架构师） / 2026-10-29 17:40 / 本文件加这一条，`docs/` 下的文档都没有改——新增技能 `.claude/skills/doc-scan/`：`SKILL.md` 写全量文档一致性扫描的六步（划范围、读正本写核对清单、分组并发派发、脚本核对、合并抽查、写报告），`scripts/` 下三个脚本（`check-links.ps1` 链接可解析性、`term-audit.ps1` 术语表避免说法与旧编号分布、`merge-findings.ps1` 合并各组 JSON 成明细表）；`CLAUDE.md` 的「文档维护与归档」加一行指向 `/doc-scan` / 用户要求把 2026-10-29 那次全量扫描的做法固化成技能
 
 solo-deepseek-v4.1-flash / 2026-10-29 15:40 / 工单 #1225 [试用工具]：本文件加这一条，`docs/` 下的文档都没有改——工单写的是「无设计说明」，改的是试用工具的两处：`.claude/skills/trial/scripts/browser.mjs` 的 `audit` 对比度读数改成沿祖先链逐层合上背景（元素自己的 `background-color` 也算），任何一层真的画了渐变或图片时读数写「未知」并给 `reason`，不再拿页面底色顶替；`.claude/skills/trial/SKILL.md` 第 322 行的 `audit` 一行补一句 `lowContrast` 每条带 `color` 与 `background`、算不出时写「未知」（文件在「只改」清单之外，工单评论里补记了） / 试用问题（帖子 discussions/1212 观察 9）：按钮上的文字报 1.08，实际约 9:1
