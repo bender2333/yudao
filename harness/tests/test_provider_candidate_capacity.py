@@ -36,7 +36,7 @@ def _item_with(writing: str, window, output) -> dict:
 
 
 @pytest.mark.parametrize("writing", sorted(WRITINGS))
-def test_each_upstream_writing_prefills_both_limits(writing):
+def test_candidates_carry_each_upstream_writing_of_both_limits(writing):
     # 四种写法各自能被取到：窗口与输出上限的值与来源都在候选里（验收第 1 项）
     window, output = EXPECTED[writing]
     [candidate] = _parse_candidates({"data": [{"id": "model-a", **WRITINGS[writing]}]}, CUSTOM)
@@ -45,7 +45,7 @@ def test_each_upstream_writing_prefills_both_limits(writing):
     assert candidate["max_output_tokens_source"] == "models_url"
 
 
-def test_the_writings_are_tried_in_the_listed_order():
+def test_candidates_try_the_writings_in_the_listed_order():
     # 优先级：同时给出几种写法时取列在前面的那种（验收第 2 项）
     item: dict = {"id": "model-a"}
     for writing in ("capabilities", "top_provider", "top_level", "limit"):
@@ -54,7 +54,7 @@ def test_the_writings_are_tried_in_the_listed_order():
         assert (candidate["context_window"], candidate["max_output_tokens"]) == EXPECTED[writing]
 
 
-def test_the_window_and_the_output_limit_are_read_independently():
+def test_candidates_read_the_window_and_the_output_limit_independently():
     # 窗口与输出上限各自独立按次序取：一处有、另一处都没有时只填有的那一项
     [candidate] = _parse_candidates({"data": [{"id": "model-a", "max_completion_tokens": 65536}]}, CUSTOM)
     assert "context_window" not in candidate and "context_window_source" not in candidate
@@ -74,14 +74,14 @@ INVALID_VALUES = [0, -1, 1.5, 1048576.0, True, False, "128000", None, [], {}]
 
 @pytest.mark.parametrize("value", INVALID_VALUES)
 @pytest.mark.parametrize("writing", sorted(WRITINGS))
-def test_values_that_are_not_positive_integers_are_not_used(writing, value):
+def test_candidates_ignore_values_that_are_not_positive_integers(writing, value):
     # 0、负数、小数、布尔与字符串都不采用，候选里没有这两个键（验收第 3 项）
     [candidate] = _parse_candidates({"data": [{"id": "model-a", **_item_with(writing, value, value)}]}, CUSTOM)
     assert "context_window" not in candidate and "context_window_source" not in candidate
     assert "max_output_tokens" not in candidate and "max_output_tokens_source" not in candidate
 
 
-def test_an_invalid_writing_falls_through_to_the_next_one():
+def test_candidates_fall_through_an_invalid_writing():
     # 前一种写法给出的值不合法时继续看下一种写法；中间一层不是对象时同样跳过
     [candidate] = _parse_candidates({"data": [{"id": "model-a", "limit": {"context": 0, "output": -1},
                                                "context_length": 1048576,
@@ -93,7 +93,7 @@ def test_an_invalid_writing_falls_through_to_the_next_one():
     assert (candidate["context_window"], candidate["max_output_tokens"]) == (400000, 128000)
 
 
-def test_the_capability_table_is_used_when_the_upstream_list_has_no_limits():
+def test_candidates_fall_back_to_the_capability_table():
     # 上游列表没有容量时仍取模型能力表的值与来源：两处的次序没有变
     recorded = capabilities.capability("opencode-go", "deepseek-v4-flash")
     assert recorded is not None
