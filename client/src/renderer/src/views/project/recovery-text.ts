@@ -105,7 +105,6 @@ export function sessionLabel(row: RecoverySession, branchOrdinal: number): strin
 }
 
 export interface SessionUsageRow {
-  key: string;
   label: string;
   elapsedSec: number;
   activations: number;
@@ -116,7 +115,6 @@ export interface SessionUsageRow {
 export function sessionUsageRows(sessions: RecoverySession[]): SessionUsageRow[] {
   const ordinals = branchOrdinals(sessions);
   return sessions.map((row, index) => ({
-    key: row.session_id,
     label: sessionLabel(row, ordinals[index]),
     elapsedSec: row.elapsed_sec,
     activations: row.activations,

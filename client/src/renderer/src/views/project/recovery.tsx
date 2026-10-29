@@ -25,7 +25,7 @@ import type { Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import { DecisionCardList } from "../decisions/card";
 import { artifactRefText } from "./artifact-ref";
-import { Empty, KeyValue, Loading, Section, StopNote, Tag, show } from "./common";
+import { Empty, KeyValue, Loading, Section, StopNote, Table, Tag, show } from "./common";
 import { ACTION_STATUS, RECOVERY_STATE, RECOVERY_STATE_KIND, STOP_REASON, departmentName, formatDuration, formatTime, label } from "./labels";
 import {
   PENDING_NOTE,
@@ -413,26 +413,10 @@ function LimitsBlock(props: { data: RunRecoveryResult; elapsed: number | null; l
       {sessions.length > 0 ? (
         <>
           <h3 className="y10-h3 sub">各会话的用量</h3>
-          <table className="y10-table rc-sessions">
-            <thead>
-              <tr>
-                <th>会话</th>
-                <th>已用时间</th>
-                <th>工作轮数</th>
-                <th>模型步骤</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sessions.map((row) => (
-                <tr key={row.key}>
-                  <td>{row.label}</td>
-                  <td>{formatDuration(row.elapsedSec)}</td>
-                  <td>{row.activations}</td>
-                  <td>{row.modelSteps}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <Table
+            head={["会话", "已用时间", "工作轮数", "模型步骤"]}
+            rows={sessions.map((row) => [row.label, formatDuration(row.elapsedSec), row.activations, row.modelSteps])}
+          />
         </>
       ) : null}
     </Section>
