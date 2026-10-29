@@ -7,6 +7,8 @@
 
 ---
 
+claude-sonnet-5-5（总架构师） / 2026-10-29 17:40 / 本文件加这一条，`docs/` 下的文档都没有改——新增技能 `.claude/skills/doc-scan/`：`SKILL.md` 写全量文档一致性扫描的六步（划范围、读正本写核对清单、分组并发派发、脚本核对、合并抽查、写报告），`scripts/` 下三个脚本（`check-links.ps1` 链接可解析性、`term-audit.ps1` 术语表避免说法与旧编号分布、`merge-findings.ps1` 合并各组 JSON 成明细表）；`CLAUDE.md` 的「文档维护与归档」加一行指向 `/doc-scan` / 用户要求把 2026-10-29 那次全量扫描的做法固化成技能
+
 solo-deepseek-v4.1-flash / 2026-10-29 15:40 / 工单 #1225 [试用工具]：本文件加这一条，`docs/` 下的文档都没有改——工单写的是「无设计说明」，改的是试用工具的两处：`.claude/skills/trial/scripts/browser.mjs` 的 `audit` 对比度读数改成沿祖先链逐层合上背景（元素自己的 `background-color` 也算），任何一层真的画了渐变或图片时读数写「未知」并给 `reason`，不再拿页面底色顶替；`.claude/skills/trial/SKILL.md` 第 322 行的 `audit` 一行补一句 `lowContrast` 每条带 `color` 与 `background`、算不出时写「未知」（文件在「只改」清单之外，工单评论里补记了） / 试用问题（帖子 discussions/1212 观察 9）：按钮上的文字报 1.08，实际约 9:1
 
 solo-deepseek-v4.1-flash / 2026-10-29 15:00 / 工单 #1240 [界面]：本文件加这一条，`docs/` 下的文档都没有改——依据 `docs/design/app-and-interface.md`（main `4f1f8cf5`，第 153 行把「新建项目、接入已有项目」列在「没有已存在的对象」的一类）在放出以后没有改动，本单只改客户端的文字：左侧栏两个入口各加一行场景说明（「从想法新建」从一段想法或需求文字开始、可以先建一个空项目；「接入已有项目」把电脑上已有的代码目录接进来、先建档再做事项），新建项目弹窗的说明改成「新建项目不调用模型。需求材料（原文或文件）在项目建好以后，到概览里作为新事项开始时提交。」；两处文字抽在 `client/src/renderer/src/shell/new-project-text.ts` 由单元用例判，端到端用例在首页与弹窗上判；原型 v13 的两个入口没有说明、弹窗写的是旧的一句，按工单正文改，原型未改 / 试用问题 Te28ea596-04（main `e28ea596`，帖子 https://github.com/bender2333/yudao/discussions/1231）：拿着 16KB 需求正文的新手从首页看不出走哪个入口、材料放在哪一步
@@ -788,3 +790,11 @@ claude-sonnet-5-5（总架构师） / 2026-10-29 14:59 / `docs/architecture.html
 claude-架构师 / 2026-10-29 15:15 / `.github/workflows/ci.yml` 的 ③ 集成层：作业超时 60 → 25 分钟，pytest 加 `--timeout=300 --timeout-method=thread`（后者每条用例超过 5 分钟算失败并报出用例名）/ #1208：今天集成层五次挂住（xdist 工作进程消失、作业不吞不吐），每次空耗 40 至 45 分钟
 claude-sonnet-5-5 / 2026-10-29 17:05 / `docs/design/context-assembly.md` 第 6.2 节写入新数据上的召回复核（三份试用事件库 840 步，丢引用的步占 5% 至 14%，几乎全部来自 R3），新增第 6.4 节成本（按前缀缓存计价，R1 费用 101% 至 315%，R2、R5 持平，R3 随缓存命中从 43% 到 138%），第 8 节补折叠规则的取舍，第 8 节第 7 条改为只核对了压缩阈值一行；新增 `evals/context/cost.py` 与 `python -m evals.context cost`，测试 `evals/tests/test_context_cost.py`，报告三份在 `docs/evaluation/context-assembly-cost-*-2026-10-29.*` / 引用材料可及性的核对用新数据复核时发现 token 数下降不等于费用下降：基线的缓存读占比 91%、97%、61%，折叠让前缀失效
 claude-sonnet-5-5（总架构师） / 2026-10-29 15:53 / `docs/current-baseline.md` 用 `git mv` 移到 `docs/archive/current-baseline-2026-10-29.md`（文件内的相对链接随之改正）；`CLAUDE.md` 文档结构、`README.md`、`docs/program-roadmap.md`、`docs/requirements/README.md`、`docs/agents/issue-tracker.md`、`docs/agents/acceptance-evidence.md`（第 3、17、61、65 行）、`docs/design/existing-project-onboarding.md`、`docs/design/recovery-contract-and-fault-matrix.md` 里指向它的引用删去，`flow`、`architect-loop`、`trial-intake` 三个技能里「更新路线图、验收基线」改为只更新需求索引与设计索引 / 用户决定取消当前验收基线；进度在 GitHub 的里程碑与工单里，路线图不记状态，所以验收时也没有可同步的状态文档
+
+Codex（GPT-6） / 2026-10-29 16:06 / 新增 ADR-0039，记录 agent 试用的目标、现场发现与独立复现的区别、体验问题候选的裁决；docs/decision.md 追加用户确认，CONTEXT.md 增加三个相关术语 / 用户在 grill-with-docs 第一轮采纳 Q1–Q3；技能与工具的实施仍待完整方案确认
+
+Codex（GPT-6） / 2026-10-29 16:11 / ADR-0039 记录用户采纳的 Q4–Q7，CONTEXT.md 补充固定试用任务、探索任务、部分完成报告，docs/decision.md 追加第二轮确认 / 记录固定流程与探索分开、复现保持被测配置、按影响安排复现以及缺项报告的取舍
+
+Codex（GPT-6） / 2026-10-29 16:19 / ADR-0039 补充 Q8 的裁决、修复与复验分别记录原则，CONTEXT.md 定义缺陷命中率，docs/decision.md 追加单独确认 / 用户在 Q8 解释后采纳推荐；Q9–Q11 尚未确认
+
+Codex（GPT-6） / 2026-10-29 16:27 / ADR-0039 补充用户采纳的 Q9–Q11，新增 docs/trial/skill-revision-plan.md 说明文件范围、记录内容与基于既有反例的验证条件，docs/decision.md 追加确认 / 访谈的实质取舍已全部确定，完整实施方案交用户最终核对

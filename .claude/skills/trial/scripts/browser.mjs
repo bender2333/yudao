@@ -12,7 +12,7 @@
 //   node browser.mjs text   [--css <选择器>]       页面可见文字（或某个元素的文字）
 //   node browser.mjs audit                         视觉与结构的读数：横向溢出、画布是否空白与是否铺满容器、对比度、图片、被截断的文字
 //   node browser.mjs click  --css <选择器> | --text <文字>
-//   node browser.mjs type   (--css <选择器> | --text <文字>) --value <文本>
+//   node browser.mjs type   (--css <选择器> | --text <文字>) (--value <文本> | --file <UTF-8文件> | --env <环境变量>) [--replace] [--wrong-key]
 //   node browser.mjs press  --key Enter|Tab|Escape|Backspace|ArrowDown
 //   node browser.mjs eval   --expr '<JavaScript>'
 //   node browser.mjs watch  --out <errors.log> [--seconds <秒>]
@@ -25,6 +25,19 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 
 const DEFAULT_PORT = 9222;
+const secretValues = new Set(Object.entries(process.env)
+  .filter(([name, value]) => /(?:API_KEY|ACCESS_TOKEN|SECRET|PASSWORD)$/.test(name) && value?.length >= 8)
+  .flatMap(([, value]) => [value, value.slice(0, -1)]));
+
+function redact(value) {
+  if (typeof value === 'string') {
+    for (const secret of secretValues) value = value.split(secret).join('[REDACTED]');
+    return value;
+  }
+  if (Array.isArray(value)) return value.map(redact);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redact(item)]));
+  return value;
+}
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -51,7 +64,7 @@ function port(args) {
 }
 
 function out(value) {
-  process.stdout.write(JSON.stringify(value) + '\n');
+  process.stdout.write(JSON.stringify(redact({ observed_at: new Date().toISOString(), ...value })) + '\n');
 }
 
 function fail(message) {
@@ -385,7 +398,25 @@ async function click(args) {
 }
 
 async function type(args) {
-  if (args.value === undefined) fail('缺少 --value');
+  const sources = ['value', 'file', 'env'].filter((name) => args[name] !== undefined);
+  if (sources.length !== 1) fail('输入内容只选一个来源：--value、--file 或 --env');
+  if (args['wrong-key'] && !args.env) fail('--wrong-key 只与 --env 一起使用');
+  let value;
+  if (args.env) {
+    if (typeof args.env !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(args.env)) fail('--env 需要环境变量名');
+    value = process.env[args.env];
+    if (!value) fail(`环境变量 ${args.env} 未设置`);
+    secretValues.add(value);
+    if (args['wrong-key']) {
+      if (value.length < 2) fail('凭据不足两个字符，无法改错一位');
+      value = value.slice(0, -1);
+      secretValues.add(value);
+    }
+  } else if (args.file) {
+    value = fs.readFileSync(path.resolve(args.file), 'utf8');
+  } else {
+    value = String(args.value);
+  }
   const p = port(args);
   await withPage(p, async (cdp) => {
     const expression = resolverExpression(args);
@@ -395,11 +426,18 @@ async function type(args) {
       if (typeof el.setSelectionRange === 'function' && typeof el.value === 'string') {
         el.setSelectionRange(el.value.length, el.value.length);
       }
-      return { ok: true, tag: el.tagName, name: el.getAttribute('name') || el.getAttribute('placeholder') || '' }; })()`);
+      return { ok: true, tag: el.tagName, type: el.getAttribute('type'), name: el.getAttribute('name') || el.getAttribute('placeholder') || '' }; })()`);
     if (!focused.ok) fail(focused.reason ?? '没有找到输入位置');
-    await cdp.send('Input.insertText', { text: args.value });
+    if (args.env && (focused.tag !== 'INPUT' || focused.type !== 'password')) fail('--env 只向 password 输入框填入凭据');
+    if (args.replace) {
+      await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+      await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
+    }
+    await cdp.send('Input.insertText', { text: value });
     await new Promise((resolve) => setTimeout(resolve, Number(args.wait ?? 300)));
-    out({ ok: true, tag: focused.tag, name: focused.name, length: args.value.length });
+    out(args.env
+      ? { ok: true, tag: focused.tag, credential_ref: args.env, altered: Boolean(args['wrong-key']) }
+      : { ok: true, tag: focused.tag, name: focused.name, length: value.length });
   });
 }
 
@@ -636,9 +674,7 @@ async function audit(args) {
 // ---------------------------------------------------------------- 错误收集
 
 function stamp() {
-  const now = new Date();
-  const pad = (n, w = 2) => String(n).padStart(w, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  return new Date().toISOString();
 }
 
 async function watch(args) {
@@ -659,7 +695,7 @@ async function watch(args) {
     if (now - (recent.get(key) ?? 0) < 2000) return;
     recent.set(key, now);
     if (recent.size > 2000) recent.clear();
-    stream.write(JSON.stringify({ ts: stamp(), ...entry }) + '\n');
+    stream.write(JSON.stringify(redact({ ts: stamp(), ...entry })) + '\n');
   };
 
   let closed = false;
