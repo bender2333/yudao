@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Yudao 总图</title>
 <style>
-  /* 一页六节。第一节是总图与方程，带建设状态；二至六节写应当如此。固定结构实线，填进去的内容虚线。 */
+  /* 一页六节。第一节是总图与方程，二至六节写应当如此。固定结构实线，填进去的内容虚线。 */
   :root {
     --bg: #fbfaf7; --fg: #1f1f1d; --muted: #6b6a64; --line: #1f1f1d; --soft: #c9c7bf;
     --s3: #2f5d50; --s2: #9fbfb3; --s1: #e6ede9; --accent: #2f5d50; --warn: #a8622a; --stop: #8a3a3a;
@@ -35,11 +35,8 @@
   .legend .solid { border: 2px solid var(--line); background: transparent }
   .legend .dash { border: 1.5px dashed var(--soft); background: transparent }
 
-  /* 方框。data-status: 3 已建 / 2 建了一半 / 1 未建；没有 data-status 的是应然 */
+  /* 方框 */
   .box { position: relative; padding: 10px 12px; border: 1.5px dashed var(--soft); background: var(--s1); min-width: 0 }
-  .box[data-status="3"] { background: var(--s3); color: var(--bg) }
-  .box[data-status="2"] { background: var(--s2) }
-  .box[data-status="2"] .muted, .box[data-status="3"] .muted { color: inherit; opacity: .8 }
   .fixed { border: 2px solid var(--line) }
   .box b { display: block; font-weight: 600 }
   .box small { display: block; font-size: 12.5px; line-height: 1.4 }
@@ -150,7 +147,7 @@
 <main>
   <header>
     <h1>Yudao 总图</h1>
-    <p class="muted">六节，从上往下越来越具体。三个部门围着同一份事实循环，写入先过门，结论靠独立的证据。固定不变的只有四样：循环、边界、裁决、独立的证据；部门、轮转方式、工作单元的大小都是填进去的内容。第一节带建设状态，鼠标放到方框上看技术名词；二至六节写的是应当如此，与代码不符的地方由子架构师把代码改到图这样。</p>
+    <p class="muted">六节，从上往下越来越具体。三个部门围着同一份事实循环，写入先过门，结论靠独立的证据。固定不变的只有四样：循环、边界、裁决、独立的证据；部门、轮转方式、工作单元的大小都是填进去的内容。鼠标放到第一节的方框上看技术名词；总图写的是应当如此，与代码不符的地方由子架构师把代码改到图这样；各方框的建设状态在 docs/program-roadmap.md 第 6 节。</p>
     <nav>
       <a href="#s1">01 全局总图与方程</a><a href="#s2">02 什么能动</a><a href="#s3">03 一轮工作的经过</a><a href="#s4">04 要守的缝</a><a href="#s5">05 自举与验收</a><a href="#s6">06 拆开部署</a>
     </nav>
@@ -160,103 +157,84 @@
     <h2>全局总图与方程<small>部门围着一份事实转，薄驱动连着三个共用的槽位</small></h2>
     <div class="legend">
       <span><i class="solid"></i>固定的结构</span><span><i class="dash"></i>填进去的内容</span>
-      <span><i style="background:var(--s3)"></i>已建</span><span><i style="background:var(--s2)"></i>建了一半</span><span><i style="background:var(--s1)"></i>未建</span>
     </div>
     <div class="outer" style="margin-top:14px">
       <div class="col">
-        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：主机测量（检查回执、树摘要、用量）、判定点、用户决定。
-状态：检查回执与用户决定已建；另一个模型的判断（判定点）未建。">
+        <div class="box fixed" tabindex="0" data-tech="技术名词：主机测量（检查回执、树摘要、用量）、判定点、用户决定。">
           <b>独立的证据</b><small>主机跑的检查回执、另一个模型的判断、你的回答。不信部门自己说的。</small>
         </div>
-        <div class="box" data-status="1" tabindex="0" data-tech="技术名词：观察者（教训发现、元观察、演化）、振荡信号。
-状态：离线的教训候选已有；在线订阅、提案与振荡信号未建。">
+        <div class="box" tabindex="0" data-tech="技术名词：观察者（教训发现、元观察、演化）、振荡信号。">
           <b>观察者</b><small>在系统外面看。只出证据、提案与振荡信号，都经写入口；不动手。</small>
         </div>
-        <div class="box" data-status="3" tabindex="0" data-tech="技术名词：命令接口、决定请求与回答、指导。
-状态：已建。">
+        <div class="box" tabindex="0" data-tech="技术名词：命令接口、决定请求与回答、指导。">
           <b>你</b><small>给意图与中途的指导，回答停在写入口的决定请求，批准内核与定义的修改。</small>
         </div>
       </div>
 
       <div class="frame">
         <div class="label">循环（固定）</div>
-        <div class="box" data-status="2" tabindex="0" data-tech="技术名词：界面（同步层、翻译层、画面层、页面）、应用层、接口层。
-状态：页面已建；像素画面按新合同重做中。">
+        <div class="box" tabindex="0" data-tech="技术名词：界面（同步层、翻译层、画面层、页面）、应用层、接口层。">
           <b>界面</b><small>你看到的页面与画面，只读事实；命令从这里发。关掉页面，循环照跑。</small>
         </div>
         <div class="ring">
           <div class="col">
-            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：部门定义、成果驱动路由里的产品一轮。
-状态：三部门同时运行的循环正在实施。">
+            <div class="box" tabindex="0" data-tech="技术名词：部门定义、成果驱动路由里的产品一轮。">
               <b>产品</b><small>意图 → 要求（PRD）。裁决目标与取舍。</small>
             </div>
-            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：成果驱动路由里的工程一轮、运行工作区、外包角色。
-状态：实施中；外包角色未建。">
+            <div class="box" tabindex="0" data-tech="技术名词：成果驱动路由里的工程一轮、运行工作区、外包角色。">
               <b>工程</b><small>要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色。</small>
             </div>
-            <div class="box" data-status="1" tabindex="0" data-tech="技术名词：运维部门（Stage 4）。外部动作走「模型与工具」。
-状态：未建。">
+            <div class="box" tabindex="0" data-tech="技术名词：运维部门。外部动作走「模型与工具」。">
               <b>运维（以后）</b><small>监控、部署、故障记录。</small>
             </div>
           </div>
           <div class="col">
-            <div class="box fact" data-status="3" tabindex="0" data-tech="技术名词：事件日志、写入口、工件、封存快照、带版本的定义。
-状态：已建。项目流长期保存，run 流只在一次运行里用。">
+            <div class="box fact" tabindex="0" data-tech="技术名词：事件日志、写入口、工件、封存快照、带版本的定义。项目流长期保存，run 流只在一次运行里用。">
               <b>一份事实</b><small>发生过的事只记一份，只追加，谁都不能改。部门之间的询问也在这里。</small>
             </div>
-            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：路由契约与路由实现（成果驱动；任务池是第二种实现）。
-状态：按成果在实施；任务池未建。换档位只换「谁开工、一轮怎么结束」与它自己的定义。">
+            <div class="box" tabindex="0" data-tech="技术名词：路由契约与路由实现（成果驱动；任务池是第二种实现）。换档位只换「谁开工、一轮怎么结束」与它自己的定义。">
               <b>轮转方式</b>
               <div class="switch" style="margin-top:6px"><span class="on">按成果</span><span>任务池（以后）</span></div>
               <small class="muted" style="margin-top:6px">按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。两种只差工作单元的大小与由谁来拆。</small>
             </div>
           </div>
           <div class="col">
-            <div class="box" data-status="2" tabindex="0" data-tech="技术名词：成果驱动路由里的质检一轮、检查工作区。
-状态：实施中。">
+            <div class="box" tabindex="0" data-tech="技术名词：成果驱动路由里的质检一轮、检查工作区。">
               <b>质检</b><small>交付 → 缺陷或放行。只有它能放行；在信任链末端，不能外包。</small>
             </div>
-            <div class="box" data-status="1" tabindex="0" data-tech="加一个部门只写声明（组织定义），不改其他方框。">
+            <div class="box" tabindex="0" data-tech="加一个部门只写声明（组织定义），不改其他方框。">
               <b>下一个部门</b><small>加部门只写声明。部门拥有的是定义、角色材料与知识，不是代码。</small>
             </div>
           </div>
         </div>
         <div class="arrows">产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门</div>
         <div class="slots">
-          <div class="box fixed" data-status="3" tabindex="0" data-tech="技术名词：薄驱动、插件加载。
-状态：已建。只做连接，部门名与实现类名零命中；三道契约的版本在构造时核对。">
+          <div class="box fixed" tabindex="0" data-tech="技术名词：薄驱动、插件加载。只做连接，部门名与实现类名零命中；三道契约的版本在构造时核对。">
             <b>薄驱动</b><small>只做连接：读事实、问路由、问装配、交执行、经写入口写回。不认识部门的名字。</small>
           </div>
-          <div class="box" data-status="2" tabindex="0" data-tech="技术名词：路由实现（成果驱动）。
-状态：按成果的路由已建；第二种路由（任务池）只有测试用的一份。">
+          <div class="box" tabindex="0" data-tech="技术名词：路由实现（成果驱动）。">
             <b>槽位：路由</b><small>谁开工、一轮怎么结束、事项怎么结束。</small>
           </div>
-          <div class="box" data-status="3" tabindex="0" data-tech="技术名词：上下文装配、压缩、上下文清单。
-状态：已建。装配与压缩按契约抽成槽位，第二种实现在测试里跑通。">
+          <div class="box" tabindex="0" data-tech="技术名词：上下文装配、压缩、上下文清单。">
             <b>槽位：装配</b><small>从事实减出这一轮要看的，交给模型的那份记进事实。</small>
           </div>
-          <div class="box" data-status="2" tabindex="0" data-tech="技术名词：步骤驱动、外包角色派发。
-状态：已按契约抽成槽位，本机步骤驱动可用；外包角色未建。">
+          <div class="box" tabindex="0" data-tech="技术名词：步骤驱动、外包角色派发。">
             <b>槽位：执行</b><small>一轮里的每一步：问边界、调模型、发工具请求。</small>
           </div>
         </div>
-        <div class="box" data-status="2" tabindex="0" data-tech="技术名词：Provider、工具实现、执行环境（本机进程、远程执行代理）、动作合同。
-状态：本机已建；远程执行、网络与 MCP、浏览器未建。">
+        <div class="box" tabindex="0" data-tech="技术名词：Provider、工具实现、执行环境（本机进程、远程执行代理）、动作合同。">
           <b>模型与工具</b><small>调模型、改文件、跑命令、查网络；本机或远程。每个动作带前后快照的差异与回执。</small>
         </div>
       </div>
 
       <div class="col">
-        <div class="box fixed" data-status="3" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同、停止原因清单。
-状态：已建。裁决读最小投影，边界与停止原因清单来自定义。">
+        <div class="box fixed" tabindex="0" data-tech="技术名词：裁决入口、边界的核对、最小投影、提案合同、停止原因清单。裁决读最小投影，边界与停止原因清单来自定义。">
           <b>裁决与边界</b><small>每次写入先过这里：有没有资格、引用的是不是最新、到没到上限。保证一定会停。</small>
         </div>
-        <div class="box fixed" data-status="2" tabindex="0" data-tech="技术名词：评价材料（评测场景与隐藏检查、评分器、发布检查、内核清单）。
-状态：评测工具实施中；发布检查未建。">
+        <div class="box fixed" tabindex="0" data-tech="技术名词：评价材料（评测场景与隐藏检查、评分器、发布检查、内核清单）。">
           <b>评价</b><small>评测题与判分器、发布检查。在系统之外，被开发的版本读不到。</small>
         </div>
-        <div class="box fixed" data-status="1" tabindex="0" data-tech="技术名词：看门狗、A/B 槽位、健康协议、金丝雀任务。
-状态：未建（Stage 4）。">
+        <div class="box fixed" tabindex="0" data-tech="技术名词：看门狗、A/B 槽位、健康协议、金丝雀任务。">
           <b>看门狗</b><small>在进程外面。两个槽位，候选版本失败就切回稳定版。</small>
         </div>
       </div>
@@ -290,8 +268,7 @@
         </div>
       </div>
       <div class="col">
-        <div class="box" data-status="3" tabindex="0" data-tech="技术名词：定义与参数（组织、角色、工具、提案合同、上限与规则）。
-状态：已建；参数事件、路由自己的定义、判定点、登记的机器、限定采用未建。">
+        <div class="box" tabindex="0" data-tech="技术名词：定义与参数（组织、角色、工具、提案合同、上限与规则）。">
           <b>定义</b><small>带版本的数据。部门与角色、谁能拒绝谁、判定点、登记的机器、路由实现与它自己的定义、工作单元的大小、限定采用的范围、上限、停止原因清单，都住在这里。改定义不改代码，能撤回。</small>
         </div>
         <p class="muted" style="font-size:12.5px"><b>交叉演进</b>：谁的定义与角色材料不由谁自己改；谁改谁从谁评价谁反推，被谁评价就不能改谁。工程被质检评价，所以工程不改质检的材料。</p>
@@ -500,7 +477,7 @@
     </table>
   </section>
 
-  <footer>第一节的状态按 main 2026-10-29。已建：在 main 上运行并有测试；建了一半：有代码，设计里标了未实施的部分；未建：只有设计。里程碑结束时由总架构师更新。二至六节写的是应当如此，没有状态；缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
+  <footer>各方框的建设状态见 docs/program-roadmap.md 第 6 节。缝的已定、未定由总架构师改。技术细节见 docs/design/architecture/overall-architecture.md（模块图）。</footer>
 </main>
 </body>
 </html>
