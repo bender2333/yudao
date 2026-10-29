@@ -13,6 +13,7 @@ import {
   durationText,
   isKeyKind,
   partsOf,
+  scopeAtTick,
   secondsBetween,
   ticksInRefs,
   ticksOf,
@@ -73,6 +74,31 @@ test("按项目筛选：只保留该项目的关键事实", () => {
     fact({ position: 3, project_id: "p1" }),
   ], "p1");
   assert.deepEqual(ticks.map((tick) => tick.position), [1, 3]);
+});
+
+// 回放的位置与事项范围是两个参数（接口设计说明第 4.1 节「按位置读取」，工单 #1217）：
+// 点一个属于另一个事项的刻度时，范围先换成那个事项；刻度属于当前事项或没有事项时维持现范围；
+// 位置不在刻度列表里（例如回到现在）时也维持现范围。
+test("点刻度时的事项范围：属于另一个事项的刻度换成它，属于当前事项或没有事项时不变（工单 #1217）", () => {
+  const ticks = ticksOf([
+    fact({ position: 20, work_item_id: "w1", kind: "decision" }),
+    fact({ position: 31, work_item_id: "w2", kind: "ask" }),
+    // 项目级的事实没有事项：点它时维持现范围
+    fact({ position: 40, work_item_id: null, kind: "deploy" }),
+  ]);
+  // 当前范围是后一个事项，点的刻度属于前一个事项：换成前一个
+  assert.equal(scopeAtTick(ticks, "w2", 20), "w1");
+  // 刻度属于当前事项：不变
+  assert.equal(scopeAtTick(ticks, "w2", 31), "w2");
+  // 刻度没有事项：维持现范围
+  assert.equal(scopeAtTick(ticks, "w2", 40), "w2");
+  // 当前没有范围时，点的刻度有事项就换成它
+  assert.equal(scopeAtTick(ticks, null, 20), "w1");
+  // 回到现在（位置为 null）与位置不在刻度列表里：范围不动
+  assert.equal(scopeAtTick(ticks, "w2", null), "w2");
+  assert.equal(scopeAtTick(ticks, "w2", 999), "w2");
+  // 没有刻度时也维持现范围
+  assert.equal(scopeAtTick([], "w2", 20), "w2");
 });
 
 

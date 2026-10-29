@@ -88,9 +88,11 @@ F1 与新手段不删减。单 agent 一方不跑（第 6 节），预算里没�
 
 记下已有的安装（`yudao --version`、`uv tool list`），然后从 main 构建 wheel，装进仓库外的独立虚拟环境。**用干净克隆构建**：工作区里正在写的东西不能混进包里。
 
+`scripts/release.py` 只接受「在 main 上、已推送、且是远端最新」的提交，所以构建的提交就是克隆下来那一刻的 `origin/main`，不要 `git checkout` 到旧提交（2026-10-29 试用时这一点卡过一次：指定的提交落后于 main，脚本拒绝构建，只能在最新提交上跑）。要试的是某个旧提交时，先把这个事实写进帖子的「环境与前提」，再按脚本允许的提交构建。
+
 ```powershell
 git clone --no-tags <仓库地址> $env:TEMP\yudao-trial-src
-cd $env:TEMP\yudao-trial-src; git checkout <main 的提交>
+cd $env:TEMP\yudao-trial-src; git rev-parse HEAD        # 就是 origin/main 的最新提交，记进帖子
 uv run python scripts/release.py                 # 输出 wheel 路径与 SHA-256，记进帖子
 uv venv $env:TEMP\yudao-trial-venv
 uv pip install --python $env:TEMP\yudao-trial-venv\Scripts\python.exe <wheel 路径>
