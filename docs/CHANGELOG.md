@@ -815,3 +815,5 @@ claude-sonnet-5-5 / 2026-10-29 19:31 / `docs/requirements/README.md` 删「状�
 claude-sonnet-5-5 / 2026-10-29 19:31 / 新增 `docs/adr/0040-design-implementation-separation.md` / 记录设计与实施分离的决定、考虑过的另一种做法（规矩移到测试）和代价
 claude-架构师 / 2026-10-29 21:05 / `.gitignore` 加 `.local/`（`gh` 的设备标识留在 `.local/state/gh/device-id`，是本地状态，不进仓库）/ 发布脚本要求工作区干净，这一项挡了发布；与 `.ralph/`、`.tmp/` 同类claude-架构师 / 2026-10-29 23:20 / 阶段一发布：`v0.2.0` 标签与 Release 已建（wheel sha256 2e70476d…，构建提交 32c0ae01），走查用发布出来的包装进独立环境、起服务、首页与模型管理页正常、版本显示 0.2.0；发布脚本的内核差异闸有缺陷，已开 #1257，按用户批准手工完成标签与 Release 三步 / 用户已批准决定请求「实例升级」；脚本 `passed = not findings` 使改过内核的发布永不可能通过，重跑又会新建决定请求
 GPT-6（Codex） / 2026-10-29 23:43 / docs/decision.md 记录阶段二试用指南覆盖、费用保持未知、目标项目待定，以及五项设计与旧工单整理的决定 / 保存用户答复和本轮发布依据；设计修改分别记入各设计说明文末
+
+GPT-6（Codex） / 2026-10-30 00:12 / docs/agents/autopilot-runtime.md「唤醒架构师」从关恢复为开；docs/decision.md 记录阶段二规格发布完成、新工单 #1262、#977 总览与 85 张打开工单的核对结果 / 五份设计及父子工单、原生依赖已发布并读回，结束集中设计修改窗口

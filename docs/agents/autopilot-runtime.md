@@ -199,7 +199,7 @@ $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_
 | 同一个 PR 要求修改的上限 | 3 次，第 3 次时搁置 | 派发者规则第 3 节第 4、5 步 |
 | 工单大小的上限 | 「只改」清单中手写文件 15 个；生成的客户端类型、接口快照、事件序列基准与日记不计 | `docs/agents/ticket-spec.md`；`executor` 技能第 2 步 |
 | 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/`；可信内核：`harness/definitions/kernel-manifest.json` 里 `kind` 为 `module` 的路径 | `docs/agents/ticket-spec.md` |
-| 唤醒架构师 | 关 | 派发者规则第 3 节第 7 步；`autopilot` 技能「Solo 模式」要求 solo 与架构师循环运行期间保持开，架构师循环也读这一个开关，关着时整轮不做。用户在场的会话做大的设计修改时改为关，做完改回开 |
+| 唤醒架构师 | 开 | 派发者规则第 3 节第 7 步；`autopilot` 技能「Solo 模式」要求 solo 与架构师循环运行期间保持开，架构师循环也读这一个开关，关着时整轮不做。用户在场的会话做大的设计修改时改为关，做完改回开 |
 | 被唤醒的架构师一次运行的时长 | 4 小时 | 派发者规则第 3 节第 7 步 |
 | 架构师循环的间隔 | 30 分钟 | 第 3 节启动命令；一轮只做一个子代理，做完结束回合 |
 | 同一张工单唤醒或分诊的上限 | 2 次，第 3 次直接交给用户 | 派发者规则第 3 节第 7 步；`woken-architect` 技能与 [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md) |
