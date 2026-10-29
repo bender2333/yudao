@@ -307,9 +307,16 @@ export function Table(props: { head: string[]; rows: React.ReactNode[][]; captio
   );
 }
 
+// 每一对标签与取值一格。默认排成行（is-rows 的「9em 标签列 | 取值列」）；调用处自己带了 is-inline 时
+// 不再叠加 is-rows（工单 #1229）：原型 v13 的 .y13-kv.is-inline 就只有 is-inline，两组样式叠在一起时
+// 取值贴着下一个标签，读不出哪个取值属于哪个标签。
 export function KeyValue(props: { items: [string, React.ReactNode][]; className?: string }) {
+  const extra = (props.className ?? "").split(/\s+/).filter((name) => name !== "");
+  const inline = extra.includes("is-inline");
+  const classes = ["y10-kv", inline ? "is-inline" : "is-rows", "kv", ...extra].filter(
+    (name, index, all) => all.indexOf(name) === index);
   return (
-    <div className={`y10-kv is-rows kv ${props.className ?? ""}`}>
+    <div className={classes.join(" ")}>
       {props.items.map(([term, value]) => (
         <Line key={term} term={term} value={value} />
       ))}
