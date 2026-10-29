@@ -5,8 +5,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import type { WritebackRecordView } from "../../src/renderer/src/api/generated/types.gen.ts";
-import { writebackText } from "../../src/renderer/src/views/project/writeback-text.ts";
+import type { SourceDirectorySetting, WritebackRecordView } from "../../src/renderer/src/api/generated/types.gen.ts";
+import {
+  CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE, checkCommandsFromText, checkCommandsText, sourceDirectoryPayload,
+  writebackText,
+} from "../../src/renderer/src/views/project/writeback-text.ts";
 
 function record(overrides: Partial<WritebackRecordView>): WritebackRecordView {
   return {
@@ -91,6 +94,109 @@ test("页面上不出现英文内部标识与开发者措辞", () => {
     for (const forbidden of ["completed", "stopped", "not_needed", "held", "verified", "conflict",
       "verification_failed", "target_changed", "unrepresentable_path", "missing_source_reference",
       "local_test_boundary", "adoption_id", "pull_request"]) {
+      assert.equal(text.includes(forbidden), false, `这一句里出现了 ${forbidden}`);
+    }
+  }
+});
+
+// 写回检查的命令清单（工单 #815）：一行一条，保存源目录时按填写的清单写回
+
+function sourceDirectory(overrides: Partial<SourceDirectorySetting>): SourceDirectorySetting {
+  return {
+    name: "回声工具",
+    path: "D:/source/echo",
+    version: 3,
+    writeback_enabled: true,
+    remote: "",
+    target_branch: "main",
+    check_commands: ["uv run pytest -q"],
+    credential_ref: null,
+    ...overrides,
+  };
+}
+
+test("写回检查的命令按填写的清单写进源目录的保存参数", () => {
+  const payload = sourceDirectoryPayload({
+    projectId: "p1",
+    existing: sourceDirectory({}),
+    name: "回声工具",
+    path: "D:/source/echo",
+    writebackEnabled: true,
+    targetBranch: "main",
+    remote: "",
+    checkCommands: "uv run pytest -q\nnpm test",
+  });
+  assert.deepEqual(payload.check_commands, ["uv run pytest -q", "npm test"]);
+  assert.equal(payload.project_id, "p1");
+  assert.equal(payload.base_version, 3);
+});
+
+test("只改名称时写回检查的命令与读出的一致", () => {
+  const existing = sourceDirectory({ check_commands: ["uv run pytest -q", "npm test"] });
+  const payload = sourceDirectoryPayload({
+    projectId: "p1",
+    existing,
+    name: "回声工具二",
+    path: existing.path,
+    writebackEnabled: existing.writeback_enabled ?? false,
+    targetBranch: existing.target_branch ?? "",
+    remote: existing.remote ?? "",
+    checkCommands: checkCommandsText(existing.check_commands ?? []),
+  });
+  assert.equal(payload.name, "回声工具二");
+  assert.deepEqual(payload.check_commands, existing.check_commands);
+  assert.equal(payload.writeback_enabled, true);
+  assert.equal(payload.target_branch, "main");
+});
+
+test("空行与两端的空白去掉，行的顺序保持", () => {
+  assert.deepEqual(
+    checkCommandsFromText("  npm test \r\n\r\n\t\n uv run pytest -q \n"),
+    ["npm test", "uv run pytest -q"],
+  );
+  assert.deepEqual(checkCommandsFromText(""), []);
+  assert.deepEqual(checkCommandsFromText(" \n\t\n"), []);
+  assert.deepEqual(checkCommandsFromText(checkCommandsText(["a", "b", "c"])), ["a", "b", "c"]);
+});
+
+test("凭据引用与基准版本按读出的一行写回，不因保存而清空", () => {
+  const payload = sourceDirectoryPayload({
+    projectId: "p1",
+    existing: sourceDirectory({ credential_ref: "ECHO_TOKEN", version: 7 }),
+    name: "回声工具",
+    path: "D:/source/echo",
+    writebackEnabled: true,
+    targetBranch: "main",
+    remote: "",
+    checkCommands: "",
+  });
+  assert.equal(payload.credential_ref, "ECHO_TOKEN");
+  assert.equal(payload.base_version, 7);
+});
+
+test("没有登记源目录时按第一次登记保存", () => {
+  const payload = sourceDirectoryPayload({
+    projectId: "p2",
+    existing: null,
+    name: " 回声工具 ",
+    path: " D:/source/echo ",
+    writebackEnabled: false,
+    targetBranch: "",
+    remote: "",
+    checkCommands: "",
+  });
+  assert.deepEqual(payload.check_commands, []);
+  assert.equal(payload.base_version, 0);
+  assert.equal(payload.credential_ref, null);
+  assert.equal(payload.name, "回声工具");
+  assert.equal(payload.path, "D:/source/echo");
+  assert.equal(payload.writeback_enabled, false);
+});
+
+test("写回检查的命令在页面上的说明里没有英文内部标识与开发者措辞", () => {
+  for (const text of [CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE]) {
+    for (const forbidden of ["check_commands", "source_directory", "writeback", "credential_ref", "argv",
+      "base_version"]) {
       assert.equal(text.includes(forbidden), false, `这一句里出现了 ${forbidden}`);
     }
   }
