@@ -15,6 +15,7 @@ from __future__ import annotations
 import os
 import signal
 import subprocess
+import threading
 import time
 from typing import Any
 
@@ -81,6 +82,29 @@ if os.name == "nt":
                     ("ActiveProcesses", wintypes.DWORD),
                     ("TotalTerminatedProcesses", wintypes.DWORD)]
 
+    _HANDLE = wintypes.HANDLE
+    # 显式声明参数与返回值的类型：不声明时 ctypes 按 C 的 int 处理，64 位上的句柄会被截成 32 位，
+    # 之后拿一个错的句柄去结束或关闭，后果与「杀不掉」完全不同
+    _kernel32.CreateJobObjectW.restype = _HANDLE
+    _kernel32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+    _kernel32.SetInformationJobObject.restype = wintypes.BOOL
+    _kernel32.SetInformationJobObject.argtypes = [_HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    _kernel32.QueryInformationJobObject.restype = wintypes.BOOL
+    _kernel32.QueryInformationJobObject.argtypes = [_HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD,
+                                                   ctypes.c_void_p]
+    _kernel32.TerminateJobObject.restype = wintypes.BOOL
+    _kernel32.TerminateJobObject.argtypes = [_HANDLE, wintypes.UINT]
+    _kernel32.AssignProcessToJobObject.restype = wintypes.BOOL
+    _kernel32.AssignProcessToJobObject.argtypes = [_HANDLE, _HANDLE]
+    _kernel32.OpenProcess.restype = _HANDLE
+    _kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    _kernel32.CloseHandle.restype = wintypes.BOOL
+    _kernel32.CloseHandle.argtypes = [_HANDLE]
+    _kernel32.GetExitCodeProcess.restype = wintypes.BOOL
+    _kernel32.GetExitCodeProcess.argtypes = [_HANDLE, ctypes.POINTER(wintypes.DWORD)]
+    _ntdll.NtResumeProcess.restype = ctypes.c_long
+    _ntdll.NtResumeProcess.argtypes = [_HANDLE]
+
     def _active_processes(job: int) -> int | None:
         # 容器里还在运行的进程数；查不出来时交回 None（调用方按「无法确认」处理）
         info = _BasicAccounting()
@@ -135,6 +159,10 @@ class ProcessTree:
         self.attached = False
         # POSIX：子进程是新会话的首进程，进程组号就是它的进程号
         self._pgid: int | None = None
+        # 后台作业的计时器线程、stop_job 与会话结束会从不同的线程走到 stop()/close()：句柄只能
+        # 在锁里取用，否则两边同时关同一个句柄会关到别人刚拿到的那一个（后果不是「杀不掉」而是坏事）
+        self._lock = threading.Lock()
+        self._closed = False
 
     def attach(self, pid: int) -> None:
         """把刚启动的子进程收进容器。
@@ -162,12 +190,14 @@ class ProcessTree:
             return
         assigned = bool(_kernel32.AssignProcessToJobObject(job, handle))
         if assigned:
-            self._job = job
-            self._process = handle
-            self.attached = True
+            with self._lock:
+                self._job = job
+                self._process = handle
+                self.attached = True
         else:
             _kernel32.CloseHandle(job)
-            self._process = handle
+            with self._lock:
+                self._process = handle
         self._resume_or_stop(handle)
 
     def _resume(self, pid: int) -> None:
@@ -191,23 +221,28 @@ class ProcessTree:
 
     def stop(self) -> None:
         """一次结束整棵进程树。已经停下的、本来就没有的都不算错。"""
-        if os.name == "nt":
-            if self._job is not None:
-                # 容器里包括直接子进程已经退出以后留下的那些孙进程
-                _kernel32.TerminateJobObject(self._job, 1)
-            elif self.pid is not None:
-                # 没挂上作业对象：按进程树结束，与改动前的做法相同
-                subprocess.run(["taskkill", "/PID", str(self.pid), "/T", "/F"],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-            return
-        if self._pgid is not None:
-            try:
-                os.killpg(self._pgid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                pass
+        with self._lock:
+            if os.name == "nt":
+                if self._job is not None:
+                    # 容器里包括直接子进程已经退出以后留下的那些孙进程
+                    _kernel32.TerminateJobObject(self._job, 1)
+                elif self.pid is not None:
+                    # 没挂上作业对象：按进程树结束，与改动前的做法相同
+                    subprocess.run(["taskkill", "/PID", str(self.pid), "/T", "/F"],
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+                return
+            if self._pgid is not None:
+                try:
+                    os.killpg(self._pgid, signal.SIGKILL)
+                except (ProcessLookupError, PermissionError):
+                    pass
 
     def has_live_processes(self) -> bool:
         """容器里还有进程吗。直接子进程退出以后用它判断命令是否留下了子进程。"""
+        with self._lock:
+            return self._has_live_processes()
+
+    def _has_live_processes(self) -> bool:
         if os.name == "nt":
             if self._job is not None:
                 active = _active_processes(self._job)
@@ -239,12 +274,16 @@ class ProcessTree:
 
     def close(self) -> None:
         """释放容器。Windows 上关掉作业对象的最后一个句柄会让容器里剩下的进程一起结束。"""
-        if self._process is not None:
-            _kernel32.CloseHandle(self._process)
-            self._process = None
-        if self._job is not None:
-            _kernel32.CloseHandle(self._job)
-            self._job = None
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            if self._process is not None:
+                _kernel32.CloseHandle(self._process)
+                self._process = None
+            if self._job is not None:
+                _kernel32.CloseHandle(self._job)
+                self._job = None
 
     def __enter__(self) -> "ProcessTree":
         return self

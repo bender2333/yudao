@@ -510,8 +510,17 @@ class _Job:
         self.read_offset = 0
         # 上一次结束整棵树时它是否确实停了下来
         self._tree_stopped = True
+        # 后台作业的时限到了由计时器线程调 stop()，读输出与停止来自另一条线程：状态与句柄只能
+        # 在锁里改，否则两边同时关同一个句柄会关到别人刚拿到的那一个
+        self._lock = Lock()
+        # 已经结束过时的回执：重复调 stop() 交回同一条，不再动已经放掉的资源
+        self._stop_receipt: dict[str, Any] | None = None
 
     def read(self) -> dict[str, Any]:
+        with self._lock:
+            return self._read()
+
+    def _read(self) -> dict[str, Any]:
         if self.status == "running" and self.process is not None:
             ret = self.process.poll()
             if ret is not None:
@@ -539,6 +548,14 @@ class _Job:
         }
 
     def stop(self) -> dict[str, Any]:
+        with self._lock:
+            if self._stop_receipt is not None:
+                return dict(self._stop_receipt)
+            receipt = self._stop()
+            self._stop_receipt = dict(receipt)
+            return receipt
+
+    def _stop(self) -> dict[str, Any]:
         if self.status == "running" and self.process is not None:
             ret = self.process.poll()
             if ret is not None:
