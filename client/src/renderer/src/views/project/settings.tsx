@@ -361,7 +361,7 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
       <TextInput label="目标分支" value={targetBranch} onInput={setTargetBranch} />
       <TextInput label="远端仓库（留空表示源目录本身）" value={remote} onInput={setRemote} />
       <TextArea label={CHECK_COMMANDS_LABEL} value={checkCommands} rows={3} onInput={setCheckCommands} />
-      <p className="y10-note note">{CHECK_COMMANDS_NOTE}</p>
+      <span className="y10-note note">{CHECK_COMMANDS_NOTE}</span>
       <SubmitButton
         label="保存源目录"
         busy={command.busy}
