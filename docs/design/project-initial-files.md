@@ -1,14 +1,12 @@
 # 项目的起始文件夹设计说明
 
-更新：2026-10-06。状态：设计已确认（2026-10-06 用户同意），未实施。路线位置：Stage 3 的 3.8 的补充，父工单 [#124](https://github.com/bender2333/yudao/issues/124)，属于里程碑 M2。 总图位置：第一节「一份事实」方框（起始文件夹的快照是事项的起点）。
-
-依据：[D37 新建项目的起始文件夹](../requirements/project-initial-files.md)、[接入已有项目设计说明](existing-project-onboarding.md)（快照采集、`source_invalid` 与公开树的规则）、[本地通用工具设计说明](local-tools.md)（公开树）、[应用层与接口层设计说明](app-and-interface.md)第 3.1、3.2 节、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流只增加字段）、[恢复契约](recovery-contract-and-fault-matrix.md)第 6 节第 10 行。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。
+总图位置：第一节「一份事实」方框（起始文件夹的快照是事项的起点）。依据：[D37 新建项目的起始文件夹](../requirements/project-initial-files.md)、[接入已有项目设计说明](existing-project-onboarding.md)（快照采集、`source_invalid` 与公开树的规则）、[本地通用工具设计说明](local-tools.md)（公开树）、[应用层与接口层设计说明](app-and-interface.md)第 3.1、3.2 节、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流只增加字段）、[恢复契约](recovery-contract-and-fault-matrix.md)第 6 节第 10 行。
 
 ## 1. 要解决的问题
 
 | 问题 | 现状 | 影响 |
 | --- | --- | --- |
-| 新建项目只能从空树开始 | `project.create` 登记名称与长期目标，不带文件；`start_work_item` 在没有采纳成果时用空树建立工作区（`harness/projects.py` 约 519 至 553 行） | 题目带数据文件、脚手架或样例的场景无法开始：评测场景 3 的 `subway_data.json`（71,666 字节）进不了新项目的工作区，Yudao 一侧与 OpenCode 一侧的起点不同，完成度无法比较（#192 登记） |
+| 新建项目只能从空树开始 | `project.create` 登记名称与长期目标，不带文件；`start_work_item` 在没有采纳成果时用空树建立工作区（`harness/projects.py` 约 519 至 553 行） | 题目带数据文件、脚手架或样例的场景无法开始：评测场景 3 的 `subway_data.json`（71,666 字节）进不了新项目的工作区，Yudao 一侧与 OpenCode 一侧的起点不同，完成度无法比较 |
 | 已有文件进入项目的唯一入口是建档 | `project.onboard` 建立建档事项、核验基线、等用户确认初始 PRD | 只想带几份起点文件的用户被迫走完整的建档，而且建档把项目来源记为已有项目 |
 
 起始文件夹是第二条入口：用户在新建项目时给出一个文件夹，它的快照成为项目的起点文件。它不建档：没有建档事项、基线核验与初始 PRD，项目来源仍是想法新建。
@@ -56,7 +54,7 @@ flowchart LR
 ## 5. 界面与评测
 
 - 界面「从想法新建」表单增加可选项「起始文件夹」：单行文本，提示「控制主机上的文件夹路径，留空则从空项目开始」；提交以后项目概览的「项目摘要」在没有采纳成果时写「起点：起始文件夹（N 个文件）」，有采纳成果以后不再写。
-- 评测场景 3 的 Yudao 运行器用 `initial_directory` 带入 `subway_data.json`，与 OpenCode 一侧起点相同（[评测场景设计](evaluation-scenarios.md)第 3 节「隔离」）；#192 的第一份报告记录了没有这个入口时的结果，重新运行以后另出一份。
+- 评测场景 3 的 Yudao 运行器用 `initial_directory` 带入 `subway_data.json`，与 OpenCode 一侧起点相同（[评测场景设计](evaluation-scenarios.md)第 3 节「隔离」）。
 
 ## 6. 模块交互
 
@@ -109,3 +107,7 @@ sequenceDiagram
 | 应用层与接口层设计说明第 3.2 节 `project.create` | 增加可选参数与事件字段 |
 | 恢复契约第 6 节第 10 行 | 因升级重新开始的事项取项目的起点 |
 | `harness/projects.py` 三处重复的起点写法 | 合为一个函数 |
+
+## 变更记录
+
+- 2026-10-29 / claude-sonnet-5-5 / 按设计说明规范整理：开头合并为总图位置与依据一行，删去更新日期、状态、路线位置、父工单、里程碑和工单号 / 设计与实施分离（decision.md 2026-10-29）

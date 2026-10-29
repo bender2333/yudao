@@ -1,6 +1,6 @@
 # 总体架构：总图与职责分层
 
-状态：设计，用户已确认；最近一次改动 2026-10-28，去掉已删除的 ADR 的引用。改动的经过与原因见 [docs/CHANGELOG.md](../../CHANGELOG.md) 与[决策记录](../../decision.md)。路线位置：未实施的部分按[总体路线图](../../program-roadmap.md)推进。总图位置：全部六节的技术对照；第 1.3 节对应第四节「要守的缝」。
+总图位置：全部六节的技术对照；第 1.3 节对应第四节「要守的缝」。
 
 正本：[总图](../../architecture.html)；09-26 的原理讨论记录已归档（[控制核心与可替换的材料](../../archive/design/architecture/core-and-materials.md)），其中的公式、三环、外包判据与拆开后的硬问题以总图第一、二、四、六节为准。本文把路线图中的全部模块放进同一个结构：第 1 节是总图，其余各节写明各层的职责与边界、长期决定、合同与使用的技术。
 
@@ -14,30 +14,33 @@
 
 ### 1.3 给子架构师：缝与设计说明
 
-维护规则：缝的名字、两侧、保证、规矩、交换什么与已定、未定，以总图第四节为准；这张表只是技术对照，记代码名、工单与设计说明的位置。模块与缝的增减先交总架构师改总图，再改这张表；设计说明挂在总图的一个方框或一道缝上，不新增总图没有的模块或缝。
+维护规则：缝的名字、两侧、保证、规矩、交换什么与已定、未定，以总图第四节为准；这张表只是技术对照，记两侧、合同的意思与设计说明的位置。模块与缝的增减先交总架构师改总图，再改这张表；设计说明挂在总图的一个方框或一道缝上，不新增总图没有的模块或缝。
 
-与总图的对应：总图的十道缝是写入口、路由、装配、执行、模型、动作、投影、接口、画面、定义，系统之外三道是评价、观察者、看门狗。表里的「裁决」与「最小投影」在总图里属于内核内部，不是缝；「观察者、判定点、外包派发」一行拆开看：观察者是总图的外部缝，判定点属于定义与装配的规矩，外包是执行的一种实现；「健康协议」就是看门狗那道缝。
+与总图的对应：总图的十道缝是写入口、路由、装配、执行、模型、动作、投影、接口、画面、定义，系统之外三道是评价、观察者、看门狗。「裁决」与「最小投影」在总图里属于内核内部，不是缝；「观察者、判定点、外包派发」拆开看：观察者是总图的外部缝，判定点属于定义与装配的规矩，外包是执行的一种实现；「健康协议」就是看门狗那道缝。
 
-**缝的清单**（两侧、合同、版本、状态）：
+**缝的清单**（两侧、合同、细化在）：
 
-| 缝 | 两侧 | 合同 | 版本 | 状态（main 2026-10-25） | 细化在 |
-| --- | --- | --- | --- | --- | --- |
-| 路由契约 | 薄驱动 ↔ 路由实现 | 谁开工、一轮怎么结束、事项怎么结束 | 带版本（设计） | S2a（#825） | [骨架与应用](../skeleton-and-application.md)第 5.1 节 |
-| 装配契约 | 执行实现 ↔ 装配实现 | `ContextAssembly` 四个方法 | 无版本 | 已实施，装配实现是可以整体重写的应用层；视图按「事件日志上的纯函数 `view(events, rules)`」测过，减法规则见[上下文装配设计说明](../context-assembly.md)；契约加版本在 S3（#826） | 同上第 5.2 节 |
-| 执行契约 | 薄驱动 ↔ 执行实现 | `StepDriver` 与安全节点 | 无版本 | 已实施；加版本在 S3 | 同上第 5.3 节 |
-| 写入口 | 一切写入方 ↔ 内核 | 执行权、流版本、同一事务里的裁决 | 已有 | 已实施 | [可信内核](../trusted-kernel.md) |
-| 裁决 | 写入口 ↔ 裁决；路由 → 裁决（收紧检查） | 工具许可、合同的通用条件、收紧接口 | 已有；收紧新 | S1c（#859）、S1d（#860） | [骨架与应用](../skeleton-and-application.md)第 5.5 节 |
-| 最小投影 | 骨架事件 → 裁决、边界、薄驱动 | 固定的几样事实 | 新 | S1a（#824） | 同上第 4 节 |
-| 模型调用 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | 已有 | 已实施 | [模型管理](../model-management.md)（含第 13 节统一调用、取消与观测） |
-| 动作合同 | 执行实现 ↔ 工具 ↔ 执行环境 | 每类动作的契约与回执；远程经 HTTP | 已有；远程带版本 | 本机已实施；远程 M3（#120） | [执行环境服务](../execution-environment.md)、[本地通用工具](../local-tools.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器](../browser-and-computer-use.md) |
-| 接口合同 | 界面、命令行、评测 ↔ 接口层 | 命令、查询、事件流、能力清单 | 接口版本号 | 已实施（#619） | [应用层与接口层](../app-and-interface.md) |
-| 画面合同 | 翻译层 ↔ 画面层 | 状态、动作、实时内容、回调 | 设计 | M0.5 画面 | [画面与播放](../visualization.md) |
-| 定义格式 | 定义 ↔ 加载与校验 | 七个 JSON 的结构；路由自己的定义 | 内容摘要 | 已实施；S2b（#861） | [规则登记与参数](../rules-and-parameters.md) |
-| 观察者、判定点、外包派发 | 观察者 ↔ 接口（读）与写入口（写）；判定点在定义与装配里；外包是执行契约的一种实现 | 按读取范围读，证据、提案与振荡信号经写入口；问题与去向；ACP | 设计 | Stage 5、6 | 第 7.2、7.5 至 7.7 节；振荡信号见[循环与收敛](../loops-and-convergence.md)第 5 节 |
-| 健康协议 | 看门狗 ↔ 实例 | 心跳、冒烟、金丝雀 | 设计 | Stage 4 | [骨架与应用](../skeleton-and-application.md)第 10 节 |
-| 评价 | 评价材料 → 应用 | 只经接口层 | 不适用 | 运行器实施中；真实用户场景验收 S7（#830） | [评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md) |
+| 缝 | 两侧 | 合同（意思，不写类型） | 细化在 |
+| --- | --- | --- | --- |
+| 写入口 | 一切写入方 ↔ 内核 | 执行权、流版本、同一事务里的裁决 | [可信内核](../trusted-kernel.md) |
+| 路由 | 薄驱动 ↔ 路由实现 | 谁开工、一轮怎么结束、事项怎么结束 | [骨架与应用](../skeleton-and-application.md)第 5.1 节 |
+| 装配 | 执行实现 ↔ 装配实现 | 四个操作：取部门历史、固定一步的材料与工具、接上历史得到请求与上下文清单、由压缩的回答生成检查点；视图是事件日志与规则的纯函数 | [骨架与应用](../skeleton-and-application.md)第 5.2 节；减法规则见[上下文装配](../context-assembly.md) |
+| 执行 | 薄驱动 ↔ 执行实现 | 步骤驱动与安全节点 | [骨架与应用](../skeleton-and-application.md)第 5.3 节 |
+| 模型 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | [模型管理](../model-management.md)（含第 13 节统一调用、取消与观测） |
+| 动作 | 执行实现 ↔ 工具 ↔ 执行环境 | 每类动作的契约与回执；远程经 HTTP | [执行环境服务](../execution-environment.md)、[本地通用工具](../local-tools.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器](../browser-and-computer-use.md) |
+| 投影 | 一份事实 → 读的人 | 骨架自己折叠的最小投影（裁决读）、应用层的投影（应用层读取模型读） | [骨架与应用设计说明](../skeleton-and-application.md)、[应用层与接口层设计说明](../app-and-interface.md)、[语义系统设计说明](../semantic-system.md)（知识层） |
+| 接口 | 界面、命令行、评测 ↔ 接口层 | 命令、查询、事件流、能力清单 | [应用层与接口层](../app-and-interface.md) |
+| 画面 | 翻译层 ↔ 画面层 | 状态、动作、实时内容、回调 | [画面与播放](../visualization.md) |
+| 定义 | 定义 ↔ 加载与校验 | 定义文件的结构；路由自己的定义 | [规则登记与参数](../rules-and-parameters.md) |
+| 评价 | 评价材料 → 应用 | 只经接口层 | [评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md) |
+| 观察者 | 观察者 ↔ 接口（读）与写入口（写） | 按读取范围读，证据、提案与振荡信号经写入口 | 第 7.2、7.5 至 7.7 节；振荡信号见[循环与收敛](../loops-and-convergence.md)第 5 节 |
+| 看门狗 | 看门狗 ↔ 实例 | 心跳、冒烟、金丝雀 | [骨架与应用](../skeleton-and-application.md)第 10 节 |
 
-**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)第 10 节、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[验证的独立性](../independent-verification.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含第 13 节统一调用、取消与观测）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、界面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)、[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39 与 #836。
+判定点和外包不是单独的缝：判定点在定义与装配里，合同是问题与去向（第 7.5 节）；外包派发是执行契约的一种实现，合同是 ACP（第 7.2 节）。
+
+**内核内部（不是缝）**：裁决（写入口 ↔ 裁决，路由 → 裁决的收紧检查：工具许可、合同的通用条件、收紧接口），细化在[可信内核](../trusted-kernel.md)与[骨架与应用](../skeleton-and-application.md)第 5.5 节。最小投影（骨架事件 → 裁决、边界、薄驱动：固定的几样事实），细化在[骨架与应用](../skeleton-and-application.md)第 4 节。
+
+**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)第 10 节、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[验证的独立性](../independent-verification.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含第 13 节统一调用、取消与观测）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、界面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)、[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39。
 
 **总图的词与代码名的对照**：[name-map.md](name-map.md)，按缝列出总图的词、代码里现在的名字与一致、不一致、代码里还没有；代码名随立缝工单改成总图的词，立缝工单关闭时由子架构师改那一行。
 
@@ -131,6 +134,137 @@ flowchart TB
   Release -->|"决定请求：实例升级"| App
 ```
 
+### 1.4A 包图
+
+这张图画 `harness/`、`client/`、`evals/` 三个顶层包下的包与模块组，以及包之间允许的直接导入方向：箭头从导入的一方指向被导入的一方，图里没有箭头的两个包不能直接导入（下面三处省略除外）。虚线是进程之间经接口的调用，不是导入；评测工具里的实线多是运行评分器、读场景材料，也不是 Python 导入。模块图（第 1.1 节起）画概念上的部件与合同，包图画代码放在哪、谁能导入谁。节点写目录或文件的真实名字（不带后缀的是 `harness/` 顶层的 Python 模块），括号里是总图的词，总图里没有对应词的写一句话说明；几个文件并成一组时只列有代表性的名字，完整的对应见[总图的词与代码名的对照](name-map.md)。
+
+三处省略：一是指向内核模块与 `definitions/` 的箭头：除了图上画出的契约与 Provider 两处限制（契约只导入内核，Provider 只导入 `definitions/`），`harness/` 里其余的包都可以导入它们，只有接口层不能（它只导入应用层），应用层只能导入其中的公开接口模块；内核自己只导入内核文件、标准库与 pydantic。二是组装处 `runtime.py`、入口模块（`__main__`、`demo`、`smoke`）和客户端的 `app.tsx`、`main.tsx`：它们负责把各包接在一起，可以导入各自顶层包里的任何包，图里只画 `runtime.py` 接薄驱动与三个实现的箭头。三是各顶层包自己的 `tests/`：可以导入包里的任何东西，没有包导入测试。
+
+```mermaid
+flowchart TB
+  subgraph C["client/src/renderer/src/"]
+    Views["views/ · shell/<br/>（页面）"]
+    Sync["contract/<br/>（同步层与命令接口）"]
+    Trans["translate/<br/>（翻译层）"]
+    Pixel["pixel/<br/>（画面层）"]
+    Gen["api/<br/>（接口生成的类型）"]
+  end
+  subgraph E["evals/"]
+    Runner["runner/<br/>（运行器）"]
+    Scorer["scorer/<br/>（评分器）"]
+    Scen["scenarios/<br/>（场景材料、隐藏检查）"]
+    EOther["baseline/ · context/<br/>（其他）"]
+  end
+  subgraph H["harness/"]
+    Api["api/<br/>（接口层）"]
+    App["app/<br/>（应用层）"]
+    Rt["runtime.py<br/>（组装处）"]
+    Thin["orchestrator.py<br/>（薄驱动）"]
+    subgraph Slots["三个槽位的实现"]
+      Route["watched_outputs · tightening<br/>（路由实现）"]
+      Asm["assembly · context · compaction<br/>（装配实现）"]
+      Exec["engine · recording · sessions<br/>（执行实现）"]
+    end
+    Adapt["adapters/<br/>（模型适配）"]
+    Env["environment · workspace · public_tree 等<br/>（执行环境）"]
+    Svc["projects · interactions · submissions 等<br/>（应用服务）"]
+    Base["models · projection · artifacts 等<br/>（应用的投影与共用类型）"]
+    Contract["*_contract · contract_versions<br/>（契约）"]
+    Kernel["write_path · event_store · adjudication 等<br/>（内核清单里的模块）"]
+    Prov["providers/<br/>（模型服务 Provider）"]
+    Defs["definitions/<br/>（定义）"]
+  end
+  Views --> Sync
+  Views --> Trans
+  Views --> Pixel
+  Views --> Gen
+  Sync --> Gen
+  Trans --> Gen
+  Trans -->|"只取画面合同与声明表"| Pixel
+  Runner --> Scorer
+  Runner --> Scen
+  Scorer --> Scen
+  Sync -.->|"HTTP"| Api
+  Runner -.->|"HTTP"| Api
+  Gen ~~~ Api
+  Scen ~~~ Api
+  EOther ~~~ Api
+  Api --> App
+  App --> Rt
+  App --> Svc
+  App --> Base
+  App --> Env
+  App --> Prov
+  Rt --> Thin
+  Rt --> Slots
+  Thin --> Contract
+  Slots --> Contract
+  Slots --> Base
+  Exec --> Env
+  Exec --> Adapt
+  Exec --> Prov
+  Svc --> Env
+  Svc --> Prov
+  Svc --> Base
+  Env --> Base
+  Adapt --> Prov
+  Adapt --> Base
+  Base --> Prov
+  Contract --> Kernel
+  Kernel --> Defs
+  Prov --> Defs
+  Prov ~~~ Kernel
+```
+
+**依据。** 方向由下面的检查守着，它们都在合并前的 CI 里运行，失败不能合并（[测试分层设计说明](../test-pyramid.md)「缝的合同检查」一节）：
+
+- `harness/tests/test_layers.py` 运行 `pyproject.toml` 里的五条 import-linter 合同：接口层只导入应用层；控制核心不导入应用层与接口层，应用层不导入接口层；应用层只导入控制核心的公开接口（[应用层与接口层设计说明](../app-and-interface.md)「依赖规则」一节按类列出）；契约模块只导入内核与标准库；应用层与三个实现的主要文件不导入薄驱动。
+- 契约：`harness/tests/test_contract_modules.py` 再核对一遍契约模块只导入内核清单里的模块、标准库与契约模块自己；`harness/tests/kernel/test_contract_surface.py` 守契约的公开名称与版本只增不删（这是兼容，不是导入方向）。
+- 内核：`harness/tests/kernel/test_manifest.py` 核对内核清单（`harness/definitions/kernel-manifest.json`）里 kind 为 module 的文件只导入内核文件、标准库与 pydantic，并核对行数上限；发布检查（`harness/release_check.py`）对待发布的提交再做一次（[可信内核设计说明](../trusted-kernel.md)「发布检查与探针」一节）。最小投影模块的同一条限制另有 `harness/tests/kernel/test_minimal_projection.py`；`harness/tests/kernel/test_single_write_path.py` 核对只有写入口调用事件日志的写入函数，只有事件日志打开数据库（应用的读取模型有自己可重建的数据库，除外）。
+- 路由与决定请求：`harness/tests/test_routing_contract.py` 核对路由实现不导入薄驱动与最小投影；`harness/tests/test_decision_flow.py` 核对决定请求与建档的流转不导入薄驱动。
+- 动作缝：`harness/tests/test_workspace_boundary.py` 核对控制核心里的步骤驱动、装配、裁决与提交等模块不直接读写工作区文件，只经执行环境。
+- 界面：`client/tests/unit/pixel-imports.test.ts` 核对画面层不导入页面、`contract/`、接口生成的类型、翻译层与 React，翻译层只从画面层取画面合同与三张声明表（[画面与播放设计说明](../visualization.md)「分层与边界」一节）。
+- 评测工具：`evals/tests/test_no_harness_import.py` 与 `evals/tests/test_no_harness_paths.py` 核对评测工具不导入 `harness`，也不写死它内部文件的路径。
+- 测试：`harness/tests/test_test_imports.py` 核对测试文件不互相导入，只从辅助模块取共用代码。
+
+靠约定、没有检查守着的方向：
+
+- 薄驱动只导入契约与内核（[骨架与应用设计说明](../skeleton-and-application.md)「薄驱动」一节）。上面的检查只管应用不导入薄驱动，反方向没有检查；`harness/tests/test_thin_driver_names.py` 查的是薄驱动源码里没有部门与成果的名字，不是导入。
+- 路由、装配、执行三个实现之间不互相导入，只经契约和薄驱动相连。
+- Provider 只导入 `definitions/`（[模型管理设计说明](../model-management.md)「模块边界」一节）：`harness/tests/test_providers_module.py` 只核对导入 `harness.providers` 时加载了哪些模块，函数里的延迟导入看不到。
+- 执行环境与模型适配不导入应用服务和三个实现；应用服务、应用的投影与执行环境之间自上而下的顺序。
+- 界面里页面、翻译层、同步层之间的方向（画面层与翻译层那两条除外）。
+- 评测工具内部：运行器、评分器、场景材料之间的方向。
+
+`harness/tests/test_layer_boundaries.py` 里的「层」指单元、模块、集成三层测试各自能做什么，不是包的分层，不查导入方向。
+
+| 包 | 总图里的位置 | 备注 |
+| --- | --- | --- |
+| `harness/api/` | 接口缝的外侧：接口层 | 只导入 `app/`；HTTP 接口、事件流、认证与界面的页面文件 |
+| `harness/app/` | 接口缝的内侧：应用层 | 命令处理、查询与读取模型；只导入控制核心的公开接口 |
+| `runtime.py` | 薄驱动与插件加载：组装处 | 启动时把路由、装配、执行三个实现接上薄驱动 |
+| `orchestrator.py` | 薄驱动 | 总图第二节「只由你批准」那一环；它要接契约模块，而内核文件只导入内核文件，所以与内核模块分开画；代码里叫流程编排，见对照表 |
+| `watched_outputs`、`tightening` | 路由缝的实现 | 成果驱动的路由与它的收紧检查 |
+| `assembly`、`context`、`compaction` | 装配缝的实现 | 可以整体重写 |
+| `engine`、`recording`、`sessions` | 执行缝的实现 | 步骤驱动与它的记录 |
+| `projects`、`interactions`、`submissions` 等 | 写入口的写入方、投影的读取方 | 项目、交互与提交的写入，恢复与核对；总图里没有对应的方框 |
+| `environment`、`workspace`、`public_tree` 等 | 动作缝：执行环境 | 本机实现；工作区、封存快照、命令与检查在这里 |
+| `harness/adapters/` | 模型缝，执行一侧 | 步骤驱动调模型用的接口，含测试用的假模型 |
+| `harness/providers/` | 模型缝，模型服务一侧 | 可以单独使用与测试；只导入 `definitions/` |
+| `models`、`projection`、`artifacts` 等 | 投影缝：应用的投影 | 内核事件以外的类型、折叠与工件存储 |
+| `routing_contract` 等五个模块 | 契约，只能向后兼容 | 带版本，实现声明实现哪一版，薄驱动接受当前版与上一版 |
+| 内核清单里的模块 | 内核，只由用户批准 | 写入口、裁决、边界、最小投影 |
+| `harness/definitions/` | 定义 | 加载与校验在内核清单里，数据文件（JSON）不在 |
+| `client/src/renderer/src/views/`、`shell/` | 界面：页面 | 两个目录互相导入，合成一格 |
+| `client/src/renderer/src/contract/` | 接口缝读者一侧：同步层与命令接口 | 目录叫 contract，不是三道槽位的契约 |
+| `client/src/renderer/src/translate/` | 画面缝：翻译层 | 唯一同时认识 Yudao 的说法与画面的说法的地方 |
+| `client/src/renderer/src/pixel/` | 画面缝：画面层 | 独立模块，只认画面合同 |
+| `client/src/renderer/src/api/` | 接口缝：接口生成的类型 | 生成的代码，不手写 |
+| `evals/runner/` | 评价：运行器 | 只经接口层驱动 Yudao |
+| `evals/scorer/` | 评价：评分器 | 在内核清单里 |
+| `evals/scenarios/` | 评价：场景材料 | 隐藏检查与参考解法在内核清单里 |
+| `evals/baseline/`、`context/` | 评价之外的离线工具 | 读 GitHub、事件库与工件库，不导入 `harness` |
+
 ### 1.5 固定的结构与内核的位置
 
 固定的结构有四样：循环、边界、裁决、独立的证据。部门、角色、观察者、判定点、使用者、机器、写入者都是填进这个结构的内容，增加其中一项应当只写声明。
@@ -216,9 +350,9 @@ flowchart LR
 
 1. **一份事件日志与唯一写入口**：每条事件有全局位置、所属的流与流内版本；所有写入只经过写入口，在同一个事务中核对执行权编号与流版本、接收 U 的裁决、追加事件、更新投影；投影保存下来，随写入逐步更新。
 2. **异步执行**：控制核心在一个异步事件循环中运行，事项与角色任务都是可以取消的任务；模型调用、动作的进程与事件推送都以异步方式等待。
-3. **部署形态与执行权**（[ADR-0018](../../adr/0018-single-control-host-remote-execution.md)）：控制核心、事件日志（SQLite）、工件存储、Provider 模块与观察者在一台控制主机上运行；控制核心只有一份，持有每个 run 的执行权，执行权没有期限与续期；执行环境可以分布到用户登记的其他电脑与开发板上；不引入外部工作流引擎。部门不单独部署成服务：部门的身份、历史与路由都在一份事实与定义里，部门没有自己的服务与状态。部门成员（一个成员就是一个会话，即执行实现运行的一轮工作或一个询问分支）可以多份、放在任何登记的位置，同一部门可以有几个成员同时在不同的地方；它们经模型、动作与写入口三道缝回到控制主机，模型凭据只在控制主机（总图第六节）。谁放在哪里写在带版本的定义里（[执行环境服务设计说明](../execution-environment.md)第 7.1 节）。现在全部在一个进程里运行。
+3. **部署形态与执行权**（[ADR-0018](../../adr/0018-single-control-host-remote-execution.md)）：控制核心、事件日志（SQLite）、工件存储、Provider 模块与观察者在一台控制主机上运行；控制核心只有一份，持有每个 run 的执行权，执行权没有期限与续期；执行环境可以分布到用户登记的其他电脑与开发板上；不引入外部工作流引擎。部门不单独部署成服务：部门的身份、历史与路由都在一份事实与定义里，部门没有自己的服务与状态。部门成员（一个成员就是一个会话，即执行实现运行的一轮工作或一个询问分支）可以多份、放在任何登记的位置，同一部门可以有几个成员同时在不同的地方；它们经模型、动作与写入口三道缝回到控制主机，模型凭据只在控制主机（总图第六节）。谁放在哪里写在带版本的定义里（[执行环境服务设计说明](../execution-environment.md)第 7.1 节）。
 4. **合同**（第 7 节）：模型调用、动作、外包派发（执行契约的一种实现）、判定点、观察者的读取与写入，以及界面与命令行使用的命令、查询与事件流，都是可以序列化、带身份的 pydantic 类型。
-5. **调用目标每次请求解析**：每次模型请求之前由 Provider 模块解析；控制核心不持有明文凭据，凭据在执行调用的地方按引用读取。实施排在 3.1 之前。
+5. **调用目标每次请求解析**：每次模型请求之前由 Provider 模块解析；控制核心不持有明文凭据，凭据在执行调用的地方按引用读取。
 6. **动作契约与执行环境**（第 7.3 节）：所有环境工具都是动作，每类动作有契约；执行环境是一个服务，有本机进程与远程执行代理两种实现（3.2C）：本机进程在控制核心的进程内调用，远程执行代理经过 HTTP 加 JSON 的合同；代码在执行位置上直接运行（总图第六节画了「容器」作为放置成员的地方，两种读法交用户决定，见[架构问题](../../architecture-issues.md) 2026-10-25「总图 第六节：容器」一条）；执行环境从封存快照建立；控制核心不直接读写工作区文件。
 7. **带版本的定义**：组织、角色、动作、本体、判定点、技能、循环层、限额与规则、停止原因作为带版本的数据；参数的当前值写成事件；每个事项记录它使用的定义版本与参数版本，每次请求与裁决记录所用的版本。
 8. **用户决定**（第 7.4 节）：所有等待用户的事项使用同一种机制，决定请求与回答都写成事件。
@@ -328,7 +462,7 @@ sequenceDiagram
 - 一个动作是一个逻辑动作，下面有一次或多次动作尝试。
 - 询问、决定请求、判定、提案各有自己的身份；询问分支记录它所属的询问与开出时部门历史的位置（[三部门的循环结构](../department-loop.md)第 4 节）。
 - 每条往来带身份，接收方按身份去重，旧执行权编号的结果只记录、不接纳。
-- 派发编号（总图第一节方程里的 U、第三节「重派与迟到的结果」）：每开始一轮工作或一次外包派发，控制主机经写入口写一条事件，发一个派发编号；重派先写事件、编号加一。这一轮交回的工具请求、提案与回执都带派发编号，写入口在同一事务里与执行权编号、流版本一起核对，旧编号交回的结果只记录、不接纳。执行权属于事项、没有期限；派发编号属于一轮工作。现在只有一个进程，一轮工作与它的激活一一对应，旧编号的结果还不会出现；会话放到别处之前（总图第六节）实施，排期按[总体路线图](../../program-roadmap.md)，还没有工单。
+- 派发编号（总图第一节方程里的 U、第三节「重派与迟到的结果」）：每开始一轮工作或一次外包派发，控制主机经写入口写一条事件，发一个派发编号；重派先写事件、编号加一。这一轮交回的工具请求、提案与回执都带派发编号，写入口在同一事务里与执行权编号、流版本一起核对，旧编号交回的结果只记录、不接纳。执行权属于事项、没有期限；派发编号属于一轮工作。会话放到别处（总图第六节）之前，这项核对要先具备。
 
 ### 7.2 五种合同
 
@@ -346,16 +480,16 @@ sequenceDiagram
 
 每类动作的契约回答[恢复契约](../recovery-contract-and-fault-matrix.md)第 4 节的问题：谁有权做，作用于什么，怎样识别同一动作与不同尝试，成功证据是什么，结果未知时向哪里查，何时可以重复，取消能否确认停止，谁负责未解决的结果。没有可以验证的恢复方法时，结果未知的动作交还发出它的会话，由模型决定；主机发起的动作（例如采纳写回）保持结果未知，等待下一次核实。不自行补偿。
 
-| 动作类别 | 执行环境 | 授权 | 出现时间 |
-| --- | --- | --- | --- |
-| 读取、搜索 | 本机或执行代理 | 角色的工具许可 | 已有 |
-| 写入、编辑、删除、移动 | 本机或执行代理 | 角色的工具许可；运行工作区只由工程的一轮工作写入（[三部门的循环结构](../department-loop.md)第 3.2 节） | 已有 |
-| 命令（bash，接受任意命令字符串，可以后台运行） | 本机或执行代理；工程的一轮工作在运行工作区运行，其他会话在各自的检查工作区运行 | 角色的工具许可 | 3.2A |
-| 检查 | 快照的全新副本 | 质检角色 | 已有 |
-| 网络取回、MCP 工具 | 控制主机，与 run 的执行位置无关（[网络取回与 MCP 工具设计说明](../network-and-mcp.md)第 3 节） | 取回任何 http 与 https 地址（拒绝 Yudao 服务自己的地址）；项目设置中的 MCP 服务器提供的工具全部直接提供 | 3.2B |
-| 浏览器（Playwright MCP）与 computer use | run 的执行位置；computer use 只在控制主机的交互桌面上（[浏览器与 computer use 设计说明](../browser-and-computer-use.md)第 5.1 节） | 角色的工具许可；按普通浏览器 MCP 的默认做法运行，不另加限制；computer use 只提供给模型能看图的部门；质检只按交付说明中的启动方式启动交付的软件（[D34](../../requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](../browser-and-computer-use.md)） | 浏览器 3.2D；computer use 为以后阶段的专题 |
-| 外部动作（部署、回滚、重启、读取运行数据） | 登记的运行环境上的执行代理 | 常设授权清单以内由运维直接执行；清单以外由用户决定 | Stage 4 |
-| 外包 agent 的文件与命令请求 | 外包 agent 的进程 | 与自有角色相同 | D31 |
+| 动作类别 | 执行环境 | 授权 |
+| --- | --- | --- |
+| 读取、搜索 | 本机或执行代理 | 角色的工具许可 |
+| 写入、编辑、删除、移动 | 本机或执行代理 | 角色的工具许可；运行工作区只由工程的一轮工作写入（[三部门的循环结构](../department-loop.md)第 3.2 节） |
+| 命令（bash，接受任意命令字符串，可以后台运行） | 本机或执行代理；工程的一轮工作在运行工作区运行，其他会话在各自的检查工作区运行 | 角色的工具许可 |
+| 检查 | 快照的全新副本 | 质检角色 |
+| 网络取回、MCP 工具 | 控制主机，与 run 的执行位置无关（[网络取回与 MCP 工具设计说明](../network-and-mcp.md)第 3 节） | 取回任何 http 与 https 地址（拒绝 Yudao 服务自己的地址）；项目设置中的 MCP 服务器提供的工具全部直接提供 |
+| 浏览器（Playwright MCP）与 computer use | run 的执行位置；computer use 只在控制主机的交互桌面上（[浏览器与 computer use 设计说明](../browser-and-computer-use.md)第 5.1 节） | 角色的工具许可；按普通浏览器 MCP 的默认做法运行，不另加限制；computer use 只提供给模型能看图的部门；质检只按交付说明中的启动方式启动交付的软件（[D34](../../requirements/browser-and-computer-use.md)、[浏览器与 computer use 设计说明](../browser-and-computer-use.md)） |
+| 外部动作（部署、回滚、重启、读取运行数据） | 登记的运行环境上的执行代理 | 常设授权清单以内由运维直接执行；清单以外由用户决定 |
+| 外包 agent 的文件与命令请求 | 外包 agent 的进程 | 与自有角色相同 |
 
 动作类别按放置分两种：随 run 的执行位置（读写文件、命令、检查、试用会话、浏览器与屏幕动作），固定在控制主机（网络取回、MCP 工具，由执行环境服务的本机进程实现提供，执行代理不实现）。两种使用同一份动作合同。
 
@@ -381,11 +515,11 @@ sequenceDiagram
 | 确认接入已有项目的初始 PRD：确认、提出修改 | 接入已有项目设计说明、D33 |
 | 进入等待模型服务的通知（只通知一次，用户可以取消 run） | Stage 4、D17 |
 | 判定点不确定、并且没有独立的下游核验时的裁定：阻塞范围取能够隔开的最小范围（第 7.7 节） | D28 |
-| 证据核对的校准样本裁定 | D25、#41 |
+| 证据核对的校准样本裁定 | D25 |
 | 采用定义候选（`definition.adopt`；系统提出的候选在 Stage 6） | Stage 6 |
 | 内核修改：交付相对基线的改动路径与内核清单有交集时，附差异；批准采纳、拒绝 | [可信内核设计说明](../trusted-kernel.md)第 4.2 节 |
 | 实例升级：发布检查对待发布的提交运行以后，附检查结果；批准升级、拒绝 | 可信内核设计说明第 4.4 节 |
-| 等待超过时长上限：等待模型服务、等待机器、等待桌面、等待桌面解锁各自超过 `wait.<种类>.max_sec`（暂定默认值，见规则登记）时发出一次，同时通知用户一次；选项为继续等待、停止事项；等待用户的决定本身没有上限，由用户结束 | [循环与收敛设计说明](../loops-and-convergence.md)第 3 节 |
+| 等待超过时长上限：等待模型服务、等待机器、等待桌面、等待桌面解锁各自超过 `wait.<种类>.max_sec`（暂定默认值）时发出一次，同时通知用户一次；选项为继续等待、停止事项；等待用户的决定本身没有上限，由用户结束 | [循环与收敛设计说明](../loops-and-convergence.md)第 3 节 |
 | 反复退回的提醒（只通知，不阻塞） | D26 |
 
 中断的 run 在 Yudao 启动时自动继续；事项记录的定义版本与当前加载的版本不同时，先发出定义版本的决定请求；结果未知的外部动作按上表第二行交给用户。
@@ -452,12 +586,17 @@ sequenceDiagram
 
 ## 10. 近期实施顺序
 
-2026-09-27 的实施顺序早已做完，2026-10-25 删除：顺序见[总体路线图](../../program-roadmap.md)第 2 至 4 节与第 8.3 节。
+2026-09-27 的实施顺序已于 2026-10-25 删除：顺序见[总体路线图](../../program-roadmap.md)第 2 至 4 节与第 8.3 节。
 
 ## 11. 待讨论的事项
 
 1. 判定点的清单（合同、校准与升级规则见第 7.5、7.7 节；证据核对是第一个判定点，流转上的判定点各自校准以后加入）与元观察（D28）。
 2. 教训发现模块与惊讶机制（D25）：单独审查事件与事实，找出教训与洞见；可能与元观察结合；参考主动推断与自由能原理。
 3. 修复事项（D27）：运维发起的修复事项自动开始，不需要用户批准；同一项目一次只进行一个事项，按优先级排队，修复事项在前；登记的运行环境带常设授权清单，清单以外的动作走用户决定。项目层长期存在的运维部门与 run 内各部门之间的询问方式在 Stage 4 设计时确定。
-4. 技能的定义（路线图里还没有落点，需求由 S0 讨论，#494）：注册、适用性、执行与展开。
+4. 技能的定义（路线图里还没有落点，需求由 S0 讨论）：注册、适用性、执行与展开。
 5. Stage 6 与持续改进工作线的需求记录。
+
+## 变更记录
+
+- 2026-10-29 / claude-sonnet-5-5 / 按设计说明规范整理：开头改为总图位置一行，删去状态、路线位置和最近一次改动；删去正文里的 3 处工单号和 1 处指向规则登记的说法；删去第 3 节第 3 条的现状句、第 7.1 节派发编号一条的现状与排期、第 10 节的「早已做完」；第 1.3 节维护规则、与总图的对应两段按新表改了用语 / 设计与实施分离（decision.md 2026-10-29）
+- 2026-10-29 / claude-sonnet-5-5 / 第 1.3 节缝清单重写：一行一道缝（13 行，补上「投影」），去掉版本、状态和工单列，「裁决」「最小投影」移出表格归入「内核内部」；第 7.3 节动作类别表去掉「出现时间」一列，第 3 节第 5 条去掉「实施排在 3.1 之前。」（都是路线位置与排期，不是设计）；在第 1.4 节之后新增第 1.4A 节包图（用户 2026-10-29 对包图的定义） / 缝清单的版本与状态是实施进度，且已过期（decision.md 2026-10-29）
