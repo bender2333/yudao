@@ -36,6 +36,20 @@ function watchErrors(client: ClientApp): string[] {
   return errors;
 }
 
+// 同上的控制台错误，但服务端按设计用 409 拒绝命令时浏览器自己记的那一条不算应用错误：
+// 界面已经把原因显示给用户（与 building、home 等用例同一个处理）
+function watchErrorsAllowingRejectedCommands(client: ClientApp): string[] {
+  const errors: string[] = [];
+  client.page.on("console", (message) => {
+    if (message.type() === "error"
+        && !message.text().startsWith("Failed to load resource: the server responded with a status of 409")) {
+      errors.push(message.text());
+    }
+  });
+  client.page.on("pageerror", (error) => errors.push(error.message));
+  return errors;
+}
+
 // 给已经保存的连接设置内存里的 Key：走真实命令与真实凭据链，页面只看到状态
 async function setKey(client: ClientApp, backend: Backend, ref: string): Promise<void> {
   const status = await client.page.evaluate(async (payload: { address: string; ref: string; key: string }) => {
@@ -48,6 +62,26 @@ async function setKey(client: ClientApp, backend: Backend, ref: string): Promise
       body: JSON.stringify({
         command_id: crypto.randomUUID(),
         base_version: provider.credential.version,
+        ref: payload.ref,
+        secret: payload.key,
+        persist: false,
+      }),
+    });
+    return response.status;
+  }, { address: backend.address, ref, key: KEY });
+  expect(status).toBe(200);
+}
+
+// 给一个没有被连接引用的凭据引用写入内存里的 Key（工单 #1216）：页面的凭据表里没有这一行，
+// 「保存凭据」发出的基准版本因此是 0，而服务端这个引用的版本已经是 1，保存会按版本过期被拒绝
+async function setDetachedKey(client: ClientApp, backend: Backend, ref: string): Promise<void> {
+  const status = await client.page.evaluate(async (payload: { address: string; ref: string; key: string }) => {
+    const response = await fetch(`${payload.address}/api/commands/credential.set`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        command_id: crypto.randomUUID(),
+        base_version: 0,
         ref: payload.ref,
         secret: payload.key,
         persist: false,
@@ -195,6 +229,97 @@ for (const size of [{ width: 1440, height: 900 }]) {
       await backend.stop();
     }
   });
+
+  // 工单 #1216：页面上「写入凭据」保存以后把结果写在表单旁（设计说明第 9.1 节「凭据」一行）
+  test(`${label}：页面「保存凭据」以后表单旁写出已保存与凭据版本、来源，Key 在结果回来以后才清空`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    // 请求在途的那一段把 credential.set 按住：结果回来以前 Key 不清空、按钮显示忙碌，这两件是可判定的
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = () => resolve();
+    });
+    await client.page.route("**/api/commands/credential.set", async (route) => {
+      await gate;
+      await route.continue();
+    });
+    try {
+      const versionCell = client.page.getByRole("row").filter({ hasText: "OPENCODE_GO_KEY" }).locator("td").nth(2);
+      // 版本从目录读，不写死：种子脚本先给这个引用写过一次 Key 再清掉，界面从「缺失」与那个版本开始
+      await expect(versionCell).toHaveText(/^\d+$/);
+      const before = Number((await versionCell.innerText()).trim());
+
+      await client.page.getByTestId("page-cred-memory").check();
+      await client.page.getByTestId("page-cred-ref").fill("OPENCODE_GO_KEY");
+      await client.page.getByTestId("page-cred-secret").fill(KEY);
+      const save = client.page.getByTestId("page-cred-save");
+      await expect(save).toBeEnabled();
+      await save.click();
+
+      // 请求还没有回来：Key 仍在输入框里，按钮显示忙碌，表单旁还没有结果
+      await expect(save).toBeDisabled();
+      await expect(save).toContainText("保存中");
+      await expect(client.page.getByTestId("page-cred-secret")).toHaveValue(KEY);
+      await expect(client.page.getByTestId("page-cred-result")).toHaveCount(0);
+
+      release();
+
+      // 结果回来：表单旁写「已保存 API Key」与这次保存的凭据版本、来源
+      const result = client.page.getByTestId("page-cred-result");
+      await expect(result).toContainText("已保存 API Key");
+      await expect(result).toContainText("凭据 OPENCODE_GO_KEY");
+      await expect(result).toContainText(`版本 ${before + 1}`);
+      await expect(result).toContainText("进程内存");
+      // 结果出现以后 Key 才清空，「还不能保存：填写 API Key」那一行不顶替结果
+      await expect(client.page.getByTestId("page-cred-secret")).toHaveValue("");
+      await expect(client.page.getByTestId("page-cred-save-hint")).toHaveCount(0);
+      // 凭据表里这一行版本 +1，状态换成内存
+      await expect(versionCell).toHaveText(String(before + 1));
+      await expect(client.page.getByRole("row").filter({ hasText: "OPENCODE_GO_KEY" }))
+        .toContainText("已配置，来源 内存");
+
+      // Key 不进页面文字
+      expect(await client.page.locator("body").innerText()).not.toContain(KEY);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.page.unroute("**/api/commands/credential.set");
+      await client.close();
+      await backend.stop();
+    }
+  });
+
+  test(`${label}：保存被服务端拒绝时表单旁写服务端给的原因原文，Key 不清空，版本不变`, async () => {
+    test.setTimeout(300_000);
+    const { backend, client } = await openModels(size);
+    const errors = watchErrorsAllowingRejectedCommands(client);
+    try {
+      // 一个没有被任何连接引用的凭据引用先被写进 Key（版本 1）：页面的凭据表里没有这一行，
+      // 「保存凭据」发出的基准版本因此是 0，服务端按版本过期拒绝（真实命令、真实拒绝，工单 #1216）
+      await setDetachedKey(client, backend, "TRIAL_ONLY_KEY");
+      await client.page.getByTestId("page-cred-ref").fill("TRIAL_ONLY_KEY");
+      await client.page.getByTestId("page-cred-secret").fill(KEY);
+      await client.page.getByTestId("page-cred-save").click();
+
+      const result = client.page.getByTestId("page-cred-result");
+      await expect(result).toContainText(
+        "凭据命令的基准版本是目录查询里这个引用 TRIAL_ONLY_KEY 的 credential.version，当前是 1");
+      await expect(result).toContainText("服务端当前版本 1");
+      // 失败时 Key 留在输入框里，让人改了再试
+      await expect(client.page.getByTestId("page-cred-secret")).toHaveValue(KEY);
+
+      // 版本没有变：再点一次，服务端给出的当前版本仍是 1（被拒绝的那一次没有写入）
+      await client.page.getByTestId("page-cred-secret").fill(`${KEY}-again`);
+      await client.page.getByTestId("page-cred-save").click();
+      await expect(result).toContainText("当前是 1");
+      await expect(result).toContainText("服务端当前版本 1");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+    }
+  });
+
 
   test(`${label}：部门默认只列出已准入的定义，保存以后生效`, async () => {
     test.setTimeout(300_000);
