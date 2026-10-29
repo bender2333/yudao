@@ -11,7 +11,7 @@ from filelock import FileLock
 from harness.__main__ import main
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
-from harness.app.application import Application
+from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.decision_queries import DecisionsList
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
@@ -35,7 +35,7 @@ from harness.app.project_queries import (
     WorkItemInputs,
     WorkItemMaterials,
 )
-from harness.app.registry import Registry
+from harness.app.registry import QueryDefinition, Registry
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
@@ -48,6 +48,7 @@ from harness.proposals import (
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
+from harness.tests.api_helpers import running_api
 from harness.tests.helpers import explore_turn, happy_script, merge_scripts, quality_turns
 from harness.tests.onboarding_project import onboarding_source
 from harness.write_path import NewEvent
@@ -1077,3 +1078,71 @@ def test_a_cancelled_item_has_no_stop_note(data_dir):
     assert card.status == "stopped"
     assert card.stop_reason == "cancelled"
     assert card.stop_note is None
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1218：replay.check 的参数组合不对时按输入问题回 422，说明只能给 run_id 或 project_id
+# 其中一个。查询只有一个参数组合是对的（图里两种目标只有一种能问），所以这里核对的是
+# 拒绝按输入问题回答（设计说明第 4.1 节「按位置读取」与第 4.3 节 replay.check 一行），
+# 而不是未登记的异常冒到框架成为 500。
+
+
+def _serving(data_dir, *, registry: Registry | None = None):
+    # 真 HTTP 服务用的打开方式：应用层在服务的事件循环里按数据目录打开，事件日志是先前写好的那一份
+    def open_application() -> Application:
+        return Application(LoopSystem.for_testing(data_dir, FakeAdapter(happy_script())),
+                           registry=registry or DEFAULT_REGISTRY)
+    return open_application
+
+
+def _unregistered_failure(application, request):
+    # 探针查询：抛一个没有登记的应用层异常。接口层不该把它收成 422
+    raise RuntimeError("a failure nobody registered")
+
+
+UNREGISTERED_FAILURE = QueryDefinition(name="test.unregistered_failure", request=None, result=int,
+                                       handle=_unregistered_failure, changed_by=())
+
+
+def test_replay_check_answers_422_when_it_gets_neither_or_both_parameters(data_dir):
+    # 验收一（工单 #1218）：不带参数、两个都带都回 422，error 写明只能给其中一个；只给其中一个照旧 200
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("回放的参数", GOAL)
+    _work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    system.close()
+
+    with running_api(_serving(data_dir)) as client:
+        for params in ({}, {"run_id": run_id, "project_id": project_id}):
+            response = client.get("/api/queries/replay.check", params=params)
+            assert response.status_code == 422, response.text
+            error = response.json()["error"]
+            assert "run_id" in error and "project_id" in error, error
+        for params in ({"run_id": run_id}, {"project_id": project_id}):
+            response = client.get("/api/queries/replay.check", params=params)
+            assert response.status_code == 200, response.text
+            assert response.json()["data"] == {"target": "run" if "run_id" in params else "project",
+                                              "consistent": True, "differences": []}
+
+
+def test_an_unregistered_application_failure_is_still_a_500(data_dir):
+    # 验收四（工单 #1218）：只有登记过的输入问题变成 422。别的异常照旧冒到框架，回 500 纯文本，
+    # 响应体不写原因与路径（与 #740 的字段错误不同：那不是输入问题）
+    registry = Registry(commands=list(DEFAULT_REGISTRY.commands.values()),
+                        queries=[*DEFAULT_REGISTRY.queries.values(), UNREGISTERED_FAILURE],
+                        decisions=DEFAULT_REGISTRY.decisions)
+    with running_api(_serving(data_dir, registry=registry), registry=registry) as client:
+        response = client.get("/api/queries/test.unregistered_failure")
+        assert response.status_code == 500, response.text
+        assert response.text.strip() == "Internal Server Error"
+
+
+def test_cli_replay_refuses_neither_or_both_parameters_without_a_traceback(data_dir, capsys):
+    # 验收三（工单 #1218）：命令行走同一个查询。参数组合不对时打印原因、非零退出，不打印栈
+    for argv in (["replay"], ["replay", "run_x", "--project", "project_x"]):
+        with pytest.raises(SystemExit) as stopped:
+            main([*argv, "--data-dir", str(data_dir)])
+        assert stopped.value.code not in (0, None)
+        err = capsys.readouterr().err
+        assert "run_id" in err and "project_id" in err, err
+        assert "Traceback" not in err and "ValueError" not in err, err
