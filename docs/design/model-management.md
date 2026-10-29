@@ -1,6 +1,6 @@
 # 模型管理设计说明
 
-状态：设计已确认，未实施；最近一次改动 2026-10-29，第 8.3 节压缩阈值参照 OpenCode 改为「窗口 − 预留量」，不设工作上限。依据：需求 [D24 模型管理与部门模型选择](../requirements/model-management.md)；术语以 [CONTEXT.md](../../CONTEXT.md) 为准；界面原型 [v7 原型](../archive/prototypes/v7/design.md)，模型管理页与部门设置弹窗按第 9 节制作。总图位置：第四节「模型」的缝；第二节「定义」里的模型设置。
+状态：设计已确认，未实施；最近一次改动 2026-10-29，第 8.3 节压缩阈值参照 OpenCode 改为「窗口 − 预留量」，不设工作上限。依据：需求 [D24 模型管理与部门模型选择](../requirements/model-management.md)；术语以 [CONTEXT.md](../../CONTEXT.md) 为准；界面原型 [v13 原型](../prototypes/v13/design.md)（当前定稿），模型管理页与部门设置弹窗按第 9 节制作。总图位置：第四节「模型」的缝；第二节「定义」里的模型设置。
 
 本说明是模型目录、部门与角色的模型选择、推理档位、调用目标解析与上下文容量的判断标准。其他文档与本说明冲突时，以本说明为准。
 
@@ -399,7 +399,7 @@ sequenceDiagram
 
 ## 9. 界面
 
-本节以 [v6 原型](../archive/prototypes/department-workspace-v6.html)为基础写成，列出按本说明修改的地方；[v7 原型](../archive/prototypes/v7/design.md)已按本节制作。
+本节以 [v6 原型](../archive/prototypes/department-workspace-v6.html)为基础写成，列出按本说明修改的地方；当前定稿的 [v13 原型](../prototypes/v13/index.html)已按本节制作，模型管理页见 `js/ui/views/sys-models.js`。
 
 ### 9.1 模型管理页
 
