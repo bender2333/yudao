@@ -96,6 +96,19 @@ export function partsOf(ticks: FactTick[]): TimelinePart[] {
   return parts;
 }
 
+// 点一个刻度时该用的事项范围（接口设计说明第 4.1 节「按位置读取」，工单 #1217）：
+// 回放的位置与事项范围是两个参数，页面不从一个推另一个。刻度自己带着它所属的事项
+// （ticksOf 从关键事实的 work_item_id 带过来），点一个属于另一个事项的刻度时，先把范围换成那个事项，
+// 再按位置读取，画面因此显示那一刻的那个事项；刻度没有事项、位置不在刻度列表里（回到现在）
+// 或者还没选中范围时，范围不动。
+export function scopeAtTick(ticks: FactTick[], current: string | null, position: number | null): string | null {
+  if (position === null) {
+    return current;
+  }
+  const tick = ticks.find((row) => row.position === position);
+  return tick?.work_item_id ?? current;
+}
+
 // 报告项展开时的高亮刻度：报告的来源事件位置与时间轴刻度位置相同即高亮（原型 v10 的 replay.highlight）
 export function ticksInRefs(refs: number[], ticks: FactTick[]): number[] {
   const known = new Set(ticks.map((tick) => tick.position));
