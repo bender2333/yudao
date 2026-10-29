@@ -29,7 +29,7 @@ from ..app.catalog_queries import CatalogQueryInvalid
 from ..app.contracts import AccessMode, Accepted, API_VERSION, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
 from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
 from ..app.labels import validation_text
-from ..app.project_queries import NotFound
+from ..app.project_queries import NotFound, QueryInputInvalid
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
 from ..app.replay import ReplayOutOfRange
 from .access import AccessMiddleware
@@ -153,6 +153,10 @@ def _add_query(api: FastAPI, definition: QueryDefinition) -> None:
             return JSONResponse(status_code=422, content={"error": str(exc)})
         except CatalogQueryInvalid as exc:
             # 查询的拟议文档或选择结构非法：按输入问题返回 422，原因写出字段位置（工单 #261）
+            return JSONResponse(status_code=422, content={"error": str(exc)})
+        except QueryInputInvalid as exc:
+            # 查询的参数组合不合法：按输入问题返回 422，原因写明白（例如 replay.check 只能给 run_id 或
+            # project_id 其中一个，工单 #1218）。只有登记成这一种的检查走这里，别的异常照旧 500
             return JSONResponse(status_code=422, content={"error": str(exc)})
 
     parameters = () if definition.request is None else (("params", Annotated[definition.request, Query()]),)

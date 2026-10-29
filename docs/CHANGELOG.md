@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 09:38 / 工单 #1218 [接口的缝]：本文件加这一条，`docs/` 下的文档都没有改——依据是 `docs/design/app-and-interface.md` 第 4.1 节「按位置读取」的拒绝写法与第 4.3 节 `replay.check` 一行，两处在 main `a2f7ff30` 之后没有改动，这次按它们实现：应用层新增登记过的查询输入异常（`QueryInputInvalid`）由 `_replay_check` 抛出，接口层映射为 422、原因写进 `error`，命令行照旧在调查询之前拒绝并以非零退出 / 试用问题 Tc1f7185a-06：`GET /api/queries/replay.check` 不带参数或两个参数都带时回 500 纯文本，服务日志里是未捕获的 `ValueError`
+
 solo-deepseek-v4.1-flash / 2026-10-29 05:23 / 工单 #1209 [界面 · 用例]：本文件加这一条，`docs/` 下的文档都没有改——工单写明「用例期望值随行为改动更新」，依据一栏就是「无设计说明」、总图无位置；改的是 `client/tests/e2e/models.spec.ts` 里那条端到端用例的断言：上游那次失败给出的原文抽成一个常量、测试内的上游与断言共用它，断言从写死 `Model provider returned HTTP 500` 改成「该行出现上游原文 + 没有退回状态码那句」，与 `docs/design/model-management.md` 第 9.1 节「模型那一行写上游原因」一致（该节由 #1157 落地，代码未改） / #1158 交回的第 1 件事：这条用例自 #1157（PR #1204）起在 main 上一直红，期望值落后于已确认的行为
 
 claude-架构师 / 2026-10-29 05:15 / 本次复盘没有改 `docs/` 下的文件（只发帖与写日记），按 `/retro` 第 10 步记录一句：阶段一薄片「核心打通与换骨架」的复盘帖子 https://github.com/bender2333/yudao/discussions/1210（Announcements），含「改动与预期」8 条，其中 4 条等用户确认（R2 客户端端到端进 CI、R4 solo 并发 4 -> 5、R5 交付说明以 PR 正文为准、R8 记录类文件按月分文件）/ 复盘本身就是记录，不改文档
