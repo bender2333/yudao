@@ -139,6 +139,10 @@ class RoundResult:
     message: str = ""
     target: dict[str, Any] | None = None
     facts: tuple[str, ...] = ()
+    # 整理连续没有推进达到 compaction.stalled_limit（stop_reason 为 compaction_failed，模型管理设计说明
+    # 第 8.7 节最后一条，工单 #1238）：薄驱动让 run 进入待恢复、等用户回答，不结束运行。其余
+    # compaction_failed（整理请求本身装不进窗口）照旧结束运行，所以由实现标明是哪一种
+    stalled_compaction: bool = False
     # 这一轮里模型用提交类工具交上来的参数（原样的工具回执，或参数加上工具声明的种类），带来它的这次回答，
     # 以及这一轮的发言：薄驱动经写入口提交时用（转录存成工件）。是不是提交、是哪一种，由路由按它自己的定义判断；
     # response 是 Provider 的回答对象，原样交回实现，契约不解释它

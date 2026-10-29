@@ -160,10 +160,10 @@ def compaction_success(data_dir):
 
 
 def compaction_failed(data_dir):
-    # 整理连续 compaction.stalled_limit 次没有推进，事项以 compaction_failed 停止（工单 #1155）：
-    # 第一次是同一逻辑调用的三次尝试都回未声明的工具调用（工具不执行，尝试用完以后工作请求按未压缩的
-    # 历史照常发出），之后两次整理各回一次空摘要。窗口按固定材料的实测 token 数加余量推出，
-    # 使历史超过压缩阈值而未压缩的工作请求仍放得下。
+    # 整理连续 compaction.stalled_limit 次没有推进，run 进入待恢复（工单 #1238），答「停止事项」时事项以
+    # compaction_failed 结束（工单 #1155）：第一次是同一逻辑调用的三次尝试都回未声明的工具调用
+    # （工具不执行，尝试用完以后工作请求按未压缩的历史照常发出），之后两次整理各回一次空摘要。
+    # 窗口按固定材料的实测 token 数加余量推出，使历史超过压缩阈值而未压缩的工作请求仍放得下。
     task = "build an echo CLI"
     work_counts: dict[str, int] = {}
     compactions = 0
@@ -186,7 +186,11 @@ def compaction_failed(data_dir):
     measure_id = system.create_run(task, context_window=1_000_000)
     run_id = system.create_run(task, context_window=pinned_input_tokens(system, measure_id) + 1600)
     system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 340)
-    system.run_until_stop(run_id)
+    blocked = system.run_until_stop(run_id)
+    assert blocked.status == "running", blocked.error
+    _answer_open_decision(system, "stop", reason="compaction_failed")
+    finished = system.run_until_stop(run_id)
+    assert (finished.status, finished.stop_reason) == ("failed", "compaction_failed"), finished.error
     return system, run_id, {}
 
 
@@ -547,13 +551,13 @@ def _failure_then_success(protocol: str, first, *, timeout_sec: float = 20.0,
 _UNAVAILABLE_MESSAGE = "Missing configuration: provider credential"
 
 
-def _answer_open_decision(system: LoopSystem, option: str) -> str:
+def _answer_open_decision(system: LoopSystem, option: str, *, reason: str = "provider_unavailable") -> str:
     # 只经公开接口回答待恢复：按保存的投影列出未回答的决定请求，经流程编排的回答入口回答
     _position, decisions = saved_decisions(system.store, statuses=("open",))
     assert len(decisions) == 1, [decision.decision_id for decision in decisions]
     [decision] = decisions
     assert (decision.request["kind"], decision.request["blocks"]) == ("model_unavailable", "run")
-    assert decision.request["reason"] == "provider_unavailable"
+    assert decision.request["reason"] == reason
     command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:1", "user:local")
     system.orchestrator.answer_decision(decision.decision_id, option, None, base_version=1, command=command)
     return decision.decision_id
@@ -712,8 +716,9 @@ SCENARIOS: dict[str, Scenario] = {
         compaction_success),
     "compaction_failed": Scenario(
         "整理连续三次没有推进：先是同一逻辑调用的三次尝试都回未声明的工具调用（工具不执行，"
-        "工作请求按未压缩的历史照常发出），之后两次整理各回一次空摘要，达到 compaction.stalled_limit 时"
-        "运行以 compaction_failed 失败，停止说明写明连续的次数与最后一次的原因。",
+        "工作请求按未压缩的历史照常发出），之后两次整理各回一次空摘要，达到 compaction.stalled_limit 时 "
+        "run 进入待恢复、发出待恢复的决定请求（reason 为 compaction_failed，说明写明连续的次数与最后一次的"
+        "原因）；答「停止事项」时事项以 compaction_failed 结束。",
         compaction_failed),
     "invalid_tool_arguments": Scenario(
         "模型给出无法解析的工具参数：工具不启动，错误作为工具结果返回模型，记入历史的参数换成 {}；下一步提交成功。",

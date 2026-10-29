@@ -1405,7 +1405,8 @@ class Orchestrator:
         # 有停止原因的是这个会话停下或失败，按原因暂停或结束运行
         if result.stop_reason is not None:
             self._end_run(activation, result.stop_reason, result.message, result.version,
-                          target=result.target, facts=list(result.facts) or None)
+                          target=result.target, facts=list(result.facts) or None,
+                          stalled_compaction=result.stalled_compaction)
             return
 
         current = self.project(run_id)
@@ -1890,8 +1891,10 @@ class Orchestrator:
             transaction.on_commit(lambda: self._on_close_run(run_id))
 
     def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None,
-                 *, target: dict[str, Any] | None = None, facts: list[str] | None = None) -> None:
-        # 在一个事务中按停止原因暂停或结束运行；模型引用无法使用（provider_unavailable）时 run 进入待恢复。
+                 *, target: dict[str, Any] | None = None, facts: list[str] | None = None,
+                 stalled_compaction: bool = False) -> None:
+        # 在一个事务中按停止原因暂停或结束运行；模型引用无法使用（provider_unavailable）与整理连续没有推进
+        # 达到上限（compaction_failed，工单 #1238）时 run 进入待恢复。
         # version 是作出停止判断时 run 流的版本：同一事务中核对此后有没有用户的命令或输入写入；有写入、并且写入
         # 改变了这次激活的依据（输入或指导）时，停止判断已经过期，按安全节点停止处理，运行继续，由下一次激活处理
         # 新的输入或指导。运行时间用完不因此改变；已经结束（例如已经取消）的运行不再写入。
@@ -1899,7 +1902,9 @@ class Orchestrator:
         def end(transaction: Transaction) -> None:
             if version is not None and reason != TIME_BOUND and self._superseded(transaction, activation, version):
                 return
-            if reason == "provider_unavailable":
+            if reason == "provider_unavailable" or (reason == "compaction_failed" and stalled_compaction):
+                # 整理连续没有推进（模型管理设计说明第 8.7 节最后一条）：停在这次整理之前，等用户决定换模型
+                # 继续还是停止事项；已收下的交付与已完成的工作都留在投影里
                 scope = activation.scope
                 self._await_model(transaction, scope.department, target, reason, message,
                                   facts=self._failed_attempts(transaction, scope.activation_id))
@@ -1917,23 +1922,31 @@ class Orchestrator:
 
     def _await_model(self, transaction: Transaction, department: str, target: dict[str, Any] | None,
                      reason: str, message: str, *, facts: list[str] | None = None) -> None:
-        # 模型引用无法使用（模型管理设计说明第 5.5 节）：run 进入待恢复，停在这次请求之前，发出待恢复的决定请求，
-        # 写明部门、模型与具体问题；不改用其他模型。已经结束或正在取消的运行不再写入
+        # 待恢复（模型管理设计说明第 5.5 节、第 8.7 节最后一条）：run 进入待恢复，停在这次请求（对整理是这次
+        # 整理）之前，发出待恢复的决定请求，写明部门、模型与具体问题；不改用其他模型。已经结束或正在取消的
+        # 运行不再写入
         projection = transaction.projection
         run_id = projection.run_id
         if projection.status in TERMINAL_STATUSES or self._aborted(run_id):
             return
         kind = MODEL_UNAVAILABLE
         model = "（没有找到调用目标）" if target is None else target["requested_model"]
+        if reason == "compaction_failed":
+            # 整理连续失败：用户可以先换这个部门的模型，再选「继续执行」，事项从这次整理接着进行
+            description = (f"部门 {department} 的模型 {model} 连续整理没有推进：{message}"
+                           "可以先换这个部门的模型，再选择「继续执行」，事项从这次整理接着进行，"
+                           "已完成的工作与已收下的交付保留；选择「停止事项」则事项结束。")
+        else:
+            description = (f"部门 {department} 的模型 {model} 无法使用：{message}。修复模型配置或凭据以后选择"
+                           "「继续执行」，事项从这次请求接着进行，已完成的工作与已用限额保留；"
+                           "选择「停止事项」则运行结束。")
         transaction.append(NewEvent(
             EventType.DECISION_REQUESTED, actor="system", department=department,
             state_before=projection.status, state_after=projection.status,
             payload={
                 "kind": kind.name, "blocks": kind.blocks,
                 "options": [{"id": option.id, "label": option.label} for option in kind.options],
-                "description": (f"部门 {department} 的模型 {model} 无法使用：{message}。修复模型配置或凭据以后选择"
-                                "「继续执行」，事项从这次请求接着进行，已完成的工作与已用限额保留；"
-                                "选择「停止事项」则运行结束。"),
+                "description": description,
                 "facts": list(facts or []), "department": department, "target": target,
                 "reason": reason, "message": message,
             },

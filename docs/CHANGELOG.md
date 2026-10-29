@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 14:56 / 工单 #1238 [执行的缝]：本文件加这一条，`docs/` 下的文档都没有改——依据 `docs/design/model-management.md` 第 8.7 节最后一条与第 5.5 节（main `4f1f8cf5`，放出以后没有改动），本单就是落实它：整理连续没有推进达到 `compaction.stalled_limit` 时 run 进入待恢复（决定种类仍是 `model_unavailable`，`reason` 写 `compaction_failed`），用户可以换这个部门的模型再选「继续执行」，事项从这次整理接着进行、已收下的交付保留，选「停止事项」时事项以 `compaction_failed` 结束；`context_overflow` 与「摘要请求装不进窗口」照旧直接结束，不进入待恢复 / 试用问题 Te28ea596-01、Te28ea596-02（main `e28ea596` 的试用：交付已收下，质检的整理连续失败，事项整条停止，用户没有任何选择）
+
 solo-deepseek-v4.1-flash / 2026-10-29 13:28 / 工单 #1230 [画面的缝]：本文件加这一条，`docs/` 下的文档都没有改——依据 `docs/design/department-roles.md` 第 15 节「界面」第 406 行（部门工作间显示角色名单：状态、模型、当前任务），该行在 main `9c605b66` 之后没有改动；本单按工单定下的读法落实：系统里没有「部门此刻手上做的是哪件事」的事实（一个部门只有一个角色，没有哪一项记录写着它此刻手上的事），所以服务端角色的 `task` 填空（`None`），角色条显示页面已有的中文状态词，事项标题只留在房间屏幕的目标行；以后有了这样的事实另开工单填它 / 用户 2026-10-29 亲自试用发现（main `e28ea596`）：三个部门的房间角色条上都是同一句被截断的事项标题，读者会把它当成该部门此刻在做的事
 
 solo-deepseek-v4.1-flash / 2026-10-29 13:20 / 工单 #1228 [画面的缝]：本文件加这一条，`docs/` 下的文档都没有改——依据 `docs/design/visualization.md`（main `9c605b66`）与 ADR-0021「整数倍铺满容器宽度」在放出以后没有改动，本单就是落实它们：部门房间的画布宿主从来没有宽度，被刚创建的 `<canvas>`（默认 300 像素宽）撑成 300，画布按 300 排好以后宿主不再变、`ResizeObserver` 看不到变化，宽度永远停在 300；`client/src/renderer/src/styles/v10-department.css` 加一条 `.y10-ws-stage > .y10-scene.room-canvas { flex: 1 1 auto; width: 100%; min-width: 0; }`，`pixel/surface.ts` 不动，端到端用例的「铺满」改成对着可见的 `.y10-ws-stage` 量并补 800×600 一条 / 用户 2026-10-29 试用时看到（试用实例 0.1.1，main `e28ea596`）：部门房间的深色舞台横跨整个内容宽，房间画面只占中间 300 像素，左右各留一大片空的深色

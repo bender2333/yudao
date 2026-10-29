@@ -1,4 +1,5 @@
 import json
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from harness.watched_outputs import has_new_work
@@ -7,8 +8,10 @@ from harness.adapters.fake import FakeAdapter
 from harness.compaction import SUMMARY_OUTPUT_TOKENS
 from harness.contracts import artifact_hash
 from harness.definitions import DEFINITIONS
+from harness.event_store import Command
 from harness.models import EventType, canonical_hash, json_dumps
 from harness.engine import StepLimits
+from harness.projection import saved_decisions
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
@@ -350,9 +353,10 @@ def test_summary_text_with_an_undeclared_tool_call_is_kept_without_retry(tmp_pat
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_mixed_compaction_failures_stop_at_the_stall_limit_with_the_last_reason(tmp_path):
+def test_mixed_compaction_failures_enter_recovery_at_the_stall_limit_with_the_last_reason(tmp_path):
     """同一会话的整理连续失败（请求失败与「摘要为空」混在一起）达到 compaction.stalled_limit：
-    事项以 compaction_failed 停止，停止说明写明连续的次数与最后一次的原因（工单 #1155）。"""
+    事项进入待恢复，待恢复的决定请求写明连续的次数与最后一次的原因；答「停止事项」时以
+    compaction_failed 结束（工单 #1155、#1238，设计说明第 8.7 节最后一条）。"""
     limit = DEFINITIONS.rule_value("compaction.stalled_limit")
     compactions = 0
 
@@ -367,13 +371,21 @@ def test_mixed_compaction_failures_stop_at_the_stall_limit_with_the_last_reason(
     system, adapter, run_id = _tight_window_runner(tmp_path, respond)
     result = system.activate_once(run_id)
 
-    assert result.status == "failed" and result.stop_reason == "compaction_failed", result.error
-    assert f"连续 {limit} 次没有推进" in (result.error or "")
-    assert "摘要为空或超过上限" in (result.error or "")
-    # 请求失败的那一次与两次空摘要计入同一个次数；停止以后不再发出新的整理请求
+    # 达到上限：run 停在待恢复，没有结束
+    assert (result.status, result.stop_reason) == ("running", None)
+    [decision] = saved_decisions(system.store, statuses=("open",))[1]
+    assert decision.request["reason"] == "compaction_failed"
+    assert f"连续 {limit} 次没有推进" in decision.request["message"]
+    assert "摘要为空或超过上限" in decision.request["message"]
+    # 请求失败的那一次与两次空摘要计入同一个次数；停下以后不再发出新的整理请求
     assert compactions == 3 + limit - 1
     assert not result.compactions
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
+    # 答「停止事项」：事项以 compaction_failed 结束，停止说明写明连续的次数与最后一次的原因
+    _answer_recovery(system, "stop")
+    failed = system.project(run_id)
+    assert (failed.status, failed.stop_reason) == ("failed", "compaction_failed")
+    assert f"连续 {limit} 次没有推进" in (failed.error or "")
+    assert failed.canonical_state() == system.replay(run_id).canonical_state()
 
 
 def test_a_compaction_that_progresses_clears_the_stall_count(tmp_path):
@@ -626,8 +638,9 @@ def test_reported_upstream_usage_triggers_compaction_when_the_local_estimate_doe
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_repeated_empty_summaries_stop_the_run_with_compaction_failed(tmp_path):
-    """整理每次都返回空摘要：连续 compaction.stalled_limit 次以后以压缩失败停止（工单 #840）。"""
+def test_repeated_empty_summaries_enter_recovery_at_the_stall_limit(tmp_path):
+    """整理每次都返回空摘要：连续 compaction.stalled_limit 次没有推进以后进入待恢复，答「停止事项」
+    时以压缩失败结束（工单 #840、#1238）。"""
     limit = DEFINITIONS.rule_value("compaction.stalled_limit")
     compaction_requests = []
 
@@ -646,17 +659,22 @@ def test_repeated_empty_summaries_stop_the_run_with_compaction_failed(tmp_path):
     system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * (window * 8 // 11))
     result = system.activate_once(run_id)
 
-    # 连续达到上限以后以压缩失败停止
-    assert result.status == "failed" and result.stop_reason == "compaction_failed", result.error
-    # 停止说明写明连续的次数与最后一次的原因
-    assert f"连续 {limit} 次没有推进" in (result.error or "")
-    assert "摘要为空" in (result.error or "")
-    # 停止以后不再发出新的压缩请求
+    # 连续达到上限以后进入待恢复，不是结束运行
+    assert (result.status, result.stop_reason) == ("running", None)
+    [decision] = saved_decisions(system.store, statuses=("open",))[1]
+    assert decision.request["reason"] == "compaction_failed"
+    # 待恢复的说明写明连续的次数与最后一次的原因
+    assert f"连续 {limit} 次没有推进" in decision.request["message"]
+    assert "摘要为空" in decision.request["message"]
+    # 停下以后不再发出新的压缩请求
     assert len(compaction_requests) == limit
     assert not result.compactions
     assert not any(event.type == EventType.COMPACTION_RECORDED
                    for event in system.store.list_events(run_id))
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
+    _answer_recovery(system, "stop")
+    failed = system.project(run_id)
+    assert (failed.status, failed.stop_reason) == ("failed", "compaction_failed")
+    assert failed.canonical_state() == system.replay(run_id).canonical_state()
 
 
 # 工单 #1213：整理请求自己的失败不止「回应带未声明的工具调用」一种。空响应（上游流正常结束却没有
@@ -725,9 +743,10 @@ def test_empty_summary_replies_keep_the_step_and_send_the_work_request_uncompres
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_mixed_empty_and_failed_compaction_requests_stop_at_the_stall_limit(tmp_path):
-    """同一会话的整理连续失败（空响应与请求失败混在一起）达到 compaction.stalled_limit：事项以
-    compaction_failed 停止，停止说明写明连续的次数与最后一次的原因（工单 #1213）。"""
+def test_mixed_empty_and_failed_compaction_requests_enter_recovery_at_the_stall_limit(tmp_path):
+    """同一会话的整理连续失败（空响应与请求失败混在一起）达到 compaction.stalled_limit：事项进入
+    待恢复，待恢复的说明写明连续的次数与最后一次的原因，答「停止事项」时以 compaction_failed 结束
+    （工单 #1213、#1238）。"""
     limit = DEFINITIONS.rule_value("compaction.stalled_limit")
     work_counts = {}
     compactions = 0
@@ -746,15 +765,20 @@ def test_mixed_empty_and_failed_compaction_requests_stop_at_the_stall_limit(tmp_
     system, adapter, run_id = _tight_window_runner(tmp_path, respond)
     result = system.activate_once(run_id)
 
-    assert result.status == "failed" and result.stop_reason == "compaction_failed", result.error
-    # 停止说明写明连续的次数与最后一次的原因
-    assert f"连续 {limit} 次没有推进" in (result.error or "")
-    assert "Upstream returned 503" in (result.error or "")
-    # 空响应与请求失败计入同一个次数，停止以后不再发出新的整理请求
+    assert (result.status, result.stop_reason) == ("running", None)
+    [decision] = saved_decisions(system.store, statuses=("open",))[1]
+    assert decision.request["reason"] == "compaction_failed"
+    # 待恢复的说明写明连续的次数与最后一次的原因
+    assert f"连续 {limit} 次没有推进" in decision.request["message"]
+    assert "Upstream returned 503" in decision.request["message"]
+    # 空响应与请求失败计入同一个次数，停下以后不再发出新的整理请求
     assert compactions == 3 * limit
     assert not result.compactions
     assert not any(event.type == EventType.COMPACTION_RECORDED for event in system.store.list_events(run_id))
-    assert result.canonical_state() == system.replay(run_id).canonical_state()
+    _answer_recovery(system, "stop")
+    failed = system.project(run_id)
+    assert (failed.status, failed.stop_reason) == ("failed", "compaction_failed")
+    assert failed.canonical_state() == system.replay(run_id).canonical_state()
 
 
 def test_the_work_request_after_a_failed_compaction_fails_on_its_own_path(tmp_path):
@@ -798,4 +822,154 @@ def test_compaction_request_overflow_still_stops_the_run(tmp_path):
     # 没有走「不生效」那条路：一次请求就停下，不再重试也不再整理
     assert len([request for request in adapter.invocations if request.purpose == "compaction"]) == 1
     assert not result.compactions
+    # 上下文超限不进入待恢复（工单 #1238）：没有待回答的决定请求
+    assert not saved_decisions(system.store, statuses=("open",))[1]
     assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+# ---------------------------------------------------------------------------
+# 整理连续失败进入待恢复（工单 #1238，模型管理设计说明第 8.7 节最后一条）
+#
+# 交付已经收下以后，质检的整理连续没有推进：run 不结束，进入待恢复，发出待恢复的决定请求（reason 为
+# compaction_failed）。用户可以换这个部门的模型以后选「继续执行」，事项从这次整理接着进行；选「停止事项」
+# 时事项以 compaction_failed 结束。
+
+def _delivery_then_stalled_quality(tmp_path, *, stall_compactions: int):
+    """交付已收下、质检的整理连续不生效的运行：产品提出 PRD，工程交付（交付被收下），质检的第一步读一个
+    大文件把历史顶过压缩阈值，之后的整理都回空摘要（不生效）；前 stall_compactions 次整理这样回，
+    之后回真正的摘要。质检提交放行结论的那一轮在读完文件以后的第四步，整理出事的这几步到不了。
+
+    窗口在交付收下以后按质检部门的固定材料实测 token 数加余量推出（测试分层设计第 10 节第 3 条，
+    不写死数字）：质检的固定材料里有 PRD 与交付，交付之前量不全。
+    """
+    work_counts = {}
+    compactions = []
+    state = {"large_read": False}
+
+    def respond(request):
+        if request.purpose == "compaction":
+            compactions.append(request)
+            return ModelResponse(output=[_message(request, "")]) if len(compactions) <= stall_compactions \
+                else ModelResponse(output=[_message(request)])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        if request.department == "quality":
+            if "delivery_spec" not in json_dumps(request.input_items):
+                # 还没有交付：预测性探索，提交的结论被拒绝，这一轮在这里结束
+                return review_turn("release", "还没有交付可以核验")(request)
+            if not state["large_read"]:
+                state["large_read"] = True
+                return _read(request, "large.txt")
+            if count >= 3:
+                return review_turn("release", "checks passed on the current snapshot")(request)
+            return _read(request, "small.txt")
+        if request.department == "engineering":
+            return delivery_turn()(request)
+        return product_spec()
+
+    adapter = FakeAdapter({department: [respond] * 200 for department in ("product", "engineering", "quality")})
+    system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
+    run_id = system.create_run("Original intent", context_window=1_000_000)
+    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 340)
+    system.workspace(run_id).write_file("small.txt", "SMALL_TOOL_OUTPUT " * 4)
+    return system, adapter, run_id, compactions
+
+
+def _delivery_accepted(system, run_id):
+    # 驱动到交付被收下：之后才量得出质检的固定材料，量出来再声明这次运行的窗口
+    for _ in range(6):
+        system.activate_once(run_id)
+        if system.project(run_id).delivery_specs:
+            break
+    projection = system.project(run_id)
+    assert (projection.status, len(projection.delivery_specs)) == ("running", 1)
+    system.orchestrator._test_context_windows[run_id] = pinned_input_tokens(system, run_id, "quality") + 1600
+    return projection
+
+
+def _answer_recovery(system, option: str) -> str | None:
+    # 只经公开接口回答待恢复：按保存的投影取未回答的决定请求，经流程编排的回答入口回答
+    [decision] = list(saved_decisions(system.store, statuses=("open",))[1])
+    command = Command(str(uuid.uuid4()), "decision.answer", f"sha256:{option}:{decision.version}", "user:local")
+    return system.orchestrator.answer_decision(decision.decision_id, option, None,
+                                               base_version=decision.version, command=command)
+
+
+def test_a_compaction_stall_after_the_delivery_enters_recovery_and_keeps_the_delivery(tmp_path):
+    """整理连续 compaction.stalled_limit 次没有推进：run 进入待恢复，有一条待回答的决定请求（reason 为
+    compaction_failed），停在这次整理之前；已经收下的交付与已完成的工作都还在投影里（工单 #1238）。"""
+    limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+    system, adapter, run_id, compactions = _delivery_then_stalled_quality(tmp_path, stall_compactions=limit)
+    _delivery_accepted(system, run_id)
+    # 质检读大文件、整理连续不生效
+    result = system.activate_once(run_id)
+
+    # 待恢复：run 没有结束，有一条未回答、阻塞整个 run 的决定请求
+    assert (result.status, result.stop_reason) == ("running", None)
+    [decision] = saved_decisions(system.store, statuses=("open",))[1]
+    assert (decision.kind, decision.request["blocks"], decision.request["department"]) == \
+        ("model_unavailable", "run", "quality")
+    assert decision.request["reason"] == "compaction_failed"
+    # 说明写明部门、模型、连续的次数与最后一次的原因
+    assert decision.request["department"] == "quality"
+    assert decision.request["target"]["requested_model"]
+    assert f"连续 {limit} 次没有推进" in decision.request["description"]
+    assert "摘要为空或超过上限" in decision.request["description"]
+    # 已收下的交付与已完成的工作都在
+    assert len(result.delivery_specs) == 1 and result.delivery_spec is not None
+    assert result.product_spec is not None
+    # 停在这次整理之前：达到上限以后不再发整理请求，也没有运行失败
+    assert len(compactions) == limit
+    assert not any(event.type == EventType.RUN_FAILED for event in system.store.list_events(run_id))
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_answering_continue_after_a_compaction_stall_clears_the_stall_count(tmp_path):
+    """答「继续执行」：连续次数清零（这一轮从零数），部门重新整理并写下检查点，事项继续；清零的证据是
+    之后又失败了两次也没有再次进入待恢复，第三次整理成功以后事项走到放行（工单 #1238）。"""
+    limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+    system, adapter, run_id, compactions = _delivery_then_stalled_quality(tmp_path,
+                                                                         stall_compactions=limit + 2)
+    _delivery_accepted(system, run_id)
+    system.activate_once(run_id)
+    assert len(compactions) == limit
+    failed_so_far = len(system.project(run_id).compactions)
+
+    assert _answer_recovery(system, "continue") == run_id
+    assert not saved_decisions(system.store, statuses=("open",))[1]
+    result = system.activate_once(run_id)
+
+    # 清零：又失败两次（达到上限要三次）没有再次进入待恢复，第三次整理成功，事项从这次整理接着走
+    assert (result.status, result.stop_reason) != ("failed", "compaction_failed"), result.error
+    assert len(compactions) >= limit + 3
+    assert len(result.compactions) > failed_so_far
+    assert not saved_decisions(system.store, statuses=("open",))[1]
+    # 已收下的交付与已完成的工作都还在
+    assert len(result.delivery_specs) == 1 and result.product_spec is not None
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_answering_stop_at_a_compaction_stall_ends_the_run_with_compaction_failed(tmp_path):
+    """答「停止事项」：事项以 compaction_failed 结束，停止说明写明连续的次数与最后一次的原因；
+    已收下的交付留在投影里，不再发出整理请求（工单 #1238）。"""
+    limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+    system, adapter, run_id, compactions = _delivery_then_stalled_quality(tmp_path, stall_compactions=limit)
+    _delivery_accepted(system, run_id)
+    system.activate_once(run_id)
+    assert len(compactions) == limit
+
+    assert _answer_recovery(system, "stop") is None
+    projection = system.project(run_id)
+
+    assert (projection.status, projection.stop_reason) == ("failed", "compaction_failed")
+    assert f"连续 {limit} 次没有推进" in (projection.error or "")
+    assert "摘要为空或超过上限" in (projection.error or "")
+    assert len(projection.delivery_specs) == 1
+    events = system.store.list_events(run_id)
+    [failed_event] = [event for event in events if event.type == EventType.RUN_FAILED]
+    assert failed_event.stop_reason == "compaction_failed"
+    assert events[events.index(failed_event) - 1].type == EventType.DECISION_ANSWERED
+    # 结束以后不再开始新的激活，也不再整理
+    system.activate_once(run_id)
+    assert len(compactions) == limit
+    assert projection.canonical_state() == system.replay(run_id).canonical_state()
