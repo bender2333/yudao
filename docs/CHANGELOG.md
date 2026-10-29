@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 10:44 / 工单 #1214 [动作的缝]：本文件加这一条；`docs/` 下另外只动了 `docs/architecture-issues.md`（加一条，工单评论里补记了原因）——设计说明 `docs/design/local-tools.md` 第 3 节「公开树」那行没改，本单就是落实它（捕获期间撞上并发写入，快照这一侧重读；有界次数用完后才报 `TreeError`；判据不改）：`harness/public_tree.py` 加有界重读（3 次、间隔递减），并把「扫描时看到的」与「打开的」身份比对改成路径 stat 与句柄 stat 都一致的字段——Windows 上可执行后缀（`.cmd`/`.bat`/`.exe`）的权限位两侧不同，原来会让这类文件每次捕获都失败 / 试用问题 Tc1f7185a-02：写 `jizhang.cmd`、`start.bat` 时 `TreeError: File changed before it could be captured`，整个事项停下（停止原因的归类在 #604）；本机实测该错误对这类文件是必然的，不只并发
+
 claude-架构师 / 2026-10-29 10:24 / 试用技能第 5 节与第 2 节子代理表：会话里的看图子代理从「走不通」改为两条路都能走（本机已给 ag/gemini-3.8-flash-high 声明图像输入），并写明字段名是 input: [text, image]，inputModalities 是另一族协议用的、写错不生效也不报错 / 用户 2026-10-29 同意给这个模型开图像输入；开子代理读图实测成功，技能里原先的说明已经过期
 
 solo-deepseek-v4.1-flash / 2026-10-29 09:55 / 工单 #1217 [画面的缝]：本文件加这一条，`docs/` 下的文档都没有改——依据 `docs/design/app-and-interface.md` 第 4.1 节「按位置读取」的最后两条（回放的位置与事项范围是两个参数、页面不从一个推另一个；`work_item` 在 `at` 那个位置还不存在时服务端照旧 404）已由架构师写在 main `a2f7ff30` 上，本单只落实它：概览点时间轴刻度时按刻度自己的 `work_item_id` 决定范围（新增纯函数 `scopeAtTick`），地址里的 `?w=` 与 `?at=` 在同一次导航里一起变；服务端一行没改 / 试用问题 Tc1f7185a-05：同一项目里点前一个事项的刻度，画面拿不到数据、显示「没有进行中的事项」，`project.loop` 每 3 秒一次 404
