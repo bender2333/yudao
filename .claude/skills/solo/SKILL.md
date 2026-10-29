@@ -25,7 +25,7 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | 后台架构师 | 设计、需求、范围上的裁定；交回的工单分诊、父工单验收、薄片达到以后的试用准备 | 另一个会话；用户不在场时是[架构师循环](../architect-loop/SKILL.md)，随时在改工单与里程碑 |
 | 用户 | 执行环境、规则文件、验收标准 | 工单评论 |
 
-设计问题不自己拍板，但也不要停下来等：**把问题写成评论、交回架构师、接着做别的工单**。这与 `AGENTS.md`「Solo 模式」是同一份规矩（任何 harness 的 solo 执行者都按它与 `docs/agents/triage-labels.md` 做事）；工人逐步的做法在 [`/solo-worker`](../solo-worker/SKILL.md)。
+设计问题不自己拍板，但也不要停下来等：**把问题写成评论、交回架构师、接着做别的工单**。这与 `solo-worker` 技能是同一份规矩（任何 harness 的 solo 执行者都按它与 `docs/agents/triage-labels.md` 做事）；工人逐步的做法在 [`/solo-worker`](../solo-worker/SKILL.md)。
 
 ## 三条通道
 
