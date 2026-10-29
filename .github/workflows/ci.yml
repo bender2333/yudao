@@ -314,6 +314,18 @@ jobs:
       - name: 安装依赖
         run: uv sync --frozen
 
+      # #1182、#1184 的集成用例起真实的 Playwright MCP 与 Chromium。程序按 docs/design/browser-and-computer-use.md
+      # 第 3.2 节由使用者安装，这台机器照同样的办法装，版本与那一节同步；Chromium 用 Playwright MCP 依赖的
+      # playwright 版本自带的安装命令，浏览器修订号才对得上
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: 安装 Playwright MCP 与 Chromium
+        run: |
+          npm install --global @playwright/mcp@0.0.83
+          npx --yes playwright@"$(npm view @playwright/mcp@0.0.83 dependencies.playwright)" install chromium
+
       # --dist loadgroup：带同一个 xdist_group 标记的用例在同一个 worker 里运行（#614），没有标记的照常分配
       # --timeout=300：单条用例超过 5 分钟算失败并报出用例名（pytest-timeout 已是开发依赖）；作业本身另有 25 分钟的兜底
       - name: 集成层
