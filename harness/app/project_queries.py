@@ -227,6 +227,17 @@ class WorkItemProgress(Contract):
     conclusion: str | None
 
 
+class KeptDelivery(Contract):
+    """已收下的交付（工单 #1239）：事项停止时，这个 run 里已经收下的那一版交付与收下的时间。
+
+    事项因为别的原因停下时，已收下的交付仍然在，页面在停止说明下面写出这一句，
+    免得用户看不出这件事已经有一份可用的交付。
+    """
+
+    version: int
+    accepted_at: str
+
+
 class WorkItemCard(Contract):
     work_item_id: str
     kind: str
@@ -246,6 +257,9 @@ class WorkItemCard(Contract):
     # 停止说明（工单 #1162）：让事项停下的那条错误的原文，取自事项结束的事件；只有停止的事项有，
     # 询问分支的失败原因不算，用户自己让事项停下时为空
     stop_note: str | None = None
+    # 已收下的交付（工单 #1239）：事项停止时这个 run 里已经收下的那一版交付与收下的时间；
+    # 没有已收下的交付时为空。用户自己取消时也写，交付仍然在
+    kept_delivery: KeptDelivery | None = None
     human_action: str | None
     pending_question: str | None
     adoption_id: str | None
@@ -291,7 +305,9 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
             progress=progress,
             departments=_departments(run, progress, _observation(run, decisions, events), decisions),
             round=item.cycle_count,
-            stop_reason=item.stop_reason, stop_note=item.stop_note, human_action=item.human_action,
+            stop_reason=item.stop_reason, stop_note=item.stop_note,
+            kept_delivery=None if item.kept_delivery is None else KeptDelivery(**item.kept_delivery),
+            human_action=item.human_action,
             pending_question=item.pending_question, adoption_id=item.adoption_id,
             start_error=item.start_error,
         ))
