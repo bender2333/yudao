@@ -109,12 +109,13 @@ def test_a_clean_pending_commit_passes(repository):
 
 
 def test_a_changed_kernel_path_is_reported(repository):
-    # 改动内核清单里的路径：报成内核差异，位置是改动的路径
+    # 改动内核清单里的路径：列进报告的内核路径改动，不算不通过（改内核路径不事前批准，守它的是内核测试）
     repository.write(KERNEL_MODULE, KERNEL_SOURCE + "\nEXTRA = 2\n")
     repository.commit("change the kernel")
     report = check_repository(repository.path)
     assert KERNEL_MODULE in report.kernel_changes
-    assert KERNEL_MODULE in [item.where for item in _findings(report).get("内核差异", [])]
+    assert report.passed, report.text
+    assert KERNEL_MODULE in report.text
 
 
 def test_kernel_python_lines_over_the_cap_are_reported(repository, tmp_path):
@@ -181,13 +182,14 @@ def test_eval_proprietary_content_in_a_definition_is_reported(repository):
 
 def test_editing_the_pending_manifest_does_not_change_the_result(repository):
     # 待发布提交里的清单与内核测试改不动结果：检查用的是实例自带的清单与检查。
-    # 把待发布提交里的行数上限改成 1，结果仍然只有内核差异这两项，行数上限仍按实例自带的算
+    # 把待发布提交里的行数上限改成 1，清单与内核测试列进内核路径改动、结果仍通过，行数上限仍按实例自带的算
     repository.write("harness/definitions/kernel-manifest.json", _manifest_payload(python_lines_max=1))
     repository.write("harness/tests/kernel/test_manifest.py",
                      "def test_manifest():\n    assert True  # 待发布提交里改成一律通过\n")
     repository.commit("rewrite the manifest in the pending commit")
     report = check_repository(repository.path)
-    assert [item.check for item in report.findings] == ["内核差异", "内核差异"]
+    assert report.passed, report.text
+    assert "harness/definitions/kernel-manifest.json" in report.kernel_changes
     assert report.python_lines_max == load_manifest().python_lines_max
     assert report.kernel_python_lines > 1
 

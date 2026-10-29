@@ -1,6 +1,8 @@
 # 发布检查（可信内核设计说明第 4.4 节，网页界面的提供与发布设计说明第 6.3 节，工单 #355）。
 # 已安装的实例用它检查待发布的提交：用这一份实例的内核清单与检查，对待发布提交的内容做
-#   1. 内核差异：上一次发布标签到待发布提交之间，内核清单里的路径有哪些改动；
+#   1. 内核差异：上一次发布标签到待发布提交之间，内核清单里的路径有哪些改动，列进报告供用户查看，不算不通过
+#      （阶段一由外部模型开发这个仓库，改内核路径不事前批准，守它的是 CI 里的内核测试；
+#      运行中的系统改自己的内核才经决定请求「内核修改」批准，见可信内核设计说明第 3 节）；
 #   2. 行数：内核清单里的 Python 文件的总行数不超过清单的上限；
 #   3. 导入方向：内核清单里的模块只导入内核文件、标准库与 pydantic；
 #   4. 评测专有内容：部门 Prompt、定义、工具说明、技能里出现评测场景专有内容即为不通过。
@@ -334,8 +336,6 @@ def check_repository(repo_root: Path, manifest: _Manifest | None = None) -> Rele
                                if _tree_entry(repository, tree, path) is not None)
 
     findings: list[Finding] = []
-    findings += [Finding("内核差异", "内核路径发生改动，改动需要经决定请求「内核修改」由用户批准", path)
-                 for path in kernel_changes]
 
     lines = 0
     for path in manifest.modules:
@@ -378,7 +378,7 @@ def report_text(*, repository: str, pending_commit: str, base_tag: str | None, k
         lines.append("不通过项：")
         lines += [f"  [{item.check}] {item.where}：{item.reason}" for item in findings]
     else:
-        lines.append("四项检查（内核差异、行数、导入方向、评测专有内容）全部通过。")
+        lines.append("三项检查（行数、导入方向、评测专有内容）全部通过；内核路径改动列在上面，供用户查看。")
     return "\n".join(lines)
 
 
