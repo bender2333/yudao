@@ -39,6 +39,7 @@ import {
   confirmImpactText,
   credentialRefIssue,
   credentialSaveDisabledReason,
+  credentialSavedText,
   credentialStatusLabel,
   emptyFormState,
   formDocumentValid,
@@ -131,6 +132,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const pageCredReason = credentialSaveDisabledReason({
     ref: pageCredRef, secret: pageCredSecret, persist: pageCredPersist,
   });
+  // 「写入凭据」保存以后写在表单旁的结果（设计说明第 9.1 节「凭据」一行，工单 #1216）：
+  // 成功写版本与来源，失败写服务端给出的原因原样；结果回来以后才清空 Key 输入框
+  const [pageCredResult, setPageCredResult] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
+  const [pageCredSaving, setPageCredSaving] = useState(false);
 
   const capabilityRows = useMemo(() => {
     if (!catalog?.capability_table?.presets) return [];
@@ -469,7 +474,11 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     }
   }, [submit]);
 
-  const saveCredential = useCallback(async (ref: string, secret: string, persist: boolean, baseVersion: number) => {
+  // 保存凭据：两个入口（Provider 编辑表单与页面上的「写入凭据」）共用这一次提交，
+  // 结果带给调用处各自写在它旁边；保存成功以后刷新目录，版本与来源取刷新后的读数，不按基准版本往前加一
+  // （设计说明第 9.1 节「凭据」一行，工单 #1216）
+  const saveCredential = useCallback(async (ref: string, secret: string, persist: boolean, baseVersion: number):
+    Promise<{ result: SubmitResult; credential: CatalogCredential | null }> => {
     setBusy(true);
     const outcome = await props.command("credential.set", {
       command_id: newCommandId(),
@@ -478,9 +487,15 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       secret,
       persist,
     });
+    let credential: CatalogCredential | null = null;
+    if (outcome.ok) {
+      await props.views?.refresh("models.catalog");
+      credential = catalogRef.current?.providers.find((item) => item.credential_ref === ref)?.credential ?? null;
+    }
     setBusy(false);
     const result = interpret(outcome);
     setFormStatus({ kind: result.ok ? "ok" : "error", message: result.ok ? "已保存 API Key。" : result.message });
+    return { result, credential };
   }, [props]);
 
   const credentialAction = useCallback(async (
@@ -1122,7 +1137,11 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                 data-testid="page-cred-ref"
                 value={pageCredRef}
                 placeholder={DOTENV_KEY_EXAMPLE}
-                onChange={(e) => setPageCredRef(e.target.value)}
+                onChange={(e) => {
+                  setPageCredRef(e.target.value);
+                  // 改了表单内容，上一条结果不再说明这一次要保存的东西（工单 #1216）
+                  setPageCredResult(null);
+                }}
               />
               <datalist id="y10-cred-refs-list">
                 {credentialsList.map((c) => (
@@ -1148,7 +1167,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                 data-testid="page-cred-secret"
                 value={pageCredSecret}
                 placeholder="Key 不回填，也不进入事件"
-                onChange={(e) => setPageCredSecret(e.target.value)}
+                onChange={(e) => {
+                  setPageCredSecret(e.target.value);
+                  setPageCredResult(null);
+                }}
               />
             </label>
             <fieldset className="y10-field">
@@ -1160,7 +1182,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                     name="page-cred-persist"
                     data-testid="page-cred-memory"
                     checked={!pageCredPersist}
-                    onChange={() => setPageCredPersist(false)}
+                    onChange={() => {
+                      setPageCredPersist(false);
+                      setPageCredResult(null);
+                    }}
                   />
                   <span>只在本进程有效</span>
                 </label>
@@ -1170,7 +1195,10 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
                     name="page-cred-persist"
                     data-testid="page-cred-dotenv"
                     checked={pageCredPersist}
-                    onChange={() => setPageCredPersist(true)}
+                    onChange={() => {
+                      setPageCredPersist(true);
+                      setPageCredResult(null);
+                    }}
                   />
                   <span>写入 .env</span>
                 </label>
@@ -1186,17 +1214,49 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
               type="button"
               className="y10-btn primary"
               data-testid="page-cred-save"
-              disabled={busy || pageCredReason !== ""}
+              disabled={busy || pageCredSaving || pageCredReason !== ""}
               onClick={() => {
-                const cred = credentialsList.find((c) => c.ref === pageCredRef.trim())?.credential;
-                void saveCredential(pageCredRef.trim(), pageCredSecret.trim(), pageCredPersist, cred?.version ?? 0);
-                setPageCredSecret("");
+                const ref = pageCredRef.trim();
+                const persist = pageCredPersist;
+                const cred = credentialsList.find((c) => c.ref === ref)?.credential;
+                setPageCredResult(null);
+                setPageCredSaving(true);
+                // 发出去了就一定有结果落在表单旁：成功写版本与来源，失败写服务端给出的原因原样，
+                // Key 输入框只在成功以后才清空（设计说明第 9.1 节「凭据」一行，工单 #1216）
+                void saveCredential(ref, pageCredSecret.trim(), persist, cred?.version ?? 0).then(({ result, credential }) => {
+                  setPageCredSaving(false);
+                  if (!result.ok) {
+                    setPageCredResult({ kind: "error", message: result.message });
+                    return;
+                  }
+                  setPageCredResult({
+                    kind: "ok",
+                    message: credentialSavedText({
+                      ref,
+                      version: credential?.version ?? null,
+                      // 目录里找不到这个引用的连接时按这次选的写入方式说来源，不写一个空词
+                      source: credential?.source ?? (persist ? "dotenv" : "override"),
+                    }),
+                  });
+                  setPageCredSecret("");
+                });
               }}
             >
-              保存凭据
+              {pageCredSaving ? "保存中…" : "保存凭据"}
             </button>
-            {/* 「保存凭据」不可用时写明缺哪一项（工单 #1158） */}
-            {pageCredReason !== "" && (
+            {/* 保存的结果写在表单旁：成功写「已保存 API Key」与凭据版本、来源，失败写服务端原因原样（工单 #1216） */}
+            {pageCredResult && (
+              <p
+                className={pageCredResult.kind === "ok" ? "y10-small mm-ok" : "y10-warn-text mm-warn"}
+                role="status"
+                data-testid="page-cred-result"
+              >
+                {pageCredResult.message}
+              </p>
+            )}
+            {/* 「保存凭据」不可用时写明缺哪一项（工单 #1158）；有结果时由上面那一行说明，
+                不让「还不能保存」顶替结果（工单 #1216） */}
+            {pageCredReason !== "" && !pageCredResult && (
               <p className="y10-small y10-muted" role="status" data-testid="page-cred-save-hint">
                 还不能保存：{pageCredReason}。
               </p>
