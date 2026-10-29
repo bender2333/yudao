@@ -21,7 +21,7 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDepartmentDraft } from "./department-settings-form";
 import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts, formatTime,
-  itemSource, label, lettersWaitingText, type DepartmentStateView } from "./labels";
+  itemSource, label, lettersWaitingText, roleBarText, type DepartmentStateView } from "./labels";
 import { askIndent, askLine } from "./asks-text";
 import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
@@ -142,7 +142,9 @@ function RoomInfoArea(props: { data: DepartmentWorkspaceResult }) {
             {room.roles.map((role) => (
               <li key={role.id}>
                 <strong>{role.name}</strong>
-                <span className="y10-status">{role.task || role.status}</span>
+                {/* 角色的当前任务只在有事实说明它此刻做什么时才填（工单 #1230）：没有时显示中文状态词，
+                    不显示 working、idle 这样的原始标识，也不拿事项标题充当角色的任务 */}
+                <span className="y10-status">{roleBarText(role)}</span>
               </li>
             ))}
           </ul>

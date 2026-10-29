@@ -417,3 +417,52 @@ test("部门页：三个部门的状态、本部门的询问与传信管", async
     await backend.stop();
   }
 });
+
+// 「房间里的角色」那一行的文字（工单 #1230）：角色的当前任务只在有事实说明它此刻做什么时才填，
+// 现在没有这样的事实，所以这一格是中文状态词（工作中、未工作），不是 working、idle 这样的原始标识，
+// 也不再拿事项标题顶上；事项标题只留在房间屏幕的目标行。
+test("房间角色条：事项进行中显示中文状态词，不显示事项标题与原始标识", async () => {
+  test.setTimeout(600_000);
+  backend = await startBackend({ room: true });
+  const client = await startClient(backend, { width: 1440, height: 900 });
+  const errors = watchErrors(client);
+  const page = client.page;
+  // 事项标题取自用户输入的原文，与页面上的「所选事项」一致
+  const title = "为待办清单增加截止日期";
+  try {
+    const projectId = backend.roomProject;
+    expect(projectId).not.toBeNull();
+    await openRoom(page, projectId!, "product");
+    // 房间打开以后才开始事项：角色的状态在页面不刷新的情况下随事件流更新
+    await command("work_item.create", { project_id: projectId, text: title });
+    // 页面已经换成这个事项：标题区与角色条由同一份 department.workspace 的查询结果驱动
+    const itemLine = page.locator(".y10-ws-item", { hasText: "所选事项" }).first();
+    await expect(itemLine).toContainText(title);
+    // 事项标题留在房间屏幕的目标行（同一份查询结果的 crt.target）
+    const overview = await query<{ work_items: { work_item_id: string; title: string }[] }>(
+      "project.overview", { project_id: projectId });
+    const started = overview.work_items.find((item) => item.title === title);
+    expect(started).toBeDefined();
+    await waitUntil(async () => {
+      const workspace = await query<{ room: { crt: { target: string } } }>(
+        "department.workspace",
+        { project_id: projectId, department: "product", work_item: started!.work_item_id });
+      return workspace.room.crt.target === title;
+    }, "房间屏幕的目标行是事项标题");
+    const roles = page.locator(".y10-ws-roles");
+    await expect(roles).toBeVisible();
+    const text = await roles.innerText();
+    expect(text).toContain("产品部门 Agent");
+    // 中文状态词：事项进行中是「工作中」，结束以后是「未工作」
+    expect(text).toMatch(/工作中|未工作/);
+    // 不出现 working、idle 这样的原始标识
+    expect(text).not.toMatch(/\b(working|idle)\b/);
+    // 事项标题不出现在角色条上（它的任何一段文字都不出现）
+    expect(text).not.toContain(title);
+    expect(text).not.toContain("待办清单");
+    expect(errors).toEqual([]);
+  } finally {
+    await client.close();
+    await backend.stop();
+  }
+});
