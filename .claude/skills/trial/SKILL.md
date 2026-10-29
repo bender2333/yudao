@@ -319,7 +319,7 @@ pwsh -NoProfile -File .claude/skills/trial/scripts/preflight.ps1 -Ticket <工单
 | `open --url <地址>` / `tabs` / `stop` | 打开或复用标签页、列标签页、关掉 |
 | `text`、`text --css <选择器>` | 取页面文字，存成 `.txt` 作证据 |
 | `shot --out <文件.png> --full` | 整页截图 |
-| `audit` | 视觉读数：横向溢出、画布是否空白、画布是否铺满容器（`underfilled`）、低对比度文字、图片、被截断的文字、可见元素计数 |
+| `audit` | 视觉读数：横向溢出、画布是否空白、画布是否铺满容器（`underfilled`）、低对比度文字（`lowContrast`：每条带文字色 `color` 与逐层合上的底色 `background`，读数低于 4.5 的前 15 条；背景是图片或渐变时算不出，`ratio` 写「未知」并给出 `reason`，排在后面最多 5 条）、图片、被截断的文字、可见元素计数 |
 | `click --text <文字>` / `--css <选择器>`、`type`、`press` | 点击、输入、按键 |
 | `eval --expr '<JavaScript>'` | 读页面状态（只读） |
 | `watch --out <errors.log>` | 后台记录控制台报错与 4xx、5xx 请求，一直跑到被停 |

@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 15:40 / 工单 #1225 [试用工具]：本文件加这一条，`docs/` 下的文档都没有改——工单写的是「无设计说明」，改的是试用工具的两处：`.claude/skills/trial/scripts/browser.mjs` 的 `audit` 对比度读数改成沿祖先链逐层合上背景（元素自己的 `background-color` 也算），任何一层真的画了渐变或图片时读数写「未知」并给 `reason`，不再拿页面底色顶替；`.claude/skills/trial/SKILL.md` 第 322 行的 `audit` 一行补一句 `lowContrast` 每条带 `color` 与 `background`、算不出时写「未知」（文件在「只改」清单之外，工单评论里补记了） / 试用问题（帖子 discussions/1212 观察 9）：按钮上的文字报 1.08，实际约 9:1
+
 solo-deepseek-v4.1-flash / 2026-10-29 15:00 / 工单 #1240 [界面]：本文件加这一条，`docs/` 下的文档都没有改——依据 `docs/design/app-and-interface.md`（main `4f1f8cf5`，第 153 行把「新建项目、接入已有项目」列在「没有已存在的对象」的一类）在放出以后没有改动，本单只改客户端的文字：左侧栏两个入口各加一行场景说明（「从想法新建」从一段想法或需求文字开始、可以先建一个空项目；「接入已有项目」把电脑上已有的代码目录接进来、先建档再做事项），新建项目弹窗的说明改成「新建项目不调用模型。需求材料（原文或文件）在项目建好以后，到概览里作为新事项开始时提交。」；两处文字抽在 `client/src/renderer/src/shell/new-project-text.ts` 由单元用例判，端到端用例在首页与弹窗上判；原型 v13 的两个入口没有说明、弹窗写的是旧的一句，按工单正文改，原型未改 / 试用问题 Te28ea596-04（main `e28ea596`，帖子 https://github.com/bender2333/yudao/discussions/1231）：拿着 16KB 需求正文的新手从首页看不出走哪个入口、材料放在哪一步
 
 solo-deepseek-v4.1-flash / 2026-10-29 14:48 / 工单 #1229 [画面的缝]：本文件加这一条，`docs/` 下的文档都没有改——依据是原型 v13 的 `docs/prototypes/v13/js/ui/views/department.js` 第 138 至 146 行（房间信息条只用 `is-inline y13-ws-facts`）与 `docs/prototypes/v13/styles/base.css` 第 331 至 338 行（`.y13-kv.is-inline` 加 `dt`/`dd` 的上下排法），以及 `docs/design/visualization.md`（main `9c605b66`），这三处放出以后没有改动；本单按它们落实：`KeyValue` 带 `is-inline` 时不再叠加 `is-rows`，房间信息条与标题区的那几对按「标签在上、取值在下、格与格之间留空」排，`v10-department.css` 补上原型里 `dt`/`dd` 的上下排法；「已用时间 / 上限」改读 `project.loop` 里当前事项的 `elapsed_sec` 与 `time_limit_sec`（与恢复页「已用时间与时间上限」同一个查询、同一对字段、同一种写法），只有事项进行中才有读数 / 用户 2026-10-29 亲自试用发现（main `e28ea596`，试用实例 0.1.1）：部门房间画面下方那一行读起来是「第几轮　　第 5 轮已用时间 / 上限　　—执行机器」，每个取值贴着下一个标签，「已用时间 / 上限」永远是「—」
