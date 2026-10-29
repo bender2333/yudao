@@ -38,7 +38,7 @@ export function checkScope({ changes, policy, kernelPaths, events = [], createdA
   for (const { status, path } of changes) {
     if (evaluationPaths.some(prefix => within(path, prefix)) || (status !== 'A' && evaluationBaselines.some(prefix => within(path, prefix)))) errors.push(`候选不能修改评价材料: ${path}`);
     if (!policy.allowed.some(prefix => within(path, prefix))) errors.push(`超出只改清单: ${path}`);
-    const inner = [...protectedPaths, ...kernelPaths].some(prefix => within(path, prefix));
+    const inner = [...protectedPaths, ...kernelPaths, ...(policy.kernelApprovedPaths ?? [])].some(prefix => within(path, prefix));
     if (inner && (!policy.kernelApprovedPaths?.includes(path) || !approved(events, policy.approvers, createdAt))) errors.push(`缺少事前内核授权: ${path}`);
     if (policy.middle.some(prefix => within(path, prefix))) {
       if (status === 'D') errors.push(`删除合同: ${path}`);

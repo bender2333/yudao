@@ -44,6 +44,11 @@ test('R1：规则与评分器即使在只改清单内也需要精确的事前授
   input.events = [{ event: 'labeled', label: { name: 'kernel-approved' }, actor: { login: 'owner' }, created_at: '2026-10-29T00:00:00Z' }];
   input.createdAt = '2026-10-30T00:00:00Z';
   assert.deepEqual(checkScope(input), []);
+  input.changes = [{ status: 'A', path: 'harness/new_kernel.py' }];
+  input.policy.allowed = ['harness/new_kernel.py'];
+  input.policy.kernelApprovedPaths = ['harness/new_kernel.py'];
+  input.events = [];
+  assert.ok(checkScope(input).some(e => e.includes('内核授权')));
 });
 
 test('R2：WRAP 可以新增签名文件，旧签名、合同删除与目录相似名称均受阻', () => {
