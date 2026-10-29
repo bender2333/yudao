@@ -110,6 +110,36 @@ def effective_models_url(provider: ProviderDefinition, override: str | None = No
     return provider.base_url.rstrip("/") + "/models"
 
 
+# 上游模型列表描述容量（窗口与输出上限）的四种写法，按次序取到第一个有效的就停（设计说明第 4.3 节）：
+# limit.context / limit.output（OpenCode 一类）、context_length / max_completion_tokens（OpenRouter 一类的顶层写法）、
+# top_provider 下的同名字段、capabilities.contextWindow / capabilities.maxOutput
+_UPSTREAM_LIMIT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "context_window": (("limit", "context"), ("context_length",),
+                       ("top_provider", "context_length"), ("capabilities", "contextWindow")),
+    "max_output_tokens": (("limit", "output"), ("max_completion_tokens",),
+                          ("top_provider", "max_completion_tokens"), ("capabilities", "maxOutput")),
+}
+
+
+def _first_positive_int(item: Mapping[str, Any], paths: tuple[tuple[str, ...], ...]) -> int | None:
+    # 按次序取第一个有效的正整数字：布尔、小数、0 与负数都当没有，取不到时返回 None
+    for path in paths:
+        value = _value_at(item, path)
+        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+            return value
+    return None
+
+
+def _value_at(item: Mapping[str, Any], path: tuple[str, ...]) -> Any:
+    # 按路径取嵌套字段；中间任一层不是对象时当作没有这个字段
+    value: Any = item
+    for key in path:
+        if not isinstance(value, Mapping):
+            return None
+        value = value.get(key)
+    return value
+
+
 def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
     # 候选带预填值与来源（设计说明第 4.3 节）：协议先取能力表（来源 capability_table），
     # 其次取服务方案的默认协议（来源 preset_default），自定义服务预填 Chat Completions（来源 default）；
@@ -156,36 +186,6 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         candidates.append(candidate)
     candidates.sort(key=lambda entry: entry["id"])
     return candidates
-
-
-# 上游模型列表描述容量（窗口与输出上限）的四种写法，按次序取到第一个有效的就停（设计说明第 4.3 节）：
-# limit.context / limit.output（OpenCode 一类）、context_length / max_completion_tokens（OpenRouter 一类的顶层写法）、
-# top_provider 下的同名字段、capabilities.contextWindow / capabilities.maxOutput
-_UPSTREAM_LIMIT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
-    "context_window": (("limit", "context"), ("context_length",),
-                       ("top_provider", "context_length"), ("capabilities", "contextWindow")),
-    "max_output_tokens": (("limit", "output"), ("max_completion_tokens",),
-                          ("top_provider", "max_completion_tokens"), ("capabilities", "maxOutput")),
-}
-
-
-def _first_positive_int(item: Mapping[str, Any], paths: tuple[tuple[str, ...], ...]) -> int | None:
-    # 按次序取第一个有效的正整数字：布尔、小数、0 与负数都当没有，取不到时返回 None
-    for path in paths:
-        value = _value_at(item, path)
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
-            return value
-    return None
-
-
-def _value_at(item: Mapping[str, Any], path: tuple[str, ...]) -> Any:
-    # 按路径取嵌套字段；中间任一层不是对象时当作没有这个字段
-    value: Any = item
-    for key in path:
-        if not isinstance(value, Mapping):
-            return None
-        value = value.get(key)
-    return value
 
 
 def _connection_reason(exc: httpx.HTTPError) -> str:
