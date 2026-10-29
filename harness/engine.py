@@ -53,6 +53,10 @@ COMPACTION_REQUEST_TIER = "minimal"
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
 COMPACTION_REQUEST_TIER = "minimal"
 
+# 整理请求自己失败时不按「这一次压缩不生效」处理的原因（设计说明第 8.7 节，工单 #1213）：未压缩的
+# 历史放不进窗口是停下来的一条；取消与运行时间到、模型步数用完在决定是否重试的那一处先判定
+_COMPACTION_STOP_REASONS = frozenset({"context_overflow"})
+
 
 # 放行等输入处理完（工单 #561）：在安全节点等待时最多等这么久，醒来以后重新做工具许可。
 # 产品那一轮结束、提交被写入时会唤醒它；没有收到唤醒（例如那一轮以文字回答结束）时也按这个间隔重新核对。
@@ -441,10 +445,12 @@ class StepDriver:
                             "department reached the model step limit during provider retries",
                             reason="model_steps_exhausted",
                         ) from retry_error
-                    if request.purpose == "compaction" and retry_error.reason == "compaction_failed":
+                    if request.purpose == "compaction" and retry_error.reason not in _COMPACTION_STOP_REASONS:
                         # 整理请求失败（尝试次数用完）：这一次压缩不生效，不写检查点。这一步的工作请求按
                         # 未压缩的历史照常发送，下一步再次尝试压缩；连续没有推进的次数达到上限时在这里
-                        # 以压缩失败停止（设计说明第 8.7 节，工单 #1155）
+                        # 以压缩失败停止（设计说明第 8.7 节第一条，工单 #1155、#1213）。失败的原因不限：
+                        # 空响应、上游故障与连接失败都走这一条；未压缩的历史放不进窗口（context_overflow，
+                        # 第 8.7 节第三条）照旧停止；取消与运行时间到、模型步数用完在上面先判定
                         self._compaction_request_failed(f"整理请求失败：{retry_error}")
                         self._compaction_deferred = True
                         attempt = 1
