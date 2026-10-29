@@ -149,6 +149,33 @@ export function credentialSaveDisabledReason(input: { ref: string; secret: strin
   return "";
 }
 
+// 凭据来源在界面上的说法（设计说明第 9.1 节「凭据」一行）：保存成功时写在表单旁的来源就是这两个词
+export function credentialSourceText(source: string): string {
+  switch (source) {
+    case "override":
+      return "进程内存";
+    case "dotenv":
+      return ".env";
+    case "env":
+      return "环境";
+    case "none":
+      return "不需要凭据";
+    default:
+      return source;
+  }
+}
+
+// 保存凭据成功时写在表单旁的那一句（设计说明第 9.1 节「凭据」一行，工单 #1216）：
+// 写「已保存 API Key」与凭据版本、来源；版本没有读到时说明没读到，不按基准版本猜一个数
+export function credentialSavedText(input: { ref: string; version: number | null; source: string }): string {
+  const ref = input.ref.trim() === "" ? "（未填写引用）" : input.ref.trim();
+  const source = credentialSourceText(input.source);
+  if (input.version === null) {
+    return `已保存 API Key：凭据 ${ref} 已写入，来源：${source}；版本没有读到。`;
+  }
+  return `已保存 API Key：凭据 ${ref} 版本 ${input.version}，来源：${source}。`;
+}
+
 // 准入摘要（设计说明第 9.1 节）：按连接统计「已准入 x · 候选 y」。
 // 已准入且未作废的定义计入已准入，其余定义计入候选
 export function admissionSummary(provider: CatalogProvider, admissions: CatalogAdmission[]): { admitted: number; candidates: number } {

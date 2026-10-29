@@ -45,6 +45,8 @@ import {
   credentialStatusLabel,
   credentialRefIssue,
   credentialSaveDisabledReason,
+  credentialSavedText,
+  credentialSourceText,
   isDotenvKey,
   suggestedDotenvKey,
   DOTENV_KEY_EXAMPLE,
@@ -283,3 +285,23 @@ test("连接测试结果写明读取的模型列表地址（工单 #302）", () 
 
 
 
+
+test("保存凭据的结果写在表单旁：成功写「已保存 API Key」加版本与来源（工单 #1216）", () => {
+  // 来源的词按设计说明第 9.1 节「凭据」一行：进程内存与 .env 是两种写入方式各自的结果
+  assert.equal(credentialSourceText("override"), "进程内存");
+  assert.equal(credentialSourceText("dotenv"), ".env");
+  assert.equal(credentialSourceText("env"), "环境");
+  assert.equal(credentialSourceText("none"), "不需要凭据");
+  // 以后多一种来源时照原样写出来，不吞掉
+  assert.equal(credentialSourceText("vault"), "vault");
+
+  const memory = credentialSavedText({ ref: "OPENCODE_GO_KEY", version: 3, source: "override" });
+  assert.equal(memory, "已保存 API Key：凭据 OPENCODE_GO_KEY 版本 3，来源：进程内存。");
+  const dotenv = credentialSavedText({ ref: " TRIAL_KEY ", version: 1, source: "dotenv" });
+  assert.equal(dotenv, "已保存 API Key：凭据 TRIAL_KEY 版本 1，来源：.env。");
+  // 版本没读到时说没读到，不按基准版本猜一个数（界面读的是刷新以后的目录）
+  const unknown = credentialSavedText({ ref: "TRIAL_KEY", version: null, source: "override" });
+  assert.match(unknown, /已保存 API Key/);
+  assert.match(unknown, /版本没有读到/);
+  assert.doesNotMatch(unknown, /版本 \d/);
+});
