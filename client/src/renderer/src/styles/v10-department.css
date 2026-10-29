@@ -25,7 +25,7 @@
 .y10-ws-item { display: flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; font-size: 13px; margin-top: 4px; min-width: 0; }
 .y10-ws-item strong { overflow-wrap: anywhere; }
 .y10-ws-head-actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.y10-ws-model { padding-top: 12px; border-top: 1px dashed var(--line); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+.y10-ws-model { padding-top: 12px; border-top: 1px dashed var(--line); }
 .y10-ws-inline { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; min-width: 0; }
 .y10-ws-inline strong { font-weight: 600; overflow-wrap: anywhere; }
 .y10-ws-k { font-size: 11.5px; color: var(--muted); }
@@ -42,7 +42,13 @@
    画布按宿主的 clientWidth 排布（pixel/surface.ts），宿主撑满以后画布跟着铺满。 */
 .y10-ws-stage > .y10-scene.room-canvas { flex: 1 1 auto; width: 100%; min-width: 0; }
 .y10-ws-room-info { margin-top: 12px; display: grid; gap: 10px; }
-.y10-ws-facts { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 18px; }
+.y10-ws-facts { gap: 8px 18px; }
+/* 房间信息条与标题区的模型那几对（工单 #1229）：每一对标签在上、取值在下，格与格之间留空，
+   与原型 v13 的 .y13-ws-facts 加 base.css 的 dt/dd 排法一致。KeyValue 带 is-inline 时不再叠加
+   is-rows 的「9em 标签列 | 取值列」，原型的上下排法由下面两行补上（容器是 flex 的行，每格自成一格）。 */
+.y10-ws-facts > div, .y10-ws-model > div { display: grid; gap: 2px; }
+.y10-ws-facts .term, .y10-ws-model .term { font-size: 11.5px; color: var(--muted); }
+.y10-ws-facts .value, .y10-ws-model .value { font-size: 13px; overflow-wrap: anywhere; }
 .y10-ws-roles { display: grid; gap: 4px; }
 .y10-ws-roles ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 10px; }
 .y10-ws-roles li { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; padding: 4px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); min-width: 0; max-width: 100%; }
