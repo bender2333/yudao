@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-状态：设计说明，依据总体架构编写，第 10 节的事项由架构师决定，未实施；最近一次改动 2026-10-28，按试用 #1153 在第 4.1 节写明以事项为对象的查询的参数名，第 4.3 节 `project.overview` 的卡片带停止说明。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（删除命令登记、一次性批准与动作核实的决定）、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：[v7 设计说明](../archive/prototypes/v7/design.md)第 7 节、[构建约定](../archive/prototypes/v7/BUILD.md)第 3.5、5、6 节；依据改为原型 v9（原型设计已结束，[v9 设计说明](../archive/prototypes/v9/design.md)与[构建约定](../archive/prototypes/v9/BUILD.md)，屏幕清单、页面导航与接口层沿用 [v8 设计说明](../archive/prototypes/v8/design.md)与[构建约定](../archive/prototypes/v8/BUILD.md)），系统首页、机器页与系统通知以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../archive/research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。总图位置：第四节「接口」的缝；第一节「界面」方框。
+状态：设计说明，依据总体架构编写，第 10 节的事项由架构师决定，未实施；最近一次改动 2026-10-28，按试用 #1153 在第 4.1 节写明以事项为对象的查询的参数名，第 4.3 节 `project.overview` 的卡片带停止说明。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（删除命令登记、一次性批准与动作核实的决定）、[总体架构](architecture/overall-architecture.md)第 2、5、7 节。需求：[D30](../requirements/web-game-frontend.md)。原型：当前定稿 [v13 原型](../prototypes/v13/design.md)与[构建约定](../prototypes/v13/BUILD.md)；系统首页、机器页与系统通知以本文为准。界面要求：[语义系统设计说明](semantic-system.md)第 14 节、[部门内多角色设计说明](department-roles.md)第 15 节、[模型管理设计说明](model-management.md)第 9 节、[可观测性设计](../archive/research/observability-design.md)第 5、6 节。用词以 `CONTEXT.md` 为准。总图位置：第四节「接口」的缝；第一节「界面」方框。
 
 ## 1. 要解决的问题
 
@@ -334,7 +334,7 @@ sequenceDiagram
 
 | 决定种类 | 选项 | 阻塞范围 | 来源 | 工单 |
 | --- | --- | --- | --- | --- |
-| 模型引用无法使用时的待恢复 | 继续执行（修复配置以后）、停止事项 | run | 模型管理设计说明第 5.5 节 | #49 |
+| 待恢复：模型引用无法使用；整理连续失败 | 继续执行（修复配置或换模型以后）、停止事项 | run | 模型管理设计说明第 5.5、8.7 节 | #49 |
 | 暂停以后继续（停止原因 `no_tool_call`、`workspace_unrepresentable`） | 处理以后继续执行、停止事项 | run | [D09](../requirements/execution-limits.md) | #204 |
 | 继续旧事项时定义版本不同（`definitions_changed`） | 按新版本继续、停止事项 | run | 总体架构第 7.4 节 | #16 |
 | 质检无法核验 | 重新核验、停止事项 | run | [浏览器与 computer use 设计说明](browser-and-computer-use.md)第 8.4 节 | #151 |
