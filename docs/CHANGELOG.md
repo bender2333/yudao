@@ -7,6 +7,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-10-29 13:20 / 工单 #1228 [画面的缝]：本文件加这一条，`docs/` 下的文档都没有改——依据 `docs/design/visualization.md`（main `9c605b66`）与 ADR-0021「整数倍铺满容器宽度」在放出以后没有改动，本单就是落实它们：部门房间的画布宿主从来没有宽度，被刚创建的 `<canvas>`（默认 300 像素宽）撑成 300，画布按 300 排好以后宿主不再变、`ResizeObserver` 看不到变化，宽度永远停在 300；`client/src/renderer/src/styles/v10-department.css` 加一条 `.y10-ws-stage > .y10-scene.room-canvas { flex: 1 1 auto; width: 100%; min-width: 0; }`，`pixel/surface.ts` 不动，端到端用例的「铺满」改成对着可见的 `.y10-ws-stage` 量并补 800×600 一条 / 用户 2026-10-29 试用时看到（试用实例 0.1.1，main `e28ea596`）：部门房间的深色舞台横跨整个内容宽，房间画面只占中间 300 像素，左右各留一大片空的深色
+
 solo-deepseek-v4.1-flash / 2026-10-29 10:05 / 工单 #1215 [执行]：本文件加这一条，`docs/architecture-issues.md` 追加一条——本机工具设计说明第 3 节「命令（`bash`）」一行与第 4 节最后两条只写了超时、取消、会话结束三条路要让整棵进程树停下，没写命令**自己正常退出**时留下的子进程怎么处理；按「设计没写到的边界自己定、登记、继续做」定为「随这次调用一起结束，回执写明并指向 `background`」，设计说明由架构师补写 / 试用问题 Tc1f7185a-03：命令留下子进程时调用不返回、取消以后后台服务还留在机器上
 
 solo-deepseek-v4.1-flash / 2026-10-29 10:44 / 工单 #1214 [动作的缝]：本文件加这一条；`docs/` 下另外只动了 `docs/architecture-issues.md`（加一条，工单评论里补记了原因）——设计说明 `docs/design/local-tools.md` 第 3 节「公开树」那行没改，本单就是落实它（捕获期间撞上并发写入，快照这一侧重读；有界次数用完后才报 `TreeError`；判据不改）：`harness/public_tree.py` 加有界重读（3 次、间隔递减），并把「扫描时看到的」与「打开的」身份比对改成路径 stat 与句柄 stat 都一致的字段——Windows 上可执行后缀（`.cmd`/`.bat`/`.exe`）的权限位两侧不同，原来会让这类文件每次捕获都失败 / 试用问题 Tc1f7185a-02：写 `jizhang.cmd`、`start.bat` 时 `TreeError: File changed before it could be captured`，整个事项停下（停止原因的归类在 #604）；本机实测该错误对这类文件是必然的，不只并发

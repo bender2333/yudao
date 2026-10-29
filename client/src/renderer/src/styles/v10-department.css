@@ -36,6 +36,11 @@
   background: #1c1a2b; border-radius: 9px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--ws-accent) 30%, var(--line));
 }
 .y10-ws-canvas { display: block; image-rendering: pixelated; }
+/* 工单 #1228：房间的画布宿主是舞台的弹性子项，要自己撑满舞台的内容宽。
+   宿主没有宽度时宽度由里面的 <canvas> 决定：刚创建的画布默认 300 像素宽，画布按 300 排好以后
+   宿主仍旧 300 宽，ResizeObserver 看不到变化，画面永远停在 300——舞台上左右各留一条空的深色。
+   画布按宿主的 clientWidth 排布（pixel/surface.ts），宿主撑满以后画布跟着铺满。 */
+.y10-ws-stage > .y10-scene.room-canvas { flex: 1 1 auto; width: 100%; min-width: 0; }
 .y10-ws-room-info { margin-top: 12px; display: grid; gap: 10px; }
 .y10-ws-facts { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 18px; }
 .y10-ws-roles { display: grid; gap: 4px; }
