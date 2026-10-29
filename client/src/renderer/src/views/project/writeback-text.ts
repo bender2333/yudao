@@ -1,8 +1,9 @@
 // 写回在页面上怎么写（工单 #709）：写回结果与写回设置的中文说明。
 // 页面上不出现英文内部标识与开发者措辞：状态与停止原因按中文写，
 // 合并请求还只是本地记录这件事照实写明。
+// 写回检查的命令清单的文本互转与源目录保存参数的组装也在这里（工单 #815）。
 
-import type { WritebackRecordView } from "../../api/generated/types.gen";
+import type { SourceDirectorySetting, WritebackRecordView } from "../../api/generated/types.gen";
 
 // 写回结果的中文名。写回停止原因与 harness/app/labels.py 的 WRITEBACK_REASON_NAMES 是同一份取值，
 // 事件说明与页面上的说明用同一个名字。
@@ -71,4 +72,49 @@ export function sourceWritebackText(setting: {
   return remote === ""
     ? `已打开，目标分支 ${target}`
     : `已打开，目标分支 ${target}，远端 ${remote}`;
+}
+
+// 写回检查的命令在页面上的说明（工单 #815）：一行一条命令字符串
+export const CHECK_COMMANDS_LABEL = "写回检查的命令（一行一条）";
+
+export const CHECK_COMMANDS_NOTE =
+  "写回时在可以丢弃的检查副本里按顺序运行这些命令，覆盖本次变更与原有行为；"
+  + "清单为空、超时或失败时停止写回，不推送分支，也不创建合并请求。";
+
+// 清单转成页面上的文本：一行一条
+export function checkCommandsText(commands: string[]): string {
+  return commands.join("\n");
+}
+
+// 页面上的文本转成清单：去掉空行与两端的空白，行的顺序按填写的顺序
+export function checkCommandsFromText(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
+}
+
+// 源目录保存时提交的参数（工单 #815）：写回检查的命令按页面上填写的清单写回；
+// 凭据引用不在这个表单里填写，按原来的值写回，不清空
+export function sourceDirectoryPayload(props: {
+  projectId: string;
+  existing: SourceDirectorySetting | null;
+  name: string;
+  path: string;
+  writebackEnabled: boolean;
+  targetBranch: string;
+  remote: string;
+  checkCommands: string;
+}): Record<string, unknown> {
+  return {
+    project_id: props.projectId,
+    name: props.name.trim(),
+    path: props.path.trim(),
+    base_version: props.existing?.version ?? 0,
+    writeback_enabled: props.writebackEnabled,
+    target_branch: props.targetBranch.trim(),
+    remote: props.remote.trim(),
+    check_commands: checkCommandsFromText(props.checkCommands),
+    credential_ref: props.existing?.credential_ref ?? null,
+  };
 }

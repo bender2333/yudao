@@ -13,7 +13,9 @@ import {
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, promptWritten, useDepartmentDraft } from "./department-settings-form";
 import { WritebackSection } from "./writeback";
-import { sourceWritebackText } from "./writeback-text";
+import {
+  CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE, checkCommandsText, sourceDirectoryPayload, sourceWritebackText,
+} from "./writeback-text";
 import { departmentName, itemSource } from "./labels";
 import { PageHead } from "../../shell/kit";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
@@ -324,13 +326,19 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
   const [open, setOpen] = useState(false);
   const [name, setName] = useDraft(`settings/${data.project_id}/source/${props.name}/name`, props.name);
   const [path, setPath] = useDraft(`settings/${data.project_id}/source/${props.name}/path`, existing?.path ?? "");
-  // 写回的三项设置（是否打开、远端、目标分支）：界面上填写，随源目录一起保存（工单 #709）
+  // 写回的三项设置（是否打开、远端、目标分支）与写回检查的命令：界面上填写，随源目录一起保存（工单 #709、#815）
   const [writebackEnabled, setWritebackEnabled] = useState(existing?.writeback_enabled ?? false);
   const [targetBranch, setTargetBranch] = useDraft(
     `settings/${data.project_id}/source/${props.name}/target_branch`, existing?.target_branch ?? "");
   const [remote, setRemote] = useDraft(
     `settings/${data.project_id}/source/${props.name}/remote`, existing?.remote ?? "");
-  const command = useCommand(props.app, pageKey([existing?.version, name, path, writebackEnabled, targetBranch, remote]));
+  // 写回检查的命令从已登记的清单读出初值，一行一条；只改名称、路径与写回的三项设置时它保持不变
+  const [checkCommands, setCheckCommands] = useDraft(
+    `settings/${data.project_id}/source/${props.name}/check_commands`,
+    checkCommandsText(existing?.check_commands ?? []));
+  const command = useCommand(
+    props.app,
+    pageKey([existing?.version, name, path, writebackEnabled, targetBranch, remote, checkCommands]));
 
   if (!open) {
     return (
@@ -352,22 +360,22 @@ function SourceDirectoryForm(props: { app: ClientApp; data: ProjectSettingsResul
       </label>
       <TextInput label="目标分支" value={targetBranch} onInput={setTargetBranch} />
       <TextInput label="远端仓库（留空表示源目录本身）" value={remote} onInput={setRemote} />
+      <TextArea label={CHECK_COMMANDS_LABEL} value={checkCommands} rows={3} onInput={setCheckCommands} />
+      <span className="y10-note note">{CHECK_COMMANDS_NOTE}</span>
       <SubmitButton
         label="保存源目录"
         busy={command.busy}
         disabled={name.trim() === "" || path.trim() === ""}
-        onClick={() => void command.submit("source_directory.save", {
-          project_id: data.project_id,
-          name: name.trim(),
-          path: path.trim(),
-          base_version: existing?.version ?? 0,
-          writeback_enabled: writebackEnabled,
-          target_branch: targetBranch.trim(),
-          remote: remote.trim(),
-          // 写回检查的命令与凭据引用不在这个表单里填写：保存时按原来的值写回，不清空
-          check_commands: existing?.check_commands ?? [],
-          credential_ref: existing?.credential_ref ?? null,
-        }).then((ok) => { if (ok) { setOpen(false); } })}
+        onClick={() => void command.submit("source_directory.save", sourceDirectoryPayload({
+          projectId: data.project_id,
+          existing: existing ?? null,
+          name,
+          path,
+          writebackEnabled,
+          targetBranch,
+          remote,
+          checkCommands,
+        })).then((ok) => { if (ok) { setOpen(false); } })}
       />
       <button type="button" onClick={() => setOpen(false)}>取消</button>
       <CommandFeedback submitted={command.submitted} problem={command.problem} />
