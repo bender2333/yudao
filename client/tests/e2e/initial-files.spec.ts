@@ -166,10 +166,11 @@ test.describe("起始文件夹（1440×900）", () => {
       const files = listedFiles(source);
       const name = `起点项目 ${Date.now()}`;
       const form = await newProjectForm(page);
-      // 表单的说明照原型 v13（工单 #1160）：起始文件夹是可选项，是一份快照；新建项目不调用模型
+      // 表单的说明照原型 v13（工单 #1160）：起始文件夹是可选项，是一份快照；新建项目不调用模型。
+      // 最后一段按工单 #1240 改写：需求材料在项目建好以后到概览里作为新事项开始时提交
       await expect(form).toContainText("起始文件夹（可选）");
       await expect(form).toContainText("填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。");
-      await expect(form).toContainText("新建项目不调用模型；之后在概览中记录原文或作为新事项开始。");
+      await expect(form).toContainText("新建项目不调用模型。需求材料（原文或文件）在项目建好以后，到概览里作为新事项开始时提交。");
       await fillNewProjectForm(form, name, source);
       expect(await overflowReport(page)).toEqual([]);
       await form.getByRole("button", { name: "新建项目" }).click();
