@@ -1350,3 +1350,10 @@ Argon 的工作流建议（四条）对照仓库后的取舍：
 - 理由：折叠要付出一次前缀失效，只有被折掉的内容以后会被反复按未缓存价格重读时才划算；缓存命中高的调用目标不是这样。参照的 OpenCode（提交 `0027387`，`packages/opencode/src/session/compaction.ts` 的 `prune`）清理旧工具结果时保护最近 40000 token，可清理的量超过 20000 才执行，并且只在配置 `compaction.prune` 打开时才清理。
 - 落点：`docs/design/context-assembly.md` 第 6.4、8 节；`evals/context/cost.py`。
 - 撤回：把 #1201、#1202 改回 `ready-for-agent`，并把「依据」更新到当时的 main 提交。
+
+## 2026-10-29 - 取消当前验收基线
+
+- 决定（用户在场）：`docs/current-baseline.md` 取消，移到 `docs/archive/current-baseline-2026-10-29.md`；父工单与里程碑关闭时不再同步它，也不再同步路线图（路线图不记状态）。
+- 理由：与总图、路线图一样，进度在 GitHub 的里程碑与工单里，文档里再抄一份会过期。
+- 落点：`CLAUDE.md` 文档结构、`README.md`、验收证据规则、`issue-tracker.md`、需求索引说明、`flow`、`architect-loop`、`trial-intake` 技能。
+- 撤回：把归档件移回 `docs/` 并恢复上面各处的引用。
