@@ -31,7 +31,7 @@ description: 架构师会话开始的三项检查（架构问题、豁免记录�
    - 一个薄片的工单全部关闭时，把总图缝的已定、未定有哪些变化告诉总架构师，由总架构师改；接着按第 7 步办理。
    - 一个阶段的里程碑关闭时，总架构师按路线图第 2 节该阶段的「结束时总图」与第 5 节那张表逐列核对 main，核对做法与记录见[验收证据规则](../../../docs/agents/acceptance-evidence.md)第 6 节，不过的格补成缺口工单，过了总架构师再改缝的已定、未定；过门（可迭代状态的五条判据）在阶段二结束时按这些读数核对。
 7. 试用：一个阶段一个里程碑（GitHub Milestone），阶段里每个薄片一张试用工单（[工单规范](../../../docs/agents/ticket-spec.md)），在薄片达到之前标 `waiting`。
-   - 薄片达到以后，先用 `/retro <里程碑标题与薄片>` 复盘（[复盘 skill](../retro/SKILL.md)），报告发在 GitHub Discussions 的 Announcements 分类；提出的改动中，参数与规则句子的修改先经用户确认。
+   - 薄片达到以后，先用 `/milestone-retro <里程碑标题与薄片>` 复盘（[复盘 skill](../milestone-retro/SKILL.md)），报告发在 GitHub Discussions 的 Announcements 分类；提出的改动中，参数与规则句子的修改先经用户确认。
    - 接着跑一次 agent 试用（[`/trial`](../trial/SKILL.md)）：另一个模型按真实用户的路子用一个从 main 打包的实例，只读、不建工单，帖子发在 General；明确缺陷按 [`/trial-intake`](../trial-intake/SKILL.md) 的 A 类建成工单，由 solo 修完，这一道筛子把机器能发现的问题挡在用户的时间之前。
    - 然后架构师发布版本并按试用指南走查，再把试用工单改为 `ready-for-human` 交给用户；步骤见 `docs/design/web-interface-and-release.md` 第 6.4 至 6.6 节。
    - 用户试用并确认以后，架构师按[验收证据规则](../../../docs/agents/acceptance-evidence.md)第 5 节在试用工单写关闭评论，再关闭试用工单，最后一个薄片的试用工单关闭时一起关闭里程碑；用户不在场时它们保持打开，被唤醒的架构师、派发者与 solo 执行者不关闭它们。

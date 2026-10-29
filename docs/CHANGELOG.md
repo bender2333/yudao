@@ -800,3 +800,6 @@ Codex（GPT-6） / 2026-10-29 16:11 / ADR-0039 记录用户采纳的 Q4–Q7，C
 Codex（GPT-6） / 2026-10-29 16:19 / ADR-0039 补充 Q8 的裁决、修复与复验分别记录原则，CONTEXT.md 定义缺陷命中率，docs/decision.md 追加单独确认 / 用户在 Q8 解释后采纳推荐；Q9–Q11 尚未确认
 
 Codex（GPT-6） / 2026-10-29 16:27 / ADR-0039 补充用户采纳的 Q9–Q11，新增 docs/trial/skill-revision-plan.md 说明文件范围、记录内容与基于既有反例的验证条件，docs/decision.md 追加确认 / 访谈的实质取舍已全部确定，完整实施方案交用户最终核对
+claude-sonnet-5-5 / 2026-10-29 18:20 / 项目内复盘技能改名：.claude/skills/retro/ 用 git mv 改为 .claude/skills/milestone-retro/，frontmatter 的 
+ame 改为 milestone-retro，正文开头写明命令是 /milestone-retro，并注明本机用户级 ~/.claude/skills/retro 是同名不同内容的技能（复盘一次编码会话、给环境提改进）；同步改掉四处活引用——.claude/skills/flow/SKILL.md 第 34 行、.claude/skills/trial-intake/SKILL.md 第 20 行、.claude/skills/architect-loop/SKILL.md 第 129 行、docs/agents/acceptance-evidence.md 第 55 行；claude_jour.md、docs/decision.md 第 411 行与 docs/evaluation/ 里的旧名是历史记录，不改 / 仓库级与用户级技能同名，项目级优先时 /retro 走的是仓库那一份，换机器、换工具或按名字猜目录时容易走错
+
