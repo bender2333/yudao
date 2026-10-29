@@ -6,7 +6,9 @@
 // 不做伪造。页面用后端提供的构建产物（与 shell.spec.ts 相同）。
 
 import { expect, test, type Page } from "@playwright/test";
-import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { repoRoot, startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
 interface RoomViewState {
   department: string;
@@ -71,6 +73,14 @@ async function waitUntil(check: () => Promise<boolean>, description: string, tim
     setTimeout(resolve, 250);
     await promise;
   }
+}
+
+/** 时长的写法：与页面里的 formatDuration（views/project/labels.ts）相同，用例自己算一遍，不借页面的函数。 */
+function duration(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  if (total < 60) return `${total} 秒`;
+  if (total < 3600) return `${Math.floor(total / 60)} 分 ${total % 60} 秒`;
+  return `${Math.floor(total / 3600)} 小时 ${Math.floor((total % 3600) / 60)} 分`;
 }
 
 /** 房间画面的当前状态（经读取入口）。 */
@@ -465,4 +475,116 @@ test("房间角色条：事项进行中显示中文状态词，不显示事项�
     await client.close();
     await backend.stop();
   }
+});
+
+// 房间信息条的排法与读数（工单 #1229）：用户试用时看到的是「第几轮　　第 5 轮已用时间 / 上限　　—执行机器」，
+// 每个取值贴着下一个标签，读不出哪个值属于哪个标签；「已用时间 / 上限」永远是「—」。
+// 两条用例共用一份后端（端到端是贵操作，别为同一页重复起后端）：第一条只看排法，第二条看读数，
+// 第二条在第一条之后跑，因为它在页面里新建事项、改变服务端状态。
+test.describe("房间信息条（工单 #1229）", () => {
+  const shots = join(repoRoot, ".tmp", "1229-shots");
+  let client: ClientApp;
+  const facts = () => client.page.locator("[data-ws-info] .y10-ws-facts");
+  // 同一格里那一对：标签（.term，原型里的 dt）与取值（.value，原型里的 dd）
+  const timeValue = () => facts().locator("div.line").filter({ hasText: "已用时间 / 上限" }).locator(".value");
+
+  test.beforeAll(async () => {
+    backend = await startBackend({ room: true });
+    client = await startClient(backend, { width: 1440, height: 900 });
+    mkdirSync(shots, { recursive: true });
+  });
+
+  test.afterAll(async () => {
+    await client.close();
+    await backend.stop();
+  });
+
+  // 原型 v13（`ui.kv(items, 'is-inline y13-ws-facts')`，见 `docs/prototypes/v13/js/ui/views/department.js`
+  // 第 138 至 146 行与 `styles/base.css` 第 331 至 338 行）：每一对标签在上、取值在下，对与对之间留空。
+  test("每一对标签与取值成一格：标签在上、取值在下，格与格之间留空", async () => {
+    test.setTimeout(600_000);
+    const page = client.page;
+    const errors = watchErrors(client);
+    const projectId = backend.roomProject;
+    expect(projectId).not.toBeNull();
+    await openRoom(page, projectId!, "product");
+    await expect(facts()).toBeVisible();
+    await page.locator("[data-ws-info]").screenshot({ path: join(shots, "room-info-before.png") });
+
+    // 每一对：标签的下边不低于取值的上边（上下排列）
+    const cells = facts().locator("div.line");
+    const count = await cells.count();
+    expect(count).toBe(4);
+    const boxes: { x: number; y: number; width: number; height: number }[] = [];
+    let within = 0;
+    for (let index = 0; index < count; index += 1) {
+      const cell = cells.nth(index);
+      const term = await cell.locator(".term").boundingBox();
+      const value = await cell.locator(".value").boundingBox();
+      const box = await cell.boundingBox();
+      expect(term).not.toBeNull();
+      expect(value).not.toBeNull();
+      expect(box).not.toBeNull();
+      expect(value!.y).toBeGreaterThanOrEqual(term!.y + term!.height - 0.5);
+      if (index === 0) within = value!.y - (term!.y + term!.height);
+      boxes.push(box!);
+    }
+    // 相邻两格的水平间距大于同一格里标签与取值的间距
+    expect(within).toBeGreaterThanOrEqual(0);
+    const gaps = boxes.slice(1)
+      .map((box, index) => ({ box, previous: boxes[index]! }))
+      .filter(({ box, previous }) => Math.abs(box.y - previous.y) < 4)
+      .map(({ box, previous }) => box.x - (previous.x + previous.width));
+    expect(gaps.length).toBeGreaterThan(0);
+    for (const gap of gaps) {
+      expect(gap).toBeGreaterThan(within);
+    }
+    // 别处用 KeyValue 的地方行为不变：检查区「部门设置」页签那份仍按 is-rows 排（标签列 | 取值列）
+    await page.getByRole("tab", { name: "部门设置" }).click();
+    const settingKv = page.locator("section.card")
+      .filter({ has: page.getByRole("heading", { name: "检查区" }) })
+      .locator(".y10-kv.is-rows").first();
+    await expect(settingKv).toBeVisible();
+    const rowTerm = await settingKv.locator("div.line").first().locator(".term").boundingBox();
+    const rowValue = await settingKv.locator("div.line").first().locator(".value").boundingBox();
+    expect(rowTerm).not.toBeNull();
+    expect(rowValue).not.toBeNull();
+    expect(rowValue!.x).toBeGreaterThan(rowTerm!.x + rowTerm!.width - 1);
+    expect(Math.abs(rowValue!.y - rowTerm!.y)).toBeLessThan(4);
+    await settingKv.screenshot({ path: join(shots, "keyvalue-is-rows-unchanged.png") });
+    expect(errors).toEqual([]);
+  });
+
+  // 数据在 project.loop：事项的 elapsed_sec 与 time_limit_sec（harness/app/project_queries.py 第 362、400、401 行），
+  // 恢复页已经这样取（views/project/recovery.tsx 第 53 至 58 行）；写法与恢复页「已用时间与时间上限」一致。
+  test("已用时间 / 上限：事项进行中是两个真实时长，没有进行中的事项时是「—」", async () => {
+    test.setTimeout(600_000);
+    const page = client.page;
+    const errors = watchErrors(client);
+    const projectId = backend.roomProject;
+    expect(projectId).not.toBeNull();
+    await openRoom(page, projectId!, "product");
+    await expect(facts()).toBeVisible();
+    // 预置事项已经结束，没有进行中的事项：仍是「—」
+    const finished = await query<{ work_items: { status: string }[] }>("project.loop", { project_id: projectId });
+    expect(finished.work_items.every((item) => item.status !== "in_progress")).toBe(true);
+    await expect(timeValue()).toHaveText("—");
+
+    // 起一个事项，等房间信息条换成真实读数
+    await command("work_item.create", { project_id: projectId, text: "为待办清单增加截止日期" });
+    await waitUntil(async () => (await timeValue().innerText()).trim() !== "—", "房间信息条的已用时间 / 上限出现读数");
+    const shown = (await timeValue().innerText()).trim();
+    // 上限部分与 project.loop 返回的 time_limit_sec 写出来的时长一致
+    const loop = await query<{ work_items: { status: string; elapsed_sec: number | null; time_limit_sec: number }[] }>(
+      "project.loop", { project_id: projectId });
+    const running = loop.work_items.find((item) => item.status === "in_progress");
+    expect(running).toBeDefined();
+    const parts = shown.split(" / ");
+    expect(parts).toHaveLength(2);
+    expect(parts[1]).toBe(duration(running!.time_limit_sec));
+    expect(parts[0]).toMatch(/^\d+ 秒$|^\d+ 分 \d+ 秒$|^\d+ 小时 \d+ 分$/);
+    await page.locator("[data-ws-info]").screenshot({ path: join(shots, "room-info-in-progress.png") });
+    await page.screenshot({ path: join(shots, "department-page-in-progress.png"), fullPage: true });
+    expect(errors).toEqual([]);
+  });
 });
