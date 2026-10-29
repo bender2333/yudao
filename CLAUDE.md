@@ -95,7 +95,6 @@ Yudao（枢道）是一个让产品、工程、质检三个部门围绕同一份
 ### docs/
 - `docs/architecture.html`：总图，给用户看的一页，六节：全局总图与方程、什么能动、一轮工作的经过、要守的缝、自举与验收、拆开部署。只由总架构师改。
 - `docs/program-roadmap.md`：总体路线图，五个阶段、十条道、三个空间与五条判据的对照；之前按 Stage 写的路线图在 `docs/archive/program-roadmap-2026-10-25.md`。
-- `docs/current-baseline.md`：当前验收基线与证据状态。
 - `docs/foundation-rules.md`：六条基础规则与属于它们的具体规则，属于可信内核，只由用户修改。
 - `docs/archive/stage-3-plan.md`、`docs/archive/stage-3/`：Stage 3 计划、验收合同与重排方案，2026-10-25 归档，已被路线图取代。
 - `docs/decision.md`：按日期记录的决策；2026-09-30 及以前的在 `docs/archive/decision-2026-09.md`。

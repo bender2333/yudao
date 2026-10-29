@@ -26,7 +26,7 @@
 两个地方各管一样，不合并：
 
 - **GitHub Issues**：工作队列。哪些打开、谁领取、被什么阻塞、是否完成。技能发布的内容都放这里。
-- **`docs/`**：设计与证据。需求记录（`docs/requirements/`）、模块设计与架构（`docs/design/`）、路线图与当前验收基线（`docs/program-roadmap.md`、`docs/current-baseline.md`）。长篇论证留在这里，工单只链接，不复制。日记：架构师的 `claude_jour.md` 在仓库根目录，执行者与审查者的在 `agents_jour/<工单编号>.md`（2026-10-06 之前的日记已归档为 `docs/archive/agents_jour.md`）。
+- **`docs/`**：设计与证据。需求记录（`docs/requirements/`）、模块设计与架构（`docs/design/`）、路线图（`docs/program-roadmap.md`）。长篇论证留在这里，工单只链接，不复制。日记：架构师的 `claude_jour.md` 在仓库根目录，执行者与审查者的在 `agents_jour/<工单编号>.md`（2026-10-06 之前的日记已归档为 `docs/archive/agents_jour.md`）。
 
 ## PR 是否作为分诊入口
 
