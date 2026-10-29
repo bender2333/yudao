@@ -2,6 +2,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from harness.watched_outputs import has_new_work
+from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
 from harness.compaction import SUMMARY_OUTPUT_TOKENS
 from harness.contracts import artifact_hash
@@ -408,8 +409,10 @@ def test_a_compaction_that_progresses_clears_the_stall_count(tmp_path):
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path):
-    """A summary cut off by the output limit is a terminal provider response: never adopted, never retried."""
+def test_truncated_summary_is_not_adopted_and_the_run_stops_on_overflow(tmp_path):
+    """被输出上限截断的整理回应是一次终局的上游回应：不采用、不重试、不写检查点。这一次压缩因此不生效
+    （设计说明第 8.7 节第一条），这一步的工作请求按未压缩的历史装配；这个窗口里放不下，所以按第 8.7 节
+    第三条以上下文超限结束，而不是把整项按模型服务故障停下（工单 #1213）。"""
     def truncated(request):
         item = _message(request, "Decisions: the first half of the memory and then")
         item["status"] = "incomplete"
@@ -418,7 +421,8 @@ def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path):
     system, adapter, run_id, _ = _runner(tmp_path, cancelled_summary=truncated, step_limits=FAST_RETRIES)
     result = system.activate_once(run_id)
 
-    assert result.status == "failed" and result.stop_reason == "provider_error"
+    # 停止原因来自「未压缩的历史放不下」，不是单次调用的失败分类（归类在 #604）
+    assert result.status == "failed" and result.stop_reason == "context_overflow", result.error
     assert not result.compactions
     attempts = [request for request in adapter.invocations if request.purpose == "compaction"]
     assert len(attempts) == 1
@@ -427,6 +431,7 @@ def test_truncated_summary_is_rejected_without_retry_or_checkpoint(tmp_path):
     assert not any(event.type == EventType.MODEL_RETRY_SCHEDULED for event in events)
     failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
     assert len(failed) == 1 and failed[0].payload["purpose"] == "compaction"
+    assert failed[0].payload["reason"] == "provider_error"
     assert failed[0].payload["retryable"] is False and failed[0].payload["will_retry"] is False
     assert "the first half" not in json_dumps(department_history(system, run_id, "product"))
     assert result.canonical_state() == system.replay(run_id).canonical_state()
@@ -651,4 +656,146 @@ def test_repeated_empty_summaries_stop_the_run_with_compaction_failed(tmp_path):
     assert not result.compactions
     assert not any(event.type == EventType.COMPACTION_RECORDED
                    for event in system.store.list_events(run_id))
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+# 工单 #1213：整理请求自己的失败不止「回应带未声明的工具调用」一种。空响应（上游流正常结束却没有
+# 输出项）与请求失败（上游故障、连接失败）都按设计说明第 8.7 节第一条处理：这一次压缩不生效、
+# 不写检查点，这一步的工作请求按未压缩的历史照常发送，下一步再次尝试压缩。
+
+
+def _empty_output_failure():
+    # 上游流正常结束却没有输出项：Provider 给出的可重试失败（工单 #305），整理请求收到它算一次请求失败
+    return ProviderError("Model response contained no output items", reason="empty_output", retryable=True,
+                         diagnostics={"error_type": "empty_output", "finish_reason": "completed",
+                                      "usage_reported": False, "output_tokens": None,
+                                      "max_output_tokens": 4096, "has_reasoning": False})
+
+
+def _upstream_unavailable_failure():
+    # 上游 5xx：可重试的请求失败，三次尝试用完以后交给内核（工单 #305）
+    return ProviderError("Upstream returned 503", reason="provider_unavailable", retryable=True,
+                         diagnostics={"error_type": "http_status", "status": 503})
+
+
+def test_empty_summary_replies_keep_the_step_and_send_the_work_request_uncompressed(tmp_path):
+    """整理请求三次尝试都回空响应（没有输出项）：没有写检查点，这一步的工作请求按未压缩的历史照常
+    发出，事项不停止；下一步再次发出整理请求并成功（工单 #1213，设计说明第 8.7 节第一条）。"""
+    work_counts = {}
+    compactions = 0
+
+    def respond(request):
+        nonlocal compactions
+        if request.purpose == "compaction":
+            compactions += 1
+            return _empty_output_failure() if compactions <= 3 else ModelResponse(output=[_message(request)])
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        return _read(request, "large.txt") if count == 0 else _read(request, "small.txt") if count == 1 \
+            else product_spec()
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+    assert result.status != "failed", result.error
+
+    product = [request for request in adapter.invocations if request.department == "product"]
+    # 三次空响应作为可重试失败记录，用尽以后这一步照常发工作请求，再下一步重新整理并成功
+    assert [request.purpose for request in product] == ["work", "compaction", "compaction", "compaction",
+                                                        "work", "compaction", "work"]
+    assert [request.attempt for request in product if request.purpose == "compaction"][:3] == [1, 2, 3]
+    events = system.store.list_events(run_id)
+    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert [(event.payload["purpose"], event.payload["will_retry"]) for event in failed] == [
+        ("compaction", True), ("compaction", True), ("compaction", False)]
+    assert [event.payload["reason"] for event in failed] == ["empty_output"] * 3
+    assert all(event.payload["diagnostics"]["error_type"] == "empty_output" for event in failed)
+    # 这一步的工作请求按未压缩的历史装配：原始工具输出在，摘要不在
+    kept = product[4]
+    assert "TOOL_OUTPUT " in json_dumps(kept.input_items)
+    assert "department_memory" not in json_dumps(kept.input_items)
+    # 空响应那三次没有写检查点：这次激活只记下延迟以后成功的那一次压缩，它在工作请求之后
+    assert len(result.compactions) == 1
+    recorded = next(event for event in events if event.type == EventType.COMPACTION_RECORDED)
+    requested = next(event for event in events if event.type == EventType.MODEL_REQUESTED
+                     and event.payload["purpose"] == "work" and event.stream_version > failed[-1].stream_version)
+    assert recorded.stream_version > requested.stream_version
+    # 下一个工作请求接着用摘要
+    assert "department_memory" in json_dumps(product[-1].input_items)
+    assert has_new_work(result, "engineering")
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_mixed_empty_and_failed_compaction_requests_stop_at_the_stall_limit(tmp_path):
+    """同一会话的整理连续失败（空响应与请求失败混在一起）达到 compaction.stalled_limit：事项以
+    compaction_failed 停止，停止说明写明连续的次数与最后一次的原因（工单 #1213）。"""
+    limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+    work_counts = {}
+    compactions = 0
+
+    def respond(request):
+        nonlocal compactions
+        if request.purpose == "compaction":
+            compactions += 1
+            # 每次逻辑调用的第一次尝试回空响应，后两次回上游 503：一个逻辑调用三次尝试用完，记一次没有推进
+            return _empty_output_failure() if compactions % 3 == 1 else _upstream_unavailable_failure()
+        # 第一次读大文件把历史顶过压缩阈值；之后的步骤只添一点点历史，未压缩的工作请求仍放得下
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        return _read(request, "large.txt") if count == 0 else _read(request, "small.txt")
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+
+    assert result.status == "failed" and result.stop_reason == "compaction_failed", result.error
+    # 停止说明写明连续的次数与最后一次的原因
+    assert f"连续 {limit} 次没有推进" in (result.error or "")
+    assert "Upstream returned 503" in (result.error or "")
+    # 空响应与请求失败计入同一个次数，停止以后不再发出新的整理请求
+    assert compactions == 3 * limit
+    assert not result.compactions
+    assert not any(event.type == EventType.COMPACTION_RECORDED for event in system.store.list_events(run_id))
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_the_work_request_after_a_failed_compaction_fails_on_its_own_path(tmp_path):
+    """整理请求失败以后紧接着的工作请求如果自己也失败：它走普通的请求失败路径停下，不在别处被吞成
+    「这一次压缩不生效」（工单 #1213「改完反问一句」，设计说明第 8.7 节第一条只讲整理请求）。"""
+    compactions = 0
+
+    def respond(request):
+        nonlocal compactions
+        if request.purpose == "compaction":
+            compactions += 1
+            return _empty_output_failure()
+        # 第一次工作请求读到的大文件把历史顶过压缩阈值；之后的工作请求同样回空响应，用尽三次停止
+        return _read(request, "large.txt") if compactions == 0 else _empty_output_failure()
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+
+    assert result.status == "failed" and result.stop_reason == "provider_error", result.error
+    assert "no output items" in (result.error or "")
+    assert compactions == 3
+    work = [request for request in adapter.invocations
+            if request.department == "product" and request.purpose == "work"]
+    assert [request.attempt for request in work[1:]] == [1, 2, 3]
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
+def test_compaction_request_overflow_still_stops_the_run(tmp_path):
+    """整理请求的失败原因是 context_overflow 时照旧以上下文超限停止，不被吞成「不生效」（工单 #1213，
+    设计说明第 8.7 节第三条）。"""
+    def respond(request):
+        if request.purpose == "compaction":
+            return ProviderError("prompt is too long", reason="context_overflow", retryable=False,
+                                 diagnostics={"error_type": "context_length"})
+        return _read(request, "large.txt")
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+
+    assert result.status == "failed" and result.stop_reason == "context_overflow", result.error
+    # 没有走「不生效」那条路：一次请求就停下，不再重试也不再整理
+    assert len([request for request in adapter.invocations if request.purpose == "compaction"]) == 1
+    assert not result.compactions
     assert result.canonical_state() == system.replay(run_id).canonical_state()
