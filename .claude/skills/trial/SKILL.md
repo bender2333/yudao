@@ -71,7 +71,7 @@ F1 与新手段不删减。单 agent 一方不跑（第 6 节），预算里没�
 | F1 新手段 | model2 | 起始文件夹路径、输入文本路径、归档目录、[method/novice.md](method/novice.md) | 不给 `docs/`、导出、本文第 5 节以后的任何内容 | `novice.md`、`shots/`、`text/` |
 | R1 新手段 | model2 | 同上，任务换成任务集 R1 的步骤与两段指导原话 | 同上 | `novice-r1.md`、`shots/`、`text/` |
 | 专家段 | model2 | 两段记录、导出、`errors.log`、试用工单、[method/expert.md](method/expert.md)、[method/probes.md](method/probes.md) | 不给结论与建议，让它自己查 | `expert.md` |
-| 看图（`vision.mjs`，不是子代理） | model2 | 截图的绝对路径与要回答的问题 | 不给结论，也不给「这里应该是什么样」 | 每张一段「看到什么」 |
+| 看图（子代理，或 `vision.mjs` 脚本） | model2 | 截图的绝对路径与要回答的问题 | 不给结论，也不给「这里应该是什么样」 | 每张一段「看到什么」 |
 | 独立复现 | model1 | 帖子草稿里每条问题的复现步骤、同一个 wheel、一个全新数据目录 | 不给记录、结论、`expert.md` | 每条一份「复现到 / 没复现到」 |
 
 两个模型时做不到三处互不相同。质检本来就跑 model2，找问题与看图的也是 model2，所以质检自己的输出要靠 model1 的复现子代理去查；产品与工程的输出由 model2 的找问题子代理查。帖子的「环境与前提」里写明这条分工与两个模型的名称。
@@ -88,9 +88,11 @@ F1 与新手段不删减。单 agent 一方不跑（第 6 节），预算里没�
 
 记下已有的安装（`yudao --version`、`uv tool list`），然后从 main 构建 wheel，装进仓库外的独立虚拟环境。**用干净克隆构建**：工作区里正在写的东西不能混进包里。
 
+`scripts/release.py` 只接受「在 main 上、已推送、且是远端最新」的提交，所以构建的提交就是克隆下来那一刻的 `origin/main`，不要 `git checkout` 到旧提交（2026-10-29 试用时这一点卡过一次：指定的提交落后于 main，脚本拒绝构建，只能在最新提交上跑）。要试的是某个旧提交时，先把这个事实写进帖子的「环境与前提」，再按脚本允许的提交构建。
+
 ```powershell
 git clone --no-tags <仓库地址> $env:TEMP\yudao-trial-src
-cd $env:TEMP\yudao-trial-src; git checkout <main 的提交>
+cd $env:TEMP\yudao-trial-src; git rev-parse HEAD        # 就是 origin/main 的最新提交，记进帖子
 uv run python scripts/release.py                 # 输出 wheel 路径与 SHA-256，记进帖子
 uv venv $env:TEMP\yudao-trial-venv
 uv pip install --python $env:TEMP\yudao-trial-venv\Scripts\python.exe <wheel 路径>
@@ -144,7 +146,7 @@ node .claude\skills\trial\scripts\vision.mjs --image shots/models.png --prompt "
 - 整页截图会到上亿像素：本轮 `shot --full` 出过 1674×223164 的图，送模型直接回 413。`browser.mjs` 现在默认 JPEG 并限制高度，`vision.mjs` 有体积与像素双闸；要更细的地方单独截那一块（`shot --css`），不要放大整页。
 - 视觉这条路只有 model2，而质检也跑 model2：截图读数只当客观读数（页面上写了什么、按钮什么状态），判断交给文本模型，不把截图读数算成独立证据。
 
-会话里的看图子代理这条路在这台机器上走不通：`ag/gemini-3.8-flash-high` 在 harness 的模型声明里只有文本输入，子代理调 `read_image` 会回「model does not declare image input」。要让它走通，得在本机 harness 配置里给这个模型加 `inputModalities: [text, image]`；不加就用脚本这条路，同一份 Key、同一个模型。
+看图有两条路，都走同一个模型。开子代理看图，适合要它顺带说页面前后关系、要它自己裁出几处细节的情形；`scripts/vision.mjs` 适合只要逐张抄看到什么，或者会话里的模型没有图像输入时。2026-10-29 起本机 harness 已给 `ag/gemini-3.8-flash-high` 声明了图像输入，子代理可以直接 `read_image`。换一台机器先试一次子代理读图，回「model does not declare image input」时二选一：在 harness 的模型声明里加 `input: [text, image]`（字段名是 `input`，`inputModalities` 是另一族协议用的，写错不生效也不报错），或者直接用脚本这条。两条路都不把截图读数算成独立证据（见上一条）。
 
 ## 6. 读数与对照
 
