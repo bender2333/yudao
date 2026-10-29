@@ -10,6 +10,7 @@ import re
 import shutil
 import stat
 import tempfile
+import time
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Iterable, Sequence
@@ -26,6 +27,14 @@ _HASH = re.compile(r"sha256:[0-9a-f]{64}")
 # 工作区忽略规则探测用的 Git 目录：放在工作区自身之外，避免它成为公开树的条目
 IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
 QA_TESTS_DIR = ".yudao-qa-tests"
+# 捕获撞上并发写入时的重读（工单 #1214，[设计说明](docs/design/local-tools.md)第 3 节「公开树」）：
+# 文件、目录或整棵树在两次扫描之间变了，读这一侧重读整份捕获，次数有界；
+# 工作区本来就有多会话并发读写（第 2 节「每块内容只有一个写入者」是纪律，不是锁），
+# 因此一次并发写入不结束事项。次数用完仍不稳定才以 TreeError 交出文件与原因。
+CAPTURE_ATTEMPTS = 3
+# 每次重读前的等待（秒），递减：一直变的工作区不会因为等得更久而稳定，
+# 而捕获是在动作路径上同步执行的，等待越短越好。
+_CAPTURE_DELAYS = (0.1, 0.05)
 _GIT_DIR_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
 # 探测库所在的进程专属目录（工单 #706）：libgit2 拒绝长度超过约 190 个字符的仓库路径，
 # 探测库放在工作区旁边时，深的数据目录会让每一次判断都失败
@@ -44,6 +53,15 @@ class UnrepresentableWorkspace(TreeError):
         super().__init__(
             "; ".join([*self.reasons, "Add these paths to the project's ignore rules or delete them."])
         )
+
+class _ConcurrentChange(TreeError):
+    """捕获期间工作区被别的写入者改了：读这一侧重读，不是判据上的拒绝。
+
+    只在 `capture_public_tree` 内部使用：有界重读用完后照旧以 `TreeError` 交出这一次的
+    说明文字，文件名与原因都保留。判据上的拒绝（链接、硬链接、特殊文件）不是这个类型，
+    第一次就抛出，不重读。
+    """
+
 
 @dataclass(frozen=True)
 class CapturedFile:
@@ -219,13 +237,30 @@ def unrepresentable_reason(observed: os.stat_result, relative: str) -> str | Non
     return None
 
 def capture_public_tree(root: str | Path, respect_ignore_rules: bool = False) -> CapturedTree:
-    """Capture stable local bytes; filesystem changes during collection are errors.
+    """Capture stable local bytes; a concurrent writer is reread, a persistent change is an error.
 
     respect_ignore_rules 打开时（run 工作区的读取、起始文件夹与建档的快照采集），
     被项目忽略规则排除的路径不进入公开树，规则由 libgit2 在进程内判断；
     已封存树的恢复与核对不应用忽略规则。
+
+    别的部门正在写这个工作区时（文件内容或身份变了、条目消失了、条目种类变了、
+    前后两次扫描不同），读这一侧不在第一次变化上失败：短暂等待后重读整份捕获，
+    共 `CAPTURE_ATTEMPTS` 次；用完仍不稳定就以 `TreeError` 交出文件与原因。
+    不可表示的条目与链接照旧第一次就拒绝，重读不放宽任何判据。
     """
     base = _checked_directory(root)
+    for attempt in range(CAPTURE_ATTEMPTS):
+        try:
+            return _capture_once(base, respect_ignore_rules=respect_ignore_rules)
+        except _ConcurrentChange:
+            if attempt + 1 >= CAPTURE_ATTEMPTS:
+                raise
+            time.sleep(_CAPTURE_DELAYS[min(attempt, len(_CAPTURE_DELAYS) - 1)])
+    raise AssertionError("capture loop ended without a tree or an error")
+
+
+def _capture_once(base: Path, *, respect_ignore_rules: bool) -> CapturedTree:
+    """One complete attempt: scan, read every file, scan again and compare identities."""
     before = _scan(base, respect_ignore_rules=respect_ignore_rules)
     files = []
     for relative, observed in before.items():
@@ -235,7 +270,7 @@ def capture_public_tree(root: str | Path, respect_ignore_rules: bool = False) ->
     if {path: _identity(value) for path, value in before.items()} != {
         path: _identity(value) for path, value in after.items()
     }:
-        raise TreeError("Public tree changed during capture")
+        raise _ConcurrentChange("Public tree changed during capture")
     return CapturedTree(
         directories=tuple(sorted(path for path, value in before.items() if path and stat.S_ISDIR(value.st_mode))),
         files=tuple(sorted(files, key=lambda item: item.path)),
@@ -319,10 +354,10 @@ def _scan(base: Path, *, respect_ignore_rules: bool = False) -> dict[str, os.sta
     pending: list[tuple[Path, str]] = [(base, "")]
     while pending:
         directory, relative_directory = pending.pop()
-        observed = directory.lstat()
+        observed = _lstat_captured(directory, relative_directory or ".")
         _check_kind(directory, observed)
         if not stat.S_ISDIR(observed.st_mode):
-            raise TreeError(f"Directory changed during capture: {directory}")
+            raise _ConcurrentChange(f"Directory changed during capture: {relative_directory or '.'}")
         if relative_directory:
             found[relative_directory] = observed
         entries: list[tuple[str, Path, os.stat_result]] = []
@@ -334,7 +369,7 @@ def _scan(base: Path, *, respect_ignore_rules: bool = False) -> dict[str, os.sta
                 validate_public_path(relative)
                 path = directory / entry.name
                 # Windows DirEntry.stat omits file identity and link count.
-                entries.append((relative, path, path.lstat()))
+                entries.append((relative, path, _lstat_captured(path, relative)))
         ignored = (excluded_by_ignore_rules(base, [relative for relative, _path, _observed in entries])
                    if respect_ignore_rules else frozenset())
         for relative, path, entry_observed in entries:
@@ -352,19 +387,28 @@ def _scan(base: Path, *, respect_ignore_rules: bool = False) -> dict[str, os.sta
         raise UnrepresentableWorkspace(findings)
     return found
 
+def _lstat_captured(path: Path, relative: str) -> os.stat_result:
+    """lstat 一个扫描到的条目；它在捕获期间不见了也算并发改动，交给重读。"""
+    try:
+        return path.lstat()
+    except FileNotFoundError as error:
+        raise _ConcurrentChange(f"Workspace entry disappeared during capture: {relative}") from error
+
 def _read_stable_file(path: Path, expected: os.stat_result, relative: str) -> bytes:
-    with path.open("rb") as handle:
-        opened = os.fstat(handle.fileno())
-        _check_kind(path, opened, relative)
-        # Windows path stat and fstat disagree on the meaning of st_ctime.
-        if _identity(opened, change_time=False) != _identity(expected, change_time=False):
-            raise TreeError(f"File changed before it could be captured: {relative}")
-        raw = handle.read()
-        closed = os.fstat(handle.fileno())
-    current = path.lstat()
+    try:
+        with path.open("rb") as handle:
+            opened = os.fstat(handle.fileno())
+            _check_kind(path, opened, relative)
+            if _identity_shared_by_path_and_handle(opened) != _identity_shared_by_path_and_handle(expected):
+                raise _ConcurrentChange(f"File changed before it could be captured: {relative}")
+            raw = handle.read()
+            closed = os.fstat(handle.fileno())
+        current = path.lstat()
+    except FileNotFoundError as error:
+        raise _ConcurrentChange(f"File disappeared while it was being captured: {relative}") from error
     _check_kind(path, current, relative)
     if _identity(closed) != _identity(opened) or _identity(current) != _identity(expected) or len(raw) != expected.st_size:
-        raise TreeError(f"File changed while it was being captured: {relative}")
+        raise _ConcurrentChange(f"File changed while it was being captured: {relative}")
     return raw
 
 def _identity(observed: os.stat_result, *, change_time: bool = True) -> tuple[int, ...]:
@@ -373,6 +417,20 @@ def _identity(observed: os.stat_result, *, change_time: bool = True) -> tuple[in
         observed.st_size, observed.st_mtime_ns,
     )
     return (*fields, observed.st_ctime_ns) if change_time else fields
+
+def _identity_shared_by_path_and_handle(observed: os.stat_result) -> tuple[int, ...]:
+    """按路径 stat 与按句柄 fstat 都取得到的字段：判断「扫描时看到的」与「打开的」是不是同一个文件。
+
+    权限位不参与比较：Windows 上按路径 stat 会按可执行后缀（`.cmd`、`.bat`、`.exe`）补上
+    可执行位，按句柄 fstat 没有文件名可用、不补，同一个文件因此给出两个不同的 `st_mode`
+    （工单 #1214，试用 Tc1f7185a-02 撞上的正是写 `jizhang.cmd` 与 `start.bat` 那两次）。
+    权限位也不是内容；文件种类另由 `_check_kind` 与 `stat.S_IFMT` 判，链接、重解析点与硬链接
+    照旧拒绝。
+    """
+    return (
+        observed.st_dev, observed.st_ino, stat.S_IFMT(observed.st_mode), observed.st_nlink,
+        observed.st_size, observed.st_mtime_ns,
+    )
 
 
 __all__ = [

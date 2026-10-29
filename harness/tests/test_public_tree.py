@@ -1,9 +1,11 @@
 import os
 import subprocess
+import threading
 from pathlib import Path
 
 import pytest
 
+from harness import public_tree as public_tree_module
 from harness.models import hash_bytes
 from harness.public_tree import (
     TreeError,
@@ -139,35 +141,155 @@ def test_capture_rejects_windows_junctions(tmp_path, placement):
         capture_public_tree(target)
 
 
-@pytest.mark.parametrize("change", ["rewrite", "replace", "add_file", "remove_directory"])
-def test_capture_rejects_a_tree_that_changes_during_collection(tmp_path, monkeypatch, change):
+@pytest.mark.parametrize("change", ["rewrite", "replace", "toggle_file", "toggle_directory"])
+def test_capture_rejects_a_tree_that_keeps_changing_during_collection(tmp_path, monkeypatch, change):
+    # 一直变的工作区：有界重读用完后仍然报错，不吞成空树，也不返回这一轮读到的残缺的树
     source = _workspace(tmp_path / "source")
     trigger = source / "undeclared.txt"
     original_open = Path.open
-    changed = False
+    attempts = []
 
     def changing_open(path, mode="r", *args, **kwargs):
-        nonlocal changed
-        if path == trigger and mode == "rb" and not changed:
-            changed = True
+        if path == trigger and mode == "rb":
+            attempts.append(path)
             if change == "rewrite":
                 with original_open(trigger, "wb") as handle:
-                    handle.write(b"changed bytes")
+                    handle.write(b"changed %d bytes" % len(attempts))
             elif change == "replace":
                 trigger.unlink()
                 with original_open(trigger, "wb") as handle:
-                    handle.write(b"replacement bytes")
-            elif change == "add_file":
-                with original_open(source / "new.txt", "wb") as handle:
-                    handle.write(b"new")
+                    handle.write(b"replacement %d bytes" % len(attempts))
+            elif change == "toggle_file":
+                toggled = source / "toggled.txt"
+                if toggled.exists():
+                    toggled.unlink()
+                else:
+                    with original_open(toggled, "wb") as handle:
+                        handle.write(b"toggle")
             else:
-                (source / "nested" / "empty").rmdir()
+                toggled = source / "nested" / "toggled"
+                if toggled.exists():
+                    toggled.rmdir()
+                else:
+                    toggled.mkdir()
         return original_open(path, mode, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", changing_open)
-    with pytest.raises((TreeError, FileNotFoundError)):
+    with pytest.raises(TreeError) as raised:
         capture_public_tree(source)
-    assert changed
+    assert len(attempts) == public_tree_module.CAPTURE_ATTEMPTS
+    assert "changed" in str(raised.value)
+
+
+def test_capture_rereads_once_another_department_is_done_writing(tmp_path, monkeypatch):
+    # 另一个线程在工作区里写文件（模拟工程的 write_file）：捕获撞上这一次写入时重读，成功返回
+    source = _workspace(tmp_path / "source")
+    trigger = source / "undeclared.txt"
+    original_open = Path.open
+    write_started = threading.Event()
+    writes_done = threading.Event()
+    reads = []
+
+    def writer():
+        # 一次完整的写入：写完之后这个文件就稳定了，重读应当读到它
+        if write_started.wait(10):
+            with original_open(trigger, "wb") as handle:
+                handle.write(b"engineering wrote this\r\n")
+            writes_done.set()
+
+    def writing_open(path, mode="r", *args, **kwargs):
+        if path == trigger and mode == "rb" and not reads:
+            write_started.set()
+            assert writes_done.wait(10), "the writing thread never finished its write"
+        if path == trigger and mode == "rb":
+            reads.append(path)
+        return original_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", writing_open)
+    thread = threading.Thread(target=writer, daemon=True)
+    thread.start()
+    try:
+        tree = capture_public_tree(source)
+    finally:
+        thread.join(10)
+
+    assert len(reads) >= 2, "the first capture should have collided with the write and been retried"
+    captured = {item.path: item.data for item in tree.files}
+    assert captured["undeclared.txt"] == b"engineering wrote this\r\n"
+    assert sorted(captured) == [".hidden", "nested/binary.bin", "undeclared.txt"]
+    assert tree.directories == ("nested", "nested/empty")
+
+
+def test_capture_reports_a_file_it_can_never_read_stably(tmp_path, monkeypatch):
+    # 整个窗口里一直变：重读写不完，仍然报错，消息里有文件名与原因
+    source = _workspace(tmp_path / "source")
+    trigger = source / "undeclared.txt"
+    original_open = Path.open
+    reads = []
+
+    def always_changing_open(path, mode="r", *args, **kwargs):
+        if path == trigger and mode == "rb":
+            reads.append(path)
+            with original_open(trigger, "wb") as handle:
+                handle.write(b"still changing %d" % len(reads))
+        return original_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", always_changing_open)
+    with pytest.raises(TreeError) as raised:
+        capture_public_tree(source)
+    assert len(reads) == public_tree_module.CAPTURE_ATTEMPTS
+    assert 1 < public_tree_module.CAPTURE_ATTEMPTS <= 5
+    assert "undeclared.txt" in str(raised.value)
+    assert "File changed" in str(raised.value)
+
+
+@pytest.mark.parametrize("name", ["jizhang.cmd", "start.bat", "tool.exe"])
+def test_capture_reads_a_stable_script_file_whose_path_and_handle_modes_differ(tmp_path, name):
+    # 工作区里一个稳定的 .cmd/.bat/.exe：Windows 上按路径 stat 按后缀补上可执行位、按句柄 fstat
+    # 不补，同一个文件的 st_mode 因此不同，不能被当成「文件在变」（工单 #1214，试用 Tc1f7185a-02）
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "notes.txt").write_bytes(b"stable\r\n")
+    (source / name).write_bytes(b"@echo off\r\n")
+    tree = capture_public_tree(source)
+    assert sorted(item.path for item in tree.files) == sorted(["notes.txt", name])
+    assert {item.path: item.data for item in tree.files}[name] == b"@echo off\r\n"
+
+
+@pytest.mark.parametrize("kind", ["link", "hardlink", "junction"])
+def test_a_reread_does_not_loosen_what_the_tree_cannot_represent(tmp_path, monkeypatch, kind):
+    # 链接、硬链接与重解析点不可表示：第一次就拒绝，不靠重读把它们绕过去
+    source = tmp_path / "source"
+    source.mkdir()
+    (source / "keep.txt").write_bytes(b"keep")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.txt").write_bytes(b"outside")
+    if kind == "link":
+        _symlink(outside, source / "linked", directory=True)
+    elif kind == "junction":
+        if os.name != "nt":
+            pytest.skip("junctions are Windows-specific")
+        result = subprocess.run(["cmd", "/c", "mklink", "/J", str(source / "linked"), str(outside)], capture_output=True)
+        if result.returncode:
+            pytest.skip("junctions are unavailable")
+    else:
+        try:
+            os.link(outside / "secret.txt", source / "linked.bin")
+        except OSError:
+            pytest.skip("hard links are unavailable")
+    attempts = []
+    original_capture_once = public_tree_module._capture_once
+
+    def counting_capture_once(base, **kwargs):
+        attempts.append(base)
+        return original_capture_once(base, **kwargs)
+
+    monkeypatch.setattr(public_tree_module, "_capture_once", counting_capture_once)
+    with pytest.raises(TreeError, match="not supported") as raised:
+        capture_public_tree(source)
+    assert len(attempts) == 1, "an entry the tree cannot represent must not be reread"
+    assert "linked" in str(raised.value)
 
 
 def test_restore_rejects_existing_destination_without_changing_it(tmp_path):
