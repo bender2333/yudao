@@ -230,8 +230,12 @@ def test_capture_reports_a_file_it_can_never_read_stably(tmp_path, monkeypatch):
     def always_changing_open(path, mode="r", *args, **kwargs):
         if path == trigger and mode == "rb":
             reads.append(path)
+            # 每次读之前都写一次，长度逐次变化，而且第一次就与原内容（`original\r\nbytes\r`，16 字节）不同：
+            # Windows 上文件时间按系统时钟更新（约 15.6 毫秒一格），同一格里的两次**等长**写入在
+            # `st_size` 与 `st_mtime_ns` 上都看不出变化，捕获会被当成稳定（2026-10-29 的 CI 上就是这样
+            # 失败的：DID NOT RAISE TreeError；本机慢一些、每次写入跨格，所以本机一直通过）
             with original_open(trigger, "wb") as handle:
-                handle.write(b"still changing %d" % len(reads))
+                handle.write(b"still changing " + b"y" * (10 + len(reads)))
         return original_open(path, mode, *args, **kwargs)
 
     monkeypatch.setattr(Path, "open", always_changing_open)
