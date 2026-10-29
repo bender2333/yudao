@@ -91,12 +91,23 @@ async function goto(page: Page, hash: string): Promise<void> {
   await page.evaluate((h) => { window.location.hash = h; }, hash);
 }
 
-/** 检查一张画布：整数倍、铺满容器、最近邻、画面有内容。 */
+/** 可见容器的内容宽：clientWidth 已去掉边框与滚动条，再减掉左右内边距。 */
+async function contentWidthOf(locator: Locator): Promise<number> {
+  return locator.evaluate((el) => {
+    const cs = getComputedStyle(el);
+    const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+    return Math.round((el.clientWidth - (Number.isNaN(pad) ? 0 : pad)) * 100) / 100;
+  });
+}
+
+/** 检查一张画布：整数倍、铺满容器、最近邻、画面有内容。
+ *  `reference` 是量「铺满」的对象，默认是画布自己的父元素；部门房间传可见的舞台。 */
 async function checkSurface(
   locator: Locator,
   logicalW: number,
   logicalH: number | null,
   description: string,
+  reference?: Locator,
 ): Promise<CanvasPixels> {
   const pixels = await readCanvas(locator);
   expect(pixels.width % logicalW, `${description} 的画布宽不是逻辑宽 ${logicalW} 的整数倍：${pixels.width}`).toBe(0);
@@ -104,7 +115,11 @@ async function checkSurface(
     expect(pixels.height % logicalH, `${description} 的画布高不是逻辑高 ${logicalH} 的整数倍：${pixels.height}`).toBe(0);
   }
   expect(pixels.width / logicalW).toBeGreaterThanOrEqual(1);
-  expect(Math.abs(pixels.cssWidth - pixels.hostWidth), `${description} 的画布没有铺满容器`).toBeLessThanOrEqual(2);
+  // 「铺满」对着可见的容器量。默认量画布自己的父元素（宿主）；部门房间要对着舞台量：
+  // 宿主缩成画布那么宽时两边必然相等，量父元素拦不住宿主没有撑满舞台（工单 #1228）。
+  const containerWidth = reference === undefined ? pixels.hostWidth : await contentWidthOf(reference);
+  expect(Math.abs(pixels.cssWidth - containerWidth),
+         `${description} 的画布没有铺满容器：画布 ${pixels.cssWidth}，容器 ${containerWidth}`).toBeLessThanOrEqual(2);
   expect(pixels.imageRendering).toBe("pixelated");
   expect(pixels.colors, `${description} 的画面只有 ${pixels.colors} 种颜色`).toBeGreaterThan(8);
   expect(pixels.inkRatio, `${description} 的画面几乎没有内容`).toBeGreaterThan(0.02);
@@ -135,11 +150,14 @@ test("楼层、部门房间、首页的楼按设备分辨率绘制：整数倍�
     const floorPixels = await checkSurface(floor, 640, 320, "楼层");
     expect(floorPixels.midLevels, "楼层画面的文字没有灰阶层次").toBeGreaterThan(12);
 
-    // 部门工作间的房间：480×240
+    // 部门工作间的房间：480×240。「铺满」对着舞台量：宿主没有撑满舞台时画布的 CSS 宽只有 300
     await goto(page, `#/p/${id}/dept/product`);
     const room = page.locator(".room-canvas canvas");
     await expect(room).toHaveCount(1);
-    const roomPixels = await checkSurface(room, 480, 240, "部门房间");
+    const stage = page.locator(".y10-ws-stage");
+    await expect(stage).toHaveCount(1);
+    const roomPixels = await checkSurface(room, 480, 240, "部门房间", stage);
+    expect(roomPixels.width, `部门房间的画布缓冲宽 ${roomPixels.width} 没有超过逻辑宽 480`).toBeGreaterThan(480);
     expect(roomPixels.midLevels, "部门房间画面的文字没有灰阶层次").toBeGreaterThan(12);
 
     expect(errors).toEqual([]);
@@ -186,3 +204,32 @@ for (const size of [
     }
   });
 }
+
+// 工单 #1228 验收第 2 条：窗口缩窄时画布跟着舞台变窄，页面不出现横向滚动条。
+test("800×600 下部门房间的画布不超过舞台宽，页面没有横向滚动条", async () => {
+  test.setTimeout(300_000);
+  const client = await startClient(backend, { width: 800, height: 600 });
+  const page = client.page;
+  try {
+    const id = await projectId("示例项目");
+    await goto(page, `#/p/${id}/dept/product`);
+    const room = page.locator(".room-canvas canvas");
+    await expect(room).toHaveCount(1);
+    const stage = page.locator(".y10-ws-stage");
+    await expect(stage).toHaveCount(1);
+
+    const pixels = await readCanvas(room);
+    const stageWidth = await contentWidthOf(stage);
+    expect(pixels.width % 480, `画布的像素宽不是逻辑宽 480 的整数倍：${pixels.width}`).toBe(0);
+    expect(pixels.cssWidth, `画布 ${pixels.cssWidth} 比舞台 ${stageWidth} 宽`).toBeLessThanOrEqual(stageWidth + 2);
+
+    const read = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(read.scrollWidth, `页面出现横向滚动条：scrollWidth ${read.scrollWidth} > 视口 ${read.clientWidth}`)
+      .toBeLessThanOrEqual(read.clientWidth);
+  } finally {
+    await client.close();
+  }
+});
