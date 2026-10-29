@@ -51,6 +51,13 @@ class NotFound(LookupError):
     pass
 
 
+class QueryInputInvalid(ValueError):
+    # 查询的参数组合或取值不合法：这是输入问题，接口层映射为 422、原因写进 error，命令行打印原因并非零退出。
+    # 与 CatalogQueryInvalid 同一类做法（工单 #261）：接口层只认应用层登记过的异常，不去认一个裸 ValueError。
+    # 只有登记成这一种输入问题的参数检查才抛它，别的异常照旧冒到框架（工单 #1218）
+    pass
+
+
 # 分页游标：第一页位置、最后一条记录的位置与标识（设计说明第 4.1 节）
 CURSOR_PATTERN = re.compile(r"^\d+:\d+:.+$")
 
@@ -2139,7 +2146,8 @@ class ReplayCheckResult(Contract):
 
 def _replay_check(application: Application, request: ReplayCheck) -> Snapshot[ReplayCheckResult]:
     if (request.run_id is None) == (request.project_id is None):
-        raise ValueError("replay.check takes exactly one of run_id or project_id")
+        # 重放核对只有一个目标：两个都不给或两个都给是输入问题，接口层回 422（工单 #1218）
+        raise QueryInputInvalid("replay.check takes exactly one of run_id or project_id")
     store = application.system.store
     if request.project_id is not None:
         saved = saved_project(store, request.project_id)
