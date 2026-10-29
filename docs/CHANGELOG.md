@@ -7,6 +7,8 @@
 
 ---
 
+claude-opus-5-5（总架构师） / 2026-10-29 23:45 / `docs/trial/stage-1-guide.md` 第 3 节「四个实测过的坑」改为六个，新增两条：新建连接时「保存 Key」灰着是正常的（Key 随「添加」一起提交）；服务方案选「自定义」时窗口与输出上限没有预填，要在候选卡片里填上数字并勾选以后「加入」才亮。设计说明 `docs/design/model-management.md` 第 4.3 节「加入」同步加一句批量填写与两句说明（记在该文件文末的变更记录里，不重复记这里） / 用户 2026-10-29 23:23 起亲自试用 0.2.0 时卡在「填写了 key 以后保持为灰色、后续获取模型都不能用」；同一现象已建工单 #1259（灰着的按钮写明缺哪一项）与 #1260（候选可批量填写容量）
+
 solo-deepseek-v4.1-flash / 2026-10-29 19:59 / 工单 #1250 [集成层]：本文件加这一条，`docs/` 下改的是 `docs/architecture-issues.md`——新增一条规范遗漏：`harness/tests/wait_limits.py` 的 `WAIT_FOR_HOST_WORK_SEC`（300 秒）与根 `conftest.py` 的集成层用例超时（`TIMEOUTS[INTEGRATION]`，300 秒）相等，而 CI 的集成层命令用 `--timeout-method=thread`，该实现在 Windows 上到点 dump 栈后 `os._exit(1)`，用例卡住时表现为 xdist 的 `node down: Not properly terminated`（工作进程消失、作业不再推进）而不是一条失败；建议把「等待主机工作的上限严格小于所在层给每条用例的超时」写成不变式并给一条检查，`wait_limits.py` 与根 `conftest.py` 都不在本单的「只改」里 / 工单 #1250 的取证发现：该用例自己的等待与 CI 的用例超时取同一个数，是「工作进程为什么会消失」的那一步；本单在 `test_onboarding_commands.py` 里取 `min(WAIT_FOR_HOST_WORK_SEC, 150.0)` 兜底
 
 claude-sonnet-5-5（总架构师） / 2026-10-29 17:40 / 本文件加这一条，`docs/` 下的文档都没有改——新增技能 `.claude/skills/doc-scan/`：`SKILL.md` 写全量文档一致性扫描的六步（划范围、读正本写核对清单、分组并发派发、脚本核对、合并抽查、写报告），`scripts/` 下三个脚本（`check-links.ps1` 链接可解析性、`term-audit.ps1` 术语表避免说法与旧编号分布、`merge-findings.ps1` 合并各组 JSON 成明细表）；`CLAUDE.md` 的「文档维护与归档」加一行指向 `/doc-scan` / 用户要求把 2026-10-29 那次全量扫描的做法固化成技能
