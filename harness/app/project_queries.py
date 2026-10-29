@@ -971,8 +971,10 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
         department=department, level="ui", status=status,
         crt=RoomCrt(target=target, model=model_label, protocol=protocol,
                     status=ROOM_STATUS_TEXT[status], cycle=None if run is None else run.cycle_count),
-        roles=[RoomRole(id=role_id, name=role_name, kind=role_kind, status=role_status,
-                        task=None if item is None else item.title)],
+        # 角色的当前任务只在有事实说明它此刻做什么时才填（工单 #1230）：现在系统里还没有这样的事实
+        # （一个部门只有一个角色，没有哪一项记录写着它此刻手上的事），所以这一栏是空，
+        # 事项标题只留在房间屏幕的目标行（上面的 crt.target），不再借过来当角色的任务
+        roles=[RoomRole(id=role_id, name=role_name, kind=role_kind, status=role_status, task=None)],
         existing_read=bool(item is not None and item.kind == "onboarding"),
         pose=pose,
         door=_room_door(run, status),

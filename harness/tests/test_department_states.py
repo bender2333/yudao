@@ -328,6 +328,40 @@ def test_the_room_counts_the_questions_waiting_for_its_department(data_dir):
     assert captured["rooms"] == {"product": 1, "engineering": 0, "quality": 0}
 
 
+def test_the_role_bar_does_not_use_the_item_title_as_the_current_task(data_dir):
+    # 工单 #1230：角色的 task 只在有事实说明它此刻做什么时才填。现在系统里没有这样的事实
+    # （一个部门只有一个角色，没有哪一项记录写着它此刻手上的事），所以事项进行中时它也是空；
+    # 事项标题只留在房间屏幕的目标行（crt.target），不再借过来当角色的任务
+    system = _system(data_dir, _happy_script())
+    project_id = system.projects.register("角色条", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    application = _application(system)
+    captured: dict[str, Any] = {}
+
+    def take(event: Any) -> None:
+        if "rooms" not in captured:
+            # 事项进行中：工程刚开始这一步，run 还没有结束
+            captured["rooms"] = {
+                department: application.query(
+                    "department.workspace",
+                    DepartmentWorkspace(project_id=project_id, department=department, work_item=work_item_id)
+                ).data.room
+                for department in ("product", "engineering", "quality")
+            }
+            captured["item"] = application.query(
+                "project.overview", ProjectOverview(project_id=project_id, work_item=work_item_id)
+            ).data.work_items[0]
+
+    _capture(system, lambda event: (event.type == EventType.DEPARTMENT_ACTIVATED
+                                    and event.department == "engineering"), take)
+    system.run_until_stop(run_id)
+
+    assert captured["item"].status == "in_progress"
+    for department, room in captured["rooms"].items():
+        assert room.roles[0].task is None, (department, room.roles[0])
+        assert room.crt.target == "做一件事"
+
+
 def test_every_event_that_changes_the_departments_is_in_the_three_refresh_lists():
     # 验收第 9 条：会改变部门状态的事件种类都在三个查询的刷新清单里（重放核对另有用例）
     needed = {EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED, EventType.ASK_STARTED,
