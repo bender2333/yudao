@@ -227,6 +227,8 @@ uv run python -m harness smoke --provider-config .yudao/providers.json --scenari
 
 报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性、Git 版本及逐步模型输入审计。Git 审计缺失或未通过时不能返回验收成功。每次只记录本次选择的场景，不继承上次报告中的验收结果。
 
+**先跑模型测试准入。** smoke 自己不做准入：三个部门绑定的模型没有通过模型测试时，它以 exit 2、`provider_unavailable` 拒绝，原文写明是哪个部门的哪个模型没过。做法与页面同一条规则：用同一份 provider 配置与数据目录起一次服务（`--no-browser`），走 `catalog.connection.test` 与 `catalog.model.test` 写下 `admissions.json`，再跑 smoke（2026-10-29 实测）。
+
 ## 如何使用
 
 界面由服务提供的网页提供，命令与查询经应用接口提交与读取。下面的例子用 `curl` 直接调用接口；每条命令都带客户端生成的 `command_id`（重试使用同一个值）。

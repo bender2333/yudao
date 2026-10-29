@@ -1,6 +1,6 @@
 {
   "name": "yudao-client",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Yudao 网页界面：Vite 构建的页面文件，由 Yudao 服务提供",
