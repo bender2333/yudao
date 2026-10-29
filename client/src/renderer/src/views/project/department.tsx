@@ -12,16 +12,18 @@ import type {
   DepartmentWorkspaceResult,
   EventDetailResult,
   GuidanceRecord,
+  ProjectLoopResult,
   ProjectOverviewResult,
   RunActionsResult,
   RunAsksResult,
+  WorkItemLoop,
 } from "../../api/generated/types.gen";
 import { paths, type Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDepartmentDraft } from "./department-settings-form";
-import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts, formatTime,
-  itemSource, label, lettersWaitingText, roleBarText, type DepartmentStateView } from "./labels";
+import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts, formatDuration,
+  formatTime, itemSource, label, lettersWaitingText, roleBarText, type DepartmentStateView } from "./labels";
 import { askIndent, askLine } from "./asks-text";
 import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
 import { RoomScreen } from "./room-screen";
@@ -108,18 +110,35 @@ export function RoomSection(props: { app: ClientApp; department: string; data: D
       </div>
       {props.data ? (
         <div className="y10-ws-room-info room-info" data-ws-info>
-          <RoomInfoArea data={props.data} />
+          <RoomInfoArea app={props.app} data={props.data} />
         </div>
       ) : null}
     </Section>
   );
 }
 
-function RoomInfoArea(props: { data: DepartmentWorkspaceResult }) {
+// 「已用时间 / 上限」的读数（工单 #1229）：事项进行中时用 project.loop 里的 elapsed_sec 与 time_limit_sec
+// 写成两个时长，写法与恢复页「已用时间与时间上限」一致；没有进行中的事项、或者查询还没有数据时显示「—」。
+export function elapsedLimitText(item: WorkItemLoop | null): string {
+  if (item === null || item.status !== "in_progress" || item.elapsed_sec === null) {
+    return "—";
+  }
+  return `${formatDuration(item.elapsed_sec)} / ${formatDuration(item.time_limit_sec)}`;
+}
+
+function RoomInfoArea(props: { app: ClientApp; data: DepartmentWorkspaceResult }) {
   const { data } = props;
   const room = data.room;
   // 传信管：等待本部门回答的询问数（原型 v12 第 3.3 节，工单 #905）；为 0 时不写这一行
   const letters = lettersWaitingText(room.pipes?.letters_waiting);
+  // 已用时间与上限在 project.loop（department.workspace 不带这两项）：取当前事项的 elapsed_sec 与
+  // time_limit_sec，与恢复页「已用时间与时间上限」同一个查询、同一对字段、同一种写法（工单 #1229）
+  const loop = useSnapshot<ProjectLoopResult>(props.app, "page.dept.loop", "project.loop", {
+    project_id: data.project_id,
+    work_item: data.work_item_id ?? "",
+  }, data.work_item_id === null);
+  const loopItem = (loop.data?.work_items ?? []).find(
+    (entry) => entry.work_item_id === data.work_item_id) ?? null;
   return (
     <>
       <KeyValue
@@ -128,8 +147,7 @@ function RoomInfoArea(props: { data: DepartmentWorkspaceResult }) {
           ["第几轮", data.room.crt.cycle === null || data.room.crt.cycle === undefined
             ? "—"
             : `第 ${data.room.crt.cycle} 轮`],
-          // 已用时间与上限：department.workspace 不带这两项（project.loop 里有），没有数据显示「—」
-          ["已用时间 / 上限", "—"],
+          ["已用时间 / 上限", elapsedLimitText(loopItem)],
           ["执行机器", room.machine ? room.machine : "—"],
           ["信箱", `${room.mailbox} 封未读指导`],
         ]}
