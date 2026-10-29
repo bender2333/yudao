@@ -194,6 +194,9 @@ class WorkItem:
     stop_reason: str | None = None
     # 停止说明（工单 #1162）：让事项停下的那条错误的原文，取自事项结束的事件；只有停止的事项有
     stop_note: str | None = None
+    # 已收下的交付（工单 #1239）：事项停止时这个 run 里已经收下的那一版交付的版本与收下的时间（{"version", "accepted_at"}）；
+    # 没有已收下的交付时为空。用户自己取消也照样写：交付仍然在
+    kept_delivery: dict[str, Any] | None = None
     human_action: str | None = None
     cycle_count: int = 0
     rework: list[dict[str, Any]] = field(default_factory=list)

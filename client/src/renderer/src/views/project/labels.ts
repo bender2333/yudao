@@ -389,18 +389,32 @@ export function departmentName(value: string | null | undefined): string {
 export const STOP_NOTE_INLINE_LIMIT = 120;
 
 export type StopNoteView =
-  | { kind: "none" }
-  | { kind: "inline"; text: string }
-  | { kind: "folded"; text: string };
+  | { kind: "none"; keptDelivery?: string }
+  | { kind: "inline"; text: string; keptDelivery?: string }
+  | { kind: "folded"; text: string; keptDelivery?: string };
 
-export function stopNoteView(note: string | null | undefined): StopNoteView {
+// 已收下的交付（工单 #1239）：事项停止时这个 run 里已经收下的一版交付，写在停止说明下面一行。
+// 用户自己取消时也写，交付仍然在；没有已收下的交付（或者事项没有停止）时没有这一项。
+export type KeptDeliveryView = { version?: number | null; accepted_at?: string | null } | null | undefined;
+
+export function keptDeliveryLine(kept: KeptDeliveryView): string | undefined {
+  const version = kept?.version;
+  if (version === null || version === undefined) {
+    return undefined;
+  }
+  return `交付 r${version} 已于 ${formatTime(kept?.accepted_at)} 收下，尚未经质检放行`;
+}
+
+export function stopNoteView(note: string | null | undefined, kept?: KeptDeliveryView): StopNoteView {
   const text = note ?? "";
+  const keptDelivery = keptDeliveryLine(kept);
+  const extra = keptDelivery === undefined ? {} : { keptDelivery };
   if (text.trim() === "") {
-    return { kind: "none" };
+    return { kind: "none", ...extra };
   }
   return text.length <= STOP_NOTE_INLINE_LIMIT
-    ? { kind: "inline", text }
-    : { kind: "folded", text };
+    ? { kind: "inline", text, ...extra }
+    : { kind: "folded", text, ...extra };
 }
 
 export function formatTime(value: string | null | undefined): string {
