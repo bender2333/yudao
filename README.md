@@ -29,7 +29,7 @@
 - 下一个发布是阶段一达到时的版本，附试用指南。
 - 想先看 main 上的网页界面：在与 origin/main 一致、没有未提交改动的检出上运行 `uv run python scripts/release.py`（需要 Node 22.12 以上；只构建 wheel，不发布），再按下面「安装与启动」安装它输出的 wheel。直接从源码运行服务时没有页面文件，页面只返回「没有页面文件」。
 
-当前入口：[总体路线图](docs/program-roadmap.md)、[当前验收基线](docs/current-baseline.md)；进度看 GitHub 的里程碑。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
+当前入口：[总体路线图](docs/program-roadmap.md)；进度看 GitHub 的里程碑。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
 
 ## 分层
 

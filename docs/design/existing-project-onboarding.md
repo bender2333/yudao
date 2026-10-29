@@ -1,6 +1,6 @@
 # 接入已有项目设计说明
 
-状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248）；实施中：#134 至 #137 与 #346（建档材料的分类）已实施，#138、#139 与 #347（采纳写回）未实施。采纳写回的合同由 ADR-0034 确定。最近一次改动 2026-10-28，去掉已删除的 ADR 的引用。依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../archive/stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../archive/prototypes/v9/design.md)（沿用 [v8 设计说明](../archive/prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../archive/prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../archive/prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。路线位置：路线图阶段二「真实项目接着做」；原属 Stage 3 的 3.8（父工单 [#124](https://github.com/bender2333/yudao/issues/124)）。总图位置：第一节「你」与「一份事实」方框（接入已有项目是事项的一种起点）。
+状态：设计已确认（2026-09-29 用户确认第 12 节的五项决定；2026-10-02 建档的读取顺序写在事项种类的工作说明中，用户写入部门 Prompt 以后仍然放入，见第 4.2 节，工单 #248）；实施中：#134 至 #137 与 #346（建档材料的分类）已实施，#138、#139 与 #347（采纳写回）未实施。采纳写回的合同由 ADR-0034 确定。最近一次改动 2026-10-29，材料分类里去掉对已归档文档的举例。依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[总体架构](architecture/overall-architecture.md)第 6、7.4 节、[应用层与接口层设计说明](app-and-interface.md)第 3、4 节、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[Stage 3 计划](../archive/stage-3-plan.md)第 2、3 节 3.8 行、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../archive/prototypes/v9/design.md)（沿用 [v8 设计说明](../archive/prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../archive/prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../archive/prototypes/v8/BUILD.md)第 5.2、8.3 节）。用词以 [CONTEXT.md](../../CONTEXT.md) 为准。路线位置：路线图阶段二「真实项目接着做」；原属 Stage 3 的 3.8（父工单 [#124](https://github.com/bender2333/yudao/issues/124)）。总图位置：第一节「你」与「一份事实」方框（接入已有项目是事项的一种起点）。
 
 ## 1. 要解决的问题
 
@@ -131,7 +131,7 @@ flowchart TB
 
 **读取顺序。** 建档事项种类的工作说明（定义中按事项种类给出，每次请求放在部门 Prompt 之后，用户写入项目部门设置的部门 Prompt 以后仍然放入，[模型管理设计说明](model-management.md)第 5.3 节第 5 项）规定读取顺序，做法参照 OpenCode 的 `/init`（第 9 节）：先读价值最高的来源，可执行的来源（配置、脚本、测试）与文字说明冲突时以可执行的来源为准。
 
-材料分两类。描述现有行为的材料：README、测试、可执行的配置与脚本、项目自己的当前状态说明（例如 Yudao 仓库的 `docs/current-baseline.md`）；描述要求的材料：项目的设计与需求文档。现有行为以第一类为准。第二类写入初始 PRD 时作为要求材料，其中代码尚未实现的部分不是现有行为，写进初始 PRD 的边界并标明「设计中，未实施」，不记为现有缺陷。
+材料分两类。描述现有行为的材料：README、测试、可执行的配置与脚本、项目自己的当前状态说明；描述要求的材料：项目的设计与需求文档。现有行为以第一类为准。第二类写入初始 PRD 时作为要求材料，其中代码尚未实现的部分不是现有行为，写进初始 PRD 的边界并标明「设计中，未实施」，不记为现有缺陷。
 
 | 部门 | 顺序 |
 | --- | --- |

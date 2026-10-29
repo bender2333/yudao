@@ -49,7 +49,7 @@ Claude 担任派发者时使用这里的路径。
 | --- | --- | --- |
 | 开发 App（`yudao-dev`） | 执行者 | Contents、Pull requests、Issues：读写；Actions：读写（重新运行失败的 CI）；Checks、Commit statuses：只读；没有 Workflows 权限，推送不了 `.github/workflows` |
 | 审查 App（`yudao-review`） | 审查者 | Pull requests：读写（提交审查）；Contents、Issues、Actions、Checks、Commit statuses：只读 |
-| `bender2333` | 用户、架构师（包括被唤醒的架构师）、派发者、solo 执行者 | 仓库所有者，main 规则唯一可以豁免的身份；派发者不使用豁免，solo 执行者只在合并自己范围内的 PR 时使用（`AGENTS.md`「Solo 模式」） |
+| `bender2333` | 用户、架构师（包括被唤醒的架构师）、派发者、solo 执行者 | 仓库所有者，main 规则唯一可以豁免的身份；派发者不使用豁免，solo 执行者只在合并自己范围内的 PR 时使用（`solo-worker` 技能） |
 
 - 两个 App 只安装在 `bender2333/yudao`。私钥文件放在派发的机器上仓库以外的目录。
 - 执行者与审查者的进程启动前设置 `YUDAO_GH_APP_ID`（App 编号）与 `YUDAO_GH_APP_KEY_FILE`（私钥文件路径），并把仓库的 `scripts/github-app/` 放在 `PATH` 的最前面。之后进程里的 `gh` 与 `git push` 以这个 App 的身份运行，令牌快到期时自动换新（#513）。
@@ -72,16 +72,16 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 命令里的时长取自第 7 节的参数表，调整时两处一起改。
 
 - 派发执行者（在工单的 worktree 中后台运行，进程环境按第 2 节设置开发 App）：
-  `omp -p --mode json --auto-approve --max-time 4h --config docs/agents/omp-print-runs.yml "你是执行者，按 AGENTS.md「执行者」一节处理工单 #<编号>"`
+  `omp -p --mode json --auto-approve --max-time 4h --config docs/agents/omp-print-runs.yml "你是执行者，按 .claude/skills/executor/SKILL.md 处理工单 #<编号>"`
 - 派发审查者（同一个 worktree，进程环境按第 2 节设置审查 App）：
-  `omp -p --mode json --auto-approve --max-time 4h --no-prewalk --config docs/agents/omp-print-runs.yml --model <审查者模型> "你是审查者，按 AGENTS.md「审查者」一节以及两类角色共同遵守的内容工作，忽略「执行者」一节。审查工单 #<编号> 的 PR（issue-<编号> 分支）"`
+  `omp -p --mode json --auto-approve --max-time 4h --no-prewalk --config docs/agents/omp-print-runs.yml --model <审查者模型> "你是审查者，按 .claude/skills/reviewer/SKILL.md 工作。审查工单 #<编号> 的 PR（issue-<编号> 分支）"`
 - 启动被唤醒的架构师（在架构师的 worktree 中后台运行，记下进程号；进程环境不设置第 2 节的 App 变量，设置提交的署名 `GIT_AUTHOR_NAME`、`GIT_COMMITTER_NAME` 为 `claude-架构师`，`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_EMAIL` 为 `noreply@anthropic.com`）：
 
   ```bash
   git fetch origin main
   git checkout --detach origin/main
   claude -p --model <架构师模型> --effort <架构师 effort> --dangerously-skip-permissions --output-format json \
-    "你是被唤醒的架构师，也是子架构师：按 CLAUDE.md「被唤醒的架构师」与「子架构师」两节，在总图 docs/architecture.html 的范围内处理全部带 needs-architect 标签的工单" \
+    "你是被唤醒的架构师，也是子架构师：先调用 woken-architect 技能，再按 CLAUDE.md「子架构师」一节，在总图 docs/architecture.html 的范围内处理全部带 needs-architect 标签的工单" \
     > .tmp/architect-<日期时刻>.json
   ```
 
@@ -98,7 +98,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   循环跑在这个会话里，会话关掉就停；重新打开会话、再输入一次启动命令即接着做，状态全在 GitHub 与 `.ralph/architect/heartbeat.json`。宿主没有 `/loop` 时用它的定时机制按第 7 节的间隔叫起同一个技能（这个仓库常用的 DSH 会话用定时提醒），间隔与上下文换法不变。
 
 - 启动 solo 执行者（用户指定 solo 范围时，在主工作区或工单的 worktree 中运行；进程环境使用开发 App，按第 2 节设置，并设置署名 `GIT_AUTHOR_NAME`、`GIT_COMMITTER_NAME` 为 `solo-<模型 ID>`）。合并要用仓库所有者的豁免，所以 solo 执行者的 `gh` 使用 `bender2333` 登录的身份，不设置开发 App 的两个变量；开发 App 没有豁免权限：
-  `claude -p --model <solo 模型> --dangerously-skip-permissions --output-format json "你是 solo 执行者，按 AGENTS.md「Solo 模式」处理范围 <范围> 内的工单"`
+  `claude -p --model <solo 模型> --dangerously-skip-permissions --output-format json "你是 solo 执行者，按 .claude/skills/solo-worker/SKILL.md 逐张处理范围 <范围> 内的工单"`
   solo 范围内没有派发者，一次启动处理到范围内没有可以领取的工单为止，或者到第 7 节的执行者一轮时长。
 - 打开自动合并：`gh pr merge <PR> --auto --squash`；关掉：`gh pr merge <PR> --disable-auto`。
 - 在本机运行集成层（在集成层的 worktree 中后台运行）。平时集成层由 CI 在每次合并以后运行（第 5 节）；本机运行用于和 CI 的结果对照，或者 CI 不可用的时候：
@@ -110,7 +110,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
   uv run python -m pytest -m integration -n 4 --junitxml=.tmp/test-results/integration.xml
   ```
 
-- 导出里程碑的工单记录（架构师在里程碑达到时，`CLAUDE.md` 工作流程第 7 步）。`<短名>` 例如 `phase1-1`；有上一个里程碑的记录时加 `--previous`：
+- 导出里程碑的工单记录（架构师在里程碑达到时，`/flow` 第 7 步）。`<短名>` 例如 `phase1-1`；有上一个里程碑的记录时加 `--previous`：
 
   ```bash
   uv run python evals/baseline/milestone.py collect --milestone "<里程碑标题>" --data docs/evaluation/milestones/<短名>.json
@@ -168,7 +168,7 @@ $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_
 
 - 定义：`.github/workflows/ci.yml`，由用户在场时的架构师维护，执行者与被唤醒的架构师不修改。
 - 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上并行运行四个作业：① 单元层、② 模块层（各含一项固定检查）、评测工具（`evals/tests`，`real_model` 的用例默认不选）、客户端（类型检查与单元测试，逐场景回放测试除外，按 `AGENTS.md` 单独运行；编译页面与 wheel）。汇总作业 `check` 在四项都成功时成功，是 main 的规则要求的检查，并在运行摘要里写出各层的表。PR 上另有「用例变化」：合并前后各层用例的增减，只显示，不挡合并（测试分层设计说明第 4.3、4.4 节）。
-- main 的每次推送（每次合并以后）另外运行 ③ 集成层（作业 `integration`）：集成层全部（`-n 4`，2026-10-18 在 main 上测得约 15 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。带 `touches-core` 的工单例外：执行者在交付前对自己的分支手动触发一次（`AGENTS.md` 执行者第 5 步）。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
+- main 的每次推送（每次合并以后）另外运行 ③ 集成层（作业 `integration`）：集成层全部（`-n 4`，2026-10-18 在 main 上测得约 15 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。带 `touches-core` 的工单例外：执行者在交付前对自己的分支手动触发一次（`executor` 技能第 5 步）。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
 - 手动触发（`check` 与 `integration` 都运行）：`gh workflow run CI --ref <分支>`，例如工单要在 GitHub 的运行机上验证集成层时 `gh workflow run CI --ref issue-<编号>`；之后用 `gh run list --workflow CI --branch <分支> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果。
 - main 上的结果：`gh run list --workflow CI --branch main --event push --limit 10`；某次运行的失败项：`gh run view <运行编号> --log-failed | grep FAILED`。
 - 查看 PR 的结果：`gh pr checks <PR>`；重新运行失败的作业：`gh run rerun <运行编号> --failed`。
@@ -186,7 +186,7 @@ $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_
   gh api repos/bender2333/yudao/commits/<after_sha>/pulls --jq '.[].number'
   ```
 
-  第二条命令有输出的，是经豁免合并的 PR：用 `gh pr view <PR 编号> --json body --jq .body` 看正文里有没有 `Solo:` 行（`AGENTS.md`「Solo 模式」第 2 步要求写），有的是 solo 模式的合并，记入 `claude_jour.md`，其余的告诉用户。没有输出的，是架构师直接推送的文档与日记（被唤醒的架构师的提交作者是 `claude-架构师`）。
+  第二条命令有输出的，是经豁免合并的 PR：用 `gh pr view <PR 编号> --json body --jq .body` 看正文里有没有 `Solo:` 行（`solo-worker` 技能第 7 步要求写），有的是 solo 模式的合并，记入 `claude_jour.md`，其余的告诉用户。没有输出的，是架构师直接推送的文档与日记（被唤醒的架构师的提交作者是 `claude-架构师`）。
 
 ## 7. 参数
 
@@ -197,11 +197,11 @@ $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_
 | 执行者一轮的时长 | 4 小时 | 第 3 节派发执行者的 `--max-time`；`AGENTS.md` 共同要求 |
 | 审查者一轮的时长 | 4 小时 | 第 3 节派发审查者的 `--max-time` |
 | 同一个 PR 要求修改的上限 | 3 次，第 3 次时搁置 | 派发者规则第 3 节第 4、5 步 |
-| 工单大小的上限 | 「只改」清单中手写文件 15 个；生成的客户端类型、接口快照、事件序列基准与日记不计 | `CLAUDE.md`「工单规范」；`AGENTS.md` 执行者第 2 步 |
-| 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/`；可信内核：`harness/definitions/kernel-manifest.json` 里 `kind` 为 `module` 的路径 | `CLAUDE.md`「工单规范」 |
-| 唤醒架构师 | 开 | 派发者规则第 3 节第 7 步；`CLAUDE.md`「Solo 模式」要求 solo 与架构师循环运行期间保持开，架构师循环也读这一个开关，关着时整轮不做。用户在场的会话做大的设计修改时改为关，做完改回开 |
+| 工单大小的上限 | 「只改」清单中手写文件 15 个；生成的客户端类型、接口快照、事件序列基准与日记不计 | `docs/agents/ticket-spec.md`；`executor` 技能第 2 步 |
+| 核心文件 | 工具定义：`harness/tools.py`、`harness/definitions/`；控制核心：`harness/` 下的 `orchestrator.py`、`engine.py`、`recording.py`、`assembly.py`、`context.py`、`compaction.py`、`adjudication.py`、`validation.py`、`write_path.py`、`event_store.py`、`projection.py`、`decisions.py`、`runtime.py`；执行环境：`harness/` 下的 `environment.py`、`actions.py`、`workspace.py`；事件序列基准：`harness/tests/event_sequences/`、`harness/tests/prompt_snapshot.json`；接口合同：`harness/tests/openapi/openapi.json`、`client/src/renderer/src/api/generated/`；可信内核：`harness/definitions/kernel-manifest.json` 里 `kind` 为 `module` 的路径 | `docs/agents/ticket-spec.md` |
+| 唤醒架构师 | 开 | 派发者规则第 3 节第 7 步；`autopilot` 技能「Solo 模式」要求 solo 与架构师循环运行期间保持开，架构师循环也读这一个开关，关着时整轮不做。用户在场的会话做大的设计修改时改为关，做完改回开 |
 | 被唤醒的架构师一次运行的时长 | 4 小时 | 派发者规则第 3 节第 7 步 |
 | 架构师循环的间隔 | 30 分钟 | 第 3 节启动命令；一轮只做一个子代理，做完结束回合 |
-| 同一张工单唤醒或分诊的上限 | 2 次，第 3 次直接交给用户 | 派发者规则第 3 节第 7 步；`CLAUDE.md`「被唤醒的架构师」与 [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md) |
+| 同一张工单唤醒或分诊的上限 | 2 次，第 3 次直接交给用户 | 派发者规则第 3 节第 7 步；`woken-architect` 技能与 [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md) |
 | 一个薄片交给用户之前的缺陷修复上限 | 2 轮，第 3 轮连同两轮的证据交给用户 | [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md)「薄片推进」 |
 | 后台长运行算作失败的超时 | 各自预算加 1 小时，重跑一次，再失败交给用户 | [`/architect-loop`](../../.claude/skills/architect-loop/SKILL.md)「长运行与心跳」 |

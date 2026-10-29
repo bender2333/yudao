@@ -451,26 +451,63 @@ const AUDIT_EXPRESSION = `(() => {
     const l1 = luminance(a); const l2 = luminance(b);
     return Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100;
   };
-  const background = (el) => {
-    let node = el;
-    while (node && node !== document.documentElement) {
-      const style = getComputedStyle(node);
-      const color = parseColor(style.backgroundColor);
-      if (color && color.a > 0.5) return color;
-      node = node.parentElement;
+  // 背景按「元素自己的背景色 + 祖先逐层合上」算：半透明的颜色（rgba、opacity 之外的白 10% 之类）
+  // 互相铺在一起，直接跳到最近的「最上面那层不透明的背景」会算错。
+  // 自己或祖先画的是渐变、图片时算不出文字底下是什么颜色，返回「未知」，不拿底色当背景再报一个数。
+  const splitLayers = (value) => {
+    const text = String(value || '').trim();
+    if (!text || text === 'none') return [];
+    const layers = [];
+    let depth = 0;
+    let start = 0;
+    for (let i = 0; i < text.length; i += 1) {
+      const ch = text[i];
+      if (ch === '(') depth += 1;
+      else if (ch === ')') depth -= 1;
+      else if (ch === ',' && depth === 0) { layers.push(text.slice(start, i).trim()); start = i + 1; }
     }
-    return { r: 255, g: 255, b: 255, a: 1 };
+    layers.push(text.slice(start).trim());
+    return layers.filter((layer) => layer && layer !== 'none');
   };
+  const paintsImage = (layer) => /gradient\\(|url\\(|image-set\\(|cross-fade\\(|element\\(/i.test(layer);
+  const blendOver = (top, bottom) => {
+    const a = top.a;
+    if (!(a > 0)) return bottom;
+    if (a >= 1) return { r: top.r, g: top.g, b: top.b, a: 1 };
+    return { r: top.r * a + bottom.r * (1 - a), g: top.g * a + bottom.g * (1 - a), b: top.b * a + bottom.b * (1 - a), a: 1 };
+  };
+  const brief = (el) => {
+    const id = el.id ? '#' + el.id : '';
+    const cls = (el.className && typeof el.className === 'string') ? '.' + el.className.trim().split(/\\s+/).slice(0, 2).join('.') : '';
+    return el.tagName.toLowerCase() + id + cls;
+  };
+  const resolveBackground = (el) => {
+    const stack = [];
+    let base = { r: 255, g: 255, b: 255, a: 1 };
+    for (let node = el; node && node.nodeType === 1; node = node.parentElement) {
+      const style = getComputedStyle(node);
+      const layer = splitLayers(style.backgroundImage)[0];
+      if (layer && paintsImage(layer)) {
+        const who = node === el ? '自己' : brief(node) + ' ';
+        return { unknown: who + '的背景是图片或渐变（' + layer.slice(0, 60) + '）' };
+      }
+      const color = parseColor(style.backgroundColor);
+      if (color && color.a > 0.001) stack.push(color);
+      if (color && color.a >= 0.999) break;
+      if (node === document.documentElement) break;
+    }
+    for (let i = stack.length - 1; i >= 0; i -= 1) base = blendOver(stack[i], base);
+    return { color: base };
+  };
+  const hex = (c) => '#' + [c.r, c.g, c.b].map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
   const visible = (el) => {
     const r = el.getBoundingClientRect();
     const style = getComputedStyle(el);
     return r.width > 0 && r.height > 0 && style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity || 1) > 0.05;
   };
   const describe = (el) => {
-    const id = el.id ? '#' + el.id : '';
-    const cls = (el.className && typeof el.className === 'string') ? '.' + el.className.trim().split(/\\s+/).slice(0, 2).join('.') : '';
     const text = (el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 40);
-    return el.tagName.toLowerCase() + id + cls + (text ? ' 「' + text + '」' : '');
+    return brief(el) + (text ? ' 「' + text + '」' : '');
   };
 
   const viewportWidth = document.documentElement.clientWidth;
@@ -523,19 +560,35 @@ const AUDIT_EXPRESSION = `(() => {
     }
   }
 
-  const contrasts = [];
+  // 对比度：低到 4.5 以下的前 15 条；算不出背景的另记，读数写「未知」，同一片渐变或图片底最多记一条、总共 5 条，排在后面。
+  const low = [];
+  const unknown = [];
+  const seenUnknown = new Set();
   const textBlocks =['h1', 'h2', 'h3', 'p', 'label', 'button', 'td', 'th', 'li', 'a', 'span'];
   for (const el of document.querySelectorAll(textBlocks.join(','))) {
-    if (contrasts.length >= 15) break;
+    if (low.length >= 15 && unknown.length >= 5) break;
     const own = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim().length > 0);
     if (!own || !visible(el)) continue;
     const style = getComputedStyle(el);
     const fg = parseColor(style.color);
-    if (!fg) continue;
-    const bg = background(el);
-    const value = ratio(fg, bg);
-    if (value < 4.5) contrasts.push({ el: describe(el), ratio: value, font: parseFloat(style.fontSize), weight: style.fontWeight });
+    if (!fg || !(fg.a > 0.001)) continue;
+    const font = parseFloat(style.fontSize);
+    const weight = style.fontWeight;
+    const resolved = resolveBackground(el);
+    if (resolved.unknown) {
+      if (unknown.length < 5 && !seenUnknown.has(resolved.unknown)) {
+        seenUnknown.add(resolved.unknown);
+        unknown.push({ el: describe(el), ratio: '未知', reason: resolved.unknown, font, weight });
+      }
+      continue;
+    }
+    const bg = resolved.color;
+    // 文字自己也可能是半透明的（rgba 文字、白 50% 之类），按合在背景上的颜色算
+    const shown = fg.a >= 0.999 ? fg : blendOver(fg, bg);
+    const value = ratio(shown, bg);
+    if (value < 4.5 && low.length < 15) low.push({ el: describe(el), ratio: value, color: hex(shown), background: hex(bg), font, weight });
   }
+  const contrasts = low.concat(unknown);
 
   const images = Array.from(document.images).filter(visible).map((img) => ({
     src: String(img.currentSrc || img.src).slice(0, 120),

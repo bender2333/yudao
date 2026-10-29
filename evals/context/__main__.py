@@ -46,6 +46,13 @@ def main(argv: list[str] | None = None) -> int:
     counter.add_argument("--out", default="docs/evaluation/context-assembly-counterfactual-2026-10-29.json")
     counter.add_argument("--seed", type=int, default=912)
 
+    cost = sub.add_parser("cost", help="按前缀缓存计价，折算每套规则的费用")
+    cost.add_argument("--db", default=DEFAULT_DB)
+    cost.add_argument("--artifacts", default=None)
+    cost.add_argument("--rules", default="evals/context/rule-set.json")
+    cost.add_argument("--title", default="")
+    cost.add_argument("--out", default=None)
+
     sweep = sub.add_parser("sweep", help="扫描一个参数的取值，看省量与召回")
     sweep.add_argument("--db", default=DEFAULT_DB)
     sweep.add_argument("--artifacts", default=None)
@@ -74,6 +81,13 @@ def main(argv: list[str] | None = None) -> int:
         from . import counterfactual as module
         return module.main(args.db, args.artifacts, args.rules, args.sample,
                            args.temperature, args.out, args.seed)
+    if args.command == "cost":
+        from . import cost as module
+        data = module.run_cost(args.db, args.artifacts, args.rules)
+        print(module.to_markdown(data, args.title))
+        if args.out:
+            module.write_report(data, args.out + ".json", args.out + ".md", args.title)
+        return 0
     if args.command == "sweep":
         from . import sweep as module
         values = []

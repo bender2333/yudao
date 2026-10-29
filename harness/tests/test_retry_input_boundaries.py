@@ -53,24 +53,49 @@ def test_retryable_failure_after_new_input_retries_and_carries_it(tmp_path):
 
 def test_input_during_retry_backoff_is_carried_by_the_retry(tmp_path):
     # 工单 #964：输入在工作期间到达时，它在这个会话的下一步作为通知加入历史，
-    # 这一轮不因此结束：重试照常进行，重试的请求里带着这条输入
+    # 这一轮不因此结束：重试照常进行，重试的请求里带着这条输入。
+    # 工单 #1226：先后由事件决定，不用时长去赌（测试分层设计说明第 10 节第 7 条）：
+    # 退避安排的事件交给订阅方时退避还没有开始走，订阅方在这里等测试线程写完输入再放行，
+    # 重试的请求在放行之后才装配。退避有多长、测试线程慢到什么时候都不影响判定
+    text = "NEW USER ORIGINAL\nwith exact spacing"
     scheduled = Event()
+    written = Event()
+    never_written: list[str] = []
+
     adapter = FakeAdapter([ProviderError("temporary", retryable=True), product_spec()])
     system = LoopSystem.for_testing(tmp_path, adapter,
                                     step_limits=StepLimits(retry_initial_delay_sec=1, retry_max_delay_sec=1))
     run_id = system.create_run("original task")
-    after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
+
+    def hold_the_retry_until_the_input_is_written(_event):
+        # 重试已经安排、还没有开始等待：放行之前输入一定已经写进事件日志
+        scheduled.set()
+        if not written.wait(_WAIT_LIMIT):
+            never_written.append("输入没有在等待的上限内写完，重试没有被放行")
+
+    after_event(system, EventType.MODEL_RETRY_SCHEDULED, hold_the_retry_until_the_input_is_written)
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
-        assert scheduled.wait(_WAIT_LIMIT)
-        system.add_input(run_id, "NEW USER ORIGINAL\nwith exact spacing")
+        assert scheduled.wait(_WAIT_LIMIT), "这个会话没有安排重试：等不到 MODEL_RETRY_SCHEDULED"
+        try:
+            system.add_input(run_id, text)
+        finally:
+            written.set()
         first_result = future.result(timeout=_WAIT_LIMIT)
 
+    assert not never_written, never_written[0]
     assert len(adapter.invocations) == 2, "重试照常进行"
     assert first_result.input_version == 2 and first_result.processed_input_version == 2
     content = adapter.invocations[1].input_items[0]["content"]
-    assert "[intend]\noriginal taskNEW USER ORIGINAL\nwith exact spacing\n\n" in content
-    assert "NEW USER ORIGINAL\nwith exact spacing" in content
+    assert "[intend]\noriginal task" + text + "\n\n" in content
+    assert text in content
+    # 先后由事件日志核对：重试安排之后才有这条输入，第二次请求在输入之后才装配
+    events = system.store.list_events(run_id)
+    kinds = [item.type for item in events]
+    second_attempt = [index for index, item in enumerate(events)
+                      if item.type == EventType.MODEL_REQUESTED and item.payload["attempt"] == 2]
+    assert len(second_attempt) == 1
+    assert kinds.index(EventType.MODEL_RETRY_SCHEDULED) < kinds.index(EventType.USER_INPUT_RECEIVED) < second_attempt[0]
     # 产品要求被接纳以后工程有新的工作（工单 #556：工程关注 PRD 的新版本）
     assert has_new_work(first_result, "engineering")
 

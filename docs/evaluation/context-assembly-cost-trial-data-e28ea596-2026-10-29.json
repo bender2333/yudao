@@ -1,0 +1,172 @@
+{
+ "cached_price": 0.1,
+ "departments": {
+  "engineering": [
+   {
+    "cost_ratio": 1.0,
+    "implied_hit": 0.9239,
+    "tokens_ratio": 1.0,
+    "variant": "现状（记录）"
+   },
+   {
+    "cost_ratio": 2.2378,
+    "tokens_ratio": 0.98,
+    "variant": "R1 部门输入只留最新"
+   },
+   {
+    "cost_ratio": 1.0294,
+    "tokens_ratio": 0.986,
+    "variant": "R2 同路径读取只留最新"
+   },
+   {
+    "cost_ratio": 0.9999,
+    "tokens_ratio": 0.9999,
+    "variant": "R5 引证段按引用门控"
+   },
+   {
+    "cost_ratio": 1.2684,
+    "tokens_ratio": 0.5459,
+    "variant": "R3 保留 16000 / 最少省 4000"
+   },
+   {
+    "cost_ratio": 1.0,
+    "tokens_ratio": 1.0,
+    "variant": "R3 保留 40000 / 最少省 20000"
+   },
+   {
+    "cost_ratio": 1.6351,
+    "tokens_ratio": 0.5295,
+    "variant": "全开（16000 / 4000）"
+   }
+  ],
+  "product": [
+   {
+    "cost_ratio": 1.0,
+    "implied_hit": 0.4502,
+    "tokens_ratio": 1.0,
+    "variant": "现状（记录）"
+   },
+   {
+    "cost_ratio": 0.7454,
+    "tokens_ratio": 0.8435,
+    "variant": "R1 部门输入只留最新"
+   },
+   {
+    "cost_ratio": 1.0,
+    "tokens_ratio": 1.0,
+    "variant": "R2 同路径读取只留最新"
+   },
+   {
+    "cost_ratio": 0.9997,
+    "tokens_ratio": 0.9998,
+    "variant": "R5 引证段按引用门控"
+   },
+   {
+    "cost_ratio": 0.9453,
+    "tokens_ratio": 0.9675,
+    "variant": "R3 保留 16000 / 最少省 4000"
+   },
+   {
+    "cost_ratio": 1.0,
+    "tokens_ratio": 1.0,
+    "variant": "R3 保留 40000 / 最少省 20000"
+   },
+   {
+    "cost_ratio": 0.745,
+    "tokens_ratio": 0.8433,
+    "variant": "全开（16000 / 4000）"
+   }
+  ],
+  "quality": [
+   {
+    "cost_ratio": 1.0,
+    "implied_hit": 0.4301,
+    "tokens_ratio": 1.0,
+    "variant": "现状（记录）"
+   },
+   {
+    "cost_ratio": 1.1716,
+    "tokens_ratio": 0.9873,
+    "variant": "R1 部门输入只留最新"
+   },
+   {
+    "cost_ratio": 1.0,
+    "tokens_ratio": 1.0,
+    "variant": "R2 同路径读取只留最新"
+   },
+   {
+    "cost_ratio": 0.9978,
+    "tokens_ratio": 0.994,
+    "variant": "R5 引证段按引用门控"
+   },
+   {
+    "cost_ratio": 0.4262,
+    "tokens_ratio": 0.465,
+    "variant": "R3 保留 16000 / 最少省 4000"
+   },
+   {
+    "cost_ratio": 0.6709,
+    "tokens_ratio": 0.7983,
+    "variant": "R3 保留 40000 / 最少省 20000"
+   },
+   {
+    "cost_ratio": 0.4634,
+    "tokens_ratio": 0.4469,
+    "variant": "全开（16000 / 4000）"
+   }
+  ]
+ },
+ "implied_hit": 0.6346,
+ "rows": [
+  {
+   "cost": 7786610,
+   "cost_ratio": 1.0,
+   "tokens": 18156466,
+   "tokens_ratio": 1.0,
+   "variant": "现状（记录）"
+  },
+  {
+   "cost": 10385081,
+   "cost_ratio": 1.3337,
+   "tokens": 17823032,
+   "tokens_ratio": 0.9816,
+   "variant": "R1 部门输入只留最新"
+  },
+  {
+   "cost": 7823769,
+   "cost_ratio": 1.0048,
+   "tokens": 18051131,
+   "tokens_ratio": 0.9942,
+   "variant": "R2 同路径读取只留最新"
+  },
+  {
+   "cost": 7772501,
+   "cost_ratio": 0.9982,
+   "tokens": 18094194,
+   "tokens_ratio": 0.9966,
+   "variant": "R5 引证段按引用门控"
+  },
+  {
+   "cost": 4488583,
+   "cost_ratio": 0.5764,
+   "tokens": 9220704,
+   "tokens_ratio": 0.5078,
+   "variant": "R3 保留 16000 / 最少省 4000"
+  },
+  {
+   "cost": 5706563,
+   "cost_ratio": 0.7329,
+   "tokens": 16076419,
+   "tokens_ratio": 0.8854,
+   "variant": "R3 保留 40000 / 最少省 20000"
+  },
+  {
+   "cost": 5147056,
+   "cost_ratio": 0.661,
+   "tokens": 8868886,
+   "tokens_ratio": 0.4885,
+   "variant": "全开（16000 / 4000）"
+  }
+ ],
+ "rules_version": "sha256:6d66cca8e0935b187fb1b2580dcdcda1b4ee60fe3948894bb7f225790f3b369b"
+}
