@@ -16,7 +16,6 @@ import os
 import re
 
 import shutil
-import signal
 import subprocess
 import threading
 
@@ -33,6 +32,7 @@ from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import QA_TESTS_DIR, CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import TreeError
+from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
 from .tools import tool_action
 from .tree_archive import artifact_run, load_tree
@@ -471,11 +471,15 @@ if _UNIMPLEMENTED:
 
 @dataclass(frozen=True)
 class _Finished:
-    # 一个进程的结束：completed、timeout 或 cancelled，以及截至结束时的输出
+    # 一个进程的结束：completed、timeout 或 cancelled，以及截至结束时的输出。
+    # stopped 说明整棵进程树确实停了没有（确实杀不掉时回执要说清楚，不把「已停止」当结论写出去），
+    # left_behind 说明命令结束时它留下了子进程（那些进程随这次调用一起结束了）
     status: str
-    returncode: int
+    returncode: int | None
     stdout: str
     stderr: str
+    stopped: bool = True
+    left_behind: bool = False
 
 class _Job:
     def __init__(
@@ -489,6 +493,7 @@ class _Job:
         timer: threading.Timer | None = None,
         session_id: str | None = None,
         workspace_root: Path | None = None,
+        tree: ProcessTree | None = None,
     ) -> None:
         self.job_id = job_id
         self.output_path = output_path
@@ -499,7 +504,12 @@ class _Job:
         self.timer = timer
         self.session_id = session_id
         self.workspace_root = workspace_root
+        # 这个后台作业的整棵进程树（工单 #1215）：直接子进程退出以后它留下的子进程还在树里，
+        # 按直接子进程的进程号结束打不到它们
+        self.tree = tree
         self.read_offset = 0
+        # 上一次结束整棵树时它是否确实停了下来
+        self._tree_stopped = True
 
     def read(self) -> dict[str, Any]:
         if self.status == "running" and self.process is not None:
@@ -535,10 +545,12 @@ class _Job:
                 self.status = "exited"
                 self.exit_code = ret
             else:
-                _kill_process_tree_sync(self.process.pid)
                 self.status = "stopped"
         elif self.status == "running":
             self.status = "stopped"
+        # 直接子进程已经退出时它留下的子进程还在树里：无论哪一种都结束整棵树（工单 #1215）
+        left_behind = self.status == "exited" and self._tree_has_processes()
+        self._stop_tree()
 
         if self.timer is not None:
             self.timer.cancel()
@@ -551,18 +563,40 @@ class _Job:
             output_msg = f"job {self.job_id} has already exited"
             if self.exit_code is not None:
                 output_msg += f" with exit code {self.exit_code}"
+            if left_behind:
+                output_msg += "; the processes it left behind were stopped"
             return {
                 "job_id": self.job_id,
                 "output": output_msg,
                 "status": self.status,
                 "exit_code": self.exit_code,
             }
+        stopped = self._tree_stopped
         return {
             "job_id": self.job_id,
-            "output": f"job {self.job_id} was stopped; the process tree was stopped",
+            "output": (f"job {self.job_id} was stopped; the process tree was stopped" if stopped
+                       else f"job {self.job_id} was stopped; some processes from the job could not be stopped"),
             "status": self.status,
             "exit_code": self.exit_code,
         }
+
+    def _tree_has_processes(self) -> bool:
+        return self.tree is not None and self.tree.has_live_processes()
+
+    def _stop_tree(self) -> None:
+        # 结束整棵树并等它真正停下；停不下来时记下来，回执里如实写
+        if self.tree is None:
+            return
+        self.tree.stop()
+        stopped = self.tree.wait_stopped(STOP_LIMIT_SEC)
+        if self.process is not None and self.process.poll() is None:
+            try:
+                self.process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+        self.tree.close()
+        self._tree_stopped = stopped
+        self.tree = None
 
 
 class BackgroundJobTable:
@@ -980,8 +1014,7 @@ class LocalEnvironment:
             output_path = directory / f"{job_id}.output"
             file_handle = open(output_path, "wb")
 
-            spawn: dict[str, Any] = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
-                                     else {"start_new_session": True})
+            spawn: dict[str, Any] = spawn_options()
             process = subprocess.Popen(
                 [_resolve_bash(), "-c", command],
                 cwd=str(self.workspace.root),
@@ -991,6 +1024,16 @@ class LocalEnvironment:
                 stderr=subprocess.STDOUT,
                 **spawn,
             )
+            # 整棵树收进容器：stop_job 与会话结束时一次停掉它，包括直接子进程退出以后留下的子进程
+            tree = ProcessTree()
+            try:
+                tree.attach(process.pid)
+            except BaseException:
+                # 放不进容器也放不出去的时候：结束它、关掉输出文件，不留在机器上
+                tree.stop()
+                tree.close()
+                file_handle.close()
+                raise
             job = _Job(
                 job_id=job_id,
                 output_path=output_path,
@@ -999,6 +1042,7 @@ class LocalEnvironment:
                 status="running",
                 session_id=self._session_id,
                 workspace_root=self.workspace.root,
+                tree=tree,
             )
             timer = threading.Timer(timeout_sec, job.stop)
             timer.daemon = True
@@ -1014,13 +1058,20 @@ class LocalEnvironment:
         text = "\n".join(part for part in (finished.stdout.strip(), finished.stderr.strip()) if part)
         if finished.status == "timeout":
             exit_code, status = TIMEOUT_EXIT_CODE, "timeout"
-            text = ((text + "\n") if text else "") + f"command timed out after {timeout_sec}s; the process tree was stopped"
+            text = ((text + "\n") if text else "") + _tree_stopped_note("command timed out", timeout_sec,
+                                                                      finished.stopped)
         elif finished.status == "cancelled":
             exit_code, status = CANCELLED_EXIT_CODE, "cancelled"
-            text = ((text + "\n") if text else "") + "command cancelled; the process tree was stopped"
+            text = ((text + "\n") if text else "") + _tree_stopped_note("command cancelled", None,
+                                                                      finished.stopped)
         else:
             exit_code = finished.returncode
             status = "ok" if exit_code == 0 else "failed"
+            if finished.left_behind:
+                # 命令自己退出了，它留下的子进程随这次调用一起结束：要长期运行的服务用 background（工单 #1215）
+                text = ((text + "\n") if text else "") + (
+                    "the command left processes running; they were stopped with this call "
+                    "(use background for a service that should keep running)")
         text = redact_text(text)
         meta = {"command": command, "exit_code": exit_code, "status": status,
                 "snapshot_hash": snapshot.digest, "executor": "host"}
@@ -1173,46 +1224,128 @@ class LocalEnvironment:
 
 async def _run_process(argv: list[str], cwd: Path, env: dict[str, str], timeout_sec: float,
                        stop: asyncio.Event) -> _Finished:
-    # 进程在新的进程组（Windows）或新的会话（POSIX）中启动，超时或停止信号到达时结束整个进程树，
-    # 输出读到管道关闭为止：结束以后是截至结束时的输出。标准输入接空设备：bash 调用与检查都不读输入，
-    # 若继承服务进程的标准输入（一根打开但无人写入的管道），解释器启动时对该句柄取状态会一直等待
-    spawn: dict[str, Any] = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt"
-                             else {"start_new_session": True})
+    # 命令在整棵进程树里启动（Windows 作业对象、POSIX 新会话的进程组，见 process_tree.py）：
+    # 超时、取消与命令自己结束以后都一次结束整棵树，包括「直接子进程已经退出、它起的子进程还在」
+    # 这一种。回执的返回不依赖输出管道关闭（工单 #1215）：命令留下的后台进程手里那根写端可能一直
+    # 开着，读完输出不能等它关；直接子进程退出以后输出只再收这么久，到点就带已有输出返回。
+    # 标准输入接空设备：bash 调用与检查都不读输入，若继承服务进程的标准输入（一根打开但无人写入的
+    # 管道），解释器启动时对该句柄取状态会一直等待
+    tree = ProcessTree()
     process = await asyncio.create_subprocess_exec(
         *argv, cwd=str(cwd), env=env, stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, **spawn,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, **spawn_options(),
     )
-    communicate = asyncio.ensure_future(process.communicate())
-    stopped = asyncio.ensure_future(stop.wait())
     try:
-        done, _pending = await asyncio.wait({communicate, stopped}, timeout=timeout_sec,
-                                            return_when=asyncio.FIRST_COMPLETED)
+        tree.attach(process.pid)
+    except BaseException:
+        # 放不进容器也放不出去的时候不让挂起的子进程留在机器上
+        tree.stop()
+        tree.close()
+        raise
+    out: bytearray = bytearray()
+    err: bytearray = bytearray()
+    readers = [asyncio.ensure_future(_collect_output(process.stdout, out)),
+               asyncio.ensure_future(_collect_output(process.stderr, err))]
+    left_behind = False
+    stopped = False
+    try:
+        status = await _wait_for_end(process, stop, timeout_sec)
+        left_behind = status == "completed" and tree.has_live_processes()
+        tree.stop()
+        stopped = await _wait_tree_stopped(tree, STOP_LIMIT_SEC)
+        await _finish_readers(readers, _OUTPUT_DRAIN_SEC, process)
     finally:
-        stopped.cancel()
-    if communicate in done:
-        status = "completed"
-    else:
-        status = "cancelled" if stopped in done else "timeout"
-        await _kill_process_tree(process)
-    stdout, stderr = await communicate
-    return _Finished(status, process.returncode, _text(stdout), _text(stderr))
+        tree.close()
+    return _Finished(status, process.returncode, _text(bytes(out)), _text(bytes(err)),
+                     stopped=stopped, left_behind=left_behind)
 
 
-def _kill_process_tree_sync(pid: int) -> None:
-    if os.name == "nt":
-        subprocess.run(
-            ["taskkill", "/PID", str(pid), "/T", "/F"],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-        )
-    else:
-        try:
-            os.killpg(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
+# 直接子进程退出以后等输出收尾的上限（秒）
+_OUTPUT_DRAIN_SEC = 3.0
+# 等直接子进程退出的轮询间隔（秒）；取消与时限仍按事件到达的时刻生效
+_EXIT_POLL_SEC = 0.05
 
 
-async def _kill_process_tree(process: asyncio.subprocess.Process) -> None:
-    _kill_process_tree_sync(process.pid)
+async def _wait_tree_stopped(tree: ProcessTree, limit: float) -> bool:
+    # 等整棵树真正停下，最多等 limit 秒；到点还没停就交回 False，回执里如实写。
+    # 这一条不占住事件循环（同时还有别的会话在跑）
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + limit
+    while True:
+        if tree.stopped():
+            return True
+        if loop.time() >= deadline:
+            return False
+        await asyncio.sleep(_EXIT_POLL_SEC)
+
+
+async def _collect_output(stream: asyncio.StreamReader | None, sink: bytearray) -> None:
+    # 读自己这一端的输出，读到管道关闭为止
+    if stream is None:
+        return
+    while True:
+        chunk = await stream.read(65536)
+        if not chunk:
+            return
+        sink.extend(chunk)
+
+
+async def _wait_for_end(process: asyncio.subprocess.Process, stop: asyncio.Event,
+                        timeout_sec: float) -> str:
+    # 直接子进程退出、时限到点、停止信号到达三者先到的是哪一个。
+    # 不 await process.wait()：它要等输出管道一起关闭才返回，命令留下的后台进程还开着管道时等不到
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_sec
+    stopper = asyncio.ensure_future(stop.wait())
+    try:
+        while True:
+            if process.returncode is not None:
+                return "completed"
+            remaining = deadline - loop.time()
+            if remaining <= 0:
+                return "timeout"
+            await asyncio.wait({stopper}, timeout=min(_EXIT_POLL_SEC, remaining))
+            if stopper.done() and process.returncode is None:
+                return "cancelled"
+    finally:
+        stopper.cancel()
+
+
+async def _finish_readers(readers: list[asyncio.Future[Any]], limit: float,
+                          process: asyncio.subprocess.Process) -> None:
+    # 整棵树停下以后输出应该很快就读完；等不到就关掉自己这一端，带着已经收到的输出返回
+    pending = [reader for reader in readers if not reader.done()]
+    if not pending:
+        return
+    _done, still = await asyncio.wait(pending, timeout=limit)
+    for reader in still:
+        reader.cancel()
+    if still:
+        await asyncio.gather(*still, return_exceptions=True)
+        _close_read_side(process)
+
+
+def _close_read_side(process: asyncio.subprocess.Process) -> None:
+    # 关掉自己这一端的读管道：有进程逃出了容器、一直开着写端时，调用不能跟着它一起挂着
+    transport = getattr(process, "_transport", None)
+    getter = getattr(transport, "get_pipe_transport", None)
+    if getter is None:
+        return
+    for fd in (1, 2):
+        pipe = getter(fd)
+        if pipe is not None:
+            try:
+                pipe.close()
+            except Exception:
+                pass
+
+
+def _tree_stopped_note(headline: str, timeout_sec: float | None, stopped: bool) -> str:
+    # 超时与取消的说明：整棵树确实停了才写「已停止」；确实杀不掉时写明，不把「已停止」当结论写出去
+    lead = headline if timeout_sec is None else f"{headline} after {timeout_sec}s"
+    if stopped:
+        return f"{lead}; the process tree was stopped"
+    return f"{lead}; some processes from the command could not be stopped"
 
 
 def _text(raw: bytes) -> str:
