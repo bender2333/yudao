@@ -67,6 +67,12 @@ HISTORY_ITEM = "实现交付历史"
 BLOCKED_ITEM = "实现逐行处理"
 LIVE_GOAL = "在界面上走完一个事项"
 
+# 回放范围（工单 #1217）：同一项目里先后两个事项，前一个结束以后才有后一个。
+# 由 --script replay 预置在「交付历史」与「文本工具」之间，其余模式不建这个项目
+REPLAY_PROJECT = "回放范围"
+REPLAY_FIRST_ITEM = "实现回放范围的前一个事项"
+REPLAY_SECOND_ITEM = "实现回放范围的后一个事项"
+
 # 进行中的询问（工单 #477 的验收第 2 条）：用例自己建项目并开始这个事项，工程问产品，
 # 产品的回答分支流式返回一段时间，询问因此在页面上停在进行中
 PENDING_ASK_ITEM = "实现等待回答的事项"
@@ -396,7 +402,7 @@ def source_directory(root: Path) -> Path:
     return root
 
 
-async def seed(application: Application, system: LoopSystem) -> None:
+async def seed(application: Application, system: LoopSystem, *, two_item_project: bool = False) -> None:
     # 四个项目：第一个走完一轮三部门（供项目列表与看板）；第二个（交付历史）走完一轮包含询问与回答、
     # 返工、放行与采纳（供时间轴与回放，工单 #180）；第三个的事项停在模型不可用，留下一个等待回答的
     # 决定请求，run 没有进终态，system.status 的 running_runs 因此大于 0（工单 #207 的停止确认与
@@ -426,6 +432,20 @@ async def seed(application: Application, system: LoopSystem) -> None:
     task = system.orchestrator.work_item_execution(item.refs.run_id)
     if task is not None:
         await task
+    if two_item_project:
+        # 回放范围（工单 #1217）：同一项目里先后两个事项，都走完一轮。回放到前一个事项的刻度时，
+        # 后一个事项在那一刻还没有创建，按后一个事项的范围读那一刻的项目状态因此读不到。
+        # 预置必须放在停住的项目之前：那个停住的 run 一直占着执行槽位（下面的第三个项目），
+        # 之后再建事项会被服务端按 busy 拒绝
+        created = await accept(application, "project.create", ProjectCreate(
+            command_id=str(uuid.uuid4()), name=REPLAY_PROJECT, goal="同一项目里先后两个事项"))
+        replay_project = created.refs.project_id
+        for text in (REPLAY_FIRST_ITEM, REPLAY_SECOND_ITEM):
+            item = await accept(application, "work_item.create", WorkItemCreate(
+                command_id=str(uuid.uuid4()), project_id=replay_project, text=text))
+            task = system.orchestrator.work_item_execution(item.refs.run_id)
+            if task is not None:
+                await task
     # 第三个项目：第二个事项停在模型不可用，留下一个等待回答的决定请求
     created = await accept(application, "project.create", ProjectCreate(
         command_id=str(uuid.uuid4()), name="文本工具", goal="逐行处理文本"))
@@ -636,9 +656,10 @@ def main() -> int:
     parser.add_argument("--catalog-driven", action="store_true")
     # 脚本选择：默认是项目列表与看板用的预置脚本；onboarding 是接入已有项目用的建档脚本（工单 #137）；
     # initial 是从想法新建带起始文件夹用的脚本（工单 #323）；waiting 是等待模型服务用的脚本（工单 #375，
-    # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）。它们需要的轮次与预置事项不同，因此由用例选择
+    # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
+    # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote"),
+                                             "stopnote", "replay"),
                         default="default")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
@@ -693,6 +714,10 @@ def main() -> int:
         adapter_script = pending_ask_script()
     elif args.script == "stopnote":
         adapter_script = stop_note_script()
+    elif args.script == "replay":
+        # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
+        base_script = script()
+        adapter_script = {department: turns * 2 for department, turns in base_script.items()}
     else:
         adapter_script = script()
     # 流式片段的停顿（秒）：进行中的询问模式要有一段够长的窗口，回答分支每段停 0.5 秒，
@@ -761,6 +786,9 @@ def main() -> int:
             asyncio.run(seed_onboarding(application))
         elif args.script == "kernel":
             asyncio.run(seed_kernel(application, system))
+        elif args.script == "replay":
+            # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
+            asyncio.run(seed(application, system, two_item_project=True))
         elif args.script not in ("initial", "waiting", "pending", "stopnote"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）与停止说明的用例（工单 #1162）自己在界面上建项目并开始事项，
