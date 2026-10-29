@@ -10,7 +10,7 @@
 //   node browser.mjs url                           当前地址
 //   node browser.mjs shot   --out <文件> [--full] [--jpeg] [--quality 72] [--max-height 4000]
 //   node browser.mjs text   [--css <选择器>]       页面可见文字（或某个元素的文字）
-//   node browser.mjs audit                         视觉与结构的读数：横向溢出、画布是否空白、对比度、图片、被截断的文字
+//   node browser.mjs audit                         视觉与结构的读数：横向溢出、画布是否空白与是否铺满容器、对比度、图片、被截断的文字
 //   node browser.mjs click  --css <选择器> | --text <文字>
 //   node browser.mjs type   (--css <选择器> | --text <文字>) --value <文本>
 //   node browser.mjs press  --key Enter|Tab|Escape|Backspace|ArrowDown
@@ -501,8 +501,30 @@ const AUDIT_EXPRESSION = `(() => {
     }
   });
 
+  // 画布比它所在的可见容器窄得多（容器要有底色或边框、至少宽 320、比画布宽 25% 以上）：画面没铺满。
+  // 往上最多找三层：紧贴画布、宽度只够裹住它的那一层宿主不算容器。
+  const underfilled = [];
+  for (const canvas of document.querySelectorAll('canvas')) {
+    if (underfilled.length >= 10) break;
+    if (!visible(canvas)) continue;
+    const shown = canvas.getBoundingClientRect().width;
+    if (shown < 160) continue;
+    let box = canvas.parentElement;
+    for (let level = 0; box && box !== document.body && level < 3; level += 1, box = box.parentElement) {
+      const style = getComputedStyle(box);
+      const fill = parseColor(style.backgroundColor);
+      if (!((fill && fill.a > 0.5) || parseFloat(style.borderLeftWidth) > 0)) continue;
+      const inner = box.getBoundingClientRect().width
+        - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+        - parseFloat(style.borderLeftWidth) - parseFloat(style.borderRightWidth);
+      if (inner < 320 || inner < shown * 1.25) continue;
+      underfilled.push({ el: describe(canvas), shown: Math.round(shown), container: describe(box), containerWidth: Math.round(inner), ratio: Math.round((shown / inner) * 100) / 100 });
+      break;
+    }
+  }
+
   const contrasts = [];
-  const textBlocks = ['h1', 'h2', 'h3', 'p', 'label', 'button', 'td', 'th', 'li', 'a', 'span'];
+  const textBlocks =['h1', 'h2', 'h3', 'p', 'label', 'button', 'td', 'th', 'li', 'a', 'span'];
   for (const el of document.querySelectorAll(textBlocks.join(','))) {
     if (contrasts.length >= 15) break;
     const own = Array.from(el.childNodes).some((n) => n.nodeType === 3 && n.textContent.trim().length > 0);
@@ -536,6 +558,7 @@ const AUDIT_EXPRESSION = `(() => {
     overflowX: document.documentElement.scrollWidth > viewportWidth + 2 ? document.documentElement.scrollWidth : 0,
     wideElements: wide,
     canvases,
+    underfilled,
     lowContrast: contrasts,
     images,
     clippedText: clipped,
