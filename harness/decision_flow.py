@@ -128,6 +128,12 @@ class DecisionFlow:
                 return transaction.projection.run_id
             return None
         if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
+            if decision.request.get("reason") == "compaction_failed":
+                # 整理连续没有推进的待恢复（模型管理设计说明第 8.7 节最后一条，工单 #1238）：答「停止事项」
+                # 时事项以 compaction_failed 结束，停止说明沿用请求里写明的连续的次数与最后一次的原因
+                driver.fail_run(transaction, "compaction_failed",
+                                str(decision.request.get("message") or "run stopped by the user's decision"))
+                return None
             driver.fail_run(transaction, "cancelled", "run stopped by the user's decision")
             return None
         if blocks_run(transaction.decisions.values()):
