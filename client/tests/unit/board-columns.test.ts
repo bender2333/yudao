@@ -6,7 +6,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boardColumns } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,label,progressLabel,stopNoteView,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,formatTime,label,progressLabel,stopNoteView,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
 import type { WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 
@@ -229,4 +229,40 @@ test("停止说明太长时折起来，全文照旧保留", () => {
   // 恰好到那一个字数的仍然一行写完
   assert.equal(stopNoteView("x".repeat(STOP_NOTE_INLINE_LIMIT)).kind, "inline");
   assert.equal(stopNoteView("x".repeat(STOP_NOTE_INLINE_LIMIT + 1)).kind, "folded");
+});
+
+// ---------------------------------------------------------------------------
+// 已收下的交付（工单 #1239）：事项停止时，交付已经收下这件事写在停止说明下面一行，
+// 带交付的版本与收下的时间；没有这一项时停止说明照旧（上面三条用例已经核对）。
+
+test("停止说明下面多写一行：交付的版本与收下的时间", () => {
+  const stopped = item({
+    work_item_id: "w1",
+    status: "stopped",
+    stop_reason: "provider_error",
+    stop_note: "模型服务返回 HTTP 400：input length 131072 exceeds the maximum",
+    kept_delivery: { version: 2, accepted_at: "2026-01-02T03:04:05Z" },
+  });
+  const view = stopNoteView(stopped.stop_note, stopped.kept_delivery);
+  assert.equal(view.kind, "inline");
+  // 时间按页面统一的那一种写法（共用的 formatTime），句中其余是字面值
+  assert.equal(view.keptDelivery, `交付 r2 已于 ${formatTime("2026-01-02T03:04:05Z")} 收下，尚未经质检放行`);
+});
+
+test("收下的时间缺失时写未知时间，整句照旧写出", () => {
+  assert.equal(stopNoteView(null, { version: 3 }).keptDelivery, "交付 r3 已于 未知时间 收下，尚未经质检放行");
+});
+
+test("用户自己取消时没有停止说明，已收下的交付照旧写出来", () => {
+  // 取消说的是用户的这次决定，交付仍然在：停止说明不写，已收下的交付照旧写
+  const view = stopNoteView(null, { version: 1, accepted_at: "2026-01-02T03:04:05Z" });
+  assert.equal(view.kind, "none");
+  assert.equal(view.keptDelivery, `交付 r1 已于 ${formatTime("2026-01-02T03:04:05Z")} 收下，尚未经质检放行`);
+});
+
+test("没有已收下的交付时停止说明不变", () => {
+  assert.equal(stopNoteView("出错了").keptDelivery, undefined);
+  assert.equal(stopNoteView("出错了", null).keptDelivery, undefined);
+  assert.equal(stopNoteView(null).keptDelivery, undefined);
+  assert.deepEqual(stopNoteView(null, null), { kind: "none" });
 });

@@ -49,7 +49,9 @@ from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
-from harness.tests.helpers import explore_turn, happy_script, merge_scripts, quality_turns
+from harness.tests.helpers import (
+    after_event, explore_turn, from_another_thread, happy_script, merge_scripts, quality_turns,
+)
 from harness.tests.onboarding_project import onboarding_source
 from harness.write_path import NewEvent
 
@@ -1064,6 +1066,8 @@ def test_a_released_item_has_no_stop_note(data_dir):
     card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
     assert card.status == "released_unsettled"
     assert card.stop_note is None
+    # 验收三（工单 #1239）：放行完成的事项不写停止说明，kept_delivery 也为空——它走的是正常的进度
+    assert card.kept_delivery is None
 
 
 def test_a_cancelled_item_has_no_stop_note(data_dir):
@@ -1078,6 +1082,69 @@ def test_a_cancelled_item_has_no_stop_note(data_dir):
     assert card.status == "stopped"
     assert card.stop_reason == "cancelled"
     assert card.stop_note is None
+
+
+# 已收下的交付（工单 #1239，试用 Te28ea596-03）：交付收下之后事项因为别的原因停下时，
+# 停止说明旁边要写出这件事。页面上只有一句失败原因，用户看不出这件事已经有一份可用的交付
+KEPT_DELIVERY_FAILURE = "整理失败：模型服务返回 HTTP 500（工作区整理没能完成）"
+
+
+def _kept_delivery_system(data_dir):
+    # 工程交出一版交付，质检核验那一轮的请求失败：交付已经收下，事项仍以 provider_error 停下。
+    # 质检的预测性探索（PRD 被接纳以后同时开始的那一轮）照常给上，先失败的是后面核验那一轮
+    system = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [delivery_turn()],
+        "quality": [explore_turn(), ProviderError(KEPT_DELIVERY_FAILURE)],
+    })
+    project_id = system.projects.register("已收下的交付", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "验证已收下的交付")
+    system.run_until_stop(run_id)
+    return system, project_id, work_item_id, run_id
+
+
+def test_a_stopped_item_reports_the_delivery_it_already_kept(data_dir):
+    # 验收一（工单 #1239）：交付收下之后以 provider_error 停下 → 卡片的 kept_delivery 有版本与收下的时间，
+    # 停止说明照旧是让事项停下的那条错误
+    system, project_id, work_item_id, run_id = _kept_delivery_system(data_dir)
+    accepted = [event for event in system.store.list_events(run_id)
+                if event.type == EventType.DELIVERY_ACCEPTED]
+    assert accepted, "这份脚本应当先收下一版交付"
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "stopped"
+    assert card.stop_reason == "provider_error"
+    assert card.stop_note == KEPT_DELIVERY_FAILURE
+    assert card.kept_delivery is not None
+    assert card.kept_delivery.version == accepted[-1].payload["revision"]
+    assert card.kept_delivery.accepted_at == accepted[-1].created_at
+
+
+def test_a_stopped_item_without_a_delivery_keeps_nothing(data_dir):
+    # 验收二（工单 #1239）：没有交付就停下的事项，kept_delivery 为空
+    system, project_id, work_item_id, run_id = _stop_note_system(data_dir)
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "stopped"
+    assert card.kept_delivery is None
+
+
+def test_a_cancelled_item_still_reports_the_delivery_it_kept(data_dir):
+    # 用户自己取消时也写这一行（工单 #1239）：交付仍然在，取消说的是这次决定，不是交付没了
+    system = _system(data_dir, {"product": [product_spec()], "engineering": [delivery_turn()],
+                                "quality": quality_turns()})
+    project_id = system.projects.register("取消前已收下", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    after_event(system, EventType.DELIVERY_ACCEPTED,
+                lambda event: from_another_thread(lambda: system.cancel(run_id)))
+    system.run_until_stop(run_id)
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "stopped"
+    assert card.stop_reason == "cancelled"
+    assert card.stop_note is None
+    assert card.kept_delivery is not None
+    assert card.kept_delivery.version == 1
 
 
 # ---------------------------------------------------------------------------
