@@ -22,7 +22,7 @@ from harness.app.project_queries import (
 )
 from harness.event_store import run_stream
 from harness.models import EventType
-from harness.proposals import delivery_turn, product_spec
+from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import TOOL_CALL_REQUIRED_LIMIT as LIMIT, quality_turns
 from harness.write_path import NewEvent
@@ -61,14 +61,22 @@ def _engineering_run(data_dir, script):
     assert has_new_work(system.project(run_id), "engineering")
     return system, project_id, run_id
 
+def _main_session(system: LoopSystem, run_id: str, department: str) -> str:
+    # 部门的部门主线会话编号：事项创建事件里记下的那一组（工单 #473）
+    created = next(event for event in system.store.list_events(run_id)
+                   if event.type == EventType.RUN_CREATED)
+    return str((created.payload or {}).get("sessions", {})[department])
+
 def _lost_write(system, run_id, *, tool="write_file", action_id="lost-write"):
-    # 追加一条动作前快照与一条没有结果的 tool_started：表示「效果已经写入、完成确认没有保存」的中断状态
+    # 追加一条动作前快照与一条没有结果的 tool_started：表示「效果已经写入、完成确认没有保存」的中断状态。
+    # 动作与它的核实记录属于发出它的那个会话（工单 #181、#475）
+    session_id = _main_session(system, run_id, "engineering")
     ref = system.artifacts.put(run_id, "snapshot/before",
                                json.dumps({"digest": f"sha256:{action_id}", "files": []}, ensure_ascii=False),
                                media_type="application/json")
     system.writes.append(run_stream(run_id), NewEvent(
         EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
-        state_before="running", state_after="running",
+        state_before="running", state_after="running", session_id=session_id,
         payload={"id": action_id, "name": tool, "args": {"path": "src/a.py", "content": "A"},
                  "step_id": 1, "activation_id": "act_" + action_id, "attempt": 1, "purpose": "work",
                  "before_snapshot_ref": asdict(ref)}))
@@ -77,7 +85,7 @@ def _lost_write(system, run_id, *, tool="write_file", action_id="lost-write"):
 
 def test_the_interrupted_state_is_reported_with_the_last_confirmed_position(data_dir):
     # 中断：停在 ENGINEERING，进度已经持久化，进程在下一次激活之前退出。查询给出已确认位置与下一项合法操作。
-    # 重新打开时不自动继续，观察中断时的状态本身
+    # 重新打开时不自动继续，观察中断时的状态本身。最后已确认的位置另带一条事件的文字（工单 #181）
     system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
     system.close()
 
@@ -90,6 +98,11 @@ def test_the_interrupted_state_is_reported_with_the_last_confirmed_position(data
     assert recovery.next_legal_action == "continue"
     assert recovery.executable is True
     assert recovery.last_confirmed_event_id == restarted.project(run_id).last_event_id
+    # 最后已确认位置的文字取自最后一条事件：页面要写出这一步做完了什么，不只写事件编号（工单 #181）
+    last_event = next(event for event in restarted.store.list_events(run_id)
+                      if event.event_id == recovery.last_confirmed_event_id)
+    assert recovery.last_confirmed_text
+    assert recovery.last_confirmed_text != last_event.type, recovery.last_confirmed_text
     restarted.close()
 
 
@@ -267,6 +280,89 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
     assert record.basis == "重新启动时结果未知，交还发出它的会话"
     assert record.result
     assert recovery.next_legal_action in ("continue", "none")
+    restarted.close()
+
+
+def test_unknown_actions_keep_the_handling_and_what_was_handed_back(data_dir):
+    # 结果未知的动作交还以后仍列在查询里（工单 #181，设计说明第 4.3 节）：处理方式、发出它的会话、
+    # 执行前快照与交还给模型的内容都在，项目不因它进入等待用户（没有决定卡片）
+    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
+    _lost_write(system, run_id)
+    system.close()
+
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
+    restarted.orchestrator.resume_incomplete_run(run_id)
+    application = _application(restarted)
+    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
+    assert [entry.action_id for entry in recovery.unknown_actions] == ["lost-write"]
+    handled = recovery.unknown_actions[0]
+    assert handled.handling == "returned"
+    assert handled.tool == "write_file"
+    assert handled.department == "engineering"
+    assert handled.session_id == _main_session(restarted, run_id, "engineering")
+    assert handled.purpose == "work"
+    assert handled.before is not None
+    # 交还给模型的内容就是写进部门历史的工具结果：模型读到的是「执行被中断、结果未知」
+    assert handled.returned
+    handed_back = json.loads(handled.returned)
+    assert handed_back["ok"] is False
+    assert "结果未知" in handed_back["error"]
+    assert handled.at
+    restarted.close()
+
+
+def test_sessions_report_the_usage_of_each_session(data_dir):
+    # 各会话的用量（工单 #181，三部门的循环结构第 9 节）：部门主线与会话分支各一行，
+    # 写部门、主线或分支、已用秒、轮数与步数。分支是工程询问产品时产品的那次旁支工作
+    script = {
+        "product": [product_spec()],
+        "engineering": [ask_turn(recipient="product", question="输出要不要改成大写？")],
+        "product:ask": [answer_turn(answer="不改，保持原样。")],
+        "quality": [],
+    }
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
+    _project_id, _work_item_id, run_id = _work_item_run(system, "各会话的用量")
+    system.activate_once(run_id)  # 产品提交初始 PRD
+    system.activate_once(run_id)  # 工程询问产品，产品在询问分支里回答
+
+    application = _application(system)
+    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
+    mainline = {row.department: row for row in recovery.sessions if row.kind == "main"}
+    assert set(mainline) == {"product", "engineering", "quality"}
+    assert mainline["product"].activations >= 1
+    # 还没有开始工作的部门也有一行主线会话：用量为零，不是「没有这个会话」
+    assert mainline["quality"].activations == 0
+    assert mainline["quality"].model_steps == 0
+    branches = [row for row in recovery.sessions if row.kind == "branch"]
+    assert len(branches) == 1
+    assert branches[0].department == "product"
+    assert branches[0].activations >= 1
+    assert branches[0].model_steps >= 1
+    # 已用秒是已结算的运行时间：中断的那一轮不计，因此不会是负数
+    assert all(row.elapsed_sec >= 0 for row in recovery.sessions)
+    system.close()
+
+
+def test_a_resumed_run_keeps_the_record_of_this_interruption(data_dir):
+    # 自动继续以后仍能看到这次中断的记录（工单 #181）：执行权带上这次取得所依据的中断位置与文字，
+    # 页面因此能写「自动继续的时间」与中断在哪一步；继续以后事项仍是同一个，记录不因继续而消失
+    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
+    confirmed_before = system.project(run_id).last_event_id
+    system.close()
+
+    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
+                                      resume_on_startup=False)
+    assert restarted.orchestrator.resume_incomplete_run(run_id) is not None
+    application = _application(restarted)
+    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
+    assert recovery.owner is not None
+    assert recovery.owner.interrupted_at_event_id == confirmed_before
+    assert recovery.owner.interrupted_at_text
+    assert recovery.owner.since
+    # 最后已确认的位置随继续前进（继续本身也是一条已提交的事件），中断位置由执行权另记
+    assert recovery.last_confirmed_event_id != confirmed_before
+    assert recovery.last_confirmed_text
     restarted.close()
 
 

@@ -36,7 +36,7 @@ from ..recovery import (
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
-from .labels import status_name
+from .labels import event_label, status_name
 from .payloads import BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure, Department
 from .read_models import AttemptStatus, ReadModels
 from .registry import QueryDefinition, UnchangedEvent
@@ -2554,10 +2554,38 @@ class RecoveryLimits(Contract):
 
 class RecoveryOwner(Contract):
     # 执行所有权（v8 设计说明第 7.2 节）：当前执行者与取得时间。没有有效执行者时为空。
-    # 执行槽位在 3.4A 之前只有一个，holds_slot 表示这个 run 是否占用它
+    # 执行槽位在 3.4A 之前只有一个，holds_slot 表示这个 run 是否占用它。
+    # 这次取得执行权所依据的中断位置与当时那条事件的文字取自 run_resumed 的依据（工单 #181，设计说明第 4.3 节）
     epoch: int
     since: str
     holds_slot: bool
+    interrupted_at_event_id: str | None
+    interrupted_at_text: str | None
+
+class UnknownAction(Contract):
+    # 重新启动时结果未知的动作与它的处理方式（工单 #181，设计说明第 4.3 节）：核实确认（自动核实，或者
+    # 用户选择按当前实际状态接受）或交还发出它的会话。交还以后动作仍列在这里，不等同于「没有发生过」：
+    # 原始观察不改写，处理方式与交还给模型的内容照实写出（恢复契约第 4 节）
+    action_id: str
+    tool: str
+    department: str | None
+    session_id: str | None
+    handling: Literal["confirmed", "returned"]
+    purpose: str | None
+    input_version: int | None
+    before: dict[str, Any] | None
+    returned: str | None
+    at: str
+
+class RecoverySession(Contract):
+    # 一个会话的已用量（设计说明第 4.3 节，三部门的循环结构第 9 节）：部门主线与询问分支各是一个会话，
+    # 用量各自累计。已用秒是已结算的运行时间，中断的那一轮不计
+    session_id: str
+    department: str | None
+    kind: Literal["main", "branch"]
+    elapsed_sec: int
+    activations: int
+    model_steps: int
 
 class LateResult(Contract):
     # 迟到结果：旧执行者写入的、不推进状态的记录（v8 设计说明第 7.2 节）
@@ -2572,8 +2600,9 @@ class UnusableTarget(Contract):
     problem: str
 
 class RunRecoveryResult(Contract):
-    # 一个事项的恢复观察（设计说明第 4.3 节）：恢复观察状态、待恢复原因、最后已确认位置、未完成动作、
-    # 核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果
+    # 一个事项的恢复观察（设计说明第 4.3 节）：恢复观察状态、待恢复原因、最后已确认位置、
+    # 未完成动作、核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果。
+    # 最后已确认位置的文字、结果未知的动作与各会话的用量是 v13 恢复页要读的内容（工单 #181）
     work_item_id: str
     run_id: str
     state: Literal["running", "interrupted", "waiting_resume", "completed", "paused", "cancelled", "stopped"]
@@ -2581,13 +2610,16 @@ class RunRecoveryResult(Contract):
     executable: bool
     last_confirmed_position: int
     last_confirmed_event_id: str | None
+    last_confirmed_text: str | None
     unfinished_actions: list[UnfinishedAction]
+    unknown_actions: list[UnknownAction]
     verifications: list[VerificationRecord]
     next_legal_action: str | None
     can_continue: bool
     cannot_continue_reason: str | None
     unusable: UnusableTarget | None
     limits: RecoveryLimits
+    sessions: list[RecoverySession]
     owner: RecoveryOwner | None
     late_results: list[LateResult]
 
@@ -2628,7 +2660,9 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
             executable=not terminal,
             last_confirmed_position=0 if confirmed is None else confirmed.position,
             last_confirmed_event_id=run.last_event_id,
-            unfinished_actions=unfinished, verifications=verifications,
+            last_confirmed_text=_event_text(confirmed),
+            unfinished_actions=unfinished, unknown_actions=_unknown_actions(events),
+            verifications=verifications,
             next_legal_action=_NEXT_ACTION[state],
             can_continue=_can_continue(state, terminal),
             cannot_continue_reason=_cannot_continue_reason(run, state, terminal, resume_requests),
@@ -2637,6 +2671,7 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
             limits=RecoveryLimits(activations=minimal.used.activations,
                                   model_steps=minimal.used.model_steps,
                                   retries=_retry_count(events), cycle_count=run.cycle_count),
+            sessions=_recovery_sessions(minimal, run, events),
             owner=_execution_owner(minimal, events),
             # 迟到结果：3.1 的执行权在写入口拦住旧执行者的写入（write_path 的 claim_execution_right 与
             # StaleExecutionRight），被拒的写入不落盘，因此 3.1 没有迟到结果可列。远程执行代理上的迟到回执
@@ -2644,6 +2679,11 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
             late_results=[],
         ),
     )
+
+def _event_text(event: Any) -> str | None:
+    # 一条事件给用户看的文字（与应用层事件流里的说明同一份，工单 #181）：最后已确认的位置与中断位置
+    # 都按它写，页面上不出现事件种类与编号
+    return None if event is None else event_label(event.type, event.payload or {})
 
 def _run_decisions(application: Application, run_id: str) -> dict[str, Any]:
     # 一个 run 流保存的决定请求，按身份：与事件在同一个事务中更新，重放只读取
@@ -2720,6 +2760,71 @@ def _unfinished_actions(events: list[Any]) -> list[UnfinishedAction]:
     return unfinished
 
 
+def _unknown_actions(events: list[Any]) -> list[UnknownAction]:
+    # 重新启动时结果未知的动作与它后来的处置（工单 #181，设计说明第 4.3 节）：核实确认或交还发出它的会话。
+    # 处置是追加的核实记录，原始观察不改写；同一个动作有几条处置时取最后一条，动作本身仍只有一行
+    started = {action_identity(event): event for event in events if event.type == EventType.TOOL_STARTED}
+    latest: dict[tuple[str, int | None, str], UnknownAction] = {}
+    for event in events:
+        if event.type != EventType.ACTION_VERIFIED:
+            continue
+        payload = event.payload or {}
+        identity = action_identity(event)
+        source = started.get(identity)
+        source_payload = {} if source is None else (source.payload or {})
+        latest[identity] = UnknownAction(
+            action_id=identity[2],
+            tool=str(payload.get("name") or source_payload.get("name") or ""),
+            department=event.department or (None if source is None else source.department),
+            session_id=event.session_id or (None if source is None else source.session_id),
+            # 交还发出它的会话是 handed_back；其余处置都是核实确认（自动核实，或者用户选择按当前实际状态接受）
+            handling="returned" if payload.get("resolution") == "handed_back" else "confirmed",
+            purpose=payload.get("purpose", source_payload.get("purpose")),
+            input_version=source_payload.get("input_version"),
+            before=source_payload.get("before_snapshot_ref"),
+            returned=_returned_text(payload),
+            at=event.created_at,
+        )
+    return sorted(latest.values(), key=lambda item: item.at)
+
+def _returned_text(payload: Any) -> str | None:
+    # 交还给模型的内容（工单 #181）：核实记录里写进部门历史的工具结果原文，模型读到的就是它
+    item = payload.get("input_item")
+    if not isinstance(item, dict):
+        return None
+    output = item.get("output")
+    if isinstance(output, str):
+        return output
+    return None if output is None else json.dumps(output, ensure_ascii=False)
+
+def _recovery_sessions(minimal: MinimalProjection, run: Any, events: list[Any]) -> list[RecoverySession]:
+    # 各会话的用量（工单 #181，设计说明第 4.3 节）：已用量读最小投影的 sessions，按部门、主线在前的顺序。
+    # 主线会话的部门在事项创建时记下；询问分支的部门取自它的激活事件，分支的编号来自运行状态投影
+    branches = set(getattr(run, "branch_sessions", None) or ())
+    departments: dict[str, str] = {}
+    for event in events:
+        if event.type != EventType.DEPARTMENT_ACTIVATED:
+            continue
+        session_id = event.session_id or ""
+        if session_id and event.department and session_id not in departments:
+            departments[session_id] = event.department
+    rows = [
+        RecoverySession(
+            session_id=session_id,
+            department=state.department or departments.get(session_id),
+            kind="branch" if session_id in branches else "main",
+            elapsed_sec=max(0, round(state.settled_ms / 1000)),
+            activations=state.activations, model_steps=state.model_steps,
+        )
+        for session_id, state in minimal.sessions.items()
+    ]
+    rows.sort(key=lambda item: (
+        DEPARTMENTS.index(item.department) if item.department in DEPARTMENTS else len(DEPARTMENTS),
+        item.kind != "main", item.session_id,
+    ))
+    return rows
+
+
 def _verification_records(events: list[Any], decisions: Any) -> list[VerificationRecord]:
     # 核实记录有三条来源，都不改写原始观察：
     # - 自动核实（工单 #308）：对比确认动作已经完成，记 action_verified，依据是这次对比；
@@ -2765,7 +2870,8 @@ def _retry_count(events: list[Any]) -> int:
 
 def _execution_owner(minimal: MinimalProjection, events: list[Any]) -> RecoveryOwner | None:
     # 执行所有权读最小投影（S1e 工单 #1015）：编号是投影里的执行权编号，没有取得过执行权时为空。
-    # 取得的时间不是投影的内容（内核不为应用加字段），仍取自记下这一次取得的那个事件
+    # 取得的时间不是投影的内容（内核不为应用加字段），仍取自记下这一次取得的那个事件；
+    # 这次取得所依据的中断位置与当时那条事件的文字也来自它（工单 #181，设计说明第 4.3 节）
     epoch = minimal.execution_right
     if epoch <= 0:
         return None
@@ -2773,7 +2879,14 @@ def _execution_owner(minimal: MinimalProjection, events: list[Any]) -> RecoveryO
                     if event.type == EventType.RUN_RESUMED
                     and int((event.payload or {}).get("acquired_epoch") or 0) == epoch), None)
     since = resumed.created_at if resumed is not None else ""
-    return RecoveryOwner(epoch=epoch, since=since, holds_slot=True)
+    basis = {} if resumed is None else ((resumed.payload or {}).get("basis") or {})
+    interrupted_at = basis.get("interrupted_at_event_id")
+    interrupted_at = interrupted_at if isinstance(interrupted_at, str) and interrupted_at else None
+    interrupted_event = None
+    if interrupted_at is not None:
+        interrupted_event = next((event for event in events if event.event_id == interrupted_at), None)
+    return RecoveryOwner(epoch=epoch, since=since, holds_slot=True,
+                         interrupted_at_event_id=interrupted_at, interrupted_at_text=_event_text(interrupted_event))
 
 RUN_RECOVERY = QueryDefinition(
     name="run.recovery", request=RunRecovery, result=RunRecoveryResult, handle=_run_recovery,
@@ -2783,7 +2896,7 @@ RUN_RECOVERY = QueryDefinition(
                 EventType.DECISION_WITHDRAWN, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
     unchanged_by=(
         UnchangedEvent(EventType.MODEL_REQUESTED,
-                       "模型请求只改变恢复页上的已用模型步数；那是进度读数，与已用秒数同类（工单 #891）"),
+                       "模型请求只改变恢复页上的已用模型步数与各会话的模型步骤；那是进度读数，与已用秒数同类（工单 #891）"),
     ),
 )
 
