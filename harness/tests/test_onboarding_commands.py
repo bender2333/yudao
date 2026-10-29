@@ -11,7 +11,7 @@ from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
-from harness.models import ProjectEventType
+from harness.models import TERMINAL_STATUSES, ProjectEventType
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
@@ -29,10 +29,14 @@ def _source(root: Path) -> Path:
     (root / "tests" / "test_echo.py").write_text("def test_placeholder():\n    assert True\n", encoding="utf-8")
     return root
 
-def _onboarding_script():
-    # 三个部门各一轮的建档脚本；给两轮，覆盖 onboarding.restart 再次建档
-    # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
-    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
+def _onboarding_script(rounds: int = 4):
+    # 三个部门的建档脚本；脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）。
+    # rounds 是每个部门准备几条回答：同一部门的回答相同，条数只决定「够不够用」。
+    # 一次建档 run 里同一部门可能被唤醒不止一次（工单 #1250）：质检的基线核验要覆盖工程的现有结构说明，
+    # 工程的结构说明还没被接纳时先做的那一次不被接受，结构说明到了以后质检再被唤醒一次。
+    # 这个先后由调度决定，不总是同一边。用例里有两次建档（project.onboard 与 onboarding.restart），
+    # 所以按 2 次 run × 2 次质检唤醒准备 4 条；用不完的留在脚本里，不影响任何断言。
     def round_turns():
         return {
             "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT],
@@ -42,9 +46,11 @@ def _onboarding_script():
             "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
                                                            "evidence": "smoke"}])],
         }
-    first = round_turns()
-    second = round_turns()
-    return {department: first[department] + second[department] for department in first}
+    script: dict[str, list] = {}
+    for _ in range(rounds):
+        for department, turns in round_turns().items():
+            script.setdefault(department, []).extend(turns)
+    return script
 
 class _Opened:
     def __init__(self, data_dir, adapter=None) -> None:
@@ -69,7 +75,13 @@ def _post(client, command, **body):
 # （架构师 2026-09-27 16:55，docs/archive/architecture-issues-2026-09-10.md）设为远大于正常用时的值。
 # 建档 run 含多次版本存储写入，正常用时数秒、并发负载下更慢；
 # run 是否按预期结束由等待之后的阶段与停止原因断言核对。
-_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
+#
+# 集中的 WAIT_FOR_HOST_WORK_SEC 是 300 秒，与 CI 给每条集成层用例的 300 秒上限相等（conftest.py 的
+# TIMEOUTS[INTEGRATION]）。两处一样时，卡住的是 pytest-timeout 而不是用例自己的等待：它在 Windows 上
+# 用线程法结束整个进程（os._exit），xdist 报 `node down: Not properly terminated`，用例记成 FAILED，
+# 作业随后不再推进，日志里也看不出是哪一步卡住（工单 #1250）。这里取更短的一个，卡住就报成一条失败。
+# 150 秒仍远大于本机 1 至 5 秒的正常用时。
+_WAIT_LIMIT = min(WAIT_FOR_HOST_WORK_SEC, 150.0)
 
 
 def _wait_for(predicate, timeout=_WAIT_LIMIT):
@@ -79,6 +91,13 @@ def _wait_for(predicate, timeout=_WAIT_LIMIT):
             return True
         time.sleep(0.05)
     return False
+
+
+def _wait_for_run_end(opened, run_id, timeout=_WAIT_LIMIT) -> bool:
+    # 等一次 run 走到终点（done / paused / failed），它按预期结束与否由调用方随后的断言核对。
+    # 不只等 done：run 以失败或暂停结束时，只等 done 的那条会一直空转到 _WAIT_LIMIT。
+    return _wait_for(lambda: opened.system.project(run_id).status in TERMINAL_STATUSES, timeout)
+
 
 def _git_init(root: Path) -> None:
     environment = {
@@ -113,8 +132,10 @@ def test_project_onboard_reaches_baseline_verified_over_http(data_dir, tmp_path)
         assert accepted.status_code == 200, accepted.text
         refs = accepted.json()["refs"]
         project_id, run_id = refs["project_id"], refs["run_id"]
-        assert _wait_for(lambda: _idle(client) and opened.system.project(run_id).status == "done")
+        assert _wait_for_run_end(opened, run_id), opened.system.project(run_id)
+        assert _wait_for(lambda: _idle(client)), opened.system.project(run_id)
         run = opened.system.project(run_id)
+        assert run.status == "done"
         assert run.stop_reason == "baseline_verified"
         assert run.kind == "onboarding"
         assert run.workspace_digest == run.snapshot["tree_digest"]
@@ -145,7 +166,9 @@ def test_git_provenance_recorded_when_the_source_is_a_repository(data_dir, tmp_p
         assert provenance["branch"] in {"master", "main"}
         assert len(provenance["commit"]) == 40
         assert provenance["dirty"] is True
-        assert _wait_for(lambda: _idle(client))
+        assert _wait_for_run_end(opened, run_id), opened.system.project(run_id)
+        assert _wait_for(lambda: _idle(client)), opened.system.project(run_id)
+        assert opened.system.project(run_id).status == "done", opened.system.project(run_id)
 
         plain = _source(tmp_path / "plain")
         accepted = _post(client, "project.onboard", name="非 git 项目", goal=GOAL,
@@ -153,7 +176,8 @@ def test_git_provenance_recorded_when_the_source_is_a_repository(data_dir, tmp_p
         assert accepted.status_code == 200, accepted.text
         plain_run = accepted.json()["refs"]["run_id"]
         assert opened.system.project(plain_run).snapshot["provenance"] == {}
-        assert _wait_for(lambda: opened.system.project(plain_run).status == "done")
+        assert _wait_for_run_end(opened, plain_run), opened.system.project(plain_run)
+        assert opened.system.project(plain_run).status == "done", opened.system.project(plain_run)
 
 def test_source_invalid_rejects_without_building_the_project(data_dir, tmp_path):
     # 验收（第 10 节第 9 项）：源目录不存在、含宿主私有路径或公开树有无法表示的条目时返回 source_invalid，
@@ -206,7 +230,8 @@ def test_new_work_item_is_rejected_before_the_baseline(data_dir, tmp_path):
         restarted = _post(client, "onboarding.restart", project_id=project_id, source_name="src")
         assert restarted.status_code == 200, restarted.text
         second_run = restarted.json()["refs"]["run_id"]
-        assert _wait_for(lambda: opened.system.project(second_run).status == "done")
+        assert _wait_for_run_end(opened, second_run), opened.system.project(second_run)
+        assert opened.system.project(second_run).status == "done", opened.system.project(second_run)
         assert opened.system.project(second_run).stop_reason == "baseline_verified"
 
 def test_projects_list_and_loop_show_onboarding_status_and_kind(data_dir, tmp_path):
