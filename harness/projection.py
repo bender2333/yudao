@@ -778,4 +778,8 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
         checks=list(payload.get("checks", [])),
         defects=[Defect(**item) if not isinstance(item, Defect) else item for item in payload.get("defects", [])],
         evidence_refs=[ArtifactRef(**item) if not isinstance(item, ArtifactRef) else item for item in payload.get("evidence_refs", [])],
+        # 逐条结论与放行记录里的三个数（工单 #151）：旧事件没有这几项，缺省是空
+        criteria=[dict(item) for item in payload.get("criteria", [])],
+        coverage=dict(payload.get("coverage") or {}),
+        open_criteria=[str(item) for item in payload.get("open_criteria", [])],
     )

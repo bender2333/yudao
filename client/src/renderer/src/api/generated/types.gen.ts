@@ -13593,6 +13593,66 @@ export type ProposalSubmittedPayload = {
 };
 
 /**
+ * QaCoveragePayload
+ */
+export type QaCoveragePayload = {
+    /**
+     * Criteria Total
+     */
+    criteria_total: number;
+    /**
+     * Executable
+     */
+    executable: number;
+    /**
+     * Covered
+     */
+    covered: number;
+    /**
+     * Coverage Ratio
+     */
+    coverage_ratio: number;
+    /**
+     * Model Reading
+     */
+    model_reading: number;
+    /**
+     * Open
+     */
+    open: number;
+};
+
+/**
+ * QaCriterionPayload
+ */
+export type QaCriterionPayload = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Method
+     */
+    method: 'check' | 'trial' | 'measure' | 'judgement' | 'human' | 'open';
+    /**
+     * Result
+     */
+    result: 'passed' | 'failed' | 'unverified';
+    /**
+     * Checks
+     */
+    checks: Array<string>;
+    /**
+     * Trial Cases
+     */
+    trial_cases: Array<string>;
+    /**
+     * Note
+     */
+    note: string;
+};
+
+/**
  * QaSubmittedEvent
  */
 export type QaSubmittedEvent = {
@@ -13726,6 +13786,15 @@ export type QaSubmittedPayload = {
      * Defects
      */
     defects: Array<Defect>;
+    /**
+     * Criteria
+     */
+    criteria: Array<QaCriterionPayload>;
+    coverage: QaCoveragePayload;
+    /**
+     * Open Criteria
+     */
+    open_criteria: Array<string>;
     /**
      * Evidence Refs
      */

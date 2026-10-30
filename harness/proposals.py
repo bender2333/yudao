@@ -154,19 +154,41 @@ def baseline_review_turn(
     )
 
 
+def default_criteria(count: int, checks: list[str], *,
+                     method: str = "check", result: str = "passed") -> list[dict[str, Any]]:
+    # 逐条结论的默认项（工单 #151）：每条验收条件一项，AC1 起按位置编号，都用给出的检查名当证据。
+    # 要写别的检验方式或结果的用例显式传 criteria
+    return [{"criterion": f"AC{position}", "method": method, "result": result,
+             "checks": list(checks), "trial_cases": [], "note": ""}
+            for position in range(1, count + 1)]
+
+
+def acceptance_criteria_count(call: Any) -> int:
+    # 请求里的当前 ProductSpec 有几条验收条件：逐条结论按这个条数生成，与真实模型从上下文读到的一样
+    raw = prompt_part(call, "current_product_spec")
+    if not raw:
+        return 1
+    spec = json.loads(raw)
+    return max(1, len(spec.get("acceptance_criteria") or []))
+
+
 def review(
     verdict: str,
     rationale: str,
     checks: list[str] | None = None,
     defects: list[dict[str, str]] | None = None,
     basis_delivery_spec_hash: str | None = None,
+    criteria: list[dict[str, Any]] | None = None,
+    criteria_count: int = 1,
 ) -> dict[str, Any]:
+    names = checks or ["smoke"]
     return {
         "kind": "qa_review",
         "verdict": verdict,
         "rationale": rationale,
-        "checks": checks or ["smoke"],
+        "checks": names,
         "defects": defects or [],
+        "criteria": default_criteria(criteria_count, list(names)) if criteria is None else criteria,
         "basis_delivery_spec_hash": basis_delivery_spec_hash,
     }
 
@@ -207,6 +229,7 @@ def review_turn(
     checks: dict[str, int | dict[str, Any]] | None = None,
     defects: list[dict[str, str]] | None = None,
     basis_delivery_spec_hash: str | None = None,
+    criteria: list[dict[str, Any]] | None = None,
     transcript: str = "",
 ) -> Callable[[Any], FakeTurn]:
     checks = checks or {"smoke": 0}
@@ -218,7 +241,8 @@ def review_turn(
             declared = json.loads(raw).get("content_hash") if raw else None
         return FakeTurn(
             proposal=review(verdict, rationale, checks=list(checks), defects=defects,
-                            basis_delivery_spec_hash=declared),
+                            basis_delivery_spec_hash=declared, criteria=criteria,
+                            criteria_count=acceptance_criteria_count(call)),
             checks=checks,
             transcript=transcript,
         )
