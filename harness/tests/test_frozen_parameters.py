@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -58,6 +59,11 @@ def _created(system: LoopSystem, run_id: str) -> dict:
 
 def _frozen(system: LoopSystem, run_id: str) -> dict:
     return _created(system, run_id)["parameters"]
+
+
+def _python(command: str) -> str:
+    # 命令串交给 bash 执行：解释器取当前进程的 sys.executable，路径写成正斜杠并加引号（helpers 的同一做法）
+    return f'"{sys.executable.replace(chr(92), "/")}" {command}'
 
 
 def _tool_called(system: LoopSystem, run_id: str, identity: str) -> dict:
@@ -234,7 +240,7 @@ def test_compaction_stalled_limit_comes_from_the_frozen_value(tmp_path):
 
 
 def test_bash_timeouts_come_from_the_frozen_values(tmp_path):
-    slow = "C:/code/yudao/.venv/Scripts/python.exe -c \"import time; time.sleep(30)\""
+    slow = _python('-c "import time; time.sleep(30)"')
     script = {"product": [_respond(_call("slow-default", "bash", command=slow)),
                           _respond(_call("slow-max", "bash", command=slow, timeout_sec=100)), product_spec()]}
     system = _system(tmp_path, script)
@@ -251,7 +257,7 @@ def test_bash_timeouts_come_from_the_frozen_values(tmp_path):
 
 
 def test_check_timeout_max_comes_from_the_frozen_value(tmp_path):
-    script = {"product": [_respond(_call("slow-check", "run_check", name="slow", command="C:/code/yudao/.venv/Scripts/python.exe sleep.py",
+    script = {"product": [_respond(_call("slow-check", "run_check", name="slow", command=_python("sleep.py"),
                                          timeout_sec=100)),
                           product_spec()]}
     system = _system(tmp_path, script)
