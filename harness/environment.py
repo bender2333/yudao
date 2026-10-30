@@ -221,11 +221,8 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
-=======
->>>>>>> 6397fc1f (environment 的冻结读数补全：_limit/_output_limit 方法、parameters_for 接线与全部调用点（rebase 后对齐 #1171 与 #1309）)
         )
 
     # ---- 会话用哪份工作区 ----
@@ -277,11 +274,8 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
-=======
->>>>>>> 6397fc1f (environment 的冻结读数补全：_limit/_output_limit 方法、parameters_for 接线与全部调用点（rebase 后对齐 #1171 与 #1309）)
         )
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
@@ -357,11 +351,8 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
-=======
->>>>>>> 6397fc1f (environment 的冻结读数补全：_limit/_output_limit 方法、parameters_for 接线与全部调用点（rebase 后对齐 #1171 与 #1309）)
         )
         if department in self.delivery_inspecting:
             ref = projection.qa_tests_archive_ref
