@@ -154,7 +154,7 @@ flowchart TB
 | --- | --- | --- | --- |
 | 新建 | 新建项目、接入已有项目、重新开始建档、记录原文、新建事项 | 没有已存在的对象，为空 | 不核对 |
 | 修改 | 项目的重命名、置顶、归档与恢复，项目部门设置，源目录登记，MCP 服务器设置，机器登记与项目的机器授权，项目的执行位置，同一项目的排队顺序，角色设置，执行槽位数，模型目录与部门默认，凭据，语义记录的纠正 | 被修改对象的版本：项目基本信息版本、该部门设置的版本、该项目源目录登记的版本、该项目网络与 MCP 设置的版本、该机器登记的版本、该项目机器授权的版本、该项目执行位置的版本、该项目排队顺序的版本、目录修订号、凭据版本、该条记录的版本 | 必须等于当前版本，否则拒绝，返回当前版本 |
-| 追加与控制 | 追加需求、部门指导、取消事项、取消排队、开始排空、强制升级、目录的重新读取、获取模型列表、连接测试与模型测试 | 用户提交时看到的对象版本：事项的输入版本、该部门的指导版本、事项版本、排空状态的版本、目录修订号 | 写入事件作为依据，不要求相等；对象的状态不允许时拒绝 |
+| 追加与控制 | 追加需求、部门指导、取消事项、取消排队、开始排空、强制升级、目录的重新读取、连接服务、选用模型、获取模型列表、连接测试与模型测试 | 用户提交时看到的对象版本：事项的输入版本、该部门的指导版本、事项版本、排空状态的版本、目录修订号 | 写入事件作为依据，不要求相等；对象的状态不允许时拒绝 |
 | 回答 | 回答决定请求 | 决定请求的版本 | 请求仍未回答且版本相等 |
 
 修改类命令要求相等，因为基于旧内容的保存会覆盖别人或系统的修改（原型第 4.6 节「版本冲突时提示重新读取」）。追加类命令本身不覆盖任何内容，重新读取不会改变用户的意图，所以只记录依据。
@@ -304,16 +304,19 @@ sequenceDiagram
 | `catalog.connection.delete` | 删除 Provider 配置 | Provider 配置 | `catalog_revised` | 目录修订号 | 已有 `DELETE /api/providers/{id}` |
 | `catalog.document.save` | 保存目录文档（编辑 JSON、导入） | 目录文档 | `catalog_revised` | 目录修订号 | 已有 `POST /api/providers`（带 `providers` 字段） |
 | `catalog.reload` | 重新读取目录文件 | 无 | `catalog_revised`（修订号变化时） | 目录修订号（记录依据） | 已有 `POST /api/providers/reload` |
-| `catalog.candidates.collect` | 获取模型列表；每个候选带预填的协议、窗口、输出上限与输入方式，窗口、输出上限与输入方式的预填值带来源（上游模型列表，或模型能力表及其 revision）；失败时结果写明请求的地址与返回的状态码，或连接失败的原因 | Provider 配置、模型列表地址（可选） | `catalog_candidates_collected` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/candidates` |
+| `catalog.connect` | 一步连接服务：规范化地址，沿用同一地址的连接或新建一份（ID、名称与凭据引用由系统按地址生成），保存 Key（始终写入 `.env`），再获取候选；写入 `.env` 失败时连接与 Key 都不保存 | 服务地址、API Key（沿用已有连接且不更换 Key 时可以省略） | `catalog_revised`、`credential_changed`、`catalog_candidates_collected` | 目录修订号（记录依据） | 新增 |
+| `catalog.model.select` | 选用一个模型：补全参数并保存模型访问定义，随后进行模型测试，通过时写入准入，并按模型管理设计说明第 5.1 节填写还没有部门默认的部门；手动添加时给出上游模型 ID 与协议；容量补不全时按用户填写的窗口与输出上限继续；同一个模型已在进行或已准入时沿用，不重复发出请求 | 连接、上游模型 ID、协议（手动添加时）、窗口与输出上限（用户填写时） | `catalog_revised`（定义保存；自动填写的部门默认）、`catalog_test_finished`（带准入） | 目录修订号（记录依据） | 新增 |
+| `catalog.model.remove` | 取消选用（移除模型访问定义）；进行中的测试同时取消，结果按选用序号核对，序号不是当前的结果丢弃；被部门默认、角色默认或项目设置引用时拒绝并列出引用方 | Provider 配置、模型访问定义 | `catalog_revised` | 目录修订号 | 已有 |
+| `catalog.candidates.collect` | 刷新模型列表；每个候选带补全后的协议、窗口、输出上限与输入方式及其来源（上游模型列表，或能力表的服务商与 revision），以及提供方、是否支持推理、是否适用于部门任务；失败分五种（Key 被拒绝、地址不可达、返回的不是模型列表、其他状态码、空列表），结果写明请求的地址与原因；最近一次的结果保存在服务进程里，随 `catalog` 查询返回 | 连接、模型列表地址（可选） | `catalog_candidates_collected` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/candidates`；失败分类、来源与适用性新增 |
 | `catalog.connection.test` | 连接测试 | Provider 配置 | `catalog_test_finished` | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=connection`） |
-| `catalog.model.test` | 模型测试，通过时写入准入 | Provider 配置、模型访问定义 | `catalog_test_finished`（带准入） | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=model`） |
+| `catalog.model.test` | 模型测试（最小问答与工具往返），通过时写入准入并记录是否接受要求调用工具；测试未通过的定义用它重新测试 | Provider 配置、模型访问定义 | `catalog_test_finished`（带准入） | 目录修订号（记录依据） | 已有 `POST /api/providers/{id}/test`（`kind=model`）；工具往返新增 |
 | `catalog.department_defaults.save` | 保存部门默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各部门的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 已有 `PUT /api/department-bindings`；提醒新增（D24 第 5.6 节） |
 | `catalog.role_defaults.save` | 保存角色默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各角色的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 | 新增（Stage 5） |
-| `credential.set` | 保存 API Key，只在本进程有效或写入 `.env` | 凭据引用、API Key、写入方式 | `credential_changed`（只含引用、来源与版本） | 凭据版本 | 已有 `POST /api/provider-credentials`（`action=set`） |
-| `credential.clear_override` | 清除内存覆盖 | 凭据引用 | `credential_changed` | 凭据版本 | 已有（`action=clear_override`） |
-| `credential.remove_persisted` | 删除持久凭据 | 凭据引用 | `credential_changed` | 凭据版本 | 已有（`action=remove_persisted`） |
+| `credential.set` | 保存 API Key，写入数据目录的 `.env`；评测与测试可以选「只在本进程有效」，模型管理页不使用这个方式 | 凭据引用、API Key、写入方式 | `credential_changed`（只含引用、来源与版本） | 凭据版本 | 已有 `POST /api/provider-credentials`（`action=set`） |
+| `credential.clear_override` | 清除内存覆盖（评测与测试使用） | 凭据引用 | `credential_changed` | 凭据版本 | 已有（`action=clear_override`） |
+| `credential.remove_persisted` | 删除保存的 Key（删除连接时一并执行） | 凭据引用 | `credential_changed` | 凭据版本 | 已有（`action=remove_persisted`） |
 
-模型管理属于 Stage 3 的 D24 工作包。从模型列表勾选「加入」的访问定义随 `catalog.connection.save` 一起提交，保存以后界面对每个新的访问定义发送一次 `catalog.model.test`（模型管理设计说明第 4.3 节），「加入」不单独成为命令。连接测试、获取模型列表与模型测试需要请求上游，命令接受以后作为任务进行，结果以事件出现，界面在事件到达前显示「测试中」；读取 MCP 服务器的工具清单（`tool_server.probe`）按同样的方式进行。
+模型管理属于 Stage 3 的 D24 工作包。页面主路径用 `catalog.connect` 与 `catalog.model.select`：前者把连接、Key 与候选做成一步，后者把选用的补全参数、保存定义、模型测试与准入做成一条流水线（模型管理设计说明第 4.3 节）；`catalog.connection.save`、`catalog.document.save` 与 `credential.*` 服务高级部分、评测与测试。连接测试、获取模型列表与模型测试需要请求上游，命令接受以后作为任务进行，结果以事件出现。选用进行中的状态（补全参数、等待测试、测试中）是服务进程里的瞬时状态：经实时通道推送，`catalog` 查询也返回它，页面刷新以后据此恢复，不写事件日志；进程重启以后进行中的选用丢失，这些定义显示为候选，用户重新测试。读取 MCP 服务器的工具清单（`tool_server.probe`）按同样的方式进行。
 
 **运维（Stage 4）**
 
@@ -535,7 +538,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 | 现状 |
 | --- | --- | --- | --- |
-| `catalog` | 服务方案预置表与修订号、模型能力表的 revision、快照日期与来源链接，以及预置服务方案在能力表中的条目（手动添加模型访问定义时页面据此预填）、Provider 配置、模型访问定义（含输入方式：文本、图像）、准入记录、凭据状态（不含 Key）、候选与采集时间（候选的预填值带来源）、部门默认与角色默认（角色默认为 Stage 5），各带当前的建议能力提醒；目录修订号 | | 已有 `GET /api/providers`、`/api/provider-presets`、`/api/department-bindings`，合并；按 D24 修改 |
+| `catalog` | 服务方案预置表与修订号、模型能力表的 revision、快照日期与来源链接、Provider 配置、模型访问定义（含输入方式：文本、图像，以及每个值的来源）、准入记录、凭据状态（不含 Key）、进行中的选用（补全参数、等待测试、测试中，带选用序号）、每个连接最近一次的候选获取结果与采集时间（候选带来源、提供方、是否支持推理、是否适用于部门任务；失败时带原因）、部门默认与角色默认（角色默认为 Stage 5），各带当前的建议能力提醒；目录修订号 | | 已有 `GET /api/providers`、`/api/provider-presets`、`/api/department-bindings`，合并；按 D24 修改 |
 | `catalog.document` | 目录文档（编辑 JSON 与导出使用），不含 Key、准入记录与项目部门设置 | | 数据已有（`to_document`），查询新增 |
 | `catalog.change_impact` | 按拟议的修改计算会作废准入的定义、引用方（部门默认的哪个部门、哪个项目的哪个部门）与正在使用它们的进行中事项，不写入任何内容（模型管理设计说明第 4.4 节） | | 新增 |
 | `runtime.slots` | 槽位数、占用、跨项目队列、重启后的队列状态 | | 新增 |
@@ -871,3 +874,4 @@ sequenceDiagram
 - 2026-10-29 / GPT-6（Codex） / 修订参数页为全局值页面并补充默认值、接入标记与系统页入口 / 按完整核对证据固定页面与后端工单分工
 
 - 2026-10-29 / GPT-6（Codex） / 补充撤回命令在同一写事务核对最近历史身份与参数版本，区分全局值编辑与项目覆盖 / 防止撤回重读后发生修改又改回的并发误撤回
+- 2026-10-30 / claude-sonnet-5-5（总架构师） / 模型管理一节：新增 `catalog.connect`（一步连接）与 `catalog.model.select`（选用即启用）两条命令，补 `catalog.model.remove` 的说明；`catalog.candidates.collect` 的失败分五种并带来源、提供方与适用性；`catalog.model.test` 含工具往返；`credential.*` 写明页面不使用只在本进程有效的方式；`catalog` 查询加进行中的选用与每个连接最近一次的候选获取结果；选用进行中的状态是瞬时状态，不写事件日志 / 模型管理改为填写地址与 Key、选择模型即可使用（模型管理设计说明第 4.2、4.3、9.1 节）
