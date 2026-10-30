@@ -1,7 +1,8 @@
 """报告：机器可读的结果与中文报告。
 
-结果记录 OpenCode 版本号、模型、材料版本、评分器版本、宿主环境与每次运行的
-全部指标与失败条目（第 6 节）。多次运行时每个指标报告平均值、最小值与最大值。
+结果记录 OpenCode 版本号、模型、模型的容量与来源、材料版本、评分器版本、宿主环境与
+每次运行的全部指标与失败条目（第 6 节）。多次运行时每个指标报告平均值、最小值、
+最大值与噪声范围（极差，第 5.2 节）；缺字段的样本按未知处理，不转成零。
 原始证据放在 .yudao/evals/ 下，结果与报告提交到 docs/evaluation/。
 """
 
@@ -11,9 +12,13 @@ import platform
 import shutil
 import subprocess
 
+import model_service
+
 AGGREGATED_METRICS = ("request_count", "input_tokens", "output_tokens",
                       "cache_read_tokens", "cache_write_tokens", "cost",
                       "elapsed_seconds")
+# 评分器给出的两项：完成度与正确性（第 5.2 节，来自 run["score"]）
+SCORED_METRICS = ("completion", "correctness")
 
 
 def host_environment():
@@ -38,28 +43,43 @@ def _version(name):
 
 
 def aggregate(runs):
-    """多次运行的平均值、最小值与最大值（第 5.2 节）。"""
-    counts = []
-    for run in runs:
-        if run.get("void") or run.get("model_service_failure"):
-            continue
-        counts.append(run)
+    """多次运行的汇总（第 5.2 节）：平均值、最小值、最大值与噪声范围。
+
+    噪声范围是同一版本各次运行的取值极差（最大值减最小值）；只有一次运行时写「未知」，
+    不写零。缺字段的样本按未知处理：不进上面四项，另计有效样本数与未知样本数。
+    """
+    counted = [run for run in runs
+               if not run.get("void") and not run.get("model_service_failure")]
     summary = {}
     for name in AGGREGATED_METRICS:
-        values = [float(run["metrics"][name]) for run in counts
-                  if name in run.get("metrics", {}) and run["metrics"][name] is not None]
-        if not values:
-            continue
-        summary[name] = {
-            "count": len(values),
-            "mean": sum(values) / len(values),
-            "min": min(values),
-            "max": max(values),
-        }
+        summary[name] = _summary([_metric_value(run, name) for run in counted])
+    for name in SCORED_METRICS:
+        summary[name] = _summary([_score_value(run, name) for run in counted])
     return summary
 
 
-def build_result(scenario, material_version, scorer_version, model, runs):
+def _metric_value(run, name):
+    value = (run.get("metrics") or {}).get(name)
+    return None if value is None else float(value)
+
+
+def _score_value(run, name):
+    value = (run.get("score") or {}).get(name)
+    return None if value is None else float(value)
+
+
+def _summary(values):
+    """一项指标的统计：取值、未知样本数与噪声范围。"""
+    known = [value for value in values if value is not None]
+    item = {"count": len(values), "unknown": len(values) - len(known)}
+    if not known:
+        return item
+    item.update({"mean": sum(known) / len(known), "min": min(known), "max": max(known),
+                 "spread": (max(known) - min(known)) if len(known) > 1 else None})
+    return item
+
+
+def build_result(scenario, material_version, scorer_version, model, runs, model_capacity=None):
     counted = [run for run in runs
                if not run.get("void") and not run.get("model_service_failure")]
     return {
@@ -68,6 +88,7 @@ def build_result(scenario, material_version, scorer_version, model, runs):
         "scorer_version": scorer_version,
         "side": "opencode",
         "model": model,
+        "model_capacity": model_capacity,
         "opencode_version": host_environment()["opencode"],
         "network": {
             "allowed": False,
@@ -107,6 +128,8 @@ def write_report(result, path, run_reports):
     lines.append("| 材料版本 | " + result["material_version"] + " |")
     lines.append("| 评分器版本 | " + result["scorer_version"] + " |")
     lines.append("| 被测模型 | " + result["model"] + " |")
+    if result.get("model_capacity"):
+        lines.append("| 模型的容量 | " + model_service.describe(result["model_capacity"]) + " |")
     lines.append("| OpenCode 版本 | " + result["opencode_version"] + " |")
     lines.append("| 计入结果的运行次数 | " + str(result["run_count"]) + " |")
     lines.append("")
@@ -125,12 +148,20 @@ def write_report(result, path, run_reports):
     lines.append("")
     lines.append("## 四、指标汇总")
     lines.append("")
-    if result["summary"]:
-        lines.append("| 指标 | 平均值 | 最小值 | 最大值 |")
-        lines.append("| --- | --- | --- | --- |")
+    if result["run_count"]:
+        lines.append("噪声范围是同一版本各次运行的取值极差；只有一次运行、或该项全部未知时写「未知」。")
+        lines.append("")
+        lines.append("| 指标 | 平均值 | 最小值 | 最大值 | 噪声范围（极差） | 有效样本数 | 未知样本数 |")
+        lines.append("| --- | --- | --- | --- | --- | --- | --- |")
         for name, item in result["summary"].items():
-            lines.append("| " + _metric_label(name) + " | " + _number(item["mean"])
-                         + " | " + _number(item["min"]) + " | " + _number(item["max"]) + " |")
+            if "mean" in item:
+                cells = [_number(item["mean"]), _number(item["min"]), _number(item["max"]),
+                         "未知" if item["spread"] is None else _number(item["spread"])]
+            else:
+                cells = ["未知", "未知", "未知", "未知"]
+            lines.append("| " + _metric_label(name) + " | " + " | ".join(cells)
+                         + " | " + str(item["count"] - item.get("unknown", 0))
+                         + " | " + str(item.get("unknown", 0)) + " |")
     else:
         lines.append("没有计入结果的运行。")
     lines.append("")
@@ -158,6 +189,7 @@ def run_section(run, scores):
     lines.append("| 模型请求数 | " + str(run["metrics"]["request_count"]) + " |")
     lines.append("| 输入用量 | " + str(run["metrics"]["input_tokens"]) + " |")
     lines.append("| 输出用量 | " + str(run["metrics"]["output_tokens"]) + " |")
+    lines.append("| 费用 | " + _maybe(run["metrics"]["cost"]) + " |")
     lines.append("| 耗时（秒） | " + _number(run["metrics"]["elapsed_seconds"]) + " |")
     lines.append("| 完成度 | " + _number(scores["completion"]) + " |")
     lines.append("| 正确性 | " + _number(scores["correctness"]) + " |")
@@ -167,6 +199,11 @@ def run_section(run, scores):
         lines.append("| 丰富程度 | " + _number(r_score) + " |")
     lines.append("| 这次运行是否作废 | " + ("是" if run.get("void") else "否") + " |")
     lines.append("")
+    if run.get("skipped_files"):
+        lines.append("复制交付与评分时跳过的 Windows 保留设备名文件（`nul`、`con` 等）：")
+        for path in run["skipped_files"]:
+            lines.append("- " + path)
+        lines.append("")
     if run.get("void_reasons"):
         lines.append("作废原因：")
         for reason in run["void_reasons"]:
@@ -269,6 +306,8 @@ _METRIC_LABELS = {
     "cache_write_tokens": "缓存写入用量",
     "cost": "费用",
     "elapsed_seconds": "耗时（秒）",
+    "completion": "完成度",
+    "correctness": "正确性",
 }
 
 
@@ -279,6 +318,11 @@ def _metric_label(name):
 def _number(value):
     value = float(value)
     return str(int(value)) if value == int(value) else ("%.4f" % value).rstrip("0").rstrip(".")
+
+
+def _maybe(value):
+    """缺字段或取不到的用量写「未知」，不记 0（第 5.2 节）。"""
+    return "未知" if value is None else _number(value)
 
 
 def _write(path, text):

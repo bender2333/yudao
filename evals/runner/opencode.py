@@ -9,17 +9,23 @@ runner/scenario2.py 提供，本模块的其余部分对所有场景通用。
 JSON 输出里有没有这两类工具的调用。
 """
 
+import fnmatch
 import json
 import os
 import shutil
 import subprocess
 import time
 import material_integrity
+import model_service
 
 SCENARIO_MODULE = "scenario3"
 NETWORK_TOOLS = ("webfetch", "websearch")
-MODEL_SERVICE_BASE_URL_ENV = "YUDAO_EVAL_BASE_URL"
-MODEL_SERVICE_API_KEY_ENV = "YUDAO_EVAL_API_KEY"
+MODEL_SERVICE_BASE_URL_ENV = model_service.MODEL_SERVICE_BASE_URL_ENV
+MODEL_SERVICE_API_KEY_ENV = model_service.MODEL_SERVICE_API_KEY_ENV
+
+# Windows 的保留设备名：复制交付与评分时跳过它们，不分大小写，带不带扩展名都算（第 3 节「隔离」）
+RESERVED_DEVICE_NAMES = ("nul", "con", "prn", "aux") + tuple(
+    prefix + str(index) for prefix in ("com", "lpt") for index in range(1, 10))
 
 
 def scenario(name=None):
@@ -28,11 +34,12 @@ def scenario(name=None):
     return importlib.import_module(name or SCENARIO_MODULE)
 
 
-def write_run_config(run_dir, model, model_id):
-    """写运行配置：关闭取回与搜索工具，模型服务由环境变量给出。
+def write_run_config(run_dir, model, model_id, limits):
+    """写运行配置：关闭取回与搜索工具，模型服务由环境变量给出，模型限额取模型服务的容量。
 
     被测模型由用户提供（评测场景设计第 3 节），凭据只留在环境变量里，
-    配置里用 {env:...} 引用，不写进运行目录与仓库。
+    配置里用 {env:...} 引用，不写进运行目录与仓库。`limit` 的 `context` 与 `output`
+    是与 Yudao 一侧模型访问定义相同的那对数（第 3 节「模型的容量」）。
     """
     config_dir = os.path.join(run_dir, ".opencode-config")
     os.makedirs(config_dir, exist_ok=True)
@@ -53,7 +60,11 @@ def write_run_config(run_dir, model, model_id):
                     "baseURL": "{env:" + MODEL_SERVICE_BASE_URL_ENV + "}",
                     "apiKey": "{env:" + MODEL_SERVICE_API_KEY_ENV + "}",
                 },
-                "models": {model_id: {"name": model_id}},
+                "models": {model_id: {
+                    "name": model_id,
+                    "limit": {"context": limits["context_window"],
+                              "output": limits["max_output_tokens"]},
+                }},
             }
         },
     }
@@ -63,7 +74,7 @@ def write_run_config(run_dir, model, model_id):
     return path
 
 
-def create_run_dir(runs_root, run_id, model, model_id, scenario_name=None):
+def create_run_dir(runs_root, run_id, model, model_id, limits, scenario_name=None):
     """在 Yudao 仓库之外新建运行目录，由场景模块填入起点。"""
     scenario_module = scenario(scenario_name)
     run_dir = os.path.abspath(os.path.join(runs_root, run_id))
@@ -77,7 +88,7 @@ def create_run_dir(runs_root, run_id, model, model_id, scenario_name=None):
     # 没有版本控制的目录被 OpenCode 当成全局目录，交付会落到系统临时目录。
     subprocess.run(["git", "init", "--quiet"], cwd=run_dir, check=True,
                    capture_output=True)
-    write_run_config(run_dir, model, model_id)
+    write_run_config(run_dir, model, model_id, limits)
     return run_dir
 
 
@@ -220,3 +231,33 @@ def _path_variants(path):
     """同一目录在 Windows 上可能写成反斜杠或正斜杠，两种都算命中。"""
     absolute = os.path.abspath(path)
     return sorted({absolute, absolute.replace("\\", "/")})
+
+
+def reserved_device_names(names):
+    """列表里属于 Windows 保留设备名的条目（不分大小写，带不带扩展名都算）。"""
+    return sorted(name for name in names if name.split(".", 1)[0].lower() in RESERVED_DEVICE_NAMES)
+
+
+def delivery_copy_ignore(run_dir, patterns, skipped):
+    """复制交付与评分目录的 ignore：跳过评分不带的条目与保留设备名，记下跳过的文件。
+
+    Windows 上不能把名为 `nul` 的文件写进复制目标（写进去的是设备），被测模型留下
+    这类文件时原来的复制会中止整组运行；跳过的文件按相对运行目录的路径记进 `skipped`，
+    报告列出（第 3 节「隔离」）。
+    """
+    def ignore(directory, names):
+        ignored = set()
+        for pattern in patterns:
+            ignored.update(fnmatch.filter(names, pattern))
+        reserved = set(reserved_device_names(names)) - ignored
+        if reserved:
+            relative_dir = os.path.relpath(directory, run_dir).replace(os.sep, "/")
+            for name in sorted(reserved):
+                # 保留设备名不能交给 os.path.join 与 abspath：它们把 `nul` 当成设备，
+                # 路径会变成 `\\.\nul`。跳过的文件按目录与名字两段拼出相对路径；
+                # 同一棵目录树复制两次（证据目录与评分目录）时每个文件只记一次
+                relative = name if relative_dir == "." else relative_dir + "/" + name
+                if relative not in skipped:
+                    skipped.append(relative)
+        return ignored | reserved
+    return ignore
