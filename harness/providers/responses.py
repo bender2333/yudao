@@ -22,7 +22,7 @@ if typing.TYPE_CHECKING:
 
 from .call import ModelDelta
 from .errors import CancelledError, ProviderError
-from .invoke import Emit, InvokeResult, ProviderInput
+from .invoke import Emit, InvokeResult, ProviderInput, ToolResult, tool_image_part, tool_text_part
 from .presets import build_identity_headers
 from .reasoning import RESPONSES_REASONING_INCLUDE, ReasoningOutput, responses_reasoning
 from .resolve import FrozenTarget
@@ -698,9 +698,18 @@ def _responses_input_items(provider_input: ProviderInput) -> list[dict[str, Any]
         items.append({
             "type": "function_call_output",
             "call_id": result.call_id,
-            "output": result.output,
+            "output": _responses_tool_output(result),
         })
     return items
+
+
+def _responses_tool_output(result: ToolResult) -> str | list[dict[str, Any]]:
+    # 工具结果带图像时写成内容块：文字块在前，图像块按顺序（Responses 的图像输入写法，设计说明第 6.2 节）
+    if not result.images:
+        return result.output
+    parts = [tool_text_part(result.output)] if result.output else []
+    parts.extend(tool_image_part(image) for image in result.images)
+    return parts
 
 
 def _responses_tools(provider_input: ProviderInput) -> list[dict[str, Any]]:

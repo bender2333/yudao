@@ -15,12 +15,12 @@ from .artifacts import ArtifactStore
 # 每一步装配的输入（身份、版本、路由的工作引用）与窗口的取值是装配契约的输入，定义在契约模块里；这里照旧导出
 from .assembly_contract import ModelLimits, StepFrame
 from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, finish_compaction, plan_compaction,
-                         response_reserve, visible_history)
+                         request_input_tokens, response_reserve, visible_history)
 from .context import AssembledContext, ContextAssembler, department_work_text
 from .definitions import DEFINITIONS
 from .event_store import EventStore
 from .models import (ArtifactRef, DepartmentGuidance, Event, EventType, RunProjection,
-                     canonical_hash, estimate_tokens, json_dumps)
+                     canonical_hash)
 from .validation import Tightening
 
 PENDING_GUIDANCE = frozenset({"received", "in_input"})
@@ -359,7 +359,7 @@ class ContextAssembly:
             payload["max_output_tokens"] = context.manifest.max_output_tokens
         return StepRequest(
             context=context, compaction_plan=plan, limits=limits, payload=payload, parts=_context_parts(context),
-            input_token_estimate=estimate_tokens(json_dumps({"input": context.input_items, "tools": context.tools})),
+            input_token_estimate=request_input_tokens(context.input_items, context.tools),
             output_reserve_tokens=context.manifest.max_output_tokens or 0,
             previous_usage_tokens=previous,
         )

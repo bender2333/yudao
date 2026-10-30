@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import asdict, dataclass
 from copy import deepcopy
 from typing import Any
 
 from .adjudication import offered_tools
+from .compaction import request_input_tokens
 from .contracts import artifact_hash
+from .providers.invoke import ToolImage, tool_image_part, tool_text_part
 from .watched_outputs import has_new_baseline_review
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
@@ -58,6 +61,66 @@ def department_work_text(pinned: AssembledContext) -> str:
               "collaboration_rules", "input_handling", "proposal_contract", "allowed_tools",
               "department_history", "tool_schemas"}
     return "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
+
+
+# 工具结果里的图像放进请求的张数与换出的粒度（浏览器与 computer use 设计说明第 6.2 节，取值参照
+# Anthropic 参考实现 `_maybe_filter_to_n_most_recent_images`：保留最近 3 张，换出按 3 张一组）
+REQUEST_IMAGE_KEPT = 3
+REQUEST_IMAGE_BATCH = 3
+
+
+def evidence_placeholder(evidence: str) -> str:
+    # 换出请求的图像换成这一行占位文字：模型仍知道这张截图已保存为证据，可以按编号引用
+    return f"截图 {evidence} 已保存为证据"
+
+
+def request_history(history: list[dict[str, Any]], *, run_id: str, artifacts: ArtifactStore | None,
+                    input_modalities: tuple[str, ...] = ("text",)) -> list[dict[str, Any]]:
+    """部门历史里的工具结果按调用目标的输入方式放进请求（设计说明第 6.2 节）。
+
+    调用目标包含图像时读出图像字节，只保留最近 3 张，更早的换成一行占位文字，换出按 3 张一组；
+    不含图像时截图不放进请求，历史里已有的图像全部换成占位文字。
+    """
+    total = sum(len(item.get("images") or ()) for item in history)
+    if not total:
+        return list(history)
+    removed = 0 if "image" in input_modalities else total
+    if "image" in input_modalities:
+        removed = total - REQUEST_IMAGE_KEPT
+        removed -= removed % REQUEST_IMAGE_BATCH
+    result: list[dict[str, Any]] = []
+    for item in history:
+        images = item.get("images") or ()
+        if not images:
+            result.append(item)
+            continue
+        cut = max(0, min(len(images), removed))
+        removed -= cut
+        result.append(_request_tool_result(item, images[:cut], images[cut:],
+                                           run_id=run_id, artifacts=artifacts))
+    return result
+
+
+def _request_tool_result(item: dict[str, Any], replaced: list[dict[str, Any]], kept: list[dict[str, Any]],
+                         *, run_id: str, artifacts: ArtifactStore | None) -> dict[str, Any]:
+    # 一张工具结果在请求里的样子：文字块在前，换出的图像按原位置换成占位文字，保留的图像读成图像块
+    result = {key: value for key, value in item.items() if key != "images"}
+    text = item.get("output") if isinstance(item.get("output"), str) else ""
+    result["output"] = [
+        tool_text_part(text),
+        *(tool_text_part(evidence_placeholder(str(image["content_hash"]))) for image in replaced),
+        *(_request_image(image, run_id=run_id, artifacts=artifacts) for image in kept),
+    ]
+    return result
+
+
+def _request_image(image: dict[str, Any], *, run_id: str, artifacts: ArtifactStore | None) -> dict[str, Any]:
+    if artifacts is None:
+        raise ValueError("tool result images require an artifact store")
+    ref = ArtifactRef(**{key: image[key] for key in ("kind", "content_hash", "path", "media_type")})
+    raw = artifacts.get_for_run(run_id, ref)
+    return tool_image_part(ToolImage(media_type=str(image["media_type"]),
+                                     data=base64.b64encode(raw).decode("ascii")))
 
 
 def work_notifications(projection: RunProjection, events: list[Any] | None, department: str,
@@ -399,7 +462,10 @@ class ContextAssembler:
         parts.append(ContextPart("causal_chain", None, json_dumps(_causal_chain(projection))))
 
         prompt_text = "\n\n".join(f"[{part.source}]\n{part.text}" for part in parts)
-        input_items = [{"role": "developer", "content": prompt_text}, *deepcopy(history or [])]
+        input_items = [{"role": "developer", "content": prompt_text},
+                       *deepcopy(request_history(history or [], run_id=projection.run_id,
+                                                 artifacts=self.artifacts,
+                                                 input_modalities=input_modalities))]
         from .tools import tool_definitions
 
         tools = [
@@ -420,17 +486,17 @@ class ContextAssembler:
             ContextExclusion("expired_product_decisions", "earlier decisions enter the current contract only when the current ProductSpec explicitly retains them"),
             ContextExclusion("invalid_delivery_as_current", "superseded deliveries are not injected as current_delivery_spec"),
         ]
-        input_token_estimate = estimate_tokens(json_dumps({"input": input_items, "tools": tools}))
+        input_token_estimate = request_input_tokens(input_items, tools)
         if max_output_tokens is not None:
             # The request may spend whatever the window leaves after its input, up to the
             # model's declared limit; compaction keeps the input below the response reserve.
             max_output_tokens = min(max_output_tokens, effective_window - input_token_estimate)
             if max_output_tokens < 1:
                 raise ValueError("the model request leaves no room for model output")
+        token_estimate = request_input_tokens(input_items, tools, max_output_tokens)
         actual_request = {"input": input_items, "tools": tools}
         if max_output_tokens is not None:
             actual_request["max_output_tokens"] = max_output_tokens
-        token_estimate = estimate_tokens(json_dumps(actual_request))
         digest = canonical_hash(actual_request)
         manifest = ContextManifest(
             session_id=session_id,
