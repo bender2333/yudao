@@ -11,11 +11,12 @@ from harness.tests.protocol_helpers import ScriptedProvider, facade_with, model_
 PROTOCOLS = ["responses", "chat_completions", "messages"]
 
 
-def reply(protocol, *, without_tool=False, arguments="{}", call_id="probe-call"):
+def reply(protocol, *, without_tool=False, arguments="{}", call_id="probe-call", actual_model="tested-model"):
     def respond(_provider, handler):
         body = {**handler.body, "tools": []} if without_tool else handler.body
         status, content_type, chunks = model_test_responder(body, protocol=protocol,
-                                                         arguments=arguments, call_id=call_id)
+                                                         arguments=arguments, call_id=call_id,
+                                                         actual_model=actual_model)
         send_reply(handler, status, content_type, b"".join(chunks))
     return respond
 
@@ -65,6 +66,19 @@ def test_a_text_answer_does_not_pass_the_tool_round_trip(protocol):
         assert tested["failure_group"] == "tool_round_trip" and tested["failure_step"] == "tool_call"
         assert "工具往返" in tested["error"]
         assert not any(row["admitted"] for row in facade.model_admissions())
+    finally:
+        provider.close()
+
+
+@pytest.mark.parametrize("protocol", PROTOCOLS)
+def test_missing_upstream_model_identity_stays_unknown(protocol):
+    provider = ScriptedProvider([reply(protocol, actual_model=None)] * 3)
+    try:
+        facade = facade_with(provider.base + "/v1", protocol=protocol)
+        tested = facade.model_test("go", "m-go")
+        assert tested["ok"] is True and tested["admitted"] is True, tested
+        assert tested["model"] is None
+        assert facade.model_admissions()[0]["admitted_model"] == ""
     finally:
         provider.close()
 

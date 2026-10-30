@@ -905,14 +905,14 @@ class ProviderFacade:
                       else _model_test_failure_reason(exc))
             return {
                 "ok": False, "error": f"{group_text} / {step_text}：{reason}",
-                "model": None if result is None else (result.actual_model or result.model or None), "admitted": False,
+                "model": None if result is None else (result.actual_model or None), "admitted": False,
                 "protocol": model.protocol, "revision": self.revision,
                 "elapsed_ms": elapsed_ms, "usage_reported": False,
                 "accepts_required_tool_call": accepts_required,
                 "failure_group": group, "failure_step": step, "request_timeout_sec": target.timeout_sec,
             }
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
-        actual = result.actual_model or result.model or None
+        actual = result.actual_model or None
         capacity_confirmed = model.context_window is not None and model.max_output_tokens is not None
         if capacity_confirmed:
             with self._lock:
