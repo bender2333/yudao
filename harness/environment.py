@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import time
 from threading import Lock
-from typing import Any
+from typing import Any, Mapping
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .artifacts import ArtifactStore, ExternalSource
@@ -201,6 +201,13 @@ class Workspaces:
         # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
         self._source: dict[tuple[str, str], str | None] = {}
 
+    def parameters_for(self, run_id: str) -> dict[str, Any]:
+        # 这个 run 冻结的参数取值（工单 #1189）：执行环境的输出上限、命令与检查的时限上限读它，
+        # 建 run 之后改参数事件不影响已经创建的 run。旧 run 没有冻结字典时按定义初值解释
+        from .parameters import frozen_run_parameters
+
+        return frozen_run_parameters(self._view(run_id))
+
     # ---- 运行工作区 ----
     def run_environment(self, run_id: str, *, session_id: str | None = None,
                         jobs: Any | None = None) -> LocalEnvironment:
@@ -209,8 +216,12 @@ class Workspaces:
             check_timeout_sec=self._check_timeout(run_id),
             jobs=jobs,
             session_id=session_id,
+<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
+=======
+            parameters=self.parameters_for(run_id),
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
         )
 
     # ---- 会话用哪份工作区 ----
@@ -259,8 +270,12 @@ class Workspaces:
             check_timeout_sec=self._check_timeout(run_id),
             jobs=jobs,
             session_id=session_id,
+<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
+=======
+            parameters=self.parameters_for(run_id),
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
         )
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
@@ -333,8 +348,12 @@ class Workspaces:
             check_timeout_sec=self._check_timeout(run_id),
             jobs=jobs,
             session_id=session_id,
+<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
+=======
+            parameters=self.parameters_for(run_id),
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
         )
         if department in self.delivery_inspecting:
             ref = projection.qa_tests_archive_ref
@@ -385,10 +404,10 @@ class Workspaces:
         return refresh
 
 
-def _bash_slice(full: str, start: int) -> tuple[str, int | None]:
-    # 从字符偏移 start 取一页：尽量在 _OUTPUT_LIMIT 个字符内不断行；
+def _bash_slice(full: str, start: int, limit: int = _OUTPUT_LIMIT) -> tuple[str, int | None]:
+    # 从字符偏移 start 取一页：尽量在 limit（这个 run 冻结的 tool_output_limit）个字符内不断行；
     # 取完返回 (剩余全文, None)，否则返回 (页, 下一页的字符偏移)
-    end = start + _OUTPUT_LIMIT
+    end = start + limit
     if end >= len(full):
         return full[start:], None
     newline = full.rfind("\n", start, end)
@@ -696,16 +715,25 @@ class LocalEnvironment:
         *,
         jobs: BackgroundJobTable | None = None,
         session_id: str | None = None,
+<<<<<<< HEAD
         artifacts: ArtifactStore | None = None,
         run_id: str | None = None,
+=======
+        parameters: Mapping[str, Any] | None = None,
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
     ) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
         self._jobs = jobs
         self._session_id = session_id
+<<<<<<< HEAD
         # 这个 run 的外部来源工件：read_external_source 只读这个 run 的工件库
         self._artifacts = artifacts
         self._run_id = run_id
+=======
+        # 这个 run 冻结的参数取值（工单 #1189）；直接构造环境（测试、没有冻结字典的旧 run）时为空
+        self._parameters = dict(parameters or {})
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -724,15 +752,23 @@ class LocalEnvironment:
         check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
         jobs: BackgroundJobTable | None = None,
         session_id: str | None = None,
+<<<<<<< HEAD
         artifacts: ArtifactStore | None = None,
         run_id: str | None = None,
+=======
+        parameters: Mapping[str, Any] | None = None,
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
     ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
             materialize_tree(tree, root)
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
+<<<<<<< HEAD
                    artifacts=artifacts, run_id=run_id)
+=======
+                   parameters=parameters)
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
 
     @classmethod
     def open(
@@ -742,12 +778,28 @@ class LocalEnvironment:
         check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
         jobs: BackgroundJobTable | None = None,
         session_id: str | None = None,
+<<<<<<< HEAD
         artifacts: ArtifactStore | None = None,
         run_id: str | None = None,
     ) -> LocalEnvironment:
         # 打开已经建立的工作区
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
                    artifacts=artifacts, run_id=run_id)
+=======
+        parameters: Mapping[str, Any] | None = None,
+    ) -> LocalEnvironment:
+        # 打开已经建立的工作区
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
+                   parameters=parameters)
+
+    def _limit(self, name: str, default: Any) -> Any:
+        # 这个 run 冻结的参数取值；没有冻结字典时用定义文件里的初始值（工单 #1189）
+        value = self._parameters.get(name)
+        return default if value is None else value
+
+    def _output_limit(self) -> int:
+        return int(self._limit('tool_output_limit', _OUTPUT_LIMIT))
+>>>>>>> d138fe7e (建 run 时冻结 10 个参数与 3 条可见范围，run 全程读冻结值（#1189）)
 
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
@@ -899,7 +951,7 @@ class LocalEnvironment:
                     matches.append({"path": item.path, "line": number, "snippet": _clip_snippet(line)})
         page = matches[offset:offset + page_size]
         truncated = offset + len(page) < len(matches)
-        page, truncated = _fit_match_page(page, truncated)
+        page, truncated = _fit_match_page(page, truncated, self._output_limit())
         return {
             "pattern": pattern,
             "path": scope_rel,
@@ -943,7 +995,7 @@ class LocalEnvironment:
         numbered = list(enumerate(raw.decode("utf-8").splitlines(), 1))
         total = len(numbered)
         wanted = [(number, text) for number, text in numbered if number >= offset and (end is None or number <= end)]
-        entries, consumed = _fit_line_entries(wanted)
+        entries, consumed = _fit_line_entries(wanted, self._output_limit())
         truncated = consumed < len(wanted)
         next_offset = offset + consumed
         last = offset + consumed - 1
@@ -1100,11 +1152,11 @@ class LocalEnvironment:
             raise ValueError("bash requires a non-empty command string")
         timeout_sec = args.get("timeout_sec")
         if timeout_sec is None:
-            timeout_sec = _BASH_TIMEOUT_DEFAULT
+            timeout_sec = self._limit("bash_timeout_default_sec", _BASH_TIMEOUT_DEFAULT)
         else:
             if type(timeout_sec) is not int or timeout_sec < 1:
                 raise ValueError("timeout_sec must be a positive integer")
-            timeout_sec = min(timeout_sec, _BASH_TIMEOUT_MAX)
+            timeout_sec = min(timeout_sec, self._limit("bash_timeout_max_sec", _BASH_TIMEOUT_MAX))
         snapshot = self.workspace.snapshot()
         expected = action.preconditions.tree_digest
         if expected is not None and snapshot.digest != expected:
@@ -1187,7 +1239,8 @@ class LocalEnvironment:
         except UnrepresentableWorkspace as exc:
             workspace_error = {"message": str(exc), "paths": list(exc.paths)}
 
-        if len(text) <= _OUTPUT_LIMIT:
+        output_limit = self._output_limit()
+        if len(text) <= output_limit:
             return {**meta, "output": text, "truncated": False}, finished.status, workspace_error
 
         if self._jobs is None or self._session_id is None:
@@ -1199,7 +1252,7 @@ class LocalEnvironment:
         path = directory / f"{job_id}.output"
         path.write_text(text, encoding="utf-8")
 
-        page, cut = _bash_slice(text, 0)
+        page, cut = _bash_slice(text, 0, output_limit)
         job = _Job(
             job_id=job_id,
             output_path=path,
@@ -1214,7 +1267,7 @@ class LocalEnvironment:
         self._jobs.register(job)
 
         truncated_marker = (
-            f"\n...output truncated at {_OUTPUT_LIMIT} chars; the full output is saved, "
+            f"\n...output truncated at {output_limit} chars; the full output is saved, "
             f"use read_output with job_id {job_id!r} to read the rest"
         )
         return {
@@ -1254,7 +1307,7 @@ class LocalEnvironment:
         else:
             if type(timeout_sec) is not int or timeout_sec < 1:
                 raise ValueError("timeout_sec must be a positive integer")
-            timeout_sec = min(timeout_sec, _CHECK_TIMEOUT_MAX)
+            timeout_sec = min(timeout_sec, self._limit("check_timeout_max_sec", _CHECK_TIMEOUT_MAX))
         # 模型自报 exit_code 不是证据：这里只读主机执行结果，从不读取该字段
         snapshot = self.workspace.snapshot()
         original_digest = snapshot.digest
@@ -1270,7 +1323,7 @@ class LocalEnvironment:
             )
             if finished.status == "completed":
                 exit_code = finished.returncode
-                output = _summarize_output(finished.stdout, finished.stderr)
+                output = _summarize_output(finished.stdout, finished.stderr, self._output_limit())
             else:
                 if finished.status == "timeout":
                     exit_code, output = TIMEOUT_EXIT_CODE, f"check timed out after {timeout_sec}s"
@@ -1469,10 +1522,10 @@ def _require_reason(args: dict[str, Any]) -> None:
         raise ValueError("a non-empty reason is required for deleting or moving files")
 
 
-def _summarize_output(stdout: str, stderr: str) -> str:
+def _summarize_output(stdout: str, stderr: str, limit: int = _OUTPUT_LIMIT) -> str:
     text = "\n".join(part for part in (stdout.strip(), stderr.strip()) if part)
-    if len(text) > _OUTPUT_LIMIT:
-        text = text[:_OUTPUT_LIMIT] + "\n...truncated..."
+    if len(text) > limit:
+        text = text[:limit] + "\n...truncated..."
     return text
 
 
@@ -1508,16 +1561,17 @@ def _result_size(result: dict[str, Any]) -> int:
     return len(json_dumps(result))
 
 
-def _fit_match_page(page: list[dict[str, Any]], truncated: bool) -> tuple[list[dict[str, Any]], bool]:
-    # 按输出上限收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
+def _fit_match_page(page: list[dict[str, Any]], truncated: bool,
+                    limit: int = _OUTPUT_LIMIT) -> tuple[list[dict[str, Any]], bool]:
+    # 按输出上限 limit 收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
     probe = {"matches": page}
-    while len(page) > 1 and _result_size({**probe, "truncated": True}) > _OUTPUT_LIMIT:
+    while len(page) > 1 and _result_size({**probe, "truncated": True}) > limit:
         page = page[:-1]
         truncated = True
-    if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > _OUTPUT_LIMIT:
+    if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > limit:
         only = dict(page[0])
         snippet = only["snippet"]
-        while len(snippet) > 1 and _result_size({"matches": [{**only, "snippet": snippet}], "truncated": True}) > _OUTPUT_LIMIT:
+        while len(snippet) > 1 and _result_size({"matches": [{**only, "snippet": snippet}], "truncated": True}) > limit:
             snippet = snippet[:len(snippet) // 2]
         only["snippet"] = snippet + "\n...truncated..."
         page = [only]
@@ -1525,18 +1579,19 @@ def _fit_match_page(page: list[dict[str, Any]], truncated: bool) -> tuple[list[d
     return page, truncated
 
 
-def _fit_line_entries(wanted: list[tuple[int, str]]) -> tuple[list[dict[str, Any]], int]:
+def _fit_line_entries(wanted: list[tuple[int, str]],
+                      limit: int = _OUTPUT_LIMIT) -> tuple[list[dict[str, Any]], int]:
     # 逐行累加直到输出上限；单行超限则截断该行文本，保证每页至少返回一行或空
     entries: list[dict[str, Any]] = []
     for number, text in wanted:
         candidate = entries + [{"line": number, "text": text}]
-        if _result_size({"lines": candidate, "truncated": True}) > _OUTPUT_LIMIT:
+        if _result_size({"lines": candidate, "truncated": True}) > limit:
             break
         entries = candidate
     if not entries and wanted:
         number, text = wanted[0]
         clipped = text
-        while len(clipped) > 1 and _result_size({"lines": [{"line": number, "text": clipped}], "truncated": True}) > _OUTPUT_LIMIT:
+        while len(clipped) > 1 and _result_size({"lines": [{"line": number, "text": clipped}], "truncated": True}) > limit:
             clipped = clipped[:len(clipped) // 2]
         entries = [{"line": number, "text": clipped + "\n...truncated..."}]
         return entries, 1

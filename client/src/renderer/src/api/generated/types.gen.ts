@@ -9597,6 +9597,42 @@ export type FieldError = {
 };
 
 /**
+ * FrozenParameters
+ */
+export type FrozenParameters = {
+    /**
+     * Values
+     */
+    values: {
+        [key: string]: unknown;
+    };
+    /**
+     * Global Version
+     */
+    global_version: string;
+    /**
+     * Project Overrides
+     */
+    project_overrides?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Project Version
+     */
+    project_version?: string;
+    /**
+     * Item Limits
+     */
+    item_limits: {
+        [key: string]: unknown;
+    };
+    /**
+     * Definitions Version
+     */
+    definitions_version: string;
+};
+
+/**
  * FunctionCallOutput
  */
 export type FunctionCallOutput = {
@@ -14218,6 +14254,7 @@ export type RunCreatedPayload = {
      * Parameters Version
      */
     parameters_version: string;
+    parameters?: FrozenParameters | null;
     /**
      * Run Event Version
      */

@@ -64,8 +64,11 @@ _COMPACTION_STOP_REASONS = frozenset({"context_overflow"})
 RELEASE_WAIT_INTERVAL_SEC = 0.5
 
 
-def tool_call_required_text(count: int) -> str:
-    limit = DEFINITIONS.rule_value("tool_call_required_limit")
+def tool_call_required_text(count: int, limit: int | None = None) -> str:
+    # limit 是这个 run 冻结的 tool_call_required_limit（工单 #1189）；不给时用定义里的初始值，
+    # 只有不涉及某个 run 的调用方这样用（例如按定义核对提示文字的用例）
+    if limit is None:
+        limit = int(DEFINITIONS.rule_value("tool_call_required_limit"))
     return (
         f"上一次回复没有调用工具（连续第 {count} 次，最多 {limit} 次）。"
         "只回复文字不会推进工作，也不会结束本次激活。"
@@ -522,16 +525,18 @@ class StepDriver:
                     return RoundResult(version=self._version)
                 # 回复已记入历史；追加一条 user 消息，下一次请求不以助手消息结尾
                 replies_without_tool_call += 1
-                if replies_without_tool_call > DEFINITIONS.rule_value("tool_call_required_limit"):
+                if replies_without_tool_call > self._limits.tool_call_required_limit:
                     raise ProviderError(
                         f"department replied {replies_without_tool_call} times in a row without calling a tool",
                         reason="no_tool_call",
                     )
                 self._recorder.tool_call_required(
                     request,
-                    {"role": "user", "content": tool_call_required_text(replies_without_tool_call)},
+                    {"role": "user",
+                     "content": tool_call_required_text(replies_without_tool_call,
+                                                       self._limits.tool_call_required_limit)},
                     replies_without_tool_call,
-                    DEFINITIONS.rule_value("tool_call_required_limit"),
+                    self._limits.tool_call_required_limit,
                 )
                 continue
             replies_without_tool_call = 0
@@ -820,7 +825,7 @@ class StepDriver:
         # 最后一次主机提示之后的工作请求要求调用工具；调用目标声明不接受时照常为自动（#102）
         declaration = (self._call_public or {}).get("accepts_required_tool_call", True)
         if (purpose == "work" and tools
-                and replies_without_tool_call >= DEFINITIONS.rule_value("tool_call_required_limit")
+                and replies_without_tool_call >= self._limits.tool_call_required_limit
                 and declaration is not False):
             return "required"
         return "auto"
@@ -1022,7 +1027,7 @@ class StepDriver:
             self._compaction_reason = ""
             self._compaction_coverage = outcome.covered_digest
             self._compaction_contract = contract
-        limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+        limit = self._limits.compaction_stalled_limit
         if self._compaction_stalls >= limit:
             # 达到上限：这次停下按待恢复处理（第 8.7 节最后一条，工单 #1238）。说明只写事实，
             # 「结束还是等用户回答」不写在这里：用户答「停止事项」时同一段文字作为停止说明

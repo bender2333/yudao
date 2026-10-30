@@ -50,7 +50,7 @@ class LoopSystem:
         test_adapter: ModelAdapter | None = None,
         provider_config_path: str | Path | None = None,
         dotenv_path: str | Path | None = None,
-        step_limits: StepLimits = StepLimits(),
+        step_limits: StepLimits | None = None,
         resume_on_startup: bool = True,
         assembly: Any | None = None,
         execution: Any | None = None,
@@ -391,7 +391,7 @@ class LoopSystem:
 
     @classmethod
     def for_testing(cls, data_dir: str | Path, adapter: ModelAdapter, *,
-                    step_limits: StepLimits = StepLimits(),
+                    step_limits: StepLimits | None = None,
                     resume_on_startup: bool = True,
                     assembly: Any | None = None,
                     execution: Any | None = None) -> "LoopSystem":
