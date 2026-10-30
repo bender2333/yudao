@@ -336,27 +336,41 @@ class LoopSystem:
         self.writes.transact(catalog_stream(), decide, command=command)
         return position
 
-    def set_parameter(self, name: str, value: Any, *, reason: str, modified_by: str,
+    def set_parameter(self, name: str, value: Any, *, reason: str, modified_by: str | None = None,
+                      base_version: str | None = None, expected_change_id: str | None = None,
                       command: Command | None = None) -> str:
         # 界内修改一次全局参数现值：先核对条目、是否已经接入行为与界限，通过后在目录流写一条 parameter_set。
-        # 未接入的条目拒绝修改（工单 #643）。run 已经在创建时冻结参数版本，运行中修改不影响已经创建的 run。
-        # 返回修改以后的参数版本
+        # 未接入的条目拒绝修改（工单 #643）。提出者以认证身份为准（工单 #1262，设计说明第 3.1 节）：
+        # 经命令进来时取命令的提出者，请求体里的旧字段 modified_by 不再决定提出者；直接调用（没有命令）
+        # 必须给出 modified_by。基准版本是查询返回的全局参数版本（内容摘要），过期返回 ParameterStaleError；
+        # expected_change_id 是撤回的目标修改记录身份，在同一写事务核对它仍是这个参数最近的一次修改。
+        # run 已经在创建时冻结参数版本，运行中修改不影响已经创建的 run。返回修改以后的参数版本
+        actor = command.actor if command is not None else modified_by
+        if not actor:
+            raise ValueError("set_parameter requires the authenticated actor (modified_by) without a command")
         new_value = parameters.check_parameter(name, value)
-        values = parameters.current_values(self.store)
-        old_value = values[name]
-        after = {**values, name: new_value}
-        version = parameters.parameters_version(after)
-        bounds = list(DEFINITIONS.rule(name).bounds)
 
-        def decide(transaction):
+        def decide(transaction) -> str:
+            # 基准版本与撤回身份在同一写事务内核对（工单 #1262）：按提交时刻的事件读，
+            # 另一方的写入已经提交时这里看到新的版本，不符拒绝，不写事件
+            if base_version is not None:
+                current = parameters.current_version(self.store)
+                if base_version != current:
+                    raise parameters.ParameterStaleError(current)
+            if expected_change_id is not None:
+                latest = parameters.last_parameter_change_id(self.store, name)
+                if latest != expected_change_id:
+                    raise parameters.ParameterStaleError(parameters.current_version(self.store))
+            values = parameters.current_values(self.store)
+            version = parameters.parameters_version({**values, name: new_value})
             transaction.append(NewCatalogEvent(CatalogEventType.PARAMETER_SET, {
-                "name": name, "old_value": old_value, "new_value": new_value,
-                "reason": reason, "modified_by": modified_by,
-                "bounds": bounds, "parameters_version": version,
-            }, actor=modified_by))
+                "name": name, "old_value": values[name], "new_value": new_value,
+                "reason": reason, "modified_by": actor, "expected_change_id": expected_change_id,
+                "bounds": list(DEFINITIONS.rule(name).bounds), "parameters_version": version,
+            }, actor=actor))
+            return version
 
-        self.writes.transact(catalog_stream(), decide, command=command)
-        return version
+        return self.writes.transact(catalog_stream(), decide, command=command)
 
     def parameters(self) -> dict[str, Any]:
         # 参数现值：目录流事件折叠的结果

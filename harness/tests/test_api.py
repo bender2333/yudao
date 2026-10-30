@@ -142,16 +142,20 @@ def test_rules_registry_returns_every_entry_with_its_four_notes_bounds_kind_form
 
     data = body["data"]
     assert data["definitions_version"] == DEFINITIONS.version
-    entries = data["rules"]
-    # 全部条目都在，按名称排列，每条给全四项记录、界限、种类、形式与来源
+    # 全局参数版本随登记一起返回：页面把它作为参数命令的基准版本提交（工单 #1262）
+    from harness.parameters import initial_version
+    assert data["parameters_version"] == initial_version()
+    entries = data["rules"]    # 全部条目都在，按名称排列，每条给全四项记录、界限、种类、形式与来源
     assert [item["name"] for item in entries] == sorted(DEFINITIONS.rules)
     assert len(entries) == len(DEFINITIONS.rules)
     assert {frozenset(item) for item in entries} == {frozenset({
-        "name", "value", "bounds", "kind", "form", "wired", "not_wired_reason", "guards", "cost", "relax_when",
-        "tighten_when", "origin", "changes"})}
+        "name", "value", "default_value", "bounds", "kind", "form", "wired", "not_wired_reason", "guards", "cost",
+        "relax_when", "tighten_when", "origin", "changes"})}
     for item in entries:
         rule = DEFINITIONS.rules[item["name"]]
         assert item["value"] == rule.value
+        # 默认值取定义里的初值（工单 #1262）：没有参数事件时现值与默认值相同
+        assert item["default_value"] == rule.value
         assert item["bounds"] == list(rule.bounds)
         assert item["kind"] == rule.kind and item["form"] == rule.form
         # 接入标记与原因成对出现：接入的条目原因为空（工单 #643）
@@ -242,7 +246,9 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "runtime.force_upgrade", "reasons": ["not_allowed", "command_id_reused"]},
         {"name": "home.mark_seen", "reasons": ["not_allowed", "command_id_reused"]},
         {"name": "parameter.set",
-         "reasons": ["not_found", "not_wired", "out_of_bounds", "command_id_reused"]},
+         "reasons": ["not_found", "not_wired", "out_of_bounds", "stale_base", "command_id_reused"]},
+        {"name": "parameter.withdraw",
+         "reasons": ["not_found", "not_wired", "out_of_bounds", "stale_base", "command_id_reused"]},
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]

@@ -77,6 +77,14 @@ class ParameterNotWiredError(ValueError):
     """这条登记还没有接入行为：改动它不会改变任何行为，拒绝修改。原因逐字来自接入清单（工单 #643）。"""
 
 
+class ParameterStaleError(ValueError):
+    """参数命令的基准版本过期（工单 #1262）：`current_version` 是现在的参数版本，命令不写事件。"""
+
+    def __init__(self, current_version: str) -> None:
+        super().__init__(f"参数版本已经变化，当前是 {current_version}，请重新读取以后再提交")
+        self.current_version = current_version
+
+
 # 接入清单（工单 #643）：每条登记一项结论，已接入的条目为空字符串，未接入的写可以直接显示的中文原因。
 # 「接入」指代码按这条登记取值改变实际行为：parameter 条目要有代码读它的现值（参数事件折叠的结果，或创建
 # run 时从现值冻结下来的值），structure 条目要有代码读定义里的取值。把值写进参数事件、登记查询或 run 的
@@ -259,6 +267,16 @@ def fold_project_parameters(events: list[Any]) -> dict[str, Any]:
     return values
 
 
+def last_project_parameter_change_id(store: Any, project_id: str, name: str) -> str | None:
+    # 一个项目的项目级参数最近一次修改的稳定身份：它在项目流里的事件编号；没有设置过时为空
+    from .event_store import project_stream
+
+    for event in reversed(list(store.stream_events(project_stream(project_id)))):
+        if event.type == ProjectEventType.PARAMETER_SET and event.payload["name"] == name:
+            return event.event_id
+    return None
+
+
 def value_for_project(store: Any, project_id: str | None, name: str) -> Any:
     # 一个参数的生效取值：项目设置过用项目值，否则用全局现值（工单 #351 验收第 1、2 条）
     if project_id is not None:
@@ -266,6 +284,25 @@ def value_for_project(store: Any, project_id: str | None, name: str) -> Any:
         if name in project:
             return project[name]
     return current_values(store)[name]
+
+
+def effective_parameter_version(store: Any, project_id: str | None) -> str:
+    # 项目参数命令的基准版本（工单 #1262，设计说明第 3 节第 2 条）：项目级修改以该项目有效参数的版本为基准。
+    # 基准版本按内容摘要核对，与参数写路径核对的是同一份数据：全局现值上先应用这个项目的覆盖。
+    # project_id 为空时就是全局参数版本
+    values = current_values(store)
+    if project_id is not None:
+        values = {**values, **project_values(store, project_id)}
+    return parameters_version(values)
+
+
+def last_parameter_change_id(store: Any, name: str) -> str | None:
+    # 一个参数最近一次修改的稳定身份：它的目录流事件编号；没有修改记录（包括只在项目流修改过的）时为空
+    changes = history(store)
+    for change in reversed(changes):
+        if change.name == name:
+            return change.event_id
+    return None
 
 def frozen_check_timeout(store: Any, run_id: str) -> int:
     # 一个 run 中检查的时限（迭代底座 B3，工单 #351）：run_created 事件里冻结的取值，运行中不再跟随修改。

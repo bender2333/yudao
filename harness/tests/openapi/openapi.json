@@ -1768,7 +1768,58 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, stale_base, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/commands/parameter.withdraw": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "parameter.withdraw",
+        "operationId": "command_parameter_withdraw",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParameterWithdraw"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, stale_base, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -7909,7 +7960,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 10
+            "example": 11
           },
           "contract_digest": {
             "type": "string",
@@ -9878,7 +9929,7 @@
           "base_version": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "string"
               },
               {
                 "type": "null"
@@ -9900,8 +9951,90 @@
             "title": "Reason"
           },
           "modified_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modified By"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "expected_change_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Change Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "name",
+          "value",
+          "reason"
+        ],
+        "title": "ParameterSet"
+      },
+      "ParameterWithdraw": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "name": {
             "type": "string",
             "minLength": 1,
+            "title": "Name"
+          },
+          "expected_change_id": {
+            "type": "string",
+            "title": "Expected Change Id"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Reason"
+          },
+          "modified_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Modified By"
           },
           "project_id": {
@@ -9921,11 +10054,10 @@
         "required": [
           "command_id",
           "name",
-          "value",
-          "reason",
-          "modified_by"
+          "expected_change_id",
+          "reason"
         ],
-        "title": "ParameterSet"
+        "title": "ParameterWithdraw"
       },
       "PauseRequested": {
         "properties": {
@@ -10604,6 +10736,11 @@
             },
             "type": "object",
             "title": "Department Reminders"
+          },
+          "effective_parameters_version": {
+            "type": "string",
+            "title": "Effective Parameters Version",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -11032,6 +11169,9 @@
             "anyOf": [
               {
                 "type": "integer"
+              },
+              {
+                "type": "string"
               },
               {
                 "type": "null"
@@ -11526,6 +11666,9 @@
           "value": {
             "title": "Value"
           },
+          "default_value": {
+            "title": "Default Value"
+          },
           "bounds": {
             "items": {},
             "type": "array",
@@ -11590,6 +11733,7 @@
         "required": [
           "name",
           "value",
+          "default_value",
           "bounds",
           "kind",
           "form",
@@ -11615,13 +11759,18 @@
           "definitions_version": {
             "type": "string",
             "title": "Definitions Version"
+          },
+          "parameters_version": {
+            "type": "string",
+            "title": "Parameters Version"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
           "rules",
-          "definitions_version"
+          "definitions_version",
+          "parameters_version"
         ],
         "title": "RuleRegistry"
       },
@@ -27514,6 +27663,17 @@
           "parameters_version": {
             "title": "Parameters Version",
             "type": "string"
+          },
+          "expected_change_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Change Id"
           }
         },
         "required": [
@@ -29010,6 +29170,17 @@
             "items": {},
             "title": "Bounds",
             "type": "array"
+          },
+          "expected_change_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Change Id"
           }
         },
         "required": [

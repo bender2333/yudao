@@ -60,11 +60,12 @@ class Accepted(Contract, Generic[Refs]):
 
 
 class Rejected(Contract):
-    # 命令被拒绝：什么也没有写入，也没有登记命令身份；修改类命令版本不符时带当前版本
+    # 命令被拒绝：什么也没有写入，也没有登记命令身份；修改类命令版本不符时带当前版本。
+    # 版本是对象版本查询返回的那一种读法：流版本是序号，参数版本是内容摘要（工单 #1262）
     command_id: CommandId
     reason: RejectionReason
     message: str
-    current_version: int | None = None
+    current_version: int | str | None = None
 
 
 class NoRefs(Contract):
@@ -153,7 +154,10 @@ AccessMode = Literal["local", "lan"]
 # 版本 8：一步连接命令，候选结果与来源、凭据持久状态随目录查询提供（#1293）。
 # 版本 9：选用命令、逐字段来源、未知容量候选与进程内选用进度（#1295）。
 # 版本 10：选用序号只属于瞬时进度，不进入持久化的测试结果合同（#1295）。
-API_VERSION = 10
+# 版本 11：parameter.set 的 modified_by 改为可选、base_version 与 expected_change_id 改为参数版本
+# 的内容摘要，新增 parameter.withdraw 命令，规则登记每条加 default_value，拒绝的 current_version
+# 放宽为序号或内容摘要（#1262）。
+API_VERSION = 11
 
 
 class CatalogSelection(Contract):

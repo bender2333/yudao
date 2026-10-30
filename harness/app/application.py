@@ -44,7 +44,7 @@ from .decision_queries import DECISIONS_LIST
 from .evidence_queries import EVIDENCE_EXTERNAL_SOURCE
 from .event_stream import EventScope, EventStream
 from .home import HOME_AWAY_REPORT, HOME_MARK_SEEN
-from .parameter_commands import PARAMETER_SET
+from .parameter_commands import PARAMETER_SET, PARAMETER_WITHDRAW
 from .project_commands import ONBOARDING_RESTART, PROJECT_CREATE, PROJECT_ONBOARD
 from .project_and_work_item_commands import (
     DEPARTMENT_SETTINGS_SAVE,
@@ -120,7 +120,7 @@ DEFAULT_REGISTRY = Registry(
               CATALOG_CONNECTION_TEST,
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
               CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN,
-              PARAMETER_SET],
+              PARAMETER_SET, PARAMETER_WITHDRAW],
     queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, EVIDENCE_EXTERNAL_SOURCE,
              CATALOG_QUERY, CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY],
     decisions=tuple(DECISION_KINDS))
@@ -218,7 +218,7 @@ class Application:
         self.system.facade.notify_changes()
         result = await execute(self, self.registry.commands[name], request, actor=actor)
         self.system.facade.notify_changes()
-        if name == "parameter.set":
+        if name in ("parameter.set", "parameter.withdraw"):
             self.system.facade.selections.wake()
         return result
 

@@ -18,8 +18,9 @@ if TYPE_CHECKING:
 
 class Rejection(Exception):
     # 处理函数拒绝这次命令：原因来自封闭清单并且是这个命令声明过的，message 是给用户的中文说明；
-    # 修改类命令的基准版本过期时带对象的当前版本
-    def __init__(self, reason: RejectionReason, message: str, *, current_version: int | None = None) -> None:
+    # 修改类命令的基准版本过期时带对象的当前版本（版本可以是流版本那样的序号，也可以是参数版本
+    # 这样的内容摘要，工单 #1262：只要与同一对象的查询返回的版本同一种读法即可）
+    def __init__(self, reason: RejectionReason, message: str, *, current_version: int | str | None = None) -> None:
         super().__init__(f"{reason}: {message}")
         self.reason = reason
         self.message = message

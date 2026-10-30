@@ -2401,6 +2401,7 @@ def _run_attempt(application: Application, request: RunAttempt) -> Snapshot[RunA
 
 
 class ProjectSettings(Contract):
+    # 项目设置查询（设计说明第 4.3 节）：project_parameter_set 改变这个查询里本项目的有效参数版本
     project_id: str
 
 
@@ -2439,6 +2440,9 @@ class ProjectSettingsResult(Contract):
     # 各部门生效模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）；
     # 生效模型按第 5.3 节解析，包括跟随部门默认的情况
     department_reminders: dict[str, list[str]]
+    # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明第 3 节第 2 条）：
+    # 项目级参数命令的基准版本，全局现值加本项目覆盖的内容摘要；与 parameter.set 按项目核对的是同一份
+    effective_parameters_version: str = ""
 
 
 def _project_settings(application: Application, request: ProjectSettings) -> Snapshot[ProjectSettingsResult]:
@@ -2455,6 +2459,7 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
             department_setting_configured=state.department_settings[department].configured_prompt)
         for department in DEPARTMENTS
     }
+    from ..parameters import effective_parameter_version
     return Snapshot[ProjectSettingsResult](
         position=store.end_position(),
         data=ProjectSettingsResult(
@@ -2475,6 +2480,7 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
             # 各部门生效模型（跟随部门默认时取部门默认）的建议能力提醒（设计说明第 5.6 节）
             department_reminders=application.system.facade.project_department_reminders(
                 {department: {"model_id": setting.model_id} for department, setting in settings.items()}),
+            effective_parameters_version=effective_parameter_version(store, request.project_id),
         ),
     )
 
@@ -2917,7 +2923,10 @@ PROJECT_SETTINGS = QueryDefinition(
     # 因此保存部门设置、取消事项的基准不会过期（工单 #891 的验收）
     changed_by=(*PROJECT_EVENT_KINDS,
                 # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
-                CatalogEventType.CATALOG_REVISED),
+                CatalogEventType.CATALOG_REVISED,
+                # 全局参数事件改变这个项目有效参数的版本（工单 #1262）：项目覆盖没有变时取值可能仍相同，
+                # 但页面按事件重新读取，基准版本不会停在过期的那一个
+                CatalogEventType.PARAMETER_SET),
 )
 
 RUN_EXPORT = QueryDefinition(
