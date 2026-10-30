@@ -29,12 +29,13 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 from mcp_types import REQUEST_TIMEOUT
 
-# 标准错误输出读末尾这么多字符（设计说明第 7.2 节：读取末尾部分用于诊断）
+# 标准错误输出读末尾这么多字符（设计说明第 7.2 节「读取末尾部分用于诊断」）
 STDERR_TAIL_CHARS = 4000
-# 超时或取消以后等服务器应答的最长时间（设计说明第 8 节「取消能否确认停止」）
+# 超时或取消以后等服务器应答的最长时间。这个数取自设计说明第 8 节的两处：
+# 「stdio：发取消通知，等服务器应答最多 10 秒，随后结束进程树」与「MCP 调用超时的处理顺序」。
+# 不够用的情况：服务器在收到取消通知之前正要开始一次慢操作（冷启动一个 npx 包、一次大结果的序列化），
+# 应答会晚于 10 秒——这时按设计说明的顺序直接结束进程树（stdio 已能确认停止），HTTP 一侧本来就无法确认
 CANCEL_ACK_TIMEOUT_SEC = 10.0
-# stdio 关闭时先关标准输入、等这么久再结束进程树（设计说明第 7.2 节）
-STDIO_SHUTDOWN_GRACE_SEC = 2.0
 # 子进程需要的系统变量：SDK 默认已给 APPDATA、LOCALAPPDATA、PATH、PATHEXT、SYSTEMROOT、TEMP、USERPROFILE 等，
 # 少了 Windows 上命令行程序自己再起子进程时用的 COMSPEC 与 WINDIR（设计说明第 7.2 节，工单 #69）
 EXTRA_ENVIRONMENT = ("COMSPEC", "WINDIR", "PATH", "APPDATA", "LOCALAPPDATA", "USERPROFILE", "TEMP")
@@ -224,12 +225,15 @@ class McpClient:
             assert launch.http is not None
             http_client = httpx2.AsyncClient(headers=launch.http.headers or None, timeout=None)
             await self._stack.enter_async_context(http_client)
-            read_stream, write_stream, _ = await self._stack.enter_async_context(
+            # SDK 的 HTTP 传输交出两条或三条流（版本不同）：只取前两条使用
+            streams = await self._stack.enter_async_context(
                 streamable_http_client(launch.http.url, http_client=http_client, terminate_on_close=True))
+            read_stream, write_stream = streams[0], streams[1]
         self._session = await self._stack.enter_async_context(
             ClientSession(read_stream, write_stream, read_timeout_seconds=launch.call_timeout_sec))
-        # 启动时限只包住握手：进入传输与登记会话仍在同一个任务里完成，退出时不会跨任务
-        result = await self._session.initialize()
+        # 启动时限包住握手（同任务内取消，不换任务）
+        async with asyncio.timeout(launch.startup_timeout_sec):
+            result = await self._session.initialize()
         self.info = ServerInfo(name=result.server_info.name, version=result.server_info.version,
                                protocol_version=result.protocol_version)
         if launch.stdio is not None:
