@@ -151,7 +151,23 @@ AccessMode = Literal["local", "lan"]
 # 版本 6：删除动作回执里的登记名与登记参数，动作列表显示命令原文（#658）
 # 版本 7：删除 run_created 载荷里不再生效的事项级窗口字段（#669）
 # 版本 8：一步连接命令，候选结果与来源、凭据持久状态随目录查询提供（#1293）。
-API_VERSION = 8
+# 版本 9：选用命令、逐字段来源、未知容量候选与进程内选用进度（#1295）。
+API_VERSION = 9
+
+
+class CatalogSelection(Contract):
+    provider_id: str
+    model_id: str
+    model: str
+    sequence: int
+    status: Literal["completing", "capacity_unknown", "waiting", "testing", "failed", "not_in_list"]
+    missing: list[str]
+    error: str | None
+
+
+class CatalogSelectionProgress(Contract):
+    # 不带日志位置、不持久化的目录选用快照，与 catalog.selections 使用同一份进程状态。
+    selections: list[CatalogSelection]
 
 
 class Deployment(Contract):

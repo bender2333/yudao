@@ -27,6 +27,7 @@ from .catalog_commands import (
     CATALOG_DEPARTMENT_DEFAULTS_SAVE,
     CATALOG_DOCUMENT_SAVE,
     CATALOG_MODEL_REMOVE,
+    CATALOG_MODEL_SELECT,
     CATALOG_MODEL_TEST,
     CATALOG_RELOAD,
     CREDENTIAL_CLEAR_OVERRIDE,
@@ -112,7 +113,7 @@ DEFAULT_REGISTRY = Registry(
               MATERIAL_RECORD, WORK_ITEM_CREATE, WORK_ITEM_APPEND_INPUT, WORK_ITEM_CANCEL, GUIDANCE_SEND,
               DEPARTMENT_SETTINGS_SAVE, SOURCE_DIRECTORY_SAVE, WRITEBACK_EXECUTE,
               DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECT, CATALOG_CONNECTION_DELETE,
-              CATALOG_MODEL_REMOVE, CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT,
+              CATALOG_MODEL_REMOVE, CATALOG_MODEL_SELECT, CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT,
               CATALOG_CONNECTION_TEST,
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
               CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN,
@@ -161,6 +162,8 @@ class Application:
     def close(self) -> None:
         if self.deltas is not None:
             self.deltas.stop()
+        if not self.system.read_only:
+            self.system.facade.selections.cancel_all()
         self.read_models.close()
         for task in list(self._tasks):
             task.cancel()
@@ -200,7 +203,9 @@ class Application:
         # 一个事件流连接（第 5 节）。带 live=1 时连接接收模型输出片段（订阅在应用层建立时已登记）。
         # options 透传批次大小、队列长度与检查点参数（默认值见 event_stream 模块）
         stream = EventStream(self.system.store, scope, after=after, live=live and self.deltas is not None,
-                             pump=self.deltas, on_close=self._streams.discard, **options)
+                             pump=self.deltas,
+                             selections=None if self.system.read_only else self.system.facade.selections.snapshot,
+                             on_close=self._streams.discard, **options)
         self._streams.add(stream)
         return stream
 

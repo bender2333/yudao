@@ -38,6 +38,7 @@
 "test_call_target_per_request.py" = "integration"
 "test_capabilities.py" = "module"
 "test_catalog_api.py" = "integration"
+"test_model_select.py" = "integration"
 "test_ci_layers.py" = "unit"
 "test_cli_entry.py" = "module"
 "test_compaction.py" = "unit"

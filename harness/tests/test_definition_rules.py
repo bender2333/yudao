@@ -19,6 +19,7 @@ def test_every_registered_rule_has_a_wiring_conclusion():
     assert {name for name in DEFINITIONS.rules if wired(name)} == {
         "max_cycles", "run_time_limit_sec", "check_timeout_sec", "onboarding.round_time_limit_sec",
         "organization.ask_chain_max_depth",
+        "provider.model_test_max_concurrent",
     }
     assert all(NOT_WIRED_REASONS[name] for name in DEFINITIONS.rules if not wired(name))
 

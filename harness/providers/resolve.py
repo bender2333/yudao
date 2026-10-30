@@ -149,6 +149,9 @@ def resolve_snapshot(
         if model.context_window is None:
             issues.append(ValidationIssue(f"{location}.model_id", "模型缺少 context_window，无法用于任务"))
             continue
+        if model.max_output_tokens is None:
+            issues.append(ValidationIssue(f"{location}.model_id", "模型缺少 max_output_tokens，无法用于任务"))
+            continue
         material = None
         if model.protocol != "fake":
             if not provider.credential_ref:

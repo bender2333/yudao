@@ -18,7 +18,7 @@ from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
 from .credentials import CredentialChain, CredentialMaterial, connection_credential_ref, dotenv_key_problem
-from .discovery import effective_models_url, probe_connection as _probe_connection
+from .discovery import _parse_candidates, effective_models_url, probe_connection as _probe_connection
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
 from .invoke import (
@@ -44,6 +44,7 @@ from ..definitions import DEFINITIONS
 from .responses import ProviderConnections
 from .sdk import prepare_protocols
 from .selection import ModelSelection, SelectionResolution, merge_selection
+from .selection_flow import SelectionAttempt, SelectionFlow
 from .suggested import reminders as _suggested_reminders
 from .store import (
     REASONING_LEVELS,
@@ -91,6 +92,7 @@ class ProviderFacade:
         # 实际生效修订：目录与绑定任一发布即单调递增，包含 store.revision 的推进
         self._revision = 0
         self._lock = threading.RLock()
+        self.selections = SelectionFlow(self._lock, self._cancels.cancel)
         # 本地源路径与轮询状态，Web 只提交命令与读取状态，不持有目录真相
         self._config_path: Path | None = None
         self._dotenv_path: Path | None = None
@@ -237,6 +239,7 @@ class ProviderFacade:
         with self._lock:
             document = dict(raw)
             document["revision"] = self._store.revision + 1
+            _require_capacity(document.get("models", []), None, set(self._store.models))
             store, bindings = _parse_document(document, self._startup_mode)
             _require_bound_admissions(bindings, store, self._admissions)
             self._store = store
@@ -260,6 +263,8 @@ class ProviderFacade:
                 raise CatalogValidationError(tuple(
                     ValidationIssue(name, "仍被引用，无法移除") for name in referrers
                 ))
+            self.selections.cancel(key)
+            self._admissions.pop(key, None)
             providers = [self._store.providers[name].public_dict()
                          for name in sorted(self._store.providers)]
             models = [self._store.models[name].public_dict()
@@ -857,6 +862,104 @@ class ProviderFacade:
         with self._lock:
             return copy.deepcopy(self._candidate_results.get(str(provider_id)))
 
+    def select_model(self, provider_id: str, upstream_model: str, *, protocol: str | None = None,
+                     context_window: int | None = None, max_output_tokens: int | None = None,
+                     force: bool = False) -> tuple[SelectionAttempt | None, bool]:
+        # 候选与手动添加共用候选补全；重复选用复用当前测试或有效准入。
+        with self._lock:
+            provider = self._store.providers.get(provider_id)
+            if provider is None:
+                raise CatalogValidationError((ValidationIssue(f"providers.{provider_id}", "Provider 配置不存在"),))
+            existing = next((item for item in self._store.models.values()
+                             if item.provider_id == provider_id and item.model == upstream_model
+                             and (protocol is None or item.protocol == protocol)), None)
+            if existing is not None and not force:
+                current = self.selections.current(existing.id)
+                if current is not None and current.status in {"completing", "waiting", "testing"}:
+                    return current, False
+                record = self._admissions.get(existing.id)
+                if record is not None and admission_is_current(record, existing, provider):
+                    return None, False
+            latest = self._candidate_results.get(provider_id) or {}
+            candidate = next((item for item in latest.get("candidates", ()) if item["id"] == upstream_model), None)
+            from_list = candidate is not None
+            if candidate is None:
+                candidate = _parse_candidates([{"id": upstream_model}], provider.preset_id)[0]
+            if not candidate.get("applicable", True):
+                raise CatalogValidationError((ValidationIssue("model", "不适用于部门任务：模型不输出文本"),))
+            values = dict(candidate)
+            details = copy.deepcopy(values.get("source_details", {}))
+            if existing is not None:
+                for name in ("context_window", "max_output_tokens", "protocol"):
+                    if ((not from_list and (name == "protocol" or values.get(name) is None))
+                            or (existing.source_details.get(name, {}).get("source") == "manual"
+                                and (name == "protocol" or values.get(name) is None))):
+                        values[name] = getattr(existing, name)
+                        details[name] = dict(existing.source_details.get(name, {"source": "manual"}))
+            for name, value in (("context_window", context_window), ("max_output_tokens", max_output_tokens),
+                                ("protocol", protocol)):
+                if value is not None:
+                    values[name] = value
+                    details[name] = {"source": "manual"}
+            identifier = (existing.id if existing is not None else
+                          "selected-" + hashlib.sha256(f"{provider_id}\0{upstream_model}".encode()).hexdigest()[:24])
+            if values["protocol"] == "fake" and self._startup_mode == "normal":
+                raise CatalogValidationError((ValidationIssue("protocol", "正常启动不能选用 fake 协议"),))
+            previous = self.to_document()
+            self.save_model({"id": identifier, "provider_id": provider_id, "model": upstream_model,
+                             "protocol": values["protocol"], "context_window": values.get("context_window"),
+                             "max_output_tokens": values.get("max_output_tokens"),
+                             "input_modalities": values["input_modalities"], "source_details": details,
+                             "capability_source": " · ".join(f"{name}：{detail['source']}"
+                                                             for name, detail in details.items())})
+            problem = self.persist_catalog(previous)
+            if problem is not None:
+                raise CatalogValidationError((ValidationIssue("catalog", problem),))
+            selected = self.selections.begin(provider_id, identifier, upstream_model)
+            selected.missing = [name for name in ("context_window", "max_output_tokens") if values.get(name) is None]
+            selected.status = "capacity_unknown" if selected.missing else "waiting"
+            return selected, not selected.missing
+
+    def run_selection(self, selected: SelectionAttempt, limit: Callable[[], int]) -> dict[str, Any] | None:
+        if not self.selections.acquire(selected, limit):
+            return None
+        try:
+            result = self.model_test(selected.provider_id, selected.model_id, selection=selected)
+            return result if self.selections.finish(selected, result) else None
+        finally:
+            self.selections.release(selected)
+
+    def retry_selection(self, provider_id: str, model_id: str) -> tuple[SelectionAttempt, bool]:
+        with self._lock:
+            model = self._store.models.get(model_id)
+            if model is None or model.provider_id != provider_id:
+                raise CatalogValidationError((ValidationIssue(f"models.{model_id}", "模型访问定义不存在"),))
+            current = self.selections.current(model_id)
+            if current is not None and current.status in {"completing", "waiting", "testing"}:
+                return current, False
+            selected = self.selections.begin(provider_id, model_id, model.model)
+            selected.missing = [name for name in ("context_window", "max_output_tokens")
+                                if getattr(model, name) is None]
+            selected.status = "capacity_unknown" if selected.missing else "waiting"
+            return selected, not selected.missing
+
+    def _fill_missing_defaults(self, model_id: str) -> tuple[int, int]:
+        # 由准入提交所在的同一把锁串行决定先通过者，已有选择逐项保留。
+        before = self.catalog_revision()
+        model = self._store.models[model_id]
+        additions = {name: {"provider_id": model.provider_id, "model_id": model.id}
+                     for name in REQUIRED_DEPARTMENTS if name not in self._bindings}
+        if additions:
+            previous = self.to_document()
+            _require_bound_admissions(additions, self._store, self._admissions)
+            self._bindings.update(additions)
+            self._store.bump_revision()
+            self._publish()
+            problem = self.persist_catalog(previous)
+            if problem is not None:
+                raise CatalogValidationError((ValidationIssue("bindings", problem),))
+        return before, self.catalog_revision()
+
     def models_url_of(self, provider_id: str, models_url_override: str | None = None) -> str:
         # 这次请求实际读取的模型列表地址：覆盖值、已保存值、预置表地址，最后是自定义默认值
         with self._lock:
@@ -906,7 +1009,8 @@ class ProviderFacade:
                 "admitted_protocol": record.protocol,
             }
 
-    def model_test(self, provider_id: str, model_id: str) -> dict[str, Any]:
+    def model_test(self, provider_id: str, model_id: str, *,
+                   selection: SelectionAttempt | None = None) -> dict[str, Any]:
         # 最小问答与工具往返都成功才准入；每次请求走正式协议路径并有独立等待上限。
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
@@ -931,7 +1035,7 @@ class ProviderFacade:
         accepts_required = True
         result: InvokeResult | None = None
         try:
-            result = self._invoke_for_test(target, provider_input, model)
+            result = self._invoke_for_test(target, provider_input, model, selection)
             if model.protocol != "fake":
                 group, step = "tool_round_trip", "tool_call"
                 tool = {"type": "function", "name": "yudao_model_test",
@@ -942,19 +1046,19 @@ class ProviderFacade:
                                                        max_output_tokens=model.max_output_tokens),
                                      tool_choice="required")
                 try:
-                    result = self._invoke_for_test(target, tool_input, model)
+                    result = self._invoke_for_test(target, tool_input, model, selection)
                 except ProviderError as exc:
                     if not _required_tool_parameter_rejected(exc):
                         raise
                     accepts_required = False
                     step = "tool_call_retry"
-                    result = self._invoke_for_test(target, replace(tool_input, tool_choice="auto"), model)
+                    result = self._invoke_for_test(target, replace(tool_input, tool_choice="auto"), model, selection)
                 outputs = _model_test_tool_outputs(result)
                 step = "tool_result"
                 reasoning = [] if result.reasoning is None else result.reasoning.items
                 follow_up = replace(tool_input, tool_choice="auto", raw_request={
                     "input": [prompt, *reasoning, *result.output, *outputs], "tools": [tool]})
-                result = self._invoke_for_test(target, follow_up, model)
+                result = self._invoke_for_test(target, follow_up, model, selection)
         except ProviderError as exc:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
             group_text = "最小问答" if group == "minimal_qa" else "工具往返"
@@ -973,9 +1077,17 @@ class ProviderFacade:
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
         actual = result.actual_model or None
         capacity_confirmed = model.context_window is not None and model.max_output_tokens is not None
+        defaults_before = defaults_after = self.catalog_revision()
         if capacity_confirmed:
             with self._lock:
-                current = self._store.models[model.id]
+                current = self._store.models.get(model.id)
+                current_provider = self._store.providers.get(provider.id)
+                if (current is None or current_provider is None
+                        or (selection is not None and not self.selections.is_current(selection))
+                        or (provider.base_url, provider.credential_ref, model.protocol, model.model, model.reasoning_mode)
+                        != (current_provider.base_url, current_provider.credential_ref,
+                            current.protocol, current.model, current.reasoning_mode)):
+                    return {"ok": False, "admitted": False, "error": "选用已取消或测试目标已经改变"}
                 if current.accepts_required_tool_call != accepts_required:
                     previous = self.to_document()
                     self.save_model(replace(current, accepts_required_tool_call=accepts_required).public_dict())
@@ -987,6 +1099,8 @@ class ProviderFacade:
                                 "accepts_required_tool_call": accepts_required, "failure_group": "tool_round_trip",
                                 "failure_step": "save_capability", "request_timeout_sec": target.timeout_sec}
                 self.record_admission(provider_id, model.id, admitted_model=actual)
+                if selection is not None:
+                    defaults_before, defaults_after = self._fill_missing_defaults(model.id)
         persisted, persist_error = self._persist_admissions()
         payload = {
             "ok": True,
@@ -1002,6 +1116,7 @@ class ProviderFacade:
             "failure_group": None,
             "failure_step": None,
             "request_timeout_sec": target.timeout_sec,
+            "defaults_before": defaults_before, "defaults_after": defaults_after,
         }
         if persist_error is not None:
             payload["persist_error"] = persist_error
@@ -1079,21 +1194,29 @@ class ProviderFacade:
         self._admissions = kept
 
     def _invoke_for_test(self, target: FrozenTarget, provider_input: ProviderInput,
-                         model: Any) -> InvokeResult:
+                         model: Any, selection: SelectionAttempt | None = None) -> InvokeResult:
         # 诊断调用由接口层同步发起，在自己的事件循环中走与正式调用相同的协议与身份路径，
         # 使用独立会话，每次新建客户端；Web 服务多线程，同一个模型可能同时测试，每次调用使用唯一的尝试身份
         session_id = f"diagnostic:{target.provider_id}:{model.id}"
         attempt_id = f"diagnostic:{model.id}:{uuid4().hex}"
+        if selection is not None:
+            with self._lock:
+                selection.attempts.add(attempt_id)
 
         async def run() -> InvokeResult:
             async with aclosing(stream_invocation(target, provider_input, session_id, attempt_id,
-                                                  self._cancels)) as items:
+                                                  self._cancels, cancelled=() if selection is None else selection)) as items:
                 async for item in items:
                     if isinstance(item, InvokeResult):
                         return item
             raise ProviderError("Model invocation ended without a result", reason="provider_protocol")
 
-        return asyncio.run(run())
+        try:
+            return asyncio.run(run())
+        finally:
+            if selection is not None:
+                with self._lock:
+                    selection.attempts.discard(attempt_id)
 
     def describe_readiness(
         self,

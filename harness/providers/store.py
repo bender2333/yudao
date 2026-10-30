@@ -5,7 +5,7 @@ import math
 import os
 import re
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from types import MappingProxyType
@@ -81,8 +81,9 @@ class ModelDefinition:
     model: str
     protocol: str
     context_window: int | None
-    max_output_tokens: int
+    max_output_tokens: int | None
     capability_source: str = ""
+    source_details: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
     # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
     accepts_required_tool_call: bool = True
     # 输入方式（模型管理设计说明第 4.3 节）：取值为 text 与 image，文本总是包含；
@@ -113,6 +114,7 @@ class ModelDefinition:
             "context_window": self.context_window,
             "max_output_tokens": self.max_output_tokens,
             "capability_source": self.capability_source,
+            "source_details": {name: dict(value) for name, value in self.source_details.items()},
             "accepts_required_tool_call": self.accepts_required_tool_call,
             "input_modalities": list(self.input_modalities),
             "reasoning_levels": list(self.reasoning_levels),
@@ -402,13 +404,18 @@ class ProviderStore:
             if not isinstance(model.protocol, str) or model.protocol not in SUPPORTED_PROTOCOLS:
                 issues.append(ValidationIssue(f"{location}.protocol", "协议不受支持"))
             _validate_positive_int(model.context_window, f"{location}.context_window", issues, allow_none=True)
-            _validate_positive_int(model.max_output_tokens, f"{location}.max_output_tokens", issues, allow_none=False)
+            _validate_positive_int(model.max_output_tokens, f"{location}.max_output_tokens", issues, allow_none=True)
             if model.context_window is not None and model.max_output_tokens is not None \
                     and isinstance(model.context_window, int) and isinstance(model.max_output_tokens, int) \
                     and model.max_output_tokens > model.context_window:
                 issues.append(ValidationIssue(f"{location}.max_output_tokens", "不能超过 context_window"))
             if not isinstance(model.capability_source, str):
                 issues.append(ValidationIssue(f"{location}.capability_source", "必须为字符串"))
+            if not isinstance(model.source_details, Mapping) or not all(
+                    isinstance(name, str) and isinstance(detail, Mapping)
+                    and all(isinstance(key, str) and isinstance(value, str) for key, value in detail.items())
+                    for name, detail in model.source_details.items()):
+                issues.append(ValidationIssue(f"{location}.source_details", "必须为逐字段的来源对象"))
             if not isinstance(model.accepts_required_tool_call, bool):
                 issues.append(ValidationIssue(f"{location}.accepts_required_tool_call", "必须为 true 或 false"))
             if not isinstance(model.input_modalities, tuple) \
@@ -516,7 +523,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
     # 调用协议是模型访问定义的必填字段；其余未知字段（含准入字段）按未知字段处理（工单 #86）
     allowed = {
         "id", "provider_id", "model", "protocol", "context_window", "max_output_tokens",
-        "capability_source", "accepts_required_tool_call",
+        "capability_source", "source_details", "accepts_required_tool_call",
         "reasoning_levels", "default_reasoning_level", "reasoning_mode", "input_modalities",
     }
     issues = [ValidationIssue(f"{location}.{key}", "未知字段")
@@ -562,6 +569,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         id=raw["id"], provider_id=raw["provider_id"], model=raw["model"],
         protocol=raw["protocol"], context_window=raw.get("context_window"),
         max_output_tokens=raw["max_output_tokens"], capability_source=raw.get("capability_source", ""),
+        source_details=raw.get("source_details", {}),
         accepts_required_tool_call=raw.get("accepts_required_tool_call", True),
         reasoning_levels=levels if isinstance(levels, tuple) else (),
         default_reasoning_level=default_level,
