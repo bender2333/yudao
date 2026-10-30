@@ -19,7 +19,7 @@ from collections.abc import Callable, Sequence
 from contextlib import aclosing
 from dataclasses import asdict, dataclass, replace
 from threading import Event
-from typing import Any, Mapping
+from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, Preconditions, TreeFacts, WorkspaceFacts
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
@@ -548,7 +548,6 @@ class StepDriver:
                 after_snapshot = None
                 qa_tests_saved = None
                 deferred = False
-                refusal: str | None = None
                 try:
                     args = json.loads(raw_args)
                     if not isinstance(args, dict):
@@ -568,11 +567,11 @@ class StepDriver:
                                    "Not executed because the current activation can no longer start tools.")
                         return RoundResult(version=self._version)
                     if not permission.allowed:
-                        # 工具许可拒绝：动作不交给执行环境，回执带被拒绝标记与原因，结果照常记录（总图第四节「动作」缝）
+                        # 工具许可拒绝：动作不交给执行环境，回执照常带动作身份、被拒绝标记与原因；
+                        # 交给模型的工具结果保持原来的三项（ok、output、error），不带被拒绝标记（工单 #1275）
                         receipt = ActionReceipt.refusal(f"{request.activation_id}:{step_id}:{identity}",
                                                         permission.reason)
                         ok, output, error = receipt.ok, receipt.output, receipt.error
-                        refusal = receipt.refused_reason
                         deferred = permission.deferred
                     elif name == "ask":
                         ask_call = {
@@ -645,11 +644,7 @@ class StepDriver:
                         except UnrepresentableWorkspace:
                             after_snapshot = None
                         qa_tests_saved = self._save_qa_tests_if_changed(request)
-                # 工具结果与回执的字段相同；被拒绝的结果另带被拒绝标记与原因，其余结果保持原来的三项
-                extra = None
-                if refusal is not None:
-                    extra = {"refused": True, "refused_reason": refusal}
-                input_item = tool_result_item(identity, ok, output, error, extra=extra,
+                input_item = tool_result_item(identity, ok, output, error,
                                               input_modalities=tool_input_modalities(request))
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
@@ -1169,17 +1164,14 @@ def tool_input_modalities(request: Any) -> tuple[str, ...]:
 
 
 def tool_result_item(identity: str, ok: bool, output: Any, error: str | None, *,
-                     extra: Mapping[str, Any] | None = None,
                      input_modalities: tuple[str, ...]) -> dict[str, Any]:
     # 工具结果进入部门历史的条目。调用目标包含图像时，回执里的截图作为工件引用随结果进入历史，
     # 由上下文装配按「最近 3 张」放进请求（设计说明第 6.2 节）；不含图像时截图只保存为证据，
-    # 工具结果里既没有图像，也没有占位文字。被拒绝的结果由调用处经 extra 带上被拒绝标记与原因
+    # 工具结果里既没有图像，也没有占位文字。条目就是回执的三项，模型输入审计按事件里的结果重新装配它
     images = tool_output_images(output)
     if isinstance(output, dict) and TOOL_IMAGE_KEY in output:
         output = {key: value for key, value in output.items() if key != TOOL_IMAGE_KEY}
     result: dict[str, Any] = {"ok": ok, "output": output, "error": error}
-    if extra:
-        result.update(extra)
     item: dict[str, Any] = {"type": "function_call_output", "call_id": identity,
                             "output": json_dumps(result)}
     if images and "image" in input_modalities:

@@ -18,12 +18,59 @@ from typing import Annotated, Any, Literal
 from pydantic import (BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError,
                       field_validator, model_validator)
 
-from ..actions import ActionKind, Verification, check_contract
-
 DEFINITIONS_DIR = Path(__file__).parent
 
 # 定义中的编号：小写字母开头，由小写字母、数字与下划线组成
 Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
+
+# 环境工具的动作类别（tools.json 的 action 一栏）：读取、写入、检查、本地命令，以及网络取回、MCP 工具、
+# 试用会话、浏览器与屏幕动作。动作合同（harness/actions.py）从这里取这一份取值；反方向不导入：
+# 本模块不依赖动作合同，只导入本模块的 Provider 模块因此不会带上动作层（工单 #1275）
+ActionKind = Literal["read", "write", "check", "command", "fetch", "mcp", "trial", "browser"]
+
+# 核实方法（恢复契约第 4 节「结果未知时向哪里查」）：none 不查询外部结果，snapshot 以动作前后的公开树快照
+# 核对实际效果，query 按尝试身份查询执行环境的动作记录、检查回执或试用会话记录
+Verification = Literal["none", "snapshot", "query"]
+
+# 每类动作的既定合同：（核实方法，取消能否确认停止）。None 表示这一类里随工具不同，必须由定义写明。
+# 前四类是在这份合同之前就有的动作：读取与命令没有可以查询的外部结果，写入以树快照核实，检查的结果是检查回执、
+# 经执行环境的查询取得；它们的定义可以省略这两项，按这里的值解释（恢复契约第 4 节「动作分类与处置」）
+ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]] = {
+    "read": ("none", True),
+    "write": ("snapshot", True),
+    "check": ("query", True),
+    "command": ("none", True),
+    "fetch": ("none", True),
+    "mcp": ("none", None),
+    "trial": (None, True),
+    "browser": (None, True),
+}
+
+# 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明第 18 节）
+ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
+
+
+def established_verification(kind: ActionKind) -> Verification | None:
+    # 这一类动作的既定核实方法；None 表示这一类里随工具不同，必须写明
+    return ESTABLISHED_CONTRACTS[kind][0]
+
+
+def established_cancellable(kind: ActionKind) -> bool | None:
+    # 这一类动作的既定取消合同；None 表示这一类里随工具不同，必须写明
+    return ESTABLISHED_CONTRACTS[kind][1]
+
+
+def check_contract(kind: ActionKind, verification: Verification | None, cancellable: bool | None) -> None:
+    # 定义与动作请求里的两项元数据按类别的既定合同核对：写错的值立刻拒绝，新类别缺少这两项也拒绝
+    expected_verification = established_verification(kind)
+    if verification is not None and expected_verification is not None and verification != expected_verification:
+        raise ValueError(f"a {kind} action is verified by {expected_verification!r}, not {verification!r}")
+    expected_cancellable = established_cancellable(kind)
+    if cancellable is not None and expected_cancellable is not None and cancellable != expected_cancellable:
+        raise ValueError(f"cancelling a {kind} action can be confirmed: {expected_cancellable!r}, "
+                         f"not {cancellable!r}")
+    if kind in ADDED_KINDS and (verification is None or cancellable is None):
+        raise ValueError(f"a {kind} action requires verification and cancellable")
 
 # 规则登记中的条目名：由点号连接的小写标识，每一段与 Identifier 相同（设计说明第 2、8 节）。
 # 前一段是领域，最后一段是条目；等待的时长上限与栏目上限因此写作 wait.desktop.max_sec、

@@ -18,7 +18,8 @@ from dataclasses import fields
 from pathlib import Path
 from typing import get_args
 
-from harness.actions import ActionKind, ActionReceipt
+from harness.actions import ActionReceipt
+from harness.definitions import ActionKind
 from harness.kernel_events import (
     SKELETON_CATALOG_EVENTS,
     SKELETON_PROJECT_EVENTS,
