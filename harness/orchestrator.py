@@ -237,7 +237,7 @@ class Orchestrator:
         test_adapter_name: str = "test",
         test_model: str = "fake-script",
         sessions: SessionFactory | None = None,
-        step_limits: StepLimits = StepLimits(),
+        step_limits: StepLimits | None = None,
         deltas: DeltaChannel | None = None,
         tightening: Tightening,
         routing: routing_contract.Routing,
@@ -361,6 +361,9 @@ class Orchestrator:
         round: int = 0,
         # 与 run 的创建在同一步写入的第二项输入（建档修改轮的用户修改意见原文，工单 #136）
         additional_input: str | None = None,
+        # 事项创建时冻结的定义版本（工单 #1189）：不给时是当前加载的定义。参数快照按它记下定义版本，
+        # 定义版本与当前不同时不创建 run（启动补建的那条路径在调用之前就跳过）
+        item_definitions_version: str | None = None,
     ) -> str:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
@@ -420,6 +423,20 @@ class Orchestrator:
             overview_ref = asdict(self.artifacts.put(
                 run_id, "repository_overview", repository_overview(initial_tree), media_type="text/markdown",
             ))
+        # 建 run 时冻结的参数快照（工单 #1189，设计说明第 3 节第 3 条）：全局现值叠加项目覆盖，
+        # 事项已经解析出来的实际限额单独记下；这个 run 之后只读这份快照
+        item_limits = {
+            "max_cycles": max_cycles,
+            "run_time_limit_sec": run_time_limit_sec,
+            "check_timeout_sec": check_timeout_sec,
+            "onboarding.round_time_limit_sec": parameter_values.value_for_project(
+                self.store, project_id, "onboarding.round_time_limit_sec"),
+        }
+        frozen_definitions_version = item_definitions_version or DEFINITIONS.version
+        frozen_parameters = parameter_values.frozen_snapshot(
+            self.store, project_id=project_id, definitions_version=frozen_definitions_version,
+            item_limits=item_limits,
+        )
         run_created = NewEvent(
             EventType.RUN_CREATED,
             actor="system",
@@ -445,8 +462,9 @@ class Orchestrator:
                 "workspace_digest": workspace_digest,
                 "project_context_ref": project_context_ref,
                 "prompt_config_versions": dict(prompt_config_versions or {}),
-                "definitions_version": DEFINITIONS.version,
+                "definitions_version": frozen_definitions_version,
                 "parameters_version": parameter_values.current_version(self.store),
+                "parameters": frozen_parameters,
                 "run_event_version": RUN_EVENT_VERSION,
                 "onboarding_basis": onboarding_basis,
                 "round": round,
@@ -1336,13 +1354,29 @@ class Orchestrator:
         # 已经结束的激活不算在内：下一轮工作重新按上限开始。
         # 两个数都读最小投影（S1e 工单 #1015）：累计的模型步数减去上一次结算时的步数。
         # max_model_steps 给出时不按运行配置的全局上限，按这个数（询问分支的这一轮由路由给上限）
-        base = self.step_limits if max_model_steps is None else replace(
-            self.step_limits, max_model_steps=max_model_steps)
+        base = self._run_step_limits(run_id)
+        if max_model_steps is not None:
+            base = replace(base, max_model_steps=max_model_steps)
         session = self._session_used(run_id, session_id)
         used = max(0, session.model_steps - session.settled_steps)
         if used <= 0:
             return base
         return replace(base, max_model_steps=max(0, base.max_model_steps - used))
+
+    def _run_step_limits(self, run_id: str) -> StepLimits:
+        # 这个 run 的上限（工单 #1189）：组装处显式给出 step_limits 时整份照用（测试与运行配置），
+        # 没有给时按 run 创建时冻结的 6 项参数构造；建 run 之后改参数事件不影响已经创建的 run
+        if self.step_limits is not None:
+            return self.step_limits
+        frozen = parameter_values.frozen_run_parameters(self.project(run_id))
+        return StepLimits(
+            retry_initial_delay_sec=float(frozen["retry_initial_delay_sec"]),
+            retry_max_delay_sec=float(frozen["retry_max_delay_sec"]),
+            max_provider_attempts=int(frozen["max_provider_attempts"]),
+            max_model_steps=int(frozen["max_model_steps"]),
+            tool_call_required_limit=int(frozen["tool_call_required_limit"]),
+            compaction_stalled_limit=int(frozen["compaction.stalled_limit"]),
+        )
 
     async def _invoke_activation(self, activation: _Activation) -> None:
         scope = activation.scope
@@ -1454,13 +1488,14 @@ class Orchestrator:
         # 回复给谁与这一轮的上限都归路由；薄驱动照常把这一轮交给执行契约运行。写事件、跑这一轮，
         # 以及把这个分支会话已经用掉的步数与时间从这一轮的上限里扣掉，归薄驱动（工单 #1015 的读法）
         stream = run_stream(scope.run_id)
+        ask_limits = self._run_step_limits(scope.run_id)
         asked = self._routing.ask_branch(
             self.project(scope.run_id), list(self.writes.read(stream).events()),
             requester=scope.department, session_id=scope.session_id, call=call,
             limits=routing_contract.AskLimits(
-                max_model_steps=self.step_limits.max_model_steps,
-                department_max_model_steps=self.step_limits.department_max_model_steps,
-                department_max_time_sec=self.step_limits.department_max_time_sec,
+                max_model_steps=ask_limits.max_model_steps,
+                department_max_model_steps=ask_limits.department_max_model_steps,
+                department_max_time_sec=ask_limits.department_max_time_sec,
             ),
         )
         if isinstance(asked, routing_contract.AskRejection):

@@ -19,7 +19,14 @@ def test_every_registered_rule_has_a_wiring_conclusion():
     assert {name for name in DEFINITIONS.rules if wired(name)} == {
         "max_cycles", "run_time_limit_sec", "check_timeout_sec", "onboarding.round_time_limit_sec",
         "organization.ask_chain_max_depth",
+        # 工单 #1309（选用即启用）接入的模型测试并发
         "provider.model_test_max_concurrent",
+        # 工单 #1189：建 run 时冻结的 10 个参数与 3 条可见范围
+        "tool_call_required_limit", "max_model_steps", "max_provider_attempts",
+        "retry_initial_delay_sec", "retry_max_delay_sec", "tool_output_limit",
+        "bash_timeout_default_sec", "bash_timeout_max_sec", "check_timeout_max_sec",
+        "compaction.stalled_limit",
+        "roles.product.visibility", "roles.engineering.visibility", "roles.quality.visibility",
     }
     assert all(NOT_WIRED_REASONS[name] for name in DEFINITIONS.rules if not wired(name))
 

@@ -13,7 +13,7 @@ import math
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, get_args
 
 from pydantic import (BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError,
                       field_validator, model_validator)
@@ -76,6 +76,11 @@ def check_contract(kind: ActionKind, verification: Verification | None, cancella
 # 前一段是领域，最后一段是条目；等待的时长上限与栏目上限因此写作 wait.desktop.max_sec、
 # context.column_limit.catalog
 RuleName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")]
+
+# 可见范围的封闭词表（roles.json 的 visibility 一栏）：三条 roles.<部门>.visibility 参数的取值只能是其中的子集
+# （工单 #1189）。词表只在这里写一份，参数的取值核对与角色定义共用它
+VisibilityValue = Literal["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"]
+VISIBILITY_VALUES: frozenset[str] = frozenset(get_args(VisibilityValue))
 
 
 def _freeze(value: Any) -> Any:
@@ -206,7 +211,7 @@ class Role(_Definition):
     # 可以使用的工具，按这个顺序提供给模型
     tools: tuple[Identifier, ...]
     # 可见范围：除全体角色共同的材料以外，本角色还能看到的材料
-    visibility: tuple[Literal["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"], ...]
+    visibility: tuple[VisibilityValue, ...]
 
 
 class Tool(_Definition):
@@ -410,26 +415,40 @@ class ModelCapability(_Definition):
     # 模型能力表中的一条：取自 models.dev 的快照，只保留设计说明第 4.1 节的字段。
     # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
-    # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务方案的默认协议
-    protocol: Protocol
+    # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务商接入包。
+    # 接入包没有对应的协议时为空（None）：容量与输入方式照常记录。
+    protocol: Protocol | None = None
+    # 模型自己声明的接入包（provider.npm）；没有声明时不记录（空串）。
+    npm: str = ""
     input_modalities: tuple[str, ...] = ()
     output_modalities: tuple[str, ...] = ()
     context_window: int | None = None
     max_output_tokens: int | None = None
+    max_input_tokens: int | None = None
     tool_call: bool = False
     reasoning: bool = False
 
 
+class CapabilityProvider(_Definition):
+    # 服务商的接口地址与接入包；接口地址取自 models.dev，官方服务商由提取脚本的补充表补上。
+    api: str = ""
+    npm: str = Field(min_length=1)
+    models: tuple[ModelCapability, ...]
+
+
 class ModelCapabilities(_Definition):
-    # 模型能力表（设计说明第 4.1 节）：只收录预置表中服务方案的模型，整张表带 revision、快照日期与来源；
-    # 运行时不从远端刷新，只用于新建模型访问定义时的预填（设计说明第 4.1 节）。
-    # 键是预置表中的服务方案 ID（取值与 ServicePreset.id 一致，可以含连字符）
+    # 版本 2 增加全部服务商资料；presets 保留原服务方案的模型，旧文件按版本 1 读取。
+    version: int = Field(default=1, ge=1, le=2)
+    providers: Mapping[str, CapabilityProvider] = Field(default_factory=dict)
     presets: Mapping[str, tuple[ModelCapability, ...]]
     revision: str = Field(min_length=1)
     snapshot_date: str = Field(min_length=1)
     source: str = Field(min_length=1)
+    # 来源文件（取回的 models.dev api.json，或用本地文件生成时的那份）的 SHA-256。
+    source_sha256: str = ""
 
     freeze_presets = _frozen("presets")
+    freeze_providers = _frozen("providers")
 
 
 class StopReason(_Definition):
@@ -794,6 +813,18 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         if preset.models_dev_id and preset.id not in capabilities.presets:
             issues.append(("model_capabilities.json", f"presets.{preset.id}",
                            f"预置表第 {index + 1} 项（{preset.id}）记录了 models_dev_id，能力表却缺少这个服务方案"))
+        if capabilities.version == 2 and preset.models_dev_id:
+            provider = capabilities.providers.get(preset.models_dev_id)
+            if provider is None:
+                issues.append(("model_capabilities.json", f"providers.{preset.models_dev_id}", "能力表缺少预置方案对应的服务商"))
+            elif capabilities.presets.get(preset.id) != provider.models:
+                issues.append(("model_capabilities.json", f"presets.{preset.id}", "服务方案与对应服务商的模型资料不一致"))
+    for provider_id, provider in capabilities.providers.items():
+        models = [entry.model for entry in provider.models]
+        for position, model in enumerate(models):
+            if models.index(model) != position:
+                issues.append(("model_capabilities.json", f"providers.{provider_id}.models[{position}].model",
+                               f"同一个服务商中模型 {model} 重复"))
     return issues
 
 

@@ -1,7 +1,10 @@
-# 模型能力表（工单 #146，模型管理设计说明第 4.1 节）：提取脚本的取材规则与运行时访问。
+# 模型能力表（工单 #146、#1296，模型管理设计说明第 4.1 节）：提取脚本的取材规则与运行时访问。
 # 提取脚本用仓库内的真实数据 fixtures（harness/tests/data/models_dev_snapshot.json，
-# 从 models.dev 的 api.json 裁剪，含一个未被任何预置服务方案引用的 provider）；不使用假数据。
+# 从 models.dev 的 api.json 裁剪，含一个未被任何预置服务方案引用的 provider）；
+# 另有一份从 2026-10-30 的真实快照裁剪的资料（models_dev_snapshot_20261030.json），
+# 用来核对「接入包没有对应的协议时照常收录」；不使用假数据。
 
+import hashlib
 import importlib.util
 import json
 import sys
@@ -11,8 +14,10 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE = REPO_ROOT / "harness" / "tests" / "data" / "models_dev_snapshot.json"
-# 另一份 fixtures：同一个服务方案下的模型带三种取值以外的 provider.npm，提取脚本要报出它
+# 另一份 fixtures：同一个服务方案下的模型自己声明了 provider.npm，提取脚本按它取协议
 OTHER_FIXTURE = REPO_ROOT / "harness" / "tests" / "data" / "models_dev_snapshot_other_npm.json"
+# 从 2026-10-30 的真实快照裁剪的资料：含协议为空的模型与同一服务商下的其他模型
+REAL_FIXTURE = REPO_ROOT / "harness" / "tests" / "data" / "models_dev_snapshot_20261030.json"
 SPEC = REPO_ROOT / "scripts" / "generate_model_capabilities.py"
 
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, load_definitions
@@ -37,9 +42,16 @@ def _fixture_copy():
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
-def test_shipped_capability_table_covers_only_preset_plans():
+def _real_fixture_copy():
+    return json.loads(REAL_FIXTURE.read_text(encoding="utf-8"))
+
+
+def test_shipped_capability_table_preserves_preset_plans():
     table = DEFINITIONS.model_capabilities
     assert table.revision and table.snapshot_date and table.source
+    assert table.version == 2
+    # 表里记录来源文件的 SHA-256（取回的 models.dev 文件）
+    assert len(table.source_sha256) == 64 and int(table.source_sha256, 16) >= 0
     preset_ids = {preset.id for preset in DEFINITIONS.service_presets.presets}
     assert set(table.presets) <= preset_ids
     # 预置表里记录了 models_dev_id 的服务方案都有条目（当前只有 OpenCode Go）
@@ -47,12 +59,20 @@ def test_shipped_capability_table_covers_only_preset_plans():
         if preset.models_dev_id:
             assert preset.id in table.presets
             assert table.presets[preset.id]
+            assert preset.models_dev_id in table.providers
 
 
-def test_extractor_keeps_section_4_1_fields_and_filters_providers():
+def test_extractor_keeps_section_4_1_fields_for_all_providers():
+    # R2：定义格式增加服务商资料，保留旧服务方案字段的读法。
     module = _extractor()
     table = module.build_table(_presets(), _fixture_copy(), "2026-10-11.1", "2026-10-11", "https://models.dev")
-    assert set(table["presets"]) == {"opencode-go"}  # fixtures 里的 anthropic 不被收录
+    assert table["version"] == 2
+    assert set(table["providers"]) == {"anthropic", "opencode-go"}
+    assert table["providers"]["anthropic"]["api"] == "https://api.anthropic.com"
+    assert table["providers"]["anthropic"]["npm"] == "@ai-sdk/anthropic"
+    assert table["providers"]["opencode-go"]["api"] == "https://opencode.ai/inference/go/openai/v1"
+    assert table["providers"]["opencode-go"]["npm"] == "@ai-sdk/openai-compatible"
+    assert table["providers"]["opencode-go"]["models"] == table["presets"]["opencode-go"]
     entries = {entry["model"]: entry for entry in table["presets"]["opencode-go"]}
     assert set(entries) == {"claude-haiku-5-5", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp",
                             "glm-5.3-flash", "grok-4.7", "kimi-k2.7-code"}
@@ -66,14 +86,49 @@ def test_extractor_keeps_section_4_1_fields_and_filters_providers():
         "tool_call": True,
         "reasoning": True,
     }
+    # 输入上限是可选字段：上游没有给出时不记录
+    assert "max_input_tokens" not in entries["deepseek-v4-flash"]
     assert entries["deepseek-v4-flash-vision-exp"]["input_modalities"] == ["image", "text"]
-    # 协议按 provider.npm 映射：openai → responses，anthropic → messages，openai-compatible → chat_completions
+    # 协议按接入包映射：模型自己声明的接入包优先（openai → responses，anthropic → messages），
+    # 没有声明时取服务商的接入包（openai-compatible → chat_completions）
     assert entries["grok-4.7"]["protocol"] == "responses"
+    assert entries["grok-4.7"]["npm"] == "@ai-sdk/openai"
     assert entries["claude-haiku-5-5"]["protocol"] == "messages"
-    # 模型没有单独声明 provider.npm 时记录服务方案的默认协议
+    assert entries["claude-haiku-5-5"]["npm"] == "@ai-sdk/anthropic"
     assert entries["glm-5.3-flash"]["protocol"] == "chat_completions"
     assert entries["kimi-k2.7-code"]["protocol"] == "chat_completions"
     assert entries["deepseek-v4-flash-vision-exp"]["protocol"] == "chat_completions"
+    # 没有声明接入包的模型不记录这一项
+    assert "npm" not in entries["glm-5.3-flash"]
+
+
+def test_extractor_uses_the_package_the_model_declares():
+    # R2：模型自己声明了 provider.npm 时按它取协议，并记录这一项。
+    module = _extractor()
+    models_dev = json.loads(OTHER_FIXTURE.read_text(encoding="utf-8"))
+    table = module.build_table(_presets(), models_dev, "r", "2026-10-30", "https://models.dev")
+    [entry] = table["presets"]["opencode-go"]
+    assert entry["model"] == "mistral-large-4"
+    assert entry["npm"] == "@ai-sdk/mistral"
+    assert entry["protocol"] == "chat_completions"
+
+
+def test_extractor_keeps_models_without_a_protocol_and_their_capacity():
+    # R2：接入包没有对应的协议时照常收录：协议为空，窗口与输出上限保留，
+    # 同一服务商下其余模型的协议不变。
+    module = _extractor()
+    table = module.build_table(_presets(), _real_fixture_copy(), "2026-10-30.1", "2026-10-30",
+                               "https://models.dev/api.json")
+    entries = {entry["model"]: entry for entry in table["providers"]["opencode-go"]["models"]}
+    argon = entries["gemini-4-argon"]
+    assert argon["protocol"] is None
+    assert argon["npm"] == "@ai-sdk/google"
+    assert argon["context_window"] == 1048576 and argon["max_output_tokens"] == 65536
+    assert argon["input_modalities"] == ["audio", "image", "pdf", "text", "video"]
+    # 同一服务商下其余模型的协议不变
+    assert entries["minimax-m3"]["protocol"] == "messages"
+    assert entries["kimi-k3"]["protocol"] == "chat_completions"
+    assert entries["gpt-6-luna"]["protocol"] == "responses"
 
 
 def test_extractor_skips_missing_modalities_and_unknown_limit():
@@ -98,27 +153,48 @@ def test_extractor_fails_fast_when_preset_plan_is_absent_upstream():
         module.build_table(_presets(), models_dev, "2026-10-11.1", "2026-10-11", "https://models.dev")
 
 
-def test_extractor_fails_fast_on_unmapped_provider_npm():
-    # 三种取值以外的 provider.npm：以错误结束，并列出这些模型（设计说明第 4.1 节）
+def test_extractor_reports_every_unmapped_package_without_writing_a_file(tmp_path, capsys):
+    # R2：严格处理服务商级与模型级接入包，失败时没有半份快照输出。
     module = _extractor()
-    models_dev = json.loads(OTHER_FIXTURE.read_text(encoding="utf-8"))
-    with pytest.raises(ValueError) as raised:
-        module.build_table(_presets(), models_dev, "2026-10-11.1", "2026-10-11", "https://models.dev")
-    message = str(raised.value)
-    assert "provider.npm 不在协议映射中" in message
-    assert "mistral-large-4（@ai-sdk/mistral）" in message
+    raw = _fixture_copy()
+    raw["anthropic"]["npm"] = "unregistered-package"
+    raw["opencode-go"]["models"]["grok-4.7"]["provider"]["npm"] = "another-unregistered-package"
+    local_input = tmp_path / "unmapped.json"
+    local_input.write_text(json.dumps(raw), encoding="utf-8")
+    output = tmp_path / "result.json"
+    assert module.main(["--input", str(local_input), "--out", str(output)]) == 1
+    message = capsys.readouterr().err
+    assert "anthropic" in message and "unregistered-package" in message
+    assert "opencode-go/grok-4.7" in message and "another-unregistered-package" in message
+    assert not output.exists()
 
 
-@pytest.mark.parametrize(("entry", "expected"), [
-    ({}, ""),
-    ({"provider": "openai"}, ""),
-    ({"provider": {"npm": 3}}, ""),
-    ({"provider": {"npm": "  @ai-sdk/openai  "}}, "@ai-sdk/openai"),
-])
-def test_declared_npm_reads_only_string_provider_npm(entry, expected):
-    # 模型单独声明的 provider.npm：只有字符串取值有效，去掉首尾空白；其余输入返回空串，由调用方取默认协议
+def test_every_registered_protocol_has_evidence():
+    # R2：登记为某种协议的接入包都要有官方源码依据（仓库、提交与文件位置）。
     module = _extractor()
-    assert module.declared_npm(entry) == expected
+    module.check_evidence()
+    for npm, protocol in module.NPM_PROTOCOLS.items():
+        evidence = module.NPM_EVIDENCE.get(npm, "")
+        if protocol is None:
+            continue
+        assert evidence, f"{npm} 登记为 {protocol} 但没有依据"
+        assert "@" in evidence and ("/" in evidence or ":" in evidence)
+
+
+def test_extractor_rejects_a_registered_protocol_without_evidence(monkeypatch):
+    module = _extractor()
+    monkeypatch.setitem(module.NPM_PROTOCOLS, "@ai-sdk/example", "responses")
+    with pytest.raises(ValueError, match="缺少依据"):
+        module.check_evidence()
+
+
+def test_extractor_records_the_source_file_hash(tmp_path):
+    # R2：表里记录来源文件的 SHA-256。
+    module = _extractor()
+    output = tmp_path / "table.json"
+    assert module.main(["--input", str(FIXTURE), "--date", "2026-10-11", "--out", str(output)]) == 0
+    table = json.loads(output.read_text(encoding="utf-8"))
+    assert table["source_sha256"] == hashlib.sha256(FIXTURE.read_bytes()).hexdigest()
 
 
 def test_extractor_output_is_stable(tmp_path):
@@ -132,14 +208,12 @@ def test_extractor_output_is_stable(tmp_path):
 
 def test_committed_table_matches_the_extractor():
     # 提交的能力表与提取脚本按仓库内 fixtures 的取材结果一致（同一脚本、同一预置表）。
-    # fixtures 里 kimi 的记录被有意裁掉 modalities 覆盖缺少的形状，逐条比对只看未裁剪的记录
     module = _extractor()
-    table = module.build_table(_presets(), _fixture_copy(), "2026-10-11.1", "2026-10-11", "https://models.dev")
+    table = module.build_table(_presets(), _real_fixture_copy(), "2026-10-30.1", "2026-10-30",
+                               "https://models.dev/api.json")
     committed = json.loads((DEFINITIONS_DIR / "model_capabilities.json").read_text(encoding="utf-8"))
-    by_model = {row["model"]: row for row in committed["presets"]["opencode-go"]}
-    for entry in table["presets"]["opencode-go"]:
-        if entry["model"] == "kimi-k2.7-code":
-            continue
+    by_model = {row["model"]: row for row in committed["providers"]["opencode-go"]["models"]}
+    for entry in table["providers"]["opencode-go"]["models"]:
         assert by_model[entry["model"]] == entry
 
 
@@ -148,6 +222,7 @@ def test_table_public_lists_entries_with_metadata():
     assert view["revision"] == capabilities.CAPABILITY_TABLE_REVISION
     assert view["snapshot_date"] == capabilities.CAPABILITY_TABLE_SNAPSHOT_DATE
     assert view["source"] == capabilities.CAPABILITY_TABLE_SOURCE
+    assert view["source_sha256"] == capabilities.CAPABILITY_TABLE_SOURCE_SHA256
     assert set(view["presets"]) == set(DEFINITIONS.model_capabilities.presets)
     entry = view["presets"]["opencode-go"][0]
     assert set(entry) == {"model", "protocol", "input_modalities", "output_modalities",
@@ -155,10 +230,10 @@ def test_table_public_lists_entries_with_metadata():
 
 
 def test_capability_lookup_by_preset_and_model():
-    hit = capabilities.capability("opencode-go", "deepseek-v4-flash-vision-exp")
+    hit = capabilities.capability("opencode-go", "deepseek-v4.1-flash")
     assert hit is not None and "image" in hit.input_modalities
     assert capabilities.capability("opencode-go", "不存在的模型") is None
-    assert capabilities.capability("custom", "deepseek-v4-flash") is None
+    assert capabilities.capability("custom", "deepseek-v4.1-flash") is None
     assert capabilities.entries("custom") == ()
     listed = capabilities.entries("opencode-go")
     assert [entry.model for entry in listed] == sorted(entry.model for entry in listed)
@@ -205,22 +280,63 @@ def test_duplicate_model_in_one_preset_is_rejected(tmp_path):
     assert any(issue[0] == "model_capabilities.json" and issue[1].startswith("presets.opencode-go[")
                for issue in raised.value.issues)
 
+
 def test_reading_the_capability_table_never_reaches_the_network():
-    # 运行的系统读取能力表时不发出网络请求：读取本模块顶层已经建好的索引，导入时也不连接远端
-    import socket
-
+    # R2：通过真实审计事件核对离线读取；不替换网络实现。
     attempts: list[object] = []
-    original = socket.socket.connect
+    active = True
 
-    def guard(self, address, *args, **kwargs):
-        attempts.append(address)
-        raise AssertionError(f"能力表的读取不应连接网络：{address}")
+    def guard(event, args):
+        if active and event == "socket.connect":
+            attempts.append(args)
+            raise AssertionError(f"能力表的读取不应连接网络：{args}")
 
-    socket.socket.connect = guard
+    sys.addaudithook(guard)
     try:
         view = capabilities.table_public()
         assert capabilities.capability("opencode-go", view["presets"]["opencode-go"][0]["model"]) is not None
         assert capabilities.entries("opencode-go")
     finally:
-        socket.socket.connect = original
+        active = False
     assert attempts == []
+
+
+def _version_two_table():
+    return _extractor().build_table(_presets(), _fixture_copy(), "2026-10-30.1", "2026-10-30",
+                                    "https://models.dev")
+
+
+def test_version_two_definitions_load_provider_metadata_and_optional_input_limit(tmp_path):
+    # R2：增加字段后的定义仍能通过同一加载入口读取，旧服务方案内容不变。
+    directory = _copy_definitions(tmp_path)
+    table = _version_two_table()
+    (directory / "model_capabilities.json").write_text(json.dumps(table), encoding="utf-8")
+    loaded = load_definitions(directory).model_capabilities
+    assert loaded.version == 2
+    assert set(loaded.providers) == {"anthropic", "opencode-go"}
+    assert loaded.providers["opencode-go"].models == loaded.presets["opencode-go"]
+    assert loaded.providers["opencode-go"].npm == "@ai-sdk/openai-compatible"
+
+
+@pytest.mark.parametrize("case", ["missing_provider", "inconsistent_models", "duplicate_model",
+                                  "invalid_npm", "future_version", "protocol_outside_the_three"])
+def test_invalid_version_two_provider_definitions_are_rejected(tmp_path, case):
+    # R2：拒绝缺失的预置服务商、双份模型资料矛盾、重复模型和不合法的新字段。
+    directory = _copy_definitions(tmp_path)
+    table = _version_two_table()
+    if case == "missing_provider":
+        del table["providers"]["opencode-go"]
+    elif case == "inconsistent_models":
+        table["providers"]["opencode-go"]["models"] = []
+    elif case == "duplicate_model":
+        table["providers"]["anthropic"]["models"].append(table["providers"]["anthropic"]["models"][0])
+    elif case == "invalid_npm":
+        table["providers"]["anthropic"]["npm"] = ""
+    elif case == "protocol_outside_the_three":
+        table["providers"]["anthropic"]["models"][0]["protocol"] = "grpc"
+    else:
+        table["version"] = 3
+    (directory / "model_capabilities.json").write_text(json.dumps(table), encoding="utf-8")
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[0] == "model_capabilities.json" for issue in raised.value.issues)

@@ -426,17 +426,19 @@ def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests(
 
 
 def test_candidate_prefill_carries_the_protocol_and_its_source():
-    # R2：先采用能力表里的逐模型协议与来源，查不到时再使用方案默认协议。
+    # R2：先采用能力表里这个模型的协议与来源（识别出的服务商之内），查不到时再使用方案默认协议。
     known = _parse_candidates({"data": [{"id": "grok-4.7"}, {"id": "glm-5.3-flash"},
                                         {"id": "claude-haiku-5-5"}, {"id": "清单里没有的模型"}]},
                               "opencode-go")
     by_id = {item["id"]: item for item in known}
+    # 能力表里的逐模型协议：模型自己声明的接入包决定（openai → responses，anthropic → messages）
     assert by_id["grok-4.7"]["protocol"] == "responses"
     assert by_id["grok-4.7"]["protocol_source"] == "capability_table"
     assert by_id["glm-5.3-flash"]["protocol"] == "chat_completions"
     assert by_id["glm-5.3-flash"]["protocol_source"] == "capability_table"
     assert by_id["claude-haiku-5-5"]["protocol"] == "messages"
     assert by_id["claude-haiku-5-5"]["protocol_source"] == "capability_table"
+    # 能力表里没有这个模型：内置服务方案取方案的默认协议
     assert by_id["清单里没有的模型"]["protocol"] == "chat_completions"
     assert by_id["清单里没有的模型"]["protocol_source"] == "preset_default"
     # 自定义服务不在能力表里：预填 Chat Completions，来源 default

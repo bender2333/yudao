@@ -24,6 +24,7 @@ from .contracts import artifact_hash
 from .data_directory import default_provider_config
 from .definitions import DEFINITIONS
 from .engine import tool_call_required_text
+from . import parameters as parameter_values
 from .event_store import EventStore, run_stream
 from .git_audit import verify_git_history
 from .models import (ArtifactRef, DepartmentPrompt, EventType, ProjectEventType, RunProjection, canonical_hash, estimate_tokens, hash_bytes, json_dumps)
@@ -1003,11 +1004,12 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                     # 主机只在工作步骤没有调用工具时追加这条消息，计数连续且不超过上限
                     count = replies_without_tool_call.get(activation, 0) + 1
                     item = _read_artifact(artifacts, run_id, payload["input_ref"])
-                    limit = DEFINITIONS.rule_value("tool_call_required_limit")
+                    # 这个 run 冻结的提醒上限（工单 #1189）：审计按事件里的冻结值重新装配这条消息
+                    limit = int(parameter_values.frozen_run_parameters(current_work)["tool_call_required_limit"])
                     if (purposes[activation] != "work" or (activation, steps[activation]) in tool_steps
                             or payload.get("count") != count or count > limit
                             or payload.get("limit") != limit
-                            or item != {"role": "user", "content": tool_call_required_text(count)}):
+                            or item != {"role": "user", "content": tool_call_required_text(count, limit)}):
                         raise ValueError("appended tool call message does not follow a reply without tool calls")
                     replies_without_tool_call[activation] = count
                 else:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import MappingProxyType
 from typing import Any, Mapping
+from urllib.parse import urlsplit, urlunsplit
 
 from ..definitions import DEFINITIONS, ServicePreset, thaw
 
@@ -30,6 +31,26 @@ def get_preset(preset_id: str) -> dict[str, Any] | None:
 
 def preset_exists(preset_id: str) -> bool:
     return str(preset_id) in _PRESET_INDEX
+
+
+def normalized_base_url(value: str) -> str:
+    text = value.strip()
+    if not text:
+        return ""
+    parsed = urlsplit(text if "://" in text else "https://" + text)
+    host = parsed.hostname
+    if parsed.scheme not in ("http", "https") or not host or parsed.username is not None or parsed.password is not None:
+        return ""
+    authority = f"[{host}]" if ":" in host else host
+    if parsed.port is not None:
+        authority += f":{parsed.port}"
+    return urlunsplit((parsed.scheme, authority, parsed.path.rstrip("/"), parsed.query, parsed.fragment))
+
+
+def preset_id_for_base_url(base_url: str, presets: tuple[ServicePreset, ...] = _TABLE.presets) -> str:
+    address = normalized_base_url(base_url)
+    return next((preset.id for preset in presets if address and any(
+        normalized_base_url(value) == address for value in preset.base_urls.values())), "")
 
 
 def preset_models_url(preset_id: str) -> str:
