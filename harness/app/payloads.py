@@ -1190,6 +1190,9 @@ class WorkItemCreatedPayload(Payload):
     priority: str = PRIORITY_USER
     # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
     kind: str = "change"
+    # 因升级重新开始（ADR-0019，工单 #1186）：这个事项的 run 从哪一个旧 run 重新开始。旧事件没有这个字段，
+    # 读取时按「不经升级重新开始」处理：用户新建的事项与建档事项都没有旧 run
+    restarted_from_run_id: str | None = None
 
 
 class WorkItemStartFailedPayload(Payload):

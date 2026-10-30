@@ -104,7 +104,8 @@
     },
     "work_item_created": {
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
-      "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的"
+      "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的",
+      "restarted_from_run_id": "旧事件没有这个字段，读取时按不经升级重新开始处理：用户新建的事项与建档事项都没有旧 run，升级重新开始由强制升级写入"
     },
     "writeback_completed": {
       "adopted_tree_digest": "这个事件种类是新增的，旧版本的项目流中没有它：采纳树摘要",
@@ -403,6 +404,7 @@
       "priority": "string",
       "project_context_ref": "object",
       "prompt_config_versions": "object",
+      "restarted_from_run_id": "string?",
       "run_id": "string",
       "run_time_limit_sec": "integer",
       "snapshot": "object?",

@@ -39,7 +39,8 @@ from harness.app.registry import QueryDefinition, Registry
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
-from harness.models import EventType
+from harness.models import EventType, ProjectEventType
+from harness.streams import PRIORITY_UPGRADE_RESTART, RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.proposals import (
     product_spec, delivery_turn, review_turn,
     ask_turn, answer_turn,
@@ -1213,3 +1214,105 @@ def test_cli_replay_refuses_neither_or_both_parameters_without_a_traceback(data_
         err = capsys.readouterr().err
         assert "run_id" in err and "project_id" in err, err
         assert "Traceback" not in err and "ValueError" not in err, err
+
+
+# ---------------------------------------------------------------------------
+# 因升级停止的新旧 run 关联（工单 #1186，设计说明第 4.3 节 2026-10-29 补充）
+
+def _upgrade_system(data_dir):
+    # 产品提交规格以后工程的请求失败，run 停在非终态（与排空用例的脚本同一做法），可以发起强制升级；
+    # 强制升级以后交回最后一条 work_item_created（重新开始的那一个）
+    system = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [ProviderError("Missing configuration: provider credential",
+                                       reason="provider_unavailable")],
+        "quality": quality_turns("release", "checks passed on the current snapshot"),
+    })
+    project_id = system.projects.register("强制升级", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "被升级打断的事项")
+    system.run_until_stop(run_id)
+    assert system.project(run_id).status not in {"done", "paused", "failed"}
+    system.force_upgrade()
+    created = [event for event in system.store.list_project_events(project_id)
+               if event.type == ProjectEventType.WORK_ITEM_CREATED][-1]
+    return system, project_id, work_item_id, run_id, created
+
+
+def test_a_forced_upgrade_links_the_new_work_item_to_the_old_run(data_dir):
+    # 验收一（工单 #1186）：旧 run 记为因升级停止；新事项的 restarted_from_run_id 指向它，优先级仍是最前
+    system, project_id, work_item_id, run_id, created = _upgrade_system(data_dir)
+    stopped = system.project(run_id)
+    assert (stopped.status, stopped.stop_reason) == ("failed", STOP_REASON_UPGRADE)
+    assert created.payload["restarted_from_run_id"] == run_id
+    assert created.payload["priority"] == PRIORITY_UPGRADE_RESTART
+    new_run_id = created.payload["run_id"]
+    assert new_run_id != run_id
+    new_item = system.projects.projection(project_id).work_item_for_run(new_run_id)
+    assert new_item is not None and new_item.restarted_from_run_id == run_id
+
+
+def test_a_plain_work_item_created_does_not_carry_the_upgrade_field(data_dir):
+    # 验收三（工单 #1186）：没有旧 run 的事项不写这个字段（只增字段：写出来的事件与旧事件同样读得懂）
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("没有升级", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    [created] = [event for event in system.store.list_project_events(project_id)
+                 if event.type == ProjectEventType.WORK_ITEM_CREATED]
+    assert "restarted_from_run_id" not in created.payload
+    assert system.projects.projection(project_id).work_item(work_item_id).restarted_from_run_id is None
+    assert _application(system).query("run.recovery", RunRecovery(run_id=run_id)).data.upgrade is None
+
+
+def test_the_loop_gives_the_stop_reason_and_the_last_department(data_dir):
+    # 验收一（工单 #1186）：project.loop 每个事项带 stop_reason 与 last_department；结束的 run 没有当前部门，
+    # 最后活动的部门按事件找——画面的门口牌子立在最后工作的那个房间
+    system, project_id, work_item_id, run_id, created = _upgrade_system(data_dir)
+    loop = _application(system).query("project.loop", ProjectLoop(project_id=project_id)).data
+    old = next(row for row in loop.work_items if row.run_id == run_id)
+    assert old.stop_reason == STOP_REASON_UPGRADE
+    assert old.department is None
+    # 与事件里的最后一条带部门的事件一致：三个部门同时工作时谁最后激活由调度决定，测试按日志核对
+    last = next(event.department for event in reversed(system.store.list_events(run_id)) if event.department)
+    assert old.last_department == last
+    assert old.last_department in {"product", "engineering", "quality"}
+    new = next(row for row in loop.work_items if row.run_id == created.payload["run_id"])
+    assert new.stop_reason is None
+
+
+def test_run_recovery_gives_the_upgrade_from_the_old_run_and_the_new_run(data_dir):
+    # 验收一（工单 #1186）：旧 run 与从它重新开始的新 run 的 run.recovery 都给同一份关联：
+    # 旧新 run、事件版本、起点（这个项目没有采纳成果与起始文件夹，起点是空树）
+    system, project_id, work_item_id, run_id, created = _upgrade_system(data_dir)
+    new_run_id = created.payload["run_id"]
+    application = _application(system)
+    old = application.query("run.recovery", RunRecovery(run_id=run_id)).data
+    assert old.state == "stopped"
+    assert old.upgrade is not None
+    assert (old.upgrade.stopped_run_id, old.upgrade.new_run_id) == (run_id, new_run_id)
+    assert old.upgrade.stopped_work_item_title == "被升级打断的事项"
+    assert old.upgrade.new_work_item_title == "被升级打断的事项"
+    assert old.upgrade.stopped_run_event_version == RUN_EVENT_VERSION
+    assert old.upgrade.new_run_event_version == RUN_EVENT_VERSION
+    assert old.upgrade.start_point == "empty"
+    new = application.query("run.recovery", RunRecovery(run_id=new_run_id)).data
+    assert new.upgrade is not None
+    assert (new.upgrade.stopped_run_id, new.upgrade.new_run_id) == (run_id, new_run_id)
+    assert new.upgrade.start_point == "empty"
+
+
+def test_the_old_version_run_is_listed_read_only_with_its_events(data_dir):
+    # 验收一（工单 #1186）：恢复页要读的旧 run 只读列表由 work_item.materials 给出，事件照实列出；
+    # 重新开始的新事项没有旧 run
+    system, project_id, work_item_id, run_id, created = _upgrade_system(data_dir)
+    application = _application(system)
+    materials = application.query("work_item.materials",
+                                  WorkItemMaterials(project_id=project_id, work_item=work_item_id)).data
+    [old] = materials.old_runs
+    assert old.run_id == run_id
+    assert old.run_event_version == RUN_EVENT_VERSION
+    assert (old.state, old.stop_reason) == ("stopped", STOP_REASON_UPGRADE)
+    assert any("因 Yudao 升级停止" in event.label for event in old.events), [event.label for event in old.events]
+    assert [event.position for event in old.events] == sorted(event.position for event in old.events)
+    restarted = application.query("work_item.materials", WorkItemMaterials(
+        project_id=project_id, work_item=created.payload["work_item_id"])).data
+    assert restarted.old_runs == []

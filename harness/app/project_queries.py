@@ -383,6 +383,11 @@ class WorkItemLoop(Contract):
     # 恢复观察状态（工单 #18、#747）：运行中、中断、待恢复，以及完成、暂停、取消、停止四种结束方式；
     # run 没有创建时没有
     recovery_state: str | None
+    # 停止原因与最后活动的部门（工单 #1186，设计说明第 4.3 节 2026-10-29 补充）：画面的门口牌子与概览入口读它们。
+    # 停止原因来自所属 run 的停止原因；最后活动的部门取自 run 的最后一条带部门的事件——结束的 run 没有当前部门，
+    # 画面按它把门口牌子立在最后工作的那个房间
+    stop_reason: str | None
+    last_department: str | None
     # 事项的版本：取消事项等命令的基准版本
     version: int
 
@@ -416,13 +421,28 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
             elapsed_sec=None if bounds is None else _elapsed_seconds(bounds, terminal=run, now=at_time),
             time_limit_sec=item.run_time_limit_sec, pending_question=item.pending_question,
             run_id=item.run_id, adoption_id=item.adoption_id,
-            recovery_state=observation, version=item.stream_version,
+            recovery_state=observation, stop_reason=item.stop_reason,
+            last_department=_last_department(store, item, through=through), version=item.stream_version,
         ))
     return Snapshot[ProjectLoopResult](
         position=_snapshot_position(store, through),
         data=ProjectLoopResult(project_id=state.project_id, work_items=rows,
                                adoptions=[_adoption(item) for item in state.adoptions]),
     )
+
+
+def _last_department(store: Any, item: Any, *, through: int | None = None) -> str | None:
+    """最后活动的部门（工单 #1186，设计说明第 4.3 节 2026-10-29 补充）。
+
+    进行中的 run 当前就在这个部门里工作，直接用事项的当前部门；结束的 run 没有当前部门，
+    从它的事件里找最后一条带部门的事件。没有 run、没有事件或事件里都没有部门时为 None。
+    """
+    if item.department is not None:
+        return item.department
+    for event in reversed(store.list_events(item.run_id, through_position=through)):
+        if event.department:
+            return event.department
+    return None
 
 
 def _work_item_progress(run: Any) -> WorkItemProgress | None:
@@ -1558,6 +1578,23 @@ class ProjectMaterial(Contract):
     event_id: str
 
 
+class OldRunEvent(Contract):
+    # 旧 run 的一条事件（只读列表，工单 #1186）：时间与说明。页面上不写事件种类与编号
+    position: int
+    at: str
+    label: str
+
+
+class OldRunView(Contract):
+    # 旧版本的 run（工单 #1186）：这个事项因升级停止的 run，只读列出。事件版本是它创建时记下的
+    # run 事件版本；状态与停止原因来自它自己的投影；事件供恢复页显示「因升级停止」时照实列出，不改写
+    run_id: str
+    run_event_version: int
+    state: str
+    stop_reason: str | None
+    events: list[OldRunEvent]
+
+
 class WorkItemMaterialsResult(Contract):
     work_item_id: str
     run_id: str
@@ -1569,6 +1606,8 @@ class WorkItemMaterialsResult(Contract):
     # 建档各轮的材料（工单 #136，设计第 3.4 节）：按提出顺序列出这个建档事项的每一次候选与确认记录；
     # 普通事项没有建档候选，为空
     onboarding_rounds: list[OnboardingRound]
+    # 旧版本的 run（工单 #1186）：因升级停止的 run 与它的事件，只读；没有时为空
+    old_runs: list[OldRunView]
 
 
 def _work_item_materials(application: Application, request: WorkItemMaterials
@@ -1615,8 +1654,31 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
                 for value in state.materials
             ],
             onboarding_rounds=_onboarding_rounds(application, state, item.work_item_id),
+            old_runs=_old_runs(application, state, item.work_item_id),
         ),
     )
+
+def _old_runs(application: Application, state: Any, work_item_id: str) -> list[OldRunView]:
+    # 旧版本的 run（工单 #1186）：这个事项因升级停止的 run，只读列出。建档事项因升级重新开始时
+    # 同一个事项编号会再登记一条 work_item_created（新 run 在新的一条记录上），普通事项另开一个新事项；
+    # 两种都按事项编号收集，旧 run 的事件照实列出，供恢复页显示「因升级停止」时查看
+    store = application.system.store
+    views: list[OldRunView] = []
+    for entry in state.work_items:
+        if entry.work_item_id != work_item_id:
+            continue
+        run = _optional_run(application, entry.run_id)
+        if run is None or run.stop_reason != STOP_REASON_UPGRADE:
+            continue
+        events = store.list_events(run.run_id)
+        views.append(OldRunView(
+            run_id=run.run_id, run_event_version=run.run_event_version,
+            state=observation_state([], [], status=run.status, stop_reason=run.stop_reason),
+            stop_reason=run.stop_reason,
+            events=[OldRunEvent(position=event.position, at=event.created_at,
+                                label=event_label(event.type, event.payload or {})) for event in events],
+        ))
+    return views
 
 def _onboarding_rounds(application: Application, state: Any,
                        work_item_id: str) -> list[OnboardingRound]:
@@ -2448,7 +2510,10 @@ WORK_ITEM_MATERIALS = QueryDefinition(
                 EventType.ARTIFACT_INVALIDATED,
                 ProjectEventType.MATERIAL_RECORDED, ProjectEventType.INITIAL_PRD_PROPOSED,
                 ProjectEventType.PROJECT_DECISION_REQUESTED, ProjectEventType.PROJECT_DECISION_ANSWERED,
-                ProjectEventType.PROJECT_DECISION_WITHDRAWN),
+                ProjectEventType.PROJECT_DECISION_WITHDRAWN,
+                # 旧版本的 run（工单 #1186）：因升级重新开始时同一个建档事项再登记一条事项记录（新 run），
+                # 旧 run 停止时它的状态随之写下
+                ProjectEventType.WORK_ITEM_CREATED, EventType.RUN_FAILED),
 )
 
 DELIVERY_FILE = QueryDefinition(
@@ -2599,6 +2664,22 @@ class UnusableTarget(Contract):
     model: str | None
     problem: str
 
+class RecoveryUpgrade(Contract):
+    # 因升级停止的新旧 run 关联（工单 #1186，设计说明第 4.3 节 2026-10-29 补充）：旧 run 记为因升级停止，
+    # 对应的事项用项目的起点重新开始。旧 run 与从它重新开始的新 run 两边的 run.recovery 都给同一份关联：
+    # 页面在旧 run 上写「因升级停止」，同时看得到重新开始的新 run。
+    # 事件版本是 run_created 记下的 run 事件版本（ADR-0019）；起点是重新开始的那条：采纳成果、
+    # 起始文件夹快照或空树。新 run 还没有建立时它为空，起点也为空
+    stopped_run_id: str
+    stopped_work_item_id: str | None
+    stopped_work_item_title: str | None
+    stopped_run_event_version: int
+    new_run_id: str | None
+    new_work_item_id: str | None
+    new_work_item_title: str | None
+    new_run_event_version: int | None
+    start_point: Literal["adoption", "initial_snapshot", "empty"] | None
+
 class RunRecoveryResult(Contract):
     # 一个事项的恢复观察（设计说明第 4.3 节）：恢复观察状态、待恢复原因、最后已确认位置、
     # 未完成动作、核实记录、下一项合法操作、继续执行是否可用及原因、限额、执行所有权与迟到结果。
@@ -2622,6 +2703,8 @@ class RunRecoveryResult(Contract):
     sessions: list[RecoverySession]
     owner: RecoveryOwner | None
     late_results: list[LateResult]
+    # 因升级停止的新旧 run 关联（工单 #1186）；这个 run 不是因升级停止、也不是从旧 run 重新开始的，为空
+    upgrade: RecoveryUpgrade | None
 
 # 一个事项的恢复观察状态对应的下一项合法操作（v8 设计说明第 7.2 节）
 _NEXT_ACTION = {
@@ -2677,8 +2760,62 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
             # StaleExecutionRight），被拒的写入不落盘，因此 3.1 没有迟到结果可列。远程执行代理上的迟到回执
             # 由 3.2C 在 run.actions 上补齐
             late_results=[],
+            upgrade=_recovery_upgrade(application, run),
         ),
     )
+
+def _recovery_upgrade(application: Application, run: Any) -> RecoveryUpgrade | None:
+    # 因升级停止的新旧 run 关联（工单 #1186）：这个 run 自己是被强制升级停下的旧 run，或者它是从某个旧 run
+    # 重新开始的新 run，两种都给同一份关联。旧 run 的新 run 从项目流的事项记录里找（work_item_created 的
+    # restarted_from_run_id）；新 run 的旧 run 由事项记录自己写下的字段给出。不是升级的情形为空
+    if run.project_id is None:
+        return None
+    state = _project(application, run.project_id, include_history=False)
+    items = {item.run_id: item for item in state.work_items}
+    item = items.get(run.run_id)
+    if item is not None and item.restarted_from_run_id:
+        stopped = _optional_run(application, item.restarted_from_run_id)
+        if stopped is None:
+            return None
+        stopped_item = items.get(stopped.run_id)
+        return RecoveryUpgrade(
+            stopped_run_id=stopped.run_id, stopped_work_item_id=stopped.work_item_id,
+            stopped_work_item_title=None if stopped_item is None else stopped_item.title,
+            stopped_run_event_version=stopped.run_event_version,
+            new_run_id=run.run_id, new_work_item_id=item.work_item_id, new_work_item_title=item.title,
+            new_run_event_version=run.run_event_version, start_point=_upgrade_start_point(item),
+        )
+    if run.stop_reason != STOP_REASON_UPGRADE:
+        return None
+    stopped_item = items.get(run.run_id)
+    new_item = next((entry for entry in state.work_items if entry.restarted_from_run_id == run.run_id), None)
+    if new_item is None:
+        # 重新开始的新事项没有建立：旧 run 仍列出，起点与新 run 为空
+        return RecoveryUpgrade(
+            stopped_run_id=run.run_id, stopped_work_item_id=run.work_item_id,
+            stopped_work_item_title=None if stopped_item is None else stopped_item.title,
+            stopped_run_event_version=run.run_event_version,
+            new_run_id=None, new_work_item_id=None, new_work_item_title=None, new_run_event_version=None,
+            start_point=None,
+        )
+    new_run = _optional_run(application, new_item.run_id)
+    return RecoveryUpgrade(
+        stopped_run_id=run.run_id, stopped_work_item_id=run.work_item_id,
+        stopped_work_item_title=None if stopped_item is None else stopped_item.title,
+        stopped_run_event_version=run.run_event_version,
+        new_run_id=new_item.run_id, new_work_item_id=new_item.work_item_id, new_work_item_title=new_item.title,
+        new_run_event_version=None if new_run is None else new_run.run_event_version,
+        start_point=_upgrade_start_point(new_item),
+    )
+
+def _upgrade_start_point(item: Any) -> str:
+    # 因升级重新开始时的起点（设计说明第 4.3 节、项目的起始文件夹设计说明第 2 节）：有采纳成果时是采纳成果，
+    # 其次是起始文件夹快照，都没有时是空树。与事项的起点按同一个顺序取
+    if item.baseline is not None:
+        return "adoption"
+    if item.snapshot is not None:
+        return "initial_snapshot"
+    return "empty"
 
 def _event_text(event: Any) -> str | None:
     # 一条事件给用户看的文字（与应用层事件流里的说明同一份，工单 #181）：最后已确认的位置与中断位置
@@ -2893,7 +3030,10 @@ RUN_RECOVERY = QueryDefinition(
     changed_by=(EventType.RUN_RESUMED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
                 EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
                 EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
-                EventType.DECISION_WITHDRAWN, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
+                EventType.DECISION_WITHDRAWN, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED,
+                # 因升级停止的新旧 run 关联（工单 #1186）：旧 run 的新 run 由事项记录给出，新 run 的事件版本取自
+                # 它的 run_created；两者都改变这份关联
+                ProjectEventType.WORK_ITEM_CREATED, EventType.RUN_CREATED),
     unchanged_by=(
         UnchangedEvent(EventType.MODEL_REQUESTED,
                        "模型请求只改变恢复页上的已用模型步数与各会话的模型步骤；那是进度读数，与已用秒数同类（工单 #891）"),
