@@ -43,7 +43,7 @@ from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
                                  event_call_target)
 from .recording import StepRecorder
-from .tools import in_force, proposal_kind, tool_action, tool_kind
+from .tools import in_force, proposal_kind, tool_action, tool_cancellable, tool_kind, tool_verification
 from .validation import PRD_REVISION_FIELDS, AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 
@@ -548,6 +548,7 @@ class StepDriver:
                 after_snapshot = None
                 qa_tests_saved = None
                 deferred = False
+                refusal: str | None = None
                 try:
                     args = json.loads(raw_args)
                     if not isinstance(args, dict):
@@ -567,7 +568,11 @@ class StepDriver:
                                    "Not executed because the current activation can no longer start tools.")
                         return RoundResult(version=self._version)
                     if not permission.allowed:
-                        ok, output, error = False, None, permission.reason
+                        # 工具许可拒绝：动作不交给执行环境，回执带被拒绝标记与原因，结果照常记录（总图第四节「动作」缝）
+                        receipt = ActionReceipt.refusal(f"{request.activation_id}:{step_id}:{identity}",
+                                                        permission.reason)
+                        ok, output, error = receipt.ok, receipt.output, receipt.error
+                        refusal = receipt.refused_reason
                         deferred = permission.deferred
                     elif name == "ask":
                         ask_call = {
@@ -626,6 +631,8 @@ class StepDriver:
                                 action_id=f"{request.activation_id}:{step_id}:{identity}",
                                 kind=tool_action(name, definitions=self._definitions),
                                 tool=name, department=request.department, input=args,
+                                verification=tool_verification(name, definitions=self._definitions),
+                                cancellable=tool_cancellable(name, definitions=self._definitions),
                                 preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                             ))
                         except UnrepresentableWorkspace as exc:
@@ -638,8 +645,12 @@ class StepDriver:
                         except UnrepresentableWorkspace:
                             after_snapshot = None
                         qa_tests_saved = self._save_qa_tests_if_changed(request)
-                input_item = {"type": "function_call_output", "call_id": identity,
-                              "output": json_dumps({"ok": ok, "output": output, "error": error})}
+                # 工具结果与回执的字段相同；被拒绝的结果另带被拒绝标记与原因，其余结果保持原来的三项
+                result = {"ok": ok, "output": output, "error": error}
+                if refusal is not None:
+                    result["refused"] = True
+                    result["refused_reason"] = refusal
+                input_item = {"type": "function_call_output", "call_id": identity, "output": json_dumps(result)}
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
                 self._recorder.tool_called(request, call, after_snapshot=after_snapshot, qa_tests_saved=qa_tests_saved)
@@ -774,6 +785,8 @@ class StepDriver:
                     action_id=f"{request.activation_id}:recovered:{identity}",
                     kind=tool_action(name, definitions=self._definitions),
                     tool=name, department=request.department, input=args,
+                    verification=tool_verification(name, definitions=self._definitions),
+                    cancellable=tool_cancellable(name, definitions=self._definitions),
                     preconditions=Preconditions(tree_digest=None if facts.tree is None else facts.tree.digest),
                 ))
                 ok, output, error = receipt.ok, receipt.output, receipt.error

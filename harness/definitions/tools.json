@@ -2,6 +2,8 @@
   "read_file": {
     "kind": "environment",
     "action": "read",
+    "verification": "none",
+    "cancellable": true,
     "description": "Return the entire content of one public workspace file as a single UTF-8 string, without line numbers or truncation. Files that are not valid UTF-8 are rejected. Paths under .checks are host-private. Use read_range for large files, or when you need line numbers and the content_hash that edit_range checks.",
     "parameters": {
       "type": "object",
@@ -20,6 +22,8 @@
   "list_files": {
     "kind": "environment",
     "action": "read",
+    "verification": "none",
+    "cancellable": true,
     "description": "List every file in the public workspace tree, recursively, as workspace-relative paths. prefix filters by plain string prefix on those paths: \"src/\" keeps only the src directory, while \"src\" also keeps paths such as \"src2/a.py\". Paths under .checks are never listed.",
     "parameters": {
       "type": "object",
@@ -35,6 +39,8 @@
   "search": {
     "kind": "environment",
     "action": "read",
+    "verification": "none",
+    "cancellable": true,
     "description": "Search public workspace files with a Python re regex. Returns path, 1-based line and snippet per match with the snapshot digest. Large results are truncated with next_cursor.",
     "parameters": {
       "type": "object",
@@ -74,6 +80,8 @@
   "read_range": {
     "kind": "environment",
     "action": "read",
+    "verification": "none",
+    "cancellable": true,
     "description": "Read a line range of one public workspace file. Returns path, start_line, end_line, total_lines, the snapshot digest and the file content_hash. Truncated output carries next_cursor.",
     "parameters": {
       "type": "object",
@@ -111,6 +119,8 @@
   "write_file": {
     "kind": "environment",
     "action": "write",
+    "verification": "snapshot",
+    "cancellable": true,
     "description": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
     "parameters": {
       "type": "object",
@@ -134,6 +144,8 @@
   "edit_range": {
     "kind": "environment",
     "action": "write",
+    "verification": "snapshot",
+    "cancellable": true,
     "description": "Replace an exact original text inside one public workspace file. Engineering only. The text is located by content: when expected_text occurs exactly once in the file it is replaced wherever it is, so the line numbers may be stale; when it occurs more than once, start_line picks the occurrence starting on that line. expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
     "parameters": {
       "type": "object",
@@ -177,6 +189,8 @@
   "delete_file": {
     "kind": "environment",
     "action": "write",
+    "verification": "snapshot",
+    "cancellable": true,
     "description": "Delete one existing regular workspace file. Engineering only; requires a reason. Directories and links are rejected.",
     "parameters": {
       "type": "object",
@@ -199,6 +213,8 @@
   "move_file": {
     "kind": "environment",
     "action": "write",
+    "verification": "snapshot",
+    "cancellable": true,
     "description": "Move one existing regular workspace file without overwriting. Engineering only; requires a reason. Directories and links are rejected.",
     "parameters": {
       "type": "object",
@@ -225,6 +241,8 @@
   "run_check": {
     "kind": "environment",
     "action": "check",
+    "verification": "query",
+    "cancellable": true,
     "description": "Host-executes a check in a fresh copy of the checked snapshot and records exit_code, summary, and snapshot hash. The command string runs with bash at the copy root, in a new process with the Yudao process's full environment; the copy is deleted when the check finishes. Do not self-report exit_code. command example: \"uv run pytest tests\". timeout_sec is optional: when omitted it is the default; a larger value is applied at the maximum (both are rule-registered defaults). Only run_check receipts count as check evidence; bash results are action receipts.",
     "parameters": {
       "type": "object",
@@ -255,6 +273,8 @@
   "bash": {
     "kind": "environment",
     "action": "command",
+    "verification": "none",
+    "cancellable": true,
     "description": "Run one arbitrary shell command string with bash in this session's workspace and get the host-observed exit status, output, and whether the process was stopped. Each call is a new process with no shell state; the workspace root is the working directory. The process inherits the Yudao process's full environment, and output replaces the value of any known secret with its name. On timeout or cancellation the whole process tree is stopped and the receipt says so, with the output received until then. Output exceeding the limit is truncated with a job_id; use read_output to retrieve the remaining output. Background commands (background=true) return immediately with a job_id. A bash result is an action receipt, not a check receipt: it cannot be listed in submit_delivery check_names; run the checks a delivery needs with run_check.",
     "parameters": {
       "type": "object",
@@ -285,6 +305,8 @@
   "read_output": {
     "kind": "environment",
     "action": "command",
+    "verification": "none",
+    "cancellable": true,
     "description": "Read new output produced since the last read for a background command or a truncated command. Returns the output chunk, status (running, exited, stopped, ended), and exit_code.",
     "parameters": {
       "type": "object",
@@ -303,6 +325,8 @@
   "stop_job": {
     "kind": "environment",
     "action": "command",
+    "verification": "none",
+    "cancellable": true,
     "description": "Stop a running background command and its entire process tree. Returns receipt stating the process tree was stopped.",
     "parameters": {
       "type": "object",
