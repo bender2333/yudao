@@ -1,4 +1,15 @@
 {
+  "provider.model_test_timeout_sec": {
+    "value": 60,
+    "bounds": [10, 300],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "模型测试请求长时间没有回应",
+    "cost": "较慢的模型需要重新测试或提高等待上限",
+    "relax_when": "正常的最小问答与工具往返经常超过当前等待上限",
+    "tighten_when": "失败的模型请求长期等待且没有得到有效回应",
+    "origin": "docs/design/model-management.md 第 4.3 节「模型测试」：每次请求默认 60 秒，范围 10 至 300 秒"
+  },
   "run_time_limit_sec": {
     "value": 7200,
     "bounds": [600, 86400],

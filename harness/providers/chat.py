@@ -463,10 +463,12 @@ def _chat_output(text: str, tool_calls: dict[str, dict[str, Any]]) -> list[dict[
             "content": [{"type": "output_text", "text": text}],
         })
     for index, call in sorted(tool_calls.items(), key=lambda item: item[0]):
+        if not call["id"]:
+            raise ProviderError("Tool call is missing its identifier", reason="provider_protocol")
         output.append({
-            "id": call["id"] or f"chat-call-{index}",
+            "id": call["id"],
             "type": "function_call",
-            "call_id": call["id"] or f"chat-call-{index}",
+            "call_id": call["id"],
             "name": call["name"],
             "arguments": call["arguments"] or "{}",
         })
