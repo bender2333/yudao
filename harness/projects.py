@@ -578,26 +578,46 @@ class ProjectService:
             self._starting[project_id].discard(token)
         return item
 
-    def set_parameter(self, project_id: str, name: str, value: Any, *, reason: str, modified_by: str,
-                      command: Command | None = None) -> None:
+    def set_parameter(self, project_id: str, name: str, value: Any, *, reason: str,
+                      modified_by: str | None = None, base_version: str | None = None,
+                      expected_change_id: str | None = None,
+                      command: Command | None = None) -> str:
         # 设置项目级参数（迭代底座 B3，工单 #351）：只有检查时限与建档单轮上限可以按项目设置，
-        # 取值按全局的界限核对；事件写进项目流，只作用于之后创建的 run
+        # 取值按全局的界限核对；事件写进项目流，只作用于之后创建的 run。
+        # 提出者以认证身份为准（工单 #1262）：经命令进来时取命令的提出者；基准版本按这个项目有效参数的
+        # 版本（全局现值加项目覆盖的内容摘要，设计说明第 3 节第 2 条）核对；expected_change_id 的撤回
+        # 在同一事务核对它仍是这个参数最近的项目级修改。返回这次修改以后的项目有效参数版本
         from . import parameters as parameter_values
 
         _require_text("reason", reason)
-        _require_text("modified_by", modified_by)
+        actor = command.actor if command is not None else modified_by
+        if not actor:
+            raise ValueError("set_parameter requires the authenticated actor (modified_by) without a command")
         new_value = parameter_values.check_project_parameter(name, value)
-        old_value = parameter_values.value_for_project(self.store, project_id, name)
 
-        def set_parameter(transaction: Transaction) -> None:
+        def set_parameter(transaction: Transaction) -> str:
+            # 基准版本与撤回的最近修改身份在同一写事务里核对（工单 #1262）：按事务开始时读到的
+            # 全局现值与项目覆盖算，事务里追加的事件之后才生效；另一方的写入已经提交时这次提交
+            # 因流版本不符被拒绝，不重新判断、不写事件
+            global_values = parameter_values.current_values(self.store)
+            overrides = parameter_values.project_values(self.store, project_id)
+            effective = parameter_values.parameters_version({**global_values, **overrides})
+            if base_version is not None and base_version != effective:
+                raise parameter_values.ParameterStaleError(effective)
+            if expected_change_id is not None:
+                latest = parameter_values.last_project_parameter_change_id(self.store, project_id, name)
+                if latest != expected_change_id:
+                    raise parameter_values.ParameterStaleError(effective)
+            old_value = overrides.get(name, global_values[name])
             self._writable_in(transaction, project_id)
             transaction.append(NewProjectEvent(ProjectEventType.PARAMETER_SET, {
                 "name": name, "old_value": old_value, "new_value": new_value,
-                "reason": reason, "modified_by": modified_by,
+                "reason": reason, "modified_by": actor, "expected_change_id": expected_change_id,
                 "bounds": list(DEFINITIONS.rule(name).bounds),
-            }, actor=modified_by))
+            }, actor=actor))
+            return effective
 
-        self.writes.transact(project_stream(project_id), set_parameter, command=command)
+        return self.writes.transact(project_stream(project_id), set_parameter, command=command)
 
     def rename(self, project_id: str, name: str, *, command: Command | None = None) -> None:
         _require_text("name", name)

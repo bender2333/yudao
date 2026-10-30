@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from ..definitions import DEFINITIONS
 from ..models import CatalogEventType, EventType
-from ..parameters import current_values, history, not_wired_reason, wired
+from ..parameters import current_values, current_version, history, not_wired_reason, wired
 from .contracts import Contract, Snapshot
 from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, check_position
@@ -33,6 +33,9 @@ class RuleEntry(Contract):
     # 价值类型与界限类型：kind 为 structure 的条目现值是发布时的默认取值，取值范围由候选与用户批准保证
     name: str
     value: Any
+    # 默认值：定义里的初值（Rule.value）。参数被修改过时现值 value 可能不同于默认值；
+    # structure 条目与从未修改的参数两者相同（工单 #1262，设计说明第 2 节「登记照着实现」）
+    default_value: Any
     bounds: list[Any]
     kind: Literal["parameter", "structure"]
     form: Literal["permission", "boundary", "admission"]
@@ -53,9 +56,12 @@ class RuleEntry(Contract):
 
 class RuleRegistry(Contract):
     # 全部条目按名称排列；definitions_version 指出这批条目出自哪一版的定义，
-    # 读取历史位置时给出当时生效的定义版本，查询结果里不混入现在才有的条目
+    # 读取历史位置时给出当时生效的定义版本，查询结果里不混入现在才有的条目。
+    # parameters_version 是当前全局参数版本（全部参数现值的内容摘要，设计说明第 4.3 节）：
+    # 页面把它作为 parameter.set 与 parameter.withdraw 的基准版本 base_version 提交（工单 #1262）
     rules: list[RuleEntry]
     definitions_version: str
+    parameters_version: str
 
 
 class RulesRegistryRequest(ReplayRequest):
@@ -67,7 +73,8 @@ def _rules_registry(application: Application, request: RulesRegistryRequest) -> 
     store = application.system.store
     # 参数现值与修改历史由参数事件折叠（工单 #349）：登记里的 value 是参数的现值（目录流事件折叠的结果），
     # changes 是它的全部修改记录；structure 条目与从未修改的参数没有修改记录。
-    # 按位置读取只核对 at 不超过日志末尾，返回的登记是当前这一版定义与当前参数事件的内容
+    # default_value 取定义条目自己的初值（Rule.value，工单 #1262）：不改变定义格式或规则登记文件结构，
+    # 定义改版时默认值跟着定义走。按位置读取只核对 at 不超过日志末尾，返回当前定义与当前参数事件的内容
     check_position(application, request.at)
 
     values = current_values(store)
@@ -81,7 +88,8 @@ def _rules_registry(application: Application, request: RulesRegistryRequest) -> 
     definitions = DEFINITIONS
     entries = [
         RuleEntry(
-            name=name, value=values.get(name, rule.value), bounds=list(rule.bounds), kind=rule.kind,
+            name=name, value=values.get(name, rule.value), default_value=rule.value, bounds=list(rule.bounds),
+            kind=rule.kind,
             form=rule.form, wired=wired(name), not_wired_reason=not_wired_reason(name),
             guards=rule.guards, cost=rule.cost, relax_when=rule.relax_when,
             tighten_when=rule.tighten_when, origin=rule.origin, changes=by_name.get(name, []),
@@ -90,7 +98,8 @@ def _rules_registry(application: Application, request: RulesRegistryRequest) -> 
     ]
     return Snapshot[RuleRegistry](
         position=store.end_position(),
-        data=RuleRegistry(rules=entries, definitions_version=definitions.version),
+        data=RuleRegistry(rules=entries, definitions_version=definitions.version,
+                          parameters_version=current_version(store)),
     )
 
 

@@ -1513,6 +1513,8 @@ class ParameterSetPayload(Payload):
     # 这次修改所依据的界限：修改以后界面仍能显示可调整范围
     bounds: list[Any]
     parameters_version: str
+    # 撤回时目标修改记录的稳定身份（工单 #1262）：普通修改没有这个字段；读取方不依赖它，只为事件留痕
+    expected_change_id: str | None = None
 
 
 class InstanceUpgradeReport(Payload):
@@ -1565,6 +1567,8 @@ class ProjectParameterSetPayload(Payload):
     modified_by: str
     # 这次修改所依据的界限：修改以后界面仍能显示可调整范围
     bounds: list[Any]
+    # 撤回时目标修改记录的稳定身份（工单 #1262）：普通修改没有这个字段；读取方不依赖它，只为事件留痕
+    expected_change_id: str | None = None
 
 
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷

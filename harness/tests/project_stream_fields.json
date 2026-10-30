@@ -86,6 +86,7 @@
     },
     "project_parameter_set": {
       "bounds": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有修改所依据的界限，读取时按规则登记中该条目的界限",
+      "expected_change_id": "旧事件没有这个字段（#1262）：撤回时目标修改记录的稳定身份；普通修改与旧事件都没有，读取方不依赖它，只为事件留痕",
       "modified_by": "这个事件种类是新增的，旧版本的项目流中没有它：项目级参数出现之前没有按项目修改参数的记录",
       "name": "这个事件种类是新增的，旧版本的项目流中没有它：参数名取自目录流的 parameter_set 事件",
       "new_value": "这个事件种类是新增的，旧版本的项目流中没有它：没有项目级取值时这个参数按全局的当前值生效",
@@ -364,6 +365,7 @@
     },
     "project_parameter_set": {
       "bounds": "array[any]",
+      "expected_change_id": "string?",
       "modified_by": "string",
       "name": "string",
       "new_value": "any",

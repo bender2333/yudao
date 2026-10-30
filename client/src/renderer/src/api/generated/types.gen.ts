@@ -3415,7 +3415,7 @@ export type ParameterSet = {
     /**
      * Base Version
      */
-    base_version?: number | null;
+    base_version?: string | null;
     /**
      * Name
      */
@@ -3431,7 +3431,45 @@ export type ParameterSet = {
     /**
      * Modified By
      */
-    modified_by: string;
+    modified_by?: string | null;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+    /**
+     * Expected Change Id
+     */
+    expected_change_id?: string | null;
+};
+
+/**
+ * ParameterWithdraw
+ */
+export type ParameterWithdraw = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version?: string | null;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Expected Change Id
+     */
+    expected_change_id: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Modified By
+     */
+    modified_by?: string | null;
     /**
      * Project Id
      */
@@ -3878,6 +3916,10 @@ export type ProjectSettingsResult = {
     department_reminders: {
         [key: string]: Array<string>;
     };
+    /**
+     * Effective Parameters Version
+     */
+    effective_parameters_version?: string;
 };
 
 /**
@@ -4117,7 +4159,7 @@ export type Rejected = {
     /**
      * Current Version
      */
-    current_version?: number | null;
+    current_version?: number | string | null;
 };
 
 /**
@@ -4407,6 +4449,10 @@ export type RuleEntry = {
      */
     value: unknown;
     /**
+     * Default Value
+     */
+    default_value: unknown;
+    /**
      * Bounds
      */
     bounds: Array<unknown>;
@@ -4464,6 +4510,10 @@ export type RuleRegistry = {
      * Definitions Version
      */
     definitions_version: string;
+    /**
+     * Parameters Version
+     */
+    parameters_version: string;
 };
 
 /**
@@ -12409,6 +12459,10 @@ export type ParameterSetPayload = {
      * Parameters Version
      */
     parameters_version: string;
+    /**
+     * Expected Change Id
+     */
+    expected_change_id?: string | null;
 };
 
 /**
@@ -13148,6 +13202,10 @@ export type ProjectParameterSetPayload = {
      * Bounds
      */
     bounds: Array<unknown>;
+    /**
+     * Expected Change Id
+     */
+    expected_change_id?: string | null;
 };
 
 /**
@@ -18550,7 +18608,7 @@ export type CommandParameterSetData = {
 
 export type CommandParameterSetErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, stale_base, command_id_reused
      */
     409: Rejected;
     /**
@@ -18569,6 +18627,35 @@ export type CommandParameterSetResponses = {
 };
 
 export type CommandParameterSetResponse = CommandParameterSetResponses[keyof CommandParameterSetResponses];
+
+export type CommandParameterWithdrawData = {
+    body: ParameterWithdraw;
+    path?: never;
+    query?: never;
+    url: '/api/commands/parameter.withdraw';
+};
+
+export type CommandParameterWithdrawErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, stale_base, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandParameterWithdrawError = CommandParameterWithdrawErrors[keyof CommandParameterWithdrawErrors];
+
+export type CommandParameterWithdrawResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandParameterWithdrawResponse = CommandParameterWithdrawResponses[keyof CommandParameterWithdrawResponses];
 
 export type QuerySystemStatusData = {
     body?: never;

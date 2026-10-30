@@ -96,7 +96,8 @@ def test_project_check_timeout_applies_to_runs_created_afterwards(data_dir):
         payload = event.payload
         assert payload["name"] == "check_timeout_sec"
         assert (payload["old_value"], payload["new_value"]) == (600, 120)
-        assert (payload["reason"], payload["modified_by"]) == ("这个项目的检查跑得快", "user:test")
+        # 旧请求的 modified_by 仍被接受，事件里的提出者与历史以认证身份为准（工单 #1262）
+        assert (payload["reason"], payload["modified_by"]) == ("这个项目的检查跑得快", "user:local")
         assert payload["bounds"] == [1, 86400]
         assert _global_parameter_events(opened) == []
 
