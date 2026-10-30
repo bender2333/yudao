@@ -1,72 +1,44 @@
-// 模型管理页（原型 v8 设计说明第 9.1 节与模型管理设计说明第 9.1 节，工单 #93）。
-// 页面读取两个视图：catalog（连接、模型访问定义、准入与部门默认）与 catalog.document（编辑 JSON）。
-// 命令经 app.command 提交；两种测试与候选采集的结果内容在事件里，页面订阅事件取回。
-// 显示与判断都在 model-logic.ts 与 form.tsx 里，这个文件负责取数、提交与把结果放回界面。
+// 模型管理页（工单 #1297；模型管理设计说明第 9.1 节，原型 docs/prototypes/v14）。
+// 页面按「连接服务 → 搜索筛选候选 → 勾选模型即补全参数并验证 → 部门使用」的单页流程组织。
+// 页面只读写服务端交付的命令与查询：连接与取候选用 catalog.connect 与 catalog.candidates.collect，
+// 选用用 catalog.model.select，取消选用用 catalog.model.remove，部门使用用 catalog.department_defaults.save，
+// 高级部分用 catalog.document.save 与 catalog.reload。
+// 客户端不预填参数、不判断准入：协议、窗口、输出上限与准入都按服务端的值显示（工单正文第 1 条）。
+// 反馈的位置：每个操作的进度、成功与失败写在被操作的对象旁边（连接卡片、模型的那一行、部门使用的那一项）。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CommandOutcome } from "../../contract/invoke";
 import { newCommandId } from "../../contract/command-id.ts";
 import { commandProblemText } from "../../contract/command-problem.ts";
-import { optionalRead, readFailureText } from "../../contract/read-failure.ts";
+import { readFailureText } from "../../contract/read-failure.ts";
 import type { ViewSync } from "../../contract/view-sync";
-import type {
-  Catalog,
-  CatalogCredential,
-  CatalogDocument,
-  ChangeImpact,
-  EventObject,
-} from "../../api/generated/types.gen";
-import { JsonDialog } from "./json-dialog";
-import { credentialText, ProviderForm } from "./form";
-import { Block, Icon, PageHead, StatusMark } from "../../shell/kit";
+import type { Catalog, CatalogDocument, EventObject } from "../../api/generated/types.gen";
+import { JsonDialog, type EditableDocument } from "./json-dialog";
+import { Advanced, type ConnectionDraft, type ModelDraft } from "./advanced";
+import { CandidateList, type CandidateStatus } from "./candidate-list";
+import { ConnectCard, type ConnectStatus, type ConnectTarget } from "./connect-card";
+import { DepartmentUsage, type DepartmentStatus } from "./department-usage";
+import { SelectionPanel, type SelectionStatus } from "./selection-panel";
+import { Block, PageHead } from "../../shell/kit";
 import {
-  CONFIG_STATE_LABELS,
-  DEPARTMENT_LABELS,
-  DOTENV_KEY_EXAMPLE,
-  DOTENV_KEY_RULE,
-  PREFILL_SOURCE_LABELS,
-  PROTOCOL_LABELS,
-  STALE_ADMISSION_LABEL,
-  admissionLabel,
-  admissionOf,
-  admissionSummary,
+  FIRST_BATCH,
+  MORE_BATCH,
   admittedModels,
-  canJoinCandidates,
-  candidateToRow,
-  capacityIssueText,
-  collectCandidatesAction,
-  collectImpact,
-  confirmImpactText,
-  credentialRefIssue,
-  credentialSaveDisabledReason,
-  credentialSavedText,
-  credentialStatusLabel,
-  emptyFormState,
-  formDocumentValid,
-  formStateFromProvider,
+  candidateKey,
+  candidateRowsOf,
+  capacityInputIssue,
+  departmentBindings,
+  departmentTierBindings,
+  departmentsOf,
+  filterCandidates,
+  groupAdmittedModels,
   intFromInput,
-  modelRemoveReferrers,
-  numberToText,
-  prefillModel,
-  presetById,
-  providerDeleteConfirmation,
-  providerInputFromForm,
-  rowFromCandidate,
-  rowFromManual,
-  rowToModelInput,
-  rowsSavable,
-  sanitizeModelId,
-  saveSuccessText,
-  testKeyOf,
-  testText,
-  tierOptions,
-  type CandidateCustomCapacity,
-  type CandidateState,
-  type FormState,
-  type ModelImpact,
-  type ModelOption,
-  type ServicePreset,
-  type UpstreamCandidate,
+  modelInputOf,
+  removalRejectionText,
+  selectedModelRows,
+  type BindingInput,
+  type CandidateFilterId,
+  type CandidateRow,
 } from "./model-logic";
 
 export type ModelManagementPageProps = {
@@ -77,101 +49,48 @@ export type ModelManagementPageProps = {
   onBack: () => void;
 };
 
-// 提交结果：命令被接受或按原因拒绝，两者都在界面上说明
-type SubmitResult = { ok: boolean; message: string };
-
-const DEPARTMENTS = ["product", "engineering", "quality"] as const;
+// 一次保存部门默认要写的三项
 
 export function ModelManagementPage(props: ModelManagementPageProps) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [document, setDocument] = useState<CatalogDocument | null>(null);
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [form, setForm] = useState<{ mode: "add" | "edit"; state: FormState } | null>(null);
-  const [candidates, setCandidates] = useState<Record<string, CandidateState>>({});
-  const [selectedCandidates, setSelectedCandidates] = useState<Record<string, Record<string, boolean>>>({});
-  const [candidateCapacity, setCandidateCapacity] = useState<Record<string, Record<string, CandidateCustomCapacity>>>({});
-  const [collecting, setCollecting] = useState<string | null>(null);
-  // 点「获取模型列表」以后页面给的说明：连接没有保存时说明先保存什么、为什么（工单 #843）
-  const [collectNotice, setCollectNotice] = useState("");
-  const [testing, setTesting] = useState<Record<string, boolean>>({});
-  const [tests, setTests] = useState<Record<string, string>>({});
-  const [formStatus, setFormStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [editingDefaults, setEditingDefaults] = useState<Record<string, { modelId: string; tier: string }>>({});
-  const [defaultsStatus, setDefaultsStatus] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
-  const [jsonOpen, setJsonOpen] = useState(false);
-  const [notice, setNotice] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
-  // 目录与目录文档读取失败时的原因（工单 #776）：读不出来时说读不出来，
-  // 不停在「正在读取目录…」，也不让用户在空文档上按保存
   const [catalogError, setCatalogError] = useState<string | null>(null);
   const [documentError, setDocumentError] = useState<string | null>(null);
-  // 保存会作废准入的修改之前的影响列表，与删除时的一并删除清单（设计说明第 4.4、4.5 节，工单 #94）：
-  // 由应用层查询 catalog.change_impact 算出，界面按它弹确认框与列出引用方
-  const [saveImpact, setSaveImpact] = useState<ModelImpact | null>(null);
-  const [deleteImpact, setDeleteImpact] = useState<ModelImpact | null>(null);
-  const [pendingSave, setPendingSave] = useState<{ body: Record<string, unknown>; state: FormState; secret: string; persist: boolean } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [target, setTarget] = useState<ConnectTarget | null>(null);
+  const [address, setAddress] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [connecting, setConnecting] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [connectStatus, setConnectStatus] = useState<Record<string, ConnectStatus>>({});
+  const [candidateStatus, setCandidateStatus] = useState<Record<string, CandidateStatus>>({});
+  const [selectionStatus, setSelectionStatus] = useState<Record<string, SelectionStatus>>({});
+  const [departmentStatus, setDepartmentStatus] = useState<Record<string, DepartmentStatus>>({});
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<CandidateFilterId>("auto");
+  const [limit, setLimit] = useState(FIRST_BATCH);
+  const [capacity, setCapacity] = useState<Record<string, { context_window: string; max_output_tokens: string }>>({});
+  const [manualOpen, setManualOpen] = useState(false);
+  const [manualModel, setManualModel] = useState("");
+  const [manualProvider, setManualProvider] = useState("");
+  const [tests, setTests] = useState<Record<string, { elapsed_ms: number; actual_model: string | null }>>({});
+  const [jsonOpen, setJsonOpen] = useState(false);
+  // 页面级提示：只用于整页的事（目录文件的重新读取）
+  const [pageNotice, setPageNotice] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
 
-  const views = props.views;
   const catalogRef = useRef<Catalog | null>(null);
+  const views = props.views;
+  // 还没有任何连接时表单直接展开：第一次连接不用先点「添加服务」
+  const formOpened = useRef(false);
 
-  const presets = useMemo(
-    () => (catalog?.presets.presets ?? []) as unknown as ServicePreset[],
-    [catalog],
-  );
-  // 部门默认与项目设置的选项：按连接分组的已准入定义（第 9.1 节）
-  const choices = useMemo(
-    () => (catalog ? admittedModels(catalog.models, catalog.providers, catalog.admissions) : []),
-    [catalog],
-  );
-  const [pageCredRef, setPageCredRef] = useState("");
-  const [pageCredSecret, setPageCredSecret] = useState("");
-  const [pageCredPersist, setPageCredPersist] = useState(false);
-  // 写入 .env 的键名规则与「保存凭据」缺的那一项（工单 #1158）
-  const pageCredIssue = credentialRefIssue(pageCredRef, pageCredPersist);
-  const pageCredReason = credentialSaveDisabledReason({
-    ref: pageCredRef, secret: pageCredSecret, persist: pageCredPersist,
-  });
-  // 「写入凭据」保存以后写在表单旁的结果（设计说明第 9.1 节「凭据」一行，工单 #1216）：
-  // 成功写版本与来源，失败写服务端给出的原因原样；结果回来以后才清空 Key 输入框
-  const [pageCredResult, setPageCredResult] = useState<{ kind: "ok" | "error"; message: string } | null>(null);
-  const [pageCredSaving, setPageCredSaving] = useState(false);
-
-  const capabilityRows = useMemo(() => {
-    if (!catalog?.capability_table?.presets) return [];
-    const list: { presetId: string; presetName: string; id: string; image: boolean }[] = [];
-    const seen = new Set<string>();
-    for (const [presetId, entries] of Object.entries(catalog.capability_table.presets)) {
-      if (!Array.isArray(entries)) continue;
-      const presetName = presets.find((p) => p.id === presetId)?.name ?? presetId;
-      for (const entry of entries) {
-        const item = entry as { model?: string; input_modalities?: string[]; image_input?: boolean };
-        const modelId = typeof item.model === "string" ? item.model : "";
-        if (!modelId || seen.has(`${presetId}:${modelId}`)) continue;
-        seen.add(`${presetId}:${modelId}`);
-        const modalities = Array.isArray(item.input_modalities) ? item.input_modalities : [];
-        list.push({
-          presetId,
-          presetName,
-          id: modelId,
-          image: modalities.includes("image") || Boolean(item.image_input),
-        });
-      }
+  useEffect(() => {
+    if (catalog === null || formOpened.current) {
+      return;
     }
-    return list;
-  }, [catalog, presets]);
-
-  const credentialsList = useMemo(() => {
-    if (!catalog) return [];
-    const map = new Map<string, { ref: string; credential: CatalogCredential | null }>();
-    for (const provider of catalog.providers) {
-      const ref = provider.credential_ref;
-      if (!ref || map.has(ref)) continue;
-      map.set(ref, { ref, credential: provider.credential ?? null });
+    formOpened.current = true;
+    if (catalog.providers.length === 0) {
+      setTarget({ mode: "new" });
     }
-    return Array.from(map.values());
   }, [catalog]);
-
 
   useEffect(() => {
     if (!views) {
@@ -181,26 +100,13 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       catalogRef.current = data;
       setCatalogError(null);
       setCatalog(data);
-      setEditingDefaults((current) => {
-        // 部门默认的草稿：目录更新时保留用户未提交的选择，其余按目录重建
-        if (Object.keys(current).length > 0) {
-          return current;
-        }
-        const next: Record<string, { modelId: string; tier: string }> = {};
-        for (const [department, binding] of Object.entries(data.bindings)) {
-          next[department] = { modelId: binding.model_id, tier: binding.requested_tier ?? "" };
-        }
-        return next;
-      });
     }, (reason) => {
-      // 目录读不出来：说读出来不成功，不停在「正在读取目录…」（工单 #776）
       setCatalogError(reason);
     });
     void views.open<CatalogDocument>("models.document", { query: "catalog.document", params: undefined }, (data) => {
       setDocumentError(null);
       setDocument(data);
     }, (reason) => {
-      // 目录文档读不出来：编辑器里要说明，不是一份空文档（工单 #776）
       setDocumentError(reason);
     });
     return () => {
@@ -209,385 +115,394 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     };
   }, [views]);
 
-  // 事件：候选采集与两种测试的结果内容都在事件里；按同一把键把「测试中」换成结果
+  // 事件：获取模型列表的结果与模型测试的结果都在事件里；视图按事件自动重新查询
   useEffect(() => {
     return props.subscribeEvents((event) => {
       if (event.type === "catalog_candidates_collected") {
-        const payload = event.payload;
-        const collected: CandidateState = {
-          status: payload.status,
-          source_url: payload.source_url,
-          fetched_at: payload.fetched_at,
-          candidates: payload.candidates.filter(isUpstreamCandidate),
-          error: payload.error,
-        };
-        setCandidates((current) => ({ ...current, [payload.provider_id]: collected }));
-        setCollecting(null);
+        setConnecting(false);
         return;
       }
-      if (event.type === "catalog_test_finished") {
-        setTesting((current) => ({ ...current, [testKeyOf(event.payload)]: false }));
-        setTests((current) => ({ ...current, [testKeyOf(event.payload)]: testText(event.payload) }));
+      if (event.type === "catalog_test_finished" && event.payload.kind === "model"
+          && event.payload.model_id !== null) {
+        const payload = event.payload;
+        setTests((current) => ({
+          ...current,
+          [payload.model_id as string]: {
+            elapsed_ms: payload.elapsed_ms,
+            actual_model: payload.actual_model,
+          },
+        }));
       }
     });
   }, [props]);
 
-  // 提交一个命令：结果交回接受或按原因拒绝；两个测试与候选的命令先登记命令身份，结果随后由事件到达
-  const submit = useCallback(async (name: string, body: Record<string, unknown>): Promise<SubmitResult> => {
+  // 提交一个命令：结果交回接受或按原因拒绝；接受以后重新读取目录，下一条命令用刷新后的修订号。
+  // 命令在途时页面上的操作先停住：部门默认是整份保存的，两次改动叠在一起会被服务端按版本过期拒绝
+  const submit = useCallback(async (name: string, body: Record<string, unknown>): Promise<CommandOutcome> => {
+    setBusy(true);
+    try {
+      const outcome = await props.command(name, {
+        command_id: newCommandId(),
+        base_version: catalogRef.current?.revision ?? 0,
+        ...body,
+      });
+      if (outcome.ok) {
+        await props.views?.refresh("models.catalog");
+      }
+      return outcome;
+    } finally {
+      setBusy(false);
+    }
+  }, [props]);
+
+  // 候选：各连接最近一次取到的模型，按连接汇总
+  const candidateRows = useMemo<CandidateRow[]>(
+    () => (catalog === null ? [] : candidateRowsOf(catalog)),
+    [catalog],
+  );
+
+  // 用户刚勾选的候选：勾选以后服务端要往返一次才建好访问定义，
+  // 勾选框先按本地这份显示（命令被拒绝时再撤回）
+  const [picked, setPicked] = useState<Record<string, boolean>>({});
+
+  // 已经选用的模型：目录里有访问定义就是选用了
+  const selectedKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const model of catalog?.models ?? []) {
+      keys.add(candidateKey(model.provider_id, model.model));
+    }
+    for (const [key, value] of Object.entries(picked)) {
+      if (value) {
+        keys.add(key);
+      }
+    }
+    return keys;
+  }, [catalog, picked]);
+
+  const filteredRows = useMemo(
+    () => filterCandidates(candidateRows, search, filter, selectedKeys),
+    [candidateRows, search, filter, selectedKeys],
+  );
+  const visibleRows = useMemo(() => filteredRows.slice(0, limit), [filteredRows, limit]);
+  const remaining = Math.max(0, filteredRows.length - visibleRows.length);
+
+  // 已选模型清单：目录里的定义加上它此刻的状态
+  const selectedRows = useMemo(
+    () => (catalog === null ? [] : selectedModelRows({
+      providers: catalog.providers,
+      models: catalog.models,
+      admissions: catalog.admissions,
+      selections: catalog.selections,
+    })),
+    [catalog],
+  );
+
+  // 部门默认涉及的部门：定义里的部门（默认三部门），目录里已有绑定的部门也算
+  const departments = useMemo(() => departmentsOf(catalog?.bindings), [catalog]);
+
+  // 部门使用的选项：已启用的模型，按连接分组
+  const departmentGroups = useMemo(
+    () => (catalog === null ? [] : groupAdmittedModels(
+      admittedModels(catalog.models, catalog.providers, catalog.admissions),
+      catalog.providers,
+    )),
+    [catalog],
+  );
+
+  // —— 连接服务 ——
+
+  const connect = useCallback(async () => {
+    const current = catalogRef.current;
+    const editing = target?.mode === "edit" ? target.provider_id : null;
+    const editingProvider = editing === null ? null
+      : current?.providers.find((item) => item.id === editing) ?? null;
+    const credentialSaved = editingProvider?.credential?.configured === true;
+    // 已有凭据的连接不填 Key 也可以：服务端按同一份凭据继续用
+    const key = apiKey.trim() === "" ? null : apiKey;
+    if (key === null && !credentialSaved) {
+      setConnectStatus((current2) => ({
+        ...current2,
+        [editing ?? "new"]: { kind: "error", message: "请填写 API Key。" },
+      }));
+      return;
+    }
+    setConnecting(true);
+    const outcome = await submit("catalog.connect", {
+      base_url: address.trim(),
+      api_key: key,
+    });
+    if (!outcome.ok) {
+      setConnecting(false);
+      setConnectStatus((current2) => ({
+        ...current2,
+        [editing ?? "new"]: { kind: "error", message: commandProblemText(outcome.problem) },
+      }));
+      return;
+    }
+    // 连接成功以后结果写在连接卡片旁（被操作的对象），表单收起、Key 清空
+    const refs = outcome.accepted.refs as { provider_id?: string } | undefined;
+    const providerId = refs?.provider_id ?? editing ?? "new";
+    setApiKey("");
+    setAddress("");
+    setTarget(null);
+    setConnectStatus((current2) => ({
+      ...current2,
+      [providerId]: { kind: "ok", message: "连接信息已保存，正在获取模型列表。" },
+    }));
+  }, [address, apiKey, submit, target]);
+
+  const refreshCandidates = useCallback(async (providerId: string) => {
+    setConnecting(true);
+    const outcome = await submit("catalog.candidates.collect", { provider_id: providerId });
+    if (!outcome.ok) {
+      setConnecting(false);
+      setConnectStatus((current) => ({
+        ...current,
+        [providerId]: { kind: "error", message: commandProblemText(outcome.problem) },
+      }));
+    }
+  }, [submit]);
+
+  const removeConnection = useCallback(async (providerId: string) => {
+    const outcome = await submit("catalog.connection.delete", { provider_id: providerId });
+    setConnectStatus((current) => ({
+      ...current,
+      [providerId]: outcome.ok
+        ? { kind: "ok", message: "已删除这份连接。" }
+        : { kind: "error", message: commandProblemText(outcome.problem) },
+    }));
+  }, [submit]);
+
+  // —— 选用与取消选用 ——
+
+  const selectModel = useCallback(async (providerId: string, upstreamModel: string, key: string): Promise<boolean> => {
+    const outcome = await submit("catalog.model.select", {
+      provider_id: providerId,
+      model: upstreamModel,
+    });
+    if (!outcome.ok) {
+      setCandidateStatus((current) => ({
+        ...current,
+        [key]: { kind: "error", message: commandProblemText(outcome.problem) },
+      }));
+      return false;
+    }
+    setCandidateStatus((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    return true;
+  }, [submit]);
+
+  const removeModel = useCallback(async (providerId: string, modelId: string, key: string): Promise<boolean> => {
+    const outcome = await submit("catalog.model.remove", {
+      provider_id: providerId,
+      model_id: modelId,
+    });
+    if (!outcome.ok) {
+      setSelectionStatus((current) => ({
+        ...current,
+        [key]: { kind: "error", message: removalRejectionText(commandProblemText(outcome.problem)) },
+      }));
+      return false;
+    }
+    setSelectionStatus((current) => {
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+    return true;
+  }, [submit]);
+
+  // 取消选用：从候选的勾选框与从「已选模型」面板走的是同一条路，
+  // 成功以后两处都取消（候选那边按本地这份勾选显示）
+  const cancelSelection = useCallback(async (providerId: string, modelId: string, key: string) => {
+    const removed = await removeModel(providerId, modelId, key);
+    if (removed) {
+      setPicked((current) => ({ ...current, [key]: false }));
+    }
+    return removed;
+  }, [removeModel]);
+
+  const toggleCandidate = useCallback(async (row: CandidateRow) => {
+    const key = candidateKey(row.provider_id, row.candidate.id);
+    const model = catalogRef.current?.models.find(
+      (item) => item.provider_id === row.provider_id && item.model === row.candidate.id,
+    );
+    if (model) {
+      // 取消选用：先撤下勾选，服务端拒绝（被引用）时再放回去
+      setPicked((current) => ({ ...current, [key]: false }));
+      const removed = await cancelSelection(row.provider_id, model.id, key);
+      if (!removed) {
+        setPicked((current) => ({ ...current, [key]: true }));
+      }
+      return;
+    }
+    setPicked((current) => ({ ...current, [key]: true }));
+    const selected = await selectModel(row.provider_id, row.candidate.id, key);
+    if (!selected) {
+      setPicked((current) => ({ ...current, [key]: false }));
+    }
+  }, [cancelSelection, selectModel]);
+
+  // 容量未知：填完窗口与输出上限以后继续（同一条选用命令带上这两个值）
+  const continueWithCapacity = useCallback(async (providerId: string, upstreamModel: string, key: string) => {
+    const draft = capacity[key] ?? { context_window: "", max_output_tokens: "" };
+    const window = intFromInput(draft.context_window);
+    const output = intFromInput(draft.max_output_tokens);
+    const issue = capacityInputIssue(window, output);
+    if (issue !== "") {
+      setSelectionStatus((current) => ({ ...current, [key]: { kind: "error", message: issue } }));
+      return;
+    }
+    const outcome = await submit("catalog.model.select", {
+      provider_id: providerId,
+      model: upstreamModel,
+      context_window: window,
+      max_output_tokens: output,
+    });
+    if (!outcome.ok) {
+      setSelectionStatus((current) => ({
+        ...current,
+        [key]: { kind: "error", message: commandProblemText(outcome.problem) },
+      }));
+    }
+  }, [capacity, submit]);
+
+  const submitManual = useCallback(async () => {
+    const providerId = manualProvider !== ""
+      ? manualProvider
+      : catalogRef.current?.providers[0]?.id ?? "";
+    if (providerId === "") {
+      setCandidateStatus((current) => ({
+        ...current,
+        manual: { kind: "error", message: "先连接一个服务，再手动添加模型。" },
+      }));
+      return;
+    }
+    const upstream = manualModel.trim();
+    const key = candidateKey(providerId, upstream);
+    const outcome = await submit("catalog.model.select", { provider_id: providerId, model: upstream });
+    if (!outcome.ok) {
+      setCandidateStatus((current) => ({
+        ...current,
+        [key]: { kind: "error", message: commandProblemText(outcome.problem) },
+      }));
+      return;
+    }
+    setManualOpen(false);
+    setManualModel("");
+  }, [manualModel, manualProvider, submit]);
+
+  // —— 部门使用 ——
+
+  const saveBindings = useCallback(async (bindings: Record<string, BindingInput>, department: string,
+    message: string) => {
+    const outcome = await submit("catalog.department_defaults.save", { bindings });
+    setDepartmentStatus((current) => ({
+      ...current,
+      [department]: outcome.ok
+        ? { kind: "ok", message }
+        : { kind: "error", message: commandProblemText(outcome.problem) },
+    }));
+  }, [submit]);
+
+  const chooseDepartmentModel = useCallback(async (department: string, modelId: string) => {
     const current = catalogRef.current;
     if (current === null) {
-      return { ok: false, message: "尚未读取目录，请稍后再试" };
+      return;
     }
-    const outcome = await props.command(name, {
-      command_id: newCommandId(),
-      base_version: current.revision,
-      ...body,
-    });
-    if (outcome.ok) {
-      // 命令被接受以后等目录视图刷新：下一条命令的基准版本用刷新后的修订号，
-      // 连续操作（例如清空部门默认以后删除连接）不会提交过期的版本（设计说明第 5.7 节）
-      await props.views?.refresh("models.catalog");
+    await saveBindings(departmentBindings(current, department, modelId, departments), department,
+      modelId === "" ? "已取消这个部门的模型，从下一次模型请求起生效。"
+        : "已保存部门默认，从各部门下一次模型请求起生效。");
+  }, [departments, saveBindings]);
+
+  const chooseDepartmentTier = useCallback(async (department: string, tier: string) => {
+    const current = catalogRef.current;
+    if (current === null || current.bindings[department] === undefined) {
+      return;
     }
-    return interpret(outcome);
-  }, [props]);
+    await saveBindings(departmentTierBindings(current, department, tier, departments), department,
+      "已保存请求档位，从下一次模型请求起生效。");
+  }, [departments, saveBindings]);
+
+  // —— 高级 ——
 
   const reload = useCallback(async () => {
-    setNotice(null);
-    setBusy(true);
-    const result = await submit("catalog.reload", {});
-    setBusy(false);
-    setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? "已重新读取目录文件。" : result.message });
+    const outcome = await submit("catalog.reload", {});
+    setPageNotice(outcome.ok
+      ? { kind: "ok", message: "已重新读取目录文件。" }
+      : { kind: "error", message: commandProblemText(outcome.problem) });
   }, [submit]);
 
-  const openEdit = useCallback((providerId: string) => {
+  const saveDocument = useCallback(async (next: EditableDocument): Promise<{ ok: boolean; message: string }> => {
+    const outcome = await submit("catalog.document.save", { document: next });
+    return outcome.ok
+      ? { ok: true, message: "已保存目录文档。" }
+      : { ok: false, message: commandProblemText(outcome.problem) };
+  }, [submit]);
+
+  // 连接与定义的参数保存：一次写这份连接与它下面的全部定义（catalog.connection.save）
+  const saveConnection = useCallback(async (providerId: string, draft: ConnectionDraft) => {
     const current = catalogRef.current;
     const provider = current?.providers.find((item) => item.id === providerId);
-    if (!provider) {
+    if (!current || !provider) {
       return;
     }
-    setFormStatus(null);
-    setCollectNotice("");
-    setForm({ mode: "edit", state: formStateFromProvider(provider) });
-  }, []);
+    const timeout = intFromInput(draft.timeout_sec);
+    const outcome = await submit("catalog.connection.save", {
+      provider: {
+        id: provider.id,
+        name: draft.name,
+        base_url: provider.base_url,
+        credential_ref: draft.credential_ref,
+        ...(timeout === null ? {} : { timeout_sec: timeout }),
+        preset_id: provider.preset_id,
+        models_url: draft.models_url,
+      },
+      models: provider.models.map(modelInputOf),
+    });
+    setPageNotice(outcome.ok
+      ? { kind: "ok", message: "已保存这份连接。" }
+      : { kind: "error", message: commandProblemText(outcome.problem) });
+  }, [submit]);
 
-  // 新建连接的请求时限取目录合同的 default_timeout_sec（工单 #294）：默认值只在后端有一份
-  const openAdd = useCallback(() => {
+  const saveModel = useCallback(async (providerId: string, modelId: string, draft: ModelDraft) => {
     const current = catalogRef.current;
-    if (current === null) {
+    const provider = current?.providers.find((item) => item.id === providerId);
+    if (!current || !provider) {
       return;
     }
-    setFormStatus(null);
-    setCollectNotice("");
-    setForm({ mode: "add", state: emptyFormState(current.default_timeout_sec) });
-  }, []);
-
-  const testModel = useCallback(async (providerId: string, modelId: string) => {
-    setTesting((current) => ({ ...current, [`model:${modelId}`]: true }));
-    const result = await submit("catalog.model.test", { provider_id: providerId, model_id: modelId });
-    if (!result.ok) {
-      setTesting((current) => ({ ...current, [`model:${modelId}`]: false }));
-      setNotice({ kind: "error", message: result.message });
-    }
-  }, [submit]);
-
-  const runSave = useCallback(async (body: Record<string, unknown>, successMessage: string,
-    state: FormState, secret: string, persist: boolean) => {
-    const previousModelIds = new Set(
-      catalogRef.current?.providers.find((item) => item.id === state.id)?.models.map((m) => m.id) ?? []
-    );
-    const newModelIds = ((body.models as { id: string }[]) || [])
-      .map((m) => m.id)
-      .filter((id) => !previousModelIds.has(id));
-
-    setBusy(true);
-    const saved = await submit("catalog.connection.save", body);
-    let result = saved;
-    if (saved.ok && secret.trim()) {
-      const credential = catalogRef.current?.providers.find((item) => item.id === state.id)?.credential;
-      const outcome = await props.command("credential.set", {
-        command_id: newCommandId(), base_version: credential?.version ?? 0,
-        ref: state.credential_ref, secret, persist,
-      });
-      result = interpret(outcome);
-    }
-    setBusy(false);
-    setPendingSave(null);
-    setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? successMessage : result.message });
-    if (result.ok) {
-      setForm(null);
-      for (const id of newModelIds) {
-        await testModel(state.id, id);
+    const models = provider.models.map((model) => (model.id === modelId
+      ? {
+        ...modelInputOf(model),
+        protocol: draft.protocol,
+        reasoning_levels: draft.reasoning_levels,
+        default_reasoning_level: draft.reasoning_levels.includes(draft.default_reasoning_level)
+          ? draft.default_reasoning_level
+          : null,
+        reasoning_mode: draft.reasoning_mode,
+        input_modalities: draft.input_image ? ["text", "image"] : ["text"],
+        accepts_required_tool_call: draft.accepts_required_tool_call,
       }
-    } else {
-      setFormStatus({ kind: "error", message: result.message });
-    }
-  }, [submit, props, testModel]);
-
-  const joinCandidates = useCallback(async (providerId: string) => {
-    const curCatalog = catalogRef.current;
-    if (!curCatalog) return;
-    const provider = curCatalog.providers.find((p) => p.id === providerId);
-    if (!provider) return;
-    const candState = candidates[providerId];
-    if (!candState || candState.status !== "ok") return;
-
-    const checkedMap = selectedCandidates[providerId] || {};
-    const checkedIds = Object.keys(checkedMap).filter((id) => checkedMap[id]);
-    if (checkedIds.length === 0) return;
-
-    const capMap = candidateCapacity[providerId] || {};
-    const preset = presetById(presets, provider.preset_id);
-
-    const newRows = checkedIds.map((id) => {
-      const candidate = candState.candidates.find((c) => c.id === id) || { id };
-      return candidateToRow(candidate, capMap[id], curCatalog.capability_table, provider.preset_id, preset);
-    });
-
-    const existingRows = formStateFromProvider(provider).rows;
-    const existingIds = new Set(existingRows.map((r) => r.id));
-    const uniqueNewRows = newRows.filter((r) => !existingIds.has(r.id));
-    if (uniqueNewRows.length === 0) return;
-
-    const allModels = [...existingRows, ...uniqueNewRows].map(rowToModelInput);
-    const providerInput = providerInputFromForm(formStateFromProvider(provider));
-
-    setBusy(true);
-    const saved = await submit("catalog.connection.save", {
-      provider: providerInput,
-      models: allModels,
-    });
-    setBusy(false);
-
-    if (!saved.ok) {
-      setNotice({ kind: "error", message: saved.message });
-      return;
-    }
-
-    setNotice({ kind: "ok", message: "已保存 Provider 配置。" });
-    setSelectedCandidates((current) => ({ ...current, [providerId]: {} }));
-    setCandidateCapacity((current) => ({ ...current, [providerId]: {} }));
-
-    for (const row of uniqueNewRows) {
-      await testModel(providerId, row.id);
-    }
-  }, [candidates, selectedCandidates, candidateCapacity, presets, submit, testModel]);
-
-  const submitForm = useCallback(async (secret: string, persist: boolean) => {
-    if (!form) return;
-    const rows = form.state.rows;
-    if (!rowsSavable(rows)) {
-      setFormStatus({ kind: "error", message: "窗口或输出上限缺少或无效的行不能保存。" });
-      return;
-    }
-    const body = { provider: providerInputFromForm(form.state), models: rows.map(rowToModelInput) };
-    if (confirmImpactText(saveImpact) !== "") {
-      setPendingSave({ body, state: form.state, secret, persist });
-      return;
-    }
-    await runSave(body, saveSuccessText(form.mode), form.state, secret, persist);
-  }, [form, runSave, saveImpact]);
-
-  const deleteProvider = useCallback((providerId: string) => {
-    // 删除之前按第 4.5 节取回引用方与将一并删除的定义；被引用时确认框列出引用方，拒绝删除。
-    // 这一次读取会失败（服务不可达或查询失败）：失败有去处——写明失败的原因，
-    // 不产生未处理的拒绝（工单 #777）
-    setBusy(true);
-    optionalRead(
-      props.query<ChangeImpact>("catalog.change_impact", { kind: "provider", provider_id: providerId }),
-      (snapshot) => {
-        setBusy(false);
-        setDeleteImpact(collectImpact(snapshot.data));
-        setPendingDelete(providerId);
+      : modelInputOf(model)));
+    const outcome = await submit("catalog.connection.save", {
+      provider: {
+        id: provider.id,
+        name: provider.name,
+        base_url: provider.base_url,
+        credential_ref: provider.credential_ref,
+        timeout_sec: provider.timeout_sec,
+        preset_id: provider.preset_id,
+        models_url: provider.models_url,
       },
-      (reason) => {
-        setBusy(false);
-        setNotice({ kind: "error", message: readFailureText(reason) });
-      },
-    );
-  }, [props]);
-
-  const runDelete = useCallback(async (providerId: string) => {
-    setBusy(true);
-    const result = await submit("catalog.connection.delete", { provider_id: providerId });
-    setBusy(false);
-    setPendingDelete(null);
-    setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? "已删除 Provider 配置。" : result.message });
-    if (result.ok) {
-      setForm(null);
-    }
-  }, [submit]);
-
-  const removeModel = useCallback((providerId: string, modelId: string) => {
-    // 移除单条定义（设计说明第 4.5 节）：被引用时显示引用方并拒绝。
-    // 先取回拟议终态（这条定义被移除）的影响，引用方存在时显示引用方，不再提交命令。
-    // 这一次读取会失败：失败有去处——写明失败的原因，不产生未处理的拒绝（工单 #777）
-    const catalogNow = catalogRef.current;
-    const provider = catalogNow?.providers.find((item) => item.id === providerId);
-    if (catalogNow === null || provider === undefined) {
-      return;
-    }
-    const remaining = provider.models
-      .filter((item) => item.id !== modelId)
-      .map((item) => modelDocumentFromDefinition(item));
-    optionalRead(
-      props.query<ChangeImpact>("catalog.change_impact", {
-        kind: "connection",
-        document: JSON.stringify({ provider: providerInputOf(provider), models: remaining }),
-      }),
-      (snapshot) => {
-        const referrers = modelRemoveReferrers(collectImpact(snapshot.data));
-        if (referrers !== "") {
-          setNotice({ kind: "error", message: referrers });
-          return;
-        }
-        void submit("catalog.model.remove", { provider_id: providerId, model_id: modelId }).then((result) => {
-          setNotice({ kind: result.ok ? "ok" : "error", message: result.ok ? "已移除访问定义。" : result.message });
-        });
-      },
-      (reason) => {
-        setNotice({ kind: "error", message: readFailureText(reason) });
-      },
-    );
-  }, [props, submit]);
-
-  const testConnection = useCallback(async (providerId: string) => {
-    setTesting((current) => ({ ...current, [`connection:${providerId}`]: true }));
-    const result = await submit("catalog.connection.test", { provider_id: providerId });
-    if (!result.ok) {
-      setTesting((current) => ({ ...current, [`connection:${providerId}`]: false }));
-      setNotice({ kind: "error", message: result.message });
-    }
-  }, [submit]);
-
-
-  const collectCandidates = useCallback(async (providerId: string, modelsUrl: string) => {
-    // 真的开始采集以后，表单里那句「先保存」的说明不再适用
-    setCollectNotice("");
-    setCollecting(providerId);
-    const result = await submit("catalog.candidates.collect", {
-      provider_id: providerId,
-      models_url: modelsUrl.trim() === "" ? null : modelsUrl.trim(),
-    });
-    if (!result.ok) {
-      setCollecting(null);
-      setNotice({ kind: "error", message: result.message });
-    }
-  }, [submit]);
-
-  // 保存凭据：两个入口（Provider 编辑表单与页面上的「写入凭据」）共用这一次提交，
-  // 结果带给调用处各自写在它旁边；保存成功以后刷新目录，版本与来源取刷新后的读数，不按基准版本往前加一
-  // （设计说明第 9.1 节「凭据」一行，工单 #1216）
-  const saveCredential = useCallback(async (ref: string, secret: string, persist: boolean, baseVersion: number):
-    Promise<{ result: SubmitResult; credential: CatalogCredential | null }> => {
-    setBusy(true);
-    const outcome = await props.command("credential.set", {
-      command_id: newCommandId(),
-      base_version: baseVersion,
-      ref,
-      secret,
-      persist,
-    });
-    let credential: CatalogCredential | null = null;
-    if (outcome.ok) {
-      await props.views?.refresh("models.catalog");
-      credential = catalogRef.current?.providers.find((item) => item.credential_ref === ref)?.credential ?? null;
-    }
-    setBusy(false);
-    const result = interpret(outcome);
-    setFormStatus({ kind: result.ok ? "ok" : "error", message: result.ok ? "已保存 API Key。" : result.message });
-    return { result, credential };
-  }, [props]);
-
-  const credentialAction = useCallback(async (
-    action: "clear_override" | "remove_persisted",
-    ref: string,
-    baseVersion: number,
-  ) => {
-    setBusy(true);
-    const name = action === "clear_override" ? "credential.clear_override" : "credential.remove_persisted";
-    const outcome = await props.command(name, {
-      command_id: newCommandId(), base_version: baseVersion, ref,
-    });
-    setBusy(false);
-    const result = interpret(outcome);
-    setFormStatus({
-      kind: result.ok ? "ok" : "error",
-      message: result.ok ? (action === "clear_override" ? "已清除内存覆盖。" : "已删除持久凭据。") : result.message,
-    });
-  }, [props]);
-
-  const saveDefaults = useCallback(async () => {
-    const bindings: Record<string, { provider_id: string; model_id: string; requested_tier: string | null }> = {};
-    for (const department of DEPARTMENTS) {
-      const choice = editingDefaults[department];
-      if (!choice || choice.modelId === "") {
-        continue;
-      }
-      const option = choices.find((item) => item.id === choice.modelId);
-      if (!option) {
-        continue;
-      }
-      bindings[department] = {
-        provider_id: option.provider_id,
-        model_id: option.id,
-        requested_tier: choice.tier === "" ? null : choice.tier,
-      };
-    }
-    setDefaultsStatus(null);
-    setBusy(true);
-    const result = await submit("catalog.department_defaults.save", { bindings });
-    setBusy(false);
-    setDefaultsStatus({ kind: result.ok ? "ok" : "error", message: result.ok ? "已保存部门默认。" : result.message });
-  }, [editingDefaults, choices, submit]);
-
-  const saveDocument = useCallback(async (next: unknown): Promise<SubmitResult> => {
-    const result = await submit("catalog.document.save", { document: next });
-    return result;
-  }, [submit]);
-
-  const formCredential = useMemo(() => {
-    if (!form || form.mode !== "edit" || !catalog) {
-      return null;
-    }
-    return catalog.providers.find((item) => item.id === form.state.id)?.credential ?? null;
-  }, [form, catalog]);
-
-  // 编辑表单的拟议修改：打开 catalog.change_impact 视图取回影响（设计说明第 4.4 节）。
-  // 参数用编辑中的表单内容序列化，表单内容变化时重开视图；查询只读，不写入任何内容。
-  // 查询的文档形状与目录文档一致
-  const formImpactParams = useMemo(() => {
-    if (!form || form.mode !== "edit") {
-      return null;
-    }
-    // 只有能构成合法目录文档的表单才发问影响：编辑中的表单会短暂地不合法（必填项为空、
-    // 协议与推理参数方式暂时不相符等），这时查询会被拒绝并把失败写进控制台（第 4.6 节的必填项与容量关系）
-    if (!formDocumentValid(form.state, form.state.rows)) {
-      return null;
-    }
-    const models = form.state.rows.map((row) => {
-      const input = rowToModelInput(row);
-      return input;
-    });
-    return JSON.stringify({
-      kind: "connection",
-      provider: providerInputFromForm(form.state),
       models,
     });
-  }, [form]);
-
-  useEffect(() => {
-    if (views === null || formImpactParams === null) {
-      return;
-    }
-    // 编辑中的表单可以短暂地不合法（例如协议与推理参数方式暂时不相符），这时影响查询被拒绝。
-    // 这份拟议修改不会保存：保存命令按字段校验并给出位置，所以回退到「没有影响」，
-    // 让保存路径负责拒绝（catalog.change_impact 对不合法拟议文档的错误映射见 docs/architecture-issues.md）
-    views.open<ChangeImpact>("models.impact", {
-      query: "catalog.change_impact",
-      params: { kind: "connection", document: formImpactParams },
-    }, (data) => setSaveImpact(collectImpact(data))).catch(() => setSaveImpact(null));
-    return () => views.close("models.impact");
-  }, [views, formImpactParams]);
+    setPageNotice(outcome.ok
+      ? { kind: "ok", message: "已保存这个模型。" }
+      : { kind: "error", message: commandProblemText(outcome.problem) });
+  }, [submit]);
 
   if (catalog === null) {
     // 目录读不出来：写一句失败提示与服务端给的原文，不停在「正在读取目录…」（工单 #776）
@@ -615,888 +530,133 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           </div>
         }
       />
-      {notice && (
-        <p className={notice.kind === "ok" ? "y10-note mm-ok" : "y10-note is-warn mm-warn"} role="status" data-testid="page-notice">
-          {notice.message}
+      {pageNotice ? (
+        <p className={pageNotice.kind === "ok" ? "y10-note mm-ok" : "y10-note is-warn mm-warn"}
+           role="status" data-testid="page-notice">
+          {pageNotice.message}
         </p>
-      )}
+      ) : null}
 
       <Block
-        title="模型目录文件"
-        actions={
-          <div className="y10-row mm-actions">
-            <button
-              type="button"
-              className="y10-btn small"
-              data-testid="reload"
-              disabled={busy}
-              onClick={() => void reload()}
-            >
-              重新读取
-            </button>
-          </div>
-        }
+        title="连接服务"
+        subtitle="填服务地址与 API Key，点「获取模型」：连接、Key 与候选一步完成"
       >
-        <div className="y10-file-row">
-          <dl className="y10-kv is-inline">
-            <div>
-              <dt>目录修订</dt>
-              <dd><code>{catalog.revision}</code></dd>
-            </div>
-            <div>
-              <dt>配置状态</dt>
-              <dd>
-                <span className="mm-meta">
-                  配置状态 {CONFIG_STATE_LABELS[catalog.config_state] ?? catalog.config_state}
-                </span>
-              </dd>
-            </div>
-            <div>
-              <dt>重读错误</dt>
-              <dd>
-                {catalog.reload_error ? (
-                  <span className="y10-warn-text mm-warn">{catalog.reload_error}</span>
-                ) : (
-                  <span className="y10-muted">无</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-        </div>
-      </Block>
-
-      <Block
-        title="Provider 配置"
-        subtitle="连接提供请求基址与凭据；模型访问定义声明上游模型与调用协议"
-        actions={
-          <button type="button" className="y10-btn small primary" onClick={openAdd}>
-            添加 Provider 配置
-          </button>
-        }
-      >
-        {catalog.providers.length === 0 && (
-          <p className="y10-empty y10-small y10-muted mm-hint">还没有 Provider 配置。添加一份连接，选择服务方案与协议，保存以后再获取模型列表。</p>
-        )}
-        <div className="y10-conn-list">
-          {catalog.providers.map((provider) => {
-            const summary = admissionSummary(provider, catalog.admissions);
-            const preset = presetById(presets, provider.preset_id);
-            const open = expanded[provider.id] === true;
-            return (
-              <section className={`y10-conn-card mm-card${open ? " is-open" : ""}`} key={provider.id} data-testid={`provider-${provider.id}`}>
-                <button
-                  type="button"
-                  className="y10-conn-summary mm-summary"
-                  aria-expanded={open}
-                  aria-label={open ? "收起" : "展开"}
-                  onClick={() => setExpanded((current) => ({ ...current, [provider.id]: !open }))}
-                >
-                  <span className="y10-conn-name mm-name">
-                    <strong>{provider.name}</strong>
-                    <small>{preset?.name ?? "自定义"}</small>
-                  </span>
-                  <span className="y10-conn-url">
-                    <code>{provider.base_url || "（没有地址）"}</code>
-                  </span>
-                  <span className="y10-conn-cred y10-small y10-muted mm-meta">
-                    <StatusMark kind={provider.credential?.configured ? "admitted" : "unusable"} text={provider.credential?.configured ? "已就绪" : "凭据缺失"} />
-                    <small>凭据：{credentialStatusLabel(provider.credential)}</small>
-                  </span>
-                  <span className="y10-conn-count mm-count">
-                    已准入 {summary.admitted} · 候选 {summary.candidates}
-                  </span>
-                  <Icon name="chevron" className="y10-icon y10-chevron" />
-                </button>
-
-            {open && (
-              <div className="y10-def-table mm-body">
-                <div className="y10-row mm-actions">
-                  <button type="button" className="y10-btn small" onClick={() => openEdit(provider.id)}>编辑</button>
-                  <button type="button" className="y10-btn small" data-testid={`test-connection-${provider.id}`}
-                          disabled={testing[`connection:${provider.id}`] === true}
-                          onClick={() => void testConnection(provider.id)}>
-                    {testing[`connection:${provider.id}`] ? "测试中…" : "测试连接"}
-                  </button>
-                  <button type="button" className="y10-btn small" data-testid={`collect-${provider.id}`}
-                          disabled={collecting === provider.id}
-                          onClick={() => void collectCandidates(provider.id, provider.models_url)}>
-                    {collecting === provider.id ? "候选获取中…" : "获取模型列表"}
-                  </button>
-                  <button type="button" className="y10-btn small danger" data-testid={`delete-${provider.id}`}
-                          onClick={() => void deleteProvider(provider.id)}>删除</button>
-                </div>
-                {(tests[`connection:${provider.id}`] || testing[`connection:${provider.id}`]) && (
-                  <p className="y10-test-line mm-meta" data-testid={`connection-result-${provider.id}`}>
-                    连接测试：{testing[`connection:${provider.id}`] ? "测试中…" : tests[`connection:${provider.id}`]}
-                  </p>
-                )}
-
-                {candidates[provider.id] && (
-                  <div className="y10-candidates mm-candidates" data-testid={`candidates-${provider.id}`}>
-                    {candidates[provider.id].status === "unknown" ? (
-                      <p className="y10-warn-text mm-warn" role="status">请求 {candidates[provider.id].source_url || "（没有模型列表地址）"} 时候选未知：{candidates[provider.id].error || "上游模型列表不可用"}</p>
-                    ) : (() => {
-                      const candState = candidates[provider.id];
-                      const checkedMap = selectedCandidates[provider.id] || {};
-                      const checkedIds = Object.keys(checkedMap).filter((id) => checkedMap[id]);
-                      const capMap = candidateCapacity[provider.id] || {};
-                      const preset = presetById(presets, provider.preset_id);
-                      const joinStatus = canJoinCandidates(
-                        checkedIds,
-                        candState.candidates,
-                        capMap,
-                        catalog.capability_table,
-                        provider.preset_id,
-                        preset,
-                      );
-                      const existingIds = new Set(provider.models.map((m) => m.id));
-
-                      return (
-                        <>
-                          <div className="y10-row mm-candidates-meta">
-                            <p className="y10-small y10-muted mm-meta">
-                              来源 {candState.source_url} · 采集时间 {candState.fetched_at}
-                            </p>
-                            <div className="y10-row mm-actions y10-candidates-actions">
-                              <button
-                                type="button"
-                                className="y10-btn primary small"
-                                data-testid={`join-candidates-${provider.id}`}
-                                disabled={!joinStatus.ok || busy}
-                                onClick={() => void joinCandidates(provider.id)}
-                              >
-                                加入
-                              </button>
-                              {joinStatus.issue !== "" && (
-                                <span className="y10-warn-text mm-warn" role="status" data-testid={`candidates-issue-${provider.id}`}>
-                                  {joinStatus.issue}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <ul className="y10-candidate-grid mm-candidates-list">
-                            {candState.candidates.map((item) => {
-                              const prefill = prefillModel(item.id, item, catalog.capability_table, provider.preset_id, preset);
-                              const isChecked = Boolean(checkedMap[item.id]);
-                              const isAdded = existingIds.has(sanitizeModelId(item.id) || item.id);
-                              const customCap = capMap[item.id];
-                              const winVal = customCap?.context_window !== undefined
-                                ? customCap.context_window
-                                : numberToText(prefill.context_window);
-                              const outVal = customCap?.max_output_tokens !== undefined
-                                ? customCap.max_output_tokens
-                                : numberToText(prefill.max_output_tokens);
-                              const candIssue = capacityIssueText({
-                                context_window: intFromInput(winVal),
-                                max_output_tokens: intFromInput(outVal),
-                              });
-
-                              return (
-                                <li key={item.id} className="y10-candidate-card mm-candidate-card" data-testid={`candidate-${item.id}`}>
-                                  <label className="y10-candidate-head">
-                                    <input
-                                      type="checkbox"
-                                      disabled={isAdded}
-                                      checked={isChecked}
-                                      data-testid={`candidate-check-${item.id}`}
-                                      onChange={(e) => {
-                                        setSelectedCandidates((current) => ({
-                                          ...current,
-                                          [provider.id]: {
-                                            ...(current[provider.id] || {}),
-                                            [item.id]: e.target.checked,
-                                          },
-                                        }));
-                                      }}
-                                    />
-                                    <code className="mm-candidate-id">{item.id}</code>
-                                    {isAdded && <span className="y10-small mm-ok">已加入</span>}
-                                  </label>
-                                  <div className="y10-candidate-fields">
-                                    <span className="y10-small mm-meta" data-testid={`candidate-protocol-${item.id}`}>
-                                      协议：{PROTOCOL_LABELS[prefill.protocol] ?? prefill.protocol}（{PREFILL_SOURCE_LABELS[prefill.sources.protocol] ?? prefill.sources.protocol}）
-                                    </span>
-                                    {prefill.context_window !== null ? (
-                                      <span className="y10-small mm-meta" data-testid={`candidate-window-${item.id}`}>
-                                        窗口：{prefill.context_window}（{PREFILL_SOURCE_LABELS[prefill.sources.context_window ?? ""] ?? prefill.sources.context_window}）
-                                      </span>
-                                    ) : (
-                                      <label className="y10-field mm-field-inline">
-                                        <span className="mm-label">窗口</span>
-                                        <input
-                                          className="y10-input small"
-                                          type="number"
-                                          min="1"
-                                          placeholder="填写窗口"
-                                          data-testid={`candidate-window-${item.id}`}
-                                          value={winVal}
-                                          onChange={(e) => {
-                                            const val = e.target.value;
-                                            setCandidateCapacity((current) => ({
-                                              ...current,
-                                              [provider.id]: {
-                                                ...(current[provider.id] || {}),
-                                                [item.id]: {
-                                                  ...(current[provider.id]?.[item.id] || {}),
-                                                  context_window: val,
-                                                },
-                                              },
-                                            }));
-                                          }}
-                                        />
-                                      </label>
-                                    )}
-                                    {prefill.max_output_tokens !== null ? (
-                                      <span className="y10-small mm-meta" data-testid={`candidate-output-${item.id}`}>
-                                        输出上限：{prefill.max_output_tokens}（{PREFILL_SOURCE_LABELS[prefill.sources.max_output_tokens ?? ""] ?? prefill.sources.max_output_tokens}）
-                                      </span>
-                                    ) : (
-                                      <label className="y10-field mm-field-inline">
-                                        <span className="mm-label">输出上限</span>
-                                        <input
-                                          className="y10-input small"
-                                          type="number"
-                                          min="1"
-                                          placeholder="填写输出上限"
-                                          data-testid={`candidate-output-${item.id}`}
-                                          value={outVal}
-                                          onChange={(e) => {
-                                            const val = e.target.value;
-                                            setCandidateCapacity((current) => ({
-                                              ...current,
-                                              [provider.id]: {
-                                                ...(current[provider.id] || {}),
-                                                [item.id]: {
-                                                  ...(current[provider.id]?.[item.id] || {}),
-                                                  max_output_tokens: val,
-                                                },
-                                              },
-                                            }));
-                                          }}
-                                        />
-                                      </label>
-                                    )}
-                                    <span className="y10-small mm-meta">
-                                      输入方式：{prefill.input_modalities.includes("image") ? "文本与图像" : "文本"}（{PREFILL_SOURCE_LABELS[prefill.sources.input_modalities] ?? prefill.sources.input_modalities}）
-                                    </span>
-                                  </div>
-                                  {isChecked && candIssue !== "" && (
-                                    <span className="y10-warn-text mm-warn" role="status" data-testid={`candidate-issue-${item.id}`}>
-                                      {candIssue}
-                                    </span>
-                                  )}
-                                  <button
-                                    type="button"
-                                    className="y10-chip"
-                                    data-testid={`add-candidate-${provider.id}-${item.id}`}
-                                    onClick={() => {
-                                      setFormStatus(null);
-                                      setForm((current) => {
-                                        const base = current ?? {
-                                          mode: "edit" as const,
-                                          state: formStateFromProvider(provider),
-                                        };
-                                        const row = rowFromCandidate(item, catalog.capability_table, provider.preset_id,
-                                                                     presetById(presets, provider.preset_id));
-                                        return { mode: "edit", state: { ...base.state, rows: [...base.state.rows, row] } };
-                                      });
-                                    }}
-                                  >
-                                    建立访问定义
-                                  </button>
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                <table className="y10-table y10-table-defs mm-table">
-                  <thead>
-                    <tr>
-                      <th>上游模型 ID</th>
-                      <th>调用协议</th>
-                      <th>窗口</th>
-                      <th>输出上限</th>
-                      <th>推理档位声明</th>
-                      <th>输入方式</th>
-                      <th>准入</th>
-                      <th>操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {provider.models.map((model) => {
-                      const admission = admissionOf(provider.id, model.id, catalog.admissions);
-                      const result = tests[`model:${model.id}`];
-                      const running = testing[`model:${model.id}`] === true;
-                      return (
-                        <tr key={model.id} data-testid={`model-${model.id}`}>
-                          <td>{model.model}</td>
-                          <td>{PROTOCOL_LABELS[model.protocol] ?? model.protocol}</td>
-                          <td>{model.context_window ?? "—"}</td>
-                          <td>{model.max_output_tokens ?? "—"}</td>
-                          <td className="y10-cell-stack">{model.reasoning_levels.length === 0 ? "未声明" : model.reasoning_levels.join("、")}</td>
-                          <td>{model.input_modalities.includes("image") ? "文本与图像" : "文本"}</td>
-                          <td>{admissionLabel(admission)}</td>
-                          <td className="y10-col-actions">
-                            <button type="button" className="y10-btn small" data-testid={`row-test-${model.id}`}
-                                    disabled={running}
-                                    onClick={() => void testModel(provider.id, model.id)}>
-                              {running ? "测试中…" : "模型测试"}
-                            </button>
-                            <button type="button" className="y10-btn small" data-testid={`row-remove-${model.id}`}
-                                    onClick={() => void removeModel(provider.id, model.id)}>
-                              移除
-                            </button>
-                            {/* 模型测试的结果写在这一行里：通过写用时，失败写原因（工单 #294） */}
-                            {(running || result !== undefined) && (
-                              <p className="y10-test-mini mm-meta" role="status" data-testid={`model-result-${model.id}`}>
-                                {running ? "模型测试中…" : result}
-                              </p>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {provider.models.length === 0 && <p className="y10-empty y10-small y10-muted mm-hint">还没有模型访问定义。</p>}
-              </div>
-            )}
-          </section>
-        );
-          })}
-        </div>
-      </Block>
-
-      {form && (
-        <ProviderForm
-          mode={form.mode}
-          state={form.state}
-          onPatch={(patch) => setForm((current) => (current ? { ...current, state: { ...current.state, ...patch } } : current))}
-          onPatchRow={(key, patch) => setForm((current) => {
-            if (!current) {
-              return current;
-            }
-            return {
-              ...current,
-              state: {
-                ...current.state,
-                rows: current.state.rows.map((row) => (row.key === key ? { ...row, ...patch } : row)),
-              },
-            };
-          })}
-          onAddRow={(row) => setForm((current) => (
-            current ? { ...current, state: { ...current.state, rows: [...current.state.rows, row] } } : current
-          ))}
-          onRemoveRow={(key) => setForm((current) => (
-            current ? { ...current, state: { ...current.state, rows: current.state.rows.filter((row) => row.key !== key) } } : current
-          ))}
-          rowFromCandidate={(item) => rowFromCandidate(item, catalog.capability_table, form.state.preset_id,
-                                                       presetById(presets, form.state.preset_id))}
-          blankRow={() => rowFromManual(form.state.rows.length)}
-          presets={presets}
-          presetRevision={catalog.presets.revision}
-          presetSource={catalog.presets.source}
-          capabilityRevision={catalog.capability_table.revision}
-          capabilitySnapshotDate={catalog.capability_table.snapshot_date}
-          capabilitySource={catalog.capability_table.source}
-          credential={formCredential}
-          candidate={candidates[form.state.id] ?? null}
-          collecting={collecting === form.state.id}
-          collectNotice={collectNotice}
-          admissions={catalog.admissions}
-          impact={confirmImpactText(saveImpact)}
-          busy={busy}
-          testing={testing}
-          tests={tests}
-          status={formStatus}
-          onSubmit={(secret, persist) => void submitForm(secret, persist)}
-          onCancel={() => setForm(null)}
-          onDelete={() => void deleteProvider(form.state.id)}
-          onTestConnection={() => void testConnection(form.state.id)}
-          onCollectCandidates={() => {
-            // 连接没有保存时按服务端合同采不到候选（第 4.3 节只对已保存的连接采集）：
-            // 页面说明先保存什么、为什么，不发请求（工单 #843）
-            const action = collectCandidatesAction(form.mode);
-            if (action.kind === "explain") {
-              setCollectNotice(action.message);
-              return;
-            }
-            void collectCandidates(form.state.id, form.state.models_url);
-          }}
-          onCredential={(action, secret, persist) => {
-            if (action === "set") {
-              void saveCredential(form.state.credential_ref, secret, persist, formCredential?.version ?? 0);
+        <ConnectCard
+          providers={catalog.providers}
+          target={target}
+          address={address}
+          apiKey={apiKey}
+          busy={busy || connecting}
+          status={connectStatus}
+          onTarget={(next) => {
+            setTarget(next);
+            setConnectStatus({});
+            if (next?.mode === "edit") {
+              const provider = catalog.providers.find((item) => item.id === next.provider_id);
+              setAddress(provider?.base_url ?? "");
             } else {
-              void credentialAction(action, form.state.credential_ref, formCredential?.version ?? 0);
+              setAddress("");
             }
+            setApiKey("");
           }}
-          onTestModel={(modelId) => void testModel(form.state.id, modelId)}
+          onAddress={setAddress}
+          onApiKey={setApiKey}
+          onConnect={() => void connect()}
+          onRefresh={(providerId) => void refreshCandidates(providerId)}
+          onRemove={(providerId) => void removeConnection(providerId)}
         />
-      )}
-
-      <Block
-        title="模型能力表"
-        subtitle={`来源 ${catalog.capability_table.source} · 版本 ${catalog.capability_table.revision}；模型访问定义的「支持图像输入」默认取自能力表，可以手动改写`}
-      >
-        <div className="y10-table-wrap">
-          <table className="y10-table">
-            <thead>
-              <tr>
-                <th>方案</th>
-                <th>上游模型</th>
-                <th>支持图像输入</th>
-              </tr>
-            </thead>
-            <tbody>
-              {capabilityRows.map((row) => (
-                <tr key={`${row.presetId}-${row.id}`}>
-                  <td>{row.presetName}</td>
-                  <td><code>{row.id}</code></td>
-                  <td>{row.image ? "是" : "否"}</td>
-                </tr>
-              ))}
-              {capabilityRows.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="y10-muted" style={{ textAlign: "center" }}>能力表没有记录</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
       </Block>
 
       <Block
-        title="凭据"
-        subtitle="Key 只写入内存或 .yudao/.env，不进入界面数据、事件与提交"
+        title="部门使用"
+        subtitle="首个启用的模型自动供三个部门使用；在这里按部门更换"
       >
-        <div className="y10-grid-cred">
-          <div className="y10-table-wrap">
-            <table className="y10-table">
-              <thead>
-                <tr>
-                  <th>凭据引用</th>
-                  <th>状态</th>
-                  <th>版本</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {credentialsList.map((row) => (
-                  <tr key={row.ref}>
-                    <td><code>{row.ref}</code></td>
-                    <td>{row.credential ? credentialText(row.credential) : "没有任何来源"}</td>
-                    <td>{row.credential?.version ?? "—"}</td>
-                    <td className="y10-col-actions">
-                      <div className="y10-row">
-                        {row.credential?.has_override && (
-                          <button
-                            type="button"
-                            className="y10-btn small"
-                            disabled={busy}
-                            onClick={() => void credentialAction("clear_override", row.ref, row.credential!.version)}
-                          >
-                            清除内存覆盖
-                          </button>
-                        )}
-                        {row.credential?.source === "dotenv" && (
-                          <button
-                            type="button"
-                            className="y10-btn small danger"
-                            disabled={busy}
-                            onClick={() => void credentialAction("remove_persisted", row.ref, row.credential!.version)}
-                          >
-                            删除持久凭据
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                {credentialsList.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="y10-muted" style={{ textAlign: "center" }}>暂无凭据记录</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+        <DepartmentUsage
+          departments={departments}
+          groups={departmentGroups}
+          bindings={catalog.bindings}
+          models={catalog.models}
+          reminders={catalog.department_reminders}
+          status={departmentStatus}
+          busy={busy}
+          onSelect={(department, modelId) => void chooseDepartmentModel(department, modelId)}
+          onTier={(department, tier) => void chooseDepartmentTier(department, tier)}
+        />
+      </Block>
 
-          <div className="y10-cred-form">
-            <h3 className="y10-h3">写入凭据</h3>
-            <label className="y10-field">
-              <span>凭据引用</span>
-              <input
-                className="y10-input"
-                type="text"
-                list="y10-cred-refs-list"
-                data-testid="page-cred-ref"
-                value={pageCredRef}
-                placeholder={DOTENV_KEY_EXAMPLE}
-                onChange={(e) => {
-                  setPageCredRef(e.target.value);
-                  // 改了表单内容，上一条结果不再说明这一次要保存的东西（工单 #1216）
-                  setPageCredResult(null);
-                }}
-              />
-              <datalist id="y10-cred-refs-list">
-                {credentialsList.map((c) => (
-                  <option key={c.ref} value={c.ref} />
-                ))}
-              </datalist>
-            </label>
-            {/* 勾「写入 .env」时在凭据引用旁写出键名规则，不合规时写明原因（工单 #1158） */}
-            {pageCredPersist && (
-              <p className="y10-small y10-muted" data-testid="page-cred-ref-rule">
-                写入 .env 时，键名只用{DOTENV_KEY_RULE}，例如 {DOTENV_KEY_EXAMPLE}。
-              </p>
-            )}
-            {pageCredIssue !== "" && (
-              <p className="y10-warn-text" role="status" data-testid="page-cred-ref-issue">{pageCredIssue}</p>
-            )}
-            <label className="y10-field">
-              <span>API Key</span>
-              <input
-                className="y10-input"
-                type="password"
-                autoComplete="new-password"
-                data-testid="page-cred-secret"
-                value={pageCredSecret}
-                placeholder="Key 不回填，也不进入事件"
-                onChange={(e) => {
-                  setPageCredSecret(e.target.value);
-                  setPageCredResult(null);
-                }}
-              />
-            </label>
-            <fieldset className="y10-field">
-              <legend>写入方式</legend>
-              <div className="y10-radio-row">
-                <label>
-                  <input
-                    type="radio"
-                    name="page-cred-persist"
-                    data-testid="page-cred-memory"
-                    checked={!pageCredPersist}
-                    onChange={() => {
-                      setPageCredPersist(false);
-                      setPageCredResult(null);
-                    }}
-                  />
-                  <span>只在本进程有效</span>
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="page-cred-persist"
-                    data-testid="page-cred-dotenv"
-                    checked={pageCredPersist}
-                    onChange={() => {
-                      setPageCredPersist(true);
-                      setPageCredResult(null);
-                    }}
-                  />
-                  <span>写入 .env</span>
-                </label>
-              </div>
-            </fieldset>
-            {/* 只在本进程有效的 Key 重启以后要重新提供（D22 第 5 节，工单 #1158） */}
-            {!pageCredPersist && (
-              <p className="y10-small y10-muted" data-testid="page-cred-restart-hint">
-                只在本进程有效：重启后需要重新提供。
-              </p>
-            )}
-            <button
-              type="button"
-              className="y10-btn primary"
-              data-testid="page-cred-save"
-              disabled={busy || pageCredSaving || pageCredReason !== ""}
-              onClick={() => {
-                const ref = pageCredRef.trim();
-                const persist = pageCredPersist;
-                const cred = credentialsList.find((c) => c.ref === ref)?.credential;
-                setPageCredResult(null);
-                setPageCredSaving(true);
-                // 发出去了就一定有结果落在表单旁：成功写版本与来源，失败写服务端给出的原因原样，
-                // Key 输入框只在成功以后才清空（设计说明第 9.1 节「凭据」一行，工单 #1216）
-                void saveCredential(ref, pageCredSecret.trim(), persist, cred?.version ?? 0).then(({ result, credential }) => {
-                  setPageCredSaving(false);
-                  if (!result.ok) {
-                    setPageCredResult({ kind: "error", message: result.message });
-                    return;
-                  }
-                  setPageCredResult({
-                    kind: "ok",
-                    message: credentialSavedText({
-                      ref,
-                      version: credential?.version ?? null,
-                      // 目录里找不到这个引用的连接时按这次选的写入方式说来源，不写一个空词
-                      source: credential?.source ?? (persist ? "dotenv" : "override"),
-                    }),
-                  });
-                  setPageCredSecret("");
-                });
+      <Block
+        title="选择模型"
+        subtitle="勾选后自动补全参数并验证，通过的模型启用"
+      >
+        <div className="mm-model-layout">
+          <div className="mm-model-results">
+            <CandidateList
+              rows={visibleRows}
+              total={candidateRows.length}
+              search={search}
+              filter={filter}
+              selected={selectedKeys}
+              remaining={remaining}
+              status={candidateStatus}
+              manualOpen={manualOpen}
+              manualModel={manualModel}
+              manualProvider={manualProvider}
+              providers={catalog.providers.map((item) => ({ id: item.id, base_url: item.base_url }))}
+              disabled={busy || connecting}
+              onSearch={(value) => {
+                setSearch(value);
+                setLimit(FIRST_BATCH);
               }}
-            >
-              {pageCredSaving ? "保存中…" : "保存凭据"}
-            </button>
-            {/* 保存的结果写在表单旁：成功写「已保存 API Key」与凭据版本、来源，失败写服务端原因原样（工单 #1216） */}
-            {pageCredResult && (
-              <p
-                className={pageCredResult.kind === "ok" ? "y10-small mm-ok" : "y10-warn-text mm-warn"}
-                role="status"
-                data-testid="page-cred-result"
-              >
-                {pageCredResult.message}
-              </p>
-            )}
-            {/* 「保存凭据」不可用时写明缺哪一项（工单 #1158）；有结果时由上面那一行说明，
-                不让「还不能保存」顶替结果（工单 #1216） */}
-            {pageCredReason !== "" && !pageCredResult && (
-              <p className="y10-small y10-muted" role="status" data-testid="page-cred-save-hint">
-                还不能保存：{pageCredReason}。
-              </p>
-            )}
+              onFilter={(value) => {
+                setFilter(value);
+                setLimit(FIRST_BATCH);
+              }}
+              onMore={() => setLimit((current) => current + MORE_BATCH)}
+              onToggle={(row) => void toggleCandidate(row)}
+              onManualOpen={() => {
+                setManualOpen(true);
+                setManualProvider(catalog.providers[0]?.id ?? "");
+              }}
+              onManualClose={() => setManualOpen(false)}
+              onManualModel={setManualModel}
+              onManualProvider={setManualProvider}
+              onManualSubmit={() => void submitManual()}
+            />
           </div>
+          <SelectionPanel
+            rows={selectedRows}
+            capacity={capacity}
+            status={selectionStatus}
+            tests={tests}
+            busy={busy}
+            onCapacity={(key, field, value) => setCapacity((current) => ({
+              ...current,
+              [key]: { ...(current[key] ?? { context_window: "", max_output_tokens: "" }), [field]: value },
+            }))}
+            onContinue={(row) => void continueWithCapacity(row.provider_id, row.upstream_model, row.key)}
+            onRetry={(row) => void selectModel(row.provider_id, row.upstream_model, row.key)}
+            onRemove={(row) => void cancelSelection(row.provider_id, row.model_id, row.key)}
+          />
         </div>
       </Block>
 
-      <Block
-        title="目录文档（编辑 JSON）"
-        actions={
-          <button type="button" className="y10-btn small" data-testid="edit-json" onClick={() => setJsonOpen(true)}>
-            编辑 JSON
-          </button>
-        }
-      >
-        <dl className="y10-kv is-inline">
-          <div>
-            <dt>文档内容</dt>
-            <dd>连接、模型访问定义与部门默认</dd>
-          </div>
-          <div>
-            <dt>不含</dt>
-            <dd>API Key、准入记录、项目部门设置与项目角色设置</dd>
-          </div>
-        </dl>
-      </Block>
+      <Advanced
+        catalog={catalog}
+        busy={busy}
+        onReload={() => void reload()}
+        onEditDocument={() => setJsonOpen(true)}
+        onSaveConnection={(providerId, draft) => void saveConnection(providerId, draft)}
+        onSaveModel={(providerId, modelId, draft) => void saveModel(providerId, modelId, draft)}
+      />
 
-      <Block
-        id="department-defaults"
-        data-testid="department-defaults"
-        className="mm-defaults"
-        title="部门默认"
-        subtitle="从各部门下一次模型请求起生效，没有另选模型的项目同样生效，包括进行中的事项；全局只有一份，所有项目共用"
-      >
-        <div className="y10-dept-grid mm-defaults-grid">
-          {DEPARTMENTS.map((department) => {
-            const choice = editingDefaults[department] ?? { modelId: "", tier: "" };
-            // 所选模型的声明取自目录中的定义，档位选项与「未声明」提示都按它判断（设计说明第 9.1 节）
-            const model = catalog.models.find((item) => item.id === choice.modelId);
-            const savedTier = savedAdmissionTier(catalog, choice.modelId);
-            const tiers = tierOptions(model?.reasoning_levels ?? [], savedTier);
-            // 提醒按下拉里当前选中的模型取：选中就显示，保存只负责保存（工单 #302）
-            const reminders = choice.modelId !== ""
-              ? catalog.model_reminders[choice.modelId]?.[department] ?? []
-              : catalog.department_reminders[department] ?? [];
-            const unavailable = unavailableBindingLabel(catalog, choice.modelId);
-            return (
-              <div className="y10-dept-card mm-default" key={department} data-testid={`default-${department}`}>
-                <h3 className="y10-h3">{DEPARTMENT_LABELS[department]}</h3>
-                <label className="y10-field mm-field">
-                  <span className="mm-label">模型</span>
-                  <select className="y10-select" value={choice.modelId}
-                          data-testid={`default-model-${department}`}
-                          onChange={(event) => setEditingDefaults((current) => ({
-                            ...current,
-                            [department]: { ...choice, modelId: event.target.value, tier: "" },
-                          }))}>
-                    <option value="">未设置</option>
-                    {groupByProvider(choices).map((group) => (
-                      <optgroup key={group.provider} label={group.label}>
-                        {group.options.map((item) => (
-                          <option key={item.id} value={item.id}>{item.model}</option>
-                        ))}
-                      </optgroup>
-                    ))}
-                    {/* 引用已作废或不在已准入选项里的定义时保留这一项（设计说明第 4.4 节表格） */}
-                    {unavailable !== "" && (
-                      <option value={choice.modelId}>{model?.model ?? choice.modelId}</option>
-                    )}
-                  </select>
-                </label>
-                <label className="y10-field mm-field">
-                  <span className="mm-label">推理档位</span>
-                  <select className="y10-select" value={choice.tier} data-testid={`default-tier-${department}`}
-                          disabled={(model?.reasoning_levels ?? []).length === 0 && choice.tier === ""}
-                          onChange={(event) => setEditingDefaults((current) => ({
-                            ...current,
-                            [department]: { ...choice, tier: event.target.value },
-                          }))}>
-                    <option value="">跟随（不使用档位）</option>
-                    {tiers.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-                  </select>
-                </label>
-                {(model?.reasoning_levels ?? []).length === 0 && !choice.tier && (
-                  <p className="y10-small y10-muted mm-hint" data-testid={`tier-hint-${department}`}>
-                    该模型未声明推理档位，请求不带推理参数。
-                  </p>
-                )}
-                {unavailable !== "" && (
-                  <p className="y10-warn-text mm-warn" data-testid={`unavailable-${department}`}>{unavailable}</p>
-                )}
-                {reminders.map((text) => <p className="y10-warn-text mm-warn" key={text} data-testid={`reminder-${department}`}>{text}</p>)}
-              </div>
-            );
-          })}
-        </div>
-        <div className="y10-row mm-actions">
-          <button type="button" className="y10-btn primary" data-testid="save-defaults" disabled={busy}
-                  onClick={() => void saveDefaults()}>
-            保存部门默认
-          </button>
-        </div>
-        {defaultsStatus && (
-          <p className={defaultsStatus.kind === "ok" ? "y10-small mm-ok" : "y10-warn-text mm-warn"} role="status" data-testid="defaults-status">
-            {defaultsStatus.message}
-          </p>
-        )}
-      </Block>
-
-      {pendingSave && (
-        <div className="y10-modal-backdrop modal-backdrop" role="presentation" onClick={() => setPendingSave(null)}>
-          <div className="y10-modal modal" role="dialog" aria-modal="true" aria-label="确认保存" data-testid="confirm-save"
-               onClick={(event) => event.stopPropagation()}>
-            <h2>确认保存</h2>
-            <p className="y10-warn-text mm-warn" data-testid="confirm-save-list">{confirmImpactText(saveImpact)}</p>
-            <div className="y10-row mm-actions">
-              <button type="button" className="y10-btn primary danger" data-testid="confirm-save-yes" disabled={busy}
-                      onClick={() => void runSave(pendingSave.body, saveSuccessText(form?.mode ?? "edit"),
-                        pendingSave.state, pendingSave.secret, pendingSave.persist)}>确认保存</button>
-              <button type="button" className="y10-btn" data-testid="confirm-save-no" onClick={() => setPendingSave(null)}>取消</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {pendingDelete !== null && (
-        <div className="y10-modal-backdrop modal-backdrop" role="presentation" onClick={() => setPendingDelete(null)}>
-          <div className="y10-modal modal" role="dialog" aria-modal="true" aria-label="确认删除" data-testid="confirm-delete"
-               onClick={(event) => event.stopPropagation()}>
-            <h2>确认删除</h2>
-            <p className={deleteImpact !== null && deleteImpact.references.length > 0 ? "y10-warn-text mm-warn" : "y10-small y10-muted mm-hint"}
-               data-testid="confirm-delete-list">{providerDeleteConfirmation(deleteImpact)}</p>
-            <div className="y10-row mm-actions">
-              <button type="button" className="y10-btn primary danger" data-testid="confirm-delete-yes"
-                      disabled={busy || (deleteImpact !== null && deleteImpact.references.length > 0)}
-                      onClick={() => void runDelete(pendingDelete)}>确认删除</button>
-              <button type="button" className="y10-btn" data-testid="confirm-delete-no" onClick={() => setPendingDelete(null)}>取消</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {jsonOpen && (
+      {jsonOpen ? (
         <JsonDialog
-          document={document === null ? null : {
-            providers: document.providers,
-            models: document.models,
-            bindings: document.bindings,
-          }}
+          document={document === null ? null : (document as unknown as EditableDocument)}
           error={documentError}
           onSave={saveDocument}
           onClose={() => setJsonOpen(false)}
         />
-      )}
+      ) : null}
     </div>
   );
-}
-
-// 一条命令的结果：接受时 ok，没有成功时显示那一句说明
-// （应用层拒绝、接口层校验错误与其它失败各有各的说法，工单 #740）
-function interpret(outcome: CommandOutcome): SubmitResult {
-  if (outcome.ok) {
-    return { ok: true, message: "" };
-  }
-  const problem = outcome.problem;
-  if (problem.kind === "invalid") {
-    // 合同校验失败（422）：这一页编辑的是原始 JSON，按字段位置指出问题改哪一处（第 4.6 节）；
-    // 服务端给的字段错误明细里就有位置，没有明细时用服务端给的那句中文说明
-    const detail = (problem.body as { detail?: { loc?: unknown[]; msg?: string }[] } | null)?.detail;
-    if (Array.isArray(detail)) {
-      const parts = detail.map((item) => {
-        const location = Array.isArray(item.loc) ? item.loc.filter((part) => part !== "body").join(".") : "";
-        return location === "" ? String(item.msg ?? "") : `${location}：${item.msg ?? ""}`;
-      });
-      return { ok: false, message: parts.join("；") };
-    }
-  }
-  return { ok: false, message: commandProblemText(problem) };
-}
-
-// 某部门当前绑定到所选模型的已保存请求档位（设计说明第 9.1 节）：绑定指向别的模型时没有已保存档位
-function savedAdmissionTier(catalog: Catalog, modelId: string): string {
-  for (const binding of Object.values(catalog.bindings)) {
-    if (binding.model_id === modelId) {
-      return binding.requested_tier ?? "";
-    }
-  }
-  return "";
-}
-
-// 引用不可用时下拉框的说明（设计说明第 4.4 节）：绑定的定义已不在已准入的定义里，
-// 且准入记录显示作废时显示「无法使用：准入已作废」，否则提示先做模型测试
-function unavailableBindingLabel(catalog: Catalog, modelId: string): string {
-  if (modelId === "") {
-    return "";
-  }
-  if (catalog.models.some((item) => item.id === modelId)) {
-    const admission = catalog.admissions.find((item) => item.model_id === modelId);
-    if (admission && admission.stale) {
-      return STALE_ADMISSION_LABEL;
-    }
-    return "";
-  }
-  return "该模型不在已准入的定义中，请先做模型测试。";
-}
-
-function groupByProvider(choices: ModelOption[]): { provider: string; label: string; options: ModelOption[] }[] {
-  const groups: Record<string, { provider: string; label: string; options: ModelOption[] }> = {};
-  for (const choice of choices) {
-    const group = groups[choice.provider_id] ?? {
-      provider: choice.provider_id, label: choice.provider_name, options: [],
-    };
-    group.options.push(choice);
-    groups[choice.provider_id] = group;
-  }
-  return Object.values(groups);
-}
-
-// 一份连接内容：卡片里「移除」与表单保存用的是同一份取值口径（设计说明第 4.4 节的拟议修改）
-function providerInputOf(provider: Catalog["providers"][number]): Record<string, unknown> {
-  return {
-    id: provider.id, name: provider.name, base_url: provider.base_url,
-    credential_ref: provider.credential_ref, timeout_sec: provider.timeout_sec,
-    preset_id: provider.preset_id, models_url: provider.models_url,
-  };
-}
-
-// 一条模型访问定义按目录文档形状提交：catalog.change_impact 的拟议修改用它
-function modelDocumentFromDefinition(model: Catalog["models"][number]): Record<string, unknown> {
-  return {
-    id: model.id, model: model.model, protocol: model.protocol, context_window: model.context_window,
-    max_output_tokens: model.max_output_tokens, capability_source: model.capability_source,
-    accepts_required_tool_call: model.accepts_required_tool_call, input_modalities: model.input_modalities,
-    reasoning_levels: model.reasoning_levels, default_reasoning_level: model.default_reasoning_level,
-    reasoning_mode: model.reasoning_mode,
-  };
-}
-
-// 候选事件里的每一项按第 4.3 节的字段读取：id 必须有，容量与来源可选
-function isUpstreamCandidate(value: Record<string, unknown>): value is UpstreamCandidate {
-  return typeof value.id === "string" && value.id.trim() !== "";
 }

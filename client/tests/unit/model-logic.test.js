@@ -1,307 +1,306 @@
-// 模型管理页的纯计算（工单 #93、#94）：预填、档位选项、准入汇总与显示、影响列表与引用方、凭据状态。
+// 模型管理页的纯计算（工单 #1297）：筛选、搜索与分批，各状态的文字，
+// 「不可用的按钮旁写明缺哪一项」，取消选用被拒绝时的引用方，以及项目设置页仍要用的取值。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  REASONING_LEVELS,
-  UI_PROTOCOLS,
-  CUSTOM_PRESET_ID,
-  STALE_ADMISSION_LABEL,
-  admittedOptions,
-  capacityIssueText,
-  collectImpact,
-  confirmImpactText,
-  connectionTestable,
-  defaultLevelOptions,
-  defaultModelsUrl,
-  effectiveModelsUrl,
-  emptyFormState,
-  formDocumentValid,
-  formStateFromProvider,
-  formPatchForBaseUrl,
-  formPatchForPreset,
+  DEPARTMENTS,
+  FIRST_BATCH,
+  MORE_BATCH,
+  admittedModels,
+  candidateBatch,
+  candidateKey,
+  capacityInputIssue,
+  capacityKnown,
+  capacityMissingText,
+  connectIssue,
+  currentEffectiveLabel,
+  departmentBindings,
+  departmentTierBindings,
+  filterCandidates,
+  followDepartmentLabel,
   groupAdmittedModels,
-  intFromInput,
-  MODEL_OPTION_COLLATOR,
-  modelRemoveReferrers,
-  patchRowCapacity,
-  prefillModel,
-  prefillSourceText,
-  presetBaseUrlFor,
-  presetById,
-  normalizeBaseUrl,
-  providerDeleteConfirmation,
-  providerInputFromForm,
-  reasoningModeOptions,
-  rowFromCandidate,
-  rowFromManual,
-  rowSavable,
-  rowToModelInput,
-  rowsSavable,
-  testKeyOf,
-  testText,
+  matchesFilter,
+  matchesSearch,
+  mergedModelId,
+  modelById,
+  moreCount,
+  removalRejectionText,
+  selectedModelRows,
+  selectionStatusKind,
+  selectionStatusLabel,
   tierOptions,
-  credentialStatusLabel,
-  credentialRefIssue,
-  credentialSaveDisabledReason,
-  credentialSavedText,
-  credentialSourceText,
-  isDotenvKey,
-  suggestedDotenvKey,
-  DOTENV_KEY_EXAMPLE,
-  admissionSummary,
-  admissionFor,
-  admissionLabel,
-  rowCapacityValid,
-  canSaveRows,
-  candidateToRow,
-  canJoinCandidates,
-  sanitizeModelId,
-  saveSuccessText,
 } from "../../src/renderer/src/views/models/model-logic.ts";
 
-const PRESETS = [
-  {
-    id: "opencode-go",
-    name: "OpenCode Go",
-    auth: "api_key",
-    default_protocol: "chat_completions",
-    base_urls: {
-      responses: "https://opencode.ai/zen/go/v1",
-      chat_completions: "https://opencode.ai/zen/go/v1",
-      messages: "https://opencode.ai/zen/go/v1",
-    },
-    models_url: "https://opencode.ai/zen/go/v1/models",
-    docs_url: "https://opencode.ai/docs/go/",
-    source: "https://opencode.ai/docs/go/#endpoints",
-    notes: "",
-  },
+// 一个候选：窗口与输出上限已知，协议按服务端给的值
+function candidate(id, over = {}) {
+  return {
+    id,
+    protocol: "chat_completions",
+    protocol_source: "capability_table",
+    context_window: 200000,
+    context_window_source: "models_url",
+    max_output_tokens: 32000,
+    max_output_tokens_source: "models_url",
+    input_modalities: ["text"],
+    input_modalities_source: "models_url",
+    provider: null,
+    reasoning: null,
+    applicable: true,
+    ...over,
+  };
+}
+
+const ROWS = [
+  { provider_id: "go", provider_address: "http://127.0.0.1:1/v1", candidate: candidate("glm-4.6") },
+  { provider_id: "go", provider_address: "http://127.0.0.1:1/v1", candidate: candidate("vision-1", {
+    input_modalities: ["text", "image"], reasoning: true,
+  }) },
+  { provider_id: "go", provider_address: "http://127.0.0.1:1/v1", candidate: candidate("no-capacity", {
+    context_window: null, context_window_source: null, max_output_tokens: null, max_output_tokens_source: null,
+  }) },
+  { provider_id: "go", provider_address: "http://127.0.0.1:1/v1", candidate: candidate("image-only", {
+    applicable: false, output_modalities: ["image"],
+  }) },
 ];
 
-const TABLE = {
-  revision: "2026-10-01.1",
-  snapshot_date: "2026-10-01",
-  source: "https://models.dev",
-  presets: {
-    "opencode-go": [
-      {
-        model: "deepseek-v4-flash",
-        protocol: "chat_completions",
-        input_modalities: ["text"],
-        output_modalities: ["text"],
-        context_window: 1000000,
-        max_output_tokens: 128000,
-        tool_call: true,
-        reasoning: true,
-      },
-      {
-        protocol: "responses",
-        model: "vision-model",
-        input_modalities: ["text", "image"],
-        output_modalities: ["text"],
-        context_window: 256000,
-        max_output_tokens: 32000,
-        tool_call: true,
-        reasoning: false,
-      },
-    ],
-  },
-};
+// —— 搜索 ——
 
-
-
-test("凭据状态用词（设计说明第 9.1 节）：缺失、内存、环境、.env", () => {
-  assert.equal(credentialStatusLabel({ configured: false, source: "missing" }), "缺失");
-  assert.equal(credentialStatusLabel({ configured: true, source: "override" }), "来源：内存");
-  assert.equal(credentialStatusLabel({ configured: true, source: "env" }), "来源：环境");
-  assert.equal(credentialStatusLabel({ configured: true, source: "dotenv" }), "来源：.env");
+test("搜索按名称、提供方与上游模型 ID 匹配，空搜索全都留下", () => {
+  assert.equal(matchesSearch(ROWS[0], ""), true);
+  assert.equal(matchesSearch(ROWS[0], "GLM"), true);
+  assert.equal(matchesSearch(ROWS[0], "glm"), true);
+  assert.equal(matchesSearch(ROWS[0], "没有"), false);
+  const named = [{ provider_id: "go", provider_address: "http://x/v1",
+    candidate: candidate("deepseek/deepseek-v4", { provider: "deepseek" }) }];
+  assert.equal(matchesSearch(named[0], "deepseek"), true);
+  // 提供方也在搜索范围里
+  assert.equal(matchesSearch(named[0], "provider"), false);
 });
 
-test("写入 .env 的键名规则：不合规的引用写明规则并举一个合规的写法（工单 #1158）", () => {
-  // 合规的写法原样通过；没有勾写入 .env 时不检查
-  assert.equal(isDotenvKey("TRIAL_MODEL_KEY"), true);
-  assert.equal(isDotenvKey("trial-model-key"), false);
-  assert.equal(credentialRefIssue("TRIAL_MODEL_KEY", true), "");
-  assert.equal(credentialRefIssue("trial-model-key", false), "");
-  // 不合规：说明里有规则与一个可用的写法
-  const issue = credentialRefIssue("trial-model-key", true);
-  assert.equal(issue, "凭据引用 trial-model-key 不能写进 .env：键名只用字母、数字与下划线，不以数字开头，例如 TRIAL_MODEL_KEY");
-  assert.equal(suggestedDotenvKey("9lives-key"), "KEY_9LIVES_KEY");
-  assert.equal(suggestedDotenvKey("---"), DOTENV_KEY_EXAMPLE);
+// —— 筛选 ——
+
+test("可自动配置的筛选只留容量已知的候选", () => {
+  const rows = filterCandidates(ROWS, "", "auto", new Set());
+  assert.deepEqual(rows.map((row) => row.candidate.id), ["glm-4.6", "vision-1"]);
+  assert.equal(capacityKnown(ROWS[2].candidate), false);
 });
 
-test("「保存凭据」不可用时写明缺哪一项（工单 #1158）", () => {
-  assert.equal(credentialSaveDisabledReason({ ref: "", secret: "k", persist: false }), "填写凭据引用");
-  assert.equal(credentialSaveDisabledReason({ ref: "TRIAL_MODEL_KEY", secret: "", persist: true }), "填写 API Key");
-  assert.match(credentialSaveDisabledReason({ ref: "trial-model-key", secret: "k", persist: true }),
-    /不能写进 \.env/);
-  // 引用不合规时先说引用这一项，不再说缺 Key
-  assert.match(credentialSaveDisabledReason({ ref: "trial-model-key", secret: "", persist: true }),
-    /不能写进 \.env/);
-  assert.equal(credentialSaveDisabledReason({ ref: "TRIAL_MODEL_KEY", secret: "k", persist: true }), "");
-});
-
-test("准入摘要按连接统计「已准入 x · 候选 y」", () => {
-  const provider = {
-    id: "p1",
-    models: [
-      { id: "m1", provider_id: "p1" },
-      { id: "m2", provider_id: "p1" },
-      { id: "m3", provider_id: "p1" },
-      { id: "m4", provider_id: "p1" },
-    ],
-  };
-  const admissions = [
-    { model_id: "m1", provider_id: "p1", admitted: true, stale: false },
-    { model_id: "m2", provider_id: "p1", admitted: true, stale: true },
-    { model_id: "m3", provider_id: "p1", admitted: false, stale: false },
-    // 别的连接不计入
-    { model_id: "m9", provider_id: "other", admitted: true, stale: false },
-  ];
-  assert.deepEqual(admissionSummary(provider, admissions), { admitted: 1, candidates: 3 });
-});
-
-test("准入列显示测试时间与实际返回的模型；候选与作废各自显示", () => {
-  assert.equal(admissionLabel(null), "候选");
-  assert.equal(
-    admissionLabel({ admitted: true, stale: false, admitted_at: "2026-10-02T01:00:00Z", admitted_model: "glm-4.6" }),
-    "已准入：2026-10-02T01:00:00Z · glm-4.6",
+test("支持图像、支持推理、全部模型与已选用的筛选各按自己的条件", () => {
+  assert.deepEqual(
+    filterCandidates(ROWS, "", "vision", new Set()).map((row) => row.candidate.id),
+    ["vision-1"],
   );
-  // 视图里 admitted 与 stale 互斥：作废的准入 admitted 为假、stale 为真
-  assert.equal(admissionLabel({ admitted: false, stale: true }), "候选（准入已作废）");
-  assert.equal(admissionLabel({ admitted: false, stale: false }), "候选");
-  const admissions = [{ model_id: "m1", provider_id: "p1", admitted: true, stale: false }];
-  assert.equal(admissionFor({ id: "m1", provider_id: "p1" }, admissions)?.admitted, true);
-  assert.equal(admissionFor({ id: "m2", provider_id: "p1" }, admissions), null);
+  assert.deepEqual(
+    filterCandidates(ROWS, "", "reasoning", new Set()).map((row) => row.candidate.id),
+    ["vision-1"],
+  );
+  assert.equal(filterCandidates(ROWS, "", "all", new Set()).length, 4);
+  const selected = new Set([candidateKey("go", "no-capacity")]);
+  assert.deepEqual(
+    filterCandidates(ROWS, "", "selected", selected).map((row) => row.candidate.id),
+    ["no-capacity"],
+  );
+  assert.equal(matchesFilter(ROWS[3], "auto", new Set()), false);
 });
 
+test("搜索与筛选一起时两边都要过", () => {
+  const rows = filterCandidates(ROWS, "vision", "auto", new Set());
+  assert.deepEqual(rows.map((row) => row.candidate.id), ["vision-1"]);
+  assert.deepEqual(filterCandidates(ROWS, "vision", "reasoning", new Set()).length, 1);
+});
 
+// —— 分批 ——
 
+test("候选先显示 8 个，之后每次再显示 12 个", () => {
+  const many = Array.from({ length: 30 }, (_, index) => ({
+    provider_id: "go",
+    provider_address: "http://x/v1",
+    candidate: candidate(`m-${index}`),
+  }));
+  const first = candidateBatch(many, FIRST_BATCH);
+  assert.equal(first.shown.length, 8);
+  assert.equal(first.remaining, 22);
+  const second = candidateBatch(many, FIRST_BATCH + MORE_BATCH);
+  assert.equal(second.shown.length, 20);
+  assert.equal(second.remaining, 10);
+  assert.equal(moreCount(22), 12);
+  assert.equal(moreCount(5), 5);
+});
 
+// —— 状态的文字 ——
 
+test("选用的状态按设计说明第 9.5 节的用词", () => {
+  assert.equal(selectionStatusLabel("completing"), "补全参数");
+  assert.equal(selectionStatusLabel("waiting"), "等待验证");
+  assert.equal(selectionStatusLabel("testing"), "验证调用");
+  assert.equal(selectionStatusLabel("failed"), "验证失败");
+  assert.equal(selectionStatusLabel("capacity_unknown"), "容量未知");
+  assert.equal(selectionStatusLabel("not_in_list"), "不在新的模型列表中");
+  assert.equal(selectionStatusLabel("enabled"), "已启用");
+  assert.equal(selectionStatusKind("failed"), "failed");
+  assert.equal(selectionStatusKind("capacity_unknown"), "unknown");
+  assert.equal(selectionStatusKind("testing"), "running");
+});
 
+// —— 不可用的按钮旁写明缺哪一项 ——
 
+test("「获取模型」不可用时写明缺的是地址还是 Key", () => {
+  assert.equal(connectIssue({ address: "", api_key: "", credential_saved: false }), "填写服务地址");
+  assert.equal(connectIssue({ address: "   ", api_key: "k", credential_saved: false }), "填写服务地址");
+  assert.equal(
+    connectIssue({ address: "https://api.example.com/v1", api_key: "", credential_saved: false }),
+    "填写 API Key",
+  );
+  // 已有凭据的连接不用再填 Key
+  assert.equal(
+    connectIssue({ address: "https://api.example.com/v1", api_key: "", credential_saved: true }),
+    "",
+  );
+  // 地址不成样子时先说地址
+  assert.equal(
+    connectIssue({ address: "ftp://api.example.com/v1", api_key: "k", credential_saved: true }),
+    "服务地址要用 http 或 https",
+  );
+  assert.equal(
+    connectIssue({ address: "https://api.example.com/v1", api_key: "k", credential_saved: false }),
+    "",
+  );
+});
 
+test("容量未知写明缺哪一项，手填的容量不合法时也写明哪一项", () => {
+  assert.equal(capacityMissingText(["context_window", "max_output_tokens"]), "缺少窗口与输出上限");
+  assert.equal(capacityMissingText(["context_window"]), "缺少窗口");
+  assert.equal(capacityMissingText(["max_output_tokens"]), "缺少输出上限");
+  assert.equal(capacityMissingText([]), "");
 
+  assert.equal(capacityInputIssue(null, null), "填写窗口与输出上限");
+  assert.equal(capacityInputIssue(200000, null), "填写输出上限");
+  assert.equal(capacityInputIssue(null, 32000), "填写窗口");
+  assert.equal(capacityInputIssue(200000, 32000), "");
+  assert.equal(capacityInputIssue(1000, 32000), "输出上限不能大于窗口");
+  assert.equal(capacityInputIssue(200000, 0), "输出上限必须是正整数");
+});
 
+// —— 取消选用被拒绝时的引用方 ——
 
+test("服务端给的位置串换成看得懂的引用方", () => {
+  assert.equal(
+    removalRejectionText("仍被引用，无法移除：bindings.product、bindings.engineering、bindings.quality"),
+    "仍被引用，无法移除：部门默认：产品、部门默认：工程、部门默认：质检",
+  );
+  assert.equal(
+    removalRejectionText("仍被引用，无法移除：projects.p1.department_settings.quality"),
+    "仍被引用，无法移除：项目部门设置：质检",
+  );
+  // 不是位置串时原样给出
+  assert.equal(removalRejectionText("目录已经变化，请重新读取以后再提交"), "目录已经变化，请重新读取以后再提交");
+});
 
+// —— 已选模型清单 ——
 
-test("提交的形状：档位与输入方式按声明写入，默认档位不在支持档位时为未选择（验收第 4 项）", () => {
-  const row = {
-    ...rowFromCandidate({ id: "m1", context_window: 1000, max_output_tokens: 100 }, TABLE, "opencode-go",
-                        presetById(PRESETS, "opencode-go")),
-    image_input: true,
-    reasoning_levels: ["low", "high"],
-    default_reasoning_level: "high",
-    reasoning_mode: "effort",
+test("已选模型清单只列正在选用或已启用的定义", () => {
+  const catalog = {
+    providers: [{ id: "go", base_url: "http://x/v1" }],
+    models: [
+      { id: "d1", provider_id: "go", model: "glm-4.6", protocol: "chat_completions", context_window: 200000,
+        max_output_tokens: 32000, capability_source: "窗口：上游模型列表", accepts_required_tool_call: true,
+        input_modalities: ["text"], reasoning_levels: [], default_reasoning_level: null, reasoning_mode: "" },
+      { id: "d2", provider_id: "go", model: "slow", protocol: "chat_completions", context_window: null,
+        max_output_tokens: null, capability_source: "", accepts_required_tool_call: true,
+        input_modalities: ["text"], reasoning_levels: [], default_reasoning_level: null, reasoning_mode: "" },
+      { id: "d3", provider_id: "go", model: "idle", protocol: "chat_completions", context_window: 1,
+        max_output_tokens: 1, capability_source: "", accepts_required_tool_call: true,
+        input_modalities: ["text"], reasoning_levels: [], default_reasoning_level: null, reasoning_mode: "" },
+    ],
+    admissions: [{ model_id: "d1", provider_id: "go", admitted: true, stale: false, admitted_at: "2026-10-30T10:00:00Z",
+      admitted_model: "glm-4.6-real" }],
+    selections: [{ provider_id: "go", model_id: "d2", model: "slow", sequence: 1, status: "capacity_unknown",
+      missing: ["context_window", "max_output_tokens"], error: null }],
   };
-  const input = rowToModelInput(row);
-  assert.equal(input.context_window, 1000);
-  assert.equal(input.max_output_tokens, 100);
-  assert.deepEqual(input.input_modalities, ["text", "image"]);
-  assert.equal(input.default_reasoning_level, "high");
-  // 默认档位不属于支持档位时交回 null（默认档位只能从已选的支持档位中选择）
-  assert.equal(rowToModelInput({ ...row, default_reasoning_level: "max" }).default_reasoning_level, null);
-  // 不支持图像时只有文本
-  assert.deepEqual(rowToModelInput({ ...row, image_input: false }).input_modalities, ["text"]);
+  const rows = selectedModelRows(catalog);
+  assert.deepEqual(rows.map((row) => row.model_id).sort(), ["d1", "d2"]);
+  const enabled = rows.find((row) => row.model_id === "d1");
+  assert.equal(enabled.status, "enabled");
+  assert.equal(enabled.admitted_model, "glm-4.6-real");
+  const unknown = rows.find((row) => row.model_id === "d2");
+  assert.equal(unknown.status, "capacity_unknown");
+  assert.deepEqual(unknown.missing, ["context_window", "max_output_tokens"]);
+  assert.equal(unknown.provider_address, "http://x/v1");
 });
 
-test("连接提交的请求时限：填了取填的值，留空不提交该字段（工单 #294）", () => {
-  const state = emptyFormState(600);
-  assert.equal(providerInputFromForm(state).timeout_sec, 600);
-  assert.equal(providerInputFromForm({ ...state, timeout_sec: "45" }).timeout_sec, 45);
-  // 留空时整个字段不出现，后端 ProviderInput 的默认值生效，客户端不写第二个数
-  assert.equal("timeout_sec" in providerInputFromForm({ ...state, timeout_sec: "" }), false);
+// —— 部门使用的保存 ——
+
+test("换一个部门的模型时其余两个部门照当前的值一起写回去", () => {
+  const catalog = {
+    bindings: {
+      product: { provider_id: "go", model_id: "d1", requested_tier: "low" },
+      engineering: { provider_id: "go", model_id: "d2", requested_tier: null },
+    },
+    models: [
+      { id: "d1", provider_id: "go", model: "a" },
+      { id: "d2", provider_id: "go", model: "b" },
+      { id: "d3", provider_id: "go", model: "c" },
+    ],
+  };
+  const bindings = departmentBindings(catalog, "quality", "d3");
+  assert.deepEqual(Object.keys(bindings).sort(), ["engineering", "product", "quality"]);
+  assert.equal(bindings.product.model_id, "d1");
+  assert.equal(bindings.product.requested_tier, "low");
+  assert.equal(bindings.engineering.model_id, "d2");
+  assert.equal(bindings.quality.model_id, "d3");
+  // 选「未设置」时这个部门不再写，别的部门不动
+  const cleared = departmentBindings(catalog, "quality", "");
+  assert.equal(cleared.quality, undefined);
+  assert.equal(cleared.product.model_id, "d1");
 });
 
-test("部门默认的选项只含已准入且未作废的定义，档位选项保留按模型限制的已存值（第 9.1 节）", () => {
-  const providers = [
-    { id: "p1", name: "OpenCode Go" },
-    { id: "p2", name: "其他连接" },
-  ];
+test("改请求档位时模型不动，只换这一个部门的档位", () => {
+  const catalog = {
+    bindings: {
+      product: { provider_id: "go", model_id: "d1", requested_tier: "low" },
+      quality: { provider_id: "go", model_id: "d2", requested_tier: null },
+    },
+  };
+  const bindings = departmentTierBindings(catalog, "product", "high");
+  assert.equal(bindings.product.requested_tier, "high");
+  assert.equal(bindings.product.model_id, "d1");
+  assert.equal(bindings.quality.requested_tier, null);
+});
+
+// —— 项目设置页仍要用的取值 ——
+
+test("部门默认与项目设置的模型选项按连接分组", () => {
   const models = [
-    { id: "m1", provider_id: "p1", model: "glm-4.6" },
-    { id: "m2", provider_id: "p1", model: "kimi-k2" },
-    { id: "m3", provider_id: "p2", model: "deepseek" },
+    { id: "d1", provider_id: "go", model: "glm-4.6" },
+    { id: "d2", provider_id: "go", model: "vision-1" },
   ];
+  const providers = [{ id: "go", name: "OpenCode Go" }, { id: "other", name: "别的" }];
   const admissions = [
-    { model_id: "m1", provider_id: "p1", admitted: true, stale: false },
-    { model_id: "m2", provider_id: "p1", admitted: true, stale: true },
-    { model_id: "m3", provider_id: "p2", admitted: true, stale: false },
+    { model_id: "d1", provider_id: "go", admitted: true, stale: false },
+    { model_id: "d2", provider_id: "go", admitted: false, stale: false },
   ];
-  const options = admittedOptions(models, providers, admissions);
-  assert.deepEqual(options.map((item) => item.id), ["m3", "m1"]);
-  assert.equal(options.find((item) => item.id === "m1")?.provider_name, "OpenCode Go");
-
-  assert.deepEqual(tierOptions(["low", "medium"], "low"), [
-    { value: "low", label: "low" },
-    { value: "medium", label: "medium" },
-  ]);
-  // 已保存的档位不在支持档位内：额外保留这一项并标明按模型限制
-  const kept = tierOptions(["low"], "max");
-  assert.equal(kept.length, 2);
-  assert.match(kept[1].label, /按模型限制/);
+  const options = admittedModels(models, providers, admissions);
+  assert.deepEqual(options.map((item) => item.id), ["d1"]);
+  const groups = groupAdmittedModels(options, providers);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].provider_name, "OpenCode Go");
 });
 
-
-
-
-test("模型测试的结果显示在模型行：通过写用时，未通过写原因（工单 #294）", () => {
-  const passed = testText({
-    kind: "model", ok: true, elapsed_ms: 1234, actual_model: "glm-4.6", admitted: true, error: null,
-  });
-  assert.match(passed, /模型测试通过/);
-  assert.match(passed, /1234 毫秒/);
-  // 失败时写出上游给出的原因
-  const failed = testText({ kind: "model", ok: false, elapsed_ms: 12, error: "401 unauthorized", admitted: null });
-  assert.match(failed, /模型测试未通过/);
-  assert.match(failed, /401 unauthorized/);
-  // 事件按同一把键找回界面上的这一行
-  assert.equal(testKeyOf({ kind: "model", model_id: "m1" }), "model:m1");
-  assert.equal(testKeyOf({ kind: "connection", provider_id: "p1" }), "connection:p1");
+test("档位选项、跟随说明与设置的取值", () => {
+  assert.deepEqual(tierOptions(["low", "high"], null).map((item) => item.value), ["low", "high"]);
+  assert.equal(tierOptions(["low"], "max")[1].label, "max（不在该模型的支持档位内，请求按模型限制）");
+  assert.equal(followDepartmentLabel(""), "跟随部门默认");
+  assert.equal(followDepartmentLabel("glm-4.6"), "跟随部门默认（当前：glm-4.6）");
+  assert.equal(currentEffectiveLabel(null), "");
+  assert.equal(currentEffectiveLabel({ state: "unset" }), "未设置");
+  assert.equal(currentEffectiveLabel({ state: "unusable", message: "准入已作废" }), "无法使用：准入已作废");
+  assert.equal(currentEffectiveLabel({ state: "ok", model: "glm-4.6" }), "glm-4.6");
 });
 
-
-
-test("连接测试结果写明读取的模型列表地址（工单 #302）", () => {
-  const passed = testText({
-    kind: "connection", ok: true, elapsed_ms: 123, error: null,
-    source_url: "https://cbcn.com/v1/models",
-  });
-  assert.equal(passed, "已读取模型列表地址 https://cbcn.com/v1/models：连接测试通过（123 毫秒）");
-  // 未通过时同样写明是哪个地址没有读到，不让人误以为请求地址也通过了
-  const failed = testText({
-    kind: "connection", ok: false, elapsed_ms: 8, error: "HTTP 401",
-    source_url: "https://cbcn.com/v1/models",
-  });
-  assert.match(failed, /https:\/\/cbcn\.com\/v1\/models/);
-  assert.match(failed, /HTTP 401/);
-  // 模型测试不写地址：它证明的是这一条定义可调
-  const model = testText({ kind: "model", ok: true, elapsed_ms: 50, actual_model: "glm-4.6", admitted: true, error: null });
-  assert.doesNotMatch(model, /模型列表地址/);
-});
-
-
-
-
-test("保存凭据的结果写在表单旁：成功写「已保存 API Key」加版本与来源（工单 #1216）", () => {
-  // 来源的词按设计说明第 9.1 节「凭据」一行：进程内存与 .env 是两种写入方式各自的结果
-  assert.equal(credentialSourceText("override"), "进程内存");
-  assert.equal(credentialSourceText("dotenv"), ".env");
-  assert.equal(credentialSourceText("env"), "环境");
-  assert.equal(credentialSourceText("none"), "不需要凭据");
-  // 以后多一种来源时照原样写出来，不吞掉
-  assert.equal(credentialSourceText("vault"), "vault");
-
-  const memory = credentialSavedText({ ref: "OPENCODE_GO_KEY", version: 3, source: "override" });
-  assert.equal(memory, "已保存 API Key：凭据 OPENCODE_GO_KEY 版本 3，来源：进程内存。");
-  const dotenv = credentialSavedText({ ref: " TRIAL_KEY ", version: 1, source: "dotenv" });
-  assert.equal(dotenv, "已保存 API Key：凭据 TRIAL_KEY 版本 1，来源：.env。");
-  // 版本没读到时说没读到，不按基准版本猜一个数（界面读的是刷新以后的目录）
-  const unknown = credentialSavedText({ ref: "TRIAL_KEY", version: null, source: "override" });
-  assert.match(unknown, /已保存 API Key/);
-  assert.match(unknown, /版本没有读到/);
-  assert.doesNotMatch(unknown, /版本 \d/);
+test("项目设置的模型取值与合并", () => {
+  assert.equal(modelById([{ id: "d1", model: "glm-4.6" }], "d1").model, "glm-4.6");
+  assert.equal(modelById([], "d1"), null);
+  assert.deepEqual(DEPARTMENTS, ["product", "engineering", "quality"]);
 });

@@ -1,23 +1,150 @@
-// 模型管理页的端到端测试（工单 #93 的验收）：Playwright 打开 Chromium 页面，页面由真实后端提供
-// （client/tests/e2e/backend.py）。后端内启动真实的 HTTP 上游（Responses 协议的最小推理服务与模型列表服务），
-// 候选、连接测试与模型测试都发真实请求。窗口尺寸 1440×900 与 1920×1080，控制台错误为零。
+// 模型管理页的端到端测试（工单 #1297）：Playwright 打开 Chromium 页面，页面由真实后端提供
+// （client/tests/e2e/backend.py）。用例在测试内启动真实的 HTTP 上游：模型列表与 Chat Completions
+// 推理都按真实协议应答（写法照 harness/tests/protocol_helpers.py），不用假对象。
+//
+// 主路径：填写地址与 Key → 获取 → 搜索筛选 → 勾选两个模型 → 补全参数与验证 → 已启用 →
+// 三个部门自动使用第一个启用的模型 → 刷新页面以后状态仍在。
+// 失败路径：Key 被拒绝、地址不可达、空列表、单个模型验证失败、容量未知后手填继续、搜索无结果；
+// 原因都写在被操作的对象旁边，同一个视口里看得到。
+// 取消勾选：被部门使用的模型取消不了并写明引用方；进行中的模型取消以后迟到的结果不启用它。
 
-import { expect,test } from "@playwright/test";
-import { createServer } from "node:http";
+import { expect, test } from "@playwright/test";
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { startBackend,startClient,type Backend,type ClientApp } from "./fixtures";
+import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
-// 上游凭据：测试经命令设置在内存里，页面与网络响应都不应出现它
-const KEY = "sk-e2e-opencode-go-8f3a1c";
+// 上游的凭据：页面填的 Key 必须与它一致，否则上游按真实服务的方式拒绝
+const UPSTREAM_KEY = "sk-e2e-models-2f8c41";
 
-// 每条用例各自启动一份后端与客户端：用例会修改目录（保存连接、部门默认、凭据），
-// 共用一份后端会让用例之间互相影响。后端启动用时由 git 子进程与目录种子决定（#107 裁定，
-// 见 docs/archive/architecture-issues-2026-09-10.md），这里单独放宽每条用例的时限
-async function openModels(
-  size: { width: number; height: number },
-  options: { admitAndBind?: boolean; rejectUpstream?: boolean } = {},
-): Promise<{ backend: Backend; client: ClientApp }> {
-  const backend = await startBackend({ admitAndBind: options.admitAndBind === true, rejectUpstream: options.rejectUpstream === true });
+// 上游给的模型列表：容量、图像输入与推理由这里给出，页面按服务端的值显示
+const UPSTREAM_MODELS = [
+  { id: "trial-alpha", limit: { context: 200000, output: 32000 } },
+  { id: "trial-beta", limit: { context: 128000, output: 16000 } },
+  { id: "trial-vision", limit: { context: 128000, output: 16000 }, modalities: ["text", "image"] },
+  // 上游没有给容量：这一条要手填窗口与输出上限才能继续
+  { id: "trial-unknown" },
+];
+
+// 这个前缀下的模型：上游拒绝推理（HTTP 403），模型测试因此不通过
+const DENIED_MODELS = [{ id: "trial-denied", limit: { context: 64000, output: 8000 } }];
+
+// 这个前缀下的模型：推理慢，用例在测试进行中取消选用
+const SLOW_MODELS = [{ id: "trial-slow", limit: { context: 200000, output: 32000 } }];
+
+// 推理慢时的停顿（毫秒）：够用例在测试进行中取消，又不至于让用例等太久
+const SLOW_DELAY_MS = 4000;
+
+type ChatRequest = {
+  model?: string;
+  messages?: { role?: string }[];
+  tools?: { function?: { name?: string } }[];
+};
+
+type Upstream = {
+  base: string;
+  close: () => Promise<void>;
+};
+
+// 测试内启动的真实 HTTP 上游（工单 #1297）：
+// GET {前缀}/v1/models 给模型列表；POST {前缀}/v1/chat/completions 按 Chat Completions 的 SSE 回答。
+// 前缀决定这一份上游的行为：empty 是空列表，denied 的推理被上游拒绝，slow 的推理慢。
+async function startUpstream(): Promise<Upstream> {
+  const server = createServer((request, response) => {
+    void handleUpstream(request, response);
+  });
+  const port = await new Promise<number>((resolve) => {
+    server.listen(0, "127.0.0.1", () => resolve((server.address() as AddressInfo).port));
+  });
+  return {
+    base: `http://127.0.0.1:${port}`,
+    close: () => new Promise<void>((resolve) => {
+      server.close(() => resolve());
+    }),
+  };
+}
+
+async function handleUpstream(request: IncomingMessage, response: ServerResponse): Promise<void> {
+  const parts = (request.url ?? "/").split("/").filter((part) => part !== "");
+  const scenario = parts[0] === "v1" ? "" : parts[0] ?? "";
+  if ((request.url ?? "").endsWith("/models")) {
+    if (!authorized(request)) {
+      response.writeHead(401, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: { message: "invalid api key", type: "authentication_error" } }));
+      return;
+    }
+    const models = scenario === "empty" ? []
+      : scenario === "denied" ? DENIED_MODELS
+        : scenario === "slow" ? SLOW_MODELS
+          : UPSTREAM_MODELS;
+    response.writeHead(200, { "Content-Type": "application/json" });
+    response.end(JSON.stringify({ data: models }));
+    return;
+  }
+  if ((request.url ?? "").endsWith("/chat/completions")) {
+    const payload = JSON.parse(await readBody(request)) as ChatRequest;
+    if (scenario === "denied") {
+      response.writeHead(403, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({
+        error: { message: "当前 Key 没有调用这个模型的权限", type: "permission_error" },
+      }));
+      return;
+    }
+    if (scenario === "slow") {
+      await new Promise((resolve) => setTimeout(resolve, SLOW_DELAY_MS));
+    }
+    response.writeHead(200, { "Content-Type": "text/event-stream" });
+    response.end(chatStream(payload));
+    return;
+  }
+  response.writeHead(404, { "Content-Type": "application/json" });
+  response.end("{}");
+}
+
+// 自定义服务按 Bearer 带凭据（模型管理设计说明第 4.2 节）
+function authorized(request: IncomingMessage): boolean {
+  return request.headers.authorization === `Bearer ${UPSTREAM_KEY}`;
+}
+
+function readBody(request: IncomingMessage): Promise<string> {
+  return new Promise<string>((resolve) => {
+    let body = "";
+    request.on("data", (chunk: Buffer) => {
+      body += chunk.toString("utf8");
+    });
+    request.on("end", () => resolve(body));
+  });
+}
+
+// Chat Completions 的流式回答（真实 SSE）：请求带工具时给一次完整的工具调用，
+// 收到工具结果以后再回答一段文字——模型测试的工具往返因此真的走一遍
+function chatStream(payload: ChatRequest): string {
+  const hasToolResult = (payload.messages ?? []).some((message) => message.role === "tool");
+  const tool = hasToolResult ? null : payload.tools?.[0];
+  const delta = tool
+    ? {
+      tool_calls: [{
+        index: 0,
+        id: "probe-call",
+        type: "function",
+        function: { name: tool.function?.name ?? "yudao_model_test", arguments: "{}" },
+      }],
+    }
+    : { content: "pong" };
+  const chunk = {
+    id: "chat-1",
+    object: "chat.completion.chunk",
+    created: 1,
+    model: payload.model ?? "trial-model",
+    choices: [{ index: 0, delta, finish_reason: tool ? "tool_calls" : "stop" }],
+    usage: { prompt_tokens: 3, completion_tokens: 2, total_tokens: 5 },
+  };
+  return `data: ${JSON.stringify(chunk)}\n\ndata: [DONE]\n\n`;
+}
+
+// 每条用例各自启动一份后端与客户端：用例会修改目录（连接、选用、部门默认），
+// 共用一份后端会让用例之间互相影响
+async function openModels(size: { width: number; height: number }): Promise<{ backend: Backend; client: ClientApp }> {
+  const backend = await startBackend();
   const client = await startClient(backend, size);
   await expect(client.page.locator(".brand .y10-brand-name")).toContainText("Yudao");
   await client.page.getByRole("button", { name: "模型管理", exact: true }).click();
@@ -36,7 +163,7 @@ function watchErrors(client: ClientApp): string[] {
   return errors;
 }
 
-// 同上的控制台错误，但服务端按设计用 409 拒绝命令时浏览器自己记的那一条不算应用错误：
+// 服务端按设计用 409 拒绝命令时浏览器自己记的那一条不算应用错误：
 // 界面已经把原因显示给用户（与 building、home 等用例同一个处理）
 function watchErrorsAllowingRejectedCommands(client: ClientApp): string[] {
   const errors: string[] = [];
@@ -50,509 +177,237 @@ function watchErrorsAllowingRejectedCommands(client: ClientApp): string[] {
   return errors;
 }
 
-// 给已经保存的连接设置内存里的 Key：走真实命令与真实凭据链，页面只看到状态
-async function setKey(client: ClientApp, backend: Backend, ref: string): Promise<void> {
-  const status = await client.page.evaluate(async (payload: { address: string; ref: string; key: string }) => {
-    const listed = await (await fetch(`${payload.address}/api/queries/catalog`)).json();
-    // 凭据版本按引用分别记；找到引用这个凭据的连接，取它的版本
-    const provider = listed.data.providers.find((item: { credential_ref: string }) => item.credential_ref === payload.ref);
-    const response = await fetch(`${payload.address}/api/commands/credential.set`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        command_id: crypto.randomUUID(),
-        base_version: provider.credential.version,
-        ref: payload.ref,
-        secret: payload.key,
-        persist: false,
-      }),
-    });
-    return response.status;
-  }, { address: backend.address, ref, key: KEY });
-  expect(status).toBe(200);
+// 填地址与 Key，点「获取模型」：连接、Key 与候选一步做完
+async function connectService(client: ClientApp, address: string, key: string): Promise<void> {
+  await client.page.getByTestId("connection-add").click();
+  await client.page.getByTestId("connect-address").fill(address);
+  await client.page.getByTestId("connect-key").fill(key);
+  await client.page.getByTestId("connect-submit").click();
 }
 
-// 给一个没有被连接引用的凭据引用写入内存里的 Key（工单 #1216）：页面的凭据表里没有这一行，
-// 「保存凭据」发出的基准版本因此是 0，而服务端这个引用的版本已经是 1，保存会按版本过期被拒绝
-async function setDetachedKey(client: ClientApp, backend: Backend, ref: string): Promise<void> {
-  const status = await client.page.evaluate(async (payload: { address: string; ref: string; key: string }) => {
-    const response = await fetch(`${payload.address}/api/commands/credential.set`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        command_id: crypto.randomUUID(),
-        base_version: 0,
-        ref: payload.ref,
-        secret: payload.key,
-        persist: false,
-      }),
-    });
-    return response.status;
-  }, { address: backend.address, ref, key: KEY });
-  expect(status).toBe(200);
+// 这一份连接对应的卡片：按地址找，不用连接标识（标识由服务端按主机生成）
+function connectionCard(client: ClientApp, address: string) {
+  return client.page.getByTestId("connection-card").filter({ hasText: address });
 }
 
-// 网络响应里没有任何 API Key：记录所有响应体，逐条断言不含这个值
-function watchBodies(client: ClientApp): string[] {
-  const bodies: string[] = [];
-  client.page.on("response", (response) => {
-    const url = response.url();
-    if (!url.includes("/api/")) {
-      return;
-    }
-    void response.text().then((text) => bodies.push(text)).catch(() => undefined);
-  });
-  return bodies;
+// 部门当前选中的模型（选项上的文字）
+async function departmentChoice(client: ClientApp, department: string): Promise<string> {
+  return client.page.getByTestId(`department-model-${department}`).evaluate(
+    (element) => (element as HTMLSelectElement).selectedOptions[0]?.textContent ?? "",
+  );
+}
+
+// 端到端后端预置的部门默认指向测试用的假模型（测试装置的产物，真实部署里没有）：
+// 先在页面上把三个部门改成「未设置」，接着第一个启用的模型才会自动成为它们的默认
+async function clearDepartmentDefaults(client: ClientApp): Promise<void> {
+  for (const department of ["product", "engineering", "quality"]) {
+    await client.page.getByTestId(`department-model-${department}`).selectOption("");
+    // 部门默认是整份保存的：上一次保存写完以后再改下一个，
+    // 否则两次改动叠在一起会被服务端按版本过期拒绝
+    await expect(client.page.getByTestId(`department-status-${department}`))
+      .toContainText("已取消这个部门的模型");
+  }
 }
 
 for (const size of [{ width: 1440, height: 900 }]) {
   const label = `${size.width}×${size.height}`;
 
-  test(`${label}：候选真实取自测试内上游，模型测试通过以后准入列显示测试时间与实际返回的模型`, async () => {
+  test(`${label}：填地址与 Key → 获取 → 搜索筛选 → 勾选两个模型 → 已启用 → 三个部门自动使用 → 刷新后仍在`, async () => {
     test.setTimeout(300_000);
+    const upstream = await startUpstream();
     const { backend, client } = await openModels(size);
     const errors = watchErrors(client);
     try {
-      await setKey(client, backend, "OPENCODE_GO_KEY");
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
+      const address = `${upstream.base}/v1`;
+      // 三个部门先没有默认模型，第一个启用的模型才会自动填上
+      await clearDepartmentDefaults(client);
+      await connectService(client, address, UPSTREAM_KEY);
 
-      // 连接测试：测试中 → 通过
-      await client.page.getByTestId("test-connection-opencode-go").click();
-      await expect(client.page.getByTestId("connection-result-opencode-go")).toContainText("连接测试通过");
+      // 候选到了：连接卡片上写明最近一次获取的结果与时间
+      const card = connectionCard(client, address);
+      await expect(card.getByTestId("connection-fetch")).toContainText("已获取 4 个模型", { timeout: 60_000 });
 
-      // 候选：来源地址与采集时间来自真实的上游模型列表
-      await client.page.getByTestId("collect-opencode-go").click();
-      const candidates = client.page.getByTestId("candidates-opencode-go");
-      await expect(candidates).toContainText("来源 http://127.0.0.1:");
-      await expect(candidates).toContainText("采集时间");
-      await expect(candidates).toContainText("vision-model");
+      // 筛选：容量未知的候选只在「全部模型」里
+      await client.page.getByTestId("candidate-filter-all").click();
+      await expect(client.page.getByTestId("candidate-count")).toContainText("找到 4 个模型");
+      await expect(client.page.getByTestId("candidate-trial-unknown")).toBeVisible();
 
-      // 模型测试：测试中 → 通过，模型行显示通过与用时，准入列显示测试时间与实际返回的模型
-      await client.page.getByTestId("row-test-glm-4.6").click();
-      await expect(client.page.getByTestId("model-result-glm-4.6")).toContainText("模型测试通过");
-      await expect(client.page.getByTestId("model-result-glm-4.6")).toContainText(/\d+ 毫秒/);
-      await expect(client.page.getByTestId("model-glm-4.6")).toContainText("已准入：");
-      await expect(client.page.getByTestId("provider-opencode-go").locator(".mm-summary"))
-        .toContainText("已准入 1 · 候选 0");
+      // 搜索：按上游模型 ID 找
+      await client.page.getByTestId("candidate-search").fill("trial-");
+      await expect(client.page.getByTestId("candidate-count")).toContainText("找到 4 个模型");
+      await client.page.getByTestId("candidate-search").fill("trial-alpha");
+      await expect(client.page.getByTestId("candidate-count")).toContainText("找到 1 个模型");
+      await expect(client.page.getByTestId("candidate-trial-alpha")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-trial-beta")).toHaveCount(0);
+      await client.page.getByTestId("candidate-search").fill("");
 
-      // 准入列只读：模型表里没有可编辑准入的控件
-      await expect(client.page.getByTestId("model-glm-4.6").locator("input")).toHaveCount(0);
+      // 「可自动配置」只留容量已知的候选
+      await client.page.getByTestId("candidate-filter-auto").click();
+      await expect(client.page.getByTestId("candidate-trial-unknown")).toHaveCount(0);
+      await client.page.getByTestId("candidate-filter-all").click();
+      await expect(client.page.getByTestId("candidate-trial-unknown")).toBeVisible();
+
+      // 勾选第一个模型：补全参数与验证通过以后启用
+      await client.page.getByTestId("candidate-check-trial-alpha").check();
+      await expect(client.page.getByTestId("selected-status-trial-alpha")).toContainText("已启用", { timeout: 120_000 });
+      // 第一个启用的模型自动供三个部门使用
+      expect(await departmentChoice(client, "product")).toContain("trial-alpha");
+      expect(await departmentChoice(client, "engineering")).toContain("trial-alpha");
+      expect(await departmentChoice(client, "quality")).toContain("trial-alpha");
+
+      // 再勾选一个：同样启用，部门默认不变
+      await client.page.getByTestId("candidate-check-trial-beta").check();
+      await expect(client.page.getByTestId("selected-status-trial-beta")).toContainText("已启用", { timeout: 120_000 });
+      expect(await departmentChoice(client, "product")).toContain("trial-alpha");
+
+      // 刷新页面以后状态仍在
+      await client.page.reload();
+      await expect(client.page.locator(".path")).toHaveText("模型管理");
+      await expect(client.page.getByTestId("selected-status-trial-alpha")).toContainText("已启用");
+      await expect(client.page.getByTestId("selected-status-trial-beta")).toContainText("已启用");
+      expect(await departmentChoice(client, "quality")).toContain("trial-alpha");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
       await backend.stop();
+      await upstream.close();
     }
   });
 
-  
-  
-  
-  
-  test(`${label}：Key 输入框不回填，页面与网络响应中都没有 API Key`, async () => {
+  test(`${label}：Key 被拒绝、地址不可达、空列表，原因写在各自的连接卡片旁`, async () => {
     test.setTimeout(300_000);
+    const upstream = await startUpstream();
     const { backend, client } = await openModels(size);
     const errors = watchErrors(client);
-    const bodies = watchBodies(client);
     try {
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
-      const form = client.page.locator(".mm-form");
-      // 还没有设置 Key 时，凭据状态显示缺失；Key 输入框始终为空，不回填
-      await expect(form.getByTestId("credential-status")).toContainText("缺失");
-      await expect(form.getByTestId("credential-secret")).toHaveValue("");
-      // 输入一个 Key 并保存：输入框随之清空，凭据来源变为内存
-      await form.getByTestId("credential-secret").fill(KEY);
-      await form.getByRole("button", { name: "保存 Key" }).click();
-      await expect(form.getByTestId("credential-secret")).toHaveValue("");
-      await expect(form.getByTestId("credential-status")).toContainText("已配置，来源 内存");
-      // 重新打开表单仍然为空
-      await form.getByRole("button", { name: "取消" }).click();
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
-      await expect(client.page.locator(".mm-form").getByTestId("credential-secret")).toHaveValue("");
+      // Key 被拒绝：上游按真实的认证方式拒绝
+      const rejectAddress = `${upstream.base}/v1`;
+      await connectService(client, rejectAddress, "sk-wrong-key");
+      const rejectCard = connectionCard(client, rejectAddress);
+      await expect(rejectCard.getByTestId("connection-fetch")).toContainText("HTTP 401", { timeout: 60_000 });
+      await expect(rejectCard.getByTestId("connection-fetch")).toContainText("服务拒绝了这个 API Key");
 
-      const pageText = await client.page.locator("body").innerText();
-      expect(pageText).not.toContain(KEY);
-      expect(pageText).not.toContain("sk-");
-      await client.page.waitForTimeout(500);
-      for (const body of bodies) {
-        expect(body).not.toContain(KEY);
-      }
+      // 空列表：服务连上了，但没有返回任何模型
+      const emptyAddress = `${upstream.base}/empty/v1`;
+      await connectService(client, emptyAddress, UPSTREAM_KEY);
+      const emptyCard = connectionCard(client, emptyAddress);
+      await expect(emptyCard.getByTestId("connection-fetch")).toContainText("已连接，但服务没有返回任何模型", { timeout: 60_000 });
+
+      // 地址不可达：连不上那个地址
+      const deadAddress = "http://127.0.0.1:1/v1";
+      await connectService(client, deadAddress, UPSTREAM_KEY);
+      const deadCard = connectionCard(client, deadAddress);
+      await expect(deadCard.getByTestId("connection-fetch")).toContainText("连接失败", { timeout: 60_000 });
       expect(errors).toEqual([]);
     } finally {
       await client.close();
       await backend.stop();
+      await upstream.close();
     }
   });
 
-  test(`${label}：勾「写入 .env」时不合规的凭据引用让保存不可用并写明原因`, async () => {
+  test(`${label}：单个模型验证失败、容量未知后手填继续、搜索无结果，原因写在模型行旁`, async () => {
     test.setTimeout(300_000);
+    const upstream = await startUpstream();
     const { backend, client } = await openModels(size);
     const errors = watchErrors(client);
     try {
-      // 连接表单：勾「写入 .env」时凭据引用旁写出键名规则，不合规时「保存 Key」不可用并写明原因
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
-      const form = client.page.locator(".mm-form");
-      const refInput = form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input");
-      await refInput.fill("trial-model-key");
-      await form.getByTestId("credential-secret").fill(KEY);
-      await form.getByTestId("credential-persist").check();
-      await expect(form.getByTestId("credential-ref-rule")).toContainText("字母、数字与下划线");
-      await expect(form.getByTestId("credential-ref-issue")).toContainText("TRIAL_MODEL_KEY");
-      await expect(form.getByTestId("save-credential")).toBeDisabled();
-      await expect(form.getByTestId("save-credential-hint")).toContainText("不能写进 .env");
+      // 单个模型验证失败：上游拒绝这个模型的推理
+      const deniedAddress = `${upstream.base}/denied/v1`;
+      await connectService(client, deniedAddress, UPSTREAM_KEY);
+      await expect(client.page.getByTestId("candidate-trial-denied")).toBeVisible({ timeout: 60_000 });
+      await client.page.getByTestId("candidate-check-trial-denied").check();
+      await expect(client.page.getByTestId("selected-status-trial-denied")).toContainText("验证失败", { timeout: 120_000 });
+      await expect(client.page.getByTestId("selected-error-trial-denied")).toContainText("HTTP 403");
+      // 失败以后这一行还在，可以重新验证或取消选用
+      await expect(client.page.getByTestId("selected-retry-trial-denied")).toBeVisible();
 
-      // 换成合规的写法：原因消失，「保存 Key」可用
-      await refInput.fill("TRIAL_MODEL_KEY");
-      await expect(form.getByTestId("credential-ref-issue")).toHaveCount(0);
-      await expect(form.getByTestId("save-credential")).toBeEnabled();
-      await form.getByRole("button", { name: "取消" }).click();
+      // 容量未知：上游没有给容量，缺哪一项写在这一行
+      const address = `${upstream.base}/v1`;
+      await connectService(client, address, UPSTREAM_KEY);
+      await client.page.getByTestId("candidate-filter-all").click();
+      await expect(client.page.getByTestId("candidate-trial-unknown")).toBeVisible({ timeout: 60_000 });
+      await client.page.getByTestId("candidate-check-trial-unknown").check();
+      await expect(client.page.getByTestId("selected-status-trial-unknown")).toContainText("容量未知", { timeout: 60_000 });
+      await expect(client.page.getByTestId("selected-capacity-trial-unknown")).toContainText("缺少窗口与输出上限");
 
-      // 页面上「凭据」那一节：选「只在本进程有效」时写重启后要重新提供
-      await client.page.getByTestId("page-cred-memory").check();
-      await expect(client.page.getByTestId("page-cred-restart-hint")).toContainText("重启后需要重新提供");
-      await client.page.getByTestId("page-cred-ref").fill("trial-model-key");
-      await client.page.getByTestId("page-cred-secret").fill(KEY);
-      // 只写内存时没有键名要求：可以保存
-      await expect(client.page.getByTestId("page-cred-ref-rule")).toHaveCount(0);
-      await expect(client.page.getByTestId("page-cred-save")).toBeEnabled();
-      // 勾「写入 .env」：规则出现，不合规的引用让「保存凭据」不可用并写明原因
-      await client.page.getByTestId("page-cred-dotenv").check();
-      await expect(client.page.getByTestId("page-cred-restart-hint")).toHaveCount(0);
-      await expect(client.page.getByTestId("page-cred-ref-rule")).toContainText("字母、数字与下划线");
-      await expect(client.page.getByTestId("page-cred-save")).toBeDisabled();
-      await expect(client.page.getByTestId("page-cred-ref-issue")).toContainText("TRIAL_MODEL_KEY");
-      await expect(client.page.getByTestId("page-cred-save-hint")).toContainText("不能写进 .env");
+      // 手填窗口与输出上限以后继续：补全参数与验证通过，模型启用
+      await client.page.getByTestId("capacity-window-trial-unknown").fill("200000");
+      await client.page.getByTestId("capacity-output-trial-unknown").fill("32000");
+      await client.page.getByTestId("selected-continue-trial-unknown").click();
+      await expect(client.page.getByTestId("selected-status-trial-unknown")).toContainText("已启用", { timeout: 120_000 });
+
+      // 搜索无结果：写明没有匹配
+      await client.page.getByTestId("candidate-search").fill("没有这个模型");
+      await expect(client.page.getByTestId("candidate-empty")).toContainText("没有符合条件的模型");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
       await backend.stop();
+      await upstream.close();
     }
   });
 
-  // 工单 #1216：页面上「写入凭据」保存以后把结果写在表单旁（设计说明第 9.1 节「凭据」一行）
-  test(`${label}：页面「保存凭据」以后表单旁写出已保存与凭据版本、来源，Key 在结果回来以后才清空`, async () => {
+  test(`${label}：取消勾选被部门使用的模型被拒绝并写明引用方`, async () => {
     test.setTimeout(300_000);
-    const { backend, client } = await openModels(size);
-    const errors = watchErrors(client);
-    // 请求在途的那一段把 credential.set 按住：结果回来以前 Key 不清空、按钮显示忙碌，这两件是可判定的
-    let release = () => {};
-    const gate = new Promise<void>((resolve) => {
-      release = () => resolve();
-    });
-    await client.page.route("**/api/commands/credential.set", async (route) => {
-      await gate;
-      await route.continue();
-    });
-    try {
-      const versionCell = client.page.getByRole("row").filter({ hasText: "OPENCODE_GO_KEY" }).locator("td").nth(2);
-      // 版本从目录读，不写死：种子脚本先给这个引用写过一次 Key 再清掉，界面从「缺失」与那个版本开始
-      await expect(versionCell).toHaveText(/^\d+$/);
-      const before = Number((await versionCell.innerText()).trim());
-
-      await client.page.getByTestId("page-cred-memory").check();
-      await client.page.getByTestId("page-cred-ref").fill("OPENCODE_GO_KEY");
-      await client.page.getByTestId("page-cred-secret").fill(KEY);
-      const save = client.page.getByTestId("page-cred-save");
-      await expect(save).toBeEnabled();
-      await save.click();
-
-      // 请求还没有回来：Key 仍在输入框里，按钮显示忙碌，表单旁还没有结果
-      await expect(save).toBeDisabled();
-      await expect(save).toContainText("保存中");
-      await expect(client.page.getByTestId("page-cred-secret")).toHaveValue(KEY);
-      await expect(client.page.getByTestId("page-cred-result")).toHaveCount(0);
-
-      release();
-
-      // 结果回来：表单旁写「已保存 API Key」与这次保存的凭据版本、来源
-      const result = client.page.getByTestId("page-cred-result");
-      await expect(result).toContainText("已保存 API Key");
-      await expect(result).toContainText("凭据 OPENCODE_GO_KEY");
-      await expect(result).toContainText(`版本 ${before + 1}`);
-      await expect(result).toContainText("进程内存");
-      // 结果出现以后 Key 才清空，「还不能保存：填写 API Key」那一行不顶替结果
-      await expect(client.page.getByTestId("page-cred-secret")).toHaveValue("");
-      await expect(client.page.getByTestId("page-cred-save-hint")).toHaveCount(0);
-      // 凭据表里这一行版本 +1，状态换成内存
-      await expect(versionCell).toHaveText(String(before + 1));
-      await expect(client.page.getByRole("row").filter({ hasText: "OPENCODE_GO_KEY" }))
-        .toContainText("已配置，来源 内存");
-
-      // Key 不进页面文字
-      expect(await client.page.locator("body").innerText()).not.toContain(KEY);
-      expect(errors).toEqual([]);
-    } finally {
-      await client.page.unroute("**/api/commands/credential.set");
-      await client.close();
-      await backend.stop();
-    }
-  });
-
-  test(`${label}：保存被服务端拒绝时表单旁写服务端给的原因原文，Key 不清空，版本不变`, async () => {
-    test.setTimeout(300_000);
+    const upstream = await startUpstream();
     const { backend, client } = await openModels(size);
     const errors = watchErrorsAllowingRejectedCommands(client);
     try {
-      // 一个没有被任何连接引用的凭据引用先被写进 Key（版本 1）：页面的凭据表里没有这一行，
-      // 「保存凭据」发出的基准版本因此是 0，服务端按版本过期拒绝（真实命令、真实拒绝，工单 #1216）
-      await setDetachedKey(client, backend, "TRIAL_ONLY_KEY");
-      await client.page.getByTestId("page-cred-ref").fill("TRIAL_ONLY_KEY");
-      await client.page.getByTestId("page-cred-secret").fill(KEY);
-      await client.page.getByTestId("page-cred-save").click();
+      const address = `${upstream.base}/v1`;
+      // 三个部门先没有默认模型，第一个启用的模型才会自动填上
+      await clearDepartmentDefaults(client);
+      await connectService(client, address, UPSTREAM_KEY);
+      await client.page.getByTestId("candidate-check-trial-alpha").check();
+      await expect(client.page.getByTestId("selected-status-trial-alpha")).toContainText("已启用", { timeout: 120_000 });
+      // 三个部门都在用它
+      expect(await departmentChoice(client, "product")).toContain("trial-alpha");
 
-      const result = client.page.getByTestId("page-cred-result");
-      await expect(result).toContainText(
-        "凭据命令的基准版本是目录查询里这个引用 TRIAL_ONLY_KEY 的 credential.version，当前是 1");
-      await expect(result).toContainText("服务端当前版本 1");
-      // 失败时 Key 留在输入框里，让人改了再试
-      await expect(client.page.getByTestId("page-cred-secret")).toHaveValue(KEY);
-
-      // 版本没有变：再点一次，服务端给出的当前版本仍是 1（被拒绝的那一次没有写入）
-      await client.page.getByTestId("page-cred-secret").fill(`${KEY}-again`);
-      await client.page.getByTestId("page-cred-save").click();
-      await expect(result).toContainText("当前是 1");
-      await expect(result).toContainText("服务端当前版本 1");
+      // 取消勾选：被部门引用，服务端拒绝，引用方写在模型行旁
+      await client.page.getByTestId("selected-remove-trial-alpha").click();
+      await expect(client.page.getByTestId("selected-status-text-trial-alpha")).toContainText("仍被引用，无法移除");
+      await expect(client.page.getByTestId("selected-status-text-trial-alpha")).toContainText("部门默认：产品");
+      // 它仍然启用着，部门仍然用它
+      await expect(client.page.getByTestId("selected-status-trial-alpha")).toContainText("已启用");
+      expect(await departmentChoice(client, "engineering")).toContain("trial-alpha");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
       await backend.stop();
+      await upstream.close();
     }
   });
 
-
-  test(`${label}：部门默认只列出已准入的定义，保存以后生效`, async () => {
+  test(`${label}：取消勾选进行中的模型，迟到的结果不启用它`, async () => {
     test.setTimeout(300_000);
+    const upstream = await startUpstream();
     const { backend, client } = await openModels(size);
     const errors = watchErrors(client);
     try {
-      await setKey(client, backend, "OPENCODE_GO_KEY");
-      // 先做模型测试，让定义进入已准入
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
-      await client.page.getByTestId("row-test-glm-4.6").click();
-      await expect(client.page.getByTestId("model-glm-4.6")).toContainText("已准入：");
+      const address = `${upstream.base}/slow/v1`;
+      // 三个部门先没有默认模型：迟到的结果如果启用了这个模型，这里会看得到
+      await clearDepartmentDefaults(client);
+      await connectService(client, address, UPSTREAM_KEY);
+      await expect(client.page.getByTestId("candidate-trial-slow")).toBeVisible({ timeout: 60_000 });
 
-      // 未准入时选项只有「未设置」
-      const options = await client.page.getByTestId("default-model-product").locator("option").allTextContents();
-      expect(options).toContain("glm-4.6");
+      // 勾选以后模型测试在进行中（上游的推理慢）
+      await client.page.getByTestId("candidate-check-trial-slow").check();
+      await expect(client.page.getByTestId("selected-trial-slow")).toBeVisible({ timeout: 60_000 });
 
-      await client.page.getByTestId("default-model-product").selectOption("glm-4.6");
-      const tiers = await client.page.getByTestId("default-tier-product").locator("option").allTextContents();
-      expect(tiers).toContain("low");
-      expect(tiers).toContain("high");
-      await client.page.getByTestId("default-tier-product").selectOption("low");
-      await client.page.getByTestId("save-defaults").click();
-      await expect(client.page.getByTestId("defaults-status")).toContainText("已保存部门默认");
+      // 取消勾选：定义被移除，进行中的测试取消
+      await client.page.getByTestId("selected-remove-trial-slow").click();
+      await expect(client.page.getByTestId("selected-trial-slow")).toHaveCount(0, { timeout: 60_000 });
+
+      // 等上游把迟到的结果送回来：它没有启用这个模型，也没有写进部门默认
+      await client.page.waitForTimeout(SLOW_DELAY_MS + 4000);
+      await expect(client.page.getByTestId("selected-trial-slow")).toHaveCount(0);
+      await expect(client.page.getByTestId("selected-status-trial-slow")).toHaveCount(0);
+      expect(await departmentChoice(client, "product")).toBe("未设置");
       expect(errors).toEqual([]);
     } finally {
       await client.close();
       await backend.stop();
+      await upstream.close();
     }
   });
-
-  
-  
-  test(`${label}：改地址保存前显示影响列表，取消以后目录不变，确认以后准入作废`, async () => {
-    test.setTimeout(300_000);
-    const { backend, client } = await openModels(size, { admitAndBind: true });
-    const errors = watchErrors(client);
-    try {
-      // 三个部门默认都绑定了 glm-4.6，准入有效
-      await expect(client.page.getByTestId("provider-opencode-go").locator(".mm-summary")).toContainText("已准入 1 · 候选 0");
-
-      // 编辑连接，改地址：影响列表由 catalog.change_impact 算出，保存前弹确认框
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "展开" }).click();
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
-      const form = client.page.locator(".mm-form");
-      await expect(form.getByTestId("impact-notice")).toHaveCount(0);
-      await form.getByTestId("provider-base-url").fill("https://changed.example/v1");
-      await expect(form.getByTestId("impact-notice")).toContainText("准入作废");
-      await expect(form.getByTestId("impact-notice")).toContainText("产品");
-
-      // 取消：目录不变，连接地址仍是种子地址，准入仍然有效
-      await form.getByTestId("submit-provider").click();
-      const confirm = client.page.getByTestId("confirm-save");
-      await expect(confirm).toBeVisible();
-      await expect(confirm.getByTestId("confirm-save-list")).toContainText("glm-4.6");
-      await confirm.getByTestId("confirm-save-no").click();
-      await expect(confirm).toHaveCount(0);
-      await expect(form.getByTestId("impact-notice")).toContainText("准入作废");
-      await form.getByRole("button", { name: "取消" }).click();
-      const summary = client.page.getByTestId("provider-opencode-go").locator(".mm-summary");
-      await expect(summary).toContainText(/127\.0\.0\.1/);
-      await expect(summary).toContainText("已准入 1 · 候选 0");
-
-      // 再次改地址并确认：保存成功，准入作废
-      await client.page.getByTestId("provider-opencode-go").getByRole("button", { name: "编辑" }).click();
-      await client.page.locator(".mm-form").getByTestId("provider-base-url").fill("https://changed.example/v1");
-      await client.page.locator(".mm-form").getByTestId("submit-provider").click();
-      await client.page.getByTestId("confirm-save").getByTestId("confirm-save-yes").click();
-      await expect(client.page.locator(".mm-form")).toHaveCount(0);
-      await expect(client.page.getByTestId("provider-opencode-go").locator(".mm-summary")).toContainText("已准入 0 · 候选 1");
-      expect(errors).toEqual([]);
-    } finally {
-      await client.close();
-      await backend.stop();
-    }
-  });
-
-  
-  
-  }
-
-
-
-
-
-// 工单 #385 / #563 验收第 1 条：勾选两个模型加入后自动测试通过并进入部门默认
-test("新建自定义连接，获取候选，勾选两个模型（带容量与就地填写）点加入，自动测试通过并进入部门默认", async () => {
-  test.setTimeout(300_000);
-  const { backend, client } = await openModels({ width: 1440, height: 900 });
-  const errors = watchErrors(client);
-  try {
-    const { chatBaseUrl, modelsUrl } = await client.page.evaluate(async (address: string) => {
-      const listed = await (await fetch(`${address}/api/queries/catalog`)).json();
-      const preset = (listed.data.presets.presets as { id: string; base_urls: Record<string, string> }[])
-        .find((item) => item.id === "opencode-go");
-      const provider = (listed.data.providers as { id: string; models_url: string }[])
-        .find((item) => item.id === "opencode-go");
-      return { chatBaseUrl: preset!.base_urls.chat_completions, modelsUrl: provider!.models_url };
-    }, backend.address);
-
-    // 新建自定义连接，只粘贴 Key、填基址与模型列表地址，点「添加」
-    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
-    const form = client.page.locator(".mm-form");
-    await form.getByTestId("provider-models-url").fill(modelsUrl);
-    await form.getByTestId("provider-base-url").fill(chatBaseUrl);
-    await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("custom-p");
-    await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("自定义测试");
-    await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("CUSTOM_P_KEY");
-    await form.getByTestId("credential-secret").fill("custom-secret-key");
-    await form.getByTestId("submit-provider").click();
-    await expect(form).toHaveCount(0);
-    await expect(client.page.getByTestId("page-notice")).toHaveText("已添加 Provider 配置。");
-
-    // 展开连接，获取模型列表
-    const providerCard = client.page.getByTestId("provider-custom-p");
-    await providerCard.getByRole("button", { name: "展开" }).click();
-    await providerCard.getByTestId("collect-custom-p").click();
-    const candidates = providerCard.getByTestId("candidates-custom-p");
-    await expect(candidates).toBeVisible();
-
-    // 勾选两个模型：vision-model（列表带容量）与 cbcn/deepseek-v4.1-flash（缺少容量并在就地填写）
-    await candidates.getByTestId("candidate-check-vision-model").check();
-    await candidates.getByTestId("candidate-check-cbcn/deepseek-v4.1-flash").check();
-
-    // 未补齐容量前，「加入」按钮不可用，并提示缺少输出上限
-    await expect(candidates.getByTestId("candidates-issue-custom-p")).toHaveText("缺少输出上限");
-    await expect(candidates.getByTestId("join-candidates-custom-p")).toBeDisabled();
-
-    // 就地填写缺少的输出上限
-    await candidates.getByTestId("candidate-output-cbcn/deepseek-v4.1-flash").fill("16000");
-    await expect(candidates.getByTestId("candidates-issue-custom-p")).toHaveCount(0);
-    await expect(candidates.getByTestId("join-candidates-custom-p")).toBeEnabled();
-
-    // 点一次「加入」：保存后自动执行模型测试并通过
-    await candidates.getByTestId("join-candidates-custom-p").click();
-
-    // 两个模型在模型表中出现，且自动模型测试通过
-    await expect(providerCard.getByTestId("model-vision-model")).toBeVisible();
-    await expect(providerCard.getByTestId("model-cbcn-deepseek-v4.1-flash")).toBeVisible();
-    await expect(providerCard.getByTestId("model-result-vision-model")).toContainText("模型测试通过");
-    await expect(providerCard.getByTestId("model-result-cbcn-deepseek-v4.1-flash")).toContainText("模型测试通过");
-
-    // 两个模型均已准入并出现在部门默认的下拉选项中
-    await expect(client.page.getByTestId("default-model-product").locator('option[value="vision-model"]')).toBeAttached();
-    await expect(client.page.getByTestId("default-model-product").locator('option[value="cbcn-deepseek-v4.1-flash"]')).toBeAttached();
-    expect(errors).toEqual([]);
-  } finally {
-    await client.close();
-    await backend.stop();
-  }
-});
-
-// 上游这次失败给出的错误原文（工单 #1209）：模型测试失败时界面写的是上游给的这一句，
-// 断言与测试内的上游共用同一个变量，上游换一句话时用例跟着走，不必再改第二处
-const UPSTREAM_ERROR_MESSAGE = "upstream internal failure";
-
-// 工单 #385 / #563 验收第 2 条：手动添加模型保存后自动测试一次，失败留在候选，修正后通过
-test("手动添加一个模型并保存自动测试一次；上游返回错误该行显示原因并留在候选，修正后测试通过", async () => {
-  test.setTimeout(300_000);
-  let failUpstream = true;
-  const upstream = createServer((_request, response) => {
-    if (failUpstream) {
-      response.writeHead(500, { "Content-Type": "application/json" });
-      response.end(JSON.stringify({ error: { message: UPSTREAM_ERROR_MESSAGE, type: "server_error" } }));
-    } else {
-      response.writeHead(200, { "Content-Type": "text/event-stream" });
-      const chunk = `data: ${JSON.stringify({
-        id: "chat-1",
-        object: "chat.completion.chunk",
-        created: 1,
-        model: "manual-failing-model",
-        choices: [{ index: 0, delta: { content: "pong" }, finish_reason: "stop" }],
-        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
-      })}\n\n`;
-      const done = "data: [DONE]\n\n";
-      response.end(chunk + done);
-    }
-  });
-
-  const address = await new Promise<string>((resolve) => {
-    upstream.listen(0, "127.0.0.1", () => {
-      const port = (upstream.address() as AddressInfo).port;
-      resolve(`http://127.0.0.1:${port}/v1`);
-    });
-  });
-
-  const { backend, client } = await openModels({ width: 1440, height: 900 });
-  const errors = watchErrors(client);
-  try {
-    // 新建连接指向测试内可控上游
-    await client.page.getByRole("button", { name: "添加 Provider 配置" }).click();
-    const form = client.page.locator(".mm-form");
-    await form.getByTestId("provider-base-url").fill(address);
-    await form.locator("label.mm-field").filter({ hasText: "ID" }).first().locator("input").fill("fail-test-p");
-    await form.locator("label.mm-field").filter({ hasText: "名称" }).first().locator("input").fill("可控上游连接");
-    await form.locator("label.mm-field").filter({ hasText: "凭据引用" }).locator("input").fill("FAIL_TEST_KEY");
-    await form.getByTestId("credential-secret").fill("secret");
-
-    // 手动添加一个模型定义并保存
-    await form.getByTestId("add-model-row").click();
-    await form.getByTestId("row-id-model-1").fill("manual-fail");
-    await form.getByTestId("row-model-manual-fail").fill("manual-failing-model");
-    await form.getByTestId("row-window-manual-fail").fill("100000");
-    await form.getByTestId("row-output-manual-fail").fill("4096");
-    await form.getByTestId("submit-provider").click();
-    await expect(form).toHaveCount(0);
-    await expect(client.page.getByTestId("page-notice")).toHaveText("已添加 Provider 配置。");
-
-    // 展开连接：保存后自动测试一次，上游返回错误，该行显示上游给出的原因并留在候选
-    const card = client.page.getByTestId("provider-fail-test-p");
-    await card.getByRole("button", { name: "展开" }).click();
-    await expect(card.getByTestId("model-manual-fail")).toBeVisible();
-    // 断言落在「这一行写的是上游原文」上，不钉死某一个英文字句（工单 #1209）：前缀与原文分开核对，
-    // 界面以后在原文前后多写一句、或上游换一句原文，这条用例都不必改
-    const result = card.getByTestId("model-result-manual-fail");
-    await expect(result).toContainText("模型测试未通过");
-    await expect(result).toContainText(UPSTREAM_ERROR_MESSAGE);
-    // 反向：界面写死成状态码那句（不再写上游原文）时，上面一条会红，这里也再核对它没有退回那句
-    await expect(result).not.toContainText("Model provider returned HTTP");
-    await expect(card.getByTestId("model-manual-fail")).toContainText("候选");
-    // 未准入的模型不在部门默认下拉中
-    await expect(client.page.getByTestId("default-model-product").locator("option", { hasText: "manual-fail" })).toHaveCount(0);
-
-    // 修正上游错误，再次测试通过
-    failUpstream = false;
-    await card.getByTestId("row-test-manual-fail").click();
-    await expect(card.getByTestId("model-result-manual-fail")).toContainText("模型测试通过");
-    await expect(card.getByTestId("model-manual-fail")).toContainText("已准入");
-    // 准入后出现在部门默认选项中
-    await expect(client.page.getByTestId("default-model-product").locator("option", { hasText: "manual-fail" })).toBeAttached();
-    expect(errors).toEqual([]);
-  } finally {
-    await client.close();
-    await backend.stop();
-    upstream.close();
-  }
-});
+}
