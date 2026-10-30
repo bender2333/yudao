@@ -218,13 +218,13 @@ def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
 
 def test_release_without_quality_evidence_is_rejected(data_dir):
     # 质检声称跑过检查但没有跑：放行被拒绝（这条规则与同时运行无关，
-    # 因此这里逐个部门驱动：产品提交要求、工程交付、质检核验）
+    # 因此这里逐个部门驱动：产品提交要求、工程交付、质检核验）。
+    # 提案用构造函数生成（工单 #151：qa_review 多了必填的 criteria，由构造函数按当前 PRD 填）
     script = {
         "product": [product_spec()],
         "engineering": [delivery_turn()],
         "quality": [
-            FakeTurn(proposal={"kind": "qa_review", "verdict": "release", "rationale": "looks good",
-                               "checks": ["smoke"], "defects": []}),
+            FakeTurn(proposal=review("release", "looks good")),
         ],
     }
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
