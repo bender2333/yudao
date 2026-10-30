@@ -7824,7 +7824,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 9
+            "example": 10
           },
           "contract_digest": {
             "type": "string",
@@ -17254,17 +17254,6 @@
               }
             ],
             "title": "Admitted"
-          },
-          "selection_sequence": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Selection Sequence"
           }
         },
         "required": [

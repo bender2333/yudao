@@ -280,6 +280,7 @@ def test_live_progress_matches_catalog_and_unfinished_selections_are_candidates_
             facts = opened.application.system.store.read(0, limit=10000)
             assert all(event.type != "catalog_selection" for event in facts)
             assert all(event.payload.get("status") not in {"completing", "waiting", "testing"} for event in facts)
+            assert all("selection_sequence" not in event.payload and "selections" not in event.payload for event in facts)
         with running_api(opened) as client:
             restarted = catalog(client)
             assert restarted["selections"] == []
@@ -337,7 +338,7 @@ def test_cancel_and_reselect_ignores_the_old_final_response(tmp_path):
             assert data["admissions"][0]["admitted"] is True
             results = [event for event in opened.application.system.store.read(0, limit=10000)
                        if event.type == CatalogEventType.CATALOG_TEST_FINISHED and event.payload["kind"] == "model"]
-            assert [event.payload["selection_sequence"] for event in results] == [new["sequence"]]
+            assert len(results) == 1 and results[0].payload["actual_model"] == "again"
     finally:
         old_release.set()
         new_release.set()
@@ -550,6 +551,8 @@ def test_failed_tool_test_can_retry_through_the_same_bounded_selection_flow(prot
             assert not failed["admissions"] and not failed["bindings"]
             [attempt] = failed["selections"]
             assert "工具往返" in attempt["error"]
+            failed_event = wait_event(opened, lambda event: event.type == CatalogEventType.CATALOG_TEST_FINISHED
+                                      and event.payload["ok"] is False)
             retried = command(client, "catalog.model.test", base_version=failed["revision"],
                               provider_id=provider_id, model_id=attempt["model_id"])
             assert retried.status_code == 200, retried.text
@@ -558,7 +561,7 @@ def test_failed_tool_test_can_retry_through_the_same_bounded_selection_flow(prot
             assert enabled["models"][0]["protocol"] == protocol
             event = wait_event(opened, lambda event: event.type == CatalogEventType.CATALOG_TEST_FINISHED
                                and event.payload["admitted"] is True)
-            assert event.payload["selection_sequence"] > attempt["sequence"]
+            assert event.position > failed_event.position and event.payload["actual_model"] == "retry"
     finally:
         upstream.close()
 

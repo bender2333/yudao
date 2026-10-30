@@ -1429,7 +1429,6 @@ class CatalogTestFinishedPayload(Payload):
     actual_model: str | None
     elapsed_ms: int
     admitted: bool | None
-    selection_sequence: int | None = None
 
 
 class CredentialChangedPayload(Payload):

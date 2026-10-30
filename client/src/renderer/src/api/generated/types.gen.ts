@@ -7443,10 +7443,6 @@ export type CatalogTestFinishedPayload = {
      * Admitted
      */
     admitted: boolean | null;
-    /**
-     * Selection Sequence
-     */
-    selection_sequence?: number | null;
 };
 
 /**

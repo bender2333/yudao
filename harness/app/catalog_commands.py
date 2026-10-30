@@ -489,8 +489,8 @@ def _schedule_selection(application: Application, base_version: int, selected) -
         if result is None:
             return
         _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                {**_test_payload(base_version, "model", selected.provider_id, selected.model_id,
-                                 started, result, result.get("error")), "selection_sequence": selected.sequence})
+                _test_payload(base_version, "model", selected.provider_id, selected.model_id,
+                              started, result, result.get("error")))
         if result.get("defaults_after", 0) != result.get("defaults_before", 0):
             _result(application, CatalogEventType.CATALOG_REVISED, {
                 "operation": "department_defaults", "base_revision": result["defaults_before"],

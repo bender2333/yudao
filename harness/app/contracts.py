@@ -152,7 +152,8 @@ AccessMode = Literal["local", "lan"]
 # 版本 7：删除 run_created 载荷里不再生效的事项级窗口字段（#669）
 # 版本 8：一步连接命令，候选结果与来源、凭据持久状态随目录查询提供（#1293）。
 # 版本 9：选用命令、逐字段来源、未知容量候选与进程内选用进度（#1295）。
-API_VERSION = 9
+# 版本 10：选用序号只属于瞬时进度，不进入持久化的测试结果合同（#1295）。
+API_VERSION = 10
 
 
 class CatalogSelection(Contract):
