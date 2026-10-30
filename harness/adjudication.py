@@ -12,6 +12,7 @@ from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .definitions import DEFINITIONS, Definitions
 from .kernel_events import TERMINAL_STATUSES, Event
 from .minimal_projection import MinimalProjection
+from .path_rules import QA_TESTS_DIR, is_qa_tests_path
 from .tools import has_tool, in_force, tool_action
 from .validation import (
     AdjudicationView, FieldError, ProposalDecision, TightenRequest, Tightening, evaluate_proposal,
@@ -22,6 +23,8 @@ _STALE_BASIS = ("The contract or current work changed after this activation bega
 _STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; stale results cannot be rebound."
 _PENDING_INPUT_RELEASE = ("New user input is waiting for the product; the release is judged after the product "
                           "round that received it has ended.")
+_QUALITY_WRITE_OUTSIDE_TESTS = (f"quality can only write test files under {QA_TESTS_DIR}/: the other files in the "
+                                "check workspace are the tree the release is judged against")
 
 
 def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
@@ -135,7 +138,8 @@ def tool_permission(
     if not tight.permitted and not has_tool(department, name, projection.work_item_kind, definitions=definition):
         return ToolPermission(reason=f"{department} cannot use {name}")
     if _is_write(name, definition):
-        reason = _write_path_error(name, args, facts)
+        reason = (_quality_write_error(name, args) if department == "quality" else None) \
+            or _write_path_error(name, args, facts)
         if reason:
             return ToolPermission(reason=reason)
     return ToolPermission()
@@ -203,3 +207,13 @@ def _write_path_error(name: str, args: dict[str, Any], facts: WorkspaceFacts) ->
 
 def _write_targets(name: str, args: dict[str, Any]) -> list[Any]:
     return [args.get("source"), args.get("destination")] if name == "move_file" else [args.get("path")]
+
+
+def _quality_write_error(name: str, args: dict[str, Any]) -> str | None:
+    # 质检的写工具只能写测试材料目录（本地工具设计说明第 3 节「质检的文件工具」）：检查工作区里其余文件
+    # 参与放行时核对的树（提案条件 tree_matches），改动它们会让放行被拒绝，所以在这里直接拒绝
+    for target in _write_targets(name, args):
+        if isinstance(target, str) and is_qa_tests_path(target):
+            continue
+        return _QUALITY_WRITE_OUTSIDE_TESTS
+    return None

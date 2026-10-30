@@ -27,10 +27,12 @@ def test_answer_prd_revision_parameter_definitions_match_submit_product_spec():
         assert answer_props[param_name] == spec_def, f"{param_name} definition mismatch"
 
 
-def test_edit_range_is_an_engineering_only_write_tool():
+def test_write_tools_belong_to_engineering_and_quality():
+    # 工程写交付、质检写测试材料（工单 #645）：两个部门都有写入与区间编辑，产品没有；
+    # 质检能写到哪里由工具许可核对（只能写 .yudao-qa-tests/，见 test_qa_test_materials.py）
     assert tool_kind("edit_range") == "environment" and tool_action("edit_range") == "write"
-    assert "edit_range" in tools_for("engineering")
-    assert "edit_range" not in tools_for("product")
-    assert "edit_range" not in tools_for("quality")
+    assert {"write_file", "edit_range"} <= set(tools_for("engineering"))
+    assert {"write_file", "edit_range"} <= set(tools_for("quality"))
+    assert "edit_range" not in tools_for("product") and "write_file" not in tools_for("product")
 
 

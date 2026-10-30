@@ -31,7 +31,7 @@ from .compaction import CompactionError
 from .contracts import artifact_hash
 from .definitions import DEFINITIONS, Definitions
 from .deltas import DeltaChannel, DeltaScope
-from .environment import LocalEnvironment, QA_TESTS_DIR, qa_tests_digest
+from .environment import LocalEnvironment, qa_tests_digest
 from .event_store import run_stream
 from . import execution_contract
 from .execution_contract import ActivationScope, Judgment, RoundRequest, RoundResult, SafeNode, StepLimits
@@ -1065,10 +1065,6 @@ class StepDriver:
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
                 tightening=self._tightening, events=transaction.events(), definitions=self._definitions,
             )
-            if not permission.allowed and scope.department == "quality" and call["name"] == "write_file":
-                rel = str(call.get("args", {}).get("path") or "")
-                if rel.replace("\\", "/").strip("/").split("/")[0] == QA_TESTS_DIR:
-                    permission = ToolPermission()
             if permission.allowed:
                 already_started = any(
                     e.type == EventType.TOOL_STARTED and (e.payload or {}).get("id") == call["id"]

@@ -29,9 +29,9 @@ from typing import Any
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .event_store import run_stream
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
-from .public_tree import QA_TESTS_DIR, CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
+from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
-from .path_rules import TreeError
+from .path_rules import QA_TESTS_DIR, TreeError
 from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
 from .tools import tool_action
@@ -962,10 +962,9 @@ class LocalEnvironment:
             raise FileNotFoundError(f"file not found: {rel}")
         if not target.is_file():
             raise ValueError(f"edit_range requires an existing regular file: {rel}")
-        snapshot = self.workspace.snapshot()
-        raw = next((item.data for item in snapshot.tree.files if item.path == rel), None)
-        if raw is None:
-            raise FileNotFoundError(f"file not found: {rel}")
+        # 原文按目标文件本身读取：公开树不含质检的测试材料目录（本地工具第 2 节），
+        # 区间编辑与写入工具作用在同一批可写的目标文件上
+        raw = target.read_bytes()
         # 文件级摘要只绑定目标文件，其它文件的改动不影响本次核对
         if expected_digest is not None and hash_bytes(raw) != expected_digest:
             raise ValueError("file changed since the read; re-read the span before editing")

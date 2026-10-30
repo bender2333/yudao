@@ -166,10 +166,10 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     assert raised.value.issues == (
         ("roles.json", "product.tools[4]", "工具 bash 没有定义"),
         ("roles.json", "engineering.tools[9]", "工具 bash 没有定义"),
-        ("roles.json", "quality.tools[4]", "工具 bash 没有定义"),
+        ("roles.json", "quality.tools[6]", "工具 bash 没有定义"),
         ("work_items.json", "kinds.change.departments.product.tools[4]", "工具 bash 没有定义"),
         ("work_items.json", "kinds.change.departments.engineering.tools[9]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.change.departments.quality.tools[4]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.quality.tools[6]", "工具 bash 没有定义"),
         ("work_items.json", "kinds.onboarding.departments.product.tools[4]", "工具 bash 没有定义"),
         ("work_items.json", "kinds.onboarding.departments.quality.tools[4]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
