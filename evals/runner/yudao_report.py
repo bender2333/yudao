@@ -104,6 +104,11 @@ def build_result(scenario, material_version, scorer_version, model, runs, model_
         "summary": aggregate_metrics(runs),
         "runs": runs,
     }
+    # 场景 2 的建档单独成段（第 5.2 节）：建档的请求数、用量与耗时不计入事项的指标
+    onboarding = [{"run_id": run["run_id"], **run["onboarding"]}
+                  for run in runs if run.get("onboarding")]
+    if onboarding:
+        payload["onboarding"] = onboarding
     if comparison is not None:
         payload["comparison"] = comparison
     return payload
@@ -119,7 +124,7 @@ def write_result(result, path):
 
 
 def write_report(result, path, run_reports):
-    lines = ["# 场景 3 · Yudao 一侧评测报告", ""]
+    lines = ["# " + _scenario_title(result["scenario"]) + " · Yudao 一侧评测报告", ""]
     lines.extend(_basic_section(result))
     lines.extend(_host_section(result))
     lines.extend(_network_section())
@@ -269,6 +274,33 @@ def _summary_section(result):
         for name, reason in unknowns:
             lines.append("- " + METRIC_LABELS.get(name, name) + "：" + reason)
         lines.append("")
+    lines.extend(_onboarding_section(result))
+    return lines
+
+
+def _scenario_title(name):
+    """场景名写成中文（报告标题用）：`scenario-2` 写成「场景 2」。"""
+    tail = str(name).rsplit("-", 1)[-1]
+    return "场景 " + tail if tail.isdigit() else str(name)
+
+
+def _onboarding_section(result):
+    """场景 2 的建档（第 5.2 节）：模型请求数、用量与耗时单独列出，不计入事项的指标。"""
+    onboarding = result.get("onboarding") or []
+    if not onboarding:
+        return []
+    lines = ["### 建档（场景 2）：模型请求数、用量与耗时", ""]
+    lines.append("建档与事项是两个 run：下面这些数值不计入上面的指标汇总，也不进均值与噪声（第 5.2 节）。")
+    lines.append("")
+    lines.append("| 运行 | 模型请求数 | 输入用量 | 输出用量 | 总用量 | 耗时（秒） |")
+    lines.append("| --- | --- | --- | --- | --- | --- |")
+    for item in onboarding:
+        lines.append("| " + item["run_id"] + " | " + _number(item.get("model_requests", 0))
+                     + " | " + _maybe(item.get("input_tokens"))
+                     + " | " + _maybe(item.get("output_tokens"))
+                     + " | " + _maybe(item.get("total_tokens"))
+                     + " | " + _maybe(item.get("elapsed_seconds")) + " |")
+    lines.append("")
     return lines
 
 
@@ -284,7 +316,12 @@ def _maybe(value):
 
 
 def run_section(run, scores):
-    """一次运行的中文小节：指标、评分与失败条目。"""
+    """一次运行的中文小节：指标、评分与失败条目。
+
+    场景 2 另列建档的模型请求数、用量与耗时（第 5.2 节）：建档与事项是两个 run，
+    建档的数值不并入上面那一张表，也不计入汇总。初始 PRD 没有被确认的运行没有
+    可以评分的交付（`scores` 为 None），这一节写「作废，未评分」。
+    """
     metrics = run["metrics"]
     lines = ["### " + run["run_id"], ""]
     lines.append("| 项目 | 取值 |")
@@ -306,6 +343,11 @@ def run_section(run, scores):
     lines.append("| 封存的交付文件数 | " + _number(run.get("delivery_files", 0)) + " |")
     lines.append("| 成功但没有输出项的模型调用 | "
                  + _number(metrics.get("empty_model_responses", 0)) + " |")
+    if scores is None:
+        lines.append("| 评分 | 作废，未评分 |")
+        lines.append("")
+        lines.extend(_failures_section(run, None))
+        return lines
     lines.append("| 完成度 | " + _number(scores["completion"]) + " |")
     lines.append("| 正确性 | " + _number(scores["correctness"]) + " |")
     lines.append("| 未做的隐藏检查数 | " + _number(scores["not_done_count"]) + " |")
@@ -318,6 +360,13 @@ def run_section(run, scores):
 def _failures_section(run, scores):
     """失败条目：未通过的要求与没有通过的隐藏检查（第 6 节要求写进报告）。"""
     lines = ["失败条目：", ""]
+    if scores is None:
+        lines.append("作废：没有可以评分的交付。")
+        lines.append("")
+        if run.get("void"):
+            lines.append("这次运行作废：" + str(run.get("void_reason", "")))
+            lines.append("")
+        return lines
     for name, item in scores["requirements"].items():
         if item["passed"] == item["total"]:
             continue

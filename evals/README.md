@@ -34,7 +34,7 @@ flowchart TD
 - `scorer/`：评分器，对一份交付运行隐藏检查并写出机器可读结果。
 - `runner/`：OpenCode 一侧的运行器、指标收集与报告（`run_eval.py` 是入口）。它把材料起点复制到仓库之外的运行目录，运行 `opencode run`，从 JSON 事件流收集指标，再用评分器评分，最后写出机器可读结果与中文报告。
 - `runner/material_integrity.py`：两边的评分前核对共用的部分：按 LF 规范化字节流递归计算材料摘要并与 `materials/manifest.json` 的 `digests` 块比较，在输出文本里查找对任务上游仓库的访问。摘要重新生成也由它做。
-- `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块，也不引用被测方内部文件的路径。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，建立项目、绑定三个部门、运行器不登记命令，以用户原始意图提交需求原文加接口约定，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取最后一次封存的交付交给评分器，并计算过程检查点与指标。
+- `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块，也不引用被测方内部文件的路径。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，绑定三个部门、运行器不登记命令，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取最后一次封存的交付交给评分器，并计算过程检查点与指标。场景 3 新建项目并带入起始文件夹，以用户原始意图提交需求原文加接口约定；场景 2 接入已有仓库（`project.onboard`）、确认初始 PRD（`decision.answer`，或者等人确认），再新建事项提交需求原文（见下面「场景 2 的运行」）。
 - `scenarios/scenario-3/materials/manifest.json`：场景 3 的材料来源、运行环境与材料摘要（`digests` 块）。
 - `baseline/`：omp 流程开发 Yudao 的基线数字。`collect.py` 抓取 Stage 3 里程碑下的工单、标签时间线与评论、合并请求、阶段父工单 #9 的集成层记录与运行目录里的运行输出，合成一个数据文件；`compute.py` 只读这个数据文件，算出每个工单的审查轮数、集成层失败归因、搁置原因、耗时与用量，写出中文报告。
 - `context/`：上下文装配的离线回放（#912，[设计说明](../docs/design/context-assembly.md)）。只读事件库与工件库，把每一步交给模型的上下文当成纯函数 `view(events, rules) → request`：`measure` 测每一步的召回与浪费，`replay` 用新视图重放并做逐条规则的消融，`sweep` 扫参数取值，`verify` 核对视图与记录逐字节一致，`counterfactual` 用真实模型做反事实回放。用法见 [context/README.md](context/README.md)。
@@ -70,7 +70,7 @@ uv run python -c "import sys; sys.path.insert(0, 'evals/runner'); import materia
 uv run python evals/scorer/scorer.py --delivery <交付目录> --result <结果文件>
 ```
 
-场景 3 的评分器把交付当作一个带 `src/` 子目录的项目。场景 2 的评分器针对一份仓库：`--delivery` 指向交付副本，评分器把隐藏测试文件盖上去，再用交付自带的 Python 3.13 环境运行 F2P 与 P2P 两份清单。
+场景 3 的评分器把交付当作一个带 `src/` 子目录的项目。场景 2 的评分器针对一份仓库：`--delivery` 指向交付副本，评分器把隐藏测试文件盖上去，再用交付自带的 Python 3.13 环境运行 F2P 与 P2P 两份清单。OpenCode 一侧的交付自带虚拟环境；Yudao 一侧的交付没有虚拟环境，由运行器在评分副本里按材料的 `runtime.install` 建立（见「场景 2 的运行」）。
 
 场景 1 的评分器针对一份待办应用交付：`--delivery` 指向交付目录，评分器启动服务并将端口通过 `PORT` 传入，服务就绪后由界面智能体在 Chromium 中执行 8 条用例并截图：
 
@@ -143,16 +143,41 @@ uv run python evals/runner/run_yudao_eval.py \
     --report docs/evaluation/scenario-3-yudao.md
 ```
 
+入口的 `--scenario` 选场景：默认 3（上面那条命令），`--scenario 2` 是在已有代码上加功能（见下一节）。
+
+### 场景 2 的运行
+
+```bash
+uv run python evals/runner/run_yudao_eval.py \
+    --scenario 2 \
+    --model <模型名> \
+    --runs 3 \
+    --runs-root <Yudao 仓库之外的目录> \
+    --result docs/evaluation/scenario-2-yudao.json \
+    --report docs/evaluation/scenario-2-yudao.md
+```
+
+一次运行分两步，都用 Yudao 的正常入口：
+
+1. **接入已有仓库并建档。** 运行器在运行目录之外检出 `openai/openai-agents-python` 在材料基准提交上的代码，用仓库自己的锁文件建立 Python 3.13 环境（需要联网，这一步在评测之前），经 `project.onboard` 接入：新建项目、登记源目录、只读采集快照、开始建档事项。接入的目录保留 `.git`（快照记录 git 提交与是否有未提交的修改），不带评测材料（没有 `requirement.md`、没有隐藏检查），远端地址检出以后去掉。
+2. **确认初始 PRD，再新建事项。** 建档给出初始 PRD 的确认请求以后，运行器经 `decision.answer` 选「确认」（基准版本取请求的版本），项目的基线从此采纳；随后 `work_item.create` 以用户原始意图提交需求原文（`scenarios/scenario-2/materials/requirement.md`），这一步是事项的开始。
+
+- `--wait-prd-confirmation`：不经接口回答，等运行的人在浏览器的决定卡片里确认；运行器轮询决定请求的状态，被回答以后继续。`--prd-confirmation-timeout-seconds`（默认 600 秒）是等它的上限，到时限仍没有被回答时这次运行作废，报告写明原因；这个选项给需要在界面上确认并截图的那次真实运行用。
+- `--onboarding-timeout-seconds`（默认 7200 秒）是等建档给出确认请求的上限，与建档 run 自己的运行时间上限相同（[接入已有项目设计说明](../docs/design/existing-project-onboarding.md)第 12 节第 5 项）。
+- 建档与事项是两个 run，各自导出、分开保存：`onboarding-run-export.json` 与 `run-export.json`，建档的指标在 `onboarding-metrics.json`。建档的模型请求数、用量与耗时在结果与报告里单独成段，不计入事项的指标（第 5.2 节）。
+- 时间上限（默认 120 分钟）从新建事项开始计算：建档用了多久不影响事项的超时判断。
+- 评分环境：Yudao 封存的交付没有虚拟环境，运行器在评分副本里按材料 `manifest.json` 的 `runtime.install` 建立 Python 3.13 环境（需要联网），再用 `evals/scorer/scenario2.py` 与 `runner/scenario2.py` 的评分命令评 F2P 与 P2P；评分器不改。
+
 Yudao 一侧的运行器保证下面这些：
 
 - 只经 HTTP 接口与导出的事件日志观察 Yudao，不导入 `harness` 的模块（`tests/test_no_harness_import.py` 检查这一点），也不引用被测方内部文件的路径（`tests/test_no_harness_paths.py` 检查这一点）。
 - 被测的 Yudao 在仓库之外的数据目录上启动，每次运行新建一个数据目录，用默认的执行位置（控制主机上的本机进程），以 `--no-browser` 启动（评测运行不在控制主机上开页面）。
-- 起点：每次运行新建一个只含题目提供的数据文件 `subway_data.json` 的起始文件夹，放在运行目录之外，经 `project.create` 的 `initial_directory` 带入；事项文字不另写起点文件的说明。
+- 起点：场景 3 每次运行新建一个只含题目提供的数据文件 `subway_data.json` 的起始文件夹，放在运行目录之外，经 `project.create` 的 `initial_directory` 带入；事项文字不另写起点文件的说明。场景 2 的起点是检出好的上游仓库，经 `project.onboard` 接入，见上一节。
 - 三个部门的部门默认绑定与项目部门设置都使用被测模型；模型先经 `catalog.model.test` 准入，报告记录模型服务实际服务的模型名。
 - 项目不登记取回的来源与 MCP 服务器，部门没有这两类工具。
 - 每次运行的提交号在启动服务之前记下，结果逐次记录；各次不一致时顶层写明不一致并逐次列出。
 - 到墙钟上限（默认 120 分钟，`--limit-seconds` 可覆盖）时经 `work_item.cancel` 结束事项，标记超时，按最后一次封存的交付评分；没有交付时全部检查记为「没有做」。
-- 评分之前做三项核对，任一命中这次运行作废，写进报告：事件日志导出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、事件日志导出中出现对任务上游仓库的访问（场景 3 的上游仓库是 `AGI-Eval-Official/PRDBench`）。
+- 评分之前做三项核对，任一命中这次运行作废，写进报告：事件日志导出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、事件日志导出中出现对任务上游仓库的访问（场景 3 的上游仓库是 `AGI-Eval-Official/PRDBench`，场景 2 的是 `openai/openai-agents-python`）。
 
 ### 五项过程检查点（第 5.1 节）
 
@@ -209,4 +234,4 @@ uv run python evals/baseline/compute.py --data docs/evaluation/baseline-omp-stag
 
 ## 运行环境
 
-场景 2、3 的运行环境是 uv 管理的 Python 3.13。场景 1 的运行环境为 Node.js、uv 管理的 Python 3.13 与 Playwright 安装的 Chromium。场景 3 的评分器与隐藏检查在被测交付的目录之外运行，不在交付目录中写入除导出文件与探测脚本以外的内容。场景 2 的评分器在交付副本的副本里运行，用交付自带的虚拟环境（`uv run --project <交付> --no-sync`），不重新建立依赖。场景 1 的评分器在交付副本里启动 Node.js 服务并通过环境变量 PORT 传入端口，由界面智能体经浏览器操作。
+场景 2、3 的运行环境是 uv 管理的 Python 3.13。场景 1 的运行环境为 Node.js、uv 管理的 Python 3.13 与 Playwright 安装的 Chromium。场景 3 的评分器与隐藏检查在被测交付的目录之外运行，不在交付目录中写入除导出文件与探测脚本以外的内容。场景 2 的评分器在交付副本的副本里运行，用交付自带的虚拟环境（`uv run --project <交付> --no-sync`），不重新建立依赖；Yudao 一侧的交付没有虚拟环境，由运行器在评分副本里按材料的 `runtime.install` 建立一次（需要联网）。场景 1 的评分器在交付副本里启动 Node.js 服务并通过环境变量 PORT 传入端口，由界面智能体经浏览器操作。

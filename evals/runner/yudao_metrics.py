@@ -7,6 +7,7 @@
 import json
 import os
 import sys
+from datetime import datetime
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -59,6 +60,43 @@ def collect(export, outcome, replay=None, parameters_version=None):
         "empty_model_responses": _empty_responses(export),
         "checkpoints": checkpoints,
     }
+
+
+def onboarding_metrics(export, elapsed_seconds=None):
+    """建档的模型请求数、用量与耗时（场景 2，设计第 5.2 节）：单独列出，不计入事项的指标。
+
+    数值从建档 run 的 `run.export` 算，与事项的指标同一套字段与未知值规则（缺的记未知，
+    不记零）；耗时取事件日志里第一条到最后一件事的间隔，取不到时用运行器量到的墙钟时间。
+    """
+    if export is None:
+        return {"model_requests": 0, "input_tokens": None, "output_tokens": None,
+                "total_tokens": None, "cost": None, "elapsed_seconds": _round_seconds(elapsed_seconds),
+                "status": None, "stop_reason": None}
+    return {
+        "model_requests": _requests(export),
+        "input_tokens": _usage(export, "input_tokens"),
+        "output_tokens": _usage(export, "output_tokens"),
+        "total_tokens": _usage(export, "total_tokens"),
+        "cost": _usage_float(export, "cost"),
+        "elapsed_seconds": _event_span_seconds(export) if _event_span_seconds(export) is not None
+        else _round_seconds(elapsed_seconds),
+        "status": export["projection"].get("status"),
+        "stop_reason": export["projection"].get("stop_reason"),
+    }
+
+
+def _round_seconds(value):
+    return None if value is None else round(float(value), 1)
+
+
+def _event_span_seconds(export):
+    """事件日志里第一条到最后一件事的间隔：导出有写入时间时用它量耗时，没有时为空。"""
+    times = [event.get("created_at") for event in export.get("events", [])]
+    stamps = [datetime.fromisoformat(value) for value in times
+              if isinstance(value, str) and value]
+    if len(stamps) < 2:
+        return None
+    return round((max(stamps) - min(stamps)).total_seconds(), 1)
 
 
 def _end_state(projection, outcome, model_service_failure):

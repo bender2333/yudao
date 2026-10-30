@@ -13,8 +13,11 @@
 """
 
 import base64
+import contextlib
+import importlib.util
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -27,19 +30,76 @@ import uuid
 import material_integrity
 import model_service
 
-SCENARIO = "scenario-3"
+# 一次评测运行的场景（评测场景设计第 2 节）：场景 3 从较长的 PRD 新建项目，场景 2 接入已有仓库。
+# 入口按 `--scenario` 设一次；测试用 `scenario()` 临时切换，结束后恢复
+SCENARIO_2 = "scenario-2"
+SCENARIO_3 = "scenario-3"
+SCENARIOS = (SCENARIO_2, SCENARIO_3)
+SCENARIO = SCENARIO_3
 
 # 场景 3 的运行模型在三个部门都使用同一条连接与同一个访问定义（评测场景设计第 3 节）
 PROVIDER_ID = "yudao-eval"
 MODEL_DEFINITION_ID = "yudao-eval-model"
 PROTOCOL = "chat_completions"
-# 交给 Yudao 的起点：只有题目提供的数据文件（第 3 节「输入」）
+# 场景 3 交给 Yudao 的起点：只有题目提供的数据文件（第 3 节「输入」）
 START_FILES = ("subway_data.json",)
+# 场景 2 的起点是检出好的上游仓库，经 `project.onboard` 接入；建档的那个事项的种类（接入已有项目设计说明第 3.3 节）
+ONBOARDING_SOURCE_NAME = "upstream"
+INITIAL_PRD_KIND = "initial_prd"
+CONFIRM_OPTION = "confirm"
 TERMINAL_STATUSES = ("done", "paused", "failed")
+# 建档事项还在执行、或者在等用户确认初始 PRD 时的状态（接入已有项目设计说明第 3.4 节）
+ONBOARDING_RUNNING_STATUSES = ("in_progress", "not_started", "awaiting_initial_prd")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
 POLL_INTERVAL_SECONDS = 3.0
 STARTUP_TIMEOUT_SECONDS = 180.0
 
+
+def set_scenario(name):
+    """切换当前场景：入口按 `--scenario` 设一次，测试用 `scenario()` 临时切换。"""
+    global SCENARIO
+    if name not in SCENARIOS:
+        raise ValueError("unknown scenario: " + str(name))
+    SCENARIO = name
+    return SCENARIO
+
+
+@contextlib.contextmanager
+def scenario(name):
+    """在指定场景下运行一段代码，结束后恢复原来的场景（一次运行与测试都用它）。"""
+    previous = SCENARIO
+    set_scenario(name)
+    try:
+        yield name
+    finally:
+        set_scenario(previous)
+
+
+_SCENARIO_MODULES = {}
+
+
+def scenario_module():
+    """当前场景的运行器专用部分：材料目录、评分输入与上游仓库地址由它给出。
+
+    两边的运行器共用同一个 `scenarioN` 模块（评测场景设计第 7 节），场景 2 与场景 3
+    的评分输入与上游地址都在里面。按文件路径加载：场景 2 的运行器模块与评分器的模块
+    同名（`runner/scenario2.py` 与 `scorer/scenario2.py`），同一个进程里先导入的那个
+    会占住 `scenario2` 这个名字，按模块名查找会拿到评分器。
+    """
+    if SCENARIO not in _SCENARIO_MODULES:
+        name = SCENARIO.replace("-", "")
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), name + ".py")
+        spec = importlib.util.spec_from_file_location("yudao_" + name, path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _SCENARIO_MODULES[SCENARIO] = module
+    return _SCENARIO_MODULES[SCENARIO]
+
+
+def material_version():
+    """当前场景的材料版本（材料 manifest 的 `material_version`，第 6 节）。"""
+    with open(os.path.join(materials_dir(), "manifest.json"), encoding="utf-8") as handle:
+        return json.load(handle).get("material_version")
 
 
 def scenario_base():
@@ -84,20 +144,89 @@ def hidden_dirs():
     }
 
 
+def source_install_command():
+    """场景 2 评分副本建立环境用的命令：材料 manifest 的 `runtime.install`（第 2.2 节）。"""
+    with open(os.path.join(materials_dir(), "manifest.json"), encoding="utf-8") as handle:
+        return str(json.load(handle)["runtime"]["install"])
+
+
+def prepare_source_dir(runs_root, run_id, *, repo_url=None, commit=None, install_command=None):
+    """场景 2 的起点：在运行目录之外检出任务上游仓库的基准提交（第 3 节「输入」「隔离」）。
+
+    检出方式沿用 OpenCode 一侧的 `scenario2.fill_run_dir`：按材料里的基准提交号从
+    上游检出，再用仓库自己的锁文件建立 Python 3.13 环境。两处不同：`.git` 保留，
+    快照要记下 git 提交（接入已有项目设计说明第 4.6 节）；不放需求原文，评测材料
+    不进入被接入的目录。远端地址检出以后去掉，工作区里不留回到上游的入口。
+
+    `repo_url`、`commit`、`install_command` 只由测试给出：用测试里建的本地小仓库
+    代替上游，不联网。
+    """
+    path = os.path.abspath(os.path.join(runs_root, run_id, "source"))
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+    if _is_inside(path, repo_root):
+        raise ValueError("the onboarded repository must be outside the Yudao repository: " + path)
+    if os.path.exists(path):
+        raise ValueError("the onboarded repository already exists: " + path)
+    os.makedirs(path)
+    url = repo_url or scenario_module().UPSTREAM_URL
+    target = commit or scenario_module().base_commit()
+    _git(["init", "--quiet"], path)
+    _git(["remote", "add", "origin", url], path)
+    fetched = _git(["fetch", "--quiet", "--depth", "1", "origin", target], path, check=False)
+    if fetched.returncode != 0:
+        raise RuntimeError("cannot fetch base commit " + str(target) + ": "
+                           + (fetched.stderr or fetched.stdout))
+    _git(["checkout", "--quiet", "FETCH_HEAD"], path)
+    _git(["remote", "remove", "origin"], path)
+    install_environment(path, install_command)
+    return path
+
+
+def _git(arguments, cwd, check=True):
+    return subprocess.run(["git"] + arguments, cwd=cwd, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", check=check)
+
+
+def install_environment(repo_dir, install_command=None):
+    """按材料的 `runtime.install` 在检出好的仓库里建立运行环境（需要联网，第 2.2 节）。
+
+    测试给出空串时跳过：本地小仓库没有锁文件，也不为它建立环境。
+    """
+    command = source_install_command() if install_command is None else install_command
+    if not command:
+        return None
+    completed = subprocess.run(shlex.split(command), cwd=repo_dir, capture_output=True, text=True,
+                               encoding="utf-8", errors="replace")
+    if completed.returncode != 0:
+        raise RuntimeError("cannot build the environment: " + (completed.stderr or completed.stdout))
+    return completed
+
+
 # 场景 3 的任务上游仓库（PRDBench）。运行器在导出的事件日志里查找对它的访问，
 # 与材料目录的路径使用同一条作废处理（评测场景设计第 3 节「联网」）。
 UPSTREAM_REPOSITORY = "AGI-Eval-Official/PRDBench"
 UPSTREAM_URLS = ("https://github.com/" + UPSTREAM_REPOSITORY,)
 
 
-def requirement_text():
-    """交给 Yudao 的用户原始意图：需求原文加接口约定（评测场景设计第 3 节「输入」）。
+def upstream_urls():
+    """当前场景的任务上游仓库地址：导出的事件日志里出现时这次运行作废（第 3 节「联网」）。
 
-    两边的输入是同一份：OpenCode 一侧用 `opencode run` 的消息加 `-f` 材料附件，
-    Yudao 一侧从正常入口作为用户原文提交。需求原文与接口约定的全文写在这条原文里，
-    工作区里没有这两个文件，工程不需要去读它们。起点文件（`subway_data.json`）由
-    运行器经新建项目的起始文件夹带入，事项文字里不另写起点文件的说明。
+    场景 2 的上游是 `openai/openai-agents-python`（`scenario2.UPSTREAM_URL`），
+    场景 3 的是 PRDBench；两边都在各自的 `scenarioN` 模块里，与 OpenCode 一侧同一份。
     """
+    return tuple(scenario_module().upstream_urls())
+
+
+def requirement_text():
+    """交给 Yudao 的用户原始意图（评测场景设计第 3 节「输入」）。
+
+    场景 3 是需求原文加接口约定：两边的输入是同一份，全文写在这条原文里，工作区里
+    没有这两个文件，工程不需要去读它们；起点文件（`subway_data.json`）由运行器经
+    起始文件夹带入，事项文字里不另写起点文件的说明。场景 2 是需求原文一件：已有的
+    代码由 `project.onboard` 接入，事项只提交这次要加的功能。
+    """
+    if SCENARIO == SCENARIO_2:
+        return _read(os.path.join(materials_dir(), "requirement.md"))
     prd = _read(os.path.join(materials_dir(), "prd.md"))
     agreement = _read(os.path.join(materials_dir(), "interface-agreement.md"))
     return (
@@ -319,6 +448,77 @@ def submit_requirement(client, project_id, text):
     return created["refs"]["work_item_id"], created["refs"]["run_id"]
 
 
+# ---------------------------------------------------------------------------
+# 场景 2 的建档：接入已有仓库、确认初始 PRD（接入已有项目设计说明第 3、4 节）
+
+def onboard_project(client, name, goal, source_path):
+    """接入已有项目：新建项目、登记源目录、采集快照、开始建档事项（第 3.1 节）。
+
+    返回项目、建档事项与建档 run 三个编号：建档的导出按 run 取，与事项的导出分开。
+    """
+    created = client.command("project.onboard", {"name": name, "goal": goal,
+                                                 "source_name": ONBOARDING_SOURCE_NAME,
+                                                 "source_path": source_path})
+    refs = created["refs"]
+    return refs["project_id"], refs["work_item_id"], refs["run_id"]
+
+
+def initial_prd_decision(client, project_id):
+    """这个项目的初始 PRD 决定请求；还没有出现时为 None。
+
+    请求写在项目流中，`decisions.list` 同时返回项目流与 run 流中的请求（第 3.2 节）。
+    """
+    listed = client.query("decisions.list", {"project_id": project_id,
+                                             "kind": INITIAL_PRD_KIND})["data"]["decisions"]
+    return listed[0] if listed else None
+
+
+def onboarding_status(client, project_id, work_item_id):
+    """建档事项的状态：`running_statuses` 里的是还在建档，`awaiting_initial_prd` 是等确认。"""
+    card = work_item_status(client, project_id, work_item_id)
+    return None if card is None else str(card.get("status") or "")
+
+
+def wait_for_initial_prd(client, project_id, work_item_id, timeout_seconds):
+    """等建档跑完并出现初始 PRD 的确认请求，返回这个请求（第 4.7 节）。
+
+    建档只回答一次确认：请求出现时它就是这次等待的结果。建档在出请求之前停下时
+    抛 RuntimeError，运行器把它写成这次运行的作废原因。
+    """
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        decision = initial_prd_decision(client, project_id)
+        if decision is not None:
+            return decision
+        status = onboarding_status(client, project_id, work_item_id)
+        if status not in ONBOARDING_RUNNING_STATUSES:
+            raise RuntimeError("建档没有给出初始 PRD 的确认请求，建档事项停在 " + (status or "未知状态"))
+        time.sleep(POLL_INTERVAL_SECONDS)
+    raise RuntimeError("建档在 " + str(timeout_seconds) + " 秒内没有给出初始 PRD 的确认请求")
+
+
+def wait_for_confirmation(client, project_id, timeout_seconds):
+    """等运行之外的回答：人在浏览器的决定卡片里确认初始 PRD（`--wait-prd-confirmation`）。
+
+    回答由人和运行器以外的一方提交，运行器只轮询决定请求的状态；到时限仍没有被
+    回答时抛 RuntimeError，运行器把这次运行作废并写明原因。
+    """
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        decision = initial_prd_decision(client, project_id)
+        if decision is not None and decision["status"] == "answered":
+            return decision
+        time.sleep(POLL_INTERVAL_SECONDS)
+    raise RuntimeError("初始 PRD 的确认在 " + str(timeout_seconds) + " 秒内没有被回答")
+
+
+def answer_initial_prd(client, decision):
+    """经 `decision.answer` 确认初始 PRD：基准版本是请求的版本（第 3.2 节）。"""
+    return client.command("decision.answer", {"base_version": decision["version"],
+                                              "decision_id": decision["decision_id"],
+                                              "option": CONFIRM_OPTION})
+
+
 def work_item_status(client, project_id, work_item_id):
     overview = client.query("project.overview", {"project_id": project_id, "work_item": work_item_id})
     cards = overview["data"]["work_items"]
@@ -455,19 +655,18 @@ def describe_hits(hits):
 
 
 def digest_reasons(base):
-    """场景 3 的材料摘要与材料版本记录比较：不同时这次运行作废（第 3 节「隔离」）。
+    """材料摘要与材料版本记录比较：不同时这次运行作废（第 3 节「隔离」）。
 
     摘要算在场景目录的材料原件上，不算评分目录里的副本：评分目录紧接在运行
     之后从原件复制，两者相同，而真正要防的是被测方在运行途中改掉仓库里的原件。
+    要核对哪几项由当前场景的 `SCORING_INPUTS` 给出（与 OpenCode 一侧同一份）。
     """
-    import scenario3
-    return material_integrity.digest_reasons(
-        base, set(scenario3.SCORING_INPUTS) | {"reference"})
+    return material_integrity.digest_reasons(base, set(scenario_module().SCORING_INPUTS))
 
 
 def upstream_hits(text):
     """在导出的事件日志中查找对任务上游仓库的访问：找到时这次运行作废。"""
-    return material_integrity.upstream_hits(text, UPSTREAM_URLS)
+    return material_integrity.upstream_hits(text, upstream_urls())
 
 
 def void_reasons(text):
