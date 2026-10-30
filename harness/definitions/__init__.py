@@ -18,6 +18,8 @@ from typing import Annotated, Any, Literal
 from pydantic import (BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError,
                       field_validator, model_validator)
 
+from ..actions import ActionKind, Verification, check_contract
+
 DEFINITIONS_DIR = Path(__file__).parent
 
 # 定义中的编号：小写字母开头，由小写字母、数字与下划线组成
@@ -164,8 +166,13 @@ class Tool(_Definition):
     # host：主机工具，由控制核心执行（现在只有提交类工具）；environment：环境工具，每次调用是一个动作，
     # 经过工具许可以后在执行环境中执行
     kind: Literal["host", "environment"]
-    # 环境工具的动作类别：读取、写入、检查、登记的本地命令；许可规则按动作类别适用
-    action: Literal["read", "write", "check", "command"] | None = None
+    # 环境工具的动作类别：读取、写入、检查、本地命令与新增的四类（网络取回、MCP、试用会话、浏览器）；
+    # 许可规则与执行环境的分派按动作类别适用，实际工具名仍供许可、提案与装配读取
+    action: ActionKind | None = None
+    # 这一类动作的核实方法与取消能否确认停止（恢复契约第 4 节）：旧类别可以省略，按类别的既定值解释；
+    # 新增的类别必须写明（动作合同：harness/actions.py 的 check_contract）
+    verification: Verification | None = None
+    cancellable: bool | None = None
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
     # 声明这个工具需要图像输入（设计说明第 5.6 节与浏览器设计第 6.1 节）：调用目标不含图像时
@@ -181,8 +188,13 @@ class Tool(_Definition):
     def _category(self) -> Tool:
         if self.kind == "environment" and (self.action is None or self.proposal is not None):
             raise ValueError("an environment tool requires action and has no proposal")
-        if self.kind == "host" and self.action is not None:
-            raise ValueError("a host tool requires proposal and has no action")
+        if self.kind == "host":
+            if self.action is not None:
+                raise ValueError("a host tool requires proposal and has no action")
+            if self.verification is not None or self.cancellable is not None:
+                raise ValueError("a host tool has no action metadata")
+            return self
+        check_contract(self.action, self.verification, self.cancellable)
         return self
 
 
