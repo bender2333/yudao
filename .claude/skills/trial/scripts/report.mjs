@@ -46,7 +46,7 @@ function redactDiagnostic(text, names = []) {
   }
   return value;
 }
-const print = (text) => console.log(redactDiagnostic(text, String(process.env.YUDAO_TRIAL_SECRET_ENV ?? "").split(",")));
+const print = (text, names = []) => console.log(redactDiagnostic(text, [...String(process.env.YUDAO_TRIAL_SECRET_ENV ?? "").split(","), ...names]));
 const PATH_PATTERNS = [
   ["本机盘符路径", /(?<![A-Za-z0-9])[A-Za-z]:[\\/]+(?!Users[\\/]+<)/g],
   ["本机用户目录", /(?<![A-Za-z0-9.])\/(?:Users|home)\/[^\s"'`|)]+/g],
@@ -80,6 +80,36 @@ export function check(resultPath, { secretEnv = [] } = {}) {
   } catch (e) {
     return { ok: false, status: "failed", errors: [{ code: "result_unreadable", where: basename(resultPath), message: e.code === "ENOENT" ? "文件不存在" : "JSON 无法解析" }], warnings, missing, summary: null, ctx: null };
   }
+  if (!result || typeof result !== "object" || Array.isArray(result)) {
+    return { ok: false, status: "failed", errors: [{ code: "schema", where: basename(resultPath), message: "result 必须是 JSON 对象" }], warnings, missing, summary: null, ctx: null };
+  }
+  for (const field of ["tasks", "instances", "findings", "history", "first_impressions", "missing", "handoffs", "publish"]) {
+    if (result[field] !== undefined && !Array.isArray(result[field])) err("schema", field, "该字段必须是数组");
+  }
+  if (errors.length) return { ok: false, status: "failed", errors, warnings, missing, summary: null, ctx: null };
+  const object = (value, where) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) return true;
+    err("schema", where, "该字段必须是 JSON 对象"); return false;
+  };
+  const array = (value, where) => {
+    if (value === undefined || Array.isArray(value)) return true;
+    err("schema", where, "该字段必须是数组"); return false;
+  };
+  for (const [i, t] of (result.tasks ?? []).entries()) {
+    if (!object(t, `tasks[${i}]`)) continue;
+    array(t.missing, `tasks[${i}].missing`);
+    if (t.score !== undefined) object(t.score, `tasks[${i}].score`);
+  }
+  for (const field of ["findings", "history"]) for (const [i, f] of (result[field] ?? []).entries()) {
+    const where = `${field}[${i}]`;
+    if (!object(f, where)) continue;
+    array(f.evidence, `${where}.evidence`);
+    for (const name of ["reproduction", "judgment", "repair", "verification", "tracker"]) {
+      if (f[name] !== undefined && object(f[name], `${where}.${name}`) && name === "reproduction") array(f[name].evidence, `${where}.${name}.evidence`);
+    }
+  }
+  for (const [i, f] of (result.first_impressions ?? []).entries()) object(f, `first_impressions[${i}]`);
+  if (errors.length) return { ok: false, status: "failed", errors, warnings, missing, summary: null, ctx: null };
 
   // 路径：相对 result 所在目录，不收绝对路径
   const looksAbsolute = (p) => isAbsolute(p) || /^[A-Za-z]:/.test(p) || p.startsWith("\\\\");
@@ -175,7 +205,7 @@ export function check(resultPath, { secretEnv = [] } = {}) {
     if (!abs) return null;
     if (!manifests.has(abs)) {
       const m = getJson(p, where);
-      const errs = m ? checkManifest(m) : [];
+      const errs = checkManifest(m);
       errs.forEach((e) => err("manifest_invalid", where, `${p}：${e}`));
       manifests.set(abs, m && !errs.length ? m : null);
     }
@@ -254,7 +284,8 @@ export function check(resultPath, { secretEnv = [] } = {}) {
       if (!["done", "missing", "not_applicable"].includes(s.status)) err("score_status", w, "score.status 必须是 done、missing 或 not_applicable");
       else if (s.status === "done") {
         const scored = getJson(s.path, `${w}.path`);
-        if (scored) {
+        if (!scored || typeof scored !== "object" || Array.isArray(scored)) err("score_content", w, "评分文件必须是含评分字段的 JSON 对象");
+        else {
           for (const field of ["completion", "correctness"]) if (typeof scored[field] !== "number" || !Number.isFinite(scored[field]) || scored[field] < 0 || scored[field] > 1) err("score_content", w, `评分文件的 ${field} 不是 0..1 的数值`);
           if (scored.material_version !== result.material_version) err("score_material", w, "评分文件的材料版本与本轮不同");
           if (!scored.scorer_version) err("score_content", w, "评分文件缺少 scorer_version");
@@ -324,6 +355,15 @@ export function check(resultPath, { secretEnv = [] } = {}) {
     if (["passed", "failed", "partial"].includes(vf)) {
       checkSource(f.verification.source, `${where}.verification.source`);
       if (!f.verification.commit && !f.verification.instance_path) err("verification_version", `${where}.verification`, "验证结果需要写明对应的 commit 或 instance_path");
+      const commit = f.verification.commit;
+      if (commit !== undefined && (typeof commit !== "string" || !/^[0-9a-f]{7,40}$/.test(commit))) err("verification_version", `${where}.verification.commit`, "commit 必须是 7 到 40 位十六进制");
+      if (f.verification.instance_path) {
+        const path = f.verification.instance_path;
+        const abs = localPath(path, `${where}.verification.instance_path`);
+        if (abs && !listedInstances.has(abs)) err("instance_not_listed", `${where}.verification`, "instance_path 必须同时列在顶层 instances 里");
+        const manifest = getManifest(path, `${where}.verification.instance_path`);
+        if (manifest && typeof commit === "string" && !(manifest.commit.startsWith(commit) || commit.startsWith(manifest.commit))) err("verification_version", `${where}.verification`, "commit 与验证实例的提交不同");
+      }
       if (rp !== "fixed") err("verification_without_repair", `${where}.verification`, "修复进度不是 fixed，不能有修复后验证结果");
     }
     if (f?.tracker?.source) checkSource(f.tracker.source, `${where}.tracker.source`);
@@ -574,16 +614,17 @@ export function init(resultPath, { taskSet, material, commit, exports }) {
 
 // ---------- 命令行 ----------
 function printReport(rep) {
+  const output = text => print(text, rep.ctx?.secretEnvNames ?? []);
   const label = { complete: "完整", partial: "部分完成", failed: "未通过" }[rep.status];
-  print(`结果：${label}`);
-  if (rep.errors.length) { print(`\n错误 ${rep.errors.length} 条：`); for (const e of rep.errors) print(`- [${e.code}] ${e.where}：${e.message}`); }
-  if (rep.warnings.length) { print(`\n警告 ${rep.warnings.length} 条：`); for (const e of rep.warnings) print(`- [${e.code}] ${e.where}：${e.message}`); }
-  if (rep.missing.length) { print(`\n缺项 ${rep.missing.length} 条：`); for (const m of rep.missing) print(`- ${m.scope} / ${m.item}：${m.reason ?? "（未写原因）"}`); }
+  output(`结果：${label}`);
+  if (rep.errors.length) { output(`\n错误 ${rep.errors.length} 条：`); for (const e of rep.errors) output(`- [${e.code}] ${e.where}：${e.message}`); }
+  if (rep.warnings.length) { output(`\n警告 ${rep.warnings.length} 条：`); for (const e of rep.warnings) output(`- [${e.code}] ${e.where}：${e.message}`); }
+  if (rep.missing.length) { output(`\n缺项 ${rep.missing.length} 条：`); for (const m of rep.missing) output(`- ${m.scope} / ${m.item}：${m.reason ?? "（未写原因）"}`); }
   if (rep.summary && rep.ok) {
     const t = rep.summary.tallyCurrent;
     const rd = rep.summary.redaction;
-    print(`\n脱敏检查：扫描 ${rd.filesScanned} 个文件（其中发布文件 ${rd.publishFiles} 个），与 ${rd.envValuesCompared}/${rd.envNamesChecked} 个环境变量的值比较（值不输出）`);
-    print(`\n本轮缺陷命中率：${rate(t.defect.confirmed, t.defectDenominator)}；待定 ${t.defect.pending}；体验采纳 ${t.experience.confirmed}／不采纳 ${t.experience.rejected}／待定 ${t.experience.pending}`);
+    output(`\n脱敏检查：扫描 ${rd.filesScanned} 个文件（其中发布文件 ${rd.publishFiles} 个），与 ${rd.envValuesCompared}/${rd.envNamesChecked} 个环境变量的值比较（值不输出）`);
+    output(`\n本轮缺陷命中率：${rate(t.defect.confirmed, t.defectDenominator)}；待定 ${t.defect.pending}；体验采纳 ${t.experience.confirmed}／不采纳 ${t.experience.rejected}／待定 ${t.experience.pending}`);
   }
 }
 
@@ -619,7 +660,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
     if (argv.includes("--json")) {
       const { ctx, ...rest } = rep;
-      print(JSON.stringify({ ...rest, rendered }, null, 1));
+      print(JSON.stringify({ ...rest, rendered }, null, 1), rep.ctx?.secretEnvNames ?? []);
     } else {
       printReport(rep);
       if (rendered) print(`\n已写入 ${rendered}`);

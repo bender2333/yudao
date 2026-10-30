@@ -33,12 +33,15 @@ if ($InstanceManifest) {
     $manifestPath = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $InstanceManifest))
     $instance = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
     $Port = [int]$instance.port
-    if (-not $DataDir) { $DataDir = [string]$instance.data_dir }
+    if (-not $DataDir -and $instance.data_dir) {
+      $DataDir = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Split-Path -Parent $manifestPath), [string]$instance.data_dir))
+    }
   } catch {
     $instanceError = $_.Exception.Message
   }
 }
 if (-not $DataDir) { $DataDir = Join-Path ([System.IO.Path]::GetTempPath()) "yudao-trial-$Port" }
+$DataDir = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine((Get-Location).ProviderPath, $DataDir))
 
 $rows = New-Object System.Collections.Generic.List[object]
 function Add-Row([string]$Item, [string]$Value, [string]$Level, [string]$Note = '') {
