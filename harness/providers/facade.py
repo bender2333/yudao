@@ -1663,10 +1663,22 @@ def _required_tool_parameter_rejected(error: ProviderError) -> bool:
     param = details.get("param")
     if isinstance(param, str):
         return param == "tool_choice" or param.startswith("tool_choice.")
-    message = str(details.get("error_message") or "").casefold()
-    return "tool_choice" in message and any(word in message for word in (
-        "unsupported", "not supported", "not allowed", "invalid", "unrecognized", "unknown",
-        "incompatible", "cannot", "may not", "不支持", "无效", "不能"))
+    message = " ".join(str(details.get("error_message") or "").casefold().split())
+    message = message.replace("'", "").replace('"', "").replace("`", "")
+    before, separator, after = message.partition("tool_choice")
+    if not separator:
+        return False
+    # 错误必须直接说明这个参数不被接受；其他字段的 invalid/unknown 不能作为工具能力证据。
+    after = after.lstrip(" :=,.-")
+    if after.startswith("parameter "):
+        after = after[len("parameter "):]
+    return after.startswith((
+        "is not supported", "not supported", "is unsupported", "unsupported", "is invalid", "invalid",
+        "is not allowed", "not allowed", "is incompatible", "must be", "required is not supported",
+        "required is invalid", "不支持", "无效", "不能")) or before.rstrip().endswith((
+        "unsupported parameter:", "unsupported parameter", "unknown parameter:", "invalid parameter:",
+        "unrecognized parameter:", "unsupported value for", "invalid value for", "does not support",
+        "not support", "不支持", "不支持参数", "无效参数"))
 
 
 def _model_test_tool_outputs(result: InvokeResult) -> list[dict[str, Any]]:

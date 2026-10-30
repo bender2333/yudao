@@ -112,6 +112,8 @@ def test_explicit_tool_choice_rejection_retries_once_without_requiring_tools(pro
     (400, None, "unsupported tools parameter"),
     (500, "tool_choice", "tool_choice temporarily unavailable"),
     (400, None, "request rejected"),
+    (400, None, "tools schema invalid; tool_choice=required"),
+    (400, None, "unknown model target-model; tool_choice was required"),
 ])
 def test_other_upstream_errors_fail_without_a_tool_choice_retry(protocol, status, param, message):
     provider = ScriptedProvider([reply(protocol), rejected(status, message, param=param)])
