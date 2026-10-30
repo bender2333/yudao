@@ -271,6 +271,31 @@ def test_form_and_json_report_the_same_field_location_for_invalid_content(tmp_pa
         assert _catalog(client)["revision"] == base
         assert [item["id"] for item in _document(client)["models"]] == ["model-a", "model-a2", "model-b"]
 
+        # #1310：整份文档都要满足第 4.6 节，取出的文档原样保存（绑定与现有完全相同，没有条目变化）
+        # 也整份拒绝；引用的定义通过模型测试以后，同一份文档再保存就被接受——
+        # 「选用以后保存同一份文档不被自己的旧状态挡住」由准入先发生来保证
+        same = {"providers": document["providers"], "models": document["models"],
+                "bindings": unadmitted["bindings"]}
+        unchanged = _post(client, "catalog.document.save", base_version=base, document=same)
+        assert unchanged.status_code == 409, unchanged.text
+        assert "bindings.product.model_id" in _location_paths(unchanged)
+        assert _catalog(client)["revision"] == base
+        opened.admit(("provider-a", "model-a"))
+        admitted = _post(client, "catalog.document.save", base_version=base, document=same)
+        assert admitted.status_code == 200, admitted.text
+        assert [item["id"] for item in _document(client)["models"]] == ["model-a", "model-a2", "model-b"]
+
+        # 文档新增的定义没有任何准入记录，绑定它的文档也整份拒绝
+        fresh = {"providers": document["providers"], "models": [*document["models"],
+                                                               _model("model-new", "provider-a", "upstream-new")],
+                 "bindings": {department: {"provider_id": "provider-a", "model_id": "model-new"}
+                              for department in DEPARTMENTS}}
+        fresh_rejected = _post(client, "catalog.document.save",
+                               base_version=_catalog(client)["revision"], document=fresh)
+        assert fresh_rejected.status_code == 409, fresh_rejected.text
+        assert "bindings.product.model_id" in _location_paths(fresh_rejected)
+        assert not any(item["id"] == "model-new" for item in _document(client)["models"])
+
 
 def test_external_address_change_returns_definitions_to_candidates(tmp_path):
     # 外部修改目录文件中某份连接的地址以后，该连接下的定义回到候选；
