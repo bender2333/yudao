@@ -873,22 +873,24 @@ class ProviderFacade:
 
     def select_model(self, provider_id: str, upstream_model: str, *, protocol: str | None = None,
                      context_window: int | None = None, max_output_tokens: int | None = None,
-                     force: bool = False) -> tuple[SelectionAttempt | None, bool]:
+                     force: bool = False, definition_id: str | None = None) -> tuple[SelectionAttempt | None, bool]:
         # 候选与手动添加共用候选补全；重复选用复用当前测试或有效准入。
         with self._lock:
             provider = self._store.providers.get(provider_id)
             if provider is None:
                 raise CatalogValidationError((ValidationIssue(f"providers.{provider_id}", "Provider 配置不存在"),))
-            existing = next((item for item in self._store.models.values()
-                             if item.provider_id == provider_id and item.model == upstream_model
-                             and (protocol is None or item.protocol == protocol)), None)
-            if existing is not None and not force:
-                current = self.selections.current(existing.id)
-                if current is not None and current.status in {"completing", "waiting", "testing"}:
-                    return current, False
-                record = self._admissions.get(existing.id)
-                if record is not None and admission_is_current(record, existing, provider):
-                    return None, False
+            matches = [item for item in self._store.models.values()
+                       if item.provider_id == provider_id and item.model == upstream_model
+                       and (definition_id is None or item.id == definition_id)]
+            if not force:
+                for item in matches:
+                    current = self.selections.current(item.id)
+                    if current is not None and current.status in {"completing", "waiting", "testing"}:
+                        return current, False
+                    record = self._admissions.get(item.id)
+                    if record is not None and admission_is_current(record, item, provider):
+                        return None, False
+            existing = next(iter(matches), None)
             latest = self._candidate_results.get(provider_id) or {}
             candidate = next((item for item in latest.get("candidates", ()) if item["id"] == upstream_model), None)
             from_list = candidate is not None
@@ -951,7 +953,7 @@ class ProviderFacade:
                 if model.provider_id != provider_id:
                     continue
                 if latest.get("status") == "ok" and model.model in candidate_ids:
-                    selected, start = self.select_model(provider_id, model.model, force=True)
+                    selected, start = self.select_model(provider_id, model.model, force=True, definition_id=model.id)
                     if start:
                         ready.append(selected)
                 else:

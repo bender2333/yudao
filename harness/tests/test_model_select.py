@@ -128,6 +128,9 @@ def test_select_completes_and_tests_upstream_capacity_then_preserves_it_on_resta
             select(client, provider_id, "maker/ready")
             assert catalog(client)["models"] == data["models"]
             assert len(upstream.requests) == count
+            select(client, provider_id, "maker/ready", protocol="responses")
+            assert catalog(client)["models"] == data["models"]
+            assert len(upstream.requests) == count
             facts = opened.application.system.store.read(0, limit=10000)
             assert any(event.type == CatalogEventType.CATALOG_TEST_FINISHED for event in facts)
             assert SECRET not in json.dumps([event.payload for event in facts])
@@ -604,3 +607,65 @@ def test_manual_capacity_fills_only_fields_missing_from_the_upstream_list(tmp_pa
             assert output["source_details"]["max_output_tokens"]["source"] == "models_url"
     finally:
         upstream.close()
+
+
+def test_address_change_retests_each_existing_definition_of_the_same_upstream_model(tmp_path):
+    # R3：高级目录允许同一上游模型有多个协议定义，地址变更必须分别重测并保留各自的声明。
+    entered = set()
+    condition = threading.Condition()
+    release = threading.Event()
+
+    def respond(window, *, gated=False):
+        def reply(_provider, handler):
+            if handler.body is None:
+                send_reply(handler, 200, "application/json", json.dumps({"data": [
+                    {"id": "shared", "limit": {"context": window, "output": 2048}}]}).encode())
+                return
+            protocol = "responses" if handler.path.endswith("/responses") else "chat_completions"
+            if gated and not handler.body.get("tools"):
+                with condition:
+                    entered.add(protocol)
+                    condition.notify_all()
+                assert release.wait(30), "等待同一模型的两个协议定义重新测试"
+            status, content_type, chunks = model_test_responder(handler.body, protocol=protocol, actual_model="shared")
+            send_reply(handler, status, content_type, b"".join(chunks))
+        return reply
+
+    old = ScriptedProvider([respond(32000)] * 20)
+    new = ScriptedProvider([respond(64000, gated=True)] * 20)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id = connect(client, old)
+            provider = catalog(client)["providers"][0]
+            fields = ("id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")
+            provider = {name: provider[name] for name in fields}
+            models = [{"id": protocol, "model": "shared", "protocol": protocol,
+                       "context_window": 32000, "max_output_tokens": 2048,
+                       "source_details": {"protocol": {"source": "manual"}}}
+                      for protocol in ("responses", "chat_completions")]
+            saved = command(client, "catalog.connection.save", base_version=catalog(client)["revision"],
+                            provider=provider, models=models)
+            assert saved.status_code == 200, saved.text
+            for model in models:
+                tested = command(client, "catalog.model.test", base_version=catalog(client)["revision"],
+                                 provider_id=provider_id, model_id=model["id"])
+                assert tested.status_code == 200, tested.text
+            before = wait_catalog(client, lambda data: len(data["admissions"]) == 2 and not data["selections"])
+            changed = command(client, "catalog.connection.save", base_version=before["revision"],
+                              provider={**provider, "base_url": new.base + "/v1"}, models=models)
+            assert changed.status_code == 200, changed.text
+            with condition:
+                assert condition.wait_for(lambda: len(entered) == 2, timeout=10)
+            pending = catalog(client)
+            assert {row["model_id"] for row in pending["selections"]} == {"responses", "chat_completions"}
+            assert all(row["context_window"] == 64000 for row in pending["models"])
+            release.set()
+            enabled = wait_catalog(client, lambda data: all(row["admitted"] for row in data["admissions"])
+                                   and not data["selections"])
+            assert {row["protocol"] for row in enabled["admissions"]} == {"responses", "chat_completions"}
+            assert enabled["bindings"] == before["bindings"]
+    finally:
+        release.set()
+        old.close()
+        new.close()
