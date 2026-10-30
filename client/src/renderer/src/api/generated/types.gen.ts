@@ -246,6 +246,28 @@ export type ActionView = {
 };
 
 /**
+ * ActivationView
+ */
+export type ActivationView = {
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * Step Count
+     */
+    step_count: number;
+};
+
+/**
  * AdoptionView
  */
 export type AdoptionView = {
@@ -4330,6 +4352,62 @@ export type RunRecoveryResult = {
 };
 
 /**
+ * RunStepView
+ */
+export type RunStepView = {
+    /**
+     * Step Id
+     */
+    step_id: number;
+    /**
+     * Requested At
+     */
+    requested_at: string;
+    /**
+     * Discarded Attempts
+     */
+    discarded_attempts: number;
+    /**
+     * Reasoning
+     */
+    reasoning: Array<StepText>;
+    /**
+     * Texts
+     */
+    texts: Array<StepText>;
+    /**
+     * Actions
+     */
+    actions: Array<ActionView>;
+};
+
+/**
+ * RunStepsResult
+ */
+export type RunStepsResult = {
+    /**
+     * Activation Id
+     */
+    activation_id: string | null;
+    /**
+     * Activations
+     */
+    activations: Array<ActivationView>;
+    /**
+     * Steps
+     */
+    steps: Array<RunStepView>;
+    /**
+     * Unassigned Actions
+     */
+    unassigned_actions: Array<ActionView>;
+    /**
+     * Background Commands
+     */
+    background_commands: Array<BackgroundCommandView>;
+};
+
+/**
  * RuntimeForceUpgrade
  */
 export type RuntimeForceUpgrade = {
@@ -4611,6 +4689,17 @@ export type SnapshotRunRecoveryResult = {
 };
 
 /**
+ * Snapshot[RunStepsResult]
+ */
+export type SnapshotRunStepsResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: RunStepsResult;
+};
+
+/**
  * Snapshot[SystemStatus]
  */
 export type SnapshotSystemStatus = {
@@ -4736,6 +4825,28 @@ export type SourceDirectorySetting = {
      * Credential Ref
      */
     credential_ref?: string | null;
+};
+
+/**
+ * StepText
+ */
+export type StepText = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Readable
+     */
+    readable: boolean;
+    /**
+     * Length
+     */
+    length: number;
+    /**
+     * Preview
+     */
+    preview: string;
 };
 
 /**
@@ -18340,6 +18451,44 @@ export type QueryRunActionsResponses = {
 };
 
 export type QueryRunActionsResponse = QueryRunActionsResponses[keyof QueryRunActionsResponses];
+
+export type QueryRunStepsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+        /**
+         * Department
+         */
+        department: 'product' | 'engineering' | 'quality';
+        /**
+         * Activation Id
+         */
+        activation_id?: string | null;
+    };
+    url: '/api/queries/run.steps';
+};
+
+export type QueryRunStepsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryRunStepsError = QueryRunStepsErrors[keyof QueryRunStepsErrors];
+
+export type QueryRunStepsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotRunStepsResult;
+};
+
+export type QueryRunStepsResponse = QueryRunStepsResponses[keyof QueryRunStepsResponses];
 
 export type QueryRunAsksData = {
     body?: never;

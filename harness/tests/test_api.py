@@ -267,7 +267,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
-        "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions", "run.asks",
+        "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions", "run.steps",
+        "run.asks",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
@@ -416,6 +417,7 @@ def test_queries_for_a_missing_target_answer_404(data_dir):
                              ("work_item.inputs", {"project_id": "missing", "work_item": "missing"}),
                              ("event.detail", {"event_id": "missing"}),
                              ("run.actions", {"run_id": "missing"}),
+                             ("run.steps", {"run_id": "missing", "department": "product"}),
                              ("run.attempt", {"run_id": "missing", "attempt_id": "missing"}),
                              ("run.export", {"run_id": "missing"}),
                              ("delivery.file", {"event_id": "missing", "path": "missing.py"})):
