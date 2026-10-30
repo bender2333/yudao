@@ -279,7 +279,7 @@
 
   <section id="s3">
     <h2>一轮工作的经过<small>三种轮转方式共用一套状态词</small></h2>
-    <p class="muted">下面的状态对一个角色成立，部门名只是默认三部门里的例子。按成果时，状态由关注的成果推动；直做时，由你的输入、询问与交完成推动；任务池时，由认领的工作单元推动。工作单元有多大是定义里的参数，池子允许一个单元就是整个事项，那时它就是按成果。有核验角色核验的成果经过「核验中」；不需要核验的成果（例如三部门里产品交的要求）和开环完成从「一轮工作中」直接到「接纳」。</p>
+    <p class="muted">下面的状态对一个部门成立。按成果时，状态由关注的成果推动；任务池时，由认领的工作单元推动。工作单元有多大是定义里的参数，池子允许一个单元就是整个事项，那时它就是按成果。</p>
     <div class="map" style="margin-top:12px">
     <svg viewBox="0 -12 1000 712" role="img" aria-label="双环：外环是部门之间的流转，内环是一轮工作里的单步循环">
       <defs>
@@ -289,26 +289,26 @@
       </defs>
       <!-- 外环区 -->
       <rect class="zone" x="8" y="-6" width="984" height="384" rx="8" transform="" style="stroke-dasharray:6 5"/>
-      <text class="zone-l" x="20" y="14">外环 · 角色之间的流转（直做、按成果、任务池共用这套状态）</text>
+      <text class="zone-l" x="20" y="14">外环 · 部门之间的流转（按成果或任务池，共用这套状态）</text>
       <!-- 上排：分支 -->
       <g class="st side"><rect x="250" y="34" width="170" height="56" rx="4"/><text x="335" y="58">询问中</text><text x="335" y="76" class="s">嵌在一轮里的另一轮，等回应</text></g>
       <g class="st side"><rect x="470" y="34" width="170" height="56" rx="4"/><text x="555" y="58">等用户</text><text x="555" y="76" class="s">决定请求停在写入口</text></g>
       <!-- 中排：主线 -->
       <g class="st main"><rect x="30" y="160" width="150" height="60" rx="4"/><text x="105" y="186">等待工作</text><text x="105" y="204" class="s">关注的成果更新 / 待认领</text></g>
       <g class="st main"><rect x="250" y="160" width="170" height="60" rx="4"/><text x="335" y="186">一轮工作中</text><text x="335" y="204" class="s">派发编号 + 从快照建工作区</text></g>
-      <g class="st main"><rect x="560" y="160" width="150" height="60" rx="4"/><text x="635" y="186">核验中</text><text x="635" y="204" class="s">核验角色在独立副本检查</text></g>
+      <g class="st main"><rect x="560" y="160" width="150" height="60" rx="4"/><text x="635" y="186">核验中</text><text x="635" y="204" class="s">独立副本检查 + 回执</text></g>
       <g class="st end"><rect x="800" y="160" width="150" height="60" rx="4"/><text x="875" y="186">接纳</text><text x="875" y="204" class="s">绑定合同、交付树、回执</text></g>
       <!-- 下排 -->
       <g class="st side"><rect x="250" y="300" width="170" height="56" rx="4"/><text x="335" y="324">排空中</text><text x="335" y="342" class="s">不接新事项，等在途的结束</text></g>
-      <g class="st"><rect x="560" y="300" width="150" height="56" rx="4"/><text x="635" y="324">返工</text><text x="635" y="342" class="s">打回给被核验的一方</text></g>
+      <g class="st"><rect x="560" y="300" width="150" height="56" rx="4"/><text x="635" y="324">返工</text><text x="635" y="342" class="s">打回工程或产品</text></g>
       <g class="st end"><rect x="800" y="300" width="150" height="56" rx="4"/><text x="875" y="324">停止</text><text x="875" y="342" class="s">原因来自封闭清单</text></g>
       <!-- 主线箭头 -->
       <path class="edge" d="M180 190 L248 190" marker-end="url(#ah)"/><text class="e-l" x="214" y="182" text-anchor="middle">路由触发 / 认领</text>
       <path class="edge" d="M420 190 L558 190" marker-end="url(#ah)"/><text class="e-l" x="489" y="182" text-anchor="middle">提交成果或单元</text>
       <path class="edge" d="M710 190 L798 190" marker-end="url(#ah)"/><text class="e-l" x="754" y="182" text-anchor="middle">通过</text>
-      <path class="edge" d="M875 220 L875 298" marker-end="url(#ah)"/><text class="e-l" x="885" y="262">放行或开环完成</text>
-      <path class="edge dashed" d="M420 212 C 480 262, 740 262, 800 212" marker-end="url(#ah)"/><text class="e-l" x="489" y="262" text-anchor="middle">不需核验的成果；开环完成</text>
-      <path class="edge dashed" d="M875 160 C 875 -20, 105 -20, 105 158" marker-end="url(#ah)"/><text class="e-l" x="490" y="22" text-anchor="middle">下游角色关注的成果有了新版本，它开始一轮</text>
+      <path class="edge" d="M875 220 L875 298" marker-end="url(#ah)"/><text class="e-l" x="885" y="262">放行或开环完成，事项完成</text>
+      <path class="edge dashed" d="M420 212 C 480 262, 740 262, 800 212" marker-end="url(#ah)"/><text class="e-l" x="610" y="250" text-anchor="middle">没有核验角色：交完成</text>
+      <path class="edge dashed" d="M875 160 C 875 -20, 105 -20, 105 158" marker-end="url(#ah)"/><text class="e-l" x="490" y="22" text-anchor="middle">下游部门关注的成果有了新版本，它开始一轮</text>
       <!-- 分支箭头 -->
       <path class="edge" d="M300 160 L300 92" marker-end="url(#ah)"/><text class="e-l" x="262" y="130">询问</text>
       <path class="edge" d="M370 92 L370 158" marker-end="url(#ah)"/><text class="e-l" x="378" y="130">回应到达</text>
@@ -318,7 +318,7 @@
       <path class="edge back" d="M560 330 C 400 330, 200 300, 105 222" marker-end="url(#ahb)"/><text class="e-l back" x="330" y="276" text-anchor="middle">缺陷记录是上游关注的成果；连续无进展达到阈值就提醒你</text>
       <path class="edge dashed" d="M105 220 C 105 335, 150 328, 248 328" marker-end="url(#ah)"/><text class="e-l" x="150" y="372">升级前排空</text>
       <path class="edge dashed" d="M420 328 L798 328" marker-end="url(#ah)"/><text class="e-l" x="500" y="320">排空完毕</text>
-      <path class="edge thin dashed" d="M700 240 C 740 280, 780 300, 800 310" marker-end="url(#ah)"/><text class="e-l" x="980" y="372" text-anchor="end">边界到上限、你取消、振荡信号：任何状态都能到停止</text>
+      <path class="edge thin dashed" d="M700 240 C 740 280, 780 300, 800 310" marker-end="url(#ah)"/><text class="e-l" x="660" y="246">边界到上限、你取消、振荡信号：任何状态都能到停止</text>
       <!-- 外环到内环 -->
       <path class="edge" style="stroke:var(--accent);stroke-width:2" d="M335 220 C 335 260, 40 290, 60 465" marker-end="url(#aha)"/>
       <text class="e-l" style="fill:var(--accent);font-weight:600" x="110" y="392">一轮工作中 = 内环在转</text>
@@ -328,7 +328,7 @@
       <g class="st"><rect x="30" y="470" width="130" height="72" rx="4"/><text x="95" y="492">1 路由与边界</text><text x="95" y="510" class="s">谁开工、一轮怎么结束</text><text x="95" y="526" class="s">每步先问上限</text></g>
       <g class="st"><rect x="190" y="470" width="140" height="72" rx="4"/><text x="260" y="492">2 装配</text><text x="260" y="510" class="s">从事实减出这一轮要看的</text><text x="260" y="526" class="s">并入指导，记进事实</text></g>
       <g class="st"><rect x="360" y="470" width="140" height="72" rx="4"/><text x="430" y="492">3 模型 / 外包</text><text x="430" y="510" class="s">一次请求，记尝试与用量</text><text x="430" y="526" class="s">只出提案</text></g>
-      <g class="st"><rect x="530" y="470" width="140" height="72" rx="4"/><text x="600" y="492">4 工具与环境</text><text x="600" y="510" class="s">先经写入口记下动作</text><text x="600" y="526" class="s">再执行，交回差异与回执</text></g>
+      <g class="st"><rect x="530" y="470" width="140" height="72" rx="4"/><text x="600" y="492">4 工具与环境</text><text x="600" y="510" class="s">核对许可与范围</text><text x="600" y="526" class="s">前后差异与回执</text></g>
       <g class="st main"><rect x="700" y="470" width="140" height="72" rx="4"/><text x="770" y="492">5 裁决与写入口</text><text x="770" y="510" class="s">同一事务核对执行权、</text><text x="770" y="526" class="s">派发编号、版本；只追加</text></g>
       <g class="st"><rect x="870" y="470" width="110" height="72" rx="4"/><text x="925" y="492">6 投影</text><text x="925" y="510" class="s">最小投影、页面、</text><text x="925" y="526" class="s">观察者看的</text></g>
       <path class="edge" d="M160 506 L188 506" marker-end="url(#ah)"/>
@@ -349,14 +349,12 @@
       <path class="edge dashed" d="M770 542 L770 578" marker-end="url(#ah)"/>
     </svg>
     </div>
-    <p class="muted" style="font-size:12.5px;margin-top:6px">两环的关系：外环的「一轮工作中」就是内环在转；内环每转一圈写回一次事实，外环只看写回的事实决定下一步。你的意图和中途的指导都是关注的成果：事项创建时的意图是它的第一版，路由不为第一轮另写规矩；角色在等待时，指导让它开始一轮；在一轮工作中时，指导在下一步作为通知加入。</p>
+    <p class="muted" style="font-size:12.5px;margin-top:6px">两环的关系：外环的「一轮工作中」就是内环在转；内环每转一圈写回一次事实，外环只看写回的事实决定下一步。你中途的指导是部门关注的成果：部门在等待时，指导让它开始一轮；在一轮工作中时，指导在下一步作为通知加入。</p>
     <ul class="rules">
       <li><b>每一步先问边界</b>：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。</li>
-      <li><b>判定点</b>：需要判断的小问题（挑上下文、含糊的读法）可以问一个小模型，答案先写成事件再被使用；重放时读事件，不再问模型。下游有独立核验兜底时默认继续，没有就升级成决定请求；开环的定义里照判定点自己声明的去向走，不因为没有核验角色而升级。</li>
-      <li><b>工具调用先记后做</b>：执行一个动作之前，先经写入口记下动作身份，这时核对许可、执行权与派发编号，重派以后旧编号的动作不会开始；执行以后回执再经写入口写回。工作区里的改动只落在这一轮自己从快照建的工作区，没有经过接纳就不进别人看到的事实。</li>
-      <li><b>询问</b>：嵌在提问方这一轮里，用同一个执行权与派发编号写入，不推进轮次；上限取被询问方声明的值与提问方剩余量中较小的一个，用量计入提问方，询问链的层数有上限。提问方被重派时，分支迟到的回答按旧编号只记录。</li>
-      <li><b>增量与整份</b>：任务池模式下每个单元各自核验，但放行门仍是整份交付对要求的一次核验。几个单元并行时，每个单元交回时写明自己的起点快照；起点已经不是当前的整份交付时，先合并再重新跑检查，旧的核验结论不采用，与多个写入者是同一条规矩。合并由谁做归任务池自己的设计。</li>
-      <li><b>开环完成</b>：定义里没有核验角色的事项，指定的角色交了完成就按流程采纳，不因为没有核验而发决定请求；内核修改、定义的采用、常设授权以外的外部动作这些本来就要你决定的事照旧发请求。记录、页面与报告上写开环完成，不写放行。最差的配置是一个外包角色直做，等于跑一次外面的 agent，外加快照、上限、写入口与这个标记。</li>
+      <li><b>判定点</b>：需要判断的小问题（挑上下文、含糊的读法）可以问一个小模型，答案先写成事件再被使用；重放时读事件，不再问模型。下游有独立核验兜底时默认继续，没有就升级成决定请求。</li>
+      <li><b>增量与整份</b>：任务池模式下每个单元各自核验，但放行门仍是整份交付对要求的一次核验。</li>
+      <li><b>开环完成</b>：定义里没有核验角色的事项，指定的角色交了完成就按流程采纳，不因为缺少核验发决定请求；记录、页面与报告上写开环完成，不写放行。最差的配置是一个外包角色直做，等于跑一次外面的 agent，外加快照、上限、写入口与这个标记。</li>
       <li><b>子组织</b>：一个角色的一轮工作可以开一个子事项，子事项有自己的事件流、冻结的定义与边界，时间与用量从上一层剩下的里扣，层数有上限；结果作为这个角色的普通提案回到上一层，照常过裁决。部门内的多角色也用这一种做法。</li>
     </ul>
   </section>
@@ -368,13 +366,13 @@
       <div class="seam" data-state="set"><b>写入口<span>已定</span></b><i>一切写入方 ↔ 一份事实</i><em>事实只从这里进，进了就不改。</em><ul><li>先过裁决与边界再写</li><li>同一事务里核对执行权、派发编号与版本</li><li>只追加；按消息身份去重</li></ul><div class="x"><b>交换：</b>消息身份、事项的执行权编号、这一轮的派发编号、期望版本、来源（部门、角色、工作单元）、内容（提案、回执、模型判断、你的回答、观察者信号）、证据引用。</div></div>
       <div class="seam" data-state="set"><b>路由<span>已定</span></b><i>薄驱动 ↔ 路由实现</i><em>换轮转方式，循环本身不动。</em><ul><li>只回答谁开工、一轮怎么结束、事项怎么结束</li><li>只读事实与冻结的定义，自己从事件折叠要用的状态，不存别的</li><li>部门的名字不进代码；每种路由带自己的定义</li></ul><div class="x"><b>交换：</b>入：只读事实、冻结的定义、最新事件。出：下一步谁开工（部门或工作单元的认领）、这一轮怎么结束（继续、询问、等你、核验、结束）、事项是否结束及原因。</div></div>
       <div class="seam" data-state="set"><b>装配<span>已定</span></b><i>执行 ↔ 装配实现</i><em>一轮看到的是事实的一个视图，不改事实。</em><ul><li>只读事实、定义与待并入的指导</li><li>同样的事件重放出同样的请求；判定点的选择先写事件</li><li>交给模型的那份与清单记进事实</li></ul><div class="x"><b>交换：</b>入：只读事实、角色定义、待并入的指导。出：交给模型的每一个字节、上下文清单（指令、意图、有效合同、摘要、放进去的事件位置）。</div></div>
-      <div class="seam" data-state="set"><b>执行<span>已定</span></b><i>薄驱动 ↔ 执行实现</i><em>一轮里的每一步都停得下来。</em><ul><li>每一步先问边界</li><li>工具调用先经写入口记下动作（核对许可、执行权与派发编号）再执行；回执写回事实，不自己存</li><li>外包角色是执行的一种实现：全新的状态目录、无历史的快照，模型与工具走受控入口；交回的是快照与差异，经写入口成为提案。没有下游核验角色时照样可以外包，事项记为开环完成</li></ul><div class="x"><b>交换：</b>入：装配结果、角色的工具。出：完成提案、工具请求、询问。每步前：用量与上限 → 继续或停止。</div></div>
+      <div class="seam" data-state="set"><b>执行<span>已定</span></b><i>薄驱动 ↔ 执行实现</i><em>一轮里的每一步都停得下来。</em><ul><li>每一步先问边界</li><li>工具调用经裁决；结果写回事实，不自己存</li><li>外包角色是执行的一种实现：全新的状态目录、无历史的快照，模型与工具走受控入口；交回的是快照与差异，经写入口成为提案。没有下游核验角色时照样可以外包，事项记为开环完成</li></ul><div class="x"><b>交换：</b>入：装配结果、角色的工具。出：完成提案、工具请求、询问。每步前：用量与上限 → 继续或停止。</div></div>
       <div class="seam" data-state="set"><b>模型<span>已定</span></b><i>执行 ↔ 模型服务</i><em>换模型不改循环。</em><ul><li>每次请求解析一次调用目标</li><li>尝试与用量记进事实；重放读事件不再调模型</li><li>凭据只在控制主机，不进事实与导出</li></ul><div class="x"><b>交换：</b>入：请求字节、调用目标。出：尝试记录、模型输出事件、用量。</div></div>
       <div class="seam" data-state="set"><b>动作<span>已定</span></b><i>工具 ↔ 执行环境</i><em>每个动作有回执；结果未知时有核实办法。</em><ul><li>按类别带合同：成功证据、核实方法、能否取消</li><li>本机与远程同一份合同</li><li>工作区每次从封存快照建；环境可以温热</li></ul><div class="x"><b>交换：</b>请求：动作身份、起点快照、命令或改动、核实方法、能否取消。回执：退出状态、输出、终点快照、前后差异。</div></div>
       <div class="seam" data-state="set"><b>投影<span>已定</span></b><i>一份事实 → 读的人</i><em>任何投影都能从事实重算。</em><ul><li>内核的最小投影是骨架的一部分，只给裁决读；应用可以读，但不为应用加字段。它不在这道缝里</li><li>应用的投影（轨迹、图谱、状态视图）推倒重算，不写回事实</li><li>骨架事件只增，应用事件可以排空</li></ul><div class="x"><b>交换：</b>折叠函数：当前状态 + 一条事件 → 下一状态；从头重算：事件序列 → 同一状态。</div></div>
       <div class="seam" data-state="set"><b>接口<span>已定</span></b><i>页面、命令行、评测、观察者 ↔ 应用层</i><em>外面只经这里读与发。</em><ul><li>只有命令、查询、事件流三种</li><li>命令带身份，重发不重做；事件流按位置续</li><li>带版本号；改了合同版本必升</li></ul><div class="x"><b>交换：</b>命令（带身份）、查询（只读快照）、事件流（从某个位置起）。</div></div>
       <div class="seam" data-state="set"><b>画面<span>已定</span></b><i>翻译层 ↔ 画面层</i><em>画面整个换掉，事实与页面不动。</em><ul><li>画面只收元件断言与动作，不读事实</li><li>每条断言带回链到事件</li><li>播放节奏归画面，回放走同一份合同</li></ul><div class="x"><b>交换：</b>元件断言（元件、状态、回链）、播放参数。</div></div>
-      <div class="seam" data-state="set"><b>定义<span>已定</span></b><i>定义文件 ↔ 加载与校验</i><em>改定义不改代码，能撤回。</em><ul><li>带版本；创建事项时冻结</li><li>字段只增，旧文件新版本能读</li><li>采纳前校验谁能拒绝谁无环；核验角色核验的对象存在，不核验自己；有核验角色时，每一种能结束事项的成果都至少有一个核验角色核验，同一成果的几个核验角色都放行才算放行，一个打回就是打回；一个核验角色也没有的定义在事项上标为开环</li></ul><div class="x"><b>交换：</b>版本、部门与角色（关注的成果、目标、证据来源、可见范围、写入范围、工具许可、是否核验角色及核验谁）、成果种类与提案合同、谁能拒绝谁、判定点、登记的机器、路由实现与它的定义、工作单元的大小、限定采用的范围、上限、停止原因清单。</div></div>
+      <div class="seam" data-state="set"><b>定义<span>已定</span></b><i>定义文件 ↔ 加载与校验</i><em>改定义不改代码，能撤回。</em><ul><li>带版本；创建事项时冻结</li><li>字段只增，旧文件新版本能读</li><li>采纳前校验谁能拒绝谁无环；核验角色核验的对象存在；没有核验角色的定义在事项上标为开环</li></ul><div class="x"><b>交换：</b>版本、部门与角色（关注的成果、目标、证据来源、可见范围、写入范围、工具许可、是否核验角色及核验谁）、成果种类与提案合同、谁能拒绝谁、判定点、登记的机器、路由实现与它的定义、工作单元的大小、限定采用的范围、上限、停止原因清单。</div></div>
     </div>
     <h3>系统之外的三道</h3>
     <div class="seams">
