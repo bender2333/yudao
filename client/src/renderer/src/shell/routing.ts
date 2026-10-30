@@ -32,6 +32,8 @@ const SYSTEM_PAGES: Record<string, string> = {
   machines: "sys-machines",
   runtime: "sys-runtime",
   tools: "sys-tools",
+  // 规则与参数页（工单 #1195，应用层与接口层设计说明「规则与参数在页面上的显示」）
+  rules: "sys-rules",
 };
 
 // 顶栏的路径里的页名（设计说明第 3.4、9.1 节）：项目内页面写页名，系统页写它自己的页名。
@@ -47,6 +49,8 @@ const PAGE_LABELS: Record<string, string> = {
   "sys-machines": "机房",
   "sys-runtime": "执行槽位",
   "sys-tools": "工具登记",
+  // 规则与参数页（工单 #1195）：页名与页面里的标题一致，写规则登记
+  "sys-rules": "规则登记",
 };
 
 /**

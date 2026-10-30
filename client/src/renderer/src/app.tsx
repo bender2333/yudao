@@ -18,6 +18,7 @@ import { ModelManagementPage } from "./views/models/page";
 import { PlaceholderPage } from "./views/placeholder";
 import { MachinesPage } from "./views/system/machines";
 import { ReservedPage } from "./views/system/reserved";
+import { RulesPage } from "./views/system/rules";
 import { RuntimePage } from "./views/system/runtime";
 import { ToolsPage } from "./views/system/tools";
 import { DepartmentPage } from "./views/project/department";
@@ -362,6 +363,9 @@ export function App() {
             <RuntimePage app={app} systemStatus={systemStatus} />
           ) : route.name === "sys-tools" ? (
             <ToolsPage capabilities={capabilities} />
+          ) : route.name === "sys-rules" ? (
+            // 规则与参数页（工单 #1195）：读取 rules.registry，修改与撤回走参数命令
+            <RulesPage app={app} />
           ) : route.name === "sys-reserved" ? (
             <ReservedPage which={route.systemPage} />
           ) : (
