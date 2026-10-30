@@ -23,6 +23,7 @@ import { ATTEMPT_STATUS, DEPARTMENTS, departmentName, formatTime, label } from "
 import { useSnapshot } from "./use-snapshot";
 import { reportedCountText, usageText } from "./usage-text";
 import { readFailureText } from "../../contract/read-failure";
+import { downloadRunExport } from "./run-export";
 import { scopeName } from "./scope-name";
 import { EMPTY_FILTERS, type Filters, departmentFilterNote, seedFilters } from "./observe-filter";
 
@@ -355,6 +356,11 @@ export function ObserveDetailPage(props: { app: ClientApp; route: Route }) {
   const attemptId = props.route.attemptId ?? "";
   const workItem = props.route.workItemId;
   const projectId = props.route.projectId ?? "";
+  // 范围里是哪个事项：导出的文件名用它（工单 #814），与页面其余地方同一份数据
+  const scope = useSnapshot<ProjectOverviewResult>(props.app, "page.observe.scope", "project.overview", {
+    project_id: projectId,
+  });
+  const scopeTitle = scopeName(scope.data?.work_items ?? [], workItem);
   // 路径里带了 run 标识时直接读取；只输入请求标识时用列表按 attempt_id 找回所属的 run
   const lookup = useSnapshot<ProjectAttemptsResult>(
     props.app, `page.attempt.run.${attemptId}`, "project.attempts",
@@ -384,13 +390,34 @@ export function ObserveDetailPage(props: { app: ClientApp; route: Route }) {
         <Loading state={detail} />
         <Loading state={lookup} />
         {runId === null && attemptId !== "" ? <Empty text="这个请求标识在本项目里找不到，请从请求记录点「详情」进入" /> : null}
-        {data ? <AttemptDetail data={data} projectId={projectId} attemptId={attemptId} /> : null}
+        {data ? <AttemptDetail app={props.app} data={data} projectId={projectId} attemptId={attemptId} workItemTitle={scopeTitle === "" ? null : scopeTitle} /> : null}
       </Section>
     </div>
   );
 }
 
-function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attemptId: string }) {
+// 观测详情里的「导出这次运行」（工单 #814）：按需读取 run.export，整包下载为 JSON 文件。
+// 状态只管两件事：导出进行中禁用按钮，失败把原因写出来；成功不再显示提示，
+// 文件本身就是导出的结果（浏览器自己的下载提示在那里）。
+function useRunExport(app: ClientApp, runId: string | null, workItemTitle: string | null) {
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const exportRun = async () => {
+    if (runId === null || busy) {
+      return;
+    }
+    setBusy(true);
+    setFailure(null);
+    const outcome = await downloadRunExport(app, runId, workItemTitle);
+    setBusy(false);
+    if (!outcome.ok) {
+      setFailure(outcome.reason);
+    }
+  };
+  return { busy, failure, exportRun };
+}
+
+function AttemptDetail(props: { app: ClientApp; data: RunAttemptResult; projectId: string; attemptId: string; workItemTitle: string | null }) {
   const attempt = dict(props.data.attempt);
   const context = props.data.context === null ? null : dict(props.data.context);
   const manifest = context === null ? null : dict(context.manifest);
@@ -404,9 +431,25 @@ function AttemptDetail(props: { data: RunAttemptResult; projectId: string; attem
   const callTarget = dict(attempt.call_target);
   // 失败类型与结束原因（工单 #305）：取值规则抽在 attempt-failure.ts，便于单元测试核对
   const failure = failureRows(attempt);
+  // 导出这次运行的证据（工单 #814）：整包是 run.export 给出的那一份
+  const runId = text(attempt.run_id) || null;
+  const runExport = useRunExport(props.app, runId, props.workItemTitle);
 
   return (
     <>
+      <p>
+        {runId !== null ? (
+          <button
+            type="button"
+            className="y10-btn"
+            disabled={runExport.busy}
+            onClick={() => { void runExport.exportRun(); }}
+          >
+            {runExport.busy ? "正在导出" : "导出这次运行"}
+          </button>
+        ) : null}
+        {runExport.failure !== null ? <span className="y10-note note"> 导出失败：{runExport.failure}</span> : null}
+      </p>
       <KeyValue
         items={[
           ["状态", `${label(ATTEMPT_STATUS, text(attempt.status))}${attempt.stage ? ` · 阶段 ${text(attempt.stage)}` : ""}`],
