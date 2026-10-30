@@ -9781,6 +9781,28 @@
           "holds_slot": {
             "type": "boolean",
             "title": "Holds Slot"
+          },
+          "interrupted_at_event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interrupted At Event Id"
+          },
+          "interrupted_at_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interrupted At Text"
           }
         },
         "additionalProperties": false,
@@ -9788,9 +9810,61 @@
         "required": [
           "epoch",
           "since",
-          "holds_slot"
+          "holds_slot",
+          "interrupted_at_event_id",
+          "interrupted_at_text"
         ],
         "title": "RecoveryOwner"
+      },
+      "RecoverySession": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "main",
+              "branch"
+            ],
+            "title": "Kind"
+          },
+          "elapsed_sec": {
+            "type": "integer",
+            "title": "Elapsed Sec"
+          },
+          "activations": {
+            "type": "integer",
+            "title": "Activations"
+          },
+          "model_steps": {
+            "type": "integer",
+            "title": "Model Steps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "department",
+          "kind",
+          "elapsed_sec",
+          "activations",
+          "model_steps"
+        ],
+        "title": "RecoverySession"
       },
       "RecoveryStatus": {
         "properties": {
@@ -10643,12 +10717,30 @@
             ],
             "title": "Last Confirmed Event Id"
           },
+          "last_confirmed_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Confirmed Text"
+          },
           "unfinished_actions": {
             "items": {
               "$ref": "#/components/schemas/UnfinishedAction"
             },
             "type": "array",
             "title": "Unfinished Actions"
+          },
+          "unknown_actions": {
+            "items": {
+              "$ref": "#/components/schemas/UnknownAction"
+            },
+            "type": "array",
+            "title": "Unknown Actions"
           },
           "verifications": {
             "items": {
@@ -10696,6 +10788,13 @@
           "limits": {
             "$ref": "#/components/schemas/RecoveryLimits"
           },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/RecoverySession"
+            },
+            "type": "array",
+            "title": "Sessions"
+          },
           "owner": {
             "anyOf": [
               {
@@ -10724,13 +10823,16 @@
           "executable",
           "last_confirmed_position",
           "last_confirmed_event_id",
+          "last_confirmed_text",
           "unfinished_actions",
+          "unknown_actions",
           "verifications",
           "next_legal_action",
           "can_continue",
           "cannot_continue_reason",
           "unusable",
           "limits",
+          "sessions",
           "owner",
           "late_results"
         ],
@@ -11622,6 +11724,112 @@
           "started_event_id"
         ],
         "title": "UnfinishedAction"
+      },
+      "UnknownAction": {
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "title": "Action Id"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "handling": {
+            "type": "string",
+            "enum": [
+              "confirmed",
+              "returned"
+            ],
+            "title": "Handling"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "input_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Version"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "returned": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "action_id",
+          "tool",
+          "department",
+          "session_id",
+          "handling",
+          "purpose",
+          "input_version",
+          "before",
+          "returned",
+          "at"
+        ],
+        "title": "UnknownAction"
       },
       "UnknownActionRequested": {
         "properties": {

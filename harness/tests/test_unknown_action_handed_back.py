@@ -122,6 +122,20 @@ def test_a_killed_bash_is_handed_back_to_model(tmp_path):
         assert output_data["ok"] is False
         assert "执行被中断" in output_data["error"] and "结果未知" in output_data["error"]
 
+        # 交还以后仍在结果未知的动作里（工单 #181，设计说明第 4.3 节）：处理方式是交还会话，
+        # 交还给模型的内容与模型读到的那条工具结果相同，发出的会话与执行前快照都在，处理时间也有。
+        # 没有决定卡片：事项不因这个动作等待用户
+        handed = [entry for entry in killed.run_recovery(run.after, run.run_id).unknown_actions
+                  if entry.action_id == "call-bash"]
+        assert len(handed) == 1
+        assert handed[0].handling == "returned"
+        assert handed[0].session_id == session
+        assert handed[0].department == "engineering"
+        assert handed[0].before is not None
+        assert handed[0].returned is not None
+        assert json.loads(handed[0].returned) == output_data
+        assert handed[0].at
+
 
 def test_b_killed_check_is_handed_back_to_model(tmp_path):
     # (b) run_check 同样：检查运行中停掉再启动，结果交还模型
@@ -273,6 +287,15 @@ def test_d_file_action_completed_receives_confirmed_result(tmp_path):
         output_data = json.loads(output_item["output"])
         assert output_data["ok"] is True
         assert output_data["output"]["resolved"] == "auto_verify"
+        # 自动核实确认完成以后同样列在结果未知的动作里（工单 #181）：处理方式是核实确认，
+        # 交还给模型的内容与模型读到的工具结果相同
+        handled = [entry for entry in killed.run_recovery(run.after, run.run_id).unknown_actions
+                   if entry.action_id == "call-write"]
+        assert len(handled) == 1
+        assert handled[0].handling == "confirmed"
+        assert handled[0].before is not None
+        assert handled[0].returned is not None
+        assert json.loads(handled[0].returned) == output_data
         # 核实记录与动作状态（工单 #308 的验收二：原来由 test_issue_308 的同结论用例断言）
         actions = [
             action

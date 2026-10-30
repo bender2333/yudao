@@ -256,9 +256,10 @@ EXCLUDED_READINGS = (
     ("projects.list", "projects.*.last_activity_at"),
     # 已用秒数：随墙钟增长，与事件无关
     ("project.loop", "work_items.*.elapsed_sec"),
-    # 恢复页最后确认的位置与事件：每条事件到达都推进它
+    # 恢复页最后确认的位置、事件与那条事件的文字：每条事件到达都推进它
     ("run.recovery", "last_confirmed_position"),
     ("run.recovery", "last_confirmed_event_id"),
+    ("run.recovery", "last_confirmed_text"),
     # 离开期间报告的截止位置、截止时间与起始时间：随日志末尾与上次查看的位置变化
     ("home.away_report", "range.from_at"),
     ("home.away_report", "range.to_position"),

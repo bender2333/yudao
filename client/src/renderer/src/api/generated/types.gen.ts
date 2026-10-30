@@ -3613,6 +3613,44 @@ export type RecoveryOwner = {
      * Holds Slot
      */
     holds_slot: boolean;
+    /**
+     * Interrupted At Event Id
+     */
+    interrupted_at_event_id: string | null;
+    /**
+     * Interrupted At Text
+     */
+    interrupted_at_text: string | null;
+};
+
+/**
+ * RecoverySession
+ */
+export type RecoverySession = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Kind
+     */
+    kind: 'main' | 'branch';
+    /**
+     * Elapsed Sec
+     */
+    elapsed_sec: number;
+    /**
+     * Activations
+     */
+    activations: number;
+    /**
+     * Model Steps
+     */
+    model_steps: number;
 };
 
 /**
@@ -4134,9 +4172,17 @@ export type RunRecoveryResult = {
      */
     last_confirmed_event_id: string | null;
     /**
+     * Last Confirmed Text
+     */
+    last_confirmed_text: string | null;
+    /**
      * Unfinished Actions
      */
     unfinished_actions: Array<UnfinishedAction>;
+    /**
+     * Unknown Actions
+     */
+    unknown_actions: Array<UnknownAction>;
     /**
      * Verifications
      */
@@ -4155,6 +4201,10 @@ export type RunRecoveryResult = {
     cannot_continue_reason: string | null;
     unusable: UnusableTarget | null;
     limits: RecoveryLimits;
+    /**
+     * Sessions
+     */
+    sessions: Array<RecoverySession>;
     owner: RecoveryOwner | null;
     /**
      * Late Results
@@ -4685,6 +4735,54 @@ export type UnfinishedAction = {
      * Started Event Id
      */
     started_event_id: string;
+};
+
+/**
+ * UnknownAction
+ */
+export type UnknownAction = {
+    /**
+     * Action Id
+     */
+    action_id: string;
+    /**
+     * Tool
+     */
+    tool: string;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Session Id
+     */
+    session_id: string | null;
+    /**
+     * Handling
+     */
+    handling: 'confirmed' | 'returned';
+    /**
+     * Purpose
+     */
+    purpose: string | null;
+    /**
+     * Input Version
+     */
+    input_version: number | null;
+    /**
+     * Before
+     */
+    before: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Returned
+     */
+    returned: string | null;
+    /**
+     * At
+     */
+    at: string;
 };
 
 /**
