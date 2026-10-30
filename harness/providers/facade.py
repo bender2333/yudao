@@ -44,7 +44,7 @@ from ..definitions import DEFINITIONS
 from .responses import ProviderConnections
 from .sdk import prepare_protocols
 from .selection import ModelSelection, SelectionResolution, merge_selection
-from .selection_flow import SelectionAttempt, SelectionFlow
+from .selection_flow import ProviderChange, SelectionAttempt, SelectionFlow
 from .suggested import reminders as _suggested_reminders
 from .store import (
     REASONING_LEVELS,
@@ -117,6 +117,10 @@ class ProviderFacade:
         self._admissions: dict[str, AdmissionRecord] = {}
         self._admission_path: Path | None = None
         self._admission_seen = False
+        # 有效地址/凭据的差异只在进程内比较；回调只携带版本和动作，不携带凭据或摘要。
+        self._change_listener: Callable[[tuple[ProviderChange, ...]], None] | None = None
+        self._source_snapshot: dict[str, tuple[tuple[str, str], bytes | None]] = {}
+        self._source_versions: dict[str, int] = {}
 
     @property
     def revision(self) -> int:
@@ -241,7 +245,8 @@ class ProviderFacade:
             document["revision"] = self._store.revision + 1
             _require_capacity(document.get("models", []), None, set(self._store.models))
             store, bindings = _parse_document(document, self._startup_mode)
-            _require_bound_admissions(bindings, store, self._admissions)
+            _require_bound_admissions({name: value for name, value in bindings.items()
+                                       if value != self._bindings.get(name)}, store, self._admissions)
             self._store = store
             self._bindings = bindings
             self._publish()
@@ -860,10 +865,12 @@ class ProviderFacade:
                 raise CatalogValidationError((ValidationIssue(
                     f"providers.{provider_id}", "Provider 配置不存在"),))
             api_key = self._resolve_api_key(provider)
+            source = self._provider_source(provider)
         result = _refresh_candidates(provider, models_url_override=models_url_override, api_key=api_key,
                                      timeout_sec=min(provider.timeout_sec, 30.0))
         with self._lock:
-            if self._store.providers.get(provider.id) == provider:
+            if (self._store.providers.get(provider.id) == provider
+                    and self._provider_source(provider) == source):
                 self._candidate_results[provider.id] = copy.deepcopy(result)
         return result
 
@@ -943,6 +950,54 @@ class ProviderFacade:
                 if model.provider_id == provider_id:
                     self.selections.cancel(model.id)
 
+    def _provider_source(self, provider: Any) -> tuple[tuple[str, str], bytes | None]:
+        material = self._credentials.resolve(provider.credential_ref)
+        fingerprint = None if material is None else hashlib.sha256(material.secret.encode()).digest()
+        return (provider.base_url, provider.credential_ref), fingerprint
+
+    def set_change_listener(self, listener: Callable[[tuple[ProviderChange, ...]], None] | None) -> None:
+        with self._lock:
+            self._change_listener = listener
+            self._source_snapshot = {key: self._provider_source(provider)
+                                     for key, provider in self._store.providers.items()}
+
+    def connection_version(self, provider_id: str) -> int:
+        with self._lock:
+            return self._source_versions.get(provider_id, 0)
+
+    def change_is_current(self, provider_id: str, version: int) -> bool:
+        with self._lock:
+            provider = self._store.providers.get(provider_id)
+            return (provider is not None and self._source_versions.get(provider_id, 0) == version
+                    and self._source_snapshot.get(provider_id) == self._provider_source(provider))
+
+    def notify_changes(self) -> tuple[ProviderChange, ...]:
+        # 命令保存、显式重载、目录/.env监视共享这一份差异与版本；同一内容再次读到不会重复调度。
+        with self._lock:
+            current = {key: self._provider_source(provider) for key, provider in self._store.providers.items()}
+            changes: list[ProviderChange] = []
+            for key in self._source_snapshot.keys() | current.keys():
+                before, after = self._source_snapshot.get(key), current.get(key)
+                if before == after:
+                    continue
+                self._source_versions[key] = self._source_versions.get(key, 0) + 1
+                if after is None:
+                    self._candidate_results.pop(key, None)
+                    for selected in self.selections.snapshot():
+                        if selected["provider_id"] == key:
+                            self.selections.cancel(selected["model_id"])
+                elif before is not None:
+                    retest = before[0] != after[0]
+                    if retest:
+                        self.prepare_provider_reselection(key)
+                    changes.append(ProviderChange(key, self._source_versions[key], retest, before[1] != after[1]))
+            self._source_snapshot = current
+            listener = self._change_listener
+        result = tuple(changes)
+        if listener is not None and result:
+            listener(result)
+        return result
+
     def reselect_provider(self, provider_id: str) -> list[SelectionAttempt]:
         # 地址修改后只使用这次获取的候选；缺少的定义保留引用，明确说明无法重新测试的原因。
         with self._lock:
@@ -953,7 +1008,12 @@ class ProviderFacade:
                 if model.provider_id != provider_id:
                     continue
                 if latest.get("status") == "ok" and model.model in candidate_ids:
-                    selected, start = self.select_model(provider_id, model.model, force=True, definition_id=model.id)
+                    try:
+                        selected, start = self.select_model(provider_id, model.model, force=True, definition_id=model.id)
+                    except CatalogValidationError as exc:
+                        selected = self.selections.begin(provider_id, model.id, model.model)
+                        selected.status, selected.error = "failed", str(exc)
+                        continue
                     if start:
                         ready.append(selected)
                 else:
@@ -1519,6 +1579,7 @@ class ProviderFacade:
         listener = self._reload_listener
         if listener is not None:
             listener()
+        self.notify_changes()
 
     def _poll_config_file(self) -> bool:
         # 返回磁盘内容是否导致内存发布变化；失败保留上一有效版本

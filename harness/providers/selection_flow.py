@@ -1,10 +1,18 @@
-"""进程内选用状态、测试队列与序号；不依赖应用层或事件存储。"""
+# 进程内选用状态、测试队列与序号；不依赖应用层或事件存储。
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from threading import Condition, Event, RLock
 from typing import Any
+
+
+@dataclass(frozen=True)
+class ProviderChange:
+    provider_id: str
+    version: int
+    retest: bool
+    connection_test: bool
 
 
 @dataclass(eq=False)

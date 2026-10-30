@@ -59,7 +59,7 @@ def test_candidates_use_table_metadata_and_upstream_modalities_without_inferring
     assert result["status"] == "ok", result["error"]
     by_id = {candidate["id"]: candidate for candidate in result["candidates"]}
     table = by_id["deepseek-v4-flash"]
-    assert table["protocol"] == "chat_completions" and table["protocol_source"] == "preset_default"
+    assert table["protocol"] == "chat_completions" and table["protocol_source"] == "capability_table"
     assert (table["context_window"], table["context_window_source"]) == (500000, "models_url")
     assert (table["max_output_tokens"], table["max_output_tokens_source"]) == (384000, "capability_table")
     assert table["source_details"]["max_output_tokens"] == {

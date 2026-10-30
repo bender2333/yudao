@@ -1,4 +1,4 @@
-"""R2、R3：通过真实 HTTP、SQLite、文件与公开目录合同核对选用即启用。"""
+# R2、R3：通过真实 HTTP、SQLite、文件与公开目录合同核对选用即启用。
 from __future__ import annotations
 
 import json
@@ -672,3 +672,175 @@ def test_address_change_retests_each_existing_definition_of_the_same_upstream_mo
         release.set()
         old.close()
         new.close()
+
+
+@pytest.mark.parametrize("mode", ["document", "reload", "watch"])
+def test_address_changes_through_document_reload_and_file_watch_share_one_retest(mode, tmp_path):
+    # R3：目录文档、显式重载与文件监视都保留原引用，按新候选重测；同一次变化只测试一次。
+    old = ScriptedProvider([responder([{"id": "stable", "limit": {"context": 32000, "output": 2048}}])] * 12)
+    new_normal = responder([{"id": "stable", "limit": {"context": 128000, "output": 8192}}])
+
+    def held(provider, handler):
+        if handler.body is not None and not handler.body.get("tools"):
+            provider.held.set()
+            assert provider.release.wait(30), "等待高级修改入口的重测放行"
+        new_normal(provider, handler)
+
+    new = ScriptedProvider([held] * 16)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id = connect(client, old)
+            select(client, provider_id, "stable")
+            before = wait_catalog(client, lambda data: bool(data["admissions"]) and not data["selections"])
+            document = client.get("/api/queries/catalog.document").json()["data"]
+            document["providers"][0]["base_url"] = new.base + "/v1"
+            if mode == "document":
+                saved = command(client, "catalog.document.save", base_version=before["revision"],
+                                document={key: value for key, value in document.items() if key != "revision"})
+                assert saved.status_code == 200, saved.text
+            else:
+                opened.config.write_text(json.dumps(document), encoding="utf-8")
+                if mode == "reload":
+                    loaded = command(client, "catalog.reload", base_version=before["revision"])
+                    assert loaded.status_code == 200, loaded.text
+            assert new.held.wait(10), "高级修改入口没有启动模型重测"
+            pending = catalog(client)
+            assert pending["admissions"][0]["stale"] is True
+            assert pending["bindings"] == before["bindings"]
+            assert pending["models"][0]["context_window"] == 128000
+            new.release.set()
+            enabled = wait_catalog(client, lambda data: data["admissions"][0]["admitted"] and not data["selections"])
+            assert enabled["bindings"] == before["bindings"]
+            same = command(client, "catalog.reload", base_version=enabled["revision"])
+            assert same.status_code == 200, same.text
+        assert len(new.requests) == 4  # 一次列表请求与同一轮模型测试的三次真实请求。
+    finally:
+        old.close()
+        new.close()
+
+
+@pytest.mark.parametrize("mode", ["credential", "reload", "watch"])
+def test_key_changes_through_credentials_reload_and_dotenv_watch_share_one_connection_test(mode, tmp_path):
+    # R3：所有实际 Key 修改入口都保持准入，用新 Key 测连，自己写入与监视不重复调度。
+    replacement = "replacement-key-for-source-change"
+    saw_replacement = threading.Event()
+    normal = responder([{"id": "stable", "limit": {"context": 32000, "output": 2048}}])
+
+    def capture(provider, handler):
+        if handler.headers.get("Authorization") == f"Bearer {replacement}":
+            saw_replacement.set()
+        normal(provider, handler)
+
+    upstream = ScriptedProvider([capture] * 16)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id = connect(client, upstream)
+            select(client, provider_id, "stable")
+            before = wait_catalog(client, lambda data: bool(data["admissions"]) and not data["selections"])
+            credential = before["providers"][0]["credential"]
+            position = opened.application.system.store.end_position()
+            count = len(upstream.requests)
+            if mode == "credential":
+                saved = command(client, "credential.set", base_version=credential["version"],
+                                ref=credential["ref"], secret=replacement, persist=True)
+                assert saved.status_code == 200, saved.text
+            else:
+                opened.dotenv.write_text(f"{credential['ref']}={replacement}\n", encoding="utf-8")
+                if mode == "reload":
+                    loaded = command(client, "catalog.reload", base_version=before["revision"])
+                    assert loaded.status_code == 200, loaded.text
+            tested = wait_event(opened, lambda event: event.type == CatalogEventType.CATALOG_TEST_FINISHED
+                                and event.payload["kind"] == "connection", after=position)
+            assert tested.payload["ok"] is True and saw_replacement.is_set()
+            assert catalog(client)["admissions"] == before["admissions"]
+            assert catalog(client)["bindings"] == before["bindings"]
+            same = command(client, "catalog.reload", base_version=catalog(client)["revision"])
+            assert same.status_code == 200, same.text
+            assert replacement not in json.dumps([event.payload for event in
+                                                  opened.application.system.store.read(0, limit=10000)])
+        assert len(upstream.requests) == count + 1
+        assert upstream.requests[count:] == [None]
+    finally:
+        upstream.close()
+
+
+def test_candidate_protocol_prefers_the_capability_table_then_the_plan_default(tmp_path):
+    # R2、R3：使用当前能力表的真实非默认协议记录，候选请求走本地真实HTTP，来源反映实际预填。
+    upstream = ScriptedProvider([responder([{"id": "claude-haiku-5-5"}, {"id": "unrecorded"}])] * 4)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id = connect(client, upstream)
+            provider = catalog(client)["providers"][0]
+            fields = ("id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")
+            saved = command(client, "catalog.connection.save", base_version=catalog(client)["revision"],
+                            provider={**{name: provider[name] for name in fields}, "preset_id": "opencode-go",
+                                      "models_url": upstream.base + "/v1/models"})
+            assert saved.status_code == 200, saved.text
+            position = opened.application.system.store.end_position()
+            collected = command(client, "catalog.candidates.collect", base_version=catalog(client)["revision"],
+                                provider_id=provider_id)
+            assert collected.status_code == 200, collected.text
+            wait_event(opened, lambda event: event.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
+                       after=position)
+            candidates = catalog(client)["providers"][0]["latest_candidates"]["candidates"]
+            known = next(row for row in candidates if row["id"] == "claude-haiku-5-5")
+            assert known["protocol"] == "messages" and known["protocol_source"] == "capability_table"
+            assert known["source_details"]["protocol"]["provider"] == "opencode-go"
+            missing = next(row for row in candidates if row["id"] == "unrecorded")
+            assert missing["protocol"] == "chat_completions" and missing["protocol_source"] == "preset_default"
+    finally:
+        upstream.close()
+
+
+def test_late_list_from_an_older_address_does_not_replace_the_current_candidates_or_admission(tmp_path):
+    # R3：两个实际地址变更按版本隔离；较旧的HTTP列表迟到以后不覆盖新的补全值或准入。
+    old = ScriptedProvider([responder([{"id": "stable", "limit": {"context": 32000, "output": 2048}}])] * 12)
+    middle_reply = responder([{"id": "stable", "limit": {"context": 16000, "output": 1024}}])
+    returned = threading.Event()
+
+    def middle_held(provider, handler):
+        provider.held.set()
+        assert provider.release.wait(30), "等待旧地址的模型列表放行"
+        try:
+            middle_reply(provider, handler)
+        finally:
+            returned.set()
+
+    middle = ScriptedProvider([middle_held])
+    latest = ScriptedProvider([responder([{"id": "stable", "limit": {"context": 256000, "output": 8192}}])] * 12)
+    opened = Opened(tmp_path)
+    try:
+        with running_api(opened) as client:
+            provider_id = connect(client, old)
+            select(client, provider_id, "stable")
+            data = wait_catalog(client, lambda data: bool(data["admissions"]) and not data["selections"])
+            provider = data["providers"][0]
+            fields = ("id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")
+            provider = {name: provider[name] for name in fields}
+            for upstream in (middle, latest):
+                changed = command(client, "catalog.connection.save", base_version=catalog(client)["revision"],
+                                  provider={**provider, "base_url": upstream.base + "/v1"},
+                                  models=[{key: value for key, value in row.items() if key != "provider_id"}
+                                          for row in data["models"]])
+                assert changed.status_code == 200, changed.text
+                if upstream is middle:
+                    assert middle.held.wait(10)
+            current = wait_catalog(client, lambda data: data["admissions"][0]["admitted"] and not data["selections"])
+            assert current["models"][0]["context_window"] == 256000
+            middle.release.set()
+            assert returned.wait(10)
+            current = catalog(client)
+            assert current["models"][0]["context_window"] == 256000
+            assert current["admissions"][0]["base_url"] == latest.base + "/v1"
+        # 服务退出会等待本轮真实HTTP读取结束；即使旧异步通知已取消，缓存也不能被旧读取覆盖。
+        candidate = opened.application.system.facade.latest_candidates(provider_id)
+        assert candidate["source_url"] == latest.base + "/v1/models"
+        assert candidate["candidates"][0]["context_window"] == 256000
+        assert middle.requests == [None] and len(latest.requests) == 4
+    finally:
+        old.close()
+        middle.close()
+        latest.close()
