@@ -10,8 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .actions import Verification
-from .definitions import DEFINITIONS, Definitions, thaw
+from .definitions import DEFINITIONS, Definitions, Verification, thaw
 
 
 def in_force(definitions: Definitions | None) -> Definitions:

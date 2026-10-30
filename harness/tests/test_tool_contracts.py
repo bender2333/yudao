@@ -3,17 +3,22 @@
 #
 # 动作合同的两项元数据（工单 #1170；恢复契约第 4 节；网络取回与 MCP 设计说明第 18 节；总图第四节「动作」缝）：
 # 类别只增、每类有自己的既定合同，定义与动作请求写明这两项，写错立刻拒绝，旧合同与旧定义照旧读得进来。
+# 定义与动作合同的导入方向（工单 #1275）：取值在定义一侧，定义不反过来导入动作合同。
 
+import ast
+from pathlib import Path
 from typing import get_args
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
 
-from harness.actions import (ADDED_KINDS, ESTABLISHED_CONTRACTS, Action, ActionKind, ActionReceipt,
-                             established_cancellable, established_verification)
-from harness.definitions import DEFINITIONS, Identifier, Tool
+from harness.actions import Action, ActionReceipt
+from harness.definitions import (ADDED_KINDS, DEFINITIONS, ESTABLISHED_CONTRACTS, ActionKind, Identifier, Tool,
+                                 established_cancellable, established_verification)
 from harness.tools import (tool_action, tool_cancellable, tool_kind, tool_verification, tools_for)
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFINITIONS_MODULE = REPO_ROOT / "harness" / "definitions" / "__init__.py"
 TOOLS = DEFINITIONS.tools
 
 
@@ -164,5 +169,21 @@ def test_a_refusal_receipt_marks_the_refusal_and_keeps_the_old_fields():
     assert (receipt.refused, receipt.refused_reason) == (True, reason)
     assert receipt.error == reason and receipt.ok is False
     assert (receipt.action_id, receipt.status, receipt.output) == ("act:1", "failed", None)
+
+
+def test_the_definitions_module_does_not_import_the_action_contract():
+    # 导入方向（工单 #1275）：动作类别与核实方法的取值在定义一侧，定义不反过来导入动作合同。
+    # Provider 模块只导入定义；定义带上动作层以后，「Provider 模块不加载 Web 与部门内核」那条集成用例失败，
+    # 这一条在单元层先把它拦住（harness/tests/test_providers_module.py 是它的判据）
+    offenders: list[str] = []
+    for node in ast.walk(ast.parse(DEFINITIONS_MODULE.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.ImportFrom):
+            if node.level == 2 and node.module == "actions":
+                offenders.append("from ..actions import …")
+            elif node.level == 0 and (node.module or "") == "harness.actions":
+                offenders.append("from harness.actions import …")
+        elif isinstance(node, ast.Import):
+            offenders.extend(alias.name for alias in node.names if alias.name == "harness.actions")
+    assert offenders == [], f"定义模块导入了动作合同：{offenders}"
 
 

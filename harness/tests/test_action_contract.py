@@ -182,8 +182,9 @@ def _function_call(identity: str, name: str, arguments: dict[str, Any]) -> dict[
 
 
 def test_a_tool_permission_refusal_is_a_receipt_and_the_environment_is_not_called(tmp_path):
-    # 拒绝发生在工具一侧的执行前检查（工具许可）：回执带被拒绝标记与原因，工具结果照常记录，
-    # 执行环境没有被调用，工作区没有变化
+    # 拒绝发生在工具一侧的执行前检查（工具许可）：回执带被拒绝标记与原因，结果照常记录，
+    # 执行环境没有被调用，工作区没有变化。交给模型的工具结果仍是回执的三项（ok、output、error）：
+    # 模型输入审计按事件里的结果重新装配这一次请求，多带的字段会让重装配对不上（工单 #1275）
     department = FIRST_DEPARTMENT
     allowed = set(DEFINITIONS.tools_for(department))
     denied = next(name for name, tool in DEFINITIONS.tools.items()
@@ -201,8 +202,8 @@ def test_a_tool_permission_refusal_is_a_receipt_and_the_environment_is_not_calle
     called = next(event for event in events
                   if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("id") == "denied")
     result = json.loads(called.payload["input_item"]["output"])
-    assert result["refused"] is True, "被拒绝的调用没有带回被拒绝标记"
-    assert result["refused_reason"] == called.payload["error"] and called.payload["ok"] is False
+    assert result == {"ok": False, "output": None, "error": called.payload["error"]}
+    assert called.payload["ok"] is False and called.payload["error"]
     assert not any(event.type == EventType.TOOL_STARTED and (event.payload or {}).get("id") == "denied"
                    for event in events), "被拒绝的调用有工具开始事件"
     assert workspace.read_file("src/echo.py") == "original\n", "被拒绝的写入改动了工作区"

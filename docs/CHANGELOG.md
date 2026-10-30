@@ -823,3 +823,4 @@ GPT-6（Codex） / 2026-10-30 00:12 / docs/agents/autopilot-runtime.md「唤醒�
 
 deepseek-v4.1-pro / 2026-10-30 08:20 / 工单 #149 [浏览器 1]：本文件加这一条；`docs/` 下另外只动了 `docs/architecture-issues.md`（加一条，登记设计说明没写到的三处边界：图像按张计的本地用量估算、部门历史里只放工件引用而装配时才读字节、动作回执用 `images` 键交回图像工件引用）/ 模型看到截图时请求里只放最近 3 张，这几处取值与形状是后续 MCP 图像结果（#1175）与 Playwright 截图（#1184）共用的依据，需要写进设计说明
 deepseek-v4.1-flash / 2026-10-30 08:19 / docs/architecture-issues.md 登记工单 #643 的一条：docs/design/app-and-interface.md 第 202 行的拒绝原因封闭清单缺 not_wired，与该设计说明第 845 行（验收第 15 条）不一致 / 本单按验收第 15 条实现 parameter.set 的 not_wired 拒绝，封闭清单请架构师补一行
+执行者 worker-1275 / 2026-10-30 09:24 / `docs/architecture-issues.md` 加一条并改一处旧条目的文件位置：工具结果条目固定为回执的三项（`ok`、`output`、`error`），动作回执新加的 `refused`、`refused_reason` 不进入这一条；#1170 那条登记的 `ESTABLISHED_CONTRACTS` 位置改成 `harness/definitions/__init__.py`（工单 #1275 把取值搬到定义一侧）/ #1170 的合并让 main 的集成层确定性失败（模型输入审计按事件里的结果重新装配请求），这条不变式只写在两处代码里，请架构师写进设计说明
