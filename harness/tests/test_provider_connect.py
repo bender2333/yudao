@@ -252,6 +252,29 @@ def test_dotenv_write_failure_saves_neither_connection_nor_key(tmp_path):
         assert not opened.applications[-1].system.facade.credential_status("LOCALHOST_KEY")["configured"]
 
 
+@pytest.mark.skipif(os.name != "nt", reason="Windows 的只读文件禁止原子替换")
+def test_a_readonly_dotenv_saves_neither_key_nor_connection_and_leaves_no_secret_file(tmp_path):
+    # R3：真实文件权限导致写入失败，原 Key、目录与临时文件都不含这次未保存的 Key。
+    opened = _Opened(tmp_path)
+    original = "OTHER_KEY=unrelated-key\n"
+    opened.dotenv.write_text(original, encoding="utf-8")
+    opened.dotenv.chmod(0o444)
+    try:
+        with running_api(opened) as client:
+            before = _catalog(client)
+            response = _command(client, "catalog.connect", base_version=before["revision"],
+                                base_url="http://localhost:1/v1", api_key=SECRET)
+            assert response.status_code == 409, response.text
+            assert response.json()["reason"] == "catalog_invalid"
+            assert "失败" in response.json()["message"]
+            assert _catalog(client)["providers"] == []
+            assert opened.dotenv.read_text(encoding="utf-8") == original
+            assert not list(tmp_path.glob(".env.*.tmp"))
+            assert not opened.config.exists()
+    finally:
+        opened.dotenv.chmod(0o600)
+
+
 def test_deleting_connection_removes_its_persisted_key_and_keeps_other_keys(tmp_path):
     opened = _Opened(tmp_path)
     opened.dotenv.write_text("OTHER_KEY=unrelated-key\n", encoding="utf-8")

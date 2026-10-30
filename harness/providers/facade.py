@@ -1785,11 +1785,6 @@ def _write_dotenv_payload(path: Path, payload: str) -> Path:
     parent = path.parent
     if str(parent) not in ("", "."):
         parent.mkdir(parents=True, exist_ok=True)
-    existing_mode = None
-    try:
-        existing_mode = path.stat().st_mode & 0o777
-    except OSError:
-        existing_mode = None
     fd, tmp_name = tempfile.mkstemp(dir=str(parent) if str(parent) not in ("", ".") else None,
                                      prefix=path.name + ".", suffix=".tmp")
     try:
@@ -1799,11 +1794,6 @@ def _write_dotenv_payload(path: Path, payload: str) -> Path:
             os.fsync(handle.fileno())
         if os.name == "posix":
             os.chmod(tmp_name, 0o600)
-        elif existing_mode is not None:
-            try:
-                os.chmod(tmp_name, existing_mode)
-            except OSError:
-                pass
         os.replace(tmp_name, path)
     except Exception:
         try:
