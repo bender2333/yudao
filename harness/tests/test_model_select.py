@@ -336,9 +336,11 @@ def test_cancel_and_reselect_ignores_the_old_final_response(tmp_path):
             new_release.set()
             data = wait_catalog(client, lambda data: bool(data["admissions"]))
             assert data["admissions"][0]["admitted"] is True
+            finished = wait_event(opened, lambda event: event.type == CatalogEventType.CATALOG_TEST_FINISHED
+                                  and event.payload["kind"] == "model" and event.payload["admitted"] is True)
             results = [event for event in opened.application.system.store.read(0, limit=10000)
                        if event.type == CatalogEventType.CATALOG_TEST_FINISHED and event.payload["kind"] == "model"]
-            assert len(results) == 1 and results[0].payload["actual_model"] == "again"
+            assert results == [finished] and results[0].payload["actual_model"] == "again"
     finally:
         old_release.set()
         new_release.set()
