@@ -114,6 +114,7 @@
 "test_layer_boundaries.py" = "module"
 "test_lesson_candidates.py" = "integration"
 "test_malformed_tool_arguments.py" = "integration"
+"test_mcp_client.py" = "integration"
 "test_materials.py" = "module"
 "test_materials_status.py" = "integration"
 "test_message_protocol_contract.py" = "unit"

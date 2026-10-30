@@ -10,6 +10,8 @@ requires-python = ">=3.11"
 dependencies = [
     "openai>=2.26,<3", "httpx>=0.23,<1", "anthropic>=1.7,<2", "httpx2>=2,<3", "pydantic>=2.11,<3",
     "fastapi>=0.141,<1", "uvicorn>=0.54,<1", "filelock>=4,<5", "truststore>=0.10,<1", "pygit2>=1.20,<2",
+    # MCP 客户端（网络与 MCP 设计说明第 7.1 节，工单 #69）：官方 SDK，以及按进程标识结束遗留进程用的 psutil
+    "mcp>=2.2,<3", "psutil>=7,<8",
 ]
 
 # 安装成 yudao 命令（桌面客户端的安装、更新与发布设计说明第 4.1 节）
@@ -47,6 +49,13 @@ harness = ["definitions/*.json", "release_assets/*", "release_assets/**/*"]
 # 分层的依赖规则（应用层与接口层设计说明第 2.4 节），由 harness/tests/test_layers.py 检查
 [tool.importlinter]
 root_package = "harness"
+# 工单 #69：MCP 客户端模块不导入 Yudao 的其他模块（网络与 MCP 设计说明第 7.1 节；执行环境服务设计说明第 5 节）。
+# 阶段四搬进执行代码包时只改导入路径
+[[tool.importlinter.contracts]]
+name = "MCP 客户端模块不导入 Yudao 的其他模块"
+type = "forbidden"
+source_modules = ["harness.mcp_client"]
+forbidden_modules = ["harness.*"]
 
 [[tool.importlinter.contracts]]
 name = "接口层只导入应用层"
