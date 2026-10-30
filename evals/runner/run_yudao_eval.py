@@ -161,7 +161,6 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     export = None
     replay = None
     delivery_files = []
-    released = False
     elapsed = 0.0
     timed_out = False
     served_model = model_name
@@ -182,7 +181,6 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         elapsed = time.monotonic() - started
         export = yudao.export_run(client, run_id_yudao)
         replay = client.query("replay.check", {"run_id": run_id_yudao})["data"]
-        released = yudao.quality_released(export)
         delivery_event = yudao.last_archived_delivery(export)
         if delivery_event is not None:
             delivery_files = yudao.fetch_delivery(client, delivery_event, delivery_dir)
@@ -257,7 +255,6 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     export = None
     replay = None
     delivery_files = []
-    released = False
     elapsed = 0.0
     timed_out = False
     served_model = model_name
@@ -294,7 +291,6 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
             elapsed = time.monotonic() - started
             export = yudao.export_run(client, run_id_yudao)
             replay = client.query("replay.check", {"run_id": run_id_yudao})["data"]
-            released = yudao.quality_released(export)
             delivery_event = yudao.last_archived_delivery(export)
             if delivery_event is not None:
                 delivery_files = yudao.fetch_delivery(client, delivery_event, delivery_dir)
