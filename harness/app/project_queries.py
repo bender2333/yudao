@@ -517,21 +517,34 @@ def _fact_ref(store: Any, event_id: str | None, what: str) -> FactRef:
     return FactRef(position=event.position, source=DEFINITIONS.event_source(event.type).source)
 
 
-def _elapsed_ref(store: Any, run: Any, run_id: str) -> FactRef:
-    """已用时间的来源（工单 #396）：这个 run 的最后一条事件。
+# 结算类事件（设计说明第 3、4.3 节）：已用时间在这些事件上更新——一次激活结束、run 结束、暂停或失败。
+# 「已用时间」这个事实元素的来源取其中最后一条，别的进展事件不改变它
+ELAPSED_EVENT_TYPES = frozenset({
+    EventType.ACTIVATION_FINISHED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
+})
 
-    运行中与结束时的最后一条事件都是登记过的种类；测试直接往 run 流里写的标记事件不在来源表里，
-    不构成事实来源，遇到时往前找（最多看最近几条）。
+
+def _elapsed_ref(store: Any, run: Any, run_id: str) -> FactRef:
+    """已用时间的来源（工单 #396）：这个 run 最后一条结算类事件。
+
+    从最后一条事件往前按批（每批 200 条）找，正常运行时不到一批就找到；测试直接往 run 流里写的标记事件
+    不在来源表里，也不影响这个判断。还没有结算过（例如刚开 run）时已用时间从开 run 起算，来源是第一条事件。
     """
     last = store.get_event(run.last_event_id)
     if last is None:
         raise NotFound(f"已用时间 的来源事件不在事件日志里：{run.last_event_id}")
-    if last.type in DEFINITIONS.event_sources:
-        return FactRef(position=last.position, source=DEFINITIONS.event_source(last.type).source)
-    for event in reversed(store.list_events(run_id, after_version=max(0, last.stream_version - 6))):
-        if event.type in DEFINITIONS.event_sources:
-            return FactRef(position=event.position, source=DEFINITIONS.event_source(event.type).source)
-    raise NotFound("已用时间 没有来源事件")
+    version = last.stream_version
+    while version > 0:
+        start = max(0, version - 200)
+        for event in reversed(store.list_events(run_id, after_version=start)):
+            if event.type in ELAPSED_EVENT_TYPES:
+                return FactRef(position=event.position, source=DEFINITIONS.event_source(event.type).source)
+        version = start
+    created = store.stream_events(run_stream(run_id), through_version=1)
+    if not created:
+        raise NotFound("已用时间 没有来源事件")
+    first = created[0]
+    return FactRef(position=first.position, source=DEFINITIONS.event_source(first.type).source)
 
 
 def _fact_refs(store: Any, item: Any, run: Any, state: Any) -> dict[str, FactRef]:
