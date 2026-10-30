@@ -29,6 +29,7 @@ import {
   capacityInputIssue,
   departmentBindings,
   departmentTierBindings,
+  departmentsOf,
   filterCandidates,
   groupAdmittedModels,
   intFromInput,
@@ -195,6 +196,9 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     })),
     [catalog],
   );
+
+  // 部门默认涉及的部门：定义里的部门（默认三部门），目录里已有绑定的部门也算
+  const departments = useMemo(() => departmentsOf(catalog?.bindings), [catalog]);
 
   // 部门使用的选项：已启用的模型，按连接分组
   const departmentGroups = useMemo(
@@ -409,19 +413,19 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     if (current === null) {
       return;
     }
-    await saveBindings(departmentBindings(current, department, modelId), department,
+    await saveBindings(departmentBindings(current, department, modelId, departments), department,
       modelId === "" ? "已取消这个部门的模型，从下一次模型请求起生效。"
         : "已保存部门默认，从各部门下一次模型请求起生效。");
-  }, [saveBindings]);
+  }, [departments, saveBindings]);
 
   const chooseDepartmentTier = useCallback(async (department: string, tier: string) => {
     const current = catalogRef.current;
     if (current === null || current.bindings[department] === undefined) {
       return;
     }
-    await saveBindings(departmentTierBindings(current, department, tier), department,
+    await saveBindings(departmentTierBindings(current, department, tier, departments), department,
       "已保存请求档位，从下一次模型请求起生效。");
-  }, [saveBindings]);
+  }, [departments, saveBindings]);
 
   // —— 高级 ——
 
@@ -568,6 +572,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         subtitle="首个启用的模型自动供三个部门使用；在这里按部门更换"
       >
         <DepartmentUsage
+          departments={departments}
           groups={departmentGroups}
           bindings={catalog.bindings}
           models={catalog.models}

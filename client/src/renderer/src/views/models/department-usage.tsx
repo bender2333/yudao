@@ -5,11 +5,13 @@
 // 建议能力提醒沿用（设计说明第 5.6 节）：保存时带回的提醒一直显示在该项旁。
 
 import type { CatalogBinding, CatalogModel } from "../../api/generated/types.gen";
-import { DEPARTMENT_LABELS, DEPARTMENTS, tierOptions, type AdmissionGroup } from "./model-logic";
+import { DEPARTMENT_LABELS, tierOptions, type AdmissionGroup } from "./model-logic";
 
 export type DepartmentStatus = { kind: "ok" | "error"; message: string };
 
 export type DepartmentUsageProps = {
+  /** 部门默认涉及的部门：定义里的部门（默认三部门） */
+  departments: string[];
   /** 已启用的模型，按连接分组 */
   groups: AdmissionGroup[];
   /** 当前的部门默认 */
@@ -35,7 +37,7 @@ export function DepartmentUsage(props: DepartmentUsageProps) {
           <p>首个通过验证的模型会自动供三个部门使用。</p>
         </div>
       ) : null}
-      {DEPARTMENTS.map((department) => {
+      {props.departments.map((department) => {
         const binding = props.bindings[department];
         const current = binding?.model_id ?? "";
         const model = props.models.find((item) => item.id === current) ?? null;

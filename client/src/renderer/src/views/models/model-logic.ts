@@ -498,14 +498,15 @@ export function removalRejectionText(message: string): string {
 export type BindingInput = { provider_id: string; model_id: string; requested_tier: string | null };
 
 // 换一个部门的模型以后要写的一整份部门默认：服务端按整份替换（catalog.department_defaults.save），
-// 所以其余两个部门照当前的值一起写回去
+// 所以其余部门照当前的值一起写回去
 export function departmentBindings(
   catalog: { bindings: Record<string, CatalogBinding>; models: CatalogModel[] },
   department: string,
   modelId: string,
+  departments: readonly string[] = DEPARTMENTS,
 ): Record<string, BindingInput> {
   const bindings: Record<string, BindingInput> = {};
-  for (const dept of DEPARTMENTS) {
+  for (const dept of departments) {
     const binding = catalog.bindings[dept];
     const chosen = dept === department ? modelId : binding?.model_id ?? "";
     if (chosen === "") {
@@ -529,9 +530,10 @@ export function departmentTierBindings(
   catalog: { bindings: Record<string, CatalogBinding> },
   department: string,
   tier: string,
+  departments: readonly string[] = DEPARTMENTS,
 ): Record<string, BindingInput> {
   const bindings: Record<string, BindingInput> = {};
-  for (const dept of DEPARTMENTS) {
+  for (const dept of departments) {
     const item = catalog.bindings[dept];
     if (!item) {
       continue;
@@ -543,6 +545,18 @@ export function departmentTierBindings(
     };
   }
   return bindings;
+}
+
+// 部门默认涉及的部门：定义里的部门（默认三部门），目录里已有绑定的部门也算
+// （模型管理设计说明第 5.1 节：部门默认按定义里的每个部门各设一项）
+export function departmentsOf(bindings: Record<string, CatalogBinding> | undefined): string[] {
+  const departments: string[] = [...DEPARTMENTS];
+  for (const key of Object.keys(bindings ?? {})) {
+    if (!departments.includes(key)) {
+      departments.push(key);
+    }
+  }
+  return departments;
 }
 
 // 目录里的定义 → 保存时要写的一份（catalog.connection.save 的 models 字段）
