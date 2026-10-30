@@ -83,7 +83,7 @@ class ModelDefinition:
     context_window: int | None
     max_output_tokens: int | None
     capability_source: str = ""
-    source_details: Mapping[str, Mapping[str, str]] = field(default_factory=dict)
+    source_details: Mapping[str, Mapping[str, str | None]] = field(default_factory=dict)
     # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
     accepts_required_tool_call: bool = True
     # 输入方式（模型管理设计说明第 4.3 节）：取值为 text 与 image，文本总是包含；
@@ -413,7 +413,9 @@ class ProviderStore:
                 issues.append(ValidationIssue(f"{location}.capability_source", "必须为字符串"))
             if not isinstance(model.source_details, Mapping) or not all(
                     isinstance(name, str) and isinstance(detail, Mapping)
-                    and all(isinstance(key, str) and isinstance(value, str) for key, value in detail.items())
+                    and isinstance(detail.get("source"), str)
+                    and not set(detail) - {"source", "provider", "revision"}
+                    and all(value is None or isinstance(value, str) for value in detail.values())
                     for name, detail in model.source_details.items()):
                 issues.append(ValidationIssue(f"{location}.source_details", "必须为逐字段的来源对象"))
             if not isinstance(model.accepts_required_tool_call, bool):

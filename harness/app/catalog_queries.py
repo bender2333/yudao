@@ -220,8 +220,8 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
     system = application.system
     facade = system.facade
     position = system.store.end_position()
-    revision = facade.catalog_revision()
     view = facade.providers_view()
+    revision = view["catalog_revision"]
     status = facade.config_status()
     providers = []
     for item in view["providers"]:
@@ -250,7 +250,7 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
         models=[_model(item) for item in view["models"]],
         admissions=[CatalogAdmission.model_validate(item) for item in view["admissions"]],
         bindings=bindings,
-        selections=facade.selections.snapshot(),
+        selections=view["selections"],
         # 部门默认各自当前绑定的模型的建议能力提醒（设计说明第 5.6 节）
         department_reminders={department: facade.model_reminders(
             None if bindings.get(department) is None else bindings[department].model_id, department)

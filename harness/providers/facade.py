@@ -264,7 +264,8 @@ class ProviderFacade:
                     ValidationIssue(name, "仍被引用，无法移除") for name in referrers
                 ))
             self.selections.cancel(key)
-            self._admissions.pop(key, None)
+            previous_store = self._store
+            previous_admission = self._admissions.pop(key, None)
             providers = [self._store.providers[name].public_dict()
                          for name in sorted(self._store.providers)]
             models = [self._store.models[name].public_dict()
@@ -273,6 +274,13 @@ class ProviderFacade:
             candidate.revision = self._store.revision + 1
             self._store = candidate
             self._publish()
+            if previous_admission is not None:
+                _persisted, problem = self._persist_admissions()
+                if problem is not None:
+                    self._store = previous_store
+                    self._admissions[key] = previous_admission
+                    self._publish()
+                    raise CatalogValidationError((ValidationIssue("admissions", problem),))
             return self._revision
 
     def impacted_definitions(self, document: Mapping[str, Any]) -> list[dict[str, str]]:
@@ -480,6 +488,7 @@ class ProviderFacade:
                 raise CatalogValidationError(tuple(
                     ValidationIssue(name, "仍被引用，无法删除") for name in dependents
                 ))
+            self.prepare_provider_reselection(key)
             providers = [self._store.providers[name].public_dict()
                          for name in sorted(self._store.providers) if name != key]
             models = [self._store.models[name].public_dict()
@@ -898,7 +907,8 @@ class ProviderFacade:
                         details[name] = dict(existing.source_details.get(name, {"source": "manual"}))
             for name, value in (("context_window", context_window), ("max_output_tokens", max_output_tokens),
                                 ("protocol", protocol)):
-                if value is not None:
+                if value is not None and (name == "protocol" or values.get(name) is None
+                                          or details.get(name, {}).get("source") == "manual"):
                     values[name] = value
                     details[name] = {"source": "manual"}
             identifier = (existing.id if existing is not None else
@@ -910,6 +920,10 @@ class ProviderFacade:
                              "protocol": values["protocol"], "context_window": values.get("context_window"),
                              "max_output_tokens": values.get("max_output_tokens"),
                              "input_modalities": values["input_modalities"], "source_details": details,
+                             "reasoning_levels": [] if existing is None else list(existing.reasoning_levels),
+                             "default_reasoning_level": None if existing is None else existing.default_reasoning_level,
+                             "reasoning_mode": "" if existing is None else existing.reasoning_mode,
+                             "accepts_required_tool_call": True if existing is None else existing.accepts_required_tool_call,
                              "capability_source": " · ".join(f"{name}：{detail['source']}"
                                                              for name, detail in details.items())})
             problem = self.persist_catalog(previous)
@@ -920,12 +934,39 @@ class ProviderFacade:
             selected.status = "capacity_unknown" if selected.missing else "waiting"
             return selected, not selected.missing
 
+    def prepare_provider_reselection(self, provider_id: str) -> None:
+        with self._lock:
+            self._candidate_results.pop(provider_id, None)
+            for model in self._store.models.values():
+                if model.provider_id == provider_id:
+                    self.selections.cancel(model.id)
+
+    def reselect_provider(self, provider_id: str) -> list[SelectionAttempt]:
+        # 地址修改后只使用这次获取的候选；缺少的定义保留引用，明确说明无法重新测试的原因。
+        with self._lock:
+            latest = self._candidate_results.get(provider_id) or {}
+            candidate_ids = {item["id"] for item in latest.get("candidates", ())}
+            ready: list[SelectionAttempt] = []
+            for model in tuple(self._store.models.values()):
+                if model.provider_id != provider_id:
+                    continue
+                if latest.get("status") == "ok" and model.model in candidate_ids:
+                    selected, start = self.select_model(provider_id, model.model, force=True)
+                    if start:
+                        ready.append(selected)
+                else:
+                    selected = self.selections.begin(provider_id, model.id, model.model)
+                    selected.status = "not_in_list" if latest.get("status") == "ok" else "failed"
+                    selected.error = ("不在新的模型列表中" if selected.status == "not_in_list"
+                                      else latest.get("error") or "未能获取新的模型列表")
+            return ready
+
     def run_selection(self, selected: SelectionAttempt, limit: Callable[[], int]) -> dict[str, Any] | None:
         if not self.selections.acquire(selected, limit):
             return None
         try:
             result = self.model_test(selected.provider_id, selected.model_id, selection=selected)
-            return result if self.selections.finish(selected, result) else None
+            return result if result.get("admitted") or self.selections.finish(selected, result) else None
         finally:
             self.selections.release(selected)
 
@@ -1078,49 +1119,60 @@ class ProviderFacade:
         actual = result.actual_model or None
         capacity_confirmed = model.context_window is not None and model.max_output_tokens is not None
         defaults_before = defaults_after = self.catalog_revision()
-        if capacity_confirmed:
-            with self._lock:
-                current = self._store.models.get(model.id)
-                current_provider = self._store.providers.get(provider.id)
-                if (current is None or current_provider is None
-                        or (selection is not None and not self.selections.is_current(selection))
-                        or (provider.base_url, provider.credential_ref, model.protocol, model.model, model.reasoning_mode)
-                        != (current_provider.base_url, current_provider.credential_ref,
-                            current.protocol, current.model, current.reasoning_mode)):
-                    return {"ok": False, "admitted": False, "error": "选用已取消或测试目标已经改变"}
-                if current.accepts_required_tool_call != accepts_required:
-                    previous = self.to_document()
-                    self.save_model(replace(current, accepts_required_tool_call=accepts_required).public_dict())
-                    persist_error = self.persist_catalog(previous)
-                    if persist_error is not None:
-                        return {"ok": False, "error": f"工具往返 / 保存测试能力：{persist_error}",
-                                "model": actual, "admitted": False, "protocol": model.protocol,
-                                "revision": self.revision, "elapsed_ms": elapsed_ms, "usage_reported": False,
-                                "accepts_required_tool_call": accepts_required, "failure_group": "tool_round_trip",
-                                "failure_step": "save_capability", "request_timeout_sec": target.timeout_sec}
-                self.record_admission(provider_id, model.id, admitted_model=actual)
-                if selection is not None:
-                    defaults_before, defaults_after = self._fill_missing_defaults(model.id)
-        persisted, persist_error = self._persist_admissions()
-        payload = {
-            "ok": True,
-            "error": None,
-            "model": actual,
-            "admitted": bool(capacity_confirmed),
-            "protocol": model.protocol,
-            "revision": self.revision,
-            "elapsed_ms": elapsed_ms,
-            "usage_reported": bool(result.usage.get("reported", False)),
-            "persisted": persisted,
-            "accepts_required_tool_call": accepts_required,
-            "failure_group": None,
-            "failure_step": None,
-            "request_timeout_sec": target.timeout_sec,
-            "defaults_before": defaults_before, "defaults_after": defaults_after,
-        }
-        if persist_error is not None:
-            payload["persist_error"] = persist_error
-        return payload
+        with self._lock:
+            if capacity_confirmed:
+                with self._lock:
+                    current = self._store.models.get(model.id)
+                    current_provider = self._store.providers.get(provider.id)
+                    if (current is None or current_provider is None
+                            or (selection is not None and not self.selections.is_current(selection))
+                            or (provider.base_url, provider.credential_ref, model.protocol, model.model, model.reasoning_mode)
+                            != (current_provider.base_url, current_provider.credential_ref,
+                                current.protocol, current.model, current.reasoning_mode)):
+                        return {"ok": False, "admitted": False, "error": "选用已取消或测试目标已经改变"}
+                    if current.accepts_required_tool_call != accepts_required:
+                        previous = self.to_document()
+                        self.save_model(replace(current, accepts_required_tool_call=accepts_required).public_dict())
+                        persist_error = self.persist_catalog(previous)
+                        if persist_error is not None:
+                            return {"ok": False, "error": f"工具往返 / 保存测试能力：{persist_error}",
+                                    "model": actual, "admitted": False, "protocol": model.protocol,
+                                    "revision": self.revision, "elapsed_ms": elapsed_ms, "usage_reported": False,
+                                    "accepts_required_tool_call": accepts_required, "failure_group": "tool_round_trip",
+                                    "failure_step": "save_capability", "request_timeout_sec": target.timeout_sec}
+                    previous_admission = self._admissions.get(model.id)
+                    self.record_admission(provider_id, model.id, admitted_model=actual)
+                    if selection is not None:
+                        try:
+                            defaults_before, defaults_after = self._fill_missing_defaults(model.id)
+                        except CatalogValidationError:
+                            if previous_admission is None:
+                                self._admissions.pop(model.id, None)
+                            else:
+                                self._admissions[model.id] = previous_admission
+                            raise
+            persisted, persist_error = self._persist_admissions()
+            payload = {
+                "ok": True,
+                "error": None,
+                "model": actual,
+                "admitted": bool(capacity_confirmed),
+                "protocol": model.protocol,
+                "revision": self.revision,
+                "elapsed_ms": elapsed_ms,
+                "usage_reported": bool(result.usage.get("reported", False)),
+                "persisted": persisted,
+                "accepts_required_tool_call": accepts_required,
+                "failure_group": None,
+                "failure_step": None,
+                "request_timeout_sec": target.timeout_sec,
+                "defaults_before": defaults_before, "defaults_after": defaults_after,
+            }
+            if persist_error is not None:
+                payload["persist_error"] = persist_error
+            if selection is not None and payload["admitted"]:
+                self.selections.finish(selection, payload)
+            return payload
 
     def _persist_admissions(self) -> tuple[bool, str | None]:
         # 准入记录落在与目录分开的文件里：CLI 与 smoke 在独立进程读取同一份配置；
@@ -1311,6 +1363,7 @@ class ProviderFacade:
                 "models": [self._store.models[key].public_dict() for key in sorted(self._store.models)],
                 "bindings": {key: dict(value) for key, value in self._bindings.items()},
                 "admissions": self.model_admissions(),
+                "selections": self.selections.snapshot(),
             }
 
     async def stream(

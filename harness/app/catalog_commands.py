@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal, Sequence
 from pydantic import PositiveInt
 
 from ..event_store import Command, catalog_stream
-from ..models import CatalogEventType
+from ..models import DEPARTMENTS, CatalogEventType
 from ..providers import CatalogValidationError, DEFAULT_TIMEOUT_SEC, ProviderError, SUPPORTED_PROTOCOLS, suggested
 from ..write_path import NewCatalogEvent
 from .commands import Rejection
@@ -72,7 +72,7 @@ class ModelInput(Contract):
     context_window: int | None = None
     max_output_tokens: PositiveInt | None = None
     capability_source: str = ""
-    source_details: dict[str, dict[str, str]] = {}
+    source_details: dict[str, dict[str, str | None]] = {}
     accepts_required_tool_call: bool = True
     # 输入方式（设计说明第 4.3 节）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
     # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
@@ -345,6 +345,8 @@ def _binding_reminders(application: Application) -> list[str]:
     models = {item["id"]: item for item in view["models"]}
     notes: list[str] = []
     for department, binding in view["bindings"].items():
+        if department not in DEPARTMENTS:
+            continue
         model = models.get(binding.get("model_id") or "")
         if model is None:
             continue
@@ -362,6 +364,7 @@ async def _save_connection(application: Application, command: Command, request: 
     _stale_base(facade, request.base_version)
     before = facade.catalog_revision()
     previous = facade.to_document()
+    old_provider = _provider_view(facade, request.provider.id)
     provider = request.provider.model_dump()
     models = [item.model_dump() for item in request.models]
     try:
@@ -373,6 +376,10 @@ async def _save_connection(application: Application, command: Command, request: 
     if problem is not None:
         raise Rejection("catalog_invalid", problem)
     _revised(application, command, "save_connection", before, after, provider_id=request.provider.id)
+    if old_provider is not None and any(old_provider[name] != provider[name]
+                                        for name in ("base_url", "credential_ref")):
+        facade.prepare_provider_reselection(request.provider.id)
+        _schedule_candidates(application, after, request.provider.id, retarget=True)
 
 
 async def _connect(application: Application, command: Command, request: CatalogConnect) -> None:
@@ -389,7 +396,9 @@ async def _connect(application: Application, command: Command, request: CatalogC
     provider_id = connected["provider_id"]
     _revised(application, command, "connect", request.base_version, facade.catalog_revision(),
              provider_id=provider_id, credential=connected["credential"])
-    _schedule_candidates(application, request.base_version, provider_id)
+    existed = any(item["id"] == provider_id for item in previous["providers"])
+    _schedule_candidates(application, request.base_version, provider_id,
+                         connection_test=existed and connected["credential"] is not None)
 
 
 async def _delete_connection(application: Application, command: Command, request: CatalogConnectionDelete) -> None:
@@ -564,10 +573,14 @@ async def _collect_candidates(application: Application, command: Command, reques
 
 
 def _schedule_candidates(application: Application, base_version: int, provider_id: str,
-                         models_url: str | None = None) -> None:
+                         models_url: str | None = None, *, connection_test: bool = False,
+                         retarget: bool = False) -> None:
     facade = application.system.facade
+    provider = _provider_view(facade, provider_id)
+    connection = None if provider is None else tuple(provider[name] for name in ("base_url", "credential_ref", "models_url"))
 
     async def run() -> None:
+        started = time.monotonic()
         try:
             result = await asyncio.to_thread(facade.refresh_candidates, provider_id,
                                              models_url_override=models_url)
@@ -580,6 +593,9 @@ def _schedule_candidates(application: Application, base_version: int, provider_i
                 "reason": "unreachable",
             })
             return
+        current = _provider_view(facade, provider_id)
+        if current is None or tuple(current[name] for name in ("base_url", "credential_ref", "models_url")) != connection:
+            return
         _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
             "base_revision": base_version,
             "provider_id": provider_id, "status": result["status"], "source_url": result["source_url"],
@@ -587,6 +603,20 @@ def _schedule_candidates(application: Application, base_version: int, provider_i
             "candidate_ids": [item["id"] for item in result["candidates"]], "error": result["error"],
             "reason": result["reason"],
         })
+        if connection_test:
+            _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
+                    _test_payload(base_version, "connection", provider_id, "", started,
+                                  {"ok": result["status"] == "ok", "admitted": None,
+                                   "source_url": result["source_url"]}, result["error"]))
+        if retarget:
+            before = facade.catalog_revision()
+            selected = facade.reselect_provider(provider_id)
+            if facade.catalog_revision() != before:
+                _result(application, CatalogEventType.CATALOG_REVISED, {
+                    "operation": "select_model", "base_revision": before, "revision": facade.catalog_revision(),
+                    "provider_id": provider_id})
+            for item in selected:
+                _schedule_selection(application, facade.catalog_revision(), item)
 
     application.schedule(run())
 
@@ -609,23 +639,27 @@ async def _test_connection(application: Application, command: Command, request: 
     facade = application.system.facade
     if _provider_view(facade, request.provider_id) is None:
         raise Rejection("not_found", f"Provider 配置不存在：{request.provider_id}")
-    model_id = ""
     _register(application, command)
+    _schedule_connection_test(application, request.base_version, request.provider_id)
+
+
+def _schedule_connection_test(application: Application, base_version: int, provider_id: str) -> None:
+    facade = application.system.facade
 
     async def run() -> None:
         started = time.monotonic()
         try:
-            result = await asyncio.to_thread(facade.test_connection, request.provider_id)
+            result = await asyncio.to_thread(facade.test_connection, provider_id)
         except (CatalogValidationError, ProviderError) as exc:
             _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                    _test_payload(request.base_version, "connection", request.provider_id, model_id, started,
+                    _test_payload(base_version, "connection", provider_id, "", started,
                                   {"ok": False, "admitted": None}, str(exc)))
             return
         error = None
         if not result.get("ok"):
             error = str(result.get("message") or result.get("reason") or "连接失败")
         _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                _test_payload(request.base_version, "connection", request.provider_id, model_id, started,
+                _test_payload(base_version, "connection", provider_id, "", started,
                               result, error))
 
     application.schedule(run())
@@ -678,6 +712,9 @@ async def _set_credential(application: Application, command: Command, request: C
         # 兜底：写入路径上的校验都应当以目录校验失败的回答出现，不漏成服务的 500（工单 #1158）
         raise Rejection("catalog_invalid", str(exc))
     _credential_changed(application, command, "set", result, persisted=result["persisted"])
+    for provider in facade.providers_view()["providers"]:
+        if provider["credential_ref"] == request.ref:
+            _schedule_connection_test(application, facade.catalog_revision(), provider["id"])
 
 
 async def _clear_credential_override(application: Application, command: Command, request: CredentialClearOverride) -> None:

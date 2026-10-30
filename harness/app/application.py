@@ -184,7 +184,10 @@ class Application:
     async def command(self, name: str, request: CommandRequest, *, actor: str) -> Accepted | Rejected:
         if self.system.read_only:
             raise ReadOnlyError("commands are not available in a read-only open")
-        return await execute(self, self.registry.commands[name], request, actor=actor)
+        result = await execute(self, self.registry.commands[name], request, actor=actor)
+        if name == "parameter.set":
+            self.system.facade.selections.wake()
+        return result
 
     def query(self, name: str, request: BaseModel | None) -> Snapshot[Any]:
         definition = self.registry.queries[name]

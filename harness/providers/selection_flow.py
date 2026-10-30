@@ -24,8 +24,9 @@ class SelectionAttempt:
         return self.cancelled.is_set()
 
     def public(self) -> dict[str, Any]:
-        return {name: getattr(self, name) for name in
-                ("provider_id", "model_id", "model", "sequence", "status", "missing", "error")}
+        return {**{name: getattr(self, name) for name in
+                   ("provider_id", "model_id", "model", "sequence", "status", "error")},
+                "missing": list(self.missing)}
 
 
 class SelectionFlow:
@@ -63,6 +64,7 @@ class SelectionFlow:
                 if waiting and waiting[0] is selected and len(self._running) < limit():
                     self._running.add(selected)
                     selected.status = "testing"
+                    self._condition.notify_all()
                     return True
                 self._condition.wait()
             return False
@@ -85,6 +87,10 @@ class SelectionFlow:
         with self._condition:
             for model_id in tuple(self._current):
                 self.cancel(model_id)
+
+    def wake(self) -> None:
+        with self._condition:
+            self._condition.notify_all()
 
     def finish(self, selected: SelectionAttempt, result: dict[str, Any]) -> bool:
         with self._condition:

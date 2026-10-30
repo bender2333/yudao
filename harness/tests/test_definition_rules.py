@@ -40,3 +40,11 @@ def test_model_test_request_timeout_matches_the_design():
     assert not_wired_reason("provider.model_test_timeout_sec")
 
 
+def test_model_test_concurrency_matches_the_selection_contract():
+    # R2：选用并发登记的初值、上下界、来源和现值消费者属于公开规则合同。
+    rule = DEFINITIONS.rule("provider.model_test_max_concurrent")
+    assert rule.value == 3 and list(rule.bounds) == [1, 8]
+    assert "model-management.md" in rule.origin and "选用" in rule.origin
+    assert wired("provider.model_test_max_concurrent") is True
+
+
