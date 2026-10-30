@@ -292,8 +292,11 @@ jobs:
     name: ③ 集成层
     if: ${{ github.event_name != 'pull_request' }}
     runs-on: windows-latest
-    # 正常一趟 15 至 16 分钟；工作进程消失时 xdist 会一直等下去，45 分钟不够快，收到 25 分钟（#1208）
-    timeout-minutes: 25
+    # 正常一趟 15 至 16 分钟；工作进程消失时 xdist 会一直等下去，45 分钟不够快，收到 25 分钟（#1208）。
+    # 2026-10-30：用例长到 969 项、机器上同时跑多个分支与合并，正常一趟已到 15 至 16 分钟，
+    # 一次工作进程消失就把 25 分钟吃满、失败清单打不出来；收到 25 分钟改为 35 分钟，并给 pytest 加 -v，
+    # 失败名一出现就在日志里，作业被取消也留得下（#1274、#1255 之外由架构师当场改，见 docs/CHANGELOG.md）
+    timeout-minutes: 35
     env:
       PYTHONUTF8: "1"
     defaults:
@@ -327,9 +330,10 @@ jobs:
           npx --yes playwright@"$(npm view @playwright/mcp@0.0.83 dependencies.playwright)" install chromium
 
       # --dist loadgroup：带同一个 xdist_group 标记的用例在同一个 worker 里运行（#614），没有标记的照常分配
-      # --timeout=300：单条用例超过 5 分钟算失败并报出用例名（pytest-timeout 已是开发依赖）；作业本身另有 25 分钟的兜底
+      # --timeout=300：单条用例超过 5 分钟算失败并报出用例名（pytest-timeout 已是开发依赖）；作业本身另有 35 分钟的兜底
+      # -v：失败名一出现就写进日志，作业被取消时不至于连是哪一条失败都留不下
       - name: 集成层
-        run: uv run python -m pytest -m integration -n 4 --dist loadgroup --timeout=300 --timeout-method=thread --junitxml=.tmp/test-results/integration.xml
+        run: uv run python -m pytest -m integration -n 4 --dist loadgroup --timeout=300 --timeout-method=thread -v --junitxml=.tmp/test-results/integration.xml
 
       - name: 集成层的结果
         if: ${{ !cancelled() }}
