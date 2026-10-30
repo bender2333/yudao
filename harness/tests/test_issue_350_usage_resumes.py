@@ -20,11 +20,42 @@ from harness.tests.helpers import quality_turns
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 CHECKS = {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}
-# 短的运行时间上限与跨过上限的那次检查：中断以前那次激活不跑检查，累计只有这一次的激活时间，
-# 离上限足够远；上限取 3 秒，重启以后的检查睡满 4 秒（中断前那次激活实测不到 0.2 秒），这一次检查本身就越过上限，
-# 因此「达到上限」由这一次检查保证，与中断前经过了多长时间、机器快慢都无关（工单 #410）
+# 中断以前的激活不跑检查；重启以后工程的真实检查运行 4 秒，越过原有的 3 秒上限。
+# 质检用信号等待工程检查完成，保证两个激活覆盖同一运行段，核对并发结算也保留这一段时间。
 TIME_LIMIT_SEC = 3
-SLOW_CHECK = {"slow": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"import time; time.sleep(4)\""}}
+
+
+def _overlapping_checks(tmp_path):
+    signals = tmp_path / "check-signals"
+    signals.mkdir()
+    script = tmp_path / "overlapping-checks.py"
+    script.write_text("""import sys
+import time
+from pathlib import Path
+
+signals = Path(sys.argv[1])
+department = sys.argv[2]
+timeout = float(sys.argv[3])
+
+def wait_for(name):
+    deadline = time.monotonic() + timeout
+    while not (signals / name).exists():
+        if time.monotonic() >= deadline:
+            raise TimeoutError(f"waiting for {name}")
+        time.sleep(0.01)
+
+if department == "engineering":
+    wait_for("quality-ready")
+    time.sleep(4)
+    (signals / "engineering-finished").touch()
+else:
+    (signals / "quality-ready").touch()
+    wait_for("engineering-finished")
+""", encoding="utf-8")
+    command = (f'"{sys.executable.replace(chr(92), chr(47))}" "{script.as_posix()}" '
+               f'"{signals.as_posix()}"')
+    return {department: {"command": f"{command} {department} {killed.STARTUP_TIMEOUT_SEC}"}
+            for department in ("engineering", "quality")}
 
 def _call(identity, name, arguments):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
@@ -106,8 +137,11 @@ def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
     data_dir = tmp_path / "data"
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
     script = {"product": [{"proposal": product_spec()}]}
-    tail = {"engineering": [{"proposal": delivery(check_names=["slow"]), "checks": SLOW_CHECK}],
-            "quality": [{"proposal": {"kind": "quality_auto"}}]}
+    checks = _overlapping_checks(tmp_path)
+    tail = {"engineering": [{"proposal": delivery(check_names=["slow"]),
+                             "checks": {"slow": checks["engineering"]}}],
+            "quality": [{"checks": {"synchronize": checks["quality"]}},
+                        {"proposal": {"kind": "quality_auto"}}]}
 
     with killed.interrupted(data_dir, script, tail=tail, run_time_limit_sec=TIME_LIMIT_SEC,
                             hold_after="activation_finished") as run:
