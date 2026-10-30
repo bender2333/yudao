@@ -476,7 +476,7 @@ def _schedule_selection(application: Application, base_version: int, selected) -
         try:
             result = await asyncio.to_thread(
                 facade.run_selection, selected,
-                lambda: int(application.system.parameters()["provider.model_test_max_concurrent"]))
+                lambda: int(application.system.parameters()["provider.model_test_max_concurrent"]), DEPARTMENTS)
         except (CatalogValidationError, ProviderError) as exc:
             result = {"ok": False, "admitted": False, "error": str(exc)}
             if not facade.selections.finish(selected, result):

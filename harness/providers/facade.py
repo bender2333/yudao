@@ -1023,11 +1023,13 @@ class ProviderFacade:
                                       else latest.get("error") or "未能获取新的模型列表")
             return ready
 
-    def run_selection(self, selected: SelectionAttempt, limit: Callable[[], int]) -> dict[str, Any] | None:
+    def run_selection(self, selected: SelectionAttempt, limit: Callable[[], int],
+                      default_keys: Sequence[str]) -> dict[str, Any] | None:
         if not self.selections.acquire(selected, limit):
             return None
         try:
-            result = self.model_test(selected.provider_id, selected.model_id, selection=selected)
+            result = self.model_test(selected.provider_id, selected.model_id, selection=selected,
+                                     default_keys=default_keys)
             return result if result.get("admitted") or self.selections.finish(selected, result) else None
         finally:
             self.selections.release(selected)
@@ -1046,12 +1048,12 @@ class ProviderFacade:
             selected.status = "capacity_unknown" if selected.missing else "waiting"
             return selected, not selected.missing
 
-    def _fill_missing_defaults(self, model_id: str) -> tuple[int, int]:
+    def _fill_missing_defaults(self, model_id: str, keys: Sequence[str]) -> tuple[int, int]:
         # 由准入提交所在的同一把锁串行决定先通过者，已有选择逐项保留。
         before = self.catalog_revision()
         model = self._store.models[model_id]
         additions = {name: {"provider_id": model.provider_id, "model_id": model.id}
-                     for name in REQUIRED_DEPARTMENTS if name not in self._bindings}
+                     for name in keys if name not in self._bindings}
         if additions:
             previous = self.to_document()
             _require_bound_admissions(additions, self._store, self._admissions)
@@ -1113,7 +1115,8 @@ class ProviderFacade:
             }
 
     def model_test(self, provider_id: str, model_id: str, *,
-                   selection: SelectionAttempt | None = None) -> dict[str, Any]:
+                   selection: SelectionAttempt | None = None,
+                   default_keys: Sequence[str] = ()) -> dict[str, Any]:
         # 最小问答与工具往返都成功才准入；每次请求走正式协议路径并有独立等待上限。
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
@@ -1206,7 +1209,7 @@ class ProviderFacade:
                     self.record_admission(provider_id, model.id, admitted_model=actual)
                     if selection is not None:
                         try:
-                            defaults_before, defaults_after = self._fill_missing_defaults(model.id)
+                            defaults_before, defaults_after = self._fill_missing_defaults(model.id, default_keys)
                         except CatalogValidationError:
                             if previous_admission is None:
                                 self._admissions.pop(model.id, None)
