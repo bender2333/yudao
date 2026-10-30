@@ -29,6 +29,11 @@ TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
 # 骨架事件载荷里的封闭取值，只增：qa_submitted 的结论，baseline_review_accepted 逐条结论的状态
 QA_VERDICTS = ("rework_engineering", "release")
 BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
+# 质检逐条结论用的封闭取值（验证的独立性设计说明第 7.1 节第 1、2 条，工单 #151）：六种检验方式与三种结果。
+# 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在
+# harness/tests/fixtures/check_methods.json 与客户端各一份，服务端核对本表与夹具一致
+QA_METHODS = ("check", "trial", "measure", "judgement", "human", "open")
+QA_RESULTS = ("passed", "failed", "unverified")
 
 
 class SkeletonEventType:

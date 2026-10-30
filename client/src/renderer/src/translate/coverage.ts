@@ -341,3 +341,64 @@ export function checkCoverage(types: readonly string[], coverage: TranslationCov
     throw new Error("翻译覆盖核对没有通过：\n" + problems.join("\n"));
   }
 }
+
+// ---------------------------------------------------------------------------
+// 检验方式的名称（验证的独立性设计说明第 7.1 节，工单 #151）
+//
+// 质检的逐条结论里每种检验方式用代码名保存：check（命令检查）、trial（试用用例）、measure（主机测量）、
+// judgement（带参照材料的判定点）、human（人）、open（开环）；前三种是可执行的检验，后三种不可执行。
+// 页面上显示中文名。两端各读自己那一份夹具：客户端是 client/tests/fixtures/check-methods.json，
+// 服务端是 harness/tests/fixtures/check_methods.json（服务端测试核对两份相同，也核对服务端的封闭取值
+// 与它那份一致）。这里缺一行时客户端单元测试失败并写明缺哪个代码名。
+
+/** 一种检验方式：页面上显示的名字与它是不是可执行的检验。 */
+export interface CheckMethodRow {
+  readonly label: string;
+  readonly executable: boolean;
+}
+
+/** 夹具里的一行：代码名、名字与是否可执行。 */
+export interface CheckMethodFixtureRow extends CheckMethodRow {
+  readonly code: string;
+}
+
+/** 检验方式的声明表：六个代码名各一行。 */
+export const CHECK_METHODS: Readonly<Record<string, CheckMethodRow>> = Object.freeze({
+  check: { label: "命令检查", executable: true },
+  trial: { label: "试用用例", executable: true },
+  measure: { label: "主机测量", executable: true },
+  judgement: { label: "带参照材料的判定点", executable: false },
+  human: { label: "人", executable: false },
+  open: { label: "开环", executable: false },
+});
+
+/**
+ * 声明表覆盖夹具的核对：夹具里的每个代码名都有一行且名字与可执行相同，
+ * 声明表里也没有夹具以外的代码名。返回问题清单（空表示通过）。
+ */
+export function checkMethodProblems(
+  methods: readonly CheckMethodFixtureRow[],
+  table: Readonly<Record<string, CheckMethodRow>> = CHECK_METHODS,
+): string[] {
+  const problems: string[] = [];
+  for (const item of methods) {
+    const row = table[item.code];
+    if (row === undefined) {
+      problems.push(`检验方式 ${item.code} 在声明表里没有一行`);
+      continue;
+    }
+    if (row.label !== item.label) {
+      problems.push(`检验方式 ${item.code} 的名字与夹具不同：${row.label} 与 ${item.label}`);
+    }
+    if (row.executable !== item.executable) {
+      problems.push(`检验方式 ${item.code} 的可执行与夹具不同`);
+    }
+  }
+  const codes = new Set(methods.map((item) => item.code));
+  for (const code of Object.keys(table)) {
+    if (!codes.has(code)) {
+      problems.push(`声明表里的 ${code} 不在夹具里`);
+    }
+  }
+  return problems;
+}
