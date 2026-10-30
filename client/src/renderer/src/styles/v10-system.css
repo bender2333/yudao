@@ -133,6 +133,86 @@ button.y10-chip:hover { border-color: var(--green); color: var(--green); backgro
 .y10-def-reasoning .y10-check-row { gap: 4px 10px; }
 .y10-def-reasoning .y10-check { font-size: 12px; }
 
+/* ---------------------------------------------------------------- 模型管理页（工单 #1297）
+   主路径：连接服务 → 搜索筛选候选 → 勾选即补全并验证 → 部门使用。
+   反馈写在被操作的对象旁边：连接卡片、候选的那一行、已选模型的那一行、部门使用的那一项。 */
+
+.mm-page .y10-block { margin-top: 18px; }
+.mm-actions { gap: 8px; }
+.mm-meta { margin: 4px 0 0; }
+.mm-hint { min-width: 0; }
+.mm-ok { color: var(--green); }
+.mm-warn { color: var(--amber); }
+.mm-empty { display: grid; gap: 8px; justify-items: center; }
+.mm-empty strong { color: var(--text); }
+.mm-empty p { margin: 0; }
+.mm-sep { color: var(--faint); }
+
+/* 连接服务 */
+.mm-connect { display: grid; gap: 12px; }
+.mm-connect .y10-conn-card { border-radius: 10px; }
+.mm-connect .y10-conn-summary {
+  grid-template-columns: minmax(0, 1fr) auto; gap: 8px 16px; padding: 12px 16px; cursor: default;
+}
+.mm-connect .y10-conn-summary:hover { background: transparent; }
+.mm-connect .y10-conn-name strong { white-space: normal; overflow-wrap: anywhere; }
+.mm-connect .y10-conn-count { color: var(--muted); }
+.mm-connect-form { max-width: 560px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.mm-connect-form .y10-h3 { margin: 0; }
+
+/* 部门使用 */
+.mm-usage { display: grid; gap: 12px; }
+.mm-usage-row { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-2); }
+.mm-usage-row .y10-field { grid-template-columns: 84px minmax(0, 1fr); align-items: center; gap: 10px; }
+.mm-usage-row .y10-field > span { white-space: nowrap; }
+.mm-usage-more { padding: 6px 10px; }
+.mm-usage-more summary { font-size: 12px; color: var(--muted); }
+
+/* 选择模型：候选在左，已选模型在右 */
+.mm-model-layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, .85fr); gap: 18px; align-items: start; }
+.mm-model-results { min-width: 0; }
+.mm-candidates { display: grid; gap: 10px; }
+.mm-search { padding: 6px 10px; }
+.mm-filters { align-self: start; }
+.mm-candidate-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.mm-candidate {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center;
+  padding: 9px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+}
+.mm-candidate.is-on { border-color: color-mix(in srgb, var(--green) 40%, var(--line)); background: var(--tint); }
+.mm-candidate-main { display: flex; align-items: flex-start; gap: 10px; min-width: 0; cursor: pointer; }
+.mm-check { margin: 3px 0 0; accent-color: var(--green); flex: none; }
+.mm-candidate-info { display: grid; gap: 2px; min-width: 0; }
+.mm-candidate-name { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+.mm-candidate-specs { color: var(--text); }
+.mm-candidate-state { color: var(--muted); white-space: nowrap; }
+.mm-candidate p { grid-column: 1 / -1; margin: 2px 0 0; }
+.mm-more { justify-self: start; }
+
+/* 已选模型清单 */
+.mm-selection { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.mm-selection .y10-h3 { margin: 0; display: flex; align-items: center; gap: 6px; }
+.mm-selection-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.mm-selection-item { display: grid; gap: 5px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.mm-selection-item.is-on { border-color: color-mix(in srgb, var(--green) 40%, var(--line)); }
+.mm-selection-head { justify-content: space-between; }
+.mm-selection-head strong { overflow-wrap: anywhere; }
+.mm-selection-status { margin: 0; }
+.mm-selection-item p { margin: 0; }
+.mm-capacity { display: grid; gap: 6px; }
+.mm-detail { font-size: 12.5px; }
+.mm-detail .y10-kv { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px 16px; margin-top: 8px; }
+.mm-detail dt { font-size: 11.5px; color: var(--muted); }
+.mm-detail dd { margin: 0; font-size: 12.5px; overflow-wrap: anywhere; }
+
+/* 高级 */
+.mm-advanced { margin-top: 18px; }
+.mm-advanced-body { display: grid; gap: 16px; }
+.mm-advanced-block { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); }
+.mm-advanced-block .y10-h3 { margin: 0; }
+.mm-advanced-model { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.mm-advanced-model .y10-h3 { margin: 0; font-size: 12.5px; }
+
 /* ---------------------------------------------------------------- 窄屏 */
 
 @media (max-width: 1100px) {
@@ -142,6 +222,7 @@ button.y10-chip:hover { border-color: var(--green); color: var(--green); backgro
   .y10-conn-count { grid-column: 2; grid-row: 1; }
   .y10-chevron { grid-column: 3; grid-row: 1; }
   .y10-grid-cred { grid-template-columns: minmax(0, 1fr); }
+  .mm-model-layout { grid-template-columns: minmax(0, 1fr); }
 }
 
 @media (max-width: 720px) {
