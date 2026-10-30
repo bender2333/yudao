@@ -61,3 +61,13 @@ def capability(preset_id: str, model: str) -> ModelCapability | None:
     # 按服务方案与上游模型 ID 查一条能力记录；自定义服务方案与未收录的模型返回 None
     index = _INDEX.get(str(preset_id))
     return None if index is None else index.get(str(model))
+
+
+def source_details(source: str, preset_id: str = "") -> dict[str, str]:
+    # 能力表的来源随预填值一起交回，后续扩大能力表时仍使用同一份来源合同。
+    detail = {"source": source}
+    if source == "capability_table":
+        preset = next((item for item in DEFINITIONS.service_presets.presets if item.id == preset_id), None)
+        detail.update(provider=preset.models_dev_id if preset is not None else preset_id,
+                      revision=CAPABILITY_TABLE_REVISION)
+    return detail

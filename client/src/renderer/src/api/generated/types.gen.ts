@@ -968,6 +968,100 @@ export type CatalogBinding = {
 };
 
 /**
+ * CatalogCandidate
+ */
+export type CatalogCandidate = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Protocol
+     */
+    protocol: string;
+    /**
+     * Protocol Source
+     */
+    protocol_source: string;
+    /**
+     * Context Window
+     */
+    context_window?: number | null;
+    /**
+     * Context Window Source
+     */
+    context_window_source?: string | null;
+    /**
+     * Max Output Tokens
+     */
+    max_output_tokens?: number | null;
+    /**
+     * Max Output Tokens Source
+     */
+    max_output_tokens_source?: string | null;
+    /**
+     * Input Modalities
+     */
+    input_modalities: Array<string>;
+    /**
+     * Input Modalities Source
+     */
+    input_modalities_source: string;
+    /**
+     * Output Modalities
+     */
+    output_modalities?: Array<string> | null;
+    /**
+     * Output Modalities Source
+     */
+    output_modalities_source?: string | null;
+    /**
+     * Provider
+     */
+    provider?: string | null;
+    /**
+     * Reasoning
+     */
+    reasoning?: boolean | null;
+    /**
+     * Reasoning Source
+     */
+    reasoning_source?: string;
+    /**
+     * Applicable
+     */
+    applicable?: boolean;
+    /**
+     * Applicable Source
+     */
+    applicable_source?: string;
+    /**
+     * Source Details
+     */
+    source_details?: {
+        [key: string]: CatalogCandidateSource;
+    };
+};
+
+/**
+ * CatalogCandidateSource
+ */
+export type CatalogCandidateSource = {
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Provider
+     */
+    provider?: string | null;
+    /**
+     * Revision
+     */
+    revision?: string | null;
+};
+
+/**
  * CatalogCandidatesCollect
  */
 export type CatalogCandidatesCollect = {
@@ -987,6 +1081,40 @@ export type CatalogCandidatesCollect = {
      * Models Url
      */
     models_url?: string | null;
+};
+
+/**
+ * CatalogCandidatesResult
+ */
+export type CatalogCandidatesResult = {
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Status
+     */
+    status: 'ok' | 'unknown';
+    /**
+     * Source Url
+     */
+    source_url: string;
+    /**
+     * Fetched At
+     */
+    fetched_at: string;
+    /**
+     * Candidates
+     */
+    candidates: Array<CatalogCandidate>;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
 };
 
 /**
@@ -1013,6 +1141,28 @@ export type CatalogCapabilityTable = {
             [key: string]: unknown;
         }>;
     };
+};
+
+/**
+ * CatalogConnect
+ */
+export type CatalogConnect = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Base Url
+     */
+    base_url: string;
+    /**
+     * Api Key
+     */
+    api_key?: string | null;
 };
 
 /**
@@ -1104,6 +1254,10 @@ export type CatalogCredential = {
      * Version
      */
     version: number;
+    /**
+     * Persisted
+     */
+    persisted?: boolean;
 };
 
 /**
@@ -1360,6 +1514,7 @@ export type CatalogProvider = {
      * Models
      */
     models: Array<CatalogModel>;
+    latest_candidates?: CatalogCandidatesResult | null;
 };
 
 /**
@@ -6972,6 +7127,10 @@ export type CatalogCandidatesCollectedPayload = {
      * Error
      */
     error: string | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
 };
 
 /**
@@ -7060,7 +7219,7 @@ export type CatalogRevisedPayload = {
     /**
      * Operation
      */
-    operation: 'save_connection' | 'delete_connection' | 'remove_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
+    operation: 'save_connection' | 'connect' | 'delete_connection' | 'remove_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
     /**
      * Provider Id
      */
@@ -17639,6 +17798,35 @@ export type CommandCatalogConnectionSaveResponses = {
 
 export type CommandCatalogConnectionSaveResponse = CommandCatalogConnectionSaveResponses[keyof CommandCatalogConnectionSaveResponses];
 
+export type CommandCatalogConnectData = {
+    body: CatalogConnect;
+    path?: never;
+    query?: never;
+    url: '/api/commands/catalog.connect';
+};
+
+export type CommandCatalogConnectErrors = {
+    /**
+     * 命令被拒绝，可能的原因：catalog_invalid, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandCatalogConnectError = CommandCatalogConnectErrors[keyof CommandCatalogConnectErrors];
+
+export type CommandCatalogConnectResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedCatalogConnectionSaveRefs;
+};
+
+export type CommandCatalogConnectResponse = CommandCatalogConnectResponses[keyof CommandCatalogConnectResponses];
+
 export type CommandCatalogConnectionDeleteData = {
     body: CatalogConnectionDelete;
     path?: never;
@@ -17648,7 +17836,7 @@ export type CommandCatalogConnectionDeleteData = {
 
 export type CommandCatalogConnectionDeleteErrors = {
     /**
-     * 命令被拒绝，可能的原因：stale_base, not_found, in_use, command_id_reused
+     * 命令被拒绝，可能的原因：stale_base, not_found, in_use, catalog_invalid, command_id_reused
      */
     409: Rejected;
     /**
