@@ -144,10 +144,12 @@ STOP_REASON_UPGRADE = "run_event_version_changed"
 PRIORITY_UPGRADE_RESTART = "upgrade_restart"
 PRIORITY_USER = "user"
 
-# 排空状态的三种取值：未排空、排空中（还有 run 在进行）、已排空可以升级
+# 排空状态的取值：未排空、排空中（还有 run 在进行）、已排空可以升级，以及强制升级以后的「已强制升级」
+# （工单 #1187）：最后一条排空相关的事件是「请求强制升级」时是这一种，下一次启动记下「排空已结束」以后回到未排空
 DRAIN_IDLE = "idle"
 DRAIN_DRAINING = "draining"
 DRAIN_READY = "ready"
+DRAIN_FORCED = "forced"
 
 # 排空与强制升级的事件种类：记在目录流中，是控制主机这一份部署的长期事实（ADR-0019）
 DRAIN_STARTED = "runtime_drain_started"
@@ -197,10 +199,20 @@ def classify_startup_runs(store: EventStore) -> StartupRuns:
     return StartupRuns(tuple(same), tuple(other), tuple(finished))
 
 @dataclass(frozen=True)
+class DrainRunning:
+    # 排空中还没有结束的 run 与它的事项标题（工单 #1187）：页面上按标题列出；找不到对应事项的 run
+    # （命令行直接建的 run）没有标题
+    run_id: str
+    title: str | None
+
+@dataclass(frozen=True)
 class DrainState:
-    # 排空状态：state 是未排空、排空中或已排空可以升级；version 是状态的版本，命令的基准版本与它记录在一起；
-    # running_runs 是还没有结束的 run 数，queued_work_items 是排空期间新建、还没有开始的事项数
+    # 排空状态：state 是未排空、排空中、已排空可以升级或已强制升级；version 是状态的版本，命令的基准版本与它记录在一起；
+    # running_runs 是还没有结束的 run 数，running 是这些 run 与事项标题；queued_work_items 是排空期间新建、
+    # 还没有开始的事项数；since 是这次排空的开始时间（来自「开始排空」事件），没有排空时为空
     state: str = DRAIN_IDLE
     version: int = 0
     running_runs: int = 0
     queued_work_items: int = 0
+    since: str | None = None
+    running: tuple[DrainRunning, ...] = ()

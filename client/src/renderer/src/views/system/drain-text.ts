@@ -21,6 +21,34 @@ export const DRAIN_CONFIRM_CONFIRM = "不再开始新事项";
 export const DRAIN_CONFIRM_CANCEL = "先不开始";
 
 /**
+ * 排空状态的中文名（工单 #1187，原型 v13 `js/ui/views/sys-runtime.js` 的 DRAIN_LABELS）：
+ * 未排空、排空中、已排空可以升级，以及强制升级以后的「已强制升级」。
+ * 计划的界面文字在这里，页面上不出现 idle、draining 这类取值。
+ */
+export const DRAIN_STATE_TEXT: Record<string, string> = {
+  idle: "未排空",
+  draining: "排空中",
+  ready: "已排空，可以升级",
+  forced: "已强制升级",
+};
+
+/** 强制升级确认框的标题（工单 #1187）：与开始排空一样，点下去以前要说清后果 */
+export const FORCE_UPGRADE_CONFIRM_TITLE = "让正在进行的 run 记为因升级停止？";
+
+/** 强制升级确认框里逐条写的后果与下一步 */
+export const FORCE_UPGRADE_CONFIRM_LINES: string[] = [
+  "确认以后，正在进行的 run 记为因升级停止，不再继续。",
+  "对应的事项用项目的起点重新开始（采纳成果；没有时是起始文件夹快照，都没有时是空树），并排在队列最前面。",
+  "这一步以后，这个实例处于「已强制升级」；装上新的版本重新启动，排空会解除。",
+];
+
+/** 强制升级确认框里那个真的做下去的按钮 */
+export const FORCE_UPGRADE_CONFIRM_CONFIRM = "确认强制升级";
+
+/** 强制升级确认框里那个不做的按钮 */
+export const FORCE_UPGRADE_CONFIRM_CANCEL = "先不升级";
+
+/**
  * 排空期间给用户看的一句提示：新的事项为什么没有开始，下一步做什么。
  * 没有排空时是空（页面上不出现这句话）。
  */

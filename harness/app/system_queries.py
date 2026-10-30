@@ -28,13 +28,22 @@ class CatalogState(Contract):
     revision: int
     reload_error: str | None
 
+class DrainRunning(Contract):
+    # 排空中还没有结束的 run 与它的事项标题（工单 #1187，设计说明第 4.3 节 2026-10-29 补充）：
+    # 页面按标题列出；找不到对应事项的 run（命令行直接建的 run）没有标题
+    run_id: str
+    title: str | None
+
 class DrainStatus(Contract):
-    # 排空状态（ADR-0019）：未排空、排空中或已排空可以升级；排空中的剩余 run 数与期间排队的事项数。
-    # version 是排空状态的版本，命令的基准版本与它记录在一起
-    state: Literal["idle", "draining", "ready"]
+    # 排空状态（ADR-0019）：未排空、排空中、已排空可以升级或已强制升级；排空中剩余 run 数与期间排队的事项数。
+    # version 是排空状态的版本，命令的基准版本与它记录在一起。since 是这次排空的开始时间（工单 #1187），
+    # running 是还没有结束的 run 与事项标题
+    state: Literal["idle", "draining", "ready", "forced"]
     version: int
     running_runs: int
     queued_work_items: int
+    since: str | None
+    running: list[DrainRunning]
 
 class HomeStatus(Contract):
     # 首页顶部的状态项（设计说明第 4.3 节「系统首页」，工单 #127）：待你决定的数量与磁盘可用空间。
@@ -100,7 +109,8 @@ def _system_status(application: Application, request: SystemStatusRequest) -> Sn
                                    message=readiness["message"]),
         catalog=CatalogState(revision=catalog["revision"], reload_error=catalog["reload_error"]),
         drain=DrainStatus(state=drain.state, version=drain.version, running_runs=drain.running_runs,
-                          queued_work_items=drain.queued_work_items),
+                          queued_work_items=drain.queued_work_items, since=drain.since,
+                          running=[DrainRunning(run_id=item.run_id, title=item.title) for item in drain.running]),
         recovery=recovery,
         home=HomeStatus(
             waiting_decisions=sum(1 for item in decisions if item.status == "open"),
@@ -126,7 +136,9 @@ SYSTEM_STATUS = QueryDefinition(
                 EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
                 EventType.ACTION_VERIFIED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
                 EventType.DECISION_WITHDRAWN, CatalogEventType.CATALOG_REVISED,
-                CatalogEventType.RUNTIME_DRAIN_STARTED, CatalogEventType.RUNTIME_DRAIN_FINISHED),
+                # 排空与强制升级（工单 #1187）：状态、开始时间与进行中的 run 都随它们改变
+                CatalogEventType.RUNTIME_DRAIN_STARTED, CatalogEventType.RUNTIME_DRAIN_FINISHED,
+                CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED),
     unchanged_by=_MODEL_PROCESS_EVENTS,
     replayable=True,
 )

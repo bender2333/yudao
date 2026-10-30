@@ -24,8 +24,8 @@ from .projects import ProjectService, project_projection
 from .providers import ProviderFacade
 from .tightening import WATCHED_OUTPUTS
 from .streams import (
-    DRAIN_DRAINING, DRAIN_FINISHED, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED,
-    DrainState, classify_startup_runs, last_drain_event,
+    DRAIN_DRAINING, DRAIN_FINISHED, DRAIN_FORCED, DRAIN_IDLE, DRAIN_READY, DRAIN_STARTED, FORCE_UPGRADE_REQUESTED,
+    DrainRunning, DrainState, classify_startup_runs, last_drain_event,
 )
 from .replay_check import verify_replay
 from .workspace import Workspace
@@ -213,16 +213,35 @@ class LoopSystem:
 
     @property
     def drain(self) -> DrainState:
-        # 排空状态：未排空、排空中（还有 run 在进行）、已排空可以升级；正在进行的 run 数与期间排队的事项数
-        # 排空在升级完成（换了版本）以后结束：最后一条排空事件是「排空已结束」时不再排空（工单 #731）
-        running = self.running_runs
-        last = last_drain_event(self.store.stream_events(catalog_stream()))
+        # 排空状态（工单 #1187）：未排空、排空中（还有 run 在进行）、已排空可以升级，以及强制升级以后的
+        # 「已强制升级」；带这次排空的开始时间与还没有结束的 run（与事项标题）。排空在升级完成（换了版本）
+        # 以后结束：最后一条排空相关的事件是「排空已结束」时不再排空（工单 #731）
+        running = self._running_runs()
+        events = [event for event in self.store.stream_events(catalog_stream())
+                  if event.type in (DRAIN_STARTED, DRAIN_FINISHED, FORCE_UPGRADE_REQUESTED)]
+        last = events[-1] if events else None
         if last is None or last.type == DRAIN_FINISHED:
-            return DrainState(state=DRAIN_IDLE, version=0, running_runs=running)
+            return DrainState(state=DRAIN_IDLE, version=0, running_runs=len(running), running=tuple(running))
         version = int(last.payload["version"])
-        state = DRAIN_READY if running == 0 else DRAIN_DRAINING
-        return DrainState(state=state, version=version, running_runs=running,
-                          queued_work_items=len(self._queued_work_items()))
+        started = [event for event in events if event.type == DRAIN_STARTED]
+        since = None if not started else started[-1].created_at
+        if last.type == FORCE_UPGRADE_REQUESTED:
+            state = DRAIN_FORCED
+        else:
+            state = DRAIN_READY if not running else DRAIN_DRAINING
+        return DrainState(state=state, version=version, running_runs=len(running),
+                          queued_work_items=len(self._queued_work_items()), since=since, running=tuple(running))
+
+    def _running_runs(self) -> list[DrainRunning]:
+        # 还没有结束的 run 与它的事项标题（工单 #1187）：标题取自项目投影；命令行直接建的 run 没有对应事项，
+        # 没有标题。排空的 run 数与页面上的列表都从这一处来，两处说的是同一批 run
+        unfinished = classify_startup_runs(self.store)
+        titles: dict[str, str] = {}
+        for project_id in self.store.list_project_ids():
+            for item in project_projection(self.store, self.artifacts, project_id, include_history=False).work_items:
+                titles.setdefault(item.run_id, item.title)
+        return [DrainRunning(run_id=run_id, title=titles.get(run_id))
+                for run_id in (*unfinished.same_version, *unfinished.other_version)]
 
     def finish_drain_on_startup(self) -> bool:
         # 排空在服务下一次启动时结束（工单 #731，应用层与接口层设计说明第 3.2 节「升级」）：
