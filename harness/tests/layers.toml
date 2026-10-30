@@ -146,6 +146,7 @@
 "test_provider_candidate_collection.py" = "integration"
 "test_provider_catalog.py" = "module"
 "test_provider_protocols.py" = "integration"
+"test_provider_model_test.py" = "integration"
 "test_provider_retry_engine.py" = "module"
 "test_provider_tls.py" = "integration"
 "test_providers_module.py" = "integration"

@@ -16,7 +16,7 @@ from harness.models import DEPARTMENTS
 from harness.runtime import LoopSystem
 from harness.smoke import run_smoke
 from harness.tests.helpers import delete_watched_file
-from harness.tests.protocol_helpers import serve, sse
+from harness.tests.protocol_helpers import model_test_responder, serve, sse
 
 KEY_A = "issue266-key-a"
 
@@ -24,7 +24,7 @@ def _event(kind: str, **payload: Any) -> str:
     return f"event: {kind}\ndata: {json.dumps({'type': kind, **payload}, ensure_ascii=False)}\n\n"
 
 def _text_reply(*, response_id: str, model: str, text: str) -> tuple[int, str, list[bytes]]:
-    # Responses 协议的最小回答：模型测试只要求拿到一次回应
+    # Responses 协议的文字回答，供 smoke 的真实请求使用。
     response = {
         "id": response_id, "object": "response", "created_at": 1, "status": "completed", "model": model,
         "output": [{"id": f"msg-{response_id}", "type": "message", "role": "assistant",
@@ -44,6 +44,8 @@ def _text_reply(*, response_id: str, model: str, text: str) -> tuple[int, str, l
 def _model_reply(model: str = "upstream-a"):
     def responder(body: dict[str, Any]) -> tuple[int, str, list[bytes]]:
         chosen = str(body.get("model") or model)
+        if body.get("tools"):
+            return model_test_responder(body, protocol="responses", actual_model=chosen)
         return _text_reply(response_id="ping", model=chosen, text="pong")
     return responder
 

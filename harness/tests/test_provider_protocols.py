@@ -21,6 +21,7 @@ from harness.tests.protocol_helpers import (
     invoke,
     messages_responder,
     model_call,
+    model_test_responder,
     preset_base_urls,
     provider_system,
     responses_responder,
@@ -122,7 +123,7 @@ def test_messages_wire_format_system_split_tool_round_trip_and_usage():
 
 def test_model_test_sends_reasoning_parameters_at_the_default_level():
     # 模型测试按该模型的默认档位发送推理参数（设计说明第 4.3、7.5 节）
-    server, capture, base = serve(chat_responder)
+    server, capture, base = serve(lambda body: model_test_responder(body, protocol="chat_completions"))
     try:
         facade = facade_with(base + "/v1", protocol="chat_completions",
                              reasoning_levels=["low", "medium"], default_reasoning_level="medium",
@@ -259,7 +260,7 @@ def test_concurrent_model_tests_of_one_model_both_admit():
         if not first_held.is_set():
             first_held.set()
             release.wait(60)
-        return responses_responder(body)
+        return model_test_responder(body, protocol="responses")
 
     server, capture, base = serve(gated)
     results: dict[str, dict] = {}
@@ -278,7 +279,7 @@ def test_concurrent_model_tests_of_one_model_both_admit():
         server.server_close()
     assert [results[key]["ok"] for key in ("first", "second")] == [True, True], results
     assert [results[key]["admitted"] for key in ("first", "second")] == [True, True]
-    assert len(capture.requests) == 2
+    assert len(capture.requests) == 6
     # 两次测试都通过，准入记录只有一份且与目录分开保存（工单 #86）
     stored = next(item for item in facade.model_admissions() if item["model_id"] == "m-go")
     assert stored["admitted_at"] is not None
@@ -537,9 +538,9 @@ def test_model_test_failure_writes_the_upstream_reason(protocol):
     finally:
         provider.close()
     assert failed["ok"] is False and failed["admitted"] is False
-    assert failed["error"] == denied_reason
+    assert denied_reason in failed["error"] and failed["failure_group"] == "minimal_qa"
     assert unauthorized["ok"] is False
-    assert unauthorized["error"] == "Model provider returned HTTP 401"
+    assert "401" in unauthorized["error"] and "credential-echoed-by-provider" not in unauthorized["error"]
 
 
 # 空输出（工单 #305）：流正常结束、没有任何可见输出项。结束原因按各协议自己的写法给出，

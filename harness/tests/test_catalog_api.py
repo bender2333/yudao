@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from harness.app.application import Application
 from harness.models import CatalogEventType
 from harness.tests.api_helpers import running_api
-from harness.tests.protocol_helpers import responses_responder, serve
+from harness.tests.protocol_helpers import model_test_responder, responses_responder, serve
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 模型目录与凭据的查询与命令：真实启动 FastAPI 应用，目录文件与 .env 是真实文件，事件日志是真实 SQLite；
@@ -276,7 +276,7 @@ def test_connection_save_accepts_the_reasoning_declaration(tmp_path):
         assert "default_reasoning_level" in rejected.text
 
 def test_model_test_admits_and_connection_test_does_not(tmp_path):
-    server, _capture, base = serve(responses_responder)
+    server, _capture, base = serve(lambda body: model_test_responder(body, protocol="responses"))
     # 连接测试读取模型列表地址：该连接没有地址时不提供连接测试，这里给出一份真实的上游
     with _models_server({"data": [{"id": "model-x"}]}) as models_url:
         try:

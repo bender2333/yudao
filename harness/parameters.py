@@ -70,6 +70,7 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "organization.ask_chain_max_depth": "",
 
     # 由 #1189 接入：现在读的是定义文件里的初值，参数事件改不了它
+    "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
     "tool_call_required_limit": "读的是定义文件里的初值（harness/engine.py 的 DEFINITIONS.rule_value），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
     "max_model_steps": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
     "max_provider_attempts": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",

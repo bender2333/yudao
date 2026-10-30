@@ -848,7 +848,7 @@ class ProviderFacade:
             }
 
     def model_test(self, provider_id: str, model_id: str) -> dict[str, Any]:
-        # 对某个模型访问定义发一次真实最小推理；通过且容量已确认才记录准入，失败不记录（工单 #86）
+        # 最小问答与工具往返都成功才准入；每次请求走正式协议路径并有独立等待上限。
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
             model = self._store.models.get(str(model_id))
@@ -860,26 +860,74 @@ class ProviderFacade:
                 [{"key": model.id, "provider_id": provider.id, "model_id": model.id}],
                 self._credentials,
             )
-        target = snapshot.target(model.id)
+        frozen = snapshot.target(model.id)
+        target = replace(frozen, timeout_sec=min(
+            frozen.timeout_sec, float(DEFINITIONS.rule_value("provider.model_test_timeout_sec"))))
         provider_input = to_provider_input(
             [{"role": "user", "content": "ping"}],
             max_output_tokens=model.max_output_tokens,
         )
         started = time.monotonic()
+        group, step = "minimal_qa", "request"
+        accepts_required = True
+        result: InvokeResult | None = None
         try:
             result = self._invoke_for_test(target, provider_input, model)
+            if model.protocol != "fake":
+                group, step = "tool_round_trip", "tool_call"
+                tool = {"type": "function", "name": "yudao_model_test",
+                        "description": "无副作用的模型接入测试工具，返回 pong。请调用一次。",
+                        "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}
+                prompt = {"role": "user", "content": "请调用 yudao_model_test，不需要参数。收到工具结果后回复。"}
+                tool_input = replace(to_provider_input([prompt], [tool],
+                                                       max_output_tokens=model.max_output_tokens),
+                                     tool_choice="required")
+                try:
+                    result = self._invoke_for_test(target, tool_input, model)
+                except ProviderError as exc:
+                    if not _required_tool_parameter_rejected(exc):
+                        raise
+                    accepts_required = False
+                    step = "tool_call_retry"
+                    result = self._invoke_for_test(target, replace(tool_input, tool_choice="auto"), model)
+                outputs = _model_test_tool_outputs(result)
+                step = "tool_result"
+                reasoning = [] if result.reasoning is None else result.reasoning.items
+                follow_up = replace(tool_input, tool_choice="auto", raw_request={
+                    "input": [prompt, *reasoning, *result.output, *outputs], "tools": [tool]})
+                result = self._invoke_for_test(target, follow_up, model)
         except ProviderError as exc:
             elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+            group_text = "最小问答" if group == "minimal_qa" else "工具往返"
+            step_text = {"request": "请求", "tool_call": "调用测试工具", "tool_call_retry": "不要求调用工具重试",
+                         "tool_result": "回传工具结果"}[step]
+            reason = (f"请求超时（等待上限 {target.timeout_sec:g} 秒）" if exc.reason == "provider_timeout"
+                      else _model_test_failure_reason(exc))
             return {
-                "ok": False, "error": _model_test_failure_reason(exc), "model": None, "admitted": False,
+                "ok": False, "error": f"{group_text} / {step_text}：{reason}",
+                "model": None if result is None else (result.actual_model or result.model or None), "admitted": False,
                 "protocol": model.protocol, "revision": self.revision,
                 "elapsed_ms": elapsed_ms, "usage_reported": False,
+                "accepts_required_tool_call": accepts_required,
+                "failure_group": group, "failure_step": step, "request_timeout_sec": target.timeout_sec,
             }
         elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
         actual = result.actual_model or result.model or None
         capacity_confirmed = model.context_window is not None and model.max_output_tokens is not None
         if capacity_confirmed:
-            self.record_admission(provider_id, model.id, admitted_model=actual)
+            with self._lock:
+                current = self._store.models[model.id]
+                if current.accepts_required_tool_call != accepts_required:
+                    previous = self.to_document()
+                    self.save_model(replace(current, accepts_required_tool_call=accepts_required).public_dict())
+                    persist_error = self.persist_catalog(previous)
+                    if persist_error is not None:
+                        return {"ok": False, "error": f"工具往返 / 保存测试能力：{persist_error}",
+                                "model": actual, "admitted": False, "protocol": model.protocol,
+                                "revision": self.revision, "elapsed_ms": elapsed_ms, "usage_reported": False,
+                                "accepts_required_tool_call": accepts_required, "failure_group": "tool_round_trip",
+                                "failure_step": "save_capability", "request_timeout_sec": target.timeout_sec}
+                self.record_admission(provider_id, model.id, admitted_model=actual)
         persisted, persist_error = self._persist_admissions()
         payload = {
             "ok": True,
@@ -891,6 +939,10 @@ class ProviderFacade:
             "elapsed_ms": elapsed_ms,
             "usage_reported": bool(result.usage.get("reported", False)),
             "persisted": persisted,
+            "accepts_required_tool_call": accepts_required,
+            "failure_group": None,
+            "failure_step": None,
+            "request_timeout_sec": target.timeout_sec,
         }
         if persist_error is not None:
             payload["persist_error"] = persist_error
@@ -1596,8 +1648,44 @@ def _admission_state_text(record: AdmissionRecord | None) -> str:
 def _model_test_failure_reason(error: ProviderError) -> str:
     # 模型测试失败时写上游给出的原因（设计说明第 9.1 节，工单 #294）：上游有错误原文时写原文，
     # 没有时照旧写状态码那句（401 与 403 不记回应体，见第 13.4 节）
+    status = (error.diagnostics or {}).get("status_code")
+    if status in {401, 403}:
+        return f"HTTP {status}：" + ("凭据无效" if status == 401 else "没有访问权限")
     message = (error.diagnostics or {}).get("error_message")
     return message if isinstance(message, str) and message.strip() else str(error)
+
+
+def _required_tool_parameter_rejected(error: ProviderError) -> bool:
+    # 只允许明确的 tool_choice 参数错误触发一次能力探测；不重试工具 schema、认证或服务故障。
+    details = error.diagnostics or {}
+    if details.get("status_code") not in {400, 422}:
+        return False
+    param = details.get("param")
+    if isinstance(param, str):
+        return param == "tool_choice" or param.startswith("tool_choice.")
+    message = str(details.get("error_message") or "").casefold()
+    return "tool_choice" in message and any(word in message for word in (
+        "unsupported", "not supported", "not allowed", "invalid", "unrecognized", "unknown",
+        "incompatible", "cannot", "may not", "不支持", "无效", "不能"))
+
+
+def _model_test_tool_outputs(result: InvokeResult) -> list[dict[str, Any]]:
+    calls = [item for item in result.output if item.get("type") == "function_call"]
+    if not calls:
+        raise ProviderError("模型没有调用测试工具", reason="provider_protocol")
+    outputs: list[dict[str, Any]] = []
+    for call in calls:
+        if call.get("name") != "yudao_model_test" or not call.get("call_id") \
+                or call.get("status", "completed") != "completed":
+            raise ProviderError("测试工具的调用不完整或工具名称不符", reason="provider_protocol")
+        try:
+            arguments = json.loads(call.get("arguments", ""))
+        except (TypeError, ValueError) as exc:
+            raise ProviderError("测试工具的参数不是完整的 JSON 对象", reason="provider_protocol") from exc
+        if arguments != {}:
+            raise ProviderError("测试工具只接受空参数对象", reason="provider_protocol")
+        outputs.append({"type": "function_call_output", "call_id": call["call_id"], "output": "pong"})
+    return outputs
 
 
 def _provider_dependents(store: ProviderStore, bindings: Mapping[str, Mapping[str, str]],

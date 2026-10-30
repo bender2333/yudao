@@ -31,3 +31,11 @@ def test_the_evaluation_run_limit_starts_at_120_minutes_and_has_no_consumer():
     assert not_wired_reason("evaluation.run_minutes")
 
 
+def test_model_test_request_timeout_matches_the_design():
+    # R2：模型测试的等待上限属于规则登记合同；参数事件尚未接入，接入说明如实声明初值消费者。
+    rule = DEFINITIONS.rule("provider.model_test_timeout_sec")
+    assert rule.value == 60 and list(rule.bounds) == [10, 300]
+    assert "模型测试" in rule.origin and "model-management.md" in rule.origin
+    assert not_wired_reason("provider.model_test_timeout_sec")
+
+
