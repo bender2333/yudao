@@ -785,10 +785,10 @@ class Orchestrator:
         self._run_segment_start.setdefault(run_id, time.monotonic())
 
     def _settle_run_segment(self, run_id: str, department: str | None = None) -> int:
-        # 激活结束：结算当前段，返回累计的已用毫秒：投影里已结算的那一部分加上停过表、投影还没有结算的那些段。
-        # 同时运行（工单 #557）：这个会话结束时别的会话还在工作，run 的计时继续，这一段不折进去
+        # 激活结束：把当前运行段也写入累计；还有其他会话工作时，提交以后从新的起点继续计时。
+        # 当前段必须在 _rebase_run_clock 重设起点以前结算，保留同时运行的会话已经用掉的时间。
         self._pause_run_clock(run_id, exclude=department)
-        return self.writes.minimal(run_stream(run_id)).used.settled_ms + self._run_segment_ms.get(run_id, 0)
+        return self._elapsed_ms(run_id)
 
     def _rebase_run_clock(self, run_id: str) -> None:
         # 一轮工作的累计量写进事件以后：已结算量改由投影给出，停过表的那些段清零；
