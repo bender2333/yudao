@@ -58,6 +58,7 @@ def running_server(open_application: Callable[[], Application], *,
     # pages 是页面文件目录；不给出时用一个不存在的目录，页面请求按「没有页面文件」回答。
     # data_dir 是令牌文件所在的数据目录，局域网访问方式按它校验访问令牌（第 6.3 节）。
     # disable_uvicorn_logging 交给真实的服务日志处理时用：日志写进数据目录里的日志文件
+    # http_protocol 让并发测试通过真实协议处理器发出关闭信号。
     server = uvicorn.Server(uvicorn.Config(
         create_app(open_application, registry=registry, access=access, keepalive_sec=keepalive_sec,
                    pages=RELEASE_ASSETS if pages is None else pages,
@@ -75,8 +76,11 @@ def running_server(open_application: Callable[[], Application], *,
             raise TimeoutError("the API server did not start")
         time.sleep(0.01)
     port = server.servers[0].sockets[0].getsockname()[1]
-    handle = RunningServer(httpx.Client(base_url=f"http://{connect or '127.0.0.1'}:{port}", timeout=30),
-                           server, port, thread)
+    # 测试在两次请求之间执行领域检查，耗时由调度决定；每次响应结束后释放空闲连接，
+    # 避免下一次请求选中连接之后，与服务的空闲关闭计时竞争。正在读取的事件流仍保持连接。
+    client = httpx.Client(base_url=f"http://{connect or '127.0.0.1'}:{port}", timeout=30,
+                          limits=httpx.Limits(max_keepalive_connections=0))
+    handle = RunningServer(client, server, port, thread)
     try:
         yield handle
     finally:
