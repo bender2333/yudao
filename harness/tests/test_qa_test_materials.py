@@ -99,6 +99,44 @@ def test_qa_writes_test_and_runs_check(tmp_path: Path) -> None:
     assert output.get("qa_tests_hash") == saved.payload["content_hash"]
     qa_sub = next(e for e in events if e.type == EventType.QA_SUBMITTED)
     assert qa_sub.payload["checks"][0]["qa_tests_hash"] == saved.payload["content_hash"]
+    # 逐条结论与放行记录里的三个数随放行载荷写进事实（工单 #151）：一条验收条件、可执行检验、通过
+    assert [item["criterion"] for item in qa_sub.payload["criteria"]] == ["AC1"]
+    assert qa_sub.payload["coverage"] == {"criteria_total": 1, "executable": 1, "covered": 1,
+                                          "coverage_ratio": 1.0, "model_reading": 0, "open": 0}
+    assert qa_sub.payload["open_criteria"] == []
+    # 说明工件的引用与逐条结论引用的检查回执输出工件都在
+    assert len(qa_sub.payload["evidence_refs"]) >= 2
+
+
+def test_a_review_that_misses_an_acceptance_criterion_is_rejected(tmp_path: Path) -> None:
+    # 产品 PRD 有两条验收条件，质检只写了一条：放行被拒绝并写明缺哪一条（工单 #151 验收第 4 条）
+    criteria_one = [{"criterion": "AC1", "method": "check", "result": "passed",
+                     "checks": ["smoke"], "trial_cases": [], "note": ""}]
+    criteria_both = [*criteria_one, {"criterion": "AC2", "method": "check", "result": "passed",
+                                     "checks": ["smoke"], "trial_cases": [], "note": ""}]
+
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
+        "product": [product_spec(acceptance=["prints the argument", "exits 0"])],
+        "engineering": [delivery_turn()],
+        "quality": [
+            review_turn("release", "only one criterion", checks={"smoke": 0}, criteria=criteria_one),
+            review_turn("release", "both criteria", checks={"smoke": 0}, criteria=criteria_both),
+        ],
+    }))
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)  # product
+    system.activate_once(run_id)  # engineering
+    system.activate_once(run_id)  # quality：缺一条验收条件，放行被拒绝
+    rejected = next(e for e in _events(system, run_id) if e.type == EventType.PROPOSAL_REJECTED)
+    errors = rejected.payload.get("errors", [])
+    assert any(error.get("field") == "criteria" and "AC2" in error.get("message", "") for error in errors), errors
+
+    # 下一步补齐两条验收条件：放行被接纳，两个数写进放行记录
+    projection = system.activate_once(run_id)
+    assert projection.status == "done", projection.stop_reason
+    qa_sub = next(e for e in _events(system, run_id) if e.type == EventType.QA_SUBMITTED)
+    assert [item["criterion"] for item in qa_sub.payload["criteria"]] == ["AC1", "AC2"]
+    assert qa_sub.payload["coverage"]["criteria_total"] == 2
 
 
 def test_next_session_has_saved_test_materials(tmp_path: Path) -> None:

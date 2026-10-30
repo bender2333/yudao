@@ -722,7 +722,7 @@
   "submit_review": {
     "kind": "host",
     "proposal": "qa_review",
-    "description": "Submit a QAReview. release requires quality-run host receipts with exit_code 0 on the current snapshot. Engineering receipts are not accepted as QA evidence. checks are check names. basis_delivery_spec_hash must equal the current effective DeliverySpec content_hash; a stale basis is rejected so the review cannot proceed against a superseded delivery.",
+    "description": "Submit a QAReview. criteria has one entry per acceptance criterion of the current ProductSpec (criterion is AC<position>, method is the verification method, result is passed, failed or unverified); the host rejects a review that misses a criterion, uses a method or result outside the closed sets, claims a passed executable criterion without a quality check receipt from this activation, or carries trial cases. release requires quality-run host receipts with exit_code 0 on the current snapshot, no failed criterion and every executable criterion passed; engineering receipts are not accepted as QA evidence. checks are check names. basis_delivery_spec_hash must equal the current effective DeliverySpec content_hash; a stale basis is rejected so the review cannot proceed against a superseded delivery.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -765,8 +765,65 @@
               "summary"
             ]
           }
-        }
-        ,
+        },
+        "criteria": {
+          "type": "array",
+          "description": "One entry per acceptance criterion of the current ProductSpec; criterion is AC<position> (1-based), method is how you verify it, result is passed, failed, or unverified",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion": {
+                "type": "string",
+                "description": "AC<position> of the acceptance criterion in the current ProductSpec"
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "check",
+                  "trial",
+                  "measure",
+                  "judgement",
+                  "human",
+                  "open"
+                ]
+              },
+              "result": {
+                "type": "string",
+                "enum": [
+                  "passed",
+                  "failed",
+                  "unverified"
+                ]
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Quality check names from this activation that support this criterion"
+              },
+              "trial_cases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Trial case ids; leave it empty (trial cases arrive with a later ticket)"
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "criterion",
+              "method",
+              "result"
+            ],
+            "additionalProperties": false
+          }
+        },
         "basis_delivery_spec_hash": {
           "type": [
             "string",
@@ -780,7 +837,8 @@
         "basis_delivery_spec_hash",
          "verdict",
          "rationale",
-         "checks"
+         "checks",
+         "criteria"
        ]
     }
   },

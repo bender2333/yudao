@@ -248,7 +248,8 @@ class SubmissionWriter:
             artifact["id"] = new_id("qa")
             ref = self.artifacts.put(run_id, "qa_evidence", artifact["rationale"], media_type="text/plain")
             environment.verify_tree(snapshot)
-            artifact["evidence_refs"] = [asdict(ref)]
+            # 说明工件的引用放在最前面，后面是逐条结论引用的检查回执输出工件（工单 #151）
+            artifact["evidence_refs"] = [asdict(ref), *artifact.get("evidence_refs", [])]
             artifact.update(acceptance_fields("qa_review", artifact, version=int(artifact["revision"]),
                                               ref=asdict(ref)))
             event = append(EventType.QA_SUBMITTED, artifact, [artifact["content_hash"], ref.content_hash])

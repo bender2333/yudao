@@ -29897,6 +29897,103 @@
         "title": "ProposalSubmittedPayload",
         "type": "object"
       },
+      "QaCoveragePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "criteria_total": {
+            "title": "Criteria Total",
+            "type": "integer"
+          },
+          "executable": {
+            "title": "Executable",
+            "type": "integer"
+          },
+          "covered": {
+            "title": "Covered",
+            "type": "integer"
+          },
+          "coverage_ratio": {
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
+          "model_reading": {
+            "title": "Model Reading",
+            "type": "integer"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "criteria_total",
+          "executable",
+          "covered",
+          "coverage_ratio",
+          "model_reading",
+          "open"
+        ],
+        "title": "QaCoveragePayload",
+        "type": "object"
+      },
+      "QaCriterionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "criterion": {
+            "title": "Criterion",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "check",
+              "trial",
+              "measure",
+              "judgement",
+              "human",
+              "open"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "passed",
+              "failed",
+              "unverified"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "trial_cases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trial Cases",
+            "type": "array"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion",
+          "method",
+          "result",
+          "checks",
+          "trial_cases",
+          "note"
+        ],
+        "title": "QaCriterionPayload",
+        "type": "object"
+      },
       "QaSubmittedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -30164,6 +30261,23 @@
             "title": "Defects",
             "type": "array"
           },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/QaCriterionPayload"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/QaCoveragePayload"
+          },
+          "open_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Open Criteria",
+            "type": "array"
+          },
           "evidence_refs": {
             "items": {
               "$ref": "#/components/schemas/ArtifactRef"
@@ -30222,6 +30336,9 @@
           "rationale",
           "checks",
           "defects",
+          "criteria",
+          "coverage",
+          "open_criteria",
           "evidence_refs",
           "kind",
           "issuer",
