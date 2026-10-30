@@ -15,7 +15,7 @@
 import type { AskView, DecisionView, EventObject, ProjectLoopResult, WorkItemLoop } from "../api/generated/types.gen.ts";
 import type {
   Artifact, BusyState, DecisionFace, FloorModel, ItemState, LoopItem, MachineView, OpenRequest, OpsView, PixelAction, RoleInfo,
-  WaitingProvider,
+  SourceRef, WaitingProvider,
 } from "../pixel/contract.ts";
 import { floorState as checkFloorState } from "../pixel/contract.ts";
 import { face } from "../views/decisions/card-logic.ts";
@@ -74,6 +74,33 @@ function itemState(row: WorkItemLoop): ItemState {
   return base === "working" && own === "asking" ? "asking" : base;
 }
 
+/**
+ * 楼层事实元素的中文名（工单 #398）：来源卡片与覆盖层「来源」按它显示。页面不出现内部标识，
+ * 六个元素与 project.loop 的 refs 的键一一对应（工单 #396）。
+ */
+export const FACT_LABELS: Readonly<Record<string, string>> = {
+  sign: "门牌",
+  round: "轮次",
+  elapsed: "已用时间",
+  parcel: "包裹",
+  stamp: "盖章",
+  box: "成果库的箱子",
+};
+
+/**
+ * 事项的事实元素与它们的来源（工单 #396 的 project.loop refs → 画面合同，工单 #398）：
+ * 每个元素给出它的事件位置与来源种类。没有来源的元素不出现在结果里，画面按缺来源处理
+ * （pixel/floor/render.ts 的 noSource），覆盖层「来源」据此标出。
+ */
+export function factRefs(row: WorkItemLoop): Record<string, SourceRef> {
+  const refs: Record<string, SourceRef> = {};
+  for (const key of Object.keys(FACT_LABELS)) {
+    const ref = row.refs?.[key];
+    if (ref) refs[key] = { position: ref.position, source: ref.source };
+  }
+  return refs;
+}
+
 function itemOf(row: WorkItemLoop, index: number): LoopItem {
   const departments: Record<string, BusyState> = {};
   for (const [dept, state] of Object.entries(row.departments ?? {})) {
@@ -81,6 +108,7 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     if (busy) departments[dept] = busy;
   }
   const status = itemState(row);
+  const refs = factRefs(row);
   return {
     id: row.work_item_id,
     work_item_id: row.work_item_id,
@@ -99,6 +127,8 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     queue_pos: undefined,
     waiting_provider_sec: undefined,
     ...(Object.keys(departments).length ? { departments } : {}),
+    // 事实元素与它们的来源（工单 #398）：来源卡片与覆盖层「来源」读它；没有来源的元素不在这里
+    ...(Object.keys(refs).length ? { refs } : {}),
   };
 }
 
