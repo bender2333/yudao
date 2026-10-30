@@ -32,6 +32,12 @@ def suggested_dotenv_key(ref: str) -> str:
     return suggested or "PROVIDER_KEY"
 
 
+def connection_credential_ref(provider_id: str) -> str:
+    # 一步连接按连接 ID 生成引用，非字母开头时使用 HOST_ 前缀（设计说明第 4.2 节）。
+    reference = re.sub(r"[^A-Za-z0-9]", "_", provider_id).upper() + "_KEY"
+    return reference if reference[0] in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" else "HOST_" + reference
+
+
 def dotenv_key_problem(ref: str) -> str | None:
     # 引用不能写进 .env 时的说明：写明规则并举一个合规的写法；可以用时返回空。
     # 保存之前按它拒绝，文件与内存都不动：Yudao 不写出自己读不回的 .env（工单 #1158）
@@ -122,6 +128,10 @@ class CredentialChain:
     def remove_dotenv_value(self, ref: str) -> bool:
         # 移除单个文件源值，返回是否确实存在
         return self._dotenv.pop(str(ref), None) is not None
+
+    def has_persisted(self, ref: str) -> bool:
+        material = self._dotenv.get(str(ref))
+        return material is not None and bool(material.secret.strip())
 
     def resolve(self, ref: str) -> CredentialMaterial | None:
         key = str(ref)

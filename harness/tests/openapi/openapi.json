@@ -923,6 +923,57 @@
         }
       }
     },
+    "/api/commands/catalog.connect": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "catalog.connect",
+        "operationId": "command_catalog_connect",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogConnect"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_CatalogConnectionSaveRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：catalog_invalid, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/catalog.connection.delete": {
       "post": {
         "tags": [
@@ -952,7 +1003,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：stale_base, not_found, in_use, command_id_reused",
+            "description": "命令被拒绝，可能的原因：stale_base, not_found, in_use, catalog_invalid, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -5471,6 +5522,193 @@
         ],
         "title": "CatalogBinding"
       },
+      "CatalogCandidate": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "protocol": {
+            "type": "string",
+            "title": "Protocol"
+          },
+          "protocol_source": {
+            "type": "string",
+            "title": "Protocol Source"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "context_window_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window Source"
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens"
+          },
+          "max_output_tokens_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens Source"
+          },
+          "input_modalities": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Input Modalities"
+          },
+          "input_modalities_source": {
+            "type": "string",
+            "title": "Input Modalities Source"
+          },
+          "output_modalities": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Modalities"
+          },
+          "output_modalities_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Modalities Source"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "reasoning": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reasoning"
+          },
+          "reasoning_source": {
+            "type": "string",
+            "title": "Reasoning Source",
+            "default": "default"
+          },
+          "applicable": {
+            "type": "boolean",
+            "title": "Applicable",
+            "default": true
+          },
+          "applicable_source": {
+            "type": "string",
+            "title": "Applicable Source",
+            "default": "default"
+          },
+          "source_details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CatalogCandidateSource"
+            },
+            "type": "object",
+            "title": "Source Details",
+            "default": {}
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "protocol",
+          "protocol_source",
+          "input_modalities",
+          "input_modalities_source"
+        ],
+        "title": "CatalogCandidate"
+      },
+      "CatalogCandidateSource": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source"
+        ],
+        "title": "CatalogCandidateSource"
+      },
       "CatalogCandidatesCollect": {
         "properties": {
           "command_id": {
@@ -5508,6 +5746,70 @@
         ],
         "title": "CatalogCandidatesCollect"
       },
+      "CatalogCandidatesResult": {
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "unknown"
+            ],
+            "title": "Status"
+          },
+          "source_url": {
+            "type": "string",
+            "title": "Source Url"
+          },
+          "fetched_at": {
+            "type": "string",
+            "title": "Fetched At"
+          },
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogCandidate"
+            },
+            "type": "array",
+            "title": "Candidates"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider_id",
+          "status",
+          "source_url",
+          "fetched_at",
+          "candidates",
+          "error"
+        ],
+        "title": "CatalogCandidatesResult"
+      },
       "CatalogCapabilityTable": {
         "properties": {
           "revision": {
@@ -5543,6 +5845,43 @@
           "presets"
         ],
         "title": "CatalogCapabilityTable"
+      },
+      "CatalogConnect": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "base_url": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Base Url"
+          },
+          "api_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Api Key"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "base_url"
+        ],
+        "title": "CatalogConnect"
       },
       "CatalogConnectionDelete": {
         "properties": {
@@ -5663,6 +6002,11 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "persisted": {
+            "type": "boolean",
+            "title": "Persisted",
+            "default": false
           }
         },
         "additionalProperties": false,
@@ -6041,6 +6385,16 @@
             },
             "type": "array",
             "title": "Models"
+          },
+          "latest_candidates": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogCandidatesResult"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -7261,7 +7615,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 7
+            "example": 8
           },
           "contract_digest": {
             "type": "string",
@@ -16175,6 +16529,17 @@
               }
             ],
             "title": "Error"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
           }
         },
         "required": [
@@ -16361,6 +16726,7 @@
           "operation": {
             "enum": [
               "save_connection",
+              "connect",
               "delete_connection",
               "remove_model",
               "save_document",

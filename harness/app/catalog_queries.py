@@ -29,6 +29,43 @@ class CatalogCredential(Contract):
     source: str
     has_override: bool
     version: int
+    persisted: bool = False
+
+
+class CatalogCandidateSource(Contract):
+    source: str
+    provider: str | None = None
+    revision: str | None = None
+
+
+class CatalogCandidate(Contract):
+    id: str
+    protocol: str
+    protocol_source: str
+    context_window: int | None = None
+    context_window_source: str | None = None
+    max_output_tokens: int | None = None
+    max_output_tokens_source: str | None = None
+    input_modalities: list[str]
+    input_modalities_source: str
+    output_modalities: list[str] | None = None
+    output_modalities_source: str | None = None
+    provider: str | None = None
+    reasoning: bool | None = None
+    reasoning_source: str = "default"
+    applicable: bool = True
+    applicable_source: str = "default"
+    source_details: dict[str, CatalogCandidateSource] = {}
+
+
+class CatalogCandidatesResult(Contract):
+    provider_id: str
+    status: Literal["ok", "unknown"]
+    source_url: str
+    fetched_at: str
+    candidates: list[CatalogCandidate]
+    error: str | None
+    reason: str | None = None
 
 
 class CatalogModel(Contract):
@@ -72,6 +109,7 @@ class CatalogProvider(Contract):
     credential: CatalogCredential
     credential_configured: bool
     models: list[CatalogModel]
+    latest_candidates: CatalogCandidatesResult | None = None
 
 
 class CatalogBinding(Contract):
@@ -191,6 +229,7 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
         providers.append(CatalogProvider.model_validate({
             **item, "credential": credential,
             "models": [_model(model) for model in item["models"]],
+            "latest_candidates": facade.latest_candidates(item["id"]),
         }))
     presets = facade.presets_public_view()
     table = capabilities.table_public()

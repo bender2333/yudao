@@ -1391,7 +1391,7 @@ class CatalogRevisedPayload(Payload):
     # base_revision 是这次变化依据的修订号：命令写提交时用户看到的修订号，外部修改与启动补写取变化前的修订号
     revision: int
     base_revision: int | None
-    operation: Literal["save_connection", "delete_connection", "remove_model", "save_document",
+    operation: Literal["save_connection", "connect", "delete_connection", "remove_model", "save_document",
                        "department_defaults", "reload", "startup"]
     provider_id: str | None
     # 部门默认保存以后各部门的建议能力提醒（设计说明第 5.6 节）；其他操作为空
@@ -1410,6 +1410,8 @@ class CatalogCandidatesCollectedPayload(Payload):
     candidates: list[dict[str, Any]]
     candidate_ids: list[str]
     error: str | None
+    # 可判定的获取失败类别；旧事件没有这一项时仍然可以读取。
+    reason: str | None = None
 
 
 class CatalogTestFinishedPayload(Payload):

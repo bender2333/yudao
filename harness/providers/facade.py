@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import hashlib
 import json
 import os
@@ -12,10 +13,11 @@ from contextlib import aclosing
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from .call import CallUsage, ModelCall, ModelResponse, ModelStreamEvent
-from .credentials import CredentialChain, CredentialMaterial, dotenv_key_problem
+from .credentials import CredentialChain, CredentialMaterial, connection_credential_ref, dotenv_key_problem
 from .discovery import effective_models_url, probe_connection as _probe_connection
 from .discovery import refresh_candidates as _refresh_candidates
 from .errors import CatalogValidationError, ProviderError, ValidationIssue
@@ -103,6 +105,8 @@ class ProviderFacade:
         self._watch_interval_sec = 1.0
         # 凭据版本：每次被接受的凭据命令推进，供基准版本核对；只在本次进程内累计
         self._credential_versions: dict[str, int] = {}
+        # 最近获取的候选只在本次服务进程内存在，目录文件与重启都不恢复它。
+        self._candidate_results: dict[str, dict[str, Any]] = {}
         # 目录文件被外部修改并发布以后的回调，由系统装配登记（写入口据它补写 catalog_revised）
         self._reload_listener: Callable[[], None] | None = None
         # 启动方式：normal 拒绝 fake 连接，test 与 demo 放行（工单 #86）
@@ -417,6 +421,46 @@ class ProviderFacade:
             self._publish()
             return self._revision
 
+    def connect(self, base_url: str, api_key: str | None = None) -> dict[str, Any]:
+        # 先校验完整连接，再写入 Key；凭据文件写入失败时目录、凭据内存与版本都不改变。
+        address = _normalized_connection_url(base_url)
+        with self._lock:
+            previous = self.to_document()
+            existing = next((provider for provider in self._store.providers.values()
+                             if provider.base_url and _normalized_connection_url(provider.base_url) == address), None)
+            if existing is not None:
+                provider = {**existing.public_dict(), "base_url": address}
+                if not provider["credential_ref"]:
+                    provider["credential_ref"] = connection_credential_ref(existing.id)
+            else:
+                host = urlsplit(address).hostname
+                assert host is not None
+                # IPv6 的主机名以冒号开头，目录 ID 使用可读且符合既有标识符规则的形式。
+                stem = host.strip(":")
+                names = {item.name for item in self._store.providers.values()}
+                references = {item.credential_ref for item in self._store.providers.values()}
+                identifier, number = stem, 2
+                while (identifier in self._store.providers or identifier in names or
+                       connection_credential_ref(identifier) in references):
+                    identifier = f"{stem}-{number}"
+                    number += 1
+                preset_id = next((preset["id"] for preset in list_presets()
+                                  if any(_normalized_connection_url(value) == address
+                                         for value in preset["base_urls"].values())), "")
+                provider = {"id": identifier, "name": identifier, "base_url": address,
+                            "credential_ref": connection_credential_ref(identifier), "preset_id": preset_id}
+            provider_id = provider["id"]
+            merged = {**previous, "providers": [item for item in previous["providers"]
+                                                if item["id"] != provider_id] + [provider]}
+            _parse_document(merged, self._startup_mode)
+            credential = None
+            if api_key is not None:
+                credential = self.set_credential(provider["credential_ref"], api_key, persist=True)
+            elif existing is None or not self._resolve_api_key(existing):
+                raise CatalogValidationError((ValidationIssue("credentials.secret", "请填写 API Key"),))
+            self.save_provider_entry(provider)
+            return {"provider_id": provider_id, "credential": credential}
+
     def delete_provider(self, provider_id: str,
                         extra_referrers: Sequence[str] = ()) -> int:
         # 删除 Provider 配置：其下的模型访问定义一并删除（定义本身不算引用方）；
@@ -438,7 +482,12 @@ class ProviderFacade:
                       if self._store.models[name].provider_id != key]
             candidate = ProviderStore.from_dict({"providers": providers, "models": models})
             candidate.revision = self._store.revision + 1
+            reference = self._store.providers[key].credential_ref
+            if reference and self._dotenv_path is not None:
+                self.remove_persisted_credential(reference)
+                self._credentials.clear_override(reference)
             self._store = candidate
+            self._candidate_results.pop(key, None)
             self._bindings = {name: dict(value) for name, value in self._bindings.items()}
             self._publish()
             return self._revision
@@ -489,7 +538,7 @@ class ProviderFacade:
         with self._lock:
             try:
                 data = target.read_text(encoding="utf-8")
-            except OSError:
+            except FileNotFoundError:
                 self._credentials.remove_dotenv_value(key)
                 return {**self._credentials.describe(key), "removed": False}
             parsed = _parse_dotenv_or_raise(data)
@@ -509,6 +558,7 @@ class ProviderFacade:
         with self._lock:
             status: dict[str, Any] = dict(self._credentials.describe(ref))
             status["version"] = self._credential_versions.get(str(ref), 0)
+            status["persisted"] = self._credentials.has_persisted(ref)
             return status
 
     def set_credential(self, ref: str, secret: str, *, persist: bool) -> dict[str, Any]:
@@ -789,14 +839,23 @@ class ProviderFacade:
 
     def refresh_candidates(self, provider_id: str,
                            *, models_url_override: str | None = None) -> dict[str, Any]:
-        # 显式刷新候选：按连接协议的认证方式带上凭据，结果只服务本次会话，不落盘、不自动绑定
+        # 显式刷新候选：按服务方案认证，最近结果供查询读取，不落盘、不自动绑定。
         with self._lock:
             provider = self._store.providers.get(str(provider_id))
             if provider is None:
                 raise CatalogValidationError((ValidationIssue(
                     f"providers.{provider_id}", "Provider 配置不存在"),))
             api_key = self._resolve_api_key(provider)
-        return _refresh_candidates(provider, models_url_override=models_url_override, api_key=api_key)
+        result = _refresh_candidates(provider, models_url_override=models_url_override, api_key=api_key,
+                                     timeout_sec=min(provider.timeout_sec, 30.0))
+        with self._lock:
+            if self._store.providers.get(provider.id) == provider:
+                self._candidate_results[provider.id] = copy.deepcopy(result)
+        return result
+
+    def latest_candidates(self, provider_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            return copy.deepcopy(self._candidate_results.get(str(provider_id)))
 
     def models_url_of(self, provider_id: str, models_url_override: str | None = None) -> str:
         # 这次请求实际读取的模型列表地址：覆盖值、已保存值、预置表地址，最后是自定义默认值
@@ -1768,6 +1827,23 @@ def _readiness_message(exc: CatalogValidationError, store: ProviderStore,
     return "；".join(parts) if parts else str(exc)
 
 
+def _normalized_connection_url(value: str) -> str:
+    text = value.strip()
+    if "://" not in text:
+        text = "https://" + text
+    try:
+        parsed = urlsplit(text)
+        host, port = parsed.hostname, parsed.port
+        if parsed.scheme not in ("http", "https") or not host or parsed.username is not None or parsed.password is not None:
+            raise ValueError("必须是 HTTP(S) 服务地址且不能携带凭据")
+        authority = f"[{host.lower()}]" if ":" in host else host.lower()
+        if port is not None:
+            authority += f":{port}"
+        return urlunsplit((parsed.scheme, authority, parsed.path.rstrip("/"), parsed.query, parsed.fragment))
+    except ValueError as exc:
+        raise CatalogValidationError((ValidationIssue("providers.base_url", str(exc)),)) from exc
+
+
 def _parse_dotenv_or_raise(text: str) -> dict[str, str]:
     from .credentials import parse_dotenv_text
     return parse_dotenv_text(text)
@@ -1776,7 +1852,7 @@ def _parse_dotenv_or_raise(text: str) -> dict[str, str]:
 def _read_dotenv_strict(path: Path) -> dict[str, str]:
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
+    except FileNotFoundError:
         return {}
     return _parse_dotenv_or_raise(text)
 
@@ -1804,16 +1880,11 @@ def _atomic_write_dotenv(path: Path, data: Mapping[str, str]) -> Path:
 
 def _write_dotenv_payload(path: Path, payload: str) -> Path:
     # 原子替换写 .env：临时文件同目录创建，成功才替换；保持文件权限语义，
-    # 已有文件沿用原权限，新文件使用用户私有权限；Windows 下 ACL 由目录继承，
+    # POSIX 上每次保存都使用用户私有权限；Windows 下 ACL 由目录继承，
     # 不把数字模式当成权限已受保护的证明
     parent = path.parent
     if str(parent) not in ("", "."):
         parent.mkdir(parents=True, exist_ok=True)
-    existing_mode = None
-    try:
-        existing_mode = path.stat().st_mode & 0o777
-    except OSError:
-        existing_mode = None
     fd, tmp_name = tempfile.mkstemp(dir=str(parent) if str(parent) not in ("", ".") else None,
                                      prefix=path.name + ".", suffix=".tmp")
     try:
@@ -1821,16 +1892,8 @@ def _write_dotenv_payload(path: Path, payload: str) -> Path:
             handle.write(payload)
             handle.flush()
             os.fsync(handle.fileno())
-        if existing_mode is not None:
-            try:
-                os.chmod(tmp_name, existing_mode)
-            except OSError:
-                pass
-        elif os.name == "posix":
-            try:
-                os.chmod(tmp_name, 0o600)
-            except OSError:
-                pass
+        if os.name == "posix":
+            os.chmod(tmp_name, 0o600)
         os.replace(tmp_name, path)
     except Exception:
         try:
