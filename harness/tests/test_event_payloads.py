@@ -146,6 +146,12 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     projects.record_material(project_id, "一段原文", department="product")
     projects.record_material(project_id, "不属于部门的原文")
     projects.configure_source_directory(project_id, "src", "C:/repo/src", base_version=0)
+    # 项目设置里的 MCP 服务器（工单 #236）：保存写入项目流事件，载荷只有非秘密设置与凭据引用
+    projects.configure_mcp_servers(project_id, {"time": {
+        "name": "time", "transport": "stdio", "command": "uvx", "args": ["mcp-server-time"],
+        "departments": ["product", "engineering", "quality"],
+        "env": {"API_KEY": {"kind": "credential", "credential_ref": "MCP_TIME_KEY"}},
+    }}, base_version=0)
     projects.archive(project_id)
     projects.restore(project_id)
     projects.set_parameter(project_id, "check_timeout_sec", 300, reason="核对载荷", modified_by="user:test")

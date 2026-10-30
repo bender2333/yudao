@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Sequence
 from copy import deepcopy
 from dataclasses import asdict, dataclass
@@ -13,6 +14,7 @@ from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
 from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
+from .kernel_events import canonical_hash
 from .materials import save_text_material
 from .models import (
     ArtifactRef,
@@ -30,6 +32,7 @@ from .project_projection import (
     DepartmentSetting,
     HeldCandidate,
     InitialPrdCandidate,
+    McpServersConfig,
     ProjectProjection,
     SourceDirectory,
     WorkItem,
@@ -38,6 +41,7 @@ from .project_projection import (
 )
 from .projection import RunNotFoundError, project_run, replay_run
 from .providers.selection import ModelSelection
+from .providers.credentials import is_dotenv_key
 from .write_path import NewProjectEvent, Transaction, WritePath
 from .snapshot import ingest_snapshot
 from .decisions import INITIAL_PRD, KERNEL_MODIFICATION
@@ -86,6 +90,17 @@ class SourceDirectoryConflict(Exception):
         self.current = current
 
 
+class McpServersConflict(Exception):
+    """MCP 服务器设置的版本过期（工单 #236）；`current` 是当前设置的读取体，提示重新读取以后提交。"""
+    def __init__(self, current: dict[str, Any]) -> None:
+        super().__init__("mcp servers changed since base_version")
+        self.current = current
+
+
+class McpServersInvalid(ValueError):
+    """MCP 服务器设置的字段错误（工单 #236）：文字写明是哪一项、要求是什么。"""
+
+
 def _adoption_payload(delivery: Any, release: Any, run: Any, item: WorkItem) -> dict[str, Any]:
     # 采纳交付的载荷（工单 #354）：照常采纳与批准以后采纳写的是同一份内容，由结算与被批准的请求共用
     return {
@@ -97,6 +112,134 @@ def _adoption_payload(delivery: Any, release: Any, run: Any, item: WorkItem) -> 
         # 批准时按批准当时的当前采纳重写：请求可能等了很久，此刻的值才是对的
         "previous_adoption_id": None,
     }
+
+
+# ---------------------------------------------------------------------------
+# MCP 服务器设置（工单 #236，网络与 MCP 设计说明第 4.1 至 4.4 节）
+#
+# 设置里只写凭据名称（凭据值按现有的边界，由调用时读取的凭据来源解析）；
+# 校验只认非秘密字段。整份设置一个版本，保存经 mcp_servers.save 带基准版本，
+# 过期时拒绝并提示重新读取。
+
+MCP_SERVER_NAME_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+MCP_DEFAULT_STARTUP_TIMEOUT_SEC = 60
+MCP_DEFAULT_CALL_TIMEOUT_SEC = 120
+MCP_DEFAULT_OUTPUT_LIMIT = 20000
+MCP_OUTPUT_LIMIT_DEFAULTS = {
+    "startup_timeout_sec": MCP_DEFAULT_STARTUP_TIMEOUT_SEC,
+    "call_timeout_sec": MCP_DEFAULT_CALL_TIMEOUT_SEC,
+    "output_limit": MCP_DEFAULT_OUTPUT_LIMIT,
+}
+
+
+def _mcp_field_error(message: str) -> None:
+    raise McpServersInvalid(message)
+
+
+def _mcp_require_text(name: str, value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        _mcp_field_error(f"「{name}」不能为空")
+    return value
+
+
+def _mcp_variable(entry: Any, *, where: str) -> dict[str, Any]:
+    # 一个环境变量或请求头的值：固定文本，或凭据名称（设计说明第 4.1 节「变量与请求头的值」）
+    if not isinstance(entry, dict):
+        _mcp_field_error(f"「{where}」的值必须是对象：{{\"kind\": \"text\" 或 \"credential\", ...}}")
+    kind = str(entry.get("kind") or "")
+    if kind == "text":
+        return {"kind": "text", "value": _mcp_require_text(f"{where} 的固定文本", entry.get("value")),
+                "credential_ref": ""}
+    if kind == "credential":
+        ref = _mcp_require_text(f"{where} 的凭据名称", entry.get("credential_ref"))
+        if not is_dotenv_key(ref):
+            _mcp_field_error(f"「{where}」的凭据名称 {ref} 不能作为凭据引用："
+                             f"字母、数字与下划线，不以数字开头")
+        return {"kind": "credential", "value": "", "credential_ref": ref}
+    _mcp_field_error(f"「{where}」的取值方式必须是「固定文本」或「凭据名称」")
+
+
+def _mcp_server_document(name: str, server: Any) -> dict[str, Any]:
+    # 校验一台服务器的非秘密设置（设计说明第 4.1 节的表），返回事件里保存的形状
+    if not isinstance(server, dict):
+        _mcp_field_error("每台服务器的设置必须是一个对象")
+    server_name = _mcp_require_text("名称", server.get("name"))
+    if not MCP_SERVER_NAME_PATTERN.fullmatch(server_name):
+        _mcp_field_error(f"「{server_name}」的名称只能用小写字母、数字与连字符，并以字母或数字开头")
+    transport = str(server.get("transport") or "")
+    if transport not in ("stdio", "http"):
+        _mcp_field_error(f"「{server_name}」的传输必须是 stdio 或 http（streamable HTTP）")
+    departments = server.get("departments")
+    if not isinstance(departments, list) or not departments or any(d not in DEPARTMENTS for d in departments):
+        _mcp_field_error(f"「{server_name}」的可以使用的部门必须是部门清单的非空子集")
+    document: dict[str, Any] = {
+        "name": server_name,
+        "transport": transport,
+        "departments": [str(d) for d in departments],
+        **MCP_OUTPUT_LIMIT_DEFAULTS,
+    }
+    for key in ("startup_timeout_sec", "call_timeout_sec", "output_limit"):
+        value = server.get(key)
+        if value is not None and (not isinstance(value, int) or isinstance(value, bool) or value < 1):
+            _mcp_field_error(f"「{server_name}」的 {key} 必须是不小于 1 的整数")
+        document[key] = MCP_OUTPUT_LIMIT_DEFAULTS[key] if value is None else int(value)
+    if transport == "stdio":
+        document["command"] = _mcp_require_text(f"{server_name} 的命令", server.get("command"))
+        args = server.get("args")
+        if args is None:
+            args = []
+        if not isinstance(args, list) or any(not isinstance(a, str) for a in args):
+            _mcp_field_error(f"「{server_name}」的参数必须是字符串清单")
+        document["args"] = [str(a) for a in args]
+        env = server.get("env")
+        if env is not None and not isinstance(env, dict):
+            _mcp_field_error(f"「{server_name}」的环境变量必须是对象")
+        document["env"] = {str(key): _mcp_variable(entry, where=f"{server_name} 的环境变量 {key}")
+                           for key, entry in (env or {}).items()} if isinstance(env, dict) else {}
+    else:
+        url = _mcp_require_text(f"{server_name} 的地址", server.get("url"))
+        if not url.startswith(("http://", "https://")):
+            _mcp_field_error(f"「{server_name}」的地址必须是 http 或 https")
+        document["url"] = url
+        headers = server.get("headers")
+        if headers is not None and not isinstance(headers, dict):
+            _mcp_field_error(f"「{server_name}」的请求头必须是对象")
+        document["headers"] = {str(key): _mcp_variable(entry, where=f"{server_name} 的请求头 {key}")
+                               for key, entry in headers.items()} if isinstance(headers, dict) else {}
+    document["config_digest"] = _mcp_server_digest(document)
+    # 可选的工具清单快照（设计说明第 4.2 节）：必须带与本台服务器配置一致的摘要，
+    # 配置改变后旧快照不可继续使用；保存未探测的配置允许，快照缺省为没有
+    snapshot = server.get("tool_snapshot")
+    if snapshot is not None:
+        if not isinstance(snapshot, dict) or "tools" not in snapshot:
+            _mcp_field_error(f"「{server_name}」的工具清单快照必须带工具清单")
+        if snapshot.get("config_digest") != document["config_digest"]:
+            _mcp_field_error(f"「{server_name}」的工具清单快照带的配置摘要与本台服务器的配置不一致："
+                             f"配置已经改变，旧快照不能继续使用，请重新读取工具清单")
+    document["tool_snapshot"] = snapshot
+    return document
+
+
+def _mcp_server_digest(server: dict[str, Any]) -> str:
+    # 一台服务器配置的内容摘要：工具清单快照与它绑定（设计说明第 4.2 节），只取配置内容本身
+    payload = {key: value for key, value in server.items() if key != "tool_snapshot"}
+    return canonical_hash(payload)
+
+
+def normalize_mcp_servers(servers: dict[str, Any]) -> dict[str, Any]:
+    # 保存命令接受的服务器清单：按名称校验、按字母序保存；同一清单里重名时报告后一个。
+    # 探测（后续工单）按同一个函数归一化同一份配置，才能得到与保存一致的配置摘要
+    checked: dict[str, dict[str, Any]] = {}
+    for name, server in servers.items():
+        if name in checked:
+            _mcp_field_error(f"同一份设置里有两台名为「{name}」的服务器")
+        checked[name] = _mcp_server_document(str(name), server)
+    return {"servers": dict(sorted(checked.items()))}
+
+
+def mcp_document_digest(document: dict[str, Any]) -> str:
+    # 一份非秘密设置文档的摘要：事项冻结与 run_created 记的是同一份，按摘要核对
+    return canonical_hash({"servers": document["servers"]})
 
 
 def project_projection(store: EventStore, artifacts: ArtifactStore, project_id: str, *,
@@ -735,12 +878,18 @@ class ProjectService:
                            priority: str = PRIORITY_USER, kind: str = "change",
                            round: int | None = None, onboarding_basis: dict[str, Any] | None = None,
                            additional_input: str | None = None,
-                           restarted_from_run_id: str | None = None) -> _NewWorkItem:
+                           restarted_from_run_id: str | None = None,
+                           mcp_servers: dict[str, Any] | None = None) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
         prompt_config_versions = {department: project.department_settings[department].version
                                   for department in DEPARTMENTS}
+        # MCP 服务器设置在事项创建时冻结（工单 #236，设计说明第 4.3 节）：事项创建事实带上当时的
+        # 非秘密设置与凭据引用；因升级重新开始的事项沿用原事项冻结的那份（不给时取项目当前设置）。
+        # 还没有保存过 MCP 设置的事项不带这个字段，按空设置读取
+        frozen_mcp = (deepcopy(mcp_servers) if mcp_servers is not None
+                      else project.mcp_servers.frozen_document())
         context_text = project_context_text(project, title, source_run)
         # 项目上下文是该 run 的模型输入，按 run 作用域存放；内核创建 run 时会写出同一份工件。
         context_ref = self.artifacts.put(run_id, "project_context", context_text, media_type="text/markdown")
@@ -755,6 +904,8 @@ class ProjectService:
             "kind": kind,
             # 因升级重新开始的事项记下它从哪一个旧 run 重新开始（工单 #1186）；其余事项不写这个字段
             **({} if restarted_from_run_id is None else {"restarted_from_run_id": restarted_from_run_id}),
+            # 事项创建时冻结的 MCP 服务器设置（工单 #236）；没有设置过时不写这个字段
+            **({} if frozen_mcp is None else {"mcp_servers": frozen_mcp}),
         }, actor="user:local"))
         return _NewWorkItem(
             work_item_id=work_item_id, run_id=run_id, text=text,
@@ -765,6 +916,7 @@ class ProjectService:
                 prompt_config_versions=prompt_config_versions, kind=kind,
                 round=(1 if kind == "onboarding" else 0) if round is None else round,
                 onboarding_basis=onboarding_basis, additional_input=additional_input,
+                mcp_servers=frozen_mcp,
             ),
         )
 
@@ -801,6 +953,8 @@ class ProjectService:
                 source_run=point.source_run,
                 work_item_id=new_id("wi"), run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
                 restarted_from_run_id=run_id,
+                # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
+                mcp_servers=item.mcp_servers,
             )
 
         created = self.writes.transact(project_stream(run.project_id), restart, command=command)
@@ -839,6 +993,8 @@ class ProjectService:
             work_item_id=item.work_item_id, run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
             kind="onboarding", round=prior.round, onboarding_basis=basis, additional_input=note,
             restarted_from_run_id=run_id,
+            # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
+            mcp_servers=item.mcp_servers,
         )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
@@ -1002,6 +1158,9 @@ class ProjectService:
                         ArtifactRef(**item.project_context_ref)).decode("utf-8"),
                     prompt_config_versions=dict(item.prompt_config_versions),
                     item_definitions_version=item_definitions_version or DEFINITIONS.version,
+                    # 补建只读 work_item_created 里冻结的 MCP 服务器设置（工单 #236）：
+                    # 不取项目当前设置，旧事件没有这个字段时为空，按空设置读取
+                    mcp_servers=item.mcp_servers,
                 )
                 created.append(item.run_id)
         return created
@@ -1292,6 +1451,35 @@ class ProjectService:
             raise ValueError(f"unknown source directory: {name}")
         return _source_directory_view(directory)
 
+    # MCP 服务器设置（工单 #236）
+
+    def configure_mcp_servers(self, project_id: str, servers: dict[str, Any], *, base_version: int,
+                              command: Command | None = None) -> dict[str, Any]:
+        # 保存项目设置里的 MCP 服务器（网络与 MCP 设计说明第 4.3 节）：整份设置一个版本，
+        # 基准版本是当前设置的版本（第一次保存为 0），不相等时拒绝并返回当前版本，提示重新读取。
+        # 保存只写非秘密设置与凭据引用：凭据值按现有的边界由调用时的凭据来源解析，不进入事件
+        if type(base_version) is not int or base_version < 0:
+            raise ValueError("base_version must be a non-negative integer")
+        if not isinstance(servers, dict):
+            raise McpServersInvalid("MCP 服务器设置必须是一个对象：名称到服务器设置")
+        document = normalize_mcp_servers(servers)
+
+        def configure(transaction: Transaction) -> None:
+            project = self._writable_in(transaction, project_id)
+            current = project.mcp_servers
+            if base_version != current.version:
+                raise McpServersConflict(_mcp_settings_view(current))
+            payload = {**document, "version": current.version + 1, "base_version": base_version,
+                       "document_digest": mcp_document_digest(document)}
+            transaction.append(NewProjectEvent(ProjectEventType.MCP_SERVERS_CONFIGURED, payload,
+                                               actor="user:local"))
+
+        self.writes.transact(project_stream(project_id), configure, command=command)
+        return self.read_mcp_servers(project_id)
+
+    def read_mcp_servers(self, project_id: str) -> dict[str, Any]:
+        return _mcp_settings_view(self.projection(project_id).mcp_servers)
+
     # 材料（D-H：无活跃事项时记录原文）
 
     def record_material(self, project_id: str, text: str, *, department: str | None = None,
@@ -1402,6 +1590,17 @@ def _source_directory_view(config: SourceDirectory) -> dict[str, Any]:
         "target_branch": config.target_branch,
         "check_commands": list(config.check_commands),
         "credential_ref": config.credential_ref,
+    }
+
+
+def _mcp_settings_view(config: McpServersConfig) -> dict[str, Any]:
+    # MCP 服务器设置的读取体（工单 #236）：非秘密设置与凭据引用、版本与文档摘要。
+    # 旧事件没有 MCP 设置时按空设置读取：version 0、没有服务器
+    return {
+        "version": config.version,
+        "servers": config.servers,
+        "document_digest": config.document_digest,
+        "updated_at": config.updated_at,
     }
 
 def _require_text(name: str, value: Any) -> None:

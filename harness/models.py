@@ -430,6 +430,11 @@ class RunProjection:
     # 建 run 时冻结的参数快照（工单 #1189）：13 项取值、全局参数版本、项目覆盖来源、事项实限与定义版本。
     # 旧 run 的创建事件没有这个字段时为空，读取方按该事件所记录的定义版本的定义初值解释
     parameters: dict[str, Any] | None = None
+    # 建 run 时冻结的 MCP 服务器设置（工单 #236）：运行投影只保存版本、文档摘要与服务器名称，
+    # 不保存整份设置（设置在 run_created 与事项创建事实里）；旧 run 没有这个字段时为空设置
+    mcp_servers_version: int = 0
+    mcp_servers_digest: str = ""
+    mcp_servers_names: list[str] = field(default_factory=list)
     qa_tests_version: int = 0
     qa_tests_hash: str | None = None
     qa_tests_archive_ref: dict[str, Any] | None = None

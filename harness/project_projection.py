@@ -147,6 +147,28 @@ class SourceDirectory:
 
 
 @dataclass
+class McpServersConfig:
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本。
+    # servers 是这个版本的非秘密设置与凭据引用（凭据值在调用时按凭据来源解析，不在这里）；
+    # document_digest 是这份非秘密文档的摘要，事项冻结与工具清单快照按它核对。
+    # 旧事件没有 MCP 设置时按空设置读取（version 0、没有服务器）。
+    version: int = 0
+    servers: dict[str, dict[str, Any]] = field(default_factory=dict)
+    document_digest: str = ""
+    updated_at: str | None = None
+    event_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+    def frozen_document(self) -> dict[str, Any] | None:
+        # 事项创建时冻结的非秘密设置：还没有保存过时为空（旧事件按空设置读取）
+        if self.version == 0:
+            return None
+        return {"version": self.version, "servers": self.servers, "document_digest": self.document_digest}
+
+
+@dataclass
 class WritebackRecord:
     status: str
     work_item_id: str
@@ -190,6 +212,9 @@ class WorkItem:
     kind: str = "change"
     # 因升级重新开始（ADR-0019，工单 #1186）：这个事项的 run 从哪一个旧 run 重新开始；普通新建与建档事项为空
     restarted_from_run_id: str | None = None
+    # 事项创建时冻结的 MCP 服务器设置（工单 #236）：非秘密设置与凭据引用的整份文档（{"version", "servers",
+    # "document_digest"}）。旧事件没有这个字段时为空，按没有 MCP 设置读取；事项创建以后修改项目设置不影响它
+    mcp_servers: dict[str, Any] | None = None
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
     department: str | None = None
@@ -234,6 +259,8 @@ class ProjectProjection:
     materials: list[Material] = field(default_factory=list)
     source_directories: dict[str, SourceDirectory] = field(default_factory=dict)
     source_directory_history: list[SourceDirectory] = field(default_factory=list)
+    # 项目设置里的 MCP 服务器（工单 #236）：整份设置一个版本；旧事件按空设置读取
+    mcp_servers: McpServersConfig = field(default_factory=McpServersConfig)
     writebacks: list[WritebackRecord] = field(default_factory=list)
     active_work_item_id: str | None = None
     updated_at: str = ""
@@ -335,6 +362,8 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             kind=payload.get("kind", "change"),
             # 因升级重新开始的事项从哪一个旧 run 重新开始；旧事件没有这个字段，按不经升级重新开始处理
             restarted_from_run_id=payload.get("restarted_from_run_id"),
+            # 事项创建时冻结的 MCP 服务器设置（工单 #236）；旧事件没有这个字段，按空设置读取
+            mcp_servers=payload.get("mcp_servers"),
         ))
         return
     if etype == ProjectEventType.WORK_ITEM_START_FAILED:
@@ -500,6 +529,15 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         item = state.work_item(payload["work_item_id"])
         if item is not None:
             item.writeback = rec
+        return
+    if etype == ProjectEventType.MCP_SERVERS_CONFIGURED:
+        # 项目设置里的 MCP 服务器（工单 #236）：整份设置一个版本，servers 是非秘密设置与凭据引用；
+        # 没有这一种事件的旧项目按空设置（version 0、没有服务器）读取
+        state.mcp_servers = McpServersConfig(
+            version=int(payload["version"]), servers=dict(payload["servers"]),
+            document_digest=str(payload["document_digest"]), updated_at=event.created_at,
+            event_id=event.event_id,
+        )
         return
 
 

@@ -225,6 +225,7 @@ _LABELS: dict[str, str] = {
     ProjectEventType.WRITEBACK_NOT_NEEDED: "无需写回：本事项的变更已经在目标分支上",
     ProjectEventType.WRITEBACK_HELD: "写回等待前项合入：{previous_adoption_id}",
     ProjectEventType.WRITEBACK_VERIFIED: "核实了已发生的写回动作：分支 {branch}",
+    ProjectEventType.MCP_SERVERS_CONFIGURED: "保存了 MCP 服务器设置（第 {version} 版）",
     CatalogEventType.CATALOG_REVISED: "模型目录修订到第 {revision} 号（{operation}）",
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: "收集了模型候选：{candidate_ids} 个",
     CatalogEventType.CATALOG_TEST_FINISHED: "模型测试结束：{kind}，结果 {ok}",

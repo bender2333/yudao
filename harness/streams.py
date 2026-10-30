@@ -113,6 +113,8 @@ PROJECT_EVENT_TYPES = frozenset({
     "writeback_not_needed",
     "writeback_held",
     "writeback_verified",
+    # 项目设置里的 MCP 服务器（工单 #236）：整份设置的保存记录，事项创建时冻结当时的这份
+    "mcp_servers_configured",
 })
 
 # 目录流：模型目录与凭据的修订记录，以及排空与强制升级、用户查看过的位置。

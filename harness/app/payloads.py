@@ -116,6 +116,47 @@ class InputRecord(Payload):
     base_version: int | None = None
 
 
+class McpVariableValue(Payload):
+    # 环境变量或请求头的值（网络与 MCP 设计说明第 4.1 节）：固定文本，或凭据名称（取值时读取当前的凭据来源）。
+    # 凭据只出现名称：值不进入事件、投影、导出与日志
+    kind: Literal["text", "credential"]
+    # 固定文本；凭据名称时为空
+    value: str = ""
+    # 凭据名称；固定文本时为空
+    credential_ref: str = ""
+
+
+class McpServerSetting(Payload):
+    # 一台 MCP 服务器的非秘密设置（网络与 MCP 设计说明第 4.1、4.4 节）：名称、传输与对应传输的参数、
+    # 可以使用的部门、时限与输出上限；凭据只以名称出现，值在调用时按凭据来源解析
+    name: str
+    transport: Literal["stdio", "http"]
+    # stdio：命令、参数与环境变量；不经过 shell。HTTP：地址与请求头
+    command: str = ""
+    args: list[str] = []
+    env: dict[str, McpVariableValue] = {}
+    url: str = ""
+    headers: dict[str, McpVariableValue] = {}
+    departments: list[str] = []
+    startup_timeout_sec: int = 60
+    call_timeout_sec: int = 120
+    output_limit: int = 20000
+    # 可选的工具清单快照（设计说明第 4.2 节）：保存未探测配置允许，探测由后续工单完成；
+    # 只有摘要与本台服务器配置摘要一致的成功探测结果才能成为可用快照
+    tool_snapshot: dict[str, Any] | None = None
+    # 本台服务器配置的内容摘要：工具清单快照与它绑定，配置改变后旧快照不可继续使用
+    config_digest: str = ""
+
+
+class McpServersDocument(Payload):
+    # 一份冻结的 MCP 服务器设置（事项创建事实与 run_created 携带同一份，设计说明第 4.3 节）：
+    # 非秘密设置与凭据引用的整份文档，凭据值不出现；还没有保存过 MCP 设置的事项没有这个对象
+    version: int
+    servers: dict[str, McpServerSetting]
+    # 这份非秘密文档的摘要：与 mcp_servers_configured 事件、工具清单快照核对的是同一份
+    document_digest: str
+
+
 class Usage(Payload):
     # 提供方上报的用量；没有上报的项为空
     input_tokens: int
@@ -288,6 +329,9 @@ class RunCreatedPayload(Payload):
     # 创建这个 run 时冻结的参数快照（工单 #1189）：本 run 全程读这份取值；旧事件没有这个字段时，
     # 按该事件所记录的定义版本的定义初值解释（不取参数现值）
     parameters: FrozenParameters | None = None
+    # 创建这个 run 时冻结的 MCP 服务器设置（工单 #236）：与事项创建事实同一份非秘密设置与凭据引用；
+    # 旧事件没有这个字段时为空，按空设置读取
+    mcp_servers: McpServersDocument | None = None
     # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
     run_event_version: int
     # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮候选事件与修改意见的工件引用。
@@ -1232,6 +1276,19 @@ class WorkItemCreatedPayload(Payload):
     # 因升级重新开始（ADR-0019，工单 #1186）：这个事项的 run 从哪一个旧 run 重新开始。旧事件没有这个字段，
     # 读取时按「不经升级重新开始」处理：用户新建的事项与建档事项都没有旧 run
     restarted_from_run_id: str | None = None
+    # 事项创建时冻结的 MCP 服务器设置（工单 #236）：非秘密设置与凭据引用的整份文档，或可解析出它们的
+    # 版本引用（document_digest 与 version）。旧事件没有这个字段时为空，按空设置读取
+    mcp_servers: McpServersDocument | None = None
+
+
+class McpServersConfiguredPayload(Payload):
+    # 项目设置里的 MCP 服务器保存（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本。
+    # servers 是这个版本的非秘密设置与凭据引用（McpServerSetting），凭据值不进入事件、投影、导出与日志；
+    # document_digest 是这份非秘密文档的摘要，事项冻结与工具清单快照按它核对
+    version: int
+    base_version: int
+    servers: dict[str, McpServerSetting]
+    document_digest: str
 
 
 class WorkItemStartFailedPayload(Payload):
@@ -1646,6 +1703,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.WRITEBACK_NOT_NEEDED: WritebackNotNeededPayload,
     ProjectEventType.WRITEBACK_HELD: WritebackHeldPayload,
     ProjectEventType.WRITEBACK_VERIFIED: WritebackVerifiedPayload,
+    ProjectEventType.MCP_SERVERS_CONFIGURED: McpServersConfiguredPayload,
     CatalogEventType.CATALOG_REVISED: CatalogRevisedPayload,
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,

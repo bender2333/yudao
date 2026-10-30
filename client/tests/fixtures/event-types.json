@@ -33,6 +33,7 @@
   "instance_upgrade_withdrawn",
   "lesson_candidate_recorded",
   "material_recorded",
+  "mcp_servers_configured",
   "model_attempt_failed",
   "model_attempt_finished",
   "model_message",

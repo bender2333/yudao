@@ -75,6 +75,9 @@ class MinimalProjection:
     stop_reason: str | None = None
     definitions_version: str = ""
     parameters_version: str = ""
+    # 建 run 时冻结的 MCP 服务器设置版本（工单 #236）：最小投影只取版本，不取设置的内容；
+    # 旧事件没有这个字段时为 0（空设置）
+    mcp_servers_version: int = 0
     max_cycles: int = 0
     run_time_limit_sec: int = 0
     # 执行权编号：每次取得执行权加一，写入方的编号小于流上记录的编号时由写入口拒绝
@@ -242,6 +245,7 @@ def _fold_run(state: MinimalProjection, event: Event) -> MinimalProjection:
             stop_reason=None,
             definitions_version=str(payload.get("definitions_version", "")),
             parameters_version=str(payload.get("parameters_version", "")),
+            mcp_servers_version=int((payload.get("mcp_servers") or {}).get("version") or 0),
             max_cycles=int(payload.get("max_cycles") or 0),
             run_time_limit_sec=int(payload.get("run_time_limit_sec") or 0),
         )

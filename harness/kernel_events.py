@@ -106,6 +106,9 @@ class ProjectEventType:
     WRITEBACK_NOT_NEEDED = "writeback_not_needed"
     WRITEBACK_HELD = "writeback_held"
     WRITEBACK_VERIFIED = "writeback_verified"
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本，
+    # 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
+    MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
 
 
 class CatalogEventType:
