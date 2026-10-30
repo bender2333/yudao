@@ -1,6 +1,6 @@
 # 基础规则
 
-更新：2026-10-28（用户授权：删除过时的 ADR 以后，「出处」一列改为指向总图与设计说明，规则本身不变）；2026-10-27（用户授权修改基础规则 4：开发仓库里改内核不再事前批准，经 CI 里的内核测试与测试覆盖核对）；2026-10-26（用户授权修改基础规则 4：内核清单的修改由「只由用户修改」改为经批准，并加内核路径的测试覆盖一行）；2026-10-13（用户授权按 [ADR-0038](adr/0038-function-first-commands-without-registration.md) 修改基础规则 3 下评测隐藏材料与新的检查两行）。本文件属于[可信内核](design/trusted-kernel.md)，列在内核清单里，只由用户修改。
+更新：2026-10-30（用户授权：规则 3 下「质检放行不外包」一行改为按核验角色写，规则本身不变）；2026-10-28（用户授权：删除过时的 ADR 以后，「出处」一列改为指向总图与设计说明，规则本身不变）；2026-10-27（用户授权修改基础规则 4：开发仓库里改内核不再事前批准，经 CI 里的内核测试与测试覆盖核对）；2026-10-26（用户授权修改基础规则 4：内核清单的修改由「只由用户修改」改为经批准，并加内核路径的测试覆盖一行）；2026-10-13（用户授权按 [ADR-0038](adr/0038-function-first-commands-without-registration.md) 修改基础规则 3 下评测隐藏材料与新的检查两行）。本文件属于[可信内核](design/trusted-kernel.md)，列在内核清单里，只由用户修改。
 
 六条基础规则是整个系统最底层的规则，高于任何具体设计，不随演化改变，不进入规则登记。原文见 [D38 系统意图与基础规则](requirements/system-intent.md)「三、基础规则」。下表列出六条规则，以及系统中已有的、属于基础规则的具体规则；B1 建立内核清单时，为每条具体规则补上对应的测试名称。
 
@@ -14,7 +14,7 @@
 | | 目标、约束、验收标准只由用户修改 | [D38](requirements/system-intent.md)「三、基础规则」第 3 条、[总图](architecture.html)第四节「定义」的缝 |
 | | 权威关系只随定义的版本改变；运行中 agent 与观察者不能修改定义 | [总图](architecture.html)第四节「定义」的缝 |
 | | 达到上限记为失败或暂停，恢复不重新计数，参数修改不让它继续 | [规则登记与参数设计说明](design/rules-and-parameters.md)第 3 节、[循环与收敛设计说明](design/loops-and-convergence.md)第 3 节 |
-| | 质检放行与产品取舍不外包，也不交给判定点 | [总图](architecture.html)第一节「质检」与第四节「执行」的缝、[总体架构](design/architecture/overall-architecture.md)第 7.5 节 |
+| | 有核验角色时，它的放行与产品取舍不外包，也不交给判定点；没有核验角色的事项记为开环完成 | [总图](architecture.html)第一节「质检」与第四节「执行」的缝、[形态与核验角色设计说明](design/forms-and-verifier-role.md)「核验角色」、[总体架构](design/architecture/overall-architecture.md)第 7.5 节 |
 | | 角色只提交记录与尝试，主机按本体校验后写成事件；重放不调用模型 | [语义系统设计说明](design/semantic-system.md)第 7 节 |
 | | 隐藏材料不进入运行目录，隐藏检查、条目表与参考解法在运行结束以后才进入评分目录；评分之前核对材料的摘要，不同则这次运行无效 | [评测场景设计说明](design/evaluation-scenarios.md)第 3 节、[ADR-0038](adr/0038-function-first-commands-without-registration.md) |
 | | 项目流只增加字段、事件种类或取值，已有字段的含义不变，删除或改变类型时测试失败 | [ADR-0019](adr/0019-project-stream-across-versions.md) |
