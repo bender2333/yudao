@@ -95,9 +95,9 @@ def test_candidates_fall_through_an_invalid_writing():
 
 def test_candidates_fall_back_to_the_capability_table():
     # 上游列表没有容量时仍取模型能力表的值与来源：两处的次序没有变
-    recorded = capabilities.capability("opencode-go", "deepseek-v4-flash")
+    recorded = capabilities.capability("opencode-go", "deepseek-v4-pro")
     assert recorded is not None
-    [candidate] = _parse_candidates({"data": [{"id": "deepseek-v4-flash"}]}, "opencode-go")
+    [candidate] = _parse_candidates({"data": [{"id": "deepseek-v4-pro"}]}, "opencode-go")
     assert (candidate["context_window"], candidate["context_window_source"]) == (
         recorded.context_window, "capability_table")
     assert (candidate["max_output_tokens"], candidate["max_output_tokens_source"]) == (

@@ -117,9 +117,11 @@
         "tool_call": true
       }
     },
-    "name": "Anthropic"
+    "name": "Anthropic",
+    "npm": "@ai-sdk/anthropic"
   },
   "opencode-go": {
+    "api": "https://opencode.ai/inference/go/openai/v1",
     "id": "opencode-go",
     "models": {
       "claude-haiku-5-5": {

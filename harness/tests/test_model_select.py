@@ -770,6 +770,8 @@ def test_key_changes_through_credentials_reload_and_dotenv_watch_share_one_conne
 
 def test_candidate_protocol_prefers_the_capability_table_then_the_plan_default(tmp_path):
     # R2、R3：使用当前能力表的真实非默认协议记录，候选请求走本地真实HTTP，来源反映实际预填。
+    # 连接的地址取预置方案的请求基址：能力资料按连接地址识别服务商（设计说明第 4.3 节），
+    # 模型列表仍走本地真实 HTTP 服务。
     upstream = ScriptedProvider([responder([{"id": "claude-haiku-5-5"}, {"id": "unrecorded"}])] * 4)
     opened = Opened(tmp_path)
     try:
@@ -779,6 +781,7 @@ def test_candidate_protocol_prefers_the_capability_table_then_the_plan_default(t
             fields = ("id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")
             saved = command(client, "catalog.connection.save", base_version=catalog(client)["revision"],
                             provider={**{name: provider[name] for name in fields}, "preset_id": "opencode-go",
+                                      "base_url": "https://opencode.ai/zen/go/v1",
                                       "models_url": upstream.base + "/v1/models"})
             assert saved.status_code == 200, saved.text
             position = opened.application.system.store.end_position()
