@@ -95,7 +95,8 @@ def test_a_write_changes_the_public_tree_the_contract_reports(implementation):
     assert after is not None
     assert after.digest != before.digest, "写入以后公开树的摘要没有变化"
     assert "notes/a.txt" in after.files
-    assert len(after.hashes) == len(after.files) and after.hashes[after.files.index("notes/a.txt")]
+    assert len(after.hashes) == len(after.files)
+    assert after.hashes[after.files.index("notes/a.txt")].startswith("sha256:")
 
 
 @pytest.mark.parametrize("declared", [

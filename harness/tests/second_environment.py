@@ -15,7 +15,8 @@ from pathlib import Path
 from typing import Any
 
 from harness.actions import Action, ActionReceipt, FactsQuery, TreeFacts, WorkspaceFacts
-from harness.public_tree import capture_public_tree, hash_bytes
+from harness.models import hash_bytes
+from harness.public_tree import capture_public_tree
 
 # 这一版实现执行的工具，按动作类别分组：读取与写入的文件动作
 _KIND_TOOLS = {
