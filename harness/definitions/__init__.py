@@ -435,6 +435,21 @@ class RoutingEndReason(_Definition):
     human_action: str | None = None
 
 
+# 事件的主要事实从哪里来（应用层与接口层设计说明第 5.2 节「事件对象」）：确定规则的判定、决策模型的判定、
+# 角色的陈述、主机的测量、用户。事件载荷不带来源字段，来源由 event_sources.json 按事件种类给出
+SourceKind = Literal["rule", "decision_model", "role_statement", "host_measurement", "user"]
+
+
+class EventSource(_Definition):
+    # 一种事件的来源（工单 #396）：这条事件的主要事实的来源种类，以及按字段的覆盖。
+    # 按字段的覆盖用于「主要事实与字段来源不同」的条目：事件里的测量值（已用时间、已用次数与步数、
+    # 检查回执的结果）来自主机测量，其余字段按这条事件的主要事实
+    source: SourceKind
+    # 载荷字段名 → 这个字段的来源种类
+    fields: Mapping[Identifier, SourceKind] = Field(default_factory=dict)
+
+
+
 class Routing(_Definition):
     # 一种路由实现（routings.json，工单 #825），下面一段是它自己的一份定义（设计说明第 5.4 节第 2 条）：
     # 部门、成果种类、提议方式、路由自己的上限与结束原因。内核只核对这份定义的结构（字段、类型与非空），
@@ -485,8 +500,10 @@ class Definitions(_Definition):
     work_items: WorkItems
     # 可用的路由实现，来自 routings.json（工单 #825）
     routings: Routings
+    # 事件种类的来源表，来自 event_sources.json（工单 #396）：键是事件种类
+    event_sources: Mapping[Identifier, EventSource]
 
-    freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items", "rules")
+    freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items", "rules", "event_sources")
 
     @property
     def routing(self) -> str:
@@ -583,6 +600,14 @@ class Definitions(_Definition):
         # 规则登记中一个条目的现值；条目不在登记里直接报错
         return self.rule(name).value
 
+    def event_source(self, event_type: str) -> EventSource:
+        # 一种事件的来源；种类不在表里直接报错，调用方不留回退取值（缺行由测试与加载核对）
+        definition = self.event_sources.get(event_type)
+        if definition is None:
+            raise ValueError(
+                f"event type {event_type!r} is not in the event source table (event_sources.json)")
+        return definition
+
 
 # 定义文件与它在 Definitions 中的字段、类型
 _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
@@ -596,6 +621,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "model_capabilities.json": ("model_capabilities", TypeAdapter(ModelCapabilities)),
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
     "routings.json": ("routings", TypeAdapter(Routings)),
+    "event_sources.json": ("event_sources", TypeAdapter(dict[Identifier, EventSource])),
 }
 
 

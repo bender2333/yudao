@@ -13267,6 +13267,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -13305,6 +13316,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -13528,6 +13540,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -13566,6 +13589,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -13757,6 +13781,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -13795,6 +13830,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -13954,6 +13990,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -13992,6 +14039,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -14216,6 +14264,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -14254,6 +14313,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -14378,6 +14438,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -14416,6 +14487,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -14602,6 +14674,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -14640,6 +14723,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -14856,6 +14940,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -14894,6 +14989,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -15111,6 +15207,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -15149,6 +15256,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -15435,6 +15543,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -15473,6 +15592,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -15640,6 +15760,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -15678,6 +15809,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -15838,6 +15970,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -15876,6 +16019,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -16294,6 +16438,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -16332,6 +16487,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -16812,6 +16968,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -16850,6 +17017,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -17452,6 +17620,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -17490,6 +17669,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -17707,6 +17887,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -17745,6 +17936,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -17884,6 +18076,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -17922,6 +18125,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -18087,6 +18291,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -18142,6 +18357,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -18242,6 +18458,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -18280,6 +18507,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -18451,6 +18679,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -18489,6 +18728,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -18589,6 +18829,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -18627,6 +18878,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -18913,6 +19165,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -18951,6 +19214,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -19117,6 +19381,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -19155,6 +19430,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -19294,6 +19570,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -19332,6 +19619,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -19487,6 +19775,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -19525,6 +19824,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -19653,6 +19953,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -19691,6 +20002,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -19856,6 +20168,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -19894,6 +20217,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -20201,6 +20525,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -20239,6 +20574,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -20353,6 +20689,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -20391,6 +20738,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -20671,6 +21019,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -20709,6 +21068,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -20809,6 +21169,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -20847,6 +21218,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -20966,6 +21338,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -21004,6 +21387,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -21104,6 +21488,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -21142,6 +21537,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -21339,6 +21735,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -21377,6 +21784,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -21517,6 +21925,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -21555,6 +21974,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -22147,6 +22567,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -22185,6 +22616,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -22736,6 +23168,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -22774,6 +23217,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -23194,6 +23638,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -23232,6 +23687,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -23618,6 +24074,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -23656,6 +24123,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -24075,6 +24543,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -24113,6 +24592,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -24568,6 +25048,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -24606,6 +25097,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -25040,6 +25532,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -25078,6 +25581,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -25360,6 +25864,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -25398,6 +25913,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -25532,6 +26048,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -25570,6 +26097,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -25713,6 +26241,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -25751,6 +26290,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -25973,6 +26513,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -26011,6 +26562,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -26125,6 +26677,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -26163,6 +26726,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -26269,6 +26833,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -26307,6 +26882,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -26460,6 +27036,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -26506,6 +27093,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -26606,6 +27194,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -26644,6 +27243,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -26780,6 +27380,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -26818,6 +27429,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -26936,6 +27548,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -26974,6 +27597,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -27112,6 +27736,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -27150,6 +27785,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -27264,6 +27900,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -27302,6 +27949,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -27444,6 +28092,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -27482,6 +28141,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -27596,6 +28256,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -27634,6 +28305,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -27740,6 +28412,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -27778,6 +28461,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -27933,6 +28617,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -27971,6 +28666,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -28126,6 +28822,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -28164,6 +28871,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -28452,6 +29160,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -28490,6 +29209,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -28645,6 +29365,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -28683,6 +29414,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -28806,6 +29538,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -28844,6 +29587,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -29137,6 +29881,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -29175,6 +29930,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -29293,6 +30049,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -29331,6 +30098,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -29486,6 +30254,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -29524,6 +30303,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -29675,6 +30455,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -29713,6 +30504,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -29845,6 +30637,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -29883,6 +30686,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -29997,6 +30801,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -30035,6 +30850,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -30154,6 +30970,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -30192,6 +31019,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -30322,6 +31150,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -30360,6 +31199,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -30523,6 +31363,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -30561,6 +31412,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -30868,6 +31720,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -30906,6 +31769,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -31025,6 +31889,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -31063,6 +31938,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -31450,6 +32326,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -31488,6 +32375,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -32021,6 +32909,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -32067,6 +32966,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -32167,6 +33067,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -32205,6 +33116,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -32612,6 +33524,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -32650,6 +33573,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -33316,6 +34240,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -33354,6 +34289,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -33520,6 +34456,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -33558,6 +34505,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -33758,6 +34706,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -33796,6 +34755,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -33920,6 +34880,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -33958,6 +34929,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -34150,6 +35122,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -34188,6 +35171,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -34328,6 +35312,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -34366,6 +35361,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -34515,6 +35511,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -34553,6 +35560,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",
@@ -34759,6 +35767,17 @@
             "title": "Actor",
             "type": "string"
           },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
           "command_id": {
             "anyOf": [
               {
@@ -34797,6 +35816,7 @@
           "department",
           "role",
           "actor",
+          "source",
           "command_id",
           "label",
           "type",

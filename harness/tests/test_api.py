@@ -276,11 +276,13 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert {item["name"] for item in queries if item["replayable"]} == {
         "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry",
     }
-    # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入
+    # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入；
+    # 事实来源不依赖查询，事件对象带上 source 以后列出（工单 #396，设计说明第 4.3 节）
     assert capabilities["overlays"] == [
         {"name": "flow", "queries": ["project.flow"]},
         {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
         {"name": "recovery", "queries": ["run.recovery"]},
+        {"name": "sources", "queries": []},
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)

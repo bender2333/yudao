@@ -20,6 +20,7 @@ from typing import Literal, Union
 from pydantic import BaseModel, TypeAdapter
 
 from ..app.contracts import Contract, EventObject, OutputDelta
+from ..definitions import DEFINITIONS
 from ..deltas import DeltaFragment, DeltaPump
 from ..event_store import EventStore
 from ..models import CatalogEvent, Event, ProjectEvent
@@ -235,6 +236,8 @@ class EventStream:
             "project_id": getattr(event, "project_id", None), "work_item_id": getattr(event, "work_item_id", None),
             "run_id": getattr(event, "run_id", None), "department": getattr(event, "department", None),
             "role": getattr(event, "role", None), "actor": event.actor or "",
+            # 来源按事件种类取自定义里的来源表（工单 #396）：事件载荷不带来源字段
+            "source": DEFINITIONS.event_source(event.type).source,
             "command_id": event.command_id, "label": event_label(event.type, event.payload),
         }
         return _EVENT_OBJECT.validate_python({**fields, "type": event.type,
