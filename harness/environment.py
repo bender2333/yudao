@@ -27,6 +27,7 @@ from threading import Lock
 from typing import Any
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
+from .artifacts import ArtifactStore, ExternalSource
 from .event_store import run_stream
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
@@ -208,6 +209,8 @@ class Workspaces:
             check_timeout_sec=self._check_timeout(run_id),
             jobs=jobs,
             session_id=session_id,
+            artifacts=self._artifacts,
+            run_id=run_id,
         )
 
     # ---- 会话用哪份工作区 ----
@@ -256,6 +259,8 @@ class Workspaces:
             check_timeout_sec=self._check_timeout(run_id),
             jobs=jobs,
             session_id=session_id,
+            artifacts=self._artifacts,
+            run_id=run_id,
         )
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
@@ -328,6 +333,8 @@ class Workspaces:
             check_timeout_sec=self._check_timeout(run_id),
             jobs=jobs,
             session_id=session_id,
+            artifacts=self._artifacts,
+            run_id=run_id,
         )
         if department in self.delivery_inspecting:
             ref = projection.qa_tests_archive_ref
@@ -453,6 +460,7 @@ _HANDLERS = {
     "list_files": "_list_files",
     "search": "_search",
     "read_range": "_read_range",
+    "read_external_source": "_read_external_source",
     "write_file": "_write_file",
     "edit_range": "_edit_range",
     "delete_file": "_delete_file",
@@ -465,7 +473,7 @@ _PROCESSES = {"run_check": "_run_check", "bash": "_bash"}
 # 动作类别与属于它的工具：执行环境按类别分派，再从上面两种执行方式里按实际工具名取执行方法。
 # 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明第 18 节）
 _KIND_TOOLS = {
-    "read": frozenset({"read_file", "list_files", "search", "read_range"}),
+    "read": frozenset({"read_file", "list_files", "search", "read_range", "read_external_source"}),
     "write": frozenset({"write_file", "edit_range", "delete_file", "move_file"}),
     "check": frozenset({"run_check"}),
     "command": frozenset({"bash", "read_output", "stop_job"}),
@@ -688,11 +696,16 @@ class LocalEnvironment:
         *,
         jobs: BackgroundJobTable | None = None,
         session_id: str | None = None,
+        artifacts: ArtifactStore | None = None,
+        run_id: str | None = None,
     ) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
         self._jobs = jobs
         self._session_id = session_id
+        # 这个 run 的外部来源工件：read_external_source 只读这个 run 的工件库
+        self._artifacts = artifacts
+        self._run_id = run_id
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -711,12 +724,15 @@ class LocalEnvironment:
         check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
         jobs: BackgroundJobTable | None = None,
         session_id: str | None = None,
+        artifacts: ArtifactStore | None = None,
+        run_id: str | None = None,
     ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
             materialize_tree(tree, root)
-        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id)
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
+                   artifacts=artifacts, run_id=run_id)
 
     @classmethod
     def open(
@@ -726,9 +742,12 @@ class LocalEnvironment:
         check_timeout_sec: int = DEFINITIONS.rule_value("check_timeout_sec"),
         jobs: BackgroundJobTable | None = None,
         session_id: str | None = None,
+        artifacts: ArtifactStore | None = None,
+        run_id: str | None = None,
     ) -> LocalEnvironment:
         # 打开已经建立的工作区
-        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id)
+        return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
+                   artifacts=artifacts, run_id=run_id)
 
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
@@ -942,6 +961,59 @@ class LocalEnvironment:
                 "offset": next_offset, "digest": digest,
             }) if truncated else None,
         }
+
+    def _read_external_source(self, args: dict[str, Any]) -> dict[str, Any]:
+        # 读一份已经存下来的外部来源（网络取回与 MCP 设计说明第 6.4 节）：按来源编号与行范围读，
+        # 不重新取回；游标做法与 read_range 相同，并绑定这份正文的摘要
+        source = args.get("source")
+        if not isinstance(source, str) or not source:
+            raise ValueError("read_external_source requires a source")
+        start = args.get("start_line")
+        if type(start) is not int or start < 1:
+            raise ValueError("start_line must be an integer >= 1")
+        end = args.get("end_line")
+        if end is not None and (type(end) is not int or end < start):
+            raise ValueError("end_line must be an integer >= start_line")
+        offset = start
+        cursor: dict[str, Any] | None = None
+        cursor_arg = args.get("cursor")
+        if cursor_arg not in (None, ""):
+            cursor = _decode_cursor(str(cursor_arg), kind="read_external_source")
+            if cursor.get("source") != source or cursor.get("start_line") != start or cursor.get("end_line") != end:
+                raise ValueError("cursor does not match the current read_external_source arguments")
+            offset = cursor["offset"]
+        entry = self._external_source(source)
+        if cursor is not None and cursor.get("content_hash") != entry.content_hash:
+            raise ValueError("external source changed since the cursor was issued; start a new read")
+        numbered = list(enumerate(entry.text.splitlines(), 1))
+        total = len(numbered)
+        wanted = [(number, text) for number, text in numbered if number >= offset and (end is None or number <= end)]
+        entries, consumed = _fit_line_entries(wanted)
+        truncated = consumed < len(wanted)
+        last = offset + consumed - 1
+        return {
+            "source": entry.source,
+            "content_hash": entry.content_hash,
+            "final_url": entry.final_url,
+            "status_code": entry.status_code,
+            "content_type": entry.content_type,
+            "fetched_at": entry.fetched_at,
+            "start_line": offset,
+            "end_line": last if consumed else min(total, offset - 1),
+            "total_lines": total,
+            "lines": entries,
+            "truncated": truncated,
+            "next_cursor": _encode_cursor({
+                "kind": "read_external_source", "source": source, "start_line": start, "end_line": end,
+                "offset": offset + consumed, "content_hash": entry.content_hash,
+            }) if truncated else None,
+        }
+
+    def _external_source(self, source: str) -> ExternalSource:
+        # 这个 run 的外部来源工件：执行环境没有接上工件库时直接报错，不猜
+        if self._artifacts is None or self._run_id is None:
+            raise ValueError("external sources are not available in this environment")
+        return self._artifacts.external_source(self._run_id, source)
 
     def _write_file(self, args: dict[str, Any]) -> str:
         return self.workspace.write_file(str(args["path"]), str(args["content"]))

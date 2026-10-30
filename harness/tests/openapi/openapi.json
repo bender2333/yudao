@@ -3310,6 +3310,91 @@
         }
       }
     },
+    "/api/queries/evidence.external_source": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "evidence.external_source",
+        "operationId": "query_evidence_external_source",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "content_hash",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Content Hash"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "media_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Media Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ExternalSourceEvidenceResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/catalog": {
       "get": {
         "tags": [
@@ -8209,31 +8294,72 @@
         ],
         "title": "EventDetailResult"
       },
-      "FactRef": {
+      "ExternalSourceEvidenceResult": {
         "properties": {
-          "position": {
-            "type": "integer",
-            "title": "Position"
-          },
           "source": {
             "type": "string",
-            "enum": [
-              "rule",
-              "decision_model",
-              "role_statement",
-              "host_measurement",
-              "user"
-            ],
             "title": "Source"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "fetched_at": {
+            "type": "string",
+            "title": "Fetched At"
+          },
+          "total_lines": {
+            "type": "integer",
+            "title": "Total Lines"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "final_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Url"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "position",
-          "source"
+          "source",
+          "content_hash",
+          "fetched_at",
+          "total_lines",
+          "content"
         ],
-        "title": "FactRef"
+        "title": "ExternalSourceEvidenceResult"
       },
       "FileActionComparison": {
         "properties": {
@@ -12114,6 +12240,24 @@
         ],
         "title": "Snapshot[EventDetailResult]"
       },
+      "Snapshot_ExternalSourceEvidenceResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExternalSourceEvidenceResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ExternalSourceEvidenceResult]"
+      },
       "Snapshot_LiveAttempt_": {
         "properties": {
           "position": {
@@ -13951,13 +14095,6 @@
           "version": {
             "type": "integer",
             "title": "Version"
-          },
-          "refs": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/FactRef"
-            },
-            "type": "object",
-            "title": "Refs"
           }
         },
         "additionalProperties": false,

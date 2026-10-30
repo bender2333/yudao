@@ -276,6 +276,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
+        "evidence.external_source",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {

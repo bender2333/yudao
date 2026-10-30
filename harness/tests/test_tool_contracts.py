@@ -28,9 +28,21 @@ def test_tools_are_host_tools_or_environment_actions():
         *{name for name in TOOLS if name.startswith("submit_")}, "ask", "answer"}
     assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
         "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
+        "read_external_source": "read",
         "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
         "run_check": "check", "bash": "command", "read_output": "command", "stop_job": "command",
     }
+
+
+def test_every_department_reads_saved_external_sources():
+    # 网络取回与 MCP 设计说明第 5.1 节：三个部门始终都有 read_external_source；
+    # 普通事项与建档事项的工具清单都是显式写的，两份都要有（工单 #1171）
+    assert tool_kind("read_external_source") == "environment"
+    assert tool_action("read_external_source") == "read"
+    for kind in ("change", "onboarding"):
+        for department in ("product", "engineering", "quality"):
+            assert "read_external_source" in tools_for(department, kind), f"{kind} 的 {department} 没有这个工具"
+
 
 def test_answer_prd_revision_parameter_definitions_match_submit_product_spec():
     # answer 中附带的 PRD 修订参数定义必须与 submit_product_spec 对应参数完全一致

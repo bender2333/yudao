@@ -164,14 +164,14 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     assert raised.value.issues == (
-        ("roles.json", "product.tools[4]", "工具 bash 没有定义"),
-        ("roles.json", "engineering.tools[9]", "工具 bash 没有定义"),
-        ("roles.json", "quality.tools[6]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.change.departments.product.tools[4]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.change.departments.engineering.tools[9]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.change.departments.quality.tools[6]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.onboarding.departments.product.tools[4]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.onboarding.departments.quality.tools[4]", "工具 bash 没有定义"),
+        ("roles.json", "product.tools[5]", "工具 bash 没有定义"),
+        ("roles.json", "engineering.tools[10]", "工具 bash 没有定义"),
+        ("roles.json", "quality.tools[7]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.product.tools[5]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.engineering.tools[10]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.quality.tools[7]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.onboarding.departments.product.tools[5]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.onboarding.departments.quality.tools[5]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
         ("proposal_contracts.json", "roles.quality.kinds",
          "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、qa_review"),

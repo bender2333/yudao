@@ -2444,17 +2444,41 @@ export type EventDetailResult = {
 };
 
 /**
- * FactRef
+ * ExternalSourceEvidenceResult
  */
-export type FactRef = {
-    /**
-     * Position
-     */
-    position: number;
+export type ExternalSourceEvidenceResult = {
     /**
      * Source
      */
-    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    source: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Fetched At
+     */
+    fetched_at: string;
+    /**
+     * Total Lines
+     */
+    total_lines: number;
+    /**
+     * Content
+     */
+    content: string;
+    /**
+     * Final Url
+     */
+    final_url?: string | null;
+    /**
+     * Status Code
+     */
+    status_code?: number | null;
+    /**
+     * Content Type
+     */
+    content_type?: string | null;
 };
 
 /**
@@ -4787,6 +4811,17 @@ export type SnapshotEventDetailResult = {
 };
 
 /**
+ * Snapshot[ExternalSourceEvidenceResult]
+ */
+export type SnapshotExternalSourceEvidenceResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ExternalSourceEvidenceResult;
+};
+
+/**
  * Snapshot[LiveAttempt]
  */
 export type SnapshotLiveAttempt = {
@@ -5805,12 +5840,6 @@ export type WorkItemLoop = {
      * Version
      */
     version: number;
-    /**
-     * Refs
-     */
-    refs?: {
-        [key: string]: FactRef;
-    };
 };
 
 /**
@@ -19309,6 +19338,52 @@ export type QueryRunRecoveryResponses = {
 };
 
 export type QueryRunRecoveryResponse = QueryRunRecoveryResponses[keyof QueryRunRecoveryResponses];
+
+export type QueryEvidenceExternalSourceData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Event Id
+         */
+        event_id: string;
+        /**
+         * Kind
+         */
+        kind: string;
+        /**
+         * Content Hash
+         */
+        content_hash: string;
+        /**
+         * Path
+         */
+        path: string;
+        /**
+         * Media Type
+         */
+        media_type?: string | null;
+    };
+    url: '/api/queries/evidence.external_source';
+};
+
+export type QueryEvidenceExternalSourceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryEvidenceExternalSourceError = QueryEvidenceExternalSourceErrors[keyof QueryEvidenceExternalSourceErrors];
+
+export type QueryEvidenceExternalSourceResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotExternalSourceEvidenceResult;
+};
+
+export type QueryEvidenceExternalSourceResponse = QueryEvidenceExternalSourceResponses[keyof QueryEvidenceExternalSourceResponses];
 
 export type QueryCatalogData = {
     body?: never;
