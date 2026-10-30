@@ -234,7 +234,7 @@ def test_compaction_stalled_limit_comes_from_the_frozen_value(tmp_path):
 
 
 def test_bash_timeouts_come_from_the_frozen_values(tmp_path):
-    slow = "python -c \"import time; time.sleep(30)\""
+    slow = "C:/code/yudao/.venv/Scripts/python.exe -c \"import time; time.sleep(30)\""
     script = {"product": [_respond(_call("slow-default", "bash", command=slow)),
                           _respond(_call("slow-max", "bash", command=slow, timeout_sec=100)), product_spec()]}
     system = _system(tmp_path, script)
@@ -251,7 +251,7 @@ def test_bash_timeouts_come_from_the_frozen_values(tmp_path):
 
 
 def test_check_timeout_max_comes_from_the_frozen_value(tmp_path):
-    script = {"product": [_respond(_call("slow-check", "run_check", name="slow", command="python sleep.py",
+    script = {"product": [_respond(_call("slow-check", "run_check", name="slow", command="C:/code/yudao/.venv/Scripts/python.exe sleep.py",
                                          timeout_sec=100)),
                           product_spec()]}
     system = _system(tmp_path, script)
