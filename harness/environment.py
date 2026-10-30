@@ -272,8 +272,6 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            artifacts=self._artifacts,
-            run_id=run_id,
         )
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
@@ -349,8 +347,6 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            artifacts=self._artifacts,
-            run_id=run_id,
         )
         if department in self.delivery_inspecting:
             ref = projection.qa_tests_archive_ref
