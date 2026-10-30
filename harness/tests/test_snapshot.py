@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 import uuid
 from dataclasses import asdict
 from pathlib import Path
@@ -13,12 +14,14 @@ from pygit2.enums import RepositoryOpenFlag
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
-from harness.models import ArtifactRef, EventType, ProjectEventType, canonical_hash, json_dumps
+from harness.models import (ArtifactRef, TERMINAL_STATUSES, EventType, ProjectEventType,
+                            canonical_hash, json_dumps)
 from harness.public_tree import TreeError, capture_public_tree
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
 from harness.snapshot import git_provenance, restore_snapshot
 from harness.tests.api_helpers import running_api
+from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 GOAL = "把一份可信代码快照接入后完成增量变更。"
 REQUIREMENT = "run the CLI with a word"
@@ -26,12 +29,37 @@ APP_BYTES = "print('hello')\n".encode("utf-8")
 BIN_BYTES = bytes(range(256))
 HIDDEN_BYTES = b"\x00\xff\xfe\r\n"
 
+# 这个文件里等 run 结束的墙钟上限：集成的 WAIT_FOR_HOST_WORK_SEC 是 300 秒，与 CI 给每条集成层用例的
+# 300 秒上限相等（根 conftest.py 的 TIMEOUTS[INTEGRATION]），两处一样时卡住的是 pytest-timeout 而不是
+# 用例自己的等待（工单 #1250 的登记）。150 秒仍远大于本机几秒的正常用时（工单 #1274）
+WAIT_LIMIT = min(WAIT_FOR_HOST_WORK_SEC, 150.0)
+
+
+def _run_to_end(system, run_id):
+    # 一步一步驱动这个 run 到终态：等待由终态决定，不靠固定时长。到 WAIT_LIMIT 还没有终态时在这里报成
+    # 一条失败（150 秒小于集成层给每条用例的 300 秒），不会等到 pytest-timeout 结束整个 worker。
+    # 假模型的脚本用尽会让 run 以 provider_error 结束，那不是业务失败（工单 #1274）：单独报出来
+    deadline = time.monotonic() + WAIT_LIMIT
+    result = system.project(run_id)
+    while result.status not in TERMINAL_STATUSES:
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                f"the run did not reach a terminal state within {WAIT_LIMIT:.0f}s: "
+                f"status={result.status} stop={result.stop_reason}")
+        result = system.activate_once(run_id)
+    assert "fake adapter script exhausted" not in str(result.error or ""), (
+        f"假模型的脚本用完了，这不是业务失败：给每个部门的脚本备够回答（工单 #1274）；error={result.error}")
+    return result
+
 
 def _system(data_dir):
     # 建档 run 的三个部门依次提交初始 PRD、现有结构说明与基线核验；
     # 工程与质检的 run_check 回执运行源目录里可执行的 src/app.py。
     # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
-    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化。
+    # 质检备两条同一内容的回答（工单 #1274，与 #1255 同族）：一次建档 run 里它的基线核验可能要核验两次
+    # ——工程的结构说明还没被接纳时先做的那一次不被接受，结构说明到了以后它再被唤醒一次；
+    # 先后由调度决定。回答内容相同，条数只决定够不够用，用不完的留在脚本里
     return LoopSystem.for_testing(data_dir, FakeAdapter({
         "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT],
                                                    acceptance=["run the CLI with a word"]))],
@@ -42,9 +70,13 @@ def _system(data_dir):
                                        build_and_test=[{"name": "smoke", "command": "python src/app.py",
                                                         "purpose": "run it"}],
                                        requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/app.py"]}])],
-        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
-                                                       "evidence": "smoke"}])],
+        "quality": [_review_turn(), _review_turn()],
     }))
+
+
+def _review_turn() -> FakeTurn:
+    return baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
+                                              "evidence": "smoke"}])
 
 
 def _make_source(root: Path) -> Path:
@@ -207,9 +239,10 @@ def test_run_created_from_snapshot_has_files_before_activation(data_dir, tmp_pat
     assert created.payload["snapshot"]["source"] == str(source.absolute())
     assert created.payload["snapshot"]["files"] == [".hidden", "src/app.py", "src/data.bin"]
     assert created.payload["snapshot"]["directories"] == ["empty", "empty/nested", "src"]
-    # 建档 run 以 baseline_verified 结束；结算按工单 #136 提出初始 PRD 候选并请求用户确认
-    result = system.run_until_stop(run_id)
-    assert result.status == "done"
+    # 建档 run 以 baseline_verified 结束；结算按工单 #136 提出初始 PRD 候选并请求用户确认。
+    # 等待由终态决定、上限 150 秒（见 _run_to_end）：不靠固定时长，也不等到集成层给每条用例的 300 秒
+    result = _run_to_end(system, run_id)
+    assert result.status == "done", result.error
     assert result.stop_reason == "baseline_verified"
     [proposed, requested] = [system.projects.settle(run_id), system.projects.settle(run_id)]
     assert proposed is not None and requested is None

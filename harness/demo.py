@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 import uuid
 from pathlib import Path
 
@@ -72,10 +73,14 @@ V2 = product_spec_turn(
 )
 
 def demo_script():
+    # 检查命令用跑 demo 的这个解释器，不写 PATH 上的 `python`：有的 Windows 机器上 `python` 是
+    # Microsoft Store 的占位程序，bash 里跑到它就返回 49，检查一律失败，质检的放行被拒、再被唤醒，
+    # 假模型的脚本迟早用尽（工单 #1274）。路径按 bash 认的写法给：正斜杠、加引号
+    interpreter = '"' + sys.executable.replace("\\", "/") + '"'
     quality_checks = {
-        "echo": {"command": "python -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','hello'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='hello'\""},
-        "flags": {"command": "python -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','--unknown'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='--unknown' and not r.stderr\""},
-        "usage": {"command": "python -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py'],capture_output=True,text=True); assert r.returncode==2 and 'usage' in r.stderr\""},
+        "echo": {"command": interpreter + " -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','hello'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='hello'\""},
+        "flags": {"command": interpreter + " -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py','--unknown'],capture_output=True,text=True); assert r.returncode==0 and r.stdout.strip()=='--unknown' and not r.stderr\""},
+        "usage": {"command": interpreter + " -c \"import subprocess,sys; r=subprocess.run([sys.executable,'src/echo.py'],capture_output=True,text=True); assert r.returncode==2 and 'usage' in r.stderr\""},
     }
     echo_flags = (
         "import sys\n"
@@ -140,13 +145,13 @@ def demo_script():
             return delivery_turn(
                 "added usage text",
                 files={"src/echo.py": echo_help},
-                checks={"smoke": {"command": "python src/echo.py hello"}},
+                checks={"smoke": {"command": interpreter + " src/echo.py hello"}},
                 transcript="added usage",
             )(call)
         return delivery_turn(
             "first delivery treats dash-prefixed input as ordinary text",
             files={"src/echo.py": echo_flags},
-            checks={"smoke": {"command": "python src/echo.py hello"}},
+            checks={"smoke": {"command": interpreter + " src/echo.py hello"}},
             transcript="implemented the user's revised argument behavior",
         )(call)
 
