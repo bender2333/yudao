@@ -147,13 +147,15 @@ def test_rules_registry_returns_every_entry_with_its_four_notes_bounds_kind_form
     assert [item["name"] for item in entries] == sorted(DEFINITIONS.rules)
     assert len(entries) == len(DEFINITIONS.rules)
     assert {frozenset(item) for item in entries} == {frozenset({
-        "name", "value", "bounds", "kind", "form", "guards", "cost", "relax_when", "tighten_when", "origin",
-        "changes"})}
+        "name", "value", "bounds", "kind", "form", "wired", "not_wired_reason", "guards", "cost", "relax_when",
+        "tighten_when", "origin", "changes"})}
     for item in entries:
         rule = DEFINITIONS.rules[item["name"]]
         assert item["value"] == rule.value
         assert item["bounds"] == list(rule.bounds)
         assert item["kind"] == rule.kind and item["form"] == rule.form
+        # 接入标记与原因成对出现：接入的条目原因为空（工单 #643）
+        assert item["wired"] == (item["not_wired_reason"] == "")
         assert item["guards"] == rule.guards and item["cost"] == rule.cost
         assert item["relax_when"] == rule.relax_when and item["tighten_when"] == rule.tighten_when
         assert item["origin"] == rule.origin
@@ -235,7 +237,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "runtime.start_drain", "reasons": ["not_allowed", "command_id_reused"]},
         {"name": "runtime.force_upgrade", "reasons": ["not_allowed", "command_id_reused"]},
         {"name": "home.mark_seen", "reasons": ["not_allowed", "command_id_reused"]},
-        {"name": "parameter.set", "reasons": ["not_found", "out_of_bounds", "command_id_reused"]},
+        {"name": "parameter.set",
+         "reasons": ["not_found", "not_wired", "out_of_bounds", "command_id_reused"]},
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]

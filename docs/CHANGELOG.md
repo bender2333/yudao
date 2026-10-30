@@ -822,3 +822,4 @@ GPT-6（Codex） / 2026-10-30 00:12 / docs/agents/autopilot-runtime.md「唤醒�
 执行者 worker-1170 / 2026-10-30 07:55 / `docs/architecture-issues.md` 追加一条登记：动作请求两项元数据里，「检查的核实方法」取 `query`、「读取与写入的取消能否确认停止」取 `true` 的两处理由（恢复契约第 4 节与执行环境服务设计说明第 4.1 节推出的取值） / 设计没有写逐类取值表，执行者按「设计没写到的边界自己定、登记、继续做」处置，方便架构师一次改到位
 
 deepseek-v4.1-pro / 2026-10-30 08:20 / 工单 #149 [浏览器 1]：本文件加这一条；`docs/` 下另外只动了 `docs/architecture-issues.md`（加一条，登记设计说明没写到的三处边界：图像按张计的本地用量估算、部门历史里只放工件引用而装配时才读字节、动作回执用 `images` 键交回图像工件引用）/ 模型看到截图时请求里只放最近 3 张，这几处取值与形状是后续 MCP 图像结果（#1175）与 Playwright 截图（#1184）共用的依据，需要写进设计说明
+deepseek-v4.1-flash / 2026-10-30 08:19 / docs/architecture-issues.md 登记工单 #643 的一条：docs/design/app-and-interface.md 第 202 行的拒绝原因封闭清单缺 not_wired，与该设计说明第 845 行（验收第 15 条）不一致 / 本单按验收第 15 条实现 parameter.set 的 not_wired 拒绝，封闭清单请架构师补一行

@@ -319,9 +319,10 @@ class LoopSystem:
 
     def set_parameter(self, name: str, value: Any, *, reason: str, modified_by: str,
                       command: Command | None = None) -> str:
-        # 界内修改一次全局参数现值：先核对条目与界限，通过后在目录流写一条 parameter_set。
-        # run 已经在创建时冻结参数版本，运行中修改不影响已经创建的 run。返回修改以后的参数版本
-        new_value = parameters.check_bounds(name, value)
+        # 界内修改一次全局参数现值：先核对条目、是否已经接入行为与界限，通过后在目录流写一条 parameter_set。
+        # 未接入的条目拒绝修改（工单 #643）。run 已经在创建时冻结参数版本，运行中修改不影响已经创建的 run。
+        # 返回修改以后的参数版本
+        new_value = parameters.check_parameter(name, value)
         values = parameters.current_values(self.store)
         old_value = values[name]
         after = {**values, name: new_value}

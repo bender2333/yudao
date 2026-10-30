@@ -1666,7 +1666,7 @@
             }
           },
           "409": {
-            "description": "命令被拒绝，可能的原因：not_found, out_of_bounds, command_id_reused",
+            "description": "命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, command_id_reused",
             "content": {
               "application/json": {
                 "schema": {
@@ -6138,7 +6138,8 @@
                 "not_allowed",
                 "command_id_reused",
                 "source_invalid",
-                "out_of_bounds"
+                "out_of_bounds",
+                "not_wired"
               ]
             },
             "type": "array",
@@ -9910,7 +9911,8 @@
               "not_allowed",
               "command_id_reused",
               "source_invalid",
-              "out_of_bounds"
+              "out_of_bounds",
+              "not_wired"
             ],
             "title": "Reason"
           },
@@ -10438,6 +10440,14 @@
             ],
             "title": "Form"
           },
+          "wired": {
+            "type": "boolean",
+            "title": "Wired"
+          },
+          "not_wired_reason": {
+            "type": "string",
+            "title": "Not Wired Reason"
+          },
           "guards": {
             "type": "string",
             "title": "Guards"
@@ -10475,6 +10485,8 @@
           "bounds",
           "kind",
           "form",
+          "wired",
+          "not_wired_reason",
           "guards",
           "cost",
           "relax_when",

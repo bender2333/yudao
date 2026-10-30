@@ -1442,7 +1442,7 @@ export type CommandCapability = {
     /**
      * Reasons
      */
-    reasons: Array<'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid' | 'out_of_bounds'>;
+    reasons: Array<'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid' | 'out_of_bounds' | 'not_wired'>;
 };
 
 /**
@@ -3678,7 +3678,7 @@ export type Rejected = {
     /**
      * Reason
      */
-    reason: 'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid' | 'out_of_bounds';
+    reason: 'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid' | 'out_of_bounds' | 'not_wired';
     /**
      * Message
      */
@@ -3987,6 +3987,14 @@ export type RuleEntry = {
      * Form
      */
     form: 'permission' | 'boundary' | 'admission';
+    /**
+     * Wired
+     */
+    wired: boolean;
+    /**
+     * Not Wired Reason
+     */
+    not_wired_reason: string;
     /**
      * Guards
      */
@@ -17470,7 +17478,7 @@ export type CommandParameterSetData = {
 
 export type CommandParameterSetErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, out_of_bounds, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, not_wired, out_of_bounds, command_id_reused
      */
     409: Rejected;
     /**
