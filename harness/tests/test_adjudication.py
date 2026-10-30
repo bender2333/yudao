@@ -7,6 +7,7 @@ from harness.adjudication import WorkBasis, commit_decision, facts_query, propos
 from harness.watched_outputs import has_new_work
 from harness.environment import LocalEnvironment
 from harness.models import SessionRecord
+from harness.path_rules import QA_TESTS_DIR
 from harness.proposals import delivery, delivery_turn, product_spec
 from harness.runtime import LoopSystem
 from harness.tightening import WATCHED_OUTPUTS, pending_product_input
@@ -28,11 +29,11 @@ def _engineering(tmp_path):
 def _environment(system, projection):
     return LocalEnvironment(system.workspace(projection.run_id))
 
-def _permission(system, projection, name, args, *, basis=None, aborted=False):
+def _permission(system, projection, name, args, *, department="engineering", basis=None, aborted=False):
     # 工具许可依据的工作区事实由执行环境按 U 给出的查询取得
     call = {"id": "call", "name": name, "args": args}
-    return tool_permission(adjudication_view(projection), call, department="engineering",
-        basis=basis or work_basis(projection, "engineering"),
+    return tool_permission(adjudication_view(projection), call, department=department,
+        basis=basis or work_basis(projection, department),
         aborted=aborted, facts=_environment(system, projection).query(facts_query(call)),
      tightening=WATCHED_OUTPUTS)
 
@@ -157,6 +158,35 @@ def test_the_new_work_checks_hold_when_there_is_no_effective_contract(tmp_path):
     # 质检看的是「有没有交付要核验」：这里把交付也去掉，只看合同这一支
     no_delivery = replace(projection, effective_contract=None, delivery_spec=None, delivery_specs=[])
     assert not has_new_work(no_delivery, "quality")
+
+
+def test_quality_write_tools_only_target_the_test_materials(tmp_path):
+    # 验收第 1、2 条（工单 #645，本地工具设计说明第 3 节「质检的文件工具」）：质检有写入与区间编辑的工具，
+    # 写测试材料目录被允许；写检查工作区里的其他文件被许可拒绝并说明原因——那是放行时核对的树。
+    # 这条规则只针对质检：工程照旧写交付文件
+    system, projection = _engineering(tmp_path)
+    test_file = f"{QA_TESTS_DIR}/test_echo.py"
+    assert _permission(system, projection, "write_file", {"path": test_file, "content": "print('ok')\n"},
+                       department="quality").allowed
+    assert _permission(system, projection, "edit_range",
+                       {"path": test_file, "expected_text": "print('ok')", "new_text": "print('edited')"},
+                       department="quality").allowed
+
+    for name, args in (("write_file", {"path": "src/echo.py", "content": "print('tampered')\n"}),
+                       ("edit_range", {"path": "src/echo.py", "expected_text": "import sys",
+                                       "new_text": "import os"})):
+        refused = _permission(system, projection, name, args, department="quality")
+        assert not refused.allowed and not refused.stopped, name
+        assert QA_TESTS_DIR in refused.reason and "quality" in refused.reason, refused.reason
+
+    # 测试材料目录里的路径逃逸同样被拒绝：原因来自公开路径规则
+    escaped = _permission(system, projection, "write_file",
+                          {"path": f"{QA_TESTS_DIR}/../src/echo.py", "content": "x"}, department="quality")
+    assert not escaped.allowed and not escaped.stopped
+
+    # 工程照旧可以写交付文件：限定只加在质检这一支
+    assert _permission(system, projection, "write_file",
+                       {"path": "src/echo.py", "content": "print('delivery')\n"}).allowed
 
 
 

@@ -19,14 +19,13 @@ import pygit2
 from pygit2.enums import RepositoryInitFlag, RepositoryOpenFlag
 
 from .models import canonical_hash, hash_bytes
-from .path_rules import TreeError, is_git_metadata, is_private_path, validate_public_path
+from .path_rules import TreeError, is_git_metadata, is_private_path, is_qa_tests_path, validate_public_path
 
 
 TREE_FORMAT = "yudao-public-tree-v1"
 _HASH = re.compile(r"sha256:[0-9a-f]{64}")
 # 工作区忽略规则探测用的 Git 目录：放在工作区自身之外，避免它成为公开树的条目
 IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
-QA_TESTS_DIR = ".yudao-qa-tests"
 # 捕获撞上并发写入时的重读（工单 #1214，[设计说明](docs/design/local-tools.md)第 3 节「公开树」）：
 # 文件、目录或整棵树在两次扫描之间变了，读这一侧重读整份捕获，次数有界；
 # 工作区本来就有多会话并发读写（第 2 节「每块内容只有一个写入者」是纪律，不是锁），
@@ -364,7 +363,7 @@ def _scan(base: Path, *, respect_ignore_rules: bool = False) -> dict[str, os.sta
         with os.scandir(directory) as scanning:
             for entry in scanning:
                 relative = f"{relative_directory}/{entry.name}" if relative_directory else entry.name
-                if is_private_path(relative) or relative.split("/")[0] == QA_TESTS_DIR:
+                if is_private_path(relative) or is_qa_tests_path(relative):
                     continue
                 validate_public_path(relative)
                 path = directory / entry.name

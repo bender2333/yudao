@@ -9,6 +9,7 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.environment import LocalEnvironment
 from harness.models import EventType, json_dumps
+from harness.path_rules import QA_TESTS_DIR
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -182,8 +183,9 @@ def check_copy_base(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("department", ["product", "quality"])
-def test_departments_without_write_tools_cannot_change_files(tmp_path, department):
-    # 部门的工具范围由工具许可核对：没有写入工具的部门调用写入、编辑、删除、移动都被拒绝，文件不变
+def test_departments_cannot_change_delivery_files(tmp_path, department):
+    # 部门的工具范围由工具许可核对：没有写入工具的部门调用写入、编辑、删除、移动都被拒绝，文件不变；
+    # 质检有写入工具（工单 #645），只能写测试材料目录，写交付里的文件同样被拒绝
     calls = ModelResponse(output=[
         _call("write", "write_file", path="src/echo.py", content="x"),
         _call("edit", "edit_range", path="src/echo.py", start_line=1, end_line=1,
@@ -211,7 +213,12 @@ def test_departments_without_write_tools_cannot_change_files(tmp_path, departmen
                            ("move", "move_file")):
         called = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("id") == identity)
         assert called.department == department
-        assert not called.payload["ok"] and called.payload["error"] == f"{department} cannot use {tool}"
+        assert not called.payload["ok"]
+        if department == "quality" and tool in ("write_file", "edit_range"):
+            # 质检的写入工具只写测试材料目录：原因写明目录与放行核对的树
+            assert QA_TESTS_DIR in called.payload["error"] and "quality" in called.payload["error"]
+        else:
+            assert called.payload["error"] == f"{department} cannot use {tool}"
         assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == identity for event in events)
     assert workspace.read_file("src/echo.py") == before != "x"
     assert not (workspace.root / "src" / "moved.py").exists()

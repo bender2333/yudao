@@ -54,6 +54,8 @@
             "list_files",
             "search",
             "read_range",
+            "write_file",
+            "edit_range",
             "bash",
             "read_output",
             "stop_job",

@@ -121,7 +121,7 @@
     "action": "write",
     "verification": "snapshot",
     "cancellable": true,
-    "description": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering only. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
+    "description": "Create one public workspace file or replace its entire content with UTF-8 text; missing parent directories are created. Engineering writes delivery files; quality writes test files under .yudao-qa-tests/ only. Paths under .checks are host-private. Use edit_range to change part of an existing file.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -146,7 +146,7 @@
     "action": "write",
     "verification": "snapshot",
     "cancellable": true,
-    "description": "Replace an exact original text inside one public workspace file. Engineering only. The text is located by content: when expected_text occurs exactly once in the file it is replaced wherever it is, so the line numbers may be stale; when it occurs more than once, start_line picks the occurrence starting on that line. expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
+    "description": "Replace an exact original text inside one public workspace file. Engineering edits delivery files; quality edits test files under .yudao-qa-tests/ only. The text is located by content: when expected_text occurs exactly once in the file it is replaced wherever it is, so the line numbers may be stale; when it occurs more than once, start_line picks the occurrence starting on that line. expected_digest (the read_range file content_hash) must still match when given; otherwise the edit is rejected and the file is left unchanged.",
     "parameters": {
       "type": "object",
       "properties": {

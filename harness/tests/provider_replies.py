@@ -6,8 +6,8 @@ from http.server import BaseHTTPRequestHandler
 from typing import Any
 
 from harness.models import json_dumps
+from harness.path_rules import QA_TESTS_DIR
 from harness.proposals import delivery, product_spec, review
-from harness.public_tree import QA_TESTS_DIR
 from harness.tests.protocol_helpers import ScriptedProvider, send_reply, sse
 
 # 检查命令一律写成 ["python", ...]，由主机解析解释器，基准中不出现本机路径
