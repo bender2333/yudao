@@ -12,7 +12,7 @@ from .store import ProviderDefinition
 from .tls import certificate_verification_failed, service_address, ssl_context
 
 
-# 候选模型只服务本次设置页会话，不落盘、不自动绑定
+# 候选结果由服务进程保存，不落盘、不自动绑定。
 def refresh_candidates(
     provider: ProviderDefinition,
     *,
@@ -23,10 +23,12 @@ def refresh_candidates(
     source_url = effective_models_url(provider, models_url_override)
     fetched_at = datetime.now(timezone.utc).isoformat()
     if not source_url:
-        return _unknown(provider, "", fetched_at, "未提供模型列表地址，请填写或选择带模型列表的服务方案")
+        return _unknown(provider, "", fetched_at, "未提供模型列表地址，请填写或选择带模型列表的服务方案",
+                        "unreachable")
     if not api_key.strip():
         return _unknown(provider, source_url, fetched_at,
-                        f"凭据引用 {provider.credential_ref or '（未填写）'} 无法解析，请在模型管理中配置凭据")
+                        f"模型列表请求 {source_url}：凭据引用 {provider.credential_ref or '（未填写）'} 无法解析，请在模型管理中配置凭据",
+                        "credential_missing")
     try:
         headers = {**_auth_headers(provider, api_key), "User-Agent": USER_AGENT}
         with httpx.Client(timeout=timeout_sec, verify=ssl_context()) as client:
@@ -34,22 +36,35 @@ def refresh_candidates(
         response.raise_for_status()
         payload = response.json()
     except httpx.HTTPStatusError as exc:
+        status = exc.response.status_code
+        if status in (401, 403):
+            return _unknown(provider, source_url, fetched_at,
+                            f"模型列表请求 {source_url} 返回 HTTP {status}：服务拒绝了这个 API Key",
+                            "credential_rejected")
+        hint = ""
+        if status == 404 and any(provider.base_url.endswith(suffix) for suffix in
+                                 ("/chat/completions", "/responses", "/messages")):
+            hint = "；请将服务地址填写到当前推理接口的上一级"
         return _unknown(provider, source_url, fetched_at,
-                        f"模型列表请求 {source_url} 返回 HTTP {exc.response.status_code}")
+                        f"模型列表请求 {source_url} 返回 HTTP {status}{hint}", "http_status")
     except httpx.HTTPError as exc:
         if certificate_verification_failed(exc):
             return _unknown(provider, source_url, fetched_at,
-                            f"模型列表请求 {source_url} 失败：证书校验失败（{service_address(source_url)}）")
+                            f"模型列表请求 {source_url} 失败：证书校验失败（{service_address(source_url)}）", "unreachable")
         return _unknown(provider, source_url, fetched_at,
-                        f"模型列表请求 {source_url} 连接失败：{_connection_reason(exc)}")
+                        f"模型列表请求 {source_url} 连接失败：{_connection_reason(exc)}", "unreachable")
     except ValueError:
-        return _unknown(provider, source_url, fetched_at, "模型列表不是合法 JSON")
+        received = response.headers.get("content-type", "未声明内容类型")
+        return _unknown(provider, source_url, fetched_at,
+                        f"模型列表请求 {source_url} 返回的内容不是合法 JSON（内容类型：{received}）", "invalid_response")
     try:
         candidates = _parse_candidates(payload, provider.preset_id)
     except ValueError as exc:
-        return _unknown(provider, source_url, fetched_at, str(exc))
+        return _unknown(provider, source_url, fetched_at,
+                        f"模型列表请求 {source_url} 返回的不是模型列表：{exc}", "invalid_response")
     if not candidates:
-        return _unknown(provider, source_url, fetched_at, "模型列表为空")
+        return _unknown(provider, source_url, fetched_at,
+                        f"模型列表请求 {source_url} 已连接，但服务没有返回任何模型；请检查 API Key 的模型权限", "empty_list")
     return {
         "provider_id": provider.id,
         "source_url": source_url,
@@ -57,6 +72,7 @@ def refresh_candidates(
         "status": "ok",
         "candidates": candidates,
         "error": None,
+        "reason": None,
     }
 
 
@@ -141,14 +157,11 @@ def _value_at(item: Mapping[str, Any], path: tuple[str, ...]) -> Any:
 
 
 def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
-    # 候选带预填值与来源（设计说明第 4.3 节）：协议先取能力表（来源 capability_table），
-    # 其次取服务方案的默认协议（来源 preset_default），自定义服务预填 Chat Completions（来源 default）；
-    # 窗口与输出上限先取上游模型列表（来源 models_url），其次取模型能力表（来源 capability_table），
-    # 两处都没有时留空；输入方式取能力表，包含 image 时预填文本与图像，
-    # 不包含 image、能力表没有记录或服务方案为自定义时只有文本。不按模型名称推测
+    # 候选的来源规则由设计说明第 4.3 节规定；没有明确的输出类型时保持适用。
     items = payload.get("data") if isinstance(payload, dict) else payload
     if not isinstance(items, list):
-        raise ValueError("模型列表缺少 data 数组")
+        kind = _content_kind(items if isinstance(payload, dict) and "data" in payload else payload)
+        raise ValueError(f"收到{kind}，需要模型数组或含 data 数组的对象")
     candidates: list[dict[str, Any]] = []
 
     seen: set[str] = set()
@@ -165,8 +178,8 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         candidate: dict[str, Any] = {"id": model_id}
         entry = capabilities.capability(preset_id, model_id) if preset_id else None
         candidate["protocol"], candidate["protocol_source"] = (
-            (entry.protocol, "capability_table") if entry is not None
-            else (preset_default_protocol(preset_id), "preset_default") if preset_id
+            (preset_default_protocol(preset_id), "preset_default") if preset_id
+            else (entry.protocol, "capability_table") if entry is not None
             else ("chat_completions", "default"))
         for field, paths in _UPSTREAM_LIMIT_PATHS.items():
             value = _first_positive_int(item, paths)
@@ -178,14 +191,62 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
             if field not in candidate and entry is not None and getattr(entry, field) is not None:
                 candidate[field] = getattr(entry, field)
                 candidate[f"{field}_source"] = "capability_table"
-        modalities = ["text"]
-        if entry is not None and "image" in entry.input_modalities:
-            modalities = ["text", "image"]
-        candidate["input_modalities"] = modalities
-        candidate["input_modalities_source"] = "capability_table" if entry is not None else "default"
+        inputs = _modalities(item, "input")
+        input_source = "models_url"
+        if inputs is None:
+            inputs = list(entry.input_modalities) if entry is not None and entry.input_modalities else None
+            input_source = "capability_table" if inputs is not None else "default"
+        candidate["input_modalities"] = ["text", "image"] if inputs and "image" in inputs else ["text"]
+        candidate["input_modalities_source"] = input_source
+        outputs = _modalities(item, "output")
+        output_source = "models_url"
+        if outputs is None:
+            outputs = list(entry.output_modalities) if entry is not None and entry.output_modalities else None
+            output_source = "capability_table" if outputs is not None else "default"
+        if outputs is not None:
+            candidate["output_modalities"] = outputs
+            candidate["output_modalities_source"] = output_source
+        reasoning = item.get("reasoning")
+        if not isinstance(reasoning, bool):
+            reasoning = _value_at(item, ("capabilities", "reasoning"))
+        if isinstance(reasoning, bool):
+            candidate["reasoning"], candidate["reasoning_source"] = reasoning, "models_url"
+        else:
+            candidate["reasoning"] = entry.reasoning if entry is not None else None
+            candidate["reasoning_source"] = "capability_table" if entry is not None else "default"
+        candidate["provider"] = model_id.split("/", 1)[0] if "/" in model_id else None
+        candidate["applicable"] = outputs is None or "text" in outputs
+        candidate["applicable_source"] = output_source
+        candidate["source_details"] = {
+            field.removesuffix("_source"): capabilities.source_details(source, preset_id)
+            for field, source in candidate.items() if field.endswith("_source")
+        }
         candidates.append(candidate)
+    if items and not candidates:
+        raise ValueError("收到数组，但其中没有带有效 id 的模型对象")
     candidates.sort(key=lambda entry: entry["id"])
     return candidates
+
+
+def _modalities(item: Mapping[str, Any], direction: str) -> list[str] | None:
+    for path in (("modalities", direction), (f"{direction}_modalities",),
+                 ("architecture", f"{direction}_modalities")):
+        value = _value_at(item, path)
+        if isinstance(value, list) and value and all(isinstance(part, str) and part for part in value):
+            return value
+    return None
+
+
+def _content_kind(value: Any) -> str:
+    if isinstance(value, dict):
+        return "对象"
+    if isinstance(value, list):
+        return "数组"
+    if isinstance(value, str):
+        return "字符串"
+    if value is None:
+        return "空值"
+    return "布尔值" if isinstance(value, bool) else "数值"
 
 
 def _connection_reason(exc: httpx.HTTPError) -> str:
@@ -217,7 +278,8 @@ def _connection_reason(exc: httpx.HTTPError) -> str:
     return f"连接失败：{exc}"
 
 
-def _unknown(provider: ProviderDefinition, source_url: str, fetched_at: str, error: str) -> dict[str, Any]:
+def _unknown(provider: ProviderDefinition, source_url: str, fetched_at: str, error: str,
+             reason: str) -> dict[str, Any]:
     # 上游不可用时候选未知，不沿用上次结果
     return {
         "provider_id": provider.id,
@@ -226,6 +288,7 @@ def _unknown(provider: ProviderDefinition, source_url: str, fetched_at: str, err
         "status": "unknown",
         "candidates": [],
         "error": error,
+        "reason": reason,
     }
 
 

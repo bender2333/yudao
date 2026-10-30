@@ -183,10 +183,19 @@ def test_collect_candidates_keeps_upstream_window_and_output_limit(tmp_path):
                 "id": "m1", "protocol": "chat_completions", "protocol_source": "default",
                 "context_window": 128000, "context_window_source": "models_url",
                 "max_output_tokens": 8192, "max_output_tokens_source": "models_url",
-                "input_modalities": ["text"], "input_modalities_source": "default"}
+                "input_modalities": ["text"], "input_modalities_source": "default",
+                "provider": None, "reasoning": None, "reasoning_source": "default",
+                "applicable": True, "applicable_source": "default", "source_details": {
+                    "protocol": {"source": "default"}, "context_window": {"source": "models_url"},
+                    "max_output_tokens": {"source": "models_url"}, "input_modalities": {"source": "default"},
+                    "reasoning": {"source": "default"}, "applicable": {"source": "default"}}}
             assert event.payload["candidates"][1] == {
                 "id": "m2", "protocol": "chat_completions", "protocol_source": "default",
-                "input_modalities": ["text"], "input_modalities_source": "default"}
+                "input_modalities": ["text"], "input_modalities_source": "default",
+                "provider": None, "reasoning": None, "reasoning_source": "default",
+                "applicable": True, "applicable_source": "default", "source_details": {
+                    "protocol": {"source": "default"}, "input_modalities": {"source": "default"},
+                    "reasoning": {"source": "default"}, "applicable": {"source": "default"}}}
             _assert_no_secret(client, opened)
 
 

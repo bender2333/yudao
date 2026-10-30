@@ -156,6 +156,12 @@ class CatalogConnectionSave(CommandRequest):
 class CatalogConnectionSaveRefs(Contract):
     provider_id: str
 
+
+class CatalogConnect(CommandRequest):
+    base_version: int
+    base_url: Text
+    api_key: str | None = None
+
 class CatalogDepartmentDefaultsSaveRefs(Contract):
     # 部门默认保存以后，各部门当前绑定的模型不具备建议能力时的提醒（设计说明第 5.6 节「保存时」）
     reminders: list[str] = []
@@ -231,12 +237,17 @@ def _register(application: Application, command: Command) -> None:
 
 
 def _revised(application: Application, command: Command, operation: str, before: int, after: int,
-             *, provider_id: str | None, reminders: list[str] | None = None) -> None:
+             *, provider_id: str | None, reminders: list[str] | None = None,
+             credential: dict[str, Any] | None = None, credential_action: str = "set") -> None:
     # reminders 是这次保存算出的建议能力提醒（设计说明第 5.6 节），随事件一起保存，接受结果重新计算时能得到同样的值
     payload = {"revision": after, "base_revision": before, "operation": operation, "provider_id": provider_id,
                "reminders": list(reminders or ())}
-    application.system.writes.transact(catalog_stream(), lambda transaction: transaction.append(
-        NewCatalogEvent(CatalogEventType.CATALOG_REVISED, payload)), command=command)
+    def append(transaction):
+        transaction.append(NewCatalogEvent(CatalogEventType.CATALOG_REVISED, payload))
+        if credential is not None:
+            transaction.append(NewCatalogEvent(CatalogEventType.CREDENTIAL_CHANGED,
+                               _credential_event(credential_action, credential["status"], credential["version"], True)))
+    application.system.writes.transact(catalog_stream(), append, command=command)
 
 
 def _result(application: Application, event_type: str, payload: dict[str, Any]) -> None:
@@ -354,25 +365,50 @@ async def _save_connection(application: Application, command: Command, request: 
     _revised(application, command, "save_connection", before, after, provider_id=request.provider.id)
 
 
+async def _connect(application: Application, command: Command, request: CatalogConnect) -> None:
+    facade = application.system.facade
+    _check_not_registered(application, command)
+    previous = facade.to_document()
+    try:
+        connected = facade.connect(request.base_url, request.api_key)
+    except CatalogValidationError as exc:
+        raise Rejection("catalog_invalid", str(exc))
+    problem = facade.persist_catalog(previous)
+    if problem is not None:
+        raise Rejection("catalog_invalid", problem)
+    provider_id = connected["provider_id"]
+    _revised(application, command, "connect", request.base_version, facade.catalog_revision(),
+             provider_id=provider_id, credential=connected["credential"])
+    _schedule_candidates(application, request.base_version, provider_id)
+
+
 async def _delete_connection(application: Application, command: Command, request: CatalogConnectionDelete) -> None:
     facade = application.system.facade
     _check_not_registered(application, command)
     _stale_base(facade, request.base_version)
     before = facade.catalog_revision()
     previous = facade.to_document()
+    provider = _provider_view(facade, request.provider_id)
     try:
         facade.delete_provider(request.provider_id,
                                _project_provider_referrers(application, request.provider_id))
     except CatalogValidationError as exc:
         if any("不存在" in issue.message for issue in exc.issues):
             raise Rejection("not_found", f"Provider 配置不存在：{request.provider_id}")
-        referrers = [issue.location for issue in exc.issues]
-        raise Rejection("in_use", "仍被引用，无法删除：" + "、".join(referrers))
+        if any("仍被引用" in issue.message for issue in exc.issues):
+            referrers = [issue.location for issue in exc.issues]
+            raise Rejection("in_use", "仍被引用，无法删除：" + "、".join(referrers))
+        raise Rejection("catalog_invalid", str(exc))
     after = facade.catalog_revision()
     problem = facade.persist_catalog(previous)
     if problem is not None:
         raise Rejection("catalog_invalid", problem)
-    _revised(application, command, "delete_connection", before, after, provider_id=request.provider_id)
+    credential = None
+    if provider is not None and provider["credential_ref"] and facade.dotenv_path is not None:
+        status = facade.credential_status(provider["credential_ref"])
+        credential = {"status": status, "version": status["version"]}
+    _revised(application, command, "delete_connection", before, after, provider_id=request.provider_id,
+             credential=credential, credential_action="remove_persisted")
 
 
 async def _remove_model(application: Application, command: Command, request: CatalogModelRemove) -> None:
@@ -467,24 +503,32 @@ async def _collect_candidates(application: Application, command: Command, reques
     if _provider_view(facade, request.provider_id) is None:
         raise Rejection("not_found", f"Provider 配置不存在：{request.provider_id}")
     _register(application, command)
+    _schedule_candidates(application, request.base_version, request.provider_id, request.models_url)
+
+
+def _schedule_candidates(application: Application, base_version: int, provider_id: str,
+                         models_url: str | None = None) -> None:
+    facade = application.system.facade
 
     async def run() -> None:
         try:
-            result = await asyncio.to_thread(facade.refresh_candidates, request.provider_id,
-                                             models_url_override=request.models_url)
+            result = await asyncio.to_thread(facade.refresh_candidates, provider_id,
+                                             models_url_override=models_url)
         except (CatalogValidationError, ProviderError) as exc:
-            address = facade.models_url_of(request.provider_id, request.models_url)
+            address = facade.models_url_of(provider_id, models_url)
             _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
-                "base_revision": request.base_version,
-                "provider_id": request.provider_id, "status": "unknown", "source_url": address,
+                "base_revision": base_version,
+                "provider_id": provider_id, "status": "unknown", "source_url": address,
                 "fetched_at": "", "candidates": [], "candidate_ids": [], "error": str(exc),
+                "reason": "unreachable",
             })
             return
         _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
-            "base_revision": request.base_version,
-            "provider_id": request.provider_id, "status": result["status"], "source_url": result["source_url"],
+            "base_revision": base_version,
+            "provider_id": provider_id, "status": result["status"], "source_url": result["source_url"],
             "fetched_at": result["fetched_at"], "candidates": result["candidates"],
             "candidate_ids": [item["id"] for item in result["candidates"]], "error": result["error"],
+            "reason": result["reason"],
         })
 
     application.schedule(run())
@@ -627,10 +671,15 @@ CATALOG_CONNECTION_SAVE = CommandDefinition(
     derive_refs=lambda events: CatalogConnectionSaveRefs(provider_id=events[0].payload["provider_id"]),
     reasons=("stale_base", "catalog_invalid"),
 )
+CATALOG_CONNECT = CommandDefinition(
+    name="catalog.connect", request=CatalogConnect, refs=CatalogConnectionSaveRefs, handle=_connect,
+    derive_refs=lambda events: CatalogConnectionSaveRefs(provider_id=events[0].payload["provider_id"]),
+    reasons=("catalog_invalid",),
+)
 CATALOG_CONNECTION_DELETE = CommandDefinition(
     name="catalog.connection.delete", request=CatalogConnectionDelete, refs=NoRefs,
     handle=_delete_connection, derive_refs=lambda _events: NoRefs(),
-    reasons=("stale_base", "not_found", "in_use"),
+    reasons=("stale_base", "not_found", "in_use", "catalog_invalid"),
 )
 CATALOG_MODEL_REMOVE = CommandDefinition(
     name="catalog.model.remove", request=CatalogModelRemove, refs=NoRefs, handle=_remove_model,
