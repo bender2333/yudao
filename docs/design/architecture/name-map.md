@@ -46,7 +46,9 @@
 | 按成果（关注的成果） | 第一节「轮转方式」 | `definitions/__init__.py` 的 `Definitions.watched_outputs`、组织定义里部门的 `watched`；`watched_outputs.py` 的 `watched_new_work`、`has_new_work` | 路由；道 03 | 一致 |
 | 任务池、工作单元、认领 | 第一节「轮转方式」；第三节外环「待认领」 | 无（`claim_execution_right` 的 claim 是领取事项的执行权，不是认领工作单元） | 路由；道 03 | 代码里还没有 |
 | 事项 | 第一、三节 | 项目流里叫 work_item（`work_item_created`、命令 `work_item.create`、`work_item.cancel`、`work_item.append_input`，查询 `work_item.*`）；事项的一次执行叫 run（`run_stream`、`run_created` 至 `run_continued`、`RunProjection`，查询 `run.*`） | 路由、接口 | 不一致：总图只有事项，代码与接口资源名里 `work_item` 与 `run` 两个名字并存 |
-| 质检放行，事项完成 | 第三节外环 | 质检结论 `models.py` 的 `QAReview`（`verdict` 字段）、事件 `qa_submitted`；事项结束 `run_done` | 路由 | 不一致：放行没有自己的名字，是质检结论的一个取值 |
+| 放行或开环完成，事项完成 | 第三节外环 | 放行：质检结论 `models.py` 的 `QAReview`（`verdict` 字段）、事件 `qa_submitted`；事项结束 `run_done`；开环完成：无 | 路由 | 不一致：放行没有自己的名字，是质检结论的一个取值；开环完成代码里还没有 |
+| 直做 | 第一节「轮转方式」 | 无 | 路由；道 03 | 代码里还没有 |
+| 子事项、子组织 | 第一节「工程」；第三节「子组织」 | 无 | 路由、执行；道 02 | 代码里还没有 |
 
 ### 装配
 
@@ -134,10 +136,13 @@
 | --- | --- | --- | --- | --- |
 | 定义、加载与校验 | 第二节「定义」；第四节定义 | `definitions/__init__.py` 的 `Definitions`、`load_definitions`、`DefinitionError`；文件 `organization.json`、`roles.json`、`tools.json`、`proposal_contracts.json`、`rules.json`、`stop_reasons.json`、`work_items.json`、`service_presets.json`、`model_capabilities.json`、`routings.json` | 定义；道 10 | 一致 |
 | 版本 | 第四节定义「交换」 | `Definitions` 的版本取全部文件的内容摘要 | 定义 | 一致 |
-| 部门与角色 | 第一节「下一个部门」；第四节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality` | 定义；道 01、02 | 一致 |
+| 部门与角色 | 第一节「下一个部门」；第四节定义「交换」 | `Organization`、`Department`、`Role`；`organization.json` 的 `product`、`engineering`、`quality` | 定义；道 01、02 | 不一致：部门是固定取值，`models.py` 的 `DEPARTMENTS` 取自加载的定义并在 `app/payloads.py` 写成 `Literal[DEPARTMENTS]`，`providers/facade.py` 的 `REQUIRED_DEPARTMENTS` 写死三部门；总图要的是随事项冻结的定义给出 |
 | 上限 | 第四节定义「交换」 | `rules.json` 与 `Rule`；`parameters.py`（`check_bounds`、`ParameterChange`、`fold_parameters`）；命令 `parameter.set`、事件 `parameter_set`、`project_parameter_set` | 定义 | 一致（方框的技术名词是上限与规则、参数） |
 | 停止原因清单 | 第三节外环「停止」；第四节定义「交换」 | `stop_reasons.json`、`StopReason`、`UnknownStopReason`、`models.stop_reason_name`、`Event.stop_reason` | 定义 | 一致 |
-| 谁能拒绝谁 | 第四节定义「交换」 | 无单独的声明；各部门能提交什么写在 `proposal_contracts.json`，核验关系在 `app/project_queries.py` 的 `VERIFIER_OF` 里写死（只有工程由质检核验） | 定义 | 代码里还没有 |
+| 谁能拒绝谁 | 第四节定义「交换」 | 无单独的声明；各部门能提交什么写在 `proposal_contracts.json` | 定义 | 代码里还没有 |
+| 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第四节定义「交换」 | 无声明；`app/project_queries.py` 的 `VERIFIER_OF`（`{"engineering": "quality"}`）写死，检查材料目录 `path_rules.py` 的 `QA_TESTS_DIR`，部门 id `quality` | 定义、路由；道 01 | 不一致：写死在部门名上 |
+| 写入范围 | 第四节定义「交换」 | 无声明；最接近的是 `adjudication.py` 按部门名 `quality` 把写入限在 `QA_TESTS_DIR` 下 | 定义、写入口 | 不一致：按部门名写死，不是角色的通用权限 |
+| 成果种类与提案合同 | 第四节定义「交换」 | `routings.json` 每种路由的 `outcome_kinds`；`proposal_contracts.json` | 定义；道 03 | 不一致：成果种类放在路由自己的定义里，总图是定义里单独的一项 |
 | 路由实现与它的定义、工作单元的大小 | 第四节定义「交换」 | 路由实现与它的定义：组织定义的 `routing`、`routings.json`（每种路由一条）、`Definitions.routing_definition`；工作单元的大小：无 | 定义、路由；道 03 | 一致（路由实现与它的定义）；代码里还没有（工作单元的大小） |
 | 登记的机器 | 第四节定义「交换」；第六节 | 无 | 定义；道 10 | 代码里还没有 |
 | 限定采用的范围 | 第四节定义「交换」；第五节第二层 | 无 | 定义 | 代码里还没有 |
@@ -161,12 +166,13 @@
 | 一轮工作中 | 第三节外环 | `watched_outputs.is_working`；部门状态 `working`；run 状态 `running` | 路由、执行 | 一致 |
 | 询问中 | 第三节外环 | `watched_outputs.pending_ask_department`；部门状态 `asking`；事件 `ask_started` | 路由、执行 | 一致 |
 | 等用户 | 第三节外环 | `decisions.blocks_run`、`DecisionRequest`（见接口一节）；部门状态 `waiting_user` | 接口 | 一致 |
-| 核验中 | 第三节外环 | 部门状态 `verifying`（`app/project_queries.py` 的 `DepartmentState`；`_awaiting_verification`：最新的交付还没有质检的缺陷记录或放行）；检查工作区 `environment.inspection_root` | 路由、动作 | 一致 |
-| 接纳 | 第三节外环 | 事件 `spec_accepted`、`contract_accepted`、`delivery_accepted`、`structure_accepted`、`baseline_review_accepted`、`product_decision_accepted` | 写入口、路由 | 一致 |
+| 核验中 | 第三节外环 | 部门状态 `verifying`（`app/project_queries.py` 的 `DepartmentState`；`_awaiting_verification`：最新的交付还没有质检的缺陷记录或放行）；检查工作区 `environment.inspection_root` | 路由、动作 | 不一致：`_awaiting_verification` 按质检与交付写死，不按核验角色 |
+| 接纳 | 第三节外环 | 通用接纳事件 `artifact_accepted`（`kernel_events.py`）；成果驱动的老事件 `spec_accepted`、`contract_accepted`、`delivery_accepted`、`structure_accepted`、`baseline_review_accepted`、`product_decision_accepted` | 写入口、路由 | 一致 |
 | 返工 | 第三节外环 | 质检结论的取值 `rework_engineering`（`kernel_events.py` 的 `QA_VERDICTS`）；取值 `rework`（`views/timeline/logic.ts`）；缺陷在 `QAReview.defects`，页面显示「缺陷记录」 | 路由 | 一致 |
 | 排空中 | 第三节外环 | `streams.py` 的 `DrainState`（见看门狗一行） | 看门狗 | 一致 |
-| 停止 | 第三节外环 | run 的终态 `paused`、`failed` 加 `stop_reason`；`done` 是放行以后的完成 | 路由、定义 | 不一致：代码按暂停、失败分两种终态，总图只有停止，原因来自封闭清单 |
+| 停止 | 第三节外环 | run 的终态 `paused`、`failed` 加 `stop_reason`；`done` 是放行或开环完成以后的完成（开环完成代码里还没有；`coverage.py` 里的「开环」是检验覆盖的说法，不是这个词） | 路由、定义 | 不一致：代码按暂停、失败分两种终态，总图只有停止，原因来自封闭清单 |
 
 ## 变更记录
 
 - 2026-10-29 / claude-sonnet-5-5 / 对着 main c5308acf 重核全表：改了 34 行（11 行把原来写「无」或「代码里还没有」的补上了代码里已有的名字，4 行补上漏记的名字，19 行订正名字或它所在的文件）；判断改为「一致」的 7 行、改为「不一致」的 4 行，「路由实现与它的定义、工作单元的大小」一行拆成两半分别判断；去掉旧提交号，其余行的名字核对无误；说明段里「一致的词不用记，立缝时逐行消」一句改为立缝时把那一行改成一致（表里仍有大量一致的行，原句与表相矛盾） / 原表按 2026-10-25 清点，整片过期（decision.md 2026-10-29）
+- 2026-10-31 / claude-opus-5-5 / 加直做、子事项与子组织、核验角色、写入范围、成果种类与提案合同五行，「质检放行，事项完成」改为「放行或开环完成，事项完成」；「部门与角色」「核验中」改为不一致，`VERIFIER_OF` 从「谁能拒绝谁」移到核验角色一行；接纳补 `artifact_accepted`；`done` 一句补开环完成 / 按总图 ADR-0044 的改动核对
