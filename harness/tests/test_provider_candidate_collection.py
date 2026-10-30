@@ -53,6 +53,7 @@ def test_candidates_use_table_metadata_and_upstream_modalities_without_inferring
         handler, 200, "application/json", json.dumps(models).encode("utf-8"))])
     try:
         result = refresh_candidates(ProviderDefinition(id="go", name="Go", preset_id="opencode-go",
+                                                       base_url="https://opencode.ai/zen/go/v1",
                                                        models_url=upstream.base + "/models"), api_key="local-key")
     finally:
         upstream.close()

@@ -7,7 +7,7 @@ from typing import Any
 import httpx
 
 from . import capabilities
-from .presets import USER_AGENT, preset_auth, preset_default_protocol, preset_models_url
+from .presets import USER_AGENT, preset_auth, preset_default_protocol, preset_models_url, preset_id_for_base_url
 from .store import ProviderDefinition
 from .tls import certificate_verification_failed, service_address, ssl_context
 
@@ -58,7 +58,7 @@ def refresh_candidates(
         return _unknown(provider, source_url, fetched_at,
                         f"模型列表请求 {source_url} 返回的内容不是合法 JSON（内容类型：{received}）", "invalid_response")
     try:
-        candidates = _parse_candidates(payload, provider.preset_id)
+        candidates = _parse_candidates(payload, provider.preset_id, base_url=provider.base_url)
     except ValueError as exc:
         return _unknown(provider, source_url, fetched_at,
                         f"模型列表请求 {source_url} 返回的不是模型列表：{exc}", "invalid_response")
@@ -134,6 +134,7 @@ _UPSTREAM_LIMIT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
                        ("top_provider", "context_length"), ("capabilities", "contextWindow")),
     "max_output_tokens": (("limit", "output"), ("max_completion_tokens",),
                           ("top_provider", "max_completion_tokens"), ("capabilities", "maxOutput")),
+    "max_input_tokens": (("limit", "input"),),
 }
 
 
@@ -156,13 +157,17 @@ def _value_at(item: Mapping[str, Any], path: tuple[str, ...]) -> Any:
     return value
 
 
-def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
+def _parse_candidates(payload: Any, preset_id: str, *, base_url: str | None = None,
+                      capability_index: capabilities.CapabilityIndex | None = None) -> list[dict[str, Any]]:
     # 候选的来源规则由设计说明第 4.3 节规定；没有明确的输出类型时保持适用。
     items = payload.get("data") if isinstance(payload, dict) else payload
     if not isinstance(items, list):
         kind = _content_kind(items if isinstance(payload, dict) and "data" in payload else payload)
         raise ValueError(f"收到{kind}，需要模型数组或含 data 数组的对象")
     candidates: list[dict[str, Any]] = []
+    index = capability_index if capability_index is not None else capabilities.CAPABILITY_INDEX
+    provider_id = index.recognize_provider(base_url) if base_url is not None else preset_id
+    effective_preset = preset_id_for_base_url(base_url, index.presets.presets) if base_url is not None else preset_id
 
     seen: set[str] = set()
     for item in items:
@@ -176,9 +181,9 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         # 上游列表带窗口与输出上限时带上这两项，来源是上游模型列表。上游的写法有四种，按
         # _UPSTREAM_LIMIT_PATHS 的次序取到第一个有效的就停；窗口与输出上限各自独立取
         candidate: dict[str, Any] = {"id": model_id}
-        entry = capabilities.capability(preset_id, model_id) if preset_id else None
+        entry = index.lookup(base_url, model_id) if base_url is not None else index.capability(provider_id or "", model_id)
         candidate["protocol"], candidate["protocol_source"] = (
-            (preset_default_protocol(preset_id), "preset_default") if preset_id
+            (preset_default_protocol(effective_preset), "preset_default") if effective_preset
             else (entry.protocol, "capability_table") if entry is not None
             else ("chat_completions", "default"))
         for field, paths in _UPSTREAM_LIMIT_PATHS.items():
@@ -187,7 +192,7 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
                 candidate[field] = value
                 candidate[f"{field}_source"] = "models_url"
 
-        for field in ("context_window", "max_output_tokens"):
+        for field in ("context_window", "max_output_tokens", "max_input_tokens"):
             if field not in candidate and entry is not None and getattr(entry, field) is not None:
                 candidate[field] = getattr(entry, field)
                 candidate[f"{field}_source"] = "capability_table"
@@ -218,7 +223,7 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         candidate["applicable"] = outputs is None or "text" in outputs
         candidate["applicable_source"] = output_source
         candidate["source_details"] = {
-            field.removesuffix("_source"): capabilities.source_details(source, preset_id)
+            field.removesuffix("_source"): index.source_details(source, provider_id or "")
             for field, source in candidate.items() if field.endswith("_source")
         }
         candidates.append(candidate)

@@ -37,7 +37,7 @@ def _fixture_copy():
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
-def test_shipped_capability_table_covers_only_preset_plans():
+def test_shipped_capability_table_preserves_preset_plans():
     table = DEFINITIONS.model_capabilities
     assert table.revision and table.snapshot_date and table.source
     preset_ids = {preset.id for preset in DEFINITIONS.service_presets.presets}
@@ -49,10 +49,15 @@ def test_shipped_capability_table_covers_only_preset_plans():
             assert table.presets[preset.id]
 
 
-def test_extractor_keeps_section_4_1_fields_and_filters_providers():
+def test_extractor_keeps_section_4_1_fields_for_all_providers():
+    # R2：定义格式增加服务商资料，保留旧服务方案字段的读法。
     module = _extractor()
     table = module.build_table(_presets(), _fixture_copy(), "2026-10-11.1", "2026-10-11", "https://models.dev")
-    assert set(table["presets"]) == {"opencode-go"}  # fixtures 里的 anthropic 不被收录
+    assert table["version"] == 2
+    assert set(table["providers"]) == {"anthropic", "opencode-go"}
+    assert table["providers"]["anthropic"]["api"] == "https://api.anthropic.com"
+    assert table["providers"]["anthropic"]["npm"] == "@ai-sdk/anthropic"
+    assert table["providers"]["opencode-go"]["models"] == table["presets"]["opencode-go"]
     entries = {entry["model"]: entry for entry in table["presets"]["opencode-go"]}
     assert set(entries) == {"claude-haiku-5-5", "deepseek-v4-flash", "deepseek-v4-flash-vision-exp",
                             "glm-5.3-flash", "grok-4.7", "kimi-k2.7-code"}
@@ -151,7 +156,7 @@ def test_table_public_lists_entries_with_metadata():
     assert set(view["presets"]) == set(DEFINITIONS.model_capabilities.presets)
     entry = view["presets"]["opencode-go"][0]
     assert set(entry) == {"model", "protocol", "input_modalities", "output_modalities",
-                          "context_window", "max_output_tokens", "tool_call", "reasoning"}
+                          "context_window", "max_output_tokens", "max_input_tokens", "tool_call", "reasoning"}
 
 
 def test_capability_lookup_by_preset_and_model():
@@ -206,21 +211,84 @@ def test_duplicate_model_in_one_preset_is_rejected(tmp_path):
                for issue in raised.value.issues)
 
 def test_reading_the_capability_table_never_reaches_the_network():
-    # 运行的系统读取能力表时不发出网络请求：读取本模块顶层已经建好的索引，导入时也不连接远端
-    import socket
-
+    # R2：通过真实审计事件核对离线读取；不替换网络实现。
     attempts: list[object] = []
-    original = socket.socket.connect
+    active = True
 
-    def guard(self, address, *args, **kwargs):
-        attempts.append(address)
-        raise AssertionError(f"能力表的读取不应连接网络：{address}")
+    def guard(event, args):
+        if active and event == "socket.connect":
+            attempts.append(args)
+            raise AssertionError(f"能力表的读取不应连接网络：{args}")
 
-    socket.socket.connect = guard
+    sys.addaudithook(guard)
     try:
         view = capabilities.table_public()
         assert capabilities.capability("opencode-go", view["presets"]["opencode-go"][0]["model"]) is not None
         assert capabilities.entries("opencode-go")
     finally:
-        socket.socket.connect = original
+        active = False
     assert attempts == []
+
+
+def _version_two_table():
+    return _extractor().build_table(_presets(), _fixture_copy(), "2026-10-30.1", "2026-10-30", "https://models.dev")
+
+
+def test_version_two_definitions_load_provider_metadata_and_optional_input_limit(tmp_path):
+    # R2：增加字段后的定义仍能通过同一加载入口读取，旧服务方案内容不变。
+    directory = _copy_definitions(tmp_path)
+    table = _version_two_table()
+    (directory / "model_capabilities.json").write_text(json.dumps(table), encoding="utf-8")
+    loaded = load_definitions(directory).model_capabilities
+    assert loaded.version == 2
+    assert set(loaded.providers) == {"anthropic", "opencode-go"}
+    assert loaded.providers["opencode-go"].models == loaded.presets["opencode-go"]
+
+
+@pytest.mark.parametrize("case", ["missing_provider", "inconsistent_models", "duplicate_model", "invalid_npm", "future_version"])
+def test_invalid_version_two_provider_definitions_are_rejected(tmp_path, case):
+    # R2：拒绝缺失的预置服务商、双份模型资料矛盾、重复模型和不合法的新字段。
+    directory = _copy_definitions(tmp_path)
+    table = _version_two_table()
+    if case == "missing_provider":
+        del table["providers"]["opencode-go"]
+    elif case == "inconsistent_models":
+        table["providers"]["opencode-go"]["models"] = []
+    elif case == "duplicate_model":
+        table["providers"]["anthropic"]["models"].append(table["providers"]["anthropic"]["models"][0])
+    elif case == "invalid_npm":
+        table["providers"]["anthropic"]["npm"] = ""
+    else:
+        table["version"] = 3
+    (directory / "model_capabilities.json").write_text(json.dumps(table), encoding="utf-8")
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[0] == "model_capabilities.json" for issue in raised.value.issues)
+
+
+def test_extractor_explicit_provider_exclusion_is_visible_and_cannot_remove_a_preset():
+    # R2：排除由快照更新者明确指定，拼写错误及排除预置服务商都立即报错。
+    module = _extractor()
+    table = module.build_table(_presets(), _fixture_copy(), "r", "2026-10-30", "https://models.dev",
+                               excluded_providers=("anthropic",))
+    assert set(table["providers"]) == {"opencode-go"}
+    for excluded in ("absent", "opencode-go"):
+        with pytest.raises(ValueError, match=excluded):
+            module.build_table(_presets(), _fixture_copy(), "r", "2026-10-30", "https://models.dev",
+                               excluded_providers=(excluded,))
+
+
+def test_extractor_reports_every_unmapped_provider_package_without_writing_a_file(tmp_path, capsys):
+    # R2：严格处理服务商级与模型级接入包，失败时没有半份快照输出。
+    module = _extractor()
+    raw = _fixture_copy()
+    raw["anthropic"]["npm"] = "unregistered-package"
+    raw["opencode-go"]["models"]["grok-4.7"]["provider"]["npm"] = "another-unregistered-package"
+    local_input = tmp_path / "unmapped.json"
+    local_input.write_text(json.dumps(raw), encoding="utf-8")
+    output = tmp_path / "result.json"
+    assert module.main(["--input", str(local_input), "--out", str(output)]) == 1
+    message = capsys.readouterr().err
+    assert "anthropic（unregistered-package）" in message
+    assert "opencode-go/grok-4.7（another-unregistered-package）" in message
+    assert not output.exists()
