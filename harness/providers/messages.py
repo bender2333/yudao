@@ -21,7 +21,7 @@ from anthropic.types import RawMessageStreamEvent
 
 from .call import ModelDelta
 from .errors import CancelledError, ProviderError
-from .invoke import Emit, InvokeResult, ProviderInput
+from .invoke import Emit, InvokeResult, ProviderInput, ToolImage, split_tool_output
 from .presets import build_identity_headers
 from .reasoning import ReasoningOutput, messages_reasoning_params
 from .resolve import FrozenTarget
@@ -427,11 +427,9 @@ def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, 
                     _prepend_blocks(messages[-1], thinking)
                 continue
             if item_type == "function_call_output":
-                _append_message(messages, "user", [{
-                    "type": "tool_result",
-                    "tool_use_id": str(item.get("call_id") or ""),
-                    "content": str(item.get("output") or ""),
-                }])
+                text, images = split_tool_output(item.get("output"))
+                _append_message(messages, "user", [
+                    _messages_tool_result(str(item.get("call_id") or ""), text, images)])
                 continue
             if item_type == "message" or item_type is None:
                 role = str(item.get("role") or "user")
@@ -448,12 +446,20 @@ def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, 
             continue
         _append_message(messages, "assistant" if message.role == "assistant" else "user", message.content)
     for result in provider_input.tool_results:
-        _append_message(messages, "user", [{
-            "type": "tool_result",
-            "tool_use_id": result.call_id,
-            "content": result.output,
-        }])
+        _append_message(messages, "user", [_messages_tool_result(result.call_id, result.output, result.images)])
     return "\n".join(part for part in system_parts if part), messages
+
+
+def _messages_tool_result(call_id: str, text: str, images: tuple[ToolImage, ...]) -> dict[str, Any]:
+    # Anthropic 的 tool_result 自带图像块：文字块在前，图像块按顺序（Messages 的图像输入写法，设计说明第 6.2 节）
+    if not images:
+        return {"type": "tool_result", "tool_use_id": call_id, "content": text}
+    content: list[dict[str, Any]] = [{"type": "text", "text": text}] if text else []
+    content.extend({
+        "type": "image",
+        "source": {"type": "base64", "media_type": image.media_type, "data": image.data},
+    } for image in images)
+    return {"type": "tool_result", "tool_use_id": call_id, "content": content}
 
 def _append_message(messages: list[dict[str, Any]], role: str, content: Any) -> None:
     # 相邻的同一 role 合并成一条消息：合并时把两段内容拼成块列表，只有单个文本块的回合保持字符串，

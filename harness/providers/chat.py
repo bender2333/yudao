@@ -20,7 +20,7 @@ from openai.types.chat import ChatCompletionChunk
 
 from .call import ModelDelta
 from .errors import CancelledError, ProviderError
-from .invoke import Emit, InvokeResult, ProviderInput
+from .invoke import Emit, InvokeResult, ProviderInput, ToolImage, split_tool_output, tool_image_data_url
 from .presets import build_identity_headers
 from .reasoning import chat_reasoning_effort, ReasoningOutput
 from .resolve import FrozenTarget
@@ -339,10 +339,14 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
     if isinstance(items, list) and items:
         pending_calls: list[dict[str, Any]] = []
         pending_reasoning = ""
+        pending_images: list[tuple[str, ToolImage]] = []
         for item in items:
             if not isinstance(item, dict):
                 continue
             item_type = item.get("type")
+            if item_type != "function_call_output":
+                # 连续的几条工具结果一起换成一条 user 消息：tool 消息之间不能再插别的消息
+                _flush_tool_images(messages, pending_images)
             if item_type == "reasoning":
                 # 推理内容与消息、工具调用合并在 assistant 消息上，累积到下一次冲刷
                 pending_reasoning = _reasoning_content(item)
@@ -360,11 +364,10 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
             _flush_tool_calls(messages, pending_calls, pending_reasoning)
             if item_type == "function_call_output":
                 pending_reasoning = ""
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": str(item.get("call_id") or ""),
-                    "content": str(item.get("output") or ""),
-                })
+                call_id = str(item.get("call_id") or "")
+                text, images = split_tool_output(item.get("output"))
+                messages.append({"role": "tool", "tool_call_id": call_id, "content": text})
+                pending_images.extend((call_id, image) for image in images)
                 continue
             if item_type == "message" or item_type is None:
                 role = str(item.get("role") or "user")
@@ -375,8 +378,10 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
                 pending_reasoning = ""
                 messages.append(entry)
         _flush_tool_calls(messages, pending_calls, pending_reasoning)
+        _flush_tool_images(messages, pending_images)
         return messages
     # 没有装配好的 input 时才由统一消息与工具结果组成请求；input 中的工具结果已按原位置翻译
+    images: list[tuple[str, ToolImage]] = []
     for message in provider_input.messages:
         entry: dict[str, Any] = {"role": message.role, "content": message.content}
         if message.name:
@@ -388,7 +393,22 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
             "tool_call_id": result.call_id,
             "content": result.output,
         })
+        images.extend((result.call_id, image) for image in result.images)
+    _flush_tool_images(messages, images)
     return messages
+
+
+def _flush_tool_images(messages: list[dict[str, Any]], pending: list[tuple[str, ToolImage]]) -> None:
+    # Chat Completions 的 tool 消息只收文字（设计说明第 6.2 节），工具结果里的图像写成紧跟其后的一条
+    # user 消息：每张图前面一行写明它是哪个工具调用的结果，图像按出现顺序
+    if not pending:
+        return
+    content: list[dict[str, Any]] = []
+    for call_id, image in pending:
+        content.append({"type": "text", "text": f"工具调用 {call_id} 的结果图像"})
+        content.append({"type": "image_url", "image_url": {"url": tool_image_data_url(image)}})
+    messages.append({"role": "user", "content": content})
+    pending.clear()
 
 
 def _flush_tool_calls(messages: list[dict[str, Any]], pending: list[dict[str, Any]],

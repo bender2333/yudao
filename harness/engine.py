@@ -19,7 +19,7 @@ from collections.abc import Callable, Sequence
 from contextlib import aclosing
 from dataclasses import asdict, dataclass, replace
 from threading import Event
-from typing import Any
+from typing import Any, Mapping
 
 from .actions import Action, ActionReceipt, FactsQuery, Preconditions, TreeFacts, WorkspaceFacts
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
@@ -646,11 +646,11 @@ class StepDriver:
                             after_snapshot = None
                         qa_tests_saved = self._save_qa_tests_if_changed(request)
                 # 工具结果与回执的字段相同；被拒绝的结果另带被拒绝标记与原因，其余结果保持原来的三项
-                result = {"ok": ok, "output": output, "error": error}
+                extra = None
                 if refusal is not None:
-                    result["refused"] = True
-                    result["refused_reason"] = refusal
-                input_item = {"type": "function_call_output", "call_id": identity, "output": json_dumps(result)}
+                    extra = {"refused": True, "refused_reason": refusal}
+                input_item = tool_result_item(identity, ok, output, error, extra=extra,
+                                              input_modalities=tool_input_modalities(request))
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
                 self._recorder.tool_called(request, call, after_snapshot=after_snapshot, qa_tests_saved=qa_tests_saved)
@@ -795,8 +795,8 @@ class StepDriver:
                 except UnrepresentableWorkspace:
                     after_snapshot = None
                 qa_tests_saved = self._save_qa_tests_if_changed(request)
-        input_item = {"type": "function_call_output", "call_id": identity,
-                      "output": json_dumps({"ok": ok, "output": output, "error": error})}
+        input_item = tool_result_item(identity, ok, output, error,
+                                      input_modalities=tool_input_modalities(request))
         self._recorder.tool_called(request,
                                    {"id": identity, "name": name, "args": args, "ok": ok, "output": output,
                                     "error": error, "step_id": request.step_id, "input_item": input_item},
@@ -1133,8 +1133,8 @@ class StepDriver:
             self._recorder.tool_skipped(request, {
                 "id": item["call_id"], "name": item["name"], "ok": False, "output": None,
                 "error": error, "step_id": request.step_id,
-                "input_item": {"type": "function_call_output", "call_id": item["call_id"],
-                               "output": json_dumps({"ok": False, "output": None, "error": error})}})
+                "input_item": tool_result_item(item["call_id"], False, None, error,
+                                               input_modalities=tool_input_modalities(request))})
 
 
 def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
@@ -1143,6 +1143,52 @@ def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
     if tree is None:
         return None
     return {"digest": tree.digest, "entries": [list(item) for item in zip(tree.files, tree.hashes)]}
+
+
+# 动作回执的输出里带图像的写法：键 images 是一串图像工件引用（浏览器与 computer use 设计说明
+# 第 7.1 节：截图存成工件，工具结果带它的引用）
+TOOL_IMAGE_KEY = "images"
+TOOL_IMAGE_FIELDS = ("kind", "content_hash", "path", "media_type")
+
+
+def tool_output_images(output: Any) -> tuple[dict[str, Any], ...]:
+    # 从动作回执的输出里取出图像的工件引用；输出没有图像时为空
+    if not isinstance(output, dict) or TOOL_IMAGE_KEY not in output:
+        return ()
+    images = output[TOOL_IMAGE_KEY]
+    if not isinstance(images, list):
+        raise ProviderError("tool result images must be a list of artifact references", reason="provider_protocol")
+    result = []
+    for image in images:
+        if not isinstance(image, dict) or not all(
+                isinstance(image.get(key), str) and image.get(key) for key in TOOL_IMAGE_FIELDS):
+            raise ProviderError("tool result image must be an artifact reference", reason="provider_protocol")
+        result.append({key: image[key] for key in TOOL_IMAGE_FIELDS})
+    return tuple(result)
+
+
+def tool_input_modalities(request: Any) -> tuple[str, ...]:
+    # 这次调用请求的调用目标的输入方式（模型管理设计说明第 4.3 节）：工具结果里的截图是否进入请求按它决定
+    return tuple((getattr(request, "call_target", None) or {}).get("input_modalities") or ())
+
+
+def tool_result_item(identity: str, ok: bool, output: Any, error: str | None, *,
+                     extra: Mapping[str, Any] | None = None,
+                     input_modalities: tuple[str, ...]) -> dict[str, Any]:
+    # 工具结果进入部门历史的条目。调用目标包含图像时，回执里的截图作为工件引用随结果进入历史，
+    # 由上下文装配按「最近 3 张」放进请求（设计说明第 6.2 节）；不含图像时截图只保存为证据，
+    # 工具结果里既没有图像，也没有占位文字。被拒绝的结果由调用处经 extra 带上被拒绝标记与原因
+    images = tool_output_images(output)
+    if isinstance(output, dict) and TOOL_IMAGE_KEY in output:
+        output = {key: value for key, value in output.items() if key != TOOL_IMAGE_KEY}
+    result: dict[str, Any] = {"ok": ok, "output": output, "error": error}
+    if extra:
+        result.update(extra)
+    item: dict[str, Any] = {"type": "function_call_output", "call_id": identity,
+                            "output": json_dumps(result)}
+    if images and "image" in input_modalities:
+        item["images"] = [dict(image) for image in images]
+    return item
 
 def _run_host_tool(name: str, args: dict[str, Any],
                    definitions: Definitions | None = None) -> dict[str, Any]:

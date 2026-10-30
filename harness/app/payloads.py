@@ -143,6 +143,9 @@ class FunctionCallOutput(Payload):
     type: Literal["function_call_output"]
     call_id: str
     output: str
+    # 工具结果带的图像：截图存成工件，这里只放工件引用（证据编号是工件的内容哈希）。
+    # 上下文装配按调用目标的输入方式决定放进请求的最近 3 张（浏览器与 computer use 设计说明第 6.2 节）
+    images: list[ArtifactRef] = []
 
 
 # 各种模型与工具记录共有的字段组

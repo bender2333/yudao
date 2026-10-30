@@ -20048,6 +20048,14 @@
           "output": {
             "title": "Output",
             "type": "string"
+          },
+          "images": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef"
+            },
+            "title": "Images",
+            "type": "array"
           }
         },
         "required": [

@@ -64,6 +64,19 @@ def prompt_part(call: ModelCall, source: str) -> str | None:
     return prompt_parts(call).get(source)
 
 
+def received_images(call: ModelCall) -> list[dict[str, Any]]:
+    # 这次调用收到的图像内容块：工具结果带图像时，它的输出是文字块与图像块组成的列表
+    # （浏览器与 computer use 设计说明第 6.2 节）。测试按它核对模型实际看到了哪几张
+    images: list[dict[str, Any]] = []
+    for item in call.input_items:
+        output = item.get("output")
+        if not isinstance(output, list):
+            continue
+        images.extend(part for part in output
+                      if isinstance(part, dict) and part.get("type") == "input_image")
+    return images
+
+
 def session_key(call: ModelCall) -> str:
     # 会话身份：主线按部门区分，询问分支按所属询问区分
     if call.session_id.startswith("ses_ask_"):

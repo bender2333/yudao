@@ -37,6 +37,44 @@ class CompactionPlan:
 
 SUMMARY_OUTPUT_TOKENS = 4096
 
+# 工具结果里的一张图像在本地估算中按这个值计（浏览器与 computer use 设计说明第 6.2 节）。
+# 图像的真实用量由上游按像素计算，请求里 data URL 的字节数不是它的用量：1280×800 的截图按
+# Anthropic 的宽高公式约 1400 token、按 OpenAI 的分块约 1100 token，取偏大的固定值
+IMAGE_TOKEN_ESTIMATE = 1600
+
+
+def request_input_tokens(items: list[dict[str, Any]], tools: list[dict[str, Any]],
+                         max_output_tokens: int | None = None) -> int:
+    """本地估算（模型管理设计说明第 8.2 节）：文字按 UTF-8 字节数除以 4，图像按张计固定值。"""
+    payload = {"input": _without_image_bytes(items), "tools": tools}
+    if max_output_tokens is not None:
+        payload["max_output_tokens"] = max_output_tokens
+    return estimate_tokens(json_dumps(payload)) + IMAGE_TOKEN_ESTIMATE * _request_image_count(items)
+
+
+def _request_image_count(items: list[dict[str, Any]]) -> int:
+    return sum(1 for item in items for part in _output_parts(item) if part.get("type") == "input_image")
+
+
+def _without_image_bytes(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # 估算之前去掉图像块里的字节：一张图的 data URL 有几百 KB，按文字计会把它估成几十万 token
+    sanitized: list[dict[str, Any]] = []
+    for item in items:
+        parts = _output_parts(item)
+        if not parts or not any(part.get("type") == "input_image" for part in parts):
+            sanitized.append(item)
+            continue
+        sanitized.append({**item, "output": [
+            {"type": "input_image"} if part.get("type") == "input_image" else part for part in parts
+        ]})
+    return sanitized
+
+
+def _output_parts(item: dict[str, Any]) -> list[dict[str, Any]]:
+    # 工具结果的输出在请求里是文字，带图像时是文字块与图像块组成的列表
+    output = item.get("output")
+    return [part for part in output if isinstance(part, dict)] if isinstance(output, list) else []
+
 
 SUMMARY_PREFACE = (
     "This request is a summarization task, not a department work turn. "
@@ -130,13 +168,13 @@ def plan_compaction(
     threshold = context_window - output_reserve
     if work_limit_tokens is not None:
         threshold = min(threshold, work_limit_tokens)
-    pinned_tokens = _request_tokens(pinned_input, tools, output_limit)
+    pinned_tokens = request_input_tokens(pinned_input, tools, output_limit)
     if pinned_tokens >= threshold:
         raise CompactionError("Pinned intend/current work and tool schemas leave no room for history and a response")
     active = ([] if checkpoint is None else [_summary_item(checkpoint)]) + [
         record["item"] for record in records[start:]
     ]
-    before = _request_tokens([*pinned_input, *active], tools, output_limit)
+    before = request_input_tokens([*pinned_input, *active], tools, output_limit)
     # 用量取上一次请求的上游回报用量与本次本地估算中较大的一个（设计说明第 8.2 节）；
     # 没有上一次或上游没有回报时只用估算
     used = before if previous_usage_tokens is None else max(before, previous_usage_tokens)
@@ -172,20 +210,20 @@ def plan_compaction(
             })},
         ]
 
-    if _request_tokens(inputs([]), [], output_reserve) >= material_budget:
+    if request_input_tokens(inputs([]), [], output_reserve) >= material_budget:
         raise CompactionError("Pinned context and previous summary leave no room for a summary source fragment")
     # 预检：摘要提示词超过可用空间时不发送请求，返回"未压缩"。
     # 使用固定 SUMMARY_OUTPUT_TOKENS 作为输出预算，与模型声明的输出上限无关。
     # 小窗口（< 2 * SUMMARY_OUTPUT_TOKENS）由 summary_limit < 32 兜底。
     if context_window >= 2 * SUMMARY_OUTPUT_TOKENS:
-        if _request_tokens(inputs([]), []) > context_window - SUMMARY_OUTPUT_TOKENS:
+        if request_input_tokens(inputs([]), []) > context_window - SUMMARY_OUTPUT_TOKENS:
             return None
 
     position, position_offset = start, offset
     while position < end:
         record, text = records[position], texts[position]
         whole = _fragment(record, text, position_offset, len(text))
-        if _request_tokens(inputs([*parts, whole]), [], output_reserve) <= material_budget:
+        if request_input_tokens(inputs([*parts, whole]), [], output_reserve) <= material_budget:
             parts.append(whole)
             position += 1
             position_offset = 0
@@ -199,7 +237,7 @@ def plan_compaction(
         while low <= high:
             midpoint = (low + high) // 2
             fragment = _fragment(record, text, position_offset, midpoint)
-            if _request_tokens(inputs([fragment]), [], output_reserve) <= material_budget:
+            if request_input_tokens(inputs([fragment]), [], output_reserve) <= material_budget:
                 fit = midpoint
                 low = midpoint + 1
             else:
@@ -224,7 +262,7 @@ def plan_compaction(
     request_input = inputs(parts)
     # 摘要请求的输出上限固定为 SUMMARY_OUTPUT_TOKENS，与模型声明的输出上限无关。
     # 推理模型的 reasoning 输出与摘要正文共享该预算，固定上限避免摘要被 reasoning 挤占。
-    input_estimate = _request_tokens(request_input, [])
+    input_estimate = request_input_tokens(request_input, [])
     max_output_tokens = min(SUMMARY_OUTPUT_TOKENS, context_window - input_estimate)
     if output_limit is not None:
         max_output_tokens = min(max_output_tokens, output_limit)
@@ -263,13 +301,6 @@ def finish_compaction(plan: CompactionPlan, output: list[dict[str, Any]]) -> Com
     if estimate_tokens(summary) > plan.summary_token_limit:
         return None
     return replace(plan.next_checkpoint, summary=summary)
-
-
-def _request_tokens(items: list[dict[str, Any]], tools: list[dict[str, Any]], max_output_tokens: int | None = None) -> int:
-    payload = {"input": items, "tools": tools}
-    if max_output_tokens is not None:
-        payload["max_output_tokens"] = max_output_tokens
-    return estimate_tokens(json_dumps(payload))
 
 
 def summary_material(record: dict[str, Any]) -> dict[str, Any]:

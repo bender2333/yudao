@@ -8942,6 +8942,10 @@ export type FunctionCallOutput = {
      * Output
      */
     output: string;
+    /**
+     * Images
+     */
+    images?: Array<ArtifactRef>;
 };
 
 /**

@@ -32,10 +32,22 @@ class ToolSpec:
 
 
 @dataclass(frozen=True)
+class ToolImage:
+    # 工具结果里的一张图像：媒体类型与 base64 编码的字节。证据编号属于装配一侧的工件引用，
+    # 走到请求里的内容块只有图像本身（设计说明第 6.2 节）
+    media_type: str
+    data: str
+
+
+@dataclass(frozen=True)
 class ToolResult:
     call_id: str
     name: str
     output: str
+    images: tuple[ToolImage, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "images", tuple(self.images))
 
 
 @dataclass(frozen=True)
@@ -58,6 +70,55 @@ class ProviderInput:
         if raw is not None and not isinstance(raw, Mapping):
             raise TypeError("raw_request must be a mapping or None")
         # 原始请求只读引用，不做深拷贝，调用方保证当次调用内不变
+
+
+# 工具结果的输出在请求里是文字，或者文字与图像的块列表：图像块写成 data URL 的 input_image，
+# 三种协议各自按它转成该协议的图像输入写法（浏览器与 computer use 设计说明第 6.2 节）
+TOOL_TEXT_PART = "input_text"
+TOOL_IMAGE_PART = "input_image"
+
+
+def tool_text_part(text: str) -> dict[str, Any]:
+    return {"type": TOOL_TEXT_PART, "text": text}
+
+
+def tool_image_part(image: ToolImage) -> dict[str, Any]:
+    return {"type": TOOL_IMAGE_PART, "image_url": tool_image_data_url(image)}
+
+
+def tool_image_data_url(image: ToolImage) -> str:
+    return f"data:{image.media_type};base64,{image.data}"
+
+
+def tool_image_from_url(image_url: Any) -> ToolImage:
+    # 图像块按 data URL 携带：data:<媒体类型>;base64,<字节>。其他形式在发送之前拒绝
+    if not isinstance(image_url, str) or not image_url.startswith("data:") or ";base64," not in image_url:
+        raise ProviderError("Tool result image must be a base64 data URL", reason="provider_protocol")
+    media_type, _, data = image_url[len("data:"):].partition(";base64,")
+    if not media_type or not data:
+        raise ProviderError("Tool result image must carry a media type and its bytes", reason="provider_protocol")
+    return ToolImage(media_type=media_type, data=data)
+
+
+def split_tool_output(output: Any) -> tuple[str, tuple[ToolImage, ...]]:
+    # 工具结果的输出拆成文字与图像：文字段按空行接起来，图像按出现的顺序
+    if isinstance(output, str):
+        return output, ()
+    if not isinstance(output, list):
+        raise ProviderError("Tool result output must be text or a list of content parts", reason="provider_protocol")
+    texts: list[str] = []
+    images: list[ToolImage] = []
+    for part in output:
+        if not isinstance(part, Mapping):
+            raise ProviderError("Tool result content part must be an object", reason="provider_protocol")
+        if part.get("type") == TOOL_IMAGE_PART:
+            images.append(tool_image_from_url(part.get("image_url")))
+            continue
+        text = part.get("text")
+        if not isinstance(text, str):
+            raise ProviderError("Tool result text part must carry text", reason="provider_protocol")
+        texts.append(text)
+    return "\n".join(texts), tuple(images)
 
 
 @dataclass
@@ -235,11 +296,11 @@ def provider_input_for(call: ModelCall) -> ProviderInput:
             continue
         if item_type == "function_call_output":
             call_id = item.get("call_id")
-            output = item.get("output")
+            output, images = split_tool_output(item.get("output"))
             tool_results.append(ToolResult(
                 call_id=str(call_id) if call_id is not None else "",
                 name=call_names.get(str(call_id), ""),
-                output=str(output) if output is not None else "",
+                output=output, images=images,
             ))
             continue
         if item_type == "message":
@@ -367,8 +428,15 @@ def to_provider_input(
                 call_id=str(item.get("call_id", "")),
                 name=str(item.get("name", "")),
                 output=str(item.get("output", "")),
+                images=tuple(_tool_image(entry) for entry in item.get("images") or ()),
             ))
     return ProviderInput(
         messages=tuple(normalized_messages), tools=tuple(normalized_tools),
         tool_results=tuple(normalized_results), max_output_tokens=max_output_tokens,
     )
+
+
+def _tool_image(item: ToolImage | Mapping[str, Any]) -> ToolImage:
+    if isinstance(item, ToolImage):
+        return item
+    return ToolImage(media_type=str(item.get("media_type", "")), data=str(item.get("data", "")))
