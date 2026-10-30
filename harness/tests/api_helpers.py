@@ -1,3 +1,4 @@
+import asyncio
 import json
 import threading
 import time
@@ -51,7 +52,8 @@ def running_server(open_application: Callable[[], Application], *,
                    keepalive_sec: float = 15.0,
                    pages: Path | None = None,
                    data_dir: Path | str | None = None,
-                   disable_uvicorn_logging: bool = False) -> Iterator[RunningServer]:
+                   disable_uvicorn_logging: bool = False,
+                   http_protocol: type[asyncio.Protocol] | None = None) -> Iterator[RunningServer]:
     # 与 running_api 相同的启动方式，另外把服务句柄交给调用方。
     # pages 是页面文件目录；不给出时用一个不存在的目录，页面请求按「没有页面文件」回答。
     # data_dir 是令牌文件所在的数据目录，局域网访问方式按它校验访问令牌（第 6.3 节）。
@@ -61,7 +63,8 @@ def running_server(open_application: Callable[[], Application], *,
                    pages=RELEASE_ASSETS if pages is None else pages,
                    tokens=None if data_dir is None else AccessTokenStore(data_dir)),
         host=host, port=0, log_level="warning", lifespan="on", timeout_graceful_shutdown=3.0,
-        log_config=None if disable_uvicorn_logging else LOGGING_CONFIG))
+        log_config=None if disable_uvicorn_logging else LOGGING_CONFIG,
+        http=http_protocol or "auto"))
     thread = threading.Thread(target=server.run, daemon=True)
     thread.start()
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC
@@ -87,10 +90,12 @@ def running_api(open_application: Callable[[], Application], *,
                 host: str = "127.0.0.1", connect: str | None = None,
                 keepalive_sec: float = 15.0, pages: Path | None = None,
                 data_dir: Path | str | None = None,
-                disable_uvicorn_logging: bool = False) -> Iterator[httpx.Client]:
+                disable_uvicorn_logging: bool = False,
+                http_protocol: type[asyncio.Protocol] | None = None) -> Iterator[httpx.Client]:
     with running_server(open_application, registry=registry, access=access, host=host, connect=connect,
                         keepalive_sec=keepalive_sec, pages=pages, data_dir=data_dir,
-                        disable_uvicorn_logging=disable_uvicorn_logging) as handle:
+                        disable_uvicorn_logging=disable_uvicorn_logging,
+                        http_protocol=http_protocol) as handle:
         yield handle.client
 
 
