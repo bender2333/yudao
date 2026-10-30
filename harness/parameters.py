@@ -51,6 +51,102 @@ class ParameterNotFoundError(KeyError):
     """没有这个参数：名字不在规则登记里，或不是 kind 为 parameter 的条目。"""
 
 
+class ParameterNotWiredError(ValueError):
+    """这条登记还没有接入行为：改动它不会改变任何行为，拒绝修改。原因逐字来自接入清单（工单 #643）。"""
+
+
+# 接入清单（工单 #643）：每条登记一项结论，已接入的条目为空字符串，未接入的写可以直接显示的中文原因。
+# 「接入」指代码按这条登记取值改变实际行为：parameter 条目要有代码读它的现值（参数事件折叠的结果，或创建
+# run 时从现值冻结下来的值），structure 条目要有代码读定义里的取值。把值写进参数事件、登记查询或 run 的
+# 冻结容器本身不算消费；只有同一提交已经提供实际消费者时才标为接入。
+# #1189 接入的冻结读取参数与三条可见范围、#397 接入的三项收敛参数在各自的实现提交里改这一份清单。
+NOT_WIRED_REASONS: dict[str, str] = {
+    # 已接入：代码按现值改变行为
+    "run_time_limit_sec": "",
+    "max_cycles": "",
+    "check_timeout_sec": "",
+    "onboarding.round_time_limit_sec": "",
+    # 已接入：裁决按定义里的取值判断询问链的层数
+    "organization.ask_chain_max_depth": "",
+
+    # 由 #1189 接入：现在读的是定义文件里的初值，参数事件改不了它
+    "tool_call_required_limit": "读的是定义文件里的初值（harness/engine.py 的 DEFINITIONS.rule_value），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "max_model_steps": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "max_provider_attempts": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "retry_initial_delay_sec": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "retry_max_delay_sec": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "tool_output_limit": "读的是定义文件里的初值（harness/environment.py 的模块常量 _OUTPUT_LIMIT），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "bash_timeout_default_sec": "读的是定义文件里的初值（harness/environment.py 的模块常量 _BASH_TIMEOUT_DEFAULT），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "bash_timeout_max_sec": "读的是定义文件里的初值（harness/environment.py 的模块常量 _BASH_TIMEOUT_MAX），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "check_timeout_max_sec": "读的是定义文件里的初值（harness/environment.py 的模块常量 _CHECK_TIMEOUT_MAX），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    "compaction.stalled_limit": "读的是定义文件里的初值（harness/engine.py 的 DEFINITIONS.rule_value），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
+    # 由 #1189 接入：可见范围现在读的是 roles.json
+    "roles.product.visibility": "可见范围读定义文件 harness/definitions/roles.json（harness/context.py 的 DEFINITIONS.role），参数事件改不了它；由 #1189 改为读 run 创建时冻结的取值",
+    "roles.engineering.visibility": "可见范围读定义文件 harness/definitions/roles.json（harness/context.py 的 DEFINITIONS.role），参数事件改不了它；由 #1189 改为读 run 创建时冻结的取值",
+    "roles.quality.visibility": "可见范围读定义文件 harness/definitions/roles.json（harness/context.py 的 DEFINITIONS.role），参数事件改不了它；由 #1189 改为读 run 创建时冻结的取值",
+
+    # 还没有读取方：取值不影响任何行为
+    "adjudication.plan_before_write": "没有代码读取这条登记的取值：写入前的计划检查还没有实现",
+    "review.isolation": "没有代码读取这条登记的取值：部门内的审查者与它的信息隔离还没有实现",
+    "review.ratio": "没有代码读取这条登记的取值：部门内的审查者与按比例抽审还没有实现",
+    "loop.single_work_item": "没有代码读取这条登记的取值：同一项目一次只进行一个事项现在是固定行为，不看这条开关",
+    "loop.single_writer": "没有代码读取这条登记的取值：同一时刻只有一个角色写代码现在是固定行为，不看这条开关",
+    "loop.nesting_max": "没有代码读取这条登记的取值：子循环与嵌套深度还没有实现",
+    "creation.resolve_all_roles": "没有代码读取这条登记的取值：新建事项前解析每个部门的每个角色是固定行为，不看这条开关",
+    "desktop.consent_per_session": "没有代码读取这条登记的取值：桌面会话与每个会话开始前的用户同意还没有实现",
+    "stall.rounds": "还没有代码读取它：停滞的判定与重新规划还没有实现",
+    "plan_item.rejection_reminder": "还没有代码读取它：同一计划条目被反复退回时提醒用户还没有实现",
+    "ops.repair_max_failures": "还没有代码读取它：运维部门的修复循环还没有实现",
+    "ops.observation_window_hours": "还没有代码读取它：修复后的观察窗口还没有实现",
+    "ops.backup_keep": "还没有代码读取它：部署前的备份与回滚还没有实现",
+    "evaluation.runs_per_side": "还没有代码读取它：评测运行器的运行次数由命令行给出，不读运行时规则",
+    "evaluation.runs_per_side_max": "还没有代码读取它：评测运行器的补跑次数由命令行给出，不读运行时规则",
+    "evaluation.run_minutes": "评测运行器读自己的常量（evals/runner/run_eval.py 与 run_yudao_eval.py 的 TIME_LIMIT_SECONDS），不读运行时规则；两个运行器共同的 120 分钟默认值已由 #324 统一，同样不读这条参数",
+    "calibration.batch_size": "还没有代码读取它：判定点的校准样本还没有实现",
+    "calibration.sample_ratio": "还没有代码读取它：判定点的校准抽样还没有实现",
+    "calibration.min_precision": "还没有代码读取它：判定点的启用条件与校准还没有实现",
+    "verification.recheck_ratio": "还没有代码读取它：质检只接受本次激活的回执是固定行为，按比例重复运行的调节规则还没有实现",
+    "execution.slots": "还没有代码读取它：执行槽位的调度还没有实现，现在一次只执行一个事项",
+    "context.work_limit_tokens": "读的是定义文件里的初值（harness/assembly.py 的 work_limit_tokens()），参数事件改不了它；#1189 的清单里没有这一条，#1236 把它留作旧工具结果折叠的触发线",
+    "context.tool_result_keep_tokens": "还没有代码读取它：旧工具结果的清理还没有实现",
+    "context.tool_result_clear_min_tokens": "还没有代码读取它：旧工具结果的清理还没有实现",
+    "context.history_keep_tokens": "还没有代码读取它：压缩时保留多长的历史还没有实现",
+    "context.compaction_output_tokens": "还没有代码读取它：整理请求的输出上限用 harness/compaction.py 里的固定常量 4096",
+    "context.column_limit.catalog": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.column_limit.project_profile": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.column_limit.lessons": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.column_limit.department_ledger": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.column_limit.review_queue": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.column_limit.touch_added": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.column_limit.trajectory_excerpt": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.role_result_chars": "还没有代码读取它：角色结果摘要的长度上限还没有实现",
+    "compaction.min_reasoning_effort": "还没有代码读取它：整理请求的最低推理档位还没有实现",
+    "screenshot.max_width": "还没有代码读取它：浏览器截图的等比缩小还没有实现",
+    "screenshot.max_height": "还没有代码读取它：浏览器截图的等比缩小还没有实现",
+    "execution.readiness_timeout_sec": "还没有代码读取它：执行环境服务的就绪时限还没有实现",
+    "execution.heartbeat_interval_sec": "还没有代码读取它：执行代理的心跳还没有实现",
+    "execution.heartbeat_timeout_sec": "还没有代码读取它：执行代理的心跳还没有实现",
+    "execution.dispatch_ack_timeout_sec": "还没有代码读取它：动作派发的确认时限还没有实现",
+    "execution.probe_interval_sec": "还没有代码读取它：机器的在线探测还没有实现",
+    "execution.probe_timeout_sec": "还没有代码读取它：机器的在线探测还没有实现",
+    "execution.offline_after_sec": "还没有代码读取它：机器的离线判断还没有实现",
+    "wait.model_service.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
+    "wait.machine.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
+    "wait.desktop.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
+    "wait.desktop_unlock.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
+}
+
+
+def not_wired_reason(name: str) -> str:
+    # 这条登记的未接入原因，已接入时为空字符串。清单漏了一条就是清单没有写完，当场报错（KeyError）
+    return NOT_WIRED_REASONS[name]
+
+
+def wired(name: str) -> bool:
+    # 这条登记是否已经接入行为
+    return not not_wired_reason(name)
+
+
 def fold_parameters(events: list[CatalogEvent]) -> tuple[dict[str, Any], list[ParameterChange]]:
     # 按事件顺序折叠参数事件：现值是最后一次修改的新值，历史是全部修改记录
     values = initial_values()
@@ -114,7 +210,9 @@ PROJECT_PARAMETERS = ("check_timeout_sec", "onboarding.round_time_limit_sec")
 
 
 def check_project_parameter(name: str, value: Any) -> Any:
-    # 项目级参数的新值核对：条目必须是可按项目设置的那两项，取值按全局的界限核对
+    # 项目级参数的新值核对：条目存在且是参数、已经接入行为、可以按项目设置，取值按全局的界限核对。
+    # 未接入的条目在全局与项目两个入口都拒绝修改，不写事件（工单 #643）
+    _require_wired(name)
     if name not in PROJECT_PARAMETERS:
         raise ParameterNotFoundError(f"参数 {name} 不能按项目设置")
     return check_bounds(name, value)
@@ -158,13 +256,33 @@ def frozen_check_timeout(store: Any, run_id: str) -> int:
     raise KeyError(run_id)
 
 
+def check_parameter(name: str, value: Any) -> Any:
+    # 全局参数的新值核对：条目存在且是参数、已经接入行为，取值落在界限以内（工单 #643）
+    _require_wired(name)
+    return check_bounds(name, value)
+
+
+def _parameter_rule(name: str) -> Any:
+    # 条目必须存在且 kind 为 parameter，否则抛出 ParameterNotFoundError
+    rule = DEFINITIONS.rules.get(name)
+    if rule is None or rule.kind != "parameter":
+        raise ParameterNotFoundError(f"没有这个参数：{name}")
+    return rule
+
+
+def _require_wired(name: str) -> None:
+    # 没有接入行为的条目拒绝修改，原因逐字复用接入清单里的未接入原因
+    _parameter_rule(name)
+    reason = not_wired_reason(name)
+    if reason:
+        raise ParameterNotWiredError(reason)
+
+
 def check_bounds(name: str, value: Any) -> Any:
     # 新值核对：类型必须与定义的现值一致，数值与可见范围条目数必须落在界限之内；
     # 开关与档位名只核对类型（定义加载时同样只核对界限的写法，见 Rule._within_bounds）。
     # 通过时返回原值；条目不存在时抛出 ParameterNotFoundError，超界或类型不对时抛出 ParameterOutOfBoundsError
-    rule = DEFINITIONS.rules.get(name)
-    if rule is None or rule.kind != "parameter":
-        raise ParameterNotFoundError(f"没有这个参数：{name}")
+    rule = _parameter_rule(name)
     current = rule.value
     if isinstance(current, bool) or isinstance(value, bool):
         if not isinstance(value, bool) or not isinstance(current, bool):

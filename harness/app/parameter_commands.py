@@ -44,6 +44,9 @@ async def _set_parameter(application: Application, command: Command, request: Pa
             reason=request.reason, modified_by=request.modified_by, command=command)
     except parameter_values.ParameterNotFoundError as exc:
         raise Rejection("not_found", str(exc)) from exc
+    except parameter_values.ParameterNotWiredError as exc:
+        # 未接入的条目拒绝修改：说明逐字复用规则登记里的未接入原因（工单 #643）
+        raise Rejection("not_wired", str(exc)) from exc
     except parameter_values.ParameterOutOfBoundsError as exc:
         raise Rejection("out_of_bounds", str(exc)) from exc
     except ProjectNotFoundError as exc:
@@ -53,5 +56,5 @@ async def _set_parameter(application: Application, command: Command, request: Pa
 PARAMETER_SET = CommandDefinition(
     name="parameter.set", request=ParameterSet, refs=NoRefs, handle=_set_parameter,
     derive_refs=_parameter_set_refs,
-    reasons=("not_found", "out_of_bounds"),
+    reasons=("not_found", "not_wired", "out_of_bounds"),
 )

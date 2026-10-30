@@ -1,6 +1,8 @@
 # 参数命令与参数事件（工单 #349）：从 HTTP 提交 parameter.set，经真实运行的服务读规则登记；
 # 限额冻结与停止行为直接用系统核对。覆盖六条验收：界内修改后新 run 用新限额、旧 run 保持冻结值、
 # 超界拒绝不写事件、改回原值后历史列两次修改、停止的 run 不因调大而继续、事件载荷带双版本。
+# 工单 #643 的接入标记与拒绝：登记每条带 wired 与未接入原因，未接入的条目在全局与项目两个入口
+# 都以 not_wired 拒绝，说明与登记逐字相同，两条流都不写事件。
 
 from __future__ import annotations
 
@@ -9,7 +11,7 @@ import uuid
 
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import DEFAULT_REGISTRY, Application
-from harness.event_store import catalog_stream
+from harness.event_store import catalog_stream, project_stream
 from harness.definitions import DEFINITIONS
 from harness.models import CatalogEventType, EventType, ProjectEventType
 from harness.runtime import LoopSystem
@@ -182,20 +184,57 @@ def test_rules_registry_reports_current_values_and_untouched_parameters_keep_the
     with running_api(opened) as client:
         assert _post(client, "project.create", name="参数",
                      goal="做一个命令行回显工具。").status_code == 200
-        assert _post(client, "parameter.set", name="execution.slots", value=8,
-                     reason="并行槽位调大", modified_by="user:test").status_code == 200
+        assert _post(client, "parameter.set", name="max_cycles", value=12,
+                     reason="轮数限制调小", modified_by="user:test").status_code == 200
 
         registry = client.get("/api/queries/rules.registry")
         assert registry.status_code == 200, registry.text
         entries = {item["name"]: item for item in registry.json()["data"]["rules"]}
-        assert entries["execution.slots"]["value"] == 8
-        assert len(entries["execution.slots"]["changes"]) == 1
+        assert entries["max_cycles"]["value"] == 12
+        assert len(entries["max_cycles"]["changes"]) == 1
+        # 已经接入行为的条目改动生效，登记里原因为空（工单 #643）
+        assert entries["max_cycles"]["wired"] is True
+        assert entries["max_cycles"]["not_wired_reason"] == ""
+        # 未接入的条目照常列出，原因写在登记里，参数命令拒绝修改
+        assert entries["execution.slots"]["wired"] is False
+        assert entries["execution.slots"]["not_wired_reason"]
         # 可见范围条目：现值是字符串列表，界限约束条目数，没有修改记录
         visibility = entries["roles.engineering.visibility"]
         assert visibility["value"] == DEFINITIONS.rule_value("roles.engineering.visibility")
         assert visibility["changes"] == []
         # 结构类条目取定义的默认值，没有修改记录
         assert entries["loop.nesting_max"]["changes"] == []
+
+
+def test_unwired_parameters_are_rejected_in_both_scopes_with_the_registry_reason(data_dir):
+    # 守 R2（对外合同：命令的拒绝原因与登记字段）与 R3 的阶段二要求：没有接入行为的参数不许改，
+    # 拒绝说明与服务端的登记逐字一致，页面不另写文字（工单 #643、#726）
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        project = _post(client, "project.create", name="参数", goal="做一个命令行回显工具。")
+        assert project.status_code == 200, project.text
+        project_id = project.json()["refs"]["project_id"]
+
+        registry = client.get("/api/queries/rules.registry")
+        assert registry.status_code == 200, registry.text
+        entry = next(item for item in registry.json()["data"]["rules"] if item["name"] == "execution.slots")
+        assert entry["wired"] is False and entry["not_wired_reason"]
+        end = opened.store.end_position()
+
+        # 全局入口与项目入口用同一条未接入的条目：两处都拒绝，说明逐字复用登记里的原因
+        for body in ({"name": "execution.slots", "value": 8},
+                     {"project_id": project_id, "name": "execution.slots", "value": 8}):
+            rejected = _post(client, "parameter.set", reason="试试没有接入行为的条目",
+                             modified_by="user:test", **body)
+            assert rejected.status_code == 409, rejected.text
+            assert rejected.json()["reason"] == "not_wired"
+            assert rejected.json()["message"] == entry["not_wired_reason"]
+
+        # 拒绝不写事件：目录流与项目流都没有新增参数事件，日志末尾不动
+        assert _parameter_events(opened) == []
+        assert [event for event in opened.store.stream_events(project_stream(project_id))
+                if event.type == ProjectEventType.PARAMETER_SET] == []
+        assert opened.store.end_position() == end
 
 
 def test_a_paused_run_keeps_its_frozen_limit_after_the_parameter_is_raised(data_dir):

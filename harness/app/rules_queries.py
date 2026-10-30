@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from ..definitions import DEFINITIONS
 from ..models import CatalogEventType, EventType
-from ..parameters import current_values, history
+from ..parameters import current_values, history, not_wired_reason, wired
 from .contracts import Contract, Snapshot
 from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, check_position
@@ -36,6 +36,10 @@ class RuleEntry(Contract):
     bounds: list[Any]
     kind: Literal["parameter", "structure"]
     form: Literal["permission", "boundary", "admission"]
+    # 是否已经接入行为，未接入时给出可以直接显示的中文原因；两条都取自 harness/parameters.py 的接入清单
+    # （工单 #643）。未接入的条目参数命令以 not_wired 拒绝修改，说明逐字复用这里的 not_wired_reason
+    wired: bool
+    not_wired_reason: str
     guards: str
     cost: str
     relax_when: str
@@ -78,7 +82,8 @@ def _rules_registry(application: Application, request: RulesRegistryRequest) -> 
     entries = [
         RuleEntry(
             name=name, value=values.get(name, rule.value), bounds=list(rule.bounds), kind=rule.kind,
-            form=rule.form, guards=rule.guards, cost=rule.cost, relax_when=rule.relax_when,
+            form=rule.form, wired=wired(name), not_wired_reason=not_wired_reason(name),
+            guards=rule.guards, cost=rule.cost, relax_when=rule.relax_when,
             tighten_when=rule.tighten_when, origin=rule.origin, changes=by_name.get(name, []),
         )
         for name, rule in sorted(definitions.rules.items())
