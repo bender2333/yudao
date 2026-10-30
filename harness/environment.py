@@ -397,10 +397,10 @@ class Workspaces:
         return refresh
 
 
-def _bash_slice(full: str, start: int) -> tuple[str, int | None]:
+def _bash_slice(full: str, start: int, limit: int) -> tuple[str, int | None]:
     # 从字符偏移 start 取一页：尽量在 limit（这个 run 冻结的 tool_output_limit）个字符内不断行；
     # 取完返回 (剩余全文, None)，否则返回 (页, 下一页的字符偏移)
-    end = start + self._output_limit()
+    end = start + limit
     if end >= len(full):
         return full[start:], None
     newline = full.rfind("\n", start, end)
