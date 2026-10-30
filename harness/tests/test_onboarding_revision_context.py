@@ -35,17 +35,26 @@ def _review_turn(requirements: list[str]) -> FakeTurn:
 
 
 def _round_turns(captured: dict, holder: dict, round_number: int, requirements: list[str]) -> dict:
-    # 一轮建档的三个部门回答；每个部门第一次被激活时把它收到的上下文材料记下来。
+    # 一轮建档的三个部门回答；每个部门第一次被激活时把它收到的上下文材料记下来，后一次不覆盖。
     # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
-    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
-    def remember(department: str, call, turn: FakeTurn) -> FakeTurn:
-        captured[f"round{round_number}_{department}"] = recorded_context(holder["system"], call)
-        return turn
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化。
+    # 质检备两条同一轮的回答（工单 #1255）：一次建档 run 里它的基线核验可能要核验两次
+    # ——工程的结构说明还没被接纳时先做的那一次不被接受（事件 proposal_rejected），
+    # 结构说明到了以后它再被唤醒一次；先后由调度决定，不总是同一边。产品与工程各一条：
+    # 两次 run 按顺序取用同一个部门的脚本，多给的回答会让后一次 run 拿到前一轮的内容。
+    # 同一部门的回答内容相同，用不完的留在脚本里，不影响任何断言
+    def remember(department: str, call, make) -> FakeTurn:
+        captured.setdefault(f"round{round_number}_{department}",
+                            recorded_context(holder["system"], call))
+        return make()
+
+    def turns(department: str, make, count: int) -> list:
+        return [lambda call: remember(department, call, make) for _ in range(count)]
 
     return {
-        "product": [lambda call: remember("product", call, _product_turn(round_number, requirements))],
-        "engineering": [lambda call: remember("engineering", call, _structure_turn(round_number, requirements))],
-        "quality": [lambda call: remember("quality", call, _review_turn(requirements))],
+        "product": turns("product", lambda: _product_turn(round_number, requirements), 1),
+        "engineering": turns("engineering", lambda: _structure_turn(round_number, requirements), 1),
+        "quality": turns("quality", lambda: _review_turn(requirements), 2),
     }
 
 

@@ -32,15 +32,22 @@ def _source(root) -> Path:
 def _script():
     # 建档的三个部门各一轮。核验把失败的检查记为现有缺陷：确认以后采纳成果的已知风险与现有缺陷数才有内容。
     # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
-    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化。
+    # 质检备两条同一内容的回答（工单 #1255）：一次建档 run 里它的基线核验可能要核验两次
+    # ——工程的结构说明还没被接纳时先做的那一次不被接受，结构说明到了以后它再被唤醒一次；
+    # 先后由调度决定。回答内容相同，条数只决定够不够用，不影响任何断言
+    def turns(make, count: int) -> list:
+        return [make() for _ in range(count)]
+
     return {
-        "product": [FakeTurn(proposal=product_spec(requirements=[REQUIREMENT],
-                                                   acceptance=["run the CLI with a word"]))],
-        "engineering": [structure_turn(checks={"smoke": 0, "broken": 1},
-                                       requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}])],
-        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "existing_defect",
-                                                       "evidence": "broken"}],
-                                         checks={"smoke": 0, "broken": 1})],
+        "product": turns(lambda: FakeTurn(proposal=product_spec(
+            requirements=[REQUIREMENT], acceptance=["run the CLI with a word"])), 1),
+        "engineering": turns(lambda: structure_turn(
+            checks={"smoke": 0, "broken": 1},
+            requirement_locations=[{"requirement": REQUIREMENT, "locations": ["src/echo.py"]}]), 1),
+        "quality": turns(lambda: baseline_review_turn(
+            conclusions=[{"requirement": REQUIREMENT, "status": "existing_defect", "evidence": "broken"}],
+            checks={"smoke": 0, "broken": 1}), 2),
     }
 
 
