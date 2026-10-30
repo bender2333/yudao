@@ -276,6 +276,26 @@ def test_model_definition_carries_the_reported_capacity():
     assert adjusted["max_output_tokens"] == 4_000
 
 
+def test_the_model_list_reports_the_capacity():
+    """模型列表报告了 `context_length` 与 `max_completion_tokens` 时取这两个值（第 3 节）。"""
+    payload = {"data": [
+        {"id": "another-model", "context_length": 8_192, "max_completion_tokens": 1_024},
+        {"id": MODEL, "context_length": 262_144, "max_completion_tokens": 64_000},
+    ]}
+    assert model_service.reported_limits(payload, MODEL) == {"context_window": 262_144,
+                                                             "max_output_tokens": 64_000}
+    assert model_service.reported_limits(payload, "missing-model") == {
+        "context_window": None, "max_output_tokens": None}
+
+
+def test_the_capacity_comes_from_the_list_or_the_arguments():
+    """列表没有报告、也没有给参数时报错，两种情况各报出缺哪一个参数。"""
+    with pytest.raises(RuntimeError, match="--context-window"):
+        model_service.resolve_limits(MODEL, {})
+    with pytest.raises(RuntimeError, match="--max-output-tokens"):
+        model_service.resolve_limits(MODEL, {"context_window": 131_072})
+
+
 def test_requirement_text_carries_the_prd_and_the_agreement():
     text = yudao.requirement_text()
     assert "## 需求原文" in text and "## 接口约定" in text
