@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import time
 from threading import Lock
-from typing import Any
+from typing import Any, Mapping
 
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .artifacts import ArtifactStore, ExternalSource
