@@ -4,13 +4,16 @@
 # 等待确认的决定不占执行槽位也不挡住排空。系统整体运行：真实启动 FastAPI 应用（uvicorn），
 # 经 HTTP 提交命令与读取查询，事件日志是真实的 SQLite 文件，模型回答由 FakeAdapter 给出。
 
+import threading
 import uuid
+
+from uvicorn.protocols.http.h11_impl import H11Protocol
 
 from harness.adapters.fake import FakeTurn
 from harness.event_store import project_stream
 from harness.models import EventType, ProjectEventType
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
-from harness.tests.api_helpers import running_api
+from harness.tests.api_helpers import STARTUP_TIMEOUT_SEC, running_api
 from harness.tests.onboarding_project import (
     ONBOARDING_GOAL as GOAL,
     ONBOARDING_REQUIREMENT as REQUIREMENT,
@@ -77,11 +80,11 @@ def _onboard(client, tmp_path, source_name="src"):
     return accepted.json()["refs"]
 
 
-def _run_onboarding_http(data_dir, tmp_path, script, *, rounds: int = 0):
+def _run_onboarding_http(data_dir, tmp_path, script, *, rounds: int = 0, http_protocol=None):
     # 起服务、接入已有项目、按顺序回答 rounds 次「提出修改」，每轮都等 run 结束。
     # 返回服务上下文管理器、HTTP 客户端、系统与最后一轮接入的 refs
     opened = _Opened(data_dir, turns=script)
-    context = running_api(opened)
+    context = running_api(opened, http_protocol=http_protocol)
     client = context.__enter__()
     refs = _onboard(client, tmp_path)
     assert _wait_for(lambda: _request_opened(client, refs["project_id"])), "the initial PRD was not requested"
@@ -252,9 +255,43 @@ def test_awaiting_confirmation_blocks_restart_create_and_archive(data_dir, tmp_p
 def test_decisions_list_carries_the_initial_prd_materials_and_the_note_mark(data_dir, tmp_path):
     # 验收（3.4 节）：决定列表里的建档请求带初始 PRD、结构说明、基线核验、快照与仓库概况的工件引用，
     # 「提出修改」标记说明必填，确认不要求说明
-    context, client, opened, refs = _run_onboarding_http(data_dir, tmp_path, _round([REQUIREMENT]))
+    # R2（决定查询合同）与 R3（接入已有项目）：请求选中空闲连接后，让真实的服务空闲计时先到达，
+    # 再发送请求并关闭连接。信号只控制先后，关闭仍由 H11 的原处理器执行。
+    selected = threading.Event()
+    closing = threading.Event()
+    sent = threading.Event()
+    closed = threading.Event()
+
+    class ClosingIdleConnection(H11Protocol):
+        def timeout_keep_alive_handler(self):
+            if selected.is_set():
+                closing.set()
+                assert sent.wait(STARTUP_TIMEOUT_SEC), "the selected request did not send its headers"
+            super().timeout_keep_alive_handler()
+            closed.set()
+
+    new_connection = False
+
+    def trace(name, info):
+        nonlocal new_connection
+        if name == "connection.connect_tcp.started":
+            new_connection = True
+        elif name == "http11.send_request_headers.started" and not new_connection:
+            selected.set()
+            assert closing.wait(STARTUP_TIMEOUT_SEC), "the server idle timer did not reach the selected connection"
+        elif name == "http11.send_request_headers.complete":
+            sent.set()
+        elif name == "http11.receive_response_headers.started" and selected.is_set():
+            assert closed.wait(STARTUP_TIMEOUT_SEC), "the server did not close the selected idle connection"
+
+    context, client, opened, refs = _run_onboarding_http(
+        data_dir, tmp_path, _round([REQUIREMENT]), http_protocol=ClosingIdleConnection)
     try:
-        decision = _open_initial_prd(client, refs["project_id"])
+        response = client.get(f"/api/queries/decisions.list?project_id={refs['project_id']}",
+                              extensions={"trace": trace})
+        assert response.status_code == 200, response.text
+        decision = next(item for item in response.json()["data"]["decisions"]
+                        if item["kind"] == "initial_prd" and item["status"] == "open")
         request = decision["request"]
         assert request["prd"]["prd_ref"] and request["structure"]["structure_ref"]
         assert request["overview_ref"] and request["snapshot"]["tree_ref"]
