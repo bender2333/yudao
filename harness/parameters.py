@@ -5,11 +5,33 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, VISIBILITY_VALUES
 from .models import CatalogEvent, CatalogEventType, ProjectEventType, json_dumps
+
+# 建 run 时冻结的参数（工单 #1189）：这 10 项在 run 创建时从参数现值取样，这个 run 一直用它，
+# 参数事件只作用于之后创建的 run（规则登记与参数设计说明第 3 节）
+RUN_PARAMETERS = (
+    "tool_call_required_limit",
+    "max_model_steps",
+    "max_provider_attempts",
+    "retry_initial_delay_sec",
+    "retry_max_delay_sec",
+    "tool_output_limit",
+    "bash_timeout_default_sec",
+    "bash_timeout_max_sec",
+    "check_timeout_max_sec",
+    "compaction.stalled_limit",
+)
+
+# 三条可见范围也在建 run 时冻结：取值是定义 roles.json 词表里的子集（工单 #1189）
+VISIBILITY_PARAMETERS = ("roles.product.visibility", "roles.engineering.visibility", "roles.quality.visibility")
+
+# 每个 run 的冻结快照里的全部参数名；#397 的三项收敛参数随后追加，不另立字段
+FROZEN_PARAMETERS = (*RUN_PARAMETERS, *VISIBILITY_PARAMETERS)
 
 
 @dataclass(frozen=True)
@@ -69,23 +91,21 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "onboarding.round_time_limit_sec": "",
     # 已接入：裁决按定义里的取值判断询问链的层数
     "organization.ask_chain_max_depth": "",
-
-    # 由 #1189 接入：现在读的是定义文件里的初值，参数事件改不了它
-    "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
-    "tool_call_required_limit": "读的是定义文件里的初值（harness/engine.py 的 DEFINITIONS.rule_value），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "max_model_steps": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "max_provider_attempts": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "retry_initial_delay_sec": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "retry_max_delay_sec": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "tool_output_limit": "读的是定义文件里的初值（harness/environment.py 的模块常量 _OUTPUT_LIMIT），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "bash_timeout_default_sec": "读的是定义文件里的初值（harness/environment.py 的模块常量 _BASH_TIMEOUT_DEFAULT），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "bash_timeout_max_sec": "读的是定义文件里的初值（harness/environment.py 的模块常量 _BASH_TIMEOUT_MAX），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "check_timeout_max_sec": "读的是定义文件里的初值（harness/environment.py 的模块常量 _CHECK_TIMEOUT_MAX），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    "compaction.stalled_limit": "读的是定义文件里的初值（harness/engine.py 的 DEFINITIONS.rule_value），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
-    # 由 #1189 接入：可见范围现在读的是 roles.json
-    "roles.product.visibility": "可见范围读定义文件 harness/definitions/roles.json（harness/context.py 的 DEFINITIONS.role），参数事件改不了它；由 #1189 改为读 run 创建时冻结的取值",
-    "roles.engineering.visibility": "可见范围读定义文件 harness/definitions/roles.json（harness/context.py 的 DEFINITIONS.role），参数事件改不了它；由 #1189 改为读 run 创建时冻结的取值",
-    "roles.quality.visibility": "可见范围读定义文件 harness/definitions/roles.json（harness/context.py 的 DEFINITIONS.role），参数事件改不了它；由 #1189 改为读 run 创建时冻结的取值",
+    # 已接入（工单 #1189）：建 run 时冻结，run 全程读冻结值（代码读的是 run_created 里的冻结字典）
+    "tool_call_required_limit": "",
+    "max_model_steps": "",
+    "max_provider_attempts": "",
+    "retry_initial_delay_sec": "",
+    "retry_max_delay_sec": "",
+    "tool_output_limit": "",
+    "bash_timeout_default_sec": "",
+    "bash_timeout_max_sec": "",
+    "check_timeout_max_sec": "",
+    "compaction.stalled_limit": "",
+    # 已接入（工单 #1189）：三条可见范围在建 run 时冻结，上下文装配只读冻结的那份
+    "roles.product.visibility": "",
+    "roles.engineering.visibility": "",
+    "roles.quality.visibility": "",
 
     # 还没有读取方：取值不影响任何行为
     "adjudication.plan_before_write": "没有代码读取这条登记的取值：写入前的计划检查还没有实现",
@@ -136,6 +156,7 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "wait.machine.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "wait.desktop.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "wait.desktop_unlock.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
+    "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
 }
 
 
@@ -258,6 +279,37 @@ def frozen_check_timeout(store: Any, run_id: str) -> int:
     raise KeyError(run_id)
 
 
+def frozen_snapshot(store: Any, *, project_id: str | None, definitions_version: str,
+                    item_limits: Mapping[str, Any]) -> dict[str, Any]:
+    # 建 run 时写进 run_created 的参数快照（工单 #1189，设计说明第 3 节第 3 条）：先取全局现值，再取项目的
+    # 覆盖，事项已经解析出来的实际限额单独记下，四项与定义版本合在一起构成这个 run 的有效快照。
+    # 取值按当时的定义核对界限；可见范围的词表核对在 check_bounds 里
+    values = current_values(store)
+    for name in FROZEN_PARAMETERS:
+        check_bounds(name, values[name])
+    overrides = ({name: value_for_project(store, project_id, name) for name in PROJECT_PARAMETERS}
+                 if project_id is not None else {})
+    return {
+        "values": {name: values[name] for name in FROZEN_PARAMETERS},
+        "global_version": parameters_version(values),
+        "project_overrides": overrides,
+        "project_version": parameters_version(overrides),
+        "item_limits": dict(item_limits),
+        "definitions_version": definitions_version,
+    }
+
+
+def frozen_run_parameters(projection: Any) -> dict[str, Any]:
+    # 这个 run 使用的参数取值：run_created 里冻结的那份；旧事件没有冻结字典时按定义初值解释
+    # （定义初值是发布时的那份，不取进程重启时的现值，也不取项目当前的覆盖）
+    frozen = getattr(projection, "parameters", None) or {}
+    values = frozen.get("values")
+    if isinstance(values, dict) and all(name in values for name in FROZEN_PARAMETERS):
+        return dict(values)
+    initial = initial_values()
+    return {name: initial[name] for name in FROZEN_PARAMETERS}
+
+
 def check_parameter(name: str, value: Any) -> Any:
     # 全局参数的新值核对：条目存在且是参数、已经接入行为，取值落在界限以内（工单 #643）
     _require_wired(name)
@@ -311,6 +363,13 @@ def check_bounds(name: str, value: Any) -> Any:
             raise ParameterOutOfBoundsError(
                 f"参数 {name} 的取值应为字符串列表，收到 {value!r}，界限为 {list(rule.bounds)!r}",
                 bounds=rule.bounds)
+        if name in VISIBILITY_PARAMETERS:
+            # 三条可见范围只能是封闭词表里的值（工单 #1189）：词表外的取值在参数校验处就拒绝
+            unknown = [item for item in value if item not in VISIBILITY_VALUES]
+            if unknown:
+                raise ParameterOutOfBoundsError(
+                    f"参数 {name} 的取值 {unknown!r} 不在可见范围词表内：{'、'.join(sorted(VISIBILITY_VALUES))}",
+                    bounds=rule.bounds)
         low, high = rule.bounds
         if not low <= len(value) <= high:
             raise ParameterOutOfBoundsError(

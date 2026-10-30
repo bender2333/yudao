@@ -21706,6 +21706,48 @@
         "title": "FieldError",
         "type": "object"
       },
+      "FrozenParameters": {
+        "additionalProperties": false,
+        "properties": {
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          },
+          "global_version": {
+            "title": "Global Version",
+            "type": "string"
+          },
+          "project_overrides": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Project Overrides",
+            "type": "object"
+          },
+          "project_version": {
+            "default": "",
+            "title": "Project Version",
+            "type": "string"
+          },
+          "item_limits": {
+            "additionalProperties": true,
+            "title": "Item Limits",
+            "type": "object"
+          },
+          "definitions_version": {
+            "title": "Definitions Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "values",
+          "global_version",
+          "item_limits",
+          "definitions_version"
+        ],
+        "title": "FrozenParameters",
+        "type": "object"
+      },
       "FunctionCallOutput": {
         "additionalProperties": false,
         "properties": {
@@ -31197,6 +31239,16 @@
           "parameters_version": {
             "title": "Parameters Version",
             "type": "string"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FrozenParameters"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "run_event_version": {
             "title": "Run Event Version",

@@ -947,10 +947,20 @@ class ProjectService:
         created: list[str] = []
         for project_id in self.store.list_project_ids():
             state = self.projection(project_id)
+            # 事项创建时冻结的定义版本（工单 #1189）：与当前不同时不补建，保留事项记录与原始起点，
+            # 交给定义版本差异的恢复决定处理；同一版本时按事项记录自动补建
+            frozen_versions = {
+                event.payload["run_id"]: str(event.payload.get("definitions_version", ""))
+                for event in self.store.list_project_events(project_id)
+                if event.type == ProjectEventType.WORK_ITEM_CREATED
+            }
             for item in state.work_items:
                 if item.kind == "onboarding":
                     continue
                 if self.store.stream_events(run_stream(item.run_id), after_version=0):
+                    continue
+                item_definitions_version = frozen_versions.get(item.run_id, "")
+                if item_definitions_version and item_definitions_version != DEFINITIONS.version:
                     continue
                 snapshot = item.snapshot
                 tree = None
@@ -971,6 +981,7 @@ class ProjectService:
                     project_context=self.artifacts.get(
                         ArtifactRef(**item.project_context_ref)).decode("utf-8"),
                     prompt_config_versions=dict(item.prompt_config_versions),
+                    item_definitions_version=item_definitions_version or DEFINITIONS.version,
                 )
                 created.append(item.run_id)
         return created

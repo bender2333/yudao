@@ -245,6 +245,17 @@ class OnboardingBasis(Payload):
     note_ref: ArtifactRef | None = None
 
 
+class FrozenParameters(Payload):
+    # 建 run 时冻结的参数快照（工单 #1189）：13 项取值、全局参数版本、项目覆盖与其版本、事项已解析的实际限额、
+    # 事项创建时的定义版本。字段只增，#397 的三项收敛参数随后追加进 values
+    values: dict[str, Any]
+    global_version: str
+    project_overrides: dict[str, Any] = {}
+    project_version: str = ""
+    item_limits: dict[str, Any]
+    definitions_version: str
+
+
 class RunCreatedPayload(Payload):
     task: str
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
@@ -274,6 +285,9 @@ class RunCreatedPayload(Payload):
     definitions_version: str
     # 创建这个 run 时冻结的参数版本（全部参数现值的内容摘要，工单 #349）
     parameters_version: str
+    # 创建这个 run 时冻结的参数快照（工单 #1189）：本 run 全程读这份取值；旧事件没有这个字段时，
+    # 按该事件所记录的定义版本的定义初值解释（不取参数现值）
+    parameters: FrozenParameters | None = None
     # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
     run_event_version: int
     # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮候选事件与修改意见的工件引用。

@@ -427,6 +427,9 @@ class RunProjection:
     definitions_version: str = ""
     # 创建这个 run 时冻结的参数版本（工单 #349）：运行中不跟随参数修改
     parameters_version: str = ""
+    # 建 run 时冻结的参数快照（工单 #1189）：13 项取值、全局参数版本、项目覆盖来源、事项实限与定义版本。
+    # 旧 run 的创建事件没有这个字段时为空，读取方按该事件所记录的定义版本的定义初值解释
+    parameters: dict[str, Any] | None = None
     qa_tests_version: int = 0
     qa_tests_hash: str | None = None
     qa_tests_archive_ref: dict[str, Any] | None = None

@@ -73,6 +73,7 @@
 "test_event_sequence.py" = "integration"
 "test_event_sources.py" = "unit"
 "test_fake_adapter_scripts.py" = "module"
+"test_frozen_parameters.py" = "integration"
 "test_event_store_batch.py" = "module"
 "test_event_store_read_only.py" = "module"
 "test_event_stream.py" = "module"

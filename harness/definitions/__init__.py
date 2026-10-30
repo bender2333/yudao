@@ -13,7 +13,7 @@ import math
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, get_args
 
 from pydantic import (BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError,
                       field_validator, model_validator)
@@ -76,6 +76,11 @@ def check_contract(kind: ActionKind, verification: Verification | None, cancella
 # 前一段是领域，最后一段是条目；等待的时长上限与栏目上限因此写作 wait.desktop.max_sec、
 # context.column_limit.catalog
 RuleName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")]
+
+# 可见范围的封闭词表（roles.json 的 visibility 一栏）：三条 roles.<部门>.visibility 参数的取值只能是其中的子集
+# （工单 #1189）。词表只在这里写一份，参数的取值核对与角色定义共用它
+VisibilityValue = Literal["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"]
+VISIBILITY_VALUES: frozenset[str] = frozenset(get_args(VisibilityValue))
 
 
 def _freeze(value: Any) -> Any:
@@ -206,7 +211,7 @@ class Role(_Definition):
     # 可以使用的工具，按这个顺序提供给模型
     tools: tuple[Identifier, ...]
     # 可见范围：除全体角色共同的材料以外，本角色还能看到的材料
-    visibility: tuple[Literal["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"], ...]
+    visibility: tuple[VisibilityValue, ...]
 
 
 class Tool(_Definition):

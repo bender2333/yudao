@@ -70,11 +70,14 @@ class ActivationScope:
 
 @dataclass(frozen=True)
 class StepLimits:
-    # 步骤驱动的重试与步数参数；默认值取规则登记中的现值，正式运行使用默认值
+    # 步骤驱动的重试与步数参数；默认值取规则登记中的初始值，一次 run 里由流程编排换成这个 run 冻结的值
+    # （工单 #1189：这 6 项与 compaction_stalled_limit 一起在 run_created 里冻结）
     retry_initial_delay_sec: float = DEFINITIONS.rule_value("retry_initial_delay_sec")
     retry_max_delay_sec: float = DEFINITIONS.rule_value("retry_max_delay_sec")
     max_provider_attempts: int = DEFINITIONS.rule_value("max_provider_attempts")
     max_model_steps: int = DEFINITIONS.rule_value("max_model_steps")
+    tool_call_required_limit: int = DEFINITIONS.rule_value("tool_call_required_limit")
+    compaction_stalled_limit: int = DEFINITIONS.rule_value("compaction.stalled_limit")
     department_max_model_steps: Mapping[str, int] = field(default_factory=dict)
     department_max_time_sec: Mapping[str, float] = field(default_factory=dict)
 

@@ -74,6 +74,17 @@ def evidence_placeholder(evidence: str) -> str:
     return f"截图 {evidence} 已保存为证据"
 
 
+def frozen_visibility(projection: RunProjection, department: str) -> tuple[str, ...]:
+    # 三条 roles.<部门>.visibility 在建 run 时冻结（工单 #1189）：上下文装配只读这一份；
+    # 旧 run 的事件没有冻结字典时按定义初值解释（不取参数现值，也不取较新的定义）
+    from .parameters import frozen_run_parameters
+
+    declared = frozen_run_parameters(projection).get(f"roles.{department}.visibility")
+    if declared is None:
+        return tuple(DEFINITIONS.role(department).visibility)
+    return tuple(str(item) for item in declared)
+
+
 def request_history(history: list[dict[str, Any]], *, run_id: str, artifacts: ArtifactStore | None,
                     input_modalities: tuple[str, ...] = ("text",)) -> list[dict[str, Any]]:
     """部门历史里的工具结果按调用目标的输入方式放进请求（设计说明第 6.2 节）。
@@ -264,9 +275,9 @@ class ContextAssembler:
             raise ValueError("department guidance must belong to the activated department")
         tool_names = offered_tools(projection, department, tightening=self.tightening,
                                    session_id=session_id, input_modalities=input_modalities)
-        # 全体角色共同的规则文字与本角色的可见范围取自定义
+        # 全体角色共同的规则文字取自定义；本角色的可见范围读这个 run 冻结的取值（工单 #1189）
         rules = DEFINITIONS.organization.rules
-        visible = DEFINITIONS.role(department).visibility
+        visible = frozen_visibility(projection, department)
         current_delivery = projection.delivery_spec
         if current_delivery is not None and current_delivery.status != "active":
             current_delivery = None
