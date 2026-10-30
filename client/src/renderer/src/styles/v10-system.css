@@ -213,6 +213,25 @@ button.y10-chip:hover { border-color: var(--green); color: var(--green); backgro
 .mm-advanced-model { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
 .mm-advanced-model .y10-h3 { margin: 0; font-size: 12.5px; }
 
+/* ---------------------------------------------------------------- 规则与参数 */
+
+/* 按领域分组的条目（工单 #1195）：一组一张卡，卡内一条登记一个块 */
+.y10-rules-list { display: grid; gap: 14px; }
+.y10-rule-row { border: 1px solid var(--line); border-radius: 9px; background: var(--surface); padding: 12px 14px; display: grid; gap: 8px; }
+.y10-rule-row.is-not-wired { border-style: dashed; }
+.y10-rule-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; justify-content: space-between; }
+.y10-rule-name { margin: 0; font-size: 14px; font-family: var(--mono); overflow-wrap: anywhere; }
+.y10-rule-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.y10-rule-values { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; font-size: 13px; }
+.y10-rule-values strong { font-family: var(--mono); font-size: 14px; }
+.y10-rule-records { font-size: 12.5px; }
+.y10-rule-records .term { min-width: 6.5em; }
+.y10-rule-history ul { margin: 4px 0 0; }
+.y10-rule-history li { display: flex; flex-wrap: wrap; gap: 2px 12px; justify-content: space-between; align-items: baseline; }
+.y10-rule-edit { display: grid; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.y10-rule-edit-fields { display: grid; grid-template-columns: minmax(140px, 220px) minmax(220px, 1fr); gap: 10px 16px; }
+.y10-rule-withdraw { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding-top: 4px; }
+
 /* ---------------------------------------------------------------- 窄屏 */
 
 @media (max-width: 1100px) {
@@ -234,4 +253,5 @@ button.y10-chip:hover { border-color: var(--green); color: var(--green); backgro
   .y10-lamps { flex-wrap: wrap; }
   .y10-table-defs .y10-input, .y10-table-defs .y10-select { min-width: 0; }
   .y10-def-reasoning { min-width: 0; }
+  .y10-rule-edit-fields { grid-template-columns: minmax(0, 1fr); }
 }

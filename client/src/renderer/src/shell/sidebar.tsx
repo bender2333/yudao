@@ -41,6 +41,9 @@ const SYSTEM_ENTRIES: { page: string; label: string; query: string; icon: string
   { page: "machines", label: "机器", query: "machines.list", icon: "machines" },
   { page: "runtime", label: "运行与执行槽位", query: "system.status", icon: "runtime" },
   { page: "tools", label: "工具与扩展", query: "tools.registry", icon: "tools" },
+  // 规则与参数页（工单 #1195）：入口按 rules.registry 出现；图标用现有的 tag（登记条目），
+  // 不为这一页改 kit.tsx 的图标清单
+  { page: "rules", label: "规则与参数", query: "rules.registry", icon: "tag" },
 ];
 
 // 项目状态标记（原型 v10 左侧栏的项目行）：每种自带图标与颜色，计数取自项目列表，
