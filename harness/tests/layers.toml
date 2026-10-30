@@ -171,6 +171,7 @@
 "test_routing_contract.py" = "unit"
 "test_routing_definition.py" = "module"
 "test_run_event_version.py" = "module"
+"test_run_steps.py" = "module"
 "test_run_time_limit.py" = "integration"
 "test_runtime_drain.py" = "integration"
 "test_saved_projections.py" = "integration"

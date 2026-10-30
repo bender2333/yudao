@@ -24,7 +24,7 @@ from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
     DepartmentWorkspace, DeliveryFile, EventDetail, NotFound, ProjectAttempts, ProjectFlow, ProjectLoop,
     ProjectOverview, ProjectsList, ProjectSettings, ProjectUsage, ProjectWriteback, ReplayCheck, RunActions,
-    RunAsks, RunAttempt, RunExport, RunRecovery, WorkItemInputs, WorkItemMaterials,
+    RunAsks, RunAttempt, RunExport, RunRecovery, RunSteps, WorkItemInputs, WorkItemMaterials,
 )
 from harness.app.registry import QueryDefinition, Registry, UnchangedEvent
 from harness.app.rules_queries import RulesRegistryRequest
@@ -229,6 +229,7 @@ def _requests(scope: _Scope) -> dict[str, Any]:
         "event.detail": EventDetail(event_id=scope.first_event_id or "none"),
         "department.workspace": DepartmentWorkspace(project_id=project_id, department=scope.department),
         "run.actions": RunActions(run_id=run_id),
+        "run.steps": RunSteps(run_id=run_id, department=scope.department),
         "run.asks": RunAsks(run_id=run_id),
         "work_item.materials": WorkItemMaterials(project_id=project_id, work_item=work_item_id),
         "delivery.file": DeliveryFile(event_id=scope.delivery_event_id or "none",

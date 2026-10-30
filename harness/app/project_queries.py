@@ -695,6 +695,47 @@ def _event_detail(application: Application, request: EventDetail) -> Snapshot[Ev
     )
 
 
+def _reasoning_text(item: Any) -> str | None:
+    # 一条推理内容里能读懂的文字（设计说明第 7.6 节，工单 #1234）：三种协议各取各的字段——
+    # Chat Completions 的 reasoning_content、Messages 的 thinking 块、Responses 的 summary 文字。
+    # 上游只返回加密内容（Responses 的 encrypted_content）时没有可读文字，返回 None。
+    # run.steps 的 preview 与 event.detail 的 reasoning_text 共用这一处
+    if not isinstance(item, dict):
+        return None
+    content = item.get("reasoning_content")
+    if isinstance(content, str) and content != "":
+        return content
+    blocks = item.get("blocks")
+    if isinstance(blocks, list):
+        thinking = [str(block.get("thinking")) for block in blocks
+                    if isinstance(block, dict) and block.get("type") == "thinking"
+                    and isinstance(block.get("thinking"), str) and block.get("thinking")]
+        if thinking:
+            return "\n".join(thinking)
+    summary = item.get("summary")
+    if isinstance(summary, list):
+        parts = [str(part.get("text")) for part in summary
+                 if isinstance(part, dict) and isinstance(part.get("text"), str) and part.get("text")]
+        if parts:
+            return "\n".join(parts)
+    return None
+
+
+def _output_text(item: Any) -> str:
+    # 模型输出条目里的文字（工单 #1234）：只有文字条目（`type` 为 message）有，工具调用条目没有。
+    # 一条回答可能同时有文字与工具调用，步骤里的「模型文字」只取文字条目
+    if not isinstance(item, dict) or item.get("type") != "message":
+        return ""
+    content = item.get("content")
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts = [str(part.get("text")) for part in content
+             if isinstance(part, dict) and isinstance(part.get("text"), str) and part.get("text")]
+    return "\n".join(parts)
+
+
 def _event_artifacts(application: Application, event: Any) -> dict[str, Any]:
     # 一条 run 事件的完整内容：正式事件的 Git 版本、交付封存、引用的工件原文与压缩来源
     artifacts = application.system.artifacts
@@ -735,6 +776,15 @@ def _event_artifacts(application: Application, event: Any) -> dict[str, Any]:
         ref = event.payload.get(key)
         if ref:
             loaded[target] = artifacts.get_for_run(run_id, ArtifactRef(**ref)).decode("utf-8")
+    # 推理内容与模型输出的可读文字（工单 #1234，设计说明第 7.6 节）：推理的原文照常给出，
+    # 另给归一后的可读文字；模型输出条目给文字条目的全文，工具调用条目没有文字
+    ref = event.payload.get("reasoning_ref")
+    if ref:
+        reasoning = json.loads(artifacts.get_for_run(run_id, ArtifactRef(**ref)))
+        loaded["reasoning"] = reasoning
+        loaded["reasoning_text"] = _reasoning_text(reasoning) or ""
+    if "message" in loaded:
+        loaded["message_text"] = _output_text(loaded["message"])
     if event.payload.get("summary_ref"):
         loaded["compaction_summary"] = artifacts.get_for_run(
             run_id, ArtifactRef(**event.payload["summary_ref"]),
@@ -1268,10 +1318,23 @@ class RunActionsResult(Contract):
 def _run_actions(application: Application, request: RunActions) -> Snapshot[RunActionsResult]:
     store = application.system.store
     _run(application, request.run_id)
-    events = _tool_events(store, request.run_id)
+    actions, background_commands = _run_action_views(application, request.run_id)
+    return Snapshot[RunActionsResult](
+        position=store.end_position(),
+        data=RunActionsResult(actions=actions,
+                              background_commands=[view for _department, view in background_commands]),
+    )
+
+
+def _run_action_views(application: Application, run_id: str
+                      ) -> tuple[list[ActionView], list[tuple[str | None, BackgroundCommandView]]]:
+    # 一个 run 的动作与后台命令（工单 #17）：`run.actions` 与 `run.steps` 共用这一段，
+    # 不复制取法与归并（工单 #1234）。后台命令带上发起它的部门，`run.steps` 按部门过滤时要用
+    store = application.system.store
+    events = _tool_events(store, run_id)
     actions: list[ActionView] = []
     started: dict[tuple[str, int | None, str], Any] = {}
-    background_commands: list[BackgroundCommandView] = []
+    background_commands: list[tuple[str | None, BackgroundCommandView]] = []
     jobs_table = None
     orchestrator = getattr(application.system, "orchestrator", None)
     if orchestrator is not None:
@@ -1299,7 +1362,7 @@ def _run_actions(application: Application, request: RunActions) -> Snapshot[RunA
                 output_ref = payload.get("output_ref")
                 if output_ref:
                     try:
-                        raw = application.system.artifacts.get_for_run(request.run_id, ArtifactRef(**output_ref))
+                        raw = application.system.artifacts.get_for_run(run_id, ArtifactRef(**output_ref))
                         output_data = json.loads(raw)
                         if isinstance(output_data, dict):
                             job_id = output_data.get("job_id")
@@ -1310,22 +1373,19 @@ def _run_actions(application: Application, request: RunActions) -> Snapshot[RunA
                     if jobs_table.get_status(job_id) == "running":
                         status = "running"
                 started_at = started_event.created_at if started_event is not None else event.created_at
-                background_commands.append(BackgroundCommandView(
+                background_commands.append((event.department, BackgroundCommandView(
                     command=str(args.get("command") or ""),
                     started_at=started_at,
                     status=status,
-                ))
+                )))
     # 有 tool_started、还没有结果的动作用运行状态区分（工单 #17，恢复契约第 1 节）：这次激活仍在进行
     # 的时候是运行中，否则是结果未知，等待核实
     live = _live_activations(events)
     for identity, event in started.items():
         actions.append(_action_view(None, identity, event, live=identity[0] in live))
     actions.sort(key=lambda item: item.created_at)
-    background_commands.sort(key=lambda item: item.started_at)
-    return Snapshot[RunActionsResult](
-        position=store.end_position(),
-        data=RunActionsResult(actions=actions, background_commands=background_commands),
-    )
+    background_commands.sort(key=lambda item: item[1].started_at)
+    return actions, background_commands
 
 
 def _live_activations(events: list[Any]) -> set[str]:
@@ -1402,6 +1462,204 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
         before_snapshot_ref=started_payload.get("before_snapshot_ref"),
         after_snapshot_ref=payload.get("after_snapshot_ref"),
 
+    )
+
+
+# ---------------------------------------------------------------------------
+# run.steps（工单 #1234，设计说明第 4.3 节）：按激活与步骤给出推理、模型文字、动作与回执
+
+
+class RunSteps(Contract):
+    # 一个部门在一个运行里的逐步记录：`activation_id` 为空时看这个部门最近一次激活
+    run_id: str
+    department: Department
+    activation_id: str | None = None
+
+
+class StepText(Contract):
+    # 一段可读的推理或模型文字：事件位置、能不能读出文字、全文字数与前 200 字
+    event_id: str
+    readable: bool
+    length: int
+    preview: str
+
+
+class RunStepView(Contract):
+    # 一步（一次模型请求；重试与它重试的那一步算一步）：请求时间、被丢弃的调用尝试数、
+    # 这一步的推理与模型文字、这一步发起的动作与回执
+    step_id: int
+    requested_at: str
+    discarded_attempts: int
+    reasoning: list[StepText]
+    texts: list[StepText]
+    actions: list[ActionView]
+
+
+class ActivationView(Contract):
+    # 一次激活：开始与结束时间（进行中时结束为空）与步数
+    activation_id: str
+    started_at: str
+    finished_at: str | None
+    step_count: int
+
+
+class RunStepsResult(Contract):
+    # 这次返回的是哪个激活的步骤（这个部门还没有激活时为空），该部门的全部激活、所选激活的每一步、
+    # 没有归到步骤的动作与这个部门的后台命令。动作的取法与回执和 run.actions 是同一段代码
+    activation_id: str | None
+    activations: list[ActivationView]
+    steps: list[RunStepView]
+    unassigned_actions: list[ActionView]
+    background_commands: list[BackgroundCommandView]
+
+
+STEP_EVENT_TYPES = (EventType.MODEL_REQUESTED, EventType.MODEL_MESSAGE, EventType.MODEL_REASONING,
+                    EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED)
+
+
+def _department_events(store: Any, run_id: str, department: str) -> list[Any]:
+    # 读步骤需要的事件：按 run 与部门的索引分页读取，不扫整个日志
+    collected: list[Any] = []
+    cursor = 0
+    while True:
+        batch = store.read(after=cursor, runs=(run_id,), departments=(department,), limit=500,
+                           types=STEP_EVENT_TYPES)
+        if not batch:
+            break
+        collected.extend(batch)
+        cursor = batch[-1].position
+    return collected
+
+
+def _activation_windows(events: list[Any]) -> tuple[list[str], dict[str, dict[str, Any]]]:
+    # 这个部门的激活：开始与结束时间，按开始时间升序（事件本来就按位置排列）
+    order: list[str] = []
+    windows: dict[str, dict[str, Any]] = {}
+    for event in events:
+        activation_id = str((event.payload or {}).get("activation_id") or "")
+        if not activation_id:
+            continue
+        if event.type == EventType.DEPARTMENT_ACTIVATED:
+            if activation_id in windows:
+                continue
+            windows[activation_id] = {"activation_id": activation_id, "started_at": event.created_at,
+                                      "finished_at": None}
+            order.append(activation_id)
+        elif event.type == EventType.ACTIVATION_FINISHED and activation_id in windows:
+            windows[activation_id]["finished_at"] = event.created_at
+    return order, windows
+
+
+def _steps_by_root(events: list[Any], activation_id: str
+                   ) -> tuple[dict[int, list[Any]], dict[int, int]]:
+    # 一个激活里的步：按逻辑步（root_step_id）归并，重试与它重试的那一步算一步。
+    # 返回「步 → 它的全部模型请求」与「请求的 step_id → 逻辑步」
+    groups: dict[int, list[Any]] = {}
+    root_of_step: dict[int, int] = {}
+    for event in events:
+        if event.type != EventType.MODEL_REQUESTED:
+            continue
+        payload = event.payload or {}
+        if str(payload.get("activation_id") or "") != activation_id:
+            continue
+        step_id = int(payload.get("step_id") or 0)
+        root = int(payload.get("root_step_id") or step_id)
+        groups.setdefault(root, []).append(event)
+        root_of_step[step_id] = root
+    return groups, root_of_step
+
+
+def _step_item(application: Application, run_id: str, event: Any) -> Any:
+    # 一条推理或模型输出事件引用的工件内容；引用缺失或取不出时为空（按不可读处理）
+    key = "reasoning_ref" if event.type == EventType.MODEL_REASONING else "message_ref"
+    ref = (event.payload or {}).get(key)
+    if not isinstance(ref, dict):
+        return None
+    try:
+        return json.loads(application.system.artifacts.get_for_run(run_id, ArtifactRef(**ref)))
+    except (FileNotFoundError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _step_text(event: Any, text: str | None) -> StepText:
+    # 一段可读文字：读不出来时长度为 0、预览为空（上游只给加密推理时是这样）
+    return StepText(event_id=event.event_id, readable=text is not None,
+                    length=0 if text is None else len(text),
+                    preview="" if text is None else text[:MESSAGE_TEXT_LIMIT])
+
+
+def _run_steps(application: Application, request: RunSteps) -> Snapshot[RunStepsResult]:
+    # 只读事件与工件：不调用模型、不回写事实、不新增事件种类。只给本部门的步骤与动作
+    store = application.system.store
+    _run(application, request.run_id)
+    events = _department_events(store, request.run_id, request.department)
+    order, windows = _activation_windows(events)
+    if request.activation_id is not None:
+        if request.activation_id not in windows:
+            raise NotFound(f"activation not found for {request.department}: {request.activation_id}")
+        selected: str | None = request.activation_id
+    else:
+        selected = order[-1] if order else None
+    # 该部门每一次激活的步数：同一段事件按激活分别归并
+    step_counts = {activation_id: len(_steps_by_root(events, activation_id)[0]) for activation_id in order}
+    activations = [
+        ActivationView(activation_id=activation_id, started_at=windows[activation_id]["started_at"],
+                       finished_at=windows[activation_id]["finished_at"],
+                       step_count=step_counts.get(activation_id, 0))
+        for activation_id in order
+    ]
+    groups, root_of_step = ({}, {}) if selected is None else _steps_by_root(events, selected)
+    discarded = _discarded_attempts(application, request.run_id)
+    steps = [
+        RunStepView(step_id=root,
+                    requested_at=min(event.created_at for event in groups[root]),
+                    discarded_attempts=sum(
+                        1 for event in groups[root]
+                        if str((event.payload or {}).get("attempt_id") or "") in discarded),
+                    reasoning=[], texts=[], actions=[])
+        for root in sorted(groups)
+    ]
+    by_step = {view.step_id: view for view in steps}
+    # 推理与模型文字：失败与取消的尝试不进（与部门消息同一条规则），只计入被丢弃的尝试数
+    for event in events:
+        if event.type not in (EventType.MODEL_MESSAGE, EventType.MODEL_REASONING):
+            continue
+        payload = event.payload or {}
+        if selected is None or str(payload.get("activation_id") or "") != selected:
+            continue
+        if str(payload.get("attempt_id") or "") in discarded:
+            continue
+        view = by_step.get(root_of_step.get(int(payload.get("step_id") or 0)))
+        if view is None:
+            continue
+        item = _step_item(application, request.run_id, event)
+        if event.type == EventType.MODEL_REASONING:
+            view.reasoning.append(_step_text(event, _reasoning_text(item)))
+        else:
+            text = _output_text(item)
+            # 模型文字只取文字条目：工具调用条目没有文字，不进这一步的 texts
+            if text != "":
+                view.texts.append(_step_text(event, text))
+    # 动作：取法与归并和 run.actions 共用同一段代码，这里只按部门与激活过滤
+    actions, background = _run_action_views(application, request.run_id)
+    unassigned: list[ActionView] = []
+    for action in actions:
+        if action.department != request.department or action.activation_id != selected:
+            continue
+        view = None if action.step_id is None else by_step.get(root_of_step.get(action.step_id))
+        if view is None:
+            # 没有归到任何一步的动作照实列出，不丢弃（工单 #1234）
+            unassigned.append(action)
+            continue
+        view.actions.append(action)
+    return Snapshot[RunStepsResult](
+        position=store.end_position(),
+        data=RunStepsResult(
+            activation_id=selected, activations=activations, steps=steps,
+            unassigned_actions=unassigned,
+            background_commands=[view for department, view in background
+                                 if department == request.department],
+        ),
     )
 
 
@@ -2496,6 +2754,16 @@ RUN_ACTIONS = QueryDefinition(
                 EventType.ACTION_VERIFIED, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED),
 )
 
+RUN_STEPS = QueryDefinition(
+    name="run.steps", request=RunSteps, result=RunStepsResult, handle=_run_steps,
+    # 步骤、推理与模型文字、动作与后台命令都由这些事件改变（工单 #1234）。被丢弃的尝试数读应用层的
+    # 调用尝试表，因此让那次尝试结束的事件也算改变结果
+    changed_by=(EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED,
+                EventType.ACTION_VERIFIED, EventType.DEPARTMENT_ACTIVATED, EventType.ACTIVATION_FINISHED,
+                EventType.MODEL_REQUESTED, EventType.MODEL_MESSAGE, EventType.MODEL_REASONING,
+                EventType.MODEL_ATTEMPT_FAILED, EventType.MODEL_ATTEMPT_FINISHED),
+)
+
 RUN_ASKS = QueryDefinition(
     name="run.asks", request=RunAsks, result=RunAsksResult, handle=_run_asks,
     changed_by=(EventType.ASK_STARTED, EventType.ASK_ANSWERED),
@@ -3042,6 +3310,6 @@ RUN_RECOVERY = QueryDefinition(
 
 PROJECT_QUERIES = (
     PROJECTS_LIST, PROJECT_OVERVIEW, PROJECT_LOOP, PROJECT_FLOW, WORK_ITEM_INPUTS, EVENT_DETAIL,
-    DEPARTMENT_WORKSPACE, RUN_ACTIONS, RUN_ASKS, WORK_ITEM_MATERIALS, DELIVERY_FILE, PROJECT_ATTEMPTS, PROJECT_USAGE,
+    DEPARTMENT_WORKSPACE, RUN_ACTIONS, RUN_STEPS, RUN_ASKS, WORK_ITEM_MATERIALS, DELIVERY_FILE, PROJECT_ATTEMPTS, PROJECT_USAGE,
     RUN_ATTEMPT, PROJECT_SETTINGS, PROJECT_WRITEBACK, RUN_EXPORT, REPLAY_CHECK, RUN_RECOVERY,
 )

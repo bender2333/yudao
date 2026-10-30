@@ -2349,6 +2349,78 @@
         }
       }
     },
+    "/api/queries/run.steps": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "run.steps",
+        "operationId": "query_run_steps",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "department",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": [
+                "product",
+                "engineering",
+                "quality"
+              ],
+              "type": "string",
+              "title": "Department"
+            }
+          },
+          {
+            "name": "activation_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Activation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_RunStepsResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/run.asks": {
       "get": {
         "tags": [
@@ -4022,6 +4094,42 @@
           "receipt"
         ],
         "title": "ActionView"
+      },
+      "ActivationView": {
+        "properties": {
+          "activation_id": {
+            "type": "string",
+            "title": "Activation Id"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "step_count": {
+            "type": "integer",
+            "title": "Step Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "activation_id",
+          "started_at",
+          "finished_at",
+          "step_count"
+        ],
+        "title": "ActivationView"
       },
       "AdoptionView": {
         "properties": {
@@ -11084,6 +11192,107 @@
         ],
         "title": "RunRecoveryResult"
       },
+      "RunStepView": {
+        "properties": {
+          "step_id": {
+            "type": "integer",
+            "title": "Step Id"
+          },
+          "requested_at": {
+            "type": "string",
+            "title": "Requested At"
+          },
+          "discarded_attempts": {
+            "type": "integer",
+            "title": "Discarded Attempts"
+          },
+          "reasoning": {
+            "items": {
+              "$ref": "#/components/schemas/StepText"
+            },
+            "type": "array",
+            "title": "Reasoning"
+          },
+          "texts": {
+            "items": {
+              "$ref": "#/components/schemas/StepText"
+            },
+            "type": "array",
+            "title": "Texts"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionView"
+            },
+            "type": "array",
+            "title": "Actions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "requested_at",
+          "discarded_attempts",
+          "reasoning",
+          "texts",
+          "actions"
+        ],
+        "title": "RunStepView"
+      },
+      "RunStepsResult": {
+        "properties": {
+          "activation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activation Id"
+          },
+          "activations": {
+            "items": {
+              "$ref": "#/components/schemas/ActivationView"
+            },
+            "type": "array",
+            "title": "Activations"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/RunStepView"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "unassigned_actions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionView"
+            },
+            "type": "array",
+            "title": "Unassigned Actions"
+          },
+          "background_commands": {
+            "items": {
+              "$ref": "#/components/schemas/BackgroundCommandView"
+            },
+            "type": "array",
+            "title": "Background Commands"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "activation_id",
+          "activations",
+          "steps",
+          "unassigned_actions",
+          "background_commands"
+        ],
+        "title": "RunStepsResult"
+      },
       "RuntimeForceUpgrade": {
         "properties": {
           "command_id": {
@@ -11550,6 +11759,24 @@
         ],
         "title": "Snapshot[RunRecoveryResult]"
       },
+      "Snapshot_RunStepsResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunStepsResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[RunStepsResult]"
+      },
       "Snapshot_SystemStatus_": {
         "properties": {
           "position": {
@@ -11754,6 +11981,35 @@
           "version"
         ],
         "title": "SourceDirectorySetting"
+      },
+      "StepText": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "readable": {
+            "type": "boolean",
+            "title": "Readable"
+          },
+          "length": {
+            "type": "integer",
+            "title": "Length"
+          },
+          "preview": {
+            "type": "string",
+            "title": "Preview"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "readable",
+          "length",
+          "preview"
+        ],
+        "title": "StepText"
       },
       "StreamCapability": {
         "properties": {
