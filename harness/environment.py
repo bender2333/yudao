@@ -176,11 +176,6 @@ class Workspaces:
     """
 
 
-    def _limit(self, name: str, default: Any) -> Any:
-        # 这个 run 冻结的参数取值；没有冻结字典时用定义文件里的初始值（工单 #1189）
-        value = self._parameters.get(name)
-        return default if value is None else value
-
     def __init__(
         self,
         root: str | Path,
@@ -208,6 +203,14 @@ class Workspaces:
         self._source: dict[tuple[str, str], str | None] = {}
 
     # ---- 运行工作区 ----
+    def parameters_for(self, run_id: str) -> dict[str, Any]:
+        # 这个 run 冻结的参数取值（工单 #1189）：执行环境的输出上限、命令与检查的时限上限读它，
+        # 建 run 之后改参数事件不影响已经创建的 run。旧 run 没有冻结字典时按定义初值解释
+        from .parameters import frozen_run_parameters
+
+        return frozen_run_parameters(self._view(run_id))
+
+    # ---- 运行工作区 ----
     def run_environment(self, run_id: str, *, session_id: str | None = None,
                         jobs: Any | None = None) -> LocalEnvironment:
         return LocalEnvironment.open(
@@ -218,8 +221,11 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
+<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
+=======
+>>>>>>> 6397fc1f (environment 的冻结读数补全：_limit/_output_limit 方法、parameters_for 接线与全部调用点（rebase 后对齐 #1171 与 #1309）)
         )
 
     # ---- 会话用哪份工作区 ----
@@ -271,8 +277,11 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
+<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
+=======
+>>>>>>> 6397fc1f (environment 的冻结读数补全：_limit/_output_limit 方法、parameters_for 接线与全部调用点（rebase 后对齐 #1171 与 #1309）)
         )
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
@@ -348,8 +357,11 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
+<<<<<<< HEAD
             artifacts=self._artifacts,
             run_id=run_id,
+=======
+>>>>>>> 6397fc1f (environment 的冻结读数补全：_limit/_output_limit 方法、parameters_for 接线与全部调用点（rebase 后对齐 #1171 与 #1309）)
         )
         if department in self.delivery_inspecting:
             ref = projection.qa_tests_archive_ref
@@ -732,6 +744,14 @@ class LocalEnvironment:
             name: getattr(self, method) for name, method in _HANDLERS.items()}
         self._processes: dict[str, Callable[[Action, asyncio.Event], Awaitable[tuple[Any, str]]]] = {
             name: getattr(self, method) for name, method in _PROCESSES.items()}
+    def _limit(self, name: str, default: Any) -> Any:
+        # 这个 run 冻结的参数取值；没有冻结字典时用定义文件里的初始值（工单 #1189）
+        value = self._parameters.get(name)
+        return default if value is None else value
+
+    def _output_limit(self) -> int:
+        return int(self._limit('tool_output_limit', _OUTPUT_LIMIT))
+
 
     @classmethod
     def establish(
@@ -776,7 +796,6 @@ class LocalEnvironment:
 
     def _output_limit(self) -> int:
         return int(self._limit('tool_output_limit', _OUTPUT_LIMIT))
-                   artifacts=artifacts, run_id=run_id, parameters=parameters)
 
     def bind_check(self, *, activation_id: str | None, product_spec_hash: str | None,
                    delivery_spec_hash: str | None, effective_contract_hash: str | None = None) -> None:
@@ -928,7 +947,7 @@ class LocalEnvironment:
                     matches.append({"path": item.path, "line": number, "snippet": _clip_snippet(line)})
         page = matches[offset:offset + page_size]
         truncated = offset + len(page) < len(matches)
-        page, truncated = _fit_match_page(page, truncated)
+        page, truncated = _fit_match_page(page, truncated, self._output_limit())
         return {
             "pattern": pattern,
             "path": scope_rel,
@@ -972,7 +991,7 @@ class LocalEnvironment:
         numbered = list(enumerate(raw.decode("utf-8").splitlines(), 1))
         total = len(numbered)
         wanted = [(number, text) for number, text in numbered if number >= offset and (end is None or number <= end)]
-        entries, consumed = _fit_line_entries(wanted)
+        entries, consumed = _fit_line_entries(wanted, self._output_limit())
         truncated = consumed < len(wanted)
         next_offset = offset + consumed
         last = offset + consumed - 1
@@ -1017,7 +1036,7 @@ class LocalEnvironment:
         numbered = list(enumerate(entry.text.splitlines(), 1))
         total = len(numbered)
         wanted = [(number, text) for number, text in numbered if number >= offset and (end is None or number <= end)]
-        entries, consumed = _fit_line_entries(wanted)
+        entries, consumed = _fit_line_entries(wanted, self._output_limit())
         truncated = consumed < len(wanted)
         last = offset + consumed - 1
         return {
@@ -1228,7 +1247,7 @@ class LocalEnvironment:
         path = directory / f"{job_id}.output"
         path.write_text(text, encoding="utf-8")
 
-        page, cut = _bash_slice(text, 0)
+        page, cut = _bash_slice(text, 0, self._output_limit())
         job = _Job(
             job_id=job_id,
             output_path=path,
@@ -1283,7 +1302,7 @@ class LocalEnvironment:
         else:
             if type(timeout_sec) is not int or timeout_sec < 1:
                 raise ValueError("timeout_sec must be a positive integer")
-            timeout_sec = min(timeout_sec, _CHECK_TIMEOUT_MAX)
+            timeout_sec = min(timeout_sec, self._limit("check_timeout_max_sec", _CHECK_TIMEOUT_MAX))
         # 模型自报 exit_code 不是证据：这里只读主机执行结果，从不读取该字段
         snapshot = self.workspace.snapshot()
         original_digest = snapshot.digest
@@ -1299,7 +1318,7 @@ class LocalEnvironment:
             )
             if finished.status == "completed":
                 exit_code = finished.returncode
-                output = _summarize_output(finished.stdout, finished.stderr)
+                output = _summarize_output(finished.stdout, finished.stderr, self._output_limit())
             else:
                 if finished.status == "timeout":
                     exit_code, output = TIMEOUT_EXIT_CODE, f"check timed out after {timeout_sec}s"
@@ -1498,10 +1517,10 @@ def _require_reason(args: dict[str, Any]) -> None:
         raise ValueError("a non-empty reason is required for deleting or moving files")
 
 
-def _summarize_output(stdout: str, stderr: str) -> str:
+def _summarize_output(stdout: str, stderr: str, limit: int = _OUTPUT_LIMIT) -> str:
     text = "\n".join(part for part in (stdout.strip(), stderr.strip()) if part)
-    if len(text) > self._output_limit():
-        text = text[:self._output_limit()] + "\n...truncated..."
+    if len(text) > limit:
+        text = text[:limit] + "\n...truncated..."
     return text
 
 
@@ -1537,16 +1556,17 @@ def _result_size(result: dict[str, Any]) -> int:
     return len(json_dumps(result))
 
 
-def _fit_match_page(page: list[dict[str, Any]], truncated: bool) -> tuple[list[dict[str, Any]], bool]:
-    # 按输出上限收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
+def _fit_match_page(page: list[dict[str, Any]], truncated: bool,
+                    limit: int = _OUTPUT_LIMIT) -> tuple[list[dict[str, Any]], bool]:
+    # 按输出上限 limit 收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
     probe = {"matches": page}
-    while len(page) > 1 and _result_size({**probe, "truncated": True}) > _OUTPUT_LIMIT:
+    while len(page) > 1 and _result_size({**probe, "truncated": True}) > limit:
         page = page[:-1]
         truncated = True
-    if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > _OUTPUT_LIMIT:
+    if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > limit:
         only = dict(page[0])
         snippet = only["snippet"]
-        while len(snippet) > 1 and _result_size({"matches": [{**only, "snippet": snippet}], "truncated": True}) > _OUTPUT_LIMIT:
+        while len(snippet) > 1 and _result_size({"matches": [{**only, "snippet": snippet}], "truncated": True}) > limit:
             snippet = snippet[:len(snippet) // 2]
         only["snippet"] = snippet + "\n...truncated..."
         page = [only]
@@ -1554,18 +1574,19 @@ def _fit_match_page(page: list[dict[str, Any]], truncated: bool) -> tuple[list[d
     return page, truncated
 
 
-def _fit_line_entries(wanted: list[tuple[int, str]]) -> tuple[list[dict[str, Any]], int]:
+def _fit_line_entries(wanted: list[tuple[int, str]],
+                      limit: int = _OUTPUT_LIMIT) -> tuple[list[dict[str, Any]], int]:
     # 逐行累加直到输出上限；单行超限则截断该行文本，保证每页至少返回一行或空
     entries: list[dict[str, Any]] = []
     for number, text in wanted:
         candidate = entries + [{"line": number, "text": text}]
-        if _result_size({"lines": candidate, "truncated": True}) > _OUTPUT_LIMIT:
+        if _result_size({"lines": candidate, "truncated": True}) > limit:
             break
         entries = candidate
     if not entries and wanted:
         number, text = wanted[0]
         clipped = text
-        while len(clipped) > 1 and _result_size({"lines": [{"line": number, "text": clipped}], "truncated": True}) > _OUTPUT_LIMIT:
+        while len(clipped) > 1 and _result_size({"lines": [{"line": number, "text": clipped}], "truncated": True}) > limit:
             clipped = clipped[:len(clipped) // 2]
         entries = [{"line": number, "text": clipped + "\n...truncated..."}]
         return entries, 1
