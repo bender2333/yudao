@@ -221,8 +221,6 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            artifacts=self._artifacts,
-            run_id=run_id,
         )
 
     # ---- 会话用哪份工作区 ----
