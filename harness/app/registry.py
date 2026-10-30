@@ -69,8 +69,9 @@ OVERLAYS: tuple[OverlayDefinition, ...] = (
     OverlayDefinition(name="recovery", queries=("run.recovery",)),
     OverlayDefinition(name="context_usage", queries=("overlay.context_usage",)),
     OverlayDefinition(name="semantic_records", queries=("semantic.records",)),
-    # 事实来源：事件对象的 source 字段（设计说明第 4.3 节），不依赖查询，随事件对象一起可用（工单 #396）
-    OverlayDefinition(name="sources", queries=()),
+    # 事实来源：事件对象的 source 字段（设计说明第 4.3 节），覆盖在楼层的事实上。它依赖楼层查询，
+    # 楼层查询登记以后才列出（工单 #396）
+    OverlayDefinition(name="sources", queries=("project.loop",)),
 )
 
 

@@ -2203,6 +2203,20 @@ export type EventDetailResult = {
 };
 
 /**
+ * FactRef
+ */
+export type FactRef = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+};
+
+/**
  * FileActionComparison
  */
 export type FileActionComparison = {
@@ -5542,6 +5556,12 @@ export type WorkItemLoop = {
      * Version
      */
     version: number;
+    /**
+     * Refs
+     */
+    refs?: {
+        [key: string]: FactRef;
+    };
 };
 
 /**

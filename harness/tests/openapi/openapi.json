@@ -7628,6 +7628,32 @@
         ],
         "title": "EventDetailResult"
       },
+      "FactRef": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "source"
+        ],
+        "title": "FactRef"
+      },
       "FileActionComparison": {
         "properties": {
           "tool": {
@@ -13326,6 +13352,13 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "refs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FactRef"
+            },
+            "type": "object",
+            "title": "Refs"
           }
         },
         "additionalProperties": false,
