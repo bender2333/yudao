@@ -360,6 +360,10 @@ def history_exceeds_the_window(data_dir):
     # 窗口按固定材料的实测 token 数加余量推出，不写死数字（测试分层设计第 10 节第 3 条）。
     # 余量的可行区间由实测确定：低于下界时错误变成「固定材料放不下摘要」，
     # 高于上界时摘要请求放得下，运行会真的调用模型（适配器脚本耗尽）。
+    # 摘要请求里没有工具清单（固定材料里有），加一个工具时固定材料与窗口一起变大、摘要请求不变，
+    # 可行区间因此整体下移；工单 #1171 加上 read_external_source 以后按实测重定：
+    # 1664 落在下界（Pinned context leaves insufficient room…），1920 起摘要求得下（模型被调用），
+    # 取中间的 1792，与基准记录的失败说明一致。
     task = "build an echo CLI. " + "Keep the requirement text. " * 370
     adapter = FakeAdapter([product_spec()])
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -367,7 +371,7 @@ def history_exceeds_the_window(data_dir):
     # 测量 run 与真实 run 共用同一个 data_dir：调用目标按事项窗口逐次安装（orchestrator.py:1162），
     # 后建的 run 用自己 create_run 时声明的窗口，两者互不影响。
     pinned = pinned_input_tokens(system, measure_id)
-    run_id = system.create_run(task, context_window=pinned + 2048)
+    run_id = system.create_run(task, context_window=pinned + 1792)
     system.run_until_stop(run_id)
     return system, run_id, {}
 

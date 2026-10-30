@@ -41,6 +41,7 @@ from .commands import execute
 from .contracts import API_VERSION, AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
+from .evidence_queries import EVIDENCE_EXTERNAL_SOURCE
 from .event_stream import EventScope, EventStream
 from .home import HOME_AWAY_REPORT, HOME_MARK_SEEN
 from .parameter_commands import PARAMETER_SET
@@ -120,8 +121,8 @@ DEFAULT_REGISTRY = Registry(
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
               CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN,
               PARAMETER_SET],
-    queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, CATALOG_QUERY,
-             CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY],
+    queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, EVIDENCE_EXTERNAL_SOURCE,
+             CATALOG_QUERY, CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY],
     decisions=tuple(DECISION_KINDS))
 
 
