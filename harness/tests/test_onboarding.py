@@ -1,12 +1,14 @@
 from pathlib import Path
 
+import pytest
+
 from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, DEPARTMENTS, EventType
 from harness.proposals import baseline_review_turn, product_spec, product_spec_turn, structure_turn
 from harness.runtime import LoopSystem
 from harness.snapshot import ingest_snapshot
-from harness.tests.helpers import adjudication_view
+from harness.tests.helpers import adjudication_view, run_wait_command
 from harness.tightening import WATCHED_OUTPUTS
 from harness.tools import tools_for
 
@@ -87,10 +89,32 @@ def test_onboarding_departments_have_no_write_tools(tmp_path):
     assert "submit_baseline_review" in set(tools_for("quality", "onboarding"))
 
 
-def test_quality_cannot_see_existing_structure(tmp_path):
+@pytest.mark.parametrize("first_department", ["engineering", "quality"])
+def test_quality_cannot_see_existing_structure(tmp_path, first_department):
+    # R3：建档返工时的权限隔离在工程、质检两种完成顺序下都成立。
     # 第一轮工程提交结构说明；退回产品以后，新一轮里工程能看到上一轮的结构说明，产品与质检看不到
     captured: dict[str, object] = {}
     holder: dict[str, LoopSystem] = {}
+    signals: list[Path] = []
+    quality_contexts = []
+
+    def checks_for(department):
+        if department == first_department:
+            return {"smoke": 0}
+        # 真实检查进程等待当前 PRD 的提交通知；等待有 30 秒上限（run_wait_command）。
+        return {"smoke": {"command": run_wait_command(signals[-1])}}
+
+    def first_completed(events):
+        for event in events:
+            if event.type == EventType.SPEC_ACCEPTED:
+                signal = tmp_path / "signals" / event.event_id
+                signal.mkdir(parents=True)
+                signals.append(signal)
+            elif ((first_department == "engineering" and event.type == EventType.STRUCTURE_ACCEPTED)
+                  or (first_department == "quality" and event.type == EventType.PROPOSAL_REJECTED
+                      and event.department == "quality"
+                      and any(error["field"] == "structure" for error in event.payload["errors"]))):
+                (signals[-1] / "release").write_text(event.event_id, encoding="utf-8")
 
     # 提交依据的版本由工厂从请求里的当前版本取（工单 #471）
     def product_rework_turn(call):
@@ -102,40 +126,67 @@ def test_quality_cannot_see_existing_structure(tmp_path):
     def engineering_turn(call):
         from harness.tests.helpers import recorded_context
         captured["engineering"] = recorded_context(holder["system"], call)
-        return _structure_turn()
+        return _structure_turn(checks=checks_for("engineering"))
 
     def quality_turn(call):
         from harness.tests.helpers import recorded_context
         captured["quality"] = recorded_context(holder["system"], call)
+        quality_contexts.append(captured["quality"])
         return baseline_review_turn(
             verdict="rework_product" if not captured.get("reworked") else "consistent",
             conclusions=[{"requirement": REQUIREMENT, "status": "unsupported" if not captured.get("reworked")
                           else "verified", "evidence": "the README says nothing about this" if not captured.get("reworked")
                           else "smoke"}],
-            checks={"smoke": 0})
+            checks=checks_for("quality"))
 
     def product_then_mark(call):
         captured["reworked"] = True
         return product_rework_turn(call)
 
     system, run_id = _onboarding_run(tmp_path, {
-        # 脚本按部门给出（工单 #557、#879）：每一轮三个部门各一轮。
+        # 脚本按部门给出（工单 #557、#879）。
         # 第一轮质检要求产品修改，第二轮产品改完以后质检核验通过
         "product": [_product_turn(), product_then_mark],
         "engineering": [engineering_turn, engineering_turn],
-        "quality": [quality_turn, quality_turn],
+        # 每版 PRD 的质检可能在结构接纳前被拒绝、接纳后再激活；两版各准备两条回答。
+        "quality": [quality_turn] * 4,
     })
     holder["system"] = system
-    result = system.run_until_stop(run_id)
+    unsubscribe = system.store.subscribe(first_completed)
+    try:
+        result = system.run_until_stop(run_id)
+    finally:
+        unsubscribe()
     assert result.status == "done", result.error
+    assert result.stop_reason == "baseline_verified"
+    for signal in signals:
+        assert (signal / "release").is_file(), f"未收到 {first_department} 的完成事件：{signal}"
     engineering_sources = [part.source for part in captured["engineering"].parts]
     quality_sources = [part.source for part in captured["quality"].parts]
     assert "existing_overview" in engineering_sources
     assert "existing_overview" in quality_sources
     assert "existing_structure" in engineering_sources
     assert "existing_structure" not in quality_sources
+    assert all("existing_structure" not in {part.source for part in context.parts}
+               for context in quality_contexts)
     # 读取与搜索工具取不到 STRUCTURE.md：它不在工作区的公开树中
     assert "STRUCTURE.md" not in system.workspace(run_id).list_files()
+
+    events = system.store.list_events(run_id)
+    specs = [event for event in events if event.type == EventType.SPEC_ACCEPTED]
+    reviews = [event for event in events if event.type == EventType.BASELINE_REVIEW_ACCEPTED]
+    assert [event.payload["verdict"] for event in reviews] == ["rework_product", "consistent"]
+    for spec, review in zip(specs, reviews, strict=True):
+        round_events = [event for event in events if spec.position < event.position < review.position]
+        structure = next(event for event in round_events if event.type == EventType.STRUCTURE_ACCEPTED)
+        rejected = [event for event in round_events
+                    if event.type == EventType.PROPOSAL_REJECTED and event.department == "quality"]
+        if first_department == "quality":
+            assert any(event.position < structure.position
+                       and any(error["field"] == "structure" for error in event.payload["errors"])
+                       for event in rejected), "质检必须在当前结构接纳前提交核验并被拒绝"
+        else:
+            assert not rejected, "工程先完成时，质检必须等当前结构接纳以后再提交核验"
 
 def test_consistent_with_unsupported_is_rejected(tmp_path):
     system, run_id = _onboarding_run(tmp_path, {
