@@ -45,6 +45,20 @@ test("事项状态的对应：接口给出的每个事项状态都翻成画面�
   assert.equal(itemStateOf({ status: "held" }), "paused");
 });
 
+test("事项状态：因升级停止与用户停止分开（工单 #1186）", () => {
+  // 停止原因不同，画面上的状态不同：因升级停止单独一种，门口牌子据此出现；用户停止仍按已取消画
+  assert.equal(itemStateOf({ status: "stopped", stop_reason: "run_event_version_changed" }), "upgrade_stopped");
+  assert.ok(ITEM_STATES.includes(itemStateOf({ status: "stopped", stop_reason: "run_event_version_changed" })));
+  assert.equal(itemStateOf({ status: "stopped", stop_reason: "user_cancelled" }), "cancelled");
+  assert.equal(itemStateOf({ status: "stopped", stop_reason: "cancelled" }), "cancelled");
+  assert.equal(itemStateOf({ status: "stopped" }), "cancelled");
+  // 其他状态不因停止原因改变
+  assert.equal(itemStateOf({ status: "adopted", stop_reason: "run_event_version_changed" }), "adopted");
+  // 状态灯：因升级停止的事项不决定灯
+  assert.equal(floorSign("upgrade_stopped"), null);
+  assert.equal(floorSignOf([{ status: "stopped", stop_reason: "run_event_version_changed" }]), "idle");
+});
+
 test("楼的状态灯的对应：每个事项状态翻出的灯都在画面合同的状态灯里，或明确不决定灯", () => {
   for (const state of ITEM_STATES) {
     const sign = floorSign(state);

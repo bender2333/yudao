@@ -24,7 +24,7 @@ import { LETTER_ANSWERED_TYPE, LETTER_ASKED_TYPE } from "../../pixel/world/types
 import { itemColor } from "../../pixel/world/floor";
 import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
-import { floorActions, floorCards, floorState, streamText, toFloorEvent, type FloorEvent } from "../../translate/floor";
+import { floorActions, floorCards, floorState, recoveryOverlay, streamText, toFloorEvent, type FloorEvent } from "../../translate/floor";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
 import { useSnapshot } from "./use-snapshot";
@@ -383,6 +383,8 @@ function overlayData(
     return { entries };
   }
   if (name === "flow") return { segments: flowSegments };
+  // 「恢复」覆盖层的数据在翻译层写好（工单 #1186）：这里只把查询结果交过去，不在这里写事项与状态的对应
+  if (name === "recovery") return recoveryOverlay(loop);
   return null;
 }
 

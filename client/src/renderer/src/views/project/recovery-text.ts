@@ -138,3 +138,19 @@ export function showsInterruptionRecord(data: { state: string; owner: RecoveryOw
   }
   return data.state === "running" || data.state === "interrupted";
 }
+
+// 因升级重新开始时的起点（工单 #1186，设计说明第 4.3 节）：与项目开始事项时取起点的顺序相同——
+// 有采纳成果时是采纳成果，其次是起始文件夹快照，都没有时是空树
+export const UPGRADE_START_POINT: Record<string, string> = {
+  adoption: "采纳成果",
+  initial_snapshot: "起始文件夹快照",
+  empty: "空树",
+};
+
+// 起点的文字：没有重新开始的新 run 时查询不给起点，页面上写未上报
+export function upgradeStartPointText(startPoint: string | null): string {
+  if (startPoint === null) {
+    return "未上报";
+  }
+  return UPGRADE_START_POINT[startPoint] ?? startPoint;
+}

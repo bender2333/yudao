@@ -53,13 +53,20 @@ const RECOVERY_STATUS: Readonly<Record<string, ItemState>> = {
   paused: "paused",
 };
 
-/** 一条事项在画面上的状态：事项还在进行时按恢复观察状态分开，其余按事项状态。 */
-export function itemStateOf(row: { status: string; recovery_state?: string | null }): ItemState {
+// 因升级停止的停止原因（工单 #1186，ADR-0019）：服务端在 harness/streams.py 的 STOP_REASON_UPGRADE 里给出。
+// 事项停下的原因不同，画面上的状态也不同：用户停止按「已取消」画，因升级停止单独一种，门口的牌子据此出现
+const UPGRADE_STOP_REASON = "run_event_version_changed";
+
+/** 一条事项在画面上的状态：事项还在进行时按恢复观察状态分开，因升级停止单独一种，其余按事项状态。 */
+export function itemStateOf(row: { status: string; recovery_state?: string | null; stop_reason?: string | null }): ItemState {
   if (row.status === "in_progress") {
     const recovery = row.recovery_state ?? null;
     if (recovery !== null && Object.prototype.hasOwnProperty.call(RECOVERY_STATUS, recovery)) {
       return RECOVERY_STATUS[recovery];
     }
+  }
+  if (row.status === "stopped" && row.stop_reason === UPGRADE_STOP_REASON) {
+    return "upgrade_stopped";
   }
   return itemStatus(row.status);
 }
@@ -104,7 +111,7 @@ export const FLOOR_SIGN_ORDER: readonly ItemState[] = [
 ];
 
 /** 一层的状态灯：这一层的事项按优先顺序取第一个能决定灯的状态，都不决定时为空闲。 */
-export function floorSignOf(items: readonly { status: string; recovery_state?: string | null }[]): FloorSign {
+export function floorSignOf(items: readonly { status: string; recovery_state?: string | null; stop_reason?: string | null }[]): FloorSign {
   const states = items.map(itemStateOf);
   for (const state of FLOOR_SIGN_ORDER) {
     if (states.includes(state)) {

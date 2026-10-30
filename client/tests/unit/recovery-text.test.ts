@@ -18,6 +18,7 @@ import {
   purposeText,
   sessionUsageRows,
   showsInterruptionRecord,
+  upgradeStartPointText,
 } from "../../src/renderer/src/views/project/recovery-text.ts";
 import type {
   RecoveryOwner,
@@ -129,4 +130,12 @@ test("继续以后运行中的页面仍显示这次中断，其余状态不显�
 test("四种结束方式各有自己的说明", () => {
   assert.deepEqual(Object.keys(TERMINAL_NOTE).sort(), ["cancelled", "completed", "paused", "stopped"]);
   assert.match(TERMINAL_NOTE.completed, /已完成的运行不再继续/);
+});
+
+test("因升级重新开始的起点写成中文，没有新 run 时写未上报（工单 #1186）", () => {
+  // 期望值写成字面值：与原型 rc-upgrade 的副标题里那三个词一致，不复用实现的表
+  assert.equal(upgradeStartPointText("adoption"), "采纳成果");
+  assert.equal(upgradeStartPointText("initial_snapshot"), "起始文件夹快照");
+  assert.equal(upgradeStartPointText("empty"), "空树");
+  assert.equal(upgradeStartPointText(null), "未上报");
 });
