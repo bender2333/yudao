@@ -278,7 +278,7 @@
   </section>
 
   <section id="s3">
-    <h2>一轮工作的经过<small>两种轮转方式共用一套状态词</small></h2>
+    <h2>一轮工作的经过<small>三种轮转方式共用一套状态词</small></h2>
     <p class="muted">下面的状态对一个部门成立。按成果时，状态由关注的成果推动；任务池时，由认领的工作单元推动。工作单元有多大是定义里的参数，池子允许一个单元就是整个事项，那时它就是按成果。</p>
     <div class="map" style="margin-top:12px">
     <svg viewBox="0 -12 1000 712" role="img" aria-label="双环：外环是部门之间的流转，内环是一轮工作里的单步循环">
@@ -306,7 +306,8 @@
       <path class="edge" d="M180 190 L248 190" marker-end="url(#ah)"/><text class="e-l" x="214" y="182" text-anchor="middle">路由触发 / 认领</text>
       <path class="edge" d="M420 190 L558 190" marker-end="url(#ah)"/><text class="e-l" x="489" y="182" text-anchor="middle">提交成果或单元</text>
       <path class="edge" d="M710 190 L798 190" marker-end="url(#ah)"/><text class="e-l" x="754" y="182" text-anchor="middle">通过</text>
-      <path class="edge" d="M875 220 L875 298" marker-end="url(#ah)"/><text class="e-l" x="885" y="262">质检放行，事项完成</text>
+      <path class="edge" d="M875 220 L875 298" marker-end="url(#ah)"/><text class="e-l" x="885" y="262">放行或开环完成，事项完成</text>
+      <path class="edge dashed" d="M420 212 C 480 262, 740 262, 800 212" marker-end="url(#ah)"/><text class="e-l" x="610" y="250" text-anchor="middle">没有核验角色：交完成</text>
       <path class="edge dashed" d="M875 160 C 875 -20, 105 -20, 105 158" marker-end="url(#ah)"/><text class="e-l" x="490" y="22" text-anchor="middle">下游部门关注的成果有了新版本，它开始一轮</text>
       <!-- 分支箭头 -->
       <path class="edge" d="M300 160 L300 92" marker-end="url(#ah)"/><text class="e-l" x="262" y="130">询问</text>
@@ -353,7 +354,7 @@
       <li><b>每一步先问边界</b>：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。</li>
       <li><b>判定点</b>：需要判断的小问题（挑上下文、含糊的读法）可以问一个小模型，答案先写成事件再被使用；重放时读事件，不再问模型。下游有独立核验兜底时默认继续，没有就升级成决定请求。</li>
       <li><b>增量与整份</b>：任务池模式下每个单元各自核验，但放行门仍是整份交付对要求的一次核验。</li>
-      <li><b>开环完成</b>：定义里没有核验角色的事项，指定的角色交了完成就按流程采纳，不发决定请求；记录、页面与报告上写开环完成，不写放行。最差的配置是一个外包角色直做，等于跑一次外面的 agent，外加快照、上限、写入口与这个标记。</li>
+      <li><b>开环完成</b>：定义里没有核验角色的事项，指定的角色交了完成就按流程采纳，不因为缺少核验发决定请求；记录、页面与报告上写开环完成，不写放行。最差的配置是一个外包角色直做，等于跑一次外面的 agent，外加快照、上限、写入口与这个标记。</li>
       <li><b>子组织</b>：一个角色的一轮工作可以开一个子事项，子事项有自己的事件流、冻结的定义与边界，时间与用量从上一层剩下的里扣，层数有上限；结果作为这个角色的普通提案回到上一层，照常过裁决。部门内的多角色也用这一种做法。</li>
     </ul>
   </section>
