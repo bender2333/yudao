@@ -3,7 +3,7 @@
 // 材料按决定种类从决定请求携带的事实里读出。这里是纯函数，界面与单元测试都直接调用。
 
 import type { DecisionView } from "../../api/generated/types.gen";
-import { DECISION_KIND, STOP_REASON, label } from "../project/labels.ts";
+import { DECISION_KIND, DECISION_REASON, STOP_REASON, label } from "../project/labels.ts";
 
 export type MaterialRow = { term: string; value: string };
 export type MaterialLink = { label: string; href: string };
@@ -132,7 +132,9 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
       push("部门", dept(request.department));
       push("模型", (request.target as Payload | null | undefined)?.model_id);
       push("具体问题", request.message);
-      push("原因", request.reason);
+      // 原因按中文写（工单 #181）：provider_unavailable 这样的机器标识不写进页面
+      push("原因", typeof request.reason === "string" && request.reason !== ""
+        ? label(DECISION_REASON, request.reason) : "");
       break;
     case "no_tool_call":
     case "workspace_unrepresentable":

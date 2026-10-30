@@ -11,7 +11,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-import yudao as driver
+import model_service
 from report import _number, _write, host_environment
 
 AGGREGATED_METRICS = ("cycles", "rework", "collaboration", "model_requests",
@@ -71,17 +71,26 @@ def aggregate_metrics(runs):
     return summary
 
 
-def build_result(scenario, material_version, scorer_version, model, runs, yudao_commit,
+def build_result(scenario, material_version, scorer_version, model, runs, model_capacity=None,
                  notes=(), comparison=None):
+    """一份结果：每次运行的指标与失败条目、逐次的提交号、模型的容量与来源（第 6 节）。"""
     counted = [run for run in runs
                if not run.get("void") and not run["metrics"].get("model_service_failure")]
+    commits = _run_commits(runs)
+    distinct = []
+    for item in commits:
+        if item["yudao_commit"] not in distinct:
+            distinct.append(item["yudao_commit"])
     payload = {
         "scenario": scenario,
         "material_version": material_version,
         "scorer_version": scorer_version,
         "side": "yudao",
         "model": model,
-        "yudao_commit": yudao_commit,
+        "yudao_commit": distinct[0] if len(distinct) == 1 else None,
+        "yudao_commits": commits,
+        "yudao_commit_mismatch": distinct if len(distinct) > 1 else [],
+        "model_capacity": model_capacity,
         "network": {
             "allowed": False,
             "note": "Yudao 的评测项目不登记取回来源与 MCP 服务器，运行中也没有这两类工具的调用。",
@@ -98,6 +107,11 @@ def build_result(scenario, material_version, scorer_version, model, runs, yudao_
     if comparison is not None:
         payload["comparison"] = comparison
     return payload
+
+
+def _run_commits(runs):
+    """每次运行的提交号：运行器在启动服务之前各自记下（第 3 节「运行环境」）。"""
+    return [{"run_id": run["run_id"], "yudao_commit": run.get("yudao_commit")} for run in runs]
 
 
 def write_result(result, path):
@@ -126,7 +140,7 @@ def write_report(result, path, run_reports):
         lines.extend(_comparison_section(result["comparison"]))
     if result["notes"]:
         lines.append("")
-        lines.append("## 九、起点缺口与运行条件")
+        lines.append("## 九、运行条件与记录")
         lines.append("")
         for note in result["notes"]:
             lines.append("- " + note)
@@ -178,9 +192,20 @@ def _basic_section(result):
     lines.append("| 材料版本 | " + result["material_version"] + " |")
     lines.append("| 评分器版本 | " + result["scorer_version"] + " |")
     lines.append("| 被测模型 | " + result["model"] + " |")
-    lines.append("| Yudao 提交号 | " + result["yudao_commit"] + " |")
+    lines.append("| Yudao 提交号 | " + _commit_text(result) + " |")
+    if result.get("model_capacity"):
+        lines.append("| 模型的容量 | " + model_service.describe(result["model_capacity"]) + " |")
     lines.append("| 计入结果的运行次数 | " + str(result["run_count"]) + " |")
     return lines + [""]
+
+
+def _commit_text(result):
+    """提交号一栏：各次运行相同时写那个提交号，不同时写明不一致并逐次列出。"""
+    commits = result.get("yudao_commits") or []
+    if commits and result.get("yudao_commit") is None:
+        return "各次运行不一致：" + "、".join(
+            str(item["run_id"]) + " " + str(item["yudao_commit"]) for item in commits)
+    return str(result.get("yudao_commit") or "未知")
 
 
 def _host_section(result):
@@ -267,6 +292,8 @@ def run_section(run, scores):
     lines.append("| 结束状态 | " + str(metrics["end_status"]) + " |")
     lines.append("| 结束原因 | " + str(metrics["end_reason"]) + " |")
     lines.append("| 停止原因 | " + str(metrics["stop_reason"]) + " |")
+    if run.get("yudao_commit"):
+        lines.append("| Yudao 提交号 | " + str(run["yudao_commit"]) + " |")
     lines.append("| 循环次数 | " + _number(metrics["cycles"]) + " |")
     lines.append("| 返工次数 | " + _number(metrics["rework"]) + " |")
     lines.append("| 部门之间询问次数 | " + _number(metrics["collaboration"]) + " |")
@@ -324,7 +351,3 @@ def default_evidence_dir():
     """原始证据目录：仓库根的 .yudao/evals/（已被 git 忽略）。"""
     root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
     return os.path.join(root, ".yudao", "evals")
-
-
-def yudao_commit():
-    return driver.yudao_commit()

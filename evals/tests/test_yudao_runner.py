@@ -16,6 +16,7 @@ RUNNER_DIR = os.path.join(EVALS_DIR, "runner")
 if RUNNER_DIR not in sys.path:
     sys.path.insert(0, RUNNER_DIR)
 
+import model_service
 import run_yudao_eval
 import yudao
 import yudao_metrics
@@ -24,6 +25,10 @@ import yudao_report
 # 不需要模型服务的用例使用的占位名；真实模型用例在运行时取 YUDAO_EVAL_MODEL（见 real_model_name）。
 MODEL = "test-model"
 REPO_ROOT = EVALS_DIR
+
+# 模型列表报告的容量（第 3 节「模型的容量」）：用例把它写进模型访问定义，不访问模型服务
+LIMITS = {"context_window": 262_144, "context_window_source": "model_list",
+          "max_output_tokens": 64_000, "max_output_tokens_source": "model_list"}
 
 # 需要真实模型的用例：默认不选，`-m real_model` 才运行；三个变量缺哪个由根目录 conftest.py 跳过并写明。
 real_model = pytest.mark.real_model
@@ -53,6 +58,33 @@ def test_data_directory_inside_the_repository_is_rejected():
     inside = os.path.join(REPO_ROOT, "evals", "inside-the-repo")
     with pytest.raises(ValueError, match="outside the Yudao repository"):
         yudao.data_dir_for(os.path.join(REPO_ROOT, "evals"), "inside-the-repo")
+    assert not os.path.exists(inside)
+
+
+def test_starting_folder_holds_only_the_data_file(runs_root):
+    """起点文件夹只含题目提供的 `subway_data.json`，与材料里的原件逐字节相同（第 3 节「输入」）。"""
+    start = yudao.fresh_start_dir(runs_root, "run-1")
+    assert sorted(os.listdir(start)) == ["subway_data.json"]
+    with open(os.path.join(start, "subway_data.json"), "rb") as handle:
+        delivered = handle.read()
+    with open(os.path.join(yudao.start_dir(), "subway_data.json"), "rb") as handle:
+        assert handle.read() == delivered
+    # 起点在运行目录（这次运行的数据目录）之外
+    assert not _inside(start, yudao.data_dir_for(runs_root, "run-1"))
+
+
+def test_starting_folder_is_new_for_each_run(runs_root):
+    first = yudao.fresh_start_dir(runs_root, "run-1")
+    second = yudao.fresh_start_dir(runs_root, "run-2")
+    assert first != second
+    with pytest.raises(ValueError, match="already exists"):
+        yudao.fresh_start_dir(runs_root, "run-1")
+
+
+def test_starting_folder_inside_the_repository_is_rejected():
+    inside = os.path.join(REPO_ROOT, "evals", "start-inside-the-repo")
+    with pytest.raises(ValueError, match="outside the Yudao repository"):
+        yudao.fresh_start_dir(os.path.join(REPO_ROOT, "evals"), "start-inside-the-repo")
     assert not os.path.exists(inside)
 
 
@@ -98,12 +130,14 @@ class _FakeClient:
         return None
 
 
-def _stub_run_once(monkeypatch, tmp_path, export):
+def _stub_run_once(monkeypatch, tmp_path, export, calls=None):
     """把 `run_once` 触碰的服务、评分与交付换成固定值，核对调用点保持真实。
 
     不起服务、不发模型请求、不跑评分器；`yudao.void_reasons` 与其调用的三项核对
-    都是真代码，改动的只是它们的输入（场景目录指向副本）。
+    都是真代码，改动的只是它们的输入（场景目录指向副本）。`calls` 收下调用点收到的
+    起点文件夹与时间上限。
     """
+    calls = {} if calls is None else calls
     data_dir = str(tmp_path / "data")
     os.makedirs(data_dir, exist_ok=True)
     monkeypatch.setattr(yudao, "data_dir_for", lambda runs_root, run_id: data_dir)
@@ -111,14 +145,21 @@ def _stub_run_once(monkeypatch, tmp_path, export):
     monkeypatch.setattr(yudao, "start_service",
                         lambda data_dir, port: (None, _FakeClient()))
     monkeypatch.setattr(yudao, "register_model",
-                        lambda client, model_name: {"admitted_model": model_name})
-    monkeypatch.setattr(yudao, "create_project", lambda client, name, goal: "project-1")
+                        lambda client, model_name, limits: {"admitted_model": model_name})
+
+    def create_project(client, name, goal, initial_directory=None):
+        calls["initial_directory"] = initial_directory
+        return "project-1"
+
+    def wait_for_end(client, project_id, work_item_id, limit_seconds):
+        calls["limit_seconds"] = limit_seconds
+        return {"status": "done"}, False
+
+    monkeypatch.setattr(yudao, "create_project", create_project)
     monkeypatch.setattr(yudao, "save_department_settings", lambda client, project_id: {})
     monkeypatch.setattr(yudao, "submit_requirement",
                         lambda client, project_id, text: ("work-item-1", "yudao-run-1"))
-    monkeypatch.setattr(yudao, "wait_for_end",
-                        lambda client, project_id, work_item_id, limit_seconds:
-                        ({"status": "done"}, False))
+    monkeypatch.setattr(yudao, "wait_for_end", wait_for_end)
     monkeypatch.setattr(yudao, "export_run", lambda client, run_id: export)
     monkeypatch.setattr(yudao, "stop_service", lambda process, timeout_seconds=60: ("", ""))
     monkeypatch.setattr(run_yudao_eval, "score_delivery",
@@ -139,7 +180,7 @@ def test_a_tampered_check_voids_the_yudao_run(runs_root, tmp_path, monkeypatch):
     _stub_run_once(monkeypatch, tmp_path, export)
 
     run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"),
-                                  MODEL, 60)
+                                  MODEL, 60, LIMITS)
 
     assert run["void"] is True
     assert run["void_reason"] == "材料摘要与材料版本记录不同：checks"
@@ -153,12 +194,106 @@ def test_clean_materials_let_the_yudao_run_score(runs_root, tmp_path, monkeypatc
     _stub_run_once(monkeypatch, tmp_path, export)
 
     run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"),
-                                  MODEL, 60)
+                                  MODEL, 60, LIMITS)
 
     assert run["void"] is False
     assert run["void_reason"] == ""
     assert run["delivery_files"] == 0
     assert run["score"]["scorer_version"] == "scorer-3@2"
+
+
+def test_the_project_gets_the_starting_folder(runs_root, tmp_path, monkeypatch):
+    """`run_once` 把这次运行新建的起点文件夹交给 `project.create` 的起始文件夹参数。"""
+    export = _export()
+    export["run_id"] = "yudao-run-1"
+    calls = {}
+    _stub_run_once(monkeypatch, tmp_path, export, calls)
+
+    run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"),
+                            MODEL, 60, LIMITS)
+
+    start = calls["initial_directory"]
+    assert start == os.path.abspath(os.path.join(runs_root, "run-1", "start"))
+    assert sorted(os.listdir(start)) == ["subway_data.json"]
+
+
+def test_the_real_system_records_the_starting_folder(runs_root):
+    """真实服务新建项目时接纳起点文件夹：项目概览记下 1 个起点文件（第 3 节「输入」）。
+
+    起的是被测的 Yudao 服务（仓库之外的新数据目录），不需要模型：新建项目不需要模型，
+    起点文件夹在项目登记时采集。起点文件夹的内容由 `test_starting_folder_holds_only_the_data_file`
+    核对成题目提供的 `subway_data.json`；工作区里的文件随运行的第一次模型调用建立，
+    由真实运行（#196、#198）核对。
+    """
+    start = yudao.fresh_start_dir(runs_root, "real-start")
+    data_dir = yudao.data_dir_for(runs_root, "real-start")
+    process, client = yudao.start_service(data_dir, yudao.free_port())
+    try:
+        client.wait_ready()
+        project_id = yudao.create_project(client, "评测 · 场景 3",
+                                          "按需求原文与接口约定实现地铁换乘查询程序",
+                                          initial_directory=start)
+        overview = client.query("project.overview", {"project_id": project_id})["data"]
+    finally:
+        client.stop()
+        yudao.stop_service(process)
+
+    assert overview["start_point"] == "起点：起始文件夹（1 个文件）"
+
+
+def test_default_time_limit_is_two_hours():
+    """两个运行器的默认时间上限都是 120 分钟（第 3 节「时间上限」）。"""
+    assert run_yudao_eval.TIME_LIMIT_SECONDS == 120 * 60
+    args = run_yudao_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs"])
+    assert args.limit_seconds == 120 * 60
+
+
+def test_explicit_time_limit_still_wins(runs_root, tmp_path, monkeypatch):
+    """显式给出的 `--limit-seconds` 覆盖默认值，并且到达等待结束时用的是它。"""
+    args = run_yudao_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs",
+                                      "--limit-seconds", "600"])
+    assert args.limit_seconds == 600.0
+    export = _export()
+    export["run_id"] = "yudao-run-1"
+    calls = {}
+    _stub_run_once(monkeypatch, tmp_path, export, calls)
+
+    run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"),
+                            MODEL, args.limit_seconds, LIMITS)
+
+    assert calls["limit_seconds"] == 600.0
+
+
+def test_model_definition_carries_the_reported_capacity():
+    """模型访问定义里的容量取模型服务报告的值或运行器参数（第 3 节「模型的容量」）。"""
+    definition = yudao.model_definition(MODEL, LIMITS)
+    assert definition["context_window"] == LIMITS["context_window"]
+    assert definition["max_output_tokens"] == LIMITS["max_output_tokens"]
+    from_args = model_service.resolve_limits(MODEL, {}, context_window=100_000,
+                                            max_output_tokens=4_000)
+    adjusted = yudao.model_definition(MODEL, from_args)
+    assert adjusted["context_window"] == 100_000
+    assert adjusted["max_output_tokens"] == 4_000
+
+
+def test_the_model_list_reports_the_capacity():
+    """模型列表报告了 `context_length` 与 `max_completion_tokens` 时取这两个值（第 3 节）。"""
+    payload = {"data": [
+        {"id": "another-model", "context_length": 8_192, "max_completion_tokens": 1_024},
+        {"id": MODEL, "context_length": 262_144, "max_completion_tokens": 64_000},
+    ]}
+    assert model_service.reported_limits(payload, MODEL) == {"context_window": 262_144,
+                                                             "max_output_tokens": 64_000}
+    assert model_service.reported_limits(payload, "missing-model") == {
+        "context_window": None, "max_output_tokens": None}
+
+
+def test_the_capacity_comes_from_the_list_or_the_arguments():
+    """列表没有报告、也没有给参数时报错，两种情况各报出缺哪一个参数。"""
+    with pytest.raises(RuntimeError, match="--context-window"):
+        model_service.resolve_limits(MODEL, {})
+    with pytest.raises(RuntimeError, match="--max-output-tokens"):
+        model_service.resolve_limits(MODEL, {"context_window": 131_072})
 
 
 def test_requirement_text_carries_the_prd_and_the_agreement():
@@ -174,6 +309,14 @@ def test_requirement_text_holds_no_hidden_material():
     for part in yudao.hidden_dirs().values():
         assert part not in text
         assert part.replace("\\", "/") not in text
+
+
+def test_requirement_text_does_not_ask_for_the_data_file():
+    """起点文件由起始文件夹带入：事项文字里不再写「工作区是空的」与「自己写出这份文件」。"""
+    text = yudao.requirement_text()
+    assert "工作区是空的" not in text
+    assert "自己写出" not in text
+    assert "subway_data.json 没有进入它" not in text
 
 
 # ---------------------------------------------------------------------------
@@ -530,6 +673,7 @@ def _scores(**overrides):
 
 def _run(**overrides):
     run = {"run_id": "yudao-run-1", "void": False, "void_reason": "", "delivery_files": 5,
+           "yudao_commit": "abc1234",
            "metrics": yudao_metrics.collect(_export(), {"timed_out": False, "elapsed_seconds": 20.0,
                                                         "hidden_failures": ["cmd_3_1b"]})}
     run.update(overrides)
@@ -538,11 +682,33 @@ def _run(**overrides):
 
 def test_result_records_the_yudao_commit_and_the_host_environment():
     result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
-                                        [_run()], yudao_commit="abc1234")
+                                        [_run()], model_capacity=LIMITS)
     assert result["side"] == "yudao"
     assert result["yudao_commit"] == "abc1234"
+    assert result["yudao_commits"] == [{"run_id": "yudao-run-1", "yudao_commit": "abc1234"}]
+    assert result["yudao_commit_mismatch"] == []
+    assert result["model_capacity"] == LIMITS
     assert result["host_environment"]["python"]
     assert result["network"]["allowed"] is False
+
+
+def test_each_run_keeps_its_own_commit_and_a_mismatch_is_listed(tmp_path):
+    """两次运行的提交号不同：每次各自记下自己的提交号，顶层写明不一致并逐次列出。"""
+    runs = [_run(), _run(run_id="yudao-run-2", yudao_commit="def5678")]
+    result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL, runs)
+    assert result["yudao_commit"] is None
+    assert result["yudao_commit_mismatch"] == ["abc1234", "def5678"]
+    assert result["yudao_commits"] == [
+        {"run_id": "yudao-run-1", "yudao_commit": "abc1234"},
+        {"run_id": "yudao-run-2", "yudao_commit": "def5678"}]
+
+    path = str(tmp_path / "mismatch.md")
+    yudao_report.write_report(result, path, [yudao_report.run_section(run, _scores()) for run in runs])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+    assert "各次运行不一致：yudao-run-1 abc1234、yudao-run-2 def5678" in text
+    assert text.count("| Yudao 提交号 | abc1234 |") == 1
+    assert text.count("| Yudao 提交号 | def5678 |") == 1
 
 
 def test_result_aggregates_mean_min_and_max():
@@ -562,7 +728,7 @@ def test_void_and_model_service_failures_stay_out_of_the_summary():
         _export("failed", [{"type": "model_attempt_failed", "payload": {"error": "APIError"}}]),
         {"timed_out": False, "elapsed_seconds": 60.0, "hidden_failures": []})
     result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
-                                        runs, yudao_commit="abc1234")
+                                        runs)
     assert result["run_count"] == 1
     assert result["summary"]["elapsed_seconds"]["count"] == 1
     assert result["void_runs"] == ["v"]
@@ -573,8 +739,8 @@ def test_report_writes_every_metric_and_checkpoint(tmp_path):
     run["metrics"].update({"input_tokens": None, "output_tokens": None, "cost": None,
                            "total_tokens": None})
     result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
-                                        [run], yudao_commit="abc1234",
-                                        notes=[run_yudao_eval.START_GAP_NOTE],
+                                        [run], model_capacity=LIMITS,
+                                        notes=["起点文件经起始文件夹带入，事项文字不另写说明。"],
                                         comparison={"compared": False,
                                                     "verdict": "blocked",
                                                     "block_reason": "示例受阻",
@@ -591,14 +757,15 @@ def test_report_writes_every_metric_and_checkpoint(tmp_path):
     yudao_report.write_report(result, path, [yudao_report.run_section(run, _scores())])
     text = open(path, encoding="utf-8").read()
     assert "Yudao 提交号 | abc1234" in text
+    assert "模型的容量 | 上下文窗口 262144（模型服务的模型列表）" in text
     assert "循环次数" in text and "返工次数" in text and "部门之间询问次数" in text
     assert "模型请求数" in text and "耗时（秒）" in text
     assert "质检没有误放行" in text
-    assert "起点缺口" in text
+    assert "起点文件经起始文件夹带入" in text
     assert "cmd_3_1b" in text
     assert "未知" in text  # 未知用量写为「未知」
     assert "八、版本比较" in text
-    assert "九、起点缺口与运行条件" in text
+    assert "九、运行条件与记录" in text
     assert "示例受阻" in text
 
 
@@ -611,7 +778,8 @@ def _comparison_run(run_id, false_release=False, completion=0.5, failed=frozense
     if false_release:
         metrics["checkpoints"]["no_false_release"] = {"passed": False, "detail": "人工置为失败"}
     return {"run_id": run_id, "void": False, "void_reason": "", "delivery_files": 0,
-            "metrics": metrics, "score": {"completion": completion}}
+            "yudao_commit": "abc1234", "metrics": metrics,
+            "score": {"completion": completion}}
 
 
 def test_version_compare_refuses_when_versions_differ():
@@ -619,9 +787,9 @@ def test_version_compare_refuses_when_versions_differ():
     import yudao_compare
     runs = [_comparison_run("task-1")]
     current = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
-                                          runs, yudao_commit="abc1234")
+                                          runs)
     baseline = yudao_report.build_result("scenario-3", "scenario-3@1", "scorer-3@2", MODEL,
-                                          runs, yudao_commit="abc1234")
+                                          runs)
     comparison = yudao_compare.compare(current, baseline)
     assert comparison["verdict"] == "blocked"
     assert "材料版本或评分器版本不同" in comparison["block_reason"]
@@ -635,7 +803,7 @@ def test_version_compare_improvement_no_difference_regression_and_blocked():
 
     def build(runs):
         return yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
-                                         runs, yudao_commit="abc1234")
+                                         runs)
 
     improved = yudao_compare.compare(
         build([_comparison_run("task-1", false_release=False, completion=0.6)]),
@@ -690,8 +858,9 @@ def test_real_run_produces_metrics_a_score_and_a_report(runs_root, tmp_path):
     """真实运行一次 Yudao：指标、五项过程检查点、评分与报告都在。"""
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO,
                                  "yudao-tests")
+    limits = model_service.model_limits(real_model_name())
     run = run_yudao_eval.run_once("yudao-real-1", runs_root, evidence_root,
-                                  real_model_name(), 90 * 60)
+                                  real_model_name(), run_yudao_eval.TIME_LIMIT_SECONDS, limits)
     assert run["metrics"]["model_requests"] > 0
     assert run["metrics"]["elapsed_seconds"] > 0
     assert set(run["metrics"]["checkpoints"]) == {
@@ -707,8 +876,9 @@ def test_time_limit_ends_the_run_and_marks_it(runs_root):
     """时间上限到达时事项被结束，按结束时的交付评分并标记超时。"""
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO,
                                  "yudao-tests")
+    limits = model_service.model_limits(real_model_name())
     run = run_yudao_eval.run_once("yudao-limit-1", runs_root, evidence_root,
-                                  real_model_name(), 120.0)
+                                  real_model_name(), 120.0, limits)
     assert run["metrics"]["timed_out"] is True
     assert run["metrics"]["end_reason"] == yudao_metrics.TIME_LIMIT
     assert 0.0 <= run["score"]["completion"] <= 1.0

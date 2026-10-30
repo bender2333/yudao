@@ -1,17 +1,22 @@
-// 恢复与动作核实页（原型 v10 设计说明第 7.2 节，工单 #380）：只读显示一个事项的恢复观察状态、
-// 待恢复原因与修复入口、等待回答的决定请求、未完成动作与核实记录、限额、执行所有权与迟到结果。
+// 恢复与动作核实页（原型 v13 `js/ui/views/recovery.js` 第 7.2 节，工单 #380、#181）：只读显示一个事项的
+// 恢复观察状态、最后已确认位置与自动继续的时间、待恢复原因与修复入口、等待回答的决定请求、
+// 结果未知的动作与它的处理方式、各会话的用量与限额、执行所有权与迟到结果。
 // 数据只来自 run.recovery、decisions.list、project.loop 与 project.overview 四个已登记的查询；
 // 状态迁移由控制层决定，页面不做任何推进，也不显示按钮声称能继续。
 // 恢复观察状态按结束的方式区分（工单 #747）：正常完成是「已完成」，被取消是「已取消」，
 // 状态的说法与标记一致，页面上不出现停止原因与阶段的机器标识。
 // 因升级停止没有单独的一块（原型 rc-upgrade），停止原因里写着「因 Yudao 升级停止」。
+// 文字与状态映射在 recovery-text.ts 里（工单 #181），页面只按它的结果显示。
 
 import type {
   DecisionList,
   ProjectLoopResult,
   ProjectOverviewResult,
+  RecoveryOwner,
+  RecoverySession,
   RunRecoveryResult,
   UnfinishedAction,
+  UnknownAction,
   VerificationRecord,
   WorkItemCard,
 } from "../../api/generated/types.gen";
@@ -19,33 +24,28 @@ import type { ClientApp } from "../../contract/client-app";
 import type { Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import { DecisionCardList } from "../decisions/card";
-import { Empty, KeyValue, Loading, Section, StopNote, Tag, show } from "./common";
+import { artifactRefText } from "./artifact-ref";
+import { Empty, KeyValue, Loading, Section, StopNote, Table, Tag, show } from "./common";
 import { ACTION_STATUS, RECOVERY_STATE, RECOVERY_STATE_KIND, STOP_REASON, departmentName, formatDuration, formatTime, label } from "./labels";
+import {
+  PENDING_NOTE,
+  TERMINAL_NOTE,
+  UNFINISHED_CLASS,
+  UNFINISHED_KIND,
+  actionSessionText,
+  autoResumeText,
+  handlingKind,
+  handlingNote,
+  handlingText,
+  interruptedAtText,
+  lastConfirmedText,
+  purposeText,
+  sessionUsageRows,
+  showsInterruptionRecord,
+} from "./recovery-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
-
-// 四种结束方式（原型 rc-reason）：按状态给出不同的说明。
-// 正常完成不是被中止（工单 #747），被取消是用户自己的决定。
-const TERMINAL_NOTES: Record<string, string> = {
-  completed: "已完成的运行不再继续；未完成动作不由恢复处理。",
-  paused: "运行暂停，等待处理；处理以后可以继续。",
-  cancelled: "取消是用户自己的决定；未完成动作不由恢复处理。",
-  stopped: "已停止的运行不再继续；未完成动作不由恢复处理。",
-};
-
-// 动作状态对应的原型标记（原型 v10 views/recovery.js 的 ACTION_KIND）；
-// 已完成不是未完成动作的状态，界面按核实结果给出，不在这一张表里
-const ACTION_KIND: Record<string, string> = {
-  not_sent: "pending",
-  unknown: "unknown",
-};
-
-// 动作状态对应的样式（原型 v10 views/recovery.js 的 ACTION_CLASS）
-const ACTION_CLASS: Record<string, string> = {
-  not_sent: "is-not_sent",
-  unknown: "is-unknown",
-};
 
 export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: (hash: string) => void }) {
   const projectId = props.route.projectId ?? "";
@@ -64,8 +64,10 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
   }, workItemId === "");
   const settled = overview.data?.work_items.find((entry) => entry.work_item_id === workItemId) ?? null;
   const title = settled?.title ?? workItemId;
-  // 决定卡片写事项标题；取不到时不写事项标识（工单 #802）
+  // 决定卡片写事项标题；取不到时不写事项标识（工单 #802）。
+  // 卡片头写项目名：项目名取自己读的概览，不把项目标识写进页面（设计说明第 4.1 节）
   const cardTitle = settled?.title ?? "";
+  const projectName = overview.data?.name ?? "";
   const runId = item?.run_id ?? null;
   const elapsed = item?.elapsed_sec ?? null;
   const limit = item?.time_limit_sec ?? null;
@@ -110,13 +112,13 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
               app={props.app}
               decisions={decisions.data?.decisions ?? []}
               now={now}
-              names={() => ({ projectName: projectId, workItemTitle: cardTitle })}
+              names={() => ({ projectName, workItemTitle: cardTitle })}
               onNavigate={props.onNavigate}
               viewId="recovery.decisions"
               emptyText="没有等待你回答的决定"
             />
           </Section>
-          <VerifyBlock data={data} />
+          <ActionBlock data={data} />
           <LimitsBlock data={data} elapsed={elapsed} limit={limit} />
           <OwnerBlock data={data} />
           {item?.kind === "onboarding"
@@ -160,13 +162,20 @@ function StateBlock(props: { title: string; data: RunRecoveryResult; startedAt: 
 }
 
 // 待恢复原因、中断位置与四种结束方式（原型 rc-reason）：按状态给出不同内容。
-// 已结束的 run 不再继续，未完成动作不由恢复处理，只显示结束原因与所在部门
+// 已结束的 run 不再继续，未完成动作不由恢复处理，只显示结束原因与最后已确认的位置
 function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null }) {
   const data = props.data;
   if (data.state === "waiting_resume") {
     const unusable = data.unusable;
     if (unusable === null) {
-      throw new Error("待恢复状态没有给出待恢复原因");
+      // 模型引用无法使用时给出部门、模型与问题；其余的待恢复由决定请求结束（例如定义版本不同，
+      // 工单 #181）：原因由决定请求写，页面照实显示，不在这里抛错
+      return (
+        <Section id="rc-reason" title="待恢复原因" className="y10-rc-reason-block">
+          <p className="y10-rc-reason">{show(data.reason, "还没有写明原因")}</p>
+          <p className="y10-note note">修复或选择以后由控制主机重新判断能否继续；回答使用下方决定卡片。</p>
+        </Section>
+      );
     }
     return (
       <Section id="rc-reason" title="待恢复原因" className="y10-rc-reason-block">
@@ -194,16 +203,31 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
         <p className="y10-rc-reason">{show(data.reason, "服务进程停止")}</p>
         <KeyValue
           items={[
-            ["最后已确认", data.last_confirmed_event_id ?? `第 ${data.last_confirmed_position} 条事件`],
-            ["自动继续时间", <span className="y10-muted" key="at">还没有自动继续</span>],
+            ["最后已确认", lastConfirmedText(data)],
+            ["自动继续时间", autoResumeText(data.owner)],
           ]}
         />
         <p className="y10-note note">按持久事实核对：没有未完成动作时自动继续。</p>
       </Section>
     );
   }
-  // 四种结束方式：标题与状态一致，停止原因与所在部门照旧列出（工单 #747）
-  const note = TERMINAL_NOTES[data.state];
+  // 继续以后（运行中）仍显示这次中断的记录（工单 #181）：中断位置来自取得执行权时记下的依据
+  if (showsInterruptionRecord(data)) {
+    return (
+      <Section id="rc-reason" title="这次中断" className="y10-rc-reason-block">
+        <KeyValue
+          items={[
+            ["中断位置", interruptedAtText(data.owner)],
+            ["自动继续时间", autoResumeText(data.owner)],
+            ["最后已确认", lastConfirmedText(data)],
+          ]}
+        />
+        <p className="y10-note note">这次中断的记录保留在下方；继续以后的事项是同一个，已用限额不清零。</p>
+      </Section>
+    );
+  }
+  // 四种结束方式：标题与状态一致，停止原因与所在部门照旧列出（工单 #747），最后已确认位置也写出来
+  const note = TERMINAL_NOTE[data.state];
   if (note !== undefined) {
     const item = props.item;
     return (
@@ -216,6 +240,7 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
             ["停止说明", <StopNote key="stop-note" note={item?.stop_note ?? null} kept={item?.kept_delivery}
               empty="没有" />],
             ["所在部门", item?.department ? departmentName(item.department) : "没有在部门里执行"],
+            ["最后已确认", lastConfirmedText(data)],
           ]}
         />
         <p className="y10-note note">{note}</p>
@@ -225,69 +250,103 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
   return null;
 }
 
-// 动作核实（原型 rc-verify）：未完成动作与核实记录；核实结果追加到记录，原始观察不改写
-function VerifyBlock(props: { data: RunRecoveryResult }) {
-  const actions = props.data.unfinished_actions;
+// 未完成动作与结果未知的动作（原型 rc-verify）：还没有处置的写它的状态与输入依据；
+// 已经处置的写处理方式与交还给模型的内容。核实是追加的记录，原始观察不改写
+function ActionBlock(props: { data: RunRecoveryResult }) {
+  const pending = props.data.unfinished_actions;
+  const handled = props.data.unknown_actions;
   const records = props.data.verifications;
+  const sessions = props.data.sessions;
   return (
     <Section
       id="rc-verify"
-      title="动作核实"
-      note="未完成动作与核实记录；核实结果追加到记录，原始观察不改写"
+      title="未完成动作"
+      note="重新启动时结果未知的动作：有核实方法的先自动核实（核实确认），其余作为工具结果交还发出它的会话（交还会话）；核实产生新的记录，不改写原始观察"
     >
-      {actions.length === 0
+      {pending.length === 0 && handled.length === 0
         ? <Empty text="没有未完成的动作：所有动作都有回执" />
-        : (
+        : null}
+      {pending.length > 0 ? (
+        <>
+          <h3 className="y10-h3 sub">还没有处置</h3>
           <div className="y10-rc-actions">
-            {actions.map((entry) => (
-              <ActionCard
-                key={entry.action_id}
+            {pending.map((entry) => (
+              <PendingActionCard key={entry.started_event_id} entry={entry} />
+            ))}
+          </div>
+        </>
+      ) : null}
+      {handled.length > 0 ? (
+        <>
+          <h3 className="y10-h3 sub">已经处置</h3>
+          <div className="y10-rc-actions">
+            {handled.map((entry) => (
+              <HandledActionCard
+                key={`${entry.action_id}-${entry.at}`}
                 entry={entry}
+                sessions={sessions}
                 checks={records.filter((record) => record.action_id === entry.action_id)}
               />
             ))}
           </div>
-        )}
-      {records.length > 0 ? (
-        <>
-          <h3 className="y10-h3 sub">核实记录</h3>
-          <ul className="y10-rc-checks">
-            {records.map((record) => (
-              <li key={record.event_id} className={record.decided_by === "user" ? "is-user" : ""}>
-                <div><b>动作</b><code className="y10-code">{record.action_id}</code></div>
-                <div><b>核实依据</b>{show(record.basis)}</div>
-                <div><b>核实结果</b>{show(record.result)}</div>
-                <small className="y10-muted">
-                  {formatTime(record.at)}{record.decided_by === "user" ? " · 用户决定" : ""}
-                </small>
-              </li>
-            ))}
-          </ul>
         </>
       ) : null}
     </Section>
   );
 }
 
-// 一个未完成动作（原型 rc-verify 的 verifyCard）：状态、动作身份、所属部门、输入依据与所在步骤
-function ActionCard(props: { entry: UnfinishedAction; checks: VerificationRecord[] }) {
+// 还没有处置的动作（原型 rc-verify 的 verifyCard）：状态、所属部门、输入依据与执行前快照
+function PendingActionCard(props: { entry: UnfinishedAction }) {
   const entry = props.entry;
   return (
-    <article className={`y10-rc-action ${ACTION_CLASS[entry.status]} is-pending`}>
+    <article className={`y10-rc-action ${UNFINISHED_CLASS[entry.status] ?? ""} is-pending`}>
       <header className="y10-rc-action-head">
-        <StatusMark kind={ACTION_KIND[entry.status]} text={label(ACTION_STATUS, entry.status)} />
-        <code className="y10-code">{entry.action_id}</code>
+        <StatusMark kind={UNFINISHED_KIND[entry.status] ?? "waiting"} text={label(ACTION_STATUS, entry.status)} />
         <Tag>未完成</Tag>
+        <small className="y10-muted">{formatTime(entry.created_at)}</small>
       </header>
-      <p className="y10-rc-action-sum">{show(entry.purpose, `${entry.tool} 动作`)}</p>
+      <p className="y10-rc-action-sum">{purposeText(entry.purpose)}</p>
       <KeyValue
         items={[
-          ["部门", departmentName(entry.department)],
+          ["部门", departmentName(entry.department) || "没有在部门里执行"],
           ["工具", entry.tool],
           ["输入依据", entry.input_version === null ? "未上报" : `第 ${entry.input_version} 版`],
+          ["执行前", artifactRefText(entry.before_snapshot_ref)],
           ["所在步骤", entry.step_id === null ? "未上报" : `第 ${entry.step_id} 步`],
         ]}
       />
+      <p className="y10-note note">{PENDING_NOTE}</p>
+    </article>
+  );
+}
+
+// 已经处置的结果未知动作（原型 unknownCard）：处理方式、所在会话、执行前快照、交还给模型的内容，
+// 以及这次处置的核实依据与结果
+function HandledActionCard(props: {
+  entry: UnknownAction;
+  sessions: RecoverySession[];
+  checks: VerificationRecord[];
+}) {
+  const entry = props.entry;
+  const returned = entry.returned ?? "";
+  return (
+    <article className={`y10-rc-action is-unknown is-${entry.handling}`}>
+      <header className="y10-rc-action-head">
+        <StatusMark kind={handlingKind(entry.handling)} text={handlingText(entry.handling)} />
+        <Tag>结果未知</Tag>
+        <small className="y10-muted">{formatTime(entry.at)}</small>
+      </header>
+      <p className="y10-rc-action-sum">{purposeText(entry.purpose)}</p>
+      <KeyValue
+        items={[
+          ["部门", departmentName(entry.department) || "没有在部门里执行"],
+          ["会话", actionSessionText(props.sessions, entry.session_id)],
+          ["工具", entry.tool],
+          ["输入依据", entry.input_version === null ? "未上报" : `第 ${entry.input_version} 版`],
+          ["执行前", artifactRefText(entry.before)],
+        ]}
+      />
+      <p className="y10-note note">{handlingNote(entry.handling)}</p>
       {props.checks.length > 0 ? (
         <ul className="y10-rc-checks">
           {props.checks.map((check) => (
@@ -301,15 +360,23 @@ function ActionCard(props: { entry: UnfinishedAction; checks: VerificationRecord
           ))}
         </ul>
       ) : null}
+      {returned !== "" ? (
+        <>
+          <h4 className="y10-h3 sub">交还给模型的内容</h4>
+          <pre className="y10-pre raw">{returned}</pre>
+        </>
+      ) : null}
     </article>
   );
 }
 
-// 限额（原型 rc-limits）：已用时间与时间上限来自事项的运行限制；恢复不清零，用量未上报时显示未知
+// 限额与会话的用量（原型 rc-limits 与 sessionsTable）：已用时间与时间上限来自事项的运行限制；
+// 恢复不清零，用量未上报时显示未知。各会话的用量各自累计，部门主线与询问分支各一行
 function LimitsBlock(props: { data: RunRecoveryResult; elapsed: number | null; limit: number | null }) {
   const limits = props.data.limits;
+  const sessions = sessionUsageRows(props.data.sessions);
   return (
-    <Section id="rc-limits" title="限额" note="恢复不清零；发送状态未知的尝试仍然占用；用量未上报时显示未知，不填零">
+    <Section id="rc-limits" title="限额与会话的用量" note="恢复不清零；发送状态未知的尝试仍然占用；用量未上报时显示未知，不填零">
       <div className="y10-rc-limits">
         <div className="y10-rc-limit is-wide">
           <span>已用时间与时间上限</span>
@@ -343,6 +410,15 @@ function LimitsBlock(props: { data: RunRecoveryResult; elapsed: number | null; l
           <strong>{limits.cycle_count}</strong>
         </div>
       </div>
+      {sessions.length > 0 ? (
+        <>
+          <h3 className="y10-h3 sub">各会话的用量</h3>
+          <Table
+            head={["会话", "已用时间", "工作轮数", "模型步骤"]}
+            rows={sessions.map((row) => [row.label, formatDuration(row.elapsedSec), row.activations, row.modelSteps])}
+          />
+        </>
+      ) : null}
     </Section>
   );
 }
@@ -359,13 +435,7 @@ function OwnerBlock(props: { data: RunRecoveryResult }) {
             ["当前执行者", <span className="y10-muted" key="none">没有有效执行者</span>],
             ["执行槽位", <span className="y10-muted" key="slot">没有占用执行槽位</span>],
           ]
-          : [
-            ["当前执行者", `第 ${owner.epoch} 任执行者`],
-            ["取得时间", formatTime(owner.since)],
-            ["执行槽位", owner.holds_slot
-              ? "占用一个执行槽位"
-              : <span className="y10-muted" key="slot">没有占用执行槽位</span>],
-          ]}
+          : ownerRows(owner)}
       />
       {late.length > 0 ? (
         <>
@@ -383,4 +453,13 @@ function OwnerBlock(props: { data: RunRecoveryResult }) {
       ) : <p className="y10-note note">没有迟到结果。</p>}
     </Section>
   );
+}
+
+function ownerRows(owner: RecoveryOwner): [string, React.ReactNode][] {
+  return [
+    ["当前执行者", `第 ${owner.epoch} 任执行者`],
+    ["取得时间", formatTime(owner.since)],
+    ["中断位置", interruptedAtText(owner)],
+    ["执行槽位", owner.holds_slot ? "占用一个执行槽位" : "没有占用执行槽位"],
+  ];
 }

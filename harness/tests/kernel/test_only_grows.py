@@ -1,5 +1,6 @@
-# 「只增」的三份清单（S6a，工单 #829；骨架与应用设计说明第 3.1、3.2、7 节；总图第二节第二环「契约」）：
+# 「只增」的清单（S6a，工单 #829；骨架与应用设计说明第 3.1、3.2、7 节；总图第二节第二环「契约」）：
 # 骨架事件的种类、事件信封的字段、封闭的停止原因清单都只增——新增可以，删除与改名不行。
+# 动作的缝（工单 #1170；恢复契约第 4 节）同样只增：动作类别与回执的字段。
 #
 # 快照是放出这一版时的清单。删掉其中一项时这几项测试失败，信息写明是哪一种事件、哪一个字段、
 # 哪一个停止原因：已经写进日志的事件不会因为一个发布而被重新解释（第 7 节），停止原因清单外的原因
@@ -10,12 +11,14 @@
 # 的分工：那一个核对每个基准的结束事件都带清单里的原因，这一个守住清单本身不缩。
 #
 # 读仓库里的静态声明与定义文件，不开数据库、不用子进程、不用网络，属于单元层。
-# 守第 13 节的 R2（第二环的合同：骨架事件只增；封闭的停止原因）。
+# 守第 13 节的 R2（第二环的合同：骨架事件只增；封闭的停止原因；动作类别与回执字段只增）。
 
 import json
 from dataclasses import fields
 from pathlib import Path
+from typing import get_args
 
+from harness.actions import ActionKind, ActionReceipt
 from harness.kernel_events import (
     SKELETON_CATALOG_EVENTS,
     SKELETON_PROJECT_EVENTS,
@@ -96,6 +99,12 @@ _DECLARATIONS = {
     "catalog": SKELETON_CATALOG_EVENTS,
 }
 
+# 放出动作合同时的动作类别（恢复契约第 4 节的表；工单 #1170）：原来的四类加新增的四类
+ACTION_KIND_SNAPSHOT = frozenset({"read", "write", "check", "command", "fetch", "mcp", "trial", "browser"})
+
+# 放出动作合同时回执的字段（工单 #1170）：动作身份、状态、输出、原因，以及工具许可拒绝的两项
+ACTION_RECEIPT_SNAPSHOT = ("action_id", "status", "output", "error", "refused", "refused_reason")
+
 _CLASSES = {"Event": Event, "ProjectEvent": ProjectEvent, "CatalogEvent": CatalogEvent}
 
 
@@ -144,4 +153,32 @@ def test_the_stop_reasons_only_grow():
     assert not added, (
         f"停止原因清单多了 {added}：新加的原因补进 harness/tests/kernel/test_only_grows.py 的快照，"
         f"并为它的去向（run_done、run_paused、run_failed）加一条用例"
+    )
+
+
+def test_the_action_kinds_only_grow():
+    # 动作类别只增：删掉一类或改名，已经按这一类记录的动作读不回来；新加一类以后补进快照
+    declared = frozenset(get_args(ActionKind))
+    missing = sorted(ACTION_KIND_SNAPSHOT - declared)
+    assert not missing, (
+        f"动作类别少了 {missing}：类别只增。如果是有意删掉或改名，先在恢复契约第 4 节写明，"
+        f"再更新这里的快照与定义"
+    )
+    added = sorted(declared - ACTION_KIND_SNAPSHOT)
+    assert not added, (
+        f"动作类别多了 {added}：加进动作合同以后，把它补进 harness/tests/kernel/test_only_grows.py 的快照，"
+        f"并为它写一条既定核实方法与能否取消"
+    )
+
+
+def test_the_action_receipt_fields_only_grow():
+    # 回执的字段只增：删掉一个字段，动作的记录与工具结果就少了它（恢复契约第 4 节）
+    current = list(ActionReceipt.model_fields)
+    missing = [field for field in ACTION_RECEIPT_SNAPSHOT if field not in current]
+    assert not missing, (
+        f"动作回执少了字段 {missing}：回执的字段只增，删掉或改名都会让已记录的动作读不回来"
+    )
+    added = [field for field in current if field not in ACTION_RECEIPT_SNAPSHOT]
+    assert not added, (
+        f"动作回执多了字段 {added}：加进回执以后，把它补进 harness/tests/kernel/test_only_grows.py 的快照"
     )

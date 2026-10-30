@@ -462,9 +462,20 @@ _HANDLERS = {
 }
 _PROCESSES = {"run_check": "_run_check", "bash": "_bash"}
 
-# 定义中的每个环境工具都要在这里有执行方法，否则启动失败
+# 动作类别与属于它的工具：执行环境按类别分派，再从上面两种执行方式里按实际工具名取执行方法。
+# 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明第 18 节）
+_KIND_TOOLS = {
+    "read": frozenset({"read_file", "list_files", "search", "read_range"}),
+    "write": frozenset({"write_file", "edit_range", "delete_file", "move_file"}),
+    "check": frozenset({"run_check"}),
+    "command": frozenset({"bash", "read_output", "stop_job"}),
+}
+
+# 定义中的每个环境工具都要在它动作类别的分派里有执行方法，否则启动失败
 _UNIMPLEMENTED = sorted(name for name, tool in DEFINITIONS.tools.items()
-                        if tool.kind == "environment" and name not in _HANDLERS and name not in _PROCESSES)
+                        if tool.kind == "environment"
+                        and (name not in _KIND_TOOLS.get(tool.action, ())
+                             or (name not in _HANDLERS and name not in _PROCESSES)))
 if _UNIMPLEMENTED:
     raise DefinitionError([("tools.json", name, "执行环境没有这个环境工具的实现") for name in _UNIMPLEMENTED])
 
@@ -749,8 +760,14 @@ class LocalEnvironment:
             qa_dir.mkdir(parents=True, exist_ok=True)
 
     async def perform(self, action: Action) -> ActionReceipt:
-        # 工具的执行出错时回执为 failed，错误说明交回模型；工作区出现公开树无法表示的条目时
-        # （UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行
+        # 按动作类别分派（总图第四节「动作」缝）：同一类里按实际工具名取执行方法；新的动作类别不在本机执行
+        # 环境的处理分支里，立刻失败。工具的执行出错时回执为 failed，错误说明交回模型；工作区出现公开树无法
+        # 表示的条目时（UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行
+        tools = _KIND_TOOLS.get(action.kind)
+        if tools is None:
+            raise ValueError(f"the local environment does not execute {action.kind} actions")
+        if action.tool not in tools:
+            raise ValueError(f"{action.tool} is not a {action.kind} action")
         process = self._processes.get(action.tool)
         handler = None if process is not None else self._handlers[action.tool]
         if action.department != "quality" and action.tool in self._handlers:

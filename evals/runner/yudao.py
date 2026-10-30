@@ -5,7 +5,8 @@
 与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中），不写进代码、
 事件、日志与提交。
 
-一次运行：建立项目、三个部门的项目部门设置使用被测模型、运行器不登记命令、
+一次运行：新建每次运行独立的起点文件夹（只含题目提供的数据文件）、建立项目并把它作为
+起始文件夹交给被测的 Yudao、三个部门的项目部门设置使用被测模型、运行器不登记命令、
 以用户原始意图提交需求原文加接口约定、等待结束；到时间上限时经 `work_item.cancel`
 结束并标记超时；运行结束以后经 `run.export` 导出事件日志，取最后一次封存的交付交给
 评分器，并在导出的事件日志中查找材料目录的路径（找到时这次运行作废）。
@@ -24,17 +25,16 @@ import urllib.parse
 import urllib.request
 import uuid
 import material_integrity
+import model_service
 
 SCENARIO = "scenario-3"
 
-MODEL_SERVICE_BASE_URL_ENV = "YUDAO_EVAL_BASE_URL"
-MODEL_SERVICE_API_KEY_ENV = "YUDAO_EVAL_API_KEY"
 # 场景 3 的运行模型在三个部门都使用同一条连接与同一个访问定义（评测场景设计第 3 节）
 PROVIDER_ID = "yudao-eval"
 MODEL_DEFINITION_ID = "yudao-eval-model"
 PROTOCOL = "chat_completions"
-CONTEXT_WINDOW = 128_000
-MAX_OUTPUT_TOKENS = 8_192
+# 交给 Yudao 的起点：只有题目提供的数据文件（第 3 节「输入」）
+START_FILES = ("subway_data.json",)
 TERMINAL_STATUSES = ("done", "paused", "failed")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
 POLL_INTERVAL_SECONDS = 3.0
@@ -53,6 +53,24 @@ def materials_dir():
 
 def start_dir():
     return os.path.join(materials_dir(), "start", "files")
+
+
+def fresh_start_dir(runs_root, run_id):
+    """每次运行新建的起点文件夹：只含题目提供的数据文件，放在运行目录之外。
+
+    运行目录是这次运行的数据目录（`data_dir_for`），起点文件夹与它并列；仓库内的路径
+    与已经存在的文件夹都拒绝，与数据目录同一条规矩（第 3 节「隔离」）。
+    """
+    path = os.path.abspath(os.path.join(runs_root, run_id, "start"))
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
+    if _is_inside(path, repo_root):
+        raise ValueError("Yudao starting folder must be outside the Yudao repository: " + path)
+    if os.path.exists(path):
+        raise ValueError("Yudao starting folder already exists: " + path)
+    os.makedirs(path)
+    for name in START_FILES:
+        shutil.copy2(os.path.join(start_dir(), name), os.path.join(path, name))
+    return path
 
 
 def hidden_dirs():
@@ -77,12 +95,8 @@ def requirement_text():
 
     两边的输入是同一份：OpenCode 一侧用 `opencode run` 的消息加 `-f` 材料附件，
     Yudao 一侧从正常入口作为用户原文提交。需求原文与接口约定的全文写在这条原文里，
-    工作区里没有这两个文件，工程不需要去读它们。
-
-    `subway_data.json` 是题目提供的数据文件，接口约定第 1 节要求它与源码放在一起；
-    Yudao 的新建项目没有把文件放进空工作区的接口（docs/architecture-issues.md 中本
-    工单的登记），因此起点文件缺口如实写进结果：这份数据文件由工程按接口约定自己
-    写出，不在此工单改接口合同。
+    工作区里没有这两个文件，工程不需要去读它们。起点文件（`subway_data.json`）由
+    运行器经新建项目的起始文件夹带入，事项文字里不另写起点文件的说明。
     """
     prd = _read(os.path.join(materials_dir(), "prd.md"))
     agreement = _read(os.path.join(materials_dir(), "interface-agreement.md"))
@@ -90,11 +104,6 @@ def requirement_text():
         "按下面的需求原文与接口约定实现这份程序。两份全文都写在下面，工作区里没有"
         "这两个文件，不需要去读取它们。代码放在工作区的 `src/` 下，模块名、构造参数、"
         "属性名、命令入口、输入输出格式与导出版面都按接口约定。\n\n"
-        "工作区是空的，题目提供的 `subway_data.json` 没有进入它。接口约定第 1 节要求"
-        "这份数据文件与源码放在一起并由 `data_loader.DATA_FILE_PATH` 指向它，请按接口"
-        "约定的结构自己写出这份文件（`stations` 每项含 `name` 与 `lines`，`connections` "
-        "每项含 `source`、`dest`、`distance`（米）、`line`，站名与连接互相自洽），"
-        "内容反映真实的北京地铁网络，并在交付说明里写明数据的来源与收录的车站数。\n\n"
         "## 需求原文\n\n" + prd + "\n\n## 接口约定\n\n" + agreement
     )
 
@@ -195,9 +204,12 @@ def data_dir_for(runs_root, run_id):
 
 
 def start_service(data_dir, port, python_executable=None):
-    """在被测的数据目录上启动 Yudao 服务，返回进程对象与接口地址。"""
+    """在被测的数据目录上启动 Yudao 服务，返回进程对象与接口地址。
+
+    `--no-browser`：运行器不需要在控制主机上打开页面，评测运行与测试都按无界面启动。
+    """
     command = [python_executable or sys.executable, "-m", "harness", "api",
-               "--data-dir", data_dir, "--port", str(port)]
+               "--data-dir", data_dir, "--port", str(port), "--no-browser"]
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                stdin=subprocess.DEVNULL)
     return process, YudaoClient("http://127.0.0.1:" + str(port))
@@ -232,15 +244,29 @@ def _is_inside(path, parent):
 # 一次运行
 
 def model_service_url():
-    base_url = (os.environ.get(MODEL_SERVICE_BASE_URL_ENV) or "").strip()
+    base_url = (os.environ.get(model_service.MODEL_SERVICE_BASE_URL_ENV) or "").strip()
     if not base_url:
-        raise RuntimeError("the model service address is not in " + MODEL_SERVICE_BASE_URL_ENV)
-    if not (os.environ.get(MODEL_SERVICE_API_KEY_ENV) or "").strip():
-        raise RuntimeError("the model service credential is not in " + MODEL_SERVICE_API_KEY_ENV)
+        raise RuntimeError("the model service address is not in "
+                           + model_service.MODEL_SERVICE_BASE_URL_ENV)
+    if not (os.environ.get(model_service.MODEL_SERVICE_API_KEY_ENV) or "").strip():
+        raise RuntimeError("the model service credential is not in "
+                           + model_service.MODEL_SERVICE_API_KEY_ENV)
     return base_url.rstrip("/")
 
 
-def register_model(client, model_name):
+def model_definition(model_name, limits):
+    """写进目录文档的模型访问定义：容量取模型服务报告的值或运行器参数（第 3 节）。"""
+    return {
+        "id": MODEL_DEFINITION_ID, "provider_id": PROVIDER_ID, "model": model_name, "protocol": PROTOCOL,
+        "context_window": limits["context_window"],
+        "max_output_tokens": limits["max_output_tokens"],
+        "accepts_required_tool_call": True,
+        "input_modalities": ["text", "image"], "reasoning_levels": [],
+        "default_reasoning_level": None, "reasoning_mode": "",
+    }
+
+
+def register_model(client, model_name, limits):
     """把被测模型写入目录文档，经模型测试准入，并让三个部门的默认绑定都指向它。
 
     部门默认绑定（`catalog.department_defaults.save`）是新建事项的前提：事项要求三个
@@ -251,16 +277,10 @@ def register_model(client, model_name):
     models = [item for item in document["models"] if item["id"] != MODEL_DEFINITION_ID]
     providers.append({
         "id": PROVIDER_ID, "name": "Yudao eval",
-        "base_url": model_service_url(), "credential_ref": MODEL_SERVICE_API_KEY_ENV,
+        "base_url": model_service_url(), "credential_ref": model_service.MODEL_SERVICE_API_KEY_ENV,
         "timeout_sec": 600.0, "preset_id": "", "models_url": "",
     })
-    models.append({
-        "id": MODEL_DEFINITION_ID, "provider_id": PROVIDER_ID, "model": model_name, "protocol": PROTOCOL,
-        "context_window": CONTEXT_WINDOW, "max_output_tokens": MAX_OUTPUT_TOKENS,
-        "accepts_required_tool_call": True,
-        "input_modalities": ["text", "image"], "reasoning_levels": [],
-        "default_reasoning_level": None, "reasoning_mode": "",
-    })
+    models.append(model_definition(model_name, limits))
     client.command("catalog.document.save",
                    {"base_version": document["revision"],
                     "document": {"providers": providers, "models": models, "bindings": {}}})
@@ -273,8 +293,10 @@ def register_model(client, model_name):
     return admission
 
 
-def create_project(client, name, goal):
-    created = client.command("project.create", {"name": name, "goal": goal})
+def create_project(client, name, goal, initial_directory=None):
+    """新建项目；`initial_directory` 是这次运行的起点文件夹（评测场景设计第 3 节「输入」）。"""
+    created = client.command("project.create", {"name": name, "goal": goal,
+                                                "initial_directory": initial_directory})
     return created["refs"]["project_id"]
 
 

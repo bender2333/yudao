@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from .actions import Verification
 from .definitions import DEFINITIONS, Definitions, thaw
 
 
@@ -50,9 +51,22 @@ def tool_kind(name: str, *, definitions: Definitions | None = None) -> str | Non
 
 
 def tool_action(name: str, *, definitions: Definitions | None = None) -> str | None:
-    # 环境工具的动作类别（read、write、check、command）；主机工具与没有定义的工具为 None
+    # 环境工具的动作类别（read、write、check、command，以及新增的 fetch、mcp、trial、browser）；
+    # 主机工具与没有定义的工具为 None
     tool = in_force(definitions).tools.get(name)
     return None if tool is None else tool.action
+
+
+def tool_verification(name: str, *, definitions: Definitions | None = None) -> Verification | None:
+    # 环境工具的核实方法；主机工具、没有定义的工具与省略了这项的旧定义为 None（按动作类别的既定值解释）
+    tool = in_force(definitions).tools.get(name)
+    return None if tool is None else tool.verification
+
+
+def tool_cancellable(name: str, *, definitions: Definitions | None = None) -> bool | None:
+    # 环境工具的取消能否确认停止；主机工具、没有定义的工具与省略了这项的旧定义为 None
+    tool = in_force(definitions).tools.get(name)
+    return None if tool is None else tool.cancellable
 
 
 def proposal_kind(name: str, *, definitions: Definitions | None = None) -> str | None:

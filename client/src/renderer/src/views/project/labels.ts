@@ -115,6 +115,39 @@ export const ACTION_STATUS: Record<string, string> = {
   unknown: "结果未知",
 };
 
+// 决定请求里写的原因（model_unavailable 一类请求的 reason 取值，工单 #181）：与停止原因同一套词，
+// 缺的一个是模型或凭据不可用。页面上按中文写，不写 provider_unavailable 这样的机器标识
+export const DECISION_REASON: Record<string, string> = {
+  ...STOP_REASON,
+  provider_unavailable: "模型或凭据不可用",
+};
+
+// 结果未知的动作的处理方式（工单 #181，恢复契约第 4 节）：核实确认是自动核实，或者用户选择按当前
+// 实际状态接受；交还会话是把结果作为工具结果交给发出它的会话，由模型决定是否重新执行。
+// 页面上写这两个词，不写 handed_back 这类取值
+export const ACTION_HANDLING: Record<string, string> = {
+  confirmed: "核实确认",
+  returned: "交还会话",
+};
+
+// 处理方式对应的原型标记：核实确认已经结束，交还会话在等模型处置
+export const ACTION_HANDLING_KIND: Record<string, string> = {
+  confirmed: "succeeded",
+  returned: "asking",
+};
+
+// 动作的用途（tool_started 的 purpose 取值）：一轮工作里的工具调用，或者压缩上下文时的调用
+export const ACTION_PURPOSE: Record<string, string> = {
+  work: "工作中的工具调用",
+  compaction: "压缩上下文时的调用",
+};
+
+// 会话是部门主线还是询问分支（三部门的循环结构第 9 节，工单 #181）：用量各自累计，页面上分开写
+export const SESSION_KIND: Record<string, string> = {
+  main: "部门主线",
+  branch: "询问分支",
+};
+
 export const ATTEMPT_STATUS: Record<string, string> = {
   prepared: "准备中",
   requesting: "请求中",
