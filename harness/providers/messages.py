@@ -532,10 +532,12 @@ def _messages_output(text: str, tool_blocks: dict[int, dict[str, Any]]) -> list[
             "content": [{"type": "output_text", "text": text}],
         })
     for index, block in sorted(tool_blocks.items()):
+        if not block["id"]:
+            raise ProviderError("Tool call is missing its identifier", reason="provider_protocol")
         output.append({
-            "id": block["id"] or f"messages-call-{index}",
+            "id": block["id"],
             "type": "function_call",
-            "call_id": block["id"] or f"messages-call-{index}",
+            "call_id": block["id"],
             "name": block["name"],
             "arguments": block["arguments"] or "{}",
         })
