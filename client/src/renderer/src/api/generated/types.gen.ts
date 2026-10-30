@@ -2069,13 +2069,27 @@ export type DocumentModelInput = {
 };
 
 /**
+ * DrainRunning
+ */
+export type DrainRunning = {
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Title
+     */
+    title: string | null;
+};
+
+/**
  * DrainStatus
  */
 export type DrainStatus = {
     /**
      * State
      */
-    state: 'idle' | 'draining' | 'ready';
+    state: 'idle' | 'draining' | 'ready' | 'forced';
     /**
      * Version
      */
@@ -2088,6 +2102,14 @@ export type DrainStatus = {
      * Queued Work Items
      */
     queued_work_items: number;
+    /**
+     * Since
+     */
+    since: string | null;
+    /**
+     * Running
+     */
+    running: Array<DrainRunning>;
 };
 
 /**

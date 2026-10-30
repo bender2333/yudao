@@ -7289,6 +7289,32 @@
         ],
         "title": "DocumentModelInput"
       },
+      "DrainRunning": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "title"
+        ],
+        "title": "DrainRunning"
+      },
       "DrainStatus": {
         "properties": {
           "state": {
@@ -7296,7 +7322,8 @@
             "enum": [
               "idle",
               "draining",
-              "ready"
+              "ready",
+              "forced"
             ],
             "title": "State"
           },
@@ -7311,6 +7338,24 @@
           "queued_work_items": {
             "type": "integer",
             "title": "Queued Work Items"
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Since"
+          },
+          "running": {
+            "items": {
+              "$ref": "#/components/schemas/DrainRunning"
+            },
+            "type": "array",
+            "title": "Running"
           }
         },
         "additionalProperties": false,
@@ -7319,7 +7364,9 @@
           "state",
           "version",
           "running_runs",
-          "queued_work_items"
+          "queued_work_items",
+          "since",
+          "running"
         ],
         "title": "DrainStatus"
       },
