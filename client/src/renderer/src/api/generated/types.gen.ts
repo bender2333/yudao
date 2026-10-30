@@ -5661,6 +5661,10 @@ export type ActionVerifiedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -5779,6 +5783,10 @@ export type ActivationFinishedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -5905,6 +5913,10 @@ export type AdoptionHeldEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -6005,6 +6017,10 @@ export type ArtifactAcceptedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -6135,6 +6151,10 @@ export type ArtifactInvalidatedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -6219,6 +6239,10 @@ export type AskAnsweredEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -6328,6 +6352,10 @@ export type AskStartedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -6457,6 +6485,10 @@ export type BaselineAdoptedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -6585,6 +6617,10 @@ export type BaselineReviewAcceptedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -6747,6 +6783,10 @@ export type CatalogCandidatesCollectedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -6854,6 +6894,10 @@ export type CatalogRevisedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -6946,6 +6990,10 @@ export type CatalogTestFinishedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -7179,6 +7227,10 @@ export type CompactionRecordedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -7437,6 +7489,10 @@ export type ContextAssembledEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -7757,6 +7813,10 @@ export type ContractAcceptedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -7879,6 +7939,10 @@ export type CredentialChangedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -7971,6 +8035,10 @@ export type DecisionAnsweredEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -8079,6 +8147,10 @@ export type DecisionRequestedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -8148,6 +8220,10 @@ export type DecisionWithdrawnEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -8244,6 +8320,10 @@ export type DeliverableAdoptedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -8310,6 +8390,10 @@ export type DeliveryAcceptedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -8473,6 +8557,10 @@ export type DepartmentActivatedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -8578,6 +8666,10 @@ export type DepartmentGuidanceAppliedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -8666,6 +8758,10 @@ export type DepartmentGuidanceReceivedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -8765,6 +8861,10 @@ export type DepartmentGuidanceRespondedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -8849,6 +8949,10 @@ export type DepartmentInputEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -8951,6 +9055,10 @@ export type DepartmentPromptConfiguredEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -9126,6 +9234,10 @@ export type HomeSeenEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -9202,6 +9314,10 @@ export type InitialPrdProposedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -9371,6 +9487,10 @@ export type InstanceUpgradeAnsweredEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -9437,6 +9557,10 @@ export type InstanceUpgradeRequestedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -9519,6 +9643,10 @@ export type InstanceUpgradeWithdrawnEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -9585,6 +9713,10 @@ export type LessonCandidateRecordedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -9703,6 +9835,10 @@ export type MaterialRecordedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -9788,6 +9924,10 @@ export type ModelAttemptFailedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -10073,6 +10213,10 @@ export type ModelAttemptFinishedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -10331,6 +10475,10 @@ export type ModelMessageEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -10545,6 +10693,10 @@ export type ModelReasoningEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -10742,6 +10894,10 @@ export type ModelRequestSerializedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -10960,6 +11116,10 @@ export type ModelRequestedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -11202,6 +11362,10 @@ export type ModelRetryScheduledEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -11435,6 +11599,10 @@ export type ModelStreamProgressEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -11603,6 +11771,10 @@ export type OnboardingRevisionStartedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -11695,6 +11867,10 @@ export type ParameterSetEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -11796,6 +11972,10 @@ export type ProductDecisionAcceptedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -11922,6 +12102,10 @@ export type ProductInputAssignedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -11999,6 +12183,10 @@ export type ProjectArchivedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -12072,6 +12260,10 @@ export type ProjectDecisionAnsweredEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -12170,6 +12362,10 @@ export type ProjectDecisionRequestedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -12239,6 +12435,10 @@ export type ProjectDecisionWithdrawnEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -12329,6 +12529,10 @@ export type ProjectGoalChangedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -12406,6 +12610,10 @@ export type ProjectParameterSetEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -12504,6 +12712,10 @@ export type ProjectPinnedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -12580,6 +12792,10 @@ export type ProjectRegisteredEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -12668,6 +12884,10 @@ export type ProjectRenamedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -12745,6 +12965,10 @@ export type ProjectRestoredEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -12818,6 +13042,10 @@ export type ProposalRejectedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -12913,6 +13141,10 @@ export type ProposalSubmittedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -13006,6 +13238,10 @@ export type QaSubmittedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -13172,6 +13408,10 @@ export type QaTestsSavedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -13276,6 +13516,10 @@ export type RunContinuedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -13356,6 +13600,10 @@ export type RunCreatedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -13510,6 +13758,10 @@ export type RunDoneEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -13586,6 +13838,10 @@ export type RunFailedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -13672,6 +13928,10 @@ export type RunPausedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -13770,6 +14030,10 @@ export type RunResumedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -13857,6 +14121,10 @@ export type RuntimeDrainFinishedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -13933,6 +14201,10 @@ export type RuntimeDrainStartedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -14014,6 +14286,10 @@ export type RuntimeForceUpgradeRequestedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -14099,6 +14375,10 @@ export type SourceDirectoryConfiguredEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -14208,6 +14488,10 @@ export type SpecAcceptedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -14375,6 +14659,10 @@ export type SpecSupersededEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -14455,6 +14743,10 @@ export type StructureAcceptedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -14682,6 +14974,10 @@ export type ToolCallRequiredEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -14960,6 +15256,10 @@ export type ToolCalledEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -15029,6 +15329,10 @@ export type ToolSkippedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -15243,6 +15547,10 @@ export type ToolStartedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -15605,6 +15913,10 @@ export type UserInputReceivedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -15708,6 +16020,10 @@ export type WorkItemCreatedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -15835,6 +16151,10 @@ export type WorkItemStartFailedEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -15919,6 +16239,10 @@ export type WritebackCompletedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -16048,6 +16372,10 @@ export type WritebackHeldEvent = {
      */
     actor: string;
     /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
      * Command Id
      */
     command_id: string | null;
@@ -16144,6 +16472,10 @@ export type WritebackNotNeededEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -16249,6 +16581,10 @@ export type WritebackStoppedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */
@@ -16375,6 +16711,10 @@ export type WritebackVerifiedEvent = {
      * Actor
      */
     actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
     /**
      * Command Id
      */

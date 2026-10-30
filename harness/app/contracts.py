@@ -6,6 +6,7 @@ from typing import Annotated, Any, Generic, Literal, TypeVar, Union, get_args
 from pydantic import AfterValidator, AwareDatetime, BaseModel, ConfigDict, Field, StringConstraints, create_model
 
 from .payloads import PAYLOADS, Department
+from ..definitions import SourceKind
 
 
 class Contract(BaseModel):
@@ -89,7 +90,7 @@ class Snapshot(Contract, Generic[Data]):
 
 class EventEnvelope(Contract):
     # 事件对象的公共字段（第 5.2 节）：全局位置、本连接上一条消息的位置、所属的流与对象、提出者与引起它的命令、
-    # 应用层生成的一句中文说明；type 与 payload 由各事件种类确定
+    # 这条事件主要事实的来源种类、应用层生成的一句中文说明；type 与 payload 由各事件种类确定
     position: int
     previous: int
     event_id: str
@@ -102,6 +103,8 @@ class EventEnvelope(Contract):
     department: Department | None
     role: str | None
     actor: str
+    # 这条事件的主要事实从哪里来（第 5.2 节）：按事件种类取自定义里的来源表（event_sources.json）
+    source: SourceKind
     command_id: CommandId | None
     label: str
 

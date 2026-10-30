@@ -1,0 +1,281 @@
+{
+  "run_created": {
+    "source": "user"
+  },
+  "user_input_received": {
+    "source": "user"
+  },
+  "product_input_assigned": {
+    "source": "rule"
+  },
+  "department_guidance_received": {
+    "source": "user"
+  },
+  "department_guidance_applied": {
+    "source": "role_statement"
+  },
+  "department_guidance_responded": {
+    "source": "role_statement"
+  },
+  "department_activated": {
+    "source": "rule"
+  },
+  "department_input": {
+    "source": "rule"
+  },
+  "tool_call_required": {
+    "source": "rule"
+  },
+  "activation_finished": {
+    "source": "rule",
+    "fields": {
+      "activations": "host_measurement",
+      "elapsed_ms": "host_measurement",
+      "latency_ms": "host_measurement",
+      "model_steps": "host_measurement",
+      "session_activations": "host_measurement",
+      "session_elapsed_ms": "host_measurement",
+      "session_model_steps": "host_measurement"
+    }
+  },
+  "context_assembled": {
+    "source": "host_measurement"
+  },
+  "model_request_serialized": {
+    "source": "host_measurement"
+  },
+  "model_message": {
+    "source": "role_statement"
+  },
+  "model_reasoning": {
+    "source": "role_statement"
+  },
+  "model_requested": {
+    "source": "host_measurement"
+  },
+  "model_stream_progress": {
+    "source": "host_measurement"
+  },
+  "model_attempt_finished": {
+    "source": "host_measurement"
+  },
+  "model_attempt_failed": {
+    "source": "host_measurement"
+  },
+  "model_retry_scheduled": {
+    "source": "rule",
+    "fields": {
+      "attempt": "host_measurement"
+    }
+  },
+  "compaction_recorded": {
+    "source": "host_measurement"
+  },
+  "tool_called": {
+    "source": "host_measurement"
+  },
+  "tool_started": {
+    "source": "host_measurement"
+  },
+  "tool_skipped": {
+    "source": "rule"
+  },
+  "action_verified": {
+    "source": "host_measurement"
+  },
+  "proposal_submitted": {
+    "source": "role_statement"
+  },
+  "proposal_rejected": {
+    "source": "rule"
+  },
+  "spec_accepted": {
+    "source": "rule"
+  },
+  "spec_superseded": {
+    "source": "rule"
+  },
+  "contract_accepted": {
+    "source": "rule"
+  },
+  "ask_started": {
+    "source": "role_statement"
+  },
+  "ask_answered": {
+    "source": "role_statement"
+  },
+  "product_decision_accepted": {
+    "source": "rule"
+  },
+  "artifact_invalidated": {
+    "source": "rule"
+  },
+  "delivery_accepted": {
+    "source": "rule",
+    "fields": {
+      "checks": "host_measurement"
+    }
+  },
+  "qa_submitted": {
+    "source": "role_statement",
+    "fields": {
+      "checks": "host_measurement"
+    }
+  },
+  "qa_tests_saved": {
+    "source": "rule"
+  },
+  "structure_accepted": {
+    "source": "rule"
+  },
+  "baseline_review_accepted": {
+    "source": "role_statement",
+    "fields": {
+      "checks": "host_measurement"
+    }
+  },
+  "artifact_accepted": {
+    "source": "rule"
+  },
+  "lesson_candidate_recorded": {
+    "source": "role_statement"
+  },
+  "run_done": {
+    "source": "rule"
+  },
+  "run_paused": {
+    "source": "rule"
+  },
+  "run_failed": {
+    "source": "rule"
+  },
+  "run_resumed": {
+    "source": "rule"
+  },
+  "run_continued": {
+    "source": "rule"
+  },
+  "decision_requested": {
+    "source": "rule"
+  },
+  "decision_answered": {
+    "source": "user"
+  },
+  "decision_withdrawn": {
+    "source": "user"
+  },
+  "project_registered": {
+    "source": "user"
+  },
+  "project_renamed": {
+    "source": "user"
+  },
+  "project_goal_changed": {
+    "source": "user"
+  },
+  "project_pinned": {
+    "source": "user"
+  },
+  "project_archived": {
+    "source": "user"
+  },
+  "project_restored": {
+    "source": "user"
+  },
+  "work_item_created": {
+    "source": "user"
+  },
+  "work_item_start_failed": {
+    "source": "rule"
+  },
+  "deliverable_adopted": {
+    "source": "rule"
+  },
+  "adoption_held": {
+    "source": "rule"
+  },
+  "department_prompt_configured": {
+    "source": "user"
+  },
+  "material_recorded": {
+    "source": "user"
+  },
+  "source_directory_configured": {
+    "source": "user"
+  },
+  "initial_prd_proposed": {
+    "source": "role_statement"
+  },
+  "project_decision_requested": {
+    "source": "rule"
+  },
+  "project_decision_answered": {
+    "source": "user"
+  },
+  "project_decision_withdrawn": {
+    "source": "user"
+  },
+  "onboarding_revision_started": {
+    "source": "user"
+  },
+  "baseline_adopted": {
+    "source": "rule",
+    "fields": {
+      "checks": "host_measurement"
+    }
+  },
+  "project_parameter_set": {
+    "source": "user"
+  },
+  "writeback_completed": {
+    "source": "host_measurement"
+  },
+  "writeback_stopped": {
+    "source": "rule"
+  },
+  "writeback_not_needed": {
+    "source": "rule"
+  },
+  "writeback_held": {
+    "source": "rule"
+  },
+  "writeback_verified": {
+    "source": "host_measurement"
+  },
+  "catalog_revised": {
+    "source": "user"
+  },
+  "catalog_candidates_collected": {
+    "source": "host_measurement"
+  },
+  "catalog_test_finished": {
+    "source": "host_measurement"
+  },
+  "credential_changed": {
+    "source": "user"
+  },
+  "runtime_drain_started": {
+    "source": "rule"
+  },
+  "runtime_drain_finished": {
+    "source": "rule"
+  },
+  "runtime_force_upgrade_requested": {
+    "source": "user"
+  },
+  "home_seen": {
+    "source": "user"
+  },
+  "parameter_set": {
+    "source": "user"
+  },
+  "instance_upgrade_requested": {
+    "source": "rule"
+  },
+  "instance_upgrade_answered": {
+    "source": "user"
+  },
+  "instance_upgrade_withdrawn": {
+    "source": "user"
+  }
+}
