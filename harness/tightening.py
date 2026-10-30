@@ -17,14 +17,16 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .watched_outputs import has_new_work, is_working
 from .contracts import normalize_scope
+from .coverage import coverage_report, method_is_executable, open_criteria
 from .definitions import Definitions
-from .kernel_events import BASELINE_STATUSES, QA_VERDICTS
+from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS
 from .models import TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
 from .tools import in_force, offers_with_input, proposal_kind, proposal_kinds, tool_action, tools_for
 from . import tightening_contract
@@ -358,6 +360,17 @@ class WatchedOutputsTightening:
             # 放行要用当前的质检测试材料：材料摘要的比较读的是内容
             if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in bound_checks):
                 errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
+        # 逐条结论（验证的独立性设计说明第 7、7.1 节，工单 #151）在前面这些检查通过以后才判：
+        # 覆盖当前 ProductSpec 的全部验收条件、可执行检验的 passed 至少一个本轮质检回执、放行的三条规则
+        criteria: list[dict[str, Any]] = []
+        if not errors:
+            criteria, criteria_errors = _qa_criteria(proposal)
+            errors.extend(criteria_errors)
+            if not errors:
+                errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts))
+                errors.extend(_criteria_evidence_errors(criteria))
+                if verdict == "release":
+                    errors.extend(_release_criteria_errors(criteria))
         defects, defect_errors = _qa_defects(proposal)
         errors.extend(defect_errors)
         if errors:
@@ -375,7 +388,12 @@ class WatchedOutputsTightening:
             "rationale": proposal["rationale"].strip(),
             "checks": bound_checks,
             "defects": defects,
-            "evidence_refs": [],
+            "criteria": criteria,
+            # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算
+            "coverage": coverage_report(criteria),
+            "open_criteria": open_criteria(criteria),
+            # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
+            "evidence_refs": _check_evidence_refs(criteria, request.events),
         }, ends_run=verdict == "release")
 
     def _structure(self, request: TightenRequest) -> Tightened:
@@ -557,6 +575,7 @@ def _schema_errors(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
             errors.append(FieldError("verdict", "verdict must be rework_engineering or release"))
         errors.extend(_qa_defects_errors(proposal))
         errors.extend(_qa_check_name_errors(proposal))
+        errors.extend(_qa_criteria_errors(proposal))
         defects = [] if "defects" not in proposal else proposal.get("defects")
         if verdict == "release" and isinstance(defects, list) and defects:
             errors.append(FieldError("defects", "release requires an empty defect list"))
@@ -821,6 +840,142 @@ def _qa_defects(proposal: dict[str, Any]) -> tuple[list[dict[str, str]], list[Fi
         if isinstance(summary, str) and summary.strip() and severity in {"blocker", "major", "minor"}:
             defects.append({"severity": severity, "summary": summary.strip()})
     return defects, errors
+
+
+# 验收条件的引用形式（浏览器与 computer use 设计说明第 8.1 节）：AC<序号>，序号是它在 ProductSpec 里的位置
+_CRITERION_ID = re.compile(r"^AC[1-9][0-9]*$")
+# 逐条结论一项的字段（独立性说明第 7.1 节、浏览器说明第 8.3 节）：封闭，多写的字段报错
+_QA_CRITERION_FIELDS = frozenset({"criterion", "method", "result", "checks", "trial_cases", "note"})
+
+
+def _qa_criteria_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    return _qa_criteria(proposal)[1]
+
+
+def _qa_criteria(proposal: dict[str, Any]) -> tuple[list[dict[str, Any]], list[FieldError]]:
+    # 逐条结论的结构：每条验收条件一项，criterion 是 AC<序号>，method 是六种检验方式之一，
+    # result 是 passed、failed、unverified 之一；checks 是本次激活的质检检查名，trial_cases 在 #1180 之前为空
+    raw = proposal.get("criteria")
+    if raw is None or not isinstance(raw, list) or not raw:
+        return [], [FieldError("criteria", "criteria must list one entry per acceptance criterion of the current ProductSpec")]
+    rows: list[dict[str, Any]] = []
+    errors: list[FieldError] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            errors.append(FieldError(f"criteria[{index}]", "a criterion must be an object"))
+            continue
+        errors.extend(FieldError(f"criteria[{index}].{key}", "unknown field")
+                      for key in sorted(set(item) - _QA_CRITERION_FIELDS))
+        criterion = item.get("criterion")
+        if not isinstance(criterion, str) or not _CRITERION_ID.match(criterion.strip()):
+            errors.append(FieldError(f"criteria[{index}].criterion",
+                                     "criterion must be AC<position>, the acceptance criterion's position in the current ProductSpec"))
+            continue
+        method = item.get("method")
+        if method not in QA_METHODS:
+            errors.append(FieldError(f"criteria[{index}].method", "method must be one of " + ", ".join(QA_METHODS)))
+        result = item.get("result")
+        if result not in QA_RESULTS:
+            errors.append(FieldError(f"criteria[{index}].result", "result must be passed, failed, or unverified"))
+        checks_raw = item.get("checks", [])
+        checks: list[str] = []
+        if not isinstance(checks_raw, list):
+            errors.append(FieldError(f"criteria[{index}].checks", "checks must be a list of check names"))
+        else:
+            for position, name in enumerate(checks_raw):
+                if not isinstance(name, str) or not name.strip():
+                    errors.append(FieldError(f"criteria[{index}].checks[{position}]", "check name must be a non-empty string"))
+                    continue
+                checks.append(name.strip())
+        trial_cases = item.get("trial_cases", [])
+        if not isinstance(trial_cases, list) or any(not isinstance(name, str) for name in trial_cases):
+            errors.append(FieldError(f"criteria[{index}].trial_cases", "trial_cases must be a list of trial case ids"))
+        elif trial_cases:
+            # 试用用例由 #1180 接上：在那之前这一项必须为空
+            errors.append(FieldError(f"criteria[{index}].trial_cases", "trial cases are not accepted yet; leave trial_cases empty"))
+        note = item.get("note")
+        if note is not None and not isinstance(note, str):
+            errors.append(FieldError(f"criteria[{index}].note", "note must be a string"))
+        if method in QA_METHODS and result in QA_RESULTS:
+            rows.append({"criterion": criterion.strip(), "method": method, "result": result,
+                         "checks": checks, "trial_cases": [], "note": (note or "").strip()})
+    return rows, errors
+
+
+def _criteria_coverage_errors(criteria: list[dict[str, Any]], projection: RunProjection,
+                              receipts: dict[str, Any]) -> list[FieldError]:
+    # 覆盖当前 ProductSpec 的全部验收条件，按位置一一对应：缺一条、多一条、重复一条都报在 criteria 上；
+    # 每条引用的检查名必须是本次激活里绑定当前快照、ProductSpec 与交付的质检回执（工程的回执不在 receipts 里）
+    errors: list[FieldError] = []
+    spec = projection.product_spec
+    expected = [f"AC{position}" for position in range(1, len(spec.acceptance_criteria) + 1)] if spec is not None else []
+    seen = [row["criterion"] for row in criteria]
+    missing = [item for item in expected if item not in seen]
+    extra = sorted({item for item in seen if item not in expected})
+    if missing:
+        errors.append(FieldError("criteria", "criteria must cover every acceptance criterion of the current ProductSpec; missing "
+                                 + ", ".join(missing)))
+    if extra:
+        errors.append(FieldError("criteria", "criteria reference acceptance criteria the current ProductSpec does not have: "
+                                 + ", ".join(extra)))
+    if len(seen) != len(set(seen)):
+        errors.append(FieldError("criteria", "criteria list the same acceptance criterion twice"))
+    for index, row in enumerate(criteria):
+        unknown = [name for name in row["checks"] if name not in receipts]
+        if unknown:
+            errors.append(FieldError(f"criteria[{index}].checks",
+                                     "checks must name quality run_check receipts bound to the current snapshot, ProductSpec and "
+                                     "delivery in this activation: " + ", ".join(unknown)))
+    return errors
+
+
+def _criteria_evidence_errors(criteria: list[dict[str, Any]]) -> list[FieldError]:
+    # 可执行检验（check、trial、measure）的 passed 至少一个证据：本次激活的质检检查回执
+    errors: list[FieldError] = []
+    for index, row in enumerate(criteria):
+        if row["result"] == "passed" and method_is_executable(row["method"]) and not row["checks"]:
+            errors.append(FieldError(f"criteria[{index}].checks",
+                                     "a passed executable criterion needs at least one quality check receipt"))
+    return errors
+
+
+def _release_criteria_errors(criteria: list[dict[str, Any]]) -> list[FieldError]:
+    # 放行（第 7.1 节第 3 点）：没有 failed；可执行检验的验收条件都是 passed。
+    # 不可执行检验的条件可以是 unverified，列进放行记录的开环明细
+    errors: list[FieldError] = []
+    for index, row in enumerate(criteria):
+        if row["result"] == "failed":
+            errors.append(FieldError(f"criteria[{index}].result", "release cannot carry a failed acceptance criterion"))
+        elif method_is_executable(row["method"]) and row["result"] != "passed":
+            errors.append(FieldError(f"criteria[{index}].result", "release requires executable criteria to be passed"))
+    return errors
+
+
+def _check_evidence_refs(criteria: list[dict[str, Any]], events: tuple[Event, ...] | list[Event]) -> list[dict[str, Any]]:
+    # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用。说明工件（结论原文）的引用由接纳时补在前面
+    refs: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for row in criteria:
+        for name in row["checks"]:
+            ref = _check_output_ref(events, name)
+            if ref is None or ref.get("content_hash") in seen:
+                continue
+            seen.add(ref["content_hash"])
+            refs.append(ref)
+    return refs
+
+
+def _check_output_ref(events: tuple[Event, ...] | list[Event], name: str) -> dict[str, Any] | None:
+    for event in reversed(list(events)):
+        if event.type != EventType.TOOL_CALLED:
+            continue
+        payload = event.payload or {}
+        if payload.get("name") != "run_check" or (payload.get("args") or {}).get("name") != name:
+            continue
+        ref = payload.get("output_ref")
+        if isinstance(ref, dict) and ref.get("content_hash"):
+            return dict(ref)
+    return None
 
 
 def _require_text(payload: dict[str, Any], field: str) -> list[FieldError]:

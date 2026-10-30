@@ -761,6 +761,28 @@ class Defect(Payload):
     summary: str
 
 
+class QaCriterionPayload(Payload):
+    # 质检的逐条结论（验证的独立性设计说明第 7.1 节、浏览器与 computer use 设计说明第 8.3 节，工单 #151）：
+    # criterion 是验收条件在 ProductSpec 里的位置写成的 AC<序号>，method 是检验方式，result 只有三种
+    criterion: str
+    method: Literal["check", "trial", "measure", "judgement", "human", "open"]
+    result: Literal["passed", "failed", "unverified"]
+    checks: list[str]
+    trial_cases: list[str]
+    note: str
+
+
+class QaCoveragePayload(Payload):
+    # 放行记录里的三个数（第 7.1 节第 4 点）：一次算好，查询与画面读这个数，不重新计算。
+    # coverage_ratio 是可执行检验里已在当前快照上通过的条件数除以条件总数
+    criteria_total: int
+    executable: int
+    covered: int
+    coverage_ratio: float
+    model_reading: int
+    open: int
+
+
 class QaSubmittedPayload(AcceptanceFields):
     product_spec_hash: str
     effective_contract_hash: str
@@ -770,6 +792,9 @@ class QaSubmittedPayload(AcceptanceFields):
     rationale: str
     checks: list[CheckReceipt]
     defects: list[Defect]
+    criteria: list[QaCriterionPayload]
+    coverage: QaCoveragePayload
+    open_criteria: list[str]
     evidence_refs: list[ArtifactRef]
     kind: Literal["qa_review"]
     issuer: Literal["quality"]
@@ -1391,7 +1416,7 @@ class CatalogRevisedPayload(Payload):
     # base_revision 是这次变化依据的修订号：命令写提交时用户看到的修订号，外部修改与启动补写取变化前的修订号
     revision: int
     base_revision: int | None
-    operation: Literal["save_connection", "connect", "delete_connection", "remove_model", "save_document",
+    operation: Literal["save_connection", "connect", "delete_connection", "remove_model", "select_model", "save_document",
                        "department_defaults", "reload", "startup"]
     provider_id: str | None
     # 部门默认保存以后各部门的建议能力提醒（设计说明第 5.6 节）；其他操作为空

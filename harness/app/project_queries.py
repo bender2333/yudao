@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, field_validator
 
+from ..definitions import DEFINITIONS, SourceKind
 from ..git_versions import GitVersionError
 from ..event_store import run_stream
 from ..minimal_projection import MinimalProjection, fold_events
@@ -362,6 +363,13 @@ class ProjectLoop(ReplayRequest):
     work_item: str | None = None
 
 
+class FactRef(Contract):
+    # 一个事实元素的来源（工单 #396，设计说明第 4.3 节与画面诚实性 H4）：给出它的事件在事件日志里的
+    # 全局位置与这条事件的来源种类。来源种类在定义里（event_sources.json），页面与画面层不自己判断
+    position: int
+    source: SourceKind
+
+
 class WorkItemLoop(Contract):
     work_item_id: str
     kind: str
@@ -390,6 +398,9 @@ class WorkItemLoop(Contract):
     last_department: str | None
     # 事项的版本：取消事项等命令的基准版本
     version: int
+    # 每个事实元素的来源（工单 #396，设计说明第 4.3 节）：门牌 sign、轮次 round、已用时间 elapsed、
+    # 包裹 parcel（当前交付）、盖章 stamp（放行结论）、成果库的箱子 box（采纳的成果）。没有 run 的事项只有门牌
+    refs: dict[str, FactRef] = Field(default_factory=dict)
 
 
 class ProjectLoopResult(Contract):
@@ -423,6 +434,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
             run_id=item.run_id, adoption_id=item.adoption_id,
             recovery_state=observation, stop_reason=item.stop_reason,
             last_department=_last_department(store, item, through=through), version=item.stream_version,
+            refs=_fact_refs(store, item, run, state),
         ))
     return Snapshot[ProjectLoopResult](
         position=_snapshot_position(store, through),
@@ -454,15 +466,9 @@ def _work_item_progress(run: Any) -> WorkItemProgress | None:
     if run is None:
         return None
     spec = getattr(run, "product_spec", None)
-    delivery = getattr(run, "delivery_spec", None)
-    if delivery is None:
-        specs = getattr(run, "delivery_specs", None) or []
-        delivery = specs[-1] if specs else None
-    conclusion = None
-    for review in reversed(getattr(run, "reviews", None) or []):
-        if delivery is not None and review.delivery_spec_hash == delivery.content_hash:
-            conclusion = review.verdict
-            break
+    delivery = _current_delivery(run)
+    review = _matching_review(run, delivery)
+    conclusion = None if review is None else review.verdict
     # 交付依据的 PRD 版本：按交付记录的 PRD 摘要找到那一版的修订号
     basis_revision = None
     if delivery is not None:
@@ -476,6 +482,96 @@ def _work_item_progress(run: Any) -> WorkItemProgress | None:
         delivery_product_spec_revision=basis_revision,
         conclusion=conclusion,
     )
+
+
+def _current_delivery(run: Any) -> Any:
+    # 当前交付（工单 #396 从进度里抽出来共用）：这个 run 最新的一版交付，没有交付时为空
+    delivery = getattr(run, "delivery_spec", None)
+    if delivery is not None:
+        return delivery
+    specs = getattr(run, "delivery_specs", None) or []
+    return specs[-1] if specs else None
+
+
+def _matching_review(run: Any, delivery: Any) -> Any:
+    # 对这份交付的结论（工单 #396 从进度里抽出来共用）：回执绑定的交付摘要与它相同的最近一条审查
+    if delivery is None:
+        return None
+    for review in reversed(getattr(run, "reviews", None) or []):
+        if review.delivery_spec_hash == delivery.content_hash:
+            return review
+    return None
+
+
+def _fact_ref(store: Any, event_id: str | None, what: str) -> FactRef:
+    """一个事实元素的来源（工单 #396，设计说明第 4.3 节，画面诚实性 H4）。
+
+    位置与来源种类都取投影里记下的那条事件：事件编号在投影里（回放与恢复以后不变），位置由事件日志里
+    同一个编号给出，所以同一份事件序列推出的位置相同。事件不在事件日志里时报错：来源不能为空。
+    """
+    if event_id is None:
+        raise NotFound(f"{what} 没有来源事件")
+    event = store.get_event(event_id) or store.get_project_event(event_id)
+    if event is None:
+        raise NotFound(f"{what} 的来源事件不在事件日志里：{event_id}")
+    return FactRef(position=event.position, source=DEFINITIONS.event_source(event.type).source)
+
+
+# 结算类事件（设计说明第 3、4.3 节）：已用时间在这些事件上更新——一次激活结束、run 结束、暂停或失败。
+# 「已用时间」这个事实元素的来源取其中最后一条，别的进展事件不改变它
+ELAPSED_EVENT_TYPES = frozenset({
+    EventType.ACTIVATION_FINISHED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
+})
+
+
+def _elapsed_ref(store: Any, run: Any, run_id: str) -> FactRef:
+    """已用时间的来源（工单 #396）：这个 run 最后一条结算类事件。
+
+    从最后一条事件往前按批（每批 200 条）找，正常运行时不到一批就找到；测试直接往 run 流里写的标记事件
+    不在来源表里，也不影响这个判断。还没有结算过（例如刚开 run）时已用时间从开 run 起算，来源是第一条事件。
+    """
+    last = store.get_event(run.last_event_id)
+    if last is None:
+        raise NotFound(f"已用时间 的来源事件不在事件日志里：{run.last_event_id}")
+    version = last.stream_version
+    while version > 0:
+        start = max(0, version - 200)
+        for event in reversed(store.list_events(run_id, after_version=start)):
+            if event.type in ELAPSED_EVENT_TYPES:
+                return FactRef(position=event.position, source=DEFINITIONS.event_source(event.type).source)
+        version = start
+    created = store.stream_events(run_stream(run_id), through_version=1)
+    if not created:
+        raise NotFound("已用时间 没有来源事件")
+    first = created[0]
+    return FactRef(position=first.position, source=DEFINITIONS.event_source(first.type).source)
+
+
+def _fact_refs(store: Any, item: Any, run: Any, state: Any) -> dict[str, FactRef]:
+    """事项的每个事实元素的来源（工单 #396，设计说明第 4.3 节，画面诚实性 H4）。
+
+    门牌与成果库的箱子用项目投影里记下的位置；轮次取这个 run 的第一条事件，已用时间取它的最后一条事件；
+    包裹（当前交付）与盖章（放行结论）按 run 投影里记下的创建事件取位置。没有 run 的事项只有门牌与箱子。
+    """
+    refs = {"sign": _fact_ref(store, item.event_id, "门牌")}
+    if item.adoption_id is not None:
+        adoption = next((row for row in state.adoptions if row.adoption_id == item.adoption_id), None)
+        if adoption is not None:
+            refs["box"] = _fact_ref(store, adoption.event_id, "成果库的箱子")
+    if run is None:
+        return refs
+    created = store.stream_events(run_stream(item.run_id), through_version=1)
+    if created:
+        refs["round"] = _fact_ref(store, created[0].event_id, "轮次")
+    if getattr(run, "last_event_id", None):
+        refs["elapsed"] = _elapsed_ref(store, run, item.run_id)
+    delivery = _current_delivery(run)
+    if delivery is not None:
+        refs["parcel"] = _fact_ref(store, delivery.created_event_id, "包裹")
+    review = _matching_review(run, delivery)
+    if review is not None:
+        refs["stamp"] = _fact_ref(store, review.created_event_id, "盖章")
+    return refs
 
 
 def _item_sources(application: Application, run_id: str, *, through: int | None = None

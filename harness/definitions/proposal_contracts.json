@@ -71,9 +71,17 @@
       "kinds": {
         "qa_review": {
           "when": ["QUALITY"],
-          "required": ["kind=qa_review", "verdict", "rationale", "checks", "basis_delivery_spec_hash"],
+          "required": ["kind=qa_review", "verdict", "rationale", "checks", "criteria", "basis_delivery_spec_hash"],
           "optional": ["defects"],
           "verdict": ["rework_engineering", "release"],
+          "criteria": {
+            "criterion": "AC<position> of the acceptance criterion in the current ProductSpec (1-based)",
+            "method": "check | trial | measure | judgement | human | open; check, trial and measure are executable, the others are open",
+            "result": "passed | failed | unverified",
+            "checks": "quality check names from this activation that support this criterion",
+            "trial_cases": "leave it empty (trial cases arrive with a later ticket)",
+            "note": "free text"
+          },
           "bind": [
             "current_contract.content_hash",
             "current_delivery_spec.content_hash",
@@ -104,7 +112,9 @@
         }
       },
       "notes": [
-        "release 要求缺陷为空且质量检查 exit_code 均为 0。",
+        "criteria 覆盖当前 ProductSpec 的全部验收条件，每条一项：criterion 是 AC<序号>（验收条件在 ProductSpec 里的位置，从 1 开始），method 是检验方式，result 只有 passed、failed、unverified。",
+        "可执行检验（check、trial、measure）写成 passed 时要有证据：checks 里列出本次激活的质检 run_check 回执；trial_cases 现在必须为空。不可执行检验（judgement、human、open）的条件可以是 unverified，放行时列进开环明细。",
+        "release 要求缺陷为空、质量检查 exit_code 均为 0、没有 failed 的条目、可执行检验的条目都是 passed。",
         "rework 至少包含一条缺陷。"
       ]
     }

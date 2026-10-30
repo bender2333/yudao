@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal, Sequence
 from pydantic import PositiveInt
 
 from ..event_store import Command, catalog_stream
-from ..models import CatalogEventType
+from ..models import DEPARTMENTS, CatalogEventType
 from ..providers import CatalogValidationError, DEFAULT_TIMEOUT_SEC, ProviderError, SUPPORTED_PROTOCOLS, suggested
 from ..write_path import NewCatalogEvent
 from .commands import Rejection
@@ -72,6 +72,7 @@ class ModelInput(Contract):
     context_window: int | None = None
     max_output_tokens: PositiveInt | None = None
     capability_source: str = ""
+    source_details: dict[str, dict[str, str | None]] = {}
     accepts_required_tool_call: bool = True
     # 输入方式（设计说明第 4.3 节）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
     # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
@@ -182,6 +183,15 @@ class CatalogModelRemove(CommandRequest):
     base_version: int
     provider_id: Text
     model_id: Text
+
+
+class CatalogModelSelect(CommandRequest):
+    base_version: int
+    provider_id: Text
+    model: Text
+    protocol: ProtocolName | None = None
+    context_window: PositiveInt | None = None
+    max_output_tokens: PositiveInt | None = None
 
 
 class CatalogReload(CommandRequest):
@@ -335,6 +345,8 @@ def _binding_reminders(application: Application) -> list[str]:
     models = {item["id"]: item for item in view["models"]}
     notes: list[str] = []
     for department, binding in view["bindings"].items():
+        if department not in DEPARTMENTS:
+            continue
         model = models.get(binding.get("model_id") or "")
         if model is None:
             continue
@@ -379,7 +391,9 @@ async def _connect(application: Application, command: Command, request: CatalogC
     provider_id = connected["provider_id"]
     _revised(application, command, "connect", request.base_version, facade.catalog_revision(),
              provider_id=provider_id, credential=connected["credential"])
-    _schedule_candidates(application, request.base_version, provider_id)
+    changes = facade.notify_changes()
+    if not any(change.provider_id == provider_id for change in changes):
+        _schedule_candidates(application, request.base_version, provider_id)
 
 
 async def _delete_connection(application: Application, command: Command, request: CatalogConnectionDelete) -> None:
@@ -432,6 +446,53 @@ async def _remove_model(application: Application, command: Command, request: Cat
     if problem is not None:
         raise Rejection("catalog_invalid", problem)
     _revised(application, command, "remove_model", before, after, provider_id=request.provider_id)
+
+
+async def _select_model(application: Application, command: Command, request: CatalogModelSelect) -> None:
+    facade = application.system.facade
+    _check_not_registered(application, command)
+    before = facade.catalog_revision()
+    try:
+        selected, start = facade.select_model(request.provider_id, request.model, protocol=request.protocol,
+                                             context_window=request.context_window,
+                                             max_output_tokens=request.max_output_tokens)
+    except CatalogValidationError as exc:
+        reason = "not_found" if any("不存在" in issue.message for issue in exc.issues) else "catalog_invalid"
+        raise Rejection(reason, str(exc))
+    if facade.catalog_revision() != before:
+        _revised(application, command, "select_model", request.base_version, facade.catalog_revision(),
+                 provider_id=request.provider_id)
+    else:
+        _register(application, command)
+    if start:
+        _schedule_selection(application, request.base_version, selected)
+
+
+def _schedule_selection(application: Application, base_version: int, selected) -> None:
+    facade = application.system.facade
+
+    async def run() -> None:
+        started = time.monotonic()
+        try:
+            result = await asyncio.to_thread(
+                facade.run_selection, selected,
+                lambda: int(application.system.parameters()["provider.model_test_max_concurrent"]), DEPARTMENTS)
+        except (CatalogValidationError, ProviderError) as exc:
+            result = {"ok": False, "admitted": False, "error": str(exc)}
+            if not facade.selections.finish(selected, result):
+                return
+        if result is None:
+            return
+        _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
+                _test_payload(base_version, "model", selected.provider_id, selected.model_id,
+                              started, result, result.get("error")))
+        if result.get("defaults_after", 0) != result.get("defaults_before", 0):
+            _result(application, CatalogEventType.CATALOG_REVISED, {
+                "operation": "department_defaults", "base_revision": result["defaults_before"],
+                "revision": result["defaults_after"], "provider_id": selected.provider_id,
+                "reminders": _binding_reminders(application)})
+
+    application.schedule(run())
 
 
 async def _save_document(application: Application, command: Command, request: CatalogDocumentSave) -> None:
@@ -507,10 +568,17 @@ async def _collect_candidates(application: Application, command: Command, reques
 
 
 def _schedule_candidates(application: Application, base_version: int, provider_id: str,
-                         models_url: str | None = None) -> None:
+                         models_url: str | None = None, *, connection_test: bool = False,
+                         retarget: bool = False) -> None:
     facade = application.system.facade
+    provider = _provider_view(facade, provider_id)
+    connection = None if provider is None else tuple(provider[name] for name in ("base_url", "credential_ref", "models_url"))
+    version = facade.connection_version(provider_id)
 
     async def run() -> None:
+        started = time.monotonic()
+        if not facade.change_is_current(provider_id, version):
+            return
         try:
             result = await asyncio.to_thread(facade.refresh_candidates, provider_id,
                                              models_url_override=models_url)
@@ -523,6 +591,10 @@ def _schedule_candidates(application: Application, base_version: int, provider_i
                 "reason": "unreachable",
             })
             return
+        current = _provider_view(facade, provider_id)
+        if (current is None or not facade.change_is_current(provider_id, version)
+                or tuple(current[name] for name in ("base_url", "credential_ref", "models_url")) != connection):
+            return
         _result(application, CatalogEventType.CATALOG_CANDIDATES_COLLECTED, {
             "base_revision": base_version,
             "provider_id": provider_id, "status": result["status"], "source_url": result["source_url"],
@@ -530,6 +602,20 @@ def _schedule_candidates(application: Application, base_version: int, provider_i
             "candidate_ids": [item["id"] for item in result["candidates"]], "error": result["error"],
             "reason": result["reason"],
         })
+        if connection_test:
+            _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
+                    _test_payload(base_version, "connection", provider_id, "", started,
+                                  {"ok": result["status"] == "ok", "admitted": None,
+                                   "source_url": result["source_url"]}, result["error"]))
+        if retarget:
+            before = facade.catalog_revision()
+            selected = facade.reselect_provider(provider_id)
+            if facade.catalog_revision() != before:
+                _result(application, CatalogEventType.CATALOG_REVISED, {
+                    "operation": "select_model", "base_revision": before, "revision": facade.catalog_revision(),
+                    "provider_id": provider_id})
+            for item in selected:
+                _schedule_selection(application, facade.catalog_revision(), item)
 
     application.schedule(run())
 
@@ -552,23 +638,32 @@ async def _test_connection(application: Application, command: Command, request: 
     facade = application.system.facade
     if _provider_view(facade, request.provider_id) is None:
         raise Rejection("not_found", f"Provider 配置不存在：{request.provider_id}")
-    model_id = ""
     _register(application, command)
+    _schedule_connection_test(application, request.base_version, request.provider_id)
+
+
+def _schedule_connection_test(application: Application, base_version: int, provider_id: str) -> None:
+    facade = application.system.facade
+    version = facade.connection_version(provider_id)
 
     async def run() -> None:
         started = time.monotonic()
+        if not facade.change_is_current(provider_id, version):
+            return
         try:
-            result = await asyncio.to_thread(facade.test_connection, request.provider_id)
+            result = await asyncio.to_thread(facade.test_connection, provider_id)
         except (CatalogValidationError, ProviderError) as exc:
             _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                    _test_payload(request.base_version, "connection", request.provider_id, model_id, started,
+                    _test_payload(base_version, "connection", provider_id, "", started,
                                   {"ok": False, "admitted": None}, str(exc)))
             return
         error = None
+        if not facade.change_is_current(provider_id, version):
+            return
         if not result.get("ok"):
             error = str(result.get("message") or result.get("reason") or "连接失败")
         _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                _test_payload(request.base_version, "connection", request.provider_id, model_id, started,
+                _test_payload(base_version, "connection", provider_id, "", started,
                               result, error))
 
     application.schedule(run())
@@ -583,21 +678,9 @@ async def _test_model(application: Application, command: Command, request: Catal
                for item in view["models"]):
         raise Rejection("not_found", f"模型访问定义不存在：{request.model_id}")
     _register(application, command)
-
-    async def run() -> None:
-        started = time.monotonic()
-        try:
-            result = await asyncio.to_thread(facade.model_test, request.provider_id, request.model_id)
-        except (CatalogValidationError, ProviderError) as exc:
-            _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                    _test_payload(request.base_version, "model", request.provider_id, request.model_id, started,
-                                  {"ok": False, "admitted": None}, str(exc)))
-            return
-        _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
-                _test_payload(request.base_version, "model", request.provider_id, request.model_id, started,
-                              result, result.get("error")))
-
-    application.schedule(run())
+    selected, start = facade.retry_selection(request.provider_id, request.model_id)
+    if start:
+        _schedule_selection(application, request.base_version, selected)
 
 
 # ---------------------------------------------------------------------------
@@ -685,6 +768,10 @@ CATALOG_MODEL_REMOVE = CommandDefinition(
     name="catalog.model.remove", request=CatalogModelRemove, refs=NoRefs, handle=_remove_model,
     derive_refs=lambda _events: NoRefs(),
     reasons=("stale_base", "not_found", "in_use", "catalog_invalid"),
+)
+CATALOG_MODEL_SELECT = CommandDefinition(
+    name="catalog.model.select", request=CatalogModelSelect, refs=NoRefs, handle=_select_model,
+    derive_refs=lambda _events: NoRefs(), reasons=("not_found", "catalog_invalid"),
 )
 CATALOG_DOCUMENT_SAVE = CommandDefinition(
     name="catalog.document.save", request=CatalogDocumentSave, refs=NoRefs, handle=_save_document,

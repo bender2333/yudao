@@ -233,6 +233,10 @@ class QAReview:
     checks: list[dict[str, Any]]
     defects: list[Defect]
     evidence_refs: list[ArtifactRef]
+    # 逐条结论与放行记录里的三个数（验证的独立性设计说明第 7.1 节，工单 #151）：旧事件没有这几项
+    criteria: list[dict[str, Any]] = field(default_factory=list)
+    coverage: dict[str, Any] = field(default_factory=dict)
+    open_criteria: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

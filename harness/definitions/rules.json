@@ -1,4 +1,26 @@
 {
+  "provider.model_test_max_concurrent": {
+    "value": 3,
+    "bounds": [1, 8],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "多个选用的模型测试同时向上游发出请求",
+    "cost": "超过上限的选用需要等待正在进行的测试结束",
+    "relax_when": "上游允许更多并发并且用户愿意承担同时测试的费用",
+    "tighten_when": "模型测试触发上游限流或同时测试的费用过高",
+    "origin": "docs/design/model-management.md 第 4.3 节「选用」：同时测试默认 3 个，范围 1 至 8"
+  },
+  "provider.model_test_timeout_sec": {
+    "value": 60,
+    "bounds": [10, 300],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "模型测试请求长时间没有回应",
+    "cost": "较慢的模型需要重新测试或提高等待上限",
+    "relax_when": "正常的最小问答与工具往返经常超过当前等待上限",
+    "tighten_when": "失败的模型请求长期等待且没有得到有效回应",
+    "origin": "docs/design/model-management.md 第 4.3 节「模型测试」：每次请求默认 60 秒，范围 10 至 300 秒"
+  },
   "run_time_limit_sec": {
     "value": 7200,
     "bounds": [600, 86400],

@@ -61,6 +61,7 @@ class ParameterNotWiredError(ValueError):
 # 冻结容器本身不算消费；只有同一提交已经提供实际消费者时才标为接入。
 # #1189 接入的冻结读取参数与三条可见范围、#397 接入的三项收敛参数在各自的实现提交里改这一份清单。
 NOT_WIRED_REASONS: dict[str, str] = {
+    "provider.model_test_max_concurrent": "",
     # 已接入：代码按现值改变行为
     "run_time_limit_sec": "",
     "max_cycles": "",
@@ -70,6 +71,7 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "organization.ask_chain_max_depth": "",
 
     # 由 #1189 接入：现在读的是定义文件里的初值，参数事件改不了它
+    "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
     "tool_call_required_limit": "读的是定义文件里的初值（harness/engine.py 的 DEFINITIONS.rule_value），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
     "max_model_steps": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",
     "max_provider_attempts": "读的是定义文件里的初值（harness/execution_contract.py 的 StepLimits 默认值），参数事件改不了它；由 #1189 改为读 run 创建时冻结的值",

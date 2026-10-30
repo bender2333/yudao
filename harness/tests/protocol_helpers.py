@@ -376,6 +376,56 @@ def responses_responder(body: dict):
     return 200, "text/event-stream", [sse(*events)]
 
 
+def model_test_responder(body: dict, *, protocol: str, actual_model: str = "tested-model",
+                         arguments: str = "{}", call_id: str = "probe-call"):
+    # 真实 HTTP 模型测试的回复：按协议生成完整的文字或工具调用；收到工具结果以后回复文字。
+    has_result = any(item.get("type") == "function_call_output" for item in body.get("input", []))
+    for message in body.get("messages", []):
+        content = message.get("content", [])
+        has_result |= message.get("role") == "tool" or (isinstance(content, list) and any(
+            isinstance(block, dict) and block.get("type") == "tool_result" for block in content))
+    tool = body["tools"][0] if body.get("tools") and not has_result else None
+    name = (tool.get("function") or tool)["name"] if tool else None
+
+    def event(kind: str, payload: dict) -> str:
+        return f"event: {kind}\ndata: {json.dumps(payload)}\n\n"
+
+    if protocol == "responses":
+        item = ({"id": "probe-item", "type": "function_call", "call_id": call_id,
+                 "name": name, "arguments": arguments, "status": "completed"} if tool else
+                {"id": "probe-text", "type": "message", "role": "assistant", "status": "completed",
+                 "content": [{"type": "output_text", "text": "pong", "annotations": []}]})
+        response = {"id": "probe-response", "model": actual_model, "status": "completed", "output": [item],
+                    "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2}}
+        events = [event("response.output_item.done", {"type": "response.output_item.done", "item": item}),
+                  event("response.completed", {"type": "response.completed", "response": response})]
+    elif protocol == "chat_completions":
+        delta = ({"tool_calls": [{"index": 0, "id": call_id, "type": "function",
+                                  "function": {"name": name, "arguments": arguments}}]} if tool else
+                 {"content": "pong"})
+        chunk = {"id": "probe-chat", "object": "chat.completion.chunk", "created": 1, "model": actual_model,
+                 "choices": [{"index": 0, "delta": delta, "finish_reason": "tool_calls" if tool else "stop"}],
+                 "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2}}
+        events = [f"data: {json.dumps(chunk)}\n\n", "data: [DONE]\n\n"]
+    else:
+        events = [event("message_start", {"type": "message_start", "message": {
+            "id": "probe-message", "type": "message", "role": "assistant", "model": actual_model,
+            "content": [], "usage": {"input_tokens": 1, "output_tokens": 0}}})]
+        block = ({"type": "tool_use", "id": call_id, "name": name, "input": {}} if tool else
+                 {"type": "text", "text": ""})
+        delta = ({"type": "input_json_delta", "partial_json": arguments} if tool else
+                 {"type": "text_delta", "text": "pong"})
+        events.extend([
+            event("content_block_start", {"type": "content_block_start", "index": 0, "content_block": block}),
+            event("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": delta}),
+            event("content_block_stop", {"type": "content_block_stop", "index": 0}),
+            event("message_delta", {"type": "message_delta", "delta": {"stop_reason": "tool_use" if tool else "end_turn"},
+                                    "usage": {"output_tokens": 1}}),
+            event("message_stop", {"type": "message_stop"}),
+        ])
+    return 200, "text/event-stream", [sse(*events)]
+
+
 def facade_with(base_url: str, *, protocol: str, preset_id: str = "",
                 model: str = "target-model",
                 accepts_required_tool_call: bool = True,

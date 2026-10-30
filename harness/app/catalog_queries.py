@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Literal, Mapping
 from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
 from ..providers import DEFAULT_TIMEOUT_SEC, capabilities
 from ..providers.errors import CatalogValidationError
-from .contracts import Contract, Snapshot
+from .contracts import CatalogSelection, Contract, Snapshot
 from .project_queries import NotFound
 from .registry import QueryDefinition, UnchangedEvent
 
@@ -75,8 +75,9 @@ class CatalogModel(Contract):
     model: str
     protocol: str
     context_window: int | None
-    max_output_tokens: int
+    max_output_tokens: int | None
     capability_source: str
+    source_details: dict[str, CatalogCandidateSource] = {}
     accepts_required_tool_call: bool
     # 输入方式（设计说明第 4.3 节）：模型访问定义中的值，文本总是包含
     input_modalities: list[str]
@@ -153,6 +154,7 @@ class Catalog(Contract):
     # 目录中每条模型访问定义在各部门的建议能力提醒（模型 ID → 部门 → 提醒）：
     # 部门默认的下拉选中一条定义时界面立即给出提醒，不等保存（设计说明第 5.6 节）
     model_reminders: dict[str, dict[str, list[str]]]
+    selections: list[CatalogSelection] = []
 
 
 class CatalogDocument(Contract):
@@ -218,8 +220,8 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
     system = application.system
     facade = system.facade
     position = system.store.end_position()
-    revision = facade.catalog_revision()
     view = facade.providers_view()
+    revision = view["catalog_revision"]
     status = facade.config_status()
     providers = []
     for item in view["providers"]:
@@ -248,6 +250,7 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
         models=[_model(item) for item in view["models"]],
         admissions=[CatalogAdmission.model_validate(item) for item in view["admissions"]],
         bindings=bindings,
+        selections=view["selections"],
         # 部门默认各自当前绑定的模型的建议能力提醒（设计说明第 5.6 节）
         department_reminders={department: facade.model_reminders(
             None if bindings.get(department) is None else bindings[department].model_id, department)

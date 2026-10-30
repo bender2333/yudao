@@ -901,6 +901,10 @@ export type Catalog = {
             [key: string]: Array<string>;
         };
     };
+    /**
+     * Selections
+     */
+    selections?: Array<CatalogSelection>;
 };
 
 /**
@@ -1382,11 +1386,17 @@ export type CatalogModel = {
     /**
      * Max Output Tokens
      */
-    max_output_tokens: number;
+    max_output_tokens: number | null;
     /**
      * Capability Source
      */
     capability_source: string;
+    /**
+     * Source Details
+     */
+    source_details?: {
+        [key: string]: CatalogCandidateSource;
+    };
     /**
      * Accepts Required Tool Call
      */
@@ -1429,6 +1439,40 @@ export type CatalogModelRemove = {
      * Model Id
      */
     model_id: string;
+};
+
+/**
+ * CatalogModelSelect
+ */
+export type CatalogModelSelect = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Protocol
+     */
+    protocol?: 'chat_completions' | 'fake' | 'messages' | 'responses' | null;
+    /**
+     * Context Window
+     */
+    context_window?: number | null;
+    /**
+     * Max Output Tokens
+     */
+    max_output_tokens?: number | null;
 };
 
 /**
@@ -1529,6 +1573,40 @@ export type CatalogReload = {
      * Base Version
      */
     base_version: number;
+};
+
+/**
+ * CatalogSelection
+ */
+export type CatalogSelection = {
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Sequence
+     */
+    sequence: number;
+    /**
+     * Status
+     */
+    status: 'completing' | 'capacity_unknown' | 'waiting' | 'testing' | 'failed' | 'not_in_list';
+    /**
+     * Missing
+     */
+    missing: Array<string>;
+    /**
+     * Error
+     */
+    error: string | null;
 };
 
 /**
@@ -2220,6 +2298,14 @@ export type DocumentModelInput = {
      */
     capability_source?: string;
     /**
+     * Source Details
+     */
+    source_details?: {
+        [key: string]: {
+            [key: string]: string | null;
+        };
+    };
+    /**
      * Accepts Required Tool Call
      */
     accepts_required_tool_call?: boolean;
@@ -2355,6 +2441,58 @@ export type EventDetailResult = {
     artifacts: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * ExternalSourceEvidenceResult
+ */
+export type ExternalSourceEvidenceResult = {
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Fetched At
+     */
+    fetched_at: string;
+    /**
+     * Total Lines
+     */
+    total_lines: number;
+    /**
+     * Content
+     */
+    content: string;
+    /**
+     * Final Url
+     */
+    final_url?: string | null;
+    /**
+     * Status Code
+     */
+    status_code?: number | null;
+    /**
+     * Content Type
+     */
+    content_type?: string | null;
+};
+
+/**
+ * FactRef
+ */
+export type FactRef = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
 };
 
 /**
@@ -2977,6 +3115,14 @@ export type ModelInput = {
      * Capability Source
      */
     capability_source?: string;
+    /**
+     * Source Details
+     */
+    source_details?: {
+        [key: string]: {
+            [key: string]: string | null;
+        };
+    };
     /**
      * Accepts Required Tool Call
      */
@@ -4679,6 +4825,17 @@ export type SnapshotEventDetailResult = {
 };
 
 /**
+ * Snapshot[ExternalSourceEvidenceResult]
+ */
+export type SnapshotExternalSourceEvidenceResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ExternalSourceEvidenceResult;
+};
+
+/**
  * Snapshot[LiveAttempt]
  */
 export type SnapshotLiveAttempt = {
@@ -5697,6 +5854,12 @@ export type WorkItemLoop = {
      * Version
      */
     version: number;
+    /**
+     * Refs
+     */
+    refs?: {
+        [key: string]: FactRef;
+    };
 };
 
 /**
@@ -7219,7 +7382,7 @@ export type CatalogRevisedPayload = {
     /**
      * Operation
      */
-    operation: 'save_connection' | 'connect' | 'delete_connection' | 'remove_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
+    operation: 'save_connection' | 'connect' | 'delete_connection' | 'remove_model' | 'select_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
     /**
      * Provider Id
      */
@@ -13479,6 +13642,66 @@ export type ProposalSubmittedPayload = {
 };
 
 /**
+ * QaCoveragePayload
+ */
+export type QaCoveragePayload = {
+    /**
+     * Criteria Total
+     */
+    criteria_total: number;
+    /**
+     * Executable
+     */
+    executable: number;
+    /**
+     * Covered
+     */
+    covered: number;
+    /**
+     * Coverage Ratio
+     */
+    coverage_ratio: number;
+    /**
+     * Model Reading
+     */
+    model_reading: number;
+    /**
+     * Open
+     */
+    open: number;
+};
+
+/**
+ * QaCriterionPayload
+ */
+export type QaCriterionPayload = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Method
+     */
+    method: 'check' | 'trial' | 'measure' | 'judgement' | 'human' | 'open';
+    /**
+     * Result
+     */
+    result: 'passed' | 'failed' | 'unverified';
+    /**
+     * Checks
+     */
+    checks: Array<string>;
+    /**
+     * Trial Cases
+     */
+    trial_cases: Array<string>;
+    /**
+     * Note
+     */
+    note: string;
+};
+
+/**
  * QaSubmittedEvent
  */
 export type QaSubmittedEvent = {
@@ -13612,6 +13835,15 @@ export type QaSubmittedPayload = {
      * Defects
      */
     defects: Array<Defect>;
+    /**
+     * Criteria
+     */
+    criteria: Array<QaCriterionPayload>;
+    coverage: QaCoveragePayload;
+    /**
+     * Open Criteria
+     */
+    open_criteria: Array<string>;
     /**
      * Evidence Refs
      */
@@ -17276,6 +17508,16 @@ export type OutputDelta = {
     text: string;
 };
 
+/**
+ * CatalogSelectionProgress
+ */
+export type CatalogSelectionProgress = {
+    /**
+     * Selections
+     */
+    selections: Array<CatalogSelection>;
+};
+
 export type CommandProjectCreateData = {
     body: ProjectCreate;
     path?: never;
@@ -17884,6 +18126,35 @@ export type CommandCatalogModelRemoveResponses = {
 };
 
 export type CommandCatalogModelRemoveResponse = CommandCatalogModelRemoveResponses[keyof CommandCatalogModelRemoveResponses];
+
+export type CommandCatalogModelSelectData = {
+    body: CatalogModelSelect;
+    path?: never;
+    query?: never;
+    url: '/api/commands/catalog.model.select';
+};
+
+export type CommandCatalogModelSelectErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, catalog_invalid, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandCatalogModelSelectError = CommandCatalogModelSelectErrors[keyof CommandCatalogModelSelectErrors];
+
+export type CommandCatalogModelSelectResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandCatalogModelSelectResponse = CommandCatalogModelSelectResponses[keyof CommandCatalogModelSelectResponses];
 
 export type CommandCatalogDocumentSaveData = {
     body: CatalogDocumentSave;
@@ -19087,6 +19358,52 @@ export type QueryRunRecoveryResponses = {
 };
 
 export type QueryRunRecoveryResponse = QueryRunRecoveryResponses[keyof QueryRunRecoveryResponses];
+
+export type QueryEvidenceExternalSourceData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Event Id
+         */
+        event_id: string;
+        /**
+         * Kind
+         */
+        kind: string;
+        /**
+         * Content Hash
+         */
+        content_hash: string;
+        /**
+         * Path
+         */
+        path: string;
+        /**
+         * Media Type
+         */
+        media_type?: string | null;
+    };
+    url: '/api/queries/evidence.external_source';
+};
+
+export type QueryEvidenceExternalSourceErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryEvidenceExternalSourceError = QueryEvidenceExternalSourceErrors[keyof QueryEvidenceExternalSourceErrors];
+
+export type QueryEvidenceExternalSourceResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotExternalSourceEvidenceResult;
+};
+
+export type QueryEvidenceExternalSourceResponse = QueryEvidenceExternalSourceResponses[keyof QueryEvidenceExternalSourceResponses];
 
 export type QueryCatalogData = {
     body?: never;

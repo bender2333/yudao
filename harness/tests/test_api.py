@@ -225,6 +225,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["stale_base", "not_found", "in_use", "catalog_invalid", "command_id_reused"]},
         {"name": "catalog.model.remove",
          "reasons": ["stale_base", "not_found", "in_use", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.model.select",
+         "reasons": ["not_found", "catalog_invalid", "command_id_reused"]},
         {"name": "catalog.document.save",
          "reasons": ["stale_base", "catalog_invalid", "in_use", "command_id_reused"]},
         {"name": "catalog.reload", "reasons": ["command_id_reused"]},
@@ -274,6 +276,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
+        "evidence.external_source",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {
@@ -285,7 +288,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "flow", "queries": ["project.flow"]},
         {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
         {"name": "recovery", "queries": ["run.recovery"]},
-        {"name": "sources", "queries": []},
+        {"name": "sources", "queries": ["project.loop"]},
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)

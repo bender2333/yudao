@@ -1076,6 +1076,57 @@
         }
       }
     },
+    "/api/commands/catalog.model.select": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "catalog.model.select",
+        "operationId": "command_catalog_model_select",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogModelSelect"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, catalog_invalid, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/catalog.document.save": {
       "post": {
         "tags": [
@@ -3259,6 +3310,91 @@
         }
       }
     },
+    "/api/queries/evidence.external_source": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "evidence.external_source",
+        "operationId": "query_evidence_external_source",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "content_hash",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Content Hash"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "media_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Media Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ExternalSourceEvidenceResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/catalog": {
       "get": {
         "tags": [
@@ -5371,6 +5507,14 @@
             },
             "type": "object",
             "title": "Model Reminders"
+          },
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSelection"
+            },
+            "type": "array",
+            "title": "Selections",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -6191,12 +6335,27 @@
             "title": "Context Window"
           },
           "max_output_tokens": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Output Tokens"
           },
           "capability_source": {
             "type": "string",
             "title": "Capability Source"
+          },
+          "source_details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CatalogCandidateSource"
+            },
+            "type": "object",
+            "title": "Source Details",
+            "default": {}
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -6281,6 +6440,79 @@
           "model_id"
         ],
         "title": "CatalogModelRemove"
+      },
+      "CatalogModelSelect": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "provider_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider Id"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "chat_completions",
+                  "fake",
+                  "messages",
+                  "responses"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "provider_id",
+          "model"
+        ],
+        "title": "CatalogModelSelect"
       },
       "CatalogModelTest": {
         "properties": {
@@ -6432,6 +6664,68 @@
           "base_version"
         ],
         "title": "CatalogReload"
+      },
+      "CatalogSelection": {
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completing",
+              "capacity_unknown",
+              "waiting",
+              "testing",
+              "failed",
+              "not_in_list"
+            ],
+            "title": "Status"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider_id",
+          "model_id",
+          "model",
+          "sequence",
+          "status",
+          "missing",
+          "error"
+        ],
+        "title": "CatalogSelection"
       },
       "CatalogState": {
         "properties": {
@@ -7615,7 +7909,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 8
+            "example": 10
           },
           "contract_digest": {
             "type": "string",
@@ -7691,6 +7985,24 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "source_details": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Source Details",
+            "default": {}
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -7981,6 +8293,99 @@
           "artifacts"
         ],
         "title": "EventDetailResult"
+      },
+      "ExternalSourceEvidenceResult": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "fetched_at": {
+            "type": "string",
+            "title": "Fetched At"
+          },
+          "total_lines": {
+            "type": "integer",
+            "title": "Total Lines"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "final_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Final Url"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
+          "content_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Type"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "content_hash",
+          "fetched_at",
+          "total_lines",
+          "content"
+        ],
+        "title": "ExternalSourceEvidenceResult"
+      },
+      "FactRef": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "source"
+        ],
+        "title": "FactRef"
       },
       "FileActionComparison": {
         "properties": {
@@ -8984,6 +9389,24 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "source_details": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Source Details",
+            "default": {}
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -11843,6 +12266,24 @@
         ],
         "title": "Snapshot[EventDetailResult]"
       },
+      "Snapshot_ExternalSourceEvidenceResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ExternalSourceEvidenceResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ExternalSourceEvidenceResult]"
+      },
       "Snapshot_LiveAttempt_": {
         "properties": {
           "position": {
@@ -13680,6 +14121,13 @@
           "version": {
             "type": "integer",
             "title": "Version"
+          },
+          "refs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FactRef"
+            },
+            "type": "object",
+            "title": "Refs"
           }
         },
         "additionalProperties": false,
@@ -16729,6 +17177,7 @@
               "connect",
               "delete_connection",
               "remove_model",
+              "select_model",
               "save_document",
               "department_defaults",
               "reload",
@@ -29618,6 +30067,103 @@
         "title": "ProposalSubmittedPayload",
         "type": "object"
       },
+      "QaCoveragePayload": {
+        "additionalProperties": false,
+        "properties": {
+          "criteria_total": {
+            "title": "Criteria Total",
+            "type": "integer"
+          },
+          "executable": {
+            "title": "Executable",
+            "type": "integer"
+          },
+          "covered": {
+            "title": "Covered",
+            "type": "integer"
+          },
+          "coverage_ratio": {
+            "title": "Coverage Ratio",
+            "type": "number"
+          },
+          "model_reading": {
+            "title": "Model Reading",
+            "type": "integer"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "criteria_total",
+          "executable",
+          "covered",
+          "coverage_ratio",
+          "model_reading",
+          "open"
+        ],
+        "title": "QaCoveragePayload",
+        "type": "object"
+      },
+      "QaCriterionPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "criterion": {
+            "title": "Criterion",
+            "type": "string"
+          },
+          "method": {
+            "enum": [
+              "check",
+              "trial",
+              "measure",
+              "judgement",
+              "human",
+              "open"
+            ],
+            "title": "Method",
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "passed",
+              "failed",
+              "unverified"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "trial_cases": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Trial Cases",
+            "type": "array"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion",
+          "method",
+          "result",
+          "checks",
+          "trial_cases",
+          "note"
+        ],
+        "title": "QaCriterionPayload",
+        "type": "object"
+      },
       "QaSubmittedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -29885,6 +30431,23 @@
             "title": "Defects",
             "type": "array"
           },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/QaCriterionPayload"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/QaCoveragePayload"
+          },
+          "open_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Open Criteria",
+            "type": "array"
+          },
           "evidence_refs": {
             "items": {
               "$ref": "#/components/schemas/ArtifactRef"
@@ -29943,6 +30506,9 @@
           "rationale",
           "checks",
           "defects",
+          "criteria",
+          "coverage",
+          "open_criteria",
           "evidence_refs",
           "kind",
           "issuer",
@@ -37210,6 +37776,23 @@
           "text"
         ],
         "title": "OutputDelta",
+        "type": "object"
+      },
+      "CatalogSelectionProgress": {
+        "additionalProperties": false,
+        "properties": {
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSelection"
+            },
+            "title": "Selections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "selections"
+        ],
+        "title": "CatalogSelectionProgress",
         "type": "object"
       }
     }

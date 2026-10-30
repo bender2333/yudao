@@ -26,8 +26,9 @@ from pydantic import TypeAdapter
 from ..app.access_tokens import AccessTokenStore
 from ..app.application import DEFAULT_REGISTRY, Application
 from ..app.catalog_queries import CatalogQueryInvalid
-from ..app.contracts import AccessMode, Accepted, API_VERSION, Capabilities, EventObject, OutputDelta, Rejected, Snapshot
-from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent
+from ..app.contracts import (AccessMode, Accepted, API_VERSION, Capabilities, CatalogSelectionProgress,
+                             EventObject, OutputDelta, Rejected, Snapshot)
+from ..app.event_stream import EventScope, EventStream, StreamCheckpoint, StreamDelta, StreamEvent, StreamSelection
 from ..app.labels import validation_text
 from ..app.project_queries import NotFound, QueryInputInvalid
 from ..app.registry import CommandDefinition, QueryDefinition, Registry
@@ -222,6 +223,8 @@ def _add_events(api: FastAPI, *, keepalive_sec: float) -> None:
                                  message.position)
                 elif isinstance(message, StreamDelta):
                     yield ServerSentEvent(event="delta", data=message.delta.model_dump(mode="json"))
+                elif isinstance(message, StreamSelection):
+                    yield ServerSentEvent(event="catalog_selection", data=message.progress.model_dump(mode="json"))
                 else:
                     yield _frame("resync", {"reason": message.reason, "end_position": message.end_position}, None)
                     return
@@ -264,7 +267,8 @@ def _openapi(api: FastAPI) -> dict[str, Any]:
     if api.openapi_schema is None:
         document = get_openapi(title=api.title, version=api.version, routes=api.routes)
         schemas = document.setdefault("components", {}).setdefault("schemas", {})
-        for name, contract in (("EventObject", EventObject), ("OutputDelta", OutputDelta)):
+        for name, contract in (("EventObject", EventObject), ("OutputDelta", OutputDelta),
+                               ("CatalogSelectionProgress", CatalogSelectionProgress)):
             generated = jsonable_encoder(TypeAdapter(contract).json_schema(ref_template=_COMPONENTS),
                                          by_alias=True, exclude_none=True)
             for key, value in generated.pop("$defs", {}).items():

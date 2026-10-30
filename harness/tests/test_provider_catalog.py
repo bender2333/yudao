@@ -426,7 +426,7 @@ def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests(
 
 
 def test_candidate_prefill_carries_the_protocol_and_its_source():
-    # R2：协议先取能力表里这个模型的协议（识别出的服务商之内），表里没有时才取方案的默认协议。
+    # R2：先采用能力表里这个模型的协议与来源（识别出的服务商之内），查不到时再使用方案默认协议。
     known = _parse_candidates({"data": [{"id": "grok-4.7"}, {"id": "glm-5.3-flash"},
                                         {"id": "claude-haiku-5-5"}, {"id": "清单里没有的模型"}]},
                               "opencode-go")
