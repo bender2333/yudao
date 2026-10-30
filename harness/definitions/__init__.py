@@ -411,7 +411,10 @@ class ModelCapability(_Definition):
     # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
     # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务商接入包。
-    protocol: Protocol
+    # 接入包没有对应的协议时为空（None）：容量与输入方式照常记录。
+    protocol: Protocol | None = None
+    # 模型自己声明的接入包（provider.npm）；没有声明时不记录（空串）。
+    npm: str = ""
     input_modalities: tuple[str, ...] = ()
     output_modalities: tuple[str, ...] = ()
     context_window: int | None = None
@@ -422,6 +425,7 @@ class ModelCapability(_Definition):
 
 
 class CapabilityProvider(_Definition):
+    # 服务商的接口地址与接入包；接口地址取自 models.dev，官方服务商由提取脚本的补充表补上。
     api: str = ""
     npm: str = Field(min_length=1)
     models: tuple[ModelCapability, ...]
@@ -435,6 +439,8 @@ class ModelCapabilities(_Definition):
     revision: str = Field(min_length=1)
     snapshot_date: str = Field(min_length=1)
     source: str = Field(min_length=1)
+    # 来源文件（取回的 models.dev api.json，或用本地文件生成时的那份）的 SHA-256。
+    source_sha256: str = ""
 
     freeze_presets = _frozen("presets")
     freeze_providers = _frozen("providers")

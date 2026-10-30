@@ -182,10 +182,15 @@ def _parse_candidates(payload: Any, preset_id: str, *, base_url: str | None = No
         # _UPSTREAM_LIMIT_PATHS 的次序取到第一个有效的就停；窗口与输出上限各自独立取
         candidate: dict[str, Any] = {"id": model_id}
         entry = index.lookup(base_url, model_id) if base_url is not None else index.capability(provider_id or "", model_id)
-        candidate["protocol"], candidate["protocol_source"] = (
-            (preset_default_protocol(effective_preset), "preset_default") if effective_preset
-            else (entry.protocol, "capability_table") if entry is not None
-            else ("chat_completions", "default"))
+        # 协议先取能力表（识别出的服务商之内，模型自己声明的接入包优先）；
+        # 能力表里没有这个模型或它的协议为空时，内置服务方案取方案的默认协议，其余取 Chat Completions。
+        if entry is not None and entry.protocol:
+            candidate["protocol"], candidate["protocol_source"] = entry.protocol, "capability_table"
+        elif effective_preset:
+            candidate["protocol"], candidate["protocol_source"] = (
+                preset_default_protocol(effective_preset), "preset_default")
+        else:
+            candidate["protocol"], candidate["protocol_source"] = ("chat_completions", "default")
         for field, paths in _UPSTREAM_LIMIT_PATHS.items():
             value = _first_positive_int(item, paths)
             if value is not None:

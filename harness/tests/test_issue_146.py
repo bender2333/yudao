@@ -165,12 +165,13 @@ def test_catalog_exposes_the_capability_table(tmp_path):
 
 def test_candidates_take_the_window_from_upstream_and_the_input_from_the_table(tmp_path):
     # 上游列表返回窗口时预填取列表的值与来源；输入方式取能力表；能力表没有记录时只有文本
+    # 连接地址是预置方案的请求基址时，能力资料在这家服务商之内查（设计说明第 4.3 节）
     upstream_models = {"data": [
-        {"id": "deepseek-v4-flash-vision-exp", "limit": {"context": 500000, "output": 100000}},
+        {"id": "deepseek-v4.1-flash", "limit": {"context": 500000, "output": 100000}},
         {"id": "not-in-the-table"},
     ]}
     with _Upstream(upstream_models) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base,
+        opened = _Opened(tmp_path, {"providers": [_provider(base_url="https://opencode.ai/zen/go/v1",
                                                            models_url=upstream.models_url,
                                                            preset_id="opencode-go")],
                                     "models": [_document_model("model-a")], "bindings": {}})
@@ -182,7 +183,7 @@ def test_candidates_take_the_window_from_upstream_and_the_input_from_the_table(t
                               lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
                               description="catalog_candidates_collected")
             by_id = {item["id"]: item for item in event.payload["candidates"]}
-            vision = by_id["deepseek-v4-flash-vision-exp"]
+            vision = by_id["deepseek-v4.1-flash"]
             assert vision["context_window"] == 500000 and vision["context_window_source"] == "models_url"
             assert vision["max_output_tokens"] == 100000
             assert vision["input_modalities"] == ["text", "image"]
@@ -193,9 +194,9 @@ def test_candidates_take_the_window_from_upstream_and_the_input_from_the_table(t
             assert unknown["input_modalities_source"] == "default"
 
 def test_candidates_take_the_window_from_the_table_when_upstream_omits_it(tmp_path):
-    # 上游列表没有返回窗口时取能力表的值与来源（deepseek-v4-flash 在提交的快照里带窗口与输出上限）
-    with _Upstream({"data": [{"id": "deepseek-v4-flash"}]}) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base,
+    # 上游列表没有返回窗口时取能力表的值与来源（deepseek-v4-pro 在提交的快照里带窗口与输出上限）
+    with _Upstream({"data": [{"id": "deepseek-v4-pro"}]}) as upstream:
+        opened = _Opened(tmp_path, {"providers": [_provider(base_url="https://opencode.ai/zen/go/v1",
                                                            models_url=upstream.models_url,
                                                            preset_id="opencode-go")],
                                     "models": [_document_model("model-a")], "bindings": {}})
@@ -207,7 +208,7 @@ def test_candidates_take_the_window_from_the_table_when_upstream_omits_it(tmp_pa
                               lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
                               description="catalog_candidates_collected")
             [entry] = event.payload["candidates"]
-            recorded = capabilities.capability("opencode-go", "deepseek-v4-flash")
+            recorded = capabilities.capability("opencode-go", "deepseek-v4-pro")
             assert recorded is not None
             assert entry["context_window"] == recorded.context_window
             assert entry["context_window_source"] == "capability_table"

@@ -43,7 +43,7 @@ def test_collected_candidates_carry_the_window_and_output_limit_from_the_model_l
 def test_candidates_use_table_metadata_and_upstream_modalities_without_inferring_from_names():
     # R2、R3：列表优先、能力表来源与适用性的公开候选合同，通过真实服务读取。
     models = {"data": [
-        {"id": "deepseek-v4-flash", "context_length": 500000},
+        {"id": "deepseek-v4-pro", "context_length": 500000},
         {"id": "deepseek-v4-flash-vision-exp", "input_modalities": ["text"],
          "output_modalities": ["audio"], "reasoning": False},
         {"id": "unknown-image-embedding-model"},
@@ -59,8 +59,9 @@ def test_candidates_use_table_metadata_and_upstream_modalities_without_inferring
         upstream.close()
     assert result["status"] == "ok", result["error"]
     by_id = {candidate["id"]: candidate for candidate in result["candidates"]}
-    table = by_id["deepseek-v4-flash"]
-    assert table["protocol"] == "chat_completions" and table["protocol_source"] == "preset_default"
+    table = by_id["deepseek-v4-pro"]
+    # 协议先取能力表（识别出的服务商之内），再取方案的默认协议
+    assert table["protocol"] == "chat_completions" and table["protocol_source"] == "capability_table"
     assert (table["context_window"], table["context_window_source"]) == (500000, "models_url")
     assert (table["max_output_tokens"], table["max_output_tokens_source"]) == (384000, "capability_table")
     assert table["source_details"]["max_output_tokens"] == {

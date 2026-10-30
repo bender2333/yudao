@@ -1,3 +1,7 @@
+# 按连接地址识别服务商并在这家服务商之内查能力资料（模型管理设计说明第 4.3 节）。
+# 资料取自从 2026-10-30 的真实快照裁剪的 fixtures（harness/tests/data/models_dev_snapshot_20261030.json）；
+# 识别、查找与候选补全走同一条路径。
+
 import importlib.util
 import json
 import sys
@@ -31,6 +35,7 @@ def _index():
     ("https://OPENCODE.ai/zen/go/v1/", "opencode-go"),
     ("https://api.openai.com/another/path", "openai"),
     ("https://api.anthropic.com/v1", "anthropic"),
+    ("https://api.moonshot.cn/v1", "moonshotai-cn"),
     ("https://opencode.ai/another/path", None),
     ("https://unrecognized.example/v1", None),
     ("", None),
@@ -72,9 +77,41 @@ def test_candidates_and_lookup_use_the_same_provider_and_source():
 def test_unrecognized_address_ignores_a_saved_preset_and_other_provider_models():
     # R3：连接地址决定能力资料的服务商，不借用保存的方案标签或模型名。
     [candidate] = _parse_candidates({"data": [{"id": "grok-4.7", "context_length": 100000}]},
-                                    "opencode-go", base_url="https://unrecognized.example/v1", capability_index=_index())
+                                    "opencode-go", base_url="https://unrecognized.example/v1",
+                                    capability_index=_index())
     assert candidate["context_window"] == 100000
     assert candidate["context_window_source"] == "models_url"
     assert "max_output_tokens" not in candidate
     assert candidate["protocol"] == "chat_completions"
     assert candidate["protocol_source"] == "default"
+
+
+def test_protocol_comes_from_the_capability_table_first():
+    # R3：预置方案下能力表有协议的模型取能力表的值；协议为空或表里没有时取方案的默认协议。
+    index = _index()
+    address = "https://opencode.ai/zen/go/v1"
+    [anthropic_model] = _parse_candidates({"data": [{"id": "minimax-m3"}]}, "opencode-go",
+                                          base_url=address, capability_index=index)
+    assert anthropic_model["protocol"] == "messages"
+    assert anthropic_model["protocol_source"] == "capability_table"
+    [empty_protocol] = _parse_candidates({"data": [{"id": "gemini-4-argon"}]}, "opencode-go",
+                                          base_url=address, capability_index=index)
+    assert empty_protocol["protocol"] == "chat_completions"
+    assert empty_protocol["protocol_source"] == "preset_default"
+    [not_in_table] = _parse_candidates({"data": [{"id": "model-not-in-the-table"}]}, "opencode-go",
+                                        base_url=address, capability_index=index)
+    assert not_in_table["protocol"] == "chat_completions"
+    assert not_in_table["protocol_source"] == "preset_default"
+    # 能力表里的容量照常生效（协议为空不影响容量）
+    assert empty_protocol["context_window"] == 1048576
+    assert empty_protocol["context_window_source"] == "capability_table"
+    assert empty_protocol["max_output_tokens"] == 65536
+
+
+def test_preset_address_recognizes_the_provider_of_the_plan():
+    # R3：预置方案的地址识别为该方案对应的服务商（models.dev 的 provider ID）。
+    index = _index()
+    assert index.recognize_provider("https://opencode.ai/zen/go/v1") == "opencode-go"
+    entry = index.lookup("https://opencode.ai/zen/go/v1", "gemini-4-argon")
+    assert entry is not None and entry.protocol is None
+    assert entry.npm == "@ai-sdk/google"
