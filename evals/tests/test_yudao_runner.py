@@ -7,7 +7,9 @@ credentials in the environment and skip without them.
 import json
 import os
 import shutil
+import subprocess
 import sys
+import time
 
 import pytest
 
@@ -341,7 +343,7 @@ def _export(outcome="released", events=None, projection=None):
             "status": "done" if outcome == "released" else None}
     if projection:
         base.update(projection)
-    return {"projection": base, "events": events, "usage": {}}
+    return {"run_id": "yudao-run-1", "projection": base, "events": events, "usage": {}}
 
 
 def test_released_run_is_reported_as_released():
@@ -836,6 +838,353 @@ def _inside(path, parent):
     path = os.path.normcase(os.path.abspath(path))
     parent = os.path.normcase(os.path.abspath(parent))
     return path == parent or path.startswith(parent + os.sep)
+
+
+# ---------------------------------------------------------------------------
+# 场景 2：接入已有仓库、确认初始 PRD、再新建事项（评测场景设计第 2.2、9 节；
+# 接入已有项目设计说明第 3、4 节）
+#
+# 评测工具不得导入 harness（`test_no_harness_import.py`），因此这里按本文件已有的做法
+# 脚本化服务端的回答：三步命令与两次导出按写好的顺序回答，运行器的调用点保持真实。
+# 真实模型与真实上游的运行在 #139、#198。
+
+SCENARIO_2 = yudao.SCENARIO_2
+
+
+def _local_repository(root, files=None):
+    """测试里建的小 git 仓库：一个提交，没有评测材料（不联网，不用真实上游）。"""
+    contents = {"README.md": "# sample repository\n", "app.py": "def add(a, b):\n    return a + b\n"}
+    contents.update(files or {})
+    os.makedirs(root, exist_ok=True)
+    for name, text in contents.items():
+        with open(os.path.join(root, name), "w", encoding="utf-8") as handle:
+            handle.write(text)
+    subprocess.run(["git", "init", "--quiet"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+    subprocess.run(["git", "-c", "user.name=eval", "-c", "user.email=eval@example.invalid",
+                    "commit", "--quiet", "-m", "base"], cwd=root, check=True, capture_output=True)
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root, check=True,
+                          capture_output=True, encoding="utf-8")
+    return root, head.stdout.strip()
+
+
+class _OnboardingClient:
+    """场景 2 用的一份脚本化客户端：接入、确认、新建事项三步与两次导出。
+
+    `states` 是 `decisions.list` 依次给出的请求状态：第一个是 "open"，之后可以是
+    "answered"（模拟人在界面上确认）。命令与查询都记下来，供断言调用顺序与请求体。
+    """
+
+    def __init__(self, *, states=("open",), onboarding_export=None, item_export=None):
+        self.states = list(states)
+        self.calls = []
+        self.created_items = []
+        self.item_started_at = None
+        self.onboarding_export = onboarding_export or _export()
+        self.item_export = item_export or _export()
+        self.answered = False
+        self.index = 0
+
+    def wait_ready(self):
+        return {"capabilities": []}
+
+    def command(self, name, body):
+        self.calls.append((name, body))
+        if name == "project.onboard":
+            return {"refs": {"project_id": "project-1", "work_item_id": "onboarding-item",
+                             "run_id": "onboarding-run"}}
+        if name == "decision.answer":
+            self.answered = True
+            return {"accepted": True}
+        if name == "work_item.create":
+            self.created_items.append(body)
+            self.item_started_at = time.monotonic()
+            return {"refs": {"work_item_id": "item-1", "run_id": "item-run"}}
+        raise AssertionError("unexpected command: " + name)
+
+    def query(self, name, params=None):
+        if name == "decisions.list":
+            return {"data": {"decisions": self._decisions()}}
+        if name == "project.overview":
+            return {"data": {"work_items": [{"work_item_id": "onboarding-item",
+                                            "status": "awaiting_initial_prd"}]}}
+        if name == "replay.check":
+            return {"data": {"consistent": True, "differences": []}}
+        if name == "run.export":
+            exports = {"onboarding-run": self.onboarding_export, "item-run": self.item_export}
+            return {"data": exports[params["run_id"]]}
+        raise AssertionError("unexpected query: " + name)
+
+    def _decisions(self):
+        if self.answered:
+            return []
+        state = self.states[min(self.index, len(self.states) - 1)]
+        self.index += 1
+        return [{"decision_id": "decision-1", "kind": yudao.INITIAL_PRD_KIND, "status": state,
+                 "version": 3, "run_id": None, "project_id": "project-1",
+                 "work_item_id": "onboarding-item", "request": {}, "answer": None,
+                 "requested_at": "2026-10-30T00:00:00+00:00", "blocked": None, "blocks": "work_item"}]
+
+    def stop(self):
+        return None
+
+
+def _stub_scenario2(monkeypatch, tmp_path, client):
+    """把 `run_once` 触碰的服务、源目录与评分换成脚本值；运行器的调用点保持真实。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    monkeypatch.setattr(yudao, "data_dir_for", lambda runs_root, run_id: str(tmp_path / "data"))
+    monkeypatch.setattr(yudao, "prepare_source_dir",
+                        lambda runs_root, run_id, **options: str(tmp_path / "source"))
+    monkeypatch.setattr(yudao, "free_port", lambda: 0)
+    monkeypatch.setattr(yudao, "start_service", lambda data_dir, port: (None, client))
+    monkeypatch.setattr(yudao, "register_model",
+                        lambda client_, model_name, limits: {"admitted_model": model_name})
+    monkeypatch.setattr(yudao, "stop_service", lambda process, timeout_seconds=60: ("", ""))
+    monkeypatch.setattr(run_yudao_eval, "score_delivery",
+                        lambda delivery_dir, evidence_dir: {"checks": [], "completion": 0.5,
+                                                            "correctness": 1.0, "not_done_count": 1,
+                                                            "wrong_count": 0, "requirements": {},
+                                                            "material_version": "scenario-2@1",
+                                                            "scorer_version": "scorer-2@1"})
+
+
+def _onboarding_export(requests=3, tokens=900):
+    export = _export()
+    export["usage"] = {"totals": {"attempts": requests, "input_tokens": tokens,
+                                  "output_tokens": 100, "total_tokens": tokens + 100, "cost": 0.1}}
+    export["projection"] = {"status": "done", "stop_reason": "baseline_verified"}
+    return export
+
+
+def test_scenario_two_onboards_confirms_and_starts_the_item(runs_root, tmp_path, monkeypatch):
+    """三步到达事项开始：`project.onboard` → `decision.answer` → `work_item.create`。"""
+    client = _OnboardingClient(onboarding_export=_onboarding_export())
+    _stub_scenario2(monkeypatch, tmp_path, client)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS, scenario=SCENARIO_2)
+
+    names = [name for name, _body in client.calls]
+    assert names == ["project.onboard", "decision.answer", "work_item.create"]
+    onboard = client.calls[0][1]
+    assert onboard["source_path"] == str(tmp_path / "source")
+    assert onboard["source_name"] == yudao.ONBOARDING_SOURCE_NAME
+    answer = client.calls[1][1]
+    assert answer["decision_id"] == "decision-1"
+    assert answer["option"] == "confirm"
+    assert answer["base_version"] == 3
+    with yudao.scenario(SCENARIO_2):
+        requirement = yudao.requirement_text()
+    requirement_path = os.path.join(EVALS_DIR, "scenarios", SCENARIO_2, "materials",
+                                    "requirement.md")
+    with open(requirement_path, encoding="utf-8") as handle:
+        assert requirement == handle.read()
+    assert client.created_items[0]["text"] == requirement
+    assert client.created_items[0]["project_id"] == "project-1"
+    assert run["void"] is False
+    assert run["onboarding"]["model_requests"] == 3
+    assert run["onboarding"]["input_tokens"] == 900
+    # 事项的指标不含建档：事项自己的导出里没有模型请求，指标就是 0
+    assert run["metrics"]["model_requests"] == 0
+    assert os.path.isfile(os.path.join(run["evidence_dir"], "onboarding-run-export.json"))
+    assert os.path.isfile(os.path.join(run["evidence_dir"], "run-export.json"))
+
+
+def test_the_time_limit_starts_when_the_item_starts(runs_root, tmp_path, monkeypatch):
+    """建档用了多久不影响事项的超时判断：时间上限从新建事项开始量（第 5.2、9 节）。"""
+    client = _OnboardingClient()
+    _stub_scenario2(monkeypatch, tmp_path, client)
+    limit = 0.3
+
+    def slow_onboarding(client_, project_id, work_item_id, timeout_seconds):
+        time.sleep(0.6)
+        return {"decision_id": "decision-1", "version": 3, "status": "open"}
+
+    observed = {}
+
+    def wait_for_end(client_, project_id, work_item_id, limit_seconds):
+        observed["limit"] = limit_seconds
+        observed["since_item_started"] = time.monotonic() - client_.item_started_at
+        return {"status": "done"}, False
+
+    monkeypatch.setattr(yudao, "wait_for_initial_prd", slow_onboarding)
+    monkeypatch.setattr(yudao, "wait_for_end", wait_for_end)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, limit,
+                                  LIMITS, scenario=SCENARIO_2)
+
+    assert observed["limit"] == limit
+    # 建档花了 0.6 秒，比时间上限长；事项开始以后没有等过这么久，因此不会被判超时
+    assert run["onboarding"]["elapsed_seconds"] >= 0.5
+    assert observed["since_item_started"] < limit
+    assert run["metrics"]["timed_out"] is False
+
+
+def test_wait_prd_confirmation_continues_after_the_answer_outside_the_runner(runs_root, tmp_path,
+                                                                             monkeypatch):
+    """`--wait-prd-confirmation`：决定在运行外被回答以后运行器继续，不经接口回答。"""
+    client = _OnboardingClient(states=("open", "answered"))
+    _stub_scenario2(monkeypatch, tmp_path, client)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS, scenario=SCENARIO_2, wait_prd_confirmation=True)
+
+    names = [name for name, _body in client.calls]
+    assert "decision.answer" not in names
+    assert names == ["project.onboard", "work_item.create"]
+    assert run["void"] is False
+
+
+def test_wait_prd_confirmation_times_out_and_voids_the_run(runs_root, tmp_path, monkeypatch):
+    """决定一直没有被回答：到限定时间作废，写明原因，不新建事项、不评分。"""
+    client = _OnboardingClient(states=("open",))
+    _stub_scenario2(monkeypatch, tmp_path, client)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS, scenario=SCENARIO_2, wait_prd_confirmation=True,
+                                  prd_confirmation_timeout_seconds=0.05)
+
+    assert run["void"] is True
+    assert "初始 PRD 的确认" in run["void_reason"]
+    assert "0.05" in run["void_reason"]
+    assert client.created_items == []
+    assert run["score"] is None
+    assert run["onboarding"]["model_requests"] >= 0
+
+
+def test_the_onboarded_repository_keeps_git_and_no_evaluation_material(runs_root, tmp_path):
+    """接入的目录是上游仓库本身：带 `.git`，没有需求原文与隐藏检查（第 3 节「隔离」）。"""
+    repository, head = _local_repository(str(tmp_path / "upstream"))
+    with yudao.scenario(SCENARIO_2):
+        source = yudao.prepare_source_dir(runs_root, "run-1", repo_url=repository, commit=head,
+                                          install_command="")
+
+    assert os.path.isdir(os.path.join(source, ".git"))
+    public = sorted(name for name in os.listdir(source) if name != ".git")
+    assert public == ["README.md", "app.py"]
+    for name in ("requirement.md", "checks", "materials", "reference"):
+        assert not os.path.exists(os.path.join(source, name))
+    # 基准提交就是测试仓库的提交，工作区干净
+    status = subprocess.run(["git", "status", "--porcelain"], cwd=source, capture_output=True,
+                            encoding="utf-8")
+    assert status.stdout.strip() == ""
+    assert not os.path.exists(os.path.join(source, "requirement.md"))
+
+
+def test_the_onboarded_repository_inside_the_yudao_repository_is_rejected(tmp_path):
+    """接入的目录与数据目录同一条规矩：必须在 Yudao 仓库之外（第 3 节「隔离」）。"""
+    repository, head = _local_repository(str(tmp_path / "upstream"))
+    with yudao.scenario(SCENARIO_2):
+        with pytest.raises(ValueError, match="outside the Yudao repository"):
+            yudao.prepare_source_dir(os.path.join(EVALS_DIR, "evals"), "inside-the-repo",
+                                     repo_url=repository, commit=head, install_command="")
+    assert not os.path.exists(os.path.join(EVALS_DIR, "evals", "inside-the-repo", "source"))
+
+
+def test_scenario_two_scores_with_the_scenario_two_scorer(runs_root, tmp_path, monkeypatch):
+    """评分用场景 2 的评分器与评分命令，评分前在评分副本里建立运行环境（第 2.2 节）。"""
+    delivery = tmp_path / "delivery"
+    delivery.mkdir()
+    (delivery / "app.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
+    evidence = tmp_path / "evidence"
+    evidence.mkdir()
+    installed = {}
+
+    def fake_install(repo_dir, install_command=None):
+        installed["dir"] = repo_dir
+        return None
+
+    recorded = {}
+
+    def fake_run(command, **options):
+        recorded["command"] = command
+        result_path = command[command.index("--result") + 1]
+        with open(result_path, "w", encoding="utf-8") as handle:
+            json.dump({"completion": 0.25, "correctness": 1.0, "checks": [],
+                       "material_version": "scenario-2@1", "scorer_version": "scorer-2@1"}, handle)
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(yudao, "install_environment", fake_install)
+    monkeypatch.setattr(run_yudao_eval, "scenario_python", lambda: sys.executable)
+    monkeypatch.setattr(run_yudao_eval.subprocess, "run", fake_run)
+
+    scores = run_yudao_eval.score_delivery(str(delivery), str(evidence), scenario=SCENARIO_2)
+
+    assert scores["completion"] == 0.25
+    command = recorded["command"]
+    assert command[1].endswith(os.path.join("scorer", "scenario2.py"))
+    assert "--table" in command and "--work-dir" in command
+    scoring_dir = os.path.join(str(evidence), "scoring")
+    assert installed["dir"] == os.path.join(scoring_dir, "delivery")
+    assert os.path.isdir(os.path.join(scoring_dir, "checks"))
+    assert os.path.isfile(os.path.join(scoring_dir, "requirement-table.json"))
+    # 场景 2 不复制参考实现：它不参与评分
+    assert not os.path.exists(os.path.join(scoring_dir, "reference"))
+
+
+def test_a_tampered_scenario_two_check_voids_the_run(runs_root, tmp_path, monkeypatch):
+    """场景 2 的材料摘要同样在评分之前核对：改一份隐藏检查，这次运行作废。"""
+    copy = tmp_path / "scenario-2"
+    with yudao.scenario(SCENARIO_2):
+        shutil.copytree(yudao.scenario_base(), copy)
+        monkeypatch.setattr(yudao, "scenario_base", lambda: str(copy))
+        target = copy / "checks" / "f2p.json"
+        target.write_text(target.read_text(encoding="utf-8") + " ", encoding="utf-8")
+        reasons = yudao.void_reasons(json.dumps({"events": []}, ensure_ascii=False))
+    assert any("材料摘要与材料版本记录不同：checks" in reason for reason in reasons), reasons
+
+
+def test_scenario_two_upstream_access_voids_the_run():
+    """场景 2 的上游仓库是 openai-agents-python：日志里出现它的地址时这次运行作废。"""
+    with yudao.scenario(SCENARIO_2):
+        reasons = yudao.void_reasons(json.dumps(
+            {"command": "git clone " + yudao.scenario_module().UPSTREAM_URL}, ensure_ascii=False))
+    assert any("上游仓库" in reason for reason in reasons), reasons
+    assert any("openai-agents-python" in reason for reason in reasons), reasons
+
+
+def test_scenario_option_defaults_to_three_and_selects_two():
+    """`--scenario` 默认 3（现有行为不变）；2 时这次运行走接入已有仓库的那条路。"""
+    default = run_yudao_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs"])
+    assert default.scenario == 3
+    assert default.wait_prd_confirmation is False
+    chosen = run_yudao_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs",
+                                        "--scenario", "2", "--wait-prd-confirmation",
+                                        "--prd-confirmation-timeout-seconds", "30"])
+    assert chosen.scenario == 2
+    assert chosen.wait_prd_confirmation is True
+    assert chosen.prd_confirmation_timeout_seconds == 30.0
+    assert run_yudao_eval.parse_args(["--scenario", "3", "--model", MODEL,
+                                      "--runs-root", "C:/runs"]).scenario == 3
+
+
+def test_the_result_lists_the_onboarding_separately(tmp_path):
+    """结果里建档单独成段：请求数、用量与耗时进 `onboarding`，不进指标汇总（第 5.2 节）。"""
+    run = _run()
+    run["onboarding"] = yudao_metrics.onboarding_metrics(
+        _onboarding_export(requests=7, tokens=1234), 42.0)
+    result = yudao_report.build_result("scenario-2", "scenario-2@1", "scorer-2@1", MODEL, [run])
+    assert result["onboarding"][0]["run_id"] == "yudao-run-1"
+    assert result["onboarding"][0]["model_requests"] == 7
+    assert result["onboarding"][0]["input_tokens"] == 1234
+    assert "onboarding" not in result["summary"]
+    assert result["summary"]["model_requests"]["count"] == 1
+
+    path = str(tmp_path / "scenario-2.md")
+    yudao_report.write_report(result, path, [yudao_report.run_section(run, _scores())])
+    text = open(path, encoding="utf-8").read()
+    assert text.startswith("# 场景 2 · Yudao 一侧评测报告")
+    assert "建档（场景 2）：模型请求数、用量与耗时" in text
+    assert "不计入上面的指标汇总" in text
+
+
+def test_a_run_without_a_score_is_reported_as_void(tmp_path):
+    """初始 PRD 没有被确认的运行没有可以评分的交付：报告写「作废，未评分」。"""
+    run = _run(void=True, void_reason="初始 PRD 的确认在 0.05 秒内没有被回答", score=None)
+    lines = yudao_report.run_section(run, None)
+    text = "\n".join(lines)
+    assert "作废，未评分" in text
+    assert "初始 PRD 的确认在 0.05 秒内没有被回答" in text
 
 
 def test_process_exit_failure_is_not_a_release():
