@@ -178,8 +178,8 @@ def _parse_candidates(payload: Any, preset_id: str) -> list[dict[str, Any]]:
         candidate: dict[str, Any] = {"id": model_id}
         entry = capabilities.capability(preset_id, model_id) if preset_id else None
         candidate["protocol"], candidate["protocol_source"] = (
-            (preset_default_protocol(preset_id), "preset_default") if preset_id
-            else (entry.protocol, "capability_table") if entry is not None
+            (entry.protocol, "capability_table") if entry is not None and entry.protocol
+            else (preset_default_protocol(preset_id), "preset_default") if preset_id
             else ("chat_completions", "default"))
         for field, paths in _UPSTREAM_LIMIT_PATHS.items():
             value = _first_positive_int(item, paths)

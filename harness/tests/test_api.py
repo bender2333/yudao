@@ -225,6 +225,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["stale_base", "not_found", "in_use", "catalog_invalid", "command_id_reused"]},
         {"name": "catalog.model.remove",
          "reasons": ["stale_base", "not_found", "in_use", "catalog_invalid", "command_id_reused"]},
+        {"name": "catalog.model.select",
+         "reasons": ["not_found", "catalog_invalid", "command_id_reused"]},
         {"name": "catalog.document.save",
          "reasons": ["stale_base", "catalog_invalid", "in_use", "command_id_reused"]},
         {"name": "catalog.reload", "reasons": ["command_id_reused"]},

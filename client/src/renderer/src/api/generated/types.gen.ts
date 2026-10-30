@@ -901,6 +901,10 @@ export type Catalog = {
             [key: string]: Array<string>;
         };
     };
+    /**
+     * Selections
+     */
+    selections?: Array<CatalogSelection>;
 };
 
 /**
@@ -1382,11 +1386,17 @@ export type CatalogModel = {
     /**
      * Max Output Tokens
      */
-    max_output_tokens: number;
+    max_output_tokens: number | null;
     /**
      * Capability Source
      */
     capability_source: string;
+    /**
+     * Source Details
+     */
+    source_details?: {
+        [key: string]: CatalogCandidateSource;
+    };
     /**
      * Accepts Required Tool Call
      */
@@ -1429,6 +1439,40 @@ export type CatalogModelRemove = {
      * Model Id
      */
     model_id: string;
+};
+
+/**
+ * CatalogModelSelect
+ */
+export type CatalogModelSelect = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Protocol
+     */
+    protocol?: 'chat_completions' | 'fake' | 'messages' | 'responses' | null;
+    /**
+     * Context Window
+     */
+    context_window?: number | null;
+    /**
+     * Max Output Tokens
+     */
+    max_output_tokens?: number | null;
 };
 
 /**
@@ -1529,6 +1573,40 @@ export type CatalogReload = {
      * Base Version
      */
     base_version: number;
+};
+
+/**
+ * CatalogSelection
+ */
+export type CatalogSelection = {
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model Id
+     */
+    model_id: string;
+    /**
+     * Model
+     */
+    model: string;
+    /**
+     * Sequence
+     */
+    sequence: number;
+    /**
+     * Status
+     */
+    status: 'completing' | 'capacity_unknown' | 'waiting' | 'testing' | 'failed' | 'not_in_list';
+    /**
+     * Missing
+     */
+    missing: Array<string>;
+    /**
+     * Error
+     */
+    error: string | null;
 };
 
 /**
@@ -2219,6 +2297,14 @@ export type DocumentModelInput = {
      * Capability Source
      */
     capability_source?: string;
+    /**
+     * Source Details
+     */
+    source_details?: {
+        [key: string]: {
+            [key: string]: string | null;
+        };
+    };
     /**
      * Accepts Required Tool Call
      */
@@ -2977,6 +3063,14 @@ export type ModelInput = {
      * Capability Source
      */
     capability_source?: string;
+    /**
+     * Source Details
+     */
+    source_details?: {
+        [key: string]: {
+            [key: string]: string | null;
+        };
+    };
     /**
      * Accepts Required Tool Call
      */
@@ -7219,7 +7313,7 @@ export type CatalogRevisedPayload = {
     /**
      * Operation
      */
-    operation: 'save_connection' | 'connect' | 'delete_connection' | 'remove_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
+    operation: 'save_connection' | 'connect' | 'delete_connection' | 'remove_model' | 'select_model' | 'save_document' | 'department_defaults' | 'reload' | 'startup';
     /**
      * Provider Id
      */
@@ -17276,6 +17370,16 @@ export type OutputDelta = {
     text: string;
 };
 
+/**
+ * CatalogSelectionProgress
+ */
+export type CatalogSelectionProgress = {
+    /**
+     * Selections
+     */
+    selections: Array<CatalogSelection>;
+};
+
 export type CommandProjectCreateData = {
     body: ProjectCreate;
     path?: never;
@@ -17884,6 +17988,35 @@ export type CommandCatalogModelRemoveResponses = {
 };
 
 export type CommandCatalogModelRemoveResponse = CommandCatalogModelRemoveResponses[keyof CommandCatalogModelRemoveResponses];
+
+export type CommandCatalogModelSelectData = {
+    body: CatalogModelSelect;
+    path?: never;
+    query?: never;
+    url: '/api/commands/catalog.model.select';
+};
+
+export type CommandCatalogModelSelectErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, catalog_invalid, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandCatalogModelSelectError = CommandCatalogModelSelectErrors[keyof CommandCatalogModelSelectErrors];
+
+export type CommandCatalogModelSelectResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandCatalogModelSelectResponse = CommandCatalogModelSelectResponses[keyof CommandCatalogModelSelectResponses];
 
 export type CommandCatalogDocumentSaveData = {
     body: CatalogDocumentSave;

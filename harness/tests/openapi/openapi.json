@@ -1076,6 +1076,57 @@
         }
       }
     },
+    "/api/commands/catalog.model.select": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "catalog.model.select",
+        "operationId": "command_catalog_model_select",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogModelSelect"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, catalog_invalid, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/catalog.document.save": {
       "post": {
         "tags": [
@@ -5371,6 +5422,14 @@
             },
             "type": "object",
             "title": "Model Reminders"
+          },
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSelection"
+            },
+            "type": "array",
+            "title": "Selections",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -6191,12 +6250,27 @@
             "title": "Context Window"
           },
           "max_output_tokens": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Max Output Tokens"
           },
           "capability_source": {
             "type": "string",
             "title": "Capability Source"
+          },
+          "source_details": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CatalogCandidateSource"
+            },
+            "type": "object",
+            "title": "Source Details",
+            "default": {}
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -6281,6 +6355,79 @@
           "model_id"
         ],
         "title": "CatalogModelRemove"
+      },
+      "CatalogModelSelect": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "provider_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider Id"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model"
+          },
+          "protocol": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "chat_completions",
+                  "fake",
+                  "messages",
+                  "responses"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Protocol"
+          },
+          "context_window": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Context Window"
+          },
+          "max_output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Output Tokens"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "provider_id",
+          "model"
+        ],
+        "title": "CatalogModelSelect"
       },
       "CatalogModelTest": {
         "properties": {
@@ -6432,6 +6579,68 @@
           "base_version"
         ],
         "title": "CatalogReload"
+      },
+      "CatalogSelection": {
+        "properties": {
+          "provider_id": {
+            "type": "string",
+            "title": "Provider Id"
+          },
+          "model_id": {
+            "type": "string",
+            "title": "Model Id"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completing",
+              "capacity_unknown",
+              "waiting",
+              "testing",
+              "failed",
+              "not_in_list"
+            ],
+            "title": "Status"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "provider_id",
+          "model_id",
+          "model",
+          "sequence",
+          "status",
+          "missing",
+          "error"
+        ],
+        "title": "CatalogSelection"
       },
       "CatalogState": {
         "properties": {
@@ -7615,7 +7824,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 8
+            "example": 10
           },
           "contract_digest": {
             "type": "string",
@@ -7691,6 +7900,24 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "source_details": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Source Details",
+            "default": {}
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -8984,6 +9211,24 @@
             "type": "string",
             "title": "Capability Source",
             "default": ""
+          },
+          "source_details": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Source Details",
+            "default": {}
           },
           "accepts_required_tool_call": {
             "type": "boolean",
@@ -16729,6 +16974,7 @@
               "connect",
               "delete_connection",
               "remove_model",
+              "select_model",
               "save_document",
               "department_defaults",
               "reload",
@@ -37210,6 +37456,23 @@
           "text"
         ],
         "title": "OutputDelta",
+        "type": "object"
+      },
+      "CatalogSelectionProgress": {
+        "additionalProperties": false,
+        "properties": {
+          "selections": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogSelection"
+            },
+            "title": "Selections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "selections"
+        ],
+        "title": "CatalogSelectionProgress",
         "type": "object"
       }
     }

@@ -18,6 +18,7 @@ from ..event_store import EventStore, catalog_stream
 from ..git_versions import GitVersionStore
 from ..models import new_id, utc_now
 from ..runtime import LoopSystem
+from ..providers.selection_flow import ProviderChange
 from .catalog_commands import (
     CATALOG_CANDIDATES_COLLECT,
     CATALOG_CONNECT,
@@ -27,11 +28,13 @@ from .catalog_commands import (
     CATALOG_DEPARTMENT_DEFAULTS_SAVE,
     CATALOG_DOCUMENT_SAVE,
     CATALOG_MODEL_REMOVE,
+    CATALOG_MODEL_SELECT,
     CATALOG_MODEL_TEST,
     CATALOG_RELOAD,
     CREDENTIAL_CLEAR_OVERRIDE,
     CREDENTIAL_REMOVE_PERSISTED,
     CREDENTIAL_SET,
+    _schedule_candidates,
 )
 from .catalog_queries import CATALOG_CHANGE_IMPACT_QUERY, CATALOG_DOCUMENT_QUERY, CATALOG_QUERY
 from .commands import execute
@@ -112,7 +115,7 @@ DEFAULT_REGISTRY = Registry(
               MATERIAL_RECORD, WORK_ITEM_CREATE, WORK_ITEM_APPEND_INPUT, WORK_ITEM_CANCEL, GUIDANCE_SEND,
               DEPARTMENT_SETTINGS_SAVE, SOURCE_DIRECTORY_SAVE, WRITEBACK_EXECUTE,
               DECISION_ANSWER, CATALOG_CONNECTION_SAVE, CATALOG_CONNECT, CATALOG_CONNECTION_DELETE,
-              CATALOG_MODEL_REMOVE, CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT,
+              CATALOG_MODEL_REMOVE, CATALOG_MODEL_SELECT, CATALOG_DOCUMENT_SAVE, CATALOG_RELOAD, CATALOG_CANDIDATES_COLLECT,
               CATALOG_CONNECTION_TEST,
               CATALOG_MODEL_TEST, CATALOG_DEPARTMENT_DEFAULTS_SAVE, CREDENTIAL_SET, CREDENTIAL_CLEAR_OVERRIDE,
               CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN,
@@ -143,6 +146,31 @@ class Application:
         self._tasks: set[asyncio.Task[Any]] = set()
         # 打开的事件流连接：停止请求到达时先让它们干净结束，再退出（工单 #301）
         self._streams: set[EventStream] = set()
+        self._source_loop: asyncio.AbstractEventLoop | None = None
+        self._source_closed = False
+        self._ensure_source_listener()
+
+    def _ensure_source_listener(self) -> None:
+        if self.system.read_only or self._source_loop is not None:
+            return
+        try:
+            self._source_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self.system.facade.set_change_listener(self._source_changed)
+
+    def _source_changed(self, changes: tuple[ProviderChange, ...]) -> None:
+        # 文件监视在线程中通知，实际任务仍在服务的事件循环里创建。
+        assert self._source_loop is not None
+        for change in changes:
+            self._source_loop.call_soon_threadsafe(self._apply_source_change, change)
+
+    def _apply_source_change(self, change: ProviderChange) -> None:
+        facade = self.system.facade
+        if self._source_closed or not facade.change_is_current(change.provider_id, change.version):
+            return
+        _schedule_candidates(self, facade.catalog_revision(), change.provider_id,
+                             connection_test=change.connection_test, retarget=change.retest)
 
     @classmethod
     def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path) -> Application:
@@ -161,6 +189,10 @@ class Application:
     def close(self) -> None:
         if self.deltas is not None:
             self.deltas.stop()
+        if not self.system.read_only:
+            self._source_closed = True
+            self.system.facade.set_change_listener(None)
+            self.system.facade.selections.cancel_all()
         self.read_models.close()
         for task in list(self._tasks):
             task.cancel()
@@ -181,7 +213,13 @@ class Application:
     async def command(self, name: str, request: CommandRequest, *, actor: str) -> Accepted | Rejected:
         if self.system.read_only:
             raise ReadOnlyError("commands are not available in a read-only open")
-        return await execute(self, self.registry.commands[name], request, actor=actor)
+        self._ensure_source_listener()
+        self.system.facade.notify_changes()
+        result = await execute(self, self.registry.commands[name], request, actor=actor)
+        self.system.facade.notify_changes()
+        if name == "parameter.set":
+            self.system.facade.selections.wake()
+        return result
 
     def query(self, name: str, request: BaseModel | None) -> Snapshot[Any]:
         definition = self.registry.queries[name]
@@ -200,7 +238,9 @@ class Application:
         # 一个事件流连接（第 5 节）。带 live=1 时连接接收模型输出片段（订阅在应用层建立时已登记）。
         # options 透传批次大小、队列长度与检查点参数（默认值见 event_stream 模块）
         stream = EventStream(self.system.store, scope, after=after, live=live and self.deltas is not None,
-                             pump=self.deltas, on_close=self._streams.discard, **options)
+                             pump=self.deltas,
+                             selections=None if self.system.read_only else self.system.facade.selections.snapshot,
+                             on_close=self._streams.discard, **options)
         self._streams.add(stream)
         return stream
 

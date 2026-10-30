@@ -19,7 +19,7 @@ from typing import Literal, Union
 
 from pydantic import BaseModel, TypeAdapter
 
-from ..app.contracts import Contract, EventObject, OutputDelta
+from ..app.contracts import CatalogSelectionProgress, Contract, EventObject, OutputDelta
 from ..definitions import DEFINITIONS
 from ..deltas import DeltaFragment, DeltaPump
 from ..event_store import EventStore
@@ -76,7 +76,12 @@ class StreamDelta(BaseModel):
     kind: Literal["delta"] = "delta"
     delta: OutputDelta
 
-StreamMessage = Union[StreamEvent, StreamCheckpoint, StreamResync, StreamDelta]
+class StreamSelection(BaseModel):
+    kind: Literal["catalog_selection"] = "catalog_selection"
+    progress: CatalogSelectionProgress
+
+
+StreamMessage = Union[StreamEvent, StreamCheckpoint, StreamResync, StreamDelta, StreamSelection]
 
 class _Subscriber:
     # 一个连接的有界订阅队列：事件日志的订阅回调同步写入，写满时标记溢出
@@ -90,6 +95,7 @@ class EventStream:
                  pump: DeltaPump | None = None, batch_size: int = BATCH_SIZE, queue_limit: int = QUEUE_LIMIT,
                  checkpoint_idle_sec: float = CHECKPOINT_IDLE_SEC,
                  checkpoint_skipped: int = CHECKPOINT_SKIPPED,
+                 selections: Callable[[], list[dict]] | None = None,
                  on_close: Callable[[EventStream], None] | None = None) -> None:
         self._store = store
         self._scope = scope
@@ -111,6 +117,8 @@ class EventStream:
         self._closed = asyncio.Event()
         # 连接结束时调用（应用层用它从登记中移除，连接对象不长期堆积）
         self._on_close = on_close
+        self._selections = selections
+        self._last_selections: list[dict] = []
 
     def close(self) -> None:
         # 停止请求到达时由应用层调用：等待中的连接在下一个时间片干净结束
@@ -179,6 +187,14 @@ class EventStream:
             # 片段先转发：它们不属于事件日志的位置序列，与事件顺序无关
             for message in self._drain_deltas():
                 yield message
+            scope = self._scope
+            if (self._live and self._selections is not None
+                    and not (scope.projects or scope.work_items or scope.runs or scope.departments or scope.roles)
+                    and (not scope.types or any(name.startswith("catalog_") for name in scope.types))):
+                current = self._selections()
+                if current != self._last_selections:
+                    self._last_selections = current
+                    yield StreamSelection(progress=CatalogSelectionProgress(selections=current))
             drained = _drain(subscriber)
             if drained:
                 for event in drained:
