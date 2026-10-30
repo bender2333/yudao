@@ -156,6 +156,7 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "wait.machine.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "wait.desktop.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "wait.desktop_unlock.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
+    "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
 }
 
 
