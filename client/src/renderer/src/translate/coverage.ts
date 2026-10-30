@@ -60,6 +60,8 @@ const COMMON: Readonly<Record<string, string>> = none({
   department_prompt_configured: SETTINGS,
   material_recorded: SETTINGS,
   source_directory_configured: SETTINGS,
+  // 项目设置里的 MCP 服务器（工单 #236）：与源目录登记同一类设置修改
+  mcp_servers_configured: SETTINGS,
   project_parameter_set: SETTINGS,
   home_seen: SETTINGS,
   parameter_set: SETTINGS,

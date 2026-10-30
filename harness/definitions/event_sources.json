@@ -242,6 +242,9 @@
   "writeback_verified": {
     "source": "host_measurement"
   },
+  "mcp_servers_configured": {
+    "source": "user"
+  },
   "catalog_revised": {
     "source": "user"
   },

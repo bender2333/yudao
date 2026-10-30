@@ -81,6 +81,25 @@ export type AcceptedDepartmentSettingsSaveRefs = {
 };
 
 /**
+ * Accepted[McpServersSaveRefs]
+ */
+export type AcceptedMcpServersSaveRefs = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Position
+     */
+    position: number;
+    refs: McpServersSaveRefs;
+    /**
+     * Duplicate
+     */
+    duplicate: boolean;
+};
+
+/**
  * Accepted[NoRefs]
  */
 export type AcceptedNoRefs = {
@@ -3088,6 +3107,132 @@ export type MaterialRecord = {
 };
 
 /**
+ * McpServerSettingView
+ */
+export type McpServerSettingView = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Transport
+     */
+    transport: string;
+    /**
+     * Command
+     */
+    command?: string;
+    /**
+     * Args
+     */
+    args?: Array<string>;
+    /**
+     * Env
+     */
+    env?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Url
+     */
+    url?: string;
+    /**
+     * Headers
+     */
+    headers?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Departments
+     */
+    departments?: Array<string>;
+    /**
+     * Startup Timeout Sec
+     */
+    startup_timeout_sec?: number;
+    /**
+     * Call Timeout Sec
+     */
+    call_timeout_sec?: number;
+    /**
+     * Output Limit
+     */
+    output_limit?: number;
+    /**
+     * Tool Snapshot
+     */
+    tool_snapshot?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Config Digest
+     */
+    config_digest?: string;
+};
+
+/**
+ * McpServersSave
+ */
+export type McpServersSave = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version?: number | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Servers
+     */
+    servers: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * McpServersSaveRefs
+ */
+export type McpServersSaveRefs = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Document Digest
+     */
+    document_digest: string;
+};
+
+/**
+ * McpServersSetting
+ */
+export type McpServersSetting = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Document Digest
+     */
+    document_digest: string;
+    /**
+     * Servers
+     */
+    servers?: {
+        [key: string]: McpServerSettingView;
+    };
+    /**
+     * Updated At
+     */
+    updated_at?: string | null;
+};
+
+/**
  * ModelInput
  */
 export type ModelInput = {
@@ -3910,6 +4055,7 @@ export type ProjectSettingsResult = {
     source_directories: {
         [key: string]: SourceDirectorySetting;
     };
+    mcp_servers: McpServersSetting;
     /**
      * Department Reminders
      */
@@ -10414,6 +10560,203 @@ export type MaterialRecordedPayload = {
 };
 
 /**
+ * McpServerSetting
+ */
+export type McpServerSetting = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Transport
+     */
+    transport: 'stdio' | 'http';
+    /**
+     * Command
+     */
+    command?: string;
+    /**
+     * Args
+     */
+    args?: Array<string>;
+    /**
+     * Env
+     */
+    env?: {
+        [key: string]: McpVariableValue;
+    };
+    /**
+     * Url
+     */
+    url?: string;
+    /**
+     * Headers
+     */
+    headers?: {
+        [key: string]: McpVariableValue;
+    };
+    /**
+     * Departments
+     */
+    departments?: Array<string>;
+    /**
+     * Startup Timeout Sec
+     */
+    startup_timeout_sec?: number;
+    /**
+     * Call Timeout Sec
+     */
+    call_timeout_sec?: number;
+    /**
+     * Output Limit
+     */
+    output_limit?: number;
+    /**
+     * Tool Snapshot
+     */
+    tool_snapshot?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Config Digest
+     */
+    config_digest?: string;
+};
+
+/**
+ * McpServersConfiguredEvent
+ */
+export type McpServersConfiguredEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'mcp_servers_configured';
+    payload: McpServersConfiguredPayload;
+};
+
+/**
+ * McpServersConfiguredPayload
+ */
+export type McpServersConfiguredPayload = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Servers
+     */
+    servers: {
+        [key: string]: McpServerSetting;
+    };
+    /**
+     * Document Digest
+     */
+    document_digest: string;
+};
+
+/**
+ * McpServersDocument
+ */
+export type McpServersDocument = {
+    /**
+     * Version
+     */
+    version: number;
+    /**
+     * Servers
+     */
+    servers: {
+        [key: string]: McpServerSetting;
+    };
+    /**
+     * Document Digest
+     */
+    document_digest: string;
+};
+
+/**
+ * McpVariableValue
+ */
+export type McpVariableValue = {
+    /**
+     * Kind
+     */
+    kind: 'text' | 'credential';
+    /**
+     * Value
+     */
+    value?: string;
+    /**
+     * Credential Ref
+     */
+    credential_ref?: string;
+};
+
+/**
  * ModelAttemptFailedEvent
  */
 export type ModelAttemptFailedEvent = {
@@ -14313,6 +14656,7 @@ export type RunCreatedPayload = {
      */
     parameters_version: string;
     parameters?: FrozenParameters | null;
+    mcp_servers?: McpServersDocument | null;
     /**
      * Run Event Version
      */
@@ -16715,6 +17059,7 @@ export type WorkItemCreatedPayload = {
      * Restarted From Run Id
      */
     restarted_from_run_id?: string | null;
+    mcp_servers?: McpServersDocument | null;
 };
 
 /**
@@ -17532,6 +17877,8 @@ export type EventObject = ({
 } & WritebackHeldEvent) | ({
     type: 'writeback_verified';
 } & WritebackVerifiedEvent) | ({
+    type: 'mcp_servers_configured';
+} & McpServersConfiguredEvent) | ({
     type: 'catalog_revised';
 } & CatalogRevisedEvent) | ({
     type: 'catalog_candidates_collected';
@@ -18076,6 +18423,35 @@ export type CommandWritebackExecuteResponses = {
 };
 
 export type CommandWritebackExecuteResponse = CommandWritebackExecuteResponses[keyof CommandWritebackExecuteResponses];
+
+export type CommandMcpServersSaveData = {
+    body: McpServersSave;
+    path?: never;
+    query?: never;
+    url: '/api/commands/mcp_servers.save';
+};
+
+export type CommandMcpServersSaveErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandMcpServersSaveError = CommandMcpServersSaveErrors[keyof CommandMcpServersSaveErrors];
+
+export type CommandMcpServersSaveResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedMcpServersSaveRefs;
+};
+
+export type CommandMcpServersSaveResponse = CommandMcpServersSaveResponses[keyof CommandMcpServersSaveResponses];
 
 export type CommandDecisionAnswerData = {
     body: DecisionAnswer;

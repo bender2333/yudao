@@ -38,6 +38,12 @@
       "structure": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选出现之前的现有结构说明只留在 run 流中",
       "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选属于建档事项"
     },
+    "mcp_servers_configured": {
+      "base_version": "这个事件种类是新增的，旧版本的项目流中没有它：第一次保存之前没有版本可依据",
+      "document_digest": "这个事件种类是新增的，旧版本的项目流中没有它：保存的整份非秘密设置的摘要，事项冻结与工具清单快照按它核对",
+      "servers": "这个事件种类是新增的，旧版本的项目流中没有它：没有保存过 MCP 服务器设置，读取时按空设置（版本 0、没有服务器）",
+      "version": "这个事件种类是新增的，旧版本的项目流中没有它：第一次保存为第 1 版"
+    },
     "onboarding_revision_started": {
       "candidate_event_id": "这个事件种类是新增的，旧版本的项目流中没有它：提出修改针对上一次建档候选",
       "note": "这个事件种类是新增的，旧版本的项目流中没有它：修改意见原文，确认时必须给出",
@@ -105,6 +111,7 @@
     },
     "work_item_created": {
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
+      "mcp_servers": "旧事件没有这个字段（工单 #236），读取时按空设置处理：保存 MCP 服务器设置之前登记的事项没有冻结的设置，后续 run 也不带",
       "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的",
       "restarted_from_run_id": "旧事件没有这个字段，读取时按不经升级重新开始处理：用户新建的事项与建档事项都没有旧 run，升级重新开始由强制升级写入"
     },
@@ -316,6 +323,12 @@
       "material_ref": "object",
       "text": "string"
     },
+    "mcp_servers_configured": {
+      "base_version": "integer",
+      "document_digest": "string",
+      "servers": "object",
+      "version": "integer"
+    },
     "onboarding_revision_started": {
       "candidate_event_id": "string",
       "note": "string",
@@ -402,6 +415,7 @@
       "context_window": "integer",
       "definitions_version": "string",
       "kind": "string",
+      "mcp_servers": "object?",
       "max_cycles": "integer",
       "priority": "string",
       "project_context_ref": "object",

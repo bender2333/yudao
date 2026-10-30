@@ -221,6 +221,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["not_found", "stale_base", "project_archived", "command_id_reused"]},
         {"name": "writeback.execute",
          "reasons": ["not_found", "project_archived", "not_allowed", "command_id_reused"]},
+        {"name": "mcp_servers.save",
+         "reasons": ["not_found", "stale_base", "project_archived", "not_allowed", "command_id_reused"]},
         {"name": "decision.answer", "reasons": ["not_found", "decision_closed", "stale_base", "option_invalid",
                                                "not_allowed", "command_id_reused"]},
         {"name": "catalog.connection.save", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},

@@ -821,6 +821,57 @@
         }
       }
     },
+    "/api/commands/mcp_servers.save": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "mcp_servers.save",
+        "operationId": "command_mcp_servers_save",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/McpServersSave"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_McpServersSaveRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/decision.answer": {
       "post": {
         "tags": [
@@ -4031,6 +4082,35 @@
           "duplicate"
         ],
         "title": "Accepted[DepartmentSettingsSaveRefs]"
+      },
+      "Accepted_McpServersSaveRefs_": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "refs": {
+            "$ref": "#/components/schemas/McpServersSaveRefs"
+          },
+          "duplicate": {
+            "type": "boolean",
+            "title": "Duplicate"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "position",
+          "refs",
+          "duplicate"
+        ],
+        "title": "Accepted[McpServersSaveRefs]"
       },
       "Accepted_NoRefs_": {
         "properties": {
@@ -9391,6 +9471,189 @@
         ],
         "title": "MaterialRecord"
       },
+      "McpServerSettingView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "transport": {
+            "type": "string",
+            "title": "Transport"
+          },
+          "command": {
+            "type": "string",
+            "title": "Command",
+            "default": ""
+          },
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Args",
+            "default": []
+          },
+          "env": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Env",
+            "default": {}
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          },
+          "headers": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Headers",
+            "default": {}
+          },
+          "departments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Departments",
+            "default": []
+          },
+          "startup_timeout_sec": {
+            "type": "integer",
+            "title": "Startup Timeout Sec",
+            "default": 60
+          },
+          "call_timeout_sec": {
+            "type": "integer",
+            "title": "Call Timeout Sec",
+            "default": 120
+          },
+          "output_limit": {
+            "type": "integer",
+            "title": "Output Limit",
+            "default": 20000
+          },
+          "tool_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Snapshot"
+          },
+          "config_digest": {
+            "type": "string",
+            "title": "Config Digest",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "transport"
+        ],
+        "title": "McpServerSettingView"
+      },
+      "McpServersSave": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "servers": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Servers"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "project_id",
+          "servers"
+        ],
+        "title": "McpServersSave"
+      },
+      "McpServersSaveRefs": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "document_digest": {
+            "type": "string",
+            "title": "Document Digest"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "document_digest"
+        ],
+        "title": "McpServersSaveRefs"
+      },
+      "McpServersSetting": {
+        "properties": {
+          "version": {
+            "type": "integer",
+            "title": "Version"
+          },
+          "document_digest": {
+            "type": "string",
+            "title": "Document Digest"
+          },
+          "servers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/McpServerSettingView"
+            },
+            "type": "object",
+            "title": "Servers",
+            "default": {}
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "document_digest"
+        ],
+        "title": "McpServersSetting"
+      },
       "ModelInput": {
         "properties": {
           "id": {
@@ -10727,6 +10990,9 @@
             "type": "object",
             "title": "Source Directories"
           },
+          "mcp_servers": {
+            "$ref": "#/components/schemas/McpServersSetting"
+          },
           "department_reminders": {
             "additionalProperties": {
               "items": {
@@ -10754,6 +11020,7 @@
           "archived",
           "departments",
           "source_directories",
+          "mcp_servers",
           "department_reminders"
         ],
         "title": "ProjectSettingsResult"
@@ -23361,6 +23628,340 @@
         "title": "MaterialRecordedPayload",
         "type": "object"
       },
+      "McpServerSetting": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "transport": {
+            "enum": [
+              "stdio",
+              "http"
+            ],
+            "title": "Transport",
+            "type": "string"
+          },
+          "command": {
+            "default": "",
+            "title": "Command",
+            "type": "string"
+          },
+          "args": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Args",
+            "type": "array"
+          },
+          "env": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/McpVariableValue"
+            },
+            "default": {},
+            "title": "Env",
+            "type": "object"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "headers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/McpVariableValue"
+            },
+            "default": {},
+            "title": "Headers",
+            "type": "object"
+          },
+          "departments": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Departments",
+            "type": "array"
+          },
+          "startup_timeout_sec": {
+            "default": 60,
+            "title": "Startup Timeout Sec",
+            "type": "integer"
+          },
+          "call_timeout_sec": {
+            "default": 120,
+            "title": "Call Timeout Sec",
+            "type": "integer"
+          },
+          "output_limit": {
+            "default": 20000,
+            "title": "Output Limit",
+            "type": "integer"
+          },
+          "tool_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Snapshot"
+          },
+          "config_digest": {
+            "default": "",
+            "title": "Config Digest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "transport"
+        ],
+        "title": "McpServerSetting",
+        "type": "object"
+      },
+      "McpServersConfiguredEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "mcp_servers_configured",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/McpServersConfiguredPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "McpServersConfiguredEvent",
+        "type": "object"
+      },
+      "McpServersConfiguredPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "base_version": {
+            "title": "Base Version",
+            "type": "integer"
+          },
+          "servers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/McpServerSetting"
+            },
+            "title": "Servers",
+            "type": "object"
+          },
+          "document_digest": {
+            "title": "Document Digest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "base_version",
+          "servers",
+          "document_digest"
+        ],
+        "title": "McpServersConfiguredPayload",
+        "type": "object"
+      },
+      "McpServersDocument": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "servers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/McpServerSetting"
+            },
+            "title": "Servers",
+            "type": "object"
+          },
+          "document_digest": {
+            "title": "Document Digest",
+            "type": "string"
+          }
+        },
+        "required": [
+          "version",
+          "servers",
+          "document_digest"
+        ],
+        "title": "McpServersDocument",
+        "type": "object"
+      },
+      "McpVariableValue": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "text",
+              "credential"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "value": {
+            "default": "",
+            "title": "Value",
+            "type": "string"
+          },
+          "credential_ref": {
+            "default": "",
+            "title": "Credential Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "McpVariableValue",
+        "type": "object"
+      },
       "ModelAttemptFailedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -31421,6 +32022,16 @@
               }
             ]
           },
+          "mcp_servers": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpServersDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "run_event_version": {
             "title": "Run Event Version",
             "type": "integer"
@@ -36283,6 +36894,16 @@
               }
             ],
             "title": "Restarted From Run Id"
+          },
+          "mcp_servers": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpServersDocument"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -37599,6 +38220,7 @@
             "instance_upgrade_withdrawn": "#/components/schemas/InstanceUpgradeWithdrawnEvent",
             "lesson_candidate_recorded": "#/components/schemas/LessonCandidateRecordedEvent",
             "material_recorded": "#/components/schemas/MaterialRecordedEvent",
+            "mcp_servers_configured": "#/components/schemas/McpServersConfiguredEvent",
             "model_attempt_failed": "#/components/schemas/ModelAttemptFailedEvent",
             "model_attempt_finished": "#/components/schemas/ModelAttemptFinishedEvent",
             "model_message": "#/components/schemas/ModelMessageEvent",
@@ -37872,6 +38494,9 @@
           },
           {
             "$ref": "#/components/schemas/WritebackVerifiedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/McpServersConfiguredEvent"
           },
           {
             "$ref": "#/components/schemas/CatalogRevisedEvent"

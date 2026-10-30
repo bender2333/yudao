@@ -2428,6 +2428,34 @@ class SourceDirectorySetting(Contract):
     check_commands: list[str] = []
     credential_ref: str | None = None
 
+
+class McpServerSettingView(Contract):
+    # 一台 MCP 服务器的非秘密设置（工单 #236）：名称、传输、对应传输的参数、可以使用的部门、
+    # 时限与输出上限、可选的工具清单快照与配置摘要；凭据只出现名称
+    name: str
+    transport: str
+    command: str = ""
+    args: list[str] = []
+    env: dict[str, Any] = {}
+    url: str = ""
+    headers: dict[str, Any] = {}
+    departments: list[str] = []
+    startup_timeout_sec: int = 60
+    call_timeout_sec: int = 120
+    output_limit: int = 20000
+    tool_snapshot: dict[str, Any] | None = None
+    config_digest: str = ""
+
+
+class McpServersSetting(Contract):
+    # 项目设置里的 MCP 服务器（工单 #236）：整份设置与版本、文档摘要与服务器清单；
+    # 最近一次探测的结果由后续探测工单写入，本单读取快照随设置携带的状态
+    version: int
+    document_digest: str
+    servers: dict[str, McpServerSettingView] = {}
+    updated_at: str | None = None
+
+
 class ProjectSettingsResult(Contract):
     project_id: str
     name: str
@@ -2437,6 +2465,8 @@ class ProjectSettingsResult(Contract):
     archived: bool
     departments: dict[str, DepartmentSetting]
     source_directories: dict[str, SourceDirectorySetting]
+    # 项目设置里的 MCP 服务器（工单 #236）：旧事件没有 MCP 设置时按空设置读取（版本 0、没有服务器）
+    mcp_servers: McpServersSetting
     # 各部门生效模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）；
     # 生效模型按第 5.3 节解析，包括跟随部门默认的情况
     department_reminders: dict[str, list[str]]
@@ -2477,6 +2507,17 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                 )
                 for name, value in state.source_directories.items()
             },
+            # 项目设置里的 MCP 服务器（工单 #236）：保存的非秘密设置与凭据引用、版本与文档摘要
+            mcp_servers=McpServersSetting(
+                version=state.mcp_servers.version, document_digest=state.mcp_servers.document_digest,
+                updated_at=state.mcp_servers.updated_at,
+                servers={
+                    name: McpServerSettingView(
+                        **{field: value for field, value in server.items()
+                           if field in McpServerSettingView.model_fields})
+                    for name, server in state.mcp_servers.servers.items()
+                },
+            ),
             # 各部门生效模型（跟随部门默认时取部门默认）的建议能力提醒（设计说明第 5.6 节）
             department_reminders=application.system.facade.project_department_reminders(
                 {department: {"model_id": setting.model_id} for department, setting in settings.items()}),

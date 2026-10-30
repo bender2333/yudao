@@ -242,6 +242,8 @@ class DecisionFlow:
             project_id=project_id, work_item_id=candidate.work_item_id,
             project_context=driver.artifacts.get(ArtifactRef(**prior.project_context_ref)).decode("utf-8"),
             prompt_config_versions=dict(item.prompt_config_versions),
+            # 修改轮沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
+            mcp_servers=item.mcp_servers,
             round=round_number,
             onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
                               "note_ref": note_ref},

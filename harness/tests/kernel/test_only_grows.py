@@ -56,6 +56,8 @@ SKELETON_EVENT_SNAPSHOT = {
         "onboarding_revision_started", "baseline_adopted", "project_parameter_set",
         "writeback_completed", "writeback_stopped", "writeback_not_needed", "writeback_held",
         "writeback_verified",
+        # 项目设置里的 MCP 服务器（工单 #236）
+        "mcp_servers_configured",
     }),
     "catalog": frozenset({
         "catalog_revised", "catalog_candidates_collected", "catalog_test_finished",

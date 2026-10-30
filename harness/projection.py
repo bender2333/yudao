@@ -191,6 +191,13 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.parameters_version = str(payload.get("parameters_version", ""))
         # 建 run 时冻结的参数快照；旧事件没有这个字段时为空（工单 #1189）
         state.parameters = payload.get("parameters")
+        # 建 run 时冻结的 MCP 服务器设置（工单 #236）：运行投影只保存版本与文档摘要，不保存整份设置；
+        # 旧事件没有这个字段时按空设置读取（版本 0、摘要为空）
+        mcp = payload.get("mcp_servers")
+        if isinstance(mcp, dict):
+            state.mcp_servers_version = int(mcp.get("version") or 0)
+            state.mcp_servers_digest = str(mcp.get("document_digest") or "")
+            state.mcp_servers_names = sorted(mcp.get("servers") or {})
         # 事项种类与仓库概况：旧 run 的创建事件没有这两个字段，种类按普通事项理解（工单 #134）
         state.kind = str(payload.get("kind", "change"))
         state.overview_ref = payload.get("overview_ref")

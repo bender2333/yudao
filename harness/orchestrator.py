@@ -17,6 +17,7 @@ import json
 import time
 from collections.abc import Iterable, Iterator, Sequence
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from threading import Condition, Event
@@ -364,6 +365,9 @@ class Orchestrator:
         # 事项创建时冻结的定义版本（工单 #1189）：不给时是当前加载的定义。参数快照按它记下定义版本，
         # 定义版本与当前不同时不创建 run（启动补建的那条路径在调用之前就跳过）
         item_definitions_version: str | None = None,
+        # 事项创建时冻结的 MCP 服务器设置（工单 #236）：非秘密设置与凭据引用的整份文档；
+        # 不给时是 None（旧事项与没有 MCP 设置的事项按空设置读取）。run 期间只读这份冻结值
+        mcp_servers: dict[str, Any] | None = None,
     ) -> str:
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
@@ -465,6 +469,8 @@ class Orchestrator:
                 "definitions_version": frozen_definitions_version,
                 "parameters_version": parameter_values.current_version(self.store),
                 "parameters": frozen_parameters,
+                # 事项创建时冻结的 MCP 服务器设置（工单 #236）：与事项创建事实同一份；没有时为空
+                "mcp_servers": deepcopy(mcp_servers) if mcp_servers is not None else None,
                 "run_event_version": RUN_EVENT_VERSION,
                 "onboarding_basis": onboarding_basis,
                 "round": round,
