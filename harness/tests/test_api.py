@@ -287,7 +287,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "flow", "queries": ["project.flow"]},
         {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
         {"name": "recovery", "queries": ["run.recovery"]},
-        {"name": "sources", "queries": []},
+        {"name": "sources", "queries": ["project.loop"]},
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)

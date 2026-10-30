@@ -40,6 +40,7 @@ from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
+from harness.project_projection import replay_project
 from harness.streams import PRIORITY_UPGRADE_RESTART, RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.proposals import (
     product_spec, delivery_turn, review_turn,
@@ -86,6 +87,8 @@ def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     overlays = {item.name: item.queries for item in capabilities.overlays}
     assert overlays["flow"] == ["project.flow"]
     assert overlays["waiting"] == ["project.loop", "decisions.list"]
+    # 事实来源不依赖查询，随事件对象的 source 一起可用（工单 #396，设计说明第 4.3 节）
+    assert overlays["sources"] == ["project.loop"]
     assert overlays["recovery"] == ["run.recovery"]
     assert "context_usage" not in overlays
     assert "semantic_records" not in overlays
@@ -1316,3 +1319,43 @@ def test_the_old_version_run_is_listed_read_only_with_its_events(data_dir):
     restarted = application.query("work_item.materials", WorkItemMaterials(
         project_id=project_id, work_item=created.payload["work_item_id"])).data
     assert restarted.old_runs == []
+
+
+def test_loop_facts_carry_their_source_position_and_kind(data_dir):
+    # 守 R3（画面诚实性 H4：每条事实带来源；设计说明第 4.3 节）：project.loop 的每个事实元素给出它的事件位置与
+    # 来源种类；同一份事件序列推出同一个位置——按位置重放与重新投影以后位置不变（工单 #396）
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("来源", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    settled = system.projects.settle(run_id)
+    application = _application(system)
+    loop = application.query("project.loop", ProjectLoop(project_id=project_id)).data
+    row = next(item for item in loop.work_items if item.work_item_id == work_item_id)
+    # 六个事实元素都有来源：门牌、轮次、已用时间、包裹（当前交付）、盖章（放行结论）、成果库的箱子（采纳的成果）
+    assert {"sign", "round", "elapsed", "parcel", "stamp", "box"} <= set(row.refs)
+    assert {ref.source for ref in row.refs.values()} <= {"rule", "decision_model", "role_statement",
+                                                         "host_measurement", "user"}
+    # 位置与事件日志对得上，因果次序也成立：写下事项 → 开 run → 交交付 → 放行 → 采纳
+    positions = {name: ref.position for name, ref in row.refs.items()}
+    assert positions["sign"] < positions["round"] < positions["parcel"] < positions["stamp"] < positions["box"]
+    assert positions["box"] == settled.position
+    assert row.refs["sign"].source == "user" and row.refs["stamp"].source == "role_statement"
+    # 同一份事件序列推出同一个位置：按位置读取（重放）时，采纳之前的那一份没有箱子，其余来源与现在相同
+    before = application.query("project.loop", ProjectLoop(project_id=project_id, at=positions["stamp"])).data
+    before_row = next(item for item in before.work_items if item.work_item_id == work_item_id)
+    assert before_row.refs["sign"] == row.refs["sign"]
+    assert before_row.refs["parcel"] == row.refs["parcel"]
+    assert before_row.refs["stamp"] == row.refs["stamp"]
+    assert "box" not in before_row.refs
+    # 同一份事件序列推出同一个位置：再读一次这份快照，六个来源一个也不变
+    again = application.query("project.loop", ProjectLoop(project_id=project_id)).data
+    again_row = next(item for item in again.work_items if item.work_item_id == work_item_id)
+    assert again_row.refs == row.refs
+    # 来源记在投影里：门牌与成果库的箱子各指回写下它的事件，重新投影（从同一份事件序列重算）以后还是同两个事件
+    [created] = [event for event in system.store.list_project_events(project_id)
+                 if event.type == ProjectEventType.WORK_ITEM_CREATED]
+    rebuilt = replay_project(system.store, project_id)
+    assert rebuilt.work_item(work_item_id).event_id == created.event_id
+    assert rebuilt.adoptions[-1].event_id == settled.event_id
+    system.close()
