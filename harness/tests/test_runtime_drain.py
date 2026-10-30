@@ -6,10 +6,11 @@ import uuid
 
 from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
+from harness.event_store import catalog_stream
 from harness.models import EventType, ProjectEventType
 from harness.projection import project_run
 from harness.proposals import product_spec
-from harness.streams import PRIORITY_UPGRADE_RESTART, STOP_REASON_UPGRADE
+from harness.streams import DRAIN_STARTED, PRIORITY_UPGRADE_RESTART, STOP_REASON_UPGRADE
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import quality_turns
 from harness.tests.onboarding_project import (
@@ -121,3 +122,49 @@ def test_force_upgrade_stops_the_run_and_restarts_its_work_item(data_dir):
         assert project_run(opened.store, new_run_id).run_event_version > 0
         # 旧版本的 run 事件保留供查阅
         assert any(event.type == EventType.RUN_CREATED for event in opened.store.list_events(run_id))
+
+
+def _create_blocked_item(opened, client, name: str) -> tuple[str, str]:
+    # 一个项目与一个停在非终态的事项（产品提交规格以后工程的请求失败）：可以开始排空与强制升级
+    project_id = _post(client, "project.create", name=name, goal="核对排空区的读数").json()["refs"]["project_id"]
+    item = _post(client, "work_item.create", project_id=project_id, text="进行中的事项")
+    assert item.status_code == 200, item.text
+    run_id = item.json()["refs"]["run_id"]
+    assert _wait_for(lambda: has_new_work(project_run(opened.store, run_id), "engineering"))
+    return project_id, run_id
+
+
+def test_drain_reports_the_start_time_and_the_running_run(data_dir):
+    # 验收一（工单 #1187）：开始排空以后 system.status.drain 带开始时间（来自「开始排空」事件）与
+    # 进行中的 run（run 标识与事项标题）
+    opened = _Opened(data_dir, adapter=FakeAdapter(_blocked_script()))
+    with running_api(opened) as client:
+        project_id, run_id = _create_blocked_item(opened, client, "排空区")
+        assert _post(client, "runtime.start_drain").status_code == 200
+        started = [event for event in opened.store.stream_events(catalog_stream())
+                   if event.type == DRAIN_STARTED][-1]
+        drain = client.get("/api/queries/system.status").json()["data"]["drain"]
+        assert drain["state"] == "draining"
+        assert drain["since"] == started.created_at
+        assert drain["running_runs"] == 1
+        assert [(entry["run_id"], entry["title"]) for entry in drain["running"]] == [(run_id, "进行中的事项")]
+
+
+def test_force_upgrade_shows_the_forced_state_and_the_restarted_run(data_dir):
+    # 验收二（工单 #1187）：强制升级以后排空状态是「已强制升级」，进行中的 run 列表换成重新开始的那个 run；
+    # 开始时间仍记在这一处
+    opened = _Opened(data_dir, adapter=FakeAdapter(_blocked_script()))
+    with running_api(opened) as client:
+        project_id, run_id = _create_blocked_item(opened, client, "强制升级后的排空区")
+        assert _post(client, "runtime.start_drain").status_code == 200
+        started = [event for event in opened.store.stream_events(catalog_stream())
+                   if event.type == DRAIN_STARTED][-1]
+        assert _post(client, "runtime.force_upgrade").status_code == 200
+        created = [event for event in opened.store.list_project_events(project_id)
+                   if event.type == ProjectEventType.WORK_ITEM_CREATED]
+        new_run_id = created[-1].payload["run_id"]
+        drain = client.get("/api/queries/system.status").json()["data"]["drain"]
+        assert drain["state"] == "forced"
+        assert drain["since"] == started.created_at
+        assert [(entry["run_id"], entry["title"]) for entry in drain["running"]] == [
+            (new_run_id, "进行中的事项")]
