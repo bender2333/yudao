@@ -32,7 +32,9 @@ node .claude/skills/trial/scripts/report.mjs --check <归档>/result.json --json
 
 这里的数值只是格式例子，填写本轮实际值；model 可以是本地定义名或请求模型名，两种名字都从导出保留，不能推测供应商返回名代表同一配置。
 
-目录声明了 requested_tier、reasoning_mode、default_reasoning_level 或 input_modalities 时一并保存；实际调用中这些配置变化也影响同条件判断。
+目录声明的 reasoning_mode、default_reasoning_level、input_modalities 一并保存，报告逐部门与实际调用核对。input_modalities 按内容比较，排列顺序不影响结论。models.requested_tier 保存部门工作请求选择的档位，可以为空；它与工作请求核对，并用于比较两次运行的部门计划。
+
+导出中 call_target.requested_tier 是本次调用请求的档位，按部门和用途分别保留。整理请求按模型管理设计第 7.5 节使用最低支持档位，可以与工作请求不同；重试或整理记录中实际出现的不同档位如实显示，不据此推定部门设置发生改变。两次运行的工作请求档位不同仍影响同条件判断，整理档位的差异单独提示。
 
 ```powershell
 pwsh -NoProfile -File .claude/skills/trial/scripts/instance.ps1 -Action Inspect -Manifest <控制清单> -ModelsFile <models.json>
@@ -104,7 +106,7 @@ reproduced 与 not_observed 同时需要：独立的 export_path、instance_path
 
 judgment.status 为 confirmed、rejected、pending；前两种必须给实际架构师裁决的 source（已读回的 https 链接或本地快照路径）。缺陷 confirmed 表示成立，体验候选 confirmed 表示采纳改进。修复状态 repair 为 none、planned、in_progress、fixed、wontfix、unknown，fixed 需要修复来源。
 
-verification.status 为 not_run、passed、failed、partial、unknown；passed、failed、partial 需要验证来源、对应 commit 或 instance_path，以及 fixed 的修复记录。一次成立但尚未修复的问题仍是命中，关闭工单和未复验都不能自动改写裁决。
+verification.status 为 not_run、passed、failed、partial、unknown；passed、failed、partial 需要验证来源、对应 commit 或 instance_path，以及 fixed 的修复记录。验证实例同样列在顶层 instances；同时填写 commit 和 instance_path 时，两者提交必须相同。一次成立但尚未修复的问题仍是命中，关闭工单和未复验都不能自动改写裁决。
 
 history 复用问题 id、kind、title、judgment、repair、verification，可附 tracker.state、tracker.reason、tracker.source。它只保存本轮回查，旧归档不覆盖。命中率分母只含明确的 confirmed 和 rejected，分母为零输出未知，体验候选另列采纳情况。
 

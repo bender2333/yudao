@@ -30,7 +30,7 @@ param(
   [string]$SkillCommit = '',
   [string]$WorkingDirectory = '',
   [string]$ModelsFile = '',
-  [int]$ReadyTimeoutSec = 90,
+  [ValidateRange(1, 600)][int]$ReadyTimeoutSec = 90,
   [switch]$NoWrite,
   [switch]$PassThru
 )
@@ -145,18 +145,24 @@ function Test-SameStart([string]$Recorded, [string]$Actual) {
   [math]::Abs(((ConvertTo-UtcTime $Recorded) - (ConvertTo-UtcTime $Actual)).TotalMilliseconds) -lt 5
 }
 
-function Get-DescendantIds([int]$RootId) {
+function Get-DescendantIds([int]$RootId, [string]$RootStartedAt = '', [string]$RootStoppedAt = '') {
   # 某进程当前的全部后代；父进程号链条上要求父进程比子进程先创建，避免进程号被复用后误连
   $all = @(Get-CimInstance Win32_Process)
   $found = New-Object System.Collections.Generic.List[int]
   $queue = New-Object System.Collections.Generic.Queue[object]
   $root = $all | Where-Object { $_.ProcessId -eq $RootId }
+  if ($RootStartedAt) {
+    if ($root -and -not (Test-SameStart $RootStartedAt (Format-Utc $root.CreationDate))) { return @() }
+    if (-not $root) { $root = [pscustomobject]@{ ProcessId = $RootId; CreationDate = (ConvertTo-UtcTime $RootStartedAt).ToLocalTime() } }
+  }
   if (-not $root) { return @() }
+  $rootEnded = if ($RootStoppedAt) { (ConvertTo-UtcTime $RootStoppedAt).ToLocalTime() } else { $null }
   $queue.Enqueue($root)
   while ($queue.Count -gt 0) {
     $parent = $queue.Dequeue()
     foreach ($child in ($all | Where-Object { $_.ParentProcessId -eq $parent.ProcessId -and $_.ProcessId -ne $parent.ProcessId })) {
       if ($child.CreationDate -lt $parent.CreationDate) { continue }
+      if ($parent.ProcessId -eq $RootId -and $rootEnded -and $child.CreationDate -gt $rootEnded) { continue }
       if ($found.Contains([int]$child.ProcessId)) { continue }
       $found.Add([int]$child.ProcessId)
       $queue.Enqueue($child)
@@ -171,13 +177,19 @@ function Get-Listener([int]$PortNumber) {
   return [int]$listener[0].OwningProcess
 }
 
-function Stop-Recorded([int]$ProcessId, [string]$StartedAt, [string]$Label) {
-  # 只停 manifest 记录的进程，创建时间不符说明进程号已被别的进程使用，拒绝停止
+function Get-RecordedProcess([int]$ProcessId, [string]$StartedAt, [string]$Label) {
   $info = Get-ProcessInfo $ProcessId
-  if (-not $info) { return "$Label $ProcessId 已不存在" }
+  if (-not $info) { return $null }
   if (-not (Test-SameStart $StartedAt $info.StartedAt)) {
     throw "$Label $ProcessId 的创建时间是 $($info.StartedAt)，与 manifest 记录的 $StartedAt 不符，不停止"
   }
+  return $info
+}
+
+function Stop-Recorded([int]$ProcessId, [string]$StartedAt, [string]$Label) {
+  # 只停 manifest 记录且创建时间一致的进程
+  $info = Get-RecordedProcess $ProcessId $StartedAt $Label
+  if (-not $info) { return "$Label $ProcessId 已不存在" }
   # 服务进程结束时启动进程可能同时退出，此时进程已不在不算错误，结束后再确认
   Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
   Wait-Process -Id $ProcessId -Timeout 20 -ErrorAction SilentlyContinue
@@ -310,9 +322,10 @@ function Assert-OutsideRepository([string]$Directory) {
 
 # ---- 启动 ----
 
-function Start-Server($M, [bool]$FreshData) {
+function Assert-ServerInputs($M, [bool]$FreshData, [int]$AllowedListenerId = 0) {
   $python = $M['python']; $wheelPath = $M['wheel']['path']
   $workDir = $M['working_directory']; $dataDir = $M['data_dir']; $portNumber = [int]$M['port']
+  if ($portNumber -lt 1024 -or $portNumber -gt 65535) { throw '实例端口需要在 1024–65535 之间' }
   if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "解释器不存在：$python" }
   if (-not (Test-Path -LiteralPath $wheelPath -PathType Leaf)) { throw "wheel 不存在：$wheelPath" }
   if (-not (Test-Path -LiteralPath $workDir -PathType Container)) { throw "工作目录不存在：$workDir" }
@@ -325,10 +338,18 @@ function Start-Server($M, [bool]$FreshData) {
   } elseif (-not (Test-Path -LiteralPath $dataDir -PathType Container)) {
     throw "数据目录不存在：$dataDir"
   }
-  if (Get-Listener $portNumber) { throw "端口 $portNumber 已被占用" }
+  $listenerId = Get-Listener $portNumber
+  if ($listenerId -and $listenerId -ne $AllowedListenerId) { throw "端口 $portNumber 已被占用" }
 
   $identity = Test-PackageIdentity $python $wheelPath $workDir
   if (-not $identity.ok) { throw ("包身份核对未通过：" + (@($identity.problems) -join '；')) }
+  return $identity
+}
+
+function Start-Server($M, [bool]$FreshData) {
+  $identity = Assert-ServerInputs $M $FreshData
+  $python = $M['python']; $workDir = $M['working_directory']
+  $dataDir = $M['data_dir']; $portNumber = [int]$M['port']
 
   New-Item -ItemType Directory -Force -Path $dataDir | Out-Null
   New-Item -ItemType Directory -Force -Path $ManifestDir | Out-Null
@@ -336,9 +357,24 @@ function Start-Server($M, [bool]$FreshData) {
   $stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddTHHmmssZ')
   $outFile = Join-Path $ManifestDir "$stem.$stamp.stdout.log"
   $errFile = Join-Path $ManifestDir "$stem.$stamp.stderr.log"
-  $argumentLine = "-I -X utf8 -m harness api --data-dir `"$dataDir`" --host 127.0.0.1 --port $portNumber --no-browser"
-  $launcher = Start-Process -FilePath $python -ArgumentList $argumentLine -WorkingDirectory $workDir -WindowStyle Hidden `
-    -RedirectStandardOutput $outFile -RedirectStandardError $errFile -PassThru
+  # 独立隐藏窗口负责服务输出；外层不重定向句柄，避免调用者等后台服务关闭输出管道才返回。
+  $bootPath = Join-Path $ManifestDir "$stem.boot.ps1"
+  $bootConfigPath = Join-Path $ManifestDir "$stem.boot.json"
+  $bootScript = @'
+param([Parameter(Mandatory)][string]$Config)
+$ErrorActionPreference = 'Stop'
+$settings = Get-Content -LiteralPath $Config -Raw -Encoding UTF8 | ConvertFrom-Json
+$OutputEncoding = [Text.UTF8Encoding]::new($false)
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+& $settings.python -I -X utf8 -m harness api --data-dir $settings.data_dir --host 127.0.0.1 --port $settings.port --no-browser 1> $settings.stdout 2> $settings.stderr
+exit $LASTEXITCODE
+'@
+  [IO.File]::WriteAllText($bootPath, $bootScript, [Text.UTF8Encoding]::new($false))
+  $bootConfig = [ordered]@{ python = $python; data_dir = $dataDir; port = $portNumber; stdout = $outFile; stderr = $errFile }
+  [IO.File]::WriteAllText($bootConfigPath, (ConvertTo-Json $bootConfig), [Text.UTF8Encoding]::new($false))
+  $shell = (Get-Command pwsh -CommandType Application -ErrorAction Stop).Source
+  $argumentLine = "-NoProfile -File `"$bootPath`" -Config `"$bootConfigPath`""
+  $launcher = Start-Process -FilePath $shell -ArgumentList $argumentLine -WorkingDirectory $workDir -WindowStyle Hidden -PassThru
   $null = $launcher.Handle
   $launcherStart = Format-Utc $launcher.StartTime
   $serverId = 0
@@ -370,11 +406,21 @@ function Start-Server($M, [bool]$FreshData) {
     if (-not $server) { throw "监听进程 $serverId 在就绪后消失" }
   } catch {
     # 失败时只清理本次自己创建的进程，日志留在原处供查看
-    foreach ($pair in @(@($serverId, $serverStart), @($launcher.Id, $launcherStart))) {
-      $info = if ($pair[0]) { Get-ProcessInfo $pair[0] } else { $null }
-      if ($info -and $pair[1] -and (Test-SameStart $pair[1] $info.StartedAt)) { Stop-Process -Id $pair[0] -Force -ErrorAction SilentlyContinue }
+    $startupError = $_.Exception.Message
+    # 先停止启动进程，再读取后代，防止读取期间仍有新的服务进程被创建
+    $launcherInfo = Get-ProcessInfo $launcher.Id
+    if ($launcherInfo -and (Test-SameStart $launcherStart $launcherInfo.StartedAt)) {
+      $null = Stop-Recorded $launcher.Id $launcherStart '启动进程'
     }
-    throw "启动失败：$($_.Exception.Message)（stdout $outFile，stderr $errFile）"
+    $launcherStopped = Format-Utc (Get-Date)
+    $owned = @(Get-DescendantIds $launcher.Id $launcherStart $launcherStopped | ForEach-Object { Get-ProcessInfo $_ } | Where-Object { $_ })
+    if ($serverId -and $serverStart) { $owned += [pscustomobject]@{ Id = $serverId; StartedAt = $serverStart } }
+    $owned += [pscustomobject]@{ Id = $launcher.Id; StartedAt = $launcherStart }
+    foreach ($recorded in $owned) {
+      $info = Get-ProcessInfo $recorded.Id
+      if ($info -and (Test-SameStart $recorded.StartedAt $info.StartedAt)) { $null = Stop-Recorded $recorded.Id $recorded.StartedAt '本次启动进程' }
+    }
+    throw "启动失败：$startupError（stdout $outFile，stderr $errFile）"
   }
 
   $history = @()
@@ -531,8 +577,11 @@ switch ($Action) {
     $m = Read-Manifest
     $port = [int]$m['port']
     $descendants = @()
-    $info = Get-ProcessInfo ([int]$m['pid'])
-    if ($info -and (Test-SameStart $m['process_started_at'] $info.StartedAt)) {
+    $info = Get-RecordedProcess ([int]$m['pid']) $m['process_started_at'] '服务进程'
+    if ($m['launcher_pid'] -and [int]$m['launcher_pid'] -ne [int]$m['pid']) {
+      $null = Get-RecordedProcess ([int]$m['launcher_pid']) $m['launcher_started_at'] '启动进程'
+    }
+    if ($info) {
       $descendants = @(Get-DescendantIds ([int]$m['pid']) | ForEach-Object { Get-ProcessInfo $_ } | Where-Object { $_ })
     }
     Write-Output (Stop-Recorded ([int]$m['pid']) $m['process_started_at'] '服务进程')
@@ -563,10 +612,14 @@ switch ($Action) {
     if (-not (Test-Path -LiteralPath $m['wheel']['path'] -PathType Leaf)) { throw '重启需要原来的 wheel，当前文件不存在' }
     $wheelHash = (Get-FileHash -LiteralPath $m['wheel']['path'] -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($wheelHash -ne $m['wheel']['sha256']) { throw '重启的 wheel 摘要与原实例不同，保留当前进程' }
-    $identity = Test-PackageIdentity $m['python'] $m['wheel']['path'] $m['working_directory']
-    if (-not $identity.ok) { throw '重启前包身份核对未通过，保留当前进程' }
+    $info = Get-RecordedProcess ([int]$m['pid']) $m['process_started_at'] '服务进程'
+    if ($m['launcher_pid'] -and [int]$m['launcher_pid'] -ne [int]$m['pid']) {
+      $null = Get-RecordedProcess ([int]$m['launcher_pid']) $m['launcher_started_at'] '启动进程'
+    }
+    # 全部输入与进程身份通过以后再停止原服务，当前端口只允许由记录的服务占用
+    $allowedListener = if ($info) { [int]$info.Id } else { 0 }
+    $null = Assert-ServerInputs $m $false $allowedListener
     # 重启前同一份 manifest 里的进程先停掉；进程已不在时只记录
-    $info = Get-ProcessInfo ([int]$m['pid'])
     if ($info) {
       Write-Output (Stop-Recorded ([int]$m['pid']) $m['process_started_at'] '服务进程')
     }

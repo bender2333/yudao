@@ -1382,6 +1382,13 @@ Argon 的工作流建议（四条）对照仓库后的取舍：
 - Q1–Q11 已全部确认，原则写入 [ADR-0039](adr/0039-agent-trial-observation-reproduction-and-judgment.md)，具体文件范围、记录格式与验证条件写入 [试用技能修订方案](trial/skill-revision-plan.md)。
 - 完整方案待用户最终核对后实施。
 
+## 2026-10-29 - 批准实施 agent 试用技能修订
+
+- 用户在核对完整方案后回复「可以」，同意实施 Q1–Q11 对应的技能、任务集与辅助工具修改；后续要求使用原生 subagent。
+- 实施依据是 [ADR-0039](adr/0039-agent-trial-observation-reproduction-and-judgment.md) 与[技能修订方案](trial/skill-revision-plan.md)。任务集提高为 `trial-tasks@4`，四段 R1 输入原话保留，模型分工与证据读法采用已确认的约定。
+- 本次收尾分别使用原生 subagent 核查实例工具、报告工具和技能一致性，主会话汇总修正及实际验证结果；整轮真实模型试用与产品验收仍按各自的证据记录。
+- Q1–Q11 对应修订与三项技术复核已完成，实际检查和适用范围见[实施与验证结果](trial/skill-revision-validation-2026-10-29.md)。通用校验器的既有兼容限制单独保留，整轮真实模型试用未重跑。
+
 ## 2026-10-29 - 设计与实施分离：设计说明不记状态，易变的一方反向引用设计
 
 - 决定（用户在场，`/grill-with-docs` 里逐条采纳）：

@@ -263,10 +263,10 @@ export function summarize(data, label = "") {
 export const readExport = (path) => summarize(loadExport(path), path);
 
 // ---------- 配置比较 ----------
-// 阻断项决定复现条件是否相同；别名和档位只提示。model_id 是本地别名，requested_model 是上游名字，不混用。
+// 模型声明与工作请求档位影响同条件判断；整理档位是按用途选取的调用值，单独提示。
 const REQUIRED_FIELDS = ["requested_model", "protocol", "context_window", "max_output_tokens"];
-const BLOCK_FIELDS = [...REQUIRED_FIELDS, "requested_tier", "reasoning_mode", "default_reasoning_level", "input_modalities"];
-const INFO_FIELDS = ["model_id"];
+const BLOCK_FIELDS = [...REQUIRED_FIELDS, "reasoning_mode", "default_reasoning_level", "input_modalities"];
+const INFO_FIELDS = ["model_id", "requested_tier"];
 
 const groupConfigs = (rows) => {
   const m = new Map();
@@ -288,7 +288,7 @@ export function compareConfigs(rowsA, rowsB) {
     for (const f of [...BLOCK_FIELDS, ...INFO_FIELDS]) {
       const va = valuesOf(ga.get(k), f);
       const vb = valuesOf(gb.get(k), f);
-      const level = BLOCK_FIELDS.includes(f) ? "blocking" : "info";
+      const level = BLOCK_FIELDS.includes(f) || (f === "requested_tier" && ga.get(k)[0].purpose === "work") ? "blocking" : "info";
       if ((va.includes("null") || vb.includes("null")) && REQUIRED_FIELDS.includes(f)) unknown.push({ key: k, field: f });
       else if (va.join("|") !== vb.join("|")) diffs.push({ key: k, field: f, a: va.map((x) => JSON.parse(x)), b: vb.map((x) => JSON.parse(x)), level });
     }
@@ -325,18 +325,27 @@ export function checkManifest(m) {
   for (const k of ["process_started_at", "identity_checked_at"]) need(parseTime(m[k]) !== null, `${k} 缺失或缺时区偏移`);
   need(typeof m.package_path === "string" && m.package_path.replaceAll("\\", "/").includes("/site-packages/"), "package_path 未指向独立安装的 site-packages");
   need(Array.isArray(m.models), "models 必须是数组，未配置时用空数组并注明缺项");
-  for (const [i, x] of (m.models ?? []).entries()) {
+  if (m.process_history !== undefined) {
+    need(Array.isArray(m.process_history), "process_history 必须是数组");
+    if (Array.isArray(m.process_history)) for (const [i, h] of m.process_history.entries()) {
+      need(h && typeof h === "object" && parseTime(h.process_started_at) !== null, `process_history[${i}] 缺少有效的 process_started_at`);
+    }
+  }
+  const models = Array.isArray(m.models) ? m.models : [];
+  for (const [i, x] of models.entries()) {
     need(x && typeof x.department === "string" && typeof x.model === "string" && typeof x.protocol === "string", `models[${i}] 缺 department/model/protocol`);
     need(isInt(x?.context_window) && isInt(x?.max_output_tokens), `models[${i}] 的 context_window/max_output_tokens 必须是整数`);
+    for (const field of ["requested_tier", "reasoning_mode", "default_reasoning_level"]) if (x?.[field] != null) need(typeof x[field] === "string", `models[${i}].${field} 必须是字符串`);
+    if (x?.input_modalities != null) need(Array.isArray(x.input_modalities) && x.input_modalities.every(v => typeof v === "string"), `models[${i}].input_modalities 必须是字符串数组`);
   }
-  need(new Set((m.models ?? []).map((x) => x?.department)).size === m.models?.length, "models 中的部门重复");
+  need(new Set(models.map((x) => x?.department)).size === models.length, "models 中的部门重复");
   return errs;
 }
 
 export const hasWheelIdentity = (m) => typeof m?.wheel?.sha256 === "string" && SHA256.test(m.wheel.sha256);
 const sameCommit = (a, b) => typeof a === "string" && typeof b === "string" && (a.startsWith(b) || b.startsWith(a));
 
-// 两个实例是否同一构建。身份缺失（例如 editable 安装没有 wheel SHA）是未知，不算相同。
+// 核对两个实例的构建、材料与完整部门计划。身份缺失时不认定条件相同。
 export function compareManifests(a, b) {
   const unknown = [];
   const diffs = [];
@@ -348,7 +357,7 @@ export function compareManifests(a, b) {
     else if (a[field] !== b[field]) diffs.push({ field, a: a[field], b: b[field] });
   }
   const departmentPlan = (m) => [...(m?.models ?? [])]
-    .map(({ department, model, protocol, context_window, max_output_tokens, requested_tier, reasoning_mode, default_reasoning_level, input_modalities }) => ({ department, model, protocol, context_window, max_output_tokens, requested_tier: requested_tier ?? null, reasoning_mode: reasoning_mode ?? null, default_reasoning_level: default_reasoning_level ?? null, input_modalities: input_modalities ?? null }))
+    .map(({ department, model, protocol, context_window, max_output_tokens, requested_tier, reasoning_mode, default_reasoning_level, input_modalities }) => ({ department, model, protocol, context_window, max_output_tokens, requested_tier: requested_tier ?? null, reasoning_mode: reasoning_mode ?? null, default_reasoning_level: default_reasoning_level ?? null, input_modalities: input_modalities ? [...input_modalities].sort() : null }))
     .sort((x, y) => x.department.localeCompare(y.department));
   if (!a?.models?.length || !b?.models?.length) unknown.push("models");
   else if (JSON.stringify(departmentPlan(a)) !== JSON.stringify(departmentPlan(b))) diffs.push({ field: "models", a: departmentPlan(a), b: departmentPlan(b) });
@@ -365,6 +374,12 @@ export function manifestVsExport(m, rows) {
       if (x.protocol !== r.protocol) diffs.push({ department: x.department, purpose: r.purpose, field: "protocol", manifest: x.protocol, export: r.protocol });
       if (x.context_window !== r.context_window) diffs.push({ department: x.department, purpose: r.purpose, field: "context_window", manifest: x.context_window, export: r.context_window });
       if (x.max_output_tokens !== r.max_output_tokens) diffs.push({ department: x.department, purpose: r.purpose, field: "max_output_tokens", manifest: x.max_output_tokens, export: r.max_output_tokens });
+      // 部门档位是工作请求的选择；整理请求按用途取最低档位，不要求与工作请求相同。
+      if (r.purpose === "work" && (x.requested_tier ?? null) !== (r.requested_tier ?? null)) diffs.push({ department: x.department, purpose: r.purpose, field: "requested_tier", manifest: x.requested_tier ?? null, export: r.requested_tier ?? null });
+      for (const field of ["reasoning_mode", "default_reasoning_level", "input_modalities"]) {
+        const normal = (value) => field === "input_modalities" && Array.isArray(value) ? [...value].sort() : value ?? null;
+        if (JSON.stringify(normal(x[field])) !== JSON.stringify(normal(r[field]))) diffs.push({ department: x.department, purpose: r.purpose, field, manifest: x[field] ?? null, export: r[field] ?? null });
+      }
   }
   return diffs;
 }
