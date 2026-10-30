@@ -135,6 +135,7 @@
 "test_proposal_conditions.py" = "unit"
 "test_proposal_conditions_contract.py" = "module"
 "test_proposal_version_check.py" = "module"
+"test_prompts.py" = "unit"
 "test_protocol_belongs_to_definition.py" = "integration"
 "test_redact.py" = "module"
 "test_protocol_history_replay.py" = "integration"

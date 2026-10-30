@@ -5,7 +5,7 @@
       "stop_reason": "released",
       "departments": {
         "product": {
-          "prompt": "普通事项中，产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交。你看到的是这次会话的检查工作区，从当前运行工作区快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。",
+          "prompt": "普通事项中，产品补充决定必须显式 submit_product_decision；需要改需求正文时提交新的 ProductSpec。新 ProductSpec 必须逐项保留、整合或废止当前有效补充决定并说明理由。使用 submit_product_spec 或 submit_product_decision 提交。要求是给实现读的，验收标准是给检验用的。每条验收标准都要能直接写成一条断言：写死输入与期望的输出、退出码或文件内容，或者写明用哪个样本、期望哪个结果；「若……则……」这类条件式的一般规则不算，它的前提不成立时对任何实现都自动成立，测不出缺陷。例：反例（条件式的一般规则）「若输出有大小写要求，则按大写输出」——没写用哪个输入、期望什么输出，任何实现都能声称满足；正例（可复现的检查）「运行 `echo hello`，标准输出是 `HELLO` 跟一个换行，退出码 0」——输入与期望结果都写死了。你看到的是这次会话的检查工作区，从当前运行工作区快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。",
           "tools": [
             "read_file",
             "list_files",
