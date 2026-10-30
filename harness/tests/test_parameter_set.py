@@ -354,6 +354,22 @@ def test_base_version_is_checked_against_the_parameter_version_and_rejections_ca
         assert len(_parameter_events(opened)) == 1
 
 
+def test_blank_reasons_are_refused_as_contract_violations(data_dir):
+    # 守 R2（对外合同）：空字符串与全空白理由都过不了合同校验，接口层返回 422，不写事件（工单 #1262）
+    opened = _Opened(data_dir)
+    with running_api(opened) as client:
+        assert _post(client, "project.create", name="参数",
+                     goal="做一个命令行回显工具。").status_code == 200
+        end = opened.store.end_position()
+
+        for reason in ("", "   \t\n"):
+            assert _post(client, "parameter.set", name="max_cycles", value=12,
+                         reason=reason).status_code == 422
+            assert _post(client, "parameter.withdraw", name="max_cycles",
+                         expected_change_id="evt_x", reason=reason).status_code == 422
+        assert _parameter_events(opened) == [] and opened.store.end_position() == end
+
+
 def test_the_project_command_checks_the_project_effective_version(data_dir):
     # 守 R1（边界与基准版本）：项目级修改按项目有效参数的版本核对（全局现值加项目覆盖），
     # 项目的覆盖变化使全局版本不再相同；设置查询返回这个项目有效参数的版本（工单 #1262）

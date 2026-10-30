@@ -13,7 +13,7 @@ from ..event_store import Command
 from ..models import ProjectEventType
 from ..projects import ProjectNotFoundError
 from .commands import Rejection
-from .contracts import CommandRequest, NoRefs
+from .contracts import CommandRequest, NoRefs, Text
 from .registry import CommandDefinition
 
 if TYPE_CHECKING:
@@ -31,7 +31,8 @@ class ParameterSet(CommandRequest):
     # 核对它仍是这个参数最近的一次修改，任一不符以 stale_base 拒绝；普通修改省略，原有请求继续有效
     name: str = Field(min_length=1)
     value: Any
-    reason: str = Field(min_length=1)
+    # 非空理由（设计说明第 4.3 节）：空字符串与全空白都过不了合同校验，接口层返回 422（工单 #1262）
+    reason: Text
     modified_by: str | None = None
     project_id: str | None = None
     base_version: str | None = None
@@ -82,7 +83,8 @@ class ParameterWithdraw(CommandRequest):
     # 撤回不删除历史记录：它自己也是一次修改，理由按「撤回：」与原理由（页面提交时已按这个格式给出）
     name: str = Field(min_length=1)
     expected_change_id: str
-    reason: str = Field(min_length=1)
+    # 非空理由（设计说明第 4.3 节）：空字符串与全空白都过不了合同校验，接口层返回 422（工单 #1262）
+    reason: Text
     modified_by: str | None = None
     project_id: str | None = None
     base_version: str | None = None
