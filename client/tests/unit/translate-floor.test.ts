@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { COVERAGE, classOf } from "../../src/renderer/src/translate/coverage.ts";
-import { FLOOR_EVENT_TYPES, floorActions, floorCards, floorState, streamText, type FloorEvent } from "../../src/renderer/src/translate/floor.ts";
+import { FLOOR_EVENT_TYPES, floorActions, floorCards, floorState, recoveryOverlay, streamText, type FloorEvent } from "../../src/renderer/src/translate/floor.ts";
 import { KINDS } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import { floorState as checkFloorState } from "../../src/renderer/src/pixel/contract.ts";
 import type { AskView, DecisionView, ProjectLoopResult } from "../../src/renderer/src/api/generated/types.gen.ts";
@@ -153,6 +153,40 @@ test("状态：project.loop 的样例结果翻出的状态通过画面合同的�
   assert.equal(state.roles?.engineering[0].status, "working");
   assert.deepEqual(state.shelves.adopted, ["w1"]);
   assert.equal(state.focus_id, "w1");
+});
+
+test("状态：因升级停止的事项翻成 upgrade_stopped，门口牌子立在最后工作的部门（工单 #1186）", () => {
+  const state = floorState({
+    position: 7,
+    loop: loopResult([
+      loopRow({ work_item_id: "w1", status: "stopped", department: null,
+                stop_reason: "run_event_version_changed", last_department: "engineering" }),
+      loopRow({ work_item_id: "w2", status: "stopped", department: null,
+                stop_reason: "user_cancelled", last_department: "product" }),
+    ]),
+  });
+  checkFloorState(state);
+  assert.deepEqual(state.items.map((it) => it.status), ["upgrade_stopped", "cancelled"]);
+  // 结束的事项没有当前部门：只有因升级停止的那一项按最后工作的部门立在房间里（门口牌子）
+  assert.equal(state.items[0].department, "engineering");
+  assert.equal(state.items[1].department, null);
+});
+
+test("覆盖层：恢复覆盖层列出中断与待恢复的事项，写状态与事项标题（工单 #1186）", () => {
+  const loop = loopResult([
+    loopRow({ work_item_id: "w1", sign: "被打断的事项", status: "in_progress",
+              recovery_state: "interrupted", department: "engineering" }),
+    loopRow({ work_item_id: "w2", sign: "等修复的事项", status: "in_progress",
+              recovery_state: "waiting_resume", department: "quality" }),
+    loopRow({ work_item_id: "w3", sign: "工作中的事项", status: "in_progress", department: "product" }),
+    loopRow({ work_item_id: "w4", sign: "没有部门的中断", status: "in_progress",
+              recovery_state: "interrupted", department: null }),
+  ]);
+  assert.deepEqual(recoveryOverlay(loop).entries, [
+    { department: "engineering", text: "中断：被打断的事项", state: "interrupted" },
+    { department: "quality", text: "待恢复：等修复的事项", state: "waiting_resume" },
+  ]);
+  assert.deepEqual(recoveryOverlay(null).entries, []);
 });
 
 test("状态：部门的忙碌状态经对应表翻成画面的取值，空闲的部门不写进事项", () => {

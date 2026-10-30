@@ -80,15 +80,18 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     const busy = busyOf(state.state);
     if (busy) departments[dept] = busy;
   }
+  const status = itemState(row);
   return {
     id: row.work_item_id,
     work_item_id: row.work_item_id,
     title: row.sign,
-    status: itemState(row),
+    status,
     kind: row.kind,
     sign: row.sign,
     color_index: row.color_index ?? index + 1,
-    department: row.department,
+    // 因升级停止的事项没有当前部门（project.loop 的 department 为空）：门口牌子立在最后工作的那个部门
+    // （工单 #1186，设计说明第 4.3 节 2026-10-29 补充）
+    department: row.department ?? (status === "upgrade_stopped" ? row.last_department : null),
     round: row.round,
     started_at: row.started_at,
     elapsed_sec: row.elapsed_sec,
@@ -147,6 +150,32 @@ export function floorState(input: FloorStateInput): FloorModel {
     ...(input.focus ? { focus_id: input.focus } : {}),
   };
   return checkFloorState(model) as unknown as FloorModel;
+}
+
+// ---------------------------------------------------------------------------
+// 覆盖层
+
+/** 「恢复」覆盖层里两种状态的文字（原型 v13 js/translate/translate.js 的 RECOVERY_TEXT）。 */
+const RECOVERY_OVERLAY_TEXT: Readonly<Record<"interrupted" | "waiting_resume", string>> = {
+  interrupted: "中断",
+  waiting_resume: "待恢复",
+};
+
+/**
+ * 「恢复」覆盖层的数据（工单 #1186，原型 v13 js/translate/translate.js 的 floorOverlay 恢复一项）：
+ * 中断与待恢复的事项各在自己所在的部门挂一块牌子，牌子写状态与事项标题。
+ * 数据在这里由查询结果写好，画面层只照着画；事项的范围与画面合同的状态同 itemStateOf 的对应。
+ */
+export function recoveryOverlay(loop: ProjectLoopResult | null): {
+  entries: { department: string; text: string; state: ItemState }[];
+} {
+  const entries: { department: string; text: string; state: ItemState }[] = [];
+  for (const row of loop?.work_items ?? []) {
+    const state = itemStateOf(row);
+    if ((state !== "interrupted" && state !== "waiting_resume") || !row.department) continue;
+    entries.push({ department: row.department, text: `${RECOVERY_OVERLAY_TEXT[state]}：${row.sign}`, state });
+  }
+  return { entries };
 }
 
 // ---------------------------------------------------------------------------

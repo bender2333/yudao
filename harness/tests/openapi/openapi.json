@@ -8608,6 +8608,74 @@
         "type": "object",
         "title": "NoRefs"
       },
+      "OldRunEvent": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "at": {
+            "type": "string",
+            "title": "At"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "at",
+          "label"
+        ],
+        "title": "OldRunEvent"
+      },
+      "OldRunView": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "run_event_version": {
+            "type": "integer",
+            "title": "Run Event Version"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/OldRunEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "run_event_version",
+          "state",
+          "stop_reason",
+          "events"
+        ],
+        "title": "OldRunView"
+      },
       "OnboardRefs": {
         "properties": {
           "project_id": {
@@ -9886,6 +9954,114 @@
         ],
         "title": "RecoveryStatus"
       },
+      "RecoveryUpgrade": {
+        "properties": {
+          "stopped_run_id": {
+            "type": "string",
+            "title": "Stopped Run Id"
+          },
+          "stopped_work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped Work Item Id"
+          },
+          "stopped_work_item_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped Work Item Title"
+          },
+          "stopped_run_event_version": {
+            "type": "integer",
+            "title": "Stopped Run Event Version"
+          },
+          "new_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Run Id"
+          },
+          "new_work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Work Item Id"
+          },
+          "new_work_item_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Work Item Title"
+          },
+          "new_run_event_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "New Run Event Version"
+          },
+          "start_point": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "adoption",
+                  "initial_snapshot",
+                  "empty"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Point"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "stopped_run_id",
+          "stopped_work_item_id",
+          "stopped_work_item_title",
+          "stopped_run_event_version",
+          "new_run_id",
+          "new_work_item_id",
+          "new_work_item_title",
+          "new_run_event_version",
+          "start_point"
+        ],
+        "title": "RecoveryUpgrade"
+      },
       "Rejected": {
         "properties": {
           "command_id": {
@@ -10823,6 +10999,16 @@
             },
             "type": "array",
             "title": "Late Results"
+          },
+          "upgrade": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecoveryUpgrade"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -10846,7 +11032,8 @@
           "limits",
           "sessions",
           "owner",
-          "late_results"
+          "late_results",
+          "upgrade"
         ],
         "title": "RunRecoveryResult"
       },
@@ -12811,6 +12998,28 @@
             ],
             "title": "Recovery State"
           },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "last_department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Department"
+          },
           "version": {
             "type": "integer",
             "title": "Version"
@@ -12834,6 +13043,8 @@
           "run_id",
           "adoption_id",
           "recovery_state",
+          "stop_reason",
+          "last_department",
           "version"
         ],
         "title": "WorkItemLoop"
@@ -12889,6 +13100,13 @@
             },
             "type": "array",
             "title": "Onboarding Rounds"
+          },
+          "old_runs": {
+            "items": {
+              "$ref": "#/components/schemas/OldRunView"
+            },
+            "type": "array",
+            "title": "Old Runs"
           }
         },
         "additionalProperties": false,
@@ -12901,7 +13119,8 @@
           "reviews",
           "inputs",
           "materials",
-          "onboarding_rounds"
+          "onboarding_rounds",
+          "old_runs"
         ],
         "title": "WorkItemMaterialsResult"
       },
@@ -33647,6 +33866,17 @@
             "default": "change",
             "title": "Kind",
             "type": "string"
+          },
+          "restarted_from_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Restarted From Run Id"
           }
         },
         "required": [

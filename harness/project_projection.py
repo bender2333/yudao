@@ -188,6 +188,8 @@ class WorkItem:
     start_error: str | None = None
     # 事项种类：普通事项为 change，建档事项为 onboarding；旧事件缺省为 change
     kind: str = "change"
+    # 因升级重新开始（ADR-0019，工单 #1186）：这个事项的 run 从哪一个旧 run 重新开始；普通新建与建档事项为空
+    restarted_from_run_id: str | None = None
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
     department: str | None = None
@@ -331,6 +333,8 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             context_window=int(payload["context_window"]), created_at=event.created_at,
             stream_version=event.stream_version, event_id=event.event_id, snapshot=payload.get("snapshot"),
             kind=payload.get("kind", "change"),
+            # 因升级重新开始的事项从哪一个旧 run 重新开始；旧事件没有这个字段，按不经升级重新开始处理
+            restarted_from_run_id=payload.get("restarted_from_run_id"),
         ))
         return
     if etype == ProjectEventType.WORK_ITEM_START_FAILED:

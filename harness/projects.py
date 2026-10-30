@@ -714,7 +714,8 @@ class ProjectService:
                            source_run: Any, work_item_id: str, run_id: str,
                            priority: str = PRIORITY_USER, kind: str = "change",
                            round: int | None = None, onboarding_basis: dict[str, Any] | None = None,
-                           additional_input: str | None = None) -> _NewWorkItem:
+                           additional_input: str | None = None,
+                           restarted_from_run_id: str | None = None) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
@@ -732,6 +733,8 @@ class ProjectService:
             # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
             "priority": priority,
             "kind": kind,
+            # 因升级重新开始的事项记下它从哪一个旧 run 重新开始（工单 #1186）；其余事项不写这个字段
+            **({} if restarted_from_run_id is None else {"restarted_from_run_id": restarted_from_run_id}),
         }, actor="user:local"))
         return _NewWorkItem(
             work_item_id=work_item_id, run_id=run_id, text=text,
@@ -777,6 +780,7 @@ class ProjectService:
                 baseline=point.baseline, initial_tree=point.initial_tree, snapshot=point.snapshot,
                 source_run=point.source_run,
                 work_item_id=new_id("wi"), run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
+                restarted_from_run_id=run_id,
             )
 
         created = self.writes.transact(project_stream(run.project_id), restart, command=command)
@@ -814,6 +818,7 @@ class ProjectService:
             baseline=None, initial_tree=tree, snapshot=snapshot, source_run=None,
             work_item_id=item.work_item_id, run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
             kind="onboarding", round=prior.round, onboarding_basis=basis, additional_input=note,
+            restarted_from_run_id=run_id,
         )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,

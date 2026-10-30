@@ -2847,6 +2847,50 @@ export type NoRefs = {
 };
 
 /**
+ * OldRunEvent
+ */
+export type OldRunEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
+ * OldRunView
+ */
+export type OldRunView = {
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Run Event Version
+     */
+    run_event_version: number;
+    /**
+     * State
+     */
+    state: string;
+    /**
+     * Stop Reason
+     */
+    stop_reason: string | null;
+    /**
+     * Events
+     */
+    events: Array<OldRunEvent>;
+};
+
+/**
  * OnboardRefs
  */
 export type OnboardRefs = {
@@ -3668,6 +3712,48 @@ export type RecoveryStatus = {
 };
 
 /**
+ * RecoveryUpgrade
+ */
+export type RecoveryUpgrade = {
+    /**
+     * Stopped Run Id
+     */
+    stopped_run_id: string;
+    /**
+     * Stopped Work Item Id
+     */
+    stopped_work_item_id: string | null;
+    /**
+     * Stopped Work Item Title
+     */
+    stopped_work_item_title: string | null;
+    /**
+     * Stopped Run Event Version
+     */
+    stopped_run_event_version: number;
+    /**
+     * New Run Id
+     */
+    new_run_id: string | null;
+    /**
+     * New Work Item Id
+     */
+    new_work_item_id: string | null;
+    /**
+     * New Work Item Title
+     */
+    new_work_item_title: string | null;
+    /**
+     * New Run Event Version
+     */
+    new_run_event_version: number | null;
+    /**
+     * Start Point
+     */
+    start_point: 'adoption' | 'initial_snapshot' | 'empty' | null;
+};
+
+/**
  * Rejected
  */
 export type Rejected = {
@@ -4218,6 +4304,7 @@ export type RunRecoveryResult = {
      * Late Results
      */
     late_results: Array<LateResult>;
+    upgrade: RecoveryUpgrade | null;
 };
 
 /**
@@ -5311,6 +5398,14 @@ export type WorkItemLoop = {
      */
     recovery_state: string | null;
     /**
+     * Stop Reason
+     */
+    stop_reason: string | null;
+    /**
+     * Last Department
+     */
+    last_department: string | null;
+    /**
      * Version
      */
     version: number;
@@ -5352,6 +5447,10 @@ export type WorkItemMaterialsResult = {
      * Onboarding Rounds
      */
     onboarding_rounds: Array<OnboardingRound>;
+    /**
+     * Old Runs
+     */
+    old_runs: Array<OldRunView>;
 };
 
 /**
@@ -15677,6 +15776,10 @@ export type WorkItemCreatedPayload = {
      * Kind
      */
     kind?: string;
+    /**
+     * Restarted From Run Id
+     */
+    restarted_from_run_id?: string | null;
 };
 
 /**

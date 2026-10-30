@@ -1,11 +1,11 @@
-// 恢复与动作核实页（原型 v13 `js/ui/views/recovery.js` 第 7.2 节，工单 #380、#181）：只读显示一个事项的
+// 恢复与动作核实页（原型 v13 `js/ui/views/recovery.js` 第 7.2 节，工单 #380、#181、#1186）：只读显示一个事项的
 // 恢复观察状态、最后已确认位置与自动继续的时间、待恢复原因与修复入口、等待回答的决定请求、
-// 结果未知的动作与它的处理方式、各会话的用量与限额、执行所有权与迟到结果。
-// 数据只来自 run.recovery、decisions.list、project.loop 与 project.overview 四个已登记的查询；
+// 结果未知的动作与它的处理方式、各会话的用量与限额、执行所有权与迟到结果，
+// 以及因升级停止时的旧新 run 关联与旧版本 run 的只读列表（原型 rc-upgrade）。
+// 数据只来自 run.recovery、decisions.list、project.loop、project.overview 与 work_item.materials 五个已登记的查询；
 // 状态迁移由控制层决定，页面不做任何推进，也不显示按钮声称能继续。
 // 恢复观察状态按结束的方式区分（工单 #747）：正常完成是「已完成」，被取消是「已取消」，
 // 状态的说法与标记一致，页面上不出现停止原因与阶段的机器标识。
-// 因升级停止没有单独的一块（原型 rc-upgrade），停止原因里写着「因 Yudao 升级停止」。
 // 文字与状态映射在 recovery-text.ts 里（工单 #181），页面只按它的结果显示。
 
 import type {
@@ -14,11 +14,13 @@ import type {
   ProjectOverviewResult,
   RecoveryOwner,
   RecoverySession,
+  RecoveryUpgrade,
   RunRecoveryResult,
   UnfinishedAction,
   UnknownAction,
   VerificationRecord,
   WorkItemCard,
+  WorkItemMaterialsResult,
 } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import type { Route } from "../../shell/routing";
@@ -42,6 +44,7 @@ import {
   purposeText,
   sessionUsageRows,
   showsInterruptionRecord,
+  upgradeStartPointText,
 } from "./recovery-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { useSnapshot } from "./use-snapshot";
@@ -74,6 +77,13 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
   const recovery = useSnapshot<RunRecoveryResult>(props.app, "page.recovery", "run.recovery", {
     run_id: runId ?? "",
   }, runId === null);
+  // 旧版本的 run（工单 #1186）：因升级停止的块按 stopped_run_id 从这份材料里取旧 run 的事件；
+  // 页面只在 run.recovery 给出 upgrade 时显示这一块
+  const materials = useSnapshot<WorkItemMaterialsResult>(props.app, "page.recovery.materials",
+    "work_item.materials", {
+      project_id: projectId,
+      work_item: workItemId,
+    }, workItemId === "");
   const decisions = useSnapshot<DecisionList>(props.app, "page.recovery.decisions", "decisions.list", {
     work_item_id: workItemId,
     status: ["open"],
@@ -121,6 +131,7 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
           <ActionBlock data={data} />
           <LimitsBlock data={data} elapsed={elapsed} limit={limit} />
           <OwnerBlock data={data} />
+          {data.upgrade !== null ? <UpgradeBlock upgrade={data.upgrade} materials={materials.data} /> : null}
           {item?.kind === "onboarding"
             ? <RestartOnboarding app={props.app} projectId={projectId} />
             : null}
@@ -462,4 +473,59 @@ function ownerRows(owner: RecoveryOwner): [string, React.ReactNode][] {
     ["中断位置", interruptedAtText(owner)],
     ["执行槽位", owner.holds_slot ? "占用一个执行槽位" : "没有占用执行槽位"],
   ];
+}
+
+// 因升级停止（原型 rc-upgrade，工单 #1186）：旧 run 与从它重新开始的新 run、事件版本与起点；
+// 旧 run 的事件从 work_item.materials 的旧版本 run 列表里取，只读列出，不改写原始观察
+function UpgradeBlock(props: { upgrade: RecoveryUpgrade; materials: WorkItemMaterialsResult | null }) {
+  const upgrade = props.upgrade;
+  const oldRuns = props.materials?.old_runs ?? [];
+  const oldRun = oldRuns.find((run) => run.run_id === upgrade.stopped_run_id) ?? null;
+  const rows: [string, React.ReactNode][] = [
+    ["停止时的事件版本", String(upgrade.stopped_run_event_version)],
+    ["旧 run", show(upgrade.stopped_work_item_title, "未上报")],
+    ["重新开始的起点", upgradeStartPointText(upgrade.start_point)],
+  ];
+  if (upgrade.new_run_id !== null) {
+    rows.push(["新 run", show(upgrade.new_work_item_title, "未上报")]);
+    rows.push(["新 run 的事件版本",
+      upgrade.new_run_event_version === null ? "未上报" : String(upgrade.new_run_event_version)]);
+  }
+  return (
+    <Section
+      id="rc-upgrade"
+      title="因升级停止"
+      note="停止时的版本与从项目的起点重新开始的新 run（起点是采纳成果；没有采纳成果时是起始文件夹快照，都没有时是空树）"
+    >
+      <KeyValue items={rows} />
+      {upgrade.new_run_id === null ? <p className="y10-note note">还没有重新开始的新 run。</p> : null}
+      {oldRun !== null && oldRun.events.length > 0 ? (
+        <>
+          <h3 className="y10-h3 sub">旧 run 的事件（只读）</h3>
+          <ul className="y10-rc-late">
+            {oldRun.events.map((event) => (
+              <li key={event.position}>
+                <span className="y10-muted">{formatTime(event.at)}</span>
+                <span>{event.label}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {oldRuns.length > 0 ? (
+        <>
+          <h3 className="y10-h3 sub">旧版本的 run（只读）</h3>
+          <ul className="y10-rc-late">
+            {oldRuns.map((run) => (
+              <li key={run.run_id}>
+                <span className="y10-muted">事件版本 {run.run_event_version}</span>
+                <span>{label(RECOVERY_STATE, run.state)}</span>
+                <span>{run.stop_reason === null ? "未上报停止原因" : label(STOP_REASON, run.stop_reason)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+    </Section>
+  );
 }
