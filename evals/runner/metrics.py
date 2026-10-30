@@ -16,7 +16,7 @@ def collect(outcome, events, run_dir=None):
             part = event.get("part") or {}
             requests.append({
                 "tokens": part.get("tokens") or {},
-                "cost": part.get("cost") or 0,
+                "cost": part.get("cost"),
                 "reason": part.get("reason", ""),
             })
         elif kind == "error":
@@ -44,11 +44,23 @@ def collect(outcome, events, run_dir=None):
         "output_tokens": tokens["output"],
         "cache_read_tokens": tokens["cache_read"],
         "cache_write_tokens": tokens["cache_write"],
-        "cost": sum(float(item["cost"] or 0) for item in requests),
+        "cost": _total_cost(requests),
         "elapsed_seconds": round(outcome["elapsed_seconds"], 3),
         "errors": errors,
         "model_service_failure": model_service_failure,
     }
+
+
+def _total_cost(requests):
+    """各次请求的费用合计；每一次都为空或为 0 时记未知，不记 0.0（第 5.2 节）。"""
+    values = []
+    for item in requests:
+        value = item.get("cost")
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        values.append(float(value))
+    total = sum(values)
+    return total if total > 0 else None
 
 
 def _error_text(error):

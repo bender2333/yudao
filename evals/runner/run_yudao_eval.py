@@ -15,21 +15,14 @@ import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import model_service
 import yudao
 import yudao_metrics
 import yudao_report
 
-TIME_LIMIT_SECONDS = 90 * 60
+# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计第 3 节「时间上限」）
+TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
-
-# 起点缺口：Yudao 没有把文件放进新建项目空工作区的接口（docs/architecture-issues.md
-# 中本工单的登记），`subway_data.json` 没有进入工作区，起点与 OpenCode 一侧不同。
-# 运行器如实把缺口交给工程自己写这份数据文件，并把这条缺口写进报告。
-START_GAP_NOTE = (
-    "起点缺口：Yudao 的接口没有把文件放进新建项目空工作区的命令，本运行的工作区里"
-    "没有题目提供的 `subway_data.json`；运行器请工程按接口约定自行写出这份数据文件。"
-    "工作区从空目录建立（Yudao 默认的执行位置是控制主机上的本机进程）。"
-)
 
 
 def empty_output_note(runs):
@@ -80,9 +73,14 @@ def score_delivery(delivery_dir, evidence_dir):
         return json.load(handle)
 
 
-def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds):
-    """运行一次 Yudao，评分并收好原始证据。"""
+def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds, limits):
+    """运行一次 Yudao，评分并收好原始证据。
+
+    提交号在启动服务之前记下：每次运行各带自己的提交号（第 3 节「运行环境」）。
+    """
+    commit = yudao.yudao_commit()
     data_dir = yudao.data_dir_for(runs_root, run_id)
+    start_dir = yudao.fresh_start_dir(runs_root, run_id)
     evidence_dir = os.path.join(evidence_root, run_id)
     os.makedirs(evidence_dir, exist_ok=True)
     delivery_dir = os.path.join(evidence_dir, "delivery")
@@ -99,10 +97,11 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds):
     served_model = model_name
     try:
         client.wait_ready()
-        admission = yudao.register_model(client, model_name)
+        admission = yudao.register_model(client, model_name, limits)
         served_model = admission.get("admitted_model") or model_name
         project_id = yudao.create_project(client, "评测 · 场景 3",
-                                          "按需求原文与接口约定实现地铁换乘查询程序")
+                                          "按需求原文与接口约定实现地铁换乘查询程序",
+                                          initial_directory=start_dir)
         yudao.save_department_settings(client, project_id)
         work_item_id, run_id_yudao = yudao.submit_requirement(client, project_id,
                                                                yudao.requirement_text())
@@ -151,8 +150,10 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds):
     return {
         "run_id": run_id,
         "yudao_run_id": export["run_id"],
+        "yudao_commit": commit,
         "served_model": served_model,
         "data_dir": data_dir,
+        "start_dir": start_dir,
         "evidence_dir": evidence_dir,
         "metrics": metrics,
         "delivery_files": len(delivery_files),
@@ -174,17 +175,27 @@ def _parameters_version(export):
     return None
 
 
-def main(argv=None):
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Scenario 3 Yudao evaluation")
     parser.add_argument("--model", required=True, help="被测模型名（模型服务里的 model）")
     parser.add_argument("--runs", type=int, default=1, help="运行次数（每个场景每边 3 次）")
     parser.add_argument("--limit-seconds", type=float, default=TIME_LIMIT_SECONDS,
                         help="单次运行的墙钟上限")
+    parser.add_argument("--context-window", type=int, default=None,
+                        help="上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）")
+    parser.add_argument("--max-output-tokens", type=int, default=None,
+                        help="单次输出上限；模型列表没有报告这个模型时用它")
     parser.add_argument("--run-id-prefix", default="yudao-run")
     parser.add_argument("--runs-root", required=True, help="运行目录根，必须在 Yudao 仓库之外")
     parser.add_argument("--result", help="机器可读结果的路径")
     parser.add_argument("--report", help="中文报告的路径")
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
+    limits = model_service.model_limits(args.model, args.context_window, args.max_output_tokens)
+    print("model capacity: " + model_service.describe(limits), flush=True)
 
     evidence_root = os.path.join(yudao_report.default_evidence_dir(), yudao.SCENARIO, "yudao")
 
@@ -193,12 +204,13 @@ def main(argv=None):
     for index in range(1, args.runs + 1):
         run_id = "%s-%d" % (args.run_id_prefix, index)
         print("running " + run_id + "...", flush=True)
-        run = run_once(run_id, args.runs_root, evidence_root, args.model, args.limit_seconds)
+        run = run_once(run_id, args.runs_root, evidence_root, args.model, args.limit_seconds,
+                       limits)
         runs.append(run)
         run_reports.append(yudao_report.run_section(run, run["score"]))
-        print("  end_status=%s reason=%s completion=%.4f" % (
+        print("  end_status=%s reason=%s commit=%s completion=%.4f" % (
             run["metrics"]["end_status"], run["metrics"]["end_reason"],
-            run["score"]["completion"]), flush=True)
+            run["yudao_commit"], run["score"]["completion"]), flush=True)
 
     result = yudao_report.build_result(
         scenario=yudao.SCENARIO,
@@ -206,8 +218,8 @@ def main(argv=None):
         scorer_version=runs[0]["score"]["scorer_version"],
         model=runs[0]["served_model"],
         runs=runs,
-        yudao_commit=yudao.yudao_commit(),
-        notes=[note for note in [START_GAP_NOTE, empty_output_note(runs)] if note],
+        model_capacity=limits,
+        notes=[note for note in [empty_output_note(runs)] if note],
     )
     if args.result:
         yudao_report.write_result(result, args.result)

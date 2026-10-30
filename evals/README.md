@@ -38,7 +38,7 @@ flowchart TD
 - `scenarios/scenario-3/materials/manifest.json`：场景 3 的材料来源、运行环境与材料摘要（`digests` 块）。
 - `baseline/`：omp 流程开发 Yudao 的基线数字。`collect.py` 抓取 Stage 3 里程碑下的工单、标签时间线与评论、合并请求、阶段父工单 #9 的集成层记录与运行目录里的运行输出，合成一个数据文件；`compute.py` 只读这个数据文件，算出每个工单的审查轮数、集成层失败归因、搁置原因、耗时与用量，写出中文报告。
 - `context/`：上下文装配的离线回放（#912，[设计说明](../docs/design/context-assembly.md)）。只读事件库与工件库，把每一步交给模型的上下文当成纯函数 `view(events, rules) → request`：`measure` 测每一步的召回与浪费，`replay` 用新视图重放并做逐条规则的消融，`sweep` 扫参数取值，`verify` 核对视图与记录逐字节一致，`counterfactual` 用真实模型做反事实回放。用法见 [context/README.md](context/README.md)。
-- `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。基线工具的测试读录制的数据文件，同样不使用 mock。`test_yudao_runner.py` 用 `harness/tests/event_sequences/` 里的系统事件序列驱动同一套 `run.export` 形状的判定逻辑；这些序列的事件头是 `adapter: fake`，不是真实系统导出，凡是需要真实导出才能核实的项记「未核实」。`test_regen_scenario3.py` 用 `runner/regen_scenario3.py` 从仓库内固定的历史 JSON（`data/scenario-3-yudao-historical.json`，提交 `aaa91883` 的旧版原文，不可修改）重算 `docs/evaluation/scenario-3-yudao.json` 与 `.md`，与已提交的文件逐字节比对；以已提交的新 JSON 为输入重算同样逐字节一致（幂等）。`test_no_harness_paths.py` 用 `ast` 扫描并折叠字符串拼接与 `os.path.join` 字面量参数，再比对被测方内部文件路径。
+- `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。基线工具的测试读录制的数据文件，同样不使用 mock。`test_yudao_runner.py` 用 `harness/tests/event_sequences/` 里的系统事件序列驱动同一套 `run.export` 形状的判定逻辑；这些序列的事件头是 `adapter: fake`，不是真实系统导出，凡是需要真实导出才能核实的项记「未核实」。`test_regen_scenario3.py` 用 `runner/regen_scenario3.py` 从仓库内固定的历史 JSON（`data/scenario-3-yudao-historical.json`，提交 `aaa91883` 的旧版原文，不可修改）重算 `docs/evaluation/scenario-3-yudao.json` 与 `.md`，与已提交的文件逐字节比对；以已提交的新 JSON 为输入重算同样逐字节一致（幂等）。`test_no_harness_paths.py` 用 `ast` 扫描并折叠字符串拼接与 `os.path.join` 字面量参数，再比对被测方内部文件路径。`test_report.py` 核对多次运行的汇总是怎么算的：完成度与正确性进汇总，每个指标带噪声范围，一次运行时噪声范围写「未知」，费用全为 0 或为空时写「未知」。
 
 ## 材料版本
 
@@ -87,7 +87,7 @@ uv run python -m pytest evals/tests
 需要真实模型的用例带 `real_model` 标记，只在明确选择时运行：变量在环境里也不会触发它们，上面的命令不运行它们。三个变量（`YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY`、`YUDAO_EVAL_MODEL`）都设置以后：
 
 ```bash
-uv run python -m pytest evals/tests -m real_model                                    # 全部，单项最长 90 分钟
+uv run python -m pytest evals/tests -m real_model                                    # 全部，单项最长 120 分钟
 uv run python -m pytest evals/tests/test_yudao_runner.py -m real_model -k time_limit # 最短的一项
 ```
 
@@ -100,6 +100,8 @@ uv run playwright install chromium
 ```
 
 ## 运行一次评测
+
+每次评测在检出被测提交的专门 worktree 里运行，运行期间不切换提交；运行目录与原始证据在 Yudao 仓库之外。三次运行每次最长 120 分钟，整组要几个小时：用 `Start-Process pwsh -File <脚本>` 启动，不用会话里的后台命令（会话空闲、内存不足时后台命令会被结束）。
 
 模型服务的地址与凭据只从环境变量读，不写入代码、事件、日志与提交：
 
@@ -115,6 +117,9 @@ uv run python evals/runner/run_eval.py \
     --result docs/evaluation/scenario-3-opencode.json \
     --report docs/evaluation/scenario-3-opencode.md
 ```
+
+两个运行器都从模型服务的模型列表（`YUDAO_EVAL_BASE_URL` 加 `/models`）取被测模型报告的 `context_length` 与 `max_completion_tokens`：Yudao 一侧写进模型访问定义，OpenCode 一侧写进运行配置的模型限额（`models.<id>.limit` 的 `context` 与 `output`），两处是同一对数；列表没有报告这个模型时用 `--context-window` 与 `--max-output-tokens`，两者都没有时报错。报告与结果写明取值与来源。
+
 场景 1 的运行命令（单次运行写到 `.tmp/` 或正式运行写到 `docs/evaluation/`）：
 
 ```bash
@@ -141,10 +146,12 @@ uv run python evals/runner/run_yudao_eval.py \
 Yudao 一侧的运行器保证下面这些：
 
 - 只经 HTTP 接口与导出的事件日志观察 Yudao，不导入 `harness` 的模块（`tests/test_no_harness_import.py` 检查这一点），也不引用被测方内部文件的路径（`tests/test_no_harness_paths.py` 检查这一点）。
-- 被测的 Yudao 在仓库之外的数据目录上启动，每次运行新建一个数据目录，用默认的执行位置（控制主机上的本机进程）。
+- 被测的 Yudao 在仓库之外的数据目录上启动，每次运行新建一个数据目录，用默认的执行位置（控制主机上的本机进程），以 `--no-browser` 启动（评测运行不在控制主机上开页面）。
+- 起点：每次运行新建一个只含题目提供的数据文件 `subway_data.json` 的起始文件夹，放在运行目录之外，经 `project.create` 的 `initial_directory` 带入；事项文字不另写起点文件的说明。
 - 三个部门的部门默认绑定与项目部门设置都使用被测模型；模型先经 `catalog.model.test` 准入，报告记录模型服务实际服务的模型名。
 - 项目不登记取回的来源与 MCP 服务器，部门没有这两类工具。
-- 到墙钟上限时经 `work_item.cancel` 结束事项，标记超时，按最后一次封存的交付评分；没有交付时全部检查记为「没有做」。
+- 每次运行的提交号在启动服务之前记下，结果逐次记录；各次不一致时顶层写明不一致并逐次列出。
+- 到墙钟上限（默认 120 分钟，`--limit-seconds` 可覆盖）时经 `work_item.cancel` 结束事项，标记超时，按最后一次封存的交付评分；没有交付时全部检查记为「没有做」。
 - 评分之前做三项核对，任一命中这次运行作废，写进报告：事件日志导出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、事件日志导出中出现对任务上游仓库的访问（场景 3 的上游仓库是 `AGI-Eval-Official/PRDBench`）。
 
 ### 五项过程检查点（第 5.1 节）
@@ -159,9 +166,11 @@ Yudao 一侧的过程检查点共五项，每项给通过 / 未通过 / 未核�
 
 ### 用量的未知值
 
-模型服务没有分项统计时，`usage.totals` 的那一项是 `None`，按「未知」写入报告，不进平均值、最小、最大与噪声，另计有效样本数与未知样本数及原因，只有来源明确上报的零才记零。取不到单价时费用同样是未知。
+模型服务没有分项统计时，`usage.totals` 的那一项是 `None`，按「未知」写入报告，不进平均值、最小、最大与噪声，另计有效样本数与未知样本数及原因，只有来源明确上报的零才记零。取不到单价时费用同样是未知；OpenCode 一侧各次请求的费用全为 0 或为空时，这次运行的费用记「未知」，汇总里费用也写「未知」。
 
-Yudao 一侧当前的起点缺口与模型行为记录在 `docs/architecture-issues.md`（本工单的登记）与报告的第八节：新建项目的空工作区没有放入题目数据文件的接口通道，题目提供的 `subway_data.json` 由被测工程按接口约定自行写出；被测模型在工程部门连续返回成功但没有输出项的调用，主机按 `no_tool_call` 暂停。
+多次运行的汇总含评分器给出的完成度与正确性，每个指标给出噪声范围（同一版本各次运行的取值极差）；只有一次运行时噪声范围写「未知」，不写零。
+
+被测模型在工程部门连续返回成功但没有输出项的调用，主机按 `no_tool_call` 暂停；这条模型行为的记录写进报告（`docs/architecture-issues.md` 里有登记）。
 
 运行器保证下面这些：
 
@@ -169,6 +178,9 @@ Yudao 一侧当前的起点缺口与模型行为记录在 `docs/architecture-iss
 - 隐藏检查、条目表与参考实现不进入运行目录；它们在运行结束以后才复制到评分目录。场景 2 的运行目录是仓库，材料只把需求原文放进去，隐藏测试文件与两份清单都不进去。
 - 取回与搜索工具（`webfetch`、`websearch`）在运行配置里关闭，运行器另外检查 JSON 输出里没有这两类工具的调用。
 - 消息用短指示加上材料附件（`prd.md`、`interface-agreement.md`、`subway_data.json`），不把需求全文放进命令行。
+- 运行配置的模型限额取模型服务的容量，与 Yudao 一侧的模型访问定义是同一对数（见「运行一次评测」一节）。
+- 复制交付与评分目录时跳过 Windows 的保留设备名（`nul`、`con`、`prn`、`aux`、`com1` 至 `com9`、`lpt1` 至 `lpt9`，不分大小写，带不带扩展名都算），报告列出被跳过的文件。
+- 每次运行的墙钟上限默认 120 分钟，`--limit-seconds` 可覆盖。
 - 评分之前做三项核对，任一命中这次运行作废（`void`），不计入结果；这类运行在报告的第六节列出：JSON 输出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、JSON 输出中出现对任务上游仓库的访问（场景 1 是 `mnluzimu/WebGen-Bench`，场景 2 是 `openai/openai-agents-python`，场景 3 是 `AGI-Eval-Official/PRDBench`）。
 - 到达墙钟上限时结束进程，按结束时的目录评分并标记超时，不因为没有跑完而作废。
 

@@ -21,16 +21,22 @@ if RUNNER_DIR not in sys.path:
     sys.path.insert(0, RUNNER_DIR)
 
 import metrics
+import model_service
 import opencode
 import report
 import run_eval
 import scenario3
+import yudao
 
 # 不需要模型服务的用例使用的占位名；真实模型用例在运行时取 YUDAO_EVAL_MODEL（见 real_model_names）。
 MODEL_ID = "test-model"
 MODEL = "yudao-eval/" + MODEL_ID
 SCENARIO = scenario3
 REPO_ROOT = EVALS_DIR
+
+# 模型列表报告的容量：用例把它写进运行配置的模型限额，不访问模型服务
+LIMITS = {"context_window": 262_144, "context_window_source": "model_list",
+          "max_output_tokens": 64_000, "max_output_tokens_source": "model_list"}
 
 # 需要真实模型的用例：默认不选，`-m real_model` 才运行；三个变量缺哪个由根目录 conftest.py 跳过并写明。
 real_model = pytest.mark.real_model
@@ -50,7 +56,7 @@ def runs_root(tmp_path):
 
 
 def test_run_directory_holds_only_the_starting_point(runs_root):
-    run_dir = opencode.create_run_dir(runs_root, "start-only", MODEL, MODEL_ID)
+    run_dir = opencode.create_run_dir(runs_root, "start-only", MODEL, MODEL_ID, LIMITS)
     names = set(os.listdir(run_dir))
     assert names == {"PRD.md", "interface_agreement.md", "subway_data.json",
                      "manifest.json", ".git", ".opencode-config"}
@@ -66,18 +72,18 @@ def test_run_directory_holds_only_the_starting_point(runs_root):
 def test_run_directory_inside_the_repository_is_rejected():
     inside = os.path.join(REPO_ROOT, "evals", "inside-the-repo")
     with pytest.raises(ValueError, match="outside the Yudao repository"):
-        opencode.create_run_dir(inside, "run-1", MODEL, MODEL_ID)
+        opencode.create_run_dir(inside, "run-1", MODEL, MODEL_ID, LIMITS)
     assert not os.path.exists(inside)
 
 
 def test_existing_run_directory_is_rejected(runs_root):
-    opencode.create_run_dir(runs_root, "once", MODEL, MODEL_ID)
+    opencode.create_run_dir(runs_root, "once", MODEL, MODEL_ID, LIMITS)
     with pytest.raises(ValueError, match="already exists"):
-        opencode.create_run_dir(runs_root, "once", MODEL, MODEL_ID)
+        opencode.create_run_dir(runs_root, "once", MODEL, MODEL_ID, LIMITS)
 
 
 def test_run_configuration_denies_fetch_and_search(runs_root):
-    run_dir = opencode.create_run_dir(runs_root, "config", MODEL, MODEL_ID)
+    run_dir = opencode.create_run_dir(runs_root, "config", MODEL, MODEL_ID, LIMITS)
     with open(os.path.join(run_dir, ".opencode-config", "opencode.json"),
               encoding="utf-8") as handle:
         config = json.load(handle)
@@ -92,8 +98,21 @@ def test_run_configuration_denies_fetch_and_search(runs_root):
         assert os.environ[opencode.MODEL_SERVICE_API_KEY_ENV] not in json.dumps(config)
 
 
+def test_run_configuration_carries_the_same_capacity_as_the_yudao_definition(runs_root):
+    """运行配置的模型限额与 Yudao 的模型访问定义是同一对数（第 3 节「模型的容量」）。"""
+    run_dir = opencode.create_run_dir(runs_root, "capacity", MODEL, MODEL_ID, LIMITS)
+    with open(os.path.join(run_dir, ".opencode-config", "opencode.json"),
+              encoding="utf-8") as handle:
+        config = json.load(handle)
+    limit = config["provider"]["yudao-eval"]["models"][MODEL_ID]["limit"]
+    definition = yudao.model_definition(MODEL_ID, LIMITS)
+    assert limit == {"context": definition["context_window"],
+                     "output": definition["max_output_tokens"]}
+    assert limit == {"context": 262_144, "output": 64_000}
+
+
 def test_message_points_at_the_same_materials_the_run_directory_has(runs_root):
-    run_dir = opencode.create_run_dir(runs_root, "inputs", MODEL, MODEL_ID)
+    run_dir = opencode.create_run_dir(runs_root, "inputs", MODEL, MODEL_ID, LIMITS)
     attached = scenario3.message_files(run_dir)
     assert [os.path.basename(path) for path in attached] == \
         ["PRD.md", "interface_agreement.md", "subway_data.json"]
@@ -114,7 +133,7 @@ def test_command_line_fits_the_windows_limit(runs_root, monkeypatch):
     """
     monkeypatch.setattr(opencode.shutil, "which",
                         lambda name: "C:/Users/runner/AppData/Roaming/npm/" + name + ".cmd")
-    run_dir = opencode.create_run_dir(runs_root, "limits", MODEL, MODEL_ID)
+    run_dir = opencode.create_run_dir(runs_root, "limits", MODEL, MODEL_ID, LIMITS)
     command = opencode.build_command(run_dir, MODEL)
     length = sum(len(item) for item in command)
     assert length < 8000, length
@@ -188,13 +207,15 @@ def _stub_opencode(monkeypatch, tmp_path, base):
     with open(os.path.join(run_dir, "delivery.txt"), "w", encoding="utf-8") as handle:
         handle.write("delivery")
     monkeypatch.setattr(opencode, "create_run_dir",
-                        lambda runs_root, run_id, model, model_id, scenario_name=None: run_dir)
+                        lambda runs_root, run_id, model, model_id, limits,
+                        scenario_name=None: run_dir)
     monkeypatch.setattr(opencode, "run_opencode",
                         lambda run_dir, model, limit_seconds, **kwargs:
                         {"returncode": 0, "timed_out": False, "stdout": "", "stderr": "",
                          "elapsed_seconds": 1.0, "command": []})
     monkeypatch.setattr(run_eval, "score_delivery",
-                        lambda run_dir, evidence_dir, scenario_name=None, python=None:
+                        lambda run_dir, evidence_dir, scenario_name=None, python=None,
+                        skipped=None:
                         {"checks": [], "material_version": "scenario-3@2",
                          "scorer_version": "scorer-3@2"})
     monkeypatch.setattr(scenario3, "scenario_base", lambda: base)
@@ -208,7 +229,8 @@ def test_a_tampered_check_voids_the_opencode_run(runs_root, tmp_path, monkeypatc
     target.write_text(target.read_text(encoding="utf-8") + "\n# tampered\n", encoding="utf-8")
     _stub_opencode(monkeypatch, tmp_path, str(copy))
 
-    run = run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID, 60)
+    run = run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID,
+                           60, LIMITS)
 
     assert run["void"] is True
     assert run["void_reasons"] == ["材料摘要与材料版本记录不同：checks"]
@@ -218,7 +240,8 @@ def test_clean_materials_let_the_opencode_run_score(runs_root, tmp_path, monkeyp
     """材料没有改动、没有上游访问：`run_once` 不作废，评分与报告照常。"""
     _stub_opencode(monkeypatch, tmp_path, scenario3.scenario_base())
 
-    run = run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID, 60)
+    run = run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID,
+                           60, LIMITS)
 
     assert run["void"] is False
     assert run["void_reasons"] == []
@@ -275,6 +298,104 @@ def test_unparseable_lines_are_ignored():
     assert [event["type"] for event in events] == ["text", "text"]
 
 
+def test_metrics_record_cost_as_unknown_when_no_request_reports_one():
+    """各次请求的费用全为 0 或为空：这次运行的费用记未知，不记 0.0（第 5.2 节）。"""
+    events = [{"type": "step_finish", "part": {"tokens": {}, "cost": 0}},
+              {"type": "step_finish", "part": {"tokens": {}}}]
+    collected = metrics.collect({"returncode": 0, "timed_out": False, "elapsed_seconds": 2.0},
+                                events)
+    assert collected["cost"] is None
+
+
+def test_metrics_sum_the_costs_the_service_reports():
+    events = [{"type": "step_finish", "part": {"cost": 0.1}},
+              {"type": "step_finish", "part": {"cost": 0.2}}]
+    collected = metrics.collect({"returncode": 0, "timed_out": False, "elapsed_seconds": 2.0},
+                                events)
+    assert abs(collected["cost"] - 0.3) < 1e-9
+
+
+def test_reserved_device_names_are_skipped_with_or_without_extension():
+    """Windows 的保留设备名不分大小写，带不带扩展名都算（第 3 节「隔离」）。"""
+    names = ["nul", "NUL.TXT", "con.md", "aux", "com1", "lpt9.tar.gz", "src", "readme.md",
+             "COM10", "nullify.py"]
+    assert opencode.reserved_device_names(names) == ["NUL.TXT", "aux", "com1", "con.md",
+                                                     "lpt9.tar.gz", "nul"]
+
+
+def _reserved_path(directory, name="nul"):
+    """保留设备名的长路径：`os.path.abspath` 会把 `nul` 折成 `\\.\nul`，所以只规范化目录。"""
+    return "\\\\?\\" + os.path.abspath(directory).rstrip("\\") + "\\" + name
+
+
+def _reserved_file(directory, name="nul"):
+    """在目录里建一个名为 `nul` 的文件：普通路径写进的是设备，加长路径前缀才落到磁盘上。"""
+    path = _reserved_path(directory, name)
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write("reserved device name")
+    return path
+
+
+def _remove_reserved_file(directory, name="nul"):
+    os.remove(_reserved_path(directory, name))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows 的保留设备名只在 Windows 上存在")
+def test_a_run_directory_holding_a_reserved_name_still_copies_and_scores(runs_root, tmp_path,
+                                                                       monkeypatch):
+    """交付里有名为 `nul` 的文件：复制与评分照常完成，报告列出被跳过的文件。
+
+    以前把这棵目录树复制到证据目录或评分目录时会中止整组运行：普通路径的 `nul` 写进
+    复制目标的是设备，不是文件。同一棵目录树复制两次，跳过的文件只记一次。
+    """
+    run_dir = opencode.create_run_dir(runs_root, "reserved", MODEL, MODEL_ID, LIMITS)
+    _reserved_file(run_dir)
+    monkeypatch.setattr(opencode, "create_run_dir",
+                        lambda runs_root, run_id, model, model_id, limits,
+                        scenario_name=None: run_dir)
+    monkeypatch.setattr(opencode, "run_opencode",
+                        lambda run_dir, model, limit_seconds, **kwargs:
+                        {"returncode": 0, "timed_out": False, "stdout": "", "stderr": "",
+                         "elapsed_seconds": 1.0, "command": []})
+    try:
+        run = run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID,
+                                60, LIMITS)
+    finally:
+        _remove_reserved_file(run_dir)
+
+    assert run["skipped_files"] == ["nul"]
+    assert len(run["score"]["checks"]) == 24
+    text = "\n".join(report.run_section(run, run["score"]))
+    assert "保留设备名" in text
+    assert "nul" in text
+
+
+def test_default_time_limit_is_two_hours():
+    """两个运行器的默认时间上限都是 120 分钟（第 3 节「时间上限」）。"""
+    assert run_eval.TIME_LIMIT_SECONDS == 120 * 60
+    args = run_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs"])
+    assert args.limit_seconds == 120 * 60
+
+
+def test_explicit_time_limit_reaches_opencode(runs_root, tmp_path, monkeypatch):
+    """显式给出的 `--limit-seconds` 覆盖默认值，并且回到 OpenCode 时用的就是它。"""
+    args = run_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs",
+                                "--limit-seconds", "600"])
+    assert args.limit_seconds == 600.0
+    _stub_opencode(monkeypatch, tmp_path, scenario3.scenario_base())
+    seen = []
+
+    def run_opencode(run_dir, model, limit_seconds, **kwargs):
+        seen.append(limit_seconds)
+        return {"returncode": 0, "timed_out": False, "stdout": "", "stderr": "",
+                "elapsed_seconds": 1.0, "command": []}
+
+    monkeypatch.setattr(opencode, "run_opencode", run_opencode)
+    run_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, MODEL_ID,
+                      args.limit_seconds, LIMITS)
+    assert seen == [600.0]
+
+
 def test_aggregate_reports_mean_min_and_max():
     runs = [
         {"void": False, "model_service_failure": False,
@@ -298,8 +419,12 @@ def test_aggregate_reports_mean_min_and_max():
                                             "cost", "elapsed_seconds"]}},
     ]
     summary = report.aggregate(runs)
-    assert summary["request_count"] == {"count": 2, "mean": 5.0, "min": 4, "max": 6}
-    assert summary["elapsed_seconds"] == {"count": 2, "mean": 20.0, "min": 10.0, "max": 30.0}
+    assert summary["request_count"] == {"count": 2, "unknown": 0, "mean": 5.0, "min": 4.0,
+                                        "max": 6.0, "spread": 2.0}
+    assert summary["elapsed_seconds"] == {"count": 2, "unknown": 0, "mean": 20.0, "min": 10.0,
+                                          "max": 30.0, "spread": 20.0}
+    # 运行费用记 0.0 的样本照常计入
+    assert summary["cost"]["mean"] == 0.0
 
 
 def test_result_records_the_environment_and_the_no_network_rule():
@@ -375,7 +500,8 @@ def _run_with_cap(runs_root, run_id):
     事件流、取回与搜索工具没有调用、交付落在运行目录。
     """
     model, model_id = real_model_names()
-    run_dir = opencode.create_run_dir(runs_root, run_id, model, model_id)
+    limits = model_service.model_limits(model_id)
+    run_dir = opencode.create_run_dir(runs_root, run_id, model, model_id, limits)
     outcome = opencode.run_opencode(run_dir, model, 180)
     outcome["run_dir"] = run_dir
     return outcome
@@ -385,8 +511,9 @@ def _run_with_cap(runs_root, run_id):
 def test_time_limit_ends_the_run(runs_root, tmp_path):
     """时间上限到达时运行被结束，按结束时的目录评分并标记超时。"""
     model, model_id = real_model_names()
-    run_dir = opencode.create_run_dir(runs_root, "timeout", model, model_id)
-    started = opencode.create_run_dir(runs_root, "timeout-control", model, model_id)
+    limits = model_service.model_limits(model_id)
+    run_dir = opencode.create_run_dir(runs_root, "timeout", model, model_id, limits)
+    started = opencode.create_run_dir(runs_root, "timeout-control", model, model_id, limits)
     assert os.path.isdir(run_dir) and os.path.isdir(started)
 
     outcome = opencode.run_opencode(run_dir, model, 20)

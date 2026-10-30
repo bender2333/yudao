@@ -15,10 +15,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import material_integrity
 import metrics
+import model_service
 import opencode
 import report
 
-TIME_LIMIT_SECONDS = 90 * 60
+# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计第 3 节「时间上限」）
+TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
 
 
@@ -32,10 +34,11 @@ def scenario_python():
     return path
 
 
-def prepare_scoring_dir(scenario_module, run_dir, evidence_dir):
+def prepare_scoring_dir(scenario_module, run_dir, evidence_dir, skipped):
     """运行结束以后把隐藏检查与条目表复制到评分目录，再复制一份交付。
 
-    隐藏部分与交付副本各自独立：被测方在运行期间见不到检查与条目表。
+    隐藏部分与交付副本各自独立：被测方在运行期间见不到检查与条目表。Windows 的保留
+    设备名（`nul` 等）不复制，跳过的文件记进 `skipped`（第 3 节「隔离」）。
     """
     scoring_dir = os.path.join(evidence_dir, "scoring")
     if os.path.exists(scoring_dir):
@@ -51,14 +54,17 @@ def prepare_scoring_dir(scenario_module, run_dir, evidence_dir):
             shutil.copy2(source, target)
     delivery_copy = os.path.join(scoring_dir, "delivery")
     shutil.copytree(run_dir, delivery_copy,
-                    ignore=shutil.ignore_patterns(*scenario_module.SCORING_IGNORES))
+                    ignore=opencode.delivery_copy_ignore(run_dir,
+                                                         scenario_module.SCORING_IGNORES,
+                                                         skipped))
     return scoring_dir, delivery_copy
 
 
-def score_delivery(run_dir, evidence_dir, scenario_name=None, python=None):
+def score_delivery(run_dir, evidence_dir, scenario_name=None, python=None, skipped=None):
     """在评分目录中对交付评分，返回机器可读结果。"""
     scenario_module = opencode.scenario(scenario_name)
-    scoring_dir, delivery_copy = prepare_scoring_dir(scenario_module, run_dir, evidence_dir)
+    scoring_dir, delivery_copy = prepare_scoring_dir(
+        scenario_module, run_dir, evidence_dir, [] if skipped is None else skipped)
     result_path = os.path.join(scoring_dir, "score.json")
     command = scenario_module.scorer_command(python or scenario_python(),
                                              scoring_dir, delivery_copy) + ["--result", result_path]
@@ -70,11 +76,11 @@ def score_delivery(run_dir, evidence_dir, scenario_name=None, python=None):
         return json.load(handle)
 
 
-def run_once(run_id, runs_root, evidence_root, model, model_id, limit_seconds,
+def run_once(run_id, runs_root, evidence_root, model, model_id, limit_seconds, limits,
              scenario_name=None):
     """运行一次 OpenCode，评分并收好原始证据。"""
     scenario_module = opencode.scenario(scenario_name)
-    run_dir = opencode.create_run_dir(runs_root, run_id, model, model_id, scenario_name)
+    run_dir = opencode.create_run_dir(runs_root, run_id, model, model_id, limits, scenario_name)
     evidence_dir = os.path.join(evidence_root, run_id)
     os.makedirs(evidence_dir, exist_ok=True)
 
@@ -87,8 +93,11 @@ def run_once(run_id, runs_root, evidence_root, model, model_id, limit_seconds,
         handle.write(outcome["stdout"])
     with open(os.path.join(evidence_dir, "opencode-stderr.txt"), "w", encoding="utf-8") as handle:
         handle.write(outcome["stderr"])
+    skipped = []
     shutil.copytree(run_dir, os.path.join(evidence_dir, "delivery"),
-                    ignore=shutil.ignore_patterns(*scenario_module.SCORING_IGNORES),
+                    ignore=opencode.delivery_copy_ignore(run_dir,
+                                                         scenario_module.SCORING_IGNORES,
+                                                         skipped),
                     dirs_exist_ok=True)
 
     run_metrics = metrics.collect(outcome, events, run_dir=run_dir)
@@ -108,11 +117,12 @@ def run_once(run_id, runs_root, evidence_root, model, model_id, limit_seconds,
     # 评分之前核对材料摘要：算在场景目录的材料原件上，被测方在运行途中改掉它才算数
     void_reasons.extend(opencode.digest_reasons(scenario_module.scenario_base(), scenario_name))
 
-    scores = score_delivery(run_dir, evidence_dir, scenario_name)
+    scores = score_delivery(run_dir, evidence_dir, scenario_name, skipped=skipped)
     with open(os.path.join(evidence_dir, "metrics.json"), "w", encoding="utf-8") as handle:
         json.dump({"run_id": run_id, "run_dir": run_dir, "metrics": run_metrics,
                    "tool_calls": calls, "void_reasons": void_reasons,
-                   "score": scores}, handle, ensure_ascii=False, indent=2)
+                   "skipped_files": skipped, "score": scores},
+                  handle, ensure_ascii=False, indent=2)
 
     return {
         "run_id": run_id,
@@ -120,6 +130,7 @@ def run_once(run_id, runs_root, evidence_root, model, model_id, limit_seconds,
         "evidence_dir": evidence_dir,
         "metrics": run_metrics,
         "tool_calls": calls,
+        "skipped_files": skipped,
         "void": bool(void_reasons),
         "void_reasons": void_reasons,
         "model_service_failure": run_metrics["model_service_failure"],
@@ -132,7 +143,7 @@ def _describe_hits(hits):
     return "、".join(parts)
 
 
-def main(argv=None):
+def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="OpenCode evaluation for one scenario")
     parser.add_argument("--scenario", default="scenario3",
                         help="场景：scenario1、scenario2 或 scenario3")
@@ -141,13 +152,23 @@ def main(argv=None):
     parser.add_argument("--runs", type=int, default=1, help="运行次数（每个场景每边 3 次）")
     parser.add_argument("--limit-seconds", type=float, default=TIME_LIMIT_SECONDS,
                         help="单次运行的墙钟上限")
+    parser.add_argument("--context-window", type=int, default=None,
+                        help="上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）")
+    parser.add_argument("--max-output-tokens", type=int, default=None,
+                        help="单次输出上限；模型列表没有报告这个模型时用它")
     parser.add_argument("--run-id-prefix", default="run")
     parser.add_argument("--runs-root", required=True, help="运行目录根，必须在 Yudao 仓库之外")
     parser.add_argument("--result", help="机器可读结果的路径")
     parser.add_argument("--report", help="中文报告的路径")
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
+
+
+def main(argv=None):
+    args = parse_args(argv)
 
     model_id = args.model_id or args.model.split("/", 1)[1]
+    limits = model_service.model_limits(model_id, args.context_window, args.max_output_tokens)
+    print("model capacity: " + model_service.describe(limits), flush=True)
     scenario_module = opencode.scenario(args.scenario)
     evidence_root = os.path.join(report.default_evidence_dir(), scenario_module.SCENARIO)
 
@@ -157,7 +178,7 @@ def main(argv=None):
         run_id = "%s-%d" % (args.run_id_prefix, index)
         print("running " + run_id + "...", flush=True)
         run = run_once(run_id, args.runs_root, evidence_root, args.model, model_id,
-                       args.limit_seconds, args.scenario)
+                       args.limit_seconds, limits, args.scenario)
         runs.append(run)
         run_reports.append(report.run_section(run, run["score"]))
         print("  status=%s reason=%s completion=%.4f" % (
@@ -170,6 +191,7 @@ def main(argv=None):
         scorer_version=runs[0]["score"]["scorer_version"],
         model=args.model,
         runs=runs,
+        model_capacity=limits,
     )
     if args.result:
         report.write_result(result, args.result)
