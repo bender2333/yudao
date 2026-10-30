@@ -1424,3 +1424,9 @@ Argon 的工作流建议（四条）对照仓库后的取舍：
 - #977 重建五薄片清单、进入包与设计迁移落点；#1255 直接挂在阶段下。全部 85 张打开工单已读回核对正文、依据、父子关系和原生前置；整仓 131 张打开工单的依赖图无循环。
 - 临时 needs-triage 已清除。设计与工单规格一致后，将「唤醒架构师」恢复为开，继续既有架构师循环职责。
 - 本轮只发布设计、记录与工单规格，未改实现或测试，也未运行实现测试。#830、#1196、#1197 仍等待用户确定任务二至五的目标项目；试用指南覆盖与费用未知决定保持不变。
+
+## 2026-10-30 评测两侧的模型改用 ag/gemini-3.8-flash-medium
+
+- 事实：qhub/Qwen3.8-Flash 在 OpenCode 一侧调不动工具——opencode run --pure 一要求改文件就报 UnknownError: Expected 'function.name' to be a string.；同一份运行器生成的配置换 g/gemini-3.8-flash-medium 能正常写文件。
+- 决定：两侧都用 g/gemini-3.8-flash-medium（9router，Chat Completions，带视觉）。理由是对等条件要求两边同一个模型，而 qhub/Qwen3.8-Flash 在这条链路上做不出交付；这一版之前没有任何一边的基线结果跑完，因此不产生可比性问题。
+- 记录：docs/design/evaluation-scenarios.md 第 3 节「模型」一行已补这次改动与实测；YUDAO_EVAL_MODEL 用户环境变量随之改。
