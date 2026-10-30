@@ -236,7 +236,11 @@ class ProviderFacade:
 
     def replace_catalog_document(self, raw: Mapping[str, Any]) -> int:
         # 导入整份文档：以当前修订号加一发布，文档里的旧修订号不会让修订号回退。
-        # 部门默认与角色默认只能引用已准入、并且属于所填连接的定义（设计说明第 4.6 节），导入时在此核对；
+        # 部门默认与角色默认只能引用已准入、并且属于所填连接的定义（设计说明第 4.6 节），
+        # 整份文档的全部绑定在此核对，与现有绑定相同的条目不豁免（工单 #1310）；
+        # 准入有效性按保存前的配置核对（effective_store=self._store，与 save_bindings 同一基准）：
+        # 文档自带连接字段的重新配置（如改地址）不作废引用，由保存后的重测重新准入
+        # （设计说明第 5.5 节引用保留、第 14 节验收第 10 条）。
         # 导入移除被引用的定义、或移除被引用定义所属的连接时由应用层按移除单条定义的同一规则拒绝
         # （第 4.5、4.6 节），引用方包含各部门默认与项目部门设置；
         # 启动读取目录文件容错陈旧引用与未准入的默认，两者走出不同的入口
@@ -245,8 +249,7 @@ class ProviderFacade:
             document["revision"] = self._store.revision + 1
             _require_capacity(document.get("models", []), None, set(self._store.models))
             store, bindings = _parse_document(document, self._startup_mode)
-            _require_bound_admissions({name: value for name, value in bindings.items()
-                                       if value != self._bindings.get(name)}, store, self._admissions)
+            _require_bound_admissions(bindings, store, self._admissions, effective_store=self._store)
             self._store = store
             self._bindings = bindings
             self._publish()
@@ -1899,15 +1902,20 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
 
 def _require_bound_admissions(bindings: Mapping[str, Mapping[str, str]],
                               store: ProviderStore,
-                              admissions: Mapping[str, AdmissionRecord]) -> None:
-    # 保存部门默认要求所选定义已准入且未作废；fake 定义无真实上游可测，豁免该要求（工单 #86）
+                              admissions: Mapping[str, AdmissionRecord],
+                              *,
+                              effective_store: ProviderStore | None = None) -> None:
+    # 保存部门默认要求所选定义已准入且未作废；fake 定义无真实上游可测，豁免该要求（工单 #86）。
+    # 定义与协议从 store（被保存的目录）取，准入有效性按 effective_store 核对（不填即 store）：
+    # 文档自带连接字段重新配置时（如改地址），按保存前的配置核对，引用不作废、由重测重新准入（工单 #1310）；
+    # 定义不在有效配置里（文档新增的定义）必然没有准入记录，按未准入拒绝
     issues: list[ValidationIssue] = []
+    anchor = store if effective_store is None else effective_store
     for department in sorted(bindings):
         model_id = bindings[department].get("model_id", "")
         model = store.models.get(model_id)
         if model is None:
             continue
-        provider = store.providers.get(model.provider_id)
         if model.protocol == "fake":
             continue
         record = admissions.get(model_id)
@@ -1915,7 +1923,10 @@ def _require_bound_admissions(bindings: Mapping[str, Mapping[str, str]],
         if record is None:
             issues.append(ValidationIssue(location, "该模型访问定义尚未通过模型测试准入"))
             continue
-        if provider is None or not admission_is_current(record, model, provider):
+        provider = anchor.providers.get(model.provider_id)
+        current = anchor.models.get(model_id)
+        if (provider is None or current is None
+                or not admission_is_current(record, current, provider)):
             issues.append(ValidationIssue(location, "该模型访问定义的准入已作废，请重新执行模型测试"))
     if issues:
         raise CatalogValidationError(issues)
