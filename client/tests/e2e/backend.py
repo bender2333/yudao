@@ -53,7 +53,7 @@ from harness.proposals import (  # noqa: E402
 from harness.providers.call import ModelResponse  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
 from harness.tests.protocol_helpers import (  # noqa: E402
-    chat_responder, messages_responder, preset_base_urls, responses_responder, serve,
+    chat_responder, messages_responder, model_test_responder, preset_base_urls, serve,
 )
 
 UNAVAILABLE = "Missing configuration: provider credential"
@@ -675,8 +675,11 @@ def main() -> int:
     # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（模型管理设计说明第 4.2 节），
     # 因此每种协议各起一个上游，端到端的请求按协议打到不同的本机服务。
     # 「yudao api」模式不预置目录数据，但上游仍然要起：fixture 与 api 两种模式共用同一个
-    # 收尾清理，api 模式的上游只在没有用例连接时空转
-    upstream, _capture, upstream_base = serve(responses_responder)
+    # 收尾清理，api 模式的上游只在没有用例连接时空转。
+    # Responses 上游按模型测试的协议回答（工单 #1300 以后模型测试要真的走一遍工具往返）：
+    # 请求带工具时给一次完整的工具调用，收到工具结果以后再回答。
+    upstream, _capture, upstream_base = serve(
+        lambda body: model_test_responder(body, protocol="responses"))
     chat_upstream, _chat_capture, chat_base = serve(chat_responder)
     messages_upstream, _messages_capture, messages_base = serve(messages_responder)
     # 第二个上游：始终返回 HTTP 401，让模型测试真实失败（工单 #294）
@@ -732,6 +735,9 @@ def main() -> int:
         system = LoopSystem(data_dir, test_adapter_factory=lambda _department: adapter)
     else:
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap))
+    # 一步连接把 Key 写进 .env（catalog.connect 的既定行为，设计说明第 4.2 节）：
+    # 因此给凭据文件一个路径，与目录文件放在数据目录里（工单 #1297）
+    system.facade.configure_paths(system.facade.config_path, Path(data_dir) / ".env")
     application = VersionedApplication(system)
     if args.api_version is not None:
         application.reported_api_version = args.api_version
