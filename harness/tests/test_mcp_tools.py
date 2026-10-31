@@ -89,3 +89,48 @@ def test_an_unknown_alias_is_reported():
         assert "不在这个事项" in str(unknown)
     else:
         raise AssertionError("不存在的别名没有被拒绝")
+
+
+# 事项定义副本（工单 #1175 第 3 轮）：冻结的 MCP 设置叠加以后，MCP 工具只出现在写明部门的工具清单里，
+# 没有设置或没有可用快照时副本就是当前定义本身。
+
+from harness.definitions import DEFINITIONS  # noqa: E402 - 用例只读当前定义
+
+
+def _document(departments=("engineering",), snapshot_digest="sha256:cfg", config_digest="sha256:cfg"):
+    snapshot = None if snapshot_digest is None else {
+        "config_digest": snapshot_digest,
+        "tools": [{"name": "Read.File", "description": "读取一个文件",
+                    "input_schema": {"type": "object", "properties": {"path": {"type": "string"}}}}],
+    }
+    return {"version": 1, "document_digest": "sha256:doc",
+            "servers": {"fs": {"name": "fs", "transport": "stdio", "config_digest": config_digest,
+                                   "departments": list(departments), "tool_snapshot": snapshot}}}
+
+
+def test_no_mcp_settings_keep_the_current_definitions():
+    assert mcp_session.item_definitions(DEFINITIONS, None) is DEFINITIONS
+    assert mcp_session.item_definitions(DEFINITIONS, {"version": 1, "document_digest": "", "servers": {}}) is DEFINITIONS
+
+
+def test_mcp_tools_are_added_for_their_departments_only():
+    item = mcp_session.item_definitions(DEFINITIONS, _document())
+    tool = item.tools["mcp__fs__read_file"]
+    assert tool.action == "mcp" and tool.verification == "none" and tool.cancellable is True
+    assert tool.description == "读取一个文件"
+    assert tool.parameters["properties"]["path"] == {"type": "string"}
+    assert "mcp__fs__read_file" in item.tools_for("engineering")
+    assert "mcp__fs__read_file" not in item.tools_for("product")
+    assert "mcp__fs__read_file" not in item.tools_for("quality")
+    # 原来的工具与角色清单不受影响
+    assert set(DEFINITIONS.tools) < set(item.tools)
+    assert set(DEFINITIONS.tools_for("product")) == set(item.tools_for("product"))
+
+
+def test_a_server_without_a_snapshot_adds_no_tools():
+    assert mcp_session.item_definitions(DEFINITIONS, _document(snapshot_digest=None)) is DEFINITIONS
+
+
+def test_a_snapshot_with_a_different_digest_is_not_used():
+    assert mcp_session.item_definitions(DEFINITIONS,
+                                        _document(snapshot_digest="sha256:old")) is DEFINITIONS
