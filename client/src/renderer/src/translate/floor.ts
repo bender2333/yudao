@@ -220,6 +220,8 @@ export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
   proposal_submitted: "提交提案",
   qa_submitted: "质检提交结论",
   qa_tests_saved: "保存质检测试材料",
+  // 质检先交独立判断、再看解释（验证的独立性设计说明第 4 节，工单 #358）
+  independent_judgement_committed: "提交独立判断",
   run_continued: "运行继续",
   run_created: "建立事项",
   run_done: "运行结束",
