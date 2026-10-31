@@ -118,16 +118,21 @@ async def _probe_server(application: "Application", command: Command, request: T
     except McpServersInvalid as invalid:
         raise Rejection("not_allowed", str(invalid)) from invalid
     server = document["servers"][request.name]
-    # 结果以后以事件出现的命令：先登记命令身份（与目录的连接测试同一做法，这里登记在项目流）
+    # 结果以后以事件出现的命令：先登记命令身份（与目录的连接测试同一做法，这里登记在项目流），
+    # 探测作为任务在服务的事件循环里进行（设计说明第 4.2 节「接受以后作为任务进行」），命令立即接受
     application.system.writes.transact(project_stream(request.project_id), lambda _t: None, command=command)
+    application.schedule(_probe_task(application, request.project_id, request.name, server))
+
+
+async def _probe_task(application: "Application", project_id: str, name: str, server: dict[str, Any]) -> None:
+    system = application.system
     outcome = await probe(server, credentials=system.facade.credential_chain(),
-                          stderr_log_path=stderr_log_path_for(system.data_dir, request.name))
-    _append_probe_result(application, request.project_id, _probe_event(request.name, server, outcome))
+                          stderr_log_path=stderr_log_path_for(system.data_dir, name))
+    _append_probe_result(application, project_id, _probe_event(name, server, outcome))
     if outcome.error == "":
         # 成功探测把工具清单快照写回设置里这台服务器；设置在探测期间被修改时写回中止，
         # 探测结果只保留在事件里，不得覆盖新配置的可用状态（设计说明第 4.2 节）
-        system.projects.record_tool_snapshot(request.project_id, request.name,
-                                             _probe_snapshot(server, outcome))
+        system.projects.record_tool_snapshot(project_id, name, _probe_snapshot(server, outcome))
 
 
 TOOL_SERVER_PROBE = CommandDefinition(

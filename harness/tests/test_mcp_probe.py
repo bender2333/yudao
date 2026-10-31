@@ -66,11 +66,22 @@ def _http_server(url: str) -> dict:
 
 
 def _probe(application: Application, project_id: str, name: str, server: dict):
-    # 提交探测命令：结果以后以事件出现。命令处理在这次调用自己的事件循环里跑完再返回
+    # 提交探测命令：命令立即接受，探测作为任务在应用层的事件循环里进行（设计说明第 4.2 节）。
+    # 测试在同一个事件循环里等那个任务完成，再核对结果事件
     from harness.app.commands import execute
-    request = ToolServerProbe(command_id=str(uuid.uuid4()), project_id=project_id, name=name, server=server)
-    return asyncio.run(execute(application, application.registry.commands["tool_server.probe"],
-                               request, actor="user:local"))
+
+    async def submit_and_wait():
+        request = ToolServerProbe(command_id=str(uuid.uuid4()), project_id=project_id, name=name, server=server)
+        result = await execute(application, application.registry.commands["tool_server.probe"],
+                               request, actor="user:local")
+        task = max(application._tasks, key=lambda item: 0) if application._tasks else None
+        if task is not None and not task.done():
+            await asyncio.wait_for(task, timeout=300)
+        return result
+
+    result = asyncio.run(submit_and_wait())
+    assert result.duplicate is False
+    return result
 
 
 def _probe_events(system: LoopSystem, project_id: str) -> list:
