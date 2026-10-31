@@ -16,7 +16,7 @@
 
 维护规则：缝的名字、两侧、保证、规矩、交换什么与已定、未定，以总图第四节为准；这张表只是技术对照，记两侧、合同的意思与设计说明的位置。模块与缝的增减先交总架构师改总图，再改这张表；设计说明挂在总图的一个方框或一道缝上，不新增总图没有的模块或缝。
 
-与总图的对应：总图的十道缝是写入口、路由、装配、执行、模型、动作、投影、接口、画面、定义，系统之外三道是评价、观察者、看门狗。「裁决」与「最小投影」在总图里属于内核内部，不是缝；「观察者、判定点、外包派发」拆开看：观察者是总图的外部缝，判定点属于定义与装配的规矩，外包是执行的一种实现；「健康协议」就是看门狗那道缝。
+与总图的对应：总图系统里的九道缝是写入口、路由、装配、执行、模型、动作、投影、接口、定义，系统之外四道是评价、观察者、画面、看门狗。「裁决」与「最小投影」在总图里属于内核内部，不是缝；「观察者、判定点、外包派发」拆开看：观察者是总图的外部缝，判定点属于定义与装配的规矩，外包是执行的一种实现；「健康协议」就是看门狗那道缝。
 
 **缝的清单**（两侧、合同、细化在）：
 
@@ -29,18 +29,18 @@
 | 模型 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | [模型管理](../model-management.md)（含「统一调用、取消与观测」） |
 | 动作 | 执行实现 ↔ 工具 ↔ 执行环境 | 每类动作的契约与回执；远程经 HTTP | [执行环境服务](../execution-environment.md)、[本地通用工具](../local-tools.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器](../browser-and-computer-use.md) |
 | 投影 | 一份事实 → 读的人 | 骨架自己折叠的最小投影（裁决读）、应用层的投影（应用层读取模型读） | [骨架与应用设计说明](../skeleton-and-application.md)、[应用层与接口层设计说明](../app-and-interface.md)、[语义系统设计说明](../semantic-system.md)（知识层） |
-| 接口 | 界面、命令行、评测 ↔ 接口层 | 命令、查询、事件流、能力清单 | [应用层与接口层](../app-and-interface.md) |
-| 画面 | 翻译层 ↔ 画面层 | 状态、动作、实时内容、回调 | [画面与播放](../visualization.md) |
+| 接口 | 页面、命令行、评测、观察者、画面 ↔ 接口层 | 命令、查询、事件流、能力清单 | [应用层与接口层](../app-and-interface.md) |
 | 定义 | 定义 ↔ 加载与校验 | 定义文件的结构；角色的写入范围、是否核验角色及核验谁、成果种类与提案合同；路由自己的定义 | [规则登记与参数](../rules-and-parameters.md) |
 | 评价 | 评价材料 → 应用 | 只经接口层 | [评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md) |
 | 观察者 | 观察者 ↔ 接口（读）与写入口（写） | 按读取范围读，证据、提案与振荡信号经写入口 | 第 7.2、7.5 至 7.7 节；振荡信号见[循环与收敛](../loops-and-convergence.md)「收敛的检测」 |
+| 画面 | 接口 ↔ 画面 | 只经接口读带位置的查询快照与事件流，操作只发现有的命令；不要专用查询，互不导入。画面里面的缝（画面合同：状态、动作、实时内容、回调）见画面总图 | [画面与播放](../visualization.md) |
 | 看门狗 | 看门狗 ↔ 实例 | 心跳、冒烟、金丝雀 | [骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」 |
 
 判定点和外包不是单独的缝：判定点在定义与装配里，合同是问题与去向（第 7.5 节）；外包派发是执行契约的一种实现，合同是 ACP（第 7.2 节）。
 
 **内核内部（不是缝）**：裁决（写入口 ↔ 裁决，路由 → 裁决的收紧检查：工具许可、合同的通用条件、收紧接口），细化在[可信内核](../trusted-kernel.md)与[骨架与应用](../skeleton-and-application.md)「裁决的分工：内核的通用检查与路由的收紧检查」。最小投影（骨架事件 → 裁决、边界、薄驱动：固定的几样事实），细化在[骨架与应用](../skeleton-and-application.md)「最小投影」。
 
-**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、界面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)、[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39。
+**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、页面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)。画面（系统之外）：[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39。
 
 **总图的词与代码名的对照**：[name-map.md](name-map.md)，按缝列出总图的词、代码里现在的名字与一致、不一致、代码里还没有；代码名随立缝工单改成总图的词，立缝工单关闭时由子架构师改那一行。
 
@@ -52,7 +52,8 @@
 
 | 副图与各份设计说明里的层 | 在总图里的位置 |
 | --- | --- |
-| 界面与命令行 | 第一节「界面」方框；接口缝外侧的读者与发命令的一方；画面缝的两侧都在这里 |
+| 界面与命令行 | 第一节「页面」方框；接口缝外侧的读者与发命令的一方 |
+| 画面 | 第一节系统之外的「画面」方框；画面缝的外侧，和命令行、评测、观察者一样只经接口读事实与发命令 |
 | 接口层 | 接口缝本身：命令、查询、事件流 |
 | 应用层 | 接口缝的内侧：命令处理与读取模型；读取模型是投影缝里「应用的投影」 |
 | 控制核心 | 薄驱动、三个槽位的实现（路由、装配、执行）与内核（写入口、裁决、边界）合在一起的叫法。只有一份的是写入口、裁决、边界与薄驱动（总图第六节）；三个槽位的实现在第二节「可以整体重写」那一环 |
@@ -66,6 +67,7 @@
 ```mermaid
 flowchart TB
   Client["界面与命令行：浏览器中的网页、命令行"]
+  View["画面：系统外的单独应用，只经接口"]
   Api["接口层：命令、查询、事件流、能力清单、认证、界面的页面文件"]
   App["应用层：命令处理、查询与读取模型"]
   subgraph Core["控制核心：身份与裁决，逻辑上一份"]
@@ -96,6 +98,7 @@ flowchart TB
     Release["发布检查：内核清单、探针、回归结果"]
   end
   Client --> Api --> App
+  View -->|"查询、事件流、现有的命令"| Api
   App -->|"命令"| Orch
   App -->|"查询"| Know
   App -->|"查询"| Log
@@ -136,18 +139,23 @@ flowchart TB
 
 ### 1.4A 包图
 
-这张图画 `harness/`、`client/`、`evals/` 三个顶层包下的包与模块组，以及包之间允许的直接导入方向：箭头从导入的一方指向被导入的一方，图里没有箭头的两个包不能直接导入（下面三处省略除外）。虚线是进程之间经接口的调用，不是导入；评测工具里的实线多是运行评分器、读场景材料，也不是 Python 导入。模块图（第 1.1 节起）画概念上的部件与合同，包图画代码放在哪、谁能导入谁。节点写目录或文件的真实名字（不带后缀的是 `harness/` 顶层的 Python 模块），括号里是总图的词，总图里没有对应词的写一句话说明；几个文件并成一组时只列有代表性的名字，完整的对应见[总图的词与代码名的对照](name-map.md)。
+这张图画 `harness/`、`client/`、`view/`、`evals/` 四个顶层包下的包与模块组，以及包之间允许的直接导入方向：箭头从导入的一方指向被导入的一方，图里没有箭头的两个包不能直接导入（下面三处省略除外）。虚线是进程之间经接口的调用，不是导入；评测工具里的实线多是运行评分器、读场景材料，也不是 Python 导入。模块图（第 1.1 节起）画概念上的部件与合同，包图画代码放在哪、谁能导入谁。节点写目录或文件的真实名字（不带后缀的是 `harness/` 顶层的 Python 模块），括号里是总图的词，总图里没有对应词的写一句话说明；几个文件并成一组时只列有代表性的名字，完整的对应见[总图的词与代码名的对照](name-map.md)。
 
-三处省略：一是指向内核模块与 `definitions/` 的箭头：除了图上画出的契约与 Provider 两处限制（契约只导入内核，Provider 只导入 `definitions/`），`harness/` 里其余的包都可以导入它们，只有接口层不能（它只导入应用层），应用层只能导入其中的公开接口模块；内核自己只导入内核文件、标准库与 pydantic。二是组装处 `runtime.py`、入口模块（`__main__`、`demo`、`smoke`）和客户端的 `app.tsx`、`main.tsx`：它们负责把各包接在一起，可以导入各自顶层包里的任何包，图里只画 `runtime.py` 接薄驱动与三个实现的箭头。三是各顶层包自己的 `tests/`：可以导入包里的任何东西，没有包导入测试。
+三处省略：一是指向内核模块与 `definitions/` 的箭头：除了图上画出的契约与 Provider 两处限制（契约只导入内核，Provider 只导入 `definitions/`），`harness/` 里其余的包都可以导入它们，只有接口层不能（它只导入应用层），应用层只能导入其中的公开接口模块；内核自己只导入内核文件、标准库与 pydantic。二是组装处 `runtime.py`、入口模块（`__main__`、`demo`、`smoke`）、客户端的 `app.tsx`、`main.tsx` 与画面的壳：它们负责把各包接在一起，可以导入各自顶层包里的任何包，图里只画 `runtime.py` 接薄驱动与三个实现的箭头。三是各顶层包自己的 `tests/`：可以导入包里的任何东西，没有包导入测试。
 
 ```mermaid
 flowchart TB
-  subgraph C["client/src/renderer/src/"]
+  subgraph C["client/src/renderer/src/（页面）"]
     Views["views/ · shell/<br/>（页面）"]
     Sync["contract/<br/>（同步层与命令接口）"]
+    Gen["api/<br/>（接口生成的类型）"]
+  end
+  subgraph V["view/src/（画面，系统之外）"]
+    VShell["shell/<br/>（壳）"]
+    VSync["sync/<br/>（画面的同步层）"]
     Trans["translate/<br/>（翻译层）"]
     Pixel["pixel/<br/>（画面层）"]
-    Gen["api/<br/>（接口生成的类型）"]
+    VGen["api/<br/>（接口生成的类型）"]
   end
   subgraph E["evals/"]
     Runner["runner/<br/>（运行器）"]
@@ -175,18 +183,23 @@ flowchart TB
     Defs["definitions/<br/>（定义）"]
   end
   Views --> Sync
-  Views --> Trans
-  Views --> Pixel
   Views --> Gen
   Sync --> Gen
-  Trans --> Gen
+  VShell --> VSync
+  VShell --> Trans
+  VShell --> Pixel
+  VShell --> VGen
+  VSync --> VGen
+  Trans --> VGen
   Trans -->|"只取画面合同与声明表"| Pixel
   Runner --> Scorer
   Runner --> Scen
   Scorer --> Scen
   Sync -.->|"HTTP"| Api
+  VSync -.->|"HTTP"| Api
   Runner -.->|"HTTP"| Api
   Gen ~~~ Api
+  VGen ~~~ Api
   Scen ~~~ Api
   EOther ~~~ Api
   Api --> App
@@ -223,7 +236,7 @@ flowchart TB
 - 内核：`harness/tests/kernel/test_manifest.py` 核对内核清单（`harness/definitions/kernel-manifest.json`）里 kind 为 module 的文件只导入内核文件、标准库与 pydantic，并核对行数上限；发布检查（`harness/release_check.py`）对待发布的提交再做一次（[可信内核设计说明](../trusted-kernel.md)「发布检查与探针」一节）。最小投影模块的同一条限制另有 `harness/tests/kernel/test_minimal_projection.py`；`harness/tests/kernel/test_single_write_path.py` 核对只有写入口调用事件日志的写入函数，只有事件日志打开数据库（应用的读取模型有自己可重建的数据库，除外）。
 - 路由与决定请求：`harness/tests/test_routing_contract.py` 核对路由实现不导入薄驱动与最小投影；`harness/tests/test_decision_flow.py` 核对决定请求与建档的流转不导入薄驱动。
 - 动作缝：`harness/tests/test_workspace_boundary.py` 核对控制核心里的步骤驱动、装配、裁决与提交等模块不直接读写工作区文件，只经执行环境。
-- 界面：`client/tests/unit/pixel-imports.test.ts` 核对画面层不导入页面、`contract/`、接口生成的类型、翻译层与 React，翻译层只从画面层取画面合同与三张声明表（[画面与播放设计说明](../visualization.md)「分层与边界」一节）。
+- 页面与画面：基础部分一条导入方向的测试核对 `client/` 不导入 `view/`，在合并门里；画面一条核对 `view/` 不导入 `client/` 与 `harness/`，画面层只导入画面合同与自己的声明表，在画面自己的 CI 任务里，不进合并门（[画面与播放设计说明](../visualization.md)「分层与边界」与「画面诚实性的不变式」）。两边唯一共读的是接口描述 `harness/tests/openapi/openapi.json`，各自从它生成类型。
 - 评测工具：`evals/tests/test_no_harness_import.py` 与 `evals/tests/test_no_harness_paths.py` 核对评测工具不导入 `harness`，也不写死它内部文件的路径。
 - 测试：`harness/tests/test_test_imports.py` 核对测试文件不互相导入，只从辅助模块取共用代码。
 
@@ -233,7 +246,7 @@ flowchart TB
 - 路由、装配、执行三个实现之间不互相导入，只经契约和薄驱动相连。
 - Provider 只导入 `definitions/`（[模型管理设计说明](../model-management.md)「模块边界」一节）：`harness/tests/test_providers_module.py` 只核对导入 `harness.providers` 时加载了哪些模块，函数里的延迟导入看不到。
 - 执行环境与模型适配不导入应用服务和三个实现；应用服务、应用的投影与执行环境之间自上而下的顺序。
-- 界面里页面、翻译层、同步层之间的方向（画面层与翻译层那两条除外）。
+- 页面与同步层之间、画面的壳、同步层与翻译层之间的方向（画面层与翻译层那两条除外）。
 - 评测工具内部：运行器、评分器、场景材料之间的方向。
 
 `harness/tests/test_layer_boundaries.py` 里的「层」指单元、模块、集成三层测试各自能做什么，不是包的分层，不查导入方向。
@@ -257,9 +270,13 @@ flowchart TB
 | `harness/definitions/` | 定义 | 加载与校验在内核清单里，数据文件（JSON）不在 |
 | `client/src/renderer/src/views/`、`shell/` | 界面：页面 | 两个目录互相导入，合成一格 |
 | `client/src/renderer/src/contract/` | 接口缝读者一侧：同步层与命令接口 | 目录叫 contract，不是三道槽位的契约 |
-| `client/src/renderer/src/translate/` | 画面缝：翻译层 | 唯一同时认识 Yudao 的说法与画面的说法的地方 |
-| `client/src/renderer/src/pixel/` | 画面缝：画面层 | 独立模块，只认画面合同 |
 | `client/src/renderer/src/api/` | 接口缝：接口生成的类型 | 生成的代码，不手写 |
+| `view/` | 画面缝的外侧：画面，系统之外的单独应用 | 自己的依赖、构建、测试与 CI 任务；不导入 `client/` 与 `harness/`，基础部分也不导入它；发布时随 wheel 带上，构建不过时不带 |
+| `view/src/shell/` | 画面：壳 | 把回调变成现有的命令，把点开回链变成 Yudao 页面的地址 |
+| `view/src/sync/` | 画面：同步层 | 与页面的同步规则相同，画面自己的一份 |
+| `view/src/translate/` | 画面：翻译层 | 画面里唯一认识 Yudao 说法的地方；认不出的事件与部门进缺口清单 |
+| `view/src/pixel/` | 画面：画面层 | 只认画面合同 |
+| `view/src/api/` | 画面：接口生成的类型 | 从接口描述生成，不手写 |
 | `evals/runner/` | 评价：运行器 | 只经接口层驱动 Yudao |
 | `evals/scorer/` | 评价：评分器 | 在内核清单里 |
 | `evals/scenarios/` | 评价：场景材料 | 隐藏检查与参考解法在内核清单里 |
@@ -283,7 +300,7 @@ flowchart TB
 
 ### 1.6 模块交互
 
-调整的命令把参数与候选写进定义与参数事件；运行时由流程编排按定义与参数的当前版本驱动，创建 run 时冻结两者的版本；裁决、边界的核对与写入口在内核里；事件日志经知识层生成循环实例、收敛状态与检验覆盖；界面的同步层取快照、接收事件，翻译层把它们翻成画面合同，画面按事实层与表演层显示，命令只由页面发出（[画面与播放设计说明](../visualization.md)「分层与边界」）；评测工具与发布检查在运行的系统之外，对照的结论与升级的决定请求回到用户。
+调整的命令把参数与候选写进定义与参数事件；运行时由流程编排按定义与参数的当前版本驱动，创建 run 时冻结两者的版本；裁决、边界的核对与写入口在内核里；事件日志经知识层生成循环实例、收敛状态与检验覆盖；页面的同步层取快照、接收事件，页面显示列表与详情、发命令；画面在系统之外经接口读同样的快照与事件，翻译层把它们翻成画面合同，画面按事实层与表演层显示，命令由画面的壳经接口发出现有的命令（[画面与播放设计说明](../visualization.md)「分层与边界」）；评测工具与发布检查在运行的系统之外，对照的结论与升级的决定请求回到用户。
 
 ```mermaid
 flowchart LR
@@ -302,12 +319,16 @@ flowchart LR
   end
   subgraph See["查看"]
     Know2["知识层"]
-    subgraph Cli["界面"]
+    subgraph Cli["页面"]
       Sync2["同步层：快照与事件"]
-      Adapt2["翻译层：翻成画面合同"]
-      Scene2["画面层：播放时间线与渲染（事实层与表演层）"]
-      Pages2["页面：文字、决定卡片与命令"]
+      Pages2["页面：列表与详情、决定卡片与命令"]
     end
+  end
+  subgraph ViewApp["画面（系统之外）"]
+    VSync2["同步层：快照与事件"]
+    Adapt2["翻译层：翻成画面合同"]
+    Scene2["画面层：播放时间线与渲染（事实层与表演层）"]
+    Shell2["壳：现有的命令、回链到页面"]
   end
   subgraph Judge["评价"]
     Ev["评测工具"]
@@ -322,9 +343,11 @@ flowchart LR
   Orch2 --> Ker
   Ker --> Evt
   Evt --> Know2 --> Sync2
-  Sync2 --> Adapt2 --> Scene2
   Sync2 --> Pages2
-  Scene2 -.->|"用户操作（回调）"| Pages2
+  Know2 --> VSync2 --> Adapt2 --> Scene2
+  Scene2 -.->|"用户操作（回调）"| Shell2
+  Shell2 -->|"现有的命令，例如回答决定"| Orch2
+  Shell2 -.->|"点开回链"| Pages2
   Pages2 --> PS
   Ev -->|"对照的结论"| Pages2
   Rel -->|"实例升级的决定请求"| Pages2
@@ -334,7 +357,8 @@ flowchart LR
 
 | 层 | 职责 | 边界 |
 | --- | --- | --- |
-| 界面与命令行 | 展示与操作。界面内部分同步层（取快照、接收事件、按刷新清单重新查询）、翻译层（把查询结果翻成状态、事件翻成动作）、画面层（播放时间线与三个场景的渲染）与页面（文字、决定卡片、发命令） | 只通过接口层读写；画面层只认画面合同，不导入 Yudao 的代码，不发命令（[画面与播放设计说明](../visualization.md)「分层与边界」） |
+| 界面与命令行 | 展示与操作。页面分同步层（取快照、接收事件、按刷新清单重新查询）与页面（列表与详情、决定卡片、发命令）；看得见由页面负责 | 只通过接口层读写 |
+| 画面 | 系统之外的单独应用：同步层、翻译层、画面层与壳（[画面与播放设计说明](../visualization.md)「分层与边界」） | 只经接口读事实、发现有的命令；与基础部分互不导入；系统的验收不等画面，画面的测试不进合并门 |
 | 接口层 | 路由、合同、事件流、能力清单、认证，以及提供界面的页面文件 | 不含业务规则，只调用应用层 |
 | 应用层 | 命令处理（按身份去重、核对基准版本）、查询与读取模型（循环画面、流转、回放、报告） | 修改只经过控制核心；读取只读投影；查询不写入事件 |
 | 控制核心 | 身份与裁决：流程编排、步骤驱动、上下文装配（P）、裁决规则（U）、写入口、事件日志 | 每个决定只依据已记录的事实与事先规定的去向，模型的判断先写成事件再被使用；是唯一写入事实的地方。写入口、裁决、边界与薄驱动在控制主机上只有一份；执行实现运行的会话（部门成员）可以多份、放在别处，经写入口写回（第 3 节第 3 条，总图第六节；[ADR-0018](../../adr/0018-single-control-host-remote-execution.md)） |
@@ -358,7 +382,7 @@ flowchart LR
 7. **带版本的定义**：组织、角色、动作、本体、判定点、技能、循环层、限额与规则、停止原因作为带版本的数据；参数的当前值写成事件；每个事项记录它使用的定义版本与参数版本，每次请求与裁决记录所用的版本。
 8. **用户决定**（第 7.4 节）：所有等待用户的事项使用同一种机制，决定请求与回答都写成事件。
 9. **观察者**：需要调用模型的派生工作（教训发现、元观察、演化、校准抽样）在系统外按读取范围经接口读事实，证据、提案与振荡信号经写入口写入、经过 U；振荡信号是边界的输入，内核按定义停下受影响的分支并交给用户（[循环与收敛设计说明](../loops-and-convergence.md)「收敛的检测」）；隐藏的评价材料放在任何 agent 与观察者都读不到的存储中。
-10. **应用层与界面**：接口层使用 FastAPI；命令、查询与一条按范围筛选的事件流；能力清单；访问令牌在自举项目的执行位置设到控制主机以外之前加入，TLS 在离开局域网之前加入；界面是 Yudao 服务提供的网页，构建好的页面文件随 wheel 发布，由接口层提供，在浏览器中打开服务的地址使用。
+10. **应用层与界面**：接口层使用 FastAPI；命令、查询与一条按范围筛选的事件流；能力清单；访问令牌在自举项目的执行位置设到控制主机以外之前加入，TLS 在离开局域网之前加入；界面是 Yudao 服务提供的网页，构建好的页面文件随 wheel 发布，由接口层提供，在浏览器中打开服务的地址使用；构建好的画面随同一个 wheel 带上，有单独的地址，构建不过时不带。
 
 ## 4. 语义系统在各层中的位置
 
@@ -375,7 +399,7 @@ flowchart LR
 ## 5. 依赖方向
 
 - 定义 ← 事件日志 ← 知识层与运行状态投影 ← P 与 U ← 步骤驱动 ← 流程编排 ← 应用层 ← 接口层 ← 界面与命令行。
-- 界面内部：画面层 ← 翻译层 ← 同步层，页面只做连接；画面层不导入页面、接口生成的类型、`contract/` 与命令接口，由导入方向的测试核对（[画面与播放设计说明](../visualization.md)「分层与边界」）。
+- 画面在系统之外，与接口层的关系和命令行一样：只经接口读事实、发现有的命令。画面与基础部分互不导入，两边各一条导入方向的测试。画面里面：画面层 ← 翻译层 ← 同步层，壳只做连接（[画面与播放设计说明](../visualization.md)「分层与边界」）。
 - 步骤驱动向上只通过流程编排提供的安全节点接口（依赖倒置），在每个安全节点得到继续或停止；新输入的分派与通知的送达在这里完成。接口有四个操作：继续判断在每个安全节点调用（每一步开始、尝试失败以后、工具前后、重试等待中），分派新输入与指导并判断是否停止，停止只来自取消、暂停与上限；开始新工作之前的核对在准备每一步、开始请求、安排重试与工具开始之前调用，把 PRD 的新版本与指导作为通知加入部门的历史（[三部门的循环结构](../department-loop.md)「工作中途要求变化」与「指导」）；重试等待可以被新输入、指导与取消唤醒；结束运行写入终态时核对作出停止判断时的流版本，此后有用户命令或输入写入时按写入以后的状态重新判断。取消由发起的一方写入；激活与运行循环交回的运行状态包含已经开始的取消，取消还没有写入时等它写入以后再交回。
 - 控制核心只通过合同调用执行层与观察层；执行层不依赖控制核心的内部。
 - 观察者只经接口层按读取范围读事实，只经写入口写入证据、提案与振荡信号，不依赖控制核心的内部。
@@ -588,14 +612,15 @@ sequenceDiagram
 | 工件与快照 | 按内容摘要寻址，存放在控制主机上 |
 | 模型调用 | openai 与 anthropic 官方异步客户端，JEV 的 systemone 协议 |
 | 接口层 | FastAPI，OpenAPI 由 pydantic 类型生成，事件流使用 SSE |
-| 界面 | 由接口层提供的网页，以 Windows 上的 Edge 与 Chrome 为准；React 19、TypeScript、Vite、PixiJS 8、XState 5、GSAP |
+| 界面 | 由接口层提供的网页，以 Windows 上的 Edge 与 Chrome 为准；React 19、TypeScript、Vite |
+| 画面 | 单独的应用：TypeScript、Vite、PixiJS 8、XState 5、GSAP（画面自己的选择，[ADR-0021](../../adr/0021-client-pixel-view-follows-v9-structure.md)） |
 | 服务之间的传输 | HTTP 加 JSON，流式结果使用 SSE 或分块传输 |
 | 执行环境 | 本机进程；其他电脑与开发板上使用执行代理；代码在执行位置上直接运行（[执行环境服务设计说明](../execution-environment.md)「代码的权限、认证与加密」） |
 | 扩展协议 | MCP 使用官方 Python SDK；外包 agent 使用 ACP（D31） |
 
 ## 10. 近期实施顺序
 
-实施顺序见[总体路线图](../../program-roadmap.md)「五个阶段」「十条内容道」与「三个空间：楼、机房、城」。
+实施顺序见[总体路线图](../../program-roadmap.md)「五个阶段」「十条内容道」与「画面自己的阶段：楼、机房、城」。
 
 ## 11. 待讨论的事项
 

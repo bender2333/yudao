@@ -55,7 +55,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 8. **等 CI**：`gh pr checks issue-<编号> --watch`。失败就改、提交、推送，直到通过。**不要开自动合并**（它会跳过第 10 步）。
    - 失败项明显与本次改动无关时，先 `gh run rerun <运行号> --failed` 重跑一次；重跑过了就在交付说明里写明这个不稳定测试，仍然失败按自己的问题修。
    - **带 `touches-core` 的工单**：`check` 绿了以后在分支上跑一次集成层：`gh workflow run CI --ref issue-<编号>` → `gh run list --workflow CI --branch issue-<编号> --limit 1` 拿运行号 → `gh run watch <运行号>`（约 15 分钟）。失败项与 main 最近 7 天比（`gh run list --workflow CI --branch main --event push --limit 5`）：main 上也失败过的是不稳定项，写进交付说明；main 上没失败过的按自己的问题修，修好再跑。这次运行的链接写进交付说明。
-9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、删掉的用例逐条写「用例名 + 依据（哪条 ADR 或工单删的）」，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。工单没写明删除的行为，用例只改写不删。
+9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、删掉的用例逐条写「用例名 + 理由（工单写明的删除行为，或测试分层设计说明「一个测试凭什么留」删除口径的哪一条）+ 接替的用例」并附删除前后的覆盖读数，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。两种理由都没有的用例只改写不删。
 10. **合并前的核对**（五项都成立才合并）：
     - `git fetch origin main && git merge origin/main`（冲突在自己的分支上解，两边改了同一段逻辑的按下面「前提变了」交回）；`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过。
     - 工作区没有未提交也未推送的改动。
