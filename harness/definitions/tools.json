@@ -544,6 +544,34 @@
           },
           "description": "Must contain at least one item"
         },
+        "requirement_mapping": {
+          "type": "array",
+          "description": "One entry per requirement: criteria lists AC<position> values of this spec's acceptance_criteria; when no acceptance criterion can be written, give gap with the reason instead",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "type": "integer",
+                "description": "1-based position of the requirement in requirements"
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^AC[1-9][0-9]*$"
+                }
+              },
+              "gap": {
+                "type": "string",
+                "description": "Reason why no acceptance criterion can be written for this requirement"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requirement"
+            ]
+          }
+        },
         "boundaries": {
           "type": "array",
           "items": {
@@ -652,7 +680,8 @@
         "basis_product_spec_hash",
         "goal",
         "requirements",
-        "acceptance_criteria"
+        "acceptance_criteria",
+        "requirement_mapping"
        ]
       }
   },
@@ -749,6 +778,34 @@
             "type": "string"
           },
           "description": "Must contain at least one item"
+        },
+        "requirement_mapping": {
+          "type": "array",
+          "description": "One entry per requirement: criteria lists AC<position> values of this spec's acceptance_criteria; when no acceptance criterion can be written, give gap with the reason instead",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "type": "integer",
+                "description": "1-based position of the requirement in requirements"
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^AC[1-9][0-9]*$"
+                }
+              },
+              "gap": {
+                "type": "string",
+                "description": "Reason why no acceptance criterion can be written for this requirement"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requirement"
+            ]
+          }
         },
         "boundaries": {
           "type": "array",

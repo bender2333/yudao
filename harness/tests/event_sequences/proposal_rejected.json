@@ -248,6 +248,10 @@
      {
       "field": "goal",
       "message": "goal must be a non-empty string"
+     },
+     {
+      "field": "requirement_mapping",
+      "message": "requirement_mapping must give one entry per requirement: requirement 1"
      }
     ],
     "input_version": 1,
@@ -497,7 +501,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#32>",
+    "content_hash": "<sha256#34>",
     "id": "<spec#1>",
     "input_version": 1,
     "issuer": "product",
@@ -518,9 +522,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#33>",
+    "content_hash": "<sha256#36>",
     "input_version": 1,
-    "product_spec_hash": "<sha256#32>",
+    "product_spec_hash": "<sha256#34>",
     "revision": 1
    }
   },
@@ -556,7 +560,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#3>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1
    }
   },
@@ -573,7 +577,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1
    }
   },
@@ -590,7 +594,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#3>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "step_id": 1
    }
@@ -612,7 +616,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "department": "engineering",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -637,7 +641,7 @@
     "attempted": true,
     "context_event_id": "<ses_eng#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "max_attempts": 3,
@@ -661,7 +665,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -683,7 +687,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -705,7 +709,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -771,7 +775,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#3>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -794,7 +798,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#3>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -820,7 +824,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#3>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -841,7 +845,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "step_id": 1
    }
@@ -863,7 +867,7 @@
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "department": "quality",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "purpose": "work",
@@ -888,7 +892,7 @@
     "attempted": true,
     "context_event_id": "<ses_qua#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "max_attempts": 3,
@@ -912,7 +916,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "purpose": "work",
@@ -934,7 +938,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "purpose": "work",
@@ -1000,7 +1004,7 @@
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#4>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -1021,7 +1025,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "content_hash": "<sha256#81>",
+    "content_hash": "<sha256#83>",
     "version": 1
    }
   },
@@ -1040,7 +1044,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#4>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -1066,7 +1070,7 @@
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#4>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -1089,7 +1093,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#4>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -1175,7 +1179,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#3>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1206,7 +1210,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#3>-1-3",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1229,7 +1233,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#3>-1-3",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1272,13 +1276,13 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#59>",
-    "content_hash": "<sha256#63>",
-    "effective_contract_hash": "<sha256#33>",
+    "code_tree_digest": "<sha256#61>",
+    "content_hash": "<sha256#66>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "<del#1>",
     "issuer": "engineering",
     "kind": "delivery_spec",
-    "product_spec_hash": "<sha256#32>",
+    "product_spec_hash": "<sha256#34>",
     "revision": 1,
     "status": "active"
    }
@@ -1315,7 +1319,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#5>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1
    }
   },
@@ -1332,7 +1336,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#5>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "step_id": 1
    }
@@ -1354,7 +1358,7 @@
     "attempt": 1,
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "department": "quality",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "purpose": "work",
@@ -1379,7 +1383,7 @@
     "attempted": true,
     "context_event_id": "<ses_qua#1>#19",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "max_attempts": 3,
@@ -1403,7 +1407,7 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "purpose": "work",
@@ -1425,7 +1429,7 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "purpose": "work",
@@ -1491,7 +1495,7 @@
     "attempt": 1,
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#5>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
@@ -1514,7 +1518,7 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#5>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
@@ -1525,7 +1529,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#81>",
+    "qa_tests_hash": "<sha256#83>",
     "tree_changed": false
    }
   },
@@ -1545,7 +1549,7 @@
     "attempt": 1,
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#5>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
@@ -1568,7 +1572,7 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#33>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "call-<act#5>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
@@ -1608,14 +1612,14 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#59>",
-    "content_hash": "<sha256#100>",
-    "delivery_spec_hash": "<sha256#63>",
-    "effective_contract_hash": "<sha256#33>",
+    "code_snapshot_hash": "<sha256#61>",
+    "content_hash": "<sha256#103>",
+    "delivery_spec_hash": "<sha256#66>",
+    "effective_contract_hash": "<sha256#36>",
     "id": "<qa#1>",
     "issuer": "quality",
     "kind": "qa_review",
-    "product_spec_hash": "<sha256#32>",
+    "product_spec_hash": "<sha256#34>",
     "revision": 1,
     "status": "active",
     "verdict": "release"
