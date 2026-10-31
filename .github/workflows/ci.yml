@@ -1,10 +1,10 @@
-# 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/dispatcher.md）。
+# 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/autopilot-runtime.md「main 的规则」）。
 # 测试按层与时机运行（docs/design/test-pyramid.md 第 4 节）：
 #   合并前（PR、main 的推送与手动触发）：① 单元层、② 模块层、评测工具、客户端、工作台脚本五个作业并行，check 汇总五项的结果
 #     并在运行摘要里写出各层的表；PR 上另有「用例变化」，列出合并前后各层用例的增减，只显示，不挡合并
 #   合并以后（main 的推送与手动触发）：③ 集成层，不挡合并
 #   发布之前（架构师手动运行，不在 CI 中）：真实模型冒烟与桌面测试
-# 本文件由用户在场时的架构师维护，执行者与被唤醒的架构师不修改；执行者使用的开发 App 没有 workflows 权限。
+# 本文件由用户在场时的架构师维护，solo 执行者与架构师循环不修改。
 name: CI
 
 on:
@@ -287,7 +287,7 @@ jobs:
             | tee -a "$GITHUB_STEP_SUMMARY"
 
   # ③ 集成层全部（docs/design/test-pyramid.md 第 4.2 节）。不是合并必须通过的检查：
-  # main 的每次推送（每次合并以后）与手动触发时运行，PR 上不运行。失败由派发者按派发者规则第 5 节处理
+  # main 的每次推送（每次合并以后）与手动触发时运行，PR 上不运行。失败由 solo 执行者按 solo-worker 技能「main 上的 CI」处理
   integration:
     name: ③ 集成层
     if: ${{ github.event_name != 'pull_request' }}
