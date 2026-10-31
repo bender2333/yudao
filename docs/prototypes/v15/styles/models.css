@@ -1,0 +1,102 @@
+/* 模型管理页（取自 v14 的样式，换成 v15 的变量与类名） */
+.m15 { display: grid; gap: 18px; max-width: 1180px; align-content: start; }
+.m15 .m15-head { margin-bottom: 0; }
+.m15-flow { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.m15-flow span { display: inline-flex; align-items: center; gap: 6px; }
+.m15-flow i { font-style: normal; }
+.m15-flow b { width: 23px; height: 23px; border: 1px solid var(--line-strong); border-radius: 50%; display: inline-grid; place-items: center; font-size: 11px; }
+.m15-flow .is-done { color: var(--green); }
+.m15-flow .is-done b { background: var(--tint); border-color: var(--green); }
+.m15-top { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr); gap: 18px; align-items: start; }
+.m15-panel { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 20px; min-width: 0; }
+.m15-panel.m15-flush { padding: 0; overflow: hidden; }
+.m15-panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.m15-title { display: flex; align-items: center; gap: 10px; }
+.m15-num { background: var(--soft); border-radius: 7px; width: 28px; height: 28px; display: inline-grid; place-items: center; font: 12px var(--mono); color: var(--muted); }
+.m15-num .y15-icon { width: 15px; height: 15px; }
+.m15-tag { display: inline-flex; align-items: center; padding: 1px 7px; border-radius: 5px; background: var(--soft); color: var(--muted); font-size: 11px; font-weight: 400; white-space: nowrap; }
+.m15-tag.is-ok { color: var(--green); background: var(--tint); }
+.m15-tag.is-warn { color: var(--amber); background: var(--amber-bg); }
+.m15-tag.is-error { color: var(--red); background: var(--red-bg); }
+.m15-gap { margin-top: 12px; }
+.m15-keywrap { display: flex; gap: 8px; }
+.m15-keywrap .y15-input { flex: 1; min-width: 0; }
+.m15-wrap { overflow-wrap: anywhere; }
+.m15-conn-card { display: grid; gap: 10px; margin-bottom: 14px; }
+.m15-conn-head { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.m15-hint { padding: 11px 13px; border-radius: 8px; background: var(--soft); font-size: 12px; line-height: 1.7; }
+.m15-hint strong { display: block; }
+.m15-hint.is-ok { background: var(--tint); color: var(--green); }
+.m15-hint.is-error { background: var(--red-bg); color: var(--red); }
+.m15-hint.is-warn { background: var(--amber-bg); color: var(--amber); }
+.m15-remind { margin: 0 0 8px; padding: 8px 10px; border-radius: 7px; background: var(--amber-bg); color: var(--amber); font-size: 12px; line-height: 1.6; }
+.m15-use { padding: 10px 0; }
+.m15-use + .m15-use { border-top: 1px solid var(--line); }
+.m15-use-main { display: grid; grid-template-columns: 44px minmax(0, 1fr); align-items: center; gap: 12px; margin-bottom: 6px; font-size: 13px; }
+.m15-use-main .y15-select { width: 100%; }
+.m15-more { font-size: 12px; color: var(--muted); }
+.m15-more summary { cursor: pointer; padding: 2px 0; }
+.m15-role { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 10px; margin: 6px 0; font-size: 12px; }
+.m15-sub { font-size: 12px; margin: 12px 0 4px; color: var(--text); }
+.m15-note { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 8px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+.m15-empty { padding: 20px 12px; text-align: center; color: var(--muted); display: grid; gap: 6px; justify-items: center; }
+.m15-symbol { background: var(--soft); border: 1px dashed var(--line-strong); width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; color: var(--green); }
+.m15-models-head { padding: 18px 20px 14px; border-bottom: 1px solid var(--line); }
+.m15-search { position: relative; display: block; }
+.m15-search input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface-2); }
+.m15-search .y15-icon { position: absolute; left: 11px; top: 11px; color: var(--muted); }
+.m15-filters { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.m15-filter { border: 1px solid var(--line); background: var(--surface); color: var(--muted); padding: 4px 10px; border-radius: 6px; font-size: 12px; }
+.m15-filter[aria-pressed=true] { color: var(--green); border-color: var(--green); background: var(--tint); }
+.m15-layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; }
+.m15-results { padding: 0 20px 16px; min-width: 0; }
+.m15-meta { padding: 12px 0 10px; font-size: 12px; color: var(--muted); }
+.m15-card { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 8px; overflow: hidden; }
+.m15-card.is-selected { border-color: var(--green); background: color-mix(in srgb, var(--tint) 32%, var(--surface)); }
+.m15-pick { width: 100%; padding: 12px 14px; text-align: left; display: flex; align-items: flex-start; gap: 11px; border: 0; background: transparent; }
+.m15-pick:hover:not(:disabled) { background: var(--soft); }
+.m15-pick:disabled { opacity: .6; }
+.m15-check { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 18px; border: 1px solid var(--line-strong); border-radius: 5px; color: transparent; margin-top: 2px; font-size: 12px; }
+.m15-card.is-selected .m15-check { background: var(--green); border-color: var(--green); color: var(--on-accent); }
+.m15-info { flex: 1; min-width: 0; display: block; }
+.m15-name { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-weight: 600; font-size: 13px; }
+.m15-mid { display: block; font: 11px/1.6 var(--mono); overflow-wrap: anywhere; color: var(--muted); margin: 2px 0 6px; }
+.m15-specs { display: block; font-size: 12px; color: var(--muted); }
+.m15-state { flex: 0 0 auto; font-size: 12px; color: var(--green); max-width: 110px; text-align: right; }
+.m15-state.error { color: var(--red); }
+.m15-state.warn { color: var(--amber); }
+.m15-morebtn { display: block; margin: 12px auto 0; }
+.m15-selection { border-left: 1px solid var(--line); background: var(--surface-2); padding: 18px; min-width: 0; }
+.m15-selection h3 { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
+.m15-pad { padding: 22px 0; }
+.m15-sel { border-bottom: 1px solid var(--line); padding: 12px 0; font-size: 12px; display: grid; gap: 6px; }
+.m15-sel-top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.m15-x { border: 0; background: transparent; color: var(--muted); padding: 0 4px; font-size: 16px; line-height: 1; }
+.m15-err { color: var(--red); line-height: 1.6; }
+.m15-fill { display: grid; gap: 6px; }
+.m15-fill label { display: grid; gap: 3px; font-size: 12px; }
+.m15-fill input { width: 100%; padding: 6px 8px; border: 1px solid var(--line-strong); border-radius: 6px; background: var(--surface); }
+.m15-detail { color: var(--muted); }
+.m15-detail summary { cursor: pointer; }
+.m15-detail p { padding-top: 6px; line-height: 1.8; }
+.m15-selection .m15-hint { margin-top: 14px; }
+.m15-zero { display: grid; justify-items: center; padding: 38px 16px; text-align: center; gap: 8px; color: var(--muted); font-size: 12px; }
+.m15-zero strong { color: var(--text); font-size: 14px; }
+.m15-foot { padding: 11px 20px; background: var(--surface-2); border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
+.m15-manual { padding: 12px 20px; border-top: 1px solid var(--line); font-size: 13px; }
+.m15-manual summary { cursor: pointer; }
+.m15-manual-body { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; margin: 10px 0 6px; }
+.m15-manual-body .y15-field { min-width: 220px; }
+.m15-adv, .m15-demo { border: 1px solid var(--line); border-radius: 10px; padding: 11px 16px; background: var(--surface); font-size: 13px; }
+.m15-demo { border-style: dashed; border-color: var(--line-strong); background: var(--surface-2); color: var(--muted); }
+.m15-adv summary, .m15-demo summary { cursor: pointer; }
+.m15-adv-body { margin-top: 8px; }
+.m15-json { max-height: 220px; overflow: auto; }
+.m15-demo-state { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; margin-top: 10px; }
+@media (max-width: 1100px) { .m15-layout { grid-template-columns: minmax(0, 1fr) 280px; } }
+@media (max-width: 860px) {
+  .m15-top, .m15-layout { grid-template-columns: 1fr; }
+  .m15-selection { border-left: 0; border-top: 1px solid var(--line); }
+  .m15-results { padding: 0 12px 12px; }
+  .m15-state { max-width: 80px; }
+}

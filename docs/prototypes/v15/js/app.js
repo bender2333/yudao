@@ -4,6 +4,8 @@
   const Y15 = window.Y15;
   const esc = Y15.esc;
 
+  Y15.SYS = [{ id: 'models', label: '模型管理', icon: 'models' }, { id: 'machines', label: '机器', icon: 'machines' }, { id: 'runtime', label: '运行与执行槽位', icon: 'runtime' }, { id: 'tools', label: '工具与扩展', icon: 'tools' }];
+  Y15.RESERVED = [{ id: 'meta', label: '元观察', stage: '阶段六', icon: 'meta' }, { id: 'evolution', label: '演化', stage: '阶段六', icon: 'evolution' }, { id: 'lessons', label: '经验', stage: '持续改进', icon: 'lessons' }];
   const S = { world: null, scenario: Y15.store.get('scenario', 'normal'), route: null, mismatchDir: 'page_old', drawer: false, search: '' };
   const views = {};
   const actions = {};
@@ -45,12 +47,16 @@
     const r = { name: 'not-found', params: {}, query, hash: '#' + text };
     if (!seg.length || seg[0] === 'home') r.name = 'home';
     else if (seg[0] === 'event' && seg[1]) { r.name = 'event'; r.params = { pos: seg[1] }; }
+    else if (seg[0] === 'sys' && Y15.SYS.some((x) => x.id === seg[1])) r.name = 'sys-' + seg[1];
+    else if (seg[0] === 'sys' && Y15.RESERVED.some((x) => x.id === seg[1])) { r.name = 'reserved'; r.params = { which: seg[1] }; }
     else if (seg[0] === 'p' && seg[1]) {
       r.params = { project: seg[1] };
       if (seg.length === 2) r.name = 'overview';
+      else if (seg[2] === 'w' && seg[3] && seg[4] === 'recovery') { r.name = 'recovery'; r.params.item = seg[3]; }
       else if (seg[2] === 'w' && seg[3]) { r.name = 'item'; r.params.item = seg[3]; }
+      else if (seg[2] === 'observe' && seg[3]) { r.name = 'observe-detail'; r.params.attempt = seg[3]; }
       else if (seg[2] === 'dept' && seg[3]) { r.name = 'dept'; r.params.dept = seg[3]; }
-      else if (['outcomes', 'flow', 'timeline'].includes(seg[2])) r.name = seg[2];
+      else if (['outcomes', 'flow', 'timeline', 'materials', 'observe', 'settings'].includes(seg[2])) r.name = seg[2];
     }
     return r;
   }
@@ -67,6 +73,7 @@
     const route = parse(location.hash);
     if (S.route && S.route.hash === route.hash) { S.route = route; render(true); return; }
     S.route = route;
+    if (!/^#\/(sys|connect)/.test(route.hash)) S.back = route.hash;
     render(false);
   }
 
@@ -124,6 +131,13 @@
   }
   Y15.marker = marker;
 
+  function sideBottom() {
+    const r = S.route;
+    const sys = Y15.SYS.map((l) => '<li><button type="button" class="y15-side-link' + (r.name === 'sys-' + l.id ? ' is-active' : '') + '" data-go="#/sys/' + l.id + '">' + Y15.ui.icon(l.icon) + '<span>' + l.label + '</span></button></li>').join('');
+    const res = Y15.RESERVED.map((l) => '<li><button type="button" class="y15-side-link is-reserved' + (r.name === 'reserved' && r.params.which === l.id ? ' is-active' : '') + '" data-go="#/sys/' + l.id + '" title="预留入口：' + l.stage + '">' + Y15.ui.icon(l.icon) + '<span>' + l.label + '</span><span class="y15-side-stage">' + l.stage + '</span></button></li>').join('');
+    return '<div class="y15-side-bottom"><div class="y15-side-label"><span>系统</span></div><ul class="y15-side-links">' + sys + '</ul><div class="y15-side-label is-sub"><span>预留入口</span></div><ul class="y15-side-links">' + res + '</ul></div>';
+  }
+
   function sidebar() {
     const r = S.route;
     const list = S.world.projects.map((p) => {
@@ -137,26 +151,30 @@
       '<button type="button" class="y15-icon-btn y15-drawer-close" data-act="drawer" aria-label="收起左侧栏">' + Y15.ui.icon('close') + '</button></div>' +
       '<button type="button" class="y15-side-link y15-home-link' + (r.name === 'home' ? ' is-active' : '') + '" data-go="#/home">' + Y15.ui.icon('home') + '<span>首页</span></button>' +
       '<label class="y15-search">' + Y15.ui.icon('search') + '<input type="search" placeholder="搜索项目" value="' + esc(S.search) + '" data-act="search" aria-label="搜索项目"></label>' +
-      '<div class="y15-side-label"><span>项目</span><span class="y15-count">' + S.world.projects.length + '</span></div><ul class="y15-project-list">' + list + '</ul></div>';
+      '<div class="y15-side-label"><span>项目</span><span class="y15-count">' + S.world.projects.length + '</span></div><ul class="y15-project-list">' + list + '</ul></div>' + sideBottom();
   }
 
-  const TITLES = { home: '首页', overview: '项目', item: '事项', outcomes: '成果库', flow: '流转', timeline: '时间轴', event: '按位置看一条事件' };
+  const TITLES = { home: '首页', overview: '项目', item: '事项', outcomes: '成果库', flow: '流转', timeline: '时间轴', event: '按位置看一条事件', materials: '资料', observe: '观测', 'observe-detail': '请求详情', settings: '设置', recovery: '恢复与动作核实' };
+  const sysTitle = (r) => (r.name === 'reserved' ? Y15.RESERVED.find((x) => x.id === r.params.which).label : (Y15.SYS.find((x) => 'sys-' + x.id === r.name) || {}).label);
 
   function topbar() {
     const r = S.route;
     const p = r.params.project ? H.project(r.params.project) : null;
     const crumbs = ['<button type="button" class="y15-crumb" data-go="#/home">首页</button>'];
-    if (p) {
+    if (sysTitle(r)) { crumbs.length = 0; crumbs.push('<strong>' + sysTitle(r) + '</strong>', '<span class="y15-crumb-note">系统</span>'); }
+    else if (p) {
       crumbs.push('<button type="button" class="y15-crumb" data-go="#/p/' + p.id + '">' + esc(p.name) + '</button>');
       if (r.name === 'item') { const it = H.item(p, r.params.item); if (it) crumbs.push('<strong>' + esc(it.title) + '</strong>'); }
+      else if (r.name === 'recovery') { const it = H.item(p, r.params.item); if (it) crumbs.push('<button type="button" class="y15-crumb" data-go="#/p/' + p.id + '/w/' + it.id + '">' + esc(it.title) + '</button>'); crumbs.push('<strong>' + TITLES.recovery + '</strong>'); }
+      else if (r.name === 'observe-detail') crumbs.push('<button type="button" class="y15-crumb" data-go="#/p/' + p.id + '/observe">观测</button>', '<strong>' + TITLES['observe-detail'] + '</strong>');
       else if (r.name === 'dept') crumbs.push('<strong>' + esc(H.dept(r.params.dept)) + '部门</strong>');
       else if (r.name !== 'overview') crumbs.push('<strong>' + TITLES[r.name] + '</strong>');
     } else if (r.name === 'event') {
       const e = H.event(r.params.pos);
       if (e && e.project) { const ep = H.project(e.project); if (ep) crumbs.splice(1, 0, '<button type="button" class="y15-crumb" data-go="#/p/' + ep.id + '">' + esc(ep.name) + '</button>'); }
       crumbs.push('<strong>按位置看一条事件</strong>');
-    } else if (r.name !== 'home') crumbs.push('<strong>' + (TITLES[r.name] || '') + '</strong>');
-    else crumbs.pop(), crumbs.push('<strong>首页</strong>');
+    } else if (r.name !== 'home' && !sysTitle(r)) crumbs.push('<strong>' + (TITLES[r.name] || '') + '</strong>');
+    else if (!sysTitle(r)) crumbs.pop(), crumbs.push('<strong>首页</strong>');
     const stats = statusItems().filter((i) => i.lit).map((i) => statItem(i, true)).join('');
     return desktopStrip() + '<button type="button" class="y15-icon-btn y15-drawer-open" data-act="drawer" aria-label="打开左侧栏">' + Y15.ui.icon('menu') + '</button>' +
       '<nav class="y15-crumbs" aria-label="路径">' + crumbs.join('<span class="y15-crumb-sep">/</span>') + '</nav>' +
@@ -168,10 +186,11 @@
     const r = S.route;
     const p = r.params.project ? H.project(r.params.project) : null;
     if (!p) return '';
-    const t = [{ go: '#/p/' + p.id, label: '概览', on: r.name === 'overview' || r.name === 'item' }]
+    const t = [{ go: '#/p/' + p.id, label: '概览', on: r.name === 'overview' || r.name === 'item' || r.name === 'recovery' }]
       .concat(p.depts.map((d) => ({ go: '#/p/' + p.id + '/dept/' + d, label: H.dept(d), on: r.name === 'dept' && r.params.dept === d })))
       .concat([{ go: '#/p/' + p.id + '/outcomes', label: '成果库', on: r.name === 'outcomes' }, { go: '#/p/' + p.id + '/flow', label: '流转', on: r.name === 'flow' },
-        { go: '#/p/' + p.id + '/timeline', label: '时间轴', on: r.name === 'timeline' }]);
+        { go: '#/p/' + p.id + '/timeline', label: '时间轴', on: r.name === 'timeline' }, { go: '#/p/' + p.id + '/materials', label: '资料', on: r.name === 'materials' },
+        { go: '#/p/' + p.id + '/observe', label: '观测', on: r.name === 'observe' || r.name === 'observe-detail' }, { go: '#/p/' + p.id + '/settings', label: '设置', on: r.name === 'settings' }]);
     return '<div class="y15-ptabs" role="navigation" aria-label="项目页面">' + t.map((x) => '<button type="button" class="y15-ptab' + (x.on ? ' is-active' : '') + '" data-go="' + x.go + '">' + x.label + '</button>').join('') + '</div>';
   }
 
@@ -268,7 +287,7 @@
     if (el.dataset.act) actions[el.dataset.act](el, ev);
     if (el.hasAttribute('data-close-modal')) Y15.ui.closeModal();
   });
-  document.addEventListener('change', (ev) => { const el = ev.target; if (el.matches('select') && el.dataset.act) actions[el.dataset.act](el, ev); });
+  document.addEventListener('change', (ev) => { const el = ev.target; if (el.matches('select, input[type=checkbox]') && el.dataset.act) actions[el.dataset.act](el, ev); });
   document.addEventListener('input', (ev) => { const el = ev.target; if (el.matches('input[type=search]') && el.dataset.act) actions[el.dataset.act](el, ev); });
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') Y15.ui.closeModal(); });
 
