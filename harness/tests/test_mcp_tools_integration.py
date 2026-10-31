@@ -144,8 +144,13 @@ def test_a_run_reuses_one_session_per_server_and_closes_it_at_run_end(tmp_path):
     assert first["is_error"] is False and second["is_error"] is False
 
     def _pid(result):
-        # environment 工具把进程号放在 structuredContent 里（结果工件的一行）
-        return json.loads("".join(line["text"] for line in result["lines"]))["pid"]
+        # environment 工具把进程号放在结果里（结果工件的一行；文本与 structuredContent 都有 JSON 时逐行找）
+        store = ArtifactStore(system.data_dir / "artifacts")
+        entry = store.external_source(run_id, result["content_hash"])
+        for line in entry.text.splitlines():
+            if '"pid"' in line:
+                return json.loads(line)["pid"]
+        raise AssertionError(f"结果里没有进程号：{entry.text[:200]}")
 
     server_pid = _pid(first)
     assert _pid(second) == server_pid, "两次调用用了两个服务器进程：会话实例没有被复用"
