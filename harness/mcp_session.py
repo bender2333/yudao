@@ -11,6 +11,8 @@ import json
 import re
 from collections.abc import Iterable
 
+from .definitions import DepartmentWork, Role, Tool, WorkItemKind, WorkItems
+
 TOOL_PREFIX = "mcp__"
 # 模型接口与静态定义对工具名的长度上限；超过它时改用确定性别名
 TOOL_NAME_MAX = 64
@@ -84,3 +86,59 @@ class ToolAliases:
 
     def aliases(self) -> dict[str, tuple[str, str]]:
         return dict(self._aliases)
+
+
+def item_definitions(base, document):
+    """把事项冻结的 MCP 设置叠加到当前定义上，得到这个事项的定义副本。
+
+    document 是 
+un_created 里冻结的那份 MCP 设置（非秘密设置与凭据引用的整份文档，
+    见设计说明第 4.3 节），ase 是当前定义。规则（第 5.1 节）：
+
+    - 只用工具清单快照，且快照的配置摘要必须与这台服务器的配置摘要一致；没有快照或摘要不符的
+      服务器不提供工具（本函数不探测）。
+    - 每个工具按名称规则得到标识别名，作为工具定义的键；原名只在调用时经 ToolAliases.original 还原。
+      工具的动作类别是 mcp：核实方法是 
+one，取消能否确认停止按传输方式（stdio 能确认）。
+    - 只给服务器设置里写明的部门：别名追加到这些部门的角色工具清单与每一种事项种类的工具清单，
+      其他部门看不到它。
+    - 没有 MCP 设置、或没有可用快照时返回 ase 本身（副本与当前定义等价，第 4.3 节「旧事项按空设置读取」）。
+    """
+    servers = (document or {}).get("servers") or {}
+    aliases = ToolAliases(reserved=tuple(base.tools))
+    tools = dict(base.tools)
+    additions: dict[str, list[str]] = {}
+    for key, server in servers.items():
+        snapshot = server.get("tool_snapshot") or {}
+        if not snapshot or snapshot.get("config_digest") != server.get("config_digest", ""):
+            continue
+        server_name = str(server.get("name") or key)
+        for spec in snapshot.get("tools") or []:
+            alias = aliases.add(server_name, str(spec.get("name") or ""))
+            tools[alias] = Tool(kind="environment", action="mcp", verification="none",
+                                cancellable=str(server.get("transport") or "stdio") == "stdio",
+                                description=str(spec.get("description") or alias),
+                                parameters=spec.get("input_schema") or {})
+            for department in server.get("departments") or []:
+                additions.setdefault(str(department), []).append(alias)
+    if not additions:
+        return base
+    roles = {name: Role(**{**role.model_dump(), "tools": tuple(role.tools) + tuple(additions.get(name, ()))}) 
+             for name, role in base.roles.items()}
+    kinds = {}
+    for kind_name, kind in base.work_items.kinds.items():
+        departments = {}
+        changed = False
+        for department, work in kind.departments.items():
+            extra = tuple(additions.get(department, ()))
+            if extra:
+                changed = True
+                departments[department] = DepartmentWork(**{**work.model_dump(), "tools": tuple(work.tools) + extra})
+            else:
+                departments[department] = work
+        kinds[kind_name] = (WorkItemKind(**{**kind.model_dump(), "departments": departments})
+                            if changed else kind)
+    work_items = WorkItems(**{**base.work_items.model_dump(), "kinds": kinds})
+    fields = {name: getattr(base, name) for name in type(base).model_fields}
+    fields.update({"tools": tools, "roles": roles, "work_items": work_items})
+    return type(base)(**fields)

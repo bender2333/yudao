@@ -28,7 +28,7 @@ from .adapters.base import ModelAdapter
 from .adapters.facade_adapter import FacadeAdapter
 from .adjudication import WorkBasis, commit_decision, proposal_decision
 from .artifacts import ArtifactStore
-from . import assembly_contract, execution_contract, routing_contract, tightening_contract
+from . import assembly_contract, execution_contract, mcp_session, routing_contract, tightening_contract
 from .assembly import PENDING_GUIDANCE, pending_guidance
 from .bounds import TIME_BOUND, activation_bound, time_left_sec, time_limit_message, time_used_up
 from .compaction import response_reserve
@@ -270,6 +270,8 @@ class Orchestrator:
         # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判；
         # 没有交的时候是当前加载的那一份
         self._definitions = in_force(definitions)
+        # 事项定义副本（工单 #1175）：按 run_created 里冻结的 MCP 设置叠加一次，按 run 记住
+        self._item_definitions: dict[str, Any] = {}
         # 路由实现（成果驱动）：谁在等、谁能开工、一轮以什么结束、事项以什么结束由它判断（工单 #825）；
         # 薄驱动只按契约的三个问题调用它，组装时核对它声明的契约版本
         self._routing = routing
@@ -1093,6 +1095,21 @@ class Orchestrator:
         finally:
             await connections.aclose()
 
+    def item_definitions(self, run_id: str):
+        # 这个 run 的定义副本（网络与 MCP 设计说明第 4.3、5.1 节，工单 #1175）：当前定义加上
+        # run_created 里冻结的 MCP 设置带来的工具；没有设置或没有可用快照时就是当前定义本身
+        cached = self._item_definitions.get(run_id)
+        if cached is not None:
+            return cached
+        document = None
+        for event in self.store.list_events(run_id):
+            if event.type == EventType.RUN_CREATED:
+                document = (event.payload or {}).get("mcp_servers")
+                break
+        definitions = mcp_session.item_definitions(self._definitions, document)
+        self._item_definitions[run_id] = definitions
+        return definitions
+
     async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
         projection = self.project(run_id)
         department = self._routing.next_department(projection, waiting=self._waiting_departments(run_id))
@@ -1429,7 +1446,7 @@ class Orchestrator:
                 nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
                 deltas=self.deltas, tightening=self._tightening,
                 refresh_workspace=self._workspaces.refresh_for(self._round_workspace(activation)),
-                definitions=self._definitions,
+                definitions=self.item_definitions(activation.scope.run_id),
             )
             result = await activation.driver.result()
         except UnrepresentableWorkspace as exc:
