@@ -14,7 +14,7 @@ import type {
 } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
 import { Empty, EventDetail, Tag } from "./common";
-import { RunningBackgroundCommands } from "./department";
+import { RunningBackgroundCommands } from "./department.tsx";
 import { formatTime } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 import {
@@ -22,7 +22,6 @@ import {
   ENCRYPTED_REASONING,
   NO_ACTIVATION,
   NO_RUN,
-  UNASSIGNED_TITLE,
   actionLines,
   activationLabel,
   discardedMark,
@@ -32,7 +31,8 @@ import {
   selectedActivation,
   stepBlocks,
   stepTitle,
-} from "./step-timeline";
+  unassignedBlock,
+} from "./step-timeline.ts";
 
 // 一个事项下本部门的步骤时间线：页签最上面是正在运行的后台命令，下面依次是激活选择、步骤与
 // 未归到步骤的动作。展开与折叠的状态以事件编号为键存在组件里，数据刷新（新事件到达）时保持；
@@ -70,10 +70,11 @@ export function StepTimeline(props: { app: ClientApp; runId: string | null; depa
     if (steps.loading) {
       return <p className="y10-note note">正在读取这一轮的步骤</p>;
     }
-    return <Empty text={readFailureText(steps.error)} />;
+    return <Empty text={steps.error === null ? NO_RUN : readFailureText(steps.error)} />;
   }
   const data = steps.data;
   const selected = selectedActivation(data, chosen);
+  const unassigned = unassignedBlock(data);
   return (
     <>
       <RunningBackgroundCommands commands={data.background_commands} />
@@ -104,10 +105,10 @@ export function StepTimeline(props: { app: ClientApp; runId: string | null; depa
               </li>
             ))}
           </ol>
-          {data.unassigned_actions.length === 0 ? null : (
+          {unassigned === null ? null : (
             <section className="y10-ws-step-block is-unassigned">
-              <h3 className="y10-h3 sub">{UNASSIGNED_TITLE}</h3>
-              <ActionList actions={data.unassigned_actions} onOpenEvent={setOpenEvent} />
+              <h3 className="y10-h3 sub">{unassigned.title}</h3>
+              <ActionList actions={unassigned.actions} onOpenEvent={setOpenEvent} />
             </section>
           )}
         </>

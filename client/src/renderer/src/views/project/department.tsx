@@ -24,7 +24,7 @@ import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDep
 import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts, formatDuration,
   formatTime, itemSource, label, lettersWaitingText, roleBarText, type DepartmentStateView } from "./labels";
 import { askIndent, askLine } from "./asks-text";
-import { StepTimeline } from "./step-timeline";
+import { StepTimeline } from "./step-timeline.tsx";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";

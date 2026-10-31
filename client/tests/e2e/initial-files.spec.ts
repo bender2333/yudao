@@ -194,14 +194,16 @@ test.describe("起始文件夹（1440×900）", () => {
       // 事件到达以后页面自动显示（页面不刷新）
       await navigate(page, id, "dept/product");
       const actions = page.locator("section.card").filter({ has: page.getByRole("tab", { name: "动作与回执" }) });
-      const listRow = actions.locator("tbody tr").filter({ hasText: "list_files" });
-      const readRow = actions.locator("tbody tr").filter({ hasText: "read_file" });
+      // 工单 #1235 起这个页签是步骤时间线：动作行是时间线里的动作块，不再是表格的行
+      const listRow = actions.locator(".y10-ws-act").filter({ hasText: "list_files" });
+      const readRow = actions.locator(".y10-ws-act").filter({ hasText: "read_file" });
       await waitUntil(async () => (await listRow.filter({ hasText: "成功" }).count()) > 0, page,
         "部门工作间出现列出工作区文件的成功动作", 180_000);
       await expect(readRow.filter({ hasText: "成功" })).toBeVisible();
 
-      // 表格里没有「登记名」一列：命令登记按 ADR-0038 删除以后，这一列恒为「没有回执」（工单 #655）
-      await expect(actions.locator("thead th").filter({ hasText: "登记名" })).toHaveCount(0);
+      // 表格的「登记名」一列（命令登记按 ADR-0038 删除以后恒为「没有回执」，工单 #655）随表格一起去掉：
+      // 这个页签里不再有 table（工单 #1235）
+      await expect(actions.locator("table")).toHaveCount(0);
 
       // 列出文件的回执里是起始文件夹里的文件：点时间看这条事件的原始载荷
       await listRow.locator("button.link").click();

@@ -57,13 +57,21 @@ export function stepTitle(step: RunStepView): string {
   return `第 ${step.step_id} 步`;
 }
 
-// 被丢弃的调用尝试的标记：有失败或取消的尝试时写出来，读者不会以为那一次没发生过
+// 被丢弃的调用尝试的标记：有失败或取消的尝试时写出来，读者不会以为那一次没发生过。
+// 文字按工单 #1235 的版式：「调用失败，已重试 N 次」
 export function discardedMark(step: RunStepView): string | null {
   if (step.discarded_attempts <= 0) {
     return null;
   }
-  const times = step.discarded_attempts === 1 ? "一次" : `${step.discarded_attempts} 次`;
-  return `调用失败 ${times}，已重试`;
+  return `调用失败，已重试 ${step.discarded_attempts} 次`;
+}
+
+// 未归到步骤的动作那一块：有动作时给出标题与动作，没有时为空（步骤列表末尾的一块）
+export function unassignedBlock(result: RunStepsResult): { title: string; actions: ActionView[] } | null {
+  if (result.unassigned_actions.length === 0) {
+    return null;
+  }
+  return { title: UNASSIGNED_TITLE, actions: result.unassigned_actions };
 }
 
 // 折叠时显示预览的前两行

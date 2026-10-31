@@ -18,6 +18,7 @@ import {
   selectedActivation,
   stepBlocks,
   stepTitle,
+  unassignedBlock,
 } from "../../src/renderer/src/views/project/step-timeline.ts";
 import type {
   ActionView,
@@ -127,8 +128,8 @@ test("读不出来的思考写固定的说法", () => {
 
 test("被丢弃的尝试在标题上有标记", () => {
   assert.equal(discardedMark(step({ discarded_attempts: 0 })), null);
-  assert.equal(discardedMark(step({ discarded_attempts: 1 })), "调用失败 一次，已重试");
-  assert.equal(discardedMark(step({ discarded_attempts: 2 })), "调用失败 2 次，已重试");
+  assert.equal(discardedMark(step({ discarded_attempts: 1 })), "调用失败，已重试 1 次");
+  assert.equal(discardedMark(step({ discarded_attempts: 2 })), "调用失败，已重试 2 次");
 });
 
 test("折叠时只显示预览的前两行与字数", () => {
@@ -181,6 +182,13 @@ test("动作的两行文字：工具、命令、状态与主机回执", () => {
   const missing = actionLines(action({ receipt: null, status: "unknown" }));
   assert.equal(missing.receipt, "没有回执");
   assert.equal(missing.status, "结果未知");
+});
+
+test("未归到步骤的动作：有动作时多出一块，没有时没有这块", () => {
+  assert.equal(unassignedBlock(result()), null);
+  const block = unassignedBlock(result({ unassigned_actions: [action(), action({ action_id: "a_2" })] }));
+  assert.equal(block?.title, "未归到步骤的动作");
+  assert.equal(block?.actions.length, 2);
 });
 
 test("没有激活时的空状态说法", () => {
