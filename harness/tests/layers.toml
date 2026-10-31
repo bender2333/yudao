@@ -20,6 +20,7 @@
 "kernel/test_tightening_only_rejects_or_waits.py" = "module"
 "kernel/test_tool_needs_permission.py" = "unit"
 "test_access.py" = "integration"
+"test_acceptance_coverage.py" = "module"
 "test_access_tokens.py" = "integration"
 "test_action_contract.py" = "module"
 "test_activation_accounting.py" = "integration"

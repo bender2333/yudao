@@ -5,6 +5,41 @@ export type ClientOptions = {
 };
 
 /**
+ * AcceptanceCoverageResult
+ */
+export type AcceptanceCoverageResult = {
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Verdict
+     */
+    verdict: string;
+    /**
+     * Review Event Id
+     */
+    review_event_id: string;
+    /**
+     * Revision
+     */
+    revision: number;
+    numbers: CoverageNumbers;
+    /**
+     * Criteria
+     */
+    criteria: Array<CoverageCriterion>;
+    /**
+     * Open Criteria
+     */
+    open_criteria: Array<string>;
+};
+
+/**
  * Accepted[CatalogConnectionSaveRefs]
  */
 export type AcceptedCatalogConnectionSaveRefs = {
@@ -1762,6 +1797,62 @@ export type CommandCapability = {
      * Reasons
      */
     reasons: Array<'stale_base' | 'not_found' | 'already_exists' | 'project_archived' | 'work_item_in_progress' | 'run_terminal' | 'busy' | 'provider_unavailable' | 'catalog_invalid' | 'in_use' | 'decision_closed' | 'option_invalid' | 'not_allowed' | 'command_id_reused' | 'source_invalid' | 'out_of_bounds' | 'not_wired'>;
+};
+
+/**
+ * CoverageCriterion
+ */
+export type CoverageCriterion = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Method
+     */
+    method: string;
+    /**
+     * Result
+     */
+    result: 'passed' | 'failed' | 'unverified';
+    /**
+     * Executable
+     */
+    executable: boolean;
+    /**
+     * Open
+     */
+    open: boolean;
+};
+
+/**
+ * CoverageNumbers
+ */
+export type CoverageNumbers = {
+    /**
+     * Criteria Total
+     */
+    criteria_total: number;
+    /**
+     * Executable
+     */
+    executable: number;
+    /**
+     * Covered
+     */
+    covered: number;
+    /**
+     * Coverage Ratio
+     */
+    coverage_ratio: number;
+    /**
+     * Model Reading
+     */
+    model_reading: number;
+    /**
+     * Open
+     */
+    open: number;
 };
 
 /**
@@ -5297,6 +5388,17 @@ export type RuntimeStartDrain = {
      * Base Version
      */
     base_version?: number | null;
+};
+
+/**
+ * Snapshot[AcceptanceCoverageResult]
+ */
+export type SnapshotAcceptanceCoverageResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: AcceptanceCoverageResult;
 };
 
 /**
@@ -20694,6 +20796,40 @@ export type QueryEvidenceExternalSourceResponses = {
 };
 
 export type QueryEvidenceExternalSourceResponse = QueryEvidenceExternalSourceResponses[keyof QueryEvidenceExternalSourceResponses];
+
+export type QueryAcceptanceCoverageData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * At
+         */
+        at?: number | null;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    url: '/api/queries/acceptance.coverage';
+};
+
+export type QueryAcceptanceCoverageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryAcceptanceCoverageError = QueryAcceptanceCoverageErrors[keyof QueryAcceptanceCoverageErrors];
+
+export type QueryAcceptanceCoverageResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotAcceptanceCoverageResult;
+};
+
+export type QueryAcceptanceCoverageResponse = QueryAcceptanceCoverageResponses[keyof QueryAcceptanceCoverageResponses];
 
 export type QueryCatalogData = {
     body?: never;
