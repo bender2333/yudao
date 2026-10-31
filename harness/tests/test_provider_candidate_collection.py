@@ -40,6 +40,23 @@ def test_collected_candidates_carry_the_window_and_output_limit_from_the_model_l
     assert "max_output_tokens" not in by_id["model-without-limits"]
 
 
+def test_collected_candidates_take_the_window_by_the_priority_when_several_writings_appear():
+    # R3：上游同时给出 context_length 与 model_info 两种写法时按次序取值，来源仍是上游模型列表。
+    models = {"data": [{"id": "model-with-two-writings", "context_length": 1048576,
+                        "model_info": {"gemma3.context_length": 131072}}]}
+    upstream = ScriptedProvider([lambda _provider, handler: send_reply(
+        handler, 200, "application/json", json.dumps(models).encode("utf-8"))])
+    try:
+        result = refresh_candidates(ProviderDefinition(id="custom", name="Custom",
+                                                       models_url=upstream.base + "/v1/models"),
+                                    api_key="list-secret")
+    finally:
+        upstream.close()
+    assert result["status"] == "ok", result["error"]
+    [candidate] = result["candidates"]
+    assert (candidate["context_window"], candidate["context_window_source"]) == (1048576, "models_url")
+
+
 def test_candidates_use_table_metadata_and_upstream_modalities_without_inferring_from_names():
     # R2、R3：列表优先、能力表来源与适用性的公开候选合同，通过真实服务读取。
     models = {"data": [

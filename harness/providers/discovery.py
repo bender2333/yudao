@@ -126,23 +126,55 @@ def effective_models_url(provider: ProviderDefinition, override: str | None = No
     return provider.base_url.rstrip("/") + "/models"
 
 
-# 上游模型列表描述容量（窗口与输出上限）的四种写法，按次序取到第一个有效的就停（设计说明第 4.3 节）：
-# limit.context / limit.output（OpenCode 一类）、context_length / max_completion_tokens（OpenRouter 一类的顶层写法）、
-# top_provider 下的同名字段、capabilities.contextWindow / capabilities.maxOutput
+# 上游模型列表描述容量（窗口与输出上限）的写法，按次序取到第一个有效的就停（设计说明第 4.3 节）。
+# 固定路径：limit.context / limit.output（OpenCode 一类）、context_length / max_completion_tokens（OpenRouter 一类的顶层写法）、
+# top_provider 下的同名字段、capabilities.contextWindow / capabilities.maxOutput。
+# 各家另有的别名按同样的次序追加：model_info 里以 .context_length 结尾的键（Ollama）、max_context_window_tokens（GitHub Copilot）、
+# max_model_len（vLLM）、loaded_context_length 与 max_context_length（LM Studio）、context_window_tokens（OpenAI 兼容网关）；
+# 输出上限另有顶层的 max_output_tokens 与 capabilities.limit.output。
+# 路径的末段写成 "*<后缀>" 时表示「容器里任意以该后缀结尾的键」（Ollama 的 model_info 用它）。
 _UPSTREAM_LIMIT_PATHS: dict[str, tuple[tuple[str, ...], ...]] = {
     "context_window": (("limit", "context"), ("context_length",),
-                       ("top_provider", "context_length"), ("capabilities", "contextWindow")),
+                       ("top_provider", "context_length"), ("capabilities", "contextWindow"),
+                       ("model_info", "*.context_length"), ("model_info", "*.num_ctx"),
+                       ("max_context_window_tokens",), ("max_model_len",),
+                       ("loaded_context_length",), ("max_context_length",),
+                       ("context_window_tokens",)),
     "max_output_tokens": (("limit", "output"), ("max_completion_tokens",),
-                          ("top_provider", "max_completion_tokens"), ("capabilities", "maxOutput")),
+                          ("top_provider", "max_completion_tokens"), ("capabilities", "maxOutput"),
+                          ("max_output_tokens",), ("capabilities", "limit", "output")),
     "max_input_tokens": (("limit", "input"),),
 }
+
+# 路径末段以 _SUFFIX_MARK 开头时，那一段是后缀而不是键名
+_SUFFIX_MARK = "*"
+
+
+def _is_positive_int(value: Any) -> bool:
+    # 只有正整数算容量：布尔、小数、0 与负数都当没有
+    return isinstance(value, int) and not isinstance(value, bool) and value > 0
 
 
 def _first_positive_int(item: Mapping[str, Any], paths: tuple[tuple[str, ...], ...]) -> int | None:
     # 按次序取第一个有效的正整数字：布尔、小数、0 与负数都当没有，取不到时返回 None
     for path in paths:
-        value = _value_at(item, path)
-        if isinstance(value, int) and not isinstance(value, bool) and value > 0:
+        if path[-1].startswith(_SUFFIX_MARK):
+            value = _first_positive_int_by_suffix(item, path[:-1], path[-1][len(_SUFFIX_MARK):])
+        else:
+            value = _value_at(item, path)
+        if _is_positive_int(value):
+            return value
+    return None
+
+
+def _first_positive_int_by_suffix(item: Mapping[str, Any], container_path: tuple[str, ...],
+                                   suffix: str) -> int | None:
+    # 容器里任意以该后缀结尾的键（Ollama 的 model_info）：按容器里的次序取第一个正整数
+    container = _value_at(item, container_path)
+    if not isinstance(container, Mapping):
+        return None
+    for key, value in container.items():
+        if isinstance(key, str) and key.endswith(suffix) and _is_positive_int(value):
             return value
     return None
 
