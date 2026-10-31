@@ -72,9 +72,9 @@ test("能力清单缺少某个查询时，依赖它的页面入口不出现", as
   const client = await openClient({ width: 1440, height: 900 });
   const errors = watchErrors(client);
   try {
-    // 当前部署的注册表没有 machines.list、tools.registry 等查询
+    // 当前部署的注册表没有 machines.list 等查询；tools.registry 已随工单 #1177 登记，入口在
     await expect(client.page.getByRole("button", { name: "机器" })).toHaveCount(0);
-    await expect(client.page.getByRole("button", { name: "工具与扩展" })).toHaveCount(0);
+    await expect(client.page.getByRole("button", { name: "工具与扩展" })).toHaveCount(1);
     // 执行槽位这一页的数据来自 system.status（工单 #727），所以它的入口在
     await expect(client.page.getByRole("button", { name: "运行与执行槽位" })).toHaveCount(1);
     expect(errors).toEqual([]);

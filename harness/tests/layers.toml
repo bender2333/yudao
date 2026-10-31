@@ -201,6 +201,7 @@
 "test_tool_contracts.py" = "unit"
 "test_tool_result_images.py" = "module"
 "test_tools.py" = "integration"
+"test_tools_registry.py" = "module"
 "test_tree_archive.py" = "module"
 "test_undefined_names.py" = "module"
 "test_unknown_action_handed_back.py" = "integration"

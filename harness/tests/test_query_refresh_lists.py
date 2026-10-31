@@ -29,6 +29,7 @@ from harness.app.project_queries import (
 from harness.app.registry import QueryDefinition, Registry, UnchangedEvent
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import LiveAttemptRequest, SystemStatusRequest
+from harness.app.tools_queries import TOOLS_REGISTRY
 from harness.event_store import Command, EventStore, catalog_stream, run_stream
 from harness.models import EventType, json_dumps
 from harness.projection import dump_decision, replay_decisions, saved_decisions
@@ -248,6 +249,7 @@ def _requests(scope: _Scope) -> dict[str, Any]:
             kind="document", document=json.dumps({"providers": [], "models": []})),
         "home.away_report": AwayReportRequest(),
         "rules.registry": RulesRegistryRequest(),
+        "tools.registry": None,
     }
 
 
