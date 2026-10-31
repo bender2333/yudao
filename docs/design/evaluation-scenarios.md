@@ -1,6 +1,6 @@
 # 评测场景：版本回归与 OpenCode 对照
 
-总图位置：第四节系统之外「评价」的缝；第五节验收表的「真实场景」一层。依据：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)（需求）、[评测场景选题调研](../archive/research/evaluation-benchmarks.md)（选题依据）、[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)、[D38](../requirements/system-intent.md)、[规则登记与参数设计说明](rules-and-parameters.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。
+总图位置：第四节系统之外「评价」的缝；第五节验收表的「真实场景」一层。依据：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)（需求）、[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)、[D38](../requirements/system-intent.md)、[规则登记与参数设计说明](rules-and-parameters.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。
 
 ## 1. 用途
 
@@ -40,7 +40,7 @@
 - 需求条目（6 条）：参数保存与序列化；合并时覆盖的一方优先；一方为空或两方都为空时的合并；透传到 Chat Completions；透传到 LiteLLM；参数为空时的行为。8 条 F2P 挂在这 6 个条目下。
 - 环境：仓库按任务的基准提交检出，用仓库自己的锁文件建立环境（`uv sync --frozen --all-extras --all-packages --group dev`），使用 Python 3.13；建立环境时需要网络（GitHub 与 PyPI）。标准答案与上游提交 `0eee6b83` 相同。
   - Python 3.9 在 Windows 上的时钟精度为 15.6 毫秒，tracing 的 20 条原有功能测试结果不稳定。
-  - Python 3.13 上，基准提交的 P2P 与标准答案的 F2P、P2P 各运行 3 次，全部通过（核对见[决策记录](../archive/decision-2026-09.md)「不使用容器以后的执行环境」一条）。
+  - Python 3.13 上，基准提交的 P2P 与标准答案的 F2P、P2P 各运行 3 次，全部通过。
   - 已知有 8 条用例因为缺少 API key 或 pydantic 版本不符而失败，它们不在 F2P 与 P2P 清单中，评分只运行清单中的用例。
 
 ### 2.3 场景 3：北京地铁票价
@@ -153,7 +153,7 @@
 
 ### 6.2 留出场景
 
-留出场景从三个现有来源（WebGen-Bench、FeatBench、PRDBench）各取 2 个，评分器的结构沿用，不参与日常调整。第一次运行在阶段三结束时，以后每个阶段结束时与每次结构性采用之前各运行一次；用过的转为回归场景，再补入新的。每个新场景的材料（需求原文、接口约定、需求条目表、隐藏检查、运行环境、参考解法）按第 2.4 节冻结与校验。采用任何定义版本与升级实例，都要求回归场景与留出场景不退化；只在自举工单上出现的改善不算数。
+留出场景从三个现有来源（WebGen-Bench、FeatBench、PRDBench）各取 2 个，评分器的结构沿用，不参与日常调整。在每个阶段结束时与每次结构性采用之前各运行一次；用过的转为回归场景，再补入新的。每个新场景的材料（需求原文、接口约定、需求条目表、隐藏检查、运行环境、参考解法）按第 2.4 节冻结与校验。采用任何定义版本与升级实例，都要求回归场景与留出场景不退化；只在自举工单上出现的改善不算数。
 
 ### 6.3 Yudao 对单个 agent
 
@@ -197,14 +197,6 @@ flowchart LR
 
 ## 9. 前提与未决事项
 
-- 场景 1 的 Yudao 一侧需要质检部门的浏览器工具，按 PRD 自行生成测试并操作页面。浏览器工具在阶段二提供（[D34](../requirements/browser-and-computer-use.md)）；评测使用的模型具有视觉能力。工程按接口约定在交付说明中写启动方式，端口从 `PORT` 读取；质检按交付说明启动交付的网页（[浏览器与 computer use 设计说明](browser-and-computer-use.md)「启动方式」）。OpenCode 基础分与 Yudao 的场景 2、3 不依赖它。
+- 场景 1 的 Yudao 一侧需要质检部门的浏览器工具，按 PRD 自行生成测试并操作页面（浏览器工具见 [D34](../requirements/browser-and-computer-use.md)）；评测使用的模型具有视觉能力。工程按接口约定在交付说明中写启动方式，端口从 `PORT` 读取；质检按交付说明启动交付的网页（[浏览器与 computer use 设计说明](browser-and-computer-use.md)「启动方式」）。OpenCode 基础分与 Yudao 的场景 2、3 不依赖它。
 - 场景 2 的 Yudao 一侧依赖接入已有项目：运行器用 `project.onboard` 接入仓库在基准提交的代码，建档完成以后由运行器回答初始 PRD 的确认，再新建事项提交需求；测试命令用 Python 3.13 运行（命令不登记，ADR-0038），例如 `uv run --python 3.13 pytest …`。建档的用量与耗时在报告中单独列出，与事项的指标分开（第 5.2 节；[接入已有项目设计说明](existing-project-onboarding.md)「用户确认的决定」第 1 项）。
 - 界面智能体与裁判使用的模型由用户提供：要能看图、版本固定、与被测模型不同。第 3 节、第 4.3 节用到的模型都要经核对能读出网页截图中的文字。
-
-## 10. 实施顺序
-
-1. 场景材料与参考解法校验（阶段二）。
-2. 评分器（确定的检查、失败分类、完成度；场景 1 的界面智能体沿用 WebGen-Bench `c89e074` 评测脚本的做法，裁判沿用 ArtifactsBench 的做法，两者都使用用户提供的模型）（阶段二）。费用、检验覆盖比例与噪声范围随评分器与版本比较实现。
-3. OpenCode 运行器与指标收集，运行 OpenCode 基础分，提交第一份报告（阶段二）。
-4. Yudao 运行器、过程检查点与版本比较，运行 Yudao 的场景 3 与场景 2（阶段二）。场景 2 另外依赖接入已有项目（阶段二）。
-5. 浏览器工具完成后，运行 Yudao 的场景 1（阶段二）。

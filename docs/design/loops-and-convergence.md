@@ -1,6 +1,6 @@
 # 循环与收敛设计说明
 
-总图位置：第三节的边界、停止与子循环；第一节「裁决与边界」方框。依据：[D38 系统意图与基础规则](../requirements/system-intent.md)（N-L1 至 N-L4、N-A1 至 N-A3、N-C1、N-C3、N-I6）、[D09 循环次数与超时限制](../requirements/execution-limits.md)、[部门内多角色设计说明](department-roles.md)、[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)、[Loop System 原理](../archive/native-harness/loop-system-principles.md)第 7、12 节。
+总图位置：第三节的边界、停止与子循环；第一节「裁决与边界」方框。依据：[D38 系统意图与基础规则](../requirements/system-intent.md)（N-L1 至 N-L4、N-A1 至 N-A3、N-C1、N-C3、N-I6）、[D09 循环次数与超时限制](../requirements/execution-limits.md)、[部门内多角色设计说明](department-roles.md)、[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)。
 
 ## 1. 要解决的问题
 

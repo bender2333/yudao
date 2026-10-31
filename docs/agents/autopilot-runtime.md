@@ -141,7 +141,7 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 架构师循环的子代理 | `claude-opus-5-5`，effort `xhigh` | 与上表同一行：这一层做设计判断，判断错了比多用的量贵；它与 solo 执行者用不同的模型，判断才独立 |
 | 试用的两个模型 | model1 `wb/cn:deepseek-v4.1-flash` 给产品与工程；model2 `ag/gemini-3.8-flash-high` 给质检、找问题与看图 | 分工见 [`/trial`](../../.claude/skills/trial/SKILL.md)第 1 节的表；地址与凭据取下面的 `YUDAO_EVAL_*` |
 | 备用链 | `9router/ds`| 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
-| 真实模型测试与评测 | `qhub/Qwen3.8-Flash`（9router，Chat Completions） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)第 4.3 节 |
+| 真实模型测试与评测 | `qhub/Qwen3.8-Flash`（9router，Chat Completions） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)「丰富程度（场景 1）」 |
 
 `task` 子代理请求会让执行者停滞，任务评论里写明不使用子代理。
 
@@ -167,7 +167,7 @@ $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_
 ## 5. CI
 
 - 定义：`.github/workflows/ci.yml`，由用户在场时的架构师维护，执行者与被唤醒的架构师不修改。
-- 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上并行运行四个作业：① 单元层、② 模块层（各含一项固定检查）、评测工具（`evals/tests`，`real_model` 的用例默认不选）、客户端（类型检查与单元测试，逐场景回放测试除外，按 `AGENTS.md` 单独运行；编译页面与 wheel）。汇总作业 `check` 在四项都成功时成功，是 main 的规则要求的检查，并在运行摘要里写出各层的表。PR 上另有「用例变化」：合并前后各层用例的增减，只显示，不挡合并（测试分层设计说明第 4.3、4.4 节）。
+- 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上并行运行四个作业：① 单元层、② 模块层（各含一项固定检查）、评测工具（`evals/tests`，`real_model` 的用例默认不选）、客户端（类型检查与单元测试，逐场景回放测试除外，按 `AGENTS.md` 单独运行；编译页面与 wheel）。汇总作业 `check` 在四项都成功时成功，是 main 的规则要求的检查，并在运行摘要里写出各层的表。PR 上另有「用例变化」：合并前后各层用例的增减，只显示，不挡合并（[测试分层设计说明](../design/test-pyramid.md)「CI 中的分层」与「用例的变化」）。
 - main 的每次推送（每次合并以后）另外运行 ③ 集成层（作业 `integration`）：集成层全部（`-n 4`，在 main 上约 15 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。带 `touches-core` 的工单例外：执行者在交付前对自己的分支手动触发一次（`executor` 技能第 5 步）。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
 - 手动触发（`check` 与 `integration` 都运行）：`gh workflow run CI --ref <分支>`，例如工单要在 GitHub 的运行机上验证集成层时 `gh workflow run CI --ref issue-<编号>`；之后用 `gh run list --workflow CI --branch <分支> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果。
 - main 上的结果：`gh run list --workflow CI --branch main --event push --limit 10`；某次运行的失败项：`gh run view <运行编号> --log-failed | grep FAILED`。

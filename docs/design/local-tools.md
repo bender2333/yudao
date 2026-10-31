@@ -2,7 +2,7 @@
 
 总图位置：第四节「动作」的缝；第一节「模型与工具」方框。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)、[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)。
 
-本文写明三个部门使用的本地工具的边界，网络与 MCP、执行环境服务、浏览器与以后阶段的 computer use 新增的工具同样遵守这些边界。
+本文写明三个部门使用的本地工具的边界，网络与 MCP、执行环境服务、浏览器与 computer use 新增的工具同样遵守这些边界。
 
 ## 1. 使用过程
 
