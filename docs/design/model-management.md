@@ -6,7 +6,7 @@
 
 ## 1. 参照对象与取舍
 
-参照 OMP（`C:/project/codes/oh-my-pi` @ fdfeef1f78）与 opencode（`anomalyco/opencode`，原 `sst/opencode`）：压缩的部分按 @ 7ab721a97f，模型数据来源的部分按 @ 0027387。用户原话与已确认的规则见 D24。
+参照 OMP（`C:/project/codes/oh-my-pi` @ fdfeef1f78）与 opencode（`anomalyco/opencode`，原 `sst/opencode`）：压缩的部分按 @ 7ab721a97f，模型数据来源的部分按 @ 0027387。已确认的规则见 D24。
 
 | 方面 | OMP | opencode | Yudao |
 | --- | --- | --- | --- |
