@@ -2876,6 +2876,18 @@ export type InitialPrdProposal = {
      * Summary
      */
     summary?: string | null;
+    /**
+     * Requirements
+     */
+    requirements?: Array<string>;
+    /**
+     * Acceptance Criteria
+     */
+    acceptance_criteria?: Array<string>;
+    /**
+     * Requirement Mapping
+     */
+    requirement_mapping?: Array<RequirementMapping>;
 };
 
 /**
@@ -4674,6 +4686,24 @@ export type ReportItem = {
      * Detail
      */
     detail?: string | null;
+};
+
+/**
+ * RequirementMapping
+ */
+export type RequirementMapping = {
+    /**
+     * Requirement
+     */
+    requirement: number;
+    /**
+     * Criteria
+     */
+    criteria?: Array<string>;
+    /**
+     * Gap
+     */
+    gap?: string | null;
 };
 
 /**
@@ -14991,24 +15021,6 @@ export type QaTestsSavedPayload = {
      * Activation Id
      */
     activation_id: string;
-};
-
-/**
- * RequirementMapping
- */
-export type RequirementMapping = {
-    /**
-     * Requirement
-     */
-    requirement: number;
-    /**
-     * Criteria
-     */
-    criteria?: Array<string>;
-    /**
-     * Gap
-     */
-    gap?: string | null;
 };
 
 /**

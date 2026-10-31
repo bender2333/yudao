@@ -1062,11 +1062,15 @@ class DecisionOption(Payload):
 
 class InitialPrdProposal(Payload):
     # 候选中的初始 PRD：接纳它的事件编号、ProductSpec 的内容哈希与 PRD.md 的工件引用；
-    # summary 是给用户看的 PRD 摘要（原型 v8 的 materials.prd_summary）
+    # summary 是给用户看的 PRD 摘要（原型 v8 的 materials.prd_summary）。
+    # 要求、验收标准与对应声明随候选交给决定卡片（工单 #1349）；旧事件没有这三项时为空
     event_id: str
     content_hash: str
     prd_ref: ArtifactRef
     summary: str | None = None
+    requirements: list[str] = []
+    acceptance_criteria: list[str] = []
+    requirement_mapping: list[RequirementMapping] = []
 
 
 class StructureProposal(Payload):
