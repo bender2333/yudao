@@ -145,6 +145,7 @@
 "test_project_parameters.py" = "integration"
 "test_projects.py" = "integration"
 "test_proposal_conditions.py" = "unit"
+"test_product_spec_mapping.py" = "module"
 "test_proposal_conditions_contract.py" = "module"
 "test_proposal_version_check.py" = "module"
 "test_prompts.py" = "unit"

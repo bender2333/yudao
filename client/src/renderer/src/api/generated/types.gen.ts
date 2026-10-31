@@ -14994,6 +14994,24 @@ export type QaTestsSavedPayload = {
 };
 
 /**
+ * RequirementMapping
+ */
+export type RequirementMapping = {
+    /**
+     * Requirement
+     */
+    requirement: number;
+    /**
+     * Criteria
+     */
+    criteria?: Array<string>;
+    /**
+     * Gap
+     */
+    gap?: string | null;
+};
+
+/**
  * ReviewObservation
  */
 export type ReviewObservation = {
@@ -16125,6 +16143,10 @@ export type SpecAcceptedPayload = {
      * Input Version
      */
     input_version: number;
+    /**
+     * Requirement Mapping
+     */
+    requirement_mapping?: Array<RequirementMapping>;
     /**
      * Kind
      */

@@ -526,6 +526,7 @@ def _prd_revision_answer(call):
             "goal": "build an echo CLI",
             "requirements": ["print the given argument in uppercase to stdout"],
             "acceptance_criteria": ["running the program with a word prints that word in uppercase"],
+            "requirement_mapping": [{"requirement": 1, "criteria": ["AC1"]}],
             "change_record": {
                 "changed": ["print the given argument in uppercase to stdout"],
                 "retained": ["single file implementation"],

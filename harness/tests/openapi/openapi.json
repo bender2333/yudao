@@ -32622,6 +32622,39 @@
         "title": "QaTestsSavedPayload",
         "type": "object"
       },
+      "RequirementMapping": {
+        "additionalProperties": false,
+        "properties": {
+          "requirement": {
+            "title": "Requirement",
+            "type": "integer"
+          },
+          "criteria": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          }
+        },
+        "required": [
+          "requirement"
+        ],
+        "title": "RequirementMapping",
+        "type": "object"
+      },
       "ReviewObservation": {
         "additionalProperties": false,
         "properties": {
@@ -34959,6 +34992,14 @@
           "input_version": {
             "title": "Input Version",
             "type": "integer"
+          },
+          "requirement_mapping": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RequirementMapping"
+            },
+            "title": "Requirement Mapping",
+            "type": "array"
           },
           "kind": {
             "const": "product_spec",

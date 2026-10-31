@@ -68,6 +68,7 @@ def test_new_spec_explicitly_disposes_each_effective_decision_and_preserves_its_
                 "goal": "build an echo CLI",
                 "requirements": ["print the argument and reject unknown flags"],
                 "acceptance_criteria": ["running the program with a word prints that word"],
+                "requirement_mapping": [{"requirement": 1, "criteria": ["AC1"]}],
                 "change_record": {
                     "changed": ["Make unknown flag behavior explicit"],
                     "retained": ["Echo valid input"],
