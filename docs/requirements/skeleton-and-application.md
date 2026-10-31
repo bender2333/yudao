@@ -1,6 +1,6 @@
 # D40 骨架与应用：骨架向后兼容，应用一次完成
 
-确认时间：2026-10-23。状态：需求已确认，设计在[骨架与应用设计说明](../design/skeleton-and-application.md)，未实施。路线位置：Stage 3 新增工作包「骨架与应用」，排在 M0 之后、M2 之前（[总体路线图](../archive/program-roadmap-2026-10-25.md)第 2 节第 17 项，[Stage 3 计划](../archive/stage-3-plan.md)第 3、9 节）。相关记录：[D35 自举](self-hosting.md)、[D38 系统意图与基础规则](system-intent.md)、[可信内核设计说明](../design/trusted-kernel.md)。编号 D39 留给暂缓的黑板编排（PR #751，不合并）。
+确认时间：2026-10-23。状态：需求已确认，设计在[骨架与应用设计说明](../design/skeleton-and-application.md)，未实施。路线位置：[路线图](../program-roadmap.md)第 2 节阶段一「核心打通与换骨架」。相关记录：[D35 自举](self-hosting.md)、[D38 系统意图与基础规则](system-intent.md)、[可信内核设计说明](../design/trusted-kernel.md)。编号 D39 留给暂缓的黑板编排（PR #751，不合并）。
 
 ## 用户原话
 
