@@ -162,6 +162,20 @@ const RECOVERY_OVERLAY_TEXT: Readonly<Record<"interrupted" | "waiting_resume", s
 };
 
 /**
+ * 整层「中断」的取值（工单 #1188，设计说明第 4.3 节 2026-10-29 补充）：事件流断开，或者任一事项的
+ * 恢复观察状态是 interrupted。整层变暗、时钟停住，不是弹窗也不是空白；画面本身照旧画着最后一份状态。
+ * 服务进程被强行结束时读不到 interrupted（未结束的激活在 finally 才结束），所以以事件流断开为准；
+ * 服务回来、页面重新连接并看到自动继续以后恢复。
+ * 待恢复（waiting_resume）不使整层变暗：那是等用户处理，画面照常显示。
+ */
+export function floorInterrupted(loop: ProjectLoopResult | null, streamDisconnected: boolean): boolean {
+  if (streamDisconnected) {
+    return true;
+  }
+  return (loop?.work_items ?? []).some((row) => row.recovery_state === "interrupted");
+}
+
+/**
  * 「恢复」覆盖层的数据（工单 #1186，原型 v13 js/translate/translate.js 的 floorOverlay 恢复一项）：
  * 中断与待恢复的事项各在自己所在的部门挂一块牌子，牌子写状态与事项标题。
  * 数据在这里由查询结果写好，画面层只照着画；事项的范围与画面合同的状态同 itemStateOf 的对应。
