@@ -880,4 +880,3 @@ sequenceDiagram
 - 2026-10-30 / claude-sonnet-5-5（总架构师） / 模型管理一节：新增 `catalog.connect`（一步连接）与 `catalog.model.select`（选用即启用）两条命令，补 `catalog.model.remove` 的说明；`catalog.candidates.collect` 的失败分五种并带来源、提供方与适用性；`catalog.model.test` 含工具往返；`credential.*` 写明页面不使用只在本进程有效的方式；`catalog` 查询加进行中的选用与每个连接最近一次的候选获取结果；选用进行中的状态是瞬时状态，不写事件日志 / 模型管理改为填写地址与 Key、选择模型即可使用（模型管理设计说明第 4.2、4.3、9.1 节）
 - 2026-10-31 / claude-opus-5-5 / 部门改为按事项所用的定义给出（`provider_unavailable`、`departments` 说明、部门筛选、谁开工）；「质检无法核验」改为「核验角色无法核验」；`kept_delivery`、`run.trials`、`acceptance.coverage` 的质检改为核验角色；第 4.3 节区分验收条件的开环与事项的开环完成；字段名与取值不变 / 按总图 ADR-0044 的改动核对
 - 2026-10-31 / claude-opus-5-5（子架构师） / 第 3.1 节拒绝原因封闭清单补 `not_wired` / 架构问题 #643 一条
-- 2026-10-31 / claude-opus-5-5（子架构师） / 第 3.3 节决定种类表「判定点不确定、并且没有独立的下游核验时的裁定」改为「角色拿不准时按角色材料选择问用户」 / 用户 2026-10-31 定判定点拿不准时由角色材料判断（总图第三节「判定点」）
