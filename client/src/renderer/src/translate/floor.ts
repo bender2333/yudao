@@ -294,14 +294,47 @@ export function sourceOverlay(loop: ProjectLoopResult | null): SourceOverlayData
   return { entries, missing, legend };
 }
 
-/** 来源卡片要读的原始事件：`event.detail` 或事件流给出的事件对象里用到的那几个字段。 */
+/** 来源卡片要读的原始事件：`event.detail`、`event.positions` 或事件流给出的事件对象里用到的那几个字段。 */
 export interface SourceEvent {
   type?: string | null;
   label?: string | null;
   at?: string | null;
   actor?: string | null;
+  /** 提出者的可读名（`event.positions` 已经写好，如「产品部门」「你」）；没有时按 actor 自己翻 */
+  actor_label?: string | null;
   position?: number | null;
   payload?: Record<string, unknown> | null;
+}
+
+/** `event.positions` 的一条结果（工单 #1342）：位置、能不能取到、取不到的原因与事件流同形状的字段。 */
+export interface EventAtPositionView {
+  position: number;
+  status: "available" | "missing";
+  reason?: string | null;
+  label?: string | null;
+  type?: string | null;
+  actor?: string | null;
+  actor_label?: string | null;
+  at?: string | null;
+  payload?: Record<string, unknown> | null;
+}
+
+/**
+ * 按位置取事件的结果里取出那个位置的事件（工单 #1342）：取得到时翻成来源卡片要的形状；
+ * 取不到（越界、已归档、已压缩或位置上是别的流的事件）时为空，卡片按「取不到」写。
+ */
+export function sourceEventOf(items: readonly EventAtPositionView[], position: number): SourceEvent | null {
+  const found = items.find((item) => item.position === position);
+  if (!found || found.status !== "available") return null;
+  return {
+    type: found.type ?? null,
+    label: found.label ?? null,
+    at: found.at ?? null,
+    actor: found.actor ?? null,
+    actor_label: found.actor_label ?? null,
+    position: found.position,
+    payload: found.payload ?? null,
+  };
 }
 
 /**
@@ -325,7 +358,7 @@ export function sourceCard(
     event_label: event?.label ?? null,
     kind_label: eventKindLabel(event?.type),
     at: event?.at ?? null,
-    actor_label: actorLabel(event?.actor),
+    actor_label: event?.actor_label ?? actorLabel(event?.actor),
     detail: detailRows(row, payload),
     note: event === null
       ? `原始事件的说明没有取到；在时间轴上回到第 ${ref.position} 位，可以看到它影响的那一刻`

@@ -292,7 +292,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
-        "project.flow", "work_item.inputs", "event.detail", "department.workspace", "run.actions", "run.steps",
+        "project.flow", "work_item.inputs", "event.detail", "event.positions", "department.workspace", "run.actions", "run.steps",
         "run.asks",
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",

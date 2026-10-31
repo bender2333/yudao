@@ -28,7 +28,8 @@ import { itemColor } from "../../pixel/world/floor";
 import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
 import { OVERLAY_LABELS } from "../../translate/coverage";
-import { floorActions, floorCards, floorInterrupted, floorState, loopsOverlay, recoveryOverlay, sourceCard, sourceOverlay, streamText,
+import { floorActions, floorCards, floorInterrupted, floorState, loopsOverlay, recoveryOverlay, sourceCard, sourceEventOf,
+         sourceOverlay, streamText, type EventAtPositionView,
          toFloorEvent, type FloorEvent } from "../../translate/floor";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
@@ -285,12 +286,26 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     [decisions.data, replaying, model],
   );
 
-  // 点开事实元素：按这一份查询结果找到来源与原始事件，翻好来源卡片交给画面（工单 #398）
+  // 点开事实元素：按这一份查询结果找到来源与原始事件，翻好来源卡片交给画面（工单 #398）。
+  // 原始事件先按位置取一次（工单 #1342 的 event.positions）：回链可能指向 run 流或项目流，两个都给；
+  // 取到以后替换卡片的内容，取不到时用手上已有的事件（页面缓存 500 条）兜底，再没有就写「取不到」。
   openSourceRef.current = (workItemId, element) => {
     const row = (loop.data?.work_items ?? []).find((item) => item.work_item_id === workItemId);
     const ref = row?.refs?.[element];
     if (!row || !ref) return;
-    viewRef.current?.showSource(sourceCard(row, element, ref, eventsRef.current.get(ref.position) ?? null));
+    const cached = eventsRef.current.get(ref.position) ?? null;
+    viewRef.current?.showSource(sourceCard(row, element, ref, cached));
+    const params: Record<string, unknown> = { project_id: props.projectId, positions: [ref.position] };
+    if (row.run_id) params.run_id = row.run_id;
+    void props.app
+      .queryOne<{ events: EventAtPositionView[] }>("event.positions", params)
+      .then((result) => {
+        const event = sourceEventOf(result.data.events ?? [], ref.position);
+        if (event) viewRef.current?.showSource(sourceCard(row, element, ref, event));
+      })
+      .catch(() => {
+        // 查询失败时留着缓存摊开的卡片（取不到就写着它在时间轴上的位置），不打断画面
+      });
   };
 
   // 每次查询结果到达：交给播放时间线（状态等它之前的动作演完再上画面）
