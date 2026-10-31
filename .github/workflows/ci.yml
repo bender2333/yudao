@@ -199,7 +199,7 @@ jobs:
           node-version: "24"
 
       - name: 单元测试
-        run: node --test --test-reporter=spec .claude/skills/solo/scripts/test/*.test.mjs
+        run: node --test --test-reporter=spec .claude/skills/solo/scripts/test/*.test.mjs .claude/hooks/*.test.mjs
 
       - name: 语法检查
         run: |
