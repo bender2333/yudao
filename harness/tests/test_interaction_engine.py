@@ -12,7 +12,7 @@ from harness.definitions import DEFINITIONS
 from harness.engine import StepLimits
 from harness.models import EventType, json_dumps
 from harness.proposals import (
-    delivery_turn, product_spec, product_spec_turn,
+    delivery_turn, judgement_turn, product_spec, product_spec_turn,
     review_turn,
 )
 from harness.providers.call import ModelResponse
@@ -253,7 +253,7 @@ def test_user_input_during_a_quality_round_is_delivered_as_a_notification(tmp_pa
     system = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [product_spec(), _revision()],
         "engineering": [delivery_turn(), delivery_turn()],
-        "quality": [in_flight_input, review_turn("release", "checks passed on the current snapshot")]
+        "quality": [in_flight_input, judgement_turn(), review_turn("release", "checks passed on the current snapshot")]
                    + quality_turns("release", "checks passed on the current snapshot"),
     }))
     run_id = system.create_run("build echo")
@@ -289,7 +289,7 @@ def test_input_received_during_quality_model_response_is_delivered_as_a_notifica
     system = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [product_spec(), _revision()],
         "engineering": [delivery_turn(), delivery_turn()],
-        "quality": [stale_release, review_turn("release", "checks passed on the current snapshot")]
+        "quality": [stale_release, judgement_turn(), review_turn("release", "checks passed on the current snapshot")]
                    + quality_turns("release", "checks passed on the current snapshot"),
     }))
     run_id = system.create_run("build echo")
@@ -320,10 +320,10 @@ def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_p
     system = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn()],
-        "quality": [review_turn("release", "Current check passed")],
+        "quality": [judgement_turn(), review_turn("release", "Current check passed")],
     }))
     run_id = system.create_run("build echo")
-    _steps(system, run_id, 2)
+    _steps(system, run_id, 3)  # 产品、工程交付、质检交独立判断（工单 #358）
     prepare = system.orchestrator.submissions.prepare
     receivers = []
 

@@ -11,7 +11,7 @@ from harness.app.project_queries import DepartmentWorkspace
 from harness.engine import StepLimits
 from harness.models import EventType
 from harness.proposals import (
-    answer_turn, ask_turn, delivery_turn,
+    answer_turn, ask_turn, delivery_turn, judgement_turn,
     product_spec, product_spec_turn, review_turn,
 )
 from harness.providers.call import ModelResponse, ModelStreamEvent
@@ -272,9 +272,11 @@ def test_guidance_round_changes_the_running_workspace_and_delivers(tmp_path):
     assert result.department_guidance[0].status == "answered"
     assert result.department_guidance[0].outcome == "proposal_accepted"
 
+    adapter.scripts["quality"].append(judgement_turn())
     adapter.scripts["quality"].append(review_turn("release", "checks passed on the current delivery"))
     released = system.activate_once(run_id)
     assert adapter.invocations[-1].department == "quality"
+    released = system.activate_once(run_id)
     assert released.status == "done"
     assert released.last_review.verdict == "release"
 
@@ -327,7 +329,7 @@ def test_a_round_that_ends_the_item_still_writes_answered(tmp_path):
     # 验收第 1 条：收到指导的那一轮以放行结束、事项随这一轮完成，同样写已回答。
     # 这一轮的结束状态是已完成，不是暂停或失败，所以不算「这一轮没有正常结束」
     adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()],
-                           "quality": [review_turn("release", "checks passed on the current delivery")]})
+                           "quality": [judgement_turn(), review_turn("release", "checks passed on the current delivery")]})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.activate_once(run_id)
