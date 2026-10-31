@@ -148,7 +148,9 @@ def _compaction_system(data_dir, summary: Callable[[Any], ModelResponse], *, ste
             return ModelResponse(output=[_call(identity, "read_file", {"path": "large.txt"})])
         return product_spec()
 
-    system, _, run_id = _system(data_dir, [respond] * 20, step_limits=step_limits, context_window=6000)
+    # 窗口按本场景的需要设置：工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token，窗口随之上调，
+    # 压缩发生在哪一步与事件序列基准保持一致
+    system, _, run_id = _system(data_dir, [respond] * 20, step_limits=step_limits, context_window=6000 + 346)
     system.workspace(run_id).write_file("large.txt", "LARGE_TOOL_OUTPUT " * 2200)
     return system, run_id
 

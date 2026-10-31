@@ -63,7 +63,7 @@
    "parent_event_id": null,
    "session_id": null,
    "stop_reason": "compaction_failed",
-   "error": "the model request leaves no room for model output",
+   "error": "Pinned context leaves insufficient room for a useful history summary",
    "payload": {
     "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
     "stop_reason": "compaction_failed"
@@ -110,7 +110,7 @@
  "projection": {
   "status": "failed",
   "stop_reason": "compaction_failed",
-  "error": "the model request leaves no room for model output",
+  "error": "Pinned context leaves insufficient room for a useful history summary",
   "waiting_reason": "未能完成：上下文压缩失败",
   "active_department": null,
   "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",

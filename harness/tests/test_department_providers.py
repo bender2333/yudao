@@ -717,7 +717,8 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
         "models": [
             {"id": "model-p", "provider_id": "provider-p", "model": "p-model",
              "protocol": "messages",
-             "context_window": 6_000, "max_output_tokens": 1_000},
+             # 工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token，这个为了触发压缩而定的小窗口随之上调
+            "context_window": 6_000 + 346, "max_output_tokens": 1_000},
             {"id": "model-e", "provider_id": "provider-e", "model": "e-model",
              "protocol": "chat_completions",
              "context_window": 20_000, "max_output_tokens": 1_000},
