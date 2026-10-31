@@ -157,6 +157,25 @@ class McpServersDocument(Payload):
     document_digest: str
 
 
+class McpToolHint(Payload):
+    # 服务器标注的工具提示（网络与 MCP 设计说明第 4.1 节「工具清单」）：只读、幂等与破坏性提示，
+    # 只显示给用户参考；模型看到的工具定义不带它
+    title: str = ""
+    read_only_hint: bool | None = None
+    idempotent_hint: bool | None = None
+    destructive_hint: bool | None = None
+    open_world_hint: bool | None = None
+
+
+class McpToolSpec(Payload):
+    # 工具清单快照里一个工具的清单项（设计说明第 4.1 节「工具清单」）：名称、说明与参数结构，
+    # 加服务器自己的提示（只供参考）
+    name: str
+    description: str = ""
+    input_schema: dict[str, Any] = {}
+    hints: McpToolHint | None = None
+
+
 class Usage(Payload):
     # 提供方上报的用量；没有上报的项为空
     input_tokens: int
@@ -1291,6 +1310,26 @@ class McpServersConfiguredPayload(Payload):
     document_digest: str
 
 
+class McpServerInfo(Payload):
+    # 探测读到的服务器信息（initialize 的结果，工单 #1174）
+    name: str
+    version: str = ""
+    protocol_version: str = ""
+
+
+class ToolServerProbeFinishedPayload(Payload):
+    # 一次探测的结果（工单 #1174，网络与 MCP 设计说明第 4.2 节）：成功带服务器信息与工具清单快照
+    # （快照带它绑定的配置摘要），失败带原因（带服务器标准错误输出的末尾部分，凭据值已替换为星号）。
+    # config_digest 是这次探测针对的非秘密服务器配置的内容摘要：与待保存配置摘要一致的成功结果
+    # 才能成为可用快照；凭据引用参加摘要，凭据值不参加、不进入事件
+    server_name: str
+    status: Literal["ok", "failed"]
+    config_digest: str
+    server_info: McpServerInfo | None = None
+    tools: list[McpToolSpec] = []
+    error: str = ""
+
+
 class WorkItemStartFailedPayload(Payload):
     work_item_id: str
     run_id: str
@@ -1704,6 +1743,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.WRITEBACK_HELD: WritebackHeldPayload,
     ProjectEventType.WRITEBACK_VERIFIED: WritebackVerifiedPayload,
     ProjectEventType.MCP_SERVERS_CONFIGURED: McpServersConfiguredPayload,
+    ProjectEventType.TOOL_SERVER_PROBE_FINISHED: ToolServerProbeFinishedPayload,
     CatalogEventType.CATALOG_REVISED: CatalogRevisedPayload,
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: CatalogCandidatesCollectedPayload,
     CatalogEventType.CATALOG_TEST_FINISHED: CatalogTestFinishedPayload,

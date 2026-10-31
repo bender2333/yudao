@@ -9,7 +9,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { COVERAGE, classOf } from "../../src/renderer/src/translate/coverage.ts";
-import { FLOOR_EVENT_TYPES, floorActions, floorCards, floorState, recoveryOverlay, streamText, type FloorEvent } from "../../src/renderer/src/translate/floor.ts";
+import { FLOOR_EVENT_TYPES, floorActions, floorCards, floorInterrupted, floorState, recoveryOverlay, streamText, type FloorEvent } from "../../src/renderer/src/translate/floor.ts";
 import { KINDS } from "../../src/renderer/src/pixel/world/floor-decl.ts";
 import { floorState as checkFloorState } from "../../src/renderer/src/pixel/contract.ts";
 import type { AskView, DecisionView, ProjectLoopResult } from "../../src/renderer/src/api/generated/types.gen.ts";
@@ -153,6 +153,27 @@ test("状态：project.loop 的样例结果翻出的状态通过画面合同的�
   assert.equal(state.roles?.engineering[0].status, "working");
   assert.deepEqual(state.shelves.adopted, ["w1"]);
   assert.equal(state.focus_id, "w1");
+});
+
+test("整层中断：事件流断开时变暗，任一事项 interrupted 时同样，正常时不变暗（工单 #1188）", () => {
+  // 事件流断开：服务不可达期间整层变暗、时钟停住；画面照旧画着最后一份状态，不是弹窗也不是空白
+  assert.equal(floorInterrupted(null, true), true);
+  assert.equal(floorInterrupted(loopResult([loopRow()]), true), true);
+  // 任一事项的恢复观察状态是 interrupted（进程在步骤之间退出）：同样整层变暗
+  assert.equal(floorInterrupted(loopResult([
+    loopRow({ work_item_id: "w1" }),
+    loopRow({ work_item_id: "w2", status: "in_progress", recovery_state: "interrupted" }),
+  ]), false), true);
+  // 正常时不变暗；待恢复与暂停是等用户处理，画面照常显示，不使整层变暗
+  assert.equal(floorInterrupted(loopResult([loopRow()]), false), false);
+  assert.equal(floorInterrupted(loopResult([
+    loopRow({ status: "in_progress", recovery_state: "waiting_resume" }),
+    loopRow({ status: "in_progress", recovery_state: "paused" }),
+  ]), false), false);
+  // 画面拿到的就是这一个取值：交给 floorState 的 interrupted 与纯函数一致
+  const interrupted = floorInterrupted(loopResult([loopRow({ recovery_state: "interrupted" })]), false);
+  const state = floorState({ position: 1, loop: loopResult([loopRow({ recovery_state: "interrupted" })]), interrupted });
+  assert.equal(state.interrupted, true);
 });
 
 test("状态：因升级停止的事项翻成 upgrade_stopped，门口牌子立在最后工作的部门（工单 #1186）", () => {

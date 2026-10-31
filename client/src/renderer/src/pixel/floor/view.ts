@@ -189,6 +189,8 @@ export interface FloorTestHooks {
     pipes: [string, string | null][];
     signals: string[];
     items: { id: string; status: string; department: string | null }[];
+    /** 整层是否在中断里（画面变暗、时钟停住，工单 #1188）：端到端在服务不可达与恢复以后读它。 */
+    interrupted: boolean;
     reduced: boolean;
     canvasWidth: number;
   };
@@ -250,6 +252,7 @@ export function floorTestHooks(view: FloorView, onResync: () => void): FloorTest
         pipes: Object.entries(world.links).map(([key, p]) => [key, p.flow ? p.flow.state : null] as [string, string | null]),
         signals: Object.keys(world.signals).filter((name) => world.signals[name].until > scene.realT),
         items: driver.model.items.map((it) => ({ id: it.id, status: it.status, department: it.department })),
+        interrupted: driver.model.interrupted,
         reduced: scene.reduced,
         canvasWidth: 0,
       };

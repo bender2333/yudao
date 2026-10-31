@@ -128,16 +128,19 @@ def event_label(event_type: str, payload: dict[str, Any]) -> str:
         return GENERIC_EVENT_LABEL
     try:
         return template.format_map(_Translated(payload))
-    except (KeyError, IndexError, ValueError):
+    except (KeyError, IndexError, ValueError, TypeError):
+        # TypeError：载荷里被当作清单翻译的字段其实是数字（例如开始排空事件的 running_runs），
+        # 一种说明写不成不能把整条事件流断掉（工单 #1188 的端到端撞到）
         return GENERIC_EVENT_LABEL
 
 
 class _Translated(dict):
-    # 停止原因与部门取中文名，标识清单取数量，其余字段原样
+    # 停止原因与部门取中文名，标识清单取数量，其余字段原样。
+    # 数字与清单同名时以载荷里的类型为准：整数的 running_runs 不按清单翻译，标签里直接写数字
     _NAMES = {
         "stop_reason": stop_reason_name, "reason": value_name,
         "department": department_name, "requester": department_name, "recipient": department_name,
-        "guidance_ids": item_count, "candidate_ids": item_count, "running_runs": item_count,
+        "guidance_ids": item_count, "candidate_ids": item_count,
         "stopped_runs": item_count, "restarted_work_items": item_count,
         "kind": decision_kind_name,
         "artifact_kind": artifact_kind_name,
@@ -226,6 +229,7 @@ _LABELS: dict[str, str] = {
     ProjectEventType.WRITEBACK_HELD: "写回等待前项合入：{previous_adoption_id}",
     ProjectEventType.WRITEBACK_VERIFIED: "核实了已发生的写回动作：分支 {branch}",
     ProjectEventType.MCP_SERVERS_CONFIGURED: "保存了 MCP 服务器设置（第 {version} 版）",
+    ProjectEventType.TOOL_SERVER_PROBE_FINISHED: "探测 MCP 服务器 {server_name}：{status}",
     CatalogEventType.CATALOG_REVISED: "模型目录修订到第 {revision} 号（{operation}）",
     CatalogEventType.CATALOG_CANDIDATES_COLLECTED: "收集了模型候选：{candidate_ids} 个",
     CatalogEventType.CATALOG_TEST_FINISHED: "模型测试结束：{kind}，结果 {ok}",

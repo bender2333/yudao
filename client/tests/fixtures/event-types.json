@@ -75,6 +75,7 @@
   "structure_accepted",
   "tool_call_required",
   "tool_called",
+  "tool_server_probe_finished",
   "tool_skipped",
   "tool_started",
   "user_input_received",

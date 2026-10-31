@@ -4,7 +4,7 @@
 // 后端使用临时目录，不写入仓库（工单验收：模型回答由 FakeAdapter 给出，不使用 mock）。
 
 import { chromium, type Browser, type Page } from "@playwright/test";
-import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { spawn, spawnSync, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -13,6 +13,11 @@ export type Backend = {
   port: number;
   address: string;
   dataDir: string;
+  // 后端进程自己的进程号（工单 #1188）：硬杀按它结束整个进程树
+  pid: number;
+  // 硬杀重启的脚本给出的信号目录（--script kill）：工程执行的那条等待命令在这里写 started 与 child.pid，
+  // 用例等 started 出现以后再结束进程；其他模式为空
+  signals: string | null;
   // 局域网访问方式（工单 #348）下的局域网地址；本机访问方式时为空串
   lanAddress: string;
   // 局域网访问方式下后端建立的访问令牌明文；本机访问方式时为空串。页面在令牌表单里填写它
@@ -23,6 +28,8 @@ export type Backend = {
   // 前者填进接入对话框的源目录路径，后者填进从想法新建的起始文件夹
   sourceDir: string | null;
   stop: () => Promise<void>;
+  // 硬杀服务进程（与进程树，工单 #1188）：不做优雅收尾，下一个进程要按启动恢复继续未结束的 run
+  kill: () => Promise<void>;
 };
 
 export type ClientApp = {
@@ -80,7 +87,7 @@ function newestModification(directory: string): number {
 // port 固定端口（断线恢复的用例在同一端口再起一次）；room 用流式慢模型跑
 // 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; releaseVersion?: string; releaseVersionOnce?: string; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial" | "waiting" | "kernel" | "pending" | "stopnote" | "replay"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean; tokenName?: string } = {},
+  options: { apiVersion?: number; releaseVersion?: string; releaseVersionOnce?: string; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial" | "waiting" | "kernel" | "pending" | "stopnote" | "replay" | "kill"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean; tokenName?: string; holdResume?: boolean } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {
@@ -122,30 +129,55 @@ export async function startBackend(
   if (options.tokenName !== undefined) {
     script.push("--token-name", options.tokenName);
   }
+  // 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本，续跑完才起服务
+  if (options.holdResume === true) {
+    script.push("--hold-resume");
+  }
   const child = spawn("uv", ["run", "python", ...script], {
     cwd: repoRoot,
     stdio: ["pipe", "pipe", "pipe"],
     shell: true,
   });
+  // 后端的标准错误照原样转到测试进程：服务里的异常不会因为没有读取管道而在用例里静默消失
+  child.stderr.on("data", (chunk: Buffer) => process.stderr.write(chunk));
   const line = await readFirstLine(child);
   const parsed = JSON.parse(line) as {
     port: number;
     data_dir: string;
+    pid?: number;
+    signals?: string | null;
     room_project?: string | null;
     source_dir?: string | null;
     access?: string;
     address?: string | null;
     token?: string | null;
   };
+  const pid = parsed.pid ?? child.pid;
+  if (pid === undefined) {
+    throw new Error("后端没有报告进程号，硬杀无法按进程树结束");
+  }
+  // 收尾只做一次：硬杀以后进程已经退出，再走优雅收尾会往关闭的标准输入里写东西
+  let finished = false;
   return {
     port: parsed.port,
     address: `http://127.0.0.1:${parsed.port}`,
     lanAddress: parsed.address ?? "",
     token: parsed.token ?? "",
     dataDir: parsed.data_dir,
+    pid,
+    signals: parsed.signals ?? null,
     roomProject: parsed.room_project ?? null,
     sourceDir: parsed.source_dir ?? null,
-    stop: () => stopProcess(child),
+    stop: async () => {
+      if (finished) return;
+      finished = true;
+      await stopProcess(child);
+    },
+    kill: async () => {
+      if (finished) return;
+      await killProcess(child, pid);
+      finished = true;
+    },
   };
 }
 
@@ -165,6 +197,8 @@ function readFirstLine(child: ChildProcessWithoutNullStreams): Promise<string> {
 }
 
 async function stopProcess(child: ChildProcessWithoutNullStreams): Promise<void> {
+  // 硬杀以后进程已经退出：往关闭的标准输入里写会报 EPIPE，这里当作收尾完成
+  child.stdin.on("error", () => undefined);
   const exited = new Promise<void>((resolve) => {
     child.on("exit", () => resolve());
     setTimeout(() => {
@@ -173,6 +207,32 @@ async function stopProcess(child: ChildProcessWithoutNullStreams): Promise<void>
     }, 3000);
   });
   child.stdin.end();
+  await exited;
+}
+
+// 硬杀服务进程与它起的命令（工单 #1188）：spawn 用了 shell: true，子进程在 shell 之下，
+// 只结束顶层进程会让 python 服务与它起的命令继续活着；Windows 上按进程树结束（taskkill /T /F）。
+// 不做优雅收尾：下一个进程要按启动恢复继续未结束的 run。抛出的错误由调用方看到，不静默吞掉
+async function killProcess(child: ChildProcessWithoutNullStreams, pid: number): Promise<void> {
+  const exited = new Promise<void>((resolve) => {
+    if (child.exitCode !== null || child.signalCode !== null) {
+      resolve();
+      return;
+    }
+    child.once("exit", () => resolve());
+  });
+  if (process.platform === "win32") {
+    const result = spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    if (result.status !== 0 && child.exitCode === null) {
+      throw new Error(`结束进程树失败（taskkill 退出码 ${result.status}）`);
+    }
+  } else {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {
+      // 进程已经不在：与结束成功一样
+    }
+  }
   await exited;
 }
 

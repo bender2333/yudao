@@ -872,6 +872,57 @@
         }
       }
     },
+    "/api/commands/tool_server.probe": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "tool_server.probe",
+        "operationId": "command_tool_server_probe",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ToolServerProbe"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, project_archived, not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/decision.answer": {
       "post": {
         "tags": [
@@ -9492,6 +9543,67 @@
         ],
         "title": "MaterialRecord"
       },
+      "McpProbeResultView": {
+        "properties": {
+          "server_name": {
+            "type": "string",
+            "title": "Server Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "config_digest": {
+            "type": "string",
+            "title": "Config Digest",
+            "default": ""
+          },
+          "server_info": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Server Info"
+          },
+          "tools": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Tools",
+            "default": []
+          },
+          "error": {
+            "type": "string",
+            "title": "Error",
+            "default": ""
+          },
+          "probed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Probed At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "server_name",
+          "status"
+        ],
+        "title": "McpProbeResultView"
+      },
       "McpServerSettingView": {
         "properties": {
           "name": {
@@ -11013,6 +11125,16 @@
           },
           "mcp_servers": {
             "$ref": "#/components/schemas/McpServersSetting"
+          },
+          "last_probe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpProbeResultView"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "department_reminders": {
             "additionalProperties": {
@@ -13365,6 +13487,48 @@
           "home"
         ],
         "title": "SystemStatus"
+      },
+      "ToolServerProbe": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "server": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Server"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "project_id",
+          "name",
+          "server"
+        ],
+        "title": "ToolServerProbe"
       },
       "ToolsRegistryFetchRecord": {
         "properties": {
@@ -23880,6 +24044,30 @@
         "title": "MaterialRecordedPayload",
         "type": "object"
       },
+      "McpServerInfo": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "default": "",
+            "title": "Version",
+            "type": "string"
+          },
+          "protocol_version": {
+            "default": "",
+            "title": "Protocol Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "McpServerInfo",
+        "type": "object"
+      },
       "McpServerSetting": {
         "additionalProperties": false,
         "properties": {
@@ -24184,6 +24372,97 @@
           "document_digest"
         ],
         "title": "McpServersDocument",
+        "type": "object"
+      },
+      "McpToolHint": {
+        "additionalProperties": false,
+        "properties": {
+          "title": {
+            "default": "",
+            "title": "Title",
+            "type": "string"
+          },
+          "read_only_hint": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Only Hint"
+          },
+          "idempotent_hint": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Idempotent Hint"
+          },
+          "destructive_hint": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destructive Hint"
+          },
+          "open_world_hint": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open World Hint"
+          }
+        },
+        "title": "McpToolHint",
+        "type": "object"
+      },
+      "McpToolSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "input_schema": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Input Schema",
+            "type": "object"
+          },
+          "hints": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpToolHint"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "McpToolSpec",
         "type": "object"
       },
       "McpVariableValue": {
@@ -35515,6 +35794,207 @@
         "title": "ToolCalledEvent",
         "type": "object"
       },
+      "ToolServerProbeFinishedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "tool_server_probe_finished",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ToolServerProbeFinishedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ToolServerProbeFinishedEvent",
+        "type": "object"
+      },
+      "ToolServerProbeFinishedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "server_name": {
+            "title": "Server Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "config_digest": {
+            "title": "Config Digest",
+            "type": "string"
+          },
+          "server_info": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/McpServerInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tools": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/McpToolSpec"
+            },
+            "title": "Tools",
+            "type": "array"
+          },
+          "error": {
+            "default": "",
+            "title": "Error",
+            "type": "string"
+          }
+        },
+        "required": [
+          "server_name",
+          "status",
+          "config_digest"
+        ],
+        "title": "ToolServerProbeFinishedPayload",
+        "type": "object"
+      },
       "ToolSkippedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -38514,6 +38994,7 @@
             "structure_accepted": "#/components/schemas/StructureAcceptedEvent",
             "tool_call_required": "#/components/schemas/ToolCallRequiredEvent",
             "tool_called": "#/components/schemas/ToolCalledEvent",
+            "tool_server_probe_finished": "#/components/schemas/ToolServerProbeFinishedEvent",
             "tool_skipped": "#/components/schemas/ToolSkippedEvent",
             "tool_started": "#/components/schemas/ToolStartedEvent",
             "user_input_received": "#/components/schemas/UserInputReceivedEvent",
@@ -38749,6 +39230,9 @@
           },
           {
             "$ref": "#/components/schemas/McpServersConfiguredEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ToolServerProbeFinishedEvent"
           },
           {
             "$ref": "#/components/schemas/CatalogRevisedEvent"

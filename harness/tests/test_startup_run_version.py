@@ -75,12 +75,18 @@ def _source(root):
 
 def _onboarding_script():
     # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
-    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化
+    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化。
+    # 质检备两条同一内容的回答（工单 #1290，与 #1255 同一个机制）：一次建档 run 里它的基线核验要覆盖
+    # 工程的现有结构说明，结构说明还没被接纳时先做的那一次不被接受，结构说明到了以后它再被唤醒一次；
+    # 先后由调度决定。回答内容相同，条数只决定够不够用
+    def review():
+        return baseline_review_turn(
+            conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}])
+
     return {
         "product": [product_spec(requirements=[REQUIREMENT], acceptance=["run the CLI with a word"])],
         "engineering": [structure_turn(requirement_locations=[{"requirement": REQUIREMENT, "locations": [ECHO_FILE]}])],
-        "quality": [baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified",
-                                                      "evidence": "smoke"}])],
+        "quality": [review(), review()],
     }
 
 
@@ -219,9 +225,10 @@ def test_an_onboarding_run_is_restarted_from_the_recorded_snapshot(data_dir, tmp
     assert restarted_run.baseline is None
     snapshot = restarted.projects.projection(project_id).work_item(work_item_id).snapshot
     assert restarted_run.snapshot == snapshot, "从建档事项记录的快照开始"
-    # 重新开始以后的建档 run 照常跑到它的终态
+    # 重新开始以后的建档 run 照常跑到它的终态；没到 done 时把停止原因与错误一起报出来
+    # （工单 #1290：原来只有一句 assert，失败时看不出是脚本用尽还是别的原因）
     assert created.payload["run_id"] in restarted.resumed_runs
-    assert project_run(restarted.store, created.payload["run_id"]).status == "done"
+    assert restarted_run.status == "done", (restarted_run.stop_reason, restarted_run.error)
     restarted.close()
 
 

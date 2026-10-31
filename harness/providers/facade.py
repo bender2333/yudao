@@ -575,6 +575,11 @@ class ProviderFacade:
         with self._lock:
             return self._credential_versions.get(str(ref), 0)
 
+    def credential_chain(self) -> CredentialChain:
+        # 控制主机的凭据来源本体（进程内存、进程环境、数据目录的 .env）：
+        # MCP 服务器的探测与调用按名称从这里取值（网络与 MCP 设计说明第 4.4 节）
+        return self._credentials
+
     def credential_status(self, ref: str) -> dict[str, Any]:
         # 脱敏状态加版本，不含 Key
         with self._lock:

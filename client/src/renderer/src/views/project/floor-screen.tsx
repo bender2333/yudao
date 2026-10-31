@@ -27,8 +27,8 @@ import { itemColor } from "../../pixel/world/floor";
 import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
 import { OVERLAY_LABELS } from "../../translate/coverage";
-import { floorActions, floorCards, floorState, recoveryOverlay, sourceCard, sourceOverlay, streamText, toFloorEvent,
-         type FloorEvent } from "../../translate/floor";
+import { floorActions, floorCards, floorInterrupted, floorState, recoveryOverlay, sourceCard, sourceOverlay, streamText,
+         toFloorEvent, type FloorEvent } from "../../translate/floor";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
 import { paths } from "../../shell/routing";
@@ -136,10 +136,27 @@ export interface PixelFloorEventBridge {
   payload?: Record<string, unknown>;
 }
 
+/**
+ * 事件流断开（外壳在 body 上写 is-disconnected，工单 #296）：画面据此整层变暗。
+ * 只读外壳维护的那一个类名，不另开一条连接状态的来源；断开与恢复都从外壳那一处知道（工单 #1188）。
+ */
+function useBodyDisconnected(): boolean {
+  const [disconnected, setDisconnected] = useState(() => document.body.classList.contains("is-disconnected"));
+  useEffect(() => {
+    const update = (): void => setDisconnected(document.body.classList.contains("is-disconnected"));
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return disconnected;
+}
+
 /** 循环画面：画布、覆盖层切换、窄屏文字列表与决定卡片。 */
 export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const at = props.at ?? null;
   const replaying = at !== null;
+  const streamDisconnected = useBodyDisconnected();
   const loop = useSnapshot<ProjectLoopResult>(props.app, "page.loop", "project.loop", {
     project_id: props.projectId,
     work_item: props.workItemId,
@@ -247,10 +264,10 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
       slots: null,
       ops: null,
       machines: null,
-      interrupted: false,
+      interrupted: floorInterrupted(loop.data, streamDisconnected),
       focus: props.workItemId,
     }),
-    [loop.position, asks.position, loop.data, asks.data, runId, props.workItemId],
+    [loop.position, asks.position, loop.data, asks.data, runId, props.workItemId, streamDisconnected],
   );
 
   // 决定卡片是实时内容：到了就贴上大厅的板（回放期间不显示）

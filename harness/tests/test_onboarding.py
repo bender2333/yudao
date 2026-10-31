@@ -41,6 +41,22 @@ def _review_turn(**kwargs) -> FakeTurn:
     return baseline_review_turn(conclusions=[{"requirement": REQUIREMENT, "status": "verified", "evidence": "smoke"}],
                                 **kwargs)
 
+def _rework_review_turn() -> FakeTurn:
+    # 核验要求产品修改：结论里有一条没有被证据支持的要求
+    return baseline_review_turn(verdict="rework_product",
+                                conclusions=[{"requirement": REQUIREMENT, "status": "unsupported",
+                                              "evidence": "the README says nothing about this"}],
+                                checks={"smoke": 0})
+
+def _require_baseline_review(result):
+    # 投影里没有核验记录时先说清 run 是怎么结束的（工单 #1290）：run 在核验被接纳以前就结束时
+    # baseline_review 是 None，直接下标会报成 TypeError: 'NoneType' object is not subscriptable，
+    # 看不出是脚本用尽、被取消还是别的原因
+    assert result.baseline_review is not None, (
+        "the run ended before a baseline review was accepted: "
+        f"status={result.status} stop_reason={result.stop_reason} error={result.error}")
+    return result.baseline_review
+
 def _happy_script() -> dict:
     # 脚本按部门给出（工单 #557、#879）：PRD 被接纳以后工程与质检同时开始一轮工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化（工单 #879）。
@@ -203,20 +219,60 @@ def test_consistent_with_unsupported_is_rejected(tmp_path):
 
 def test_rework_product_returns_to_product(tmp_path):
     system, run_id = _onboarding_run(tmp_path, {
-        # 脚本按部门给出（工单 #557、#879）
+        # 脚本按部门给出（工单 #557、#879）。质检备两条同一内容的回答（工单 #1290）：它的基线核验要覆盖
+        # 工程的现有结构说明，结构说明还没被接纳时先做的那一次不被接受，结构说明到了以后它再被唤醒一次；
+        # 先后由调度决定。产品一条：核验要求修改以后产品开始一轮工作，用的就是这一条；这一轮之后再激活
+        # 产品时没有回答可用，run 在那里以 provider_error 结束（本用例只核对到这次激活为止）
         "product": [_product_turn()],
         "engineering": [_structure_turn()],
-        "quality": [baseline_review_turn(verdict="rework_product",
-                                         conclusions=[{"requirement": REQUIREMENT, "status": "unsupported", "evidence": "the README says nothing about this"}],
-                                         checks={"smoke": 0})],
+        "quality": [_rework_review_turn(), _rework_review_turn()],
     })
     result = system.run_until_stop(run_id)
-    assert result.baseline_review["verdict"] == "rework_product"
-    # 核验要求产品修改以后，产品开始一轮工作（工单 #556：关注的成果有了新东西，部门在等待工作时开始工作）
-    activated = [event.department for event in system.store.list_events(run_id)
-                 if event.type == EventType.DEPARTMENT_ACTIVATED]
-    assert activated == ["product", "engineering", "quality", "product"]
-    assert EventType.BASELINE_REVIEW_ACCEPTED in [event.type for event in system.store.list_events(run_id)]
+    assert _require_baseline_review(result)["verdict"] == "rework_product"
+    # 核验要求产品修改以后，产品开始一轮工作（工单 #556：关注的成果有了新东西，部门在等待工作时开始工作）。
+    # 触发与被触发的先后由事件决定，不靠「工程与质检谁先」（工单 #1290）：工程与质检同时开工，
+    # 质检可能被唤醒两次（结构说明接纳的前后各一次），激活的条数与两者的先后都不固定
+    events = system.store.list_events(run_id)
+    accepted = [event for event in events if event.type == EventType.BASELINE_REVIEW_ACCEPTED]
+    assert len(accepted) == 1
+    product_activations = [event for event in events
+                           if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == "product"]
+    assert len(product_activations) == 2  # 提交初始 PRD 一次、核验要求修改以后再一次
+    assert accepted[0].stream_version < product_activations[1].stream_version
+    activated = {event.department for event in events if event.type == EventType.DEPARTMENT_ACTIVATED}
+    assert activated == {"product", "engineering", "quality"}
+
+def test_rework_review_rejected_before_the_structure_is_accepted(tmp_path):
+    # 核验在结构说明被接纳以前提交的那一支（工单 #1290）：工程第一次提交的结构说明不全（覆盖了 PRD 里
+    # 没有的要求）被拒，所以质检第一次提交的核验一定落在「还没有结构说明」上、也被拒；结构说明接纳以后
+    # 质检再被唤醒一次，这一次通过。用「先给一条不合格的结构说明」把这一支确定下来，不看调度先后
+    system, run_id = _onboarding_run(tmp_path, {
+        "product": [_product_turn()],
+        "engineering": [
+            structure_turn(requirement_locations=[{"requirement": "a requirement that is not in the PRD",
+                                                   "locations": ["src/echo.py"]}]),
+            _structure_turn(),
+        ],
+        "quality": [_rework_review_turn(), _rework_review_turn()],
+    })
+    result = system.run_until_stop(run_id)
+    assert _require_baseline_review(result)["verdict"] == "rework_product"
+    events = system.store.list_events(run_id)
+    rejected = [event for event in events
+                if event.type == EventType.PROPOSAL_REJECTED and event.department == "quality"]
+    assert len(rejected) == 1
+    assert [error["field"] for error in rejected[0].payload["errors"]] == ["structure"]
+    quality_activations = [event for event in events
+                           if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == "quality"]
+    assert len(quality_activations) == 2
+    accepted = [event for event in events if event.type == EventType.BASELINE_REVIEW_ACCEPTED]
+    assert len(accepted) == 1
+    assert quality_activations[1].stream_version < accepted[0].stream_version
+    # 核验通过以后产品开始一轮工作
+    product_activations = [event for event in events
+                           if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == "product"]
+    assert len(product_activations) == 2
+    assert accepted[0].stream_version < product_activations[1].stream_version
 
 def test_rework_product_requires_unsupported_or_omission(tmp_path):
     system, run_id = _onboarding_run(tmp_path, {
