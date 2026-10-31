@@ -228,7 +228,7 @@
         ], rows: depts
       });
       const mine = H.decisions(p.id).filter((d) => d.item === it.id);
-      return '<div class="y15-page"><div class="y15-page-head"><div class="y15-page-titles"><h1>' + H.dot(it) + ' ' + esc(it.title) + '</h1><p class="y15-muted">门牌 ' + esc(it.door) + ' ' + H.src('door-' + it.id) + '</p></div></div>' +
+      return '<div class="y15-page"><div class="y15-page-head"><div class="y15-page-titles"><h1>' + H.dot(it) + ' ' + esc(it.title) + '</h1><p class="y15-muted">门牌 ' + esc(it.door) + ' ' + H.src('door-' + it.id) + '</p></div><div class="y15-page-actions">' + ui.button({ label: '恢复与动作核实', kind: 'small', go: '#/p/' + p.id + '/w/' + it.id + '/recovery' }) + ui.button({ label: '资料', kind: 'small', go: '#/p/' + p.id + '/materials?w=' + it.id }) + '</div></div>' +
         ui.block({ title: '此刻', body: ui.kv([
           ['状态', H.status(it) + ' ' + H.src('status-' + it.id)], ['原因', esc(it.reason)], it.progress ? ['进度', esc(it.progress)] : null, ['所在部门', esc(it.dept ? H.dept(it.dept) : '—')],
           ['轮次', it.round ? '第 ' + it.round + ' 轮 / 上限 ' + it.round_limit + ' ' + H.src('round-' + it.id) : '还没开始'],
