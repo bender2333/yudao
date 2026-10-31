@@ -279,7 +279,7 @@
 
   <section id="s3">
     <h2>一轮工作的经过<small>三种轮转方式共用一套状态词</small></h2>
-    <p class="muted">下面的状态对一个部门成立。按成果时，状态由关注的成果推动；任务池时，由认领的工作单元推动。工作单元有多大是定义里的参数，池子允许一个单元就是整个事项，那时它就是按成果。</p>
+    <p class="muted">下面的状态对一个部门成立。按成果时，状态由关注的成果推动；直做时，由你的输入、询问与交完成推动；任务池时，由认领的工作单元推动。工作单元有多大是定义里的参数，池子允许一个单元就是整个事项，那时它就是按成果。</p>
     <div class="map" style="margin-top:12px">
     <svg viewBox="0 -12 1000 712" role="img" aria-label="双环：外环是部门之间的流转，内环是一轮工作里的单步循环">
       <defs>
@@ -289,7 +289,7 @@
       </defs>
       <!-- 外环区 -->
       <rect class="zone" x="8" y="-6" width="984" height="384" rx="8" transform="" style="stroke-dasharray:6 5"/>
-      <text class="zone-l" x="20" y="14">外环 · 部门之间的流转（按成果或任务池，共用这套状态）</text>
+      <text class="zone-l" x="20" y="14">外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）</text>
       <!-- 上排：分支 -->
       <g class="st side"><rect x="250" y="34" width="170" height="56" rx="4"/><text x="335" y="58">询问中</text><text x="335" y="76" class="s">嵌在一轮里的另一轮，等回应</text></g>
       <g class="st side"><rect x="470" y="34" width="170" height="56" rx="4"/><text x="555" y="58">等用户</text><text x="555" y="76" class="s">决定请求停在写入口</text></g>
@@ -306,22 +306,22 @@
       <path class="edge" d="M180 190 L248 190" marker-end="url(#ah)"/><text class="e-l" x="214" y="182" text-anchor="middle">路由触发 / 认领</text>
       <path class="edge" d="M420 190 L558 190" marker-end="url(#ah)"/><text class="e-l" x="489" y="182" text-anchor="middle">提交成果或单元</text>
       <path class="edge" d="M710 190 L798 190" marker-end="url(#ah)"/><text class="e-l" x="754" y="182" text-anchor="middle">通过</text>
-      <path class="edge" d="M875 220 L875 298" marker-end="url(#ah)"/><text class="e-l" x="885" y="262">放行或开环完成，事项完成</text>
-      <path class="edge dashed" d="M420 212 C 480 262, 740 262, 800 212" marker-end="url(#ah)"/><text class="e-l" x="610" y="250" text-anchor="middle">没有核验角色：交完成</text>
+      <path class="edge" d="M875 220 L875 298" marker-end="url(#ah)"/><text class="e-l" x="885" y="256">放行或开环完成</text><text class="e-l" x="885" y="272">事项完成</text>
+      <path class="edge dashed" d="M420 212 C 480 262, 740 262, 800 212" marker-end="url(#ah)"/><text class="e-l" x="550" y="274" text-anchor="middle">不需核验的成果；开环时交完成</text>
       <path class="edge dashed" d="M875 160 C 875 -20, 105 -20, 105 158" marker-end="url(#ah)"/><text class="e-l" x="490" y="22" text-anchor="middle">下游部门关注的成果有了新版本，它开始一轮</text>
       <!-- 分支箭头 -->
       <path class="edge" d="M300 160 L300 92" marker-end="url(#ah)"/><text class="e-l" x="262" y="130">询问</text>
       <path class="edge" d="M370 92 L370 158" marker-end="url(#ah)"/><text class="e-l" x="378" y="130">回应到达</text>
       <path class="edge" d="M420 175 L470 90" marker-end="url(#ah)"/><text class="e-l" x="455" y="140">决定请求</text>
       <path class="edge" d="M555 92 L430 168" marker-end="url(#ah)"/><text class="e-l" x="520" y="150">你的回答</text>
-      <path class="edge back" d="M635 220 L635 298" marker-end="url(#ahb)"/><text class="e-l back" x="645" y="262">打回</text>
-      <path class="edge back" d="M560 330 C 400 330, 200 300, 105 222" marker-end="url(#ahb)"/><text class="e-l back" x="330" y="276" text-anchor="middle">缺陷记录是上游关注的成果；连续无进展达到阈值就提醒你</text>
-      <path class="edge dashed" d="M105 220 C 105 335, 150 328, 248 328" marker-end="url(#ah)"/><text class="e-l" x="150" y="372">升级前排空</text>
+      <path class="edge back" d="M635 220 L635 298" marker-end="url(#ahb)"/><text class="e-l back" x="645" y="290">打回</text>
+      <path class="edge back" d="M560 330 C 400 330, 200 300, 105 222" marker-end="url(#ahb)"/><text class="e-l back" x="280" y="256">缺陷记录是上游关注的成果；</text><text class="e-l back" x="280" y="272">连续无进展达到阈值就提醒你</text>
+      <path class="edge dashed" d="M105 220 C 105 335, 150 328, 248 328" marker-end="url(#ah)"/><text class="e-l" x="150" y="350">升级前排空</text>
       <path class="edge dashed" d="M420 328 L798 328" marker-end="url(#ah)"/><text class="e-l" x="500" y="320">排空完毕</text>
-      <path class="edge thin dashed" d="M700 240 C 740 280, 780 300, 800 310" marker-end="url(#ah)"/><text class="e-l" x="660" y="246">边界到上限、你取消、振荡信号：任何状态都能到停止</text>
+      <path class="edge thin dashed" d="M700 240 C 740 280, 780 300, 800 310" marker-end="url(#ah)"/><text class="e-l" x="980" y="372" text-anchor="end">边界到上限、你取消、振荡信号：任何状态都能到停止</text>
       <!-- 外环到内环 -->
-      <path class="edge" style="stroke:var(--accent);stroke-width:2" d="M335 220 C 335 260, 40 290, 60 465" marker-end="url(#aha)"/>
-      <text class="e-l" style="fill:var(--accent);font-weight:600" x="110" y="392">一轮工作中 = 内环在转</text>
+      <path class="edge" style="stroke:var(--accent);stroke-width:2" d="M262 220 C 235 280, 225 340, 200 400 C 185 440, 110 440, 95 466" marker-end="url(#aha)"/>
+      <text class="e-l" style="fill:var(--accent);font-weight:600" x="215" y="392">一轮工作中 = 内环在转</text>
       <!-- 内环区 -->
       <rect class="zone" x="8" y="396" width="984" height="300" rx="8" style="stroke-dasharray:6 5"/>
       <text class="zone-l" x="20" y="416">内环 · 一轮工作里的每一步（薄驱动连接，每步都停得下来）</text>
@@ -345,7 +345,7 @@
       <g class="st side"><rect x="420" y="580" width="240" height="50" rx="4"/><text x="540" y="600">失败的尝试、未获许可的工具</text><text x="540" y="618" class="s">记成事件供回查，不执行、不进有效历史</text></g>
       <path class="edge dashed" d="M430 542 L480 578" marker-end="url(#ah)"/>
       <path class="edge dashed" d="M600 542 L580 578" marker-end="url(#ah)"/>
-      <g class="st side"><rect x="690" y="580" width="200" height="50" rx="4"/><text x="790" y="600">重派与迟到的结果</text><text x="790" y="618" class="s">重派先写事件、编号加一；旧编号只记录</text></g>
+      <g class="st side"><rect x="676" y="580" width="236" height="50" rx="4"/><text x="794" y="600">重派与迟到的结果</text><text x="794" y="618" class="s">重派先写事件、编号加一；旧编号只记录</text></g>
       <path class="edge dashed" d="M770 542 L770 578" marker-end="url(#ah)"/>
     </svg>
     </div>
