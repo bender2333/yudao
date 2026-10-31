@@ -309,9 +309,11 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)
+    # 决定请求的种类按 harness/decisions.py 里 DECISION_KINDS 的登记顺序；#1179 新增的
+    # qa_cannot_verify（质检无法核验）排在 instance_upgrade 之后、kernel_modification 之前
     assert capabilities["decisions"] == ["model_unavailable", "definitions_changed",
                                          "no_tool_call", "workspace_unrepresentable", "initial_prd",
-                                         "instance_upgrade", "kernel_modification"]
+                                         "instance_upgrade", "qa_cannot_verify", "kernel_modification"]
     deployment = capabilities["deployment"]
     assert deployment["contract_digest"] == _digest(document)
     assert deployment["log_id"] == opened.store.log_id and deployment["boot_id"] == opened.applications[0].boot_id
