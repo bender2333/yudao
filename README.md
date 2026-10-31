@@ -31,6 +31,10 @@
 
 当前入口：[总体路线图](docs/program-roadmap.md)；进度看 GitHub 的里程碑。
 
+## 参与开发
+
+这个仓库由架构师与 agent 按[工作方式](docs/agents/workflow.md)开发：工单在 GitHub Issues，状态是标签，每一段流转在工单上留一条证据评论。用到的技能、什么时候用、怎么调，见[技能使用说明](.claude/skills/README.md)。架构师的规则在 `CLAUDE.md`，执行者的规则在 `AGENTS.md`。
+
 ## 架构
 
 系统由哪些部分组成、怎样连接、一轮工作怎样进行，见总图 [`docs/architecture.html`](docs/architecture.html)。
