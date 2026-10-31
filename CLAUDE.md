@@ -78,7 +78,7 @@ Yudao（枢道）是一个协作执行系统：角色围着同一份事实工作
 - 上下文并不是越大越好，清晰干净的上下文很重要
 
 ### 依据
-- docs\architecture.html 
+- `docs/architecture.html`（总图）与它展开的 `docs/architecture-view.html`（画面总图）
 
 架构原则与控制边界见 [共同规则](docs/agents/shared-rules.md)。
 
