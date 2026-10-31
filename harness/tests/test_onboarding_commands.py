@@ -76,12 +76,9 @@ def _post(client, command, **body):
 # 建档 run 含多次版本存储写入，正常用时数秒、并发负载下更慢；
 # run 是否按预期结束由等待之后的阶段与停止原因断言核对。
 #
-# 集中的 WAIT_FOR_HOST_WORK_SEC 是 300 秒，与 CI 给每条集成层用例的 300 秒上限相等（conftest.py 的
-# TIMEOUTS[INTEGRATION]）。两处一样时，卡住的是 pytest-timeout 而不是用例自己的等待：它在 Windows 上
-# 用线程法结束整个进程（os._exit），xdist 报 `node down: Not properly terminated`，用例记成 FAILED，
-# 作业随后不再推进，日志里也看不出是哪一步卡住（工单 #1250）。这里取更短的一个，卡住就报成一条失败。
-# 150 秒仍远大于本机 1 至 5 秒的正常用时。
-_WAIT_LIMIT = min(WAIT_FOR_HOST_WORK_SEC, 150.0)
+# 上限取集中的等待上限（harness/tests/wait_limits.py）：它比集成层给每条用例的上限短，
+# 卡住时在这里报成一条失败，不等 pytest-timeout 结束整个进程（工单 #1250 的登记）
+_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
 
 
 def _wait_for(predicate, timeout=_WAIT_LIMIT):
