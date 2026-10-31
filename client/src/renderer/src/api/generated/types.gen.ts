@@ -207,6 +207,15 @@ export type ActionReceipt = {
      * Created At
      */
     created_at: string;
+    /**
+     * Refused
+     */
+    refused?: boolean;
+    /**
+     * Refused Reason
+     */
+    refused_reason?: string | null;
+    fetch?: FetchReceipt | null;
 };
 
 /**
@@ -228,7 +237,7 @@ export type ActionView = {
     /**
      * Status
      */
-    status: 'running' | 'completed' | 'failed' | 'unknown';
+    status: 'running' | 'completed' | 'failed' | 'refused' | 'unknown';
     /**
      * Activation Id
      */
@@ -2548,6 +2557,50 @@ export type FactRef = {
      * Source
      */
     source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+};
+
+/**
+ * FetchReceipt
+ */
+export type FetchReceipt = {
+    /**
+     * Final Url
+     */
+    final_url: string;
+    /**
+     * Status Code
+     */
+    status_code: number;
+    /**
+     * Content Type
+     */
+    content_type: string;
+    /**
+     * Bytes
+     */
+    bytes: number;
+    /**
+     * Download Truncated
+     */
+    download_truncated: boolean;
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Ref
+     */
+    ref: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Redirects
+     */
+    redirects: Array<string>;
+    /**
+     * Duration Ms
+     */
+    duration_ms: number;
 };
 
 /**
@@ -16477,6 +16530,14 @@ export type ToolCallResult = {
      */
     error: string | null;
     output_ref?: ArtifactRef | null;
+    /**
+     * Refused
+     */
+    refused?: boolean;
+    /**
+     * Refused Reason
+     */
+    refused_reason?: string | null;
     after_snapshot_ref?: ArtifactRef | null;
 };
 

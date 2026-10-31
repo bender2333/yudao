@@ -87,7 +87,7 @@ function newestModification(directory: string): number {
 // port 固定端口（断线恢复的用例在同一端口再起一次）；room 用流式慢模型跑
 // 一个项目，供部门房间在请求进行中观察（工单 #177）
 export async function startBackend(
-  options: { apiVersion?: number; releaseVersion?: string; releaseVersionOnce?: string; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial" | "waiting" | "kernel" | "pending" | "stopnote" | "replay" | "kill"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean; tokenName?: string; holdResume?: boolean } = {},
+  options: { apiVersion?: number; releaseVersion?: string; releaseVersionOnce?: string; room?: boolean; admitAndBind?: boolean; port?: number; script?: "default" | "onboarding" | "initial" | "waiting" | "kernel" | "pending" | "stopnote" | "replay" | "kill" | "steps"; rejectUpstream?: boolean; dataDir?: string; bindDepartments?: string[]; catalogDriven?: boolean; tokenName?: string; holdResume?: boolean } = {},
 ): Promise<Backend> {
   const script = ["client/tests/e2e/backend.py", "--port", String(options.port ?? 0)];
   if (options.apiVersion !== undefined) {

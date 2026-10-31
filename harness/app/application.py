@@ -42,6 +42,7 @@ from .contracts import API_VERSION, AccessMode, Accepted, Capabilities, CommandR
 from .decision_commands import DECISION_ANSWER
 from .decision_queries import DECISIONS_LIST
 from .evidence_queries import EVIDENCE_EXTERNAL_SOURCE
+from .. import fetch
 from .event_stream import EventScope, EventStream
 from .home import HOME_AWAY_REPORT, HOME_MARK_SEEN
 from .mcp_commands import MCP_SERVERS_SAVE, TOOL_SERVER_PROBE
@@ -178,8 +179,13 @@ class Application:
                              connection_test=change.connection_test, retarget=change.retest)
 
     @classmethod
-    def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path) -> Application:
-        # 服务进程使用的控制核心：读取模型目录与凭据文件，并在文件被外部修改时重新读取
+    def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path,
+             listen: tuple[str, int] | None = None) -> Application:
+        # 服务进程使用的控制核心：读取模型目录与凭据文件，并在文件被外部修改时重新读取。
+        # listen 是接口层实际的监听地址与端口（网络与 MCP 设计说明第 6.3、18 节）：取回与浏览器导航
+        # 只拒绝这些地址与端口，所以由接口层在启动时交给应用，应用交给取回
+        if listen is not None:
+            fetch.configure_service_address(*listen)
         system = LoopSystem(data_dir, provider_config_path=provider_config, dotenv_path=dotenv)
         # 启动时目录修订号与最后一条 catalog_revised 不同则补写（设计说明第 10 节第 1 项）
         system.sync_catalog_revision(operation="startup")

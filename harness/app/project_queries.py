@@ -1378,6 +1378,20 @@ class RunActions(Contract):
     run_id: str
 
 
+class FetchReceipt(Contract):
+    # 一次取回的回执（网络与 MCP 设计说明第 6.5、10 节）：最终地址、状态码、内容类型、字节数、
+    # 是否因为超过下载上限被截断、摘要值、外部来源工件的引用、重定向链与耗时
+    final_url: str
+    status_code: int
+    content_type: str
+    bytes: int
+    download_truncated: bool
+    content_hash: str
+    ref: dict[str, Any] | None
+    redirects: list[str]
+    duration_ms: int
+
+
 class ActionReceipt(Contract):
     args: dict[str, Any]
     ok: bool
@@ -1385,13 +1399,17 @@ class ActionReceipt(Contract):
     output_ref: dict[str, Any] | None
     event_id: str
     created_at: str
+    # 动作被拒绝（工单 #1170 的回执字段）：工具许可拒绝，或地址规则拒绝取回；取回的回执字段在 fetch 里
+    refused: bool = False
+    refused_reason: str | None = None
+    fetch: FetchReceipt | None = None
 
 
 class ActionView(Contract):
     action_id: str
     tool: str
     department: str | None
-    status: Literal["running", "completed", "failed", "unknown"]
+    status: Literal["running", "completed", "failed", "refused", "unknown"]
     activation_id: str | None
     step_id: int | None
     input_version: int | None
@@ -1449,7 +1467,9 @@ def _run_action_views(application: Application, run_id: str
             started[identity] = event
             continue
         started_event = started.pop(identity, None)
-        actions.append(_action_view(event, identity, started_event))
+        fetched = _fetch_receipt(application, run_id, payload) if (
+            event.type == EventType.TOOL_CALLED and payload.get("name") == "fetch_url") else None
+        actions.append(_action_view(event, identity, started_event, fetch=fetched))
         if event.type == EventType.TOOL_CALLED and payload.get("name") == "bash":
             started_payload = {} if started_event is None else (started_event.payload or {})
             args = dict(payload.get("args") or started_payload.get("args") or {})
@@ -1511,8 +1531,34 @@ def _tool_events(store: Any, run_id: str) -> list[Any]:
     return collected
 
 
+def _fetch_receipt(application: Application, run_id: str, payload: dict[str, Any]) -> FetchReceipt | None:
+    # 取回的回执字段在工具结果的工件里：读得出来就给界面用，读不出来时留空，不影响动作本身的显示
+    output_ref = payload.get("output_ref")
+    if not output_ref:
+        return None
+    try:
+        raw = application.system.artifacts.get_for_run(run_id, ArtifactRef(**output_ref))
+        output = json.loads(raw)
+    except Exception:
+        return None
+    if not isinstance(output, dict) or "final_url" not in output or "status_code" not in output:
+        return None
+    return FetchReceipt(
+        final_url=str(output.get("final_url") or ""),
+        status_code=int(output.get("status_code") or 0),
+        content_type=str(output.get("content_type") or ""),
+        bytes=int(output.get("bytes") or 0),
+        download_truncated=bool(output.get("download_truncated")),
+        content_hash=str(output.get("content_hash") or ""),
+        ref=output.get("ref"),
+        redirects=[str(item) for item in output.get("redirects") or []],
+        duration_ms=int(output.get("duration_ms") or 0),
+    )
+
+
 def _action_view(result_event: Any | None, identity: tuple[str, int | None, str],
-                 started_event: Any | None, *, live: bool = False) -> ActionView:
+                 started_event: Any | None, *, live: bool = False,
+                 fetch: FetchReceipt | None = None) -> ActionView:
     # 一个动作的读取视图（工单 #17）：状态、回执，以及动作前后的快照引用（动作前取自 tool_started，
     # 动作后取自 tool_called）。result_event 为空表示只有 tool_started、还没有结果。
     action_id = identity[2]
@@ -1542,10 +1588,11 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
         )
     ok = bool(payload.get("ok"))
     started_payload = {} if started_event is None else (started_event.payload or {})
+    refused = bool(payload.get("refused"))
     return ActionView(
         action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
         department=result_event.department,
-        status="completed" if ok else "failed",
+        status="refused" if refused else ("completed" if ok else "failed"),
         activation_id=payload.get("activation_id"), step_id=payload.get("step_id"),
         input_version=payload.get("input_version"), prompt_version=payload.get("prompt_version"),
         created_at=result_event.created_at,
@@ -1554,6 +1601,7 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
             ok=ok, error=payload.get("error"),
             output_ref=payload.get("output_ref"), event_id=result_event.event_id,
             created_at=result_event.created_at,
+            refused=refused, refused_reason=payload.get("refused_reason"), fetch=fetch,
         ),
         before_snapshot_ref=started_payload.get("before_snapshot_ref"),
         after_snapshot_ref=payload.get("after_snapshot_ref"),
