@@ -27,7 +27,7 @@ RUN_STATUSES = ("running", "done", "paused", "failed")
 TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
 
 # 骨架事件载荷里的封闭取值，只增：qa_submitted 的结论，baseline_review_accepted 逐条结论的状态
-QA_VERDICTS = ("rework_engineering", "release")
+QA_VERDICTS = ("rework_engineering", "release", "cannot_verify")
 BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
 # 质检逐条结论用的封闭取值（验证的独立性设计说明第 7.1 节第 1、2 条，工单 #151）：六种检验方式与三种结果。
 # 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在

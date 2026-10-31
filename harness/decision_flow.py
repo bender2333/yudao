@@ -22,7 +22,8 @@ from typing import Any, Protocol
 from . import parameters as parameter_values
 from .artifacts import ArtifactStore
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS,
+    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, QA_CANNOT_VERIFY,
+    RESUMABLE_PAUSE_KINDS,
     DecisionClosed, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
 )
 from .event_store import Command, EventStore, is_catalog_stream, is_run_stream, run_stream
@@ -127,6 +128,17 @@ class DecisionFlow:
                     return None
                 return transaction.projection.run_id
             return None
+        if decision.kind == QA_CANNOT_VERIFY.name:
+            # 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：回答「停止事项」时
+            # 事项结束、交付不被采纳；回答「重新核验」不作别的动作，run 继续以后质检重新检查同一份交付
+            # （watched_outputs 的 _has_new_delivery 把 cannot_verify 的结论排除在外）
+            if option == "stop":
+                driver.fail_run(transaction, "cannot_verify",
+                                "verification could not be completed; the delivery is not adopted")
+                return None
+            if blocks_run(transaction.decisions.values()):
+                return None
+            return projection.run_id
         if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
             if decision.request.get("reason") == "compaction_failed":
                 # 整理连续没有推进的待恢复（模型管理设计说明第 8.7 节最后一条，工单 #1238）：答「停止事项」

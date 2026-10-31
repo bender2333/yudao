@@ -35,7 +35,7 @@ OBSERVATION_CANCELLED = "cancelled"
 OBSERVATION_STOPPED = "stopped"
 
 # 运行级待恢复的决定种类（工单 #16、#18）：模型引用无法使用与定义版本不同，都要用户先回答再继续
-RESUME_KINDS = frozenset({"model_unavailable", "definitions_changed"})
+RESUME_KINDS = frozenset({"model_unavailable", "definitions_changed", "qa_cannot_verify"})
 
 def action_identity(event: Event) -> tuple[str, int | None, str]:
     # 动作的身份：激活、步骤与模型给出的调用编号。tool_started 与 tool_called 由同一次工具调用写入，
