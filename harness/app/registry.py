@@ -74,6 +74,8 @@ OVERLAYS: tuple[OverlayDefinition, ...] = (
     OverlayDefinition(name="sources", queries=("project.loop",)),
     # 循环与收敛（工单 #400）：循环实例的层、已用边界与收敛状态，依赖 run.loops（工单 #397）
     OverlayDefinition(name="loops", queries=("run.loops",)),
+    # 检验覆盖与开环（工单 #399）：每条验收条件的检验方式与结果、开环明细，依赖 acceptance.coverage
+    OverlayDefinition(name="coverage", queries=("acceptance.coverage",)),
 )
 
 
