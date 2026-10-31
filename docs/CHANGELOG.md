@@ -929,3 +929,5 @@ claude-opus-5-5（子架构师） / 2026-10-31 21:50 / 状态文档只写现在�
   - `docs/design/trusted-kernel.md`：2026-10-29 / claude-sonnet-5-5 / 按设计说明规范整理：开头改为总图位置与依据一行，删去状态、路线位置、实施状态说法和工单号；第 2 节末段删去边界核对的现状 / 设计与实施分离（decision.md 2026-10-29）
   - `docs/design/trusted-kernel.md`：2026-10-29 / claude-sonnet-5-5 / 第 4.2、4.4 节：发布检查的内核差异只列出不判不通过，与第 3 节、总图第二节「阶段一改内核路径不事前批准」一致；代码 `harness/release_check.py` 同改
   - `docs/design/trusted-kernel.md`：2026-10-31 / claude-opus-5-5 / 第 2 节裁决规则补写入范围、定义校验改为总图「定义」缝的三项；探针 `false_release_reported` 改按核验角色写 / 按总图 ADR-0044 的改动核对
+
+claude-opus-5-5（总架构师） / 2026-10-31 21:40 / `docs/program-roadmap.md` 阶段二去掉同一实例直做的对照，形态可换改随薄片 ④ 到，道 08 与判据二只留 OpenCode 对照；`docs/decision.md` 记一条 / 用户：三部门结论这件事不做

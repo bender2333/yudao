@@ -1517,3 +1517,9 @@ Argon 的工作流建议（四条）对照仓库后的取舍：
   4. 加一个写入时的提醒：Claude Code 的 PostToolUse 钩子在状态文档新写进日期时提醒写的人，只提醒、不拦截。
   5. 基础规则（用户要求更新）：开环完成移到规则 2；规则 3 那一行改为「核验角色的结论不外包；放行、要求里的取舍与规则修改不交给判定点」；「新的检查不修改控制核心」的出处改为总图第二节；去掉开头的更新段落。
 - 改动：`docs/foundation-rules.md`、`CLAUDE.md`、`docs/agents/shared-rules.md`、`docs/agents/design-spec.md`、`docs/program-roadmap.md`、`docs/architecture.html`、`.claude/hooks/state-doc-dates.mjs` 与测试、`.claude/settings.json`、`.github/workflows/ci.yml`。其余状态文档（`docs/agents/` 其他文件、技能、`CONTEXT.md`、`README.md`、设计说明，以及 ADR 与需求记录的开头）由子架构师在同一轮清理。
+
+## 2026-10-31 - 不做三部门对同一实例直做的对照；形态可换随薄片 ④
+
+- 背景：路线图阶段二在 OpenCode 对照之外加过一组「同一个实例换成一个角色直做」，用来量组织与核验带来的提高；子架构师问这组结论要不要计入「高于单个 agent」。
+- 决策：用户定这组对照与结论不做。阶段二的对照只有 OpenCode（D32）。形态可换照旧在阶段二建，改随薄片 ④（改一处、看得见、能撤回）到：换一份定义就换形态，画面跟着变，能撤回。用户同时确认基础规则规则 3 下「核验角色的结论不外包；放行、要求里的取舍与规则修改不交给判定点」。
+- 改动：`docs/program-roadmap.md` 阶段二、道 08、判据二；阶段工单 #977。评测设计、对照需求记录与 #1377、#1378、#118、#991 由子架构师撤。
