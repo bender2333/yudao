@@ -103,7 +103,7 @@ Yudao（枢道）是一个协作执行系统：角色围着同一份事实工作
 - `docs/adr/`：架构决策记录（ADR），记录难以撤销的决定。
 - `docs/requirements/`：逐项需求记录，索引见 `docs/requirements/README.md`。
 - `docs/design/`：模块设计、架构图与设计说明，索引见 `docs/design/README.md`。工单、代码和规则登记引用这里的文档，设计说明不引用它们。
-- `docs/prototypes/`：回答设计问题的界面草图（假数据的单页，答完就扔，不当外观标准），记录见 `docs/prototypes/CHANGELOG.md`。
+- `docs/prototypes/`：界面原型，记录见 `docs/prototypes/CHANGELOG.md`。页面原型不带画面，用假数据、能点，交给用户试用，一版接一版；画面只用单页草图回答设计问题，答完就扔。两种都说明设计意图，不当逐像素的标准。
 - `docs/research/`：仍在使用的调研，索引见 `docs/research/README.md`。
 - `docs/evaluation/`：评测的基准数字与被测试固定的场景结果。
 - `docs/examples/`：配置文件的格式示例。
