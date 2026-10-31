@@ -562,6 +562,8 @@ const FLOOR: Readonly<Record<string, Rule>> = {
   qa_submitted: (ev, ctx) => (pl(ev).verdict === "release"
     ? [one("stamp_release", ev, ctx), handoff(ev, "quality", text(pl(ev).release_to) || "library", "release")]
     : [one("stamp_defect", ev, ctx), handoff(ev, "quality", "engineering", "defect")]),
+  // 独立判断：核验角色交上自己的判断（先判断后看解释，工单 #358）
+  independent_judgement_committed: (ev, ctx) => [one("submit", ev, ctx)],
   ask_started: (ev) => {
     const spoken = sayAsk(ev);
     return [{
