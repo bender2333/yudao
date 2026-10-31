@@ -264,7 +264,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.change_impact", "changed_by": catalog_impact_changed_by, "replayable": False},
     ]
-    assert capabilities["queries"][-2] == {
+    assert capabilities["queries"][-3] == {
         "name": "home.away_report", "replayable": False,
         "changed_by": sorted([
             "ask_started", "ask_answered",
@@ -273,8 +273,15 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         ]) + ["model_attempt_finished", "home_seen"],
     }
     # 规则登记：现值是参数事件折叠的结果，参数修改触发重查（工单 #349）
-    assert capabilities["queries"][-1] == {
+    assert capabilities["queries"][-2] == {
         "name": "rules.registry", "changed_by": ["parameter_set"], "replayable": True,
+    }
+    # 工具登记（工单 #1177）：MCP 服务器与取回动作的取回记录；取回记录待 #68 合并后填充
+    assert capabilities["queries"][-1] == {
+        "name": "tools.registry",
+        "changed_by": ["project_registered", "project_renamed", "mcp_servers_configured",
+                       "tool_started", "tool_called"],
+        "replayable": False,
     }
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
@@ -284,7 +291,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
-        "evidence.external_source",
+        "evidence.external_source", "tools.registry",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {

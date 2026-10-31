@@ -158,6 +158,7 @@ def _all_requests(system, project_id, work_item_id, run_id):
         ("run.export", RunExport(run_id=run_id)),
         ("replay.check", ReplayCheck(run_id=run_id)),
         ("rules.registry", RulesRegistryRequest()),
+        ("tools.registry", None),
     ]
 
 
