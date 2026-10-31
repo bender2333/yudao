@@ -35,7 +35,8 @@ from .compaction import response_reserve
 from .context import DEFAULT_CONTEXT_WINDOW
 from .contracts import artifact_hash
 from .decisions import (
-    MODEL_UNAVAILABLE, RESUMABLE_PAUSE_KINDS, DecisionKind, blocked_by_other_session, blocks_run,
+    MODEL_UNAVAILABLE, QA_CANNOT_VERIFY, RESUMABLE_PAUSE_KINDS, DecisionKind, blocked_by_other_session,
+    blocks_run,
 )
 from .environment import (
     LocalEnvironment, RoundWorkspace, Workspaces, cleanup_inspection_workspace,
@@ -1913,6 +1914,12 @@ class Orchestrator:
             return
         source_event = acceptance.append(transaction)
         self.submissions.record_accepted_lesson(transaction, source_event, projection, artifact)
+        if artifact.get("kind") == "qa_review" and artifact.get("verdict") == "cannot_verify":
+            # 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：不是放行也不是退回，
+            # 由流程编排发出决定请求，阻塞整个 run；等待回答期间恢复页显示待恢复
+            self._await_cannot_verify(transaction, department=department, artifact=artifact,
+                                      parent_event_id=parent_event_id)
+            return
         # 只有质检的放行与基线核验的一致结论结束事项（工单 #556）：结束以后控制核心不再决定下一个谁工作
         if ends_run:
             # 进入完成状态的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
@@ -1930,6 +1937,32 @@ class Orchestrator:
                 payload={"stop_reason": stop_reason},
             ))
             transaction.on_commit(lambda: self._on_close_run(run_id))
+
+    def _await_cannot_verify(self, transaction: Transaction, *, department: str, artifact: dict[str, Any],
+                             parent_event_id: str) -> None:
+        # 质检无法核验的决定请求：说明列出每条无法核验的验收条件与原因，选项是「重新核验」与「停止事项」
+        projection = transaction.projection
+        criteria = [{"criterion": row.get("criterion"), "note": row.get("note") or ""}
+                    for row in artifact.get("criteria") or [] if row.get("result") == "unverified"]
+        listed = "；".join(f"{item['criterion']}（{item['note'] or '没有写原因'}）" for item in criteria)
+        transaction.append(NewEvent(
+            EventType.DECISION_REQUESTED, actor="system", department=department,
+            parent_event_id=parent_event_id,
+            state_before=projection.status, state_after=projection.status,
+            session_id=None,
+            payload={
+                "kind": QA_CANNOT_VERIFY.name, "blocks": QA_CANNOT_VERIFY.blocks,
+                "options": [{"id": option.id, "label": option.label} for option in QA_CANNOT_VERIFY.options],
+                "facts": [item["criterion"] for item in criteria],
+                "department": department,
+                "reason": "qa_cannot_verify",
+                "criteria": criteria,
+                "description": ("质检无法核验这些验收条件：" + listed + "。修改质检使用的模型（例如换成能看图的）"
+                                "或在执行位置上装好缺少的程序以后选择「重新核验」，质检会以新的激活重新检查同一份交付；"
+                                "选择「停止事项」则事项结束，这份交付不被采纳。"),
+            },
+        ))
+        transaction.on_commit(lambda: self._wake(projection.run_id))
 
     def _end_run(self, activation: _Activation, reason: str, message: str, version: int | None,
                  *, target: dict[str, Any] | None = None, facts: list[str] | None = None,

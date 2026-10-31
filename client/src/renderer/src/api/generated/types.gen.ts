@@ -839,6 +839,42 @@ export type CallTarget = {
 };
 
 /**
+ * CannotVerifyRequested
+ */
+export type CannotVerifyRequested = {
+    /**
+     * Kind
+     */
+    kind: 'qa_cannot_verify';
+    /**
+     * Blocks
+     */
+    blocks: 'run';
+    /**
+     * Options
+     */
+    options: Array<DecisionOption>;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Facts
+     */
+    facts: Array<string>;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality';
+    /**
+     * Criteria
+     */
+    criteria: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
  * Capabilities
  */
 export type Capabilities = {
@@ -1927,7 +1963,7 @@ export type DecisionView = {
     /**
      * Request
      */
-    request: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | KernelModificationRequested | InstanceUpgradeRequested;
+    request: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested | KernelModificationRequested | InstanceUpgradeRequested;
     answer: DecisionAnswerRecord | null;
 };
 
@@ -9029,7 +9065,7 @@ export type DecisionRequestedEvent = {
     /**
      * Payload
      */
-    payload: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested;
+    payload: ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested | PauseRequested | InitialPrdRequested | CannotVerifyRequested;
 };
 
 /**
@@ -9114,7 +9150,7 @@ export type DecisionWithdrawnPayload = {
     /**
      * Reason
      */
-    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed' | 'superseded_by_hand_back';
+    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'cannot_verify' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed' | 'superseded_by_hand_back';
 };
 
 /**
@@ -14537,7 +14573,7 @@ export type QaSubmittedPayload = {
     /**
      * Verdict
      */
-    verdict: 'rework_engineering' | 'release';
+    verdict: 'rework_engineering' | 'release' | 'cannot_verify';
     /**
      * Rationale
      */
@@ -15105,7 +15141,7 @@ export type RunFailedPayload = {
     /**
      * Stop Reason
      */
-    stop_reason: 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed';
+    stop_reason: 'cannot_verify' | 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed';
     /**
      * Human Action
      */

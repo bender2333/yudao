@@ -19,6 +19,11 @@
     "outcome": "paused",
     "human_action": "部门连续调用模型仍未提交有效提案。检查最后一次模型输出与工具回执后，调整任务并新建运行。"
   },
+  "cannot_verify": {
+    "label": "质检无法核验，交付未采纳",
+    "outcome": "failed",
+    "human_action": "质检无法核验这次交付，事项结束且交付不被采纳。给质检换成能看图的模型或在执行位置上装好缺少的程序以后，作为新事项重新开始。"
+  },
   "no_tool_call": {
     "label": "部门连续多次没有调用工具",
     "outcome": "paused",

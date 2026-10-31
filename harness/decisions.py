@@ -57,6 +57,14 @@ INITIAL_PRD = DecisionKind("initial_prd", "work_item",
 KERNEL_MODIFICATION = DecisionKind("kernel_modification", "run",
                                    (Option("approve", "批准采纳"), Option("reject", "拒绝")))
 
+# 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：质检自己的条件不够
+# （模型不支持图像输入而条目依赖外观、执行位置上缺少试用或运行交付需要的程序）时提交 cannot_verify，
+# 流程编排发出这个请求，阻塞范围是这个 run，说明列出每条无法核验的验收条件与原因。
+# 「重新核验」：用户修改设置或装好程序以后回答，质检以新的激活重新检查同一份交付；
+# 「停止事项」：事项结束，交付不被采纳
+QA_CANNOT_VERIFY = DecisionKind("qa_cannot_verify", "run",
+                                (Option("re_verify", "重新核验"), Option("stop", "停止事项")))
+
 # 实例升级（迭代底座 B7，工单 #355）：升级这台电脑上安装的那一份是一次用户决定，请求写在目录流中，
 # 不属于任何 run 或项目，也不阻塞它们；发布检查的结果作为材料附在请求里
 INSTANCE_UPGRADE = DecisionKind("instance_upgrade", "instance",
@@ -64,7 +72,7 @@ INSTANCE_UPGRADE = DecisionKind("instance_upgrade", "instance",
 
 DECISION_KINDS = {kind.name: kind for kind in (MODEL_UNAVAILABLE, DEFINITIONS_CHANGED,
                                                NO_TOOL_CALL, WORKSPACE_UNREPRESENTABLE, INITIAL_PRD,
-                                               INSTANCE_UPGRADE,
+                                               INSTANCE_UPGRADE, QA_CANNOT_VERIFY,
                                                KERNEL_MODIFICATION)}
 
 

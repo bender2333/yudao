@@ -95,7 +95,7 @@ STOP_REASON_SNAPSHOT = frozenset({
     "time_limit", "cancelled", "user_cancelled",
     "provider_error", "provider_timeout", "provider_protocol", "unsupported_protocol",
     "retry_after_too_long", "context_overflow", "compaction_failed", "host_commit_error",
-    "run_event_version_changed",
+    "run_event_version_changed", "cannot_verify",
 })
 
 _DECLARATIONS = {
@@ -187,3 +187,10 @@ def test_the_action_receipt_fields_only_grow():
     assert not added, (
         f"动作回执多了字段 {added}：加进回执以后，把它补进 harness/tests/kernel/test_only_grows.py 的快照"
     )
+
+
+def test_cannot_verify_ends_the_run_as_failed():
+    # 质检无法核验、用户选择停止事项：停止原因是 cannot_verify，去向是 run_failed（工单 #1179）
+    reasons = json.loads(STOP_REASONS.read_text(encoding="utf-8"))
+    assert reasons["cannot_verify"]["outcome"] == "failed"
+    assert "cannot_verify" in reasons

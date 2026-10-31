@@ -157,7 +157,7 @@ AccessMode = Literal["local", "lan"]
 # 版本 11：parameter.set 的 modified_by 改为可选、base_version 与 expected_change_id 改为参数版本
 # 的内容摘要，新增 parameter.withdraw 命令，规则登记每条加 default_value，拒绝的 current_version
 # 放宽为序号或内容摘要（#1262）。
-API_VERSION = 11
+API_VERSION = 12
 
 
 class CatalogSelection(Contract):

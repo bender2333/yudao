@@ -5572,6 +5572,67 @@
         ],
         "title": "CallTarget"
       },
+      "CannotVerifyRequested": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "qa_cannot_verify",
+            "title": "Kind"
+          },
+          "blocks": {
+            "type": "string",
+            "const": "run",
+            "title": "Blocks"
+          },
+          "options": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionOption"
+            },
+            "type": "array",
+            "title": "Options"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "department": {
+            "type": "string",
+            "enum": [
+              "product",
+              "engineering",
+              "quality"
+            ],
+            "title": "Department"
+          },
+          "criteria": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Criteria"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "blocks",
+          "options",
+          "description",
+          "facts",
+          "department",
+          "criteria"
+        ],
+        "title": "CannotVerifyRequested"
+      },
       "Capabilities": {
         "properties": {
           "deployment": {
@@ -7457,6 +7518,9 @@
                 "$ref": "#/components/schemas/InitialPrdRequested"
               },
               {
+                "$ref": "#/components/schemas/CannotVerifyRequested"
+              },
+              {
                 "$ref": "#/components/schemas/KernelModificationRequested"
               },
               {
@@ -8112,7 +8176,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 11
+            "example": 12
           },
           "contract_digest": {
             "type": "string",
@@ -20508,6 +20572,9 @@
               },
               {
                 "$ref": "#/components/schemas/InitialPrdRequested"
+              },
+              {
+                "$ref": "#/components/schemas/CannotVerifyRequested"
               }
             ],
             "title": "Payload"
@@ -20700,6 +20767,7 @@
                   "baseline_verified",
                   "max_cycles",
                   "model_steps_exhausted",
+                  "cannot_verify",
                   "no_tool_call",
                   "workspace_unrepresentable",
                   "time_limit",
@@ -31753,7 +31821,8 @@
           "verdict": {
             "enum": [
               "rework_engineering",
-              "release"
+              "release",
+              "cannot_verify"
             ],
             "title": "Verdict",
             "type": "string"
@@ -32931,6 +33000,7 @@
         "properties": {
           "stop_reason": {
             "enum": [
+              "cannot_verify",
               "time_limit",
               "cancelled",
               "user_cancelled",

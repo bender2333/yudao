@@ -150,11 +150,16 @@ def _has_new_defect_record(projection: RunProjection) -> bool:
 
 
 def _has_new_delivery(projection: RunProjection) -> bool:
-    """新的交付：最近一份交付还没有质检的结论。"""
+    """新的交付：最近一份交付还没有质检的结论。
+
+    质检无法核验的结论（cannot_verify）不算核验过（工单 #1179）：用户回答「重新核验」以后
+    质检要以新的激活重新检查同一份交付，这一条决定它会不会被重新激活。
+    """
     delivery = latest_delivery(projection)
     if delivery is None:
         return False
-    return not any(review.delivery_spec_hash == delivery.content_hash for review in projection.reviews)
+    return not any(review.delivery_spec_hash == delivery.content_hash
+                   and review.verdict != "cannot_verify" for review in projection.reviews)
 
 
 def _has_new_structure(projection: RunProjection) -> bool:
