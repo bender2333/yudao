@@ -1,25 +1,29 @@
 # MCP 工具在事项定义里的形状（网络与 MCP 设计说明第 5.1 节）：名称规则与原名反查。
 #
-# 事项固定的工具清单快照给出每个工具的原名（可能含点号等 MCP 允许、模型接口不允许的字符），
-# 模型接口看到的是带服务器范围的别名 `mcp__服务器名__工具名`；调用时按别名反查服务器与原工具名
-# （工单 #1175）。冲突（与内置或动态工具重名、或两个不同的工具落到同一个别名）在装配时拒绝。
+# 事项固定的工具清单快照给出每个工具的原名（可能含点号、大写、连字符等 MCP 允许、静态定义不允许的字符）；
+# 模型看到的工具名、事项定义里的键与许可判断用的是同一个**标识**（小写字母、数字与下划线，字母开头），
+# 原名只在调用时按映射还原（工单 #1175 第 2 轮，设计说明第 5.1 节）。
+# 冲突（与内置或动态工具重名、或两个不同的工具收敛成同一个别名）在装配时拒绝。
 # 会话与调用按第 7 节放进本模块的 MCP 会话部分（下一轮），这里只放名称规则与名称表。
 
 import hashlib
 import json
+import re
 from collections.abc import Iterable
 
 TOOL_PREFIX = "mcp__"
-# 模型接口对工具名的长度上限；发生替换或超过它时改用确定性别名
+# 模型接口与静态定义对工具名的长度上限；超过它时改用确定性别名
 TOOL_NAME_MAX = 64
-# 别名里保留的完整名称前缀长度：64 - 1（下划线）- 12（摘要）
+# 别名里保留的名称前缀长度：64 - 1（下划线）- 12（摘要）
 ALIAS_PREFIX_LENGTH = 51
 ALIAS_SUFFIX_LENGTH = 12
-_ALLOWED = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-")
+# 静态定义里的标识（`harness/definitions/__init__.py` 的 Identifier 是同一个字符集）
+IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
+_DISALLOWED = re.compile(r"[^a-z0-9_]")
 
 
 class ToolAliasConflict(Exception):
-    # 名称与内置或动态工具重名，或两个不同的工具落到同一个别名：拒绝保存（第 5.1 节）
+    # 与内置或动态工具重名，或两个不同的工具收敛成同一个别名：拒绝保存（第 5.1 节）
     pass
 
 
@@ -36,24 +40,23 @@ def alias_suffix(server: str, tool: str) -> str:
 
 
 def tool_alias(server: str, tool: str) -> str:
-    """先拼 `mcp__server__tool`，再把不在 `[A-Za-z0-9_-]` 里的字符换成下划线。
+    """先拼 `mcp__server__tool`，再收敛成标识：小写，不在 `[a-z0-9_]` 里的字符换成下划线。
 
-    发生替换或完整名称超过 64 个字符时，取拼好名称的前 51 个字符，加下划线，再追加
-    `alias_suffix(server, tool)`；两种情况下结果都不超过 64 个字符，且同一个（服务器、工具）
-    总是得到同一个别名（第 5.1 节）。
+    收敛以后超过 64 个字符时，取前 51 个字符、加下划线、追加 `alias_suffix(server, tool)`；
+    结果总是标识（前缀 `mcp__` 以字母开头），且同一个（服务器、工具）总是得到同一个别名。
+    两个不同的工具收敛成同一个别名时不在这里改名：由 `ToolAliases.add` 拒绝（第 5.1 节）。
     """
-    full = TOOL_PREFIX + server + "__" + tool
-    replaced = "".join(char if char in _ALLOWED else "_" for char in full)
-    if replaced == full and len(full) <= TOOL_NAME_MAX:
-        return full
-    return replaced[:ALIAS_PREFIX_LENGTH] + "_" + alias_suffix(server, tool)
+    name = _DISALLOWED.sub("_", (TOOL_PREFIX + server + "__" + tool).lower())
+    if len(name) > TOOL_NAME_MAX:
+        name = name[:ALIAS_PREFIX_LENGTH] + "_" + alias_suffix(server, tool)
+    return name
 
 
 class ToolAliases:
     """一个事项里 MCP 工具的名称表：别名到（服务器、原工具名）的映射。
 
     内置与动态工具的名称在开始时登记为保留名；加入 MCP 工具时按名称规则生成别名，
-    与保留名重名、或两个不同的工具落到同一个别名时抛 `ToolAliasConflict`（拒绝保存）。
+    与保留名重名、或两个不同的工具收敛成同一个别名时抛 `ToolAliasConflict`（拒绝保存）。
     """
 
     def __init__(self, reserved: Iterable[str] = ()) -> None:

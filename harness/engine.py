@@ -553,6 +553,8 @@ class StepDriver:
                 after_snapshot = None
                 qa_tests_saved = None
                 deferred = False
+                # 动作被拒绝的原因（工具许可或取回时的地址规则）：进入事件载荷，界面按「被拒绝」显示
+                refused_reason = None
                 try:
                     args = json.loads(raw_args)
                     if not isinstance(args, dict):
@@ -577,6 +579,7 @@ class StepDriver:
                         receipt = ActionReceipt.refusal(f"{request.activation_id}:{step_id}:{identity}",
                                                         permission.reason)
                         ok, output, error = receipt.ok, receipt.output, receipt.error
+                        refused_reason = permission.reason
                         deferred = permission.deferred
                     elif name == "ask":
                         ask_call = {
@@ -643,6 +646,7 @@ class StepDriver:
                             raise ProviderError(str(exc), reason="workspace_unrepresentable",
                                                 facts=list(exc.paths)) from exc
                         ok, output, error = receipt.ok, receipt.output, receipt.error
+                        refused_reason = receipt.refused_reason if receipt.refused else None
                         # 动作后的公开树快照：与动作前快照、动作参数一起构成核实的依据
                         try:
                             after_snapshot = _tree_snapshot(self._environment.query(FactsQuery(tree=True)).tree)
@@ -653,6 +657,9 @@ class StepDriver:
                                               input_modalities=tool_input_modalities(request))
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
                         "output": output, "error": error, "step_id": step_id, "input_item": input_item}
+                if refused_reason is not None:
+                    call["refused"] = True
+                    call["refused_reason"] = refused_reason
                 self._recorder.tool_called(request, call, after_snapshot=after_snapshot, qa_tests_saved=qa_tests_saved)
                 # 登记命令结束后主机核对公开树发现无法表示的条目：回执已记录，运行在这里暂停
                 if isinstance(output, dict) and output.get("workspace_unrepresentable"):

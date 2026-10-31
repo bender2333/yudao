@@ -14,7 +14,6 @@ import type {
   GuidanceRecord,
   ProjectLoopResult,
   ProjectOverviewResult,
-  RunActionsResult,
   RunAsksResult,
   WorkItemLoop,
 } from "../../api/generated/types.gen";
@@ -25,12 +24,12 @@ import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDep
 import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts, formatDuration,
   formatTime, itemSource, label, lettersWaitingText, roleBarText, type DepartmentStateView } from "./labels";
 import { askIndent, askLine } from "./asks-text";
-import { ACTION_TABLE_HEAD, actionCells } from "./action-table";
+import { StepTimeline } from "./step-timeline.tsx";
 import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
 import { scopeName } from "./scope-name";
-import { emptyOrFailureText, readFailureText } from "../../contract/read-failure";
+import { readFailureText } from "../../contract/read-failure";
 
 export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   const projectId = props.route.projectId ?? "";
@@ -326,64 +325,16 @@ function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult })
           </button>
         ))}
       </div>
-      {tab === "actions" ? <Actions app={props.app} runId={data.run_id} /> : null}
+      {tab === "actions" ? (
+        <StepTimeline app={props.app} runId={data.run_id} department={data.department} />
+      ) : null}
       {tab === "context" ? <ContextPanel data={data} /> : null}
       {tab === "department-setting" ? <DepartmentSettingState data={data} /> : null}
     </Section>
   );
 }
 
-// 动作与回执：这次运行的动作列表；执行机器（3.2C）在 machines.list 登记以后加入
-function Actions(props: { app: ClientApp; runId: string | null }) {
-  const [openEvent, setOpenEvent] = useState<string | null>(null);
-  const actions = useSnapshot<RunActionsResult>(
-    props.app, "page.dept.actions", "run.actions", { run_id: props.runId ?? "" }, props.runId === null,
-  );
-  const detail = useSnapshot<EventDetailResult>(
-    props.app,
-    openEvent ? `page.dept.actions.event.${openEvent}` : "page.dept.actions.event.none",
-    "event.detail",
-    { event_id: openEvent ?? "" },
-    openEvent === null,
-  );
-
-  if (props.runId === null) {
-    return <Empty text="这个范围没有运行，动作列表为空" />;
-  }
-  if (actions.loading && actions.data === null) {
-    return <p className="y10-note note">正在读取动作列表</p>;
-  }
-  const rows = actions.data?.actions ?? [];
-  const backgroundCommands = actions.data?.background_commands ?? [];
-
-  return (
-    <>
-      <RunningBackgroundCommands commands={backgroundCommands} />
-      {rows.length === 0 ? <Empty text={emptyOrFailureText(actions.error, "这次运行没有记录动作")} /> : (
-        <Table
-          head={ACTION_TABLE_HEAD}
-          rows={rows.map((action) => {
-            const eventId = action.receipt === null ? null : action.receipt.event_id;
-            return [
-              ...actionCells(action),
-              <button
-                type="button"
-                className="y10-link link"
-                key={action.action_id}
-                disabled={eventId === null || eventId === ""}
-                onClick={() => setOpenEvent(eventId)}
-              >
-                {formatTime(action.created_at)}
-              </button>,
-            ];
-          })}
-        />
-      )}
-      {openEvent ? <EventDetail eventId={openEvent} onClose={() => setOpenEvent(null)} snapshot={detail} /> : null}
-    </>
-  );
-}
-
+// 正在运行的后台命令：命令原文、开始时间与运行中；数据来自 run.steps 的 background_commands
 export function RunningBackgroundCommands(props: { commands: BackgroundCommandView[] }) {
   const running = props.commands.filter((cmd) => cmd.status === "running");
   if (running.length === 0) {
@@ -392,14 +343,15 @@ export function RunningBackgroundCommands(props: { commands: BackgroundCommandVi
   return (
     <>
       <h3 className="y10-h3 sub">正在运行的后台命令（{running.length} 条）</h3>
-      <Table
-        head={["命令原文", "开始时间", "状态"]}
-        rows={running.map((cmd) => [
-          cmd.command,
-          formatTime(cmd.started_at),
-          "运行中",
-        ])}
-      />
+      <ul className="y10-ws-cmds">
+        {running.map((cmd, index) => (
+          <li key={`${cmd.started_at}-${index}`} className="y10-ws-cmd">
+            <code className="y10-code y10-ws-cmd-command">{cmd.command}</code>
+            <span className="y10-muted">{formatTime(cmd.started_at)}</span>
+            <span className="y10-ws-cmd-state">运行中</span>
+          </li>
+        ))}
+      </ul>
     </>
   );
 }

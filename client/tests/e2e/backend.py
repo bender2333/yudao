@@ -273,6 +273,69 @@ def initial_script():
         "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2,
     }
 
+STEPS_ITEM_MISSING = "missing-1235.txt"
+
+
+def steps_script(data_dir: Path):
+    # 步骤时间线的端到端验收（工单 #1235）：产品第一次激活走三步——第一步有推理、一句模型文字、
+    # 一个成功的动作（列出文件）与一个失败的动作（读一个不存在的文件），第二步只有动作，第三步提交规格；
+    # 之后工程问产品一次，产品回答时是第二次激活，页面的激活选择因此出现两格，已在第一次激活里展开的
+    # 思考要一直保持展开。这个模式不预置项目与事项：用例在页面上自己建项目并开始事项
+    # （同 initial-files.spec.ts 的做法）
+    #
+    # 「追加一步」的开关是数据目录里的 advance-step 文件：工程的询问先在流式片段里等着（每段 0.5 秒，
+    # --script steps 的 stream_gap），文件出现以后才真的发问，产品因此多出一次激活。用例在断言完
+    # 第一次激活的页面以后创建这个文件，先后由事件决定，不按时长赌
+    from harness.providers.call import ModelDelta, ModelStreamEvent
+
+    gate = Path(data_dir) / "advance-step"
+
+    def gated_ask(call):
+        for index in range(600):
+            if gate.exists():
+                fn = ask_turn("product", "要不要支持命令行参数？", call_id="ask-1235")
+                return fn(call) if callable(fn) else fn
+            text = f"正在核对需求（第 {index + 1} 次）"
+            yield ModelStreamEvent(kind="stream_event", id=f"steps-gate-{index}",
+                                   payload={"type": "response.output_text.delta", "delta": text},
+                                   text=text, sequence=index, stage="output", source="provider_sdk",
+                                   deltas=(ModelDelta(channel="output", offset=0, text=text),))
+        raise ProviderError("追加一步的开关没有打开")
+    def step_one(call):
+        # 推理内容与输出分开保存（ModelResponse.reasoning）：Responses 的 reasoning 条目带可读的 summary
+        # 与加密内容，页面上读得懂的是 summary 的文字
+        return ModelResponse(
+            output=[
+                {"id": "msg-1235-1", "type": "message", "role": "assistant", "status": "completed",
+                 "content": [{"type": "output_text", "text": "我先列出工作区里的文件，再读一个文件。", "annotations": []}]},
+                {"id": "fc-1235-1", "type": "function_call", "name": "list_files", "call_id": "call-1235-1",
+                 "arguments": json_dumps({}), "status": "completed"},
+                {"id": "fc-1235-2", "type": "function_call", "name": "read_file", "call_id": "call-1235-2",
+                 "arguments": json_dumps({"path": STEPS_ITEM_MISSING}), "status": "completed"},
+            ],
+            reasoning={"items": [{
+                "id": "rs-1235-1", "type": "reasoning", "encrypted_content": "CIPHER-1235",
+                "summary": [{"type": "summary_text",
+                             "text": "先看工作区里有什么。\n再挑一个文件读一下。\n第三个文件先不读，等需求确认。"}],
+            }]},
+        )
+
+    def step_two(call):
+        return ModelResponse(output=[
+            {"id": "fc-1235-3", "type": "function_call", "name": "list_files", "call_id": "call-1235-3",
+             "arguments": json_dumps({}), "status": "completed"},
+        ])
+
+    return {
+        # 两条端到端用例各自建一个项目（执行槽位一次一个事项，前一个走完才建下一个），
+        # 因此每个部门的轮次按用例数重复
+        "product": [step_one, step_two, product_spec(),
+                    answer_turn("按需求实现即可。", call_id="ans-1235")] * 2,
+        "engineering": [gated_ask, delivery_turn()] * 2,
+        "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 4,
+    }
+
+
 def room_script():
     # 部门房间的端到端验收（工单 #177）：产品的模型请求分三段流式返回，每段之间停顿；
     # 之后产品向工程发出一次询问（工程收到并回答），再走完交付与质检放行。端到端测试在请求
@@ -716,7 +779,7 @@ def main() -> int:
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote", "replay", "kill"),
+                                             "stopnote", "replay", "kill", "steps"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -733,6 +796,7 @@ def main() -> int:
 
     import tempfile
 
+    data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
     # 测试内启动的真实 HTTP 上游：三种协议的推理服务与模型列表服务（工单 #93）。
     # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（模型管理设计说明第 4.2 节），
     # 因此每种协议各起一个上游，端到端的请求按协议打到不同的本机服务。
@@ -763,7 +827,6 @@ def main() -> int:
     preset_redirect.enter_context(preset_base_urls(
         {"responses": f"{upstream_base}/v1", "chat_completions": f"{chat_base}/v1",
          "messages": f"{messages_base}/v1"}, models_url=models_server.base))
-    data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
     port = args.port
     # 硬杀重启（工单 #1188）：工程执行的那条等待命令在信号目录里写下 started 与 child.pid，等 release
     # 文件出现才结束；目录由这里建、连同进程号一起报给用例
@@ -785,6 +848,8 @@ def main() -> int:
     elif args.script == "kill":
         # 重启以后的进程用后半脚本：中断前的那一轮已经被第一个进程取走
         adapter_script = kill_resume_script() if args.hold_resume else kill_script(signals)
+    elif args.script == "steps":
+        adapter_script = steps_script(data_dir)
     elif args.script == "replay":
         # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
         base_script = script()
@@ -793,7 +858,7 @@ def main() -> int:
         adapter_script = script()
     # 流式片段的停顿（秒）：进行中的询问模式要有一段够长的窗口，回答分支每段停 0.5 秒，
     # 120 段约一分钟（工单 #477 的验收第 2 条）；房间模式按 2.5 秒；其余模式不停顿
-    stream_gap = 2.5 if args.room else (0.5 if args.script == "pending" else 0.0)
+    stream_gap = 2.5 if args.room else (0.5 if args.script in ("pending", "steps") else 0.0)
     if args.catalog_driven:
         # 工单 #319 第 6 项：用例要在界面上核对「缺少部门默认」的真实拒绝。
         # 就绪检查只按目录里的部门默认判断（LoopSystem.provider_status），单适配器方式直接返回
@@ -869,7 +934,7 @@ def main() -> int:
         elif args.script == "replay":
             # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
             asyncio.run(seed(application, system, two_item_project=True))
-        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill"):
+        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）
             # 自己在界面上建项目并开始事项，不需要预置的项目与事项；进行中的询问还要求执行槽位空着，

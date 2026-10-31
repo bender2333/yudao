@@ -29,19 +29,23 @@ def test_tools_are_host_tools_or_environment_actions():
     assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
         "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
         "read_external_source": "read",
+        "fetch_url": "fetch",
         "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
         "run_check": "check", "bash": "command", "read_output": "command", "stop_job": "command",
     }
 
 
-def test_every_department_reads_saved_external_sources():
-    # 网络取回与 MCP 设计说明第 5.1 节：三个部门始终都有 read_external_source；
-    # 普通事项与建档事项的工具清单都是显式写的，两份都要有（工单 #1171）
+def test_every_department_reads_saved_external_sources_and_fetches():
+    # 网络取回与 MCP 设计说明第 5.1 节：三个部门始终都有取回工具 fetch_url 与读已保存来源的
+    # read_external_source；普通事项与建档事项的工具清单都是显式写的，两份都要有（工单 #1171、#68）
     assert tool_kind("read_external_source") == "environment"
     assert tool_action("read_external_source") == "read"
+    assert tool_kind("fetch_url") == "environment"
+    assert tool_action("fetch_url") == "fetch"
     for kind in ("change", "onboarding"):
         for department in ("product", "engineering", "quality"):
-            assert "read_external_source" in tools_for(department, kind), f"{kind} 的 {department} 没有这个工具"
+            for tool in ("read_external_source", "fetch_url"):
+                assert tool in tools_for(department, kind), f"{kind} 的 {department} 没有 {tool}"
 
 
 def test_answer_prd_revision_parameter_definitions_match_submit_product_spec():

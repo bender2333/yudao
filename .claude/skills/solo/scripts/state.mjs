@@ -134,6 +134,34 @@ export function countPendingTasks(loop) {
   return parseTasks(loop).filter((t) => t.status === 'pending').length;
 }
 
+/** 台账里还在的活：已经完成的单子不算（做法与 lib/report.mjs 的 live 过滤同一条）。 */
+function liveTasks(tasks) {
+  return (Array.isArray(tasks) ? tasks : []).filter((t) => t.status !== 'done');
+}
+
+function stateOf(taskState) {
+  return taskState && typeof taskState === 'object' && !Array.isArray(taskState) ? taskState : {};
+}
+
+/**
+ * 台账里等用户的单子：已经完成的单子不再算进去。
+ * 台账里留着 waitFor=user 的旧标记（人早就把单子关了），印出来会让人以为还要处理。
+ */
+export function waitingOnUser(tasks, taskState) {
+  const state = stateOf(taskState);
+  return liveTasks(tasks)
+    .filter((t) => state[t.id] && state[t.id].waitFor === 'user')
+    .map((t) => t.id);
+}
+
+/** 失败中的单子：同样的口径，已经完成的单子不再算进去。 */
+export function failingTasks(tasks, taskState) {
+  const state = stateOf(taskState);
+  return liveTasks(tasks)
+    .filter((t) => state[t.id] && state[t.id].fails > 0)
+    .map((t) => t.id + 'x' + state[t.id].fails);
+}
+
 export function safeFileName(value) {
   const cleaned = String(value ?? '')
     .replace(/[^A-Za-z0-9._-]+/g, '-')

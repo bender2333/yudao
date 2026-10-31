@@ -152,9 +152,9 @@ def test_a_new_instance_over_the_same_workspace_reads_the_written_file(implement
 
 def test_an_action_the_implementation_does_not_execute_fails(implementation):
     _name, _root, environment = implementation
-    # 新的动作类别由各自的处理分支提供：本机执行环境还没有取回的处理分支
-    with pytest.raises(ValueError, match="does not execute fetch"):
-        _perform(environment, _action("fetch_url", "fetch", {"url": "https://example.invalid"},
+    # 新的动作类别由各自的处理分支提供：取回（fetch）已由工单 #68 接上，MCP 调用还没有处理分支
+    with pytest.raises(ValueError, match="does not execute mcp"):
+        _perform(environment, _action("mcp__time__now", "mcp", {"tool": "now"},
                                       verification="none", cancellable=True))
     # 工具不在它声明的动作类别里：按类别分派时立刻失败，不换一个动作执行
     with pytest.raises(ValueError, match="is not a read action"):

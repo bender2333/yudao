@@ -4341,6 +4341,32 @@
           "created_at": {
             "type": "string",
             "title": "Created At"
+          },
+          "refused": {
+            "type": "boolean",
+            "title": "Refused",
+            "default": false
+          },
+          "refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused Reason"
+          },
+          "fetch": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FetchReceipt"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -4382,6 +4408,7 @@
               "running",
               "completed",
               "failed",
+              "refused",
               "unknown"
             ],
             "title": "Status"
@@ -8653,6 +8680,71 @@
           "source"
         ],
         "title": "FactRef"
+      },
+      "FetchReceipt": {
+        "properties": {
+          "final_url": {
+            "type": "string",
+            "title": "Final Url"
+          },
+          "status_code": {
+            "type": "integer",
+            "title": "Status Code"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type"
+          },
+          "bytes": {
+            "type": "integer",
+            "title": "Bytes"
+          },
+          "download_truncated": {
+            "type": "boolean",
+            "title": "Download Truncated"
+          },
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "ref": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ref"
+          },
+          "redirects": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Redirects"
+          },
+          "duration_ms": {
+            "type": "integer",
+            "title": "Duration Ms"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "final_url",
+          "status_code",
+          "content_type",
+          "bytes",
+          "download_truncated",
+          "content_hash",
+          "ref",
+          "redirects",
+          "duration_ms"
+        ],
+        "title": "FetchReceipt"
       },
       "FileActionComparison": {
         "properties": {
@@ -35652,6 +35744,22 @@
                 "type": "null"
               }
             ]
+          },
+          "refused": {
+            "default": false,
+            "title": "Refused",
+            "type": "boolean"
+          },
+          "refused_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Refused Reason"
           },
           "after_snapshot_ref": {
             "anyOf": [
