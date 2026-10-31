@@ -39,6 +39,7 @@
     admitted: '<path d="M8 1.6l5.2 2v4.2c0 3-2.2 5.3-5.2 6.6-3-1.3-5.2-3.6-5.2-6.6V3.6z"/><path d="M5.6 8l1.7 1.7 3.1-3.3"/>',
     unusable: '<path d="M8 1.8l6.6 11.6H1.4z"/><path d="M8 6.4v3.2"/><path d="M8 11.4v.2"/>',
     unknown: '<path d="M5.6 5.6a2.4 2.4 0 1 1 3.4 2.2c-.7.3-1 .8-1 1.5v.6"/><path d="M8 12.4v.2"/>',
+    held: '<circle cx="8" cy="8" r="6" stroke-dasharray="2.4 2"/><path d="M5.4 8h5.2"/>',
     idle: '<circle cx="8" cy="8" r="5.6"/>'
   };
   Y15.STATUS_KINDS = Object.keys(ICON_PATHS);

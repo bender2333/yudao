@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Yudao 页面原型 v15</title>
+  <link rel="stylesheet" href="styles/base.css">
+  <link rel="stylesheet" href="styles/page.css">
+</head>
+<body>
+  <div class="y15-banner" role="note">
+    <strong>页面原型 · 示例数据</strong>
+    <span class="y15-banner-text">不带画面，内容全部是假数据，不连接任何服务；右下角的「场景」菜单可以切换情形</span>
+  </div>
+
+  <div id="y15-window-note" class="y15-window-note" hidden></div>
+
+  <div class="y15-app">
+    <aside id="y15-sidebar" class="y15-sidebar" aria-label="首页与项目"></aside>
+    <div class="y15-scrim" data-act="drawer" aria-hidden="true"></div>
+    <div class="y15-main">
+      <header id="y15-topbar" class="y15-topbar"></header>
+      <nav id="y15-tabs" class="y15-tabbar" aria-label="项目页面" hidden></nav>
+      <main id="y15-content" class="y15-content"></main>
+    </div>
+  </div>
+
+  <div id="y15-toolbar" class="y15-toolbar" aria-label="原型工具条"></div>
+  <div id="y15-modal-root"></div>
+  <div id="y15-toast-root" class="y15-toast-root" aria-live="polite"></div>
+
+  <script src="js/y15.js"></script>
+  <script src="js/kit.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/cards.js"></script>
+  <script src="js/pages.js"></script>
+  <script src="js/dept.js"></script>
+  <script>Y15.app.start();</script>
+</body>
+</html>
