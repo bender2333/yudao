@@ -42,6 +42,8 @@ _MULTIPLE_KINDS = frozenset({"product_decision"})
 # 质检退回工程的放行结论（S4c 工单 #863 从薄驱动搬来）：接纳的一方认成果种类与结论取值，
 # 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用设计说明第 6 节）
 REVIEW_KIND = "qa_review"
+# 质检无法核验的结论（工单 #1179）：薄驱动只问这一句，不写成果种类与结论的字面值
+CANNOT_VERIFY_VERDICT = "cannot_verify"
 REWORK_VERDICT = "rework_engineering"
 # 成果记下的树摘要：交付记代码树、建档记快照的树；没有这一项的成果不带
 _TREE_FIELDS = ("code_tree_digest", "code_snapshot_hash", "tree_digest")
@@ -410,3 +412,8 @@ class SubmissionWriter:
 def _json_bytes(value: dict[str, Any]) -> bytes:
     return (json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
+
+
+def asks_cannot_verify(artifact: dict[str, Any]) -> bool:
+    # 这一份成果是「质检无法核验」的结论吗（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）
+    return artifact.get("kind") == REVIEW_KIND and artifact.get("verdict") == CANNOT_VERIFY_VERDICT

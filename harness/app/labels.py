@@ -32,6 +32,7 @@ DECISION_KIND_NAMES: dict[str, str] = {
     "initial_prd": "接入已有项目的初始需求文档等待确认",
     "instance_upgrade": "实例升级等待批准",
     "kernel_modification": "交付改动了内核清单里的路径，等待批准",
+    "qa_cannot_verify": "质检无法核验，等待回答",
 }
 
 
