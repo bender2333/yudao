@@ -824,7 +824,7 @@ def _model_input_audit(store: EventStore, artifacts: ArtifactStore, run_id: str)
                 department=event.department, session_id=event.session_id, activation_id=activation,
                 prompt=activation_prompts[activation],
                 effective_contract_hash=basis["effective_contract_hash"],
-                input_version=current_input,
+                input_version=current_input, definitions=DEFINITIONS,
             )
             before = events[:index]
             # 回放用的调用目标与本次请求事件记录的一致：CONTEXT_ASSEMBLED 事件本身带目标字段，
