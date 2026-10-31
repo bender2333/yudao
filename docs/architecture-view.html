@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Yudao 画面总图</title>
 <style>
-  /* 总图「界面」方框与「画面」缝的展开，六节，写法与总图相同：固定结构实线，填进去的内容虚线。 */
+  /* 总图「画面」方框与「画面」缝的展开，六节，写法与总图相同：固定结构实线，填进去的内容虚线。 */
   :root {
     --bg: #fbfaf7; --fg: #1f1f1d; --muted: #6b6a64; --line: #1f1f1d; --soft: #c9c7bf;
     --s3: #2f5d50; --s2: #9fbfb3; --s1: #e6ede9; --accent: #2f5d50; --warn: #a8622a; --stop: #8a3a3a;
@@ -113,7 +113,7 @@
 <main>
   <header>
     <h1>Yudao 画面总图</h1>
-    <p class="muted">这一页展开<a href="architecture.html#s1">总图</a>第一节的「界面」方框与第四节「画面」的缝，写法与总图相同。画面是事实的投影，不是模拟：画面上能当真的东西都能回到一条事实；关掉表演，剩下的全是事实。固定的是画面合同、播放的规矩、七种元件与诚实性；空间、场景、翻译器与画法都是填进去的内容。画面跟着定义伸缩：一个角色时是一间屋，三部门时是一层楼，子事项是屋里的一间小屋。</p>
+    <p class="muted">这一页展开<a href="architecture.html#s1">总图</a>第一节的「画面」方框与第四节「画面」的缝，写法与总图相同。画面是系统外面的一个使用方：像观察者一样只经接口读事实，操作只发现有的命令；它有自己的代码、测试与阶段，系统不等它。画面只要求诚实，不要求跟上。画面是事实的投影，不是模拟：画面上能当真的东西都能回到一条事实；关掉表演，剩下的全是事实。固定的是画面合同、播放的规矩、七种元件与诚实性；空间、场景、翻译器与画法都是填进去的内容。画面跟着定义伸缩：一个角色时是一间屋，三部门时是一层楼，子事项是屋里的一间小屋。</p>
     <nav>
       <a href="#v1">01 全局图与方程</a><a href="#v2">02 什么能动</a><a href="#v3">03 一个事件怎样上画面</a><a href="#v4">04 要守的缝</a><a href="#v5">05 跟着定义伸缩</a><a href="#v6">06 换宿主</a>
     </nav>
@@ -124,7 +124,7 @@
     <div class="legend"><span><i class="solid"></i>固定的结构</span><span><i class="dash"></i>填进去的内容</span></div>
     <div class="outer" style="margin-top:14px">
       <div class="col">
-        <div class="box fixed"><b>一份事实</b><small>Yudao 的查询快照与事件流，都带位置。画面只读，不另存事实。</small></div>
+        <div class="box fixed"><b>Yudao 的接口</b><small>查询快照与事件流，都带位置；现有的命令。画面只读，不另存事实，不要专用查询。</small></div>
         <div class="box"><b>别的宿主（以后）</b><small>外部 agent 的会话记录，例如 Claude Code。换宿主只换翻译器（第六节）。</small></div>
       </div>
 
@@ -145,9 +145,9 @@
       </div>
 
       <div class="col">
-        <div class="box"><b>页面</b><small>把画面交出的操作变成命令；画布以外的列表与详情实时显示，不进时间线。点开回链看到的原始事件、差异与回执在页面上看，画布不画这类细内容。</small></div>
+        <div class="box"><b>壳</b><small>把画面交出的操作变成现有的命令，经接口发。点开回链看到的原始事件、差异与回执在宿主的页面上看，画布不画这类细内容。</small></div>
         <div class="box"><b>你</b><small>看、点开回链、拖队列、在决定板上回答。每个操作都是一条现有的命令。</small></div>
-        <div class="box fixed"><b>诚实性</b><small>不说谎、能回链、开环看得见。写成测试，换画法也照过。</small></div>
+        <div class="box fixed"><b>诚实性</b><small>不说谎、能回链、开环看得见。写成测试，是画面唯一硬的验收，换画法也照过。</small></div>
       </div>
     </div>
 
@@ -176,7 +176,7 @@
         <div class="r">
           <b>只能向后兼容</b><small>画面合同的形状与取值、七种元件、视觉通道表（哪些通道承载事实）。字段只增，带版本。</small>
           <div class="r">
-            <b>换画面也不换</b><small>事实只来自查询；画面不回写、不发命令；每个事实带来源；开环看得见；固定画出的只有边界、裁决点与权威关系，没有事件就没有轨迹。</small>
+            <b>换画面也不换</b><small>事实只来自接口的查询；画面层不回写，命令只由壳发现有的命令；每个事实带来源；开环看得见；固定画出的只有边界、裁决点与权威关系，没有事件就没有轨迹。</small>
           </div>
         </div>
       </div>
@@ -185,6 +185,12 @@
         <p class="muted" style="font-size:12.5px"><b>调节参数</b>：落后上限、最短时长、时长倍率是填进去的内容，调节面板里改，不改合同。</p>
       </div>
     </div>
+    <ul class="rules">
+      <li><b>可以落后</b>：系统加了画面不认识的部门或事件，画面画成通用的屋与小人，或者不画，测试照过；还没画的列在缺口清单里，不让测试失败。画面落后不算错，画错才算。</li>
+      <li><b>先事实层，后表演</b>：每加一个空间或元件，先只画事实层，状态直接换上去；走位、气泡、排队这些表演以后再补。</li>
+      <li><b>只画已有的记录</b>：画面的每一步都等系统先有对应的记录；系统的验收不等画面，画面的测试不挡系统的合并。</li>
+      <li><b>设计问题用草图回答</b>：要回答画面怎么画时，画一张假数据的单页草图，答完就扔；验收看画面合同与诚实性，不对照草图的像素。</li>
+    </ul>
   </section>
 
   <section id="v3">
@@ -210,15 +216,15 @@
   </section>
 
   <section id="v4">
-    <h2>要守的缝<small>「画面」方框里面的缝，不计入总图的十三道</small></h2>
+    <h2>要守的缝<small>「画面」方框里面的缝，不计入总图的十三道；画面与系统之间只有总图的「画面」那一道</small></h2>
     <p class="muted">已定：子架构师现在就守；未定：先别依赖。字段名由子架构师定。</p>
     <div class="seams">
-      <div class="seam" data-state="set"><b>画面合同<span>已定</span></b><i>翻译层 ↔ 画面层</i><em>就是总图第四节「画面」的缝。</em><ul><li>画面层只收状态、动作与实时内容，不导入宿主的任何代码</li><li>合同里没有宿主的事件种类、查询名与状态值</li><li>都带位置；画面层只传位置，不解读</li></ul></div>
-      <div class="seam" data-state="set"><b>读事实<span>已定</span></b><i>宿主 ↔ 同步层</i><em>只管数据是不是最新，不管怎么画。</em><ul><li>快照带位置；事件流按位置续，有缺口就重新同步</li><li>按刷新清单重查；服务端不为画面加专用的查询</li><li>Yudao 这一侧就是总图「接口」的缝</li></ul></div>
-      <div class="seam" data-state="set"><b>回调<span>已定</span></b><i>画面层 → 页面</i><em>画面看得见、点得到，自己不动手。</em><ul><li>画面只交出用户的操作：选决定、点跳转、聚焦</li><li>命令只由页面发</li><li>每个可操作的物件对应一条现有命令</li></ul></div>
+      <div class="seam" data-state="set"><b>画面合同<span>已定</span></b><i>翻译层 ↔ 画面层</i><em>画面里面最要紧的一道。</em><ul><li>画面层只收状态、动作与实时内容，不导入宿主的任何代码</li><li>合同里没有宿主的事件种类、查询名与状态值</li><li>都带位置；画面层只传位置，不解读</li></ul></div>
+      <div class="seam" data-state="set"><b>读事实<span>已定</span></b><i>宿主 ↔ 同步层</i><em>只管数据是不是最新，不管怎么画。</em><ul><li>快照带位置；事件流按位置续，有缺口就重新同步</li><li>按刷新清单重查；服务端不为画面加专用的查询</li><li>Yudao 这一侧就是总图「画面」那道缝，经「接口」</li></ul></div>
+      <div class="seam" data-state="set"><b>回调<span>已定</span></b><i>画面层 → 壳</i><em>画面看得见、点得到，自己不动手。</em><ul><li>画面只交出用户的操作：选决定、点跳转、聚焦、点开回链</li><li>命令只由壳经接口发，每个可操作的物件对应一条现有命令</li><li>细内容交给宿主的页面看</li></ul></div>
       <div class="seam" data-state="set"><b>声明<span>已定</span></b><i>画面层 ↔ 场景内容</i><em>加场景、加动作不改时间线。</em><ul><li>每种动作的级别、时长、谁演、走到哪写在声明表</li><li>屋子、人物、管道的画法按定义里的种类取</li><li>动作本身不带级别与时长</li></ul></div>
-      <div class="seam" data-state="set"><b>映射<span>已定</span></b><i>系统的概念 → 七种元件</i><em>表写完，世界就定了。</em><ul><li>每个概念归一种元件，写来源、状态与变化、位置、操作、仪表、不画的部分</li><li>每种事件在每个场景里要么翻成动作，要么写明不画与理由</li><li>归不进去的是装饰，不作断言</li></ul></div>
-      <div class="seam" data-state="open"><b>宿主<span>未定</span></b><i>画面层 ↔ 宿主壳</i><em>同一个画面层放进不同的宿主。</em><ul><li>画面层不依赖宿主，已经由导入方向的测试守住</li><li>拆成独立的包、宿主怎样嵌入，还没定</li><li>现在只有 Yudao 一个使用方，不拆</li></ul></div>
+      <div class="seam" data-state="set"><b>映射<span>已定</span></b><i>系统的概念 → 七种元件</i><em>表写完，世界就定了。</em><ul><li>每个概念归一种元件，写来源、状态与变化、位置、操作、仪表、不画的部分</li><li>每种事件在每个场景里翻成动作、写明不画，或者还没归类；还没归类的不画，列进缺口清单</li><li>归不进去的是装饰，不作断言</li></ul></div>
+      <div class="seam" data-state="set"><b>宿主<span>已定</span></b><i>画面 ↔ 宿主</i><em>同一个画面放进不同的宿主。</em><ul><li>画面是单独的应用：单独的目录、构建、测试与里程碑，以单独的页面打开</li><li>只经宿主公开的接口，不导入宿主的任何代码，由导入方向的测试守住</li><li>Yudao 是第一个宿主</li></ul></div>
     </div>
   </section>
 
@@ -306,8 +312,8 @@
   </section>
 
   <section id="v6">
-    <h2>换宿主<small>方向，不排期</small></h2>
-    <p class="muted">画面层不认识 Yudao，只认画面合同，所以换一个事实源只要换翻译器。现在只有 Yudao 一个使用方，不拆包；有了第二个使用方再拆，只是搬代码。</p>
+    <h2>换宿主<small>Yudao 是第一个宿主</small></h2>
+    <p class="muted">画面是单独的应用，画面层不认识 Yudao，只认画面合同；Yudao 也只是经公开接口接上的一个宿主。换一个事实源只要换翻译器与壳。接外部 agent 是方向，不排期。</p>
     <div class="outer" style="margin-top:12px;grid-template-columns:1fr 1fr 1fr">
       <div class="col">
         <div class="box fixed"><b>Yudao</b><small>查询快照与事件流 → Yudao 的翻译器。部门、核验、子事项、观察者都有，画面按定义长全。</small></div>
@@ -317,7 +323,7 @@
         <div class="box fixed" style="display:grid;place-items:center;text-align:center;min-height:100%"><b>同一个画面层</b><small>画面合同、播放时间线、七种元件、诚实性测试</small></div>
       </div>
       <div class="col">
-        <div class="box"><b>Yudao 的页面</b><small>回调变成命令，可以指挥。</small></div>
+        <div class="box"><b>Yudao 的壳</b><small>回调变成现有的命令经接口发，可以指挥；细内容链到 Yudao 的页面。</small></div>
         <div class="box"><b>外部宿主的壳</b><small>可以只看；回调怎样处理由宿主定。</small></div>
       </div>
     </div>
@@ -328,7 +334,7 @@
     </ul>
   </section>
 
-  <footer>只由总架构师改；与总图不一致时以<a href="architecture.html">总图</a>为准。细节见 docs/design/visualization.md（画面与播放）、docs/requirements/game-world-three-spaces.md（三个空间）、docs/research/game-world-as-projection.md（映射的调研）。</footer>
+  <footer>只由总架构师改；与总图不一致时以<a href="architecture.html">总图</a>为准。画面自己的阶段见<a href="program-roadmap.md">路线图</a>第 4 节。细节见 docs/design/visualization.md（画面与播放）、docs/requirements/game-world-three-spaces.md（三个空间）、docs/research/game-world-as-projection.md（映射的调研）。</footer>
 </main>
 </body>
 </html>

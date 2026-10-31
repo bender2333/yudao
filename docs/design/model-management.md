@@ -1,6 +1,6 @@
 # 模型管理设计说明
 
-总图位置：第四节「模型」的缝；第二节「定义」里的模型设置。依据：需求 [D24 模型管理与部门模型选择](../requirements/model-management.md)；界面原型 [v14 原型](../prototypes/v14/design.md)（模型管理页）与 [v13 原型](../prototypes/v13/design.md)（部门设置弹窗与部门工作间），按第 9 节制作。
+总图位置：第四节「模型」的缝；第二节「定义」里的模型设置。依据：需求 [D24 模型管理与部门模型选择](../requirements/model-management.md)；界面原型 [v14 原型](../archive/prototypes/v14/design.md)（模型管理页）与 [v13 原型](../prototypes/v13/design.md)（部门设置弹窗与部门工作间），按第 9 节制作。
 
 本说明是模型目录、部门与角色的模型选择、推理档位、调用目标解析与上下文容量的判断标准。其他文档与本说明冲突时，以本说明为准。
 
