@@ -1,6 +1,6 @@
 # D33 接入已有项目
 
-确认时间：2026-09-28，设计 2026-09-29 确认。状态：设计已确认，未实施。设计：[接入已有项目设计说明](../design/existing-project-onboarding.md)。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.8，排在 3.1 之后、3.9 之前。原路线图中的 B5 已有项目建档由本项承担。
+状态：设计已确认，未实施。设计：[接入已有项目设计说明](../design/existing-project-onboarding.md)。路线位置：[路线图](../program-roadmap.md)阶段二（接入真实项目）。
 
 ## 用户原话
 

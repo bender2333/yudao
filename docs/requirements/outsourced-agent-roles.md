@@ -1,6 +1,6 @@
 # D31 部门内的外包角色
 
-确认时间：2026-09-25。状态：需求已记录，未实施。路线位置：待定。相关记录：D26 [部门内多角色与多循环](department-roles.md)、D29 [远程执行环境](remote-execution.md)。
+状态：需求已记录，未实施。路线位置：[路线图](../program-roadmap.md)阶段四，「角色与外包」那条道。相关记录：D26 [部门内多角色与多循环](department-roles.md)、D29 [远程执行环境](remote-execution.md)。
 
 ## 用户原话
 

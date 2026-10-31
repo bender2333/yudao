@@ -1,6 +1,6 @@
 # D37 新建项目的起始文件夹
 
-确认时间：2026-10-06。状态：设计已确认，未实施。设计：[项目的起始文件夹设计说明](../design/project-initial-files.md)。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.8 的补充，属于里程碑 M2。
+状态：设计已确认，未实施。设计：[项目的起始文件夹设计说明](../design/project-initial-files.md)。路线位置：[路线图](../program-roadmap.md)阶段二，接入已有项目（D33）的补充。
 
 ## 用户原话
 

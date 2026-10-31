@@ -1,6 +1,6 @@
 # 核验是角色的性质，固定结构只剩循环、边界、裁决
 
-状态：有效；最近一次改动：2026-10-30 新建；依据：2026-10-30 用户在 `/grill-with-docs` 里的决定（方案出处：分支 `plan/verification-as-node` 的 `docs/plan-verification-as-node.md`）。
+状态：有效；依据：用户在 `/grill-with-docs` 里的决定（方案出处：分支 `plan/verification-as-node` 的 `docs/plan-verification-as-node.md`）。
 
 用户的目的是让同一套底下的层能退化成单 agent、普通多 agent，往上是三部门，再往上是部门内的子组织与观察者，而且各种形态复用同一套抽象。此前「独立的证据」是第四样固定结构，质检的规矩按部门名写在装配、执行、记录与内核的一行里，任务池又自己写了一份判定部门；换一种形态就要改这些共用的地方。
 

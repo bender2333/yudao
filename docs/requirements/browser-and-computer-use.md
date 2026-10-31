@@ -1,6 +1,6 @@
 # D34 浏览器与 computer use
 
-确认时间：2026-09-28。状态：需求已确认，设计已确认，未实施；Stage 3 实施浏览器的部分，computer use 的部分作为以后阶段的专题，放在哪个阶段在专题讨论时确定（见本文「computer use 专题待重新确定的事项」）。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。工单：父工单 [#123](https://github.com/bender2333/yudao/issues/123)「[3.2D] 浏览器：质检操作交付的网页」，子工单 #147 至 #149、#151 至 #155；computer use 的工单 #150、#246、#247 属于以后阶段的专题。路线位置：浏览器的部分在[总体路线图](../program-roadmap.md) Stage 3 的 3.2D，依赖 3.2B（MCP 接入）与执行环境的合同（#128），排在 3.9 之前。调研：[浏览器与 computer use 调研](../archive/research/browser-and-computer-use.md)。最近一次改动：2026-10-28 去掉已删除的 ADR 的引用。
+状态：需求已确认，设计已确认，未实施；computer use 的部分作为以后阶段的专题，放在哪个阶段在专题讨论时确定（见本文「computer use 专题待重新确定的事项」）。设计：[浏览器与 computer use 设计说明](../design/browser-and-computer-use.md)。路线位置：浏览器的部分在[路线图](../program-roadmap.md)阶段二，「动作与工具」那条道，依赖网络取回与 MCP 的接入与执行环境的合同。调研：[浏览器与 computer use 调研](../archive/research/browser-and-computer-use.md)。
 
 ## 用户原话
 

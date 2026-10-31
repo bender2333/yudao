@@ -1,6 +1,6 @@
 # D27 运维部门
 
-确认时间：2026-09-24，2026-09-28 两次补充规则。状态：需求已确认，设计在 Stage 4 进行，未实施。路线位置：[总体路线图](../program-roadmap.md) Stage 4：运维部门与长时间运行。相关准备：[运行责任样例](../archive/stage-3/operations-responsibility-sample.md)。
+状态：需求已确认，设计在阶段三进行，未实施。路线位置：[路线图](../program-roadmap.md)阶段三「常驻自转、运维部门、看门狗兜底」。相关准备：[运行责任样例](../archive/stage-3/operations-responsibility-sample.md)。
 
 ## 用户原话
 

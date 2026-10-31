@@ -1,6 +1,6 @@
 # D36 网络取回与 MCP 工具
 
-确认时间：2026-10-01。状态：需求已确认，设计已确认，未实施。设计：[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。工单：父工单 [#122](https://github.com/bender2333/yudao/issues/122)，子工单见设计说明第 16 节。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.2B，里程碑 M3；3.2D 的浏览器经它的 MCP 客户端模块接入（#69）。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。最近一次改动：2026-10-28 去掉已删除的 ADR 的引用。
+状态：需求已确认，设计已确认，未实施。设计：[网络取回与 MCP 工具设计说明](../design/network-and-mcp.md)。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。路线位置：[路线图](../program-roadmap.md)阶段二，「动作与工具」那条道；浏览器经它的 MCP 客户端模块接入。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。
 
 ## 用户原话
 

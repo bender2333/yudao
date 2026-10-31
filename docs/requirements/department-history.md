@@ -1,6 +1,6 @@
 # D08 部门完整历史与逐次上下文
 
-> 每次模型请求的组成（栏目与顺序）与压缩以 [D25 语义系统](semantic-system.md) 及[语义系统设计说明](../design/semantic-system.md)第 10、11 节为准。
+> 每次模型请求的组成（栏目与顺序）与压缩以 [D25 语义系统](semantic-system.md) 及[语义系统设计说明](../design/semantic-system.md)「上下文组装」与「长度控制」为准。
 
 ## 用户原话
 

@@ -1,6 +1,6 @@
 # D35 自举：用 Yudao 开发 Yudao
 
-确认时间：2026-09-29，2026-09-30 与 2026-10-07 补充。状态：需求已记录，未实施；最近一次改动 2026-10-29：用户确认 #395 下的六张画面工单是薄片 ④ 的交付，试点的六张题在薄片 ⑤ 开始时再选（2026-10-07 原定这六张兼作试点题）；2026-10-28 加入「第一层试点的配对验收约定」（从已归档的旧路线图搬入）。路线位置：[路线图](../program-roadmap.md)第 2 节。第一层的试点是阶段二「Yudao 做自己的工单」，在阶段二「真实项目接着做」与阶段二「改一处、看得见、能撤回」之后、五项前置条件完成以后开始；第二层是阶段五；圈复杂度与变异测试的研发工具在阶段三。相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)、[系统架构原理](../archive/design/architecture/core-and-materials.md)第 8 节、决策记录 2026-09-29、2026-09-30（[已归档](../archive/decision-2026-09.md)）与 2026-10-07「Stage 3 剩余的两个专题」（[决策记录](../decision.md)）三条、[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)。
+状态：需求已记录，未实施。路线位置：[路线图](../program-roadmap.md)「五个阶段」：第一层的试点是阶段二「Yudao 做自己的工单」，在阶段二「真实项目接着做」与阶段二「改一处、看得见、能撤回」之后、五项前置条件完成以后开始，试点的六张题在薄片 ⑤ 开始时选；第二层是阶段五；圈复杂度与变异测试的研发工具在阶段三。相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)、[系统架构原理](../archive/design/architecture/core-and-materials.md)第 8 节、决策记录 2026-09-29、2026-09-30（[决策记录 2026-09](../archive/decision-2026-09.md)）与 2026-10-07「Stage 3 剩余的两个专题」（[决策记录](../decision.md)）三条、[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)。
 
 ## 用户原话
 

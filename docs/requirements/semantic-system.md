@@ -1,6 +1,6 @@
 # D25 语义系统
 
-确认时间：2026-09-24 至 2026-09-29。状态：需求已确认，设计已按本记录写成（2026-09-26），未实施。设计：[语义系统设计说明](../design/semantic-system.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)。
+状态：需求已确认，设计已按本记录写成，未实施。设计：[语义系统设计说明](../design/semantic-system.md)。ADR：[0019](../adr/0019-project-stream-across-versions.md)。
 
 ## 用户原话
 

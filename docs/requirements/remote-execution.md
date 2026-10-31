@@ -1,6 +1,6 @@
 # D29 远程执行环境
 
-确认时间：2026-09-24，2026-09-28 按使用方式修改，设计 2026-09-29 确认。状态：设计已确认，未实施。设计：[执行环境服务设计说明](../design/execution-environment.md)。部署形态见 [ADR-0018](../adr/0018-single-control-host-remote-execution.md)，执行环境服务的合同沿用[总图](../architecture.html)第四节的缝，拆开部署见第六节；机器授权与结果未知两条依据 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)。路线位置：[总体路线图](../program-roadmap.md) Stage 3 的 3.2C 执行环境服务。最近一次改动：2026-10-28 去掉已删除的 ADR 的引用。
+状态：设计已确认，未实施。设计：[执行环境服务设计说明](../design/execution-environment.md)。依据：部署形态见 [ADR-0018](../adr/0018-single-control-host-remote-execution.md)，执行环境服务的合同沿用[总图](../architecture.html)第四节的缝，拆开部署见第六节；机器授权与结果未知两条依据 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)。路线位置：[路线图](../program-roadmap.md)阶段四「拆开部署」。
 
 ## 用户原话
 
