@@ -34,7 +34,7 @@ description: 子架构师接手工单、模块或里程碑的事之前的三项�
 7. 试用：一个阶段一个里程碑（GitHub Milestone），阶段里每个薄片一张试用工单（[工单规范](../../../docs/agents/ticket-spec.md)），在薄片达到之前标 `waiting`。
    - 薄片达到以后，先用 `/milestone-retro <里程碑标题与薄片>` 复盘（[复盘 skill](../milestone-retro/SKILL.md)），报告发在 GitHub Discussions 的 Announcements 分类；提出的改动中，参数与规则句子的修改先经用户确认。
    - 接着跑一次 agent 试用（[`/trial`](../trial/SKILL.md)）：另一个模型按真实用户的路子用一个从 main 打包的实例，只读、不建工单，帖子发在 General；明确缺陷按 [`/trial-intake`](../trial-intake/SKILL.md) 的 A 类建成工单，由 solo 修完，这一道筛子把机器能发现的问题挡在用户的时间之前。
-   - 然后架构师发布版本并按试用指南走查，再把试用工单改为 `ready-for-human` 交给用户；步骤见 `docs/design/web-interface-and-release.md` 第 6.4 至 6.6 节。
+   - 然后架构师发布版本并按试用指南走查，再把试用工单改为 `ready-for-human` 交给用户；步骤见 `docs/design/web-interface-and-release.md`「谁在什么时候发布」「架构师的走查」与「试用的交接」。
    - 用户试用并确认以后，架构师按[验收证据规则](../../../docs/agents/acceptance-evidence.md)第 5 节在试用工单写关闭评论，再关闭试用工单，最后一个薄片的试用工单关闭时一起关闭里程碑；用户不在场时它们保持打开，被唤醒的架构师、派发者与 solo 执行者不关闭它们。
    - 用户不在场时，复盘、agent 试用、缺陷工单、发布与走查由[架构师循环](../architect-loop/SKILL.md)做完，导游卡写在试用工单上；「试用通过」仍只由用户给。
    - 试用期间继续推进下一个薄片，不等试用结论。

@@ -21,7 +21,7 @@ description: 用户说「自主推进」或「solo」并指定范围时，架构
 2. 修改进行中的工单：按 `docs/agents/acceptance-evidence.md` 第 4 节，修改内容写在工单的任务评论里，执行者在下一轮读取。
 3. 卡住的工单：派发者把它改为 `needs-architect` 并启动架构师（`woken-architect` 技能）。`ready-for-human` 的工单是架构师已经看过、等用户决定的，用户在场的会话先处理这些。
 4. 冻结：里程碑开始派发以后，它的工单依据的设计说明只做一致性修正，也就是让设计说明与总图、ADR、决策记录和用户确认过的内容一致；修正影响到已放出的工单时，同时更新这些工单的「依据」与任务评论。要改设计本身，先把受影响的工单退回 `needs-triage`（验收证据规则第 4 节），改完、更新「依据」以后放回。用户新的想法与设计讨论的结论注明生效的里程碑，只进入还没有开始派发的里程碑。里程碑里有工单因交付而关闭（作废与重复关闭的不算）、带 `in-progress` 或 `needs-review`、或有了负责人，就是开始派发（`gh issue list --milestone "<标题>" --state all --json number,state,stateReason,labels,assignees`），到它的最后一个试用工单经用户确认关闭、里程碑关闭时解开；开始派发以后只接受补缺（`/to-parents`「已在派发的范围」）与试用中发现的缺陷。不在阶段里程碑里的工单（清理单与「待排期与阶段总览」里的，见[工单规范](../../../docs/agents/ticket-spec.md)）不适用，它们靠派发者在派发前对「依据」的核对。检查者是派发者：派发前核对「依据」之后的提交，有改动改为 `needs-architect`（派发者规则第 3 节第 1 步）。
-5. 验收：子工单全部关闭后核对父工单的验收标准，关闭父工单。把里程碑交给用户试用之前，按 `docs/design/test-pyramid.md` 第 4 节核对要发布的 main 提交：CI 的 `integration` 在这个提交上通过，运行真实模型冒烟与全部客户端端到端测试，在用户同意的时间运行 `desktop` 测试。
+5. 验收：子工单全部关闭后核对父工单的验收标准，关闭父工单。把里程碑交给用户试用之前，按 `docs/design/test-pyramid.md`「各角色运行哪一层」核对要发布的 main 提交：CI 的 `integration` 在这个提交上通过，运行真实模型冒烟与全部客户端端到端测试，在用户同意的时间运行 `desktop` 测试。
 
 ## Solo 模式
 只有用户明确说「solo」并指定范围（一个父工单、一组子工单或一个阶段）时进入这个模式。范围内没有派发者和审查者；执行者可以由任何 harness 运行（Claude Code 的 `/solo` 循环、Hermes、OpenCode 等），都按 `solo-worker` 技能这一份规矩与 `docs/agents/triage-labels.md` 的同一套标签做事：自己领取工单、自测、开 PR、等 CI 通过以后用仓库所有者的豁免合并；设计问题与连续三轮失败交回架构师（`needs-triage`，子架构师分诊），只有执行环境挡住才转用户（`ready-for-human`）。启动命令在[运行配置](../../../docs/agents/autopilot-runtime.md)第 3 节。

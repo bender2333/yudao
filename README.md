@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/bender2333/yudao/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/bender2333/yudao/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
-徽章显示 main 上最近一次合并以后的 CI 结果。测试分三层，按时机运行（[测试分层](docs/design/test-pyramid.md)第 4 节）：
+徽章显示 main 上最近一次合并以后的 CI 结果。测试分三层，按时机运行（[测试分层](docs/design/test-pyramid.md)「各角色运行哪一层」）：
 
 | 时机 | CI 作业 | 挡什么 |
 | --- | --- | --- |
@@ -90,7 +90,7 @@ uv sync --frozen
 }
 ```
 
-调用协议（`responses` / `chat_completions` / `messages`）在每个模型访问定义上声明，一份 Provider 配置（连接）只有一个服务方案下的地址与凭据引用，不声明协议（[模型管理设计说明](docs/design/model-management.md)第 4.3 节）；在连接上声明协议会在读取目录时报错并指出字段位置。请求时基址取所属连接的地址，请求路径由协议适配器拼接（Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`）。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
+调用协议（`responses` / `chat_completions` / `messages`）在每个模型访问定义上声明，一份 Provider 配置（连接）只有一个服务方案下的地址与凭据引用，不声明协议（[模型管理设计说明](docs/design/model-management.md)「模型访问定义与准入」）；在连接上声明协议会在读取目录时报错并指出字段位置。请求时基址取所属连接的地址，请求路径由协议适配器拼接（Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`）。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
 
 Provider 连接只信任操作系统的证书库：私有 CA 与企业代理的证书装在系统证书库中即可；`SSL_CERT_FILE`、`SSL_CERT_DIR` 这两个环境变量对 Provider 连接不起作用。
 

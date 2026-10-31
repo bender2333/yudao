@@ -18,7 +18,7 @@ disable-model-invocation: true
 1. 达到检查：读置顶的阶段工单里这个薄片的清单，用 `gh issue list --milestone "<标题>" --state open --json number,title,labels` 对照。这个薄片只剩试用工单与子工单已全部关闭的父工单才往下走；还有别的开着就把清单给用户，停。
 2. 核对父工单：每张父工单的验收标准逐条在当前 main 上核对（`/flow` 第 6 步），过了关闭父工单；没过的补成缺口工单放进里程碑，停。
 3. 复盘：读 [`/milestone-retro`](../milestone-retro/SKILL.md) 按它做，报告发到 Discussions；参数与规则句子的修改先经用户确认。
-4. 发布与走查：按 `docs/design/web-interface-and-release.md` 第 6.4 至 6.6 节。发布前的测试按 `docs/design/test-pyramid.md` 第 4 节：`integration` 在要发布的提交上通过，真实模型冒烟与全部客户端端到端测试，`desktop` 测试在用户同意的时间跑。发布脚本在 `scripts/`，走查用临时虚拟环境、单独的数据目录与端口，不动用户安装的那一份。走查按用户的操作路径走，指南与合理预期不一致时建缺陷工单，不改指南迁就。
+4. 发布与走查：按 `docs/design/web-interface-and-release.md`「谁在什么时候发布」「架构师的走查」与「试用的交接」。发布前的测试按 `docs/design/test-pyramid.md`「各角色运行哪一层」：`integration` 在要发布的提交上通过，真实模型冒烟与全部客户端端到端测试，`desktop` 测试在用户同意的时间跑。发布脚本在 `scripts/`，走查用临时虚拟环境、单独的数据目录与端口，不动用户安装的那一份。走查按用户的操作路径走，指南与合理预期不一致时建缺陷工单，不改指南迁就。
 5. 试用工单改为 `ready-for-human`。里程碑的变化（缝的已定未定）告诉总架构师。
 6. 向用户输出导游卡，**不超过 10 行**：
 
