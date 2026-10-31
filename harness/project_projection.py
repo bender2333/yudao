@@ -169,6 +169,23 @@ class McpServersConfig:
 
 
 @dataclass
+class LastProbe:
+    # 最近一次探测的结果（工单 #1174，网络与 MCP 设计说明第 4.2、10 节）：project.settings 返回它。
+    # 成功带服务器信息与工具清单快照，失败带原因（凭据值已替换为星号）；旧事件没有探测时按没有读
+    server_name: str
+    status: str
+    config_digest: str = ""
+    server_info: dict[str, Any] | None = None
+    tools: list[dict[str, Any]] = field(default_factory=list)
+    error: str = ""
+    probed_at: str | None = None
+    event_id: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return _plain(self)
+
+
+@dataclass
 class WritebackRecord:
     status: str
     work_item_id: str
@@ -261,6 +278,8 @@ class ProjectProjection:
     source_directory_history: list[SourceDirectory] = field(default_factory=list)
     # 项目设置里的 MCP 服务器（工单 #236）：整份设置一个版本；旧事件按空设置读取
     mcp_servers: McpServersConfig = field(default_factory=McpServersConfig)
+    # 最近一次探测的结果（工单 #1174）；还没有探测时为空
+    last_probe: LastProbe | None = None
     writebacks: list[WritebackRecord] = field(default_factory=list)
     active_work_item_id: str | None = None
     updated_at: str = ""
@@ -537,6 +556,17 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             version=int(payload["version"]), servers=dict(payload["servers"]),
             document_digest=str(payload["document_digest"]), updated_at=event.created_at,
             event_id=event.event_id,
+        )
+        return
+    if etype == ProjectEventType.TOOL_SERVER_PROBE_FINISHED:
+        # 最近一次探测（工单 #1174）：结果整体替换，配置改变后旧结果保留在事件里，
+        # 投影读到的总是最后一次；还没有探测过的项目按没有读
+        state.last_probe = LastProbe(
+            server_name=str(payload.get("server_name") or ""), status=str(payload.get("status") or ""),
+            config_digest=str(payload.get("config_digest") or ""),
+            server_info=payload.get("server_info"),
+            tools=list(payload.get("tools") or []), error=str(payload.get("error") or ""),
+            probed_at=event.created_at, event_id=event.event_id,
         )
         return
 

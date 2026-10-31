@@ -90,12 +90,15 @@ class ServerInfo(BaseModel):
 
 
 class ToolSpec(BaseModel):
-    # 一个工具的清单项：名称、说明与参数结构；服务器自己的提示只作参考
+    # 一个工具的清单项：名称、说明与参数结构；服务器自己的提示只作参考。
+    # hints 保留服务器标注的提示对象（SDK 的 ToolAnnotations：标题与只读、幂等、破坏性、开放世界提示），
+    # 探测把它写进工具清单快照（工单 #1174，设计说明第 4.1 节「工具清单」）；服务器没有标注时为空
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str
     description: str
     input_schema: dict[str, Any] = Field(default_factory=dict)
+    hints: Any | None = None
 
 
 class ContentBlock(BaseModel):
@@ -261,7 +264,8 @@ class McpClient:
         except MCPError as exc:
             raise McpCallError(self.failure_reason(exc), code=_error_code(exc)) from exc
         return [ToolSpec(name=tool.name, description=tool.description or "",
-                         input_schema=dict(tool.input_schema or {})) for tool in result.tools]
+                         input_schema=dict(tool.input_schema or {}), hints=tool.annotations)
+                for tool in result.tools]
 
     async def call_tool(self, name: str, arguments: dict[str, Any] | None = None) -> ToolCallResult:
         session = self._require_session()

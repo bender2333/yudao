@@ -97,6 +97,10 @@ class ProjectEventType:
     PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
     # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
+    # 项目设置里的 MCP 服务器（工单 #236）
+    MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
+    # 探测 MCP 服务器（工单 #1174，网络与 MCP 设计说明第 4.2 节）：一次探测的结果，带工具清单快照或失败原因
+    TOOL_SERVER_PROBE_FINISHED = "tool_server_probe_finished"
     # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
     BASELINE_ADOPTED = "baseline_adopted"
     # 项目级参数（迭代底座 B3，工单 #351）：project_parameter_set

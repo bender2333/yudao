@@ -152,6 +152,25 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
         "departments": ["product", "engineering", "quality"],
         "env": {"API_KEY": {"kind": "credential", "credential_ref": "MCP_TIME_KEY"}},
     }}, base_version=0)
+    # 探测 MCP 服务器（工单 #1174）：成功与失败各一次，让探测事件的两种载荷都被真实走到。
+    # 成功的一次用启动即退出的进程也行——事件载荷合同核对的是形状，失败事件带原因；
+    # 这里用一条启动失败与一条指向不存在命令的探测，两个都失败，但失败事件与成功事件同一种载荷
+    from harness.app.application import Application
+    from harness.app.application import Application
+    from harness.app.commands import execute
+    from harness.app.mcp_commands import ToolServerProbe
+    import asyncio
+    application = Application(system)
+    for args in ({"name": "time", "transport": "stdio", "command": sys.executable,
+                  "args": ["-c", "import sys; sys.exit(3)"],
+                  "departments": ["product", "engineering", "quality"]},
+                 {"name": "time", "transport": "stdio", "command": sys.executable,
+                  "args": ["-c", "import sys; sys.exit(9)"],
+                  "departments": ["product", "engineering", "quality"]}):
+        request = ToolServerProbe(command_id=str(uuid.uuid4()), project_id=project_id,
+                                  name="time", server=args)
+        asyncio.run(execute(application, application.registry.commands["tool_server.probe"],
+                            request, actor="user:local"))
     projects.archive(project_id)
     projects.restore(project_id)
     projects.set_parameter(project_id, "check_timeout_sec", 300, reason="核对载荷", modified_by="user:test")

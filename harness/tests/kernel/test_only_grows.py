@@ -58,6 +58,8 @@ SKELETON_EVENT_SNAPSHOT = {
         "writeback_verified",
         # 项目设置里的 MCP 服务器（工单 #236）
         "mcp_servers_configured",
+        # 探测 MCP 服务器（工单 #1174）
+        "tool_server_probe_finished",
     }),
     "catalog": frozenset({
         "catalog_revised", "catalog_candidates_collected", "catalog_test_finished",

@@ -3107,6 +3107,44 @@ export type MaterialRecord = {
 };
 
 /**
+ * McpProbeResultView
+ */
+export type McpProbeResultView = {
+    /**
+     * Server Name
+     */
+    server_name: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Config Digest
+     */
+    config_digest?: string;
+    /**
+     * Server Info
+     */
+    server_info?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Tools
+     */
+    tools?: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Error
+     */
+    error?: string;
+    /**
+     * Probed At
+     */
+    probed_at?: string | null;
+};
+
+/**
  * McpServerSettingView
  */
 export type McpServerSettingView = {
@@ -4056,6 +4094,7 @@ export type ProjectSettingsResult = {
         [key: string]: SourceDirectorySetting;
     };
     mcp_servers: McpServersSetting;
+    last_probe?: McpProbeResultView | null;
     /**
      * Department Reminders
      */
@@ -5219,17 +5258,6 @@ export type SnapshotSystemStatus = {
 };
 
 /**
- * Snapshot[ToolsRegistryResult]
- */
-export type SnapshotToolsRegistryResult = {
-    /**
-     * Position
-     */
-    position: number;
-    data: ToolsRegistryResult;
-};
-
-/**
  * Snapshot[UsageReport]
  */
 export type SnapshotUsageReport = {
@@ -5433,45 +5461,17 @@ export type SystemStatus = {
 };
 
 /**
- * ToolsRegistryFetchRecord
+ * ToolServerProbe
  */
-export type ToolsRegistryFetchRecord = {
+export type ToolServerProbe = {
     /**
-     * At
+     * Command Id
      */
-    at?: string;
+    command_id: string;
     /**
-     * Url
+     * Base Version
      */
-    url?: string;
-    /**
-     * Ok
-     */
-    ok?: boolean | null;
-};
-
-/**
- * ToolsRegistryProbeState
- */
-export type ToolsRegistryProbeState = {
-    /**
-     * Finished At
-     */
-    finished_at?: string | null;
-    /**
-     * Ok
-     */
-    ok?: boolean | null;
-    /**
-     * Error
-     */
-    error?: string | null;
-};
-
-/**
- * ToolsRegistryProject
- */
-export type ToolsRegistryProject = {
+    base_version?: number | null;
     /**
      * Project Id
      */
@@ -5481,90 +5481,11 @@ export type ToolsRegistryProject = {
      */
     name: string;
     /**
-     * Mcp Servers
+     * Server
      */
-    mcp_servers: {
-        [key: string]: ToolsRegistryServerView;
-    };
-    /**
-     * Fetch Records
-     */
-    fetch_records?: Array<ToolsRegistryFetchRecord>;
-};
-
-/**
- * ToolsRegistryResult
- */
-export type ToolsRegistryResult = {
-    /**
-     * Projects
-     */
-    projects: Array<ToolsRegistryProject>;
-};
-
-/**
- * ToolsRegistryServerView
- */
-export type ToolsRegistryServerView = {
-    /**
-     * Name
-     */
-    name: string;
-    /**
-     * Transport
-     */
-    transport: string;
-    /**
-     * Command
-     */
-    command?: string;
-    /**
-     * Args
-     */
-    args?: Array<string>;
-    /**
-     * Env
-     */
-    env?: {
+    server: {
         [key: string]: unknown;
     };
-    /**
-     * Url
-     */
-    url?: string;
-    /**
-     * Headers
-     */
-    headers?: {
-        [key: string]: unknown;
-    };
-    /**
-     * Departments
-     */
-    departments?: Array<string>;
-    /**
-     * Startup Timeout Sec
-     */
-    startup_timeout_sec?: number;
-    /**
-     * Call Timeout Sec
-     */
-    call_timeout_sec?: number;
-    /**
-     * Output Limit
-     */
-    output_limit?: number;
-    /**
-     * Tool Snapshot
-     */
-    tool_snapshot?: {
-        [key: string]: unknown;
-    } | null;
-    /**
-     * Config Digest
-     */
-    config_digest?: string;
-    probe?: ToolsRegistryProbeState;
 };
 
 /**
@@ -10706,6 +10627,24 @@ export type MaterialRecordedPayload = {
 };
 
 /**
+ * McpServerInfo
+ */
+export type McpServerInfo = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Version
+     */
+    version?: string;
+    /**
+     * Protocol Version
+     */
+    protocol_version?: string;
+};
+
+/**
  * McpServerSetting
  */
 export type McpServerSetting = {
@@ -10882,6 +10821,53 @@ export type McpServersDocument = {
      * Document Digest
      */
     document_digest: string;
+};
+
+/**
+ * McpToolHint
+ */
+export type McpToolHint = {
+    /**
+     * Title
+     */
+    title?: string;
+    /**
+     * Read Only Hint
+     */
+    read_only_hint?: boolean | null;
+    /**
+     * Idempotent Hint
+     */
+    idempotent_hint?: boolean | null;
+    /**
+     * Destructive Hint
+     */
+    destructive_hint?: boolean | null;
+    /**
+     * Open World Hint
+     */
+    open_world_hint?: boolean | null;
+};
+
+/**
+ * McpToolSpec
+ */
+export type McpToolSpec = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Description
+     */
+    description?: string;
+    /**
+     * Input Schema
+     */
+    input_schema?: {
+        [key: string]: unknown;
+    };
+    hints?: McpToolHint | null;
 };
 
 /**
@@ -16387,6 +16373,104 @@ export type ToolCalledEvent = {
 };
 
 /**
+ * ToolServerProbeFinishedEvent
+ */
+export type ToolServerProbeFinishedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'tool_server_probe_finished';
+    payload: ToolServerProbeFinishedPayload;
+};
+
+/**
+ * ToolServerProbeFinishedPayload
+ */
+export type ToolServerProbeFinishedPayload = {
+    /**
+     * Server Name
+     */
+    server_name: string;
+    /**
+     * Status
+     */
+    status: 'ok' | 'failed';
+    /**
+     * Config Digest
+     */
+    config_digest: string;
+    server_info?: McpServerInfo | null;
+    /**
+     * Tools
+     */
+    tools?: Array<McpToolSpec>;
+    /**
+     * Error
+     */
+    error?: string;
+};
+
+/**
  * ToolSkippedEvent
  */
 export type ToolSkippedEvent = {
@@ -18025,6 +18109,8 @@ export type EventObject = ({
 } & WritebackVerifiedEvent) | ({
     type: 'mcp_servers_configured';
 } & McpServersConfiguredEvent) | ({
+    type: 'tool_server_probe_finished';
+} & ToolServerProbeFinishedEvent) | ({
     type: 'catalog_revised';
 } & CatalogRevisedEvent) | ({
     type: 'catalog_candidates_collected';
@@ -18598,6 +18684,35 @@ export type CommandMcpServersSaveResponses = {
 };
 
 export type CommandMcpServersSaveResponse = CommandMcpServersSaveResponses[keyof CommandMcpServersSaveResponses];
+
+export type CommandToolServerProbeData = {
+    body: ToolServerProbe;
+    path?: never;
+    query?: never;
+    url: '/api/commands/tool_server.probe';
+};
+
+export type CommandToolServerProbeErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, project_archived, not_allowed, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandToolServerProbeError = CommandToolServerProbeErrors[keyof CommandToolServerProbeErrors];
+
+export type CommandToolServerProbeResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandToolServerProbeResponse = CommandToolServerProbeResponses[keyof CommandToolServerProbeResponses];
 
 export type CommandDecisionAnswerData = {
     body: DecisionAnswer;
@@ -20184,22 +20299,6 @@ export type QueryRulesRegistryResponses = {
 };
 
 export type QueryRulesRegistryResponse = QueryRulesRegistryResponses[keyof QueryRulesRegistryResponses];
-
-export type QueryToolsRegistryData = {
-    body?: never;
-    path?: never;
-    query?: never;
-    url: '/api/queries/tools.registry';
-};
-
-export type QueryToolsRegistryResponses = {
-    /**
-     * Successful Response
-     */
-    200: SnapshotToolsRegistryResult;
-};
-
-export type QueryToolsRegistryResponse = QueryToolsRegistryResponses[keyof QueryToolsRegistryResponses];
 
 export type CapabilitiesData = {
     body?: never;
