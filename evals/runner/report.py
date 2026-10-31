@@ -92,7 +92,8 @@ def build_result(scenario, material_version, scorer_version, model, runs, model_
         "opencode_version": host_environment()["opencode"],
         "network": {
             "allowed": False,
-            "note": "两边都不联网：Yudao 的评测项目不登记取回来源与 MCP 服务器；"
+            "note": "两边都不联网：被测的 Yudao 以关闭取回的启动参数（--no-fetch）启动，三个部门的请求里"
+                    "没有取回工具（fetch_url、read_external_source），评测项目也不设置 MCP 服务器；"
                     "OpenCode 的运行配置关闭 webfetch 与 websearch，"
                     "运行器检查 JSON 输出中没有这两类工具的调用。",
         },

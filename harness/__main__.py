@@ -24,7 +24,7 @@ from .data_directory import default_provider_config as default_provider_config_p
 from .demo import run_demo
 from .models import utc_now
 from .release_check import check_repository, request_instance_upgrade
-from .runtime import LoopSystem
+from .runtime import LoopSystem, configure_fetch_tools
 from .smoke import DEFAULT_DIR as SMOKE_DIR
 from .smoke import run_smoke, smoke_exit_code
 
@@ -54,6 +54,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-config", default=None)
     # 服务就绪以后打开页面的浏览器（设计说明第 4.2 节）：默认打开，带 --no-browser 时不打开
     parser.add_argument("--no-browser", action="store_true", default=False)
+    # 关闭取回（网络与 MCP 设计说明第 5.1、12.4 节）：以它运行时这个服务的部门没有 fetch_url 与
+    # read_external_source；评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明第 3 节）
+    parser.add_argument("--no-fetch", action="store_true", default=False)
     sub = parser.add_subparsers(dest="command")
     demo = sub.add_parser("demo", help="run a fake end-to-end sample")
     demo.add_argument("--data-dir", default=argparse.SUPPRESS)
@@ -65,6 +68,7 @@ def build_parser() -> argparse.ArgumentParser:
     api.add_argument("--access", choices=get_args(AccessMode), default=argparse.SUPPRESS)
     api.add_argument("--provider-config", default=argparse.SUPPRESS)
     api.add_argument("--no-browser", action="store_true", default=argparse.SUPPRESS)
+    api.add_argument("--no-fetch", action="store_true", default=argparse.SUPPRESS)
     replay = sub.add_parser("replay", help="rebuild a run or project projection from the event store")
     replay.add_argument("run_id", nargs="?")
     replay.add_argument("--project", dest="project_id", help="rebuild a project projection twice and compare")
@@ -124,6 +128,8 @@ def main(argv: list[str] | None = None) -> int:
     # 不写子命令时启动新接口（应用层与接口层设计说明第 7.3、7.4 节）
     command = args.command or "api"
     args.data_dir = _data_dir(args, command)
+    # 关闭取回的启动参数在装配之前交给定义（工单 #1172）：此后这个进程的部门都没有取回工具
+    configure_fetch_tools(not args.no_fetch)
 
     if command == "demo":
         lock = _lock_data_dir(args.data_dir)

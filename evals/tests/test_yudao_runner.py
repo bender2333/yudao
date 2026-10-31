@@ -694,6 +694,42 @@ def test_result_records_the_yudao_commit_and_the_host_environment():
     assert result["network"]["allowed"] is False
 
 
+def test_start_service_turns_fetch_off(monkeypatch, tmp_path):
+    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP 设计说明第 5.1、12.4 节、
+    评测场景设计说明第 3 节「两边都不联网」）：启动命令里有 --no-fetch 与 --no-browser。"""
+    seen = {}
+
+    class Process:
+        def poll(self):
+            return 0
+
+    def fake_popen(command, **options):
+        seen["command"] = command
+        return Process()
+
+    monkeypatch.setattr(yudao.subprocess, "Popen", fake_popen)
+    yudao.start_service(str(tmp_path / "data"), 1234)
+    command = seen["command"]
+    assert command[:2] == [sys.executable, "-m"]
+    assert "harness" in command and "api" in command
+    assert "--no-fetch" in command
+    assert "--no-browser" in command
+
+
+def test_report_network_says_the_service_runs_with_fetch_off(tmp_path):
+    """报告的网络一栏写明以关闭取回的启动参数启动，与运行器的启动命令一致（第 3 节「联网」）。"""
+    result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+                                        [_run()], model_capacity=LIMITS)
+    assert result["network"]["allowed"] is False
+    assert "--no-fetch" in result["network"]["note"]
+    path = tmp_path / "report.md"
+    yudao_report.write_report(result, path, [])
+    text = path.read_text(encoding="utf-8")
+    assert "## 三、联网" in text
+    assert "--no-fetch" in text
+    assert "fetch_url" in text
+
+
 def test_each_run_keeps_its_own_commit_and_a_mismatch_is_listed(tmp_path):
     """两次运行的提交号不同：每次各自记下自己的提交号，顶层写明不一致并逐次列出。"""
     runs = [_run(), _run(run_id="yudao-run-2", yudao_commit="def5678")]
