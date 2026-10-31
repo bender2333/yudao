@@ -52,6 +52,8 @@ import {
   parseTasks,
   parseTasksText,
   safeFileName,
+  waitingOnUser,
+  failingTasks,
 } from './state.mjs';
 import { openBlockers, isSelectable, pickUpTo } from './lib/select.mjs';
 import { labelsToDrop, branchFor } from './lib/labels.mjs';
@@ -620,8 +622,8 @@ function commandState(args) {
     waitMode: str(loop.state.waitMode, ''),
     signature: str(loop.state.signature, ''),
     self: str(loop.state.self, ''),
-    forUser: Object.keys(state).filter((id) => state[id] && state[id].waitFor === 'user'),
-    failing: Object.keys(state).filter((id) => state[id] && state[id].fails > 0).map((id) => id + 'x' + state[id].fails),
+    forUser: waitingOnUser(tasks, state),
+    failing: failingTasks(tasks, state),
     stalled,
     flight,
   };
@@ -1918,7 +1920,7 @@ function commandSummary(args) {
     done: group((t) => t.status === 'done'),
     escalated: group((t) => t.status === 'escalated'),
     waiting: group((t) => t.status === 'waiting'),
-    forUser: Object.keys(state).filter((id) => state[id] && state[id].waitFor === 'user'),
+    forUser: waitingOnUser(tasks, state),
     running: conc.active.map((a) => (a.issue ? '#' + a.issue : a.task)),
     free: group((t) => t.status === 'pending' && !inScopeAnnotated(t)
       && !conc.active.some((a) => a.task === t.id)

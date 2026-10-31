@@ -22,6 +22,7 @@ import {
   concurrencyOf,
   parseTasks,
   safeFileName,
+  waitingOnUser,
 } from './state.mjs';
 
 /** 同一个会话最多被 Stop hook 叫回来这么多次，防止死循环。 */
@@ -120,8 +121,7 @@ function onSessionStart(input) {
   const conc = concurrencyOf(loop);
   const done = tasks.filter((t) => t.status === 'done').length;
   const pending = tasks.filter((t) => t.status === 'pending').length;
-  const forUser = Object.keys(loop.state.taskState || {})
-    .filter((id) => loop.state.taskState[id] && loop.state.taskState[id].waitFor === 'user');
+  const forUser = waitingOnUser(tasks, loop.state.taskState);
   const text = [
     '[solo] 本工作区有一个' + (loop.status === 'paused' ? '已暂停' : '进行中') + '的 solo 循环「' + loop.name + '」：第 '
       + num(loop.state.iteration, 0) + '/' + num(loop.state.maxIterations, 0) + ' 轮，完成 ' + done + '/' + tasks.length
@@ -240,7 +240,8 @@ function onStop(input) {
   const conc = concurrencyOf(loop);
   const iteration = num(loop.state.iteration, 0);
   const max = num(loop.state.maxIterations, 0);
-  const pending = num(loop.state.pendingTasks, parseTasks(loop).filter((t) => t.status === 'pending').length);
+  const tasks = parseTasks(loop);
+  const pending = num(loop.state.pendingTasks, tasks.filter((t) => t.status === 'pending').length);
 
   let phase = '';
   if (conc.active.length) {
@@ -266,8 +267,7 @@ function onStop(input) {
     return;
   }
 
-  const forUser = Object.keys(loop.state.taskState || {})
-    .filter((id) => loop.state.taskState[id] && loop.state.taskState[id].waitFor === 'user');
+  const forUser = waitingOnUser(tasks, loop.state.taskState);
   const userNote = forUser.length ? '另外有 ' + forUser.length + ' 张在等用户处理（' + forUser.join(', ') + '），收账时转告用户。' : '';
   const reason = phase === 'collect'
     ? 'solo 循环「' + loop.name + '」还有 ' + conc.active.length + ' 个工人在跑（' + conc.active.map((a) => a.task).join(', ')
