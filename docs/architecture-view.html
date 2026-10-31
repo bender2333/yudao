@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Yudao 画面总图</title>
+<style>
+  /* 总图「界面」方框与「画面」缝的展开，六节，写法与总图相同：固定结构实线，填进去的内容虚线。 */
+  :root {
+    --bg: #fbfaf7; --fg: #1f1f1d; --muted: #6b6a64; --line: #1f1f1d; --soft: #c9c7bf;
+    --s3: #2f5d50; --s2: #9fbfb3; --s1: #e6ede9; --accent: #2f5d50; --warn: #a8622a; --stop: #8a3a3a;
+    --font: system-ui, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    --mono: ui-monospace, Consolas, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #17181a; --fg: #ecebe6; --muted: #a09f98; --line: #ecebe6; --soft: #4a4a46;
+    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; --warn: #d79a5c; --stop: #d47f7f; color-scheme: dark } }
+  :root[data-theme="dark"] {
+    --bg: #17181a; --fg: #ecebe6; --muted: #a09f98; --line: #ecebe6; --soft: #4a4a46;
+    --s3: #8fc7b3; --s2: #3f6f60; --s1: #243a33; --accent: #8fc7b3; --warn: #d79a5c; --stop: #d47f7f; color-scheme: dark }
+  * { box-sizing: border-box }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--font);
+    padding-block: 28px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+  main { max-width: 1060px; margin: 0 auto; display: grid; gap: 32px }
+  h1 { font-size: 24px; font-weight: 600; margin: 0 }
+  h2 { font-size: 17px; font-weight: 600; margin: 0 0 6px }
+  h2 small { font-weight: 400; color: var(--muted); font-size: 13px; margin-left: 8px }
+  h3 { font-size: 14px; font-weight: 600; margin: 14px 0 6px; color: var(--muted) }
+  p { margin: 0; max-width: 70ch }
+  a { color: var(--accent) }
+  .muted { color: var(--muted) }
+  nav { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; margin-top: 10px }
+  nav a { text-decoration: none; border-bottom: 1px dotted var(--soft) }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px 22px; font-size: 13px; color: var(--muted); align-items: center }
+  .legend i { display: inline-block; width: 14px; height: 14px; vertical-align: -2px; margin-right: 6px; border: 1px solid var(--soft) }
+  .legend .solid { border: 2px solid var(--line); background: transparent }
+  .legend .dash { border: 1.5px dashed var(--soft); background: transparent }
+
+  .box { position: relative; padding: 10px 12px; border: 1.5px dashed var(--soft); background: var(--s1); min-width: 0 }
+  .fixed { border: 2px solid var(--line) }
+  .box b { display: block; font-weight: 600 }
+  .box small { display: block; font-size: 12.5px; line-height: 1.4 }
+  .outer { display: grid; grid-template-columns: 190px 1fr 190px; gap: 12px; align-items: stretch }
+  .col { display: grid; gap: 12px; align-content: start }
+  .frame { border: 2px solid var(--line); padding: 12px; display: grid; gap: 12px }
+  .frame > .label { font-size: 13px; color: var(--muted) }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px }
+  .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px }
+  .tags span { font-size: 12.5px; border: 1px solid var(--line); padding: 1px 8px; border-radius: 3px; background: var(--bg) }
+  .arrows { font-size: 12.5px; color: var(--muted); text-align: center }
+  .outer > *, .pair > *, .rings > *, .seams > *, .col, .frame { min-width: 0 }
+  @media (max-width: 760px) { .outer, .pair { grid-template-columns: 1fr } }
+
+  .formula { display: grid; grid-template-columns: 1.1fr 1.4fr; gap: 16px; align-items: start; border: 2px solid var(--line); padding: 14px; margin-top: 14px }
+  .formula .eq { font: 600 15px/1.9 var(--mono); padding: 10px 12px; background: var(--s1); text-align: center }
+  .formula .eq .u { color: var(--accent) } .formula .eq .f { color: var(--warn) }
+  .formula .eq small { display: block; font: 12.5px/1.5 var(--font); color: var(--muted); margin-top: 6px }
+  .formula dl { margin: 0; display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; font-size: 13.5px }
+  .formula dt { font-family: var(--mono); font-weight: 600 }
+  .formula dd { margin: 0; color: var(--muted) }
+  @media (max-width: 760px) { .formula { grid-template-columns: 1fr } }
+
+  .rings { display: grid; grid-template-columns: 1fr 260px; gap: 16px; align-items: start }
+  .r { padding: 14px; border: 2px solid var(--line) }
+  .r .r { border-style: dashed; border-width: 1.5px; margin-top: 10px }
+  .r .r .r { border-style: dotted }
+  .r > b { display: block; font-weight: 600 }
+  .r > small { display: block; color: var(--muted); font-size: 12.5px }
+  @media (max-width: 760px) { .rings { grid-template-columns: 1fr } }
+
+  .flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 12px }
+  .flow .box + .box::before { content: "→"; position: absolute; left: -10px; top: 8px; color: var(--muted); font-size: 12px }
+  @media (max-width: 760px) { .flow { grid-template-columns: 1fr } .flow .box + .box::before { content: none } }
+  .rules { margin: 10px 0 0; padding-left: 18px; font-size: 13.5px; max-width: 76ch }
+  .rules li { margin: 4px 0 }
+
+  .seams { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 12px }
+  .seam { border: 1.5px solid var(--line); padding: 10px 12px; font-size: 13px; display: grid; gap: 4px; align-content: start }
+  .seam[data-state="open"] { border-style: dashed; border-color: var(--soft) }
+  .seam b { font-weight: 600; font-size: 14px; display: flex; justify-content: space-between; gap: 8px }
+  .seam b span { font-size: 11.5px; font-weight: 600; padding: 1px 7px; border: 1px solid var(--line); border-radius: 3px; white-space: nowrap }
+  .seam[data-state="open"] b span { border-style: dashed; color: var(--muted) }
+  .seam i { font-style: normal; color: var(--muted); font-size: 12px }
+  .seam em { font-style: normal; margin: 2px 0 }
+  .seam ul { margin: 0; padding-left: 16px; color: var(--muted) }
+
+  .map { overflow-x: auto; margin-top: 12px }
+  .map svg { width: 100%; max-width: 1000px; height: auto; display: block; font: 13px var(--font) }
+  .zone { fill: var(--s1); stroke: var(--soft); stroke-width: 1.5; stroke-dasharray: 6 5 }
+  .zone-l { fill: var(--fg); font-size: 13px; font-weight: 600 }
+  .room { fill: var(--bg); stroke: var(--line); stroke-width: 1.5 }
+  .room.sub { stroke-dasharray: 4 3; fill: var(--s1) }
+  .ppl { fill: var(--muted) }
+  .pipe { fill: none; stroke: var(--muted); stroke-width: 2 }
+  .pipe.back { stroke: var(--stop) }
+  .pipe.thin { stroke-width: 1.2; stroke-dasharray: 4 3 }
+  .lbl { fill: var(--fg); font-size: 11.5px; text-anchor: middle }
+  .cap { fill: var(--muted); font-size: 11.5px; text-anchor: middle }
+  .stamp-open { fill: none; stroke: var(--fg); stroke-width: 1.5; stroke-dasharray: 4 3 }
+  .stamp-pass { fill: var(--s3); stroke: var(--line); stroke-width: 1.5 }
+  .stamp-pass + text { fill: var(--bg) }
+  .meter { fill: none; stroke: var(--line); stroke-width: 1 }
+  .meter-fill { fill: var(--accent) }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; margin-top: 8px }
+  th, td { text-align: left; vertical-align: top; padding: 7px 10px; border-bottom: 1px solid var(--soft) }
+  th { font-weight: 600; color: var(--muted); font-size: 12.5px; white-space: nowrap }
+  .tbl { overflow-x: auto }
+  footer { font-size: 12.5px; color: var(--muted) }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Yudao 画面总图</h1>
+    <p class="muted">这一页展开<a href="architecture.html#s1">总图</a>第一节的「界面」方框与第四节「画面」的缝，写法与总图相同。画面是事实的投影，不是模拟：画面上能当真的东西都能回到一条事实；关掉表演，剩下的全是事实。固定的是画面合同、播放的规矩、七种元件与诚实性；空间、场景、翻译器与画法都是填进去的内容。画面跟着定义伸缩：一个角色时是一间屋，三部门时是一层楼，子事项是屋里的一间小屋。</p>
+    <nav>
+      <a href="#v1">01 全局图与方程</a><a href="#v2">02 什么能动</a><a href="#v3">03 一个事件怎样上画面</a><a href="#v4">04 要守的缝</a><a href="#v5">05 跟着定义伸缩</a><a href="#v6">06 换宿主</a>
+    </nav>
+  </header>
+
+  <section id="v1">
+    <h2>全局图与方程<small>事实进来，翻成画面的说法，按叙事时间演出来</small></h2>
+    <div class="legend"><span><i class="solid"></i>固定的结构</span><span><i class="dash"></i>填进去的内容</span></div>
+    <div class="outer" style="margin-top:14px">
+      <div class="col">
+        <div class="box fixed"><b>一份事实</b><small>Yudao 的查询快照与事件流，都带位置。画面只读，不另存事实。</small></div>
+        <div class="box"><b>别的宿主（以后）</b><small>外部 agent 的会话记录，例如 Claude Code。换宿主只换翻译器（第六节）。</small></div>
+      </div>
+
+      <div class="frame">
+        <div class="label">画面（固定）</div>
+        <div class="box"><b>翻译层</b><small>唯一同时认识宿主说法与画面说法的地方：查询结果翻成状态，事件翻成动作，对照只写一次。每个宿主一份。</small></div>
+        <div class="box fixed"><b>画面合同</b><small>状态（此刻该画什么）、动作（发生了什么）、实时内容（决定卡片、流式文字）、回调。只用画面的说法，都带位置。</small></div>
+        <div class="pair">
+          <div class="box fixed"><b>播放时间线</b><small>排队、状态等动作、落后有上限、跳到最新。叙事时间只在这里，不反过来影响事实。</small></div>
+          <div class="box fixed"><b>七种元件</b><small>系统的每个概念归入一种，写明来源；归不进去的是装饰。</small>
+            <div class="tags"><span>地点</span><span>物</span><span>连接</span><span>流</span><span>规则</span><span>操作</span><span>仪表</span></div>
+          </div>
+        </div>
+        <div class="pair">
+          <div class="box"><b>三个空间</b><small>楼是组织，机房是机器，城是产品。一台摄像机切换，远看状态灯与仪表，推近看工位与回链。</small></div>
+          <div class="box"><b>声明表与画法</b><small>每种动作的级别、时长、谁演；屋子长什么样、走位、待机。加场景、加动作只写声明。</small></div>
+        </div>
+      </div>
+
+      <div class="col">
+        <div class="box"><b>页面</b><small>把画面交出的操作变成命令；画布以外的列表与详情实时显示，不进时间线。</small></div>
+        <div class="box"><b>你</b><small>看、点开回链、拖队列、在决定板上回答。每个操作都是一条现有的命令。</small></div>
+        <div class="box fixed"><b>诚实性</b><small>不说谎、能回链、开环看得见。写成测试，换画法也照过。</small></div>
+      </div>
+    </div>
+
+    <div class="formula">
+      <div class="eq">
+        状态 = <span class="u">T</span>( 查询快照 @ 位置 )<br>
+        动作 = <span class="u">T</span>( 事件 @ 位置 )<br>
+        画面 = 事实层( 状态 ) ＋ <span class="f">表演层</span>( 动作, 叙事时间 )
+        <small>事实层只由状态决定；关掉表演层，事实层不变。</small>
+      </div>
+      <dl>
+        <dt>T</dt><dd>翻译：宿主的说法 → 画面的说法。状态只来自查询，画面不自己累加事件得出事实。</dd>
+        <dt>位置</dt><dd>事件时间。画面上任何一样东西都靠它回到依据的那一刻的事实；回放按它取。</dd>
+        <dt>叙事时间</dt><dd>演出来的先后。顺序与事件时间一致，最多落后一个上限。</dd>
+        <dt>事实层</dt><dd>承载事实的视觉通道：在哪间屋、亮不亮灯、牌子上的字、盖了什么章、仪表读数。</dd>
+        <dt>表演层</dt><dd>走位、待机、包裹在管道里走、说话气泡。不占事实通道，不回写。</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section id="v2">
+    <h2>什么能动<small>换掉画法，诚实性不换</small></h2>
+    <div class="rings">
+      <div class="r">
+        <b>可以整体重写</b><small>渲染技术、场景布局、表演（走位、待机、气泡）、声明表里的时长与级别、每个宿主的翻译器。重写以后诚实性测试照过，外面看不出事实有区别。</small>
+        <div class="r">
+          <b>只能向后兼容</b><small>画面合同的形状与取值、七种元件、视觉通道表（哪些通道承载事实）。字段只增，带版本。</small>
+          <div class="r">
+            <b>换画面也不换</b><small>事实只来自查询；画面不回写、不发命令；每个事实带来源；开环看得见；固定画出的只有边界、裁决点与权威关系，没有事件就没有轨迹。</small>
+          </div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="box"><b>定义</b><small>画面里有几间屋、几个人、哪些管道、谁有盖章台，都从事项冻结的定义来。画面层的代码不写部门的名字，屋子长什么样写在声明里。</small></div>
+        <p class="muted" style="font-size:12.5px"><b>调节参数</b>：落后上限、最短时长、时长倍率是填进去的内容，调节面板里改，不改合同。</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="v3">
+    <h2>一个事件怎样上画面<small>先演经过，再落状态</small></h2>
+    <div class="flow">
+      <div class="box"><b>事件到达</b><small>带位置</small></div>
+      <div class="box"><b>翻成动作</b><small>零个、一个或几个</small></div>
+      <div class="box"><b>按级别</b><small>关键、普通、进度</small></div>
+      <div class="box"><b>排队演</b><small>同一个参与方一次演一件</small></div>
+      <div class="box"><b>状态到达</b><small>等位置不大于它的动作演完</small></div>
+      <div class="box fixed"><b>上画面</b><small>事实层换成这份状态，带回链</small></div>
+    </div>
+    <ul class="rules">
+      <li><b>关键的一定演</b>：成果送达、打回、询问与回答、核验结论、决定送出与收到、失败。堆积时可以缩短，不丢。</li>
+      <li><b>普通的排队</b>：读材料、写文件、跑命令。画面落后超过上限时丢掉。</li>
+      <li><b>进度不排队</b>：工具调用、模型请求、输出片段合成一个持续的姿势，头顶换成最近的一项。</li>
+      <li><b>状态等动作</b>：状态只等已经到了、位置不大于它的动作，所以不会卡住；画面上的每个状态都是事实在某个位置上真有过的状态。</li>
+      <li><b>落后有上限</b>：超过就快进；正在演的关键动作加快演完，不凭空消失。</li>
+      <li><b>跳到最新</b>：打开画面、重新同步、从后台切回时清空时间线，直接显示最新状态，不补播；错过的经过由离开报告交代。</li>
+      <li><b>回放</b>：拖到哪个位置，就显示那个位置的状态。</li>
+      <li><b>实时内容不排队</b>：决定卡片和流式文字到了就显示，你要据此操作。</li>
+    </ul>
+  </section>
+
+  <section id="v4">
+    <h2>要守的缝<small>「画面」方框里面的缝，不计入总图的十三道</small></h2>
+    <p class="muted">已定：子架构师现在就守；未定：先别依赖。字段名由子架构师定。</p>
+    <div class="seams">
+      <div class="seam" data-state="set"><b>画面合同<span>已定</span></b><i>翻译层 ↔ 画面层</i><em>就是总图第四节「画面」的缝。</em><ul><li>画面层只收状态、动作与实时内容，不导入宿主的任何代码</li><li>合同里没有宿主的事件种类、查询名与状态值</li><li>都带位置；画面层只传位置，不解读</li></ul></div>
+      <div class="seam" data-state="set"><b>读事实<span>已定</span></b><i>宿主 ↔ 同步层</i><em>只管数据是不是最新，不管怎么画。</em><ul><li>快照带位置；事件流按位置续，有缺口就重新同步</li><li>按刷新清单重查；服务端不为画面加专用的查询</li><li>Yudao 这一侧就是总图「接口」的缝</li></ul></div>
+      <div class="seam" data-state="set"><b>回调<span>已定</span></b><i>画面层 → 页面</i><em>画面看得见、点得到，自己不动手。</em><ul><li>画面只交出用户的操作：选决定、点跳转、聚焦</li><li>命令只由页面发</li><li>每个可操作的物件对应一条现有命令</li></ul></div>
+      <div class="seam" data-state="set"><b>声明<span>已定</span></b><i>画面层 ↔ 场景内容</i><em>加场景、加动作不改时间线。</em><ul><li>每种动作的级别、时长、谁演、走到哪写在声明表</li><li>屋子、人物、管道的画法按定义里的种类取</li><li>动作本身不带级别与时长</li></ul></div>
+      <div class="seam" data-state="set"><b>映射<span>已定</span></b><i>系统的概念 → 七种元件</i><em>表写完，世界就定了。</em><ul><li>每个概念归一种元件，写来源、状态与变化、位置、操作、仪表、不画的部分</li><li>每种事件在每个场景里要么翻成动作，要么写明不画与理由</li><li>归不进去的是装饰，不作断言</li></ul></div>
+      <div class="seam" data-state="open"><b>宿主<span>未定</span></b><i>画面层 ↔ 宿主壳</i><em>同一个画面层放进不同的宿主。</em><ul><li>画面层不依赖宿主，已经由导入方向的测试守住</li><li>拆成独立的包、宿主怎样嵌入，还没定</li><li>现在只有 Yudao 一个使用方，不拆</li></ul></div>
+    </div>
+  </section>
+
+  <section id="v5">
+    <h2>跟着定义伸缩<small>同一套元件，拓扑从定义推出</small></h2>
+    <p class="muted">部门是屋，角色是小人，关注与许可关系是管道，核验角色有盖章台，子事项是屋里的一间小屋。定义变了，画面跟着变，不另写代码；没有的东西不画，不留黑着灯的空屋。</p>
+    <div class="map">
+    <svg viewBox="0 0 1000 300" role="img" aria-label="同一套元件随定义伸缩：一个角色、三部门、子组织、观察者与机房">
+      <defs>
+        <marker id="m" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--muted)"/></marker>
+        <marker id="mb" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="var(--stop)"/></marker>
+      </defs>
+      <!-- 一个角色直做 -->
+      <rect class="zone" x="8" y="8" width="234" height="284" rx="8"/>
+      <text class="zone-l" x="22" y="32">一个角色直做</text>
+      <rect class="room" x="50" y="60" width="150" height="110" rx="3"/>
+      <circle class="ppl" cx="95" cy="100" r="9"/><rect class="ppl" x="87" y="111" width="16" height="22" rx="3"/>
+      <rect class="room" x="112" y="118" width="44" height="14"/>
+      <rect class="room" x="168" y="146" width="26" height="16"/><text class="cap" x="125" y="160">出口托盘</text>
+      <path class="pipe" d="M125 170 L125 200" marker-end="url(#m)"/>
+      <circle class="stamp-open" cx="125" cy="232" r="28"/><text class="lbl" x="125" y="236">开环完成</text>
+      <text class="cap" x="125" y="282">交完成就结束，盖虚线章</text>
+      <!-- 三部门按成果 -->
+      <rect class="zone" x="258" y="8" width="234" height="284" rx="8"/>
+      <text class="zone-l" x="272" y="32">三部门按成果</text>
+      <rect class="room" x="282" y="56" width="74" height="44" rx="3"/><text class="lbl" x="319" y="82">产品</text>
+      <rect class="room" x="394" y="56" width="74" height="44" rx="3"/><text class="lbl" x="431" y="82">工程</text>
+      <rect class="room" x="338" y="140" width="74" height="44" rx="3"/><text class="lbl" x="375" y="166">质检</text>
+      <path class="pipe" d="M356 78 L392 78" marker-end="url(#m)"/>
+      <path class="pipe" d="M420 100 L396 138" marker-end="url(#m)"/>
+      <path class="pipe back" d="M412 170 C 460 170, 470 130, 452 102" marker-end="url(#mb)"/>
+      <text class="cap" x="470" y="186" style="fill:var(--stop)">打回</text>
+      <path class="pipe" d="M375 184 L375 202" marker-end="url(#m)"/>
+      <circle class="stamp-pass" cx="375" cy="232" r="28"/><text class="lbl" x="375" y="236">放行</text>
+      <text class="cap" x="375" y="282">核验角色的实心章</text>
+      <!-- 子组织 -->
+      <rect class="zone" x="508" y="8" width="234" height="284" rx="8"/>
+      <text class="zone-l" x="522" y="32">子组织</text>
+      <rect class="room" x="534" y="56" width="182" height="160" rx="3"/>
+      <circle class="ppl" cx="562" cy="86" r="9"/><rect class="ppl" x="554" y="97" width="16" height="22" rx="3"/>
+      <rect class="room sub" x="596" y="80" width="104" height="80" rx="3"/>
+      <text class="cap" x="648" y="98">子事项</text>
+      <circle class="ppl" cx="626" cy="116" r="6"/><rect class="ppl" x="621" y="123" width="10" height="14" rx="2"/>
+      <circle class="ppl" cx="670" cy="116" r="6"/><rect class="ppl" x="665" y="123" width="10" height="14" rx="2"/>
+      <rect class="meter" x="596" y="172" width="104" height="9"/><rect class="meter-fill" x="597" y="173" width="44" height="7"/>
+      <text class="cap" x="648" y="198">余量从上一层扣</text>
+      <path class="pipe thin" d="M596 150 C 575 150, 562 140, 562 122" marker-end="url(#m)"/>
+      <text class="cap" x="625" y="250">结束时收成一份提案</text>
+      <text class="cap" x="625" y="268">回到这个角色，照常过裁决</text>
+      <!-- 观察者与机房 -->
+      <rect class="zone" x="758" y="8" width="234" height="284" rx="8"/>
+      <text class="zone-l" x="772" y="32">楼外与机房</text>
+      <rect class="room" x="780" y="56" width="100" height="120" rx="3"/>
+      <path class="pipe thin" d="M780 96 L880 96 M780 136 L880 136"/>
+      <text class="cap" x="830" y="160">楼</text>
+      <rect class="room sub" x="910" y="56" width="62" height="64" rx="3"/><text class="lbl" x="941" y="84">观察哨</text>
+      <path class="pipe thin" d="M908 100 L884 100" marker-end="url(#m)"/><text class="cap" x="941" y="104">只读</text>
+      <rect class="room" x="780" y="196" width="192" height="52" rx="3"/>
+      <rect class="room" x="796" y="210" width="60" height="26"/><text class="lbl" x="826" y="227">稳定槽</text>
+      <rect class="room sub" x="866" y="210" width="60" height="26"/><text class="lbl" x="896" y="227">候选槽</text>
+      <text class="cap" x="950" y="227">机房</text>
+      <text class="cap" x="875" y="282">看门狗在进程外，失败切回</text>
+    </svg>
+    </div>
+    <div class="tbl">
+    <table>
+      <thead><tr><th>定义里填的</th><th>画面</th><th>规则怎样看得见</th></tr></thead>
+      <tbody>
+        <tr><td>一个角色直做</td><td>一间屋、一个人、出口托盘</td><td>交完成盖虚线的「开环完成」章，没有放行章</td></tr>
+        <tr><td>几个角色直做</td><td>几间屋，询问走传信管</td><td>有核验角色时，它的屋里有盖章台</td></tr>
+        <tr><td>三部门按成果</td><td>一层楼，三间屋连成环</td><td>核验角色的实心「放行」章；打回走红色回流</td></tr>
+        <tr><td>任务池（以后）</td><td>大厅的任务板，成员摘卡认领</td><td>每个单元一张卡；放行仍是整份交付一次</td></tr>
+        <tr><td>子组织</td><td>屋里一间小屋，门框上是余量与层数</td><td>远看是一个在转的小盒子，推近进去；结束时收成一份提案</td></tr>
+        <tr><td>观察者、看门狗</td><td>楼外的观察哨；机房的两个槽位</td><td>观察者只看，信号送到写入口；候选失败切回稳定槽</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <h3>三个空间</h3>
+    <div class="pair" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="box"><b>楼：组织</b><small>部门、角色、包裹、询问、决定板、上下文刻度。来自事项的事件流。</small></div>
+      <div class="box"><b>机房：机器</b><small>执行机器、部署、交付出去的软件在运行，故障冒烟。来自机器流与运维记录。</small></div>
+      <div class="box"><b>城：产品</b><small>页面、接口、数据表是建筑，要求是蓝图，证据让蓝图变成建筑。只读，只能指着说话。</small></div>
+    </div>
+    <p class="muted" style="font-size:12.5px;margin-top:8px">按什么顺序建出来见<a href="program-roadmap.md">路线图</a>第 4 节；每个空间画的都是已经存在的记录，没有记录就不画。</p>
+  </section>
+
+  <section id="v6">
+    <h2>换宿主<small>方向，不排期</small></h2>
+    <p class="muted">画面层不认识 Yudao，只认画面合同，所以换一个事实源只要换翻译器。现在只有 Yudao 一个使用方，不拆包；有了第二个使用方再拆，只是搬代码。</p>
+    <div class="outer" style="margin-top:12px;grid-template-columns:1fr 1fr 1fr">
+      <div class="col">
+        <div class="box fixed"><b>Yudao</b><small>查询快照与事件流 → Yudao 的翻译器。部门、核验、子事项、观察者都有，画面按定义长全。</small></div>
+        <div class="box"><b>外部 agent（以后）</b><small>例如 Claude Code 的会话记录与工作区的差异 → 它自己的翻译器。只有一个角色，没有核验。</small></div>
+      </div>
+      <div class="col">
+        <div class="box fixed" style="display:grid;place-items:center;text-align:center;min-height:100%"><b>同一个画面层</b><small>画面合同、播放时间线、七种元件、诚实性测试</small></div>
+      </div>
+      <div class="col">
+        <div class="box"><b>Yudao 的页面</b><small>回调变成命令，可以指挥。</small></div>
+        <div class="box"><b>外部宿主的壳</b><small>可以只看；回调怎样处理由宿主定。</small></div>
+      </div>
+    </div>
+    <ul class="rules">
+      <li><b>翻译器交出带位置的状态与动作</b>：Yudao 的状态来自查询；别的宿主没有查询，状态由它的翻译器从记录得出。这件事在画面层外面，画面层照样不累加事件。</li>
+      <li><b>诚实性对任何宿主都成立</b>：每个状态能回到来源里的一个位置；来源里没有独立核验，就画开环。</li>
+      <li><b>宿主没有的东西不画</b>：外部 agent 没有部门与放行，画面就是一间屋、一个人、一枚虚线章。</li>
+    </ul>
+  </section>
+
+  <footer>只由总架构师改；与总图不一致时以<a href="architecture.html">总图</a>为准。细节见 docs/design/visualization.md（画面与播放）、docs/requirements/game-world-three-spaces.md（三个空间）、docs/research/game-world-as-projection.md（映射的调研）。</footer>
+</main>
+</body>
+</html>
