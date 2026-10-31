@@ -143,6 +143,9 @@ def _context(projection: RunProjection, frame: assembly_contract.StepFrame,
     parts = [
         ContextPart("department_prompt", str(frame.prompt.version), frame.prompt.text),
         ContextPart(_ROUND_TASK_SOURCE, frame.department, _task_line(projection, frame)),
+        # 这一版不带工具 schema，但按 frame.definitions 写出这个部门可用的工具名（契约 v2 的定义来源）
+        ContextPart("allowed_tools", frame.department,
+                    json_dumps(sorted(frame.definitions.role(frame.department).tools))),
     ]
     if history:
         parts.append(ContextPart("department_history", frame.department, json_dumps(history)))

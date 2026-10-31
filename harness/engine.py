@@ -199,10 +199,14 @@ class StepDriver:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
-        # 这一步交给装配的输入：身份、提示与采用的版本，以及路由的工作引用（原样带过去，第 5.4 节第 4 条）
+        # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判，
+        # 没有交的时候是当前加载的那一份；装配也按这一份取（工单 #1175 第 7 轮的契约 v2）
+        self._definitions = in_force(definitions)
+        # 这一步交给装配的输入：身份、提示、采用的版本、这一份定义，以及路由的工作引用（原样带过去，
+        # 第 5.4 节第 4 条）
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt,
                                 basis.effective_contract_hash, basis.input_version,
-                                work_ref=request.work_ref)
+                                definitions=self._definitions, work_ref=request.work_ref)
         self._stream = run_stream(scope.run_id)
         self._writes = writes
         self._artifacts = artifacts
@@ -217,9 +221,6 @@ class StepDriver:
         self._limits = limits
         self._deltas = deltas
         self._tightening = tightening
-        # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判，
-        # 没有交的时候是当前加载的那一份
-        self._definitions = in_force(definitions)
         # 这一轮只有指导、没有要做的工作：模型不调用工具的文字回复就是回答用户，这一轮正常结束。
         # 判断在轮开始时做一次，轮内保持，不因为指导随后进入模型输入或有了别的新工作而重算。
         # shortcut: 这个判断不持久化；进程重新启动以后同一轮由新会话接着做的，丢掉它并退回要求调用工具，
