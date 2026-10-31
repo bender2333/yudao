@@ -1,6 +1,6 @@
 {
   "scenario": "scenario-3",
-  "material_version": "scenario-3@2",
+  "material_version": "scenario-3@3",
   "title": "PRDBench subway fare pathfinding",
   "source": {
     "dataset": "github.com/AGI-Eval-Official/PRDBench 050bbcb",
