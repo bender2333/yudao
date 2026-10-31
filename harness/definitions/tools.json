@@ -401,6 +401,125 @@
       ]
     }
   },
+  "trial_start": {
+    "kind": "environment",
+    "action": "trial",
+    "verification": "query",
+    "cancellable": true,
+    "requires_image_input": false,
+    "description": "Start a trial session of the delivered software from one launch method given by engineering: stop this department's previous session, check the programs the trial needs on the execution location, build the trial copy, take a free port, run the launch command and wait until it is ready (a web app also starts Playwright MCP and opens the ready URL). The receipt carries the session id, the kind, the port and ready URL, the trial copy tree digest, the head of the launch output, and the page structure or screenshot. A desktop launch is rejected when the calling target cannot take images.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "launch": {
+          "type": "object",
+          "description": "One launch method: a name, the kind, the command per system, the ready URL of a web app and an optional readiness timeout",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Name of the launch method"
+            },
+            "kind": {
+              "type": "string",
+              "enum": [
+                "web",
+                "desktop"
+              ]
+            },
+            "commands": {
+              "type": "object",
+              "description": "argv per system; the keys are windows or linux",
+              "additionalProperties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "ready_url": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "description": "URL that must answer before a web app is ready"
+            },
+            "ready_timeout_sec": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "description": "Readiness timeout in seconds; the registered default when omitted"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "kind",
+            "commands"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "launch"
+      ]
+    }
+  },
+  "trial_open": {
+    "kind": "environment",
+    "action": "trial",
+    "verification": "query",
+    "cancellable": true,
+    "requires_image_input": false,
+    "description": "Start a trial session from a launch method named in the current DeliverySpec; the steps and the receipt are the same as trial_start. A name the DeliverySpec does not carry is rejected, and the reason lists the names it carries (or says the DeliverySpec has no launch method).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "launch_name": {
+          "type": "string",
+          "description": "Name of a launch method in the current DeliverySpec"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "launch_name"
+      ]
+    }
+  },
+  "trial_output": {
+    "kind": "environment",
+    "action": "trial",
+    "verification": "none",
+    "cancellable": true,
+    "requires_image_input": false,
+    "description": "Read the tail of the trial software's standard output and standard error so far. Returns the output and a truncation marker.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "description": "How many bytes of the tail to return"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "trial_stop": {
+    "kind": "environment",
+    "action": "trial",
+    "verification": "query",
+    "cancellable": true,
+    "requires_image_input": false,
+    "description": "End the trial session: close the MCP server and browser, stop the delivered software's process tree, restore minimized windows for a desktop session and delete the trial copy. Returns how it ended and the tail of the output.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
   "submit_product_spec": {
     "kind": "host",
     "proposal": "product_spec",
@@ -424,6 +543,34 @@
             "type": "string"
           },
           "description": "Must contain at least one item"
+        },
+        "requirement_mapping": {
+          "type": "array",
+          "description": "One entry per requirement: criteria lists AC<position> values of this spec's acceptance_criteria; when no acceptance criterion can be written, give gap with the reason instead",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "type": "integer",
+                "description": "1-based position of the requirement in requirements"
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^AC[1-9][0-9]*$"
+                }
+              },
+              "gap": {
+                "type": "string",
+                "description": "Reason why no acceptance criterion can be written for this requirement"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requirement"
+            ]
+          }
         },
         "boundaries": {
           "type": "array",
@@ -533,7 +680,8 @@
         "basis_product_spec_hash",
         "goal",
         "requirements",
-        "acceptance_criteria"
+        "acceptance_criteria",
+        "requirement_mapping"
        ]
       }
   },
@@ -630,6 +778,34 @@
             "type": "string"
           },
           "description": "Must contain at least one item"
+        },
+        "requirement_mapping": {
+          "type": "array",
+          "description": "One entry per requirement: criteria lists AC<position> values of this spec's acceptance_criteria; when no acceptance criterion can be written, give gap with the reason instead",
+          "items": {
+            "type": "object",
+            "properties": {
+              "requirement": {
+                "type": "integer",
+                "description": "1-based position of the requirement in requirements"
+              },
+              "criteria": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^AC[1-9][0-9]*$"
+                }
+              },
+              "gap": {
+                "type": "string",
+                "description": "Reason why no acceptance criterion can be written for this requirement"
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "requirement"
+            ]
+          }
         },
         "boundaries": {
           "type": "array",

@@ -27,6 +27,8 @@ def test_every_registered_rule_has_a_wiring_conclusion():
         "bash_timeout_default_sec", "bash_timeout_max_sec", "check_timeout_max_sec",
         "compaction.stalled_limit",
         "roles.product.visibility", "roles.engineering.visibility", "roles.quality.visibility",
+        # 工单 #397：收敛投影每读一次就按冻结值判定，三项收敛判定参数已接入
+        "convergence.rounds", "convergence.step_window", "convergence.step_repeat",
     }
     assert all(NOT_WIRED_REASONS[name] for name in DEFINITIONS.rules if not wired(name))
 

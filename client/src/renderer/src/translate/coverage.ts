@@ -365,6 +365,8 @@ export const OVERLAY_LABELS: Readonly<Record<string, string>> = Object.freeze({
   semantic_records: "语义记录",
   // 事实来源（工单 #396 的事件对象 source、工单 #398 的画面）：五种来源的描边与图例
   sources: "来源",
+  // 循环与收敛（工单 #400）：循环树的层、已用边界与收敛状态
+  loops: "循环",
 });
 
 /**

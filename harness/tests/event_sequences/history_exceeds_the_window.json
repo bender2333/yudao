@@ -62,11 +62,11 @@
    "state_after": "failed",
    "parent_event_id": null,
    "session_id": null,
-   "stop_reason": "compaction_failed",
-   "error": "Pinned context leaves insufficient room for a useful history summary",
+   "stop_reason": "context_overflow",
+   "error": "Pinned intend/current work and tool schemas leave no room for history and a response",
    "payload": {
-    "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
-    "stop_reason": "compaction_failed"
+    "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。",
+    "stop_reason": "context_overflow"
    }
   },
   {
@@ -103,17 +103,17 @@
     "input_version": 1,
     "session_activations": 1,
     "session_elapsed_ms": "<duration>",
-    "stop_reason": "compaction_failed"
+    "stop_reason": "context_overflow"
    }
   }
  ],
  "projection": {
   "status": "failed",
-  "stop_reason": "compaction_failed",
-  "error": "Pinned context leaves insufficient room for a useful history summary",
-  "waiting_reason": "未能完成：上下文压缩失败",
+  "stop_reason": "context_overflow",
+  "error": "Pinned intend/current work and tool schemas leave no room for history and a response",
+  "waiting_reason": "未能完成：上下文超过窗口",
   "active_department": null,
-  "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
+  "human_action": "单次装配的上下文超过窗口。缩小注入内容或提高模型服务的上下文窗口后，作为新事项重新开始。",
   "cycle_count": 1,
   "rework_count": 0,
   "round": 0,

@@ -10,6 +10,18 @@ from .adapters.fake import FakeTurn, prompt_part
 from .providers.call import ModelCall
 
 
+def default_requirement_mapping(requirements: list[str], acceptance: list[str]) -> list[dict[str, Any]]:
+    # 测试脚本的默认对应声明（工单 #1178）：第 n 条要求指向 AC<n>，多出来的要求写明写不出验收标准的原因
+    mapping: list[dict[str, Any]] = []
+    for position in range(1, len(requirements) + 1):
+        if position <= len(acceptance):
+            mapping.append({"requirement": position, "criteria": [f"AC{position}"]})
+        else:
+            mapping.append({"requirement": position,
+                            "gap": "no separate acceptance criterion is defined for this requirement"})
+    return mapping
+
+
 def product_spec(
     goal: str = "build an echo CLI",
     requirements: list[str] | None = None,
@@ -17,13 +29,16 @@ def product_spec(
     basis_product_spec_hash: str | None = None,
     **extra: Any,
 ) -> dict[str, Any]:
+    requirements = requirements or ["print the given argument to stdout"]
+    acceptance = acceptance or ["running the program with a word prints that word"]
     payload = {
         "kind": "product_spec",
         "goal": goal,
-        "requirements": requirements or ["print the given argument to stdout"],
+        "requirements": requirements,
         "boundaries": extra.get("boundaries", ["do not read files"]),
         "constraints": extra.get("constraints", ["single file implementation"]),
-        "acceptance_criteria": acceptance or ["running the program with a word prints that word"],
+        "acceptance_criteria": acceptance,
+        "requirement_mapping": extra.get("requirement_mapping") or default_requirement_mapping(requirements, acceptance),
         "fatal_conditions": extra.get("fatal_conditions", ["non-zero exit on valid input"]),
         "non_goals": extra.get("non_goals", ["network access"]),
         "decision_changes": extra.get("decision_changes", []),
@@ -334,6 +349,9 @@ def answer_turn(
             args["requirements"] = requirements
             args["goal"] = goal or "build an echo CLI"
             args["acceptance_criteria"] = acceptance or ["prints the argument"]
+            # 修订也要带要求与验收标准的对应声明（工单 #1178），默认每条要求指向同序的验收标准
+            args["requirement_mapping"] = extra.get("requirement_mapping") or default_requirement_mapping(
+                list(requirements), list(args["acceptance_criteria"]))
             declared = basis_product_spec_hash
             if declared is None:
                 raw = prompt_part(call, "current_product_spec")

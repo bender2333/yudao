@@ -442,3 +442,27 @@ def test_a_run_stopping_for_an_unlisted_reason_fails_to_record_the_stop(tmp_path
     assert not [event for event in system.store.list_events(run_id)
                 if event.type in {EventType.RUN_FAILED, EventType.RUN_PAUSED, EventType.RUN_DONE}]
     system.close()
+
+
+def test_a_generated_browser_tool_that_duplicates_a_handwritten_one_is_rejected(tmp_path):
+    # 浏览器工具与手写的工具清单合并：同名工具是定义不合法，写明是哪个名字（工单 #147）
+    directory = _copy(tmp_path)
+    tools = _read(directory, "tools.json")
+    tools["browser_navigate"] = {"kind": "environment", "action": "read", "verification": "none",
+                                 "cancellable": True, "description": "shadow", "parameters": {"type": "object"}}
+    _write(directory, "tools.json", tools)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert ("browser_tools.json", "browser_navigate", "工具名与 tools.json 重复") in raised.value.issues
+
+
+def test_definitions_without_the_generated_browser_tools_load_with_fewer_tools(tmp_path):
+    # 生成的浏览器工具定义可以不出现：这份定义就没有浏览器工具（测试用的另一份完整定义如此）。
+    # 发布的那一份确实带上它们，由 test_browser_tool_definitions.py 核对
+    directory = _copy(tmp_path)
+    (directory / "browser_tools.json").unlink()
+    loaded = load_definitions(directory)
+    from harness.tools import BROWSER_TOOL_NAMES
+    assert not set(BROWSER_TOOL_NAMES) & set(loaded.tools)
+    assert loaded.version != DEFINITIONS.version
+

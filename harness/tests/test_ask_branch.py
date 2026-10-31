@@ -91,6 +91,7 @@ def test_ask_answer_with_spec_revision_continuous_work(tmp_path: Path):
                       goal="build an echo CLI",
                       requirements=["print the given argument in uppercase to stdout"],
                       acceptance_criteria=["running the program with a word prints that word in uppercase"],
+                      requirement_mapping=[{"requirement": 1, "criteria": ["AC1"]}],
                       change_record={
                           "changed": ["print the given argument in uppercase to stdout"],
                           "retained": ["single file implementation"],
@@ -279,6 +280,7 @@ def test_ask_answer_requirements_only_rejected_and_cannot_lose_acceptance_criter
                   goal="build an echo CLI",
                   requirements=["print the given argument in uppercase to stdout"],
                   acceptance_criteria=["running the program with a word prints that word in uppercase"],
+                  requirement_mapping=[{"requirement": 1, "criteria": ["AC1"]}],
                   change_record={
                       "changed": ["print the given argument in uppercase to stdout"],
                       "retained": ["single file implementation"],
@@ -531,7 +533,8 @@ def test_ask_branch_resumes_across_system_restart(tmp_path: Path):
     script = {
         "product": [
             {"proposal": {"kind": "product_spec", "goal": "build an echo CLI",
-                          "requirements": ["echo input"], "acceptance_criteria": ["prints arg"]}},
+                          "requirements": ["echo input"], "acceptance_criteria": ["prints arg"],
+                          "requirement_mapping": [{"requirement": 1, "criteria": ["AC1"]}]}},
         ],
         "engineering": [
             {"output": [
@@ -582,7 +585,8 @@ def test_ask_branch_finished_restart_retains_accumulated_elapsed_time(tmp_path: 
     script = {
         "product": [
             {"proposal": {"kind": "product_spec", "goal": "build echo", "requirements": ["echo"],
-                          "acceptance_criteria": ["ok"]}},
+                          "acceptance_criteria": ["ok"],
+                          "requirement_mapping": [{"requirement": 1, "criteria": ["AC1"]}]}},
         ],
         "engineering": [
             {"output": [_call("ask-1", "ask", recipient="product", question="q?", background="b", expected="e")]},

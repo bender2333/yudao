@@ -612,7 +612,8 @@ def _schema_errors(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
             proposal, "acceptance_criteria", min_items=1
         ) + _optional_string_list(proposal, "boundaries") + _optional_string_list(proposal, "constraints") + _optional_string_list(
             proposal, "fatal_conditions"
-        ) + _optional_string_list(proposal, "non_goals") + _decision_change_errors(proposal) + _change_record_errors(proposal)
+        ) + _optional_string_list(proposal, "non_goals") + _decision_change_errors(proposal) + _change_record_errors(proposal) + \
+        _requirement_mapping_errors(proposal)
     if kind == "delivery_spec":
         return (
             _require_text(proposal, "summary")
@@ -811,6 +812,7 @@ def _product_payload(proposal: dict[str, Any]) -> dict[str, Any]:
         "boundaries": [item.strip() for item in proposal.get("boundaries", [])],
         "constraints": [item.strip() for item in proposal.get("constraints", [])],
         "acceptance_criteria": [item.strip() for item in proposal["acceptance_criteria"]],
+        "requirement_mapping": _requirement_mapping(proposal)[0],
         "fatal_conditions": [item.strip() for item in proposal.get("fatal_conditions", [])],
         "non_goals": [item.strip() for item in proposal.get("non_goals", [])],
         "decision_changes": [{"decision_hash": item["decision_hash"], "disposition": item["disposition"],
@@ -1059,6 +1061,83 @@ def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: st
         and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
         for event in events
     )
+_REQUIREMENT_MAPPING_FIELDS = frozenset({"requirement", "criteria", "gap"})
+
+
+def _requirement_mapping_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    return _requirement_mapping(proposal)[1]
+
+
+def _requirement_mapping(proposal: dict[str, Any]) -> tuple[list[dict[str, Any]], list[FieldError]]:
+    # 要求与验收标准的对应声明（工单 #1178，验证的独立性设计说明第 7 节第 1 点）：每条要求一条，
+    # requirement 是要求在 requirements 里的位置（从 1 起），criteria 是它对应的验收标准（AC<序号>，约定见 #151），
+    # 写不出验收标准时用 gap 写明原因。每条要求要么有至少一条验收标准，要么有显式标注
+    requirements = proposal.get("requirements")
+    acceptance = proposal.get("acceptance_criteria")
+    requirement_count = len(requirements) if isinstance(requirements, list) else 0
+    criterion_count = len(acceptance) if isinstance(acceptance, list) else 0
+    raw = proposal.get("requirement_mapping")
+    if raw is None:
+        return [], [FieldError("requirement_mapping",
+                               "requirement_mapping must give one entry per requirement: "
+                               + ", ".join(f"requirement {position}" for position in range(1, requirement_count + 1)))]
+    if not isinstance(raw, list) or not raw:
+        return [], [FieldError("requirement_mapping", "requirement_mapping must be a non-empty list, one entry per requirement")]
+    rows: list[dict[str, Any]] = []
+    errors: list[FieldError] = []
+    seen: list[int] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, dict):
+            errors.append(FieldError(f"requirement_mapping[{index}]", "a requirement mapping must be an object"))
+            continue
+        errors.extend(FieldError(f"requirement_mapping[{index}].{key}", "unknown field")
+                      for key in sorted(set(item) - _REQUIREMENT_MAPPING_FIELDS))
+        position = item.get("requirement")
+        if type(position) is not int or position < 1:
+            errors.append(FieldError(f"requirement_mapping[{index}].requirement",
+                                     "requirement must be the 1-based position of a requirement"))
+            continue
+        seen.append(position)
+        criteria = item.get("criteria")
+        if criteria is None:
+            criteria = []
+        if not isinstance(criteria, list) or any(not isinstance(value, str) for value in criteria):
+            errors.append(FieldError(f"requirement_mapping[{index}].criteria",
+                                     "criteria must be a list of AC<position> strings"))
+            continue
+        criteria = [value.strip() for value in criteria]
+        gap = item.get("gap")
+        if gap is not None and (not isinstance(gap, str) or not gap.strip()):
+            errors.append(FieldError(f"requirement_mapping[{index}].gap", "gap must be a non-empty reason"))
+            gap = None
+        if criteria and gap is not None:
+            errors.append(FieldError(f"requirement_mapping[{index}]",
+                                     "a requirement has either acceptance criteria or a gap note, not both"))
+        if not criteria and gap is None:
+            errors.append(FieldError(f"requirement_mapping[{index}]",
+                                     f"requirement {position} has no acceptance criterion and no gap note"))
+        for offset, value in enumerate(criteria):
+            if not _CRITERION_ID.match(value):
+                errors.append(FieldError(f"requirement_mapping[{index}].criteria[{offset}]",
+                                         "criterion must be AC<position>, the acceptance criterion's position"))
+            elif int(value[2:]) > criterion_count:
+                errors.append(FieldError(f"requirement_mapping[{index}].criteria[{offset}]",
+                                         f"{value} does not exist; the ProductSpec has {criterion_count} acceptance criteria"))
+        rows.append({"requirement": position, "criteria": criteria,
+                     "gap": None if gap is None else gap.strip()})
+    missing = [position for position in range(1, requirement_count + 1) if position not in seen]
+    if missing:
+        errors.append(FieldError("requirement_mapping",
+                                 "requirement_mapping must cover every requirement; missing "
+                                 + ", ".join(f"requirement {position}" for position in missing)))
+    unexpected = sorted({position for position in seen if position > requirement_count})
+    if unexpected:
+        errors.append(FieldError("requirement_mapping",
+                                 "requirement_mapping references requirements the ProductSpec does not have: "
+                                 + ", ".join(str(position) for position in unexpected)))
+    if len(seen) != len(set(seen)):
+        errors.append(FieldError("requirement_mapping", "requirement_mapping lists the same requirement twice"))
+    return rows, errors
 
 
 def _require_text(payload: dict[str, Any], field: str) -> list[FieldError]:

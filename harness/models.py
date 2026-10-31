@@ -166,6 +166,8 @@ class ProductSpec:
     decision_changes: list[dict[str, str]]
     change_record: dict[str, Any] | None
     input_version: int
+    # 要求与验收标准的对应声明（工单 #1178）：每条要求一项 {requirement, criteria, gap}；旧事件没有这个字段时为空
+    requirement_mapping: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

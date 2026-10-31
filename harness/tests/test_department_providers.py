@@ -722,8 +722,10 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
         "models": [
             {"id": "model-p", "provider_id": "provider-p", "model": "p-model",
              "protocol": "messages",
-             # 工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token，这个为了触发压缩而定的小窗口随之上调
-            "context_window": 6_000 + 346, "max_output_tokens": 1_000},
+            # 工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token，工单 #1178 给两个提交工具加上
+            # requirement_mapping 的说明以后产品的固定材料再实测多 283 个 token；这个为了触发压缩而定的小窗口
+            # 按两笔之和上调（与 helpers.compacted_runner 同一个做法），压缩仍然发生在第一次读取以后
+            "context_window": 6_000 + 346 + 283, "max_output_tokens": 1_000},
             {"id": "model-e", "provider_id": "provider-e", "model": "e-model",
              "protocol": "chat_completions",
              "context_window": 20_000, "max_output_tokens": 1_000},

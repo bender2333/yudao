@@ -49,6 +49,21 @@ ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]]
 # 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明第 18 节）
 ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
 
+# 取回工具（网络与 MCP 设计说明第 5.1、12.4 节）：部门按定义都有这两个工具；以关闭取回的启动参数
+# （`--no-fetch`）运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里
+# 不动：取舍发生在「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，
+# 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明第 3 节）
+FETCH_TOOLS: tuple[str, ...] = ("fetch_url", "read_external_source")
+
+# 取回是否可用：进程范围的启动设置，默认可用；只在启动时由命令行改一次（工单 #1172）
+_fetch_enabled = True
+
+
+def configure_fetch(enabled: bool) -> None:
+    """设置这个进程的取回是否可用（启动参数 `--no-fetch` 关掉取回）。"""
+    global _fetch_enabled
+    _fetch_enabled = bool(enabled)
+
 
 def established_verification(kind: ActionKind) -> Verification | None:
     # 这一类动作的既定核实方法；None 表示这一类里随工具不同，必须写明
@@ -615,9 +630,13 @@ class Definitions(_Definition):
         return self.work_item(kind).departments.get(department)
 
     def tools_for(self, department: str, kind: str = "change") -> tuple[Identifier, ...]:
-        # 部门在事项种类中的工具清单：种类写明时以它为准，未写明时是角色自己的清单
+        # 部门在事项种类中的工具清单：种类写明时以它为准，未写明时是角色自己的清单。
+        # 以关闭取回的启动参数运行时去掉取回工具（工单 #1172）：定义里留着工具本身，部门的清单里没有
         work = self.department_work(department, kind)
-        return work.tools if work is not None else self.roles[department].tools
+        names = work.tools if work is not None else self.roles[department].tools
+        if not _fetch_enabled:
+            return tuple(name for name in names if name not in FETCH_TOOLS)
+        return names
 
     def proposal_contract(self, department: str, kind: str = "change") -> dict[str, Any]:
         # 部门在事项种类中的提案合同：角色自己的部分接上共同的部分，再按本种类的工具清单筛选，
@@ -688,7 +707,12 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
     "routings.json": ("routings", TypeAdapter(Routings)),
     "event_sources.json": ("event_sources", TypeAdapter(dict[Identifier, EventSource])),
+    # 生成的浏览器工具定义（浏览器与 computer use 设计说明第 4.1 节，工单 #147）：与 tools.json 合并成工具清单
+    "browser_tools.json": ("browser_tools", TypeAdapter(dict[Identifier, Tool])),
 }
+# 可以不存在的定义文件：浏览器工具是随系统发布的一份生成定义，只用于测试的另一份完整定义里没有它时
+# 这份定义就没有浏览器工具（发布的那一份由 harness/tests/test_browser_tool_definitions.py 核对确实加载得到）
+_OPTIONAL_FILES = frozenset({"browser_tools.json"})
 
 
 class _DuplicateKey(ValueError):
@@ -720,6 +744,10 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
     for file, (field, adapter) in _FILES.items():
         path = directory / file
         if not path.is_file():
+            if file in _OPTIONAL_FILES:
+                # 可选的生成定义缺省为空：这份定义里没有那批工具
+                parts[field] = {}
+                continue
             issues.append((file, "（整个文件）", "定义文件不存在"))
             continue
         try:
@@ -742,6 +770,15 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
             parts[field] = adapter.validate_json(text, strict=True)
         except ValidationError as exc:
             issues.extend((file, _location(error["loc"]), error["msg"]) for error in exc.errors())
+    # 浏览器工具是单独一份生成的文件：与手写的工具清单合并，同名工具即定义不合法（工单 #147）
+    browser_tools = parts.pop("browser_tools", {})
+    if "tools" in parts:
+        merged = dict(parts["tools"])
+        for name in browser_tools:
+            if name in merged:
+                issues.append(("browser_tools.json", name, "工具名与 tools.json 重复"))
+        merged.update(browser_tools)
+        parts["tools"] = merged
     if issues:
         raise DefinitionError(issues)
     issues = _references(parts)

@@ -740,6 +740,13 @@ class ChangeRecord(Payload):
     rationale: str
 
 
+class RequirementMapping(Payload):
+    # 要求与验收标准的对应声明（工单 #1178）：要求的位置、对应的验收标准（AC<序号>），写不出验收标准时的原因
+    requirement: int
+    criteria: list[str] = []
+    gap: str | None = None
+
+
 class SpecAcceptedPayload(AcceptanceFields):
     goal: str
     requirements: list[str]
@@ -751,6 +758,8 @@ class SpecAcceptedPayload(AcceptanceFields):
     decision_changes: list[DecisionChange]
     change_record: ChangeRecord | None
     input_version: int
+    # 旧事件没有这个字段时为空（工单 #1178）
+    requirement_mapping: list[RequirementMapping] = []
     kind: Literal["product_spec"]
     issuer: Literal["product"]
     parent_hash: str | None

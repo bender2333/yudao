@@ -5,7 +5,7 @@
       "kinds": {
         "product_spec": {
           "when": ["PRODUCT_SPEC", "REWORK_PRODUCT"],
-          "required": ["kind=product_spec", "goal", "requirements", "acceptance_criteria", "basis_product_spec_hash"],
+          "required": ["kind=product_spec", "goal", "requirements", "acceptance_criteria", "requirement_mapping", "basis_product_spec_hash"],
           "optional": ["boundaries", "constraints", "fatal_conditions", "non_goals", "decision_changes", "change_record"],
           "decision_changes": [{"decision_hash": "every current decision", "disposition": "retain|integrate|retire", "rationale": "reason"}],
           "change_record": {
@@ -15,6 +15,13 @@
             "retired": ["legitimately removed behavior"],
             "rationale": "reason for the revision"
           },
+          "requirement_mapping": [
+            {
+              "requirement": "1-based position of the requirement in requirements",
+              "criteria": ["AC<position> of an acceptance criterion, at least one when the requirement can be verified"],
+              "gap": "reason when no acceptance criterion can be written; give either criteria or gap"
+            }
+          ],
           "basis_product_spec_hash": "content hash of the ProductSpec this revision is based on; null for the first spec; the host rejects the submission if it does not equal the current effective ProductSpec content_hash"
          },
         "product_decision": {

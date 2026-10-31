@@ -493,9 +493,14 @@ _KIND_TOOLS = {
     "command": frozenset({"bash", "read_output", "stop_job"}),
 }
 
-# 定义中的每个环境工具都要在它动作类别的分派里有执行方法，否则启动失败
+# 定义中的环境工具，只要出现在某个部门或事项种类的工具清单里（模型可能被提供它），就要在它动作类别的
+# 分派里有执行方法，否则启动失败。试用与浏览器工具的定义先随系统发布（工单 #147），到 #1182 能执行时
+# 才放进工具清单：只写进定义、还没有在任何清单里出现的工具不需要实现
+_OFFERED_TOOLS = frozenset(tool for role in DEFINITIONS.roles.values() for tool in role.tools) | frozenset(
+    tool for kind in DEFINITIONS.work_items.kinds.values()
+    for work in kind.departments.values() for tool in work.tools)
 _UNIMPLEMENTED = sorted(name for name, tool in DEFINITIONS.tools.items()
-                        if tool.kind == "environment"
+                        if tool.kind == "environment" and name in _OFFERED_TOOLS
                         and (name not in _KIND_TOOLS.get(tool.action, ())
                              or (name not in _HANDLERS and name not in _PROCESSES)))
 if _UNIMPLEMENTED:

@@ -27,6 +27,7 @@ from harness.app.project_queries import (
     RunAsks, RunAttempt, RunExport, RunRecovery, RunSteps, WorkItemInputs, WorkItemMaterials,
 )
 from harness.app.registry import QueryDefinition, Registry, UnchangedEvent
+from harness.app.loops_queries import RunLoops
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import LiveAttemptRequest, SystemStatusRequest
 from harness.app.tools_queries import TOOLS_REGISTRY
@@ -250,6 +251,7 @@ def _requests(scope: _Scope) -> dict[str, Any]:
         "home.away_report": AwayReportRequest(),
         "rules.registry": RulesRegistryRequest(),
         "tools.registry": None,
+        "run.loops": RunLoops(run_id=run_id),
     }
 
 

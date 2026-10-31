@@ -694,6 +694,42 @@ def test_result_records_the_yudao_commit_and_the_host_environment():
     assert result["network"]["allowed"] is False
 
 
+def test_start_service_turns_fetch_off(monkeypatch, tmp_path):
+    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP 设计说明第 5.1、12.4 节、
+    评测场景设计说明第 3 节「两边都不联网」）：启动命令里有 --no-fetch 与 --no-browser。"""
+    seen = {}
+
+    class Process:
+        def poll(self):
+            return 0
+
+    def fake_popen(command, **options):
+        seen["command"] = command
+        return Process()
+
+    monkeypatch.setattr(yudao.subprocess, "Popen", fake_popen)
+    yudao.start_service(str(tmp_path / "data"), 1234)
+    command = seen["command"]
+    assert command[:2] == [sys.executable, "-m"]
+    assert "harness" in command and "api" in command
+    assert "--no-fetch" in command
+    assert "--no-browser" in command
+
+
+def test_report_network_says_the_service_runs_with_fetch_off(tmp_path):
+    """报告的网络一栏写明以关闭取回的启动参数启动，与运行器的启动命令一致（第 3 节「联网」）。"""
+    result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+                                        [_run()], model_capacity=LIMITS)
+    assert result["network"]["allowed"] is False
+    assert "--no-fetch" in result["network"]["note"]
+    path = tmp_path / "report.md"
+    yudao_report.write_report(result, path, [])
+    text = path.read_text(encoding="utf-8")
+    assert "## 三、联网" in text
+    assert "--no-fetch" in text
+    assert "fetch_url" in text
+
+
 def test_each_run_keeps_its_own_commit_and_a_mismatch_is_listed(tmp_path):
     """两次运行的提交号不同：每次各自记下自己的提交号，顶层写明不一致并逐次列出。"""
     runs = [_run(), _run(run_id="yudao-run-2", yudao_commit="def5678")]
@@ -1231,3 +1267,76 @@ def test_time_limit_ends_the_run_and_marks_it(runs_root):
     assert run["metrics"]["timed_out"] is True
     assert run["metrics"]["end_reason"] == yudao_metrics.TIME_LIMIT
     assert 0.0 <= run["score"]["completion"] <= 1.0
+
+
+class _WaitForPrdClient:
+    """按调用顺序给出决定请求与建档状态的脚本客户端（工单 #1360 的两种先后顺序）。
+
+    decisions 与 statuses 各自按调用次数取值，取完以后重复最后一个：这样能分别构造
+    「请求先出现」「状态先离开 running、请求随后出现」与「从来没有任何请求」。
+    """
+
+    def __init__(self, decisions, statuses):
+        self.decisions = list(decisions)
+        self.statuses = list(statuses)
+        self.decision_calls = 0
+        self.status_calls = 0
+
+    def query(self, name, params=None):
+        if name == "decisions.list":
+            value = self.decisions[min(self.decision_calls, len(self.decisions) - 1)]
+            self.decision_calls += 1
+            return {"data": {"decisions": [] if value is None else [value]}}
+        if name == "project.overview":
+            status = self.statuses[min(self.status_calls, len(self.statuses) - 1)]
+            self.status_calls += 1
+            return {"data": {"work_items": [{"work_item_id": "onboarding-item", "status": status}]}}
+        raise AssertionError("unexpected query: " + name)
+
+
+def _decision_request():
+    return {"decision_id": "decision-1", "kind": yudao.INITIAL_PRD_KIND, "status": "open",
+            "version": 3, "run_id": None, "project_id": "project-1",
+            "work_item_id": "onboarding-item", "request": {}, "answer": None,
+            "requested_at": "2026-10-30T00:00:00+00:00", "blocked": None, "blocks": "work_item"}
+
+
+def test_the_initial_prd_decision_is_returned_when_it_appears_before_the_item_ends(monkeypatch):
+    """守 R1：决定请求先出现、事项状态随后离开 running（工单 #1360 的顺序一）。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    decision = _decision_request()
+    client = _WaitForPrdClient([decision], ["awaiting_initial_prd"])
+
+    assert yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 5.0) is decision
+    assert client.status_calls == 0
+
+
+def test_the_initial_prd_decision_is_returned_when_the_item_ends_first(monkeypatch):
+    """守 R1：事项状态先离开 running、请求随后写入（工单 #1360 的真实顺序），宽限里等到请求。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    decision = _decision_request()
+    client = _WaitForPrdClient([None, None, decision],
+                               ["awaiting_initial_prd", "done", "done"])
+
+    assert yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 5.0) is decision
+
+
+def test_a_finished_onboarding_without_any_decision_request_raises(monkeypatch):
+    """守 R1：事项结束且从来没有决定请求时仍然抛，作废原因写清是「出请求之前就停了」。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    client = _WaitForPrdClient([None], ["awaiting_initial_prd", "done"])
+
+    with pytest.raises(RuntimeError) as error:
+        yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 5.0)
+    assert "建档在给出初始 PRD 的确认请求之前就停了" in str(error.value)
+    assert "建档事项停在 done" in str(error.value)
+
+
+def test_wait_for_initial_prd_times_out_while_the_item_still_runs(monkeypatch):
+    """守 R1：事项一直停在 running、请求也不出现时按「等到时限都没有请求」作废。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    client = _WaitForPrdClient([None], ["awaiting_initial_prd"])
+
+    with pytest.raises(RuntimeError) as error:
+        yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 0.2)
+    assert "秒内没有给出初始 PRD 的确认请求" in str(error.value)

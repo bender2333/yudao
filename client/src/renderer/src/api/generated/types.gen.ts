@@ -3152,6 +3152,164 @@ export type LiveAttempt = {
 };
 
 /**
+ * LoopActivation
+ */
+export type LoopActivation = {
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Finished At
+     */
+    finished_at: string | null;
+    /**
+     * State
+     */
+    state: string;
+    /**
+     * Missing
+     */
+    missing: string;
+    /**
+     * Steps
+     */
+    steps: Array<LoopStep>;
+};
+
+/**
+ * LoopAmount
+ */
+export type LoopAmount = {
+    /**
+     * Used
+     */
+    used: number;
+    /**
+     * Limit
+     */
+    limit: number;
+    /**
+     * Unlimited
+     */
+    unlimited: boolean;
+};
+
+/**
+ * LoopFact
+ */
+export type LoopFact = {
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Position
+     */
+    position: number;
+};
+
+/**
+ * LoopLayer
+ */
+export type LoopLayer = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * State
+     */
+    state: string;
+    /**
+     * Missing
+     */
+    missing: string | null;
+    /**
+     * Amounts
+     */
+    amounts: {
+        [key: string]: LoopAmount;
+    };
+};
+
+/**
+ * LoopStep
+ */
+export type LoopStep = {
+    /**
+     * Step Id
+     */
+    step_id: number;
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Purpose
+     */
+    purpose: string;
+    /**
+     * Requested At
+     */
+    requested_at: string;
+    /**
+     * Attempts
+     */
+    attempts: number;
+    /**
+     * Accepted
+     */
+    accepted: boolean;
+    /**
+     * Facts
+     */
+    facts: Array<LoopFact>;
+    /**
+     * Calls
+     */
+    calls: Array<string>;
+};
+
+/**
+ * LoopTrend
+ */
+export type LoopTrend = {
+    /**
+     * Method
+     */
+    method: string;
+    /**
+     * Switch Rounds
+     */
+    switch_rounds: number;
+    /**
+     * Flip Threshold
+     */
+    flip_threshold: number;
+    /**
+     * Rho
+     */
+    rho: number;
+    /**
+     * Step State
+     */
+    step_state: string;
+    /**
+     * Note
+     */
+    note: string;
+};
+
+/**
  * MarkSeen
  */
 export type MarkSeen = {
@@ -4903,6 +5061,57 @@ export type RunExportResult = {
 };
 
 /**
+ * RunLoopsResult
+ */
+export type RunLoopsResult = {
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Stop Reason
+     */
+    stop_reason: string | null;
+    /**
+     * Parameters
+     */
+    parameters: {
+        [key: string]: number;
+    };
+    /**
+     * Method
+     */
+    method: {
+        [key: string]: number;
+    };
+    /**
+     * Layers
+     */
+    layers: Array<LoopLayer>;
+    /**
+     * Activations
+     */
+    activations: Array<LoopActivation>;
+    /**
+     * Rounds
+     */
+    rounds: number;
+    trend: LoopTrend | null;
+};
+
+/**
  * RunRecoveryResult
  */
 export type RunRecoveryResult = {
@@ -5311,6 +5520,17 @@ export type SnapshotRunExportResult = {
      */
     position: number;
     data: RunExportResult;
+};
+
+/**
+ * Snapshot[RunLoopsResult]
+ */
+export type SnapshotRunLoopsResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: RunLoopsResult;
 };
 
 /**
@@ -14875,6 +15095,24 @@ export type QaTestsSavedPayload = {
 };
 
 /**
+ * RequirementMapping
+ */
+export type RequirementMapping = {
+    /**
+     * Requirement
+     */
+    requirement: number;
+    /**
+     * Criteria
+     */
+    criteria?: Array<string>;
+    /**
+     * Gap
+     */
+    gap?: string | null;
+};
+
+/**
  * ReviewObservation
  */
 export type ReviewObservation = {
@@ -16006,6 +16244,10 @@ export type SpecAcceptedPayload = {
      * Input Version
      */
     input_version: number;
+    /**
+     * Requirement Mapping
+     */
+    requirement_mapping?: Array<RequirementMapping>;
     /**
      * Kind
      */
@@ -20661,6 +20903,40 @@ export type QueryToolsRegistryResponses = {
 };
 
 export type QueryToolsRegistryResponse = QueryToolsRegistryResponses[keyof QueryToolsRegistryResponses];
+
+export type QueryRunLoopsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * At
+         */
+        at?: number | null;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    url: '/api/queries/run.loops';
+};
+
+export type QueryRunLoopsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryRunLoopsError = QueryRunLoopsErrors[keyof QueryRunLoopsErrors];
+
+export type QueryRunLoopsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotRunLoopsResult;
+};
+
+export type QueryRunLoopsResponse = QueryRunLoopsResponses[keyof QueryRunLoopsResponses];
 
 export type CapabilitiesData = {
     body?: never;
