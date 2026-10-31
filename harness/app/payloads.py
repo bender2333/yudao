@@ -825,12 +825,23 @@ class AskAnsweredPayload(Payload):
 
 
 
+class LaunchMethodPayload(Payload):
+    # 交付说明里的一个启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #148）：需要试用的每个入口一项
+    name: str
+    kind: Literal["web", "desktop"]
+    commands: dict[str, list[str]]
+    ready_url: str | None = None
+    ready_timeout_sec: int | None = None
+
+
 class DeliveryAcceptedPayload(AcceptanceFields):
     summary: str
     files: list[str]
     check_names: list[str]
     checks: list[CheckReceipt]
     known_risks: list[str]
+    # 启动方式（工单 #148）：可选，旧交付没有这一项
+    launch: list[LaunchMethodPayload] = Field(default_factory=list)
     product_spec_hash: str
     effective_contract_hash: str
     code_tree_digest: str

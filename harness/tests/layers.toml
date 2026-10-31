@@ -56,6 +56,7 @@
 "test_decision_projection.py" = "module"
 "test_decisions.py" = "integration"
 "test_decision_flow.py" = "module"
+"test_delivery_launch.py" = "integration"
 "test_definition_rules.py" = "unit"
 "test_definitions.py" = "integration"
 "test_demo.py" = "module"

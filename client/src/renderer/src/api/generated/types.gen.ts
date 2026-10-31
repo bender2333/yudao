@@ -9634,6 +9634,10 @@ export type DeliveryAcceptedPayload = {
      */
     known_risks: Array<string>;
     /**
+     * Launch
+     */
+    launch?: Array<LaunchMethodPayload>;
+    /**
      * Product Spec Hash
      */
     product_spec_hash: string;
@@ -10868,6 +10872,34 @@ export type InstanceUpgradeWithdrawnEvent = {
      */
     type: 'instance_upgrade_withdrawn';
     payload: InstanceUpgradeWithdrawn;
+};
+
+/**
+ * LaunchMethodPayload
+ */
+export type LaunchMethodPayload = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Kind
+     */
+    kind: 'web' | 'desktop';
+    /**
+     * Commands
+     */
+    commands: {
+        [key: string]: Array<string>;
+    };
+    /**
+     * Ready Url
+     */
+    ready_url?: string | null;
+    /**
+     * Ready Timeout Sec
+     */
+    ready_timeout_sec?: number | null;
 };
 
 /**

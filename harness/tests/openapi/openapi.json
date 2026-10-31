@@ -21739,6 +21739,13 @@
             "title": "Known Risks",
             "type": "array"
           },
+          "launch": {
+            "items": {
+              "$ref": "#/components/schemas/LaunchMethodPayload"
+            },
+            "title": "Launch",
+            "type": "array"
+          },
           "product_spec_hash": {
             "title": "Product Spec Hash",
             "type": "string"
@@ -24181,6 +24188,62 @@
           "payload"
         ],
         "title": "InstanceUpgradeWithdrawnEvent",
+        "type": "object"
+      },
+      "LaunchMethodPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "web",
+              "desktop"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "commands": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Commands",
+            "type": "object"
+          },
+          "ready_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Url"
+          },
+          "ready_timeout_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Timeout Sec"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "commands"
+        ],
+        "title": "LaunchMethodPayload",
         "type": "object"
       },
       "LessonCandidateRecordedEvent": {

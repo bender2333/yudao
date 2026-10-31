@@ -732,6 +732,8 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None,
         "created_event_id": delivery.created_event_id,
         "invalidation_reason": delivery.invalidation_reason,
         "known_risks": delivery.known_risks,
+        # 启动方式属于事实部分（工单 #148）：质检按它开始试用会话
+        "launch": delivery.launch,
         "product_spec_hash": delivery.product_spec_hash,
         "effective_contract_hash": delivery.effective_contract_hash,
         "revision": delivery.revision,
