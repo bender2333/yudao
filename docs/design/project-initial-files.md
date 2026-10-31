@@ -101,9 +101,9 @@ sequenceDiagram
 
 ## 9. 与现有设计的关系
 
-| 现有内容 | 改变 |
+| 位置 | 相关内容 |
 | --- | --- |
-| [接入已有项目设计说明](existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」中的「已有代码的唯一入口」与「用户确认的决定」第 1 项 | 已有项目的代码仍只经 `project.onboard` 接入并建档；新建项目的起始文件夹是另一条入口，不建档 |
-| [应用层与接口层设计说明](app-and-interface.md)「命令清单」 `project.create` | 增加可选参数与事件字段 |
+| [接入已有项目设计说明](existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」中的「已有代码的唯一入口」与「用户确认的决定」第 1 项 | 已有项目的代码只经 `project.onboard` 接入并建档；新建项目的起始文件夹是另一条入口，不建档 |
+| [应用层与接口层设计说明](app-and-interface.md)「命令清单」 `project.create` | 带可选的起始文件夹参数与事件字段 |
 | [恢复契约](recovery-contract-and-fault-matrix.md)「故障矩阵」第 10 行 | 因升级重新开始的事项取项目的起点 |
-| `harness/projects.py` 三处重复的起点写法 | 合为一个函数 |
+| `harness/projects.py` | 起点只有一处写法 |

@@ -90,7 +90,7 @@ sequenceDiagram
 - 连续一致达到次数以后比例减半，不低于下界；出现清单里的任一事件，比例回到 1.0。调节写成事件。
 - 现有的三个固定密度用同样的办法登记为参数：每次对外提交必有一次审查成为 `review.ratio`，下界大于 0；校准抽样固定 10% 成为 `calibration.sample_ratio`；质检只认自己本次激活的回执就是 `verification.recheck_ratio` 等于 1.0。
 - 阶段一、二保持 1.0，调节规则在阶段四启用。
-- 用户 2026-09-25 把「模型固有的知识或者动作，但是结果反馈不行」称为需要记录的惊讶（[D25](../requirements/semantic-system.md)）；本节的意外事件清单是它在验证这一侧的代码化定义：预期与主机测量的结果不一致。
+- 用户把「模型固有的知识或者动作，但是结果反馈不行」称为需要记录的惊讶（[D25](../requirements/semantic-system.md)）；本节的意外事件清单是它在验证这一侧的代码化定义：预期与主机测量的结果不一致。
 
 ## 6. 共享上下文的一组对照
 
@@ -201,8 +201,8 @@ flowchart LR
 
 ## 12. 与现有设计的关系
 
-- [语义系统设计说明](semantic-system.md)：可见范围表按第 2 节对应修改。
+- [语义系统设计说明](semantic-system.md)：「可见范围与跨事项」的可见范围表与第 2 节一致。
 - [部门内多角色设计说明](department-roles.md)：审查者使用先判断后看解释；`review.ratio` 是参数。
 - [接入已有项目设计说明](existing-project-onboarding.md)：现有结构说明的可见范围是参数。
-- [浏览器与 computer use 设计说明](browser-and-computer-use.md)：逐条结论增加检验方式、基线与交付两次运行；试用浏览器的拒绝规则。
+- [浏览器与 computer use 设计说明](browser-and-computer-use.md)：逐条结论带检验方式、基线与交付两次运行；试用浏览器的拒绝规则。
 - [规则登记与参数设计说明](rules-and-parameters.md)：可见范围、先判断后看解释与验证密度都是登记的参数。
