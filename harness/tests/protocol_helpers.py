@@ -377,8 +377,10 @@ def responses_responder(body: dict):
 
 
 def model_test_responder(body: dict, *, protocol: str, actual_model: str = "tested-model",
-                         arguments: str = "{}", call_id: str = "probe-call"):
+                         arguments: str = "{}", call_id: str = "probe-call",
+                         tool_name: str | None = None):
     # 真实 HTTP 模型测试的回复：按协议生成完整的文字或工具调用；收到工具结果以后回复文字。
+    # tool_name 给出时这次调用报的是另一个工具的名字（守「工具名不对仍然不通过」）。
     has_result = any(item.get("type") == "function_call_output" for item in body.get("input", []))
     for message in body.get("messages", []):
         content = message.get("content", [])
@@ -386,6 +388,8 @@ def model_test_responder(body: dict, *, protocol: str, actual_model: str = "test
             isinstance(block, dict) and block.get("type") == "tool_result" for block in content))
     tool = body["tools"][0] if body.get("tools") and not has_result else None
     name = (tool.get("function") or tool)["name"] if tool else None
+    if tool_name is not None:
+        name = tool_name
 
     def event(kind: str, payload: dict) -> str:
         return f"event: {kind}\ndata: {json.dumps(payload)}\n\n"
