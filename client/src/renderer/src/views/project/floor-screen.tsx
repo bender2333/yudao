@@ -19,14 +19,19 @@ import { commandProblemText } from "../../contract/command-problem.ts";
 import { createRafClock, type Clock } from "../../pixel/clock";
 import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
 import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
+import type { FactElement } from "../../pixel/contract";
 import type { FloorModel } from "../../pixel/world/types";
+import type { SourceEvent } from "../../translate/floor";
 import { LETTER_ANSWERED_TYPE, LETTER_ASKED_TYPE } from "../../pixel/world/types";
 import { itemColor } from "../../pixel/world/floor";
 import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
-import { floorActions, floorCards, floorState, recoveryOverlay, streamText, toFloorEvent, type FloorEvent } from "../../translate/floor";
+import { OVERLAY_LABELS } from "../../translate/coverage";
+import { floorActions, floorCards, floorState, recoveryOverlay, sourceCard, sourceOverlay, streamText, toFloorEvent,
+         type FloorEvent } from "../../translate/floor";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
+import { paths } from "../../shell/routing";
 import { useSnapshot } from "./use-snapshot";
 
 /** 文字列表里的一行：按查询结果原样写（页面文字不属于画面）。 */
@@ -48,14 +53,7 @@ export interface FloorScreenProps {
   at?: number | null;
 }
 
-/** 覆盖层的名称与中文标签（按能力清单显示）。 */
-const OVERLAY_LABELS: [string, string][] = [
-  ["flow", "流转"],
-  ["waiting", "等待"],
-  ["recovery", "恢复"],
-  ["context_usage", "上下文用量"],
-  ["semantic_records", "语义记录"],
-];
+/** 覆盖层的名称与中文标签：中文名写在翻译层（工单 #398），页面按能力清单挑出按钮条上的几个。 */
 
 /**
  * 楼层画面要读询问链的那次运行：聚焦的事项优先，否则进行中的一项（与概览页「当前事项」同一口径）。
@@ -162,6 +160,11 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const clockRef = useRef<Clock | null>(null);
   const resyncRef = useRef<(() => void) | null>(null);
   const decideRef = useRef<((payload: DecisionAnswer) => Promise<DecisionResult>) | null>(null);
+  // 来源卡片（工单 #398）：页面按事项与元素找到来源与原始事件，翻好一张 face 交给画面。
+  // 原始事件取不到时（这一页打开以前的事件）卡片仍写它在时间轴上的位置
+  const openSourceRef = useRef<((workItemId: string, element: FactElement) => void) | null>(null);
+  // 事件流上收到的事件按位置留着：来源卡片要读原始事件的中文说明、种类与提出者
+  const eventsRef = useRef<Map<number, SourceEvent>>(new Map());
   const [error, setError] = useState<string | null>(null);
   const [overlay, setOverlay] = useState<string | null>(null);
   const capabilities = props.app.currentCapabilities;
@@ -204,6 +207,11 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
           },
           onGo: (target) => {
             window.location.hash = target.startsWith("#") ? target.slice(1) : target;
+          },
+          onOpenSource: (workItemId, element) => openSourceRef.current?.(workItemId, element),
+          // 来源卡片上的「在时间轴上查看」：回到那个位置的概览回放（设计说明第 3.3 节，位置写在 ?at= 中）
+          onGoTimeline: (position) => {
+            window.location.hash = paths.overviewAt(props.projectId, position, { workItem: props.workItemId });
           },
         });
         if (cancelled) {
@@ -255,6 +263,14 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     [decisions.data, replaying, model],
   );
 
+  // 点开事实元素：按这一份查询结果找到来源与原始事件，翻好来源卡片交给画面（工单 #398）
+  openSourceRef.current = (workItemId, element) => {
+    const row = (loop.data?.work_items ?? []).find((item) => item.work_item_id === workItemId);
+    const ref = row?.refs?.[element];
+    if (!row || !ref) return;
+    viewRef.current?.showSource(sourceCard(row, element, ref, eventsRef.current.get(ref.position) ?? null));
+  };
+
   // 每次查询结果到达：交给播放时间线（状态等它之前的动作演完再上画面）
   useEffect(() => {
     modelRef.current = model;
@@ -280,6 +296,13 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     const off = props.app.subscribeEvents((event) => {
       const floorEvent = toFloorEvent(event);
       if (floorEvent.project_id !== null && floorEvent.project_id !== props.projectId) return;
+      // 来源卡片要读原始事件（工单 #398）：按位置留最近的事件，超过 500 条时丢掉最旧的
+      const cache = eventsRef.current;
+      cache.set(event.position, event as unknown as SourceEvent);
+      if (cache.size > 500) {
+        const oldest = Math.min(...cache.keys());
+        cache.delete(oldest);
+      }
       const stream = streamText(floorEvent);
       if (stream) {
         viewRef.current?.stream({ room: stream.room, role: stream.role }, stream.text);
@@ -323,7 +346,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments));
   }, [overlay, loop.data, decisions.data, flowSegments]);
 
-  const overlays = (capabilities?.overlays ?? []).map((o) => o.name);
+  const overlays = (capabilities?.overlays ?? []).map((o) => o.name).filter((name) => OVERLAY_LABELS[name] !== undefined);
   // 文字列表里的决定请求：与画面同源的查询结果，按发出时间排列
   const openDecisions = useMemo(
     () => sortByRequested((decisions.data?.decisions ?? []).filter((d) => d.status === "open")),
@@ -336,14 +359,14 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     <div className="floor-screen">
       <div className="y10-scene y10-floor-wrap">
         <div className="y10-overlay-bar floor-overlay-tabs" role="group" aria-label="覆盖层">
-          {OVERLAY_LABELS.filter(([name]) => overlays.includes(name)).map(([name, labelText]) => (
+          {overlays.map((name) => (
             <button
               key={name}
               type="button"
               className={`y10-seg-btn${overlay === name ? " is-on active" : ""}`}
               onClick={() => setOverlay(overlay === name ? null : name)}
             >
-              {labelText}
+              {OVERLAY_LABELS[name]}
             </button>
           ))}
         </div>
@@ -385,6 +408,8 @@ function overlayData(
   if (name === "flow") return { segments: flowSegments };
   // 「恢复」覆盖层的数据在翻译层写好（工单 #1186）：这里只把查询结果交过去，不在这里写事项与状态的对应
   if (name === "recovery") return recoveryOverlay(loop);
+  // 「来源」覆盖层的数据同样在翻译层写好（工单 #398）：五种来源的事实元素、缺来源的元素与图例计数
+  if (name === "sources") return sourceOverlay(loop) as unknown as Record<string, unknown>;
   return null;
 }
 

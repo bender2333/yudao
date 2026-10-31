@@ -15,6 +15,7 @@ import { polyLength, pointAt, roomOf } from "../world/declare.ts";
 import { ACTIVE, IN_ROOM, busyItems, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
 import { actorOf, charsOf, primaryOf } from "../world/scene.ts";
 import type { Character, LoopItem, MachineView, Room, SceneLike, World } from "../world/types.ts";
+import type { FactElement, Source, SourceOverlayData } from "../contract.ts";
 
 export const W = 640;
 export const H = 320;
@@ -26,6 +27,27 @@ const TUBE = "#7fc3e8";
 const TUBE_D = "#3f86b0";
 
 const noSource = (refs?: Record<string, unknown> | null, key?: string): boolean => Boolean(refs) && Boolean(key) && !refs![key!];
+
+/** 画面上一个事实元素的位置（工单 #398）：覆盖层「来源」按它描边，点它打开来源卡片。 */
+export interface FactRect {
+  work_item_id: string;
+  element: FactElement;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** 这个元素画出来了（false 表示缺来源、画面上只有覆盖层标出的那一块）。 */
+  drawn: boolean;
+}
+
+/** 五种来源的描边：确定规则灰、主机测量蓝、用户绿；角色陈述与决策模型没有经过主机核实，用加粗的虚线（原型 v10 第 5.2 节）。 */
+export const SOURCE_PEN: Record<Source, { color: string; bold: boolean; dashed: boolean }> = {
+  rule: { color: PAL.grey1, bold: false, dashed: false },
+  host_measurement: { color: PAL.blue2, bold: false, dashed: false },
+  user: { color: PAL.green2, bold: false, dashed: false },
+  role_statement: { color: PAL.orange1, bold: true, dashed: true },
+  decision_model: { color: "#7c6bd6", bold: true, dashed: true },
+};
 
 // 状态词与状态色：键是画面合同的事项状态（pixel/contract.ts 的 ITEM_STATES），翻译层已经把服务端的说法
 // 翻成这些取值（工单 #953）。服务端的 running、waiting_provider 这些词不再出现在画面层。
@@ -82,6 +104,8 @@ export class FloorRenderer {
   overlay: { id: string | null; data: Record<string, unknown> | null } = { id: null, data: null };
   /** 最近一帧画出的覆盖层标签的矩形（画面逻辑坐标），供端到端测试核对标签互不遮挡（工单 #415）。 */
   overlayLabels: { x: number; y: number; w: number; h: number; key: string }[] = [];
+  /** 最近一帧画出的事实元素的位置（工单 #398）：覆盖层「来源」按它描边，点它打开来源卡片。 */
+  factRects: FactRect[] = [];
   /** 世界里的决定卡片：打开时画在最上层（工单 #179）。 */
   card: { draw: (c: CanvasRenderingContext2D) => void } | null = null;
 
@@ -91,6 +115,7 @@ export class FloorRenderer {
   draw(c: CanvasRenderingContext2D): void {
     const t = this.scene.animT;
     c.imageSmoothingEnabled = false;
+    this.factRects = [];
     c.drawImage(this.background(), 0, 0);
     this.hall(c, t);
     const lay = this.rooms();
@@ -451,6 +476,10 @@ export class FloorRenderer {
     const shown = adopted.slice(-per);
     shown.forEach((v, i) => {
       const bx = r.x + 20 + i * 18;
+      // 成果库的箱子的位置：覆盖层「来源」按它描边，点它打开来源卡片（工单 #398）
+      const item = this.driver.model.items.find((it) => it.work_item_id === v) ?? null;
+      const missing = Boolean(item) && noSource(item!.refs as Record<string, unknown> | undefined, "box");
+      this.factRects.push({ work_item_id: v, element: "box", x: bx - 1, y: 115, w: 15, h: 23, drawn: !missing });
       drawBitmap(c, "box_sealed", bx, 117);
       RB(c, bx + 1, 130, 13, 7, PAL.white);
       drawText(c, v, bx + 7.5, 133.8, { size: 6, weight: 800, align: "center", color: PAL.green3, max: 13 });
@@ -578,9 +607,12 @@ export class FloorRenderer {
       drawSign(c, r.x + r.w / 2, 54, dept?.name ?? r.label, { size: 7, bg: dept?.main ?? PAL.paper, fg: PAL.white, hi: dept?.light, lo: dept?.shade, minW: 30 });
       const here = this.itemsIn(r.id);
       here.forEach((it, i) => {
-        if (noSource(it.refs as Record<string, unknown> | undefined, "parcel")) return;
-        c.globalAlpha = this.dimFor(it.work_item_id);
         const fx = r.door - 22 - i * 9;
+        const missing = noSource(it.refs as Record<string, unknown> | undefined, "parcel");
+        // 包裹（门口的小旗）的位置：缺来源时画面上没有它，覆盖层「来源」仍按这个位置标出（工单 #398）
+        this.factRects.push({ work_item_id: it.work_item_id, element: "parcel", x: fx - 1, y: 216, w: 9, h: 12, drawn: !missing });
+        if (missing) return;
+        c.globalAlpha = this.dimFor(it.work_item_id);
         drawBitmap(c, (Math.floor(t / 320) + i) % 2 && !this.scene.reduced ? "flag2" : "flag", fx, 218, {
           recolor: { X: ITEM_COLORS[it.color_index % 6], x: ITEM_SHADES[it.color_index % 6] },
         });
@@ -588,10 +620,17 @@ export class FloorRenderer {
       });
       let row = 0;
       here.forEach((it) => {
-        if (!it.sign || noSource(it.refs as Record<string, unknown> | undefined, "sign")) return;
+        if (!it.sign) return;
         const ss = signStyle(it.sign);
         const maxW = r.w - 6;
         const w = Math.min(maxW, Math.max(18, measure(c, it.sign, 6, 600) + 8));
+        const missing = noSource(it.refs as Record<string, unknown> | undefined, "sign");
+        // 门牌的位置：缺来源时画面上没有它，覆盖层「来源」仍按这个位置标出（工单 #398）
+        this.factRects.push({
+          work_item_id: it.work_item_id, element: "sign", x: r.door + 12 + w / 2 - 20 - w / 2, y: 232 + row * 12,
+          w, h: 10, drawn: !missing,
+        });
+        if (missing) return;
         c.globalAlpha = this.dimFor(it.work_item_id);
         drawSign(c, r.door + 12 + w / 2 - 20, 232 + row * 12, it.sign, { size: 6, bg: ss.bg, fg: ss.fg, stripe: ss.stripe, maxW, nail: row === 0 ? 217 : undefined });
         c.globalAlpha = 1;
@@ -686,6 +725,75 @@ export class FloorRenderer {
         if (!r) continue;
         label(e.department, r.x + r.w / 2, 94, `有效 ${e.valid} · 冲突 ${e.conflicts}`, e.conflicts ? PAL.orange1 : PAL.white);
       }
+    } else if (overlay.id === "sources") {
+      this.sourceOverlay(c, data as unknown as SourceOverlayData);
+    }
+  }
+
+  /**
+   * 覆盖层「来源」（工单 #398，原型 v10 设计说明第 5.2 节）：画面上有事实元素的按来源描边，
+   * 确定规则灰、主机测量蓝、用户绿，角色陈述与决策模型没有经过主机核实、用加粗的虚线；
+   * 缺来源的元素用虚线框标「缺来源」；右上角的图例写出每种来源在画面上有几个元素。
+   */
+  private sourceOverlay(c: CanvasRenderingContext2D, data: SourceOverlayData): void {
+    const pen = new Map<string, { source: Source; label: string }>();
+    for (const entry of data.entries) pen.set(`${entry.work_item_id}|${entry.element}`, { source: entry.source, label: entry.label });
+    const missing = new Map(data.missing.map((item) => [`${item.work_item_id}|${item.element}`, item.label]));
+    for (const rect of this.factRects) {
+      const key = `${rect.work_item_id}|${rect.element}`;
+      const marked = pen.get(key);
+      if (marked && rect.drawn) {
+        this.sourceStroke(c, rect, SOURCE_PEN[marked.source]);
+        continue;
+      }
+      const missingLabel = missing.get(key);
+      if (missingLabel === undefined) continue;
+      // 缺来源：画面上没有这个元素，用虚线框标出来（工单 #398 的验收：缺来源的元件在覆盖层标出）
+      this.dashedRect(c, rect, PAL.red1);
+      drawText(c, `缺来源：${missingLabel}`, rect.x, rect.y - 3, { size: 5.5, weight: 700, color: PAL.red1, max: 90 });
+    }
+    // 图例：右上角，五种来源各一行：色块（角色陈述与决策模型是虚线块）与这一种在画面上有几个元素
+    const rows = data.legend ?? [];
+    const w = 96;
+    const h = rows.length * 10 + 6;
+    const x = W - w - 6;
+    const y = BAR + 6;
+    RB(c, x, y, w, h, PAL.paper);
+    rows.forEach((row, i) => {
+      const ry = y + 4 + i * 10;
+      const style = SOURCE_PEN[row.source];
+      if (style.dashed) {
+        for (let step = 0; step < 8; step += 3) R(c, x + 5 + step, ry, 2, style.bold ? 4 : 2, style.color);
+      } else {
+        R(c, x + 5, ry, 8, style.bold ? 4 : 2, style.color);
+      }
+      drawText(c, `${row.label} ${row.count}`, x + 18, ry + 3, { size: 5.5, weight: 600, color: PAL.ink, max: w - 24 });
+    });
+  }
+
+  /** 沿一个事实元素的边描一层（描边宽度按 bold 加粗；虚线按 dashed）。 */
+  private sourceStroke(c: CanvasRenderingContext2D, rect: FactRect, style: { color: string; bold: boolean; dashed: boolean }): void {
+    const thickness = style.bold ? 2 : 1;
+    if (style.dashed) {
+      this.dashedRect(c, rect, style.color, thickness);
+      return;
+    }
+    R(c, rect.x, rect.y - thickness, rect.w, thickness, style.color);
+    R(c, rect.x, rect.y + rect.h, rect.w, thickness, style.color);
+    R(c, rect.x - thickness, rect.y, thickness, rect.h, style.color);
+    R(c, rect.x + rect.w, rect.y, thickness, rect.h, style.color);
+  }
+
+  /** 一圈虚线框（覆盖层的描边与「缺来源」的标记共用）。 */
+  private dashedRect(c: CanvasRenderingContext2D, rect: FactRect, color: string, thickness = 1): void {
+    const step = 4;
+    for (let x = rect.x; x < rect.x + rect.w; x += step) {
+      R(c, x, rect.y - thickness, Math.min(2, rect.x + rect.w - x), thickness, color);
+      R(c, x, rect.y + rect.h, Math.min(2, rect.x + rect.w - x), thickness, color);
+    }
+    for (let y = rect.y; y < rect.y + rect.h; y += step) {
+      R(c, rect.x - thickness, y, thickness, Math.min(2, rect.y + rect.h - y), color);
+      R(c, rect.x + rect.w, y, thickness, Math.min(2, rect.y + rect.h - y), color);
     }
   }
 
@@ -714,7 +822,16 @@ export class FloorRenderer {
       drawText(c, text, x + w / 2, 9, { size: 6.5, weight: 700, align: "center", color: fg ?? PAL.ink });
       x += w + 4;
     };
+    const refs = it.refs as Record<string, unknown> | undefined;
+    const roundStart = x;
     if (it.round) chip(`第 ${it.round} 轮`, PAL.paper);
+    if (it.round) {
+      // 轮次的位置：信息条上的这一块（工单 #398 的覆盖层「来源」与来源卡片按它定位）
+      this.factRects.push({
+        work_item_id: it.work_item_id, element: "round", x: roundStart, y: 4, w: Math.max(10, x - roundStart - 4), h: 10,
+        drawn: !noSource(refs, "round"),
+      });
+    }
     const dept = it.department ? DEPT_SHELL[it.department] : null;
     if (dept) chip(`当前部门：${dept.name}`, dept.light);
     chip(STATUS_TEXT[it.status] ?? it.status, STATUS_CHIP[it.status] ?? PAL.grey2, ["working", "failed", "adopted", "asking"].includes(it.status) ? PAL.white : PAL.ink);
@@ -737,6 +854,11 @@ export class FloorRenderer {
         c.fillStyle = PAL.grey1;
         for (let i = 0; i < ww; i += 3) c.fillRect(bx + 1 + ew + i, 6 + (i % 6 < 3 ? 0 : 3), 1, 3);
       }
+      // 已用时间的位置：信息条右边的这一块（工单 #398）
+      this.factRects.push({
+        work_item_id: it.work_item_id, element: "elapsed", x: bx - 116, y: 3, w: 110, h: 11,
+        drawn: !noSource(refs, "elapsed"),
+      });
     }
   }
 
