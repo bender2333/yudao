@@ -1,6 +1,6 @@
 # 部门指导的处理设计
 
-总图位置：第三节外环「你中途的指导」那条规矩；第一节「你」方框。依据：需求 [D20](../requirements/department-guidance.md)；[三部门的循环结构](department-loop.md)「指导」；[应用层与接口层设计说明](app-and-interface.md)「路由对照」（指导记录的读取）。
+总图位置：第三节外环「你中途的指导」那条规矩；第一节「你」方框。依据：需求 [D20](../requirements/department-guidance.md)；[三部门的循环结构](department-loop.md)「指导」；[应用层与接口层设计说明](app-and-interface.md)「查询清单」（指导记录的读取）。
 
 ## 1. 三类职责
 
