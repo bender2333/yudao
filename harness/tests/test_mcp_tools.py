@@ -139,8 +139,9 @@ def test_a_snapshot_with_a_different_digest_is_not_used():
 
 
 # MCP 会话（工单 #1175 第 8 轮，网络与 MCP 设计说明第 7.2 节）：会话表的名称表来自冻结设置带来的定义副本，
-# 每台服务器的启动参数从同一份冻结设置组出。会话实例的建立、复用与关闭按真实 MCP 进程核对（集成层，
-# test_mcp_tools_integration.py）；缝层守名称表与启动参数这两段，凭据来源用进程内的 CredentialChain（真实实现）。
+# 每台服务器的启动参数从同一份冻结设置组出。会话实例的建立、复用与关闭、结果的凭据替换按真实 MCP 进程
+# 核对（集成层，test_mcp_tools_integration.py）；缝层守名称表与启动参数这两段，
+# 凭据来源用进程内的 CredentialChain（真实实现）。
 
 from harness.mcp_client import ServerLaunch  # noqa: E402
 from harness.providers.credentials import CredentialChain  # noqa: E402

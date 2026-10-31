@@ -144,12 +144,16 @@ def test_a_run_reuses_one_session_per_server_and_closes_it_at_run_end(tmp_path):
     assert first["is_error"] is False and second["is_error"] is False
 
     def _pid(result):
-        # environment 工具把进程号放在结果里（结果工件的一行；文本与 structuredContent 都有 JSON 时逐行找）
+        # environment 工具把进程号放在结果里（结果工件的正文；文本与 structuredContent 都是 JSON）
         store = ArtifactStore(system.data_dir / "artifacts")
         entry = store.external_source(run_id, result["content_hash"])
-        for line in entry.text.splitlines():
-            if '"pid"' in line:
-                return json.loads(line)["pid"]
+        for candidate in (entry.text, *(line for line in entry.text.splitlines() if line.strip().startswith("{"))):
+            try:
+                parsed = json.loads(candidate)
+            except ValueError:
+                continue
+            if isinstance(parsed, dict) and "pid" in parsed:
+                return int(parsed["pid"])
         raise AssertionError(f"结果里没有进程号：{entry.text[:200]}")
 
     server_pid = _pid(first)
@@ -218,22 +222,27 @@ def test_the_run_actions_query_carries_the_mcp_receipt(tmp_path):
 
 
 def test_credential_values_do_not_appear_in_events_or_artifacts(tmp_path):
-    # 凭据值不进入事件、工件与日志（设计说明第 4.4 节）：值只以名称与脱敏后的星号出现在保存的内容里
+    # 凭据值不进入事件、工件与日志（设计说明第 4.4 节）：值只以名称与脱敏后的星号出现在保存的内容里。
+    # environment 工具回报子进程的全部环境变量（里面有按名称取值的凭据值）：结果文本与结构化输出
+    # 在保存之前替换为星号，事件与工件里查不到值本身
     system = _system(tmp_path, {
         "product": [product_spec_turn()],
-        "engineering": [_echo_turn("凭据"), FakeTurn(transcript="调用完成")],
+        "engineering": [
+            _mcp_turn(ENV_ALIAS, {}, "mcp-env"),
+            FakeTurn(transcript="调用完成"),
+        ],
         "quality": [explore_turn(), explore_turn(), explore_turn()],
     })
     project_id = _project_with_server(system)
     run_id = _work_item_run(system, project_id)
-    system.activate_once(run_id)
-    system.activate_once(run_id)
+    system.run_until_stop(run_id)
 
     events = json.dumps([event.to_dict() for event in system.store.list_events(run_id)], ensure_ascii=False)
     assert SECRET not in events
-    output = _result_of(system, run_id, _tool_called(system, run_id, "mcp-凭据"))
+    output = _result_of(system, run_id, _tool_called(system, run_id, "mcp-env"))
     artifact = system.artifacts.get_for_run(run_id, ArtifactRef(**output["ref"])).decode("utf-8")
-    assert SECRET not in artifact
+    assert SECRET not in artifact, "结果工件里出现了凭据值"
+    assert "***" in artifact, "结果工件里的凭据值没有替换为星号"
     system.close()
 
 

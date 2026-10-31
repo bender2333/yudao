@@ -299,8 +299,10 @@ class McpSessions:
             if not call.done():
                 call.cancel()
             raise
-        text = result.text
-        structured = result.structured_content
+        # 结果文本与结构化输出都把凭据值替换为星号再保存（设计说明第 4.4 节：
+        # 「保存的标准错误输出、错误文本与结果文本在写入之前，把已取得的凭据值替换为星号」）
+        text = _redacted(result.text, client.launch.secrets)
+        structured = _redacted_value(result.structured_content, client.launch.secrets)
         if isinstance(structured, (dict, list)) and structured:
             text = text + "\n" + json.dumps(structured, ensure_ascii=False) if text else json.dumps(
                 structured, ensure_ascii=False)
@@ -340,3 +342,14 @@ def _redacted(text: str, secrets) -> str:
     from .mcp_client import redact
 
     return redact(text, tuple(secrets or ()))
+
+
+def _redacted_value(value: object, secrets) -> object:
+    # 结构化输出里的凭据值递归替换为星号（与客户端对 structuredContent 的替换同一做法）
+    if isinstance(value, str):
+        return _redacted(value, secrets)
+    if isinstance(value, dict):
+        return {key: _redacted_value(item, secrets) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_redacted_value(item, secrets) for item in value]
+    return value
