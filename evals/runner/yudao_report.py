@@ -191,18 +191,46 @@ def _noise_text(noise):
     return "完成度极差 " + (str(spread) if spread is not None else "未知") + "（" + noise.get("note", "") + "）"
 
 def _basic_section(result):
+    # 作废的运行没有评分器版本：只有评分时才有的字段写「未评分」，不拼 None（工单 #1350）
     lines = ["## 一、基本信息", ""]
     lines.append("| 项目 | 取值 |")
     lines.append("| --- | --- |")
-    lines.append("| 场景 | " + result["scenario"] + " |")
-    lines.append("| 材料版本 | " + result["material_version"] + " |")
-    lines.append("| 评分器版本 | " + result["scorer_version"] + " |")
-    lines.append("| 被测模型 | " + result["model"] + " |")
+    lines.append("| 场景 | " + str(result["scenario"]) + " |")
+    lines.append("| 材料版本 | " + str(result["material_version"]) + " |")
+    lines.append("| 评分器版本 | " + _scored_text(result.get("scorer_version")) + " |")
+    lines.append("| 被测模型 | " + str(result["model"]) + " |")
     lines.append("| Yudao 提交号 | " + _commit_text(result) + " |")
     if result.get("model_capacity"):
         lines.append("| 模型的容量 | " + model_service.describe(result["model_capacity"]) + " |")
     lines.append("| 计入结果的运行次数 | " + str(result["run_count"]) + " |")
+    void_runs = [run for run in result.get("runs", []) if run.get("void")]
+    if void_runs:
+        # 作废的运行正是最需要报告的一类：顶部写清原因与跑到哪一步，没有结论时写明未产生
+        lines.append("| 作废原因 | " + "；".join(
+            str(run["run_id"]) + "：" + _void_reason_text(run) for run in void_runs) + " |")
+        lines.append("| 跑到哪一步 | " + "；".join(
+            str(run["run_id"]) + "：" + _void_position(run) for run in void_runs) + " |")
+        if result["run_count"] == 0:
+            lines.append("| 逐条结论与覆盖读数 | 未产生（没有可以评分的交付） |")
     return lines + [""]
+
+
+def _scored_text(value):
+    """只在评分时才有的字段（评分器版本这类）：作废的运行写「未评分」，不写 None。"""
+    return str(value) if value not in (None, "") else "未评分"
+
+
+def _void_reason_text(run):
+    return str(run.get("void_reason") or "未写明原因")
+
+
+def _void_position(run):
+    """作废的运行跑到哪一步：建档没有完成时没有新建事项，事项已经开始的写出运行编号与结束状态。"""
+    metrics = run.get("metrics") or {}
+    if not run.get("yudao_run_id"):
+        reason = metrics.get("end_reason") or "初始 PRD 没有被确认"
+        return "建档（" + str(reason) + "，没有新建事项）"
+    return "事项运行（" + str(run["yudao_run_id"]) + "，结束状态 " + str(metrics.get("end_status")) + "）"
 
 
 def _commit_text(result):
@@ -254,6 +282,12 @@ def _checkpoints_section(result):
 def _summary_section(result):
     lines = ["## 五、指标汇总", ""]
     summary = result["summary"]
+    if result["run_count"] == 0:
+        # 作废或模型服务故障的运行不进汇总：评分与噪声范围写「未评分」（工单 #1350）
+        lines.append("没有计入结果的运行。评分（完成度、正确性）与噪声范围：未评分。")
+        lines.append("")
+        lines.extend(_onboarding_section(result))
+        return lines
     if summary:
         lines.append("| 指标 | 平均值 | 最小值 | 最大值 | 有效样本数 | 未知样本数 |")
         lines.append("| --- | --- | --- | --- | --- | --- |")

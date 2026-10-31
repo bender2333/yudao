@@ -155,10 +155,11 @@ def test_step_layer_is_undetermined_until_a_full_window():
 
 
 def test_activation_project_and_run_layers_are_undetermined_with_missing_facts():
-    # 守 R3：本工单只判步骤层；run 层等 #1194 的逐条核验结论，激活层与项目层写明缺少的事实
+    # 守 R3：本工单只判步骤层；run 层在 #1194 接入逐条核验数据以后判，激活层与项目层写明缺少的事实
     tree = loops.build_loop_tree(base_events())
     layers = {layer.name: layer for layer in tree.layers}
-    assert layers["run"].state == loops.UNDETERMINED and "#1194" in layers["run"].missing
+    # #1194 以后 run 层仍不判定（这份事件流没有逐条核验结论），说明的文字改成「核验角色提交…以后判定」
+    assert layers["run"].state == loops.UNDETERMINED and layers["run"].missing == loops.MISSING_RUN
     assert layers["activation"].state == loops.UNDETERMINED and layers["activation"].missing
     assert layers["project_loop"].state == loops.UNDETERMINED and "故障记录" in layers["project_loop"].missing
     assert layers["work_item"].state == loops.UNDETERMINED
@@ -193,7 +194,8 @@ def test_amounts_carry_numbers_and_an_unlimited_flag():
 
 
 def test_trend_explanation_appears_from_eight_rounds_and_rank_trend_is_the_method():
-    # 守 R3：轮数达到 8 改用秩相关的趋势检验；run 层仍写明缺少的逐条核验结论
+    # 守 R3：轮数达到 8 改用秩相关的趋势检验；这一格说明的是步骤层的秩相关（run 层的逐条核验结论
+    # 由 #1194 的 run_state 判定，不再写进这一格）
     events = [created()]
     position = 2
     for index in range(8):
@@ -203,7 +205,7 @@ def test_trend_explanation_appears_from_eight_rounds_and_rank_trend_is_the_metho
     assert tree.rounds == 8
     assert tree.trend is not None
     assert tree.trend["method"] == "spearman" and tree.trend["switch_rounds"] == 8
-    assert tree.trend["flip_threshold"] == 2 and "#1194" in tree.trend["note"]
+    assert tree.trend["flip_threshold"] == 2 and "步骤层" in tree.trend["note"]
     # 严格下降为负、上升为正、并列无趋势
     assert loops.rank_trend([3, 2, 1]) < 0
     assert loops.rank_trend([1, 2, 3]) > 0

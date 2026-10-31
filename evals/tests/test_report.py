@@ -15,6 +15,7 @@ if RUNNER_DIR not in sys.path:
 
 import metrics
 import report
+import yudao_report
 
 MODEL = "yudao-eval/test-model"
 LIMITS = {"context_window": 262_144, "context_window_source": "model_list",
@@ -108,3 +109,80 @@ def test_the_report_records_the_model_capacity_and_its_source(tmp_path):
     result, text = _report_text(tmp_path, [_run("run-1")])
     assert result["model_capacity"] == LIMITS
     assert "上下文窗口 262144（模型服务的模型列表），单次输出上限 64000（模型服务的模型列表）" in text
+
+
+def _void_run(run_id="run-void"):
+    """作废的运行：初始 PRD 没有被确认，没有事项、没有可以评分的交付（runner 的返回形状）。"""
+    return {
+        "run_id": run_id,
+        "yudao_run_id": None,
+        "yudao_commit": "107e1a31",
+        "served_model": MODEL,
+        "data_dir": "data",
+        "source_dir": "source",
+        "evidence_dir": "evidence",
+        "onboarding": {"run_id": run_id + "-onboarding", "model_requests": 7, "input_tokens": 1200,
+                       "output_tokens": 300, "total_tokens": 1500, "elapsed_seconds": 42.5},
+        "metrics": {"end_status": "void", "end_reason": "initial_prd_not_confirmed", "outcome": None,
+                    "stop_reason": None, "status": None, "cycles": 0, "rework": 0, "collaboration": 0,
+                    "model_requests": 0, "input_tokens": None, "output_tokens": None,
+                    "cache_read_tokens": None, "cache_write_tokens": None, "total_tokens": None,
+                    "cost": None, "model_latency_ms": None, "elapsed_seconds": 0.0,
+                    "timed_out": False, "model_service_failure": False, "empty_model_responses": 0,
+                    "checkpoints": {}},
+        "delivery_files": 0,
+        "void": True,
+        "void_reason": "initial_prd_not_confirmed",
+        "model_service_failure": False,
+        "score": None,
+    }
+
+
+def _failed_run(run_id="run-failed"):
+    """模型服务故障结束的运行：有事项但没有可以评分的交付。"""
+    run = _void_run(run_id)
+    run["yudao_run_id"] = "yudao-run-1"
+    run["void"] = False
+    run["void_reason"] = ""
+    run["metrics"].update({"end_status": "failed", "end_reason": "model_service_failure",
+                           "model_service_failure": True, "elapsed_seconds": 12.0})
+    return run
+
+
+def test_a_void_run_still_writes_a_chinese_report(tmp_path):
+    """守 R1/R2：作废的运行（没有评分器版本）也能出完整中文报告（工单 #1350）。
+
+    报告写明作废原因、跑到哪一步、建档用量与耗时，评分字段写「未评分」；写报告不抛异常。
+    """
+    run = _void_run()
+    result = yudao_report.build_result("scenario-2", "scenario-2@1", None, MODEL, [run],
+                                       model_capacity=LIMITS)
+    path = str(tmp_path / "void.md")
+    yudao_report.write_report(result, path, [yudao_report.run_section(run, None)])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+
+    assert "| 评分器版本 | 未评分 |" in text
+    assert "| 作废原因 | run-void：initial_prd_not_confirmed |" in text
+    assert "| 跑到哪一步 | run-void：建档（initial_prd_not_confirmed，没有新建事项） |" in text
+    assert "| 逐条结论与覆盖读数 | 未产生（没有可以评分的交付） |" in text
+    assert "没有计入结果的运行。评分（完成度、正确性）与噪声范围：未评分。" in text
+    assert "| run-void-onboarding | 7 | 1200 | 300 | 1500 | 42.5 |" in text
+    assert "| 评分 | 作废，未评分 |" in text
+    assert "这次运行作废：initial_prd_not_confirmed" in text
+
+
+def test_a_failed_run_still_writes_a_report(tmp_path):
+    """守 R1：模型服务故障结束的运行同样能写出报告，评分字段写「未评分」。"""
+    run = _failed_run()
+    result = yudao_report.build_result("scenario-3", "scenario-3@2", None, MODEL, [run],
+                                       model_capacity=LIMITS)
+    path = str(tmp_path / "failed.md")
+    yudao_report.write_report(result, path, [yudao_report.run_section(run, None)])
+    with open(path, encoding="utf-8") as handle:
+        text = handle.read()
+
+    assert "| 结束状态 | failed |" in text
+    assert "| 结束原因 | model_service_failure |" in text
+    assert "| 评分器版本 | 未评分 |" in text
+    assert "评分（完成度、正确性）与噪声范围：未评分。" in text

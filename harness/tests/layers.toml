@@ -120,6 +120,7 @@
 "test_layer_boundaries.py" = "module"
 "test_lesson_candidates.py" = "integration"
 "test_loops_projection.py" = "unit"
+"test_loops_run_layer.py" = "unit"
 "test_malformed_tool_arguments.py" = "integration"
 "test_mcp_client.py" = "integration"
 "test_mcp_probe.py" = "integration"
