@@ -25,10 +25,6 @@
 - 阶段收尾的手动检查（全部父工单关闭以后进行）、以后专题的占位工单、试点开始之前的自举试点工单。
 - 还没有进入的阶段里的工单：这个阶段的四项进入条件（[验收证据规则](acceptance-evidence.md)第 6 节）成立之前一直标 `waiting`；成立以后由总架构师去掉，按本节开头的办法逐张在当时的 main 上核对正文。
 
-## 不再使用的标签：`kernel-approved`
-
-`kernel-approved` 是 2026-10-26 加的事前批准标签，2026-10-27 起不再使用（用户决定）：改内核路径的工单不事前批准，与其他工单一样标 `ready-for-agent`，守内核的是 CI 里的内核测试、内核清单的检查与测试覆盖（`docs/agents/ticket-spec.md`「内核路径」一条）。旧工单上的标签与批准行只是历史，不表示任何许可。
-
 `needs-triage` 只用于四种情况：新报告的工单等架构师评估；新子工单核对规格期间（[验收证据规则](acceptance-evidence.md)第 4 节）；架构师退回工单、改写正文期间；Ralph 循环（solo 模式）里同一张工单连续三轮没有通过，循环停止重试、交回架构师评估。`needs-architect` 只由派发者按自主推进的流程加上；[架构师循环](../../.claude/skills/architect-loop/SKILL.md)与用户在场的架构师都不给工单加它。
 
 ## 自主推进模式的流程标签
@@ -51,6 +47,8 @@ Ralph 循环把「连续三轮没有通过」当作停止信号（一轮是一�
 
 审查的结论是 PR 审查的状态（批准或要求修改），不用标签表示。要求修改后，派发者把标签改回 `ready-for-agent`；卡住的工单改为 `needs-architect`，派发者启动架构师。架构师处理以后改为 `ready-for-agent`、`needs-review` 或 `ready-for-human`，`ready-for-human` 表示架构师已经看过、要用户决定。`needs-architect` 与 `needs-triage`、`waiting` 是两回事：架构师自己退回工单、改写正文期间用 `needs-triage`，等前提条件用 `waiting`，都不会启动被唤醒的架构师。
 
-另有一个标记 `touches-core`：工单的「只改」包含核心文件（范围见[运行配置](autopilot-runtime.md)第 7 节），由架构师放出工单时加上。带它的工单合并前在分支上跑一次集成层；要改「只改」以外的文件时与普通工单一样补记后改（用户 2026-10-27 决定）。它与上面的标签同时存在，不限制同时进行的张数，也不表示先后；先后用工单依赖表示。
+另有一个标记 `touches-core`：工单的「只改」包含核心文件（范围见[运行配置](autopilot-runtime.md)第 7 节），由架构师放出工单时加上。带它的工单合并前在分支上跑一次集成层；要改「只改」以外的文件时与普通工单一样补记后改。它与上面的标签同时存在，不限制同时进行的张数，也不表示先后；先后用工单依赖表示。
 
-2026-10-14 以前用过的 `review-passed`、`review-failed` 不再使用。仓库里保留这两个标签，已有工单上的记录供评测统计使用。
+## 流程不使用的标签
+
+仓库里另有 `kernel-approved`、`review-passed`、`review-failed` 三个标签，流程不使用。改内核路径的工单不事前批准，与其他工单一样标 `ready-for-agent`，守内核的是 CI 里的内核测试、内核清单的检查与测试覆盖（`docs/agents/ticket-spec.md`「内核路径」一条）；工单上的 `kernel-approved` 标签与批准行不表示任何许可。`review-passed`、`review-failed` 留在仓库里，已有工单上的记录供评测统计使用。

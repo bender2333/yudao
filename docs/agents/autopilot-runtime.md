@@ -37,7 +37,7 @@ Claude 担任派发者时使用这里的路径。
 
 两台机器把 `PYTHONUTF8=1` 设成用户环境变量（Windows：`setx PYTHONUTF8 1`，之后新开的终端生效），任何终端与 harness 里的 Python 及其测试子进程都输出 UTF-8；pytester 的子进程输出按 UTF-8 读取。
 
-共享的 `C:/code/yudao/.venv` 是 editable 安装，它的 `harness` 指向最近一次 `uv sync` 的那个 worktree，会随别的会话的同步而变（2026-10-29 实测从 `C:\w\issue-1162` 变成 `C:\w\issue-1161`）。工人在自己的 worktree 里跑「导入 `harness` 的脚本」或嵌套起子进程的用例时，带 `PYTHONPATH=<worktree 根>`，否则导入会落到别人那一份上；报错形态是「莫名 import 错」或与本单无关的怪失败。
+共享的 `C:/code/yudao/.venv` 是 editable 安装，它的 `harness` 指向最近一次 `uv sync` 的那个 worktree，会随别的会话的同步而变。工人在自己的 worktree 里跑「导入 `harness` 的脚本」或嵌套起子进程的用例时，带 `PYTHONPATH=<worktree 根>`，否则导入会落到别人那一份上；报错形态是「莫名 import 错」或与本单无关的怪失败。
 
 各角色只使用第 1 节列出的目录。架构师在会话中临时建的 worktree，会话结束之前删除。
 
@@ -141,11 +141,11 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | 架构师循环的子代理 | `claude-opus-5-5`，effort `xhigh` | 与上表同一行：这一层做设计判断，判断错了比多用的量贵；它与 solo 执行者用不同的模型，判断才独立 |
 | 试用的两个模型 | model1 `wb/cn:deepseek-v4.1-flash` 给产品与工程；model2 `ag/gemini-3.8-flash-high` 给质检、找问题与看图 | 分工见 [`/trial`](../../.claude/skills/trial/SKILL.md)第 1 节的表；地址与凭据取下面的 `YUDAO_EVAL_*` |
 | 备用链 | `9router/ds`| 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
-| 真实模型测试与评测 | `qhub/Qwen3.8-Flash`（9router，Chat Completions，2026-10-19） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)第 4.3 节 |
+| 真实模型测试与评测 | `qhub/Qwen3.8-Flash`（9router，Chat Completions） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)第 4.3 节 |
 
 `task` 子代理请求会让执行者停滞，任务评论里写明不使用子代理。
 
-需要真实模型的测试、真实模型 smoke 与评测工作线使用同一套设置，放在派发机器的用户环境变量中（用户提供，2026-10-18）：
+需要真实模型的测试、真实模型 smoke 与评测工作线使用同一套设置，放在派发机器的用户环境变量中（用户提供）：
 
 | 变量 | 内容 |
 | --- | --- |
@@ -153,14 +153,14 @@ omp 的配置是 [omp-print-runs.yml](omp-print-runs.yml)：关闭后台命令�
 | `YUDAO_EVAL_API_KEY` | 凭据，不写进仓库、工单、PR、日志与日记 |
 | `YUDAO_EVAL_MODEL` | 模型名，与上表一致；换模型时两处一起改 |
 
-2026-10-29 实测：会话进程里可能没有 `YUDAO_EVAL_API_KEY`（用户级有、这个进程没继承），`YUDAO_VISION_API_KEY` 也没有；`vision.mjs` 在没有 `SOLO_VISION_*` 时沿用 `YUDAO_EVAL_API_KEY`，所以看图只缺这一样。用到凭据的命令，先在本进程里补一行再跑，值只在进程里存在，不写进文件、评论与日记：
+会话进程里可能没有 `YUDAO_EVAL_API_KEY`（用户级有、这个进程没继承），`YUDAO_VISION_API_KEY` 也没有；`vision.mjs` 在没有 `SOLO_VISION_*` 时沿用 `YUDAO_EVAL_API_KEY`，所以看图只缺这一样。用到凭据的命令，先在本进程里补一行再跑，值只在进程里存在，不写进文件、评论与日记：
 
 ```powershell
 $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_KEY', 'User')
 ```
 
 
-- 不用 9router 上 `cc/` 分组的模型（用户，2026-10-18）。
+- 不用 9router 上 `cc/` 分组的模型。
 - 不放进 CI：CI 没有这三个变量，需要模型的测试在 CI 中不运行。
 - 用户级的环境变量只对设置以后启动的进程生效；修改以后，派发者重新启动，执行者与审查者从下一次派发起读到。
 
@@ -168,7 +168,7 @@ $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_
 
 - 定义：`.github/workflows/ci.yml`，由用户在场时的架构师维护，执行者与被唤醒的架构师不修改。
 - 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上并行运行四个作业：① 单元层、② 模块层（各含一项固定检查）、评测工具（`evals/tests`，`real_model` 的用例默认不选）、客户端（类型检查与单元测试，逐场景回放测试除外，按 `AGENTS.md` 单独运行；编译页面与 wheel）。汇总作业 `check` 在四项都成功时成功，是 main 的规则要求的检查，并在运行摘要里写出各层的表。PR 上另有「用例变化」：合并前后各层用例的增减，只显示，不挡合并（测试分层设计说明第 4.3、4.4 节）。
-- main 的每次推送（每次合并以后）另外运行 ③ 集成层（作业 `integration`）：集成层全部（`-n 4`，2026-10-18 在 main 上测得约 15 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。带 `touches-core` 的工单例外：执行者在交付前对自己的分支手动触发一次（`executor` 技能第 5 步）。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
+- main 的每次推送（每次合并以后）另外运行 ③ 集成层（作业 `integration`）：集成层全部（`-n 4`，在 main 上约 15 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由派发者按派发者规则第 5 节处理。带 `touches-core` 的工单例外：执行者在交付前对自己的分支手动触发一次（`executor` 技能第 5 步）。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
 - 手动触发（`check` 与 `integration` 都运行）：`gh workflow run CI --ref <分支>`，例如工单要在 GitHub 的运行机上验证集成层时 `gh workflow run CI --ref issue-<编号>`；之后用 `gh run list --workflow CI --branch <分支> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果。
 - main 上的结果：`gh run list --workflow CI --branch main --event push --limit 10`；某次运行的失败项：`gh run view <运行编号> --log-failed | grep FAILED`。
 - 查看 PR 的结果：`gh pr checks <PR>`；重新运行失败的作业：`gh run rerun <运行编号> --failed`。
