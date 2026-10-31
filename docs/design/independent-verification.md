@@ -1,6 +1,6 @@
 # 验证的独立性设计说明
 
-总图位置：第一节「独立的证据」方框；第四节「装配」的缝里作者与验证者的可见范围。依据：[D38 系统意图与基础规则](../requirements/system-intent.md)（N-I1 至 N-I7、N-K1、N-K2、N-V7）、[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)、[语义系统设计说明](semantic-system.md)、[浏览器与 computer use 设计说明](browser-and-computer-use.md)、[网络取回与 MCP 设计说明](network-and-mcp.md)。
+总图位置：第一节「独立的证据」方框；第四节「装配」的缝里作者与验证者的可见范围。依据：[D38 系统意图与基础规则](../requirements/system-intent.md)（N-I1 至 N-I7、N-K1、N-K2、N-V7）、[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)、[D35 自举](../requirements/self-hosting.md)、[语义系统设计说明](semantic-system.md)、[浏览器与 computer use 设计说明](browser-and-computer-use.md)、[网络取回与 MCP 设计说明](network-and-mcp.md)。
 
 文中的质检、工程是默认三部门里的核验角色与被核验方；第 2 至 8 节对任何核验角色和它核验的角色成立（[形态与核验角色设计说明](forms-and-verifier-role.md)「核验角色」）。
 
@@ -86,6 +86,7 @@ sequenceDiagram
 
 - 比例的对象：工程已经有主机回执、并且树摘要相同的检查，质检按比例重新运行；其余直接引用工程的主机回执。
 - 质检从验收条件导出的检查与试用用例不在这个比例之内，始终运行。
+- 质检的独立性来自核验什么由质检决定（本说明「检验覆盖与开环」），不取决于重新运行的比例。
 - 在另一台机器上运行同一检查算作新的独立证据，不计为重复。
 - 连续一致达到次数以后比例减半，不低于下界；出现清单里的任一事件，比例回到 1.0。调节写成事件。
 - 现有的三个固定密度用同样的办法登记为参数：每次对外提交必有一次审查成为 `review.ratio`，下界大于 0；校准抽样固定 10% 成为 `calibration.sample_ratio`；质检只认自己本次激活的回执就是 `verification.recheck_ratio` 等于 1.0。

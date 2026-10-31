@@ -21,6 +21,7 @@
 ## 设计决定
 
 - 已有项目的代码经 `project.onboard` 接入并建档，`work_item.create` 没有代码快照来源（新建项目可以带起始文件夹，不建档，见 [D37](project-initial-files.md)）；评测场景 2 的 Yudao 一侧先建档，运行器回答确认，建档的用量与耗时在报告中单独列出。
+- 建档目前只在本机进行。
 - 建档以后源目录的修改不同步进项目；要在新代码上工作，接入为新项目。采纳写回按 [ADR-0034](../adr/0034-adopted-change-writeback-three-tree-merge.md) 合并事项起点、采纳成果与写回时目标分支三份代码树，保留期间的独立修改，冲突停止，核验最终树后生成分支与合并请求。
 - 检查时限 `check_timeout_sec` 的暂定默认值是 600 秒，是项目级参数，按项目记录的检查用时设定，见规则登记。
 - 验收用的真实项目：openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码，建档以后的事项实现 issue 842。

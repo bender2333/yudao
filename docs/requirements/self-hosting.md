@@ -1,6 +1,6 @@
 # D35 自举：用 Yudao 开发 Yudao
 
-状态：有效。依据：[总图](../architecture.html)第五节自举与验收（两层自举）；设计：[可信内核设计说明](../design/trusted-kernel.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)第 6.5 节、[规则登记与参数设计说明](../design/rules-and-parameters.md)；调研：[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)；相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)。路线位置：[总体路线图](../program-roadmap.md)第 2 节。第一层的试点是阶段二薄片 ⑤「Yudao 做自己的工单」，在薄片 ①「真实项目接着做」与薄片 ④「改一处、看得见、能撤回」之后、五项前置条件完成以后开始；第一层成为常态在阶段三；第二层是阶段五；圈复杂度与变异测试的研发工具在阶段三。
+状态：有效。依据：[总图](../architecture.html)第五节自举与验收（两层自举）；设计：[可信内核设计说明](../design/trusted-kernel.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)第 6.5 节、[规则登记与参数设计说明](../design/rules-and-parameters.md)、[循环与收敛设计说明](../design/loops-and-convergence.md)、[部门内多角色设计说明](../design/department-roles.md)、[验证的独立性设计说明](../design/independent-verification.md)；调研：[圈复杂度与变异测试调研](../research/complexity-and-mutation-testing.md)；相关记录：[D26](department-roles.md)、[D27](operations-department.md)、[D16](git-change-management.md)、[D31](outsourced-agent-roles.md)、[D33](existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)。路线位置：[总体路线图](../program-roadmap.md)第 2 节。第一层的试点是阶段二薄片 ⑤「Yudao 做自己的工单」，在薄片 ①「真实项目接着做」与薄片 ④「改一处、看得见、能撤回」之后、五项前置条件完成以后开始；第一层成为常态在阶段三；第二层是阶段五；圈复杂度与变异测试的研发工具在阶段三。
 
 ## 已确认
 
@@ -14,20 +14,6 @@
 8. 质检依据回执的比例由验证密度参数决定，阶段一、二保持现值 1.0，调节规则在阶段四。
 9. 跨平台：圈复杂度与变异测试做成稳定的跨平台工具库，现在与以后都要能在 Windows 上运行。阶段二结束之前的手动检查在控制主机的 Windows 上进行，工具与步骤见[调研记录](../research/complexity-and-mutation-testing.md)第 2 节；研发工具在阶段三建立，排在成果由 Yudao 直接采纳之前：那以后审查流程不再检查 Yudao 的成果，工程部门用它检查自己的交付。
 
-## 设计方向（未经用户逐项确认）
-
-### 自举的做法
-
-参照编译器的做法（rustc 用按 SHA256 固定的上一个版本编译当前源码）：一个固定版本的 Yudao 实例承载「Yudao」这个项目，部门修改的是项目仓库里下一个版本的代码，实例本身不变；把实例升级到新采纳的版本是一次部署，由用户决定，出现问题时回滚到上一个版本；项目流跨版本保存（[ADR-0019](../adr/0019-project-stream-across-versions.md)），升级实例不会丢掉这个项目。
-
-### 多个写入者的采纳（待设计）
-
-同一项目有多个写入者以后，采纳一步改为合并队列的做法（GitHub 合并队列、bors、Zuul、GitLab merge train 都是先检查再合入）：对合并后的结果运行质检的大验证，通过才采纳；基线在这期间发生变化，就在新基线上重新合并、重新验证。现在的 `adoption_held`（基线发生变化就不采纳）是只有一个写入者时的特例；先合并、再批量运行、失败后二分定位的做法不再需要。
-
-### 检查定义与交出检查
-
-工序对应 CONTEXT.md 已有的「交出检查」（D26 设计说明第 12.6 节）。必做的检查由项目的检查定义规定（命令、运行环境、运行时机、输出格式与发现项、对流转的作用、谁可以修改），工程可以另外增加；交出检查不依赖部门内多角色，在单角色的部门里就是提交交付与提交质检结论时的提案校验。检查的策略（阈值、排除规则）记录在定义中，不从被检查的代码中读取。质检以工程工序的主机回执为依据的比例由验证密度参数决定：阶段一、二保持现值 1.0（质检亲自运行检查），在同一树摘要上连续一致以后降低，出现不一致时回到全量，调节规则在阶段四；质检另按 PRD 做自己的验收检查；质检的独立性来自由谁决定核验什么。它与接入已有项目设计中记入项目流的基线检查回执（[D33](existing-project-onboarding.md)）是同一个概念。
-
 ## 前提与路线位置
 
 | 前提 | 现在的位置 |
@@ -35,7 +21,7 @@
 | 交出检查与项目的检查定义 | 检查接受任意命令字符串（[ADR-0038](../adr/0038-function-first-commands-without-registration.md)），项目级的检查时限在阶段二；交出检查属于 D26，在阶段四 |
 | 执行环境服务（远程执行代理） | 阶段四（拆开部署） |
 | 接入已有项目（Yudao 仓库本身） | 阶段二「真实项目接着做」 |
-| 外包开发者（omp、Claude Code 经 ACP 接入） | D31，在阶段四：主程的执行者种类增加外包，经 ACP 接入 |
+| 外包角色 | [D31](outsourced-agent-roles.md)，在阶段四：角色定义中的执行者种类增加外包 |
 | 采纳的版本写回代码仓库；跨任务分支合并 | 采纳写回属于阶段二「真实项目接着做」；跨任务分支合并随多个写入者的放开条件 |
 | 同一项目多个写入者，以及采纳前对合并结果的验证 | 路线图没有落点，需要时以新的形式列回 |
 | 第二层：候选采纳前的独立评价 | 阶段五：在系统外、被测方没见过的评测集上与基线隔离对照，通过并经用户批准才限定采用 |
