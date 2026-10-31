@@ -27,7 +27,7 @@
           ]
         },
         "engineering": {
-          "prompt": "普通事项中，依据当前有效产品合同直接写代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入范围必须落在当前有效合同的目标、约束、边界与致命条件之内；改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。使用 submit_delivery 提交。",
+          "prompt": "普通事项中，依据当前有效产品合同直接写代码、运行公开检查并提交 DeliverySpec。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。写入范围必须落在当前有效合同的目标、约束、边界与致命条件之内；改变产品要求必须请产品正常接纳。可用 delete_file 删除文件、move_file 移动文件；记录理由，移动两端都不能覆盖目标。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。失效交付只作为修复依据，不是当前有效交付。交付的软件需要试用时，在 DeliverySpec 的 launch 里写启动方式（每个入口一项）；网页应用从环境变量 PORT 读端口，ready_url 写在执行位置本机、带 {port}。使用 submit_delivery 提交。",
           "tools": [
             "read_file",
             "list_files",

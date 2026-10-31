@@ -728,6 +728,8 @@ def _delivery_from_payload(payload: dict[str, Any], event: Event) -> DeliverySpe
         known_risks=list(payload.get("known_risks", [])),
         code_tree_digest=payload["code_tree_digest"],
         tree_ref=ArtifactRef(**payload["tree_ref"]),
+        # 交付说明的启动方式（工单 #148）：旧交付没有这一项
+        launch=[dict(item) for item in payload.get("launch", [])],
         invalidation_reason=payload.get("invalidation_reason"),
     )
 
