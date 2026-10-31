@@ -1632,7 +1632,7 @@ class Orchestrator:
                 facts=env.query(FactsQuery(tree=True)).tree,
                 tightening=self._tightening,
                 events=transaction.events(),
-                definitions=self._definitions,
+                definitions=self.item_definitions(scope.run_id),
             )
             if not decision.accepted:
                 raise RuntimeError(f"invalid prd revision: {decision.errors}")
@@ -1752,7 +1752,7 @@ class Orchestrator:
             nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
             deltas=self.deltas, tightening=self._tightening,
             refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
-            definitions=self._definitions,
+            definitions=self.item_definitions(branch_activation.scope.run_id),
         )
         started = time.monotonic()
         try:
@@ -1823,7 +1823,7 @@ class Orchestrator:
             view = AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection)
             decision = proposal_decision(view, department=department, proposal=proposal, facts=facts,
                                          tightening=self._tightening, events=evaluated.events(),
-                                         definitions=self._definitions)
+                                         definitions=self.item_definitions(run_id))
             try:
                 self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
                     transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
@@ -1863,7 +1863,7 @@ class Orchestrator:
             evaluated=AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection), facts=facts,
             current=AdjudicationView(minimal=transaction.minimal(), state=current), current_facts=snapshot.facts,
             events=transaction.events(), tightening=self._tightening,
-            definitions=self._definitions,
+            definitions=self.item_definitions(run_id),
         )
         if proposal is not None:
             transaction.append(NewEvent(
