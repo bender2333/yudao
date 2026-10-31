@@ -2,7 +2,7 @@
 
 总图位置：第四节「投影」的缝（图谱是应用投影）与「装配」的缝；第一节「观察者」方框（教训发现）。依据：需求 [D25 语义系统](../requirements/semantic-system.md)；调研 [Semantica 参照调研](../archive/research/semantica-reference.md)、[上下文组装：参照调研](../archive/research/context-assembly-reference.md)、[JEV 决策模型](../research/jev-decision-model.md)、[惊讶与预测误差](../archive/research/surprise-and-prediction-error.md)、[语义系统与部门内多角色：参照调研](../archive/research/semantic-system-and-department-roles.md)；ADR [0019](../adr/0019-project-stream-across-versions.md)；相关设计 [总体架构：职责分层](architecture/overall-architecture.md)、[模型管理设计说明](model-management.md)「上下文容量与压缩」、[部门内多角色设计说明](department-roles.md)。
 
-用语：交接已改为部门按关注的成果开始工作（见[三部门的循环结构](department-loop.md)「部门按关注的成果开始工作」），轨迹的「交接」一层改称「一轮工作」。本文第 4 节等处的层名（知识层、控制核心的 P 与 U、观察层、执行层）是技术对照里的说法，总图不用它们，对应见[总体架构](architecture/overall-architecture.md)「副图：职责分层」的对照表：知识层是投影缝里「应用的投影」，P 是装配槽位的实现，U 是内核里的裁决，观察层是判定点（定义里的规矩，不是一层），教训发现模块是系统之外的观察者，经接口读、经写入口写。
+用语：部门按关注的成果开始工作（见[三部门的循环结构](department-loop.md)「部门按关注的成果开始工作」），轨迹里对应的一层是「一轮工作」。本文第 4 节等处的层名（知识层、控制核心的 P 与 U、观察层、执行层）是技术对照里的说法，总图不用它们，对应见[总体架构](architecture/overall-architecture.md)「副图：职责分层」的对照表：知识层是投影缝里「应用的投影」，P 是装配槽位的实现，U 是内核里的裁决，观察层是判定点（定义里的规矩，不是一层），教训发现模块是系统之外的观察者，经接口读、经写入口写。
 
 ## 1. 要解决的问题
 
@@ -15,7 +15,7 @@ Agent 最重要的是上下文管理。一个长任务运行很久以后，只�
 
 语义系统还承担第二项职责：为系统演化（Stage 6）提供过程记录（轨迹与决定）与语义工程（项目术语、教训、洞见）。
 
-现行实现的具体问题（调研第 1 节）：
+调研中看到的具体问题（调研第 1 节）：
 
 - 25 个部分全部由主机推送，拼成一条消息，各部分都不设上限；动态内容与固定规则交错排列，跨激活时提示缓存几乎不命中。
 - 部门没有读取材料、查询事件或历史的工具。
