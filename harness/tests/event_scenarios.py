@@ -212,10 +212,6 @@ def invalid_tool_arguments(data_dir):
     return system, run_id, {}
 
 
-    system.run_until_stop(run_id)
-    return system, run_id, {}
-
-
 def ask_answer_with_spec_revision(data_dir):
     # 单步驱动（工单 #1061）：质检关注的成果里「PRD 被接纳」也算新的工作，产品在分支里修订 PRD 就是
     # PRD 的一个新版本，因此它会让质检在工程交付之前就开始一轮。同时运行时这一轮落在交付之前还是之后
@@ -239,8 +235,8 @@ def ask_answer_with_spec_revision(data_dir):
     })
     system.activate_once(run_id)  # 产品提交 PRD
     system.activate_once(run_id)  # 工程询问产品，收到修订后的 PRD 与新合同，接着交付
-    system.activate_once(run_id)  # 质检交独立判断（工单 #358）
-    system.activate_once(run_id)  # 质检核验并放行
+    system.activate_once(run_id)  # 质检交独立判断（工单 #358：判断一轮）
+    system.activate_once(run_id)  # 质检核验并放行（判断一轮结束以后再核验一轮）
     assert system.project(run_id).status == "done"
     return system, run_id, {}
 
