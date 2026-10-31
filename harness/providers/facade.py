@@ -1998,6 +1998,35 @@ def _required_tool_parameter_rejected(error: ProviderError) -> bool:
         "not support", "不支持", "不支持参数", "无效参数"))
 
 
+def _non_empty_tool_arguments(raw: Any) -> str | None:
+    # 无参数的工具调用在 JSON 上有三种合法写法：arguments 为 {}、为 null、或省略（工单 #1332）。
+    # 网关与代理接入的模型常写成后两种；把序列化风格当成能力差异会挡住整个准入。
+    # 参数确实是空的时候返回 None；不是空的时候返回收到的原文，供拒绝原因写明这家模型是怎么写的
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        candidate = raw.strip()
+        if candidate == "":
+            return None
+        try:
+            value = json.loads(candidate)
+        except (TypeError, ValueError):
+            return _quoted_arguments(raw)
+        if value is None or value == {}:
+            return None
+        return _quoted_arguments(raw)
+    if isinstance(raw, dict):
+        return None if not raw else _quoted_arguments(raw)
+    return _quoted_arguments(raw)
+
+
+def _quoted_arguments(raw: Any) -> str:
+    # 收到的原文：字符串照抄，其它形状按 JSON 写出来；空白压成一行，超过 120 字截断
+    text = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
+    collapsed = " ".join(str(text).split())
+    return collapsed if len(collapsed) <= 120 else collapsed[:120] + "…"
+
+
 def _model_test_tool_outputs(result: InvokeResult) -> list[dict[str, Any]]:
     calls = [item for item in result.output if item.get("type") == "function_call"]
     if not calls:
@@ -2007,12 +2036,9 @@ def _model_test_tool_outputs(result: InvokeResult) -> list[dict[str, Any]]:
         if call.get("name") != "yudao_model_test" or not call.get("call_id") \
                 or call.get("status", "completed") != "completed":
             raise ProviderError("测试工具的调用不完整或工具名称不符", reason="provider_protocol")
-        try:
-            arguments = json.loads(call.get("arguments", ""))
-        except (TypeError, ValueError) as exc:
-            raise ProviderError("测试工具的参数不是完整的 JSON 对象", reason="provider_protocol") from exc
-        if arguments != {}:
-            raise ProviderError("测试工具只接受空参数对象", reason="provider_protocol")
+        received = _non_empty_tool_arguments(call.get("arguments"))
+        if received is not None:
+            raise ProviderError(f"测试工具只接受无参数的调用，收到的是 {received}", reason="provider_protocol")
         outputs.append({"type": "function_call_output", "call_id": call["call_id"], "output": "pong"})
     return outputs
 
