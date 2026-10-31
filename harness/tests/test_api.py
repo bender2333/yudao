@@ -310,6 +310,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "waiting", "queries": ["project.loop", "decisions.list"]},
         {"name": "recovery", "queries": ["run.recovery"]},
         {"name": "sources", "queries": ["project.loop"]},
+        # 循环与收敛（工单 #400）：依赖 run.loops（#397 已登记）
+        {"name": "loops", "queries": ["run.loops"]},
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)

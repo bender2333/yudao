@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, RunAsksResult,
+  RunLoopsResult,
 } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { newCommandId } from "../../contract/command-id.ts";
@@ -27,7 +28,7 @@ import { itemColor } from "../../pixel/world/floor";
 import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
 import { OVERLAY_LABELS } from "../../translate/coverage";
-import { floorActions, floorCards, floorInterrupted, floorState, recoveryOverlay, sourceCard, sourceOverlay, streamText,
+import { floorActions, floorCards, floorInterrupted, floorState, loopsOverlay, recoveryOverlay, sourceCard, sourceOverlay, streamText,
          toFloorEvent, type FloorEvent } from "../../translate/floor";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
@@ -170,6 +171,10 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   // 回放不查：这个查询不带位置，把最新的询问画到过去的画面上会讲反（画面诚实性 H7）
   const runId = useMemo(() => asksRunId(loop.data, props.workItemId), [loop.data, props.workItemId]);
   const asks = useSnapshot<RunAsksResult>(props.app, "page.loop.asks", "run.asks", { run_id: runId },
+    replaying || runId === "");
+  // 循环状态（工单 #400）：覆盖层「循环」的数据来源；覆盖层在回放时不画（画面与播放设计说明第 8 节），
+  // 没有运行时也不查
+  const loopsQuery = useSnapshot<RunLoopsResult>(props.app, "page.loop.loops", "run.loops", { run_id: runId },
     replaying || runId === "");
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<FloorView | null>(null);
@@ -360,8 +365,8 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   });
   const flowSegments = useMemo(() => flowSegmentsOf(flow.data?.records ?? null), [flow.data]);
   useEffect(() => {
-    viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments));
-  }, [overlay, loop.data, decisions.data, flowSegments]);
+    viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments, loopsQuery.data));
+  }, [overlay, loop.data, decisions.data, flowSegments, loopsQuery.data]);
 
   const overlays = (capabilities?.overlays ?? []).map((o) => o.name).filter((name) => OVERLAY_LABELS[name] !== undefined);
   // 文字列表里的决定请求：与画面同源的查询结果，按发出时间排列
@@ -407,6 +412,7 @@ function overlayData(
   loop: ProjectLoopResult | null,
   decisions: DecisionList | null,
   flowSegments: FlowSegment[],
+  loops: RunLoopsResult | null,
 ): Record<string, unknown> | null {
   if (name === "waiting") {
     const entries = (loop?.work_items ?? [])
@@ -427,6 +433,8 @@ function overlayData(
   if (name === "recovery") return recoveryOverlay(loop);
   // 「来源」覆盖层的数据同样在翻译层写好（工单 #398）：五种来源的事实元素、缺来源的元素与图例计数
   if (name === "sources") return sourceOverlay(loop) as unknown as Record<string, unknown>;
+  // 「循环」覆盖层的数据同样在翻译层写好（工单 #400）：信息条写 run 层，房间写激活层与步骤循环，图例写状态
+  if (name === "loops") return loopsOverlay(loops) as unknown as Record<string, unknown>;
   return null;
 }
 
