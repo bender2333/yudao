@@ -30,6 +30,7 @@ from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFact
 from .artifacts import ArtifactStore, ExternalSource
 from .event_store import run_stream
 from .fetch import EXTERNAL_CONTENT_NOTICE, FetchCancelled, FetchRefused, fetch_url
+from .mcp_session import MCP_DISPATCH_TOOL, McpOutcome, McpRefused, UnknownToolAlias
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
@@ -481,16 +482,22 @@ _HANDLERS = {
     "read_output": "_read_output",
     "stop_job": "_stop_job",
 }
-_PROCESSES = {"run_check": "_run_check", "bash": "_bash", "fetch_url": "_fetch"}
+_PROCESSES = {"run_check": "_run_check", "bash": "_bash", "fetch_url": "_fetch", "mcp": "_mcp"}
+
+# MCP 调用的参数里执行环境自己写的键（现在没有）：保留这个清单供以后扩展，模型给出的其余键原样交回服务器
+_MCP_PRIVATE_ARGUMENTS = frozenset({})
 
 # 动作类别与属于它的工具：执行环境按类别分派，再从上面两种执行方式里按实际工具名取执行方法。
-# 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明第 18 节）
+# 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明第 18 节）。
+# MCP 类别的工具名是各事项自己的动态别名，静态清单列不出它们：类别进入唯一的处理方法（_PROCESSES["mcp"]），
+# 由会话表核对别名并还原原名
 _KIND_TOOLS = {
     "read": frozenset({"read_file", "list_files", "search", "read_range", "read_external_source"}),
     "fetch": frozenset({"fetch_url"}),
     "write": frozenset({"write_file", "edit_range", "delete_file", "move_file"}),
     "check": frozenset({"run_check"}),
     "command": frozenset({"bash", "read_output", "stop_job"}),
+    "mcp": frozenset(),
 }
 
 # 定义中的环境工具，只要出现在某个部门或事项种类的工具清单里（模型可能被提供它），就要在它动作类别的
@@ -718,6 +725,7 @@ class LocalEnvironment:
         artifacts: ArtifactStore | None = None,
         run_id: str | None = None,
         parameters: Mapping[str, Any] | None = None,
+        mcp_sessions: Any | None = None,
     ) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
@@ -728,6 +736,10 @@ class LocalEnvironment:
         self._run_id = run_id
         # 这个 run 冻结的参数取值（工单 #1189）；直接构造环境（测试、没有冻结字典的旧 run）时为空
         self._parameters = dict(parameters or {})
+        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：
+        # 每个 run 每台服务器一个实例，第一次 MCP 调用时启动，run 结束时由持有它的一方关闭；
+        # 没有 MCP 设置的 run（大多数 run 与旧事项）为空，环境工具的分派不受影响
+        self.mcp_sessions = mcp_sessions
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -757,13 +769,14 @@ class LocalEnvironment:
         artifacts: ArtifactStore | None = None,
         run_id: str | None = None,
         parameters: Mapping[str, Any] | None = None,
+        mcp_sessions: Any | None = None,
     ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
             materialize_tree(tree, root)
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
-                   artifacts=artifacts, run_id=run_id, parameters=parameters)
+                   artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions)
 
     @classmethod
     def open(
@@ -776,10 +789,11 @@ class LocalEnvironment:
         artifacts: ArtifactStore | None = None,
         run_id: str | None = None,
         parameters: Mapping[str, Any] | None = None,
+        mcp_sessions: Any | None = None,
     ) -> LocalEnvironment:
         # 打开已经建立的工作区
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
-                   artifacts=artifacts, run_id=run_id, parameters=parameters)
+                   artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions)
 
     def _limit(self, name: str, default: Any) -> Any:
         # 这个 run 冻结的参数取值；没有冻结字典时用定义文件里的初始值（工单 #1189）
@@ -821,14 +835,23 @@ class LocalEnvironment:
     async def perform(self, action: Action) -> ActionReceipt:
         # 按动作类别分派（总图第四节「动作」缝）：同一类里按实际工具名取执行方法；新的动作类别不在本机执行
         # 环境的处理分支里，立刻失败。工具的执行出错时回执为 failed，错误说明交回模型；工作区出现公开树无法
-        # 表示的条目时（UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行
+        # 表示的条目时（UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行。
+        # MCP 动作的动态别名不在静态清单里：分派按类别交给唯一的处理方法，别名与原名由会话表核对
         tools = _KIND_TOOLS.get(action.kind)
         if tools is None:
             raise ValueError(f"the local environment does not execute {action.kind} actions")
-        if action.tool not in tools:
+        if action.kind != "mcp" and action.tool not in tools:
             raise ValueError(f"{action.tool} is not a {action.kind} action")
         process = self._processes.get(action.tool)
-        handler = None if process is not None else self._handlers[action.tool]
+        if process is None and action.kind == "mcp":
+            # MCP 动作的执行方法按分派键取（_PROCESSES 里的 "mcp"），别名的核对在处理方法里
+            process = self._processes.get(MCP_DISPATCH_TOOL)
+        if process is None:
+            handler = self._handlers.get(action.tool)
+            if handler is None:
+                raise ValueError(f"{action.tool} is not a {action.kind} action")
+        else:
+            handler = None
         if action.department != "quality" and action.tool in self._handlers:
             for key in ("path", "source", "destination", "prefix"):
                 val = action.input.get(key)
@@ -856,6 +879,10 @@ class LocalEnvironment:
             raise
         except FetchRefused as exc:
             # 地址指向服务自己：动作被拒绝，回执标 refused 并带原因，作为工具结果交回（工单 #1170）
+            return ActionReceipt.refusal(action.action_id, str(exc))
+        except McpRefused as exc:
+            # 工具许可与名称表（网络与 MCP 设计说明第 5.2 节）：别名不在这个事项的名称表里等拒绝情形，
+            # 回执标 refused 并带原因，作为工具结果交回（工单 #1170 的回执字段）
             return ActionReceipt.refusal(action.action_id, str(exc))
         except Exception as exc:
             return ActionReceipt(action_id=action.action_id, status="failed", error=str(exc))
@@ -1085,6 +1112,42 @@ class LocalEnvironment:
             "duration_ms": receipt.duration_ms,
             "external_content": True,
             "notice": EXTERNAL_CONTENT_NOTICE,
+            **page,
+        }, "completed"
+
+    async def _mcp(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 调用项目设置中 MCP 服务器的工具（网络与 MCP 设计说明第 5.2、7.2、7.3 节，工单 #1175）。
+        # 执行环境只认识这一个处理键（分派按动作类别进入，再按工具名取处理方法）；
+        # 别名与原名由会话表还原：别名不在这个事项的名称表里时拒绝，原因作为工具结果交回。
+        # 结果保存为这个 run 的外部来源工件（第 7.3 节，接 #1171 的工件路径），第一页按
+        # read_external_source 的同一套分页交回；工具失败（is_error）交回错误文本，动作记为已完成
+        alias = action.tool
+        if self.mcp_sessions is None:
+            raise McpRefused("这个 run 没有 MCP 会话表（没有冻结的 MCP 设置）")
+        try:
+            server, tool = self.mcp_sessions.original(alias)
+        except UnknownToolAlias as unknown:
+            raise McpRefused(str(unknown)) from unknown
+        # 模型给出的参数就是工具的参数（事项定义里的参数结构按快照原样交给模型）
+        arguments = {key: value for key, value in action.input.items() if key not in _MCP_PRIVATE_ARGUMENTS}
+        outcome: McpOutcome = await self.mcp_sessions.call(alias, server, tool, arguments, stop=stop)
+        if self._artifacts is None or self._run_id is None:
+            raise RuntimeError("mcp results require an environment with an artifact store")
+        source = f"mcp:{server}:{tool}"
+        ref = self._artifacts.put_external_source(
+            self._run_id, outcome.result_text, source=source, content_type="text/plain")
+        page = self._read_external_source({"source": ref.content_hash, "start_line": 1})
+        return {
+            "server": server,
+            "tool": tool,
+            "alias": alias,
+            "transport": outcome.transport,
+            "is_error": outcome.is_error,
+            "error_code": outcome.error_code,
+            "duration_ms": outcome.elapsed_ms,
+            "external_content": True,
+            "notice": EXTERNAL_CONTENT_NOTICE,
+            "ref": asdict(ref),
             **page,
         }, "completed"
 

@@ -151,11 +151,19 @@ def test_a_new_instance_over_the_same_workspace_reads_the_written_file(implement
 
 
 def test_an_action_the_implementation_does_not_execute_fails(implementation):
-    _name, _root, environment = implementation
-    # 新的动作类别由各自的处理分支提供：取回（fetch）已由工单 #68 接上，MCP 调用还没有处理分支
-    with pytest.raises(ValueError, match="does not execute mcp"):
-        _perform(environment, _action("mcp__time__now", "mcp", {"tool": "now"},
-                                      verification="none", cancellable=True))
+    name, _root, environment = implementation
+    # 第二种实现没有 MCP 的处理分支：类别不在它的分派里立刻失败；
+    # 本机执行环境的 MCP 分支由工单 #1175 接上，没有会话表（没有冻结的 MCP 设置）时动作被拒绝，
+    # 回执带被拒绝标记与原因（网络与 MCP 设计说明第 5.2 节）
+    if name == "second":
+        with pytest.raises(ValueError, match="does not execute mcp"):
+            _perform(environment, _action("mcp__time__now", "mcp", {"tool": "now"},
+                                          verification="none", cancellable=True))
+    else:
+        receipt = _perform(environment, _action("mcp__time__now", "mcp", {"tool": "now"},
+                                                verification="none", cancellable=True))
+        assert receipt.refused is True and receipt.status == "failed"
+        assert "MCP 会话表" in (receipt.refused_reason or "")
     # 工具不在它声明的动作类别里：按类别分派时立刻失败，不换一个动作执行
     with pytest.raises(ValueError, match="is not a read action"):
         _perform(environment, _action("write_file", "read", {"path": "a.txt", "content": "x"}))

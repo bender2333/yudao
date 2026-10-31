@@ -272,6 +272,10 @@ class Orchestrator:
         self._definitions = in_force(definitions)
         # 事项定义副本（工单 #1175）：按 run_created 里冻结的 MCP 设置叠加一次，按 run 记住
         self._item_definitions: dict[str, Any] = {}
+        # MCP 会话表（工单 #1175）：按 run 记住，run 结束时在会话收尾里关闭
+        self._mcp_sessions: dict[str, mcp_session.McpSessions] = {}
+        # 数据目录：MCP 服务器标准错误输出的日志文件放在它的 mcp-logs 下（与探测同一处，设计说明第 7.2 节）
+        self.data_dir = self.workspace_root.parent
         # 路由实现（成果驱动）：谁在等、谁能开工、一轮以什么结束、事项以什么结束由它判断（工单 #825）；
         # 薄驱动只按契约的三个问题调用它，组装时核对它声明的契约版本
         self._routing = routing
@@ -874,6 +878,8 @@ class Orchestrator:
 
     def _on_close_run(self, run_id: str) -> None:
         # 会话结束（事务提交以后）执行的副作用：关闭会话并清理检查工作区。
+        # MCP 会话的关闭在运行的执行循环收尾（run_until_stop 的收尾段，工单 #1175），
+        # 不在这里做：这个钩子可能在写入口的工作线程里运行，跨事件循环等待 SDK 的会话关闭会挂起。
         # 清理错误（如 Windows 句柄长期占用）记录在 self._close_errors 供后续处理
         errors = self.sessions.close_run(run_id)
         if errors:
@@ -976,6 +982,10 @@ class Orchestrator:
         finally:
             self._run_wakeups.pop(run_id, None)
             await self._stop_sessions(run_id, tasks)
+            # 这个 run 的 MCP 会话随运行一起关闭（网络与 MCP 设计说明第 7.2 节，工单 #1175）：
+            # 到达终态、被决定请求阻塞、中止或没有新工作，运行都从这一条退出；会话表清空，
+            # 继续同一个 run 时按同一台服务器重新建立。持久化生命周期事件归 #1176
+            await self._close_mcp_sessions(run_id)
             await connections.aclose()
 
     def _ready_departments(self, run_id: str) -> list[str]:
@@ -1088,11 +1098,15 @@ class Orchestrator:
             })
 
     async def activate_once(self, run_id: str) -> RunProjection:
-        # 开始一个部门的一轮工作（单步入口）：按关注的成果取下一个可以工作的部门
+        # 开始一个部门的一轮工作（单步入口）：按关注的成果取下一个可以工作的部门。
+        # 这条入口自成一个事件循环（LoopSystem.activate_once 用 asyncio.run 运行它），激活结束时
+        # 这个循环退出：这个 run 的 MCP 会话随收尾关闭（网络与 MCP 设计说明第 7.2 节「run 结束、
+        # 暂停或停止时关闭」，工单 #1175），下一次激活按同一台服务器重新建立
         connections = ProviderConnections()
         try:
             return await self._activate_once(run_id, connections)
         finally:
+            await self._close_mcp_sessions(run_id)
             await connections.aclose()
 
     def item_definitions(self, run_id: str):
@@ -1109,6 +1123,52 @@ class Orchestrator:
         definitions = mcp_session.item_definitions(self._definitions, document)
         self._item_definitions[run_id] = definitions
         return definitions
+
+    def mcp_sessions(self, run_id: str) -> mcp_session.McpSessions:
+        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：每台服务器一个会话实例，
+        # 第一次 MCP 调用时启动，run 结束、暂停或停止时关闭（`_on_close_run`）。会话表按 run 记住；
+        # 没有冻结的 MCP 设置的 run 也有这张表（空表，调用在名称表核对时拒绝）
+        table = self._mcp_sessions.get(run_id)
+        if table is None:
+            table = mcp_session.McpSessions(
+                self._mcp_document(run_id), credentials=self.facade.credential_chain(),
+                stderr_dir=self.data_dir)
+            self._mcp_sessions[run_id] = table
+        return table
+
+    def _mcp_document(self, run_id: str) -> dict | None:
+        # run_created 里冻结的 MCP 设置：与定义副本读同一份（没有时为空，按空设置读取）
+        for event in self.store.list_events(run_id):
+            if event.type == EventType.RUN_CREATED:
+                return (event.payload or {}).get("mcp_servers")
+        return None
+
+    async def _close_mcp_sessions(self, run_id: str) -> None:
+        # run 结束（或暂停、停止）以后关闭它的全部 MCP 会话：stdio 先关标准输入，SDK 等待以后结束
+        # 整个进程树；HTTP 关闭会话。表随关闭清空，重启或继续同一个 run 时按同一台服务器重新建立；
+        # 关闭失败不阻塞 run 的收尾，原因记下来供运维查看（与检查工作区的清理错误同一做法）
+        table = self._mcp_sessions.pop(run_id, None)
+        if table is None:
+            return
+        try:
+            await table.close()
+        except Exception as exc:
+            self._close_errors.setdefault(run_id, []).append(exc)
+
+    def mcp_sessions_open(self) -> tuple[str, ...]:
+        # 还有会话表在的 run：服务关闭时逐个收掉（runtime.close）
+        return tuple(self._mcp_sessions)
+
+    def close_mcp_sessions_sync(self, run_id: str) -> None:
+        # 在没有运行中的事件循环时关闭一个 run 的 MCP 会话（服务关闭、测试收尾）：
+        # 直接跑完关闭，错误记下来
+        table = self._mcp_sessions.pop(run_id, None)
+        if table is None:
+            return
+        try:
+            asyncio.run(table.close())
+        except Exception as exc:
+            self._close_errors.setdefault(run_id, []).append(exc)
 
     async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
         projection = self.project(run_id)
@@ -1447,6 +1507,7 @@ class Orchestrator:
                 deltas=self.deltas, tightening=self._tightening,
                 refresh_workspace=self._workspaces.refresh_for(self._round_workspace(activation)),
                 definitions=self.item_definitions(activation.scope.run_id),
+                mcp_sessions=self.mcp_sessions(activation.scope.run_id),
             )
             result = await activation.driver.result()
         except UnrepresentableWorkspace as exc:
