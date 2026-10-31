@@ -25,7 +25,7 @@
 | 写入口 | 一切写入方 ↔ 内核 | 执行权、流版本、同一事务里的裁决 | [可信内核](../trusted-kernel.md) |
 | 路由 | 薄驱动 ↔ 路由实现 | 谁开工、一轮怎么结束、事项怎么结束 | [骨架与应用](../skeleton-and-application.md)「路由契约」 |
 | 装配 | 执行实现 ↔ 装配实现 | 四个操作：取部门历史、固定一步的材料与工具、接上历史得到请求与上下文清单、由压缩的回答生成检查点；视图是事件日志与规则的纯函数 | [骨架与应用](../skeleton-and-application.md)「装配契约」；减法规则见[上下文装配](../context-assembly.md) |
-| 执行 | 薄驱动 ↔ 执行实现 | 步骤驱动与安全节点 | [骨架与应用](../skeleton-and-application.md)「执行契约」 |
+| 执行 | 薄驱动 ↔ 执行实现 | 步骤驱动与安全节点 | [骨架与应用](../skeleton-and-application.md)「执行契约」；外包派发见[外包角色](../outsourced-roles.md) |
 | 模型 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | [模型管理](../model-management.md)（含「统一调用、取消与观测」） |
 | 动作 | 执行实现 ↔ 工具 ↔ 执行环境 | 每类动作的契约与回执；远程经 HTTP | [执行环境服务](../execution-environment.md)、[本地通用工具](../local-tools.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器](../browser-and-computer-use.md) |
 | 投影 | 一份事实 → 读的人 | 骨架自己折叠的最小投影（裁决读）、应用层的投影（应用层读取模型读） | [骨架与应用设计说明](../skeleton-and-application.md)、[应用层与接口层设计说明](../app-and-interface.md)、[语义系统设计说明](../semantic-system.md)（知识层） |
@@ -36,11 +36,11 @@
 | 画面 | 接口 ↔ 画面 | 只经接口读带位置的查询快照与事件流，操作只发现有的命令；不要专用查询，互不导入。画面里面的缝（画面合同：状态、动作、实时内容、回调）见画面总图 | [画面与播放](../visualization.md) |
 | 看门狗 | 看门狗 ↔ 实例 | 心跳、冒烟、金丝雀 | [骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」 |
 
-判定点和外包不是单独的缝：判定点在定义与装配里，合同是问题与去向（第 7.5 节）；外包派发是执行契约的一种实现，合同是 ACP（第 7.2 节）。
+判定点和外包不是单独的缝：判定点在定义与装配里，合同是问题与去向（第 7.5 节）；外包派发是执行契约的一种实现，合同是 ACP（第 7.2 节），细化在[外包角色](../outsourced-roles.md)。
 
 **内核内部（不是缝）**：裁决（写入口 ↔ 裁决，路由 → 裁决的收紧检查：工具许可、合同的通用条件、收紧接口），细化在[可信内核](../trusted-kernel.md)与[骨架与应用](../skeleton-and-application.md)「裁决的分工：内核的通用检查与路由的收紧检查」。最小投影（骨架事件 → 裁决、边界、薄驱动：固定的几样事实），细化在[骨架与应用](../skeleton-and-application.md)「最小投影」。
 
-**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、页面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)。画面（系统之外）：[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39。
+**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)。外包角色：[外包角色](../outsourced-roles.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、页面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)。画面（系统之外）：[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39。
 
 **总图的词与代码名的对照**：[name-map.md](name-map.md)，按缝列出总图的词、代码里现在的名字与一致、不一致、代码里还没有；代码名随立缝工单改成总图的词，立缝工单关闭时由子架构师改那一行。
 
@@ -496,7 +496,7 @@ sequenceDiagram
 | --- | --- | --- |
 | 模型调用 | 步骤驱动与 Provider | 身份（run、角色任务、步骤、逻辑调用、尝试）；调用目标的选择；装配好的输入、工具定义与缓存断点或缓存键；流式输出；结果与用量；按尝试取消 |
 | 动作 | 步骤驱动与执行环境 | 逻辑动作与尝试的身份；动作类别；输入；前置条件（树摘要、文件版本）；预期效果；授权依据；回执（结果、证据、执行以后的树摘要）；结果未知时的核实方法 |
-| 外包派发 | 薄驱动与外包 agent 的运行进程；不是单独的缝，是执行契约的一种实现（总图第四节「执行」） | 角色定义与版本、任务说明、资料引用、无历史的工作区快照摘要、全新的状态目录、工具入口与模型入口（都是受控入口，经工具许可与写入口）、派发编号；工具请求（转为动作合同）；提案与证据；取消。没有下游核验角色时也可以外包，事项记为开环完成 |
+| 外包派发 | 薄驱动与外包 agent 的运行进程；不是单独的缝，是执行契约的一种实现（总图第四节「执行」） | 角色定义与版本、任务说明、资料引用、无历史的工作区快照摘要、全新的状态目录、工具入口与模型入口（都是受控入口，经工具许可与写入口）、派发编号；工具请求（转为动作合同）；提案与证据；取消。没有下游核验角色时也可以外包，事项记为开环完成。展开见[外包角色设计说明](../outsourced-roles.md) |
 | 判定点 | 流程编排与观察层 | 判定点与版本、问题、参照材料、选项；两个阈值（通过、不通过）；通过、不通过、不确定三种结果各自的去向（取自一份允许清单，清单里没有放行、接纳产品合同、采用定义与修改限额）；校准状态（只记录、已校准）；拦截什么与花费多少；概率、模型版本与选项顺序；重放使用记录的结果 |
 | 观察者 | 观察者与接口层（读）、写入口（写） | 从某个全局位置开始按读取范围读事件；写入统计证据、提案（教训、洞见、发现、演化候选）与振荡信号（哪个事项、哪条分支、依据的事件），都带身份与依据，经裁决 |
 
@@ -616,7 +616,7 @@ sequenceDiagram
 | 画面 | 单独的应用：TypeScript、Vite、PixiJS 8、XState 5、GSAP（画面自己的选择，[ADR-0021](../../adr/0021-client-pixel-view-follows-v9-structure.md)） |
 | 服务之间的传输 | HTTP 加 JSON，流式结果使用 SSE 或分块传输 |
 | 执行环境 | 本机进程；其他电脑与开发板上使用执行代理；代码在执行位置上直接运行（[执行环境服务设计说明](../execution-environment.md)「代码的权限、认证与加密」） |
-| 扩展协议 | MCP 使用官方 Python SDK；外包 agent 使用 ACP（D31） |
+| 扩展协议 | MCP 使用官方 Python SDK；外包 agent 使用 ACP（[外包角色设计说明](../outsourced-roles.md)） |
 
 ## 10. 近期实施顺序
 
