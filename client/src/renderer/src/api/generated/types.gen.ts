@@ -2581,6 +2581,70 @@ export type EffectiveModel = {
 };
 
 /**
+ * EventAtPosition
+ */
+export type EventAtPosition = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Status
+     */
+    status: 'available' | 'missing';
+    /**
+     * Reason
+     */
+    reason?: 'out_of_range' | 'archived' | 'compacted' | 'not_in_stream' | null;
+    /**
+     * Event Id
+     */
+    event_id?: string | null;
+    /**
+     * Type
+     */
+    type?: string | null;
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Actor
+     */
+    actor?: string | null;
+    /**
+     * Actor Label
+     */
+    actor_label?: string | null;
+    /**
+     * Department
+     */
+    department?: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Department Label
+     */
+    department_label?: string | null;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * At
+     */
+    at?: string | null;
+    /**
+     * Stream
+     */
+    stream?: string | null;
+    /**
+     * Payload
+     */
+    payload?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
  * EventDetailResult
  */
 export type EventDetailResult = {
@@ -2596,6 +2660,20 @@ export type EventDetailResult = {
     artifacts: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * EventPositionsResult
+ */
+export type EventPositionsResult = {
+    /**
+     * Streams
+     */
+    streams: Array<string>;
+    /**
+     * Events
+     */
+    events: Array<EventAtPosition>;
 };
 
 /**
@@ -5487,6 +5565,17 @@ export type SnapshotEventDetailResult = {
      */
     position: number;
     data: EventDetailResult;
+};
+
+/**
+ * Snapshot[EventPositionsResult]
+ */
+export type SnapshotEventPositionsResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: EventPositionsResult;
 };
 
 /**
@@ -20234,6 +20323,44 @@ export type QueryEventDetailResponses = {
 };
 
 export type QueryEventDetailResponse = QueryEventDetailResponses[keyof QueryEventDetailResponses];
+
+export type QueryEventPositionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Run Id
+         */
+        run_id?: string | null;
+        /**
+         * Project Id
+         */
+        project_id?: string | null;
+        /**
+         * Positions
+         */
+        positions?: Array<number>;
+    };
+    url: '/api/queries/event.positions';
+};
+
+export type QueryEventPositionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryEventPositionsError = QueryEventPositionsErrors[keyof QueryEventPositionsErrors];
+
+export type QueryEventPositionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotEventPositionsResult;
+};
+
+export type QueryEventPositionsResponse = QueryEventPositionsResponses[keyof QueryEventPositionsResponses];
 
 export type QueryDepartmentWorkspaceData = {
     body?: never;

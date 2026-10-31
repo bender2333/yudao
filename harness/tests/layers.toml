@@ -72,6 +72,7 @@
 "test_event_kind_registration.py" = "module"
 "test_event_log.py" = "integration"
 "test_event_payloads.py" = "integration"
+"test_event_positions.py" = "module"
 "test_event_sequence_compare.py" = "unit"
 "test_event_sequence.py" = "integration"
 "test_event_sources.py" = "unit"

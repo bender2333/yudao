@@ -22,7 +22,8 @@ from harness.app.catalog_queries import ChangeImpactRequest
 from harness.app.decision_queries import DecisionsList
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
-    DepartmentWorkspace, DeliveryFile, EventDetail, NotFound, ProjectAttempts, ProjectFlow, ProjectLoop,
+    DepartmentWorkspace, DeliveryFile, EventDetail, EventPositions, NotFound, ProjectAttempts,
+    ProjectFlow, ProjectLoop,
     ProjectOverview, ProjectsList, ProjectSettings, ProjectUsage, ProjectWriteback, ReplayCheck, RunActions,
     RunAsks, RunAttempt, RunExport, RunRecovery, RunSteps, WorkItemInputs, WorkItemMaterials,
 )
@@ -229,6 +230,9 @@ def _requests(scope: _Scope) -> dict[str, Any]:
         "project.flow": ProjectFlow(project_id=project_id),
         "work_item.inputs": WorkItemInputs(project_id=project_id, work_item=work_item_id),
         "event.detail": EventDetail(event_id=scope.first_event_id or "none"),
+        # 按位置取事件（工单 #1342）：日志末尾之外的位置，结果在整个重放里不变（越界），
+        # 所以它没有刷新清单（changed_by 为空）；请求时还不存在的位置按需再查
+        "event.positions": EventPositions(run_id=run_id, positions=[10 ** 9]),
         "department.workspace": DepartmentWorkspace(project_id=project_id, department=scope.department),
         "run.actions": RunActions(run_id=run_id),
         "run.steps": RunSteps(run_id=run_id, department=scope.department),

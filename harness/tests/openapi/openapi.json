@@ -2490,6 +2490,83 @@
         }
       }
     },
+    "/api/queries/event.positions": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "event.positions",
+        "operationId": "query_event_positions",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "positions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "title": "Positions"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_EventPositionsResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/department.workspace": {
       "get": {
         "tags": [
@@ -8822,6 +8899,173 @@
         ],
         "title": "EffectiveModel"
       },
+      "EventAtPosition": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "missing"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "out_of_range",
+                  "archived",
+                  "compacted",
+                  "not_in_stream"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "actor_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Label"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "department_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Label"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "stream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stream"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "status"
+        ],
+        "title": "EventAtPosition"
+      },
       "EventDetailResult": {
         "properties": {
           "event": {
@@ -8842,6 +9086,31 @@
           "artifacts"
         ],
         "title": "EventDetailResult"
+      },
+      "EventPositionsResult": {
+        "properties": {
+          "streams": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Streams"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventAtPosition"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "streams",
+          "events"
+        ],
+        "title": "EventPositionsResult"
       },
       "ExternalSourceEvidenceResult": {
         "properties": {
@@ -13650,6 +13919,24 @@
           "data"
         ],
         "title": "Snapshot[EventDetailResult]"
+      },
+      "Snapshot_EventPositionsResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventPositionsResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[EventPositionsResult]"
       },
       "Snapshot_ExternalSourceEvidenceResult_": {
         "properties": {
