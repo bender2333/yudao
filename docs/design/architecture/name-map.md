@@ -129,6 +129,11 @@
 | 元件断言、回链 | 第四节画面「交换」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
 | 播放参数 | 第四节画面「交换」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
 | 页面 | 第一节「界面」悬停 | `views/`（`home/`、`project/`、`decisions/`、`models/`、`system/`、`timeline/`）、`shell/` | 画面（页面一侧）、接口 | 一致 |
+| 七种元件的对照表 | 画面总图第四节「映射」 | `translate/coverage.ts`：事件在三个场景的归属 `COVERAGE`、覆盖层的中文名 `OVERLAY_LABELS`；概念到元件的行：无 | 画面；道 09 | 不一致：只有事件与覆盖层两份，没有概念到七种元件的表，事实元素与视觉通道没有核对 |
+| 画面拓扑（屋、管道、盖章台从定义推出） | 画面总图第五节 | 写死在画面层：`pixel/world/floor-decl.ts` 的 `ROOMS`、`pixel/building/render.ts` 的 `ROOMS`、`pixel/room/layout.ts` 的 `ROOM_DEPTS`；合同里楼的亮灯 `lit` 是固定的四个部门字段（`pixel/contract.ts`）；楼层查询的 `departments` 按固定的 `DEPARTMENTS` 列出（`harness/app/project_queries.py`） | 画面、接口；道 09 | 不一致：拓扑不从事项冻结的定义来，画面层按部门名分支 |
+| 盖章台、出口托盘 | 画面总图第五节 | 盖章台：`pixel/room/layout.ts` 按部门 `quality` 画「检验台」；出口托盘：无 | 画面 | 不一致：按部门名取，不按核验角色 |
+| 章（放行、开环完成） | 画面总图第五节 | 合同 `pixel/contract.ts` 的 `Stamp`（楼层状态的 `stamp`）；动作 `stamp_release`、`stamp_defect`、`stamp_valid`（`translate/floor.ts`）；开环完成章：无 | 画面 | 不一致：开环完成章代码里还没有 |
+| 点开回链 | 画面总图第一节「页面」、第四节「回调」 | 画布上的来源卡片 `pixel/floor/card.ts` 的 `createSourceCard`，卡片内容 `SourceCardFace`（`pixel/contract.ts`）画原始事件与差异 | 画面（页面一侧） | 不一致：细内容画在画布上，没有交给页面 |
 
 ### 定义
 
@@ -176,3 +181,4 @@
 
 - 2026-10-29 / claude-sonnet-5-5 / 对着 main c5308acf 重核全表：改了 34 行（11 行把原来写「无」或「代码里还没有」的补上了代码里已有的名字，4 行补上漏记的名字，19 行订正名字或它所在的文件）；判断改为「一致」的 7 行、改为「不一致」的 4 行，「路由实现与它的定义、工作单元的大小」一行拆成两半分别判断；去掉旧提交号，其余行的名字核对无误；说明段里「一致的词不用记，立缝时逐行消」一句改为立缝时把那一行改成一致（表里仍有大量一致的行，原句与表相矛盾） / 原表按 2026-10-25 清点，整片过期（decision.md 2026-10-29）
 - 2026-10-31 / claude-opus-5-5 / 加直做、子事项与子组织、核验角色、写入范围、成果种类与提案合同五行，「质检放行，事项完成」改为「放行或开环完成，事项完成」；「部门与角色」「核验中」改为不一致，`VERIFIER_OF` 从「谁能拒绝谁」移到核验角色一行；接纳补 `artifact_accepted`；`done` 一句补开环完成 / 按总图 ADR-0044 的改动核对
+- 2026-10-31 / claude-opus-5-5（子架构师） / 「画面」一节加七种元件的对照表、画面拓扑、盖章台与出口托盘、章、点开回链五行，都是不一致 / 按画面总图与画面与播放设计说明第 10 至 13 节核对
