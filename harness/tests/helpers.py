@@ -409,7 +409,7 @@ def read_file_call(request, path) -> ModelResponse:
                                   "arguments": json_dumps({"path": path})}])
 
 
-COMPACTION_HEADROOM = 1504
+COMPACTION_HEADROOM = 1704
 
 
 def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False, step_limits=StepLimits()):

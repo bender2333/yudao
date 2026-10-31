@@ -72,6 +72,10 @@ OVERLAYS: tuple[OverlayDefinition, ...] = (
     # 事实来源：事件对象的 source 字段（设计说明第 4.3 节），覆盖在楼层的事实上。它依赖楼层查询，
     # 楼层查询登记以后才列出（工单 #396）
     OverlayDefinition(name="sources", queries=("project.loop",)),
+    # 循环与收敛（工单 #400）：循环实例的层、已用边界与收敛状态，依赖 run.loops（工单 #397）
+    OverlayDefinition(name="loops", queries=("run.loops",)),
+    # 检验覆盖与开环（工单 #399）：每条验收条件的检验方式与结果、开环明细，依赖 acceptance.coverage
+    OverlayDefinition(name="coverage", queries=("acceptance.coverage",)),
 )
 
 

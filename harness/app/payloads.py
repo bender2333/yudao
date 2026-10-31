@@ -825,12 +825,23 @@ class AskAnsweredPayload(Payload):
 
 
 
+class LaunchMethodPayload(Payload):
+    # 交付说明里的一个启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #148）：需要试用的每个入口一项
+    name: str
+    kind: Literal["web", "desktop"]
+    commands: dict[str, list[str]]
+    ready_url: str | None = None
+    ready_timeout_sec: int | None = None
+
+
 class DeliveryAcceptedPayload(AcceptanceFields):
     summary: str
     files: list[str]
     check_names: list[str]
     checks: list[CheckReceipt]
     known_risks: list[str]
+    # 启动方式（工单 #148）：可选，旧交付没有这一项
+    launch: list[LaunchMethodPayload] = Field(default_factory=list)
     product_spec_hash: str
     effective_contract_hash: str
     code_tree_digest: str
@@ -1062,11 +1073,15 @@ class DecisionOption(Payload):
 
 class InitialPrdProposal(Payload):
     # 候选中的初始 PRD：接纳它的事件编号、ProductSpec 的内容哈希与 PRD.md 的工件引用；
-    # summary 是给用户看的 PRD 摘要（原型 v8 的 materials.prd_summary）
+    # summary 是给用户看的 PRD 摘要（原型 v8 的 materials.prd_summary）。
+    # 要求、验收标准与对应声明随候选交给决定卡片（工单 #1349）；旧事件没有这三项时为空
     event_id: str
     content_hash: str
     prd_ref: ArtifactRef
     summary: str | None = None
+    requirements: list[str] = []
+    acceptance_criteria: list[str] = []
+    requirement_mapping: list[RequirementMapping] = []
 
 
 class StructureProposal(Payload):

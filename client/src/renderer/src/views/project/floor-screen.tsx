@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, RunAsksResult,
+  RunLoopsResult,
 } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
 import { newCommandId } from "../../contract/command-id.ts";
@@ -27,7 +28,8 @@ import { itemColor } from "../../pixel/world/floor";
 import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
 import { OVERLAY_LABELS } from "../../translate/coverage";
-import { floorActions, floorCards, floorInterrupted, floorState, recoveryOverlay, sourceCard, sourceOverlay, streamText,
+import { floorActions, floorCards, floorInterrupted, floorState, loopsOverlay, recoveryOverlay, sourceCard, sourceEventOf,
+         sourceOverlay, streamText, type EventAtPositionView,
          toFloorEvent, type FloorEvent } from "../../translate/floor";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
@@ -171,6 +173,10 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const runId = useMemo(() => asksRunId(loop.data, props.workItemId), [loop.data, props.workItemId]);
   const asks = useSnapshot<RunAsksResult>(props.app, "page.loop.asks", "run.asks", { run_id: runId },
     replaying || runId === "");
+  // 循环状态（工单 #400）：覆盖层「循环」的数据来源；覆盖层在回放时不画（画面与播放设计说明第 8 节），
+  // 没有运行时也不查
+  const loopsQuery = useSnapshot<RunLoopsResult>(props.app, "page.loop.loops", "run.loops", { run_id: runId },
+    replaying || runId === "");
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<FloorView | null>(null);
   const modelRef = useRef<FloorModel | null>(null);
@@ -280,12 +286,26 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     [decisions.data, replaying, model],
   );
 
-  // 点开事实元素：按这一份查询结果找到来源与原始事件，翻好来源卡片交给画面（工单 #398）
+  // 点开事实元素：按这一份查询结果找到来源与原始事件，翻好来源卡片交给画面（工单 #398）。
+  // 原始事件先按位置取一次（工单 #1342 的 event.positions）：回链可能指向 run 流或项目流，两个都给；
+  // 取到以后替换卡片的内容，取不到时用手上已有的事件（页面缓存 500 条）兜底，再没有就写「取不到」。
   openSourceRef.current = (workItemId, element) => {
     const row = (loop.data?.work_items ?? []).find((item) => item.work_item_id === workItemId);
     const ref = row?.refs?.[element];
     if (!row || !ref) return;
-    viewRef.current?.showSource(sourceCard(row, element, ref, eventsRef.current.get(ref.position) ?? null));
+    const cached = eventsRef.current.get(ref.position) ?? null;
+    viewRef.current?.showSource(sourceCard(row, element, ref, cached));
+    const params: Record<string, unknown> = { project_id: props.projectId, positions: [ref.position] };
+    if (row.run_id) params.run_id = row.run_id;
+    void props.app
+      .queryOne<{ events: EventAtPositionView[] }>("event.positions", params)
+      .then((result) => {
+        const event = sourceEventOf(result.data.events ?? [], ref.position);
+        if (event) viewRef.current?.showSource(sourceCard(row, element, ref, event));
+      })
+      .catch(() => {
+        // 查询失败时留着缓存摊开的卡片（取不到就写着它在时间轴上的位置），不打断画面
+      });
   };
 
   // 每次查询结果到达：交给播放时间线（状态等它之前的动作演完再上画面）
@@ -360,8 +380,8 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   });
   const flowSegments = useMemo(() => flowSegmentsOf(flow.data?.records ?? null), [flow.data]);
   useEffect(() => {
-    viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments));
-  }, [overlay, loop.data, decisions.data, flowSegments]);
+    viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments, loopsQuery.data));
+  }, [overlay, loop.data, decisions.data, flowSegments, loopsQuery.data]);
 
   const overlays = (capabilities?.overlays ?? []).map((o) => o.name).filter((name) => OVERLAY_LABELS[name] !== undefined);
   // 文字列表里的决定请求：与画面同源的查询结果，按发出时间排列
@@ -407,6 +427,7 @@ function overlayData(
   loop: ProjectLoopResult | null,
   decisions: DecisionList | null,
   flowSegments: FlowSegment[],
+  loops: RunLoopsResult | null,
 ): Record<string, unknown> | null {
   if (name === "waiting") {
     const entries = (loop?.work_items ?? [])
@@ -427,6 +448,8 @@ function overlayData(
   if (name === "recovery") return recoveryOverlay(loop);
   // 「来源」覆盖层的数据同样在翻译层写好（工单 #398）：五种来源的事实元素、缺来源的元素与图例计数
   if (name === "sources") return sourceOverlay(loop) as unknown as Record<string, unknown>;
+  // 「循环」覆盖层的数据同样在翻译层写好（工单 #400）：信息条写 run 层，房间写激活层与步骤循环，图例写状态
+  if (name === "loops") return loopsOverlay(loops) as unknown as Record<string, unknown>;
   return null;
 }
 

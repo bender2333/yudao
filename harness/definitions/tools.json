@@ -938,6 +938,56 @@
           },
           "description": "Optional"
         },
+        "launch": {
+          "type": "array",
+          "description": "Optional: one entry per entry point the delivered software needs a trial for; leave it out for libraries and command line programs. A web app reads its port from the PORT environment variable",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Entry point name, unique within this DeliverySpec"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "web",
+                  "desktop"
+                ]
+              },
+              "commands": {
+                "type": "object",
+                "description": "argv per system; the keys are windows or linux, at least one",
+                "additionalProperties": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "ready_url": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Web apps only: an http URL on 127.0.0.1 or localhost containing {port}"
+              },
+              "ready_timeout_sec": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Optional readiness timeout in seconds; the registered default when omitted"
+              }
+            },
+            "required": [
+              "name",
+              "kind",
+              "commands"
+            ],
+            "additionalProperties": false
+          }
+        },
         "basis_product_spec_hash": {
           "type": [
             "string",

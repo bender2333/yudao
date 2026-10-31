@@ -40,14 +40,22 @@
         "delivery_spec": {
           "when": ["ENGINEERING", "REWORK_ENGINEERING"],
           "required": ["kind=delivery_spec", "summary", "check_names", "basis_product_spec_hash"],
-          "optional": ["known_risks"],
+          "optional": ["known_risks", "launch"],
           "bind": [
             "current_contract.content_hash",
             "run_check receipts from this activation on the current workspace"
           ],
           "basis_product_spec_hash": "content hash of the ProductSpec this delivery is based on; the host rejects the submission if it does not equal the current effective ProductSpec content_hash",
+          "launch": {
+            "what": "one entry per entry point the delivered software needs a trial for; optional, leave it out for libraries and command line programs",
+            "name": "entry point name, unique within this DeliverySpec",
+            "kind": "web or desktop",
+            "commands": "argv per system; the keys are windows or linux, at least one",
+            "ready_url": "web apps only: an http URL on 127.0.0.1 or localhost containing {port}; desktop programs have none",
+            "ready_timeout_sec": "optional readiness timeout in seconds; the registered default when omitted"
+          },
           "parts": {
-            "facts": ["files", "check_names", "checks"],
+            "facts": ["files", "check_names", "checks", "launch"],
             "explanation": ["summary", "known_risks"]
           }
         },

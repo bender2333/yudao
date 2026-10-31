@@ -567,7 +567,7 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
     # 上下文窗口按这个场景的需要设置（测试分层设计说明第 10 节第 3 条）：开始时的请求（部门提示与
     # 工程可用的工具说明）装得下、留出余量，压缩只发生在询问带回新合同以后；窗口不随工具说明的长短调整
     # 窗口按本场景的需要设置：工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token，窗口随之上调
-    run_id = system.create_run("build echo", context_window=7000 + 346)
+    run_id = system.create_run("build echo", context_window=7000 + 346 + 200)
     for index in range(1, read_count + 1):
         system.workspace(run_id).write_file(f"part{index}.txt", "x" * 1200)
 

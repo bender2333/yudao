@@ -1267,3 +1267,76 @@ def test_time_limit_ends_the_run_and_marks_it(runs_root):
     assert run["metrics"]["timed_out"] is True
     assert run["metrics"]["end_reason"] == yudao_metrics.TIME_LIMIT
     assert 0.0 <= run["score"]["completion"] <= 1.0
+
+
+class _WaitForPrdClient:
+    """按调用顺序给出决定请求与建档状态的脚本客户端（工单 #1360 的两种先后顺序）。
+
+    decisions 与 statuses 各自按调用次数取值，取完以后重复最后一个：这样能分别构造
+    「请求先出现」「状态先离开 running、请求随后出现」与「从来没有任何请求」。
+    """
+
+    def __init__(self, decisions, statuses):
+        self.decisions = list(decisions)
+        self.statuses = list(statuses)
+        self.decision_calls = 0
+        self.status_calls = 0
+
+    def query(self, name, params=None):
+        if name == "decisions.list":
+            value = self.decisions[min(self.decision_calls, len(self.decisions) - 1)]
+            self.decision_calls += 1
+            return {"data": {"decisions": [] if value is None else [value]}}
+        if name == "project.overview":
+            status = self.statuses[min(self.status_calls, len(self.statuses) - 1)]
+            self.status_calls += 1
+            return {"data": {"work_items": [{"work_item_id": "onboarding-item", "status": status}]}}
+        raise AssertionError("unexpected query: " + name)
+
+
+def _decision_request():
+    return {"decision_id": "decision-1", "kind": yudao.INITIAL_PRD_KIND, "status": "open",
+            "version": 3, "run_id": None, "project_id": "project-1",
+            "work_item_id": "onboarding-item", "request": {}, "answer": None,
+            "requested_at": "2026-10-30T00:00:00+00:00", "blocked": None, "blocks": "work_item"}
+
+
+def test_the_initial_prd_decision_is_returned_when_it_appears_before_the_item_ends(monkeypatch):
+    """守 R1：决定请求先出现、事项状态随后离开 running（工单 #1360 的顺序一）。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    decision = _decision_request()
+    client = _WaitForPrdClient([decision], ["awaiting_initial_prd"])
+
+    assert yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 5.0) is decision
+    assert client.status_calls == 0
+
+
+def test_the_initial_prd_decision_is_returned_when_the_item_ends_first(monkeypatch):
+    """守 R1：事项状态先离开 running、请求随后写入（工单 #1360 的真实顺序），宽限里等到请求。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    decision = _decision_request()
+    client = _WaitForPrdClient([None, None, decision],
+                               ["awaiting_initial_prd", "done", "done"])
+
+    assert yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 5.0) is decision
+
+
+def test_a_finished_onboarding_without_any_decision_request_raises(monkeypatch):
+    """守 R1：事项结束且从来没有决定请求时仍然抛，作废原因写清是「出请求之前就停了」。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    client = _WaitForPrdClient([None], ["awaiting_initial_prd", "done"])
+
+    with pytest.raises(RuntimeError) as error:
+        yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 5.0)
+    assert "建档在给出初始 PRD 的确认请求之前就停了" in str(error.value)
+    assert "建档事项停在 done" in str(error.value)
+
+
+def test_wait_for_initial_prd_times_out_while_the_item_still_runs(monkeypatch):
+    """守 R1：事项一直停在 running、请求也不出现时按「等到时限都没有请求」作废。"""
+    monkeypatch.setattr(yudao, "POLL_INTERVAL_SECONDS", 0.01)
+    client = _WaitForPrdClient([None], ["awaiting_initial_prd"])
+
+    with pytest.raises(RuntimeError) as error:
+        yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 0.2)
+    assert "秒内没有给出初始 PRD 的确认请求" in str(error.value)

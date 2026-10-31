@@ -92,8 +92,10 @@ def test_away_report_summarises_real_events_with_sources_and_omits_empty_items(d
     ends = {event.position for event in system.store.read(after=0, limit=100000)}
     for item in report.summary:
         assert item.refs and all(ref in ends for ref in item.refs)
-    # 没有来源的项不返回：本工单没有 Stage 4 的事件，故障等项不出现
-    assert {item.id for item in report.summary} == {"released"}
+    # 没有来源的项不返回：本工单没有 Stage 4 的事件，故障等项不出现。
+    # 收敛状态的变化（工单 #399）在这条完整的三部门运行里有：各层从「无法判定」走到判定过的状态；
+    # 带开环条件的放行不出现：这份放行的逐条结论都是可执行的检验，没有开环条件
+    assert {item.id for item in report.summary} == {"released", "convergence"}
     assert all(fact.project_id in (None, project_id) for fact in report.facts)
     assert any(fact.work_item_id == work_item_id for fact in report.facts)
 

@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 
 import {
   DRAWN_FACT_ELEMENTS, EVENT_KIND_LABELS, FACT_LABELS, SOURCE_LABELS, actorLabel, eventKindLabel, factRefs, floorState,
-  sourceCard, sourceOverlay,
+  sourceCard, sourceEventOf, sourceOverlay,
 } from "../../src/renderer/src/translate/floor.ts";
 import { OVERLAY_LABELS, checkMethodProblems, overlayProblems } from "../../src/renderer/src/translate/coverage.ts";
 import { floorState as checkFloorState, SOURCES } from "../../src/renderer/src/pixel/contract.ts";
@@ -155,4 +155,25 @@ test("来源卡片：写原始事件的说明、种类、时间、提出者与�
   assert.equal(actorLabel("user:local"), "你");
   assert.equal(actorLabel("system"), "系统");
   assert.equal(actorLabel(null), null);
+});
+test("按位置取事件的结果：取得到时翻成来源卡片要的形状，取不到时为空", () => {
+  // 工单 #1342：来源卡片优先用 event.positions 的答案，不再只靠页面缓存
+  const items = [
+    { position: 2, status: "available" as const, type: "work_item_created", label: "在项目中建立了事项：测试事项",
+      at: "2026-10-30T01:00:00+00:00", actor: "department:product", actor_label: "产品部门",
+      payload: { summary: "建立事项" } },
+    { position: 5, status: "missing" as const, reason: "archived" },
+  ];
+  const event = sourceEventOf(items, 2);
+  assert.equal(event?.type, "work_item_created");
+  assert.equal(event?.label, "在项目中建立了事项：测试事项");
+  assert.equal(event?.actor_label, "产品部门");
+  assert.deepEqual(event?.payload, { summary: "建立事项" });
+  // 取不到（已归档、已压缩、越界、位置上是别的流的事件）与不在结果里：都为空，卡片按「取不到」写
+  assert.equal(sourceEventOf(items, 5), null);
+  assert.equal(sourceEventOf(items, 99), null);
+  // 查询给出的提出者可读名优先于按 actor 自己翻（「产品部门」不是按 department:product 翻出来的写法）
+  const face = sourceCard(row() as never, "sign", { position: 2, source: "user" },
+    event ?? null);
+  assert.equal(face.actor_label, "产品部门");
 });

@@ -26,6 +26,7 @@ import { readFailureText } from "../../contract/read-failure";
 import { downloadRunExport } from "./run-export";
 import { scopeName } from "./scope-name";
 import { EMPTY_FILTERS, type Filters, departmentFilterNote, seedFilters } from "./observe-filter";
+import { LoopsBlock, loopItems } from "./loops-block";
 
 const PAGE_SIZE = 50;
 
@@ -235,6 +236,8 @@ export function ObservePage(props: { app: ClientApp; route: Route }) {
           />
         ) : <UsageSection usage={usage} />}
       </Section>
+      {/* 「循环」区块（工单 #400）：请求记录与用量之后，按事项列出循环树的层、已用边界与收敛状态 */}
+      <LoopsBlock app={props.app} items={loopItems(scope.data, workItem)} />
     </div>
   );
 }

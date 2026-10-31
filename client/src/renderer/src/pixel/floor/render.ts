@@ -15,7 +15,21 @@ import { polyLength, pointAt, roomOf } from "../world/declare.ts";
 import { ACTIVE, IN_ROOM, busyItems, visibleDecisions, type FloorDriver, type BoardRect } from "../world/floor.ts";
 import { actorOf, charsOf, primaryOf } from "../world/scene.ts";
 import type { Character, LoopItem, MachineView, Room, SceneLike, World } from "../world/types.ts";
-import type { FactElement, Source, SourceOverlayData } from "../contract.ts";
+import type { FactElement, LoopsOverlayData, Source, SourceOverlayData } from "../contract.ts";
+
+// 收敛状态的颜色（工单 #400）：文字与颜色同时给，五种状态与「不判定」各一种
+const LOOP_STATE_BG: Readonly<Record<string, string>> = Object.freeze({
+  converging: PAL.green1,
+  stalled: PAL.yellow1,
+  oscillating: PAL.orange1,
+  drifting: PAL.orange2,
+  boundary: PAL.red1,
+  undetermined: PAL.grey3,
+});
+
+function loopStateBg(state: string): string {
+  return LOOP_STATE_BG[state] ?? PAL.white;
+}
 
 export const W = 640;
 export const H = 320;
@@ -727,7 +741,30 @@ export class FloorRenderer {
       }
     } else if (overlay.id === "sources") {
       this.sourceOverlay(c, data as unknown as SourceOverlayData);
+    } else if (overlay.id === "loops") {
+      this.loopsOverlay(label, data as unknown as LoopsOverlayData);
     }
+  }
+
+  /**
+   * 覆盖层「循环」（工单 #400，原型 v10 设计说明第 3 节）：楼层信息条写 run 层的收敛状态与停止原因，
+   * 各部门房间写这次激活与步骤循环，右上角写五种状态与「不判定」的图例；文字与颜色一起给，
+   * 不只靠颜色区分。内容只来自 run.loops（画面诚实性 H1）。
+   */
+  private loopsOverlay(label: (key: string, x: number, y: number, text: string, bg?: string) => void,
+                       data: LoopsOverlayData): void {
+    const world = this.driver.world;
+    label("loops:run", W / 2, 10, data.bar.text, loopStateBg(data.bar.state));
+    for (const room of data.rooms) {
+      const r = roomOf(world, room.department);
+      if (!r) continue;
+      const height = r.h ?? 0;
+      label(room.department, r.x + r.w / 2, r.y + height / 2 - 8, room.text, loopStateBg(room.state));
+      label(`${room.department}:steps`, r.x + r.w / 2, r.y + height / 2 + 6, room.step_text, PAL.white);
+    }
+    data.legend.forEach((row, index) => {
+      label(`loops:legend:${row.state}`, W - 96, BAR + 10 + index * 12, row.label, loopStateBg(row.state));
+    });
   }
 
   /**

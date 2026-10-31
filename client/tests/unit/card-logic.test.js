@@ -231,3 +231,40 @@ test("质检无法核验的决定卡片逐条列出无法核验的条件与原�
   assert.equal(map["AC2"], "执行位置没有安装浏览器");
   assert.equal(map["说明"], "质检无法核验这些验收条件：AC1（质检的模型不支持图像输入）。");
 });
+
+
+test("初始 PRD 的材料逐条列出要求与验收标准的对应声明", () => {
+  // 工单 #1349：决定卡片要让人看到哪条要求对应哪条验收标准、哪条标了 gap 原因
+  const request = {
+    kind: "initial_prd",
+    blocks: "work_item",
+    options: [{ id: "confirm", label: "确认" }],
+    description: "确认第 1 轮建档的初始 PRD",
+    work_item_id: "w1",
+    round: 1,
+    prd: {
+      event_id: "ev1",
+      content_hash: "0123456789abcdef",
+      prd_ref: { kind: "prd", content_hash: "0123456789abcdef", path: "PRD.md", media_type: "text/markdown" },
+      summary: "目标：接入已有项目",
+      requirements: ["print the argument", "explain the usage"],
+      acceptance_criteria: ["prints the argument", "prints help"],
+      requirement_mapping: [
+        { requirement: 1, criteria: ["AC1", "AC2"], gap: null },
+        { requirement: 2, criteria: [], gap: "no host check yet" },
+      ],
+    },
+    structure: {},
+    baseline_review: {},
+    snapshot: {},
+  };
+  const rows = materialRows(decision({ kind: "initial_prd", request, work_item_id: "w1" }));
+  const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
+  assert.equal(map["要求 1"], "AC1、AC2（print the argument）");
+  assert.equal(map["要求 2"], "未写验收标准：no host check yet（explain the usage）");
+});
+
+test("旧事件的初始 PRD 没有对应声明时不出要求行", () => {
+  const rows = materialRows(initialPrd());
+  assert.equal(rows.some((row) => row.term.startsWith("要求 ")), false);
+});
