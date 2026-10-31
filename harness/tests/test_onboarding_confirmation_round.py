@@ -325,3 +325,40 @@ def test_waiting_decision_holds_no_slot_and_does_not_block_drain(data_dir, tmp_p
         assert opened.system.orchestrator.busy() is False
     finally:
         context.__exit__(None, None, None)
+
+
+def test_the_initial_prd_candidate_carries_the_requirement_mapping(data_dir, tmp_path):
+    """验收（工单 #1349）：建档候选的 prd 带着要求、验收标准与逐条对应声明，决定卡片据此显示。"""
+    context, client, opened, refs = _run_onboarding_http(data_dir, tmp_path, _round([REQUIREMENT]))
+    try:
+        prd = _open_initial_prd(client, refs["project_id"])["request"]["prd"]
+        assert prd["requirements"] == [REQUIREMENT]
+        assert prd["acceptance_criteria"] == ["run the CLI with a word"]
+        assert prd["requirement_mapping"] == [{"requirement": 1, "criteria": ["AC1"], "gap": None}]
+    finally:
+        context.__exit__(None, None, None)
+
+
+def test_the_onboarding_requirement_mapping_is_checked_like_a_later_submission():
+    """验收（工单 #1349）：建档候选的对应声明与后提交的要求用同一套规则，缺哪条要求写进原因。"""
+    from types import SimpleNamespace
+
+    from harness.projects import _requirement_mapping_errors
+
+    def spec(mapping, requirements=("one", "two"), criteria=("a",)):
+        return SimpleNamespace(requirements=list(requirements), acceptance_criteria=list(criteria),
+                               requirement_mapping=mapping)
+
+    # 旧事件没有声明：逐条要求都没有对应声明，原因写明位置
+    assert _requirement_mapping_errors(spec([])) == ["requirement 1 没有对应声明",
+                                                     "requirement 2 没有对应声明"]
+    assert _requirement_mapping_errors(spec([{"requirement": 1, "criteria": ["AC1"]}])) == [
+        "requirement 2 没有对应声明"]
+    # 写不出验收标准的要求标 gap 可以通过
+    assert _requirement_mapping_errors(spec([{"requirement": 1, "criteria": ["AC1"]},
+                                             {"requirement": 2, "gap": "no host check yet"}])) == []
+    errors = _requirement_mapping_errors(spec([
+        {"requirement": 1, "criteria": ["AC1"], "gap": "also a reason"},
+        {"requirement": 2, "criteria": ["AC9"]}]))
+    assert "requirement 1 既指向验收标准又标了 gap" in errors
+    assert any("AC9" in item and "不存在" in item for item in errors), errors
