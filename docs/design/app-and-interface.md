@@ -199,7 +199,7 @@ sequenceDiagram
 
 接受表示事件已经追加。页面在事件流到达位置 P 之前显示「已提交」，到达以后按事件显示最终状态（可观测性设计第 5 节）。
 
-拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；3.4A 加入排队以后由排队代替）、`provider_unavailable`（新建事项时，事项所用定义里的某个部门或角色无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据不算）、公开树中有无法表示的条目，附工作区内的相对路径与处理方法；3.8）、`out_of_bounds`（`parameter.set` 的取值超出规则登记的界限，附界限）、`candidate_invalid`（`definition.propose` 的候选没有通过结构校验，附字段位置）。
+拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；3.4A 加入排队以后由排队代替）、`provider_unavailable`（新建事项时，事项所用定义里的某个部门或角色无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据不算）、公开树中有无法表示的条目，附工作区内的相对路径与处理方法；3.8）、`out_of_bounds`（`parameter.set` 的取值超出规则登记的界限，附界限）、`not_wired`（`parameter.set` 修改没有接入行为的条目，附登记里的未接入原因）、`candidate_invalid`（`definition.propose` 的候选没有通过结构校验，附字段位置）。
 
 ### 3.2 命令清单
 
@@ -879,3 +879,4 @@ sequenceDiagram
 - 2026-10-29 / GPT-6（Codex） / 补充撤回命令在同一写事务核对最近历史身份与参数版本，区分全局值编辑与项目覆盖 / 防止撤回重读后发生修改又改回的并发误撤回
 - 2026-10-30 / claude-sonnet-5-5（总架构师） / 模型管理一节：新增 `catalog.connect`（一步连接）与 `catalog.model.select`（选用即启用）两条命令，补 `catalog.model.remove` 的说明；`catalog.candidates.collect` 的失败分五种并带来源、提供方与适用性；`catalog.model.test` 含工具往返；`credential.*` 写明页面不使用只在本进程有效的方式；`catalog` 查询加进行中的选用与每个连接最近一次的候选获取结果；选用进行中的状态是瞬时状态，不写事件日志 / 模型管理改为填写地址与 Key、选择模型即可使用（模型管理设计说明第 4.2、4.3、9.1 节）
 - 2026-10-31 / claude-opus-5-5 / 部门改为按事项所用的定义给出（`provider_unavailable`、`departments` 说明、部门筛选、谁开工）；「质检无法核验」改为「核验角色无法核验」；`kept_delivery`、`run.trials`、`acceptance.coverage` 的质检改为核验角色；第 4.3 节区分验收条件的开环与事项的开环完成；字段名与取值不变 / 按总图 ADR-0044 的改动核对
+- 2026-10-31 / claude-opus-5-5（子架构师） / 第 3.1 节拒绝原因封闭清单补 `not_wired` / 架构问题 #643 一条
