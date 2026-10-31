@@ -73,7 +73,7 @@ from .recording import ActivationScope
 from .recovery import RunRecovery
 from .sessions import SessionFactory
 from .snapshot import SNAPSHOT_FIELDS
-from .submissions import SubmissionWriter
+from .submissions import SubmissionWriter, asks_cannot_verify
 from .tools import in_force
 from .validation import AdjudicationView, ProposalDecision, Tightening, evaluate_proposal
 from .watched_outputs import waiting_departments
@@ -1914,7 +1914,7 @@ class Orchestrator:
             return
         source_event = acceptance.append(transaction)
         self.submissions.record_accepted_lesson(transaction, source_event, projection, artifact)
-        if self.submissions.asks_cannot_verify(artifact):
+        if asks_cannot_verify(artifact):
             # 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：不是放行也不是退回，
             # 由流程编排发出决定请求，阻塞整个 run；等待回答期间恢复页显示待恢复
             self._await_cannot_verify(transaction, department=department, artifact=artifact,
