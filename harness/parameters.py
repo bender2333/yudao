@@ -25,12 +25,16 @@ RUN_PARAMETERS = (
     "bash_timeout_max_sec",
     "check_timeout_max_sec",
     "compaction.stalled_limit",
+    # #397 的三项收敛判定参数（循环与收敛设计说明第 5.1 节）：实例创建时冻结，投影按冻结值重放
+    "convergence.rounds",
+    "convergence.step_window",
+    "convergence.step_repeat",
 )
 
 # 三条可见范围也在建 run 时冻结：取值是定义 roles.json 词表里的子集（工单 #1189）
 VISIBILITY_PARAMETERS = ("roles.product.visibility", "roles.engineering.visibility", "roles.quality.visibility")
 
-# 每个 run 的冻结快照里的全部参数名；#397 的三项收敛参数随后追加，不另立字段
+# 每个 run 的冻结快照里的全部参数名：运行参数与三条可见范围都在这一个字典里（工单 #1189、#397），不另立字段
 FROZEN_PARAMETERS = (*RUN_PARAMETERS, *VISIBILITY_PARAMETERS)
 
 
@@ -99,6 +103,10 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "onboarding.round_time_limit_sec": "",
     # 已接入：裁决按定义里的取值判断询问链的层数
     "organization.ask_chain_max_depth": "",
+    # 已接入：收敛投影每读一次就按冻结值判定（工单 #397）
+    "convergence.rounds": "",
+    "convergence.step_window": "",
+    "convergence.step_repeat": "",
     # 已接入（工单 #1189）：建 run 时冻结，run 全程读冻结值（代码读的是 run_created 里的冻结字典）
     "tool_call_required_limit": "",
     "max_model_steps": "",
@@ -336,15 +344,19 @@ def frozen_snapshot(store: Any, *, project_id: str | None, definitions_version: 
     }
 
 
-def frozen_run_parameters(projection: Any) -> dict[str, Any]:
-    # 这个 run 使用的参数取值：run_created 里冻结的那份；旧事件没有冻结字典时按定义初值解释
-    # （定义初值是发布时的那份，不取进程重启时的现值，也不取项目当前的覆盖）
-    frozen = getattr(projection, "parameters", None) or {}
-    values = frozen.get("values")
+def frozen_values(frozen: Mapping[str, Any] | None) -> dict[str, Any]:
+    # 冻结快照里的参数取值（工单 #1189 写进 run_created 的参数字典，工单 #397 的收敛判定参数也从这里取）：
+    # 旧事件没有冻结字典时按定义初值解释；定义初值是发布时的那份，不取进程重启时的现值，也不取项目当前的覆盖
+    values = (frozen or {}).get("values")
     if isinstance(values, dict) and all(name in values for name in FROZEN_PARAMETERS):
         return dict(values)
     initial = initial_values()
     return {name: initial[name] for name in FROZEN_PARAMETERS}
+
+
+def frozen_run_parameters(projection: Any) -> dict[str, Any]:
+    # 这个 run 使用的参数取值：run_created 里冻结的那份（见 frozen_values）
+    return frozen_values(getattr(projection, "parameters", None))
 
 
 def check_parameter(name: str, value: Any) -> Any:

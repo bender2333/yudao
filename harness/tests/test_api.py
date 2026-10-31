@@ -266,7 +266,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.change_impact", "changed_by": catalog_impact_changed_by, "replayable": False},
     ]
-    assert capabilities["queries"][-3] == {
+    assert capabilities["queries"][-4] == {
         "name": "home.away_report", "replayable": False,
         "changed_by": sorted([
             "ask_started", "ask_answered",
@@ -275,16 +275,20 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         ]) + ["model_attempt_finished", "home_seen"],
     }
     # 规则登记：现值是参数事件折叠的结果，参数修改触发重查（工单 #349）
-    assert capabilities["queries"][-2] == {
+    assert capabilities["queries"][-3] == {
         "name": "rules.registry", "changed_by": ["parameter_set"], "replayable": True,
     }
     # 工具登记（工单 #1177）：MCP 服务器与取回动作的取回记录；取回记录待 #68 合并后填充
-    assert capabilities["queries"][-1] == {
+    assert capabilities["queries"][-2] == {
         "name": "tools.registry",
         "changed_by": ["project_registered", "project_renamed", "mcp_servers_configured",
                        "tool_started", "tool_called"],
         "replayable": False,
     }
+    # 收敛状态（工单 #397）：按运行实例标识返回五层循环树，按位置回放
+    assert capabilities["queries"][-1]["name"] == "run.loops"
+    assert capabilities["queries"][-1]["replayable"] is True
+    assert "model_requested" in capabilities["queries"][-1]["changed_by"]
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
@@ -293,11 +297,11 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
-        "evidence.external_source", "tools.registry",
+        "evidence.external_source", "tools.registry", "run.loops",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {
-        "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry",
+        "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry", "run.loops",
     }
     # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入；
     # 事实来源不依赖查询，事件对象带上 source 以后列出（工单 #396，设计说明第 4.3 节）

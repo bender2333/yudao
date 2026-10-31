@@ -593,6 +593,39 @@
     "tighten_when": "回归场景里压缩接得上上一次却在现值以内就停了",
     "origin": "#840 与 F1：试用里工程部连续 31 次压缩、35 分钟没有推进也没有停止"
   },
+  "convergence.rounds": {
+    "value": 3,
+    "bounds": [2, 20],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "收敛判定的窗口太短时把偶然波动当成停滞或改进",
+    "cost": "收敛状态的反应变慢",
+    "relax_when": "短窗口的判定与更长的窗口结论一致时放宽",
+    "tighten_when": "同一事项的收敛判定在短窗口里反复翻转",
+    "origin": "循环与收敛设计说明「判定参数」一节，收敛判定所看的最近轮数"
+  },
+  "convergence.step_window": {
+    "value": 8,
+    "bounds": [3, 100],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "步骤层过早判定停滞",
+    "cost": "连续没有进展的步骤占用更多轮次",
+    "relax_when": "读文件、检查资料与整理上下文这类正常工作序列在现值内被误判为停滞",
+    "tighten_when": "停滞的判定长期早于实际停止",
+    "origin": "循环与收敛设计说明「判定参数」一节，步骤停滞所看的连续步数"
+  },
+  "convergence.step_repeat": {
+    "value": 3,
+    "bounds": [2, 20],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "步骤层反复做同一次调用却不被判为震荡",
+    "cost": "合理重试被提前判为震荡",
+    "relax_when": "两次以内的重复调用经常是合理重试",
+    "tighten_when": "重复次数达到现值时震荡仍然判得太晚",
+    "origin": "循环与收敛设计说明「判定参数」一节，步骤层相同工具调用的重复次数"
+  },
   "screenshot.max_width": {
     "value": 1280,
     "bounds": [320, 7680],
