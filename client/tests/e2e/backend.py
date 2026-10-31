@@ -15,9 +15,12 @@ import asyncio
 import contextlib
 import json
 import os
+import sqlite3
 import sys
 import socket
 import threading
+import tempfile
+import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -52,11 +55,15 @@ from harness.proposals import (  # noqa: E402
 )
 from harness.providers.call import ModelResponse  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
+# 等待放行的真实命令：与恢复契约的集成层用例（harness/tests/process_kill.py）同一套装置（工单 #1188）
+from harness.tests.helpers import run_wait_command  # noqa: E402
 from harness.tests.protocol_helpers import (  # noqa: E402
     chat_responder, messages_responder, model_test_responder, preset_base_urls, serve,
 )
 
 UNAVAILABLE = "Missing configuration: provider credential"
+# 硬杀重启以后事件库的文件还会被短暂占用（与 harness/tests/process_kill.py 的处理相同）：打开时重试的上限
+OPEN_AFTER_KILL_TIMEOUT_SEC = 60
 
 # 路径守卫的端到端验收（工单 #354）：交付改动的这个路径落在运行实例的内核清单里
 KERNEL_PATH = "harness/bounds.py"
@@ -385,6 +392,39 @@ def kernel_script():
     }
 
 
+def kill_script(signals: Path):
+    # 硬杀重启的端到端（工单 #1188）：产品提交规格以后，工程用 bash 执行一条等着放行的真实命令
+    # （信号目录由 backend.py 建、报给用例：命令写下 started 与 child.pid，等 release 文件出现才结束）。
+    # 用例在这条命令运行中硬杀服务进程，再用同一个数据目录与端口起第二个进程。
+    # 这个模式不预置项目：事项由用例在页面上建，命令在页面开着的时候开始
+    return {
+        "product": [product_spec(), product_spec()],
+        "engineering": [
+            read_turn("call-wait-1", "bash", {"command": run_wait_command(signals)}),
+            read_turn("call-wait-2", "bash", {"command": run_wait_command(signals)}),
+        ],
+        "quality": [
+            quality_turn(review_turn("release", "checks passed on the current snapshot")),
+            quality_turn(review_turn("release", "checks passed on the current snapshot")),
+            quality_turn(review_turn("release", "checks passed on the current snapshot")),
+            quality_turn(review_turn("release", "checks passed on the current snapshot")),
+        ],
+    }
+
+
+def kill_resume_script():
+    # 硬杀重启以后的第二个进程用的脚本（工单 #1188）：中断前的脚本已经用完（与 harness/tests/process_kill.py
+    # 的 tail 同一做法）。工程读到交还的那条工具结果，接着交付；质检核验那一版交付
+    return {
+        "product": [],
+        "engineering": [delivery_turn()],
+        "quality": [
+            quality_turn(review_turn("release", "checks passed on the current snapshot")),
+            quality_turn(review_turn("release", "checks passed on the current snapshot")),
+        ],
+    }
+
+
 def read_turn(identity: str, tool: str, arguments: dict):
     # 脚本里的一项可以是接收模型调用合同的函数（harness/adapters/fake.py 的 TurnFactory），
     # 函数返回带工具调用的回答；工具由原生循环真实执行
@@ -631,6 +671,23 @@ class VersionedApplication(Application):
         return capabilities.model_copy(update={"deployment": deployment})
 
 
+def open_after_kill(build):
+    # 硬杀以后事件库的文件还会被短暂占用（与 harness/tests/process_kill.py 的处理相同：
+    # GitHub 的 Windows 运行机上实测过 PRAGMA journal_mode=WAL 报 disk I/O error）：打开系统这一步
+    # 按次数重试，超过总时长时把最后一次错误抛出去，不静默失败（工单 #1188）
+    deadline = time.monotonic() + OPEN_AFTER_KILL_TIMEOUT_SEC
+    attempt = 0
+    while True:
+        attempt += 1
+        try:
+            return build()
+        except sqlite3.OperationalError as error:
+            if time.monotonic() >= deadline:
+                raise
+            print(f"打开事件库失败，第 {attempt} 次重试：{error}", file=sys.stderr, flush=True)
+            time.sleep(0.2)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=0)
@@ -659,8 +716,13 @@ def main() -> int:
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote", "replay"),
+                                             "stopnote", "replay", "kill"),
                         default="default")
+    # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
+    # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
+    # 事件库在硬杀以后还会被短暂占用，打开这一步按次数重试（见 open_after_kill）
+    parser.add_argument("--hold-resume", action="store_true",
+                        help="重启以后的服务：用 --script kill 的后半脚本，续跑完以后才起服务")
     # 预置一条指向「拒绝凭据」上游的连接：模型测试在它上面真实失败，
     # 用例核对失败的结果写在模型行里（工单 #294）。默认不预置，避免影响其他用例的统计
     parser.add_argument("--reject-upstream", action="store_true")
@@ -703,6 +765,9 @@ def main() -> int:
          "messages": f"{messages_base}/v1"}, models_url=models_server.base))
     data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
     port = args.port
+    # 硬杀重启（工单 #1188）：工程执行的那条等待命令在信号目录里写下 started 与 child.pid，等 release
+    # 文件出现才结束；目录由这里建、连同进程号一起报给用例
+    signals = Path(tempfile.mkdtemp(prefix="yudao-e2e-signals-")) if args.script == "kill" else None
     if args.room:
         adapter_script = room_script()
     elif args.script == "onboarding":
@@ -717,6 +782,9 @@ def main() -> int:
         adapter_script = pending_ask_script()
     elif args.script == "stopnote":
         adapter_script = stop_note_script()
+    elif args.script == "kill":
+        # 重启以后的进程用后半脚本：中断前的那一轮已经被第一个进程取走
+        adapter_script = kill_resume_script() if args.hold_resume else kill_script(signals)
     elif args.script == "replay":
         # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
         base_script = script()
@@ -733,6 +801,12 @@ def main() -> int:
         # 工厂给出同一个适配器实例：每次新建会把脚本的读取位置重置到开头
         adapter = FakeAdapter(adapter_script)
         system = LoopSystem(data_dir, test_adapter_factory=lambda _department: adapter)
+    elif args.hold_resume:
+        # 重启的进程：硬杀以后事件库还会被短暂占用，打开这一步重试；打开以后先让启动恢复跑完，
+        # 再起服务（页面上看到的是恢复以后的状态，不抢在恢复中间读）
+        system = open_after_kill(lambda: LoopSystem.for_testing(
+            data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap), resume_on_startup=False))
+        system.resume_startup_runs()
     else:
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap))
     # 一步连接把 Key 写进 .env（catalog.connect 的既定行为，设计说明第 4.2 节）：
@@ -795,10 +869,11 @@ def main() -> int:
         elif args.script == "replay":
             # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
             asyncio.run(seed(application, system, two_item_project=True))
-        elif args.script not in ("initial", "waiting", "pending", "stopnote"):
+        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
-            # （工单 #477 的验收第 2 条）与停止说明的用例（工单 #1162）自己在界面上建项目并开始事项，
-            # 不需要预置的项目与事项；进行中的询问还要求执行槽位空着，预置的「文本工具」会占着它
+            # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）
+            # 自己在界面上建项目并开始事项，不需要预置的项目与事项；进行中的询问还要求执行槽位空着，
+            # 预置的「文本工具」会占着它
             asyncio.run(seed(application, system))
     if args.catalog_driven:
         os.environ.pop("OPENCODE_GO_KEY", None)
@@ -809,11 +884,14 @@ def main() -> int:
 
     port = server.servers[0].sockets[0].getsockname()[1]
     # 局域网访问方式下把局域网地址与令牌明文一并报给测试（工单 #348）：
-    # 测试经局域网地址打开页面，填写这个令牌
+    # 测试经局域网地址打开页面，填写这个令牌。
+    # 进程号与信号目录给硬杀重启的用例（工单 #1188）：进程号用来结束整个进程树，信号目录说明
+    # 工程执行的那条等待命令有没有开始
     print(json.dumps({"port": port, "data_dir": str(data_dir), "room_project": room_project,
                       "source_dir": None if source_dir is None else str(source_dir),
                       "access": access, "address": None if token is None else f"http://{lan_address()}:{port}",
-                      "token": token}), flush=True)
+                      "token": token, "pid": os.getpid(),
+                      "signals": None if signals is None else str(signals)}), flush=True)
     # 标准输入关闭时退出（由 Playwright 的 fixture 控制生命周期）
     try:
         sys.stdin.read()

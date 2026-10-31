@@ -128,16 +128,19 @@ def event_label(event_type: str, payload: dict[str, Any]) -> str:
         return GENERIC_EVENT_LABEL
     try:
         return template.format_map(_Translated(payload))
-    except (KeyError, IndexError, ValueError):
+    except (KeyError, IndexError, ValueError, TypeError):
+        # TypeError：载荷里被当作清单翻译的字段其实是数字（例如开始排空事件的 running_runs），
+        # 一种说明写不成不能把整条事件流断掉（工单 #1188 的端到端撞到）
         return GENERIC_EVENT_LABEL
 
 
 class _Translated(dict):
-    # 停止原因与部门取中文名，标识清单取数量，其余字段原样
+    # 停止原因与部门取中文名，标识清单取数量，其余字段原样。
+    # 数字与清单同名时以载荷里的类型为准：整数的 running_runs 不按清单翻译，标签里直接写数字
     _NAMES = {
         "stop_reason": stop_reason_name, "reason": value_name,
         "department": department_name, "requester": department_name, "recipient": department_name,
-        "guidance_ids": item_count, "candidate_ids": item_count, "running_runs": item_count,
+        "guidance_ids": item_count, "candidate_ids": item_count,
         "stopped_runs": item_count, "restarted_work_items": item_count,
         "kind": decision_kind_name,
         "artifact_kind": artifact_kind_name,
