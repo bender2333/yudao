@@ -3803,6 +3803,64 @@
         }
       }
     },
+    "/api/queries/run.loops": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "run.loops",
+        "operationId": "query_run_loops",
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_RunLoopsResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "tags": [
@@ -9626,6 +9684,243 @@
         ],
         "title": "LiveAttempt"
       },
+      "LoopActivation": {
+        "properties": {
+          "activation_id": {
+            "type": "string",
+            "title": "Activation Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "missing": {
+            "type": "string",
+            "title": "Missing"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/LoopStep"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "activation_id",
+          "department",
+          "started_at",
+          "finished_at",
+          "state",
+          "missing",
+          "steps"
+        ],
+        "title": "LoopActivation"
+      },
+      "LoopAmount": {
+        "properties": {
+          "used": {
+            "type": "integer",
+            "title": "Used"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "unlimited": {
+            "type": "boolean",
+            "title": "Unlimited"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "used",
+          "limit",
+          "unlimited"
+        ],
+        "title": "LoopAmount"
+      },
+      "LoopFact": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "position"
+        ],
+        "title": "LoopFact"
+      },
+      "LoopLayer": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "state": {
+            "type": "string",
+            "title": "State"
+          },
+          "missing": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing"
+          },
+          "amounts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/LoopAmount"
+            },
+            "type": "object",
+            "title": "Amounts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "state",
+          "missing",
+          "amounts"
+        ],
+        "title": "LoopLayer"
+      },
+      "LoopStep": {
+        "properties": {
+          "step_id": {
+            "type": "integer",
+            "title": "Step Id"
+          },
+          "activation_id": {
+            "type": "string",
+            "title": "Activation Id"
+          },
+          "purpose": {
+            "type": "string",
+            "title": "Purpose"
+          },
+          "requested_at": {
+            "type": "string",
+            "title": "Requested At"
+          },
+          "attempts": {
+            "type": "integer",
+            "title": "Attempts"
+          },
+          "accepted": {
+            "type": "boolean",
+            "title": "Accepted"
+          },
+          "facts": {
+            "items": {
+              "$ref": "#/components/schemas/LoopFact"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "calls": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Calls"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "step_id",
+          "activation_id",
+          "purpose",
+          "requested_at",
+          "attempts",
+          "accepted",
+          "facts",
+          "calls"
+        ],
+        "title": "LoopStep"
+      },
+      "LoopTrend": {
+        "properties": {
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "switch_rounds": {
+            "type": "integer",
+            "title": "Switch Rounds"
+          },
+          "flip_threshold": {
+            "type": "integer",
+            "title": "Flip Threshold"
+          },
+          "rho": {
+            "type": "number",
+            "title": "Rho"
+          },
+          "step_state": {
+            "type": "string",
+            "title": "Step State"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "method",
+          "switch_rounds",
+          "flip_threshold",
+          "rho",
+          "step_state",
+          "note"
+        ],
+        "title": "LoopTrend"
+      },
       "MarkSeen": {
         "properties": {
           "command_id": {
@@ -12499,6 +12794,109 @@
         ],
         "title": "RunExportResult"
       },
+      "RunLoopsResult": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "parameters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Parameters"
+          },
+          "method": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Method"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/LoopLayer"
+            },
+            "type": "array",
+            "title": "Layers"
+          },
+          "activations": {
+            "items": {
+              "$ref": "#/components/schemas/LoopActivation"
+            },
+            "type": "array",
+            "title": "Activations"
+          },
+          "rounds": {
+            "type": "integer",
+            "title": "Rounds"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoopTrend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "project_id",
+          "work_item_id",
+          "status",
+          "stop_reason",
+          "parameters",
+          "method",
+          "layers",
+          "activations",
+          "rounds",
+          "trend"
+        ],
+        "title": "RunLoopsResult"
+      },
       "RunRecoveryResult": {
         "properties": {
           "work_item_id": {
@@ -13250,6 +13648,24 @@
           "data"
         ],
         "title": "Snapshot[RunExportResult]"
+      },
+      "Snapshot_RunLoopsResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunLoopsResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[RunLoopsResult]"
       },
       "Snapshot_RunRecoveryResult_": {
         "properties": {
