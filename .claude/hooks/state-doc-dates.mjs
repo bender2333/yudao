@@ -7,7 +7,7 @@ const STATE_DOCS = [
   /^(CLAUDE|AGENTS|CONTEXT|README)\.md$/,
   /^docs\/(architecture|architecture-view)\.html$/,
   /^docs\/(program-roadmap|foundation-rules)\.md$/,
-  /^docs\/(agents|design)\//,
+  /^docs\/(agents|design|requirements)\//,
   /^\.claude\/skills\/.+\.md$/,
 ];
 const DATE = /\b20\d\d-\d\d-\d\d\b/g;

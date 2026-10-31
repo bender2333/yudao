@@ -2,7 +2,7 @@
 
 总图位置：第四节「要守的缝」的十三道缝，以及第一节的方框、第三节内环六步与外环九个状态。
 
-子架构师维护的对照表：总图的词、代码里现在的名字、归哪道缝。立缝时把那一行改成「一致」。按 main 2026-10-29（`c5308acf`）清点。
+子架构师维护的对照表：总图的词、代码里现在的名字、归哪道缝。立缝时把那一行改成「一致」。按 main `c5308acf` 清点。
 
 ## 用法
 
@@ -200,10 +200,3 @@
 | 看门狗 | 无；排空在 `streams.py` 的 `DrainState` | `test_runtime_drain.py`、`test_drain_upgrade.py`（集成，只守排空） | 排空期间新事项排队、在跑的照常结束 |
 | 四层 | 上面两层（事实与裁决、循环）的文件：内核清单里 `kind` 为 `module` 的文件，五个契约模块，`orchestrator.py`、`runtime.py`、`engine.py`、`assembly.py`、`context.py` | `test_thin_driver_names.py`（单元，只查 `orchestrator.py`）；其余文件靠差异报告里的部门名检索 | 薄驱动不写部门与成果的名字 |
 | 三环 | 第三环：内核清单 `harness/definitions/kernel-manifest.json`；第二环：五个契约模块、骨架事件、接口合同、定义格式；第一环：各道缝的实现 | 第三环 `kernel/test_manifest.py`（单元，导入方向与行数）、`path_guard.py`；第二环 `kernel/test_contract_surface.py`、`kernel/test_only_grows.py`、`test_contract_modules.py`、`test_openapi_snapshot.py`；第一环 `test_second_routing.py`、`test_second_slot_implementations.py`、`test_action_contract.py` 的第二种实现 | 内核只导入内核与标准库、行数有上限；契约名称与版本、骨架事件与停止原因只增；路由、装配、执行、执行环境能换第二种实现 |
-
-## 变更记录
-
-- 2026-10-29 / claude-sonnet-5-5 / 对着 main c5308acf 重核全表：改了 34 行（11 行把原来写「无」或「代码里还没有」的补上了代码里已有的名字，4 行补上漏记的名字，19 行订正名字或它所在的文件）；判断改为「一致」的 7 行、改为「不一致」的 4 行，「路由实现与它的定义、工作单元的大小」一行拆成两半分别判断；去掉旧提交号，其余行的名字核对无误；说明段里「一致的词不用记，立缝时逐行消」一句改为立缝时把那一行改成一致（表里仍有大量一致的行，原句与表相矛盾） / 原表按 2026-10-25 清点，整片过期（decision.md 2026-10-29）
-- 2026-10-31 / claude-opus-5-5 / 加直做、子事项与子组织、核验角色、写入范围、成果种类与提案合同五行，「质检放行，事项完成」改为「放行或开环完成，事项完成」；「部门与角色」「核验中」改为不一致，`VERIFIER_OF` 从「谁能拒绝谁」移到核验角色一行；接纳补 `artifact_accepted`；`done` 一句补开环完成 / 按总图 ADR-0044 的改动核对
-- 2026-10-31 / claude-opus-5-5（子架构师） / 「画面」一节加七种元件的对照表、画面拓扑、盖章台与出口托盘、章、点开回链五行，都是不一致 / 按画面总图与画面与播放设计说明第 10 至 13 节核对
-- 2026-10-31 / claude-opus-5-5 / 加第 4 节「每道缝的守卫」：十三道缝与四层、三环各一行，写两侧在代码里、守卫文件与层、守卫实际断言的规矩；「核实方法、能否取消」一行改为一致（`Action.verification`、`Action.cancellable` 已在动作合同里） / 按缝的差异报告从这里取守卫清单；对着 main 5f5ff252 核对时发现该行过期

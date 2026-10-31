@@ -1,6 +1,6 @@
 # D21 模型请求、原始数据与用量观测
 
-状态：有效。依据：[总图](../architecture.html)第一节「界面」方框与第四节「投影」「接口」的缝；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[模型管理设计说明](../design/model-management.md)。路线位置：[总体路线图](../program-roadmap.md)第 5 节判据二「能度量」（阶段一：模型尝试、用量与主机回执）与判据四「看得见」。
+状态：有效。依据：[总图](../architecture.html)第一节「页面」方框与第四节「投影」「接口」的缝；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[模型管理设计说明](../design/model-management.md)。路线位置：[总体路线图](../program-roadmap.md)第 5 节判据二「能度量」（阶段一：模型尝试、用量与主机回执）与判据四「看得见」。
 
 界面提供可观测性：展示原始的请求、原始数据与 token 统计等信息，参考 Oh My Pi 的状态 Web 页面。
 

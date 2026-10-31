@@ -1,6 +1,6 @@
 # 采纳写回以三份代码树合并变更
 
-状态：已确认（2026-10-08）；最近一次改动：2026-10-28 写回检查按 [ADR-0038](0038-function-first-commands-without-registration.md) 写成源目录设置里的命令，去掉旧编号；依据：[接入已有项目设计说明](../design/existing-project-onboarding.md)第 5 节；路线位置：阶段二薄片 ①「真实项目接着做」。
+状态：已确认；依据：[接入已有项目设计说明](../design/existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」；路线位置：阶段二薄片 ①「真实项目接着做」。
 
 ## 背景
 

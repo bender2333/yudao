@@ -1,6 +1,6 @@
 # D01 Web 持续输入任务与命令
 
-状态：有效。依据：[总图](../architecture.html)第一节「界面」方框与第四节「接口」的缝；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」。
+状态：有效。依据：[总图](../architecture.html)第一节「页面」方框与第四节「接口」的缝；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)。路线位置：[总体路线图](../program-roadmap.md)阶段一「单机诚实闭环，三道槽位立缝」。
 
 ## 已确认
 

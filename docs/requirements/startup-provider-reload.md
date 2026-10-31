@@ -121,7 +121,7 @@ flowchart TB
     Target --> Runtime
 ~~~
 
-Web 不持有另一个目录真相。模块关系和调用时序见[模型管理设计说明](../design/model-management.md)第 13 节。
+Web 不持有另一个目录真相。模块关系和调用时序见[模型管理设计说明](../design/model-management.md)「统一调用、取消与观测」。
 
 ## 8. 验收标准
 

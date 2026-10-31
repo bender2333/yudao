@@ -1,6 +1,6 @@
 # D29 远程执行环境
 
-状态：有效。依据：[总图](../architecture.html)第四节「动作」的缝与第六节「拆开部署」；部署形态见 [ADR-0018](../adr/0018-single-control-host-remote-execution.md)，机器授权与结果未知两条依据 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)；设计：[执行环境服务设计说明](../design/execution-environment.md)。路线位置：[总体路线图](../program-roadmap.md)阶段四「拆开部署、细粒度协作、产品的城」（拆开与四道过网络的缝），第 3 节道 10 部署与环境、道 05 动作与工具（远程执行代理）。
+状态：有效。依据：[总图](../architecture.html)第四节「动作」的缝与第六节「拆开部署」；部署形态见 [ADR-0018](../adr/0018-single-control-host-remote-execution.md)，机器授权与结果未知两条依据 [ADR-0038](../adr/0038-function-first-commands-without-registration.md)；设计：[执行环境服务设计说明](../design/execution-environment.md)。路线位置：[总体路线图](../program-roadmap.md)阶段四「拆开部署、细粒度协作」（拆开与四道过网络的缝），第 3 节道 10 部署与环境、道 05 动作与工具（远程执行代理）。
 
 ## 已确认
 

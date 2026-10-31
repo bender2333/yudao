@@ -2,9 +2,9 @@
 
 本文档记录 Yudao 原型设计各版本的演化历程、核心设计决策与交互改进。
 
-**当前定稿：[v13](v13/index.html)；模型管理页以 [v14](v14/index.html) 为准**（v13 于 2026-10-25 用户确认；v14 于 2026-10-30 定稿，依据 D24）。界面的结构、行为与外观以它为准，截图对照与录制也用它（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）；像素画面从 v13 起按画面合同与播放时间线工作（[画面与播放设计说明](../design/visualization.md)）。每一版的设计说明与构建约定只写与前一版不同的地方：v14 沿用 [v13](v13/design.md)（只改模型管理页），v13 沿用 [v12](../archive/prototypes/v12/design.md)，v12 沿用 [v11](v11/design.md)，v11 沿用 [v10](v10/design.md)，v10 沿用 [v9](../archive/prototypes/v9/design.md)，v9 沿用 [v8](../archive/prototypes/v8/design.md)。设计文档里写明版本号的引用，指的是那一版首次给出的内容。原型定稿时改这一行，并把开放的工单中引用旧版本代码的路径改为新版本。
+原型只回答设计问题：一张用假数据的单页草图，不带翻译层与播放时间线，答完就扔，不演进成工程代码，也不当外观的标准（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）。页面照设计说明做；画面是单独的应用，按画面合同与诚实性验收（[画面与播放设计说明](../design/visualization.md)）。[v13](v13/index.html) 还留在本目录，客户端的对照测试与生成脚本仍读它，画面搬出时一并归档；更早的版本与 v14（模型管理页）在 [docs/archive/prototypes/](../archive/prototypes/)。
 
-**下一版原型（v15）的待办**（2026-10-25，由 v13 的待办转来）：v13 只做了画面与数据解耦，下面几处都照 v12 画。第 1 至 9 条是 v12 设计说明第 5 节没有定的，括号里是架构师的推荐，等用户确认；第 10 至 12 条是 2026-10-25 对照路线图第 4 节步 0 与阶段一补的，用户已定记在这里、不开工单；第 13 条是 2026-10-26 补的，也是架构师的推荐，等用户确认。确认了的在 v14 里画：
+**原 v15 待办与去向**：不再画下一版原型，十三条按归属处理。归页面、进基础部分的设计说明：第 2、3、4、5、7、8、9 条。归画面、进画面自己的待办：第 6、10、11、12 条。作废：第 1 条（推荐本来就是不显示）、第 13 条（只为原型的模拟接口存在）。各条原文：
 
 1. 事项用的是哪一种路由，界面显示不显示（B15）：推荐现在不显示，任务池上线时再定。
 2. 「定义版本不同」的卡片列不列出变了哪几份定义，路由改变走不走这张卡片（A12）：推荐列，按名字写；路由属于组织定义，走同一张卡片；事项开始时要记下每份定义各自的摘要。
@@ -61,8 +61,8 @@
 ## [v11] - 2026-10-23
 
 ### 原型交付
-- 原型文件：[v11/index.html](v11/index.html)（浏览器直接打开，档位切到「自举试点」）
-- 设计文档：[v11/design.md](v11/design.md)；构建约定：[v11/BUILD.md](v11/BUILD.md)
+- 原型文件：[v11/index.html](../archive/prototypes/v11/index.html)（浏览器直接打开，档位切到「自举试点」）
+- 设计文档：[v11/design.md](../archive/prototypes/v11/design.md)；构建约定：[v11/BUILD.md](../archive/prototypes/v11/BUILD.md)
 - 规格：工单 [#650](https://github.com/bender2333/yudao/issues/650)
 
 ### 变更明细
@@ -78,8 +78,8 @@
 - 客户端按这一版重新生成像素登记表（`client/src/renderer/src/pixel/generated/`），画面与原型一致。
 
 ### 原型交付
-- 原型文件：[v10/index.html](v10/index.html)（浏览器直接打开，档位切到「自举试点」）
-- 设计文档：[v10/design.md](v10/design.md)；构建约定：[v10/BUILD.md](v10/BUILD.md)；验收脚本：[v10/checks/](v10/checks/)
+- 原型文件：[v10/index.html](../archive/prototypes/v10/index.html)（浏览器直接打开，档位切到「自举试点」）
+- 设计文档：[v10/design.md](../archive/prototypes/v10/design.md)；构建约定：[v10/BUILD.md](../archive/prototypes/v10/BUILD.md)；验收脚本：[v10/checks/](../archive/prototypes/v10/checks/)
 - 规格：父工单 [#395](https://github.com/bender2333/yudao/issues/395)
 
 ### 变更明细
@@ -283,6 +283,6 @@
 
 ## [v14] 模型管理部分（交互原型，模型管理页的定稿）
 
-Codex（GPT-6） / 2026-10-30 00:18 / 新增 [v14/index.html](v14/index.html)，外壳与公共页面复用 V13；模型管理改为填写 URL、Key 后获取候选、搜索筛选、勾选后自动补全与验证，首个可用模型自动供三个部门使用，支持凭据错误、地址不可达、空列表、模型权限失败与容量未知的演示 / 用户要求参考 V13 制作 V14 的模型管理部分。原型使用示例数据。说明见 [v14/design.md](v14/design.md)，运行见 [v14/BUILD.md](v14/BUILD.md)。
+Codex（GPT-6） / 2026-10-30 00:18 / 新增 [v14/index.html](../archive/prototypes/v14/index.html)，外壳与公共页面复用 V13；模型管理改为填写 URL、Key 后获取候选、搜索筛选、勾选后自动补全与验证，首个可用模型自动供三个部门使用，支持凭据错误、地址不可达、空列表、模型权限失败与容量未知的演示 / 用户要求参考 V13 制作 V14 的模型管理部分。原型使用示例数据。说明见 [v14/design.md](../archive/prototypes/v14/design.md)，运行见 [v14/BUILD.md](../archive/prototypes/v14/BUILD.md)。
 
 claude-sonnet-5-5（总架构师） / 2026-10-30 / v14 定为模型管理页的定稿，其余页面仍以 v13 为准；原型没有演示的部分（多个连接、手动添加、容量未知时手填窗口与输出上限、高级部分）按模型管理设计说明第 9.1 节 / 用户按它试用模型管理的要求（D24）

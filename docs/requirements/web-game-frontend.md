@@ -1,6 +1,6 @@
 # D30 游戏化的 Web 界面与界面实现
 
-状态：有效。依据：[总图](../architecture.html)第一节「界面」方框与第四节「接口」「画面」的缝；[画面总图](../architecture-view.html)；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)、[画面与播放设计说明](../design/visualization.md)；原型：当前定稿的版本写在[原型变更记录](../prototypes/CHANGELOG.md)开头，界面的结构、行为与外观以它为准（[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)）。路线位置：[总体路线图](../program-roadmap.md)第 4 节三个空间（步 0 起）与第 3 节道 09 画面与空间。
+状态：有效。依据：[总图](../architecture.html)第一节「页面」方框与「画面」方框、第四节「接口」「画面」的缝；[画面总图](../architecture-view.html)；设计：[应用层与接口层设计说明](../design/app-and-interface.md)、[网页界面的提供与发布设计说明](../design/web-interface-and-release.md)、[画面与播放设计说明](../design/visualization.md)；[ADR-0021](../adr/0021-client-pixel-view-follows-v9-structure.md)。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 09 画面与空间与第 4 节「画面自己的阶段：楼、机房、城」。
 
 ## 已确认
 

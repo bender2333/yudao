@@ -1,6 +1,6 @@
 # D23 统一 Provider 层与 OpenCode Go 接入
 
-状态：有效。依据：[总图](../architecture.html)第四节「模型」的缝；设计：[模型管理设计说明](../design/model-management.md)第 13 节。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 06 模型与判定点（多协议无状态调用与凭据隔离），阶段一「模型」缝立住。
+状态：有效。依据：[总图](../architecture.html)第四节「模型」的缝；设计：[模型管理设计说明](../design/model-management.md)「统一调用、取消与观测」。路线位置：[总体路线图](../program-roadmap.md)第 3 节道 06 模型与判定点（多协议无状态调用与凭据隔离），阶段一「模型」缝立住。
 
 调用目标按每次模型请求解析，调用协议属于模型访问定义，连接地址保存请求基址，以[模型管理设计说明](../design/model-management.md)为准。
 
