@@ -31,6 +31,7 @@
 "test_ask_chain.py" = "integration"
 "test_ask_chain_rules.py" = "unit"
 "test_assembly.py" = "module"
+"test_browser_tool_definitions.py" = "unit"
 "test_bash.py" = "integration"
 "test_bash_jobs.py" = "integration"
 "test_bash_process_tree.py" = "integration"

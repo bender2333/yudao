@@ -139,7 +139,7 @@ flowchart LR
 | `kind` | `web`（网页应用）或 `desktop`（桌面程序） |
 | `commands` | 按执行位置的系统给出的 argv 列表，键是 `windows` 或 `linux`，至少一项，例如 `{"linux": ["sh", "-c", "npm ci && npm run build && npm start"], "windows": ["cmd", "/c", "npm ci && npm run build && npm start"]}` |
 | `ready_url` | 只用于网页应用：执行位置本机（`127.0.0.1` 或 `localhost`）上带 `{port}` 的一个 `http` 地址，例如 `http://127.0.0.1:{port}/`；执行代码把 `{port}` 替换成这个会话的端口以后使用 |
-| `ready_timeout_sec` | 可选，默认 300，范围 10 至 1800 |
+| `ready_timeout_sec` | 可选，默认 300、范围 10 至 3600（取值与界限取自规则登记里的 `execution.readiness_timeout_sec`） |
 
 就绪条件：网页应用是对替换端口以后的 `ready_url` 的请求得到任何 HTTP 响应，会话随后在浏览器中打开这个地址；桌面程序是启动的进程树中出现第一个可见的顶层窗口，执行代码把它放在主显示器上（第 5.2 节）。
 
@@ -154,17 +154,18 @@ U 接纳交付说明时核对：名称不重复；种类是两者之一；`comma
 两个部门怎样使用：
 
 - **工程**：内置 Prompt 写明，交付网页应用或桌面程序时在交付说明中写启动方式，网页应用从 `PORT` 读取端口、`ready_url` 中的端口写成 `{port}`，交付之前用 `trial_start` 以同一个启动方式确认它能够就绪。`commands` 写质检检查位置所用系统的命令；运行工作区与检查位置的系统不同时两种都写，工程只能自测运行工作区所用系统的那一条，另一条由质检第一次运行。需求中写明了启动方式时（例如评测场景 1 的接口约定），工程按需求写。
-- **质检**：`trial_start` 只接受当前交付说明中的启动方式名称。交付说明没有写启动方式（或者没有检查位置所用系统的命令）、而验收条件需要在界面上核验时，质检把这些条目记为 `failed`，以 `rework_engineering` 退回工程，缺陷写明「交付说明没有写启动方式」或缺少哪个系统的启动命令。这样处理的理由：启动方式是工程交付的一部分，缺少它与「交付的软件无法启动」同属交付的缺陷（第 8.4 节第一行），工程自己就能补上，循环不需要用户参与；`cannot_verify` 只用于质检自己的条件不够、需要用户修改设置的情况，两类原因各有一种处理，规则保持一致。
+- **质检**：`trial_open` 只接受当前交付说明中的启动方式名称。交付说明没有写启动方式（或者没有检查位置所用系统的命令）、而验收条件需要在界面上核验时，质检把这些条目记为 `failed`，以 `rework_engineering` 退回工程，缺陷写明「交付说明没有写启动方式」或缺少哪个系统的启动命令。这样处理的理由：启动方式是工程交付的一部分，缺少它与「交付的软件无法启动」同属交付的缺陷（第 8.4 节第一行），工程自己就能补上，循环不需要用户参与；`cannot_verify` 只用于质检自己的条件不够、需要用户修改设置的情况，两类原因各有一种处理，规则保持一致。
 
 ### 3.4 试用工具
 
 | 工具 | 部门 | 输入 | 作用 | 回执 |
 | --- | --- | --- | --- | --- |
-| `trial_start` | 质检、工程 | 质检：`launch_name`（当前交付说明中一个启动方式的名称）；工程：`launch`（一个启动方式，字段同第 3.3 节） | 结束本部门原来的会话；桌面种类先经用户同意并排队取得控制主机的桌面（第 5.1 节）；核对执行位置上有试用需要的程序（第 3.2 节）；建立试用副本；取得空闲端口；按执行位置的系统选用命令，启动交付的软件并等待就绪；网页种类启动 Playwright MCP 并打开就绪地址，桌面种类最小化其他程序的窗口（第 5.2 节） | 会话身份、种类、端口与就绪地址、试用副本的树摘要、启动输出的开头部分；网页种类带页面的可访问性结构与截图，桌面种类带屏幕截图与截图尺寸；缺少程序时写明缺少的程序 |
+| `trial_start` | 工程 | `launch`（一个启动方式，字段同第 3.3 节） | 结束本部门原来的会话；桌面种类先经用户同意并排队取得控制主机的桌面（第 5.1 节）；核对执行位置上有试用需要的程序（第 3.2 节）；建立试用副本；取得空闲端口；按执行位置的系统选用命令，启动交付的软件并等待就绪；网页种类启动 Playwright MCP 并打开就绪地址，桌面种类最小化其他程序的窗口（第 5.2 节） | 会话身份、种类、端口与就绪地址、试用副本的树摘要、启动输出的开头部分；网页种类带页面的可访问性结构与截图，桌面种类带屏幕截图与截图尺寸；缺少程序时写明缺少的程序 |
+| `trial_open` | 质检 | `launch_name`（当前交付说明中一个启动方式的名称） | 与 `trial_start` 相同 | 与 `trial_start` 相同 |
 | `trial_output` | 质检、工程 | 可选的字节数 | 取回交付软件到目前为止的标准输出与标准错误的末尾部分 | 输出、截断标记 |
 | `trial_stop` | 质检、工程 | 无 | 结束会话：关闭 MCP 服务与浏览器，结束交付软件的进程树，桌面种类恢复被最小化的窗口并交还桌面，删除试用副本 | 结束方式、输出的末尾部分 |
 
-两个部门的 `trial_start` 在定义中的参数不同，其余相同。质检给出的名称不在当前交付说明中时，工具许可拒绝，原因写明交付说明中已有的启动方式名称（没有时写明交付说明没有写启动方式）。
+同一个工具名不能在两个部门有不同参数，所以工程用 `trial_start`、质检用 `trial_open`，其余相同。质检给出的名称不在当前交付说明中时，工具许可拒绝，原因写明交付说明中已有的启动方式名称（没有时写明交付说明没有写启动方式）。
 
 试用副本的来源：
 
@@ -201,7 +202,7 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 | 工具 | Playwright 只读标注 | 需要图像输入 |
 | --- | --- | --- |
 | `browser_navigate`、`browser_navigate_back` | 否 | 否 |
-| `browser_click`、`browser_hover`、`browser_drag`、`browser_type`、`browser_fill_form`、`browser_select_option`、`browser_press_key`、`browser_file_upload`、`browser_handle_dialog` | 否 | 否 |
+| `browser_click`、`browser_hover`、`browser_drag`、`browser_type`、`browser_fill_form`、`browser_select_option`、`browser_press_key`、`browser_file_upload`、`browser_drop`、`browser_handle_dialog` | 否 | 否 |
 | `browser_wait_for`、`browser_tabs`、`browser_resize`、`browser_emulate_media`、`browser_close` | 否 | 否 |
 | `browser_snapshot`、`browser_find`、`browser_console_messages`、`browser_network_requests`、`browser_network_request` | 是 | 否 |
 | `browser_verify_element_visible`、`browser_verify_text_visible`、`browser_verify_list_visible`、`browser_verify_value` | 否 | 否 |
@@ -210,7 +211,7 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 不提供的工具：`browser_evaluate` 与 `browser_run_code_unsafe`，原因是试用记录要反映用户在界面上能做的操作，脚本可以绕过界面直接修改页面状态，这样得到的结论不能说明用户能完成这项操作（第 16 节第 5 项）。`vision`、`pdf`、`storage`、`devtools` 能力不启用：坐标操作由屏幕工具承担，其余三项与核验交付无关。
 
-`browser_file_upload` 的路径是试用副本中的相对路径，执行代码把它转成执行位置上的绝对路径；副本之外的路径拒绝。
+`browser_file_upload` 与 `browser_drop` 的路径是试用副本中的相对路径，执行代码把它转成执行位置上的绝对路径；副本之外的路径拒绝。
 
 ### 4.3 每一步交给模型的内容
 
@@ -295,7 +296,7 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 | 工具 | 质检（含图像） | 质检（只有文本） | 工程（含图像） | 工程（只有文本） | 产品 |
 | --- | --- | --- | --- | --- | --- |
-| `trial_start`、`trial_output`、`trial_stop` | 有 | 有（只能启动网页种类） | 有 | 有（只能启动网页种类） | 无 |
+| `trial_start`（工程）、`trial_open`（质检）、`trial_output`、`trial_stop` | 有 | 有（只能启动网页种类） | 有 | 有（只能启动网页种类） | 无 |
 | 浏览器工具（除 `browser_take_screenshot`） | 有 | 有 | 有 | 有 | 无 |
 | `browser_take_screenshot` | 有 | 无 | 有 | 无 | 无 |
 | `screen_*` | 有 | 无 | 有 | 无 | 无 |
@@ -347,7 +348,7 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 1. 读取 ProductSpec 的每条验收条件，登记检验方式：命令检查（`run_check`）、试用用例、主机测量、带参照材料的判定点、人、开环。能用命令核对的（数据、计算、接口）用 `run_check`；需要在界面上操作才能观察的用试用用例；没有可执行检验的条件标为开环，写进放行记录；一条验收条件可以同时使用两种。
 2. 每个试用用例从一条或几条验收条件导出：前置状态、操作步骤、预期结果。
-3. 按当前交付说明的启动方式用 `trial_start` 开始试用会话；交付说明没有写需要的启动方式时按第 3.3 节退回工程。
+3. 按当前交付说明的启动方式用 `trial_open` 开始试用会话；交付说明没有写需要的启动方式时按第 3.3 节退回工程。
 4. 用 `trial_case_begin` 打开用例，按计划操作，观察结果；用 `trial_case_end` 给出结论。
 5. 页面上有可以断言的内容时优先使用 `browser_verify_*`，断言的结果本身就是证据。
 
@@ -405,7 +406,7 @@ QAReview 工件的 `evidence_refs` 写入逐条结论引用的检查回执与试
 
 | 动作 | 谁有权做 | 结果未知时向哪里查 | 可以重做 | 取消能否确认停止 |
 | --- | --- | --- | --- | --- |
-| `trial_start` | 质检、工程（角色的工具许可） | 按尝试身份查询动作记录与会话记录 | 可以：会话记录不存在或已中断时以新的尝试重新开始，得到新的会话；会话已经就绪时使用它 | 能：结束已启动的进程树，回执为已取消 |
+| `trial_start`（工程）、`trial_open`（质检） | 角色的工具许可 | 按尝试身份查询动作记录与会话记录 | 可以：会话记录不存在或已中断时以新的尝试重新开始，得到新的会话；会话已经就绪时使用它 | 能：结束已启动的进程树，回执为已取消 |
 | `trial_stop` | 同上 | 会话记录 | 可以：按会话身份重复执行，结果相同 | 能 |
 | `trial_output` | 同上 | 无需查询 | 可以 | 能 |
 | 只读标注为是的浏览器工具、`screen_screenshot`、`screen_wait` | 同上 | 无需查询 | 可以：以新的尝试重新执行 | 能：MCP 的取消通知或结束屏幕动作 |
@@ -440,7 +441,7 @@ sequenceDiagram
   participant M as Playwright MCP
   participant W as 写入口
   participant Art as 工件存储
-  S->>U: trial_start(launch_name)
+  S->>U: trial_open(launch_name)
   U-->>S: 允许：名称在当前交付说明中，种类为网页
   S->>Pool: 动作：交付快照的清单与启动方式
   Pool->>A: 建立试用副本（远程只上传缺少的内容块）
@@ -480,7 +481,7 @@ sequenceDiagram
   participant User as 用户（界面）
   participant A as 执行代码（控制主机）
   participant W as 写入口
-  S->>U: trial_start(launch_name)，种类为桌面
+  S->>U: trial_open(launch_name)，种类为桌面
   U-->>S: 允许：执行位置是控制主机，模型含图像
   S->>O: 需要使用本机桌面
   alt 本事项已经「本事项内都允许」
@@ -628,3 +629,5 @@ sequenceDiagram
 - 2026-10-29 / claude-sonnet-5-5 / 按设计说明规范整理：开头改为总图位置与依据一行，状态与路线位置的说明删去，computer use 部分的说明改为「范围：」一段；删去第 17 节，以及正文里的工单号、规则登记的指向和第 15 节指向应用层与接口层设计说明第 7.5 节的引用；就绪时限的范围写为 10 至 1800 / 设计与实施分离（decision.md 2026-10-29）
 - 2026-10-30 / claude-sonnet-5-5（总架构师） / 第 6.2 节加图像的存放与交接：事件与历史只存工件引用，装配时才读出最近 3 张，动作回执以一组工件引用交给步骤驱动，浏览器截图与 MCP 图像同一个形状，图像按张计入用量估算 / 执行者在 #149 里自己定的做法，经总架构师采纳（docs/architecture-issues.md 2026-10-30 08:15 一条）
 - 2026-10-31 / claude-opus-5-5 / 第 2.1 节加总说明：本文的质检指核验角色；U 的核对改为由所有路由共用的核验执行，删去代码路径；「质检无法核验」改为「核验角色无法核验」；核验结论不接受被核验方的证据 / 按总图 ADR-0044 的改动核对
+- 2026-10-31 / DeepSeekRuntime（执行者，工单 #147） / 第 3.4 节与正文里质检的试用工具改称 `trial_open`（同一个工具名不能在两个部门有不同参数）；第 4.2 节的清单加 `browser_drop` 并写明路径规则与 `browser_file_upload` 相同；就绪时限的范围按规则登记 `execution.readiness_timeout_sec` 改为 10 至 3600 / 工具定义按调用目标的输入方式提供
+
