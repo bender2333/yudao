@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import AwareDatetime, Field
 
+from .. import loops
 from ..event_store import Command
 from ..models import CatalogEventType, Event, EventType, ProjectEvent, ProjectEventType, utc_now
 from .commands import Rejection
@@ -19,6 +20,23 @@ from .registry import CommandDefinition, QueryDefinition, UnchangedEvent
 
 if TYPE_CHECKING:
     from .application import Application
+
+# 收敛状态的变化（工单 #399，取 run.loops 的五层树）：报告里按用户看得懂的说法写层与状态的名，
+# 代码名只在 harness/loops.py 与 run.loops 的合同里出现
+LAYER_NAMES: dict[str, str] = {
+    "project_loop": "项目",
+    "work_item": "事项",
+    "run": "部门之间的循环",
+    "activation": "部门激活",
+    "step": "步骤",
+}
+STATE_NAMES: dict[str, str] = {
+    "converging": "收敛中",
+    "stalled": "停滞",
+    "oscillating": "震荡",
+    "boundary": "达到边界",
+    "undetermined": "无法判定",
+}
 
 # 报告范围（设计说明第 4.3 节）：自上次查看、最近 24 小时、最近 7 天
 RANGES: dict[str, str] = {"since_seen": "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天"}
@@ -107,7 +125,7 @@ def _away_report(application: Application, request: AwayReportRequest) -> Snapsh
     to_at = store.created_at_at(to_position) or utc_now()
     from_position, from_at = _range_start(application, request.range, to_at)
     collected = _events_in_range(store, from_position, to_position, request.project)
-    summary = _summary(collected)
+    summary = _summary(application, collected, from_position, to_position)
     facts = [_fact(event) for event in collected if event.type in FACT_TYPES]
     seen = application.home_seen()
     return Snapshot[AwayReport](
@@ -149,7 +167,8 @@ def _events_in_range(store: Any, from_position: int, to_position: int,
         cursor = batch[-1].position
     return collected
 
-def _summary(events: list[Event | ProjectEvent]) -> list[ReportItem]:
+def _summary(application: Application, events: list[Event | ProjectEvent],
+             from_position: int, to_position: int) -> list[ReportItem]:
     # 汇总各项：由范围内的事件汇总得到，没有来源事件的项不显示（不写成零）。
     # 完成与放行、用量来自现有事件；故障、修复、部署与回滚、等待模型服务、磁盘与报到属于 Stage 4
     # 「完成与放行的事项」只数成果被采纳（deliverable_adopted）或被质检放行的事项：
@@ -175,7 +194,78 @@ def _summary(events: list[Event | ProjectEvent]) -> list[ReportItem]:
     if rework:
         items.append(ReportItem(id="rework", label="返工", value=len(rework), unit="次",
                                 refs=[event.position for event in rework]))
+    # 收敛状态的变化（工单 #399，需要 run.loops）：范围内各 run 在起点与终点的层状态不同时列出。
+    # run.loops 还没登记时这一项不出现
+    convergence = _convergence_item(application, events, from_position, to_position)
+    if convergence is not None:
+        items.append(convergence)
+    # 带开环条件的放行（工单 #399）：放行记录里列出了开环条件的那几次，明细写出条件编号
+    open_release = _open_release_item(events)
+    if open_release is not None:
+        items.append(open_release)
     return items
+
+
+def _convergence_item(application: Application, events: list[Event | ProjectEvent],
+                      from_position: int, to_position: int) -> ReportItem | None:
+    # 收敛状态的变化：每个 run 的层状态各自取范围内起点与终点的两次判定（同一份 run.loops 的五层树，
+    # 不另起投影）；只在有变化时出现
+    if "run.loops" not in application.registry.queries:
+        return None
+    store = application.system.store
+    run_ids = sorted({event.run_id for event in events
+                      if isinstance(event, Event) and event.run_id is not None})
+    rows: list[str] = []
+    refs: list[int] = []
+    for run_id in run_ids:
+        run_rows, ref = _convergence_rows(store, run_id, from_position, to_position)
+        rows.extend(run_rows)
+        if ref is not None:
+            refs.append(ref)
+    if not rows:
+        return None
+    return ReportItem(id="convergence", label="收敛状态的变化", value=len(rows), unit="处",
+                      refs=refs, detail="；".join(rows))
+
+
+def _convergence_rows(store: Any, run_id: str, from_position: int,
+                      to_position: int) -> tuple[list[str], int | None]:
+    # 一个 run 在范围内起点与终点的层状态：终点没有事件（范围开始之前就结束的 run）时不算变化；
+    # 起点还没有事件时按「无法判定」比较（范围里才开始的 run 也算状态变化）
+    after_events = store.list_events(run_id, through_position=to_position)
+    if not after_events:
+        return [], None
+    after = loops.build_loop_tree(after_events)
+    before_events = store.list_events(run_id, through_position=from_position)
+    before = {layer.name: layer.state for layer in loops.build_loop_tree(before_events).layers} \
+        if before_events else {}
+    rows = [
+        f"{after.work_item_id or run_id} · {LAYER_NAMES.get(layer.name, layer.name)}："
+        f"{STATE_NAMES.get(before.get(layer.name, loops.UNDETERMINED), before.get(layer.name, loops.UNDETERMINED))}"
+        f" → {STATE_NAMES.get(layer.state, layer.state)}"
+        for layer in after.layers
+        if before.get(layer.name, loops.UNDETERMINED) != layer.state
+    ]
+    if not rows:
+        return [], None
+    # 来源事件指这个 run 的起点（建 run 的事件）：它不随 run 里的事件增加而变化，
+    # 这一项的内容只在层状态真的变化时才变（否则每来一条事件引用都会变）
+    created = next((event for event in after_events if event.type == EventType.RUN_CREATED), after_events[0])
+    return rows, created.position
+
+
+def _open_release_item(events: list[Event | ProjectEvent]) -> ReportItem | None:
+    # 带开环条件的放行：放行记录里有开环条件的那几次，明细写事项与条件编号
+    releases = [event for event in events
+                if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") == "release"
+                and event.payload.get("open_criteria")]
+    if not releases:
+        return None
+    detail = "；".join(
+        f"{event.work_item_id or '未记事项'}：{'、'.join(str(item) for item in event.payload['open_criteria'])}"
+        for event in releases)
+    return ReportItem(id="open_release", label="带开环条件的放行", value=len(releases), unit="次",
+                      refs=[event.position for event in releases], detail=detail)
 
 def _fact(event: Event | ProjectEvent) -> ReportFact:
     return ReportFact(
@@ -197,19 +287,27 @@ async def _mark_seen(application: Application, command: Command, request: MarkSe
         raise Rejection("not_allowed", "查看的位置超过日志末尾，请刷新以后重试")
     application.system.mark_seen(request.position, command=command)
 
+# 改变这份报告结果的事件（工单 #399）：汇总与关键事实之外，收敛状态的变化读 run.loops 的五层树，
+# 所以 run.loops 的刷新清单里那几种事件（建 run、激活的开始与结束、每一步的请求、工具回执、成果接纳、
+# run 的结束与继续）同样改变这份报告
+LOOP_STATE_TYPES: tuple[str, ...] = (
+    "run_created", "department_activated", "activation_finished", "model_requested", "tool_called",
+    "artifact_accepted", "spec_accepted", "contract_accepted", "delivery_accepted", "structure_accepted",
+    "baseline_review_accepted", "product_decision_accepted", "run_continued", "run_resumed",
+)
+
 HOME_AWAY_REPORT = QueryDefinition(
     name="home.away_report", request=AwayReportRequest, result=AwayReport, handle=_away_report,
     # 已看过也触发重查：点「已看过」以后同一页面立即显示新的上次查看（工单 #301）
-    changed_by=tuple(sorted(FACT_TYPES)) + (EventType.MODEL_ATTEMPT_FINISHED, CatalogEventType.HOME_SEEN),
+    changed_by=tuple(sorted(FACT_TYPES)) + (EventType.MODEL_ATTEMPT_FINISHED, CatalogEventType.HOME_SEEN) \
+    + LOOP_STATE_TYPES,
     unchanged_by=(
         UnchangedEvent(EventType.CONTEXT_ASSEMBLED, "上下文装配不改变这份报告的汇总与关键事实"),
         UnchangedEvent(EventType.MODEL_REQUEST_SERIALIZED, "请求序列化不改变这份报告的汇总与关键事实"),
-        UnchangedEvent(EventType.MODEL_REQUESTED, "发出模型请求不改变这份报告的汇总与关键事实"),
         UnchangedEvent(EventType.MODEL_MESSAGE, "模型消息不改变这份报告的汇总与关键事实"),
         UnchangedEvent(EventType.MODEL_REASONING, "模型的推理内容不改变这份报告的汇总与关键事实"),
         UnchangedEvent(EventType.MODEL_STREAM_PROGRESS, "流式进度不改变这份报告的汇总与关键事实"),
         UnchangedEvent(EventType.TOOL_STARTED, "工具开始不改变这份报告的汇总与关键事实"),
-        UnchangedEvent(EventType.TOOL_CALLED, "工具调用不改变这份报告的汇总与关键事实"),
     ),
 )
 

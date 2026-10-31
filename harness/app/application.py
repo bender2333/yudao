@@ -40,6 +40,7 @@ from .catalog_queries import CATALOG_CHANGE_IMPACT_QUERY, CATALOG_DOCUMENT_QUERY
 from .commands import execute
 from .contracts import API_VERSION, AccessMode, Accepted, Capabilities, CommandRequest, Deployment, Rejected, Snapshot
 from .decision_commands import DECISION_ANSWER
+from .coverage_queries import ACCEPTANCE_COVERAGE
 from .decision_queries import DECISIONS_LIST
 from .evidence_queries import EVIDENCE_EXTERNAL_SOURCE
 from .. import fetch
@@ -127,6 +128,7 @@ DEFAULT_REGISTRY = Registry(
               CREDENTIAL_REMOVE_PERSISTED, RUNTIME_START_DRAIN, RUNTIME_FORCE_UPGRADE, HOME_MARK_SEEN,
               PARAMETER_SET, PARAMETER_WITHDRAW],
     queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, EVIDENCE_EXTERNAL_SOURCE,
+             ACCEPTANCE_COVERAGE,
              CATALOG_QUERY, CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY,
              TOOLS_REGISTRY, RUN_LOOPS],
     decisions=tuple(DECISION_KINDS))

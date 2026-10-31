@@ -272,7 +272,13 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
             "ask_started", "ask_answered",
             "qa_submitted", "run_done", "run_paused", "run_failed", "decision_requested", "decision_answered",
             "deliverable_adopted", "work_item_created",
-        ]) + ["model_attempt_finished", "home_seen"],
+        ]) + ["model_attempt_finished", "home_seen"] + [
+            # 收敛状态的变化（工单 #399）：run.loops 的刷新清单同样改变这份报告
+            "run_created", "department_activated", "activation_finished", "model_requested", "tool_called",
+            "artifact_accepted", "spec_accepted", "contract_accepted", "delivery_accepted",
+            "structure_accepted", "baseline_review_accepted", "product_decision_accepted",
+            "run_continued", "run_resumed",
+        ],
     }
     # 规则登记：现值是参数事件折叠的结果，参数修改触发重查（工单 #349）
     assert capabilities["queries"][-3] == {
@@ -297,11 +303,12 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
-        "evidence.external_source", "tools.registry", "run.loops",
+        "evidence.external_source", "tools.registry", "run.loops", "acceptance.coverage",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {
         "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry", "run.loops",
+        "acceptance.coverage",
     }
     # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入；
     # 事实来源不依赖查询，事件对象带上 source 以后列出（工单 #396，设计说明第 4.3 节）
@@ -312,6 +319,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "sources", "queries": ["project.loop"]},
         # 循环与收敛（工单 #400）：依赖 run.loops（#397 已登记）
         {"name": "loops", "queries": ["run.loops"]},
+        # 检验覆盖与开环（工单 #399）：依赖 acceptance.coverage
+        {"name": "coverage", "queries": ["acceptance.coverage"]},
     ]
     assert _registered_paths(document, "/api/commands/") == set(DEFAULT_REGISTRY.commands)
     assert _registered_paths(document, "/api/queries/") == set(DEFAULT_REGISTRY.queries)

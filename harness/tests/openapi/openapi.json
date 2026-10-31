@@ -3625,6 +3625,64 @@
         }
       }
     },
+    "/api/queries/acceptance.coverage": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "acceptance.coverage",
+        "operationId": "query_acceptance_coverage",
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_AcceptanceCoverageResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/catalog": {
       "get": {
         "tags": [
@@ -4174,6 +4232,67 @@
   },
   "components": {
     "schemas": {
+      "AcceptanceCoverageResult": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "review_event_id": {
+            "type": "string",
+            "title": "Review Event Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/CoverageNumbers"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageCriterion"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "open_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Open Criteria"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "work_item_id",
+          "verdict",
+          "review_event_id",
+          "revision",
+          "numbers",
+          "criteria",
+          "open_criteria"
+        ],
+        "title": "AcceptanceCoverageResult"
+      },
       "Accepted_CatalogConnectionSaveRefs_": {
         "properties": {
           "command_id": {
@@ -7335,6 +7454,84 @@
           "reasons"
         ],
         "title": "CommandCapability"
+      },
+      "CoverageCriterion": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "unverified"
+            ],
+            "title": "Result"
+          },
+          "executable": {
+            "type": "boolean",
+            "title": "Executable"
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criterion",
+          "method",
+          "result",
+          "executable",
+          "open"
+        ],
+        "title": "CoverageCriterion"
+      },
+      "CoverageNumbers": {
+        "properties": {
+          "criteria_total": {
+            "type": "integer",
+            "title": "Criteria Total"
+          },
+          "executable": {
+            "type": "integer",
+            "title": "Executable"
+          },
+          "covered": {
+            "type": "integer",
+            "title": "Covered"
+          },
+          "coverage_ratio": {
+            "type": "number",
+            "title": "Coverage Ratio"
+          },
+          "model_reading": {
+            "type": "integer",
+            "title": "Model Reading"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criteria_total",
+          "executable",
+          "covered",
+          "coverage_ratio",
+          "model_reading",
+          "open"
+        ],
+        "title": "CoverageNumbers"
       },
       "CredentialClearOverride": {
         "properties": {
@@ -13560,6 +13757,24 @@
           "command_id"
         ],
         "title": "RuntimeStartDrain"
+      },
+      "Snapshot_AcceptanceCoverageResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AcceptanceCoverageResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[AcceptanceCoverageResult]"
       },
       "Snapshot_AwayReport_": {
         "properties": {
