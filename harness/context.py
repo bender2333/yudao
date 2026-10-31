@@ -413,6 +413,7 @@ class ContextAssembler:
                             "created_event_id": spec.created_event_id,
                             "non_goals": spec.non_goals,
                             "requirements": spec.requirements,
+                            "requirement_mapping": spec.requirement_mapping,
                             "revision": spec.revision,
                             "status": spec.status,
                             "decision_changes": spec.decision_changes,

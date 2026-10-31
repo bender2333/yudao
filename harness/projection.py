@@ -703,6 +703,7 @@ def _product_spec_from_payload(payload: dict[str, Any], event: Event) -> Product
         decision_changes=list(payload["decision_changes"]),
         change_record=payload["change_record"],
         input_version=payload["input_version"],
+        requirement_mapping=list(payload.get("requirement_mapping", [])),
     )
 
 

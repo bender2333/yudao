@@ -952,7 +952,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#77>",
+    "content_hash": "<sha256#79>",
     "id": "<spec#1>",
     "input_version": 1,
     "issuer": "product",
@@ -973,9 +973,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#79>",
+    "content_hash": "<sha256#81>",
     "input_version": 1,
-    "product_spec_hash": "<sha256#77>",
+    "product_spec_hash": "<sha256#79>",
     "revision": 1
    }
   },
