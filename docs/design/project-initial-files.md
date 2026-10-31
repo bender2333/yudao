@@ -1,6 +1,6 @@
 # 项目的起始文件夹设计说明
 
-总图位置：第一节「一份事实」方框（起始文件夹的快照是事项的起点）。依据：[D37 新建项目的起始文件夹](../requirements/project-initial-files.md)、[接入已有项目设计说明](existing-project-onboarding.md)（快照采集、`source_invalid` 与公开树的规则）、[本地通用工具设计说明](local-tools.md)（公开树）、[应用层与接口层设计说明](app-and-interface.md)第 3.1、3.2 节、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流只增加字段）、[恢复契约](recovery-contract-and-fault-matrix.md)第 6 节第 10 行。
+总图位置：第一节「一份事实」方框（起始文件夹的快照是事项的起点）。依据：[D37 新建项目的起始文件夹](../requirements/project-initial-files.md)、[接入已有项目设计说明](existing-project-onboarding.md)（快照采集、`source_invalid` 与公开树的规则）、[本地通用工具设计说明](local-tools.md)（公开树）、[应用层与接口层设计说明](app-and-interface.md)「合同」与「命令清单」、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流只增加字段）、[恢复契约](recovery-contract-and-fault-matrix.md)「故障矩阵」第 10 行。
 
 ## 1. 要解决的问题
 
@@ -36,11 +36,11 @@ flowchart LR
 
 `project.create` 增加可选参数 `initial_directory`：控制主机上的文件夹路径（与 `project.onboard` 的源目录路径同样是主机上的路径）。
 
-- 采集：命令处理时在事务之前，用与 `project.onboard` 相同的采集路径（`harness/snapshot.py` 的 `ingest_snapshot`）只读采集公开树，源目录不被写入。忽略规则、宿主私有路径与无法表示的条目与建档相同（[接入已有项目设计说明](existing-project-onboarding.md)第 3.1 节），失败时命令被拒绝，原因 `source_invalid`，`message` 列出工作区内的相对路径与处理方法，不建立项目，不写入任何事件。
+- 采集：命令处理时在事务之前，用与 `project.onboard` 相同的采集路径（`harness/snapshot.py` 的 `ingest_snapshot`）只读采集公开树，源目录不被写入。忽略规则、宿主私有路径与无法表示的条目与建档相同（[接入已有项目设计说明](existing-project-onboarding.md)「命令」），失败时命令被拒绝，原因 `source_invalid`，`message` 列出工作区内的相对路径与处理方法，不建立项目，不写入任何事件。
 - 存放：快照的代码树作为工件保存，所属范围是项目（与 `project_goal` 工件相同），不属于任何 run。引用快照的位置（`tree_ref`）带所属范围，读取时按它取得所属范围，不假设属于某个 run。
 - 事件：`project_registered` 增加可选字段 `initial_snapshot`，内容是快照记录（`source`、`tree_digest`、`files`、`directories`、`tree_ref`、`provenance`，字段与 `work_item_created.snapshot` 相同）。旧事件没有这个字段，缺省含义为没有起始文件夹（ADR-0019，字段清单登记）。
 - 与 `project.onboard` 的区别：不登记源目录（以后不能重新采集，不能用 `onboarding.restart`）；不建立建档事项；项目来源保持 `idea`；起始文件夹只能在新建项目时给出，以后不能增加或替换，需要不同的文件时新建项目，或者由事项的交付提供。
-- 起始文件夹是一次性的采集：建档以后源目录的修改不进入项目（接入已有项目设计说明第 5 节），起始文件夹同理。
+- 起始文件夹是一次性的采集：建档以后源目录的修改不进入项目（[接入已有项目设计说明](existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」），起始文件夹同理。
 
 ## 4. 事项
 
@@ -54,7 +54,7 @@ flowchart LR
 ## 5. 界面与评测
 
 - 界面「从想法新建」表单增加可选项「起始文件夹」：单行文本，提示「控制主机上的文件夹路径，留空则从空项目开始」；提交以后项目概览的「项目摘要」在没有采纳成果时写「起点：起始文件夹（N 个文件）」，有采纳成果以后不再写。
-- 评测场景 3 的 Yudao 运行器用 `initial_directory` 带入 `subway_data.json`，与 OpenCode 一侧起点相同（[评测场景设计](evaluation-scenarios.md)第 3 节「隔离」）。
+- 评测场景 3 的 Yudao 运行器用 `initial_directory` 带入 `subway_data.json`，与 OpenCode 一侧起点相同（[评测场景设计](evaluation-scenarios.md)「两边的运行条件」中「隔离」一行）。
 
 ## 6. 模块交互
 
@@ -103,11 +103,7 @@ sequenceDiagram
 
 | 现有内容 | 改变 |
 | --- | --- |
-| 接入已有项目设计说明第 5 节「已有代码的唯一入口」与第 12 节第 1 项 | 已有项目的代码仍只经 `project.onboard` 接入并建档；新建项目的起始文件夹是另一条入口，不建档 |
-| 应用层与接口层设计说明第 3.2 节 `project.create` | 增加可选参数与事件字段 |
-| 恢复契约第 6 节第 10 行 | 因升级重新开始的事项取项目的起点 |
+| [接入已有项目设计说明](existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」中的「已有代码的唯一入口」与「用户确认的决定」第 1 项 | 已有项目的代码仍只经 `project.onboard` 接入并建档；新建项目的起始文件夹是另一条入口，不建档 |
+| [应用层与接口层设计说明](app-and-interface.md)「命令清单」 `project.create` | 增加可选参数与事件字段 |
+| [恢复契约](recovery-contract-and-fault-matrix.md)「故障矩阵」第 10 行 | 因升级重新开始的事项取项目的起点 |
 | `harness/projects.py` 三处重复的起点写法 | 合为一个函数 |
-
-## 变更记录
-
-- 2026-10-29 / claude-sonnet-5-5 / 按设计说明规范整理：开头合并为总图位置与依据一行，删去更新日期、状态、路线位置、父工单、里程碑和工单号 / 设计与实施分离（decision.md 2026-10-29）
