@@ -26,11 +26,11 @@
 
 - 除非工单或用户指定，不读取 `docs/archive/`。
 - 中间结果放在 `.tmp/`（已被 git 忽略）。
-- 文档分两种。状态文档写现在是什么样，读起来像一次写成的：总图、画面总图、路线图、基础规则、规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`、`.claude/skills/`）、术语表、设计说明、`README.md`。它们不写日期、谁在哪天定的、原来怎样改成怎样、哪份文件已归档或被取代。记录文档写发生过什么：`docs/CHANGELOG.md`、`docs/decision.md`、日记、ADR、需求记录、调研、评测与验收证据、`docs/archive/`。历史只进记录文档与提交说明。
+- 文档分两种。状态文档写现在是什么样，读起来像一次写成的：总图、画面总图、路线图、基础规则、规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`、`.claude/skills/`）、术语表、设计说明、需求记录、`README.md`。它们不写日期、谁在哪天定的、原来怎样改成怎样、哪份文件已归档或被取代。记录文档写发生过什么：`docs/CHANGELOG.md`、`docs/decision.md`、日记、ADR、调研、评测与验收证据、GitHub 工单与 Discussions、`docs/archive/`。历史只进记录文档与提交说明。
 - 规则或总图改了，已有的文档在同一次改动里改到新的样子，不留「下次碰到时再改」。
 - 修改 `docs/` 下的文档（包括设计说明）时，在 `docs/CHANGELOG.md` 追加一行，格式：`模型 ID / 时间（到分钟） / 具体的改动 / 原因`；改了小节标题的，在这一行写「旧标题 → 新标题」。
 - `docs/decision.md` 按时间正序，新条目追加在末尾，标题 `## YYYY-MM-DD - 标题`；与变更记录、日记一样，三份都只在末尾追加。
-- 设计说明的开头只放一行「总图位置」与依据，不记状态与改动历史，写法见[设计说明规范](design-spec.md)。需求记录与 ADR 的开头只放一行状态：状态、引用的依据与路线位置；它们的改动经过只记在 `docs/CHANGELOG.md`。
+- 设计说明的开头只放一行「总图位置」与依据，不记状态与改动历史，写法见[设计说明规范](design-spec.md)。需求记录写现在的需求与验收标准，开头只放一行：状态、引用的依据与路线位置；正文不收用户原话与讨论经过，这些在 git、日记、工单与 Discussions 里。ADR 的开头只放一行状态。两者的改动经过只记在 `docs/CHANGELOG.md`。
 - 日记格式：`模型 ID / 时间（分钟） / 行动或者想法或者其他`。架构师的日记是根目录的 `claude_jour.md`；执行者的日记在 `agents_jour/<工单编号>.md`，一张工单一个文件，没有工单编号的工作写在 `agents_jour/其他.md`，内容开头写明角色；审查者的记录是 PR 上的审查。
 - 工单：GitHub Issues 是工作队列，记录状态、领取、阻塞与验收清单；长篇设计、计划与证据放在 `docs/`，工单正文只写摘要并链接到对应文档。`gh` 命令写法见 [issue-tracker.md](issue-tracker.md)，标签含义见 [triage-labels.md](triage-labels.md)，领域文档的读法见 [domain.md](domain.md)。
 

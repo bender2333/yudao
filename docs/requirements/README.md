@@ -2,9 +2,9 @@
 
 > 需求原文与确认规则的索引；进度看 GitHub 的里程碑与工单。[总体路线图](../program-roadmap.md) 定义当前阶段，D09 的次数/超时及用量只读约束继续有效。
 
-> 2026-10-07：[D38 系统意图与基础规则](system-intent.md)是 Yudao 的总体意图，其他需求记录与它冲突时以它为准。
+> [D38 系统意图与基础规则](system-intent.md)是 Yudao 的总体意图，其他需求记录与它冲突时以它为准。
 
-每项新增细节单独记录，保留原话、确认规则和待定事项。汇总范围见 [已确认需求清单](../archive/confirmed-requirements.md)。
+每项需求单独记录，写现在的需求与验收标准；用户原话与讨论经过在 git、日记、工单与 Discussions 里，不收进记录。汇总范围见 [已确认需求清单](../archive/confirmed-requirements.md)。
 
 | 编号 | 细节 |
 | --- | --- |
