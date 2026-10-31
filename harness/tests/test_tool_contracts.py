@@ -15,7 +15,8 @@ from pydantic import TypeAdapter, ValidationError
 from harness.actions import Action, ActionReceipt
 from harness.definitions import (ADDED_KINDS, DEFINITIONS, ESTABLISHED_CONTRACTS, ActionKind, Identifier, Tool,
                                  established_cancellable, established_verification)
-from harness.tools import (tool_action, tool_cancellable, tool_kind, tool_verification, tools_for)
+from harness.tools import (BROWSER_TOOL_NAMES, tool_action, tool_cancellable, tool_kind, tool_verification,
+                           tools_for)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFINITIONS_MODULE = REPO_ROOT / "harness" / "definitions" / "__init__.py"
@@ -26,13 +27,18 @@ def test_tools_are_host_tools_or_environment_actions():
     # 主机工具由控制核心处理（提交类工具与询问/回答工具）；其余工具是环境工具，各有动作类别
     assert {name for name, tool in TOOLS.items() if tool.kind == "host"} == {
         *{name for name in TOOLS if name.startswith("submit_")}, "ask", "answer"}
-    assert {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"} == {
-        "read_file": "read", "list_files": "read", "search": "read", "read_range": "read",
-        "read_external_source": "read",
-        "fetch_url": "fetch",
-        "write_file": "write", "edit_range": "write", "delete_file": "write", "move_file": "write",
-        "run_check": "check", "bash": "command", "read_output": "command", "stop_job": "command",
-    }
+    environment = {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"}
+    by_action = {action: {name for name, value in environment.items() if value == action}
+                 for action in set(environment.values())}
+    assert by_action["read"] == {"read_file", "list_files", "search", "read_range", "read_external_source"}
+    assert by_action["fetch"] == {"fetch_url"}
+    assert by_action["write"] == {"write_file", "edit_range", "delete_file", "move_file"}
+    assert by_action["check"] == {"run_check"}
+    assert by_action["command"] == {"bash", "read_output", "stop_job"}
+    # 试用工具与浏览器工具（工单 #147）：定义随系统发布，到 #1182 能执行时才放进角色的工具清单
+    assert by_action["trial"] == {"trial_start", "trial_open", "trial_output", "trial_stop"}
+    assert by_action["browser"] == set(BROWSER_TOOL_NAMES)
+    assert set(environment) == set().union(*by_action.values())
 
 
 def test_every_department_reads_saved_external_sources_and_fetches():
@@ -91,13 +97,15 @@ def test_each_action_kind_follows_the_recovery_contract():
 
 
 def test_every_environment_tool_declares_the_action_metadata():
-    # 新发布的静态环境工具定义显式给出新增元数据；主机工具没有动作，也没有这两项
+    # 新发布的静态环境工具定义显式给出新增元数据；主机工具没有动作，也没有这两项。
+    # 类别有自己的既定合同时按它核对；试用与浏览器按工具不同（第 9 节），由各自的定义写明后另有用例核对
     for name, tool in TOOLS.items():
         if tool.kind != "environment":
             assert tool.verification is None and tool.cancellable is None, name
             continue
         assert tool.verification is not None and tool.cancellable is not None, f"{name} 没有写明动作合同的元数据"
-        assert tool.verification == established_verification(tool.action), name
+        fixed_verification = established_verification(tool.action)
+        assert fixed_verification is None or tool.verification == fixed_verification, name
         fixed = established_cancellable(tool.action)
         assert fixed is None or tool.cancellable == fixed, name
 

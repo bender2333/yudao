@@ -688,7 +688,12 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
     "routings.json": ("routings", TypeAdapter(Routings)),
     "event_sources.json": ("event_sources", TypeAdapter(dict[Identifier, EventSource])),
+    # 生成的浏览器工具定义（浏览器与 computer use 设计说明第 4.1 节，工单 #147）：与 tools.json 合并成工具清单
+    "browser_tools.json": ("browser_tools", TypeAdapter(dict[Identifier, Tool])),
 }
+# 可以不存在的定义文件：浏览器工具是随系统发布的一份生成定义，只用于测试的另一份完整定义里没有它时
+# 这份定义就没有浏览器工具（发布的那一份由 harness/tests/test_browser_tool_definitions.py 核对确实加载得到）
+_OPTIONAL_FILES = frozenset({"browser_tools.json"})
 
 
 class _DuplicateKey(ValueError):
@@ -720,6 +725,10 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
     for file, (field, adapter) in _FILES.items():
         path = directory / file
         if not path.is_file():
+            if file in _OPTIONAL_FILES:
+                # 可选的生成定义缺省为空：这份定义里没有那批工具
+                parts[field] = {}
+                continue
             issues.append((file, "（整个文件）", "定义文件不存在"))
             continue
         try:
@@ -742,6 +751,15 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
             parts[field] = adapter.validate_json(text, strict=True)
         except ValidationError as exc:
             issues.extend((file, _location(error["loc"]), error["msg"]) for error in exc.errors())
+    # 浏览器工具是单独一份生成的文件：与手写的工具清单合并，同名工具即定义不合法（工单 #147）
+    browser_tools = parts.pop("browser_tools", {})
+    if "tools" in parts:
+        merged = dict(parts["tools"])
+        for name in browser_tools:
+            if name in merged:
+                issues.append(("browser_tools.json", name, "工具名与 tools.json 重复"))
+        merged.update(browser_tools)
+        parts["tools"] = merged
     if issues:
         raise DefinitionError(issues)
     issues = _references(parts)
