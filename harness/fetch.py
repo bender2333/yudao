@@ -85,10 +85,11 @@ class FetchReceipt:
 
 
 def configure_service_address(host: str, port: int) -> None:
-    # 服务自己的监听地址与端口：取回与浏览器导航只拒绝这些地址与端口
+    # 服务自己的监听地址与端口：取回与浏览器导航只拒绝这些地址与端口。
+    # 端口为 0 时由系统分配，实际端口在绑定以后才知道（测试与端口 0 的启动方式），这一版不据此拒绝
     global SERVICE
-    if not isinstance(port, int) or not 0 < port < 65536:
-        raise ValueError("the service port must be an integer between 1 and 65535")
+    if not isinstance(port, int) or not 0 <= port < 65536:
+        raise ValueError("the service port must be an integer between 0 and 65535")
     if not isinstance(host, str):
         raise ValueError("the service host must be a string")
     SERVICE = (host or "127.0.0.1", port)
@@ -184,8 +185,9 @@ def _refuse_service_address(url: str) -> None:
 
 
 def _service_endpoints() -> set[tuple[str, int]]:
-    # 服务自己的地址与端口：监听具体地址时按它解析，监听所有地址时本机的每个接口地址都算
-    if SERVICE is None:
+    # 服务自己的地址与端口：监听具体地址时按它解析，监听所有地址时本机的每个接口地址都算。
+    # 端口为 0 时实际端口未知，这一版没有可以拒绝的地址
+    if SERVICE is None or SERVICE[1] == 0:
         return set()
     host, port = SERVICE
     return {(str(address), port) for address in _listen_addresses(host)}
