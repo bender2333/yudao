@@ -12,6 +12,8 @@ dependencies = [
     "fastapi>=0.141,<1", "uvicorn>=0.54,<1", "filelock>=4,<5", "truststore>=0.10,<1", "pygit2>=1.20,<2",
     # MCP 客户端（网络与 MCP 设计说明第 7.1 节，工单 #69）：官方 SDK，以及按进程标识结束遗留进程用的 psutil
     "mcp>=2.2,<3", "psutil>=7,<8",
+    # HTML 转文本（网络与 MCP 设计说明第 6.4、17 节，工单 #68）：取回时保留标题、列表、链接与表格的成熟库
+    "html-to-markdown>=1,<2",
 ]
 
 # 安装成 yudao 命令（桌面客户端的安装、更新与发布设计说明第 4.1 节）
@@ -142,6 +144,8 @@ ignore_imports = [
   # 补：工件引用与树的封存
   "harness.app.** -> harness.artifacts",
   "harness.app.** -> harness.tree_archive",
+  # 补：网络取回——接口层启动时把服务自己的监听地址交给应用，应用交给取回（网络与 MCP 设计说明第 6.3、18 节）
+  "harness.app.** -> harness.fetch",
   # 补：用户决定的读取
   "harness.app.** -> harness.decisions",
   # 补：Git 版本与回写

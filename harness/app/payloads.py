@@ -610,11 +610,14 @@ class CompactionRecordedPayload(Versions, WorkBasis, CallTarget):
 
 
 class ToolCallResult(ToolRecord):
-    # 工具执行的结果；args 是模型给出的参数（不是合法 JSON 时为 {"invalid_arguments": 原文}），output_ref 在有输出时出现
+    # 工具执行的结果；args 是模型给出的参数（不是合法 JSON 时为 {"invalid_arguments": 原文}），output_ref 在有输出时出现。
+    # refused 是动作被拒绝的标记与原因（工单 #1170 的回执字段）：工具许可拒绝，或地址规则拒绝取回
     args: dict[str, Any]
     ok: bool
     error: str | None
     output_ref: ArtifactRef | None = None
+    refused: bool = False
+    refused_reason: str | None = None
     # 动作后的公开树快照（工单 #17）：与事件 tool_started 上的动作前快照、动作参数一起构成核实依据
     after_snapshot_ref: ArtifactRef | None = None
 

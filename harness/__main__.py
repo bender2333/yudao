@@ -149,7 +149,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"logs: {log_path}")
         config, dotenv = _provider_paths(args.data_dir, args.provider_config)
         _stop_on_ctrl_c()
-        serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv),
+        serve_api(lambda: Application.open(args.data_dir, provider_config=config, dotenv=dotenv,
+                                         listen=(args.host, args.port)),
                   access=args.access, host=args.host, port=args.port, data_dir=args.data_dir,
                   on_ready=_ready if args.no_browser else _open_page())
         return 0
