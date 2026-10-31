@@ -1,6 +1,6 @@
 # 浏览器与 computer use 设计说明
 
-总图位置：第四节「动作」的缝（浏览器与桌面是动作的两个类别）；第一节「模型与工具」方框。依据：需求 [D34](../requirements/browser-and-computer-use.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（试用启动命令的环境与命令相同，桌面会话的同意单独说明）；[执行环境服务设计说明](execution-environment.md)（执行环境服务、执行代理、执行位置、执行位置上的程序、动作回执）；[模型管理设计说明](model-management.md)「模型访问定义与准入」「部门的建议能力」与「每次模型请求」（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)「两类工具」「动作契约」与「用户决定」；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)「动作分类与处置」；[应用层与接口层设计说明](app-and-interface.md)「命令清单」「用户决定的回答」与「查询清单」；[本地通用工具设计说明](local-tools.md)「工具边界」；[语义系统设计说明](semantic-system.md)「要求类条目的编号」与「数据流核对与质检放行」；[评测场景](evaluation-scenarios.md)场景 1；[原型 v9 设计说明](../archive/prototypes/v9/design.md)（沿用 [v8 设计说明](../archive/prototypes/v8/design.md)第 7.1、7.3、8.3、9.4 节）；调研：[浏览器与 computer use 调研](../archive/research/browser-and-computer-use.md)、[computer use 实现调研](../archive/research/computer-use-implementations.md)。
+总图位置：第四节「动作」的缝（浏览器与桌面是动作的两个类别）；第一节「模型与工具」方框。依据：需求 [D34](../requirements/browser-and-computer-use.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（试用启动命令的环境与命令相同，桌面会话的同意单独说明）；[执行环境服务设计说明](execution-environment.md)（执行环境服务、执行代理、执行位置、执行位置上的程序、动作回执）；[模型管理设计说明](model-management.md)「模型访问定义与准入」「部门的建议能力」与「每次模型请求」（输入方式、部门的建议能力、请求时按输入方式提供工具）；[总体架构](architecture/overall-architecture.md)「两类工具」「动作契约」与「用户决定」；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)「动作分类与处置」；[应用层与接口层设计说明](app-and-interface.md)「命令清单」「用户决定的回答」与「查询清单」；[本地通用工具设计说明](local-tools.md)「工具边界」；[语义系统设计说明](semantic-system.md)「要求类条目的编号」与「数据流核对与质检放行」；[评测场景](evaluation-scenarios.md)场景 1。
 
 范围：computer use 的设计（第 5 节、第 11.2 节、第 16 节第 6 至 10 项与第 12 项，以及其余各节中的屏幕工具 `screen_*`、桌面种类的试用会话与启动方式、「使用本机桌面」决定请求、`trial.stop_desktop`、等待桌面与等待桌面解锁、桌面程序的无法核验与故障，第 14 节场景 2 与场景 3 中桌面程序的部分）作为专题讨论的材料（[D34](../requirements/browser-and-computer-use.md)「computer use 专题待重新确定的事项」），列出的各节仍保留在本文。
 
@@ -228,7 +228,7 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 ### 5.1 屏幕与桌面会话
 
-桌面程序在控制主机上、用户已经登录的交互桌面上试用，输入是真实输入。这与 Codex 在 Windows 上的做法相同：在当前桌面上运行，移动真实光标，占用前台，要求桌面没有锁定（[computer use 调研](../archive/research/computer-use-without-containers.md)第 2.3 节）。
+桌面程序在控制主机上、用户已经登录的交互桌面上试用，输入是真实输入。这与 Codex 在 Windows 上的做法相同：在当前桌面上运行，移动真实光标，占用前台，要求桌面没有锁定。
 
 - **只在控制主机上**：Yudao 服务由用户在自己的登录会话中手动启动（[网页界面的提供与发布设计说明](web-interface-and-release.md)「启动与停止」），能看到交互桌面。开发板没有屏幕；登记的 Windows 机器上执行代理以服务运行，处在 Session 0，没有交互桌面。执行位置不是本机进程时，桌面种类的 `trial_start` 被工具许可拒绝，原因写明「桌面程序只能在控制主机上试用」；质检把依赖它的条目记为无法核验，决定请求的说明写明要把质检的检查位置改为控制主机以后重新开始事项（执行位置在创建 run 时冻结）。
 - **只用真实输入**：输入用 `SendInput`，不使用后台投递（`PostMessage`）。后台投递对 Tk 的按键与文字、Chromium 的全部事件、WPF 的大部分事件无效（OMP `fdfeef1f78` 的 `crates/pi-natives/src/desktop/win32/delivery.rs` 第 63–88 行）；试用记录要反映用户能完成的操作，这与第 4.2 节不提供脚本工具的理由相同。
@@ -249,7 +249,7 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 ### 5.3 动作集合
 
-每个动作一个工具，与浏览器工具的形式相同。工具以 Yudao 自己的函数工具提供给任何支持工具调用、能看图的模型，不使用各家的原生 computer 工具：Anthropic 的 `computer_toolset_20260801` 只由支持它的 Claude 模型发出，OpenAI 与 Gemini 的动作名称与坐标空间各不相同（computer use 实现调研第 6 节），Yudao 的模型由用户提供，协议不限于一家。
+每个动作一个工具，与浏览器工具的形式相同。工具以 Yudao 自己的函数工具提供给任何支持工具调用、能看图的模型，不使用各家的原生 computer 工具：Anthropic 的 `computer_toolset_20260801` 只由支持它的 Claude 模型发出，OpenAI 与 Gemini 的动作名称与坐标空间各不相同，Yudao 的模型由用户提供，协议不限于一家。
 
 | 工具 | 输入 | 对应的 Anthropic 成员 | 返回 |
 | --- | --- | --- | --- |
@@ -328,13 +328,11 @@ Playwright MCP 是 Yudao 内置的 MCP 服务（工具定义随 Yudao 发布，�
 
 ### 7.3 界面
 
-按原型 v9（下面的章节号沿用 v8 设计说明）：
-
-- **部门房间**（第 8.3 节）：质检的试用台显示器与工程的显示器嵌入最近一张截图的缩略图，来自最新的浏览器或屏幕动作的 `tool_called` 事件。浏览器的每一步都有截图，模型不能看图时显示器同样显示截图，角落标明「模型只读取文字」。
-- **部门工作间的试用记录页签**（第 7.1 节）：按用例列出引用的验收条件、计划的操作、每一步的操作、截图与结论；每张截图标明模型是否看到它；点击截图查看原尺寸，旁边列出同一步的可访问性结构摘录。
-- **资料页的质检一项**（第 7.3 节）：每份 QAReview 的逐条结论表，每条验收条件一行，列出检验方式（[验证的独立性设计说明](independent-verification.md)「检验覆盖与开环」的六种）、结果、证据与截图缩略图；没有可执行检验的条件带开环标记；表头写明交付快照的摘要。
-- **工具与扩展页**（第 9.4 节）：内置的浏览器工具与屏幕工具。
-- 原型 v9 沿用 v8 设计说明第 15 节「试用台截图的尺寸与缩放」的决定：浏览器截图 1280×800（16:10），界面等比缩放；桌面截图的尺寸随控制主机的主显示器变化（第 5.2 节），界面按回执中的截图尺寸等比缩放。
+- **部门房间**：质检的试用台显示器与工程的显示器嵌入最近一张截图的缩略图，来自最新的浏览器或屏幕动作的 `tool_called` 事件。浏览器的每一步都有截图，模型不能看图时显示器同样显示截图，角落标明「模型只读取文字」。
+- **部门工作间的试用记录页签**：按用例列出引用的验收条件、计划的操作、每一步的操作、截图与结论；每张截图标明模型是否看到它；点击截图查看原尺寸，旁边列出同一步的可访问性结构摘录。
+- **资料页的质检一项**：每份 QAReview 的逐条结论表，每条验收条件一行，列出检验方式（[验证的独立性设计说明](independent-verification.md)「检验覆盖与开环」的六种）、结果、证据与截图缩略图；没有可执行检验的条件带开环标记；表头写明交付快照的摘要。
+- **工具与扩展页**：内置的浏览器工具与屏幕工具。
+- **试用台截图的尺寸与缩放**：浏览器截图 1280×800（16:10），界面等比缩放；桌面截图的尺寸随控制主机的主显示器变化（第 5.2 节），界面按回执中的截图尺寸等比缩放。
 
 ## 8. 质检从 PRD 生成测试与试用记录
 

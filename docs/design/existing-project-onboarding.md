@@ -1,6 +1,6 @@
 # 接入已有项目设计说明
 
-总图位置：第一节「你」与「一份事实」方框（接入已有项目是事项的一种起点）。依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0034](../adr/0034-adopted-change-writeback-three-tree-merge.md)（采纳写回的合同由它确定）、[总体架构](architecture/overall-architecture.md)「控制核心内部」与「用户决定」、[应用层与接口层设计说明](app-and-interface.md)「命令」与「查询与读取模型」、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[D09 运行限额](../requirements/execution-limits.md)、[原型 v9 设计说明](../archive/prototypes/v9/design.md)（沿用 [v8 设计说明](../archive/prototypes/v8/design.md)第 4、6、7.3、8、12 节）与[构建约定](../archive/prototypes/v9/BUILD.md)（沿用 [v8 构建约定](../archive/prototypes/v8/BUILD.md)第 5.2、8.3 节）。
+总图位置：第一节「你」与「一份事实」方框（接入已有项目是事项的一种起点）。依据：[D33 接入已有项目](../requirements/existing-project-onboarding.md)、[ADR-0019](../adr/0019-project-stream-across-versions.md)（项目流跨版本保存）、[ADR-0034](../adr/0034-adopted-change-writeback-three-tree-merge.md)（采纳写回的合同由它确定）、[总体架构](architecture/overall-architecture.md)「控制核心内部」与「用户决定」、[应用层与接口层设计说明](app-and-interface.md)「命令」与「查询与读取模型」、[本地通用工具设计说明](local-tools.md)（代码快照接入与公开树）、[D09 运行限额](../requirements/execution-limits.md)。
 
 ## 1. 要解决的问题
 
@@ -52,11 +52,11 @@
 
 这个决定请求写在项目流中（第 3.3 节），阻塞的是建档事项与同一项目中排在它后面的事项，不属于任何 run。回答仍使用 `decision.answer`，基准版本为决定请求的版本；`decisions.list` 同时返回 run 流与项目流中的决定请求，项目流中的请求 `run_id` 为空。阻塞范围为「故障记录」的决定（运维部门）使用同一套项目流决定事件。
 
-决定请求携带的材料（决定卡片据此显示，原型 v9 沿用 v8 设计说明第 6 节）：初始 PRD 的摘要与 PRD.md 的工件引用、现有结构说明（STRUCTURE.md）的工件引用、基线核验的汇总（各要求的核实结果计数、现有缺陷清单、失败的已有测试及说明）、快照来源（源目录、git 提交与是否有未提交的修改、文件数与总字节数）、第几轮，以及上一轮用户的修改意见（第二轮起）。
+决定请求携带的材料（决定卡片据此显示）：初始 PRD 的摘要与 PRD.md 的工件引用、现有结构说明（STRUCTURE.md）的工件引用、基线核验的汇总（各要求的核实结果计数、现有缺陷清单、失败的已有测试及说明）、快照来源（源目录、git 提交与是否有未提交的修改、文件数与总字节数）、第几轮，以及上一轮用户的修改意见（第二轮起）。
 
 ### 3.3 领域事件
 
-事件名称是本设计确定的正式名称，代替原型的 `x_onboarding_started`、`x_existing_read`、`x_initial_prd_confirmed`。
+事件名称是本设计确定的正式名称。
 
 **项目流**（登记在项目流字段清单中；新增字段写明旧事件的缺省含义）
 
@@ -80,7 +80,7 @@
 | `baseline_review_accepted` | 质检的基线核验被接纳 |
 | `run_done` | 建档 run 以停止原因 `baseline_verified` 结束（新增到定义的停止原因清单，结果为完成） |
 
-原型中的「阅读已有项目」动作（原型 v9 沿用 v8 设计说明第 8 节）由建档事项中读取、搜索与区间阅读工具的 `tool_started` 事件驱动，不另设事件。
+原型中的「阅读已有项目」动作由建档事项中读取、搜索与区间阅读工具的 `tool_started` 事件驱动，不另设事件。
 
 ### 3.4 查询的变化
 
@@ -180,7 +180,7 @@ flowchart TB
 | --- | --- |
 | 工程（建档的修改轮与退回产品以后的下一次激活） | 常驻栏目 `existing_structure` |
 | 工程（该项目以后的每个事项） | 常驻栏目 `existing_structure`，附「描述的是建档时的代码（树摘要）；当前基线为采纳 rN」，工程据此知道文件可能已经变化，需要时用工具核实 |
-| 用户 | 决定卡片中的链接；资料页的项目材料（原型 v9 沿用 v8 设计说明第 7.3 节） |
+| 用户 | 决定卡片中的链接；资料页的项目材料 |
 | 产品、质检 | 按角色定义中 `existing_structure` 的可见范围：暂定默认值不含，共享的一套取值含（见[验证的独立性设计说明](independent-verification.md)「可见范围作为参数」） |
 
 **可见范围。** 现有结构说明属于全体的架构说明，可见范围写在角色定义的 `visibility` 中（`harness/definitions/roles.json`，由 `harness/context.py:81` 读取），宽度是规则登记中的参数：暂定默认值是工程可见、产品与质检不可见，由 D32 新增的共享一组对照决定是否对三个部门可见。STRUCTURE.md 在材料目录中，材料目录不在公开树内，读取与搜索工具只按可见范围取得它。质检核验初始 PRD 时先从仓库自己找出测试命令并提交独立判断，再看其他材料。复盘写出工程部门的项目画像时，结构说明是它的来源之一（[语义系统设计说明](semantic-system.md)「分层与模块关系」）。
@@ -329,7 +329,7 @@ flowchart LR
 
 所有验收使用真实运行的系统；自动化测试中的模型回答由 FakeAdapter 脚本给出，事件日志、工件与工作区都是真实实现，不使用模拟对象。真实项目验收使用真实模型。
 
-1. **真实项目建档。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v9 的示例项目；约 1.3 万行，有完整的测试集）经 `project.onboard` 使用真实模型完成建档，用户在界面的决定卡片中确认初始 PRD，随后一个事项在它的基础上实现 issue 842 并被采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。登记的测试命令写明 Python 3.13，例如 `uv run --python 3.13 pytest`：Python 3.9 在 Windows 上的时钟精度使 tracing 的 20 条测试结果不稳定，Python 3.13 上全部通过（核对见[决策记录](../archive/decision-2026-09.md)「不使用容器以后的执行环境」一条）。
+1. **真实项目建档。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型的示例项目；约 1.3 万行，有完整的测试集）经 `project.onboard` 使用真实模型完成建档，用户在界面的决定卡片中确认初始 PRD，随后一个事项在它的基础上实现 issue 842 并被采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。登记的测试命令写明 Python 3.13，例如 `uv run --python 3.13 pytest`：Python 3.9 在 Windows 上的时钟精度使 tracing 的 20 条测试结果不稳定，Python 3.13 上全部通过。
 2. **界面。** 接入入口、建档状态与阅读动作、`initial_prd` 决定卡片（含第 3.2 节的材料与两个选项）、资料页的各轮初始 PRD、确认记录、结构说明与基线核验，在真实运行的系统上通过 Playwright 端到端测试，页面上的数据都来自查询与事件流。
 3. **修改的往返。** 用户提出修改并附说明：出现第二轮 run，产品的 ProductSpec 处理了修改意见，质检重新核验，新的决定请求出现；空说明的「提出修改」被拒绝。
 4. **退回产品。** 质检提交带 `unsupported` 或遗漏的基线核验时，run 退回产品；提交 `consistent` 时有 `unsupported` 或未说明的失败检查被拒绝。
@@ -360,6 +360,6 @@ flowchart LR
 1. **已有项目的代码经 `project.onboard` 接入并建档。** `work_item.create` 没有代码快照来源参数。由代码快照开始的普通事项没有初始 PRD，采纳以后项目的当前 PRD 只覆盖一次变更，正是 D33 要解决的问题。评测场景 2 的 Yudao 运行器先建档，由运行器回答初始 PRD 的确认，再新建事项；建档的用量与耗时在报告中单独列出（[评测场景设计](evaluation-scenarios.md)「指标」与「前提与未决事项」）。新建项目带的起始文件夹（[项目的起始文件夹设计说明](project-initial-files.md)）不建档，适合少量的起点文件；完整的已有仓库用 `project.onboard`。
 2. **建档以后源目录的修改不进入项目。** Yudao 从快照开始独立演进，源目录以后的修改不会同步进来；要在新代码上工作时，把源目录接入为新项目（第 5 节）。同步外部修改需要合并两条独立演进的代码与 PRD，属于单独的需求。
 3. **检查的缺省时限为 600 秒。** 真实仓库的测试集常常超过 30 秒，超时的检查只能记为失败，基线失真。限额定义中检查的缺省时限为 600 秒，模型可以在调用时给出更长的时限，最长 3600 秒（[本地通用工具设计说明](local-tools.md)「工具边界」），普通事项的检查同样适用（第 4.2 节）。
-4. **验收使用的真实项目。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v9 的示例项目），建档以后的事项实现 issue 842；这个仓库约 1.3 万行、有完整的测试集，与原型的示例数据一致（第 10 节第 1 项）。
+4. **验收使用的真实项目。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型的示例项目），建档以后的事项实现 issue 842；这个仓库约 1.3 万行、有完整的测试集，与原型的示例数据一致（第 10 节第 1 项）。
 5. **建档 run 的运行时间上限与普通事项相同。** 定义中的 7200 秒，每一轮单独计算；仓库概况与读取顺序限制了阅读的范围，没有核实的功能区域写进初始 PRD 的边界（第 4.2 节）。
 6. **采纳的成果写回源仓库**（第一层自举）。写回以事项起点树到采纳树的变更集作用于写回时 main，冲突停止并保留证据，成功以后生成分支与合并请求（第 5 节、ADR-0034）；建档材料分为现有行为的材料与要求材料（第 4.2 节）。

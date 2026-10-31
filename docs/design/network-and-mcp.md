@@ -1,6 +1,6 @@
 # 网络取回与 MCP 工具设计说明
 
-总图位置：第四节「动作」的缝（取回与 MCP 工具是动作的类别）；第一节「模型与工具」方框。依据：[ADR-0018](../adr/0018-single-control-host-remote-execution.md)；[ADR-0019](../adr/0019-project-stream-across-versions.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)；[总体架构](architecture/overall-architecture.md)「依赖方向」「动作契约」与「用户决定」；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)「动作分类与处置」；[应用层与接口层设计说明](app-and-interface.md)「命令清单」「用户决定的回答」与「查询与读取模型」；[本地通用工具设计说明](local-tools.md)；[浏览器与 computer use 设计说明](browser-and-computer-use.md)「浏览器工具（Playwright MCP）」；[语义系统设计说明](semantic-system.md)的证据；[模型管理设计说明](model-management.md)的凭据。调研：[网络取回与 MCP 的参照实现、官方 SDK 与搜索服务](../archive/research/network-and-mcp-references.md)。
+总图位置：第四节「动作」的缝（取回与 MCP 工具是动作的类别）；第一节「模型与工具」方框。依据：[ADR-0018](../adr/0018-single-control-host-remote-execution.md)；[ADR-0019](../adr/0019-project-stream-across-versions.md)；[ADR-0038](../adr/0038-function-first-commands-without-registration.md)；[总体架构](architecture/overall-architecture.md)「依赖方向」「动作契约」与「用户决定」；[恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md)「动作分类与处置」；[应用层与接口层设计说明](app-and-interface.md)「命令清单」「用户决定的回答」与「查询与读取模型」；[本地通用工具设计说明](local-tools.md)；[浏览器与 computer use 设计说明](browser-and-computer-use.md)「浏览器工具（Playwright MCP）」；[语义系统设计说明](semantic-system.md)的证据；[模型管理设计说明](model-management.md)的凭据。
 
 ## 1. 范围
 
@@ -154,7 +154,7 @@ flowchart LR
 
 - 每个 run 的每个服务器一个实例，第一次调用时启动；run 结束、暂停或停止时关闭；run 之间、项目之间不共享。
 - 默认启动时限 60 秒（`npx`、`uvx` 第一次运行要下载包），调用时限 120 秒（SDK 没有默认时限，Yudao 传入 `read_timeout_seconds`；进度通知不延长时限），返回给模型的输出上限 20000 个字符；设置里可以修改。
-- stdio 服务器的结束：先关闭标准输入，等待 2 秒，然后强制结束整个进程树（SDK 在 Windows 上使用作业对象，调研中已实测有效）。HTTP 服务器关闭会话。
+- stdio 服务器的结束：先关闭标准输入，等待 2 秒，然后强制结束整个进程树（SDK 在 Windows 上使用作业对象）。HTTP 服务器关闭会话。
 - 子进程的环境变量是 Yudao 进程的全部环境变量，加上项目设置中写明的变量（凭据按名称引用，取值时读取当前的凭据来源）。启动时把这份完整的环境变量传给 SDK，因为 SDK 默认在 Windows 上只给子进程 12 个基础变量（上游 issue #3335）。
 - 标准错误输出写到数据目录下的日志文件（SDK 要求带文件描述符的真实文件），读取末尾部分用于诊断，凭据值替换为星号。
 - 启动失败或连接中断：工具结果写明原因与标准错误输出的末尾部分，部门继续做别的事情，事项不停止；系统页显示这个服务器最近一次的状态。

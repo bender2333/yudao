@@ -1,6 +1,6 @@
 # 评测场景：版本回归与 OpenCode 对照
 
-总图位置：第四节系统之外「评价」的缝；第五节验收表的「真实场景」一层。依据：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)（需求）、[评测场景选题调研](../archive/research/evaluation-benchmarks.md)（选题依据）、[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)、[D38](../requirements/system-intent.md)、[规则登记与参数设计说明](rules-and-parameters.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。
+总图位置：第四节系统之外「评价」的缝；第五节验收表的「真实场景」一层。依据：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)（需求）、[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)、[D38](../requirements/system-intent.md)、[规则登记与参数设计说明](rules-and-parameters.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。
 
 ## 1. 用途
 
@@ -40,7 +40,7 @@
 - 需求条目（6 条）：参数保存与序列化；合并时覆盖的一方优先；一方为空或两方都为空时的合并；透传到 Chat Completions；透传到 LiteLLM；参数为空时的行为。8 条 F2P 挂在这 6 个条目下。
 - 环境：仓库按任务的基准提交检出，用仓库自己的锁文件建立环境（`uv sync --frozen --all-extras --all-packages --group dev`），使用 Python 3.13；建立环境时需要网络（GitHub 与 PyPI）。标准答案与上游提交 `0eee6b83` 相同。
   - Python 3.9 在 Windows 上的时钟精度为 15.6 毫秒，tracing 的 20 条原有功能测试结果不稳定。
-  - Python 3.13 上，基准提交的 P2P 与标准答案的 F2P、P2P 各运行 3 次，全部通过（核对见[决策记录](../archive/decision-2026-09.md)「不使用容器以后的执行环境」一条）。
+  - Python 3.13 上，基准提交的 P2P 与标准答案的 F2P、P2P 各运行 3 次，全部通过。
   - 已知有 8 条用例因为缺少 API key 或 pydantic 版本不符而失败，它们不在 F2P 与 P2P 清单中，评分只运行清单中的用例。
 
 ### 2.3 场景 3：北京地铁票价
