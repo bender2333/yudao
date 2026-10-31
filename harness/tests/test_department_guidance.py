@@ -327,7 +327,8 @@ def test_guidance_arriving_while_a_round_waits_for_an_answer_is_delivered_at_its
 
 def test_a_round_that_ends_the_item_still_writes_answered(tmp_path):
     # 验收第 1 条：收到指导的那一轮以放行结束、事项随这一轮完成，同样写已回答。
-    # 这一轮的结束状态是已完成，不是暂停或失败，所以不算「这一轮没有正常结束」
+    # 这一轮的结束状态是已完成，不是暂停或失败，所以不算「这一轮没有正常结束」。
+    # 质检的两轮：先交独立判断（工单 #358），收到指导的那一轮以放行结束
     adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()],
                            "quality": [judgement_turn(), review_turn("release", "checks passed on the current delivery")]})
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -335,6 +336,7 @@ def test_a_round_that_ends_the_item_still_writes_answered(tmp_path):
     system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "quality", "请按当前交付核验并放行。")
+    system.activate_once(run_id)  # 质检先交独立判断（工单 #358）
     result = system.activate_once(run_id)
 
     assert result.status == "done"

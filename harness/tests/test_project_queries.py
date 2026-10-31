@@ -496,6 +496,8 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
             ),
             # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）
             explore_turn(),
+            # 交付到达：先交独立判断再退回（工单 #358）；返工的交付再判断一次再放行
+            judgement_turn(),
             review_turn(
                 "rework_engineering", "质检退回",
                 defects=[{"severity": "minor", "summary": "空输入需要处理"}],
