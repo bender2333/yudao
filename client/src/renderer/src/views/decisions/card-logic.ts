@@ -35,12 +35,37 @@ function initialPrdRows(request: Payload, push: (term: string, value: unknown) =
   push("初始 PRD 摘要", showText(prd.summary, "没有摘要"));
   push("PRD.md 工件", refPath(prd.prd_ref));
   push("PRD 指纹", fingerprint(prd.content_hash));
+  // 要求与验收标准的对应声明（工单 #1349）：每条要求一行，值是对应的 AC 位置，写不出验收标准的写 gap 原因
+  for (const row of requirementRows(prd)) {
+    push(row.term, row.value);
+  }
   push("现有结构说明", refPath(structure.structure_ref));
   push("结构说明指纹", fingerprint(structure.code_tree_digest));
   push("基线核验汇总", baselineSummary(review));
   push("快照来源", showText(snapshot.source, "未上报"));
   push("快照提交", provenanceText(snapshot.provenance));
   push("快照规模", `文件 ${countText(snapshot.files)} 项，目录 ${countText(snapshot.directories)} 项，共 ${bytesText(snapshot.bytes)} 字节`);
+}
+
+// 初始 PRD 的要求与验收标准的对应声明（工单 #1349）：逐条要求一行，值是对应的 AC 位置；
+// 写不出验收标准的要求写它标明的 gap 原因；旧事件的 prd 没有这三项时不出这些行
+function requirementRows(prd: Payload): MaterialRow[] {
+  const requirements = Array.isArray(prd.requirements) ? prd.requirements : [];
+  const mapping = Array.isArray(prd.requirement_mapping) ? prd.requirement_mapping : [];
+  const rows: MaterialRow[] = [];
+  for (const item of mapping) {
+    const entry = (item ?? {}) as Payload;
+    const position = typeof entry.requirement === "number" ? entry.requirement : 0;
+    if (position <= 0) {
+      continue;
+    }
+    const refs = Array.isArray(entry.criteria) ? entry.criteria.map((ref) => String(ref)) : [];
+    const gap = showText(entry.gap, "");
+    const value = refs.length > 0 ? refs.join("、") : gap !== "" ? `未写验收标准：${gap}` : "没有对应声明";
+    const requirement = showText(requirements[position - 1], "");
+    rows.push({ term: `要求 ${position}`, value: requirement === "" ? value : `${value}（${requirement}）` });
+  }
+  return rows;
 }
 
 // 工件引用给出的路径：引用的 path 就是工件的相对路径（PRD.md 与 STRUCTURE.md 按它显示）

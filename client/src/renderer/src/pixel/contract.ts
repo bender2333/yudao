@@ -74,6 +74,24 @@ export interface SourceLegendRow {
 }
 
 /** 覆盖层「来源」的数据：事实元素、缺来源的元素与图例计数（翻译层写好，画面只照着画）。 */
+/** 覆盖层「循环」的一条房间标签（工单 #400）：这个部门第几次激活、步骤循环的已用步数与状态。 */
+export interface LoopsOverlayRoom {
+  department: string;
+  state: string;
+  text: string;
+  step_text: string;
+}
+
+/**
+ * 覆盖层「循环」的数据（工单 #400，原型 v10 设计说明第 3 节）：楼层信息条写 run 层，
+ * 各部门房间写激活层与步骤循环，右上角写五态与「不判定」的图例。
+ */
+export interface LoopsOverlayData {
+  bar: { text: string; state: string };
+  rooms: LoopsOverlayRoom[];
+  legend: { state: string; label: string }[];
+}
+
 export interface SourceOverlayData {
   entries: SourceOverlayEntry[];
   missing: SourceMissingEntry[];

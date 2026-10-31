@@ -207,6 +207,8 @@ class DeliverySpec:
     known_risks: list[str]
     code_tree_digest: str
     tree_ref: ArtifactRef
+    # 交付说明的启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #148）：旧交付没有这一项
+    launch: list[dict[str, Any]] = field(default_factory=list)
     invalidation_reason: str | None = None
 
 

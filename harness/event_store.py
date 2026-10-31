@@ -467,6 +467,31 @@ class EventStore:
         with self._connection() as connection:
             return _end_position(connection)
 
+    def events_at(self, positions: Sequence[int]) -> dict[int, Event | ProjectEvent | CatalogEvent]:
+        # 按全局位置取事件（工单 #1342）：位置 → 那一条事件；这个位置上没有事件时不出现在结果里。
+        # 位置是全库自增的，一个位置最多一条事件；请求里重复的位置只查一次
+        wanted = sorted({int(position) for position in positions})
+        if not wanted:
+            return {}
+        found: dict[int, Event | ProjectEvent | CatalogEvent] = {}
+        with self._connection() as connection:
+            for start in range(0, len(wanted), 500):
+                batch = wanted[start:start + 500]
+                rows = connection.execute(
+                    f"SELECT * FROM events WHERE position IN ({', '.join('?' * len(batch))})", batch,
+                ).fetchall()
+                found.update({int(row["position"]): _from_row(row) for row in rows})
+        return found
+
+    def stream_position_range(self, stream: str) -> tuple[int, int] | None:
+        # 这个流里事件的最早与最末全局位置（工单 #1342）：按位置取事件时用来分辨
+        # 「位置早于这个流的第一条（更早的事件已经归档搬走）」与「范围内缺这一条（已经压缩掉）」
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT MIN(position) AS first, MAX(position) AS last FROM events WHERE stream = ?", (stream,),
+            ).fetchone()
+        return None if row is None or row["first"] is None else (int(row["first"]), int(row["last"]))
+
     def run_time_bounds(self, run_id: str, *, through: int | None = None) -> tuple[str, str] | None:
         # 一个 run 的第一条与最后一条事件的创建时间；没有事件时为空。按 run 与位置的索引读取。
         # through 给出全局位置的上界时只看到该位置以前的最后一条（按位置读取，工单 #127）

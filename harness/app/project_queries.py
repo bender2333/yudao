@@ -10,11 +10,11 @@ import re
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationError, field_validator
 
 from ..definitions import DEFINITIONS, SourceKind
 from ..git_versions import GitVersionError
-from ..event_store import run_stream
+from ..event_store import project_stream, run_stream
 from ..minimal_projection import MinimalProjection, fold_events
 from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_STATUSES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
@@ -37,8 +37,9 @@ from ..recovery import (
 )
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
-from .labels import event_label, status_name
-from .payloads import BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure, Department
+from .labels import actor_name, department_name, event_label, status_name
+from .payloads import (PAYLOADS, BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure,
+                       Department)
 from .read_models import AttemptStatus, ReadModels
 from .registry import QueryDefinition, UnchangedEvent
 from .replay import ReplayRequest, check_position
@@ -789,6 +790,122 @@ def _event_detail(application: Application, request: EventDetail) -> Snapshot[Ev
         position=event.position,
         data=EventDetailResult(event=event.to_dict(), artifacts=_event_artifacts(application, event)),
     )
+
+
+# ---------------------------------------------------------------------------
+# event.positions（工单 #1342）
+#
+# 按位置取一组事件：来源卡片这类「拿到位置就要看原始事件」的界面用（#398 登记的边界：
+# 事实回链只给位置与来源种类，接口层原来没有按位置取事件的查询，页面只能缓存整条事件流）。
+# 返回与事件流同形状的字段：事件种类、提出者与部门的可读名、这条事件的中文说明，以及对外载荷
+# （按这个事件种类登记的载荷类型核对以后交出，与事件流发给页面的那一份相同）。
+#
+# 取不到的位置逐条回答，不抛 500：越界（大于日志末尾或小于 1）、已归档（早于所请求的流现有第一条，
+# 更早的事件已经搬走）、已被压缩（在流的范围内，但没有这一条），以及这个位置上是别的流的事件。
+# 现存储只追加、不压缩也不搬走事件，后两种回答是给以后存储形态的合同（用例直接构造这两种存储状态）。
+
+
+MAX_EVENT_POSITIONS = 200
+
+
+class EventPositions(Contract):
+    # 按位置取事件：至少给 run_id 与 project_id 之一。来源卡片的回链可能分别指向 run 流与项目流，
+    # 两个都给时按两个流取；positions 是全局位置（事实回链里的 position），一次至多 MAX_EVENT_POSITIONS 个
+    run_id: str | None = None
+    project_id: str | None = None
+    positions: list[int] = Field(default_factory=list)
+
+
+class EventAtPosition(Contract):
+    # 一个位置上的事件（status="available"）或者取不到的回答（status="missing" 与 reason）
+    position: int
+    status: Literal["available", "missing"]
+    reason: Literal["out_of_range", "archived", "compacted", "not_in_stream"] | None = None
+    event_id: str | None = None
+    type: str | None = None
+    label: str | None = None
+    actor: str | None = None
+    actor_label: str | None = None
+    department: Department | None = None
+    department_label: str | None = None
+    session_id: str | None = None
+    at: str | None = None
+    stream: str | None = None
+    payload: dict[str, Any] | None = None
+
+
+class EventPositionsResult(Contract):
+    # streams 是这次读的流（run:/project:）：页面按它认位置属于哪里；events 按请求里的位置顺序排列
+    streams: list[str]
+    events: list[EventAtPosition]
+
+
+def _event_positions(application: Application, request: EventPositions) -> Snapshot[EventPositionsResult]:
+    positions = [int(item) for item in request.positions]
+    if not positions:
+        raise QueryInputInvalid("positions must not be empty")
+    if len(positions) > MAX_EVENT_POSITIONS:
+        raise QueryInputInvalid(f"at most {MAX_EVENT_POSITIONS} positions per request")
+    streams: list[str] = []
+    if request.project_id is not None:
+        streams.append(project_stream(request.project_id))
+    if request.run_id is not None:
+        streams.append(run_stream(request.run_id))
+    if not streams:
+        raise QueryInputInvalid("give run_id, project_id, or both")
+    store = application.system.store
+    found = store.events_at(positions)
+    bounds = {stream: store.stream_position_range(stream) for stream in streams}
+    if all(bound is None for bound in bounds.values()):
+        # 一个流都没有事件时按「找不到」回答，与 run.actions、run.recovery 对不存在的 run 的做法一致
+        target = request.run_id if request.run_id is not None else request.project_id
+        raise NotFound(f"{'run' if request.run_id is not None else 'project'} not found: {target}")
+    end = store.end_position()
+    earliest = min(bound[0] for bound in bounds.values() if bound is not None)
+    events: list[EventAtPosition] = []
+    for position in positions:
+        event = found.get(position)
+        if event is not None and event.stream in streams:
+            events.append(_event_at_position(position, event=event))
+            continue
+        # 取不到的四种原因：位置上是别的流的事件；越界；早于现有第一条（已归档）；范围内缺这一条（已压缩）
+        if event is not None:
+            reason: Literal["out_of_range", "archived", "compacted", "not_in_stream"] = "not_in_stream"
+        elif position <= 0 or position > end:
+            reason = "out_of_range"
+        elif position < earliest:
+            reason = "archived"
+        else:
+            reason = "compacted"
+        events.append(EventAtPosition(position=position, status="missing", reason=reason))
+    return Snapshot[EventPositionsResult](
+        position=end, data=EventPositionsResult(streams=streams, events=events))
+
+
+def _event_at_position(position: int, *, event: Any) -> EventAtPosition:
+    payload = dict(event.payload or {})
+    department = getattr(event, "department", None)
+    return EventAtPosition(
+        position=position, status="available", reason=None,
+        event_id=event.event_id, type=event.type, label=event_label(event.type, payload),
+        actor=event.actor, actor_label=actor_name(event.actor),
+        department=department,
+        department_label=None if department is None else department_name(department),
+        session_id=getattr(event, "session_id", None),
+        at=event.created_at, stream=event.stream, payload=_public_payload(event.type, payload),
+    )
+
+
+def _public_payload(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
+    # 对外载荷（工单 #1342）：按这个事件种类登记的载荷类型核对以后交出，即事件流发给页面的那一份。
+    # 旧版本写入的载荷与当前类型对不上时原样交出：一条旧事件不让整次查询失败
+    model = PAYLOADS.get(event_type)
+    if model is None:
+        return payload
+    try:
+        return model.model_validate(payload).model_dump(mode="json")
+    except ValidationError:
+        return payload
 
 
 def _reasoning_text(item: Any) -> str | None:
@@ -2939,6 +3056,13 @@ EVENT_DETAIL = QueryDefinition(
     name="event.detail", request=EventDetail, result=EventDetailResult, handle=_event_detail, changed_by=(),
 )
 
+EVENT_POSITIONS = QueryDefinition(
+    name="event.positions", request=EventPositions, result=EventPositionsResult, handle=_event_positions,
+    # 按位置取事件：结果只由请求的位置与已有的那几条事件决定，追加别的位置的事件不改已经回答的位置，
+    # 因此没有刷新清单；请求时还不存在的位置，下一次查询可能变成可取到，调用方按需再查（工单 #1342）
+    changed_by=(),
+)
+
 DEPARTMENT_WORKSPACE = QueryDefinition(
     name="department.workspace", request=DepartmentWorkspace, result=DepartmentWorkspaceResult,
     handle=_department_workspace,
@@ -3526,7 +3650,7 @@ RUN_RECOVERY = QueryDefinition(
 )
 
 PROJECT_QUERIES = (
-    PROJECTS_LIST, PROJECT_OVERVIEW, PROJECT_LOOP, PROJECT_FLOW, WORK_ITEM_INPUTS, EVENT_DETAIL,
+    PROJECTS_LIST, PROJECT_OVERVIEW, PROJECT_LOOP, PROJECT_FLOW, WORK_ITEM_INPUTS, EVENT_DETAIL, EVENT_POSITIONS,
     DEPARTMENT_WORKSPACE, RUN_ACTIONS, RUN_STEPS, RUN_ASKS, WORK_ITEM_MATERIALS, DELIVERY_FILE, PROJECT_ATTEMPTS, PROJECT_USAGE,
     RUN_ATTEMPT, PROJECT_SETTINGS, PROJECT_WRITEBACK, RUN_EXPORT, REPLAY_CHECK, RUN_RECOVERY,
 )

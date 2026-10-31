@@ -269,6 +269,47 @@ def _compose(store: EventStore, state: ProjectProjection, *, include_history: bo
     return state
 
 
+_AC_REF = re.compile(r"^AC[1-9][0-9]*$")
+
+
+def _requirement_mapping_errors(spec: Any) -> list[str]:
+    # 建档候选的初始 PRD 与后来提交的要求用同一套规则（工单 #1349，验证的独立性设计说明第 7 节第 1 点）：
+    # 每条要求要么指向存在的 AC<序号>，要么写明 gap 原因；漏项、重复、指向不存在、两者都给或都不给都不合格
+    requirements = list(getattr(spec, "requirements", None) or [])
+    criteria = list(getattr(spec, "acceptance_criteria", None) or [])
+    mapping = list(getattr(spec, "requirement_mapping", None) or [])
+    expected = list(range(1, len(requirements) + 1))
+    errors: list[str] = []
+    seen: dict[int, dict[str, Any]] = {}
+    for entry in mapping:
+        position = entry.get("requirement") if isinstance(entry, dict) else None
+        if type(position) is not int or position not in expected:
+            errors.append("requirement " + str(position) + " 不是一条要求的位置")
+            continue
+        if position in seen:
+            errors.append("requirement " + str(position) + " 被声明了不止一次")
+            continue
+        seen[position] = entry
+    for position in expected:
+        entry = seen.get(position)
+        if entry is None:
+            errors.append("requirement " + str(position) + " 没有对应声明")
+            continue
+        refs = list(entry.get("criteria") or [])
+        gap = entry.get("gap")
+        if refs and gap is not None:
+            errors.append("requirement " + str(position) + " 既指向验收标准又标了 gap")
+        if not refs and gap is None:
+            errors.append("requirement " + str(position) + " 既没有指向验收标准，也没有标 gap")
+        for ref in refs:
+            if not (isinstance(ref, str) and _AC_REF.match(ref)):
+                errors.append("requirement " + str(position) + " 的验收标准序号 " + repr(ref) + " 不是 AC<序号>")
+            elif int(ref[2:]) > len(criteria):
+                errors.append("requirement " + str(position) + " 指向的 " + ref
+                              + " 不存在（共 " + str(len(criteria)) + " 条验收标准）")
+    return errors
+
+
 def _initial_prd_requests(store: EventStore, project_id: str, through: int | None) -> tuple[set[str], set[str]]:
     # 建档事项在 initial_prd 请求上的两种状态（工单 #136，设计第 3.4 节）：
     # 还没有回答的请求所属的事项在等待确认（算作进行中）；被撤销的请求所属的事项已停止
@@ -1340,11 +1381,22 @@ class ProjectService:
             **run.baseline_review, "event_id": review_event.event_id}
         round_number = run.round
         spec = run.product_spec
+        errors = _requirement_mapping_errors(spec)
+        if errors:
+            # 建档候选的初始 PRD 与后来提交的要求用同一套规则（工单 #1349）：没有声明或声明不全时
+            # 不提出候选，把缺哪条要求写进事项的开始失败，界面与运行记录据此排查
+            return transaction.append(NewProjectEvent(ProjectEventType.WORK_ITEM_START_FAILED, {
+                "work_item_id": item.work_item_id, "run_id": run.run_id,
+                "error": "初始 PRD 的要求与验收标准的对应声明不完整：" + "；".join(errors),
+            }, actor="system"))[0]
         prd_summary = f"目标：{spec.goal}；要求 {len(spec.requirements)} 条；边界 {len(spec.boundaries)} 条"
         candidate = {
             "work_item_id": item.work_item_id, "run_id": run.run_id, "round": round_number,
             "prd": {"event_id": run.product_spec.created_event_id, "content_hash": run.product_spec.content_hash,
-                    "prd_ref": asdict(run.effective_contract.prd_ref), "summary": prd_summary},
+                    "prd_ref": asdict(run.effective_contract.prd_ref), "summary": prd_summary,
+                    "requirements": list(spec.requirements),
+                    "acceptance_criteria": list(spec.acceptance_criteria),
+                    "requirement_mapping": [dict(entry) for entry in spec.requirement_mapping]},
             "structure": {"event_id": structure["event_id"], "content_hash": structure["content_hash"],
                           "structure_ref": structure["structure_ref"],
                           "code_tree_digest": structure["code_tree_digest"]},

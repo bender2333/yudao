@@ -15,9 +15,9 @@ from . import contract_versions
 # 具体的类型由实现（这一版是 orchestrator.py 与 assembly.py）给出。
 from .kernel_events import Event
 
-# 这一版契约的版本号；上一版是第一版之前的空位，没有实现声明它
-CURRENT_VERSION = 1
-PREVIOUS_VERSION: int | None = None
+# 这一版契约的版本号；上一版是第一版（工单 #1175 第 7 轮：StepFrame 带上这一次激活使用的事项定义副本）
+CURRENT_VERSION = 2
+PREVIOUS_VERSION: int | None = 1
 
 
 def accept(implementation: Any) -> int:
@@ -46,6 +46,9 @@ class StepFrame:
     prompt: Any
     effective_contract_hash: str | None
     input_version: int
+    # 这一次激活使用的事项定义副本（工单 #1098 的副本、#1175 第 7 轮进契约）：装配的工具清单、部门说明、
+    # 提案合同与工具 schema 都按它取，不读模块加载时的全局定义
+    definitions: Any
     work_ref: Any = None
 
 
@@ -61,7 +64,8 @@ class ContextAssembly(Protocol):
     def pin(self, projection: Any, frame: StepFrame, limits: ModelLimits, *, step_id: int,
             events: list[Event], snapshot_hash: str, call_target: dict[str, Any] | None = None,
             input_modalities: tuple[str, ...] = ("text",)) -> Any:
-        # 这一步固定的部分：部门材料、工具定义与上下文清单的前一半
+        # 这一步固定的部分：部门材料、工具定义与上下文清单的前一半。定义、工具与提案合同按
+        # frame.definitions 取（工单 #1175 第 7 轮），不读全局定义
         ...
 
     def request(self, pinned: Any, history: list[dict[str, Any]], *,

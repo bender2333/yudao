@@ -5,6 +5,41 @@ export type ClientOptions = {
 };
 
 /**
+ * AcceptanceCoverageResult
+ */
+export type AcceptanceCoverageResult = {
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Verdict
+     */
+    verdict: string;
+    /**
+     * Review Event Id
+     */
+    review_event_id: string;
+    /**
+     * Revision
+     */
+    revision: number;
+    numbers: CoverageNumbers;
+    /**
+     * Criteria
+     */
+    criteria: Array<CoverageCriterion>;
+    /**
+     * Open Criteria
+     */
+    open_criteria: Array<string>;
+};
+
+/**
  * Accepted[CatalogConnectionSaveRefs]
  */
 export type AcceptedCatalogConnectionSaveRefs = {
@@ -1765,6 +1800,62 @@ export type CommandCapability = {
 };
 
 /**
+ * CoverageCriterion
+ */
+export type CoverageCriterion = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Method
+     */
+    method: string;
+    /**
+     * Result
+     */
+    result: 'passed' | 'failed' | 'unverified';
+    /**
+     * Executable
+     */
+    executable: boolean;
+    /**
+     * Open
+     */
+    open: boolean;
+};
+
+/**
+ * CoverageNumbers
+ */
+export type CoverageNumbers = {
+    /**
+     * Criteria Total
+     */
+    criteria_total: number;
+    /**
+     * Executable
+     */
+    executable: number;
+    /**
+     * Covered
+     */
+    covered: number;
+    /**
+     * Coverage Ratio
+     */
+    coverage_ratio: number;
+    /**
+     * Model Reading
+     */
+    model_reading: number;
+    /**
+     * Open
+     */
+    open: number;
+};
+
+/**
  * CredentialClearOverride
  */
 export type CredentialClearOverride = {
@@ -2490,6 +2581,70 @@ export type EffectiveModel = {
 };
 
 /**
+ * EventAtPosition
+ */
+export type EventAtPosition = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Status
+     */
+    status: 'available' | 'missing';
+    /**
+     * Reason
+     */
+    reason?: 'out_of_range' | 'archived' | 'compacted' | 'not_in_stream' | null;
+    /**
+     * Event Id
+     */
+    event_id?: string | null;
+    /**
+     * Type
+     */
+    type?: string | null;
+    /**
+     * Label
+     */
+    label?: string | null;
+    /**
+     * Actor
+     */
+    actor?: string | null;
+    /**
+     * Actor Label
+     */
+    actor_label?: string | null;
+    /**
+     * Department
+     */
+    department?: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Department Label
+     */
+    department_label?: string | null;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * At
+     */
+    at?: string | null;
+    /**
+     * Stream
+     */
+    stream?: string | null;
+    /**
+     * Payload
+     */
+    payload?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
  * EventDetailResult
  */
 export type EventDetailResult = {
@@ -2505,6 +2660,20 @@ export type EventDetailResult = {
     artifacts: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * EventPositionsResult
+ */
+export type EventPositionsResult = {
+    /**
+     * Streams
+     */
+    streams: Array<string>;
+    /**
+     * Events
+     */
+    events: Array<EventAtPosition>;
 };
 
 /**
@@ -2876,6 +3045,18 @@ export type InitialPrdProposal = {
      * Summary
      */
     summary?: string | null;
+    /**
+     * Requirements
+     */
+    requirements?: Array<string>;
+    /**
+     * Acceptance Criteria
+     */
+    acceptance_criteria?: Array<string>;
+    /**
+     * Requirement Mapping
+     */
+    requirement_mapping?: Array<RequirementMapping>;
 };
 
 /**
@@ -4677,6 +4858,24 @@ export type ReportItem = {
 };
 
 /**
+ * RequirementMapping
+ */
+export type RequirementMapping = {
+    /**
+     * Requirement
+     */
+    requirement: number;
+    /**
+     * Criteria
+     */
+    criteria?: Array<string>;
+    /**
+     * Gap
+     */
+    gap?: string | null;
+};
+
+/**
  * ReviewEntry
  */
 export type ReviewEntry = {
@@ -5270,6 +5469,17 @@ export type RuntimeStartDrain = {
 };
 
 /**
+ * Snapshot[AcceptanceCoverageResult]
+ */
+export type SnapshotAcceptanceCoverageResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: AcceptanceCoverageResult;
+};
+
+/**
  * Snapshot[AwayReport]
  */
 export type SnapshotAwayReport = {
@@ -5355,6 +5565,17 @@ export type SnapshotEventDetailResult = {
      */
     position: number;
     data: EventDetailResult;
+};
+
+/**
+ * Snapshot[EventPositionsResult]
+ */
+export type SnapshotEventPositionsResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: EventPositionsResult;
 };
 
 /**
@@ -9634,6 +9855,10 @@ export type DeliveryAcceptedPayload = {
      */
     known_risks: Array<string>;
     /**
+     * Launch
+     */
+    launch?: Array<LaunchMethodPayload>;
+    /**
      * Product Spec Hash
      */
     product_spec_hash: string;
@@ -10868,6 +11093,34 @@ export type InstanceUpgradeWithdrawnEvent = {
      */
     type: 'instance_upgrade_withdrawn';
     payload: InstanceUpgradeWithdrawn;
+};
+
+/**
+ * LaunchMethodPayload
+ */
+export type LaunchMethodPayload = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Kind
+     */
+    kind: 'web' | 'desktop';
+    /**
+     * Commands
+     */
+    commands: {
+        [key: string]: Array<string>;
+    };
+    /**
+     * Ready Url
+     */
+    ready_url?: string | null;
+    /**
+     * Ready Timeout Sec
+     */
+    ready_timeout_sec?: number | null;
 };
 
 /**
@@ -14991,24 +15244,6 @@ export type QaTestsSavedPayload = {
      * Activation Id
      */
     activation_id: string;
-};
-
-/**
- * RequirementMapping
- */
-export type RequirementMapping = {
-    /**
-     * Requirement
-     */
-    requirement: number;
-    /**
-     * Criteria
-     */
-    criteria?: Array<string>;
-    /**
-     * Gap
-     */
-    gap?: string | null;
 };
 
 /**
@@ -20089,6 +20324,44 @@ export type QueryEventDetailResponses = {
 
 export type QueryEventDetailResponse = QueryEventDetailResponses[keyof QueryEventDetailResponses];
 
+export type QueryEventPositionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Run Id
+         */
+        run_id?: string | null;
+        /**
+         * Project Id
+         */
+        project_id?: string | null;
+        /**
+         * Positions
+         */
+        positions?: Array<number>;
+    };
+    url: '/api/queries/event.positions';
+};
+
+export type QueryEventPositionsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryEventPositionsError = QueryEventPositionsErrors[keyof QueryEventPositionsErrors];
+
+export type QueryEventPositionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotEventPositionsResult;
+};
+
+export type QueryEventPositionsResponse = QueryEventPositionsResponses[keyof QueryEventPositionsResponses];
+
 export type QueryDepartmentWorkspaceData = {
     body?: never;
     path?: never;
@@ -20650,6 +20923,40 @@ export type QueryEvidenceExternalSourceResponses = {
 };
 
 export type QueryEvidenceExternalSourceResponse = QueryEvidenceExternalSourceResponses[keyof QueryEvidenceExternalSourceResponses];
+
+export type QueryAcceptanceCoverageData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * At
+         */
+        at?: number | null;
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    url: '/api/queries/acceptance.coverage';
+};
+
+export type QueryAcceptanceCoverageErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryAcceptanceCoverageError = QueryAcceptanceCoverageErrors[keyof QueryAcceptanceCoverageErrors];
+
+export type QueryAcceptanceCoverageResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotAcceptanceCoverageResult;
+};
+
+export type QueryAcceptanceCoverageResponse = QueryAcceptanceCoverageResponses[keyof QueryAcceptanceCoverageResponses];
 
 export type QueryCatalogData = {
     body?: never;
