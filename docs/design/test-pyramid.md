@@ -79,7 +79,7 @@
 - 测试文件之间不互相导入。几个测试文件共用的辅助函数与常量放在辅助文件中（`helpers.py`、`api_helpers.py`、`protocol_helpers.py`、`event_sequence.py` 等，按用途选择）。一项单元层测试用标准库 `ast` 读取每个测试文件的导入语句，发现导入测试文件时失败，并写明文件与导入的名称。
 - 搬移共用代码时容易删掉同一文件里仍在使用的 `import` 行，这类缺漏只在测试跑到那一行时才报 `NameError`，集成层的用例要完整跑一次才暴露（`helpers.py` 丢掉 `import time` 使四项取消运行中命令的用例必然失败）。`test_undefined_names.py` 用 `pyflakes` 检查 `harness/` 下全部源文件的未定义名称（F821），信息写明文件与行列；`pyflakes` 在 dev 依赖组中。它要读完包内全部源文件再逐个检查，机器有其他任务在跑时超过单元层的 5 秒上限，登记为 `module` 层。
 - 混合了不同层级的文件不拆分，按第 2 节登记为其中最高的一层。
-- 操作控制主机真实桌面的测试（3.2D 的桌面会话与屏幕工具，[浏览器与 computer use 设计说明](browser-and-computer-use.md)「computer use」）登记为 `desktop`。这些测试移动真实的鼠标、按下真实的按键、最小化用户的窗口，在用户使用电脑时运行会打断用户。`desktop` 标记同样在 `markers` 中声明；它不属于三层中的任何一层，`-m "unit or module"` 与 `-m integration` 都不选中它，第 4 节的默认运行全部排除它。界面的 Playwright 测试中操作真实桌面的用例加 `@desktop` 标签，默认运行用 `--grep-invert @desktop` 排除。登记表建立之前，`desktop` 标记直接写在测试文件中，`pyproject.toml` 的默认参数排除它，明确写 `-m desktop` 时才运行。
+- 操作控制主机真实桌面的测试（桌面会话与屏幕工具，[浏览器与 computer use 设计说明](browser-and-computer-use.md)「computer use」）登记为 `desktop`。这些测试移动真实的鼠标、按下真实的按键、最小化用户的窗口，在用户使用电脑时运行会打断用户。`desktop` 标记同样在 `markers` 中声明；它不属于三层中的任何一层，`-m "unit or module"` 与 `-m integration` 都不选中它，第 4 节的默认运行全部排除它。界面的 Playwright 测试中操作真实桌面的用例加 `@desktop` 标签，默认运行用 `--grep-invert @desktop` 排除。登记表建立之前，`desktop` 标记直接写在测试文件中，`pyproject.toml` 的默认参数排除它，明确写 `-m desktop` 时才运行。
 - 内核的不变式测试放在 `harness/tests/kernel/`，每个文件按第 2 节的规则登记层；它们同时列在内核清单里，每条基础规则对应的测试名称由发布检查核对存在并运行（[可信内核设计说明](trusted-kernel.md)「内核清单」）。
 
 ## 4. 各角色运行哪一层

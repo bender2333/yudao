@@ -6,7 +6,7 @@
 
 | 问题 | 现状与出处 | 影响 |
 | --- | --- | --- |
-| 已有代码进入 Yudao 时没有描述现有行为的要求 | 3.2A 的代码快照接入只建立初始工作区：`start_work_item_from_snapshot`（`harness/projects.py:416-440`）以快照为初始树、`baseline` 为空开始一个普通事项；产品只为这一次变更写 ProductSpec | 这个 ProductSpec 采纳以后成为项目的当前 PRD（`projects.py:244-268` 从采纳成果所属 run 的 ProductSpec 读出），它只覆盖本次变更；此后质检无法判断原有功能的失败是否属于缺陷 |
+| 已有代码进入 Yudao 时没有描述现有行为的要求 | 本地通用工具的代码快照接入只建立初始工作区：`start_work_item_from_snapshot`（`harness/projects.py:416-440`）以快照为初始树、`baseline` 为空开始一个普通事项；产品只为这一次变更写 ProductSpec | 这个 ProductSpec 采纳以后成为项目的当前 PRD（`projects.py:244-268` 从采纳成果所属 run 的 ProductSpec 读出），它只覆盖本次变更；此后质检无法判断原有功能的失败是否属于缺陷 |
 | 项目的第一次采纳必须来自一次放行的交付 | `_settle_run`（`projects.py:518-548`）要求 run 进入 DONE、有 DeliverySpec 与 release 结论 | 已有代码本身没有交付与放行，无法成为基线 |
 | 质检放行要求全部检查退出码为 0 | `_accept_review`（`harness/validation.py:428-436`） | 已有项目常有失败的测试，放行规则无法表达「现有行为就是这样」 |
 | 决定请求只能属于某个 run | 决定请求写在 run 流中（`harness/orchestrator.py:1210-1244`），种类只有 `model_unavailable`（`harness/decisions.py:29-31`） | 确认初始 PRD 可能等待数天；run 保持打开会占用运行时间上限，也会使排空一直等待 |
@@ -16,14 +16,14 @@
 
 接入由一个事项完成，事项种类为「建档」（`kind: onboarding`）；普通事项的种类为 `change`。一个接入的项目由命令 `project.onboard` 在同一个事务中建立：登记项目（来源为已有项目）、登记源目录、登记建档事项；随后流程编排为建档事项创建 run。
 
-建档使用事项的全部已有机制：三个部门按成果驱动轮转、run 的执行权与 3.1 的自动继续、取消、执行槽位与同一项目的排队、决定请求、事件流与界面上的事项卡片。放进项目创建的做法需要在项目层另建一套部门调度、恢复与取消，与事项重复。
+建档使用事项的全部已有机制：三个部门按成果驱动轮转、run 的执行权与恢复契约的自动继续、取消、执行槽位与同一项目的排队、决定请求、事件流与界面上的事项卡片。放进项目创建的做法需要在项目层另建一套部门调度、恢复与取消，与事项重复。
 
 建档事项与普通事项的区别全部写在定义中（[总体架构](architecture/overall-architecture.md)「十项长期决定」）：各部门可用的工具、提交的提案合同、提案接纳后的阶段迁移与结束 run 的停止原因（第 4 节）。控制核心按 run 记录的事项种类选择这些定义，步骤驱动与写入口的逻辑不变。
 
 项目在建档事项被采纳之前没有基线：
 
-- 3.4A 之前（只有一个执行槽位、没有排队）：在这个项目中新建事项被拒绝，原因 `work_item_in_progress`（建档进行中或等待确认）或 `not_allowed`（建档已停止，说明「项目还没有完成建档，请重新开始建档」）。
-- 3.4A 之后：新建的事项进入该项目的队列，状态显示「等待建档」；只有项目有了基线采纳才开始，从基线出发。建档停止或被取消时，排队的事项保持等待，用户可以重新开始建档或用 `queue.cancel` 取消它们。`work_item.reorder` 不涉及建档事项，建档事项总在队列最前面。
+- 阶段四之前（只有一个执行槽位、没有排队）：在这个项目中新建事项被拒绝，原因 `work_item_in_progress`（建档进行中或等待确认）或 `not_allowed`（建档已停止，说明「项目还没有完成建档，请重新开始建档」）。
+- 阶段四之后：新建的事项进入该项目的队列，状态显示「等待建档」；只有项目有了基线采纳才开始，从基线出发。建档停止或被取消时，排队的事项保持等待，用户可以重新开始建档或用 `queue.cancel` 取消它们。`work_item.reorder` 不涉及建档事项，建档事项总在队列最前面。
 
 ## 3. 应用层命令、决定与领域事件
 
@@ -33,14 +33,14 @@
 
 **项目（左侧栏「接入已有项目」）**
 
-| 命令 | 作用 | 参数 | 领域事件 | 基准版本 | 现状 |
-| --- | --- | --- | --- | --- | --- |
-| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项 | 名称、长期目标、源目录名称、源目录路径（控制主机上的路径） | `project_registered`（`source` 为 `existing`）、源目录登记事件（`source_directory.save` 确定的名称）、`work_item_created`（`kind` 为 `onboarding`，带快照记录）、`run_created`、`user_input_received` | 空 | 新增（3.8）；原型暂用的 `project.onboard` 成为正式名称，参数增加源目录名称 |
-| `onboarding.restart` | 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项；只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用 | 项目、源目录（登记名） | `work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空（新建一个事项） | 新增（3.8） |
+| 命令 | 作用 | 参数 | 领域事件 | 基准版本 |
+| --- | --- | --- | --- | --- |
+| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项 | 名称、长期目标、源目录名称、源目录路径（控制主机上的路径） | `project_registered`（`source` 为 `existing`）、源目录登记事件（`source_directory.save` 确定的名称）、`work_item_created`（`kind` 为 `onboarding`，带快照记录）、`run_created`、`user_input_received` | 空 |
+| `onboarding.restart` | 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项；只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用 | 项目、源目录（登记名） | `work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空（新建一个事项） |
 
 - 源目录路径按 `source_directory.save` 的规则处理（[应用层设计说明](app-and-interface.md)「决定」第 6 项）：命令中填写的路径同时成为这个项目的第一条源目录登记，以后在项目设置中查看与修改。
 - 快照在命令的事务之前采集（与 `start_work_item_from_snapshot` 相同），采集失败时命令被拒绝，不建立项目，不写入任何事件；已经保存的快照工件按内容摘要寻址，重复无害。
-- 拒绝原因：`source_invalid`（新增：源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据从公开树中去掉，不算宿主私有路径）、公开树中有无法表示的条目，`message` 列出工作区内的相对路径与处理方法，处理方法与 D09 的 `workspace_unrepresentable` 相同）、`busy`（3.4A 之前）、`provider_unavailable`；`onboarding.restart` 另有 `not_found`、`project_archived`、`not_allowed`（项目由想法新建、已有基线、已有进行中或等待确认的建档事项）。
+- 拒绝原因：`source_invalid`（新增：源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据从公开树中去掉，不算宿主私有路径）、公开树中有无法表示的条目，`message` 列出工作区内的相对路径与处理方法，处理方法与 D09 的 `workspace_unrepresentable` 相同）、`busy`（阶段四之前）、`provider_unavailable`；`onboarding.restart` 另有 `not_found`、`project_archived`、`not_allowed`（项目由想法新建、已有基线、已有进行中或等待确认的建档事项）。
 - 取消建档使用已有的 `work_item.cancel`：建档 run 进行中时按原有规则取消 run；run 已结束、正在等待确认时撤销决定请求（写入 `project_decision_withdrawn`，原因为用户取消），投影据此把事项显示为已停止，项目保持没有基线。
 - `project.archive` 在建档事项进行中或等待确认时按原有规则拒绝（`work_item_in_progress`），用户先取消建档事项。
 
@@ -248,8 +248,8 @@ sequenceDiagram
 
 | 情况 | 处理 |
 | --- | --- |
-| 建档 run 执行中进程中断 | 按 3.1：Yudao 启动时自动继续；建档中的动作只有读取、搜索与检查，检查的契约声明可以重复 |
-| 事项已登记、run 还没有创建时进程中断 | 与 `work_item.create` 相同，由 3.1 的启动核对建立 run（run 流从版本 0 开始，重复创建被拒绝） |
+| 建档 run 执行中进程中断 | 按[恢复契约](recovery-contract-and-fault-matrix.md)：Yudao 启动时自动继续；建档中的动作只有读取、搜索与检查，检查的契约声明可以重复 |
+| 事项已登记、run 还没有创建时进程中断 | 与 `work_item.create` 相同，由恢复契约的启动核对建立 run（run 流从版本 0 开始，重复创建被拒绝） |
 | run 结束以后、候选写入之前进程中断 | 启动时补做结算，与采纳结算的幂等补做相同；候选与决定请求在一个事务中写入，不会只写一半 |
 | 回答了「提出修改」、新 run 还没有创建时进程中断 | 启动时按 `onboarding_revision_started` 建立缺少的 run |
 | run 事件版本不同的升级 | 进行中的建档 run 按排空规则等待结束；强制升级时记为因升级停止，建档事项重新开始一个 run：第一轮从快照开始，修改轮带同一份上一轮候选与修改意见。等待确认的候选与决定请求在项目流中，升级以后照常显示与回答，不影响排空 |
@@ -329,7 +329,7 @@ flowchart LR
 
 所有验收使用真实运行的系统；自动化测试中的模型回答由 FakeAdapter 脚本给出，事件日志、工件与工作区都是真实实现，不使用模拟对象。真实项目验收使用真实模型。
 
-1. **真实项目建档（Stage 3 计划 3.8 行）。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v9 的示例项目；约 1.3 万行，有完整的测试集）经 `project.onboard` 使用真实模型完成建档，用户在界面的决定卡片中确认初始 PRD，随后一个事项在它的基础上实现 issue 842 并被采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。登记的测试命令写明 Python 3.13，例如 `uv run --python 3.13 pytest`：Python 3.9 在 Windows 上的时钟精度使 tracing 的 20 条测试结果不稳定，Python 3.13 上全部通过（核对见[决策记录](../archive/decision-2026-09.md)「不使用容器以后的执行环境」一条）。
+1. **真实项目建档（阶段二「真实项目接着做」）。** openai-agents-python 在 FeatBench openai-agents-python-842 基准提交时的代码（原型 v9 的示例项目；约 1.3 万行，有完整的测试集）经 `project.onboard` 使用真实模型完成建档，用户在界面的决定卡片中确认初始 PRD，随后一个事项在它的基础上实现 issue 842 并被采纳；这个事项的工作区从快照建立，质检按变更后的完整 PRD 核验，采纳链为「建档基线 → 本事项」。登记的测试命令写明 Python 3.13，例如 `uv run --python 3.13 pytest`：Python 3.9 在 Windows 上的时钟精度使 tracing 的 20 条测试结果不稳定，Python 3.13 上全部通过（核对见[决策记录](../archive/decision-2026-09.md)「不使用容器以后的执行环境」一条）。
 2. **界面。** 接入入口、建档状态与阅读动作、`initial_prd` 决定卡片（含第 3.2 节的材料与两个选项）、资料页的各轮初始 PRD、确认记录、结构说明与基线核验，在真实运行的系统上通过 Playwright 端到端测试，页面上的数据都来自查询与事件流。
 3. **修改的往返。** 用户提出修改并附说明：出现第二轮 run，产品的 ProductSpec 处理了修改意见，质检重新核验，新的决定请求出现；空说明的「提出修改」被拒绝。
 4. **退回产品。** 质检提交带 `unsupported` 或遗漏的基线核验时，run 退回产品；提交 `consistent` 时有 `unsupported` 或未说明的失败检查被拒绝。
@@ -338,7 +338,7 @@ flowchart LR
 7. **可见范围。** 可见范围取暂定默认值时，建档与以后事项中，产品与质检的上下文清单没有 `existing_structure`，读取与搜索工具取不到 STRUCTURE.md，工程的上下文清单有它；取共享的一套取值时，三个部门的上下文清单都有它。
 8. **git 来源。** 源目录是 git 仓库时快照记录带提交、分支与是否有未提交的修改；不是 git 仓库时为空，建档照常进行。
 9. **源目录无效。** 源目录不存在、含有宿主私有路径或公开树中有无法表示的条目时，`project.onboard` 返回 `source_invalid` 与相对路径，没有建立项目；源目录中的 `.git` 不在公开树中，也不引起拒绝。
-10. **建档之前的事项。** 3.4A 之前在建档中的项目新建事项被拒绝（`work_item_in_progress`）；3.4A 之后进入队列显示「等待建档」，确认以后从基线开始。
+10. **建档之前的事项。** 阶段四之前在建档中的项目新建事项被拒绝（`work_item_in_progress`）；阶段四之后进入队列显示「等待建档」，确认以后从基线开始。
 11. **失败与中断（第 6 节）。** 建档 run 在工具执行时被真实进程终止，重启后自动继续；在 run 结束与候选写入之间终止，重启后补做一次结算，只有一个决定请求；回答「提出修改」以后、新 run 创建之前终止，重启后建立缺少的 run；用 run 事件版本较早的数据目录启动，等待确认的决定请求照常显示并可以回答；运行时间用完以后 `onboarding.restart` 可用；`work_item.cancel` 撤销等待中的决定请求。
 12. **评测场景 2。** 场景 2 的 Yudao 一侧由评价与验收那条道在阶段二「比单个 agent 好多少」运行，先建档，运行器回答确认（[评测场景设计](evaluation-scenarios.md)「前提与未决事项」与「实施顺序」）；版本回归在每个里程碑交给用户试用之前运行（[评测场景设计](evaluation-scenarios.md)「用途」）。
 13. **快照来源与检查时限。** `work_item.create` 的合同与 OpenAPI 中没有代码快照来源参数；`check_timeout_sec` 在当前限额定义中为 600 秒。

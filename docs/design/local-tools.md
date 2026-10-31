@@ -2,11 +2,11 @@
 
 总图位置：第四节「动作」的缝；第一节「模型与工具」方框。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)、[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)。
 
-本文写明三个部门使用的本地工具的边界，3.2B 网络与 MCP、3.2C 执行环境服务、3.2D 浏览器与以后阶段的 computer use 新增的工具同样遵守这些边界。
+本文写明三个部门使用的本地工具的边界，网络与 MCP、执行环境服务、浏览器与以后阶段的 computer use 新增的工具同样遵守这些边界。
 
 ## 1. 使用过程
 
-1. 已有项目经 3.8 的建档进入：`project.onboard` 只读采集源目录的一份确定代码快照，用户确认建档写出的初始 PRD 以后，快照成为项目的第一次采纳；之后的事项在 Yudao 管理的独立工作区中从采纳成果开始。源项目不被直接改写，变化由可核验的交付提供；建档以后源目录的修改不进入项目。
+1. 已有项目经建档进入：`project.onboard` 只读采集源目录的一份确定代码快照，用户确认建档写出的初始 PRD 以后，快照成为项目的第一次采纳；之后的事项在 Yudao 管理的独立工作区中从采纳成果开始。源项目不被直接改写，变化由可核验的交付提供；建档以后源目录的修改不进入项目。
 2. 产品确认本次变更；工程在它的一轮工作中，在运行工作区中搜索、阅读、编辑，用 `bash` 运行任意命令，例如安装依赖、构建、启动服务、运行测试。其他会话在自己的检查工作区中做同样的事情。
 3. 模型可以看到命令的退出状态和输出；成功退出只证明该命令成功，任务是否完成由核验角色判断（三部门里是质检）；定义里没有核验角色的事项，指定角色交了完成就以开环完成结束（[形态与核验角色设计说明](forms-and-verifier-role.md)「开环完成」）。下面写到的工程与质检，在其他形态里是有写入范围的角色与核验角色。
 4. 工程提交确定的完整代码树，交付引用在交付快照上运行的检查；质检在交付快照的全新副本上运行检查，包括自己按 PRD 写的测试，然后给出结论；项目按已有规则采纳。
@@ -53,7 +53,7 @@
 - 搜索使用 ripgrep，声明为运行前置并验证平台可用性，不静默改用另一套语义。
 - bash 是执行位置上的运行前置：Linux 使用系统的 bash；Windows 使用 Git for Windows 的 bash，查找顺序参照 OMP（oh-my-pi@e3106be，`packages/utils/src/procmgr.ts:135-180`：Git 的安装目录，然后是 PATH 上的 `bash.exe`）。找不到时工具结果写明原因，不改用 cmd 或 PowerShell。git 本来就是执行位置上的必需程序（[执行环境服务设计说明](execution-environment.md)「执行位置上的程序与依赖缓存」），Windows 上安装 Git for Windows 时同时带有 bash。
 - 后台运行与时限的做法参照 OMP 的 bash 工具（`packages/coding-agent/src/tools/bash.ts:335`、`:900-1000` 的 `async` 参数与任务管理，`packages/coding-agent/src/tools/tool-timeouts.ts:11` 的缺省 300 秒、最长 3600 秒）。
-- 网络取回由 3.2B 使用已有的 HTTPX；MCP 使用官方 Python SDK，不自写协议客户端。模型调用使用官方 OpenAI SDK 与统一 Provider 模块（[模型管理设计说明](model-management.md)「统一调用、取消与观测」）。
+- 网络取回使用已有的 HTTPX；MCP 使用官方 Python SDK，不自写协议客户端。模型调用使用官方 OpenAI SDK 与统一 Provider 模块（[模型管理设计说明](model-management.md)「统一调用、取消与观测」）。
 - 进程超时不等于整棵进程树已经停止。Windows 和 POSIX 分别验证，使用成熟的进程管理能力；尚未验证的平台不标为支持。
 - OMP 的工具与会话审查用作接口和证据模式的参考，不引入 OMP 运行时接管 Yudao 的部门循环。
 
