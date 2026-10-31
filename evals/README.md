@@ -42,7 +42,7 @@ flowchart TD
 
 ## 材料版本
 
-场景 3 的材料版本是 `scenario-3@2`，场景 2 的是 `scenario-2@1`，场景 1 的是 `scenario-1@2`。修改需求原文、需求条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
+场景 3 的材料版本是 `scenario-3@3`，场景 2 的是 `scenario-2@1`，场景 1 的是 `scenario-1@2`。修改需求原文、需求条目表、隐藏检查、运行环境或参考实现中的任意一项，版本号加一，新旧版本的结果不直接比较。
 
 评分之前运行器还要核对材料摘要：隐藏检查、条目表与参考实现的摘要登记在各自的 `materials/manifest.json` 的 `digests` 块里，算出来的摘要与登记值不同时这次运行无效，报告写明「材料摘要与材料版本记录不同」。摘要按 LF 规范化的字节流递归计算，跳过 `__pycache__` 与 `*.pyc`，因此在 Windows 与 Linux 签出上一致，测试或评分写下的字节码也不会让摘要失效。改动材料以后用下面这条命令重新生成摘要，随改动一起提交：
 
@@ -59,7 +59,7 @@ uv run python -c "import sys; sys.path.insert(0, 'evals/runner'); import materia
 
 ## 需求条目与检查
 
-场景 3 有 7 个需求条目与 24 条检查，对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 12 条、命令行 10 条、文件比对 2 条。
+场景 3 有 7 个需求条目与 24 条检查，对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 12 条、命令行 10 条、文件比对 2 条。评分器（`scorer-3@3`）另有一条独立的数据保真检查 `data_1_1`：它把交付数据文件里的站名与线名与材料里的逐字比，单独报告，不计入完成度与正确性（[评测场景设计](../docs/design/evaluation-scenarios.md)第 4.4 节）。
 
 场景 2 有 6 个需求条目与 8 条 F2P 的对应，见 `scenarios/scenario-2/materials/requirement-table.json`。8 条 F2P 计入完成度与正确性；331 条 P2P 是原有功能测试，失败条数单独报告，不影响完成度（[评测场景设计](../docs/design/evaluation-scenarios.md)第 4.2 节）。隐藏测试文件以文件形态放在 `checks/tests/` 下，评分时盖掉交付里的同名文件，被测方改测试不改变评分。
 

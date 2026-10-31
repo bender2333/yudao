@@ -36,6 +36,7 @@ The PRD above leaves several interfaces open. This agreement is given to both si
 ## 5. Program entry
 - The entry point is `src/cli.py`, started with `python src/cli.py`.
 - The CLI reads one query per line from standard input, in the format `Starting Station; Ending Station` (semicolon separator). After each query it prints the result and reads the next line; it exits at end of input.
+- When it starts, the program prints the input format (for example `Starting Station; Ending Station`) before reading the first line. That line is a usage hint, not a query.
 - Arguments: `--output_file PATH`, `--format text|json`, `--mode shortest_distance|least_transfer|comprehensive`, `--max_transfers N`, `--line_preference LINE`, `--check_data`.
 - `--check_data` runs the data integrity check, prints the result and exits without reading a query.
 

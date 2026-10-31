@@ -54,6 +54,7 @@ This project aims to develop a command-line interface (CLI)-based Beijing Subway
 
 ### 2.5 Command-Line Interface (CLI) System
 - Implements a simple command line interface, supporting standard input/output operations
+- Prints the input format when the program starts (for example `Starting Station; Ending Station`), then reads queries from standard input
 - Provides real-time input validation, including:
   - Station name standardization verification (based on official Beijing Subway station names)
   - Input format validation (supporting "Starting Station; Ending Station" format, using semicolon as separator)
@@ -111,6 +112,7 @@ This project aims to develop a command-line interface (CLI)-based Beijing Subway
 - **Station Data**: Cover all main lines of Beijing Subway with all stations
 - **Connection Data**: Include actual distances and connection relationships between stations
 - **Line Information**: Cover main lines like Line 1, Line 2, Line 4, Line 5, Line 6, Line 8, Line 10, Line 13, Line 14, Line 15, Changping Line, Yizhuang Line, Fangshan Line, Airport Line
+- **Station and line names**: use the names exactly as they appear in `subway_data.json`. The data file is the only source of station names and line names: do not translate, transliterate or rewrite them (no Chinese names, no pinyin spellings), and do not add an alias table or fuzzy matching.
 
 ### 4.2 Fare Structure Data
 - **Basic Fare**: 3 yuan for 0-6 kilometers, 4 yuan for 6-12 kilometers, 5 yuan for 12-22 kilometers, 6 yuan for 22-32 kilometers
@@ -120,7 +122,7 @@ This project aims to develop a command-line interface (CLI)-based Beijing Subway
 ### 4.3 Data Quality Requirements
 - **Accuracy**: Distance data between stations consistent with actual operational data
 - **Completeness**: Cover all operational stations and connection relationships
-- **Consistency**: Station names consistent with official naming
+- **Consistency**: Station names are the names given in `subway_data.json`; that file is the official naming for this dataset and the names are used as they are, not translated or rewritten
 - **Maintainability**: Support data updates and expansions
 
 ## 5. Acceptance Criteria
