@@ -1998,10 +1998,13 @@ def _required_tool_parameter_rejected(error: ProviderError) -> bool:
         "not support", "不支持", "不支持参数", "无效参数"))
 
 
-def _non_empty_tool_arguments(raw: Any) -> str | None:
-    # 无参数的工具调用在 JSON 上有三种合法写法：arguments 为 {}、为 null、或省略（工单 #1332）。
-    # 网关与代理接入的模型常写成后两种；把序列化风格当成能力差异会挡住整个准入。
-    # 参数确实是空的时候返回 None；不是空的时候返回收到的原文，供拒绝原因写明这家模型是怎么写的
+def _non_object_tool_arguments(raw: Any) -> str | None:
+    # 测试工具的参数只要是对象就通过：{}、null、省略，以及带任意字段的对象（例如
+    # {"reason": "测试连接"}）都算通过（工单 #1332 第 2 轮）。准入要证的是「会不会调工具、
+    # 能不能用工具结果」，不是「参数写得像我们期望的样子」；网关与代理接入的模型常自己加字段，
+    # 把参数写法当成能力差异会挡住整个准入。
+    # 参数是对象（含 null 与省略）时返回 None；不是对象时返回收到的原文，
+    # 供拒绝原因写明这家模型是怎么写的
     if raw is None:
         return None
     if isinstance(raw, str):
@@ -2012,11 +2015,11 @@ def _non_empty_tool_arguments(raw: Any) -> str | None:
             value = json.loads(candidate)
         except (TypeError, ValueError):
             return _quoted_arguments(raw)
-        if value is None or value == {}:
+        if value is None or isinstance(value, dict):
             return None
         return _quoted_arguments(raw)
     if isinstance(raw, dict):
-        return None if not raw else _quoted_arguments(raw)
+        return None
     return _quoted_arguments(raw)
 
 
@@ -2036,9 +2039,9 @@ def _model_test_tool_outputs(result: InvokeResult) -> list[dict[str, Any]]:
         if call.get("name") != "yudao_model_test" or not call.get("call_id") \
                 or call.get("status", "completed") != "completed":
             raise ProviderError("测试工具的调用不完整或工具名称不符", reason="provider_protocol")
-        received = _non_empty_tool_arguments(call.get("arguments"))
+        received = _non_object_tool_arguments(call.get("arguments"))
         if received is not None:
-            raise ProviderError(f"测试工具只接受无参数的调用，收到的是 {received}", reason="provider_protocol")
+            raise ProviderError(f"测试工具的参数应当是对象，收到的是 {received}", reason="provider_protocol")
         outputs.append({"type": "function_call_output", "call_id": call["call_id"], "output": "pong"})
     return outputs
 
