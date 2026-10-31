@@ -243,7 +243,7 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#25>",
+    "content_hash": "<sha256#27>",
     "id": "<spec#1>",
     "input_version": 1,
     "issuer": "product",
@@ -264,9 +264,9 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "content_hash": "<sha256#26>",
+    "content_hash": "<sha256#29>",
     "input_version": 1,
-    "product_spec_hash": "<sha256#25>",
+    "product_spec_hash": "<sha256#27>",
     "revision": 1
    }
   },
@@ -302,7 +302,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#2>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1
    }
   },
@@ -319,7 +319,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1
    }
   },
@@ -336,7 +336,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#2>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "step_id": 1
    }
@@ -358,7 +358,7 @@
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
     "department": "engineering",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "purpose": "work",
@@ -383,7 +383,7 @@
     "attempted": true,
     "context_event_id": "<ses_eng#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "max_attempts": 3,
@@ -408,7 +408,7 @@
     "attempt": 1,
     "attempt_id": "<act#2>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#3",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#2>:root-1:work",
     "max_attempts": 3,
@@ -431,7 +431,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "step_id": 1
    }
@@ -453,7 +453,7 @@
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "department": "quality",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "purpose": "work",
@@ -478,7 +478,7 @@
     "attempted": true,
     "context_event_id": "<ses_qua#1>#3",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "max_attempts": 3,
@@ -502,7 +502,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "purpose": "work",
@@ -524,7 +524,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
     "purpose": "work",
@@ -590,7 +590,7 @@
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#4>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -611,7 +611,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#4>",
-    "content_hash": "<sha256#80>",
+    "content_hash": "<sha256#82>",
     "version": 1
    }
   },
@@ -630,7 +630,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#4>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -656,7 +656,7 @@
     "attempt": 1,
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#4>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -679,7 +679,7 @@
     "activation_id": "<act#4>",
     "attempt_id": "<act#4>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#3",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#4>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#4>:root-1:work",
@@ -827,7 +827,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#3>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1
    }
   },
@@ -844,7 +844,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#3>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "step_id": 1
    }
@@ -866,7 +866,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "department": "engineering",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -891,7 +891,7 @@
     "attempted": true,
     "context_event_id": "<ses_eng#1>#9",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "max_attempts": 3,
@@ -915,7 +915,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -937,7 +937,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -959,7 +959,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
     "purpose": "work",
@@ -1025,7 +1025,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#3>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1048,7 +1048,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#3>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1074,7 +1074,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#3>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1097,7 +1097,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#3>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1128,7 +1128,7 @@
     "attempt": 1,
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#3>-1-3",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1151,7 +1151,7 @@
     "activation_id": "<act#3>",
     "attempt_id": "<act#3>:root-1:work:attempt-1",
     "context_event_id": "<ses_eng#1>#9",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#3>-1-3",
     "input_version": 1,
     "logical_call_id": "<act#3>:root-1:work",
@@ -1194,13 +1194,13 @@
     "check_names": [
      "smoke"
     ],
-    "code_tree_digest": "<sha256#58>",
-    "content_hash": "<sha256#62>",
-    "effective_contract_hash": "<sha256#26>",
+    "code_tree_digest": "<sha256#60>",
+    "content_hash": "<sha256#65>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "<del#1>",
     "issuer": "engineering",
     "kind": "delivery_spec",
-    "product_spec_hash": "<sha256#25>",
+    "product_spec_hash": "<sha256#27>",
     "revision": 1,
     "status": "active"
    }
@@ -1237,7 +1237,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#5>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1
    }
   },
@@ -1254,7 +1254,7 @@
    "error": null,
    "payload": {
     "activation_id": "<act#5>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "step_id": 1
    }
@@ -1276,7 +1276,7 @@
     "attempt": 1,
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "department": "quality",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "purpose": "work",
@@ -1301,7 +1301,7 @@
     "attempted": true,
     "context_event_id": "<ses_qua#1>#19",
     "definitions_version": "<definitions>",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "max_attempts": 3,
@@ -1325,7 +1325,7 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "purpose": "work",
@@ -1347,7 +1347,7 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
     "purpose": "work",
@@ -1413,7 +1413,7 @@
     "attempt": 1,
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#5>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
@@ -1436,7 +1436,7 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#5>-1-1",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
@@ -1447,7 +1447,7 @@
    },
    "receipt": {
     "exit_code": 0,
-    "qa_tests_hash": "<sha256#80>",
+    "qa_tests_hash": "<sha256#82>",
     "tree_changed": false
    }
   },
@@ -1467,11 +1467,11 @@
     "attempt": 1,
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#5>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
-    "name": "submit_review",
+    "name": "submit_independent_judgement",
     "step_id": 1
    }
   },
@@ -1490,11 +1490,11 @@
     "activation_id": "<act#5>",
     "attempt_id": "<act#5>:root-1:work:attempt-1",
     "context_event_id": "<ses_qua#1>#19",
-    "effective_contract_hash": "<sha256#26>",
+    "effective_contract_hash": "<sha256#29>",
     "id": "call-<act#5>-1-2",
     "input_version": 1,
     "logical_call_id": "<act#5>:root-1:work",
-    "name": "submit_review",
+    "name": "submit_independent_judgement",
     "ok": true,
     "purpose": "work",
     "step_id": 1
@@ -1514,13 +1514,13 @@
    "payload": {
     "definitions_version": "<definitions>",
     "input_version": 1,
-    "kind": "qa_review",
+    "kind": "independent_judgement",
     "parameters_version": "<parameters>"
    }
   },
   {
    "event": "<evt#70>",
-   "type": "qa_submitted",
+   "type": "independent_judgement_committed",
    "actor": "department:quality",
    "department": "quality",
    "state_before": "running",
@@ -1530,41 +1530,22 @@
    "stop_reason": null,
    "error": null,
    "payload": {
-    "code_snapshot_hash": "<sha256#58>",
-    "content_hash": "<sha256#99>",
-    "delivery_spec_hash": "<sha256#62>",
-    "effective_contract_hash": "<sha256#26>",
-    "id": "<qa#1>",
-    "issuer": "quality",
-    "kind": "qa_review",
-    "product_spec_hash": "<sha256#25>",
-    "revision": 1,
-    "status": "active",
-    "verdict": "release"
+    "checks": [
+     "smoke"
+    ],
+    "criteria_count": 1,
+    "delivery_spec_hash": "<sha256#65>",
+    "kind": "independent_judgement",
+    "product_spec_hash": "<sha256#27>"
    }
   },
   {
    "event": "<evt#71>",
-   "type": "run_done",
-   "actor": "system",
-   "department": "quality",
-   "state_before": "running",
-   "state_after": "done",
-   "parent_event_id": "<ses_qua#1>#17",
-   "session_id": "<ses_qua#1>",
-   "stop_reason": "released",
-   "error": null,
-   "payload": {
-    "stop_reason": "released"
-   }
-  },
-  {
-   "event": "<evt#72>",
    "type": "activation_finished",
    "actor": "system",
    "department": "quality",
-   "state_before": "done",
-   "state_after": "done",
+   "state_before": "running",
+   "state_after": "running",
    "parent_event_id": "<ses_qua#1>#17",
    "session_id": "<ses_qua#1>",
    "stop_reason": null,
@@ -1574,7 +1555,360 @@
     "input_version": 1,
     "session_activations": 2,
     "session_elapsed_ms": "<duration>",
-    "session_model_steps": 2,
+    "session_model_steps": 2
+   }
+  },
+  {
+   "event": "<evt#72>",
+   "type": "department_activated",
+   "actor": "system",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": null,
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "effective_contract_hash": "<sha256#29>",
+    "input_version": 1
+   }
+  },
+  {
+   "event": "<evt#73>",
+   "type": "department_input",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "effective_contract_hash": "<sha256#29>",
+    "input_version": 1,
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#74>",
+   "type": "context_assembled",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "admitted": true,
+    "attempt": 1,
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "department": "quality",
+    "effective_contract_hash": "<sha256#29>",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#75>",
+   "type": "model_requested",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt": 1,
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "attempted": true,
+    "context_event_id": "<ses_qua#1>#34",
+    "definitions_version": "<definitions>",
+    "effective_contract_hash": "<sha256#29>",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "max_attempts": 3,
+    "parameters_version": "<parameters>",
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#76>",
+   "type": "model_message",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#34",
+    "effective_contract_hash": "<sha256#29>",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#77>",
+   "type": "model_message",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#34",
+    "effective_contract_hash": "<sha256#29>",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#78>",
+   "type": "tool_called",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "input_version": 1,
+    "name": "provider_usage",
+    "ok": true,
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#79>",
+   "type": "model_attempt_finished",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt": 1,
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#34",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "purpose": "work",
+    "status": "completed",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#80>",
+   "type": "tool_started",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt": 1,
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#34",
+    "effective_contract_hash": "<sha256#29>",
+    "id": "call-<act#6>-1-1",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "name": "run_check",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#81>",
+   "type": "tool_called",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#34",
+    "effective_contract_hash": "<sha256#29>",
+    "id": "call-<act#6>-1-1",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "name": "run_check",
+    "ok": true,
+    "purpose": "work",
+    "step_id": 1
+   },
+   "receipt": {
+    "exit_code": 0,
+    "qa_tests_hash": "<sha256#82>",
+    "tree_changed": false
+   }
+  },
+  {
+   "event": "<evt#82>",
+   "type": "tool_started",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt": 1,
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#34",
+    "effective_contract_hash": "<sha256#29>",
+    "id": "call-<act#6>-1-2",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "name": "submit_review",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#83>",
+   "type": "tool_called",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "attempt_id": "<act#6>:root-1:work:attempt-1",
+    "context_event_id": "<ses_qua#1>#34",
+    "effective_contract_hash": "<sha256#29>",
+    "id": "call-<act#6>-1-2",
+    "input_version": 1,
+    "logical_call_id": "<act#6>:root-1:work",
+    "name": "submit_review",
+    "ok": true,
+    "purpose": "work",
+    "step_id": 1
+   }
+  },
+  {
+   "event": "<evt#84>",
+   "type": "proposal_submitted",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "definitions_version": "<definitions>",
+    "input_version": 1,
+    "kind": "qa_review",
+    "parameters_version": "<parameters>"
+   }
+  },
+  {
+   "event": "<evt#85>",
+   "type": "qa_submitted",
+   "actor": "department:quality",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "code_snapshot_hash": "<sha256#60>",
+    "content_hash": "<sha256#113>",
+    "delivery_spec_hash": "<sha256#65>",
+    "effective_contract_hash": "<sha256#29>",
+    "id": "<qa#1>",
+    "issuer": "quality",
+    "kind": "qa_review",
+    "product_spec_hash": "<sha256#27>",
+    "revision": 1,
+    "status": "active",
+    "verdict": "release"
+   }
+  },
+  {
+   "event": "<evt#86>",
+   "type": "run_done",
+   "actor": "system",
+   "department": "quality",
+   "state_before": "running",
+   "state_after": "done",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": "released",
+   "error": null,
+   "payload": {
+    "stop_reason": "released"
+   }
+  },
+  {
+   "event": "<evt#87>",
+   "type": "activation_finished",
+   "actor": "system",
+   "department": "quality",
+   "state_before": "done",
+   "state_after": "done",
+   "parent_event_id": "<ses_qua#1>#32",
+   "session_id": "<ses_qua#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#6>",
+    "input_version": 1,
+    "session_activations": 3,
+    "session_elapsed_ms": "<duration>",
+    "session_model_steps": 3,
     "stop_reason": "released"
    }
   }
@@ -1586,13 +1920,13 @@
   "waiting_reason": null,
   "active_department": null,
   "human_action": null,
-  "cycle_count": 5,
+  "cycle_count": 6,
   "rework_count": 0,
   "round": 0,
   "input_version": 1,
   "processed_input_version": 1,
   "product_work_input_version": 1,
-  "stream_version": 72,
+  "stream_version": 87,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
  },

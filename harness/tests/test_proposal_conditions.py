@@ -10,8 +10,9 @@
 from harness.tests.helpers import adjudication_view
 
 from harness.actions import TreeFacts
-from harness.models import (ArtifactRef, CheckReceipt, DeliverySpec, EffectiveContract, ProductDecision, ProductSpec,
-                            RunProjection, SessionRecord, canonical_hash)
+from harness.kernel_events import Event
+from harness.models import (ArtifactRef, CheckReceipt, DeliverySpec, EffectiveContract, EventType, ProductDecision,
+                            ProductSpec, RunProjection, SessionRecord, canonical_hash)
 from harness.proposals import baseline_review, delivery, product_decision, product_spec, review, structure
 from harness.validation import evaluate_proposal
 from harness.tightening import WATCHED_OUTPUTS
@@ -24,6 +25,19 @@ DELIVERY_HASH = "sha256:" + "d" * 64
 TREE = "sha256:" + "e" * 64
 OTHER_TREE = "sha256:" + "f" * 64
 REQUIREMENT = "print the given argument to stdout"
+
+
+def _judgement_events(delivery_hash: str = DELIVERY_HASH) -> list[Event]:
+    # 一条独立判断事件的内存替身（工单 #358 的门：核对它的存在与它写的交付摘要）
+    return [Event(event_id="evt_judgement", run_id=RUN, type=EventType.INDEPENDENT_JUDGEMENT_COMMITTED,
+                  role=None, parent_event_id=None, state_before="running", state_after="running",
+                  payload={"kind": "independent_judgement", "product_spec_hash": SPEC_HASH,
+                           "delivery_spec_hash": delivery_hash, "checks": ["smoke"],
+                           "criteria_count": 1, "criteria": []},
+                  artifact_hashes=[], session_id="ses_quality", provider=None, model=None,
+                  context_digest=None, stop_reason=None, error=None, created_at="2026-10-31T00:00:00Z",
+                  position=999, stream=f"run:{RUN}", stream_version=999, project_id=None,
+                  work_item_id=None, department="quality")]
 
 
 def _ref(kind: str, content_hash: str) -> ArtifactRef:
@@ -196,8 +210,10 @@ def test_a_check_receipt_from_another_activation_is_rejected():
 
 
 def test_a_review_of_a_current_delivery_is_accepted():
-    decision = evaluate_proposal(adjudication_view(_review_projection()),department="quality", facts=_facts(_quality_receipt()),
-                                 proposal=_review_proposal(), tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(_review_projection()), department="quality",
+                                 facts=_facts(_quality_receipt()),
+                                 proposal=_review_proposal(), tightening=WATCHED_OUTPUTS,
+                                 events=_judgement_events())
     assert decision.accepted, decision.error_dicts
     assert decision.ends_run
 

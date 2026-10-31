@@ -136,7 +136,8 @@
     {
       "rule": "验证者提交独立判断之前看不到作者的解释",
       "test": "kernel/test_judge_before_explanation.py",
-      "added_by": "工单 #358（先判断后看解释）"
+      "added_by": "工单 #358（先判断后看解释）",
+      "ready": true
     },
     {
       "rule": "未校准的判定点不改变事实事件",

@@ -7,7 +7,7 @@ from typing import Any
 
 from harness.models import json_dumps
 from harness.path_rules import QA_TESTS_DIR
-from harness.proposals import delivery, product_spec, review
+from harness.proposals import delivery, judgement, product_spec, review
 from harness.tests.protocol_helpers import ScriptedProvider, send_reply, sse
 
 # 检查命令一律写成 ["python", ...]，由主机解析解释器，基准中不出现本机路径
@@ -89,6 +89,10 @@ def http_script(body: dict[str, Any]) -> dict[str, list[list[tuple[str, dict[str
             [("write_file", {"path": f"{QA_TESTS_DIR}/test_echo.py",
                              "content": "import sys\nprint('QA_TEST_DRAFTED')\nsys.exit(0)\n"}),
              ("submit_review", _submission(review("release", "按 PRD 起草了测试用例；还没有交付可以核验")))],
+            # 交付到达以后先交独立判断，再核验并放行（先判断后看解释的门，工单 #358）
+            [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+             ("submit_independent_judgement",
+              _submission(judgement(checks=["smoke"], basis_delivery_spec_hash=delivery_hash)))],
             [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
              ("submit_review", _submission(review("release", "checks passed on the current snapshot",
                                                   basis_delivery_spec_hash=delivery_hash)))],

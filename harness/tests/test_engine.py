@@ -4,7 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from harness.adapters.fake import FakeAdapter
 from harness.models import ArtifactRef, EventType, canonical_hash, estimate_tokens, json_dumps
-from harness.proposals import answer_turn, delivery_turn, product_spec, review_turn
+from harness.proposals import answer_turn, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (
@@ -44,17 +44,19 @@ def test_each_step_assembles_auditable_input_with_only_current_activation_histor
         # 提交的历史留在本部门，工程的第二次请求看得到它，别的部门看不到
         "engineering": [delivery_turn(basis_product_spec_hash="stale"), delivery_turn()],
         # 质检在交付到达以前有一轮预测性探索（工单 #557），交付到达以后才核验
-        "quality": [explore_turn(), review_turn("release", "valid host evidence")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "valid host evidence")],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
     system.workspace(run_id).write_file("proof.txt", "CAUSAL_TOOL_OUTPUT")
     result = system.run_until_stop(run_id)
     assert result.status == "done"
-    # 步骤编号按各自的会话算：产品的两次请求在同一次激活里（1、2），别的部门各自是新激活的第一步
+    # 步骤编号按各自的会话算：产品的两次请求在同一次激活里（1、2），别的部门各自是新激活的第一步。
+    # 质检现在三步：预测性探索、独立判断、核验（工单 #358）
     steps = [(request.department, request.step_id) for request in adapter.invocations]
     assert steps[:2] == [("product", 1), ("product", 2)]
-    assert sorted(steps[2:]) == [("engineering", 1), ("engineering", 1), ("quality", 1), ("quality", 1)]
+    assert sorted(steps[2:]) == [("engineering", 1), ("engineering", 1),
+                                 ("quality", 1), ("quality", 1), ("quality", 1)]
     by_department: dict[str, list] = {}
     for request in adapter.invocations:
         by_department.setdefault(request.department, []).append(request)
@@ -212,6 +214,7 @@ def test_reactivated_department_restores_its_received_work_outputs_and_complete_
             answer_turn("The existing requirements define the current behavior."),
         ],
         "quality": [
+            judgement_turn(),
             review_turn("release", "valid host evidence"),
         ],
     }

@@ -47,7 +47,7 @@ from harness.app.project_queries import RunActions, RunRecovery
 from harness.event_store import Command, EventStore
 from harness.models import EventType, ProjectEventType
 from harness.projection import saved_decisions
-from harness.proposals import delivery_turn, product_spec_turn, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec_turn, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import after_event, quality_turns
@@ -61,10 +61,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 # 由这里的 TimeoutError 报成一条失败。150 秒仍远大于本机几秒的正常用时
 STARTUP_TIMEOUT_SEC = min(WAIT_FOR_HOST_WORK_SEC, 150.0)
 _TURN_FACTORIES = {"product_spec": product_spec_turn, "delivery_spec": delivery_turn,
-                   "qa_review": review_turn}
+                   "qa_review": review_turn, "independent_judgement": judgement_turn}
 # 工厂自己按请求取依据版本，字段名与 shape 也不一样：这几项不进工厂参数
 _FACTORY_SKIP_FIELDS = frozenset({"kind", "basis_product_spec_hash", "basis_delivery_spec_hash",
-                                  "check_names", "known_risks"})
+                                  "check_names", "known_risks", "checks", "criteria", "criteria_count"})
 
 
 def build_script(items: Sequence[dict[str, Any]] | Mapping[str, Sequence[dict[str, Any]]]) -> Any:

@@ -26,6 +26,7 @@ from harness.providers.call import ModelCall, ModelResponse
 from harness.proposals import (
     answer_turn, ask_turn,
     delivery_turn,
+    judgement_turn,
     product_spec, product_spec_turn, review, review_turn,
 )
 from harness.projection import saved_decisions
@@ -72,6 +73,11 @@ def _release(rationale: str = "checks passed on the current snapshot") -> Callab
     return review_turn("release", rationale, checks=CHECKS)
 
 
+def _judgement(checks: dict[str, int | dict[str, Any]] | None = None) -> Callable[[ModelCall], FakeTurn]:
+    # 独立判断（验证的独立性设计说明第 4 节，工单 #358）：按请求里的当前交付填写依据版本
+    return judgement_turn(checks=checks if checks is not None else CHECKS)
+
+
 def _explore(name: str = "test_echo.py") -> FakeTurn:
     # 质检的预测性探索（循环结构第 3.1 节、工单 #557）：PRD 被接纳以后还没有交付，
     # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
@@ -83,7 +89,7 @@ def _explore(name: str = "test_echo.py") -> FakeTurn:
 
 
 def _handoff_script() -> list[Any]:
-    return [product_spec(), _deliver(), _release()]
+    return [product_spec(), _deliver(), _judgement(), _release()]
 
 
 def _system(data_dir, script: list[Any] | dict[str, list[Any]], *, step_limits: StepLimits = StepLimits(),
@@ -100,7 +106,7 @@ def handoff_release(data_dir):
     system, _, run_id = _system(data_dir, {
         "product": [product_spec()],
         "engineering": [_deliver()],
-        "quality": [_explore(), _release()],
+        "quality": [_explore(), _judgement(), _release()],
     })
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -228,10 +234,11 @@ def ask_answer_with_spec_revision(data_dir):
                         change_record={"changed": ["print the given argument in uppercase to stdout"],
                                        "retained": ["single file implementation"]}),
         ],
-        "quality": [_release()],
+        "quality": [_judgement(), _release()],
     })
     system.activate_once(run_id)  # 产品提交 PRD
     system.activate_once(run_id)  # 工程询问产品，收到修订后的 PRD 与新合同，接着交付
+    system.activate_once(run_id)  # 质检交独立判断（工单 #358）
     system.activate_once(run_id)  # 质检核验并放行
     assert system.project(run_id).status == "done"
     return system, run_id, {}
@@ -247,7 +254,7 @@ def ask_branch_exhausted(data_dir):
         "product:ask": [
             ModelResponse(output=[_call("ans-err", "answer", {"answer": ""})]),
         ],
-        "quality": [_explore(), _release()],
+        "quality": [_explore(), _judgement(), _release()],
     }, step_limits=StepLimits(max_model_steps=4, department_max_model_steps={"product": 1}))
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -258,7 +265,7 @@ def guidance_answered(data_dir):
     # 关注的成果里只有这段指导；这一轮正常结束时主机写已回答（工单 #1039）
     system, adapter, run_id = _system(data_dir, {"product": [product_spec()],
                                                  "engineering": [_deliver()],
-                                                 "quality": [_explore(), _release()]})
+                                                 "quality": [_explore(), _judgement(), _release()]})
     system.activate_once(run_id)
     system.activate_once(run_id)
     system.add_guidance(run_id, "engineering", "请说明当前错误输出边界，无需改文件。")
@@ -278,7 +285,7 @@ def proposal_rejected(data_dir):
                     product_spec_turn(goal="print the argument", requirements=["print the argument"],
                                       acceptance=["prints it"])],
         "engineering": [_deliver()],
-        "quality": [_explore(), _release()],
+        "quality": [_explore(), _judgement(), _release()],
     })
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -294,8 +301,10 @@ def quality_rework(data_dir):
         ],
         "quality": [
             _explore(),
+            _judgement(),
             review_turn("rework_engineering", "the output misses a trailing newline check", checks=CHECKS,
                         defects=[{"severity": "major", "summary": "no check covers an argument with spaces"}]),
+            _judgement(),
             _release("the rework passed the checks"),
         ],
     })
@@ -334,7 +343,7 @@ def time_limit(data_dir):
 
     system, _, run_id = _system(data_dir, {"product": [slow_spec],
                                            "engineering": [_deliver()],
-                                           "quality": [_explore(), _release()]},
+                                           "quality": [_explore(), _judgement(), _release()]},
                                 run_time_limit_sec=3)
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -410,7 +419,7 @@ def bash_is_not_a_check_receipt(data_dir):
     system, _, run_id = _system(data_dir, {
         "product": [product_spec()],
         "engineering": [first, second, third],
-        "quality": [_explore(), _release("verified the delivered echo CLI")],
+        "quality": [_explore(), _judgement(), _release("verified the delivered echo CLI")],
     })
     system.run_until_stop(run_id)
     return system, run_id, {}
@@ -574,7 +583,7 @@ def _request_time_unavailable_script() -> dict[str, list[Any]]:
     return {
         "product": [FakeTurn(proposal=product_spec(), usage=Usage(input_tokens=100, output_tokens=20))],
         "engineering": [ProviderError(_UNAVAILABLE_MESSAGE, reason="provider_unavailable"), _deliver()],
-        "quality": [_explore(), _release()],
+        "quality": [_explore(), _judgement(), _release()],
     }
 
 
@@ -641,7 +650,7 @@ class _FlakyAvailabilityAdapter(FakeAdapter):
 def activation_start_unavailable(data_dir):
     adapter = _FlakyAvailabilityAdapter({"product": [product_spec()],
                                           "engineering": [_deliver()],
-                                          "quality": [_explore(), _release()]})
+                                          "quality": [_explore(), _judgement(), _release()]})
     system = LoopSystem.for_testing(data_dir, adapter)
     run_id = system.create_run("build an echo CLI")
     blocked = system.run_until_stop(run_id)
@@ -672,7 +681,7 @@ def _credential_rejected_then_continue(protocol: str, first):
             send_reply(handler, 200, "text/event-stream",
                        HTTP_REPLIES[protocol](reply_index(department, index), calls))
 
-        replies.extend(after_rejection for _ in range(4))
+        replies.extend(after_rejection for _ in range(5))
         provider = ScriptedProvider(replies)
         try:
             system, run_id = provider_system(data_dir, provider.base, protocol)
@@ -695,7 +704,7 @@ def concurrent_departments(data_dir):
     system, _, run_id = _system(data_dir, {
         "product": [product_spec()],
         "engineering": [_deliver()],
-        "quality": [_explore(), _release()],
+        "quality": [_explore(), _judgement(), _release()],
     })
     system.run_until_stop(run_id)
     return system, run_id, {}

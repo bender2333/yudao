@@ -16,7 +16,7 @@ import sys
 from typing import Any
 
 from harness.models import EventType
-from harness.proposals import delivery, product_spec, review
+from harness.proposals import delivery, judgement, product_spec, review
 from harness.tests import process_kill as killed
 
 
@@ -71,6 +71,7 @@ def test_a_branch_session_continues_after_a_restart(tmp_path):
              "checks": _smoke_check()},
         ],
         "quality": [
+            {"proposal": judgement("smoke")},
             {"proposal": review("release", "checks passed on the current snapshot"),
              "checks": _smoke_check()},
         ],
@@ -130,6 +131,7 @@ def test_the_delivery_is_verified_after_a_restart(tmp_path):
     }
     tail = {
         "quality": [
+            {"proposal": judgement("smoke")},
             {"proposal": review("release", "checks passed on the current snapshot"),
              "checks": _smoke_check()},
         ],
@@ -186,6 +188,7 @@ def test_session_and_item_usage_accumulate_across_a_restart(tmp_path):
              "checks": _smoke_check()},
         ],
         "quality": [
+            {"proposal": judgement("smoke")},
             {"proposal": review("release", "checks passed on the current snapshot"),
              "checks": _smoke_check()},
         ],

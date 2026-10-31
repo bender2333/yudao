@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import sys
 import uuid
 from pathlib import Path
@@ -14,7 +15,7 @@ from .app.project_and_work_item_commands import WorkItemAppendInput, WorkItemCre
 from .app.project_commands import ProjectCreate
 from .definitions import DEFINITIONS
 from .environment import QA_TESTS_DIR
-from .proposals import (ask_turn, answer_turn, delivery_turn, product_spec,
+from .proposals import (ask_turn, answer_turn, delivery_turn, judgement_turn, product_spec,
                         product_spec_turn, review, review_turn)
 from .providers.call import ModelResponse, ModelStreamEvent
 from .providers.selection import ModelSelection
@@ -99,7 +100,7 @@ def demo_script():
     # 质检的每一轮按当前有没有交付决定做什么（工单 #557：同时运行的会话轮数随交付到达变化，
     # 写死的脚本会在交付到达的时机上耗尽）。没有交付时起草测试用例（预测性探索），
     # 有交付时先记下缺陷记录，返工以后的交付核验通过以后放行。
-    quality_state = {"defect_recorded": False}
+    quality_state = {"defect_recorded": False, "judged": None}
 
     def quality_turn(call):
         delivery = prompt_part(call, "current_delivery_spec")
@@ -109,6 +110,11 @@ def demo_script():
                         "import subprocess, sys\nr = subprocess.run([sys.executable, 'src/echo.py', 'hello'],"
                         "capture_output=True, text=True)\nassert r.returncode == 0 and r.stdout.strip() == 'hello'\n"},
                 proposal=review("release", "按 PRD 起草了测试用例；还没有交付可以核验"))
+        # 先判断后看解释（工单 #358）：同一份交付只交一次独立判断
+        delivery_hash = json.loads(delivery).get("content_hash")
+        if quality_state["judged"] != delivery_hash:
+            quality_state["judged"] = delivery_hash
+            return judgement_turn(checks=quality_checks)(call)
         if not quality_state["defect_recorded"]:
             quality_state["defect_recorded"] = True
             return review_turn(
@@ -183,6 +189,8 @@ def demo_script():
                 background="Quality is preparing its independent checks.",
                 expected="Identify the existing executable path without changing the delivery.",
             ),
+            quality_turn,
+            quality_turn,
             quality_turn,
             quality_turn,
             quality_turn,

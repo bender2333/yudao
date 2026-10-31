@@ -29,11 +29,12 @@ def _session_id(system, run_id: str, department: str) -> str:
 
 
 def test_the_inspection_workspaces_are_removed_when_the_run_reaches_done(tmp_path: Path) -> None:
-    # 运行到 DONE：三个部门的检查工作区都已删除，运行工作区与交付内容仍然保留
+    # 运行到 DONE：三个部门的检查工作区都已删除，运行工作区与交付内容仍然保留。
+    # 质检先交独立判断再核验（工单 #358）
     system, _adapter, run_id = event_scenarios._system(tmp_path, {
         "product": [event_scenarios.product_spec()],
         "engineering": [event_scenarios._deliver()],
-        "quality": [event_scenarios._explore(), event_scenarios._release()],
+        "quality": [event_scenarios._explore(), event_scenarios._judgement(), event_scenarios._release()],
     })
     system.run_until_stop(run_id)
     run_root = tmp_path / "workspaces" / run_id

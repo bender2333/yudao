@@ -7,7 +7,7 @@ import pytest
 import harness.submissions as submissions
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.public_tree import TreeError, capture_public_tree, materialize_tree
 from harness.runtime import LoopSystem
 from harness.tree_archive import load_tree
@@ -19,7 +19,8 @@ def _system_with_delivery(tmp_path):
     system = LoopSystem.for_testing(tmp_path / "new" / "data", FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn()],
-        "quality": [review_turn("release", "Checks passed"), review_turn("release", "Checks passed")],
+        "quality": [judgement_turn(), review_turn("release", "Checks passed"),
+                    judgement_turn(), review_turn("release", "Checks passed")],
     }))
     run_id = system.create_run("Build echo")
     workspace = system.workspace(run_id)

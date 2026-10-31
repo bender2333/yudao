@@ -187,6 +187,7 @@ _LABELS: dict[str, str] = {
     EventType.CONTRACT_ACCEPTED: "采纳了有效合同（第 {revision} 版）",
     EventType.ASK_STARTED: "{requester}向{recipient}发问：{question}",
     EventType.ASK_ANSWERED: "回答了询问",
+    EventType.INDEPENDENT_JUDGEMENT_COMMITTED: "核验角色提交了独立判断（第 {criteria_count} 条，不含解释）",
     EventType.PRODUCT_DECISION_ACCEPTED: "采纳了产品决策（{kind}）",
     EventType.ARTIFACT_INVALIDATED: "成果失效：{artifact_kind}第 {artifact_version} 版（{reason}）",
     EventType.DELIVERY_ACCEPTED: "采纳了交付（第 {revision} 版）：{summary}",

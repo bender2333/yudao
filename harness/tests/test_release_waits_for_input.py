@@ -16,7 +16,8 @@ from harness.event_store import run_stream
 from harness.models import EventType, json_dumps
 from harness.projection import saved_decisions
 from harness.proposals import (
-    answer_turn, ask_turn, delivery_turn, product_decision, product_spec, product_spec_turn, review_turn,
+    answer_turn, ask_turn, delivery_turn, judgement_turn, product_decision, product_spec, product_spec_turn,
+    review_turn,
 )
 from harness.providers.call import ModelStreamEvent
 from harness.runtime import LoopSystem
@@ -45,14 +46,23 @@ def _quality_events(system: LoopSystem, run_id: str, kind: str):
             if event.type == kind and event.department == "quality"]
 
 
+def _quality_reviews(system: LoopSystem, run_id: str, kind: str):
+    # 质检提交的结论（kind 是 PROPOSAL_SUBMITTED 或 PROPOSAL_REJECTED 时按成果种类过滤：
+    # 独立判断的提交也走提案路径，结论的核对只看 qa_review，工单 #358）
+    return [event for event in _quality_events(system, run_id, kind)
+            if event.type != kind or (event.payload or {}).get("kind") == "qa_review"]
+
+
 def _wait_for_the_release_attempt(holder, run_id):
     # 产品这一轮等质检把放行前面的检查跑完再继续：放行的调用排在检查之后，许可在这里紧接着做，
-    # 所以这一轮结束时放行一定已经在等待；等待期间交出流式片段，让质检的会话得到调度
+    # 所以这一轮结束时放行一定已经在等待；等待期间交出流式片段，让质检的会话得到调度。
+    # 检查有两次（独立判断一次、放行一次，工单 #358）：第二次 run_check 写下以后放行才排上
     deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        if any(event.type == EventType.TOOL_CALLED and event.department == "quality"
-               and (event.payload or {}).get("name") == "run_check"
-               for event in _events(holder["system"], run_id)):
+        checks = [event for event in _events(holder["system"], run_id)
+                  if event.type == EventType.TOOL_CALLED and event.department == "quality"
+                  and (event.payload or {}).get("name") == "run_check"]
+        if len(checks) >= 2:
             holder["release_attempted"] = True
             return
         yield ModelStreamEvent(kind="stream_event", id="evt-wait")
@@ -112,7 +122,7 @@ def test_a_release_waits_until_the_product_round_ends(tmp_path):
     assert projection.department_guidance[0].status == "answered"
     product_end = max(event.position for event in _events(system, run_id)
                       if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
-    [release] = _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED)
+    [release] = _quality_reviews(system, run_id, EventType.PROPOSAL_SUBMITTED)
     assert release.position > product_end
     # 产品没有修订 PRD：放行被接纳，事项结束
     assert projection.status == "done"
@@ -142,7 +152,9 @@ def test_a_release_is_rejected_after_the_product_revises_the_prd(tmp_path):
     adapter = FakeAdapter({
         "product": [product_spec(), revise_the_prd],
         "engineering": [delivery_turn(), delivery_turn()],
-        "quality": [review_turn("release", "checks passed on the current delivery"), observe_the_notification]
+        "quality": [judgement_turn(),
+                    review_turn("release", "checks passed on the current delivery"),
+                    observe_the_notification]
                    + quality_turns("release", "checks passed on the current delivery"),
     }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -194,14 +206,18 @@ def test_the_wait_writes_no_events_and_takes_no_model_steps(tmp_path):
     assert projection.status == "done"
 
     events = _events(system, run_id)
-    release_attempt = next(event.position for event in events
-                           if event.type == EventType.TOOL_CALLED and event.department == "quality"
-                           and (event.payload or {}).get("name") == "run_check")
+    checks = [event.position for event in events
+              if event.type == EventType.TOOL_CALLED and event.department == "quality"
+              and (event.payload or {}).get("name") == "run_check"]
+    # 放行的调用排在放行检查之后：判断的检查先写，放行的检查是第二次（工单 #358）
+    assert len(checks) == 2
+    release_attempt = checks[-1]
     product_end = max(event.position for event in events
                       if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
     assert release_attempt < product_end
     during = [event for event in events if release_attempt < event.position < product_end]
     # 等待期间质检没有任何事件：没有 tool_started、tool_called，也没有新的模型请求
+    # （独立判断与它的检查都写在放行的检查以前，工单 #358）
     assert [event.type for event in during if event.department == "quality"] == []
     steps_before = len([event for event in events
                         if event.type == EventType.MODEL_REQUESTED and event.department == "quality"
@@ -243,7 +259,7 @@ def test_cancel_while_the_release_waits_cancels_the_item_without_a_release(tmp_p
     assert projection.stop_reason == "cancelled"
     # 没有放行，也没有提交放行的记录
     assert projection.last_review is None
-    assert _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
+    assert _quality_reviews(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
 
 
 def test_running_out_of_time_while_the_release_waits_ends_the_run(tmp_path):
@@ -287,7 +303,7 @@ def test_running_out_of_time_while_the_release_waits_ends_the_run(tmp_path):
     assert projection.status == "failed"
     assert projection.stop_reason == "time_limit"
     assert projection.last_review is None
-    assert _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
+    assert _quality_reviews(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
     # 运行时间是在放行等着的安全节点上用完了：这次提交放行的调用被停下、没有执行
     # （引擎在安全节点上停止时跳过没开始的调用，理由写明是这次激活不能再开始工具）
     [skipped] = [event for event in _quality_events(system, run_id, EventType.TOOL_SKIPPED)
@@ -332,7 +348,7 @@ def test_a_model_unavailable_stops_the_wait_without_a_release(tmp_path):
     # 等待停下：放行没有裁决、没有放行，事项也没有以取消或运行时间用完结束
     assert projection.status == "running", projection.stop_reason
     assert projection.last_review is None
-    assert _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
+    assert _quality_reviews(system, run_id, EventType.PROPOSAL_SUBMITTED) == []
 
 
 def test_a_defect_record_does_not_wait_for_the_product_input(tmp_path):
@@ -346,7 +362,8 @@ def test_a_defect_record_does_not_wait_for_the_product_input(tmp_path):
     adapter = FakeAdapter({
         "product": [product_spec(), process_the_input],
         "engineering": [delivery_turn(), delivery_turn()],
-        "quality": [review_turn("rework_engineering", "the delivery misses the acceptance criterion",
+        "quality": [judgement_turn(),
+                    review_turn("rework_engineering", "the delivery misses the acceptance criterion",
                                 defects=[{"severity": "major", "summary": "uppercase output missing"}])]
                    + quality_turns("release", "checks passed on the current delivery"),
     }, stream_gap_sec=0.01)
@@ -405,10 +422,13 @@ def test_a_release_that_waits_survives_a_restart(tmp_path):
                  "activation_id": "act_release_wait", "step_id": 1, "purpose": "work"}))
     first.close()
 
+    # 重启以后的质检先交独立判断再下结论（先判断后看解释的门，工单 #358）：
+    # 中断的放行调用重新执行时被门拒绝一次，判断提交以后放行照常等待与裁决
     restarted = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [FakeTurn(transcript="输出保持小写，产品要求不变。")],
         "engineering": [],
-        "quality": [review_turn("release", "checks passed on the current delivery", checks={})],
+        "quality": [judgement_turn(),
+                    review_turn("release", "checks passed on the current delivery", checks={})],
     }), resume_on_startup=False)
     restarted.orchestrator.resume_incomplete_run(run_id)
     projection = restarted.run_until_stop(run_id)
@@ -462,7 +482,7 @@ def test_the_product_can_ask_quality_while_the_release_waits(tmp_path):
     assert "大写输出" in answered.payload["answer"]
     product_end = max(event.position for event in events
                       if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
-    [release] = _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED)
+    [release] = _quality_reviews(system, run_id, EventType.PROPOSAL_SUBMITTED)
     assert release.position > product_end
     assert projection.department_guidance[0].status == "answered"
     assert projection.status == "done", projection.error
@@ -505,7 +525,7 @@ def test_input_arriving_while_quality_works_alone_starts_the_product(tmp_path):
     product_end = max(event.position for event in product_finished)
     assert guidance.position < product_end
     # 放行在这一轮结束以后才生效，事项完成：没有等到运行时间用完
-    [release] = _quality_events(system, run_id, EventType.PROPOSAL_SUBMITTED)
+    [release] = _quality_reviews(system, run_id, EventType.PROPOSAL_SUBMITTED)
     assert release.position > product_end
     assert projection.stop_reason != "time_limit"
     assert projection.status == "done", projection.error
@@ -593,7 +613,8 @@ def test_the_item_finishes_after_the_product_makes_a_decision(tmp_path):
     adapter = FakeAdapter({
         "product": [product_spec(), decide_while_the_release_waits],
         "engineering": [delivery_turn(), deliver_after_the_release_is_rejected],
-        "quality": [review_turn("release", "checks passed on the current delivery"),
+        "quality": [judgement_turn(),
+                    review_turn("release", "checks passed on the current delivery"),
                     observe_the_decision]
                    + quality_turns("release", "checks passed on the new delivery"),
     }, stream_gap_sec=0.01)

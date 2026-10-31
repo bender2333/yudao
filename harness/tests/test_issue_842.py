@@ -12,7 +12,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.project_queries import DepartmentWorkspace, ProjectOverview
 from harness.models import EventType
-from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
+from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.projection import replay_events
 from harness.runtime import LoopSystem
 
@@ -28,7 +28,9 @@ def _ask_script() -> dict[str, Any]:
             delivery_turn(files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"}),
         ],
         "product:ask": [answer_turn(answer="不改，保持原样。")],
-        "quality": [review_turn("release", "ok")],
+        "quality": [review_turn("release", "按 PRD 起草了测试用例；还没有交付可以核验"),
+                    judgement_turn(),
+                    review_turn("release", "ok")],
     }
 
 
@@ -97,7 +99,7 @@ def test_run_failed_carries_the_department_that_was_working(tmp_path: Path):
 
 
 def _finishing_script() -> dict[str, Any]:
-    # 一次询问走完整个事项：产品提交 PRD，工程询问产品以后交付，质检起草用例后放行
+    # 一次询问走完整个事项：产品提交 PRD，工程询问产品以后交付，质检起草用例后先交独立判断再放行
     return {
         "product": [product_spec()],
         "engineering": [
@@ -106,6 +108,7 @@ def _finishing_script() -> dict[str, Any]:
         ],
         "product:ask": [answer_turn(answer="不改，保持原样。")],
         "quality": [review_turn("release", "按 PRD 起草了测试用例；还没有交付可以核验"),
+                    judgement_turn(),
                     review_turn("release", "ok")],
     }
 

@@ -9,6 +9,7 @@ from harness.proposals import (
     answer_turn,
     ask_turn,
     delivery_turn,
+    judgement_turn,
     product_spec,
     review,
     review_turn,
@@ -144,7 +145,7 @@ def test_context_overflow_is_explicit_failure(data_dir):
 
 def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
     # PRD 修订以后质检不能沿用旧依据下的检查回执（工单 #555：质检要求有问题时询问产品，
-    # 产品在回答里修订 PRD）
+    # 产品在回答里修订 PRD）。质检先交独立判断再下结论（先判断后看解释的门，工单 #358）
     script = {
         "product": [product_spec(acceptance=["old behavior"])],
         "engineering": [
@@ -153,9 +154,11 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
             delivery_turn(summary="same code under new spec"),
         ],
         "quality": [
+            judgement_turn(),
             review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                         defects=[{"severity": "major", "summary": "contract issue"}]),
             FakeTurn(proposal=review("release", "I am done without any new check"), checks={}),
+            judgement_turn(),
             review_turn("release", "checked current contract"),
         ],
         "product:ask": [answer_turn(
@@ -188,7 +191,8 @@ def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
     assert projection.last_review.delivery_spec_hash == projection.delivery_spec.content_hash
 
 def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
-    # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
+    # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列。
+    # 结论前先交独立判断（先判断后看解释的门，工单 #358）
     script = {
         "product": [product_spec()],
         "engineering": [delivery_turn()],
@@ -201,6 +205,7 @@ def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
                 proposal={"kind": "qa_review", "verdict": "release", "rationale": "OK", "checks": ["smoke"], "defects": None},
                 checks={"smoke": 0},
             ),
+            judgement_turn(),
             review_turn("release", "ok"),
         ],
     }

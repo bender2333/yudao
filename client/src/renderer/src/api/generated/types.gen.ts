@@ -10252,6 +10252,107 @@ export type HomeSeenPayload = {
 };
 
 /**
+ * IndependentJudgementCommittedEvent
+ */
+export type IndependentJudgementCommittedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: 'product' | 'engineering' | 'quality' | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'independent_judgement_committed';
+    payload: IndependentJudgementPayload;
+};
+
+/**
+ * IndependentJudgementPayload
+ */
+export type IndependentJudgementPayload = {
+    /**
+     * Kind
+     */
+    kind: 'independent_judgement';
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Delivery Spec Hash
+     */
+    delivery_spec_hash: string;
+    /**
+     * Checks
+     */
+    checks: Array<string>;
+    /**
+     * Criteria Count
+     */
+    criteria_count: number;
+    /**
+     * Criteria
+     */
+    criteria: Array<QaCriterionPayload>;
+};
+
+/**
  * InitialPrdProposedEvent
  */
 export type InitialPrdProposedEvent = {
@@ -18266,6 +18367,8 @@ export type EventObject = ({
 } & AskStartedEvent) | ({
     type: 'ask_answered';
 } & AskAnsweredEvent) | ({
+    type: 'independent_judgement_committed';
+} & IndependentJudgementCommittedEvent) | ({
     type: 'product_decision_accepted';
 } & ProductDecisionAcceptedEvent) | ({
     type: 'artifact_invalidated';
