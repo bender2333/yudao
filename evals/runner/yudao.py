@@ -52,6 +52,9 @@ TERMINAL_STATUSES = ("done", "paused", "failed")
 ONBOARDING_RUNNING_STATUSES = ("in_progress", "not_started", "awaiting_initial_prd")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
 POLL_INTERVAL_SECONDS = 3.0
+# 建档结束与基线的确认请求几乎同时发生（工单 #1360）：事项状态离开 running 以后，按观测次数
+# 再查几次决定请求，而不是按一段固定时长赌。每次查一次是一份证据，看到请求就返回
+ONBOARDING_GRACE_POLLS = 5
 STARTUP_TIMEOUT_SECONDS = 180.0
 
 
@@ -484,17 +487,27 @@ def onboarding_status(client, project_id, work_item_id):
 def wait_for_initial_prd(client, project_id, work_item_id, timeout_seconds):
     """等建档跑完并出现初始 PRD 的确认请求，返回这个请求（第 4.7 节）。
 
-    建档只回答一次确认：请求出现时它就是这次等待的结果。建档在出请求之前停下时
-    抛 RuntimeError，运行器把它写成这次运行的作废原因。
+    建档只回答一次确认：请求出现时它就是这次等待的结果。状态离开 running 与请求写入几乎
+    同时发生（工单 #1360：两次真实运行都先看到事项结束、后看到请求）：这时再查一次请求，
+    并在按观测次数计的一小段宽限里继续查，只有确认请求始终没有出现才抛 RuntimeError。
+    两种作废原因分开写：建档在出请求之前停了、还是等到时限都没有请求。
     """
     deadline = time.monotonic() + timeout_seconds
+    grace_polls = ONBOARDING_GRACE_POLLS
     while time.monotonic() < deadline:
         decision = initial_prd_decision(client, project_id)
         if decision is not None:
             return decision
         status = onboarding_status(client, project_id, work_item_id)
         if status not in ONBOARDING_RUNNING_STATUSES:
-            raise RuntimeError("建档没有给出初始 PRD 的确认请求，建档事项停在 " + (status or "未知状态"))
+            # 状态先离开 running：先无等待地再查一次（请求可能已经写入），之后每次轮询都算一次观测
+            decision = initial_prd_decision(client, project_id)
+            if decision is not None:
+                return decision
+            if grace_polls <= 0:
+                raise RuntimeError("建档在给出初始 PRD 的确认请求之前就停了，建档事项停在 "
+                                   + (status or "未知状态"))
+            grace_polls -= 1
         time.sleep(POLL_INTERVAL_SECONDS)
     raise RuntimeError("建档在 " + str(timeout_seconds) + " 秒内没有给出初始 PRD 的确认请求")
 
