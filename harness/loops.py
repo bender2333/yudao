@@ -55,7 +55,9 @@ ACCEPTANCE_EVENTS = (
 
 MISSING_PROJECT = "项目层缺少故障记录：运维记录故障以后判定"
 MISSING_WORK_ITEM = "事项层缺少计划条目完成的主机事实"
-MISSING_RUN = "run 层缺少逐条核验结论（#1194 接入逐条核验数据以后判定）"
+MISSING_RUN = "run 层缺少逐条核验结论：核验角色提交带逐条结论的放行记录以后判定"
+MISSING_RUN_WINDOW = "run 层缺少事实：逐条核验结论还没满一个判定窗口（{rounds} 轮）"
+MISSING_RUN_RISING = "run 层未满足数在上升：判定规则没有定义这一状态"
 MISSING_ACTIVATION = "激活层缺少计划条目完成的主机事实"
 
 
@@ -198,6 +200,63 @@ def missing_for_step(steps: Sequence[Step], *, window: int, state: str) -> str |
     return f"步骤层缺少事实：步数还没满一个判定窗口（{window} 步）"
 
 
+def _reviews(events: Sequence[Event]) -> list[Mapping[str, Any]]:
+    # 放行记录：qa_submitted 事件上的逐条结论与覆盖数（验证的独立性设计说明第 7.1 节，工单 #151/#1194）。
+    # 旧事件没有这两项，交给 run_state 当作「缺少逐条结论」
+    return [event.payload for event in events
+            if event.type == EventType.QA_SUBMITTED and isinstance(event.payload, dict)]
+
+
+def _flips(reviews: Sequence[Mapping[str, Any]]) -> int:
+    # 同一条验收条件的结论在窗口里翻转了几次（相邻两轮不同即一次）；取翻转最多的一条
+    results: dict[str, list[str]] = {}
+    for review in reviews:
+        for item in review.get("criteria") or ():
+            if not isinstance(item, dict):
+                continue
+            criterion = str(item.get("criterion") or "")
+            results.setdefault(criterion, []).append(str(item.get("result") or ""))
+    return max((sum(1 for earlier, later in zip(sequence, sequence[1:]) if earlier != later)
+                for sequence in results.values()), default=0)
+
+
+def run_state(reviews: Sequence[Mapping[str, Any]], *, rounds: int,
+              stop_reason: str | None) -> tuple[str, str | None]:
+    # run 层的判定（设计第 5 节，工单 #1194）：只按放行记录里算好的覆盖数——未满足数 =
+    # coverage.executable − coverage.covered（可执行检验里还没在当前快照上运行并通过的条数），
+    # 不重新算逐条结论、不读文件。停止原因属于限额类 → 达到边界；没有逐条结论的旧 run 不判定并写明
+    # 缺少的事实；窗口里同一条结论翻转达到方法常量 → 震荡；未满足数严格下降或为 0 → 收敛中；
+    # 不变 → 停滞；轮数达到趋势检验的固定轮数时用秩相关（下降收敛中、不变停滞）；
+    # 上升在设计里没有对应状态，按不判定并写明（自定的边界，记在日记里）
+    if stop_reason in LIMIT_STOP_REASONS:
+        return BOUNDARY, None
+    usable = [review for review in reviews
+              if isinstance(review.get("coverage"), dict) and isinstance(review.get("criteria"), list)]
+    if not usable:
+        return UNDETERMINED, MISSING_RUN
+    window = usable[-max(rounds, 2):]
+    unsatisfied = [int(review["coverage"].get("executable", 0)) - int(review["coverage"].get("covered", 0))
+                   for review in window]
+    if unsatisfied[-1] <= 0:
+        return CONVERGING, None
+    if len(window) < 2:
+        return UNDETERMINED, MISSING_RUN_WINDOW.format(rounds=rounds)
+    if _flips(window) >= FLIP_THRESHOLD:
+        return OSCILLATING, None
+    if len(window) >= TREND_SWITCH_ROUNDS:
+        rho = rank_trend(unsatisfied)
+        if rho < 0:
+            return CONVERGING, None
+        if rho == 0:
+            return STALLED, None
+        return UNDETERMINED, MISSING_RUN_RISING
+    if all(later < earlier for earlier, later in zip(unsatisfied, unsatisfied[1:])):
+        return CONVERGING, None
+    if all(later == earlier for earlier, later in zip(unsatisfied, unsatisfied[1:])):
+        return STALLED, None
+    return UNDETERMINED, MISSING_RUN_RISING
+
+
 def build_loop_tree(events: Sequence[Event]) -> LoopTree:
     # 从一个 run 的事件（按全局位置）与建 run 时冻结的参数得到五层循环树。只读：不写事件、不调用模型
     ordered = sorted(events, key=lambda event: event.position)
@@ -210,10 +269,12 @@ def build_loop_tree(events: Sequence[Event]) -> LoopTree:
     state = step_state(steps, window=window, repeat=parameters[STEP_REPEAT], stop_reason=stop_reason)
     rounds = projection.used.activations
     amounts = _amounts(ordered, projection)
+    run_convergence, run_missing = run_state(_reviews(ordered), rounds=parameters[CONVERGENCE_ROUNDS],
+                                             stop_reason=stop_reason)
     layers = (
         Layer(name="project_loop", state=UNDETERMINED, missing=MISSING_PROJECT),
         Layer(name="work_item", state=UNDETERMINED, missing=MISSING_WORK_ITEM),
-        Layer(name="run", state=UNDETERMINED, missing=MISSING_RUN,
+        Layer(name="run", state=run_convergence, missing=run_missing,
               amounts={"elapsed_ms": amounts["elapsed_ms"], "model_steps": amounts["model_steps"]}),
         Layer(name="activation", state=UNDETERMINED, missing=MISSING_ACTIVATION,
               amounts={"activations": amounts["activations"]}),
@@ -264,13 +325,14 @@ def _frozen(events: Sequence[Event]) -> Mapping[str, Any] | None:
 
 
 def _trend(rounds: int, steps: Sequence[Step], state: str) -> Mapping[str, Any] | None:
-    # 轮数达到 TREND_SWITCH_ROUNDS 时说明改用趋势检验：run 层的逐条核验结论由 #1194 接入，本工单在这一格
-    # 只给出方法与适用条件，不用数值代替缺少的事实
+    # 轮数达到 TREND_SWITCH_ROUNDS 时说明改用趋势检验：这里给步骤层被接纳记录的秩相关；
+    # run 层的逐条核验结论与它自己的趋势由 run_state 判定（工单 #1194）
     if rounds < TREND_SWITCH_ROUNDS:
         return None
     accepted = [1.0 if step.accepted else 0.0 for step in steps]
     return {"method": "spearman", "switch_rounds": TREND_SWITCH_ROUNDS, "flip_threshold": FLIP_THRESHOLD,
-            "rho": round(rank_trend(accepted), 6), "step_state": state, "note": MISSING_RUN}
+            "rho": round(rank_trend(accepted), 6), "step_state": state,
+            "note": "步骤层的趋势检验：被接纳记录的秩相关"}
 
 
 def _activations(events: Sequence[Event], *, repeat: int) -> tuple[Activation, ...]:
