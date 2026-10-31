@@ -1,11 +1,14 @@
 import pytest
 
+from harness.providers import capabilities
 from harness.providers.discovery import _parse_candidates
 
 # 候选的窗口与输出上限预填（模型管理设计说明第 4.3 节）：上游模型列表描述容量的写法各家不同，
 # Provider 模块按列出的次序识别，取第一个有效的正整数；窗口与输出上限各自独立取值，
 # 取到的值来源写 models_url。自定义服务方案（preset_id 为空）在能力表里没有条目，
 # 候选里的容量只能来自上游模型列表，读到的值因此只说明上游模型列表这一处。
+# 工单 #1351：原来的单元层文件 test_provider_candidate_capacity.py 与本文件测的是同一件事，
+# 合成一处留在这个文件里（写法覆盖面更全），文件登记在单元层。
 
 CUSTOM = ""
 
@@ -37,7 +40,9 @@ OUTPUT_WRITINGS: list[tuple[str, dict, int]] = [
     ("capabilities.limit.output", {"capabilities": {"limit": {"output": VALUE}}}, 4096),
 ]
 
-INVALID_VALUES = ["128000", True, False, 0, -1, 1.5]
+# 不采用的值：字符串、布尔、0、负数、小数、整值浮点、空值、空列表与空对象
+# （工单 #1351：两个文件里各自的无效值合并成这一份）
+INVALID_VALUES = ["128000", True, False, 0, -1, 1.5, 1048576.0, None, [], {}]
 
 
 def _with_value(template: dict, value) -> dict:
@@ -124,6 +129,10 @@ def test_candidates_continue_to_the_next_writing_after_an_unusable_value():
                             "max_context_window_tokens": 0,
                             "max_model_len": 32768})
     assert (candidate["context_window"], candidate["context_window_source"]) == (32768, "models_url")
+    # 中间一层不是对象时同样跳过这一种写法
+    candidate = _candidate({"limit": 3, "top_provider": "none",
+                            "capabilities": {"contextWindow": 400000, "maxOutput": 128000}})
+    assert (candidate["context_window"], candidate["max_output_tokens"]) == (400000, 128000)
 
 
 def test_candidates_take_the_context_length_key_from_a_model_info_with_several_keys():
@@ -154,3 +163,14 @@ def test_candidates_read_the_window_and_the_output_limit_independently():
     candidate = _candidate({"model_info": {"gemma3.context_length": 131072},
                             "max_output_tokens": 16384})
     assert (candidate["context_window"], candidate["max_output_tokens"]) == (131072, 16384)
+
+
+def test_candidates_fall_back_to_the_capability_table():
+    # 上游列表没有容量时仍取模型能力表的值与来源：两处的次序没有变
+    recorded = capabilities.capability("opencode-go", "deepseek-v4-pro")
+    assert recorded is not None
+    [candidate] = _parse_candidates({"data": [{"id": "deepseek-v4-pro"}]}, "opencode-go")
+    assert (candidate["context_window"], candidate["context_window_source"]) == (
+        recorded.context_window, "capability_table")
+    assert (candidate["max_output_tokens"], candidate["max_output_tokens_source"]) == (
+        recorded.max_output_tokens, "capability_table")
