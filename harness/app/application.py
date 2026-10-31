@@ -69,6 +69,7 @@ from .system_queries import ATTEMPT_LIVE, SYSTEM_STATUS
 from .project_queries import PROJECT_QUERIES
 from .read_models import ReadModels
 from .registry import Registry
+from .loops_queries import RUN_LOOPS
 from .rules_queries import RULES_REGISTRY
 from .tools_queries import TOOLS_REGISTRY
 
@@ -127,7 +128,7 @@ DEFAULT_REGISTRY = Registry(
               PARAMETER_SET, PARAMETER_WITHDRAW],
     queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, EVIDENCE_EXTERNAL_SOURCE,
              CATALOG_QUERY, CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY,
-             TOOLS_REGISTRY],
+             TOOLS_REGISTRY, RUN_LOOPS],
     decisions=tuple(DECISION_KINDS))
 
 

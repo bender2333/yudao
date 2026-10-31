@@ -10,7 +10,7 @@ from .artifacts import ArtifactStore
 from .assembly import ContextAssembly
 from .deltas import DeltaChannel
 from .decision_flow import DECISION_FLOW
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, configure_fetch
 from . import parameters, routing_contract
 from .engine import StepDriver, StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
@@ -34,7 +34,18 @@ __all__ = [
     "LoopSystem",
     "CancelledInputSaveError",
     "RunTerminalError",
+    "configure_fetch_tools",
 ]
+
+
+def configure_fetch_tools(enabled: bool) -> None:
+    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明第 5.1、12.4 节）。
+
+    由命令行在启动时调用一次：以关闭取回的启动参数（`--no-fetch`）运行时，这个服务的部门没有
+    `fetch_url` 与 `read_external_source`；不带参数时三个部门都有。进程内只有一个服务实例，
+    装配（本模块）负责把启动参数交给定义，运行路径上读定义的地方都经 `Definitions.tools_for`。
+    """
+    configure_fetch(enabled)
 
 
 class LoopSystem:

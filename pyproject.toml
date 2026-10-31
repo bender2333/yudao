@@ -134,6 +134,8 @@ ignore_imports = [
   "harness.app.** -> harness.observability",
   "harness.app.** -> harness.parameters",
   "harness.app.** -> harness.interactions",
+  # 补：知识层的收敛状态投影（工单 #397，只读投影；设计说明第 8 节的模块交互）
+  "harness.app.** -> harness.loops",
   # Provider 模块的管理接口：目录、凭据与调用目标的选择
   "harness.app.** -> harness.providers",
   "harness.app.** -> harness.providers.**",

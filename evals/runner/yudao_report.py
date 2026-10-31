@@ -93,7 +93,8 @@ def build_result(scenario, material_version, scorer_version, model, runs, model_
         "model_capacity": model_capacity,
         "network": {
             "allowed": False,
-            "note": "Yudao 的评测项目不登记取回来源与 MCP 服务器，运行中也没有这两类工具的调用。",
+            "note": "被测的 Yudao 以关闭取回的启动参数（--no-fetch）启动，三个部门的请求里没有取回工具"
+                    "（fetch_url、read_external_source）；评测项目也不设置 MCP 服务器，运行中没有这两类工具的调用。",
         },
         "host_environment": host_environment(),
         "run_count": len(counted),
@@ -224,7 +225,8 @@ def _host_section(result):
 
 def _network_section():
     return ["## 三、联网", "",
-            "不联网。Yudao 的评测项目不登记取回来源与 MCP 服务器，运行中也没有这两类工具的调用。", ""]
+            "不联网。被测的 Yudao 以关闭取回的启动参数（`--no-fetch`）启动，三个部门的请求里没有取回工具"
+            "（`fetch_url`、`read_external_source`）；评测项目也不设置 MCP 服务器，运行中没有这两类工具的调用。", ""]
 
 
 def _checkpoints_section(result):
