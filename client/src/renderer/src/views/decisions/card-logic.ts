@@ -146,6 +146,15 @@ export function materialRows(decision: DecisionView): MaterialRow[] {
       push("改动的内核路径", Array.isArray(request.kernel_paths) ? request.kernel_paths.join("\n") : "");
       push("差异", request.diff);
       break;
+    case "qa_cannot_verify":
+      // 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：逐条列出无法核验的
+      // 验收条件与原因，再列出「重新核验」「停止事项」两个选项的说明
+      push("部门", dept(request.department));
+      for (const row of Array.isArray(request.criteria) ? request.criteria : []) {
+        const entry = row as Payload;
+        push(String(entry.criterion ?? ""), String(entry.note ?? "没有写原因"));
+      }
+      break;
     case "initial_prd":
       initialPrdRows(request, push);
       break;

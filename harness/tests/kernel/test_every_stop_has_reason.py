@@ -39,7 +39,7 @@ def test_every_baseline_ends_with_a_reasoned_stop_event_or_waits():
     reasons = _reasons()
     # 封闭清单的项数：18 项（第 18 项是 user_cancelled，用户放弃建档，工单 #707，
     # 依据是决策记录「M0 走查问题的五项口径」第 2 项）
-    assert len(reasons) == 18, f"停止原因的封闭清单有 {len(reasons)} 项"
+    assert len(reasons) == 19, f"停止原因的封闭清单有 {len(reasons)} 项"
     checked = 0
     for path in sorted(BASELINE_DIR.glob("*.json")):
         document = json.loads(path.read_text(encoding="utf-8"))

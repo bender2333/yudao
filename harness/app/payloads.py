@@ -865,7 +865,7 @@ class QaSubmittedPayload(AcceptanceFields):
     effective_contract_hash: str
     delivery_spec_hash: str
     code_snapshot_hash: str
-    verdict: Literal["rework_engineering", "release"]
+    verdict: Literal["rework_engineering", "release", "cannot_verify"]
     rationale: str
     checks: list[CheckReceipt]
     defects: list[Defect]
@@ -1130,6 +1130,18 @@ class PauseRequested(Payload):
     stop_reason: Literal["no_tool_call", "workspace_unrepresentable"]
 
 
+class CannotVerifyRequested(Payload):
+    # 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：阻塞整个 run，
+    # criteria 是每条无法核验的验收条件与原因；选项是「重新核验」与「停止事项」
+    kind: Literal["qa_cannot_verify"]
+    blocks: Literal["run"]
+    options: list[DecisionOption]
+    description: str
+    facts: list[str]
+    department: Department
+    criteria: list[dict[str, Any]]
+
+
 class UnknownActionRequested(Payload):
     # 旧事件保留，新版本不再写（工单 #582）
     kind: Literal["unknown_action"]
@@ -1203,7 +1215,7 @@ class KernelModificationRequested(Payload):
 
 # 决定请求的载荷：以 kind 区分的各种决定请求（UnknownActionRequested 为旧事件保留，新版本不再写）
 DecisionRequestedPayload = (ModelUnavailableRequested | DefinitionsChangedRequested | UnknownActionRequested
-                            | PauseRequested | InitialPrdRequested)
+                            | PauseRequested | InitialPrdRequested | CannotVerifyRequested)
 # 项目流中的决定请求（工单 #136、#354）：写在项目流中的那几种，run 流中没有它们
 ProjectDecisionRequestedPayload = InitialPrdRequested | KernelModificationRequested
 

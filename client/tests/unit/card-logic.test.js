@@ -209,3 +209,25 @@ test("界面不再包含已删除的 unknown_action 与 pending_verification", (
   assert.equal(DECISION_KIND.unknown_action, undefined);
   assert.equal(RECOVERY_STATE.pending_verification, undefined);
 });
+
+test("质检无法核验的决定卡片逐条列出无法核验的条件与原因", () => {
+  // 浏览器与 computer use 设计说明第 8.4 节（工单 #1179）：说明列出每条无法核验的验收条件与原因
+  const rows = materialRows(decision({
+    kind: "qa_cannot_verify",
+    request: {
+      kind: "qa_cannot_verify",
+      blocks: "run",
+      options: [{ id: "re_verify", label: "重新核验" }, { id: "stop", label: "停止事项" }],
+      description: "质检无法核验这些验收条件：AC1（质检的模型不支持图像输入）。",
+      facts: ["AC1"],
+      department: "quality",
+      criteria: [{ criterion: "AC1", note: "质检的模型不支持图像输入" },
+                 { criterion: "AC2", note: "执行位置没有安装浏览器" }],
+    },
+  }));
+  const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
+  assert.equal(map["部门"], "质检");
+  assert.equal(map["AC1"], "质检的模型不支持图像输入");
+  assert.equal(map["AC2"], "执行位置没有安装浏览器");
+  assert.equal(map["说明"], "质检无法核验这些验收条件：AC1（质检的模型不支持图像输入）。");
+});

@@ -371,6 +371,8 @@ class WatchedOutputsTightening:
                 errors.extend(_criteria_evidence_errors(criteria))
                 if verdict == "release":
                     errors.extend(_release_criteria_errors(criteria))
+                if verdict == "cannot_verify":
+                    errors.extend(_cannot_verify_criteria_errors(criteria))
         defects, defect_errors = _qa_defects(proposal)
         errors.extend(defect_errors)
         if errors:
@@ -948,6 +950,22 @@ def _release_criteria_errors(criteria: list[dict[str, Any]]) -> list[FieldError]
             errors.append(FieldError(f"criteria[{index}].result", "release cannot carry a failed acceptance criterion"))
         elif method_is_executable(row["method"]) and row["result"] != "passed":
             errors.append(FieldError(f"criteria[{index}].result", "release requires executable criteria to be passed"))
+    return errors
+
+
+def _cannot_verify_criteria_errors(criteria: list[dict[str, Any]]) -> list[FieldError]:
+    # 无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：没有 failed 的条目，
+    # 至少一条 unverified，每条 unverified 都写明原因。不满足时按无法核验提交会被拒绝
+    errors: list[FieldError] = []
+    for index, row in enumerate(criteria):
+        if row["result"] == "failed":
+            errors.append(FieldError(f"criteria[{index}].result",
+                                     "cannot_verify cannot carry a failed acceptance criterion"))
+        elif row["result"] == "unverified" and not str(row.get("note") or "").strip():
+            errors.append(FieldError(f"criteria[{index}].note",
+                                     "cannot_verify requires a reason for every unverified criterion"))
+    if not errors and not any(row["result"] == "unverified" for row in criteria):
+        errors.append(FieldError("criteria", "cannot_verify requires at least one unverified acceptance criterion"))
     return errors
 
 
