@@ -129,6 +129,7 @@
 "test_mcp_probe.py" = "integration"
 "test_mcp_settings.py" = "module"
 "test_mcp_tools.py" = "unit"
+"test_mcp_tools_integration.py" = "integration"
 "test_materials.py" = "module"
 "test_materials_status.py" = "integration"
 "test_message_protocol_contract.py" = "unit"

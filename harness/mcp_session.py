@@ -4,14 +4,20 @@
 # 模型看到的工具名、事项定义里的键与许可判断用的是同一个**标识**（小写字母、数字与下划线，字母开头），
 # 原名只在调用时按映射还原（工单 #1175 第 2 轮，设计说明第 5.1 节）。
 # 冲突（与内置或动态工具重名、或两个不同的工具收敛成同一个别名）在装配时拒绝。
-# 会话与调用按第 7 节放进本模块的 MCP 会话部分（下一轮），这里只放名称规则与名称表。
+# 第 7 节的会话部分也在这里（工单 #1175 第 8 轮）：`McpSessions` 管每个 run 每台服务器一个会话实例，
+# 从冻结的设置文档（item_definitions 读的同一份）组出启动参数，`call` 经客户端调用并交回已脱敏的结果；
+# run 之间与跨 run 的生命周期（持久化生命周期事件、遗留进程、取消后的结果未知处理）归工单 #1176。
 
+import asyncio
 import hashlib
 import json
 import re
+import time
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from .definitions import DepartmentWork, Role, Tool, WorkItemKind, WorkItems
+from .mcp_client import McpClient, McpStartupError, ServerLaunch
 
 TOOL_PREFIX = "mcp__"
 # 模型接口与静态定义对工具名的长度上限；超过它时改用确定性别名
@@ -22,6 +28,11 @@ ALIAS_SUFFIX_LENGTH = 12
 # 静态定义里的标识（`harness/definitions/__init__.py` 的 Identifier 是同一个字符集）
 IDENTIFIER = re.compile(r"^[a-z][a-z0-9_]*$")
 _DISALLOWED = re.compile(r"[^a-z0-9_]")
+# MCP 动作在执行环境里的分派键（environment.py 的 _PROCESSES["mcp"]）：分派按动作类别进入这里，
+# 再按这个键取处理方法；静态定义里没有任何环境工具用这个名字，冲突不可能发生
+MCP_DISPATCH_TOOL = "mcp"
+# 轮询取消信号与调用时限的间隔（秒）：取消从另一条线程的 Event 到达，轮询把它转给客户端的取消
+_CANCEL_POLL_SEC = 0.1
 
 
 class ToolAliasConflict(Exception):
@@ -32,6 +43,26 @@ class ToolAliasConflict(Exception):
 class UnknownToolAlias(Exception):
     # 别名不在这个事项的名称表里：工具许可拒绝，原因作为工具结果返回（第 5.2 节）
     pass
+
+
+class McpRefused(Exception):
+    # 这次 MCP 调用被拒绝（别名不在冻结设置带来的名称表里）：原因作为工具结果交回模型（第 5.2 节）
+    pass
+
+
+@dataclass(frozen=True)
+class McpOutcome:
+    # 一次 MCP 调用的结果（第 7.3 节）：回执与保存外部来源工件要用的两部分。
+    # result_text 已把凭据值替换为星号（客户端一侧），调用目标的模型直接读它；
+    # is_error 的调用记为已完成的动作，错误文本在 result_text 里
+    result_text: str
+    is_error: bool
+    error_code: str | None
+    structured: object
+    elapsed_ms: int
+    server: str
+    tool: str
+    transport: str
 
 
 def alias_suffix(server: str, tool: str) -> str:
@@ -142,3 +173,170 @@ one，取消能否确认停止按传输方式（stdio 能确认）。
     fields = {name: getattr(base, name) for name in type(base).model_fields}
     fields.update({"tools": tools, "roles": roles, "work_items": work_items})
     return type(base)(**fields)
+
+
+# ---------------------------------------------------------------------------
+# MCP 会话（第 7.2、7.3 节，工单 #1175 第 8 轮）：一个 run 一张表，每台服务器一个会话实例。
+#
+
+
+@dataclass(frozen=True)
+class _ServerLaunchPlan:
+    # 一台服务器的一次启动参数：从冻结设置组出的启动参数与它的凭据值（已按名称解析）。
+    # launch.secrets 带着这些值：错误文本与结果在客户端一侧替换为星号，值不进入事件与日志
+    launch: ServerLaunch
+
+
+class McpSessions:
+    """一个 run 的 MCP 会话表（第 7.2 节）：每台服务器一个实例，第一次调用时启动。
+
+    document 是 run_created 里冻结的那份 MCP 设置（与 `item_definitions` 读同一份）；
+    credentials 是控制主机的凭据来源（调用时按名称取值），stderr_dir 放标准错误输出的日志文件。
+    关闭（run 结束、暂停或停止）之前建立的会话一直复用；已经关闭过的会话按同一台服务器重新建立。
+    run 之间、项目之间不共享：一张表只属于一个 run。
+    """
+
+    def __init__(self, document: dict | None, *, credentials, stderr_dir) -> None:
+        self._document = document or {}
+        self._credentials = credentials
+        self._stderr_dir = str(stderr_dir)
+        self._sessions: dict[str, McpClient] = {}
+
+    def server_names(self) -> list[str]:
+        # 冻结设置里的服务器名称（非秘密的名称，可以有）
+        return sorted(str(server.get("name") or key) for key, server in (self._document.get("servers") or {}).items())
+
+    def original(self, alias: str) -> tuple[str, str]:
+        # 别名反查（服务器、原工具名）：按冻结设置里的可用快照重建名称表（与 item_definitions
+        # 叠加定义副本用的是同一条名称规则，第 5.1 节）。没有冻结设置、或别名不在其中
+        # （例如别的工具名）时抛 UnknownToolAlias，执行环境据此拒绝
+        aliases = ToolAliases()
+        for server in (self._document.get("servers") or {}).values():
+            snapshot = server.get("tool_snapshot") or {}
+            if not snapshot or snapshot.get("config_digest") != server.get("config_digest", ""):
+                continue
+            server_name = str(server.get("name") or "")
+            for spec in snapshot.get("tools") or []:
+                try:
+                    aliases.add(server_name, str(spec.get("name") or ""))
+                except ToolAliasConflict:
+                    # 名称冲突在事项创建叠加定义副本时已经拒绝：这里跳过坏项，让可用的工具仍可反查
+                    continue
+        return aliases.original(alias)
+
+    @property
+    def open(self) -> bool:
+        return bool(self._sessions)
+
+    def sessions(self) -> dict[str, McpClient]:
+        return dict(self._sessions)
+
+    async def call(self, alias: str, server: str, tool: str, arguments: dict | None,
+                   *, stop=None) -> McpOutcome:
+        # 一次 MCP 调用（第 7.2、7.3 节）：按原名调这台服务器的工具，工具失败（is_error）交回错误文本，
+        # 动作记为已完成；协议错误与启动失败是失败的动作，原因写明（凭据值已替换为星号）。
+        # stop 是执行环境的取消信号：到达时取消这次调用（进程已结束时能确认停止）
+        try:
+            client = await self._session_for(server)
+        except McpRefused as refusal:
+            # 服务器不在这份冻结设置里、或缺凭据等组装失败：失败的动作，原因交回模型
+            return self._failure_outcome(alias, server, "stdio", str(refusal), "startup_failed")
+        except McpStartupError as failure:
+            return self._failure_outcome(alias, server, "stdio", str(failure), "startup_failed")
+        try:
+            return await self._call_once(client, alias, server, tool, arguments, stop=stop)
+        except McpStartupError as failure:
+            return self._failure_outcome(alias, server, client.launch.transport,
+                                         str(failure), "startup_failed")
+        except Exception as exc:  # 协议错误与其他调用失败：失败的动作，原因写明
+            reason = _redacted(str(exc) or exc.__class__.__name__, client.launch.secrets)
+            code = getattr(exc, "code", None)
+            return self._failure_outcome(alias, server, client.launch.transport,
+                                         reason, str(code) if code is not None else "call_failed")
+
+    async def close(self) -> None:
+        # run 结束、暂停或停止时关闭全部会话（stdio 先关标准输入，SDK 等待以后结束进程树；HTTP 关闭会话）
+        sessions, self._sessions = self._sessions, {}
+        for client in sessions.values():
+            await client.close()
+
+    # ---- 内部 ----
+
+    def _plan(self, server_name: str) -> _ServerLaunchPlan:
+        # 冻结设置里这台服务器的启动参数：凭据按名称在开始时取值，值只进客户端的脱敏清单
+        servers = self._document.get("servers") or {}
+        match = next((server for server in servers.values()
+                      if str(server.get("name") or "") == server_name), None)
+        if match is None:
+            raise McpRefused(f"MCP 服务器 {server_name} 不在这个事项冻结的设置里")
+        from .mcp_probe import launch_for, stderr_log_path_for
+
+        try:
+            launch = launch_for(match, credentials=self._credentials,
+                                stderr_log_path=stderr_log_path_for(self._stderr_dir, server_name))
+        except McpStartupError as failure:
+            raise McpRefused(str(failure)) from failure
+        return _ServerLaunchPlan(launch=launch)
+
+    async def _session_for(self, server_name: str) -> McpClient:
+        client = self._sessions.get(server_name)
+        if client is not None:
+            return client
+        plan = self._plan(server_name)
+        client = await McpClient.start(plan.launch)
+        self._sessions[server_name] = client
+        return client
+
+    async def _call_once(self, client: McpClient, alias: str, server: str, tool: str,
+                         arguments: dict | None, *, stop) -> McpOutcome:
+        call = asyncio.ensure_future(client.call_tool(tool, arguments or {}))
+        try:
+            if stop is None:
+                result = await call
+            else:
+                result = await self._call_with_stop(call, stop)
+        except BaseException:
+            if not call.done():
+                call.cancel()
+            raise
+        text = result.text
+        structured = result.structured_content
+        if isinstance(structured, (dict, list)) and structured:
+            text = text + "\n" + json.dumps(structured, ensure_ascii=False) if text else json.dumps(
+                structured, ensure_ascii=False)
+        return McpOutcome(result_text=text, is_error=bool(result.is_error),
+                          error_code=result.error_code, structured=structured,
+                          elapsed_ms=result.elapsed_ms, server=server, tool=tool,
+                          transport=client.launch.transport)
+
+    async def _call_with_stop(self, call: "asyncio.Future", stop) -> object:
+        # 调用与取消信号谁先到：取消到达时取消这次调用（客户端发取消通知、stdio 随后结束进程树），
+        # 交回取消的结果；结果未知时向哪里查、持久化生命周期事件归 #1176
+        while True:
+            done, _pending = await asyncio.wait({call}, timeout=_CANCEL_POLL_SEC)
+            if call in done:
+                return call.result()
+            if stop is not None and stop.is_set():
+                await client_cancel(call)
+                return call.result()
+
+    def _failure_outcome(self, alias: str, server: str, transport: str,
+                         reason: str, code: str) -> McpOutcome:
+        started = time.monotonic()
+        return McpOutcome(result_text=reason, is_error=True, error_code=code, structured=None,
+                          elapsed_ms=0, server=server, tool=alias, transport=transport)
+
+
+async def client_cancel(call: "asyncio.Future") -> None:
+    # 等待中的调用被取消：交回客户端已经组好的取消结果（_cancelled_result 会关闭会话）
+    call.cancel()
+    try:
+        await call
+    except asyncio.CancelledError:
+        pass
+
+
+def _redacted(text: str, secrets) -> str:
+    from .mcp_client import redact
+
+    return redact(text, tuple(secrets or ()))
