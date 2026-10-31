@@ -1,6 +1,6 @@
 ---
 name: to-children
-description: 把 Yudao 的一张父工单拆成子工单：改写挂在它下面的旧工单，切出立缝与切片，按工单规范发布带依据、环、做法与验收层的子工单。代替 Matt 的 /to-tickets，`/flow` 第 4 步使用；父工单由 /to-parents 产生。
+description: 把 Yudao 的一张父工单拆成子工单：改写挂在它下面的旧工单，切出立缝与切片，按工单规范发布带依据、环、做法与验收层的子工单。代替 Matt 的 /to-tickets；父工单由 /to-parents 产生。
 argument-hint: "<父工单编号>"
 disable-model-invocation: true
 ---
@@ -22,7 +22,7 @@ disable-model-invocation: true
 
 ### 1. 读
 
-父工单「决定」一段写着「设计先写」时停下来告诉用户，先按`/flow` 第 2 步写设计说明，不拆。读父工单的正文、评论和已有的子工单，读它「总图位置」指向的设计说明与总图那一节，读 `docs/agents/ticket-spec.md`与[运行配置](../../../docs/agents/autopilot-runtime.md)第 7 节的上限，在当前 main 上看要碰的代码。完成：你能说出现有代码里哪些模块直接复用、哪些要包一层。
+父工单「决定」一段写着「设计先写」时不拆，先按 [`/to-design`](../to-design/SKILL.md) 写设计说明。读父工单的正文、评论和已有的子工单，读它「总图位置」指向的设计说明与总图那一节，读 `docs/agents/ticket-spec.md`与[运行配置](../../../docs/agents/autopilot-runtime.md)第 7 节的上限，在当前 main 上看要碰的代码。完成：你能说出现有代码里哪些模块直接复用、哪些要包一层。
 
 ### 2. 处理归并的旧工单
 

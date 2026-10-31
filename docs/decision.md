@@ -1595,3 +1595,19 @@ Argon 的工作流建议（四条）对照仓库后的取舍：
   2. 要一个不靠 LLM 的环节辅助 agent：agent 经常忽略提醒，不能靠它自己去算、自己想起来。
 - 方案还在和用户讨论：不开工单，也不派人去做。定了以后再记一条。
 - 改动：CLAUDE.md「项目表述」把「你的意图」改为「用户的意图」（这个文件里的「你」指架构师）；「一次改完」的清单补上 D38。
+
+## 2026-11-01 - 工作方式：去掉派发者，入口 /next，独立审查只审内核
+
+- 背景：用户觉得 `flow` 技能太粗，进来不知道该做什么；参照 Matt Pocock、agent-skills（addyosmani）与 pstack（poteto）三个技能库重新梳理工作流。查到的事实：派发模式已经停用（`needs-architect` 历来只用过 2 次，最近的合并都是 solo）；同一套顺序在 flow、验收证据规则、architect-loop、trial-intake 四处各写一遍；交回有 `needs-architect` 与 `needs-triage` 两个标签；总图问题记在 md 文件里，GitHub 上看不到状态；标题前缀两种写法；Discussions 七个分类只用了两个；「第 1 至 4 步同一个上下文窗口」与「产出都落进文档和工单」互相拉扯。
+- 决策（用户确认）：
+  1. 新增 `docs/agents/workflow.md`，作为流程的正本：事实放在哪、角色、工作的层级、状态与种类标签、证据评论的七个前缀（`DELIVERY:`、`REVIEW:`、`ARCHITECT:`、`TRIAGE:`、`VERDICT:`、`TRIAL:`、`HANDOFF:`）、四个循环、出问题往哪交、独立审查、技能、CI。技能只写一段流转怎么做，引用它，不复述。
+  2. 派发者机制整个去掉：派发者规则、`executor` 技能、`needs-architect`、执行与审查分开派发。执行只有 solo 一种跑法。
+  3. 独立审查只用在改到可信内核代码的 PR（内核清单里 `kind` 为 `module` 的路径或清单本身）：solo 合并前派一个全新上下文的审查子代理，结论写成 `REVIEW:` 评论，批准了才合并；其余 PR 由 solo 自己核对合并。
+  4. 子架构师的入口是 `/next`：读 GitHub 状态，按固定顺序找下一件事，把对应技能的步骤原样抄进待办，不做的写原因；用户在场与不在场是同一个入口、两种权限，不在场时就是架构师循环（`/next --循环`）。flow、architect-loop、woken-architect、autopilot 并进去。
+  5. 新技能 `discuss`、`to-design`、`verify`、`triage`（代替 Matt 的 /triage）；`trial-intake` 并入薄片推进；每个技能用同一副骨架：何时用与何时不用、先读什么、步骤（每步带「完成：」）、常见借口、危险信号、交付。
+  6. 状态标签每张一个；种类标签 `stage`、`trial`、`parent`、`cleanup`、`bug`、`architecture`；删去 10 个不再用的标签。
+  7. 架构问题：执行者自定的边界写进交付说明「自定的边界」，`/verify` 验收时收进设计说明；与总图冲突的开 `architecture` 工单。`docs/architecture-issues.md` 归档，未处理的条目转成 #1423、#1424、#1425 与 #1411 上的评论。
+  8. 每一段流转靠工单上的证据评论交接，去掉「第 1 至 4 步同一个上下文窗口」。
+- 不采纳：pstack 的多模型分工与文风规则；agent-skills 每一步等人审批的做法与通用工程技能；把原则拆成单独的技能（先不拆，看剧本跑一阵哪条总被漏掉再说）；删除清单对账挡合并。
+- 没有做：`workflow.md` 第 10 节的五项检查还没有实现；main 的规则仍要求一个审查批准（派发模式留下的设置，GitHub 上的设置由用户定）；`evals/baseline/` 统计旧标签的代码没改。
+- 改动：`docs/agents/workflow.md`（新增）、运行配置、验收证据规则、工单规范、共同规则、`issue-tracker.md`、`CLAUDE.md`、`AGENTS.md`、`CONTEXT.md`、测试分层与网页界面与发布两份设计说明、总体架构一处链接、`ci.yml` 与 `omp-print-runs.yml` 的注释；技能新增 next、triage、verify、discuss、to-design，删去 flow、architect-loop、woken-architect、autopilot、executor，改 solo、solo-worker、reviewer、trial-intake、milestone-retro、module-sync、to-parents、to-children、ticket、seam-diff；删去 `docs/agents/dispatcher.md`、`docs/agents/triage-labels.md`。

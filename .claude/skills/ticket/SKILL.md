@@ -5,7 +5,7 @@ description: 建立或改写 Yudao 的 GitHub 工单（阶段、父、子、清�
 
 # 建立工单
 
-规范正本是 [工单规范](../../../docs/agents/ticket-spec.md)；`gh` 命令在 [issue-tracker.md](../../../docs/agents/issue-tracker.md)；标签含义在 [triage-labels.md](../../../docs/agents/triage-labels.md)。
+规范正本是 [工单规范](../../../docs/agents/ticket-spec.md)；`gh` 命令在 [issue-tracker.md](../../../docs/agents/issue-tracker.md)；状态与种类标签在[工作方式](../../../docs/agents/workflow.md)第 4 节。
 
 ## 1. 定类型与归属
 
@@ -30,6 +30,6 @@ description: 建立或改写 Yudao 的 GitHub 工单（阶段、父、子、清�
 
 ## 3. 发布
 
-`gh issue create` 建工单，挂到上级工单与里程碑，设阻塞依赖（命令在 issue-tracker.md「阻塞」一条），加一个分诊标签。
+`gh issue create` 建工单，挂到上级工单与里程碑，设阻塞依赖（命令在 issue-tracker.md「阻塞」一条），加一个状态标签；阶段工单、试用工单、父工单、清理单、缺陷再加种类标签（`stage`、`trial`、`parent`、`cleanup`、`bug`）。
 
 完成：`gh issue view <编号>` 读回来，标题、标签、里程碑、依赖都对；把编号列给用户。
