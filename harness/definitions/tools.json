@@ -1242,5 +1242,93 @@
       "additionalProperties": false,
       "required": ["verdict", "conclusions", "checks"]
     }
+  },
+  "submit_independent_judgement": {
+    "kind": "host",
+    "proposal": "independent_judgement",
+    "description": "Commit the independent judgement of the current delivery before reading the engineering explanation (judge first, then read the explanation). checks are the quality check names you ran via run_check in this activation; criteria has one entry per acceptance criterion of the current ProductSpec (criterion is AC<position>, method is the verification method, result is passed, failed or unverified), based on the facts already in your context and those receipts. The host rejects a judgement that misses a criterion, uses a method or result outside the closed sets, or names a check without a quality receipt from this activation. The judgement is committed as an event; the engineering explanation enters your context afterwards, and your conclusion must reference this judgement.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Quality check names run via run_check"
+        },
+        "criteria": {
+          "type": "array",
+          "description": "One entry per acceptance criterion of the current ProductSpec; criterion is AC<position> (1-based), method is how you verify it, result is passed, failed, or unverified",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion": {
+                "type": "string",
+                "description": "AC<position> of the acceptance criterion in the current ProductSpec"
+              },
+              "method": {
+                "type": "string",
+                "enum": [
+                  "check",
+                  "trial",
+                  "measure",
+                  "judgement",
+                  "human",
+                  "open"
+                ]
+              },
+              "result": {
+                "type": "string",
+                "enum": [
+                  "passed",
+                  "failed",
+                  "unverified"
+                ]
+              },
+              "checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Quality check names from this activation that support this criterion"
+              },
+              "trial_cases": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Trial case ids; leave it empty (trial cases arrive with a later ticket)"
+              },
+              "note": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "criterion",
+              "method",
+              "result"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "basis_delivery_spec_hash": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Content hash of the DeliverySpec this judgement is based on. The host rejects the submission if this value does not equal the current effective DeliverySpec content_hash."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "basis_delivery_spec_hash",
+        "checks",
+        "criteria"
+      ]
+    }
   }
 }

@@ -52,7 +52,7 @@
           ]
         },
         "quality": {
-          "prompt": "普通事项中，独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。使用 run_check 让主机执行检查，再 submit_review。你的结论只有缺陷记录与放行两种：verdict 取 rework_engineering 或 release。要求本身有问题时用 ask 询问产品，问题里写清缺哪一条要求；产品在回答里修订 PRD，答案回到你这里以后按新的 PRD 接着核验。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、交付和代码快照的 release 才允许结束任务。你看到的是这次会话的检查工作区，从封存交付快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。",
+          "prompt": "普通事项中，独立读取当前有效产品合同、当前有效 DeliverySpec 和真实代码，亲自运行检查并提交 QAReview。当前有效产品合同是 ProductSpec 及其明确保留和正式接纳的产品补充决定。使用 run_check 让主机执行检查；下结论之前先用 submit_independent_judgement 提交独立判断：criteria 对每条验收条件给一项判断（criterion 是 AC<序号>，method 是检验方式，result 是 passed、failed 或 unverified），只依据此时上下文里的事实与检查回执，先判断后看解释——判断提交以后工程的解释才进入你的上下文。再用 submit_review 提交结论：verdict 取 rework_engineering 或 release，结论引用你提交的独立判断。要求本身有问题时用 ask 询问产品，问题里写清缺哪一条要求；产品在回答里修订 PRD，答案回到你这里以后按新的 PRD 接着核验。交付引用的 tree_ref 封存完整公开文件树，files 仅是工程声明，未声明文件也属于检查范围。只有绑定当前完整有效合同、交付和代码快照的 release 才允许结束任务。你看到的是这次会话的检查工作区，从封存交付快照建立；写入与运行命令不会进入运行工作区与交付，会话结束时删除。",
           "tools": [
             "read_file",
             "list_files",
@@ -67,9 +67,11 @@
             "stop_job",
             "run_check",
             "ask",
-            "submit_review"
+            "submit_review",
+            "submit_independent_judgement"
           ],
           "notes": [
+            "先判断后看解释：交付到达以后，先用 submit_independent_judgement 提交独立判断，再用 submit_review 下结论；没有独立判断的结论被拒绝。",
             "release 要求缺陷为空且质量检查 exit_code 均为 0。",
             "rework 至少包含一条缺陷。"
           ]

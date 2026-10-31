@@ -28,6 +28,7 @@
   "department_prompt_configured",
   "home_seen",
   "initial_prd_proposed",
+  "independent_judgement_committed",
   "instance_upgrade_answered",
   "instance_upgrade_requested",
   "instance_upgrade_withdrawn",

@@ -766,13 +766,14 @@ def _delivery_explanation_fields(definitions: Definitions | None = None) -> tupl
 
 def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec | None = None,
                                 definitions: Definitions | None = None) -> dict[str, Any]:
-    # 质检请求里可以放入的工程内容（工单 #554，验证的独立性设计说明第 4 节）：
-    # 事实部分总在；解释部分只在质检对当前交付提交结论以后进入它之后的请求。
-    # 新的交付到达后按新交付重新计算：解释部分重新藏起来，等质检对新交付的结论。
-    # 三条通道：交付说明、质检收到的工程回答、质检分支看到的工程的问题。
+    # 质检请求里可以放入的工程内容（工单 #554、#358，验证的独立性设计说明第 4 节）：
+    # 事实部分总在；解释部分在核验角色提交了当前交付的独立判断（independent_judgement_committed）
+    # 以后进入它之后的请求——先判断后看解释，解释不再等质检的结论；新的交付到达后按新交付重新计算：
+    # 解释部分重新藏起来，等核验角色对新交付的独立判断。
+    # 三条通道：交付说明、核验角色收到的工程回答、核验角色分支看到的工程的问题。
     delivery_hash = delivery.content_hash if delivery is not None else _latest_delivery_hash(events)
     explanation_visible = delivery_hash is not None and any(
-        event.type == EventType.QA_SUBMITTED
+        event.type in (EventType.QA_SUBMITTED, EventType.INDEPENDENT_JUDGEMENT_COMMITTED)
         and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
         for event in events
     )

@@ -47,6 +47,9 @@ CANNOT_VERIFY_VERDICT = "cannot_verify"
 REWORK_VERDICT = "rework_engineering"
 # 成果记下的树摘要：交付记代码树、建档记快照的树；没有这一项的成果不带
 _TREE_FIELDS = ("code_tree_digest", "code_snapshot_hash", "tree_digest")
+# 提案路径盖上的统一字段（validation._accepted 的那组）：独立判断不是成果，事件载荷不带它们；
+# kind 例外——载荷自己声明的种类与统一字段同名同值，留在载荷里
+_UNIFIED_FIELDS = frozenset({"issuer", "parent_hash", "revision", "status", "content_hash"})
 
 
 def acceptance_fields(kind: str, artifact: dict[str, Any], *, version: int,
@@ -284,6 +287,12 @@ class SubmissionWriter:
                 # 基线核验退回产品：产品要重写初始 PRD，当前交付失效（S1b）。
                 # 建档事项的工程部门没有提交交付的工具，这一刻通常没有当前交付，也就不记事件
                 invalidate("baseline_rework_product")
+        elif kind == "independent_judgement":
+            # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：不是成果——不进版本链、
+            # 不失效任何东西、不渲染材料、没有工件。内核的提案路径盖上的统一字段在这里去掉，
+            # 事件载荷只带判断本身；装配与放行的门按这条事件的存在与它写的交付摘要判断
+            payload = {key: value for key, value in artifact.items() if key not in _UNIFIED_FIELDS}
+            event = append(EventType.INDEPENDENT_JUDGEMENT_COMMITTED, payload)
         else:
             # 新种类的成果写一种通用的接纳事件（S2c，工单 #1098，设计说明第 5.5 节）：载荷是收紧检查给出的
             # 内容加统一字段。材料文件、Git 版本与 PRD 渲染这些附带写入仍按上面的种类做，

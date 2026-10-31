@@ -16,7 +16,7 @@ from harness.watched_outputs import has_new_work
 from harness.engine import StepLimits
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.providers import CredentialChain, CredentialMaterial, ProviderFacade, ResponsesConfig
-from harness.proposals import delivery, product_spec, review
+from harness.proposals import delivery, judgement, product_spec, review
 from harness.runtime import LoopSystem
 from harness.smoke import summarize_run
 from harness.tests.protocol_helpers import preset_base_urls
@@ -273,7 +273,8 @@ def _facade(
              "context_window": product_context_window, "max_output_tokens": 1_000},
             {"id": "model-a-quality", "provider_id": "provider-a", "model": "a-quality",
              "protocol": "responses",
-             "context_window": 20_000, "max_output_tokens": 1_000},
+             # 独立判断提交以后工程的解释并入质检的请求（工单 #358），固定材料变大：窗口上调
+             "context_window": 40_000, "max_output_tokens": 1_000},
             {"id": "model-b-engineering", "provider_id": "provider-b", "model": "b-engineering",
              "protocol": "responses",
              "context_window": 20_000, "max_output_tokens": 1_000},
@@ -315,6 +316,7 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
     delivery_file = "import sys\nprint(sys.argv[1])\n"
     repaired_file = "import sys\nprint(sys.argv[1].upper())\n"
     reworked = {"done": False}
+    quality = {"judged": False}
 
     def provider_a(body: dict[str, Any], _count: int) -> _Reply:
         department = _department(body)
@@ -344,7 +346,9 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
                 _call(f"quality-explore-review-{counts[department]}", "submit_review", payload),
             ], response_id=f"a-quality-explore-{counts[department]}", model="a-quality-actual")
         verdict = "release" if reworked["done"] else "rework_engineering"
-        reworked["done"] = True
+        # 独立判断先行（先判断后看解释，工单 #358）：判断一轮结束以后核验一轮，判断与结论
+        # 不在同一轮提交——同一轮里先交判断再交结论时，结论会按提交被打回后的历史装配，
+        # 每次打回都把整段判断发言记进质检历史，请求随之变大（收尾的实测）
         payload = review(
             verdict,
             "The first delivery needs an uppercase output check." if verdict.startswith("rework") else "The repaired delivery passes.",
@@ -353,15 +357,28 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
             basis_delivery_spec_hash=basis,
         )
         payload.pop("kind")
-        calls = [
+        if not quality["judged"]:
+            quality["judged"] = True
+            judgement_payload = judgement(checks=["smoke"], basis_delivery_spec_hash=basis)
+            judgement_payload.pop("kind")
+            return _stream([
+                _call(
+                    f"quality-check-{counts[department]}",
+                    "run_check",
+                    {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""},
+                ),
+                _call(f"quality-judgement-{counts[department]}", "submit_independent_judgement", judgement_payload),
+            ], response_id=f"a-quality-judgement-{counts[department]}", model="a-quality-actual")
+        quality["judged"] = False
+        reworked["done"] = True
+        return _stream([
             _call(
                 f"quality-check-{counts[department]}",
                 "run_check",
                 {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""},
             ),
             _call(f"quality-review-{counts[department]}", "submit_review", payload),
-        ]
-        return _stream(calls, response_id=f"a-quality-{counts[department]}", model="a-quality-actual")
+        ], response_id=f"a-quality-{counts[department]}", model="a-quality-actual")
 
     def provider_b(body: dict[str, Any], _count: int) -> _Reply:
         department = _department(body)
@@ -726,7 +743,9 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
              "context_window": 20_000, "max_output_tokens": 1_000},
             {"id": "model-q", "provider_id": "provider-q", "model": "q-model",
              "protocol": "responses",
-             "context_window": 20_000, "max_output_tokens": 1_000},
+             # 独立判断提交以后工程的解释并入质检的请求（工单 #358），固定材料随之变大：
+             # 窗口按第 10 节第 3 条上调，留给输出与历史
+             "context_window": 40_000, "max_output_tokens": 1_000},
         ],
         "bindings": {
             "product": {"provider_id": "provider-p", "model_id": "model-p"},
@@ -781,10 +800,31 @@ def test_mixed_protocol_task_keeps_work_compaction_retry_and_session_with_each_d
 
     def quality(body: dict[str, Any], count: int) -> _Reply:
         assert body["model"] == "q-model"
+        basis = _material_hash(body, "current_delivery_spec", "content_hash")
+        if basis is None:
+            # 预测性探索（工单 #557）：还没有交付，提交的结论被拒绝，这一轮结束
+            payload = review("release", "按 PRD 起草了测试用例；还没有交付可以核验")
+            payload.pop("kind")
+            return _stream([
+                _call("quality-explore-check", "run_check",
+                      {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""}),
+                _call("quality-explore-review", "submit_review", payload),
+            ], response_id=f"q-explore-{count}", model="q-model-actual")
+        # 独立判断先行（先判断后看解释，工单 #358）：判断一轮结束以后核验一轮，判断与结论
+        # 不在同一轮提交——同一轮里先交判断再交结论时，结论会按提交被打回后的历史装配，
+        # 每次打回都把整段判断发言记进质检历史，请求随之变大（收尾的实测）
         payload = review("release", "The delivery passes.", checks=["smoke"], defects=[],
-                         basis_delivery_spec_hash=_material_hash(body, "current_delivery_spec", "content_hash"))
+                         basis_delivery_spec_hash=basis)
+        if count % 2 == 0:
+            judgement_payload = judgement(checks=["smoke"], basis_delivery_spec_hash=basis)
+            judgement_payload.pop("kind")
+            return _stream([
+                _call("quality-check", "run_check",
+                      {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""}),
+                _call("quality-judgement", "submit_independent_judgement", judgement_payload),
+            ], response_id=f"q-judgement-{count}", model="q-model-actual")
         return _stream([
-            _call("quality-check", "run_check",
+            _call("quality-review-check", "run_check",
                   {"name": "smoke", "command": f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('quality')\""}),
             _call("quality-review", "submit_review", payload),
         ], response_id=f"q-review-{count}", model="q-model-actual")

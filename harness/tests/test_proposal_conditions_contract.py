@@ -19,7 +19,8 @@ import pytest
 import harness.tools as tools
 from harness.actions import TreeFacts
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, load_definitions
-from harness.models import (ArtifactRef, CheckReceipt, DeliverySpec, EffectiveContract, ProductDecision, ProductSpec,
+from harness.kernel_events import Event
+from harness.models import (ArtifactRef, CheckReceipt, DeliverySpec, EffectiveContract, EventType, ProductDecision, ProductSpec,
                             RunProjection, SessionRecord, canonical_hash)
 from harness.proposals import baseline_review, delivery, product_decision, review, structure
 from harness.validation import evaluate_proposal
@@ -35,6 +36,19 @@ OTHER_TREE = "sha256:" + "f" * 64
 REQUIREMENT = "print the given argument to stdout"
 CONDITIONS = ("basis_current", "referenced_current", "check_receipts", "tree_matches", "author_separation",
               "no_duplicate_content")
+
+
+def _judgement_events(delivery_hash: str = DELIVERY_HASH) -> list[Event]:
+    # 一条独立判断事件的内存替身（工单 #358 的门：核对它的存在与它写的交付摘要）
+    return [Event(event_id="evt_judgement", run_id=RUN, type=EventType.INDEPENDENT_JUDGEMENT_COMMITTED,
+                  role=None, parent_event_id=None, state_before="running", state_after="running",
+                  payload={"kind": "independent_judgement", "product_spec_hash": SPEC_HASH,
+                           "delivery_spec_hash": delivery_hash, "checks": ["smoke"],
+                           "criteria_count": 1, "criteria": []},
+                  artifact_hashes=[], session_id="ses_quality", provider=None, model=None,
+                  context_digest=None, stop_reason=None, error=None, created_at="2026-10-31T00:00:00Z",
+                  position=999, stream=f"run:{RUN}", stream_version=999, project_id=None,
+                  work_item_id=None, department="quality")]
 
 
 def _definitions(tmp_path, change):
@@ -124,7 +138,8 @@ def test_removing_the_duplicate_check_from_the_contract_accepts_the_same_decisio
 
 
 def test_removing_the_referenced_version_check_accepts_a_review_of_a_superseded_delivery(tmp_path, monkeypatch):
-    # 第五条第 2 项：质检结论依据的交付要基于当前的 PRD 与契约
+    # 第五条第 2 项：质检结论依据的交付要基于当前的 PRD 与契约。
+    # 结论前已有当前交付的独立判断（工单 #358 的门），这里只核对引用版本这一条
     projection = _projection("quality", product_spec=_spec(), effective_contract=_contract(),
                              delivery_spec=_delivery(product_spec_hash=OTHER_SPEC_HASH),
                              last_activations={"quality": "act_q"})
@@ -132,7 +147,8 @@ def test_removing_the_referenced_version_check_accepts_a_review_of_a_superseded_
     proposal = review("release", "the delivery passes", checks=["smoke"], basis_delivery_spec_hash=DELIVERY_HASH)
     assert not evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS).accepted
     monkeypatch.setattr(tools, "DEFINITIONS", _definitions(tmp_path, _without("qa_review", "referenced_current")))
-    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal, tightening=WATCHED_OUTPUTS)
+    decision = evaluate_proposal(adjudication_view(projection),department="quality", facts=facts, proposal=proposal,
+                                 tightening=WATCHED_OUTPUTS, events=_judgement_events())
     assert decision.accepted, decision.error_dicts
 
 

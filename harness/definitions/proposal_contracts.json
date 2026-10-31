@@ -82,8 +82,27 @@
       ]
     },
     "quality": {
-      "submit_tools": ["submit_review", "submit_baseline_review"],
+      "submit_tools": ["submit_review", "submit_independent_judgement", "submit_baseline_review"],
       "kinds": {
+        "independent_judgement": {
+          "when": ["QUALITY"],
+          "required": ["kind=independent_judgement", "checks", "criteria", "basis_delivery_spec_hash"],
+          "checks": "quality check names run via run_check in this activation (criteria rows reference these names)",
+          "criteria": {
+            "criterion": "AC<position> of the acceptance criterion in the current ProductSpec (1-based)",
+            "method": "check | trial | measure | judgement | human | open",
+            "result": "passed | failed | unverified",
+            "checks": "quality check names from this activation that support this criterion",
+            "trial_cases": "leave it empty (trial cases arrive with a later ticket)",
+            "note": "free text"
+          },
+          "bind": [
+            "current_contract.content_hash",
+            "current_delivery_spec.content_hash",
+            "quality host check receipts; engineering receipts are rejected"
+          ],
+          "basis_delivery_spec_hash": "content hash of the DeliverySpec this judgement is based on; the host rejects the submission if it does not equal the current effective DeliverySpec content_hash"
+        },
         "qa_review": {
           "when": ["QUALITY"],
           "required": ["kind=qa_review", "verdict", "rationale", "checks", "criteria", "basis_delivery_spec_hash"],
@@ -169,6 +188,21 @@
        "message": "quality must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"},
       {"condition": "author_separation", "evaluated": "delivery_spec", "field": "issuer",
        "message": "the department {department} authored the delivery it is evaluating; a department cannot evaluate its own artifact"}
+    ],
+    "independent_judgement": [
+      {"condition": "basis_current", "field": "basis_delivery_spec_hash", "target": "delivery_spec"},
+      {"condition": "referenced_current", "artifact": "delivery_spec",
+       "missing": {"field": "delivery_spec", "message": "independent judgement requires a current DeliverySpec"},
+       "referenced": [
+         {"field": "product_spec_hash", "target": "product_spec", "message": "delivery is not bound to the current ProductSpec"},
+         {"field": "effective_contract_hash", "target": "contract", "message": "delivery is not bound to the current effective contract"}
+       ]},
+      {"condition": "check_receipts", "department": "quality", "names": {"field": "checks", "trim": true},
+       "bind": [{"field": "product_spec_hash", "target": "product_spec"},
+                {"field": "effective_contract_hash", "target": "contract"},
+                {"field": "delivery_spec_hash", "target": "delivery_spec"}],
+       "activation": true,
+       "message": "quality must run {name} against the current snapshot, ProductSpec, and DeliverySpec in this activation; prior receipts are not reused"}
     ],
     "structure": [
       {"condition": "tree_matches", "recorded_in": "snapshot", "field": "code_snapshot_hash",

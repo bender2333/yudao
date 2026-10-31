@@ -12,7 +12,7 @@ from harness.actions import Action
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.path_rules import QA_TESTS_DIR
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree
 from harness.runtime import LoopSystem
@@ -33,9 +33,10 @@ def _tool_turn(identity: str, tool: str, **arguments) -> ModelResponse:
 
 
 def _review_turn(call, rationale: str, name: str, command: str) -> FakeTurn:
-    # 这一步只提交放行：提案由构造函数生成，依据版本按请求里的当前交付填写；检查在上一步已经跑过
+    # 这一步提交放行：提案由构造函数生成，依据版本按请求里的当前交付填写；同一轮重跑同名检查
+    # （检查回执必须来自结论所在的激活，工单 #151 的口径；判断轮与核验轮分两次激活后，回执在这里补上）
     turn = review_turn("release", rationale, checks={name: {"name": name, "command": command}})(call)
-    return FakeTurn(proposal=turn.proposal)
+    return FakeTurn(proposal=turn.proposal, checks=turn.checks)
 
 
 def _python() -> str:
@@ -66,13 +67,15 @@ def test_qa_writes_test_and_runs_check(tmp_path: Path) -> None:
         "quality": [
             lambda call: _tool_turn("qa-write", "write_file", path=test_py, content=test_content),
             lambda call: _tool_turn("qa-check", "run_check", name="qa_smoke", command=command),
+            lambda call: judgement_turn(checks={"qa_smoke": 0})(call),
             lambda call: _review_turn(call, "QA tests passed", "qa_smoke", command),
         ],
     }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
-    system.activate_once(run_id)  # quality：写测试、跑检查、放行
+    system.activate_once(run_id)  # quality：写测试、跑检查、交独立判断（工单 #358）
+    system.activate_once(run_id)  # quality：放行
 
     events = _events(system, run_id)
     # 写入经过工具许可并被执行：工具开始事件在调用结果之前
@@ -119,6 +122,7 @@ def test_a_review_that_misses_an_acceptance_criterion_is_rejected(tmp_path: Path
         "product": [product_spec(acceptance=["prints the argument", "exits 0"])],
         "engineering": [delivery_turn()],
         "quality": [
+            judgement_turn(checks={"smoke": 0}),
             review_turn("release", "only one criterion", checks={"smoke": 0}, criteria=criteria_one),
             review_turn("release", "both criteria", checks={"smoke": 0}, criteria=criteria_both),
         ],
@@ -126,6 +130,7 @@ def test_a_review_that_misses_an_acceptance_criterion_is_rejected(tmp_path: Path
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
+    system.activate_once(run_id)  # quality：交独立判断（工单 #358）
     system.activate_once(run_id)  # quality：缺一条验收条件，放行被拒绝
     rejected = next(e for e in _events(system, run_id) if e.type == EventType.PROPOSAL_REJECTED)
     errors = rejected.payload.get("errors", [])
@@ -162,7 +167,7 @@ def test_next_session_has_saved_test_materials(tmp_path: Path) -> None:
         # 脚本按部门给出（工单 #877）
         "product": [product_spec()],
         "engineering": [delivery_turn(summary="first delivery"), delivery_turn(summary="fixed delivery")],
-        "quality": [write_tests, rework,
+        "quality": [write_tests, rework, judgement_turn(checks={"smoke": 0}),
                     review_turn("release", "verified fixed delivery",
                                 checks={"verify_rework": {"name": "verify_rework", "command": command}})],
     }))
@@ -171,7 +176,8 @@ def test_next_session_has_saved_test_materials(tmp_path: Path) -> None:
     system.activate_once(run_id)  # engineering
     system.activate_once(run_id)  # quality：写测试、退回返工
     system.activate_once(run_id)  # engineering 2
-    system.activate_once(run_id)  # quality 2：新的检查工作区里有保存下来的测试材料
+    system.activate_once(run_id)  # quality 2：交独立判断（工单 #358）
+    system.activate_once(run_id)  # quality 3：新的检查工作区里有保存下来的测试材料，跑检查并放行
 
     events = _events(system, run_id)
     check_called = next(e for e in events if e.type == EventType.TOOL_CALLED and e.department == "quality" and e.payload.get("name") == "run_check" and (e.payload.get("args") or {}).get("name") == "verify_rework")
@@ -248,13 +254,15 @@ def test_qa_write_outside_the_test_materials_is_denied(tmp_path: Path) -> None:
             lambda call: _tool_turn("qa-write-outside", "write_file", path="src/echo.py", content=tampered),
             lambda call: _tool_turn("qa-write-tests", "write_file", path=test_py, content=test_content),
             lambda call: _tool_turn("qa-check", "run_check", name="qa_smoke", command=command),
+            lambda call: judgement_turn(checks={"qa_smoke": 0})(call),
             lambda call: _review_turn(call, "checks passed on the current snapshot", "qa_smoke", command),
         ],
     }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
-    projection = system.activate_once(run_id)  # quality
+    system.activate_once(run_id)  # quality：写测试、跑检查、交独立判断（工单 #358）
+    projection = system.activate_once(run_id)  # quality：放行
     assert projection.status == "done", projection.stop_reason
 
     events = _events(system, run_id)
@@ -287,13 +295,15 @@ def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_reru
         return _tool_turn("qa-check-1", "run_check", **check_spec)
 
     def edit_and_release(call):
-        # 区间编辑改掉测试材料，然后用改之前的回执放行：提案被拒绝
-        turn = review_turn("release", "attempt release with v1 receipt", checks={"qa_check": check_spec})(call)
+        # 同一步先跑检查（回执绑定 v1 的测试材料），再区间编辑改掉材料，然后用这份回执放行：提案被拒绝
         return ModelResponse(output=[
+            _call("qa-check-1", "run_check", check_spec),
             _call("qa-edit", "edit_range", {"path": test_py, "expected_text": "print('V1')",
                                             "new_text": "print('V2')"}),
             _call("qa-release-1", "submit_review",
-                  {key: value for key, value in turn.proposal.items() if key != "kind"}),
+                  {key: value for key, value in review_turn("release", "attempt release with v1 receipt",
+                                                            checks={"qa_check": check_spec})(call).proposal.items()
+                   if key != "kind"}),
         ])
 
     def check_v2_and_release(call):
@@ -308,12 +318,15 @@ def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_reru
         # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
         "product": [product_spec()],
         "engineering": [delivery_turn()],
-        "quality": [write_v1, check_v1, edit_and_release, check_v2_and_release],
+        "quality": [write_v1,
+                    lambda call: judgement_turn(checks={"qa_check": 0})(call),
+                    edit_and_release, check_v2_and_release],
     }))
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # product
     system.activate_once(run_id)  # engineering
-    proj_qa1 = system.activate_once(run_id)  # quality：写 v1、跑检查、改材料后放行被拒
+    system.activate_once(run_id)  # quality：写 v1、跑检查、交独立判断（工单 #358）
+    proj_qa1 = system.activate_once(run_id)  # quality：改材料后放行被拒
 
     # 两次保存测试材料：write_file 保存 v1，edit_range 保存 v2，两份的内容摘要不同
     saved_events = [e for e in _events(system, run_id) if e.type == EventType.QA_TESTS_SAVED]

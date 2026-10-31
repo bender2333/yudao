@@ -13,7 +13,7 @@ from harness import adjudication
 from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS
 from harness.models import EventType
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import explore_turn, quality_turns
@@ -71,7 +71,7 @@ def test_the_nested_ask_answers_the_outer_branch_and_the_run_continues(tmp_path:
             _answer("ans-2", "不用改。"),
         ],
         # 质检的脚本：预测性探索与核验各一轮（工单 #557）
-        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "valid uppercase implementation")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -107,8 +107,10 @@ def test_the_three_layer_chain_answers_and_refuses_the_fourth_layer(tmp_path: Pa
         "engineering": [delivery_turn()],
         "quality": [
             _ask("ask-1", "engineering", "检查项覆盖了回问吗？"),
-            # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）
+            # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）；
+            # 交付到达以后先交独立判断再下结论（工单 #358）
             explore_turn(),
+            judgement_turn(),
             review_turn("release", "ok"),
         ],
         # 工程在分支里回问产品（第二层）
@@ -162,8 +164,10 @@ def test_the_chain_limit_is_read_from_the_rule_registry(tmp_path: Path, monkeypa
         "engineering": [delivery_turn()],
         "quality": [
             _ask("ask-1", "engineering", "检查项覆盖了回问吗？"),
-            # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）
+            # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）；
+            # 交付到达以后先交独立判断再下结论（工单 #358）
             explore_turn(),
+            judgement_turn(),
             review_turn("release", "ok"),
         ],
         "engineering:ask": [
@@ -211,7 +215,7 @@ def test_the_nested_branch_steps_are_charged_to_the_first_asker(tmp_path: Path):
             _answer("ans-2", "不用改。"),
         ],
         # 质检的脚本：预测性探索与核验各一轮（工单 #557）
-        "quality": [explore_turn(), review_turn("release", "valid uppercase implementation")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "valid uppercase implementation")],
     }
     adapter = FakeAdapter(scripts)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=StepLimits(max_model_steps=4))

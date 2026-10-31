@@ -883,6 +883,20 @@ class QaCoveragePayload(Payload):
     open: int
 
 
+class IndependentJudgementPayload(Payload):
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里对当前交付
+    # 的每条验收条件写出的判断，按 #151 逐条结论的形状（同一份 QaCriterionPayload，字段封闭）。
+    # 它不是成果：不进版本链、不失效任何东西；门（放行要引用它）与装配（解释并进的时机）读它的存在。
+    # checks 是本次激活的质检检查名（逐条结论引用的回执），criteria_count 是判断的条数：
+    # 与 criteria 一起写入，画面不用数列表
+    kind: Literal["independent_judgement"]
+    product_spec_hash: str
+    delivery_spec_hash: str
+    checks: list[str]
+    criteria_count: int
+    criteria: list[QaCriterionPayload]
+
+
 class QaSubmittedPayload(AcceptanceFields):
     product_spec_hash: str
     effective_contract_hash: str
@@ -1739,6 +1753,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.CONTRACT_ACCEPTED: ContractAcceptedPayload,
     EventType.ASK_STARTED: AskStartedPayload,
     EventType.ASK_ANSWERED: AskAnsweredPayload,
+    EventType.INDEPENDENT_JUDGEMENT_COMMITTED: IndependentJudgementPayload,
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
     EventType.ARTIFACT_INVALIDATED: ArtifactInvalidatedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,

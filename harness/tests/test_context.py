@@ -2,7 +2,7 @@ import json
 from contextlib import contextmanager
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
-from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
+from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.tests.helpers import developer_text, explore_turn, quality_turns, recorded_context
@@ -23,7 +23,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
             "product": [FakeTurn(proposal=product_spec(), transcript=marker)],
             "engineering": [ask_turn(), delivery_turn()],
             "product:ask": [answer_turn("The existing contract covers this input.")],
-            "quality": [explore_turn(), review_turn("release", "ok")],
+            "quality": [explore_turn(), judgement_turn(), review_turn("release", "ok")],
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -89,8 +89,10 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
             ],
             "quality": [
                 explore_turn(),
+                judgement_turn(),
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "contract issue"}]),
+                judgement_turn(),
                 review_turn("release", "new delivery checked"),
             ],
             "product:ask": [answer_turn(
@@ -130,15 +132,19 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     excluded = {item.source for item in recorded_context(system, engineering_after_r2).manifest.excluded}
     assert "invalid_delivery_as_current" in excluded
 
-    quality = [item for item in adapter.invocations if item.department == "quality"][-1]
-    current = _part(quality, "current_delivery_spec")
+    quality_calls = [item for item in adapter.invocations if item.department == "quality"]
+    before_judgement = quality_calls[-2]
+    current = _part(before_judgement, "current_delivery_spec")
     assert current is not None
-    # 事实部分总在；解释部分（summary）在质检对当前交付下结论以前不给（工单 #554）
+    # 事实部分总在；解释部分（summary）在质检提交独立判断以前不给（工单 #554；#358：先判断后看解释，
+    # 判断提交以后的请求才并入解释——这里的最后一次调用是判断以后的核验请求，解释已经在里面）
     assert current["content_hash"] == projection.delivery_spec.content_hash
     assert current["content_hash"] != projection.delivery_specs[0].content_hash
     assert "summary" not in current
     assert current["status"] == "active"
-    assert _part(quality, "prior_delivery") is None
+    assert _part(before_judgement, "prior_delivery") is None
+    after_judgement = _part(quality_calls[-1], "current_delivery_spec")
+    assert after_judgement is not None and "summary" in after_judgement
 
 
 @contextmanager

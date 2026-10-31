@@ -18,7 +18,7 @@ from harness.app.coverage_queries import AcceptanceCoverage
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import NotFound
 from harness.models import EventType
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import explore_turn
 
@@ -43,8 +43,10 @@ def _script() -> dict:
     return {
         "product": [product_spec(acceptance=ACCEPTANCE)],
         "engineering": [delivery_turn()],
-        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot",
-                                                checks={"smoke": 0}, criteria=_criteria())],
+        # 先判断后看解释（工单 #358）：交付到达以后先交独立判断（一轮），再带本激活的检查回执下结论
+        "quality": [explore_turn(), judgement_turn(checks={"smoke": 0}),
+                    review_turn("release", "checks passed on the current snapshot",
+                                checks={"smoke": 0}, criteria=_criteria())],
     }
 
 

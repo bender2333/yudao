@@ -235,6 +235,7 @@ class WatchedOutputsTightening:
         "qa_review": "_review",
         "structure": "_structure",
         "baseline_review": "_baseline_review",
+        "independent_judgement": "_independent_judgement",
     }
 
     def submission(self, request: TightenRequest) -> Tightened:
@@ -379,6 +380,13 @@ class WatchedOutputsTightening:
                     errors.extend(_release_criteria_errors(criteria))
                 if verdict == "cannot_verify":
                     errors.extend(_cannot_verify_criteria_errors(criteria))
+        # 先判断后看解释的门（第 4 节，工单 #358）：提交结论前这份交付必须已有独立判断事件；
+        # 字段级错误写明缺什么，部门读 validation_feedback 以后先提交独立判断再下结论
+        if not errors and _judgement_exists(request.events, delivery_hash) is False:
+            errors.append(FieldError(
+                "independent_judgement",
+                "commit the independent judgement for the current delivery first: the conclusion must "
+                "reference the committed judgement (kind=independent_judgement, criteria per acceptance criterion)"))
         defects, defect_errors = _qa_defects(proposal)
         errors.extend(defect_errors)
         if errors:
@@ -403,6 +411,47 @@ class WatchedOutputsTightening:
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
             "evidence_refs": _check_evidence_refs(criteria, request.events),
         }, ends_run=verdict == "release")
+
+    def _independent_judgement(self, request: TightenRequest) -> Tightened:
+        # 独立判断的提交（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里
+        # 对当前交付的每条验收条件写出判断（#151 逐条结论的形状），经写入口写成事实。
+        # 它不是成果：没有结论、缺陷与检查回执的绑定——判断只依据主机已经给出的回执引用检查名，
+        # 每条引用的检查名仍是本次激活里绑定当前快照、ProductSpec 与交付的质检回执（事实通道不变）。
+        # 依据版本（当前的 PRD 与交付）在这里核对：判断必须是对当前交付的判断
+        minimal, facts = request.minimal, request.facts
+        projection = request.state
+        proposal = request.proposal or {}
+        spec_hash = minimal.artifact_hash("product_spec")
+        if spec_hash is None:
+            return Tightened(errors=(FieldError("product_spec", "no active ProductSpec"),))
+        delivery_hash = minimal.artifact_hash("delivery_spec")
+        if delivery_hash is None:
+            return Tightened(errors=(FieldError("delivery_spec", "independent judgement requires a current delivery"),))
+        # 预测性探索的一轮（工单 #557）没有交付：独立判断无从谈起
+        if projection.department_bases.get("quality") is not None \
+                and projection.department_delivery_bases.get("quality") is None:
+            return Tightened(errors=(FieldError("delivery_spec", "this work has no delivery to review"),))
+        criteria, criteria_errors = _qa_criteria(proposal)
+        errors: list[FieldError] = list(criteria_errors)
+        if not errors:
+            outcome = self._conditions("independent_judgement", request)
+            errors.extend(outcome.errors)
+        if not errors:
+            # 逐条结论必须覆盖当前 ProductSpec 的全部验收条件，引用的检查名是本次激活的质检回执
+            errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts))
+        if errors:
+            return Tightened(errors=tuple(errors))
+        # 一份交付一份判断：这份交付已经有独立判断时重复提交被拒绝（门以第一次为准）
+        if _judgement_exists(request.events, delivery_hash):
+            return Tightened(errors=(FieldError(
+                "kind", "an independent judgement for the current delivery is already committed"),))
+        return Tightened(content={
+            "product_spec_hash": spec_hash,
+            "delivery_spec_hash": delivery_hash,
+            "checks": list(proposal.get("checks") or []),
+            "criteria_count": len(criteria),
+            "criteria": criteria,
+        })
 
     def _structure(self, request: TightenRequest) -> Tightened:
         # 现有结构说明（docs/design/existing-project-onboarding.md 第 4.4 节）：构建与测试的每一项都要有本次
@@ -596,6 +645,10 @@ def _schema_errors(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
         return _structure_schema_errors(proposal)
     if kind == "baseline_review":
         return _baseline_review_schema_errors(proposal)
+    if kind == "independent_judgement":
+        # 独立判断的形状（验证的独立性设计说明第 4 节，工单 #358）：逐条结论（复用 #151 的核对）
+        # 加本次激活的检查名清单；没有结论与缺陷——判断先于解释，这一步不下结论
+        return _qa_criteria_errors(proposal) + _qa_check_name_errors(proposal)
     return [FieldError("kind", "unknown kind")]
 
 
@@ -1005,6 +1058,16 @@ def _check_output_ref(events: tuple[Event, ...] | list[Event], name: str) -> dic
     return None
 
 
+def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: str | None) -> bool:
+    # 这份交付已经有独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：门的依据，装配也用它。
+    # 事件与逐条结论里的交付摘要一致才算：写进日志的独立判断是对当前交付的判断
+    if delivery_hash is None:
+        return False
+    return any(
+        event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED
+        and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
+        for event in events
+    )
 _REQUIREMENT_MAPPING_FIELDS = frozenset({"requirement", "criteria", "gap"})
 
 
