@@ -128,6 +128,7 @@
 "test_materials_status.py" = "integration"
 "test_message_protocol_contract.py" = "unit"
 "test_model_capabilities.py" = "module"
+"test_no_fetch_flag.py" = "module"
 "test_provider_recognition.py" = "module"
 "test_observability.py" = "integration"
 "test_observability_module.py" = "module"

@@ -336,9 +336,11 @@ def start_service(data_dir, port, python_executable=None):
     """在被测的数据目录上启动 Yudao 服务，返回进程对象与接口地址。
 
     `--no-browser`：运行器不需要在控制主机上打开页面，评测运行与测试都按无界面启动。
+    `--no-fetch`：关闭取回，这个实例的部门没有 `fetch_url` 与 `read_external_source`
+    （网络与 MCP 设计说明第 5.1、12.4 节、评测场景设计说明第 3 节「两边都不联网」）。
     """
     command = [python_executable or sys.executable, "-m", "harness", "api",
-               "--data-dir", data_dir, "--port", str(port), "--no-browser"]
+               "--data-dir", data_dir, "--port", str(port), "--no-browser", "--no-fetch"]
     process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                                stdin=subprocess.DEVNULL)
     return process, YudaoClient("http://127.0.0.1:" + str(port))

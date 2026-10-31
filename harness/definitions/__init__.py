@@ -49,6 +49,21 @@ ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]]
 # 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明第 18 节）
 ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
 
+# 取回工具（网络与 MCP 设计说明第 5.1、12.4 节）：部门按定义都有这两个工具；以关闭取回的启动参数
+# （`--no-fetch`）运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里
+# 不动：取舍发生在「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，
+# 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明第 3 节）
+FETCH_TOOLS: tuple[str, ...] = ("fetch_url", "read_external_source")
+
+# 取回是否可用：进程范围的启动设置，默认可用；只在启动时由命令行改一次（工单 #1172）
+_fetch_enabled = True
+
+
+def configure_fetch(enabled: bool) -> None:
+    """设置这个进程的取回是否可用（启动参数 `--no-fetch` 关掉取回）。"""
+    global _fetch_enabled
+    _fetch_enabled = bool(enabled)
+
 
 def established_verification(kind: ActionKind) -> Verification | None:
     # 这一类动作的既定核实方法；None 表示这一类里随工具不同，必须写明
@@ -615,9 +630,13 @@ class Definitions(_Definition):
         return self.work_item(kind).departments.get(department)
 
     def tools_for(self, department: str, kind: str = "change") -> tuple[Identifier, ...]:
-        # 部门在事项种类中的工具清单：种类写明时以它为准，未写明时是角色自己的清单
+        # 部门在事项种类中的工具清单：种类写明时以它为准，未写明时是角色自己的清单。
+        # 以关闭取回的启动参数运行时去掉取回工具（工单 #1172）：定义里留着工具本身，部门的清单里没有
         work = self.department_work(department, kind)
-        return work.tools if work is not None else self.roles[department].tools
+        names = work.tools if work is not None else self.roles[department].tools
+        if not _fetch_enabled:
+            return tuple(name for name in names if name not in FETCH_TOOLS)
+        return names
 
     def proposal_contract(self, department: str, kind: str = "change") -> dict[str, Any]:
         # 部门在事项种类中的提案合同：角色自己的部分接上共同的部分，再按本种类的工具清单筛选，
