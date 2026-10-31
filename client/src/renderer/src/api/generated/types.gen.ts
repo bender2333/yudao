@@ -5258,6 +5258,17 @@ export type SnapshotSystemStatus = {
 };
 
 /**
+ * Snapshot[ToolsRegistryResult]
+ */
+export type SnapshotToolsRegistryResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ToolsRegistryResult;
+};
+
+/**
  * Snapshot[UsageReport]
  */
 export type SnapshotUsageReport = {
@@ -5486,6 +5497,141 @@ export type ToolServerProbe = {
     server: {
         [key: string]: unknown;
     };
+};
+
+/**
+ * ToolsRegistryFetchRecord
+ */
+export type ToolsRegistryFetchRecord = {
+    /**
+     * At
+     */
+    at?: string;
+    /**
+     * Url
+     */
+    url?: string;
+    /**
+     * Ok
+     */
+    ok?: boolean | null;
+};
+
+/**
+ * ToolsRegistryProbeState
+ */
+export type ToolsRegistryProbeState = {
+    /**
+     * Finished At
+     */
+    finished_at?: string | null;
+    /**
+     * Ok
+     */
+    ok?: boolean | null;
+    /**
+     * Error
+     */
+    error?: string | null;
+};
+
+/**
+ * ToolsRegistryProject
+ */
+export type ToolsRegistryProject = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Mcp Servers
+     */
+    mcp_servers: {
+        [key: string]: ToolsRegistryServerView;
+    };
+    /**
+     * Fetch Records
+     */
+    fetch_records?: Array<ToolsRegistryFetchRecord>;
+};
+
+/**
+ * ToolsRegistryResult
+ */
+export type ToolsRegistryResult = {
+    /**
+     * Projects
+     */
+    projects: Array<ToolsRegistryProject>;
+};
+
+/**
+ * ToolsRegistryServerView
+ */
+export type ToolsRegistryServerView = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Transport
+     */
+    transport: string;
+    /**
+     * Command
+     */
+    command?: string;
+    /**
+     * Args
+     */
+    args?: Array<string>;
+    /**
+     * Env
+     */
+    env?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Url
+     */
+    url?: string;
+    /**
+     * Headers
+     */
+    headers?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Departments
+     */
+    departments?: Array<string>;
+    /**
+     * Startup Timeout Sec
+     */
+    startup_timeout_sec?: number;
+    /**
+     * Call Timeout Sec
+     */
+    call_timeout_sec?: number;
+    /**
+     * Output Limit
+     */
+    output_limit?: number;
+    /**
+     * Tool Snapshot
+     */
+    tool_snapshot?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Config Digest
+     */
+    config_digest?: string;
+    probe?: ToolsRegistryProbeState;
 };
 
 /**
@@ -20299,6 +20445,22 @@ export type QueryRulesRegistryResponses = {
 };
 
 export type QueryRulesRegistryResponse = QueryRulesRegistryResponses[keyof QueryRulesRegistryResponses];
+
+export type QueryToolsRegistryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/queries/tools.registry';
+};
+
+export type QueryToolsRegistryResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotToolsRegistryResult;
+};
+
+export type QueryToolsRegistryResponse = QueryToolsRegistryResponses[keyof QueryToolsRegistryResponses];
 
 export type CapabilitiesData = {
     body?: never;

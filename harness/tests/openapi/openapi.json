@@ -3782,6 +3782,27 @@
         }
       }
     },
+    "/api/queries/tools.registry": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "tools.registry",
+        "operationId": "query_tools_registry",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ToolsRegistryResult_"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "tags": [
@@ -13128,6 +13149,24 @@
         ],
         "title": "Snapshot[SystemStatus]"
       },
+      "Snapshot_ToolsRegistryResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ToolsRegistryResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ToolsRegistryResult]"
+      },
       "Snapshot_UsageReport_": {
         "properties": {
           "position": {
@@ -13490,6 +13529,219 @@
           "server"
         ],
         "title": "ToolServerProbe"
+      },
+      "ToolsRegistryFetchRecord": {
+        "properties": {
+          "at": {
+            "type": "string",
+            "title": "At",
+            "default": ""
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ToolsRegistryFetchRecord"
+      },
+      "ToolsRegistryProbeState": {
+        "properties": {
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ToolsRegistryProbeState"
+      },
+      "ToolsRegistryProject": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "mcp_servers": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/ToolsRegistryServerView"
+            },
+            "type": "object",
+            "title": "Mcp Servers"
+          },
+          "fetch_records": {
+            "items": {
+              "$ref": "#/components/schemas/ToolsRegistryFetchRecord"
+            },
+            "type": "array",
+            "title": "Fetch Records",
+            "default": []
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "name",
+          "mcp_servers"
+        ],
+        "title": "ToolsRegistryProject"
+      },
+      "ToolsRegistryResult": {
+        "properties": {
+          "projects": {
+            "items": {
+              "$ref": "#/components/schemas/ToolsRegistryProject"
+            },
+            "type": "array",
+            "title": "Projects"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "projects"
+        ],
+        "title": "ToolsRegistryResult"
+      },
+      "ToolsRegistryServerView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "transport": {
+            "type": "string",
+            "title": "Transport"
+          },
+          "command": {
+            "type": "string",
+            "title": "Command",
+            "default": ""
+          },
+          "args": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Args",
+            "default": []
+          },
+          "env": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Env",
+            "default": {}
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": ""
+          },
+          "headers": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Headers",
+            "default": {}
+          },
+          "departments": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Departments",
+            "default": []
+          },
+          "startup_timeout_sec": {
+            "type": "integer",
+            "title": "Startup Timeout Sec",
+            "default": 60
+          },
+          "call_timeout_sec": {
+            "type": "integer",
+            "title": "Call Timeout Sec",
+            "default": 120
+          },
+          "output_limit": {
+            "type": "integer",
+            "title": "Output Limit",
+            "default": 20000
+          },
+          "tool_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Snapshot"
+          },
+          "config_digest": {
+            "type": "string",
+            "title": "Config Digest",
+            "default": ""
+          },
+          "probe": {
+            "$ref": "#/components/schemas/ToolsRegistryProbeState",
+            "default": {}
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "transport"
+        ],
+        "title": "ToolsRegistryServerView"
       },
       "UnfinishedAction": {
         "properties": {
