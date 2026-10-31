@@ -57,3 +57,4 @@ ref/
 # solo 模式的循环账本与工作记录
 .ralph/
 .local/
+.coverage

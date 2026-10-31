@@ -44,6 +44,14 @@
       "servers": "这个事件种类是新增的，旧版本的项目流中没有它：没有保存过 MCP 服务器设置，读取时按空设置（版本 0、没有服务器）",
       "version": "这个事件种类是新增的，旧版本的项目流中没有它：第一次保存为第 1 版"
     },
+    "tool_server_probe_finished": {
+      "config_digest": "这个事件种类是新增的，旧版本的项目流中没有它：出现探测之前没有工具清单快照，也没有绑定配置摘要的探测结果",
+      "error": "这个事件种类是新增的，旧版本的项目流中没有它：出现探测之前没有探测失败记录",
+      "server_info": "这个事件种类是新增的，旧版本的项目流中没有它：出现探测之前没有读到的服务器信息",
+      "server_name": "这个事件种类是新增的，旧版本的项目流中没有它：出现探测之前没有针对某台服务器的探测",
+      "status": "这个事件种类是新增的，旧版本的项目流中没有它：出现探测之前没有探测结果",
+      "tools": "这个事件种类是新增的，旧版本的项目流中没有它：出现探测之前没有工具清单快照"
+    },
     "onboarding_revision_started": {
       "candidate_event_id": "这个事件种类是新增的，旧版本的项目流中没有它：提出修改针对上一次建档候选",
       "note": "这个事件种类是新增的，旧版本的项目流中没有它：修改意见原文，确认时必须给出",
@@ -328,6 +336,14 @@
       "document_digest": "string",
       "servers": "object",
       "version": "integer"
+    },
+    "tool_server_probe_finished": {
+      "config_digest": "string",
+      "error": "string",
+      "server_info": "object?",
+      "server_name": "string",
+      "status": "enum string[failed, ok]",
+      "tools": "array[object]"
     },
     "onboarding_revision_started": {
       "candidate_event_id": "string",

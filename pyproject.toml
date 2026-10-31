@@ -152,6 +152,8 @@ ignore_imports = [
   "harness.app.** -> harness.redact",
   # 补：重放核对的读取
   "harness.app.** -> harness.replay_check",
+  # 补：MCP 服务器探测（工单 #1174）：探测本体在 mcp_probe，命令层只转调
+  "harness.app.** -> harness.mcp_probe",
 ]
 
 # S6a（工单 #829）：应用（应用层、路由实现、装配实现、执行实现）不导入薄驱动的内部

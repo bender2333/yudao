@@ -245,6 +245,9 @@
   "mcp_servers_configured": {
     "source": "user"
   },
+  "tool_server_probe_finished": {
+    "source": "host_measurement"
+  },
   "catalog_revised": {
     "source": "user"
   },

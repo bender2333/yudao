@@ -1480,6 +1480,25 @@ class ProjectService:
     def read_mcp_servers(self, project_id: str) -> dict[str, Any]:
         return _mcp_settings_view(self.projection(project_id).mcp_servers)
 
+    def record_tool_snapshot(self, project_id: str, server_name: str, snapshot: dict[str, Any]) -> bool:
+        # 探测成功以后把工具清单快照写回设置里这台服务器（工单 #1174，网络与 MCP 设计说明第 4.2 节）。
+        # 写回经 mcp_servers_configured 事件（整份设置一个版本）：用当前版本作基准重存整份设置，
+        # 事件里这台服务器的 tool_snapshot 换成探测快照；快照带的配置摘要与这台服务器当前配置不一致时
+        # 写回中止（返回 False）：旧结果保留在事件里供查询，不得覆盖新配置的可用状态；
+        # 服务器已经删除（或项目在探测期间被归档、删除）时同样中止
+        current = self.read_mcp_servers(project_id)
+        servers = deepcopy(current["servers"])
+        if server_name not in servers:
+            return False
+        if snapshot.get("config_digest") != servers[server_name].get("config_digest"):
+            return False
+        servers[server_name] = {**servers[server_name], "tool_snapshot": deepcopy(snapshot)}
+        try:
+            self.configure_mcp_servers(project_id, servers, base_version=current["version"])
+        except (McpServersConflict, ProjectNotFoundError, ProjectArchivedError):
+            return False
+        return True
+
     # 材料（D-H：无活跃事项时记录原文）
 
     def record_material(self, project_id: str, text: str, *, department: str | None = None,

@@ -2456,6 +2456,18 @@ class McpServersSetting(Contract):
     updated_at: str | None = None
 
 
+class McpProbeResultView(Contract):
+    # 最近一次探测的结果（工单 #1174，网络与 MCP 设计说明第 4.2、10 节）：成功带服务器信息与
+    # 工具清单快照，失败带原因（凭据值已替换为星号）；config_digest 是探测绑定的配置摘要
+    server_name: str
+    status: str
+    config_digest: str = ""
+    server_info: dict[str, Any] | None = None
+    tools: list[dict[str, Any]] = []
+    error: str = ""
+    probed_at: str | None = None
+
+
 class ProjectSettingsResult(Contract):
     project_id: str
     name: str
@@ -2467,6 +2479,8 @@ class ProjectSettingsResult(Contract):
     source_directories: dict[str, SourceDirectorySetting]
     # 项目设置里的 MCP 服务器（工单 #236）：旧事件没有 MCP 设置时按空设置读取（版本 0、没有服务器）
     mcp_servers: McpServersSetting
+    # 最近一次探测的结果（工单 #1174）：还没有探测过时为空
+    last_probe: McpProbeResultView | None = None
     # 各部门生效模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）；
     # 生效模型按第 5.3 节解析，包括跟随部门默认的情况
     department_reminders: dict[str, list[str]]
@@ -2517,6 +2531,13 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                            if field in McpServerSettingView.model_fields})
                     for name, server in state.mcp_servers.servers.items()
                 },
+            ),
+            # 最近一次探测的结果（工单 #1174）：还没有探测过时为空
+            last_probe=None if state.last_probe is None else McpProbeResultView(
+                server_name=state.last_probe.server_name, status=state.last_probe.status,
+                config_digest=state.last_probe.config_digest, server_info=state.last_probe.server_info,
+                tools=state.last_probe.tools, error=state.last_probe.error,
+                probed_at=state.last_probe.probed_at,
             ),
             # 各部门生效模型（跟随部门默认时取部门默认）的建议能力提醒（设计说明第 5.6 节）
             department_reminders=application.system.facade.project_department_reminders(
@@ -2779,6 +2800,8 @@ PROJECT_EVENT_KINDS: tuple[str, ...] = (
     ProjectEventType.WRITEBACK_COMPLETED, ProjectEventType.WRITEBACK_STOPPED,
     ProjectEventType.WRITEBACK_NOT_NEEDED, ProjectEventType.WRITEBACK_HELD,
     ProjectEventType.WRITEBACK_VERIFIED,
+    # 项目设置里的 MCP 服务器（工单 #236）与最近一次探测（工单 #1174）：设置页显示两者
+    ProjectEventType.MCP_SERVERS_CONFIGURED, ProjectEventType.TOOL_SERVER_PROBE_FINISHED,
 )
 
 # run 流的全部事件种类：导出（run.export）给出这个 run 的全部事件与投影，任何一条 run 事件都改变它
