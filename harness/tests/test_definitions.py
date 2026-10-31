@@ -164,14 +164,14 @@ def test_tool_categories_and_references_are_checked(tmp_path):
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     assert raised.value.issues == (
-        ("roles.json", "product.tools[5]", "工具 bash 没有定义"),
-        ("roles.json", "engineering.tools[10]", "工具 bash 没有定义"),
-        ("roles.json", "quality.tools[7]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.change.departments.product.tools[5]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.change.departments.engineering.tools[10]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.change.departments.quality.tools[7]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.onboarding.departments.product.tools[5]", "工具 bash 没有定义"),
-        ("work_items.json", "kinds.onboarding.departments.quality.tools[5]", "工具 bash 没有定义"),
+        ("roles.json", "product.tools[6]", "工具 bash 没有定义"),
+        ("roles.json", "engineering.tools[11]", "工具 bash 没有定义"),
+        ("roles.json", "quality.tools[8]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.product.tools[6]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.engineering.tools[11]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.change.departments.quality.tools[8]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.onboarding.departments.product.tools[6]", "工具 bash 没有定义"),
+        ("work_items.json", "kinds.onboarding.departments.quality.tools[6]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
         ("proposal_contracts.json", "roles.quality.kinds",
          "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、qa_review"),
@@ -315,11 +315,12 @@ def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):
 
 
 def _with_unimplemented_tool(directory: Path) -> None:
+    # 取回（fetch_url）已由工单 #68 实现，这里用一个执行环境还没有实现的环境工具做例子
     tools = _read(directory, "tools.json")
-    tools["fetch_url"] = {**tools["read_file"], "description": "Fetch one registered URL."}
+    tools["browse_page"] = {**tools["read_file"], "description": "Browse one registered page."}
     _write(directory, "tools.json", tools)
     roles = _read(directory, "roles.json")
-    roles["product"]["tools"].append("fetch_url")
+    roles["product"]["tools"].append("browse_page")
     _write(directory, "roles.json", roles)
 
 
@@ -330,7 +331,7 @@ def _with_unimplemented_tool(directory: Path) -> None:
                                               "value": -1}}),
      "rules.json max_cycles："),
     # 执行环境没有实现的环境工具
-    (_with_unimplemented_tool, "tools.json fetch_url：执行环境没有这个环境工具的实现"),
+    (_with_unimplemented_tool, "tools.json browse_page：执行环境没有这个环境工具的实现"),
 ])
 def test_startup_fails_when_a_definition_is_invalid(tmp_path, change, expected):
     # 在程序的一份副本中把定义改为不合法的内容：命令行启动失败，错误写明文件与字段

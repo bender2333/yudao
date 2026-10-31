@@ -20,7 +20,7 @@ import subprocess
 import threading
 
 from collections.abc import Awaitable, Callable, Iterable
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 import time
 from threading import Lock
@@ -29,6 +29,7 @@ from typing import Any, Mapping
 from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
 from .artifacts import ArtifactStore, ExternalSource
 from .event_store import run_stream
+from .fetch import EXTERNAL_CONTENT_NOTICE, FetchCancelled, FetchRefused, fetch_url
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
@@ -480,12 +481,13 @@ _HANDLERS = {
     "read_output": "_read_output",
     "stop_job": "_stop_job",
 }
-_PROCESSES = {"run_check": "_run_check", "bash": "_bash"}
+_PROCESSES = {"run_check": "_run_check", "bash": "_bash", "fetch_url": "_fetch"}
 
 # 动作类别与属于它的工具：执行环境按类别分派，再从上面两种执行方式里按实际工具名取执行方法。
 # 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明第 18 节）
 _KIND_TOOLS = {
     "read": frozenset({"read_file", "list_files", "search", "read_range", "read_external_source"}),
+    "fetch": frozenset({"fetch_url"}),
     "write": frozenset({"write_file", "edit_range", "delete_file", "move_file"}),
     "check": frozenset({"run_check"}),
     "command": frozenset({"bash", "read_output", "stop_job"}),
@@ -847,6 +849,9 @@ class LocalEnvironment:
                 output, status = handler(action.input), "completed"
         except UnrepresentableWorkspace:
             raise
+        except FetchRefused as exc:
+            # 地址指向服务自己：动作被拒绝，回执标 refused 并带原因，作为工具结果交回（工单 #1170）
+            return ActionReceipt.refusal(action.action_id, str(exc))
         except Exception as exc:
             return ActionReceipt(action_id=action.action_id, status="failed", error=str(exc))
         finally:
@@ -1047,6 +1052,36 @@ class LocalEnvironment:
         if self._artifacts is None or self._run_id is None:
             raise ValueError("external sources are not available in this environment")
         return self._artifacts.external_source(self._run_id, source)
+
+    async def _fetch(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 取回一个网页（网络与 MCP 设计说明第 3、6 节）：取回本身在 fetch 模块里，这里把正文存成
+        # 这个 run 的外部来源工件，再把工件的第一页按 read_external_source 的同一套分页交回。
+        # 地址指向服务自己时 fetch 模块抛 FetchRefused，由 perform 变成 refused 的回执
+        url = action.input.get("url")
+        if not isinstance(url, str) or not url.strip():
+            raise ValueError("fetch_url requires a url")
+        if self._artifacts is None or self._run_id is None:
+            raise ValueError("fetching requires an environment with an artifact store")
+        try:
+            receipt = await fetch_url(url.strip(), run_id=self._run_id, artifacts=self._artifacts, stop=stop)
+        except FetchCancelled:
+            return {"url": url.strip(), "reason": "the fetch was cancelled"}, "cancelled"
+        page = self._read_external_source({"source": receipt.content_hash, "start_line": 1})
+        return {
+            "url": receipt.url,
+            "final_url": receipt.final_url,
+            "status_code": receipt.status_code,
+            "content_type": receipt.content_type,
+            "bytes": receipt.bytes,
+            "download_truncated": receipt.download_truncated,
+            "content_hash": receipt.content_hash,
+            "ref": asdict(receipt.source_ref),
+            "redirects": list(receipt.redirects),
+            "duration_ms": receipt.duration_ms,
+            "external_content": True,
+            "notice": EXTERNAL_CONTENT_NOTICE,
+            **page,
+        }, "completed"
 
     def _write_file(self, args: dict[str, Any]) -> str:
         return self.workspace.write_file(str(args["path"]), str(args["content"]))
