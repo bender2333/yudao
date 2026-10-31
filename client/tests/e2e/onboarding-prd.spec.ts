@@ -14,6 +14,7 @@
 // 两种视口尺寸：1440×900 走完整往返，1920×1080 核对接入与资料页可用、没有横向滚动。
 
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { join } from "node:path";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
 // 每条用例接入的项目名各不相同：projectId() 按名称取第一个，同名会让后一条用例取到前一条
@@ -208,6 +209,31 @@ test.describe("初始 PRD 的修改往返（1440×900）", () => {
       // 回答以后这个数字要跟着少，不刷新页面
       await expect(page.locator(".topbar .status-item").filter({ hasText: "待你决定：" })).toHaveText("待你决定：无");
       expect(MODEL_CALLS_PER_PROJECT).toBe(12);
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+    }
+  });
+});
+
+test.describe("初始 PRD 的对应声明（1440×900）", () => {
+  test("1440×900：初始 PRD 的卡片逐条显示要求与验收标准的对应声明", async () => {
+    // 工单 #1349：决定卡片显示每条要求对应的验收标准位置，写不出验收标准的显示 gap 原因；
+    // 设了 YUDAO_PRD_MAPPING_SHOT_DIR 时把卡片截下来作为验收截图
+    const project = "对应声明";
+    test.setTimeout(300_000);
+    const client = await openClient({ width: 1440, height: 900 });
+    const errors = watchErrors(client);
+    const page = client.page;
+    try {
+      await onboardAndWaitFirstCard(page, project);
+      const card = overviewCard(page);
+      await expect(card).toContainText("要求 1");
+      await expect(card).toContainText("AC1");
+      const shotDir = process.env.YUDAO_PRD_MAPPING_SHOT_DIR;
+      if (shotDir) {
+        await card.screenshot({ path: join(shotDir, "initial-prd-mapping-1349.png") });
+      }
       expect(errors).toEqual([]);
     } finally {
       await client.close();

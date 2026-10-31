@@ -29,15 +29,14 @@ APP_BYTES = "print('hello')\n".encode("utf-8")
 BIN_BYTES = bytes(range(256))
 HIDDEN_BYTES = b"\x00\xff\xfe\r\n"
 
-# 这个文件里等 run 结束的墙钟上限：集成的 WAIT_FOR_HOST_WORK_SEC 是 300 秒，与 CI 给每条集成层用例的
-# 300 秒上限相等（根 conftest.py 的 TIMEOUTS[INTEGRATION]），两处一样时卡住的是 pytest-timeout 而不是
-# 用例自己的等待（工单 #1250 的登记）。150 秒仍远大于本机几秒的正常用时（工单 #1274）
-WAIT_LIMIT = min(WAIT_FOR_HOST_WORK_SEC, 150.0)
+# 这个文件里等 run 结束的墙钟上限，取集中的等待上限（harness/tests/wait_limits.py）：
+# 它比集成层给每条用例的上限短，卡住时在这里报成一条失败，不等 pytest-timeout 结束整个 worker
+WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
 
 
 def _run_to_end(system, run_id):
     # 一步一步驱动这个 run 到终态：等待由终态决定，不靠固定时长。到 WAIT_LIMIT 还没有终态时在这里报成
-    # 一条失败（150 秒小于集成层给每条用例的 300 秒），不会等到 pytest-timeout 结束整个 worker。
+    # 一条失败，不会等到 pytest-timeout 结束整个 worker。
     # 假模型的脚本用尽会让 run 以 provider_error 结束，那不是业务失败（工单 #1274）：单独报出来
     deadline = time.monotonic() + WAIT_LIMIT
     result = system.project(run_id)

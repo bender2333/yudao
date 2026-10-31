@@ -19,6 +19,7 @@ from threading import Event
 import pytest
 
 from harness import assembly_contract, execution_contract
+from harness.definitions import DEFINITIONS
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.assembly import ContextAssembly, model_limits
 from harness.engine import StepDriver, StepLimits
@@ -87,7 +88,8 @@ def _frame(system, run_id, work_ref=None):
         department="product", session_id=request.scope.session_id,
         activation_id=request.scope.activation_id, prompt=prompt,
         effective_contract_hash=request.scope.basis.effective_contract_hash,
-        input_version=request.scope.basis.input_version, work_ref=work_ref)
+        input_version=request.scope.basis.input_version, definitions=DEFINITIONS,
+        work_ref=work_ref)
 
 
 def _assembly(name, system):

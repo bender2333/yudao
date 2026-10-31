@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import re
 from typing import Any
+from urllib.parse import urlsplit
 
 from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .watched_outputs import has_new_work, is_working
 from .contracts import normalize_scope
 from .coverage import coverage_report, method_is_executable, open_criteria
-from .definitions import Definitions
+from .definitions import DEFINITIONS, Definitions
 from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS
 from .models import TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
 from .tools import in_force, offers_with_input, proposal_kind, proposal_kinds, tool_action, tools_for
@@ -314,7 +315,7 @@ class WatchedOutputsTightening:
         # 工程不再填清单——三份真实交付的清单只写了「这次改的那个文件」，用户按清单下载拿不全成果。
         files = sorted(item.replace("\\", "/") for item in facts.files)
         checks = [outcome.receipts[name] for name in proposal["check_names"] if name in outcome.receipts]
-        return Tightened(content={
+        content: dict[str, Any] = {
             "summary": proposal["summary"].strip(),
             "files": files,
             "check_names": list(proposal["check_names"]),
@@ -323,7 +324,12 @@ class WatchedOutputsTightening:
             "product_spec_hash": spec_hash,
             "effective_contract_hash": contract_hash,
             "code_tree_digest": facts.digest,
-        })
+        }
+        launch = _launch_content(proposal.get("launch"))
+        if launch is not None:
+            # 启动方式属于交付说明的事实部分（工单 #148）：随 delivery_accepted 写出，旧交付没有这一项
+            content["launch"] = launch
+        return Tightened(content=content)
 
     def _review(self, request: TightenRequest) -> Tightened:
         # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象；
@@ -619,6 +625,7 @@ def _schema_errors(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
             _require_text(proposal, "summary")
             + _require_string_list(proposal, "check_names", min_items=1)
             + _optional_string_list(proposal, "known_risks")
+            + _launch_errors(proposal)
         )
     if kind == "qa_review":
         errors = _require_text(proposal, "rationale")
@@ -1166,3 +1173,98 @@ def _optional_string_list(payload: dict[str, Any], field: str) -> list[FieldErro
     if any(not isinstance(item, str) or not item.strip() for item in value):
         return [FieldError(field, f"{field} items must be non-empty strings")]
     return []
+
+
+# 交付说明的启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #148）：可选，需要试用的每个入口一项
+_LAUNCH_FIELDS = frozenset({"name", "kind", "commands", "ready_url", "ready_timeout_sec"})
+_LAUNCH_KINDS = frozenset({"web", "desktop"})
+_LAUNCH_SYSTEMS = frozenset({"windows", "linux"})
+
+
+def _launch_errors(proposal: dict[str, Any]) -> list[FieldError]:
+    # launch 的形状与第 3.3 节的五项核对：名称不重复、种类是 web 或 desktop、commands 至少一项且键是
+    # windows 或 linux、网页应用有本机 http 地址且带 {port}、桌面程序没有 ready_url、就绪时限不超过上限
+    raw = proposal.get("launch")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        return [FieldError("launch", "launch must be a list of launch methods")]
+    errors: list[FieldError] = []
+    names: list[str] = []
+    for index, item in enumerate(raw):
+        prefix = f"launch[{index}]"
+        if not isinstance(item, dict):
+            errors.append(FieldError(prefix, "a launch method must be an object"))
+            continue
+        errors.extend(FieldError(f"{prefix}.{key}", "unknown field")
+                      for key in sorted(set(item) - _LAUNCH_FIELDS))
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            errors.append(FieldError(f"{prefix}.name", "name must be a non-empty string"))
+        else:
+            names.append(name.strip())
+        kind = item.get("kind")
+        if kind not in _LAUNCH_KINDS:
+            errors.append(FieldError(f"{prefix}.kind", "kind must be web or desktop"))
+        errors.extend(_launch_command_errors(item.get("commands"), prefix))
+        ready_url = item.get("ready_url")
+        if kind == "web":
+            problem = _ready_url_problem(ready_url)
+            if problem is not None:
+                errors.append(FieldError(f"{prefix}.ready_url", problem))
+        elif kind == "desktop" and ready_url is not None:
+            errors.append(FieldError(f"{prefix}.ready_url", "a desktop program has no ready_url"))
+        timeout = item.get("ready_timeout_sec")
+        if timeout is not None:
+            low, high = DEFINITIONS.rule("execution.readiness_timeout_sec").bounds
+            if type(timeout) is not int or not low <= timeout <= high:
+                errors.append(FieldError(
+                    f"{prefix}.ready_timeout_sec",
+                    f"ready_timeout_sec must be an integer between {int(low)} and {int(high)}"))
+    repeated = sorted({name for name in names if names.count(name) > 1})
+    if repeated:
+        errors.append(FieldError("launch", "launch names must be unique: " + ", ".join(repeated)))
+    return errors
+
+
+def _launch_command_errors(commands: Any, prefix: str) -> list[FieldError]:
+    # commands：按系统给出的 argv，至少一项，键是 windows 或 linux，每个 argv 不为空
+    if not isinstance(commands, dict) or not commands:
+        return [FieldError(f"{prefix}.commands", "commands must map at least one system to an argv list")]
+    errors: list[FieldError] = []
+    for system, argv in commands.items():
+        if system not in _LAUNCH_SYSTEMS:
+            errors.append(FieldError(f"{prefix}.commands",
+                                     f"commands keys must be windows or linux, not {system!r}"))
+        if not isinstance(argv, list) or not argv or any(not isinstance(part, str) or not part for part in argv):
+            errors.append(FieldError(f"{prefix}.commands.{system}",
+                                     "argv must be a non-empty list of non-empty strings"))
+    return errors
+
+
+def _ready_url_problem(value: Any) -> str | None:
+    # 网页应用的 ready_url：本机（127.0.0.1 或 localhost）上的 http 地址，带 {port}
+    if not isinstance(value, str) or not value:
+        return "a web app requires ready_url"
+    if "{port}" not in value:
+        return "ready_url must contain {port}"
+    parsed = urlsplit(value.replace("{port}", "1"))
+    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost"}:
+        return "ready_url must be an http URL on 127.0.0.1 or localhost"
+    return None
+
+
+def _launch_content(raw: Any) -> list[dict[str, Any]] | None:
+    # 通过核对以后写进交付说明的内容：五项照原样，名称去掉首尾空白；没有 launch 时为 None
+    if raw is None:
+        return None
+    methods: list[dict[str, Any]] = []
+    for item in raw:
+        methods.append({
+            "name": str(item["name"]).strip(),
+            "kind": item["kind"],
+            "commands": {system: [str(part) for part in argv] for system, argv in item["commands"].items()},
+            "ready_url": item.get("ready_url"),
+            "ready_timeout_sec": item.get("ready_timeout_sec"),
+        })
+    return methods

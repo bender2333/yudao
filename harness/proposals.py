@@ -77,15 +77,20 @@ def delivery(
     check_names: list[str] | None = None,
     known_risks: list[str] | None = None,
     basis_product_spec_hash: str | None = None,
+    launch: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    # 交付的文件清单由主机从封存的交付快照得出，工程不再填（工单 #677）
-    return {
+    # 交付的文件清单由主机从封存的交付快照得出，工程不再填（工单 #677）；
+    # 启动方式是可选的（工单 #148），给了才写进提案
+    proposal = {
         "kind": "delivery_spec",
         "summary": summary,
         "check_names": check_names or ["smoke"],
         "known_risks": known_risks or [],
         "basis_product_spec_hash": basis_product_spec_hash,
     }
+    if launch is not None:
+        proposal["launch"] = launch
+    return proposal
 
 
 
@@ -258,6 +263,7 @@ def delivery_turn(
     checks: dict[str, int | dict[str, Any]] | None = None,
     basis_product_spec_hash: str | None = None,
     known_risks: list[str] | None = None,
+    launch: list[dict[str, Any]] | None = None,
     transcript: str = "",
 ) -> Callable[[Any], FakeTurn]:
     # 返回按请求里的当前 ProductSpec 填依据版本的假模型轮次（工单 #471）：
@@ -272,7 +278,7 @@ def delivery_turn(
             declared = json.loads(raw).get("content_hash") if raw else None
         return FakeTurn(
             proposal=delivery(summary, check_names=list(checks), known_risks=known_risks,
-                              basis_product_spec_hash=declared),
+                              basis_product_spec_hash=declared, launch=launch),
             writes=files,
             checks=checks,
             transcript=transcript,

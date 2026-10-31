@@ -14,12 +14,9 @@ ONBOARDING_GOAL = "把已有项目接入 Yudao，写出初始 PRD 并核验现�
 ONBOARDING_REQUIREMENT = "print the given argument to stdout"
 
 # 轮询等待的墙钟界限只用来防止测试一直等待（#107）；run 是否按预期结束由等待之后的断言核对。
-# 集中的 WAIT_FOR_HOST_WORK_SEC 是 300 秒，与 CI 给每条集成层用例的 300 秒上限相等（根 conftest.py 的
-# TIMEOUTS[INTEGRATION]）。两处一样时卡住的是 pytest-timeout 而不是这里的等待：它在 Windows 上用线程法
-# 结束整个进程（os._exit），xdist 报 `node down: Not properly terminated`，用例记成 FAILED 而作业不再
-# 推进（工单 #1250 的登记，工单 #1255 沿用同一个做法）。这里取更短的一个，卡住就报成一条失败；
-# 150 秒仍远大于本机几秒的正常用时
-WAIT_LIMIT = min(WAIT_FOR_HOST_WORK_SEC, 150.0)
+# 上限取集中的等待上限（harness/tests/wait_limits.py）：它比集成层给每条用例的上限短，
+# 卡住时在这里报成一条失败，不等 pytest-timeout 结束整个进程（工单 #1250 的登记）
+WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
 
 
 def onboarding_source(root, *, with_failing_test: bool = False):

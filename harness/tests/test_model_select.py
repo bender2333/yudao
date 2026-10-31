@@ -45,8 +45,13 @@ def command(client, operation, **values):
     return client.post(f"/api/commands/{operation}", json={"command_id": str(uuid.uuid4()), **values})
 
 
+# 目录状态的等待窗口：一条用例里最多连等三次目录状态，每次 30 秒，加起来仍在集成层给每条用例的
+# 上限之内，所以取集中的等待上限的五分之一（harness/tests/wait_limits.py）
+CATALOG_WAIT_SEC = WAIT_FOR_HOST_WORK_SEC / 5
+
+
 def wait_catalog(client, predicate):
-    deadline = time.monotonic() + min(WAIT_FOR_HOST_WORK_SEC, 30)
+    deadline = time.monotonic() + CATALOG_WAIT_SEC
     while time.monotonic() < deadline:
         result = catalog(client)
         if predicate(result):

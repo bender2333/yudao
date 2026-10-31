@@ -317,7 +317,7 @@ class ContextAssembly:
             activation_id=frame.activation_id, step_id=step_id, prompt=frame.prompt,
             context_window=limits.context_window, max_output_tokens=limits.output_limit,
             guidance=guidance, events=events, snapshot_hash=snapshot_hash,
-            input_modalities=input_modalities,
+            input_modalities=input_modalities, definitions=frame.definitions,
         )
         return PinnedStep(projection, frame, limits, step_id, guidance, events, snapshot_hash,
                           input_modalities, context, dict(call_target or {}))
@@ -352,7 +352,7 @@ class ContextAssembly:
                 context_window=limits.context_window, max_output_tokens=limits.output_limit,
                 guidance=pinned.guidance,
                 events=pinned.events, snapshot_hash=pinned.snapshot_hash,
-                input_modalities=pinned.input_modalities,
+                input_modalities=pinned.input_modalities, definitions=frame.definitions,
             )
         payload: dict[str, Any] = {"input": context.input_items, "tools": context.tools}
         if context.manifest.max_output_tokens is not None:

@@ -39,6 +39,7 @@ def _rebuild_recorded_steps(system, run_id):
                 prompt=prompt,
                 effective_contract_hash=payload["effective_contract_hash"],
                 input_version=payload["input_version"],
+                definitions=DEFINITIONS,
             )
         elif event.type == EventType.CONTEXT_ASSEMBLED:
             before = events[:index]

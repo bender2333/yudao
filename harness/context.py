@@ -13,7 +13,7 @@ from .contracts import artifact_hash
 from .providers.invoke import ToolImage, tool_image_part, tool_text_part
 from .watched_outputs import has_new_baseline_review
 from .artifacts import ArtifactStore
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, Definitions
 from .event_store import EventStore
 from .models import (
     ArtifactRef,
@@ -74,14 +74,15 @@ def evidence_placeholder(evidence: str) -> str:
     return f"截图 {evidence} 已保存为证据"
 
 
-def frozen_visibility(projection: RunProjection, department: str) -> tuple[str, ...]:
+def frozen_visibility(projection: RunProjection, department: str,
+                      definitions: Definitions | None = None) -> tuple[str, ...]:
     # 三条 roles.<部门>.visibility 在建 run 时冻结（工单 #1189）：上下文装配只读这一份；
-    # 旧 run 的事件没有冻结字典时按定义初值解释（不取参数现值，也不取较新的定义）
+    # 旧 run 的事件没有冻结字典时按这一份定义的初值解释（不取参数现值，也不取较新的定义）
     from .parameters import frozen_run_parameters
 
     declared = frozen_run_parameters(projection).get(f"roles.{department}.visibility")
     if declared is None:
-        return tuple(DEFINITIONS.role(department).visibility)
+        return tuple((definitions or DEFINITIONS).role(department).visibility)
     return tuple(str(item) for item in declared)
 
 
@@ -257,7 +258,11 @@ class ContextAssembler:
                  guidance: list[DepartmentGuidance] | None = None,
                  events: list[Any] | None = None,
                  snapshot_hash: str | None = None,
-                 input_modalities: tuple[str, ...] = ("text",)) -> AssembledContext:
+                 input_modalities: tuple[str, ...] = ("text",),
+                 definitions: Definitions | None = None) -> AssembledContext:
+        # 这次装配按哪一份定义取工具清单、部门说明、提案合同与工具 schema（工单 #1098 的副本、#1175 第 7 轮）：
+        # 交了就按它，没交就是模块加载时的那一份
+        definitions = definitions or DEFINITIONS
         effective_window = context_window if context_window is not None else DEFAULT_CONTEXT_WINDOW
         if (not isinstance(effective_window, int) or isinstance(effective_window, bool)
                 or effective_window < 1):
@@ -274,15 +279,17 @@ class ContextAssembler:
         if any(item.department != department for item in guidance_items):
             raise ValueError("department guidance must belong to the activated department")
         tool_names = offered_tools(projection, department, tightening=self.tightening,
-                                   session_id=session_id, input_modalities=input_modalities)
+                                   session_id=session_id, input_modalities=input_modalities,
+                                   definitions=definitions)
         # 全体角色共同的规则文字取自定义；本角色的可见范围读这个 run 冻结的取值（工单 #1189）
-        rules = DEFINITIONS.organization.rules
-        visible = frozen_visibility(projection, department)
+        rules = definitions.organization.rules
+        visible = frozen_visibility(projection, department, definitions)
         current_delivery = projection.delivery_spec
         if current_delivery is not None and current_delivery.status != "active":
             current_delivery = None
         # 质检请求里可以放入的工程内容（工单 #554）：事实部分总在，解释部分看质检有没有对当前交付下结论
-        engineering = (quality_engineering_content(events or [], delivery=current_delivery)
+        engineering = (quality_engineering_content(events or [], delivery=current_delivery,
+                                                  definitions=definitions)
                        if department == "quality" else None)
         # 这个会话要回答的那一次询问：询问分支看自己那一次（一个部门可以同时有几个分支，工单 #559），
         # 主线会话沿用询问链上最内层的那一次
@@ -357,8 +364,8 @@ class ContextAssembler:
                     for item in guidance_items
                 ]),
             ))
-        work = DEFINITIONS.department_work(department, projection.kind)
-        work_text = work.prompt if work is not None else DEFINITIONS.role(department).prompt
+        work = definitions.department_work(department, projection.kind)
+        work_text = work.prompt if work is not None else definitions.role(department).prompt
         parts.extend([
             ContextPart("department_rules", str(prompt.version), prompt.text),
             ContextPart("work_item_guidance", projection.kind, work_text),
@@ -369,7 +376,7 @@ class ContextAssembler:
             ContextPart("input_handling", None, rules.input_handling),
             ContextPart("professional_completion", None, rules.professional_completion),
             ContextPart("collaboration_rules", None, rules.collaboration_rules),
-            ContextPart("proposal_contract", department, json_dumps(DEFINITIONS.proposal_contract(department, projection.kind))),
+            ContextPart("proposal_contract", department, json_dumps(definitions.proposal_contract(department, projection.kind))),
             ContextPart("binding_refs", None, json_dumps(_binding_refs(projection, department))),
             ContextPart("allowed_tools", department, json_dumps(tool_names)),
         ])
@@ -433,7 +440,7 @@ class ContextAssembler:
             )
         if current_delivery is not None and "current_delivery_spec" in visible:
             payload = (engineering["delivery"] if engineering is not None
-                       else _delivery_payload(current_delivery))
+                       else _delivery_payload(current_delivery, definitions=definitions))
             parts.append(
                 ContextPart(
                     "current_delivery_spec",
@@ -444,10 +451,10 @@ class ContextAssembler:
         elif current_delivery is None and "prior_delivery" in visible:
             prior = _prior_delivery_for_repair(projection)
             if prior is not None:
-                payload = _delivery_payload(prior, purpose="repair_basis")
+                payload = _delivery_payload(prior, purpose="repair_basis", definitions=definitions)
                 if engineering is not None and not engineering["explanation_visible"]:
                     # 新的交付还没有结论：此前全部工程内容的解释部分都重新藏起来（工单 #554）
-                    for field in _delivery_explanation_fields():
+                    for field in _delivery_explanation_fields(definitions):
                         payload.pop(field, None)
                 parts.append(
                     ContextPart(
@@ -483,7 +490,7 @@ class ContextAssembler:
         tools = [
             {"type": "function", "name": item["name"], "description": item["description"],
              "parameters": item["parameters"], "strict": False}
-            for item in tool_definitions(tool_names)
+            for item in tool_definitions(tool_names, definitions=definitions)
         ]
         if history:
             parts.append(ContextPart("department_history", department, json_dumps(history)))
@@ -720,7 +727,8 @@ def _decision_payload(item: ProductDecision) -> dict[str, Any]:
 
 
 def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None,
-                      explanation_visible: bool = True) -> dict[str, Any]:
+                      explanation_visible: bool = True,
+                      definitions: Definitions | None = None) -> dict[str, Any]:
     payload = {
         "check_names": delivery.check_names,
         "checks": delivery.checks,
@@ -732,6 +740,8 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None,
         "created_event_id": delivery.created_event_id,
         "invalidation_reason": delivery.invalidation_reason,
         "known_risks": delivery.known_risks,
+        # 启动方式属于事实部分（工单 #148）：质检按它开始试用会话
+        "launch": delivery.launch,
         "product_spec_hash": delivery.product_spec_hash,
         "effective_contract_hash": delivery.effective_contract_hash,
         "revision": delivery.revision,
@@ -742,19 +752,20 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None,
         payload["purpose"] = purpose
     if not explanation_visible:
         # 解释部分还没有到质检看的时候：只留事实部分（工单 #554）
-        for field in _delivery_explanation_fields():
+        for field in _delivery_explanation_fields(definitions):
             payload.pop(field, None)
     return payload
 
 
-def _delivery_explanation_fields() -> tuple[str, ...]:
-    # 交付说明里属于解释部分的字段：提案合同里标明（工单 #554）
-    contract = DEFINITIONS.proposal_contracts.roles["engineering"].kinds["delivery_spec"]
+def _delivery_explanation_fields(definitions: Definitions | None = None) -> tuple[str, ...]:
+    # 交付说明里属于解释部分的字段：提案合同里标明（工单 #554）；按这次激活使用的定义取（#1175 第 7 轮）
+    contract = (definitions or DEFINITIONS).proposal_contracts.roles["engineering"].kinds["delivery_spec"]
     parts = contract.get("parts") or {}
     return tuple(str(field) for field in parts.get("explanation") or ())
 
 
-def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec | None = None) -> dict[str, Any]:
+def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec | None = None,
+                                definitions: Definitions | None = None) -> dict[str, Any]:
     # 质检请求里可以放入的工程内容（工单 #554、#358，验证的独立性设计说明第 4 节）：
     # 事实部分总在；解释部分在核验角色提交了当前交付的独立判断（independent_judgement_committed）
     # 以后进入它之后的请求——先判断后看解释，解释不再等质检的结论；新的交付到达后按新交付重新计算：
@@ -802,7 +813,7 @@ def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec |
     return {
         "explanation_visible": explanation_visible,
         "delivery": None if delivery is None else _delivery_payload(
-            delivery, explanation_visible=explanation_visible),
+            delivery, explanation_visible=explanation_visible, definitions=definitions),
         "questions": questions,
         "answers": answers,
         # 问答的解释部分：质检对当前交付下结论以后进入它之后的请求（工单 #554）

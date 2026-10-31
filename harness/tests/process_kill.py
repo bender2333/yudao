@@ -55,11 +55,9 @@ from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 # 子进程启动、超时与等待退出的上限；真实进程要走文件系统与进程表，比内存里的操作慢。
-# 上限取 150 秒，不取集中的 300 秒（工单 #1250 的登记，工单 #1255 沿用同一个做法）：300 秒与 CI 给每条
-# 集成层用例的 300 秒上限相等（根 conftest.py 的 TIMEOUTS[INTEGRATION]），到点时 pytest-timeout 在 Windows
-# 上用线程法结束整个进程（os._exit），xdist 报 `node down: Not properly terminated`，中断点没有到达时
-# 由这里的 TimeoutError 报成一条失败。150 秒仍远大于本机几秒的正常用时
-STARTUP_TIMEOUT_SEC = min(WAIT_FOR_HOST_WORK_SEC, 150.0)
+# 上限取集中的等待上限（harness/tests/wait_limits.py）：它比集成层给每条用例的上限短，
+# 到点时由这里的 TimeoutError 报成一条失败，不等 pytest-timeout 结束整个进程
+STARTUP_TIMEOUT_SEC = WAIT_FOR_HOST_WORK_SEC
 _TURN_FACTORIES = {"product_spec": product_spec_turn, "delivery_spec": delivery_turn,
                    "qa_review": review_turn, "independent_judgement": judgement_turn}
 # 工厂自己按请求取依据版本，字段名与 shape 也不一样：这几项不进工厂参数

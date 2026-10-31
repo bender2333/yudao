@@ -2490,6 +2490,83 @@
         }
       }
     },
+    "/api/queries/event.positions": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "event.positions",
+        "operationId": "query_event_positions",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "positions",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              },
+              "title": "Positions"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_EventPositionsResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/department.workspace": {
       "get": {
         "tags": [
@@ -3548,6 +3625,64 @@
         }
       }
     },
+    "/api/queries/acceptance.coverage": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "acceptance.coverage",
+        "operationId": "query_acceptance_coverage",
+        "parameters": [
+          {
+            "name": "at",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "At"
+            }
+          },
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_AcceptanceCoverageResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/catalog": {
       "get": {
         "tags": [
@@ -4097,6 +4232,67 @@
   },
   "components": {
     "schemas": {
+      "AcceptanceCoverageResult": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "verdict": {
+            "type": "string",
+            "title": "Verdict"
+          },
+          "review_event_id": {
+            "type": "string",
+            "title": "Review Event Id"
+          },
+          "revision": {
+            "type": "integer",
+            "title": "Revision"
+          },
+          "numbers": {
+            "$ref": "#/components/schemas/CoverageNumbers"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/CoverageCriterion"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "open_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Open Criteria"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "work_item_id",
+          "verdict",
+          "review_event_id",
+          "revision",
+          "numbers",
+          "criteria",
+          "open_criteria"
+        ],
+        "title": "AcceptanceCoverageResult"
+      },
       "Accepted_CatalogConnectionSaveRefs_": {
         "properties": {
           "command_id": {
@@ -7259,6 +7455,84 @@
         ],
         "title": "CommandCapability"
       },
+      "CoverageCriterion": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "passed",
+              "failed",
+              "unverified"
+            ],
+            "title": "Result"
+          },
+          "executable": {
+            "type": "boolean",
+            "title": "Executable"
+          },
+          "open": {
+            "type": "boolean",
+            "title": "Open"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criterion",
+          "method",
+          "result",
+          "executable",
+          "open"
+        ],
+        "title": "CoverageCriterion"
+      },
+      "CoverageNumbers": {
+        "properties": {
+          "criteria_total": {
+            "type": "integer",
+            "title": "Criteria Total"
+          },
+          "executable": {
+            "type": "integer",
+            "title": "Executable"
+          },
+          "covered": {
+            "type": "integer",
+            "title": "Covered"
+          },
+          "coverage_ratio": {
+            "type": "number",
+            "title": "Coverage Ratio"
+          },
+          "model_reading": {
+            "type": "integer",
+            "title": "Model Reading"
+          },
+          "open": {
+            "type": "integer",
+            "title": "Open"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criteria_total",
+          "executable",
+          "covered",
+          "coverage_ratio",
+          "model_reading",
+          "open"
+        ],
+        "title": "CoverageNumbers"
+      },
       "CredentialClearOverride": {
         "properties": {
           "command_id": {
@@ -8625,6 +8899,173 @@
         ],
         "title": "EffectiveModel"
       },
+      "EventAtPosition": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "missing"
+            ],
+            "title": "Status"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "out_of_range",
+                  "archived",
+                  "compacted",
+                  "not_in_stream"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "event_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Id"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "actor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor"
+          },
+          "actor_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Label"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "department_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department Label"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "stream": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stream"
+          },
+          "payload": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payload"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "status"
+        ],
+        "title": "EventAtPosition"
+      },
       "EventDetailResult": {
         "properties": {
           "event": {
@@ -8645,6 +9086,31 @@
           "artifacts"
         ],
         "title": "EventDetailResult"
+      },
+      "EventPositionsResult": {
+        "properties": {
+          "streams": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Streams"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/EventAtPosition"
+            },
+            "type": "array",
+            "title": "Events"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "streams",
+          "events"
+        ],
+        "title": "EventPositionsResult"
       },
       "ExternalSourceEvidenceResult": {
         "properties": {
@@ -9227,6 +9693,30 @@
               }
             ],
             "title": "Summary"
+          },
+          "requirements": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Requirements",
+            "default": []
+          },
+          "acceptance_criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Acceptance Criteria",
+            "default": []
+          },
+          "requirement_mapping": {
+            "items": {
+              "$ref": "#/components/schemas/RequirementMapping"
+            },
+            "type": "array",
+            "title": "Requirement Mapping",
+            "default": []
           }
         },
         "additionalProperties": false,
@@ -12195,6 +12685,39 @@
         ],
         "title": "ReportItem"
       },
+      "RequirementMapping": {
+        "properties": {
+          "requirement": {
+            "type": "integer",
+            "title": "Requirement"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Criteria",
+            "default": []
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gap"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requirement"
+        ],
+        "title": "RequirementMapping"
+      },
       "ReviewEntry": {
         "properties": {
           "event_id": {
@@ -13235,6 +13758,24 @@
         ],
         "title": "RuntimeStartDrain"
       },
+      "Snapshot_AcceptanceCoverageResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AcceptanceCoverageResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[AcceptanceCoverageResult]"
+      },
       "Snapshot_AwayReport_": {
         "properties": {
           "position": {
@@ -13378,6 +13919,24 @@
           "data"
         ],
         "title": "Snapshot[EventDetailResult]"
+      },
+      "Snapshot_EventPositionsResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EventPositionsResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[EventPositionsResult]"
       },
       "Snapshot_ExternalSourceEvidenceResult_": {
         "properties": {
@@ -21739,6 +22298,13 @@
             "title": "Known Risks",
             "type": "array"
           },
+          "launch": {
+            "items": {
+              "$ref": "#/components/schemas/LaunchMethodPayload"
+            },
+            "title": "Launch",
+            "type": "array"
+          },
           "product_spec_hash": {
             "title": "Product Spec Hash",
             "type": "string"
@@ -24377,6 +24943,62 @@
           "payload"
         ],
         "title": "InstanceUpgradeWithdrawnEvent",
+        "type": "object"
+      },
+      "LaunchMethodPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "web",
+              "desktop"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "commands": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "title": "Commands",
+            "type": "object"
+          },
+          "ready_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Url"
+          },
+          "ready_timeout_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Timeout Sec"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "commands"
+        ],
+        "title": "LaunchMethodPayload",
         "type": "object"
       },
       "LessonCandidateRecordedEvent": {
@@ -32816,39 +33438,6 @@
           "activation_id"
         ],
         "title": "QaTestsSavedPayload",
-        "type": "object"
-      },
-      "RequirementMapping": {
-        "additionalProperties": false,
-        "properties": {
-          "requirement": {
-            "title": "Requirement",
-            "type": "integer"
-          },
-          "criteria": {
-            "default": [],
-            "items": {
-              "type": "string"
-            },
-            "title": "Criteria",
-            "type": "array"
-          },
-          "gap": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Gap"
-          }
-        },
-        "required": [
-          "requirement"
-        ],
-        "title": "RequirementMapping",
         "type": "object"
       },
       "ReviewObservation": {

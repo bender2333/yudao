@@ -71,6 +71,22 @@ def modifier_name(value: Any) -> str:
     return text
 
 
+# 提出者（事件对象第 5.2 节的 actor，工单 #1342）：部门的事件写部门名，用户与主机各写各的，
+# 认不出的标识原样写（不编一个说法）
+def actor_name(actor: Any) -> str:
+    text = str(actor or "")
+    kind, _, value = text.partition(":")
+    if kind == "department":
+        return department_name(value)
+    if kind == "user":
+        return "你" if value in ("", "local") else "用户 " + value
+    if kind == "system":
+        return "系统"
+    if kind == "model":
+        return "模型" if not value else "模型 " + value
+    return text
+
+
 # 写回停止原因的中文名（工单 #347）：取值不在停止原因里，单独给中文名
 WRITEBACK_REASON_NAMES = {
     "conflict": "合并出现冲突",

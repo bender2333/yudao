@@ -2,6 +2,7 @@
 # 直接写出回复与断开连接的辅助。事件序列基准的场景、请求时限的测试与只回复文字的测试共用。
 
 import json
+import sys
 from http.server import BaseHTTPRequestHandler
 from typing import Any
 
@@ -10,8 +11,14 @@ from harness.path_rules import QA_TESTS_DIR
 from harness.proposals import delivery, judgement, product_spec, review
 from harness.tests.protocol_helpers import ScriptedProvider, send_reply, sse
 
-# 检查命令一律写成 ["python", ...]，由主机解析解释器，基准中不出现本机路径
+# 写进文件的示例内容用 ["python", ...] 开头，由主机解析解释器，基准中不出现本机路径
 ECHO = "import sys\nprint(sys.argv[1])\n"
+
+# 主机执行的检查命令：用跑测试的这个解释器（与 Fake 适配器的做法一致，harness/adapters/fake.py），
+# 不写 PATH 上的 python。PATH 上的 python 是本机环境的一部分：本机上它不可用时这条检查以非零退出，
+# 质检的放行结论因此被拒，质检再问一轮、脚本用完，那次运行会以「模型服务连不上」结束，
+# 事件序列基准就会记下一次依赖环境的失败（工单 #1371）。命令本身不进基准与快照（args 与回执正文不比）。
+CHECK_COMMAND = f"\"{sys.executable.replace(chr(92), '/')}\" -c \"print('smoke ok')\""
 
 
 def _submission(payload: dict[str, Any]) -> dict[str, Any]:
@@ -82,7 +89,7 @@ def http_script(body: dict[str, Any]) -> dict[str, list[list[tuple[str, dict[str
         ],
         "engineering": [
             [("write_file", {"path": "src/echo.py", "content": ECHO}),
-             ("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+             ("run_check", {"name": "smoke", "command": CHECK_COMMAND}),
              ("submit_delivery", _submission(delivery(check_names=["smoke"], basis_product_spec_hash=spec_hash)))],
         ],
         "quality": [
@@ -90,10 +97,10 @@ def http_script(body: dict[str, Any]) -> dict[str, list[list[tuple[str, dict[str
                              "content": "import sys\nprint('QA_TEST_DRAFTED')\nsys.exit(0)\n"}),
              ("submit_review", _submission(review("release", "按 PRD 起草了测试用例；还没有交付可以核验")))],
             # 交付到达以后先交独立判断，再核验并放行（先判断后看解释的门，工单 #358）
-            [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+            [("run_check", {"name": "smoke", "command": CHECK_COMMAND}),
              ("submit_independent_judgement",
               _submission(judgement(checks=["smoke"], basis_delivery_spec_hash=delivery_hash)))],
-            [("run_check", {"name": "smoke", "command": "python -c \"print('smoke ok')\""}),
+            [("run_check", {"name": "smoke", "command": CHECK_COMMAND}),
              ("submit_review", _submission(review("release", "checks passed on the current snapshot",
                                                   basis_delivery_spec_hash=delivery_hash)))],
         ],
