@@ -14,11 +14,12 @@
 
 import type { AskView, DecisionView, EventObject, ProjectLoopResult, WorkItemLoop } from "../api/generated/types.gen.ts";
 import type {
-  Artifact, BusyState, DecisionFace, FloorModel, ItemState, LoopItem, MachineView, OpenRequest, OpsView, PixelAction, RoleInfo,
-  WaitingProvider,
+  Artifact, BusyState, DecisionFace, FactElement, FloorModel, ItemState, LoopItem, MachineView, OpenRequest, OpsView,
+  PixelAction, RoleInfo, Source, SourceCardFace, SourceOverlayData, SourceRef, WaitingProvider,
 } from "../pixel/contract.ts";
-import { floorState as checkFloorState } from "../pixel/contract.ts";
+import { floorState as checkFloorState, SOURCES } from "../pixel/contract.ts";
 import { face } from "../views/decisions/card-logic.ts";
+import { DEPARTMENTS } from "../views/project/labels.ts";
 import { cut, say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
 import { itemStateOf, roleStatus } from "./tables.ts";
 
@@ -74,6 +75,33 @@ function itemState(row: WorkItemLoop): ItemState {
   return base === "working" && own === "asking" ? "asking" : base;
 }
 
+/**
+ * 楼层事实元素的中文名（工单 #398）：来源卡片与覆盖层「来源」按它显示。页面不出现内部标识，
+ * 六个元素与 project.loop 的 refs 的键一一对应（工单 #396）。
+ */
+export const FACT_LABELS: Readonly<Record<string, string>> = {
+  sign: "门牌",
+  round: "轮次",
+  elapsed: "已用时间",
+  parcel: "包裹",
+  stamp: "盖章",
+  box: "成果库的箱子",
+};
+
+/**
+ * 事项的事实元素与它们的来源（工单 #396 的 project.loop refs → 画面合同，工单 #398）：
+ * 每个元素给出它的事件位置与来源种类。没有来源的元素不出现在结果里，画面按缺来源处理
+ * （pixel/floor/render.ts 的 noSource），覆盖层「来源」据此标出。
+ */
+export function factRefs(row: WorkItemLoop): Record<string, SourceRef> {
+  const refs: Record<string, SourceRef> = {};
+  for (const key of Object.keys(FACT_LABELS)) {
+    const ref = row.refs?.[key];
+    if (ref) refs[key] = { position: ref.position, source: ref.source };
+  }
+  return refs;
+}
+
 function itemOf(row: WorkItemLoop, index: number): LoopItem {
   const departments: Record<string, BusyState> = {};
   for (const [dept, state] of Object.entries(row.departments ?? {})) {
@@ -81,6 +109,7 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     if (busy) departments[dept] = busy;
   }
   const status = itemState(row);
+  const refs = factRefs(row);
   return {
     id: row.work_item_id,
     work_item_id: row.work_item_id,
@@ -99,7 +128,225 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     queue_pos: undefined,
     waiting_provider_sec: undefined,
     ...(Object.keys(departments).length ? { departments } : {}),
+    // 事实元素与它们的来源（工单 #398）：来源卡片与覆盖层「来源」读它；没有来源的元素不在这里
+    ...(Object.keys(refs).length ? { refs } : {}),
   };
+}
+
+// ---------------------------------------------------------------------------
+// 事实来源（工单 #396 的数据、工单 #398 的画面）：来源种类与事件种类的中文名、覆盖层「来源」的数据与来源卡片
+
+/** 五种来源的中文名：覆盖层「来源」的图例与来源卡片按它显示。 */
+export const SOURCE_LABELS: Readonly<Record<Source, string>> = {
+  rule: "确定规则",
+  host_measurement: "主机测量",
+  user: "用户",
+  role_statement: "角色陈述",
+  decision_model: "决策模型",
+};
+
+/**
+ * 画面上有对应物的事实元素（门牌、包裹、成果库的箱子、信息条上的轮次与已用时间）。
+ * 盖章随质检的放行到来，画面上还没有对应物，所以覆盖层不为它标位置，只让它出现在数据里。
+ */
+export const DRAWN_FACT_ELEMENTS: readonly FactElement[] = ["sign", "parcel", "box", "round", "elapsed"];
+
+/**
+ * 事件种类的中文名：来源卡片写「事件种类」一行，页面不出现英文内部标识。
+ * 覆盖 client/tests/fixtures/event-types.json 里的每一种事件，缺一行由单元测试报出（工单 #398）。
+ */
+export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
+  action_verified: "动作核实",
+  activation_finished: "激活结束",
+  adoption_held: "暂缓采纳",
+  artifact_accepted: "成果被采纳",
+  artifact_invalidated: "成果失效",
+  ask_answered: "询问有回答",
+  ask_started: "发出询问",
+  baseline_adopted: "建档基线被采纳",
+  baseline_review_accepted: "基线核验被采纳",
+  catalog_candidates_collected: "模型候选已收集",
+  catalog_revised: "模型目录修订",
+  catalog_test_finished: "模型测试结束",
+  compaction_recorded: "上下文压缩",
+  context_assembled: "装配上下文",
+  contract_accepted: "有效合同被采纳",
+  credential_changed: "凭据变化",
+  decision_answered: "决定有回答",
+  decision_requested: "提出决定",
+  decision_withdrawn: "撤回决定",
+  deliverable_adopted: "交付物被采纳",
+  delivery_accepted: "交付被采纳",
+  department_activated: "部门开始一轮工作",
+  department_guidance_applied: "定向指导被采用",
+  department_guidance_received: "收到定向指导",
+  department_guidance_responded: "回答定向指导",
+  department_input: "把材料交给部门",
+  department_prompt_configured: "部门 Prompt 已配置",
+  home_seen: "记下查看位置",
+  initial_prd_proposed: "初始 PRD 等待确认",
+  instance_upgrade_answered: "实例升级有回答",
+  instance_upgrade_requested: "请求实例升级",
+  instance_upgrade_withdrawn: "撤回实例升级",
+  lesson_candidate_recorded: "记下经验候选",
+  material_recorded: "登记材料",
+  mcp_servers_configured: "MCP 服务器设置已保存",
+  model_attempt_failed: "模型调用失败",
+  model_attempt_finished: "模型调用完成",
+  model_message: "模型回复",
+  model_reasoning: "模型思考",
+  model_request_serialized: "记录模型请求",
+  model_requested: "向模型发出请求",
+  model_retry_scheduled: "安排模型重试",
+  model_stream_progress: "模型流式输出",
+  onboarding_revision_started: "开始新一轮建档",
+  parameter_set: "修改参数",
+  product_decision_accepted: "产品决策被采纳",
+  product_input_assigned: "用户输入分派给产品",
+  project_archived: "项目被归档",
+  project_decision_answered: "项目决定有回答",
+  project_decision_requested: "请求用户决定",
+  project_decision_withdrawn: "撤回项目决定",
+  project_goal_changed: "修改项目长期目标",
+  project_parameter_set: "修改项目参数",
+  project_pinned: "固定项目",
+  project_registered: "建立项目",
+  project_renamed: "项目改名",
+  project_restored: "恢复项目",
+  proposal_rejected: "提案被拒绝",
+  proposal_submitted: "提交提案",
+  qa_submitted: "质检提交结论",
+  qa_tests_saved: "保存质检测试材料",
+  run_continued: "运行继续",
+  run_created: "建立事项",
+  run_done: "运行结束",
+  run_failed: "运行失败",
+  run_paused: "运行暂停",
+  run_resumed: "运行自动继续",
+  runtime_drain_finished: "排空结束",
+  runtime_drain_started: "开始排空",
+  runtime_force_upgrade_requested: "请求强制升级",
+  source_directory_configured: "登记源目录",
+  spec_accepted: "产品规格被采纳",
+  spec_superseded: "产品规格被取代",
+  structure_accepted: "结构说明被采纳",
+  tool_call_required: "主机提示调用工具",
+  tool_called: "工具执行完成",
+  tool_server_probe_finished: "读取 MCP 服务器工具清单",
+  tool_skipped: "跳过工具",
+  tool_started: "开始执行工具",
+  user_input_received: "收到用户输入",
+  work_item_created: "建立事项",
+  work_item_start_failed: "事项未能开始",
+  writeback_completed: "写回完成",
+  writeback_held: "写回等待前项",
+  writeback_not_needed: "无需写回",
+  writeback_stopped: "写回停止",
+  writeback_verified: "写回已核实",
+};
+
+/** 一种事件的中文种类名；没有登记时为空（卡片不显示英文的内部标识，改为不写这一行）。 */
+export function eventKindLabel(type: string | null | undefined): string | null {
+  if (!type) return null;
+  return EVENT_KIND_LABELS[type] ?? null;
+}
+
+/** 一条事件的提出者写成页面的说法：部门名、你、系统。 */
+export function actorLabel(actor: string | null | undefined): string | null {
+  if (!actor) return null;
+  const [kind, value] = actor.split(":", 2);
+  if (kind === "department") return `${DEPARTMENTS[value]?.name ?? value}部门`;
+  if (kind === "user") return "你";
+  if (kind === "system") return "系统";
+  if (kind === "model") return "模型";
+  return null;
+}
+
+/**
+ * 覆盖层「来源」的数据（工单 #398）：每个事项的每个画出来的事实元素一行，写来源种类与来源事件的位置；
+ * `project.loop` 给了 refs、这个元素却没有的算缺来源（画面按 noSource 标出）。
+ * 图例数五种来源各在画面上有几个事实元素（缺来源的不计）。
+ */
+export function sourceOverlay(loop: ProjectLoopResult | null): SourceOverlayData {
+  const entries: SourceOverlayData["entries"] = [];
+  const missing: SourceOverlayData["missing"] = [];
+  for (const row of loop?.work_items ?? []) {
+    const refs = row.refs ?? {};
+    for (const element of DRAWN_FACT_ELEMENTS) {
+      const label = FACT_LABELS[element];
+      const ref = refs[element];
+      if (ref) {
+        entries.push({ work_item_id: row.work_item_id, element, label, source: ref.source, position: ref.position });
+      } else if (Object.keys(refs).length > 0) {
+        // refs 在、这个元素不在：这个元素缺来源（没有 refs 的旧数据照常画，不算缺来源，见 render.ts 的 noSource）
+        missing.push({ work_item_id: row.work_item_id, element, label });
+      }
+    }
+  }
+  const legend: SourceOverlayData["legend"] = SOURCES.map((source) => ({
+    source,
+    label: SOURCE_LABELS[source],
+    count: entries.filter((entry) => entry.source === source).length,
+  }));
+  return { entries, missing, legend };
+}
+
+/** 来源卡片要读的原始事件：`event.detail` 或事件流给出的事件对象里用到的那几个字段。 */
+export interface SourceEvent {
+  type?: string | null;
+  label?: string | null;
+  at?: string | null;
+  actor?: string | null;
+  position?: number | null;
+  payload?: Record<string, unknown> | null;
+}
+
+/**
+ * 来源卡片的内容（工单 #398，原型 v10 设计说明第 5.1 节）：事实元素、来源种类、原始事件（说明、种类、
+ * 时间、提出者与位置）与一段上下文摘要。原始事件取不到时写明原因，卡片仍指向它在时间轴上的位置。
+ */
+export function sourceCard(
+  row: WorkItemLoop,
+  element: FactElement,
+  ref: { position: number; source: Source },
+  event: SourceEvent | null,
+): SourceCardFace {
+  const payload = event?.payload ?? null;
+  return {
+    work_item_id: row.work_item_id,
+    element,
+    element_label: FACT_LABELS[element],
+    source: ref.source,
+    source_label: SOURCE_LABELS[ref.source],
+    position: ref.position,
+    event_label: event?.label ?? null,
+    kind_label: eventKindLabel(event?.type),
+    at: event?.at ?? null,
+    actor_label: actorLabel(event?.actor),
+    detail: detailRows(row, payload),
+    note: event === null
+      ? `原始事件的说明没有取到；在时间轴上回到第 ${ref.position} 位，可以看到它影响的那一刻`
+      : null,
+  };
+}
+
+/** 上下文摘要：事项本身的两项事实与原始事件载荷里能当成文字读的几项。 */
+function detailRows(row: WorkItemLoop, payload: Record<string, unknown> | null): { term: string; value: string }[] {
+  const rows: { term: string; value: string }[] = [
+    { term: "事项", value: row.sign },
+    { term: "轮次", value: `第 ${row.round} 轮` },
+  ];
+  const text = (value: unknown): string | null =>
+    (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
+  const summary = text(payload?.summary);
+  if (summary) rows.push({ term: "摘要", value: summary });
+  const description = text(payload?.description);
+  if (description) rows.push({ term: "说明", value: description });
+  const question = text(payload?.question);
+  if (question) rows.push({ term: "问题", value: question });
+  const path = text(payload?.path);
+  if (path) rows.push({ term: "文件", value: path });
+  return rows;
 }
 
 /** 未回答的询问：信件停在被询问部门的传信管出口（原型 v13 core.js 的 openRequests）。 */

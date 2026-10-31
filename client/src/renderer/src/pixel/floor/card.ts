@@ -10,9 +10,169 @@ import { PAL, PIXEL_FONT_STACK } from "../registry.ts";
 import { mix } from "../grid.ts";
 import { LINK_HIT_PAD, hitRect } from "./card-hit.ts";
 import { R, RB } from "./render.ts";
+import { SOURCE_PEN } from "./render.ts";
 import type { DecisionFace } from "../world/types.ts";
+import type { SourceCardFace } from "../contract.ts";
 
 export type { DecisionFace };
+
+// ---------------------------------------------------------------------------
+// 来源卡片（工单 #398，原型 v10 设计说明第 5.1 节）：点画面上的事实元素，一张小纸贴在画面上，
+// 写这个元素的事实来自哪种来源、哪条事件与一段上下文摘要；「在时间轴上查看」跳到来源事件的位置。
+// 文字全部由翻译层写好（pixel/contract.ts 的 SourceCardFace），这里只画。
+
+/** 来源卡片的位置与大小（画面逻辑坐标）：比决定卡片小一些，贴在画面中间偏上。 */
+const SOURCE_PAPER = { x: 120, y: 34, w: 400, h: 224 };
+const SOURCE_LABEL_W = 64;
+
+export interface SourceCardOptions {
+  W: number;
+  H: number;
+  /** 点「在时间轴上查看」时调用：跳到来源事件的全局位置。 */
+  onGoto?: (position: number) => void;
+}
+
+export interface SourceCard {
+  /** 显示一张来源卡片（替换原来那张）。 */
+  show(face: SourceCardFace): void;
+  close(): void;
+  isOpen(): boolean;
+  face(): SourceCardFace | null;
+  /** 每帧在最上层画；同时收集这一帧的可点击区域。 */
+  draw(c: CanvasRenderingContext2D): void;
+  /** 画面逻辑坐标；卡片打开时处理点击并返回 true（点在纸的外面是关上）。 */
+  click(x: number, y: number): boolean;
+  /** 鼠标在可点击区域上返回 'pointer'。 */
+  cursor(x: number, y: number): string | null;
+  /** 测试读取：当前画出的内容与这一帧的可点击区域。 */
+  inspect(): { face: SourceCardFace | null; hits: CardHit[] };
+}
+
+/** 建立一张来源卡片：内容来自翻译层写好的 face，画到给定的 2D 画布上。 */
+export function createSourceCard(canvas: HTMLCanvasElement, opts: SourceCardOptions): SourceCard {
+  let current: SourceCardFace | null = null;
+  let hits: CardHit[] = [];
+  let wrapCache: Record<string, string[]> = {};
+
+  function wrap(c: CanvasRenderingContext2D, str: string, maxW: number, size: number, weight: number): string[] {
+    const key = `${maxW}|${size}|${weight}|${str}`;
+    if (wrapCache[key]) return wrapCache[key];
+    if (Object.keys(wrapCache).length > 200) wrapCache = {};
+    const lines: string[] = [];
+    let cur = "";
+    for (const ch of Array.from(String(str))) {
+      if (ch === "\n") {
+        lines.push(cur);
+        cur = "";
+        continue;
+      }
+      if (cur && measure(c, cur + ch, size, weight) > maxW) {
+        lines.push(cur);
+        cur = ch;
+      } else {
+        cur += ch;
+      }
+    }
+    if (cur || !lines.length) lines.push(cur);
+    wrapCache[key] = lines;
+    return lines;
+  }
+
+  function button(c: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, text: string,
+                  act: CardHit["act"]): void {
+    RB(c, x, y, w, h, PAL.white);
+    R(c, x + 1, y + 1, w - 2, 1, mix(PAL.white, PAL.white, 0.35));
+    drawText(c, text, x + w / 2, y + h / 2 + 0.5, { size: 6.5, weight: 700, align: "center", color: PAL.ink, max: w - 6 });
+    hits.push({ ...hitRect(x, y, w, h, LINK_HIT_PAD), act, arg: undefined, pad: LINK_HIT_PAD });
+  }
+
+  function draw(c: CanvasRenderingContext2D): void {
+    hits = [];
+    const face = current;
+    if (!face) return;
+    const { x: px, y: py, w: pw, h: ph } = SOURCE_PAPER;
+    c.fillStyle = "rgba(12,14,30,0.58)";
+    c.fillRect(0, BAR, opts.W, opts.H - BAR);
+    RB(c, px - 3, py - 3, pw + 6, ph + 6, PAL.wood3);
+    RB(c, px, py, pw, ph, PAL.paper);
+    // 左边的色条按来源种类取描边的颜色
+    R(c, px, py, 4, ph, SOURCE_PEN[face.source].color);
+    RB(c, px + pw / 2 - 4, py - 6, 8, 8, PAL.red2);
+    drawText(c, "来源", px + 28, py + 14, { size: 8.5, weight: 800, color: PAL.ink, max: pw - 60 });
+    button(c, px + pw - 18, py + 6, 12, 12, "×", "close");
+    // 元素与来源种类
+    drawText(c, `${face.element_label} · ${face.source_label}`, px + 14, py + 30, { size: 7, weight: 700, color: PAL.ink2, max: pw - 28 });
+    R(c, px + 10, py + 36, pw - 20, 1, PAL.wood2);
+    let y = py + 46;
+    const valueX = px + 14 + SOURCE_LABEL_W;
+    const valueW = pw - 28 - SOURCE_LABEL_W;
+    const row = (term: string, value: string, maxLines = 2): void => {
+      const lines = wrap(c, value, valueW, 6.5, 500).slice(0, maxLines);
+      drawText(c, term, px + 14, y + 4, { size: 6, weight: 600, color: PAL.grey3, max: SOURCE_LABEL_W - 4 });
+      lines.forEach((line, k) => drawText(c, line, valueX, y + 4 + k * 8, { size: 6.5, weight: 500, color: PAL.ink, max: valueW }));
+      y += Math.max(1, lines.length) * 8 + 3;
+    };
+    if (face.event_label) row("事件", face.event_label, 3);
+    if (face.kind_label) row("事件种类", face.kind_label);
+    if (face.at) row("时间", face.at);
+    if (face.actor_label) row("提出者", face.actor_label);
+    row("全局位置", `第 ${face.position} 位`);
+    face.detail.forEach((item) => row(item.term, item.value));
+    if (face.note) row("说明", face.note, 3);
+    // 底部：在时间轴上查看
+    const by = py + ph - 24;
+    R(c, px + 10, by - 8, pw - 20, 1, PAL.wood2);
+    const w = Math.min(120, Math.ceil(measure(c, "在时间轴上查看", 6.5, 700)) + 20);
+    button(c, px + 14, by, w, 16, "在时间轴上查看", "timeline");
+  }
+
+  function open(face: SourceCardFace): void {
+    current = face;
+  }
+
+  function close(): void {
+    current = null;
+    hits = [];
+  }
+
+  function hitAt(x: number, y: number): CardHit | null {
+    for (let i = hits.length - 1; i >= 0; i--) {
+      const h = hits[i];
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h;
+    }
+    return null;
+  }
+
+  function click(x: number, y: number): boolean {
+    if (!current) return false;
+    const h = hitAt(x, y);
+    if (h) {
+      if (h.act === "close") close();
+      else if (h.act === "timeline") {
+        const face = current;
+        close();
+        if (face) opts.onGoto?.(face.position);
+      }
+      return true;
+    }
+    const inside = x >= SOURCE_PAPER.x && x <= SOURCE_PAPER.x + SOURCE_PAPER.w
+      && y >= SOURCE_PAPER.y && y <= SOURCE_PAPER.y + SOURCE_PAPER.h;
+    if (!inside && y > BAR) close();
+    return true;
+  }
+
+  void canvas;
+  return {
+    show: open,
+    close,
+    isOpen: () => current !== null,
+    face: () => current,
+    draw,
+    click,
+    cursor: (x, y) => (current && hitAt(x, y) ? "pointer" : null),
+    inspect: () => ({ face: current, hits: hits.map((hit) => ({ ...hit })) }),
+  };
+}
 
 /**
  * 需要说明的选项没有写说明时的提示。文字由翻译层写在选项的 note_missing_text 上
@@ -84,7 +244,7 @@ export type CardHit = {
   y: number;
   w: number;
   h: number;
-  act: "close" | "prev" | "next" | "go" | "option";
+  act: "close" | "prev" | "next" | "go" | "option" | "timeline";
   arg?: string;
   /** 点击区比画出来的按钮放宽了多少个逻辑像素（每边），见 card-hit.ts。 */
   pad?: number;

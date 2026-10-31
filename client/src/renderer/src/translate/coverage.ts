@@ -347,6 +347,39 @@ export function checkCoverage(types: readonly string[], coverage: TranslationCov
 }
 
 // ---------------------------------------------------------------------------
+// 楼层画面的覆盖层（工单 #398）：每个覆盖层在翻译层有一行中文名
+//
+// 覆盖层的清单由服务的接口层给出（能力清单的 overlays，harness/app/registry.py 的 OVERLAYS），
+// 页面按能力清单决定按钮条上出现哪几个；按钮上的中文名写在这一份里，页面不自己拼。
+// 每个覆盖层都有一行，缺一行由单元测试报出（工单 #398 的验收：事件种类、术语与覆盖层各有一行）。
+
+/** 覆盖层标识 → 按钮上的中文名。 */
+export const OVERLAY_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  flow: "流转",
+  waiting: "等待",
+  recovery: "恢复",
+  context_usage: "上下文用量",
+  semantic_records: "语义记录",
+  // 事实来源（工单 #396 的事件对象 source、工单 #398 的画面）：五种来源的描边与图例
+  sources: "来源",
+});
+
+/**
+ * 覆盖层名字的覆盖核对：页面按能力清单列出覆盖层时，每个名字都要有一行中文名。
+ * 返回问题清单（空表示通过）；提示写明缺哪个覆盖层的名字，由单元测试与页面构建两处共用。
+ */
+export function overlayProblems(names: readonly string[], labels: Readonly<Record<string, string>> = OVERLAY_LABELS): string[] {
+  const problems: string[] = [];
+  for (const name of names) {
+    const label = labels[name];
+    if (typeof label !== "string" || label.trim() === "") {
+      problems.push(`覆盖层 ${name} 在翻译层没有中文名`);
+    }
+  }
+  return problems;
+}
+
+// ---------------------------------------------------------------------------
 // 检验方式的名称（验证的独立性设计说明第 7.1 节，工单 #151）
 //
 // 质检的逐条结论里每种检验方式用代码名保存：check（命令检查）、trial（试用用例）、measure（主机测量）、
