@@ -1,0 +1,30 @@
+{
+"schema":1,
+"path":"tools/doc-consistency/README.md",
+"hash":"b7313bcd2ae1e9a3",
+"nodes":[
+{"hash":"b7313bcd2ae1e9a3","id":"tools/doc-consistency/README.md","kind":"file","title":"tools/doc-consistency/README.md"},
+{"hash":"b1cdd98b215851f3","id":"tools/doc-consistency/README.md#文档一致性工具","kind":"section","parent":"tools/doc-consistency/README.md","title":"文档一致性工具"},
+{"hash":"fb17a25e25161fdd","id":"tools/doc-consistency/README.md#文档一致性工具 > 运行","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"运行"},
+{"hash":"c61e416d3396c30b","id":"tools/doc-consistency/README.md#文档一致性工具 > 命令","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"命令"},
+{"hash":"a54c99b4bc8d61ef","id":"tools/doc-consistency/README.md#文档一致性工具 > 范围与索引","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"范围与索引"},
+{"hash":"9879aebf6e096926","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"规则与数据"},
+{"hash":"c23f3c23f1b22291","id":"tools/doc-consistency/README.md#文档一致性工具 > 阅读范围怎么算","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"阅读范围怎么算"},
+{"hash":"47592f3e3b4f4cfc","id":"tools/doc-consistency/README.md#文档一致性工具 > 测试","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"测试"},
+{"hash":"7503105a1bb19465","id":"tools/doc-consistency/README.md#文档一致性工具 > 依赖","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"依赖"}
+],
+"edges":[
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"tools/doc-consistency/README.md#文档一致性工具"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"tools/doc-consistency/README.md#文档一致性工具"},
+{"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md"],"seen":"967e788bf3b3f131","src":"tools/doc-consistency/README.md#文档一致性工具"},
+{"dst":"tools/doc-consistency/doc_consistency/assets/cytoscape.min.js","kind":"code-path","raws":["doc_consistency/assets/cytoscape.min.js"],"seen":"081591ab735b2b6a","src":"tools/doc-consistency/README.md#文档一致性工具 > 依赖"},
+{"dst":".doc-index/labels.json","kind":"code-path","raws":[".doc-index/labels.json"],"seen":"749cfd790c3b1989","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
+{"dst":"tools/doc-consistency/data/record-docs.json","kind":"code-path","raws":["data/record-docs.json"],"seen":"eaf7cfe5858ba800","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
+{"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
+{"dst":"tools/doc-consistency/pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"6609bf8d44ed2680","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
+{"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"2c01765171109f63","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
+{"dst":"tools/doc-consistency/data/known-external.json","kind":"code-path","raws":["data/known-external.json"],"seen":"df29de1f3d2a9a00","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
+{"dst":"tools/doc-consistency/data/roles.json","kind":"code-path","raws":["data/roles.json"],"seen":"cbc45dd1c680da85","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
+{"dst":"tools/doc-consistency/data/roles.json","kind":"code-path","raws":["data/roles.json"],"seen":"cbc45dd1c680da85","src":"tools/doc-consistency/README.md#文档一致性工具 > 阅读范围怎么算"}
+]
+}

@@ -1,0 +1,32 @@
+{
+"schema":1,
+"path":".claude/skills/milestone-retro/SKILL.md",
+"hash":"7ef6f2dfc03fa6f9",
+"nodes":[
+{"hash":"7ef6f2dfc03fa6f9","id":".claude/skills/milestone-retro/SKILL.md","kind":"file","title":".claude/skills/milestone-retro/SKILL.md"},
+{"hash":"cb3f91d54eee30e5","id":".claude/skills/milestone-retro/SKILL.md#(开头)","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md","title":"(开头)"},
+{"hash":"0f82154b44603c4c","id":".claude/skills/milestone-retro/SKILL.md#name: milestone-retrodescription: 复盘 Yudao 的项目与开发流程：从工单时间线、执行者与审查者的运行记录、CI 日志与 git 历史重建经过，核对上一次改动的预期，提出带预期与撤回条件的改动。里程碑达到、用户要求复盘、或要查明一段时间里流程出了什么问题时使用。argument-hint: \"[里程碑标题 | 工单编号列表 | 起止日期]，省略时从上一份复盘报告的截止时间到现在\"","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md","title":"name: milestone-retrodescription: 复盘 Yudao 的项目与开发流程：从工单时间线、执行者与审查者的运行记录、CI 日志与 git 历史重建经过，核对上一次改动的预期，提出带预期与撤回条件的改动。里程碑达到、用户要求复盘、或要查明一段时间里流程出了什么问题时使用。argument-hint: \"[里程碑标题 | 工单编号列表 | 起止日期]，省略时从上一份复盘报告的截止时间到现在\""},
+{"hash":"2b9651284e545967","id":".claude/skills/milestone-retro/SKILL.md#复盘","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md","title":"复盘"},
+{"hash":"b76fb643d473637c","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 三条读法","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md#复盘","title":"三条读法"},
+{"hash":"7ffcdcb1a2ac41c6","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md#复盘","title":"原始记录在哪里"},
+{"hash":"6d1b87e5cbf357ab","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > 工单、标签时间线、PR","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"工单、标签时间线、PR"},
+{"hash":"e4a58f78c99645ec","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > 执行者与审查者的运行记录","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"执行者与审查者的运行记录"},
+{"hash":"3687b453e6b8021d","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > 架构师循环","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"架构师循环"},
+{"hash":"d74823019e6271e5","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > CI","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"CI"},
+{"hash":"1fc9cf6bc560669a","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > git 历史","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"git 历史"},
+{"hash":"44a77692b2c1edc5","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > 设计说明的改动","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"设计说明的改动"},
+{"hash":"7767cc35f59c49ce","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > main 的豁免记录","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"main 的豁免记录"},
+{"hash":"6a976fa69923f423","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > 用户的反馈","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"用户的反馈"},
+{"hash":"3ebbe5968adf8fb6","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > Yudao 自己的运行","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"Yudao 自己的运行"},
+{"hash":"17a81a4dd295c56a","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 复盘帖子","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md#复盘","title":"复盘帖子"},
+{"hash":"14533eff3e3ec670","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 步骤","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md#复盘","title":"步骤"}
+],
+"edges":[
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":".claude/skills/milestone-retro/SKILL.md#复盘"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":".claude/skills/milestone-retro/SKILL.md#复盘"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b4fc41b167016dad","src":".claude/skills/milestone-retro/SKILL.md#复盘 > 步骤"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":".claude/skills/milestone-retro/SKILL.md#复盘 > 步骤"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"6bf0a0bd9ec52441","src":".claude/skills/milestone-retro/SKILL.md#复盘 > 步骤"},
+{"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"fe69deff44285b85","src":".claude/skills/milestone-retro/SKILL.md#复盘 > 步骤"}
+]
+}

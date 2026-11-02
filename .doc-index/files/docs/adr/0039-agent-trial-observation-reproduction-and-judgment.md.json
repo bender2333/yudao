@@ -1,0 +1,12 @@
+{
+"schema":1,
+"path":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md",
+"hash":"c692314e41a8c822",
+"nodes":[
+{"hash":"c692314e41a8c822","id":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"file","title":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md"},
+{"hash":"c692314e41a8c822","id":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md#agent 试用分别记录现场发现、独立复现与问题裁决","kind":"section","parent":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","title":"agent 试用分别记录现场发现、独立复现与问题裁决"}
+],
+"edges":[
+{"dst":"docs/trial/skill-revision-validation-2026-10-29.md","kind":"link","raws":["../trial/skill-revision-validation-2026-10-29.md"],"seen":"348e8564a28f5946","src":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md#agent 试用分别记录现场发现、独立复现与问题裁决"}
+]
+}

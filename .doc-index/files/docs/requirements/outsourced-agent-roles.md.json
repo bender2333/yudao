@@ -1,0 +1,22 @@
+{
+"schema":1,
+"path":"docs/requirements/outsourced-agent-roles.md",
+"hash":"012cc023ae1c5e54",
+"nodes":[
+{"hash":"012cc023ae1c5e54","id":"docs/requirements/outsourced-agent-roles.md","kind":"file","title":"docs/requirements/outsourced-agent-roles.md"},
+{"hash":"9acddf2afb316bf6","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md","title":"D31 部门内的外包角色"},
+{"hash":"c3333907a47caea0","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 用户原话","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","title":"用户原话"},
+{"hash":"6be5d651887c0689","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 已确认","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","title":"已确认"},
+{"hash":"09b8797fe736f7d3","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 讨论中的分析","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","title":"讨论中的分析"},
+{"hash":"6741da32944fe0ef","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 设计中待用户确认的规则","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","title":"设计中待用户确认的规则"}
+],
+"edges":[
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"cbb9662c59025bd9","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"6ab2fc3729e45fba","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/adr/0044-verifier-role-and-open-loop.md","kind":"link","raws":["../adr/0044-verifier-role-and-open-loop.md"],"seen":"b1c2ffdb1dc08ef3","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 讨论中的分析"},
+{"dst":"docs/design/execution-environment.md","kind":"link","raws":["../design/execution-environment.md"],"seen":"3dbaa7632a73bbd8","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 讨论中的分析"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 讨论中的分析"},
+{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"69d45d94be39c988","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 讨论中的分析"}
+]
+}

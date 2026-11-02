@@ -1,0 +1,18 @@
+{
+"schema":1,
+"path":"client/README.md",
+"hash":"300f9c29e33410c4",
+"nodes":[
+{"hash":"300f9c29e33410c4","id":"client/README.md","kind":"file","title":"client/README.md"},
+{"hash":"8d45270442fa2b4c","id":"client/README.md#Yudao 网页界面","kind":"section","parent":"client/README.md","title":"Yudao 网页界面"},
+{"hash":"43fcacf8fede1f86","id":"client/README.md#Yudao 网页界面 > 目录","kind":"section","parent":"client/README.md#Yudao 网页界面","title":"目录"},
+{"hash":"139508ee77d2fd90","id":"client/README.md#Yudao 网页界面 > 常用命令","kind":"section","parent":"client/README.md#Yudao 网页界面","title":"常用命令"},
+{"hash":"a4cc756f624f146a","id":"client/README.md#Yudao 网页界面 > 开发方式","kind":"section","parent":"client/README.md#Yudao 网页界面","title":"开发方式"},
+{"hash":"d62250554815d8cf","id":"client/README.md#Yudao 网页界面 > 接口版本","kind":"section","parent":"client/README.md#Yudao 网页界面","title":"接口版本"}
+],
+"edges":[
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../docs/design/app-and-interface.md"],"seen":"1e73a165bc6cbd7b","src":"client/README.md#Yudao 网页界面"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../docs/design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"client/README.md#Yudao 网页界面"},
+{"dst":"client/src/renderer/src/api/interface-version.ts","kind":"code-path","raws":["src/renderer/src/api/interface-version.ts"],"seen":"280c0f8b6f3768fc","src":"client/README.md#Yudao 网页界面 > 接口版本"}
+]
+}

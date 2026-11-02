@@ -16,6 +16,8 @@ on:
       - "docs/**"
       - "agents_jour/**"
       - "claude_jour.md"
+      - "tools/**"
+      - ".doc-index/**"
   workflow_dispatch:
 
 # PR 与手动触发：同一分支的新运行取消旧运行。main 的推送：每个合并提交各自运行到底，
@@ -206,7 +208,7 @@ jobs:
           node --check .claude/skills/solo/scripts/solo.mjs
           node --check .claude/skills/solo/scripts/hook.mjs
           node --check .claude/skills/solo/scripts/state.mjs
-          node --check .claude/skills/next/scripts/rotate-journals.mjs
+          node --check .claude/skills/next/scripts/rotate-records.mjs
 
   # 合并必须通过的检查（main 的规则要求名为 check 的检查）：上面五个作业都成功才成功。
   # 无论五个作业结果如何都运行，在运行摘要里写出各层的表

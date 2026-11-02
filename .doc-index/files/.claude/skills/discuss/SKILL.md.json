@@ -1,0 +1,30 @@
+{
+"schema":1,
+"path":".claude/skills/discuss/SKILL.md",
+"hash":"101b2fa9de41f1cb",
+"nodes":[
+{"hash":"101b2fa9de41f1cb","id":".claude/skills/discuss/SKILL.md","kind":"file","title":".claude/skills/discuss/SKILL.md"},
+{"hash":"cb3f91d54eee30e5","id":".claude/skills/discuss/SKILL.md#(开头)","kind":"section","parent":".claude/skills/discuss/SKILL.md","title":"(开头)"},
+{"hash":"bc815a8c3cc0b6ce","id":".claude/skills/discuss/SKILL.md#name: discussdescription: 把一个新想法、一条需求或一个开放的问题讨论成结论：先在总图上找到位置，再逐项追问需求与边界，同时更新术语表与 ADR；要查证的用 research，要看到效果才能判断的用 prototype。结论记下来，交给 /to-design。总图、规则与理念的讨论不用它。argument-hint: \"[想法、问题，或工单与帖子的链接]\"","kind":"section","parent":".claude/skills/discuss/SKILL.md","title":"name: discussdescription: 把一个新想法、一条需求或一个开放的问题讨论成结论：先在总图上找到位置，再逐项追问需求与边界，同时更新术语表与 ADR；要查证的用 research，要看到效果才能判断的用 prototype。结论记下来，交给 /to-design。总图、规则与理念的讨论不用它。argument-hint: \"[想法、问题，或工单与帖子的链接]\""},
+{"hash":"c919bb5889078a23","id":".claude/skills/discuss/SKILL.md#讨论","kind":"section","parent":".claude/skills/discuss/SKILL.md","title":"讨论"},
+{"hash":"21c25745919117fc","id":".claude/skills/discuss/SKILL.md#讨论 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/discuss/SKILL.md#讨论","title":"何时用 / 何时不用"},
+{"hash":"7355597326acbc0c","id":".claude/skills/discuss/SKILL.md#讨论 > 先读什么","kind":"section","parent":".claude/skills/discuss/SKILL.md#讨论","title":"先读什么"},
+{"hash":"c66be84a8768879e","id":".claude/skills/discuss/SKILL.md#讨论 > 步骤","kind":"section","parent":".claude/skills/discuss/SKILL.md#讨论","title":"步骤"},
+{"hash":"a3a0634fcfffb4d8","id":".claude/skills/discuss/SKILL.md#讨论 > 常见借口","kind":"section","parent":".claude/skills/discuss/SKILL.md#讨论","title":"常见借口"},
+{"hash":"933a3d41d45411a6","id":".claude/skills/discuss/SKILL.md#讨论 > 常见借口 > 表1 > 「这个想法很小，不用在总图上找位置」","kind":"row","parent":".claude/skills/discuss/SKILL.md#讨论 > 常见借口","title":"「这个想法很小，不用在总图上找位置」"},
+{"hash":"2f9ad3d3e4a922f8","id":".claude/skills/discuss/SKILL.md#讨论 > 常见借口 > 表1 > 「用户没说，按常见做法定了」","kind":"row","parent":".claude/skills/discuss/SKILL.md#讨论 > 常见借口","title":"「用户没说，按常见做法定了」"},
+{"hash":"41483a9525cbf331","id":".claude/skills/discuss/SKILL.md#讨论 > 常见借口 > 表1 > 「讨论到这里顺手把设计说明也写了」","kind":"row","parent":".claude/skills/discuss/SKILL.md#讨论 > 常见借口","title":"「讨论到这里顺手把设计说明也写了」"},
+{"hash":"72fc6d23b076ae6b","id":".claude/skills/discuss/SKILL.md#讨论 > 常见借口 > 表1 > 「能跑一下看到的，问用户就行」","kind":"row","parent":".claude/skills/discuss/SKILL.md#讨论 > 常见借口","title":"「能跑一下看到的，问用户就行」"},
+{"hash":"919db105e09b166f","id":".claude/skills/discuss/SKILL.md#讨论 > 危险信号","kind":"section","parent":".claude/skills/discuss/SKILL.md#讨论","title":"危险信号"},
+{"hash":"8739533ef37743e0","id":".claude/skills/discuss/SKILL.md#讨论 > 交付","kind":"section","parent":".claude/skills/discuss/SKILL.md#讨论","title":"交付"}
+],
+"edges":[
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/discuss/SKILL.md#讨论"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":".claude/skills/discuss/SKILL.md#讨论 > 交付"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":".claude/skills/discuss/SKILL.md#讨论 > 先读什么"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":".claude/skills/discuss/SKILL.md#讨论 > 步骤"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b4fc41b167016dad","src":".claude/skills/discuss/SKILL.md#讨论 > 步骤"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"6bf0a0bd9ec52441","src":".claude/skills/discuss/SKILL.md#讨论 > 步骤"},
+{"dst":"docs/prototypes/CHANGELOG.md","kind":"code-path","raws":["docs/prototypes/CHANGELOG.md"],"seen":"ce957a09532023de","src":".claude/skills/discuss/SKILL.md#讨论 > 步骤"}
+]
+}

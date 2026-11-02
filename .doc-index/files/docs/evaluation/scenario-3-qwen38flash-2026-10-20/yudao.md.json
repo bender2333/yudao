@@ -1,0 +1,26 @@
+{
+"schema":1,
+"path":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md",
+"hash":"6914c510a7331362",
+"nodes":[
+{"hash":"6914c510a7331362","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md","kind":"file","title":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md"},
+{"hash":"b9013e04e0db5672","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md","title":"场景 3 · Yudao 一侧评测报告"},
+{"hash":"124bea31dfe5d5ec","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 一、基本信息","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"一、基本信息"},
+{"hash":"d9d320a9c8916a8a","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 二、宿主环境","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"二、宿主环境"},
+{"hash":"e81cb43223811684","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 三、联网","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"三、联网"},
+{"hash":"91d2d590babfa297","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 四、过程检查点","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"四、过程检查点"},
+{"hash":"43debc1b1bee5890","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 四、过程检查点 > yudao-q38f-start-1 的检查点依据","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 四、过程检查点","title":"yudao-q38f-start-1 的检查点依据"},
+{"hash":"a4454ed89e6afa83","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 四、过程检查点 > yudao-q38f-start-2 的检查点依据","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 四、过程检查点","title":"yudao-q38f-start-2 的检查点依据"},
+{"hash":"37cedd6d5ae2e333","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 四、过程检查点 > yudao-q38f-start-3 的检查点依据","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 四、过程检查点","title":"yudao-q38f-start-3 的检查点依据"},
+{"hash":"2b2713d9a5656eca","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 五、指标汇总","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"五、指标汇总"},
+{"hash":"e57bc0a8e6080eb8","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 六、逐次运行","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"六、逐次运行"},
+{"hash":"c66e43e439f41974","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 六、逐次运行 > yudao-q38f-start-1","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 六、逐次运行","title":"yudao-q38f-start-1"},
+{"hash":"7cc0b521c22dbf3e","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 六、逐次运行 > yudao-q38f-start-2","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 六、逐次运行","title":"yudao-q38f-start-2"},
+{"hash":"aa9e6ebf9996e219","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 六、逐次运行 > yudao-q38f-start-3","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 六、逐次运行","title":"yudao-q38f-start-3"},
+{"hash":"cda2ca9c2de84088","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 七、不计入结果的运行","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"七、不计入结果的运行"},
+{"hash":"a3f4a879285b1994","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告 > 九、起点缺口与运行条件","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/yudao.md#场景 3 · Yudao 一侧评测报告","title":"九、起点缺口与运行条件"}
+],
+"edges":[
+
+]
+}

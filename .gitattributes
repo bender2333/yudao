@@ -1,1 +1,5 @@
 * text=auto
+
+# 文档索引是生成文件：行尾固定为 LF，确认记录只追加、合并时保留两边
+.doc-index/** text eol=lf linguist-generated=true
+.doc-index/confirmed.jsonl merge=union
