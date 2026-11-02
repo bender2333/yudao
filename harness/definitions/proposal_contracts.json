@@ -55,7 +55,7 @@
             "ready_timeout_sec": "optional readiness timeout in seconds; the registered default when omitted"
           },
           "parts": {
-            "facts": ["files", "check_names", "checks", "launch"],
+            "facts": ["kind", "basis_product_spec_hash", "files", "check_names", "checks", "launch"],
             "explanation": ["summary", "known_risks"]
           }
         },
