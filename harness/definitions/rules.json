@@ -177,7 +177,7 @@
   },
   "roles.product.visibility": {
     "value": ["qa_defects"],
-    "bounds": [0, 4],
+    "bounds": [0, 6],
     "kind": "parameter",
     "form": "permission",
     "guards": "验证者被作者的材料带偏",
@@ -188,7 +188,7 @@
   },
   "roles.engineering.visibility": {
     "value": ["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"],
-    "bounds": [0, 4],
+    "bounds": [0, 6],
     "kind": "parameter",
     "form": "permission",
     "guards": "验证者被作者的材料带偏",
@@ -198,15 +198,15 @@
     "origin": "roles.json 的可见范围"
   },
   "roles.quality.visibility": {
-    "value": ["current_delivery_spec"],
-    "bounds": [0, 4],
+    "value": ["delivery_facts", "delivery_explanation"],
+    "bounds": [0, 6],
     "kind": "parameter",
     "form": "permission",
     "guards": "验证者被作者的材料带偏",
     "cost": "重复探索与部门之间的询问",
     "relax_when": "D32 新增的一组对照显示共享可见范围不劣化",
     "tighten_when": "D32 对照中验证者的结论明显依赖作者的可见材料",
-    "origin": "roles.json 的可见范围"
+    "origin": "roles.json 的可见范围；验证的独立性设计说明第 3 节的两套取值，现值是隔离的一套（交付事实与交付解释），共享的一套在这份现值上加 existing_structure、prior_delivery、qa_defects，默认取第 6 节的对照决定"
   },
   "review.isolation": {
     "value": true,
