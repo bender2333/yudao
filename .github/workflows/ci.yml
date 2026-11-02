@@ -199,13 +199,14 @@ jobs:
           node-version: "24"
 
       - name: 单元测试
-        run: node --test --test-reporter=spec .claude/skills/solo/scripts/test/*.test.mjs .claude/hooks/*.test.mjs
+        run: node --test --test-reporter=spec .claude/skills/solo/scripts/test/*.test.mjs .claude/skills/next/scripts/test/*.test.mjs .claude/hooks/*.test.mjs
 
       - name: 语法检查
         run: |
           node --check .claude/skills/solo/scripts/solo.mjs
           node --check .claude/skills/solo/scripts/hook.mjs
           node --check .claude/skills/solo/scripts/state.mjs
+          node --check .claude/skills/next/scripts/rotate-journals.mjs
 
   # 合并必须通过的检查（main 的规则要求名为 check 的检查）：上面五个作业都成功才成功。
   # 无论五个作业结果如何都运行，在运行摘要里写出各层的表
