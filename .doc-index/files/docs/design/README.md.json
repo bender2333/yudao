@@ -8,7 +8,7 @@
 ],
 "edges":[
 {"dst":"docs/agents/design-spec.md","kind":"link","raws":["../agents/design-spec.md"],"seen":"2ffb04cf2733009d","src":"docs/design/README.md#设计文档索引"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"2f559a3683328235","src":"docs/design/README.md#设计文档索引"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5d3b42fc542e8c54","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["app-and-interface.md"],"seen":"bce6934843e15eca","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/design/architecture/name-map.md","kind":"link","raws":["architecture/name-map.md"],"seen":"4423e5ea0cd9d9a9","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"c9c36b489a3697aa","src":"docs/design/README.md#设计文档索引"},
@@ -35,10 +35,10 @@
 {"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["rules-and-parameters.md"],"seen":"ead1d02389385c07","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/design/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"cd8a447b9c5db13f","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["skeleton-and-application.md"],"seen":"591166117c8dd735","src":"docs/design/README.md#设计文档索引"},
-{"dst":"docs/design/test-pyramid.md","kind":"link","raws":["test-pyramid.md"],"seen":"34c7d5eba94d3294","src":"docs/design/README.md#设计文档索引"},
+{"dst":"docs/design/test-pyramid.md","kind":"link","raws":["test-pyramid.md"],"seen":"2fa6941ea2f045ac","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["trusted-kernel.md"],"seen":"5ced538e9bf46b7d","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/design/visualization.md","kind":"link","raws":["visualization.md"],"seen":"2b8c3a091a4748db","src":"docs/design/README.md#设计文档索引"},
-{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["web-interface-and-release.md"],"seen":"927c48cebf5f33b0","src":"docs/design/README.md#设计文档索引"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["web-interface-and-release.md"],"seen":"814b52b7fd9c3d48","src":"docs/design/README.md#设计文档索引"},
 {"dst":"docs/requirements/README.md","kind":"link","raws":["../requirements/README.md"],"seen":"57ceb7495ca3a131","src":"docs/design/README.md#设计文档索引"}
 ]
 }

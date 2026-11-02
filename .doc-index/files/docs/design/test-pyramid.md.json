@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/test-pyramid.md",
-"hash":"34c7d5eba94d3294",
+"hash":"2fa6941ea2f045ac",
 "nodes":[
-{"hash":"34c7d5eba94d3294","id":"docs/design/test-pyramid.md","kind":"file","title":"docs/design/test-pyramid.md"},
+{"hash":"2fa6941ea2f045ac","id":"docs/design/test-pyramid.md","kind":"file","title":"docs/design/test-pyramid.md"},
 {"hash":"80e8eb13d7cc6cc2","id":"docs/design/test-pyramid.md#测试分层设计说明","kind":"section","parent":"docs/design/test-pyramid.md","title":"测试分层设计说明"},
 {"hash":"0317bdee0340af16","id":"docs/design/test-pyramid.md#测试分层设计说明 > 1. 出发点","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"1. 出发点"},
 {"hash":"c3e479ffacb0b9f1","id":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"2. 三层的定义"},
@@ -27,7 +27,7 @@
 {"hash":"aad42db2d3f48028","id":"docs/design/test-pyramid.md#测试分层设计说明 > 11. 事件序列基准的范围 > 11.2 只为真实变化重写","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 11. 事件序列基准的范围","title":"11.2 只为真实变化重写"},
 {"hash":"18bd80764dd964fb","id":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 缝的合同检查","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"12. 缝的合同检查"},
 {"hash":"b2d4c2a97d9297e7","id":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"13. 测试按三环留"},
-{"hash":"07902f8222e60ee1","id":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留 > 13.1 一个测试凭什么留","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留","title":"13.1 一个测试凭什么留"},
+{"hash":"4deb12aea870d93b","id":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留 > 13.1 一个测试凭什么留","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留","title":"13.1 一个测试凭什么留"},
 {"hash":"76908cce1563c7fd","id":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留 > 13.2 新增测试怎么进来","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留","title":"13.2 新增测试怎么进来"}
 ],
 "edges":[
@@ -42,7 +42,7 @@
 {"dst":"harness/app/payloads.py","kind":"code-path","raws":["harness/app/payloads.py"],"seen":"8631510a89bf35a5","src":"docs/design/test-pyramid.md#测试分层设计说明 > 11. 事件序列基准的范围 > 11.2 只为真实变化重写"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 7. 骨架事件与应用事件","kind":"link","raws":["skeleton-and-application.md"],"seen":"3322e096d9f4fcd8","src":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 缝的合同检查"},
 {"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"44dc74b7c1e33a48","src":"docs/design/test-pyramid.md#测试分层设计说明 > 12. 缝的合同检查"},
-{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"c4ce281d9a5ca1a9","src":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留 > 13.1 一个测试凭什么留"},
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"d54de39b4c1ac1da","src":"docs/design/test-pyramid.md#测试分层设计说明 > 13. 测试按三环留 > 13.1 一个测试凭什么留"},
 {"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"44dc74b7c1e33a48","src":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义"},
 {"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义 > 2.1 边界检查"},
 {"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义 > 2.2 单项时间上限"},

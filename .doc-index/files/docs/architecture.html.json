@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/architecture.html",
-"hash":"2f559a3683328235",
+"hash":"5d3b42fc542e8c54",
 "nodes":[
-{"hash":"2f559a3683328235","id":"docs/architecture.html","kind":"file","title":"docs/architecture.html"},
+{"hash":"5d3b42fc542e8c54","id":"docs/architecture.html","kind":"file","title":"docs/architecture.html"},
 {"anchor":"s1","hash":"3c9310ef49956c5b","id":"docs/architecture.html#s1","kind":"section","parent":"docs/architecture.html","title":"全局总图与方程"},
 {"anchor":"s2","hash":"501cedc1662adc79","id":"docs/architecture.html#s2","kind":"section","parent":"docs/architecture.html","title":"什么能动"},
 {"anchor":"s3","hash":"32ac07d30ac47cac","id":"docs/architecture.html#s3","kind":"section","parent":"docs/architecture.html","title":"一轮工作的经过"},
@@ -22,7 +22,7 @@
 {"hash":"19cc1b8d16d67ff4","id":"docs/architecture.html#s4 > 画面","kind":"seam","parent":"docs/architecture.html#s4","title":"画面"},
 {"hash":"541b538ffcc13381","id":"docs/architecture.html#s4 > 看门狗","kind":"seam","parent":"docs/architecture.html#s4","title":"看门狗"},
 {"anchor":"s5","hash":"cb9066af90b3b5a9","id":"docs/architecture.html#s5","kind":"section","parent":"docs/architecture.html","title":"自举与验收"},
-{"anchor":"s6","hash":"386c6ac472c7195e","id":"docs/architecture.html#s6","kind":"section","parent":"docs/architecture.html","title":"拆开部署"}
+{"anchor":"s6","hash":"e52c4fe18452782d","id":"docs/architecture.html#s6","kind":"section","parent":"docs/architecture.html","title":"拆开部署"}
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"href","raws":["#s1"],"seen":"3c9310ef49956c5b","src":"docs/architecture.html"},
@@ -30,7 +30,7 @@
 {"dst":"docs/architecture.html#s3","kind":"href","raws":["#s3"],"seen":"32ac07d30ac47cac","src":"docs/architecture.html"},
 {"dst":"docs/architecture.html#s4","kind":"href","raws":["#s4"],"seen":"cd45a09d24e819e9","src":"docs/architecture.html"},
 {"dst":"docs/architecture.html#s5","kind":"href","raws":["#s5"],"seen":"cb9066af90b3b5a9","src":"docs/architecture.html"},
-{"dst":"docs/architecture.html#s6","kind":"href","raws":["#s6"],"seen":"386c6ac472c7195e","src":"docs/architecture.html"},
+{"dst":"docs/architecture.html#s6","kind":"href","raws":["#s6"],"seen":"e52c4fe18452782d","src":"docs/architecture.html"},
 {"dst":"docs/architecture-view.html","kind":"href","raws":["architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/architecture.html#s1"},
 {"dst":"docs/architecture-view.html","kind":"href","raws":["architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/architecture.html#s4 > 画面"}
 ]

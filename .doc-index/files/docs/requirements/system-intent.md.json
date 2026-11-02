@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/requirements/system-intent.md",
-"hash":"da1c7fffe8ac5ae1",
+"hash":"249691bde85b2fb0",
 "nodes":[
-{"hash":"da1c7fffe8ac5ae1","id":"docs/requirements/system-intent.md","kind":"file","title":"docs/requirements/system-intent.md"},
+{"hash":"249691bde85b2fb0","id":"docs/requirements/system-intent.md","kind":"file","title":"docs/requirements/system-intent.md"},
 {"hash":"f157c10fb742c7ef","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则","kind":"section","parent":"docs/requirements/system-intent.md","title":"D38 系统意图与基础规则"},
 {"hash":"72a4604e0a95c128","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 目的","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则","title":"目的"},
 {"hash":"cf887607619282df","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 基础规则","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则","title":"基础规则"},
@@ -17,7 +17,8 @@
 {"hash":"9989043797906886","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 裁决","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"裁决"},
 {"hash":"59aeafd3d1319f17","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 可控的五个层次","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"可控的五个层次"},
 {"hash":"3bf9a1cef74d8f7e","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 工序","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"工序"},
-{"hash":"c5329473468b3650","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 画面","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"画面"},
+{"hash":"d678c483081055ce","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 页面","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"页面"},
+{"hash":"dc58e3e86fd7b508","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 画面","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"画面"},
 {"hash":"c3e273177cb05fa6","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 基础规则","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"基础规则"}
 ],
 "edges":[
@@ -32,8 +33,9 @@
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则"},
 {"dst":"docs/design/loops-and-convergence.md","kind":"link","raws":["../design/loops-and-convergence.md"],"seen":"a98753ef774d65e1","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 保留 agent 的能力"},
 {"dst":"docs/design/kernel-quality-gate.md","kind":"link","raws":["../design/kernel-quality-gate.md"],"seen":"7c04be1a568d7c96","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 基础规则"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"0ae7a2dd97132274","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 基础规则"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"c828dcee198a6ad8","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 基础规则"},
 {"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 独立与上下文"},
+{"dst":"docs/architecture-view.html","kind":"link","raws":["../architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 画面"},
 {"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"2b8c3a091a4748db","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 画面"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"8b813cb71f37d7dc","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},

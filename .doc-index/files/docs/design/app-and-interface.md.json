@@ -46,7 +46,7 @@
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"be2f2a8d91639563","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「页面」"],"seen":"3c9310ef49956c5b","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},
 {"dst":"docs/architecture.html#s4 > 接口","kind":"map-position","raws":["「接口」"],"seen":"df0d7ada3e8368ed","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},
-{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 2. 各层的职责与边界","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"26eeaa7a5ae22a65","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 2. 各层的职责与边界","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"2582bcb081cce4b8","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},
 {"dst":"docs/design/department-roles.md#部门内多角色设计说明 > 15. 界面","kind":"link","raws":["department-roles.md"],"seen":"362bed16c8fb816c","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","kind":"link","raws":["model-management.md"],"seen":"6a0393db4f18e6a1","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 14. 界面与观察","kind":"link","raws":["semantic-system.md"],"seen":"de654054fdc8a067","src":"docs/design/app-and-interface.md#应用层与接口层设计说明"},

@@ -134,6 +134,8 @@ $env:YUDAO_EVAL_API_KEY = [Environment]::GetEnvironmentVariable('YUDAO_EVAL_API_
 
 - 定义：`.github/workflows/ci.yml`。CI 工作流由总架构师改，用户不在场时架构师循环也可以改；solo 执行者不改 CI 工作流。
 - 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上并行运行四个作业：① 单元层、② 模块层（各含一项固定检查）、评测工具（`evals/tests`，`real_model` 的用例默认不选）、客户端（类型检查与单元测试，逐场景回放测试除外，按 `AGENTS.md` 单独运行；编译页面与 wheel）。汇总作业 `check` 在四项都成功时成功，是 main 的规则要求的检查，并在运行摘要里写出各层的表。PR 上另有「用例变化」：合并前后各层用例的增减，只显示，不挡合并（[测试分层设计说明](../design/test-pyramid.md)「CI 中的分层」与「用例的变化」）。
+- 定义：`.github/workflows/ci.yml`，由用户在场时的架构师维护，solo 执行者与架构师循环不修改。
+- 每个 PR 与 main 的每次推送在 GitHub 提供的 `windows-latest` 上并行运行五个作业：① 单元层、② 模块层（各含一项固定检查）、评测工具（`evals/tests`，`real_model` 的用例默认不选）、客户端（类型检查与单元测试，逐场景回放测试除外，按 `AGENTS.md` 单独运行；编译页面与 wheel）、工作台脚本。汇总作业 `check` 在五项都成功时成功，是 main 的规则要求的检查，并在运行摘要里写出各层的表。PR 上另有「用例变化」：合并前后各层用例的增减，只显示，不挡合并（[测试分层设计说明](../design/test-pyramid.md)「CI 中的分层」与「用例的变化」）。
 - main 的每次推送（每次合并以后）另外运行 ③ 集成层（作业 `integration`）：集成层全部（`-n 4`，在 main 上约 15 分钟），每个合并提交各自运行，不互相取消。它不是合并必须通过的检查，PR 上不运行，失败由 solo 执行者按 `solo-worker`「main 上的 CI」处理。带 `touches-core` 的工单例外：solo 执行者在交付前对自己的分支手动触发一次（`solo-worker` 第 8 步）。结果文件作为运行的附件 `integration-results` 保存，用 `gh run download <运行编号> -n integration-results` 取回。
 - 手动触发（`check` 与 `integration` 都运行）：`gh workflow run CI --ref <分支>`，例如工单要在 GitHub 的运行机上验证集成层时 `gh workflow run CI --ref issue-<编号>`；之后用 `gh run list --workflow CI --branch <分支> --limit 1` 找到运行，`gh run watch <运行编号>` 等结果。
 - main 上的结果：`gh run list --workflow CI --branch main --event push --limit 10`；某次运行的失败项：`gh run view <运行编号> --log-failed | grep FAILED`。
