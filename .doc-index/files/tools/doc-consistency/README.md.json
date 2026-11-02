@@ -18,6 +18,7 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"07180e15569923e5","src":"tools/doc-consistency/README.md#文档一致性工具"},
 {"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md"],"seen":"42c8da94e6459d99","src":"tools/doc-consistency/README.md#文档一致性工具"},
 {"dst":"tools/doc-consistency/doc_consistency/assets/cytoscape.min.js","kind":"code-path","raws":["doc_consistency/assets/cytoscape.min.js"],"seen":"081591ab735b2b6a","src":"tools/doc-consistency/README.md#文档一致性工具 > 依赖"},
+{"dst":".doc-index/labels.json","kind":"code-path","raws":[".doc-index/labels.json"],"seen":"749cfd790c3b1989","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
 {"dst":"tools/doc-consistency/pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"6609bf8d44ed2680","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"0391625f58a9e3c5","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
