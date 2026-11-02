@@ -359,7 +359,7 @@
         (cur && opts.currentTag ? ui.tag(opts.currentTag) : '') + (f.selectable ? '' : '<span class="y17-side-stage">' + f.stage + '</span>') + '</span><small>' + esc(f.note) + '</small>' + qa(f.a) + '</span></label>';
     }).join('');
     const layers = cat.layers.map((l) => '<div class="y17-org-radio y17-cat-card is-layer" data-cat="' + l.id + '"><span><span class="y17-org-radio-title"><strong>' + esc(l.name) + '</strong>' + ui.tag('层，不是形态') + '</span><small>' + esc(l.note) + '</small>' + qa(l.a) + '</span></div>').join('');
-    return '<div class="y17-cat"><div class="y17-org-radios" id="y17-cat-forms">' + forms + '</div>' + (opts.noLayers ? '' : '<h4 class="y17-cat-h">两个层：能叠在任何一份形态上</h4><div class="y17-org-radios" id="y17-cat-layers">' + layers + '</div>') + '</div>';
+    return '<div class="y17-cat"><div class="y17-org-radios" id="y17-cat-forms">' + forms + '</div>' + (opts.noLayers ? '' : '<h4 class="y17-cat-h">两个层：观察者叠在任何一份形态上，子组织叠在任何自有角色上</h4><div class="y17-org-radios" id="y17-cat-layers">' + layers + '</div>') + '</div>';
   }
   Y17.orgpage.catalogHtml = catalogHtml;
 

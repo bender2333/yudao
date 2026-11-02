@@ -344,7 +344,7 @@
     const hub = O.answers(O.compose({ form: 'hub', changes: {} }));
     const layers = [
       { id: 'observer', name: '观察者', note: '能叠在任何一份形态上；在组织页的「观察者」一块开关', a: { from: '不开事项，在事项外面读事实', who: '不做事，产出证据、提案、振荡信号', verify: '不核验，也不能核验', end: '不改事项怎么结束' } },
-      { id: 'suborg', name: '部门内子组织', note: '某个角色的「由谁做」选子组织，在部门详情里选', a: { from: hub.from, who: hub.who, verify: hub.verify + '（子组织里自己定）', end: '子事项的结果作为这个角色的提案回到上一层' } }
+      { id: 'suborg', name: '部门内子组织', note: '能叠在任何自有角色上；某个角色的「由谁做」选子组织，在部门详情里选', a: { from: hub.from, who: hub.who, verify: hub.verify + '（子组织里自己定）', end: '子事项的结果作为这个角色的提案回到上一层' } }
     ];
     return { forms, layers };
   };
