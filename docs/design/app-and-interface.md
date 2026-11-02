@@ -208,13 +208,13 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 |
 | --- | --- | --- | --- | --- |
-| `project.create` | 新建项目；可以带起始文件夹，起始文件夹的快照是第一次采纳之前每个事项的起点（[项目的起始文件夹设计说明](project-initial-files.md)）；可以选组织，缺省为默认的三部门（[项目的组织设计说明](project-organization.md)「新建的入口」） | 名称、长期目标、起始文件夹（可选，控制主机上的路径）、组织（可选：发布带的形态名，或另一个项目，表示和那个项目一样） | `project_registered`（带起始文件夹时增加 `initial_snapshot`；组织不是默认的三部门时增加 `organization_adopted`，和某项目一样时再增加复制来的项目部门设置与项目角色设置的事件） | 空 |
+| `project.create` | 新建项目；可以带起始文件夹，起始文件夹的快照是第一次采纳之前每个事项的起点（[项目的起始文件夹设计说明](project-initial-files.md)）；可以选组织，缺省为默认的三部门（[项目的组织设计说明](project-organization.md)「新建的入口」） | 名称、长期目标（可选，不写时项目上下文里没有这一项，之后在设置页写）、起始文件夹（可选，控制主机上的路径）、组织（可选：发布带的形态名，或另一个项目，表示和那个项目一样；页面上选一张模板卡） | `project_registered`（带起始文件夹时增加 `initial_snapshot`；组织不是默认的三部门时增加 `organization_adopted`，和某项目一样时再增加复制来的项目部门设置与项目角色设置的事件） | 空 |
 | `project.rename` | 重命名 | 项目、名称 | `project_renamed` | 项目基本信息版本 |
 | `project.set_goal` | 修改长期目标；之后开始的事项使用新目标，进行中的事项使用 `run_created` 记下的开始时的目标 | 项目、长期目标 | `project_goal_changed` | 项目基本信息版本 |
 | `project.pin` | 置顶或取消置顶 | 项目、是否置顶 | `project_pinned` | 项目基本信息版本 |
 | `project.archive` | 归档 | 项目 | `project_archived` | 项目基本信息版本 |
 | `project.restore` | 恢复项目 | 项目 | `project_restored` | 项目基本信息版本 |
-| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项（[接入已有项目设计说明](existing-project-onboarding.md)「命令」）；可以选组织，缺省为默认的三部门（[项目的组织设计说明](project-organization.md)「新建的入口」） | 名称、长期目标、源目录名称、源目录路径（控制主机上的路径）、组织（可选，同 `project.create`） | `project_registered`（`source` 为 `existing`）、组织不是默认的三部门时的 `organization_adopted`、源目录登记事件、`work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 |
+| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项（[接入已有项目设计说明](existing-project-onboarding.md)「命令」）；可以选组织，缺省为默认的三部门（[项目的组织设计说明](project-organization.md)「新建的入口」） | 名称、长期目标（可选，同 `project.create`）、源目录名称、源目录路径（控制主机上的路径）、组织（可选，同 `project.create`） | `project_registered`（`source` 为 `existing`）、组织不是默认的三部门时的 `organization_adopted`、源目录登记事件、`work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 |
 | `onboarding.restart` | 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项；只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用 | 项目、源目录（登记名） | `work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 |
 
 已有项目的代码经 `project.onboard` 接入并建档；建档以后源目录的修改不进入项目，要在源目录的新代码上工作时接入为新项目（[接入已有项目设计说明](existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」与「用户确认的决定」）。取消建档使用 `work_item.cancel`。
@@ -238,7 +238,7 @@ sequenceDiagram
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 |
 | --- | --- | --- | --- | --- |
 | `department_settings.save` | 保存项目部门设置；所选模型不具备部门的建议能力时照常保存，结果带提醒（D24） | 项目、部门、部门 Prompt、模型（模型访问定义引用或跟随部门默认）、推理档位（或跟随） | `department_prompt_configured`；模型与档位的事件由 D24 确定 | 该部门设置的版本 |
-| `organization.adopt` | 采用本项目的组织：一份形态加本项目的改动；经结构校验与确认就生效，范围只有这个项目，不经对照；对之后新建的事项生效，进行中的事项不受影响。版本对不上以 `stale_base` 拒绝，有拒绝项以 `organization_invalid` 拒绝并附拒绝项，理由为空时按请求体不符合合同拒绝；系统提出的候选通过对照以后走同一条命令（[项目的组织设计说明](project-organization.md)「采用与历史」） | 项目、形态名、本项目的改动、理由、用户看到的组织版本 | `organization_adopted`（项目流，带形态名、改动、理由、新版本） | 该项目组织的版本 |
+| `organization.adopt` | 采用本项目的组织：一份形态加本项目的改动；经结构校验与确认就生效，范围只有这个项目，不经对照；对之后新建的事项生效，进行中的事项不受影响。版本对不上以 `stale_base` 拒绝，有拒绝项以 `organization_invalid` 拒绝并附拒绝项，走「高级」的采用理由为空时按请求体不符合合同拒绝，换模板（形态名加空改动）的理由可不写；系统提出的候选通过对照以后走同一条命令（[项目的组织设计说明](project-organization.md)「采用与历史」） | 项目、形态名、本项目的改动、理由、用户看到的组织版本 | `organization_adopted`（项目流，带形态名、改动、理由、新版本） | 该项目组织的版本 |
 | `source_directory.save` | 登记与修改本项目的源目录；`project.onboard` 填写的路径是项目的第一条登记，`onboarding.restart` 从登记的源目录重新采集快照 | 项目、名称、路径、是否开启采纳写回、远端名称或地址、目标分支、写回检查的命令清单（命令字符串）、凭据名称引用（只按名称引用，不含凭据内容） | `source_directory_configured` | 该项目源目录登记的版本 |
 | `mcp_servers.save` | 保存 MCP 服务器（怎样启动或连接、哪些部门可以使用、工具清单快照）在本项目的整份设置（[网络取回与 MCP 工具设计说明](network-and-mcp.md)「版本与固定」） | 项目、整份设置文档 | `mcp_servers_configured`（项目流，内容是这个版本的整份文档） | MCP 设置版本 |
 | `tool_server.probe` | 读取一个 MCP 服务器的工具清单（临时启动或连接，读取后关闭）；接受以后作为任务进行，结果以事件出现（[网络取回与 MCP 工具设计说明](network-and-mcp.md)「读取工具清单（探测）」） | 项目、服务器的设置内容（保存前也可以探测） | `tool_server_probe_finished`（项目流，带工具清单快照或失败原因） | 空 |
@@ -435,6 +435,8 @@ sequenceDiagram
 | `home.away_report` | 上次查看的位置与时间；所选范围内的汇总：完成与放行的事项、发现的故障、自动修复、部署与回滚、进入等待模型服务的次数、用量、磁盘与报到状态、收敛状态的变化（事项、层、前后两种状态）、带开环条件的放行（列出开环的条件），每项带来源事件的引用；范围内的关键事实列表（时间、项目、种类、事件位置：询问与回答、返工（质检提交缺陷记录）、放行、采纳、故障、修复、部署与回滚、进入与离开等待、决定请求的发出与回答），供页面的回放与时间轴使用。范围可选「自上次查看」「最近 24 小时」「最近 7 天」 | 汇总到的全局位置 |
 
 每项数字都由事件汇总得到，没有来源事件的项不显示，不显示为零。
+
+项目页按项目的组织伸缩：最低一级（一个角色直做、一个外包角色直做）只有对话、成果库、时间条与设置页，组织变大才多出别的页，见[项目的组织设计说明](project-organization.md)「项目页跟着级别伸缩」。
 
 **概览**
 
@@ -814,4 +816,4 @@ sequenceDiagram
 8. **执行槽位数。** 执行槽位数是规则登记中的参数（`execution.slots`，暂定默认值 3），由 `parameter.set` 修改并写成事件；它取决于运行机器的能力。
 9. **取消排队的结果。** 由排队的设计确定。
 10. **模型管理的界面。** 模型管理页、组织页的部门详情与部门工作间的模型显示依赖 D24 模型管理的后端。
-11. **长期目标的修改。** 长期目标可以修改，经 `project.set_goal` 写成项目流中的事件。创建 run 时在 `run_created` 中记下当时的长期目标，部门请求中的项目上下文使用这个值：之后开始的事项使用新目标，进行中的事项按开始时的目标做完。
+11. **长期目标的修改。** 长期目标可选，新建时可以不写，在设置页写；不写时项目上下文里没有这一项。长期目标可以修改，经 `project.set_goal` 写成项目流中的事件。创建 run 时在 `run_created` 中记下当时的长期目标，部门请求中的项目上下文使用这个值：之后开始的事项使用新目标，进行中的事项按开始时的目标做完。

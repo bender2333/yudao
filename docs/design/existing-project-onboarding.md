@@ -35,7 +35,7 @@
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 |
 | --- | --- | --- | --- | --- |
-| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项 | 名称、长期目标、源目录名称、源目录路径（控制主机上的路径） | `project_registered`（`source` 为 `existing`）、源目录登记事件（`source_directory.save` 确定的名称）、`work_item_created`（`kind` 为 `onboarding`，带快照记录）、`run_created`、`user_input_received` | 空 |
+| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项 | 名称、长期目标（可选）、源目录名称、源目录路径（控制主机上的路径） | `project_registered`（`source` 为 `existing`）、源目录登记事件（`source_directory.save` 确定的名称）、`work_item_created`（`kind` 为 `onboarding`，带快照记录）、`run_created`、`user_input_received` | 空 |
 | `onboarding.restart` | 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项；只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用 | 项目、源目录（登记名） | `work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空（新建一个事项） |
 
 - 源目录路径按 `source_directory.save` 的规则处理（[应用层设计说明](app-and-interface.md)「决定」第 6 项）：命令中填写的路径同时成为这个项目的第一条源目录登记，以后在项目设置中查看与修改。
@@ -149,7 +149,7 @@ flowchart TB
 
 | 字段 | 在初始 PRD 中写什么 |
 | --- | --- |
-| 目标 | 这个仓库为谁做什么，依据 README 与项目的长期目标 |
+| 目标 | 这个仓库为谁做什么，依据 README 与项目的长期目标（没写长期目标时只依据 README） |
 | 要求 | 每条写一项使用者能观察到的能力：一个命令、一个接口、一个页面、一组公开函数的行为；写到质检能用一个检查或一段操作核实的程度；不写内部函数与实现方式。条目以功能区域开头（例如「［模型设置］」），大仓库按功能区域覆盖全部对外能力，条目数由对外能力决定，不设固定上限 |
 | 边界 | 仓库中不作为产品行为承诺的部分：示例、生成代码、第三方代码的拷贝、实验目录，写明路径；建档时没有核实的功能区域写在这里并标明「建档时未核实」 |
 | 约束 | 运行环境、支持的版本、依赖的外部服务，依据清单与文档 |
