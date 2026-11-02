@@ -32832,6 +32832,11 @@
           "open": {
             "title": "Open",
             "type": "integer"
+          },
+          "changed": {
+            "default": 0,
+            "title": "Changed",
+            "type": "integer"
           }
         },
         "required": [
@@ -32889,6 +32894,16 @@
           },
           "note": {
             "title": "Note",
+            "type": "string"
+          },
+          "judged": {
+            "default": "",
+            "title": "Judged",
+            "type": "string"
+          },
+          "change_reason": {
+            "default": "",
+            "title": "Change Reason",
             "type": "string"
           }
         },
@@ -33194,6 +33209,11 @@
             },
             "title": "Evidence Refs",
             "type": "array"
+          },
+          "judgement_event": {
+            "default": "",
+            "title": "Judgement Event",
+            "type": "string"
           },
           "kind": {
             "const": "qa_review",

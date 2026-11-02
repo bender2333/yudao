@@ -93,6 +93,7 @@
 "test_git_versions.py" = "module"
 "test_independent_judgement.py" = "integration"
 "test_inspection_workspace.py" = "module"
+"test_judgement_reference.py" = "module"
 "test_interaction_engine.py" = "integration"
 "test_issue_84.py" = "integration"
 "test_issue_85.py" = "integration"

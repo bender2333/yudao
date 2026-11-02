@@ -104,8 +104,9 @@ def test_qa_writes_test_and_runs_check(tmp_path: Path) -> None:
     assert qa_sub.payload["checks"][0]["qa_tests_hash"] == saved.payload["content_hash"]
     # 逐条结论与放行记录里的三个数随放行载荷写进事实（工单 #151）：一条验收条件、可执行检验、通过
     assert [item["criterion"] for item in qa_sub.payload["criteria"]] == ["AC1"]
+    # changed 是改判的条数（工单 #1190）：判断与结论都是 passed，没有改判
     assert qa_sub.payload["coverage"] == {"criteria_total": 1, "executable": 1, "covered": 1,
-                                          "coverage_ratio": 1.0, "model_reading": 0, "open": 0}
+                                          "coverage_ratio": 1.0, "model_reading": 0, "open": 0, "changed": 0}
     assert qa_sub.payload["open_criteria"] == []
     # 说明工件的引用与逐条结论引用的检查回执输出工件都在
     assert len(qa_sub.payload["evidence_refs"]) >= 2
