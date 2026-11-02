@@ -12,7 +12,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.event_store import Command
 from harness.models import EventType, json_dumps
 from harness.projection import saved_decisions
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import after_event, from_another_thread, run_wait_command
@@ -83,6 +83,7 @@ def test_answering_continue_after_a_pause_keeps_the_item_working(tmp_path: Path)
         "engineering": [text_after_quality_started] * 4
                        + [delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
         "quality": [FakeTurn(checks={"slow": {"command": run_wait_command(signals)}}),
+                    judgement_turn(checks=CHECKS),
                     review_turn("release", "checks passed on the current snapshot", checks=CHECKS)],
     }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -134,6 +135,7 @@ def test_model_unavailable_while_another_department_works(tmp_path: Path) -> Non
         "engineering": [FakeTurn(checks={"slow": SLOW_CHECK}),
                         delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
         "quality": [ProviderError(UNAVAILABLE, reason="provider_unavailable"),
+                    judgement_turn(checks=CHECKS),
                     review_turn("release", "checks passed on the current snapshot", checks=CHECKS)],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -166,6 +168,7 @@ def test_two_sessions_blocked_by_model_problems_in_turn(tmp_path: Path) -> None:
                         delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
         "quality": [FakeTurn(checks={"slow": SLOW_CHECK}),
                     ProviderError(UNAVAILABLE, reason="provider_unavailable"),
+                    judgement_turn(checks=CHECKS),
                     review_turn("release", "checks passed on the current snapshot", checks=CHECKS)],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)

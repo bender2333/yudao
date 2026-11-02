@@ -159,6 +159,8 @@ const BUILDING: Readonly<Record<string, (ev: BuildingEvent) => PixelAction[]>> =
   ask_answered: (ev) => flash(ev, "white"),
   // 质检的结论：放行绿、缺陷记录红
   qa_submitted: (ev) => flash(ev, released(ev) ? "green" : "red"),
+  // 独立判断：核验角色交上自己的判断（先判断后看解释，工单 #358），白光
+  independent_judgement_committed: (ev) => flash(ev, "white"),
   // 采纳：这一层撒彩带（画面层同时闪绿光）；基线采纳只闪绿光
   deliverable_adopted: (ev) => (ev.project_id
     ? [{ kind: "celebrate", position: posOf(ev), project: ev.project_id }]

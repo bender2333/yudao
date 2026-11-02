@@ -12,7 +12,7 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.event_store import Command
 from harness.models import EventType, Usage
-from harness.proposals import delivery, delivery_turn, product_spec, review, review_turn
+from harness.proposals import delivery, delivery_turn, judgement, product_spec, review, review_turn
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests import process_kill as killed
@@ -89,7 +89,8 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
               "quality": [{"proposal": {"kind": "quality_auto"}}]}
     tail = {"engineering": [{"proposal": delivery(check_names=["smoke"]), "writes": {"src/echo.py": ECHO},
                              "checks": CHECKS}],
-            "quality": [{"proposal": review("release", "checks passed on the current snapshot"),
+            "quality": [{"proposal": judgement("smoke")},
+                        {"proposal": review("release", "checks passed on the current snapshot"),
                          "checks": CHECKS}]}
 
     with killed.interrupted(data_dir, script, tail=tail,

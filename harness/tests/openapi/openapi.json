@@ -23950,6 +23950,202 @@
         "title": "HomeSeenPayload",
         "type": "object"
       },
+      "IndependentJudgementCommittedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "enum": [
+                  "product",
+                  "engineering",
+                  "quality"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "independent_judgement_committed",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/IndependentJudgementPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "IndependentJudgementCommittedEvent",
+        "type": "object"
+      },
+      "IndependentJudgementPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "const": "independent_judgement",
+            "title": "Kind",
+            "type": "string"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "delivery_spec_hash": {
+            "title": "Delivery Spec Hash",
+            "type": "string"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "criteria_count": {
+            "title": "Criteria Count",
+            "type": "integer"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/QaCriterionPayload"
+            },
+            "title": "Criteria",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "product_spec_hash",
+          "delivery_spec_hash",
+          "checks",
+          "criteria_count",
+          "criteria"
+        ],
+        "title": "IndependentJudgementPayload",
+        "type": "object"
+      },
       "InitialPrdProposedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -40170,6 +40366,7 @@
             "department_input": "#/components/schemas/DepartmentInputEvent",
             "department_prompt_configured": "#/components/schemas/DepartmentPromptConfiguredEvent",
             "home_seen": "#/components/schemas/HomeSeenEvent",
+            "independent_judgement_committed": "#/components/schemas/IndependentJudgementCommittedEvent",
             "initial_prd_proposed": "#/components/schemas/InitialPrdProposedEvent",
             "instance_upgrade_answered": "#/components/schemas/InstanceUpgradeAnsweredEvent",
             "instance_upgrade_requested": "#/components/schemas/InstanceUpgradeRequestedEvent",
@@ -40325,6 +40522,9 @@
           },
           {
             "$ref": "#/components/schemas/AskAnsweredEvent"
+          },
+          {
+            "$ref": "#/components/schemas/IndependentJudgementCommittedEvent"
           },
           {
             "$ref": "#/components/schemas/ProductDecisionAcceptedEvent"

@@ -174,7 +174,7 @@ def test_tool_categories_and_references_are_checked(tmp_path):
         ("work_items.json", "kinds.onboarding.departments.quality.tools[6]", "工具 bash 没有定义"),
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
         ("proposal_contracts.json", "roles.quality.kinds",
-         "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、qa_review"),
+         "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、independent_judgement、qa_review"),
     )
 
 

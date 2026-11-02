@@ -2981,6 +2981,8 @@ RUN_EVENT_KINDS: tuple[str, ...] = (
     EventType.TOOL_CALLED, EventType.TOOL_STARTED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED,
     EventType.PROPOSAL_SUBMITTED, EventType.PROPOSAL_REJECTED, EventType.SPEC_ACCEPTED,
     EventType.SPEC_SUPERSEDED, EventType.CONTRACT_ACCEPTED, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：导出的全部事件里有它
+    EventType.INDEPENDENT_JUDGEMENT_COMMITTED,
     EventType.PRODUCT_DECISION_ACCEPTED,
     # 成果失效（骨架事件，S1b，工单 #858）
     EventType.ARTIFACT_INVALIDATED,

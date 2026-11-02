@@ -87,6 +87,7 @@
     contract_accepted: () => '现在盖上有效章',
     delivery_accepted: () => '现在装箱封存',
     qa_submitted: (ev, pl) => (pl.verdict === 'release' ? '现在盖放行章' : '现在盖返工章'),
+    independent_judgement_committed: () => '现在交上独立判断',
     department_guidance_received: () => '收到用户的指导',
     department_guidance_applied: () => '现在阅读指导',
     department_guidance_responded: () => '现在写指导的回复',

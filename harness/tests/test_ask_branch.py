@@ -7,7 +7,7 @@ import pytest
 from harness.adapters.fake import FakeAdapter, prompt_part
 from harness.minimal_projection import fold_events
 from harness.models import EventType
-from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
+from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import quality_turns
@@ -23,6 +23,8 @@ def test_quality_asks_the_product_and_the_answer_revises_the_prd(tmp_path: Path)
         "engineering": [delivery_turn()],
         "quality": [
             ask_turn(recipient="product", question="验收标准漏了空输入，请修订 PRD。"),
+            review_turn("release", "the delivery passed the criterion the quality had"),
+            judgement_turn(),
             review_turn("release", "the delivery passed the criterion the quality had"),
         ],
         "product:ask": [answer_turn(
