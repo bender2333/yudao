@@ -8,7 +8,6 @@ import type {
   CatalogAdmission,
   CatalogBinding,
   CatalogCandidate,
-  CatalogCredential,
   CatalogModel,
   CatalogProvider,
 } from "../../api/generated/types.gen";
@@ -114,7 +113,9 @@ export function credentialSourceText(source: string): string {
   }
 }
 
-export function credentialStatusLabel(credential: CatalogCredential): string {
+// 凭据状态（设计说明第 9.1 节「Key 状态」）：已保存与来源。
+// 只读两样东西（工单 #237）：项目设置里的 MCP 服务器一节也用这句话，两处的凭据状态说法一致
+export function credentialStatusLabel(credential: { configured: boolean; source: string }): string {
   if (!credential.configured) {
     return "缺失";
   }
