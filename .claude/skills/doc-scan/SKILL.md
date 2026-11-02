@@ -19,7 +19,7 @@ disable-model-invocation: true
 
 列文件：`Get-ChildItem -Recurse -File -Include *.md,*.html`，跳过 `.venv/`、`node_modules/`、`.tmp/`、`.claude/worktrees/`、`.ralph/`、`.yudao/`、`docs/archive/`。
 
-后面这三个是上回踩到的坑：`.claude/worktrees/` 下是整份旧检出，`.ralph/`、`.yudao/` 是循环账本与试用现场，混进来会让文件数翻一倍、链接核对八成是噪音。
+`.claude/worktrees/` 下是整份旧检出，`.ralph/`、`.yudao/` 是循环账本与试用现场，混进来会让文件数翻一倍、链接核对八成是噪音。
 
 **判据**：报出文件总数与各目录份数，数字与用户预期量级相符。
 
@@ -45,7 +45,7 @@ await parallel(groups.map(g => () => agent(`你在核对 Yudao 的文档一致�
 回复只写「${g.id} 共 N 条」，不要贴条目。`)));
 ```
 
-条目写进文件而不写进回复，是这一版的硬要求：几十组的长 JSON 一起返回会被截断，回收就得重跑。
+条目写进文件而不写进回复，是硬要求：几十组的长 JSON 一起返回会被截断，回收就得重跑。
 
 **判据**：每份文件恰好出现在一组；每组 JSON 都落盘；`scripts/merge-findings.ps1` 跑通，没有缺字段的条目。
 

@@ -1,0 +1,15 @@
+{
+"schema":1,
+"path":"docs/requirements/project-initial-files.md",
+"hash":"1ea74f5887a897a0",
+"nodes":[
+{"hash":"1ea74f5887a897a0","id":"docs/requirements/project-initial-files.md","kind":"file","title":"docs/requirements/project-initial-files.md"},
+{"hash":"ac8a9d532385c935","id":"docs/requirements/project-initial-files.md#D37 新建项目的起始文件夹","kind":"section","parent":"docs/requirements/project-initial-files.md","title":"D37 新建项目的起始文件夹"},
+{"hash":"867c44e9e67cfe71","id":"docs/requirements/project-initial-files.md#D37 新建项目的起始文件夹 > 用户原话","kind":"section","parent":"docs/requirements/project-initial-files.md#D37 新建项目的起始文件夹","title":"用户原话"},
+{"hash":"7be419690497b109","id":"docs/requirements/project-initial-files.md#D37 新建项目的起始文件夹 > 已确认","kind":"section","parent":"docs/requirements/project-initial-files.md#D37 新建项目的起始文件夹","title":"已确认"}
+],
+"edges":[
+{"dst":"docs/design/project-initial-files.md","kind":"link","raws":["../design/project-initial-files.md"],"seen":"a92d5ba6596f5175","src":"docs/requirements/project-initial-files.md#D37 新建项目的起始文件夹"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/project-initial-files.md#D37 新建项目的起始文件夹"}
+]
+}

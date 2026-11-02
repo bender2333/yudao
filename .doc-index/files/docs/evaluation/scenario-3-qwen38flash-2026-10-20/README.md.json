@@ -1,0 +1,12 @@
+{
+"schema":1,
+"path":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md",
+"hash":"981cf79c5d1d7071",
+"nodes":[
+{"hash":"981cf79c5d1d7071","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md","kind":"file","title":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md"},
+{"hash":"981cf79c5d1d7071","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md#场景 3 · qhub/Qwen3.8-Flash · 2026-10-20","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md","title":"场景 3 · qhub/Qwen3.8-Flash · 2026-10-20"}
+],
+"edges":[
+{"dst":"evals/runner/yudao.py","kind":"code-path","raws":["evals/runner/yudao.py:93-97"],"seen":"8732f64d7b1da8cc","src":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md#场景 3 · qhub/Qwen3.8-Flash · 2026-10-20"}
+]
+}

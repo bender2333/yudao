@@ -1,0 +1,21 @@
+{
+  "说明": "仓库里的技能引用可以指向不在 .claude/skills 的技能：Claude Code 内置技能，和用户级技能（装在使用者自己的 ~/.claude，不随仓库）。名单写在这里，检查不依赖本机的 ~/.claude。新增一个外部技能时在这里补一行。",
+  "builtin_skills": [
+    "loop", "init", "review", "security-review", "simplify", "schedule", "update-config",
+    "claude-api", "fewer-permission-prompts", "run", "help", "compact", "clear"
+  ],
+  "user_skills": [
+    "grilling", "grill-with-docs", "domain-modeling", "improve-codebase-architecture",
+    "research", "prototype", "tdd", "diagnosing-bugs", "code-review", "codebase-design",
+    "writing-for-agents", "pr", "wizard", "setup-pre-commit", "git-guardrails-claude-code",
+    "migrate-to-shoehorn", "scaffold-exercises", "find-skills"
+  ],
+  "conventional_paths": {
+    "说明": "约定位置：文档里写了这个路径，文件在写入时才创建，平时不存在，不算死引用。只写具体的文件，不写整个目录。",
+    "paths": ["agents_jour/其他.md"]
+  },
+  "table_headers": {
+    "状态": "label",
+    "技能": "skill"
+  }
+}

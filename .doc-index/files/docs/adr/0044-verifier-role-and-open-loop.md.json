@@ -1,0 +1,12 @@
+{
+"schema":1,
+"path":"docs/adr/0044-verifier-role-and-open-loop.md",
+"hash":"b1c2ffdb1dc08ef3",
+"nodes":[
+{"hash":"b1c2ffdb1dc08ef3","id":"docs/adr/0044-verifier-role-and-open-loop.md","kind":"file","title":"docs/adr/0044-verifier-role-and-open-loop.md"},
+{"hash":"b1c2ffdb1dc08ef3","id":"docs/adr/0044-verifier-role-and-open-loop.md#核验是角色的性质，固定结构只剩循环、边界、裁决","kind":"section","parent":"docs/adr/0044-verifier-role-and-open-loop.md","title":"核验是角色的性质，固定结构只剩循环、边界、裁决"}
+],
+"edges":[
+
+]
+}

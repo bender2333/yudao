@@ -1,0 +1,15 @@
+{
+"schema":1,
+"path":"docs/requirements/delivery-archive.md",
+"hash":"8dbc29d6a30ae01e",
+"nodes":[
+{"hash":"8dbc29d6a30ae01e","id":"docs/requirements/delivery-archive.md","kind":"file","title":"docs/requirements/delivery-archive.md"},
+{"hash":"3ae3510bdd92bf96","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","kind":"section","parent":"docs/requirements/delivery-archive.md","title":"D13 完整交付封存与恢复"},
+{"hash":"4e991ed75bf146f7","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 来源与本轮决定","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"来源与本轮决定"},
+{"hash":"eb0d5cccec52ef36","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 有效规则","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"有效规则"},
+{"hash":"b6c7a8f044dcc1ab","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 状态","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"状态"}
+],
+"edges":[
+
+]
+}

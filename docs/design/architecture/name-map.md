@@ -2,7 +2,7 @@
 
 总图位置：第四节「要守的缝」的十三道缝，以及第一节的方框、第三节内环六步与外环九个状态。
 
-子架构师维护的对照表：总图的词、代码里现在的名字、归哪道缝。立缝时把那一行改成「一致」。按 main 2026-10-29（`c5308acf`）清点。
+子架构师维护的对照表：总图的词、代码里现在的名字、归哪道缝。立缝时把那一行改成「一致」。按 main `c5308acf` 清点。
 
 ## 用法
 
@@ -16,7 +16,7 @@
 
 路径省略的前缀：Python 在 `harness/` 下，TypeScript 在 `client/src/renderer/src/` 下。
 
-## 1. 系统里的十道缝
+## 1. 系统里的九道缝
 
 ### 写入口
 
@@ -48,6 +48,7 @@
 | 事项 | 第一、三节 | 项目流里叫 work_item（`work_item_created`、命令 `work_item.create`、`work_item.cancel`、`work_item.append_input`，查询 `work_item.*`）；事项的一次执行叫 run（`run_stream`、`run_created` 至 `run_continued`、`RunProjection`，查询 `run.*`） | 路由、接口 | 不一致：总图只有事项，代码与接口资源名里 `work_item` 与 `run` 两个名字并存 |
 | 放行或开环完成，事项完成 | 第三节外环 | 放行：质检结论 `models.py` 的 `QAReview`（`verdict` 字段）、事件 `qa_submitted`；事项结束 `run_done`；开环完成：无 | 路由 | 不一致：放行没有自己的名字，是质检结论的一个取值；开环完成代码里还没有 |
 | 直做 | 第一节「轮转方式」 | 无 | 路由；道 03 | 代码里还没有 |
+| 交完成（直做） | 第一节「轮转方式」；第三节外环「开环时交完成」 | 无；成果驱动下结束事项的是质检结论 `submit_review` 的 `verdict: release` | 路由；道 03 | 代码里还没有 |
 | 子事项、子组织 | 第一节「工程」；第三节「子组织」 | 无 | 路由、执行；道 02 | 代码里还没有 |
 
 ### 装配
@@ -72,6 +73,7 @@
 | 部门成员（一个会话） | 第六节「可以多份」 | `sessions.py` 的 `DepartmentSession`、`SessionFactory`；`models.py` 的 `SessionRecord` | 执行 | 一致 |
 | 询问 | 第三节外环「询问中」；第四节执行「出」 | 事件 `ask_started`、`ask_answered`；`adjudication.ask_chain_decision`；`watched_outputs.py` 的 `pending_ask_department`、`ask_branch`、`ask_outcome`；`SafeNode.ask`；查询 `run.asks` | 执行、路由 | 一致 |
 | 外包角色 | 第一节「工程」；第四节执行 | 无 | 执行；道 02 | 代码里还没有 |
+| 开子事项的请求 | 第四节执行「出」；第三节「子组织」 | 无（执行契约的结果只有这一轮写下的事件范围、停止原因与三样观察） | 执行；道 02 | 代码里还没有 |
 
 ### 模型
 
@@ -94,7 +96,7 @@
 | 工具请求 | 第四节执行「出」 | `tools.py`；事件 `tool_call_required`、`tool_called`、`tool_started`、`tool_skipped` | 动作、执行 | 一致 |
 | 起点快照、封存快照 | 第一节「一份事实」；第四节动作「请求」 | 封存：`snapshot.py`（`ingest_snapshot`、`restore_snapshot`）、`workspace.py` 的 `WorkspaceSnapshot`、`LocalEnvironment.snapshot()`；动作请求里的起点叫 `Preconditions.tree_digest`（公开树摘要）；动作前的公开树快照记在事件 `tool_started` 的 `before_snapshot_ref` | 动作 | 不一致：动作请求里的起点叫树摘要，不叫快照；快照在事件载荷里，不在请求里 |
 | 终点快照、前后差异 | 第四节动作「回执」 | 回执 `ActionReceipt` 不带终点与差异；动作后的公开树快照记在事件 `tool_called` 的 `after_snapshot_ref`；前后差异只在恢复核实时比较（`app/payloads.py` 的 `FileActionComparison`） | 动作 | 不一致：终点快照在事件载荷里，不在回执里；前后差异代码里还没有字段 |
-| 核实方法、能否取消 | 第四节动作「请求」 | 动作请求里没有这两项；核实只有事件 `action_verified` 与 `environment.py` 的 `LocalEnvironment.verify_tree`，取消是 `LocalEnvironment.cancel` 按动作身份取消、回执状态 `cancelled` | 动作 | 代码里还没有（作为动作合同的字段） |
+| 核实方法、能否取消 | 第四节动作「请求」 | `actions.py` 的 `Action.verification`（`Verification`）、`Action.cancellable`，缺少时按类别的既定值解释（`check_contract`）；核实的执行是事件 `action_verified` 与 `environment.py` 的 `LocalEnvironment.verify_tree`，取消是 `LocalEnvironment.cancel`、回执状态 `cancelled` | 动作 | 一致 |
 | 工作区 | 第三节「从快照建工作区」；第六节 | `workspace.py` 的 `Workspace`；检查工作区 `environment.inspection_root`（目录 `inspections`） | 动作 | 一致 |
 | 远程执行 | 第一节「模型与工具」；第六节 | 无 | 动作；道 05、10 | 代码里还没有 |
 
@@ -110,25 +112,15 @@
 
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
-| 应用层 | 第一节「界面」悬停；第四节接口的内侧 | `app/application.py` 的 `Application`、`ReadOnlyCore`；`app/registry.py` 的 `Registry` | 接口 | 一致 |
+| 应用层 | 第一节「页面」悬停；第四节接口的内侧 | `app/application.py` 的 `Application`、`ReadOnlyCore`；`app/registry.py` 的 `Registry` | 接口 | 一致 |
 | 命令（带身份） | 第四节接口 | `app/registry.py` 的 `CommandDefinition`、`app/contracts.py` 的 `CommandRequest`、`Accepted`、`Rejected`；路径 `/api/commands/<名字>` | 接口 | 一致 |
 | 查询（只读快照） | 第四节接口 | `app/registry.py` 的 `QueryDefinition`、`app/contracts.py` 的 `Snapshot`；路径 `/api/queries/<名字>` | 接口 | 一致 |
 | 事件流（从某个位置起） | 第四节接口 | `app/event_stream.py` 的 `EventStream`、`StreamCheckpoint`、`StreamResync`、`StreamDelta`；路径 `/api/events` | 接口 | 一致 |
 | 带版本号 | 第四节接口 | `api/app.py` 的 `contract_digest`；接口快照 `harness/tests/openapi/openapi.json`；客户端 `api/interface-version.ts` 的 `CLIENT_API_VERSION`；能力清单 `/api/capabilities`（`Capabilities`） | 接口 | 一致 |
-| 接口层 | 第一节「界面」悬停 | `api/`（`app.py` 的 `create_app`、`server.py`、`access.py`、`pages.py`） | 接口 | 一致 |
+| 接口层 | 第一节「页面」悬停 | `api/`（`app.py` 的 `create_app`、`server.py`、`access.py`、`pages.py`） | 接口 | 一致 |
 | 等用户、决定请求 | 第三节外环「等用户」 | `decisions.py`（`DecisionKind`、`blocks_run`）、`kernel_events.py` 的 `DecisionRequest`；事件 `decision_requested`、`decision_answered`、`decision_withdrawn`；命令 `decision.answer`，查询 `decisions.list` | 接口、写入口 | 一致 |
-
-### 画面
-
-| 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
-| --- | --- | --- | --- | --- |
-| 界面 | 第一节「界面」 | `client/`；壳 `shell/`、页面 `views/` | 画面、接口；道 09 | 一致 |
-| 同步层 | 第一节「界面」悬停 | `contract/view-sync.ts` 的 `ViewSync`、`contract/event-stream.ts`、`contract/stream-state.ts`（目录叫 contract） | 接口（读者一侧） | 一致 |
-| 翻译层 | 第四节画面 | `translate/`（`building.ts` 的 `buildingState`、`buildingActions`；`floor.ts` 的 `floorState`、`floorActions`、`floorCards`、`streamText`；`room.ts` 的 `state`、`actions`；`tables.ts` 的状态对应表；`say.ts`；`coverage.ts` 核对每种事件的归属） | 画面 | 一致 |
-| 画面层 | 第四节画面 | `pixel/`（`building/view.ts`、`floor/view.ts`、`room/view.ts` 的 `createBuildingView`、`createFloorView`、`createRoomView`；`world/`、`room/`、`floor/`、`building/`）；页面里的挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx` | 画面；道 09 | 不一致：叫 pixel，不叫画面层；输入类型带 Pixel 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`） |
-| 元件断言、回链 | 第四节画面「交换」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
-| 播放参数 | 第四节画面「交换」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
-| 页面 | 第一节「界面」悬停 | `views/`（`home/`、`project/`、`decisions/`、`models/`、`system/`、`timeline/`）、`shell/` | 画面（页面一侧）、接口 | 一致 |
+| 同步层（页面一侧） | 第一节「页面」悬停 | `contract/view-sync.ts` 的 `ViewSync`、`contract/event-stream.ts`、`contract/stream-state.ts`（目录叫 contract） | 接口（读者一侧） | 一致 |
+| 页面 | 第一节「页面」 | `client/`：页面 `views/`（`home/`、`project/`、`decisions/`、`models/`、`system/`、`timeline/`）、壳 `shell/` | 接口（读者一侧）；道 09 | 一致 |
 
 ### 定义
 
@@ -147,7 +139,7 @@
 | 登记的机器 | 第四节定义「交换」；第六节 | 无 | 定义；道 10 | 代码里还没有 |
 | 限定采用的范围 | 第四节定义「交换」；第五节第二层 | 无 | 定义 | 代码里还没有 |
 
-## 2. 系统之外的三道缝
+## 2. 系统之外的四道缝
 
 | 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
 | --- | --- | --- | --- | --- |
@@ -155,6 +147,26 @@
 | 观察者 | 第一节「观察者」；第四节观察者 | 无；教训候选由 `submissions.py` 的 `SubmissionWriter.record_lesson_candidate` 在控制核心里写（`orchestrator.py` 调用），事件 `lesson_candidate_recorded`，不经观察者缝 | 观察者；道 07 | 代码里还没有 |
 | 读取范围、振荡信号 | 第四节观察者「交换」 | 无（最接近的是事件流按范围筛选，`app/event_stream.py` 的 `EventScope`，范围由连接的参数给出，不在定义里声明） | 观察者；道 07 | 代码里还没有 |
 | 看门狗（健康探针、切换命令、排空命令） | 第一节「看门狗」；第四节看门狗 | 看门狗与健康探针、切换命令都没有；排空已有：`streams.py` 的 `DrainState`、命令 `runtime.start_drain`、`runtime.force_upgrade`，事件 `runtime_drain_started`、`runtime_drain_finished` | 看门狗；道 10 | 代码里还没有（排空命令一项一致） |
+
+### 画面
+
+画面在系统之外，经接口读事实（总图第四节「画面」：接口 ↔ 画面）。下面是它在代码里现在的样子。
+
+| 总图的词 | 总图位置 | 代码里现在的名字 | 归哪道缝或哪条道 | 状态 |
+| --- | --- | --- | --- | --- |
+| 画面（单独的应用） | 第一节系统之外的「画面」；第四节画面 | 还在 `client/src/renderer/src/` 里，与页面同一个目录、同一份依赖与构建：`pixel/`、`translate/`，挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx`，图鉴 `views/pixel/gallery.tsx`，开发挂载 `pixel/floor/dev-mount`（`main.tsx` 引入） | 画面；画面的阶段步 0 | 不一致：没有单独的目录、依赖与构建；页面取画面的文字与颜色（`views/project/labels.ts`、`materials.tsx`），翻译层反过来取页面的部门名与卡片文字（`translate/floor.ts`） |
+| 壳 | 画面总图第一节「壳」、第四节「回调」 | 没有单独的壳：三个挂载兼做连接，回调直接调页面的函数 | 画面 | 不一致：回调不经命令发现，点开回链在画布上画卡片 |
+| 画面的同步层 | 画面总图第四节「读事实」 | 与页面共用 `contract/view-sync.ts` | 画面 | 不一致：画面没有自己的一份 |
+| 事件种类、缺口清单 | 画面总图第二节「可以落后」、第四节「映射」 | 事件种类取自客户端夹具 `client/tests/fixtures/event-types.json`，由服务端的 `harness/tests/test_event_type_fixture.py` 与 `EVENT_TYPES` 核对；`translate/coverage.ts` 缺一种事件就测试失败；缺口清单：无 | 画面 | 不一致：服务端为画面维护夹具；不认识的事件让测试失败，不进缺口清单 |
+| 翻译层 | 第四节画面 | `translate/`（`building.ts` 的 `buildingState`、`buildingActions`；`floor.ts` 的 `floorState`、`floorActions`、`floorCards`、`streamText`；`room.ts` 的 `state`、`actions`；`tables.ts` 的状态对应表；`say.ts`；`coverage.ts` 核对每种事件的归属） | 画面 | 一致 |
+| 画面层 | 第四节画面 | `pixel/`（`building/view.ts`、`floor/view.ts`、`room/view.ts` 的 `createBuildingView`、`createFloorView`、`createRoomView`；`world/`、`room/`、`floor/`、`building/`）；页面里的挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx` | 画面；道 09 | 不一致：叫 pixel，不叫画面层；输入类型带 Pixel 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`） |
+| 元件断言、回链 | 第四节画面「交换」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
+| 播放参数 | 第四节画面「交换」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
+| 七种元件的对照表 | 画面总图第四节「映射」 | `translate/coverage.ts`：事件在三个场景的归属 `COVERAGE`、覆盖层的中文名 `OVERLAY_LABELS`；概念到元件的行：无 | 画面；道 09 | 不一致：只有事件与覆盖层两份，没有概念到七种元件的表，事实元素与视觉通道没有核对 |
+| 画面拓扑（屋、管道、盖章台从定义推出） | 画面总图第五节 | 写死在画面层：`pixel/world/floor-decl.ts` 的 `ROOMS`、`pixel/building/render.ts` 的 `ROOMS`、`pixel/room/layout.ts` 的 `ROOM_DEPTS`；合同里楼的亮灯 `lit` 是固定的四个部门字段（`pixel/contract.ts`）；楼层查询的 `departments` 按固定的 `DEPARTMENTS` 列出（`harness/app/project_queries.py`） | 画面、接口；道 09 | 不一致：拓扑不从事项冻结的定义来，画面层按部门名分支 |
+| 盖章台、出口托盘 | 画面总图第五节 | 盖章台：`pixel/room/layout.ts` 按部门 `quality` 画「检验台」；出口托盘：无 | 画面 | 不一致：按部门名取，不按核验角色 |
+| 章（放行、开环完成） | 画面总图第五节 | 合同 `pixel/contract.ts` 的 `Stamp`（楼层状态的 `stamp`）；动作 `stamp_release`、`stamp_defect`、`stamp_valid`（`translate/floor.ts`）；开环完成章：无 | 画面 | 不一致：开环完成章代码里还没有 |
+| 点开回链 | 画面总图第一节「页面」、第四节「回调」 | 画布上的来源卡片 `pixel/floor/card.ts` 的 `createSourceCard`，卡片内容 `SourceCardFace`（`pixel/contract.ts`）画原始事件与差异 | 画面（页面一侧） | 不一致：细内容画在画布上，没有交给页面 |
 
 ## 3. 外环的九个状态
 
@@ -172,7 +184,24 @@
 | 排空中 | 第三节外环 | `streams.py` 的 `DrainState`（见看门狗一行） | 看门狗 | 一致 |
 | 停止 | 第三节外环 | run 的终态 `paused`、`failed` 加 `stop_reason`；`done` 是放行或开环完成以后的完成（开环完成代码里还没有；`coverage.py` 里的「开环」是检验覆盖的说法，不是这个词） | 路由、定义 | 不一致：代码按暂停、失败分两种终态，总图只有停止，原因来自封闭清单 |
 
-## 变更记录
+## 4. 每道缝的守卫
 
-- 2026-10-29 / claude-sonnet-5-5 / 对着 main c5308acf 重核全表：改了 34 行（11 行把原来写「无」或「代码里还没有」的补上了代码里已有的名字，4 行补上漏记的名字，19 行订正名字或它所在的文件）；判断改为「一致」的 7 行、改为「不一致」的 4 行，「路由实现与它的定义、工作单元的大小」一行拆成两半分别判断；去掉旧提交号，其余行的名字核对无误；说明段里「一致的词不用记，立缝时逐行消」一句改为立缝时把那一行改成一致（表里仍有大量一致的行，原句与表相矛盾） / 原表按 2026-10-25 清点，整片过期（decision.md 2026-10-29）
-- 2026-10-31 / claude-opus-5-5 / 加直做、子事项与子组织、核验角色、写入范围、成果种类与提案合同五行，「质检放行，事项完成」改为「放行或开环完成，事项完成」；「部门与角色」「核验中」改为不一致，`VERIFIER_OF` 从「谁能拒绝谁」移到核验角色一行；接纳补 `artifact_accepted`；`done` 一句补开环完成 / 按总图 ADR-0044 的改动核对
+守卫是 CI 或手动能跑的自动检查。这张表是长期记录，按缝的差异报告（`.claude/skills/seam-diff/SKILL.md`）每次从这里取守卫清单去跑；守卫加了、删了、改名了，在这里改。「守的规矩」只写守卫实际断言的那几条，总图这道缝的规矩里没写进这一栏的，就是没有守卫。测试文件省略前缀 `harness/tests/`，括号里是测试分层登记表（`harness/tests/layers.toml`）的层。
+
+| 缝 | 两侧在代码里 | 守卫 | 守的规矩 |
+| --- | --- | --- | --- |
+| 写入口 | 写入方：`orchestrator.py`、`projects.py`、`app/` 的命令 ↔ `write_path.py`、`event_store.py` | `kernel/test_single_write_path.py`（单元）、`test_write_path.py`（模块）、`test_concurrent_commands.py`（集成）、`kernel/test_tool_needs_permission.py`（单元）、`kernel/test_tightening_only_rejects_or_waits.py`（模块） | 事实只经写入口写入；先过裁决；同一事务核对执行权编号与流版本；按命令身份去重；工具开始之前有许可记录 |
+| 路由 | 薄驱动 `orchestrator.py` ↔ 契约 `routing_contract.py`，实现 `watched_outputs.py`、`tightening.py` | `test_routing_contract.py`（单元）、`test_second_routing.py`（模块）、`test_thin_driver_names.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_contract_surface.py`（单元） | 契约的公开名称与版本；第二种路由（测试里的任务池）接上同一副骨架跑完一个事项；薄驱动的源码里没有部门与成果的名字；每种路由带自己的定义与结束原因 |
+| 装配 | 执行 `engine.py` ↔ 契约 `assembly_contract.py`，实现 `assembly.py`、`context.py`、`compaction.py` | `test_slot_contracts.py`（模块）、`test_contract_seams.py`（模块）、`test_second_slot_implementations.py`（模块）、`test_contract_modules.py`（单元） | 输入输出的形状；交给模型的那份与上下文清单记进事实；装配不写事实事件；第二种装配接上以后薄驱动不改 |
+| 执行 | 薄驱动 `orchestrator.py`（安全节点 `_SafeNode`）↔ 契约 `execution_contract.py`，实现 `engine.py`、`recording.py` | `test_slot_contracts.py`（模块）、`test_second_slot_implementations.py`（模块）、`test_contract_seams.py`（模块）、`kernel/test_every_stop_has_reason.py`（单元）、`kernel/test_limits_survive_restart.py`（集成） | 每一步先问安全节点；取消与上限时停下，停止原因取自封闭清单；重启以后用量连续累计；第二种执行接上以后薄驱动不改 |
+| 模型 | 执行 `engine.py` ↔ `providers/`、`adapters/` | `test_providers_module.py`（集成）、`test_call_target_per_request.py`（集成）、`test_resolve_call_target.py`（单元）、`test_redact.py`（模块）、`test_saved_projections.py`（集成） | 每次请求解析一次调用目标；凭据不进事实与导出；重放不调模型 |
+| 动作 | 工具 `tools.py`、`engine.py` ↔ `environment.py`、`actions.py`、`workspace.py`、`snapshot.py` | `test_action_contract.py`（模块）、`test_tool_contracts.py`（单元）、`kernel/test_only_grows.py`（单元）、`test_workspace_boundary.py`（单元） | 两种环境（本机与测试里的第二种）接受同一份动作合同、给出同样的回执；动作类别与回执字段只增；控制核心不直接读写工作区 |
+| 投影 | `event_store.py` → `projection.py`、`project_projection.py`、`app/read_models.py`；内核的 `minimal_projection.py` | `test_replay.py`（模块）、`test_saved_projections.py`（集成）、`kernel/test_minimal_projection.py`（模块）、`kernel/test_minimal_projection_baselines.py`（集成）、`kernel/test_skeleton_events.py`（单元）、`test_event_classification.py`（单元） | 从头重算得到同一状态；最小投影与应用投影逐项一致；骨架事件有登记表；每种事件声明所属的流 |
+| 接口 | 页面 `client/`、命令行、`evals/`、画面 ↔ 应用层 `app/`，经接口层 `api/` | `test_layers.py`（单元，导入方向合同，定义在 `pyproject.toml` 的 `[tool.importlinter]`）、`test_openapi_snapshot.py`（模块）、`test_event_stream.py`（模块）、`test_capabilities.py`（模块） | 接口层只导入应用层、应用层只导入控制核心的公开接口；合同快照不偷偷改；事件流按位置续；能力清单列出改变每条查询的事件 |
+| 画面 | 接口 `harness/api/` ↔ 画面（现在还在 `client/src/renderer/src/` 的 `translate/`、`pixel/` 与三个挂载里）；里面一道是翻译层 ↔ 画面层，合同 `pixel/contract.ts` | 客户端 `client/tests/unit/pixel-imports.test.ts`、`pixel-contract.test.ts`、`translate-coverage.test.ts`（都在合并门里）；逐场景回放 `pixel-floor-replay.test.ts`、`pixel-room-replay.test.ts`、`pixel-building-replay.test.ts`（不在 CI 里，手动跑） | 画面层只导入画面合同与自己的声明表；合同取值逐项校验；每种事件在三个场景里都有归属（缺一种就失败）；回放的每个检查点与原型逐像素相同。画面与基础部分互不导入、画面的测试不进合并门、认不出的事件进缺口清单：没有守卫 |
+| 定义 | 文件 `harness/definitions/*.json` ↔ `definitions/__init__.py` | `test_definitions.py`（集成）、`test_definition_rules.py`（单元）、`test_routing_definition.py`（模块）、`kernel/test_definitions_decide.py`（单元）、`test_frozen_parameters.py`（集成） | 加载与校验；版本是内容摘要；裁决读事项所用的那份定义；参数建 run 时冻结 |
+| 评价 | `evals/`、`release_check.py` → 系统（经接口） | `evals/tests/test_no_harness_import.py`、`evals/tests/test_no_harness_paths.py`；内核清单的 `material` 条目由 `path_guard.py` 在采纳前比较（`test_projects.py` 的内核守卫用例，集成）；`test_release_check.py`（模块） | 评测工具不导入 `harness`、不引用它的内部路径；改动评价材料的交付不自动采纳；发布检查的清单与检查取自运行中的实例，改待发布提交里的清单与检查不改变结果 |
+| 观察者 | 无 | 无 | 无 |
+| 看门狗 | 无；排空在 `streams.py` 的 `DrainState` | `test_runtime_drain.py`、`test_drain_upgrade.py`（集成，只守排空） | 排空期间新事项排队、在跑的照常结束 |
+| 四层 | 上面两层（事实与裁决、循环）的文件：内核清单里 `kind` 为 `module` 的文件，五个契约模块，`orchestrator.py`、`runtime.py`、`engine.py`、`assembly.py`、`context.py` | `test_thin_driver_names.py`（单元，只查 `orchestrator.py`）；其余文件靠差异报告里的部门名检索 | 薄驱动不写部门与成果的名字 |
+| 三环 | 第三环：内核清单 `harness/definitions/kernel-manifest.json`；第二环：五个契约模块、骨架事件、接口合同、定义格式；第一环：各道缝的实现 | 第三环 `kernel/test_manifest.py`（单元，导入方向与行数）、`path_guard.py`；第二环 `kernel/test_contract_surface.py`、`kernel/test_only_grows.py`、`test_contract_modules.py`、`test_openapi_snapshot.py`；第一环 `test_second_routing.py`、`test_second_slot_implementations.py`、`test_action_contract.py` 的第二种实现 | 内核只导入内核与标准库、行数有上限；契约名称与版本、骨架事件与停止原因只增；路由、装配、执行、执行环境能换第二种实现 |

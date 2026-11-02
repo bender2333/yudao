@@ -1,0 +1,16 @@
+{
+"schema":1,
+"path":"docs/requirements/expert-ask-react.md",
+"hash":"b678beade1580c89",
+"nodes":[
+{"hash":"b678beade1580c89","id":"docs/requirements/expert-ask-react.md","kind":"file","title":"docs/requirements/expert-ask-react.md"},
+{"hash":"226baa77494bb22a","id":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答","kind":"section","parent":"docs/requirements/expert-ask-react.md","title":"D07 三部门相互专家问答"},
+{"hash":"641762685a24d470","id":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答 > 用户原话","kind":"section","parent":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答","title":"用户原话"},
+{"hash":"6a5bda95c8aca5e9","id":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答 > 已确认","kind":"section","parent":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答","title":"已确认"},
+{"hash":"e0867c1aca63da37","id":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答 > 本轮设计选择","kind":"section","parent":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答","title":"本轮设计选择"}
+],
+"edges":[
+{"dst":"docs/design/department-roles.md","kind":"link","raws":["../design/department-roles.md"],"seen":"618cddeb69cfc27e","src":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答 > 本轮设计选择"},
+{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"cbb9662c59025bd9","src":"docs/requirements/expert-ask-react.md#D07 三部门相互专家问答 > 本轮设计选择"}
+]
+}
