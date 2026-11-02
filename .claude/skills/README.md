@@ -31,7 +31,7 @@
                                          │过了
 薄片达到 ──/trial-intake 推进──► 复盘 → agent 试用 → 修缺陷 → 发布 → 走查 → 导游卡 → 用户试用
                                                                                      │
-                                       /trial-intake 反馈 ──► 缺陷成子工单 / /module-sync / 交总架构师
+                                       /trial-intake 反馈 ──► 缺陷成子工单 / /module-sync / architecture 工单
 交回的工单、solo 转给用户的工单、Discussions 的想法 ──/triage──► 放回、拆小、补设计或交给用户
 ```
 
