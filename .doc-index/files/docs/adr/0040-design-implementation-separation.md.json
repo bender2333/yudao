@@ -1,0 +1,13 @@
+{
+"schema":1,
+"path":"docs/adr/0040-design-implementation-separation.md",
+"hash":"e13e2bc72a154c3b",
+"nodes":[
+{"hash":"e13e2bc72a154c3b","id":"docs/adr/0040-design-implementation-separation.md","kind":"file","title":"docs/adr/0040-design-implementation-separation.md"},
+{"hash":"e13e2bc72a154c3b","id":"docs/adr/0040-design-implementation-separation.md#设计与实施分离：设计说明不记状态，易变的一方反向引用设计","kind":"section","parent":"docs/adr/0040-design-implementation-separation.md","title":"设计与实施分离：设计说明不记状态，易变的一方反向引用设计"}
+],
+"edges":[
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/adr/0040-design-implementation-separation.md#设计与实施分离：设计说明不记状态，易变的一方反向引用设计"},
+{"dst":"docs/agents/design-spec.md","kind":"link","raws":["../agents/design-spec.md"],"seen":"2ffb04cf2733009d","src":"docs/adr/0040-design-implementation-separation.md#设计与实施分离：设计说明不记状态，易变的一方反向引用设计"}
+]
+}

@@ -1,0 +1,14 @@
+{
+"schema":1,
+"path":"evals/scenarios/scenario-1/materials/interface-agreement.md",
+"hash":"03ca12013253cb57",
+"nodes":[
+{"hash":"03ca12013253cb57","id":"evals/scenarios/scenario-1/materials/interface-agreement.md","kind":"file","title":"evals/scenarios/scenario-1/materials/interface-agreement.md"},
+{"hash":"306cc689a2aba6e6","id":"evals/scenarios/scenario-1/materials/interface-agreement.md#Scenario 1 Interface Agreement","kind":"section","parent":"evals/scenarios/scenario-1/materials/interface-agreement.md","title":"Scenario 1 Interface Agreement"},
+{"hash":"f8ec82471ca4199c","id":"evals/scenarios/scenario-1/materials/interface-agreement.md#Scenario 1 Interface Agreement > 1. Application Startup","kind":"section","parent":"evals/scenarios/scenario-1/materials/interface-agreement.md#Scenario 1 Interface Agreement","title":"1. Application Startup"},
+{"hash":"887f10db562fa836","id":"evals/scenarios/scenario-1/materials/interface-agreement.md#Scenario 1 Interface Agreement > 2. Interaction and Interface","kind":"section","parent":"evals/scenarios/scenario-1/materials/interface-agreement.md#Scenario 1 Interface Agreement","title":"2. Interaction and Interface"}
+],
+"edges":[
+
+]
+}

@@ -1,0 +1,19 @@
+{
+"schema":1,
+"path":"evals/scenarios/scenario-3/materials/interface-agreement.md",
+"hash":"340becdf3eb532bb",
+"nodes":[
+{"hash":"340becdf3eb532bb","id":"evals/scenarios/scenario-3/materials/interface-agreement.md","kind":"file","title":"evals/scenarios/scenario-3/materials/interface-agreement.md"},
+{"hash":"f7627bf0438ec7ae","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md","title":"Scenario 3 Interface Agreement (appended after the PRD)"},
+{"hash":"8e62bd9da6e1271c","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD) > 1. Data file and modules","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","title":"1. Data file and modules"},
+{"hash":"e2aefd9dff3179e0","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD) > 2. models","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","title":"2. models"},
+{"hash":"3118cca6246b0d8f","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD) > 3. pathfinding","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","title":"3. pathfinding"},
+{"hash":"78dd5ef61f4c525c","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD) > 4. fare_calculator","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","title":"4. fare_calculator"},
+{"hash":"be4754462be462eb","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD) > 5. Program entry","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","title":"5. Program entry"},
+{"hash":"78636a3bd67d555d","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD) > 6. Text export layout","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","title":"6. Text export layout"},
+{"hash":"b17903c6ff06425c","id":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD) > 7. JSON export fields","kind":"section","parent":"evals/scenarios/scenario-3/materials/interface-agreement.md#Scenario 3 Interface Agreement (appended after the PRD)","title":"7. JSON export fields"}
+],
+"edges":[
+
+]
+}

@@ -1,0 +1,14 @@
+{
+"schema":1,
+"path":"evals/data/README.md",
+"hash":"ba12403c6a3f3b91",
+"nodes":[
+{"hash":"ba12403c6a3f3b91","id":"evals/data/README.md","kind":"file","title":"evals/data/README.md"},
+{"hash":"ba12403c6a3f3b91","id":"evals/data/README.md#不可变输入：场景 3 旧口径报告","kind":"section","parent":"evals/data/README.md","title":"不可变输入：场景 3 旧口径报告"}
+],
+"edges":[
+{"dst":"docs/evaluation/scenario-3-yudao.json","kind":"code-path","raws":["docs/evaluation/scenario-3-yudao.json"],"seen":"910ffc062fe6abc5","src":"evals/data/README.md#不可变输入：场景 3 旧口径报告"},
+{"dst":"evals/data/scenario-3-yudao-historical.json","kind":"code-path","raws":["scenario-3-yudao-historical.json"],"seen":"15d398e873e08553","src":"evals/data/README.md#不可变输入：场景 3 旧口径报告"},
+{"dst":"evals/runner/regen_scenario3.py","kind":"code-path","raws":["evals/runner/regen_scenario3.py"],"seen":"4126540db9b5d523","src":"evals/data/README.md#不可变输入：场景 3 旧口径报告"}
+]
+}

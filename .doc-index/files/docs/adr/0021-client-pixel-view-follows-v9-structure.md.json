@@ -1,0 +1,15 @@
+{
+"schema":1,
+"path":"docs/adr/0021-client-pixel-view-follows-v9-structure.md",
+"hash":"15afdd9d5eee1b57",
+"nodes":[
+{"hash":"15afdd9d5eee1b57","id":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","kind":"file","title":"docs/adr/0021-client-pixel-view-follows-v9-structure.md"},
+{"hash":"15afdd9d5eee1b57","id":"docs/adr/0021-client-pixel-view-follows-v9-structure.md#画面是单独的应用，按画面合同与诚实性验收","kind":"section","parent":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","title":"画面是单独的应用，按画面合同与诚实性验收"}
+],
+"edges":[
+{"dst":"docs/architecture-view.html","kind":"link","raws":["../architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/adr/0021-client-pixel-view-follows-v9-structure.md#画面是单独的应用，按画面合同与诚实性验收"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"e823b2d5f74922e1","src":"docs/adr/0021-client-pixel-view-follows-v9-structure.md#画面是单独的应用，按画面合同与诚实性验收"},
+{"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"f32e507ada24faef","src":"docs/adr/0021-client-pixel-view-follows-v9-structure.md#画面是单独的应用，按画面合同与诚实性验收"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/adr/0021-client-pixel-view-follows-v9-structure.md#画面是单独的应用，按画面合同与诚实性验收"}
+]
+}

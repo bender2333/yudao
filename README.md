@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/bender2333/yudao/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/bender2333/yudao/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
 
-徽章显示 main 上最近一次合并以后的 CI 结果。测试分三层，按时机运行（[测试分层](docs/design/test-pyramid.md)第 4 节）：
+徽章显示 main 上最近一次合并以后的 CI 结果。测试分三层，按时机运行（[测试分层](docs/design/test-pyramid.md)「各角色运行哪一层」）：
 
 | 时机 | CI 作业 | 挡什么 |
 | --- | --- | --- |
@@ -12,11 +12,11 @@
 
 每次运行的摘要页列出各层的文件数、用例数与结果；PR 上的「用例变化」列出合并前后各层用例的增减。只改 `docs/` 与日记的提交不运行 CI，徽章保持上一次的结果。
 
-面向自治系统研发者的三部门原生循环运行时。产品、工程、质检共同构成 Yudao 的 Agent loop：内核逐步装配上下文、调用模型、执行工具，并按成果的新版本决定哪个部门开始一轮工作。模型自然语言不能结束任务；只有绑定当前有效合同、交付和完整代码树的 QA release 才能进入 `DONE`。
+面向自治系统研发者的三部门原生循环运行时。产品、工程、质检三个部门轮流工作：哪个部门关注的成果有了新版本，它就开始一轮工作。模型自然语言不能结束任务；只有绑定当前有效合同、交付和完整代码树的 QA release 才能进入 `DONE`。
 
 ## 当前状态
 
-路线按[总体路线图](docs/program-roadmap.md)的五个阶段推进，每个阶段是一个 GitHub 里程碑，名字与路线图的阶段相同，进度看里程碑。之前按 Stage 1 至 3 的建设（可信交付、三部门 Harness 基线、Provider 层、网页界面与模型管理）已经完成或并入下面的阶段，对应关系见 [CONTEXT.md](CONTEXT.md)「旧阶段名」。
+路线按[总体路线图](docs/program-roadmap.md)的五个阶段推进，每个阶段是一个 GitHub 里程碑，名字与路线图的阶段相同，进度看里程碑。
 
 - **阶段一：单机诚实闭环，三道槽位立缝**：进行中。
   - 阶段一的里程碑回答「核心打通与换骨架」：三部门同时工作、询问是嵌套的调用、命令执行、网页界面与模型管理已合并；剩下指导的送达与三种状态、页面按部门显示状态与询问，薄驱动与路由、装配、执行三道槽位的契约，画面按画面合同跟上原型 v13；最后用真实模型走查一次，再交给用户试用。
@@ -25,21 +25,19 @@
 
 ### 现在能试什么
 
-- 最新的发布是 [v0.1.1](https://github.com/bender2333/yudao/releases/tag/v0.1.1)（2026-10-06），早于网页界面。
+- 最新的发布是 [v0.1.1](https://github.com/bender2333/yudao/releases/tag/v0.1.1)，早于网页界面。
 - 下一个发布是阶段一达到时的版本，附试用指南。
 - 想先看 main 上的网页界面：在与 origin/main 一致、没有未提交改动的检出上运行 `uv run python scripts/release.py`（需要 Node 22.12 以上；只构建 wheel，不发布），再按下面「安装与启动」安装它输出的 wheel。直接从源码运行服务时没有页面文件，页面只返回「没有页面文件」。
 
-当前入口：[总体路线图](docs/program-roadmap.md)；进度看 GitHub 的里程碑。历史证据见 [验收记录](docs/archive/mvp-acceptance.md) 与 [Stage 2 进度](docs/archive/stage-2-progress.md)。
+当前入口：[总体路线图](docs/program-roadmap.md)；进度看 GitHub 的里程碑。
 
-## 分层
+## 参与开发
 
-```text
-任务与观察层  网页界面 / 应用接口 / REST / 事件流（SSE）
-三部门循环核  Orchestrator、逐步上下文装配、合同校验、循环次数与停止判定
-基础能力层    单次 Responses 模型请求、宿主工具、工作区、事件、工件与 Git 版本存储
-```
+这个仓库由架构师与 agent 按[工作方式](docs/agents/workflow.md)开发：改代码的工作走 GitHub Issues 的工单，状态是标签，每一段流转在工单上留一条证据评论；设计、原型与规则直接改，不走工单。用到的技能、什么时候用、怎么调，见[技能使用说明](.claude/skills/README.md)。架构师的规则在 `CLAUDE.md`，执行者的规则在 `AGENTS.md`。
 
-Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并返回输出，不执行工具、不管理部门历史、不决定循环。内核消费模型输出，调用工具或校验提交，再装配下一步输入。每一步的部门指令、当前合同、本部门历史与工具 schema 都保存为可核对摘要的工件。界面由服务提供的网页（client/ 构建的页面文件）提供，停止服务就是结束这个进程（Ctrl+C）。
+## 架构
+
+系统由哪些部分组成、怎样连接、一轮工作怎样进行，见总图 [`docs/architecture.html`](docs/architecture.html)。
 
 ## 快速开始
 
@@ -48,7 +46,7 @@ Event Store 是唯一事实来源。Provider adapter 只做一次模型请求并
 - Python 3.11 或更新版本
 - uv（建立与使用项目环境）
 - Git CLI（可从 `PATH` 调用）
-- 模型 API 密钥（如 OpenAI、Anthropic 或兼容服务）
+- 模型服务的凭据（API Key，如 OpenAI、Anthropic 或兼容服务）
 
 ### 安装
 
@@ -96,13 +94,13 @@ uv sync --frozen
 }
 ```
 
-调用协议（`responses` / `chat_completions` / `messages`）在每个模型访问定义上声明，一份 Provider 配置（连接）只有一个服务方案下的地址与凭据引用，不声明协议（[模型管理设计说明](docs/design/model-management.md)第 4.3 节）；在连接上声明协议会在读取目录时报错并指出字段位置。请求时基址取所属连接的地址，请求路径由协议适配器拼接（Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`）。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
+调用协议（`responses` / `chat_completions` / `messages`）在每个模型访问定义上声明，一份 Provider 配置（连接）只有一个服务方案下的地址与凭据引用，不声明协议（[模型管理设计说明](docs/design/model-management.md)「模型访问定义与准入」）；在连接上声明协议会在读取目录时报错并指出字段位置。请求时基址取所属连接的地址，请求路径由协议适配器拼接（Responses 与 Chat Completions 在基址后拼接 `/responses`、`/chat/completions`，Anthropic Messages 去掉基址末尾的 `/v1` 后拼接 `/v1/messages`）。`preset_id` 与 `models_url` 可省略，省略时使用服务方案默认值。参考 [Provider 配置示例](docs/examples/providers.json)。
 
 Provider 连接只信任操作系统的证书库：私有 CA 与企业代理的证书装在系统证书库中即可；`SSL_CERT_FILE`、`SSL_CERT_DIR` 这两个环境变量对 Provider 连接不起作用。
 
 凭据来源优先级为进程内存覆盖 > 进程环境变量 > 数据目录内的 `.env`。页面填写 Key 默认只对本进程有效，勾选持久化才写入 `.env`；勾选持久化时凭据引用按 `.env` 的键名规则核对（字母、数字与下划线，不以数字开头），不合规的引用在写入之前被拒绝并写明规则，文件与内存都不动。写入成功以后来源显示 `.env`，内存里不另留一份覆盖；写入失败时什么都不改。已保存的 Key 不回填，也不进入日志、事件与导出。
 
-服务方案（OpenCode Go 是第一个预置方案）自带端点、认证方式与模型列表地址；模型列表只产生候选，候选要建立访问定义并执行一次模型测试通过（准入）后才能绑定到部门。
+服务方案（OpenCode Go 是第一个预置方案）自带端点、认证方式与模型列表地址；模型列表只产生候选，候选要建立访问定义并执行一次模型测试通过（准入）后，部门才能使用。
 
 ### 启动服务
 
@@ -126,7 +124,7 @@ yudao api
 
 同一个数据目录只允许一个服务进程：启动时取得数据目录的进程锁，另一个服务进程正在使用这个数据目录时以非零状态退出并写明占用的数据目录。
 
-### 运行演示（无需 API 密钥）
+### 运行演示（不需要凭据）
 
 ```bash
 uv run python -m harness demo
@@ -202,7 +200,7 @@ yudao api
 ## 测试
 
 Python 测试按三层分批运行（分层见 `docs/design/test-pyramid.md`）：单元层与模块层一起跑，
-集成层只跑本次改动或新增的文件，全量集成层由架构师按批运行。
+集成层只跑本次改动或新增的文件，全量集成层由 CI 在每次合并到 main 以后运行。
 
 ```bash
 uv run python -m pytest -m "unit or module"
@@ -217,7 +215,7 @@ uv run python -m pytest harness/tests/<本次改动或新增的集成层文件>
 cd harness/tests/openapi && npm ci && npm run check
 ```
 
-按目录绑定执行三部门真实 smoke（凭据引用从环境解析，应用不读取 `provider.md`）：
+按目录里的部门默认执行三部门真实 smoke（凭据引用从环境解析，应用不读取 `provider.md`）：
 
 ```bash
 uv run python -m harness smoke --provider-config .yudao/providers.json --data-dir .yudao/native-validation
@@ -227,7 +225,7 @@ uv run python -m harness smoke --provider-config .yudao/providers.json --scenari
 
 报告写在 `.yudao/native-validation/smoke-report.md`，包含 run id、路由、provider/model、宿主检查回执、结束原因、replay 一致性、Git 版本及逐步模型输入审计。Git 审计缺失或未通过时不能返回验收成功。每次只记录本次选择的场景，不继承上次报告中的验收结果。
 
-**先跑模型测试准入。** smoke 自己不做准入：三个部门绑定的模型没有通过模型测试时，它以 exit 2、`provider_unavailable` 拒绝，原文写明是哪个部门的哪个模型没过。做法与页面同一条规则：用同一份 provider 配置与数据目录起一次服务（`--no-browser`），走 `catalog.connection.test` 与 `catalog.model.test` 写下 `admissions.json`，再跑 smoke（2026-10-29 实测）。
+**先跑模型测试准入。** smoke 自己不做准入：三个部门默认使用的模型没有通过模型测试时，它以 exit 2、`provider_unavailable` 拒绝，原文写明是哪个部门的哪个模型没过。做法与页面同一条规则：用同一份 provider 配置与数据目录起一次服务（`--no-browser`），走 `catalog.connection.test` 与 `catalog.model.test` 写下 `admissions.json`，再跑 smoke。
 
 ## 如何使用
 
@@ -324,11 +322,11 @@ curl -X POST http://localhost:8765/api/commands/department_settings.save \
   -d '{"command_id": "c6", "project_id": "{project_id}", "department": "engineering", "base_version": 0, "text": "你是资深 Python 工程师，优先使用标准库..."}'
 ```
 
-Prompt 在下次该部门激活时生效，当前激活不受影响。
+Prompt 在该部门的下一轮工作开始时生效，正在进行的一轮工作不受影响。
 
 ## HTTP 接口
 
-`python -m harness api`（无参启动相同）提供的应用接口：`POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）、`GET /api/queries/{名称}`（快照与位置）、`GET /api/events`（按范围筛选、从位置补齐的事件流）、`GET /api/capabilities`（能力清单）、`GET /openapi.json`；已登记的命令与查询以能力清单为准。查询只读，创建事项与取消走命令，界面不能直接改 spec、投影或完成状态。旧 Web 控制台与它的一批旧路由已经删除（[应用层与接口层设计说明](docs/design/app-and-interface.md)第 7.1、7.3 节）。
+`python -m harness api`（无参启动相同）提供的应用接口：`POST /api/commands/{名称}`（命令带 `command_id`，接受返回位置，拒绝返回 409 与原因）、`GET /api/queries/{名称}`（快照与位置）、`GET /api/events`（按范围筛选、从位置补齐的事件流）、`GET /api/capabilities`（能力清单）、`GET /openapi.json`；已登记的命令与查询以能力清单为准。查询只读，创建事项与取消走命令，界面不能直接改 spec、投影或完成状态。
 
 ## 任务内 Git 版本
 
@@ -340,11 +338,11 @@ Git 与完整交付封存使用同一次采集的文件字节，空目录和独�
 
 ## 模型配置
 
-模型接入由独立的 Provider 模块承担（`harness/providers/`），三部门循环、界面、CLI 与 smoke 都经同一接口调用，不各自直连 SDK。Provider 配置、模型访问定义与部门绑定统一管理，产品、工程、质检分别绑定，允许共享或使用不同服务。创建任务前验证三部门绑定、凭据与模型准入；缺失配置明确拒绝创建。原生内核对连接中断、超时、限流和临时服务错误进行有界重试，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md)、[D18](docs/requirements/department-providers.md)、[D23](docs/requirements/provider-layer.md)。
+Provider 配置、模型访问定义与部门默认统一管理，产品、工程、质检各有自己的部门默认，允许共享或使用不同服务。创建任务前验证三个部门的部门默认、凭据与模型准入；缺失配置明确拒绝创建。连接中断、超时、限流和临时服务错误按有界重试处理，不切换 Provider，详见 [D17](docs/requirements/provider-retries.md)、[D18](docs/requirements/department-providers.md)、[D23](docs/requirements/provider-layer.md)。
 
-需要 Python 3.11 或更新版本，`uv sync --frozen` 按锁文件安装 SDK：OpenAI SDK 经 HTTPX 连接，Anthropic SDK 经 HTTPX2 连接。运行不需要 OMP、Bun、Node 或 OMP profile；Node 仅用于前端自动化测试。
+需要 Python 3.11 或更新版本，`uv sync --frozen` 按锁文件安装 SDK：OpenAI SDK 经 HTTPX 连接，Anthropic SDK 经 HTTPX2 连接。运行不需要 OMP、Bun、Node 或 OMP profile；Node 只在构建页面和运行界面的自动化测试时需要。
 
-目录格式见 [Provider 与三部门绑定示例](docs/examples/providers.json)。示例的服务地址、模型名称和容量均为占位示意，使用前按所选服务的实际能力填写。`context_window` 与 `max_output_tokens` 必须明确；协议在模型访问定义上声明，`responses`、`chat_completions`、`messages` 三条已接入，一条定义只走一条协议。有效窗口等于调用目标的模型窗口；压缩阈值取「窗口 − 预留量」与工作上限 `context.work_limit_tokens` 中较小的一个，工作与压缩输出均受该模型限制。
+目录格式见 [Provider 与部门默认的示例](docs/examples/providers.json)。示例的服务地址、模型名称和容量均为占位示意，使用前按所选服务的实际能力填写。`context_window` 与 `max_output_tokens` 必须明确；协议在模型访问定义上声明，`responses`、`chat_completions`、`messages` 三条已接入，一条定义只走一条协议。有效窗口等于调用目标的模型窗口；压缩阈值取「窗口 − 预留量」与工作上限 `context.work_limit_tokens` 中较小的一个，工作与压缩输出均受该模型限制。
 
 凭据只经内存、进程环境或数据目录内的 `.env` 解析，Key 不回填、不进入日志、事件、Git 与导出：
 
@@ -353,20 +351,20 @@ $env:YUDAO_OPENCODE_GO_KEY = '<your-api-key>'
 yudao api
 ```
 
-`credential_ref` 对应环境变量名称；应用不读取 `provider.md`。旧的 `YUDAO_MODEL_*` 单配置入口与 Provider 级 `protocol` 字段已移除，旧的目录文件按新结构明确报错，不做迁移。任务创建时冻结三部门的目标与认证句柄，凭据只保存在进程内存中；宿主更换默认目录或凭据来源只影响新任务。Provider 模块在后台轮询本地配置与 `.env`（约 1 秒，按内容核对），界面保存与手动重载也经同一接口发布；文件损坏时保留上一有效版本并持续显示重载错误。进程重启后无法继续使用已丢失原凭据的旧任务，但仍可查看和重放其历史。
+`credential_ref` 对应环境变量名称；应用不读取 `provider.md`。不符合目录格式的文件在读取时明确报错，不做迁移。任务创建时冻结三部门的目标与认证句柄，凭据只保存在进程内存中；宿主更换默认目录或凭据来源只影响新任务。服务在后台轮询本地配置与 `.env`（约 1 秒，按内容核对），界面保存与手动重载也经同一接口发布；文件损坏时保留上一有效版本并持续显示重载错误。进程重启后无法继续使用已丢失原凭据的旧任务，但仍可查看和重放其历史。
 
-默认单次等待 600 秒，由目录中 Provider 的 `timeout_sec` 设置。每个逻辑请求最多尝试 3 次，通常间隔 1 秒、2 秒；有效 Retry-After 最多等 60 秒，超过时明确停止而不提前重发。各实际尝试计入每次部门激活的 32 次模型调用上限，压缩调用同样适用，不另设累计耗时预算。等待可被取消或新增输入打断，每次实际尝试重新装配上下文并准入。失败部分输出可回查，但不执行其工具、不进入有效部门历史。SDK 不另开隐藏重试。
+默认单次等待 600 秒，由目录中 Provider 的 `timeout_sec` 设置。每个逻辑请求最多尝试 3 次，通常间隔 1 秒、2 秒；有效 Retry-After 最多等 60 秒，超过时明确停止而不提前重发。各实际尝试计入部门每一轮工作的 32 次模型调用上限，压缩调用同样适用，不另设累计耗时预算。等待可被取消或新增输入打断，每次实际尝试重新装配上下文并准入。失败部分输出可回查，但不执行其工具、不进入有效部门历史。SDK 不另开隐藏重试。
 
-工具由 Yudao 内核执行（读取、写入、删除、移动、检查和结构化提交）。Product/Quality 没有写工具，工程修改受有效合同及事前计划范围约束。检查在可丢弃的完整公开树副本执行，由主机签发绑定当前合同、计划、交付和激活的回执；模型自报 `exit_code` 不是证据。交付保存完整文件字节、二进制与空目录，原工作区不可用后仍可独立恢复。该副本机制不提供操作系统沙箱。
+部门的工具有读取、写入、删除、移动、检查和结构化提交。Product/Quality 没有写工具，工程修改受有效合同及事前计划范围约束。检查在可丢弃的完整公开树副本执行，由主机签发绑定当前合同、计划、交付和这一轮工作的回执；模型自报 `exit_code` 不是证据。交付保存完整文件字节、二进制与空目录，原工作区不可用后仍可独立恢复。该副本机制不提供操作系统沙箱。
 
-三个部门均可通过 `submit_request` 咨询或请求职责内动作，经 `submit_response` 回应。一次只有一个未结请求，保留原工作，使用同一个部门循环。普通意见不改变需求，正式产品决定单独接纳；动作回复引用真实结果，最后仍须独立 QA。
+三个部门均可通过 `submit_request` 询问或请求职责内动作，经 `submit_response` 回应。一次只有一个未结请求，保留原工作。普通意见不改变需求，正式产品决定单独接纳；动作回复引用真实结果，最后仍须独立 QA。
 
-部门指令作为显式 developer 输入发送；原始任务逐字保留，本部门完整历史跨激活延续，部门开始一轮工作时重新装配当前合同，不携带其它部门的私有历史。接近压缩阈值时自动压缩部门历史视图，保留摘要来源、原始事件与近期完整工具回合；摘要调用同样可取消并计入模型步数。判断要不要压缩时，用量取上一次工作请求的上游回报用量（输入、缓存读写与输出之和）与本次请求的本地估算（UTF-8 字节数除以 4）中较大的一个，两项数值都记在请求事件里；会话的第一步、上游没有回报、或上一次之后已经压缩过时只用本地估算。上下文视图可按步骤打开实际输入、摘要及原始来源。调用尝试事件表示内核已开始调用 provider，不承诺网络请求已经送达。SDK 返回的用量用于这个判断与界面显示，不用于暂停任务、不设置 token 预算；未上报用量或费用显示为“未上报”。
+部门指令作为显式 developer 输入发送；原始任务逐字保留，本部门完整历史在各轮工作之间延续，部门开始一轮工作时重新装配当前合同，不携带其它部门的私有历史。接近压缩阈值时自动压缩部门历史视图，保留摘要来源、原始事件与近期完整工具回合；摘要调用同样可取消并计入模型步数。判断要不要压缩时，用量取上一次工作请求的上游回报用量（输入、缓存读写与输出之和）与本次请求的本地估算（UTF-8 字节数除以 4）中较大的一个，两项数值都记在请求事件里；会话的第一步、上游没有回报、或上一次之后已经压缩过时只用本地估算。上下文视图可按步骤打开实际输入、摘要及原始来源。调用尝试事件表示 Yudao 服务已开始调用 provider，不承诺网络请求已经送达。SDK 返回的用量用于这个判断与界面显示，不用于暂停任务、不设置 token 预算；未上报用量或费用显示为“未上报”。
 
 ## 停止与后续范围
 
-只有独立质检 release 才能进入 `DONE`。运行时间达到 `run_time_limit_sec` 上限进入 `FAILED`（停止原因为 `time_limit`）；取消、不可重试的 provider 错误、重试耗尽或上下文溢出同样进入 `FAILED`。部门激活次数上限（`max_cycles`）和单次激活模型步数上限仍保留，但默认值已大幅放宽（均为 999999），在实际运行中不再成为有效约束。调用方仍可显式配置较小值以恢复旧行为，达到上限时进入 `PAUSED`。压缩返回空摘要或超限时这一次压缩不生效，部门继续工作，下一次压缩重试；整理请求自己失败（重试耗尽，或回应不是摘要文字）时同样不写检查点，这一步的工作请求按未压缩的历史照常发出（放不进窗口时以上下文超限结束），下一次再整理，回应里带文字就用文字、未声明的工具调用不执行也不进入历史；同一会话的压缩连续 `compaction.stalled_limit` 次（默认 3）没有推进覆盖范围——整理请求失败、整理不生效，或者压缩的结果没有被下一次接上——时，事项进入 `FAILED`（停止原因为 `compaction_failed`），停止说明写明连续的次数与最后一次的原因。当前以运行时间（`run_time_limit_sec`，默认 7200 秒）作为主要收敛保证，辅以循环次数、模型步数、有界重试和单次请求超时限制执行，不设置 token 预算。固定原文与当前工作无法容纳时明确停止，不静默截断或无限压缩。停止后仍可查看、导出和重放事件，迟到结果不能继续提交。
+只有独立质检 release 才能进入 `DONE`。运行时间达到 `run_time_limit_sec` 上限进入 `FAILED`（停止原因为 `time_limit`）；取消、不可重试的 provider 错误、重试耗尽或上下文溢出同样进入 `FAILED`。部门工作轮数上限（`max_cycles`）和一轮工作的模型步数上限的默认值均为 999999，实际运行中不构成约束；调用方可以显式配置较小的值，达到上限时进入 `PAUSED`。压缩返回空摘要或超限时这一次压缩不生效，部门继续工作，下一次压缩重试；整理请求自己失败（重试耗尽，或回应不是摘要文字）时同样不写检查点，这一步的工作请求按未压缩的历史照常发出（放不进窗口时以上下文超限结束），下一次再整理，回应里带文字就用文字、未声明的工具调用不执行也不进入历史；同一会话的压缩连续 `compaction.stalled_limit` 次（默认 3）没有推进覆盖范围——整理请求失败、整理不生效，或者压缩的结果没有被下一次接上——时，事项进入 `FAILED`（停止原因为 `compaction_failed`），停止说明写明连续的次数与最后一次的原因。当前以运行时间（`run_time_limit_sec`，默认 7200 秒）作为主要收敛保证，辅以循环次数、模型步数、有界重试和单次请求超时限制执行，不设置 token 预算。固定原文与当前工作无法容纳时明确停止，不静默截断或无限压缩。停止后仍可查看、导出和重放事件，迟到结果不能继续提交。
 
-当前不提供暂停任务的继续执行，也不自动复用经验、修改规则或模型。知识图谱、长期记忆、异步恢复及新增部门属于后续阶段，见 [总体路线图](docs/program-roadmap.md)。
+当前不提供暂停任务的继续执行，也不自动复用教训、修改规则或模型。知识图谱、语义系统、异步恢复及新增部门属于后续阶段，见 [总体路线图](docs/program-roadmap.md)。
 
-经验候选仅来自已接受的质检返工或非取消失败，可在证据视图查看来源、导出和重放。候选保持待验证，不自动注入部门上下文。
+教训候选仅来自已接受的质检返工或非取消失败，可在证据视图查看来源、导出和重放。候选保持待验证，不进入部门上下文。

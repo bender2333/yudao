@@ -1,0 +1,19 @@
+{
+"schema":1,
+"path":"docs/requirements/game-world-three-spaces.md",
+"hash":"e624b0e886358b4d",
+"nodes":[
+{"hash":"e624b0e886358b4d","id":"docs/requirements/game-world-three-spaces.md","kind":"file","title":"docs/requirements/game-world-three-spaces.md"},
+{"hash":"1b64ac4e8e1d972a","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","kind":"section","parent":"docs/requirements/game-world-three-spaces.md","title":"D41 三个空间：楼、机房、城"},
+{"hash":"c9367a2193a16445","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城 > 用户原话","kind":"section","parent":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","title":"用户原话"},
+{"hash":"5d74d0bc016cc678","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城 > 确认的内容","kind":"section","parent":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","title":"确认的内容"},
+{"hash":"16e1728350abae83","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城 > 调研里待用户决定的六项的处理","kind":"section","parent":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","title":"调研里待用户决定的六项的处理"},
+{"hash":"1450912bb31885aa","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城 > 待定","kind":"section","parent":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","title":"待定"}
+],
+"edges":[
+{"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"f32e507ada24faef","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"},
+{"dst":"docs/research/game-world-as-projection.md","kind":"link","raws":["../research/game-world-as-projection.md"],"seen":"9c8d71b3273064a0","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"},
+{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"a78961c96f7ce911","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城 > 调研里待用户决定的六项的处理"}
+]
+}
