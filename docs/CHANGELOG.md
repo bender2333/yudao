@@ -1005,3 +1005,7 @@ claude-opus-5-5 / 2026-11-02 15:17 / `research/doc-consistency-concept-model.md`
 claude-opus-5-5 / 2026-11-02 15:56 / `agents/autopilot-runtime.md` 第 4 节真实模型测试与评测的模型改为 `ag/gemini-3.8-flash-medium`；`requirements/comparison-experiment.md` 三条按日期的模型记录合成一条现在的说法；`decision.md` 加一条 / 用户不再使用 `qhub/Qwen3.8-Flash`，评测场景设计说明本来就写着不用它，这两处没跟上
 
 claude-opus-5-5 / 2026-11-02 15:57 / `agents/autopilot-runtime.md` 第 4 节、`design/evaluation-scenarios.md`「模型」一行、`requirements/comparison-experiment.md` 的被测模型改为 `ag/gemini-3.8-flash-high`；`decision.md` 加一条 / 用户要求评测用这个模型
+
+claude-sonnet-5-5 / 2026-11-02 17:05 / `design/model-management.md` 第 4.3 节「候选的内容与呈现」改为分页显示（每页 8 个），新增「候选测试」一条，「选用」里同时测试的上限包含候选测试；第 9.1 节选择模型一行、候选与已选模型、失败与未知表、操作步骤，第 9.5 节用词，第 10 节候选与选用、模型测试、Web 三行，第 13 节新增验收 13、14；`design/app-and-interface.md` 新增 `catalog.candidate.test`，`catalog` 查询返回候选测试的状态与结果；`requirements/model-management.md` 已确认补两条 / 用户要求扫描出来的模型有测试按钮，候选列表每页最多 8 个
+
+claude-sonnet-5-5 / 2026-11-02 17:42 / `prototypes/v15` 模型管理页（`js/models.js`、`styles/models.css`）：候选卡片增加「测试」按钮与结果，候选列表改为每页 8 个翻页；`prototypes/CHANGELOG.md` v15 补一节与一条试用要点 / 用户试用 v15 时提出，设计说明同一次改动已同步
