@@ -999,3 +999,5 @@ Claude（Duet 助手） / 2026-11-02 07:58 / `docs/program-roadmap.md` 第 3 节
 Claude（Duet 助手） / 2026-11-02 09:15 / 新增调研 `research/deepseek-superagent-async-framework.md`：DeepSeek Harness 团队开源的 dsh-superagent 原型做了什么（来源、触发、评估、授权、工单、派工，路由会话加每张工单一个执行会话，先存后做的副作用队列、并发槽、长命令转后台），与总图逐项对照，倾向不引入它的框架与代码，借四个做法，外部入口是否算新方框交总架构师；`research/README.md` 加一行索引 / 用户要调研 DeepSeek 新发的 Super-agent，看 Yudao 能不能用它的异步框架，报告放 docs/research
 
 Claude（Duet 助手） / 2026-11-02 13:58 / 新增 `research/doc-consistency-concept-model.md`：文档一致性核对的方案，概念模型放在 `CONTEXT.md`（每个词条下加一块结构：别名、定义在、属于与包含与依赖、取值、写法、代码、代码状态、不自动挂），文档按名字自动挂、复述取值写语义链接，发现走样只用脚本、只提醒不拦；第一版六步与第一步的写法草稿；待定五条，复述的写法与 49 个总图的词怎么办先定；`research/README.md` 加一行索引；`decision.md` 加一条 / 用户定按概念模型核对、模型放在 CONTEXT.md，要先把方案推到 main
+
+claude-opus-5-5 / 2026-11-02 15:17 / `research/doc-consistency-concept-model.md` 改写：判断走样靠 clingo 规则，LLM 只把文字翻译成文档说法（词汇封闭、带原文、结果固定、脚本优先），不加隐藏标记与语义链接，工具放 `tools/doc-consistency/`，补两个引擎的试验数字与 LLM 提取的验收；`research/README.md` 改一行；`decision.md` 加一条 / 用户要走符号推理、做成单独的工具，从文字到语义用 LLM
