@@ -313,3 +313,4 @@ claude-opus-5-5 / 2026-11-02 18:01 / `research/architecture-diagnosis-2026-10-19
 claude-opus-5-5 / 2026-11-02 18:38 / `agents/autopilot-runtime.md` 删去已不存在的测试 `test_github_app_entries.py` 那半句；`research/doc-consistency-concept-model.md` 记第 1、2 步已建、待核对的范围与第一次运行；`decision.md` 加一条 / 新工具查出这条失效引用，工具已合入
 claude-sonnet-5-5 / 2026-11-02 18:19 / 新建 `docs/prototypes/v16/`（整份取自 v15，画出项目的组织：组织页、部门详情、加部门、子组织、新建项目与事项）与走查文档，`docs/prototypes/CHANGELOG.md` 加 `[v16]` 一节并更新开头一段 / 把项目的组织设计说明画成能点的页面交给用户试用
 claude-opus-5-5 / 2026-11-02 18:42 / `design/project-organization.md`：「组织是形态加本项目的改动」写明前三份形态可以选给项目或事项、第四份给部门内部用；「合成规则」第 4 条补去掉部门时别的部门对它独占成果的关注一起去掉；「冻结与升级」补合不到一起的例子；「组织页」补没有部门关注的成果写到成果库为止；「部门详情」补子组织的起点与结尾、子组织部门的模型与 Prompt 只留部门这一层；「项目页跟着组织变」标签写改过几处 / 做页面原型 v16 时暴露的细节
+claude / 2026-11-02 19:59 / 新增 `research/doc-consistency-rule-facts.md`（规则事实线方案）；`research/doc-consistency-concept-model.md` 第 1、9 节各加一段指向它；`research/README.md` 加一行；`decision.md` 加一条 / 用户定规则类事实单独成线、先做
