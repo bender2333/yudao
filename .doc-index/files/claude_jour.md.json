@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"claude_jour.md",
-"hash":"b4fc41b167016dad",
+"hash":"36bb5efe1df8bef3",
 "nodes":[
-{"hash":"b4fc41b167016dad","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
+{"hash":"36bb5efe1df8bef3","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
 {"hash":"028833a01631910c","id":"claude_jour.md#Claude 执行日记 (Claude Journal)","kind":"section","parent":"claude_jour.md","title":"Claude 执行日记 (Claude Journal)"},
 {"hash":"48043ae754efd878","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 记录格式规范","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"记录格式规范"},
 {"hash":"16623160c7b059eb","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 21:10 状态文档与一次改完","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-10-31 21:10 状态文档与一次改完"},
@@ -45,7 +45,7 @@
 {"hash":"ba864e1746009236","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 03:26 路线图与工单阶段：评测只留一个，④ 重切，五个阶段都建，按新总图整理工单","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 03:26 路线图与工单阶段：评测只留一个，④ 重切，五个阶段都建，按新总图整理工单"},
 {"hash":"f568f465ee45987d","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 07:58 路线图：内核的代码质量门槛","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-02 07:58 路线图：内核的代码质量门槛"},
 {"hash":"4488f132287022d1","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 09:15 DeepSeek Super-agent 调研入库","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-02 09:15 DeepSeek Super-agent 调研入库"},
-{"hash":"cbc499ce5e2eaab6","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-02 13:58 文档一致性方案入库"}
+{"hash":"282212cb6fc72ef6","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-02 13:58 文档一致性方案入库"}
 ],
 "edges":[
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 19:40 规则文件与技能的历史清理"},
@@ -77,8 +77,9 @@
 {"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"266c758f0cf38a07","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:40 画面线：设计说明、搬出工单与页面原型 v15"},
 {"dst":".claude/skills/README.md","kind":"code-path","raws":[".claude/skills/README.md"],"seen":"6ed1d66350b92c02","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:50 v15 缺了模型管理"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:50 v15 缺了模型管理"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"c364b23b348abe82","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"6bf0a0bd9ec52441","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
-{"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md"],"seen":"967e788bf3b3f131","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"}
+{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"8925eb413dc43f57","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
+{"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md"],"seen":"c8e89c7acf507972","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"}
 ]
 }
