@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..event_store import Command
+from ..definitions import DEFINITIONS
 from ..models import DEPARTMENTS, TERMINAL_STATUSES, Event, ProjectEvent
 from ..interactions import RunTerminalError
 from ..projection import RunNotFoundError
@@ -122,6 +123,13 @@ async def _restore_project(application: "Application", command: Command, request
 # ---------------------------------------------------------------------------
 # 记录原文（新建类：不核对基准版本）
 
+def _unknown_department(department: str) -> Rejection:
+    # 部门的名字由定义给出（工单 #1389，设计说明「形态随事项冻结」）：定义里没有这个名字时照旧拒绝，
+    # 错误里写出这份定义可用的部门，提交的人不必再去别处找。中文名给提交的人看，编号给提交的命令用
+    available = "、".join(f"{DEFINITIONS.department_labels.get(name, name)}（{name}）" for name in DEPARTMENTS)
+    return Rejection("not_allowed", f"部门不存在：{department}；可用的部门：{available}")
+
+
 class MaterialRecord(CommandRequest):
     base_version: None = None
     project_id: str
@@ -131,7 +139,7 @@ class MaterialRecord(CommandRequest):
 
 def _material_department(request: MaterialRecord) -> None:
     if request.department is not None and request.department not in DEPARTMENTS:
-        raise Rejection("not_allowed", "部门不存在")
+        raise _unknown_department(request.department)
 
 
 async def _record_material(application: "Application", command: Command, request: MaterialRecord) -> None:
@@ -288,7 +296,7 @@ class GuidanceSend(CommandRequest):
 
 def _guidance_department(request: GuidanceSend) -> None:
     if request.department not in DEPARTMENTS:
-        raise Rejection("not_allowed", "部门不存在")
+        raise _unknown_department(request.department)
 
 
 async def _send_guidance(application: "Application", command: Command, request: GuidanceSend) -> None:
@@ -325,7 +333,7 @@ class DepartmentSettingsSaveRefs(Contract):
 async def _save_department_settings(application: "Application", command: Command,
                                     request: DepartmentSettingsSave) -> None:
     if request.department not in DEPARTMENTS:
-        raise Rejection("not_allowed", "部门不存在")
+        raise _unknown_department(request.department)
     if (request.provider_id is None) != (request.model_id is None):
         raise Rejection("not_allowed", "模型访问定义引用必须同时给出所属连接与定义")
     project_selection = ModelSelection(

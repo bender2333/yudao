@@ -57,8 +57,9 @@ from .store import (
 )
 
 
-# 三部门默认绑定键，模块自身不硬编码部门语义，只提供默认选择
-REQUIRED_DEPARTMENTS = ("product", "engineering", "quality")
+# 按部门的默认设置用的部门清单：名字由定义给出（工单 #1389，设计说明「形态随事项冻结」），
+# 模块自身不硬编码部门语义，只提供默认选择
+REQUIRED_DEPARTMENTS = DEFINITIONS.departments
 
 # 启动方式：normal 读取真实目录，拒绝 fake 连接；test 与 demo 为测试和演示放行 fake（工单 #86）
 STARTUP_MODES = ("normal", "test", "demo")
