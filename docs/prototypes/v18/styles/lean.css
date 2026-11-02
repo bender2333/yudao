@@ -1,0 +1,42 @@
+/* 简洁的项目页：对话、成果库、设置，新建项目的模板卡。只用 base.css 的变量。 */
+.ln, .ln-vers, .ln-settings { max-width: 820px; margin: 0 auto; display: grid; gap: 14px; align-content: start; }
+.ln-time { display: grid; gap: 4px; font-size: 13px; color: var(--muted); }
+.ln-time-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; }
+.ln-thread { display: grid; gap: 10px; padding-bottom: 8px; align-content: start; overflow-y: auto; max-height: calc(100vh - 400px); min-height: 240px; }
+.ln-msg { display: grid; gap: 2px; max-width: 86%; }
+.ln-msg.is-you { justify-self: end; }
+.ln-meta { font-size: 12px; color: var(--faint); }
+.ln-msg.is-you .ln-meta { text-align: right; }
+.ln-bubble { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; overflow-wrap: anywhere; }
+.ln-msg.is-you .ln-bubble { background: var(--tint); border-color: transparent; }
+.ln-msg.is-done .ln-bubble { border-color: var(--green); }
+.ln-opts { display: flex; gap: 8px; margin: 6px 0 2px; }
+.ln-sep { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; margin: 8px 0 2px; }
+.ln-sep::before, .ln-sep::after { content: ""; flex: 1; border-top: 1px solid var(--line); }
+.ln-input { position: sticky; bottom: 0; background: var(--bg); padding: 8px 0 62px; display: grid; gap: 4px; }
+.ln-hint { font-size: 12px; color: var(--muted); }
+.ln-row { display: flex; gap: 8px; }
+.ln-row .y18-input { flex: 1; }
+.ln-who { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; display: grid; gap: 4px; }
+.ln-who-row { display: flex; gap: 12px; } .ln-who-row strong { min-width: 48px; }
+.ln-vrow { display: grid; grid-template-columns: 70px 1.2fr 90px 2fr; gap: 12px; padding: 8px 12px; align-items: baseline; }
+.ln-vrow.has-concl { grid-template-columns: 70px 1.2fr 90px 2fr 80px; }
+.ln-vrow.is-head { color: var(--muted); font-size: 12px; padding-bottom: 0; }
+.ln-ver { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+.ln-ver > summary { cursor: pointer; list-style: none; }
+.ln-diff { padding: 0 12px 10px; }
+.ln-set { display: grid; grid-template-columns: 130px 1fr; gap: 12px; align-items: start; }
+.ln-set label { color: var(--muted); padding-top: 6px; }
+.ln-set > div { padding-top: 3px; }
+.ln-adv { border-top: 1px solid var(--line); padding-top: 10px; }
+.ln-adv summary { cursor: pointer; font-weight: 600; }
+.ln-new { display: grid; gap: 12px; }
+.ln-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.ln-card { text-align: left; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: 12px; display: grid; gap: 4px; }
+.ln-card:hover:not(:disabled) { border-color: var(--green); background: var(--tint); }
+.ln-card.is-off { background: var(--soft); border-style: dashed; }
+.ln-card small { color: var(--muted); }
+.ln-warn { color: var(--red); font-size: 12px; min-height: 0; }
+.ln-more { display: flex; gap: 14px; font-size: 12px; }
+.ln-advbox { display: grid; gap: 8px; padding: 10px; background: var(--soft); border-radius: var(--radius); }
+@media (max-width: 640px) { .ln-vrow, .ln-vrow.has-concl { grid-template-columns: 1fr 1fr; } .ln-set { grid-template-columns: 1fr; } .ln-msg { max-width: 100%; } }

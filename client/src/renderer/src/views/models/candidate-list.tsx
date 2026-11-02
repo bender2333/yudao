@@ -35,6 +35,8 @@ export type CandidateListProps = {
   manualProvider: string;
   providers: { id: string; base_url: string }[];
   disabled: boolean;
+  /** 请求在途或正在取候选时的一句话：写明在做什么（工单 #1355）。空闲时是空串 */
+  fetchNote: string;
   onSearch: (value: string) => void;
   onFilter: (value: CandidateFilterId) => void;
   onMore: () => void;
@@ -84,6 +86,11 @@ export function CandidateList(props: CandidateListProps) {
           </button>
         ))}
       </div>
+      {props.fetchNote === "" ? null : (
+        <p className="y10-note mm-ok" role="status" data-testid="candidate-fetching">
+          {props.fetchNote}
+        </p>
+      )}
       <p className="y10-small y10-muted mm-meta" role="status" data-testid="candidate-count">
         {props.filter === "auto"
           ? `${props.rows.length} 个模型可自动配置 · 其他候选可在「全部模型」中查看`

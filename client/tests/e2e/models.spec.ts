@@ -7,6 +7,8 @@
 // 失败路径：Key 被拒绝、地址不可达、空列表、单个模型验证失败、容量未知后手填继续、搜索无结果；
 // 原因都写在被操作的对象旁边，同一个视口里看得到。
 // 取消勾选：被部门使用的模型取消不了并写明引用方；进行中的模型取消以后迟到的结果不启用它。
+// 获取模型这条请求（工单 #1355）：进行中时页面写明在做什么且候选区照常可以操作；
+// 结束以后不刷新页面就能勾选（服务端收到 catalog.model.select）；失败以后写明原因，页面可以继续操作。
 
 import { expect, test } from "@playwright/test";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -34,6 +36,9 @@ const SLOW_MODELS = [{ id: "trial-slow", limit: { context: 200000, output: 32000
 // 推理慢时的停顿（毫秒）：够用例在测试进行中取消，又不至于让用例等太久
 const SLOW_DELAY_MS = 4000;
 
+// 模型列表慢时的停顿（毫秒，工单 #1355）：够用例在请求还在进行时读到页面写的说明
+const SLOW_MODELS_DELAY_MS = 4000;
+
 type ChatRequest = {
   model?: string;
   messages?: { role?: string }[];
@@ -47,7 +52,8 @@ type Upstream = {
 
 // 测试内启动的真实 HTTP 上游（工单 #1297）：
 // GET {前缀}/v1/models 给模型列表；POST {前缀}/v1/chat/completions 按 Chat Completions 的 SSE 回答。
-// 前缀决定这一份上游的行为：empty 是空列表，denied 的推理被上游拒绝，slow 的推理慢。
+// 前缀决定这一份上游的行为：empty 是空列表，denied 的推理被上游拒绝，slow 的推理慢，
+// slowmodels 的模型列表慢（工单 #1355 在读说明），broken 的模型列表返回 HTTP 500
 async function startUpstream(): Promise<Upstream> {
   const server = createServer((request, response) => {
     void handleUpstream(request, response);
@@ -72,12 +78,26 @@ async function handleUpstream(request: IncomingMessage, response: ServerResponse
       response.end(JSON.stringify({ error: { message: "invalid api key", type: "authentication_error" } }));
       return;
     }
+    // 模型列表不可用（工单 #1355 的失败路径）：上游按真实的失败方式回一个错误
+    if (scenario === "broken") {
+      response.writeHead(500, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ error: { message: "模型列表暂时不可用", type: "server_error" } }));
+      return;
+    }
     const models = scenario === "empty" ? []
       : scenario === "denied" ? DENIED_MODELS
         : scenario === "slow" ? SLOW_MODELS
           : UPSTREAM_MODELS;
-    response.writeHead(200, { "Content-Type": "application/json" });
-    response.end(JSON.stringify({ data: models }));
+    const send = () => {
+      response.writeHead(200, { "Content-Type": "application/json" });
+      response.end(JSON.stringify({ data: models }));
+    };
+    // 模型列表慢回来：页面在请求进行中要写明在做什么（工单 #1355）
+    if (scenario === "slowmodels") {
+      setTimeout(send, SLOW_MODELS_DELAY_MS);
+      return;
+    }
+    send();
     return;
   }
   if ((request.url ?? "").endsWith("/chat/completions")) {
@@ -403,6 +423,61 @@ for (const size of [{ width: 1440, height: 900 }]) {
       await expect(client.page.getByTestId("selected-trial-slow")).toHaveCount(0);
       await expect(client.page.getByTestId("selected-status-trial-slow")).toHaveCount(0);
       expect(await departmentChoice(client, "product")).toBe("未设置");
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+      await upstream.close();
+    }
+  });
+
+  // 工单 #1355：获取模型这条请求结束以后页面不能停在忙碌态。三种情形放在同一条用例里：
+  // 页面刚打开不禁用、进行中写明在做什么且不刷新就能勾选、失败以后写明原因并可继续操作
+  test(`${label}：获取模型进行中写明在做什么，结束以后不刷新就能勾选，失败以后写明原因并可继续`, async () => {
+    test.setTimeout(300_000);
+    const upstream = await startUpstream();
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    try {
+      // 页面刚打开：候选区的搜索、筛选与手动添加都可以用（工单验收：不引入「一打开就禁用」）
+      await expect(client.page.getByTestId("candidate-search")).toBeEnabled();
+      await expect(client.page.getByTestId("candidate-filter-auto")).toBeEnabled();
+      await expect(client.page.getByTestId("candidate-manual")).toBeEnabled();
+
+      // 请求进行中：模型列表要几秒才回来，页面写明在做什么（不是只把按钮变灰），
+      // 后台取候选期间候选区照常可以操作
+      const address = `${upstream.base}/slowmodels/v1`;
+      await connectService(client, address, UPSTREAM_KEY);
+      await expect(client.page.getByTestId("candidate-fetching")).toContainText("正在获取模型列表");
+      await expect(client.page.getByTestId("candidate-search")).toBeEnabled();
+      await expect(client.page.getByTestId("candidate-filter-auto")).toBeEnabled();
+
+      // 结束以后不刷新页面：说明消失，勾选框可点，服务端收到 catalog.model.select
+      const card = connectionCard(client, address);
+      await expect(card.getByTestId("connection-fetch")).toContainText("已获取 4 个模型", { timeout: 60_000 });
+      await expect(client.page.getByTestId("candidate-fetching")).toHaveCount(0);
+      await expect(client.page.getByTestId("candidate-check-trial-alpha")).toBeEnabled();
+      const selectRequest = client.page.waitForRequest((request) =>
+        request.method() === "POST" && request.url().includes("/api/commands/catalog.model.select"));
+      await client.page.getByTestId("candidate-check-trial-alpha").check();
+      const sent = await selectRequest;
+      expect(sent.postDataJSON()).toMatchObject({ model: "trial-alpha" });
+      // 勾选以后这一行进入已选模型：没有刷新页面
+      await expect(client.page.getByTestId("selected-trial-alpha")).toBeVisible({ timeout: 60_000 });
+
+      // 失败：原因写在连接卡片旁，正在取的说明消失，页面照常可以操作
+      const brokenAddress = `${upstream.base}/broken/v1`;
+      await connectService(client, brokenAddress, UPSTREAM_KEY);
+      const brokenCard = connectionCard(client, brokenAddress);
+      await expect(brokenCard.getByTestId("connection-fetch")).toContainText("HTTP 500", { timeout: 60_000 });
+      await expect(client.page.getByTestId("candidate-fetching")).toHaveCount(0);
+      await expect(client.page.getByTestId("candidate-search")).toBeEnabled();
+      // 继续操作照常有效：再勾选一个候选，服务端照样收到
+      const secondSelect = client.page.waitForRequest((request) =>
+        request.method() === "POST" && request.url().includes("/api/commands/catalog.model.select"));
+      await client.page.getByTestId("candidate-check-trial-beta").check();
+      expect((await secondSelect).postDataJSON()).toMatchObject({ model: "trial-beta" });
+      await expect(client.page.getByTestId("selected-trial-beta")).toBeVisible({ timeout: 60_000 });
       expect(errors).toEqual([]);
     } finally {
       await client.close();
