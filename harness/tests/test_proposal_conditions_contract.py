@@ -44,7 +44,7 @@ def _judgement_events(delivery_hash: str = DELIVERY_HASH) -> list[Event]:
                   role=None, parent_event_id=None, state_before="running", state_after="running",
                   payload={"kind": "independent_judgement", "product_spec_hash": SPEC_HASH,
                            "delivery_spec_hash": delivery_hash, "checks": ["smoke"],
-                           "criteria_count": 1, "criteria": []},
+                           "criteria_count": 1, "criteria": _judged_criterion()},
                   artifact_hashes=[], session_id="ses_quality", provider=None, model=None,
                   context_digest=None, stop_reason=None, error=None, created_at="2026-10-31T00:00:00Z",
                   position=999, stream=f"run:{RUN}", stream_version=999, project_id=None,
@@ -68,6 +68,13 @@ def _without(kind: str, name: str):
     def change(conditions):
         conditions[kind] = [item for item in conditions[kind] if item["condition"] != name]
     return change
+
+
+def _judged_criterion() -> list[dict]:
+    # 判断的逐条结论（工单 #1190）：一条验收条件一项，结论引用它并与它对照；这里与 _review_proposal 的
+    # 逐条结论同形（AC1 用本次激活的 smoke 回执判为 passed），这两个用例只核对别的通用条件
+    return [{"criterion": "AC1", "method": "check", "result": "passed", "checks": ["smoke"],
+             "trial_cases": [], "note": "", "change_reason": ""}]
 
 
 def _ref(kind: str, content_hash: str) -> ArtifactRef:

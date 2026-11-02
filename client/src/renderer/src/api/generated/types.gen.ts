@@ -15055,6 +15055,10 @@ export type QaCoveragePayload = {
      * Open
      */
     open: number;
+    /**
+     * Changed
+     */
+    changed?: number;
 };
 
 /**
@@ -15085,6 +15089,14 @@ export type QaCriterionPayload = {
      * Note
      */
     note: string;
+    /**
+     * Judged
+     */
+    judged?: string;
+    /**
+     * Change Reason
+     */
+    change_reason?: string;
 };
 
 /**
@@ -15234,6 +15246,10 @@ export type QaSubmittedPayload = {
      * Evidence Refs
      */
     evidence_refs: Array<ArtifactRef>;
+    /**
+     * Judgement Event
+     */
+    judgement_event?: string;
     /**
      * Kind
      */
