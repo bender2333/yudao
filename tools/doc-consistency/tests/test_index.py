@@ -85,6 +85,34 @@ def test_code_html_is_outside_the_index(docs_repo):
     assert not [f for f in files if f.startswith(("evals/", "docs/prototypes/")) or f.endswith("assets/graph.html")]
 
 
+def test_link_target_is_not_in_hash_but_display_text_is(docs_repo):
+    docs_repo.write("docs/design/c.md", "# 丙\n\n内容。\n")
+    docs_repo.write("docs/design/user.md", "# 引用者\n\n## 做法\n\n见 [另一份的细节](other.md)。\n\n也见 <a href=\"other.md\">网页写法</a>。\n")
+    docs_repo.commit("链接")
+    index.build(docs_repo.path)
+    uid = "docs/design/user.md#引用者 > 做法"
+
+    def snap():
+        d = index.load_index(docs_repo.path)["docs/design/user.md"]
+        return (
+            {n["id"]: n["hash"] for n in d["nodes"]},
+            {(e["dst"], e["kind"]) for e in d["edges"] if e["src"] == uid},
+        )
+
+    h0, e0 = snap()
+    assert ("docs/design/other.md", "link") in e0
+    # 只改链接地址：hash 不变，边的目标跟着变
+    docs_repo.write("docs/design/user.md", docs_repo.read("docs/design/user.md").replace("(other.md)", "(c.md)").replace('href="other.md"', 'href="c.md"'))
+    assert index.status(docs_repo.path) == []
+    index.build(docs_repo.path)
+    h1, e1 = snap()
+    assert h1 == h0
+    assert ("docs/design/c.md", "link") in e1 and ("docs/design/other.md", "link") not in e1
+    # 改显示文字：hash 变
+    docs_repo.write("docs/design/user.md", docs_repo.read("docs/design/user.md").replace("另一份的细节", "改了的文字"))
+    assert index.status(docs_repo.path) == [("改动", uid)]
+
+
 def test_who_gives_lines(docs_repo):
     index.build(docs_repo.path)
     target, rows = index.who(docs_repo.path, "docs/architecture.html#s4 > 装配")

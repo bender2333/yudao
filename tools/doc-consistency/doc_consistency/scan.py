@@ -38,8 +38,15 @@ def read_text(path):
     return text[1:] if text.startswith("﻿") else text
 
 
+MD_LINK_TARGET = re.compile(r"\]\([^)]*\)")
+HTML_HREF = re.compile(r"""href\s*=\s*(?:"[^"]*"|'[^']*')""", re.I)
+
+
 def digest(text):
-    return hashlib.sha256(normalize_text(text).encode("utf-8")).hexdigest()[:16]
+    """文档内容的 hash：行尾统一；链接地址（Markdown 链接的目标、HTML 的 href）不算，显示文字算。
+    链接指向变了，由索引的边和死引用检查发现，不再靠 hash 重复发现。"""
+    text = HTML_HREF.sub('href=""', MD_LINK_TARGET.sub("]()", normalize_text(text)))
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
 
 
 def git_tracked(root):
