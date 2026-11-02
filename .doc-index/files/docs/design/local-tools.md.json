@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/design/local-tools.md",
-"hash":"966a719f1a5b0d8f",
+"hash":"da237f7db6aa2ab5",
 "nodes":[
-{"hash":"966a719f1a5b0d8f","id":"docs/design/local-tools.md","kind":"file","title":"docs/design/local-tools.md"},
-{"hash":"1c321cfb65b38314","id":"docs/design/local-tools.md#本地通用工具设计说明","kind":"section","parent":"docs/design/local-tools.md","title":"本地通用工具设计说明"},
+{"hash":"da237f7db6aa2ab5","id":"docs/design/local-tools.md","kind":"file","title":"docs/design/local-tools.md"},
+{"hash":"febf8a124d807652","id":"docs/design/local-tools.md#本地通用工具设计说明","kind":"section","parent":"docs/design/local-tools.md","title":"本地通用工具设计说明"},
 {"hash":"1d27ee123e0554cc","id":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"1. 使用过程"},
 {"hash":"67e8350a463e950c","id":"docs/design/local-tools.md#本地通用工具设计说明 > 2. 工作区","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"2. 工作区"},
-{"hash":"076e6618d99663e6","id":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"3. 工具边界"},
+{"hash":"0849f7bf4cb611f6","id":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"3. 工具边界"},
 {"hash":"b02de218539b9206","id":"docs/design/local-tools.md#本地通用工具设计说明 > 4. 使用的依赖与成熟实现","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"4. 使用的依赖与成熟实现"},
 {"hash":"6b41f008e3e93f73","id":"docs/design/local-tools.md#本地通用工具设计说明 > 5. 模块交互","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"5. 模块交互"}
 ],
@@ -15,7 +15,6 @@
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"ff40f75d471b5bf2","src":"docs/design/local-tools.md#本地通用工具设计说明"},
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「模型与工具」"],"seen":"dc6c9962ab484fe5","src":"docs/design/local-tools.md#本地通用工具设计说明"},
 {"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"9318b13ea3585f40","src":"docs/design/local-tools.md#本地通用工具设计说明"},
-{"dst":"docs/research/architecture-diagnosis-2026-10-19.md","kind":"link","raws":["../research/architecture-diagnosis-2026-10-19.md"],"seen":"14f3c295330cf865","src":"docs/design/local-tools.md#本地通用工具设计说明"},
 {"dst":"docs/design/existing-project-onboarding.md","kind":"link","raws":["existing-project-onboarding.md"],"seen":"126a80405a22498d","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"485ba14cc9bb7c43","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程"},
 {"dst":"docs/design/project-initial-files.md","kind":"link","raws":["project-initial-files.md"],"seen":"aa384ca3e4aca69c","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程"},
@@ -28,8 +27,7 @@
 {"dst":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明","kind":"link","raws":["network-and-mcp.md"],"seen":"f7dcf72aad40fbeb","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
 {"dst":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明 > 4. 项目设置中的 MCP 服务器","kind":"link","raws":["network-and-mcp.md"],"seen":"186bb2627e553016","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 4. 动作分类与处置","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"b2046e2fa5dfdbfb","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
-{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"9d95fe1ea660bf53","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
-{"dst":"docs/research/architecture-diagnosis-2026-10-19.md","kind":"link","raws":["../research/architecture-diagnosis-2026-10-19.md"],"seen":"14f3c295330cf865","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"1a899e30127a7d66","src":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界"},
 {"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序 > 4.2 执行位置上的程序与依赖缓存","kind":"link","raws":["execution-environment.md"],"seen":"5ff0085729143dea","src":"docs/design/local-tools.md#本地通用工具设计说明 > 4. 使用的依赖与成熟实现"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","kind":"link","raws":["model-management.md"],"seen":"17891a8b09694ac3","src":"docs/design/local-tools.md#本地通用工具设计说明 > 4. 使用的依赖与成熟实现"}
 ]

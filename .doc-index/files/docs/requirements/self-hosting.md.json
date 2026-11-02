@@ -17,7 +17,7 @@
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"7594224d7b0c0dc6","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
 {"dst":"docs/archive/decision-2026-09.md","kind":"link","raws":["../archive/decision-2026-09.md"],"seen":"ec4c292a915503d8","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
 {"dst":"docs/archive/design/architecture/core-and-materials.md","kind":"link","raws":["../archive/design/architecture/core-and-materials.md"],"seen":"15bfce50418f0d20","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
-{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"895b5f21f4980650","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"216fcf1d205477db","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
 {"dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 五个阶段","kind":"link","raws":["../program-roadmap.md"],"seen":"a526ade17bc7d30c","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
 {"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"afd4d3a8e2469783","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
 {"dst":"docs/requirements/existing-project-onboarding.md","kind":"link","raws":["existing-project-onboarding.md"],"seen":"ccbb3c4aaf284500","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},

@@ -27,7 +27,7 @@
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"62809d75791df6d8","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
 {"dst":"docs/design/network-and-mcp.md","kind":"link","raws":["network-and-mcp.md"],"seen":"d60bf335e97b36ee","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
 {"dst":"docs/design/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"73383fa4e2c9e12f","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
-{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["../requirements/comparison-experiment.md"],"seen":"346fb4163dc2fbee","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["../requirements/comparison-experiment.md"],"seen":"63e470e3ae9c722a","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
 {"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"fd5a013bfdfa0f32","src":"docs/design/independent-verification.md#验证的独立性设计说明"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["browser-and-computer-use.md"],"seen":"2442f6a7fc4067fb","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 12. 与现有设计的关系"},
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"d12403d0c052fd04","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 12. 与现有设计的关系"},
@@ -36,7 +36,7 @@
 {"dst":"docs/design/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"73383fa4e2c9e12f","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 12. 与现有设计的关系"},
 {"dst":"docs/design/department-loop.md#三部门的循环结构 > 4. 询问与回答 > 4.6 工程与质检之间的问答：事实与解释","kind":"link","raws":["department-loop.md"],"seen":"1a6ff8c9be5cd832","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释"},
 {"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["../requirements/semantic-system.md"],"seen":"8cbabc2c9cae8dab","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 5. 验证密度"},
-{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"42d9a1a938123f39","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 6. 共享上下文的一组对照"},
+{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"1005db08c2b2d6c9","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 6. 共享上下文的一组对照"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"288e20f8cc6363ff","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"485ba14cc9bb7c43","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前"},
 {"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["web-interface-and-release.md"],"seen":"ed4c2b8fb539b859","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前"}

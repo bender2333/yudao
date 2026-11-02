@@ -14,7 +14,7 @@
 {"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"3e1eb032980c7ef2","src":"docs/trial/tasks.md#试用任务集"},
 {"dst":"docs/trial/skill-revision-plan.md","kind":"link","raws":["skill-revision-plan.md"],"seen":"3a806a47eabec753","src":"docs/trial/tasks.md#试用任务集"},
 {"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../agents/autopilot-runtime.md"],"seen":"d15d36e6b6934d9a","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
-{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"42d9a1a938123f39","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
+{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"1005db08c2b2d6c9","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
 {"dst":"evals/runner/yudao.py","kind":"code-path","raws":["evals/runner/yudao.py"],"seen":"8732f64d7b1da8cc","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
 {"dst":"evals/scenarios/scenario-3/files/subway_data.json","kind":"code-path","raws":["evals/scenarios/scenario-3/files/subway_data.json"],"seen":"f5414f760e579594","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"}
 ]

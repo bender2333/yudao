@@ -51,7 +51,7 @@
 {"dst":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","kind":"link","raws":["browser-and-computer-use.md"],"seen":"8a3183f5248c85ad","src":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"9c7649b2a15130be","src":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码"},
 {"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"78e235b5c69afc24","src":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码"},
-{"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"7ffb65b4c63d3aa6","src":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层"},
+{"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"eb9a5d218fcc4892","src":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层"},
 {"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../agents/autopilot-runtime.md"],"seen":"d15d36e6b6934d9a","src":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 11. 真实用户场景验收","kind":"link","raws":["skeleton-and-application.md"],"seen":"63b1d445503de702","src":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层"},
 {"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../agents/autopilot-runtime.md"],"seen":"d15d36e6b6934d9a","src":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.2 集成层在每次合并以后运行"},

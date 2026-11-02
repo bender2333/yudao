@@ -31,7 +31,7 @@
 {"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5480a34a8595fd15","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 依据"},
 {"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"ae524890ae20668d","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 依据"},
 {"dst":"harness/definitions/organization.json","kind":"code-path","raws":["harness/definitions/organization.json"],"seen":"07b5fa82513b1c18","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 3 算差异"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"7183dbbb17e2ef54","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 6 交出去"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 6 交出去"}
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f4c72246940d73fe","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 6 交出去"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 6 交出去"}
 ]
 }

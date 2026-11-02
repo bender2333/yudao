@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/requirements/skeleton-and-application.md",
-"hash":"fc4f76f74c501687",
+"hash":"c3464489376804ce",
 "nodes":[
-{"hash":"fc4f76f74c501687","id":"docs/requirements/skeleton-and-application.md","kind":"file","title":"docs/requirements/skeleton-and-application.md"},
+{"hash":"c3464489376804ce","id":"docs/requirements/skeleton-and-application.md","kind":"file","title":"docs/requirements/skeleton-and-application.md"},
 {"hash":"d65ca15ec0da593a","id":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成","kind":"section","parent":"docs/requirements/skeleton-and-application.md","title":"D40 骨架与应用：骨架向后兼容，应用一次完成"},
 {"hash":"bd857f19d2fa88bc","id":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 用户原话","kind":"section","parent":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成","title":"用户原话"},
 {"hash":"9183f1ae27f7985a","id":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 已确认","kind":"section","parent":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成","title":"已确认"},
-{"hash":"5472a3d35b1514a7","id":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 讨论中的分析","kind":"section","parent":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成","title":"讨论中的分析"}
+{"hash":"dee9ab88f3793de2","id":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 讨论中的分析","kind":"section","parent":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成","title":"讨论中的分析"}
 ],
 "edges":[
 {"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"85fd23daae3825c4","src":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成"},
@@ -18,7 +18,6 @@
 {"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"85fd23daae3825c4","src":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 已确认"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["../design/trusted-kernel.md"],"seen":"7f64bd3f488a4ea2","src":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 已确认"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["../design/trusted-kernel.md"],"seen":"7f64bd3f488a4ea2","src":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 讨论中的分析"},
-{"dst":"docs/research/architecture-diagnosis-2026-10-19.md","kind":"link","raws":["../research/architecture-diagnosis-2026-10-19.md"],"seen":"14f3c295330cf865","src":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 讨论中的分析"},
 {"dst":"harness/orchestrator.py","kind":"code-path","raws":["harness/orchestrator.py"],"seen":"4721bd1e9d1cbcae","src":"docs/requirements/skeleton-and-application.md#D40 骨架与应用：骨架向后兼容，应用一次完成 > 讨论中的分析"}
 ]
 }

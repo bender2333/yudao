@@ -15,12 +15,12 @@
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"2442f6a7fc4067fb","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use"},
 {"dst":"docs/archive/requirements/stage-requirements-overview.md","kind":"link","raws":["../archive/requirements/stage-requirements-overview.md"],"seen":"d59ad4921303638e","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
-{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"895b5f21f4980650","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
+{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"216fcf1d205477db","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"2442f6a7fc4067fb","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
 {"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"ed4c2b8fb539b859","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"2442f6a7fc4067fb","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
 {"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f498d01b1f51bd42","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
-{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"346fb4163dc2fbee","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"63e470e3ae9c722a","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 已确认"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["../design/browser-and-computer-use.md"],"seen":"2442f6a7fc4067fb","src":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > 设计确定的内容"}
 ]
 }

@@ -35,7 +35,7 @@
 {"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["../requirements/department-guidance.md"],"seen":"ba3ce90a33c6fd1b","src":"docs/design/department-loop.md#三部门的循环结构"},
 {"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"fd5a013bfdfa0f32","src":"docs/design/department-loop.md#三部门的循环结构"},
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"d12403d0c052fd04","src":"docs/design/department-loop.md#三部门的循环结构 > 1. 依据与范围"},
-{"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"966a719f1a5b0d8f","src":"docs/design/department-loop.md#三部门的循环结构 > 1. 依据与范围"},
+{"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"da237f7db6aa2ab5","src":"docs/design/department-loop.md#三部门的循环结构 > 1. 依据与范围"},
 {"dst":"docs/design/local-tools.md#本地通用工具设计说明 > 2. 工作区","kind":"link","raws":["local-tools.md"],"seen":"67e8350a463e950c","src":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行 > 3.1 各部门在什么时候工作"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"485ba14cc9bb7c43","src":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行 > 3.2 同时运行的条件"},
 {"dst":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 4. 子循环","kind":"link","raws":["loops-and-convergence.md"],"seen":"3068e53aa74f7237","src":"docs/design/department-loop.md#三部门的循环结构 > 4. 询问与回答 > 4.5 用量与失败"},

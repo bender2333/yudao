@@ -75,20 +75,20 @@
 {"dst":"docs/agents/design-spec.md","kind":"link","raws":["design-spec.md"],"seen":"6b599df76e561f68","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 一个方框或一道缝怎么做"},
 {"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5480a34a8595fd15","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 系统的形状、三环、缝"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"2aafa894cba16ffe","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 规则"},
-{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"07180e15569923e5","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 规则"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"7183dbbb17e2ef54","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"895b5f21f4980650","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"f146598de78ce15f","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 规则"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f4c72246940d73fe","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"216fcf1d205477db","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
 {"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 阶段、薄片、十条道"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.3 CI 中的分层","kind":"link","raws":["../design/test-pyramid.md"],"seen":"8602d6d8e045dbb1","src":"docs/agents/workflow.md#工作方式 > 10. CI"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":"docs/agents/workflow.md#工作方式 > 3. 工作的层级"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/workflow.md#工作方式 > 3. 工作的层级"},
 {"dst":"docs/agents/ticket-spec.md","kind":"link","raws":["ticket-spec.md"],"seen":"7877afe0459a32ef","src":"docs/agents/workflow.md#工作方式 > 3. 工作的层级"},
 {"dst":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数","kind":"link","raws":["autopilot-runtime.md"],"seen":"f7d1c570027aa2b4","src":"docs/agents/workflow.md#工作方式 > 4. 状态与标签"},
 {"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","kind":"link","raws":["acceptance-evidence.md"],"seen":"c96911907473a5fa","src":"docs/agents/workflow.md#工作方式 > 6. 四个循环"},
 {"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md"],"seen":"2aafa894cba16ffe","src":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交"},
 {"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"1155373f0753c2aa","src":"docs/agents/workflow.md#工作方式 > 8. 独立审查"},
 {"dst":".claude/skills/README.md","kind":"link","raws":["../../.claude/skills/README.md"],"seen":"32124a5dad766c74","src":"docs/agents/workflow.md#工作方式 > 9. 技能"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"7183dbbb17e2ef54","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流、基础规则"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流、基础规则"}
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f4c72246940d73fe","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流、基础规则"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流、基础规则"}
 ]
 }

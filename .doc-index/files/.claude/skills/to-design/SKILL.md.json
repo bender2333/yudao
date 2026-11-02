@@ -22,8 +22,8 @@
 {"dst":"docs/agents/design-spec.md","kind":"link","raws":["../../../docs/agents/design-spec.md"],"seen":"6b599df76e561f68","src":".claude/skills/to-design/SKILL.md#写成设计说明"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"0391625f58a9e3c5","src":".claude/skills/to-design/SKILL.md#写成设计说明"},
 {"dst":".claude/skills/to-parents/SKILL.md","kind":"link","raws":["../to-parents/SKILL.md"],"seen":"e85b43812ea6ae6f","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"7183dbbb17e2ef54","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f4c72246940d73fe","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
 {"dst":"docs/design/README.md","kind":"code-path","raws":["docs/design/README.md"],"seen":"6ded0c1f2ab0bdcf","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
 {"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"86574edb5c537d29","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"}
 ]

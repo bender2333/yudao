@@ -1,13 +1,12 @@
 {
 "schema":1,
 "path":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md",
-"hash":"bb273e6c798bb656",
+"hash":"da891d95e3676704",
 "nodes":[
-{"hash":"bb273e6c798bb656","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md","kind":"file","title":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md"},
-{"hash":"bb273e6c798bb656","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md#场景 3 · qhub/Qwen3.8-Flash · 2026-10-20","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md","title":"场景 3 · qhub/Qwen3.8-Flash · 2026-10-20"}
+{"hash":"da891d95e3676704","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md","kind":"file","title":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md"},
+{"hash":"da891d95e3676704","id":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md#场景 3 · qhub/Qwen3.8-Flash · 2026-10-20","kind":"section","parent":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md","title":"场景 3 · qhub/Qwen3.8-Flash · 2026-10-20"}
 ],
 "edges":[
-{"dst":"docs/research/architecture-diagnosis-2026-10-19.md","kind":"link","raws":["../../research/architecture-diagnosis-2026-10-19.md"],"seen":"14f3c295330cf865","src":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md#场景 3 · qhub/Qwen3.8-Flash · 2026-10-20"},
 {"dst":"evals/runner/yudao.py","kind":"code-path","raws":["evals/runner/yudao.py:93-97"],"seen":"8732f64d7b1da8cc","src":"docs/evaluation/scenario-3-qwen38flash-2026-10-20/README.md#场景 3 · qhub/Qwen3.8-Flash · 2026-10-20"}
 ]
 }

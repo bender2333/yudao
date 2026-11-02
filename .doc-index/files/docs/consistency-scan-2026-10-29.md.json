@@ -42,13 +42,13 @@
 ],
 "edges":[
 {"dst":"CONTEXT.md","kind":"link","raws":["../CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29）"},
-{"dst":"docs/agents/shared-rules.md","kind":"link","raws":["agents/shared-rules.md"],"seen":"f339b22ebf153734","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29）"},
+{"dst":"docs/agents/shared-rules.md","kind":"link","raws":["agents/shared-rules.md"],"seen":"3871cb1d5f04b60f","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29）"},
 {"dst":"docs/architecture.html","kind":"link","raws":["architecture.html"],"seen":"5480a34a8595fd15","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29）"},
 {"dst":"docs/foundation-rules.md","kind":"link","raws":["foundation-rules.md"],"seen":"d0b3655a7ca70906","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29）"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29）"},
 {"dst":".claude/skills/trial/SKILL.md","kind":"code-path","raws":[".claude/skills/trial/SKILL.md"],"seen":"ce89702099853161","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"2aafa894cba16ffe","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md:312"],"seen":"895b5f21f4980650","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md:312"],"seen":"216fcf1d205477db","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论"},
 {"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"86574edb5c537d29","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"code-path","raws":["design/architecture/overall-architecture.md"],"seen":"5187beb59fd0fef7","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论"},
 {"dst":"docs/design/context-assembly.md","kind":"code-path","raws":["design/context-assembly.md:3"],"seen":"400af62f29a72884","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论"},
@@ -60,18 +60,18 @@
 {"dst":"docs/architecture.html","kind":"code-path","raws":["architecture.html"],"seen":"5480a34a8595fd15","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论 > 处理归属"},
 {"dst":"docs/foundation-rules.md","kind":"code-path","raws":["foundation-rules.md"],"seen":"d0b3655a7ca70906","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论 > 处理归属"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论 > 最该先改的七件事"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md:312"],"seen":"895b5f21f4980650","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论 > 最该先改的七件事"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md:312"],"seen":"216fcf1d205477db","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论 > 最该先改的七件事"},
 {"dst":"docs/foundation-rules.md","kind":"code-path","raws":["foundation-rules.md"],"seen":"d0b3655a7ca70906","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 2. 结论 > 最该先改的七件事"},
 {"dst":"README.md","kind":"code-path","raws":["README.md:356"],"seen":"e9284e5d7f7e7214","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 与代码不一致"},
 {"dst":"harness/bounds.py","kind":"code-path","raws":["harness/bounds.py"],"seen":"700f3ac90bf67b67","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 与代码不一致"},
 {"dst":"README.md","kind":"section-ref","raws":["README.md:366"],"seen":"e9284e5d7f7e7214","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 复核后确认的两条假阳性"},
 {"dst":"docs/archive/current-baseline-2026-10-29.md","kind":"code-path","raws":["docs/archive/current-baseline-2026-10-29.md"],"seen":"9e4a89c32b73cba5","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 失效链接"},
 {"dst":"docs/current-baseline.md","kind":"code-path","raws":["docs/current-baseline.md"],"seen":"00a44322330b1251","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 失效链接"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md"],"seen":"895b5f21f4980650","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 失效链接"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md"],"seen":"216fcf1d205477db","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 失效链接"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"2aafa894cba16ffe","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 术语与台账"},
 {"dst":"docs/archive/requirements/stage-requirements-overview.md","kind":"code-path","raws":["archive/requirements/stage-requirements-overview.md"],"seen":"d59ad4921303638e","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 术语与台账"},
 {"dst":"docs/foundation-rules.md","kind":"code-path","raws":["foundation-rules.md:21","foundation-rules.md:23"],"seen":"d0b3655a7ca70906","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 术语与台账"},
 {"dst":".claude/skills/module-sync/SKILL.md","kind":"code-path","raws":[".claude/skills/module-sync/SKILL.md"],"seen":"420ac0ce9158ba82","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 违禁词"},
-{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md:22"],"seen":"07180e15569923e5","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 违禁词"}
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md:22"],"seen":"f146598de78ce15f","src":"docs/consistency-scan-2026-10-29.md#文档一致性全量扫描（2026-10-29） > 3. 我自己的机器核对结论（21 条） > 违禁词"}
 ]
 }

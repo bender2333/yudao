@@ -77,10 +77,10 @@
 {"dst":".claude/skills/solo-worker/SKILL.md#solo 工人协议 > 一张工单的完整做法","kind":"link","raws":["../solo-worker/SKILL.md"],"seen":"e43e89178c9143ad","src":".claude/skills/solo/SKILL.md#solo > 一张工单的完整链路"},
 {"dst":".claude/skills/solo-worker/SKILL.md","kind":"link","raws":["../solo-worker/SKILL.md"],"seen":"51ec683833fc3aa8","src":".claude/skills/solo/SKILL.md#solo > 四个角色"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"0391625f58a9e3c5","src":".claude/skills/solo/SKILL.md#solo > 四个角色"},
-{"dst":".claude/skills/next/SKILL.md","kind":"link","raws":["../next/SKILL.md"],"seen":"7b48f856197f96cf","src":".claude/skills/solo/SKILL.md#solo > 四个角色 > 表1 > 后台架构师"},
+{"dst":".claude/skills/next/SKILL.md","kind":"link","raws":["../next/SKILL.md"],"seen":"28a54b777fbc1b85","src":".claude/skills/solo/SKILL.md#solo > 四个角色 > 表1 > 后台架构师"},
 {"dst":".claude/settings.json","kind":"code-path","raws":[".claude/settings.json"],"seen":"91ab181a1e3d76bc","src":".claude/skills/solo/SKILL.md#solo > 无人值守"},
 {"dst":".claude/skills/solo/scripts/hook.mjs","kind":"code-path","raws":[".claude/skills/solo/scripts/hook.mjs"],"seen":"d654dc15cf99c882","src":".claude/skills/solo/SKILL.md#solo > 无人值守"},
 {"dst":".codebuddy/settings.json","kind":"code-path","raws":[".codebuddy/settings.json"],"seen":"1b1c577b153e58bb","src":".claude/skills/solo/SKILL.md#solo > 机器配置（开循环之前配一次） > 表1 > 这个目录的写权限"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":".claude/skills/solo/SKILL.md#solo > 硬规则"}
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":".claude/skills/solo/SKILL.md#solo > 硬规则"}
 ]
 }

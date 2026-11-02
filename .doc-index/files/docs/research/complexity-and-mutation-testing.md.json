@@ -17,6 +17,6 @@
 "edges":[
 {"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"44f5577c951e86c1","src":"docs/research/complexity-and-mutation-testing.md#圈复杂度与变异测试调研"},
 {"dst":"harness/workspace.py","kind":"code-path","raws":["harness/workspace.py"],"seen":"e8ab423398de7827","src":"docs/research/complexity-and-mutation-testing.md#圈复杂度与变异测试调研 > 1. 本仓库的实测 > 1.4 平台"},
-{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"895b5f21f4980650","src":"docs/research/complexity-and-mutation-testing.md#圈复杂度与变异测试调研 > 2. 手动进行的方法"}
+{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"216fcf1d205477db","src":"docs/research/complexity-and-mutation-testing.md#圈复杂度与变异测试调研 > 2. 手动进行的方法"}
 ]
 }

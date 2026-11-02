@@ -52,7 +52,7 @@
 {"dst":"docs/architecture.html#s6","kind":"map-position","raws":["「可以多份」"],"seen":"386c6ac472c7195e","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"49866d689f311ad8","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"42da1ffb87162463","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
-{"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"966a719f1a5b0d8f","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
+{"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"da237f7db6aa2ab5","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 3. 执行权与一致边界","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"7d789e725779c06c","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["../requirements/remote-execution.md"],"seen":"384d12f32d94c89b","src":"docs/design/execution-environment.md#执行环境服务设计说明"},
 {"dst":"docs/design/browser-and-computer-use.md","kind":"link","raws":["browser-and-computer-use.md"],"seen":"2442f6a7fc4067fb","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 1. 范围"},

@@ -37,7 +37,7 @@
 {"dst":"docs/design/department-loop.md","kind":"link","raws":["department-loop.md"],"seen":"d85e5d29f5db0c47","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["trusted-kernel.md"],"seen":"7f64bd3f488a4ea2","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
 {"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"d0b3655a7ca70906","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
-{"dst":"docs/requirements/skeleton-and-application.md","kind":"link","raws":["../requirements/skeleton-and-application.md"],"seen":"fc4f76f74c501687","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
+{"dst":"docs/requirements/skeleton-and-application.md","kind":"link","raws":["../requirements/skeleton-and-application.md"],"seen":"c3464489376804ce","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
 {"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"fd5a013bfdfa0f32","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.1 版本关系","kind":"link","raws":["trusted-kernel.md"],"seen":"7c762cfea0624935","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议"},
 {"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 10. 遗留","kind":"link","raws":["web-interface-and-release.md"],"seen":"bf8b96c40a13c3c8","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议"},

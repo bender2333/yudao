@@ -40,7 +40,7 @@
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"ae524890ae20668d","src":"README.md#Yudao Loop System > 停止与后续范围"},
 {"dst":".claude/skills/README.md","kind":"link","raws":[".claude/skills/README.md"],"seen":"32124a5dad766c74","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"2aafa894cba16ffe","src":"README.md#Yudao Loop System > 参与开发"},
-{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"07180e15569923e5","src":"README.md#Yudao Loop System > 参与开发"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"f146598de78ce15f","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["docs/agents/workflow.md"],"seen":"0391625f58a9e3c5","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["docs/adr/0019-project-stream-across-versions.md"],"seen":"7594224d7b0c0dc6","src":"README.md#Yudao Loop System > 安装与启动 > 升级"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"ae524890ae20668d","src":"README.md#Yudao Loop System > 当前状态"},

@@ -42,7 +42,7 @@
 {"dst":".claude/skills/trial/method/expert.md","kind":"link","raws":["method/expert.md"],"seen":"544cfc27c4f1ba34","src":".claude/skills/trial/SKILL.md#试用 > 1. 准入、模型与预算 > 表1 > 专家段"},
 {"dst":".claude/skills/trial/method/reproduce.md","kind":"link","raws":["method/reproduce.md"],"seen":"a4be407682e98f1e","src":".claude/skills/trial/SKILL.md#试用 > 1. 准入、模型与预算 > 表1 > 独立复现"},
 {"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["method/records.md"],"seen":"55c8afcbca45bc44","src":".claude/skills/trial/SKILL.md#试用 > 13. 工具入口 > 表1 > report.mjs"},
-{"dst":"docs/decision.md","kind":"link","raws":["../../../docs/decision.md"],"seen":"895b5f21f4980650","src":".claude/skills/trial/SKILL.md#试用 > 2. 判据与任务集"},
+{"dst":"docs/decision.md","kind":"link","raws":["../../../docs/decision.md"],"seen":"216fcf1d205477db","src":".claude/skills/trial/SKILL.md#试用 > 2. 判据与任务集"},
 {"dst":"docs/trial/tasks.md","kind":"link","raws":["../../../docs/trial/tasks.md"],"seen":"8bb71185c90ca7d8","src":".claude/skills/trial/SKILL.md#试用 > 2. 判据与任务集"},
 {"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["method/records.md"],"seen":"55c8afcbca45bc44","src":".claude/skills/trial/SKILL.md#试用 > 3. 安装、身份与配置"},
 {"dst":".claude/skills/trial/scripts/instance.ps1","kind":"link","raws":["scripts/instance.ps1"],"seen":"0fe720bfe81953a3","src":".claude/skills/trial/SKILL.md#试用 > 3. 安装、身份与配置"},

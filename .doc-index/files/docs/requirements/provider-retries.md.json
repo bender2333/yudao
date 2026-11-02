@@ -10,8 +10,8 @@
 {"hash":"f18856e6a06bd815","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 本轮实施选择","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"本轮实施选择"}
 ],
 "edges":[
-{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"9d95fe1ea660bf53","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"1a899e30127a7d66","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"},
 {"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"8d786b944efce344","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"},
-{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"9d95fe1ea660bf53","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 本轮实施选择"}
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"1a899e30127a7d66","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 本轮实施选择"}
 ]
 }

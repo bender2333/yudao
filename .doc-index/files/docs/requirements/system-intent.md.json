@@ -33,9 +33,9 @@
 {"dst":"docs/design/loops-and-convergence.md","kind":"link","raws":["../design/loops-and-convergence.md"],"seen":"5b7b834a10761344","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 保留 agent 的能力"},
 {"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"da2fd62402caa715","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 可视化"},
 {"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"d85e5d29f5db0c47","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 独立与上下文"},
-{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"42d9a1a938123f39","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
+{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"1005db08c2b2d6c9","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
-{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"346fb4163dc2fbee","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"63e470e3ae9c722a","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
 {"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"8d786b944efce344","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
 {"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定","kind":"link","raws":["self-hosting.md"],"seen":"c9b6ce5a0cab8316","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
 {"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"abd6d0e803335d77","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"}

@@ -17,7 +17,7 @@
 ],
 "edges":[
 {"dst":"docs/design/test-pyramid.md","kind":"link","raws":["../design/test-pyramid.md"],"seen":"a2cf60afb98a64bf","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）"},
-{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"07180e15569923e5","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 1. 做法"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"f146598de78ce15f","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 1. 做法"},
 {"dst":"harness/tests/kernel/test_every_stop_has_reason.py","kind":"code-path","raws":["harness/tests/kernel/test_every_stop_has_reason.py"],"seen":"098207ddbe405468","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 4. 留给用户的"},
 {"dst":"evals/tests/test_milestone_records.py","kind":"code-path","raws":["evals/tests/test_milestone_records.py"],"seen":"a984ed0e059c3785","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 5. 没删但记下的"},
 {"dst":"harness/tests/test_access_tokens.py","kind":"code-path","raws":["harness/tests/test_access_tokens.py"],"seen":"3635a6a535c14900","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单 > client/tests"},

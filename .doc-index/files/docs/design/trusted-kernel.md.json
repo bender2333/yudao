@@ -43,7 +43,7 @@
 {"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"abd6d0e803335d77","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 5. 自我修改按风险分级放开"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["app-and-interface.md"],"seen":"bc0d27ad3a9d74f7","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"5187beb59fd0fef7","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"},
-{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"42d9a1a938123f39","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"},
+{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"1005db08c2b2d6c9","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"},
 {"dst":"docs/design/execution-environment.md","kind":"link","raws":["execution-environment.md"],"seen":"7089fb5e17c4b7b6","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"},
 {"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["web-interface-and-release.md"],"seen":"ed4c2b8fb539b859","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 9. 与现有设计的关系"}
 ]

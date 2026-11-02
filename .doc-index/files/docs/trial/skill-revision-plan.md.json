@@ -16,8 +16,8 @@
 {"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"3e1eb032980c7ef2","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案"},
 {"dst":".claude/skills/trial/SKILL.md","kind":"code-path","raws":[".claude/skills/trial/SKILL.md"],"seen":"ce89702099853161","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"895b5f21f4980650","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"216fcf1d205477db","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
 {"dst":"docs/trial/tasks.md","kind":"code-path","raws":["docs/trial/tasks.md"],"seen":"8bb71185c90ca7d8","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
 {"dst":"docs/trial/skill-revision-validation-2026-10-29.md","kind":"link","raws":["skill-revision-validation-2026-10-29.md"],"seen":"30ff3dd80a725a5a","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 批准与实施"}
 ]

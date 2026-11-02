@@ -78,7 +78,7 @@
 {"dst":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条）","kind":"link","raws":["context-assembly.md"],"seen":"f49f154224a6443c","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.3 预留与阈值"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制 > 11.1 工作上限与阈值","kind":"link","raws":["semantic-system.md"],"seen":"b056923cc5972fc0","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.3 预留与阈值"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","kind":"link","raws":["semantic-system.md"],"seen":"146af5b6ce0d6040","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.6 检查点有效性"},
-{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"9d95fe1ea660bf53","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.1 模型管理页"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"1a899e30127a7d66","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.1 模型管理页"},
 {"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 部门详情","kind":"link","raws":["project-organization.md"],"seen":"f57187e782021370","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 部门详情里的模型与 Prompt"}
 ]
 }
