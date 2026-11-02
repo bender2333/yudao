@@ -1692,9 +1692,9 @@ def _result_size(result: dict[str, Any]) -> int:
 
 def _fit_match_page(page: list[dict[str, Any]], truncated: bool,
                     limit: int = _OUTPUT_LIMIT) -> tuple[list[dict[str, Any]], bool]:
-    # 按输出上限 limit 收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
-    probe = {"matches": page}
-    while len(page) > 1 and _result_size({**probe, "truncated": True}) > limit:
+    # 按输出上限 limit 收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并。
+    # 每收缩一条都重新量剩下的这一页：一页放几条由这一页自己的大小决定
+    while len(page) > 1 and _result_size({"matches": page, "truncated": True}) > limit:
         page = page[:-1]
         truncated = True
     if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > limit:
