@@ -1,18 +1,20 @@
 {
 "schema":1,
 "path":"docs/requirements/department-prompts.md",
-"hash":"60fd81715aaf3e23",
+"hash":"009480e40a8eb387",
 "nodes":[
-{"hash":"60fd81715aaf3e23","id":"docs/requirements/department-prompts.md","kind":"file","title":"docs/requirements/department-prompts.md"},
-{"hash":"117b1e5e8a590f2f","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","kind":"section","parent":"docs/requirements/department-prompts.md","title":"D02 三部门 prompt 展示与修改"},
-{"hash":"14c56fb1d2b3a9bf","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 用户原话","kind":"section","parent":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","title":"用户原话"},
+{"hash":"009480e40a8eb387","id":"docs/requirements/department-prompts.md","kind":"file","title":"docs/requirements/department-prompts.md"},
+{"hash":"81a5f1b6eb7b56d5","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","kind":"section","parent":"docs/requirements/department-prompts.md","title":"D02 三部门 prompt 展示与修改"},
 {"hash":"9452e43023c5ed79","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 已确认","kind":"section","parent":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","title":"已确认"},
-{"hash":"67f3b358f642f05a","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 本轮设计选择","kind":"section","parent":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","title":"本轮设计选择"}
+{"hash":"60f9e51571d9715b","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择","kind":"section","parent":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","title":"设计选择"}
 ],
 "edges":[
-{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"06f69b1d0733b575","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
-{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c0ad35140a868277","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 本轮设计选择"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 本轮设计选择"},
-{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"06f69b1d0733b575","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 本轮设计选择"}
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c885094f22cf0815","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c885094f22cf0815","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择"},
+{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"c6e237cf82f11f6b","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择"}
 ]
 }

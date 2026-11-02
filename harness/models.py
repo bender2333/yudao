@@ -66,6 +66,10 @@ class EventType(SkeletonEventType):
     ACTION_VERIFIED = "action_verified"
     ASK_STARTED = "ask_started"
     ASK_ANSWERED = "ask_answered"
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里对当前交付
+    # 的每条验收条件写出判断，经写入口提交成事实；之后工程的解释才并入它的请求，质检结论必须引用它。
+    # 应用事件：装配看它存在、放行的门引用它，内核不解释内容
+    INDEPENDENT_JUDGEMENT_COMMITTED = "independent_judgement_committed"
     QA_TESTS_SAVED = "qa_tests_saved"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
 

@@ -1053,6 +1053,7 @@
   "department_guidance_applied",
   "department_guidance_received",
   "department_guidance_responded",
+  "independent_judgement_committed",
   "model_attempt_failed",
   "model_attempt_finished",
   "model_request_serialized",

@@ -1,0 +1,16 @@
+{
+"schema":1,
+"path":"docs/C4/04-code.md",
+"hash":"8297d9d1172672fa",
+"nodes":[
+{"hash":"8297d9d1172672fa","id":"docs/C4/04-code.md","kind":"file","title":"docs/C4/04-code.md"},
+{"hash":"8297d9d1172672fa","id":"docs/C4/04-code.md#C4：关键代码结构","kind":"section","parent":"docs/C4/04-code.md","title":"C4：关键代码结构"}
+],
+"edges":[
+{"dst":"docs/C4/model.json","kind":"code-path","raws":["model.json"],"seen":"706e4250c015d7cc","src":"docs/C4/04-code.md#C4：关键代码结构"},
+{"dst":"harness/assembly.py","kind":"code-path","raws":["harness/assembly.py"],"seen":"160fd7053d861a89","src":"docs/C4/04-code.md#C4：关键代码结构"},
+{"dst":"harness/assembly_contract.py","kind":"code-path","raws":["harness/assembly_contract.py"],"seen":"a77f9d30f7191987","src":"docs/C4/04-code.md#C4：关键代码结构"},
+{"dst":"harness/execution_contract.py","kind":"code-path","raws":["harness/execution_contract.py"],"seen":"a1429ab6ea2cc64d","src":"docs/C4/04-code.md#C4：关键代码结构"},
+{"dst":"harness/orchestrator.py","kind":"code-path","raws":["harness/orchestrator.py"],"seen":"4721bd1e9d1cbcae","src":"docs/C4/04-code.md#C4：关键代码结构"}
+]
+}

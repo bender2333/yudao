@@ -17,7 +17,8 @@ from dataclasses import replace
 
 from harness.actions import CheckReceipt, TreeFacts
 from harness.adapters.fake import FakeAdapter
-from harness.models import (ArtifactRef, DeliverySpec, EffectiveContract, SessionRecord)
+from harness.kernel_events import Event
+from harness.models import (ArtifactRef, DeliverySpec, EffectiveContract, EventType, SessionRecord)
 from harness.proposals import baseline_review, product_spec, review, structure
 from harness.runtime import LoopSystem
 from harness.tightening import WATCHED_OUTPUTS, pending_product_input
@@ -65,6 +66,19 @@ def _receipt(name: str, department: str, *, spec_hash: str, activation: str, exi
                         product_spec_hash=spec_hash, delivery_spec_hash=delivery_hash,
                         activation_id=activation, effective_contract_hash=None if delivery_hash is None else CONTRACT,
                         qa_tests_hash=qa_tests_hash)
+
+
+def _judgement_event(delivery_hash: str = DELIVERY) -> Event:
+    # 一条独立判断事件的内存替身（工单 #358 的门核对它的存在与它写的交付摘要）
+    return Event(event_id="evt_judgement", run_id="run_test", type=EventType.INDEPENDENT_JUDGEMENT_COMMITTED,
+                 role=None, parent_event_id=None, state_before="running", state_after="running",
+                 payload={"kind": "independent_judgement", "product_spec_hash": "sha256:spec",
+                          "delivery_spec_hash": delivery_hash, "checks": ["smoke"],
+                          "criteria_count": 1, "criteria": []},
+                 artifact_hashes=[], session_id="ses_quality", provider=None, model=None,
+                 context_digest=None, stop_reason=None, error=None, created_at="2026-10-31T00:00:00Z",
+                 position=999, stream="run:run_test", stream_version=999, project_id=None,
+                 work_item_id=None, department="quality")
 
 
 def _delivery_ready(projection, *, qa_tests_hash="sha256:current", receipt_material="sha256:current"):
@@ -186,7 +200,8 @@ def test_a_release_must_use_the_current_quality_test_material(tmp_path):
 
 def test_a_release_waits_for_the_product_input_inside_the_commit(tmp_path):
     # R3（工单 #561）：工具许可之后、提交之前产品又收到输入时，提交事务里再判一次，结果是等待；
-    # 写入口按安全节点等，醒来以后按此刻的 PRD 与交付重新裁决
+    # 写入口按安全节点等，醒来以后按此刻的 PRD 与交付重新裁决。
+    # 当前交付的独立判断已经提交（工单 #358 的门），这里只核对等待本身
     system, run_id = _accepted(tmp_path)
     system.add_input(run_id, "one more requirement")
     projection, receipt = _delivery_ready(system.project(run_id))
@@ -195,7 +210,7 @@ def test_a_release_waits_for_the_product_input_inside_the_commit(tmp_path):
     tightened = WATCHED_OUTPUTS.submission(_structured(
         projection, "quality",
         review("release", "verified", checks=["smoke"], basis_delivery_spec_hash=DELIVERY),
-        facts=_facts(receipt), events=events, commit=True))
+        facts=_facts(receipt), events=(*events, _judgement_event()), commit=True))
     assert tightened.wait and not tightened.accepted
 
 

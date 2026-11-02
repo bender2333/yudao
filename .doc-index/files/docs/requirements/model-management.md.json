@@ -1,17 +1,18 @@
 {
 "schema":1,
 "path":"docs/requirements/model-management.md",
-"hash":"06f69b1d0733b575",
+"hash":"c6e237cf82f11f6b",
 "nodes":[
-{"hash":"06f69b1d0733b575","id":"docs/requirements/model-management.md","kind":"file","title":"docs/requirements/model-management.md"},
-{"hash":"02bade8c7610b991","id":"docs/requirements/model-management.md#D24 模型管理与部门模型选择","kind":"section","parent":"docs/requirements/model-management.md","title":"D24 模型管理与部门模型选择"},
-{"hash":"d14340fdc981b73e","id":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 用户原话","kind":"section","parent":"docs/requirements/model-management.md#D24 模型管理与部门模型选择","title":"用户原话"},
-{"hash":"69d641432b03b0c7","id":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 已确认","kind":"section","parent":"docs/requirements/model-management.md#D24 模型管理与部门模型选择","title":"已确认"},
-{"hash":"6cb5acdcfd70b95b","id":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 后续功能","kind":"section","parent":"docs/requirements/model-management.md#D24 模型管理与部门模型选择","title":"后续功能"}
+{"hash":"c6e237cf82f11f6b","id":"docs/requirements/model-management.md","kind":"file","title":"docs/requirements/model-management.md"},
+{"hash":"30fbe76efe7f1c3f","id":"docs/requirements/model-management.md#D24 模型管理与部门模型选择","kind":"section","parent":"docs/requirements/model-management.md","title":"D24 模型管理与部门模型选择"},
+{"hash":"2759083a7c99d1e7","id":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 已确认","kind":"section","parent":"docs/requirements/model-management.md#D24 模型管理与部门模型选择","title":"已确认"},
+{"hash":"061a1bca9f8e85ca","id":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 后续功能","kind":"section","parent":"docs/requirements/model-management.md#D24 模型管理与部门模型选择","title":"后续功能"}
 ],
 "edges":[
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 已确认"},
-{"dst":"docs/design/project-organization.md","kind":"link","raws":["../design/project-organization.md"],"seen":"0efc415bea91c11f","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 已确认"}
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 已确认"},
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["../design/project-organization.md"],"seen":"e5d59b14843c8899","src":"docs/requirements/model-management.md#D24 模型管理与部门模型选择 > 已确认"}
 ]
 }

@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"README.md",
-"hash":"bf7f2025603ef66f",
+"hash":"c92ab02c3359bfa1",
 "nodes":[
-{"hash":"bf7f2025603ef66f","id":"README.md","kind":"file","title":"README.md"},
+{"hash":"c92ab02c3359bfa1","id":"README.md","kind":"file","title":"README.md"},
 {"hash":"be9cb249fd225931","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
-{"hash":"c1c6085b8ecad689","id":"README.md#Yudao Loop System > 当前状态","kind":"section","parent":"README.md#Yudao Loop System","title":"当前状态"},
+{"hash":"790f464ba514654d","id":"README.md#Yudao Loop System > 当前状态","kind":"section","parent":"README.md#Yudao Loop System","title":"当前状态"},
 {"hash":"eb93a109884ad267","id":"README.md#Yudao Loop System > 当前状态 > 现在能试什么","kind":"section","parent":"README.md#Yudao Loop System > 当前状态","title":"现在能试什么"},
 {"hash":"45bf8e193824bc7c","id":"README.md#Yudao Loop System > 参与开发","kind":"section","parent":"README.md#Yudao Loop System","title":"参与开发"},
 {"hash":"f90a94acb5117a67","id":"README.md#Yudao Loop System > 架构","kind":"section","parent":"README.md#Yudao Loop System","title":"架构"},
@@ -43,7 +43,7 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["docs/agents/workflow.md"],"seen":"2c01765171109f63","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["docs/adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"README.md#Yudao Loop System > 安装与启动 > 升级"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"fe69deff44285b85","src":"README.md#Yudao Loop System > 当前状态"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"README.md#Yudao Loop System > 当前状态"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"fe69deff44285b85","src":"README.md#Yudao Loop System > 当前状态 > 现在能试什么"},
 {"dst":"docs/design/app-and-interface.md","kind":"link","raws":["docs/design/app-and-interface.md"],"seen":"1e73a165bc6cbd7b","src":"README.md#Yudao Loop System > 快速开始 > 启动服务"},
 {"dst":"uv.lock","kind":"code-path","raws":["uv.lock"],"seen":"8dc93751ce5c2064","src":"README.md#Yudao Loop System > 快速开始 > 安装"},

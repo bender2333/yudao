@@ -1,21 +1,22 @@
 {
 "schema":1,
 "path":"docs/requirements/existing-project-onboarding.md",
-"hash":"c15be4443ed0d94d",
+"hash":"a1f62a4433d5dbab",
 "nodes":[
-{"hash":"c15be4443ed0d94d","id":"docs/requirements/existing-project-onboarding.md","kind":"file","title":"docs/requirements/existing-project-onboarding.md"},
-{"hash":"bb4d4a7102d37370","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","kind":"section","parent":"docs/requirements/existing-project-onboarding.md","title":"D33 接入已有项目"},
-{"hash":"46f092bceba3f637","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 用户原话","kind":"section","parent":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","title":"用户原话"},
-{"hash":"1163da279742d478","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 已确认","kind":"section","parent":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","title":"已确认"},
+{"hash":"a1f62a4433d5dbab","id":"docs/requirements/existing-project-onboarding.md","kind":"file","title":"docs/requirements/existing-project-onboarding.md"},
+{"hash":"6f113dc8a91bbee8","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","kind":"section","parent":"docs/requirements/existing-project-onboarding.md","title":"D33 接入已有项目"},
+{"hash":"3c0292c911340716","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 已确认","kind":"section","parent":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","title":"已确认"},
 {"hash":"60721b54603aaa9e","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 设计中确定的内容","kind":"section","parent":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","title":"设计中确定的内容"},
-{"hash":"931e2886db326c86","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 2026-09-29 用户确认的设计决定","kind":"section","parent":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","title":"2026-09-29 用户确认的设计决定"}
+{"hash":"30c9ca97ed46195a","id":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 设计决定","kind":"section","parent":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目","title":"设计决定"}
 ],
 "edges":[
+{"dst":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md","kind":"link","raws":["../adr/0034-adopted-change-writeback-three-tree-merge.md"],"seen":"7cb8e63e2228473b","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目"},
 {"dst":"docs/design/existing-project-onboarding.md","kind":"link","raws":["../design/existing-project-onboarding.md"],"seen":"4604e4d55473c0cf","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目"},
-{"dst":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md","kind":"link","raws":["../adr/0034-adopted-change-writeback-three-tree-merge.md"],"seen":"7cb8e63e2228473b","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 2026-09-29 用户确认的设计决定"},
-{"dst":"docs/requirements/project-initial-files.md","kind":"link","raws":["project-initial-files.md"],"seen":"1ea74f5887a897a0","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 2026-09-29 用户确认的设计决定"},
-{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"cc5ed4519032f933","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 已确认"},
-{"dst":"docs/design/existing-project-onboarding.md","kind":"link","raws":["../design/existing-project-onboarding.md"],"seen":"4604e4d55473c0cf","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 设计中确定的内容"}
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目"},
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"4175c0ea88f1e971","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 已确认"},
+{"dst":"docs/design/existing-project-onboarding.md","kind":"link","raws":["../design/existing-project-onboarding.md"],"seen":"4604e4d55473c0cf","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 设计中确定的内容"},
+{"dst":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md","kind":"link","raws":["../adr/0034-adopted-change-writeback-three-tree-merge.md"],"seen":"7cb8e63e2228473b","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 设计决定"},
+{"dst":"docs/requirements/project-initial-files.md","kind":"link","raws":["project-initial-files.md"],"seen":"23cc47ec6cdcd74a","src":"docs/requirements/existing-project-onboarding.md#D33 接入已有项目 > 设计决定"}
 ]
 }

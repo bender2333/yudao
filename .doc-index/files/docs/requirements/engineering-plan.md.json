@@ -1,15 +1,16 @@
 {
 "schema":1,
 "path":"docs/requirements/engineering-plan.md",
-"hash":"8d9861f085f26e0b",
+"hash":"b51b08be44b7744f",
 "nodes":[
-{"hash":"8d9861f085f26e0b","id":"docs/requirements/engineering-plan.md","kind":"file","title":"docs/requirements/engineering-plan.md"},
-{"hash":"b44ef513ca5411e5","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","kind":"section","parent":"docs/requirements/engineering-plan.md","title":"D05 研发先分解任务与计划"},
-{"hash":"5b59d7d487f83f20","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划 > 用户原话","kind":"section","parent":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","title":"用户原话"},
+{"hash":"b51b08be44b7744f","id":"docs/requirements/engineering-plan.md","kind":"file","title":"docs/requirements/engineering-plan.md"},
+{"hash":"cc88a3daf4c9627a","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","kind":"section","parent":"docs/requirements/engineering-plan.md","title":"D05 研发先分解任务与计划"},
 {"hash":"1fc68cd799e9730a","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划 > 已确认","kind":"section","parent":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","title":"已确认"},
-{"hash":"1206e3e8bdcc6aea","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划 > 本轮设计选择","kind":"section","parent":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","title":"本轮设计选择"}
+{"hash":"387e949f34fd75a8","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划 > 设计选择","kind":"section","parent":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","title":"设计选择"}
 ],
 "edges":[
-
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划"}
 ]
 }

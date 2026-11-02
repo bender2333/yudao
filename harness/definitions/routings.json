@@ -13,6 +13,7 @@
         "product_spec",
         "product_decision",
         "delivery_spec",
+        "independent_judgement",
         "qa_review",
         "structure",
         "baseline_review"
@@ -22,6 +23,7 @@
         "submit_product_decision",
         "submit_delivery",
         "submit_review",
+        "submit_independent_judgement",
         "submit_structure",
         "submit_baseline_review"
       ],

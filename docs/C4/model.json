@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "source_commit": "a8d115f6fc37cce28ff484555636cc49e3db880e",
-  "source_date": "2026-10-31",
+  "source_commit": "68733737fb8aab3e94dabecf27f5d2460f93b17f",
+  "source_date": "2026-11-02",
   "scope": "当前产品运行结构；静态代码证据",
   "nodes": [
     {
@@ -16,7 +16,7 @@
           "path": "README.md",
           "symbol": null,
           "line": 1,
-          "sha256": "fa9af3829cc82a85f9a74db3ee0342263dca4f75e2562133b1c35ae1ce57b0e7"
+          "sha256": "e9284e5d7f7e721441a9618ae62e92198eaaca44ca2030177306ffddabd0ff26"
         }
       ]
     },
@@ -32,13 +32,13 @@
           "path": "README.md",
           "symbol": null,
           "line": 1,
-          "sha256": "fa9af3829cc82a85f9a74db3ee0342263dca4f75e2562133b1c35ae1ce57b0e7"
+          "sha256": "e9284e5d7f7e721441a9618ae62e92198eaaca44ca2030177306ffddabd0ff26"
         },
         {
           "path": "CONTEXT.md",
           "symbol": null,
           "line": 1,
-          "sha256": "fe1861951bc7dd73abd7aaae4dfe87a22a3fbcf74fc872b4a7781f0a1cae9e48"
+          "sha256": "fff42abddd390e797409e6c3e2963ce4920df52957102ea74f75337d6748103e"
         }
       ]
     },
@@ -884,7 +884,7 @@
           "path": "README.md",
           "symbol": null,
           "line": 1,
-          "sha256": "fa9af3829cc82a85f9a74db3ee0342263dca4f75e2562133b1c35ae1ce57b0e7"
+          "sha256": "e9284e5d7f7e721441a9618ae62e92198eaaca44ca2030177306ffddabd0ff26"
         }
       ]
     },
