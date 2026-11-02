@@ -37,8 +37,9 @@ from harness.api.app import create_app  # noqa: E402
 from harness.app.access_tokens import AccessTokenStore  # noqa: E402
 from harness.app.application import Application  # noqa: E402
 from harness.app.catalog_commands import (  # noqa: E402
-    BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, ModelInput, ProviderInput,
+    BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, CredentialSet, ModelInput, ProviderInput,
 )
+from harness.app.mcp_commands import McpServersSave  # noqa: E402
 from harness.app.contracts import Accepted, Rejected  # noqa: E402
 from harness.app.project_commands import ProjectCreate  # noqa: E402
 from harness.app.project_and_work_item_commands import (  # noqa: E402
@@ -93,6 +94,17 @@ SLOW_ANSWER_DELTAS = 120
 STOP_NOTE_QUESTION = "输出要不要改成大写？"
 STOP_NOTE_ERROR = "模型服务返回 HTTP 400：input length 131072 exceeds the maximum context length"
 BRANCH_ERROR = "回答的请求被拒绝：HTTP 400 invalid_request_error"
+
+# MCP 服务器（工单 #237）：项目设置页的「MCP 服务器」一节要有一台真的 MCP 服务器——
+# 探测时控制主机真的启动 harness/tests/mcp_servers/stdio_server.py（官方 SDK 写的测试服务器），
+# 不是替身。变量里写两个凭据名称：一个在数据目录的 .env 里有值（状态写「已设置」），一个没有值（「缺失」）
+MCP_PROJECT = "示例项目"
+MCP_SERVER = "time"
+MCP_HTTP_SERVER = "search"
+MCP_KEY = "MCP_E2E_KEY"
+MCP_MISSING_KEY = "MCP_MISSING_KEY"
+MCP_SECRET = "mcp-e2e-secret-237"
+MCP_STDIO_SERVER = Path(__file__).resolve().parents[3] / "harness" / "tests" / "mcp_servers" / "stdio_server.py"
 
 
 def lan_address() -> str:
@@ -563,6 +575,41 @@ async def seed(application: Application, system: LoopSystem, *, two_item_project
     await accept(application, "project.create", ProjectCreate(
         command_id=str(uuid.uuid4()), name="实时项目", goal=LIVE_GOAL))
 
+async def seed_mcp_servers(application: Application, project_id: str) -> None:
+    # 项目设置页的「MCP 服务器」一节（工单 #237）：保存两台服务器与两个凭据名称。
+    # 命令与保存路径都走应用层自己的命令（mcp_servers.save、credential.set），不在测试里直接改状态文件。
+    # 第一台是真的 stdio 服务器：探测时控制主机真的启动 harness/tests/mcp_servers/stdio_server.py；
+    # 它的变量只用一个有值的凭据（缺凭据会让启动失败，那是另一件事）。
+    # 第二台是 HTTP 服务器，请求头里写一个数据目录的 .env 里没有的凭据名称：页面上显示「缺失」。
+    servers = {
+        MCP_SERVER: {
+            "name": MCP_SERVER, "transport": "stdio",
+            "command": sys.executable, "args": [str(MCP_STDIO_SERVER)],
+            "env": {"API_KEY": {"kind": "credential", "credential_ref": MCP_KEY}},
+            "departments": ["product", "engineering", "quality"],
+        },
+        MCP_HTTP_SERVER: {
+            "name": MCP_HTTP_SERVER, "transport": "http", "url": "https://mcp.example.com/mcp",
+            "headers": {"Authorization": {"kind": "credential", "credential_ref": MCP_MISSING_KEY}},
+            "departments": ["product"],
+        },
+    }
+    await accept(application, "mcp_servers.save", McpServersSave(
+        command_id=str(uuid.uuid4()), project_id=project_id, servers=servers, base_version=0))
+    facade = application.system.facade
+    await accept(application, "credential.set", CredentialSet(
+        command_id=str(uuid.uuid4()), ref=MCP_KEY, secret=MCP_SECRET, persist=True,
+        base_version=facade.credential_status(MCP_KEY)["version"]))
+
+
+def project_id_of(application: Application, name: str) -> str:
+    # 预置的项目按名字取标识：用例与预置脚本对同一个项目（projects.list 是应用层自己的查询）
+    listed = application.query("projects.list", ProjectsList(include_archived=True)).data
+    row = next((item for item in listed.projects if item.name == name), None)
+    if row is None:
+        raise AssertionError(f"projects.list 里没有项目 {name}")
+    return row.project_id
+
 async def seed_onboarding(application: Application) -> None:
     # 建档脚本的预置（工单 #332）：只建一个空项目，不跑事项。建档轮次全部留给接入已有项目用：
     # 接入的建档 run 要走过产品、工程与质检共六次模型调用，重新开始建档再来六次，
@@ -940,6 +987,10 @@ def main() -> int:
             # 自己在界面上建项目并开始事项，不需要预置的项目与事项；进行中的询问还要求执行槽位空着，
             # 预置的「文本工具」会占着它
             asyncio.run(seed(application, system))
+            # MCP 服务器一节的预置（工单 #237）：示例项目里保存一台真服务器与两个凭据名称，
+            # 用例打开设置页的「MCP 服务器」一节核对保存、修改、探测与凭据状态
+            if args.script == "default":
+                asyncio.run(seed_mcp_servers(application, project_id_of(application, MCP_PROJECT)))
     if args.catalog_driven:
         os.environ.pop("OPENCODE_GO_KEY", None)
         asyncio.run(clear_department_defaults(application, args.bind_departments))

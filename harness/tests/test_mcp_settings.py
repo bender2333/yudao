@@ -372,3 +372,32 @@ def test_project_settings_query_returns_the_mcp_section(tmp_path):
     assert settings.mcp_servers.servers["time"].env["API_KEY"]["credential_ref"] == "MCP_TIME_KEY"
     assert settings.mcp_servers.document_digest == _saved_event(system, project_id)["document_digest"]
     system.close()
+
+
+def test_project_settings_gives_the_state_of_the_credential_names_in_the_settings(tmp_path):
+    # 工单 #237：界面在凭据名称旁写「已设置」或「缺失」，判断来自后端（网络与 MCP 设计说明第 11.1 节）。
+    # 变量与请求头里出现的凭据名称各给一项，状态与凭据命令读的是同一个来源；只给名称与状态，不含凭据值
+    system = _system(tmp_path)
+    project_id = system.projects.register("凭据状态", GOAL)
+    application = Application(system)
+    _save(system, project_id, {**STDIO_SERVER, **HTTP_SERVER}, base_version=0)
+
+    missing = _settings(application, project_id).mcp_servers.credentials
+    assert set(missing) == {"MCP_TIME_KEY", "EXA_KEY"}
+    assert missing["MCP_TIME_KEY"].configured is False and missing["MCP_TIME_KEY"].source == "missing"
+    assert missing["MCP_TIME_KEY"].version == 0
+
+    # 写入一个只在本进程有效的值以后，设置里的这一项按同一个来源变成「已设置」；version 是下一条凭据命令的基准版本
+    system.facade.set_credential("MCP_TIME_KEY", SECRET, persist=False)
+    configured = _settings(application, project_id).mcp_servers.credentials
+    assert configured["MCP_TIME_KEY"].configured is True
+    assert configured["MCP_TIME_KEY"].source == "override"
+    assert configured["MCP_TIME_KEY"].version == 1
+    assert configured["EXA_KEY"].configured is False
+
+    # 凭据值不进入这份设置（保存的非秘密设置与凭据状态都只有名称）
+    assert SECRET not in _settings(application, project_id).model_dump_json()
+    # 凭据改过以后这条查询重新读取：能力清单里登记凭据事件，页面上的状态不用整页刷新
+    queries = application.capabilities("", access="local").queries
+    assert "credential_changed" in next(item for item in queries if item.name == "project.settings").changed_by
+    system.close()

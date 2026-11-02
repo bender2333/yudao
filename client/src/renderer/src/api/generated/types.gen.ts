@@ -3535,6 +3535,28 @@ export type MaterialRecord = {
 };
 
 /**
+ * McpCredentialStatusView
+ */
+export type McpCredentialStatusView = {
+    /**
+     * Ref
+     */
+    ref: string;
+    /**
+     * Configured
+     */
+    configured: boolean;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Version
+     */
+    version?: number;
+};
+
+/**
  * McpProbeResultView
  */
 export type McpProbeResultView = {
@@ -3696,6 +3718,12 @@ export type McpServersSetting = {
      * Updated At
      */
     updated_at?: string | null;
+    /**
+     * Credentials
+     */
+    credentials?: {
+        [key: string]: McpCredentialStatusView;
+    };
 };
 
 /**
