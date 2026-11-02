@@ -1001,3 +1001,5 @@ Claude（Duet 助手） / 2026-11-02 09:15 / 新增调研 `research/deepseek-sup
 Claude（Duet 助手） / 2026-11-02 13:58 / 新增 `research/doc-consistency-concept-model.md`：文档一致性核对的方案，概念模型放在 `CONTEXT.md`（每个词条下加一块结构：别名、定义在、属于与包含与依赖、取值、写法、代码、代码状态、不自动挂），文档按名字自动挂、复述取值写语义链接，发现走样只用脚本、只提醒不拦；第一版六步与第一步的写法草稿；待定五条，复述的写法与 49 个总图的词怎么办先定；`research/README.md` 加一行索引；`decision.md` 加一条 / 用户定按概念模型核对、模型放在 CONTEXT.md，要先把方案推到 main
 
 claude-opus-5-5 / 2026-11-02 15:17 / `research/doc-consistency-concept-model.md` 改写：判断走样靠 clingo 规则，LLM 只把文字翻译成文档说法（词汇封闭、带原文、结果固定、脚本优先），不加隐藏标记与语义链接，工具放 `tools/doc-consistency/`，补两个引擎的试验数字与 LLM 提取的验收；`research/README.md` 改一行；`decision.md` 加一条 / 用户要走符号推理、做成单独的工具，从文字到语义用 LLM
+
+claude-opus-5-5 / 2026-11-02 15:56 / `agents/autopilot-runtime.md` 第 4 节真实模型测试与评测的模型改为 `ag/gemini-3.8-flash-medium`；`requirements/comparison-experiment.md` 三条按日期的模型记录合成一条现在的说法；`decision.md` 加一条 / 用户不再使用 `qhub/Qwen3.8-Flash`，评测场景设计说明本来就写着不用它，这两处没跟上

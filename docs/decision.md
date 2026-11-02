@@ -1652,3 +1652,9 @@ Argon 的工作流建议（四条）对照仓库后的取舍：
 - 待定：总图与模型谁是上游；对照表去留；向量化；Discussions #1426 第 3 至 6 条。
 - 没有做：工具还没有建，`CONTEXT.md` 与钩子都没改，不开工单。
 - 改动：`docs/research/doc-consistency-concept-model.md` 按以上改写，`docs/research/README.md` 改一行。
+
+## 2026-11-02 - 不再使用 qhub/Qwen3.8-Flash
+
+- 用户原话：「qhub/Qwen3.8-Flash不要再用了」。
+- 决策：试验、评测与真实模型测试都不选它。真实模型测试与评测的模型按评测场景设计说明已写的 `ag/gemini-3.8-flash-medium`，运行配置与需求记录改成一致。
+- 没有做：这台机器的用户环境变量 `YUDAO_EVAL_MODEL` 没有设置，属于用户环境，没有改。
