@@ -33,7 +33,7 @@
 
 ## 参与开发
 
-这个仓库由架构师与 agent 按[工作方式](docs/agents/workflow.md)开发：工单在 GitHub Issues，状态是标签，每一段流转在工单上留一条证据评论。用到的技能、什么时候用、怎么调，见[技能使用说明](.claude/skills/README.md)。架构师的规则在 `CLAUDE.md`，执行者的规则在 `AGENTS.md`。
+这个仓库由架构师与 agent 按[工作方式](docs/agents/workflow.md)开发：改代码的工作走 GitHub Issues 的工单，状态是标签，每一段流转在工单上留一条证据评论；设计、原型与规则直接改，不走工单。用到的技能、什么时候用、怎么调，见[技能使用说明](.claude/skills/README.md)。架构师的规则在 `CLAUDE.md`，执行者的规则在 `AGENTS.md`。
 
 ## 架构
 

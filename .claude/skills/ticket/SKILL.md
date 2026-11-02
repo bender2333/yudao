@@ -5,6 +5,8 @@ description: 建立或改写 Yudao 的 GitHub 工单（阶段、父、子、清�
 
 # 建立工单
 
+工单只管改代码与测试的工作。只改设计说明、原型、规则或文档的事不建工单，直接改（[工作方式](../../../docs/agents/workflow.md)第 3 节）。
+
 规范正本是 [工单规范](../../../docs/agents/ticket-spec.md)；`gh` 命令在 [issue-tracker.md](../../../docs/agents/issue-tracker.md)；状态与种类标签在[工作方式](../../../docs/agents/workflow.md)第 4 节。
 
 ## 1. 定类型与归属

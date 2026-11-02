@@ -11,7 +11,7 @@ argument-hint: "<工单编号 | Discussions 帖子链接>"
 ## 何时用 / 何时不用
 
 - 用：带 `needs-triage` 的工单；solo 自己转成 `ready-for-human`、架构师还没看过的工单；Discussions 的 Ideas；新报告、还没有状态标签的工单。
-- 不用：与总图冲突、要改总图的（开 `architecture` 工单交总架构师）；用户在场时要改规则的（直接和用户定）。
+- 不用：与总图冲突、要改总图的（发帖交总架构师，[工作方式](../../../docs/agents/workflow.md)第 7 节）；用户在场时要改规则的（直接和用户定）。
 
 ## 先读什么
 
@@ -28,10 +28,12 @@ argument-hint: "<工单编号 | Discussions 帖子链接>"
    | 正文过时：名字搬了家、「只改」漏了文件 | 在当前 main 上改写正文与「依据」 | `ready-for-agent` |
    | 一张里有两件不确定的事，或者太大 | 按 [`/to-children`](../to-children/SKILL.md) 拆成能各自验证的几张，里程碑跟原单走 | 新单 `ready-for-agent`，原单关闭或改成父工单 |
    | 设计没写到，两种读法会做出不同的交付 | 在总图与意图的范围里定下来，按 [`/to-design`](../to-design/SKILL.md) 写进设计说明 | `ready-for-agent` |
+| 不用改代码，只要把设计说明写清 | 按 [`/to-design`](../to-design/SKILL.md) 写进设计说明，推送 main | 关闭，评论写提交 |
    | 测试靠时长赌先后 | 写成修复工单（[测试分层设计说明](../../../docs/design/test-pyramid.md)「测试的写法」） | `ready-for-agent` |
    | 已经不需要了 | 关闭，写明依据；会改变这个阶段交给用户的东西时交给用户 | 关闭 |
-   | 与总图冲突 | 开 `architecture` 工单，写现象、总图哪一节、要定什么 | `ready-for-human` |
-   | 要改规则、要放宽验收、执行环境 | 写清要定什么、建议怎么做、不定会怎样 | `ready-for-human` |
+   | 与总图冲突 | 发帖交总架构师（[工作方式](../../../docs/agents/workflow.md)第 7 节），工单评论附链接 | `ready-for-human` |
+   | 要改规则 | 用户在场时直接和用户定；不在场时发帖交总架构师，工单评论附链接 | `ready-for-human` |
+| 要放宽验收、执行环境 | 写清要定什么、建议怎么做、不定会怎样 | `ready-for-human` |
 
 3. **先推送设计，再放出工单**：改正文与设计期间工单留在 `needs-triage`；设计说明进了 main、「依据」写上推送后的提交以后，才改回 `ready-for-agent`。完成：solo 领到时读到的一定是新设计。
 4. **写 `TRIAGE:` 评论**：第一行 `TRIAGE: <去向>`，下面写核对了哪些前提、按哪一条原因处理、改了哪一段设计或正文、补了哪条依赖。完成：下一个人只读这条评论就知道发生了什么。
@@ -47,7 +49,7 @@ solo 自己转成 `ready-for-human` 的，逐张看：
 
 ## 想法与外部报告
 
-- Discussions 的 Ideas：要做的，按[工单规范](../../../docs/agents/ticket-spec.md)建工单（`/ticket`），在帖子里回「已转 #编号」；不做的，在帖子里回一句理由；方向还看不清、一次会话做不完的，开 `/wayfinder` 的决策图。
+- Discussions 的 Ideas：要改代码的，按[工单规范](../../../docs/agents/ticket-spec.md)建工单（`/ticket`），在帖子里回「已转 #编号」；要改设计、原型或文档的，按 [`/discuss`](../discuss/SKILL.md)、[`/to-design`](../to-design/SKILL.md) 直接改，在帖子里回一句改了哪份文档；不做的，在帖子里回一句理由；标题以「总图：」「规则：」开头的交总架构师。
 - 新报告的工单：先查是不是已经实现（按领域概念找，不只按报告的字面），是就关闭并指出在哪里；是缺陷就按 `/to-children` 的模板改写正文、带 `bug`；要讨论的转 [`/discuss`](../discuss/SKILL.md)。
 
 ## 常见借口

@@ -5,7 +5,7 @@
 ## 先记住三件事
 
 1. **不知道该做什么时，用 `/next`。** 它读 GitHub 的状态，找到下一件该做的事，告诉你交给哪个技能。
-2. **每做完一段，工单上都有一条证据评论**（`DELIVERY:`、`REVIEW:`、`TRIAGE:`、`VERDICT:`、`TRIAL:` 等）。下一个人读工单就能接上，不用回翻会话。
+2. **工单只管改代码与测试，每做完一段，工单上都有一条证据评论**（`DELIVERY:`、`REVIEW:`、`TRIAGE:`、`VERDICT:`、`TRIAL:` 等）。下一个人读工单就能接上，不用回翻会话。设计、原型、规则这些非代码的工作不走工单，直接改。
 3. **用户只定三件事**：走向、规则、试用结论。其余由架构师与 solo 按标签流转。
 
 ## 谁用哪些
@@ -31,7 +31,7 @@
                                          │过了
 薄片达到 ──/trial-intake 推进──► 复盘 → agent 试用 → 修缺陷 → 发布 → 走查 → 导游卡 → 用户试用
                                                                                      │
-                                       /trial-intake 反馈 ──► 缺陷成子工单 / /module-sync / architecture 工单
+                                       /trial-intake 反馈 ──► 缺陷成子工单 / /module-sync / 交总架构师
 交回的工单、solo 转给用户的工单、Discussions 的想法 ──/triage──► 放回、拆小、补设计或交给用户
 ```
 
@@ -47,7 +47,7 @@
 | --- | --- | --- | --- | --- |
 | [`next`](next/SKILL.md) | 读 GitHub 状态，按固定顺序找下一件事，交给对应的技能；用户不在场时就是架构师循环 | 接手一条工作线、一个模块或一个里程碑；不知道该做什么 | `/next [范围] [--循环]` | 否 |
 | [`discuss`](discuss/SKILL.md) | 把想法讨论成结论：先在总图上定位，再追问需求与边界，同时更新术语表与 ADR | 新想法、要先想清楚的问题 | `/discuss [想法或链接]` | 否 |
-| [`to-design`](to-design/SKILL.md) | 把结论写成设计说明（第 3 行是总图位置），更新索引；放出等设计的父工单 | 讨论有了结论；父工单写着「设计先写」 | `/to-design [设计说明路径 \| 父工单编号]` | 否 |
+| [`to-design`](to-design/SKILL.md) | 把结论写成设计说明（第 3 行是总图位置），更新索引；设计未写的桶写完后建父工单 | 讨论有了结论；阶段工单的薄片清单里有「设计未写」的桶 | `/to-design [设计说明路径 \| 桶名]` | 否 |
 | [`to-parents`](to-parents/SKILL.md) | 按缝与道把一个阶段或模块归桶，每桶一张父工单，旧工单定去向 | 一个里程碑、阶段或模块要开工 | `/to-parents [里程碑名 \| 缝或道]` | 是 |
 | [`to-children`](to-children/SKILL.md) | 把一张父工单拆成立缝与切片的子工单 | 父工单有了设计说明 | `/to-children <父工单编号>` | 否 |
 | [`module-sync`](module-sync/SKILL.md) | 和用户定一个模块的走向：体检卡、选择题，接着归桶与拆单 | 用户要定一个模块、一道缝或一条道往哪走 | `/module-sync <模块 \| 缝 \| 道>` | 是 |
@@ -85,7 +85,6 @@
 | `codebase-design` | `module-sync`、`to-design` |
 | `tdd`、`diagnosing-bugs` | `solo-worker` |
 | `code-review` | `reviewer` |
-| `wayfinder` | 方向看不清、一次会话做不完的大事：开一张决策图，一次解一张票 |
 
 ## 常见用法
 
