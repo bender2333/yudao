@@ -13,17 +13,19 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from harness import watched_outputs
+from harness import routing_contract, watched_outputs
 from harness.app import project_queries, read_models
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.kernel_events import Event
 from harness.models import (
-    ArtifactRef, DeliverySpec, EffectiveContract, EventType, ProductSpec, RunProjection, SessionRecord, UserInput,
+    ArtifactRef, DeliverySpec, DepartmentGuidance, EffectiveContract, EventType, ProductSpec, RunProjection,
+    SessionRecord, UserInput,
 )
-from harness.tightening import WATCHED_OUTPUTS
+from harness.tightening import WATCHED_OUTPUTS, pending_product_input
 from harness.validation import TightenRequest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -248,6 +250,53 @@ def test_a_release_by_the_renamed_verifier_waits_for_the_input(tmp_path, monkeyp
         department=RENAMED_VERIFIER, state=projection, definitions=renamed,
         tool={"id": "call", "name": "submit_review", "args": {"verdict": "rework_engineering"}}))
     assert not tightened.wait
+
+
+def test_the_requirement_owner_is_the_one_the_proposal_contract_gives(tmp_path, monkeypatch):
+    # 验收第 3 条：谁能交要求按提案合同判断；回答里顺带交上的修订，提案带交它的部门
+    renamed = _all_renamed(tmp_path)
+    monkeypatch.setattr(watched_outputs, "DEFINITIONS", renamed)
+    projection = _projection(RENAMED_PRODUCT, RENAMED_ENGINEERING, RENAMED_VERIFIER)
+    revision = {"answer": "按澄清修订 PRD。", "goal": "echo",
+                "requirements": ["prints the argument"], "acceptance_criteria": ["prints"]}
+    branch = routing_contract.AskBranch(recipient=RENAMED_PRODUCT, session_id="ses_ask",
+                                        max_model_steps=4, max_time_sec=60.0)
+
+    outcome = watched_outputs.ask_outcome(
+        projection, branch=branch, result=routing_contract.AskRoundResult(submission=revision))
+
+    assert outcome.revises is not None
+    assert (outcome.revises["kind"], outcome.revises["issuer"]) == ("product_spec", RENAMED_PRODUCT)
+    assert outcome.revises["requirements"] == ["prints the argument"]
+    # 收输入与核验的角色回答时带着同样的参数，也不是提案：它的提案合同里没有要求
+    branch = routing_contract.AskBranch(recipient=RENAMED_VERIFIER, session_id="ses_ask2",
+                                        max_model_steps=4, max_time_sec=60.0)
+    outcome = watched_outputs.ask_outcome(
+        projection, branch=branch,
+        result=routing_contract.AskRoundResult(submission={"facts": "f", "requirements": ["r"]}))
+    assert outcome.revises is None
+
+
+def test_the_input_department_is_the_one_that_watches_user_input(tmp_path, monkeypatch):
+    # 验收第 2、3 条：收用户的输入与发给它的指导的是关注用户输入的那个部门（不是写死的），放行等它处理完
+    renamed = _all_renamed(tmp_path)
+    projection = _projection(RENAMED_PRODUCT, RENAMED_ENGINEERING, RENAMED_VERIFIER, active=RENAMED_VERIFIER)
+    guidance = DepartmentGuidance(
+        id="guidance", run_id="run", department=RENAMED_PRODUCT, version=1, text="按新的要求做",
+        guidance_ref=ArtifactRef("guidance", "g-hash", "guidance/1"), created_event_id="guidance-event",
+        status="received")
+    projection.department_guidance.append(guidance)
+    release = TightenRequest(
+        department=RENAMED_VERIFIER, state=projection, definitions=renamed,
+        tool={"id": "call", "name": "submit_review", "args": {"verdict": "release"}})
+
+    assert pending_product_input(projection, [], definitions=renamed)
+    assert WATCHED_OUTPUTS.tool(release).wait
+
+    # 同一句话发给别的部门：不是收输入的那个部门的事，放行不等
+    projection.department_guidance[0] = replace(guidance, department=RENAMED_ENGINEERING)
+    assert not pending_product_input(projection, [], definitions=renamed)
+    assert not WATCHED_OUTPUTS.tool(release).wait
 
 
 # ---------------------------------------------------------------------------
