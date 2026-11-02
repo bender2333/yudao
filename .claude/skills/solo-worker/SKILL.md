@@ -104,7 +104,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 | 情况 | 标签 | 循环里的收尾 | 单独运行时 |
 | --- | --- | --- | --- |
-| 设计问题：工单要求的做法与设计说明相反、规则互相矛盾、验收标准无法满足或互相矛盾（设计没写到的边界自己定、登记架构问题、继续做） | `needs-triage` | 评论写到 `<工作目录>/.tmp/<编号>-question.md`，`STATUS: blocked`，`ERROR` 以 `[设计]` 开头，后面写问题一句话与那个文件的绝对路径 | `gh issue edit <编号> --remove-label in-progress --add-label needs-triage`，`gh issue comment <编号> --body-file <文件>` |
+| 设计问题：工单要求的做法与设计说明相反、规则互相矛盾、验收标准无法满足或互相矛盾（设计没写到的边界自己定、写进交付说明、继续做） | `needs-triage` | 评论写到 `<工作目录>/.tmp/<编号>-question.md`，`STATUS: blocked`，`ERROR` 以 `[设计]` 开头，后面写问题一句话与那个文件的绝对路径 | `gh issue edit <编号> --remove-label in-progress --add-label needs-triage`，`gh issue comment <编号> --body-file <文件>` |
 | 同一张工单连续三轮没有通过（一轮一次会话，收尾报 failed 或 blocked 算一次；本地测试失败不算） | `needs-triage` | 每轮失败照实报 `STATUS: blocked`，不带前缀；第三轮由编排者 `escalate` | 自己交回，评论写三轮分别卡在哪、试过什么 |
 | 执行环境挡住：跑不了测试、缺凭据、权限不够、CI 平台挂了、依赖装不上、网络不通 | `ready-for-human` | 评论写到 `<工作目录>/.tmp/<编号>-env.md`，`ERROR` 以 `[环境]` 开头 | `--remove-label in-progress --add-label ready-for-human`，发评论 |
 | 要改规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、评测的隐藏检查、参考解法、评分器与发布检查（`evals/scenarios/*/checks`、`evals/scenarios/*/reference`、`evals/scorer`、`scripts/release.py`、`harness/release_check.py`；可信内核清单与 `harness/tests/kernel/` 不在其中：可以改，不需要事前批准，要求是内核路径的测试覆盖，`AGENTS.md` 共同要求） | `ready-for-human` | PR 上写明理由，评论写清要用户决定什么，收尾 blocked | 同上 |
@@ -123,7 +123,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 执行环境的评论写清哪一步被挡住、试过什么、需要什么、哪些部分不受影响。其它做不下去的：算一次失败，写清原因，不要在同一处反复试。
 
-设计没写到的边界自己定、继续做，写进交付说明的「自定的边界」，由架构师验收时写进设计说明；与总图冲突的，交回评论里写明「总图」与节号，架构师开 `architecture` 工单（`AGENTS.md`「架构问题」）。
+设计没写到的边界自己定、继续做，写进交付说明的「自定的边界」，由架构师验收时写进设计说明；与总图冲突的，交回评论里写明「总图」与节号，架构师发帖交总架构师（`AGENTS.md`「架构问题」）。
 
 ## main 上的 CI
 

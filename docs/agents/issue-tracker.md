@@ -1,6 +1,6 @@
 # 工单系统：GitHub Issues
 
-本仓库的工单与规格都是 GitHub Issues，全部操作用 `gh` 命令行。仓库 `bender2333/yudao`，`gh` 在仓库目录内运行时自动从 `git remote -v` 识别。
+本仓库的工单是 GitHub Issues，全部操作用 `gh` 命令行。仓库 `bender2333/yudao`，`gh` 在仓库目录内运行时自动从 `git remote -v` 识别。
 
 ## 常用写法
 
@@ -25,8 +25,8 @@
 
 两个地方各管一样，不合并：
 
-- **GitHub Issues**：工作队列。哪些打开、谁领取、被什么阻塞、是否完成。技能发布的内容都放这里。
-- **`docs/`**：设计与证据。需求记录（`docs/requirements/`）、模块设计与架构（`docs/design/`）、路线图（`docs/program-roadmap.md`）。长篇论证留在这里，工单只链接，不复制。日记：架构师的 `claude_jour.md` 在仓库根目录，执行者与审查者的在 `agents_jour/<工单编号>.md`。
+- **GitHub Issues**：改代码与测试的工作队列。哪些打开、谁领取、被什么阻塞、是否完成。
+- **`docs/`**：设计与证据。需求记录（`docs/requirements/`）、模块设计与架构（`docs/design/`）、路线图（`docs/program-roadmap.md`）。这些直接改，不走工单（[工作方式](workflow.md)第 3 节）。长篇论证留在这里，工单只链接，不复制。日记：架构师的 `claude_jour.md` 在仓库根目录，执行者与审查者的在 `agents_jour/<工单编号>.md`。
 
 ## PR 是否作为分诊入口
 
@@ -42,13 +42,7 @@
 
 运行 `gh issue view <编号> --comments`。
 
-## `/wayfinder` 的操作
+## 子工单与阻塞
 
-**地图**是一张工单，**子工单**是它的子项。
-
-- **地图**：一张带 `wayfinder:map` 标签的工单，正文放 Notes、Decisions-so-far、Fog 三段。`gh issue create --label wayfinder:map`。
-- **子工单**：作为 GitHub 子工单（sub-issue）挂在地图下（用 `gh api` 调 sub-issues 接口）。不能用子工单时，在地图正文的任务清单里列出，子工单正文开头写 `Part of #<地图编号>`。标签 `wayfinder:<类型>`（`research`、`prototype`、`grilling`、`task`）。领取后分配给负责的开发者。
-- **阻塞**：用 GitHub 原生的工单依赖，界面可见。加一条依赖：`gh api --method POST repos/<owner>/<repo>/issues/<子工单>/dependencies/blocked_by -F issue_id=<阻塞方的数据库 id>`，其中数据库 id 用 `gh api repos/<owner>/<repo>/issues/<n> --jq .id` 取得（既不是 `#编号` 也不是 `node_id`）。GitHub 在 `issue_dependencies_summary.blocked_by` 里只报告未关闭的阻塞方。不能用依赖时，退回在子工单正文开头写一行 `Blocked by: #<n>, #<n>`。所有阻塞方关闭后子工单解除阻塞。
-- **前沿查询**：列出地图下打开的子工单（`gh issue list --state open`，限定在地图的子工单或任务清单内），去掉有未关闭阻塞方（`issue_dependencies_summary.blocked_by > 0`，或 `Blocked by` 行里有打开的工单）或已有负责人的，按地图顺序取第一个。
-- **领取**：`gh issue edit <n> --add-assignee @me`，是会话的第一次写入。
-- **结束**：`gh issue comment <n> --body "<答案>"`，然后 `gh issue close <n>`，再把上下文指针（gist 与链接）追加到地图的 Decisions-so-far。
+- **子工单**：用 GitHub 原生的子工单（sub-issue），挂在上级工单下（用 `gh api` 调 sub-issues 接口）。
+- **阻塞**：用 GitHub 原生的工单依赖，界面可见。加一条依赖：`gh api --method POST repos/<owner>/<repo>/issues/<子工单>/dependencies/blocked_by -F issue_id=<阻塞方的数据库 id>`，其中数据库 id 用 `gh api repos/<owner>/<repo>/issues/<n> --jq .id` 取得（既不是 `#编号` 也不是 `node_id`）。GitHub 在 `issue_dependencies_summary.blocked_by` 里只报告未关闭的阻塞方，所有阻塞方关闭后工单解除阻塞。
