@@ -12,7 +12,8 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const ANY_DATE = /^.{0,60}?\b(20\d\d-\d\d)-\d\d\b/;
+// 记录头：`## 日期` 开头，或前 90 个字符内有「 / 日期」；正文里提到的日期不算
+const ANY_DATE = /^(?:## |.{0,90}? \/ )(20\d\d-\d\d)-\d\d\b/;
 // decision.md 的正文常带日期，只认 `## ` 标题
 const H2_DATE = /^## (20\d\d-\d\d)-\d\d/;
 
@@ -89,12 +90,12 @@ function rotateRecord(root, spec) {
   }
   if (head < 0 || cut <= head) throw new Error(`${spec.file} 找不到可切的记录头`);
 
-  // 当前月份只往后走：正文里提到旧日期的行不改变它
+  // 每个记录头决定自己的月份，其余行跟着前一个记录头
   const byMonth = new Map();
   let month = match(lines[head])[1];
   for (const line of lines.slice(head, cut)) {
     const m = match(line);
-    if (m && m[1] > month) month = m[1];
+    if (m) month = m[1];
     if (!byMonth.has(month)) byMonth.set(month, []);
     byMonth.get(month).push(line);
   }

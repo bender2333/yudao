@@ -115,7 +115,8 @@ test('架构师日记：CRLF、混合日记头、跨月，切在日记头上，�
         `## 2026-${month}-${day} 23:40 两份评审${i}`,
         `- claude-sonnet-5-5 / 2026-${month}-${day} 条目${i}`,
         `claude-opus-5-5 / 2026-${month}-${day} / 无时间${i}`,
-      ][i % 4],
+        `claude-opus-5-5（画面线子架构师；页面由 claude-sonnet-5-5 子代理补） / 2026-${month}-${day} 09:00 / 括号${i}`,
+      ][i % 5],
       '正文一行',
       '正文二行，日期出现在很后面 2025-01-01，不是日记头'.padStart(100, '字'),
       '',
@@ -171,24 +172,57 @@ test('决策记录：切点落在 ## 标题上，正文里的日期不当切点�
 
 test('一批跨两个月：各进各月文件，正文里的旧日期不产生新月份', () => {
   const root = newRepo();
-  const headText = '# 决策记录\n\n';
-  const entry = (m, i) => `## 2026-${m}-0${i + 1} 条目\n- 背景：用户 2026-09-30 要求\n- 内容\n\n`;
+  const headText = '# 变更\n\n';
+  const entry =(m, i) => `## 2026-${m}-0${i + 1} 条目
+- 背景：用户 2026-09-30 要求
+- 内容
+
+`;
   const oct = Array.from({ length: 6 }, (_, i) => entry('10', i));
   const nov = Array.from({ length: 6 }, (_, i) => entry('11', i));
   const original = headText + [...oct, ...nov].join('');
-  commit(root, 'docs/decision.md', original);
+  commit(root, 'docs/CHANGELOG.md', original);
 
   const r = rotate(root, limits(40, 12));
-  assert.deepEqual(r.archives, ['docs/archive/decision-2026-10.md', 'docs/archive/decision-2026-11.md']);
-  assert.ok(!fs.existsSync(path.join(root, 'docs/archive/decision-2026-09.md')));
-  const t = (m) => `# 决策记录（${m}）\n\n`;
+  assert.deepEqual(r.archives, ['docs/archive/CHANGELOG-2026-10.md', 'docs/archive/CHANGELOG-2026-11.md']);
+  assert.ok(!fs.existsSync(path.join(root, 'docs/archive/CHANGELOG-2026-09.md')));
+  const t = (m) => `# 文档变更记录（${m}）
+
+`;
   const a10 = read(root, r.archives[0]).slice(t('2026-10').length);
   const a11 = read(root, r.archives[1]).slice(t('2026-11').length);
   assert.equal(a10, oct.join(''));
   assert.equal(a11, nov.slice(0, 3).join(''));
   assert.ok(a11.includes('2026-09-30'));
-  const kept = read(root, 'docs/decision.md');
+  const kept = read(root, 'docs/CHANGELOG.md');
   assert.equal(headText + a10 + a11 + kept.slice(headText.length), original);
+});
+
+test('文件开头倒序：每个记录头决定自己的月份，一行不多一行不少', () => {
+  const root = newRepo();
+  const headText = '# 变更\n\n';
+  const dates =['11-01', '10-28', '10-21', '10-25', '10-29', '10-31', '11-02', '11-03', '11-04', '11-05', '11-06', '11-07'];
+  const entries = dates.map((d, n) => `## 2026-${d} 条目${n}
+- 背景：用户 2026-09-30 要求
+- 内容${n}
+
+`);
+  const original = headText + entries.join('');
+  commit(root, 'docs/CHANGELOG.md', original);
+
+  const r = rotate(root, limits(40, 12));
+  assert.deepEqual([...r.archives].sort(), ['docs/archive/CHANGELOG-2026-10.md', 'docs/archive/CHANGELOG-2026-11.md']);
+  const body = (rel, m) => read(root, rel).slice(`# 文档变更记录（${m}）
+
+`.length);
+  const a10 = body('docs/archive/CHANGELOG-2026-10.md', '2026-10');
+  const a11 = body('docs/archive/CHANGELOG-2026-11.md', '2026-11');
+  assert.equal(a11, [0, 6, 7, 8].map((n) => entries[n]).join(''));
+  assert.equal(a10, [1, 2, 3, 4, 5].map((n) => entries[n]).join(''));
+  const kept = read(root, 'docs/CHANGELOG.md');
+  assert.equal(kept, headText + entries.slice(9).join(''));
+  const sorted = (t) => t.split('\n').sort();
+  assert.deepEqual(sorted(a10 + a11 + kept), sorted(original));
 });
 
 test('三份记录：都超就都移走，只有一份超就只动那一份', () => {
