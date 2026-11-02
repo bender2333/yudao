@@ -909,7 +909,7 @@ export type CannotVerifyRequested = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Criteria
      */
@@ -2090,7 +2090,7 @@ export type DefinitionsChangedRequested = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Reason
      */
@@ -2619,7 +2619,7 @@ export type EventAtPosition = {
     /**
      * Department
      */
-    department?: 'product' | 'engineering' | 'quality' | null;
+    department?: string | null;
     /**
      * Department Label
      */
@@ -3086,7 +3086,7 @@ export type InitialPrdRequested = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Work Item Id
      */
@@ -3260,7 +3260,7 @@ export type KernelModificationRequested = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Work Item Id
      */
@@ -3811,7 +3811,7 @@ export type ModelUnavailableRequested = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     target: CallTarget | null;
     /**
      * Reason
@@ -4142,7 +4142,7 @@ export type PauseRequested = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Stop Reason
      */
@@ -6327,7 +6327,7 @@ export type UnknownActionRequested = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Action Id
      */
@@ -7077,7 +7077,7 @@ export type ActionVerifiedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -7200,7 +7200,7 @@ export type ActivationFinishedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -7329,7 +7329,7 @@ export type AdoptionHeldEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -7434,7 +7434,7 @@ export type ArtifactAcceptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -7567,7 +7567,7 @@ export type ArtifactInvalidatedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -7656,7 +7656,7 @@ export type AskAnsweredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -7691,11 +7691,11 @@ export type AskAnsweredPayload = {
     /**
      * Requester
      */
-    requester: 'product' | 'engineering' | 'quality';
+    requester: string;
     /**
      * Recipient
      */
-    recipient: 'product' | 'engineering' | 'quality';
+    recipient: string;
     /**
      * Status
      */
@@ -7769,7 +7769,7 @@ export type AskStartedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -7804,11 +7804,11 @@ export type AskStartedPayload = {
     /**
      * Requester
      */
-    requester: 'product' | 'engineering' | 'quality';
+    requester: string;
     /**
      * Recipient
      */
-    recipient: 'product' | 'engineering' | 'quality';
+    recipient: string;
     /**
      * Question
      */
@@ -7901,7 +7901,7 @@ export type BaselineAdoptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -8034,7 +8034,7 @@ export type BaselineReviewAcceptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -8132,7 +8132,7 @@ export type BaselineReviewAcceptedPayload = {
     /**
      * Issuer
      */
-    issuer: 'quality';
+    issuer: string;
     /**
      * Parent Hash
      */
@@ -8199,7 +8199,7 @@ export type CatalogCandidatesCollectedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -8314,7 +8314,7 @@ export type CatalogRevisedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -8411,7 +8411,7 @@ export type CatalogTestFinishedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -8648,7 +8648,7 @@ export type CompactionRecordedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -8787,7 +8787,7 @@ export type CompactionRecordedPayload = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Activation Id
      */
@@ -8910,7 +8910,7 @@ export type ContextAssembledEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9049,7 +9049,7 @@ export type ContextAssembledPayload = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Activation Id
      */
@@ -9233,7 +9233,7 @@ export type ContractAcceptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9359,7 +9359,7 @@ export type CredentialChangedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9456,7 +9456,7 @@ export type DecisionAnsweredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9567,7 +9567,7 @@ export type DecisionRequestedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9641,7 +9641,7 @@ export type DecisionWithdrawnEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9740,7 +9740,7 @@ export type DeliverableAdoptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9811,7 +9811,7 @@ export type DeliveryAcceptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -9913,7 +9913,7 @@ export type DeliveryAcceptedPayload = {
     /**
      * Issuer
      */
-    issuer: 'engineering';
+    issuer: string;
     /**
      * Parent Hash
      */
@@ -9981,7 +9981,7 @@ export type DepartmentActivatedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10090,7 +10090,7 @@ export type DepartmentGuidanceAppliedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10183,7 +10183,7 @@ export type DepartmentGuidanceReceivedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10222,7 +10222,7 @@ export type DepartmentGuidanceReceivedPayload = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Version
      */
@@ -10285,7 +10285,7 @@ export type DepartmentGuidanceRespondedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10374,7 +10374,7 @@ export type DepartmentInputEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10480,7 +10480,7 @@ export type DepartmentPromptConfiguredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10515,7 +10515,7 @@ export type DepartmentSettingsConfiguredPayload = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Version
      */
@@ -10694,7 +10694,7 @@ export type HomeSeenEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10775,7 +10775,7 @@ export type IndependentJudgementCommittedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -10876,7 +10876,7 @@ export type InitialPrdProposedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -11048,7 +11048,7 @@ export type InstanceUpgradeAnsweredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -11119,7 +11119,7 @@ export type InstanceUpgradeRequestedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -11204,7 +11204,7 @@ export type InstanceUpgradeWithdrawnEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -11303,7 +11303,7 @@ export type LessonCandidateRecordedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -11424,7 +11424,7 @@ export type MaterialRecordedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -11468,7 +11468,7 @@ export type MaterialRecordedPayload = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
 };
 
 /**
@@ -11596,7 +11596,7 @@ export type McpServersConfiguredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -11776,7 +11776,7 @@ export type ModelAttemptFailedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -12064,7 +12064,7 @@ export type ModelAttemptFinishedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -12326,7 +12326,7 @@ export type ModelMessageEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -12544,7 +12544,7 @@ export type ModelReasoningEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -12746,7 +12746,7 @@ export type ModelRequestSerializedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -12968,7 +12968,7 @@ export type ModelRequestedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -13213,7 +13213,7 @@ export type ModelRetryScheduledEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -13450,7 +13450,7 @@ export type ModelStreamProgressEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -13622,7 +13622,7 @@ export type OnboardingRevisionStartedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -13719,7 +13719,7 @@ export type ParameterSetEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -13828,7 +13828,7 @@ export type ProductDecisionAcceptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -13957,7 +13957,7 @@ export type ProductInputAssignedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14038,7 +14038,7 @@ export type ProjectArchivedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14116,7 +14116,7 @@ export type ProjectDecisionAnsweredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14217,7 +14217,7 @@ export type ProjectDecisionRequestedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14291,7 +14291,7 @@ export type ProjectDecisionWithdrawnEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14384,7 +14384,7 @@ export type ProjectGoalChangedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14466,7 +14466,7 @@ export type ProjectParameterSetEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14571,7 +14571,7 @@ export type ProjectPinnedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14652,7 +14652,7 @@ export type ProjectRegisteredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14743,7 +14743,7 @@ export type ProjectRenamedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14824,7 +14824,7 @@ export type ProjectRestoredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -14902,7 +14902,7 @@ export type ProposalRejectedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15000,7 +15000,7 @@ export type ProposalSubmittedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15170,7 +15170,7 @@ export type QaSubmittedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15285,7 +15285,7 @@ export type QaSubmittedPayload = {
     /**
      * Issuer
      */
-    issuer: 'quality';
+    issuer: string;
     /**
      * Parent Hash
      */
@@ -15352,7 +15352,7 @@ export type QaTestsSavedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15460,7 +15460,7 @@ export type RunContinuedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15545,7 +15545,7 @@ export type RunCreatedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15704,7 +15704,7 @@ export type RunDoneEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15785,7 +15785,7 @@ export type RunFailedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15875,7 +15875,7 @@ export type RunPausedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -15976,7 +15976,7 @@ export type RunResumedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16067,7 +16067,7 @@ export type RuntimeDrainFinishedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16148,7 +16148,7 @@ export type RuntimeDrainStartedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16233,7 +16233,7 @@ export type RuntimeForceUpgradeRequestedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16322,7 +16322,7 @@ export type SourceDirectoryConfiguredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16435,7 +16435,7 @@ export type SpecAcceptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16542,7 +16542,7 @@ export type SpecAcceptedPayload = {
     /**
      * Issuer
      */
-    issuer: 'product';
+    issuer: string;
     /**
      * Parent Hash
      */
@@ -16609,7 +16609,7 @@ export type SpecSupersededEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16694,7 +16694,7 @@ export type StructureAcceptedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -16792,7 +16792,7 @@ export type StructureAcceptedPayload = {
     /**
      * Issuer
      */
-    issuer: 'engineering';
+    issuer: string;
     /**
      * Parent Hash
      */
@@ -16925,7 +16925,7 @@ export type ToolCallRequiredEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -17214,7 +17214,7 @@ export type ToolCalledEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -17288,7 +17288,7 @@ export type ToolServerProbeFinishedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -17386,7 +17386,7 @@ export type ToolSkippedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -17604,7 +17604,7 @@ export type ToolStartedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -17969,7 +17969,7 @@ export type UserInputReceivedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -18077,7 +18077,7 @@ export type WorkItemCreatedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -18208,7 +18208,7 @@ export type WorkItemStartFailedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -18297,7 +18297,7 @@ export type WritebackCompletedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -18429,7 +18429,7 @@ export type WritebackHeldEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -18530,7 +18530,7 @@ export type WritebackNotNeededEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -18639,7 +18639,7 @@ export type WritebackStoppedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -18769,7 +18769,7 @@ export type WritebackVerifiedEvent = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality' | null;
+    department: string | null;
     /**
      * Role
      */
@@ -19038,7 +19038,7 @@ export type OutputDelta = {
     /**
      * Department
      */
-    department: 'product' | 'engineering' | 'quality';
+    department: string;
     /**
      * Role
      */
@@ -20528,7 +20528,7 @@ export type QueryDepartmentWorkspaceData = {
         /**
          * Department
          */
-        department: 'product' | 'engineering' | 'quality';
+        department: string;
         /**
          * Work Item
          */
@@ -20596,7 +20596,7 @@ export type QueryRunStepsData = {
         /**
          * Department
          */
-        department: 'product' | 'engineering' | 'quality';
+        department: string;
         /**
          * Activation Id
          */
@@ -20736,7 +20736,7 @@ export type QueryProjectAttemptsData = {
         /**
          * Department
          */
-        department?: 'product' | 'engineering' | 'quality' | null;
+        department?: string | null;
         /**
          * Status
          */
@@ -20802,7 +20802,7 @@ export type QueryProjectUsageData = {
         /**
          * Department
          */
-        department?: 'product' | 'engineering' | 'quality' | null;
+        department?: string | null;
         /**
          * Status
          */
