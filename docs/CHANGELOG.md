@@ -1001,6 +1001,10 @@ Claude（Duet 助手） / 2026-11-02 09:15 / 新增调研 `research/deepseek-sup
 Claude（Duet 助手） / 2026-11-02 13:58 / 新增 `research/doc-consistency-concept-model.md`：文档一致性核对的方案，概念模型放在 `CONTEXT.md`（每个词条下加一块结构：别名、定义在、属于与包含与依赖、取值、写法、代码、代码状态、不自动挂），文档按名字自动挂、复述取值写语义链接，发现走样只用脚本、只提醒不拦；第一版六步与第一步的写法草稿；待定五条，复述的写法与 49 个总图的词怎么办先定；`research/README.md` 加一行索引；`decision.md` 加一条 / 用户定按概念模型核对、模型放在 CONTEXT.md，要先把方案推到 main
 
 claude-opus-5-5 / 2026-11-02 15:17 / `research/doc-consistency-concept-model.md` 改写：判断走样靠 clingo 规则，LLM 只把文字翻译成文档说法（词汇封闭、带原文、结果固定、脚本优先），不加隐藏标记与语义链接，工具放 `tools/doc-consistency/`，补两个引擎的试验数字与 LLM 提取的验收；`research/README.md` 改一行；`decision.md` 加一条 / 用户要走符号推理、做成单独的工具，从文字到语义用 LLM
+
+claude-opus-5-5 / 2026-11-02 15:56 / `agents/autopilot-runtime.md` 第 4 节真实模型测试与评测的模型改为 `ag/gemini-3.8-flash-medium`；`requirements/comparison-experiment.md` 三条按日期的模型记录合成一条现在的说法；`decision.md` 加一条 / 用户不再使用 `qhub/Qwen3.8-Flash`，评测场景设计说明本来就写着不用它，这两处没跟上
+
+claude-opus-5-5 / 2026-11-02 15:57 / `agents/autopilot-runtime.md` 第 4 节、`design/evaluation-scenarios.md`「模型」一行、`requirements/comparison-experiment.md` 的被测模型改为 `ag/gemini-3.8-flash-high`；`decision.md` 加一条 / 用户要求评测用这个模型
 claude-sonnet-5-5（子架构师） / 2026-10-31 21:16 / `docs/requirements/web-continuous-input.md`（D01）：第 3 行改成「状态、依据、路线位置」一行；删「用户原话」；「已确认」里两条按日期的用户决定去掉日期与出处措辞；「本轮设计选择」→「设计选择」，去掉「此为本轮依据授权确定的选择」，「首批不提供任意 shell 终端」改为「当前不提供」 / 需求记录改为只写现在的状态文档（共同规则「文档与记录」，D38 为样板）；用户原话、日期、出处与进度在 git、日记、工单与 Discussions 里
 claude-sonnet-5-5（子架构师） / 2026-10-31 21:16 / `docs/requirements/department-prompts.md`（D02）：第 3 行改成一行；文首引用块（内容已在「设计选择」）删去；删「用户原话」；「本轮设计选择」→「设计选择」；依据里的 Prompt 归属按术语表写成「内置默认 Prompt 属于带版本的定义，项目内的修改属项目部门设置」 / 需求记录改为只写现在的状态文档（共同规则「文档与记录」）
 claude-sonnet-5-5（子架构师） / 2026-10-31 21:16 / `docs/requirements/intend-original.md`（D03）：第 3 行改成一行；删「用户原话」；「本轮设计选择」→「设计选择」，去掉「此为……本轮执行选择」，「首批入口仅支持文本」→「当前入口仅支持文本」 / 需求记录改为只写现在的状态文档（共同规则「文档与记录」）
@@ -1054,3 +1058,4 @@ claude-sonnet-5-5（子架构师） / 2026-11-01 01:50 / `docs/requirements/game
 claude-sonnet-5-5（子架构师） / 2026-11-01 02:02 / `docs/requirements/model-management.md`（D24）与 `docs/requirements/department-providers.md`（D18）：去掉「判定点的升级使用判定点声明的第二个判定者」半句，其余不变（角色的模型失败时不自动改用其他模型，角色的模型不变） / 总图第三节「判定点」与总体架构「拿不准时继续还是问用户」不另设升级一步；用户答复：D18、D24 一起改
 claude-sonnet-5-5（子架构师） / 2026-11-01 02:18 / 合并 main 后同步：`docs/requirements/operations-department.md`（D27）「流转规则由定义驱动」一条去掉指向架构问题记录的链接（`docs/architecture-issues.md` 已归档，状态文档不指向归档）；`.claude/skills/woken-architect/SKILL.md` 随 main 删除，这次对它的一句引用修改不再保留 / main 的「工作方式：去掉派发者」把架构问题记录归档、删了 woken-architect 技能
 claude-sonnet-5-5（子架构师） / 2026-11-01 03:42 / 合并 main 后同步：`docs/requirements/comparison-experiment.md`（D32）「评测是阶段二的薄片 ②……」一条写明阶段二里评测只做场景 2（在已有代码上加功能），Yudao 与 OpenCode 各运行 3 次出一份对照报告；场景 1 与场景 3 的运行与对照、共享对隔离的对照不在阶段二里，待排期 / main 的决策记录「阶段二：评测只留一个场景」（用户同意总架构师的方案）
+claude-sonnet-5-5（子架构师） / 2026-11-02 16:04 / 合并 main 后同步：`docs/requirements/comparison-experiment.md`（D32）「评测使用的模型」一条取 main 上的现在说法：被测模型、界面智能体与裁判都用 `ag/gemini-3.8-flash-high`，不用 `cc/` 分组的模型与 `qhub/Qwen3.8-Flash`；其余仍是这次清理的写法 / main 把这一条合成一条并换了模型（用户不再用 `qhub/Qwen3.8-Flash`，评测设计要求 `ag/gemini-3.8-flash-high`），这次清理合成的那一条写的是旧的被测模型

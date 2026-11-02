@@ -63,7 +63,7 @@
 
 | 条件 | 规则 |
 | --- | --- |
-| 模型 | 两边使用同一个模型，由用户提供，具有视觉能力；Yudao 三个部门都绑定这个模型，模型与服务写进报告。用户指定 `ag/gemini-3.8-flash-medium`（9router，Chat Completions，带视觉），经用户的模型服务调用：OpenAI 兼容接口，模型名在用户环境变量 `YUDAO_EVAL_MODEL` 中，地址与 Key 在 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中，不写进仓库、工单与日志（[运行配置](../agents/autopilot-runtime.md)第 4 节）。`qhub/Qwen3.8-Flash` 在 OpenCode 一侧调不动工具（`opencode run --pure` 一要求改文件就报 `UnknownError: Expected 'function.name' to be a string.`），不用。模型变了，以前的结果不能和以后的直接比较，两边的基础分用新模型重新运行。 |
+| 模型 | 两边使用同一个模型，由用户提供，具有视觉能力；Yudao 三个部门都绑定这个模型，模型与服务写进报告。用户指定 `ag/gemini-3.8-flash-high`（9router，Chat Completions，带视觉），经用户的模型服务调用：OpenAI 兼容接口，模型名在用户环境变量 `YUDAO_EVAL_MODEL` 中，地址与 Key 在 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中，不写进仓库、工单与日志（[运行配置](../agents/autopilot-runtime.md)第 4 节）。`qhub/Qwen3.8-Flash` 在 OpenCode 一侧调不动工具（`opencode run --pure` 一要求改文件就报 `UnknownError: Expected 'function.name' to be a string.`），不用。模型变了，以前的结果不能和以后的直接比较，两边的基础分用新模型重新运行。 |
 | 输入 | 同一份需求原文加同一份接口约定；Yudao 从正常入口作为用户原始意图提交，OpenCode 作为 `opencode run` 的消息。起点相同：材料起点里的文件（场景 3 是 `subway_data.json`）在 OpenCode 一侧复制进运行目录，在 Yudao 一侧经新建项目的起始文件夹（`project.create` 的 `initial_directory`）带入，事项文字不另写起点文件的说明 |
 | 设置 | Yudao 使用当前版本的规则登记中的暂定默认值与参数，不为场景调整，结果记录定义版本与参数版本；OpenCode 固定版本号，使用默认 agent |
 | 模型的容量 | 两边的上下文窗口与单次输出上限相同，取模型服务的模型列表为这个模型报告的值（`context_length`、`max_completion_tokens`），列表没有报告时用运行器参数给出；Yudao 写进模型访问定义，OpenCode 写进运行配置的模型限额；报告写明取值与来源 |
