@@ -203,8 +203,14 @@ class ProjectOverview(Contract):
 DEPARTMENT_STATES = ("waiting_user", "working", "asking", "verifying", "waiting")
 # 阻塞事项的决定请求：回答以前事项（它的 run）不推进（decisions.py 的 blocks）
 BLOCKING_SCOPES = ("run", "work_item")
-# 谁核验谁的成果取自定义里的「谁能拒绝谁」：成果驱动下只有工程的交付由质检核验（循环结构第 2.1 节）
-VERIFIER_OF = {"engineering": "quality"}
+
+
+def _verifiers_of(department: str) -> tuple[str, ...]:
+    """核验这个部门的交付的核验角色：取自定义里的核验声明（工单 #1391）。
+
+    谁核验谁读定义里声明的「核验谁」，不写部门名；没有核验角色核验它时为空。
+    """
+    return DEFINITIONS.verifiers_of(department, "delivery_spec")
 
 
 class DepartmentState(Contract):
@@ -620,7 +626,7 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
     # 还没回答的询问：链上每一层一个，最内层在最后（投影的 ask_stack）
     asks = list(run.ask_stack)
     departments: dict[str, DepartmentState] = {}
-    for department in DEPARTMENTS:
+    for department in DEFINITIONS.departments:
         session = run.sessions.get(department)
         main_session = None if session is None else session.session_id
         active = session is not None and session.status == "active"
@@ -635,14 +641,16 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
         elif own_ask is not None:
             state, note = "asking", f"在等待{_department_label(own_ask.get('recipient') or '')}的回答"
         elif active:
-            # 质检在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构第 3.1 节）
-            predictive = (department == "quality" and not run.delivery_specs and progress is not None
+            # 核验角色在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构第 3.1 节）；
+            # 谁是核验角色取自定义里的核验声明（工单 #1391）
+            predictive = (DEFINITIONS.is_verifier(department) and not run.delivery_specs and progress is not None
                           and progress.product_spec_revision is not None)
             state = "working"
             note = (f"预测性探索：按 PRD r{progress.product_spec_revision} 起草测试用例"
                     if predictive else None)
         elif _awaiting_verification(department, progress):
-            state, note = "verifying", f"等{_department_label(VERIFIER_OF[department])}核验交付 r{progress.delivery_revision}"
+            verifiers = "、".join(_department_label(verifier) for verifier in _verifiers_of(department))
+            state, note = "verifying", f"等{verifiers}核验交付 r{progress.delivery_revision}"
         else:
             state, note = "waiting", None
         departments[department] = DepartmentState(state=state, note=note)
@@ -650,9 +658,9 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
 
 
 def _awaiting_verification(department: str, progress: WorkItemProgress | None) -> bool:
-    # 核验中：最新的正式成果在等下游的结论。成果驱动下只有工程有这种情况：
-    # 最新的交付还没有质检的缺陷记录或放行（循环结构第 2.1 节）
-    if department not in VERIFIER_OF or progress is None or progress.delivery_revision is None:
+    # 核验中：最新的正式成果在等下游的结论。核验这个部门交付的角色从定义的核验声明取（工单 #1391）：
+    # 交付还没有它的缺陷记录或放行（循环结构第 2.1 节）
+    if not _verifiers_of(department) or progress is None or progress.delivery_revision is None:
         return False
     return progress.conclusion is None
 
@@ -1298,8 +1306,8 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
     )
 
 def _department_label(department: str) -> str:
-    return {"product": "产品", "engineering": "工程", "quality": "质检", "operations": "运维"}.get(
-        department, department)
+    # 部门的中文名取自定义（工单 #1391）：定义里没有这个部门时退回部门编号
+    return DEFINITIONS.department_labels.get(department, department)
 
 
 def _department_workspace(application: Application, request: DepartmentWorkspace
