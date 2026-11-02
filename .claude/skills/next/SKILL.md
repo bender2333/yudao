@@ -17,7 +17,7 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 
 | | 用户在场 | 用户不在场（`--循环`） |
 | --- | --- | --- |
-| 规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、总图、评价标准（评测的隐藏检查、参考解法、评分器、发布检查） | 可以改，改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 不改；在 Ideas 发帖写清要定什么（[工作方式](../../../docs/agents/workflow.md)第 7 节），相关工单标 `ready-for-human` |
+| 规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、总图、评价标准（评测的隐藏检查、参考解法、评分器、发布检查） | 可以改，改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 不改；开一张 `architecture` 工单写清要定什么，相关工单标 `ready-for-human` |
 | 设计说明、ADR、需求记录（用户原话不改）、`CONTEXT.md`、原型；工单正文、子工单、依赖、评论 | 可以 | 可以，直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md` |
 | 里程碑：建、关、改名 | 总架构师 | 不做；拆出的子工单沿用原工单的里程碑 |
 | 关闭试用工单与里程碑 | 用户确认以后，按[验收证据规则](../../../docs/agents/acceptance-evidence.md)「试用工单与里程碑的关闭」 | 不做，不写「试用通过」 |
@@ -50,14 +50,14 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 
 | 先后 | 哪一件 | 怎么认 | 交给 |
 | --- | --- | --- | --- |
-| 1 | 等用户的事（只在用户在场时） | `ready-for-human`；Ideas 里标题以「总图：」「规则：」开头、没有关闭的帖子；试用工单最后一条是 `TRIAL: 导游卡` | 先出一张不超过 10 行的卡：每条一句话，写要用户定什么、建议、不定会怎样；那些帖子列出来交总架构师 |
+| 1 | 等用户的事（只在用户在场时） | `ready-for-human`；`architecture`；试用工单最后一条是 `TRIAL: 导游卡` | 先出一张不超过 10 行的卡：每条一句话，写要用户定什么、建议、不定会怎样；`architecture` 的列出来交总架构师 |
 | 2 | 交回的工单 | `needs-triage` | [`/triage`](../triage/SKILL.md) |
-| 3 | solo 直接交给用户、架构师还没看过的 | `ready-for-human`，没有架构师的 `TRIAGE:` 评论 | [`/triage`](../triage/SKILL.md)「交给用户的工单」 |
+| 3 | solo 直接交给用户、架构师还没看过的；总架构师已经定了的 | `ready-for-human`，没有架构师的 `TRIAGE:` 评论，或者 `TRIAGE:` 评论写的 `architecture` 工单已关闭 | [`/triage`](../triage/SKILL.md)「交给用户的工单」 |
 | 4 | 该验收的父工单 | `parent`，子工单全部关闭，自己还开着 | [`/verify`](../verify/SKILL.md) |
-| 5 | 薄片推进 | 薄片里除试用工单以外都已关闭，试用工单还有下一步 | [`/trial-intake`](../trial-intake/SKILL.md)「薄片推进」 |
+| 5 | 薄片推进 | 薄片里除试用工单以外都已关闭、没有「设计未写」的行，试用工单还有下一步 | [`/trial-intake`](../trial-intake/SKILL.md)「薄片推进」 |
 | 6 | 设计未写的桶 | 阶段工单的薄片清单里写着「设计未写」的行 | [`/to-design`](../to-design/SKILL.md) |
 | 7 | 还没拆的父工单 | `parent`，没有子工单 | [`/to-children`](../to-children/SKILL.md) |
-| 8 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子，标题以「总图：」「规则：」开头的除外 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
+| 8 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
 
 ```bash
 gh issue list --state open --limit 300 --json number,title,labels,milestone \
@@ -117,7 +117,7 @@ NEXT: 建议下一轮做什么；没有写 none
 
 ## 交给用户
 
-只在这几种时候：试用工单的导游卡写好；薄片修缺陷到第三轮；长运行两次失败；同一张工单分诊满两次；要改规则、放宽验收或执行环境挡住。都做同样的事：工单上写清要用户定什么（一句话一条，带建议与不定的后果），标 `ready-for-human`，会话收尾的消息里再列一遍；要改规则的写在帖子里（[工作方式](../../../docs/agents/workflow.md)第 7 节），工单评论附链接。
+只在这几种时候：试用工单的导游卡写好；薄片修缺陷到第三轮；长运行两次失败；同一张工单分诊满两次；要改规则、放宽验收或执行环境挡住。都做同样的事：工单上写清要用户定什么（一句话一条，带建议与不定的后果），标 `ready-for-human`，会话收尾的消息里再列一遍；要改规则的开 `architecture` 工单。
 
 ## 常见借口
 
@@ -126,7 +126,7 @@ NEXT: 建议下一轮做什么；没有写 none
 | 「这一项上一轮看过，结论还记得」 | 每一轮从 GitHub 重读；交回评论写的是那一刻，main 可能已经变了 |
 | 「工人安静了很久，应该死了」 | 等集成层与长模型回合的工人和死掉的一样安静；四样都静止才 `reap` |
 | 「顺手把下一件也做了」 | 一轮一件；做完写心跳再看下一件，证据才对得上 |
-| 「规则这里明显不对，先改了」 | 用户不在场时不改规则，发帖交总架构师 |
+| 「规则这里明显不对，先改了」 | 用户不在场时不改规则，开 `architecture` 工单 |
 | 「这份设计也开张工单记一下」 | 设计与原型不走工单，提交与变更记录就是记录 |
 
 ## 危险信号
