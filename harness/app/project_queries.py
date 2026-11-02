@@ -2612,13 +2612,26 @@ class McpServerSettingView(Contract):
     config_digest: str = ""
 
 
+class McpCredentialStatusView(Contract):
+    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP 设计说明第 11.1 节）：
+    # 页面在凭据名称旁写「已设置」或「缺失」与来源，与后端同一份判断，不自己猜；
+    # 只有名称、状态与来源，没有凭据值。version 是 credential.set 的基准版本
+    ref: str
+    configured: bool
+    source: str
+    version: int = 0
+
+
 class McpServersSetting(Contract):
     # 项目设置里的 MCP 服务器（工单 #236）：整份设置与版本、文档摘要与服务器清单；
-    # 最近一次探测的结果由后续探测工单写入，本单读取快照随设置携带的状态
+    # 最近一次探测的结果由后续探测工单写入，本单读取快照随设置携带的状态。
+    # credentials 是设置里出现的凭据名称与它们此刻的状态（工单 #237）：凭据值按名称读取，
+    # 不随设置保存，所以状态在这里按当前的凭据来源给出
     version: int
     document_digest: str
     servers: dict[str, McpServerSettingView] = {}
     updated_at: str | None = None
+    credentials: dict[str, McpCredentialStatusView] = {}
 
 
 class McpProbeResultView(Contract):
@@ -2652,6 +2665,42 @@ class ProjectSettingsResult(Contract):
     # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明第 3 节第 2 条）：
     # 项目级参数命令的基准版本，全局现值加本项目覆盖的内容摘要；与 parameter.set 按项目核对的是同一份
     effective_parameters_version: str = ""
+
+
+MCP_CREDENTIAL_KINDS = ("env", "headers")
+
+
+def _mcp_credential_refs(servers: dict[str, Any]) -> list[str]:
+    # 设置里出现的凭据名称，按出现的先后各记一次：变量与请求头的取值方式为「凭据名称」的那些
+    # （网络与 MCP 设计说明第 4.1 节「变量与请求头的值」）
+    refs: list[str] = []
+    for server in servers.values():
+        if not isinstance(server, dict):
+            continue
+        entries = [entry for kind in MCP_CREDENTIAL_KINDS
+                   for entry in (server.get(kind) or {}).values()]
+        for entry in entries:
+            if not isinstance(entry, dict) or str(entry.get("kind") or "") != "credential":
+                continue
+            ref = str(entry.get("credential_ref") or "")
+            if ref and ref not in refs:
+                refs.append(ref)
+    return refs
+
+
+def _mcp_credential_status(application: Application,
+                           servers: dict[str, Any]) -> dict[str, McpCredentialStatusView]:
+    # 每个凭据名称此刻的状态（工单 #237）：与凭据命令读的是同一个来源（进程内存、进程环境、
+    # 数据目录的 .env，设计说明第 4.4 节），页面上的「已设置／缺失」因此与后端一致；
+    # version 是 credential.set 的基准版本
+    facade = application.system.facade
+    view: dict[str, McpCredentialStatusView] = {}
+    for ref in _mcp_credential_refs(servers):
+        status = facade.credential_status(ref)
+        view[ref] = McpCredentialStatusView(
+            ref=ref, configured=bool(status.get("configured")), source=str(status.get("source") or ""),
+            version=int(status.get("version") or 0))
+    return view
 
 
 def _project_settings(application: Application, request: ProjectSettings) -> Snapshot[ProjectSettingsResult]:
@@ -2696,6 +2745,8 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                            if field in McpServerSettingView.model_fields})
                     for name, server in state.mcp_servers.servers.items()
                 },
+                # 设置里出现的凭据名称与它们此刻的状态（工单 #237）：页面照它显示「已设置」或「缺失」
+                credentials=_mcp_credential_status(application, state.mcp_servers.servers),
             ),
             # 最近一次探测的结果（工单 #1174）：还没有探测过时为空
             last_probe=None if state.last_probe is None else McpProbeResultView(
@@ -3162,6 +3213,9 @@ PROJECT_SETTINGS = QueryDefinition(
     changed_by=(*PROJECT_EVENT_KINDS,
                 # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
                 CatalogEventType.CATALOG_REVISED,
+                # 凭据改过以后，MCP 服务器设置里各凭据名称的状态跟着更新（工单 #237）：
+                # 页面上的「已设置／缺失」不用刷新整页
+                CatalogEventType.CREDENTIAL_CHANGED,
                 # 全局参数事件改变这个项目有效参数的版本（工单 #1262）：项目覆盖没有变时取值可能仍相同，
                 # 但页面按事件重新读取，基准版本不会停在过期的那一个
                 CatalogEventType.PARAMETER_SET),
