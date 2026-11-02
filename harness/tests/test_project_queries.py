@@ -43,7 +43,7 @@ from harness.models import EventType, ProjectEventType
 from harness.project_projection import replay_project
 from harness.streams import PRIORITY_UPGRADE_RESTART, RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.proposals import (
-    product_spec, delivery_turn, review_turn,
+    product_spec, delivery_turn, judgement_turn, review_turn,
     ask_turn, answer_turn,
     baseline_review_turn, structure_turn,
 )
@@ -64,7 +64,7 @@ def _release_script(summary="v1", files=None):
     return {
         "product": [product_spec()],
         "engineering": [delivery_turn(summary=summary, files=files)],
-        "quality": [explore_turn(), review_turn("release", f"ok {summary}")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", f"ok {summary}")],
     }
 
 
@@ -379,6 +379,7 @@ def test_run_asks_returns_in_progress_answered_and_unable(data_dir):
         "quality": [
             ask_turn(recipient="engineering", question="执行入口在哪里？",
                      background="质检核对", expected="指出入口", call_id="ask-3"),
+            judgement_turn(),
             review_turn("release", "验收通过"),
         ],
         "engineering:ask": [
@@ -495,10 +496,13 @@ def test_flow_records_give_one_department_pair_two_plain_kinds_and_one_rework(da
             ),
             # 预测性探索那一轮没有交付可以核验，提交的结论被拒绝（工单 #557）
             explore_turn(),
+            # 交付到达：先交独立判断再退回（工单 #358）；返工的交付再判断一次再放行
+            judgement_turn(),
             review_turn(
                 "rework_engineering", "质检退回",
                 defects=[{"severity": "minor", "summary": "空输入需要处理"}],
             ),
+            judgement_turn(),
             review_turn("release", "revised delivery checked"),
         ],
         "engineering:ask": [
@@ -743,7 +747,9 @@ def _rework_script(verdict="rework_engineering"):
         "product": [product_spec()],
         "engineering": [delivery_turn()],
         "quality": [explore_turn(),
+                    judgement_turn(),
                     review_turn(verdict, "质检退回", defects=[{"severity": "minor", "summary": "空输入需要处理"}]),
+                    judgement_turn(),
                     review_turn("release", "revised delivery checked")],
     }
 
@@ -1036,7 +1042,7 @@ def _stop_note_system(data_dir):
                      expected="确认输出形式", call_id="ask-stop-note"),
             ProviderError(STOP_FAILURE),
         ],
-        "quality": [explore_turn(), review_turn("release", "ok")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "ok")],
         "product:ask": [ProviderError(BRANCH_FAILURE)],
     })
     project_id = system.projects.register("停止说明", GOAL)

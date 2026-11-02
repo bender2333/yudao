@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":"docs/design/test-pyramid.md",
-"hash":"6ed7870024cc25f6",
+"hash":"b69a994b20499c9a",
 "nodes":[
-{"hash":"6ed7870024cc25f6","id":"docs/design/test-pyramid.md","kind":"file","title":"docs/design/test-pyramid.md"},
+{"hash":"b69a994b20499c9a","id":"docs/design/test-pyramid.md","kind":"file","title":"docs/design/test-pyramid.md"},
 {"hash":"80e8eb13d7cc6cc2","id":"docs/design/test-pyramid.md#测试分层设计说明","kind":"section","parent":"docs/design/test-pyramid.md","title":"测试分层设计说明"},
 {"hash":"0317bdee0340af16","id":"docs/design/test-pyramid.md#测试分层设计说明 > 1. 出发点","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"1. 出发点"},
 {"hash":"c3e479ffacb0b9f1","id":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"2. 三层的定义"},
 {"hash":"cffb24d885c040eb","id":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义 > 2.1 边界检查","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义","title":"2.1 边界检查"},
-{"hash":"628cb90761f0472b","id":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义 > 2.2 单项时间上限","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义","title":"2.2 单项时间上限"},
+{"hash":"2e0a2459ba0450b5","id":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义 > 2.2 单项时间上限","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义","title":"2.2 单项时间上限"},
 {"hash":"3113c19fbaa95597","id":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义 > 2.3 多进程运行","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明 > 2. 三层的定义","title":"2.3 多进程运行"},
 {"hash":"9625924450c9c873","id":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"3. 登记表与共用代码"},
 {"hash":"e4a777d86f1b6e3c","id":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"section","parent":"docs/design/test-pyramid.md#测试分层设计说明","title":"4. 各角色运行哪一层"},

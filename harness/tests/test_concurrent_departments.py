@@ -16,6 +16,7 @@ from harness.proposals import (
     answer_turn,
     ask_turn,
     delivery_turn,
+    judgement_turn,
     product_decision,
     product_spec,
     product_spec_turn,
@@ -66,11 +67,11 @@ def _position(events: list, event_type: str, department: str, *, name: str | Non
 
 
 def test_engineering_and_quality_work_at_the_same_time(tmp_path: Path) -> None:
-    # 交付到达以后质检核验并放行；工程写入与质检起草测试用例的事件交错出现
+    # 交付到达以后质检交独立判断、核验并放行；工程写入与质检起草测试用例的事件交错出现
     adapter = FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
-        "quality": [_explore(), _release()],
+        "quality": [_explore(), judgement_turn(checks=CHECKS), _release()],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI")
@@ -86,10 +87,10 @@ def test_engineering_and_quality_work_at_the_same_time(tmp_path: Path) -> None:
     quality_write = _position(events, EventType.TOOL_CALLED, "quality", name="write_file")
     delivery = _position(events, EventType.DELIVERY_ACCEPTED, "engineering")
     assert engineering_write < quality_write < delivery
-    # 交付到达以后质检开始新一轮工作：质检有两个激活（预测性探索与核验）
+    # 交付到达以后质检开始新一轮工作：质检有三个激活（预测性探索、独立判断与核验；工单 #358）
     quality_activations = [event for event in events
                             if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == "quality"]
-    assert len(quality_activations) == 2
+    assert len(quality_activations) == 3
     # 质检核验并放行
     assert [event.type for event in events if event.type == EventType.QA_SUBMITTED]
     assert projection.stop_reason == "released"
@@ -112,7 +113,7 @@ def test_predictive_exploration_reads_the_project_start_not_the_delivery(tmp_pat
     adapter = FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
-        "quality": [explore, _release()],
+        "quality": [explore, judgement_turn(checks=CHECKS), _release()],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI")
@@ -145,7 +146,7 @@ def test_quality_cannot_write_into_the_runtime_workspace(tmp_path: Path) -> None
     adapter = FakeAdapter({
         "product": [product_spec()],
         "engineering": [delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
-        "quality": [explore, _release()],
+        "quality": [explore, judgement_turn(checks=CHECKS), _release()],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI")
@@ -180,7 +181,7 @@ def test_pause_and_continue_lets_each_session_resume_where_it_stopped(tmp_path: 
             text_only, text_only, text_only, text_only,
             delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
         ],
-        "quality": [_explore(), _release()],
+        "quality": [_explore(), judgement_turn(checks=CHECKS), _release()],
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI")
@@ -345,6 +346,11 @@ def test_quality_receives_the_delivery_as_a_notification_and_rebuilds_its_worksp
             result = FakeTurn(writes=writes, proposal=result.proposal, checks=result.checks)
         return result
 
+    def judge(call, key):
+        # 独立判断的轮次：新交付到达的通知在这一个请求里送达（先判断后看解释，工单 #358）
+        seen[key] = prompt_part(call, "work_notification")
+        return judgement_turn(checks=CHECKS)(call)
+
     adapter = FakeAdapter({
         "product": [product_spec()],
         "engineering": [first_delivery, second_delivery],
@@ -354,10 +360,12 @@ def test_quality_receives_the_delivery_as_a_notification_and_rebuilds_its_worksp
             wait_for_delivery,
             # 这一轮开始时还没有交付，是预测性探索：结论被拒绝，这一轮到这里结束
             lambda call: review(call, "first", "release"),
-            # 下一轮面对交付：核验并退回返工
+            # 下一轮面对交付：先交独立判断（通知在这里送达），再核验并退回返工（工单 #358）
+            lambda call: judge(call, "second"),
             lambda call: review(call, "rework", "rework_engineering",
                                 writes={"scratch/second.txt": "SECOND\n"}),
-            # 返工后的新交付到达：这一轮核验并放行
+            # 返工后的新交付到达：这一轮先交独立判断（通知在这里送达），再核验并放行
+            lambda call: judge(call, "third"),
             lambda call: review(call, "second", "release"),
         ],
     }, stream_gap_sec=0.01)
@@ -373,11 +381,12 @@ def test_quality_receives_the_delivery_as_a_notification_and_rebuilds_its_worksp
     reviews = [event for event in events if event.type == EventType.QA_SUBMITTED]
     assert len(reviews) == 2
 
-    # 下一步的请求包含交付到达的通知（新版本号与改动）
+    # 下一步的请求包含交付到达的通知（新版本号与改动）：第一份给核验的请求，
+    # 第二份给独立判断的请求（判断先于解释，工单 #358 以后通知在判断这一步送达）
     notification = json.loads(seen["first"])
     assert [item["kind"] for item in notification] == ["delivery_arrived"]
     assert notification[0]["content_hash"] == deliveries[0].payload["content_hash"]
-    notification = json.loads(seen["second"])
+    notification = json.loads(seen["third"])
     assert [item["kind"] for item in notification] == ["delivery_arrived"]
     assert notification[0]["content_hash"] == deliveries[1].payload["content_hash"]
 
@@ -583,9 +592,13 @@ def test_the_inspection_workspace_survives_the_ask_and_is_rebuilt_by_a_new_deliv
         ])
 
     def after_the_new_delivery(call):
-        # 新的交付封存以后：通知送达，检查工作区从这份交付重建
+        # 新的交付封存以后：通知送达，检查工作区从这份交付重建；
+        # 核验以前先交独立判断（工单 #358：判断先于解释）
         seen["notification"] = prompt_part(call, "work_notification")
         seen["after_delivery"] = workspace_files()
+        return judgement_turn(checks=CHECKS)(call)
+
+    def after_the_judgement(call):
         return review_turn("release", "checks passed on the current snapshot", checks=CHECKS)(call)
 
     def deliver_after_the_check(call):
@@ -599,7 +612,7 @@ def test_the_inspection_workspace_survives_the_ask_and_is_rebuilt_by_a_new_deliv
         "product": [product_spec()],
         "product:ask": [answer_turn("验收标准已经写明空输入。")],
         "engineering": [deliver_after_the_check],
-        "quality": [write_and_install, ask_product, verify, after_the_new_delivery],
+        "quality": [write_and_install, ask_product, verify, after_the_new_delivery, after_the_judgement],
     }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("build an echo CLI")
@@ -639,6 +652,7 @@ def test_engineering_and_quality_ask_each_other_at_the_same_time(tmp_path: Path)
             ask_turn("engineering", "接口怎么用？", background="按 PRD 起草测试用例", expected="事实",
                      call_id="ask-qua-1"),
             _explore(),
+            judgement_turn(checks=CHECKS),
             _release(),
         ],
         # 两个部门各自在分支里回答对方的询问：分支按部门给出脚本，谁先被问到不影响结果
@@ -727,8 +741,8 @@ def test_two_checks_at_the_same_time_run_in_their_own_workspaces(tmp_path: Path)
                      call_id="ask-eng-1"),
             delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS),
         ],
-        # 质检的主线：先跑自己的检查，再按 PRD 起草测试用例；交付到达以后核验并放行
-        "quality": [main_check, _explore(), _release()],
+        # 质检的主线：先跑自己的检查，再按 PRD 起草测试用例；交付到达以后交独立判断、核验并放行
+        "quality": [main_check, _explore(), judgement_turn(checks=CHECKS), _release()],
         "quality:ask": [branch_check],
     }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)

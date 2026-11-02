@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":"docs/requirements/system-intent.md",
-"hash":"7238332bed3feff5",
+"hash":"1d03f0ff0dbd842c",
 "nodes":[
-{"hash":"7238332bed3feff5","id":"docs/requirements/system-intent.md","kind":"file","title":"docs/requirements/system-intent.md"},
+{"hash":"1d03f0ff0dbd842c","id":"docs/requirements/system-intent.md","kind":"file","title":"docs/requirements/system-intent.md"},
 {"hash":"5b84c6aa5f901849","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则","kind":"section","parent":"docs/requirements/system-intent.md","title":"D38 系统意图与基础规则"},
 {"hash":"72a4604e0a95c128","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 目的","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则","title":"目的"},
 {"hash":"475d8d83eb802cf0","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 基础规则","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则","title":"基础规则"},
 {"hash":"14a35606dc636e5d","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则","title":"需求与验收标准"},
-{"hash":"8788931d3735905b","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"目的"},
+{"hash":"4e27ca939af5ddf8","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"目的"},
 {"hash":"ba11380a1b44aa2d","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 可迭代状态的五条判据","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"可迭代状态的五条判据"},
 {"hash":"abb545dc71848220","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 循环","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"循环"},
 {"hash":"849ecd5a472b0468","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 保留 agent 的能力","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"保留 agent 的能力"},
@@ -17,7 +17,7 @@
 {"hash":"9989043797906886","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 裁决","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"裁决"},
 {"hash":"a3b77f1fe044170e","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 可控的五个层次","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"可控的五个层次"},
 {"hash":"3bf9a1cef74d8f7e","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 工序","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"工序"},
-{"hash":"cc91cbd65d72081c","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 可视化","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"可视化"},
+{"hash":"fe0c603cdeb0941b","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 画面","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"画面"},
 {"hash":"387d0134b0d552ea","id":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 基础规则","kind":"section","parent":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准","title":"基础规则"}
 ],
 "edges":[
@@ -31,13 +31,13 @@
 {"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"6362d110905936c3","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则"},
 {"dst":"docs/design/loops-and-convergence.md","kind":"link","raws":["../design/loops-and-convergence.md"],"seen":"a98753ef774d65e1","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 保留 agent 的能力"},
-{"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"f32e507ada24faef","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 可视化"},
 {"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 独立与上下文"},
+{"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"f32e507ada24faef","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 画面"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"8b813cb71f37d7dc","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
-{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"cc5ed4519032f933","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"4175c0ea88f1e971","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
 {"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"772422e14ed2ed85","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定","kind":"link","raws":["self-hosting.md"],"seen":"ab0ea2a25a8569ff","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"8a7bb31f10c94018","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"}
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定","kind":"link","raws":["self-hosting.md"],"seen":"d98c42a66b51c945","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"948cc02314d8bdc7","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的"}
 ]
 }

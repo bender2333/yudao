@@ -24,7 +24,7 @@ from harness.definitions import DEFINITIONS
 from harness.event_store import Command, run_stream
 from harness.models import EventType
 from harness.projection import saved_decisions
-from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
+from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import explore_turn
@@ -69,7 +69,7 @@ def _happy_script() -> dict[str, list[Any]]:
     return {
         "product": [product_spec()],
         "engineering": [delivery_turn()],
-        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "checks passed on the current snapshot")],
     }
 
 
@@ -111,7 +111,7 @@ def _reask_script() -> dict[str, list[Any]]:
                         call_id="ans-1"),
         ],
         "engineering:ask": [answer_turn("入口是 src/echo.py。", call_id="ans-2")],
-        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "checks passed on the current snapshot")],
     }
 
 
@@ -156,6 +156,7 @@ def _rework_script(snapshots: dict[str, Any], take) -> dict[str, list[Any]]:
     # 这两轮各有一条没有结束的激活，部门状态在这一步读得到
     deliveries = {"count": 0}
     verdicts = {"reworked": False}
+    state: dict[str, Any] = {"judged": None}
 
     def engineering_turn(call):
         if deliveries["count"]:
@@ -166,6 +167,10 @@ def _rework_script(snapshots: dict[str, Any], take) -> dict[str, list[Any]]:
     def quality_turn(call):
         if not prompt_part(call, "current_delivery_spec"):
             return explore_turn()
+        # 这份交付还没有独立判断时先交独立判断（先判断后看解释，工单 #358）
+        if state["judged"] != prompt_part(call, "current_delivery_spec"):
+            state["judged"] = prompt_part(call, "current_delivery_spec")
+            return judgement_turn()(call)
         if not verdicts["reworked"]:
             verdicts["reworked"] = True
             snapshots.setdefault("verify", take())

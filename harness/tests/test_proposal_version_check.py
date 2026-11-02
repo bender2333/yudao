@@ -8,6 +8,7 @@ from harness.models import EventType, json_dumps
 from harness.proposals import (
     delivery,
     delivery_turn,
+    judgement_turn,
     product_spec,
     product_spec_turn,
     review,
@@ -262,7 +263,8 @@ def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_curre
     system, run_id = _system_by_department(tmp_path, {
         "product": [product_spec()],
         "engineering": [delivery_turn(), delivery_turn(summary="revised implementation")],
-        "quality": [review_turn("rework_engineering", "naming does not match the requirements",
+        "quality": [judgement_turn(),
+                    review_turn("rework_engineering", "naming does not match the requirements",
                                  defects=[{"severity": "minor", "summary": "naming"}])],
     })
     projection = system.project(run_id)
@@ -289,7 +291,9 @@ def test_a_review_with_a_stale_basis_is_rejected_then_resubmitted_with_the_curre
             "release", "the current delivery passed", checks=["smoke"],
             basis_delivery_spec_hash=current_hash), checks={"smoke": 0})
 
-    system.test_adapter.scripts = {"quality": [resubmit]}
+    # 新的交付先交独立判断再下结论（先判断后看解释的门，工单 #358）
+    system.test_adapter.scripts = {"quality": [judgement_turn(), resubmit]}
+    accepted = system.activate_once(run_id)
     accepted = system.activate_once(run_id)
     assert len(_events(system, run_id, EventType.QA_SUBMITTED)) == submitted_before + 1
     assert accepted.status == "done"

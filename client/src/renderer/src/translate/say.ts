@@ -184,6 +184,7 @@ const TEXT: Readonly<Record<string, SayText>> = {
   spec_superseded: () => "现在换用新版本的规格",
   delivery_accepted: () => "现在装箱封存",
   qa_submitted: (_ev, pl) => (pl.verdict === "release" ? "现在盖放行章" : "现在盖返工章"),
+  independent_judgement_committed: () => "现在交上独立判断",
   qa_tests_saved: () => "现在写下测试用例",
   department_guidance_received: () => "收到用户的指导",
   department_guidance_applied: () => "现在阅读指导",

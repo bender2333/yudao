@@ -1,18 +1,22 @@
 {
 "schema":1,
 "path":"docs/requirements/execution-limits.md",
-"hash":"ecbb361e798404e9",
+"hash":"573c955013deada8",
 "nodes":[
-{"hash":"ecbb361e798404e9","id":"docs/requirements/execution-limits.md","kind":"file","title":"docs/requirements/execution-limits.md"},
-{"hash":"748b7af486c10b1f","id":"docs/requirements/execution-limits.md#D09 循环次数与超时限制","kind":"section","parent":"docs/requirements/execution-limits.md","title":"D09 循环次数与超时限制"},
-{"hash":"b567209861c7bf12","id":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 用户原话","kind":"section","parent":"docs/requirements/execution-limits.md#D09 循环次数与超时限制","title":"用户原话"},
-{"hash":"7bc9ec99d9229151","id":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 已确认","kind":"section","parent":"docs/requirements/execution-limits.md#D09 循环次数与超时限制","title":"已确认"},
-{"hash":"062ec6b60a825712","id":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 当前实施选择","kind":"section","parent":"docs/requirements/execution-limits.md#D09 循环次数与超时限制","title":"当前实施选择"}
+{"hash":"573c955013deada8","id":"docs/requirements/execution-limits.md","kind":"file","title":"docs/requirements/execution-limits.md"},
+{"hash":"c532906cadc8a991","id":"docs/requirements/execution-limits.md#D09 循环次数与超时限制","kind":"section","parent":"docs/requirements/execution-limits.md","title":"D09 循环次数与超时限制"},
+{"hash":"fd43f6898096838d","id":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 已确认","kind":"section","parent":"docs/requirements/execution-limits.md#D09 循环次数与超时限制","title":"已确认"},
+{"hash":"047c4e7662524e6f","id":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 实施选择","kind":"section","parent":"docs/requirements/execution-limits.md#D09 循环次数与超时限制","title":"实施选择"}
 ],
 "edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制"},
+{"dst":"docs/design/loops-and-convergence.md","kind":"link","raws":["../design/loops-and-convergence.md"],"seen":"23758f4ab48603f3","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制"},
+{"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"fa9f8439e85f2525","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制"},
+{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"a78961c96f7ce911","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c885094f22cf0815","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 实施选择"},
+{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"a78961c96f7ce911","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 实施选择"},
 {"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"772422e14ed2ed85","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 已确认"},
-{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"190ddcb53255d852","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 已确认"},
-{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c0ad35140a868277","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 当前实施选择"},
-{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"a78961c96f7ce911","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 当前实施选择"}
+{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"de20ddd0138d1f12","src":"docs/requirements/execution-limits.md#D09 循环次数与超时限制 > 已确认"}
 ]
 }

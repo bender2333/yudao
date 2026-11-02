@@ -26,10 +26,12 @@
 | 第四节：路由、装配、执行 | `B4/B5/B6` | 三个契约及 `LoopSystem` 的构造注入 | `test_slot_contracts.py`、`test_second_slot_implementations.py`、`test_second_routing.py` |
 | 第四节：模型与动作 | `B11/B10` | `ProviderFacade`、`LocalEnvironment`、`actions.py` | `test_providers_module.py`、`test_action_contract.py` |
 | 第四节：投影与接口 | `B13/B1/B2/F1` | `projection.py`、`project_projection.py`、`app/event_stream.py`、`contract/view-sync.ts` | `test_saved_projections.py`、`test_openapi_snapshot.py`、`test_event_stream.py` |
-| 第四节：画面 | `F3/F4` | `translate/`、`pixel/contract.ts`、`pixel/world/` | 客户端单元与逐场景回放；范围见 `client/package.json` |
+| 第四节（系统之外）：画面 | `F3/F4` | `translate/`、`pixel/contract.ts`、`pixel/world/` | 客户端单元与逐场景回放；范围见 `client/package.json` |
 | 第四节：定义 | `B12` | `definitions.__init__` 与定义 JSON | `test_definitions.py`、`test_routing_definition.py`、`kernel/test_manifest.py` |
 | 第五节：自举与验收 | 运行模型之外的工程约束 | 内核清单、`evals/`、`scripts/release.py`、CI | 按验收证据规则选择当前版本的实际运行记录 |
 | 第六节：拆开部署 | 当前 C2 + 部署图 | `api/server.py`、`environment.LocalEnvironment`、`mcp_client.py` | 当前实现仅证明已经存在的调用路径；未来远程拓扑需要新增实现证据 |
+
+总图把画面放在系统之外，只经接口读事实；当前代码里页面与画面同在 `C1`，由页面 `F2` 把快照与事件交给 `F3/F4`，还不是独立的运行单元。总图第二、四节定义里的「事项的来源与接它的部门」在当前定义文件与校验里还没有实现，`B12` 不包含这一项。
 
 此表记录设计概念的实现位置。列出的测试是后续验证入口，本次文档工作没有运行产品测试，也不把测试文件存在解释为对应保证已经验收通过。
 
@@ -38,7 +40,7 @@
 1. 固定代码提交并记录工作区状态。比较旧 `source_commit` 与新提交的差异，找到受影响的 `evidence.path`。
 2. 沿元素的父级向上查找：符号移动更新定位；职责变化更新 C3；运行环境或存储生命周期变化更新 C2；系统责任与外部协作变化更新 C1。
 3. 检查关系的证据。构造注入说明连接方式；方法调用说明运行协作；导入只说明静态依赖。每条架构关系同时写明方向、数据和调用方式。
-4. 检查总图对应的保证。实现遗漏、合同冲突或未规定的边界按仓库规则登记到 `docs/architecture-issues.md`，由相应角色处理。
+4. 检查总图对应的保证。实现遗漏、合同冲突或未规定的边界按仓库规则处理：要改代码的开工单，认为总图错了的开 `architecture` 工单交总架构师。
 5. 修改 `model.json` 中的元素、关系和代码证据，并重新投影 C1–C3 图。元素只是搬迁时保留 ID；拆分或合并时明确替换关系。
 6. 核对父子归属、关系端点、路径、符号和源码摘要；渲染图检查层次与标签。行为变化另外运行相关测试，把测试结果绑定到实现提交。
 

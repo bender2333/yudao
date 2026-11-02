@@ -23,7 +23,7 @@ from harness.department_prompts import save_department_prompt
 from harness.engine import StepLimits
 from harness.minimal_projection import AcceptedArtifact, MinimalProjection, SessionState, UsedAmount
 from harness.models import ArtifactRef, ContextManifest, DepartmentPrompt, Event, RunProjection, json_dumps
-from harness.proposals import (delivery_turn, product_spec, review,
+from harness.proposals import (delivery_turn, judgement_turn, product_spec, review,
                         review_turn)
 from harness.environment import LocalEnvironment, QA_TESTS_DIR
 from harness.providers.call import ModelCall, ModelResponse
@@ -291,15 +291,21 @@ def explore_turn() -> FakeTurn:
 def quality_turns(verdict: str = "release", rationale: str = "checks passed on the current snapshot",
                   *, defects: list[dict[str, str]] | None = None, checks: dict[str, Any] | None = None,
                   times: int = 10) -> list[Any]:
-    # 质检的脚本（工单 #557）：质检关注「PRD 被接纳」，PRD 的每一个新版本与每一份新交付都让它开始一轮工作，
+    # 质检的脚本（工单 #557、#358）：质检关注「PRD 被接纳」，PRD 的每一个新版本与每一份新交付都让它开始一轮工作，
     # 轮数随这些成果到达的时机变化，因此每一轮按这一轮开始时有没有交付决定做什么：
-    # 没有交付的一轮是预测性探索（提交的结论被拒绝），有交付的一轮是核验（缺陷记录或放行）。
+    # 没有交付的一轮是预测性探索（提交的结论被拒绝）；有交付的一轮先交独立判断再下结论
+    # （先判断后看解释的门：提交结论前必须有当前交付的独立判断事件，同一份交付只交一次）。
     # 脚本项给足几轮，实际用掉几轮由运行决定（PRD 每修订一次就多一轮预测性探索）。
-    state = {"concluded": False}
+    state: dict[str, Any] = {"concluded": False, "judged": None}
 
     def turn(call: ModelCall) -> FakeTurn:
         if not prompt_part(call, "current_delivery_spec"):
             return explore_turn()
+        delivery = json.loads(prompt_part(call, "current_delivery_spec"))
+        delivery_hash = delivery.get("content_hash")
+        if state["judged"] != delivery_hash:
+            state["judged"] = delivery_hash
+            return judgement_turn(checks=checks)(call)
         if verdict == "rework_engineering" and not state["concluded"]:
             state["concluded"] = True
             return review_turn(verdict, rationale, defects=defects, checks=checks)(call)
@@ -309,11 +315,12 @@ def quality_turns(verdict: str = "release", rationale: str = "checks passed on t
 
 
 def happy_script():
-    # 按部门给出的脚本（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
+    # 按部门给出的脚本（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）。
+    # 质检在交付到达后先交独立判断再下结论（先判断后看解释的门，工单 #358）
     return {
         "product": [product_spec()],
         "engineering": [delivery_turn()],
-        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "checks passed on the current snapshot")],
     }
 
 

@@ -170,6 +170,10 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "contract_accepted": ("content_hash", "input_version", "product_spec_hash", "revision"),
     "ask_started": ("branch_session_id", "question", "recipient", "requester"),
     "ask_answered": ("answer", "reason", "recipient", "requester", "revision", "status", "with_spec_revision"),
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：不是成果，事件载荷只带判断本身
+    # （提案路径盖上的统一字段在写入时去掉），依据的交付摘要与条数进基准
+    "independent_judgement_committed": ("checks", "criteria_count", "delivery_spec_hash",
+                                        "kind", "product_spec_hash"),
     "product_decision_accepted": ("content_hash", "id", "kind", "product_spec_hash"),
     # 成果失效（骨架事件，S1b，工单 #858）：成果种类、版本与原因都进基准——失效改由事件给出、
     # 不再由投影从别的事件推出，这三项变化就是行为变化

@@ -134,9 +134,11 @@ def test_delivery_citing_a_run_check_receipt_is_accepted_and_quality_releases_on
                for event in system.store.list_events(run_id)
                if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("name") == "run_check"
                and event.department == "quality"]
-    # 工程与质检各运行过一次检查：两次都是主机执行的真实进程
+    # 工程与质检都是主机执行的真实进程：工程交付前一次；质检按先判断后看解释（工单 #358）
+    # 判断与结论各一次（两个激活各带本激活的回执）
     assert len(engineering) == 1 and engineering[0].exit_code == 0
-    assert len(quality) == 1 and quality[0]["executor"] == "host" and quality[0]["exit_code"] == 0
+    assert len(quality) == 2 and all(item["executor"] == "host" and item["exit_code"] == 0
+                                     for item in quality)
 
 
 def test_delivery_citing_a_bash_result_is_rejected_with_the_check_reason(tmp_path):

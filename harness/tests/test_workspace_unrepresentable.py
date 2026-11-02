@@ -12,7 +12,7 @@ import pytest
 from harness.actions import Action
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType, json_dumps
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.public_tree import capture_public_tree
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -81,7 +81,7 @@ def test_ignored_link_does_not_pause_and_never_enters_snapshot_seal_or_delivery(
     # delivery_turn 按请求里的当前 ProductSpec 填依据版本（工单 #471）：FakeTurn 是脚本项而不是实例
     system = _system(tmp_path, [work, delivery_turn(
         summary="with ignored dependency link", files={"src/echo.py": "import sys\nprint(sys.argv[1])\n"},
-        checks={"smoke": 0}), review_turn("release", "ok")])
+        checks={"smoke": 0}), judgement_turn(), review_turn("release", "ok")])
     run_id = system.create_run("Dependencies with links do not affect the public tree")
     workspace = system.workspace(run_id)
     workspace.write_file(".gitignore", "node_modules/\n")

@@ -20,7 +20,7 @@ from harness.projects import (
     project_projection,
 )
 from harness.proposals import (
-    delivery_turn, product_spec,
+    delivery_turn, judgement_turn, product_spec,
     review_turn,
 )
 from harness.projection import RunNotFoundError, saved_decisions
@@ -39,7 +39,7 @@ def _release_script(summary="v1", files=None):
     return {
         "product": [product_spec()],
         "engineering": [delivery_turn(summary=summary, files=files)],
-        "quality": [explore_turn(), review_turn("release", f"ok {summary}")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", f"ok {summary}")],
     }
 
 def _v2_files():
@@ -50,7 +50,7 @@ def _kernel_release_script(summary="v1", files=None):
     return {
         "product": [product_spec()],
         "engineering": [delivery_turn(summary=summary, files=files)],
-        "quality": [explore_turn(), review_turn("release", f"ok {summary}")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", f"ok {summary}")],
     }
 
 
@@ -495,7 +495,9 @@ def test_work_item_derived_fields_follow_the_run(data_dir):
         "product": [product_spec()],
         "engineering": [delivery_turn(summary="v1"), delivery_turn(summary="v2", files={"src/echo.py": "print('v2')\n"})],
         "quality": [
+            judgement_turn(),
             review_turn("rework_engineering", "命名不符", defects=[{"severity": "minor", "summary": "naming"}]),
+            judgement_turn(),
             review_turn("release", "ok"),
         ],
     }

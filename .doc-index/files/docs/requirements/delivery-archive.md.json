@@ -1,15 +1,17 @@
 {
 "schema":1,
 "path":"docs/requirements/delivery-archive.md",
-"hash":"8dbc29d6a30ae01e",
+"hash":"fcc1dd317654006a",
 "nodes":[
-{"hash":"8dbc29d6a30ae01e","id":"docs/requirements/delivery-archive.md","kind":"file","title":"docs/requirements/delivery-archive.md"},
-{"hash":"3ae3510bdd92bf96","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","kind":"section","parent":"docs/requirements/delivery-archive.md","title":"D13 完整交付封存与恢复"},
-{"hash":"4e991ed75bf146f7","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 来源与本轮决定","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"来源与本轮决定"},
-{"hash":"eb0d5cccec52ef36","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 有效规则","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"有效规则"},
-{"hash":"b6c7a8f044dcc1ab","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 状态","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"状态"}
+{"hash":"fcc1dd317654006a","id":"docs/requirements/delivery-archive.md","kind":"file","title":"docs/requirements/delivery-archive.md"},
+{"hash":"0a14c1cbf7eee5fb","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","kind":"section","parent":"docs/requirements/delivery-archive.md","title":"D13 完整交付封存与恢复"},
+{"hash":"2a1f7ed19285b65e","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 有效规则","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"有效规则"},
+{"hash":"f5eaf4efed0e7ebd","id":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复 > 验收","kind":"section","parent":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复","title":"验收"}
 ],
 "edges":[
-
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复"},
+{"dst":"docs/design/local-tools.md","kind":"link","raws":["../design/local-tools.md"],"seen":"4de695e920eac8be","src":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/delivery-archive.md#D13 完整交付封存与恢复"}
 ]
 }

@@ -3,7 +3,7 @@ import time
 from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import StepLimits
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import list_files_turn, quality_turns
 
@@ -35,7 +35,7 @@ def test_time_limit_checked_between_activations(data_dir):
     # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
     # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
     script = {"product": [product_spec()], "engineering": [delivery_turn()],
-              "quality": [review_turn("release", "ok")]}
+              "quality": [judgement_turn(), review_turn("release", "ok")]}
     system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
     run_id = system.create_run("echo", run_time_limit_sec=10)
     # 第一次激活正常完成；两次激活之间的等待不计入运行时间（工单 #350，按 #410 对齐短时限到 10 秒避免负载抖动），

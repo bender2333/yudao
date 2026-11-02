@@ -64,6 +64,8 @@ RUN_EVENT_TYPES = frozenset({
     "contract_accepted",
     "ask_started",
     "ask_answered",
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：应用事件，核验角色先判断后看解释
+    "independent_judgement_committed",
     "product_decision_accepted",
     # 成果失效（骨架事件，S1b，工单 #858）
     "artifact_invalidated",

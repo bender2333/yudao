@@ -1,0 +1,14 @@
+{
+"schema":1,
+"path":"docs/C4/05-runtime.md",
+"hash":"071fcc3f2406b065",
+"nodes":[
+{"hash":"071fcc3f2406b065","id":"docs/C4/05-runtime.md","kind":"file","title":"docs/C4/05-runtime.md"},
+{"hash":"4a026a2bdbc5587e","id":"docs/C4/05-runtime.md#动态与部署视图","kind":"section","parent":"docs/C4/05-runtime.md","title":"动态与部署视图"},
+{"hash":"23f8c43085494435","id":"docs/C4/05-runtime.md#动态与部署视图 > 一次部门工作的主要路径","kind":"section","parent":"docs/C4/05-runtime.md#动态与部署视图","title":"一次部门工作的主要路径"},
+{"hash":"8f958d5ab72cc04f","id":"docs/C4/05-runtime.md#动态与部署视图 > 当前部署","kind":"section","parent":"docs/C4/05-runtime.md#动态与部署视图","title":"当前部署"}
+],
+"edges":[
+
+]
+}
