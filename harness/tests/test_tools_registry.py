@@ -1,15 +1,17 @@
-# 查询 tools.registry（工单 #1177；网络与 MCP 设计说明第 10 节、第 11.3 节；总图第四节「接口」缝）。
-# 这个文件查四件事：
-# 1. 能力清单列出这个查询与改变它结果的事件种类；调用前后事件日志末尾位置与保存的投影不变（验收 2）；
+# 查询 tools.registry（工单 #1177；网络与 MCP 设计说明第 10 节「应用层接口」、第 11.3 节「系统『工具与扩展』页」；
+# 总图第四节「接口」缝）。这个文件查五件事：
+# 1. 能力清单里列出这个查询；调用前后事件日志末尾位置与保存的投影不变（验收 2 的只读一半）；
 # 2. 两个项目各写明不同的服务器时，查询内容与各自设置一致（验收 1 的 MCP 一半）；
 # 3. 保存了工具清单快照的服务器，查询原样给出快照；没有服务器的项目给出空字典；
-#    取回记录与探测状态留空位（#68 与 #1174 合并以后填充）。
-# 第 4 件事（接口合同：OpenAPI 快照与生成的客户端类型有这一条查询）由 test_openapi_snapshot.py
-# 与 test_api.py 的能力清单核对覆盖，不在这里重复（测试分层第 13 节 D3）。
+# 4. 一次取回以后，这条记录出现在它自己项目的最近取回记录里，别的项目看不到（验收 1 的取回一半）；
+# 5. 每台服务器给出自己最近一次探测的状态，过期的结果带当时的配置摘要（设计说明第 4.2、11.3 节）。
+# 第 6 件事（接口合同：OpenAPI 快照与生成的客户端类型有这一条查询）由 test_openapi_snapshot.py
+# 与 test_api.py 的能力清单核对覆盖，不在这里重复（测试分层「测试按三环留」D3）。
 #
-# 依赖状态（2026-10-31，main 67ee4da0）：#236 已合并，MCP 服务器读项目投影；#1174（探测）与 #68（取回）
-# 未合并，最近一次探测（probe）与取回记录（fetch_records）留合同空位、恒为空，不造数据；
-# 探测记录待 #1174 合并后由它填充，取回记录待 #68 合并后由它填充。
+# 数据来源（2026-11-03，main 6ad1fd3e）：#236（MCP 设置）、#1174（探测事件 tool_server_probe_finished）与
+# #68（取回动作 fetch_url）都已合并，查询读项目投影与项目名下的两类事件。取回与探测各自的动作路径由
+# #68 的 harness/tests/test_fetch.py 与 #1174 的 harness/tests/test_mcp_probe.py 在集成层核对，
+# 这里核对的是查询读到这些事实以后给出什么。
 #
 # 层：模块层（真实 SQLite 事件库与项目投影，不出激活、不用网络，测试分层设计说明第 2 节）。
 # 守 R2（第二环的合同：查询的结果字段、能力清单登记、只读保证）。
@@ -20,8 +22,10 @@ import json
 
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
-from harness.event_store import project_stream
+from harness.event_store import project_stream, run_stream
+from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
+from harness.write_path import NewEvent, NewProjectEvent
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 
@@ -40,6 +44,7 @@ HTTP_SERVER = {
         "departments": ["product"],
     },
 }
+BOTH_SERVERS = {**STDIO_SERVER, **HTTP_SERVER}
 
 
 def _system(tmp_path) -> LoopSystem:
@@ -51,21 +56,47 @@ def _tools(application):
     return application.query("tools.registry", None).data
 
 
-def test_the_registry_lists_the_query_with_its_change_kinds_and_reads_nothing(tmp_path):
-    # 验收 2（R2）：能力清单列出 tools.registry 与改变它结果的事件种类；调用前后事件日志末尾
-    # 与保存的投影不变（查询只读取）
+def _record_fetch(system, run_id: str, *, url: str, ok: bool,
+                  error: str | None = None, refused: str | None = None) -> None:
+    # 一条取回动作的结果事件：与 #68 的动作写同一种事件（run 流的 tool_called，名字 fetch_url）
+    payload: dict = {"id": f"fetch-{url}", "name": "fetch_url", "ok": ok, "args": {"url": url}}
+    if error is not None:
+        payload["error"] = error
+    if refused is not None:
+        payload["refused"] = True
+        payload["refused_reason"] = refused
+    system.writes.transact(run_stream(run_id), lambda transaction: transaction.append(NewEvent(
+        EventType.TOOL_CALLED, actor="department:engineering", department="engineering",
+        state_before=transaction.projection.status, state_after=transaction.projection.status,
+        payload=payload)))
+
+
+def _record_probe(system, project_id: str, *, server_name: str, ok: bool, config_digest: str,
+                  error: str = "", tools: list[dict] | None = None) -> None:
+    # 一次探测的结果事件：与 #1174 的探测写同一种项目流事件（tool_server_probe_finished）
+    payload = {
+        "server_name": server_name, "status": "ok" if ok else "failed", "config_digest": config_digest,
+        "server_info": {"name": server_name} if ok else None, "tools": list(tools or []), "error": error,
+    }
+    system.writes.transact(project_stream(project_id), lambda transaction: transaction.append(
+        NewProjectEvent(ProjectEventType.TOOL_SERVER_PROBE_FINISHED, payload, actor="system")))
+
+
+def test_the_registry_is_listed_as_a_query_and_reads_nothing(tmp_path):
+    # 验收 2（R2）的只读一半：能力清单里有 tools.registry，调用前后事件日志末尾与保存的投影不变
+    # （查询只读取）。改变它结果的事件种类由 test_capabilities.py 核对（能力清单的断言集中在那里）；
+    # 接口合同（OpenAPI 快照与客户端类型）由 test_openapi_snapshot.py 核对
     system = _system(tmp_path)
     application = Application(system)
     try:
         capabilities = application.capabilities("", access="local")
         query = next(item for item in capabilities.queries if item.name == "tools.registry")
-        assert sorted(query.changed_by) == ["mcp_servers_configured", "project_registered", "project_renamed",
-                                            "tool_called", "tool_started"]
         assert query.replayable is False
 
         store = system.store
         project_id = system.projects.register("只读", GOAL)
         system.projects.configure_mcp_servers(project_id, STDIO_SERVER, base_version=0)
+        _record_probe(system, project_id, server_name="time", ok=True, config_digest="sha256:digest")
         streams = [project_stream(pid) for pid in store.list_project_ids()]
         end = store.end_position()
         saved = [store.projection(stream) for stream in streams]
@@ -80,7 +111,7 @@ def test_the_registry_lists_the_query_with_its_change_kinds_and_reads_nothing(tm
 
 def test_two_projects_with_different_servers_each_match_their_own_settings(tmp_path):
     # 验收 1（R2）：两个项目各写明不同的服务器，查询内容与各自设置一致；凭据只出现名称；
-    # 设置与 project.settings 读回的同一份非秘密文档一致
+    # 设置与 project.settings 读回的同一份非秘密文档一致；没有取回过的项目取回记录为空
     system = _system(tmp_path)
     application = Application(system)
     try:
@@ -99,8 +130,8 @@ def test_two_projects_with_different_servers_each_match_their_own_settings(tmp_p
         assert server.args == ["mcp-server-time"]
         assert server.env["API_KEY"] == {"kind": "credential", "value": "", "credential_ref": "MCP_TIME_KEY"}
         assert server.departments == ["product", "engineering", "quality"]
-        assert server.probe.ok is None and server.probe.finished_at is None  # 探测待 #1174 填充
-        assert by_id[first].fetch_records == []  # 取回记录待 #68 填充
+        assert server.probe.ok is None and server.probe.finished_at is None  # 还没有探测过
+        assert by_id[first].fetch_records == []
 
         assert by_id[second].name == "服务器乙"
         other = by_id[second].mcp_servers["search"]
@@ -140,5 +171,74 @@ def test_a_saved_tool_snapshot_is_returned_and_projects_without_servers_are_empt
         assert snapshot is not None and snapshot["config_digest"] == digest
         assert [tool["name"] for tool in snapshot["tools"]] == ["now"]
         assert by_id[without].mcp_servers == {} and by_id[without].fetch_records == []
+    finally:
+        system.close()
+
+
+def test_a_fetch_appears_in_its_own_projects_recent_records_only(tmp_path):
+    # 验收 1（R2）：一次取回之后，这条记录出现在它自己项目的最远近取回记录里，最近的在前；
+    # 别的项目看不到；只认 fetch_url，别的工具不动这份记录
+    system = _system(tmp_path)
+    application = Application(system)
+    try:
+        fetched = system.projects.register("取回过的项目", GOAL)
+        other = system.projects.register("没取回过的项目", GOAL)
+        # 取回动作写在属于这个项目的事项的 run 流里（run 的项目取自 run_created）
+        _work_item, run_id = system.projects.start_work_item(fetched, "取回一个网页")
+
+        assert _tools(application).projects[0].fetch_records == []  # 还没有取回
+
+        _record_fetch(system, run_id, url="https://example.com/manual", ok=True)
+        # 别的工具不改变取回记录
+        system.writes.transact(run_stream(run_id), lambda transaction: transaction.append(NewEvent(
+            EventType.TOOL_CALLED, actor="department:engineering", department="engineering",
+            state_before=transaction.projection.status, state_after=transaction.projection.status,
+            payload={"id": "bash-1", "name": "bash", "ok": True, "args": {"command": "ls"}})))
+        _record_fetch(system, run_id, url="http://127.0.0.1:8765/page", ok=False,
+                      refused="it points at the Yudao service's own address and port")
+        _record_fetch(system, run_id, url="https://example.com/broken", ok=False, error="连接被拒")
+
+        by_id = {item.project_id: item for item in _tools(application).projects}
+        records = by_id[fetched].fetch_records
+        # 最近的在前：最后一个取回排第一
+        assert [record.url for record in records] == [
+            "https://example.com/broken", "http://127.0.0.1:8765/page", "https://example.com/manual"]
+        assert [record.ok for record in records] == [False, False, True]
+        assert records[0].error == "连接被拒"
+        assert records[1].error == "it points at the Yudao service's own address and port"
+        assert records[2].error is None
+        assert all(record.at for record in records)  # 每条都带取回的时间
+        assert by_id[other].fetch_records == []
+    finally:
+        system.close()
+
+
+def test_each_server_shows_its_own_latest_probe_and_stale_results_keep_their_digest(tmp_path):
+    # 验收 1（最近一次状态，R2）：每台服务器给出自己最近一次探测的状态，不是项目里最后一次探测；
+    # 配置改过以后旧结果仍然给出（设计说明第 4.2 节「过期探测结果保留供查询」），带上它绑定的配置摘要；
+    # 探测过但已经删掉的服务器不再列出
+    system = _system(tmp_path)
+    application = Application(system)
+    try:
+        project_id = system.projects.register("两台服务器", GOAL)
+        system.projects.configure_mcp_servers(project_id, BOTH_SERVERS, base_version=0)
+        time_digest = system.projects.read_mcp_servers(project_id)["servers"]["time"]["config_digest"]
+
+        _record_probe(system, project_id, server_name="time", ok=True, config_digest=time_digest,
+                      tools=[{"name": "now"}])
+        _record_probe(system, project_id, server_name="search", ok=False, config_digest="sha256:old",
+                      error="缺少凭据 EXA_KEY")
+        # 同一台服务器再探测失败一次：取最后一次
+        _record_probe(system, project_id, server_name="time", ok=False, config_digest="sha256:changed",
+                      error="启动失败")
+        # 探测过的服务器后来从设置里删掉：它不再出现在登记里
+        _record_probe(system, project_id, server_name="gone", ok=True, config_digest="sha256:gone")
+
+        servers = {item.project_id: item for item in _tools(application).projects}[project_id].mcp_servers
+        assert set(servers) == {"time", "search"}
+        assert servers["time"].probe.ok is False and servers["time"].probe.error == "启动失败"
+        assert servers["time"].probe.config_digest == "sha256:changed"
+        assert servers["time"].probe.finished_at
+        assert servers["search"].probe.ok is False and servers["search"].probe.error == "缺少凭据 EXA_KEY"
     finally:
         system.close()

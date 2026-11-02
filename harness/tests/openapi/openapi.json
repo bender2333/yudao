@@ -14683,6 +14683,17 @@
               }
             ],
             "title": "Ok"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
           }
         },
         "additionalProperties": false,
@@ -14723,6 +14734,11 @@
               }
             ],
             "title": "Error"
+          },
+          "config_digest": {
+            "type": "string",
+            "title": "Config Digest",
+            "default": ""
           }
         },
         "additionalProperties": false,
@@ -14863,7 +14879,9 @@
           },
           "probe": {
             "$ref": "#/components/schemas/ToolsRegistryProbeState",
-            "default": {}
+            "default": {
+              "config_digest": ""
+            }
           }
         },
         "additionalProperties": false,
