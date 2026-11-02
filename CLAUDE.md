@@ -104,7 +104,7 @@ Yudao（枢道）是一个协作执行系统：角色围着同一份事实工作
 - `docs/design/`：模块设计、架构图与设计说明，索引见 `docs/design/README.md`。工单、代码和规则登记引用这里的文档，设计说明不引用它们。
 - `docs/prototypes/`：界面原型，记录见 `docs/prototypes/CHANGELOG.md`。页面原型不带画面，用假数据、能点，交给用户试用，一版接一版；画面只用单页草图回答设计问题，答完就扔。两种都说明设计意图，不当逐像素的标准。
 - `docs/research/`：仍在使用的调研，索引见 `docs/research/README.md`。
-- `docs/evaluation/`：评测的基准数字与被测试固定的场景结果。
+- `docs/evaluation/`：评测的数据文件（基线数字、被测试固定的场景结果、测量数据、结果 JSON）和工单验收的截图。评测的中文报告与差异报告发在 Discussions（标题前缀「证据：」或「扫描：」），不放这里；一次性的旧报告在 `docs/archive/evaluation/`。
 - `docs/examples/`：配置文件的格式示例。
 - `docs/agents/`：工作方式（流程的正本）、共同规则、运行配置、验收证据规则、工单规范、设计说明规范，以及技能读取的工单与领域文档配置。
 - `docs/CHANGELOG.md`：`docs/` 的变更记录。

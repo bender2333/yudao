@@ -45,7 +45,7 @@
   2. 原样的 Yudao 第 1 次（工作区里没有题目的数据文件）运行到 72 分钟时，与 OpenCode 第 3 次一起被 Claude Code 的内存回收结束（会话空闲时系统内存不足，不是运行出错），不计入。
   3. 用户看过这一次以后决定（2026-10-20）：Yudao 一侧按 #324 的写法补跑 3 次，新建项目时经 `project.create` 的 `initial_directory` 带入 `subway_data.json`，事项文字去掉「请工程自己写出这份文件」一段（`evals/runner/yudao.py:93-97`）。改动在补跑脚本里，运行器与 `harness/` 的代码没有改。补跑用 Start-Process 脱离会话运行。
   4. 补跑期间，另一个架构师会话在 UTC 02:02:49 把共用的 architect 工作区切到 `ffb099c7`（工作区的 reflog）。带数据的第 1 次的服务在 01:19 启动，用的是 `909deda6`；第 2、3 次的服务在这之后启动，用的是 `ffb099c7`，比第 1 次多了 M0 的 #549、#550、#551（询问工具）、#614、#616、#617。运行器在全部结束以后才读一次 HEAD（`evals/runner/run_yudao_eval.py:209`），所以结果文件里的提交号 `2959f3fd` 只对后两次成立（`ffb099c7` 到 `2959f3fd` 之间只有日记）。
-- 结果文件：[docs/evaluation/scenario-3-qwen38flash-2026-10-20/](../evaluation/scenario-3-qwen38flash-2026-10-20/)。原始证据（事件日志导出、交付副本、评分日志）在仓库外 `C:\project\yudao-evals\s3-qwen38flash-20261019\evidence\`，不进 Git。
+- 结果文件：[docs/archive/evaluation/scenario-3-qwen38flash-2026-10-20/](../archive/evaluation/scenario-3-qwen38flash-2026-10-20/)。原始证据（事件日志导出、交付副本、评分日志）在仓库外 `C:\project\yudao-evals\s3-qwen38flash-20261019\evidence\`，不进 Git。
 
 ### 2.2 OpenCode（单个 agent）
 
@@ -273,4 +273,4 @@ gemini 另外给出的数字：工程每次请求的上下文中位数约 7.7 �
 ## 11. 怎样检验这份结论
 
 - 方法 1 与方法 2 的命令写在第 3、4 节；`read_export.py <证据目录>` 读一次运行的事件日志导出，给出第 2.3 节的循环、停止位置与评分。
-- 预测 P1 至 P5 写在 [docs/evaluation/predictions-2026-10-20.md](../evaluation/predictions-2026-10-20.md)，下一次复盘按它判对错。
+- 预测 P1 至 P5 写在 [docs/archive/evaluation/predictions-2026-10-20.md](../archive/evaluation/predictions-2026-10-20.md)，下一次复盘按它判对错。
