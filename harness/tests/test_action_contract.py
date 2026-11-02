@@ -26,12 +26,12 @@ from typing import Any, Callable
 
 import pytest
 
-from harness.actions import Action, ActionReceipt, FactsQuery, TreeChange, snapshot_payload
+from harness.actions import Action, ActionReceipt, FactsQuery, TreeChange
 from harness.adapters.fake import FakeAdapter
 from harness.artifacts import ArtifactStore
 from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment
-from harness.models import ArtifactRef, EventType
+from harness.models import ArtifactRef, EventType, hash_bytes
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -66,6 +66,16 @@ def _action(tool: str, kind: str, tool_input: dict[str, Any], **declared: Any) -
 def _perform(implementation: Any, action: Action) -> ActionReceipt:
     # 两个实现的执行都是异步的；这一步没有同时进行的事，直接跑完
     return asyncio.run(implementation.perform(action))
+
+
+def _assert_snapshot_is_the_public_tree(snapshot: dict[str, Any], tree: Any, *, root: Path,
+                                       written_file: str, name: str = "") -> None:
+    # 按引用取回的终点快照就是动作以后的公开树。期望值由公开树事实与磁盘上的文件自己写出来，
+    # 不从产出这份内容的 `snapshot_payload` 取：那条路会把「这份内容变空」的改动一起放过（审查意见）
+    assert snapshot["digest"] == tree.digest, name
+    entries = {path: content_hash for path, content_hash in snapshot["entries"]}
+    assert entries == {path: content_hash for path, content_hash in zip(tree.files, tree.hashes)}, name
+    assert entries[written_file] == hash_bytes((root / written_file).read_bytes()), name
 
 
 @pytest.fixture(params=sorted(IMPLEMENTATIONS))
@@ -175,7 +185,7 @@ def test_an_action_in_a_workspace_that_cannot_be_read_reports_no_tree_evidence(i
 def test_a_written_action_reports_the_endpoint_snapshot_the_reader_can_open(implementation_with_artifacts):
     # 改动工作区的动作在回执里带终点快照的引用（工单 #1398）：读回执的一方不用再去事件载荷里找快照，
     # 按引用取回的那份快照就是动作以后的公开树
-    name, _root, environment, artifacts = implementation_with_artifacts
+    name, root, environment, artifacts = implementation_with_artifacts
     before = environment.query(FactsQuery(tree=True)).tree
     assert before is not None
 
@@ -187,7 +197,7 @@ def test_a_written_action_reports_the_endpoint_snapshot_the_reader_can_open(impl
     ref = written.after_snapshot_ref
     assert ref is not None, name
     snapshot = json.loads(artifacts.get_for_run(ARTIFACT_RUN, ArtifactRef(**ref.model_dump())))
-    assert snapshot == snapshot_payload(after), "按回执里的引用取回的快照不是动作以后的公开树"
+    _assert_snapshot_is_the_public_tree(snapshot, after, root=root, written_file="notes/a.txt", name=name)
 
 
 def test_a_read_only_action_reports_the_same_tree_digests(implementation_with_artifacts):
@@ -222,7 +232,7 @@ def test_a_local_command_reports_its_tree_change_and_endpoint_snapshot(tmp_path)
     ref = receipt.after_snapshot_ref
     assert ref is not None
     snapshot = json.loads(artifacts.get_for_run(ARTIFACT_RUN, ArtifactRef(**ref.model_dump())))
-    assert snapshot == snapshot_payload(after), "按回执里的引用取回的快照不是命令结束以后的公开树"
+    _assert_snapshot_is_the_public_tree(snapshot, after, root=root, written_file="made.txt")
 
 
 def test_an_old_receipt_without_the_tree_evidence_is_still_read():
