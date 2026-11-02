@@ -65,12 +65,34 @@ class Action(BaseModel):
         return self
 
 
+class SnapshotRef(BaseModel):
+    # 终点快照的引用（工单 #1398）：动作结束以后公开树的快照工件。kind 是工件区域里的用途名，
+    # content_hash 是快照内容的摘要，path 是工件区域里的相对路径；与事件 tool_called 上的
+    # after_snapshot_ref 是同一种引用，读回执的一方不用再去事件载荷里找快照
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    kind: str
+    content_hash: str
+    path: str
+    media_type: str | None = None
+
+
+class TreeChange(BaseModel):
+    # 动作前后的公开树摘要（工单 #1398）：两个相同表示这个动作没有改动公开树
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    before_digest: str
+    after_digest: str
+
+
 class ActionReceipt(BaseModel):
     # 动作的回执。completed：动作完成，结果在 output；failed：动作没有完成，原因在 error；
     # timeout、cancelled：进程类动作超时或被取消，进程树已经结束，output 带截至结束时的输出；
     # 取消在动作开始之前到达时不执行，status 为 cancelled，只有 error。
     # refused：工具许可拒绝，动作没有交给执行环境，原因同时写在 refused_reason 与 error；
-    # 旧合同没有这两个字段，读出来是 false 与空
+    # 旧合同没有这两个字段，读出来是 false 与空。
+    # tree_change 与 after_snapshot_ref：动作前后的两个树摘要与终点快照的引用（工单 #1398），
+    # 动作没有执行或执行环境取不到公开树时为空；旧合同没有这两项，读出来也是空
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     action_id: str
@@ -79,6 +101,8 @@ class ActionReceipt(BaseModel):
     error: str | None = None
     refused: bool = False
     refused_reason: str | None = None
+    tree_change: TreeChange | None = None
+    after_snapshot_ref: SnapshotRef | None = None
 
     @property
     def ok(self) -> bool:
@@ -136,6 +160,12 @@ class TreeFacts(BaseModel):
         if effective_contract_hash is not None:
             found = [item for item in found if item.effective_contract_hash == effective_contract_hash]
         return found[-1] if found else None
+
+
+def snapshot_payload(tree: TreeFacts) -> dict[str, Any]:
+    # 公开树快照的内容（工单 #17）：树摘要与每个文件的路径与内容哈希，不含文件内容。动作前后两条事件上的
+    # 快照工件与回执里的终点快照引用是同一份内容（工单 #1398），这里只给出要存的内容，存取由实现做
+    return {"digest": tree.digest, "entries": [list(item) for item in zip(tree.files, tree.hashes)]}
 
 
 class PathFacts(BaseModel):

@@ -107,8 +107,10 @@ _DECLARATIONS = {
 # 放出动作合同时的动作类别（恢复契约第 4 节的表；工单 #1170）：原来的四类加新增的四类
 ACTION_KIND_SNAPSHOT = frozenset({"read", "write", "check", "command", "fetch", "mcp", "trial", "browser"})
 
-# 放出动作合同时回执的字段（工单 #1170）：动作身份、状态、输出、原因，以及工具许可拒绝的两项
-ACTION_RECEIPT_SNAPSHOT = ("action_id", "status", "output", "error", "refused", "refused_reason")
+# 放出动作合同时回执的字段（工单 #1170）：动作身份、状态、输出、原因，以及工具许可拒绝的两项。
+# 动作前后的两个树摘要与终点快照的引用（工单 #1398）加在后面，旧回执没有这两项，读出来是空
+ACTION_RECEIPT_SNAPSHOT = ("action_id", "status", "output", "error", "refused", "refused_reason",
+                          "tree_change", "after_snapshot_ref")
 
 _CLASSES = {"Event": Event, "ProjectEvent": ProjectEvent, "CatalogEvent": CatalogEvent}
 
