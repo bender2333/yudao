@@ -29,8 +29,8 @@
 | 模型 | 执行实现 ↔ Provider | 调用目标、流式输出、用量 | [模型管理](../model-management.md)（含「统一调用、取消与观测」） |
 | 动作 | 执行实现 ↔ 工具 ↔ 执行环境 | 每类动作的契约与回执；远程经 HTTP | [执行环境服务](../execution-environment.md)、[本地通用工具](../local-tools.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器](../browser-and-computer-use.md) |
 | 投影 | 一份事实 → 读的人 | 骨架自己折叠的最小投影（裁决读）、应用层的投影（应用层读取模型读） | [骨架与应用设计说明](../skeleton-and-application.md)、[应用层与接口层设计说明](../app-and-interface.md)、[语义系统设计说明](../semantic-system.md)（知识层） |
-| 接口 | 页面、命令行、评测、观察者、画面 ↔ 接口层 | 命令、查询、事件流、能力清单 | [应用层与接口层](../app-and-interface.md) |
-| 定义 | 定义 ↔ 加载与校验 | 定义文件的结构；角色的写入范围、是否核验角色及核验谁、成果种类与提案合同；路由自己的定义 | [规则登记与参数](../rules-and-parameters.md) |
+| 接口 | 页面、命令行、评测、观察者、画面 ↔ 接口层 | 命令、查询、事件流、能力清单 | [应用层与接口层](../app-and-interface.md)、[项目的组织](../project-organization.md) |
+| 定义 | 定义 ↔ 加载与校验 | 定义文件的结构；角色的写入范围、是否核验角色及核验谁、成果种类与提案合同；路由自己的定义 | [规则登记与参数](../rules-and-parameters.md)、[项目的组织](../project-organization.md) |
 | 评价 | 评价材料 → 应用 | 只经接口层 | [评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md) |
 | 观察者 | 观察者 ↔ 接口（读）与写入口（写） | 按读取范围读，证据、提案与振荡信号经写入口 | 第 7.2、7.5 至 7.7 节；振荡信号见[循环与收敛](../loops-and-convergence.md)「收敛的检测」 |
 | 画面 | 接口 ↔ 画面 | 只经接口读带位置的查询快照与事件流，操作只发现有的命令；不要专用查询，互不导入。画面里面的缝（画面合同：状态、动作、实时内容、回调）见画面总图 | [画面与播放](../visualization.md) |
@@ -40,7 +40,7 @@
 
 **内核内部（不是缝）**：裁决（写入口 ↔ 裁决，路由 → 裁决的收紧检查：工具许可、合同的通用条件、收紧接口），细化在[可信内核](../trusted-kernel.md)与[骨架与应用](../skeleton-and-application.md)「裁决的分工：内核的通用检查与路由的收紧检查」。最小投影（骨架事件 → 裁决、边界、薄驱动：固定的几样事实），细化在[骨架与应用](../skeleton-and-application.md)「最小投影」。
 
-**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、页面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)。画面（系统之外）：[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39。
+**设计说明挂在哪个模块**：看门狗与评价材料：[骨架与应用](../skeleton-and-application.md)「看门狗与健康协议」、[评测场景](../evaluation-scenarios.md)、[测试分层](../test-pyramid.md)、[可信内核](../trusted-kernel.md)。内核：[可信内核](../trusted-kernel.md)、[循环与收敛](../loops-and-convergence.md)、[恢复契约](../recovery-contract-and-fault-matrix.md)。薄驱动与三道缝：[骨架与应用](../skeleton-and-application.md)。形态、核验角色、直做与子组织：[形态与核验角色](../forms-and-verifier-role.md)、[验证的独立性](../independent-verification.md)、[项目的组织](../project-organization.md)。路由实现：[三部门的循环结构](../department-loop.md)、[部门定向指导](../department-guidance.md)、[部门内多角色](../department-roles.md)。装配与知识层：[语义系统](../semantic-system.md)。Provider：[模型管理](../model-management.md)（含「统一调用、取消与观测」）。工具与执行环境：[本地通用工具](../local-tools.md)、[执行环境服务](../execution-environment.md)、[网络取回与 MCP](../network-and-mcp.md)、[浏览器与 computer use](../browser-and-computer-use.md)。应用层、接口层、页面：[应用层与接口层](../app-and-interface.md)、[接入已有项目](../existing-project-onboarding.md)、[项目的起始文件夹](../project-initial-files.md)、[网页界面的提供与发布](../web-interface-and-release.md)。画面（系统之外）：[画面与播放](../visualization.md)。定义：[规则登记与参数](../rules-and-parameters.md)。任务池路由没有设计说明，材料在 D39。
 
 **总图的词与代码名的对照**：[name-map.md](name-map.md)，按缝列出总图的词、代码里现在的名字与一致、不一致、代码里还没有；代码名随立缝工单改成总图的词，立缝工单关闭时由子架构师改那一行。
 

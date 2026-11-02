@@ -18,7 +18,7 @@
 - **合同有类型。** 页面代码从合同生成类型（第 2.2 节）。
 - **有能力清单。** 界面按部署显示页面与覆盖层（第 6.1 节）。
 - **有认证。** 从本机以外访问时，API Key 与项目内容受到保护（第 6.2、6.3 节）。
-- **部门 Prompt 只在项目设置里改。** 事项内没有 Prompt 编辑（[模型管理设计说明](model-management.md)「涉及的模块」）。
+- **部门 Prompt 只在组织页的部门详情里改。** 事项内没有 Prompt 编辑（[模型管理设计说明](model-management.md)「涉及的模块」）。
 - **模型输出逐字送到页面。** 页面（与画面）能逐字显示模型输出（第 5.6 节）。
 
 ## 2. 分层与模块
@@ -152,7 +152,7 @@ flowchart TB
 | 类别 | 命令 | 基准版本指向 | 核对 |
 | --- | --- | --- | --- |
 | 新建 | 新建项目、接入已有项目、重新开始建档、记录原文、新建事项 | 没有已存在的对象，为空 | 不核对 |
-| 修改 | 项目的重命名、置顶、归档与恢复，项目部门设置，源目录登记，MCP 服务器设置，机器登记与项目的机器授权，项目的执行位置，同一项目的排队顺序，角色设置，执行槽位数，模型目录与部门默认，凭据，语义记录的纠正 | 被修改对象的版本：项目基本信息版本、该部门设置的版本、该项目源目录登记的版本、该项目网络与 MCP 设置的版本、该机器登记的版本、该项目机器授权的版本、该项目执行位置的版本、该项目排队顺序的版本、目录修订号、凭据版本、该条记录的版本 | 必须等于当前版本，否则拒绝，返回当前版本 |
+| 修改 | 项目的重命名、置顶、归档与恢复，项目部门设置，项目的组织，源目录登记，MCP 服务器设置，机器登记与项目的机器授权，项目的执行位置，同一项目的排队顺序，角色设置，执行槽位数，模型目录与部门默认，凭据，语义记录的纠正 | 被修改对象的版本：项目基本信息版本、该部门设置的版本、该项目组织的版本、该项目源目录登记的版本、该项目网络与 MCP 设置的版本、该机器登记的版本、该项目机器授权的版本、该项目执行位置的版本、该项目排队顺序的版本、目录修订号、凭据版本、该条记录的版本 | 必须等于当前版本，否则拒绝，返回当前版本 |
 | 追加与控制 | 追加需求、部门指导、取消事项、取消排队、开始排空、强制升级、目录的重新读取、连接服务、选用模型、获取模型列表、连接测试与模型测试 | 用户提交时看到的对象版本：事项的输入版本、该部门的指导版本、事项版本、排空状态的版本、目录修订号 | 写入事件作为依据，不要求相等；对象的状态不允许时拒绝 |
 | 回答 | 回答决定请求 | 决定请求的版本 | 请求仍未回答且版本相等 |
 
@@ -198,7 +198,7 @@ sequenceDiagram
 
 接受表示事件已经追加。页面在事件流到达位置 P 之前显示「已提交」，到达以后按事件显示最终状态。
 
-拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；有了排队以后由排队代替）、`provider_unavailable`（新建事项时，事项所用定义里的某个部门或角色无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据不算）、公开树中有无法表示的条目，附工作区内的相对路径与处理方法）、`out_of_bounds`（`parameter.set` 的取值超出规则登记的界限，附界限）、`not_wired`（`parameter.set` 修改没有接入行为的条目，附登记里的未接入原因）、`candidate_invalid`（`definition.propose` 的候选没有通过结构校验，附字段位置）。
+拒绝原因是一份封闭清单，每个命令在合同中声明自己可能返回的原因：`stale_base`（基准版本过期）、`not_found`、`already_exists`、`project_archived`、`work_item_in_progress`、`run_terminal`、`busy`（没有空闲的执行槽位；有了排队以后由排队代替）、`provider_unavailable`（新建事项时，事项所用定义里的某个部门或角色无法解析调用目标）、`catalog_invalid`（目录校验失败，附字段位置）、`in_use`（仍被引用，附引用方）、`decision_closed`（决定请求已回答或已撤销）、`option_invalid`、`not_allowed`（对象状态不允许，附说明）、`command_id_reused`、`source_invalid`（接入已有项目时源目录不存在或不可读、含有宿主私有路径（仓库自身的 Git 元数据不算）、公开树中有无法表示的条目，附工作区内的相对路径与处理方法）、`out_of_bounds`（`parameter.set` 的取值超出规则登记的界限，附界限）、`not_wired`（`parameter.set` 修改没有接入行为的条目，附登记里的未接入原因）、`candidate_invalid`（`definition.propose` 的候选没有通过结构校验，附字段位置）、`organization_invalid`（组织的合成结果没有通过结构校验，附拒绝项；`organization.adopt` 与带组织的新建命令使用）。
 
 ### 3.2 命令清单
 
@@ -208,13 +208,13 @@ sequenceDiagram
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 |
 | --- | --- | --- | --- | --- |
-| `project.create` | 新建项目；可以带起始文件夹，起始文件夹的快照是第一次采纳之前每个事项的起点（[项目的起始文件夹设计说明](project-initial-files.md)） | 名称、长期目标、起始文件夹（可选，控制主机上的路径） | `project_registered`（带起始文件夹时增加 `initial_snapshot`） | 空 |
+| `project.create` | 新建项目；可以带起始文件夹，起始文件夹的快照是第一次采纳之前每个事项的起点（[项目的起始文件夹设计说明](project-initial-files.md)）；可以选组织，缺省为默认的三部门（[项目的组织设计说明](project-organization.md)「新建的入口」） | 名称、长期目标、起始文件夹（可选，控制主机上的路径）、组织（可选：发布带的形态名，或另一个项目，表示和那个项目一样） | `project_registered`（带起始文件夹时增加 `initial_snapshot`；组织不是默认的三部门时增加 `organization_adopted`，和某项目一样时再增加复制来的项目部门设置与项目角色设置的事件） | 空 |
 | `project.rename` | 重命名 | 项目、名称 | `project_renamed` | 项目基本信息版本 |
 | `project.set_goal` | 修改长期目标；之后开始的事项使用新目标，进行中的事项使用 `run_created` 记下的开始时的目标 | 项目、长期目标 | `project_goal_changed` | 项目基本信息版本 |
 | `project.pin` | 置顶或取消置顶 | 项目、是否置顶 | `project_pinned` | 项目基本信息版本 |
 | `project.archive` | 归档 | 项目 | `project_archived` | 项目基本信息版本 |
 | `project.restore` | 恢复项目 | 项目 | `project_restored` | 项目基本信息版本 |
-| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项（[接入已有项目设计说明](existing-project-onboarding.md)「命令」） | 名称、长期目标、源目录名称、源目录路径（控制主机上的路径） | `project_registered`（`source` 为 `existing`）、源目录登记事件、`work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 |
+| `project.onboard` | 接入已有项目：新建项目，登记源目录，只读采集代码快照，开始建档事项（[接入已有项目设计说明](existing-project-onboarding.md)「命令」）；可以选组织，缺省为默认的三部门（[项目的组织设计说明](project-organization.md)「新建的入口」） | 名称、长期目标、源目录名称、源目录路径（控制主机上的路径）、组织（可选，同 `project.create`） | `project_registered`（`source` 为 `existing`）、组织不是默认的三部门时的 `organization_adopted`、源目录登记事件、`work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 |
 | `onboarding.restart` | 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项；只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用 | 项目、源目录（登记名） | `work_item_created`（`kind` 为 `onboarding`）、`run_created`、`user_input_received` | 空 |
 
 已有项目的代码经 `project.onboard` 接入并建档；建档以后源目录的修改不进入项目，要在源目录的新代码上工作时接入为新项目（[接入已有项目设计说明](existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」与「用户确认的决定」）。取消建档使用 `work_item.cancel`。
@@ -224,7 +224,7 @@ sequenceDiagram
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 |
 | --- | --- | --- | --- | --- |
 | `material.record` | 记录原文 | 项目、原文、部门（可选） | `material_recorded` | 空 |
-| `work_item.create` | 新建事项并开始执行，从项目的采纳成果开始 | 项目、事项原文、标题（可选） | `work_item_created`、`run_created`、`user_input_received` | 空 |
+| `work_item.create` | 新建事项并开始执行，从项目的采纳成果开始；组织缺省为本项目的组织，也可以临时选发布带的一份形态，只影响这个事项；合成结果过不了结构校验时以 `organization_invalid` 拒绝（[项目的组织设计说明](project-organization.md)「新建的入口」「冻结与升级」） | 项目、事项原文、标题（可选）、组织（可选：发布带的形态名） | `work_item_created`（记录事项冻结的组织：形态名、版本与合成结果）、`run_created`、`user_input_received` | 空 |
 | `work_item.append_input` | 追加需求 | 事项、原文 | `user_input_received` | 事项的输入版本（记录依据） |
 | `work_item.cancel` | 取消事项 | 事项 | `run_failed`（停止原因 `cancelled`） | 事项版本（记录依据） |
 | `trial.stop_desktop` | 结束控制主机上进行中的桌面会话（界面上的「停止使用桌面」，[浏览器与 computer use 设计说明](browser-and-computer-use.md)「屏幕与桌面会话」） | 无 | `trial_session_ended`（结束方式「用户停止」） | 无 |
@@ -233,16 +233,17 @@ sequenceDiagram
 
 `work_item.cancel` 由流程编排写入取消事实并取消该事项的任务；任务在取消以后交回的结果按执行权拒收（恢复契约第 45 行、第 80 行）。
 
-**项目设置（部门设置弹窗、设置页）**
+**项目设置（组织页、设置页）**
 
 | 命令 | 作用 | 参数 | 领域事件 | 基准版本 |
 | --- | --- | --- | --- | --- |
 | `department_settings.save` | 保存项目部门设置；所选模型不具备部门的建议能力时照常保存，结果带提醒（D24） | 项目、部门、部门 Prompt、模型（模型访问定义引用或跟随部门默认）、推理档位（或跟随） | `department_prompt_configured`；模型与档位的事件由 D24 确定 | 该部门设置的版本 |
+| `organization.adopt` | 采用本项目的组织：一份形态加本项目的改动；经结构校验与确认就生效，范围只有这个项目，不经对照；对之后新建的事项生效，进行中的事项不受影响。版本对不上以 `stale_base` 拒绝，有拒绝项以 `organization_invalid` 拒绝并附拒绝项，理由为空时按请求体不符合合同拒绝；系统提出的候选通过对照以后走同一条命令（[项目的组织设计说明](project-organization.md)「采用与历史」） | 项目、形态名、本项目的改动、理由、用户看到的组织版本 | `organization_adopted`（项目流，带形态名、改动、理由、新版本） | 该项目组织的版本 |
 | `source_directory.save` | 登记与修改本项目的源目录；`project.onboard` 填写的路径是项目的第一条登记，`onboarding.restart` 从登记的源目录重新采集快照 | 项目、名称、路径、是否开启采纳写回、远端名称或地址、目标分支、写回检查的命令清单（命令字符串）、凭据名称引用（只按名称引用，不含凭据内容） | `source_directory_configured` | 该项目源目录登记的版本 |
 | `mcp_servers.save` | 保存 MCP 服务器（怎样启动或连接、哪些部门可以使用、工具清单快照）在本项目的整份设置（[网络取回与 MCP 工具设计说明](network-and-mcp.md)「版本与固定」） | 项目、整份设置文档 | `mcp_servers_configured`（项目流，内容是这个版本的整份文档） | MCP 设置版本 |
 | `tool_server.probe` | 读取一个 MCP 服务器的工具清单（临时启动或连接，读取后关闭）；接受以后作为任务进行，结果以事件出现（[网络取回与 MCP 工具设计说明](network-and-mcp.md)「读取工具清单（探测）」） | 项目、服务器的设置内容（保存前也可以探测） | `tool_server_probe_finished`（项目流，带工具清单快照或失败原因） | 空 |
 | `machine_authorization.save` | 保存本项目可以使用的机器与授权 | 项目；每台机器的登记目录；有了运维部门以后，另有是否作为本项目的运行环境与常设授权 | `machine_authorization_configured`（项目流）；运行环境与常设授权的事件由运维部门的设计确定 | 该项目机器授权的版本 |
-| `execution_placement.save` | 保存本项目的执行位置：运行工作区的位置，产品、工程、质检各自检查的位置（缺省与运行工作区相同）；位置取值为本机进程或一台授权的机器（[执行环境服务设计说明](execution-environment.md)「执行位置」） | 项目、运行工作区的位置、各部门检查的位置 | `execution_placement_configured`（项目流） | 该项目执行位置的版本 |
+| `execution_placement.save` | 保存本项目的执行位置：运行工作区的位置，各部门检查的位置（部门取自项目的组织，缺省与运行工作区相同）；位置取值为本机进程或一台授权的机器（[执行环境服务设计说明](execution-environment.md)「执行位置」） | 项目、运行工作区的位置、各部门检查的位置 | `execution_placement_configured`（项目流） | 该项目执行位置的版本 |
 | `role_settings.save` | 保存本项目的角色设置；所选模型不具备部门的建议能力时照常保存，结果带提醒（[多角色设计](department-roles.md)「模型与 Prompt 设置」） | 项目、部门、角色、模型、档位、角色 Prompt | 由 D26 确定 | 该角色设置的版本 |
 | `writeback.execute` | 对一次采纳重新发起采纳写回：三方合并、最终树核验、推送分支与创建合并请求；采纳以后源目录开启了写回时由系统自动发起；写回目标不可用时以 `not_allowed` 拒绝并给出中文说明（[ADR-0034](../adr/0034-adopted-change-writeback-three-tree-merge.md)） | 项目、采纳身份（空为当前采纳） | `writeback_completed`、`writeback_stopped`、`writeback_not_needed`、`writeback_held`、`writeback_verified` | 空 |
 
@@ -526,6 +527,8 @@ sequenceDiagram
 | 查询 | 返回内容 | 位置 |
 | --- | --- | --- |
 | `project.settings` | 基本信息与版本、各部门的项目部门设置与版本（Prompt；模型与档位为 D24）、部门建议能力的提醒（D24，按[模型管理设计说明](model-management.md)「解析规则」解析出的本项目各部门及各角色的生效模型判断，包括跟随部门默认或角色默认）、登记的源目录与版本、MCP 服务器设置（整份设置与版本、最近一次探测的结果）、机器授权与版本（登记目录、是否作为运行环境与常设授权）、执行位置与版本、观察窗口与修复失败次数上限、角色设置 | |
+| `organization.check` | 校验一份草稿，不写入：输入项目、形态名、本项目的改动；返回合成结果（每项带来源）、拒绝项（写明是哪一项）、提醒、「这样改以后事项怎么结束」（[项目的组织设计说明](project-organization.md)「草稿与校验」「拒绝与提醒」） | |
+| `project.organization` | 本项目的组织：形态名、合成结果与每项的来源（跟随发布、本项目改过、本项目加的）、版本、历史、发布带的形态清单、和上一个事项用的组织的不同、待采用的候选、观察者的开关与读取范围；带事项时返回这个事项冻结的组织，以及它和项目现在的组织的不同 | |
 | `project.writeback` | 本项目的写回记录：状态（写回完成、写回已核实、写回停止、写回等待、无需写回）、停止原因、推送的分支、目标分支、合并请求（标题与「还只是本地记录」这个事实）、冲突的文件路径、发生的时间；最近的写回在前 | |
 
 **系统页**
@@ -800,5 +803,5 @@ sequenceDiagram
 7. **界面与 Yudao 服务的启动。** 界面是 Yudao 服务提供的网页，浏览器打开服务的地址就是界面，局域网中的其他电脑打开同一个地址。用户手动启动 Yudao 服务（`yudao api`），服务就绪以后用默认浏览器打开页面地址；停止服务就是结束这个进程（[网页界面的提供与发布设计说明](web-interface-and-release.md)「启动与停止」与「页面」）。
 8. **执行槽位数。** 执行槽位数是规则登记中的参数（`execution.slots`，暂定默认值 3），由 `parameter.set` 修改并写成事件；它取决于运行机器的能力。
 9. **取消排队的结果。** 由排队的设计确定。
-10. **模型管理的界面。** 模型管理页、部门设置弹窗与部门工作间的模型显示依赖 D24 模型管理的后端。
+10. **模型管理的界面。** 模型管理页、组织页的部门详情与部门工作间的模型显示依赖 D24 模型管理的后端。
 11. **长期目标的修改。** 长期目标可以修改，经 `project.set_goal` 写成项目流中的事件。创建 run 时在 `run_created` 中记下当时的长期目标，部门请求中的项目上下文使用这个值：之后开始的事项使用新目标，进行中的事项按开始时的目标做完。
