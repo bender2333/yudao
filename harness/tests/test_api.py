@@ -284,11 +284,11 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert capabilities["queries"][-3] == {
         "name": "rules.registry", "changed_by": ["parameter_set"], "replayable": True,
     }
-    # 工具登记（工单 #1177）：MCP 服务器与取回动作的取回记录；取回记录待 #68 合并后填充
+    # 工具登记（工单 #1177）：MCP 服务器的设置与最近一次探测、取回动作的取回记录
     assert capabilities["queries"][-2] == {
         "name": "tools.registry",
         "changed_by": ["project_registered", "project_renamed", "mcp_servers_configured",
-                       "tool_started", "tool_called"],
+                       "tool_server_probe_finished", "tool_started", "tool_called"],
         "replayable": False,
     }
     # 收敛状态（工单 #397）：按运行实例标识返回五层循环树，按位置回放
