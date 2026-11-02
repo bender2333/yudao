@@ -19,8 +19,6 @@ test("动作图鉴列出全部公开画法，一项不少：与原型成员表�
   assert.deepEqual(gaps.extra, [], `图鉴多出：${gaps.extra.join("、")}`);
   assert.equal(GALLERY_MEMBERS.length, PUBLIC_MEMBERS.all.length);
   assert.equal(GALLERY_MEMBERS.length, 62);
-  // 登记表来自原型 v13
-  assert.equal(registry.generatedFrom, "docs/prototypes/v13/js/{y13.js,pixel/sprites.js,pixel/engine.js}");
 });
 
 test("动作图鉴的每一项都有说明与可渲染的取样（点阵、数据或数值）", () => {

@@ -499,8 +499,8 @@ test.describe("房间信息条（工单 #1229）", () => {
     await backend.stop();
   });
 
-  // 原型 v13（`ui.kv(items, 'is-inline y13-ws-facts')`，见 `docs/prototypes/v13/js/ui/views/department.js`
-  // 第 138 至 146 行与 `styles/base.css` 第 331 至 338 行）：每一对标签在上、取值在下，对与对之间留空。
+  // 原型 v13 的部门页（已归档）：`ui.kv(items, 'is-inline y13-ws-facts')`，每一对标签在上、取值在下，
+  // 对与对之间留空。
   test("每一对标签与取值成一格：标签在上、取值在下，格与格之间留空", async () => {
     test.setTimeout(600_000);
     const page = client.page;
