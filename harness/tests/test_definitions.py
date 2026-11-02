@@ -10,7 +10,9 @@ import pytest
 from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, UnknownStopReason, load_definitions
+from harness.definitions import (DEFINITIONS, DEFINITIONS_DIR, LEGACY_VERIFICATION, DefinitionError, UnknownStopReason,
+                                 WriteScope, load_definitions)
+from harness.path_rules import QA_TESTS_DIR
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
 from harness.providers.presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, get_preset, list_presets
@@ -142,6 +144,94 @@ def test_department_without_label_fails_naming_the_department(tmp_path):
     [issue] = raised.value.issues
     assert issue == ("organization.json", "departments[1].label", "部门 engineering 缺少中文名")
     assert DEFINITIONS.department_labels == {"product": "产品", "engineering": "工程", "quality": "质检"}
+
+
+def test_a_definition_without_the_verification_declaration_reads_the_three_departments(tmp_path):
+    # 验收第 4 条（工单 #1388）：字段只增，不写新字段的旧定义文件照旧加载，
+    # 读出的核验关系与写入范围等于默认三部门
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    del organization["verification"]
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    assert loaded.version != DEFINITIONS.version
+    assert loaded.verification == LEGACY_VERIFICATION == DEFINITIONS.verification
+    assert loaded.verifier_roles() == ("quality",)
+    assert loaded.rejection_edges() == (("quality", "engineering", "delivery_spec"),)
+    assert loaded.write_scope("quality") == WriteScope(scope="check_materials", paths=(QA_TESTS_DIR,))
+    assert loaded.write_scope("engineering") == WriteScope(scope="workspace")
+    # 普通事项最后采纳的成果是交付，质检核验工程的交付，所以不是开环
+    assert not loaded.is_open_loop("delivery_spec")
+
+
+def test_a_definition_without_a_verifier_loads_and_marks_the_delivery_open_loop(tmp_path):
+    # 验收第 2 条：去掉核验角色的测试定义加载成功，开环判断为是
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["verification"] = {"verifiers": [], "write_scopes": {}}
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    assert loaded.verifier_roles() == ()
+    assert loaded.write_scope("engineering") == WriteScope(scope="workspace")
+    assert loaded.is_open_loop("delivery_spec")
+
+
+def test_a_verifier_of_a_midway_outcome_loads_and_marks_the_delivery_open_loop(tmp_path):
+    # 验收第 2 条：核验角色只核验中途成果时，交付没有人核验，开环判断为是
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["verification"]["verifiers"][0]["verifies"][0]["outcomes"] = ["product_spec"]
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    assert loaded.verifiers_of("engineering", "product_spec") == ("quality",)
+    assert not loaded.is_open_loop("product_spec")
+    assert loaded.is_open_loop("delivery_spec")
+
+
+def _a_role_that_verifies_itself(organization) -> None:
+    # 质检核验自己：长度为一的环
+    organization["verification"]["verifiers"][0]["verifies"] = [{"role": "quality", "outcomes": ["qa_review"]}]
+
+
+def _two_roles_that_verify_each_other(organization) -> None:
+    # 质检核验工程、工程核验质检：两个角色互相核验
+    organization["verification"]["verifiers"].append(
+        {"role": "engineering", "verifies": [{"role": "quality", "outcomes": ["qa_review"]}]})
+
+
+@pytest.mark.parametrize(("change", "expected"), [
+    # 核验对象不存在：被核验的角色与成果种类各一条
+    (lambda organization: organization["verification"]["verifiers"][0]["verifies"][0].update(
+        {"role": "reviewer"}),
+     ("organization.json", "verification.verifiers[0].verifies[0].role",
+      "被核验的角色 reviewer 不属于任何部门")),
+    (lambda organization: organization["verification"]["verifiers"][0]["verifies"][0].update(
+        {"outcomes": ["test_report"]}),
+     ("organization.json", "verification.verifiers[0].verifies[0].outcomes[0]",
+      "成果种类 test_report 没有定义")),
+    # 谁能拒绝谁有环：角色核验自己、两个角色互相核验
+    (_a_role_that_verifies_itself,
+     ("organization.json", "verification.verifiers[0].verifies[0].role",
+      "谁能拒绝谁有环：quality → quality，角色核验自己")),
+    (_two_roles_that_verify_each_other,
+     ("organization.json", "verification.verifiers[1].verifies[0].role",
+      "谁能拒绝谁有环：quality → engineering → quality")),
+    # 写入范围写了一个不在定义里的角色
+    (lambda organization: organization["verification"]["write_scopes"].update(
+        {"reviewer": {"scope": "workspace"}}),
+     ("organization.json", "verification.write_scopes.reviewer", "角色 reviewer 不属于任何部门")),
+])
+def test_a_verification_declaration_that_does_not_hold_is_rejected_naming_the_file_and_the_item(
+        tmp_path, change, expected):
+    # 验收第 3 条：三种不合法的定义各被拒绝，整份拒绝，错误写明文件与项
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    change(organization)
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (expected,)
+    assert f"organization.json {expected[1]}：" in str(raised.value)
 
 
 def test_tool_categories_and_references_are_checked(tmp_path):
