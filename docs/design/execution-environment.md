@@ -348,7 +348,7 @@ sequenceDiagram
 | --- | --- | --- | --- | --- |
 | 机器登记 | 系统 | 名称、地址（主机名或 IP 加端口）、用途、认证（TODO，第 7 节） | `machine.save` | `machine_registered`、`machine_updated`，写在这台机器的机器流中；机器流跨 Yudao 版本保存（ADR-0019） |
 | 项目的机器授权 | 项目流 | 每台机器：登记的目录；有了运维部门以后另有是否作为运行环境与常设授权 | `machine_authorization.save` | `machine_authorization_configured` |
-| 项目的执行位置 | 项目流 | 运行工作区的位置；定义里每个部门（默认三部门）各自检查的位置（缺省与运行工作区相同） | `execution_placement.save`（新增） | `execution_placement_configured` |
+| 项目的执行位置 | 项目流 | 运行工作区的位置；组织里每个部门（默认三部门）各自检查的位置，部门清单取自项目的组织（缺省与运行工作区相同） | `execution_placement.save`（新增） | `execution_placement_configured` |
 
 三层合起来就是总图（第二节「定义」、第六节「部署是定义」）说的「登记的机器」与「谁放在哪台机器」。它们的存法与参数相同：不是定义文件，当前值写成事件（机器流、项目流），每次修改都有流版本；创建 run 时冻结（第 6.2 节），所以进行中的事项不受修改影响，换部署不改代码，再保存一次旧值就撤回。机器的地址是连接信息，不是语义，每次派发时读当前值，不冻结。
 
