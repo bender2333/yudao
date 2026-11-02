@@ -1003,3 +1003,5 @@ Claude（Duet 助手） / 2026-11-02 13:58 / 新增 `research/doc-consistency-co
 claude-opus-5-5 / 2026-11-02 15:17 / `research/doc-consistency-concept-model.md` 改写：判断走样靠 clingo 规则，LLM 只把文字翻译成文档说法（词汇封闭、带原文、结果固定、脚本优先），不加隐藏标记与语义链接，工具放 `tools/doc-consistency/`，补两个引擎的试验数字与 LLM 提取的验收；`research/README.md` 改一行；`decision.md` 加一条 / 用户要走符号推理、做成单独的工具，从文字到语义用 LLM
 
 claude-opus-5-5 / 2026-11-02 15:56 / `agents/autopilot-runtime.md` 第 4 节真实模型测试与评测的模型改为 `ag/gemini-3.8-flash-medium`；`requirements/comparison-experiment.md` 三条按日期的模型记录合成一条现在的说法；`decision.md` 加一条 / 用户不再使用 `qhub/Qwen3.8-Flash`，评测场景设计说明本来就写着不用它，这两处没跟上
+
+claude-opus-5-5 / 2026-11-02 15:57 / `agents/autopilot-runtime.md` 第 4 节、`design/evaluation-scenarios.md`「模型」一行、`requirements/comparison-experiment.md` 的被测模型改为 `ag/gemini-3.8-flash-high`；`decision.md` 加一条 / 用户要求评测用这个模型

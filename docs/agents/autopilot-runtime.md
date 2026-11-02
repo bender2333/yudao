@@ -108,7 +108,7 @@ doctor（Hermes）在这台 Windows 电脑上运行 solo 执行者与集成层�
 | 架构师循环与它的子代理 | `claude-opus-5-5`，effort `xhigh` | 这一层做设计判断，判断错了比多用的量贵；它与 solo 执行者用不同的模型，判断才独立 |
 | 试用的两个模型 | model1 `wb/cn:deepseek-v4.1-flash` 给产品与工程；model2 `ag/gemini-3.8-flash-high` 给质检、找问题与看图 | 分工见 [`/trial`](../../.claude/skills/trial/SKILL.md)第 1 节的表；地址与凭据取下面的 `YUDAO_EVAL_*` |
 | 备用链 | `9router/ds`| 写在机器上 omp 全局配置的 `retry.fallbackChains` 中 |
-| 真实模型测试与评测 | `ag/gemini-3.8-flash-medium`（9router，Chat Completions，带视觉） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)「丰富程度（场景 1）」 |
+| 真实模型测试与评测 | `ag/gemini-3.8-flash-high`（9router，Chat Completions，带视觉） | 见下面；评测的界面智能体与裁判见[评测场景设计](../design/evaluation-scenarios.md)「丰富程度（场景 1）」 |
 
 用 omp 运行时，`task` 子代理请求会让工人停滞，任务评论里写明不使用子代理。
 
