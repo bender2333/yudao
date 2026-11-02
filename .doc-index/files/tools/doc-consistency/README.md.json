@@ -18,6 +18,7 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"tools/doc-consistency/README.md#文档一致性工具"},
 {"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md"],"seen":"967e788bf3b3f131","src":"tools/doc-consistency/README.md#文档一致性工具"},
 {"dst":"tools/doc-consistency/doc_consistency/assets/cytoscape.min.js","kind":"code-path","raws":["doc_consistency/assets/cytoscape.min.js"],"seen":"081591ab735b2b6a","src":"tools/doc-consistency/README.md#文档一致性工具 > 依赖"},
+{"dst":".doc-index/confirmed.jsonl","kind":"code-path","raws":[".doc-index/confirmed.jsonl"],"seen":"d1da54d775a534eb","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":".doc-index/labels.json","kind":"code-path","raws":[".doc-index/labels.json"],"seen":"749cfd790c3b1989","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"tools/doc-consistency/data/record-docs.json","kind":"code-path","raws":["data/record-docs.json"],"seen":"eaf7cfe5858ba800","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
