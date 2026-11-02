@@ -33,6 +33,11 @@
     else o = { kind: val === 'three' ? 'default' : 'form', form: val, changes: {} };
     o.layers = [];
     if ($(prefix + '-obs').checked) { o.changes.observers = Object.assign({}, o.changes.observers, { lessons: { on: true }, oscillation: { on: true } }); o.layers.push('观察者'); }
+    // 外包角色本来就由别人做，不再分形
+    const eng = O.compose({ form: o.form, changes: o.changes }).depts.find((d) => d.id === 'engineering');
+    o.subBlocked = !!(eng && eng.who && eng.who.type === 'outsourced');
+    $(prefix + '-sub').disabled = o.subBlocked;
+    if (o.subBlocked) $(prefix + '-sub').checked = false;
     if ($(prefix + '-sub').checked) { o.changes.depts = Object.assign({}, o.changes.depts); o.changes.depts.engineering = Object.assign({}, o.changes.depts.engineering, { who: { type: 'suborg', form: 'hub', changes: {} } }); o.layers.push('工程内部用子组织'); }
     return o;
   }
@@ -43,6 +48,7 @@
     const a = O.answers(c), f = O.form(o.form);
     $(prefix + '-sum').innerHTML = '选用：<b>' + esc(c.formName) + '</b>' + (O.count(o.changes) ? '，带 ' + O.count(o.changes) + ' 处改动' : '') + (o.layers.length ? '，加上「' + esc(o.layers.join('」「')) + '」' : '') + ' · ' + esc(O.ROTATIONS[c.rotation]) + '。<br>' +
       '事项的来源：' + esc(a.from) + '；谁做：' + esc(a.who) + '；谁核验：' + esc(a.verify) + '；怎么结束：' + esc(a.end) + '。' + (f && f.tip && o.kind !== 'same' ? '<br>' + esc(f.tip) + '。' : '');
+    if (o.subBlocked) $(prefix + '-sum').innerHTML += '<br>工程是外包角色，本来就由别人做，没有子组织层。';
   }
   A('np.pick', (el) => { const prefix = el.closest('[data-np]').dataset.np; refreshPick(prefix); });
 

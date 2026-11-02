@@ -436,7 +436,10 @@ class LoopSystem:
         self.facade.start_watching(interval_sec)
 
     def close(self) -> None:
-        # 服务关闭停止轮询并释放存储
+        # 服务关闭停止轮询并释放存储；还在的 MCP 会话一并关闭（网络与 MCP 设计说明第 7.2 节，
+        # 工单 #1175）：正常路径下每个 run 的会话随运行收尾关闭，这里收掉剩余的（例如等待用户回答时关闭服务）
+        for run_id in list(self.orchestrator.mcp_sessions_open()):
+            self.orchestrator.close_mcp_sessions_sync(run_id)
         self.facade.stop_watching()
         self.store.close()
 

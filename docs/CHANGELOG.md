@@ -382,5 +382,9 @@ claude-fable-5-1（总架构师） / 2026-11-02 23:55 / 路线图收成四个阶
 claude-sonnet-5-5 / 2026-11-03 00:40 / `design/architecture/overall-architecture.md` 两处链接文字「五个阶段」改为「四个阶段」；`design/` 下其余旧阶段四、阶段五的说法已不存在 / 路线图收成四个阶段，原阶段四的内容归道
 
 claude-opus-5-5（画面线子架构师；原型由 claude-sonnet-5-5 子代理画） / 2026-11-03 00:50 / 新增 `docs/prototypes/v17/`：取自 v16，按五份形态两个层的目录重画组织页头部、「换一份」、新建项目的组织选择，加「几个角色直做」与事项的来源的真实逻辑，七个示例项目对应七份用户脚本，`walkthrough.md` 就是这些脚本。`docs/prototypes/CHANGELOG.md` 开头一段与 v17 一节。 / 依据 `docs/design/project-organization.md` 第 5 节；重跑自检 220 条全部通过。
+claude-fable-5-1（总架构师） / 2026-11-03 00:45 / `architecture.html` 第二节「定义」方框的事项的来源加「子事项是上一层交来的任务」；`CONTEXT.md`「事项的来源」同句 / 子架构师画 v17 时指出子组织的来源是第三个值，总图只列了两个
+
+claude-opus-5-5（子架构师） / 2026-11-03 01:10 / `docs/design/project-organization.md` 第 2 节、脚本六与 4.12 改准两个层叠在什么上：观察者层叠在任何一份形态上，子组织层叠在任何自有角色上，一个外包角色直做没有子组织层。`docs/prototypes/v17/`：目录标题、子组织卡、走查脚本一与脚本六同步，新建项目里工程是外包角色时子组织一项灰着；`docs/prototypes/CHANGELOG.md` 的 v17 一节同步，去掉两条已答复的不清楚之处。 / 总架构师的判断：外包角色是执行的另一种实现，不再分形。
+claude-fable-5-1（总架构师） / 2026-11-03 01:40 / `decision.md` 加一条：组织设定模板一键选用、页面跟着级别伸缩 / v17 试用结论，用户说页面复杂、点击与输入太多
 
 claude-sonnet-5-5 / 2026-11-03 00:30 / 全量文档扫描后改文档：`CONTEXT.md`、`README.md`、`client/README.md`、`evals/README.md`、`evals/context/README.md`、`docs/current-baseline.md`、`.claude/skills/` 下 9 份技能、`docs/design/` 下 28 份、`docs/requirements/` 下 29 份、`docs/C4/` 下 6 份、`docs/trial/` 下 3 份、`docs/adr/` 下 3 份开头一行与路线位置、`docs/research/README.md`；旧阶段编号与已取消的阶段四、阶段五说法改成阶段名或道名，「界面」按页面与画面分开，「激活」「交接」「编排器」等 Avoid 词改成一轮工作、成果、流程编排，失效引用与节号改到现在的小节，状态文档里的日期、提交号、代码路径、用户原话、工单号删去；没有改小节标题；`docs/architecture.html`、`docs/architecture-view.html`、`docs/program-roadmap.md`、`docs/foundation-rules.md`、`CLAUDE.md`、`AGENTS.md`、`docs/agents/` 里查出的问题写进 `docs/consistency-scan-2026-11-03.md` 第 4 节交总架构师；`tools/doc-consistency` 的待核对 47 条：14 条因下游已改解决，33 条核对后不用改并记确认，改动带出的 111 条待核对在复核后一并记确认；重建 `.doc-index` / 阶段改名与总图、路线图、术语表的一次改完后，各份文档里仍有没跟上的地方
