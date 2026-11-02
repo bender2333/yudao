@@ -50,10 +50,15 @@ def digest(text):
 
 
 def git_tracked(root):
-    out = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=root, capture_output=True, check=True
-    ).stdout.decode("utf-8")
-    return sorted(p for p in out.split("\0") if p)
+    """文件清单的唯一来源：git 跟踪、并且磁盘上还在的文件。
+    已跟踪但在工作区删掉的文件一律当作不存在（引用它的路径是死引用，索引里它的文档按删除处理）；
+    新增但没 git add 的文件不在清单里。后面所有读文件的地方都只看这份清单。"""
+
+    def ls(*flags):
+        out = subprocess.run(["git", "ls-files", "-z", *flags], cwd=root, capture_output=True, check=True)
+        return {p for p in out.stdout.decode("utf-8").split("\0") if p}
+
+    return sorted(ls() - ls("--deleted"))
 
 
 def in_scope(path):
@@ -551,6 +556,6 @@ def scan_repo(root):
     tracked = git_tracked(root)
     files = {}
     for p in tracked:
-        if in_scope(p) and (root / p).is_file():
+        if in_scope(p):
             files[p] = parse_file(p, read_text(root / p), is_scaffold(p))
     return Model(root, tracked, files)
