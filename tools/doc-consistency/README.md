@@ -17,6 +17,7 @@ uv run --project tools/doc-consistency doc-consistency <命令>
 | `build` | 重建 `.doc-index/`。文件没变时索引文件字节不变；第一次运行把现状记成「待核对」的基线 |
 | `status` | 工作区和索引比，列出新增、改动、删除的节点 |
 | `who <文件或小节>` | 谁引用了它，给出位置与行号。小节写成 `路径#标题 > 子标题`，同名小节后面带 `(2)` |
+| `nodes <关键词>` | 按关键词列出节点名；`who`、`impact`、`confirm` 要写完整的节点名，写错时报错也会列出相近的候选 |
 | `view` | 生成离线图谱 `.tmp/doc-index/graph.html`：拖动、按目录上色、点一份文档高亮它引用的（绿）和引用它的（橙）、双击展开小节、「展开总图」显示 6 个节和 13 道缝 |
 | `refresh` | 用 `gh label list` 保存标签快照到 `.doc-index/labels.json`；只有这一条命令要联网，其余都离线 |
 | `check` | 汇总提醒：死引用（技能、标签、文件路径）与待核对。永远以 0 退出；规则或程序自己出错（缺标签快照、规则无解、角色表对不上）才报错退出 |
@@ -27,7 +28,7 @@ uv run --project tools/doc-consistency doc-consistency <命令>
 
 ## 范围与索引
 
-- 范围：git 跟踪的 `.md`、`.html`，排除 `docs/archive/`、`agents_jour/`、`.claude/worktrees/`、`docs/prototypes/` 下的 HTML。
+- 范围：git 跟踪的 `.md`、`.html`，排除 `docs/archive/`、`agents_jour/`、`.claude/worktrees/`、`docs/prototypes/` 与 `evals/scenarios/` 下的 HTML（代码）、图谱页面模板 `assets/graph.html`。
 - 节点：文件，和小节（Markdown 标题、总图的节与缝）；脚手架文件里的表格每一行也是一个节点（身份是「表 + 首列」）。hash 在行尾统一以后算，只代表内容版本。
 - 边：Markdown 链接、HTML href、反引号路径、`` `路径`「小节」 ``、设计说明的「总图位置」行（落到总图的节和缝）。
 - 一份源文件一个索引文件：`.doc-index/files/<路径>.json`；不记行号，`who`、`impact` 查询时现算。
@@ -36,7 +37,7 @@ uv run --project tools/doc-consistency doc-consistency <命令>
 ## 规则与数据
 
 - `rules/*.lp`：clingo 规则（只用分层写法），Python 只负责把事实喂给 clingo 并输出结论。
-- `data/known-external.json`：内置技能与用户级技能的白名单（检查不依赖本机的 `~/.claude`），以及哪个表头的首列是标签或技能。
+- `data/known-external.json`：内置技能与用户级技能的白名单（检查不依赖本机的 `~/.claude`）；约定路径清单（写入时才创建的具体文件，如 `agents_jour/其他.md`，不算死引用，只写文件不写目录）；哪个表头的首列是标签或技能。
 - `data/roles.json`：角色的别名、入口规则文件、入口技能。角色名取自 `docs/agents/workflow.md` 的角色表，两边对不上会报错。
 
 ## 阅读范围怎么算

@@ -170,6 +170,7 @@ def scaffold_facts(model, labels, root):
         if is_scaffold(src_file) and ref.strict and status == "missing":
             cand_of[(ref.src, ref.raw)] = model.candidates(src_file, ref.target)
     ignored = ignored_paths(root, {c for cs in cand_of.values() for c in cs})
+    ignored |= set(ext["conventional_paths"]["paths"])
     for ref, src_file, status, dst in model.refs_all:
         if not (is_scaffold(src_file) and ref.strict):
             continue

@@ -11,6 +11,9 @@ from markdown_it import MarkdownIt
 
 # 不进索引的位置
 EXCLUDE_PREFIXES = ("docs/archive/", "agents_jour/", ".claude/worktrees/")
+# 是代码不是文档的 HTML：界面原型、评测场景、图谱页面的模板
+CODE_HTML_PREFIXES = ("docs/prototypes/", "evals/scenarios/")
+CODE_HTML_FILES = ("tools/doc-consistency/doc_consistency/assets/graph.html",)
 ARCH_FILE = "docs/architecture.html"
 PREAMBLE = "(开头)"
 SECTION_NUMBERS = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6}
@@ -51,7 +54,7 @@ def in_scope(path):
         return False
     if path.startswith(EXCLUDE_PREFIXES):
         return False
-    if path.startswith("docs/prototypes/") and path.endswith(".html"):
+    if path.endswith(".html") and (path.startswith(CODE_HTML_PREFIXES) or path in CODE_HTML_FILES):
         return False
     return True
 

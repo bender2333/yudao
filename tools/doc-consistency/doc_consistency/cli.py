@@ -41,6 +41,12 @@ def cmd_view(root, args):
     print(f"已生成 {out}（{len(data['nodes'])} 个节点，{len(data['edges'])} 条边）")
 
 
+def cmd_nodes(root, args):
+    ids = index.list_nodes(root, args.keyword)
+    print("\n".join(ids))
+    print(f"共 {len(ids)} 个节点包含 {args.keyword!r}")
+
+
 def cmd_refresh(root, args):
     names = scaffold.refresh(root)
     print(f"已保存 {len(names)} 个 GitHub 标签到 .doc-index/labels.json")
@@ -104,6 +110,7 @@ COMMANDS = {
     "status": cmd_status,
     "who": cmd_who,
     "view": cmd_view,
+    "nodes": cmd_nodes,
     "refresh": cmd_refresh,
     "check": cmd_check,
     "pending": cmd_pending,
@@ -121,6 +128,8 @@ def main(argv=None):
     sub.add_parser("status", help="工作区和索引比，哪些节点变了")
     p = sub.add_parser("who", help="谁引用了某个文件或小节")
     p.add_argument("target")
+    p = sub.add_parser("nodes", help="按关键词列出节点名（who、impact、confirm 要写完整的节点名）")
+    p.add_argument("keyword")
     sub.add_parser("view", help="生成离线图谱页面到 .tmp/doc-index/graph.html")
     sub.add_parser("refresh", help="用 gh label list 保存 GitHub 标签快照（其余命令都离线）")
     sub.add_parser("check", help="脚手架线检查，汇总提醒，永远以 0 退出；程序或规则出错才报错退出")

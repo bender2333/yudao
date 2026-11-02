@@ -104,7 +104,8 @@ def scaffold_repo(repo):
         "# 适用范围\n\n共同遵守的内容在 [shared-rules](docs/agents/shared-rules.md)，与本文件一起读。\n"
         "用 `/loop` 轮询，用 `/solo-worker` 做工单，也有 `/ghost`。见 `docs/agents/missing.md` 与 `harness/tests/test_nope.py`。\n"
         "运行产物放 `.tmp/out.json`。标签：`needs-triage`、`no-such-label`。\n"
-        "取回附件：`gh run download 1 -n integration-results`。\n",
+        "取回附件：`gh run download 1 -n integration-results`。\n"
+        "没有工单编号的日记写在 `agents_jour/其他.md`，别的日记 `agents_jour/别的.md` 不在约定清单里。\n",
     )
     repo.write(
         "AGENTS.md",

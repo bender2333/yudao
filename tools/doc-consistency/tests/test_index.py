@@ -69,6 +69,22 @@ def test_adding_first_line_changes_only_that_files_index(docs_repo):
     assert all(new[k] == v for k, v in old.items() if k != "docs/design/other.md")
 
 
+def test_code_html_is_outside_the_index(docs_repo):
+    for rel in (
+        "tools/doc-consistency/doc_consistency/assets/graph.html",
+        "evals/scenarios/s1/reference/index.html",
+        "evals/scenarios/s1/sub/page.html",
+        "docs/prototypes/v1/index.html",
+    ):
+        docs_repo.write(rel, "<html><body><a href='../docs/design/other.md'>x</a></body></html>\n")
+    docs_repo.write("docs/page.html", "<html><body>文档页面</body></html>\n")
+    docs_repo.commit("代码里的 HTML")
+    index.build(docs_repo.path)
+    files = set(index.load_index(docs_repo.path))
+    assert "docs/page.html" in files and "docs/architecture.html" in files
+    assert not [f for f in files if f.startswith(("evals/", "docs/prototypes/")) or f.endswith("assets/graph.html")]
+
+
 def test_who_gives_lines(docs_repo):
     index.build(docs_repo.path)
     target, rows = index.who(docs_repo.path, "docs/architecture.html#s4 > 装配")

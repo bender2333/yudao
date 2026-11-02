@@ -10,6 +10,10 @@
     "writing-for-agents", "pr", "wizard", "setup-pre-commit", "git-guardrails-claude-code",
     "migrate-to-shoehorn", "scaffold-exercises", "find-skills"
   ],
+  "conventional_paths": {
+    "说明": "约定位置：文档里写了这个路径，文件在写入时才创建，平时不存在，不算死引用。只写具体的文件，不写整个目录。",
+    "paths": ["agents_jour/其他.md"]
+  },
   "table_headers": {
     "状态": "label",
     "技能": "skill"

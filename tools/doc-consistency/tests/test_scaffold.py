@@ -22,7 +22,15 @@ def test_dead_references(scaffold_repo):
     d = dead(scaffold_repo.path)
     assert d["skill"] == {"ghost", "ghost-skill"}
     assert d["label"] == {"no-such-label"}
-    assert d["path"] == {"docs/agents/missing.md", "harness/tests/test_nope.py"}
+    assert d["path"] == {"docs/agents/missing.md", "harness/tests/test_nope.py", "agents_jour/别的.md"}
+
+
+def test_conventional_path_is_not_dead_but_its_directory_is_not_whitelisted(scaffold_repo):
+    d = dead(scaffold_repo.path)
+    assert "agents_jour/其他.md" not in d["path"]  # 写入时才创建的约定位置
+    assert "agents_jour/别的.md" in d["path"]  # 白名单只放具体文件，不放整个目录
+    rc, out = scaffold_repo.cli("check")
+    assert "其他.md" not in out and "别的.md" in out
 
 
 def test_known_non_problems_are_not_reported(scaffold_repo):
@@ -86,6 +94,17 @@ def test_impact_of_one_table_row_only_touches_nodes_that_mention_it(scaffold_rep
     # 反过来：改 waiting 这一行，只牵动提到 waiting 的节点
     _, _, _, hits_w, *_ = scaffold.impact(root, row_id(model, "waiting"))
     assert {n.split("#", 1)[0] for n in hits_w} == {"docs/agents/mentions-waiting.md"}
+
+
+def test_impact_with_unknown_node_name_tells_how_to_find_the_right_one(scaffold_repo):
+    index.build(scaffold_repo.path)
+    rc, out = scaffold_repo.cli("impact", "docs/agents/workflow.md#状态与标签 > waiting", check=False)
+    assert rc != 0 and "nodes <关键词>" in out
+    rc, out = scaffold_repo.cli("impact", "waiting", check=False)
+    assert rc != 0 and "docs/agents/workflow.md#工作方式 > 4. 状态与标签 > 表1 > waiting" in out
+    rc, out = scaffold_repo.cli("nodes", "表1 > waiting")
+    assert out.splitlines()[0] == "docs/agents/workflow.md#工作方式 > 4. 状态与标签 > 表1 > waiting"
+    assert "共 1 个节点" in out
 
 
 def test_impact_of_whole_file_includes_references_to_it(scaffold_repo):

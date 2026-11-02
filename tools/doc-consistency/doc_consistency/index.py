@@ -1,3 +1,4 @@
+import difflib
 import json
 from pathlib import Path
 
@@ -147,7 +148,18 @@ def resolve_spec(spec, ids, tracked=None):
     if hits:
         shown = "\n  ".join(hits[:15])
         raise SystemExit(f"目标 {spec!r} 有多个候选，请写完整：\n  {shown}")
-    raise SystemExit(f"找不到 {spec!r}：先写文件路径，小节用 路径#标题 > 子标题 的写法（见 build 后的索引文件）")
+    contains = sorted(i for i in ids if spec in i)
+    near = contains or difflib.get_close_matches(spec, sorted(ids), n=10, cutoff=0.4)
+    shown = "\n  ".join(near[:15])
+    how = "包含这个写法的节点" if contains else "名字相近的节点"
+    raise SystemExit(
+        f"找不到 {spec!r}。节点名是 路径#标题 > 子标题（表格行是 路径#标题 > 表1 > 首列）；"
+        f"用 nodes <关键词> 按关键词列出节点。{how}：\n  {shown}"
+    )
+
+
+def list_nodes(root, keyword):
+    return sorted(i for i in all_ids(root) if keyword in i)
 
 
 def target_match(spec_id, dst):
