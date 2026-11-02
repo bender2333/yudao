@@ -1,5 +1,6 @@
 // 动作图鉴与确定时钟的单元测试（工单 #176 验收标准 1、2，#956）。
-// 图鉴「一项不少」：列出原型 v13（y13.js、sprites.js、engine.js）的全部公开画法，与生成脚本导出的登记表逐一对照。
+// 图鉴「一项不少」：列出原型 v13（y13.js、sprites.js、engine.js）的 62 项公开画法，与登记表（`generated/registry.json`，
+// 现在是普通源码、不再由脚本生成）逐项对照。
 // 时钟：GSAP 与 PixiJS 共用一个时钟，换成手动时钟后推进同样的时间必得同样的补间位置。
 
 import { test } from "node:test";
