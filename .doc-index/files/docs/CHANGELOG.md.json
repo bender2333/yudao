@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"d0f8db7ceb53b42b",
+"hash":"f13dd115abc3f4ed",
 "nodes":[
-{"hash":"d0f8db7ceb53b42b","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"f13dd115abc3f4ed","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"177a82e7111f9c0d","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"8e22998c41adc7f4","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -146,7 +146,7 @@
 {"dst":"docs/requirements/workspace-refactoring.md","kind":"code-path","raws":["docs/requirements/workspace-refactoring.md"],"seen":"427878c88227118f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/research/README.md","kind":"code-path","raws":["docs/research/README.md","research/README.md"],"seen":"cf33f2bfc268c513","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/research/deepseek-superagent-async-framework.md","kind":"code-path","raws":["research/deepseek-superagent-async-framework.md"],"seen":"e57af7e8d698323d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["research/doc-consistency-concept-model.md"],"seen":"aee6360e04742851","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md","research/doc-consistency-concept-model.md"],"seen":"aee6360e04742851","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/research/doc-consistency-rule-facts.md","kind":"code-path","raws":["research/doc-consistency-rule-facts.md"],"seen":"39c644076a0542c5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/trial/stage-1-guide.md","kind":"code-path","raws":["docs/trial/stage-1-guide.md"],"seen":"8639adb798d3e4fd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/trial/tasks.md","kind":"code-path","raws":["docs/trial/tasks.md"],"seen":"80f417d87d1bd0a5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -156,12 +156,12 @@
 {"dst":"evals/context/rule-set.json","kind":"code-path","raws":["evals/context/rule-set.json"],"seen":"f325f1734a4f57ff","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"evals/tests/test_context_cost.py","kind":"code-path","raws":["evals/tests/test_context_cost.py"],"seen":"2b607d57dbfd20a8","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"evals/tests/test_context_view.py","kind":"code-path","raws":["evals/tests/test_context_view.py"],"seen":"758076225c50f7ab","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"harness/definitions/__init__.py","kind":"code-path","raws":["harness/definitions/__init__.py"],"seen":"8146dec88ae645f6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"harness/definitions/__init__.py","kind":"code-path","raws":["harness/definitions/__init__.py"],"seen":"dd2b45bdf4bf14e6","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/engine.py","kind":"code-path","raws":["harness/engine.py"],"seen":"ccdbaec02aaabf8b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/providers/discovery.py","kind":"code-path","raws":["harness/providers/discovery.py"],"seen":"08611cff42a64084","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/release_check.py","kind":"code-path","raws":["harness/release_check.py"],"seen":"56d769c46e68cc78","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/event_scenarios.py","kind":"code-path","raws":["harness/tests/event_scenarios.py"],"seen":"1327f3cb7023f448","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"14aa9b976ab0b4a2","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"47d9f6d7e8f48f0c","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/prompt_snapshot.json","kind":"code-path","raws":["harness/tests/prompt_snapshot.json"],"seen":"d7563a28620d5351","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/protocol_helpers.py","kind":"code-path","raws":["harness/tests/protocol_helpers.py"],"seen":"c6e4f886c6c24b65","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"harness/tests/provider_replies.py","kind":"code-path","raws":["harness/tests/provider_replies.py"],"seen":"6f54d672c05f2955","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
