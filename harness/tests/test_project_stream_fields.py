@@ -151,26 +151,26 @@ def test_writing_a_missing_manifest_reports_recovery_from_git(tmp_path, monkeypa
 
 def test_writing_accepts_an_expanded_value_set_and_records_it(scratch_manifest, monkeypatch):
     # #241：取值固定字段（enum）的取值集合扩大时写入成功，清单记录扩大后的取值集合
+    # （例子用项目决定请求的 blocks；部门是字符串，不再是取值固定的字段，工单 #1389）
     registered = load_manifest()["fields"]
     live = _doctored_live(registered, retypes=(
-        ("department_prompt_configured", "department",
-         "enum string[engineering, product, quality, research]"),))
+        ("project_decision_requested", "blocks", "enum string[run, work_item, hold]"),))
     monkeypatch.setattr(project_stream_fields, "live_fields", lambda: live)
     apply_rewrite()
     written = load_manifest()
-    assert written["fields"]["department_prompt_configured"]["department"] == (
-        "enum string[engineering, product, quality, research]")
+    assert written["fields"]["project_decision_requested"]["blocks"] == (
+        "enum string[run, work_item, hold]")
 
 def test_writing_rejects_a_removed_value_and_names_it(scratch_manifest, monkeypatch):
     # #241：取值固定字段删除一个已登记的取值时写入被拒绝，拒绝原因写明被删除的取值；改变字段类型仍被拒绝
     registered = load_manifest()["fields"]
     before = scratch_manifest.read_text(encoding="utf-8")
     live = _doctored_live(registered, retypes=(
-        ("department_prompt_configured", "department", "enum string[engineering, product]"),))
+        ("project_decision_requested", "blocks", "enum string[run]"),))
     monkeypatch.setattr(project_stream_fields, "live_fields", lambda: live)
     with pytest.raises(ManifestWriteRejected) as caught:
         apply_rewrite()
     assert "改变字段类型" in str(caught.value)
-    assert "删除取值 quality" in str(caught.value)
+    assert "删除取值 work_item" in str(caught.value)
     assert scratch_manifest.read_text(encoding="utf-8") == before
 

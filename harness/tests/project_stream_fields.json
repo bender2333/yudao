@@ -305,7 +305,7 @@
     },
     "department_prompt_configured": {
       "base_version": "integer",
-      "department": "enum string[engineering, product, quality]",
+      "department": "string",
       "department_prompt": "string?",
       "department_prompt_ref": "object?",
       "model_id": "string?",
@@ -326,7 +326,7 @@
       "work_item_id": "string"
     },
     "material_recorded": {
-      "department": "enum string[engineering, product, quality]?",
+      "department": "string?",
       "material_id": "string",
       "material_ref": "object",
       "text": "string"
@@ -366,7 +366,7 @@
       "blocks": "enum string[run, work_item]",
       "candidate_run_id": "string",
       "delivery_run_id": "string",
-      "department": "enum string[engineering, product, quality]",
+      "department": "string",
       "description": "string",
       "diff": "string",
       "facts": "array[string]",
