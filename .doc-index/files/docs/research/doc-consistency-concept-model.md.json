@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/research/doc-consistency-concept-model.md",
-"hash":"c8e89c7acf507972",
+"hash":"a654d1d3919fa940",
 "nodes":[
-{"hash":"c8e89c7acf507972","id":"docs/research/doc-consistency-concept-model.md","kind":"file","title":"docs/research/doc-consistency-concept-model.md"},
+{"hash":"a654d1d3919fa940","id":"docs/research/doc-consistency-concept-model.md","kind":"file","title":"docs/research/doc-consistency-concept-model.md"},
 {"hash":"e91dc72a317fef77","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","kind":"section","parent":"docs/research/doc-consistency-concept-model.md","title":"文档一致性核对：概念模型与符号推理方案"},
 {"hash":"cfebd75bf418ff0c","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"1. 结论"},
 {"hash":"ea8d626b1b0ed281","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 两条线","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论","title":"两条线"},
@@ -26,7 +26,7 @@
 {"hash":"3ec31324f19d6e8d","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 索引","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状","title":"索引"},
 {"hash":"e9f03936023a563e","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 分层","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状","title":"分层"},
 {"hash":"a83908efd27685a8","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 为什么用规则语言","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状","title":"为什么用规则语言"},
-{"hash":"ffce36e1608dbc90","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 第一次运行（第 1、2 步）","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状","title":"第一次运行（第 1、2 步）"},
+{"hash":"1f718603cadc4cf0","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 第一次运行（第 1、2 步）","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状","title":"第一次运行（第 1、2 步）"},
 {"hash":"03591309344e1292","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 愿景","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状","title":"愿景"},
 {"hash":"88bafb3d31b4cedb","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 13. LLM 提取的验收与试验","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"13. LLM 提取的验收与试验"}
 ],
