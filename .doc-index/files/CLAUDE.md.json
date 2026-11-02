@@ -53,7 +53,7 @@
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"CLAUDE.md#角色 > 子架构师"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["docs/agents/workflow.md"],"seen":"2c01765171109f63","src":"CLAUDE.md#角色 > 子架构师"},
 {"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":"CLAUDE.md#角色 > 子架构师"},
-{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","kind":"link","raws":["docs/design/architecture/overall-architecture.md"],"seen":"4f0845175867d959","src":"CLAUDE.md#角色 > 子架构师"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","kind":"link","raws":["docs/design/architecture/overall-architecture.md"],"seen":"4f9d3f25c2196e3e","src":"CLAUDE.md#角色 > 子架构师"},
 {"dst":"AGENTS.md#项目","kind":"section-ref","raws":["AGENTS.md"],"seen":"fd5b56a4a7cc98c5","src":"CLAUDE.md#角色 > 总架构师"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"CLAUDE.md#角色 > 总架构师"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"CLAUDE.md#角色 > 总架构师"},

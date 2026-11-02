@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"docs/requirements/web-continuous-input.md",
-"hash":"4c0dcff88dc72531",
+"hash":"b3615135834e679d",
 "nodes":[
-{"hash":"4c0dcff88dc72531","id":"docs/requirements/web-continuous-input.md","kind":"file","title":"docs/requirements/web-continuous-input.md"},
+{"hash":"b3615135834e679d","id":"docs/requirements/web-continuous-input.md","kind":"file","title":"docs/requirements/web-continuous-input.md"},
 {"hash":"6f03a41aa8f04e44","id":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令","kind":"section","parent":"docs/requirements/web-continuous-input.md","title":"D01 Web 持续输入任务与命令"},
 {"hash":"f7b4193fd031049b","id":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 已确认","kind":"section","parent":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令","title":"已确认"},
-{"hash":"87a7362b4226b839","id":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 设计选择","kind":"section","parent":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令","title":"设计选择"}
+{"hash":"43299a90d03a9974","id":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 设计选择","kind":"section","parent":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令","title":"设计选择"}
 ],
 "edges":[
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令"},

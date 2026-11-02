@@ -25,7 +25,7 @@
 {"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"eb9a5d218fcc4892","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"6ed7870024cc25f6","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"0ec0552adcbe7034","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.2 集成层在每次合并以后运行","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"278adeef181c8309","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.2 集成层在每次合并以后运行","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"f0fcbba4a05f64a2","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"harness/proposals.py","kind":"code-path","raws":["harness/proposals.py"],"seen":"7f1f7edb4a80f2c2","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"266c758f0cf38a07","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","kind":"link","raws":["docs/agents/workflow.md"],"seen":"0270a0d1b6b470b0","src":"AGENTS.md#项目 > 架构问题"}

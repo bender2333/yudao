@@ -2,7 +2,7 @@
 
 总图位置：第四节「要守的缝」的十三道缝，以及第一节的方框、第三节内环六步与外环九个状态。
 
-子架构师维护的对照表：总图的词、代码里现在的名字、归哪道缝。立缝时把那一行改成「一致」。按 main `c5308acf` 清点。
+子架构师维护的对照表：总图的词、代码里现在的名字、归哪道缝。立缝时把那一行改成「一致」。
 
 ## 用法
 
@@ -120,7 +120,7 @@
 | 接口层 | 第一节「页面」悬停 | `api/`（`app.py` 的 `create_app`、`server.py`、`access.py`、`pages.py`） | 接口 | 一致 |
 | 等用户、决定请求 | 第三节外环「等用户」 | `decisions.py`（`DecisionKind`、`blocks_run`）、`kernel_events.py` 的 `DecisionRequest`；事件 `decision_requested`、`decision_answered`、`decision_withdrawn`；命令 `decision.answer`，查询 `decisions.list` | 接口、写入口 | 一致 |
 | 同步层（页面一侧） | 第一节「页面」悬停 | `contract/view-sync.ts` 的 `ViewSync`、`contract/event-stream.ts`、`contract/stream-state.ts`（目录叫 contract） | 接口（读者一侧） | 一致 |
-| 页面 | 第一节「页面」 | `client/`：页面 `views/`（`home/`、`project/`、`decisions/`、`models/`、`system/`、`timeline/`）、壳 `shell/` | 接口（读者一侧）；道 09 | 一致 |
+| 页面 | 第一节「页面」 | `client/`：页面 `views/`（`home/`、`project/`、`decisions/`、`models/`、`system/`、`timeline/`）、壳 `shell/` | 接口（读者一侧） | 一致 |
 
 ### 定义
 
@@ -160,8 +160,8 @@
 | 事件种类、缺口清单 | 画面总图第二节「可以落后」、第四节「映射」 | 事件种类取自客户端夹具 `client/tests/fixtures/event-types.json`，由服务端的 `harness/tests/test_event_type_fixture.py` 与 `EVENT_TYPES` 核对；`translate/coverage.ts` 缺一种事件就测试失败；缺口清单：无 | 画面 | 不一致：服务端为画面维护夹具；不认识的事件让测试失败，不进缺口清单 |
 | 翻译层 | 第四节画面 | `translate/`（`building.ts` 的 `buildingState`、`buildingActions`；`floor.ts` 的 `floorState`、`floorActions`、`floorCards`、`streamText`；`room.ts` 的 `state`、`actions`；`tables.ts` 的状态对应表；`say.ts`；`coverage.ts` 核对每种事件的归属） | 画面 | 一致 |
 | 画面层 | 第四节画面 | `pixel/`（`building/view.ts`、`floor/view.ts`、`room/view.ts` 的 `createBuildingView`、`createFloorView`、`createRoomView`；`world/`、`room/`、`floor/`、`building/`）；页面里的挂载 `views/home/building-section.tsx`、`views/project/floor-screen.tsx`、`views/project/room-screen.tsx` | 画面；道 09 | 不一致：叫 pixel，不叫画面层；输入类型带 Pixel 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`） |
-| 元件断言、回链 | 第四节画面「交换」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
-| 播放参数 | 第四节画面「交换」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
+| 元件断言、回链 | 第四节画面的规矩（回链）；画面总图第四节「映射」 | 画面合同 `pixel/contract.ts`：状态 `PixelState` 与动作 `PixelAction` 都带 `position`（注释写作回链：来源的查询快照或事件的位置），事实元素带来源 `SourceRef`；没有元件断言这个单位，动作的种类取自场景的声明表（`floor-decl`、`room-decl`、`building-decl`） | 画面 | 不一致：回链叫 `position`；元件断言代码里还没有 |
+| 播放参数 | 画面总图第二节「调节参数」 | `pixel/timeline.ts`（播放时间线）的 `settings`（`lagMs`、`minMs`、`speed`）与 `rate()`；动画时钟 `pixel/clock.ts`；`pixel/anims.ts` 的 `reducedMotion` | 画面 | 不一致：叫 `settings`，在时间线模块里，不经画面合同给出 |
 | 七种元件的对照表 | 画面总图第四节「映射」 | `translate/coverage.ts`：事件在三个场景的归属 `COVERAGE`、覆盖层的中文名 `OVERLAY_LABELS`；概念到元件的行：无 | 画面；道 09 | 不一致：只有事件与覆盖层两份，没有概念到七种元件的表，事实元素与视觉通道没有核对 |
 | 画面拓扑（屋、管道、盖章台从定义推出） | 画面总图第五节 | 写死在画面层：`pixel/world/floor-decl.ts` 的 `ROOMS`、`pixel/building/render.ts` 的 `ROOMS`、`pixel/room/layout.ts` 的 `ROOM_DEPTS`；合同里楼的亮灯 `lit` 是固定的四个部门字段（`pixel/contract.ts`）；楼层查询的 `departments` 按固定的 `DEPARTMENTS` 列出（`harness/app/project_queries.py`） | 画面、接口；道 09 | 不一致：拓扑不从事项冻结的定义来，画面层按部门名分支 |
 | 盖章台、出口托盘 | 画面总图第五节 | 盖章台：`pixel/room/layout.ts` 按部门 `quality` 画「检验台」；出口托盘：无 | 画面 | 不一致：按部门名取，不按核验角色 |
@@ -204,4 +204,4 @@
 | 观察者 | 无 | 无 | 无 |
 | 看门狗 | 无；排空在 `streams.py` 的 `DrainState` | `test_runtime_drain.py`、`test_drain_upgrade.py`（集成，只守排空） | 排空期间新事项排队、在跑的照常结束 |
 | 四层 | 上面两层（事实与裁决、循环）的文件：内核清单里 `kind` 为 `module` 的文件，五个契约模块，`orchestrator.py`、`runtime.py`、`engine.py`、`assembly.py`、`context.py` | `test_thin_driver_names.py`（单元，只查 `orchestrator.py`）；其余文件靠差异报告里的部门名检索 | 薄驱动不写部门与成果的名字 |
-| 三环 | 第三环：内核清单 `harness/definitions/kernel-manifest.json`；第二环：五个契约模块、骨架事件、接口合同、定义格式；第一环：各道缝的实现 | 第三环 `kernel/test_manifest.py`（单元，导入方向与行数）、`path_guard.py`；第二环 `kernel/test_contract_surface.py`、`kernel/test_only_grows.py`、`test_contract_modules.py`、`test_openapi_snapshot.py`；第一环 `test_second_routing.py`、`test_second_slot_implementations.py`、`test_action_contract.py` 的第二种实现 | 内核只导入内核与标准库、行数有上限；契约名称与版本、骨架事件与停止原因只增；路由、装配、执行、执行环境能换第二种实现 |
+| 三环 | 只由你批准那一环：内核清单 `harness/definitions/kernel-manifest.json`；只能向后兼容那一环：五个契约模块、骨架事件、接口合同、定义格式；可以整体重写那一环：各道缝的实现 | 只由你批准那一环 `kernel/test_manifest.py`（单元，导入方向与行数）、`path_guard.py`；只能向后兼容那一环 `kernel/test_contract_surface.py`、`kernel/test_only_grows.py`、`test_contract_modules.py`、`test_openapi_snapshot.py`；可以整体重写那一环 `test_second_routing.py`、`test_second_slot_implementations.py`、`test_action_contract.py` 的第二种实现 | 内核只导入内核与标准库、行数有上限；契约名称与版本、骨架事件与停止原因只增；路由、装配、执行、执行环境能换第二种实现 |

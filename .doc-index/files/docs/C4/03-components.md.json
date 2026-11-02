@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/C4/03-components.md",
-"hash":"99e097a9b94dc72c",
+"hash":"119792e6fbe9e0e2",
 "nodes":[
-{"hash":"99e097a9b94dc72c","id":"docs/C4/03-components.md","kind":"file","title":"docs/C4/03-components.md"},
+{"hash":"119792e6fbe9e0e2","id":"docs/C4/03-components.md","kind":"file","title":"docs/C4/03-components.md"},
 {"hash":"f519fbefdd89f0e5","id":"docs/C4/03-components.md#C3：服务与网页组件","kind":"section","parent":"docs/C4/03-components.md","title":"C3：服务与网页组件"},
-{"hash":"c0f0a5852fcbccb6","id":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构","kind":"section","parent":"docs/C4/03-components.md#C3：服务与网页组件","title":"C2 服务的内部结构"},
+{"hash":"5a03ea4350249833","id":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构","kind":"section","parent":"docs/C4/03-components.md#C3：服务与网页组件","title":"C2 服务的内部结构"},
 {"hash":"1132b895ce6e7225","id":"docs/C4/03-components.md#C3：服务与网页组件 > C1 网页的内部结构","kind":"section","parent":"docs/C4/03-components.md#C3：服务与网页组件","title":"C1 网页的内部结构"}
 ],
 "edges":[
@@ -21,7 +21,7 @@
 {"dst":"harness/artifacts.py","kind":"link","raws":["../../harness/artifacts.py"],"seen":"5042a9dba1b213ac","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},
 {"dst":"harness/assembly.py","kind":"link","raws":["../../harness/assembly.py"],"seen":"160fd7053d861a89","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},
 {"dst":"harness/definitions/__init__.py","kind":"link","raws":["../../harness/definitions/__init__.py"],"seen":"a7d87860df0948b0","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},
-{"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"1155373f0753c2aa","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},
+{"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"c0633f678c6beeb7","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},
 {"dst":"harness/engine.py","kind":"link","raws":["../../harness/engine.py"],"seen":"365b315eee3cdef8","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},
 {"dst":"harness/environment.py","kind":"link","raws":["../../harness/environment.py"],"seen":"a79f43295803c970","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},
 {"dst":"harness/event_store.py","kind":"link","raws":["../../harness/event_store.py"],"seen":"b27d2561ff1842ed","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},

@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/requirements/workspace-refactoring.md",
-"hash":"9a6e0a03c40bfda3",
+"hash":"427878c88227118f",
 "nodes":[
-{"hash":"9a6e0a03c40bfda3","id":"docs/requirements/workspace-refactoring.md","kind":"file","title":"docs/requirements/workspace-refactoring.md"},
+{"hash":"427878c88227118f","id":"docs/requirements/workspace-refactoring.md","kind":"file","title":"docs/requirements/workspace-refactoring.md"},
 {"hash":"e3f6dfb6c1fd1445","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","kind":"section","parent":"docs/requirements/workspace-refactoring.md","title":"D14 受控删除与移动"},
-{"hash":"3461b8e8940760fe","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动 > 有效规则","kind":"section","parent":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","title":"有效规则"},
+{"hash":"70123aa983682fbc","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动 > 有效规则","kind":"section","parent":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","title":"有效规则"},
 {"hash":"2437953618c6928e","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动 > 验收","kind":"section","parent":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","title":"验收"}
 ],
 "edges":[

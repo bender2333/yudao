@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/requirements/effective-contract-changes.md",
-"hash":"9acb4e24ac658bd4",
+"hash":"1015b111caa496b9",
 "nodes":[
-{"hash":"9acb4e24ac658bd4","id":"docs/requirements/effective-contract-changes.md","kind":"file","title":"docs/requirements/effective-contract-changes.md"},
+{"hash":"1015b111caa496b9","id":"docs/requirements/effective-contract-changes.md","kind":"file","title":"docs/requirements/effective-contract-changes.md"},
 {"hash":"9ca3000f9878da0e","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","kind":"section","parent":"docs/requirements/effective-contract-changes.md","title":"D15 有效变化与执行依据"},
-{"hash":"b1cc1d39583a3acf","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据 > 有效规则","kind":"section","parent":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","title":"有效规则"},
+{"hash":"4d831f2643ef8bd8","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据 > 有效规则","kind":"section","parent":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","title":"有效规则"},
 {"hash":"250e9ea9f9d5269f","id":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据 > 验收","kind":"section","parent":"docs/requirements/effective-contract-changes.md#D15 有效变化与执行依据","title":"验收"}
 ],
 "edges":[

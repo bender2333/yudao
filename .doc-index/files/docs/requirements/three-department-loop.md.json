@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/requirements/three-department-loop.md",
-"hash":"789ea9f628cfa16a",
+"hash":"59661a20bb764738",
 "nodes":[
-{"hash":"789ea9f628cfa16a","id":"docs/requirements/three-department-loop.md","kind":"file","title":"docs/requirements/three-department-loop.md"},
+{"hash":"59661a20bb764738","id":"docs/requirements/three-department-loop.md","kind":"file","title":"docs/requirements/three-department-loop.md"},
 {"hash":"5fb1ee704d37fc1b","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","kind":"section","parent":"docs/requirements/three-department-loop.md","title":"D11 三部门循环的整体定义"},
-{"hash":"56bb68c3e72d4c6e","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 已确认","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"已确认"},
+{"hash":"25440d5a28b9cf22","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 已确认","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"已确认"},
 {"hash":"cbb88f81b82f1597","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 责任边界","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"责任边界"},
 {"hash":"7400e826fa5e1ba4","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 设计选择","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"设计选择"}
 ],

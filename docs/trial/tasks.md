@@ -2,7 +2,7 @@
 
 试用跑的任务。这里是带版本的数据：方法在 [试用 skill](../../.claude/skills/trial/SKILL.md)，任务在这里。Yudao 的能力变了就改这个文件，不改 skill。
 
-当前版本 `trial-tasks@4`，依据：2026-10-29 用户确认 [ADR-0039](../adr/0039-agent-trial-observation-reproduction-and-judgment.md) 与[技能修订方案](skill-revision-plan.md)。本次修改模型分工与证据读法，下面的任务输入原文保持不变。改了任务的输入、步骤、判据或读法时版本号加一，新旧版本读数不直接比较。任务集属于评价标准，修改由用户决定。
+当前版本 `trial-tasks@4`，依据：[ADR-0039](../adr/0039-agent-trial-observation-reproduction-and-judgment.md) 与[技能修订方案](skill-revision-plan.md)。改了任务的输入、步骤、判据或读法时版本号加一，新旧版本读数不直接比较。任务集属于评价标准，修改由用户决定。
 
 两个任务每轮都跑，先完成 F1 与 R1 的新手段，再做专家段（skill 第 4、5 节）。一次一轮。F1 运行中只做规定操作与页面观察；配错凭据、指导、停服务和改主意集中在 R1。额外改输入、配置或状态的探索使用单独事项或实例，单列记录，不混入两个固定任务。
 
@@ -13,7 +13,7 @@
 **准备**（试用者在新手段开始前做，新手段不读这些文件）：
 
 - 起始文件夹：在仓库外新建一个文件夹，只放 `evals/scenarios/scenario-3/files/subway_data.json`，新建项目时填进页面的「起始文件夹」；
-- 输入文本：`evals/runner/yudao.py` 的 `requirement_text()` 生成的文本，去掉请工程自己写出数据文件的那一段，与 2026-10-20 的评测读数写法相同。
+- 输入文本：`evals/runner/yudao.py` 的 `requirement_text()` 生成的文本，去掉请工程自己写出数据文件的那一段，与评测运行器生成的需求文本写法相同。
 
 **新手段**：新建项目（名称 `subway`，目标抄输入的第一句），部门模型按[运行配置第 4 节](../agents/autopilot-runtime.md)分工，逐部门记录实际模型、窗口与输出上限；建事项时粘贴输入，等到放行、停止或 120 分钟。到时间就在页面上取消。时限与评测相同（[评测场景](../design/evaluation-scenarios.md)第 3 节）。
 

@@ -1,6 +1,6 @@
 # 当前代码的 C4 模型
 
-代码基线：`68733737fb8aab3e94dabecf27f5d2460f93b17f`，采集日期：2026-11-02。范围为当前仓库的产品运行代码；评测、发布与测试作为证据和工程工具引用。结论来自静态代码核对，运行行为的验收以对应测试和运行记录为准。
+代码基线：`68733737fb8aab3e94dabecf27f5d2460f93b17f`。范围为当前仓库的产品运行代码；评测、发布与测试作为证据和工程工具引用。结论来自静态代码核对，运行行为的验收以对应测试和运行记录为准。
 
 | 阅读入口 | 回答的问题 |
 | --- | --- |
@@ -20,7 +20,7 @@ C4 的四个层次分别是软件系统、容器、组件、代码。容器包�
 
 正式 C1–C3 图由 `model.json` 的元素和关系投影得到。代码图与时序图是选定场景的展开。机器可读模型中的 `evidence` 保存源码相对路径、基线文件 SHA-256、定位行和符号；SHA-256 在统一 CRLF/LF 为 LF 后计算，便于跨操作系统核对。行号用于阅读，路径与符号用于后续定位。`verification` 保存本次核对范围与结果。
 
-方法参考：C4 官方的 System context、Container、Component、Code、Dynamic、Deployment diagrams 定义（c4model.com，2026-10-31 查阅）。
+方法参考：C4 官方的 System context、Container、Component、Code、Dynamic、Deployment diagrams 定义（c4model.com）。
 
 在仓库根目录运行 `uv run python docs/C4/verify_model.py`，可以检查元素归属、关系端点、源码路径、Python 符号与文件摘要。检查遇到源码变化时会直接指出需要重新核对的证据。新增文件和运行行为仍需按[建模方法](06-code-to-model.md)人工审阅。
 

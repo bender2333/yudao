@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"docs/requirements/network-and-mcp.md",
-"hash":"3f3b2bac03cc25da",
+"hash":"44d56d62b126f6cf",
 "nodes":[
-{"hash":"3f3b2bac03cc25da","id":"docs/requirements/network-and-mcp.md","kind":"file","title":"docs/requirements/network-and-mcp.md"},
+{"hash":"44d56d62b126f6cf","id":"docs/requirements/network-and-mcp.md","kind":"file","title":"docs/requirements/network-and-mcp.md"},
 {"hash":"eac2dedcaeefccda","id":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具","kind":"section","parent":"docs/requirements/network-and-mcp.md","title":"D36 网络取回与 MCP 工具"},
-{"hash":"afe6b6d5cffd5560","id":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 已确认","kind":"section","parent":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具","title":"已确认"},
-{"hash":"5d7c8891582869ef","id":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 设计确定的内容","kind":"section","parent":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具","title":"设计确定的内容"}
+{"hash":"cf5a93e19cf88cb3","id":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 已确认","kind":"section","parent":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具","title":"已确认"},
+{"hash":"4b24f4e098737539","id":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 设计确定的内容","kind":"section","parent":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具","title":"设计确定的内容"}
 ],
 "edges":[
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"14d726dbf2dad669","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具"},
@@ -14,7 +14,7 @@
 {"dst":"docs/design/network-and-mcp.md","kind":"link","raws":["../design/network-and-mcp.md"],"seen":"34c7a59af1aba6c4","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具"},
 {"dst":"docs/requirements/browser-and-computer-use.md","kind":"link","raws":["browser-and-computer-use.md"],"seen":"4558a8a3549b0d66","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具"},
-{"dst":"docs/design/network-and-mcp.md","kind":"link","raws":["../design/network-and-mcp.md"],"seen":"34c7a59af1aba6c4","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 已确认"},
-{"dst":"docs/design/network-and-mcp.md","kind":"link","raws":["../design/network-and-mcp.md"],"seen":"34c7a59af1aba6c4","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 设计确定的内容"}
+{"dst":"docs/design/network-and-mcp.md","kind":"link","raws":["../design/network-and-mcp.md"],"seen":"bcade537d9fd48d2","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 已确认"},
+{"dst":"docs/design/network-and-mcp.md","kind":"link","raws":["../design/network-and-mcp.md"],"seen":"bcade537d9fd48d2","src":"docs/requirements/network-and-mcp.md#D36 网络取回与 MCP 工具 > 设计确定的内容"}
 ]
 }

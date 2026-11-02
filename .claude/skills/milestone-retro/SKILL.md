@@ -8,7 +8,7 @@ argument-hint: "[里程碑标题 | 工单编号列表 | 起止日期]，省略�
 
 命令是 `/milestone-retro`。本机的用户级 `~/.claude/skills/retro` 是另一个内容不同的复盘技能（复盘一次编码会话、给环境提改进）；Yudao 的复盘一律用这一份，不要把它与那一份混用。
 
-复盘是一次试验的读数：上一次改了什么、预期什么、实际发生了什么，据此保留或撤回；再从这段时间的原始记录里找出时间和返工花在哪里，提出下一次的改动，并写明下一次复盘用哪个数字检验它。它是近期阶段目标「改一处，运行真实任务，看到结果，决定保留还是撤回」中看结果、做决定的那一步。
+复盘是一次试验的读数：上一次改了什么、预期什么、实际发生了什么，据此保留或撤回；再从这段时间的原始记录里找出时间和返工花在哪里，提出下一次的改动，并写明下一次复盘用哪个数字检验它。它对应路线图第 5 节判据三「改动便宜可撤回」：改一处，运行真实任务，看到结果，决定保留还是撤回，复盘做的是看结果、做决定那一步。
 
 你以架构师身份复盘，以 `CLAUDE.md`、`AGENTS.md`、`docs/agents/` 为对照基准。产出是 GitHub Discussions 上的一篇复盘帖子和日记；规则、参数、设计说明与工单的修改写成提议，由用户确认。
 
@@ -23,7 +23,7 @@ argument-hint: "[里程碑标题 | 工单编号列表 | 起止日期]，省略�
 | 记录 | 取法 | 用来看 |
 | --- | --- | --- |
 | 工单、标签时间线、PR | 里程碑范围用运行配置第 3 节的导出命令（`milestone.py collect`），数据文件含每张工单的时间线与 PR；其他范围用 `gh api repos/bender2333/yudao/issues/<n>/timeline --paginate` 与 `gh pr view issue-<n> --json commits,reviews,comments,files` | 每个标签停留的时间、轮次、要求修改、合并后重开 |
-| 执行者与审查者的运行记录 | 运行那台机器（运行配置第 1 节）的 omp 会话记录 `~/.omp/agent/sessions/<工作目录编码>/*.jsonl`，编码例如 `C:\project\yudao-worktrees\issue-127` 对应 `--C--project-yudao-worktrees-issue-127--`；2026-10-12 以前本机的运行输出在 `C:\project\yudao-worktrees\autopilot\runs\`（`omp-<编号><轮次>.jsonl`、`rv-…`，同名 `.err`、`.done`），同目录的 `analyze-run.py` 列出每次请求的模型、停止原因与工具调用 | 实际运行的命令与测试、结果、工具调用花在哪里、结束方式、用量 |
+| 执行者与审查者的运行记录 | 运行那台机器（运行配置第 1 节）的 omp 会话记录 `~/.omp/agent/sessions/<工作目录编码>/*.jsonl`，编码例如 `C:\project\yudao-worktrees\issue-127` 对应 `--C--project-yudao-worktrees-issue-127--`；更早的本机运行输出在 `C:\project\yudao-worktrees\autopilot\runs\`（`omp-<编号><轮次>.jsonl`、`rv-…`，同名 `.err`、`.done`），同目录的 `analyze-run.py` 列出每次请求的模型、停止原因与工具调用 | 实际运行的命令与测试、结果、工具调用花在哪里、结束方式、用量 |
 | 架构师循环 | 工单与 PR 上最后一行是 `— claude-架构师` 的评论、`git log --author=claude-架构师`、`.ralph/architect/heartbeat.json` | 处理了什么、怎样结束 |
 | CI | `gh run list --workflow CI --branch main --event push`、`gh run view <编号> --log-failed`、`gh run download <编号> -n integration-results` | 失败项、首次出现的提交、重新运行是否通过 |
 | git 历史 | `git log --stat <起>..<止>`；每个 PR 的差异与工单「只改」清单比较；`git log --diff-filter=D -- harness/tests client/src` | 改动是否超出工单、删掉的测试是否对应删掉的行为、哪些改动后来被删掉 |
@@ -99,7 +99,7 @@ argument-hint: "[里程碑标题 | 工单编号列表 | 起止日期]，省略�
 
    同一原因只在一张工单出现，归工单写法或角色能力；在两张以上出现，或会在还没开工的工单里再出现，归设计与架构、流程规则或 CI 与测试。完成标准：每个问题都有原因链、对照工单与改动层；证据不足的写「待定」与缺少的证据。
 
-7. **对照项目目标。** 按 `docs/program-roadmap.md` 第 2 节的阶段边界与第 5 节的五条判据，写这段时间每条判据的变化与证据；对照试用反馈与需求原话，写交付与用户要的有没有偏差；列出还没开工的工单中，哪些会碰上第 6 步暴露的原因。
+7. **对照项目目标。** 按 `docs/program-roadmap.md` 第 2 节的阶段边界与第 5 节的五条判据，写这段时间每条判据的变化与证据；对照试用反馈与 `claude_jour.md`、Discussions 里记下的用户原话，写交付与用户要的有没有偏差；列出还没开工的工单中，哪些会碰上第 6 步暴露的原因。
 
 8. **提出改动。** 选层的优先次序：能做成机械检查的进 CI 或测试，其次改运行配置第 7 节的参数表，最后才是规则句子。每项改动写四件事：
    - 改什么，改在哪里：改到技能的，写到技能名与它的哪一段（某一步、「常见借口」或「危险信号」）；

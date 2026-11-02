@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/requirements/git-change-management.md",
-"hash":"671b7c78aaef752b",
+"hash":"5e603d6c027cc0f6",
 "nodes":[
-{"hash":"671b7c78aaef752b","id":"docs/requirements/git-change-management.md","kind":"file","title":"docs/requirements/git-change-management.md"},
+{"hash":"5e603d6c027cc0f6","id":"docs/requirements/git-change-management.md","kind":"file","title":"docs/requirements/git-change-management.md"},
 {"hash":"2e3c9488e072a87c","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","kind":"section","parent":"docs/requirements/git-change-management.md","title":"D16 使用 Git 管理任务内变化"},
 {"hash":"e9d5df2ee4583198","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 范围","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"范围"},
 {"hash":"9b834fcea34f84d4","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 有效设计","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"有效设计"},
-{"hash":"4dc90394439be473","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 验收","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"验收"}
+{"hash":"9394f9fb6b23f617","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 验收","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"验收"}
 ],
 "edges":[
 {"dst":"docs/adr/0024-git-in-process-with-pygit2.md","kind":"link","raws":["../adr/0024-git-in-process-with-pygit2.md"],"seen":"887d64ba70880b48","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化"},

@@ -14,7 +14,7 @@
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["design/architecture/overall-architecture.md"],"seen":"c0ad35140a868277","src":"docs/foundation-rules.md#基础规则"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["design/evaluation-scenarios.md"],"seen":"8b813cb71f37d7dc","src":"docs/foundation-rules.md#基础规则"},
 {"dst":"docs/design/forms-and-verifier-role.md","kind":"link","raws":["design/forms-and-verifier-role.md"],"seen":"bbcbee81d2264429","src":"docs/foundation-rules.md#基础规则"},
-{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","kind":"link","raws":["design/forms-and-verifier-role.md"],"seen":"ef5a66223386fbcf","src":"docs/foundation-rules.md#基础规则"},
+{"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","kind":"link","raws":["design/forms-and-verifier-role.md"],"seen":"0853195401f3a162","src":"docs/foundation-rules.md#基础规则"},
 {"dst":"docs/design/independent-verification.md","kind":"link","raws":["design/independent-verification.md"],"seen":"5cedd8c8f85ff549","src":"docs/foundation-rules.md#基础规则"},
 {"dst":"docs/design/loops-and-convergence.md","kind":"link","raws":["design/loops-and-convergence.md"],"seen":"a98753ef774d65e1","src":"docs/foundation-rules.md#基础规则"},
 {"dst":"docs/design/model-management.md","kind":"link","raws":["design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/foundation-rules.md#基础规则"},

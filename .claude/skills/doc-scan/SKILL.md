@@ -25,7 +25,7 @@ disable-model-invocation: true
 
 ### 2 读正本，写核对清单
 
-正本是 `docs/architecture.html`、`docs/program-roadmap.md`、`CONTEXT.md`、`docs/foundation-rules.md`、`docs/agents/shared-rules.md`。把要点抄成 `.tmp/doc-scan/canonical.md`：十三道缝（名字、两侧、已定/未定）、三环归属、外环九个状态词、内环六步、五个阶段各立哪几道缝、十条内容道、五条判据名、术语正名与 _Avoid_ 词，再加一张「硬检查点」表。
+正本是 `docs/architecture.html`、`docs/program-roadmap.md`、`CONTEXT.md`、`docs/foundation-rules.md`、`docs/agents/shared-rules.md`。把要点抄成 `.tmp/doc-scan/canonical.md`：十三道缝（名字、两侧、已定/未定）、三环归属、外环九个状态词、内环六步、四个阶段各立哪几道缝、十条内容道、五条判据名、术语正名与 _Avoid_ 词，再加一张「硬检查点」表。
 
 **判据**：每条检查点都能指回正本的一节或一行；内容多到审查员只读这一份就够，不必各自读正本。
 

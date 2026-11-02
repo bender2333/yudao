@@ -1,6 +1,6 @@
 # 当前验收基线
 
-状态：区分真实项目验收的当前版本、历史基线与尚待执行的验收；最近一次改动 2026-10-31，真实项目（openai-agents-python）已接入并放行一次事项（工单 #139，报告 [docs/evaluation/2026-10-31-57835530.md](evaluation/2026-10-31-57835530.md)）。本页统一报告口径，不代替真实运行报告，也不代替用户的试用结论；路线以 [总体路线图](program-roadmap.md) 为准，总体意图见 [D38](requirements/system-intent.md)。
+状态：区分真实项目验收的当前版本、历史基线与尚待执行的验收；真实项目（openai-agents-python）已接入并放行一次事项（工单 #139，报告 [docs/evaluation/2026-10-31-57835530.md](evaluation/2026-10-31-57835530.md)）。本页统一报告口径，不代替真实运行报告，也不代替用户的试用结论；路线以 [总体路线图](program-roadmap.md) 为准，总体意图见 [D38](requirements/system-intent.md)。
 
 ## 1. 版本身份（当前）
 
@@ -18,7 +18,7 @@
 
 ## 2. 这条基线说明了什么
 
-- 接入已有项目（3.8）：真实项目 openai-agents-python（FeatBench `openai__openai-agents-python-842` 基准提交 `8dfd6ff3`，363 个文件）经 `project.onboard` 建档完成，初始 PRD（9 条要求、2 条边界）在浏览器的决定卡片中确认并被采纳，基线核验 9 条要求全部核实；快照记录带 git 提交，采纳成果的 `code_tree_digest` 等于快照摘要。
+- 接入已有项目：真实项目 openai-agents-python（FeatBench `openai__openai-agents-python-842` 基准提交 `8dfd6ff3`，363 个文件）经 `project.onboard` 建档完成，初始 PRD（9 条要求、2 条边界）在浏览器的决定卡片中确认并被采纳，基线核验 9 条要求全部核实；快照记录带 git 提交，采纳成果的 `code_tree_digest` 等于快照摘要。
 - 随后的事项（issue 842）：从建档基线开始，交付、质检按变更后的完整 PRD 核验并采纳；5 条过程检查点全部通过（其中 2 条由运行器标「未核实」的，按事件库实际读数补齐为通过）；质检覆盖比例 7/7=1.0、模型阅读条件 0 条、开环条件 0 条；原有功能 331 条 P2P 无失败。
 - 建档基线中的现有缺陷如实记录：`full_pytest`（裸 `uv run pytest`）exit=2，缺 litellm/voice 可选依赖与 `OPENAI_API_KEY`；`test_all_extras` 414 条全部通过。该缺陷不影响事项的评分结果。
 
@@ -31,5 +31,5 @@
 
 ## 4. 历史基线
 
-- [current-baseline-2026-10-29.md](archive/current-baseline-2026-10-29.md)：阶段一「换骨架」为止的能力表与证据边界，2026-10-29 归档；其中的能力状态在本页不复制，仍以归档页为准。
+- [current-baseline-2026-10-29.md](archive/current-baseline-2026-10-29.md)：阶段一「换骨架」为止的能力表与证据边界；其中的能力状态在本页不复制，仍以归档页为准。
 - [current-baseline-3.0-contract.md](archive/current-baseline-3.0-contract.md)：3.0 合同时期的历史基线。

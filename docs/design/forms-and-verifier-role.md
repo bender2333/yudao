@@ -1,6 +1,6 @@
 # 形态与核验角色设计说明
 
-总图位置：第一节「轮转方式」「独立的证据」「质检」方框与开头一段的三样固定结构；第二节「定义」方框与四层；第三节「开环完成」「子组织」两条规矩；第四节「路由」「定义」「执行」三道缝。依据：[ADR-0044 核验是角色的性质](../adr/0044-verifier-role-and-open-loop.md)、[D38 系统意图与基础规则](../requirements/system-intent.md)、[骨架与应用设计说明](skeleton-and-application.md)「三道缝的契约」「第二种路由：骨架要满足的条件」、[验证的独立性设计说明](independent-verification.md)、[部门内多角色设计说明](department-roles.md)、[ADR-0045 项目的组织是一份形态加本项目的改动](../adr/0045-project-organization-form-plus-changes.md)、[项目的组织设计说明](project-organization.md)。
+总图位置：第一节「轮转方式」「独立的证据」「质检」方框与开头一段的三样固定结构；第二节「定义」方框与四层；第三节「开环完成」「子组织」两条规矩；第四节「路由」「定义」「执行」三道缝。依据：[ADR-0044 核验是角色的性质](../adr/0044-verifier-role-and-open-loop.md)、[D38 系统意图与基础规则](../requirements/system-intent.md)、[骨架与应用设计说明](skeleton-and-application.md)「三道缝的契约」「其他路由：骨架要满足的条件」、[验证的独立性设计说明](independent-verification.md)、[部门内多角色设计说明](department-roles.md)、[ADR-0045 项目的组织是一份形态加本项目的改动](../adr/0045-project-organization-form-plus-changes.md)、[项目的组织设计说明](project-organization.md)。
 
 ## 1. 功能与依据
 

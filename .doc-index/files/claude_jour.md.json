@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"claude_jour.md",
-"hash":"9ad68c4fec0084af",
+"hash":"ab80fab7ddf8da6b",
 "nodes":[
-{"hash":"9ad68c4fec0084af","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
+{"hash":"ab80fab7ddf8da6b","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
 {"hash":"028833a01631910c","id":"claude_jour.md#Claude 执行日记 (Claude Journal)","kind":"section","parent":"claude_jour.md","title":"Claude 执行日记 (Claude Journal)"},
 {"hash":"48043ae754efd878","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 记录格式规范","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"记录格式规范"},
 {"hash":"16623160c7b059eb","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 21:10 状态文档与一次改完","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-10-31 21:10 状态文档与一次改完"},
@@ -48,7 +48,7 @@
 {"hash":"e876e1f04217e849","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-02 13:58 文档一致性方案入库"},
 {"hash":"88a51851ccb5c030","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 21:16 需求记录清理成状态文档","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-10-31 21:16 需求记录清理成状态文档"},
 {"hash":"96091be0364e062c","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 01:50 需求记录清理：按用户的答复收尾","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 01:50 需求记录清理：按用户的答复收尾"},
-{"hash":"e9a402a31be89375","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 02:02 D18、D24 去掉「判定点的升级」"}
+{"hash":"c8e67432c9a611c7","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 02:02 D18、D24 去掉「判定点的升级」"}
 ],
 "edges":[
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 19:40 规则文件与技能的历史清理"},

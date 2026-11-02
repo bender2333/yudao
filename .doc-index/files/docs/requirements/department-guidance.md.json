@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"docs/requirements/department-guidance.md",
-"hash":"9f7ec0125ed5ada7",
+"hash":"d7d91f4da588c2ec",
 "nodes":[
-{"hash":"9f7ec0125ed5ada7","id":"docs/requirements/department-guidance.md","kind":"file","title":"docs/requirements/department-guidance.md"},
+{"hash":"d7d91f4da588c2ec","id":"docs/requirements/department-guidance.md","kind":"file","title":"docs/requirements/department-guidance.md"},
 {"hash":"3020ab45f6b46ab2","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导","kind":"section","parent":"docs/requirements/department-guidance.md","title":"D20 部门定向追加指导"},
-{"hash":"17a444d95469e2cb","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 已确认","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"已确认"},
-{"hash":"02bcd28429063613","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 必须保持的边界","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"必须保持的边界"},
+{"hash":"ff6031abf391d6c2","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 已确认","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"已确认"},
+{"hash":"adbaf324c629b4cf","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 必须保持的边界","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"必须保持的边界"},
 {"hash":"871dffe91dc09470","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 处理约定","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"处理约定"},
 {"hash":"19aff5667dee5173","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 验收","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"验收"}
 ],

@@ -37,7 +37,7 @@ flowchart TD
 - `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块，也不引用被测方内部文件的路径。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，绑定三个部门、运行器不登记命令，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取最后一次封存的交付交给评分器，并计算过程检查点与指标。场景 3 新建项目并带入起始文件夹，以用户原始意图提交需求原文加接口约定；场景 2 接入已有仓库（`project.onboard`）、确认初始 PRD（`decision.answer`，或者等人确认），再新建事项提交需求原文（见下面「场景 2 的运行」）。
 - `scenarios/scenario-3/materials/manifest.json`：场景 3 的材料来源、运行环境与材料摘要（`digests` 块）。
 - `baseline/`：omp 流程开发 Yudao 的基线数字。`collect.py` 抓取 Stage 3 里程碑下的工单、标签时间线与评论、合并请求、阶段父工单 #9 的集成层记录与运行目录里的运行输出，合成一个数据文件；`compute.py` 只读这个数据文件，算出每个工单的审查轮数、集成层失败归因、搁置原因、耗时与用量，写出中文报告。
-- `context/`：上下文装配的离线回放（#912，[设计说明](../docs/design/context-assembly.md)）。只读事件库与工件库，把每一步交给模型的上下文当成纯函数 `view(events, rules) → request`：`measure` 测每一步的召回与浪费，`replay` 用新视图重放并做逐条规则的消融，`sweep` 扫参数取值，`verify` 核对视图与记录逐字节一致，`counterfactual` 用真实模型做反事实回放。用法见 [context/README.md](context/README.md)。
+- `context/`：上下文装配的离线回放（[设计说明](../docs/design/context-assembly.md)）。只读事件库与工件库，把每一步交给模型的上下文当成纯函数 `view(events, rules) → request`：`measure` 测每一步的召回与浪费，`replay` 用新视图重放并做逐条规则的消融，`sweep` 扫参数取值，`verify` 核对视图与记录逐字节一致，`counterfactual` 用真实模型做反事实回放。用法见 [context/README.md](context/README.md)。
 - `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。基线工具的测试读录制的数据文件，同样不使用 mock。`test_yudao_runner.py` 用 `harness/tests/event_sequences/` 里的系统事件序列驱动同一套 `run.export` 形状的判定逻辑；这些序列的事件头是 `adapter: fake`，不是真实系统导出，凡是需要真实导出才能核实的项记「未核实」。`test_regen_scenario3.py` 用 `runner/regen_scenario3.py` 从仓库内固定的历史 JSON（`data/scenario-3-yudao-historical.json`，提交 `aaa91883` 的旧版原文，不可修改）重算 `docs/evaluation/scenario-3-yudao.json` 与 `.md`，与已提交的文件逐字节比对；以已提交的新 JSON 为输入重算同样逐字节一致（幂等）。`test_no_harness_paths.py` 用 `ast` 扫描并折叠字符串拼接与 `os.path.join` 字面量参数，再比对被测方内部文件路径。`test_report.py` 核对多次运行的汇总是怎么算的：完成度与正确性进汇总，每个指标带噪声范围，一次运行时噪声范围写「未知」，费用全为 0 或为空时写「未知」。
 
 ## 材料版本
@@ -195,7 +195,7 @@ Yudao 一侧的过程检查点共五项，每项给通过 / 未通过 / 未核�
 
 多次运行的汇总含评分器给出的完成度与正确性，每个指标给出噪声范围（同一版本各次运行的取值极差）；只有一次运行时噪声范围写「未知」，不写零。
 
-被测模型在工程部门连续返回成功但没有输出项的调用，主机按 `no_tool_call` 暂停；这条模型行为的记录写进报告（架构问题记录里有登记，已归档在 `docs/archive/`）。
+被测模型在工程部门连续返回成功但没有输出项的调用，主机按 `no_tool_call` 暂停；这条模型行为的记录写进报告。
 
 运行器保证下面这些：
 
