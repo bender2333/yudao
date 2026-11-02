@@ -863,24 +863,30 @@ class Defect(Payload):
 
 class QaCriterionPayload(Payload):
     # 质检的逐条结论（验证的独立性设计说明第 7.1 节、浏览器与 computer use 设计说明第 8.3 节，工单 #151）：
-    # criterion 是验收条件在 ProductSpec 里的位置写成的 AC<序号>，method 是检验方式，result 只有三种
+    # criterion 是验收条件在 ProductSpec 里的位置写成的 AC<序号>，method 是检验方式，result 只有三种。
+    # judged 是独立判断当时对这条验收条件的结果，change_reason 是改判理由（第 4 节，工单 #1190）：
+    # 结论与判断不一致的条目才写；判断事件里的同一形状没有这两项，旧事件也没有
     criterion: str
     method: Literal["check", "trial", "measure", "judgement", "human", "open"]
     result: Literal["passed", "failed", "unverified"]
     checks: list[str]
     trial_cases: list[str]
     note: str
+    judged: str = ""
+    change_reason: str = ""
 
 
 class QaCoveragePayload(Payload):
     # 放行记录里的三个数（第 7.1 节第 4 点）：一次算好，查询与画面读这个数，不重新计算。
-    # coverage_ratio 是可执行检验里已在当前快照上通过的条件数除以条件总数
+    # coverage_ratio 是可执行检验里已在当前快照上通过的条件数除以条件总数；
+    # changed 是改判的条数（第 4 节，工单 #1190），以后算解释翻转率时从这里取，旧事件没有这一项
     criteria_total: int
     executable: int
     covered: int
     coverage_ratio: float
     model_reading: int
     open: int
+    changed: int = 0
 
 
 class IndependentJudgementPayload(Payload):
@@ -898,6 +904,8 @@ class IndependentJudgementPayload(Payload):
 
 
 class QaSubmittedPayload(AcceptanceFields):
+    # judgement_event 是这份结论引用的独立判断事件（第 4 节，工单 #1190）：放行记录与判断成对，
+    # 以后算解释翻转率时按这一对取；旧事件没有这一项
     product_spec_hash: str
     effective_contract_hash: str
     delivery_spec_hash: str
@@ -910,6 +918,7 @@ class QaSubmittedPayload(AcceptanceFields):
     coverage: QaCoveragePayload
     open_criteria: list[str]
     evidence_refs: list[ArtifactRef]
+    judgement_event: str = ""
     kind: Literal["qa_review"]
     issuer: Literal["quality"]
     parent_hash: str | None

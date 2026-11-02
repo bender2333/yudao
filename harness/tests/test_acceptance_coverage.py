@@ -43,8 +43,9 @@ def _script() -> dict:
     return {
         "product": [product_spec(acceptance=ACCEPTANCE)],
         "engineering": [delivery_turn()],
-        # 先判断后看解释（工单 #358）：交付到达以后先交独立判断（一轮），再带本激活的检查回执下结论
-        "quality": [explore_turn(), judgement_turn(checks={"smoke": 0}),
+        # 先判断后看解释（工单 #358）：交付到达以后先交独立判断（一轮），再带本激活的检查回执下结论。
+        # 判断的逐条结论与结论相同（工单 #1190 比对两者：结果不同的条目要写改判理由，这里没有改判）
+        "quality": [explore_turn(), judgement_turn(checks={"smoke": 0}, criteria=_criteria()),
                     review_turn("release", "checks passed on the current snapshot",
                                 checks={"smoke": 0}, criteria=_criteria())],
     }

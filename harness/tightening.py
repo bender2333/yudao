@@ -25,7 +25,7 @@ from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .watched_outputs import has_new_work, is_working
 from .contracts import normalize_scope
-from .coverage import coverage_report, method_is_executable, open_criteria
+from .coverage import changed_criteria, coverage_report, method_is_executable, open_criteria
 from .definitions import DEFINITIONS, Definitions
 from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS
 from .models import TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
@@ -380,13 +380,17 @@ class WatchedOutputsTightening:
                     errors.extend(_release_criteria_errors(criteria))
                 if verdict == "cannot_verify":
                     errors.extend(_cannot_verify_criteria_errors(criteria))
-        # 先判断后看解释的门（第 4 节，工单 #358）：提交结论前这份交付必须已有独立判断事件；
-        # 字段级错误写明缺什么，部门读 validation_feedback 以后先提交独立判断再下结论
-        if not errors and _judgement_exists(request.events, delivery_hash) is False:
-            errors.append(FieldError(
-                "independent_judgement",
-                "commit the independent judgement for the current delivery first: the conclusion must "
-                "reference the committed judgement (kind=independent_judgement, criteria per acceptance criterion)"))
+        # 先判断后看解释的门（第 4 节，工单 #358）与引用校验（工单 #1190）：提交结论前这份交付必须已有
+        # 独立判断事件，结论引用的是这一条判断——它对这个交付与这一版 PRD、写在这份交付被接纳之后，
+        # 并且它的逐条结论覆盖当前 PRD 的全部验收条件。字段级错误写明缺什么、哪一条不符
+        judgement = None
+        if not errors:
+            judgement, reference_errors = _qa_judgement(proposal, request.events, projection, delivery_hash, spec_hash)
+            errors.extend(reference_errors)
+        # 改判（第 4 节，工单 #1190）：判断与结论不一致的条目逐条写明改判理由，缺了被拒绝；
+        # 改判的条数随放行记录写进事实，以后算解释翻转率时从这里取
+        if not errors and judgement is not None:
+            errors.extend(_judgement_change_errors(criteria, judgement))
         defects, defect_errors = _qa_defects(proposal)
         errors.extend(defect_errors)
         if errors:
@@ -395,6 +399,7 @@ class WatchedOutputsTightening:
         if request.commit and verdict == "release" and pending_product_input(projection, list(request.events)):
             return Tightened(wait=True)
         # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
+        changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
         return Tightened(content={
             "product_spec_hash": spec_hash,
             "effective_contract_hash": contract_hash,
@@ -404,9 +409,13 @@ class WatchedOutputsTightening:
             "rationale": proposal["rationale"].strip(),
             "checks": bound_checks,
             "defects": defects,
-            "criteria": criteria,
-            # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算
-            "coverage": coverage_report(criteria),
+            # 逐条结论带判断的结果与改判理由（工单 #1190）：同一条记录里看得出改了哪几条、为什么
+            "criteria": _criteria_with_judgement(criteria, judgement),
+            # 结论引用的独立判断事件（工单 #1190）：以后算解释翻转率时按这一对事件取
+            "judgement_event": judgement.event_id,
+            # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算；
+            # 改判的条数随它写进放行记录（工单 #1190）
+            "coverage": coverage_report(criteria, changed=len(changed)),
             "open_criteria": open_criteria(criteria),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
             "evidence_refs": _check_evidence_refs(criteria, request.events),
@@ -450,7 +459,8 @@ class WatchedOutputsTightening:
             "delivery_spec_hash": delivery_hash,
             "checks": list(proposal.get("checks") or []),
             "criteria_count": len(criteria),
-            "criteria": criteria,
+            # 判断没有「改判理由」（#1190 的字段只属于结论）：这一项不进判断事件
+            "criteria": [{key: value for key, value in row.items() if key != "change_reason"} for row in criteria],
         })
 
     def _structure(self, request: TightenRequest) -> Tightened:
@@ -908,8 +918,9 @@ def _qa_defects(proposal: dict[str, Any]) -> tuple[list[dict[str, str]], list[Fi
 
 # 验收条件的引用形式（浏览器与 computer use 设计说明第 8.1 节）：AC<序号>，序号是它在 ProductSpec 里的位置
 _CRITERION_ID = re.compile(r"^AC[1-9][0-9]*$")
-# 逐条结论一项的字段（独立性说明第 7.1 节、浏览器说明第 8.3 节）：封闭，多写的字段报错
-_QA_CRITERION_FIELDS = frozenset({"criterion", "method", "result", "checks", "trial_cases", "note"})
+# 逐条结论一项的字段（独立性说明第 7.1 节、浏览器说明第 8.3 节）：封闭，多写的字段报错。
+# change_reason 是改判理由（第 4 节，工单 #1190）：结论与独立判断不一致的条目必须写明
+_QA_CRITERION_FIELDS = frozenset({"criterion", "method", "result", "checks", "trial_cases", "note", "change_reason"})
 
 
 def _qa_criteria_errors(proposal: dict[str, Any]) -> list[FieldError]:
@@ -960,9 +971,14 @@ def _qa_criteria(proposal: dict[str, Any]) -> tuple[list[dict[str, Any]], list[F
         note = item.get("note")
         if note is not None and not isinstance(note, str):
             errors.append(FieldError(f"criteria[{index}].note", "note must be a string"))
+        change_reason = item.get("change_reason")
+        if change_reason is not None and not isinstance(change_reason, str):
+            errors.append(FieldError(f"criteria[{index}].change_reason",
+                                     "change_reason must be a string: the reason the result differs from the independent judgement"))
         if method in QA_METHODS and result in QA_RESULTS:
             rows.append({"criterion": criterion.strip(), "method": method, "result": result,
-                         "checks": checks, "trial_cases": [], "note": (note or "").strip()})
+                         "checks": checks, "trial_cases": [], "note": (note or "").strip(),
+                         "change_reason": (change_reason or "").strip()})
     return rows, errors
 
 
@@ -1068,6 +1084,110 @@ def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: st
         and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
         for event in events
     )
+
+
+def _qa_judgement(proposal: dict[str, Any], events: tuple[Event, ...] | list[Event],
+                  projection: RunProjection, delivery_hash: str,
+                  spec_hash: str) -> tuple[Event | None, list[FieldError]]:
+    """结论引用的独立判断（验证的独立性设计说明第 4 节，工单 #1190）。
+
+    三件事：
+    · 引用存在——结论可以在 judgement_event 里写明它引用的判断的事件编号；没写明时由主机取当前交付的
+      那一条判断（同一份交付只有一条判断，#358 的门保证），结论照样引用一条判断。写明的编号在日志里
+      没有对应的判断事件时被拒绝。
+    · 属于本次激活——引用的判断必须是对当前交付与当前 PRD 的判断，并且写在这份交付被接纳之后：
+      新的交付到达以后，上一份交付的判断不再算作这一轮核验的依据。
+    · 覆盖全部验收条件——判断的逐条结论覆盖当前 PRD 的每一条验收条件，各一次。
+
+    返回引用的判断事件与错误；有错误时以错误为准。
+    """
+    committed = [event for event in events if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
+    accepted_at = _delivery_position(events, delivery_hash)
+    cited = proposal.get("judgement_event")
+    if cited is not None:
+        if not isinstance(cited, str) or not cited.strip():
+            return None, [FieldError("judgement_event",
+                                     "judgement_event must be the id of the independent judgement this conclusion "
+                                     "references, or null to use the judgement committed for the current delivery")]
+        cited = cited.strip()
+        referred = [event for event in committed if event.event_id == cited]
+        if not referred:
+            return None, [FieldError("judgement_event",
+                                     f"the referenced independent judgement does not exist in this work item: {cited}")]
+        judgement = referred[-1]
+        payload = judgement.payload or {}
+        if payload.get("delivery_spec_hash") != delivery_hash or payload.get("product_spec_hash") != spec_hash:
+            return None, [FieldError("judgement_event",
+                                     "the referenced judgement is not for the current delivery and ProductSpec; a "
+                                     "conclusion cannot reference the judgement of another delivery")]
+        if accepted_at is not None and judgement.position < accepted_at:
+            return None, [FieldError("judgement_event",
+                                     "the referenced judgement was committed before the current delivery was accepted; "
+                                     "it does not belong to this verification round")]
+        return _judgement_coverage_result(judgement, projection)
+    candidates = [event for event in committed
+                  if (event.payload or {}).get("delivery_spec_hash") == delivery_hash
+                  and (event.payload or {}).get("product_spec_hash") == spec_hash
+                  and (accepted_at is None or event.position >= accepted_at)]
+    if not candidates:
+        return None, [FieldError(
+            "judgement_event",
+            "commit the independent judgement for the current delivery first: the conclusion must reference the "
+            "committed judgement (kind=independent_judgement, criteria per acceptance criterion)")]
+    return _judgement_coverage_result(candidates[-1], projection)
+
+
+def _delivery_position(events: tuple[Event, ...] | list[Event], delivery_hash: str) -> int | None:
+    # 这份交付被接纳时的位置：判断写在这之后才算这一轮核验的依据
+    for event in events:
+        if event.type == EventType.DELIVERY_ACCEPTED and (event.payload or {}).get("content_hash") == delivery_hash:
+            return event.position
+    return None
+
+
+def _judgement_coverage_result(judgement: Event,
+                               projection: RunProjection) -> tuple[Event | None, list[FieldError]]:
+    # 判断的逐条结论覆盖当前 PRD 的全部验收条件，各一次（工单 #1190 的第三项核对）
+    rows = [row for row in (judgement.payload or {}).get("criteria") or [] if isinstance(row, dict)]
+    spec = projection.product_spec
+    expected = [f"AC{position}" for position in range(1, len(spec.acceptance_criteria) + 1)] \
+        if spec is not None else []
+    seen = [str(row.get("criterion")) for row in rows]
+    missing = [item for item in expected if item not in seen]
+    if missing:
+        return None, [FieldError("judgement_event",
+                                 "the referenced judgement does not cover every acceptance criterion of the current "
+                                 "ProductSpec; missing " + ", ".join(missing))]
+    if len(seen) != len(set(seen)):
+        return None, [FieldError("judgement_event",
+                                 "the referenced judgement lists the same acceptance criterion twice")]
+    return judgement, []
+
+
+def _judgement_change_errors(criteria: list[dict[str, Any]], judgement: Event) -> list[FieldError]:
+    # 判断与结论不一致的条目逐条写明改判理由（第 4 节，工单 #1190）：缺理由的被拒绝，错误指向那一条
+    judged = _judged_results(judgement)
+    errors: list[FieldError] = []
+    for index, row in enumerate(criteria):
+        before = judged.get(row["criterion"], "")
+        if before and before != row["result"] and not str(row.get("change_reason") or "").strip():
+            errors.append(FieldError(
+                f"criteria[{index}].change_reason",
+                f"the independent judgement recorded {before} for {row['criterion']} and the conclusion records "
+                f"{row['result']}; write why the result changed"))
+    return errors
+
+
+def _judged_results(judgement: Event) -> dict[str, str]:
+    # 独立判断的逐条结果，按 AC 序号
+    return {str(row.get("criterion")): str(row.get("result"))
+            for row in (judgement.payload or {}).get("criteria") or [] if isinstance(row, dict)}
+
+
+def _criteria_with_judgement(criteria: list[dict[str, Any]], judgement: Event) -> list[dict[str, Any]]:
+    # 结论的逐条结论带上判断当时的结果（工单 #1190）：同一条记录里看得出改了哪几条、往哪个方向改
+    judged = _judged_results(judgement)
+    return [{**row, "judged": judged.get(row["criterion"], "")} for row in criteria]
 _REQUIREMENT_MAPPING_FIELDS = frozenset({"requirement", "criteria", "gap"})
 
 

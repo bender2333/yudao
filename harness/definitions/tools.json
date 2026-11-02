@@ -1007,10 +1007,17 @@
   "submit_review": {
     "kind": "host",
     "proposal": "qa_review",
-    "description": "Submit a QAReview. criteria has one entry per acceptance criterion of the current ProductSpec (criterion is AC<position>, method is the verification method, result is passed, failed or unverified); the host rejects a review that misses a criterion, uses a method or result outside the closed sets, claims a passed executable criterion without a quality check receipt from this activation, or carries trial cases. release requires quality-run host receipts with exit_code 0 on the current snapshot, no failed criterion and every executable criterion passed; engineering receipts are not accepted as QA evidence. checks are check names. basis_delivery_spec_hash must equal the current effective DeliverySpec content_hash; a stale basis is rejected so the review cannot proceed against a superseded delivery.",
+    "description": "Submit a QAReview. criteria has one entry per acceptance criterion of the current ProductSpec (criterion is AC<position>, method is the verification method, result is passed, failed or unverified); the host rejects a review that misses a criterion, uses a method or result outside the closed sets, claims a passed executable criterion without a quality check receipt from this activation, or carries trial cases. The review must reference the independent judgement committed for the current delivery: judgement_event names its event id, or is null and the host uses the judgement committed for the current delivery; a judgement that does not exist, is not for the current delivery and ProductSpec, was committed before the delivery was accepted, or does not cover every acceptance criterion is rejected. When a criterion's result differs from the result the judgement recorded, write change_reason for it (the host rejects a changed criterion without a reason) and the release record carries the number of changed criteria. release requires quality-run host receipts with exit_code 0 on the current snapshot, no failed criterion and every executable criterion passed; engineering receipts are not accepted as QA evidence. checks are check names. basis_delivery_spec_hash must equal the current effective DeliverySpec content_hash; a stale basis is rejected so the review cannot proceed against a superseded delivery.",
     "parameters": {
       "type": "object",
       "properties": {
+        "judgement_event": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Event id of the independent judgement this review references; null uses the judgement committed for the current delivery"
+        },
         "verdict": {
           "type": "string",
           "enum": [
@@ -1099,6 +1106,13 @@
                   "string",
                   "null"
                 ]
+              },
+              "change_reason": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Why the result differs from the result the independent judgement recorded for this criterion; required when the two differ"
               }
             },
             "required": [
