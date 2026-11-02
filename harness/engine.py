@@ -21,7 +21,15 @@ from dataclasses import asdict, dataclass, replace
 from threading import Event
 from typing import Any
 
-from .actions import Action, ActionReceipt, FactsQuery, Preconditions, TreeFacts, WorkspaceFacts
+from .actions import (
+    Action,
+    ActionReceipt,
+    FactsQuery,
+    Preconditions,
+    TreeFacts,
+    WorkspaceFacts,
+    snapshot_payload,
+)
 from .adapters.base import ModelAdapter, ModelRequest, ProviderError
 from .adjudication import ToolPermission, facts_query, tool_permission
 from .artifacts import ArtifactStore
@@ -1154,10 +1162,11 @@ class StepDriver:
 
 def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
     # 公开树的动作前后快照（工单 #17）：摘要用于比对效果是否发生，entries 给出动作前后每个文件的内容哈希，
-    # 中断以后按它与动作参数核对实际效果（工单 #308）；不含文件内容，只是依据
+    # 中断以后按它与动作参数核对实际效果（工单 #308）；不含文件内容，只是依据。内容由动作合同给出
+    # （工单 #1398）：回执里的终点快照引用指向的是同一份内容，读回执的一方不用再来这里取
     if tree is None:
         return None
-    return {"digest": tree.digest, "entries": [list(item) for item in zip(tree.files, tree.hashes)]}
+    return snapshot_payload(tree)
 
 
 # 动作回执的输出里带图像的写法：键 images 是一串图像工件引用（浏览器与 computer use 设计说明
