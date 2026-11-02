@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/architecture/overall-architecture.md",
-"hash":"c885094f22cf0815",
+"hash":"5577e22ab9c2d901",
 "nodes":[
-{"hash":"c885094f22cf0815","id":"docs/design/architecture/overall-architecture.md","kind":"file","title":"docs/design/architecture/overall-architecture.md"},
+{"hash":"5577e22ab9c2d901","id":"docs/design/architecture/overall-architecture.md","kind":"file","title":"docs/design/architecture/overall-architecture.md"},
 {"hash":"7e9ffd7be394631d","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","kind":"section","parent":"docs/design/architecture/overall-architecture.md","title":"总体架构：总图与职责分层"},
 {"hash":"8a0c81462363ec00","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","title":"1. 模块图"},
 {"hash":"5ee64286ea7ce167","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.1 模块与 1.2 数据","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图","title":"1.1 模块与 1.2 数据"},
@@ -28,9 +28,9 @@
 {"hash":"9b44579c9f0d8583","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.5 判定点的校准、记录与重放","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同","title":"7.5 判定点的校准、记录与重放"},
 {"hash":"94aec3ceb08ae822","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.6 事实的来源","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同","title":"7.6 事实的来源"},
 {"hash":"d1aa18394662658a","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同","title":"7.7 拿不准时继续还是问用户"},
-{"hash":"da3944bc0037c901","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","title":"8. 路线图对照"},
+{"hash":"699d305ad1cb946d","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","title":"8. 路线图对照"},
 {"hash":"3ab57737ea134c2c","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 9. 使用的技术","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","title":"9. 使用的技术"},
-{"hash":"f46036f6336bc459","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","title":"10. 近期实施顺序"},
+{"hash":"a82ebd98ee1f59b4","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","title":"10. 近期实施顺序"},
 {"hash":"97a8ef4b54b19173","id":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 11. 待讨论的事项","kind":"section","parent":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层","title":"11. 待讨论的事项"}
 ],
 "edges":[
@@ -103,7 +103,7 @@
 {"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../skeleton-and-application.md"],"seen":"69d45d94be39c988","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.5 固定的结构与内核的位置"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["../trusted-kernel.md"],"seen":"9213f586c4c21f03","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.5 固定的结构与内核的位置"},
 {"dst":"docs/design/visualization.md#画面与播放设计说明 > 3. 分层与边界","kind":"link","raws":["../visualization.md"],"seen":"ba345f7baa0d648d","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.6 模块交互"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序"},
+{"dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 四个阶段","kind":"link","raws":["../../program-roadmap.md"],"seen":"ae959a490bb6d353","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 10. 近期实施顺序"},
 {"dst":"docs/adr/0018-single-control-host-remote-execution.md","kind":"link","raws":["../../adr/0018-single-control-host-remote-execution.md"],"seen":"67a2cd8adb1d5329","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 2. 各层的职责与边界"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["../trusted-kernel.md"],"seen":"9213f586c4c21f03","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 2. 各层的职责与边界"},
 {"dst":"docs/design/visualization.md#画面与播放设计说明 > 3. 分层与边界","kind":"link","raws":["../visualization.md"],"seen":"ba345f7baa0d648d","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 2. 各层的职责与边界"},
@@ -146,8 +146,8 @@
 {"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.4 发布检查与探针","kind":"link","raws":["../trusted-kernel.md"],"seen":"611ebba2e1959eec","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.4 用户决定"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"link","raws":["../forms-and-verifier-role.md"],"seen":"35e58f90a1c2c8ae","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户"},
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前","kind":"link","raws":["../independent-verification.md"],"seen":"bfe107abac284d7a","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../../requirements/self-hosting.md"],"seen":"8a7bb31f10c94018","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照"},
+{"dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 四个阶段","kind":"link","raws":["../../program-roadmap.md"],"seen":"ae959a490bb6d353","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["../../requirements/self-hosting.md"],"seen":"948cc02314d8bdc7","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 8. 路线图对照"},
 {"dst":"docs/adr/0021-client-pixel-view-follows-v9-structure.md","kind":"link","raws":["../../adr/0021-client-pixel-view-follows-v9-structure.md"],"seen":"15afdd9d5eee1b57","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 9. 使用的技术"},
 {"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","kind":"link","raws":["../execution-environment.md"],"seen":"5bd4d3077039c14c","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 9. 使用的技术"},
 {"dst":"docs/design/outsourced-roles.md","kind":"link","raws":["../outsourced-roles.md"],"seen":"6cbeee34a17bbb1e","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 9. 使用的技术"}
