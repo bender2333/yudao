@@ -1,6 +1,6 @@
 # 应用层与接口层设计说明
 
-总图位置：第四节「接口」的缝；第一节「页面」方框。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（删除命令登记、一次性批准与动作核实的决定）、[总体架构](architecture/overall-architecture.md)「各层的职责与边界」「依赖方向」与「合同」、需求 [D30](../requirements/web-game-frontend.md)、原型 [v13 原型](../prototypes/v13/design.md)与[构建约定](../prototypes/v13/BUILD.md)。
+总图位置：第四节「接口」的缝；第一节「页面」方框。依据：[ADR-0038](../adr/0038-function-first-commands-without-registration.md)（删除命令登记、一次性批准与动作核实的决定）、[总体架构](architecture/overall-architecture.md)「各层的职责与边界」「依赖方向」与「合同」、需求 [D30](../requirements/web-game-frontend.md)、原型 [v13 原型（已归档）](../archive/prototypes/)与它的构建约定。
 
 范围：系统首页、机器页与系统通知以本文为准。界面要求见[语义系统设计说明](semantic-system.md)「界面与观察」、[部门内多角色设计说明](department-roles.md)「界面」、[模型管理设计说明](model-management.md)「界面」。
 

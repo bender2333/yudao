@@ -93,8 +93,10 @@ def check_contract(kind: ActionKind, verification: Verification | None, cancella
 RuleName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")]
 
 # 可见范围的封闭词表（roles.json 的 visibility 一栏）：三条 roles.<部门>.visibility 参数的取值只能是其中的子集
-# （工单 #1189）。词表只在这里写一份，参数的取值核对与角色定义共用它
-VisibilityValue = Literal["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"]
+# （工单 #1189）。词表只在这里写一份，参数的取值核对与角色定义共用它。交付说明三项（工单 #357）：整份
+# current_delivery_spec、事实部分 delivery_facts、解释部分 delivery_explanation；其余三项是共享材料
+VisibilityValue = Literal["current_delivery_spec", "delivery_facts", "delivery_explanation", "existing_structure",
+                          "prior_delivery", "qa_defects"]
 VISIBILITY_VALUES: frozenset[str] = frozenset(get_args(VisibilityValue))
 
 
@@ -929,6 +931,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         elif tool.proposal is not None:
             submitters[tool.proposal] = name
     issues.extend(_contract_references(parts["proposal_contracts"], roles, tools, parts["work_items"]))
+    issues.extend(_delivery_part_issues(parts["proposal_contracts"]))
     issues.extend(_condition_references(parts["proposal_contracts"], organization))
     presets: ServicePresets = parts["service_presets"]
     identities = [preset.id for preset in presets.presets]
@@ -1123,6 +1126,26 @@ def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], t
             issues.append((file, f"roles.{name}.kinds",
                            "与共同部分合起来必须恰好说明这些提案种类：" + "、".join(sorted(kinds))))
     return issues
+
+
+def _delivery_part_issues(contracts: ProposalContracts) -> list[tuple[str, str, str]]:
+    # 交付说明的事实与解释归属（proposal_contracts.json 的 parts，工单 #357）：只核对 delivery_spec，合同写给
+    # 模型的每个字段必须恰好归入 facts 与 explanation 之一，缺了或两边都写都指出具体字段；没有 parts 的旧文件照旧加载
+    description = getattr(contracts.roles.get("engineering"), "kinds", {}).get("delivery_spec") or {}
+    declared = description.get("parts")
+    if declared is None:
+        return []
+    file, at = "proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts"
+    parts = {name: ({str(field).strip() for field in declared.get(name)}
+                    if isinstance(declared.get(name), (list, tuple)) else set())
+             for name in ("facts", "explanation")}
+    written = {str(item).split("=", 1)[0].strip() for item in description.get("required") or ()}
+    written |= {str(item).strip() for item in description.get("optional") or ()}
+    twice = [(file, at, f"字段 {field} 同时归入交付事实与解释")
+             for field in sorted(parts["facts"] & parts["explanation"])]
+    missing = [(file, at, f"字段 {field} 没有归入交付事实或解释")
+               for field in sorted(written - parts["facts"] - parts["explanation"] - {""})]
+    return twice + missing
 
 
 def _condition_references(contracts: ProposalContracts, organization: Organization) -> list[tuple[str, str, str]]:

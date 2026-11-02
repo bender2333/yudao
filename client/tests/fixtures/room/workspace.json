@@ -1,0 +1,1231 @@
+{
+  "note": "部门工作间的查询结果，只含 departments 一项：每个部门的 department 与 room（房间模型）。取自原型 v13 上录下的部门房间数据（原型已归档），房间组件只读这两项。",
+  "departments": {
+    "product": {
+      "project": {
+        "id": "p-todo",
+        "name": "待办清单网页",
+        "goal": "待办清单网页：新增、编辑、删除与标记完成任务，按完成状态筛选与搜索；任务可以设置截止日期，超过截止日期未完成时显示逾期提醒。",
+        "version": 13,
+        "archived": false
+      },
+      "department": {
+        "id": "product",
+        "label": "产品",
+        "duty": "维护原始意图与有效规范，回答其他部门的询问"
+      },
+      "work_item": {
+        "id": "w-todo-due",
+        "title": "增加截止日期与逾期提醒",
+        "status": "in_progress",
+        "color_index": 3
+      },
+      "run": {
+        "id": "r-todo-due",
+        "phase": "PRODUCT_SPEC",
+        "cycle": 1,
+        "elapsed_sec": 100200,
+        "limit_sec": 172800,
+        "department": "quality",
+        "yudao_version": "0.8.0",
+        "recovery_state": "running",
+        "stop_reason": null
+      },
+      "status": {
+        "id": "waiting",
+        "kind": "idle",
+        "text": "等待工作",
+        "note": null
+      },
+      "states": {
+        "product": {
+          "state": "waiting",
+          "text": "等待工作",
+          "kind": "idle",
+          "note": null
+        },
+        "engineering": {
+          "state": "waiting",
+          "text": "等待工作",
+          "kind": "idle",
+          "note": null
+        },
+        "quality": {
+          "state": "working",
+          "text": "工作中",
+          "kind": "running",
+          "note": null
+        }
+      },
+      "asks": [
+        {
+          "id": "q-todo-due-tz",
+          "requester": "engineering",
+          "recipient": "product",
+          "parent": null,
+          "question": "逾期是否按本地时区判定？",
+          "status": "answered",
+          "status_text": "已回答",
+          "answer": "按本地时区（Asia/Shanghai）判定；跨午夜后按本地日历日期比较，截止当天不显示逾期。",
+          "reason": null,
+          "prd_version": null,
+          "born_at": "2026-09-28T11:02:00+08:00",
+          "answered_at": "2026-09-28T11:20:00+08:00",
+          "chain": [
+            "engineering",
+            "product"
+          ],
+          "depth": 1
+        }
+      ],
+      "model": {
+        "definition": "opencode-go-responses/kimi-k2.6",
+        "label": "kimi-k2.6 · OpenCode Go · Responses",
+        "source": "部门默认",
+        "request_level": null,
+        "sent_level": "medium",
+        "protocol": "Responses",
+        "problem": null,
+        "image_input": true
+      },
+      "last_target": {
+        "attempt_id": "att-todo-due-02",
+        "at": "2026-09-28T11:21:00+08:00",
+        "status": "succeeded",
+        "status_text": "成功",
+        "connection": "opencode-go-responses",
+        "connection_name": "OpenCode Go · Responses",
+        "protocol": "Responses",
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "model": "kimi-k2.6",
+        "window": 262144,
+        "max_output": 32768,
+        "credential_ref": "OPENCODE_GO_KEY",
+        "credential_version": "k3",
+        "source": "部门默认",
+        "request_level": null,
+        "sent_level": "medium",
+        "prompt_version": 0
+      },
+      "prompt": {
+        "config_version": 0,
+        "config_text": "你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的询问时，只依据有效要求与用户原文；需要取舍时写明理由，澄清的结果写进 PRD。",
+        "request_version": 0,
+        "request_text": "你是产品部门。依据用户原文维护 PRD：写清目标、边界、验收条件与非目标，每条要求至少有一条验收条件；用户的新输入逐版本处理，写明新增、修改或保留了哪些要求。回答其他部门的询问时，只依据有效要求与用户原文；需要取舍时写明理由，澄清的结果写进 PRD。"
+      },
+      "messages": [
+        {
+          "seq": 14,
+          "at": "2026-09-28T11:20:00+08:00",
+          "source": "self",
+          "from": "product",
+          "text": "回答：按本地时区（Asia/Shanghai）判定，跨午夜后按本地日历日期比较",
+          "event_position": null
+        },
+        {
+          "seq": 13,
+          "at": "2026-09-28T11:02:00+08:00",
+          "source": "other",
+          "from": "engineering",
+          "text": "询问：逾期是否按本地时区判定？",
+          "event_position": null
+        },
+        {
+          "seq": 12,
+          "at": "2026-09-28T10:38:00+08:00",
+          "source": "self",
+          "from": "product",
+          "text": "PRD r1 已提交：5 条验收条件",
+          "event_position": null
+        },
+        {
+          "seq": 11,
+          "at": "2026-09-28T09:58:00+08:00",
+          "source": "user",
+          "from": "user",
+          "text": "用户输入 v1：截止日期与逾期提醒",
+          "event_position": null
+        }
+      ],
+      "guidance": [],
+      "context": {
+        "snapshots": [
+          {
+            "id": "ctx-todo-due-p1",
+            "at": "2026-09-28T09:59:00+08:00",
+            "title": "产品激活 1",
+            "attempt_id": "att-todo-due-01",
+            "sources": [
+              {
+                "label": "用户原文",
+                "version": "v2",
+                "included": true
+              },
+              {
+                "label": "项目上下文",
+                "version": "采纳 r1",
+                "included": true
+              },
+              {
+                "label": "部门规则",
+                "version": "默认 v0",
+                "included": true
+              }
+            ]
+          }
+        ],
+        "compactions": []
+      },
+      "settings_version": 1,
+      "room": {
+        "department": "product",
+        "level": "S5",
+        "status": "idle",
+        "crt": {
+          "target": "增加截止日期与逾期提醒",
+          "model": "kimi-k2.6",
+          "protocol": "Responses",
+          "status": "等待工作",
+          "cycle": 1
+        },
+        "roles": [
+          {
+            "id": "prod-manager",
+            "name": "产品部门经理",
+            "kind": "manager",
+            "status": "idle",
+            "task": null
+          },
+          {
+            "id": "prod-architect",
+            "name": "产品架构师",
+            "kind": "architect",
+            "status": "returned",
+            "task": "PRD r1（截止日期与逾期提醒）已被接纳；回答工程的时区询问"
+          },
+          {
+            "id": "prod-explorer",
+            "name": "产品探索者",
+            "kind": "explorer",
+            "status": "idle",
+            "task": null
+          },
+          {
+            "id": "prod-reviewer",
+            "name": "产品审查者",
+            "kind": "reviewer",
+            "status": "idle",
+            "task": null
+          }
+        ],
+        "existing_read": false,
+        "pose": null,
+        "door": null,
+        "hold_card": null,
+        "pending_tool": null,
+        "mailbox": 0,
+        "summaries": 0,
+        "scrolls": 1,
+        "pinned_notes": 0,
+        "pipes": {
+          "out": "idle",
+          "letters_waiting": 0
+        },
+        "machine": null,
+        "remote_unknown": false,
+        "tool_panel": {
+          "buttons": [
+            "search_code",
+            "get_file_contents",
+            "create_issue",
+            "lookup",
+            "annotate"
+          ],
+          "lit": -1
+        },
+        "waiting_provider": false,
+        "semantic_cards": 0
+      },
+      "roles": [
+        {
+          "id": "prod-manager",
+          "name": "产品部门经理",
+          "kind": "manager",
+          "status": "idle",
+          "task": null,
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "medium",
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "prod-manager"
+          },
+          "predictive": false
+        },
+        {
+          "id": "prod-architect",
+          "name": "产品架构师",
+          "kind": "architect",
+          "status": "returned",
+          "task": "PRD r1（截止日期与逾期提醒）已被接纳；回答工程的时区询问",
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "部门默认",
+            "request_level": null,
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": null,
+            "role_id": "prod-architect"
+          },
+          "predictive": false
+        },
+        {
+          "id": "prod-explorer",
+          "name": "产品探索者",
+          "kind": "explorer",
+          "status": "idle",
+          "task": null,
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "low",
+            "sent_level": "low",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "prod-explorer"
+          },
+          "predictive": false
+        },
+        {
+          "id": "prod-reviewer",
+          "name": "产品审查者",
+          "kind": "reviewer",
+          "status": "idle",
+          "task": null,
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "medium",
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "prod-reviewer"
+          },
+          "predictive": false
+        }
+      ],
+      "ledger": {
+        "items": [],
+        "facts": [],
+        "questions": [],
+        "progress": []
+      }
+    },
+    "engineering": {
+      "project": {
+        "id": "p-todo",
+        "name": "待办清单网页",
+        "goal": "待办清单网页：新增、编辑、删除与标记完成任务，按完成状态筛选与搜索；任务可以设置截止日期，超过截止日期未完成时显示逾期提醒。",
+        "version": 13,
+        "archived": false
+      },
+      "department": {
+        "id": "engineering",
+        "label": "工程",
+        "duty": "依据有效规范设计、实现、自测并提交交付"
+      },
+      "work_item": {
+        "id": "w-todo-due",
+        "title": "增加截止日期与逾期提醒",
+        "status": "in_progress",
+        "color_index": 3
+      },
+      "run": {
+        "id": "r-todo-due",
+        "phase": "PRODUCT_SPEC",
+        "cycle": 1,
+        "elapsed_sec": 100200,
+        "limit_sec": 172800,
+        "department": "quality",
+        "yudao_version": "0.8.0",
+        "recovery_state": "running",
+        "stop_reason": null
+      },
+      "status": {
+        "id": "waiting",
+        "kind": "idle",
+        "text": "等待工作",
+        "note": null
+      },
+      "states": {
+        "product": {
+          "state": "waiting",
+          "text": "等待工作",
+          "kind": "idle",
+          "note": null
+        },
+        "engineering": {
+          "state": "waiting",
+          "text": "等待工作",
+          "kind": "idle",
+          "note": null
+        },
+        "quality": {
+          "state": "working",
+          "text": "工作中",
+          "kind": "running",
+          "note": null
+        }
+      },
+      "asks": [
+        {
+          "id": "q-todo-due-tz",
+          "requester": "engineering",
+          "recipient": "product",
+          "parent": null,
+          "question": "逾期是否按本地时区判定？",
+          "status": "answered",
+          "status_text": "已回答",
+          "answer": "按本地时区（Asia/Shanghai）判定；跨午夜后按本地日历日期比较，截止当天不显示逾期。",
+          "reason": null,
+          "prd_version": null,
+          "born_at": "2026-09-28T11:02:00+08:00",
+          "answered_at": "2026-09-28T11:20:00+08:00",
+          "chain": [
+            "engineering",
+            "product"
+          ],
+          "depth": 1
+        }
+      ],
+      "model": {
+        "definition": "opencode-go-responses/kimi-k2.6",
+        "label": "kimi-k2.6 · OpenCode Go · Responses",
+        "source": "部门默认",
+        "request_level": "high",
+        "sent_level": "high",
+        "protocol": "Responses",
+        "problem": null,
+        "image_input": true
+      },
+      "last_target": {
+        "attempt_id": "att-todo-due-08",
+        "at": "2026-09-29T12:06:00+08:00",
+        "status": "succeeded",
+        "status_text": "成功",
+        "connection": "opencode-go-responses",
+        "connection_name": "OpenCode Go · Responses",
+        "protocol": "Responses",
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "model": "kimi-k2.6",
+        "window": 262144,
+        "max_output": 32768,
+        "credential_ref": "OPENCODE_GO_KEY",
+        "credential_version": "k3",
+        "source": "部门默认",
+        "request_level": "high",
+        "sent_level": "high",
+        "prompt_version": 0
+      },
+      "prompt": {
+        "config_version": 0,
+        "config_text": "你是工程部门。依据有效 PRD 实现代码、编写单元测试，并运行命令自测；怎样安排工作由你自己决定。交付说明写明做了什么与处理的缺陷；要求有疑问时询问产品，不自行改变要求。",
+        "request_version": 0,
+        "request_text": "你是工程部门。依据有效 PRD 实现代码、编写单元测试，并运行命令自测；怎样安排工作由你自己决定。交付说明写明做了什么与处理的缺陷；要求有疑问时询问产品，不自行改变要求。"
+      },
+      "messages": [
+        {
+          "seq": 18,
+          "at": "2026-09-29T14:00:00+08:00",
+          "source": "self",
+          "from": "engineering",
+          "text": "交付 r1 已提交：截止日期与逾期提醒",
+          "event_position": null
+        },
+        {
+          "seq": 17,
+          "at": "2026-09-28T11:20:00+08:00",
+          "source": "other",
+          "from": "product",
+          "text": "回答：跨午夜后按本地日历日期比较",
+          "event_position": null
+        },
+        {
+          "seq": 16,
+          "at": "2026-09-28T10:55:00+08:00",
+          "source": "self",
+          "from": "engineering",
+          "text": "先做截止日期显示，再做逾期判定与回归用例",
+          "event_position": null
+        },
+        {
+          "seq": 15,
+          "at": "2026-09-28T10:40:00+08:00",
+          "source": "other",
+          "from": "product",
+          "text": "PRD r1 被接纳",
+          "event_position": null
+        }
+      ],
+      "guidance": [],
+      "context": {
+        "snapshots": [
+          {
+            "id": "ctx-todo-due-e1",
+            "at": "2026-09-28T10:41:00+08:00",
+            "title": "工程激活 1",
+            "attempt_id": "att-todo-due-03",
+            "sources": [
+              {
+                "label": "当前合同",
+                "version": "PRD r1",
+                "included": true
+              },
+              {
+                "label": "项目上下文",
+                "version": "采纳 r1",
+                "included": true
+              },
+              {
+                "label": "部门规则",
+                "version": "默认 v0",
+                "included": true
+              }
+            ]
+          },
+          {
+            "id": "ctx-todo-due-e2",
+            "at": "2026-09-28T14:24:00+08:00",
+            "title": "工程激活 2（审查退回 1）",
+            "attempt_id": "att-todo-due-05",
+            "sources": [
+              {
+                "label": "当前合同",
+                "version": "PRD r1",
+                "included": true
+              },
+              {
+                "label": "审查意见",
+                "version": "第 1 次退回",
+                "included": true
+              },
+              {
+                "label": "部门账本",
+                "version": "P-1",
+                "included": true
+              }
+            ]
+          },
+          {
+            "id": "ctx-todo-due-e3",
+            "at": "2026-09-29T12:05:00+08:00",
+            "title": "工程激活 3（审查退回 3）",
+            "attempt_id": "att-todo-due-08",
+            "sources": [
+              {
+                "label": "当前合同",
+                "version": "PRD r1",
+                "included": true
+              },
+              {
+                "label": "审查意见",
+                "version": "第 3 次退回",
+                "included": true
+              },
+              {
+                "label": "用户指导",
+                "version": "无",
+                "included": false
+              }
+            ]
+          }
+        ],
+        "compactions": []
+      },
+      "settings_version": 1,
+      "room": {
+        "department": "engineering",
+        "level": "S5",
+        "status": "idle",
+        "crt": {
+          "target": "增加截止日期与逾期提醒",
+          "model": "kimi-k2.6",
+          "protocol": "Responses",
+          "status": "等待工作",
+          "cycle": 1
+        },
+        "roles": [
+          {
+            "id": "eng-manager",
+            "name": "工程经理",
+            "kind": "manager",
+            "status": "returned",
+            "task": "交付 r1 已提交"
+          },
+          {
+            "id": "eng-architect",
+            "name": "工程架构师",
+            "kind": "architect",
+            "status": "returned",
+            "task": "起草计划：截止日期显示与逾期判定"
+          },
+          {
+            "id": "eng-lead",
+            "name": "主程",
+            "kind": "lead",
+            "status": "returned",
+            "task": "P-1 至 P-3 已交回，审查退回 3 次后通过"
+          },
+          {
+            "id": "eng-explorer",
+            "name": "工程探索者",
+            "kind": "explorer",
+            "status": "idle",
+            "task": null
+          },
+          {
+            "id": "eng-reviewer",
+            "name": "工程审查者",
+            "kind": "reviewer",
+            "status": "returned",
+            "task": "P-1 退回 3 次后通过"
+          }
+        ],
+        "existing_read": false,
+        "pose": null,
+        "door": null,
+        "hold_card": null,
+        "pending_tool": null,
+        "mailbox": 0,
+        "summaries": 0,
+        "scrolls": 0,
+        "pinned_notes": 0,
+        "pipes": {
+          "out": "idle",
+          "letters_waiting": 0
+        },
+        "machine": "控制主机（小主机）",
+        "remote_unknown": false,
+        "tool_panel": {
+          "buttons": [
+            "search_code",
+            "get_file_contents",
+            "create_issue",
+            "lookup",
+            "annotate"
+          ],
+          "lit": -1
+        },
+        "waiting_provider": false,
+        "semantic_cards": 0
+      },
+      "roles": [
+        {
+          "id": "eng-manager",
+          "name": "工程经理",
+          "kind": "manager",
+          "status": "returned",
+          "task": "交付 r1 已提交",
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "high",
+            "sent_level": "high",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "eng-manager"
+          },
+          "predictive": false
+        },
+        {
+          "id": "eng-architect",
+          "name": "工程架构师",
+          "kind": "architect",
+          "status": "returned",
+          "task": "起草计划：截止日期显示与逾期判定",
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "high",
+            "sent_level": "high",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "eng-architect"
+          },
+          "predictive": false
+        },
+        {
+          "id": "eng-lead",
+          "name": "主程",
+          "kind": "lead",
+          "status": "returned",
+          "task": "P-1 至 P-3 已交回，审查退回 3 次后通过",
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "medium",
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "eng-lead"
+          },
+          "predictive": false
+        },
+        {
+          "id": "eng-explorer",
+          "name": "工程探索者",
+          "kind": "explorer",
+          "status": "idle",
+          "task": null,
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "low",
+            "sent_level": "low",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "eng-explorer"
+          },
+          "predictive": false
+        },
+        {
+          "id": "eng-reviewer",
+          "name": "工程审查者",
+          "kind": "reviewer",
+          "status": "returned",
+          "task": "P-1 退回 3 次后通过",
+          "model": "opencode-go-responses/kimi-k2.6",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/kimi-k2.6",
+            "model": "kimi-k2.6",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "medium",
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "eng-reviewer"
+          },
+          "predictive": false
+        }
+      ],
+      "ledger": {
+        "items": [
+          {
+            "id": "P-1",
+            "text": "逾期提醒的时区换算：按本地日历日期比较，补跨午夜的用例",
+            "assignee": "eng-lead",
+            "status": "returned",
+            "result": "已交回：本地日期比较与 2 条跨午夜用例",
+            "reviews": [
+              {
+                "at": "2026-09-28T14:30:00+08:00",
+                "verdict": "returned",
+                "text": "逾期判定用 UTC 毫秒比较，跨午夜后当天到期的任务会提前显示逾期；改为按本地日历日期比较。"
+              },
+              {
+                "at": "2026-09-28T16:08:00+08:00",
+                "verdict": "returned",
+                "text": "跨午夜的用例只覆盖了次日，缺少当天到期的样例；补样例。"
+              },
+              {
+                "at": "2026-09-29T11:48:00+08:00",
+                "verdict": "returned",
+                "text": "样例通过，但文案仍写「已超过截止日期」；写明截止日期与超期天数。"
+              },
+              {
+                "at": "2026-09-29T12:30:00+08:00",
+                "verdict": "passed",
+                "text": "P-1 通过：本地日期比较、跨午夜用例与文案都符合 PRD。"
+              }
+            ]
+          },
+          {
+            "id": "P-2",
+            "text": "列表与筛选结果显示截止日期",
+            "assignee": "eng-lead",
+            "status": "returned",
+            "result": "已交回",
+            "reviews": []
+          },
+          {
+            "id": "P-3",
+            "text": "npm test 回归与新增跨午夜用例",
+            "assignee": "eng-lead",
+            "status": "returned",
+            "result": "退出 0 · 16 条通过",
+            "reviews": []
+          }
+        ],
+        "facts": [
+          "跨午夜样例在审查中被指出 3 次",
+          "npm test 退出 0",
+          "计划条目都有对应实现"
+        ],
+        "questions": [],
+        "progress": [
+          {
+            "cycle": 1,
+            "judgment": "有进展",
+            "text": "计划审查通过，主程开始实现"
+          },
+          {
+            "cycle": 2,
+            "judgment": "有进展",
+            "text": "按审查意见改为本地日期比较并补样例"
+          },
+          {
+            "cycle": 3,
+            "judgment": "有进展",
+            "text": "文案与样例补齐后通过审查"
+          }
+        ]
+      }
+    },
+    "quality": {
+      "project": {
+        "id": "p-todo",
+        "name": "待办清单网页",
+        "goal": "待办清单网页：新增、编辑、删除与标记完成任务，按完成状态筛选与搜索；任务可以设置截止日期，超过截止日期未完成时显示逾期提醒。",
+        "version": 13,
+        "archived": false
+      },
+      "department": {
+        "id": "quality",
+        "label": "质检",
+        "duty": "在独立副本中验证交付，给出缺陷或放行"
+      },
+      "work_item": {
+        "id": "w-todo-due",
+        "title": "增加截止日期与逾期提醒",
+        "status": "in_progress",
+        "color_index": 3
+      },
+      "run": {
+        "id": "r-todo-due",
+        "phase": "PRODUCT_SPEC",
+        "cycle": 1,
+        "elapsed_sec": 100200,
+        "limit_sec": 172800,
+        "department": "quality",
+        "yudao_version": "0.8.0",
+        "recovery_state": "running",
+        "stop_reason": null
+      },
+      "status": {
+        "id": "working",
+        "kind": "running",
+        "text": "工作中",
+        "note": null
+      },
+      "states": {
+        "product": {
+          "state": "waiting",
+          "text": "等待工作",
+          "kind": "idle",
+          "note": null
+        },
+        "engineering": {
+          "state": "waiting",
+          "text": "等待工作",
+          "kind": "idle",
+          "note": null
+        },
+        "quality": {
+          "state": "working",
+          "text": "工作中",
+          "kind": "running",
+          "note": null
+        }
+      },
+      "asks": [],
+      "model": {
+        "definition": "opencode-go-responses/mimo-v2.5",
+        "label": "mimo-v2.5 · OpenCode Go · Responses",
+        "source": "部门默认",
+        "request_level": null,
+        "sent_level": "medium",
+        "protocol": "Responses",
+        "problem": null,
+        "image_input": true
+      },
+      "last_target": {
+        "attempt_id": "att-todo-due-10",
+        "at": "2026-09-29T14:24:00+08:00",
+        "status": "running",
+        "status_text": "进行中",
+        "connection": "opencode-go-responses",
+        "connection_name": "OpenCode Go · Responses",
+        "protocol": "Responses",
+        "base_url": "https://opencode.ai/zen/go/v1",
+        "model": "mimo-v2.5",
+        "window": 1048576,
+        "max_output": 65536,
+        "credential_ref": "OPENCODE_GO_KEY",
+        "credential_version": "k3",
+        "source": "部门默认",
+        "request_level": null,
+        "sent_level": "medium",
+        "prompt_version": 0
+      },
+      "prompt": {
+        "config_version": 0,
+        "config_text": "你是质检部门。依据有效 PRD 在独立副本中验证交付：逐条对照验收条件记录检查结果、证据与主机回执。交付到达之前按 PRD 起草测试用例。发现问题时写明复现步骤与违反的验收条件，提交缺陷记录；要求本身有问题时询问产品；全部验收条件都有通过的检查时给出放行结论。",
+        "request_version": 0,
+        "request_text": "你是质检部门。依据有效 PRD 在独立副本中验证交付：逐条对照验收条件记录检查结果、证据与主机回执。交付到达之前按 PRD 起草测试用例。发现问题时写明复现步骤与违反的验收条件，提交缺陷记录；要求本身有问题时询问产品；全部验收条件都有通过的检查时给出放行结论。"
+      },
+      "messages": [
+        {
+          "seq": 21,
+          "at": "2026-09-29T14:20:00+08:00",
+          "source": "self",
+          "from": "quality",
+          "text": "取回了 MDN 的日期输入控件说明，按它检查日期输入",
+          "event_position": null
+        },
+        {
+          "seq": 20,
+          "at": "2026-09-29T14:10:00+08:00",
+          "source": "self",
+          "from": "quality",
+          "text": "开始试用：逐步检查截止日期与逾期提醒",
+          "event_position": null
+        },
+        {
+          "seq": 19,
+          "at": "2026-09-29T14:05:00+08:00",
+          "source": "other",
+          "from": "engineering",
+          "text": "交付 r1 到达",
+          "event_position": null
+        }
+      ],
+      "guidance": [],
+      "context": {
+        "snapshots": [
+          {
+            "id": "ctx-todo-due-q1",
+            "at": "2026-09-29T14:06:00+08:00",
+            "title": "质检激活 1",
+            "attempt_id": "att-todo-due-09",
+            "sources": [
+              {
+                "label": "当前合同",
+                "version": "PRD r1",
+                "included": true
+              },
+              {
+                "label": "前次交付",
+                "version": "交付 r1",
+                "included": true
+              },
+              {
+                "label": "浏览器工具",
+                "version": "5 个工具",
+                "included": true
+              }
+            ]
+          }
+        ],
+        "compactions": []
+      },
+      "settings_version": 1,
+      "room": {
+        "department": "quality",
+        "level": "S5",
+        "status": "working",
+        "crt": {
+          "target": "增加截止日期与逾期提醒",
+          "model": "mimo-v2.5",
+          "protocol": "Responses",
+          "status": "工作中",
+          "cycle": 1
+        },
+        "roles": [
+          {
+            "id": "qa-manager",
+            "name": "质检经理",
+            "kind": "manager",
+            "status": "returned",
+            "task": "已接收交付 r1，组织试用"
+          },
+          {
+            "id": "qa-tester",
+            "name": "测试工程师",
+            "kind": "tester",
+            "status": "working",
+            "task": "在 m-study 上试用待办清单页面"
+          },
+          {
+            "id": "qa-explorer",
+            "name": "质检探索者",
+            "kind": "explorer",
+            "status": "idle",
+            "task": null
+          },
+          {
+            "id": "qa-reviewer",
+            "name": "质检审查者",
+            "kind": "reviewer",
+            "status": "idle",
+            "task": null
+          }
+        ],
+        "existing_read": false,
+        "pose": {
+          "role_id": "qa-tester",
+          "action": "typing"
+        },
+        "door": null,
+        "hold_card": null,
+        "pending_tool": null,
+        "mailbox": 0,
+        "summaries": 0,
+        "scrolls": 0,
+        "pinned_notes": 0,
+        "pipes": {
+          "out": "flowing",
+          "letters_waiting": 0
+        },
+        "machine": "书房台式机",
+        "remote_unknown": false,
+        "tool_panel": {
+          "buttons": [
+            "search_code",
+            "get_file_contents",
+            "create_issue",
+            "lookup",
+            "annotate"
+          ],
+          "lit": -1
+        },
+        "trial": {
+          "screenshot": "todo-trial-2.png",
+          "text_lines": [
+            "标题输入框：续费域名",
+            "截止日期：2026-09-30",
+            "列表出现：续费域名（截止 2026-09-30）"
+          ],
+          "step": 2,
+          "model_saw": true
+        },
+        "waiting_provider": false,
+        "semantic_cards": 0
+      },
+      "image_warning": null,
+      "trials": [
+        {
+          "step": 1,
+          "at": "2026-09-29T14:11:00+08:00",
+          "action": "打开页面，确认列表与截止日期的显示",
+          "screenshot": "todo-trial-1.png",
+          "text_lines": [
+            "标题：待办清单",
+            "导航：全部待办、关于",
+            "列表：续费域名（截止 2026-09-30）；预约体检"
+          ],
+          "requirement": "列表与截止日期显示",
+          "model_saw": true
+        },
+        {
+          "step": 2,
+          "at": "2026-09-29T14:16:00+08:00",
+          "action": "新增任务「续费域名」，填写截止日期 09-30",
+          "screenshot": "todo-trial-2.png",
+          "text_lines": [
+            "标题输入框：续费域名",
+            "截止日期：2026-09-30",
+            "列表出现：续费域名（截止 2026-09-30）"
+          ],
+          "requirement": "新建任务与截止日期",
+          "model_saw": true
+        }
+      ],
+      "roles": [
+        {
+          "id": "qa-manager",
+          "name": "质检经理",
+          "kind": "manager",
+          "status": "returned",
+          "task": "已接收交付 r1，组织试用",
+          "model": "opencode-go-responses/mimo-v2.5",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/mimo-v2.5",
+            "model": "mimo-v2.5",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "部门默认",
+            "request_level": null,
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": null,
+            "role_id": "qa-manager"
+          },
+          "predictive": false
+        },
+        {
+          "id": "qa-tester",
+          "name": "测试工程师",
+          "kind": "tester",
+          "status": "working",
+          "task": "在 m-study 上试用待办清单页面",
+          "model": "opencode-go-responses/mimo-v2.5",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/mimo-v2.5",
+            "model": "mimo-v2.5",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": null,
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": null,
+            "role_id": "qa-tester"
+          },
+          "predictive": false
+        },
+        {
+          "id": "qa-explorer",
+          "name": "质检探索者",
+          "kind": "explorer",
+          "status": "idle",
+          "task": null,
+          "model": "opencode-go-responses/mimo-v2.5",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/mimo-v2.5",
+            "model": "mimo-v2.5",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": "low",
+            "sent_level": "low",
+            "problem": null,
+            "image_input": true,
+            "level_source": "角色默认",
+            "role_id": "qa-explorer"
+          },
+          "predictive": false
+        },
+        {
+          "id": "qa-reviewer",
+          "name": "质检审查者",
+          "kind": "reviewer",
+          "status": "idle",
+          "task": null,
+          "model": "opencode-go-responses/mimo-v2.5",
+          "resolved": {
+            "ok": true,
+            "definition": "opencode-go-responses/mimo-v2.5",
+            "model": "mimo-v2.5",
+            "connection": "opencode-go-responses",
+            "connection_name": "OpenCode Go · Responses",
+            "protocol": "Responses",
+            "source": "角色默认",
+            "request_level": null,
+            "sent_level": "medium",
+            "problem": null,
+            "image_input": true,
+            "level_source": null,
+            "role_id": "qa-reviewer"
+          },
+          "predictive": false
+        }
+      ],
+      "ledger": {
+        "items": [
+          {
+            "id": "Q-1",
+            "text": "对照 PRD 的 5 条验收条件试用页面",
+            "assignee": "qa-tester",
+            "status": "working",
+            "result": null,
+            "reviews": []
+          }
+        ],
+        "facts": [
+          "试用完成 2 个步骤",
+          "取回了 MDN 的日期输入控件说明"
+        ],
+        "questions": [],
+        "progress": [
+          {
+            "cycle": 1,
+            "judgment": "有进展",
+            "text": "试用开始，截止日期显示正常"
+          }
+        ]
+      },
+      "live_attempt": "att-todo-due-10"
+    }
+  }
+}

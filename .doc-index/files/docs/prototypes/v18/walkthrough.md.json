@@ -1,0 +1,22 @@
+{
+"schema":1,
+"path":"docs/prototypes/v18/walkthrough.md",
+"hash":"00c4b4f01d62de0c",
+"nodes":[
+{"hash":"00c4b4f01d62de0c","id":"docs/prototypes/v18/walkthrough.md","kind":"file","title":"docs/prototypes/v18/walkthrough.md"},
+{"hash":"d4daf521524e12d5","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查","kind":"section","parent":"docs/prototypes/v18/walkthrough.md","title":"页面原型 v18 走查"},
+{"hash":"0192c617d2f98ca7","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 怎么打开","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查","title":"怎么打开"},
+{"hash":"f93cee989966f66f","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 数一下","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查","title":"数一下"},
+{"hash":"e20b5fc90e805b05","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客）","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查","title":"脚本二：一个角色直做（个人博客）"},
+{"hash":"29d84f9072069518","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客） > 1. 谁、要做什么项目","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客）","title":"1. 谁、要做什么项目"},
+{"hash":"be65af5d9afaa0a7","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客） > 2. 新建项目","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客）","title":"2. 新建项目"},
+{"hash":"1b4162ca2922c7c7","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客） > 3. 第一个事项","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客）","title":"3. 第一个事项"},
+{"hash":"c2f542b26dc1a3d8","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客） > 4. 中途","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客）","title":"4. 中途"},
+{"hash":"45003c66103d15c7","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客） > 5. 结束","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客）","title":"5. 结束"},
+{"hash":"5a925a038e64624b","id":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客） > 6. 最常做的改动：加一个核验角色","kind":"section","parent":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 脚本二：一个角色直做（个人博客）","title":"6. 最常做的改动：加一个核验角色"}
+],
+"edges":[
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["../../design/project-organization.md"],"seen":"dcf2278bd3e0d94b","src":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查"},
+{"dst":"docs/prototypes/v18/index.html","kind":"code-path","raws":["docs/prototypes/v18/index.html"],"seen":"58180fa2f8cdf9ad","src":"docs/prototypes/v18/walkthrough.md#页面原型 v18 走查 > 怎么打开"}
+]
+}

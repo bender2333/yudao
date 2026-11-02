@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/department-roles.md",
-"hash":"d481adf7738d91bc",
+"hash":"2bbf0b6ba111fa6c",
 "nodes":[
-{"hash":"d481adf7738d91bc","id":"docs/design/department-roles.md","kind":"file","title":"docs/design/department-roles.md"},
+{"hash":"2bbf0b6ba111fa6c","id":"docs/design/department-roles.md","kind":"file","title":"docs/design/department-roles.md"},
 {"hash":"9871f53ea1b6f6d3","id":"docs/design/department-roles.md#部门内多角色设计说明","kind":"section","parent":"docs/design/department-roles.md","title":"部门内多角色设计说明"},
 {"hash":"45d413065dd3c8fe","id":"docs/design/department-roles.md#部门内多角色设计说明 > 1. 要解决的问题","kind":"section","parent":"docs/design/department-roles.md#部门内多角色设计说明","title":"1. 要解决的问题"},
 {"hash":"1fab5a26d125e331","id":"docs/design/department-roles.md#部门内多角色设计说明 > 2. 参照对象与取舍","kind":"section","parent":"docs/design/department-roles.md#部门内多角色设计说明","title":"2. 参照对象与取舍"},
@@ -39,7 +39,7 @@
 {"hash":"22a2164de6d6c4f7","id":"docs/design/department-roles.md#部门内多角色设计说明 > 14. 模型与 Prompt 设置","kind":"section","parent":"docs/design/department-roles.md#部门内多角色设计说明","title":"14. 模型与 Prompt 设置"},
 {"hash":"362bed16c8fb816c","id":"docs/design/department-roles.md#部门内多角色设计说明 > 15. 界面","kind":"section","parent":"docs/design/department-roles.md#部门内多角色设计说明","title":"15. 界面"},
 {"hash":"62620c98e771b1fb","id":"docs/design/department-roles.md#部门内多角色设计说明 > 16. 验收","kind":"section","parent":"docs/design/department-roles.md#部门内多角色设计说明","title":"16. 验收"},
-{"hash":"1da75812eba5f49b","id":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系","kind":"section","parent":"docs/design/department-roles.md#部门内多角色设计说明","title":"17. 与其他文档的关系"}
+{"hash":"4ca8a482ac993599","id":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系","kind":"section","parent":"docs/design/department-roles.md#部门内多角色设计说明","title":"17. 与其他文档的关系"}
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「产品」","「工程」","「质检」"],"seen":"3c9310ef49956c5b","src":"docs/design/department-roles.md#部门内多角色设计说明"},
@@ -81,11 +81,10 @@
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 7. 推理档位 > 7.3 限制到支持范围","kind":"link","raws":["model-management.md"],"seen":"c72afebfb6a9c617","src":"docs/design/department-roles.md#部门内多角色设计说明 > 14. 模型与 Prompt 设置"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 14. 界面与观察","kind":"link","raws":["semantic-system.md"],"seen":"de654054fdc8a067","src":"docs/design/department-roles.md#部门内多角色设计说明 > 15. 界面"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"79efb30c90fc78d7","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["model-management.md"],"seen":"fd865184d784f371","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["model-management.md"],"seen":"ce5c495eb936b81f","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
 {"dst":"docs/design/outsourced-roles.md","kind":"link","raws":["outsourced-roles.md"],"seen":"6cbeee34a17bbb1e","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"8991ad5c4d99e914","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
 {"dst":"docs/design/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"cd8a447b9c5db13f","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
-{"dst":"docs/prototypes/v13/design.md","kind":"link","raws":["../prototypes/v13/design.md"],"seen":"226a7fe5fb527914","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
 {"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["../requirements/department-guidance.md"],"seen":"d7d91f4da588c2ec","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
 {"dst":"docs/requirements/department-prompts.md","kind":"link","raws":["../requirements/department-prompts.md"],"seen":"c8dce302f7170b1e","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
 {"dst":"docs/requirements/engineering-plan.md","kind":"link","raws":["../requirements/engineering-plan.md"],"seen":"b51b08be44b7744f","src":"docs/design/department-roles.md#部门内多角色设计说明 > 17. 与其他文档的关系"},
