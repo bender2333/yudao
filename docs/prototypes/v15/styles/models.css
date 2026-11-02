@@ -65,7 +65,11 @@
 .m15-state { flex: 0 0 auto; font-size: 12px; color: var(--green); max-width: 110px; text-align: right; }
 .m15-state.error { color: var(--red); }
 .m15-state.warn { color: var(--amber); }
-.m15-morebtn { display: block; margin: 12px auto 0; }
+.m15-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.m15-probe-side { grid-column: 2; grid-row: 1; align-self: center; display: grid; justify-items: end; gap: 4px; padding-right: 14px; max-width: 150px; text-align: right; }
+.m15-probe-msg { grid-column: 1 / -1; margin: 0; padding: 0 14px 11px 43px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.m15-probe-ok { color: var(--green); }
+.m15-pager { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
 .m15-selection { border-left: 1px solid var(--line); background: var(--surface-2); padding: 18px; min-width: 0; }
 .m15-selection h3 { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; }
 .m15-pad { padding: 22px 0; }
@@ -99,4 +103,5 @@
   .m15-selection { border-left: 0; border-top: 1px solid var(--line); }
   .m15-results { padding: 0 12px 12px; }
   .m15-state { max-width: 80px; }
+  .m15-probe-side { grid-column: 1 / -1; grid-row: auto; justify-items: start; max-width: none; text-align: left; padding: 0 12px 10px 43px; }
 }

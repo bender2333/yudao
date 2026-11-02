@@ -309,13 +309,14 @@ sequenceDiagram
 | `catalog.candidates.collect` | 刷新模型列表；每个候选带补全后的协议、窗口、输出上限与输入方式及其来源（上游模型列表，或能力表的服务商与 revision），以及提供方、是否支持推理、是否适用于部门任务；失败分五种（Key 被拒绝、地址不可达、返回的不是模型列表、其他状态码、空列表），结果写明请求的地址与原因；最近一次的结果保存在服务进程里，随 `catalog` 查询返回 | 连接、模型列表地址（可选） | `catalog_candidates_collected` | 目录修订号（记录依据） |
 | `catalog.connection.test` | 连接测试 | Provider 配置 | `catalog_test_finished` | 目录修订号（记录依据） |
 | `catalog.model.test` | 模型测试（最小问答与工具往返），通过时写入准入并记录是否接受要求调用工具；测试未通过的定义用它重新测试 | Provider 配置、模型访问定义 | `catalog_test_finished`（带准入） | 目录修订号（记录依据） |
+| `catalog.candidate.test` | 候选测试：对一个还没有选用的候选做与模型测试相同的两组请求，参数取选用时会得到的值；不保存定义、不写准入、不改部门默认；与选用后的模型测试共用同时进行的上限；候选不在当前的模型列表里时拒绝（`not_found`） | 连接、上游模型 ID | `catalog_test_finished`（`candidate` 种类，带连接与上游模型 ID，不带准入） | 目录修订号（记录依据） |
 | `catalog.department_defaults.save` | 保存部门默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各部门的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 |
 | `catalog.role_defaults.save` | 保存角色默认；所选模型不具备部门的建议能力时照常保存，结果带提醒 | 各角色的模型访问定义引用与请求档位 | `catalog_revised` | 目录修订号 |
 | `credential.set` | 保存 API Key，写入数据目录的 `.env`；评测与测试可以选「只在本进程有效」，模型管理页不使用这个方式 | 凭据引用、API Key、写入方式 | `credential_changed`（只含引用、来源与版本） | 凭据版本 |
 | `credential.clear_override` | 清除内存覆盖（评测与测试使用） | 凭据引用 | `credential_changed` | 凭据版本 |
 | `credential.remove_persisted` | 删除保存的 Key（删除连接时一并执行） | 凭据引用 | `credential_changed` | 凭据版本 |
 
-页面主路径用 `catalog.connect` 与 `catalog.model.select`：前者把连接、Key 与候选做成一步，后者把选用的补全参数、保存定义、模型测试与准入做成一条流水线（[模型管理设计说明](model-management.md)「模型访问定义与准入」）；`catalog.connection.save`、`catalog.document.save` 与 `credential.*` 服务高级部分、评测与测试。连接测试、获取模型列表与模型测试需要请求上游，命令接受以后作为任务进行，结果以事件出现。选用进行中的状态（补全参数、等待测试、测试中）是服务进程里的瞬时状态：经实时通道推送，`catalog` 查询也返回它，页面刷新以后据此恢复，不写事件日志；进程重启以后进行中的选用丢失，这些定义显示为候选，用户重新测试。读取 MCP 服务器的工具清单（`tool_server.probe`）按同样的方式进行。
+页面主路径用 `catalog.connect` 与 `catalog.model.select`：前者把连接、Key 与候选做成一步，后者把选用的补全参数、保存定义、模型测试与准入做成一条流水线（[模型管理设计说明](model-management.md)「模型访问定义与准入」）；`catalog.connection.save`、`catalog.document.save` 与 `credential.*` 服务高级部分、评测与测试。连接测试、获取模型列表与模型测试需要请求上游，命令接受以后作为任务进行，结果以事件出现。选用进行中的状态（补全参数、等待测试、测试中）是服务进程里的瞬时状态：经实时通道推送，`catalog` 查询也返回它，页面刷新以后据此恢复，不写事件日志；进程重启以后进行中的选用丢失，这些定义显示为候选，用户重新测试。候选测试（`catalog.candidate.test`）进行中的状态与最近一次的结果同样放在服务进程里，随候选一起由 `catalog` 查询返回，重新获取模型列表与进程重启以后清除；测试结束时照常追加一条 `catalog_test_finished` 事件。读取 MCP 服务器的工具清单（`tool_server.probe`）按同样的方式进行。
 
 **运维**
 
@@ -531,7 +532,7 @@ sequenceDiagram
 
 | 查询 | 返回内容 | 位置 |
 | --- | --- | --- |
-| `catalog` | 服务方案预置表与修订号、模型能力表的 revision、快照日期与来源链接、Provider 配置、模型访问定义（含输入方式：文本、图像，以及每个值的来源）、准入记录、凭据状态（不含 Key）、进行中的选用（补全参数、等待测试、测试中，带选用序号）、每个连接最近一次的候选获取结果与采集时间（候选带来源、提供方、是否支持推理、是否适用于部门任务；失败时带原因）、部门默认与角色默认，各带当前的建议能力提醒；目录修订号 | |
+| `catalog` | 服务方案预置表与修订号、模型能力表的 revision、快照日期与来源链接、Provider 配置、模型访问定义（含输入方式：文本、图像，以及每个值的来源）、准入记录、凭据状态（不含 Key）、进行中的选用（补全参数、等待测试、测试中，带选用序号）、每个连接最近一次的候选获取结果与采集时间（候选带来源、提供方、是否支持推理、是否适用于部门任务、候选测试的状态与结果；失败时带原因）、部门默认与角色默认，各带当前的建议能力提醒；目录修订号 | |
 | `catalog.document` | 目录文档（编辑 JSON 与导出使用），不含 Key、准入记录与项目部门设置 | |
 | `catalog.change_impact` | 按拟议的修改计算会作废准入的定义、引用方（部门默认的哪个部门、哪个项目的哪个部门）与正在使用它们的进行中事项，不写入任何内容（[模型管理设计说明](model-management.md)「修改与准入」） | |
 | `runtime.slots` | 槽位数、占用、跨项目队列、重启后的队列状态 | |

@@ -9,6 +9,7 @@
   const DEPTS = { product: '产品', engineering: '工程', quality: '质检' };
   const LEVELS = { minimal: '极低', low: '低', medium: '中', high: '高', xhigh: '很高', max: '最高' };
   const MAX_TEST = 3;
+  const PAGE_SIZE = 8;
   const STEP_MS = 650;
 
   // 数值只用于演示，不代表上游模型的真实能力
@@ -48,13 +49,17 @@
 
   function initial(mode) {
     return { mode, url: '', key: '', savedUrl: '', saved: false, editing: true, showKey: false, phase: 'idle', error: null, fetchedAt: null, candidates: [],
-      search: '', filter: 'auto', limit: 8, selected: {}, defaults: { product: '', engineering: '', quality: '' }, levels: { product: '', engineering: '', quality: '' },
+      search: '', filter: 'auto', page: 1, probes: {}, selected: {}, defaults: { product: '', engineering: '', quality: '' }, levels: { product: '', engineering: '', quality: '' },
       roles: {}, notice: '', manualOpen: false };
   }
 
   const rows = () => Object.values(state.selected);
   const ready = () => rows().filter((r) => r.status === 'ready');
   const busy = () => state.phase === 'connecting';
+  // 选用后的验证与候选测试共用并发上限
+  const testing = () => rows().filter((x) => x.status === 'testing').length + Object.values(state.probes).filter((p) => p.status === 'testing').length;
+  // 通过返回 null，否则给出哪一组没过与原因；选用的验证和候选的测试共用
+  const verdict = (id) => (state.mode === 'test' && id === examples[0].id ? { step: '最小问答', reason: 'HTTP 403，当前 Key 没有调用这个模型的权限' } : null);
   const units = (v) => (v === null ? '待识别' : (v / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 }) + 'K');
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms || STEP_MS));
   const tag = (text, kind) => '<span class="m15-tag' + (kind ? ' is-' + kind : '') + '">' + esc(text) + '</span>';
@@ -182,15 +187,31 @@
     });
   }
 
+  // 「测试」按钮和结果放在 .m15-pick 之外，按钮里不能再嵌按钮
+  function probeParts(r) {
+    if (state.selected[r.id] || r.type !== 'chat') return { side: '', msg: '' };
+    if (r.context === null) return { side: '<span class="m15-probe-side">' + btn('测试', 'probe', 'disabled', 'small') + '<span class="y15-small y15-muted">先选用并填写容量</span></span>', msg: '' };
+    const p = state.probes[r.id];
+    const st = p && p.status;
+    const done = st === 'passed' || st === 'failed';
+    let msg = '';
+    if (st === 'waiting') msg = '<p class="m15-probe-msg y15-muted">等待测试（同时测试最多 ' + MAX_TEST + ' 个）</p>';
+    else if (st === 'testing') msg = '<p class="m15-probe-msg y15-muted" role="status">测试中…</p>';
+    else if (st === 'passed') msg = '<p class="m15-probe-msg m15-probe-ok" role="status">测试通过 · 用时 ' + p.took + ' 秒 · 实际返回 ' + esc(r.id) + ' · 接受要求调用工具</p>';
+    else if (st === 'failed') msg = '<p class="m15-probe-msg m15-err" role="status">测试未通过：' + esc(p.step) + ' · ' + esc(p.reason) + '。</p>';
+    return { side: '<span class="m15-probe-side">' + btn(done ? '重新测试' : '测试', 'probe', 'data-id="' + esc(r.id) + '"' + (st === 'waiting' || st === 'testing' ? ' disabled' : ''), 'small') + '</span>', msg };
+  }
+
   function card(r) {
     const sel = state.selected[r.id];
     const label = sel ? STATUS[sel.status] : r.type === 'other' ? '不适用于部门任务' : r.context === null ? '容量未知' : '勾选即配置';
     const kind = sel && sel.status === 'failed' ? 'error' : sel && (sel.status === 'unknown' || sel.status === 'stale') ? 'warn' : '';
+    const t = probeParts(r);
     return '<article class="m15-card' + (sel ? ' is-selected' : '') + '"><button type="button" class="m15-pick" role="checkbox" aria-checked="' + Boolean(sel) + '" aria-label="选用 ' + esc(r.name) + '" data-act="m15.pick" data-id="' + esc(r.id) + '"' + (r.type === 'other' ? ' disabled' : '') + '>' +
       '<span class="m15-check" aria-hidden="true">✓</span><span class="m15-info"><span class="m15-name">' + esc(r.name) + (r.vision ? tag('图像输入') : '') + (r.reasoning ? tag('推理') : '') + '</span>' +
       '<span class="m15-mid">' + esc(r.provider) + ' · ' + esc(r.id) + '</span><span class="m15-specs">' +
       (r.type === 'other' ? '图片、语音或向量服务，无法执行部门任务。' : '上下文 ' + units(r.context) + ' / 最大输出 ' + units(r.output) + (r.context === null ? '' : ' · ' + (r.source.indexOf('能力表') >= 0 ? '来自模型能力表' : '来自上游模型列表'))) + '</span></span>' +
-      '<span class="m15-state ' + kind + '">' + label + '</span></button></article>';
+      '<span class="m15-state ' + kind + '">' + label + '</span></button>' + t.side + t.msg + '</article>';
   }
 
   function selectionRow(r) {
@@ -227,10 +248,15 @@
     }
     if (!state.candidates.length) return '<div class="m15-zero"><strong>服务没有返回任何模型</strong><p>连接成功，请检查这个 Key 的模型权限，刷新列表，或用下面的「手动添加」。</p>' + btn('刷新模型列表', 'connect', '', 'small') + '</div>';
     const list = filtered();
+    const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+    state.page = Math.min(Math.max(state.page, 1), pages);
+    const from = (state.page - 1) * PAGE_SIZE;
     return '<div class="m15-layout"><div class="m15-results"><div class="m15-meta" role="status">' +
-      (state.filter === 'auto' ? list.length + ' 个模型可以自动配置 · 其他候选在「全部模型」里' : '找到 ' + list.length + ' 个模型') + '</div>' +
-      (list.length ? list.slice(0, state.limit).map(card).join('') : '<div class="m15-zero"><strong>没有符合条件的模型</strong><p>试试模型名称、提供方或上游模型 ID。</p>' + btn('清除搜索和筛选', 'clear', '', 'small') + '</div>') +
-      (list.length > state.limit ? btn('继续显示 ' + Math.min(12, list.length - state.limit) + ' 个', 'more', '', 'small m15-morebtn') : '') + '</div>' + selectionPanel() + '</div>';
+      (state.filter === 'auto' ? list.length + ' 个模型可以自动配置 · 其他候选在「全部模型」里' : '找到 ' + list.length + ' 个模型') +
+      (pages > 1 ? ' · 第 ' + (from + 1) + '–' + Math.min(from + PAGE_SIZE, list.length) + ' 个' : '') + '</div>' +
+      (list.length ? list.slice(from, from + PAGE_SIZE).map(card).join('') : '<div class="m15-zero"><strong>没有符合条件的模型</strong><p>试试模型名称、提供方或上游模型 ID。</p>' + btn('清除搜索和筛选', 'clear', '', 'small') + '</div>') +
+      (pages > 1 ? '<div class="m15-pager">' + btn('上一页', 'page', 'data-dir="-1"' + (state.page <= 1 ? ' disabled' : ''), 'small') + '<span class="y15-small y15-muted">第 ' + state.page + ' / ' + pages + ' 页</span>' +
+        btn('下一页', 'page', 'data-dir="1"' + (state.page >= pages ? ' disabled' : ''), 'small') + '</div>' : '') + '</div>' + selectionPanel() + '</div>';
   }
 
   function manualForm() {
@@ -243,7 +269,7 @@
   function selectBlock() {
     const on = state.phase === 'connected';
     return '<section class="m15-panel m15-flush"><div class="m15-models-head"><div class="m15-panel-head"><div class="m15-title"><span class="m15-num">2</span><h2>选择模型</h2></div>' +
-      '<span class="y15-small y15-muted">勾选后自动配置，不用单独保存，也不用单独测试</span></div>' +
+      '<span class="y15-small y15-muted">勾选后自动配置，不用单独保存；想先看一个模型能不能连通，点它右边的「测试」</span></div>' +
       '<label class="m15-search">' + ui.icon('search') + '<input id="m15-search" type="search" aria-label="搜索模型" placeholder="搜索模型名称、提供方或上游模型 ID" value="' + esc(state.search) + '" data-act="m15.search"' + (on ? '' : ' disabled') + '></label>' +
       '<div class="m15-filters" role="group" aria-label="筛选模型">' + [['auto', '可自动配置'], ['vision', '支持图像'], ['reasoning', '支持推理'], ['all', '全部模型'], ['selected', '已选用']].map(([id, l]) =>
         '<button type="button" class="m15-filter" data-act="m15.filter" data-filter="' + id + '" aria-pressed="' + (state.filter === id) + '"' + (on ? '' : ' disabled') + '>' + l + '</button>').join('') + '</div></div>' +
@@ -283,7 +309,7 @@
     notlist: '地址里带 docs 的会返回一个网页而不是模型列表；去掉它就能继续。',
     path: '地址以 /chat/completions 结尾会得到 404；把地址填到它的上一级就能继续。',
     empty: '连接成功，服务没有返回任何模型；可以试「手动添加」。',
-    test: '第一个对话模型（DeepSeek V4 Flash）验证时被拒绝，其他模型可以继续启用。',
+    test: '第一个对话模型（DeepSeek V4 Flash）会被拒绝，点「测试」和勾选的结果一样；其他模型可以继续启用。',
     unknown: '候选里有一个模型没有给出容量，需要在「已选模型」里填写窗口和输出上限。'
   };
 
@@ -322,7 +348,8 @@
     state.savedUrl = url; state.phase = 'connected'; state.saved = true; state.key = ''; state.showKey = false; state.editing = false;
     state.candidates = state.mode === 'empty' ? [] : state.mode === 'unknown' ? [unknown, ...examples] : catalog;
     state.fetchedAt = Y15.app.now();
-    if (!was) { state.filter = state.mode === 'unknown' ? 'all' : 'auto'; state.limit = 8; }
+    state.probes = {}; state.page = 1;
+    if (!was) state.filter = state.mode === 'unknown' ? 'all' : 'auto';
     // 地址变了：该连接下的准入作废，列表里仍有的已选模型自动重新验证，没有的标「不在新的模型列表中」
     if (changed) {
       Object.keys(state.selected).forEach((id) => {
@@ -344,9 +371,15 @@
   function pump() {
     rows().forEach((r) => {
       if (r.status !== 'waiting') return;
-      if (rows().filter((x) => x.status === 'testing').length >= MAX_TEST) return;
+      if (testing() >= MAX_TEST) return;
       r.status = 'testing';
       runTest(r.id, r.ticket);
+    });
+    Object.keys(state.probes).forEach((id) => {
+      const p = state.probes[id];
+      if (p.status !== 'waiting' || testing() >= MAX_TEST) return;
+      p.status = 'testing';
+      runProbe(id, p.ticket);
     });
     redraw();
   }
@@ -357,13 +390,32 @@
     await wait(900);
     if (!cur()) { pump(); return; }
     const row = state.selected[id];
-    if (state.mode === 'test' && id === examples[0].id) {
-      Object.assign(row, { status: 'failed', error: '最小问答未通过：HTTP 403，当前 Key 没有调用这个模型的权限。请重新验证、修改 Key，或取消选用后另选模型。' });
+    const v = verdict(id);
+    if (v) {
+      Object.assign(row, { status: 'failed', error: v.step + '未通过：' + v.reason + '。请重新验证、修改 Key，或取消选用后另选模型。' });
     } else {
       Object.assign(row, { status: 'ready', error: null, took: (2 + (id.length % 5) / 2).toFixed(1) });
       // 第一个通过的模型，成为还没有部门使用的部门的默认
       Object.keys(DEPTS).forEach((d) => { if (!state.defaults[d]) state.defaults[d] = id; });
     }
+    pump();
+  }
+
+  // 候选测试：只看一眼结果，不选用、不保存；重连或重置后 state.probes 换成新对象，迟到的结果丢弃
+  function probe(id) {
+    const cur = state.probes[id];
+    if (cur && (cur.status === 'waiting' || cur.status === 'testing')) return;
+    state.probes[id] = { ticket: ++attempt, status: 'waiting' };
+    pump();
+  }
+
+  async function runProbe(id, ticket) {
+    const store = state.probes;
+    const cur = () => state.probes === store && store[id] && store[id].ticket === ticket;
+    await wait(900);
+    if (!cur()) { pump(); return; }
+    const v = verdict(id);
+    Object.assign(store[id], v ? { status: 'failed', step: v.step, reason: v.reason } : { status: 'passed', took: (2 + (id.length % 5) / 2).toFixed(1) });
     pump();
   }
 
@@ -424,10 +476,11 @@
     ui.modal({ title: '删除这个连接', body: '<p>将一起删除：</p><ul class="y15-list"><li>连接 ' + esc(state.savedUrl) + '</li><li>它保存的 API Key</li><li>已选用的 ' + rows().length + ' 个模型</li></ul>', actions: [{ label: '确认删除', kind: 'primary danger', act: 'm15.delete-ok', close: true }, { label: '取消', close: true }] });
   });
   A('delete-ok', () => { generation += 1; state = initial(state.mode); redraw(); });
-  A('search', (el) => { state.search = el.value; state.limit = 8; redraw(); });
-  A('filter', (el) => { state.filter = el.dataset.filter; state.limit = 8; redraw(); });
-  A('clear', () => { state.search = ''; state.filter = 'all'; state.limit = 8; redraw(); });
-  A('more', () => { state.limit += 12; redraw(); });
+  A('search', (el) => { state.search = el.value; state.page = 1; redraw(); });
+  A('filter', (el) => { state.filter = el.dataset.filter; state.page = 1; redraw(); });
+  A('clear', () => { state.search = ''; state.filter = 'all'; state.page = 1; redraw(); });
+  A('page', (el) => { state.page += Number(el.dataset.dir); redraw(); });
+  A('probe', (el) => probe(el.dataset.id));
   A('pick', (el) => { const id = el.dataset.id; if (state.selected[id]) remove(id); else configure(id); });
   A('remove', (el) => remove(el.dataset.id));
   A('retry', (el) => retest(el.dataset.id));
