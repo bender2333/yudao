@@ -1,0 +1,69 @@
+/* 系统页与项目里其余页面的样式：机器、运行、工具、资料、观测、设置、恢复 */
+.y15-block-line { display: block; }
+.y15-wrap { overflow-wrap: anywhere; }
+.y15-ticket { display: inline-grid; place-items: center; min-width: 24px; height: 24px; border-radius: 12px; background: var(--soft-2); font-weight: 600; font-size: 12px; }
+.y15-lamps { display: inline-flex; gap: 4px; vertical-align: middle; }
+.y15-lamp { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--surface-2); }
+.y15-lamp.is-on { background: var(--green); border-color: var(--green); }
+.y15-mcp + .y15-mcp { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.y15-quote { margin: 6px 0 0; padding: 8px 12px; border-left: 3px solid var(--line-strong); background: var(--soft); border-radius: 0 8px 8px 0; font-size: 13px; line-height: 1.7; }
+.y15-list { margin: 6px 0; padding-left: 20px; display: grid; gap: 4px; }
+
+/* 资料 */
+.y15-mt-index { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.y15-mt-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; background: var(--surface-2); }
+.y15-mt-card.is-current { border-color: var(--green); background: var(--tint); }
+.y15-mt-counts { display: flex; flex-wrap: wrap; gap: 6px; font-size: 12px; }
+.y15-mt-counts span { padding: 0 6px; border-radius: 5px; background: var(--soft); }
+.y15-mt-counts .is-zero { color: var(--faint); }
+.y15-mt-list, .y15-mt-notes, .y15-mt-files { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.y15-mt-files { margin: 6px 0; gap: 4px; }
+.y15-mt-doc { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+.y15-mt-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 13px; }
+
+/* 观测 */
+.y15-obs-filters { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; margin-bottom: 12px; }
+.y15-obs-filter { display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
+.y15-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.y15-totals div { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface-2); display: grid; gap: 2px; }
+.y15-totals span { font-size: 12px; color: var(--muted); }
+.y15-totals strong { font-size: 18px; }
+.y15-loop { display: inline-block; padding: 0 8px; border-radius: 6px; font-size: 12px; font-weight: 600; background: var(--soft); color: var(--muted); }
+.y15-loop.is-green { background: var(--tint); color: var(--green); }
+.y15-loop.is-amber { background: var(--amber-bg); color: var(--amber); }
+.y15-loop.is-orange { background: var(--orange-bg); color: var(--orange); }
+.y15-loop.is-violet { background: var(--violet-bg); color: var(--violet); }
+.y15-loop.is-red { background: var(--red-bg); color: var(--red); }
+.y15-loop-row { cursor: pointer; }
+.y15-loop-row.is-open { background: var(--soft); }
+.y15-loop-item th { text-align: left; background: var(--soft); padding: 6px 10px; font-size: 13px; }
+.y15-loop-detail td { background: var(--surface-2); padding: 8px 12px; font-size: 13px; }
+.y15-sibs { display: flex; flex-wrap: wrap; gap: 8px; }
+.y15-sib { display: grid; gap: 2px; text-align: left; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; background: var(--surface-2); }
+.y15-sib.is-on { border-color: var(--green); background: var(--tint); }
+.y15-sib small { color: var(--muted); }
+
+/* 设置 */
+.y15-set-depts { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.y15-set-dept { border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 8px; align-content: start; background: var(--surface-2); }
+.y15-set-dept header { display: flex; justify-content: space-between; align-items: center; }
+.y15-set-roles + .y15-set-roles { margin-top: 12px; }
+.y15-set-role { display: grid; grid-template-columns: 110px minmax(0, 320px); gap: 12px; align-items: center; padding: 4px 0; }
+
+/* 恢复 */
+.y15-rc-states { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.y15-rc-state { padding: 3px 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--faint); font-size: 13px; }
+.y15-rc-state.is-on { border-color: var(--line-strong); background: var(--soft); color: var(--text); font-weight: 600; }
+.y15-rc-reason { font-size: 14px; margin: 6px 0; }
+.y15-rc-rules { margin: 8px 0 0; padding-left: 20px; color: var(--muted); font-size: 12.5px; display: grid; gap: 3px; }
+.y15-rc-actions { display: grid; gap: 12px; }
+.y15-rc-action { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+.y15-rc-action > header { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.y15-rc-limits { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.y15-rc-limit { border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; background: var(--surface-2); display: grid; gap: 3px; }
+.y15-rc-limit.is-wide { grid-column: 1 / -1; }
+.y15-rc-limit span { font-size: 12px; color: var(--muted); }
+.y15-rc-limit strong { font-size: 17px; }
+
+/* 侧栏底部：系统页入口 */
+.y15-side-bottom .y15-side-label.is-sub { margin-top: 6px; }

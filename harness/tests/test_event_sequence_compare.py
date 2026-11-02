@@ -414,3 +414,25 @@ def test_baselines_keep_ok_on_every_tool_call_result():
     assert denied > 0, "基准里没有 ok: false 的工具调用结果"
 
 
+# 工单 #1371：事件序列基准不固化依赖上游可达性的失败。
+# 三个「经真实 Provider 模块走完交接与放行」的场景声明的是放行：基准里就不该出现「模型服务连不上」。
+# 这种失败只说明录基准时环境不对（夹具的检查没跑成、脚本用完），把它写进基准以后，
+# 基准在别的机器上永远对不上（工单 #1371 的诊断）。这里守着这条。
+
+HTTP_HANDOFF_SCENARIOS = ("http_responses_handoff", "http_chat_handoff", "http_messages_handoff")
+
+
+def test_http_handoff_baselines_do_not_freeze_a_provider_failure():
+    for name in HTTP_HANDOFF_SCENARIOS:
+        document = _load(name)
+        projection = document["projection"]
+        assert projection["status"] == "done", f"{name} 的基准记的不是完成：{projection}"
+        assert projection["stop_reason"] == "released", f"{name} 的基准记的不是放行：{projection}"
+        provider_failures = [
+            event for event in document["events"]
+            if event.get("error") == "Model provider connection failed"
+            or event.get("stop_reason") == "provider_error"
+        ]
+        assert not provider_failures, f"{name} 的基准里记着一次模型服务失败：{provider_failures}"
+
+

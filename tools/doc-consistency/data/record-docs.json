@@ -1,0 +1,15 @@
+{
+  "说明": "记录文档（docs/agents/shared-rules.md「文档与记录」）：只追加、天天变，不参与待核对，作为上游或下游都不算。这些文档的边仍留在索引里，who、impact 照常能查。",
+  "files": [
+    "docs/CHANGELOG.md",
+    "docs/decision.md",
+    "claude_jour.md"
+  ],
+  "prefixes": [
+    "agents_jour/",
+    "docs/adr/",
+    "docs/research/",
+    "docs/evaluation/",
+    "docs/archive/"
+  ]
+}

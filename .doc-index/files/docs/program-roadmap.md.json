@@ -1,0 +1,28 @@
+{
+"schema":1,
+"path":"docs/program-roadmap.md",
+"hash":"fe69deff44285b85",
+"nodes":[
+{"hash":"fe69deff44285b85","id":"docs/program-roadmap.md","kind":"file","title":"docs/program-roadmap.md"},
+{"hash":"8bf6cdd6aee24a64","id":"docs/program-roadmap.md#Yudao 总体路线图","kind":"section","parent":"docs/program-roadmap.md","title":"Yudao 总体路线图"},
+{"hash":"3848155008df5ad1","id":"docs/program-roadmap.md#Yudao 总体路线图 > 1. 怎么推进","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"1. 怎么推进"},
+{"hash":"9efa1a2d9616b920","id":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 五个阶段","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"2. 五个阶段"},
+{"hash":"0bc98c2eb43495da","id":"docs/program-roadmap.md#Yudao 总体路线图 > 3. 十条内容道","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"3. 十条内容道"},
+{"hash":"d34086753f32c990","id":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"4. 画面自己的阶段：楼、机房、城"},
+{"hash":"75e7ec39371df3e9","id":"docs/program-roadmap.md#Yudao 总体路线图 > 5. 五条判据与总图的阶段对照","kind":"section","parent":"docs/program-roadmap.md#Yudao 总体路线图","title":"5. 五条判据与总图的阶段对照"}
+],
+"edges":[
+{"dst":"docs/architecture-view.html","kind":"link","raws":["architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/program-roadmap.md#Yudao 总体路线图"},
+{"dst":"docs/architecture.html","kind":"link","raws":["architecture.html"],"seen":"e823b2d5f74922e1","src":"docs/program-roadmap.md#Yudao 总体路线图"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["requirements/system-intent.md"],"seen":"7238332bed3feff5","src":"docs/program-roadmap.md#Yudao 总体路线图"},
+{"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"03c60cf298c2dd35","src":"docs/program-roadmap.md#Yudao 总体路线图 > 1. 怎么推进"},
+{"dst":"docs/architecture-view.html","kind":"link","raws":["architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/program-roadmap.md#Yudao 总体路线图 > 1. 怎么推进"},
+{"dst":"docs/design/forms-and-verifier-role.md","kind":"link","raws":["design/forms-and-verifier-role.md"],"seen":"bbcbee81d2264429","src":"docs/program-roadmap.md#Yudao 总体路线图 > 1. 怎么推进"},
+{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["requirements/self-hosting.md"],"seen":"f0e8dce83a8e2a46","src":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 五个阶段"},
+{"dst":"docs/architecture-view.html","kind":"link","raws":["architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/program-roadmap.md#Yudao 总体路线图 > 3. 十条内容道"},
+{"dst":"docs/architecture-view.html","kind":"link","raws":["architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城"},
+{"dst":"docs/requirements/game-world-three-spaces.md","kind":"link","raws":["requirements/game-world-three-spaces.md"],"seen":"e624b0e886358b4d","src":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城"},
+{"dst":"docs/research/game-world-as-projection.md","kind":"link","raws":["research/game-world-as-projection.md"],"seen":"9c8d71b3273064a0","src":"docs/program-roadmap.md#Yudao 总体路线图 > 4. 画面自己的阶段：楼、机房、城"},
+{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["agents/acceptance-evidence.md"],"seen":"c508339609e8ff9b","src":"docs/program-roadmap.md#Yudao 总体路线图 > 5. 五条判据与总图的阶段对照"}
+]
+}

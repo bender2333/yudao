@@ -1,0 +1,15 @@
+{
+"schema":1,
+"path":"docs/requirements/domain-completion.md",
+"hash":"571560d74d9725ca",
+"nodes":[
+{"hash":"571560d74d9725ca","id":"docs/requirements/domain-completion.md","kind":"file","title":"docs/requirements/domain-completion.md"},
+{"hash":"811aded50988400d","id":"docs/requirements/domain-completion.md#D12 部门的专业补全","kind":"section","parent":"docs/requirements/domain-completion.md","title":"D12 部门的专业补全"},
+{"hash":"2ea8b4c684e565a0","id":"docs/requirements/domain-completion.md#D12 部门的专业补全 > 来源与本轮决定","kind":"section","parent":"docs/requirements/domain-completion.md#D12 部门的专业补全","title":"来源与本轮决定"},
+{"hash":"2ebc5cbc63d551cf","id":"docs/requirements/domain-completion.md#D12 部门的专业补全 > 有效规则","kind":"section","parent":"docs/requirements/domain-completion.md#D12 部门的专业补全","title":"有效规则"},
+{"hash":"b5899a4cc7ec9bcf","id":"docs/requirements/domain-completion.md#D12 部门的专业补全 > 状态","kind":"section","parent":"docs/requirements/domain-completion.md#D12 部门的专业补全","title":"状态"}
+],
+"edges":[
+
+]
+}

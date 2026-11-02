@@ -1,0 +1,15 @@
+{
+"schema":1,
+"path":"docs/requirements/workspace-refactoring.md",
+"hash":"fe9bfecb754c1bc2",
+"nodes":[
+{"hash":"fe9bfecb754c1bc2","id":"docs/requirements/workspace-refactoring.md","kind":"file","title":"docs/requirements/workspace-refactoring.md"},
+{"hash":"ad407855689426a3","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","kind":"section","parent":"docs/requirements/workspace-refactoring.md","title":"D14 受控删除与移动"},
+{"hash":"9174debe650208b3","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动 > 来源与本轮决定","kind":"section","parent":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","title":"来源与本轮决定"},
+{"hash":"f3683152609d0c48","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动 > 有效规则","kind":"section","parent":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","title":"有效规则"},
+{"hash":"b5361cf5d750bc7f","id":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动 > 状态","kind":"section","parent":"docs/requirements/workspace-refactoring.md#D14 受控删除与移动","title":"状态"}
+],
+"edges":[
+
+]
+}

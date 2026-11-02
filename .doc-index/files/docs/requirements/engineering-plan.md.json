@@ -1,0 +1,15 @@
+{
+"schema":1,
+"path":"docs/requirements/engineering-plan.md",
+"hash":"8d9861f085f26e0b",
+"nodes":[
+{"hash":"8d9861f085f26e0b","id":"docs/requirements/engineering-plan.md","kind":"file","title":"docs/requirements/engineering-plan.md"},
+{"hash":"b44ef513ca5411e5","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","kind":"section","parent":"docs/requirements/engineering-plan.md","title":"D05 研发先分解任务与计划"},
+{"hash":"5b59d7d487f83f20","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划 > 用户原话","kind":"section","parent":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","title":"用户原话"},
+{"hash":"1fc68cd799e9730a","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划 > 已确认","kind":"section","parent":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","title":"已确认"},
+{"hash":"1206e3e8bdcc6aea","id":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划 > 本轮设计选择","kind":"section","parent":"docs/requirements/engineering-plan.md#D05 研发先分解任务与计划","title":"本轮设计选择"}
+],
+"edges":[
+
+]
+}

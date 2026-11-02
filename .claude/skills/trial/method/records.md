@@ -34,7 +34,7 @@ node .claude/skills/trial/scripts/report.mjs --check <归档>/result.json --json
 
 目录声明的 reasoning_mode、default_reasoning_level、input_modalities 一并保存，报告逐部门与实际调用核对。input_modalities 按内容比较，排列顺序不影响结论。models.requested_tier 保存部门工作请求选择的档位，可以为空；它与工作请求核对，并用于比较两次运行的部门计划。
 
-导出中 call_target.requested_tier 是本次调用请求的档位，按部门和用途分别保留。整理请求按模型管理设计第 7.5 节使用最低支持档位，可以与工作请求不同；重试或整理记录中实际出现的不同档位如实显示，不据此推定部门设置发生改变。两次运行的工作请求档位不同仍影响同条件判断，整理档位的差异单独提示。
+导出中 call_target.requested_tier 是本次调用请求的档位，按部门和用途分别保留。整理请求按 `docs/design/model-management.md`「压缩与测试」使用最低支持档位，可以与工作请求不同；重试或整理记录中实际出现的不同档位如实显示，不据此推定部门设置发生改变。两次运行的工作请求档位不同仍影响同条件判断，整理档位的差异单独提示。
 
 ```powershell
 pwsh -NoProfile -File .claude/skills/trial/scripts/instance.ps1 -Action Inspect -Manifest <控制清单> -ModelsFile <models.json>

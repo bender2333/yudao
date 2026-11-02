@@ -497,7 +497,16 @@ def _http_scenario(protocol: str):
             department = request_department(body)
             index = state[department]
             state[department] += 1
-            calls = http_script(body)[department][index]
+            script = http_script(body)[department]
+            if index >= len(script):
+                # 脚本用完说明驱动比脚本多跑了一轮（工单 #1061 的同一条护栏）：
+                # 明确回一个说清原因的错误，不让异常落在 HTTP 处理里——异常会让连接凭空断掉，
+                # Provider 把它记成「模型服务连不上」，一次夹具的意外就此变成事件序列基准里
+                # 一条依赖上游可达性的失败（工单 #1371）
+                message = json.dumps({"error": {"message": f"script exhausted: {department} request #{index}"}},
+                                     ensure_ascii=False)
+                return 500, "application/json", [message.encode("utf-8")]
+            calls = script[index]
             return 200, "text/event-stream", [HTTP_REPLIES[protocol](reply_index(department, index), calls)]
 
         server, _capture, base = serve(responder)
@@ -507,6 +516,12 @@ def _http_scenario(protocol: str):
         finally:
             server.shutdown()
             server.server_close()
+        # 这一组场景声明的是「走完交接与放行」（场景的 covers）：没有走到放行就是夹具或环境出了问题，
+        # 在比对基准以前就失败，避免把一次失败的运行写进基准（工单 #1371）
+        projection = system.project(run_id)
+        assert (projection.status, projection.stop_reason) == ("done", "released"), (
+            f"场景 {protocol} 没有走完交接与放行：status={projection.status} "
+            f"stop_reason={projection.stop_reason} error={projection.error}")
         return system, run_id, {base: "<provider>"}
 
     return run

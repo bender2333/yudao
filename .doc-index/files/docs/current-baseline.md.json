@@ -1,0 +1,23 @@
+{
+"schema":1,
+"path":"docs/current-baseline.md",
+"hash":"a91d52dd93b1a929",
+"nodes":[
+{"hash":"a91d52dd93b1a929","id":"docs/current-baseline.md","kind":"file","title":"docs/current-baseline.md"},
+{"hash":"f866af4d1365b480","id":"docs/current-baseline.md#当前验收基线","kind":"section","parent":"docs/current-baseline.md","title":"当前验收基线"},
+{"hash":"b83542be002cf8ae","id":"docs/current-baseline.md#当前验收基线 > 1. 版本身份（当前）","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"1. 版本身份（当前）"},
+{"hash":"3872093a1a456f63","id":"docs/current-baseline.md#当前验收基线 > 2. 这条基线说明了什么","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"2. 这条基线说明了什么"},
+{"hash":"dd888dc7010cfb22","id":"docs/current-baseline.md#当前验收基线 > 3. 尚待执行的验收","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"3. 尚待执行的验收"},
+{"hash":"c60d524ea253d5da","id":"docs/current-baseline.md#当前验收基线 > 4. 历史基线","kind":"section","parent":"docs/current-baseline.md#当前验收基线","title":"4. 历史基线"}
+],
+"edges":[
+{"dst":"docs/evaluation/2026-10-31-57835530.md","kind":"link","raws":["evaluation/2026-10-31-57835530.md"],"seen":"c4f4231e4eb0ba92","src":"docs/current-baseline.md#当前验收基线"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/current-baseline.md#当前验收基线"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["requirements/system-intent.md"],"seen":"7238332bed3feff5","src":"docs/current-baseline.md#当前验收基线"},
+{"dst":"docs/evaluation/139-prd-confirm-57835530.png","kind":"link","raws":["evaluation/139-prd-confirm-57835530.png"],"seen":"a4acc60010f91b77","src":"docs/current-baseline.md#当前验收基线 > 1. 版本身份（当前）"},
+{"dst":"docs/evaluation/2026-10-31-57835530.md","kind":"link","raws":["evaluation/2026-10-31-57835530.md"],"seen":"c4f4231e4eb0ba92","src":"docs/current-baseline.md#当前验收基线 > 1. 版本身份（当前）"},
+{"dst":"client/tests/e2e/onboarding.spec.ts","kind":"code-path","raws":["client/tests/e2e/onboarding.spec.ts"],"seen":"39457c6f15cbafd5","src":"docs/current-baseline.md#当前验收基线 > 3. 尚待执行的验收"},
+{"dst":"docs/archive/current-baseline-2026-10-29.md","kind":"link","raws":["archive/current-baseline-2026-10-29.md"],"seen":"9e4a89c32b73cba5","src":"docs/current-baseline.md#当前验收基线 > 4. 历史基线"},
+{"dst":"docs/archive/current-baseline-3.0-contract.md","kind":"link","raws":["archive/current-baseline-3.0-contract.md"],"seen":"018a4291667a7332","src":"docs/current-baseline.md#当前验收基线 > 4. 历史基线"}
+]
+}

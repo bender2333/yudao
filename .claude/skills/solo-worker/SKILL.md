@@ -1,12 +1,12 @@
 ---
 name: solo-worker
-description: 以 solo 执行者身份做完一张工单：领取、三项核对、实现自测、PR、等 CI、交付说明、合并前核对、--admin 合并；设计问题、连续三轮没过交回 needs-triage，执行环境挡住转 ready-for-human。任何 harness（Claude Code 的 /solo 循环、Hermes、OpenCode）的 solo 执行者都读这一份；/solo 循环的任务书指到这里。
+description: 以 solo 执行者身份做完一张工单：领取、三项核对、实现自测、PR、等 CI、交付说明、合并前核对（改到内核代码的先过独立审查）、--admin 合并；设计问题、连续三轮没过交回 needs-triage，执行环境挡住转 ready-for-human。任何 harness（Claude Code 的 /solo 循环、Hermes、OpenCode）的 solo 执行者都读这一份；/solo 循环的任务书指到这里。
 argument-hint: "<工单编号> [里程碑标题]"
 ---
 
 # solo 工人协议
 
-你是 **solo 执行者**：范围内没有派发者、没有审查者，这张工单由你自己领取、实现、自测、开 PR、发交付说明、核对、合并。规矩的正本是这份文件与 `docs/agents/triage-labels.md`；`AGENTS.md` 的共同要求（含「请架构师处理」「内核路径的测试覆盖」）与「架构问题登记」照常遵守。没有独立审查，质量由两道检查承担：你自己对照验收标准逐条核对，CI 的 `check` 在 PR 的当前提交上通过。
+你是 **solo 执行者**：这张工单由你自己领取、实现、自测、开 PR、发交付说明、核对、合并。规矩的正本是这份文件与[工作方式](../../../docs/agents/workflow.md)；`AGENTS.md` 的共同要求（含「请架构师处理」「内核路径的测试覆盖」）照常遵守。质量由两道检查承担：你自己对照验收标准逐条核对，CI 的 `check` 在 PR 的当前提交上通过；改到可信内核代码的，再加一道独立审查（第 10 步）。
 
 两种运行方式，差别只在谁管目录、标签与账本：
 
@@ -51,20 +51,21 @@ argument-hint: "<工单编号> [里程碑标题]"
 4. **实现**：测试先行；在分支上提交，**分阶段提交**（被中断时已经推上去的还在）。
 5. **日记**：`agents_jour/<编号>.md`，随分支提交，不直接推 main；在合并之前写完，合并以后不再补记（合并提交与 main 上的 CI 在 GitHub 上查得到）。
 6. **自测**：跑与改动相关的测试文件（包括新增的集成层文件）；改动涉及 `client/` 再跑相关前端测试；逐条核对验收标准。失败项的细节用 `--tb=short` 或 `--lf` 再看，不要把长日志贴进输出。新增测试文件在 `harness/tests/layers.toml` 补一行登记，放在第一个能到达其结论的层。
-7. **推送与 PR**：正文写 `Closes #<编号>`、`Solo: 无独立审查，由 solo 执行者自行合并`、一句摘要、署名。一张工单只开一个 PR。
+7. **推送与 PR**：正文写 `Closes #<编号>`、`Solo: 由 solo 执行者合并`（改到内核代码的写 `Solo: 由 solo 执行者合并，内核改动经独立审查`）、一句摘要、署名。一张工单只开一个 PR。
 8. **等 CI**：`gh pr checks issue-<编号> --watch`。失败就改、提交、推送，直到通过。**不要开自动合并**（它会跳过第 10 步）。
    - 失败项明显与本次改动无关时，先 `gh run rerun <运行号> --failed` 重跑一次；重跑过了就在交付说明里写明这个不稳定测试，仍然失败按自己的问题修。
    - **带 `touches-core` 的工单**：`check` 绿了以后在分支上跑一次集成层：`gh workflow run CI --ref issue-<编号>` → `gh run list --workflow CI --branch issue-<编号> --limit 1` 拿运行号 → `gh run watch <运行号>`（约 15 分钟）。失败项与 main 最近 7 天比（`gh run list --workflow CI --branch main --event push --limit 5`）：main 上也失败过的是不稳定项，写进交付说明；main 上没失败过的按自己的问题修，修好再跑。这次运行的链接写进交付说明。
-9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、删掉的用例逐条写「用例名 + 依据（哪条 ADR 或工单删的）」，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。工单没写明删除的行为，用例只改写不删。
+9. **交付**：PR 上评论，第一行 `DELIVERY: 第 <k> 轮`，下面写改动清单、测试命令与结尾的计数行、CI 运行链接（`touches-core` 加集成层那次）、逐条验收核对（每条写证据，对不上的照实写）、新增的用例逐条写它守的是测试分层设计说明「测试按三环留」的哪一条、设计没写到而你自己定的边界（「自定的边界」一段，没有写「无」）、删掉的用例逐条写「用例名 + 理由（工单写明的删除行为，或测试分层设计说明「一个测试凭什么留」删除口径的哪一条）+ 接替的用例」并附删除前后的覆盖读数，最后一行署名；然后把工单标签从 `in-progress` 改成 `needs-review`。两种理由都没有的用例只改写不删。
 10. **合并前的核对**（五项都成立才合并）：
     - `git fetch origin main && git merge origin/main`（冲突在自己的分支上解，两边改了同一段逻辑的按下面「前提变了」交回）；`gh pr checks issue-<编号> --required` 显示 `check` 在 PR 当前提交上通过。
     - 工作区没有未提交也未推送的改动。
     - 交付说明里每条验收核对都有证据。
     - 带 `touches-core` 时，交付说明里有分支集成层运行的链接，失败项都是 main 上最近 7 天失败过的。
     - 「只改」含内核路径（内核模块、可信内核清单、`harness/tests/kernel/`）时，交付说明里有改动前后的覆盖读数，并且符合 `AGENTS.md` 共同要求「内核路径的测试覆盖」的三条。
+    - 改动碰到内核清单里 `kind` 为 `module` 的路径或清单本身（`git diff --name-only origin/main...HEAD` 对照清单）时：派一个全新上下文的子代理，任务书只给 PR 编号、工作目录与「按 `reviewer` 技能审，结论写成 PR 上的 `REVIEW:` 评论」；PR 上最新的 `REVIEW:` 是批准，并且晚于你最后一次推送。要求修改算这一轮没过：按它改，过 CI，回到第 9 步，再派一个新的审查子代理。
 
     任何一项不满足：标签改回 `in-progress`，修好、过 CI 以后回到第 9 步，没有例外。
-11. **合并**：`gh pr merge issue-<编号> --admin --squash`。合并时标签是 `needs-review`。`--admin` 是仓库所有者的豁免，solo 唯一允许用的场合，它绕开所有规则（包括 `check`），所以第 10 步只能由你自己做。
+11. **合并**：`gh pr merge issue-<编号> --admin --squash`。合并时标签是 `needs-review`。`--admin` 是仓库所有者的豁免，solo 唯一允许用的场合，它绕开所有规则（包括 `check`），所以第 10 步的核对只能由你来保证。
 12. **合并以后**：确认 PR 已合并、工单随 `Closes` 关闭（没关就 `gh issue close <编号>` 并说明原因）；去掉 `needs-review`。
 13. **清理**（在删 worktree **之前**）：关掉你开的网页与浏览器；按**进程号**结束自己起的进程（起的时候记下进程号）；删掉自己建的临时目录与文件（`.tmp/` 里给编排者用的评论文件与截图留着）。
 14. **不要删 worktree**：在循环里由编排者的 `solo.mjs gc` 统一清（先归档 `.tmp/` 的证据再删），收尾报告「worktree 保留：<路径>」；单独运行时工单关闭以后自己 `git worktree remove`。沙箱对工作区外目录的删除常常被拦，删一半会留下坏目录。
@@ -89,7 +90,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 界面工单除了代码与测试，还要留证据：
 
-- 读工单链接的原型（`docs/prototypes/CHANGELOG.md` 的「当前定稿」）；文本、状态词、按钮出现条件按工单与原型核；工单与原型冲突时按工单做，冲突写进工单评论。
+- 文本、状态词、按钮出现条件按工单与它指向的设计说明核；原型与草图只说明设计意图，不当标准。工单与设计说明冲突时按工单做，冲突写进工单评论。
 - 验证从便宜到贵：状态→文案/可见性的映射**先抽成纯函数**用 `cd client && npm test` 跑（快、能并发）；改到视图文件再过一次 `npm run build:pages`；真的需要渲染/交互/事件流时才跑 `npx playwright test tests/e2e/<相关>.spec.ts`。
 - **e2e 是互斥资源**：每个 spec 自己起真后端、占端口，负载下启动要 60–75 秒。一张单里把场景放进同一个 spec，不要重复起后端。
 - 像素判断用「区域差」（画布内容签名、逐格 RGB 差），**不要加 `toHaveScreenshot` 基线**：跨机器字体会让它变成不稳定测试。
@@ -103,7 +104,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 | 情况 | 标签 | 循环里的收尾 | 单独运行时 |
 | --- | --- | --- | --- |
-| 设计问题：工单要求的做法与设计说明相反、规则互相矛盾、验收标准无法满足或互相矛盾（设计没写到的边界自己定、登记架构问题、继续做） | `needs-triage` | 评论写到 `<工作目录>/.tmp/<编号>-question.md`，`STATUS: blocked`，`ERROR` 以 `[设计]` 开头，后面写问题一句话与那个文件的绝对路径 | `gh issue edit <编号> --remove-label in-progress --add-label needs-triage`，`gh issue comment <编号> --body-file <文件>` |
+| 设计问题：工单要求的做法与设计说明相反、规则互相矛盾、验收标准无法满足或互相矛盾（设计没写到的边界自己定、写进交付说明、继续做） | `needs-triage` | 评论写到 `<工作目录>/.tmp/<编号>-question.md`，`STATUS: blocked`，`ERROR` 以 `[设计]` 开头，后面写问题一句话与那个文件的绝对路径 | `gh issue edit <编号> --remove-label in-progress --add-label needs-triage`，`gh issue comment <编号> --body-file <文件>` |
 | 同一张工单连续三轮没有通过（一轮一次会话，收尾报 failed 或 blocked 算一次；本地测试失败不算） | `needs-triage` | 每轮失败照实报 `STATUS: blocked`，不带前缀；第三轮由编排者 `escalate` | 自己交回，评论写三轮分别卡在哪、试过什么 |
 | 执行环境挡住：跑不了测试、缺凭据、权限不够、CI 平台挂了、依赖装不上、网络不通 | `ready-for-human` | 评论写到 `<工作目录>/.tmp/<编号>-env.md`，`ERROR` 以 `[环境]` 开头 | `--remove-label in-progress --add-label ready-for-human`，发评论 |
 | 要改规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、评测的隐藏检查、参考解法、评分器与发布检查（`evals/scenarios/*/checks`、`evals/scenarios/*/reference`、`evals/scorer`、`scripts/release.py`、`harness/release_check.py`；可信内核清单与 `harness/tests/kernel/` 不在其中：可以改，不需要事前批准，要求是内核路径的测试覆盖，`AGENTS.md` 共同要求） | `ready-for-human` | PR 上写明理由，评论写清要用户决定什么，收尾 blocked | 同上 |
@@ -122,14 +123,19 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 执行环境的评论写清哪一步被挡住、试过什么、需要什么、哪些部分不受影响。其它做不下去的：算一次失败，写清原因，不要在同一处反复试。
 
-架构问题（设计冲突与缺漏）同时登记到 `docs/architecture-issues.md`，署名 `solo-<模型 ID>`（`AGENTS.md`「架构问题登记」）。
+设计没写到的边界自己定、继续做，写进交付说明的「自定的边界」，由架构师验收时写进设计说明；与总图冲突的，交回评论里写明「总图」与节号，架构师开 `architecture` 工单（`AGENTS.md`「架构问题」）。
 
 ## main 上的 CI
 
 每次领取工单之前和结束一轮之前，运行 `gh run list --workflow CI --branch main --event push --limit 5`。
 
 - `check` 失败：暂停领取新工单，重新打开引起失败的那张工单（合并提交所属的 PR 正文里有 `Closes #<编号>`），评论失败的检查与运行链接，标签改为 `ready-for-agent`，先修好。
-- `integration` 失败：按[派发者规则](../../../docs/agents/dispatcher.md)第 5 节处理，其中派发者与架构师的动作都由你来做：新建的不稳定项工单直接写成修复工单，标签 `ready-for-agent`，由你自己领取。
+- `integration` 失败（它在 main 的每个合并提交上运行，不挡合并）：
+  1. 重跑失败的作业一次（`gh run rerun <运行号> --failed`）。重跑通过：在这个合并提交对应的工单上评论失败项与两次运行的链接，按通过处理，失败项按下一步「没有新的失败项」记到不稳定项的工单。
+  2. 仍然失败：把失败项与最近 7 天 main 上全部 `integration` 运行的失败项比（`gh run list --workflow CI --branch main --created ">=<7 天前的日期>" --limit 100`，对失败的运行 `gh run view <运行号> --log-failed | grep FAILED`）；前一个合并提交的 `integration` 还在跑时等它结束。
+     - 没有新的失败项：是不稳定项，不重开工单。每个失败的测试文件，在标题写着这个文件名的打开的 `bug` 工单上评论这次的运行链接；没有就新建一张，标题 `[集成层] <测试文件> 不稳定`，正文列出失败项与各次运行链接，写成修复工单，标 `bug` 与 `ready-for-agent`，由你领取。这些打开的工单就是不稳定项的清单。
+     - 有新的失败项：重开这个合并提交对应的工单（`gh api repos/bender2333/yudao/commits/<提交>/pulls --jq '.[].number'` 找到 PR，正文的 `Closes #<编号>` 就是工单），评论新的失败项与运行链接，标签改为 `ready-for-agent`，先修它。
+  3. 合并提交对应不到工单（直接推送到 main 的提交）的不处理，由架构师在发布前核对。
 
 ## 前提变了
 
@@ -162,5 +168,5 @@ NEXT: 建议下一轮做什么；没有写 none
 - 不对自己的工单以外的 PR 使用 `--admin`，不修改 main 的规则与 CI 工作流。
 - 不在 `check` 没有通过的提交上合并，包括 CI 不稳定的情形：测试不稳定时重新运行失败的作业，通过以后再合并。
 - 修改接口合同、控制核心（`touches-core`）的工单不放宽任何一项核对；控制核心的工单还要在分支上跑通集成层（第 8 步）。
-- 不使用 `needs-architect` 标签（那是派发者启动架构师用的），交回用 `needs-triage`。同一时间只带一个流程标签，切换时去掉原标签。
+- 交回用 `needs-triage`。同一时间只带一个状态标签，切换时去掉原标签。
 - 设计问题可以开 subagent 帮忙查：把问题、已经查到的事实和要得到的结论写清楚交给 subagent（共同规则第 11 条，指定 sonnet 或 haiku 模型），自己读它的结论，核对以后再采用。subagent 只返回结论，不直接改工单、PR、设计文档，也不推送；采用的做法由你写进文档与日记，责任在你。这一条优先于运行配置第 4 节「任务评论里写明不使用子代理」。
