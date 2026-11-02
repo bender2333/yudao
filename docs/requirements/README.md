@@ -1,10 +1,10 @@
 # 新增细节索引
 
-> 需求原文与确认规则的索引；进度看 GitHub 的里程碑与工单。[总体路线图](../program-roadmap.md) 定义当前阶段，D09 的次数/超时及用量只读约束继续有效。
+需求记录的索引；进度看 GitHub 的里程碑与工单。[总体路线图](../program-roadmap.md)定义当前阶段，D09 的次数/超时及用量只读约束继续有效。
 
-> [D38 系统意图与基础规则](system-intent.md)是 Yudao 的总体意图，其他需求记录与它冲突时以它为准。
+[D38 系统意图与基础规则](system-intent.md)是 Yudao 的总体意图，其他需求记录与它冲突时以它为准。
 
-每项需求单独记录，写现在的需求与验收标准；用户原话与讨论经过在 git、日记、工单与 Discussions 里，不收进记录。汇总范围见 [已确认需求清单](../archive/confirmed-requirements.md)。
+每项需求单独记录，写现在的需求与验收标准；用户说过的原话与讨论经过在 git、日记、工单与 Discussions 里，不收进记录。
 
 | 编号 | 细节 |
 | --- | --- |
@@ -26,7 +26,7 @@
 | D16 | [使用 Git 管理任务内变化](git-change-management.md) |
 | D17 | [模型等待与失败重试](provider-retries.md) |
 | D18 | [统一 Provider 管理与部门绑定](department-providers.md) |
-| D19 | [按原型建设 Web 工作台](../archive/requirements/web-workspace-prototype.md)（2026-10-25 归档，被 D30 与原型 v9 至 v13 取代） |
+| D19 | 按原型建设 Web 工作台（见 [D30](web-game-frontend.md)） |
 | D20 | [部门定向追加指导](department-guidance.md) |
 | D21 | [模型请求、原始数据与用量观测](request-observability.md) |
 | D22 | [启动与 Provider 热生效](startup-provider-reload.md) |
@@ -35,7 +35,7 @@
 | D25 | [语义系统](semantic-system.md) |
 | D26 | [部门内多角色与多循环](department-roles.md) |
 | D27 | [运维部门](operations-department.md) |
-| D28 | [元观察与规则检查部门](meta-observer.md) |
+| D28 | [元观察与规则检查](meta-observer.md) |
 | D29 | [远程执行环境](remote-execution.md) |
 | D30 | [游戏化的 Web 界面与界面实现](web-game-frontend.md) |
 | D31 | [部门内的外包角色](outsourced-agent-roles.md) |
@@ -46,8 +46,8 @@
 | D36 | [网络取回与 MCP 工具](network-and-mcp.md) |
 | D37 | [新建项目的起始文件夹](project-initial-files.md) |
 | D38 | [系统意图与基础规则](system-intent.md) |
-| D39 | 黑板编排（暂缓：用户 2026-10-23 决定暂时不做；编号保留） |
+| D39 | 黑板编排（暂缓；编号保留） |
 | D41 | [三个空间：楼、机房、城](game-world-three-spaces.md) |
 | D40 | [骨架与应用](skeleton-and-application.md) |
 
-日期：2026-09-06。用户明确要求新增细节单独记录；后续每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。
+每项新增或修订分别更新其文件和本索引，不只记在聊天或施工日志里。
