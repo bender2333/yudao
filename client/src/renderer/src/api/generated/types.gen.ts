@@ -6045,6 +6045,10 @@ export type ToolsRegistryFetchRecord = {
      * Ok
      */
     ok?: boolean | null;
+    /**
+     * Error
+     */
+    error?: string | null;
 };
 
 /**
@@ -6063,6 +6067,10 @@ export type ToolsRegistryProbeState = {
      * Error
      */
     error?: string | null;
+    /**
+     * Config Digest
+     */
+    config_digest?: string;
 };
 
 /**

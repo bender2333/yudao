@@ -6,7 +6,12 @@
 // 进度、成功与失败原因都写在这张卡片里（工单第 5 条：反馈写在被操作的对象旁边）。
 
 import type { CatalogProvider } from "../../api/generated/types.gen";
-import { connectIssue, credentialStatusLabel } from "./model-logic";
+import {
+  CONNECTION_FETCHING_TEXT,
+  connectIssue,
+  credentialStatusLabel,
+  fetchSummaryOf,
+} from "./model-logic";
 
 export type ConnectStatus = { kind: "ok" | "error"; message: string };
 
@@ -21,6 +26,8 @@ export type ConnectCardProps = {
   apiKey: string;
   /** 命令在途 */
   busy: boolean;
+  /** 正在后台取候选的那一份连接（工单 #1355）：说明写在卡片里，不禁用任何操作 */
+  fetching: string | null;
   /** 被操作对象旁的结果：键是连接的 id，新建时用 "new" */
   status: Record<string, ConnectStatus>;
   onTarget: (target: ConnectTarget | null) => void;
@@ -30,18 +37,6 @@ export type ConnectCardProps = {
   onRefresh: (providerId: string) => void;
   onRemove: (providerId: string) => void;
 };
-
-// 最近一次获取模型列表的结果：成功写数量与时间，失败写服务端给的原因
-function fetchSummary(provider: CatalogProvider): { text: string; kind: "ok" | "error" | "none" } {
-  const latest = provider.latest_candidates;
-  if (!latest) {
-    return { text: "还没有获取过模型列表。", kind: "none" };
-  }
-  if (latest.status === "ok") {
-    return { text: `已获取 ${latest.candidates.length} 个模型 · ${latest.fetched_at}`, kind: "ok" };
-  }
-  return { text: latest.error ?? "获取模型列表失败。", kind: "error" };
-}
 
 export function ConnectCard(props: ConnectCardProps) {
   const editing = props.target?.mode === "edit" ? props.target.provider_id : null;
@@ -92,9 +87,9 @@ export function ConnectCard(props: ConnectCardProps) {
                     onClick={() => props.onTarget(null)}>
               取消
             </button>
-            {/* 按钮不可用时旁边写明还缺哪一项（工单验收第 1 条） */}
+            {/* 按钮不可用时旁边写明还缺哪一项；请求在途时写明在做什么（工单验收第 1 条、#1355） */}
             <span className="y10-small y10-muted mm-hint" data-testid="connect-issue">
-              {issue === "" ? "已填写完整，可以获取模型。" : issue}
+              {props.busy ? "正在连接并获取模型列表…" : issue === "" ? "已填写完整，可以获取模型。" : issue}
             </span>
           </div>
           {formStatus ? (
@@ -106,7 +101,7 @@ export function ConnectCard(props: ConnectCardProps) {
         </form>
       )}
       {props.providers.map((provider) => {
-        const summary = fetchSummary(provider);
+        const summary = fetchSummaryOf(provider);
         const status = props.status[provider.id];
         return (
           <section className="y10-conn-card mm-card" key={provider.id} data-testid="connection-card"
@@ -121,6 +116,12 @@ export function ConnectCard(props: ConnectCardProps) {
               </span>
             </div>
             <div className="y10-conn-body mm-body">
+              {/* 正在取候选：说明写在这张卡片里，不禁止操作（工单 #1355） */}
+              {props.fetching === provider.id ? (
+                <p className="y10-note mm-ok" role="status" data-testid="connection-fetching">
+                  {CONNECTION_FETCHING_TEXT}
+                </p>
+              ) : null}
               {summary.kind !== "none" ? (
                 <p className={summary.kind === "error" ? "y10-warn-text mm-warn" : "y10-small y10-muted mm-meta"}
                    data-testid="connection-fetch">
