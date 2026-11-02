@@ -1,6 +1,5 @@
 // 动作图鉴联系表（工单 #176 验收标准 1）：把全部公开画法渲染成一张对照图，交给用户查看画风。
 // 用 Playwright 的 Chromium 加载客户端的图鉴页（开发构建），逐项截取预览，拼成一张大图。
-// 原型侧的对应画法用原型自带的图鉴页（docs/prototypes/v13/index.html#/gallery）截取，两列并排。
 //
 // 用法：node scripts/build-contact-sheet.mjs [输出目录]
 // 依赖：@playwright/test 自带的 Chromium（npx playwright install chromium）。
@@ -57,7 +56,7 @@ try {
   const sheetPage = await browser.newPage({ viewport: { width, height } });
   await sheetPage.setContent(`
     <html><body style="margin:0;background:#14161e;color:#e8e6f0;font:11px/1.3 'Microsoft YaHei UI',sans-serif">
-    <div style="padding:8px 8px 0"><b>动作图鉴 · 联系表</b> · 共 ${shots.length} 项公开画法（原型 sprites.js 与 engine.js）</div>
+    <div style="padding:8px 8px 0"><b>动作图鉴 · 联系表</b> · 共 ${shots.length} 项公开画法</div>
     <div style="display:grid;grid-template-columns:repeat(${COLUMNS},${CELL}px);gap:0;padding:8px">
       ${shots
         .map(

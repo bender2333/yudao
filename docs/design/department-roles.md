@@ -446,4 +446,4 @@ stateDiagram-v2
 | [语义系统设计说明](semantic-system.md) | 「各角色的上下文」写明中心角色、经理、探索者与主程、审查者各自的上下文，以及 PRD 更新后依据旧版本的预测性任务记录的内容变为失效；「当前状态栏目」写明部门账本在中心角色与经理的当前状态栏目中的显示；「分层与模块关系」与「抽象层与复盘」写明复盘由流程编排安排，中心角色通过一次单独的请求完成 |
 | [恢复契约与故障矩阵](recovery-contract-and-fault-matrix.md) | 「角色任务的恢复」写明角色任务（含审查任务与预测性任务）的恢复规则；进行中的角色任务由步骤驱动从已提交的状态重新装配后继续 |
 | [D31](../requirements/outsourced-agent-roles.md) | 自有角色的步骤由控制核心驱动；外包角色由控制核心派发给外部 agent，做法见[外包角色设计说明](outsourced-roles.md) |
-| [原型 v13](../prototypes/v13/design.md)、[D30](../requirements/web-game-frontend.md) | 房间围绕中心角色布置，有审查者与主程；角色详情显示每一步的模型请求、工具调用及工具许可的结果；通知里有反复退回的提醒 |
+| [原型 v13（已归档）](../archive/prototypes/)、[D30](../requirements/web-game-frontend.md) | 房间围绕中心角色布置，有审查者与主程；角色详情显示每一步的模型请求、工具调用及工具许可的结果；通知里有反复退回的提醒 |
