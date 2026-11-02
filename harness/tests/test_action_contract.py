@@ -203,6 +203,28 @@ def test_a_read_only_action_reports_the_same_tree_digests(implementation_with_ar
     assert read.after_snapshot_ref is not None
 
 
+def test_a_local_command_reports_its_tree_change_and_endpoint_snapshot(tmp_path):
+    # 本地命令也改动工作区（总图第四节「动作」缝的回执一侧）：回执带动作前后的两个树摘要与终点快照的引用，
+    # 第二种实现不执行命令，这一条按本机执行环境核对（工单 #1398）
+    root = tmp_path / "workspace"
+    root.mkdir()
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    environment = LocalEnvironment.open(root, artifacts=artifacts, run_id=ARTIFACT_RUN)
+    before = environment.query(FactsQuery(tree=True)).tree
+    assert before is not None
+
+    receipt = _perform(environment, _action("bash", "command", {"command": "echo hello > made.txt"}))
+
+    after = environment.query(FactsQuery(tree=True)).tree
+    assert after is not None and "made.txt" in after.files
+    assert receipt.status == "completed" and receipt.ok, receipt.error
+    assert receipt.tree_change == TreeChange(before_digest=before.digest, after_digest=after.digest)
+    ref = receipt.after_snapshot_ref
+    assert ref is not None
+    snapshot = json.loads(artifacts.get_for_run(ARTIFACT_RUN, ArtifactRef(**ref.model_dump())))
+    assert snapshot == snapshot_payload(after), "按回执里的引用取回的快照不是命令结束以后的公开树"
+
+
 def test_an_old_receipt_without_the_tree_evidence_is_still_read():
     # 旧回执没有这两项（工单 #1398）：读得进来，两项都是空，原来的字段照旧
     receipt = ActionReceipt.model_validate({"action_id": "act:1", "status": "completed", "output": "a.txt",
