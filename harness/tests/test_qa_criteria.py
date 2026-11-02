@@ -9,8 +9,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from harness.coverage import (EXECUTABLE_METHODS, MODEL_READING_METHODS, coverage_report,
-                              method_is_executable, open_criteria)
+from harness.coverage import (EXECUTABLE_METHODS, MODEL_READING_METHODS, changed_criteria,
+                              coverage_report, method_is_executable, open_criteria)
 from harness.kernel_events import QA_METHODS, QA_RESULTS
 from harness.tightening import (_criteria_coverage_errors, _criteria_evidence_errors, _qa_criteria,
                                 _qa_criteria_errors, _release_criteria_errors)
@@ -52,9 +52,10 @@ def test_coverage_counts_covered_open_and_model_reading():
         {"criterion": "AC3", "method": "judgement", "result": "unverified"},
         {"criterion": "AC4", "method": "open", "result": "unverified"},
     ]
+    # changed 是改判的条数（工单 #1190）：不给时是 0
     assert coverage_report(criteria) == {
         "criteria_total": 4, "executable": 2, "covered": 1, "coverage_ratio": 0.25,
-        "model_reading": 1, "open": 2,
+        "model_reading": 1, "open": 2, "changed": 0,
     }
     assert open_criteria(criteria) == ["AC3", "AC4"]
     assert method_is_executable("trial") and not method_is_executable("human")
@@ -70,8 +71,30 @@ def test_an_unverified_executable_criterion_is_not_counted_as_covered():
 
 def test_an_empty_criteria_list_reports_a_zero_ratio():
     assert coverage_report([]) == {"criteria_total": 0, "executable": 0, "covered": 0,
-                                   "coverage_ratio": 0.0, "model_reading": 0, "open": 0}
+                                   "coverage_ratio": 0.0, "model_reading": 0, "open": 0, "changed": 0}
     assert open_criteria([]) == []
+
+
+def test_changed_criteria_compare_the_judgement_with_the_conclusion():
+    # 改判的对照（验证的独立性设计说明第 4 节，工单 #1190）：只按 AC 序号比 result，
+    # 两个方向都列出来（以后算解释翻转率时按方向分类）；判断里没有的条件不算改判
+    judged = [
+        {"criterion": "AC1", "method": "open", "result": "unverified"},
+        {"criterion": "AC2", "method": "check", "result": "passed"},
+        {"criterion": "AC3", "method": "check", "result": "passed"},
+    ]
+    concluded = [
+        {"criterion": "AC1", "method": "check", "result": "passed"},
+        {"criterion": "AC2", "method": "check", "result": "failed"},
+        {"criterion": "AC3", "method": "check", "result": "passed"},
+        {"criterion": "AC4", "method": "open", "result": "unverified"},
+    ]
+    assert changed_criteria(judged, concluded) == [
+        {"criterion": "AC1", "judged": "unverified", "result": "passed"},
+        {"criterion": "AC2", "judged": "passed", "result": "failed"},
+    ]
+    assert changed_criteria(judged, judged) == []
+    assert changed_criteria([], concluded) == []
 
 # ---------------------------------------------------------------------------
 # 逐条结论的规则（工单 #151）：结构、覆盖全部验收条件、可执行检验的证据、放行的三条规则。
