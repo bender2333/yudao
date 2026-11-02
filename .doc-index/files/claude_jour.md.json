@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"claude_jour.md",
-"hash":"ab80fab7ddf8da6b",
+"hash":"e9ceeca098a90056",
 "nodes":[
-{"hash":"ab80fab7ddf8da6b","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
+{"hash":"e9ceeca098a90056","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
 {"hash":"028833a01631910c","id":"claude_jour.md#Claude 执行日记 (Claude Journal)","kind":"section","parent":"claude_jour.md","title":"Claude 执行日记 (Claude Journal)"},
 {"hash":"48043ae754efd878","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 记录格式规范","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"记录格式规范"},
 {"hash":"16623160c7b059eb","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 21:10 状态文档与一次改完","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-10-31 21:10 状态文档与一次改完"},
@@ -48,7 +48,7 @@
 {"hash":"e876e1f04217e849","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-02 13:58 文档一致性方案入库"},
 {"hash":"88a51851ccb5c030","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 21:16 需求记录清理成状态文档","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-10-31 21:16 需求记录清理成状态文档"},
 {"hash":"96091be0364e062c","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 01:50 需求记录清理：按用户的答复收尾","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 01:50 需求记录清理：按用户的答复收尾"},
-{"hash":"c8e67432c9a611c7","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 02:02 D18、D24 去掉「判定点的升级」"}
+{"hash":"550933865961a75c","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 02:02 D18、D24 去掉「判定点的升级」"}
 ],
 "edges":[
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 19:40 规则文件与技能的历史清理"},
@@ -74,6 +74,7 @@
 {"dst":"client/tests/unit/pixel.test.js","kind":"code-path","raws":["client/tests/unit/pixel.test.js"],"seen":"b467f03e5d8ad14d","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 00:40 画面拆开，一次改完"},
 {"dst":"docs/design/visualization.md","kind":"code-path","raws":["docs/design/visualization.md"],"seen":"f32e507ada24faef","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 00:55 画面那条线不在这里派"},
 {"dst":"CLAUDE.md","kind":"section-ref","raws":["CLAUDE.md"],"seen":"5699f3d75484b664","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
+{"dst":"docs/consistency-scan-2026-11-03.md","kind":"code-path","raws":["docs/consistency-scan-2026-11-03.md"],"seen":"33cc4b05e042e29d","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
 {"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"6bf0a0bd9ec52441","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:03 文档一致性：不靠模型的核对环节"},
 {"dst":"docs/trial/stage-1-guide.md","kind":"code-path","raws":["docs/trial/stage-1-guide.md"],"seen":"7846e765f7829550","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:03 文档一致性：不靠模型的核对环节"},
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"2c01765171109f63","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:20 叫停：方案先和用户讨论"},

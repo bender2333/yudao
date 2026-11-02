@@ -29,7 +29,7 @@
 ],
 "edges":[
 {"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["第二节"],"seen":"3a0be485f15587d5","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["第二节"],"seen":"a40f436c1c34521a","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
 {"dst":"docs/architecture.html#s4 > 执行","kind":"map-position","raws":["「执行」"],"seen":"fac7456fab57034b","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
 {"dst":"docs/architecture.html#s4 > 投影","kind":"map-position","raws":["「投影」"],"seen":"f791f9c11958ba95","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},
 {"dst":"docs/architecture.html#s4 > 装配","kind":"map-position","raws":["「装配」"],"seen":"052770e8d9e24d0c","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明"},

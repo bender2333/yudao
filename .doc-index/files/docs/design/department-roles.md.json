@@ -43,7 +43,7 @@
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「产品」","「工程」","「质检」"],"seen":"3c9310ef49956c5b","src":"docs/design/department-roles.md#部门内多角色设计说明"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「定义」"],"seen":"3a0be485f15587d5","src":"docs/design/department-roles.md#部门内多角色设计说明"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「定义」"],"seen":"a40f436c1c34521a","src":"docs/design/department-roles.md#部门内多角色设计说明"},
 {"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"c885094f22cf0815","src":"docs/design/department-roles.md#部门内多角色设计说明"},
 {"dst":"docs/design/department-loop.md","kind":"link","raws":["department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/design/department-roles.md#部门内多角色设计说明"},
 {"dst":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","kind":"link","raws":["department-loop.md"],"seen":"17be33a6b2f0dabb","src":"docs/design/department-roles.md#部门内多角色设计说明"},

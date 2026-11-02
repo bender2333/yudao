@@ -19,7 +19,7 @@
 {"hash":"e20e81d7d837637c","id":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 12. 与现有设计的关系","kind":"section","parent":"docs/design/rules-and-parameters.md#规则登记与参数设计说明","title":"12. 与现有设计的关系"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「定义」"],"seen":"3a0be485f15587d5","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「定义」"],"seen":"a40f436c1c34521a","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明"},
 {"dst":"docs/architecture.html#s4 > 定义","kind":"map-position","raws":["「定义」"],"seen":"78827a557b376c0c","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明"},
 {"dst":"docs/architecture.html#s5","kind":"map-position","raws":["第五节"],"seen":"cb9066af90b3b5a9","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["evaluation-scenarios.md"],"seen":"8b813cb71f37d7dc","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明"},

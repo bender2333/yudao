@@ -38,7 +38,7 @@
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「装配实现」"],"seen":"3c9310ef49956c5b","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
-{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「可以整体重写」"],"seen":"3a0be485f15587d5","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「可以整体重写」"],"seen":"a40f436c1c34521a","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「上下文逼近上限 → 压缩」"],"seen":"0e9705e0dd37530b","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/architecture.html#s4 > 装配","kind":"map-position","raws":["「装配」"],"seen":"052770e8d9e24d0c","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
 {"dst":"docs/evaluation/context-assembly-2026-10-29.md","kind":"link","raws":["../evaluation/context-assembly-2026-10-29.md"],"seen":"9e3db839c73835f9","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数"},
