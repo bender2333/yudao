@@ -997,3 +997,5 @@ claude-opus-5-5（总架构师） / 2026-11-01 02:25 / `docs/agents/workflow.md`
 Claude（Duet 助手） / 2026-11-02 07:58 / `docs/program-roadmap.md` 第 3 节：道 08「评价与验收」的「变异测试与圈复杂度守卫」从未知落点挪进已规划的项目，写成「内核的代码质量门槛」；表下加一段「内核的代码质量门槛」，写三道门槛（CRAP 小于 10、结构重复低于 0.8、变异测试没有存活）与一个内核模块上门槛的两条信号 / 用户定：现在变动大，三道门槛先只用在内核，模块稳了再上，其他代码不上，策略写进路线图
 
 Claude（Duet 助手） / 2026-11-02 09:15 / 新增调研 `research/deepseek-superagent-async-framework.md`：DeepSeek Harness 团队开源的 dsh-superagent 原型做了什么（来源、触发、评估、授权、工单、派工，路由会话加每张工单一个执行会话，先存后做的副作用队列、并发槽、长命令转后台），与总图逐项对照，倾向不引入它的框架与代码，借四个做法，外部入口是否算新方框交总架构师；`research/README.md` 加一行索引 / 用户要调研 DeepSeek 新发的 Super-agent，看 Yudao 能不能用它的异步框架，报告放 docs/research
+
+Claude（Duet 助手） / 2026-11-02 13:58 / 新增 `research/doc-consistency-concept-model.md`：文档一致性核对的方案，概念模型放在 `CONTEXT.md`（每个词条下加一块结构：别名、定义在、属于与包含与依赖、取值、写法、代码、代码状态、不自动挂），文档按名字自动挂、复述取值写语义链接，发现走样只用脚本、只提醒不拦；第一版六步与第一步的写法草稿；待定五条，复述的写法与 49 个总图的词怎么办先定；`research/README.md` 加一行索引；`decision.md` 加一条 / 用户定按概念模型核对、模型放在 CONTEXT.md，要先把方案推到 main
