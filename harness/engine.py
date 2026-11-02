@@ -181,12 +181,14 @@ class StepDriver:
               facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
               cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
               refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
-              definitions: Definitions | None = None) -> StepDriver:
+              definitions: Definitions | None = None,
+              mcp_sessions: Any | None = None) -> StepDriver:
         # 在当前事件循环中开始这次激活的步骤循环
         driver = cls(request, writes=writes, artifacts=artifacts, assembly=assembly,
                      adapter=adapter, facade=facade, environment=environment, nodes=nodes,
                      cancelled=cancelled, deltas=deltas, tightening=tightening,
-                     refresh_workspace=refresh_workspace, definitions=definitions)
+                     refresh_workspace=refresh_workspace, definitions=definitions,
+                     mcp_sessions=mcp_sessions)
         driver._task = asyncio.get_running_loop().create_task(driver._run())
         return driver
 
@@ -195,7 +197,8 @@ class StepDriver:
                  facade: ProviderFacade | None, environment: LocalEnvironment, nodes: SafeNode,
                  cancelled: Event, deltas: DeltaChannel, tightening: Tightening,
                  refresh_workspace: Callable[[], LocalEnvironment | None] | None = None,
-                 definitions: Definitions | None = None) -> None:
+                 definitions: Definitions | None = None,
+                 mcp_sessions: Any | None = None) -> None:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
@@ -227,6 +230,11 @@ class StepDriver:
         # 这是可以接受的限制（工单 #1037）
         opened = writes.read(run_stream(scope.run_id))
         self._text_reply_answers = _guidance_only_round(opened.projection, scope)
+        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：编排层按 run 持有，
+        # 会话结束（run 关闭）时由它关闭。检查工作区按会话保留会换掉环境对象，会话表重新接上
+        self._mcp_sessions = mcp_sessions
+        if mcp_sessions is not None:
+            environment.mcp_sessions = mcp_sessions
         # 这一轮写下的事件范围从这个版本往后算（工单 #861）：结果里的范围由它确定
         self._start_version = opened.version
         # 检查工作区按会话保留（工单 #558）：新交付封存以后质检的检查工作区要重建，
@@ -1071,6 +1079,9 @@ class StepDriver:
             return
         refreshed = self._refresh_workspace()
         if refreshed is not None:
+            # 换掉的只是工作区对象：MCP 会话表属于这个 run（每台服务器一个实例），重新接上
+            if self._mcp_sessions is not None:
+                refreshed.mcp_sessions = self._mcp_sessions
             self._environment = refreshed
 
     def _begin_tool(self, request: ModelRequest, call: dict[str, Any]) -> tuple[ToolPermission, WorkspaceFacts]:
