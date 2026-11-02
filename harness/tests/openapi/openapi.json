@@ -10484,6 +10484,35 @@
         ],
         "title": "MaterialRecord"
       },
+      "McpCredentialStatusView": {
+        "properties": {
+          "ref": {
+            "type": "string",
+            "title": "Ref"
+          },
+          "configured": {
+            "type": "boolean",
+            "title": "Configured"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "version": {
+            "type": "integer",
+            "title": "Version",
+            "default": 0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ref",
+          "configured",
+          "source"
+        ],
+        "title": "McpCredentialStatusView"
+      },
       "McpProbeResultView": {
         "properties": {
           "server_name": {
@@ -10718,6 +10747,14 @@
               }
             ],
             "title": "Updated At"
+          },
+          "credentials": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/McpCredentialStatusView"
+            },
+            "type": "object",
+            "title": "Credentials",
+            "default": {}
           }
         },
         "additionalProperties": false,
