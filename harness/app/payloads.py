@@ -8,10 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..definitions import DEFINITIONS
 from ..kernel_events import SKELETON_EVENTS, register_application_event_types
-from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
+from ..models import CatalogEventType, EventType, ProjectEventType
 from ..streams import PRIORITY_USER
 
-Department = Literal[DEPARTMENTS]
+# 部门是对外合同里的字符串（工单 #1389，设计说明「形态随事项冻结」）：取值由事项所用的那份定义给出，
+# 不在这份合同里收窄成三个固定的值。名字不认识时由写入口按定义拒绝，错误写明可用的部门。
+# 成果的作者部门（issuer）同样：它记的是写下这份成果的部门，也是定义里给的名字
+Department = str
 Purpose = Literal["work", "compaction"]
 
 
@@ -761,7 +764,7 @@ class SpecAcceptedPayload(AcceptanceFields):
     # 旧事件没有这个字段时为空（工单 #1178）
     requirement_mapping: list[RequirementMapping] = []
     kind: Literal["product_spec"]
-    issuer: Literal["product"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -846,7 +849,7 @@ class DeliveryAcceptedPayload(AcceptanceFields):
     effective_contract_hash: str
     code_tree_digest: str
     kind: Literal["delivery_spec"]
-    issuer: Literal["engineering"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -920,7 +923,7 @@ class QaSubmittedPayload(AcceptanceFields):
     evidence_refs: list[ArtifactRef]
     judgement_event: str = ""
     kind: Literal["qa_review"]
-    issuer: Literal["quality"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -970,7 +973,7 @@ class StructureAcceptedPayload(AcceptanceFields):
     product_spec_hash: str
     code_tree_digest: str
     kind: Literal["structure"]
-    issuer: Literal["engineering"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -1007,7 +1010,7 @@ class BaselineReviewAcceptedPayload(AcceptanceFields):
     structure_hash: str
     code_snapshot_hash: str
     kind: Literal["baseline_review"]
-    issuer: Literal["quality"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
