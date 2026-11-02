@@ -26,10 +26,13 @@ import {
   admittedModels,
   candidateKey,
   candidateRowsOf,
+  candidatesLocked,
   capacityInputIssue,
+  collectingProvider,
   departmentBindings,
   departmentTierBindings,
   departmentsOf,
+  fetchNoteText,
   filterCandidates,
   groupAdmittedModels,
   intFromInput,
@@ -39,6 +42,7 @@ import {
   type BindingInput,
   type CandidateFilterId,
   type CandidateRow,
+  type PendingFetch,
 } from "./model-logic";
 
 export type ModelManagementPageProps = {
@@ -61,6 +65,9 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [apiKey, setApiKey] = useState("");
   const [connecting, setConnecting] = useState(false);
   const [busy, setBusy] = useState(false);
+  // 已经发出去、结果还没回来的那次获取模型列表（工单 #1355）：
+  // 服务端在后台取，结果以后以新的一份目录出现；页面据此说明正在取，但不因此停住操作
+  const [pendingFetch, setPendingFetch] = useState<PendingFetch | null>(null);
   const [connectStatus, setConnectStatus] = useState<Record<string, ConnectStatus>>({});
   const [candidateStatus, setCandidateStatus] = useState<Record<string, CandidateStatus>>({});
   const [selectionStatus, setSelectionStatus] = useState<Record<string, SelectionStatus>>({});
@@ -115,11 +122,20 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     };
   }, [views]);
 
-  // 事件：获取模型列表的结果与模型测试的结果都在事件里；视图按事件自动重新查询
+  // 事件：模型测试的结果在事件里（工单 #1355 之前「获取模型列表」的结果也靠这里复位，
+  // 但那条事件不是一定会到：服务端在连接已变化或任务异常时会提前结束而不写事件）。
+  // 订阅用 ref 拿进来，页面每次重画都重新订阅的话，事件可能在退订与重订之间丢掉
+  const subscribeRef = useRef(props.subscribeEvents);
+  subscribeRef.current = props.subscribeEvents;
+  // 这次获取到哪一份连接上（事件里认这一份）：结果到了就结束「正在获取」的说明
+  const pendingRef = useRef<PendingFetch | null>(null);
+  pendingRef.current = pendingFetch;
   useEffect(() => {
-    return props.subscribeEvents((event) => {
+    return subscribeRef.current((event) => {
       if (event.type === "catalog_candidates_collected") {
-        setConnecting(false);
+        if (pendingRef.current !== null && event.payload.provider_id === pendingRef.current.provider_id) {
+          setPendingFetch(null);
+        }
         return;
       }
       if (event.type === "catalog_test_finished" && event.payload.kind === "model"
@@ -134,32 +150,55 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         }));
       }
     });
-  }, [props]);
+  }, []);
 
   // 提交一个命令：结果交回接受或按原因拒绝；接受以后重新读取目录，下一条命令用刷新后的修订号。
-  // 命令在途时页面上的操作先停住：部门默认是整份保存的，两次改动叠在一起会被服务端按版本过期拒绝
+  // 命令在途时页面上的操作先停住：部门默认是整份保存的，两次改动叠在一起会被服务端按版本过期拒绝。
+  // busy 只罩住命令本身（工单 #1355）：重新读取目录是另一次请求，它挂住时不该让整页一直停着
   const submit = useCallback(async (name: string, body: Record<string, unknown>): Promise<CommandOutcome> => {
     setBusy(true);
+    let outcome: CommandOutcome;
     try {
-      const outcome = await props.command(name, {
+      outcome = await props.command(name, {
         command_id: newCommandId(),
         base_version: catalogRef.current?.revision ?? 0,
         ...body,
       });
-      if (outcome.ok) {
-        await props.views?.refresh("models.catalog");
-      }
-      return outcome;
     } finally {
       setBusy(false);
     }
+    if (outcome.ok) {
+      await props.views?.refresh("models.catalog");
+    }
+    return outcome;
   }, [props]);
+
+  // 发起这次获取之前，各份连接最近一次结果的样子：命令回来以后据此判断结果是否已经变了
+  const resultBefore = useCallback((): Map<string, { fetched_at: string | null; status: string | null }> => new Map(
+    (catalogRef.current?.providers ?? []).map((provider) => [
+      provider.id,
+      provider.latest_candidates
+        ? { fetched_at: provider.latest_candidates.fetched_at, status: provider.latest_candidates.status }
+        : { fetched_at: null, status: null },
+    ]),
+  ), []);
 
   // 候选：各连接最近一次取到的模型，按连接汇总
   const candidateRows = useMemo<CandidateRow[]>(
     () => (catalog === null ? [] : candidateRowsOf(catalog)),
     [catalog],
   );
+
+  // 正在取候选的那一份连接（工单 #1355）：目录里这一份的结果时间没变就还在取，
+  // 变了（成功写新的时间，失败写空串）就结束，页面上的说明随之消失
+  const collecting = useMemo(() => collectingProvider(catalog, pendingFetch), [catalog, pendingFetch]);
+  useEffect(() => {
+    if (pendingFetch !== null && collecting === null) {
+      setPendingFetch(null);
+    }
+  }, [collecting, pendingFetch]);
+  // 候选区只在页面自己发出的命令在途时暂停：服务端在后台取候选时页面照常可以操作
+  const locked = candidatesLocked({ busy, connecting });
 
   // 用户刚勾选的候选：勾选以后服务端要往返一次才建好访问定义，
   // 勾选框先按本地这份显示（命令被拒绝时再撤回）
@@ -226,13 +265,20 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       }));
       return;
     }
+    const before = resultBefore();
     setConnecting(true);
-    const outcome = await submit("catalog.connect", {
-      base_url: address.trim(),
-      api_key: key,
-    });
-    if (!outcome.ok) {
+    let outcome: CommandOutcome;
+    try {
+      outcome = await submit("catalog.connect", {
+        base_url: address.trim(),
+        api_key: key,
+      });
+    } finally {
+      // 请求结束（成功或失败）就回到可以操作的状态（工单 #1355）：
+      // 候选由服务端在后台取，页面不再因为这件事停住
       setConnecting(false);
+    }
+    if (!outcome.ok) {
       setConnectStatus((current2) => ({
         ...current2,
         [editing ?? "new"]: { kind: "error", message: commandProblemText(outcome.problem) },
@@ -245,23 +291,43 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     setApiKey("");
     setAddress("");
     setTarget(null);
-    setConnectStatus((current2) => ({
-      ...current2,
-      [providerId]: { kind: "ok", message: "连接信息已保存，正在获取模型列表。" },
-    }));
-  }, [address, apiKey, submit, target]);
+    setConnectStatus((current2) => {
+      const next = { ...current2 };
+      delete next[providerId];
+      return next;
+    });
+    // 记下这次获取：结果回来后连接卡片上写「已获取 N 个模型」或失败原因，说明也就随之消失
+    const previous = before.get(providerId);
+    setPendingFetch({
+      provider_id: providerId,
+      fetched_at: previous?.fetched_at ?? null,
+      status: previous?.status ?? null,
+    });
+  }, [address, apiKey, resultBefore, submit, target]);
 
   const refreshCandidates = useCallback(async (providerId: string) => {
+    const before = resultBefore();
     setConnecting(true);
-    const outcome = await submit("catalog.candidates.collect", { provider_id: providerId });
-    if (!outcome.ok) {
+    let outcome: CommandOutcome;
+    try {
+      outcome = await submit("catalog.candidates.collect", { provider_id: providerId });
+    } finally {
       setConnecting(false);
+    }
+    if (!outcome.ok) {
       setConnectStatus((current) => ({
         ...current,
         [providerId]: { kind: "error", message: commandProblemText(outcome.problem) },
       }));
+      return;
     }
-  }, [submit]);
+    const previous = before.get(providerId);
+    setPendingFetch({
+      provider_id: providerId,
+      fetched_at: previous?.fetched_at ?? null,
+      status: previous?.status ?? null,
+    });
+  }, [resultBefore, submit]);
 
   const removeConnection = useCallback(async (providerId: string) => {
     const outcome = await submit("catalog.connection.delete", { provider_id: providerId });
@@ -547,6 +613,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
           address={address}
           apiKey={apiKey}
           busy={busy || connecting}
+          fetching={collecting}
           status={connectStatus}
           onTarget={(next) => {
             setTarget(next);
@@ -602,7 +669,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
               manualModel={manualModel}
               manualProvider={manualProvider}
               providers={catalog.providers.map((item) => ({ id: item.id, base_url: item.base_url }))}
-              disabled={busy || connecting}
+              disabled={locked}
+              fetchNote={fetchNoteText({ connecting, collecting: collecting !== null })}
               onSearch={(value) => {
                 setSearch(value);
                 setLimit(FIRST_BATCH);
