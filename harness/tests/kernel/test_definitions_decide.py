@@ -4,14 +4,23 @@
 # 一个工具能不能用、一份提案能不能接纳，只看交给它的那份定义里的工具、部门与提案种类，
 # 不读模块加载时的那一份。用例自己造定义，只改「定义里有哪些工具、部门与提案种类」这一件事，
 # 看许可与校验的决定跟着它变；不跑模型、不起运行，只在内存里判断，属于单元层。
+#
+# 核验声明（工单 #1388）：定义声明谁核验谁的哪种成果、角色的写入范围，答得出事项最后采纳的成果
+# 是不是开环；加载时的核对把核验对象不存在、谁能拒绝谁有环的定义整份拒绝。这部分用例只换声明，
+# 看查询与核对跟着它变。
 
 from __future__ import annotations
 
+import pytest
+from pydantic import ValidationError
+
 from harness import adjudication, kernel_events, submissions, tools, validation
 from harness.actions import TreeFacts, WorkspaceFacts
-from harness.definitions import DEFINITIONS, Definitions, Tool
+from harness.definitions import (DEFINITIONS, LEGACY_VERIFICATION, Definitions, Tool, VerificationDeclaration,
+                                 VerifiedOutcomes, VerifierRole, WriteScope, verification_issues)
 from harness.minimal_projection import fold_events
 from harness.models import RunProjection, SessionRecord
+from harness.path_rules import QA_TESTS_DIR
 from harness.tightening import WATCHED_OUTPUTS
 
 # 这些用例只判决定，不看提案内容：种类与部门的检查在格式与内容之前
@@ -188,3 +197,138 @@ def test_a_kind_only_in_the_matter_definition_is_accepted_with_a_generic_event()
     # 同一种类拿全局定义校验被拒绝：说明读的是这个事项所用的那份定义
     refused = _decision(projection, {"kind": "matter_note", "note": "只在这份定义里的成果"}, "engineering")
     assert [error.message for error in refused.errors] == ["unknown proposal kind: 'matter_note'"]
+
+
+def _declaration(verifiers=(), write_scopes=None) -> VerificationDeclaration:
+    return VerificationDeclaration(verifiers=tuple(verifiers),
+                                    write_scopes={} if write_scopes is None else dict(write_scopes))
+
+
+def _declared(verifiers=(), write_scopes=None) -> Definitions:
+    # 这份定义把核验声明换成给出的这一份（谁核验谁、写入范围）
+    return DEFINITIONS.model_copy(update={"organization": DEFINITIONS.organization.model_copy(
+        update={"verification": _declaration(verifiers, write_scopes)})})
+
+
+def _issues(verifiers=(), write_scopes=None) -> list[tuple[str, str, str]]:
+    # 加载时对这份核验声明报出的问题，成果种类取默认定义里的那些
+    outcomes = {tool.proposal for tool in DEFINITIONS.tools.values() if tool.proposal is not None}
+    return verification_issues(_declared(verifiers, write_scopes).organization, outcomes)
+
+
+# 核验声明（工单 #1388）：默认定义里质检核验工程的交付、只写检查材料，普通事项最后采纳的成果
+# 是交付，所以不是开环；去掉核验角色、或者核验角色只核验中途成果时，交付没有人核验，判断为开环
+def test_the_default_definition_reads_the_verifier_the_delivery_and_the_write_scope() -> None:
+    assert DEFINITIONS.verifier_roles() == ("quality",)
+    assert DEFINITIONS.is_verifier("quality") and not DEFINITIONS.is_verifier("engineering")
+    assert DEFINITIONS.verifiers_of("engineering", "delivery_spec") == ("quality",)
+    assert DEFINITIONS.verifiers_of("engineering", "product_spec") == ()
+    assert DEFINITIONS.rejection_edges() == (("quality", "engineering", "delivery_spec"),)
+    assert DEFINITIONS.write_scope("quality") == WriteScope(scope="check_materials", paths=(QA_TESTS_DIR,))
+    assert DEFINITIONS.write_scope("engineering") == WriteScope(scope="workspace")
+    # 普通事项（work_items.json 的 change）最后采纳的成果是交付，所以这份定义下普通事项不是开环
+    assert DEFINITIONS.work_item("change").label == "普通事项"
+    assert not DEFINITIONS.is_open_loop("delivery_spec")
+    # 旧定义没有写核验声明时读出的就是这一份：与今天写死的三部门相同
+    assert DEFINITIONS.verification == LEGACY_VERIFICATION
+
+
+def test_a_definition_without_a_verifier_marks_the_delivery_open_loop() -> None:
+    # 验收第 2 条：去掉核验角色以后，事项最后采纳的成果没有人核验
+    without = _declared(verifiers=())
+    assert without.verifier_roles() == ()
+    assert without.is_open_loop("delivery_spec")
+
+
+def test_a_verifier_of_a_midway_outcome_leaves_the_delivery_open_loop() -> None:
+    # 验收第 2 条：核验角色只核验中途成果（产品要求）时，交付没有人核验，同样判断为开环
+    midway = _declared(verifiers=[VerifierRole(role="quality", verifies=(
+        VerifiedOutcomes(role="engineering", outcomes=("product_spec",)),))])
+    assert midway.verifiers_of("engineering", "product_spec") == ("quality",)
+    assert not midway.is_open_loop("product_spec")
+    assert midway.is_open_loop("delivery_spec")
+
+
+def test_several_verifiers_of_one_outcome_all_answer() -> None:
+    # 设计说明第 4.7 节：几个核验角色核验同一份成果时，每一个都放行才算放行
+    both = _declared(verifiers=[
+        VerifierRole(role="quality", verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),
+        VerifierRole(role="product", verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),
+    ])
+    assert both.verifiers_of("engineering", "delivery_spec") == ("quality", "product")
+    assert both.verified_by("delivery_spec") == ("quality", "product")
+    assert not both.is_open_loop("delivery_spec")
+
+
+def test_a_verifier_of_a_role_outside_the_definition_is_rejected() -> None:
+    issues = _issues(verifiers=[VerifierRole(role="quality", verifies=(
+        VerifiedOutcomes(role="reviewer", outcomes=("delivery_spec",)),))])
+    assert issues == [("organization.json", "verification.verifiers[0].verifies[0].role",
+                       "被核验的角色 reviewer 不属于任何部门")]
+
+
+def test_a_verifier_of_an_outcome_outside_the_definition_is_rejected() -> None:
+    issues = _issues(verifiers=[VerifierRole(role="quality", verifies=(
+        VerifiedOutcomes(role="engineering", outcomes=("test_report",)),))])
+    assert issues == [("organization.json", "verification.verifiers[0].verifies[0].outcomes[0]",
+                       "成果种类 test_report 没有定义")]
+
+
+def test_a_role_that_verifies_itself_is_rejected_as_a_cycle() -> None:
+    # 验收第 3 条：角色核验自己是长度为一的环
+    issues = _issues(verifiers=[VerifierRole(role="quality", verifies=(
+        VerifiedOutcomes(role="quality", outcomes=("qa_review",)),))])
+    assert issues == [("organization.json", "verification.verifiers[0].verifies[0].role",
+                       "谁能拒绝谁有环：quality → quality，角色核验自己")]
+
+
+def test_two_roles_that_verify_each_other_are_rejected_as_a_cycle() -> None:
+    # 验收第 3 条：两个角色互相核验是一个环，报一条，写明环的路径
+    issues = _issues(verifiers=[
+        VerifierRole(role="quality", verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),
+        VerifierRole(role="engineering", verifies=(VerifiedOutcomes(role="quality", outcomes=("qa_review",)),)),
+    ])
+    assert issues == [("organization.json", "verification.verifiers[1].verifies[0].role",
+                       "谁能拒绝谁有环：quality → engineering → quality")]
+
+
+def test_a_write_scope_of_a_role_outside_the_definition_is_rejected() -> None:
+    issues = _issues(write_scopes={"reviewer": WriteScope(scope="workspace")})
+    assert issues == [("organization.json", "verification.write_scopes.reviewer", "角色 reviewer 不属于任何部门")]
+
+
+def test_a_verifier_role_outside_the_definition_is_rejected() -> None:
+    issues = _issues(verifiers=[VerifierRole(role="reviewer", verifies=(
+        VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),))])
+    assert issues == [("organization.json", "verification.verifiers[0].role", "核验角色 reviewer 不属于任何部门")]
+
+
+def test_a_verifier_declared_twice_is_rejected() -> None:
+    # 一个角色只声明一次：分成两条写会让「谁能拒绝谁」出现重复的边
+    issues = _issues(verifiers=[
+        VerifierRole(role="quality", verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),
+        VerifierRole(role="quality", verifies=(VerifiedOutcomes(role="engineering", outcomes=("qa_review",)),)),
+    ])
+    assert issues == [("organization.json", "verification.verifiers[1].role", "核验角色 quality 重复声明")]
+
+
+def test_a_write_scope_must_name_the_directories_check_materials_writes() -> None:
+    # 检查材料的写入范围要写明目录；写工作区的范围不带路径
+    with pytest.raises(ValidationError, match="check_materials requires the directories"):
+        WriteScope(scope="check_materials")
+    with pytest.raises(ValidationError, match="only check_materials takes paths"):
+        WriteScope(scope="workspace", paths=(QA_TESTS_DIR,))
+
+
+def test_an_unknown_department_has_no_write_scope() -> None:
+    with pytest.raises(ValueError, match="unknown department 'reviewer'"):
+        DEFINITIONS.write_scope("reviewer")
+
+
+def test_an_old_definition_without_the_declaration_reads_the_three_departments() -> None:
+    # 旧定义没有这份声明：读的时候按默认三部门解释，那种解释不是定义的一部分，加载时不核对
+    old = DEFINITIONS.model_copy(update={"organization": DEFINITIONS.organization.model_copy(
+        update={"verification": None})})
+    assert old.verification == LEGACY_VERIFICATION
+    assert old.is_open_loop("delivery_spec") is False
+    assert verification_issues(old.organization, set()) == []

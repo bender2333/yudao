@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from pathlib import Path
 from types import MappingProxyType
 from typing import Annotated, Any, Literal, get_args
@@ -204,6 +204,59 @@ class Department(_Definition):
                           "structure", "baseline_review"], ...] = ()
 
 
+# 写入范围是内核认识的通用权限（设计说明第 4.2 节第 1 条）：workspace 写这个事项的工作区；
+# check_materials 只写检查材料的目录，写的东西不进入公开树与交付，不让被核验方的成果失效
+WriteScopeKind = Literal["workspace", "check_materials"]
+
+
+class WriteScope(_Definition):
+    scope: WriteScopeKind = "workspace"
+    # check_materials 时允许写的目录（相对运行工作区的顶层目录）；workspace 不写路径
+    paths: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _paths(self) -> "WriteScope":
+        if self.scope == "check_materials" and not self.paths:
+            raise ValueError("check_materials requires the directories it may write (paths)")
+        if self.scope != "check_materials" and self.paths:
+            raise ValueError("only check_materials takes paths")
+        return self
+
+
+# 没有声明写入范围的角色写这个事项的工作区
+WORKSPACE_WRITE_SCOPE = WriteScope(scope="workspace")
+
+
+class VerifiedOutcomes(_Definition):
+    # 核验角色核验哪个角色的哪几种成果
+    role: Identifier
+    outcomes: tuple[Identifier, ...] = Field(min_length=1)
+
+
+class VerifierRole(_Definition):
+    # 一个核验角色：核验谁的哪种成果（三部门默认：质检核验工程的交付）
+    role: Identifier
+    verifies: tuple[VerifiedOutcomes, ...] = Field(min_length=1)
+
+
+class VerificationDeclaration(_Definition):
+    # 组织定义的核验声明（设计说明第 4.2、4.7 节）：谁核验谁、角色的写入范围。
+    # 谁能拒绝谁由核验声明推出，不另写一份
+    verifiers: tuple[VerifierRole, ...] = ()
+    write_scopes: Mapping[Identifier, WriteScope] = Field(default_factory=dict)
+
+    freeze_write_scopes = _frozen("write_scopes")
+
+
+# 旧定义（organization.json 没有写核验声明）的核验关系与写入范围：与今天写死的三部门相同
+# （app/project_queries.py 的 VERIFIER_OF 与 path_rules.py 的 QA_TESTS_DIR），只为旧定义保留
+LEGACY_VERIFICATION = VerificationDeclaration(
+    verifiers=(VerifierRole(role="quality",
+                            verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),),
+    write_scopes={"quality": WriteScope(scope="check_materials", paths=(".yudao-qa-tests",))},
+)
+
+
 class OrganizationRules(_Definition):
     # 全体角色共同的规则文字，每次请求原样放进上下文：输入的处理、专业补全、协作规则
     input_handling: str = Field(min_length=1)
@@ -217,6 +270,9 @@ class Organization(_Definition):
     # 路由实现的名称（骨架与应用设计说明第 5.1 节、工单 #825）：启动时按这个名称接上实现，
     # 名称必须是 routings.json 里登记的其中一个。默认是成果驱动
     routing: Identifier = "watched_outputs"
+    # 核验声明：谁核验谁的哪种成果、角色的写入范围。没有写时按旧定义的三部门解释（LEGACY_VERIFICATION），
+    # 所以字段只增，旧文件照旧能读
+    verification: VerificationDeclaration | None = None
     rules: OrganizationRules
 
 
@@ -618,6 +674,49 @@ class Definitions(_Definition):
                 return item.watched
         raise ValueError(f"unknown department {department!r}")
 
+    @property
+    def verification(self) -> VerificationDeclaration:
+        # 核验声明：定义写明了就用它；旧定义没有写时按今天写死的三部门解释（字段只增，旧文件新版本能读）
+        declaration = self.organization.verification
+        return LEGACY_VERIFICATION if declaration is None else declaration
+
+    def verifier_roles(self) -> tuple[str, ...]:
+        # 是核验角色的角色：定义里声明了核验谁的成果
+        return tuple(verifier.role for verifier in self.verification.verifiers)
+
+    def is_verifier(self, role: str) -> bool:
+        return role in self.verifier_roles()
+
+    def rejection_edges(self) -> tuple[tuple[str, str, str], ...]:
+        """谁能拒绝谁：核验角色、被核验的角色与成果种类，由核验声明推出，不另写一份。"""
+        return tuple((verifier.role, verified.role, outcome)
+                     for verifier in self.verification.verifiers
+                     for verified in verifier.verifies
+                     for outcome in verified.outcomes)
+
+    def verifiers_of(self, role: str, outcome: str) -> tuple[str, ...]:
+        """核验这个角色的这种成果的核验角色；空表示没有核验角色核验它。"""
+        return tuple(verifier for verifier, verified, kind in self.rejection_edges()
+                     if verified == role and kind == outcome)
+
+    def verified_by(self, outcome: str) -> tuple[str, ...]:
+        """核验这种成果的核验角色，不论被核验的是哪个角色；按声明顺序，重复的不列。"""
+        return tuple(dict.fromkeys(verifier for verifier, _verified, kind in self.rejection_edges()
+                                   if kind == outcome))
+
+    def write_scope(self, role: str) -> WriteScope:
+        """角色的写入范围：声明了就用它，没有声明的角色写这个事项的工作区。"""
+        if role not in self.departments:
+            raise ValueError(f"unknown department {role!r}")
+        return self.verification.write_scopes.get(role, WORKSPACE_WRITE_SCOPE)
+
+    def is_open_loop(self, outcome: str) -> bool:
+        """事项最后采纳的成果没有核验角色核验时为开环（设计说明第 4.7 节第 4 条）。
+
+        outcome 是事项最后采纳的成果种类（成果驱动下是交付），按成果种类与核验声明算，判断里不写部门名。
+        """
+        return not self.verified_by(outcome)
+
     def work_item(self, kind: str) -> WorkItemKind:
         # 事项种类的定义；普通事项没有部门说明，沿用 roles.json
         definition = self.work_items.kinds.get(kind)
@@ -819,6 +918,8 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
                 issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
     issues.extend(_work_item_references(parts["work_items"], organization, tools, parts["stop_reasons"]))
     issues.extend(_routing_references(organization, parts["routings"]))
+    issues.extend(verification_issues(organization, {tool.proposal for tool in tools.values()
+                                                    if tool.proposal is not None}))
     issues.extend(_rule_references(parts["rules"], roles))
     submitters: dict[str, str] = {}
     for name, tool in tools.items():
@@ -912,6 +1013,80 @@ def _routing_references(organization: Organization, routings: Routings) -> list[
         return []
     return [("organization.json", "routing",
              f"路由实现 {organization.routing} 不存在；可用的是：{'、'.join(available)}")]
+
+
+def verification_issues(organization: Organization, outcomes: Collection[str]) -> list[tuple[str, str, str]]:
+    """核验声明的核对（设计说明第 4.7 节第 2、3 条）：核验角色与被核验的角色都在这份定义里，
+    成果种类在这份定义里，谁能拒绝谁无环（角色核验自己也是环）。
+
+    旧定义没有这份声明，读的时候按今天写死的三部门解释；那种解释不是定义的一部分，这里不核对。
+    """
+    declaration = organization.verification
+    if declaration is None:
+        return []
+    issues: list[tuple[str, str, str]] = []
+    file = "organization.json"
+    members = {department.id for department in organization.departments}
+    declared: set[str] = set()
+    edges: list[tuple[str, str, str]] = []
+    for index, verifier in enumerate(declaration.verifiers):
+        at = f"verification.verifiers[{index}]"
+        if verifier.role in declared:
+            issues.append((file, f"{at}.role", f"核验角色 {verifier.role} 重复声明"))
+        declared.add(verifier.role)
+        if verifier.role not in members:
+            issues.append((file, f"{at}.role", f"核验角色 {verifier.role} 不属于任何部门"))
+        for position, verified in enumerate(verifier.verifies):
+            field = f"{at}.verifies[{position}]"
+            if verified.role not in members:
+                issues.append((file, f"{field}.role", f"被核验的角色 {verified.role} 不属于任何部门"))
+            for order, outcome in enumerate(verified.outcomes):
+                if outcome not in outcomes:
+                    issues.append((file, f"{field}.outcomes[{order}]", f"成果种类 {outcome} 没有定义"))
+            if verifier.role in members and verified.role in members:
+                edges.append((verifier.role, verified.role, f"{field}.role"))
+    for role in sorted(set(declaration.write_scopes) - members):
+        issues.append((file, f"verification.write_scopes.{role}", f"角色 {role} 不属于任何部门"))
+    issues.extend(_rejection_cycles(edges))
+    return issues
+
+
+def _rejection_cycles(edges: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
+    # 谁能拒绝谁有环：每条边看能不能从被核验的一方走回核验的一方，一个环报一条，
+    # 字段是回到起点的那一项，说明写环的路径（角色核验自己是一条长度为一的环）
+    graph: dict[str, list[tuple[str, str]]] = {}
+    for verifier, verified, field in edges:
+        graph.setdefault(verifier, []).append((verified, field))
+    reported: set[frozenset[str]] = set()
+    issues: list[tuple[str, str, str]] = []
+    for verifier, _verified, _field in edges:
+        found = _cycle_through(verifier, graph)
+        if found is None:
+            continue
+        path, field = found
+        ring = frozenset(path)
+        if ring in reported:
+            continue
+        reported.add(ring)
+        text = " → ".join([*path, path[0]])
+        if len(path) == 1:
+            issues.append(("organization.json", field, f"谁能拒绝谁有环：{text}，角色核验自己"))
+        else:
+            issues.append(("organization.json", field, f"谁能拒绝谁有环：{text}"))
+    return issues
+
+
+def _cycle_through(start: str, graph: dict[str, list[tuple[str, str]]]) -> tuple[list[str], str] | None:
+    # 从 start 出发找一条回到 start 的路径，交回路径上的角色与回到起点的那一项
+    stack: list[tuple[str, list[str]]] = [(start, [start])]
+    while stack:
+        node, path = stack.pop()
+        for target, field in graph.get(node, ()):
+            if target == start:
+                return path, field
+            if target not in path:
+                stack.append((target, [*path, target]))
+    return None
 
 
 def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], tools: dict[str, Tool],
