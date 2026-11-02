@@ -1,0 +1,24 @@
+{
+"schema":1,
+"path":"docs/design/department-guidance.md",
+"hash":"feaee03ae0795192",
+"nodes":[
+{"hash":"feaee03ae0795192","id":"docs/design/department-guidance.md","kind":"file","title":"docs/design/department-guidance.md"},
+{"hash":"25e447838e4e67b7","id":"docs/design/department-guidance.md#部门指导的处理设计","kind":"section","parent":"docs/design/department-guidance.md","title":"部门指导的处理设计"},
+{"hash":"42f820e6a1f6d329","id":"docs/design/department-guidance.md#部门指导的处理设计 > 1. 三类职责","kind":"section","parent":"docs/design/department-guidance.md#部门指导的处理设计","title":"1. 三类职责"},
+{"hash":"ce33c882250bd325","id":"docs/design/department-guidance.md#部门指导的处理设计 > 2. 送达","kind":"section","parent":"docs/design/department-guidance.md#部门指导的处理设计","title":"2. 送达"},
+{"hash":"1b3b77fc467ae9ed","id":"docs/design/department-guidance.md#部门指导的处理设计 > 2. 送达 > 2.1 放行怎么等","kind":"section","parent":"docs/design/department-guidance.md#部门指导的处理设计 > 2. 送达","title":"2.1 放行怎么等"},
+{"hash":"a375e7fc1c5271c8","id":"docs/design/department-guidance.md#部门指导的处理设计 > 3. 处理结果与来源","kind":"section","parent":"docs/design/department-guidance.md#部门指导的处理设计","title":"3. 处理结果与来源"},
+{"hash":"7d9662a82512f249","id":"docs/design/department-guidance.md#部门指导的处理设计 > 4. 必验反例","kind":"section","parent":"docs/design/department-guidance.md#部门指导的处理设计","title":"4. 必验反例"},
+{"hash":"aa8fb857d0b843df","id":"docs/design/department-guidance.md#部门指导的处理设计 > 5. 界面对应","kind":"section","parent":"docs/design/department-guidance.md#部门指导的处理设计","title":"5. 界面对应"}
+],
+"edges":[
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「你」"],"seen":"dc6c9962ab484fe5","src":"docs/design/department-guidance.md#部门指导的处理设计"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「你中途的指导」"],"seen":"0e9705e0dd37530b","src":"docs/design/department-guidance.md#部门指导的处理设计"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","kind":"link","raws":["app-and-interface.md"],"seen":"4198cc9d7c011aaa","src":"docs/design/department-guidance.md#部门指导的处理设计"},
+{"dst":"docs/design/department-loop.md#三部门的循环结构 > 6. 指导","kind":"link","raws":["department-loop.md"],"seen":"30681a47537ac987","src":"docs/design/department-guidance.md#部门指导的处理设计"},
+{"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["../requirements/department-guidance.md"],"seen":"ba3ce90a33c6fd1b","src":"docs/design/department-guidance.md#部门指导的处理设计"},
+{"dst":"docs/design/department-loop.md#三部门的循环结构 > 6. 指导","kind":"link","raws":["department-loop.md"],"seen":"30681a47537ac987","src":"docs/design/department-guidance.md#部门指导的处理设计 > 2. 送达"},
+{"dst":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行 > 3.2 同时运行的条件","kind":"link","raws":["department-loop.md"],"seen":"717dff89101ec1d2","src":"docs/design/department-guidance.md#部门指导的处理设计 > 2. 送达 > 2.1 放行怎么等"}
+]
+}

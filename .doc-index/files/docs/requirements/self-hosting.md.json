@@ -1,0 +1,39 @@
+{
+"schema":1,
+"path":"docs/requirements/self-hosting.md",
+"hash":"44f5577c951e86c1",
+"nodes":[
+{"hash":"44f5577c951e86c1","id":"docs/requirements/self-hosting.md","kind":"file","title":"docs/requirements/self-hosting.md"},
+{"hash":"37ff1e19d5400538","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","kind":"section","parent":"docs/requirements/self-hosting.md","title":"D35 自举：用 Yudao 开发 Yudao"},
+{"hash":"6d9267d11fb2db5b","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 用户原话","kind":"section","parent":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","title":"用户原话"},
+{"hash":"11a7061438b0d48c","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 已确认","kind":"section","parent":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","title":"已确认"},
+{"hash":"083b4bf9b1aa1a5d","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 讨论中的分析","kind":"section","parent":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","title":"讨论中的分析"},
+{"hash":"680c1b9cc1d415c2","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 前提与现在的路线位置","kind":"section","parent":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","title":"前提与现在的路线位置"},
+{"hash":"c9b6ce5a0cab8316","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定","kind":"section","parent":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","title":"第一层试点的配对验收约定"},
+{"hash":"abd6d0e803335d77","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"section","parent":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","title":"第二层的前置条件与完成条件"},
+{"hash":"e39d615ac32a2373","id":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 设计中待用户确认的事项","kind":"section","parent":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao","title":"设计中待用户确认的事项"}
+],
+"edges":[
+{"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"7594224d7b0c0dc6","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/archive/decision-2026-09.md","kind":"link","raws":["../archive/decision-2026-09.md"],"seen":"ec4c292a915503d8","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/archive/design/architecture/core-and-materials.md","kind":"link","raws":["../archive/design/architecture/core-and-materials.md"],"seen":"15bfce50418f0d20","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"895b5f21f4980650","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/program-roadmap.md#Yudao 总体路线图 > 2. 五个阶段","kind":"link","raws":["../program-roadmap.md"],"seen":"a526ade17bc7d30c","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"afd4d3a8e2469783","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/requirements/existing-project-onboarding.md","kind":"link","raws":["existing-project-onboarding.md"],"seen":"ccbb3c4aaf284500","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/requirements/git-change-management.md","kind":"link","raws":["git-change-management.md"],"seen":"e4ddd79dfddca34e","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/requirements/operations-department.md","kind":"link","raws":["operations-department.md"],"seen":"236282e41f2af201","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/requirements/outsourced-agent-roles.md","kind":"link","raws":["outsourced-agent-roles.md"],"seen":"3dff08ea9751a6f6","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/research/complexity-and-mutation-testing.md","kind":"link","raws":["../research/complexity-and-mutation-testing.md"],"seen":"ad11d7f2de488a8b","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao"},
+{"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"ff40f75d471b5bf2","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 前提与现在的路线位置"},
+{"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["../design/trusted-kernel.md"],"seen":"7f64bd3f488a4ea2","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 已确认"},
+{"dst":"docs/research/complexity-and-mutation-testing.md","kind":"link","raws":["../research/complexity-and-mutation-testing.md"],"seen":"ad11d7f2de488a8b","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 已确认"},
+{"dst":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md","kind":"link","raws":["../adr/0034-adopted-change-writeback-three-tree-merge.md"],"seen":"848bc8cb47262004","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定"},
+{"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["../design/trusted-kernel.md"],"seen":"7f64bd3f488a4ea2","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"ed4c2b8fb539b859","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定"},
+{"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"8d786b944efce344","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定"},
+{"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"cc946a4670347cdf","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件"},
+{"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"8d786b944efce344","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["system-intent.md"],"seen":"fd5a013bfdfa0f32","src":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 讨论中的分析"}
+]
+}

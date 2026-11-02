@@ -1,0 +1,37 @@
+{
+"schema":1,
+"path":".claude/skills/triage/SKILL.md",
+"hash":"1f6add6ed46918b8",
+"nodes":[
+{"hash":"1f6add6ed46918b8","id":".claude/skills/triage/SKILL.md","kind":"file","title":".claude/skills/triage/SKILL.md"},
+{"hash":"cb3f91d54eee30e5","id":".claude/skills/triage/SKILL.md#(开头)","kind":"section","parent":".claude/skills/triage/SKILL.md","title":"(开头)"},
+{"hash":"2152049493b7cdb0","id":".claude/skills/triage/SKILL.md#name: triagedescription: 分诊：solo 交回的 needs-triage 工单、solo 直接交给用户的 ready-for-human 工单、Discussions 的想法与外部报告。先在当时的 main 上核对前提，再按原因处理：补依赖、改写正文、拆小、补设计、关闭或交给用户，结论写成 TRIAGE: 评论。代替 Matt 的 /triage。argument-hint: \"<工单编号 | Discussions 帖子链接>\"","kind":"section","parent":".claude/skills/triage/SKILL.md","title":"name: triagedescription: 分诊：solo 交回的 needs-triage 工单、solo 直接交给用户的 ready-for-human 工单、Discussions 的想法与外部报告。先在当时的 main 上核对前提，再按原因处理：补依赖、改写正文、拆小、补设计、关闭或交给用户，结论写成 TRIAGE: 评论。代替 Matt 的 /triage。argument-hint: \"<工单编号 | Discussions 帖子链接>\""},
+{"hash":"e5c29e243b2a1102","id":".claude/skills/triage/SKILL.md#分诊","kind":"section","parent":".claude/skills/triage/SKILL.md","title":"分诊"},
+{"hash":"810c92a870bcc62b","id":".claude/skills/triage/SKILL.md#分诊 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"何时用 / 何时不用"},
+{"hash":"fb04d60e118b1984","id":".claude/skills/triage/SKILL.md#分诊 > 先读什么","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"先读什么"},
+{"hash":"4a596702105f2ee2","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"交回的工单"},
+{"hash":"4a31d99a9f3f2e75","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 前提没满足，或者用到别的工单的结果却没设依赖","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","title":"前提没满足，或者用到别的工单的结果却没设依赖"},
+{"hash":"3afacc707b3fa37d","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 正文过时：名字搬了家、「只改」漏了文件","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","title":"正文过时：名字搬了家、「只改」漏了文件"},
+{"hash":"c4a819a133f71f47","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 一张里有两件不确定的事，或者太大","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","title":"一张里有两件不确定的事，或者太大"},
+{"hash":"5ee276e183818eda","id":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 设计没写到，两种读法会做出不同的交付","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","title":"设计没写到，两种读法会做出不同的交付"},
+{"hash":"29fd0215f5b35f15","id":".claude/skills/triage/SKILL.md#分诊 > 交给用户的工单","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"交给用户的工单"},
+{"hash":"45e9e47b28de8fa0","id":".claude/skills/triage/SKILL.md#分诊 > 想法与外部报告","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"想法与外部报告"},
+{"hash":"a3a0634fcfffb4d8","id":".claude/skills/triage/SKILL.md#分诊 > 常见借口","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"常见借口"},
+{"hash":"12a354837f4a2b9a","id":".claude/skills/triage/SKILL.md#分诊 > 常见借口 > 表1 > 「交回评论说了怎么改，照着改就行」","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 常见借口","title":"「交回评论说了怎么改，照着改就行」"},
+{"hash":"50923fc6439a6ea6","id":".claude/skills/triage/SKILL.md#分诊 > 常见借口 > 表1 > 「把验收改松一点 solo 就能过」","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 常见借口","title":"「把验收改松一点 solo 就能过」"},
+{"hash":"5343fc119c7b6357","id":".claude/skills/triage/SKILL.md#分诊 > 常见借口 > 表1 > 「先放回去让 solo 再试一次」","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 常见借口","title":"「先放回去让 solo 再试一次」"},
+{"hash":"bc9e95945aab5c65","id":".claude/skills/triage/SKILL.md#分诊 > 常见借口 > 表1 > 「设计改动先放出，说明晚点补」","kind":"row","parent":".claude/skills/triage/SKILL.md#分诊 > 常见借口","title":"「设计改动先放出，说明晚点补」"},
+{"hash":"37febfc7d3f178ba","id":".claude/skills/triage/SKILL.md#分诊 > 危险信号","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"危险信号"},
+{"hash":"328452765e32ec86","id":".claude/skills/triage/SKILL.md#分诊 > 交付","kind":"section","parent":".claude/skills/triage/SKILL.md#分诊","title":"交付"}
+],
+"edges":[
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"0391625f58a9e3c5","src":".claude/skills/triage/SKILL.md#分诊"},
+{"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"e4146591a4c6afd0","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"link","raws":["../../../docs/design/test-pyramid.md"],"seen":"cfd8790d43913f47","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单"},
+{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"7d620bf827db4cf6","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 一张里有两件不确定的事，或者太大"},
+{"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"e4146591a4c6afd0","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 设计没写到，两种读法会做出不同的交付"},
+{"dst":".claude/skills/discuss/SKILL.md","kind":"link","raws":["../discuss/SKILL.md"],"seen":"63671e08bba5e89a","src":".claude/skills/triage/SKILL.md#分诊 > 想法与外部报告"},
+{"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"e4146591a4c6afd0","src":".claude/skills/triage/SKILL.md#分诊 > 想法与外部报告"},
+{"dst":"docs/agents/ticket-spec.md","kind":"link","raws":["../../../docs/agents/ticket-spec.md"],"seen":"7877afe0459a32ef","src":".claude/skills/triage/SKILL.md#分诊 > 想法与外部报告"}
+]
+}

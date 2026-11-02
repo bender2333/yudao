@@ -1,0 +1,32 @@
+{
+"schema":1,
+"path":"docs/architecture-view.html",
+"hash":"ca112ad1bcc817db",
+"nodes":[
+{"hash":"ca112ad1bcc817db","id":"docs/architecture-view.html","kind":"file","title":"docs/architecture-view.html"},
+{"anchor":"v1","hash":"2e3ebc112c823d8b","id":"docs/architecture-view.html#v1","kind":"section","parent":"docs/architecture-view.html","title":"全局图与方程"},
+{"anchor":"v2","hash":"9c19cf8c5a24c8ba","id":"docs/architecture-view.html#v2","kind":"section","parent":"docs/architecture-view.html","title":"什么能动"},
+{"anchor":"v3","hash":"1f5d394d7a8e74d3","id":"docs/architecture-view.html#v3","kind":"section","parent":"docs/architecture-view.html","title":"一个事件怎样上画面"},
+{"anchor":"v4","hash":"87d607427dc7ba8e","id":"docs/architecture-view.html#v4","kind":"section","parent":"docs/architecture-view.html","title":"要守的缝"},
+{"hash":"3ad49c2db6eae617","id":"docs/architecture-view.html#v4 > 画面合同","kind":"seam","parent":"docs/architecture-view.html#v4","title":"画面合同"},
+{"hash":"014b8706f4d35a7e","id":"docs/architecture-view.html#v4 > 读事实","kind":"seam","parent":"docs/architecture-view.html#v4","title":"读事实"},
+{"hash":"92d20cb009bccbd8","id":"docs/architecture-view.html#v4 > 回调","kind":"seam","parent":"docs/architecture-view.html#v4","title":"回调"},
+{"hash":"deefc9f49a4ea090","id":"docs/architecture-view.html#v4 > 声明","kind":"seam","parent":"docs/architecture-view.html#v4","title":"声明"},
+{"hash":"25377b91adf8aeda","id":"docs/architecture-view.html#v4 > 映射","kind":"seam","parent":"docs/architecture-view.html#v4","title":"映射"},
+{"hash":"81d6431394de7671","id":"docs/architecture-view.html#v4 > 宿主","kind":"seam","parent":"docs/architecture-view.html#v4","title":"宿主"},
+{"anchor":"v5","hash":"e70bca6291818029","id":"docs/architecture-view.html#v5","kind":"section","parent":"docs/architecture-view.html","title":"跟着定义伸缩"},
+{"anchor":"v6","hash":"d7a8bf0cbe517468","id":"docs/architecture-view.html#v6","kind":"section","parent":"docs/architecture-view.html","title":"换宿主"}
+],
+"edges":[
+{"dst":"docs/architecture-view.html#v1","kind":"href","raws":["#v1"],"seen":"2e3ebc112c823d8b","src":"docs/architecture-view.html"},
+{"dst":"docs/architecture-view.html#v2","kind":"href","raws":["#v2"],"seen":"9c19cf8c5a24c8ba","src":"docs/architecture-view.html"},
+{"dst":"docs/architecture-view.html#v3","kind":"href","raws":["#v3"],"seen":"1f5d394d7a8e74d3","src":"docs/architecture-view.html"},
+{"dst":"docs/architecture-view.html#v4","kind":"href","raws":["#v4"],"seen":"87d607427dc7ba8e","src":"docs/architecture-view.html"},
+{"dst":"docs/architecture-view.html#v5","kind":"href","raws":["#v5"],"seen":"e70bca6291818029","src":"docs/architecture-view.html"},
+{"dst":"docs/architecture-view.html#v6","kind":"href","raws":["#v6"],"seen":"d7a8bf0cbe517468","src":"docs/architecture-view.html"},
+{"dst":"docs/architecture.html","kind":"href","raws":["architecture.html"],"seen":"5480a34a8595fd15","src":"docs/architecture-view.html"},
+{"dst":"docs/architecture.html#s1","kind":"href","raws":["architecture.html#s1"],"seen":"dc6c9962ab484fe5","src":"docs/architecture-view.html"},
+{"dst":"docs/program-roadmap.md","kind":"href","raws":["program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/architecture-view.html"},
+{"dst":"docs/program-roadmap.md","kind":"href","raws":["program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/architecture-view.html#v5"}
+]
+}

@@ -1,0 +1,21 @@
+{
+"schema":1,
+"path":"docs/trial/tasks.md",
+"hash":"8bb71185c90ca7d8",
+"nodes":[
+{"hash":"8bb71185c90ca7d8","id":"docs/trial/tasks.md","kind":"file","title":"docs/trial/tasks.md"},
+{"hash":"0f43877a5be32253","id":"docs/trial/tasks.md#试用任务集","kind":"section","parent":"docs/trial/tasks.md","title":"试用任务集"},
+{"hash":"73664407b84ba56c","id":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3","kind":"section","parent":"docs/trial/tasks.md#试用任务集","title":"F1 固定任务：评测场景 3"},
+{"hash":"5fbb310a768bbf20","id":"docs/trial/tasks.md#试用任务集 > R1 模拟用户任务：记账小工具","kind":"section","parent":"docs/trial/tasks.md#试用任务集","title":"R1 模拟用户任务：记账小工具"},
+{"hash":"90d895b2750c406b","id":"docs/trial/tasks.md#试用任务集 > 读数","kind":"section","parent":"docs/trial/tasks.md#试用任务集","title":"读数"}
+],
+"edges":[
+{"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../../.claude/skills/trial/SKILL.md"],"seen":"ce89702099853161","src":"docs/trial/tasks.md#试用任务集"},
+{"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"3e1eb032980c7ef2","src":"docs/trial/tasks.md#试用任务集"},
+{"dst":"docs/trial/skill-revision-plan.md","kind":"link","raws":["skill-revision-plan.md"],"seen":"3a806a47eabec753","src":"docs/trial/tasks.md#试用任务集"},
+{"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../agents/autopilot-runtime.md"],"seen":"d15d36e6b6934d9a","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
+{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"42d9a1a938123f39","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
+{"dst":"evals/runner/yudao.py","kind":"code-path","raws":["evals/runner/yudao.py"],"seen":"8732f64d7b1da8cc","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
+{"dst":"evals/scenarios/scenario-3/files/subway_data.json","kind":"code-path","raws":["evals/scenarios/scenario-3/files/subway_data.json"],"seen":"f5414f760e579594","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"}
+]
+}

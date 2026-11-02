@@ -1,0 +1,16 @@
+{
+"schema":1,
+"path":"docs/adr/0018-single-control-host-remote-execution.md",
+"hash":"b171ab33a53d9949",
+"nodes":[
+{"hash":"b171ab33a53d9949","id":"docs/adr/0018-single-control-host-remote-execution.md","kind":"file","title":"docs/adr/0018-single-control-host-remote-execution.md"},
+{"hash":"b171ab33a53d9949","id":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器","kind":"section","parent":"docs/adr/0018-single-control-host-remote-execution.md","title":"一台控制主机，执行环境分布到多台机器"}
+],
+"edges":[
+{"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["0038-function-first-commands-without-registration.md"],"seen":"ff40f75d471b5bf2","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/design/execution-environment.md","kind":"link","raws":["../design/execution-environment.md"],"seen":"7089fb5e17c4b7b6","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"26e795773f24d8b4","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/requirements/operations-department.md","kind":"link","raws":["../requirements/operations-department.md"],"seen":"236282e41f2af201","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["../requirements/remote-execution.md"],"seen":"384d12f32d94c89b","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"}
+]
+}

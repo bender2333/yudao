@@ -1,0 +1,27 @@
+{
+"schema":1,
+"path":"docs/requirements/meta-observer.md",
+"hash":"edfaad69b0ab1f4b",
+"nodes":[
+{"hash":"edfaad69b0ab1f4b","id":"docs/requirements/meta-observer.md","kind":"file","title":"docs/requirements/meta-observer.md"},
+{"hash":"472ee9024201812f","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门","kind":"section","parent":"docs/requirements/meta-observer.md","title":"D28 元观察与规则检查部门"},
+{"hash":"631841e4b6552195","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 用户原话","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门","title":"用户原话"},
+{"hash":"b9f913785d878db0","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 已确认","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门","title":"已确认"},
+{"hash":"e7f34e9a36f8f452","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > JEV 用于语义系统的证据核对","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门","title":"JEV 用于语义系统的证据核对"},
+{"hash":"430edfdad5eeff4a","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > JEV 的准入","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门","title":"JEV 的准入"},
+{"hash":"aa0af201daf4746c","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 设计中待用户确认的规则","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门","title":"设计中待用户确认的规则"},
+{"hash":"a386502dfe56a0a0","id":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 与教训发现模块的关系（待设计）","kind":"section","parent":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门","title":"与教训发现模块的关系（待设计）"}
+],
+"edges":[
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"abd6d0e803335d77","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门"},
+{"dst":"docs/research/jev-decision-model.md","kind":"link","raws":["../research/jev-decision-model.md"],"seen":"7cd79781d7cb47e3","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门"},
+{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"8cbabc2c9cae8dab","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > JEV 用于语义系统的证据核对"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f498d01b1f51bd42","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > JEV 的准入"},
+{"dst":"docs/requirements/semantic-system.md#D25 语义系统 > TODO：惊讶机制与教训发现模块","kind":"link","raws":["semantic-system.md"],"seen":"2665bef0c0e6f9a3","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 与教训发现模块的关系（待设计）"},
+{"dst":"docs/adr/0018-single-control-host-remote-execution.md","kind":"link","raws":["../adr/0018-single-control-host-remote-execution.md"],"seen":"b171ab33a53d9949","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 已确认"},
+{"dst":"docs/adr/0044-verifier-role-and-open-loop.md","kind":"link","raws":["../adr/0044-verifier-role-and-open-loop.md"],"seen":"b1c2ffdb1dc08ef3","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 已确认"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"5187beb59fd0fef7","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 已确认"},
+{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"384d12f32d94c89b","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查部门 > 已确认"}
+]
+}

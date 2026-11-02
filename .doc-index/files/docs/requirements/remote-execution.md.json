@@ -1,0 +1,31 @@
+{
+"schema":1,
+"path":"docs/requirements/remote-execution.md",
+"hash":"384d12f32d94c89b",
+"nodes":[
+{"hash":"384d12f32d94c89b","id":"docs/requirements/remote-execution.md","kind":"file","title":"docs/requirements/remote-execution.md"},
+{"hash":"5b2d0f9d53782b23","id":"docs/requirements/remote-execution.md#D29 远程执行环境","kind":"section","parent":"docs/requirements/remote-execution.md","title":"D29 远程执行环境"},
+{"hash":"0e2611c651584896","id":"docs/requirements/remote-execution.md#D29 远程执行环境 > 用户原话","kind":"section","parent":"docs/requirements/remote-execution.md#D29 远程执行环境","title":"用户原话"},
+{"hash":"b6d4f9d4084ceb13","id":"docs/requirements/remote-execution.md#D29 远程执行环境 > 已确认","kind":"section","parent":"docs/requirements/remote-execution.md#D29 远程执行环境","title":"已确认"},
+{"hash":"4734fa30d4d61f3b","id":"docs/requirements/remote-execution.md#D29 远程执行环境 > 讨论中的分析","kind":"section","parent":"docs/requirements/remote-execution.md#D29 远程执行环境","title":"讨论中的分析"},
+{"hash":"8320521c78d0dd08","id":"docs/requirements/remote-execution.md#D29 远程执行环境 > 设计中确定的内容","kind":"section","parent":"docs/requirements/remote-execution.md#D29 远程执行环境","title":"设计中确定的内容"},
+{"hash":"89c87a0c542734cf","id":"docs/requirements/remote-execution.md#D29 远程执行环境 > 2026-09-29 用户确认的设计决定","kind":"section","parent":"docs/requirements/remote-execution.md#D29 远程执行环境","title":"2026-09-29 用户确认的设计决定"}
+],
+"edges":[
+{"dst":"docs/adr/0018-single-control-host-remote-execution.md","kind":"link","raws":["../adr/0018-single-control-host-remote-execution.md"],"seen":"b171ab33a53d9949","src":"docs/requirements/remote-execution.md#D29 远程执行环境"},
+{"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"ff40f75d471b5bf2","src":"docs/requirements/remote-execution.md#D29 远程执行环境"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"5480a34a8595fd15","src":"docs/requirements/remote-execution.md#D29 远程执行环境"},
+{"dst":"docs/design/execution-environment.md","kind":"link","raws":["../design/execution-environment.md"],"seen":"7089fb5e17c4b7b6","src":"docs/requirements/remote-execution.md#D29 远程执行环境"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/requirements/remote-execution.md#D29 远程执行环境"},
+{"dst":"docs/adr/0018-single-control-host-remote-execution.md","kind":"link","raws":["../adr/0018-single-control-host-remote-execution.md"],"seen":"b171ab33a53d9949","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 2026-09-29 用户确认的设计决定"},
+{"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"7594224d7b0c0dc6","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 2026-09-29 用户确认的设计决定"},
+{"dst":"docs/design/execution-environment.md","kind":"link","raws":["../design/execution-environment.md"],"seen":"7089fb5e17c4b7b6","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 2026-09-29 用户确认的设计决定"},
+{"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"ff40f75d471b5bf2","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 已确认"},
+{"dst":"docs/design/execution-environment.md","kind":"link","raws":["../design/execution-environment.md"],"seen":"7089fb5e17c4b7b6","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 已确认"},
+{"dst":"docs/archive/research/semantic-system-and-department-roles.md","kind":"link","raws":["../archive/research/semantic-system-and-department-roles.md"],"seen":"3953f9115bd35499","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 讨论中的分析"},
+{"dst":"docs/research/organization-runtime-evolution.md","kind":"link","raws":["../research/organization-runtime-evolution.md"],"seen":"45ed7473f0d079df","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 讨论中的分析"},
+{"dst":"docs/archive/prototypes/v8/design.md","kind":"link","raws":["../archive/prototypes/v8/design.md"],"seen":"7ce05a92ebf56e07","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 设计中确定的内容"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../design/app-and-interface.md"],"seen":"bc0d27ad3a9d74f7","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 设计中确定的内容"},
+{"dst":"docs/design/execution-environment.md","kind":"link","raws":["../design/execution-environment.md"],"seen":"7089fb5e17c4b7b6","src":"docs/requirements/remote-execution.md#D29 远程执行环境 > 设计中确定的内容"}
+]
+}

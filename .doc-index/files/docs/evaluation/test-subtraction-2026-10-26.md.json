@@ -1,0 +1,26 @@
+{
+"schema":1,
+"path":"docs/evaluation/test-subtraction-2026-10-26.md",
+"hash":"8669244581a5e081",
+"nodes":[
+{"hash":"8669244581a5e081","id":"docs/evaluation/test-subtraction-2026-10-26.md","kind":"file","title":"docs/evaluation/test-subtraction-2026-10-26.md"},
+{"hash":"74fd3f864fa32e53","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md","title":"测试做减法记录（2026-10-26）"},
+{"hash":"7ca17d4bc0a05225","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 1. 做法","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）","title":"1. 做法"},
+{"hash":"9802423ef602ddc8","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 2. 数字","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）","title":"2. 数字"},
+{"hash":"ba42085ee92de05c","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 3. 总架构师的裁定","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）","title":"3. 总架构师的裁定"},
+{"hash":"7c5deb53b84be018","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 4. 留给用户的","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）","title":"4. 留给用户的"},
+{"hash":"5bb6c916f7c725a9","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 5. 没删但记下的","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）","title":"5. 没删但记下的"},
+{"hash":"209bb591279a7790","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）","title":"逐文件清单"},
+{"hash":"29a6c09bcb75ebfe","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单 > harness/tests","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单","title":"harness/tests"},
+{"hash":"f883d731eec71663","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单 > evals/tests","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单","title":"evals/tests"},
+{"hash":"cd4f0361690c13fd","id":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单 > client/tests","kind":"section","parent":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单","title":"client/tests"}
+],
+"edges":[
+{"dst":"docs/design/test-pyramid.md","kind":"link","raws":["../design/test-pyramid.md"],"seen":"a2cf60afb98a64bf","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26）"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"07180e15569923e5","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 1. 做法"},
+{"dst":"harness/tests/kernel/test_every_stop_has_reason.py","kind":"code-path","raws":["harness/tests/kernel/test_every_stop_has_reason.py"],"seen":"098207ddbe405468","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 4. 留给用户的"},
+{"dst":"evals/tests/test_milestone_records.py","kind":"code-path","raws":["evals/tests/test_milestone_records.py"],"seen":"a984ed0e059c3785","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 5. 没删但记下的"},
+{"dst":"harness/tests/test_access_tokens.py","kind":"code-path","raws":["harness/tests/test_access_tokens.py"],"seen":"3635a6a535c14900","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单 > client/tests"},
+{"dst":"harness/tests/test_projects.py","kind":"code-path","raws":["harness/tests/test_projects.py::test_release_touching_kernel_paths_is_not_adopted_without_approval"],"seen":"4da02c2ae28d3e72","src":"docs/evaluation/test-subtraction-2026-10-26.md#测试做减法记录（2026-10-26） > 逐文件清单 > client/tests"}
+]
+}

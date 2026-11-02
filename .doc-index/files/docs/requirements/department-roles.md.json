@@ -1,0 +1,23 @@
+{
+"schema":1,
+"path":"docs/requirements/department-roles.md",
+"hash":"afd4d3a8e2469783",
+"nodes":[
+{"hash":"afd4d3a8e2469783","id":"docs/requirements/department-roles.md","kind":"file","title":"docs/requirements/department-roles.md"},
+{"hash":"2c4d66560200568e","id":"docs/requirements/department-roles.md#D26 部门内多角色与多循环","kind":"section","parent":"docs/requirements/department-roles.md","title":"D26 部门内多角色与多循环"},
+{"hash":"2cf2c2cec88b5c55","id":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 用户原话","kind":"section","parent":"docs/requirements/department-roles.md#D26 部门内多角色与多循环","title":"用户原话"},
+{"hash":"4f30efdc7038232e","id":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 已确认","kind":"section","parent":"docs/requirements/department-roles.md#D26 部门内多角色与多循环","title":"已确认"},
+{"hash":"f3b4c1ea10406242","id":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 设计说明的状态","kind":"section","parent":"docs/requirements/department-roles.md#D26 部门内多角色与多循环","title":"设计说明的状态"}
+],
+"edges":[
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"d85e5d29f5db0c47","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环"},
+{"dst":"docs/design/department-roles.md","kind":"link","raws":["../design/department-roles.md"],"seen":"d12403d0c052fd04","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环"},
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["../design/project-organization.md"],"seen":"fe99431fee7b94ca","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 已确认"},
+{"dst":"docs/requirements/comparison-experiment.md","kind":"link","raws":["comparison-experiment.md"],"seen":"346fb4163dc2fbee","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 已确认"},
+{"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["department-guidance.md"],"seen":"ba3ce90a33c6fd1b","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 已确认"},
+{"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["meta-observer.md"],"seen":"edfaad69b0ab1f4b","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 已确认"},
+{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"8cbabc2c9cae8dab","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 已确认"},
+{"dst":"docs/archive/native-harness/loop-system-principles.md","kind":"link","raws":["../archive/native-harness/loop-system-principles.md"],"seen":"4249d3f252de26d4","src":"docs/requirements/department-roles.md#D26 部门内多角色与多循环 > 用户原话"}
+]
+}

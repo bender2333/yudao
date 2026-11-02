@@ -1,0 +1,27 @@
+{
+"schema":1,
+"path":"docs/evaluation/2026-10-31-57835530.md",
+"hash":"c3ba106c17100f22",
+"nodes":[
+{"hash":"c3ba106c17100f22","id":"docs/evaluation/2026-10-31-57835530.md","kind":"file","title":"docs/evaluation/2026-10-31-57835530.md"},
+{"hash":"c1094fa110fae7af","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md","title":"真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）"},
+{"hash":"59290e57f99a91fb","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 1. 建档（run run_39b34a525419452c，2026-10-31 12:35:50 – 13:07:14 UTC+8）","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"1. 建档（run run_39b34a525419452c，2026-10-31 12:35:50 – 13:07:14 UTC+8）"},
+{"hash":"24c6216dbe2fe227","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 2. STRUCTURE.md（现有结构说明）","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"2. STRUCTURE.md（现有结构说明）"},
+{"hash":"d563804c84e2829d","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 3. 初始 PRD 的确认在界面的决定卡片中完成","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"3. 初始 PRD 的确认在界面的决定卡片中完成"},
+{"hash":"7be7fface08582f9","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 4. 随后的事项：issue 842（run run_c67d4f43d8dd4cdc，13:07:18 – 13:48:59 UTC+8）","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"4. 随后的事项：issue 842（run run_c67d4f43d8dd4cdc，13:07:18 – 13:48:59 UTC+8）"},
+{"hash":"ba8ab38d59c664cd","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 5. 评分（评分器 scorer-2@1，Python 3.13）","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"5. 评分（评分器 scorer-2@1，Python 3.13）"},
+{"hash":"f463c4fe3da81d17","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 6. 现有缺陷与失败的已有测试（建档基线，如实）","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"6. 现有缺陷与失败的已有测试（建档基线，如实）"},
+{"hash":"2295c4b1ee6a5158","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 7. 过程检查点","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"7. 过程检查点"},
+{"hash":"229ac70fb501569e","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 8. 全部自动化测试与界面端到端用例","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"8. 全部自动化测试与界面端到端用例"},
+{"hash":"bf6b47a2e2c27cf6","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 9. 两次作废的重跑过程","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"9. 两次作废的重跑过程"},
+{"hash":"ee8095dc11b51cea","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 10. 报告链接与基线更新","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"10. 报告链接与基线更新"},
+{"hash":"92b237d4fc7159bb","id":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 11. 依据与参照","kind":"section","parent":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧）","title":"11. 依据与参照"}
+],
+"edges":[
+{"dst":"docs/current-baseline.md","kind":"link","raws":["../current-baseline.md"],"seen":"00a44322330b1251","src":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 10. 报告链接与基线更新"},
+{"dst":"docs/evaluation/139-prd-confirm-57835530.png","kind":"code-path","raws":["docs/evaluation/139-prd-confirm-57835530.png"],"seen":"a4acc60010f91b77","src":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 10. 报告链接与基线更新"},
+{"dst":"docs/evaluation/139-prd-confirm-57835530.png","kind":"code-path","raws":["docs/evaluation/139-prd-confirm-57835530.png"],"seen":"a4acc60010f91b77","src":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 3. 初始 PRD 的确认在界面的决定卡片中完成"},
+{"dst":"client/tests/e2e/onboarding.spec.ts","kind":"code-path","raws":["client/tests/e2e/onboarding.spec.ts"],"seen":"39457c6f15cbafd5","src":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 8. 全部自动化测试与界面端到端用例"},
+{"dst":"uv.lock","kind":"code-path","raws":["uv.lock"],"seen":"8dc93751ce5c2064","src":"docs/evaluation/2026-10-31-57835530.md#真实项目验收：openai-agents-python 建档与 issue 842（场景 2，Yudao 一侧） > 9. 两次作废的重跑过程"}
+]
+}

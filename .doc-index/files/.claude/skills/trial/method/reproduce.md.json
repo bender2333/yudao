@@ -1,0 +1,28 @@
+{
+"schema":1,
+"path":".claude/skills/trial/method/reproduce.md",
+"hash":"a4be407682e98f1e",
+"nodes":[
+{"hash":"a4be407682e98f1e","id":".claude/skills/trial/method/reproduce.md","kind":"file","title":".claude/skills/trial/method/reproduce.md"},
+{"hash":"363bea8a64081bef","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","kind":"section","parent":".claude/skills/trial/method/reproduce.md","title":"独立复现与证据复核"},
+{"hash":"6698d3da5b9507e5","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","kind":"section","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","title":"交接表"},
+{"hash":"5f52588dd2222d67","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 问题","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"问题"},
+{"hash":"f14841cc4aab6f58","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 实例","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"实例"},
+{"hash":"d3ab9be3eb8cf30f","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 被测条件","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"被测条件"},
+{"hash":"f55c972206ca0701","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 操作","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"操作"},
+{"hash":"7667154570028f52","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 触发条件","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"触发条件"},
+{"hash":"d0ae5307547665c8","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 留证","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"留证"},
+{"hash":"e0619258d6155a92","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 时间","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"时间"},
+{"hash":"066a509fe63fda76","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","kind":"section","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","title":"执行与结论"},
+{"hash":"c29991c2d854b001","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 复现到 reproduced","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"复现到 reproduced"},
+{"hash":"47070dcf63da2804","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 触发后未出现 not_observed","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"触发后未出现 not_observed"},
+{"hash":"e1bcf53f6698e2a9","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 未触发 not_triggered","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"未触发 not_triggered"},
+{"hash":"4145ed0462c58cd4","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 条件不同 conditions_differ","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"条件不同 conditions_differ"},
+{"hash":"15b2baf51f59c0e5","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 证据复核 evidence_review","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"证据复核 evidence_review"},
+{"hash":"d0fb927e822fe316","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 尚未执行 not_run","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"尚未执行 not_run"},
+{"hash":"76a54769db8e0875","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交付","kind":"section","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","title":"交付"}
+],
+"edges":[
+{"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["records.md"],"seen":"55c8afcbca45bc44","src":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交付"}
+]
+}

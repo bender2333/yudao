@@ -1,0 +1,29 @@
+{
+"schema":1,
+"path":"docs/prototypes/v13/BUILD.md",
+"hash":"0467d4842be3d4cb",
+"nodes":[
+{"hash":"0467d4842be3d4cb","id":"docs/prototypes/v13/BUILD.md","kind":"file","title":"docs/prototypes/v13/BUILD.md"},
+{"hash":"7cc1bdd0b0dbdbeb","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","kind":"section","parent":"docs/prototypes/v13/BUILD.md","title":"原型 v13 构建约定"},
+{"hash":"667337d9cfbd9027","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录","kind":"section","parent":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","title":"1. 脚本顺序与目录"},
+{"hash":"4ee42b565c083cbb","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 2. 画面的接口","kind":"section","parent":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","title":"2. 画面的接口"},
+{"hash":"26b7a8a47627efeb","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 3. 场景与工具条","kind":"section","parent":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","title":"3. 场景与工具条"},
+{"hash":"f7410e69df1080d4","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 4. 测试","kind":"section","parent":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","title":"4. 测试"}
+],
+"edges":[
+{"dst":"docs/archive/prototypes/v12/BUILD.md","kind":"link","raws":["../../archive/prototypes/v12/BUILD.md"],"seen":"e7f18d7f2137479c","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定"},
+{"dst":"docs/prototypes/v13/design.md","kind":"link","raws":["design.md"],"seen":"199695172c809e95","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定"},
+{"dst":"docs/prototypes/v13/js/y13.js","kind":"code-path","raws":["js/y13.js"],"seen":"790fc78845b66758","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定"},
+{"dst":"docs/prototypes/v13/checks/playback.js","kind":"code-path","raws":["checks/playback.js"],"seen":"e7bc42fdb84095b1","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/index.html","kind":"code-path","raws":["index.html"],"seen":"43a2dcafdb873147","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/js/pixel/contract.js","kind":"code-path","raws":["js/pixel/contract.js"],"seen":"ed39addc868d4388","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/js/pixel/engine.js","kind":"code-path","raws":["js/pixel/engine.js"],"seen":"6dccc29630723b7f","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/js/pixel/floor-decl.js","kind":"code-path","raws":["js/pixel/floor-decl.js"],"seen":"1a535d1dc7426aa1","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/js/pixel/say.js","kind":"code-path","raws":["js/pixel/say.js"],"seen":"9a06ea82108e4312","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/js/pixel/timeline.js","kind":"code-path","raws":["js/pixel/timeline.js"],"seen":"f7742669dac300c5","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/js/translate/say.js","kind":"code-path","raws":["js/translate/say.js"],"seen":"dd29e953e621c94a","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
+{"dst":"docs/prototypes/v13/js/ui/app.js","kind":"code-path","raws":["js/ui/app.js"],"seen":"b1360b4c110565d0","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 2. 画面的接口"},
+{"dst":"docs/prototypes/v13/js/ui/scenes.js","kind":"code-path","raws":["js/ui/scenes.js"],"seen":"b77340e09e9d3948","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 2. 画面的接口"},
+{"dst":"docs/prototypes/v13/js/contract/backend.js","kind":"code-path","raws":["js/contract/backend.js"],"seen":"f388d5692bb9336d","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 3. 场景与工具条"}
+]
+}

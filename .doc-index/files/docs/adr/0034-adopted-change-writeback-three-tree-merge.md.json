@@ -1,0 +1,15 @@
+{
+"schema":1,
+"path":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md",
+"hash":"848bc8cb47262004",
+"nodes":[
+{"hash":"848bc8cb47262004","id":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md","kind":"file","title":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md"},
+{"hash":"af49178c7b01fe6d","id":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更","kind":"section","parent":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md","title":"采纳写回以三份代码树合并变更"},
+{"hash":"d4c6466a8c29fbfe","id":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更 > 背景","kind":"section","parent":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更","title":"背景"},
+{"hash":"24f3f7f757d49add","id":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更 > 决定","kind":"section","parent":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更","title":"决定"},
+{"hash":"a3c81902d4fce02e","id":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更 > 后果","kind":"section","parent":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更","title":"后果"}
+],
+"edges":[
+{"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 5. 确认以后：当前有效要求与第一次采纳","kind":"link","raws":["../design/existing-project-onboarding.md"],"seen":"aefa901f25350a90","src":"docs/adr/0034-adopted-change-writeback-three-tree-merge.md#采纳写回以三份代码树合并变更"}
+]
+}

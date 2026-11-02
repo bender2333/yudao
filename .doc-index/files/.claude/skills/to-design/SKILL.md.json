@@ -1,0 +1,30 @@
+{
+"schema":1,
+"path":".claude/skills/to-design/SKILL.md",
+"hash":"e4146591a4c6afd0",
+"nodes":[
+{"hash":"e4146591a4c6afd0","id":".claude/skills/to-design/SKILL.md","kind":"file","title":".claude/skills/to-design/SKILL.md"},
+{"hash":"cb3f91d54eee30e5","id":".claude/skills/to-design/SKILL.md#(开头)","kind":"section","parent":".claude/skills/to-design/SKILL.md","title":"(开头)"},
+{"hash":"4b7aa92c0e566fc5","id":".claude/skills/to-design/SKILL.md#name: to-designdescription: 把讨论的结论写成设计说明：开头一行写总图位置与依据，按设计说明规范写功能与依据、边界与范围、接口（配模块图与包图）、方案、验收、未决问题，更新设计索引。设计说明不走工单，写完推送就完成；阶段工单的薄片清单里记着「设计未写」的桶，写完建父工单。不追问，只整理已经定了的东西。argument-hint: \"[设计说明路径 | 桶名]，省略时整理当前对话的结论\"","kind":"section","parent":".claude/skills/to-design/SKILL.md","title":"name: to-designdescription: 把讨论的结论写成设计说明：开头一行写总图位置与依据，按设计说明规范写功能与依据、边界与范围、接口（配模块图与包图）、方案、验收、未决问题，更新设计索引。设计说明不走工单，写完推送就完成；阶段工单的薄片清单里记着「设计未写」的桶，写完建父工单。不追问，只整理已经定了的东西。argument-hint: \"[设计说明路径 | 桶名]，省略时整理当前对话的结论\""},
+{"hash":"3a4e9887f141bf58","id":".claude/skills/to-design/SKILL.md#写成设计说明","kind":"section","parent":".claude/skills/to-design/SKILL.md","title":"写成设计说明"},
+{"hash":"c0aadd00c2840853","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/to-design/SKILL.md#写成设计说明","title":"何时用 / 何时不用"},
+{"hash":"1c57fdce31d9f323","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 先读什么","kind":"section","parent":".claude/skills/to-design/SKILL.md#写成设计说明","title":"先读什么"},
+{"hash":"55a85e1d43e47354","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤","kind":"section","parent":".claude/skills/to-design/SKILL.md#写成设计说明","title":"步骤"},
+{"hash":"a3a0634fcfffb4d8","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口","kind":"section","parent":".claude/skills/to-design/SKILL.md#写成设计说明","title":"常见借口"},
+{"hash":"3d6b824719b2db38","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口 > 表1 > 「写上类名和字段，执行者更好懂」","kind":"row","parent":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口","title":"「写上类名和字段，执行者更好懂」"},
+{"hash":"6c3f9bb270c71856","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口 > 表1 > 「写一节现状，说明为什么要改」","kind":"row","parent":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口","title":"「写一节现状，说明为什么要改」"},
+{"hash":"305ac87e34549498","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口 > 表1 > 「验收先空着，拆单时再想」","kind":"row","parent":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口","title":"「验收先空着，拆单时再想」"},
+{"hash":"e5ccb83db1d69ca9","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口 > 表1 > 「总图没写到，我在设计说明里补一个模块」","kind":"row","parent":".claude/skills/to-design/SKILL.md#写成设计说明 > 常见借口","title":"「总图没写到，我在设计说明里补一个模块」"},
+{"hash":"6d4372944c68011e","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 危险信号","kind":"section","parent":".claude/skills/to-design/SKILL.md#写成设计说明","title":"危险信号"},
+{"hash":"d7043253db997abb","id":".claude/skills/to-design/SKILL.md#写成设计说明 > 交付","kind":"section","parent":".claude/skills/to-design/SKILL.md#写成设计说明","title":"交付"}
+],
+"edges":[
+{"dst":"docs/agents/design-spec.md","kind":"link","raws":["../../../docs/agents/design-spec.md"],"seen":"6b599df76e561f68","src":".claude/skills/to-design/SKILL.md#写成设计说明"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"0391625f58a9e3c5","src":".claude/skills/to-design/SKILL.md#写成设计说明"},
+{"dst":".claude/skills/to-parents/SKILL.md","kind":"link","raws":["../to-parents/SKILL.md"],"seen":"e85b43812ea6ae6f","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"7183dbbb17e2ef54","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
+{"dst":"docs/design/README.md","kind":"code-path","raws":["docs/design/README.md"],"seen":"6ded0c1f2ab0bdcf","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"},
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"86574edb5c537d29","src":".claude/skills/to-design/SKILL.md#写成设计说明 > 步骤"}
+]
+}

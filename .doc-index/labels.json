@@ -1,0 +1,32 @@
+{
+"source":"gh label list",
+"labels":[
+"architecture",
+"bug",
+"cleanup",
+"documentation",
+"duplicate",
+"enhancement",
+"good first issue",
+"help wanted",
+"in-progress",
+"invalid",
+"minimax code",
+"needs-review",
+"needs-triage",
+"parent",
+"question",
+"ready-for-agent",
+"ready-for-human",
+"stage",
+"touches-core",
+"trial",
+"waiting",
+"wayfinder:grilling",
+"wayfinder:map",
+"wayfinder:prototype",
+"wayfinder:research",
+"wayfinder:task",
+"wontfix"
+]
+}

@@ -1,0 +1,17 @@
+{
+"schema":1,
+"path":"docs/requirements/provider-retries.md",
+"hash":"48e443375d10249b",
+"nodes":[
+{"hash":"48e443375d10249b","id":"docs/requirements/provider-retries.md","kind":"file","title":"docs/requirements/provider-retries.md"},
+{"hash":"c96f16c739703f5a","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","kind":"section","parent":"docs/requirements/provider-retries.md","title":"D17 模型等待与失败重试"},
+{"hash":"c755878186f01858","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 用户原话","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"用户原话"},
+{"hash":"8255d234510eaf83","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"已确认"},
+{"hash":"f18856e6a06bd815","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 本轮实施选择","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"本轮实施选择"}
+],
+"edges":[
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"9d95fe1ea660bf53","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"},
+{"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"8d786b944efce344","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"9d95fe1ea660bf53","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 本轮实施选择"}
+]
+}

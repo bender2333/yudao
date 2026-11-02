@@ -1,0 +1,22 @@
+{
+"schema":1,
+"path":"docs/agents/issue-tracker.md",
+"hash":"96db02e93f38860f",
+"nodes":[
+{"hash":"96db02e93f38860f","id":"docs/agents/issue-tracker.md","kind":"file","title":"docs/agents/issue-tracker.md"},
+{"hash":"567b7e921dfc4e62","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","kind":"section","parent":"docs/agents/issue-tracker.md","title":"工单系统：GitHub Issues"},
+{"hash":"c14c29e3bf1b2db8","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 常用写法","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"常用写法"},
+{"hash":"4d047951775cb346","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 执行者常用","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"执行者常用"},
+{"hash":"b0ef2351e9fc105e","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 工单与 docs/ 的分工","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"工单与 docs/ 的分工"},
+{"hash":"4e8ec48e1421f5fe","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > PR 是否作为分诊入口","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"PR 是否作为分诊入口"},
+{"hash":"c1c9677a57380e4b","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 技能说「发布到工单系统」时","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"技能说「发布到工单系统」时"},
+{"hash":"c042173e6429af18","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 技能说「取相关工单」时","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"技能说「取相关工单」时"},
+{"hash":"b78a17c65b99c8b3","id":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 子工单与阻塞","kind":"section","parent":"docs/agents/issue-tracker.md#工单系统：GitHub Issues","title":"子工单与阻塞"}
+],
+"edges":[
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"7183dbbb17e2ef54","src":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 工单与 docs/ 的分工"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"0391625f58a9e3c5","src":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 工单与 docs/ 的分工"},
+{"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 工单与 docs/ 的分工"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"0391625f58a9e3c5","src":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 执行者常用"}
+]
+}

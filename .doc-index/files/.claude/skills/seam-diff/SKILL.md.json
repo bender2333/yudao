@@ -1,0 +1,37 @@
+{
+"schema":1,
+"path":".claude/skills/seam-diff/SKILL.md",
+"hash":"ec5ba6c42622f881",
+"nodes":[
+{"hash":"ec5ba6c42622f881","id":".claude/skills/seam-diff/SKILL.md","kind":"file","title":".claude/skills/seam-diff/SKILL.md"},
+{"hash":"cb3f91d54eee30e5","id":".claude/skills/seam-diff/SKILL.md#(开头)","kind":"section","parent":".claude/skills/seam-diff/SKILL.md","title":"(开头)"},
+{"hash":"07a74351ff6a02c0","id":".claude/skills/seam-diff/SKILL.md#name: seam-diffdescription: 按总图的缝核对代码，产出一页差异报告：十三道缝加四层与三环，每行写两侧在代码里是什么、哪些自动检查守着、这次在某个提交上实际跑的结果、越界或缺守卫的地方、怎么处理。里程碑或阶段结束时核对缝立住没有，或用户、总架构师要看代码与总图差多少时使用；不在每个 PR 上跑。argument-hint: \"[提交号，省略时取 origin/main]\"","kind":"section","parent":".claude/skills/seam-diff/SKILL.md","title":"name: seam-diffdescription: 按总图的缝核对代码，产出一页差异报告：十三道缝加四层与三环，每行写两侧在代码里是什么、哪些自动检查守着、这次在某个提交上实际跑的结果、越界或缺守卫的地方、怎么处理。里程碑或阶段结束时核对缝立住没有，或用户、总架构师要看代码与总图差多少时使用；不在每个 PR 上跑。argument-hint: \"[提交号，省略时取 origin/main]\""},
+{"hash":"0a32eab62b5e5000","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告","kind":"section","parent":".claude/skills/seam-diff/SKILL.md","title":"按缝的差异报告"},
+{"hash":"2904789bc75d9467","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 依据","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告","title":"依据"},
+{"hash":"22c7423c4ce12955","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告","title":"六步"},
+{"hash":"6ea087016901be71","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 1 定提交","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步","title":"1 定提交"},
+{"hash":"47fba7eb510eb34b","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 2 跑守卫","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步","title":"2 跑守卫"},
+{"hash":"4219b12678a0d11f","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 3 算差异","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步","title":"3 算差异"},
+{"hash":"f719ea93b918005d","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步","title":"4 逐缝判断"},
+{"hash":"29f33a53440baca3","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 守卫失败，并且失败的断言就是这道缝的规矩","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"守卫失败，并且失败的断言就是这道缝的规矩"},
+{"hash":"c3bf56a696fa0ddd","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 缝在以后的阶段才立住（路线图第 5 节）","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"缝在以后的阶段才立住（路线图第 5 节）"},
+{"hash":"ebcca3ebdae23021","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 缝标「未定」","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"缝标「未定」"},
+{"hash":"e5f3997d4345f3fd","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 认为总图对这道缝的要求本身不成立","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"认为总图对这道缝的要求本身不成立"},
+{"hash":"c0dc899400708edd","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 该立住的缝有越界：部门名命中、交换项代码里还没有、一个名字盖住了总图分开的两样东西","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"该立住的缝有越界：部门名命中、交换项代码里还没有、一个名字盖住了总图分开的两样东西"},
+{"hash":"e96b799b3b88ba99","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 该立住的缝缺守卫","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"该立住的缝缺守卫"},
+{"hash":"f949ca8658a98d7e","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 只差名字","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"只差名字"},
+{"hash":"9f9f7043e61d0e6f","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断 > 表1 > 都没有","kind":"row","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 4 逐缝判断","title":"都没有"},
+{"hash":"b1c03dcac467f665","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 5 写报告","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步","title":"5 写报告"},
+{"hash":"6f321372178a8232","id":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 6 交出去","kind":"section","parent":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步","title":"6 交出去"}
+],
+"edges":[
+{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"2150c4e9d0285585","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告"},
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"86574edb5c537d29","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图","kind":"link","raws":["../../../docs/design/architecture/overall-architecture.md"],"seen":"8a0c81462363ec00","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5480a34a8595fd15","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 依据"},
+{"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"ae524890ae20668d","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 依据"},
+{"dst":"harness/definitions/organization.json","kind":"code-path","raws":["harness/definitions/organization.json"],"seen":"07b5fa82513b1c18","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 3 算差异"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"7183dbbb17e2ef54","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 6 交出去"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a635862380a62f58","src":".claude/skills/seam-diff/SKILL.md#按缝的差异报告 > 六步 > 6 交出去"}
+]
+}

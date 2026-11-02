@@ -1,0 +1,12 @@
+{
+"schema":1,
+"path":"docs/evaluation/predictions-2026-10-20.md",
+"hash":"7a72f7fce1444d31",
+"nodes":[
+{"hash":"7a72f7fce1444d31","id":"docs/evaluation/predictions-2026-10-20.md","kind":"file","title":"docs/evaluation/predictions-2026-10-20.md"},
+{"hash":"7a72f7fce1444d31","id":"docs/evaluation/predictions-2026-10-20.md#预测：2026-10-20 架构与需求诊断","kind":"section","parent":"docs/evaluation/predictions-2026-10-20.md","title":"预测：2026-10-20 架构与需求诊断"}
+],
+"edges":[
+{"dst":"docs/research/architecture-diagnosis-2026-10-19.md","kind":"link","raws":["../research/architecture-diagnosis-2026-10-19.md"],"seen":"14f3c295330cf865","src":"docs/evaluation/predictions-2026-10-20.md#预测：2026-10-20 架构与需求诊断"}
+]
+}

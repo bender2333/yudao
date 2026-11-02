@@ -1,0 +1,17 @@
+{
+"schema":1,
+"path":".claude/skills/trial/method/novice.md",
+"hash":"692159bdc9139ab1",
+"nodes":[
+{"hash":"692159bdc9139ab1","id":".claude/skills/trial/method/novice.md","kind":"file","title":".claude/skills/trial/method/novice.md"},
+{"hash":"f46a6e97329d2b61","id":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍","kind":"section","parent":".claude/skills/trial/method/novice.md","title":"新手段：只从 README 与页面走一遍"},
+{"hash":"411e12b188c5baab","id":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍 > 准备与凭据","kind":"section","parent":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍","title":"准备与凭据"},
+{"hash":"ccdf3ec595d38953","id":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍 > 每一步与四问","kind":"section","parent":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍","title":"每一步与四问"},
+{"hash":"3e6bb352b50c7298","id":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍 > 证据与第一眼","kind":"section","parent":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍","title":"证据与第一眼"},
+{"hash":"ed80a333223bc183","id":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍 > R1 的四步与中断","kind":"section","parent":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍","title":"R1 的四步与中断"},
+{"hash":"9d51b4a56a8dcab6","id":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍 > 结束与交付","kind":"section","parent":".claude/skills/trial/method/novice.md#新手段：只从 README 与页面走一遍","title":"结束与交付"}
+],
+"edges":[
+
+]
+}
