@@ -1,0 +1,16 @@
+{
+"schema":1,
+"path":"docs/C4/01-context.md",
+"hash":"6cfe66fa63fcb346",
+"nodes":[
+{"hash":"6cfe66fa63fcb346","id":"docs/C4/01-context.md","kind":"file","title":"docs/C4/01-context.md"},
+{"hash":"6cfe66fa63fcb346","id":"docs/C4/01-context.md#C1：系统上下文","kind":"section","parent":"docs/C4/01-context.md","title":"C1：系统上下文"}
+],
+"edges":[
+{"dst":"README.md","kind":"link","raws":["../../README.md"],"seen":"c92ab02c3359bfa1","src":"docs/C4/01-context.md#C1：系统上下文"},
+{"dst":"harness/fetch.py","kind":"link","raws":["../../harness/fetch.py"],"seen":"501a9e1e17a2b54f","src":"docs/C4/01-context.md#C1：系统上下文"},
+{"dst":"harness/mcp_client.py","kind":"link","raws":["../../harness/mcp_client.py"],"seen":"88d3e21e2faf233f","src":"docs/C4/01-context.md#C1：系统上下文"},
+{"dst":"harness/providers/responses.py","kind":"link","raws":["../../harness/providers/responses.py"],"seen":"a2f7f1897cf8becc","src":"docs/C4/01-context.md#C1：系统上下文"},
+{"dst":"harness/writeback.py","kind":"link","raws":["../../harness/writeback.py"],"seen":"e4621cf279de38a3","src":"docs/C4/01-context.md#C1：系统上下文"}
+]
+}

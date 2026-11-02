@@ -1,0 +1,20 @@
+{
+"schema":1,
+"path":"docs/C4/02-containers.md",
+"hash":"39a80ba5740c9c69",
+"nodes":[
+{"hash":"39a80ba5740c9c69","id":"docs/C4/02-containers.md","kind":"file","title":"docs/C4/02-containers.md"},
+{"hash":"39a80ba5740c9c69","id":"docs/C4/02-containers.md#C2：Yudao 内部容器","kind":"section","parent":"docs/C4/02-containers.md","title":"C2：Yudao 内部容器"}
+],
+"edges":[
+{"dst":"client/src/renderer/src/main.tsx","kind":"link","raws":["../../client/src/renderer/src/main.tsx"],"seen":"e947c808f6ad61fa","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"docs/C4/05-runtime.md","kind":"link","raws":["05-runtime.md"],"seen":"071fcc3f2406b065","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"harness/__main__.py","kind":"link","raws":["../../harness/__main__.py"],"seen":"8ab1030f9ced604a","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"harness/app/application.py","kind":"link","raws":["../../harness/app/application.py"],"seen":"cca147e0cc309ae3","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"harness/artifacts.py","kind":"link","raws":["../../harness/artifacts.py"],"seen":"5042a9dba1b213ac","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"harness/environment.py","kind":"link","raws":["../../harness/environment.py"],"seen":"a79f43295803c970","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"harness/event_store.py","kind":"link","raws":["../../harness/event_store.py"],"seen":"b27d2561ff1842ed","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"harness/git_versions.py","kind":"link","raws":["../../harness/git_versions.py"],"seen":"02dc8018cca1e79d","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},
+{"dst":"harness/providers/store.py","kind":"link","raws":["../../harness/providers/store.py"],"seen":"23a50ccb967bbdee","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"}
+]
+}

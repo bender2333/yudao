@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"docs/research/doc-consistency-concept-model.md",
-"hash":"a654d1d3919fa940",
+"hash":"8a6d8b37ae99405b",
 "nodes":[
-{"hash":"a654d1d3919fa940","id":"docs/research/doc-consistency-concept-model.md","kind":"file","title":"docs/research/doc-consistency-concept-model.md"},
+{"hash":"8a6d8b37ae99405b","id":"docs/research/doc-consistency-concept-model.md","kind":"file","title":"docs/research/doc-consistency-concept-model.md"},
 {"hash":"e91dc72a317fef77","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","kind":"section","parent":"docs/research/doc-consistency-concept-model.md","title":"文档一致性核对：概念模型与符号推理方案"},
 {"hash":"cfebd75bf418ff0c","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"1. 结论"},
-{"hash":"ea8d626b1b0ed281","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 两条线","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论","title":"两条线"},
+{"hash":"0cf1b7716daf47e2","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 两条线","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论","title":"两条线"},
 {"hash":"4c74b2096c92194c","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 用户已定","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论","title":"用户已定"},
 {"hash":"38e71718b1201fa5","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 2. 为什么不跟引用走：一个现成的例子","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"2. 为什么不跟引用走：一个现成的例子"},
 {"hash":"27ce37088e1cc191","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 3. 概念模型是什么","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"3. 概念模型是什么"},
@@ -15,7 +15,7 @@
 {"hash":"d099f0ed3792f7e3","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 6. 新概念怎么进模型","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"6. 新概念怎么进模型"},
 {"hash":"968b58111aafca86","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 7. LLM 放在哪里","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"7. LLM 放在哪里"},
 {"hash":"3bfe35590720622c","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 8. 仓库里已有的半成品模型","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"8. 仓库里已有的半成品模型"},
-{"hash":"ffc7899b41772104","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 9. 实施顺序","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"9. 实施顺序"},
+{"hash":"5a9f73569485ff06","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 9. 实施顺序","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"9. 实施顺序"},
 {"hash":"55bd277ab7894cf3","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 10. 写法草稿","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案","title":"10. 写法草稿"},
 {"hash":"6d5161ba51356686","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 10. 写法草稿 > CONTEXT.md 词条","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 10. 写法草稿","title":"CONTEXT.md 词条"},
 {"hash":"ff9113afcded0444","id":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 10. 写法草稿 > 文档说法","kind":"section","parent":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 10. 写法草稿","title":"文档说法"},
@@ -36,8 +36,9 @@
 {"dst":"docs/decision.md","kind":"link","raws":["../decision.md"],"seen":"8925eb413dc43f57","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论"},
 {"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"73a91536d217974e","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论"},
-{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 两条线"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"3ba70042e926ad1b","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 两条线"},
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"2c01765171109f63","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 两条线"},
+{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"link","raws":["doc-consistency-rule-facts.md"],"seen":"39c644076a0542c5","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 两条线"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 1. 结论 > 用户已定"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 10. 写法草稿 > CONTEXT.md 词条"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 为什么用规则语言"},
@@ -51,6 +52,7 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 6. 新概念怎么进模型"},
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 7. LLM 放在哪里"},
 {"dst":"CLAUDE.md","kind":"section-ref","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 8. 仓库里已有的半成品模型"},
-{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 8. 仓库里已有的半成品模型"}
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 8. 仓库里已有的半成品模型"},
+{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"link","raws":["doc-consistency-rule-facts.md"],"seen":"39c644076a0542c5","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 9. 实施顺序"}
 ]
 }

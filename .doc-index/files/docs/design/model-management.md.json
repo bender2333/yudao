@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/design/model-management.md",
-"hash":"5d671b998d37a3e3",
+"hash":"6d674411681caef7",
 "nodes":[
-{"hash":"5d671b998d37a3e3","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
+{"hash":"6d674411681caef7","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
 {"hash":"1f3757723b27467c","id":"docs/design/model-management.md#模型管理设计说明","kind":"section","parent":"docs/design/model-management.md","title":"模型管理设计说明"},
-{"hash":"590ab8786c18f79d","id":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"1. 参照对象与取舍"},
+{"hash":"9ff2b4bf956da184","id":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"1. 参照对象与取舍"},
 {"hash":"aa9fdedc53b8e4a8","id":"docs/design/model-management.md#模型管理设计说明 > 2. 分层","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"2. 分层"},
 {"hash":"fd44eba2a71ce87e","id":"docs/design/model-management.md#模型管理设计说明 > 3. 数据与归属","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"3. 数据与归属"},
 {"hash":"3ed1bb503b6d25ad","id":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"4. 模型目录"},

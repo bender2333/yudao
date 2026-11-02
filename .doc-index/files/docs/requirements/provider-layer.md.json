@@ -1,24 +1,22 @@
 {
 "schema":1,
 "path":"docs/requirements/provider-layer.md",
-"hash":"6bdd92e4b4c7820f",
+"hash":"db2baf313019d1fd",
 "nodes":[
-{"hash":"6bdd92e4b4c7820f","id":"docs/requirements/provider-layer.md","kind":"file","title":"docs/requirements/provider-layer.md"},
-{"hash":"8df3c0bf4ca4b5cd","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","kind":"section","parent":"docs/requirements/provider-layer.md","title":"D23 统一 Provider 层与 OpenCode Go 接入"},
-{"hash":"36ab1f626f278f77","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 1. 用户原话与首批范围","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"1. 用户原话与首批范围"},
+{"hash":"db2baf313019d1fd","id":"docs/requirements/provider-layer.md","kind":"file","title":"docs/requirements/provider-layer.md"},
+{"hash":"aeeba9d00bd03b34","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","kind":"section","parent":"docs/requirements/provider-layer.md","title":"D23 统一 Provider 层与 OpenCode Go 接入"},
+{"hash":"a0d0d4e552961d79","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 1. 范围","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"1. 范围"},
 {"hash":"45fdf71e0f5a5926","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 2. 产品结果","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"2. 产品结果"},
 {"hash":"dda22626f4f9b865","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 3. 分层责任","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"3. 分层责任"},
-{"hash":"c7846cbd0b16f675","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 4. 必要能力","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"4. 必要能力"},
+{"hash":"16792c41fc1e8f2d","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 4. 必要能力","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"4. 必要能力"},
 {"hash":"0aa5242b52281353","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 5. 验收条件","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"5. 验收条件"},
-{"hash":"d0a0a95b1f59db34","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 6. 与既有约束的关系","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"6. 与既有约束的关系"}
+{"hash":"178416c8b286d928","id":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 6. 与既有约束的关系","kind":"section","parent":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入","title":"6. 与既有约束的关系"}
 ],
 "edges":[
-{"dst":"docs/archive/stage-2-7-provider-report.md","kind":"link","raws":["../archive/stage-2-7-provider-report.md"],"seen":"c195ce38f218c169","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入"},
-{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"06f69b1d0733b575","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入"},
-{"dst":"docs/archive/design/provider-layer.md","kind":"link","raws":["../archive/design/provider-layer.md"],"seen":"7e446679ebc0bc87","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 1. 用户原话与首批范围"},
-{"dst":"docs/archive/research/opencode-go-provider-integration.md","kind":"link","raws":["../archive/research/opencode-go-provider-integration.md"],"seen":"8f9e653342ef7ecf","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 1. 用户原话与首批范围"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 1. 用户原话与首批范围"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 6. 与既有约束的关系"}
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入"},
+{"dst":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","kind":"link","raws":["../design/model-management.md"],"seen":"17891a8b09694ac3","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/provider-layer.md#D23 统一 Provider 层与 OpenCode Go 接入 > 6. 与既有约束的关系"}
 ]
 }
