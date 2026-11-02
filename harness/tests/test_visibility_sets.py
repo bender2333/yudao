@@ -61,6 +61,13 @@ def test_both_quality_visibility_sets_load(tmp_path, values):
     assert loaded.rule_value("roles.quality.visibility") == list(values)
 
 
+def test_a_definition_with_the_old_quality_value_still_loads(tmp_path):
+    # 守 R2（旧文件新版本能读）：词表只增，旧的取值（整份当前交付说明）还在词表里，此前写的角色定义照旧加载
+    directory = _copy(tmp_path)
+    _set_quality_visibility(directory, ("current_delivery_spec",))
+    assert load_definitions(directory).role("quality").visibility == ("current_delivery_spec",)
+
+
 def test_the_delivery_parts_put_the_kind_and_the_basis_into_the_facts():
     # 守 R2：交付说明的种类与它所依据的产品合同摘要属于事实（设计说明第 4 节），解释只有实现的理由与已知的不足
     parts = _delivery_contract()["parts"]
