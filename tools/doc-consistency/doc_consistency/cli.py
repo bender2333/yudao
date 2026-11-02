@@ -61,7 +61,8 @@ def cmd_pending(root, args):
     _, items = index.pending(root)
     for path, e, up in items:
         print(f"{path}  {e['src']}  [{e['kind']}]  引用的 {e['dst']} 变了")
-    print(f"共 {len(items)} 条待核对" if items else "没有待核对的引用")
+    scope = "范围：上下游都不是记录文档，只算指向小节、表格行、总图的节或缝的引用"
+    print(f"共 {len(items)} 条待核对（{scope}）" if items else f"没有待核对的引用（{scope}）")
 
 
 def cmd_confirm(root, args):

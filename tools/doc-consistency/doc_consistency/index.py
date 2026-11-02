@@ -4,6 +4,7 @@ from pathlib import Path
 
 from .scan import git_tracked, is_scaffold, parse_file, read_text, scan_repo
 
+DATA = Path(__file__).resolve().parent.parent / "data"
 INDEX_DIR = ".doc-index"
 SCHEMA = 1
 
@@ -204,17 +205,28 @@ def who(root, spec):
     return target, rows
 
 
-def pending(root, scope=None, model=None):
-    """上游变了而下游没变、也没确认的边。"""
+def is_record_doc(path):
+    cfg = json.loads((DATA / "record-docs.json").read_bytes().decode("utf-8"))
+    return path in cfg["files"] or path.startswith(tuple(cfg["prefixes"]))
+
+
+def counts_for_pending(src_file, dst):
+    """待核对的范围：上下游都不是记录文档；只有指向小节、表格行、总图的节或缝的引用参与，
+    指向整份文件的引用只查文件在不在（死引用检查），不参与。"""
+    return "#" in dst and not is_record_doc(src_file) and not is_record_doc(dst.split("#", 1)[0])
+
+
+def pending(root, model=None):
+    """上游变了而下游没变、也没确认的边，范围见 counts_for_pending。"""
     model = model or scan_repo(root)
     idx = load_index(root)
     confirmed = confirmed_keys(root)
     out = []
     for path, d in sorted(idx.items()):
-        if scope is not None and not scope(path):
-            continue
         old_nodes = {n["id"]: n["hash"] for n in d["nodes"]}
         for e in d["edges"]:
+            if not counts_for_pending(path, e["dst"]):
+                continue
             src = model.nodes.get(e["src"])
             if src is None or src.hash != old_nodes[e["src"]]:
                 continue  # 下游改过，算处理过

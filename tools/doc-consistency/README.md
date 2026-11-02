@@ -23,7 +23,7 @@ uv run --project tools/doc-consistency doc-consistency <命令>
 | `check` | 汇总提醒：死引用（技能、标签、文件路径）与待核对。永远以 0 退出；规则或程序自己出错（缺标签快照、规则无解、角色表对不上）才报错退出 |
 | `scope [--reach]` | 每个角色的阅读范围与字符数 |
 | `impact <文件或小节>` | 引用它、提到它的节点，按角色分组（必读范围内的先列，其次是只是可达的） |
-| `pending` | 上游变了而下游没变、也没确认的引用 |
+| `pending` | 上游变了而下游没变、也没确认的引用。范围（`check` 里的待核对用同一套）：上下游都不是记录文档（清单在 `data/record-docs.json`：`CHANGELOG`、`decision`、日记、`adr`、`research`、`evaluation`、`archive`）；只算指向小节、表格行、总图的节或缝的引用，指向整份文件的引用只由死引用检查查文件在不在。这些边仍在索引里，`who`、`impact` 照常能查 |
 | `confirm <下游> [上游]` | 记一条确认（下游看过，不用改）；追加到 `.doc-index/confirmed.jsonl` |
 
 ## 范围与索引

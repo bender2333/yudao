@@ -110,19 +110,63 @@ def test_pending_after_upstream_change_then_confirm(docs_repo):
     index.build(docs_repo.path)
     docs_repo.write("docs/design/other.md", docs_repo.read("docs/design/other.md").replace("第一处细节", "改过的细节"))
     rc, out = docs_repo.cli("pending")
-    assert "共 2 条待核对" in out
+    assert "共 1 条待核对" in out
     rc, out = docs_repo.cli("confirm", "docs/design/context.md")
-    assert "共确认 2 条" in out
+    assert "共确认 1 条" in out
     assert "没有待核对" in docs_repo.cli("pending")[1]
     lines = docs_repo.read(".doc-index/confirmed.jsonl").strip().split("\n")
-    assert len(lines) == 2
+    assert len(lines) == 1
     # 重建以后仍然没有待核对，确认记录只追加
     docs_repo.cli("build")
     assert "没有待核对" in docs_repo.cli("pending")[1]
     assert docs_repo.read(".doc-index/confirmed.jsonl").strip().split("\n") == lines
     # 上游再改一次，又出现
     docs_repo.write("docs/design/other.md", docs_repo.read("docs/design/other.md").replace("改过的细节", "又改了"))
-    assert "共 2 条待核对" in docs_repo.cli("pending")[1]
+    assert "共 1 条待核对" in docs_repo.cli("pending")[1]
+
+
+def test_record_docs_never_take_part_in_pending(docs_repo):
+    docs_repo.write("docs/decision.md", "# 决策\n\n## 某一条\n\n内容。\n")
+    docs_repo.write("claude_jour.md", "# 日记\n\n## 今天\n\n内容。\n")
+    docs_repo.write("docs/adr/0001-x.md", "# ADR\n\n## 决定\n\n内容。\n")
+    # 普通文档引用记录文档的小节（记录文档作上游）；记录文档引用普通文档的小节（记录文档作下游）
+    docs_repo.write(
+        "docs/design/user.md",
+        "# 引用者\n\n## 做法\n\n见 `docs/decision.md`「某一条」与 `docs/adr/0001-x.md`「决定」。\n",
+    )
+    docs_repo.write("docs/adr/0002-y.md", "# ADR 2\n\n## 决定\n\n依据 `docs/design/other.md`「细节」与 `claude_jour.md`「今天」。\n")
+    docs_repo.commit("记录文档")
+    docs_repo.cli("build")
+    for rel in ("docs/decision.md", "docs/adr/0001-x.md", "claude_jour.md"):
+        docs_repo.write(rel, docs_repo.read(rel) + "新追加的一行。\n")
+    docs_repo.write("docs/design/other.md", docs_repo.read("docs/design/other.md").replace("第一处细节", "改过的细节"))
+    items = index.pending(docs_repo.path)[1]
+    # 记录文档作上游的、作下游的都不算；剩下的只有普通文档之间那一条
+    assert {(e["src"], e["dst"]) for _, e, _ in items} == {
+        ("docs/design/context.md#上下文设计 > 方案", "docs/design/other.md#另一份 > 细节")
+    }
+    # 边仍在图谱里，who 照常能查
+    _, rows = index.who(docs_repo.path, "docs/decision.md#决策 > 某一条")
+    assert [r[0] for r in rows] == ["docs/design/user.md"]
+    _, rows = index.who(docs_repo.path, "docs/design/other.md#另一份 > 细节")
+    assert "docs/adr/0002-y.md" in [r[0] for r in rows]
+
+
+def test_references_to_a_whole_file_do_not_take_part_in_pending(docs_repo):
+    docs_repo.write("docs/design/whole.md", "# 整份引用\n\n## 做法\n\n见 [另一份](other.md)，也见 `docs/architecture.html`。\n")
+    docs_repo.commit("整份文件的引用")
+    docs_repo.cli("build")
+    docs_repo.write("docs/design/other.md", docs_repo.read("docs/design/other.md").replace("第一处细节", "改过的细节"))
+    arch = docs_repo.read("docs/architecture.html")
+    assert "同样的事件重放出同样的请求" in arch
+    docs_repo.write("docs/architecture.html", arch.replace("同样的事件重放出同样的请求", "同样的事件重放出同样的请求（改）"))
+    items = index.pending(docs_repo.path)[1]
+    # whole.md 只有指向整份文件的引用，不出现；context.md 指向小节的引用（other.md 的小节、总图的缝）出现
+    assert {e["src"].split("#", 1)[0] for _, e, _ in items} == {"docs/design/context.md"}
+    assert {e["dst"] for _, e, _ in items} == {"docs/design/other.md#另一份 > 细节", "docs/architecture.html#s4 > 装配"}
+    # 但整份文件的引用仍在索引里
+    _, rows = index.who(docs_repo.path, "docs/design/other.md")
+    assert "docs/design/whole.md" in [r[0] for r in rows]
 
 
 def test_new_edge_gets_baseline_not_pending(docs_repo):

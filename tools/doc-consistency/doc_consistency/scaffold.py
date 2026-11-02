@@ -277,8 +277,10 @@ def check(root):
     lines.append(f"== 死引用：{len(dead)} 条 ==")
     for path, l, msg, n in dead:
         lines.append(f"{path}:{l}  {msg}")
-    _, pend = pending(root, scope=is_scaffold, model=model)
-    lines.append(f"== 待核对（下游在脚手架文件里，上游变了）：{len(pend)} 条 ==")
+    _, pend = pending(root, model=model)
+    lines.append(
+        f"== 待核对：{len(pend)} 条（范围与 pending 命令相同：上下游都不是记录文档，只算指向小节、表格行、总图的节或缝的引用） =="
+    )
     for path, e, up in pend:
         lines.append(f"{path}  {e['src']}  引用的 {e['dst']} 变了  （改下游，或 confirm {e['src']!r} 记确认）")
     total = len(dead) + len(pend)

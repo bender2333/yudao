@@ -124,11 +124,15 @@ def test_refresh_writes_snapshot_in_stable_form(scaffold_repo):
 
 
 def test_check_reports_pending_from_scaffold_files(scaffold_repo):
+    scaffold_repo.write("AGENTS.md", scaffold_repo.read("AGENTS.md") + "细则见 `docs/agents/shared-rules.md`「共同规则」。\n")
+    scaffold_repo.commit("指向小节的引用")
     index.build(scaffold_repo.path)
     scaffold_repo.write("docs/agents/shared-rules.md", "# 共同规则\n\n改过的内容。\n")
     rc, out = scaffold_repo.cli("check")
-    assert "待核对" in out and "CLAUDE.md" in out
-    scaffold_repo.cli("confirm", "CLAUDE.md")
+    # 指向整份文件的引用（CLAUDE.md、AGENTS.md 里的链接）不算，指向小节的才算，输出里注明范围
+    assert "待核对：1 条（范围与 pending 命令相同" in out and "AGENTS.md" in out
+    assert "CLAUDE.md  CLAUDE.md" not in out
+    assert "1 条待核对" in scaffold_repo.cli("pending")[1].replace("共 1 条", "1 条")
     scaffold_repo.cli("confirm", "AGENTS.md")
     rc, out = scaffold_repo.cli("check")
-    assert "待核对（下游在脚手架文件里，上游变了）：0 条" in out
+    assert "待核对：0 条" in out
