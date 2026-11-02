@@ -316,3 +316,4 @@ claude-opus-5-5 / 2026-11-02 18:38 / `agents/autopilot-runtime.md` 删去已不�
 claude-sonnet-5-5 / 2026-11-02 18:19 / 新建 `docs/prototypes/v16/`（整份取自 v15，画出项目的组织：组织页、部门详情、加部门、子组织、新建项目与事项）与走查文档，`docs/prototypes/CHANGELOG.md` 加 `[v16]` 一节并更新开头一段 / 把项目的组织设计说明画成能点的页面交给用户试用
 claude-opus-5-5 / 2026-11-02 18:42 / `design/project-organization.md`：「组织是形态加本项目的改动」写明前三份形态可以选给项目或事项、第四份给部门内部用；「合成规则」第 4 条补去掉部门时别的部门对它独占成果的关注一起去掉；「冻结与升级」补合不到一起的例子；「组织页」补没有部门关注的成果写到成果库为止；「部门详情」补子组织的起点与结尾、子组织部门的模型与 Prompt 只留部门这一层；「项目页跟着组织变」标签写改过几处 / 做页面原型 v16 时暴露的细节
 claude / 2026-11-02 19:59 / 新增 `research/doc-consistency-rule-facts.md`（规则事实线方案）；`research/doc-consistency-concept-model.md` 第 1、9 节各加一段指向它；`research/README.md` 加一行；`decision.md` 加一条 / 用户定规则类事实单独成线、先做
+claude-opus-5-5（总架构师） / 2026-11-02 23:18 / `design/app-and-interface.md` 查询清单补 `event.positions` 与取不到的四种回答；`design/test-pyramid.md`「单项时间上限」改成等待上限按层取值（模块层 30 秒、集成层 150 秒）；`decision.md` 加一条 / 两件登记成工单等分诊的设计问题（#1424、#1425）按「设计不走工单」直接定下写进设计说明
