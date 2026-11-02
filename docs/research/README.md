@@ -12,5 +12,6 @@
 | [架构与需求诊断：M0 以后先把投入放在哪里](architecture-diagnosis-2026-10-19.md)（命令与脚本在同名目录） | [D38 系统意图](../requirements/system-intent.md)的 N-G1 与五条判据、[D32 对照实验](../requirements/comparison-experiment.md)、[评测场景设计](../design/evaluation-scenarios.md) | 场景 3 的第一份对等读数、五条发现与提议；预测在 [docs/evaluation/predictions-2026-10-20.md](../evaluation/predictions-2026-10-20.md)，下一次复盘按它判对错 |
 | [内核读取运行状态投影的清点（2026-10-24）](kernel-projection-reads-2026-10-24.md) | [骨架与应用设计说明](../design/skeleton-and-application.md)第 5.5、12 节 | S1a 至 S1d、S2a 的范围；S1a 放出之前在当时的 main 上重做 |
 | [DeepSeek Super-agent 与 Yudao 的异步框架](deepseek-superagent-async-framework.md) | [总体路线图](../program-roadmap.md)阶段二薄片 ⑤、阶段三、阶段四，[D06 运行中追加输入](../requirements/in-flight-input.md) | 不引入它的框架与代码的理由；外部入口、长命令转后台、并发槽留人槽、发件箱四个可借鉴的做法；外部入口是否算新方框交总架构师 |
+| [文档一致性核对：概念模型方案](doc-consistency-concept-model.md) | [决策记录](../decision.md)「文档一致性」两条 | 方案还在讨论，没有设计说明，也不开工单；概念模型放在 `CONTEXT.md`、按名字自动挂、复述取值写语义链接；复述的写法与对照表里术语表没有的 49 个词待用户定 |
 
 已归档的调研见 `docs/archive/research/`，索引是 [README-2026-09-06.md](../archive/research/README-2026-09-06.md)。
