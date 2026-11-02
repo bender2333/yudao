@@ -6,8 +6,12 @@ import assert from "node:assert/strict";
 
 import {
   candidateRowsOf,
+  candidatesLocked,
+  collectingProvider,
   departmentBindings,
   departmentTierBindings,
+  fetchNoteText,
+  fetchSummaryOf,
   modelInputOf,
   selectedModelRows,
 } from "../../src/renderer/src/views/models/model-logic.ts";
@@ -165,4 +169,82 @@ test("目录里的定义转成保存时要写的一份：字段原样带过去",
   assert.deepEqual(written.reasoning_levels, ["low", "high"]);
   assert.equal(written.default_reasoning_level, "low");
   assert.equal(written.accepts_required_tool_call, true);
+});
+
+// ---------------------------------------------------------------------------
+// 获取模型列表这条操作的状态（工单 #1355）
+// ---------------------------------------------------------------------------
+
+// 一份连接最近一次获取的结果；status 不是 ok 时带服务端给的原因
+function providerWithResult(status: "ok" | "unknown", fetchedAt: string, error: string | null = null): CatalogProvider {
+  return {
+    ...provider("go", "http://a/v1", status === "ok" ? [candidate("glm-4.6")] : []),
+    latest_candidates: {
+      provider_id: "go",
+      status,
+      source_url: "http://a/v1/models",
+      fetched_at: fetchedAt,
+      candidates: status === "ok" ? [candidate("glm-4.6")] : [],
+      error,
+    },
+  };
+}
+
+test("结果没变就是还在取候选", () => {
+  const collecting = collectingProvider({ providers: [providerWithResult("ok", "2026-10-30T10:00:00Z")] },
+    { provider_id: "go", fetched_at: "2026-10-30T10:00:00Z", status: "ok" });
+  assert.equal(collecting, "go");
+});
+
+test("第一次取候选：还没有结果时也算在取", () => {
+  const collecting = collectingProvider({ providers: [provider("go", "http://a/v1", null)] },
+    { provider_id: "go", fetched_at: null, status: null });
+  assert.equal(collecting, "go");
+});
+
+test("请求结束以后不再算在取：成功换了结果时间", () => {
+  const collecting = collectingProvider({ providers: [providerWithResult("ok", "2026-10-30T10:05:00Z")] },
+    { provider_id: "go", fetched_at: "2026-10-30T10:00:00Z", status: "ok" });
+  assert.equal(collecting, null);
+});
+
+test("请求失败以后同样复位：失败换成空的结果时间与原因", () => {
+  const failed = providerWithResult("unknown", "", "模型列表请求 http://a/v1/models 返回 HTTP 401");
+  assert.equal(collectingProvider({ providers: [failed] },
+    { provider_id: "go", fetched_at: "2026-10-30T10:00:00Z", status: "ok" }), null);
+  // 原因在连接卡片旁显示（设计说明第 9.1 节「获取中、成功、失败与失败原因都写在这张卡片里」）
+  assert.deepEqual(fetchSummaryOf(failed),
+    { text: "模型列表请求 http://a/v1/models 返回 HTTP 401", kind: "error" });
+});
+
+test("没有这次获取、或者这份连接已经不在了，都不算在取", () => {
+  assert.equal(collectingProvider({ providers: [provider("go", "http://a/v1", [])] }, null), null);
+  assert.equal(collectingProvider({ providers: [] },
+    { provider_id: "go", fetched_at: null, status: null }), null);
+  assert.equal(collectingProvider(null, { provider_id: "go", fetched_at: null, status: null }), null);
+});
+
+test("候选区只在页面自己的命令在途时暂停：页面刚打开、后台取候选都不停住操作", () => {
+  // 页面刚打开：不引入「一打开就禁用」（工单验收第 3 条）
+  assert.equal(candidatesLocked({ busy: false, connecting: false }), false);
+  // 请求在途：停住，同时候选区上方写明在做什么
+  assert.equal(candidatesLocked({ busy: true, connecting: false }), true);
+  assert.equal(candidatesLocked({ busy: false, connecting: true }), true);
+  // 服务端在后台取候选（collecting）时页面照常可以操作
+  assert.equal(candidatesLocked({ busy: false, connecting: false }), false);
+});
+
+test("说明写在候选区上方：请求在途、取候选、空闲三种", () => {
+  assert.match(fetchNoteText({ connecting: true, collecting: false }), /正在获取模型列表/);
+  assert.match(fetchNoteText({ connecting: true, collecting: false }), /暂停操作/);
+  assert.match(fetchNoteText({ connecting: false, collecting: true }), /正在获取模型列表/);
+  assert.match(fetchNoteText({ connecting: false, collecting: true }), /可以继续/);
+  assert.equal(fetchNoteText({ connecting: false, collecting: false }), "");
+});
+
+test("连接卡片上的最近一次结果：成功写数量与时间，没取过写没有取过", () => {
+  assert.equal(fetchSummaryOf(providerWithResult("ok", "2026-10-30T10:00:00Z")).text,
+    "已获取 1 个模型 · 2026-10-30T10:00:00Z");
+  assert.deepEqual(fetchSummaryOf(provider("go", "http://a/v1", null)),
+    { text: "还没有获取过模型列表。", kind: "none" });
 });
