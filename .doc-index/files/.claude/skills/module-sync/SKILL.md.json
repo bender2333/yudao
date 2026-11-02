@@ -1,26 +1,26 @@
 {
 "schema":1,
 "path":".claude/skills/module-sync/SKILL.md",
-"hash":"420ac0ce9158ba82",
+"hash":"d32322fcd6d254df",
 "nodes":[
-{"hash":"420ac0ce9158ba82","id":".claude/skills/module-sync/SKILL.md","kind":"file","title":".claude/skills/module-sync/SKILL.md"},
+{"hash":"d32322fcd6d254df","id":".claude/skills/module-sync/SKILL.md","kind":"file","title":".claude/skills/module-sync/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/module-sync/SKILL.md#(开头)","kind":"section","parent":".claude/skills/module-sync/SKILL.md","title":"(开头)"},
 {"hash":"01a559acfa9c44a4","id":".claude/skills/module-sync/SKILL.md#name: module-syncdescription: 子架构师带用户定一个模块、一道缝或一条道的走向：只读子代理扫代码对照总图与对照表，给用户一张不超过 15 行的体检卡与一两个走向选择题；用户定了走向后按 /to-parents 归桶、按 /to-children 拆子工单。用户的参与方式（CLAUDE.md）里与子架构师定走向用这个。argument-hint: \"<模块名 | 总图第四节一道缝的名字 | 路线图第 3 节一条道>\"disable-model-invocation: true","kind":"section","parent":".claude/skills/module-sync/SKILL.md","title":"name: module-syncdescription: 子架构师带用户定一个模块、一道缝或一条道的走向：只读子代理扫代码对照总图与对照表，给用户一张不超过 15 行的体检卡与一两个走向选择题；用户定了走向后按 /to-parents 归桶、按 /to-children 拆子工单。用户的参与方式（CLAUDE.md）里与子架构师定走向用这个。argument-hint: \"<模块名 | 总图第四节一道缝的名字 | 路线图第 3 节一条道>\"disable-model-invocation: true"},
 {"hash":"ad05ed22da4a93ed","id":".claude/skills/module-sync/SKILL.md#模块对齐","kind":"section","parent":".claude/skills/module-sync/SKILL.md","title":"模块对齐"},
 {"hash":"fd741fdbe7a6e028","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 一、体检卡","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"一、体检卡"},
-{"hash":"cd7f32f3cbad1189","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 二、归桶","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"二、归桶"},
-{"hash":"70b1513bd988b833","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 三、拆子工单","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"三、拆子工单"},
-{"hash":"3d07881e27a6144a","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 收尾","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"收尾"}
+{"hash":"c6f23648600c5a7d","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 二、归桶","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"二、归桶"},
+{"hash":"85166f3119210987","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 三、拆子工单","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"三、拆子工单"},
+{"hash":"ab9b27c362ab7bc2","id":".claude/skills/module-sync/SKILL.md#模块对齐 > 收尾","kind":"section","parent":".claude/skills/module-sync/SKILL.md#模块对齐","title":"收尾"}
 ],
 "edges":[
-{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"2150c4e9d0285585","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
-{"dst":"CLAUDE.md#角色 > 用户的参与方式","kind":"section-ref","raws":["CLAUDE.md"],"seen":"7dcf39cc9b1f76ab","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
-{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"86574edb5c537d29","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5480a34a8595fd15","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 一、体检卡"},
-{"dst":"docs/design/README.md","kind":"code-path","raws":["docs/design/README.md"],"seen":"6ded0c1f2ab0bdcf","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 一、体检卡"},
-{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"7d620bf827db4cf6","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 三、拆子工单"},
-{"dst":".claude/skills/to-parents/SKILL.md","kind":"link","raws":["../to-parents/SKILL.md"],"seen":"e85b43812ea6ae6f","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 二、归桶"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f4c72246940d73fe","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 收尾"},
-{"dst":"docs/agents/design-spec.md","kind":"link","raws":["../../../docs/agents/design-spec.md"],"seen":"6b599df76e561f68","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 收尾"}
+{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"61274b7dda36f60d","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
+{"dst":"CLAUDE.md#角色 > 用户的参与方式","kind":"section-ref","raws":["CLAUDE.md"],"seen":"e22a2a7af3eae058","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"73a91536d217974e","src":".claude/skills/module-sync/SKILL.md#模块对齐"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 一、体检卡"},
+{"dst":"docs/design/README.md","kind":"code-path","raws":["docs/design/README.md"],"seen":"f675b2b15321fe80","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 一、体检卡"},
+{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"2b97cc0e03cbbff6","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 三、拆子工单"},
+{"dst":".claude/skills/to-parents/SKILL.md","kind":"link","raws":["../to-parents/SKILL.md"],"seen":"216a6d9685cbf5e4","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 二、归桶"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b4fc41b167016dad","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 收尾"},
+{"dst":"docs/agents/design-spec.md","kind":"link","raws":["../../../docs/agents/design-spec.md"],"seen":"2ffb04cf2733009d","src":".claude/skills/module-sync/SKILL.md#模块对齐 > 收尾"}
 ]
 }

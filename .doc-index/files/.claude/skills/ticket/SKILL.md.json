@@ -1,28 +1,28 @@
 {
 "schema":1,
 "path":".claude/skills/ticket/SKILL.md",
-"hash":"a07d07482aea9628",
+"hash":"b9beec8880742a1e",
 "nodes":[
-{"hash":"a07d07482aea9628","id":".claude/skills/ticket/SKILL.md","kind":"file","title":".claude/skills/ticket/SKILL.md"},
+{"hash":"b9beec8880742a1e","id":".claude/skills/ticket/SKILL.md","kind":"file","title":".claude/skills/ticket/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/ticket/SKILL.md#(开头)","kind":"section","parent":".claude/skills/ticket/SKILL.md","title":"(开头)"},
 {"hash":"fd31036b3fa6f53e","id":".claude/skills/ticket/SKILL.md#name: ticketdescription: 建立或改写 Yudao 的 GitHub 工单（阶段、父、子、清理单、试用工单）：先读工单规范，按类型选模板，再用 gh 发布。","kind":"section","parent":".claude/skills/ticket/SKILL.md","title":"name: ticketdescription: 建立或改写 Yudao 的 GitHub 工单（阶段、父、子、清理单、试用工单）：先读工单规范，按类型选模板，再用 gh 发布。"},
-{"hash":"a1ad171f7551bfcf","id":".claude/skills/ticket/SKILL.md#建立工单","kind":"section","parent":".claude/skills/ticket/SKILL.md","title":"建立工单"},
+{"hash":"c715867db208c257","id":".claude/skills/ticket/SKILL.md#建立工单","kind":"section","parent":".claude/skills/ticket/SKILL.md","title":"建立工单"},
 {"hash":"c8fc556d09b9031e","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","kind":"section","parent":".claude/skills/ticket/SKILL.md#建立工单","title":"1. 定类型与归属"},
-{"hash":"ebb2aaf58b2f989e","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 阶段工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"阶段工单"},
+{"hash":"34c21ba46869433f","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 阶段工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"阶段工单"},
 {"hash":"2e47b6575a7ab396","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 父工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"父工单"},
 {"hash":"8392ea4967667e1e","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 子工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"子工单"},
 {"hash":"e24ac32b5430a581","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 试用中发现的缺陷","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"试用中发现的缺陷"},
 {"hash":"b77e1b468e945b4a","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 清理单、试用工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"清理单、试用工单"},
 {"hash":"88fe428b1ee08474","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 交总架构师的问题","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"交总架构师的问题"},
 {"hash":"67c77d89e7f34b0c","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 改写已有工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"改写已有工单"},
-{"hash":"64b8c8900d8afc8b","id":".claude/skills/ticket/SKILL.md#建立工单 > 2. 写正文","kind":"section","parent":".claude/skills/ticket/SKILL.md#建立工单","title":"2. 写正文"},
+{"hash":"62fc6033c466ec53","id":".claude/skills/ticket/SKILL.md#建立工单 > 2. 写正文","kind":"section","parent":".claude/skills/ticket/SKILL.md#建立工单","title":"2. 写正文"},
 {"hash":"399d042d42f26c83","id":".claude/skills/ticket/SKILL.md#建立工单 > 3. 发布","kind":"section","parent":".claude/skills/ticket/SKILL.md#建立工单","title":"3. 发布"}
 ],
 "edges":[
-{"dst":"docs/agents/issue-tracker.md","kind":"link","raws":["../../../docs/agents/issue-tracker.md"],"seen":"96db02e93f38860f","src":".claude/skills/ticket/SKILL.md#建立工单"},
-{"dst":"docs/agents/ticket-spec.md","kind":"link","raws":["../../../docs/agents/ticket-spec.md"],"seen":"7877afe0459a32ef","src":".claude/skills/ticket/SKILL.md#建立工单"},
-{"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"0391625f58a9e3c5","src":".claude/skills/ticket/SKILL.md#建立工单"},
-{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"db1d0f2ec6e5f9e0","src":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 阶段工单"},
-{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"7d620bf827db4cf6","src":".claude/skills/ticket/SKILL.md#建立工单 > 2. 写正文"}
+{"dst":"docs/agents/issue-tracker.md","kind":"link","raws":["../../../docs/agents/issue-tracker.md"],"seen":"2f585d2ce9fa7f84","src":".claude/skills/ticket/SKILL.md#建立工单"},
+{"dst":"docs/agents/ticket-spec.md","kind":"link","raws":["../../../docs/agents/ticket-spec.md"],"seen":"03c60cf298c2dd35","src":".claude/skills/ticket/SKILL.md#建立工单"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/ticket/SKILL.md#建立工单"},
+{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"c508339609e8ff9b","src":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 阶段工单"},
+{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"2b97cc0e03cbbff6","src":".claude/skills/ticket/SKILL.md#建立工单 > 2. 写正文"}
 ]
 }

@@ -1,29 +1,29 @@
 {
 "schema":1,
 "path":"docs/requirements/operations-department.md",
-"hash":"236282e41f2af201",
+"hash":"17090dc3e39f2bfe",
 "nodes":[
-{"hash":"236282e41f2af201","id":"docs/requirements/operations-department.md","kind":"file","title":"docs/requirements/operations-department.md"},
-{"hash":"ad4fa012e1fa6e39","id":"docs/requirements/operations-department.md#D27 运维部门","kind":"section","parent":"docs/requirements/operations-department.md","title":"D27 运维部门"},
+{"hash":"17090dc3e39f2bfe","id":"docs/requirements/operations-department.md","kind":"file","title":"docs/requirements/operations-department.md"},
+{"hash":"48b76ee04ee5adb9","id":"docs/requirements/operations-department.md#D27 运维部门","kind":"section","parent":"docs/requirements/operations-department.md","title":"D27 运维部门"},
 {"hash":"9b5daec4f3ea5107","id":"docs/requirements/operations-department.md#D27 运维部门 > 用户原话","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维部门","title":"用户原话"},
-{"hash":"7a3120f548de2939","id":"docs/requirements/operations-department.md#D27 运维部门 > 已确认","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维部门","title":"已确认"},
-{"hash":"8d786b944efce344","id":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维部门","title":"长时间运行"},
-{"hash":"a3939e462a3fc628","id":"docs/requirements/operations-department.md#D27 运维部门 > 设计中待确定的规则","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维部门","title":"设计中待确定的规则"}
+{"hash":"b6fa1bc8f94e2ce6","id":"docs/requirements/operations-department.md#D27 运维部门 > 已确认","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维部门","title":"已确认"},
+{"hash":"772422e14ed2ed85","id":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维部门","title":"长时间运行"},
+{"hash":"6253917cf4c1fc9e","id":"docs/requirements/operations-department.md#D27 运维部门 > 设计中待确定的规则","kind":"section","parent":"docs/requirements/operations-department.md#D27 运维部门","title":"设计中待确定的规则"}
 ],
 "edges":[
 {"dst":"docs/archive/stage-3/operations-responsibility-sample.md","kind":"link","raws":["../archive/stage-3/operations-responsibility-sample.md"],"seen":"866c8a70e154cf03","src":"docs/requirements/operations-department.md#D27 运维部门"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/requirements/operations-department.md#D27 运维部门"},
-{"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"7594224d7b0c0dc6","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
-{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"384d12f32d94c89b","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
-{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"44f5577c951e86c1","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"abd6d0e803335d77","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/operations-department.md#D27 运维部门"},
+{"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
+{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"6ab2fc3729e45fba","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
+{"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"f0e8dce83a8e2a46","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"8a7bb31f10c94018","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
 {"dst":"docs/archive/architecture-issues-2026-09-10.md","kind":"link","raws":["../archive/architecture-issues-2026-09-10.md"],"seen":"dc5637af3e0c1f74","src":"docs/requirements/operations-department.md#D27 运维部门 > 设计中待确定的规则"},
-{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"26e795773f24d8b4","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
-{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"b43cafcc18eee83f","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
-{"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"372078ed8c135885","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
-{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"ed4c2b8fb539b859","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
-{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"1a899e30127a7d66","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
-{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"48e443375d10249b","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"}
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
+{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"87a446b045bc0a4b","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
+{"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"d697a9c7a0bdcdd7","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"ecbb361e798404e9","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
+{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"190ddcb53255d852","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"}
 ]
 }

@@ -1,19 +1,19 @@
 {
 "schema":1,
 "path":"docs/requirements/department-history.md",
-"hash":"3c7e484333e3539b",
+"hash":"814946588a0f1bef",
 "nodes":[
-{"hash":"3c7e484333e3539b","id":"docs/requirements/department-history.md","kind":"file","title":"docs/requirements/department-history.md"},
-{"hash":"91c122f707cf6ecb","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","kind":"section","parent":"docs/requirements/department-history.md","title":"D08 部门完整历史与逐次上下文"},
+{"hash":"814946588a0f1bef","id":"docs/requirements/department-history.md","kind":"file","title":"docs/requirements/department-history.md"},
+{"hash":"d7e5ac54fb301dc8","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","kind":"section","parent":"docs/requirements/department-history.md","title":"D08 部门完整历史与逐次上下文"},
 {"hash":"9c372d4e7afb2016","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 用户原话","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"用户原话"},
-{"hash":"683263f834b8f095","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 已确认","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"已确认"},
-{"hash":"d7214b655a94a7c3","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 实现与限制","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"实现与限制"}
+{"hash":"d921476650569408","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 已确认","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"已确认"},
+{"hash":"b6cb5f3bc2aa6c12","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 实现与限制","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"实现与限制"}
 ],
 "edges":[
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装","kind":"link","raws":["../design/semantic-system.md"],"seen":"c8adf8e986aa08ab","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文"},
-{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"8cbabc2c9cae8dab","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文"},
-{"dst":"docs/requirements/context-compaction.md","kind":"link","raws":["context-compaction.md"],"seen":"e9bb40affc2bacf0","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 实现与限制"},
-{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"48e443375d10249b","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 实现与限制"},
-{"dst":"docs/requirements/context-compaction.md","kind":"link","raws":["context-compaction.md"],"seen":"e9bb40affc2bacf0","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 已确认"}
+{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["semantic-system.md"],"seen":"66c38e6465c855a1","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文"},
+{"dst":"docs/requirements/context-compaction.md","kind":"link","raws":["context-compaction.md"],"seen":"2340712d5ddaecaa","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 实现与限制"},
+{"dst":"docs/requirements/provider-retries.md","kind":"link","raws":["provider-retries.md"],"seen":"190ddcb53255d852","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 实现与限制"},
+{"dst":"docs/requirements/context-compaction.md","kind":"link","raws":["context-compaction.md"],"seen":"2340712d5ddaecaa","src":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 已确认"}
 ]
 }

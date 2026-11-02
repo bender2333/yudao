@@ -1,18 +1,18 @@
 {
 "schema":1,
 "path":"docs/trial/skill-revision-validation-2026-10-29.md",
-"hash":"30ff3dd80a725a5a",
+"hash":"348e8564a28f5946",
 "nodes":[
-{"hash":"30ff3dd80a725a5a","id":"docs/trial/skill-revision-validation-2026-10-29.md","kind":"file","title":"docs/trial/skill-revision-validation-2026-10-29.md"},
-{"hash":"86801a06969aec0e","id":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证","kind":"section","parent":"docs/trial/skill-revision-validation-2026-10-29.md","title":"agent 试用技能修订与验证"},
-{"hash":"a246d8c5edc07aae","id":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证 > 复盘依据与修订结果","kind":"section","parent":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证","title":"复盘依据与修订结果"},
+{"hash":"348e8564a28f5946","id":"docs/trial/skill-revision-validation-2026-10-29.md","kind":"file","title":"docs/trial/skill-revision-validation-2026-10-29.md"},
+{"hash":"98868908ae141e0a","id":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证","kind":"section","parent":"docs/trial/skill-revision-validation-2026-10-29.md","title":"agent 试用技能修订与验证"},
+{"hash":"6195f0b34c55d34c","id":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证 > 复盘依据与修订结果","kind":"section","parent":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证","title":"复盘依据与修订结果"},
 {"hash":"95efefd228b6a8c9","id":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证 > 实际验证","kind":"section","parent":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证","title":"实际验证"},
 {"hash":"4e2c7fec0f2072ad","id":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证 > 独立复核与前向试验","kind":"section","parent":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证","title":"独立复核与前向试验"},
 {"hash":"a5e27fa1c2aa6741","id":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证 > 适用范围与限制","kind":"section","parent":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证","title":"适用范围与限制"}
 ],
 "edges":[
-{"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"3e1eb032980c7ef2","src":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证"},
-{"dst":"docs/trial/skill-revision-plan.md","kind":"link","raws":["skill-revision-plan.md"],"seen":"3a806a47eabec753","src":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证"},
-{"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../../.claude/skills/trial/SKILL.md"],"seen":"ce89702099853161","src":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证 > 复盘依据与修订结果"}
+{"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"c692314e41a8c822","src":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证"},
+{"dst":"docs/trial/skill-revision-plan.md","kind":"link","raws":["skill-revision-plan.md"],"seen":"579d1d393ccd3710","src":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证"},
+{"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../../.claude/skills/trial/SKILL.md"],"seen":"ab9da07de18ee5d0","src":"docs/trial/skill-revision-validation-2026-10-29.md#agent 试用技能修订与验证 > 复盘依据与修订结果"}
 ]
 }

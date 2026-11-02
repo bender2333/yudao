@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/prototypes/v13/BUILD.md",
-"hash":"0467d4842be3d4cb",
+"hash":"2824b4a137a89cc8",
 "nodes":[
-{"hash":"0467d4842be3d4cb","id":"docs/prototypes/v13/BUILD.md","kind":"file","title":"docs/prototypes/v13/BUILD.md"},
-{"hash":"7cc1bdd0b0dbdbeb","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","kind":"section","parent":"docs/prototypes/v13/BUILD.md","title":"原型 v13 构建约定"},
+{"hash":"2824b4a137a89cc8","id":"docs/prototypes/v13/BUILD.md","kind":"file","title":"docs/prototypes/v13/BUILD.md"},
+{"hash":"f620af3e3401663e","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","kind":"section","parent":"docs/prototypes/v13/BUILD.md","title":"原型 v13 构建约定"},
 {"hash":"667337d9cfbd9027","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录","kind":"section","parent":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","title":"1. 脚本顺序与目录"},
 {"hash":"4ee42b565c083cbb","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 2. 画面的接口","kind":"section","parent":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","title":"2. 画面的接口"},
 {"hash":"26b7a8a47627efeb","id":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 3. 场景与工具条","kind":"section","parent":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定","title":"3. 场景与工具条"},
@@ -12,7 +12,7 @@
 ],
 "edges":[
 {"dst":"docs/archive/prototypes/v12/BUILD.md","kind":"link","raws":["../../archive/prototypes/v12/BUILD.md"],"seen":"e7f18d7f2137479c","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定"},
-{"dst":"docs/prototypes/v13/design.md","kind":"link","raws":["design.md"],"seen":"199695172c809e95","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定"},
+{"dst":"docs/prototypes/v13/design.md","kind":"link","raws":["design.md"],"seen":"226a7fe5fb527914","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定"},
 {"dst":"docs/prototypes/v13/js/y13.js","kind":"code-path","raws":["js/y13.js"],"seen":"790fc78845b66758","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定"},
 {"dst":"docs/prototypes/v13/checks/playback.js","kind":"code-path","raws":["checks/playback.js"],"seen":"e7bc42fdb84095b1","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},
 {"dst":"docs/prototypes/v13/index.html","kind":"code-path","raws":["index.html"],"seen":"43a2dcafdb873147","src":"docs/prototypes/v13/BUILD.md#原型 v13 构建约定 > 1. 脚本顺序与目录"},

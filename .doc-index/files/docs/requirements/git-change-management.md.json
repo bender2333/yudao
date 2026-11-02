@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":"docs/requirements/git-change-management.md",
-"hash":"e4ddd79dfddca34e",
+"hash":"88082796d87ffcf1",
 "nodes":[
-{"hash":"e4ddd79dfddca34e","id":"docs/requirements/git-change-management.md","kind":"file","title":"docs/requirements/git-change-management.md"},
+{"hash":"88082796d87ffcf1","id":"docs/requirements/git-change-management.md","kind":"file","title":"docs/requirements/git-change-management.md"},
 {"hash":"76b6e87e72065b7e","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","kind":"section","parent":"docs/requirements/git-change-management.md","title":"D16 使用 Git 管理任务内变化"},
 {"hash":"26a4be4e7f940dbb","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 用户原话与确认","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"用户原话与确认"},
 {"hash":"d1e47c9c8360fdea","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 有效设计","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"有效设计"},
 {"hash":"7eb22607375008a1","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 当前范围","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"当前范围"},
-{"hash":"0793d84eae7aab10","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 实施状态","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"实施状态"}
+{"hash":"d34321aa0ca86259","id":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 实施状态","kind":"section","parent":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化","title":"实施状态"}
 ],
 "edges":[
 {"dst":"docs/archive/mvp-acceptance.md","kind":"link","raws":["../archive/mvp-acceptance.md"],"seen":"a880bac3f3462a89","src":"docs/requirements/git-change-management.md#D16 使用 Git 管理任务内变化 > 实施状态"}

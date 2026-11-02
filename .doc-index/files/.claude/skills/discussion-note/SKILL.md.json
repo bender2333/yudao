@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/discussion-note/SKILL.md",
-"hash":"351cf88178bf57fa",
+"hash":"8d63c7c4edcfc7cc",
 "nodes":[
-{"hash":"351cf88178bf57fa","id":".claude/skills/discussion-note/SKILL.md","kind":"file","title":".claude/skills/discussion-note/SKILL.md"},
+{"hash":"8d63c7c4edcfc7cc","id":".claude/skills/discussion-note/SKILL.md","kind":"file","title":".claude/skills/discussion-note/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/discussion-note/SKILL.md#(开头)","kind":"section","parent":".claude/skills/discussion-note/SKILL.md","title":"(开头)"},
 {"hash":"67c4bd9e46a53f75","id":".claude/skills/discussion-note/SKILL.md#name: discussion-notedescription: 任何 harness 做完一小段只读或有界的工作（扫描、试跑、复现、走查、查证、想法），把事实与结果写成 GitHub Discussions 帖子，供架构师分诊或以后复用。不发工单评论、不改标签、不派活、不动账本，不打断进行中的工单与流程。argument-hint: \"[扫描 | 观察 | 复现 | 想法] <范围>\"","kind":"section","parent":".claude/skills/discussion-note/SKILL.md","title":"name: discussion-notedescription: 任何 harness 做完一小段只读或有界的工作（扫描、试跑、复现、走查、查证、想法），把事实与结果写成 GitHub Discussions 帖子，供架构师分诊或以后复用。不发工单评论、不改标签、不派活、不动账本，不打断进行中的工单与流程。argument-hint: \"[扫描 | 观察 | 复现 | 想法] <范围>\""},
 {"hash":"4202bb0344448d6f","id":".claude/skills/discussion-note/SKILL.md#discussion-note","kind":"section","parent":".claude/skills/discussion-note/SKILL.md","title":"discussion-note"},
@@ -20,7 +20,7 @@
 {"hash":"064953727abd6711","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 一、事实与判断分节","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"一、事实与判断分节"},
 {"hash":"7d25fac6b200bd31","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 二、可复现","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"二、可复现"},
 {"hash":"e36f82a77aa5e0b4","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","kind":"section","parent":".claude/skills/discussion-note/SKILL.md#discussion-note","title":"标题前缀与分类"},
-{"hash":"28dc1c535157dae6","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类 > 表1 > Issues","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","title":"Issues"},
+{"hash":"a2ffdb8ed70d5f75","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类 > 表1 > Issues","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","title":"Issues"},
 {"hash":"9c736079c161b84a","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类 > 表1 > Ideas","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","title":"Ideas"},
 {"hash":"4a3055bea3cf8f6d","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类 > 表1 > General","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","title":"General"},
 {"hash":"d70a0fed115f3460","id":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类 > 表1 > Show and tell","kind":"row","parent":".claude/skills/discussion-note/SKILL.md#discussion-note > 标题前缀与分类","title":"Show and tell"},

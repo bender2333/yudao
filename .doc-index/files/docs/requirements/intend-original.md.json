@@ -1,16 +1,16 @@
 {
 "schema":1,
 "path":"docs/requirements/intend-original.md",
-"hash":"789e9b2cdaa9fb9c",
+"hash":"678f867fcef96654",
 "nodes":[
-{"hash":"789e9b2cdaa9fb9c","id":"docs/requirements/intend-original.md","kind":"file","title":"docs/requirements/intend-original.md"},
+{"hash":"678f867fcef96654","id":"docs/requirements/intend-original.md","kind":"file","title":"docs/requirements/intend-original.md"},
 {"hash":"bbe025bbe3cf3218","id":"docs/requirements/intend-original.md#D03 intend.md 原文保存","kind":"section","parent":"docs/requirements/intend-original.md","title":"D03 intend.md 原文保存"},
 {"hash":"76733e8996d28f13","id":"docs/requirements/intend-original.md#D03 intend.md 原文保存 > 用户原话","kind":"section","parent":"docs/requirements/intend-original.md#D03 intend.md 原文保存","title":"用户原话"},
 {"hash":"283e47e1aea98e92","id":"docs/requirements/intend-original.md#D03 intend.md 原文保存 > 已确认","kind":"section","parent":"docs/requirements/intend-original.md#D03 intend.md 原文保存","title":"已确认"},
 {"hash":"d1a0cacb381981ab","id":"docs/requirements/intend-original.md#D03 intend.md 原文保存 > 实现边界","kind":"section","parent":"docs/requirements/intend-original.md#D03 intend.md 原文保存","title":"实现边界"},
-{"hash":"6ae9efd9d9316c97","id":"docs/requirements/intend-original.md#D03 intend.md 原文保存 > 本轮设计选择","kind":"section","parent":"docs/requirements/intend-original.md#D03 intend.md 原文保存","title":"本轮设计选择"}
+{"hash":"b6a2a170f065c18f","id":"docs/requirements/intend-original.md#D03 intend.md 原文保存 > 本轮设计选择","kind":"section","parent":"docs/requirements/intend-original.md#D03 intend.md 原文保存","title":"本轮设计选择"}
 ],
 "edges":[
-{"dst":"docs/requirements/git-change-management.md","kind":"link","raws":["git-change-management.md"],"seen":"e4ddd79dfddca34e","src":"docs/requirements/intend-original.md#D03 intend.md 原文保存 > 本轮设计选择"}
+{"dst":"docs/requirements/git-change-management.md","kind":"link","raws":["git-change-management.md"],"seen":"88082796d87ffcf1","src":"docs/requirements/intend-original.md#D03 intend.md 原文保存 > 本轮设计选择"}
 ]
 }

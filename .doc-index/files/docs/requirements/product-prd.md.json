@@ -1,15 +1,15 @@
 {
 "schema":1,
 "path":"docs/requirements/product-prd.md",
-"hash":"1e409326b1a3b64d",
+"hash":"4a00701376b2651a",
 "nodes":[
-{"hash":"1e409326b1a3b64d","id":"docs/requirements/product-prd.md","kind":"file","title":"docs/requirements/product-prd.md"},
+{"hash":"4a00701376b2651a","id":"docs/requirements/product-prd.md","kind":"file","title":"docs/requirements/product-prd.md"},
 {"hash":"98bba67877525410","id":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md","kind":"section","parent":"docs/requirements/product-prd.md","title":"D04 产品部门维护 PRD.md"},
 {"hash":"ea078cda71b23413","id":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md > 用户原话","kind":"section","parent":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md","title":"用户原话"},
-{"hash":"e1fa5c3c8cc212d2","id":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md > 已确认","kind":"section","parent":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md","title":"已确认"},
+{"hash":"bc5b5049d8e36d65","id":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md > 已确认","kind":"section","parent":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md","title":"已确认"},
 {"hash":"b69011e84db760c1","id":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md > 本轮设计选择","kind":"section","parent":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md","title":"本轮设计选择"}
 ],
 "edges":[
-{"dst":"docs/requirements/expert-ask-react.md","kind":"link","raws":["expert-ask-react.md"],"seen":"3ba3bd251886a2eb","src":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md > 已确认"}
+{"dst":"docs/requirements/expert-ask-react.md","kind":"link","raws":["expert-ask-react.md"],"seen":"b678beade1580c89","src":"docs/requirements/product-prd.md#D04 产品部门维护 PRD.md > 已确认"}
 ]
 }

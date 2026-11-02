@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/research/kernel-projection-reads-2026-10-24.md",
-"hash":"6206756dd8cef36e",
+"hash":"603f8392e9d12f46",
 "nodes":[
-{"hash":"6206756dd8cef36e","id":"docs/research/kernel-projection-reads-2026-10-24.md","kind":"file","title":"docs/research/kernel-projection-reads-2026-10-24.md"},
-{"hash":"ac95cbb4ac2caff5","id":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）","kind":"section","parent":"docs/research/kernel-projection-reads-2026-10-24.md","title":"内核读取运行状态投影的清点（2026-10-24）"},
+{"hash":"603f8392e9d12f46","id":"docs/research/kernel-projection-reads-2026-10-24.md","kind":"file","title":"docs/research/kernel-projection-reads-2026-10-24.md"},
+{"hash":"c86083568663dae1","id":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）","kind":"section","parent":"docs/research/kernel-projection-reads-2026-10-24.md","title":"内核读取运行状态投影的清点（2026-10-24）"},
 {"hash":"a084573968d4702e","id":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24） > 1. 四类","kind":"section","parent":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）","title":"1. 四类"},
 {"hash":"9074cadf0896a499","id":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24） > 2. 要补进最小投影的几样（A 类里的 12 条）","kind":"section","parent":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）","title":"2. 要补进最小投影的几样（A 类里的 12 条）"},
 {"hash":"116c3749aa0b6d11","id":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24） > 3. C 类：写死在代码里的关系规则","kind":"section","parent":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）","title":"3. C 类：写死在代码里的关系规则"},
@@ -12,6 +12,6 @@
 {"hash":"9904cfdd435eaef0","id":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24） > 5. 其他事实","kind":"section","parent":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）","title":"5. 其他事实"}
 ],
 "edges":[
-{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"85fd23daae3825c4","src":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）"}
+{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"69d45d94be39c988","src":"docs/research/kernel-projection-reads-2026-10-24.md#内核读取运行状态投影的清点（2026-10-24）"}
 ]
 }

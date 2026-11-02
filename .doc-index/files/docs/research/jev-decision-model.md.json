@@ -1,27 +1,27 @@
 {
 "schema":1,
 "path":"docs/research/jev-decision-model.md",
-"hash":"7cd79781d7cb47e3",
+"hash":"9d4af7c096414eb5",
 "nodes":[
-{"hash":"7cd79781d7cb47e3","id":"docs/research/jev-decision-model.md","kind":"file","title":"docs/research/jev-decision-model.md"},
-{"hash":"46c2cef10de0b745","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","kind":"section","parent":"docs/research/jev-decision-model.md","title":"JEV 决策模型：能力边界与在 Yudao 中的用法"},
+{"hash":"9d4af7c096414eb5","id":"docs/research/jev-decision-model.md","kind":"file","title":"docs/research/jev-decision-model.md"},
+{"hash":"2b076258f8afbfff","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","kind":"section","parent":"docs/research/jev-decision-model.md","title":"JEV 决策模型：能力边界与在 Yudao 中的用法"},
 {"hash":"476ad72fce6e269c","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 1. 基本情况","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"1. 基本情况"},
 {"hash":"907c18f5d7bead8a","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 2. 擅长的判断","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"2. 擅长的判断"},
 {"hash":"7315251410276441","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 3. 不擅长的判断","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"3. 不擅长的判断"},
 {"hash":"068cef58d96d9fa7","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 4. 语言","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"4. 语言"},
 {"hash":"8ac56f9a0f128ba6","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 5. 状态中的文字与选项顺序","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"5. 状态中的文字与选项顺序"},
 {"hash":"4177f59b8b66f8ae","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 6. 论文与使用者建议的做法","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"6. 论文与使用者建议的做法"},
-{"hash":"5e201caf15057b25","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"7. 对 Yudao 的含义"},
+{"hash":"611cf41b67462d02","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"7. 对 Yudao 的含义"},
 {"hash":"aa80ef44e3d5d58a","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 8. 本地实测（2026-09-26）","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"8. 本地实测（2026-09-26）"},
 {"hash":"48daae19af15cd74","id":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 9. 来源","kind":"section","parent":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法","title":"9. 来源"}
 ],
 "edges":[
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法"},
-{"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["../requirements/meta-observer.md"],"seen":"edfaad69b0ab1f4b","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法"},
-{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"f498d01b1f51bd42","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
-{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"73383fa4e2c9e12f","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"ae524890ae20668d","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
-{"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["../requirements/meta-observer.md"],"seen":"edfaad69b0ab1f4b","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
-{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["../requirements/semantic-system.md"],"seen":"8cbabc2c9cae8dab","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"}
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法"},
+{"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["../requirements/meta-observer.md"],"seen":"1742de8140b4cdca","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"5d671b998d37a3e3","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
+{"dst":"docs/design/semantic-system.md","kind":"link","raws":["../design/semantic-system.md"],"seen":"a78961c96f7ce911","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
+{"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["../requirements/meta-observer.md"],"seen":"1742de8140b4cdca","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"},
+{"dst":"docs/requirements/semantic-system.md","kind":"link","raws":["../requirements/semantic-system.md"],"seen":"66c38e6465c855a1","src":"docs/research/jev-decision-model.md#JEV 决策模型：能力边界与在 Yudao 中的用法 > 7. 对 Yudao 的含义"}
 ]
 }

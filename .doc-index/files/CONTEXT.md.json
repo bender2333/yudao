@@ -21,7 +21,7 @@
 {"hash":"532809e7eb6be513","id":"CONTEXT.md#Yudao > Language > 部门内多角色","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"部门内多角色"}
 ],
 "edges":[
-{"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"7877afe0459a32ef","src":"CONTEXT.md#Yudao > Language > 系统结构"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5480a34a8595fd15","src":"CONTEXT.md#Yudao > Language > 系统结构"}
+{"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"03c60cf298c2dd35","src":"CONTEXT.md#Yudao > Language > 系统结构"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":"CONTEXT.md#Yudao > Language > 系统结构"}
 ]
 }

@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/prototypes/v13/design.md",
-"hash":"199695172c809e95",
+"hash":"226a7fe5fb527914",
 "nodes":[
-{"hash":"199695172c809e95","id":"docs/prototypes/v13/design.md","kind":"file","title":"docs/prototypes/v13/design.md"},
-{"hash":"7990933c1a5d89a5","id":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线","kind":"section","parent":"docs/prototypes/v13/design.md","title":"原型 v13：画面合同、翻译层与播放时间线"},
+{"hash":"226a7fe5fb527914","id":"docs/prototypes/v13/design.md","kind":"file","title":"docs/prototypes/v13/design.md"},
+{"hash":"990f7edf77cb136d","id":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线","kind":"section","parent":"docs/prototypes/v13/design.md","title":"原型 v13：画面合同、翻译层与播放时间线"},
 {"hash":"6bb60e9ed9f5f203","id":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线 > 1. 本版做的事","kind":"section","parent":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线","title":"1. 本版做的事"},
 {"hash":"e182bfbf2fe900e8","id":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线 > 2. 分层","kind":"section","parent":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线","title":"2. 分层"},
 {"hash":"1dffafebd457ed66","id":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线 > 3. 画面合同","kind":"section","parent":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线","title":"3. 画面合同"},
@@ -22,8 +22,8 @@
 "edges":[
 {"dst":"CONTEXT.md","kind":"link","raws":["../../../CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线"},
 {"dst":"docs/archive/prototypes/v11/design.md","kind":"link","raws":["../../archive/prototypes/v11/design.md"],"seen":"cdbf89c525f0572c","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线"},
-{"dst":"docs/design/visualization.md","kind":"link","raws":["../../design/visualization.md"],"seen":"da2fd62402caa715","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线"},
-{"dst":"docs/prototypes/v13/BUILD.md","kind":"link","raws":["BUILD.md"],"seen":"0467d4842be3d4cb","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线"},
+{"dst":"docs/design/visualization.md","kind":"link","raws":["../../design/visualization.md"],"seen":"f32e507ada24faef","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线"},
+{"dst":"docs/prototypes/v13/BUILD.md","kind":"link","raws":["BUILD.md"],"seen":"2824b4a137a89cc8","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线"},
 {"dst":"docs/prototypes/v13/checks/playback.js","kind":"code-path","raws":["checks/playback.js"],"seen":"e7bc42fdb84095b1","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线 > 1. 本版做的事"},
 {"dst":"docs/prototypes/v13/checks/timeline.js","kind":"code-path","raws":["checks/timeline.js"],"seen":"4d270705aba7d860","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线 > 1. 本版做的事"},
 {"dst":"docs/prototypes/v13/js/pixel/contract.js","kind":"code-path","raws":["js/pixel/contract.js"],"seen":"ed39addc868d4388","src":"docs/prototypes/v13/design.md#原型 v13：画面合同、翻译层与播放时间线 > 1. 本版做的事"},

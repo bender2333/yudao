@@ -1,17 +1,17 @@
 {
 "schema":1,
 "path":"docs/requirements/three-department-loop.md",
-"hash":"ff5e5b2aebb42c49",
+"hash":"5ea4251686f4a84f",
 "nodes":[
-{"hash":"ff5e5b2aebb42c49","id":"docs/requirements/three-department-loop.md","kind":"file","title":"docs/requirements/three-department-loop.md"},
+{"hash":"5ea4251686f4a84f","id":"docs/requirements/three-department-loop.md","kind":"file","title":"docs/requirements/three-department-loop.md"},
 {"hash":"bc1ed9a3d662554c","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","kind":"section","parent":"docs/requirements/three-department-loop.md","title":"D11 三部门循环的整体定义"},
 {"hash":"c5e9df290b0967cb","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 用户原话","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"用户原话"},
 {"hash":"56bb68c3e72d4c6e","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 已确认","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"已确认"},
 {"hash":"cbb88f81b82f1597","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 责任边界","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"责任边界"},
-{"hash":"cd60c421af3832f5","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 本轮设计选择","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"本轮设计选择"}
+{"hash":"fe4da59df65978e5","id":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 本轮设计选择","kind":"section","parent":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义","title":"本轮设计选择"}
 ],
 "edges":[
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"d85e5d29f5db0c47","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 本轮设计选择"},
-{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"afd4d3a8e2469783","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 本轮设计选择"}
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 本轮设计选择"},
+{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"cbb9662c59025bd9","src":"docs/requirements/three-department-loop.md#D11 三部门循环的整体定义 > 本轮设计选择"}
 ]
 }

@@ -1,21 +1,21 @@
 {
 "schema":1,
 "path":"docs/requirements/department-guidance.md",
-"hash":"ba3ce90a33c6fd1b",
+"hash":"75bd259dd3147210",
 "nodes":[
-{"hash":"ba3ce90a33c6fd1b","id":"docs/requirements/department-guidance.md","kind":"file","title":"docs/requirements/department-guidance.md"},
+{"hash":"75bd259dd3147210","id":"docs/requirements/department-guidance.md","kind":"file","title":"docs/requirements/department-guidance.md"},
 {"hash":"378c6d3a01b92f27","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导","kind":"section","parent":"docs/requirements/department-guidance.md","title":"D20 部门定向追加指导"},
 {"hash":"d1124bb3cf8da737","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 用户原话与来源","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"用户原话与来源"},
 {"hash":"8784aec4787e6d68","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 已确认","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"已确认"},
 {"hash":"02bcd28429063613","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 必须保持的边界","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"必须保持的边界"},
-{"hash":"5c6df13ea7049a94","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 处理约定","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"处理约定"},
-{"hash":"786aa076cb8f9cc2","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 验收与状态","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"验收与状态"}
+{"hash":"ead7d07be6964b30","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 处理约定","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"处理约定"},
+{"hash":"cfba0e98782d98aa","id":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 验收与状态","kind":"section","parent":"docs/requirements/department-guidance.md#D20 部门定向追加指导","title":"验收与状态"}
 ],
 "edges":[
-{"dst":"docs/design/department-guidance.md","kind":"link","raws":["../design/department-guidance.md"],"seen":"feaee03ae0795192","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 处理约定"},
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"d85e5d29f5db0c47","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 处理约定"},
+{"dst":"docs/design/department-guidance.md","kind":"link","raws":["../design/department-guidance.md"],"seen":"ab4c41ecf5c5de19","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 处理约定"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 处理约定"},
 {"dst":"docs/archive/stage-3/3.0b-scenarios-report-2026-09-21.md","kind":"link","raws":["../archive/stage-3/3.0b-scenarios-report-2026-09-21.md"],"seen":"e231a9cd7f7aca29","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 验收与状态"},
-{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"d85e5d29f5db0c47","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 验收与状态"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 验收与状态"},
 {"dst":"harness/interactions.py","kind":"code-path","raws":["harness/interactions.py"],"seen":"2022ebc52681e0c9","src":"docs/requirements/department-guidance.md#D20 部门定向追加指导 > 验收与状态"}
 ]
 }

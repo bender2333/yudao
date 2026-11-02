@@ -1,20 +1,20 @@
 {
 "schema":1,
 "path":"docs/agents/design-spec.md",
-"hash":"6b599df76e561f68",
+"hash":"2ffb04cf2733009d",
 "nodes":[
-{"hash":"6b599df76e561f68","id":"docs/agents/design-spec.md","kind":"file","title":"docs/agents/design-spec.md"},
+{"hash":"2ffb04cf2733009d","id":"docs/agents/design-spec.md","kind":"file","title":"docs/agents/design-spec.md"},
 {"hash":"4082709e3f20ea3d","id":"docs/agents/design-spec.md#设计说明规范","kind":"section","parent":"docs/agents/design-spec.md","title":"设计说明规范"},
 {"hash":"bf40e826b479dbf0","id":"docs/agents/design-spec.md#设计说明规范 > 设计说明是什么","kind":"section","parent":"docs/agents/design-spec.md#设计说明规范","title":"设计说明是什么"},
 {"hash":"8bc8ea1f2ad8c254","id":"docs/agents/design-spec.md#设计说明规范 > 结构","kind":"section","parent":"docs/agents/design-spec.md#设计说明规范","title":"结构"},
-{"hash":"da0bb694a62e845a","id":"docs/agents/design-spec.md#设计说明规范 > 不写什么","kind":"section","parent":"docs/agents/design-spec.md#设计说明规范","title":"不写什么"},
+{"hash":"ea13f87c47f4e4fb","id":"docs/agents/design-spec.md#设计说明规范 > 不写什么","kind":"section","parent":"docs/agents/design-spec.md#设计说明规范","title":"不写什么"},
 {"hash":"1d1c0a28a6299780","id":"docs/agents/design-spec.md#设计说明规范 > 反向引用","kind":"section","parent":"docs/agents/design-spec.md#设计说明规范","title":"反向引用"},
 {"hash":"9d8701ce54696eec","id":"docs/agents/design-spec.md#设计说明规范 > 常量","kind":"section","parent":"docs/agents/design-spec.md#设计说明规范","title":"常量"}
 ],
 "edges":[
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/design-spec.md#设计说明规范 > 不写什么"},
-{"dst":"docs/agents/shared-rules.md#共同规则 > 文档与记录","kind":"link","raws":["shared-rules.md"],"seen":"5ecf54ee1422849c","src":"docs/agents/design-spec.md#设计说明规范 > 不写什么"},
-{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"86574edb5c537d29","src":"docs/agents/design-spec.md#设计说明规范 > 不写什么"},
+{"dst":"docs/agents/shared-rules.md#共同规则 > 文档与记录","kind":"link","raws":["shared-rules.md"],"seen":"040ca06b6ac51c24","src":"docs/agents/design-spec.md#设计说明规范 > 不写什么"},
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"73a91536d217974e","src":"docs/agents/design-spec.md#设计说明规范 > 不写什么"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/design-spec.md#设计说明规范 > 反向引用"},
 {"dst":"harness/definitions/rules.json","kind":"code-path","raws":["harness/definitions/rules.json"],"seen":"b5a35e42d62b7b5f","src":"docs/agents/design-spec.md#设计说明规范 > 常量"}
 ]

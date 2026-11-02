@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/trial/method/reproduce.md",
-"hash":"a4be407682e98f1e",
+"hash":"81717b8959cfbb52",
 "nodes":[
-{"hash":"a4be407682e98f1e","id":".claude/skills/trial/method/reproduce.md","kind":"file","title":".claude/skills/trial/method/reproduce.md"},
+{"hash":"81717b8959cfbb52","id":".claude/skills/trial/method/reproduce.md","kind":"file","title":".claude/skills/trial/method/reproduce.md"},
 {"hash":"363bea8a64081bef","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","kind":"section","parent":".claude/skills/trial/method/reproduce.md","title":"独立复现与证据复核"},
 {"hash":"6698d3da5b9507e5","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","kind":"section","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","title":"交接表"},
 {"hash":"5f52588dd2222d67","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表 > 表1 > 问题","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交接表","title":"问题"},
@@ -20,9 +20,9 @@
 {"hash":"4145ed0462c58cd4","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 条件不同 conditions_differ","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"条件不同 conditions_differ"},
 {"hash":"15b2baf51f59c0e5","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 证据复核 evidence_review","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"证据复核 evidence_review"},
 {"hash":"d0fb927e822fe316","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论 > 表1 > 尚未执行 not_run","kind":"row","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 执行与结论","title":"尚未执行 not_run"},
-{"hash":"76a54769db8e0875","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交付","kind":"section","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","title":"交付"}
+{"hash":"42fe60e289310745","id":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交付","kind":"section","parent":".claude/skills/trial/method/reproduce.md#独立复现与证据复核","title":"交付"}
 ],
 "edges":[
-{"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["records.md"],"seen":"55c8afcbca45bc44","src":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交付"}
+{"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["records.md"],"seen":"4cfb9c95d3ffbb3b","src":".claude/skills/trial/method/reproduce.md#独立复现与证据复核 > 交付"}
 ]
 }

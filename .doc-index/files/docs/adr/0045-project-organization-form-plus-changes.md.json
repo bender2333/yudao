@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"docs/adr/0045-project-organization-form-plus-changes.md",
-"hash":"d66051db9f76b80e",
+"hash":"35577a59515a54b7",
 "nodes":[
-{"hash":"d66051db9f76b80e","id":"docs/adr/0045-project-organization-form-plus-changes.md","kind":"file","title":"docs/adr/0045-project-organization-form-plus-changes.md"},
-{"hash":"d66051db9f76b80e","id":"docs/adr/0045-project-organization-form-plus-changes.md#项目的组织是一份形态加本项目的改动","kind":"section","parent":"docs/adr/0045-project-organization-form-plus-changes.md","title":"项目的组织是一份形态加本项目的改动"}
+{"hash":"35577a59515a54b7","id":"docs/adr/0045-project-organization-form-plus-changes.md","kind":"file","title":"docs/adr/0045-project-organization-form-plus-changes.md"},
+{"hash":"35577a59515a54b7","id":"docs/adr/0045-project-organization-form-plus-changes.md#项目的组织是一份形态加本项目的改动","kind":"section","parent":"docs/adr/0045-project-organization-form-plus-changes.md","title":"项目的组织是一份形态加本项目的改动"}
 ],
 "edges":[
-{"dst":"docs/decision.md#决策记录 > 2026-11-02 - 项目上的组织：形态加本项目的改动","kind":"link","raws":["../decision.md"],"seen":"142aab36c92c1868","src":"docs/adr/0045-project-organization-form-plus-changes.md#项目的组织是一份形态加本项目的改动"}
+{"dst":"docs/decision.md#决策记录 > 2026-11-02 - 项目上的组织：形态加本项目的改动","kind":"link","raws":["../decision.md"],"seen":"884b6b4ef60fd98c","src":"docs/adr/0045-project-organization-form-plus-changes.md#项目的组织是一份形态加本项目的改动"}
 ]
 }

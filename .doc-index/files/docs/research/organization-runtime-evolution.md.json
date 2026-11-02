@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/research/organization-runtime-evolution.md",
-"hash":"45ed7473f0d079df",
+"hash":"6860924d7920793e",
 "nodes":[
-{"hash":"45ed7473f0d079df","id":"docs/research/organization-runtime-evolution.md","kind":"file","title":"docs/research/organization-runtime-evolution.md"},
-{"hash":"2caa7d437ba55fb2","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计","kind":"section","parent":"docs/research/organization-runtime-evolution.md","title":"部门组织、持续运行与系统演化：研究与详细设计"},
+{"hash":"6860924d7920793e","id":"docs/research/organization-runtime-evolution.md","kind":"file","title":"docs/research/organization-runtime-evolution.md"},
+{"hash":"ed5edf87d51dd3fb","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计","kind":"section","parent":"docs/research/organization-runtime-evolution.md","title":"部门组织、持续运行与系统演化：研究与详细设计"},
 {"hash":"1b61978a5e5ca5a6","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 1. 设计结论与依赖","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计","title":"1. 设计结论与依赖"},
 {"hash":"51ae2b9d84c8189c","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 2. 三层责任与权限","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计","title":"2. 三层责任与权限"},
 {"hash":"2716fcf3ebae119e","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 2. 三层责任与权限 > 2.1 部门内部不是新的控制中心","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 2. 三层责任与权限","title":"2.1 部门内部不是新的控制中心"},
@@ -40,12 +40,12 @@
 {"hash":"f2e83fc8c1310260","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 10. 故障场景与成熟实现选型 > 10.1 故障矩阵","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 10. 故障场景与成熟实现选型","title":"10.1 故障矩阵"},
 {"hash":"6d2b22dfe1851fc2","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 10. 故障场景与成熟实现选型 > 10.2 选型比较与决策条件","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 10. 故障场景与成熟实现选型","title":"10.2 选型比较与决策条件"},
 {"hash":"cfe196fe53c720c6","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 11. 开发准备交付与待决事项","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计","title":"11. 开发准备交付与待决事项"},
-{"hash":"098cb44c17cf4810","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 12. 一手来源与阅读记录","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计","title":"12. 一手来源与阅读记录"},
+{"hash":"ef96a26b8c48ab48","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 12. 一手来源与阅读记录","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计","title":"12. 一手来源与阅读记录"},
 {"hash":"5d031191756f76f4","id":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 12. 一手来源与阅读记录 > 12.1 论文结论如何进入工程决定","kind":"section","parent":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 12. 一手来源与阅读记录","title":"12.1 论文结论如何进入工程决定"}
 ],
 "edges":[
 {"dst":"docs/archive/research/observability-design.md","kind":"link","raws":["../archive/research/observability-design.md"],"seen":"6564f16b7e3a6b06","src":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计"},
 {"dst":"docs/archive/stage-3-plan.md","kind":"link","raws":["../archive/stage-3-plan.md"],"seen":"f3ee43139a4c2521","src":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计"},
-{"dst":"docs/research/experiment-protocol.md","kind":"link","raws":["experiment-protocol.md"],"seen":"f7226b9d0e0e641e","src":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计"}
+{"dst":"docs/research/experiment-protocol.md","kind":"link","raws":["experiment-protocol.md"],"seen":"980a78ece8e85f99","src":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计"}
 ]
 }

@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/trial/method/expert.md",
-"hash":"544cfc27c4f1ba34",
+"hash":"6ac68b298dbbb912",
 "nodes":[
-{"hash":"544cfc27c4f1ba34","id":".claude/skills/trial/method/expert.md","kind":"file","title":".claude/skills/trial/method/expert.md"},
+{"hash":"6ac68b298dbbb912","id":".claude/skills/trial/method/expert.md","kind":"file","title":".claude/skills/trial/method/expert.md"},
 {"hash":"a9e3db7fc202819b","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","kind":"section","parent":".claude/skills/trial/method/expert.md","title":"专家段：把现象核对到证据"},
 {"hash":"c72a6f7ff1e8f118","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 1. 卡点与体验问题","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"1. 卡点与体验问题"},
 {"hash":"3d56ea921861b059","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 1. 卡点与体验问题 > 表1 > 系统异常","kind":"row","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 1. 卡点与体验问题","title":"系统异常"},
@@ -12,15 +12,15 @@
 {"hash":"e751fd7dbf379ec3","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 1. 卡点与体验问题 > 表1 > 试用者误解","kind":"row","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 1. 卡点与体验问题","title":"试用者误解"},
 {"hash":"dd8ff88daecdbea5","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 1. 卡点与体验问题 > 表1 > 尚不能定位","kind":"row","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 1. 卡点与体验问题","title":"尚不能定位"},
 {"hash":"25ee79ab2a619766","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 2. R1 的八件事实","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"2. R1 的八件事实"},
-{"hash":"957440cb9e6e1548","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 3. 画面、错误与事件","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"3. 画面、错误与事件"},
-{"hash":"c9e9eb3d7725c2ef","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 4. 承诺能力的覆盖","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"4. 承诺能力的覆盖"},
+{"hash":"3d710c5650fb4aa6","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 3. 画面、错误与事件","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"3. 画面、错误与事件"},
+{"hash":"5a6e5261e0ee3fa2","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 4. 承诺能力的覆盖","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"4. 承诺能力的覆盖"},
 {"hash":"98bb0d108484fc70","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 5. 工具读数与原始证据","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"5. 工具读数与原始证据"},
-{"hash":"f988b475c633e443","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 6. 产出","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"6. 产出"}
+{"hash":"1a73155545115d9c","id":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 6. 产出","kind":"section","parent":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据","title":"6. 产出"}
 ],
 "edges":[
-{"dst":"docs/design/visualization.md","kind":"link","raws":["../../../../docs/design/visualization.md"],"seen":"da2fd62402caa715","src":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 3. 画面、错误与事件"},
+{"dst":"docs/design/visualization.md","kind":"link","raws":["../../../../docs/design/visualization.md"],"seen":"f32e507ada24faef","src":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 3. 画面、错误与事件"},
 {"dst":".claude/skills/trial/method/probes.md","kind":"link","raws":["probes.md"],"seen":"85698fffc1639d8f","src":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 4. 承诺能力的覆盖"},
-{"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["records.md"],"seen":"55c8afcbca45bc44","src":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 6. 产出"},
-{"dst":".claude/skills/trial/method/reproduce.md","kind":"link","raws":["reproduce.md"],"seen":"a4be407682e98f1e","src":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 6. 产出"}
+{"dst":".claude/skills/trial/method/records.md","kind":"link","raws":["records.md"],"seen":"4cfb9c95d3ffbb3b","src":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 6. 产出"},
+{"dst":".claude/skills/trial/method/reproduce.md","kind":"link","raws":["reproduce.md"],"seen":"81717b8959cfbb52","src":".claude/skills/trial/method/expert.md#专家段：把现象核对到证据 > 6. 产出"}
 ]
 }

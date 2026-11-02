@@ -1,24 +1,24 @@
 {
 "schema":1,
 "path":"docs/trial/skill-revision-plan.md",
-"hash":"3a806a47eabec753",
+"hash":"579d1d393ccd3710",
 "nodes":[
-{"hash":"3a806a47eabec753","id":"docs/trial/skill-revision-plan.md","kind":"file","title":"docs/trial/skill-revision-plan.md"},
-{"hash":"4f0e7a70a7d2cc89","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","kind":"section","parent":"docs/trial/skill-revision-plan.md","title":"agent 试用技能修订方案"},
+{"hash":"579d1d393ccd3710","id":"docs/trial/skill-revision-plan.md","kind":"file","title":"docs/trial/skill-revision-plan.md"},
+{"hash":"0bf545f9765cb9aa","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","kind":"section","parent":"docs/trial/skill-revision-plan.md","title":"agent 试用技能修订方案"},
 {"hash":"fb0fe9d49c3de8ac","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 目标与已经确认的取舍","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"目标与已经确认的取舍"},
 {"hash":"8fdd48264d3dc20b","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"修改范围与交付内容"},
 {"hash":"7bc1e481d5be8cc2","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 本轮归档中的记录","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"本轮归档中的记录"},
 {"hash":"a36e15c29db199e5","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 检查结果的解释","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"检查结果的解释"},
 {"hash":"957556959858c94c","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 验证与完成条件","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"验证与完成条件"},
-{"hash":"54e4f21990739538","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 批准与实施","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"批准与实施"}
+{"hash":"060e2d64f54ad822","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 批准与实施","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"批准与实施"}
 ],
 "edges":[
-{"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"3e1eb032980c7ef2","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案"},
-{"dst":".claude/skills/trial/SKILL.md","kind":"code-path","raws":[".claude/skills/trial/SKILL.md"],"seen":"ce89702099853161","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
+{"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"c692314e41a8c822","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案"},
+{"dst":".claude/skills/trial/SKILL.md","kind":"code-path","raws":[".claude/skills/trial/SKILL.md"],"seen":"ab9da07de18ee5d0","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"216fcf1d205477db","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
-{"dst":"docs/trial/tasks.md","kind":"code-path","raws":["docs/trial/tasks.md"],"seen":"8bb71185c90ca7d8","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
-{"dst":"docs/trial/skill-revision-validation-2026-10-29.md","kind":"link","raws":["skill-revision-validation-2026-10-29.md"],"seen":"30ff3dd80a725a5a","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 批准与实施"}
+{"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"6bf0a0bd9ec52441","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
+{"dst":"docs/trial/tasks.md","kind":"code-path","raws":["docs/trial/tasks.md"],"seen":"17e1e2b6dc271db9","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容"},
+{"dst":"docs/trial/skill-revision-validation-2026-10-29.md","kind":"link","raws":["skill-revision-validation-2026-10-29.md"],"seen":"348e8564a28f5946","src":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 批准与实施"}
 ]
 }

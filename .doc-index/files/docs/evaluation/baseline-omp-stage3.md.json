@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/evaluation/baseline-omp-stage3.md",
-"hash":"3c213b9f47ab24aa",
+"hash":"f20e55ffd790cc89",
 "nodes":[
-{"hash":"3c213b9f47ab24aa","id":"docs/evaluation/baseline-omp-stage3.md","kind":"file","title":"docs/evaluation/baseline-omp-stage3.md"},
-{"hash":"2eb24a4b99eb063c","id":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao","kind":"section","parent":"docs/evaluation/baseline-omp-stage3.md","title":"Stage 3 基线数字：omp 流程开发 Yudao"},
+{"hash":"f20e55ffd790cc89","id":"docs/evaluation/baseline-omp-stage3.md","kind":"file","title":"docs/evaluation/baseline-omp-stage3.md"},
+{"hash":"4cdcf9dd05a8dd06","id":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao","kind":"section","parent":"docs/evaluation/baseline-omp-stage3.md","title":"Stage 3 基线数字：omp 流程开发 Yudao"},
 {"hash":"1c3205e380fae46e","id":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao > 一、口径","kind":"section","parent":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao","title":"一、口径"},
 {"hash":"871cb0f1e1a634ce","id":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao > 二、覆盖与未知","kind":"section","parent":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao","title":"二、覆盖与未知"},
 {"hash":"ffa2a36aebf6152c","id":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao > 三、按模型组合汇总","kind":"section","parent":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao","title":"三、按模型组合汇总"},
@@ -54,7 +54,7 @@
 ],
 "edges":[
 {"dst":"docs/evaluation/baseline-omp-stage3.json","kind":"code-path","raws":["docs/evaluation/baseline-omp-stage3.json"],"seen":"3f5d7df7a54ddc7a","src":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao"},
-{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"c9b6ce5a0cab8316","src":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao"},
+{"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"ab0ea2a25a8569ff","src":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao"},
 {"dst":"client/package.json","kind":"code-path","raws":["client/package.json"],"seen":"d1460867c48c119a","src":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao > 七、集成层失败与归因"},
 {"dst":"harness/runtime.py","kind":"code-path","raws":["harness/runtime.py"],"seen":"78e7fd79edcd7bb8","src":"docs/evaluation/baseline-omp-stage3.md#Stage 3 基线数字：omp 流程开发 Yudao > 七、集成层失败与归因"}
 ]
