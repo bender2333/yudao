@@ -382,3 +382,4 @@ claude-fable-5-1（总架构师） / 2026-11-02 23:55 / 路线图收成四个阶
 claude-sonnet-5-5 / 2026-11-03 00:40 / `design/architecture/overall-architecture.md` 两处链接文字「五个阶段」改为「四个阶段」；`design/` 下其余旧阶段四、阶段五的说法已不存在 / 路线图收成四个阶段，原阶段四的内容归道
 
 claude-opus-5-5（画面线子架构师；原型由 claude-sonnet-5-5 子代理画） / 2026-11-03 00:50 / 新增 `docs/prototypes/v17/`：取自 v16，按五份形态两个层的目录重画组织页头部、「换一份」、新建项目的组织选择，加「几个角色直做」与事项的来源的真实逻辑，七个示例项目对应七份用户脚本，`walkthrough.md` 就是这些脚本。`docs/prototypes/CHANGELOG.md` 开头一段与 v17 一节。 / 依据 `docs/design/project-organization.md` 第 5 节；重跑自检 220 条全部通过。
+claude-fable-5-1（总架构师） / 2026-11-03 00:45 / `architecture.html` 第二节「定义」方框的事项的来源加「子事项是上一层交来的任务」；`CONTEXT.md`「事项的来源」同句 / 子架构师画 v17 时指出子组织的来源是第三个值，总图只列了两个
