@@ -47,7 +47,7 @@ doctor（Hermes）在这台 Windows 电脑上运行 solo 执行者与集成层�
 | --- | --- | --- |
 | `bender2333` | 用户、架构师（包括架构师循环）、solo 执行者、审查子代理 | 仓库所有者，main 规则唯一可以豁免的身份；solo 执行者只在合并自己范围内的 PR 时使用（`solo-worker` 技能），架构师用它直接推送文档与日记 |
 
-`gh` 用 `gh auth login` 登录的 `bender2333`。`scripts/github-app/` 里的 `gh.exe` 与 `git.exe` 入口能让进程以 GitHub App 的身份运行（设置 `YUDAO_GH_APP_ID` 与 `YUDAO_GH_APP_KEY_FILE`，并把这个目录放在 `PATH` 最前面）；两个变量都不设时入口原样运行真正的 `gh` 与 `git`，参数与退出码原样传递。改 `make_entries.py` 以后运行 `uv run python scripts/github-app/make_entries.py` 重新生成，`harness/tests/test_github_app_entries.py` 核对提交的入口与生成的逐字节相同。
+`gh` 用 `gh auth login` 登录的 `bender2333`。`scripts/github-app/` 里的 `gh.exe` 与 `git.exe` 入口能让进程以 GitHub App 的身份运行（设置 `YUDAO_GH_APP_ID` 与 `YUDAO_GH_APP_KEY_FILE`，并把这个目录放在 `PATH` 最前面）；两个变量都不设时入口原样运行真正的 `gh` 与 `git`，参数与退出码原样传递。改 `make_entries.py` 以后运行 `uv run python scripts/github-app/make_entries.py` 重新生成。
 
 ## 3. 命令
 

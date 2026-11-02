@@ -1,0 +1,12 @@
+{
+"schema":1,
+"path":".claude/skills/solo/worker.md",
+"hash":"96183802cf7e0d7d",
+"nodes":[
+{"hash":"96183802cf7e0d7d","id":".claude/skills/solo/worker.md","kind":"file","title":".claude/skills/solo/worker.md"},
+{"hash":"96183802cf7e0d7d","id":".claude/skills/solo/worker.md#solo 工人契约","kind":"section","parent":".claude/skills/solo/worker.md","title":"solo 工人契约"}
+],
+"edges":[
+{"dst":".claude/skills/solo-worker/SKILL.md","kind":"link","raws":["../solo-worker/SKILL.md"],"seen":"baddd710fc5e8fdc","src":".claude/skills/solo/worker.md#solo 工人契约"}
+]
+}

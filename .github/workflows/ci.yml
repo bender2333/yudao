@@ -16,6 +16,8 @@ on:
       - "docs/**"
       - "agents_jour/**"
       - "claude_jour.md"
+      - "tools/**"
+      - ".doc-index/**"
   workflow_dispatch:
 
 # PR 与手动触发：同一分支的新运行取消旧运行。main 的推送：每个合并提交各自运行到底，
