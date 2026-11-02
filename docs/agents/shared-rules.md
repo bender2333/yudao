@@ -24,7 +24,7 @@
 
 ## 文档与记录
 
-- 除非工单或用户指定，不读取 `docs/archive/`。分诊要读某张工单的旧日记时，到 `docs/archive/agents_jour/<工单编号>.md` 找。
+- 除非工单或用户指定，不读取 `docs/archive/`。分诊要读某张工单的旧日记时，到 `docs/archive/agents_jour/<工单编号>.md` 找；活动文档引用的决策记录条目不在 `docs/decision.md` 里时，按它的日期到 `docs/archive/decision-<年-月>.md` 找。
 - 中间结果放在 `.tmp/`（已被 git 忽略）。
 - 文档分两种。状态文档写现在是什么样，读起来像一次写成的：总图、画面总图、路线图、基础规则、规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`、`.claude/skills/`）、术语表、设计说明、需求记录、`README.md`。它们不写日期、谁在哪天定的、原来怎样改成怎样、哪份文件已归档或被取代。记录文档写发生过什么：`docs/CHANGELOG.md`、`docs/decision.md`、日记、ADR、调研、评测与验收证据、GitHub 工单与 Discussions、`docs/archive/`。历史只进记录文档与提交说明。
 - 规则或总图改了，已有的文档在同一次改动里改到新的样子，不留「下次碰到时再改」。
@@ -32,7 +32,7 @@
 - `docs/decision.md` 按时间正序，新条目追加在末尾，标题 `## YYYY-MM-DD - 标题`；与变更记录、日记一样，三份都只在末尾追加。
 - 设计说明的开头只放一行「总图位置」与依据，不记状态与改动历史，写法见[设计说明规范](design-spec.md)。需求记录写现在的需求与验收标准，开头只放一行：状态、引用的依据与路线位置；正文不收用户原话与讨论经过，这些在 git、日记、工单与 Discussions 里。ADR 的开头只放一行状态。两者的改动经过只记在 `docs/CHANGELOG.md`。
 - 日记格式：`模型 ID / 时间（分钟） / 行动或者想法或者其他`。架构师的日记是根目录的 `claude_jour.md`；执行者的日记在 `agents_jour/<工单编号>.md`，一张工单一个文件，没有工单编号的工作写在 `agents_jour/其他.md`，内容开头写明角色；审查者的记录是 PR 上的审查。
-- 日记只留最近的：`agents_jour/` 留最近 10 个文件，`claude_jour.md` 留最近约 300 行。`/next` 每次开始时运行 `rotate-journals.mjs`：文件超过 20 个、或日记超过 600 行时，把旧的移到 `docs/archive/`（执行者日记移到 `docs/archive/agents_jour/` 下的同名文件，架构师日记接到 `docs/archive/claude_jour-<年-月>.md` 末尾）。这一步的记录只有提交说明，平时不手工整理日记。
+- 记录只留最近的：`agents_jour/` 留最近 10 个文件，`claude_jour.md`、`docs/CHANGELOG.md`、`docs/decision.md` 各留最后约 300 行。`/next` 每次开始时运行 `rotate-records.mjs`：执行者日记超过 200 个文件、架构师日记超过 2000 行、另外两份超过 1000 行时，把旧的移到 `docs/archive/`（执行者日记移到 `docs/archive/agents_jour/` 下的同名文件，其余三份按月接到 `docs/archive/<原文件名>-<年-月>.md` 末尾）。这个上限让 solo 全速时大约一周归档一次。这一步的记录只有提交说明，平时不手工整理。
 - 工单：GitHub Issues 是改代码与测试的工作队列，记录状态、领取、阻塞与验收清单；架构设计、模块设计、原型设计、规则修改这些非代码的工作都不走工单，直接改（[工作方式](workflow.md)第 3 节）；长篇设计、计划与证据放在 `docs/`，工单正文只写摘要并链接到对应文档。`gh` 命令写法见 [issue-tracker.md](issue-tracker.md)，流程与标签见[工作方式](workflow.md)，领域文档的读法见 [domain.md](domain.md)。
 
 ## 规则

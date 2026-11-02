@@ -2,6 +2,8 @@
 
 本文档记录 `docs/` 目录下全部文档的新增、修改、重构与归档记录。修改 `docs/` 下任意文档时必须在本文档追加记录。
 
+只留最近的内容，更早的按月在 `docs/archive/CHANGELOG-<年-月>.md`。
+
 ## 记录格式规范
 `模型 ID / 时间（到分钟） / 具体的改动 / 原因`
 
@@ -1016,3 +1018,4 @@ claude-sonnet-5-5 / 2026-11-02 17:26 / 新增 `design/project-organization.md`�
 
 claude-opus-5-5 / 2026-11-02 17:33 / `research/doc-consistency-concept-model.md` 改写：分设计与脚手架两条线，索引放 `.doc-index/`，开放提取的试验结果写入第 13 节，LLM 改为定向提取且不进日常提醒，实施顺序改成先索引与脚手架线；`research/README.md` 改一行；`decision.md` 加一条 / 试验没有通过，用户定了范围、两条线与索引的位置
 claude-opus-5-5 / 2026-11-02 17:30 / 交总架构师的问题走 `architecture` 工单，工作方式、共同规则、CLAUDE.md、AGENTS.md 与 12 个技能同步，工作方式第 3 节写明它不做设计工作，只把问题交上去；`TRIAGE:` 评论写的 `architecture` 工单关闭以后，`/next` 第 3 件把被挡住的工单交给 `/triage` 放回；薄片有「设计未写」的行时不算达到；`/to-design` 建父工单时给用到这个桶结果的父工单补依赖；seam-diff 报告模板「工单与帖子」→「工单」 / 用户指出没有这张工单流程转不起来
+claude-opus-5-5 / 2026-11-02 17:45 / 决策记录与变更记录也只留最近约 300 行，超过 1000 行时按月归档到 `docs/archive/`；架构师日记的上限调到 2000 行，执行者日记调到 200 个文件；脚本 `rotate-journals.mjs` 改名 `rotate-records.mjs`，归档改成严格按月分文件；共同规则写明引用的决策条目按日期到归档里找；`/next`「日记归档」→「记录归档」 / 用户指出 solo 模式下原来的上限很快就满足，并要求决策记录与变更记录一起归档
