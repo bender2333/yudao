@@ -12,6 +12,7 @@ import {
   hasCommand, list, pageKey, text, useDraft,
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, promptWritten, useDepartmentDraft } from "./department-settings-form";
+import { McpServersSection } from "./mcp-servers";
 import { WritebackSection } from "./writeback";
 import {
   CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE, checkCommandsText, sourceDirectoryPayload, sourceWritebackText,
@@ -46,7 +47,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
       <PageHead
         eyebrow="项目设置"
         title={data ? data.name : "项目设置"}
-        subtitle="基本信息、部门设置、源目录、机器授权、执行位置与角色设置。"
+        subtitle="基本信息、部门设置、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
       {settings.error !== null ? (
@@ -58,6 +59,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
           <Basics app={props.app} data={data} command={command} />
           <Departments app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
+          <McpServersSection app={props.app} data={data} />
           <WritebackSection app={props.app} projectId={projectId} />
           <MachineAuthorization />
           <ExecutionPlacement />

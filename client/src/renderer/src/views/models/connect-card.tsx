@@ -6,6 +6,7 @@
 // 进度、成功与失败原因都写在这张卡片里（工单第 5 条：反馈写在被操作的对象旁边）。
 
 import type { CatalogProvider } from "../../api/generated/types.gen";
+import { CredentialField } from "./credential-field";
 import {
   CONNECTION_FETCHING_TEXT,
   connectIssue,
@@ -70,14 +71,16 @@ export function ConnectCard(props: ConnectCardProps) {
                    onChange={(event) => props.onAddress(event.target.value)} />
             <small>填写服务提供的 API 地址。</small>
           </label>
-          <label className="y10-field" htmlFor="connect-key">
-            <span>API Key</span>
-            <input id="connect-key" className="y10-input" type="password" autoComplete="off" spellCheck={false}
-                   placeholder={credentialSaved ? "已保存 · 输入以更换 Key" : "输入 API Key"} value={props.apiKey}
-                   data-testid="connect-key"
-                   onChange={(event) => props.onApiKey(event.target.value)} />
-            <small>连接、凭据与模型配置随这次获取一起保存。</small>
-          </label>
+          {/* Key 那一行与「设置值」的写法在凭据写入区里（工单 #237）：MCP 服务器一节用的是同一块 */}
+          <CredentialField
+            id="connect-key"
+            label="API Key"
+            inputTestId="connect-key"
+            value={props.apiKey}
+            onValue={props.onApiKey}
+            placeholder={credentialSaved ? "已保存 · 输入以更换 Key" : "输入 API Key"}
+            hint="连接、凭据与模型配置随这次获取一起保存。"
+          />
           <div className="y10-row mm-actions">
             <button type="submit" className="y10-btn primary" data-testid="connect-submit"
                     disabled={props.busy || issue !== ""}>
