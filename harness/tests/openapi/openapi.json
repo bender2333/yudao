@@ -2589,11 +2589,6 @@
             "in": "query",
             "required": true,
             "schema": {
-              "enum": [
-                "product",
-                "engineering",
-                "quality"
-              ],
               "type": "string",
               "title": "Department"
             }
@@ -2703,11 +2698,6 @@
             "in": "query",
             "required": true,
             "schema": {
-              "enum": [
-                "product",
-                "engineering",
-                "quality"
-              ],
               "type": "string",
               "title": "Department"
             }
@@ -2938,11 +2928,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "product",
-                    "engineering",
-                    "quality"
-                  ],
                   "type": "string"
                 },
                 {
@@ -3131,11 +3116,6 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "product",
-                    "engineering",
-                    "quality"
-                  ],
                   "type": "string"
                 },
                 {
@@ -5885,11 +5865,6 @@
           },
           "department": {
             "type": "string",
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department"
           },
           "criteria": {
@@ -7945,11 +7920,6 @@
           },
           "department": {
             "type": "string",
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department"
           },
           "reason": {
@@ -8535,7 +8505,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 12
+            "example": 13
           },
           "contract_digest": {
             "type": "string",
@@ -8988,12 +8958,7 @@
           "department": {
             "anyOf": [
               {
-                "type": "string",
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ]
+                "type": "string"
               },
               {
                 "type": "null"
@@ -9760,11 +9725,6 @@
           },
           "department": {
             "type": "string",
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department"
           },
           "work_item_id": {
@@ -10042,11 +10002,6 @@
           },
           "department": {
             "type": "string",
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department"
           },
           "work_item_id": {
@@ -10918,11 +10873,6 @@
           },
           "department": {
             "type": "string",
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department"
           },
           "target": {
@@ -11468,11 +11418,6 @@
           },
           "department": {
             "type": "string",
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department"
           },
           "stop_reason": {
@@ -15178,11 +15123,6 @@
           },
           "department": {
             "type": "string",
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department"
           },
           "action_id": {
@@ -16581,11 +16521,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -16854,11 +16789,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -17095,11 +17025,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -17304,11 +17229,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -17578,11 +17498,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -17752,11 +17667,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -17842,20 +17752,10 @@
         "additionalProperties": false,
         "properties": {
           "requester": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Requester",
             "type": "string"
           },
           "recipient": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Recipient",
             "type": "string"
           },
@@ -17988,11 +17888,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -18078,20 +17973,10 @@
         "additionalProperties": false,
         "properties": {
           "requester": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Requester",
             "type": "string"
           },
           "recipient": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Recipient",
             "type": "string"
           },
@@ -18254,11 +18139,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -18521,11 +18401,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -18736,7 +18611,6 @@
             "type": "string"
           },
           "issuer": {
-            "const": "quality",
             "title": "Issuer",
             "type": "string"
           },
@@ -18857,11 +18731,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -19085,11 +18954,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -19297,11 +19161,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -19765,11 +19624,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -20073,11 +19927,6 @@
             "type": "string"
           },
           "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department",
             "type": "string"
           },
@@ -20295,11 +20144,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -20603,11 +20447,6 @@
             "type": "string"
           },
           "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department",
             "type": "string"
           },
@@ -20947,11 +20786,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -21214,11 +21048,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -21403,11 +21232,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -21618,11 +21442,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -21788,11 +21607,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -22010,11 +21824,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -22160,11 +21969,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -22378,7 +22182,6 @@
             "type": "string"
           },
           "issuer": {
-            "const": "engineering",
             "title": "Issuer",
             "type": "string"
           },
@@ -22503,11 +22306,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -22719,11 +22517,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -22908,11 +22701,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -23002,11 +22790,6 @@
             "type": "string"
           },
           "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department",
             "type": "string"
           },
@@ -23113,11 +22896,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -23291,11 +23069,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -23506,11 +23279,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -23596,11 +23364,6 @@
         "additionalProperties": false,
         "properties": {
           "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department",
             "type": "string"
           },
@@ -23905,11 +23668,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -24069,11 +23827,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -24265,11 +24018,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -24595,11 +24343,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -24745,11 +24488,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -24914,11 +24652,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -25120,11 +24853,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -25367,11 +25095,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -25470,11 +25193,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -25678,11 +25396,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -26006,11 +25719,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -26648,11 +26356,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -27249,11 +26952,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -27719,11 +27417,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -28155,11 +27848,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -28624,11 +28312,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -29129,11 +28812,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -29613,11 +29291,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -29945,11 +29618,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -30129,11 +29797,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -30333,11 +29996,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -30605,11 +30263,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -30769,11 +30422,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -30925,11 +30573,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -31128,11 +30771,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -31286,11 +30924,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -31472,11 +31105,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -31640,11 +31268,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -31839,11 +31462,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -32003,11 +31621,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -32195,11 +31808,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -32359,11 +31967,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -32515,11 +32118,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -32720,11 +32318,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -33037,11 +32630,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -33276,7 +32864,6 @@
             "type": "string"
           },
           "issuer": {
-            "const": "quality",
             "title": "Issuer",
             "type": "string"
           },
@@ -33401,11 +32988,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -33606,11 +33188,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -33779,11 +33356,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -33915,13 +33487,6 @@
             "additionalProperties": {
               "type": "string"
             },
-            "propertyNames": {
-              "enum": [
-                "product",
-                "engineering",
-                "quality"
-              ]
-            },
             "title": "Sessions",
             "type": "object"
           },
@@ -33994,13 +33559,6 @@
           "prompt_config_versions": {
             "additionalProperties": {
               "type": "integer"
-            },
-            "propertyNames": {
-              "enum": [
-                "product",
-                "engineering",
-                "quality"
-              ]
             },
             "title": "Prompt Config Versions",
             "type": "object"
@@ -34142,11 +33700,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -34310,11 +33863,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -34516,11 +34064,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -34717,11 +34260,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -34899,11 +34437,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -35063,11 +34596,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -35232,11 +34760,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -35412,11 +34935,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -35625,11 +35143,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -35867,7 +35380,6 @@
             "type": "string"
           },
           "issuer": {
-            "const": "product",
             "title": "Issuer",
             "type": "string"
           },
@@ -35990,11 +35502,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -36159,11 +35666,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -36373,7 +35875,6 @@
             "type": "string"
           },
           "issuer": {
-            "const": "engineering",
             "title": "Issuer",
             "type": "string"
           },
@@ -36596,11 +36097,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -37195,11 +36691,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -37353,11 +36844,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -37554,11 +37040,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -38011,11 +37492,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -38727,11 +38203,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -38943,11 +38414,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -39074,13 +38540,6 @@
           "prompt_config_versions": {
             "additionalProperties": {
               "type": "integer"
-            },
-            "propertyNames": {
-              "enum": [
-                "product",
-                "engineering",
-                "quality"
-              ]
             },
             "title": "Prompt Config Versions",
             "type": "object"
@@ -39214,11 +38673,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -39388,11 +38842,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -39630,11 +39079,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -39820,11 +39264,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -40019,11 +39458,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -40275,11 +39709,6 @@
           "department": {
             "anyOf": [
               {
-                "enum": [
-                  "product",
-                  "engineering",
-                  "quality"
-                ],
                 "type": "string"
               },
               {
@@ -40809,11 +40238,6 @@
             "type": "string"
           },
           "department": {
-            "enum": [
-              "product",
-              "engineering",
-              "quality"
-            ],
             "title": "Department",
             "type": "string"
           },
