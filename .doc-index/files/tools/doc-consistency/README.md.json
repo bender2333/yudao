@@ -1,19 +1,20 @@
 {
 "schema":1,
 "path":"tools/doc-consistency/README.md",
-"hash":"c4557be0966de5c5",
+"hash":"2bfb4fcd75c98ae4",
 "nodes":[
-{"hash":"c4557be0966de5c5","id":"tools/doc-consistency/README.md","kind":"file","title":"tools/doc-consistency/README.md"},
+{"hash":"2bfb4fcd75c98ae4","id":"tools/doc-consistency/README.md","kind":"file","title":"tools/doc-consistency/README.md"},
 {"hash":"b1cdd98b215851f3","id":"tools/doc-consistency/README.md#文档一致性工具","kind":"section","parent":"tools/doc-consistency/README.md","title":"文档一致性工具"},
 {"hash":"fb17a25e25161fdd","id":"tools/doc-consistency/README.md#文档一致性工具 > 运行","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"运行"},
-{"hash":"2a8bdf8abc86eb20","id":"tools/doc-consistency/README.md#文档一致性工具 > 命令","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"命令"},
+{"hash":"396d1868aec348cd","id":"tools/doc-consistency/README.md#文档一致性工具 > 命令","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"命令"},
 {"hash":"a1f268e4979fff8e","id":"tools/doc-consistency/README.md#文档一致性工具 > 范围与索引","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"范围与索引"},
-{"hash":"a8f3013f8bc5df61","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"规则与数据"},
-{"hash":"6e94b58711899b10","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"规则事实线"},
-{"hash":"f2bc81958584b265","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线 > 粗筛与盘点（rules scan）","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线","title":"粗筛与盘点（rules scan）"},
+{"hash":"e311a0db0bbef8f8","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"规则与数据"},
+{"hash":"562fae72f491d12f","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"规则事实线"},
+{"hash":"49b4baf131336d39","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线 > 粗筛与盘点（rules scan）","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线","title":"粗筛与盘点（rules scan）"},
+{"hash":"4d9c8c517a3289ba","id":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线 > 句式与比对（rules check）","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线","title":"句式与比对（rules check）"},
 {"hash":"c23f3c23f1b22291","id":"tools/doc-consistency/README.md#文档一致性工具 > 阅读范围怎么算","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"阅读范围怎么算"},
 {"hash":"ab4d5b7ad90caa35","id":"tools/doc-consistency/README.md#文档一致性工具 > 测试","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"测试"},
-{"hash":"7503105a1bb19465","id":"tools/doc-consistency/README.md#文档一致性工具 > 依赖","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"依赖"}
+{"hash":"2de97049add11367","id":"tools/doc-consistency/README.md#文档一致性工具 > 依赖","kind":"section","parent":"tools/doc-consistency/README.md#文档一致性工具","title":"依赖"}
 ],
 "edges":[
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"tools/doc-consistency/README.md#文档一致性工具"},
@@ -22,18 +23,20 @@
 {"dst":"tools/doc-consistency/doc_consistency/assets/cytoscape.min.js","kind":"code-path","raws":["doc_consistency/assets/cytoscape.min.js"],"seen":"081591ab735b2b6a","src":"tools/doc-consistency/README.md#文档一致性工具 > 依赖"},
 {"dst":".doc-index/confirmed.jsonl","kind":"code-path","raws":[".doc-index/confirmed.jsonl"],"seen":"debf2c5e97ca2122","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":".doc-index/labels.json","kind":"code-path","raws":[".doc-index/labels.json"],"seen":"749cfd790c3b1989","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
-{"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"0f590e84bfc391d1","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
+{"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"2ecfc93b48222626","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"tools/doc-consistency/data/record-docs.json","kind":"code-path","raws":["data/record-docs.json"],"seen":"eaf7cfe5858ba800","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
 {"dst":"tools/doc-consistency/pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"6609bf8d44ed2680","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"3fb84dc2371e4fb5","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
-{"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"0f590e84bfc391d1","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
+{"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"2ecfc93b48222626","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
 {"dst":"tools/doc-consistency/data/known-external.json","kind":"code-path","raws":["data/known-external.json"],"seen":"df29de1f3d2a9a00","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
 {"dst":"tools/doc-consistency/data/roles.json","kind":"code-path","raws":["data/roles.json"],"seen":"7f34122d7f8a921f","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
-{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"code-path","raws":["docs/research/doc-consistency-rule-facts.md"],"seen":"485e2b476027d10c","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线"},
-{"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"0f590e84bfc391d1","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线"},
+{"dst":"tools/doc-consistency/data/rulefacts-scan.json","kind":"code-path","raws":["data/rulefacts-scan.json"],"seen":"dbb48b9409121dbd","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
+{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"code-path","raws":["docs/research/doc-consistency-rule-facts.md"],"seen":"36dde0d8f5b6c344","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线"},
+{"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"2ecfc93b48222626","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线"},
 {"dst":"tools/doc-consistency/rules/rulefacts/canon.lp","kind":"code-path","raws":["rules/rulefacts/canon.lp"],"seen":"d7f5e4e9324d02f4","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线"},
 {"dst":".doc-index/labels.json","kind":"code-path","raws":[".doc-index/labels.json"],"seen":"749cfd790c3b1989","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线 > 粗筛与盘点（rules scan）"},
+{"dst":"tools/doc-consistency/data/rulefacts-scan.json","kind":"code-path","raws":["data/rulefacts-scan.json"],"seen":"dbb48b9409121dbd","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则事实线 > 粗筛与盘点（rules scan）"},
 {"dst":"tools/doc-consistency/data/roles.json","kind":"code-path","raws":["data/roles.json"],"seen":"cbc45dd1c680da85","src":"tools/doc-consistency/README.md#文档一致性工具 > 阅读范围怎么算"}
 ]
 }

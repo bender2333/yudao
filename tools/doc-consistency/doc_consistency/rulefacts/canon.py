@@ -64,6 +64,7 @@ class Canon:
     unreachable: list = field(default_factory=list)  # (角色, 表)
     roles: list = field(default_factory=list)  # 角色表里的全部角色，含不读文件的用户
     agent_roles: set = field(default_factory=set)
+    syms: set = field(default_factory=set)  # 喂给 clingo 的事实，第 3 步比对时接着用
 
 
 def short(table_id):
@@ -204,8 +205,8 @@ def read_tables(model, cfg):
     return cells, notes, unparsed, table_keys
 
 
-def read_canon(root):
-    model = scan_repo(root)
+def read_canon(root, model=None):
+    model = model or scan_repo(root)
     cfg = load_json("canon.json")
     cells, notes, unparsed, keys = read_tables(model, cfg)
     # 阅读范围的事实照图谱线现成的；标签快照这条线用不到，传空集
@@ -236,6 +237,7 @@ def read_canon(root):
         unreachable=pick(atoms, "unreachable"),
         roles=all_roles,
         agent_roles={r for r, _ in facts.roles},
+        syms=syms,
     )
 
 
@@ -258,7 +260,11 @@ def format_canon(c):
     out.append(f"== 读不出：{len(c.unparsed)} 条（不在词表里，原样报出，不猜） ==")
     for x in c.unparsed:
         out.append(f"{x.file}:{x.line}  {x.key} / 列「{x.column}」：{x.text}")
-    out.append(f"== 一条事实两处正本：{len(c.dup)} 条 ==")
+    return out + format_dup(c) + format_unreachable(c)
+
+
+def format_dup(c):
+    out = [f"== 一条事实两处正本：{len(c.dup)} 条 =="]
     for k, f, t1, t2 in c.dup:
         out.append(f"{k} / {f}")
         for t in (t1, t2):
@@ -268,7 +274,11 @@ def format_canon(c):
         for t in (t1, t2):
             only = [v for kk, ff, v, tt in c.only_in if (kk, ff, tt) == (k, f, t)]
             out.append(f"  只在 {short(t)} 有：{'、'.join(only) if only else '（无）'}")
-    out.append(f"== 读不到正本：{len(c.unreachable)} 条（正本点名的角色，必读范围里没有正本所在的文件） ==")
+    return out
+
+
+def format_unreachable(c):
+    out = [f"== 读不到正本：{len(c.unreachable)} 条（正本点名的角色，必读范围里没有正本所在的文件） =="]
     for r, t in c.unreachable:
         out.append(f"{r}  读不到  {file_of(t)}  （{short(t)}）")
     return out

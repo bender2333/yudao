@@ -5,10 +5,11 @@
 动作词与句式动词在 data/rulefacts-scan.json。
 
 粗筛：一句话里同时有键、角色、动作词，就是候选。
-三类（按顺序判，规则写在 classify）：
-  1. 已是引用：句子里有指向正本文件的链接、`路径`「小节」、或「见 X」（X 是正本文件名），并且没有「由」「只由」「不」「为准」「理由」这些陈述规则的词。
-  2. 能改成句式：匹配五种句式之一的粗形状（正则）：只由…；由…加/写/改…；角色…不加/改/写…；（不）是…的理由；以…为准。可同时像几种。
-  3. 不是规则事实：命中了词表，但不合上面两类（流程叙述、例子、命令行、格式说明）。
+第 3 步补了两条：主语是机器（CI、脚本、钩子）的句子算候选；匹配八种句式粗形状的句子直接算候选，不再要求同时有键、角色与动作词。
+三类（按顺序判，规则写在 finish）：
+  1. 解析成功：patterns.py 用真正的文法（grammar.lark）解析成功。陈述加指路的句子也按解析走。
+  2. 已是引用：纯指路的句子：句子里有指向正本文件的链接、`路径`「小节」、或「见 X」（X 是正本文件名），并且没有「由」「不」「为准」「理由」这些陈述规则的词，而且解析不了。
+  3. 不是规则事实：命中了词表，但既没解析成功也不是纯指路（流程叙述、例子、命令行、格式说明，也有还没写成句式的规则事实）。
 """
 
 import json
@@ -21,8 +22,7 @@ from ..scan import MD, is_scaffold, scan_repo
 from .canon import role_aliases, row_cells
 
 SAMPLE_SEED = 20261103
-CLS = ("已是引用", "能改成句式", "不是规则事实")
-SHAPES = ("只由谁", "由谁", "谁不", "是不是理由", "以谁为准")  # 与第 3.2 节五种句式对应（引用不在这里）
+CLS = ("已是引用", "解析成功", "不是规则事实")
 
 CUT = re.compile(r"[。；！？]|<br\s*/?>")
 SENT = re.compile(r"[。！？]|<br\s*/?>")
@@ -31,6 +31,23 @@ FENCE = re.compile(r"^\s*(```|~~~)")
 LINK_TARGET = re.compile(r"\]\([^)]*\)")
 LEAD_COLON = ("：", ":")
 STATEMENT = ("由", "不", "为准", "理由")  # 在陈述规则的词：有了就不算「已是引用」
+
+
+@dataclass
+class Unit:
+    """一个要解析的句子（分句）。不论是不是候选，脚手架文件里正本表格行以外的每个分句都有一个。"""
+
+    file: str
+    line: int
+    idx: int  # 同一行里第几个
+    text: str
+    items: list = field(default_factory=list)  # 引导句或句中冒号带的 (行号, 原文)
+    table: bool = False
+    code: bool = False
+
+    @property
+    def id(self):
+        return f"{self.file}:{self.line}#{self.idx}"
 
 
 @dataclass
@@ -50,17 +67,26 @@ class Hit:
     keys: list = field(default_factory=list)
     roles: list = field(default_factory=list)
     actions: list = field(default_factory=list)
+    by_shape: bool = False  # 没有键、角色或动作词，靠句式形状补入
+    by_machine: bool = False  # 主语是机器（CI、脚本、钩子）
+    unit: object = None
+    groups: list = field(default_factory=list)  # 解析成功的结果（patterns.Group）
 
 
-def bounded(words):
-    """词的正则：纯 ASCII 的词两边不能紧挨字母数字，免得 stage 命中 backstage。中文词直接子串。"""
+def bounded_src(words):
+    """词的正则源码：纯 ASCII 的词两边不能紧挨字母数字，免得 stage 命中 backstage。中文词直接子串。"""
     parts = []
     for w in sorted(set(words), key=lambda x: (-len(x), x)):
         e = re.escape(w)
         if re.fullmatch(r"[\x21-\x7e]+", w):
             e = rf"(?<![A-Za-z0-9_-]){e}(?![A-Za-z0-9_-])"
         parts.append(e)
-    return re.compile("|".join(parts)) if parts else None
+    return "|".join(parts)
+
+
+def bounded(words):
+    src = bounded_src(words)
+    return re.compile(src) if src else None
 
 
 def find_all(rx, text):
@@ -79,16 +105,21 @@ class Vocab:
     canon_files: dict  # 正本文件 -> 能指到它的写法
     no_labels: bool
     shapes: dict
+    machines: set = field(default_factory=set)
     rx_narrow: object = None
     rx_wide: object = None
     rx_role: object = None
     rx_action: object = None
+    rx_machine: object = None
     rx_shape: dict = field(default_factory=dict)
+    rx_machine_subject: object = None
 
 
 def load_vocab(root, model):
     cfg = load_json("canon.json")
     sc = load_json("rulefacts-scan.json")
+    pat = load_json("rulefacts-patterns.json")
+    machines = set(cfg.get("vocab", {}).get("机器", []))
     aliases, _ = role_aliases()
     role_names = set(aliases)
     labels, no_labels = set(), False
@@ -128,19 +159,32 @@ def load_vocab(root, model):
         canon_files=canon_files,
         no_labels=no_labels,
         shapes=sc["shapes"],
+        machines=machines,
     )
     v.rx_narrow, v.rx_wide = bounded(narrow), bounded(wide)
     v.rx_role = bounded(v.roles)
     v.rx_action = bounded(v.actions)
-    verbs = lambda ws: "|".join(re.escape(w) for w in sorted(ws, key=lambda x: -len(x)))
-    role_rx = "|".join(re.escape(r) for r in sorted(v.roles, key=lambda x: -len(x)))
+    v.rx_machine = bounded(machines)
+    verbs = lambda ws: "|".join(re.escape(w) for w in sorted(set(ws), key=lambda x: (-len(x), x)))
+    # 句式动词：粗筛里写的，加上第 3 步句式里的动词（rulefacts-patterns.json）
+    by_verbs = list(sc["shapes"]["由谁"]) + [w for w in pat["动词"] if not w.startswith("_")]
+    role_rx = "|".join(re.escape(r) for r in sorted(v.roles | machines, key=lambda x: (-len(x), x)))
+    # 八种句式的粗形状（引用不算）。窄口径、宽口径与动作词都不要求，形状对上就是候选
     v.rx_shape = {
         "只由谁": re.compile(r"只由"),
-        "由谁": re.compile(rf"(?<![理自经缘事来只])由(?!于)[^，。；：]{{0,60}}?(?:{verbs(sc['shapes']['由谁'])})"),
+        "由谁": re.compile(rf"(?<![理自经缘事来只])由(?!于)[^，。；：]{{0,60}}?(?:{verbs(by_verbs)})"),
         "谁不": re.compile(rf"(?:{role_rx})[^，。；：]{{0,12}}?不(?:{verbs(sc['shapes']['谁不'])})"),
-        "是不是理由": re.compile(r"是[^，。；]{1,30}的理由"),
+        "清单一员": re.compile(r"是[^，。；]{1,30}的理由"),
         "以谁为准": re.compile(r"以[^，。；]{1,30}为准|为准"),
+        "在场可否": re.compile(r"在场[^，。；]{0,30}?(?:可以|不能)"),
+        "交给": re.compile(rf"(?:{verbs(pat['交给的动词'])})(?:{role_rx})"),
+        "穷尽清单": re.compile(r"只有[^，。；]{0,40}?(?:是[^，。；]{1,30}的理由|情形|情况|种)"),
     }
+    # 主语是机器：「由 CI …做」或分句一开头就是机器，后面跟着动词
+    if machines:
+        v.rx_machine_subject = re.compile(
+            rf"(?:由|^)\s*(?:{bounded_src(machines)})[^，。；：]{{0,24}}?(?:{verbs(set(by_verbs) | set(sc['actions']))})"
+        )
     return v
 
 
@@ -164,20 +208,25 @@ def match(v, text, ctx=""):
     )
 
 
-def classify(v, text):
-    """三类分法。返回 (类别, 句式列表)。"""
-    shapes = [name for name, rx in v.rx_shape.items() if rx.search(clean(text))]
+def is_pointer(v, text):
+    """纯指路：句子里有指向正本文件的链接、反引号路径加「小节」、或「见」加正本文件的标题，并且没有陈述规则的词。"""
     refers = False
     for names in v.canon_files.values():
         if any(n in text for n in names[:2]):  # 路径或文件名：链接、反引号路径、「小节」都带着它
             refers = True
         if names[2] and re.search(rf"见\s*[`\[「]?{re.escape(names[2])}", text):  # 见 + 文件的标题
             refers = True
-    if refers and not any(w in clean(text) for w in STATEMENT):
-        return CLS[0], []
-    if shapes:
-        return CLS[1], shapes
-    return CLS[2], []
+    return refers and not any(w in clean(text) for w in STATEMENT)
+
+
+def finish(v, h):
+    """三类分法，按顺序判：解析成功；纯指路（解析不了的才算）；其余。"""
+    if h.groups:
+        h.cls, h.shapes = CLS[1], list(dict.fromkeys(g.shape for g in h.groups))
+    elif is_pointer(v, h.text):
+        h.cls, h.shapes = CLS[0], []
+    else:
+        h.cls, h.shapes = CLS[2], []
 
 
 # ---------- 切分 ----------
@@ -264,17 +313,33 @@ def scan_file(v, scan):
         end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
         if end is not None:
             start = end + 1  # YAML 头跳过
-    hits, n_sent = [], 0
+    hits, n_sent, units = [], 0, []
     consumed = set()
+    per_line = {}
 
-    def make(text, line, ctx="", **kw):
-        nk, wk, roles, acts = match(v, text, ctx)
-        if not ((nk or wk) and roles and acts):
-            return None
-        cls, shapes = classify(v, text)
-        h = Hit(scan.path, line, text, cls=cls, shapes=shapes, narrow=bool(nk), keys=nk + wk, roles=roles, actions=acts, **kw)
-        own = match(v, text)
-        h.inherited = not ((own[0] or own[1]) and own[2])
+    def new_unit(text, line, **kw):
+        k = per_line[line] = per_line.get(line, 0) + 1
+        u = Unit(scan.path, line, k, text, **kw)
+        units.append(u)
+        return u
+
+    def make(u, ctx="", text=None, shape_ok=True, **kw):
+        """候选：键、角色、动作词齐了；或者（shape_ok）主语是机器、句式形状对上。"""
+        t = u.text if text is None else text
+        nk, wk, roles, acts = match(v, t, ctx)
+        base = bool((nk or wk) and roles and acts)
+        by_machine = by_shape = False
+        if not base:
+            if not shape_ok:
+                return None
+            c = clean(t)
+            by_machine = bool(v.rx_machine_subject and v.rx_machine_subject.search(c))
+            by_shape = not by_machine and any(rx.search(c) for rx in v.rx_shape.values())
+            if not (by_machine or by_shape):
+                return None
+        h = Hit(scan.path, u.line, u.text, narrow=bool(nk), keys=nk + wk, roles=roles, actions=acts, by_machine=by_machine, by_shape=by_shape, unit=u, **kw)
+        own = match(v, t)
+        h.inherited = base and not ((own[0] or own[1]) and own[2])
         return h
 
     i = start
@@ -290,7 +355,8 @@ def scan_file(v, scan):
             for ci, cell in enumerate(cells):
                 for seg in segments(cell):
                     n_sent += 1
-                    h = make(seg, i + 1, ctx if ci else "", table=True)
+                    u = new_unit(seg, i + 1, table=True)
+                    h = make(u, ctx if ci else "", table=True)
                     if h:
                         hits.append(h)
             i += 1
@@ -312,49 +378,67 @@ def scan_file(v, scan):
                     # 引导句：它下面紧跟的列表项与续行一起算
                     rows = lead_extent(lines, kinds, i, indent, bool(m))
                     items = [(j + 1, lines[j].strip()) for j in rows]
+                    u = new_unit(seg, i + 1, items=items, code=in_code)
                     whole = seg + "：" + "；".join(t for _, t in items) if items else seg
-                    h = make(seg, i + 1, code=in_code)
+                    h = make(u, shape_ok=False, code=in_code)
                     if h is None and items:
-                        h = make(whole, i + 1, code=in_code, group=True)
-                        if h:
-                            h.text = seg
+                        h = make(u, text=whole, shape_ok=False, code=in_code, group=True)
                     if h is None:
                         # 引导句本身就是「（不）是…的理由」「以…为准」的形状：词表之外补进来，单独记数
-                        shapes = [n for n in ("是不是理由", "以谁为准") if v.rx_shape[n].search(seg)]
-                        if shapes:
-                            h = Hit(scan.path, i + 1, seg, code=in_code, shape_lead=True)
+                        if any(v.rx_shape[n].search(seg) for n in ("清单一员", "以谁为准", "穷尽清单")):
+                            h = Hit(scan.path, i + 1, seg, code=in_code, shape_lead=True, unit=u)
                     if h:
                         h.items = items
-                        h.cls, h.shapes = classify(v, whole)
                         hits.append(h)
                         consumed.update(rows)
                     continue
-                h = make(seg, i + 1, code=in_code)
+                u = new_unit(seg, i + 1, code=in_code)
+                inline = seg.find("：")
+                rest = clauses[ci + 1 :] if 0 <= inline < len(seg) - 1 and ci < len(clauses) - 1 else []
+                u.items = [(i + 1, t) for t in rest]  # 句中的冒号引出「；」分开的几项：同一句里后面的分句是它的条目
+                h = make(u, code=in_code)
                 if h:
-                    inline = seg.find("：")
-                    if 0 <= inline < len(seg) - 1 and ci < len(clauses) - 1:
-                        # 句中的冒号引出「；」分开的几项：同一句里后面的分句是它的条目
-                        rest = clauses[ci + 1 :]
-                        h.items = [(i + 1, t) for t in rest]
-                        h.cls, h.shapes = classify(v, seg + "；" + "；".join(rest))
+                    if rest:
+                        h.items = u.items
                         skip.update(range(ci + 1, len(clauses)))
                     hits.append(h)
         i += 1
-    return hits, n_sent
+    return hits, n_sent, units
 
 
-def scan_all(root):
-    model = scan_repo(root)
+class Scanned:
+    """scan_all 的结果。"""
+
+    def __init__(self, v, hits, files, total, units, pv, groups):
+        self.v, self.hits, self.files, self.total, self.units, self.pv, self.groups = v, hits, files, total, units, pv, groups
+
+
+def scan_all(root, model=None, parse=True):
+    """扫出候选，并（parse）用真正的文法解析每个分句。parse=False 只为测词表，三类分法不可用。"""
+    model = model or scan_repo(root)
     v = load_vocab(root, model)
-    hits, files, total = [], {}, 0
+    hits, files, total, units = [], {}, 0, []
     for path in sorted(model.files):
         if not (is_scaffold(path) and path.endswith(".md")):
             continue
-        h, n = scan_file(v, model.files[path])
+        h, n, u = scan_file(v, model.files[path])
         files[path] = (n, h)
         hits += h
+        units += u
         total += n
-    return v, hits, files, total
+    pv, groups = None, {}
+    if parse:
+        from . import patterns  # 晚一点导入：patterns 不依赖本模块
+        from .canon import read_tables
+
+        cfg = load_json("canon.json")
+        cells, _, _, keys = read_tables(model, cfg)
+        pv = patterns.build_vocab(model, cfg, cells, keys)
+        groups = patterns.parse_units(pv, units)
+    for h in hits:
+        h.groups = groups.get(h.unit.id, []) if h.unit else []
+        finish(v, h)
+    return Scanned(v, hits, files, total, units, pv, groups)
 
 
 # ---------- 输出 ----------
@@ -362,7 +446,14 @@ def scan_all(root):
 
 def tag(h):
     t = f"{h.cls}/{'、'.join(h.shapes) or '-'}，{'窄' if h.narrow else '宽'}"
-    return t + ("，代码块" if h.code else "") + ("，形状补入" if h.shape_lead else "") + ("，表格" if h.table else "")
+    return (
+        t
+        + ("，代码块" if h.code else "")
+        + ("，形状补入" if h.shape_lead else "")
+        + ("，机器主语补入" if h.by_machine else "")
+        + ("，句式形状补入" if h.by_shape else "")
+        + ("，表格" if h.table else "")
+    )
 
 
 def fmt_hit(h):
@@ -376,20 +467,24 @@ def counts(hits):
 
 
 def format_scan(root, sample=None):
-    v, hits, files, total = scan_all(root)
+    sc = scan_all(root)
+    v, hits, files, total = sc.v, sc.hits, sc.files, sc.total
     n = len(hits)
     c = counts(hits)
     narrow = [h for h in hits if h.narrow]
     rows = [h for h in hits if h.table]
+    parsed = [u for u in sc.units if sc.groups.get(u.id)]
+    hit_units = {h.unit.id for h in hits if h.unit}
     out = [
         f"规则事实线·粗筛：{len(files)} 个脚手架文件，{total} 个句子（表格一格一句）；候选 {n} 条",
-        f"三类：已是引用 {c[CLS[0]]}，能改成句式 {c[CLS[1]]}，不是规则事实 {c[CLS[2]]}",
+        f"三类：已是引用 {c[CLS[0]]}，解析成功 {c[CLS[1]]}，不是规则事实 {c[CLS[2]]}",
         f"窄口径命中 {len(narrow)}（其中表格格子 {sum(1 for h in narrow if h.table)}），宽口径命中 {n}（含窄口径，其中表格格子 {len(rows)}，涉及 {len({(h.file, h.line) for h in rows})} 行）",
         f"其中：代码块里 {sum(1 for h in hits if h.code)}，靠引导句加条目合起来才命中 {sum(1 for h in hits if h.group)}，引导句只靠句式形状补入（没有键、角色或动作词）{sum(1 for h in hits if h.shape_lead)}，表格格子靠所在行首列补上键或角色 {sum(1 for h in hits if h.inherited)}",
+        f"第 3 步补入：机器主语 {sum(1 for h in hits if h.by_machine)}，句式形状（没有键、角色或动作词）{sum(1 for h in hits if h.by_shape)}；文法解析成功共 {len(parsed)} 个分句，其中不是候选的 {sum(1 for u in parsed if u.id not in hit_units)} 个",
         f"词表：窄口径键 {len(v.narrow_keys)} 个（标签快照与证据前缀），其余键 {len(v.wide_keys)} 个，角色与别名 {len(v.roles)} 个，动作词 {len(v.actions)} 个"
         + ("；没有标签快照（.doc-index/labels.json），标签来源已跳过" if v.no_labels else ""),
         "",
-        "文件\t总数\t引用\t句式\t非规则\t窄\t宽(含窄)",
+        "文件\t总数\t引用\t解析\t非规则\t窄\t宽(含窄)",
     ]
     for p, (_, hs) in files.items():
         if hs:

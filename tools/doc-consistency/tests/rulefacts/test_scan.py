@@ -34,6 +34,9 @@ EXTRA = """# 额外规则
 ```
 执行者标 `waiting`。
 ```
+
+文件超过上限不是 `needs-triage` 的理由。
+设计说明与 ADR 冲突时以设计说明为准。
 """
 
 YAML_SKILL = """---
@@ -79,13 +82,17 @@ def mine(out):
 
 def test_every_class_has_sentences_and_the_shape_is_named(scan_repo):
     got = mine(run(scan_repo))
-    # 能改成句式：像哪种句式写在类别后面
-    assert got["`needs-triage` 由执行者加上"][0].startswith("能改成句式/由谁")
-    assert got["`waiting` 只由架构师加上"][0].startswith("能改成句式/只由谁")
-    assert got["架构师循环不改 `ready-for-human`"][0].startswith("能改成句式/谁不")
-    assert got["执行者认为文件超过上限不是 `needs-triage` 的理由"][0].startswith("能改成句式/是不是理由")
-    assert got["`ready-for-human` 与 `waiting` 冲突时，执行者以 `waiting` 为准"][0].startswith("能改成句式/以谁为准")
-    # 已是引用：指向正本文件，并且没有「由」「不」「为准」「理由」这些陈述规则的词
+    # 解析成功：用真正的文法读成了原子，读成哪种句式写在类别后面
+    assert got["`needs-triage` 由执行者加上"][0].startswith("解析成功/由谁")
+    assert got["`waiting` 只由架构师加上"][0].startswith("解析成功/只由谁")
+    assert got["架构师循环不改 `ready-for-human`"][0].startswith("解析成功/谁不")
+    # 没有键、角色与动作词，句式形状对上就是候选（第 3 步补的）
+    assert got["文件超过上限不是 `needs-triage` 的理由"][0].startswith("解析成功/清单一员") and "句式形状补入" in got["文件超过上限不是 `needs-triage` 的理由"][0]
+    assert got["设计说明与 ADR 冲突时以设计说明为准"][0].startswith("解析成功/以谁为准") and "句式形状补入" in got["设计说明与 ADR 冲突时以设计说明为准"][0]
+    # 像句式但文法不认：句子前面多了「执行者认为」（主语不是被比对的那个，不猜）；「以 X 为准」的 X 不是载体（不在载体词表里）
+    assert got["执行者认为文件超过上限不是 `needs-triage` 的理由"][0].startswith("不是规则事实/-")
+    assert got["`ready-for-human` 与 `waiting` 冲突时，执行者以 `waiting` 为准"][0].startswith("不是规则事实/-")
+    # 已是引用：纯指路，指向正本文件，并且没有「由」「不」「为准」「理由」这些陈述规则的词，而且解析不了
     assert got["`waiting` 谁改成它，执行者见 [工作方式](workflow.md)「状态与标签」"][0].startswith("已是引用/-")
     assert got["执行者领取时读 `docs/agents/workflow.md`「状态与标签」，标 `in-progress`"][0].startswith("已是引用/-")
     # 不是规则事实：命中了词表，但既不是引用也不合句式
@@ -98,16 +105,16 @@ def test_every_class_has_sentences_and_the_shape_is_named(scan_repo):
 def test_summary_counts_add_up_and_split_narrow_from_wide(scan_repo):
     out = run(scan_repo)
     rows = candidates(out)
-    assert "候选 16 条\n三类：已是引用 4，能改成句式 5，不是规则事实 7\n" in out
-    assert "窄口径命中 11（其中表格格子 1），宽口径命中 16（含窄口径，其中表格格子 1，涉及 1 行）" in out
-    assert sum(1 for r in rows if "，窄" in r[2]) == 11
+    assert "候选 18 条\n三类：已是引用 4，解析成功 5，不是规则事实 9\n" in out
+    assert "窄口径命中 12（其中表格格子 1），宽口径命中 18（含窄口径，其中表格格子 1，涉及 1 行）" in out
+    assert sum(1 for r in rows if "，窄" in r[2]) == 12
     # 标签快照里的 `needs-triage`、`waiting` 是窄口径的键；只靠正本表格首列的键（`in-progress`、`ready-for-human`）是宽口径
     got = mine(out)
     assert "，窄" in got["`needs-triage` 由执行者加上"][0]
     assert "，宽" in got["执行者领取时读 `docs/agents/workflow.md`「状态与标签」，标 `in-progress`"][0]
     assert "，宽" in got["架构师循环不改 `ready-for-human`"][0]
-    # 按文件的计数表：文件、总数、引用、句式、非规则、窄、宽
-    assert "\ndocs/agents/extra.md\t13\t2\t5\t6\t10\t13\n" in out
+    # 按文件的计数表：文件、总数、引用、解析、非规则、窄、宽
+    assert "\ndocs/agents/extra.md\t15\t2\t5\t8\t11\t15\n" in out
     assert "\nAGENTS.md\t1\t1\t0\t0\t0\t1\n" in out
 
 
@@ -179,6 +186,6 @@ def test_inline_colon_carries_the_semicolon_items_and_a_shaped_lead_in_is_added(
     rows = [r for r in candidates(out) if r[0] == "docs/agents/lead.md"]
     assert [r[1] for r in rows] == [3, 4]
     assert rows[0][4] == ["3: 规则矛盾"]  # 句中冒号：同一句里「；」后面的分句是它的条目，不再单独成句
-    assert rows[1][2].startswith("能改成句式/是不是理由") and "形状补入" in rows[1][2]
+    assert rows[1][2].startswith("解析成功/清单一员") and "形状补入" in rows[1][2]
     assert rows[1][4] == ["5: 文件超过上限；改了名。"]
     assert "引导句只靠句式形状补入（没有键、角色或动作词）1" in out

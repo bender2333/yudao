@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"claude_jour.md",
-"hash":"e7dd2237014d4159",
+"hash":"554ce5dc1e0c6089",
 "nodes":[
-{"hash":"e7dd2237014d4159","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
+{"hash":"554ce5dc1e0c6089","id":"claude_jour.md","kind":"file","title":"claude_jour.md"},
 {"hash":"028833a01631910c","id":"claude_jour.md#Claude 执行日记 (Claude Journal)","kind":"section","parent":"claude_jour.md","title":"Claude 执行日记 (Claude Journal)"},
 {"hash":"48043ae754efd878","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 记录格式规范","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"记录格式规范"},
 {"hash":"16623160c7b059eb","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 21:10 状态文档与一次改完","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-10-31 21:10 状态文档与一次改完"},
@@ -50,7 +50,8 @@
 {"hash":"96091be0364e062c","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 01:50 需求记录清理：按用户的答复收尾","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 01:50 需求记录清理：按用户的答复收尾"},
 {"hash":"89407a7512bf9cd2","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
 {"hash":"802d289759e2baed","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 10:28 规则事实线定稿、用户权限入核对、第 1 步交付","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 10:28 规则事实线定稿、用户权限入核对、第 1 步交付"},
-{"hash":"95038afdb52c2bd9","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"}
+{"hash":"95038afdb52c2bd9","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
+{"hash":"db9002ec4821f2d7","id":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表","kind":"section","parent":"claude_jour.md#Claude 执行日记 (Claude Journal)","title":"2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表"}
 ],
 "edges":[
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-10-31 19:40 规则文件与技能的历史清理"},
@@ -89,6 +90,7 @@
 {"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md"],"seen":"8a6d8b37ae99405b","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"eb28b96ab4232c74","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 10:28 规则事实线定稿、用户权限入核对、第 1 步交付"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
-{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"eb28b96ab4232c74","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"}
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"eb28b96ab4232c74","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
+{"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md:16"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表"}
 ]
 }

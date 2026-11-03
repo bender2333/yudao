@@ -1,0 +1,72 @@
+// 规则事实线第 3 步：八种句式的文法（Lark，Earley，动态词法）。
+//
+// 词汇封闭。下面用到的这些终结符不在本文件里，由 patterns.py 从词表生成，接在本文件后面一起交给 Lark：
+//   ROLE      角色、别名与合称（roles.json）
+//   MACHINE   机器：CI、脚本、钩子（canon.json 的 vocab.机器）
+//   KEY       键：正本表格的首列，加第 1 节「位置」一格里的载体名当别名
+//   LISTKEY   清单的键：KEY 再加「交回」这类别名（rulefacts-patterns.json）
+//   STUCK     第 7 节「卡在」一格里的项（加「的问题」「问题」）
+//   EVENT     权限表首列里的事（改意图、拆单……）
+//   CARRIER   规则的载体（canon.json 的 vocab.载体）
+//   _ADV      动词前的副词（直接、统一……，rulefacts-patterns.json 的「副词」）
+//   VERB      句式里的动词（rulefacts-patterns.json 的「动词」）
+//   ACT       动作词（rulefacts-scan.json 的 actions 与上面的动词）
+//   PRES      在场、不在场的说法；MAYV 可以、不可以；HAND 交给、交回
+// 句子送进来以前已经规范化：反引号、链接、括号里的话与限定都去掉了，汉字旁边的空白也去掉了。
+// 句子没有主语（祈使句、「你」）、词不在词表里的，一律不成立：解析不了就是解析不了，不猜。
+
+start: (LEAD "：")? sentence
+
+?sentence: by_who | only_who | who_not | who_not_bare
+         | member | not_member
+         | prevails | prevails_elided
+         | may | handoff
+         | closed_inline | closed_count | lead_member | lead_not_member
+
+// 由谁、只由谁：needs-triage 由执行者加上；总图只由总架构师改；集成层由 CI 跑
+by_who: keys "由" subjs _ADV? VERB
+only_who: keys "只由" subjs _ADV? VERB
+
+// 谁不：架构师循环不改总图；审查者不推送
+who_not: subjs "不" VERB KEY
+who_not_bare: subjs "不" ACT
+
+// 是或不是清单一员：文件超上限不是 needs-triage 的理由
+member: ITEM "是" LISTKEY "的理由"
+not_member: ITEM "不是" LISTKEY "的理由"
+
+// 以谁为准：设计说明与 ADR 冲突时以设计说明为准。省掉前一个载体的写法（「，与总图不一致时以总图为准」）
+// 只在前一个分句的主语是载体时才成立，由 patterns.py 接起来
+prevails: CARRIER _AND CARRIER CONFLICT "时" "，"? "以" CARRIER "为准"
+prevails_elided: "与" CARRIER CONFLICT "时" "，"? "以" CARRIER "为准"
+
+// 在场可否：用户在场时总架构师可以改意图
+may: PRES "时" "，"? subjs MAYV EVENT
+
+// 交给：执行环境的问题交给用户；设计问题交回架构师
+handoff: STUCK HAND subjs
+
+// 穷尽清单：只有 A、B、C 是 needs-triage 的理由；只有四种情形交回：A；B；C；D
+closed_inline: "只有" items_dun "是" LISTKEY "的理由"
+closed_count: "只有" NUM UNITW LISTKEY TAIL? "：" items_semi
+// 引导句带条目：下面这些不是交回的理由：A；B；C
+lead_member: DEM "是" LISTKEY "的理由" "：" items_semi
+lead_not_member: DEM "不是" LISTKEY "的理由" "：" items_semi
+
+keys: KEY (_SEP KEY)*
+subjs: SUBJ (_SEP SUBJ)*
+items_dun: ITEM (_DUN ITEM)*
+items_semi: ITEM2 ("；" ITEM2)*
+
+SUBJ: ROLE | MACHINE
+LEAD: /[^：，。；]{1,30}/
+ITEM: /(?:(?!不是|是|只有)[^，。；：、])+/
+ITEM2: /[^；]+/
+NUM: /[一二三四五六七八九十两\d]+/
+UNITW: /[种个条](?:情形|情况|理由|原因)/
+TAIL: /，[^：]*/
+DEM: /下面这些|以下这些|以下|这些/
+CONFLICT: /冲突|不一致|矛盾|不同/
+_AND: /与|和/
+_SEP: /、|或者|或|与|和|及/
+_DUN: "、"
