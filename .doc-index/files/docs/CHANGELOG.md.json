@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"ab5b781e7bc903cf",
+"hash":"bdd1ffa842b2dde1",
 "nodes":[
-{"hash":"ab5b781e7bc903cf","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"bdd1ffa842b2dde1","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"3e366673e4126bfe","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"9bbf813344d050f2","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -31,7 +31,7 @@
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"307d8a6ee7df36f3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"CONTEXT.md","kind":"section-ref","raws":["CONTEXT.md"],"seen":"307d8a6ee7df36f3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"2f13bdd4ac8bee5e","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"256182101a09aca3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"db868087de5ed5a0","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/README.md","kind":"code-path","raws":["client/README.md"],"seen":"f3b270cadfc31819","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/tests/e2e/models.spec.ts","kind":"code-path","raws":["client/tests/e2e/models.spec.ts"],"seen":"1e081712c4c833b0","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/adr/0040-design-implementation-separation.md","kind":"code-path","raws":["docs/adr/0040-design-implementation-separation.md"],"seen":"e13e2bc72a154c3b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -56,10 +56,11 @@
 {"dst":"docs/archive/current-baseline-2026-10-29.md","kind":"code-path","raws":["docs/archive/current-baseline-2026-10-29.md"],"seen":"9e4a89c32b73cba5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/consistency-scan-2026-11-03.md","kind":"code-path","raws":["consistency-scan-2026-11-03.md","docs/consistency-scan-2026-11-03.md"],"seen":"33cc4b05e042e29d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/current-baseline.md","kind":"code-path","raws":["current-baseline.md","docs/current-baseline.md"],"seen":"305d4937bcf23268","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md","docs/decision.md"],"seen":"41337f3633dbff7f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md","docs/decision.md"],"seen":"cea70bfff8559adc","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-02 - 组织设定：五份形态两个层做目录，事项的来源进定义，用户脚本做正本","kind":"section-ref","raws":["docs/decision.md"],"seen":"dc95142753b0be44","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-03 - 组织设定：交互骨架是一条线程加看得见的收件人，v19 画三级","kind":"section-ref","raws":["decision.md"],"seen":"e12274a555219cff","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-03 - 组织设定：最低一级就是对话，成果库折进对话","kind":"section-ref","raws":["decision.md"],"seen":"3e2c23d756a1d549","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/decision.md#决策记录 > 2026-11-04 - 事项冻结的形态不在发布里：事项停在原处，不回退默认形态；#1182 的分层问题另开单挪进 U","kind":"section-ref","raws":["decision.md"],"seen":"cb1bed045223785f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/README.md","kind":"code-path","raws":["design/README.md","docs/design/README.md"],"seen":"3e0e5aa79a009554","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["design/app-and-interface.md","docs/design/app-and-interface.md"],"seen":"31740a7c1177bcbb","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","kind":"section-ref","raws":["docs/design/app-and-interface.md"],"seen":"0d3bf612f75349f1","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -89,7 +90,7 @@
 {"dst":"docs/design/model-management.md","kind":"code-path","raws":["design/model-management.md","docs/design/model-management.md"],"seen":"152a3422cf1f9b2b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/network-and-mcp.md","kind":"code-path","raws":["docs/design/network-and-mcp.md"],"seen":"9e6977a76f2a0c55","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/outsourced-roles.md","kind":"code-path","raws":["docs/design/outsourced-roles.md"],"seen":"6cbeee34a17bbb1e","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/design/project-organization.md","kind":"code-path","raws":["design/project-organization.md","docs/design/project-organization.md"],"seen":"b799219cc1388f12","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/design/project-organization.md","kind":"code-path","raws":["design/project-organization.md","docs/design/project-organization.md"],"seen":"72b7b2b4342d8901","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"code-path","raws":["docs/design/recovery-contract-and-fault-matrix.md"],"seen":"37247cabb5b9d1c8","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/rules-and-parameters.md","kind":"code-path","raws":["design/rules-and-parameters.md","docs/design/rules-and-parameters.md"],"seen":"ec7680380889a2f5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/semantic-system.md","kind":"code-path","raws":["docs/design/semantic-system.md"],"seen":"7399da1f63955e34","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
