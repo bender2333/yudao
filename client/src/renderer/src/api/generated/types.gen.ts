@@ -9112,6 +9112,14 @@ export type ContextAssembledPayload = {
      */
     output_reserve_tokens: number;
     /**
+     * Rules Version
+     */
+    rules_version?: string | null;
+    /**
+     * Folded Rounds
+     */
+    folded_rounds?: Array<number>;
+    /**
      * Previous Usage Tokens
      */
     previous_usage_tokens?: number | null;

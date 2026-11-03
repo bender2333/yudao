@@ -467,6 +467,9 @@ class ContextAssembledPayload(Versions, WorkBasis, CallTarget):
     compaction_event_id: str | None
     input_token_estimate: int
     output_reserve_tokens: int
+    # 装配按哪一版规则算出来的，以及这一次折叠了哪几轮（工单 #1200）
+    rules_version: str | None = None
+    folded_rounds: list[int] = Field(default_factory=list)
     # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量（模型管理设计说明第 8.2 节）
     previous_usage_tokens: int | None = None
     parts_ref: ArtifactRef
