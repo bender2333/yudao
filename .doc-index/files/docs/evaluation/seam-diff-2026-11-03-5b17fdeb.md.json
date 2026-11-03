@@ -1,0 +1,16 @@
+{
+"schema":1,
+"path":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md",
+"hash":"1f380bcb90a6151d",
+"nodes":[
+{"hash":"1f380bcb90a6151d","id":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md","kind":"file","title":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md"},
+{"hash":"36a5cefb7f769168","id":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb","kind":"section","parent":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md","title":"按缝的差异报告：2026-11-03，提交 5b17fdeb"},
+{"hash":"99d6aed226be5685","id":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb > 结论","kind":"section","parent":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb","title":"结论"},
+{"hash":"98f02e629ae6c3f2","id":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb > 逐缝","kind":"section","parent":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb","title":"逐缝"},
+{"hash":"78d421ee24911f7f","id":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb > 没跑的与原因","kind":"section","parent":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb","title":"没跑的与原因"},
+{"hash":"71e1f474752f87e4","id":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb > 工单与登记","kind":"section","parent":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb","title":"工单与登记"}
+],
+"edges":[
+{"dst":"docs/design/architecture/name-map.md","kind":"code-path","raws":["docs/design/architecture/name-map.md"],"seen":"b8c5228c3945b337","src":"docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md#按缝的差异报告：2026-11-03，提交 5b17fdeb"}
+]
+}

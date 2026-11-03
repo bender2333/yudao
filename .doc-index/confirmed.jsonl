@@ -152,3 +152,4 @@
 {"down":"59ec65797200e301","dst":"docs/architecture.html#s2","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明","up":"a40f436c1c34521a"}
 {"down":"f176ef66880338f6","dst":"docs/architecture.html#s2","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明","up":"a40f436c1c34521a"}
 {"down":"d16eca7251049f49","dst":"docs/architecture.html#s2","src":"docs/design/trusted-kernel.md#可信内核设计说明","up":"a40f436c1c34521a"}
+{"down":"2c1efb439f06f1f5","dst":"docs/agents/workflow.md#工作方式 > 9. 技能","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能","up":"6ce7d3f567bb8d51"}

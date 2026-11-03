@@ -1,0 +1,56 @@
+{
+  "说明": "规则事实线的正本表格：哪张表的哪一列是哪种事实。词表：「角色」取自 roles.json（含别名与合称）；写成名字的词表在 vocab 里，值必须在清单里；列上写 open 的词表（「事」）还没封闭，一格按顿号与分号切开，每个短语原样当一个值。表的键是 doc-consistency nodes 查得到的节点名（小节名 > 表N）；文档里一个字不加。列的写法见 README「规则事实线」。",
+  "tables": {
+    "docs/agents/workflow.md#工作方式 > 2. 角色 > 表1": {
+      "key": "角色",
+      "key_vocab": "角色",
+      "node": "角色",
+      "columns": {
+        "做什么": {"fact": "做", "many": true, "vocab": "事", "open": true},
+        "不做什么": {"fact": "不做", "many": true, "vocab": "事", "open": true}
+      }
+    },
+    "docs/agents/workflow.md#工作方式 > 4. 状态与标签 > 表1": {
+      "key": "状态",
+      "node": "标签",
+      "columns": {
+        "谁改成它": {"fact": "由谁改成", "many": true, "vocab": "角色", "edge": "角色→键"},
+        "意思": {"fact": "理由", "many": true, "after": "交回架构师："}
+      }
+    },
+    "docs/agents/workflow.md#工作方式 > 5. 证据评论 > 表1": {
+      "key": "前缀",
+      "node": "证据前缀",
+      "columns": {
+        "谁写": {"fact": "由谁写", "many": true, "vocab": "角色", "edge": "角色→键"}
+      }
+    },
+    "docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1": {
+      "key": "卡在",
+      "node": "卡在项",
+      "columns": {
+        "交给": {"fact": "交给", "many": true, "vocab": "角色", "edge": "键→角色"},
+        "卡在": {"fact": "理由", "many": true, "key_from": {"column": "怎么交", "tags": ["needs-triage"]}}
+      }
+    },
+    "docs/agents/workflow.md#工作方式 > 9. 技能 > 表1": {
+      "key": "",
+      "columns": {
+        "用户在场": {"fact": "在场可否", "many": false, "vocab": "可否"},
+        "用户不在场（架构师循环）": {"fact": "不在场可否", "many": false, "vocab": "可否"}
+      }
+    },
+    "docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 1. 记录身份与结论 > 表1": {
+      "key": "结论",
+      "node": "结论",
+      "columns": {
+        "负责角色": {"fact": "由谁负责", "many": true, "vocab": "角色", "edge": "键→角色"}
+      }
+    }
+  },
+  "qualifiers": ["领取时", "之前", "核对父工单", "该验收工单的", "在用户确认以后写", "在阶段结束时汇总"],
+  "vocab": {
+    "可否": ["可以", "不可以"],
+    "载体": ["总图", "基础规则", "设计说明", "ADR", "需求记录", "术语表", "CLAUDE.md", "AGENTS.md", "共同规则", "工作方式", "工单规范", "验收证据规则", "技能", "工单正文"]
+  }
+}

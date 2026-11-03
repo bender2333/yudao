@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/agents/workflow.md",
-"hash":"2c01765171109f63",
+"hash":"8a764dc33f786798",
 "nodes":[
-{"hash":"2c01765171109f63","id":"docs/agents/workflow.md","kind":"file","title":"docs/agents/workflow.md"},
+{"hash":"8a764dc33f786798","id":"docs/agents/workflow.md","kind":"file","title":"docs/agents/workflow.md"},
 {"hash":"e08a7afc874769b7","id":"docs/agents/workflow.md#工作方式","kind":"section","parent":"docs/agents/workflow.md","title":"工作方式"},
 {"hash":"3bb5d44bd054277c","id":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"1. 事实放在哪"},
 {"hash":"0be083fce721bdc9","id":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 系统的形状、三环、缝","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪","title":"系统的形状、三环、缝"},
@@ -21,7 +21,7 @@
 {"hash":"186347ac00cce1c4","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > 用户","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"用户"},
 {"hash":"5aa344021a15549d","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > 总架构师","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"总架构师"},
 {"hash":"1a645c3be67f98bf","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > 子架构师","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"子架构师"},
-{"hash":"016656c503ede1b9","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > 架构师循环","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"架构师循环"},
+{"hash":"b94339f75421f221","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > 架构师循环","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"架构师循环"},
 {"hash":"2ba1fe4d3cd17312","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > solo 执行者","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"solo 执行者"},
 {"hash":"4b4b2ec5d95b6774","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > 审查者","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"审查者"},
 {"hash":"af8ab2840b0133e2","id":"docs/agents/workflow.md#工作方式 > 2. 角色 > 表1 > agent 试用者","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 2. 角色","title":"agent 试用者"},
@@ -46,10 +46,12 @@
 {"hash":"5e6a4e2c82e65ba8","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 执行环境、要用户提供的条件","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"执行环境、要用户提供的条件"},
 {"hash":"8e338f1b1b11a8fe","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 设计、规则矛盾、验收做不到、连续三轮没过","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"设计、规则矛盾、验收做不到、连续三轮没过"},
 {"hash":"3ff4b456178b9057","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 与总图冲突、总图缺了什么","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"与总图冲突、总图缺了什么"},
-{"hash":"30a0d1d8a0f851d0","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 规则本身要改","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"规则本身要改"},
+{"hash":"d7e1d4dec938e6f4","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 规则本身要改","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"规则本身要改"},
+{"hash":"68057a468e6d49c3","id":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 意图要改：目的、判据、基础规则的意思","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","title":"意图要改：目的、判据、基础规则的意思"},
 {"hash":"de63e29217dbff90","id":"docs/agents/workflow.md#工作方式 > 8. 独立审查","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"8. 独立审查"},
-{"hash":"f0fcf127bbc26e9a","id":"docs/agents/workflow.md#工作方式 > 9. 技能","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"9. 技能"},
-{"hash":"c723098041957f18","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流、基础规则","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"改规则、CI 工作流、基础规则"},
+{"hash":"6ce7d3f567bb8d51","id":"docs/agents/workflow.md#工作方式 > 9. 技能","kind":"section","parent":"docs/agents/workflow.md#工作方式","title":"9. 技能"},
+{"hash":"5b26ae13ecc63ae5","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改意图：目的、判据、基础规则的意思（D38、基础规则）","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"改意图：目的、判据、基础规则的意思（D38、基础规则）"},
+{"hash":"5a87757ab76e2e74","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改其余规则、CI 工作流","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"改其余规则、CI 工作流"},
 {"hash":"47998e989d7d3088","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改设计说明、拆单、分诊、验收、试用准备","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"改设计说明、拆单、分诊、验收、试用准备"},
 {"hash":"0654733ce8c8971d","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 关闭试用工单与里程碑","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"关闭试用工单与里程碑"},
 {"hash":"0e62b019491ceee7","id":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表2 > discuss","kind":"row","parent":"docs/agents/workflow.md#工作方式 > 9. 技能","title":"discuss"},
@@ -86,9 +88,13 @@
 {"dst":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数","kind":"link","raws":["autopilot-runtime.md"],"seen":"f7d1c570027aa2b4","src":"docs/agents/workflow.md#工作方式 > 4. 状态与标签"},
 {"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","kind":"link","raws":["acceptance-evidence.md"],"seen":"db8c9bc16216185d","src":"docs/agents/workflow.md#工作方式 > 6. 四个循环"},
 {"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f920037e95e4f647","src":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 规则本身要改"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"c7b391fd32066ba7","src":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交 > 表1 > 规则本身要改"},
 {"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"1155373f0753c2aa","src":"docs/agents/workflow.md#工作方式 > 8. 独立审查"},
 {"dst":".claude/skills/README.md","kind":"link","raws":["../../.claude/skills/README.md"],"seen":"6ed1d66350b92c02","src":"docs/agents/workflow.md#工作方式 > 9. 技能"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b4fc41b167016dad","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流、基础规则"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改规则、CI 工作流、基础规则"}
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"f920037e95e4f647","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改其余规则、CI 工作流"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"c7b391fd32066ba7","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改其余规则、CI 工作流"},
+{"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"6362d110905936c3","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改意图：目的、判据、基础规则的意思（D38、基础规则）"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"30d188aa945f9e1d","src":"docs/agents/workflow.md#工作方式 > 9. 技能 > 表1 > 改意图：目的、判据、基础规则的意思（D38、基础规则）"}
 ]
 }
