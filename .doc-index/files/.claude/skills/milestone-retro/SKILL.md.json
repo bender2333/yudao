@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/milestone-retro/SKILL.md",
-"hash":"ca1f477aa75c0876",
+"hash":"a783a592ec6d465e",
 "nodes":[
-{"hash":"ca1f477aa75c0876","id":".claude/skills/milestone-retro/SKILL.md","kind":"file","title":".claude/skills/milestone-retro/SKILL.md"},
+{"hash":"a783a592ec6d465e","id":".claude/skills/milestone-retro/SKILL.md","kind":"file","title":".claude/skills/milestone-retro/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/milestone-retro/SKILL.md#(开头)","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md","title":"(开头)"},
 {"hash":"0f82154b44603c4c","id":".claude/skills/milestone-retro/SKILL.md#name: milestone-retrodescription: 复盘 Yudao 的项目与开发流程：从工单时间线、执行者与审查者的运行记录、CI 日志与 git 历史重建经过，核对上一次改动的预期，提出带预期与撤回条件的改动。里程碑达到、用户要求复盘、或要查明一段时间里流程出了什么问题时使用。argument-hint: \"[里程碑标题 | 工单编号列表 | 起止日期]，省略时从上一份复盘报告的截止时间到现在\"","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md","title":"name: milestone-retrodescription: 复盘 Yudao 的项目与开发流程：从工单时间线、执行者与审查者的运行记录、CI 日志与 git 历史重建经过，核对上一次改动的预期，提出带预期与撤回条件的改动。里程碑达到、用户要求复盘、或要查明一段时间里流程出了什么问题时使用。argument-hint: \"[里程碑标题 | 工单编号列表 | 起止日期]，省略时从上一份复盘报告的截止时间到现在\""},
 {"hash":"1c167e7e6aa4c53e","id":".claude/skills/milestone-retro/SKILL.md#复盘","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md","title":"复盘"},
@@ -17,7 +17,7 @@
 {"hash":"44a77692b2c1edc5","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > 设计说明的改动","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"设计说明的改动"},
 {"hash":"7767cc35f59c49ce","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > main 的豁免记录","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"main 的豁免记录"},
 {"hash":"1bd969808bb6347b","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > 用户的反馈","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"用户的反馈"},
-{"hash":"3ebbe5968adf8fb6","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > Yudao 自己的运行","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"Yudao 自己的运行"},
+{"hash":"d9ecde41eb039e52","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里 > 表1 > Yudao 自己的运行","kind":"row","parent":".claude/skills/milestone-retro/SKILL.md#复盘 > 原始记录在哪里","title":"Yudao 自己的运行"},
 {"hash":"17a81a4dd295c56a","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 复盘帖子","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md#复盘","title":"复盘帖子"},
 {"hash":"6bdb4a76d1c31159","id":".claude/skills/milestone-retro/SKILL.md#复盘 > 步骤","kind":"section","parent":".claude/skills/milestone-retro/SKILL.md#复盘","title":"步骤"}
 ],

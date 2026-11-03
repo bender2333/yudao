@@ -1,16 +1,17 @@
 {
 "schema":1,
 "path":"evals/context/README.md",
-"hash":"fe0e1c3b3bfc804e",
+"hash":"94d911d819ae9877",
 "nodes":[
-{"hash":"fe0e1c3b3bfc804e","id":"evals/context/README.md","kind":"file","title":"evals/context/README.md"},
+{"hash":"94d911d819ae9877","id":"evals/context/README.md","kind":"file","title":"evals/context/README.md"},
 {"hash":"56f0dcde2207a024","id":"evals/context/README.md#上下文装配的离线回放","kind":"section","parent":"evals/context/README.md","title":"上下文装配的离线回放"},
-{"hash":"eb042fc16322b98b","id":"evals/context/README.md#上下文装配的离线回放 > 怎么用","kind":"section","parent":"evals/context/README.md#上下文装配的离线回放","title":"怎么用"},
+{"hash":"b19141219b0ccfed","id":"evals/context/README.md#上下文装配的离线回放 > 怎么用","kind":"section","parent":"evals/context/README.md#上下文装配的离线回放","title":"怎么用"},
 {"hash":"391ecb819713f8d9","id":"evals/context/README.md#上下文装配的离线回放 > 每一步在测什么","kind":"section","parent":"evals/context/README.md#上下文装配的离线回放","title":"每一步在测什么"},
 {"hash":"86558ecb9fe3efd4","id":"evals/context/README.md#上下文装配的离线回放 > 文件","kind":"section","parent":"evals/context/README.md#上下文装配的离线回放","title":"文件"}
 ],
 "edges":[
 {"dst":"docs/design/context-assembly.md","kind":"link","raws":["../../docs/design/context-assembly.md"],"seen":"9a60e35cc098ce8d","src":"evals/context/README.md#上下文装配的离线回放"},
+{"dst":"evals/README.md#评测工具 > 结果放哪里","kind":"link","raws":["../README.md"],"seen":"b8c4a1263606ffca","src":"evals/context/README.md#上下文装配的离线回放 > 怎么用"},
 {"dst":"evals/context/counterfactual.py","kind":"code-path","raws":["counterfactual.py"],"seen":"07acb0fe019a2f03","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
 {"dst":"evals/context/items.py","kind":"code-path","raws":["items.py"],"seen":"f2bc80c7cb6ce244","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
 {"dst":"evals/context/measure.py","kind":"code-path","raws":["measure.py"],"seen":"474977f515e63e4c","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},

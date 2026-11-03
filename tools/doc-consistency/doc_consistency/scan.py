@@ -11,9 +11,12 @@ from markdown_it import MarkdownIt
 
 # 不进索引的位置
 EXCLUDE_PREFIXES = ("docs/archive/", "agents_jour/", ".claude/worktrees/")
-# 是代码不是文档的 HTML：界面原型、评测场景、图谱页面的模板
+# 是代码不是文档的 HTML：界面原型、评测场景、图谱与规则事实页面的模板
 CODE_HTML_PREFIXES = ("docs/prototypes/", "evals/scenarios/")
-CODE_HTML_FILES = ("tools/doc-consistency/doc_consistency/assets/graph.html",)
+CODE_HTML_FILES = (
+    "tools/doc-consistency/doc_consistency/assets/graph.html",
+    "tools/doc-consistency/doc_consistency/assets/rulefacts.html",
+)
 ARCH_FILE = "docs/architecture.html"
 PREAMBLE = "(开头)"
 SECTION_NUMBERS = {"一": 1, "二": 2, "三": 3, "四": 4, "五": 5, "六": 6}

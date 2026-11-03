@@ -1,13 +1,14 @@
 {
 "schema":1,
 "path":"docs/design/department-loop.md",
-"hash":"b9b58183618435eb",
+"hash":"291975fdab7b57d4",
 "nodes":[
-{"hash":"b9b58183618435eb","id":"docs/design/department-loop.md","kind":"file","title":"docs/design/department-loop.md"},
+{"hash":"291975fdab7b57d4","id":"docs/design/department-loop.md","kind":"file","title":"docs/design/department-loop.md"},
 {"hash":"ecc70bc0c73a93d7","id":"docs/design/department-loop.md#三部门的循环结构","kind":"section","parent":"docs/design/department-loop.md","title":"三部门的循环结构"},
 {"hash":"d1db33b50989293b","id":"docs/design/department-loop.md#三部门的循环结构 > 1. 依据与范围","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"1. 依据与范围"},
 {"hash":"17be33a6b2f0dabb","id":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"2. 部门按关注的成果开始工作"},
 {"hash":"ee409d450f36ce18","id":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作 > 2.1 部门的状态","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","title":"2.1 部门的状态"},
+{"hash":"3158828b8f2c19af","id":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作 > 2.2 合同里的具体值要能指回用户原话","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","title":"2.2 合同里的具体值要能指回用户原话"},
 {"hash":"6f48b847f22d409a","id":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"3. 三个部门同时运行"},
 {"hash":"ee793571e2f00a36","id":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行 > 3.1 各部门在什么时候工作","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行","title":"3.1 各部门在什么时候工作"},
 {"hash":"959421dda4e258f9","id":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行 > 3.2 同时运行的条件","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行","title":"3.2 同时运行的条件"},
@@ -25,7 +26,7 @@
 {"hash":"3484c61530534e49","id":"docs/design/department-loop.md#三部门的循环结构 > 8. 工程的计划","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"8. 工程的计划"},
 {"hash":"ea320a6cd55f8637","id":"docs/design/department-loop.md#三部门的循环结构 > 9. 停止与恢复","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"9. 停止与恢复"},
 {"hash":"b4ae3c6c53dae213","id":"docs/design/department-loop.md#三部门的循环结构 > 10. 模块交互","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"10. 模块交互"},
-{"hash":"5e2d72d1abf338fe","id":"docs/design/department-loop.md#三部门的循环结构 > 11. 要点汇总","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"11. 要点汇总"}
+{"hash":"82827ba053ee6175","id":"docs/design/department-loop.md#三部门的循环结构 > 11. 要点汇总","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"11. 要点汇总"}
 ],
 "edges":[
 {"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"0e9705e0dd37530b","src":"docs/design/department-loop.md#三部门的循环结构"},

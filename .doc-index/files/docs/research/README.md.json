@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/research/README.md",
-"hash":"cf33f2bfc268c513",
+"hash":"e450860b77f9ab11",
 "nodes":[
-{"hash":"cf33f2bfc268c513","id":"docs/research/README.md","kind":"file","title":"docs/research/README.md"},
-{"hash":"cf33f2bfc268c513","id":"docs/research/README.md#调研资料","kind":"section","parent":"docs/research/README.md","title":"调研资料"}
+{"hash":"e450860b77f9ab11","id":"docs/research/README.md","kind":"file","title":"docs/research/README.md"},
+{"hash":"e450860b77f9ab11","id":"docs/research/README.md#调研资料","kind":"section","parent":"docs/research/README.md","title":"调研资料"}
 ],
 "edges":[
 {"dst":"docs/archive/research/README-2026-09-06.md","kind":"link","raws":["../archive/research/README-2026-09-06.md"],"seen":"1c561e6ad722899a","src":"docs/research/README.md#调研资料"},
@@ -12,8 +12,9 @@
 {"dst":"docs/decision.md#决策记录 > 2026-11-02 - 文档一致性：规则事实单独成线","kind":"link","raws":["../decision.md"],"seen":"c06944bfd9c179ba","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"8991ad5c4d99e914","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/design/rules-and-parameters.md","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"ead1d02389385c07","src":"docs/research/README.md#调研资料"},
-{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"ddfa3e624fcbad67","src":"docs/research/README.md#调研资料"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/research/README.md#调研资料"},
+{"dst":"docs/design/skeleton-and-application.md","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"591166117c8dd735","src":"docs/research/README.md#调研资料"},
+{"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["../design/trusted-kernel.md"],"seen":"5ced538e9bf46b7d","src":"docs/research/README.md#调研资料"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"0ae7a2dd97132274","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/requirements/game-world-three-spaces.md","kind":"link","raws":["../requirements/game-world-three-spaces.md"],"seen":"0aafa424289910a5","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/requirements/in-flight-input.md","kind":"link","raws":["../requirements/in-flight-input.md"],"seen":"d6a3b4a49161df61","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/requirements/meta-observer.md","kind":"link","raws":["../requirements/meta-observer.md"],"seen":"4a3423ea5e3918f5","src":"docs/research/README.md#调研资料"},
@@ -21,12 +22,13 @@
 {"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["../requirements/self-hosting.md"],"seen":"21cff6a1bbd5193d","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/research/complexity-and-mutation-testing.md","kind":"link","raws":["complexity-and-mutation-testing.md"],"seen":"c9fefacf4651dfb5","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/research/deepseek-superagent-async-framework.md","kind":"link","raws":["deepseek-superagent-async-framework.md"],"seen":"e57af7e8d698323d","src":"docs/research/README.md#调研资料"},
-{"dst":"docs/research/doc-consistency-concept-model.md","kind":"link","raws":["doc-consistency-concept-model.md"],"seen":"8a6d8b37ae99405b","src":"docs/research/README.md#调研资料"},
-{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"link","raws":["doc-consistency-rule-facts.md"],"seen":"39c644076a0542c5","src":"docs/research/README.md#调研资料"},
+{"dst":"docs/research/doc-consistency-concept-model.md","kind":"link","raws":["doc-consistency-concept-model.md"],"seen":"aee6360e04742851","src":"docs/research/README.md#调研资料"},
+{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"link","raws":["doc-consistency-rule-facts.md"],"seen":"19aee6681c333a13","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/research/experiment-protocol.md","kind":"link","raws":["experiment-protocol.md"],"seen":"980a78ece8e85f99","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/research/game-world-as-projection.md","kind":"link","raws":["game-world-as-projection.md"],"seen":"9c8d71b3273064a0","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/research/jev-decision-model.md","kind":"link","raws":["jev-decision-model.md"],"seen":"9d4af7c096414eb5","src":"docs/research/README.md#调研资料"},
 {"dst":"docs/research/kernel-projection-reads-2026-10-24.md","kind":"link","raws":["kernel-projection-reads-2026-10-24.md"],"seen":"603f8392e9d12f46","src":"docs/research/README.md#调研资料"},
-{"dst":"docs/research/organization-runtime-evolution.md","kind":"link","raws":["organization-runtime-evolution.md"],"seen":"6860924d7920793e","src":"docs/research/README.md#调研资料"}
+{"dst":"docs/research/organization-runtime-evolution.md","kind":"link","raws":["organization-runtime-evolution.md"],"seen":"6860924d7920793e","src":"docs/research/README.md#调研资料"},
+{"dst":"docs/research/uncle-bob-ub-mode.md","kind":"link","raws":["uncle-bob-ub-mode.md"],"seen":"7255ede915f29344","src":"docs/research/README.md#调研资料"}
 ]
 }
