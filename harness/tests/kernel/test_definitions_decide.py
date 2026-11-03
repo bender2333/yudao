@@ -79,9 +79,10 @@ def _basis(projection: RunProjection) -> adjudication.WorkBasis:
 
 
 def _permission(projection: RunProjection, name: str, department: str,
-                definitions: Definitions | None = None, session_id: str | None = None):
+                definitions: Definitions | None = None, session_id: str | None = None,
+                path: str = "README.md"):
     return adjudication.tool_permission(
-        _view(projection), {"name": name, "id": "call-1", "args": {"path": "README.md"}},
+        _view(projection), {"name": name, "id": "call-1", "args": {"path": path}},
         department=department, session_id=session_id, tightening=WATCHED_OUTPUTS,
         basis=_basis(projection), aborted=False, facts=WorkspaceFacts(), definitions=definitions)
 
@@ -323,6 +324,38 @@ def test_a_write_scope_must_name_the_directories_check_materials_writes() -> Non
 def test_an_unknown_department_has_no_write_scope() -> None:
     with pytest.raises(ValueError, match="unknown department 'reviewer'"):
         DEFINITIONS.write_scope("reviewer")
+
+
+def _renamed_verifier() -> Definitions:
+    # 一份把核验角色改名的定义：部门清单里旧的核验角色换成新的名字，角色与核验声明、写入范围跟着换
+    organization = DEFINITIONS.organization
+    departments = tuple(item.model_copy(update={"id": "inspection"}) if item.id == "quality" else item
+                        for item in organization.departments)
+    declaration = VerificationDeclaration(
+        verifiers=(VerifierRole(role="inspection", verifies=(
+            VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),),
+        write_scopes={"inspection": WriteScope(scope="check_materials", paths=(QA_TESTS_DIR,))})
+    return DEFINITIONS.model_copy(update={
+        "organization": organization.model_copy(update={"departments": departments, "verification": declaration}),
+        "roles": {"inspection" if role == "quality" else role: definition
+                  for role, definition in DEFINITIONS.roles.items()}})
+
+
+def test_the_write_scope_of_a_tool_call_is_read_from_the_declaration() -> None:
+    # 工单 #1390：写入范围按定义里角色的声明核对，不按部门名。核验角色改名的定义里，改名后的角色写检查材料
+    # 以外的文件被拒绝（原因与默认定义下的质检逐字相同、不写部门名），写检查材料放行；
+    # 写入范围是工作区的角色不受这个限制
+    renamed = _renamed_verifier()
+    assert renamed.write_scope("inspection") == WriteScope(scope="check_materials", paths=(QA_TESTS_DIR,))
+    projection = RunProjection()
+    outside = _permission(projection, "write_file", "inspection", renamed, path="src/echo.py")
+    assert not outside.allowed and not outside.stopped
+    assert outside.reason == _permission(projection, "write_file", "quality", path="src/echo.py").reason
+    assert QA_TESTS_DIR in outside.reason
+    for name in ("inspection", "product", "engineering", "quality"):
+        assert name not in outside.reason, outside.reason
+    assert _permission(projection, "write_file", "inspection", renamed, path=f"{QA_TESTS_DIR}/test_echo.py").allowed
+    assert _permission(projection, "write_file", "engineering", renamed, path="src/echo.py").allowed
 
 
 def test_an_old_definition_without_the_declaration_reads_the_three_departments() -> None:

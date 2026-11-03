@@ -39,7 +39,7 @@ from harness.app.application import Application  # noqa: E402
 from harness.app.catalog_commands import (  # noqa: E402
     BindingInput, CatalogConnectionSave, CatalogDepartmentDefaultsSave, CredentialSet, ModelInput, ProviderInput,
 )
-from harness.app.mcp_commands import McpServersSave  # noqa: E402
+from harness.app.mcp_commands import McpServersSave, ToolServerProbe  # noqa: E402
 from harness.app.contracts import Accepted, Rejected  # noqa: E402
 from harness.app.project_commands import ProjectCreate  # noqa: E402
 from harness.app.project_and_work_item_commands import (  # noqa: E402
@@ -51,7 +51,7 @@ from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.environment import QA_TESTS_DIR  # noqa: E402
 from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
-    answer_turn, ask_turn, baseline_review_turn, delivery_turn, product_spec,
+    answer_turn, ask_turn, baseline_review_turn, delivery_turn, judgement_turn, product_spec,
     review, review_turn, structure_turn,
 )
 from harness.providers.call import ModelResponse  # noqa: E402
@@ -105,6 +105,20 @@ MCP_KEY = "MCP_E2E_KEY"
 MCP_MISSING_KEY = "MCP_MISSING_KEY"
 MCP_SECRET = "mcp-e2e-secret-237"
 MCP_STDIO_SERVER = Path(__file__).resolve().parents[3] / "harness" / "tests" / "mcp_servers" / "stdio_server.py"
+
+# 工具与扩展页的端到端验收（工单 #239）：两个项目各有不同的 MCP 服务器与一次取回。
+# 取回是真实动作：工程在事项里调用 fetch_url，控制主机真的取回本机一个真实 HTTP 服务上的页面
+# （本机地址允许取回，服务自己的地址才拒绝）。第一台服务器真的探测过（工具清单来自
+# harness/tests/mcp_servers/stdio_server.py），第二台没有探测过，页面上两种状态各出现一次
+TOOLS_FETCH_PROJECT = "回声工具"
+TOOLS_MCP_PROJECT = "文本整理"
+TOOLS_FETCH_ITEM = "取回站点上的说明"
+TOOLS_MCP_ITEM = "整理一份文本"
+TOOLS_SERVER = "time"
+TOOLS_HTTP_SERVER = "search"
+
+# 两个项目各自取回的本机地址路径（同一个真实 HTTP 服务上的两页）
+TOOLS_FETCH_PATHS = ("/echo", "/notes")
 
 
 def lan_address() -> str:
@@ -455,6 +469,65 @@ def stop_note_script():
     }
 
 
+# 开环明细的端到端验收（工单 #401）：一个放行带两条开环条件（一条判定点、一条开环），
+# 离开期间的报告要逐条列出它们，条数与 acceptance.coverage 的数一致
+COVERAGE_PROJECT = "开环报告"
+COVERAGE_ITEM = "实现带开环条件的放行"
+COVERAGE_ACCEPTANCE = ["打印传入的文本", "空参数时打印用法", "退出码为 0"]
+
+
+def coverage_criteria() -> list[dict]:
+    # 三条验收条件（验证的独立性设计说明第 7.1 节）：一条命令检查（可执行、通过）、
+    # 一条带参照材料的判定点（模型阅读、不可执行）、一条开环（不可执行）。
+    # 可执行检验的条件放行时必须是 passed，不可执行的可以是 unverified
+    return [
+        {"criterion": "AC1", "method": "check", "result": "passed", "checks": ["smoke"],
+         "trial_cases": [], "note": ""},
+        {"criterion": "AC2", "method": "judgement", "result": "unverified", "checks": [],
+         "trial_cases": [], "note": "对照 Usage 段落人读"},
+        {"criterion": "AC3", "method": "open", "result": "unverified", "checks": [],
+         "trial_cases": [], "note": "没有可执行的检验"},
+    ]
+
+
+def coverage_script():
+    # 开环明细的脚本（工单 #401）：按部门给出，每一轮按请求里看到的事实决定做什么——
+    # 质检在没有交付的一轮是预测性探索，有交付的一轮先交独立判断（提交结论以前必须有它，
+    # 验证的独立性设计说明第 4 节）再放行。放行记录里因此有两条开环条件
+    judged: dict[str, bool] = {}
+
+    def quality_turn(call):
+        if not prompt_part(call, "current_delivery_spec"):
+            return explore_turn()
+        if not judged.get("committed"):
+            judged["committed"] = True
+            return judgement_turn(checks={"smoke": 0}, criteria=coverage_criteria())(call)
+        return review_turn("release", "checks passed on the current snapshot",
+                           checks={"smoke": 0}, criteria=coverage_criteria())(call)
+
+    return {
+        "product": [FakeTurn(proposal=product_spec(acceptance=COVERAGE_ACCEPTANCE))],
+        "engineering": [delivery_turn()],
+        "quality": [quality_turn] * 8,
+    }
+
+
+async def seed_coverage(application: Application, system: LoopSystem) -> None:
+    # 开环明细的预置（工单 #401）：一个项目、一个走完三部门并放行的事项，放行记录带两条开环条件。
+    # 没有走完时立即失败：报告里没有这一项时用例看不出是被测页面还是预置的问题
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=COVERAGE_PROJECT, goal="报告里列出开环明细"))
+    project_id = created.refs.project_id
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=project_id, text=COVERAGE_ITEM))
+    task = system.orchestrator.work_item_execution(item.refs.run_id)
+    if task is not None:
+        await task
+    run = system.project(item.refs.run_id)
+    if run.status != "done":
+        raise AssertionError(f"开环明细的预置没有走完：{run.status} {run.stop_reason}")
+
+
 def kernel_script():
     # 路径守卫的端到端验收（工单 #354）：预置的事项交付改动了内核清单里的路径，结算因此不采纳，
     # 发出内核修改决定请求；用例在界面上核对卡片给出改动的路径与差异，批准以后交付被采纳。
@@ -465,6 +538,21 @@ def kernel_script():
                                       files={"src/echo.py": "import sys\nprint(sys.argv[1])\n",
                                              KERNEL_PATH: "# 交付改动的内核文件\n"})],
         "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * 2,
+    }
+
+
+def tools_script(fetch_urls: list[str]):
+    # 工具与扩展页的端到端验收（工单 #239）：两个项目各跑一个事项，事项里工程真的取回一次本机地址
+    # （fetch_url 由原生循环执行，取回记录因此来自真实动作），取回以后交付；质检在没有交付的一轮是
+    # 预测性探索，有交付的一轮核验放行。轮次按项目数给够，不按先后赌（与默认脚本同一做法）
+    engineering: list = []
+    for index, url in enumerate(fetch_urls):
+        engineering.append(read_turn(f"fetch-tools-{index}", "fetch_url", {"url": url}))
+        engineering.append(delivery_turn())
+    return {
+        "product": [FakeTurn(proposal=product_spec())] * len(fetch_urls),
+        "engineering": engineering,
+        "quality": [quality_turn(review_turn("release", "checks passed on the current snapshot"))] * (2 * len(fetch_urls) + 4),
     }
 
 
@@ -603,6 +691,63 @@ async def seed_mcp_servers(application: Application, project_id: str) -> None:
         base_version=facade.credential_status(MCP_KEY)["version"]))
 
 
+async def seed_tools(application: Application, system: LoopSystem, fetch_urls: list[str]) -> None:
+    # 工具与扩展页的预置（工单 #239）：两个项目、两台不同的 MCP 服务器，各一个事项，
+    # 事项里工程真的取回一次本机地址（取回记录来自真实动作，不是写进去的事件）。
+    # 第一台服务器真的探测过：工具清单与最近一次状态写回设置；第二台不探测，页面上是「还没有探测过」
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=TOOLS_FETCH_PROJECT, goal="把站点上的说明取回来"))
+    fetch_project = created.refs.project_id
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=TOOLS_MCP_PROJECT, goal="整理一份文本"))
+    mcp_project = created.refs.project_id
+    # 执行槽位一次一个事项：前一个结算以后再建下一个（与默认预置同一做法）
+    for project_id, text in ((fetch_project, TOOLS_FETCH_ITEM), (mcp_project, TOOLS_MCP_ITEM)):
+        item = await accept(application, "work_item.create", WorkItemCreate(
+            command_id=str(uuid.uuid4()), project_id=project_id, text=text))
+        task = system.orchestrator.work_item_execution(item.refs.run_id)
+        if task is not None:
+            await task
+    # 两台服务器名称与传输都不同：一台是本机进程（探测时真的启动测试服务器），一台是 HTTP 服务
+    stdio_server = {
+        "name": TOOLS_SERVER, "transport": "stdio",
+        "command": sys.executable, "args": [str(MCP_STDIO_SERVER)],
+        "departments": ["product", "engineering", "quality"],
+    }
+    http_server = {
+        "name": TOOLS_HTTP_SERVER, "transport": "http", "url": "https://mcp.example.com/mcp",
+        "departments": ["product"],
+    }
+    await accept(application, "mcp_servers.save", McpServersSave(
+        command_id=str(uuid.uuid4()), project_id=fetch_project,
+        servers={TOOLS_SERVER: stdio_server}, base_version=0))
+    await accept(application, "mcp_servers.save", McpServersSave(
+        command_id=str(uuid.uuid4()), project_id=mcp_project,
+        servers={TOOLS_HTTP_SERVER: http_server}, base_version=0))
+    # 探测第一台：命令接受以后作为任务进行，结果以项目流事件出现，成功时把工具清单快照写回设置。
+    # 等事件到达再起服务，页面打开时就有「最近一次状态与工具」
+    await accept(application, "tool_server.probe", ToolServerProbe(
+        command_id=str(uuid.uuid4()), project_id=fetch_project, name=TOOLS_SERVER, server=stdio_server))
+    await wait_for_probe(application, fetch_project, TOOLS_SERVER)
+
+
+async def wait_for_probe(application: Application, project_id: str, name: str,
+                         timeout_sec: float = 120.0) -> None:
+    # 等探测结果写进工具登记：工具登记查询就是页面读的那一条，它有了状态页面才显示得出来。
+    # 结果没到或者没成功时立即失败，不静默放过一份缺了状态的预置
+    deadline = time.monotonic() + timeout_sec
+    while time.monotonic() < deadline:
+        state = application.query("tools.registry", None).data
+        project = next((row for row in state.projects if row.project_id == project_id), None)
+        server = None if project is None else project.mcp_servers.get(name)
+        if server is not None and server.probe is not None and server.probe.finished_at:
+            if server.probe.ok:
+                return
+            raise AssertionError(f"工具与扩展页的探测没有成功：{server.probe.error}")
+        await asyncio.sleep(0.2)
+    raise AssertionError(f"工具与扩展页的探测在 {timeout_sec:g} 秒内没有出结果")
+
+
 def project_id_of(application: Application, name: str) -> str:
     # 预置的项目按名字取标识：用例与预置脚本对同一个项目（projects.list 是应用层自己的查询）
     listed = application.query("projects.list", ProjectsList(include_archived=True)).data
@@ -685,6 +830,43 @@ class ModelsServer:
     def close(self):
         self.server.shutdown()
         self.server.server_close()
+
+
+class NotesServer:
+    # 端到端用例取回的本机地址（工单 #239）：一个真实的 HTTP 服务，返回两份真网页。
+    # 取回动作真的取它，取回记录因此是真实动作的结果，不是写进去的事件
+    def __init__(self) -> None:
+        pages = {
+            "/echo": "<html><body><h1>回声工具的说明</h1><p>把传入的文本原样打印出来。</p></body></html>",
+            "/notes": "<html><body><h1>文本整理的说明</h1><p>逐行整理传入的文本。</p></body></html>",
+        }
+
+        class Handler(BaseHTTPRequestHandler):
+            def log_message(self, *_args):
+                return
+
+            def do_GET(self):
+                body = pages.get(self.path.split("?")[0])
+                if body is None:
+                    self.send_response(404)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
+                payload = body.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
+        threading.Thread(target=self.server.serve_forever, daemon=True).start()
+
+    def close(self):
+        self.server.shutdown()
+        self.server.server_close()
+
 
 async def seed_catalog(application: Application, upstream_base: str, models_url: str,
                        *, admit_and_bind: bool = False, reject_base: str | None = None) -> None:
@@ -827,7 +1009,7 @@ def main() -> int:
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote", "replay", "kill", "steps"),
+                                             "stopnote", "replay", "kill", "steps", "coverage", "tools"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -879,6 +1061,8 @@ def main() -> int:
     # 硬杀重启（工单 #1188）：工程执行的那条等待命令在信号目录里写下 started 与 child.pid，等 release
     # 文件出现才结束；目录由这里建、连同进程号一起报给用例
     signals = Path(tempfile.mkdtemp(prefix="yudao-e2e-signals-")) if args.script == "kill" else None
+    # 工具与扩展页的端到端验收（工单 #239）：两个项目各取回一次本机地址，地址由这个真实 HTTP 服务提供
+    notes = NotesServer() if args.script == "tools" else None
     if args.room:
         adapter_script = room_script()
     elif args.script == "onboarding":
@@ -898,6 +1082,12 @@ def main() -> int:
         adapter_script = kill_resume_script() if args.hold_resume else kill_script(signals)
     elif args.script == "steps":
         adapter_script = steps_script(data_dir)
+    elif args.script == "coverage":
+        # 开环明细（工单 #401）：一个放行带两条开环条件，离开期间的报告逐条列出它们
+        adapter_script = coverage_script()
+    elif args.script == "tools":
+        # 工具与扩展页（工单 #239）：两个项目，工程各在事项里真实取回一次本机地址
+        adapter_script = tools_script([f"{notes.base}{path}" for path in TOOLS_FETCH_PATHS])
     elif args.script == "replay":
         # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
         base_script = script()
@@ -979,10 +1169,17 @@ def main() -> int:
             asyncio.run(seed_onboarding(application))
         elif args.script == "kernel":
             asyncio.run(seed_kernel(application, system))
+        elif args.script == "coverage":
+            # 开环明细（工单 #401）：预置一个走完并放行的事项，放行记录里带两条开环条件
+            asyncio.run(seed_coverage(application, system))
+        elif args.script == "tools":
+            # 工具与扩展页（工单 #239）：两个项目各一台 MCP 服务器、各一次真实取回；
+            # 第一台服务器真的探测过（工具清单写回设置），第二台不探测
+            asyncio.run(seed_tools(application, system, [f"{notes.base}{path}" for path in TOOLS_FETCH_PATHS]))
         elif args.script == "replay":
             # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
             asyncio.run(seed(application, system, two_item_project=True))
-        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps"):
+        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）
             # 自己在界面上建项目并开始事项，不需要预置的项目与事项；进行中的询问还要求执行槽位空着，
@@ -1027,6 +1224,8 @@ def main() -> int:
             reject_upstream.shutdown()
             reject_upstream.server_close()
         models_server.close()
+        if notes is not None:
+            notes.close()
     return 0
 
 

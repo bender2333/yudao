@@ -163,14 +163,16 @@ class _LocalResponsesUpstream:
 
 
 def test_provider_module_imports_without_web_or_department_kernel():
-    # 独立模块：导入 Provider 模块只加载模块自身与它的预置表所在的定义，不加载 Web、编排器与部门内核
+    # 独立模块：导入 Provider 模块只加载模块自身、它的预置表所在的定义，以及定义读的那一份公开路径规则
+    # （旧定义的检查材料目录名在 path_rules 里，定义一侧读它，两侧一处来源；那份模块只导入标准库），
+    # 不加载 Web、编排器与部门内核
     script = ("import json, sys; import harness.providers; "
               "print(json.dumps(sorted(name for name in sys.modules if name.startswith('harness'))))")
     completed = subprocess.run([sys.executable, "-c", script], cwd=REPO_ROOT,
                                capture_output=True, text=True, check=True)
     loaded = json.loads(completed.stdout)
     assert "harness.providers.facade" in loaded
-    assert [name for name in loaded if name not in {"harness", "harness.definitions"}
+    assert [name for name in loaded if name not in {"harness", "harness.definitions", "harness.path_rules"}
             and not name.startswith("harness.providers")] == []
 
 
