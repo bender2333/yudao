@@ -84,6 +84,8 @@ RUN_EVENT_TYPES = frozenset({
     "decision_requested",
     "decision_answered",
     "decision_withdrawn",
+    # 派发编号（工单 #1397）：每开始一轮工作写一条，这一轮写入的事件都带它
+    "dispatch_number_acquired",
 })
 
 # 项目流：项目的长期事实（项目、当前 PRD 与采纳成果、事项的存在、队列位置与最终结果、项目部门设置）

@@ -102,10 +102,13 @@ def test_outcome_edge_reversed_fails_with_diff():
                         and e["session_id"] == "<ses_qua#1>" and e["event"] > events[outcome]["event"])
     assert events[outcome]["type"] == "delivery_accepted"
     assert events[activation]["type"] == "department_activated"
-    assert outcome < activation
-    assert all(e.get("session_id") != "<ses_qua#1>" for e in events[outcome:activation])
-    item = events.pop(activation)
-    events.insert(outcome, item)
+    # 取得派发编号的事件与激活在同一个事务里、紧挨在它前面（工单 #1397）：两个一起搬，质检会话内部的顺序不变
+    start = activation - 1 if events[activation - 1]["type"] == "dispatch_number_acquired" else activation
+    assert outcome < start
+    assert all(e.get("session_id") != "<ses_qua#1>" for e in events[outcome:start])
+    block = events[start:activation + 1]
+    del events[start:activation + 1]
+    events[outcome:outcome] = block
     with pytest.raises(AssertionError) as raised:
         compare_documents("handoff_release", expected, actual)
     message = str(raised.value)

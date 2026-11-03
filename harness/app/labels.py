@@ -221,6 +221,7 @@ _LABELS: dict[str, str] = {
     EventType.DECISION_REQUESTED: "提出等待回答的决定（{kind}）：{description}",
     EventType.DECISION_ANSWERED: "回答了一个决定：{option}",
     EventType.DECISION_WITHDRAWN: "撤回了一个决定：{reason}",
+    EventType.DISPATCH_NUMBER_ACQUIRED: "开始一轮工作，取得派发编号",
     ProjectEventType.PROJECT_REGISTERED: "建立了项目：{name}",
     ProjectEventType.PROJECT_RENAMED: "项目改名为：{name}",
     ProjectEventType.PROJECT_GOAL_CHANGED: "修改了项目的长期目标",

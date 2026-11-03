@@ -139,6 +139,8 @@ const FLOOR_NONE: Readonly<Record<string, string>> = none({
   department_input: INTERNAL,
   tool_call_required: INTERNAL,
   activation_finished: STATE_ONLY,
+  // 派发编号（骨架事件，工单 #1397）：一轮工作开始时的编号，由下一份状态表示，没有一次性的动作
+  dispatch_number_acquired: STATE_ONLY,
   model_reasoning: MODEL_IO,
   model_message: MODEL_IO,
   action_verified: PAGE_ONLY,
@@ -202,6 +204,8 @@ const ROOM_NONE: Readonly<Record<string, string>> = none({
   department_input: INTERNAL,
   tool_call_required: INTERNAL,
   activation_finished: STATE_ONLY,
+  // 派发编号（骨架事件，工单 #1397）：一轮工作开始时的编号，由下一份状态表示，没有一次性的动作
+  dispatch_number_acquired: STATE_ONLY,
   model_reasoning: MODEL_IO,
   model_message: MODEL_IO,
   action_verified: PAGE_ONLY,
@@ -254,6 +258,8 @@ const BUILDING_NONE: Readonly<Record<string, string>> = none({
   department_input: INTERNAL,
   tool_call_required: INTERNAL,
   activation_finished: STATE_ONLY,
+  // 派发编号（骨架事件，工单 #1397）：楼上看不出一次性的动作，由下一份状态表示
+  dispatch_number_acquired: STATE_ONLY,
   context_assembled: TOO_SMALL,
   model_request_serialized: TOO_SMALL,
   model_reasoning: MODEL_IO,
