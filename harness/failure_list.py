@@ -180,7 +180,9 @@ def _failure(event: Any, ordered: list[Any], *, entry_chars: int) -> Failure | N
 
 def _entry(event: Any, ordered: list[Any], *, kind: str, did: str, failure: str,
            entry_chars: int) -> Failure:
-    return Failure(kind=kind, event_id=event.event_id, did=did, failure=_truncate(failure, entry_chars),
+    # 单条上限同时管「怎么失败的」与「做了什么」里的参数摘要：参数可能带整份文件内容，一样要截
+    return Failure(kind=kind, event_id=event.event_id, did=_truncate(did, entry_chars),
+                   failure=_truncate(failure, entry_chars),
                    resolved=_resolved(event, ordered, kind=kind))
 
 

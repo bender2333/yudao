@@ -230,6 +230,15 @@ def test_one_failure_entry_is_truncated_to_the_entry_limit():
     assert tool_result(failed)["error"] == long_error
 
 
+def test_the_argument_summary_is_truncated_to_the_same_entry_limit():
+    """「做了什么」里的参数摘要同样按单条上限截断：参数里可能带着整份文件的内容。"""
+    big = _tool_event(2, name="write_file", args={"path": "src/a.txt", "content": "x" * 2000},
+                      ok=False, error="the write was refused")
+    listing = _listing([_event(1, EventType.DEPARTMENT_INPUT), big], entry_chars=120)
+    assert len(listing.failures[0].did) == 120
+    assert listing.failures[0].did.startswith('write_file {"content":"xxx')
+
+
 def _many_failures(count, *, resolved_every=None):
     events = [_event(1, EventType.DEPARTMENT_INPUT)]
     position = 1
