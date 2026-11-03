@@ -213,6 +213,10 @@ _LABELS: dict[str, str] = {
     EventType.BASELINE_REVIEW_ACCEPTED: "质检提交了基线核验：{verdict}",
     EventType.ARTIFACT_ACCEPTED: "采纳了成果：{artifact_kind}（第 {artifact_version} 版）",
     EventType.LESSON_CANDIDATE_RECORDED: "记下了一条经验候选：{suggestion}",
+    # MCP 服务器的生命周期（网络与 MCP 设计说明第 7.2 节，工单 #1176）
+    EventType.MCP_SERVER_STARTED: "启动了 MCP 服务器 {server}（{transport}）",
+    EventType.MCP_SERVER_CLOSED: "关闭了 MCP 服务器 {server}（{transport}）",
+    EventType.MCP_SERVER_FAILED: "MCP 服务器 {server} 启动失败：{error}",
     EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
     EventType.RUN_CONTINUED: "运行从暂停位置继续",
