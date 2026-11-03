@@ -34,10 +34,11 @@ flowchart TD
 - `scorer/`：评分器，对一份交付运行隐藏检查并写出机器可读结果。
 - `runner/`：OpenCode 一侧的运行器、指标收集与报告（`run_eval.py` 是入口）。它把材料起点复制到仓库之外的运行目录，运行 `opencode run`，从 JSON 事件流收集指标，再用评分器评分，最后写出机器可读结果与中文报告。
 - `runner/material_integrity.py`：两边的评分前核对共用的部分：按 LF 规范化字节流递归计算材料摘要并与 `materials/manifest.json` 的 `digests` 块比较，在输出文本里查找对任务上游仓库的访问。摘要重新生成也由它做。
-- `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块，也不引用被测方内部文件的路径。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，绑定三个部门、运行器不登记命令，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取最后一次封存的交付交给评分器，并计算过程检查点与指标。场景 3 新建项目并带入起始文件夹，以用户原始意图提交需求原文加接口约定；场景 2 接入已有仓库（`project.onboard`）、确认初始 PRD（`decision.answer`，或者等人确认），再新建事项提交需求原文（见下面「场景 2 的运行」）。
+- `runner/yudao.py`、`yudao_metrics.py`、`yudao_report.py`：Yudao 一侧的运行器、指标收集与报告（`run_yudao_eval.py` 是入口）。运行器只经 HTTP 接口驱动 Yudao，只从 `run.export` 导出的事件日志观察它，不导入 `harness` 的任何模块，也不引用被测方内部文件的路径。它在仓库之外新建数据目录启动被测的 Yudao，写入被测模型并经模型测试准入，绑定三个部门、运行器不登记命令，到时间上限时经 `work_item.cancel` 结束并标记超时；运行结束以后导出事件日志，取第一次与最后一次封存的交付各评一次分（只有一次交付时两份评分相同，没有交付时都是「没有做」），并计算过程检查点与指标。场景 3 新建项目并带入起始文件夹，以用户原始意图提交需求原文加接口约定；场景 2 接入已有仓库（`project.onboard`）、确认初始 PRD（`decision.answer`，或者等人确认），再新建事项提交需求原文（见下面「场景 2 的运行」）。
+- `runner/compare_sides.py`：Yudao 对单个 agent 的对照入口（`--yudao`、`--opencode`、`--result`、`--report`）。判定与逐次并排的表在 `yudao_compare.compare_sides`，报告由 `yudao_report.write_side_report` 写出，见下面「Yudao 对 OpenCode 的对照」。
 - `scenarios/scenario-3/materials/manifest.json`：场景 3 的材料来源、运行环境与材料摘要（`digests` 块）。
 - `baseline/`：omp 流程开发 Yudao 的基线数字。`collect.py` 抓取 Stage 3 里程碑下的工单、标签时间线与评论、合并请求、阶段父工单 #9 的集成层记录与运行目录里的运行输出，合成一个数据文件；`compute.py` 只读这个数据文件，算出每个工单的审查轮数、集成层失败归因、搁置原因、耗时与用量，写出中文报告。
-- `context/`：上下文装配的离线回放（#912，[设计说明](../docs/design/context-assembly.md)）。只读事件库与工件库，把每一步交给模型的上下文当成纯函数 `view(events, rules) → request`：`measure` 测每一步的召回与浪费，`replay` 用新视图重放并做逐条规则的消融，`sweep` 扫参数取值，`verify` 核对视图与记录逐字节一致，`counterfactual` 用真实模型做反事实回放。用法见 [context/README.md](context/README.md)。
+- `context/`：上下文装配的离线回放（[设计说明](../docs/design/context-assembly.md)）。只读事件库与工件库，把每一步交给模型的上下文当成纯函数 `view(events, rules) → request`：`measure` 测每一步的召回与浪费，`replay` 用新视图重放并做逐条规则的消融，`sweep` 扫参数取值，`verify` 核对视图与记录逐字节一致，`counterfactual` 用真实模型做反事实回放。用法见 [context/README.md](context/README.md)。
 - `tests/`：评分器与运行器自己的测试，全部运行真实代码，不使用 mock。基线工具的测试读录制的数据文件，同样不使用 mock。`test_yudao_runner.py` 用 `harness/tests/event_sequences/` 里的系统事件序列驱动同一套 `run.export` 形状的判定逻辑；这些序列的事件头是 `adapter: fake`，不是真实系统导出，凡是需要真实导出才能核实的项记「未核实」。`test_regen_scenario3.py` 用 `runner/regen_scenario3.py` 从仓库内固定的历史 JSON（`data/scenario-3-yudao-historical.json`，提交 `aaa91883` 的旧版原文，不可修改）重算 `docs/evaluation/scenario-3-yudao.json` 与 `.md`，与已提交的文件逐字节比对；以已提交的新 JSON 为输入重算同样逐字节一致（幂等）。`test_no_harness_paths.py` 用 `ast` 扫描并折叠字符串拼接与 `os.path.join` 字面量参数，再比对被测方内部文件路径。`test_report.py` 核对多次运行的汇总是怎么算的：完成度与正确性进汇总，每个指标带噪声范围，一次运行时噪声范围写「未知」，费用全为 0 或为空时写「未知」。
 
 ## 材料版本
@@ -114,13 +115,13 @@ uv run python evals/runner/run_eval.py \
     --model yudao-eval/<模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-3-opencode.json \
-    --report docs/evaluation/scenario-3-opencode.md
+    --result docs/evaluation/scenario-3-opencode-<里程碑短名>.json \
+    --report .tmp/scenario-3-opencode-<里程碑短名>.md
 ```
 
 两个运行器都从模型服务的模型列表（`YUDAO_EVAL_BASE_URL` 加 `/models`）取被测模型报告的 `context_length` 与 `max_completion_tokens`：Yudao 一侧写进模型访问定义，OpenCode 一侧写进运行配置的模型限额（`models.<id>.limit` 的 `context` 与 `output`），两处是同一对数；列表没有报告这个模型时用 `--context-window` 与 `--max-output-tokens`，两者都没有时报错。报告与结果写明取值与来源。
 
-场景 1 的运行命令（单次运行写到 `.tmp/` 或正式运行写到 `docs/evaluation/`）：
+场景 1 的运行命令（单次试跑的结果文件也改写到 `.tmp/`；正式运行的结果文件写到 `docs/evaluation/`，位置规则见「结果放哪里」）：
 
 ```bash
 uv run python evals/runner/run_eval.py \
@@ -128,19 +129,19 @@ uv run python evals/runner/run_eval.py \
     --model yudao-eval/<模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-1-opencode.json \
-    --report docs/evaluation/scenario-1-opencode.md
+    --result docs/evaluation/scenario-1-opencode-<里程碑短名>.json \
+    --report .tmp/scenario-1-opencode-<里程碑短名>.md
 ```
 
-场景 2 用 `--scenario scenario2`，结果写到对应的 `scenario-2-opencode.json` 与 `scenario-2-opencode.md`。场景 2 运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
+场景 2 用 `--scenario scenario2`，结果与报告的位置同场景 1，文件名是 `scenario-2-opencode-<里程碑短名>`。场景 2 运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
 
 ```bash
 uv run python evals/runner/run_yudao_eval.py \
     --model <模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-3-yudao.json \
-    --report docs/evaluation/scenario-3-yudao.md
+    --result docs/evaluation/scenario-3-yudao-<里程碑短名>.json \
+    --report .tmp/scenario-3-yudao-<里程碑短名>.md
 ```
 
 入口的 `--scenario` 选场景：默认 3（上面那条命令），`--scenario 2` 是在已有代码上加功能（见下一节）。
@@ -153,8 +154,8 @@ uv run python evals/runner/run_yudao_eval.py \
     --model <模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-2-yudao.json \
-    --report docs/evaluation/scenario-2-yudao.md
+    --result docs/evaluation/scenario-2-yudao-<里程碑短名>.json \
+    --report .tmp/scenario-2-yudao-<里程碑短名>.md
 ```
 
 一次运行分两步，都用 Yudao 的正常入口：
@@ -189,13 +190,40 @@ Yudao 一侧的过程检查点共五项，每项给通过 / 未通过 / 未核�
 4. 质检没有误放行：放行而隐藏检查中存在失败条目记未通过；没有放行时本项不适用（放行不存在，隐藏检查的失败由评分报告单独写出）。
 5. 放行记录附逐条覆盖、模型阅读与开环条件：放行记录缺逐条覆盖数据时写「未核实」不记未通过；覆盖比例小于 1.0、模型阅读条件数大于 0、开环条件数大于 0 记未通过。
 
+### 第一次与最终两份交付（第 5.2 节）
+
+运行结束以后，运行器从导出的事件日志里取第一次与最后一次封存的交付（`delivery_accepted` 事件），两份都交给评分器；结果里每次运行各有 `first_score` 与 `score`：
+
+- 一次运行有两次或更多交付：两份评分各是各的，第一次交付的完成度与质检带来的提高都从它算；
+- 只有一次交付：两份是同一份评分，评分器只跑一次；
+- 没有交付：评分器对空的交付目录评分，每条隐藏检查记「没有做」，两份评分都是「没有做」。
+
+每次运行的 `delivery` 一段记这些指标（第 5.2 节）：第一次与最终交付的完成度、正确性与通过的隐藏检查条数；质检是否在时间上限以内给出结论（导出中有 `qa_submitted`）；质检带来的提高，即最终交付比第一次交付多通过的隐藏检查条数，第一次交付已经全部通过时记「不计入」，导出中没有质检提交时记「未知」。每次运行还带 `run_created` 事件里的定义版本与参数版本，取不到时写「未知」。
+
+### Yudao 对 OpenCode 的对照（第 6.3 节）
+
+```bash
+uv run python evals/runner/compare_sides.py \
+    --yudao docs/evaluation/scenario-3-yudao-<里程碑短名>.json \
+    --opencode docs/evaluation/scenario-3-opencode-<里程碑短名>.json \
+    --result .tmp/scenario-3-compare-<里程碑短名>.json \
+    --report .tmp/scenario-3-compare-<里程碑短名>.md
+```
+
+- 材料版本或评分器版本不同：结论「受阻」，不比较。
+- 判定按 D38 的 N-G1：同一个场景至少 2 次运行里，质检在时间上限以内给出结论，并且最终交付比本次第一次交付多通过至少 1 条隐藏检查；第一次交付已经全部通过的运行不计入；每一次运行都没有质检误放行。
+- 结论是「高于」「没有达到」「受阻」之一。可以观察质检提高的运行不到 2 次、或者结果里缺第一次交付的评分时结论是「受阻」，写明缺哪项证据。
+- 报告另附逐次并排的表：两边的完成度、正确性、失败条目、用时、请求数与用量，Yudao 一侧列第一次与最终两个完成度；两边按运行序号配对，序号对不上的列为没有配对。这一部分只报告，不单独据此判定「高于」。
+
 ### 用量的未知值
 
 模型服务没有分项统计时，`usage.totals` 的那一项是 `None`，按「未知」写入报告，不进平均值、最小、最大与噪声，另计有效样本数与未知样本数及原因，只有来源明确上报的零才记零。取不到单价时费用同样是未知；OpenCode 一侧各次请求的费用全为 0 或为空时，这次运行的费用记「未知」，汇总里费用也写「未知」。
 
 多次运行的汇总含评分器给出的完成度与正确性，每个指标给出噪声范围（同一版本各次运行的取值极差）；只有一次运行时噪声范围写「未知」，不写零。
 
-被测模型在工程部门连续返回成功但没有输出项的调用，主机按 `no_tool_call` 暂停；这条模型行为的记录写进报告（架构问题记录里有登记，已归档在 `docs/archive/`）。
+版本比较（`yudao_compare.compare`）按运行序号配对：第 1 次对第 1 次，不按运行编号（第 6.1 节）。两组结果的运行编号前缀不同时按序号照样配得上；只有材料版本与评分器版本都相同时才比较，序号对不上的部分列为没有配对。
+
+被测模型在工程部门连续返回成功但没有输出项的调用，主机按 `no_tool_call` 暂停；这条模型行为的记录写进报告。
 
 运行器保证下面这些：
 
@@ -209,7 +237,12 @@ Yudao 一侧的过程检查点共五项，每项给通过 / 未通过 / 未核�
 - 评分之前做三项核对，任一命中这次运行作废（`void`），不计入结果；这类运行在报告的第六节列出：JSON 输出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、JSON 输出中出现对任务上游仓库的访问（场景 1 是 `mnluzimu/WebGen-Bench`，场景 2 是 `openai/openai-agents-python`，场景 3 是 `AGI-Eval-Official/PRDBench`）。
 - 到达墙钟上限时结束进程，按结束时的目录评分并标记超时，不因为没有跑完而作废。
 
-原始证据（交付副本、输出、评分日志）在 `.yudao/evals/` 下，不进入 Git。
+## 结果放哪里
+
+- 原始证据（交付副本、输出、评分日志）在 `.yudao/evals/` 下，不进入 Git。
+- 结果文件（JSON）提交到 `docs/evaluation/`，文件名 `<场景>-<被测方>-<里程碑短名>.json`，不覆盖已有的；版本比较的对照基线读的就是它。
+- 中文报告先写到 `.tmp/`，再发成 Discussions 的 General 帖子，标题前缀「证据：」，发法按 [discussion-note](../.claude/skills/discussion-note/SKILL.md)。帖子写明被测提交、材料版本、评分器版本和结果文件的路径与提交号，不贴长日志。
+- 报告不提交到仓库。已经提交的一次性旧报告在 `docs/archive/evaluation/`。`scenario-3-yudao.json` 与 `.md` 由 `test_regen_scenario3.py` 逐字节固定，`baseline-omp-stage3.*` 是被别的文档当对照基准引用的基线，这两组留在 `docs/evaluation/`。
 
 ## 运行器自己的测试
 

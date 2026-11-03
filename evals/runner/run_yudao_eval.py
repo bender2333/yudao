@@ -1,8 +1,8 @@
 """一次评测：运行 Yudao、按评分器评分、写出结果与报告。
 
 与 OpenCode 一侧（`run_eval.py`）同一套形状：原始证据（事件日志导出、交付副本、
-评分日志）放在 `.yudao/evals/` 下，不进入 Git；结果与报告提交到 `docs/evaluation/`
-（评测场景设计第 6 节）。
+评分日志）放在 `.yudao/evals/` 下，不进入 Git；结果文件提交到 `docs/evaluation/`，
+中文报告写到 `.tmp/` 再发 Discussions（评测场景设计第 6 节）。
 
 场景 3 从较长的 PRD 新建项目：新建项目并带入起始文件夹，提交需求原文加接口约定，
 等待结束。场景 2 在已有代码上加功能：接入已有仓库（`project.onboard`）、确认初始
@@ -127,6 +127,18 @@ def _score_scenario2(delivery_dir, evidence_dir):
         return json.load(handle)
 
 
+def score_deliveries(first_dir, final_dir, evidence_dir):
+    """第一次与最终两份交付都交给评分器（设计第 5.2 节）。
+
+    `first_dir` 为空表示两份是同一份交付（只有一次交付，或者没有交付）：评分器只跑一次，
+    两份评分相同。没有交付时评分目录是空的，评分器把每条隐藏检查记成「没有做」。
+    """
+    if first_dir is None:
+        scores = score_delivery(final_dir, evidence_dir)
+        return scores, scores
+    return score_delivery(first_dir, evidence_dir), score_delivery(final_dir, evidence_dir)
+
+
 def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds, limits, *,
              scenario=None, wait_prd_confirmation=False,
              onboarding_timeout_seconds=ONBOARDING_TIMEOUT_SECONDS,
@@ -154,6 +166,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     evidence_dir = os.path.join(evidence_root, run_id)
     os.makedirs(evidence_dir, exist_ok=True)
     delivery_dir = os.path.join(evidence_dir, "delivery")
+    first_delivery_dir = os.path.join(evidence_dir, "delivery-first")
 
     port = yudao.free_port()
     process, client = yudao.start_service(data_dir, port)
@@ -161,6 +174,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     export = None
     replay = None
     delivery_files = []
+    first_delivery_files = []
     elapsed = 0.0
     timed_out = False
     served_model = model_name
@@ -181,11 +195,15 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         elapsed = time.monotonic() - started
         export = yudao.export_run(client, run_id_yudao)
         replay = client.query("replay.check", {"run_id": run_id_yudao})["data"]
-        delivery_event = yudao.last_archived_delivery(export)
-        if delivery_event is not None:
-            delivery_files = yudao.fetch_delivery(client, delivery_event, delivery_dir)
+        first_event = yudao.first_archived_delivery(export)
+        last_event = yudao.last_archived_delivery(export)
+        if last_event is not None:
+            delivery_files = yudao.fetch_delivery(client, last_event, delivery_dir)
         else:
             os.makedirs(delivery_dir, exist_ok=True)
+        if first_event is not None and first_event is not last_event:
+            first_delivery_files = yudao.fetch_delivery(client, first_event,
+                                                        first_delivery_dir)
     finally:
         client.stop()
         stdout, stderr = yudao.stop_service(process)
@@ -204,15 +222,18 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     # 评分之前核对：材料目录的路径、材料摘要、对上游仓库的访问，任一命中这次运行无效
     outcome = {"timed_out": timed_out, "elapsed_seconds": elapsed, "hidden_failures": []}
     void_reasons = yudao.void_reasons(json.dumps(export, ensure_ascii=False))
-    scores = score_delivery(delivery_dir, evidence_dir)
+    first_scores, scores = score_deliveries(
+        first_delivery_dir if first_delivery_files else None, delivery_dir, evidence_dir)
     # 质检误放行这一项要等评分结果，先算其余指标，评分以后用同一个判断重算
-    parameters_version = _parameters_version(export)
+    versions = _run_versions(export)
     outcome["hidden_failures"] = [check["id"] for check in scores["checks"] if check["status"] != "pass"]
-    metrics = yudao_metrics.collect(export, outcome, replay, parameters_version)
+    metrics = yudao_metrics.collect(export, outcome, replay, versions["parameters_version"])
+    delivery = yudao_metrics.delivery_metrics(export, scores, first_scores)
 
     with open(os.path.join(evidence_dir, "metrics.json"), "w", encoding="utf-8") as handle:
         json.dump({"run_id": run_id, "data_dir": data_dir, "metrics": metrics,
-                   "void_reasons": void_reasons, "score": scores},
+                   "void_reasons": void_reasons, "score": scores, "first_score": first_scores,
+                   "delivery": delivery},
                   handle, ensure_ascii=False, indent=2)
 
     return {
@@ -224,11 +245,16 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         "start_dir": start_dir,
         "evidence_dir": evidence_dir,
         "metrics": metrics,
+        "delivery": delivery,
         "delivery_files": len(delivery_files),
+        "first_delivery_files": len(first_delivery_files),
+        "definitions_version": versions["definitions_version"],
+        "parameters_version": versions["parameters_version"],
         "void": bool(void_reasons),
         "void_reason": "、".join(void_reasons),
         "model_service_failure": metrics["model_service_failure"],
         "score": scores,
+        "first_score": first_scores,
     }
 
 
@@ -247,6 +273,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     evidence_dir = os.path.join(evidence_root, run_id)
     os.makedirs(evidence_dir, exist_ok=True)
     delivery_dir = os.path.join(evidence_dir, "delivery")
+    first_delivery_dir = os.path.join(evidence_dir, "delivery-first")
 
     port = yudao.free_port()
     process, client = yudao.start_service(data_dir, port)
@@ -255,6 +282,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
     export = None
     replay = None
     delivery_files = []
+    first_delivery_files = []
     elapsed = 0.0
     timed_out = False
     served_model = model_name
@@ -291,9 +319,15 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
             elapsed = time.monotonic() - started
             export = yudao.export_run(client, run_id_yudao)
             replay = client.query("replay.check", {"run_id": run_id_yudao})["data"]
-            delivery_event = yudao.last_archived_delivery(export)
-            if delivery_event is not None:
-                delivery_files = yudao.fetch_delivery(client, delivery_event, delivery_dir)
+            first_event = yudao.first_archived_delivery(export)
+            last_event = yudao.last_archived_delivery(export)
+            if last_event is not None:
+                delivery_files = yudao.fetch_delivery(client, last_event, delivery_dir)
+            else:
+                os.makedirs(delivery_dir, exist_ok=True)
+            if first_event is not None and first_event is not last_event:
+                first_delivery_files = yudao.fetch_delivery(client, first_event,
+                                                            first_delivery_dir)
     finally:
         client.stop()
         stdout, stderr = yudao.stop_service(process)
@@ -326,11 +360,16 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
             "evidence_dir": evidence_dir,
             "onboarding": onboarding_metrics,
             "metrics": _empty_metrics(False),
+            "delivery": None,
             "delivery_files": 0,
+            "first_delivery_files": 0,
+            "definitions_version": None,
+            "parameters_version": None,
             "void": True,
             "void_reason": "、".join(void_reasons),
             "model_service_failure": False,
             "score": None,
+            "first_score": None,
         }
 
     with open(os.path.join(evidence_dir, "run-export.json"), "w", encoding="utf-8") as handle:
@@ -338,15 +377,17 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
 
     outcome = {"timed_out": timed_out, "elapsed_seconds": elapsed, "hidden_failures": []}
     void_reasons.extend(yudao.void_reasons(json.dumps(export, ensure_ascii=False)))
-    scores = score_delivery(delivery_dir, evidence_dir)
-    parameters_version = _parameters_version(export)
+    first_scores, scores = score_deliveries(
+        first_delivery_dir if first_delivery_files else None, delivery_dir, evidence_dir)
+    versions = _run_versions(export)
     outcome["hidden_failures"] = [check["id"] for check in scores["checks"] if check["status"] != "pass"]
-    metrics = yudao_metrics.collect(export, outcome, replay, parameters_version)
+    metrics = yudao_metrics.collect(export, outcome, replay, versions["parameters_version"])
+    delivery = yudao_metrics.delivery_metrics(export, scores, first_scores)
 
     with open(os.path.join(evidence_dir, "metrics.json"), "w", encoding="utf-8") as handle:
         json.dump({"run_id": run_id, "data_dir": data_dir, "metrics": metrics,
                    "onboarding": onboarding_metrics, "void_reasons": void_reasons,
-                   "score": scores},
+                   "score": scores, "first_score": first_scores, "delivery": delivery},
                   handle, ensure_ascii=False, indent=2)
 
     return {
@@ -359,11 +400,16 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         "evidence_dir": evidence_dir,
         "onboarding": onboarding_metrics,
         "metrics": metrics,
+        "delivery": delivery,
         "delivery_files": len(delivery_files),
+        "first_delivery_files": len(first_delivery_files),
+        "definitions_version": versions["definitions_version"],
+        "parameters_version": versions["parameters_version"],
         "void": bool(void_reasons),
         "void_reason": "、".join(void_reasons),
         "model_service_failure": metrics["model_service_failure"],
         "score": scores,
+        "first_score": first_scores,
     }
 
 
@@ -380,15 +426,22 @@ def _empty_metrics(timed_out):
     }
 
 
-def _parameters_version(export):
-    """取冻结的参数版本：`run_created` 事件的 `parameters_version`。
-    缺失或占位返回空，第 2 项检查点写「未取到冻结的 parameters_version」。"""
+def _run_versions(export):
+    """取 `run_created` 事件里的定义版本与参数版本（设计第 6 节）。
+
+    取不到时那一项为空，报告写「未知」；第 2 项检查点也用这里的参数版本核对冻结限额。
+    """
     for event in export["events"]:
         if event["type"] != "run_created":
             continue
-        version = (event.get("payload") or {}).get("parameters_version")
-        return version if isinstance(version, str) else None
-    return None
+        payload = event.get("payload") or {}
+        return {"definitions_version": _version_text(payload.get("definitions_version")),
+                "parameters_version": _version_text(payload.get("parameters_version"))}
+    return {"definitions_version": None, "parameters_version": None}
+
+
+def _version_text(value):
+    return value if isinstance(value, str) and value else None
 
 
 def parse_args(argv=None):

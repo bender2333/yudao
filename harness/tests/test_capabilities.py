@@ -3,7 +3,7 @@
 # 查的是运行中的服务给出的能力清单，不是手抄的常量。
 
 from harness.app.application import Application
-from harness.models import ProjectEventType
+from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
 
 
@@ -49,5 +49,20 @@ def test_the_queries_showing_department_settings_all_list_its_change(tmp_path):
     try:
         for name in ("department.workspace", "project.settings"):
             assert ProjectEventType.DEPARTMENT_SETTINGS_CONFIGURED in _changed_by(system, name), name
+    finally:
+        system.close()
+
+
+def test_the_tools_registry_lists_the_events_that_change_the_records_it_shows(tmp_path):
+    # 工单 #1177：工具登记给出各项目最近的取回记录与每台服务器最近一次探测的状态。
+    # 项目的出现与改名改变条目，服务器设置改变设置与工具清单，探测结果改变最近一次状态，
+    # 取回动作（tool_started 起、tool_called 出结果）改变取回记录；漏一种页面就停在旧值
+    system = LoopSystem(tmp_path / "data")
+    try:
+        assert _changed_by(system, "tools.registry") == {
+            ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
+            ProjectEventType.MCP_SERVERS_CONFIGURED, ProjectEventType.TOOL_SERVER_PROBE_FINISHED,
+            EventType.TOOL_STARTED, EventType.TOOL_CALLED,
+        }
     finally:
         system.close()

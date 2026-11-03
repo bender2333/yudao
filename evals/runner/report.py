@@ -3,7 +3,7 @@
 结果记录 OpenCode 版本号、模型、模型的容量与来源、材料版本、评分器版本、宿主环境与
 每次运行的全部指标与失败条目（第 6 节）。多次运行时每个指标报告平均值、最小值、
 最大值与噪声范围（极差，第 5.2 节）；缺字段的样本按未知处理，不转成零。
-原始证据放在 .yudao/evals/ 下，结果与报告提交到 docs/evaluation/。
+原始证据放在 .yudao/evals/ 下；结果文件提交到 docs/evaluation/，中文报告写到 .tmp/ 再发 Discussions（见 evals/README.md「结果放哪里」）。
 """
 
 import json

@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/requirements/department-history.md",
-"hash":"97abfd97ea46f2ac",
+"hash":"3f092232f3d660b4",
 "nodes":[
-{"hash":"97abfd97ea46f2ac","id":"docs/requirements/department-history.md","kind":"file","title":"docs/requirements/department-history.md"},
+{"hash":"3f092232f3d660b4","id":"docs/requirements/department-history.md","kind":"file","title":"docs/requirements/department-history.md"},
 {"hash":"650907134968d1d0","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","kind":"section","parent":"docs/requirements/department-history.md","title":"D08 部门完整历史与逐次上下文"},
-{"hash":"a7b35cca376b12dd","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 已确认","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"已确认"},
+{"hash":"9ac1f270062c394b","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 已确认","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"已确认"},
 {"hash":"5686da57bb410a4f","id":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文 > 实现与限制","kind":"section","parent":"docs/requirements/department-history.md#D08 部门完整历史与逐次上下文","title":"实现与限制"}
 ],
 "edges":[

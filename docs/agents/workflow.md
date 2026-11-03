@@ -20,7 +20,7 @@
 | 规则 | `CLAUDE.md`、`AGENTS.md`、`docs/agents/` | 总架构师与用户 |
 | 过程与理由 | `claude_jour.md`、`agents_jour/`、`docs/decision.md`、`docs/CHANGELOG.md` | 写的人 |
 
-Discussions 不表示工单的状态。帖子里要改代码的事转成工单，在帖子里回一句「已转 #编号」；要改设计、原型或文档的事直接改，回一句改了哪份文档；总图与规则的事开 `architecture` 工单（第 7 节）。分类：Announcements 放复盘，General 放试用报告，Ideas 放等分诊的想法，Show and tell 放只读的扫描与差异报告。
+Discussions 不表示工单的状态。帖子里要改代码的事转成工单，在帖子里回一句「已转 #编号」；要改设计、原型或文档的事直接改，回一句改了哪份文档；总图与规则的事开 `architecture` 工单（第 7 节）。分类：Announcements 放复盘，General 放试用报告与评测证据（评测的中文报告与读数，标题前缀「证据：」），Ideas 放等分诊的想法，Show and tell 放只读的扫描与差异报告。
 
 引用只往上指：工单、代码注释与规则登记引用设计说明，设计说明引用总图，反过来不引用。
 

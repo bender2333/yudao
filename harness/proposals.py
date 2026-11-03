@@ -243,9 +243,10 @@ def review(
     basis_delivery_spec_hash: str | None = None,
     criteria: list[dict[str, Any]] | None = None,
     criteria_count: int = 1,
+    judgement_event: str | None = None,
 ) -> dict[str, Any]:
     names = checks or ["smoke"]
-    return {
+    payload = {
         "kind": "qa_review",
         "verdict": verdict,
         "rationale": rationale,
@@ -254,6 +255,11 @@ def review(
         "criteria": default_criteria(criteria_count, list(names)) if criteria is None else criteria,
         "basis_delivery_spec_hash": basis_delivery_spec_hash,
     }
+    # 结论引用的独立判断（验证的独立性设计说明第 4 节，工单 #1190）：不写编号时由主机取当前交付的
+    # 那一条判断；写明的编号必须是这一轮核验引用的那条判断
+    if judgement_event is not None:
+        payload["judgement_event"] = judgement_event
+    return payload
 
 
 def delivery_turn(
@@ -295,6 +301,7 @@ def review_turn(
     defects: list[dict[str, str]] | None = None,
     basis_delivery_spec_hash: str | None = None,
     criteria: list[dict[str, Any]] | None = None,
+    judgement_event: str | None = None,
     transcript: str = "",
 ) -> Callable[[Any], FakeTurn]:
     checks = checks or {"smoke": 0}
@@ -307,7 +314,8 @@ def review_turn(
         return FakeTurn(
             proposal=review(verdict, rationale, checks=list(checks), defects=defects,
                             basis_delivery_spec_hash=declared, criteria=criteria,
-                            criteria_count=acceptance_criteria_count(call)),
+                            criteria_count=acceptance_criteria_count(call),
+                            judgement_event=judgement_event),
             checks=checks,
             transcript=transcript,
         )

@@ -49,8 +49,8 @@
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","kind":"link","raws":["model-management.md"],"seen":"17891a8b09694ac3","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.5 模型调用"},
 {"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 6. 控制核心内部 > 6.3 两类工具","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"83fd50a0c0dde4bc","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.6 会话内部的分工"},
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 2. 共享的与隔开的","kind":"link","raws":["independent-verification.md"],"seen":"e9f123e4bc03f030","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.6 会话内部的分工"},
-{"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.3 当前状态栏目","kind":"link","raws":["semantic-system.md"],"seen":"59337d605f324a39","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.6 会话内部的分工"},
-{"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","kind":"link","raws":["execution-environment.md"],"seen":"5bd4d3077039c14c","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.7 状态主权与可见范围"},
+{"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.3 当前状态栏目","kind":"link","raws":["semantic-system.md"],"seen":"3d8b4dc105d0a3ac","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.6 会话内部的分工"},
+{"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","kind":"link","raws":["execution-environment.md"],"seen":"ec91cde620c72dc7","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.7 状态主权与可见范围"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 4. 动作分类与处置","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"e8ddd2850c755628","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.8 中断与恢复"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","kind":"link","raws":["model-management.md"],"seen":"17891a8b09694ac3","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 6. 未决问题"}
 ]

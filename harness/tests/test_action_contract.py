@@ -2,13 +2,15 @@
 #
 # 立缝的样子：两个实际的环境实现（本机的 `LocalEnvironment` 与测试用的 `SecondEnvironment`）接受同一份动作合同
 # （`harness/actions.py` 的 `Action` 与 `ActionReceipt`），不按实现的名字分派，也不读请求里的部门与阶段。
-# 这个文件查六件事：
+# 这个文件查七件事：
 # 1. 写入与读取都是真的：写入以后按同一个合同读回内容，公开树摘要有对应的变化（回执可核对）；
 # 2. 旧合同（没有核实方法与能否取消）与写明这两项的请求都照常执行；
-# 3. 两个实现对同一个动作给出同样的回执；
+# 3. 两个实现对同一个动作给出同样的回执，包括动作前后的两个树摘要与终点快照的引用；
 # 4. 取消先于动作到达时记下、动作到达时不执行；实现不在合同之外保存跨步状态（新起一个实现读到同样的结果）；
 # 5. 本机执行环境不执行的类别与不在这一类里的工具立刻失败；合同与实现的连接不写部门与阶段的名字；
-# 6. 工具许可拒绝在工具一侧发生：回执带被拒绝标记与原因，执行环境没有被调用。
+# 6. 工具许可拒绝在工具一侧发生：回执带被拒绝标记与原因，执行环境没有被调用；
+# 7. 执行过的动作在回执里带终点快照与前后差异，读回执的一方按引用取回的那份快照就是动作以后的公开树；
+#    旧回执没有这两项，读出来是空。
 #
 # 层：模块层（工作区文件、一个实现与它的真实依赖、一次部门激活）。守 R2（动作合同的交换字段与类别）与
 # R3（文件动作的回执可核对；工具调用先有许可）。
@@ -17,17 +19,19 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Callable
 
 import pytest
 
-from harness.actions import Action, ActionReceipt, FactsQuery
+from harness.actions import Action, ActionReceipt, FactsQuery, TreeChange
 from harness.adapters.fake import FakeAdapter
+from harness.artifacts import ArtifactStore
 from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment
-from harness.models import EventType
+from harness.models import ArtifactRef, EventType, hash_bytes
 from harness.proposals import product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
@@ -64,11 +68,34 @@ def _perform(implementation: Any, action: Action) -> ActionReceipt:
     return asyncio.run(implementation.perform(action))
 
 
+def _assert_snapshot_is_the_public_tree(snapshot: dict[str, Any], tree: Any, *, root: Path,
+                                       written_file: str, name: str = "") -> None:
+    # 按引用取回的终点快照就是动作以后的公开树。期望值由公开树事实与磁盘上的文件自己写出来，
+    # 不从产出这份内容的 `snapshot_payload` 取：那条路会把「这份内容变空」的改动一起放过（审查意见）
+    assert snapshot["digest"] == tree.digest, name
+    entries = {path: content_hash for path, content_hash in snapshot["entries"]}
+    assert entries == {path: content_hash for path, content_hash in zip(tree.files, tree.hashes)}, name
+    assert entries[written_file] == hash_bytes((root / written_file).read_bytes()), name
+
+
 @pytest.fixture(params=sorted(IMPLEMENTATIONS))
 def implementation(request, tmp_path):
     root = tmp_path / "workspace"
     root.mkdir()
     return request.param, root, IMPLEMENTATIONS[request.param](root)
+
+
+# 终点快照存进的工件区域与 run（工单 #1398）：两个实现接的是同一组参数，取回的是同一个工件区域
+ARTIFACT_RUN = "run-contract-test"
+
+
+@pytest.fixture(params=sorted(IMPLEMENTATIONS))
+def implementation_with_artifacts(request, tmp_path):
+    root = tmp_path / "workspace"
+    root.mkdir()
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    environment = IMPLEMENTATIONS[request.param](root, artifacts=artifacts, run_id=ARTIFACT_RUN)
+    return request.param, root, environment, artifacts
 
 
 def test_a_written_file_is_read_back_through_the_same_contract(implementation):
@@ -112,18 +139,108 @@ def test_an_old_contract_and_a_declared_contract_are_both_executed(implementatio
 
 
 def test_both_implementations_answer_the_same_file_actions_the_same_way(tmp_path):
+    # 两个实现对同一个动作给出同样的回执，包括终点摘要与前后差异（工单 #1398）：同一个工件区域与 run，
+    # 写入前后的两个摘要不同、读取的两个相同，两边的终点快照因此是同一个工件
+    artifacts = ArtifactStore(tmp_path / "artifacts")
     receipts: dict[str, tuple[ActionReceipt, ActionReceipt]] = {}
     for name, open_environment in IMPLEMENTATIONS.items():
         root = tmp_path / name
         root.mkdir()
-        environment = open_environment(root)
+        environment = open_environment(root, artifacts=artifacts, run_id=ARTIFACT_RUN)
         write = _action("write_file", "write", {"path": "src/echo.py", "content": "print(1)\n"})
-        receipts[name] = (
-            _perform(environment, write),
-            _perform(environment, _action("read_file", "read", {"path": "src/echo.py"})),
-        )
+        written = _perform(environment, write)
+        read = _perform(environment, _action("read_file", "read", {"path": "src/echo.py"}))
+        receipts[name] = (written, read)
+        assert written.tree_change is not None and read.tree_change is not None, name
+        assert written.tree_change.before_digest != written.tree_change.after_digest, name
+        assert read.tree_change.before_digest == read.tree_change.after_digest, name
+        assert written.after_snapshot_ref is not None and read.after_snapshot_ref is not None, name
 
     assert receipts["local"] == receipts["second"], "两个实现给同一个动作的回执不相同"
+
+
+def test_an_action_reports_its_tree_change_without_an_artifact_area(implementation):
+    # 终点快照要存进工件区域：没有工件区域的实现只交回动作前后的两个树摘要（工单 #1398）
+    _name, _root, environment = implementation
+    written = _perform(environment, _action("write_file", "write", {"path": "a.txt", "content": "x"}))
+
+    assert written.tree_change is not None
+    assert written.tree_change.before_digest != written.tree_change.after_digest, "写入没有出现在前后差异里"
+    assert written.after_snapshot_ref is None
+
+
+def test_an_action_in_a_workspace_that_cannot_be_read_reports_no_tree_evidence(implementation):
+    # 工作区里有无法表示的条目（这里是硬链接）时取不到公开树：动作照常执行，回执里这两项为空（工单 #1398）
+    name, root, environment = implementation
+    (root / "a.txt").write_text("x", encoding="utf-8")
+    (root / "other.txt").write_text("y", encoding="utf-8")
+    os.link(root / "other.txt", root / "linked.txt")
+
+    receipt = _perform(environment, _action("read_file", "read", {"path": "a.txt"}))
+
+    assert receipt.status == "completed" and receipt.output == "x", name
+    assert receipt.tree_change is None and receipt.after_snapshot_ref is None, name
+
+
+def test_a_written_action_reports_the_endpoint_snapshot_the_reader_can_open(implementation_with_artifacts):
+    # 改动工作区的动作在回执里带终点快照的引用（工单 #1398）：读回执的一方不用再去事件载荷里找快照，
+    # 按引用取回的那份快照就是动作以后的公开树
+    name, root, environment, artifacts = implementation_with_artifacts
+    before = environment.query(FactsQuery(tree=True)).tree
+    assert before is not None
+
+    written = _perform(environment, _action("write_file", "write", {"path": "notes/a.txt", "content": "hello\n"}))
+
+    after = environment.query(FactsQuery(tree=True)).tree
+    assert after is not None
+    assert written.tree_change == TreeChange(before_digest=before.digest, after_digest=after.digest), name
+    ref = written.after_snapshot_ref
+    assert ref is not None, name
+    snapshot = json.loads(artifacts.get_for_run(ARTIFACT_RUN, ArtifactRef(**ref.model_dump())))
+    _assert_snapshot_is_the_public_tree(snapshot, after, root=root, written_file="notes/a.txt", name=name)
+
+
+def test_a_read_only_action_reports_the_same_tree_digests(implementation_with_artifacts):
+    # 只读的动作没有改动公开树：动作前后两个摘要相同（工单 #1398）
+    _name, _root, environment, _artifacts = implementation_with_artifacts
+    written = _perform(environment, _action("write_file", "write", {"path": "a.txt", "content": "x"}))
+
+    read = _perform(environment, _action("read_file", "read", {"path": "a.txt"}))
+
+    assert read.tree_change is not None
+    assert read.tree_change.before_digest == read.tree_change.after_digest, "只读的动作改动了公开树"
+    assert read.tree_change.after_digest == written.tree_change.after_digest
+    assert read.after_snapshot_ref is not None
+
+
+def test_a_local_command_reports_its_tree_change_and_endpoint_snapshot(tmp_path):
+    # 本地命令也改动工作区（总图第四节「动作」缝的回执一侧）：回执带动作前后的两个树摘要与终点快照的引用，
+    # 第二种实现不执行命令，这一条按本机执行环境核对（工单 #1398）
+    root = tmp_path / "workspace"
+    root.mkdir()
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    environment = LocalEnvironment.open(root, artifacts=artifacts, run_id=ARTIFACT_RUN)
+    before = environment.query(FactsQuery(tree=True)).tree
+    assert before is not None
+
+    receipt = _perform(environment, _action("bash", "command", {"command": "echo hello > made.txt"}))
+
+    after = environment.query(FactsQuery(tree=True)).tree
+    assert after is not None and "made.txt" in after.files
+    assert receipt.status == "completed" and receipt.ok, receipt.error
+    assert receipt.tree_change == TreeChange(before_digest=before.digest, after_digest=after.digest)
+    ref = receipt.after_snapshot_ref
+    assert ref is not None
+    snapshot = json.loads(artifacts.get_for_run(ARTIFACT_RUN, ArtifactRef(**ref.model_dump())))
+    _assert_snapshot_is_the_public_tree(snapshot, after, root=root, written_file="made.txt")
+
+
+def test_an_old_receipt_without_the_tree_evidence_is_still_read():
+    # 旧回执没有这两项（工单 #1398）：读得进来，两项都是空，原来的字段照旧
+    receipt = ActionReceipt.model_validate({"action_id": "act:1", "status": "completed", "output": "a.txt",
+                                            "refused": False, "refused_reason": None})
+    assert receipt.tree_change is None and receipt.after_snapshot_ref is None
+    assert (receipt.status, receipt.output, receipt.ok) == ("completed", "a.txt", True)
 
 
 def test_cancelling_before_the_action_arrives_keeps_it_unexecuted(implementation):

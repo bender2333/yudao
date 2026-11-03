@@ -9,6 +9,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-11-03 12:05 / `docs/design/app-and-interface.md` 第 4.3 节加「事项看板在页面上的显示」：五组各自的口径（排队中放还没有交给部门的事项；部门列放部门手上有的事项，几个部门同时工作时同一事项在几列里；已放行、已采纳、已停止按事项状态）、部门列的组成与顺序取自事项的部门（不写死产品、工程、质检三栏）、每组的数字是事项数 / 工单 #1372：概览的看板与部门状态行对同一部门说法不一致（试用 F1 的卡点 N-08：「工程 一轮工作中」旁边看板写「工程(0)」）。查证后不是后端投影算错、也不是数据时刻不同：看板的分组原来按事项的所在部门（单值，取最后一次主线的部门激活）分，多部门同时工作时表达不了「谁在工作」；设计说明里原来没有写过分组口径
+
 claude-opus-5-5 / 2026-10-28 11:25 / `AGENTS.md` 共同要求的日记一条加「日记在合并之前写完，合并以后不再补记」，「Solo 模式」第 6 步删去「记录合并提交号写入日记」；`.claude/skills/solo-worker/SKILL.md` 第 5、12 步随之改；`.claude/skills/solo/SKILL.md` 收账一节删去补记日记的小 PR 的说法 / 合并以后补记日记要再开一张 PR，10-25 以来合并的 130 张 PR 里 56 张标题带「日记」；合并提交与 main 上的 CI 在 GitHub 上查得到（solo 复盘，用户确认，决定记录同日一条）
 
 claude-opus-5-5 / 2026-10-28 11:25 / `docs/design/test-pyramid.md`：状态行收成一行；第 10 节加第 7 条（两件同时进行的事谁先谁后由事件、信号文件或提交通知决定，等待有上限，Windows 上被占用的文件做有次数上限的重试），第 5 节第 5 条改为引用它；`AGENTS.md` 常用命令里测试写法的摘要加一句 / 这一段修好的五个不稳定项（#1100、#1101、#1108、#1117、#1134）都是测试用时长去赌先后；原有的一条在第 5 节，执行者被指去读的是第 10 节
@@ -387,3 +389,16 @@ claude-opus-5-5（画面线子架构师；原型由 claude-sonnet-5-5 子代理�
 claude-fable-5-1（总架构师） / 2026-11-03 00:45 / `architecture.html` 第二节「定义」方框的事项的来源加「子事项是上一层交来的任务」；`CONTEXT.md`「事项的来源」同句 / 子架构师画 v17 时指出子组织的来源是第三个值，总图只列了两个
 
 claude-opus-5-5（子架构师） / 2026-11-03 01:10 / `docs/design/project-organization.md` 第 2 节、脚本六与 4.12 改准两个层叠在什么上：观察者层叠在任何一份形态上，子组织层叠在任何自有角色上，一个外包角色直做没有子组织层。`docs/prototypes/v17/`：目录标题、子组织卡、走查脚本一与脚本六同步，新建项目里工程是外包角色时子组织一项灰着；`docs/prototypes/CHANGELOG.md` 的 v17 一节同步，去掉两条已答复的不清楚之处。 / 总架构师的判断：外包角色是执行的另一种实现，不再分形。
+claude-fable-5-1（总架构师） / 2026-11-03 01:40 / `decision.md` 加一条：组织设定模板一键选用、页面跟着级别伸缩 / v17 试用结论，用户说页面复杂、点击与输入太多
+
+claude-sonnet-5-5 / 2026-11-03 00:30 / 全量文档扫描后改文档：`CONTEXT.md`、`README.md`、`client/README.md`、`evals/README.md`、`evals/context/README.md`、`docs/current-baseline.md`、`.claude/skills/` 下 9 份技能、`docs/design/` 下 28 份、`docs/requirements/` 下 29 份、`docs/C4/` 下 6 份、`docs/trial/` 下 3 份、`docs/adr/` 下 3 份开头一行与路线位置、`docs/research/README.md`；旧阶段编号与已取消的阶段四、阶段五说法改成阶段名或道名，「界面」按页面与画面分开，「激活」「交接」「编排器」等 Avoid 词改成一轮工作、成果、流程编排，失效引用与节号改到现在的小节，状态文档里的日期、提交号、代码路径、用户原话、工单号删去；没有改小节标题；`docs/architecture.html`、`docs/architecture-view.html`、`docs/program-roadmap.md`、`docs/foundation-rules.md`、`CLAUDE.md`、`AGENTS.md`、`docs/agents/` 里查出的问题写进 `docs/consistency-scan-2026-11-03.md` 第 4 节交总架构师；`tools/doc-consistency` 的待核对 47 条：14 条因下游已改解决，33 条核对后不用改并记确认，改动带出的 111 条待核对在复核后一并记确认；重建 `.doc-index` / 阶段改名与总图、路线图、术语表的一次改完后，各份文档里仍有没跟上的地方
+
+claude-opus-5-5（子架构师；改写由 claude-sonnet-5-5 子代理做） / 2026-11-03 02:00 / `docs/design/project-organization.md`：新增 4.12 模板一键选用、4.14 项目页跟着级别伸缩（原 4.13 并入），4.13 新建的入口重写；第 1、2、3 节，4.4、4.5、4.8、4.9、4.11 与第 5 节七份脚本、补充条跟着改；外包交回的东西叫「交付」。长期目标改成可选：`app-and-interface.md`、`existing-project-onboarding.md`、`project-initial-files.md`。`forms-and-verifier-role.md` 验收第 14 条、`README.md` 概述对齐。 / 用户试用 v17 的结论：太复杂、点击与输入太多；决定见 `docs/decision.md` 最后一条。
+
+claude-opus-5-5（子架构师；原型由 claude-sonnet-5-5 子代理画） / 2026-11-03 02:40 / 新增 `docs/prototypes/v18/`：取自 v17，新建项目是名字加模板卡，个人博客只有对话、成果库、设置三页与时间条；`walkthrough.md` 只有脚本二。`docs/prototypes/CHANGELOG.md` 开头一段与 v18 一节。 / 用户试用 v17 的结论；依据 `docs/design/project-organization.md` 4.12 至 4.14。自检 108 条全部通过。
+执行者 solo-deepseek-v4.1-flash / 2026-11-03 00:58 / 设计说明没有改动：工单 #1355 只改客户端页面与它的单元/端到端测试，按 `docs/design/model-management.md` 第 4.3 节「获取模型列表」与第 9.1 节「连接服务」的现文实现 / 页面的「获取模型列表」忙碌态改为按页面自己发出的命令与目录里的结果判定（后台取候选不再锁住整页），失败原因仍写在连接卡片旁；设计说明这两段与实现一致，不需要改
+solo-deepseek-v4.1-flash / 2026-11-03 07:12 / 工单 #1414：`docs/prototypes/v13/` 归档到 `docs/archive/prototypes/` 下的 v13（79 个文件，`git mv`）；`docs/prototypes/CHANGELOG.md` 开头一段改成「已归档」，链接指向归档的原型目录；`docs/design/department-roles.md`、`docs/design/model-management.md`、`docs/design/app-and-interface.md` 里指向 v13 的链接改到归档的原型目录；`docs/research/doc-consistency-concept-model.md` 引用的 `consistency-scan-2026-10-29.md` 改到归档位置，那份一次性扫描报告一并归档；重建 `.doc-index`（v13 的两份索引删除，13 份更新，3 份删除） / 客户端的画面不再与原型逐像素对照：对照测试、录制与按原型生成的脚本在本单删掉，活动文档不再指向 v13 的旧位置（验收标准 2 的 grep 为空）
+
+claude-opus-5-5（子架构师） / 2026-11-03 07:45 / `docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md` 新增；`docs/design/architecture/name-map.md` 改第 1 节 6 行、第 4 节 5 行到代码现在的样子；`docs/design/skeleton-and-application.md`「薄驱动」里接输入的部门改按事项的来源 / 阶段二补重构工单时重跑按缝差异；设计说明与总图 11-02 加的事项的来源不一致，属一致性修正
+
+claude-sonnet-5-5 / 2026-11-02 18:05 / 评测结果的放法改为：结果文件（JSON）留在 `docs/evaluation/`，中文报告与差异报告发 Discussions（General「证据：」、Show and tell「扫描：」）；`CLAUDE.md` 文档地址、`acceptance-evidence.md` 版本回归、`design/evaluation-scenarios.md` 第 6 节、`workflow.md` 的 Discussions 分类、`evals/README.md`（命令的 `--result`/`--report` 与新增「结果放哪里」）、`current-baseline.md`、技能 trial-intake / seam-diff / milestone-retro 同步；9 份一次性报告与 `scenario-3-qwen38flash-2026-10-20/` 用 `git mv` 移到 `docs/archive/evaluation/`，`design/context-assembly.md`、`research/`、`decision.md`、`current-baseline.md` 里指向它们的链接改指新位置，归档件里的相对链接补了一层；留在原处的是被测试固定的 `scenario-3-yudao.*`、基线 `baseline-omp-stage3.*`、各 JSON 数据与验收截图 / 用户同意：报告是某个时刻的读数，帖子有固定链接，不会被下一次运行覆盖；旧报告不补发帖子

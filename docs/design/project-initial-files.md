@@ -4,10 +4,10 @@
 
 ## 1. 要解决的问题
 
-| 问题 | 现状 | 影响 |
-| --- | --- | --- |
-| 新建项目只能从空树开始 | `project.create` 登记名称与长期目标，不带文件；`start_work_item` 在没有采纳成果时用空树建立工作区（`harness/projects.py` 约 519 至 553 行） | 题目带数据文件、脚手架或样例的场景无法开始：评测场景 3 的 `subway_data.json`（71,666 字节）进不了新项目的工作区，Yudao 一侧与 OpenCode 一侧的起点不同，完成度无法比较 |
-| 已有文件进入项目的唯一入口是建档 | `project.onboard` 建立建档事项、核验基线、等用户确认初始 PRD | 只想带几份起点文件的用户被迫走完整的建档，而且建档把项目来源记为已有项目 |
+| 问题 | 影响 |
+| --- | --- |
+| 新建项目只能从空树开始：没有采纳成果时事项的工作区是空树，`project.create` 只登记名称（长期目标可选），不带文件 | 题目带数据文件、脚手架或样例的场景无法开始：评测场景 3 的 `subway_data.json`（71,666 字节）进不了新项目的工作区，Yudao 一侧与 OpenCode 一侧的起点不同，完成度无法比较 |
+| 已有文件进入项目的唯一入口是建档：`project.onboard` 建立建档事项、核验基线、等用户确认初始 PRD | 只想带几份起点文件的用户被迫走完整的建档，而且建档把项目来源记为已有项目 |
 
 起始文件夹是第二条入口：用户在新建项目时给出一个文件夹，它的快照成为项目的起点文件。它不建档：没有建档事项、基线核验与初始 PRD，项目来源仍是想法新建。
 
@@ -19,7 +19,7 @@
 2. 项目的起始文件夹快照（只在第一次采纳之前使用）；
 3. 空树。
 
-三处使用同一个起点：开始事项（`work_item.create`）、排空期间排队的事项（`queue_work_item`）、因升级重新开始的事项（`restart_work_item_for_upgrade`，包括启动时发现 run 事件版本不同的未结束 run）。代码里只在一处求出起点，三处调用它，不各写一遍；`harness/projects.py` 现在的三处重复写法由这个函数代替。
+三处使用同一个起点：开始事项（`work_item.create`）、排空期间排队的事项（`queue_work_item`）、因升级重新开始的事项（`restart_work_item_for_upgrade`，包括启动时发现 run 事件版本不同的未结束 run）。代码里只在一处求出起点，三处调用它，不各写一遍。
 
 第一次采纳以后，采纳成果的代码树是起点，起始文件夹快照不再使用，它仍保留在项目流中供查阅。
 
@@ -49,7 +49,7 @@ flowchart LR
 - `work_item_created.snapshot` 带这份快照记录（与建档事项相同），事项种类仍是 `change`；run 创建被中断时，启动核对按这条记录建立缺少的 run（`restore_snapshot`）。
 - `baseline` 为空：快照不是采纳成果，没有采纳链上的上一版。第一次采纳的 `previous_adoption_id` 为空，`code_tree_digest` 是事项交付的代码树摘要，与没有起始文件夹时相同。
 - 快照里的文件进入公开树，产品、工程、质检都能用读取与搜索工具看到它们，没有按部门的隔离；起始文件夹的内容不在部门的材料目录中。
-- 第一个事项的 PRD 由产品依据事项文字与项目的长期目标写出，起始文件夹里的文件是它可以读取的材料，没有初始 PRD 与基线核验。这一点与建档不同：起始文件夹适合少量的起点文件（数据、脚手架、样例）；完整的已有仓库用 `project.onboard`，建档以后才有描述现有行为的 PRD 与基线检查。
+- 第一个事项的 PRD 由产品依据事项文字与项目的长期目标（有的话）写出，起始文件夹里的文件是它可以读取的材料，没有初始 PRD 与基线核验。这一点与建档不同：起始文件夹适合少量的起点文件（数据、脚手架、样例）；完整的已有仓库用 `project.onboard`，建档以后才有描述现有行为的 PRD 与基线检查。
 
 ## 5. 界面与评测
 
@@ -65,7 +65,7 @@ sequenceDiagram
   participant P as 项目服务
   participant S as 快照采集与工件
   participant W as 写入口
-  U->>A: project.create(名称, 长期目标, initial_directory)
+  U->>A: project.create(名称, 长期目标（可选）, initial_directory)
   A->>P: register(名称, 目标, 起始文件夹)
   P->>S: ingest_snapshot(起始文件夹)，工件所属范围为项目
   S-->>P: 快照记录（失败时 source_invalid，不写事件）
@@ -103,7 +103,6 @@ sequenceDiagram
 
 | 位置 | 相关内容 |
 | --- | --- |
-| [接入已有项目设计说明](existing-project-onboarding.md)「确认以后：当前有效要求与第一次采纳」中的「已有代码的唯一入口」与「用户确认的决定」第 1 项 | 已有项目的代码只经 `project.onboard` 接入并建档；新建项目的起始文件夹是另一条入口，不建档 |
+| [接入已有项目设计说明](existing-project-onboarding.md)「用户确认的决定」第 1 项 | 已有项目的代码只经 `project.onboard` 接入并建档；新建项目的起始文件夹是另一条入口，不建档 |
 | [应用层与接口层设计说明](app-and-interface.md)「命令清单」 `project.create` | 带可选的起始文件夹参数与事件字段 |
 | [恢复契约](recovery-contract-and-fault-matrix.md)「故障矩阵」第 10 行 | 因升级重新开始的事项取项目的起点 |
-| `harness/projects.py` | 起点只有一处写法 |

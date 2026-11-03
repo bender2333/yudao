@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":"docs/C4/06-code-to-model.md",
-"hash":"5c8b3b3dfceef88d",
+"hash":"1a76c24cda915311",
 "nodes":[
-{"hash":"5c8b3b3dfceef88d","id":"docs/C4/06-code-to-model.md","kind":"file","title":"docs/C4/06-code-to-model.md"},
+{"hash":"1a76c24cda915311","id":"docs/C4/06-code-to-model.md","kind":"file","title":"docs/C4/06-code-to-model.md"},
 {"hash":"a97d292b0dcbf004","id":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型","kind":"section","parent":"docs/C4/06-code-to-model.md","title":"代码怎样反映到上层模型"},
 {"hash":"f0a84ef7e9474042","id":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型 > 抽象的依据","kind":"section","parent":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型","title":"抽象的依据"},
 {"hash":"c33a83e8e9bf5132","id":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型 > 从代码到总图的对应","kind":"section","parent":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型","title":"从代码到总图的对应"},
 {"hash":"7ec23656ef4ff445","id":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型 > 一次模型更新的操作","kind":"section","parent":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型","title":"一次模型更新的操作"},
-{"hash":"7636f733bd7d8ec8","id":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型 > 覆盖与证据的限度","kind":"section","parent":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型","title":"覆盖与证据的限度"}
+{"hash":"8c37c1eec3081092","id":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型 > 覆盖与证据的限度","kind":"section","parent":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型","title":"覆盖与证据的限度"}
 ],
 "edges":[
 {"dst":"docs/C4/model.json","kind":"code-path","raws":["model.json"],"seen":"706e4250c015d7cc","src":"docs/C4/06-code-to-model.md#代码怎样反映到上层模型 > 一次模型更新的操作"},

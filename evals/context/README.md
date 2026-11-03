@@ -1,4 +1,4 @@
-# 上下文装配的离线回放（#912）
+# 上下文装配的离线回放
 
 把「每一步交给模型的上下文」当成事件日志上的纯函数 `view(events, rules) → request`，
 用真实运行记录测它、改它、再证明改完不丢东西。设计说明见
@@ -15,10 +15,10 @@
 python -m evals.context verify
 
 # 2. 测现状：每一步的召回与浪费，按步、按部门、按窗口大小给分布
-python -m evals.context measure --out docs/evaluation/context-assembly-2026-10-29
+python -m evals.context measure --out .tmp/context-assembly-<日期>
 
 # 3. 用新视图重放同一批运行，比较用量、召回、浪费，并逐条规则做消融
-python -m evals.context replay --out docs/evaluation/context-assembly-replay-2026-10-29
+python -m evals.context replay --out .tmp/context-assembly-replay-<日期>
 
 # 4. 扫一个参数的取值，给参数定默认值
 python -m evals.context sweep --param tool_result_keep_tokens --values 40000,16000,8000,4000
@@ -29,6 +29,8 @@ export YUDAO_EVAL_API_KEY=<凭据>        # 只从环境变量读，不写进文
 export YUDAO_EVAL_MODEL=<模型名>
 python -m evals.context counterfactual --sample 24
 ```
+
+输出默认写到 `.tmp/`。数据文件（`.json`）要留档就拷到 `docs/evaluation/`，不覆盖已有的；中文报告（`.md`）发 Discussions，位置规则见 [evals/README.md](../README.md)「结果放哪里」。
 
 事件库不在默认位置时用 `--db <events.sqlite>`，工件库不在默认位置时用 `--artifacts <目录>`
 （默认取事件库同级的 `artifacts`）。在别人的数据目录上重跑，表与数字一样，只是样本不同。

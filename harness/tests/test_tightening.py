@@ -68,13 +68,16 @@ def _receipt(name: str, department: str, *, spec_hash: str, activation: str, exi
                         qa_tests_hash=qa_tests_hash)
 
 
-def _judgement_event(delivery_hash: str = DELIVERY) -> Event:
-    # 一条独立判断事件的内存替身（工单 #358 的门核对它的存在与它写的交付摘要）
+def _judgement_event(delivery_hash: str = DELIVERY, spec_hash: str = "sha256:spec") -> Event:
+    # 一条独立判断事件的内存替身（工单 #358 的门核对它的存在与它写的交付摘要；工单 #1190 的引用校验
+    # 核对它是不是当前交付与当前 PRD 的判断、覆不覆盖全部验收条件）：一条验收条件一项，判为 passed
     return Event(event_id="evt_judgement", run_id="run_test", type=EventType.INDEPENDENT_JUDGEMENT_COMMITTED,
                  role=None, parent_event_id=None, state_before="running", state_after="running",
-                 payload={"kind": "independent_judgement", "product_spec_hash": "sha256:spec",
+                 payload={"kind": "independent_judgement", "product_spec_hash": spec_hash,
                           "delivery_spec_hash": delivery_hash, "checks": ["smoke"],
-                          "criteria_count": 1, "criteria": []},
+                          "criteria_count": 1,
+                          "criteria": [{"criterion": "AC1", "method": "check", "result": "passed",
+                                        "checks": ["smoke"], "trial_cases": [], "note": ""}]},
                  artifact_hashes=[], session_id="ses_quality", provider=None, model=None,
                  context_digest=None, stop_reason=None, error=None, created_at="2026-10-31T00:00:00Z",
                  position=999, stream="run:run_test", stream_version=999, project_id=None,
@@ -210,7 +213,8 @@ def test_a_release_waits_for_the_product_input_inside_the_commit(tmp_path):
     tightened = WATCHED_OUTPUTS.submission(_structured(
         projection, "quality",
         review("release", "verified", checks=["smoke"], basis_delivery_spec_hash=DELIVERY),
-        facts=_facts(receipt), events=(*events, _judgement_event()), commit=True))
+        facts=_facts(receipt),
+        events=(*events, _judgement_event(spec_hash=projection.product_spec.content_hash)), commit=True))
     assert tightened.wait and not tightened.accepted
 
 

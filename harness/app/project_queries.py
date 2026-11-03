@@ -203,8 +203,14 @@ class ProjectOverview(Contract):
 DEPARTMENT_STATES = ("waiting_user", "working", "asking", "verifying", "waiting")
 # 阻塞事项的决定请求：回答以前事项（它的 run）不推进（decisions.py 的 blocks）
 BLOCKING_SCOPES = ("run", "work_item")
-# 谁核验谁的成果取自定义里的「谁能拒绝谁」：成果驱动下只有工程的交付由质检核验（循环结构第 2.1 节）
-VERIFIER_OF = {"engineering": "quality"}
+
+
+def _verifiers_of(department: str) -> tuple[str, ...]:
+    """核验这个部门的交付的核验角色：取自定义里的核验声明（工单 #1391）。
+
+    谁核验谁读定义里声明的「核验谁」，不写部门名；没有核验角色核验它时为空。
+    """
+    return DEFINITIONS.verifiers_of(department, "delivery_spec")
 
 
 class DepartmentState(Contract):
@@ -620,7 +626,7 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
     # 还没回答的询问：链上每一层一个，最内层在最后（投影的 ask_stack）
     asks = list(run.ask_stack)
     departments: dict[str, DepartmentState] = {}
-    for department in DEPARTMENTS:
+    for department in DEFINITIONS.departments:
         session = run.sessions.get(department)
         main_session = None if session is None else session.session_id
         active = session is not None and session.status == "active"
@@ -635,14 +641,16 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
         elif own_ask is not None:
             state, note = "asking", f"在等待{_department_label(own_ask.get('recipient') or '')}的回答"
         elif active:
-            # 质检在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构第 3.1 节）
-            predictive = (department == "quality" and not run.delivery_specs and progress is not None
+            # 核验角色在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构第 3.1 节）；
+            # 谁是核验角色取自定义里的核验声明（工单 #1391）
+            predictive = (DEFINITIONS.is_verifier(department) and not run.delivery_specs and progress is not None
                           and progress.product_spec_revision is not None)
             state = "working"
             note = (f"预测性探索：按 PRD r{progress.product_spec_revision} 起草测试用例"
                     if predictive else None)
         elif _awaiting_verification(department, progress):
-            state, note = "verifying", f"等{_department_label(VERIFIER_OF[department])}核验交付 r{progress.delivery_revision}"
+            verifiers = "、".join(_department_label(verifier) for verifier in _verifiers_of(department))
+            state, note = "verifying", f"等{verifiers}核验交付 r{progress.delivery_revision}"
         else:
             state, note = "waiting", None
         departments[department] = DepartmentState(state=state, note=note)
@@ -650,9 +658,9 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
 
 
 def _awaiting_verification(department: str, progress: WorkItemProgress | None) -> bool:
-    # 核验中：最新的正式成果在等下游的结论。成果驱动下只有工程有这种情况：
-    # 最新的交付还没有质检的缺陷记录或放行（循环结构第 2.1 节）
-    if department not in VERIFIER_OF or progress is None or progress.delivery_revision is None:
+    # 核验中：最新的正式成果在等下游的结论。核验这个部门交付的角色从定义的核验声明取（工单 #1391）：
+    # 交付还没有它的缺陷记录或放行（循环结构第 2.1 节）
+    if not _verifiers_of(department) or progress is None or progress.delivery_revision is None:
         return False
     return progress.conclusion is None
 
@@ -1298,8 +1306,8 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
     )
 
 def _department_label(department: str) -> str:
-    return {"product": "产品", "engineering": "工程", "quality": "质检", "operations": "运维"}.get(
-        department, department)
+    # 部门的中文名取自定义（工单 #1391）：定义里没有这个部门时退回部门编号
+    return DEFINITIONS.department_labels.get(department, department)
 
 
 def _department_workspace(application: Application, request: DepartmentWorkspace
@@ -2612,13 +2620,26 @@ class McpServerSettingView(Contract):
     config_digest: str = ""
 
 
+class McpCredentialStatusView(Contract):
+    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP 设计说明第 11.1 节）：
+    # 页面在凭据名称旁写「已设置」或「缺失」与来源，与后端同一份判断，不自己猜；
+    # 只有名称、状态与来源，没有凭据值。version 是 credential.set 的基准版本
+    ref: str
+    configured: bool
+    source: str
+    version: int = 0
+
+
 class McpServersSetting(Contract):
     # 项目设置里的 MCP 服务器（工单 #236）：整份设置与版本、文档摘要与服务器清单；
-    # 最近一次探测的结果由后续探测工单写入，本单读取快照随设置携带的状态
+    # 最近一次探测的结果由后续探测工单写入，本单读取快照随设置携带的状态。
+    # credentials 是设置里出现的凭据名称与它们此刻的状态（工单 #237）：凭据值按名称读取，
+    # 不随设置保存，所以状态在这里按当前的凭据来源给出
     version: int
     document_digest: str
     servers: dict[str, McpServerSettingView] = {}
     updated_at: str | None = None
+    credentials: dict[str, McpCredentialStatusView] = {}
 
 
 class McpProbeResultView(Contract):
@@ -2652,6 +2673,42 @@ class ProjectSettingsResult(Contract):
     # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明第 3 节第 2 条）：
     # 项目级参数命令的基准版本，全局现值加本项目覆盖的内容摘要；与 parameter.set 按项目核对的是同一份
     effective_parameters_version: str = ""
+
+
+MCP_CREDENTIAL_KINDS = ("env", "headers")
+
+
+def _mcp_credential_refs(servers: dict[str, Any]) -> list[str]:
+    # 设置里出现的凭据名称，按出现的先后各记一次：变量与请求头的取值方式为「凭据名称」的那些
+    # （网络与 MCP 设计说明第 4.1 节「变量与请求头的值」）
+    refs: list[str] = []
+    for server in servers.values():
+        if not isinstance(server, dict):
+            continue
+        entries = [entry for kind in MCP_CREDENTIAL_KINDS
+                   for entry in (server.get(kind) or {}).values()]
+        for entry in entries:
+            if not isinstance(entry, dict) or str(entry.get("kind") or "") != "credential":
+                continue
+            ref = str(entry.get("credential_ref") or "")
+            if ref and ref not in refs:
+                refs.append(ref)
+    return refs
+
+
+def _mcp_credential_status(application: Application,
+                           servers: dict[str, Any]) -> dict[str, McpCredentialStatusView]:
+    # 每个凭据名称此刻的状态（工单 #237）：与凭据命令读的是同一个来源（进程内存、进程环境、
+    # 数据目录的 .env，设计说明第 4.4 节），页面上的「已设置／缺失」因此与后端一致；
+    # version 是 credential.set 的基准版本
+    facade = application.system.facade
+    view: dict[str, McpCredentialStatusView] = {}
+    for ref in _mcp_credential_refs(servers):
+        status = facade.credential_status(ref)
+        view[ref] = McpCredentialStatusView(
+            ref=ref, configured=bool(status.get("configured")), source=str(status.get("source") or ""),
+            version=int(status.get("version") or 0))
+    return view
 
 
 def _project_settings(application: Application, request: ProjectSettings) -> Snapshot[ProjectSettingsResult]:
@@ -2696,6 +2753,8 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                            if field in McpServerSettingView.model_fields})
                     for name, server in state.mcp_servers.servers.items()
                 },
+                # 设置里出现的凭据名称与它们此刻的状态（工单 #237）：页面照它显示「已设置」或「缺失」
+                credentials=_mcp_credential_status(application, state.mcp_servers.servers),
             ),
             # 最近一次探测的结果（工单 #1174）：还没有探测过时为空
             last_probe=None if state.last_probe is None else McpProbeResultView(
@@ -3162,6 +3221,9 @@ PROJECT_SETTINGS = QueryDefinition(
     changed_by=(*PROJECT_EVENT_KINDS,
                 # 目录修订（准入作废、模型变更）以后生效模型的建议能力提醒随之更新（工单 #95）
                 CatalogEventType.CATALOG_REVISED,
+                # 凭据改过以后，MCP 服务器设置里各凭据名称的状态跟着更新（工单 #237）：
+                # 页面上的「已设置／缺失」不用刷新整页
+                CatalogEventType.CREDENTIAL_CHANGED,
                 # 全局参数事件改变这个项目有效参数的版本（工单 #1262）：项目覆盖没有变时取值可能仍相同，
                 # 但页面按事件重新读取，基准版本不会停在过期的那一个
                 CatalogEventType.PARAMETER_SET),

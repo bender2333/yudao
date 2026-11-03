@@ -165,6 +165,76 @@ def _count(events, event_type):
 
 
 # ---------------------------------------------------------------------------
+# 第一次与最终两份交付（设计第 5.2 节）：两份评分由运行器交给评分器
+
+# 质检带来的提高（第 6.3 节第 1 条）的四种取值
+IMPROVEMENT_IMPROVED = "improved"          # 最终交付比第一次多通过至少 1 条隐藏检查
+IMPROVEMENT_NONE = "none"                  # 没有多通过
+IMPROVEMENT_NOT_COUNTED = "not_counted"    # 第一次交付已经全部通过，这次运行不计入
+IMPROVEMENT_NO_CONCLUSION = "no_conclusion"  # 导出里没有质检提交，没有结论可观察
+
+
+def delivery_metrics(export, final_scores, first_scores):
+    """第一次交付与最终交付的完成度、通过的检查，以及质检带来的提高（第 5.2 节）。
+
+    `final_scores` 与 `first_scores` 是评分器对两份封存交付的结果（没有交付时评分器
+    把每条隐藏检查记成「没有做」，两份评分相同）。每次运行的这两个值由运行器取：
+    只有一次交付时两份相同，没有交付时都是「没有做」。
+    """
+    delivered = any(event.get("type") == "delivery_accepted" for event in export.get("events", []))
+    concluded = qa_concluded(export)
+    first = _delivery_summary(first_scores, delivered)
+    final = _delivery_summary(final_scores, delivered)
+    return {
+        "first": first,
+        "final": final,
+        "qa_within_limit": concluded,
+        "qa_improvement": _qa_improvement(first, final, concluded),
+    }
+
+
+def qa_concluded(export):
+    """质检是否在时间上限以内给出结论：导出里有 `qa_submitted` 事件（第 5.2 节）。
+
+    导出是这一运行在时间上限以内写下的全部事件，导出里有质检提交就是它在时限以内
+    给出了结论；时限到达时运行被结束，之后不会再有事件。
+    """
+    return any(event.get("type") == "qa_submitted" for event in export.get("events", []))
+
+
+def _delivery_summary(scores, delivered):
+    """一份交付的评分摘要：完成度、正确性与通过的隐藏检查条数。"""
+    checks = (scores or {}).get("checks") or []
+    passed = [check["id"] for check in checks if check.get("status") == "pass"]
+    return {
+        "delivered": delivered,
+        "completion": (scores or {}).get("completion"),
+        "correctness": (scores or {}).get("correctness"),
+        "passed_checks": len(passed),
+        "total_checks": len(checks),
+        "all_passed": bool(checks) and len(passed) == len(checks),
+    }
+
+
+def _qa_improvement(first, final, concluded):
+    """质检带来的提高（第 6.3 节第 1 条）：最终交付比第一次交付多通过的隐藏检查条数。"""
+    if not concluded:
+        return {"status": IMPROVEMENT_NO_CONCLUSION, "passed_gain": None,
+                "detail": "导出中没有质检提交（qa_submitted）：质检没有给出结论"}
+    if first["all_passed"]:
+        return {"status": IMPROVEMENT_NOT_COUNTED, "passed_gain": None,
+                "detail": "第一次交付已经通过全部 " + str(first["total_checks"])
+                          + " 条隐藏检查：这次运行不计入质检带来的提高"}
+    gain = final["passed_checks"] - first["passed_checks"]
+    if gain >= 1:
+        return {"status": IMPROVEMENT_IMPROVED, "passed_gain": gain,
+                "detail": "最终交付比第一次交付多通过 " + str(gain) + " 条隐藏检查"}
+    return {"status": IMPROVEMENT_NONE, "passed_gain": gain,
+            "detail": "最终交付没有比第一次交付多通过隐藏检查（" + str(gain) + " 条）"}
+
+
+
+# ---------------------------------------------------------------------------
 # 过程检查点（设计第 5.1 节）：五项
 
 

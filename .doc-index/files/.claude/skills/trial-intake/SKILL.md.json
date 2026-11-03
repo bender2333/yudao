@@ -30,8 +30,8 @@
 {"dst":".claude/skills/milestone-retro/SKILL.md","kind":"link","raws":["../milestone-retro/SKILL.md"],"seen":"7ef6f2dfc03fa6f9","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
 {"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"2b97cc0e03cbbff6","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
 {"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../trial/SKILL.md"],"seen":"ab9da07de18ee5d0","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"link","raws":["../../../docs/design/test-pyramid.md"],"seen":"e4a777d86f1b6e3c","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
-{"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.2 版本号","kind":"section-ref","raws":["docs/design/web-interface-and-release.md"],"seen":"fda6076877fc3a73","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"link","raws":["../../../docs/design/test-pyramid.md"],"seen":"b528b2647bc3d93f","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
+{"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.2 版本号","kind":"section-ref","raws":["docs/design/web-interface-and-release.md"],"seen":"86c72df9d2141250","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
 {"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"78e235b5c69afc24","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"}
 ]
 }

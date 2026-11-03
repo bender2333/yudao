@@ -45,7 +45,7 @@ classDiagram
     LoopSystem --> Orchestrator : 注入实现
     LoopSystem --> ContextAssembly : 创建默认装配
     LoopSystem --> StepDriver : 选择默认执行
-    Orchestrator --> _SafeNode : 为激活创建
+    Orchestrator --> _SafeNode : 为每轮工作创建
     _SafeNode ..|> SafeNode : 实现安全节点
     _SafeNode --> Orchestrator : 转交边界判断
     StepDriver --> SafeNode : 每步查询能否继续

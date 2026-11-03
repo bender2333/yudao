@@ -31,8 +31,41 @@ ROUTING_NAME = "watched_outputs"
 ITEM_END_REASON = "no_new_work"
 # 提议方式：提交类工具。这一轮记下了其中一次的调用，就是「这一轮交上了正式成果」这件事
 _PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
-# 这个路由的部门清单：它自己的一份定义里写的（设计说明第 5.4 节第 2 条），一次询问只能问清单里的部门
-_DEPARTMENTS = tuple(DEFINITIONS.routing_definition().departments)
+
+
+def routing_departments(definitions: Any | None = None) -> tuple[str, ...]:
+    """这个路由的部门清单：它自己的一份定义里写的（设计说明第 5.4 节第 2 条）。
+
+    一次询问只能问清单里的部门；清单随定义变，不在这里写死（工单 #1391）。
+    """
+    definition = DEFINITIONS if definitions is None else definitions
+    declared = routing_contract.definition_of(definition, ROUTING_NAME)
+    return () if declared is None else tuple(declared.departments)
+
+
+def input_department(definitions: Any | None = None) -> str:
+    """收用户输入的部门：组织定义里关注用户输入的那一个（watched 含 user_input）。
+
+    部门的名称从定义取，代码里不写（工单 #1391）：谁收输入与发给它的指导，看谁关注用户输入。
+    """
+    definition = DEFINITIONS if definitions is None else definitions
+    for department in definition.departments:
+        if "user_input" in definition.watched_outputs(department):
+            return department
+    raise ValueError("organization.json declares no department that watches user input")
+
+
+def proposal_kinds_for(department: str, kind: str = "change", definitions: Any | None = None) -> set[str]:
+    """部门在这种事项里能交的提案种类：按定义里的提案合同，部门名不写在代码里（工单 #1391）。
+
+    提案合同给出了这个部门此刻能交的成果种类；谁能交要求（PRD）、谁能在回答询问时顺带修订要求，
+    都按它判断，不按部门名判断。
+    """
+    definition = DEFINITIONS if definitions is None else definitions
+    if department not in definition.departments:
+        return set()
+    contract = definition.proposal_contract(department, kind)
+    return set(contract.get("kinds") or ())
 
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
 # 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）。
@@ -110,19 +143,19 @@ def _latest_engineering_basis(projection: RunProjection) -> str | None:
 
 
 def _has_new_product_spec(projection: RunProjection, department: str) -> bool:
-    """PRD 的新版本，或者产品决定改了有效合同。
+    """PRD 的新版本，或者决定改了有效合同。
 
-    工程关注的是 PRD 与它最近一次成果依据的版本不同（还没有成果时为真）；PRD 没有新版本时，
-    它最近一份交付依据的合同不是当前有效合同也算新工作：产品决定只重算合同、不产生新的 PRD
+    交要求的部门关注的是 PRD 与它最近一次成果依据的版本不同（还没有成果时为真）；PRD 没有新版本时，
+    它最近一份交付依据的合同不是当前有效合同也算新工作：一个决定只重算合同、不产生新的 PRD
     版本，过期的交付要按新合同重新交付（部门指导设计说明第 2.1 节第 2 点、工单 #1079）。
-    质检关注的是「PRD 被接纳」：当前有效合同与质检上一次工作的依据不同，
-    并且还没有交付要核验（有交付时质检核验交付，预测性探索在交付到达以前做，
-    循环结构第 3.1 节）。
+    核验角色关注的是「PRD 被接纳」：当前有效合同与它上一次工作的依据不同，并且还没有交付要核验
+    （有交付时它核验交付，预测性探索在交付到达以前做，循环结构第 3.1 节）。谁核验谁取自定义里的
+    核验声明，不按部门名判断（工单 #1391）。
     """
     if projection.product_spec is None:
         return False
     contract = artifact_hash(projection.effective_contract)
-    if department == "quality":
+    if DEFINITIONS.is_verifier(department):
         if contract is None:
             return False
         if projection.department_bases.get(department) == contract:
@@ -372,7 +405,7 @@ def ask_branch(projection: RunProjection, events: list[Event], *, requester: str
         recipient = args.get("recipient")
         question = args.get("question")
         facts = args.get("facts") or ""
-        if recipient not in _DEPARTMENTS or recipient == requester:
+        if recipient not in routing_departments() or recipient == requester:
             return routing_contract.AskRejection(message=f"invalid recipient {recipient}")
         # 工程询问质检时问题与背景分两部分：facts 与 explanation 至少给一份（工单 #554）
         if not (isinstance(question, str) and question.strip()) \
@@ -420,8 +453,9 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
                 result: routing_contract.AskRoundResult) -> routing_contract.AskOutcome:
     """分支这一轮以什么结束：把回答交回提问方，还是没能回答与原因。
 
-    回答的内容、回答同时交上的成果由路由组装（设计说明第 5.5 节）：产品在回答一次询问时可以修订 PRD
-    （循环结构第 4.3 节），修订的提案参数随结果交给薄驱动，由它经写入口提交。
+    回答的内容、回答同时交上的成果由路由组装（设计说明第 5.5 节）：能交要求的部门在回答一次询问时
+    可以修订 PRD（循环结构第 4.3 节），修订的提案参数随结果交给薄驱动，由它经写入口提交。谁能交要求
+    按提案合同判断，不在代码里写部门名（工单 #1391）。
     没能回答的原因按这一轮的实际情形取：一步也走不了、时间用完、这一轮的说明或停止原因、跑完没交上回答。
     """
     if result.submission is None:
@@ -438,10 +472,11 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
         return routing_contract.AskOutcome(status="unable", session_id=branch.session_id, reason=reason)
     args = result.submission
     revises = None
-    if branch.recipient == "product" and any(args.get(field) is not None for field in PRD_REVISION_FIELDS):
+    if ("product_spec" in proposal_kinds_for(branch.recipient, projection.kind)
+            and any(args.get(field) is not None for field in PRD_REVISION_FIELDS)):
         revises = {**{key: value for key, value in args.items()
                       if key not in ("answer", "text") and value is not None},
-                   "kind": "product_spec", "issuer": "product"}
+                   "kind": "product_spec", "issuer": branch.recipient}
     return routing_contract.AskOutcome(
         status="answered",
         session_id=branch.session_id,

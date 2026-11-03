@@ -57,9 +57,10 @@ def test_the_gate_rejects_a_conclusion_without_a_judgement_and_accepts_it_after(
     rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
     assert rejected, "没有独立判断的结论应当被拒绝过一次"
     fields = [error["field"] for event in rejected for error in event.payload["errors"]]
-    assert "independent_judgement" in fields
+    # #1190 起这个门长在 qa_review 的引用字段上：错误指向 judgement_event
+    assert "judgement_event" in fields
     messages = [error["message"] for event in rejected for error in event.payload["errors"]
-                if error["field"] == "independent_judgement"]
+                if error["field"] == "judgement_event"]
     assert any("independent judgement" in message for message in messages)
     # 判断在结论之前写进日志（先判断后看解释的次序）
     assert judgements[0].position < reviews[0].position

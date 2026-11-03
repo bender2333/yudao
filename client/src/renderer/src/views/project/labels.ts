@@ -2,8 +2,6 @@
 // 单一来源：harness/app/labels.py 里的部门、阶段与状态名称，客户端按生成的合同取值对应显示。
 
 import type { StreamState } from "../../contract/stream-state";
-// 角色条在角色没有当前任务时显示房间状态词表里的中文状态（工单 #1230）
-import { STATUS_TEXT } from "../../pixel/room/layout.ts";
 
 export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   product: { name: "产品", role: "把用户的要求整理成有效需求" },
@@ -27,9 +25,6 @@ export interface DepartmentStateView {
   state: string;
   note?: string | null;
 }
-
-// 页面上列部门的顺序：产品、工程、质检（部门表本身的顺序，工单 #904）
-const DEPARTMENT_ORDER = Object.keys(DEPARTMENTS);
 
 export const WORK_ITEM_STATUS: Record<string, string> = {
   // not_started 是「已登记、还没开始运行」——排队等开始时也是它，页面上叫「排队中」（工单 #733）
@@ -325,7 +320,7 @@ export function departmentStatusView(data: {
 
 // 三个部门各自的状态与原因拆成一段段（三部门的循环结构第 2.1 节，工单 #904）：
 // 「产品 一轮工作中（回答工程的询问） · 工程 询问中（在等待产品的回答） · 质检 等待工作」。
-// 只写查询结果里有的部门，按产品、工程、质检的顺序；current 标出本部门那一段，
+// 顺序取查询给出的那个（事项所用的定义里的部门顺序，工单 #1372）；current 标出本部门那一段，
 // 部门工作间把它加粗（工单 #905）。没有 departments（事项没有进行中的 run）时返回 null。
 export interface DepartmentsLinePart {
   text: string;
@@ -339,11 +334,7 @@ export function departmentsLineParts(
   if (!departments || Object.keys(departments).length === 0) {
     return null;
   }
-  const order = [
-    ...DEPARTMENT_ORDER.filter((department) => department in departments),
-    ...Object.keys(departments).filter((department) => !DEPARTMENT_ORDER.includes(department)),
-  ];
-  return order.map((department) => ({
+  return Object.keys(departments).map((department) => ({
     text: `${departmentName(department)} ${departmentStateText(departments[department])}`,
     current: department === current,
   }));
@@ -376,7 +367,7 @@ export function departmentLine(
 }
 
 // 看板卡片上写正在工作的部门（三部门的循环结构第 3.1 节，工单 #904）：状态是一轮工作中或询问中的部门，
-// 按产品、工程、质检的顺序写成「工程、质检在工作」。有这样的部门时写它；没有时不写这句话
+// 按查询给出的部门顺序写成「工程、质检在工作」（工单 #1372）。有这样的部门时写它；没有时不写这句话
 // （返回空串，调用处这一格不出现）；查询结果里没有 departments（旧数据、没有进行中的 run）时
 // 退回事项所在的部门（工单 #842 的行为：没有部门的事项，这一格不写）。
 export function workingDepartmentsText(item: {
@@ -387,7 +378,7 @@ export function workingDepartmentsText(item: {
   if (departments === null) {
     return departmentName(item.department ?? null);
   }
-  const working = DEPARTMENT_ORDER.filter((department) => {
+  const working = Object.keys(departments).filter((department) => {
     const state = departments[department];
     return state !== undefined && (state.state === "working" || state.state === "asking");
   });
@@ -396,6 +387,13 @@ export function workingDepartmentsText(item: {
   }
   return `${working.map((department) => departmentName(department)).join("、")}在工作`;
 }
+
+// 角色条在角色没有当前任务时显示的房间状态词（工单 #1230）。页面自己的一份（工单 #1415）：
+// 页面上的文字归页面，不从画面取；画面那边自己的那一份在 pixel/room/layout.ts，两份不互相引用。
+export const STATUS_TEXT: Record<string, string> = {
+  idle: "未工作", working: "工作中", asking: "等待回答", paused: "已暂停", failed: "失败", done: "已完成",
+  cancelled: "已取消", interrupted: "中断", waiting_resume: "待恢复",
+};
 
 // 房间角色条上那一格的文字（工单 #1230）：角色的 task 只在有事实说明它此刻做什么时才填。
 // 现在系统里没有这样的事实（一个部门只有一个角色，没有哪一项记录写着它此刻手上的事），

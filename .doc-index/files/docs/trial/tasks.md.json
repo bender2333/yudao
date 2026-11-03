@@ -1,20 +1,20 @@
 {
 "schema":1,
 "path":"docs/trial/tasks.md",
-"hash":"17e1e2b6dc271db9",
+"hash":"80f417d87d1bd0a5",
 "nodes":[
-{"hash":"17e1e2b6dc271db9","id":"docs/trial/tasks.md","kind":"file","title":"docs/trial/tasks.md"},
-{"hash":"75899e99cb383ca2","id":"docs/trial/tasks.md#试用任务集","kind":"section","parent":"docs/trial/tasks.md","title":"试用任务集"},
-{"hash":"3682fcd97871048c","id":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3","kind":"section","parent":"docs/trial/tasks.md#试用任务集","title":"F1 固定任务：评测场景 3"},
+{"hash":"80f417d87d1bd0a5","id":"docs/trial/tasks.md","kind":"file","title":"docs/trial/tasks.md"},
+{"hash":"37ccd35080ce6940","id":"docs/trial/tasks.md#试用任务集","kind":"section","parent":"docs/trial/tasks.md","title":"试用任务集"},
+{"hash":"c2dbb5b012eb3537","id":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3","kind":"section","parent":"docs/trial/tasks.md#试用任务集","title":"F1 固定任务：评测场景 3"},
 {"hash":"5fbb310a768bbf20","id":"docs/trial/tasks.md#试用任务集 > R1 模拟用户任务：记账小工具","kind":"section","parent":"docs/trial/tasks.md#试用任务集","title":"R1 模拟用户任务：记账小工具"},
 {"hash":"90d895b2750c406b","id":"docs/trial/tasks.md#试用任务集 > 读数","kind":"section","parent":"docs/trial/tasks.md#试用任务集","title":"读数"}
 ],
 "edges":[
-{"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../../.claude/skills/trial/SKILL.md"],"seen":"ab9da07de18ee5d0","src":"docs/trial/tasks.md#试用任务集"},
+{"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../../.claude/skills/trial/SKILL.md"],"seen":"74b0666588e6bbf7","src":"docs/trial/tasks.md#试用任务集"},
 {"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"c692314e41a8c822","src":"docs/trial/tasks.md#试用任务集"},
-{"dst":"docs/trial/skill-revision-plan.md","kind":"link","raws":["skill-revision-plan.md"],"seen":"579d1d393ccd3710","src":"docs/trial/tasks.md#试用任务集"},
-{"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../agents/autopilot-runtime.md"],"seen":"4a6f3b31a2e2c4cd","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
-{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"8b813cb71f37d7dc","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
+{"dst":"docs/trial/skill-revision-plan.md","kind":"link","raws":["skill-revision-plan.md"],"seen":"f1b93f7b4d9bcbe8","src":"docs/trial/tasks.md#试用任务集"},
+{"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../agents/autopilot-runtime.md"],"seen":"b046e028fd6dba98","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
+{"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"02431566ceb99df9","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
 {"dst":"evals/runner/yudao.py","kind":"code-path","raws":["evals/runner/yudao.py"],"seen":"8732f64d7b1da8cc","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"},
 {"dst":"evals/scenarios/scenario-3/files/subway_data.json","kind":"code-path","raws":["evals/scenarios/scenario-3/files/subway_data.json"],"seen":"f5414f760e579594","src":"docs/trial/tasks.md#试用任务集 > F1 固定任务：评测场景 3"}
 ]

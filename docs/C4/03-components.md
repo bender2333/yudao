@@ -40,7 +40,7 @@ flowchart LR
     B2 -->|查询快照与订阅| B13
     B2 -->|模型目录与准入操作| B11
     B3 -->|选择工作与判断结束| B4
-    B3 -->|开始激活并取得结果| B6
+    B3 -->|开始一轮工作并取得结果| B6
     B6 -->|安全节点与询问回调| B3
     B6 -->|装配请求与历史| B5
     B6 -->|核对工具许可| B7
@@ -65,14 +65,14 @@ flowchart LR
     B5 -->|保存请求与清单内容| B14
     B14 -->|内容寻址保存工件| C4
     B14 -->|保存不可变代码树| C5
-    B2 -->|按用户命令回写| X4
+    B2 -->|按用户命令采纳写回| X4
 ```
 
 | 元素 | 职责 | 源码入口 |
 | --- | --- | --- |
 | `B1` HTTP 接口 | 生成命令查询路由、提供 SSE 与页面文件并检查访问 | [harness/api/app.py · create_app](../../harness/api/app.py) |
-| `B2` 应用与项目服务 | 处理登记的命令查询、项目事项、决定、配置与回写 | [harness/app/application.py · Application](../../harness/app/application.py) |
-| `B3` 薄驱动与运行组装 | 组装依赖、管理运行激活、查询边界、处理询问与提案提交 | [harness/runtime.py · LoopSystem](../../harness/runtime.py) |
+| `B2` 应用与项目服务 | 处理登记的命令查询、项目事项、决定、配置与采纳写回 | [harness/app/application.py · Application](../../harness/app/application.py) |
+| `B3` 薄驱动与运行组装 | 组装依赖、管理一轮工作的开始与结束、查询边界、处理询问与提案提交 | [harness/runtime.py · LoopSystem](../../harness/runtime.py) |
 | `B4` 成果驱动路由 | 按事实选择工作并判断轮次和事项结束 | [harness/watched_outputs.py · WatchedOutputs](../../harness/watched_outputs.py) |
 | `B5` 上下文装配 | 按冻结定义与部门历史构造请求及清单，处理压缩 | [harness/assembly.py · ContextAssembly](../../harness/assembly.py) |
 | `B6` 步骤执行与记录 | 进行模型步骤、工具许可和动作调用，记录尝试与输出 | [harness/engine.py · StepDriver](../../harness/engine.py) |

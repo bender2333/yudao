@@ -23,9 +23,9 @@ from urllib.parse import urlsplit
 
 from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
-from .watched_outputs import has_new_work, is_working
+from .watched_outputs import has_new_work, input_department, is_working, proposal_kinds_for
 from .contracts import normalize_scope
-from .coverage import coverage_report, method_is_executable, open_criteria
+from .coverage import changed_criteria, coverage_report, method_is_executable, open_criteria
 from .definitions import DEFINITIONS, Definitions
 from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS
 from .models import TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
@@ -38,7 +38,6 @@ from .validation import ConditionOutcome, FieldError, TightenRequest, Tightened,
 DESIGN_PENDING_MARK = "设计中，未实施"
 
 ANSWER_ONLY_IN_BRANCH = "answer tool is only available in an ask branch session"
-PRODUCT_BRANCH_ANSWER_ONLY = "Product ask branch can only submit answer"
 BRANCH_CANNOT_WRITE = "The branch session cannot modify files in the running workspace"
 BRANCH_CANNOT_DELIVER = "The branch session cannot submit delivery"
 BRANCH_CANNOT_REVIEW = "The branch session cannot submit QA review"
@@ -47,27 +46,31 @@ BRANCH_CANNOT_REVIEW = "The branch session cannot submit QA review"
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
 
-def pending_product_input(projection: RunProjection, events: list[Event]) -> bool:
-    """发给产品的输入里，还有没处理完的：质检放行等它处理完再裁决（部门指导设计说明第 2.1、3 节，工单 #561）。
+def pending_product_input(projection: RunProjection, events: list[Event],
+                          *, definitions: Definitions | None = None) -> bool:
+    """发给收输入的部门的输入里，还有没处理完的：核验角色的放行等它处理完再裁决
+    （部门指导设计说明第 2.1、3 节，工单 #561）。
 
     「处理完」只有一个说法：收到这条输入的那一轮主线工作正常结束了。输入进入模型输入时由这一轮的工作消息
     （部门输入事件）或者装配好的请求（上下文清单里的输入版本）记下，一轮正常结束时由轮结束事件接上；
     取消、暂停、上限与运行时间用完不算正常结束，事项已结束当作处理完。
 
-    不用 ``processed_input_version``：它只在 PRD 被接纳时前进，产品决定不改 PRD 时永远不前进，
-    放行会一直等。只看产品的输入：用户输入（``input_version``）与发给产品的指导（它的「已回答」读的是同一件事）。
+    不用 ``processed_input_version``：它只在 PRD 被接纳时前进，一个决定不改 PRD 时永远不前进，
+    放行会一直等。只看收输入的部门：用户输入（``input_version``）与发给它的指导（它的「已回答」读的是同一件事）。
+    哪个部门收输入取自定义里关注用户输入的那一个，不写部门名（工单 #1391）。
     """
+    department = input_department(definitions)
     if projection.status in TERMINAL_STATUSES:
         return False
     inputs = [item.version for item in projection.inputs]
-    guidance = [item.id for item in projection.department_guidance if item.department == "product"]
+    guidance = [item.id for item in projection.department_guidance if item.department == department]
     if not inputs and not guidance:
         return False
     branches = set(projection.branch_sessions)
-    # 产品这一次主线工作收到的输入与指导：进入模型输入时的版本与指导编号，按激活归在一起
+    # 收输入的部门这一次主线工作收到的输入与指导：进入模型输入时的版本与指导编号，按激活归在一起
     entered: dict[str, tuple[int, set[str]]] = {}
     for event in events:
-        if event.department != "product" or event.session_id in branches:
+        if event.department != department or event.session_id in branches:
             continue
         payload = event.payload or {}
         activation_id = str(payload.get("activation_id") or "")
@@ -82,7 +85,7 @@ def pending_product_input(projection: RunProjection, events: list[Event]) -> boo
     processed_inputs = 0
     processed_guidance: set[str] = set()
     for event in events:
-        if event.type != EventType.ACTIVATION_FINISHED or event.department != "product":
+        if event.type != EventType.ACTIVATION_FINISHED or event.department != department:
             continue
         if event.session_id in branches or event.state_after in _NOT_A_NORMAL_ROUND_END:
             continue
@@ -132,9 +135,18 @@ def _is_write(name: str, definitions: Definitions | None = None) -> bool:
     return tool_action(name, definitions=definitions) == "write"
 
 
-def _is_release_submission(department: str, name: str, args: dict[str, object]) -> bool:
-    # 只有质检的放行（submit_review，结论是 release）等输入处理完；质检提交缺陷记录不等（工单 #561）
-    return department == "quality" and name == "submit_review" and args.get("verdict") == "release"
+def _is_release_submission(department: str, name: str, args: dict[str, object],
+                           *, definitions: Definitions | None = None) -> bool:
+    # 只有核验角色的放行（submit_review，结论是 release）等输入处理完；它提交缺陷记录不等（工单 #561）。
+    # 谁是核验角色取自定义里的核验声明，不写部门名（工单 #1391）
+    return in_force(definitions).is_verifier(department) and name == "submit_review" \
+        and args.get("verdict") == "release"
+
+
+def _branch_answer_only(department: str) -> str:
+    # 能交要求的部门在询问分支里只能回答：部门编号取自定义，按句首大写填进说明里（工单 #1391）
+    name = department[:1].upper() + department[1:]
+    return f"{name} ask branch can only submit answer"
 
 
 class WatchedOutputsTightening:
@@ -142,11 +154,13 @@ class WatchedOutputsTightening:
     CONTRACT_VERSION = tightening_contract.CURRENT_VERSION
 
     def kinds(self, request: TightenRequest) -> set[str]:
-        # 这个部门此刻能提交的提案种类。产品在回答一次询问时可以修订 PRD（循环结构第 4.3 节）；
-        # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着产品回答
-        projection, department = request.state, request.department
-        allowed = allowed_proposal_kinds(projection, department, definitions=request.definitions)
-        if department == "product" and any(ask.get("recipient") == "product" for ask in projection.ask_stack):
+        # 这个部门此刻能提交的提案种类。能交要求的部门在回答一次询问时可以修订 PRD（循环结构第 4.3 节），
+        # 谁能交要求按提案合同判断，不写部门名（工单 #1391）；
+        # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着这个部门回答
+        projection, department, definitions = request.state, request.department, request.definitions
+        allowed = allowed_proposal_kinds(projection, department, definitions=definitions)
+        if ("product_spec" in proposal_kinds_for(department, projection.kind, definitions)
+                and any(ask.get("recipient") == department for ask in projection.ask_stack)):
             allowed = allowed | {"product_spec"}
         return allowed
 
@@ -159,7 +173,8 @@ class WatchedOutputsTightening:
             # 询问分支里：可以回答；层数允许时可以回问；不能写工作区、不能提交提案（工单 #473）
             chain_allowed, _ = ask_chain_decision(projection.ask_position(request.session_id), ask_chain_max_depth())
             nested = ["ask"] if chain_allowed else []
-            if department == "product":
+            if "product_spec" in proposal_kinds_for(department, projection.kind, definitions):
+                # 能交要求的部门在分支里只能回答（修订要求随回答交上，不走提交类工具）
                 return ["answer"] + nested
             allowed = [name for name in available
                        if name != "ask" and not _is_write(name, definitions)
@@ -189,11 +204,12 @@ class WatchedOutputsTightening:
         reason = tool_error(projection, department, name, args, definitions=definitions)
         if reason:
             return Tightened(reason=reason)
-        # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：还有没处理完的输入时，
-        # 这一次调用在安全节点上等，醒来以后按此刻的 PRD 与交付重新做许可。只有质检的放行等，缺陷记录不等；
-        # 还没有交付的预测性探索也不等：没有可以放行的交付，这次提交本来就只会被拒绝
-        if (_is_release_submission(department, name, args) and projection.delivery_spec is not None
-                and pending_product_input(projection, list(request.events))):
+        # 放行要等发给收输入的部门的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：还有没处理完的
+        # 输入时，这一次调用在安全节点上等，醒来以后按此刻的 PRD 与交付重新做许可。只有核验角色的放行等，
+        # 缺陷记录不等；还没有交付的预测性探索也不等：没有可以放行的交付，这次提交本来就只会被拒绝
+        if (_is_release_submission(department, name, args, definitions=definitions)
+                and projection.delivery_spec is not None
+                and pending_product_input(projection, list(request.events), definitions=definitions)):
             return Tightened(wait=True)
         return Tightened()
 
@@ -214,8 +230,8 @@ class WatchedOutputsTightening:
                 return None
             allowed, reason = ask_chain_decision(projection.ask_position(session_id), ask_chain_max_depth())
             return None if allowed else Tightened(reason=reason)
-        if department == "product":
-            return Tightened(reason=PRODUCT_BRANCH_ANSWER_ONLY)
+        if "product_spec" in proposal_kinds_for(department, projection.kind, definitions):
+            return Tightened(reason=_branch_answer_only(department))
         if _is_write(name, definitions):
             return Tightened(reason=BRANCH_CANNOT_WRITE)
         if name == "submit_delivery":
@@ -268,7 +284,8 @@ class WatchedOutputsTightening:
         proposal = request.proposal or {}
         if projection.input_version != projection.product_work_input_version:
             return Tightened(errors=(FieldError(
-                "input_version", "new user input must enter product work before requirements can be accepted"),))
+                "input_version",
+                f"new user input must enter {request.department} work before requirements can be accepted"),))
         outcome = self._conditions("product_spec", request)
         if outcome.errors:
             return Tightened(errors=tuple(outcome.errors))
@@ -280,8 +297,8 @@ class WatchedOutputsTightening:
         active_hashes = {item.content_hash for item in projection.effective_decisions}
         declared = [item["decision_hash"] for item in proposal.get("decision_changes", [])]
         if set(declared) != active_hashes or len(declared) != len(active_hashes):
-            errors.append(FieldError("decision_changes", "explicitly retain, integrate, or retire every current product "
-                                                          "decision exactly once"))
+            errors.append(FieldError("decision_changes", "explicitly retain, integrate, or retire every current decision "
+                                                          "exactly once"))
         if errors:
             return Tightened(errors=tuple(errors))
         # PRD 被接纳以后由关注的成果决定下一个谁工作（工单 #556）：这里不再写阶段迁移
@@ -290,7 +307,7 @@ class WatchedOutputsTightening:
     def _product_decision(self, request: TightenRequest) -> Tightened:
         if request.minimal.artifact("product_spec") is None:
             return Tightened(errors=(FieldError(
-                "product_spec", "a product decision requires an active ProductSpec"),))
+                "product_spec", "a decision requires an active ProductSpec"),))
         outcome = self._conditions("product_decision", request)
         if outcome.errors:
             return Tightened(errors=tuple(outcome.errors))
@@ -332,17 +349,19 @@ class WatchedOutputsTightening:
         return Tightened(content=content)
 
     def _review(self, request: TightenRequest) -> Tightened:
-        # 质检的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象；
-        # 放行要用当前的质检测试材料；提交事务里再判一次输入有没有处理完（工具许可之后、提交之前新输入到达）
+        # 核验角色的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象；
+        # 放行要用它当前的测试材料；提交事务里再判一次输入有没有处理完（工具许可之后、提交之前新输入到达）。
+        # 部门名取自定义：这一轮正是提交结论的那个部门在做核验（工单 #1391）
         minimal, facts = request.minimal, request.facts
         projection = request.state
+        department = request.department
         proposal = request.proposal or {}
         spec_hash = minimal.artifact_hash("product_spec")
         if spec_hash is None:
             return Tightened(errors=(FieldError("product_spec", "no active ProductSpec"),))
         # 预测性探索的一轮（工单 #557）没有交付，提交结论在这里被拒绝
-        if projection.department_bases.get("quality") is not None \
-                and projection.department_delivery_bases.get("quality") is None:
+        if projection.department_bases.get(department) is not None \
+                and projection.department_delivery_bases.get(department) is None:
             return Tightened(errors=(FieldError("delivery_spec", "this work has no delivery to review"),))
         delivery_hash = minimal.artifact_hash("delivery_spec")
         if delivery_hash is None:
@@ -350,7 +369,7 @@ class WatchedOutputsTightening:
         contract_hash = minimal.artifact_hash("contract")
         if contract_hash is None:
             return Tightened(errors=(FieldError(
-                "effective_contract", "quality review requires a current contract"),))
+                "effective_contract", f"{department} review requires a current contract"),))
         # 依据版本、交付绑定的当前版本、工作区的树与检查回执都由合同里的通用条件核对（设计说明第 5.5 节），
         # 提出评价的部门与交付的作者部门分开也由通用条件核对（基础规则 3）
         outcome = self._conditions("qa_review", request)
@@ -361,32 +380,37 @@ class WatchedOutputsTightening:
         verdict = proposal["verdict"]
         if verdict == "release":
             if any(item["exit_code"] != 0 for item in bound_checks):
-                errors.append(FieldError("checks", "release requires all quality checks to exit 0"))
+                errors.append(FieldError("checks", f"release requires all {department} checks to exit 0"))
             if not bound_checks:
-                errors.append(FieldError("checks", "release requires quality-run evidence bound to the current snapshot"))
-            # 放行要用当前的质检测试材料：材料摘要的比较读的是内容
+                errors.append(FieldError(
+                    "checks", f"release requires {department}-run evidence bound to the current snapshot"))
+            # 放行要用当前的核验测试材料：材料摘要的比较读的是内容
             if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in bound_checks):
                 errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
         # 逐条结论（验证的独立性设计说明第 7、7.1 节，工单 #151）在前面这些检查通过以后才判：
-        # 覆盖当前 ProductSpec 的全部验收条件、可执行检验的 passed 至少一个本轮质检回执、放行的三条规则
+        # 覆盖当前 ProductSpec 的全部验收条件、可执行检验的 passed 至少一个本轮核验回执、放行的三条规则
         criteria: list[dict[str, Any]] = []
         if not errors:
             criteria, criteria_errors = _qa_criteria(proposal)
             errors.extend(criteria_errors)
             if not errors:
-                errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts))
-                errors.extend(_criteria_evidence_errors(criteria))
+                errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts, department))
+                errors.extend(_criteria_evidence_errors(criteria, department))
                 if verdict == "release":
                     errors.extend(_release_criteria_errors(criteria))
                 if verdict == "cannot_verify":
                     errors.extend(_cannot_verify_criteria_errors(criteria))
-        # 先判断后看解释的门（第 4 节，工单 #358）：提交结论前这份交付必须已有独立判断事件；
-        # 字段级错误写明缺什么，部门读 validation_feedback 以后先提交独立判断再下结论
-        if not errors and _judgement_exists(request.events, delivery_hash) is False:
-            errors.append(FieldError(
-                "independent_judgement",
-                "commit the independent judgement for the current delivery first: the conclusion must "
-                "reference the committed judgement (kind=independent_judgement, criteria per acceptance criterion)"))
+        # 先判断后看解释的门（第 4 节，工单 #358）与引用校验（工单 #1190）：提交结论前这份交付必须已有
+        # 独立判断事件，结论引用的是这一条判断——它对这个交付与这一版 PRD、写在这份交付被接纳之后，
+        # 并且它的逐条结论覆盖当前 PRD 的全部验收条件。字段级错误写明缺什么、哪一条不符
+        judgement = None
+        if not errors:
+            judgement, reference_errors = _qa_judgement(proposal, request.events, projection, delivery_hash, spec_hash)
+            errors.extend(reference_errors)
+        # 改判（第 4 节，工单 #1190）：判断与结论不一致的条目逐条写明改判理由，缺了被拒绝；
+        # 改判的条数随放行记录写进事实，以后算解释翻转率时从这里取
+        if not errors and judgement is not None:
+            errors.extend(_judgement_change_errors(criteria, judgement))
         defects, defect_errors = _qa_defects(proposal)
         errors.extend(defect_errors)
         if errors:
@@ -395,6 +419,7 @@ class WatchedOutputsTightening:
         if request.commit and verdict == "release" and pending_product_input(projection, list(request.events)):
             return Tightened(wait=True)
         # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
+        changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
         return Tightened(content={
             "product_spec_hash": spec_hash,
             "effective_contract_hash": contract_hash,
@@ -404,9 +429,13 @@ class WatchedOutputsTightening:
             "rationale": proposal["rationale"].strip(),
             "checks": bound_checks,
             "defects": defects,
-            "criteria": criteria,
-            # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算
-            "coverage": coverage_report(criteria),
+            # 逐条结论带判断的结果与改判理由（工单 #1190）：同一条记录里看得出改了哪几条、为什么
+            "criteria": _criteria_with_judgement(criteria, judgement),
+            # 结论引用的独立判断事件（工单 #1190）：以后算解释翻转率时按这一对事件取
+            "judgement_event": judgement.event_id,
+            # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算；
+            # 改判的条数随它写进放行记录（工单 #1190）
+            "coverage": coverage_report(criteria, changed=len(changed)),
             "open_criteria": open_criteria(criteria),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
             "evidence_refs": _check_evidence_refs(criteria, request.events),
@@ -416,10 +445,11 @@ class WatchedOutputsTightening:
         # 独立判断的提交（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里
         # 对当前交付的每条验收条件写出判断（#151 逐条结论的形状），经写入口写成事实。
         # 它不是成果：没有结论、缺陷与检查回执的绑定——判断只依据主机已经给出的回执引用检查名，
-        # 每条引用的检查名仍是本次激活里绑定当前快照、ProductSpec 与交付的质检回执（事实通道不变）。
+        # 每条引用的检查名仍是本次激活里绑定当前快照、ProductSpec 与交付的核验回执（事实通道不变）。
         # 依据版本（当前的 PRD 与交付）在这里核对：判断必须是对当前交付的判断
         minimal, facts = request.minimal, request.facts
         projection = request.state
+        department = request.department
         proposal = request.proposal or {}
         spec_hash = minimal.artifact_hash("product_spec")
         if spec_hash is None:
@@ -428,8 +458,8 @@ class WatchedOutputsTightening:
         if delivery_hash is None:
             return Tightened(errors=(FieldError("delivery_spec", "independent judgement requires a current delivery"),))
         # 预测性探索的一轮（工单 #557）没有交付：独立判断无从谈起
-        if projection.department_bases.get("quality") is not None \
-                and projection.department_delivery_bases.get("quality") is None:
+        if projection.department_bases.get(department) is not None \
+                and projection.department_delivery_bases.get(department) is None:
             return Tightened(errors=(FieldError("delivery_spec", "this work has no delivery to review"),))
         criteria, criteria_errors = _qa_criteria(proposal)
         errors: list[FieldError] = list(criteria_errors)
@@ -437,8 +467,8 @@ class WatchedOutputsTightening:
             outcome = self._conditions("independent_judgement", request)
             errors.extend(outcome.errors)
         if not errors:
-            # 逐条结论必须覆盖当前 ProductSpec 的全部验收条件，引用的检查名是本次激活的质检回执
-            errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts))
+            # 逐条结论必须覆盖当前 ProductSpec 的全部验收条件，引用的检查名是本次激活的核验回执
+            errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts, department))
         if errors:
             return Tightened(errors=tuple(errors))
         # 一份交付一份判断：这份交付已经有独立判断时重复提交被拒绝（门以第一次为准）
@@ -450,7 +480,8 @@ class WatchedOutputsTightening:
             "delivery_spec_hash": delivery_hash,
             "checks": list(proposal.get("checks") or []),
             "criteria_count": len(criteria),
-            "criteria": criteria,
+            # 判断没有「改判理由」（#1190 的字段只属于结论）：这一项不进判断事件
+            "criteria": [{key: value for key, value in row.items() if key != "change_reason"} for row in criteria],
         })
 
     def _structure(self, request: TightenRequest) -> Tightened:
@@ -908,8 +939,9 @@ def _qa_defects(proposal: dict[str, Any]) -> tuple[list[dict[str, str]], list[Fi
 
 # 验收条件的引用形式（浏览器与 computer use 设计说明第 8.1 节）：AC<序号>，序号是它在 ProductSpec 里的位置
 _CRITERION_ID = re.compile(r"^AC[1-9][0-9]*$")
-# 逐条结论一项的字段（独立性说明第 7.1 节、浏览器说明第 8.3 节）：封闭，多写的字段报错
-_QA_CRITERION_FIELDS = frozenset({"criterion", "method", "result", "checks", "trial_cases", "note"})
+# 逐条结论一项的字段（独立性说明第 7.1 节、浏览器说明第 8.3 节）：封闭，多写的字段报错。
+# change_reason 是改判理由（第 4 节，工单 #1190）：结论与独立判断不一致的条目必须写明
+_QA_CRITERION_FIELDS = frozenset({"criterion", "method", "result", "checks", "trial_cases", "note", "change_reason"})
 
 
 def _qa_criteria_errors(proposal: dict[str, Any]) -> list[FieldError]:
@@ -960,16 +992,33 @@ def _qa_criteria(proposal: dict[str, Any]) -> tuple[list[dict[str, Any]], list[F
         note = item.get("note")
         if note is not None and not isinstance(note, str):
             errors.append(FieldError(f"criteria[{index}].note", "note must be a string"))
+        change_reason = item.get("change_reason")
+        if change_reason is not None and not isinstance(change_reason, str):
+            errors.append(FieldError(f"criteria[{index}].change_reason",
+                                     "change_reason must be a string: the reason the result differs from the independent judgement"))
         if method in QA_METHODS and result in QA_RESULTS:
             rows.append({"criterion": criterion.strip(), "method": method, "result": result,
-                         "checks": checks, "trial_cases": [], "note": (note or "").strip()})
+                         "checks": checks, "trial_cases": [], "note": (note or "").strip(),
+                         "change_reason": (change_reason or "").strip()})
     return rows, errors
 
 
+def _verifying_department(department: str | None) -> str:
+    """检查回执来自哪个部门：提交这份成果的核验角色；没有给出时取定义里声明的第一个核验角色。
+
+    部门名从定义取，写在代码里的只有这一处兜底：调用方不说明是哪个部门时，按核验声明取（工单 #1391）。
+    """
+    if department:
+        return department
+    verifiers = DEFINITIONS.verifier_roles()
+    return verifiers[0] if verifiers else "verifier"
+
+
 def _criteria_coverage_errors(criteria: list[dict[str, Any]], projection: RunProjection,
-                              receipts: dict[str, Any]) -> list[FieldError]:
+                              receipts: dict[str, Any], department: str | None = None) -> list[FieldError]:
     # 覆盖当前 ProductSpec 的全部验收条件，按位置一一对应：缺一条、多一条、重复一条都报在 criteria 上；
-    # 每条引用的检查名必须是本次激活里绑定当前快照、ProductSpec 与交付的质检回执（工程的回执不在 receipts 里）
+    # 每条引用的检查名必须是本次激活里绑定当前快照、ProductSpec 与交付的核验回执（别的部门的回执不在 receipts 里）
+    verifying = _verifying_department(department)
     errors: list[FieldError] = []
     spec = projection.product_spec
     expected = [f"AC{position}" for position in range(1, len(spec.acceptance_criteria) + 1)] if spec is not None else []
@@ -988,18 +1037,20 @@ def _criteria_coverage_errors(criteria: list[dict[str, Any]], projection: RunPro
         unknown = [name for name in row["checks"] if name not in receipts]
         if unknown:
             errors.append(FieldError(f"criteria[{index}].checks",
-                                     "checks must name quality run_check receipts bound to the current snapshot, ProductSpec and "
-                                     "delivery in this activation: " + ", ".join(unknown)))
+                                     f"checks must name {verifying} run_check receipts bound to the current snapshot, "
+                                     "ProductSpec and delivery in this activation: " + ", ".join(unknown)))
     return errors
 
 
-def _criteria_evidence_errors(criteria: list[dict[str, Any]]) -> list[FieldError]:
-    # 可执行检验（check、trial、measure）的 passed 至少一个证据：本次激活的质检检查回执
+def _criteria_evidence_errors(criteria: list[dict[str, Any]],
+                              department: str | None = None) -> list[FieldError]:
+    # 可执行检验（check、trial、measure）的 passed 至少一个证据：本次激活的核验检查回执
+    verifying = _verifying_department(department)
     errors: list[FieldError] = []
     for index, row in enumerate(criteria):
         if row["result"] == "passed" and method_is_executable(row["method"]) and not row["checks"]:
             errors.append(FieldError(f"criteria[{index}].checks",
-                                     "a passed executable criterion needs at least one quality check receipt"))
+                                     f"a passed executable criterion needs at least one {verifying} check receipt"))
     return errors
 
 
@@ -1068,6 +1119,110 @@ def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: st
         and (event.payload or {}).get("delivery_spec_hash") == delivery_hash
         for event in events
     )
+
+
+def _qa_judgement(proposal: dict[str, Any], events: tuple[Event, ...] | list[Event],
+                  projection: RunProjection, delivery_hash: str,
+                  spec_hash: str) -> tuple[Event | None, list[FieldError]]:
+    """结论引用的独立判断（验证的独立性设计说明第 4 节，工单 #1190）。
+
+    三件事：
+    · 引用存在——结论可以在 judgement_event 里写明它引用的判断的事件编号；没写明时由主机取当前交付的
+      那一条判断（同一份交付只有一条判断，#358 的门保证），结论照样引用一条判断。写明的编号在日志里
+      没有对应的判断事件时被拒绝。
+    · 属于本次激活——引用的判断必须是对当前交付与当前 PRD 的判断，并且写在这份交付被接纳之后：
+      新的交付到达以后，上一份交付的判断不再算作这一轮核验的依据。
+    · 覆盖全部验收条件——判断的逐条结论覆盖当前 PRD 的每一条验收条件，各一次。
+
+    返回引用的判断事件与错误；有错误时以错误为准。
+    """
+    committed = [event for event in events if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
+    accepted_at = _delivery_position(events, delivery_hash)
+    cited = proposal.get("judgement_event")
+    if cited is not None:
+        if not isinstance(cited, str) or not cited.strip():
+            return None, [FieldError("judgement_event",
+                                     "judgement_event must be the id of the independent judgement this conclusion "
+                                     "references, or null to use the judgement committed for the current delivery")]
+        cited = cited.strip()
+        referred = [event for event in committed if event.event_id == cited]
+        if not referred:
+            return None, [FieldError("judgement_event",
+                                     f"the referenced independent judgement does not exist in this work item: {cited}")]
+        judgement = referred[-1]
+        payload = judgement.payload or {}
+        if payload.get("delivery_spec_hash") != delivery_hash or payload.get("product_spec_hash") != spec_hash:
+            return None, [FieldError("judgement_event",
+                                     "the referenced judgement is not for the current delivery and ProductSpec; a "
+                                     "conclusion cannot reference the judgement of another delivery")]
+        if accepted_at is not None and judgement.position < accepted_at:
+            return None, [FieldError("judgement_event",
+                                     "the referenced judgement was committed before the current delivery was accepted; "
+                                     "it does not belong to this verification round")]
+        return _judgement_coverage_result(judgement, projection)
+    candidates = [event for event in committed
+                  if (event.payload or {}).get("delivery_spec_hash") == delivery_hash
+                  and (event.payload or {}).get("product_spec_hash") == spec_hash
+                  and (accepted_at is None or event.position >= accepted_at)]
+    if not candidates:
+        return None, [FieldError(
+            "judgement_event",
+            "commit the independent judgement for the current delivery first: the conclusion must reference the "
+            "committed judgement (kind=independent_judgement, criteria per acceptance criterion)")]
+    return _judgement_coverage_result(candidates[-1], projection)
+
+
+def _delivery_position(events: tuple[Event, ...] | list[Event], delivery_hash: str) -> int | None:
+    # 这份交付被接纳时的位置：判断写在这之后才算这一轮核验的依据
+    for event in events:
+        if event.type == EventType.DELIVERY_ACCEPTED and (event.payload or {}).get("content_hash") == delivery_hash:
+            return event.position
+    return None
+
+
+def _judgement_coverage_result(judgement: Event,
+                               projection: RunProjection) -> tuple[Event | None, list[FieldError]]:
+    # 判断的逐条结论覆盖当前 PRD 的全部验收条件，各一次（工单 #1190 的第三项核对）
+    rows = [row for row in (judgement.payload or {}).get("criteria") or [] if isinstance(row, dict)]
+    spec = projection.product_spec
+    expected = [f"AC{position}" for position in range(1, len(spec.acceptance_criteria) + 1)] \
+        if spec is not None else []
+    seen = [str(row.get("criterion")) for row in rows]
+    missing = [item for item in expected if item not in seen]
+    if missing:
+        return None, [FieldError("judgement_event",
+                                 "the referenced judgement does not cover every acceptance criterion of the current "
+                                 "ProductSpec; missing " + ", ".join(missing))]
+    if len(seen) != len(set(seen)):
+        return None, [FieldError("judgement_event",
+                                 "the referenced judgement lists the same acceptance criterion twice")]
+    return judgement, []
+
+
+def _judgement_change_errors(criteria: list[dict[str, Any]], judgement: Event) -> list[FieldError]:
+    # 判断与结论不一致的条目逐条写明改判理由（第 4 节，工单 #1190）：缺理由的被拒绝，错误指向那一条
+    judged = _judged_results(judgement)
+    errors: list[FieldError] = []
+    for index, row in enumerate(criteria):
+        before = judged.get(row["criterion"], "")
+        if before and before != row["result"] and not str(row.get("change_reason") or "").strip():
+            errors.append(FieldError(
+                f"criteria[{index}].change_reason",
+                f"the independent judgement recorded {before} for {row['criterion']} and the conclusion records "
+                f"{row['result']}; write why the result changed"))
+    return errors
+
+
+def _judged_results(judgement: Event) -> dict[str, str]:
+    # 独立判断的逐条结果，按 AC 序号
+    return {str(row.get("criterion")): str(row.get("result"))
+            for row in (judgement.payload or {}).get("criteria") or [] if isinstance(row, dict)}
+
+
+def _criteria_with_judgement(criteria: list[dict[str, Any]], judgement: Event) -> list[dict[str, Any]]:
+    # 结论的逐条结论带上判断当时的结果（工单 #1190）：同一条记录里看得出改了哪几条、往哪个方向改
+    judged = _judged_results(judgement)
+    return [{**row, "judged": judged.get(row["criterion"], "")} for row in criteria]
 _REQUIREMENT_MAPPING_FIELDS = frozenset({"requirement", "criteria", "gap"})
 
 

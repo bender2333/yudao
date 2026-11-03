@@ -67,7 +67,8 @@
       "submit_independent_judgement"
     ],
     "visibility": [
-      "current_delivery_spec"
+      "delivery_facts",
+      "delivery_explanation"
     ]
   }
 }

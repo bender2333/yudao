@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/C4/02-containers.md",
-"hash":"39a80ba5740c9c69",
+"hash":"e01f82387859549b",
 "nodes":[
-{"hash":"39a80ba5740c9c69","id":"docs/C4/02-containers.md","kind":"file","title":"docs/C4/02-containers.md"},
-{"hash":"39a80ba5740c9c69","id":"docs/C4/02-containers.md#C2：Yudao 内部容器","kind":"section","parent":"docs/C4/02-containers.md","title":"C2：Yudao 内部容器"}
+{"hash":"e01f82387859549b","id":"docs/C4/02-containers.md","kind":"file","title":"docs/C4/02-containers.md"},
+{"hash":"e01f82387859549b","id":"docs/C4/02-containers.md#C2：Yudao 内部容器","kind":"section","parent":"docs/C4/02-containers.md","title":"C2：Yudao 内部容器"}
 ],
 "edges":[
 {"dst":"client/src/renderer/src/main.tsx","kind":"link","raws":["../../client/src/renderer/src/main.tsx"],"seen":"e947c808f6ad61fa","src":"docs/C4/02-containers.md#C2：Yudao 内部容器"},

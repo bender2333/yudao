@@ -1,6 +1,6 @@
 // 真实的 RoomSection 在数据由空到有时同一节点存活（工单 #381 验收）：
 // 同一个 React root 挂载 department.tsx 里导出的 RoomSection，先传空数据再传
-// tests/fixtures/room/recordings.json 里真实录下的房间数据；舞台容器与房间画面容器
+// tests/fixtures/room/workspace.json 里真实录下的部门房间查询结果；舞台容器与房间画面容器
 // 在数据到达前后是同一个 DOM 节点，挂载计数仍为 1，没有页面错误。
 // 反向验证：把 RoomSection 改回两处条件分支写法时这两个测试必须失败。
 

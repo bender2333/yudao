@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"CONTEXT.md",
-"hash":"3ba70042e926ad1b",
+"hash":"47bedab1efdf5000",
 "nodes":[
-{"hash":"3ba70042e926ad1b","id":"CONTEXT.md","kind":"file","title":"CONTEXT.md"},
+{"hash":"47bedab1efdf5000","id":"CONTEXT.md","kind":"file","title":"CONTEXT.md"},
 {"hash":"64de8ed2249f3366","id":"CONTEXT.md#Yudao","kind":"section","parent":"CONTEXT.md","title":"Yudao"},
 {"hash":"0d3895bc0865e9cc","id":"CONTEXT.md#Yudao > Language","kind":"section","parent":"CONTEXT.md#Yudao","title":"Language"},
-{"hash":"897713a6569634e9","id":"CONTEXT.md#Yudao > Language > 系统结构","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"系统结构"},
+{"hash":"14c5809e183e84d7","id":"CONTEXT.md#Yudao > Language > 系统结构","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"系统结构"},
 {"hash":"5b4c2676b9fa85cf","id":"CONTEXT.md#Yudao > Language > 规则与参数","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"规则与参数"},
 {"hash":"135d6285fb2dbc93","id":"CONTEXT.md#Yudao > Language > 裁决与验证","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"裁决与验证"},
 {"hash":"8df8119a5ea6817c","id":"CONTEXT.md#Yudao > Language > 循环","kind":"section","parent":"CONTEXT.md#Yudao > Language","title":"循环"},
@@ -22,6 +22,6 @@
 ],
 "edges":[
 {"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"00fa1480737cd559","src":"CONTEXT.md#Yudao > Language > 系统结构"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"86b72cacca10bc0a","src":"CONTEXT.md#Yudao > Language > 系统结构"}
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"87d89411eab59fb8","src":"CONTEXT.md#Yudao > Language > 系统结构"}
 ]
 }

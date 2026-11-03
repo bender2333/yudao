@@ -177,7 +177,7 @@
   },
   "roles.product.visibility": {
     "value": ["qa_defects"],
-    "bounds": [0, 4],
+    "bounds": [0, 6],
     "kind": "parameter",
     "form": "permission",
     "guards": "验证者被作者的材料带偏",
@@ -188,7 +188,7 @@
   },
   "roles.engineering.visibility": {
     "value": ["current_delivery_spec", "prior_delivery", "qa_defects", "existing_structure"],
-    "bounds": [0, 4],
+    "bounds": [0, 6],
     "kind": "parameter",
     "form": "permission",
     "guards": "验证者被作者的材料带偏",
@@ -198,15 +198,15 @@
     "origin": "roles.json 的可见范围"
   },
   "roles.quality.visibility": {
-    "value": ["current_delivery_spec"],
-    "bounds": [0, 4],
+    "value": ["delivery_facts", "delivery_explanation"],
+    "bounds": [0, 6],
     "kind": "parameter",
     "form": "permission",
     "guards": "验证者被作者的材料带偏",
     "cost": "重复探索与部门之间的询问",
     "relax_when": "D32 新增的一组对照显示共享可见范围不劣化",
     "tighten_when": "D32 对照中验证者的结论明显依赖作者的可见材料",
-    "origin": "roles.json 的可见范围"
+    "origin": "roles.json 的可见范围；验证的独立性设计说明第 3 节的两套取值，现值是隔离的一套（交付事实与交付解释），共享的一套在这份现值上加 existing_structure、prior_delivery、qa_defects，默认取第 6 节的对照决定"
   },
   "review.isolation": {
     "value": true,
@@ -526,6 +526,28 @@
     "relax_when": "上下文清单记录的「被上限挡在外面的条目数量」持续很大",
     "tighten_when": "「被上限挡在外面的条目数量」持续为 0",
     "origin": "语义系统设计说明第 509 行，轨迹节录 13107 token"
+  },
+  "context.failure_list_tokens": {
+    "value": 4000,
+    "bounds": [1000, 13107],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "压缩以后的请求被失败清单挤占",
+    "cost": "更早的失败合并成一行，要按事件编号查询",
+    "relax_when": "压缩以后的请求长度分布显示清单远低于上限",
+    "tighten_when": "清单装了失败以后仍然重复同样的失败",
+    "origin": "docs/design/context-assembly.md「压缩以后保留失败的尝试」：失败清单的上限 4000 token，范围 1000 至 13107"
+  },
+  "context.failure_entry_chars": {
+    "value": 400,
+    "bounds": [100, 2000],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "单条失败原文占满清单",
+    "cost": "失败输出的开头以外的部分要按事件编号查询",
+    "relax_when": "实际失败原文的长度分布显示现值截掉了需要的信息",
+    "tighten_when": "单条失败原文的长度分布远低于现值",
+    "origin": "docs/design/context-assembly.md「压缩以后保留失败的尝试」：单条失败原文的上限 400 字符，范围 100 至 2000"
   },
   "context.role_result_chars": {
     "value": 5000,

@@ -1,22 +1,23 @@
 // 部门房间组件的部门切换测试支撑（工单 #300）：在渲染进程的页面上真实挂载 RoomScreen 组件，
 // 依次把各部门的查询结果交给它，从页面读回错误提示与画面当前的部门。
 //
-// 房间画面用 PixiJS 画，需要浏览器；模块由 Vite 的模块服务器提供，与房间回放同一方式。
+// 房间画面用 PixiJS 画，需要浏览器；模块由 Vite 的模块服务器提供。
 // 不注入替身：组件用的应用层对象是 client-app.ts 里真实的 ClientApp，它自己收下组件的三个订阅。
 
 import { createServer } from "vite";
 import { chromium } from "@playwright/test";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadRoomRecordings } from "./room-replay.ts";
 import type { DepartmentWorkspaceResult } from "../../src/renderer/src/api/generated/types.gen.ts";
 import type { RoomTestHooks } from "../../src/renderer/src/views/project/room-screen.tsx";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const clientRoot = resolve(here, "..", "..");
+const workspaceFixtureFile = join(clientRoot, "tests", "fixtures", "room", "workspace.json");
 
-// 部门工作间的查询结果：录下的数据只带房间模型，房间组件只读 department 与 room 两个字段。
-// 房间模型在录制里是驱动收到的那份完整数据，与查询结果里的房间数据同一个类型
+// 部门工作间的查询结果：夹具里只带每个部门的那一份查询结果，房间组件只读 department 与 room 两个字段。
+// 查询结果是真实录下来的部门房间数据，与页面的查询结果同一个类型
 export type RoomWorkspaceFixture = DepartmentWorkspaceResult;
 
 /** 页面读取入口的宿主窗口类型（组件把画面状态挂在 window 上）。 */
@@ -36,14 +37,12 @@ export interface RoomSwitchReport {
   pageErrors: string[];
 }
 
-/** 录下的部门房间数据里取这个部门的房间查询结果（真实录下的数据）。 */
+/** 部门工作间的查询结果：夹具 tests/fixtures/room/workspace.json 里按部门取这一份（真实录下的数据）。 */
 export function roomWorkspaceFixture(department: string): RoomWorkspaceFixture {
-  const recording = loadRoomRecordings();
-  const scenario = recording.scenarios.find((s) => s.department === department);
-  if (!scenario) throw new Error(`录下的场景里没有部门 ${department} 的房间查询结果`);
-  const workspace = scenario.ops.find((op) => op.op === "workspace" && op.arg !== null && op.arg !== undefined);
-  if (!workspace) throw new Error(`录下的场景里没有部门 ${department} 的房间数据`);
-  return workspace.arg as RoomWorkspaceFixture;
+  const fixture = JSON.parse(readFileSync(workspaceFixtureFile, "utf8")) as { departments: Record<string, RoomWorkspaceFixture> };
+  const workspace = fixture.departments[department];
+  if (!workspace) throw new Error(`夹具里没有部门 ${department} 的房间查询结果`);
+  return workspace;
 }
 
 /** 数据从空到有的存活观测：挂载计数与画面容器节点在前后两步是否同一个 DOM 节点。 */

@@ -18,7 +18,7 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | | 用户在场 | 用户不在场（`--循环`） |
 | --- | --- | --- |
 | 规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、总图、评价标准（评测的隐藏检查、参考解法、评分器、发布检查） | 可以改，改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 不改；开一张 `architecture` 工单写清要定什么，相关工单标 `ready-for-human` |
-| 设计说明、ADR、需求记录（用户原话不改）、`CONTEXT.md`、原型；工单正文、子工单、依赖、评论 | 可以 | 可以，直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md` |
+| 设计说明、ADR、需求记录（不改用户已确认的需求与验收标准）、`CONTEXT.md`、原型；工单正文、子工单、依赖、评论 | 可以 | 可以，直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md` |
 | 里程碑：建、关、改名 | 总架构师 | 不做；拆出的子工单沿用原工单的里程碑 |
 | 关闭试用工单与里程碑 | 用户确认以后，按[验收证据规则](../../../docs/agents/acceptance-evidence.md)「试用工单与里程碑的关闭」 | 不做，不写「试用通过」 |
 | `harness/` 的代码与测试 | 不改，拆成工单 | 不改 |

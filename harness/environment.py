@@ -26,7 +26,17 @@ import time
 from threading import Lock
 from typing import Any, Mapping
 
-from .actions import Action, ActionReceipt, FactsQuery, PathFacts, WorkspaceFacts
+from .actions import (
+    Action,
+    ActionReceipt,
+    FactsQuery,
+    PathFacts,
+    SnapshotRef,
+    TreeChange,
+    TreeFacts,
+    WorkspaceFacts,
+    snapshot_payload,
+)
 from .artifacts import ArtifactStore, ExternalSource
 from .event_store import run_stream
 from .fetch import EXTERNAL_CONTENT_NOTICE, FetchCancelled, FetchRefused, fetch_url
@@ -837,6 +847,8 @@ class LocalEnvironment:
         # 环境的处理分支里，立刻失败。工具的执行出错时回执为 failed，错误说明交回模型；工作区出现公开树无法
         # 表示的条目时（UnrepresentableWorkspace），按原样传出，由步骤驱动以 workspace_unrepresentable 暂停运行。
         # MCP 动作的动态别名不在静态清单里：分派按类别交给唯一的处理方法，别名与原名由会话表核对
+        # 执行过的动作在回执里带动作前后的两个树摘要与终点快照的引用（工单 #1398）；拒绝与动作开始
+        # 之前的取消没有执行，回执里这两项为空
         tools = _KIND_TOOLS.get(action.kind)
         if tools is None:
             raise ValueError(f"the local environment does not execute {action.kind} actions")
@@ -865,7 +877,10 @@ class LocalEnvironment:
                 return ActionReceipt(action_id=action.action_id, status="cancelled",
                                      error="The action was cancelled before it started.")
             self._running[action.action_id] = (asyncio.get_running_loop(), stop)
+        before: TreeFacts | None = None
         try:
+            # 动作前的公开树（工单 #1398）：与动作结束以后的读取一起构成回执里的前后差异
+            before = self._tree_facts()
             if process is not None:
                 result = await process(action, stop)
                 # 登记命令结束后主机立即取得的公开树核对结果随回执交回：附在回执上，步骤驱动在
@@ -885,11 +900,42 @@ class LocalEnvironment:
             # 回执标 refused 并带原因，作为工具结果交回（工单 #1170 的回执字段）
             return ActionReceipt.refusal(action.action_id, str(exc))
         except Exception as exc:
-            return ActionReceipt(action_id=action.action_id, status="failed", error=str(exc))
+            # 动作没有完成时同样带上前后差异：读回执的一方据此判断工作区有没有被改动（工单 #1398）
+            tree_change, after_ref = self._tree_evidence(before)
+            return ActionReceipt(action_id=action.action_id, status="failed", error=str(exc),
+                                 tree_change=tree_change, after_snapshot_ref=after_ref)
         finally:
             with self._lock:
                 self._running.pop(action.action_id, None)
-        return ActionReceipt(action_id=action.action_id, status=status, output=output)
+        tree_change, after_ref = self._tree_evidence(before)
+        return ActionReceipt(action_id=action.action_id, status=status, output=output,
+                             tree_change=tree_change, after_snapshot_ref=after_ref)
+
+    def _tree_facts(self) -> TreeFacts | None:
+        # 公开树事实取自与 query 同一次读取。工作区里有无法表示的条目时为空：动作照常执行，
+        # 能修好工作区的动作（例如删掉那个条目）不因为取不到快照而被挡住
+        try:
+            return self.workspace.snapshot().facts
+        except TreeError:
+            return None
+
+    def _tree_evidence(self, before: TreeFacts | None) -> tuple[TreeChange | None, SnapshotRef | None]:
+        # 回执里的前后差异与终点快照的引用（工单 #1398）：动作结束以后读一次公开树，与动作前的那次
+        # 配成一对；两次读数有一次取不到时这两项都为空
+        after = self._tree_facts()
+        change = None if before is None or after is None else TreeChange(
+            before_digest=before.digest, after_digest=after.digest)
+        return change, None if after is None else self._snapshot_ref(after)
+
+    def _snapshot_ref(self, tree: TreeFacts) -> SnapshotRef | None:
+        # 终点快照存进这个 run 的工件区域：与事件 tool_called 上的 after_snapshot_ref 是同一份内容、
+        # 同一种引用，读回执的一方不用再去事件载荷里找快照。没有工件区域时只交回两个树摘要
+        if self._artifacts is None or self._run_id is None:
+            return None
+        ref = self._artifacts.put(self._run_id, "snapshot/after", json_dumps(snapshot_payload(tree)),
+                                  media_type="application/json")
+        return SnapshotRef(kind=ref.kind, content_hash=ref.content_hash, path=ref.path,
+                           media_type=ref.media_type)
 
     def cancel(self, action_id: str) -> None:
         # 可以从任何线程调用。在锁内安排停止：登记在动作结束时于它的事件循环中移除，持有锁期间事件循环一定仍在运行
@@ -1646,9 +1692,9 @@ def _result_size(result: dict[str, Any]) -> int:
 
 def _fit_match_page(page: list[dict[str, Any]], truncated: bool,
                     limit: int = _OUTPUT_LIMIT) -> tuple[list[dict[str, Any]], bool]:
-    # 按输出上限 limit 收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并
-    probe = {"matches": page}
-    while len(page) > 1 and _result_size({**probe, "truncated": True}) > limit:
+    # 按输出上限 limit 收缩本页，挤出去的命中留给下一页游标，不丢弃也不合并。
+    # 每收缩一条都重新量剩下的这一页：一页放几条由这一页自己的大小决定
+    while len(page) > 1 and _result_size({"matches": page, "truncated": True}) > limit:
         page = page[:-1]
         truncated = True
     if len(page) == 1 and _result_size({"matches": page, "truncated": True}) > limit:

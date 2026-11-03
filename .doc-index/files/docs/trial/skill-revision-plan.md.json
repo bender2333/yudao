@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/trial/skill-revision-plan.md",
-"hash":"579d1d393ccd3710",
+"hash":"f1b93f7b4d9bcbe8",
 "nodes":[
-{"hash":"579d1d393ccd3710","id":"docs/trial/skill-revision-plan.md","kind":"file","title":"docs/trial/skill-revision-plan.md"},
-{"hash":"0bf545f9765cb9aa","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","kind":"section","parent":"docs/trial/skill-revision-plan.md","title":"agent 试用技能修订方案"},
+{"hash":"f1b93f7b4d9bcbe8","id":"docs/trial/skill-revision-plan.md","kind":"file","title":"docs/trial/skill-revision-plan.md"},
+{"hash":"d259d4241292c0ee","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","kind":"section","parent":"docs/trial/skill-revision-plan.md","title":"agent 试用技能修订方案"},
 {"hash":"fb0fe9d49c3de8ac","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 目标与已经确认的取舍","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"目标与已经确认的取舍"},
 {"hash":"8fdd48264d3dc20b","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 修改范围与交付内容","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"修改范围与交付内容"},
 {"hash":"7bc1e481d5be8cc2","id":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案 > 本轮归档中的记录","kind":"section","parent":"docs/trial/skill-revision-plan.md#agent 试用技能修订方案","title":"本轮归档中的记录"},

@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/evaluation-scenarios.md",
-"hash":"8b813cb71f37d7dc",
+"hash":"02431566ceb99df9",
 "nodes":[
-{"hash":"8b813cb71f37d7dc","id":"docs/design/evaluation-scenarios.md","kind":"file","title":"docs/design/evaluation-scenarios.md"},
+{"hash":"02431566ceb99df9","id":"docs/design/evaluation-scenarios.md","kind":"file","title":"docs/design/evaluation-scenarios.md"},
 {"hash":"70b91574698ee677","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照","kind":"section","parent":"docs/design/evaluation-scenarios.md","title":"评测场景：版本回归与 OpenCode 对照"},
 {"hash":"6e0b6ad8c2ab01a8","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 1. 用途","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照","title":"1. 用途"},
 {"hash":"4d2487c612c70108","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 2. 三个场景","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照","title":"2. 三个场景"},
@@ -22,7 +22,7 @@
 {"hash":"19587de76a1ee3d3","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照","title":"6. 报告与版本比较"},
 {"hash":"ce0386e7f4c63a11","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.1 噪声范围与三种结论","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较","title":"6.1 噪声范围与三种结论"},
 {"hash":"9cb61bd1076bea28","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.2 留出场景","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较","title":"6.2 留出场景"},
-{"hash":"cfd9e0bb17f0a13e","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.3 Yudao 对单个 agent","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较","title":"6.3 Yudao 对单个 agent"},
+{"hash":"8c720a58a48703a6","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.3 Yudao 对单个 agent","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较","title":"6.3 Yudao 对单个 agent"},
 {"hash":"01d39579f7ad518f","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 7. 模块划分","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照","title":"7. 模块划分"},
 {"hash":"7df3f11eda1a603d","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 8. 过拟合与数据污染","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照","title":"8. 过拟合与数据污染"},
 {"hash":"8c7410f511eb3a5a","id":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 9. 前提与未决事项","kind":"section","parent":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照","title":"9. 前提与未决事项"}
@@ -37,14 +37,14 @@
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"14d726dbf2dad669","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件"},
 {"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../agents/autopilot-runtime.md"],"seen":"4a6f3b31a2e2c4cd","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件"},
 {"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序","kind":"link","raws":["execution-environment.md"],"seen":"51ca8768d0f7114d","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件"},
-{"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","kind":"link","raws":["execution-environment.md"],"seen":"5bd4d3077039c14c","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件"},
+{"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","kind":"link","raws":["execution-environment.md"],"seen":"ec91cde620c72dc7","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件"},
 {"dst":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明 > 5. 工具的提供与工具许可","kind":"link","raws":["network-and-mcp.md"],"seen":"7145f27185cbe8b1","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件"},
 {"dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 6. 共享上下文的一组对照","kind":"link","raws":["independent-verification.md"],"seen":"765b7a6e4cbae76f","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 5. 过程检查点与指标 > 5.2 指标"},
-{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 4. 对照","kind":"link","raws":["rules-and-parameters.md"],"seen":"38af418f50655acf","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.1 噪声范围与三种结论"},
-{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"7238332bed3feff5","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.3 Yudao 对单个 agent"},
+{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 4. 对照","kind":"link","raws":["rules-and-parameters.md"],"seen":"ebfb1d9ebb1a4c54","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.1 噪声范围与三种结论"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"30d188aa945f9e1d","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.3 Yudao 对单个 agent"},
 {"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["trusted-kernel.md"],"seen":"9213f586c4c21f03","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 7. 模块划分"},
 {"dst":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话 > 3.3 启动方式","kind":"link","raws":["browser-and-computer-use.md"],"seen":"7140117eb55cb2de","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 9. 前提与未决事项"},
-{"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定","kind":"link","raws":["existing-project-onboarding.md"],"seen":"046014f6671d8433","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 9. 前提与未决事项"},
+{"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定","kind":"link","raws":["existing-project-onboarding.md"],"seen":"a4436dcb9f04b27c","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 9. 前提与未决事项"},
 {"dst":"docs/requirements/browser-and-computer-use.md","kind":"link","raws":["../requirements/browser-and-computer-use.md"],"seen":"43b57c3efa7821cc","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 9. 前提与未决事项"}
 ]
 }

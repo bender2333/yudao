@@ -1,1 +1,154 @@
 {"down":"f7b366d82d48c21d","dst":"CLAUDE.md#思考模式 > 文档维护与归档","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属","up":"406fef710b7fa67c"}
+{"down":"f98886b07dd37d98","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","up":"b528b2647bc3d93f"}
+{"down":"f98886b07dd37d98","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.2 版本号","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","up":"86c72df9d2141250"}
+{"down":"a937ec517e99bcea","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.2 集成层在每次合并以后运行","src":"AGENTS.md#项目 > 常用命令","up":"f0fcbba4a05f64a2"}
+{"down":"61274b7dda36f60d","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","src":"CLAUDE.md#角色 > 子架构师","up":"4f9d3f25c2196e3e"}
+{"down":"be9cb249fd225931","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":"README.md#Yudao Loop System","up":"b528b2647bc3d93f"}
+{"down":"be328b04f31f2e21","dst":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录 > 4.3 模型访问定义与准入","src":"README.md#Yudao Loop System > 快速开始 > 配置 Provider","up":"1717d79bc1d6e18c"}
+{"down":"ec9b3556b21ea30e","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 3. 测试分层的生效条件","up":"b528b2647bc3d93f"}
+{"down":"db8c9bc16216185d","dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 4. 对照","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","up":"ebfb1d9ebb1a4c54"}
+{"down":"db8c9bc16216185d","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","up":"b528b2647bc3d93f"}
+{"down":"db8c9bc16216185d","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.6 试用的交接","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","up":"722e82d6d60b28c6"}
+{"down":"625c94ad7065478b","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 2. 各层的职责与边界","src":"docs/design/app-and-interface.md#应用层与接口层设计说明","up":"26eeaa7a5ae22a65"}
+{"down":"625c94ad7065478b","dst":"docs/design/department-roles.md#部门内多角色设计说明 > 15. 界面","src":"docs/design/app-and-interface.md#应用层与接口层设计说明","up":"362bed16c8fb816c"}
+{"down":"625c94ad7065478b","dst":"docs/design/semantic-system.md#语义系统设计说明 > 14. 界面与观察","src":"docs/design/app-and-interface.md#应用层与接口层设计说明","up":"de654054fdc8a067"}
+{"down":"c0b4807fdb94db23","dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 10. 决定","up":"a4436dcb9f04b27c"}
+{"down":"c0b4807fdb94db23","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 4. Yudao 服务的运行 > 4.2 启动与停止","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 10. 决定","up":"cb4c6706362cf368"}
+{"down":"d1a6d1d93f4d1b38","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 2. 分层与模块 > 2.4 依赖规则","up":"3bf0ccde2acd0bda"}
+{"down":"d5e055f5e3d4c0af","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.1 合同","up":"3bf0ccde2acd0bda"}
+{"down":"d5e055f5e3d4c0af","dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.6 部门的建议能力","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.1 合同","up":"7e3019092a848eef"}
+{"down":"ccebc5f1f9b6af1f","dst":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 5. computer use > 5.1 屏幕与桌面会话","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","up":"d1ba7979cd4a8d52"}
+{"down":"ccebc5f1f9b6af1f","dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.5 引用无法使用时","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","up":"d71c47b56b17ef31"}
+{"down":"ccebc5f1f9b6af1f","dst":"docs/design/semantic-system.md#语义系统设计说明 > 7. 写入 > 7.2 证据核对","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","up":"4adbcd95661b77ba"}
+{"down":"fc4490c05f571191","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.2 五种合同","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 5. 事件流 > 5.3 范围筛选","up":"026b427162b0df59"}
+{"down":"f03abef70c72668f","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 4. Yudao 服务的运行 > 4.4 局域网访问","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 6. 能力清单与认证 > 6.2 访问方式与认证","up":"097cf4c3dcc01124"}
+{"down":"65542e702c135de0","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 6. 薄驱动","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.4A 包图","up":"1ae626fc6d33956e"}
+{"down":"7fcc61b25ca6c731","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.6 子组织（位置与规矩）","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.1 身份","up":"d668e778e45dd3a4"}
+{"down":"d8165b7288c1e848","dst":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 5. computer use > 5.1 屏幕与桌面会话","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.3 动作契约","up":"d1ba7979cd4a8d52"}
+{"down":"d8165b7288c1e848","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.3 动作契约","up":"ec91cde620c72dc7"}
+{"down":"1e76702e8bea1c3e","dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.5 引用无法使用时","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.4 用户决定","up":"d71c47b56b17ef31"}
+{"down":"1e76702e8bea1c3e","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 6. 薄驱动","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.4 用户决定","up":"1ae626fc6d33956e"}
+{"down":"d1aa18394662658a","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.7 拿不准时继续还是问用户","up":"42752b72c979052b"}
+{"down":"3ab57737ea134c2c","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 9. 使用的技术","up":"ec91cde620c72dc7"}
+{"down":"fe947a8dcc485296","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"34ec35f3d8594f1a"}
+{"down":"fe947a8dcc485296","dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"fdd52b6d0770fc6a"}
+{"down":"fe947a8dcc485296","dst":"docs/design/model-management.md#模型管理设计说明 > 4. 模型目录 > 4.3 模型访问定义与准入","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"1717d79bc1d6e18c"}
+{"down":"fe947a8dcc485296","dst":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"72d36ed5921fbd6f"}
+{"down":"b917d25df1b8533a","dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.6 部门的建议能力","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 1. 范围","up":"7e3019092a848eef"}
+{"down":"34942f995031e407","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 10. 安全","up":"ec91cde620c72dc7"}
+{"down":"ef6593629178c93b","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.1 操作","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 15. 相关文档中的浏览器与 computer use 内容","up":"9ec0328f93e0790a"}
+{"down":"ef6593629178c93b","dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.6 部门的建议能力","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 15. 相关文档中的浏览器与 computer use 内容","up":"7e3019092a848eef"}
+{"down":"ef6593629178c93b","dst":"docs/design/semantic-system.md#语义系统设计说明 > 13. 数据流核对与质检放行","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 15. 相关文档中的浏览器与 computer use 内容","up":"e248f9d52197777a"}
+{"down":"ef6593629178c93b","dst":"docs/requirements/browser-and-computer-use.md#D34 浏览器与 computer use > computer use 专题待重新确定的事项","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 15. 相关文档中的浏览器与 computer use 内容","up":"72d36ed5921fbd6f"}
+{"down":"4203e52734246d39","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 2. 概念与分层 > 2.1 概念层级","up":"0853195401f3a162"}
+{"down":"4d2860759e59d660","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.1 操作","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话 > 3.2 执行位置上的程序","up":"9ec0328f93e0790a"}
+{"down":"167a6d0f9bafd349","dst":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.2 用量","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 6. 按模型输入方式提供工具 > 6.2 请求中的图像","up":"4e9e35fc38674dec"}
+{"down":"981fcc4fdd5a0e63","dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.6 部门的建议能力","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 6. 按模型输入方式提供工具 > 6.3 各部门可用的工具","up":"7e3019092a848eef"}
+{"down":"1330f8643e9097d3","dst":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.3 预留与阈值","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条） > 开启条件：只对缓存命中低的调用目标折叠","up":"bc4e2da550ca989a"}
+{"down":"4ddd24b26e0fe900","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","src":"docs/design/department-guidance.md#部门指导的处理设计","up":"0dd04bfbe949905c"}
+{"down":"4ddd24b26e0fe900","dst":"docs/design/department-loop.md#三部门的循环结构 > 6. 指导","src":"docs/design/department-guidance.md#部门指导的处理设计","up":"5138aa51796e4a84"}
+{"down":"4ecd407736e748a9","dst":"docs/design/department-loop.md#三部门的循环结构 > 6. 指导","src":"docs/design/department-guidance.md#部门指导的处理设计 > 2. 送达","up":"5138aa51796e4a84"}
+{"down":"ecc70bc0c73a93d7","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.1 四层各认识什么","src":"docs/design/department-loop.md#三部门的循环结构","up":"c5baa1f917b5a5e3"}
+{"down":"959421dda4e258f9","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/department-loop.md#三部门的循环结构 > 3. 三个部门同时运行 > 3.2 同时运行的条件","up":"42752b72c979052b"}
+{"down":"35c87ed9638c87aa","dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释","src":"docs/design/department-loop.md#三部门的循环结构 > 4. 询问与回答 > 4.6 工程与质检之间的问答：事实与解释","up":"21d98c53d41038e2"}
+{"down":"9871f53ea1b6f6d3","dst":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","src":"docs/design/department-roles.md#部门内多角色设计说明","up":"17be33a6b2f0dabb"}
+{"down":"383f9b825b83952e","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.4 焦点与目录","src":"docs/design/department-roles.md#部门内多角色设计说明 > 10. 上下文","up":"0a6cb551760e6ede"}
+{"down":"383f9b825b83952e","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","src":"docs/design/department-roles.md#部门内多角色设计说明 > 10. 上下文","up":"fefcc8b41856f076"}
+{"down":"383f9b825b83952e","dst":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.3 尝试的整理","src":"docs/design/department-roles.md#部门内多角色设计说明 > 10. 上下文","up":"7c69181618d4fb27"}
+{"down":"383f9b825b83952e","dst":"docs/design/semantic-system.md#语义系统设计说明 > 9. 可见范围与跨事项","src":"docs/design/department-roles.md#部门内多角色设计说明 > 10. 上下文","up":"9527c6035b4e0fdd"}
+{"down":"fd71b09743ddc0cc","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.3 当前状态栏目","src":"docs/design/department-roles.md#部门内多角色设计说明 > 12. 进展判断与结束 > 12.1 部门账本","up":"3d8b4dc105d0a3ac"}
+{"down":"fd71b09743ddc0cc","dst":"docs/design/semantic-system.md#语义系统设计说明 > 13. 数据流核对与质检放行","src":"docs/design/department-roles.md#部门内多角色设计说明 > 12. 进展判断与结束 > 12.1 部门账本","up":"e248f9d52197777a"}
+{"down":"ee888a32306b1823","dst":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 5. 收敛的检测","src":"docs/design/department-roles.md#部门内多角色设计说明 > 12. 进展判断与结束 > 12.4 停滞","up":"6ac3b5bdf91bc8f6"}
+{"down":"ee888a32306b1823","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","src":"docs/design/department-roles.md#部门内多角色设计说明 > 12. 进展判断与结束 > 12.4 停滞","up":"fefcc8b41856f076"}
+{"down":"ca7ae81214096adb","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.4 焦点与目录","src":"docs/design/department-roles.md#部门内多角色设计说明 > 4. 角色清单","up":"0a6cb551760e6ede"}
+{"down":"e066f39dbce07e3c","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.7 查询工具","src":"docs/design/department-roles.md#部门内多角色设计说明 > 6. 中心角色 > 6.2 工具","up":"4e6d300421bdd88f"}
+{"down":"e066f39dbce07e3c","dst":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.1 五层","src":"docs/design/department-roles.md#部门内多角色设计说明 > 6. 中心角色 > 6.2 工具","up":"e216eebe9262a9f6"}
+{"down":"38593c0a8b9341bf","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.3 当前状态栏目","src":"docs/design/department-roles.md#部门内多角色设计说明 > 7. 经理 > 7.1 看到的内容","up":"3d8b4dc105d0a3ac"}
+{"down":"5810294e90348699","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.4 焦点与目录","src":"docs/design/department-roles.md#部门内多角色设计说明 > 9. 角色任务 > 9.1 分派说明","up":"0a6cb551760e6ede"}
+{"down":"1af955fa45f84582","dst":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.3 尝试的整理","src":"docs/design/department-roles.md#部门内多角色设计说明 > 9. 角色任务 > 9.3 角色结果","up":"7c69181618d4fb27"}
+{"down":"54962cc191afe368","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件","up":"ec91cde620c72dc7"}
+{"down":"ce0386e7f4c63a11","dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 4. 对照","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较 > 6.1 噪声范围与三种结论","up":"ebfb1d9ebb1a4c54"}
+{"down":"8c7410f511eb3a5a","dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定","src":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 9. 前提与未决事项","up":"a4436dcb9f04b27c"}
+{"down":"011ea6d41a931f22","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/execution-environment.md#执行环境服务设计说明","up":"34ec35f3d8594f1a"}
+{"down":"011ea6d41a931f22","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/design/execution-environment.md#执行环境服务设计说明","up":"3bf0ccde2acd0bda"}
+{"down":"75af8d40398fa0f4","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 9. 使用的技术","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序 > 4.3 远程执行代理 > 4.3.1 程序与数据","up":"3ab57737ea134c2c"}
+{"down":"425235f703dd128e","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 4. Yudao 服务的运行 > 4.4 局域网访问","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序 > 4.3 远程执行代理 > 4.3.2 安装","up":"097cf4c3dcc01124"}
+{"down":"425235f703dd128e","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.1 一次发布的内容","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 4. 实现与执行位置上的程序 > 4.3 远程执行代理 > 4.3.2 安装","up":"67578515d62707a4"}
+{"down":"d87e59d69833dca4","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/design/execution-environment.md#执行环境服务设计说明 > 5. 心跳、结果未知与迟到回执 > 5.1 时间","up":"3bf0ccde2acd0bda"}
+{"down":"74133bc1017b1124","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 3. 应用层命令、决定与领域事件","up":"34ec35f3d8594f1a"}
+{"down":"620e5695beed4a24","dst":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 9. 参照的成熟做法","up":"fdd52b6d0770fc6a"}
+{"down":"e837f05b561e8e01","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.2 组织是形态加本项目的改动","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 2. 边界与范围","up":"33711418492b2189"}
+{"down":"335610a158821cce","dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.2 核验角色","up":"21d98c53d41038e2"}
+{"down":"42752b72c979052b","dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 4. 建档流程 > 4.1 总体","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","up":"543e03a1acfeeb8f"}
+{"down":"e191fe072f9dfb25","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.2 组织是形态加本项目的改动","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.5 形态随事项冻结","up":"33711418492b2189"}
+{"down":"d668e778e45dd3a4","dst":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 2. 循环层的声明","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.6 子组织（位置与规矩）","up":"22e73c5fce93f7e6"}
+{"down":"95cc2a7b6d820e01","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","src":"docs/design/independent-verification.md#验证的独立性设计说明","up":"0853195401f3a162"}
+{"down":"bfe107abac284d7a","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/independent-verification.md#验证的独立性设计说明 > 9. 什么事到用户面前","up":"42752b72c979052b"}
+{"down":"c6b49daed2bf080a","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程","up":"42752b72c979052b"}
+{"down":"a3fa6f2b5f39177f","dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 8. 规则登记的初始内容","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 3. 一定会停","up":"edb2941f53d32e74"}
+{"down":"17753feda56e1f0c","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.6 子组织（位置与规矩）","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 4. 子循环","up":"d668e778e45dd3a4"}
+{"down":"6659e0d5bd66077a","dst":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 6. 防止滑向静态编排的判据","up":"17be33a6b2f0dabb"}
+{"down":"57de95b11eac66d2","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.2 五种合同","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 7. 容纳变化的判据 > 7.1 组成的变化","up":"026b427162b0df59"}
+{"down":"57de95b11eac66d2","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 7. 容纳变化的判据 > 7.1 组成的变化","up":"42752b72c979052b"}
+{"down":"1f3757723b27467c","dst":"docs/architecture.html#s2","src":"docs/design/model-management.md#模型管理设计说明","up":"3a0be485f15587d5"}
+{"down":"1f3757723b27467c","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.1 项目上配的三层","src":"docs/design/model-management.md#模型管理设计说明","up":"bee607114aab59ee"}
+{"down":"9d26db53899ed17f","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.10 加部门","src":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.2 项目部门设置与项目角色设置","up":"67bc5be88cffbfa6"}
+{"down":"c895884b1e1bc0b8","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.6 检查点有效性","up":"fefcc8b41856f076"}
+{"down":"dbbc639d0e0d8507","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 部门详情","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 部门详情里的模型与 Prompt","up":"e6a6e5a677d4a9cd"}
+{"down":"023e653719b5bbb9","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明","up":"34ec35f3d8594f1a"}
+{"down":"023e653719b5bbb9","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 5. 依赖方向","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明","up":"e5191174d1e452fc"}
+{"down":"ac338ae4d34a752c","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明 > 4. 项目设置中的 MCP 服务器 > 4.2 读取工具清单（探测）","up":"34ec35f3d8594f1a"}
+{"down":"06585fc93fefd8b1","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.3 当前状态栏目","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.6 会话内部的分工","up":"3d8b4dc105d0a3ac"}
+{"down":"8f7bb6821c1d308c","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.7 状态主权与可见范围","up":"ec91cde620c72dc7"}
+{"down":"dac73e1f3152c49d","dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","up":"0eee1f7871fde620"}
+{"down":"b7a235c674b2e553","dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 5. 确认以后：当前有效要求与第一次采纳","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件","up":"f1972ee5044a2d04"}
+{"down":"696b812ce16f3c9a","dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.6 部门的建议能力","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.6 拒绝与提醒","up":"7e3019092a848eef"}
+{"down":"e6a242b20315c9dc","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 6. 薄驱动","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.7 冻结与升级","up":"1ae626fc6d33956e"}
+{"down":"abb76d823c89c244","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/project-organization.md#项目的组织设计说明 > 6. 未决问题","up":"42752b72c979052b"}
+{"down":"315a744e37f3417f","dst":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 2. 项目的起点","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 1. 四种能力分别验收","up":"4909b10bdb240b5c"}
+{"down":"e8ddd2850c755628","dst":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 5. computer use > 5.1 屏幕与桌面会话","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 4. 动作分类与处置","up":"d1ba7979cd4a8d52"}
+{"down":"59ec65797200e301","dst":"docs/architecture.html#s2","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明","up":"3a0be485f15587d5"}
+{"down":"59ec65797200e301","dst":"docs/architecture.html#s4 > 定义","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明","up":"78827a557b376c0c"}
+{"down":"e20e81d7d837637c","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 12. 与现有设计的关系","up":"3bf0ccde2acd0bda"}
+{"down":"87a446b045bc0a4b","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","up":"42752b72c979052b"}
+{"down":"cc558392dc49cb35","dst":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 9. 命令与事件","up":"17be33a6b2f0dabb"}
+{"down":"cc558392dc49cb35","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.3 直做","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 9. 命令与事件","up":"b13b7da5d163521c"}
+{"down":"e3507a58b83e113c","dst":"docs/design/department-loop.md#三部门的循环结构 > 2. 部门按关注的成果开始工作","src":"docs/design/semantic-system.md#语义系统设计说明","up":"17be33a6b2f0dabb"}
+{"down":"25a833fe186b92e4","dst":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.7 失败处理","src":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.2 常驻栏目","up":"aaba6b4fe0693177"}
+{"down":"db268ffa313e03c0","dst":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释","src":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.8 各角色的上下文","up":"21d98c53d41038e2"}
+{"down":"e72fa0994a8ad701","dst":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.2 用量","src":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制 > 11.1 工作上限与阈值","up":"4e9e35fc38674dec"}
+{"down":"c3697638f5f9f82a","dst":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.7 失败处理","src":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制 > 11.4 失败处理","up":"aaba6b4fe0693177"}
+{"down":"94db34cbfe006273","dst":"docs/requirements/semantic-system.md#D25 语义系统 > TODO：惊讶机制与教训发现模块","src":"docs/design/semantic-system.md#语义系统设计说明 > 15. 惊讶机制与教训发现模块的扩展点","up":"50e0595afaf6984a"}
+{"down":"f176ef66880338f6","dst":"docs/architecture.html#s2","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明","up":"3a0be485f15587d5"}
+{"down":"d697a9c7a0bdcdd7","dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.1 版本关系","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","up":"7f6a344a73e84261"}
+{"down":"d697a9c7a0bdcdd7","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 10. 遗留","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","up":"085c879359947c8a"}
+{"down":"a153f29785e21da3","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 11. 真实用户场景验收","up":"b528b2647bc3d93f"}
+{"down":"41b9da751567f740","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.3 直做","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 5. 三道缝的契约 > 5.1 路由契约","up":"b13b7da5d163521c"}
+{"down":"aa8e9f25fe945750","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.6 子组织（位置与规矩）","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 5. 三道缝的契约 > 5.3 执行契约","up":"d668e778e45dd3a4"}
+{"down":"80e8eb13d7cc6cc2","dst":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用","src":"docs/design/test-pyramid.md#测试分层设计说明","up":"b5c07471d328449c"}
+{"down":"ccc9aa8cfd62867c","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 9. 用户确认的决定","src":"docs/design/test-pyramid.md#测试分层设计说明 > 7. 前端与浏览器测试","up":"0139eddb7331a5d4"}
+{"down":"d16eca7251049f49","dst":"docs/architecture.html#s2","src":"docs/design/trusted-kernel.md#可信内核设计说明","up":"3a0be485f15587d5"}
+{"down":"bbce218cebf31daf","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界","up":"3bf0ccde2acd0bda"}
+{"down":"bbce218cebf31daf","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 3. 骨架清单 > 3.1 可信内核","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界","up":"daed15c4af98ed68"}
+{"down":"bbce218cebf31daf","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 4. 最小投影","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 2. 内核的边界","up":"81b7d066f47334cd"}
+{"down":"f7e7d5a7fbbc6d05","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.3 执行位置与接口令牌","up":"3bf0ccde2acd0bda"}
+{"down":"f7e7d5a7fbbc6d05","dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","src":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.3 执行位置与接口令牌","up":"ec91cde620c72dc7"}
+{"down":"b8679d503ff30679","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/visualization.md#画面与播放设计说明 > 12. 开环完成与放行","up":"42752b72c979052b"}
+{"down":"9ed1a930474bb409","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","src":"docs/design/visualization.md#画面与播放设计说明 > 8. 画面诚实性的不变式","up":"42752b72c979052b"}
+{"down":"af08d57838cd45f9","dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.1 一次发布的内容","src":"docs/design/visualization.md#画面与播放设计说明 > 9. 与其他文档的关系","up":"67578515d62707a4"}
+{"down":"c7d76b844934b902","dst":"docs/design/visualization.md#画面与播放设计说明 > 14. 搬出：画面成为单独的应用","src":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明","up":"b5c07471d328449c"}
+{"down":"702cd1b3e8676a67","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 9. 使用的技术","src":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 12. 使用的技术","up":"3ab57737ea134c2c"}
+{"down":"1e0a04722107b7dd","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 7. 接口路径、执行归属与命令行 > 7.2 执行与结算的归属","src":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 4. Yudao 服务的运行 > 4.3 单实例与日志","up":"ba684919906306b6"}
+{"down":"b330cad888400863","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","src":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.4 谁在什么时候发布","up":"b528b2647bc3d93f"}
+{"down":"6362d110905936c3","dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","src":"docs/foundation-rules.md#基础规则","up":"0853195401f3a162"}
+{"down":"04988e76abc3bb9e","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 3. 十项长期决定","src":"docs/requirements/meta-observer.md#D28 元观察与规则检查 > 已确认","up":"3bf0ccde2acd0bda"}
+{"down":"4e27ca939af5ddf8","dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第一层试点的配对验收约定","src":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 需求与验收标准 > 目的","up":"27691a36ce422df4"}
+{"down":"34ec35f3d8594f1a","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.12 新建的入口","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","up":"61daf2f4d68ac893"}
+{"down":"92be3c0ade0125a4","dst":"docs/architecture.html#s2","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数","up":"a40f436c1c34521a"}
+{"down":"9871f53ea1b6f6d3","dst":"docs/architecture.html#s2","src":"docs/design/department-roles.md#部门内多角色设计说明","up":"a40f436c1c34521a"}
+{"down":"0853195401f3a162","dst":"docs/architecture.html#s2","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","up":"a40f436c1c34521a"}
+{"down":"1f3757723b27467c","dst":"docs/architecture.html#s2","src":"docs/design/model-management.md#模型管理设计说明","up":"a40f436c1c34521a"}
+{"down":"0c1a5db1a6b2200f","dst":"docs/architecture.html#s2","src":"docs/design/project-organization.md#项目的组织设计说明","up":"a40f436c1c34521a"}
+{"down":"59ec65797200e301","dst":"docs/architecture.html#s2","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明","up":"a40f436c1c34521a"}
+{"down":"f176ef66880338f6","dst":"docs/architecture.html#s2","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明","up":"a40f436c1c34521a"}
+{"down":"d16eca7251049f49","dst":"docs/architecture.html#s2","src":"docs/design/trusted-kernel.md#可信内核设计说明","up":"a40f436c1c34521a"}

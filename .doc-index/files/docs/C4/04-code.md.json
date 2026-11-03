@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/C4/04-code.md",
-"hash":"8297d9d1172672fa",
+"hash":"27a7ec3eaaa5d022",
 "nodes":[
-{"hash":"8297d9d1172672fa","id":"docs/C4/04-code.md","kind":"file","title":"docs/C4/04-code.md"},
-{"hash":"8297d9d1172672fa","id":"docs/C4/04-code.md#C4：关键代码结构","kind":"section","parent":"docs/C4/04-code.md","title":"C4：关键代码结构"}
+{"hash":"27a7ec3eaaa5d022","id":"docs/C4/04-code.md","kind":"file","title":"docs/C4/04-code.md"},
+{"hash":"27a7ec3eaaa5d022","id":"docs/C4/04-code.md#C4：关键代码结构","kind":"section","parent":"docs/C4/04-code.md","title":"C4：关键代码结构"}
 ],
 "edges":[
 {"dst":"docs/C4/model.json","kind":"code-path","raws":["model.json"],"seen":"706e4250c015d7cc","src":"docs/C4/04-code.md#C4：关键代码结构"},

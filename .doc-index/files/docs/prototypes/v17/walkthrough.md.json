@@ -1,0 +1,25 @@
+{
+"schema":1,
+"path":"docs/prototypes/v17/walkthrough.md",
+"hash":"4ced76d99630ea6f",
+"nodes":[
+{"hash":"4ced76d99630ea6f","id":"docs/prototypes/v17/walkthrough.md","kind":"file","title":"docs/prototypes/v17/walkthrough.md"},
+{"hash":"b621f42e61f97c9f","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","kind":"section","parent":"docs/prototypes/v17/walkthrough.md","title":"页面原型 v17 走查"},
+{"hash":"225ec9ff501c3113","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 怎么打开一节","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"怎么打开一节"},
+{"hash":"affd8b96ee1f217f","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 脚本一：一个外包角色直做（日志清理脚本）","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"脚本一：一个外包角色直做（日志清理脚本）"},
+{"hash":"69d833e67a6c09f0","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 脚本二：一个角色直做（个人博客）","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"脚本二：一个角色直做（个人博客）"},
+{"hash":"0e572e72b00630e5","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 脚本三：几个角色直做（活动报名小程序）","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"脚本三：几个角色直做（活动报名小程序）"},
+{"hash":"776bb1929e6e6fe2","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 脚本四：三部门（订单系统重构）","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"脚本四：三部门（订单系统重构）"},
+{"hash":"b09060de7cea40d3","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 脚本五：三部门加运维（线上商城，只写到在目录里看到它）","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"脚本五：三部门加运维（线上商城，只写到在目录里看到它）"},
+{"hash":"d636bcaef0682779","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 脚本六：观察者层（内部报表工具）","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"脚本六：观察者层（内部报表工具）"},
+{"hash":"7df33b1d9b0894d6","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 脚本七：部门内子组织层（固件升级服务）","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"脚本七：部门内子组织层（固件升级服务）"},
+{"hash":"e22290b6a993c361","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 补充条","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"补充条"},
+{"hash":"c1776f7addc7f4c0","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 从 v15 带过来的内容","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"从 v15 带过来的内容"},
+{"hash":"7c72b2ab37d43d35","id":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 试用结论","kind":"section","parent":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查","title":"试用结论"}
+],
+"edges":[
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["../../design/project-organization.md"],"seen":"5104f199b81ced63","src":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查"},
+{"dst":"docs/prototypes/CHANGELOG.md","kind":"link","raws":["../CHANGELOG.md"],"seen":"7fc4a16dd0151197","src":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 从 v15 带过来的内容"},
+{"dst":"docs/prototypes/v17/index.html","kind":"code-path","raws":["docs/prototypes/v17/index.html"],"seen":"a95d04f45a8c3b9f","src":"docs/prototypes/v17/walkthrough.md#页面原型 v17 走查 > 怎么打开一节"}
+]
+}

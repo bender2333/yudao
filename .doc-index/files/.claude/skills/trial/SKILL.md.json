@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":".claude/skills/trial/SKILL.md",
-"hash":"ab9da07de18ee5d0",
+"hash":"74b0666588e6bbf7",
 "nodes":[
-{"hash":"ab9da07de18ee5d0","id":".claude/skills/trial/SKILL.md","kind":"file","title":".claude/skills/trial/SKILL.md"},
+{"hash":"74b0666588e6bbf7","id":".claude/skills/trial/SKILL.md","kind":"file","title":".claude/skills/trial/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/trial/SKILL.md#(开头)","kind":"section","parent":".claude/skills/trial/SKILL.md","title":"(开头)"},
 {"hash":"d59be8b87eb42e5d","id":".claude/skills/trial/SKILL.md#name: trialdescription: 用从 main 打包安装的 Yudao 执行固定用户任务与独立探索，保留新手体验、运行证据、复现状态和明确缺项，形成试用报告。用于 agent 试用及薄片发布前走查。argument-hint: \"[试用工单号] [备注，例如「只跑固定任务」]\"","kind":"section","parent":".claude/skills/trial/SKILL.md","title":"name: trialdescription: 用从 main 打包安装的 Yudao 执行固定用户任务与独立探索，保留新手体验、运行证据、复现状态和明确缺项，形成试用报告。用于 agent 试用及薄片发布前走查。argument-hint: \"[试用工单号] [备注，例如「只跑固定任务」]\""},
 {"hash":"dd20342d18638946","id":".claude/skills/trial/SKILL.md#试用","kind":"section","parent":".claude/skills/trial/SKILL.md","title":"试用"},
@@ -33,7 +33,7 @@
 {"hash":"3470647a0a7cc0dd","id":".claude/skills/trial/SKILL.md#试用 > 13. 工具入口 > 表1 > vision.mjs","kind":"row","parent":".claude/skills/trial/SKILL.md#试用 > 13. 工具入口","title":"vision.mjs"},
 {"hash":"9e74822f11e99ab6","id":".claude/skills/trial/SKILL.md#试用 > 13. 工具入口 > 表1 > readout.mjs","kind":"row","parent":".claude/skills/trial/SKILL.md#试用 > 13. 工具入口","title":"readout.mjs"},
 {"hash":"1db701d82eb775ac","id":".claude/skills/trial/SKILL.md#试用 > 13. 工具入口 > 表1 > report.mjs","kind":"row","parent":".claude/skills/trial/SKILL.md#试用 > 13. 工具入口","title":"report.mjs"},
-{"hash":"62c96945703e418c","id":".claude/skills/trial/SKILL.md#试用 > 14. 历史入口","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"14. 历史入口"}
+{"hash":"3e044b10e22814b8","id":".claude/skills/trial/SKILL.md#试用 > 14. 历史入口","kind":"section","parent":".claude/skills/trial/SKILL.md#试用","title":"14. 历史入口"}
 ],
 "edges":[
 {"dst":"docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md","kind":"link","raws":["../../../docs/adr/0039-agent-trial-observation-reproduction-and-judgment.md"],"seen":"c692314e41a8c822","src":".claude/skills/trial/SKILL.md#试用"},
