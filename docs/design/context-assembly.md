@@ -1,6 +1,6 @@
 # 上下文装配：把视图当作事件日志上的纯函数
 
-总图位置：第四节「装配」缝（装配契约：执行实现 ↔ 装配实现），第一节「装配实现」方框（第二节「可以整体重写」一环）；第三节「上下文逼近上限 → 压缩」（保留意图、有效合同、失败尝试与近期回合）。依据：回放读数与成本核对在 [docs/evaluation/context-assembly-2026-10-29.md](../evaluation/context-assembly-2026-10-29.md)、[context-assembly-replay-2026-10-29.md](../evaluation/context-assembly-replay-2026-10-29.md)、[context-assembly-counterfactual-2026-10-29.json](../evaluation/context-assembly-counterfactual-2026-10-29.json)；规则清单另有机器可读的版本。
+总图位置：第四节「装配」缝（装配契约：执行实现 ↔ 装配实现），第一节「装配实现」方框（第二节「可以整体重写」一环）；第三节「上下文逼近上限 → 压缩」（保留意图、有效合同、失败尝试与近期回合）。依据：回放读数与成本核对在 [docs/archive/evaluation/context-assembly-2026-10-29.md](../archive/evaluation/context-assembly-2026-10-29.md)、[context-assembly-replay-2026-10-29.md](../archive/evaluation/context-assembly-replay-2026-10-29.md)、[context-assembly-counterfactual-2026-10-29.json](../evaluation/context-assembly-counterfactual-2026-10-29.json)；规则清单另有机器可读的版本。
 
 ## 1. 问题、现状与方法
 
@@ -25,7 +25,7 @@
 | 模型与窗口 | 全部 `9router/ds`，全部 1,000,000 token 窗口，输出上限 128,000 |
 | 输入用量 | 8,331,638 token（按装配实现同一条估算公式：4 字符 1 token） |
 
-`docs/evaluation/scenario-3-qwen38flash-2026-10-20/` 那份导出是报告级读数（每次运行 5 至 7 个请求、总用量均值 114,151 token），没有请求原文，所以**分布只从事件库算**，报告级数字只用来对照量级。
+`docs/archive/evaluation/scenario-3-qwen38flash-2026-10-20/` 那份导出是报告级读数（每次运行 5 至 7 个请求、总用量均值 114,151 token），没有请求原文，所以**分布只从事件库算**，报告级数字只用来对照量级。
 
 ### 1.3 方法：四步，都是离线
 
@@ -344,7 +344,7 @@
 
 **校验**：基线（记录下来的请求）反推的缓存命中占比，与上游回报的 `cache_read_tokens / input_tokens` 对照：trial-data-1016 为 91.5% 对 91.2%，trial-repro 为 94.7% 对 97.0%，trial-data-e28ea596 为 63.5% 对 60.6%。这个折算在基线上与上游的回报吻合。它只模拟前缀命中，不含缓存过期、命中的块粒度与写缓存的加价。
 
-**结果**（折算费用，现状 = 100%；报告在 `docs/evaluation/context-assembly-cost-*-2026-10-29.md`）：
+**结果**（折算费用，现状 = 100%；报告在 `docs/archive/evaluation/context-assembly-cost-*-2026-10-29.md`）：
 
 | 变体 | token 数 | trial-data-1016 | trial-repro | trial-data-e28ea596 |
 | --- | --- | --- | --- | --- |

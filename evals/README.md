@@ -114,13 +114,13 @@ uv run python evals/runner/run_eval.py \
     --model yudao-eval/<模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-3-opencode.json \
-    --report docs/evaluation/scenario-3-opencode.md
+    --result docs/evaluation/scenario-3-opencode-<里程碑短名>.json \
+    --report .tmp/scenario-3-opencode-<里程碑短名>.md
 ```
 
 两个运行器都从模型服务的模型列表（`YUDAO_EVAL_BASE_URL` 加 `/models`）取被测模型报告的 `context_length` 与 `max_completion_tokens`：Yudao 一侧写进模型访问定义，OpenCode 一侧写进运行配置的模型限额（`models.<id>.limit` 的 `context` 与 `output`），两处是同一对数；列表没有报告这个模型时用 `--context-window` 与 `--max-output-tokens`，两者都没有时报错。报告与结果写明取值与来源。
 
-场景 1 的运行命令（单次运行写到 `.tmp/` 或正式运行写到 `docs/evaluation/`）：
+场景 1 的运行命令（单次试跑的结果文件也改写到 `.tmp/`；正式运行的结果文件写到 `docs/evaluation/`，位置规则见「结果放哪里」）：
 
 ```bash
 uv run python evals/runner/run_eval.py \
@@ -128,19 +128,19 @@ uv run python evals/runner/run_eval.py \
     --model yudao-eval/<模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-1-opencode.json \
-    --report docs/evaluation/scenario-1-opencode.md
+    --result docs/evaluation/scenario-1-opencode-<里程碑短名>.json \
+    --report .tmp/scenario-1-opencode-<里程碑短名>.md
 ```
 
-场景 2 用 `--scenario scenario2`，结果写到对应的 `scenario-2-opencode.json` 与 `scenario-2-opencode.md`。场景 2 运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
+场景 2 用 `--scenario scenario2`，结果与报告的位置同场景 1，文件名是 `scenario-2-opencode-<里程碑短名>`。场景 2 运行目录就是检出好的仓库本身：建立环境需要 GitHub 与 PyPI，这一步发生在运行之前，评测运行本身不联网。
 
 ```bash
 uv run python evals/runner/run_yudao_eval.py \
     --model <模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-3-yudao.json \
-    --report docs/evaluation/scenario-3-yudao.md
+    --result docs/evaluation/scenario-3-yudao-<里程碑短名>.json \
+    --report .tmp/scenario-3-yudao-<里程碑短名>.md
 ```
 
 入口的 `--scenario` 选场景：默认 3（上面那条命令），`--scenario 2` 是在已有代码上加功能（见下一节）。
@@ -153,8 +153,8 @@ uv run python evals/runner/run_yudao_eval.py \
     --model <模型名> \
     --runs 3 \
     --runs-root <Yudao 仓库之外的目录> \
-    --result docs/evaluation/scenario-2-yudao.json \
-    --report docs/evaluation/scenario-2-yudao.md
+    --result docs/evaluation/scenario-2-yudao-<里程碑短名>.json \
+    --report .tmp/scenario-2-yudao-<里程碑短名>.md
 ```
 
 一次运行分两步，都用 Yudao 的正常入口：
@@ -209,7 +209,12 @@ Yudao 一侧的过程检查点共五项，每项给通过 / 未通过 / 未核�
 - 评分之前做三项核对，任一命中这次运行作废（`void`），不计入结果；这类运行在报告的第六节列出：JSON 输出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、JSON 输出中出现对任务上游仓库的访问（场景 1 是 `mnluzimu/WebGen-Bench`，场景 2 是 `openai/openai-agents-python`，场景 3 是 `AGI-Eval-Official/PRDBench`）。
 - 到达墙钟上限时结束进程，按结束时的目录评分并标记超时，不因为没有跑完而作废。
 
-原始证据（交付副本、输出、评分日志）在 `.yudao/evals/` 下，不进入 Git。
+## 结果放哪里
+
+- 原始证据（交付副本、输出、评分日志）在 `.yudao/evals/` 下，不进入 Git。
+- 结果文件（JSON）提交到 `docs/evaluation/`，文件名 `<场景>-<被测方>-<里程碑短名>.json`，不覆盖已有的；版本比较的对照基线读的就是它。
+- 中文报告先写到 `.tmp/`，再发成 Discussions 的 General 帖子，标题前缀「证据：」，发法按 [discussion-note](../.claude/skills/discussion-note/SKILL.md)。帖子写明被测提交、材料版本、评分器版本和结果文件的路径与提交号，不贴长日志。
+- 报告不提交到仓库。已经提交的一次性旧报告在 `docs/archive/evaluation/`。`scenario-3-yudao.json` 与 `.md` 由 `test_regen_scenario3.py` 逐字节固定，`baseline-omp-stage3.*` 是被别的文档当对照基准引用的基线，这两组留在 `docs/evaluation/`。
 
 ## 运行器自己的测试
 

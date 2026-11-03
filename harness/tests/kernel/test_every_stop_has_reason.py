@@ -7,10 +7,22 @@
 #
 # 对全部事件序列基准执行（44 个场景）：基准是真实运行录下来的事件序列，读静态文件，
 # 不重跑运行，属于单元层。
+#
+# 封闭清单是**事项所用的那份定义**里的（工单 #1165）：第二种路由在它自己那份定义的 routings.json 里
+# 声明自己的结束原因（设计说明第 5.4 节第 7 条），事项创建时冻结定义版本，写入口核对停止原因与部门时
+# 读的就是这一份；不交定义时读模块加载的那一份，与以前相同。后半的三条用例自己造定义、经写入口写入
+# 一个结束事件来核对这一点：不开数据库、不用子进程与临时目录。
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import pytest
+
+from harness import write_path
+from harness.definitions import DEFINITIONS, Definitions, RoutingEndReason, UnknownStopReason
+from harness.event_store import run_stream
 from harness.models import TERMINAL_STATUSES
 
 BASELINE_DIR = Path(__file__).resolve().parents[1] / "event_sequences"
@@ -74,3 +86,119 @@ def test_every_stop_reason_is_in_the_closed_list():
             if event["type"] in _STOP_EVENTS:
                 assert event.get("stop_reason") in reasons, \
                     f"{path.name} 的结束事件带有清单外的停止原因 {event.get('stop_reason')!r}"
+
+# ---------------------------------------------------------------------------
+# 封闭清单是事项所用的那份定义的（工单 #1165）
+# ---------------------------------------------------------------------------
+
+# 第二种路由在自己那份定义里声明的一个结束原因：内核的停止原因清单（stop_reasons.json）里没有它，
+# 它在 routings.json 那条路由的 end_reasons 里（设计说明第 5.4 节第 7 条）
+_ROUTING_END_REASON = "pool_drained"
+
+
+def _with_end_reason(definition: Definitions, reason: str, outcome: str = "failed") -> Definitions:
+    # 这份定义里，组织定义所选的那条路由多声明一个自己的结束原因。与工单 #1098 的内核用例同一个做法：
+    # 只改「这份定义里有什么」这一件事，不动模块加载的那一份
+    routing = definition.routing_definition()
+    end_reasons = {**routing.end_reasons,
+                   reason: RoutingEndReason(label="任务池里没有待办的任务", outcome=outcome,
+                                            human_action="每一件任务都有了结论，这件事项到此结束。")}
+    routings = tuple(item.model_copy(update={"end_reasons": end_reasons}) if item.id == routing.id else item
+                     for item in definition.routings.routings)
+    return definition.model_copy(
+        update={"routings": definition.routings.model_copy(update={"routings": routings})})
+
+
+def _without_department(definition: Definitions, department: str) -> Definitions:
+    # 这份组织定义里没有这个部门
+    organization = definition.organization
+    departments = tuple(item for item in organization.departments if item.id != department)
+    return definition.model_copy(
+        update={"organization": organization.model_copy(update={"departments": departments})})
+
+
+@dataclass
+class _State:
+    # 投影的替身：写入口给 run 事件盖上所属的项目与事项；这几条用例只判核对，投影不参与判断
+    project_id: str | None = None
+    work_item_id: str | None = None
+
+
+class _Handler:
+    # 流处理者的替身：折叠与保存都不参与这几条用例的判断
+    def empty(self) -> _State:
+        return _State()
+
+    def load(self, saved: Any) -> _State:
+        return _State()
+
+    def fold(self, state: _State, event: Any) -> None:
+        return None
+
+    def dump(self, state: _State) -> str:
+        return "{}"
+
+
+class _Store:
+    # 事件日志的替身：只记下提交的事件，不落盘。这几条用例判的是写入口的核对，不是存储
+    def __init__(self) -> None:
+        self.committed: list[Any] = []
+
+    def projection(self, stream: str) -> None:
+        return None
+
+    def commit(self, stream: str, expected_version: int, events: list[Any], state: str, *,
+               epoch: int | None = None, command: Any = None, decisions: Any = ()) -> None:
+        self.committed.extend(events)
+
+    def notify(self, events: list[Any]) -> None:
+        return None
+
+
+def _writes() -> tuple[write_path.WritePath, _Store]:
+    store = _Store()
+    return write_path.WritePath(store, lambda _stream: _Handler()), store
+
+
+def _ending(reason: str, *, event_type: str = "run_failed", department: str = "product") -> write_path.NewEvent:
+    # 一条结束事件：带着停止原因、终态与载荷里的同一个原因（写入口按这三样核对）
+    return write_path.NewEvent(event_type, state_before="running", state_after="failed", actor="system",
+                               department=department, stop_reason=reason,
+                               payload={"stop_reason": reason})
+
+
+def test_the_write_path_takes_the_stop_reason_of_the_matter_definition():
+    # 验收第 1 条（工单 #1165）：第二种路由在自己那份定义里声明的结束原因，事项用这份定义运行时
+    # 经写入口写得进事件日志；模块加载的那份定义里仍然没有它
+    definitions = _with_end_reason(DEFINITIONS, _ROUTING_END_REASON)
+    writes, store = _writes()
+    [event] = writes.append(run_stream("run_matter"), _ending(_ROUTING_END_REASON), definitions=definitions)
+    assert event.stop_reason == _ROUTING_END_REASON
+    assert event.payload["stop_reason"] == _ROUTING_END_REASON
+    assert [item.event_id for item in store.committed] == [event.event_id]
+    assert _ROUTING_END_REASON not in DEFINITIONS.stop_reasons
+
+
+def test_the_same_write_fails_against_a_definition_without_that_reason():
+    # 验收第 2 条（工单 #1165）：同样的写入，用一份没有声明这个原因的定义时失败，
+    # 错误写明是哪一个原因与哪份定义（内核的停止原因清单与这条路由自己的结束原因两处）
+    writes, store = _writes()
+    with pytest.raises(UnknownStopReason) as raised:
+        writes.append(run_stream("run_matter"), _ending(_ROUTING_END_REASON))
+    message = str(raised.value)
+    assert _ROUTING_END_REASON in message
+    assert "stop_reasons.json" in message and "routings.json" in message
+    assert DEFINITIONS.routing in message
+    assert store.committed == []
+
+
+def test_the_department_check_takes_the_matter_definition_and_defaults_to_the_loaded_one():
+    # 验收第 3 条（工单 #1165）：不给定义参数时，写入口对停止原因与部门的核对与以前一样；
+    # 交了定义时按它的部门核对（部门与停止原因同一个取法）
+    narrowed = _without_department(DEFINITIONS, "quality")
+    writes, _store = _writes()
+    with pytest.raises(ValueError, match="unknown department 'quality'"):
+        writes.append(run_stream("run_matter"), _ending("cancelled", department="quality"),
+                      definitions=narrowed)
+    [event] = writes.append(run_stream("run_matter"), _ending("cancelled", department="quality"))
+    assert event.department == "quality" and event.stop_reason == "cancelled"

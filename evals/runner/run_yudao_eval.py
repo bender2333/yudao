@@ -1,8 +1,8 @@
 """一次评测：运行 Yudao、按评分器评分、写出结果与报告。
 
 与 OpenCode 一侧（`run_eval.py`）同一套形状：原始证据（事件日志导出、交付副本、
-评分日志）放在 `.yudao/evals/` 下，不进入 Git；结果与报告提交到 `docs/evaluation/`
-（评测场景设计第 6 节）。
+评分日志）放在 `.yudao/evals/` 下，不进入 Git；结果文件提交到 `docs/evaluation/`，
+中文报告写到 `.tmp/` 再发 Discussions（评测场景设计第 6 节）。
 
 场景 3 从较长的 PRD 新建项目：新建项目并带入起始文件夹，提交需求原文加接口约定，
 等待结束。场景 2 在已有代码上加功能：接入已有仓库（`project.onboard`）、确认初始

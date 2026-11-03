@@ -1,6 +1,6 @@
 # 当前验收基线
 
-状态：区分真实项目验收的当前版本、历史基线与尚待执行的验收；真实项目（openai-agents-python）已接入并放行一次事项（工单 #139，报告 [docs/evaluation/2026-10-31-57835530.md](evaluation/2026-10-31-57835530.md)）。本页统一报告口径，不代替真实运行报告，也不代替用户的试用结论；路线以 [总体路线图](program-roadmap.md) 为准，总体意图见 [D38](requirements/system-intent.md)。
+状态：区分真实项目验收的当前版本、历史基线与尚待执行的验收；真实项目（openai-agents-python）已接入并放行一次事项（工单 #139，报告 [docs/archive/evaluation/2026-10-31-57835530.md](archive/evaluation/2026-10-31-57835530.md)）。本页统一报告口径，不代替真实运行报告，也不代替用户的试用结论；路线以 [总体路线图](program-roadmap.md) 为准，总体意图见 [D38](requirements/system-intent.md)。
 
 ## 1. 版本身份（当前）
 
@@ -12,7 +12,7 @@
 | 场景 | 场景 2（模型设置透传参数），材料 `scenario-2@1`，评分器 `scorer-2@1` |
 | 宿主环境 | Windows 11 (AMD64)、Python 3.13.16、uv 0.13.4、Node v24.13.1、git 2.49.0.windows.1 |
 | 结果 | 建档完成（59 次模型请求 / 1,381,762 tokens / 1500.5 秒，初始 PRD 在界面决定卡片确认）；事项 `end_status=released`、完成度 1.0000、正确性 1.0，F2P 8/8、P2P 331/331，192 次模型请求 / 6,452,654 tokens / 2495 秒；采纳链「建档基线 → 事项采纳」 |
-| 证据 | 报告 [2026-10-31-57835530.md](evaluation/2026-10-31-57835530.md)（带事件编号与文件路径）、结果文件 `C:/yudao-eval-runs/139-scenario2.json`、事件库 `C:/yudao-eval-runs/yudao-run-1/data/events.sqlite`、确认截图 [139-prd-confirm-57835530.png](evaluation/139-prd-confirm-57835530.png) |
+| 证据 | 报告 [2026-10-31-57835530.md](archive/evaluation/2026-10-31-57835530.md)（带事件编号与文件路径）、结果文件 `C:/yudao-eval-runs/139-scenario2.json`、事件库 `C:/yudao-eval-runs/yudao-run-1/data/events.sqlite`、确认截图 [139-prd-confirm-57835530.png](evaluation/139-prd-confirm-57835530.png) |
 
 每份结果只证明它记录的版本与场景：上表的身份与证据属于 2026-10-31 的这一次运行，不是对之后代码的结论。
 
