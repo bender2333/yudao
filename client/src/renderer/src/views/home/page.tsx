@@ -13,23 +13,21 @@ import type {
   SystemStatus,
 } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
-import { Loading, Section, hasCommand } from "../project/common";
+import { Loading, Section } from "../project/common";
 import { readFailureText } from "../../contract/read-failure";
 import { formatTime } from "../project/labels";
-import { useCommand, useSnapshot } from "../project/use-snapshot";
+import { useSnapshot } from "../project/use-snapshot";
 import { projectOnboardingMark } from "../project/onboarding";
 import { DecisionCardList } from "../decisions/card";
 import { sortByRequested } from "../decisions/card-logic";
 import { statusItems, type StatusItem } from "./status-items";
 import { BuildingSection } from "./building-section";
-import { Timeline } from "../timeline/timeline";
+import { AwayReportSection, type AwayRangeId } from "./away-report";
 import { ticksInRefs, ticksOf } from "../timeline/logic";
 import { paths } from "../../shell/routing";
 import { Block, Icon } from "../../shell/kit";
 
-const RANGE_LABELS: Record<string, string> = { since_seen: "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天" };
-
-export type AwayRangeId = "since_seen" | "24h" | "7d";
+export type { AwayRangeId } from "./away-report";
 
 export function HomePage(props: {
   app: ClientApp;
@@ -144,6 +142,8 @@ export function HomePage(props: {
         selected={selected}
         onSelect={setSelected}
         highlights={highlights}
+        projectNames={projectNames}
+        onNavigate={props.onNavigate}
       />
 
       <Section id="home-projects" title="项目" note="按项目列出长期目标、当前成果与等待数量">
@@ -305,123 +305,5 @@ function StatusBlock(props: { items: StatusItem[]; onNavigate: (hash: string) =>
         })}
       </div>
     </Block>
-  );
-}
-
-// 离开期间的报告（第 4.4 节）：上次查看的时间、范围切换、「已看过」（home.mark_seen）；
-// 汇总项取自 home.away_report，每项数字可以点击，展开来源事件；没有来源事件的项不显示。
-// 时间轴放在报告下方（第 5.5 节）：刻度取关键事实，与楼联动回放；报告项与刻度互相高亮。
-function AwayReportSection(props: {
-  id: string;
-  app: ClientApp;
-  report: { data: AwayReport | null; loading: boolean };
-  range: AwayRangeId;
-  onRange: (range: AwayRangeId) => void;
-  openItem: string | null;
-  onToggleItem: (id: string) => void;
-  at: number | null;
-  onPosition: (position: number | null) => void;
-  selected: number | null;
-  onSelect: (position: number) => void;
-  highlights: number[];
-}) {
-  const data = props.report.data;
-  const command = useCommand(props.app, JSON.stringify(data?.range ?? null));
-  const ranges = data?.ranges ?? [];
-  const rangeLabel = RANGE_LABELS[props.range] ?? props.range;
-
-  return (
-    <Section
-      id={props.id}
-      title="离开期间的报告"
-      note={
-        data === null
-          ? "正在读取这段时间的完成情况"
-          : `上次查看：${formatTime(data.last_seen.at)}`
-      }
-    >
-      <div className="y10-row row-actions">
-        {/* 范围切换（原型 ui/views/home.js 的 reportBlock）：三个按钮一组，选中的一项高亮 */}
-        <span className="y10-seg">
-          {ranges.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`y10-seg-btn${option.id === props.range ? " is-on primary" : ""}`}
-              onClick={() => props.onRange(option.id as AwayRangeId)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </span>
-        {hasCommand(props.app, "home.mark_seen") && data !== null ? (
-          <button
-            type="button"
-            className="y10-btn small primary"
-            disabled={command.busy}
-            onClick={() => void command.submit("home.mark_seen", { position: data.range.to_position })}
-          >
-            已看过
-          </button>
-        ) : null}
-      </div>
-      {data === null ? (
-        <Loading state={props.report} />
-      ) : data.summary.length === 0 ? (
-        <p className="y10-note note">这段时间没有完成、放行或其他需要报告的事（范围：{rangeLabel}）</p>
-      ) : (
-        <>
-          <div className="y10-report-items report-items">
-            {data.summary.map((item) => {
-              // 刻度选中时高亮对应的报告项（点击刻度，报告中的项高亮）
-              const lit = props.selected !== null && item.refs.includes(props.selected);
-              return (
-                <div key={item.id} className={`y10-report-item report-item${props.openItem === item.id ? " is-open open" : ""}${lit ? " is-highlight highlight" : ""}`}>
-                  <button type="button" className="y10-report-head report-head" onClick={() => props.onToggleItem(item.id)}>
-                    <span className="y10-report-label report-label">{item.label}</span>
-                    <span className="y10-report-value report-value">
-                      {item.value}
-                      <small>{item.unit}</small>
-                    </span>
-                    {item.detail ? <span className="y10-report-detail report-detail">{item.detail}</span> : null}
-                  </button>
-                  {props.openItem === item.id ? (
-                    item.refs.length === 0 ? (
-                      <p className="y10-note note">{item.detail ?? ""}（来源：范围内的调用尝试记录）</p>
-                    ) : (
-                      <ul className="y10-source-list source-list">
-                        {item.refs.map((position) => {
-                          const fact = data.facts.find((row) => row.position === position);
-                          return (
-                            <li key={position}>
-                              <span className="y10-note note">{formatTime(fact?.at ?? null)}</span>{" "}
-                              {fact?.label ?? "来源事件"}{" "}
-                              <code>{fact?.type ?? `事件 ${position}`}</code>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-      {data !== null ? (
-        <Timeline
-          facts={data.facts}
-          fromPosition={data.range.from_position}
-          fromAt={data.range.from_at}
-          project={null}
-          at={props.at}
-          onPosition={props.onPosition}
-          onSelect={props.onSelect}
-          highlight={props.highlights}
-          liveNote={`实时画面 · ${data.facts.length} 条关键事实`}
-        />
-      ) : null}
-    </Section>
   );
 }

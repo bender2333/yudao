@@ -494,6 +494,28 @@ export function stoppedCardLine(item: { work_item_id: string; stopped_at?: strin
   return `事项标识 ${item.work_item_id} · 停止于 ${formatTime(item.stopped_at)}`;
 }
 
+// 离开期间的报告里的开环明细（工单 #401；验证的独立性设计说明第 7、7.1 节）：每个带开环条件的放行
+// 列出它的验收条件，条数取 `acceptance.coverage` 的数——放行记录里一次算好，查询与页面读这个数，
+// 不重新计算。条件编号是产品合同里的验收条件编号（AC2 这类），不是内部标识。
+export function openCriteriaText(count: number, criteria: readonly string[]): string {
+  const names = criteria.filter((name) => name.trim() !== "").join("、");
+  return names === "" ? `开环条件 ${count} 条` : `开环条件 ${count} 条：${names}`;
+}
+
+// 开环明细还没有读到与读不出来（工单 #401）：两句话分开，与页面其余地方一样，
+// 「正在读取」不当成「没有开环条件」，「读不出来」也不当成「本来就没有」
+export const OPEN_CRITERIA_READING = "正在读取开环明细";
+export const OPEN_CRITERIA_UNREADABLE = "开环明细读不出来";
+
+// 事项标题取不到时的写法：与离开期间的报告原来的说法一致，不写事项标识（工单 #401）
+export const WORK_ITEM_UNNAMED = "未记事项";
+
+// 「跳到逐条结论表」的链接（工单 #401）：逐条结论表在资料页，由 #154 交付。软依赖，不等 #154——
+// 那张表还没有的时候链接不出现（点不到一张不存在的表）。#154 合并以后把这一行改成 true，
+// 链接跟着出现在每条开环明细后面；链接的地址与页名由调用处按 paths.materials 给出。
+export const CRITERIA_TABLE_READY = false;
+export const CRITERIA_TABLE_LINK = "跳到逐条结论表";
+
 export function formatTime(value: string | null | undefined): string {
   if (!value) {
     return "未知时间";
