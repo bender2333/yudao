@@ -387,14 +387,14 @@ def apply_decision_event(decisions: dict[str, DecisionRequest], event: Event | P
 
 
 def accepted(events: Iterable[Any]) -> list[Any]:
-    # 派发编号只增（工单 #1397）：编号低于同一个会话此前最大编号的事件只记录，不并入投影与最小投影；旧版本写入的事件没有编号，照常并入
-    highest: dict[str | None, int] = {}
+    # 派发编号只增（工单 #1397）：带编号的事件按「流 + 会话」比较，低于此前最大编号的只记录；没有编号的事件（旧版本写入的、项目流与目录流不取编号的）照常并入
+    highest: dict[Any, int] = {}
     kept = []
     for event in events:
-        number, key = getattr(event, "dispatch_number", None) or 0, getattr(event, "session_id", None)
-        if number >= highest.get(key, 0):
+        number, key = getattr(event, "dispatch_number", None), (getattr(event, "stream", None), getattr(event, "session_id", None))
+        if number is None or number >= highest.get(key, 0):
             kept.append(event)
-            highest[key] = number
+            highest[key] = max(highest.get(key, 0), number or 0)
     return kept
 
 

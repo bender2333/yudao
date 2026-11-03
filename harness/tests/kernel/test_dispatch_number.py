@@ -10,7 +10,10 @@ import sqlite3
 
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import EventStore, run_stream
-from harness.models import EventType
+from harness.kernel_events import (
+    CatalogEvent, CatalogEventType, Event, ProjectEvent, ProjectEventType, replay_decisions,
+)
+from harness.models import DEPARTMENTS, EventType
 from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
 
@@ -47,7 +50,10 @@ def _claim(system, stream: str, session_id: str = SESSION) -> int:
 
 def _system(tmp_path):
     system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter([]))
-    run_id = system.create_run("build echo")
+    # 带项目与事项的 run：只记录的事件要能按项目与按事项读出来（项目归属的四项参数要么全给，要么全不给）
+    run_id = system.create_run("build echo", project_id="proj_1397", work_item_id="wi_1397",
+                               project_context="开发一个回显工具",
+                               prompt_config_versions={department: 0 for department in DEPARTMENTS})
     return system, run_id, run_stream(run_id)
 
 
@@ -95,7 +101,36 @@ def test_a_write_that_carries_a_superseded_number_is_only_recorded(tmp_path):
     recorded = [item for item in system.store.list_events(run_id) if item.type == EventType.DEPARTMENT_ACTIVATED]
     assert [item.dispatch_number for item in recorded] == [first, first]
     assert [item.payload["cycle"] for item in recorded] == [1, 9]
+    # 只记录不等于看不见（审查要求修改 2）：项目与事项也带在它上面，按项目与按事项订阅的事件流都读得到它
+    projection = system.project(run_id)
+    assert late.project_id == projection.project_id and late.work_item_id == projection.work_item_id
+    assert late.event_id in {item.event_id for item in system.store.read(projects=[projection.project_id])}
+    assert late.event_id in {item.event_id for item in system.store.read(work_items=[projection.work_item_id])}
     system.close()
+
+
+def test_a_project_decision_request_survives_a_numbered_event_without_a_session():
+    # 审查要求修改 1：回放会把 run、项目、目录三条流的事件合在一起（decisions_through）；
+    # 没有编号的事件（项目流与目录流不取编号）不被 run 的流级事件（带编号、没有会话）挤成「只记录」
+    paused = Event(
+        event_id="evt_pause", run_id="run_1", type=EventType.RUN_PAUSED, role=None, parent_event_id=None,
+        state_before="running", state_after="paused", payload={"human_action": "retry"}, artifact_hashes=[],
+        session_id=None, provider=None, model=None, context_digest=None, stop_reason="input_needed",
+        error=None, created_at="2026-10-28T00:00:00+00:00", position=1, stream="run:run_1", stream_version=1,
+        project_id="proj_1", work_item_id="wi_1", department=None, dispatch_number=1,
+    )
+    request = ProjectEvent(
+        event_id="pevt_q", project_id="proj_1", type=ProjectEventType.PROJECT_DECISION_REQUESTED,
+        payload={"kind": "confirm_initial_prd", "blocks": "project", "work_item_id": "wi_1"},
+        created_at="2026-10-28T00:00:00+00:00", position=2, stream="project:proj_1", stream_version=1,
+        work_item_id=None, run_id=None, department=None,
+    )
+    upgrade = CatalogEvent(
+        event_id="cevt_q", type=CatalogEventType.INSTANCE_UPGRADE_REQUESTED,
+        payload={"kind": "instance_upgrade", "blocks": "instance"},
+        created_at="2026-10-28T00:00:00+00:00", position=3, stream="catalog:main", stream_version=1,
+    )
+    assert list(replay_decisions([paused, request, upgrade])) == ["pevt_q", "cevt_q"]
 
 
 def test_a_redispatch_increments_the_number(tmp_path):

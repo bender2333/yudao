@@ -1267,7 +1267,7 @@ class Orchestrator:
 
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
                 await asyncio.to_thread(self._await_cancellers, run_id)
-                self._transact(run_stream(run_id), finish, dispatch_number=scope.dispatch_number)
+                self._transact(run_stream(run_id), finish, dispatch_number=scope.dispatch_number or None)
                 # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
                 self._rebase_run_clock(run_id)
                 self.sessions.get(run_id, scope.department).idle()
