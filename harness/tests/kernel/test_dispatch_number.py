@@ -9,7 +9,7 @@
 import sqlite3
 
 from harness.adapters.fake import FakeAdapter
-from harness.event_store import run_stream
+from harness.event_store import EventStore, run_stream
 from harness.models import EventType
 from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
@@ -142,6 +142,10 @@ def test_a_data_directory_written_by_an_older_version_still_opens(tmp_path):
     system.close()
     with sqlite3.connect(data / "events.sqlite") as connection:
         connection.execute("ALTER TABLE events DROP COLUMN dispatch_number")
+    # 只读子命令不补列：同样读得出这些事件，这一列读作空
+    readonly = EventStore(data / "events.sqlite", read_only=True)
+    assert [item.dispatch_number for item in readonly.list_events(run_id)] == [None, None]
+    readonly.close()
     reopened = LoopSystem.for_testing(data, FakeAdapter([]))
     events = reopened.store.list_events(run_id)
     assert [item.dispatch_number for item in events[:2]] == [None, None]
