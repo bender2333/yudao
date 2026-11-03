@@ -27,10 +27,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from harness import orchestrator as orchestrator_module
 from harness import runtime as runtime_module
 from harness import watched_outputs
-from harness import write_path as write_path_module
 from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS
 from harness.models import EventType, json_dumps
@@ -194,10 +192,9 @@ def test_the_watched_outputs_routing_answers_the_same_way_from_the_same_events(t
 
 def test_the_task_pool_routing_answers_the_same_way_from_the_same_events(tmp_path, monkeypatch):
     # 任务池的一个事项（只在测试里用的第二种路由，工单 #864）：发任务、完成、打回、重做、接纳，池子见底结束。
-    # 事项所用的那份定义只在测试目录里，交给同一批读取处（与 test_second_routing.py 改模块里的定义同一个做法）
+    # 事项所用的那份定义只在测试目录里，交给组装处按名称接上路由（与 test_second_routing.py 改模块里的定义
+    # 同一个做法；停止原因与部门由薄驱动交给写入口，工单 #1165，所以模块加载的那份定义不动）
     definitions = second_routing.DEFINITIONS
-    monkeypatch.setattr(write_path_module, "DEFINITIONS", definitions)
-    monkeypatch.setattr(orchestrator_module, "DEFINITIONS", definitions)
     monkeypatch.setattr(runtime_module, "DEFINITIONS", definitions)
     script = {
         "product": [_turn([("submit_task", {"title": "整理 README 的用法一节"})])],
