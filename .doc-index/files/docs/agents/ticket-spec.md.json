@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/agents/ticket-spec.md",
-"hash":"00fa1480737cd559",
+"hash":"535a0407b288b1dd",
 "nodes":[
-{"hash":"00fa1480737cd559","id":"docs/agents/ticket-spec.md","kind":"file","title":"docs/agents/ticket-spec.md"},
+{"hash":"535a0407b288b1dd","id":"docs/agents/ticket-spec.md","kind":"file","title":"docs/agents/ticket-spec.md"},
 {"hash":"2fcd62092a9696a0","id":"docs/agents/ticket-spec.md#工单规范","kind":"section","parent":"docs/agents/ticket-spec.md","title":"工单规范"},
-{"hash":"8ac2d916ec2408f0","id":"docs/agents/ticket-spec.md#工单规范 > 层级与归属","kind":"section","parent":"docs/agents/ticket-spec.md#工单规范","title":"层级与归属"},
+{"hash":"e514b1e5bd1f118f","id":"docs/agents/ticket-spec.md#工单规范 > 层级与归属","kind":"section","parent":"docs/agents/ticket-spec.md#工单规范","title":"层级与归属"},
 {"hash":"6120ac79bf24270d","id":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写","kind":"section","parent":"docs/agents/ticket-spec.md#工单规范","title":"一张子工单怎么写"}
 ],
 "edges":[
@@ -14,7 +14,8 @@
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.4 用例的变化","kind":"link","raws":["../design/test-pyramid.md"],"seen":"317f43a41f6b931b","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
 {"dst":"harness/tests/kernel/test_manifest.py","kind":"code-path","raws":["harness/tests/kernel/test_manifest.py"],"seen":"1fa41458b27a29b9","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
-{"dst":"CLAUDE.md#思考模式 > 文档维护与归档","kind":"section-ref","raws":["CLAUDE.md"],"seen":"406fef710b7fa67c","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
-{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["acceptance-evidence.md"],"seen":"acf4e6f56b6c7148","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"}
+{"dst":"CLAUDE.md#思考模式 > 文档维护与归档","kind":"section-ref","raws":["CLAUDE.md"],"seen":"ff66ee419b4ba270","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
+{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["acceptance-evidence.md"],"seen":"f2a9c9c4524e9ef0","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"3851a47f4f6c331d","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"}
 ]
 }

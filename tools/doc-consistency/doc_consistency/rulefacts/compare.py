@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 
 from ..scaffold import pick, solve, sym
 from ..scan import scan_repo
+from . import baseline as BL
 from . import canon as rf
 from . import scan as S
 from .patterns import SHAPES
@@ -66,6 +67,7 @@ class Check:
     conflicts: list = field(default_factory=list)
     restates: list = field(default_factory=list)
     edges: list = field(default_factory=list)  # 以谁为准的边 (节点, 优先, 其次)
+    root: object = None  # 仓库根，读基线用
 
     def count(self, kind):
         return sum(1 for c in self.conflicts if c.kind == kind)
@@ -200,7 +202,7 @@ def check(root):
     groups = [g for u in sc.units for g in sc.groups.get(u.id, [])]
     hands_on = sc.pv.hands_on if sc.pv else []
     res = run(c, groups, hands_on)
-    chk = Check(c, sc, groups, {g.node: g for g in groups})
+    chk = Check(c, sc, groups, {g.node: g for g in groups}, root=root)
     chk.conflicts = build_conflicts(c, groups, res)
     hit = {(n, k, f) for x in chk.conflicts for n in x.nodes for k, f in x.rows}
     seen = set()
@@ -264,21 +266,31 @@ def format_check(chk, show_all=False, tier="A", sample=None):
     out += rf.format_unreachable(c)
     out += rf.format_dup(c)
     un_all = chk.unparsed()
+    base = BL.load(chk.root) if chk.root is not None else {}
+    inb = {id(h) for h in un_all if BL.key(h) in base}
     kept = [h for h in un_all if in_tier(h, tier)]
     un = kept
     if sample is not None:
         picked = random.Random(S.SAMPLE_SEED).sample(un, min(sample, len(un)))
         order = {id(h): i for i, h in enumerate(un)}
         un = sorted(picked, key=lambda h: order[id(h)])
-    shown = un if (show_all or sample is not None) else un[:SHOW_UNPARSED]
-    base = f"候选 {len(hits)} − 解析成功 {cnt[S.CLS[1]]} − 纯指路 {cnt[S.CLS[0]]}"
+    listing = show_all or sample is not None
+    if not listing:
+        un = [h for h in un if id(h) not in inb]  # 默认只报不在基线里的
+    shown = un if listing else un[:SHOW_UNPARSED]
+    base_n, new_n = len(inb), len(un_all) - len(inb)
+    counts = f"基线 {base_n} 条，新 {new_n} 条"
+    base_txt = f"候选 {len(hits)} − 解析成功 {cnt[S.CLS[1]]} − 纯指路 {cnt[S.CLS[0]]}"
     if tier == "A" and sample is None:
-        head = f"{len(un)} 条（{base}），" + ("全部列出" if show_all else f"前 {len(shown)} 条")
+        head = f"{counts}（{base_txt}），" + ("全部列出，基线的标「基线」" if show_all else f"只列新的，前 {len(shown)} 条")
     else:
-        head = f"档 {tier}：{len(kept)} 条（全部 {len(un_all)} 条里留下的；{base}），" + (
-            f"固定种子（{S.SAMPLE_SEED}）抽 {len(shown)} 条" if sample is not None else "全部列出" if show_all else f"前 {len(shown)} 条"
+        head = f"{counts}；档 {tier}：{len(kept)} 条（全部 {len(un_all)} 条里留下的；{base_txt}），" + (
+            f"固定种子（{S.SAMPLE_SEED}）抽 {len(shown)} 条，基线的标「基线」" if sample is not None else "全部列出，基线的标「基线」" if show_all else f"只列新的，前 {len(shown)} 条"
         )
     out.append(f"== 像在说规则但解析不了：{head}；这是以后钩子的提醒 ==")
     for h in shown:
-        out += S.fmt_hit(h)
+        lines = S.fmt_hit(h)
+        if id(h) in inb:
+            lines[0] = lines[0].replace("  [", "  [基线，", 1)
+        out += lines
     return out

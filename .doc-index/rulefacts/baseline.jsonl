@@ -1,0 +1,338 @@
+{"file": ".claude/skills/README.md", "hash": "ddd7a4cc40db1f7a", "head": "这个目录是开发 Yudao 仓库用的技能：架构师、solo 执行者与审查者在 Claude Code 里调用它们"}
+{"file": ".claude/skills/README.md", "hash": "f8fa01f362a88722", "head": "**用户只定三件事**：走向、规则、试用结论"}
+{"file": ".claude/skills/README.md", "hash": "d878617e7f90b7f0", "head": "`/module-sync` 与子架构师定模块走向"}
+{"file": ".claude/skills/README.md", "hash": "f666f783a26798f1", "head": "其余交给架构师"}
+{"file": ".claude/skills/README.md", "hash": "23b15499d412ba70", "head": "审查子代理"}
+{"file": ".claude/skills/README.md", "hash": "988cddcd0014c781", "head": "`reviewer`，只审改到内核代码的 PR，由 solo 在合并前派出"}
+{"file": ".claude/skills/README.md", "hash": "dd1a783a0b5e40fd", "head": "内核 PR 加 reviewer 审查"}
+{"file": ".claude/skills/README.md", "hash": "76f983803e4941dc", "head": "交回的工单、solo 转给用户的工单、Discussions 的想法 ──/triage──► 放回、拆小、补设计或交给"}
+{"file": ".claude/skills/README.md", "hash": "be4d98eda866eed3", "head": "「用户调用」一列标「是」的，只能由用户在提示符里输入命令"}
+{"file": ".claude/skills/README.md", "hash": "7b5446f02c170be9", "head": "和用户定一个模块的走向：体检卡、选择题，接着归桶与拆单"}
+{"file": ".claude/skills/README.md", "hash": "ba0e99163a4d594c", "head": "用户要定一个模块、一道缝或一条道往哪走"}
+{"file": ".claude/skills/README.md", "hash": "ae8b63a39464b1c8", "head": "分诊交回的工单、solo 转给用户的工单、Discussions 的想法与外部报告，结论写 `TRIAGE:`"}
+{"file": ".claude/skills/README.md", "hash": "b13dc256c8adbec3", "head": "由 `solo` 派出，或按启动命令运行"}
+{"file": ".claude/skills/README.md", "hash": "bbeff4da76e277d0", "head": "独立审查改到内核代码的 PR，写 `REVIEW:`"}
+{"file": ".claude/skills/README.md", "hash": "d769498081853e1f", "head": "solo 合并内核 PR 之前"}
+{"file": ".claude/skills/README.md", "hash": "01fb1970064c4add", "head": "由 `solo-worker` 第 10 步派出"}
+{"file": ".claude/skills/README.md", "hash": "7232e589c99e9d0b", "head": "agent 当真实用户，用从 main 打包的实例跑任务、写试用报告"}
+{"file": ".claude/skills/README.md", "hash": "f63d4404cbdb8534", "head": "两个会话分开开：solo 做工单，架构师循环接住交回的工单、该验收的父工单和达到的薄片"}
+{"file": ".claude/skills/README.md", "hash": "76f89c4292bb126f", "head": "**薄片做完了，要交给用户试用"}
+{"file": ".claude/skills/README.md", "hash": "4dcb25e95c90fd62", "head": "要人在场才能做的（要用户选、要用户批），在 frontmatter 加 `disable-model-invocatio"}
+{"file": ".claude/skills/README.md", "hash": "bf535990f804fbff", "head": "技能是规则文件的一部分：用户在场的会话改，改完记入 `docs/CHANGELOG.md` 与 `claude_jour"}
+{"file": ".claude/skills/discuss/SKILL.md", "hash": "b84201c24d174e99", "head": "先给出自己的判断，只把真正要用户定的事留给用户"}
+{"file": ".claude/skills/discuss/SKILL.md", "hash": "83afe49b1fb2e29c", "head": "页面原型不带画面、用假数据、能点，交给用户试用"}
+{"file": ".claude/skills/discuss/SKILL.md", "hash": "08a841fd584ec866", "head": "用户对原型的意见直接改原型与设计说明，不起草工单，定稿并要实现时才拆单"}
+{"file": ".claude/skills/discuss/SKILL.md", "hash": "026332e16c355967", "head": "用户的原话原样记在 `claude_jour.md`，需求记录只写整理后的现在的需求与验收标准"}
+{"file": ".claude/skills/discuss/SKILL.md", "hash": "a4b87bacd8e539e0", "head": "「用户没说，按常见做法定了」"}
+{"file": ".claude/skills/discuss/SKILL.md", "hash": "e42ba011bbec8fbd", "head": "先给判断，但要用户定的事要问出来"}
+{"file": ".claude/skills/discuss/SKILL.md", "hash": "43b5bae31d2be14b", "head": "能观察到的事实用原型或实验定，问用户的只留偏好与走向"}
+{"file": ".claude/skills/discussion-note/SKILL.md", "hash": "aa3918a0592e78e5", "head": "PR 上的实现分歧、审查意见"}
+{"file": ".claude/skills/discussion-note/SKILL.md", "hash": "998766797aa5bde7", "head": "会：影响合并"}
+{"file": ".claude/skills/discussion-note/SKILL.md", "hash": "527a87a26d03419a", "head": "要总架构师或用户定的总图、规则文件、CI、评价标准"}
+{"file": ".claude/skills/discussion-note/SKILL.md", "hash": "fdf23464cf72c705", "head": "被挡住的工单标 `ready-for-human`"}
+{"file": ".claude/skills/discussion-note/SKILL.md", "hash": "095d29415bb54e3b", "head": "**重跑或复核一次**，以发帖时刻为准，标题里写活动时间"}
+{"file": ".claude/skills/doc-scan/SKILL.md", "hash": "6774012b76785e07", "head": "同主题的一到三份放一组（设计说明、需求、根目录规则、角色规则、ADR、调研、原型、评测各成组），一组一个审查员"}
+{"file": ".claude/skills/doc-scan/SKILL.md", "hash": "a1aa8bf4595cc733", "head": "审查员报的假阳性不少——用户级 `~/.claude/skills/` 里存在的技能算有效引用，`DONE` 这类运行结"}
+{"file": ".claude/skills/doc-scan/SKILL.md", "hash": "0b47742adaf65293", "head": "核不住的条目删掉，别让用户替你验证"}
+{"file": ".claude/skills/doc-scan/SKILL.md", "hash": "d66fa75ef5403283", "head": "2 结论：最该先改的几件事（每件事带条数与文件数），以及哪几处归用户改、哪几处归架构师改"}
+{"file": ".claude/skills/doc-scan/SKILL.md", "hash": "c879d75c5e015bf5", "head": "用户说「顺手改」时再按报告里的几件事分批改，一次一类，一类一次提交"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "d0c0cf0f46440e1e", "head": "本机的用户级 `~/.claude/skills/retro` 是另一个内容不同的复盘技能（复盘一次编码会话、给环境提改"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "5cf13ab7e7fc3b17", "head": "规则、参数、设计说明与工单的修改写成提议，由用户确认"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "8230a08cc9e4f364", "head": "执行者与审查者的运行记录"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "d24224d1d25d297c", "head": "绕过 CI 与审查的合并"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "278ca65d7a09f43d", "head": "交付是不是用户要的、用户对上一次改动的决定"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "5c846bb2c69ff742", "head": "改状态：用户确认或否决一项改动、改动生效以后，取回正文写进 `.tmp/retro/body.md`，改「改动与预期」表"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "cd75d34b03c88213", "head": "读它的「改动与预期」表与帖子下用户的评论"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "a9fd2c33387aa509", "head": "** 每张工单按时间排出事件：每个标签的起止（`ready-for-agent` 只计没有未关闭阻塞方的时段，以及 `i"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "8dc844728cc84971", "head": "有运行记录的轮次再读："}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "251864c8515d8dc8", "head": "口径沿用里程碑报告的「口径」一节，新增的口径写进报告："}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "820dbc8fa43f5032", "head": "对照试用反馈与 `claude_jour.md`、Discussions 里记下的用户原话，写交付与用户要的有没有偏差"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "30bcc894abbe2d3d", "head": "** 报告第一行是 `# 复盘：<范围>`，顺序：覆盖表 → 上一次改动的结论 → 时间去向与度量 → 按改动层分组的问"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "2f0fb7ebe51a47e6", "head": "改动与预期表的列：编号、改动、层、位置、预期、撤回条件、证明方式、状态（提议 / 用户确认 / 已生效及日期），下一次复"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "b70f41c11bd0d0fc", "head": "`docs/CHANGELOG.md` 与 `claude_jour.md` 各追加一行：时间到分钟、范围、帖子链接、需"}
+{"file": ".claude/skills/milestone-retro/SKILL.md", "hash": "7cceae99f093d62c", "head": "回复用户：帖子链接、上一次改动的结论、需要用户决定的事项"}
+{"file": ".claude/skills/module-sync/SKILL.md", "hash": "c66177bf3360b211", "head": "用户平时只看总图、对照表（`docs/design/architecture/name-map.md`）与工单指出的一两"}
+{"file": ".claude/skills/module-sync/SKILL.md", "hash": "5e9538bbb98893d6", "head": "这个技能把一个模块的现状压成一屏，让用户只定走向"}
+{"file": ".claude/skills/module-sync/SKILL.md", "hash": "fc81ddc27548a2af", "head": "你以子架构师身份做（`CLAUDE.md`「子架构师」）：总图是正本，与总图不符时改设计说明与代码，不改总图"}
+{"file": ".claude/skills/module-sync/SKILL.md", "hash": "243747c456c06004", "head": "用户定了走向以后，读 [`/to-parents`](../to-parents/SKILL.md) 按它做，范围写成这"}
+{"file": ".claude/skills/module-sync/SKILL.md", "hash": "d31ded1e5f9e8aa4", "head": "`claude_jour.md` 追加一条：目标、用户选的走向、父工单与子工单编号、批准了哪几张"}
+{"file": ".claude/skills/module-sync/SKILL.md", "hash": "8cddcb0fd5f87b0e", "head": "对照表的行不在这里改：立缝工单关闭时子架构师再把那一行改成「一致」"}
+{"file": ".claude/skills/module-sync/SKILL.md", "hash": "c498b8a07cd95bf3", "head": "用户的走向结论改了设计说明的，按 `/next`「改设计时的冻结」处理已放出的工单"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "fa2b5008a46f11a8", "head": "同样记入 `docs/CHANGELOG.md` 与 `claude_jour.md`，日记里写明用户不在场"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "3e0b2ee463a3de1f", "head": "设计说明、ADR、需求记录（不改用户已确认的需求与验收标准）、`CONTEXT.md`、原型，以及工单正文、子工单、依赖"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "1385001f21536b7f", "head": "需要放松的写清要用户定什么，标 `ready-for-human`"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "7fcc2706155a987b", "head": "** 里程碑开始执行以后（里面有工单因交付关闭、带 `in-progress` 或 `needs-review`、或有负"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "5734118596d9a18d", "head": "其余由挑中的那件事的技能决定"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "874691e4128a36d3", "head": "PR 正文有 `Solo:` 行的是 solo 的合并，记入 `claude_jour.md`"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "69129f28e1219688", "head": "是 solo 的合并，由 solo 按 `solo-worker`「main 上的 CI」处理"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "8442a4026ba923a9", "head": "**只在 `--循环`**："}
+{"file": ".claude/skills/next/SKILL.md", "hash": "fc50a2d12cec9f32", "head": "先出一张不超过 10 行的卡：每条一句话，写要用户定什么、建议、不定会怎样"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "c2e7321c533ff885", "head": "solo 直接交给用户、架构师还没看过的"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "fd0987e015b32b76", "head": "总架构师已经定了的"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "a3eedcc30ab584e4", "head": "`ready-for-human`，没有架构师的 `TRIAGE:` 评论，或者 `TRIAGE:` 评论写的 `arc"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "a5edbf156ea48d10", "head": "[`/triage`](../triage/SKILL.md)「交给用户的工单」"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "30a9dd31f9ed8fc2", "head": "超时先看进程在不在：在就再等一轮，不在按失败处理，重跑一次，再失败交给用户，附运行记录的位置"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "4d7271aad23f0cb9", "head": "都做同样的事：工单上写清要用户定什么（一句话一条，带建议与不定的后果），标 `ready-for-human`，会话收尾"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "eb79ce2d7e00a7da", "head": "「架构师循环」开关是关"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "0eb6d3ce3d32efb1", "head": "同一项交给用户两次、用户还没回"}
+{"file": ".claude/skills/next/SKILL.md", "hash": "04c216d8f0c23428", "head": "交给用户，这个薄片停住"}
+{"file": ".claude/skills/reviewer/SKILL.md", "hash": "28481e79d6d8e4f6", "head": "由 solo 执行者在合并前派出，审查者与写代码的不是同一个上下文"}
+{"file": ".claude/skills/reviewer/SKILL.md", "hash": "d8b68546b3245ff6", "head": "不用：其他 PR（solo 按 `solo-worker` 的合并前核对自己合并）"}
+{"file": ".claude/skills/reviewer/SKILL.md", "hash": "9728ade3241ee352", "head": "CI「用例变化」列出的删除逐条与交付说明对照，每条有理由，删除前后的覆盖读数不降"}
+{"file": ".claude/skills/seam-diff/SKILL.md", "hash": "3653bd4ecea1b329", "head": "用户不读代码，要看出代码现在的样子与总图要求的样子差在哪"}
+{"file": ".claude/skills/seam-diff/SKILL.md", "hash": "39d93bd872f4953e", "head": "你以子架构师身份做（`CLAUDE.md`「子架构师」）：只读代码与测试，不改"}
+{"file": ".claude/skills/seam-diff/SKILL.md", "hash": "51977dfdff1c2484", "head": "补守卫工单（执行者写测试）"}
+{"file": ".claude/skills/seam-diff/SKILL.md", "hash": "67cc1c208d65aa20", "head": "该阶段的父工单正由别的子架构师改写时，报告里写「待建」与要合并进哪张父工单，交给那位子架构师建，免得重复"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "b3afe916ca230f5b", "head": "你是 **solo 执行者**：这张工单由你自己领取、实现、自测、开 PR、发交付说明、核对、合并"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "17fddd4605473e2f", "head": "交回与转用户"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "4c3dd0fba844802f", "head": "评论写到文件，收尾报 `blocked`，编排者用 `solo.mjs question` / `askhuman` 发"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "3f2c332c2ce3a6f0", "head": "自己改标签、自己 `gh issue comment --body-file` 发评论"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "35a272d5464a3677", "head": "有改动就读改动，以 main 的现状为准，在日记里写明差异怎么处理"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "309f6984d0fbd282", "head": "**推送与 PR**：正文写 `Closes #<编号>`、`Solo: 由 solo 执行者合并`（改到内核代码的写 "}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "afcfb1f4ca66c40b", "head": "**合并前的核对**（下面各条都成立才合并）："}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "3b7d10b54c54fab3", "head": "**不要删 worktree**：在循环里由编排者的 `solo.mjs gc` 统一清（先归档 `.tmp/` 的证据"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "503d1938b0fa9b59", "head": "署名的形式是 `solo-<模型 ID>`（例如 `solo-deepseek-v4.1-flash`），循环里**值以"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "201c374a6fbc861e", "head": "每条记录行首写 `执行者 <署名> / 日期 时间 /`"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "9e75d2c7e9748f4d", "head": "界面工单除了代码与测试，还要留证据："}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "b5f5733042ffd157", "head": "PR 上写明理由，评论写清要用户决定什么，收尾 blocked"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "a1b9bba3ae01161a", "head": "`integration` 失败（它在 main 的每个合并提交上运行，不挡合并）："}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "a469bb62d01d453a", "head": "**工单正文或评论在你工作期间被改**：以最新的正文与最新的任务评论为准"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "aff030b71fb26c99", "head": "用户的目标与约束不修改"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "511b3cbd05567664", "head": "一切以工单正文为准"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "21507b6550e11c7e", "head": "采用的做法由你写进文档与日记，责任在你"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "b97e19feb23e9002", "head": "solo 指的是**角色**上的 solo——工单由你自己领取、实现、自测、合并，只有改到可信内核代码的 PR 在合并前"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "1797e7861b87e889", "head": "设计、需求、范围上的裁定"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "ea27f942355587dd", "head": "交回的工单分诊、父工单验收、薄片达到以后的试用准备"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "c46670f2f05ec3b6", "head": "用户不在场时是架构师循环（[`/next --循环`](../next/SKILL.md)），随时在改工单与里程碑"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "3ffc9c8361f66ec4", "head": "设计问题不自己拍板，但也不要停下来等：**把问题写成评论、交回架构师、接着做别的工单**"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "1b30b33a323a0e88", "head": "已交回架构师，循环不再自动重试"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "4cf5ac200fcd17cc", "head": "`state.json` 的 `worktrees.root`，用 `solo.mjs worktrees --root"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "1c8ce65223571d7c", "head": "`state.json`、`tasks.md`、`active.json`、`.lock`、`.owner.json`、"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "cabc93e3ca6ac84c", "head": "换过根目录以后，旧目录里的 worktree 用 `solo.mjs gc --from <旧根目录>` 清（按已关闭工"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "aa186d872f272579", "head": "**用户说的话换成交给 `next` 的参数："}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "0e4fe901ffe520d1", "head": "**工单会进出里程碑、会被架构师改挂到别的里程碑、会新开，里程碑本身也会改名："}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "ed6e82931efc1e91", "head": "**读 `handoff.md`**：worktree 根目录、gh 身份、这台机器的环境坑，每轮都以它为准"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "3233edba049f9a50", "head": "**读账**：`solo.mjs state`"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "3e4879abfbbbaa33", "head": "以文件为准，不以记忆为准"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "a0242d260bfdf27a", "head": "回收以后对每张 `solo.mjs handover --task T-004`，把「上一次做到哪」写进新任务书"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "27dfbfcf5d9c70af", "head": "**领取**：`solo.mjs claim --task T-004`"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "7761da9b53eb37c3", "head": "先 `solo.mjs check --task T-004`：工作区干净、没有未推送的提交、分支含 `origin/m"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "daf1c35a2a62c87c", "head": "再 `solo.mjs finish --task T-004 --status done`：`done` 会自己核对工"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "05b29a4ed328c4d1", "head": "**worktree 不在这里逐张删**：收账以后跑 `solo.mjs gc` 统一清——它先把 `.tmp/` 的证"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "ff556c745b49caf1", "head": "长说明写 `solo.mjs note --text \"...\"`，`progress.md` 只留每段那几行"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "7682dc46bc8ab09b", "head": "【规则】先读 <仓库>/.claude/skills/solo-worker/SKILL.md，按「在 /solo 循环"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "9c7f7a075008721c", "head": "工单只写「看起来不对」这类没法判的要求，按设计问题交回架构师，不要自己猜"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "5709fd763f42e7bf", "head": "收尾给用户的总结里**单列一段「UI 待肉眼确认」**：哪几张工单、截图在哪、你据什么判定它对了"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "01f70050f94a3d98", "head": "不要把「看起来没问题」写成交付结论——那一步只能由人做"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "53983cfebb84dae9", "head": "**并发位置最多 `concurrency.max` 个**，并且以宿主返回的并发上限为准"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "09d8cb99975b3ca2", "head": "连续三轮交回架构师，不要自己试第四轮"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "9f88686f1d0ec671", "head": "署名值存在 `state.signature`，换模型用 `solo.mjs signature --value sol"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "e846ead5ed10b7fa", "head": "仓库里的 `agents_jour/<编号>.md` 与 `docs/CHANGELOG.md` 由**工人**按工单写"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "a7e5b396ab68dee2", "head": "`solo.mjs auto on`（或者 `resume` 不加 `--no-auto`）以后，循环不再需要人每轮说「"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "5d896c3b041afce4", "head": "先把收账方式记进台账：`solo.mjs resume --wait notify`，`state` 会写「无人值守 开"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "f0bcb371023f5d60", "head": "做法是："}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "fbd8f6b604d54385", "head": "`status` 改 `done`，删 `.ralph/active.json`，给用户一份来自 `progress.m"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "05f92ea0d35ebdfc", "head": "`pause`，写给用户在等什么、还剩几张"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "b933adb0beaf5f00", "head": "交回架构师，循环接着做别的"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "623d04d2fd052fe4", "head": "`blocked`，把问题写进 `progress.md` 并问用户"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "c1d6890b536367e8", "head": "给用户一份来自 `progress.md` 的总结：做了几轮、每轮改了什么、哪些交回架构师了（失败几次、卡在哪）、哪些在"}
+{"file": ".claude/skills/solo/worker.md", "hash": "c3d28a931a72fbda", "head": "读那份文件，按「在 `/solo` 循环里」那一栏做，只做任务书上的那一张工单，收尾按它的四行格式输出"}
+{"file": ".claude/skills/ticket/SKILL.md", "hash": "4901e8b4376ab111", "head": "带 `architecture` 标签，正文写现象、总图哪一节或哪条规则、要定什么，不用子工单模板"}
+{"file": ".claude/skills/ticket/SKILL.md", "hash": "4f3fd873f5d38327", "head": "总图的问题开头写「总图」与节号"}
+{"file": ".claude/skills/to-children/SKILL.md", "hash": "39180556be7dd47d", "head": "这是两级拆分的下一级：一张父工单（由 `/to-parents` 产生）拆成执行者能领取的子工单"}
+{"file": ".claude/skills/to-children/SKILL.md", "hash": "8ff0a46177ba21f5", "head": "改到用户同意为止"}
+{"file": ".claude/skills/to-children/SKILL.md", "hash": "7d15d2cbdb0133fd", "head": "用户不在场时（架构师循环）不等：自己按这三件事核对一遍，把这张表写成父工单上的一条评论，接着发布"}
+{"file": ".claude/skills/to-children/SKILL.md", "hash": "58cd6d3974808aad", "head": "守着这些行为的用例由执行者随工单删，交付说明逐条列出，架构师事后用 CI「用例变化」对照（[测试分层](../../.."}
+{"file": ".claude/skills/to-design/SKILL.md", "hash": "5800109cfea0473b", "head": "这一步不追问用户，只整理已经定了的东西"}
+{"file": ".claude/skills/to-design/SKILL.md", "hash": "26406eb380fee6c1", "head": "「写上类名和字段，执行者更好懂」"}
+{"file": ".claude/skills/to-design/SKILL.md", "hash": "458aba950b8c03ba", "head": "名字的对照写在对照表"}
+{"file": ".claude/skills/to-parents/SKILL.md", "hash": "8cc652534b6a8656", "head": "这是两级拆分的上一级：从大的范围拆到父工单，一张父工单是一个桶、一个可以交给用户试用的目标"}
+{"file": ".claude/skills/to-parents/SKILL.md", "hash": "2e75b98bc00958b9", "head": "范围的阶段工单或里程碑不存在时停下来告诉用户，不自己建"}
+{"file": ".claude/skills/to-parents/SKILL.md", "hash": "f964dc047a0483ca", "head": "挂到那个桶的父工单下，标 `needs-triage`，由 `/to-children` 改写"}
+{"file": ".claude/skills/to-parents/SKILL.md", "hash": "bd48d03e56e66e13", "head": "不用改代码：只写设计说明、改原型、改规则或整理文档（[工作方式](../../../docs/agents/workfl"}
+{"file": ".claude/skills/to-parents/SKILL.md", "hash": "fb0873da692544dc", "head": "有权限的架构师直接改、推送 main，旧工单做完后关闭"}
+{"file": ".claude/skills/to-parents/SKILL.md", "hash": "9620e0d04e9ebfdc", "head": "列成四张表给用户看：父工单（标题、桶、环、终点、依赖、里程碑，标明新建、改写还是原样对上）、设计未写的桶（缺什么）、旧工"}
+{"file": ".claude/skills/to-parents/SKILL.md", "hash": "8ff0a46177ba21f5", "head": "改到用户同意为止"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "384eee911e5ac38f", "head": "用户在场时要改规则的（直接和用户定）"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "bd01eeda6d78c3c8", "head": "工单正文、`ARCHITECT:` 交回评论与最近的评论、PR 与交付说明、执行者日记 `agents_jour/<编号"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "4a939b7e2865c0c5", "head": "会改变这个阶段交给用户的东西时交给用户 | 关闭 |"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "5e3f94bf0240380b", "head": "| 要改规则 | 用户在场时直接和用户定"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "42c35dba4c1b839d", "head": "完成：solo 领到时读到的一定是新设计"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "007703218ef97807", "head": "**上限两次**：同一张工单数 `TRIAGE:` 评论，分诊满两次，第三次直接交给用户，附上两次的结论"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "5edef10b0e208db8", "head": "solo 自己转成 `ready-for-human` 的，逐张看："}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "01c0b57f9a63a0f8", "head": "「把验收改松一点 solo 就能过」"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "121093e6e7ca50fc", "head": "要放松的交给用户"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "1df26b678f509c9e", "head": "「先放回去让 solo 再试一次」"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "87316b39cf196213", "head": "不改正文、不补设计就放回，第三轮还会卡在同一处"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "2b893b740bbb6d83", "head": "用户在场时回复：哪一张、按哪条原因、去向、改了哪份文档"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "87e44570b14145aa", "head": "与 [`/trial`](../trial/SKILL.md) 的分工：`/trial` 是 agent 自己当用户跑一"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "f329afa9755f25af", "head": "state \"交给用户定\" as S8"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "38a3719dd610c7c3", "head": "S8 --> S4: 用户定了怎么修"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "a00fb082d94dae62", "head": "S7 --> S4: 用户反馈里的缺陷建成工单"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "ac18781ee60caec2", "head": "参数与规则句子的修改留作「提议」，由用户在场的会话定"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "4bfd72d81a0858af", "head": "按三类收："}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "37a862720f91a0b8", "head": "**导游卡**：写 `TRIAL: 导游卡`，正文是导游卡，后面列「要你定的」：复盘里的提议、B 与 C 类与建议、要总"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "f2044e9f6db9fda4", "head": "变化只写用户在页面或命令行里看得到的，从这个薄片因交付关闭的工单里挑 2 至 3 个，不列内部重构"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "d1726a752ec85619", "head": "**上限**：每次交给用户之前，一个薄片最多修两轮缺陷"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "18ddd823a8957f25", "head": "从最后一条 `TRIAL: 导游卡` 之后数 `TRIAL: 缺陷`，到第三轮不再建单，连同两轮的证据交给用户，标 `r"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "0b3d61a0c47c0a75", "head": "没给参数就从试用工单的用户评论里读"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "f7843a1bc46e0d30", "head": "**分流**："}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "2a2ae15c00b7cdbe", "head": "**确认表**：一行一条，等用户确认分类："}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "c8662c8946054786", "head": "**办理**：A 按 `/to-children` 的模板建工单，正文引用用户原话，带 `bug`，标 `ready-f"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "f563bba524a547c3", "head": "用户在试用工单上确认以后，用户在场的会话按验收证据规则「试用工单与里程碑的关闭」写关闭评论，关闭试用工单"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "5cc182cb7cad8c2b", "head": "「用户不在，试用通过先写上」"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "a5a94b14a49c75a2", "head": "试用通过只由用户给"}
+{"file": ".claude/skills/trial-intake/SKILL.md", "hash": "3531ceb68ae9c60b", "head": "同一个薄片的 `TRIAL: 缺陷` 超过两条，还没交给用户"}
+{"file": ".claude/skills/trial/SKILL.md", "hash": "91d392a180ddbab4", "head": "发现写进报告，由维护者裁决与建工单"}
+{"file": ".claude/skills/trial/SKILL.md", "hash": "17ca486e453942ff", "head": "例如页面显示原始标识与英文原文按用户已有决定处理"}
+{"file": ".claude/skills/trial/SKILL.md", "hash": "19770ed12ff77b58", "head": "配置以后把实际的逐部门模型、协议、窗口、输出上限保存为清单，接口查询由协调者做"}
+{"file": ".claude/skills/trial/SKILL.md", "hash": "f2a0fc7a682ebd91", "head": "记录每两分钟实际观察和每次操作，时间以浏览器 `observed_at` 为准"}
+{"file": ".claude/skills/trial/SKILL.md", "hash": "918e449d80a0bcd9", "head": "命令与字段以 [records.md](method/records.md) 为准"}
+{"file": ".claude/skills/trial/SKILL.md", "hash": "ba4e6c865b172d34", "head": "最新一篇试用帖通过 GitHub 查询，读数以对应导出和裁决为准"}
+{"file": ".claude/skills/trial/method/expert.md", "hash": "30d3e51f39931351", "head": "页面实际写了什么，新手段漏看或误解了什么"}
+{"file": ".claude/skills/trial/method/expert.md", "hash": "5643a81a444378b4", "head": "每项写结论和事件 id，未做到写受阻原因："}
+{"file": ".claude/skills/trial/method/expert.md", "hash": "ebec9df14f39a1d0", "head": "页面显示英文原文与原始标识按已有用户决定处理，不能仅因英文或技术词出现就判缺陷"}
+{"file": ".claude/skills/trial/method/novice.md", "hash": "8f6dc3ee0f7b583e", "head": "任务执行耗时由事项提交到最后事件核对，新手段耗时另记"}
+{"file": ".claude/skills/trial/method/records.md", "hash": "d739717f3773dfc6", "head": "脚本不联网、不发布，https 裁决来源仍要由协调者实际读回核对"}
+{"file": ".claude/skills/trial/method/records.md", "hash": "7e67235ca4cbf6d0", "head": "已有记录由专家逐项核对并给下面的行引用"}
+{"file": ".claude/skills/trial/method/records.md", "hash": "549089c8b55c9c57", "head": "脚本不会仅凭文字里出现“已关闭”给出确认，也不会仅凭一个已存在的文件就证明根因成立"}
+{"file": ".claude/skills/verify/SKILL.md", "hash": "6db2dae762b01097", "head": "父工单的验收取自设计说明的「验收」一节，两边不一致时以设计说明为准，并在评论里写明"}
+{"file": ".claude/skills/verify/SKILL.md", "hash": "62fdf9161d3b5d52", "head": "**给结论**：每条只有三种：过了、没过、说不清"}
+{"file": ".claude/skills/verify/SKILL.md", "hash": "9848458ac2721001", "head": "**缝的变化**：这个薄片的父工单都关了时，把总图第四节缝的已定、未定要改的行写进交给总架构师的那条评论（阶段工单或试用"}
+{"file": ".claude/skills/verify/SKILL.md", "hash": "a065bd6d977b6f92", "head": "CI 跑的是已有的测试，未必覆盖这一条标准"}
+{"file": ".claude/skills/verify/SKILL.md", "hash": "c01e852f5fa873a7", "head": "父工单关了，缝的已定、未定没人告诉总架构师"}
+{"file": "AGENTS.md", "hash": "b1adcb2872bf5be2", "head": "角色的做法在技能里：solo 执行者读 `.claude/skills/solo-worker/SKILL.md`，审查"}
+{"file": "AGENTS.md", "hash": "679183842fc2a940", "head": "执行者有日记本，把行动、思考过程与关键状态记录在 `agents_jour/<工单编号>.md` 中（格式见共同规则「文"}
+{"file": "AGENTS.md", "hash": "e07247a868de8e2b", "head": "审查者的记录就是 PR 上的审查，不写日记文件"}
+{"file": "AGENTS.md", "hash": "f550871e08094cab", "head": "请架构师处理：交回的理由见[工作方式](docs/agents/workflow.md)第 4 节 `needs-tri"}
+{"file": "AGENTS.md", "hash": "7323e67788f556d8", "head": "需要谁决定：架构师 / 用户"}
+{"file": "AGENTS.md", "hash": "361f5e25f9df581e", "head": "单元层与模块层全部（包括下面两项固定检查）、客户端的类型检查与单元测试、页面与 wheel 的编译由 CI 在每次推送时"}
+{"file": "AGENTS.md", "hash": "d03800ef665d21b4", "head": "两件同时进行的事谁先谁后，由事件或信号决定，不用时长去赌"}
+{"file": "AGENTS.md", "hash": "7408e357d61721f1", "head": "集成层全部由 CI 在每次合并以后运行（`docs/design/test-pyramid.md`「集成层在每次合并以后"}
+{"file": "AGENTS.md", "hash": "daa6333a634bcd63", "head": "领取、评论、改标签、等 CI、在运行机上跑集成层、读 PR 时，命令见 [issue-tracker.md](docs/"}
+{"file": "AGENTS.md", "hash": "58bd0e17ab84cb51", "head": "设计冲突、规范矛盾、约束无法满足：按共同要求「请架构师处理」交回，`ARCHITECT:` 说明里写出受影响的其他工单"}
+{"file": "CLAUDE.md", "hash": "4d2436e70b8a8402", "head": "solo 执行者与审查者的做法在 `solo-worker`、`reviewer` 技能，共同要求在 `AGENTS.m"}
+{"file": "CLAUDE.md", "hash": "fdd692534c55e40c", "head": "你是架构师，你负责和用户讨论清楚要做的事情，边界，架构设计"}
+{"file": "CLAUDE.md", "hash": "64ec9e5b5f597b71", "head": "你会分层思考，控制复杂度：按职责划分层次与模块，层数和各层名称由系统实际的职责与依赖关系确定，每层写清职责和边界，通过解"}
+{"file": "CLAUDE.md", "hash": "9fcff33f95580225", "head": "你经常会挖掘用户的意图和目的，你有日记本，把你的决策和重要信息记录下来，写入根目录的 `claude_jour.md`"}
+{"file": "CLAUDE.md", "hash": "2376036806ad8da3", "head": "需要实现的内容拆成工单，交给执行者"}
+{"file": "CLAUDE.md", "hash": "aec630e0ccb81610", "head": "子架构师接手工单、模块或里程碑的事时，从 `/next` 进：它读 GitHub 的状态，找到下一件事，交给对应的技能（"}
+{"file": "CLAUDE.md", "hash": "053e0a187dc9df5c", "head": "需要核对阶段达到时由子架构师或架构师循环做"}
+{"file": "CLAUDE.md", "hash": "068da76ca888ace0", "head": "用户在场的会话中，架构师与用户一体，有与用户同等的权限，可以直接修改规则文件（`CLAUDE.md`、`AGENTS.m"}
+{"file": "CLAUDE.md", "hash": "c226fed02a716375", "head": "改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md`"}
+{"file": "CLAUDE.md", "hash": "6d0ecf98eefcd475", "head": "用户平时不写代码、不逐张确认工单、不审也不合 PR"}
+{"file": "CLAUDE.md", "hash": "a394fd584b957f1a", "head": "与子架构师定模块的走向与拆单（`/module-sync`，[skill](.claude/skills/module-"}
+{"file": "CLAUDE.md", "hash": "47775345e214d08f", "head": "每个里程碑或阶段结束时，用户亲自当使用者试用，试用发现的问题与新想法交给架构师（`/trial-intake`，[ski"}
+{"file": "CLAUDE.md", "hash": "c6e744586e509987", "head": "所以要用户决定的只有三类：走向、规则、试用结论"}
+{"file": "CLAUDE.md", "hash": "c2e3775dc38e0600", "head": "用户不逐张批准工单，也不事前批准改内核路径的工单：守内核的是 CI 里的内核测试、内核清单的检查与测试覆盖（[工单规范]"}
+{"file": "CLAUDE.md", "hash": "ecfb259eb143f94c", "head": "总架构师是规则与架构的制定者"}
+{"file": "CLAUDE.md", "hash": "ae62f276be871771", "head": "对用户的新想法，先给出自己的设计与判断，一次说完，只把真正要用户定的一两件事留给用户"}
+{"file": "CLAUDE.md", "hash": "d9a48cab31901d7a", "head": "不把决定逐条推回给用户"}
+{"file": "CLAUDE.md", "hash": "51134b876c7ed5ae", "head": "一次改完：改总图或画面总图时，同一次改动里把复述它的几份一起改到新的样子：本文件「项目表述」、`AGENTS.md`「项"}
+{"file": "CLAUDE.md", "hash": "c2a201fa93f79137", "head": "用户没有以总架构师身份与之对话的架构师会话都是子架构师：架构师循环、用户指定做某条工作线或某个模块的会话、按工单改设计说"}
+{"file": "CLAUDE.md", "hash": "bb0619248a02b05a", "head": "子架构师遵守本文件的全部规则，再加下面几条"}
+{"file": "CLAUDE.md", "hash": "0ec57591b6223249", "head": "子架构师的设计说明、ADR、工单与原型都在总图的范围内：每份设计说明在开头一行写「总图位置」与依据，指明它细化的是哪一节"}
+{"file": "CLAUDE.md", "hash": "9505f99821d6ff5a", "head": "代码里叫什么名字由子架构师定，总图和设计说明都不写代码名"}
+{"file": "CLAUDE.md", "hash": "b1c467ac5ef7ea6d", "head": "solo 范围里交回的工单（标 `needs-triage`，理由见[工作方式](docs/agents/workflo"}
+{"file": "CLAUDE.md", "hash": "4b5f71b817a72ccc", "head": "批判性思维,不要帮用户的方案找理由，想办法证明它是错的"}
+{"file": "CLAUDE.md", "hash": "a306ae42aa8c2831", "head": "假设方案是“为了解决重复请求，引入分布式锁”，此时可以考虑："}
+{"file": "CLAUDE.md", "hash": "5d1059bff6685246", "head": "从单个 agent 到三部门再到子组织，换的只是路由与定义两层，事实与裁决、循环两层不动"}
+{"file": "CLAUDE.md", "hash": "5180c7186db35113", "head": "系统不等它，看得见由页面负责"}
+{"file": "CLAUDE.md", "hash": "e03bc0a30925762f", "head": "`AGENTS.md`：solo 执行者与审查者的规则"}
+{"file": "CLAUDE.md", "hash": "5752f9f7ff2ed175", "head": "`agents_jour/`：执行者与审查者的日记，一张工单一个文件（`agents_jour/<工单编号>.md`），"}
+{"file": "CLAUDE.md", "hash": "7b44b6d9a6ed879c", "head": "只由总架构师改，与总图不一致时以总图为准"}
+{"file": "CLAUDE.md", "hash": "fe312db155304733", "head": "页面原型不带画面，用假数据、能点，交给用户试用，一版接一版"}
+{"file": "CLAUDE.md", "hash": "c914633293db7200", "head": "除非用户指定，不读取"}
+{"file": "CLAUDE.md", "hash": "774fd4db6d122c9b", "head": "要看代码与总图差在哪时（里程碑或阶段结束核对缝立住没有，或用户、总架构师要看），由子架构师走 `/seam-diff`："}
+{"file": "CLAUDE.md", "hash": "0330bc87e2363dcd", "head": "文档、归档与规则文件的清理（改旧说法与失效链接、归档、修规则的失效入口）不开工单，用户在场的架构师直接做，推送 main"}
+{"file": "CLAUDE.md", "hash": "f3d0a50f9b3b74ca", "head": "归档前列出文件清单，经用户确认后用 `git mv` 移动"}
+{"file": "CLAUDE.md", "hash": "9e3aed0061f7acf6", "head": "日记、决策记录与变更记录的归档按固定规则由脚本做，不用逐次确认（共同规则「文档与记录」）"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "1308a0e1fcfa5b11", "head": "适用：执行者写 `DELIVERY:`、审查者写 `REVIEW:`、架构师核对父工单、交给用户试用、关闭里程碑或进入一"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "ebfbc14758215e3d", "head": "solo 执行者实现代码并合并"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "3698d13eeb9a11e7", "head": "提交代码、审查通过、集成通过和真实验收分别记录"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "944e1048b7856bde", "head": "父工单关闭与里程碑关闭时，架构师同步需求与设计索引"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "05ef889213709fbf", "head": "需要架构决定的注明「架构问题」，由架构师更新设计与任务评论"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "105eb5badca67b1f", "head": "证据写在交付说明里（内核 PR 的审查者写在 `REVIEW:` 里），不因为处理工单还没建立而不合并"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "860860518ed2bcff", "head": "处理工单由 solo 执行者（`solo-worker`「main 上的 CI」）或架构师事后建立或核对"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "505b47f168f43c68", "head": "不在批准的审查里留下待架构师决定的验收问题"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "42fed63f72542317", "head": "单元层与模块层全部由 CI 在每次推送时运行"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "d83b71609d129e7b", "head": "执行者与审查者运行与改动相关的测试文件，包括本次改动涉及的集成文件"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "bc1e03d60f580ef0", "head": "集成层全部由 CI 在每次合并以后运行（[测试分层设计说明](../design/test-pyramid.md)「各角"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "a7179d77e379aff8", "head": "新增文件必须登记，测试命令以 `AGENTS.md`「常用命令」为准"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "c3a9611db317c63b", "head": "架构师修改工单前重新读取标签、领取、最新任务评论、PR 与原生依赖"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "e47d8fb50cd0a871", "head": "父工单只由架构师核对后关闭"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "2fb327d7eff24dae", "head": "solo 执行者推送分支、开 PR、核对并合并，子工单随 PR 合并关闭"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "a75e64548e37ab10", "head": "薄片回答的问题有了证据、用户试用过，才关闭"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "2a83c7558503ad50", "head": "顺序：复盘（[`/milestone-retro`](../../.claude/skills/milestone-re"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "69760558d88ace4b", "head": "这几步按 [`/trial-intake`](../../.claude/skills/trial-intake/SKI"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "0505d69700f2dbf3", "head": "用户试用、写关闭评论这两步仍只由用户在场的架构师做"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "53b3b3b183d3c603", "head": "该提交已通过发布前检查并走查过（第 1 节「可以交给用户试用」）"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "8514aa52850e1e80", "head": "**试用结论**："}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "8bf8770ec39d4131", "head": "次数以里程碑工单为准，至少一次"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "1def1cb90d516f74", "head": "**复盘**：用 `/milestone-retro <里程碑标题>`（[复盘 skill](../../.claude"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "d2815a62bdb973a2", "head": "这一行写帖子链接，以及「改动与预期」表里提议、用户确认、否决、已生效各几行"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "b425e9b90ea8bffa", "head": "规则句子与参数的修改要用户确认才生效，没有确认的不阻塞里程碑关闭，架构师交给用户试用时把仍是「提议」的行一并列出"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "d2cf968f0cd93bd3", "head": "每格的验收标准以[系统意图](../requirements/system-intent.md)N-T1 至 N-T5 "}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "fa9d6b49828f2dd4", "head": "用户确认之前，试用工单保持 `ready-for-human`，里程碑保持打开"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "ebee3d039db95edc", "head": "solo 执行者也不关闭它们：「试用通过」只有用户能给"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "6fe8f6d2066e4b34", "head": "用户本人直接关闭了的，关闭评论由架构师下次会话开始时补写"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "5d8cb00a553f12bb", "head": "用户确认以后，用户在场的架构师依次：在试用工单写关闭评论"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "d0e43bc09a530ca1", "head": "** 一个阶段的里程碑关闭时，总架构师按路线图第 5 节该阶段的一列逐格核对 main，每格写「预期 / main 上的"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "9c9c83232d217ba9", "head": "某一项不成立时，这个阶段的工单留在 `waiting`，缺的东西要改代码的补成工单，归在阶段工单下，其余的由总架构师直接"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "22d2769f86a66061", "head": "要在阶段一结束以前放行阶段二的一部分（例如薄片 ①、② 与阶段一并行），总架构师在阶段二的阶段工单「进入包」一节写明是哪"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "8c2c9a4391011a25", "head": "(a) 阶段二的结束核对通过，并且过门：[N-T1 至 N-T5](../requirements/system-int"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "3f3d0da995b737aa", "head": "(e) 用户在阶段工单上确认进入"}
+{"file": "docs/agents/acceptance-evidence.md", "hash": "baaedfe09a299fbc", "head": "(c) 用户在阶段工单上确认进入"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "2015f4411d02503c", "head": "`D:\\codes\\yudao-worktrees\\architect`，不建分支，每次启动前检出 main 的当前提交"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "37514d6ce59c514f", "head": "集成层与架构师循环的 worktree 长期保留，不存在时在主工作区用 `git worktree add --deta"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "9e4695db10fdaae2", "head": "`C:\\project\\yudao-worktrees\\architect`，不建分支，每次启动前检出 main 的当前"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "caad2f48abaa5883", "head": "用户、架构师（包括架构师循环）、solo 执行者、审查子代理"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "9a35acd2a901226d", "head": "solo 执行者只在合并自己范围内的 PR 时使用（`solo-worker` 技能），架构师用它直接推送文档与日记"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "66de98890187aea3", "head": "启动架构师循环（用户不在场时接住 solo 交回的工单、子工单已关闭的父工单、已经达到的薄片，做法见 [`/next`]"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "6557464fc07ac76d", "head": "`gh` 用 `bender2333` 登录的身份）："}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "2e1ab50756c99faa", "head": "平时集成层由 CI 在每次合并以后运行（第 5 节）"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "855d33d26b7e0961", "head": "审查子代理（内核 PR）"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "252f4d151c6d0be4", "head": "修改以后，重新启动 solo 与架构师循环的会话"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "0a72aa52a2afb64b", "head": "定义：`.github/workflows/ci.yml`，由用户在场时的架构师维护，solo 执行者与架构师循环不修改"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "c1de91d4cc0ea1d0", "head": "它不是合并必须通过的检查，PR 上不运行，失败由 solo 执行者按 `solo-worker`「main 上的 CI」"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "327adc1883125701", "head": "第二条命令有输出的，是经豁免合并的 PR：用 `gh pr view <PR 编号> --json body --jq "}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "9d43261dc2be0ebb", "head": "没有输出的，是架构师直接推送的文档与日记（架构师循环的提交作者是 `claude-架构师`）"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "3fea23826e0f8b81", "head": "`/next --循环` 每一轮先读，关着时整轮不做"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "b162f2b979c8a1a6", "head": "用户在场的会话做大的设计修改时改为关，做完改回开"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "2b29c6dd09cc5cee", "head": "2 次，第 3 次直接交给用户"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "3f2f44daee8b1e71", "head": "一个薄片交给用户之前的缺陷修复上限"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "57a692bb75fb4827", "head": "2 轮，第 3 轮连同两轮的证据交给用户"}
+{"file": "docs/agents/autopilot-runtime.md", "hash": "9f73547727a5f204", "head": "各自预算加 1 小时，重跑一次，再失败交给用户"}
+{"file": "docs/agents/design-spec.md", "hash": "533a9a4a554f6d5c", "head": "功能、设计、实现各归各处："}
+{"file": "docs/agents/design-spec.md", "hash": "19a4405153b11bb0", "head": "设计说明里出现的常量（默认值、上限、比例、次数、时长）按下面几条处理："}
+{"file": "docs/agents/issue-tracker.md", "hash": "12013c05224c0cdc", "head": "两个地方各管一样，不合并："}
+{"file": "docs/agents/shared-rules.md", "hash": "091407eaae0fb715", "head": "架构师（`CLAUDE.md`）、执行者与审查者（`AGENTS.md`）共同遵守的内容只写在这里"}
+{"file": "docs/agents/shared-rules.md", "hash": "5f621721c9ff162f", "head": "代码里的名字由设计说明定，总图不写代码名"}
+{"file": "docs/agents/shared-rules.md", "hash": "51205c35adca5738", "head": "除非工单或用户指定，不读取 `docs/archive/`"}
+{"file": "docs/agents/shared-rules.md", "hash": "c1a4aa5bceb32157", "head": "审查者的记录是 PR 上的审查"}
+{"file": "docs/agents/ticket-spec.md", "hash": "8d29323c0be7d433", "head": "三级工单："}
+{"file": "docs/agents/ticket-spec.md", "hash": "901fb5313a0125b0", "head": "清理单："}
+{"file": "docs/agents/ticket-spec.md", "hash": "f29d7ba6c6aa7bbb", "head": "工单写结束条件（验收标准、覆盖要求、要改的清单条目），执行者能不能做哪件事不写在工单里"}
+{"file": "docs/agents/ticket-spec.md", "hash": "4f75dd3289141450", "head": "正文用中文，结构、「依据」「环」「只改」「验收」的格式以 `/to-parents` 与 `/to-children` "}
+{"file": "docs/agents/ticket-spec.md", "hash": "bac5befda5235475", "head": "总图第二节「只由你批准」指运行中的系统改自己的内核，这道环在第二层自举时再立"}
+{"file": "docs/agents/ticket-spec.md", "hash": "6aa51936d919963c", "head": "守着这些行为的用例由执行者随工单删，交付说明逐条列出，架构师事后用 CI「用例变化」对照"}
+{"file": "docs/agents/workflow.md", "hash": "8fa48dd2691cbd38", "head": "开发 Yudao 的流程按 Yudao 自己的结构做：一份事实（GitHub 与 `docs/`），四个循环，边界（角色"}
+{"file": "docs/agents/workflow.md", "hash": "56c2edc55a525dee", "head": "这些由第 1 节「谁改」一列的角色直接改，推送 main，记入 `docs/CHANGELOG.md` 与日记，不起草工"}
+{"file": "docs/agents/workflow.md", "hash": "031a35f824053ab4", "head": "`architecture` 工单不做这些工作，只把要总架构师定的问题交上去：它有标签、看得见、关闭时留下结论，被挡住的"}
+{"file": "docs/agents/workflow.md", "hash": "90fb6e60cf3dfe13", "head": "内循环    子工单 → PR → CI → 合并前核对（内核改动加独立审查）→ 合并          solo 执行"}
+{"file": "docs/agents/workflow.md", "hash": "f6a700e437284b81", "head": "中循环    父工单的子工单全部关闭 → VERDICT → 没过的补成缺口子工单           子架构师或架构师"}
+{"file": "docs/agents/workflow.md", "hash": "613e4512e9c94ddf", "head": "被它挡住的工单由子架构师或架构师循环按 `/triage` 核对后放回"}
+{"file": "docs/agents/workflow.md", "hash": "4ec4dd42dc6451a8", "head": "改到可信内核代码的 PR（内核清单 `harness/definitions/kernel-manifest.json`"}
+{"file": "docs/agents/workflow.md", "hash": "36e8584399eadb56", "head": "其余 PR 由 solo 执行者按 `solo-worker` 技能的合并前核对自己合并"}
+{"file": "docs/agents/workflow.md", "hash": "a26e43a03c723e2a", "head": "CI 绿了就当验收过了"}
+{"file": "docs/agents/workflow.md", "hash": "219235deaef1c9a1", "head": "试用工单关了没有用户确认"}
+{"file": "docs/agents/workflow.md", "hash": "c732f50be901db7d", "head": "规则事实指谁做、只由谁、谁不、是不是清单一员、以谁为准、在场可否、交给、穷尽清单这几类话"}
+{"file": "docs/agents/workflow.md", "hash": "ea87d3f44a45cf0b", "head": "只由谁"}
+{"file": "docs/agents/workflow.md", "hash": "d78e8ad57217d6c1", "head": "以谁为准"}
+{"file": "docs/agents/workflow.md", "hash": "9a67238fffd2d951", "head": "「以谁为准」只对规则的载体，数据与运行状态的优先级是流程，不算规则事实"}
+{"file": "docs/agents/workflow.md", "hash": "8a6efa78c87851fb", "head": "用户只有定与确认两个动词"}
+{"file": ".claude/skills/triage/SKILL.md", "hash": "06d3e5538a0e1f6a", "head": "| 要改规则 | 规则由总架构师改，用户不在场时架构师循环直接改并记录（[工作方式](../../../docs/age"}
+{"file": "CLAUDE.md", "hash": "1dbd8204dd21353e", "head": "薄片达到的核对由子架构师或架构师循环做"}
+{"file": "CLAUDE.md", "hash": "b7fa20852c446e9f", "head": "阶段的结束核对由总架构师做"}
+{"file": "CLAUDE.md", "hash": "1c60c8dd6a7394f5", "head": "与子架构师定模块的走向与拆单（`/module-sync`，[skill](.claude/skills/module-"}
+{"file": "CLAUDE.md", "hash": "48079e7aee3548f2", "head": "文档、归档与规则文件的清理（改旧说法与失效链接、归档、修规则的失效入口）不开工单，架构师直接做（用户不在场时架构师循环也"}

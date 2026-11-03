@@ -130,9 +130,9 @@ def test_check_command_runs_for_real_exits_zero_and_prints_every_section(rf_repo
     # 解析成功按句式分、附注
     m = re.search(r"解析成功 (\d+) 句（由谁 (\d+)，只由谁 (\d+)，谁不 (\d+)，清单一员 (\d+)，以谁为准 (\d+)，在场可否 (\d+)，交给 (\d+)，穷尽清单 (\d+)）；附注 (\d+) 条", out)
     assert m and int(m.group(1)) == sum(int(x) for x in m.groups()[1:9]) == len(lines())  # 一句一行，每句都解析成功
-    # 解析不了的候选数 = 候选 − 解析成功 − 纯指路；前 20 条
-    m = re.search(r"== 像在说规则但解析不了：(\d+) 条（候选 (\d+) − 解析成功 (\d+) − 纯指路 (\d+)），前 (\d+) 条", out)
-    assert m and int(m.group(1)) == int(m.group(2)) - int(m.group(3)) - int(m.group(4)) and int(m.group(5)) == min(20, int(m.group(1)))
+    # 解析不了的候选数 = 候选 − 解析成功 − 纯指路 = 基线 + 新；没有基线时全是新的，只列新的前 20 条
+    m = re.search(r"== 像在说规则但解析不了：基线 (\d+) 条，新 (\d+) 条（候选 (\d+) − 解析成功 (\d+) − 纯指路 (\d+)），只列新的，前 (\d+) 条", out)
+    assert m and int(m.group(1)) == 0 and int(m.group(2)) == int(m.group(3)) - int(m.group(4)) - int(m.group(5)) and int(m.group(6)) == min(20, int(m.group(2)))
 
 
 def test_unparsed_candidates_are_counted_and_only_the_first_twenty_are_listed(rf_repo):
@@ -143,7 +143,7 @@ def test_unparsed_candidates_are_counted_and_only_the_first_twenty_are_listed(rf
     rc, out = rf_repo.cli("rules", "check")
     out = out.replace("\r\n", "\n")
     tail = out.split("== 像在说规则但解析不了：")[1].split("\n")
-    assert tail[0].startswith(f"{len(chk.unparsed())} 条") and f"前 20 条" in tail[0]
+    assert tail[0].startswith(f"基线 0 条，新 {len(chk.unparsed())} 条") and f"前 20 条" in tail[0]
     assert sum(1 for ln in tail[1:] if ln.strip()) == 20
 
 

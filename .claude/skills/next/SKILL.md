@@ -15,14 +15,15 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 
 ## 两种用法的权限
 
-| | 用户在场 | 用户不在场（`--循环`） |
-| --- | --- | --- |
-| 意图（目的、判据、基础规则的意思；判据含评价标准：评测的隐藏检查、参考解法、评分器、发布检查）与总图 | 可以改，用户定了以后总架构师改，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 不改；开一张 `architecture` 工单写清要定什么，相关工单标 `ready-for-human` |
-| 其余规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`、技能）、CI 工作流 | 可以改，改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 可以改，同样记入，日记里写明用户不在场；一次改完复述它的几处，跑 `tools/doc-consistency` 的 `check` |
-| 设计说明、ADR、需求记录（不改用户已确认的需求与验收标准）、`CONTEXT.md`、原型；工单正文、子工单、依赖、评论 | 可以 | 可以，直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md` |
-| 里程碑：建、关、改名 | 总架构师 | 不做；拆出的子工单沿用原工单的里程碑 |
-| 关闭试用工单与里程碑 | 用户确认以后，按[验收证据规则](../../../docs/agents/acceptance-evidence.md)「试用工单与里程碑的关闭」 | 不做，不写「试用通过」 |
-| `harness/` 的代码与测试 | 不改，拆成工单 | 不改 |
+两种用法的权限表见[工作方式](../../../docs/agents/workflow.md)第 9 节，谁改什么见第 1 节。用户不在场（`--循环`）时具体这样做。
+
+- 用户不在场时架构师循环不可以改意图（目的、判据、基础规则的意思，判据含评价标准：评测的隐藏检查、参考解法、评分器、发布检查）。开一张 `architecture` 工单写清要定什么，相关工单标 `ready-for-human`。
+- 总图只由总架构师改，架构师循环不改总图。
+- 用户不在场时架构师循环可以改其余规则、CI 工作流（规则文件是 `CLAUDE.md`、`AGENTS.md`、`docs/agents/`、技能）。同样记入 `docs/CHANGELOG.md` 与 `claude_jour.md`，日记里写明用户不在场；一次改完复述它的几处，跑 `tools/doc-consistency` 的 `check`。
+- 用户不在场时架构师循环可以改设计说明、拆单、分诊、验收、试用准备。设计说明、ADR、需求记录（不改用户已确认的需求与验收标准）、`CONTEXT.md`、原型，以及工单正文、子工单、依赖、评论，都直接改、直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md`。
+- 阶段工单与里程碑（建、关、改名）只由总架构师改。拆出的子工单沿用原工单的里程碑。
+- 用户不在场时架构师循环不可以关闭试用工单与里程碑，不写「试用通过」。用户在场时的做法见[验收证据规则](../../../docs/agents/acceptance-evidence.md)「试用工单与里程碑的关闭」。
+- 架构师不改 `harness/` 的代码与测试，要改的拆成工单。
 
 不在场时提交作者是 `claude-架构师`，工单与 PR 评论最后一行写 `— claude-架构师`。仓库是公开的，只采信用户、执行者与架构师的评论。
 

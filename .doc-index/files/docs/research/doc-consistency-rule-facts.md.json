@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"docs/research/doc-consistency-rule-facts.md",
-"hash":"3266d700b07bd452",
+"hash":"19aee6681c333a13",
 "nodes":[
-{"hash":"3266d700b07bd452","id":"docs/research/doc-consistency-rule-facts.md","kind":"file","title":"docs/research/doc-consistency-rule-facts.md"},
-{"hash":"ec35bbfca222865b","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md","title":"文档一致性：规则事实线方案"},
+{"hash":"19aee6681c333a13","id":"docs/research/doc-consistency-rule-facts.md","kind":"file","title":"docs/research/doc-consistency-rule-facts.md"},
+{"hash":"82e9b2edebae5d2b","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md","title":"文档一致性：规则事实线方案"},
 {"hash":"effb8e7884835eb8","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 1. 结论","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","title":"1. 结论"},
 {"hash":"04cd04dd6153a569","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 2. 两条线怎么分","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","title":"2. 两条线怎么分"},
 {"hash":"23f7f8b58b150ac0","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 2. 两条线怎么分 > 固定句式只管第一条线","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 2. 两条线怎么分","title":"固定句式只管第一条线"},
@@ -15,7 +15,7 @@
 {"hash":"f7778befa003fab6","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线 > 3.3 规则","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线","title":"3.3 规则"},
 {"hash":"73b6efad77bf0e2c","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线 > 3.4 提醒","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线","title":"3.4 提醒"},
 {"hash":"bd17458c36014acf","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线 > 3.5 一页图","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线","title":"3.5 一页图"},
-{"hash":"20d6821d0646b2f1","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 4. 步骤","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","title":"4. 步骤"},
+{"hash":"16d8e5a5fefdd831","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 4. 步骤","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","title":"4. 步骤"},
 {"hash":"b144de7ecca8079c","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 5. 验收","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","title":"5. 验收"},
 {"hash":"4d8f5864ca56f7ab","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 6. 已定与待定","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","title":"6. 已定与待定"},
 {"hash":"cdc0246852a76f27","id":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 7. 为什么走这条路：写法评审","kind":"section","parent":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案","title":"7. 为什么走这条路：写法评审"},
@@ -32,7 +32,7 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"eb28b96ab4232c74","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线 > 3.1 正本：每条事实只归一张表的一列"},
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 3. 规则事实线 > 3.4 提醒"},
 {"dst":".claude/settings.json","kind":"code-path","raws":[".claude/settings.json"],"seen":"91ab181a1e3d76bc","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 4. 步骤"},
-{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ecb0cd6f5e5bc94f","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 4. 步骤"},
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"e06a0c8dfa9cdec4","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 4. 步骤"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ecb0cd6f5e5bc94f","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 6. 已定与待定"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"3ba70042e926ad1b","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 7. 为什么走这条路：写法评审 > 比过的路线"},
 {"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"docs/research/doc-consistency-rule-facts.md#文档一致性：规则事实线方案 > 7. 为什么走这条路：写法评审 > 规则类句子有多少"}
