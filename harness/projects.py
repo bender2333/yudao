@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .definitions import DEFINITIONS
+from .definitions import DEFAULT_FORM, DEFINITIONS
 from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .kernel_events import canonical_hash
@@ -969,7 +969,7 @@ class ProjectService:
         title = work_item_title(text) if title is None else title
         # 事项创建时冻结项目当时的形态（工单 #1392）：创建事件记下形态名与它的定义版本，之后这个事项的
         # 写入核对、路由、装配与执行都按这一份定义。没有给 form 时取项目现在的形态（没有设过时是三部门）
-        frozen_form = self.orchestrator.form_named(form or project.form_name)
+        frozen_form = self.orchestrator.require_form(form or project.form_name)
         definitions = frozen_form.definitions
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
         prompt_config_versions = {department: project.department_settings[department].version
@@ -1048,7 +1048,7 @@ class ProjectService:
                 # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
                 # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
                 mcp_servers=item.mcp_servers,
-                form=item.form,
+                form=item.form if item.form in self.orchestrator.forms else None,
             )
 
         created = self.writes.transact(project_stream(run.project_id), restart, command=command)
@@ -1090,7 +1090,7 @@ class ProjectService:
             # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
             # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
             mcp_servers=item.mcp_servers,
-            form=item.form,
+            form=item.form if item.form in self.orchestrator.forms else None,
         )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
@@ -1234,7 +1234,10 @@ class ProjectService:
                 item_definitions_version = frozen_versions.get(item.run_id, "")
                 # 事项冻结的形态（工单 #1392）：补建时版本按那一份核，与当前不同时不补建，交给定义版本
                 # 差异的恢复决定处理；同一版本时按事项记录自动补建
-                form = self.orchestrator.form_named(item.form)
+                form = self.orchestrator.forms.get(item.form or DEFAULT_FORM)
+                if form is None:
+                    # 事项冻结的形态已经不在发布里（项目的组织设计说明「冻结与升级」）：不补建，保留事项记录
+                    continue
                 if item_definitions_version and item_definitions_version != form.definitions.version:
                     continue
                 snapshot = item.snapshot

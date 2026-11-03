@@ -7,9 +7,9 @@
 这份用例用测试目录里的任务池定义当第二份形态（它不进产品）：发布的那一份与它各跑完一个事项，各按自己
 冻结的定义核对停止原因与部门；改形态只影响之后新建的事项；重开数据目录以后按记下的那一份接着跑。
 
-层：模块层（一个实例、真实事件库、真实工作区与假模型）。守 R2（骨架事件与对外合同只增：新的项目流事件
-在服务端合同与客户端夹具两端登记）与 R3（形态随事项冻结：换一份定义就换形态，看得见、能撤回，事项按创建
-时那一份运行）。
+层：集成层（第一、二、三条用例各跑完整的三部门或任务池循环、真实事件库、真实工作区与假模型）。守 R2
+（骨架事件与对外合同只增：新的项目流事件在服务端合同与客户端夹具两端登记）与 R3（形态随事项冻结：换一份
+定义就换形态，看得见、能撤回，事项按创建时那一份运行）。
 
 先后由事件决定，不用时长赌（测试分层设计说明第 10 节第 7 条）：两个事项一个跑完再建下一个，脚本按部门
 给出；任务池那一份定义与装配只在测试里用，产品代码不导入它们。
@@ -20,6 +20,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any
+
+import pytest
 
 from harness.adapters.fake import FakeAdapter
 from harness.app.contracts import EVENT_TYPES
@@ -189,6 +191,20 @@ def test_a_restarted_instance_resumes_an_item_with_the_form_it_was_created_with(
     assert ended.stop_reason == second_routing.ITEM_END_REASON
     assert _departments(second, run_id) == set(second_routing.DEFINITIONS.departments)
     second.close()
+
+
+def test_a_new_item_is_rejected_when_the_project_form_is_not_in_the_release(tmp_path):
+    # 发布里没有那一份形态（项目的组织设计说明「冻结与升级」）：新建事项被拒绝，说明写明原因与可选的形态，
+    # 不写事项、不开始 run；已经冻结了那一份的旧事项靠自己记下的定义跑，不受影响
+    system = _system(tmp_path / "loop", _three_departments_script(), resume_on_startup=False)
+    project_id = system.projects.register("未知形态", GOAL)
+    _set_form(system, project_id, DEFAULT_FORM, "form_from_a_newer_release")
+
+    with pytest.raises(ValueError, match="unknown form 'form_from_a_newer_release'") as raised:
+        system.projects.start_work_item(project_id, "不该开始的事项")
+    assert DEFAULT_FORM in str(raised.value)
+    assert system.projects.projection(project_id).work_items == []
+    system.close()
 
 
 def test_the_new_project_event_is_registered_on_both_ends():

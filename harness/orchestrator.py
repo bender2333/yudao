@@ -281,6 +281,8 @@ class Orchestrator:
         self._forms.setdefault(DEFAULT_FORM, Form(DEFAULT_FORM, self._definitions, routing, tightening))
         for form in self._forms.values():
             routing_contract.accept(form.routing)
+        # 实例加载的具名形态（工单 #1392）：新建事项按项目现在的形态取，发布里没有那一份时拒绝
+        self.forms: dict[str, Form] = self._forms
         # 事项定义副本（工单 #1175）：按 run_created 里冻结的 MCP 设置叠加一次，按 run 记住
         self._item_definitions: dict[str, Any] = {}
         # 事项冻结的形态（工单 #1392）：按 run 记住，取自 run_created 里记下的形态名
@@ -1160,8 +1162,18 @@ class Orchestrator:
         return definitions
 
     def form_named(self, name: str | None) -> Form:
-        # 名字对应的形态：没有给或没有这个名字（旧事件、发布里已经没有的那一份）时用默认的那一份
+        # 名字对应的形态：没有给或没有这个名字（旧事件、发布里已经没有的那一份）时用默认的那一份。
+        # 只给读旧事实用；新建事项要走 require_form，发布里没有那一份时拒绝
         return self._forms.get(name or DEFAULT_FORM) or self._forms[DEFAULT_FORM]
+
+    def require_form(self, name: str | None) -> Form:
+        # 名字对应的形态；发布里没有这一份时失败，说明写明可选的形态（工单 #1392，项目的组织设计说明
+        # 「冻结与升级」：形态已经不在发布里时，新建事项被拒绝并给同样的原因）
+        form = self._forms.get(name or DEFAULT_FORM)
+        if form is None:
+            raise ValueError(
+                f"unknown form {name!r}: the release loads {sorted(self._forms)}")
+        return form
 
     def item_form(self, run_id: str) -> Form:
         # 这个事项创建时冻结的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：
