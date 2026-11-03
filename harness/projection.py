@@ -15,7 +15,7 @@ from .event_store import (
     EventStore, SavedDecision, SavedProjection, dump_decision, load_decision, load_decisions, run_stream,
 )
 from .kernel_events import (
-    StreamHandler, apply_decision_event, replay_decisions,
+    StreamHandler, accepted, apply_decision_event, replay_decisions,
 )
 from .models import (
     CatalogEventType,
@@ -68,7 +68,7 @@ class RunHandler:
 
     def replay(self, stream: str, events: list[Event]) -> RunProjection:
         state = RunProjection()
-        for event in events:
+        for event in accepted(events):
             apply_event(state, event)
         _settle_run_state(state)
         return state
@@ -98,7 +98,7 @@ def replay_run(store: EventStore, run_id: str, *, through: int | None = None) ->
 
 def replay_events(events: list[Event]) -> RunProjection:
     state = RunProjection()
-    for event in events:
+    for event in accepted(events):
         apply_event(state, event)
     _settle_run_state(state)
     return state

@@ -10594,6 +10594,91 @@ export type DepartmentSettingsConfiguredPayload = {
 };
 
 /**
+ * DispatchNumberAcquiredEvent
+ */
+export type DispatchNumberAcquiredEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'dispatch_number_acquired';
+    payload: DispatchNumberAcquiredPayload;
+};
+
+/**
+ * DispatchNumberAcquiredPayload
+ */
+export type DispatchNumberAcquiredPayload = {
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Cycle
+     */
+    cycle: number;
+};
+
+/**
  * FailureObservation
  */
 export type FailureObservation = {
@@ -19177,6 +19262,8 @@ export type EventObject = ({
 } & DepartmentGuidanceRespondedEvent) | ({
     type: 'department_activated';
 } & DepartmentActivatedEvent) | ({
+    type: 'dispatch_number_acquired';
+} & DispatchNumberAcquiredEvent) | ({
     type: 'department_input';
 } & DepartmentInputEvent) | ({
     type: 'tool_call_required';

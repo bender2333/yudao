@@ -635,7 +635,8 @@ class StepRecorder:
         if not drafts:
             return []
         return self._writes.transact(run_stream(self.scope.run_id),
-                                     lambda transaction: self._record_in(transaction, *drafts))
+                                     lambda transaction: self._record_in(transaction, *drafts),
+                                     dispatch_number=self.scope.dispatch_number or None)
 
     @staticmethod
     def _record_in(transaction: Transaction, *drafts: Draft) -> list[Event]:

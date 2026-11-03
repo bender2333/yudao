@@ -403,6 +403,12 @@ class DepartmentActivatedPayload(Versions, WorkBasis):
     guidance_version: int
 
 
+class DispatchNumberAcquiredPayload(Payload):
+    # 开始一轮工作时取得派发编号（工单 #1397）：编号本身在事件信封上，载荷只写这一轮是谁、第几个周期
+    activation_id: str
+    cycle: int
+
+
 class DepartmentInputPayload(Versions, WorkBasis):
     activation_id: str
     step_id: int
@@ -1776,6 +1782,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.DEPARTMENT_GUIDANCE_APPLIED: DepartmentGuidanceAppliedPayload,
     EventType.DEPARTMENT_GUIDANCE_RESPONDED: DepartmentGuidanceRespondedPayload,
     EventType.DEPARTMENT_ACTIVATED: DepartmentActivatedPayload,
+    EventType.DISPATCH_NUMBER_ACQUIRED: DispatchNumberAcquiredPayload,
     EventType.DEPARTMENT_INPUT: DepartmentInputPayload,
     EventType.TOOL_CALL_REQUIRED: ToolCallRequiredPayload,
     EventType.ACTIVATION_FINISHED: ActivationFinishedPayload,

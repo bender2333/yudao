@@ -23544,6 +23544,170 @@
         "title": "DepartmentSettingsConfiguredPayload",
         "type": "object"
       },
+      "DispatchNumberAcquiredEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "dispatch_number_acquired",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/DispatchNumberAcquiredPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "DispatchNumberAcquiredEvent",
+        "type": "object"
+      },
+      "DispatchNumberAcquiredPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "activation_id": {
+            "title": "Activation Id",
+            "type": "string"
+          },
+          "cycle": {
+            "title": "Cycle",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "activation_id",
+          "cycle"
+        ],
+        "title": "DispatchNumberAcquiredPayload",
+        "type": "object"
+      },
       "FailureObservation": {
         "additionalProperties": false,
         "properties": {
@@ -40535,6 +40699,7 @@
             "department_guidance_responded": "#/components/schemas/DepartmentGuidanceRespondedEvent",
             "department_input": "#/components/schemas/DepartmentInputEvent",
             "department_prompt_configured": "#/components/schemas/DepartmentPromptConfiguredEvent",
+            "dispatch_number_acquired": "#/components/schemas/DispatchNumberAcquiredEvent",
             "home_seen": "#/components/schemas/HomeSeenEvent",
             "independent_judgement_committed": "#/components/schemas/IndependentJudgementCommittedEvent",
             "initial_prd_proposed": "#/components/schemas/InitialPrdProposedEvent",
@@ -40623,6 +40788,9 @@
           },
           {
             "$ref": "#/components/schemas/DepartmentActivatedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/DispatchNumberAcquiredEvent"
           },
           {
             "$ref": "#/components/schemas/DepartmentInputEvent"

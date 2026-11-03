@@ -177,6 +177,7 @@ export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
   decision_answered: "决定有回答",
   decision_requested: "提出决定",
   decision_withdrawn: "撤回决定",
+  dispatch_number_acquired: "取得派发编号",
   deliverable_adopted: "交付物被采纳",
   delivery_accepted: "交付被采纳",
   department_activated: "部门开始一轮工作",
