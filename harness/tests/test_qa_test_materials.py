@@ -8,8 +8,9 @@ import json
 import sys
 from pathlib import Path
 
-from harness.actions import Action
+from harness.actions import Action, ActionReceipt
 from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.environment import LocalEnvironment
 from harness.models import ArtifactRef, EventType, json_dumps
 from harness.path_rules import QA_TESTS_DIR
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
@@ -18,6 +19,7 @@ from harness.public_tree import capture_public_tree
 from harness.runtime import LoopSystem
 from harness.tree_archive import artifact_run, load_tree
 from harness.watched_outputs import has_new_work
+from harness.workspace import Workspace
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 
@@ -229,7 +231,7 @@ def test_qa_tests_dir_excluded_from_public_tree_and_delivery_and_engineering(tmp
     )
     receipt = asyncio.run(env.perform(write_act))
     assert receipt.status == "failed"
-    assert "质检的测试材料" in str(receipt.error)
+    assert "这是检查材料" in str(receipt.error)
 
     read_act = Action(
         action_id="act-2", kind="read", tool="read_file", department="engineering",
@@ -237,7 +239,7 @@ def test_qa_tests_dir_excluded_from_public_tree_and_delivery_and_engineering(tmp
     )
     receipt = asyncio.run(env.perform(read_act))
     assert receipt.status == "failed"
-    assert "质检的测试材料" in str(receipt.error)
+    assert "这是检查材料" in str(receipt.error)
 
 
 def test_qa_write_outside_the_test_materials_is_denied(tmp_path: Path) -> None:
@@ -271,8 +273,10 @@ def test_qa_write_outside_the_test_materials_is_denied(tmp_path: Path) -> None:
                    if e.type == EventType.TOOL_CALLED and (e.payload or {}).get("id") == "qa-write-outside")
     assert outside.department == "quality"
     assert outside.payload["ok"] is False
-    # 拒绝原因说明质检只能写测试材料目录
-    assert QA_TESTS_DIR in outside.payload["error"] and "quality" in outside.payload["error"]
+    # 拒绝原因写明检查材料的目录，不写部门名（工单 #1390：按写入范围判，不按部门名）
+    assert QA_TESTS_DIR in outside.payload["error"]
+    for department in ("product", "engineering", "quality"):
+        assert department not in outside.payload["error"]
     assert not any(e.type == EventType.TOOL_STARTED and e.payload.get("id") == "qa-write-outside" for e in events)
     # 写测试材料目录里的路径照常执行：这一次拒绝只针对目录以外的路径
     inside = next(e for e in events
@@ -358,3 +362,33 @@ def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_reru
     rerun = next(e for e in events_final if e.type == EventType.TOOL_CALLED and (e.payload or {}).get("id") == "qa-check-2")
     output = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**rerun.payload["output_ref"])))
     assert "V2" in output.get("summary", "")
+
+
+def test_a_check_copy_carries_the_check_materials_of_the_role_that_declares_them(tmp_path: Path) -> None:
+    # 验收第 2 条（工单 #1390）：检查副本按角色的写入范围带上检查材料。写入范围是检查材料的角色在副本里看得到
+    # 自己的材料（换个名字的核验角色得到同一种待遇），别的角色看不到。角色与目录由定义声明，
+    # 声明读数的核对在 test_roles_by_declaration.py，这里直接给执行环境那份声明的结果
+    verifier = "inspection"
+    material = f"{QA_TESTS_DIR}/test_smoke.py"
+    workspace = Workspace(tmp_path / "run")
+    workspace.write_file(material, "import sys\nprint('MATERIAL_IN_THE_COPY')\nsys.exit(0)\n")
+    declared = {verifier: (QA_TESTS_DIR,)}
+
+    def check(identity: str, department: str) -> ActionReceipt:
+        return asyncio.run(LocalEnvironment(workspace, check_materials=declared).perform(Action(
+            action_id=identity, kind="check", tool="run_check", department=department,
+            input={"name": "materials", "command": f'"{_python()}" {material}'})))
+
+    # 写入范围是检查材料的角色：副本里有它的材料，检查跑起来、输出里是这份材料打的字
+    theirs = check("act-1", verifier)
+    assert theirs.status == "completed", theirs.error
+    assert "MATERIAL_IN_THE_COPY" in theirs.output["summary"]
+    # 别的角色：副本里没有这份材料，同一条命令跑不起来（退出码不是 0）
+    other = check("act-2", "engineering")
+    assert other.output["exit_code"] != 0, other.output["summary"]
+    # 不交声明时按当前加载的定义：默认定义里是质检，别的角色同样看不到
+    default = asyncio.run(LocalEnvironment(workspace).perform(Action(
+        action_id="act-3", kind="check", tool="run_check", department="engineering",
+        input={"name": "materials", "command": f'"{_python()}" {material}'})))
+    assert default.output["exit_code"] != 0, default.output["summary"]
+

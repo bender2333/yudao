@@ -44,7 +44,7 @@ from .mcp_session import MCP_DISPATCH_TOOL, McpOutcome, McpRefused, UnknownToolA
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
-from .path_rules import QA_TESTS_DIR, TreeError
+from .path_rules import CHECK_MATERIALS_DIR, QA_TESTS_DIR, TreeError  # QA_TESTS_DIR 是旧名，demo.py 还从这里取
 from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
 from .tools import tool_action
@@ -169,6 +169,14 @@ def delivery_inspecting_departments(definitions: Any = None) -> frozenset[str]:
                      if DELIVERY_WATCHED in definitions.watched_outputs(department))
 
 
+def check_material_paths(definitions: Any = None) -> dict[str, tuple[str, ...]]:
+    # 写入范围是检查材料的角色与它们能写的目录（设计说明第 4.2 节第 1 条，工单 #1390）：由定义声明，
+    # 代码里没有部门名；保存检查材料、把检查材料放进检查副本、拒绝别的角色写这些目录，都按它判
+    definitions = DEFINITIONS if definitions is None else definitions
+    scopes = {department: definitions.write_scope(department) for department in definitions.departments}
+    return {role: scope.paths for role, scope in scopes.items() if scope.scope == "check_materials"}
+
+
 @dataclass(frozen=True)
 class RoundWorkspace:
     # 一轮工作的会话用哪份工作区：这一轮的身份（检查回执要绑定的激活）、依据的合同，
@@ -211,6 +219,8 @@ class Workspaces:
         self._check_timeout = check_timeout or (lambda run_id: DEFINITIONS.rule_value("check_timeout_sec"))
         self.handing_over = handing_over_departments(definitions)
         self.delivery_inspecting = delivery_inspecting_departments(definitions)
+        # 写入范围是检查材料的角色与它们能写的目录（工单 #1390）：由定义声明，检查副本按它带上这些目录
+        self.check_materials = check_material_paths(definitions)
         # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
         self._source: dict[tuple[str, str], str | None] = {}
 
@@ -233,6 +243,7 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
+            check_materials=self.check_materials,
         )
 
     # ---- 会话用哪份工作区 ----
@@ -284,6 +295,7 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
+            check_materials=self.check_materials,
         )
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
@@ -359,6 +371,7 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
+            check_materials=self.check_materials,
         )
         if department in self.delivery_inspecting:
             ref = projection.qa_tests_archive_ref
@@ -736,11 +749,19 @@ class LocalEnvironment:
         run_id: str | None = None,
         parameters: Mapping[str, Any] | None = None,
         mcp_sessions: Any | None = None,
+        check_materials: Mapping[str, tuple[str, ...]] | None = None,
     ) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
         self._jobs = jobs
         self._session_id = session_id
+        # 写入范围是检查材料的角色与它们能写的目录（工单 #1390）：调用方交的是这个事项所用的那份定义
+        # 推出的结果，没有交时是当前加载的那份定义
+        self._check_materials = dict(check_material_paths() if check_materials is None else check_materials)
+        self._material_dirs = {directory for paths in self._check_materials.values() for directory in paths}
+        # 这个 run 的检查材料目录：定义声明的第一个目录，没有声明时是旧定义的那一个
+        self._materials_dir = next((paths[0] for paths in self._check_materials.values() if paths),
+                                   CHECK_MATERIALS_DIR)
         # 这个 run 的外部来源工件：read_external_source 只读这个 run 的工件库
         self._artifacts = artifacts
         self._run_id = run_id
@@ -780,13 +801,15 @@ class LocalEnvironment:
         run_id: str | None = None,
         parameters: Mapping[str, Any] | None = None,
         mcp_sessions: Any | None = None,
+        check_materials: Mapping[str, tuple[str, ...]] | None = None,
     ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
             Path(root).parent.mkdir(parents=True, exist_ok=True)
             materialize_tree(tree, root)
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
-                   artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions)
+                   artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions,
+                   check_materials=check_materials)
 
     @classmethod
     def open(
@@ -800,10 +823,12 @@ class LocalEnvironment:
         run_id: str | None = None,
         parameters: Mapping[str, Any] | None = None,
         mcp_sessions: Any | None = None,
+        check_materials: Mapping[str, tuple[str, ...]] | None = None,
     ) -> LocalEnvironment:
         # 打开已经建立的工作区
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
-                   artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions)
+                   artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions,
+                   check_materials=check_materials)
 
     def _limit(self, name: str, default: Any) -> Any:
         # 这个 run 冻结的参数取值；没有冻结字典时用定义文件里的初始值（工单 #1189）
@@ -827,7 +852,7 @@ class LocalEnvironment:
             raise TreeError("Public tree does not match the complete recorded manifest")
 
     def capture_qa_tests(self) -> CapturedTree:
-        qa_dir = self.workspace.root / QA_TESTS_DIR
+        qa_dir = self.workspace.root / self._materials_dir
         if qa_dir.is_dir():
             return capture_public_tree(qa_dir)
         return CapturedTree((), ())
@@ -836,7 +861,7 @@ class LocalEnvironment:
 
 
     def place_qa_tests(self, tree: CapturedTree | None) -> None:
-        qa_dir = self.workspace.root / QA_TESTS_DIR
+        qa_dir = self.workspace.root / self._materials_dir
         if tree is not None:
             materialize_tree(tree, qa_dir)
         else:
@@ -864,12 +889,13 @@ class LocalEnvironment:
                 raise ValueError(f"{action.tool} is not a {action.kind} action")
         else:
             handler = None
-        if action.department != "quality" and action.tool in self._handlers:
+        if action.department not in self._check_materials and action.tool in self._handlers:
+            # 检查材料目录只由写入范围是检查材料的角色读写（工单 #1390）：别的角色连读都拒绝
             for key in ("path", "source", "destination", "prefix"):
                 val = action.input.get(key)
-                if isinstance(val, str) and (val.replace("\\", "/").strip("/").split("/")[0] == QA_TESTS_DIR):
+                if isinstance(val, str) and (val.replace("\\", "/").strip("/").split("/")[0] in self._material_dirs):
                     return ActionReceipt(action_id=action.action_id, status="failed",
-                                         error=f"拒绝访问 {val}：这是质检的测试材料")
+                                         error=f"拒绝访问 {val}：这是检查材料")
         stop = asyncio.Event()
         with self._lock:
             if action.action_id in self._cancelled:
@@ -1441,10 +1467,12 @@ class LocalEnvironment:
         snapshot = self.workspace.snapshot()
         original_digest = snapshot.digest
         with self.workspace.check_copy(snapshot.tree) as copy_root:
-            if action.department == "quality":
-                qa_source = self.workspace.root / QA_TESTS_DIR
-                if qa_source.exists():
-                    shutil.copytree(qa_source, copy_root / QA_TESTS_DIR, dirs_exist_ok=True)
+            # 检查副本里带上这个角色声明的那几个检查材料目录（工单 #1390）：写入范围是检查材料的角色
+            # 才在副本里看得到自己的材料
+            for directory in self._check_materials.get(action.department, ()):
+                source = self.workspace.root / directory
+                if source.exists():
+                    shutil.copytree(source, copy_root / directory, dirs_exist_ok=True)
             finished = await _run_process(
                 [_resolve_bash(), "-c", command], copy_root,
                 {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
@@ -1483,7 +1511,8 @@ class LocalEnvironment:
                 f"host-executed command={command} exit={exit_code}\n{output}".strip()
             )
             qa_tests_hash = None
-            if action.department == "quality":
+            if action.department in self._check_materials:
+                # 检查回执绑定这一刻的检查材料摘要（设计说明第 4.2 节第 2 条）：只有写检查材料的角色有
                 qa_tests_hash = qa_tests_digest(self.capture_qa_tests())
             receipt = self.workspace.record_check(
                 action.department,

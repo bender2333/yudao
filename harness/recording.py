@@ -15,10 +15,11 @@ from typing import Any
 from .adapters.base import ModelRequest, ProviderError
 from .artifacts import ArtifactStore
 from .assembly import CompactionResult, StepRequest
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, Definitions
 from .event_store import run_stream
 # 激活的范围（身份、版本与工作依据）是执行契约的输入，定义在契约模块里；这里照旧导出同一个名字
 from .execution_contract import ActivationScope
+from .tools import in_force, writes_check_materials
 from .write_path import NewEvent, Transaction, WritePath
 from .models import Event, EventType, Usage, canonical_hash, json_dumps, utc_now
 from .providers.call import ModelResponse, ModelStreamEvent
@@ -162,11 +163,13 @@ def _duration_ms(request: ModelRequest) -> int | None:
 class StepRecorder:
     # 一次激活的记录接口；也持有记录需要的累计状态：用量计费、每次调用尝试的采集、观察的去重与部门的发言
     def __init__(self, writes: WritePath, artifacts: ArtifactStore, scope: ActivationScope,
-                 *, max_attempts: int) -> None:
+                 *, max_attempts: int, definitions: Definitions | None = None) -> None:
         self._writes = writes
         self._artifacts = artifacts
         self.scope = scope
         self._max_attempts = max_attempts
+        # 这个事项所用的那份定义（工单 #1390）：写入范围是检查材料的角色写的文件不让交付失效
+        self._definitions = in_force(definitions)
         self._tokens_charged = 0
         self._cost_charged = 0.0
         self._usage = Usage(reported=False)
@@ -803,10 +806,11 @@ class StepRecorder:
         payload.update(scope.versions())
         payload.update(self._call_target(request))
         drafts = [self._draft(event_type, provider=provider, model=model, payload=payload)]
-        if (event_type == EventType.TOOL_CALLED and scope.department != "quality"
+        if (event_type == EventType.TOOL_CALLED
+                and not writes_check_materials(scope.department, definitions=self._definitions)
                 and payload.get("ok") and payload.get("name") in _WRITE_TOOLS):
-            # 非质检部门写了文件：当前交付失效，紧跟着这条工具结果记一条成果失效事件（S1b，设计说明第 4 节）。
-            # 质检改的是自己的检查工作区，运行工作区与交付不变
+            # 写入范围不是检查材料的角色写了文件：当前交付失效，紧跟着这条工具结果记一条成果失效事件（S1b，
+            # 设计说明第 4 节）。检查材料角色的写入只落在检查工作区与检查材料里，运行工作区与交付不变
             drafts.append(self._delivery_invalidated("workspace_changed"))
         if observation.usage is not None and (observation.usage.reported or observation.usage.total_tokens
                                               or observation.usage.cost):
