@@ -311,7 +311,9 @@ class Workspaces:
     def _attach_trial_source(self, environment: LocalEnvironment, run_id: str, department: str,
                              projection: Any) -> LocalEnvironment:
         # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（设计说明第 3.4 节）；
-        # 其他部门的试用副本在 trial_start 时封存运行工作区
+        # 其他部门的试用副本在 trial_start 时封存运行工作区。
+        # 两处打开检查工作区的地方都走这里：激活开始时新建（new_inspection），以及会话用过文件工具以后
+        # 检查工作区按会话保留、后面一次激活重新打开（session_inspection → inspection_environment）
         if department in self.delivery_inspecting:
             environment.bind_trial_source(self.source_tree(department, projection))
         return environment

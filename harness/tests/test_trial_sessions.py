@@ -12,6 +12,7 @@
 #    名称不存在或交付说明没有 launch 时核对不通过，原因写明已有的名称或没有写启动方式；本机系统没有
 #    启动命令时原因写明缺少哪个系统的命令；真实激活里 `Workspaces` 交给执行环境的那两处接线
 #    （当前交付说明的 launch、交付快照）也能区分：关掉以后质检要么拿不到名称，要么副本来源变成工作区封存；
+#    检查工作区按会话保留以后重新打开的那条路径（`inspection_environment`）同样绑定交付快照；
 # 6. 结束本部门原来的会话：同一个部门再开始一次时，前一个会话的副本被删掉。
 #
 # 层：集成层（真实网页服务、真实端口与子进程）。守 R3：试用会话从清单建立副本、按系统选用命令、
@@ -32,15 +33,16 @@ import pytest
 
 from harness.actions import Action
 from harness.adapters.fake import FakeAdapter
+from harness.artifacts import ArtifactStore
 from harness.definitions import DEFINITIONS
-from harness.environment import LocalEnvironment
+from harness.environment import LocalEnvironment, Workspaces, inspection_root
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree
 from harness.runtime import LoopSystem
 from harness.tools import tool_cancellable, tool_verification
-from harness.tree_archive import artifact_run, load_tree
+from harness.tree_archive import artifact_run, load_tree, store_tree
 from harness.trial_sessions import TrialSessionTable, current_system, resolve_trial_call
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tiny_web_app"
@@ -83,8 +85,8 @@ def _web_workspace(tmp_path: Path, name: str = "run-1") -> Path:
 
 
 def _environment(root: Path, *, trials: TrialSessionTable | None = None,
-                 run_id: str = "run-1") -> LocalEnvironment:
-    return LocalEnvironment.open(root, run_id=run_id,
+                 run_id: str = "run-1", parameters: dict[str, Any] | None = None) -> LocalEnvironment:
+    return LocalEnvironment.open(root, run_id=run_id, parameters=parameters,
                                  trials=trials if trials is not None else TrialSessionTable(probe=lambda: []))
 
 
@@ -310,14 +312,17 @@ def test_the_tool_permission_refuses_a_launch_name_the_delivery_spec_does_not_ca
 
 
 def test_a_failed_receipt_cuts_the_launch_output_at_the_tool_output_limit(tmp_path):
-    # 失败回执带回来的启动输出按规则登记的 tool_output_limit 截断，与执行环境自己的输出上限是同一条规则
-    # （工单 #1182 的验收第 6 条）：打印得比上限多的程序只交回末尾这一段，不是把整段都交给模型
+    # 失败回执带回来的启动输出按这个 run 冻结的 tool_output_limit 截断（工单 #1182 的验收第 6 条）。
+    # 冻结值与定义里的初值不同（1000 与 4000），所以这条能区分「执行环境把这个 run 的上限传进去」与
+    # 「碰巧用了定义里的 4000」；打印得比上限多的程序只交回末尾这一段
     root = _web_workspace(tmp_path)
-    environment = _environment(root)
-    limit = int(DEFINITIONS.rule_value("tool_output_limit"))
+    frozen_limit = int(DEFINITIONS.rule_value("tool_output_limit"))
+    limit = 1000
+    assert limit != frozen_limit
+    environment = _environment(root, parameters={"tool_output_limit": limit})
     command = _python(
         "import sys\n"
-        f"sys.stdout.write('x' * {limit * 2})\n"
+        f"sys.stdout.write('x' * {frozen_limit * 2})\n"
         "sys.stdout.write('\\nBOOT FAILED\\n')\n"
         "sys.exit(3)\n")
     launch = {"name": "web", "kind": "web",
@@ -329,7 +334,7 @@ def test_a_failed_receipt_cuts_the_launch_output_at_the_tool_output_limit(tmp_pa
     assert receipt.ok is False and receipt.status == "failed"
     output = receipt.output["output"]
     assert "BOOT FAILED" in output, "失败回执没有带启动输出的末尾"
-    assert len(output) <= limit, f"启动输出没有按工具输出上限截断（{len(output)} > {limit}）"
+    assert len(output) <= limit, f"启动输出没有按这个 run 的上限截断（{len(output)} > {limit}）"
 
 
 def test_the_workspaces_hand_the_delivery_launch_and_snapshot_to_quality(tmp_path):
@@ -383,6 +388,54 @@ def test_the_workspaces_hand_the_delivery_launch_and_snapshot_to_quality(tmp_pat
                    if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("id") == "t2")
     assert stopped.payload.get("ok") is True
     assert not Path(session["copy"]).exists(), "会话结束以后试用副本还在"
+
+
+class _UsedSession:
+    """只回一条「这个会话用过文件工具」的记录：检查工作区按会话保留的那一支（工单 #558）。"""
+
+    def __init__(self, session_id: str) -> None:
+        self._session_id = session_id
+
+    def read(self, stream: Any) -> Any:
+        event = SimpleNamespace(type=EventType.TOOL_CALLED, session_id=self._session_id,
+                                payload={"name": "write_file"})
+        return SimpleNamespace(events=lambda: [event])
+
+
+def test_a_retained_inspection_workspace_still_takes_the_trial_copy_from_the_delivery(tmp_path):
+    # 检查工作区按会话保留（工单 #558）：会话用过文件工具以后，后面一次激活走 `session_inspection` →
+    # `inspection_environment`，那是 `Workspaces` 绑定试用副本来源的另一个位置。那条路径同样得把交付快照
+    # 交给执行环境，否则质检的试用副本会从它自己的检查工作区封存（那里带着它写的检查文件）
+    artifacts = ArtifactStore(tmp_path / "artifacts")
+    delivered = capture_public_tree(FIXTURE)
+    tree_ref = store_tree(artifacts, "run-1", delivered)
+    launch = _launch()
+    delivery = SimpleNamespace(tree_ref=tree_ref, content_hash="sha256:" + "1" * 64, launch=[launch])
+
+    def view(run_id: str) -> Any:
+        return SimpleNamespace(run_id=run_id, delivery_spec=delivery, baseline=None, snapshot=None,
+                               branch_sessions=set(), sessions={}, parameters=None,
+                               qa_tests_archive_ref=None)
+
+    workspaces = Workspaces(tmp_path / "runs", view=view, writes=_UsedSession("ses_1"),
+                            artifacts=artifacts, definitions=DEFINITIONS)
+    workspaces.trials = TrialSessionTable(probe=lambda: [])
+    workspaces.new_inspection("run-1", "quality", session_id="ses_1")
+    # 质检在自己的检查工作区里写的东西不在交付快照里
+    workspace_root = inspection_root(tmp_path / "runs" / "run-1", "ses_1")
+    (workspace_root / "qa-extra.txt").write_text("not part of the delivery\n", encoding="utf-8")
+
+    environment = workspaces.session_inspection("run-1", "quality", session_id="ses_1")
+    environment.bind_launch_methods([launch])
+
+    receipt = _perform(environment, "trial_open", {"launch_name": "web"}, department="quality")
+
+    assert receipt.ok is True, receipt.error
+    session = receipt.output["session"]
+    assert session["copy_source"] == "delivery_snapshot", "试用副本不是从交付快照建立的"
+    assert session["tree_digest"] == delivered.digest, "试用副本的树摘要不等于交付快照的摘要"
+    assert not (Path(session["copy"]) / "qa-extra.txt").exists(), "副本里带上了质检的检查文件"
+    _perform(environment, "trial_stop", {}, department="quality")
 
 
 def test_starting_again_replaces_the_previous_session_of_the_department(tmp_path):
