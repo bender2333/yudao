@@ -1727,7 +1727,9 @@ class InstanceUpgradeReport(Payload):
     base_tag: str | None
     kernel_changes: list[str]
     kernel_python_lines: int
-    python_lines_max: int
+    # 旧事件里的内核行数上限（工单 #1473 取消）：载荷是对外合同、目录流里已有的「实例升级」事件仍要能读，
+    # 所以字段留着、改成可选；新的发布检查不再写它（内核没有行数上限，ADR-0046）
+    python_lines_max: int | None = None
     passed: bool
     findings: list[dict[str, Any]]
 
