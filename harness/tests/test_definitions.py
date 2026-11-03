@@ -66,6 +66,24 @@ def test_version_is_the_digest_of_the_content_and_ignores_the_format(tmp_path):
     assert load_definitions(directory).version != DEFINITIONS.version
 
 
+def test_the_application_definitions_still_count_in_the_version(tmp_path):
+    # 服务方案与模型能力表的结构与引用在应用侧核对（harness/definitions/catalogs.py，工单 #1452），
+    # 内核只剩「解析一次、算进定义的版本」这一件事：这两份文件的内容改了，定义的版本必须跟着变，
+    # 否则每次运行的 definitions_version 会静默改变（重启以后在途的 run 都看不到「定义变了」）
+    directory = _copy(tmp_path)
+    presets = _read(directory, "service_presets.json")
+    _write(directory, "service_presets.json", {**presets, "revision": presets["revision"] + "-changed"})
+    changed_presets = load_definitions(directory).version
+    assert changed_presets != DEFINITIONS.version
+
+    capabilities = _read(directory, "model_capabilities.json")
+    _write(directory, "model_capabilities.json",
+           {**capabilities, "revision": capabilities["revision"] + "-changed"})
+    changed_capabilities = load_definitions(directory).version
+    assert changed_capabilities != DEFINITIONS.version
+    assert changed_capabilities != changed_presets
+
+
 @pytest.mark.parametrize(("change", "message"), [
     (lambda rules: {**rules, "max_cycles": "many"}, "Input should be an object"),
     (lambda rules: {**rules, "Max_Cycles": rules["max_cycles"]}, "String should match pattern"),
