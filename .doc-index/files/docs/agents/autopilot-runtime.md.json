@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/agents/autopilot-runtime.md",
-"hash":"ba53e8f45155a828",
+"hash":"fb0a52f2875562d9",
 "nodes":[
-{"hash":"ba53e8f45155a828","id":"docs/agents/autopilot-runtime.md","kind":"file","title":"docs/agents/autopilot-runtime.md"},
+{"hash":"fb0a52f2875562d9","id":"docs/agents/autopilot-runtime.md","kind":"file","title":"docs/agents/autopilot-runtime.md"},
 {"hash":"abc67096aff08c53","id":"docs/agents/autopilot-runtime.md#运行配置","kind":"section","parent":"docs/agents/autopilot-runtime.md","title":"运行配置"},
 {"hash":"03238a2f40cff744","id":"docs/agents/autopilot-runtime.md#运行配置 > 1. 机器与路径","kind":"section","parent":"docs/agents/autopilot-runtime.md#运行配置","title":"1. 机器与路径"},
 {"hash":"568920b56de15989","id":"docs/agents/autopilot-runtime.md#运行配置 > 1. 机器与路径 > 1.1 Hermes 的机器","kind":"section","parent":"docs/agents/autopilot-runtime.md#运行配置 > 1. 机器与路径","title":"1.1 Hermes 的机器"},
@@ -35,7 +35,7 @@
 {"hash":"1987d855b4f2a1ee","id":"docs/agents/autopilot-runtime.md#运行配置 > 4. 模型 > 表2 > YUDAO_EVAL_BASE_URL","kind":"row","parent":"docs/agents/autopilot-runtime.md#运行配置 > 4. 模型","title":"YUDAO_EVAL_BASE_URL"},
 {"hash":"476477e88a96a8f7","id":"docs/agents/autopilot-runtime.md#运行配置 > 4. 模型 > 表2 > YUDAO_EVAL_API_KEY","kind":"row","parent":"docs/agents/autopilot-runtime.md#运行配置 > 4. 模型","title":"YUDAO_EVAL_API_KEY"},
 {"hash":"af5616943cbb1c1b","id":"docs/agents/autopilot-runtime.md#运行配置 > 4. 模型 > 表2 > YUDAO_EVAL_MODEL","kind":"row","parent":"docs/agents/autopilot-runtime.md#运行配置 > 4. 模型","title":"YUDAO_EVAL_MODEL"},
-{"hash":"61417073310d3f5d","id":"docs/agents/autopilot-runtime.md#运行配置 > 5. CI","kind":"section","parent":"docs/agents/autopilot-runtime.md#运行配置","title":"5. CI"},
+{"hash":"3baaa4d7b3344e59","id":"docs/agents/autopilot-runtime.md#运行配置 > 5. CI","kind":"section","parent":"docs/agents/autopilot-runtime.md#运行配置","title":"5. CI"},
 {"hash":"fd9c6277b15e50dd","id":"docs/agents/autopilot-runtime.md#运行配置 > 6. main 的规则","kind":"section","parent":"docs/agents/autopilot-runtime.md#运行配置","title":"6. main 的规则"},
 {"hash":"f7d1c570027aa2b4","id":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数","kind":"section","parent":"docs/agents/autopilot-runtime.md#运行配置","title":"7. 参数"},
 {"hash":"8e7f85b9f85cfb34","id":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > solo 执行者一轮的时长","kind":"row","parent":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数","title":"solo 执行者一轮的时长"},
