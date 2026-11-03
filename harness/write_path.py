@@ -143,14 +143,14 @@ class Transaction(Snapshot):
         events = [_event(self.stream, entry, first + offset, self._command, self._definitions, number)
                   for offset, entry in enumerate(entries)]
         for event in events:
+            if not late: self.handler.fold(self.projection, event)
             if isinstance(event, Event):
-                # run 所属的项目与事项取自它的 run_created 事件；只记录的事件也带上，按项目与事项订阅的事件流才看得到
+                # run 所属的项目与事项取自它的 run_created 事件；只记录的事件也带上，按项目与事项读得到
                 event.project_id, event.work_item_id = self.projection.project_id, self.projection.work_item_id
             if late:
                 # 旧编号交回的结果只记录，不并入投影与决定请求
                 self.appended.append(event)
                 continue
-            self.handler.fold(self.projection, event)
             changed = apply_decision_event(self.decisions, event)
             if changed is not None and changed not in self._changed_decisions:
                 self._changed_decisions.append(changed)
