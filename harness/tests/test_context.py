@@ -2,7 +2,9 @@ import json
 from contextlib import contextmanager
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
-from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec, review_turn
+from harness.context import Rules
+from harness.models import EventType
+from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.tests.helpers import developer_text, explore_turn, quality_turns, recorded_context
@@ -23,7 +25,7 @@ def test_context_is_reassembled_from_projection_not_transcript(data_dir):
             "product": [FakeTurn(proposal=product_spec(), transcript=marker)],
             "engineering": [ask_turn(), delivery_turn()],
             "product:ask": [answer_turn("The existing contract covers this input.")],
-            "quality": [explore_turn(), review_turn("release", "ok")],
+            "quality": [explore_turn(), judgement_turn(), review_turn("release", "ok")],
         }
     )
     system = LoopSystem.for_testing(data_dir, adapter)
@@ -89,8 +91,10 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
             ],
             "quality": [
                 explore_turn(),
+                judgement_turn(),
                 review_turn("rework_engineering", "the delivery misses an acceptance criterion",
                             defects=[{"severity": "major", "summary": "contract issue"}]),
+                judgement_turn(),
                 review_turn("release", "new delivery checked"),
             ],
             "product:ask": [answer_turn(
@@ -130,15 +134,19 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     excluded = {item.source for item in recorded_context(system, engineering_after_r2).manifest.excluded}
     assert "invalid_delivery_as_current" in excluded
 
-    quality = [item for item in adapter.invocations if item.department == "quality"][-1]
-    current = _part(quality, "current_delivery_spec")
+    quality_calls = [item for item in adapter.invocations if item.department == "quality"]
+    before_judgement = quality_calls[-2]
+    current = _part(before_judgement, "current_delivery_spec")
     assert current is not None
-    # 事实部分总在；解释部分（summary）在质检对当前交付下结论以前不给（工单 #554）
+    # 事实部分总在；解释部分（summary）在质检提交独立判断以前不给（工单 #554；#358：先判断后看解释，
+    # 判断提交以后的请求才并入解释——这里的最后一次调用是判断以后的核验请求，解释已经在里面）
     assert current["content_hash"] == projection.delivery_spec.content_hash
     assert current["content_hash"] != projection.delivery_specs[0].content_hash
     assert "summary" not in current
     assert current["status"] == "active"
-    assert _part(quality, "prior_delivery") is None
+    assert _part(before_judgement, "prior_delivery") is None
+    after_judgement = _part(quality_calls[-1], "current_delivery_spec")
+    assert after_judgement is not None and "summary" in after_judgement
 
 
 @contextmanager
@@ -172,5 +180,26 @@ def _bound_system(tmp_path, *, context_window, max_output_tokens):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_each_assembled_request_records_the_rule_version_and_the_folded_rounds(data_dir):
+    # 守 R2（合同）：每一步的上下文清单记下这一次按哪一版规则算出来的、折叠了哪几轮，
+    # 重放时按同一份规则版本复原。规则全关时没有折叠任何一轮；模型的请求体（model_request 工件）
+    # 仍然只有发给模型的那几部分，所以「同一份事件同一版规则装配两次逐字节相同」比的始终是同一份字节
+    adapter = FakeAdapter({"product": [product_spec()]})
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)
+    events = [event for event in system.store.list_events(run_id)
+              if event.type == EventType.CONTEXT_ASSEMBLED]
+    assert events
+    for event in events:
+        payload = event.payload
+        assert payload["rules_version"] == Rules().version()
+        assert payload["folded_rounds"] == []
+        request = json.loads(system.artifacts.get_text(payload["request_ref"]["content_hash"]))
+        assert set(request) <= {"input", "tools", "max_output_tokens"}
+        # 部门材料那一条在请求的首位（设计说明第 6.1 节「材料恒在首位」）
+        assert request["input"][0]["role"] == "developer"
 
 

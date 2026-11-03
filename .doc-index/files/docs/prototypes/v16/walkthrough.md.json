@@ -1,0 +1,34 @@
+{
+"schema":1,
+"path":"docs/prototypes/v16/walkthrough.md",
+"hash":"e90f4883c67ec082",
+"nodes":[
+{"hash":"e90f4883c67ec082","id":"docs/prototypes/v16/walkthrough.md","kind":"file","title":"docs/prototypes/v16/walkthrough.md"},
+{"hash":"230fccee02cdeb3f","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查","kind":"section","parent":"docs/prototypes/v16/walkthrough.md","title":"页面原型 v16 走查"},
+{"hash":"91a6e73636083ab8","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 怎么打开","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查","title":"怎么打开"},
+{"hash":"37c7b7860fe18887","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查","title":"主线（三部门）"},
+{"hash":"88277099b4caa549","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 1. 新建项目，默认三部门","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"1. 新建项目，默认三部门"},
+{"hash":"4db4f92175137bd6","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 2. 新建事项","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"2. 新建事项"},
+{"hash":"fd0f7673a9e20e75","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 3. 看组织页","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"3. 看组织页"},
+{"hash":"4a71262ee8ea678b","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 4. 把质检改名并采用","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"4. 把质检改名并采用"},
+{"hash":"3dd2fbaba70a99e8","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 5. 草稿里去掉验收，看提醒，再改回","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"5. 草稿里去掉验收，看提醒，再改回"},
+{"hash":"e4e89bb895bda1a5","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 6. 加一个设计部门","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"6. 加一个设计部门"},
+{"hash":"d9ac2de6a504f9ff","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 7. 看部门详情和编辑定义","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"7. 看部门详情和编辑定义"},
+{"hash":"f5ceac856dda98fc","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 8. 新建事项时临时选一个角色直做","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"8. 新建事项时临时选一个角色直做"},
+{"hash":"832e551bd9dec5e9","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门） > 新建入口的另外两种选择","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 主线（三部门）","title":"新建入口的另外两种选择"},
+{"hash":"a7b0545af171db83","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 两头","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查","title":"两头"},
+{"hash":"531fdc37a0d95621","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 两头 > 个人博客（最少的一头）","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 两头","title":"个人博客（最少的一头）"},
+{"hash":"c2854e4641916991","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 两头 > 固件升级服务（复杂的一头）","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 两头","title":"固件升级服务（复杂的一头）"},
+{"hash":"e19f5d254876f7bb","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 三个新场景","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查","title":"三个新场景"},
+{"hash":"30106b666d805492","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 三个新场景 > 发布改了三部门","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 三个新场景","title":"发布改了三部门"},
+{"hash":"21be500e52e76d82","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 三个新场景 > 发布的改动合不到一起","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 三个新场景","title":"发布的改动合不到一起"},
+{"hash":"f6c85fd933f3f19b","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 三个新场景 > 系统提了一个候选","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 三个新场景","title":"系统提了一个候选"},
+{"hash":"4a4343f38bdb94fc","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 从 v15 带过来的内容","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查","title":"从 v15 带过来的内容"},
+{"hash":"7c72b2ab37d43d35","id":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 试用结论","kind":"section","parent":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查","title":"试用结论"}
+],
+"edges":[
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["../../design/project-organization.md"],"seen":"9cfb248c0871d024","src":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查"},
+{"dst":"docs/prototypes/CHANGELOG.md","kind":"link","raws":["../CHANGELOG.md"],"seen":"5446e1e977366b0f","src":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 从 v15 带过来的内容"},
+{"dst":"docs/prototypes/v16/index.html","kind":"code-path","raws":["docs/prototypes/v16/index.html"],"seen":"af600a1fdbaa7270","src":"docs/prototypes/v16/walkthrough.md#页面原型 v16 走查 > 怎么打开"}
+]
+}

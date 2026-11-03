@@ -284,11 +284,11 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
     assert capabilities["queries"][-3] == {
         "name": "rules.registry", "changed_by": ["parameter_set"], "replayable": True,
     }
-    # 工具登记（工单 #1177）：MCP 服务器与取回动作的取回记录；取回记录待 #68 合并后填充
+    # 工具登记（工单 #1177）：MCP 服务器的设置与最近一次探测、取回动作的取回记录
     assert capabilities["queries"][-2] == {
         "name": "tools.registry",
         "changed_by": ["project_registered", "project_renamed", "mcp_servers_configured",
-                       "tool_started", "tool_called"],
+                       "tool_server_probe_finished", "tool_started", "tool_called"],
         "replayable": False,
     }
     # 收敛状态（工单 #397）：按运行实例标识返回五层循环树，按位置回放
@@ -467,13 +467,13 @@ def test_queries_for_a_missing_target_answer_404(data_dir):
 
 
 def test_query_filters_outside_the_contract_are_refused_by_the_contract(data_dir):
-    # 状态与部门的取值由合同限定，游标与分页大小的格式同样如此：不符合时按合同拒绝，不落到 500
+    # 状态、游标与分页大小的取值由合同限定：不符合时按合同拒绝，不落到 500。
+    # 部门的过滤取值不在这里：对外合同里的部门是字符串，取值由定义给出（工单 #1389），
+    # 不认识的名字是「筛不到东西」，不是合同里没有的取值
     opened = _Opened(data_dir)
     with running_api(opened) as client:
         for name, params in (("project.attempts", {"project_id": "p", "status": "bogus"}),
                              ("project.usage", {"project_id": "p", "status": "bogus"}),
-                             ("project.attempts", {"project_id": "p", "department": "bogus"}),
-                             ("project.usage", {"project_id": "p", "department": "bogus"}),
                              ("project.attempts", {"project_id": "p", "cursor": "not-a-cursor"}),
                              ("project.attempts", {"project_id": "p", "cursor": "1:x:2"}),
                              ("project.attempts", {"project_id": "p", "limit": 0}),

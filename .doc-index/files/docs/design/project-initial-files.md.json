@@ -1,0 +1,34 @@
+{
+"schema":1,
+"path":"docs/design/project-initial-files.md",
+"hash":"1ce697482fb3bfb1",
+"nodes":[
+{"hash":"1ce697482fb3bfb1","id":"docs/design/project-initial-files.md","kind":"file","title":"docs/design/project-initial-files.md"},
+{"hash":"dac73e1f3152c49d","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","kind":"section","parent":"docs/design/project-initial-files.md","title":"项目的起始文件夹设计说明"},
+{"hash":"89928f6baeb49358","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 1. 要解决的问题","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"1. 要解决的问题"},
+{"hash":"4909b10bdb240b5c","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 2. 项目的起点","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"2. 项目的起点"},
+{"hash":"b7a235c674b2e553","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"3. 命令与事件"},
+{"hash":"b55ae42caf466798","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 4. 事项","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"4. 事项"},
+{"hash":"e30d3f6936f1c59a","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 5. 界面与评测","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"5. 界面与评测"},
+{"hash":"05affa8c40ffef62","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 6. 模块交互","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"6. 模块交互"},
+{"hash":"b129e8737544fec6","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 7. 失败与中断","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"7. 失败与中断"},
+{"hash":"63fa7116224e253e","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 8. 验收","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"8. 验收"},
+{"hash":"d0866898f9277871","id":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系","kind":"section","parent":"docs/design/project-initial-files.md#项目的起始文件夹设计说明","title":"9. 与现有设计的关系"}
+],
+"edges":[
+{"dst":"docs/adr/0019-project-stream-across-versions.md","kind":"link","raws":["../adr/0019-project-stream-across-versions.md"],"seen":"f341adc622c4751b","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「一份事实」"],"seen":"3c9310ef49956c5b","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.1 合同","kind":"link","raws":["app-and-interface.md"],"seen":"d5e055f5e3d4c0af","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/design/existing-project-onboarding.md","kind":"link","raws":["existing-project-onboarding.md"],"seen":"4604e4d55473c0cf","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/design/local-tools.md","kind":"link","raws":["local-tools.md"],"seen":"4de695e920eac8be","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"0eee1f7871fde620","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/requirements/project-initial-files.md","kind":"link","raws":["../requirements/project-initial-files.md"],"seen":"1ea74f5887a897a0","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明"},
+{"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 3. 应用层命令、决定与领域事件","kind":"link","raws":["existing-project-onboarding.md"],"seen":"74133bc1017b1124","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件"},
+{"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 5. 确认以后：当前有效要求与第一次采纳","kind":"link","raws":["existing-project-onboarding.md"],"seen":"f1972ee5044a2d04","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件"},
+{"dst":"harness/snapshot.py","kind":"code-path","raws":["harness/snapshot.py"],"seen":"30f148f28f93eb62","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件"},
+{"dst":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件","kind":"link","raws":["evaluation-scenarios.md"],"seen":"54962cc191afe368","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 5. 界面与评测"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"34ec35f3d8594f1a","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系"},
+{"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定","kind":"link","raws":["existing-project-onboarding.md"],"seen":"a4436dcb9f04b27c","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"0eee1f7871fde620","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系"}
+]
+}

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>文档图谱</title>
+<style>
+  html, body { margin: 0; height: 100%; font: 13px/1.5 "Microsoft YaHei", "PingFang SC", sans-serif; color: #222; }
+  #bar { position: fixed; top: 0; left: 0; right: 0; height: 40px; background: #f4f4f2; border-bottom: 1px solid #ccc; display: flex; align-items: center; gap: 8px; padding: 0 12px; z-index: 5; }
+  #bar button { font: inherit; padding: 3px 10px; cursor: pointer; }
+  #bar .stat { color: #666; margin-left: auto; }
+  #cy { position: fixed; top: 41px; left: 0; right: 300px; bottom: 0; }
+  #side { position: fixed; top: 41px; right: 0; width: 300px; bottom: 0; overflow: auto; border-left: 1px solid #ccc; background: #fafaf8; padding: 8px 12px; box-sizing: border-box; }
+  #side h3 { margin: 10px 0 4px; font-size: 13px; }
+  #side ul { margin: 0; padding-left: 16px; }
+  #side li { word-break: break-all; }
+  .chip { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; }
+  .legend div { margin: 1px 0; }
+  .up { color: #1b7f3b; }
+  .down { color: #b35a00; }
+  .hint { color: #777; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <button id="b-arch">展开总图</button>
+  <button id="b-collapse">全部折叠</button>
+  <button id="b-fit">适应窗口</button>
+  <button id="b-layout">重新排列</button>
+  <label><input type="checkbox" id="c-ext"> 显示代码与配置文件</label>
+  <span class="hint">拖动节点移动；点一份文档高亮上下游；双击展开或折叠它的小节</span>
+  <span class="stat" id="stat"></span>
+</div>
+<div id="cy"></div>
+<div id="side">
+  <div id="info"><span class="hint">点一个节点查看它的引用关系。</span></div>
+  <h3>目录颜色</h3>
+  <div class="legend" id="legend"></div>
+</div>
+<script type="application/json" id="data">__DATA__</script>
+<script>__LIB__</script>
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById('data').textContent);
+  var palette = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#76b7b2', '#b07aa1', '#edc948', '#9c755f', '#bab0ac', '#d37295', '#86bcb6', '#a0cbe8', '#ffbe7d', '#8cd17d', '#ff9d9a'];
+  var dirColor = {};
+  DATA.dirs.forEach(function (d, i) { dirColor[d] = palette[i % palette.length]; });
+  var byId = {};
+  DATA.nodes.forEach(function (n) { byId[n.id] = n; });
+  var kids = {};
+  DATA.nodes.forEach(function (n) { if (n.parent) { (kids[n.parent] = kids[n.parent] || []).push(n.id); } });
+  var expanded = {};
+
+  function chain(id) {
+    var out = [];
+    for (var n = byId[id]; n; n = n.parent ? byId[n.parent] : null) { out.unshift(n.id); }
+    return out;
+  }
+  // 可见的代表节点：从最上层往下，遇到没展开的就停
+  function rep(id) {
+    var c = chain(id);
+    for (var i = 0; i < c.length - 1; i++) { if (!expanded[c[i]]) { return c[i]; } }
+    return c[c.length - 1];
+  }
+  var showExt = false;
+  var focusFiles = null;  // 聚焦某份文档时，只显示它和与它直接相连的文件
+  function isHidden(id) {
+    var n = byId[id];
+    if (focusFiles && !(n && focusFiles[n.file])) { return true; }
+    return !!(n && n.external && !showExt);
+  }
+  var focusRoot = null;
+  // 聚焦时：被聚焦文档的节和缝排成格子放中间，相连的文件排成椭圆围在外面
+  function layoutFocus(root) {
+    var arch = cy.nodes().filter(function (n) { return n.id() === root || n.id().indexOf(root + '#') === 0; });
+    arch.filter(function (n) { return n.isChildless() && n.data('kind') === 'section'; })
+      .forEach(function (n, i) { n.position({ x: i * 95, y: 0 }); });
+    arch.filter(function (n) { return n.data('kind') === 'seam'; })
+      .forEach(function (n, i) { n.position({ x: (i % 5) * 95, y: 120 + Math.floor(i / 5) * 70 }); });
+    var bb = arch.boundingBox();
+    var cx = (bb.x1 + bb.x2) / 2, cy0 = (bb.y1 + bb.y2) / 2;
+    var R = Math.max(bb.w, bb.h) * 0.5 + 300;
+    var others = cy.nodes().not(arch);
+    others.forEach(function (n, i) {
+      var a = 2 * Math.PI * i / others.length;
+      n.position({ x: cx + R * 1.8 * Math.cos(a), y: cy0 + R * Math.sin(a) });
+    });
+    cy.fit(undefined, 30);
+  }
+  function focusOn(fileId) {
+    focusRoot = fileId;
+    focusFiles = {};
+    focusFiles[fileId] = true;
+    DATA.edges.forEach(function (e) {
+      var a = byId[e[0]].file, b = byId[e[1]].file;
+      if (a === fileId) { focusFiles[b] = true; }
+      if (b === fileId) { focusFiles[a] = true; }
+    });
+  }
+  function isVisible(id) { return !isHidden(id) && rep(id) === id; }
+  function contains(a, b) { return chain(b).indexOf(a) >= 0; }
+
+  var cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: [],
+    wheelSensitivity: 0.25,
+    style: [
+      { selector: 'node', style: {
+        'background-color': 'data(color)', 'label': 'data(label)', 'font-size': 9, 'color': '#222',
+        'text-valign': 'bottom', 'text-margin-y': 2, 'width': 'data(size)', 'height': 'data(size)',
+        'text-wrap': 'ellipsis', 'text-max-width': 90, 'border-width': 1, 'border-color': '#fff' } },
+      { selector: 'node:parent', style: {
+        'background-opacity': 0.12, 'border-width': 1.5, 'border-color': 'data(color)',
+        'text-valign': 'top', 'font-size': 11, 'padding': 14, 'shape': 'round-rectangle' } },
+      { selector: 'node[kind = "seam"]', style: { 'shape': 'round-rectangle' } },
+      { selector: 'node[kind = "row"]', style: { 'shape': 'diamond' } },
+      { selector: 'edge', style: {
+        'width': 'data(w)', 'line-color': '#b5b5b0', 'target-arrow-color': '#b5b5b0',
+        'target-arrow-shape': 'triangle', 'arrow-scale': 0.6, 'curve-style': 'bezier', 'opacity': 0.45 } },
+      { selector: '.dim', style: { 'opacity': 0.08 } },
+      { selector: 'edge.up', style: { 'line-color': '#1b7f3b', 'target-arrow-color': '#1b7f3b', 'opacity': 1 } },
+      { selector: 'edge.down', style: { 'line-color': '#b35a00', 'target-arrow-color': '#b35a00', 'opacity': 1 } },
+      { selector: 'node.sel', style: { 'border-width': 3, 'border-color': '#000' } },
+      { selector: 'node.nbup', style: { 'border-width': 3, 'border-color': '#1b7f3b' } },
+      { selector: 'node.nbdown', style: { 'border-width': 3, 'border-color': '#b35a00' } }
+    ]
+  });
+
+  function render(first) {
+    var pos = {};
+    cy.nodes().forEach(function (n) { pos[n.id()] = n.position(); });
+    var els = [];
+    var fresh = {};
+    var deg = {};
+    var edgeMap = {};
+    DATA.edges.forEach(function (e) {
+      if (isHidden(e[0]) || isHidden(e[1])) { return; }
+      if (focusRoot && byId[e[0]].file !== focusRoot && byId[e[1]].file !== focusRoot) { return; }
+      var s = rep(e[0]), t = rep(e[1]);
+      if (s === t || contains(s, t) || contains(t, s)) { return; }
+      var k = s + '\u0000' + t;
+      edgeMap[k] = edgeMap[k] || { s: s, t: t, c: 0 };
+      edgeMap[k].c++;
+      deg[s] = (deg[s] || 0) + 1;
+      deg[t] = (deg[t] || 0) + 1;
+    });
+    DATA.nodes.forEach(function (n) {
+      if (!isVisible(n.id)) { return; }
+      var isParent = expanded[n.id];
+      var el = { group: 'nodes', data: {
+        id: n.id, label: n.label, kind: n.kind, color: dirColor[n.dir],
+        size: 8 + Math.min(26, 3 * Math.sqrt(deg[n.id] || 0)) } };
+      if (n.parent && expanded[n.parent]) { el.data.parent = n.parent; }
+      if (pos[n.id]) { el.position = pos[n.id]; }
+      else if (n.parent && pos[n.parent]) { fresh[n.parent] = (fresh[n.parent] || []).concat([el]); }
+      els.push(el);
+    });
+    // 新展开的小节排成格子，放在原来父节点的位置上，已有的节点不动
+    Object.keys(fresh).forEach(function (p) {
+      var cols = Math.ceil(Math.sqrt(fresh[p].length));
+      fresh[p].forEach(function (el, i) {
+        el.position = { x: pos[p].x + (i % cols - (cols - 1) / 2) * 90, y: pos[p].y + (Math.floor(i / cols) - (cols - 1) / 2) * 60 };
+      });
+    });
+    Object.keys(edgeMap).forEach(function (k) {
+      var e = edgeMap[k];
+      els.push({ group: 'edges', data: { id: k, source: e.s, target: e.t, w: Math.min(1 + Math.log2(e.c), 4) } });
+    });
+    cy.elements().remove();
+    cy.add(els);
+    if (first && focusRoot) {
+      layoutFocus(focusRoot);
+    } else if (first) {
+      cy.layout({ name: 'cose', animate: false, randomize: true, nodeRepulsion: function () { return 60000; },
+        idealEdgeLength: function () { return 110; }, edgeElasticity: function () { return 80; }, gravity: 0.15,
+        numIter: 2500, fit: true, padding: 30 }).run();
+    }
+    document.getElementById('stat').textContent = cy.nodes().length + ' 个节点，' + cy.edges().length + ' 条边';
+  }
+
+  function describe(id) {
+    var n = byId[id];
+    var up = [], down = [];
+    DATA.edges.forEach(function (e) {
+      if (contains(id, e[0]) && !contains(id, e[1])) { up.push(e[1]); }
+      if (contains(id, e[1]) && !contains(id, e[0])) { down.push(e[0]); }
+    });
+    function uniq(a) { return a.filter(function (x, i) { return a.indexOf(x) === i; }).sort(); }
+    function list(a) { return '<ul>' + uniq(a).map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>'; }
+    document.getElementById('info').innerHTML =
+      '<b>' + esc(n.id) + '</b>' +
+      '<h3 class="up">它引用的（上游，' + uniq(up).length + '）</h3>' + list(up) +
+      '<h3 class="down">引用它的（下游，' + uniq(down).length + '）</h3>' + list(down);
+  }
+  function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+
+  function highlight(node) {
+    cy.elements().removeClass('dim up down sel nbup nbdown');
+    cy.elements().addClass('dim');
+    node.removeClass('dim').addClass('sel');
+    node.outgoers().forEach(function (x) {
+      x.removeClass('dim');
+      if (x.isEdge()) { x.addClass('up'); } else { x.addClass('nbup'); }
+    });
+    node.incomers().forEach(function (x) {
+      x.removeClass('dim');
+      if (x.isEdge()) { x.addClass('down'); } else { x.addClass('nbdown'); }
+    });
+    describe(node.id());
+  }
+
+  cy.on('tap', 'node', function (ev) { highlight(ev.target); });
+  cy.on('tap', function (ev) {
+    if (ev.target === cy) {
+      cy.elements().removeClass('dim up down sel nbup nbdown');
+      document.getElementById('info').innerHTML = '<span class="hint">点一个节点查看它的引用关系。</span>';
+    }
+  });
+  cy.on('dbltap', 'node', function (ev) {
+    var id = ev.target.id();
+    if (!kids[id]) { return; }
+    expanded[id] = !expanded[id];
+    if (!expanded[id]) { Object.keys(expanded).forEach(function (k) { if (k !== id && contains(id, k)) { delete expanded[k]; } }); }
+    render(false);
+  });
+
+  document.getElementById('b-arch').onclick = function () {
+    expanded = { 'docs/architecture.html': true, 'docs/architecture.html#s4': true };
+    focusOn('docs/architecture.html');
+    render(true);
+  };
+  document.getElementById('b-collapse').onclick = function () { expanded = {}; focusFiles = null; focusRoot = null; render(true); };
+  document.getElementById('b-fit').onclick = function () { cy.fit(undefined, 30); };
+  document.getElementById('b-layout').onclick = function () { render(true); };
+  document.getElementById('c-ext').onchange = function (ev) { showExt = ev.target.checked; render(true); };
+
+  var legend = document.getElementById('legend');
+  DATA.dirs.forEach(function (d) {
+    var div = document.createElement('div');
+    div.innerHTML = '<span class="chip" style="background:' + dirColor[d] + '"></span>' + esc(d);
+    legend.appendChild(div);
+  });
+  render(true);
+  window.__cy = cy;
+  window.__graphReady = true;
+})();
+</script>
+</body>
+</html>

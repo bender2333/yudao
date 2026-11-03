@@ -1,0 +1,34 @@
+{
+"schema":1,
+"path":"docs/requirements/startup-provider-reload.md",
+"hash":"cffd9c568d78177a",
+"nodes":[
+{"hash":"cffd9c568d78177a","id":"docs/requirements/startup-provider-reload.md","kind":"file","title":"docs/requirements/startup-provider-reload.md"},
+{"hash":"b56f43a75480418e","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","kind":"section","parent":"docs/requirements/startup-provider-reload.md","title":"D22 启动与 Provider 热生效设计"},
+{"hash":"a37aa2b262ffcf5f","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 1. 目标与范围","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"1. 目标与范围"},
+{"hash":"85fc71b543562f4e","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 2. 环境变量的限制","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"2. 环境变量的限制"},
+{"hash":"ff815ebc49155672","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 3. 启动矩阵","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"3. 启动矩阵"},
+{"hash":"ae626963bef4912d","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 3. 启动矩阵 > 3.1 默认入口","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 3. 启动矩阵","title":"3.1 默认入口"},
+{"hash":"a2cfc29103a26b44","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 3. 启动矩阵 > 3.2 服务可启动与任务可创建分开","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 3. 启动矩阵","title":"3.2 服务可启动与任务可创建分开"},
+{"hash":"4cb1b2206bdc3312","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"4. 生效规则"},
+{"hash":"4be72984184f00ce","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则 > 4.1 发布与按请求生效","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则","title":"4.1 发布与按请求生效"},
+{"hash":"b92ca89a9827060a","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则 > 4.2 三个修改通道","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则","title":"4.2 三个修改通道"},
+{"hash":"724227b6cf708f4d","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则 > 4.3 非法写入、删除与并发","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则","title":"4.3 非法写入、删除与并发"},
+{"hash":"e8f06fadad97272a","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 5. 凭据来源与页面填 Key","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"5. 凭据来源与页面填 Key"},
+{"hash":"422adc772e2104b1","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 6. 接口与存储变更","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"6. 接口与存储变更"},
+{"hash":"81e39640147d8880","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 7. 分层","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"7. 分层"},
+{"hash":"b1cbf7807c7c423b","id":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 8. 验收标准","kind":"section","parent":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计","title":"8. 验收标准"}
+],
+"edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计"},
+{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"c6e237cf82f11f6b","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计"},
+{"dst":"docs/requirements/provider-layer.md","kind":"link","raws":["provider-layer.md"],"seen":"db2baf313019d1fd","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 3. 启动矩阵 > 3.1 默认入口"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 4. 生效规则 > 4.1 发布与按请求生效"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../design/app-and-interface.md"],"seen":"d6c373a9722f200e","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 6. 接口与存储变更"},
+{"dst":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","kind":"link","raws":["../design/model-management.md"],"seen":"17891a8b09694ac3","src":"docs/requirements/startup-provider-reload.md#D22 启动与 Provider 热生效设计 > 7. 分层"}
+]
+}

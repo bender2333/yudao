@@ -1,0 +1,19 @@
+{
+"schema":1,
+"path":"docs/requirements/request-observability.md",
+"hash":"e86d96c1bbdbb4ef",
+"nodes":[
+{"hash":"e86d96c1bbdbb4ef","id":"docs/requirements/request-observability.md","kind":"file","title":"docs/requirements/request-observability.md"},
+{"hash":"962cb11717d7188d","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","kind":"section","parent":"docs/requirements/request-observability.md","title":"D21 模型请求、原始数据与用量观测"},
+{"hash":"62dc0722f30b6052","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 用户需要的查看路径","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"用户需要的查看路径"},
+{"hash":"74dbc91a844e3dd8","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 采集与事实边界","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"采集与事实边界"},
+{"hash":"35a049adf31cec81","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 用量口径","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"用量口径"},
+{"hash":"ec6b0d7884ff44b3","id":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测 > 验收","kind":"section","parent":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测","title":"验收"}
+],
+"edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../design/app-and-interface.md"],"seen":"d6c373a9722f200e","src":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"fd865184d784f371","src":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/request-observability.md#D21 模型请求、原始数据与用量观测"}
+]
+}

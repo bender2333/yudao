@@ -6,7 +6,7 @@ import pytest
 from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.public_tree import CapturedFile, CapturedTree
 from harness.tests.helpers import system_on_copy
@@ -14,8 +14,10 @@ from harness.tests.saved_rewrite import rewrite_saved_events, rewrite_saved_proj
 
 # 需要一份真实运行记录的文件：module 作用域的夹具各跑一次停在等质检让步的运行并保存数据目录，
 # 每项测试复制一份数据目录，在自己的副本上放行交付与检查。数据来自真实运行，登记为集成层。
+# 副本上的脚本先交独立判断再放行（先判断后看解释的门，工单 #358）
 
 REVIEW_TURN = review_turn("release", "Checks passed")
+JUDGED_REVIEW = [judgement_turn(), review_turn("release", "Checks passed")]
 
 def _saved_quality_ready(tmp_path, *, runs=1):
     # runs 个事项各激活两次，停在等待质检让步：放行发生在每项测试自己的副本上
@@ -41,8 +43,8 @@ def quality_ready(tmp_path_factory):
 @pytest.fixture
 def ready_run(quality_ready, tmp_path):
     saved, run_ids = quality_ready
-    # 保存的运行停在等待质检放行：重新打开的系统要能回答这一步，脚本里补上这次放行
-    return system_on_copy(saved, tmp_path / "ready", [REVIEW_TURN]), run_ids
+    # 保存的运行停在等待质检放行：重新打开的系统要能回答这一步，脚本里补上判断与这次放行
+    return system_on_copy(saved, tmp_path / "ready", JUDGED_REVIEW), run_ids
 
 @pytest.fixture(scope="module")
 def quality_ready_two_runs(tmp_path_factory):
@@ -98,6 +100,7 @@ def test_release_rejects_delivery_digest_that_does_not_match_current_snapshot(re
     ])
     delivery = replace(projection.delivery_spec, code_tree_digest=wrong)
     rewrite_saved_projection(system.store, run_id, replace(projection, delivery_spec=delivery))
+    system.activate_once(run_id)  # 独立判断（先判断后看解释的门，工单 #358）
     result = system.activate_once(run_id)
     recorded = system.project(run_id)
 
@@ -123,6 +126,7 @@ def test_release_rejects_a_snapshot_that_differs_before_submission_commit(ready_
         return original_prepare(transaction, **kwargs)
 
     monkeypatch.setattr(system.orchestrator.submissions, "prepare", prepare)
+    system.activate_once(run_id)  # 独立判断（先判断后看解释的门，工单 #358）
     result = system.activate_once(run_id)
 
     assert result.status == "failed"

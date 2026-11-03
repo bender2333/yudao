@@ -14,7 +14,7 @@ src/renderer/    页面：外壳、连接设置、视图同步（React）
   src/api/       由 /openapi.json 生成的接口类型与记录生成所用接口版本的文件
   src/contract/  连接、能力清单核对、事件流、视图同步、查询与命令的调用
   src/shell/     左侧栏、顶栏、项目标签与路径
-  src/views/     连接设置页（首页、项目页面与像素画面由各自的工单实现）
+  src/views/     连接设置页，以及首页、项目、模型、决定、系统、时间线等页面
 scripts/         generate-api.mjs（生成接口类型）
 tests/unit/      不需要网络的单元测试（node --test）
 tests/e2e/       Playwright 启动 Chromium，连接真实后端（FakeAdapter 驱动的服务）

@@ -16,6 +16,8 @@ on:
       - "docs/**"
       - "agents_jour/**"
       - "claude_jour.md"
+      - "tools/**"
+      - ".doc-index/**"
   workflow_dispatch:
 
 # PR 与手动触发：同一分支的新运行取消旧运行。main 的推送：每个合并提交各自运行到底，
@@ -167,12 +169,11 @@ jobs:
         working-directory: client
         run: npx playwright install chromium
 
-      # 像素画面的逐场景回放测试（pixel-*-replay）按 AGENTS.md 单独运行，不在 CI 中；路由的 routing-replay 是纯逻辑，照常运行
       - name: 客户端单元测试
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client
         timeout-minutes: 10
-        run: node --test --test-force-exit --test-timeout=60000 --test-reporter=spec $(ls tests/unit/*.test.js tests/unit/*.test.ts | grep -v -- 'pixel-.*-replay\.test\.')
+        run: node --test --test-force-exit --test-timeout=60000 --test-reporter=spec tests/unit/*.test.js tests/unit/*.test.ts
 
       - name: 编译页面与 wheel
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -206,7 +207,7 @@ jobs:
           node --check .claude/skills/solo/scripts/solo.mjs
           node --check .claude/skills/solo/scripts/hook.mjs
           node --check .claude/skills/solo/scripts/state.mjs
-          node --check .claude/skills/next/scripts/rotate-journals.mjs
+          node --check .claude/skills/next/scripts/rotate-records.mjs
 
   # 合并必须通过的检查（main 的规则要求名为 check 的检查）：上面五个作业都成功才成功。
   # 无论五个作业结果如何都运行，在运行摘要里写出各层的表

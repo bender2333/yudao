@@ -18,7 +18,7 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | | 用户在场 | 用户不在场（`--循环`） |
 | --- | --- | --- |
 | 规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、总图、评价标准（评测的隐藏检查、参考解法、评分器、发布检查） | 可以改，改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 不改；开一张 `architecture` 工单写清要定什么，相关工单标 `ready-for-human` |
-| 设计说明、ADR、需求记录（用户原话不改）、`CONTEXT.md`、原型；工单正文、子工单、依赖、评论 | 可以 | 可以，直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md` |
+| 设计说明、ADR、需求记录（不改用户已确认的需求与验收标准）、`CONTEXT.md`、原型；工单正文、子工单、依赖、评论 | 可以 | 可以，直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md` |
 | 里程碑：建、关、改名 | 总架构师 | 不做；拆出的子工单沿用原工单的里程碑 |
 | 关闭试用工单与里程碑 | 用户确认以后，按[验收证据规则](../../../docs/agents/acceptance-evidence.md)「试用工单与里程碑的关闭」 | 不做，不写「试用通过」 |
 | `harness/` 的代码与测试 | 不改，拆成工单 | 不改 |
@@ -37,7 +37,7 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 
 1. **豁免记录**：按[运行配置](../../../docs/agents/autopilot-runtime.md)「main 的规则」的命令查一周内的豁免。PR 正文有 `Solo:` 行的是 solo 的合并，记入 `claude_jour.md`；没有对应 PR 的是架构师直接推送的文档与日记；其余告诉用户。完成：豁免各有归属。
 2. **main 的 CI**：`gh run list --workflow CI --branch main --event push --limit 5`。`check` 红了，先查是不是架构师推的提交，是就先修；是 solo 的合并，由 solo 按 `solo-worker`「main 上的 CI」处理。完成：知道 main 现在是不是绿的。
-3. **日记归档**：`node .claude/skills/next/scripts/rotate-journals.mjs`。有移动时改动已经暂存好，提交并 `git push origin HEAD:main`，不用另写变更记录与日记。完成：两份日记都没有超过上限。
+3. **记录归档**：`node .claude/skills/next/scripts/rotate-records.mjs`。有移动时改动已经暂存好，提交并 `git push origin HEAD:main`，不用另写变更记录与日记。完成：日记、决策记录与变更记录都没有超过上限。
 4. **只在 `--循环`**：
    - 读运行配置「参数」的「架构师循环」开关，关着就整轮不做，写一行心跳，结束。
    - 读心跳 `.ralph/architect/heartbeat.json`。超过两轮没更新、GitHub 上还有该做的事时，先查长运行还在不在，再决定从哪一项开始。

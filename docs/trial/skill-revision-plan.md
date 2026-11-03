@@ -1,6 +1,6 @@
 # agent 试用技能修订方案
 
-状态：已实施，相关本地验证与三项原生 subagent 复核完成；最近一次改动：2026-10-29 补充实际验证与适用范围；依据：[ADR-0039](../adr/0039-agent-trial-observation-reproduction-and-judgment.md)、用户逐轮确认及最终回复「可以」；路线位置：各阶段的薄片试用与路线图第 5 节「能度量」「看得见」。
+状态：已实施，相关本地验证与三项原生 subagent 复核完成；依据：[ADR-0039](../adr/0039-agent-trial-observation-reproduction-and-judgment.md)、用户逐轮确认及最终回复「可以」；路线位置：各阶段的薄片试用与路线图第 5 节「能度量」「看得见」。
 
 ## 目标与已经确认的取舍
 

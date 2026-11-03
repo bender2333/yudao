@@ -1,0 +1,18 @@
+{
+"schema":1,
+"path":"docs/requirements/game-world-three-spaces.md",
+"hash":"0aafa424289910a5",
+"nodes":[
+{"hash":"0aafa424289910a5","id":"docs/requirements/game-world-three-spaces.md","kind":"file","title":"docs/requirements/game-world-three-spaces.md"},
+{"hash":"e9462f11da0e6214","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","kind":"section","parent":"docs/requirements/game-world-three-spaces.md","title":"D41 三个空间：楼、机房、城"},
+{"hash":"dc2b198b2542e9de","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城 > 已确认","kind":"section","parent":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","title":"已确认"},
+{"hash":"c5b179c5d41baaa3","id":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城 > 待定","kind":"section","parent":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城","title":"待定"}
+],
+"edges":[
+{"dst":"docs/architecture-view.html","kind":"link","raws":["../architecture-view.html"],"seen":"9b48c9ce4e23d54e","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"},
+{"dst":"docs/design/visualization.md","kind":"link","raws":["../design/visualization.md"],"seen":"2b8c3a091a4748db","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"},
+{"dst":"docs/research/game-world-as-projection.md","kind":"link","raws":["../research/game-world-as-projection.md"],"seen":"9c8d71b3273064a0","src":"docs/requirements/game-world-three-spaces.md#D41 三个空间：楼、机房、城"}
+]
+}

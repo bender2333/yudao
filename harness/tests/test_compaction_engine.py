@@ -887,7 +887,10 @@ def _delivery_accepted(system, run_id):
             break
     projection = system.project(run_id)
     assert (projection.status, len(projection.delivery_specs)) == ("running", 1)
-    system.orchestrator._test_context_windows[run_id] = pinned_input_tokens(system, run_id, "quality") + 1600
+    # 余量 1800：除了让大文件的读取超过压缩阈值，还要留住摘要请求的额度（摘要上限 =
+    # (阈值 − 固定材料) // 2 不得低于 32 个 token）。质检的固定材料随工单 #1190 的提案合同与提交工具说明
+    # 增加约 400 个 token，原来的 1600 落到 28 个 token 的摘要上限，三次用例以 compaction_failed 结束
+    system.orchestrator._test_context_windows[run_id] = pinned_input_tokens(system, run_id, "quality") + 1800
     return projection
 
 

@@ -1,0 +1,1820 @@
+{
+  "schema_version": 1,
+  "source_commit": "68733737fb8aab3e94dabecf27f5d2460f93b17f",
+  "source_date": "2026-11-02",
+  "scope": "当前产品运行结构；静态代码证据",
+  "nodes": [
+    {
+      "id": "P1",
+      "name": "用户",
+      "kind": "person",
+      "technology": "",
+      "parent": null,
+      "responsibility": "提出目标、指导部门、回答决定、查看和取得交付",
+      "evidence": [
+        {
+          "path": "README.md",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e9284e5d7f7e721441a9618ae62e92198eaaca44ca2030177306ffddabd0ff26"
+        }
+      ]
+    },
+    {
+      "id": "S1",
+      "name": "Yudao 枢道",
+      "kind": "software_system",
+      "technology": "Python / TypeScript",
+      "parent": null,
+      "responsibility": "让产品、工程、质检围绕有效要求协作并提供可核验交付",
+      "evidence": [
+        {
+          "path": "README.md",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e9284e5d7f7e721441a9618ae62e92198eaaca44ca2030177306ffddabd0ff26"
+        },
+        {
+          "path": "CONTEXT.md",
+          "symbol": null,
+          "line": 1,
+          "sha256": "fff42abddd390e797409e6c3e2963ce4920df52957102ea74f75337d6748103e"
+        }
+      ]
+    },
+    {
+      "id": "X1",
+      "name": "模型服务",
+      "kind": "external_system",
+      "technology": "Responses / Chat Completions / Messages",
+      "parent": null,
+      "responsibility": "返回模型输出与用量",
+      "evidence": [
+        {
+          "path": "harness/providers/responses.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "a2f7f1897cf8becc9522e434bad653a1105e1f72475ea9a5db84293b13efc921"
+        },
+        {
+          "path": "harness/providers/chat.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "cb2f702abf72e9ebe4bdae9c1a30c280dc5275638ca014bfd0d700db50565914"
+        },
+        {
+          "path": "harness/providers/messages.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "40d051edd9d2d0b3c3fea3793e1c3dd91f4f95760d0630a2665fa58f9c286203"
+        }
+      ]
+    },
+    {
+      "id": "X2",
+      "name": "MCP 工具服务",
+      "kind": "external_system",
+      "technology": "stdio / Streamable HTTP",
+      "parent": null,
+      "responsibility": "提供外部工具发现与调用",
+      "evidence": [
+        {
+          "path": "harness/mcp_client.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "88d3e21e2faf233f677057b769a1a3dda41a97d8f73b3d94eac6b8c26065a019"
+        }
+      ]
+    },
+    {
+      "id": "X3",
+      "name": "网页与外部资料源",
+      "kind": "external_system",
+      "technology": "HTTP / HTTPS",
+      "parent": null,
+      "responsibility": "提供可取回并记录来源的资料",
+      "evidence": [
+        {
+          "path": "harness/fetch.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "501a9e1e17a2b54f0f844e7b39d006d0757c76fe830211ea056832ca599a2c11"
+        }
+      ]
+    },
+    {
+      "id": "X4",
+      "name": "用户项目文件",
+      "kind": "external_system",
+      "technology": "本地文件系统 / Git",
+      "parent": null,
+      "responsibility": "提供项目起点并接收经用户命令执行的回写；外部数据资源",
+      "evidence": [
+        {
+          "path": "harness/writeback.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e4621cf279de38a3dca9d12d2f5bb62379d47cf7b0a7622cccc4dc3108a6a8ba"
+        },
+        {
+          "path": "harness/public_tree.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "52e244e9d05a8f7e33c4c0ae085eb226f2219373b18d472d637abf924825905c"
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "name": "网页应用",
+      "kind": "container",
+      "technology": "TypeScript / React / PixiJS；浏览器",
+      "parent": "S1",
+      "responsibility": "提交命令、同步快照并呈现协作过程",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/main.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e947c808f6ad61fac5331e2a8a6fc2a489d266e95d0dfe41a6772304c66de335"
+        },
+        {
+          "path": "client/package.json",
+          "symbol": null,
+          "line": 1,
+          "sha256": "d1460867c48c119a35d393cd0e9237a84b3f2f3cbea4071230c4867218456bfb"
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "name": "Yudao 服务",
+      "kind": "container",
+      "technology": "Python / FastAPI / Uvicorn；单服务进程",
+      "parent": "S1",
+      "responsibility": "接收操作、驱动循环并控制事实写入",
+      "evidence": [
+        {
+          "path": "harness/__main__.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "8ab1030f9ced604a0cd2d789e097b41b778ea18bb080db17cb966c1951c84280"
+        },
+        {
+          "path": "harness/api/server.py",
+          "symbol": "serve",
+          "line": 53,
+          "sha256": "a55e384f2ea68de1596ce87148fea6078f15556d041878852b9036e8ebaae915"
+        },
+        {
+          "path": "harness/runtime.py",
+          "symbol": "LoopSystem",
+          "line": 51,
+          "sha256": "78e7fd79edcd7bb847e38bdca6d8d6de3ebfd1de126cca30c72e8d643a3e6fd4"
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "name": "事件与保存的投影",
+      "kind": "data_store",
+      "technology": "SQLite / events.sqlite",
+      "parent": "S1",
+      "responsibility": "保存事实、命令身份和可重建投影",
+      "evidence": [
+        {
+          "path": "harness/event_store.py",
+          "symbol": "EventStore",
+          "line": 218,
+          "sha256": "b27d2561ff1842ed2f0338cce9b5a9a1979805d49403db56f271fb2aed3e33ee"
+        },
+        {
+          "path": "harness/runtime.py",
+          "symbol": "LoopSystem.__init__",
+          "line": 55,
+          "sha256": "78e7fd79edcd7bb847e38bdca6d8d6de3ebfd1de126cca30c72e8d643a3e6fd4"
+        }
+      ]
+    },
+    {
+      "id": "C4",
+      "name": "工件存储",
+      "kind": "data_store",
+      "technology": "本地文件 / artifacts",
+      "parent": "S1",
+      "responsibility": "按内容摘要保存请求、输出、证据等大对象",
+      "evidence": [
+        {
+          "path": "harness/artifacts.py",
+          "symbol": "ArtifactStore",
+          "line": 41,
+          "sha256": "5042a9dba1b213ace94b08069fcef2a8012e42b277d4b0d899bd55b1e808c3aa"
+        }
+      ]
+    },
+    {
+      "id": "C5",
+      "name": "版本快照",
+      "kind": "data_store",
+      "technology": "本地 Git 对象 / pygit2",
+      "parent": "S1",
+      "responsibility": "保存不可变代码树与正式成果关联的版本",
+      "evidence": [
+        {
+          "path": "harness/git_versions.py",
+          "symbol": "GitVersionStore",
+          "line": 31,
+          "sha256": "02dc8018cca1e79db79c2f05205572b0fbe1d0b165c511c45e4bd7bcb4c08f23"
+        }
+      ]
+    },
+    {
+      "id": "C6",
+      "name": "运行与检查工作区",
+      "kind": "data_store",
+      "technology": "本地目录",
+      "parent": "S1",
+      "responsibility": "提供工作副本与检查副本，保存动作执行期间的文件",
+      "evidence": [
+        {
+          "path": "harness/environment.py",
+          "symbol": "Workspaces",
+          "line": 172,
+          "sha256": "a79f43295803c97075c56f28eb632dc199cc88201435aa24b90fdfcdb393e011"
+        },
+        {
+          "path": "harness/workspace.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e8ab423398de78271c14c54fec08ecc50dd0ce008f25e61b6c8087ec6d0a10d8"
+        }
+      ]
+    },
+    {
+      "id": "C7",
+      "name": "模型目录与准入文件",
+      "kind": "data_store",
+      "technology": "JSON / 可选 .env",
+      "parent": "S1",
+      "responsibility": "保存连接、访问定义、准入与可选持久化凭据；凭据另可来自内存或环境",
+      "evidence": [
+        {
+          "path": "harness/providers/store.py",
+          "symbol": "ProviderStore",
+          "line": 210,
+          "sha256": "23a50ccb967bbdeea8a0da5d08cc67e31631a326fc963ba1db4d7e27467f57eb"
+        },
+        {
+          "path": "harness/providers/credentials.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "65eed9f0595cfc6ca3971bb849301e414abce1aa06be769ef9d2ace9f0874548"
+        }
+      ]
+    },
+    {
+      "id": "C8",
+      "name": "应用读取模型",
+      "kind": "data_store",
+      "technology": "SQLite / read-models.sqlite",
+      "parent": "S1",
+      "responsibility": "保存可由事件重建的尝试与流转查询索引；只读打开时在内存中重建",
+      "evidence": [
+        {
+          "path": "harness/app/application.py",
+          "symbol": "Application.__init__",
+          "line": 138,
+          "sha256": "cca147e0cc309ae3d22f94fd97120e4ae099caf684c3c0830d98024d3dbc781a"
+        },
+        {
+          "path": "harness/app/read_models.py",
+          "symbol": "ReadModels",
+          "line": 104,
+          "sha256": "60fc2a8eecdeb10fe99e2de452edad98a12935dfb83d1938a1fd9439cfec1a59"
+        }
+      ]
+    },
+    {
+      "id": "B1",
+      "name": "HTTP 接口",
+      "kind": "component",
+      "technology": "FastAPI",
+      "parent": "C2",
+      "responsibility": "生成命令查询路由、提供 SSE 与页面文件并检查访问",
+      "evidence": [
+        {
+          "path": "harness/api/app.py",
+          "symbol": "create_app",
+          "line": 42,
+          "sha256": "cd8245dd3e20fcee74cd623bf3eb67955a59a9f24f289ce7696164f62be01c9f"
+        },
+        {
+          "path": "harness/api/pages.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "d3f13910afd5294002f47fdac596a6e84b3f7735d40c1f61950bd7f0284cf3ef"
+        }
+      ]
+    },
+    {
+      "id": "B2",
+      "name": "应用与项目服务",
+      "kind": "component",
+      "technology": "Python",
+      "parent": "C2",
+      "responsibility": "处理登记的命令查询、项目事项、决定、配置与回写",
+      "evidence": [
+        {
+          "path": "harness/app/application.py",
+          "symbol": "Application",
+          "line": 137,
+          "sha256": "cca147e0cc309ae3d22f94fd97120e4ae099caf684c3c0830d98024d3dbc781a"
+        },
+        {
+          "path": "harness/app/registry.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "94998637bb2a244ea242236008a39c37da2912665b7c149a56c62468e5d1db43"
+        },
+        {
+          "path": "harness/projects.py",
+          "symbol": "ProjectService",
+          "line": 580,
+          "sha256": "158ccfda4d13076ca77f4342fe64147803a934e4d7bc7d2ca23352cdfe98b85c"
+        },
+        {
+          "path": "harness/decision_flow.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "419392ae697b6a7281d7599ace320653b88caced87e895514d8576fb9354fcd8"
+        },
+        {
+          "path": "harness/writeback.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e4621cf279de38a3dca9d12d2f5bb62379d47cf7b0a7622cccc4dc3108a6a8ba"
+        }
+      ]
+    },
+    {
+      "id": "B3",
+      "name": "薄驱动与运行组装",
+      "kind": "component",
+      "technology": "Python / asyncio",
+      "parent": "C2",
+      "responsibility": "组装依赖、管理运行激活、查询边界、处理询问与提案提交",
+      "evidence": [
+        {
+          "path": "harness/runtime.py",
+          "symbol": "LoopSystem",
+          "line": 51,
+          "sha256": "78e7fd79edcd7bb847e38bdca6d8d6de3ebfd1de126cca30c72e8d643a3e6fd4"
+        },
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": "Orchestrator",
+          "line": 228,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        },
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": "_SafeNode",
+          "line": 146,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        },
+        {
+          "path": "harness/recovery.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "aac34ada5880573cb7b0f26c572a0a747c02bd00175faed4def8097ecf91f977"
+        }
+      ]
+    },
+    {
+      "id": "B4",
+      "name": "成果驱动路由",
+      "kind": "component",
+      "technology": "Python / 路由契约",
+      "parent": "C2",
+      "responsibility": "按事实选择工作并判断轮次和事项结束",
+      "evidence": [
+        {
+          "path": "harness/watched_outputs.py",
+          "symbol": "WatchedOutputs",
+          "line": 492,
+          "sha256": "f09c55a2c1219f5963ef78620559488deb0a27a5be9b04689cf153ff1ff5f73a"
+        },
+        {
+          "path": "harness/routing_contract.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "4ac3c8c7648bd5b42ddcb0f2d5ffeaaeaf7783043e3af52a3123f90031757d3a"
+        }
+      ]
+    },
+    {
+      "id": "B5",
+      "name": "上下文装配",
+      "kind": "component",
+      "technology": "Python / 装配契约",
+      "parent": "C2",
+      "responsibility": "按冻结定义与部门历史构造请求及清单，处理压缩",
+      "evidence": [
+        {
+          "path": "harness/assembly.py",
+          "symbol": "ContextAssembly",
+          "line": 156,
+          "sha256": "160fd7053d861a89a87eda03e0134e540f9aa07a8be4ad2e349f77bdd784e5fe"
+        },
+        {
+          "path": "harness/assembly_contract.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "a77f9d30f719198737514636665b9a80d86f857ba718ef3581b3ee1b6bf501fb"
+        },
+        {
+          "path": "harness/context.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "964de83d1a17b479124f8fe7ddee30938a01de76408e24b26e3064f7dc3bd589"
+        },
+        {
+          "path": "harness/compaction.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "8a4825a0f2ba93833f8584df9fedd56325f0d4a2a6dbf98a748bd836770ac2e5"
+        }
+      ]
+    },
+    {
+      "id": "B6",
+      "name": "步骤执行与记录",
+      "kind": "component",
+      "technology": "Python / 执行契约",
+      "parent": "C2",
+      "responsibility": "进行模型步骤、工具许可和动作调用，记录尝试与输出",
+      "evidence": [
+        {
+          "path": "harness/engine.py",
+          "symbol": "StepDriver",
+          "line": 173,
+          "sha256": "365b315eee3cdef8de4dea94754922332951c64dc2215062167724916c867a66"
+        },
+        {
+          "path": "harness/execution_contract.py",
+          "symbol": "SafeNode",
+          "line": 96,
+          "sha256": "a1429ab6ea2cc64d6cb26c09ddc8ca39b6cd39a9f3102b2e6119baf417151ad1"
+        },
+        {
+          "path": "harness/recording.py",
+          "symbol": "StepRecorder",
+          "line": 162,
+          "sha256": "76b71a04e8b5870d34043bf1be4a7cf092d66249e57fd1fdec2976681901b5c3"
+        },
+        {
+          "path": "harness/adapters/facade_adapter.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "d96a7a906523eb7c81402f7555ac0f0c42bdcc74bb814310e5e833003177f340"
+        }
+      ]
+    },
+    {
+      "id": "B7",
+      "name": "裁决与边界规则",
+      "kind": "component",
+      "technology": "Python / 可信内核",
+      "parent": "C2",
+      "responsibility": "依据最小投影与事实核对工具许可、提案、合同与上限",
+      "evidence": [
+        {
+          "path": "harness/adjudication.py",
+          "symbol": "tool_permission",
+          "line": 103,
+          "sha256": "6e0d040b16564492b37068a202f97d43c8aad569539a544792dc5c4d7b497a11"
+        },
+        {
+          "path": "harness/adjudication.py",
+          "symbol": "proposal_decision",
+          "line": 148,
+          "sha256": "6e0d040b16564492b37068a202f97d43c8aad569539a544792dc5c4d7b497a11"
+        },
+        {
+          "path": "harness/adjudication.py",
+          "symbol": "commit_decision",
+          "line": 157,
+          "sha256": "6e0d040b16564492b37068a202f97d43c8aad569539a544792dc5c4d7b497a11"
+        },
+        {
+          "path": "harness/validation.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "832ed49cfbfc23368b208151d689904ad09e07f5434ecb9fccf665519c3387f0"
+        },
+        {
+          "path": "harness/bounds.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "700f3ac90bf67b674f3f892b59a56d8636f31aba1416e3f08382177437f90518"
+        },
+        {
+          "path": "harness/minimal_projection.py",
+          "symbol": "fold_events",
+          "line": 119,
+          "sha256": "2c100883c2b74c67285f013691398483294647a8aabb7b1a29adfcd8e8970438"
+        },
+        {
+          "path": "harness/contracts.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "889bb407c5a014870038955ab47601a6fc042a3ef7c54597e458161f92e8e122"
+        }
+      ]
+    },
+    {
+      "id": "B8",
+      "name": "事实写入口",
+      "kind": "component",
+      "technology": "Python / 可信内核",
+      "parent": "C2",
+      "responsibility": "组织读取判断提交事务，版本冲突重新判断，保存事件及投影",
+      "evidence": [
+        {
+          "path": "harness/write_path.py",
+          "symbol": "WritePath.transact",
+          "line": 207,
+          "sha256": "99acffc48990515bbfc07c69609f1ef03b786dcc438a645bd2cd448fa2af5aef"
+        },
+        {
+          "path": "harness/write_path.py",
+          "symbol": "Transaction",
+          "line": 110,
+          "sha256": "99acffc48990515bbfc07c69609f1ef03b786dcc438a645bd2cd448fa2af5aef"
+        },
+        {
+          "path": "harness/kernel_events.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "b396fb741bd258e2049f6385609e46ef68e9bacfa9dd6950dba9e2de7ac8e2e6"
+        }
+      ]
+    },
+    {
+      "id": "B9",
+      "name": "事件存储访问",
+      "kind": "component",
+      "technology": "Python / sqlite3 / 可信内核",
+      "parent": "C2",
+      "responsibility": "实现数据库提交、读取与订阅通知",
+      "evidence": [
+        {
+          "path": "harness/event_store.py",
+          "symbol": "EventStore.commit",
+          "line": 241,
+          "sha256": "b27d2561ff1842ed2f0338cce9b5a9a1979805d49403db56f271fb2aed3e33ee"
+        }
+      ]
+    },
+    {
+      "id": "B10",
+      "name": "本地执行与外部工具",
+      "kind": "component",
+      "technology": "Python / 子进程 / MCP",
+      "parent": "C2",
+      "responsibility": "查询工作区事实并执行动作，返回回执，管理工作和检查副本",
+      "evidence": [
+        {
+          "path": "harness/environment.py",
+          "symbol": "LocalEnvironment",
+          "line": 710,
+          "sha256": "a79f43295803c97075c56f28eb632dc199cc88201435aa24b90fdfcdb393e011"
+        },
+        {
+          "path": "harness/actions.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "5b007e162493372f6293673e8fbdb94a510cf5b03def6bee53f9eb1b4564a203"
+        },
+        {
+          "path": "harness/mcp_session.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "acc414671561e95bff0d3a0d3a750f14dbb453fa3c2b64dbe6751592e2ed37ad"
+        },
+        {
+          "path": "harness/mcp_client.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "88d3e21e2faf233f677057b769a1a3dda41a97d8f73b3d94eac6b8c26065a019"
+        },
+        {
+          "path": "harness/fetch.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "501a9e1e17a2b54f0f844e7b39d006d0757c76fe830211ea056832ca599a2c11"
+        }
+      ]
+    },
+    {
+      "id": "B11",
+      "name": "模型接入",
+      "kind": "component",
+      "technology": "Python / 模型 SDK",
+      "parent": "C2",
+      "responsibility": "管理连接与准入，每次解析目标并执行模型请求",
+      "evidence": [
+        {
+          "path": "harness/providers/facade.py",
+          "symbol": "ProviderFacade",
+          "line": 67,
+          "sha256": "47c356a236ba9c15a0b671c149948272b518ce1c993132daed8ac3c53a8a9334"
+        },
+        {
+          "path": "harness/providers/resolve.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "c32cb27d8e08a915e088047fe4e53a2f67671ff751511d3c270d045a3c6ed7ad"
+        },
+        {
+          "path": "harness/providers/invoke.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "a979da3f3cc638d6602cbccb591f559fe3f7ff36ac1f8f0f7bf8fdb35ddc4877"
+        },
+        {
+          "path": "harness/providers/credentials.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "65eed9f0595cfc6ca3971bb849301e414abce1aa06be769ef9d2ace9f0874548"
+        }
+      ]
+    },
+    {
+      "id": "B12",
+      "name": "定义加载与校验",
+      "kind": "component",
+      "technology": "Python / JSON / 可信内核加载器",
+      "parent": "C2",
+      "responsibility": "加载并校验角色、成果、工具与路由定义；JSON 数据归应用",
+      "evidence": [
+        {
+          "path": "harness/definitions/__init__.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "a7d87860df0948b096275bf9a6cbac28a9b47733b87ee0da9f494c97de9ce889"
+        },
+        {
+          "path": "harness/definitions/organization.json",
+          "symbol": null,
+          "line": 1,
+          "sha256": "07b5fa82513b1c1802e904a4201187ff75d787cfd4c2182414a6869a68a5926d"
+        },
+        {
+          "path": "harness/definitions/kernel-manifest.json",
+          "symbol": null,
+          "line": 1,
+          "sha256": "1155373f0753c2aa587eb38cf1c18b0fcd6db290fbd0e53e61e0564b21257f85"
+        }
+      ]
+    },
+    {
+      "id": "B13",
+      "name": "查询投影与观察",
+      "kind": "component",
+      "technology": "Python",
+      "parent": "C2",
+      "responsibility": "从事实计算运行、项目、统计视图，提供快照和事件读取",
+      "evidence": [
+        {
+          "path": "harness/projection.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "6fbe1cc8b64630968a838f93fc68fe90f76ac4b3b70d317e680cdd07363678d6"
+        },
+        {
+          "path": "harness/project_projection.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "d066525550a399c9656f25738191ce42e78ab8e5994d4a87e016d303f8193f85"
+        },
+        {
+          "path": "harness/app/read_models.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "60fc2a8eecdeb10fe99e2de452edad98a12935dfb83d1938a1fd9439cfec1a59"
+        },
+        {
+          "path": "harness/app/event_stream.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "89ada1210ea959fdf8018e81cbd7542f641732d5a171b72c022fdd1d3a4a8b27"
+        },
+        {
+          "path": "harness/observability.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "611a2c63d7ae573222a174606cefe0cd6bc814a79ca8aa339a79b24412ae1817"
+        }
+      ]
+    },
+    {
+      "id": "B14",
+      "name": "工件与版本封存",
+      "kind": "component",
+      "technology": "Python / pygit2",
+      "parent": "C2",
+      "responsibility": "保存内容与代码树，准备正式成果并绑定版本证据",
+      "evidence": [
+        {
+          "path": "harness/artifacts.py",
+          "symbol": "ArtifactStore",
+          "line": 41,
+          "sha256": "5042a9dba1b213ace94b08069fcef2a8012e42b277d4b0d899bd55b1e808c3aa"
+        },
+        {
+          "path": "harness/git_versions.py",
+          "symbol": "GitVersionStore",
+          "line": 31,
+          "sha256": "02dc8018cca1e79db79c2f05205572b0fbe1d0b165c511c45e4bd7bcb4c08f23"
+        },
+        {
+          "path": "harness/tree_archive.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "cb8af35261a805fcd1abf4add894c3048743ad3d4f9bc4b913a837c13f468d3f"
+        },
+        {
+          "path": "harness/submissions.py",
+          "symbol": "SubmissionWriter",
+          "line": 164,
+          "sha256": "bca07b93a0b487cf252c985915488439fa359160d24bb5763ed67605aa6516ec"
+        }
+      ]
+    },
+    {
+      "id": "F1",
+      "name": "连接与视图同步",
+      "kind": "component",
+      "technology": "TypeScript / HTTP / SSE",
+      "parent": "C1",
+      "responsibility": "核对能力版本、提交命令、恢复事件流并刷新快照",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/contract/client-app.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "df41f5c08d4d9d088fe14016532d3e86ce1b32ccf1bb88705120b5feb1552887"
+        },
+        {
+          "path": "client/src/renderer/src/contract/view-sync.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "29f9e78107ceb3832e4c09306e101cfc82ce058901de519864fe75a89cfc525b"
+        },
+        {
+          "path": "client/src/renderer/src/contract/event-stream.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "5ce96e77d031b1244c1b51218731f25d7927e83c21c72d74da2ab7acfc968403"
+        },
+        {
+          "path": "client/src/renderer/src/api/generated/types.gen.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "cc27083e00bdf6d138fc3a807e4e222feae040b257766bfc9806cde5bafb7260"
+        }
+      ]
+    },
+    {
+      "id": "F2",
+      "name": "页面与交互",
+      "kind": "component",
+      "technology": "React",
+      "parent": "C1",
+      "responsibility": "组织项目、部门、模型与决定页面，提交用户操作",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/app.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "2747a7a2f2194f292a8b78935560525874c2a492da8253390d0ebf92e943d9b9"
+        },
+        {
+          "path": "client/src/renderer/src/views/project/department.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "ad166b9ccc63d20da0f74ab146b5c29081dff14024d36b87d88e633a93dac088"
+        },
+        {
+          "path": "client/src/renderer/src/views/models/page.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "ff782c5a16c7e984504cd2cd3a3528626e843f8ac4cb0b6696690df496ad8dc9"
+        }
+      ]
+    },
+    {
+      "id": "F3",
+      "name": "事实到画面的翻译",
+      "kind": "component",
+      "technology": "TypeScript",
+      "parent": "C1",
+      "responsibility": "将查询快照翻译为状态，将事件翻译为带回链的画面动作",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/translate/room.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "1d3394aee6e0421873bb57fd79cce712b4f70790cd2dc4db688c0fbfe28e7d45"
+        },
+        {
+          "path": "client/src/renderer/src/translate/building.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "5f42ad28257e11ece15c8c091690b27b427a08079ec1ebc358d271a9ae8984e3"
+        },
+        {
+          "path": "client/src/renderer/src/translate/floor.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e6be941a3f55ac940622072d89b4980ef8335f9a8f4c262073edfa0a640cbb9d"
+        }
+      ]
+    },
+    {
+      "id": "F4",
+      "name": "画面与播放",
+      "kind": "component",
+      "technology": "TypeScript / PixiJS / GSAP",
+      "parent": "C1",
+      "responsibility": "消费画面合同，管理角色场景、绘制和播放",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/pixel/contract.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "b36a8477f0dd975815af59f657095060a1e2f979c0e4d79f3812c6bea9cbc4cb"
+        },
+        {
+          "path": "client/src/renderer/src/pixel/world/index.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "d05606699b70b249a3b1d88f4a0588889ecf71147673a0fc981ee8a7cfbc86bf"
+        },
+        {
+          "path": "client/src/renderer/src/pixel/room/view.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "211fc000318767fb8a157891dcba43ad48f0b5d4a7f0c6f40a490b194dedff31"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "R001",
+      "view": "context",
+      "source": "P1",
+      "target": "S1",
+      "description": "提出目标、指导、回答决定、查看交付",
+      "mechanism": "网页 / 命令行",
+      "evidence": [
+        {
+          "path": "README.md",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e9284e5d7f7e721441a9618ae62e92198eaaca44ca2030177306ffddabd0ff26"
+        }
+      ]
+    },
+    {
+      "id": "R002",
+      "view": "context",
+      "source": "S1",
+      "target": "X1",
+      "description": "请求推理，接收输出与用量",
+      "mechanism": "模型协议 / 网络",
+      "evidence": [
+        {
+          "path": "harness/providers/facade.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "47c356a236ba9c15a0b671c149948272b518ce1c993132daed8ac3c53a8a9334"
+        }
+      ]
+    },
+    {
+      "id": "R003",
+      "view": "context",
+      "source": "S1",
+      "target": "X2",
+      "description": "发现并调用工具，接收结果",
+      "mechanism": "MCP",
+      "evidence": [
+        {
+          "path": "harness/mcp_client.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "88d3e21e2faf233f677057b769a1a3dda41a97d8f73b3d94eac6b8c26065a019"
+        }
+      ]
+    },
+    {
+      "id": "R004",
+      "view": "context",
+      "source": "S1",
+      "target": "X3",
+      "description": "取回资料并保存来源",
+      "mechanism": "HTTP / HTTPS",
+      "evidence": [
+        {
+          "path": "harness/fetch.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "501a9e1e17a2b54f0f844e7b39d006d0757c76fe830211ea056832ca599a2c11"
+        }
+      ]
+    },
+    {
+      "id": "R005",
+      "view": "context",
+      "source": "S1",
+      "target": "X4",
+      "description": "读取项目起点，按命令回写成果",
+      "mechanism": "本地文件访问",
+      "evidence": [
+        {
+          "path": "harness/writeback.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e4621cf279de38a3dca9d12d2f5bb62379d47cf7b0a7622cccc4dc3108a6a8ba"
+        },
+        {
+          "path": "harness/public_tree.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "52e244e9d05a8f7e33c4c0ae085eb226f2219373b18d472d637abf924825905c"
+        }
+      ]
+    },
+    {
+      "id": "R006",
+      "view": "container",
+      "source": "P1",
+      "target": "C1",
+      "description": "交互",
+      "mechanism": "浏览器",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/app.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "2747a7a2f2194f292a8b78935560525874c2a492da8253390d0ebf92e943d9b9"
+        }
+      ]
+    },
+    {
+      "id": "R007",
+      "view": "container",
+      "source": "P1",
+      "target": "C2",
+      "description": "运行命令行入口",
+      "mechanism": "CLI / 应用层",
+      "evidence": [
+        {
+          "path": "harness/__main__.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "8ab1030f9ced604a0cd2d789e097b41b778ea18bb080db17cb966c1951c84280"
+        }
+      ]
+    },
+    {
+      "id": "R008",
+      "view": "container",
+      "source": "C1",
+      "target": "C2",
+      "description": "提交命令、读取快照、订阅事件",
+      "mechanism": "HTTP / SSE",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/contract/client-app.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "df41f5c08d4d9d088fe14016532d3e86ce1b32ccf1bb88705120b5feb1552887"
+        }
+      ]
+    },
+    {
+      "id": "R009",
+      "view": "container",
+      "source": "C2",
+      "target": "C3",
+      "description": "读写事件与保存的投影",
+      "mechanism": "SQLite",
+      "evidence": [
+        {
+          "path": "harness/event_store.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "b27d2561ff1842ed2f0338cce9b5a9a1979805d49403db56f271fb2aed3e33ee"
+        }
+      ]
+    },
+    {
+      "id": "R010",
+      "view": "container",
+      "source": "C2",
+      "target": "C4",
+      "description": "保存和读取内容工件",
+      "mechanism": "文件系统",
+      "evidence": [
+        {
+          "path": "harness/artifacts.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "5042a9dba1b213ace94b08069fcef2a8012e42b277d4b0d899bd55b1e808c3aa"
+        }
+      ]
+    },
+    {
+      "id": "R011",
+      "view": "container",
+      "source": "C2",
+      "target": "C5",
+      "description": "保存和读取代码版本",
+      "mechanism": "pygit2",
+      "evidence": [
+        {
+          "path": "harness/git_versions.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "02dc8018cca1e79db79c2f05205572b0fbe1d0b165c511c45e4bd7bcb4c08f23"
+        }
+      ]
+    },
+    {
+      "id": "R012",
+      "view": "container",
+      "source": "C2",
+      "target": "C6",
+      "description": "建立并执行工作副本",
+      "mechanism": "文件系统 / 子进程",
+      "evidence": [
+        {
+          "path": "harness/environment.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "a79f43295803c97075c56f28eb632dc199cc88201435aa24b90fdfcdb393e011"
+        }
+      ]
+    },
+    {
+      "id": "R013",
+      "view": "container",
+      "source": "C2",
+      "target": "C7",
+      "description": "读写配置、准入与可选凭据",
+      "mechanism": "文件系统",
+      "evidence": [
+        {
+          "path": "harness/providers/facade.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "47c356a236ba9c15a0b671c149948272b518ce1c993132daed8ac3c53a8a9334"
+        }
+      ]
+    },
+    {
+      "id": "R014",
+      "view": "container",
+      "source": "C2",
+      "target": "C8",
+      "description": "维护可重建的查询索引",
+      "mechanism": "SQLite",
+      "evidence": [
+        {
+          "path": "harness/app/application.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "cca147e0cc309ae3d22f94fd97120e4ae099caf684c3c0830d98024d3dbc781a"
+        }
+      ]
+    },
+    {
+      "id": "R015",
+      "view": "container",
+      "source": "C2",
+      "target": "X1",
+      "description": "请求推理",
+      "mechanism": "模型协议 / 网络",
+      "evidence": [
+        {
+          "path": "harness/providers/invoke.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "a979da3f3cc638d6602cbccb591f559fe3f7ff36ac1f8f0f7bf8fdb35ddc4877"
+        }
+      ]
+    },
+    {
+      "id": "R016",
+      "view": "container",
+      "source": "C2",
+      "target": "X2",
+      "description": "调用外部工具",
+      "mechanism": "MCP stdio / HTTP",
+      "evidence": [
+        {
+          "path": "harness/mcp_client.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "88d3e21e2faf233f677057b769a1a3dda41a97d8f73b3d94eac6b8c26065a019"
+        }
+      ]
+    },
+    {
+      "id": "R017",
+      "view": "container",
+      "source": "C2",
+      "target": "X3",
+      "description": "取回外部资料",
+      "mechanism": "HTTP / HTTPS",
+      "evidence": [
+        {
+          "path": "harness/fetch.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "501a9e1e17a2b54f0f844e7b39d006d0757c76fe830211ea056832ca599a2c11"
+        }
+      ]
+    },
+    {
+      "id": "R018",
+      "view": "container",
+      "source": "C2",
+      "target": "X4",
+      "description": "读取起点和回写成果",
+      "mechanism": "文件系统",
+      "evidence": [
+        {
+          "path": "harness/writeback.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e4621cf279de38a3dca9d12d2f5bb62379d47cf7b0a7622cccc4dc3108a6a8ba"
+        }
+      ]
+    },
+    {
+      "id": "R019",
+      "view": "service",
+      "source": "C1",
+      "target": "B1",
+      "description": "命令、查询、事件流",
+      "mechanism": "HTTP / SSE",
+      "evidence": [
+        {
+          "path": "harness/api/app.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "cd8245dd3e20fcee74cd623bf3eb67955a59a9f24f289ce7696164f62be01c9f"
+        }
+      ]
+    },
+    {
+      "id": "R020",
+      "view": "service",
+      "source": "B1",
+      "target": "B2",
+      "description": "转交登记操作",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/api/app.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "cd8245dd3e20fcee74cd623bf3eb67955a59a9f24f289ce7696164f62be01c9f"
+        }
+      ]
+    },
+    {
+      "id": "R021",
+      "view": "service",
+      "source": "B2",
+      "target": "B3",
+      "description": "创建、开始、取消与恢复运行",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/projects.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "158ccfda4d13076ca77f4342fe64147803a934e4d7bc7d2ca23352cdfe98b85c"
+        }
+      ]
+    },
+    {
+      "id": "R022",
+      "view": "service",
+      "source": "B2",
+      "target": "B8",
+      "description": "提交项目与目录变更",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/app/commands.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "9d2971fdeca44b413a3a1a4d5d1a7049111cbf47568d637dc27f8e6bb9b9474e"
+        }
+      ]
+    },
+    {
+      "id": "R023",
+      "view": "service",
+      "source": "B2",
+      "target": "B13",
+      "description": "查询快照与订阅",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/app/application.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "cca147e0cc309ae3d22f94fd97120e4ae099caf684c3c0830d98024d3dbc781a"
+        }
+      ]
+    },
+    {
+      "id": "R024",
+      "view": "service",
+      "source": "B2",
+      "target": "B11",
+      "description": "模型目录与准入操作",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/app/catalog_commands.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "ad25a2b8289f961d54a7318d7178984da71f5e2e1c597f224384b8d8e883b837"
+        }
+      ]
+    },
+    {
+      "id": "R025",
+      "view": "service",
+      "source": "B3",
+      "target": "B4",
+      "description": "选择工作与判断结束",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        }
+      ]
+    },
+    {
+      "id": "R026",
+      "view": "service",
+      "source": "B3",
+      "target": "B6",
+      "description": "开始激活并取得结果",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        }
+      ]
+    },
+    {
+      "id": "R027",
+      "view": "service",
+      "source": "B6",
+      "target": "B3",
+      "description": "安全节点与询问回调",
+      "mechanism": "SafeNode 回调",
+      "evidence": [
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": "_SafeNode",
+          "line": 146,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        }
+      ]
+    },
+    {
+      "id": "R028",
+      "view": "service",
+      "source": "B6",
+      "target": "B5",
+      "description": "装配请求与历史",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/engine.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "365b315eee3cdef8de4dea94754922332951c64dc2215062167724916c867a66"
+        }
+      ]
+    },
+    {
+      "id": "R029",
+      "view": "service",
+      "source": "B6",
+      "target": "B7",
+      "description": "核对工具许可",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/engine.py",
+          "symbol": "StepDriver._begin_tool",
+          "line": 1076,
+          "sha256": "365b315eee3cdef8de4dea94754922332951c64dc2215062167724916c867a66"
+        }
+      ]
+    },
+    {
+      "id": "R030",
+      "view": "service",
+      "source": "B3",
+      "target": "B7",
+      "description": "核对边界与提案",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        }
+      ]
+    },
+    {
+      "id": "R031",
+      "view": "service",
+      "source": "B3",
+      "target": "B8",
+      "description": "提交运行状态与提案",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        }
+      ]
+    },
+    {
+      "id": "R032",
+      "view": "service",
+      "source": "B6",
+      "target": "B8",
+      "description": "提交步骤与尝试记录",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/recording.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "76b71a04e8b5870d34043bf1be4a7cf092d66249e57fd1fdec2976681901b5c3"
+        }
+      ]
+    },
+    {
+      "id": "R033",
+      "view": "service",
+      "source": "B8",
+      "target": "B9",
+      "description": "原子提交事件与投影",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/write_path.py",
+          "symbol": "WritePath.transact",
+          "line": 207,
+          "sha256": "99acffc48990515bbfc07c69609f1ef03b786dcc438a645bd2cd448fa2af5aef"
+        }
+      ]
+    },
+    {
+      "id": "R034",
+      "view": "service",
+      "source": "B9",
+      "target": "C3",
+      "description": "保存及读取",
+      "mechanism": "SQLite",
+      "evidence": [
+        {
+          "path": "harness/event_store.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "b27d2561ff1842ed2f0338cce9b5a9a1979805d49403db56f271fb2aed3e33ee"
+        }
+      ]
+    },
+    {
+      "id": "R035",
+      "view": "service",
+      "source": "B13",
+      "target": "B9",
+      "description": "读取事实与保存的投影",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/app/read_models.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "60fc2a8eecdeb10fe99e2de452edad98a12935dfb83d1938a1fd9439cfec1a59"
+        }
+      ]
+    },
+    {
+      "id": "R036",
+      "view": "service",
+      "source": "B13",
+      "target": "C8",
+      "description": "增量更新并查询尝试与流转索引",
+      "mechanism": "SQLite",
+      "evidence": [
+        {
+          "path": "harness/app/read_models.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "60fc2a8eecdeb10fe99e2de452edad98a12935dfb83d1938a1fd9439cfec1a59"
+        }
+      ]
+    },
+    {
+      "id": "R037",
+      "view": "service",
+      "source": "B6",
+      "target": "B11",
+      "description": "经适配器调用模型",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/adapters/facade_adapter.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "d96a7a906523eb7c81402f7555ac0f0c42bdcc74bb814310e5e833003177f340"
+        }
+      ]
+    },
+    {
+      "id": "R038",
+      "view": "service",
+      "source": "B6",
+      "target": "B10",
+      "description": "查询事实与执行动作",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/engine.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "365b315eee3cdef8de4dea94754922332951c64dc2215062167724916c867a66"
+        }
+      ]
+    },
+    {
+      "id": "R039",
+      "view": "service",
+      "source": "B10",
+      "target": "C6",
+      "description": "管理运行与检查副本",
+      "mechanism": "本地文件访问",
+      "evidence": [
+        {
+          "path": "harness/environment.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "a79f43295803c97075c56f28eb632dc199cc88201435aa24b90fdfcdb393e011"
+        }
+      ]
+    },
+    {
+      "id": "R040",
+      "view": "service",
+      "source": "B10",
+      "target": "X2",
+      "description": "调用外部工具",
+      "mechanism": "MCP stdio / Streamable HTTP",
+      "evidence": [
+        {
+          "path": "harness/mcp_client.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "88d3e21e2faf233f677057b769a1a3dda41a97d8f73b3d94eac6b8c26065a019"
+        }
+      ]
+    },
+    {
+      "id": "R041",
+      "view": "service",
+      "source": "B10",
+      "target": "X3",
+      "description": "取回资料",
+      "mechanism": "HTTP / HTTPS",
+      "evidence": [
+        {
+          "path": "harness/fetch.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "501a9e1e17a2b54f0f844e7b39d006d0757c76fe830211ea056832ca599a2c11"
+        }
+      ]
+    },
+    {
+      "id": "R042",
+      "view": "service",
+      "source": "B11",
+      "target": "X1",
+      "description": "解析目标后请求推理",
+      "mechanism": "模型协议 / 网络",
+      "evidence": [
+        {
+          "path": "harness/providers/facade.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "47c356a236ba9c15a0b671c149948272b518ce1c993132daed8ac3c53a8a9334"
+        }
+      ]
+    },
+    {
+      "id": "R043",
+      "view": "service",
+      "source": "B11",
+      "target": "C7",
+      "description": "管理连接、准入和凭据",
+      "mechanism": "本地文件访问",
+      "evidence": [
+        {
+          "path": "harness/providers/facade.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "47c356a236ba9c15a0b671c149948272b518ce1c993132daed8ac3c53a8a9334"
+        }
+      ]
+    },
+    {
+      "id": "R044",
+      "view": "service",
+      "source": "B3",
+      "target": "B12",
+      "description": "使用冻结定义并配置实现",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/runtime.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "78e7fd79edcd7bb847e38bdca6d8d6de3ebfd1de126cca30c72e8d643a3e6fd4"
+        }
+      ]
+    },
+    {
+      "id": "R045",
+      "view": "service",
+      "source": "B5",
+      "target": "B12",
+      "description": "按事项定义装配",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/assembly.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "160fd7053d861a89a87eda03e0134e540f9aa07a8be4ad2e349f77bdd784e5fe"
+        }
+      ]
+    },
+    {
+      "id": "R046",
+      "view": "service",
+      "source": "B7",
+      "target": "B12",
+      "description": "按定义核对许可与合同",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/adjudication.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "6e0d040b16564492b37068a202f97d43c8aad569539a544792dc5c4d7b497a11"
+        }
+      ]
+    },
+    {
+      "id": "R047",
+      "view": "service",
+      "source": "B3",
+      "target": "B14",
+      "description": "封存接纳成果",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/orchestrator.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "4721bd1e9d1cbcaed3cd6f62eecc09e923c8ea50cda9fadd8c6c9523e8e44e12"
+        }
+      ]
+    },
+    {
+      "id": "R048",
+      "view": "service",
+      "source": "B5",
+      "target": "B14",
+      "description": "保存请求与清单内容",
+      "mechanism": "Python 进程内调用",
+      "evidence": [
+        {
+          "path": "harness/assembly.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "160fd7053d861a89a87eda03e0134e540f9aa07a8be4ad2e349f77bdd784e5fe"
+        }
+      ]
+    },
+    {
+      "id": "R049",
+      "view": "service",
+      "source": "B14",
+      "target": "C4",
+      "description": "内容寻址保存工件",
+      "mechanism": "本地文件访问",
+      "evidence": [
+        {
+          "path": "harness/artifacts.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "5042a9dba1b213ace94b08069fcef2a8012e42b277d4b0d899bd55b1e808c3aa"
+        }
+      ]
+    },
+    {
+      "id": "R050",
+      "view": "service",
+      "source": "B14",
+      "target": "C5",
+      "description": "保存不可变代码树",
+      "mechanism": "本地文件访问",
+      "evidence": [
+        {
+          "path": "harness/git_versions.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "02dc8018cca1e79db79c2f05205572b0fbe1d0b165c511c45e4bd7bcb4c08f23"
+        }
+      ]
+    },
+    {
+      "id": "R051",
+      "view": "service",
+      "source": "B2",
+      "target": "X4",
+      "description": "按用户命令回写",
+      "mechanism": "本地文件访问",
+      "evidence": [
+        {
+          "path": "harness/writeback.py",
+          "symbol": null,
+          "line": 1,
+          "sha256": "e4621cf279de38a3dca9d12d2f5bb62379d47cf7b0a7622cccc4dc3108a6a8ba"
+        }
+      ]
+    },
+    {
+      "id": "R052",
+      "view": "web",
+      "source": "P1",
+      "target": "F2",
+      "description": "用户操作",
+      "mechanism": "TypeScript 调用；服务边界 HTTP / SSE",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/app.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "2747a7a2f2194f292a8b78935560525874c2a492da8253390d0ebf92e943d9b9"
+        }
+      ]
+    },
+    {
+      "id": "R053",
+      "view": "web",
+      "source": "F2",
+      "target": "F1",
+      "description": "提交命令、订阅快照与事件",
+      "mechanism": "TypeScript 调用；服务边界 HTTP / SSE",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/views/project/department.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "ad166b9ccc63d20da0f74ab146b5c29081dff14024d36b87d88e633a93dac088"
+        }
+      ]
+    },
+    {
+      "id": "R054",
+      "view": "web",
+      "source": "F1",
+      "target": "C2",
+      "description": "核对能力、查询、命令与事件流",
+      "mechanism": "TypeScript 调用；服务边界 HTTP / SSE",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/contract/client-app.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "df41f5c08d4d9d088fe14016532d3e86ce1b32ccf1bb88705120b5feb1552887"
+        }
+      ]
+    },
+    {
+      "id": "R055",
+      "view": "web",
+      "source": "F2",
+      "target": "F3",
+      "description": "传入快照位置与事件",
+      "mechanism": "TypeScript 调用；服务边界 HTTP / SSE",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/views/project/room-screen.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "6b677719d1a7b6625e5307efd488299826a8fed05e0bf62132c476cbf7182e50"
+        }
+      ]
+    },
+    {
+      "id": "R056",
+      "view": "web",
+      "source": "F2",
+      "target": "F4",
+      "description": "传入翻译结果并管理视图",
+      "mechanism": "TypeScript 调用；服务边界 HTTP / SSE",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/views/project/room-screen.tsx",
+          "symbol": null,
+          "line": 1,
+          "sha256": "6b677719d1a7b6625e5307efd488299826a8fed05e0bf62132c476cbf7182e50"
+        }
+      ]
+    },
+    {
+      "id": "R057",
+      "view": "web",
+      "source": "F3",
+      "target": "F4",
+      "description": "使用画面合同构造状态与动作",
+      "mechanism": "TypeScript 调用；服务边界 HTTP / SSE",
+      "evidence": [
+        {
+          "path": "client/src/renderer/src/translate/room.ts",
+          "symbol": null,
+          "line": 1,
+          "sha256": "1d3394aee6e0421873bb57fd79cce712b4f70790cd2dc4db688c0fbfe28e7d45"
+        }
+      ]
+    }
+  ],
+  "verification": {
+    "method": "路径、Python AST 符号、文件摘要、父子归属和关系端点核对",
+    "node_count": 32,
+    "relationship_count": 57,
+    "product_tests": "本次未运行；没有修改产品代码",
+    "diagram_render": "Mermaid CLI 12.0.0 + 本机 Chromium：全部通过",
+    "evidence_count": 149,
+    "document_link_count": 49,
+    "rendered_diagrams": [
+      "docs\\C4\\diagrams\\01-context-1.svg",
+      "docs\\C4\\diagrams\\02-containers-1.svg",
+      "docs\\C4\\diagrams\\03-components-1.svg",
+      "docs\\C4\\diagrams\\03-components-2.svg",
+      "docs\\C4\\diagrams\\04-code-1.svg",
+      "docs\\C4\\diagrams\\05-runtime-1.svg",
+      "docs\\C4\\diagrams\\05-runtime-2.svg"
+    ],
+    "baseline_file_count": 77,
+    "baseline_content": "登记的全部证据文件与 source_commit 中的文件内容一致；比较与摘要计算时统一 CRLF/LF 为 LF",
+    "visual_inspection": [
+      "容器图",
+      "服务组件图",
+      "关键代码图"
+    ]
+  },
+  "evidence_hash_format": "SHA-256 of file bytes after CRLF -> LF normalization"
+}

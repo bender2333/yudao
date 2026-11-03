@@ -1,0 +1,27 @@
+{
+"schema":1,
+"path":"evals/context/README.md",
+"hash":"fe0e1c3b3bfc804e",
+"nodes":[
+{"hash":"fe0e1c3b3bfc804e","id":"evals/context/README.md","kind":"file","title":"evals/context/README.md"},
+{"hash":"56f0dcde2207a024","id":"evals/context/README.md#上下文装配的离线回放","kind":"section","parent":"evals/context/README.md","title":"上下文装配的离线回放"},
+{"hash":"eb042fc16322b98b","id":"evals/context/README.md#上下文装配的离线回放 > 怎么用","kind":"section","parent":"evals/context/README.md#上下文装配的离线回放","title":"怎么用"},
+{"hash":"391ecb819713f8d9","id":"evals/context/README.md#上下文装配的离线回放 > 每一步在测什么","kind":"section","parent":"evals/context/README.md#上下文装配的离线回放","title":"每一步在测什么"},
+{"hash":"86558ecb9fe3efd4","id":"evals/context/README.md#上下文装配的离线回放 > 文件","kind":"section","parent":"evals/context/README.md#上下文装配的离线回放","title":"文件"}
+],
+"edges":[
+{"dst":"docs/design/context-assembly.md","kind":"link","raws":["../../docs/design/context-assembly.md"],"seen":"9a60e35cc098ce8d","src":"evals/context/README.md#上下文装配的离线回放"},
+{"dst":"evals/context/counterfactual.py","kind":"code-path","raws":["counterfactual.py"],"seen":"07acb0fe019a2f03","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/items.py","kind":"code-path","raws":["items.py"],"seen":"f2bc80c7cb6ce244","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/measure.py","kind":"code-path","raws":["measure.py"],"seen":"474977f515e63e4c","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/references.py","kind":"code-path","raws":["references.py"],"seen":"36eb6a663741160b","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/replay.py","kind":"code-path","raws":["replay.py"],"seen":"8c083f80e88dd180","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/rule-set.json","kind":"code-path","raws":["rule-set.json"],"seen":"f325f1734a4f57ff","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/store.py","kind":"code-path","raws":["store.py"],"seen":"5c4b4fd06d8c0531","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/sweep.py","kind":"code-path","raws":["sweep.py"],"seen":"7473e085027fc41d","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/verify.py","kind":"code-path","raws":["verify.py"],"seen":"81356142011f5741","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/view.py","kind":"code-path","raws":["view.py"],"seen":"aa9203bb7e97c710","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/tests/test_context_view.py","kind":"code-path","raws":["evals/tests/test_context_view.py"],"seen":"758076225c50f7ab","src":"evals/context/README.md#上下文装配的离线回放 > 文件"},
+{"dst":"evals/context/references.py","kind":"code-path","raws":["references.py"],"seen":"36eb6a663741160b","src":"evals/context/README.md#上下文装配的离线回放 > 每一步在测什么"}
+]
+}

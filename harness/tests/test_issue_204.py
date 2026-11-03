@@ -19,7 +19,7 @@ from harness.definitions import DEFINITIONS
 from harness.event_store import Command
 from harness.models import EventType, new_id
 from harness.projection import saved_decisions
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
@@ -204,7 +204,7 @@ def _workspace_unrepresentable_run(tmp_path, tail):
     system = LoopSystem.for_testing(_short_data_dir(tmp_path), FakeAdapter({
         "product": [product_spec()],
         "engineering": [link_then, tail],
-        "quality": [explore_turn(), review_turn("release", "checks passed on the current snapshot")],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "checks passed on the current snapshot")],
     }))
     run_id = system.create_run("A link pauses the run")
     workspace = system.workspace(run_id)

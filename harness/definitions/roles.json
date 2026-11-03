@@ -63,10 +63,12 @@
       "stop_job",
       "run_check",
       "ask",
-      "submit_review"
+      "submit_review",
+      "submit_independent_judgement"
     ],
     "visibility": [
-      "current_delivery_spec"
+      "delivery_facts",
+      "delivery_explanation"
     ]
   }
 }

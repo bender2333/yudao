@@ -1,0 +1,16 @@
+{
+"schema":1,
+"path":"docs/adr/0024-git-in-process-with-pygit2.md",
+"hash":"123eb22123adb887",
+"nodes":[
+{"hash":"123eb22123adb887","id":"docs/adr/0024-git-in-process-with-pygit2.md","kind":"file","title":"docs/adr/0024-git-in-process-with-pygit2.md"},
+{"hash":"123eb22123adb887","id":"docs/adr/0024-git-in-process-with-pygit2.md#Yudao 自己的 Git 操作在进程内用 pygit2 完成","kind":"section","parent":"docs/adr/0024-git-in-process-with-pygit2.md","title":"Yudao 自己的 Git 操作在进程内用 pygit2 完成"}
+],
+"edges":[
+{"dst":"docs/adr/0018-single-control-host-remote-execution.md","kind":"link","raws":["0018-single-control-host-remote-execution.md"],"seen":"1a08d2ab13e30da9","src":"docs/adr/0024-git-in-process-with-pygit2.md#Yudao 自己的 Git 操作在进程内用 pygit2 完成"},
+{"dst":"harness/git_versions.py","kind":"code-path","raws":["harness/git_versions.py"],"seen":"02dc8018cca1e79d","src":"docs/adr/0024-git-in-process-with-pygit2.md#Yudao 自己的 Git 操作在进程内用 pygit2 完成"},
+{"dst":"harness/public_tree.py","kind":"code-path","raws":["harness/public_tree.py"],"seen":"52e244e9d05a8f7e","src":"docs/adr/0024-git-in-process-with-pygit2.md#Yudao 自己的 Git 操作在进程内用 pygit2 完成"},
+{"dst":"harness/snapshot.py","kind":"code-path","raws":["harness/snapshot.py"],"seen":"30f148f28f93eb62","src":"docs/adr/0024-git-in-process-with-pygit2.md#Yudao 自己的 Git 操作在进程内用 pygit2 完成"},
+{"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"78e235b5c69afc24","src":"docs/adr/0024-git-in-process-with-pygit2.md#Yudao 自己的 Git 操作在进程内用 pygit2 完成"}
+]
+}

@@ -122,6 +122,12 @@
       "checks": "host_measurement"
     }
   },
+  "independent_judgement_committed": {
+    "source": "role_statement",
+    "fields": {
+      "checks": "host_measurement"
+    }
+  },
   "qa_tests_saved": {
     "source": "rule"
   },

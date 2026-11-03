@@ -1,0 +1,27 @@
+{
+"schema":1,
+"path":"docs/C4/README.md",
+"hash":"7a93865928e5ad5b",
+"nodes":[
+{"hash":"7a93865928e5ad5b","id":"docs/C4/README.md","kind":"file","title":"docs/C4/README.md"},
+{"hash":"7a93865928e5ad5b","id":"docs/C4/README.md#当前代码的 C4 模型","kind":"section","parent":"docs/C4/README.md","title":"当前代码的 C4 模型"}
+],
+"edges":[
+{"dst":"docs/C4/01-context.md","kind":"link","raws":["01-context.md"],"seen":"334baca11b25793a","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/02-containers.md","kind":"link","raws":["02-containers.md"],"seen":"e01f82387859549b","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/03-components.md","kind":"link","raws":["03-components.md"],"seen":"119792e6fbe9e0e2","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/04-code.md","kind":"link","raws":["04-code.md"],"seen":"27a7ec3eaaa5d022","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/05-runtime.md","kind":"link","raws":["05-runtime.md"],"seen":"071fcc3f2406b065","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/06-code-to-model.md","kind":"link","raws":["06-code-to-model.md"],"seen":"1a76c24cda915311","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/diagrams/01-context-1.svg","kind":"link","raws":["diagrams/01-context-1.svg"],"seen":"2269d499bcd61221","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/diagrams/02-containers-1.svg","kind":"link","raws":["diagrams/02-containers-1.svg"],"seen":"fb9f2872d6dbb48b","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/diagrams/03-components-1.svg","kind":"link","raws":["diagrams/03-components-1.svg"],"seen":"c77ec175a6119d1b","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/diagrams/03-components-2.svg","kind":"link","raws":["diagrams/03-components-2.svg"],"seen":"bcaad15bd9370c6c","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/diagrams/04-code-1.svg","kind":"link","raws":["diagrams/04-code-1.svg"],"seen":"e160c1976db17bf6","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/diagrams/05-runtime-1.svg","kind":"link","raws":["diagrams/05-runtime-1.svg"],"seen":"f75392248d9f7eea","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/diagrams/05-runtime-2.svg","kind":"link","raws":["diagrams/05-runtime-2.svg"],"seen":"5ab8552e8491595c","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/model.json","kind":"code-path","raws":["model.json"],"seen":"706e4250c015d7cc","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/C4/model.json","kind":"link","raws":["model.json"],"seen":"706e4250c015d7cc","src":"docs/C4/README.md#当前代码的 C4 模型"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/C4/README.md#当前代码的 C4 模型"}
+]
+}

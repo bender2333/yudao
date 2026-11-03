@@ -216,7 +216,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
 
     if etype == EventType.PRODUCT_INPUT_ASSIGNED:
         state.product_work_input_version = payload["through_version"]
-        state.active_department = "product"
+        # 输入分派给了谁取事件自己带的部门（工单 #1391）：写入口按事项所用的定义填这一条，
+        # 投影不认部门的名字；旧事件也带着这个字段
+        state.active_department = event.department
         return
 
     if etype == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
@@ -794,4 +796,7 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
         criteria=[dict(item) for item in payload.get("criteria", [])],
         coverage=dict(payload.get("coverage") or {}),
         open_criteria=[str(item) for item in payload.get("open_criteria", [])],
+        # 结论文档引用的独立判断与改判的条数（工单 #1190）：旧事件没有这两项
+        judgement_event=str(payload.get("judgement_event") or ""),
+        changed=int((payload.get("coverage") or {}).get("changed") or 0),
     )

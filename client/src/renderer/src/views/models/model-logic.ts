@@ -8,7 +8,6 @@ import type {
   CatalogAdmission,
   CatalogBinding,
   CatalogCandidate,
-  CatalogCredential,
   CatalogModel,
   CatalogProvider,
 } from "../../api/generated/types.gen";
@@ -114,11 +113,80 @@ export function credentialSourceText(source: string): string {
   }
 }
 
-export function credentialStatusLabel(credential: CatalogCredential): string {
+// 凭据状态（设计说明第 9.1 节「Key 状态」）：已保存与来源。
+// 只读两样东西（工单 #237）：项目设置里的 MCP 服务器一节也用这句话，两处的凭据状态说法一致
+export function credentialStatusLabel(credential: { configured: boolean; source: string }): string {
   if (!credential.configured) {
     return "缺失";
   }
   return `已保存 · 来源：${credentialSourceText(credential.source)}`;
+}
+
+// ---------------------------------------------------------------------------
+// 获取模型列表这条操作的状态（工单 #1355）
+// ---------------------------------------------------------------------------
+
+// 一次已经发出去的获取：记下发起时这一份连接的结果（结果时间与状态）。
+// 服务端的取得是后台任务，结果以后以事件与新的一份目录出现（工单 #1355 之前页面只靠一条事件复位，
+// 事件丢了或者服务端提前结束不写事件时，页面就永远停在忙碌态）
+export type PendingFetch = { provider_id: string; fetched_at: string | null; status: string | null };
+
+// 这一份连接最近一次结果的样子：没有结果时两个值都是 null
+function latestResult(provider: CatalogProvider): { fetched_at: string | null; status: string | null } {
+  return provider.latest_candidates
+    ? { fetched_at: provider.latest_candidates.fetched_at, status: provider.latest_candidates.status }
+    : { fetched_at: null, status: null };
+}
+
+// 还在取候选的连接：目录里这一份的结果与发起时一样，就是这次的结果还没回来。
+// 成功与失败都会换掉结果（失败写空的结果时间与 unknown），所以失败也在这里结束，页面回到可以操作的状态。
+// 同一份连接连续失败两次时结果一样，这种情况由事件结束（页面另收 catalog_candidates_collected）
+export function collectingProvider(
+  catalog: { providers: CatalogProvider[] } | null,
+  pending: PendingFetch | null,
+): string | null {
+  if (catalog === null || pending === null) {
+    return null;
+  }
+  const provider = catalog.providers.find((item) => item.id === pending.provider_id);
+  if (provider === undefined) {
+    return null;
+  }
+  const latest = latestResult(provider);
+  return latest.fetched_at === pending.fetched_at && latest.status === pending.status ? provider.id : null;
+}
+
+// 候选区是否暂停操作：只有页面自己发出的命令在途时暂停。
+// 服务端在后台取候选时不暂停——取候选可能很久（真实服务上是一趟网络请求），页面不能因此不能用
+// （工单 #1355：不能停在「按钮灰着但没写为什么」，也不能靠超时或刷新页面掩盖）
+export function candidatesLocked(input: { busy: boolean; connecting: boolean }): boolean {
+  return input.busy || input.connecting;
+}
+
+// 候选区上方的一句话：请求在途时写明在做什么；取候选时说明可以继续操作；空闲时没有这一句
+export function fetchNoteText(input: { connecting: boolean; collecting: boolean }): string {
+  if (input.connecting) {
+    return "正在获取模型列表…连接与 Key 正在保存，这期间候选区暂停操作。";
+  }
+  if (input.collecting) {
+    return "正在获取模型列表…结果回来以后候选会自动出现，这期间可以继续查看已有的候选。";
+  }
+  return "";
+}
+
+// 连接卡片上取候选时的一句话（工单 #1355：说明写在被操作的对象旁边）
+export const CONNECTION_FETCHING_TEXT = "正在获取模型列表…结果会写在这张卡片里。";
+
+// 连接卡片上「最近一次获取」的一行：成功写数量与时间，失败写服务端给的原因（设计说明第 9.1 节）
+export function fetchSummaryOf(provider: CatalogProvider): { text: string; kind: "ok" | "error" | "none" } {
+  const latest = provider.latest_candidates;
+  if (!latest) {
+    return { text: "还没有获取过模型列表。", kind: "none" };
+  }
+  if (latest.status === "ok") {
+    return { text: `已获取 ${latest.candidates.length} 个模型 · ${latest.fetched_at}`, kind: "ok" };
+  }
+  return { text: latest.error ?? "获取模型列表失败。", kind: "error" };
 }
 
 // ---------------------------------------------------------------------------

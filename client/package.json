@@ -6,7 +6,6 @@
   "description": "Yudao 网页界面：Vite 构建的页面文件，由 Yudao 服务提供",
   "scripts": {
     "generate:api": "node scripts/generate-api.mjs",
-    "generate:pixel": "node scripts/generate-pixel-registry.mjs",
     "build:pages": "vite build --config vite.pages.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test --test-reporter=dot tests/unit/*.test.js tests/unit/*.test.ts",

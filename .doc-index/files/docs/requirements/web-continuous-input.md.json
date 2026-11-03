@@ -1,0 +1,20 @@
+{
+"schema":1,
+"path":"docs/requirements/web-continuous-input.md",
+"hash":"b3615135834e679d",
+"nodes":[
+{"hash":"b3615135834e679d","id":"docs/requirements/web-continuous-input.md","kind":"file","title":"docs/requirements/web-continuous-input.md"},
+{"hash":"6f03a41aa8f04e44","id":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令","kind":"section","parent":"docs/requirements/web-continuous-input.md","title":"D01 Web 持续输入任务与命令"},
+{"hash":"f7b4193fd031049b","id":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 已确认","kind":"section","parent":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令","title":"已确认"},
+{"hash":"43299a90d03a9974","id":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 设计选择","kind":"section","parent":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令","title":"设计选择"}
+],
+"edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../design/app-and-interface.md"],"seen":"27202f83b6537e9c","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令"},
+{"dst":"docs/design/app-and-interface.md","kind":"link","raws":["../design/app-and-interface.md"],"seen":"27202f83b6537e9c","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 已确认"},
+{"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 已确认"},
+{"dst":"docs/requirements/in-flight-input.md","kind":"link","raws":["in-flight-input.md"],"seen":"46b5af91b05daf1b","src":"docs/requirements/web-continuous-input.md#D01 Web 持续输入任务与命令 > 已确认"}
+]
+}

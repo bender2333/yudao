@@ -1,0 +1,20 @@
+{
+"schema":1,
+"path":"docs/requirements/department-prompts.md",
+"hash":"c8dce302f7170b1e",
+"nodes":[
+{"hash":"c8dce302f7170b1e","id":"docs/requirements/department-prompts.md","kind":"file","title":"docs/requirements/department-prompts.md"},
+{"hash":"81a5f1b6eb7b56d5","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","kind":"section","parent":"docs/requirements/department-prompts.md","title":"D02 三部门 prompt 展示与修改"},
+{"hash":"e8865b0448362e5f","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 已确认","kind":"section","parent":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","title":"已确认"},
+{"hash":"60f9e51571d9715b","id":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择","kind":"section","parent":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改","title":"设计选择"}
+],
+"edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c885094f22cf0815","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改"},
+{"dst":"docs/design/architecture/overall-architecture.md","kind":"link","raws":["../design/architecture/overall-architecture.md"],"seen":"c885094f22cf0815","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择"},
+{"dst":"docs/requirements/model-management.md","kind":"link","raws":["model-management.md"],"seen":"c6e237cf82f11f6b","src":"docs/requirements/department-prompts.md#D02 三部门 prompt 展示与修改 > 设计选择"}
+]
+}

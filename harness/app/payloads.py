@@ -8,10 +8,13 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..definitions import DEFINITIONS
 from ..kernel_events import SKELETON_EVENTS, register_application_event_types
-from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
+from ..models import CatalogEventType, EventType, ProjectEventType
 from ..streams import PRIORITY_USER
 
-Department = Literal[DEPARTMENTS]
+# 部门是对外合同里的字符串（工单 #1389，设计说明「形态随事项冻结」）：取值由事项所用的那份定义给出，
+# 不在这份合同里收窄成三个固定的值。名字不认识时由写入口按定义拒绝，错误写明可用的部门。
+# 成果的作者部门（issuer）同样：它记的是写下这份成果的部门，也是定义里给的名字
+Department = str
 Purpose = Literal["work", "compaction"]
 
 
@@ -464,6 +467,9 @@ class ContextAssembledPayload(Versions, WorkBasis, CallTarget):
     compaction_event_id: str | None
     input_token_estimate: int
     output_reserve_tokens: int
+    # 装配按哪一版规则算出来的，以及这一次折叠了哪几轮（工单 #1200）
+    rules_version: str | None = None
+    folded_rounds: list[int] = Field(default_factory=list)
     # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量（模型管理设计说明第 8.2 节）
     previous_usage_tokens: int | None = None
     parts_ref: ArtifactRef
@@ -761,7 +767,7 @@ class SpecAcceptedPayload(AcceptanceFields):
     # 旧事件没有这个字段时为空（工单 #1178）
     requirement_mapping: list[RequirementMapping] = []
     kind: Literal["product_spec"]
-    issuer: Literal["product"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -846,7 +852,7 @@ class DeliveryAcceptedPayload(AcceptanceFields):
     effective_contract_hash: str
     code_tree_digest: str
     kind: Literal["delivery_spec"]
-    issuer: Literal["engineering"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -863,27 +869,49 @@ class Defect(Payload):
 
 class QaCriterionPayload(Payload):
     # 质检的逐条结论（验证的独立性设计说明第 7.1 节、浏览器与 computer use 设计说明第 8.3 节，工单 #151）：
-    # criterion 是验收条件在 ProductSpec 里的位置写成的 AC<序号>，method 是检验方式，result 只有三种
+    # criterion 是验收条件在 ProductSpec 里的位置写成的 AC<序号>，method 是检验方式，result 只有三种。
+    # judged 是独立判断当时对这条验收条件的结果，change_reason 是改判理由（第 4 节，工单 #1190）：
+    # 结论与判断不一致的条目才写；判断事件里的同一形状没有这两项，旧事件也没有
     criterion: str
     method: Literal["check", "trial", "measure", "judgement", "human", "open"]
     result: Literal["passed", "failed", "unverified"]
     checks: list[str]
     trial_cases: list[str]
     note: str
+    judged: str = ""
+    change_reason: str = ""
 
 
 class QaCoveragePayload(Payload):
     # 放行记录里的三个数（第 7.1 节第 4 点）：一次算好，查询与画面读这个数，不重新计算。
-    # coverage_ratio 是可执行检验里已在当前快照上通过的条件数除以条件总数
+    # coverage_ratio 是可执行检验里已在当前快照上通过的条件数除以条件总数；
+    # changed 是改判的条数（第 4 节，工单 #1190），以后算解释翻转率时从这里取，旧事件没有这一项
     criteria_total: int
     executable: int
     covered: int
     coverage_ratio: float
     model_reading: int
     open: int
+    changed: int = 0
+
+
+class IndependentJudgementPayload(Payload):
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里对当前交付
+    # 的每条验收条件写出的判断，按 #151 逐条结论的形状（同一份 QaCriterionPayload，字段封闭）。
+    # 它不是成果：不进版本链、不失效任何东西；门（放行要引用它）与装配（解释并进的时机）读它的存在。
+    # checks 是本次激活的质检检查名（逐条结论引用的回执），criteria_count 是判断的条数：
+    # 与 criteria 一起写入，画面不用数列表
+    kind: Literal["independent_judgement"]
+    product_spec_hash: str
+    delivery_spec_hash: str
+    checks: list[str]
+    criteria_count: int
+    criteria: list[QaCriterionPayload]
 
 
 class QaSubmittedPayload(AcceptanceFields):
+    # judgement_event 是这份结论引用的独立判断事件（第 4 节，工单 #1190）：放行记录与判断成对，
+    # 以后算解释翻转率时按这一对取；旧事件没有这一项
     product_spec_hash: str
     effective_contract_hash: str
     delivery_spec_hash: str
@@ -896,8 +924,9 @@ class QaSubmittedPayload(AcceptanceFields):
     coverage: QaCoveragePayload
     open_criteria: list[str]
     evidence_refs: list[ArtifactRef]
+    judgement_event: str = ""
     kind: Literal["qa_review"]
-    issuer: Literal["quality"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -947,7 +976,7 @@ class StructureAcceptedPayload(AcceptanceFields):
     product_spec_hash: str
     code_tree_digest: str
     kind: Literal["structure"]
-    issuer: Literal["engineering"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -984,7 +1013,7 @@ class BaselineReviewAcceptedPayload(AcceptanceFields):
     structure_hash: str
     code_snapshot_hash: str
     kind: Literal["baseline_review"]
-    issuer: Literal["quality"]
+    issuer: str
     parent_hash: str | None
     revision: int
     status: Literal["active"]
@@ -1739,6 +1768,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.CONTRACT_ACCEPTED: ContractAcceptedPayload,
     EventType.ASK_STARTED: AskStartedPayload,
     EventType.ASK_ANSWERED: AskAnsweredPayload,
+    EventType.INDEPENDENT_JUDGEMENT_COMMITTED: IndependentJudgementPayload,
     EventType.PRODUCT_DECISION_ACCEPTED: ProductDecisionAcceptedPayload,
     EventType.ARTIFACT_INVALIDATED: ArtifactInvalidatedPayload,
     EventType.DELIVERY_ACCEPTED: DeliveryAcceptedPayload,

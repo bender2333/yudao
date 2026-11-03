@@ -238,6 +238,8 @@ const ROOM: Readonly<Record<string, (ev: RoomEvent, dept: string, ctx: RoomConte
       ? handoffIn(ev, dept, "quality", str(pl(ev).release_to) || "library", "release")
       : handoffIn(ev, dept, "quality", "engineering", "defect"));
   },
+  // 独立判断：核验角色交上自己的判断（先判断后看解释，工单 #358），交出的判断留在房间里
+  independent_judgement_committed: own("submit"),
   // 询问：发问的部门写纸条塞进传信管口；被询问的部门取出来读
   ask_started: (ev, dept) => {
     const p = pl(ev);

@@ -1,0 +1,17 @@
+{
+"schema":1,
+"path":"docs/requirements/domain-completion.md",
+"hash":"9936ac05c6c89839",
+"nodes":[
+{"hash":"9936ac05c6c89839","id":"docs/requirements/domain-completion.md","kind":"file","title":"docs/requirements/domain-completion.md"},
+{"hash":"502444cee6c323f1","id":"docs/requirements/domain-completion.md#D12 部门的专业补全","kind":"section","parent":"docs/requirements/domain-completion.md","title":"D12 部门的专业补全"},
+{"hash":"a71ae549e1b539d6","id":"docs/requirements/domain-completion.md#D12 部门的专业补全 > 有效规则","kind":"section","parent":"docs/requirements/domain-completion.md#D12 部门的专业补全","title":"有效规则"},
+{"hash":"0f976c66afd7a205","id":"docs/requirements/domain-completion.md#D12 部门的专业补全 > 验收","kind":"section","parent":"docs/requirements/domain-completion.md#D12 部门的专业补全","title":"验收"}
+],
+"edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/domain-completion.md#D12 部门的专业补全"},
+{"dst":"docs/design/department-loop.md","kind":"link","raws":["../design/department-loop.md"],"seen":"3e2445e393b9ecd2","src":"docs/requirements/domain-completion.md#D12 部门的专业补全"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/domain-completion.md#D12 部门的专业补全"},
+{"dst":"docs/requirements/expert-ask-react.md","kind":"link","raws":["expert-ask-react.md"],"seen":"9e5f173b49e86a78","src":"docs/requirements/domain-completion.md#D12 部门的专业补全 > 有效规则"}
+]
+}

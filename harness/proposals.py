@@ -183,6 +183,49 @@ def default_criteria(count: int, checks: list[str], *,
             for position in range(1, count + 1)]
 
 
+def judgement(
+    checks: list[str] | None = None,
+    criteria: list[dict[str, Any]] | None = None,
+    basis_delivery_spec_hash: str | None = None,
+    criteria_count: int = 1,
+) -> dict[str, Any]:
+    # 独立判断的提案（验证的独立性设计说明第 4 节，工单 #358）：先判断后看解释——
+    # 在只看事实的上下文里对当前交付的每条验收条件写出判断，门（提交结论前必须有它）读这个事件
+    names = checks or ["smoke"]
+    return {
+        "kind": "independent_judgement",
+        "checks": list(names),
+        "criteria": default_criteria(criteria_count, list(names)) if criteria is None else criteria,
+        "basis_delivery_spec_hash": basis_delivery_spec_hash,
+    }
+
+
+def judgement_turn(
+    checks: dict[str, int | dict[str, Any]] | None = None,
+    *,
+    basis_delivery_spec_hash: str | None = None,
+    criteria: list[dict[str, Any]] | None = None,
+    transcript: str = "",
+) -> Callable[[Any], FakeTurn]:
+    # 独立判断的假模型轮次：按请求里的当前交付填依据版本，检查名与回执同名（与 review_turn 的做法一致）。
+    # 逐条结论的条数按请求里当前 ProductSpec 的验收条件数生成（acceptance_criteria_count）
+    checks = checks or {"smoke": 0}
+
+    def factory(call: Any) -> FakeTurn:
+        declared = basis_delivery_spec_hash
+        if declared is None:
+            raw = prompt_part(call, "current_delivery_spec")
+            declared = json.loads(raw).get("content_hash") if raw else None
+        return FakeTurn(
+            proposal=judgement(list(checks), criteria=criteria, basis_delivery_spec_hash=declared,
+                               criteria_count=acceptance_criteria_count(call)),
+            checks=checks,
+            transcript=transcript,
+        )
+
+    return factory
+
+
 def acceptance_criteria_count(call: Any) -> int:
     # 请求里的当前 ProductSpec 有几条验收条件：逐条结论按这个条数生成，与真实模型从上下文读到的一样
     raw = prompt_part(call, "current_product_spec")
@@ -200,9 +243,10 @@ def review(
     basis_delivery_spec_hash: str | None = None,
     criteria: list[dict[str, Any]] | None = None,
     criteria_count: int = 1,
+    judgement_event: str | None = None,
 ) -> dict[str, Any]:
     names = checks or ["smoke"]
-    return {
+    payload = {
         "kind": "qa_review",
         "verdict": verdict,
         "rationale": rationale,
@@ -211,6 +255,11 @@ def review(
         "criteria": default_criteria(criteria_count, list(names)) if criteria is None else criteria,
         "basis_delivery_spec_hash": basis_delivery_spec_hash,
     }
+    # 结论引用的独立判断（验证的独立性设计说明第 4 节，工单 #1190）：不写编号时由主机取当前交付的
+    # 那一条判断；写明的编号必须是这一轮核验引用的那条判断
+    if judgement_event is not None:
+        payload["judgement_event"] = judgement_event
+    return payload
 
 
 def delivery_turn(
@@ -219,6 +268,7 @@ def delivery_turn(
     files: dict[str, str] | None = None,
     checks: dict[str, int | dict[str, Any]] | None = None,
     basis_product_spec_hash: str | None = None,
+    known_risks: list[str] | None = None,
     launch: list[dict[str, Any]] | None = None,
     transcript: str = "",
 ) -> Callable[[Any], FakeTurn]:
@@ -233,7 +283,7 @@ def delivery_turn(
             raw = prompt_part(call, "current_product_spec")
             declared = json.loads(raw).get("content_hash") if raw else None
         return FakeTurn(
-            proposal=delivery(summary, check_names=list(checks),
+            proposal=delivery(summary, check_names=list(checks), known_risks=known_risks,
                               basis_product_spec_hash=declared, launch=launch),
             writes=files,
             checks=checks,
@@ -251,6 +301,7 @@ def review_turn(
     defects: list[dict[str, str]] | None = None,
     basis_delivery_spec_hash: str | None = None,
     criteria: list[dict[str, Any]] | None = None,
+    judgement_event: str | None = None,
     transcript: str = "",
 ) -> Callable[[Any], FakeTurn]:
     checks = checks or {"smoke": 0}
@@ -263,7 +314,8 @@ def review_turn(
         return FakeTurn(
             proposal=review(verdict, rationale, checks=list(checks), defects=defects,
                             basis_delivery_spec_hash=declared, criteria=criteria,
-                            criteria_count=acceptance_criteria_count(call)),
+                            criteria_count=acceptance_criteria_count(call),
+                            judgement_event=judgement_event),
             checks=checks,
             transcript=transcript,
         )

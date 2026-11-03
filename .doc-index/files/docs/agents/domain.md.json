@@ -1,0 +1,17 @@
+{
+"schema":1,
+"path":"docs/agents/domain.md",
+"hash":"095a745597a86ed0",
+"nodes":[
+{"hash":"095a745597a86ed0","id":"docs/agents/domain.md","kind":"file","title":"docs/agents/domain.md"},
+{"hash":"04bc24aceb9c6009","id":"docs/agents/domain.md#领域文档","kind":"section","parent":"docs/agents/domain.md","title":"领域文档"},
+{"hash":"e97748b6d6c5fa7f","id":"docs/agents/domain.md#领域文档 > 探索之前先读","kind":"section","parent":"docs/agents/domain.md#领域文档","title":"探索之前先读"},
+{"hash":"4bbc4dbf4058a77a","id":"docs/agents/domain.md#领域文档 > 本仓库的布局","kind":"section","parent":"docs/agents/domain.md#领域文档","title":"本仓库的布局"},
+{"hash":"d6fd44b4f4a8fb6c","id":"docs/agents/domain.md#领域文档 > 用术语表的词","kind":"section","parent":"docs/agents/domain.md#领域文档","title":"用术语表的词"}
+],
+"edges":[
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/agents/domain.md#领域文档 > 探索之前先读"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/agents/domain.md#领域文档 > 本仓库的布局"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/agents/domain.md#领域文档 > 用术语表的词"}
+]
+}

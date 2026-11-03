@@ -1,0 +1,20 @@
+{
+"schema":1,
+"path":"docs/requirements/provider-retries.md",
+"hash":"f7433bc55bb7ede2",
+"nodes":[
+{"hash":"f7433bc55bb7ede2","id":"docs/requirements/provider-retries.md","kind":"file","title":"docs/requirements/provider-retries.md"},
+{"hash":"049af4699a08830f","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","kind":"section","parent":"docs/requirements/provider-retries.md","title":"D17 模型等待与失败重试"},
+{"hash":"af06ece75cf022f1","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"已确认"},
+{"hash":"b84a96fcea81ceb1","id":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 实施选择","kind":"section","parent":"docs/requirements/provider-retries.md#D17 模型等待与失败重试","title":"实施选择"}
+],
+"edges":[
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/design/model-management.md","kind":"link","raws":["../design/model-management.md"],"seen":"6d674411681caef7","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"845504a30d0207a7","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 实施选择"},
+{"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["execution-limits.md"],"seen":"573c955013deada8","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"},
+{"dst":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","kind":"link","raws":["operations-department.md"],"seen":"772422e14ed2ed85","src":"docs/requirements/provider-retries.md#D17 模型等待与失败重试 > 已确认"}
+]
+}

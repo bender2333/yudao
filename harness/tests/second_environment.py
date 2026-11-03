@@ -3,7 +3,8 @@
 # 动作合同（`harness/actions.py`；执行环境服务设计说明第 4 节「执行环境的合同」；总图第四节「动作」缝）的
 # 第二种实现。它真实执行文件动作：读取与写入都在给定的工作区目录里做，结果只留在工作区。形状与真实现
 # （`environment.py` 的 `LocalEnvironment`）不同：没有工作区对象、没有后台命令与检查，只有动作合同用到的
-# 三个操作：执行、取消、查询公开树事实。合同允许的唯一跨步状态是「取消先于动作到达」的登记，其余一概不留：
+# 三个操作：执行、取消、查询公开树事实；终点快照存进调用方给的工件区域（工单 #1398），没有给出时
+# 回执里只带动作前后的两个树摘要。合同允许的唯一跨步状态是「取消先于动作到达」的登记，其余一概不留：
 # 同一个工作区上新起一个实现，读到的结果与原来相同。
 #
 # 按动作类别分派（与真实现同一个做法），实际工具名只用来在同一类里取执行方法；它不读请求里的部门，
@@ -14,8 +15,19 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from harness.actions import Action, ActionReceipt, FactsQuery, TreeFacts, WorkspaceFacts
-from harness.models import hash_bytes
+from harness.actions import (
+    Action,
+    ActionReceipt,
+    FactsQuery,
+    SnapshotRef,
+    TreeChange,
+    TreeFacts,
+    WorkspaceFacts,
+    snapshot_payload,
+)
+from harness.artifacts import ArtifactStore
+from harness.models import hash_bytes, json_dumps
+from harness.path_rules import TreeError
 from harness.public_tree import capture_public_tree
 
 # 这一版实现执行的工具，按动作类别分组：读取与写入的文件动作
@@ -26,8 +38,12 @@ _KIND_TOOLS = {
 
 
 class SecondEnvironment:
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, artifacts: ArtifactStore | None = None,
+                 run_id: str | None = None) -> None:
         self.root = Path(root).absolute()
+        # 终点快照存进的工件区域与真实现是同一处（工单 #1398）：没有给出时回执里只带两个树摘要
+        self._artifacts = artifacts
+        self._run_id = run_id
         # 取消先于动作到达时记下的动作身份：合同允许的唯一跨步状态
         self._cancelled: set[str] = set()
 
@@ -42,14 +58,20 @@ class SecondEnvironment:
             self._cancelled.discard(action.action_id)
             return ActionReceipt(action_id=action.action_id, status="cancelled",
                                  error="The action was cancelled before it started.")
+        # 动作前的公开树（工单 #1398）：与动作结束以后的读取一起构成回执里的前后差异
+        before = self._tree_facts()
         try:
             if action.kind == "read":
                 output: Any = self._read(action.input)
             else:
                 output = self._write(action.input)
         except (OSError, ValueError) as exc:
-            return ActionReceipt(action_id=action.action_id, status="failed", error=str(exc))
-        return ActionReceipt(action_id=action.action_id, status="completed", output=output)
+            change, ref = self._tree_evidence(before)
+            return ActionReceipt(action_id=action.action_id, status="failed", error=str(exc),
+                                 tree_change=change, after_snapshot_ref=ref)
+        change, ref = self._tree_evidence(before)
+        return ActionReceipt(action_id=action.action_id, status="completed", output=output,
+                             tree_change=change, after_snapshot_ref=ref)
 
     def cancel(self, action_id: str) -> None:
         self._cancelled.add(action_id)
@@ -64,6 +86,32 @@ class SecondEnvironment:
             checks=(),
         )
         return WorkspaceFacts(tree=facts, paths={})
+
+    def _tree_facts(self) -> TreeFacts | None:
+        # 回执里要用的公开树事实：与 query 取的是同一次读取。工作区里有无法表示的条目时为空，
+        # 动作照常执行，回执里这两项为空
+        try:
+            return self.query(FactsQuery(tree=True)).tree
+        except TreeError:
+            return None
+
+    def _tree_evidence(self, before: TreeFacts | None) -> tuple[TreeChange | None, SnapshotRef | None]:
+        # 回执里的前后差异与终点快照的引用（工单 #1398）：动作以后按与 query 相同的方式读一次公开树，
+        # 与动作前的那次配成一对
+        after = self._tree_facts()
+        change = None if before is None or after is None else TreeChange(
+            before_digest=before.digest, after_digest=after.digest)
+        return change, None if after is None else self._snapshot_ref(after)
+
+    def _snapshot_ref(self, tree: TreeFacts) -> SnapshotRef | None:
+        # 真实现把终点快照存进这个 run 的工件区域；这里存的是同一份内容与同一种引用，
+        # 回执里的引用因此可以用同一个工件区域取回。没有工件区域时只交回两个树摘要
+        if self._artifacts is None or self._run_id is None:
+            return None
+        ref = self._artifacts.put(self._run_id, "snapshot/after", json_dumps(snapshot_payload(tree)),
+                                  media_type="application/json")
+        return SnapshotRef(kind=ref.kind, content_hash=ref.content_hash, path=ref.path,
+                           media_type=ref.media_type)
 
     def _path(self, rel: Any) -> Path:
         # 只接受工作区里的相对路径：绝对路径与跳出工作区的路径立刻失败

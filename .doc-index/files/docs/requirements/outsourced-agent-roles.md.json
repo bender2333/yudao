@@ -1,0 +1,20 @@
+{
+"schema":1,
+"path":"docs/requirements/outsourced-agent-roles.md",
+"hash":"0b121d4af89697e4",
+"nodes":[
+{"hash":"0b121d4af89697e4","id":"docs/requirements/outsourced-agent-roles.md","kind":"file","title":"docs/requirements/outsourced-agent-roles.md"},
+{"hash":"6fff1fec6f0a3574","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md","title":"D31 部门内的外包角色"},
+{"hash":"89d6f588af0185e0","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 已确认","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","title":"已确认"},
+{"hash":"071218aa7c97156a","id":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 待定","kind":"section","parent":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色","title":"待定"}
+],
+"edges":[
+{"dst":"docs/adr/0044-verifier-role-and-open-loop.md","kind":"link","raws":["../adr/0044-verifier-role-and-open-loop.md"],"seen":"b1c2ffdb1dc08ef3","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/design/outsourced-roles.md","kind":"link","raws":["../design/outsourced-roles.md"],"seen":"6cbeee34a17bbb1e","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"862c19040515313f","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["remote-execution.md"],"seen":"c8cf69bd1ebf5ac7","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色"},
+{"dst":"docs/adr/0044-verifier-role-and-open-loop.md","kind":"link","raws":["../adr/0044-verifier-role-and-open-loop.md"],"seen":"b1c2ffdb1dc08ef3","src":"docs/requirements/outsourced-agent-roles.md#D31 部门内的外包角色 > 已确认"}
+]
+}

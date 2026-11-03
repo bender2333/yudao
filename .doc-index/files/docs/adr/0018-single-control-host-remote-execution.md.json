@@ -1,0 +1,16 @@
+{
+"schema":1,
+"path":"docs/adr/0018-single-control-host-remote-execution.md",
+"hash":"1a08d2ab13e30da9",
+"nodes":[
+{"hash":"1a08d2ab13e30da9","id":"docs/adr/0018-single-control-host-remote-execution.md","kind":"file","title":"docs/adr/0018-single-control-host-remote-execution.md"},
+{"hash":"1a08d2ab13e30da9","id":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器","kind":"section","parent":"docs/adr/0018-single-control-host-remote-execution.md","title":"一台控制主机，执行环境分布到多台机器"}
+],
+"edges":[
+{"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["0038-function-first-commands-without-registration.md"],"seen":"be2f2a8d91639563","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/design/execution-environment.md#执行环境服务设计说明 > 7. 代码的权限、认证与加密","kind":"link","raws":["../design/execution-environment.md"],"seen":"ec91cde620c72dc7","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"8991ad5c4d99e914","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/requirements/operations-department.md","kind":"link","raws":["../requirements/operations-department.md"],"seen":"1217ad3ad94f18cf","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"},
+{"dst":"docs/requirements/remote-execution.md","kind":"link","raws":["../requirements/remote-execution.md"],"seen":"0f72e5ffd1660505","src":"docs/adr/0018-single-control-host-remote-execution.md#一台控制主机，执行环境分布到多台机器"}
+]
+}

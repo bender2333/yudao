@@ -8,7 +8,7 @@
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import Command, run_stream
 from harness.models import EventType, TERMINAL_STATUSES, new_id
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.recovery import observation_state
 from harness.runtime import LoopSystem
 from harness.watched_outputs import has_new_work
@@ -19,11 +19,14 @@ AC1, AC2 = "AC1", "AC2"
 
 
 def _criteria(results: dict[str, str], notes: dict[str, str] | None = None,
-              checks: list[str] | None = None) -> list[dict[str, object]]:
-    # 逐条结论：验收条件、检验方式（外观依赖模型看图，判为不可执行的检验）、结果、证据与原因
-    notes = notes or {}
+              checks: list[str] | None = None,
+              reasons: dict[str, str] | None = None) -> list[dict[str, object]]:
+    # 逐条结论：验收条件、检验方式（外观依赖模型看图，判为不可执行的检验）、结果、证据与原因。
+    # reasons 是改判理由（工单 #1190）：结果与独立判断不同时逐条写
+    notes, reasons = notes or {}, reasons or {}
     return [{"criterion": criterion, "method": "judgement", "result": results[criterion],
-             "checks": list(checks or []), "trial_cases": [], "note": notes.get(criterion, "")}
+             "checks": list(checks or []), "trial_cases": [], "note": notes.get(criterion, ""),
+             "change_reason": reasons.get(criterion, "")}
             for criterion in (AC1, AC2)]
 
 
@@ -54,15 +57,20 @@ def _system(tmp_path, quality_turns):
 
 def test_cannot_verify_asks_the_user_and_re_verify_reactivates_quality(tmp_path):
     # 质检提交「无法核验」：决定请求出现、阻塞整个 run、恢复观察状态是待恢复；回答「重新核验」以后
-    # 质检以新的激活核对同一份交付，这次放行，事项以 released 结束
-    system = _system(tmp_path, [review_turn("cannot_verify", "cannot see the interface", checks={"smoke": 0},
+    # 质检以新的激活核对同一份交付，这次放行，事项以 released 结束。
+    # 两种结论都在当前交付的独立判断以后提交（先判断后看解释的门，工单 #358）
+    system = _system(tmp_path, [judgement_turn(checks={"smoke": 0}, criteria=_cannot_verify()),
+                                review_turn("cannot_verify", "cannot see the interface", checks={"smoke": 0},
                                             criteria=_cannot_verify()),
                                 review_turn("release", "verified after the settings changed", checks={"smoke": 0},
                                             criteria=_criteria({AC1: "passed", AC2: "passed"},
-                                                               checks=["smoke"]))])
+                                                               checks=["smoke"],
+                                                               reasons={AC1: "换成能看图的模型以后重新核验通过",
+                                                                        AC2: "装好浏览器以后重新核验通过"}))])
     run_id = system.create_run("build echo")
     system.activate_once(run_id)  # 产品
     system.activate_once(run_id)  # 工程交付
+    system.activate_once(run_id)  # 质检交独立判断（工单 #358）
     projection = system.activate_once(run_id)  # 质检提交无法核验
     assert projection.status not in TERMINAL_STATUSES
     requests = _open_decision(system, run_id)
@@ -97,12 +105,15 @@ def test_cannot_verify_asks_the_user_and_re_verify_reactivates_quality(tmp_path)
 
 
 def test_stop_ends_the_run_and_the_delivery_is_not_adopted(tmp_path):
-    # 回答「停止事项」：事项结束，停止原因是 cannot_verify，交付不被采纳
-    system = _system(tmp_path, [review_turn("cannot_verify", "cannot see the interface", checks={"smoke": 0},
+    # 回答「停止事项」：事项结束，停止原因是 cannot_verify，交付不被采纳。
+    # 结论之前先交独立判断（工单 #358）
+    system = _system(tmp_path, [judgement_turn(checks={"smoke": 0}, criteria=_cannot_verify()),
+                                review_turn("cannot_verify", "cannot see the interface", checks={"smoke": 0},
                                             criteria=_cannot_verify())])
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
+    system.activate_once(run_id)  # 独立判断
     system.activate_once(run_id)
     request = _open_decision(system, run_id)[0]
     system.orchestrator.answer_decision(request.decision_id, "stop", None,
@@ -118,14 +129,17 @@ def test_stop_ends_the_run_and_the_delivery_is_not_adopted(tmp_path):
 
 
 def test_cannot_verify_with_a_failed_criterion_is_rejected(tmp_path):
-    # 没有 failed、至少一条 unverified：含 failed 条目时按无法核验提交被拒绝，写明是哪一条
+    # 没有 failed、至少一条 unverified：含 failed 条目时按无法核验提交被拒绝，写明是哪一条。
+    # 判断先提交（工单 #358）；被拒绝的结论不带「缺判断」的错误——逐条结论的核对在门以前
     criteria = _criteria({AC1: "failed", AC2: "unverified"}, {AC2: "执行位置没有安装浏览器"})
-    system = _system(tmp_path, [review_turn("cannot_verify", "mixed", checks={"smoke": 0}, criteria=criteria),
+    system = _system(tmp_path, [judgement_turn(checks={"smoke": 0}, criteria=_cannot_verify()),
+                                review_turn("cannot_verify", "mixed", checks={"smoke": 0}, criteria=criteria),
                                 review_turn("cannot_verify", "all unverified", checks={"smoke": 0},
                                             criteria=_cannot_verify())])
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
+    system.activate_once(run_id)  # 独立判断
     system.activate_once(run_id)
     rejected = next(event for event in _events(system, run_id) if event.type == EventType.PROPOSAL_REJECTED)
     errors = rejected.payload.get("errors", [])
@@ -138,12 +152,14 @@ def test_cannot_verify_with_a_failed_criterion_is_rejected(tmp_path):
 
 
 def test_cannot_verify_without_an_unverified_criterion_is_rejected(tmp_path):
-    # 全部 passed 的结论不能按无法核验提交
+    # 全部 passed 的结论不能按无法核验提交。判断先提交（工单 #358）
     criteria = _criteria({AC1: "passed", AC2: "passed"})
-    system = _system(tmp_path, [review_turn("cannot_verify", "all passed", checks={"smoke": 0}, criteria=criteria)])
+    system = _system(tmp_path, [judgement_turn(checks={"smoke": 0}, criteria=_cannot_verify()),
+                                review_turn("cannot_verify", "all passed", checks={"smoke": 0}, criteria=criteria)])
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
+    system.activate_once(run_id)  # 独立判断
     system.activate_once(run_id)
     rejected = next(event for event in _events(system, run_id) if event.type == EventType.PROPOSAL_REJECTED)
     errors = rejected.payload.get("errors", [])
@@ -152,13 +168,15 @@ def test_cannot_verify_without_an_unverified_criterion_is_rejected(tmp_path):
 
 
 def test_cannot_verify_without_a_reason_is_rejected(tmp_path):
-    # 每条 unverified 都要写明原因
+    # 每条 unverified 都要写明原因。判断先提交（工单 #358）
     criteria = _criteria({AC1: "unverified", AC2: "unverified"}, {AC1: "看不到界面"})
-    system = _system(tmp_path, [review_turn("cannot_verify", "missing reason", checks={"smoke": 0},
+    system = _system(tmp_path, [judgement_turn(checks={"smoke": 0}, criteria=_cannot_verify()),
+                                review_turn("cannot_verify", "missing reason", checks={"smoke": 0},
                                             criteria=criteria)])
     run_id = system.create_run("build echo")
     system.activate_once(run_id)
     system.activate_once(run_id)
+    system.activate_once(run_id)  # 独立判断
     system.activate_once(run_id)
     rejected = next(event for event in _events(system, run_id) if event.type == EventType.PROPOSAL_REJECTED)
     errors = rejected.payload.get("errors", [])

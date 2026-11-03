@@ -1,6 +1,6 @@
 # 评测场景：版本回归与 OpenCode 对照
 
-总图位置：第四节系统之外「评价」的缝；第五节验收表的「真实场景」一层。依据：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)（需求）、[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)、[D38](../requirements/system-intent.md)、[规则登记与参数设计说明](rules-and-parameters.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。
+总图位置：第四节系统之外「评价」的缝；第五节验收表的「真实场景」一层。依据：[D32 与单个 agent 的对照实验](../requirements/comparison-experiment.md)（需求）、[架构与需求诊断](https://github.com/bender2333/yudao/discussions/1429)、[D38](../requirements/system-intent.md)、[规则登记与参数设计说明](rules-and-parameters.md)、[ADR-0038](../adr/0038-function-first-commands-without-registration.md)。
 
 ## 1. 用途
 
@@ -68,7 +68,7 @@
 | 设置 | Yudao 使用当前版本的规则登记中的暂定默认值与参数，不为场景调整，结果记录定义版本与参数版本；OpenCode 固定版本号，使用默认 agent |
 | 模型的容量 | 两边的上下文窗口与单次输出上限相同，取模型服务的模型列表为这个模型报告的值（`context_length`、`max_completion_tokens`），列表没有报告时用运行器参数给出；Yudao 写进模型访问定义，OpenCode 写进运行配置的模型限额；报告写明取值与来源 |
 | 联网 | 两边都不联网：任务来自公开仓库，联网取回可能直接取回上游的答案。运行器以关闭取回的启动参数启动被测的 Yudao，评测项目不设置 MCP 服务器，部门没有这两类工具（[网络取回与 MCP 工具设计说明](network-and-mcp.md)「工具的提供」）；OpenCode 的运行配置关闭取回与搜索工具，运行器检查 JSON 输出中没有这两类工具的调用，报告写明这一条。两边的命令都能访问网络，运行器在 OpenCode 的 JSON 输出与 Yudao 的事件日志导出中查找对任务上游仓库的访问，找到时这次运行无效并写进报告。建立环境时的联网（GitHub 与 PyPI）由运行器在评测前完成，不属于模型的工具 |
-| 时间上限 | 每次运行 120 分钟，两边相同，由运行器在 120 分钟时结束运行，与 Yudao 默认的运行时间上限相同。取 120 分钟的理由：90 分钟里三部门一次也没有走到质检的结论（[架构与需求诊断](../research/architecture-diagnosis-2026-10-19.md)第 7 节发现 2）。超时的运行标记超时：OpenCode 按结束时的目录评分；Yudao 按最后一次封存的交付评分，并写明质检是否已经放行，时间上限以内没有提交过交付的，全部检查记为「没有做」 |
+| 时间上限 | 每次运行 120 分钟，两边相同，由运行器在 120 分钟时结束运行，与 Yudao 默认的运行时间上限相同。取 120 分钟的理由：90 分钟里三部门一次也没有走到质检的结论（[架构与需求诊断](https://github.com/bender2333/yudao/discussions/1429)第 7 节发现 2）。超时的运行标记超时：OpenCode 按结束时的目录评分；Yudao 按最后一次封存的交付评分，并写明质检是否已经放行，时间上限以内没有提交过交付的，全部检查记为「没有做」 |
 | 运行环境 | 在控制主机上直接运行（[执行环境服务设计说明](execution-environment.md)「代码的权限、认证与加密」）。两边的命令在同一台机器上、使用同一套版本固定的工具：uv 管理的 Python 3.13、Node.js 的一个固定版本、Playwright 安装的 Chromium；报告记录宿主环境（系统与这些工具的版本）。OpenCode 在运行目录中以 `opencode run` 运行；Yudao 的项目使用默认的执行位置，也就是控制主机上的本机进程，工作区从封存快照建立（[执行环境服务设计说明](execution-environment.md)「实现与执行位置上的程序」）；场景 2 的建档不计入时间上限，用量与耗时单独列出。每次评测在检出被测提交的专门 worktree 里运行，运行期间不切换提交；运行器在每次运行启动 Yudao 服务时记下提交号 |
 | 隔离 | 每次运行在 Yudao 仓库之外新建运行目录，从材料中的起点复制；被测的 Yudao 也使用仓库之外的数据目录。隐藏检查、条目表与参考解法不进入运行目录，运行结束以后才复制到单独的评分目录。两边的命令都能读写所在账户能访问的全部文件（[ADR-0038](../adr/0038-function-first-commands-without-registration.md)），运行器因此做两项核对：在 OpenCode 的 JSON 输出与 Yudao 的事件日志导出中查找材料目录的路径；评分之前计算材料的摘要，与材料版本记录的摘要比较。路径被找到或摘要不同时，这次运行无效并写进报告 |
 | 次数 | 每个场景每边 3 次；对照的结论是无差别、预期的效果值得继续时，补到事先写好的次数（6 次），只在 3 次与 6 次两个位置查看结果。3 次、6 次与每次 120 分钟都是暂定默认值，属于评价标准，只由用户修改 |
@@ -157,7 +157,7 @@
 
 ### 6.3 Yudao 对单个 agent
 
-Yudao 对 OpenCode 的对照不用第 6.1 节的版本比较：质检误放行对 OpenCode 没有意义；每边 3 次时完成度的差别分辨不出，场景 3 上 OpenCode 同一版本 3 次之间差 0.31。判定按 [D38](../requirements/system-intent.md) 的 N-G1：
+Yudao 对 OpenCode 的对照不用第 6.1 节的版本比较：质检误放行对 OpenCode 没有意义；每边 3 次时完成度的差别分辨不出，同一版本重复运行的完成度之间就有可见的差别。判定按 [D38](../requirements/system-intent.md) 的 N-G1：
 
 1. 「高于」看质检这一段：同一个场景 3 次运行中至少 2 次，质检在时间上限以内给出结论，并且最终交付比本次第一次交付多通过至少 1 条隐藏检查；第一次交付已经全部通过的那次运行不计入；3 次都没有质检误放行。
 2. 两边每次运行的完成度、正确性、失败条目、用时、请求数与用量逐次并排列出，Yudao 一侧列第一次交付与最终交付两个完成度；这一部分只报告，不单独据此判定「高于」。

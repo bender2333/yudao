@@ -66,6 +66,10 @@ class EventType(SkeletonEventType):
     ACTION_VERIFIED = "action_verified"
     ASK_STARTED = "ask_started"
     ASK_ANSWERED = "ask_answered"
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里对当前交付
+    # 的每条验收条件写出判断，经写入口提交成事实；之后工程的解释才并入它的请求，质检结论必须引用它。
+    # 应用事件：装配看它存在、放行的门引用它，内核不解释内容
+    INDEPENDENT_JUDGEMENT_COMMITTED = "independent_judgement_committed"
     QA_TESTS_SAVED = "qa_tests_saved"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
 
@@ -241,6 +245,10 @@ class QAReview:
     criteria: list[dict[str, Any]] = field(default_factory=list)
     coverage: dict[str, Any] = field(default_factory=dict)
     open_criteria: list[str] = field(default_factory=list)
+    # 这份结论引用的独立判断事件与改判的条数（验证的独立性设计说明第 4 节，工单 #1190）：
+    # 放行记录与判断成对，以后算解释翻转率时按这一对取；旧事件没有这两项
+    judgement_event: str = ""
+    changed: int = 0
 
 
 @dataclass(frozen=True)
@@ -299,6 +307,10 @@ class ContextManifest:
     output_reserve_tokens: int = 0
     parts_ref: dict[str, Any] | None = None
     guidance_ids: list[str] = field(default_factory=list)
+    # 这一次装配按哪一版规则算出来的（设计说明第 6.1 节）：规则版本是规则取值的规范散列
+    rules_version: str | None = None
+    # 这一次折叠了哪几轮（从 1 起的轮次编号，按部门历史顺序）；折叠计数是它的长度
+    folded_rounds: list[int] = field(default_factory=list)
 
 
 @dataclass

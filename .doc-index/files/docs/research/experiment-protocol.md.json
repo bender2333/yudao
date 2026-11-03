@@ -1,0 +1,33 @@
+{
+"schema":1,
+"path":"docs/research/experiment-protocol.md",
+"hash":"980a78ece8e85f99",
+"nodes":[
+{"hash":"980a78ece8e85f99","id":"docs/research/experiment-protocol.md","kind":"file","title":"docs/research/experiment-protocol.md"},
+{"hash":"cf870b0e59e36344","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约","kind":"section","parent":"docs/research/experiment-protocol.md","title":"改善验证与选型实验规约"},
+{"hash":"204fb3888b15cd63","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 1. 先分清四种工作","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"1. 先分清四种工作"},
+{"hash":"a526991f9b6c634a","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 2. 每次实验先写一页约定","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"2. 每次实验先写一页约定"},
+{"hash":"c02a2b8bb9e58972","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 2. 每次实验先写一页约定 > 实验约定应留下的材料","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 2. 每次实验先写一页约定","title":"实验约定应留下的材料"},
+{"hash":"5095103409f47f8f","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 3. 比较单位与分组","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"3. 比较单位与分组"},
+{"hash":"d0834d2c75c50077","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 4. 第二阶段实验顺序","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"4. 第二阶段实验顺序"},
+{"hash":"ab614070beb09110","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 4. 第二阶段实验顺序 > 有必要时增加的对照","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 4. 第二阶段实验顺序","title":"有必要时增加的对照"},
+{"hash":"d9ca06dcd333ad7c","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 5. 评价隔离","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"5. 评价隔离"},
+{"hash":"0bf02e1a94908b37","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"6. 结果、分母和不确定性"},
+{"hash":"999ca5b7578baa5b","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性 > 6.1 主要结果先定义","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性","title":"6.1 主要结果先定义"},
+{"hash":"a09987d8eca00819","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性 > 6.2 失败和未知","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性","title":"6.2 失败和未知"},
+{"hash":"e2ef0e46d802a770","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性 > 6.3 统计方法按结果类型选择","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性","title":"6.3 统计方法按结果类型选择"},
+{"hash":"ace016484fae8c10","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 7. 资源和成本","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"7. 资源和成本"},
+{"hash":"1377b37d1e418ef4","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 8. 第三阶段选型与组织实验","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"8. 第三阶段选型与组织实验"},
+{"hash":"196f264b95fd6125","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 9. 第四阶段候选与采用实验","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"9. 第四阶段候选与采用实验"},
+{"hash":"c30c4843537d867a","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 10. 开放性研究的独立支线","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"10. 开放性研究的独立支线"},
+{"hash":"2bb17ca5b9c360b9","id":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 11. 研发者使用本规约的顺序","kind":"section","parent":"docs/research/experiment-protocol.md#改善验证与选型实验规约","title":"11. 研发者使用本规约的顺序"}
+],
+"edges":[
+{"dst":"docs/archive/research/evidence-evaluation.md","kind":"link","raws":["../archive/research/evidence-evaluation.md"],"seen":"0ff71e0372f40883","src":"docs/research/experiment-protocol.md#改善验证与选型实验规约"},
+{"dst":"docs/archive/research/memory-and-control.md","kind":"link","raws":["../archive/research/memory-and-control.md"],"seen":"ce8dea7112de6a2b","src":"docs/research/experiment-protocol.md#改善验证与选型实验规约"},
+{"dst":"docs/research/organization-runtime-evolution.md","kind":"link","raws":["organization-runtime-evolution.md"],"seen":"6860924d7920793e","src":"docs/research/experiment-protocol.md#改善验证与选型实验规约"},
+{"dst":"docs/archive/native-harness/2026-08-11-open-endedness-research.md","kind":"link","raws":["../archive/native-harness/2026-08-11-open-endedness-research.md"],"seen":"f36c761f0a9e2447","src":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 10. 开放性研究的独立支线"},
+{"dst":"docs/archive/research/domain-completion-design.md","kind":"link","raws":["../archive/research/domain-completion-design.md"],"seen":"e773c4210e5080e1","src":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 2. 每次实验先写一页约定"},
+{"dst":"docs/archive/research/evidence-evaluation.md","kind":"link","raws":["../archive/research/evidence-evaluation.md"],"seen":"0ff71e0372f40883","src":"docs/research/experiment-protocol.md#改善验证与选型实验规约 > 6. 结果、分母和不确定性 > 6.3 统计方法按结果类型选择"}
+]
+}

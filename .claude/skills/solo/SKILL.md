@@ -99,16 +99,16 @@ finish --task T-004 --status done|failed|blocked [--summary "..."] [--raw-file <
 check --task T-004
 escalate --task T-004 [--reason "..."] | question --task T-004 --comment-file <文件>
 askhuman --task T-004 --comment-file <文件> | handover --task T-004 | reap [--task T-004] [--stale 90]
-gc [--task T-004] [--keep N] [--force] [--from <旧根目录>] | worktrees --root C:/w
-pause | resume [--no-auto] [--wait hook|notify] | auto on|off | budget --iterations 120 | concurrency --max 4 --exclusive 1
+gc [--task T-004] [--keep N] [--force] [--from <旧根目录>] | worktrees --root <根目录>
+pause | resume [--no-auto] [--wait hook|notify] | auto on|off | report | evidence --task T-004 | attach --task T-004 --session <id> | signature --value solo-<模型 ID> | budget --iterations 120 | concurrency --max 4 --exclusive 1
 ```
 
 ## 机器配置（开循环之前配一次）
 
 | 项 | 配在哪 | 值 |
 | --- | --- | --- |
-| worktree 根目录 | `state.json` 的 `worktrees.root`，用 `solo.mjs worktrees --root <路径>` 改 | Windows 用短路径 **`C:/w`**（`C:/w/issue-559` 比 `C:/project/yudao-worktrees/issue-559` 少 20 多个字符，`node_modules` 的深路径才不会撞 260 的上限）；类 Unix 用 `/tmp/w` |
-| 这个目录的写权限 | `.codebuddy/settings.json` 的 `permissions.allow` | `Edit(//C:/w/**)` 与 `Read(//C:/w/**)`（`//` 开头表示文件系统绝对路径）。沙箱默认只允许写当前工作目录，不放行的话 subagent 在 worktree 里写文件、删临时文件都会被拦——**这是 subagent 报“权限不够”的最常见原因** |
+| worktree 根目录 | `state.json` 的 `worktrees.root`，用 `solo.mjs worktrees --root <路径>` 改 | 目录按[运行配置](../../../docs/agents/autopilot-runtime.md)第 1 节；Windows 上选尽量短的根目录（`node_modules` 的深路径会撞 260 的上限），类 Unix 用 `/tmp/w`；具体值写进 `handoff.md` |
+| 这个目录的写权限 | `.codebuddy/settings.json` 的 `permissions.allow` | `Edit(//<根目录>/**)` 与 `Read(//<根目录>/**)`（`//` 开头表示文件系统绝对路径）。沙箱默认只允许写当前工作目录，不放行的话 subagent 在 worktree 里写文件、删临时文件都会被拦——**这是 subagent 报“权限不够”的最常见原因** |
 | 依赖 | 写进 `handoff.md`，任务书里带一句 | Python 复用主仓库的环境：`UV_PROJECT_ENVIRONMENT=C:/code/yudao/.venv`。客户端的依赖不共用：要运行客户端测试或接口合同检查的 worktree 自己 `npm ci`，不建指向主仓库 `client/node_modules` 的链接（通过链接共用时，任何一处的 npm 安装改的都是同一个目录） |
 | 账本保护 | `hook.mjs` 已内置 | `state.json`、`tasks.md`、`active.json`、`.lock`、`.owner.json`、`.stop-guard.json` 只由命令改；`goal.md`、`handoff.md`、`notes/` 人可以改 |
 
@@ -123,8 +123,8 @@ pause | resume [--no-auto] [--wait hook|notify] | auto on|off | budget --iterati
 | 用户说 | 怎么落 |
 | --- | --- |
 | 「把阶段一的工单做完」 | `next --milestone "阶段一"`（脚本按标题换成里程碑编号存进 `scope`） |
-| 「M0 的」 | `next --label M0` |
-| 「[M0] 开头的」 | `next --prefix "[M0]"` |
+| 「带 bug 标签的」 | `next --label bug` |
+| 「[路由的缝] 开头的」 | `next --prefix "[路由的缝]"` |
 | 「都做」/ 没说范围 | `next --all` |
 | 「一次做两张」 | `next --concurrency 2`，或者 `concurrency --max 2` |
 
@@ -189,7 +189,7 @@ NEXT: 建议的下一轮任务；没有写 none
 
 ## 一张工单的完整链路
 
-工人按 [`/solo-worker`](../solo-worker/SKILL.md)「一张工单的完整做法」做，编排者收账时按它的步骤核对：领取与 `in-progress`（第 1 步）、三项核对（第 3 步）、PR 正文带 `Solo:` 一行（第 7 步）、CI 与 `touches-core` 的分支集成层（第 8 步）、`DELIVERY:` 交付说明与 `needs-review`（第 9 步）、合并前五项核对（第 10 步）、`--admin --squash` 合并（第 11 步）、工单关闭与去标签（第 12 步）、清理但不删 worktree（第 13、14 步）。
+工人按 [`/solo-worker`](../solo-worker/SKILL.md)「一张工单的完整做法」做，编排者收账时按它的步骤核对：领取与 `in-progress`（第 1 步）、三项核对（第 3 步）、PR 正文带 `Solo:` 一行（第 7 步）、CI 与 `touches-core` 的分支集成层（第 8 步）、`DELIVERY:` 交付说明与 `needs-review`（第 9 步）、合并前核对（第 10 步）、`--admin --squash` 合并（第 11 步）、工单关闭与去标签（第 12 步）、清理但不删 worktree（第 13、14 步）。
 ## UI 工单
 
 界面工单多两步：**对着工单与设计说明核**、**留机器可查的证据**。无人值守时没有人替你看页面，所以「看起来对」不算完成。
@@ -205,7 +205,7 @@ NEXT: 建议的下一轮任务；没有写 none
    | 截图 | `page.screenshot()` 存 `.tmp/<编号>-shots/` | 给人看，不作为判据 |
 
 3. **端到端是贵操作，当一个互斥资源用**：每个 spec 会自己启动真后端、占端口与数据目录（`workers: 1` 是文件内串行），后端在负载下要 60–75 秒。所以同一时刻只让一个 worktree 跑 e2e——编排者安排时不要同时派两张都要跑 e2e 的 UI 单；同一张单里也别重复起后端，把要验的场景放进同一个 spec。
-4. **像素判断用「区域差」，不用截图基线**：这个仓库的做法是读画布的内容签名/逐格 RGB 差（#900：只有工程房间那一片最大差 61.7，其余为 0）。**不要引入 `toHaveScreenshot` 基线**——跨机器字体与抗锯齿会让它变成不稳定测试的主要来源。
+4. **像素判断用「区域差」，不用截图基线**：这个仓库的做法是读画布的内容签名/逐格 RGB 差。**不要引入 `toHaveScreenshot` 基线**——跨机器字体与抗锯齿会让它变成不稳定测试的主要来源。
 5. **收账前跑一次识图**（`scripts/vision.mjs`）：把关键截图交给视觉模型，按这张工单的验收条目逐条问。
    ```
    node .claude/skills/solo/scripts/vision.mjs --image <截图> --image <截图> \
