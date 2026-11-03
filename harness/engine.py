@@ -953,7 +953,7 @@ class StepDriver:
                 return None
             return request, step
 
-        prepared = self._writes.transact(self._stream, prepare, dispatch_number=self._scope.dispatch_number)
+        prepared = self._writes.transact(self._stream, prepare, dispatch_number=self._scope.dispatch_number or None)
         if isinstance(prepared, _Unassembled):
             facts = list(prepared.error.paths) if isinstance(prepared.error, UnrepresentableWorkspace) else []
             raise ProviderError(str(prepared.error), reason=prepared.reason, facts=facts) from prepared.error
@@ -970,7 +970,7 @@ class StepDriver:
             self._recorder.request_started(transaction, request)
             return True
 
-        return self._writes.transact(self._stream, start, dispatch_number=self._scope.dispatch_number)
+        return self._writes.transact(self._stream, start, dispatch_number=self._scope.dispatch_number or None)
 
     async def _call_model(self, request: ModelRequest) -> ModelResponse:
         # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果；
@@ -1004,7 +1004,7 @@ class StepDriver:
             self._recorder.retry_scheduled(transaction, request, error, delay, next_step_id)
             return True
 
-        return self._writes.transact(self._stream, schedule, dispatch_number=self._scope.dispatch_number)
+        return self._writes.transact(self._stream, schedule, dispatch_number=self._scope.dispatch_number or None)
 
     def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> _CompactionOutcome | None:
         # 整理请求的回答生成检查点。请求没有声明工具，回应里的工具调用不执行、不进入有效历史；
@@ -1030,7 +1030,7 @@ class StepDriver:
             self._recorder.compaction(transaction, request, result, response)
             return _CompactionOutcome(covered_digest=result.checkpoint.covered_digest)
 
-        outcome = self._writes.transact(self._stream, finish, dispatch_number=self._scope.dispatch_number)
+        outcome = self._writes.transact(self._stream, finish, dispatch_number=self._scope.dispatch_number or None)
         message = self._advance_compaction(outcome)
         if message is not None:
             self._compaction_stalled_target = dict(request.call_target or {})
@@ -1138,7 +1138,7 @@ class StepDriver:
                                                 before_snapshot=before_snapshot)
             return permission, facts
 
-        return self._writes.transact(self._stream, begin, dispatch_number=self._scope.dispatch_number)
+        return self._writes.transact(self._stream, begin, dispatch_number=self._scope.dispatch_number or None)
 
     async def _begin_tool_waiting_for_input(
         self, request: ModelRequest | _RecoveredCall, call: dict[str, Any]

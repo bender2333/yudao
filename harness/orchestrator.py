@@ -43,6 +43,7 @@ from .environment import (
 )
 from .deltas import DeltaChannel
 from .event_store import (Command, EventStore, StreamVersionConflict, project_stream, run_stream)
+from .kernel_events import accepted
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepLimits
 from .streams import (
@@ -1748,7 +1749,8 @@ class Orchestrator:
                 if isinstance(branch, str) and branch not in sessions:
                     sessions.add(branch)
                     grew = True
-        minimal = fold_events(events)
+        # 只记录的事件（旧派发编号）不并入，与写入口折最小投影用的是同一条规则
+        minimal = fold_events(accepted(events))
         return sum(minimal.sessions.get(session_id, SessionState()).model_steps for session_id in sessions)
 
     async def _run_ask_branch(

@@ -234,6 +234,8 @@ class EventStore:
         with self._connection() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(SCHEMA)
+            if "dispatch_number" not in {item["name"] for item in connection.execute("PRAGMA table_info(events)")}:
+                connection.execute("ALTER TABLE events ADD COLUMN dispatch_number INTEGER")  # 旧数据目录：补一列空值
             connection.execute("INSERT OR IGNORE INTO log (singleton, log_id) VALUES (1, ?)", (new_id("log"),))
             self.log_id: str = connection.execute("SELECT log_id FROM log").fetchone()["log_id"]
 
@@ -298,8 +300,7 @@ class EventStore:
 
     def claim_execution_right(self, stream: str, expected_version: int, events: Sequence[Event],
                               state: str, *, decisions: Sequence[SavedDecision] = ()) -> int:
-        # 取得一个 run 的执行权（工单 #16，ADR-0018）：在同一个写入事务中核对流版本等于 expected_version， 以这个流已经记录的执行权编号加一作为新的编号，随这次追加的事件写回，并更新保存的投影与决定请求。
-        # 编号跨进程单调：另一个进程已经取得更大的编号时，这里的 expected_version 核对失败，调用方重新判断。 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。返回这次取得的执行权编号
+        # 取得一个 run 的执行权（工单 #16，ADR-0018）：在同一个写入事务中核对流版本等于 expected_version， 以这个流已经记录的执行权编号加一作为新的编号，随这次追加的事件写回，并更新保存的投影与决定请求。 编号跨进程单调：另一个进程已经取得更大的编号时，这里的 expected_version 核对失败，调用方重新判断。 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。返回这次取得的执行权编号
         self._refuse_write()
         with self._transaction() as connection:
             saved = connection.execute(
@@ -668,8 +669,8 @@ def _from_row(row: sqlite3.Row) -> Event | ProjectEvent | CatalogEvent:
             stop_reason=row["stop_reason"], error=row["error"], created_at=row["created_at"],
             position=row["position"], stream=row["stream"], stream_version=row["stream_version"],
             project_id=row["project_id"], work_item_id=row["work_item_id"], department=row["department"],
-            epoch=row["epoch"], dispatch_number=row["dispatch_number"], command_id=row["command_id"],
-            actor=row["actor"],
+            epoch=row["epoch"], command_id=row["command_id"], actor=row["actor"],
+            dispatch_number=row["dispatch_number"] if "dispatch_number" in row.keys() else None,
         )
     if row["stream"].startswith(_CATALOG):
         return CatalogEvent(

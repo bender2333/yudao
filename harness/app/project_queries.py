@@ -15,6 +15,7 @@ from pydantic import Field, ValidationError, field_validator
 from ..definitions import DEFINITIONS, SourceKind
 from ..git_versions import GitVersionError
 from ..event_store import project_stream, run_stream
+from ..kernel_events import accepted
 from ..minimal_projection import MinimalProjection, fold_events
 from ..models import (
     ArtifactRef, DEPARTMENTS, TERMINAL_STATUSES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
@@ -3421,8 +3422,9 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     run = _run(application, request.run_id)
     events = store.list_events(request.run_id)
     # 已用量读最小投影（骨架与应用设计说明第 4 节第 4 条，S1e 工单 #1015）：
-    # 激活次数、模型步数与执行权都由它折出来，不在这里从事件数一遍
-    minimal = fold_events(events)
+    # 激活次数、模型步数与执行权都由它折出来，不在这里从事件数一遍；只记录的事件（旧派发编号）不并入，
+    # 与写入口折最小投影用的是同一条规则
+    minimal = fold_events(accepted(events))
     decisions = _run_decisions(application, request.run_id)
     terminal = run.status in TERMINAL_STATUSES
     state = observation_state(events, decisions.values(), status=run.status, stop_reason=run.stop_reason)

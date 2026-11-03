@@ -15,7 +15,7 @@ from .event_store import (
 )
 from .kernel_events import (
     CatalogEvent, DecisionRequest, Event, ProjectEvent, SkeletonEventType, StreamHandler, apply_decision_event,
-    json_dumps, new_id, replay_decisions, utc_now,
+    accepted, json_dumps, new_id, replay_decisions, utc_now,
 )
 from .minimal_projection import MinimalProjection, fold_events, fold_more
 from .tools import in_force
@@ -100,18 +100,6 @@ class Snapshot:
                                                                                           events)
             self._minimal = folded
         return self._minimal
-
-
-def accepted(events: list[Any]) -> list[Any]:
-    # 派发编号只增（工单 #1397）：编号低于同一个会话此前最大编号的事件只记录，不并入投影与最小投影；旧版本写入的事件没有编号，照常并入
-    highest: dict[str | None, int] = {}
-    kept = []
-    for event in events:
-        number, key = getattr(event, "dispatch_number", None) or 0, getattr(event, "session_id", None)
-        if number >= highest.get(key, 0):
-            kept.append(event)
-            highest[key] = number
-    return kept
 
 
 class Transaction(Snapshot):

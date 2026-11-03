@@ -6,6 +6,8 @@
 # 守 R2（第二环的合同：写入口在同一事务里核对执行权编号、派发编号与流版本）与 R1（同样的事件重放出同样的状态）。
 # 用真实的 SQLite 事件库与写入口，不起服务、不用网络；读事件日志、写数据目录，属于模块层。
 
+import sqlite3
+
 from harness.adapters.fake import FakeAdapter
 from harness.event_store import run_stream
 from harness.models import EventType
@@ -129,4 +131,31 @@ def test_a_rebuild_does_not_rewrite_the_recorded_events(tmp_path):
     before = snapshot()
     system.writes.rebuild(stream)
     assert snapshot() == before
+    system.close()
+
+
+def test_a_data_directory_written_by_an_older_version_still_opens(tmp_path):
+    # 验收第 4 条的行为一侧：旧版本写出的数据目录，事件表里没有这一列，照常读取与重放
+    system, run_id, stream = _system(tmp_path)
+    system.writes.transact(stream, _append())
+    data = tmp_path / "data"
+    system.close()
+    with sqlite3.connect(data / "events.sqlite") as connection:
+        connection.execute("ALTER TABLE events DROP COLUMN dispatch_number")
+    reopened = LoopSystem.for_testing(data, FakeAdapter([]))
+    events = reopened.store.list_events(run_id)
+    assert [item.dispatch_number for item in events[:2]] == [None, None]
+    assert reopened.writes.rebuild(stream).to_dict() == reopened.project(run_id).to_dict()
+    reopened.close()
+
+
+def test_a_late_write_does_not_make_the_replay_check_disagree(tmp_path):
+    # 「只记录」在重放核对上同样成立：旧编号的写入不并入重放，system.replay 不报投影不一致
+    system, run_id, stream = _system(tmp_path)
+    first = _claim(system, stream)
+    system.writes.transact(stream, _append(), dispatch_number=first)
+    second = _claim(system, stream)
+    assert second == first + 1
+    system.writes.transact(stream, _append(cycle=9), dispatch_number=first)
+    assert system.replay(run_id).to_dict() == system.project(run_id).to_dict()
     system.close()
