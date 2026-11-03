@@ -17,6 +17,7 @@ from harness.environment import LocalEnvironment, inspection_root
 from harness.providers.call import ModelCall, ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests import event_scenarios
+from harness.tests.helpers import python_command
 from harness.tools import tool_action
 from harness.tree_archive import load_tree
 
@@ -107,7 +108,7 @@ def test_product_bash_views_and_runs_the_snapshot(tmp_path: Path) -> None:
     spec = event_scenarios.product_spec()
     system, _adapter, run_id = event_scenarios._system(tmp_path, {"product": [ModelResponse(output=[
         event_scenarios._call("p-list-1", "bash", {"command": "ls src > listing.txt"}),
-        event_scenarios._call("p-run-2", "bash", {"command": "python src/echo.py hello > result.txt"}),
+        event_scenarios._call("p-run-2", "bash", {"command": python_command("src/echo.py", "hello") + " > result.txt"}),
         event_scenarios._call("p-write-3", "bash", {"command": "printf p > notes.txt"}),
         event_scenarios._call("p-submit-4", "submit_product_spec",
                               {key: value for key, value in spec.items() if key != "kind"}),
