@@ -12,6 +12,7 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import (DEFINITIONS, DEFINITIONS_DIR, LEGACY_VERIFICATION, DefinitionError, UnknownStopReason,
                                  WriteScope, load_definitions)
+from harness.definitions.catalogs import CATALOGS, load_catalogs
 from harness.path_rules import QA_TESTS_DIR
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
@@ -349,8 +350,9 @@ def test_a_definition_file_that_is_not_utf8_names_the_file(tmp_path):
 
 
 def test_service_presets_keep_their_revision_and_are_checked(tmp_path):
+    # 服务方案预置表与模型能力表在应用侧加载与核对（harness/definitions/catalogs.py，工单 #1452）
     assert (PRESET_TABLE_VERSION, PRESET_TABLE_SOURCE) == (
-        DEFINITIONS.service_presets.revision, DEFINITIONS.service_presets.source)
+        CATALOGS.service_presets.revision, CATALOGS.service_presets.source)
     [preset] = list_presets()
     preset["base_urls"].clear()
     assert get_preset("opencode-go")["base_urls"]["responses"] == "https://opencode.ai/zen/go/v1"
@@ -362,7 +364,7 @@ def test_service_presets_keep_their_revision_and_are_checked(tmp_path):
     table["presets"][0]["base_urls"]["responses"] = 7
     _write(directory, "service_presets.json", table)
     with pytest.raises(DefinitionError) as raised:
-        load_definitions(directory)
+        load_catalogs(directory)
     [issue] = raised.value.issues
     assert issue[:2] == ("service_presets.json", "presets[0].base_urls.responses")
     table = _read(directory, "service_presets.json")
@@ -370,7 +372,7 @@ def test_service_presets_keep_their_revision_and_are_checked(tmp_path):
     table["presets"].append(table["presets"][0])
     _write(directory, "service_presets.json", table)
     with pytest.raises(DefinitionError) as raised:
-        load_definitions(directory)
+        load_catalogs(directory)
     assert raised.value.issues == (("service_presets.json", "presets[1].id", "重复的服务方案 opencode-go"),)
 
 
@@ -468,6 +470,12 @@ def _with_unimplemented_tool(directory: Path) -> None:
      "rules.json max_cycles："),
     # 执行环境没有实现的环境工具
     (_with_unimplemented_tool, "tools.json browse_page：执行环境没有这个环境工具的实现"),
+    # 服务方案写错：这两份定义在应用侧加载与核对（harness/definitions/catalogs.py），启动照旧失败并写明文件与项
+    (lambda directory: _write(directory, "service_presets.json",
+                              {**_read(directory, "service_presets.json"),
+                               "presets": [{**_read(directory, "service_presets.json")["presets"][0],
+                                            "base_urls": {"responses": 7}}]}),
+     "service_presets.json presets[0].base_urls.responses："),
 ])
 def test_startup_fails_when_a_definition_is_invalid(tmp_path, change, expected):
     # 在程序的一份副本中把定义改为不合法的内容：命令行启动失败，错误写明文件与字段
@@ -598,7 +606,7 @@ def test_definitions_without_the_generated_browser_tools_load_with_fewer_tools(t
     directory = _copy(tmp_path)
     (directory / "browser_tools.json").unlink()
     loaded = load_definitions(directory)
-    from harness.tools import BROWSER_TOOL_NAMES
+    from harness.browser_tools import BROWSER_TOOL_NAMES
     assert not set(BROWSER_TOOL_NAMES) & set(loaded.tools)
     assert loaded.version != DEFINITIONS.version
 

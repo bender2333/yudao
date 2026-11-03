@@ -12,7 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from harness.app.application import Application
-from harness.definitions import DEFINITIONS
+from harness.definitions.catalogs import CATALOGS
 from harness.models import CatalogEventType, EventType
 from harness.providers import capabilities
 from harness.tests.api_helpers import running_api
@@ -158,7 +158,7 @@ def test_catalog_exposes_the_capability_table(tmp_path):
             assert table["revision"] == capabilities.CAPABILITY_TABLE_REVISION
             assert table["snapshot_date"] == capabilities.CAPABILITY_TABLE_SNAPSHOT_DATE
             assert table["source"] == capabilities.CAPABILITY_TABLE_SOURCE
-            assert set(table["presets"]) == set(DEFINITIONS.model_capabilities.presets)
+            assert set(table["presets"]) == set(CATALOGS.model_capabilities.presets)
             entry = table["presets"]["opencode-go"][0]
             assert set(entry) == {"model", "protocol", "input_modalities", "output_modalities",
                                   "context_window", "max_output_tokens", "tool_call", "reasoning"}

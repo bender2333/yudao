@@ -15,8 +15,8 @@ from pydantic import TypeAdapter, ValidationError
 from harness.actions import Action, ActionReceipt
 from harness.definitions import (ADDED_KINDS, DEFINITIONS, ESTABLISHED_CONTRACTS, ActionKind, Identifier, Tool,
                                  established_cancellable, established_verification)
-from harness.tools import (BROWSER_TOOL_NAMES, tool_action, tool_cancellable, tool_kind, tool_verification,
-                           tools_for)
+from harness.browser_tools import BROWSER_TOOL_NAMES
+from harness.tools import tool_action, tool_cancellable, tool_kind, tool_verification, tools_for
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFINITIONS_MODULE = REPO_ROOT / "harness" / "definitions" / "__init__.py"

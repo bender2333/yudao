@@ -7,10 +7,10 @@ from types import MappingProxyType
 from typing import Any
 from urllib.parse import urlsplit
 
-from ..definitions import DEFINITIONS, ModelCapabilities, ModelCapability, ServicePresets
+from ..definitions.catalogs import CATALOGS, ModelCapabilities, ModelCapability, ServicePresets
 from .presets import normalized_base_url, preset_id_for_base_url
 
-_TABLE = DEFINITIONS.model_capabilities
+_TABLE = CATALOGS.model_capabilities
 CAPABILITY_TABLE_REVISION = _TABLE.revision
 CAPABILITY_TABLE_SNAPSHOT_DATE = _TABLE.snapshot_date
 CAPABILITY_TABLE_SOURCE = _TABLE.source
@@ -76,7 +76,7 @@ class CapabilityIndex:
         return detail
 
 
-CAPABILITY_INDEX = CapabilityIndex(_TABLE, DEFINITIONS.service_presets)
+CAPABILITY_INDEX = CapabilityIndex(_TABLE, CATALOGS.service_presets)
 
 
 def table_public() -> dict[str, Any]:

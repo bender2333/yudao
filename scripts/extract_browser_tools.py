@@ -10,7 +10,7 @@
 #
 # --record 直接对真实的 Playwright MCP 0.0.83 说话，不用 mock；记下的回复随仓库提交
 # （harness/tests/data/playwright_mcp_tools_list.json），测试读它核对提交的定义，不需要网络与 node。
-# 筛选与映射在 harness/tools.py 的 browser_tool_definitions：哪些工具提供、不提供哪两个、动作类别、
+# 筛选与映射在 harness/browser_tools.py 的 browser_tool_definitions：哪些工具提供、不提供哪两个、动作类别、
 # 恢复契约与是否需要图像输入都写在那里，这个脚本只负责取回复与读写文件。
 
 from __future__ import annotations
@@ -25,7 +25,9 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from harness.tools import BROWSER_TOOL_NAMES, EXCLUDED_BROWSER_TOOLS, browser_tool_definitions  # noqa: E402
+from harness.browser_tools import (  # noqa: E402
+    BROWSER_TOOL_NAMES, EXCLUDED_BROWSER_TOOLS, browser_tool_definitions,
+)
 
 PACKAGE = "@playwright/mcp@0.0.83"
 RECORDED_PATH = REPO_ROOT / "harness" / "tests" / "data" / "playwright_mcp_tools_list.json"

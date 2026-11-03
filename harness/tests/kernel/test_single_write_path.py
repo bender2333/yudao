@@ -1,13 +1,13 @@
 # 基础规则第三条的前半：事实只经写入口写入。
 #
-# 事件日志只有两个写入函数（EventStore.commit 追加事件并保存投影，EventStore.replace_projection
+# 事件日志只有两个写入函数（EventLog.commit 追加事件并保存投影，EventLog.replace_projection
 # 用重放的结果替换保存的投影），只由写入口调用；只有事件日志打开数据库、写日志的表。
 # 按源码的导入与调用检查控制核心之外的全部模块。
 #
 # 例外：应用层保存的读取模型（app/read_models.py，应用层与接口层设计说明第 4.2 节）有自己的、
 # 可以删除后重建的数据库；它不写事件日志的 events、projections、commands 三张表，
 # 也不作为事件的读取来源。这条检查按原意保留（只有 write_path.py 调用 commit 与 replace_projection，
-# 三张日志表只由 event_store.py 写），读取模型是写入口事务之外的可重建派生数据（工单 #73 已处理，
+# 三张日志表只由 event_log.py 写），读取模型是写入口事务之外的可重建派生数据（工单 #73 已处理，
 # 记录在 docs/archive/architecture-issues-2026-09-10.md）。
 #
 # 读仓库里的静态文件，不开数据库、不用子进程、不用网络，属于单元层。
@@ -47,6 +47,6 @@ def test_only_the_event_log_opens_the_database_and_writes_its_tables():
                 isinstance(node, ast.ImportFrom) and node.module == "sqlite3")
             writes_table = (isinstance(node, ast.Constant) and isinstance(node.value, str)
                             and _TABLE_WRITE.search(node.value) is not None)
-            if (imported or writes_table) and path.name not in {"event_store.py", *_OWN_DATABASE}:
+            if (imported or writes_table) and path.name not in {"event_log.py", *_OWN_DATABASE}:
                 offenders.append((path.name, node.lineno))
     assert offenders == []

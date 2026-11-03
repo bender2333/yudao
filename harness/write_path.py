@@ -12,8 +12,8 @@ from dataclasses import KW_ONLY, dataclass, field
 from typing import Any, TypeVar
 
 from .definitions import Definitions
-from .event_store import (
-    Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, dump_decision, is_catalog_stream,
+from .event_log import (
+    Command, EventLog, SavedDecision, SavedProjection, StreamVersionConflict, dump_decision, is_catalog_stream,
     is_run_stream, load_decisions,
 )
 from .kernel_events import (
@@ -72,7 +72,7 @@ class NewCatalogEvent:
 
 class Snapshot:
     # 一个流在某个版本的只读视图：保存的投影与它的流版本、这个流中的决定请求（按身份），以及到这个版本为止的事件
-    def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
+    def __init__(self, store: EventLog, stream: str, saved: SavedProjection | None,
                  handler: StreamHandler, minimal_of: Callable[[str, int, list[Any]], MinimalProjection] | None = None
                  ) -> None:
         self.stream = stream
@@ -112,7 +112,7 @@ class Transaction(Snapshot):
     # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection、decisions 与 events()，提交时一起写入。
     # 判断可能因为版本冲突重新进行，判断中只做可以重复的事；只应在提交以后发生的进程内效果用 on_commit 登记，
     # 没有提交（判断出错、版本冲突或存储失败）时要撤回的外部效果用 on_abort 登记
-    def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
+    def __init__(self, store: EventLog, stream: str, saved: SavedProjection | None,
                  handler: StreamHandler, command: Command | None = None,
                  minimal_of: Callable[[str, int, list[Any]], MinimalProjection] | None = None, *,
                  definitions: Definitions | None = None) -> None:
@@ -181,7 +181,7 @@ class Transaction(Snapshot):
 class WritePath:
     # 所有领域写入唯一的入口；投影的折叠与保存按流的处理者进行，处理者由构造它的一方给出
 
-    def __init__(self, store: EventStore, handler_for: Callable[[str], StreamHandler]) -> None:
+    def __init__(self, store: EventLog, handler_for: Callable[[str], StreamHandler]) -> None:
         self._store = store
         self._handler_for = handler_for
         # 按流的版本记住折好的最小投影：流只追加，同一版本的结果不变，后面的事件在它上面接着折

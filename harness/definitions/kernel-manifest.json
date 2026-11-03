@@ -12,9 +12,9 @@
       "why": "写入口：事实只从这里进入事件日志（总图第四节「写入口」的缝）"
     },
     {
-      "path": "harness/event_store.py",
+      "path": "harness/event_log.py",
       "kind": "module",
-      "why": "事件日志的追加与投影替换，事实唯一的落盘面"
+      "why": "事件日志的追加与投影替换，事实唯一的落盘面；只给应用用的读取与订阅在应用侧的 harness/event_store.py（工单 #1452）"
     },
     {
       "path": "harness/kernel_events.py",

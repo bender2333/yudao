@@ -12,7 +12,7 @@ from harness.providers import (
     ProviderFacade,
     ProviderStore,
 )
-from harness.definitions import DEFINITIONS
+from harness.definitions.catalogs import CATALOGS
 from harness.providers import capabilities, presets
 from harness.providers.discovery import _auth_headers, _parse_candidates
 from harness.providers.presets import preset_auth, preset_default_protocol
@@ -402,7 +402,7 @@ def test_store_rejects_base_url_with_credentials_and_missing_reference():
 
 def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests():
     # 服务方案预置表带默认协议与认证方式（设计说明第 4.1 节）：OpenCode Go 是 Chat Completions
-    preset = next(item for item in DEFINITIONS.service_presets.presets if item.id == "opencode-go")
+    preset = next(item for item in CATALOGS.service_presets.presets if item.id == "opencode-go")
     assert preset.default_protocol == "chat_completions"
     assert preset.auth == "api_key"
     assert preset_default_protocol("opencode-go") == "chat_completions"

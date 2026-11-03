@@ -20,7 +20,8 @@ OTHER_FIXTURE = REPO_ROOT / "harness" / "tests" / "data" / "models_dev_snapshot_
 REAL_FIXTURE = REPO_ROOT / "harness" / "tests" / "data" / "models_dev_snapshot_20261030.json"
 SPEC = REPO_ROOT / "scripts" / "generate_model_capabilities.py"
 
-from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, load_definitions
+from harness.definitions import DEFINITIONS_DIR, DefinitionError
+from harness.definitions.catalogs import CATALOGS, load_catalogs
 from harness.providers import capabilities
 
 
@@ -47,15 +48,15 @@ def _real_fixture_copy():
 
 
 def test_shipped_capability_table_preserves_preset_plans():
-    table = DEFINITIONS.model_capabilities
+    table = CATALOGS.model_capabilities
     assert table.revision and table.snapshot_date and table.source
     assert table.version == 2
     # 表里记录来源文件的 SHA-256（取回的 models.dev 文件）
     assert len(table.source_sha256) == 64 and int(table.source_sha256, 16) >= 0
-    preset_ids = {preset.id for preset in DEFINITIONS.service_presets.presets}
+    preset_ids = {preset.id for preset in CATALOGS.service_presets.presets}
     assert set(table.presets) <= preset_ids
     # 预置表里记录了 models_dev_id 的服务方案都有条目（当前只有 OpenCode Go）
-    for preset in DEFINITIONS.service_presets.presets:
+    for preset in CATALOGS.service_presets.presets:
         if preset.models_dev_id:
             assert preset.id in table.presets
             assert table.presets[preset.id]
@@ -223,7 +224,7 @@ def test_table_public_lists_entries_with_metadata():
     assert view["snapshot_date"] == capabilities.CAPABILITY_TABLE_SNAPSHOT_DATE
     assert view["source"] == capabilities.CAPABILITY_TABLE_SOURCE
     assert view["source_sha256"] == capabilities.CAPABILITY_TABLE_SOURCE_SHA256
-    assert set(view["presets"]) == set(DEFINITIONS.model_capabilities.presets)
+    assert set(view["presets"]) == set(CATALOGS.model_capabilities.presets)
     entry = view["presets"]["opencode-go"][0]
     assert set(entry) == {"model", "protocol", "input_modalities", "output_modalities",
                           "context_window", "max_output_tokens", "tool_call", "reasoning"}
@@ -253,7 +254,7 @@ def test_capability_entry_for_unknown_preset_is_rejected(tmp_path):
     table["presets"]["no-such-preset"] = table["presets"]["opencode-go"][:1]
     (directory / "model_capabilities.json").write_text(json.dumps(table, ensure_ascii=False), encoding="utf-8")
     with pytest.raises(DefinitionError) as raised:
-        load_definitions(directory)
+        load_catalogs(directory)
     assert ("model_capabilities.json", "presets.no-such-preset",
             "能力表中有预置表没有的服务方案") in raised.value.issues
 
@@ -264,7 +265,7 @@ def test_missing_entry_for_recorded_models_dev_id_is_rejected(tmp_path):
     table["presets"].pop("opencode-go")
     (directory / "model_capabilities.json").write_text(json.dumps(table, ensure_ascii=False), encoding="utf-8")
     with pytest.raises(DefinitionError) as raised:
-        load_definitions(directory)
+        load_catalogs(directory)
     assert any(issue[0] == "model_capabilities.json" and issue[1] == "presets.opencode-go"
                for issue in raised.value.issues)
 
@@ -276,7 +277,7 @@ def test_duplicate_model_in_one_preset_is_rejected(tmp_path):
     table["presets"]["opencode-go"] = [*rows, rows[0]]
     (directory / "model_capabilities.json").write_text(json.dumps(table, ensure_ascii=False), encoding="utf-8")
     with pytest.raises(DefinitionError) as raised:
-        load_definitions(directory)
+        load_catalogs(directory)
     assert any(issue[0] == "model_capabilities.json" and issue[1].startswith("presets.opencode-go[")
                for issue in raised.value.issues)
 
@@ -311,7 +312,7 @@ def test_version_two_definitions_load_provider_metadata_and_optional_input_limit
     directory = _copy_definitions(tmp_path)
     table = _version_two_table()
     (directory / "model_capabilities.json").write_text(json.dumps(table), encoding="utf-8")
-    loaded = load_definitions(directory).model_capabilities
+    loaded = load_catalogs(directory).model_capabilities
     assert loaded.version == 2
     assert set(loaded.providers) == {"anthropic", "opencode-go"}
     assert loaded.providers["opencode-go"].models == loaded.presets["opencode-go"]
@@ -338,5 +339,5 @@ def test_invalid_version_two_provider_definitions_are_rejected(tmp_path, case):
         table["version"] = 3
     (directory / "model_capabilities.json").write_text(json.dumps(table), encoding="utf-8")
     with pytest.raises(DefinitionError) as raised:
-        load_definitions(directory)
+        load_catalogs(directory)
     assert any(issue[0] == "model_capabilities.json" for issue in raised.value.issues)

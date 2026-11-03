@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, ModelCapabilities
+from harness.definitions import DEFINITIONS_DIR
+from harness.definitions.catalogs import CATALOGS, ModelCapabilities
 from harness.providers import capabilities
 from harness.providers.discovery import _parse_candidates
 
@@ -27,7 +28,7 @@ def _index():
     presets = json.loads((DEFINITIONS_DIR / "service_presets.json").read_text(encoding="utf-8"))["presets"]
     table = module.build_table(presets, raw, "2026-10-30.1", "2026-10-30", "https://models.dev/api.json")
     definition = ModelCapabilities.model_validate_json(json.dumps(table), strict=True)
-    return capabilities.CapabilityIndex(definition, DEFINITIONS.service_presets)
+    return capabilities.CapabilityIndex(definition, CATALOGS.service_presets)
 
 
 @pytest.mark.parametrize(("address", "expected"), [

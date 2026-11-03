@@ -101,12 +101,12 @@ VisibilityValue = Literal["current_delivery_spec", "delivery_facts", "delivery_e
 VISIBILITY_VALUES: frozenset[str] = frozenset(get_args(VisibilityValue))
 
 
-def _freeze(value: Any) -> Any:
+def freeze(value: Any) -> Any:
     # 逐层把字典换成只读映射、把列表换成元组，键的顺序不变
     if isinstance(value, Mapping):
-        return MappingProxyType({key: _freeze(item) for key, item in value.items()})
+        return MappingProxyType({key: freeze(item) for key, item in value.items()})
     if isinstance(value, (list, tuple)):
-        return tuple(_freeze(item) for item in value)
+        return tuple(freeze(item) for item in value)
     return value
 
 
@@ -142,9 +142,9 @@ class _Definition(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
 
-def _frozen(*fields: str) -> Any:
+def frozen(*fields: str) -> Any:
     # 这些字段校验以后逐层换成只读结构
-    return field_validator(*fields, mode="after")(lambda cls, value: _freeze(value))
+    return field_validator(*fields, mode="after")(lambda cls, value: freeze(value))
 
 
 class Rule(_Definition):
@@ -248,7 +248,7 @@ class VerificationDeclaration(_Definition):
     verifiers: tuple[VerifierRole, ...] = ()
     write_scopes: Mapping[Identifier, WriteScope] = Field(default_factory=dict)
 
-    freeze_write_scopes = _frozen("write_scopes")
+    freeze_write_scopes = frozen("write_scopes")
 
 
 # 旧定义（organization.json 没有写核验声明）的核验关系与写入范围：与今天写死的三部门相同
@@ -308,7 +308,7 @@ class Tool(_Definition):
     description: str = Field(min_length=1)
     parameters: Mapping[str, Any]
 
-    freeze_parameters = _frozen("parameters")
+    freeze_parameters = frozen("parameters")
 
     @model_validator(mode="after")
     def _category(self) -> Tool:
@@ -330,7 +330,7 @@ class ProposalContract(_Definition):
     kinds: Mapping[Identifier, Mapping[str, Any]]
     notes: tuple[str, ...]
 
-    freeze_kinds = _frozen("kinds")
+    freeze_kinds = frozen("kinds")
 
 
 # 提案合同里的通用条件（设计说明第 5.5 节）：内核按合同核对，成果驱动写死的关系规则改写成这几种。
@@ -451,78 +451,13 @@ class ProposalContracts(_Definition):
     # 各提案种类的通用条件（设计说明第 5.5 节）：键是提案种类，值是按顺序核对的条件
     conditions: Mapping[Identifier, tuple[ProposalCondition, ...]] = Field(default_factory=dict)
 
-    freeze_roles = _frozen("roles")
-    freeze_conditions = _frozen("conditions")
+    freeze_roles = frozen("roles")
+    freeze_conditions = frozen("conditions")
 
 
-Protocol = Literal["responses", "chat_completions", "messages"]
-
-
-class ServicePreset(_Definition):
-    id: str = Field(min_length=1)
-    name: str = Field(min_length=1)
-    auth: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（设计说明第 4.3 节）；默认协议：模型没有单独声明协议时预填（设计说明第 4.1 节）
-    default_protocol: Protocol
-    # 按协议的请求基址，请求路径由各协议适配器拼接
-    base_urls: Mapping[Protocol, str]
-    models_url: str
-    docs_url: str
-    header_profile: str
-    source: str
-    notes: str
-    # 这个服务方案在 models.dev 中对应的 provider ID，模型能力表的提取脚本据此取材；
-    # 「自定义」不使用预置表，在能力表中没有条目，不填这一项
-    models_dev_id: str = ""
-
-    freeze_base_urls = _frozen("base_urls")
-
-
-class ServicePresets(_Definition):
-    # 服务方案预置表（设计说明第 4.1 节）：整张表的 revision 与来源随界面显示；每个服务方案一项
-    revision: str = Field(min_length=1)
-    source: str = Field(min_length=1)
-    presets: tuple[ServicePreset, ...]
-
-
-class ModelCapability(_Definition):
-    # 模型能力表中的一条：取自 models.dev 的快照，只保留设计说明第 4.1 节的字段。
-    # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
-    model: str = Field(min_length=1)
-    # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务商接入包。
-    # 接入包没有对应的协议时为空（None）：容量与输入方式照常记录。
-    protocol: Protocol | None = None
-    # 模型自己声明的接入包（provider.npm）；没有声明时不记录（空串）。
-    npm: str = ""
-    input_modalities: tuple[str, ...] = ()
-    output_modalities: tuple[str, ...] = ()
-    context_window: int | None = None
-    max_output_tokens: int | None = None
-    max_input_tokens: int | None = None
-    tool_call: bool = False
-    reasoning: bool = False
-
-
-class CapabilityProvider(_Definition):
-    # 服务商的接口地址与接入包；接口地址取自 models.dev，官方服务商由提取脚本的补充表补上。
-    api: str = ""
-    npm: str = Field(min_length=1)
-    models: tuple[ModelCapability, ...]
-
-
-class ModelCapabilities(_Definition):
-    # 版本 2 增加全部服务商资料；presets 保留原服务方案的模型，旧文件按版本 1 读取。
-    version: int = Field(default=1, ge=1, le=2)
-    providers: Mapping[str, CapabilityProvider] = Field(default_factory=dict)
-    presets: Mapping[str, tuple[ModelCapability, ...]]
-    revision: str = Field(min_length=1)
-    snapshot_date: str = Field(min_length=1)
-    source: str = Field(min_length=1)
-    # 来源文件（取回的 models.dev api.json，或用本地文件生成时的那份）的 SHA-256。
-    source_sha256: str = ""
-
-    freeze_presets = _frozen("presets")
-    freeze_providers = _frozen("providers")
+# 服务方案预置表与模型能力表（service_presets.json、model_capabilities.json）的结构与它们之间的引用核对
+# 不在内核里：它们只用于预填与界面显示，裁决用不到。类型、加载与核对在 harness/definitions/catalogs.py，
+# 内核不反过来导入它（工单 #1452）；内核只把这两份文件解析一次，算进定义的版本。
 
 
 class StopReason(_Definition):
@@ -550,7 +485,7 @@ class WorkItemKind(_Definition):
     # 各部门在本种类中的说明，键是部门编号
     departments: Mapping[Identifier, DepartmentWork] = Field(default_factory=dict)
 
-    freeze_work_items = _frozen("departments")
+    freeze_work_items = frozen("departments")
 
 
 class OverviewCategory(_Definition):
@@ -564,7 +499,7 @@ class WorkItems(_Definition):
     kinds: Mapping[Identifier, WorkItemKind] = Field(min_length=1)
     repository_overview: Mapping[Identifier, OverviewCategory] = Field(min_length=1)
 
-    freeze_work_items = _frozen("kinds", "repository_overview")
+    freeze_work_items = frozen("kinds", "repository_overview")
 
 
 class RoutingEndReason(_Definition):
@@ -611,14 +546,14 @@ class Routing(_Definition):
     # 路由自己的结束原因：编号到这个原因的中文名、结束方式与处理说明，封闭清单
     end_reasons: Mapping[Identifier, RoutingEndReason] = Field(min_length=1)
 
-    freeze_routing = _frozen("limits", "end_reasons")
+    freeze_routing = frozen("limits", "end_reasons")
 
 
 class Routings(_Definition):
     # routings.json：可用的路由实现是封闭的清单，组织定义的 routing 不在里面时加载失败
     routings: tuple[Routing, ...] = Field(min_length=1)
 
-    freeze_routings = _frozen("routings")
+    freeze_routings = frozen("routings")
 
 
 class Definitions(_Definition):
@@ -633,9 +568,6 @@ class Definitions(_Definition):
     rules: Mapping[RuleName, Rule]
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: Mapping[Identifier, StopReason]
-    service_presets: ServicePresets
-    # 模型能力表：models.dev 快照，带 revision、快照日期与来源，只用于预填（设计说明第 4.1 节）
-    model_capabilities: ModelCapabilities
     # 事项种类与仓库概况的模式表，来自 work_items.json
     work_items: WorkItems
     # 可用的路由实现，来自 routings.json（工单 #825）
@@ -643,7 +575,7 @@ class Definitions(_Definition):
     # 事件种类的来源表，来自 event_sources.json（工单 #396）：键是事件种类
     event_sources: Mapping[Identifier, EventSource]
 
-    freeze_collections = _frozen("roles", "tools", "stop_reasons", "work_items", "rules", "event_sources")
+    freeze_collections = frozen("roles", "tools", "stop_reasons", "work_items", "rules", "event_sources")
 
     @property
     def routing(self) -> str:
@@ -796,16 +728,17 @@ class Definitions(_Definition):
         return definition
 
 
-# 定义文件与它在 Definitions 中的字段、类型
-_FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
+# 定义文件与它在 Definitions 中的字段、类型；字段为空的（None）是应用侧的定义，内核只解析、
+# 不做结构校验，结构与引用由 harness/definitions/catalogs.py 核对（工单 #1452）
+_FILES: dict[str, tuple[str | None, TypeAdapter[Any]]] = {
     "organization.json": ("organization", TypeAdapter(Organization)),
     "roles.json": ("roles", TypeAdapter(dict[Identifier, Role])),
     "tools.json": ("tools", TypeAdapter(dict[Identifier, Tool])),
     "proposal_contracts.json": ("proposal_contracts", TypeAdapter(ProposalContracts)),
     "rules.json": ("rules", TypeAdapter(dict[RuleName, Rule])),
     "stop_reasons.json": ("stop_reasons", TypeAdapter(dict[Identifier, StopReason])),
-    "service_presets.json": ("service_presets", TypeAdapter(ServicePresets)),
-    "model_capabilities.json": ("model_capabilities", TypeAdapter(ModelCapabilities)),
+    "service_presets.json": (None, TypeAdapter(Any)),
+    "model_capabilities.json": (None, TypeAdapter(Any)),
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
     "routings.json": ("routings", TypeAdapter(Routings)),
     "event_sources.json": ("event_sources", TypeAdapter(dict[Identifier, EventSource])),
@@ -817,21 +750,21 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
 _OPTIONAL_FILES = frozenset({"browser_tools.json"})
 
 
-class _DuplicateKey(ValueError):
+class DuplicateKey(ValueError):
     def __init__(self, key: str) -> None:
         super().__init__(key)
         self.key = key
 
 
-def _unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+def unique_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     keys = [key for key, _ in pairs]
     for key in keys:
         if keys.count(key) > 1:
-            raise _DuplicateKey(key)
+            raise DuplicateKey(key)
     return dict(pairs)
 
 
-def _location(loc: tuple[Any, ...]) -> str:
+def location(loc: tuple[Any, ...]) -> str:
     text = ""
     for part in loc:
         text += f"[{part}]" if isinstance(part, int) else (f".{part}" if text else str(part))
@@ -861,17 +794,19 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
             issues.append((file, "（整个文件）", f"无法读取：{exc.strerror or exc}"))
             continue
         try:
-            contents[file] = json.loads(text, object_pairs_hook=_unique_keys)
+            contents[file] = json.loads(text, object_pairs_hook=unique_keys)
         except json.JSONDecodeError as exc:
             issues.append((file, f"第 {exc.lineno} 行第 {exc.colno} 列", f"不是合法的 JSON：{exc.msg}"))
             continue
-        except _DuplicateKey as exc:
+        except DuplicateKey as exc:
             issues.append((file, exc.key, "重复的键"))
+            continue
+        if field is None:
             continue
         try:
             parts[field] = adapter.validate_json(text, strict=True)
         except ValidationError as exc:
-            issues.extend((file, _location(error["loc"]), error["msg"]) for error in exc.errors())
+            issues.extend((file, location(error["loc"]), error["msg"]) for error in exc.errors())
     # 浏览器工具是单独一份生成的文件：与手写的工具清单合并，同名工具即定义不合法（工单 #147）
     browser_tools = parts.pop("browser_tools", {})
     if "tools" in parts:
@@ -891,8 +826,7 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
 
 def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
     # 类型以外的核对：部门与角色一一对应，角色与事项种类的工具都有定义且不重复，一种提案只由一个工具提交，
-    # 提案合同与各事项种类可以使用的主机工具相符，事项种类的停止原因在清单中，服务方案的编号不重复，
-    # 模型能力表与服务方案预置表互相对得上
+    # 提案合同与各事项种类可以使用的主机工具相符，事项种类的停止原因在清单中
     issues: list[tuple[str, str, str]] = []
     organization: Organization = parts["organization"]
     roles: dict[str, Role] = parts["roles"]
@@ -934,39 +868,6 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
     issues.extend(_contract_references(parts["proposal_contracts"], roles, tools, parts["work_items"]))
     issues.extend(_delivery_part_issues(parts["proposal_contracts"]))
     issues.extend(_condition_references(parts["proposal_contracts"], organization))
-    presets: ServicePresets = parts["service_presets"]
-    identities = [preset.id for preset in presets.presets]
-    for index, identity in enumerate(identities):
-        if identities.index(identity) != index:
-            issues.append(("service_presets.json", f"presets[{index}].id", f"重复的服务方案 {identity}"))
-    capabilities: ModelCapabilities = parts["model_capabilities"]
-    preset_ids = {preset.id for preset in presets.presets}
-    for preset_id in sorted(set(capabilities.presets) - preset_ids):
-        issues.append(("model_capabilities.json", f"presets.{preset_id}", "能力表中有预置表没有的服务方案"))
-    for index, preset_id in enumerate(capabilities.presets):
-        if preset_id not in preset_ids:
-            continue
-        models = [capability.model for capability in capabilities.presets[preset_id]]
-        for position, model in enumerate(models):
-            if models.index(model) != position:
-                issues.append(("model_capabilities.json", f"presets.{preset_id}[{position}].model",
-                               f"同一个服务方案中模型 {model} 重复"))
-    for index, preset in enumerate(presets.presets):
-        if preset.models_dev_id and preset.id not in capabilities.presets:
-            issues.append(("model_capabilities.json", f"presets.{preset.id}",
-                           f"预置表第 {index + 1} 项（{preset.id}）记录了 models_dev_id，能力表却缺少这个服务方案"))
-        if capabilities.version == 2 and preset.models_dev_id:
-            provider = capabilities.providers.get(preset.models_dev_id)
-            if provider is None:
-                issues.append(("model_capabilities.json", f"providers.{preset.models_dev_id}", "能力表缺少预置方案对应的服务商"))
-            elif capabilities.presets.get(preset.id) != provider.models:
-                issues.append(("model_capabilities.json", f"presets.{preset.id}", "服务方案与对应服务商的模型资料不一致"))
-    for provider_id, provider in capabilities.providers.items():
-        models = [entry.model for entry in provider.models]
-        for position, model in enumerate(models):
-            if models.index(model) != position:
-                issues.append(("model_capabilities.json", f"providers.{provider_id}.models[{position}].model",
-                               f"同一个服务商中模型 {model} 重复"))
     return issues
 
 

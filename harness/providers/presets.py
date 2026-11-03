@@ -4,11 +4,13 @@ from types import MappingProxyType
 from typing import Any, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
-from ..definitions import DEFINITIONS, ServicePreset, thaw
+from ..definitions import thaw
+from ..definitions.catalogs import CATALOGS, ServicePreset
 
 # 服务方案预置表是带版本的定义（definitions/service_presets.json），整张表带 revision 与来源，
-# 不做远端热更（模型管理设计说明第 4.1 节）；新增服务方案等于在定义中新增一项
-_TABLE = DEFINITIONS.service_presets
+# 不做远端热更（模型管理设计说明第 4.1 节）；新增服务方案等于在定义中新增一项。
+# 它在应用侧加载（definitions/catalogs.py，工单 #1452），内核只用它算定义的版本
+_TABLE = CATALOGS.service_presets
 PRESET_TABLE_VERSION = _TABLE.revision
 PRESET_TABLE_SOURCE = _TABLE.source
 

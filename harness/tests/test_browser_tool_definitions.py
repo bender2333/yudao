@@ -12,8 +12,9 @@ from pathlib import Path
 import pytest
 
 from harness.definitions import DEFINITIONS
-from harness.tools import (BROWSER_TOOL_NAMES, EXCLUDED_BROWSER_TOOLS, IMAGE_INPUT_BROWSER_TOOLS,
-                           browser_tool_definitions, offers_with_input, tool_definitions)
+from harness.browser_tools import (BROWSER_TOOL_NAMES, EXCLUDED_BROWSER_TOOLS, IMAGE_INPUT_BROWSER_TOOLS,
+                                   browser_tool_definitions)
+from harness.tools import offers_with_input, tool_definitions
 
 DATA = Path(__file__).resolve().parent / "data" / "playwright_mcp_tools_list.json"
 COMMITTED = Path(__file__).resolve().parents[1] / "definitions" / "browser_tools.json"
