@@ -90,7 +90,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 界面工单除了代码与测试，还要留证据：
 
-- 文本、状态词、按钮出现条件按工单与它指向的设计说明核；原型与草图只说明设计意图，不当标准。工单与设计说明冲突时按工单做，冲突写进工单评论。
+- 文本、状态词、按钮出现条件按工单与它指向的设计说明核；原型与草图只说明设计意图，不当标准。工单与设计说明相反时交回（第 4 节 `needs-triage` 的理由）；设计没写到的细节按工单做，写进工单评论。
 - 验证从便宜到贵：状态→文案/可见性的映射**先抽成纯函数**用 `cd client && npm test` 跑（快、能并发）；改到视图文件再过一次 `npm run build:pages`；真的需要渲染/交互/事件流时才跑 `npx playwright test tests/e2e/<相关>.spec.ts`。
 - **e2e 是互斥资源**：每个 spec 自己起真后端、占端口，负载下启动要 60–75 秒。一张单里把场景放进同一个 spec，不要重复起后端。
 - 像素判断用「区域差」（画布内容签名、逐格 RGB 差），**不要加 `toHaveScreenshot` 基线**：跨机器字体会让它变成不稳定测试。
@@ -107,7 +107,8 @@ argument-hint: "<工单编号> [里程碑标题]"
 | 设计问题：工单要求的做法与设计说明相反、规则互相矛盾、验收标准无法满足或互相矛盾（设计没写到的边界自己定、写进交付说明、继续做） | `needs-triage` | 评论写到 `<工作目录>/.tmp/<编号>-question.md`，`STATUS: blocked`，`ERROR` 以 `[设计]` 开头，后面写问题一句话与那个文件的绝对路径 | `gh issue edit <编号> --remove-label in-progress --add-label needs-triage`，`gh issue comment <编号> --body-file <文件>` |
 | 同一张工单连续三轮没有通过（一轮一次会话，收尾报 failed 或 blocked 算一次；本地测试失败不算） | `needs-triage` | 每轮失败照实报 `STATUS: blocked`，不带前缀；第三轮由编排者 `escalate` | 自己交回，评论写三轮分别卡在哪、试过什么 |
 | 执行环境挡住：跑不了测试、缺凭据、权限不够、CI 平台挂了、依赖装不上、网络不通 | `ready-for-human` | 评论写到 `<工作目录>/.tmp/<编号>-env.md`，`ERROR` 以 `[环境]` 开头 | `--remove-label in-progress --add-label ready-for-human`，发评论 |
-| 要改规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`）、CI 工作流、基础规则、评测的隐藏检查、参考解法、评分器与发布检查（`evals/scenarios/*/checks`、`evals/scenarios/*/reference`、`evals/scorer`、`scripts/release.py`、`harness/release_check.py`；可信内核清单与 `harness/tests/kernel/` 不在其中：可以改，不需要事前批准，要求是内核路径的测试覆盖，`AGENTS.md` 共同要求） | `ready-for-human` | PR 上写明理由，评论写清要用户决定什么，收尾 blocked | 同上 |
+| 要改规则文件（`CLAUDE.md`、`AGENTS.md`、`docs/agents/`、技能）或 CI 工作流 | `needs-triage` | `ARCHITECT:` 评论写清要改哪条、为什么，收尾 blocked | 同上 |
+| 要改意图：基础规则、评测的隐藏检查、参考解法、评分器与发布检查（`evals/scenarios/*/checks`、`evals/scenarios/*/reference`、`evals/scorer`、`scripts/release.py`、`harness/release_check.py`；可信内核清单与 `harness/tests/kernel/` 不在其中：可以改，不需要事前批准，要求是内核路径的测试覆盖，`AGENTS.md` 共同要求） | `ready-for-human` | PR 上写明理由，评论写清要用户决定什么，收尾 blocked | 同上 |
 
 交回的评论用这个结构，最后一行署名：
 
@@ -123,7 +124,7 @@ argument-hint: "<工单编号> [里程碑标题]"
 
 执行环境的评论写清哪一步被挡住、试过什么、需要什么、哪些部分不受影响。其它做不下去的：算一次失败，写清原因，不要在同一处反复试。
 
-设计没写到的边界自己定、继续做，写进交付说明的「自定的边界」，由架构师验收时写进设计说明；与总图冲突的，交回评论里写明「总图」与节号，架构师开 `architecture` 工单（`AGENTS.md`「架构问题」）。
+设计没写到的边界不是交回的理由，自己定、继续做，写进交付说明的「自定的边界」，由架构师验收时写进设计说明。与总图冲突的问题交给总架构师，交回评论里写明「总图」与节号，架构师开 `architecture` 工单（`AGENTS.md`「架构问题」）。
 
 ## main 上的 CI
 
