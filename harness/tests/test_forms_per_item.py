@@ -116,7 +116,6 @@ def test_two_forms_run_in_one_instance_each_under_its_frozen_definitions(tmp_pat
     assert system.projects.projection(project_id).form_name == DEFAULT_FORM
 
     first_item, first_run = system.projects.start_work_item(project_id, "第一步：补用法一节")
-    workspace = system.project(first_run)
     assert _created(system, project_id, first_item)["form"] == DEFAULT_FORM
     assert _created(system, project_id, first_item)["definitions_version"] == PRODUCT_DEFINITIONS.version
     assert system.run_until_stop(first_run).status == "done"
