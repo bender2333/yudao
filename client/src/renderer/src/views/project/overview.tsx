@@ -26,11 +26,11 @@ import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { scopeAtTick, ticksOf } from "../timeline/logic";
 import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, departmentLine, formatTime, label,
-  progressLabel, workingDepartmentsText } from "./labels";
+  progressLabel, stoppedCardLine, workingDepartmentsText } from "./labels";
 import { askIndent, askLine } from "./asks-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
-import { BOARD_TITLES, boardColumns } from "./board";
+import { boardGroups } from "./board";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
 // 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
@@ -274,8 +274,9 @@ function CurrentItem(props: {
           ["待决问题", show(item.pending_question, "没有")],
           ["停止原因", item.stop_reason === null || item.stop_reason === "" ? "没有" : label(STOP_REASON, item.stop_reason)],
           // 停止说明（工单 #1162）：让事项停下的那条错误的原文，写在停止原因下面；
-          // 已收下的交付（工单 #1239）写在它下面一行
-          ["停止说明", <StopNote key="stop-note" note={item.stop_note} kept={item.kept_delivery} empty="没有" />],
+          // 上游失败的细节（工单 #1373）写在它下面一行，再下面是已收下的交付（工单 #1239）
+          ["停止说明", <StopNote key="stop-note" note={item.stop_note} kept={item.kept_delivery}
+            detail={item.stop_detail} empty="没有" />],
           ["未能开始", show(item.start_error, "没有")],
           ["处理进度", processing],
         ]}
@@ -499,16 +500,22 @@ function InputRecords(props: {
 }
 
 export function Board(props: { items: WorkItemCard[] }) {
-  const columns = boardColumns(props.items);
+  // 分组的口径见 board.ts 与设计说明「事项看板在页面上的显示」（工单 #1372）：
+  // 部门列取自事项的部门，几个部门同时工作时同一事项出现在几列里
+  const groups = boardGroups(props.items);
 
   return (
-    <Section id="ov-board" title="事项看板" note="卡片显示标题、状态、正在工作的部门与轮次；排队中的顺序就是执行顺序">
+    <Section
+      id="ov-board"
+      title="事项看板"
+      note="卡片显示标题、状态、正在工作的部门与轮次；部门列放的是这个部门手上有的事项，几个部门同时工作时同一事项会出现在几列里；排队中的顺序就是执行顺序"
+    >
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
         <div className="y10-ov-board board">
-          {BOARD_TITLES.map(([key, title]) => (
-            <div key={key} className="y10-ov-board-col board-col">
-              <h3>{title}（{columns[key].length}）</h3>
-              {columns[key].map((item) => (
+          {groups.map((group) => (
+            <div key={group.key} className="y10-ov-board-col board-col">
+              <h3>{group.title}（{group.items.length}）</h3>
+              {group.items.map((item) => (
                 <article key={item.work_item_id} className="y10-ov-card board-card">
                   <strong>{item.title}</strong>
                   <div className="y10-ov-card-meta card-meta">
@@ -517,11 +524,15 @@ export function Board(props: { items: WorkItemCard[] }) {
                     {workingDepartmentsText(item) === "" ? null : <span>{workingDepartmentsText(item)}</span>}
                     <span>第 {item.round} 轮</span>
                   </div>
+                  {/* 停止的卡片要能分辨（工单 #1373）：同一项目里几张同名的失败卡片写出事项标识与停止的时间 */}
+                  {item.status === "stopped"
+                    ? <p className="y10-muted card-note stop-identity">{stoppedCardLine(item)}</p>
+                    : null}
                   {item.pending_question ? <p className="y10-muted card-note">待决问题：{item.pending_question}</p> : null}
                   {item.stop_reason ? <p className="y10-muted card-note">停止原因：{label(STOP_REASON, item.stop_reason)}</p> : null}
-                  {/* 停止说明（工单 #1162）：停在停止原因下面，长的折起来可以展开；
-                      已收下的交付（工单 #1239）写在它下面一行 */}
-                  <StopNote note={item.stop_note} kept={item.kept_delivery} block />
+                  {/* 停止说明（工单 #1162）：停在停止原因下面，长的折起来可以展开；上游失败的细节（工单 #1373）
+                      写在它下面一行，已收下的交付（工单 #1239）再下面一行 */}
+                  <StopNote note={item.stop_note} kept={item.kept_delivery} detail={item.stop_detail} block />
                   {item.start_error ? <p className="y10-muted card-note">未能开始：{item.start_error}</p> : null}
                 </article>
               ))}

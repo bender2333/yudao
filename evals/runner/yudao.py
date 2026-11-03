@@ -608,6 +608,16 @@ def last_archived_delivery(export):
     return deliveries[-1] if deliveries else None
 
 
+def first_archived_delivery(export):
+    """第一次封存的交付：与 `last_archived_delivery` 对称（设计第 5.2 节）。
+
+    只有一次交付时两次取到同一个事件，没有交付时都是 None。两份都交给评分器：
+    第一次交付的完成度与质检带来的提高都从它算（第 6.3 节第 1 条）。
+    """
+    deliveries = [event for event in export["events"] if event["type"] == "delivery_accepted"]
+    return deliveries[0] if deliveries else None
+
+
 def quality_released(export):
     """质检是否已经放行：最后一次质检提交为 `release`（设计说明第 5.1 节）。"""
     reviews = [event for event in export["events"] if event["type"] == "qa_submitted"]

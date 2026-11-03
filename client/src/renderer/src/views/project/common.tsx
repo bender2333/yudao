@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import { type CommandProblem, commandProblemText } from "../../contract/command-problem.ts";
-import { type KeptDeliveryView, stopNoteView } from "./labels";
+import { type KeptDeliveryView, type StopDetailView, stopDetailText, stopNoteView } from "./labels";
 
 export type Field = Record<string, unknown>;
 
@@ -115,13 +115,17 @@ export function Tag(props: { tone?: "ok" | "warn" | "danger" | "muted"; children
 // block 是看板卡片那一格（自己带「停止说明」这个标题），其余用在 KeyValue 的取值里（标题由左侧一列给）。
 // 已收下的交付（工单 #1239）：给 kept 时在停止说明下面多写一行（交付版本与收下的时间），
 // 没有停止说明（例如用户自己取消）也照样写——交付仍然在。
+// 上游失败的细节（工单 #1373）：给 detail 时在停止说明下面写出哪个部门、请求的哪个模型、
+// 服务返回的什么状态码、可不可重试——这几项事件里本来就有，只是此前没有带到这一句提示里。
 export function StopNote(props: {
   note: string | null | undefined;
   kept?: KeptDeliveryView;
+  detail?: StopDetailView | null;
   empty?: string;
   block?: boolean;
 }) {
   const view = stopNoteView(props.note, props.kept);
+  const detailText = stopDetailText(props.detail);
   const parts: React.ReactNode[] = [];
   if (view.kind === "none") {
     if (props.empty !== undefined) {
@@ -138,6 +142,11 @@ export function StopNote(props: {
         <p className="y10-code raw-text">{view.text}</p>
       </details>,
     );
+  }
+  if (detailText !== null) {
+    parts.push(props.block === true
+      ? <p key="detail" className="y10-muted card-note stop-detail">上游失败：{detailText}</p>
+      : <span key="detail" className="stop-detail"><br />上游失败：{detailText}</span>);
   }
   if (view.keptDelivery !== undefined) {
     parts.push(props.block === true

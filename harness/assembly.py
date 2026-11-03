@@ -19,6 +19,7 @@ from .compaction import (CompactionCheckpoint, CompactionError, CompactionPlan, 
 from .context import AssembledContext, ContextAssembler, department_work_text
 from .definitions import DEFINITIONS
 from .event_store import EventStore
+from .failure_list import failure_list
 from .models import (ArtifactRef, DepartmentGuidance, Event, EventType, RunProjection,
                      canonical_hash)
 from .validation import Tightening
@@ -345,14 +346,25 @@ class ContextAssembly:
                 max_output_tokens=plan.max_output_tokens, compaction_event_id=checkpoint_id,
             )
         else:
+            # 压缩生效以后另放一段失败清单（设计说明「压缩以后保留失败的尝试」）：由主机从事件生成，
+            # 覆盖这个角色从开始到这一次检查点分界的全部失败，接在摘要之后；没有压缩过时不生成
+            failed_attempts = None if checkpoint is None else failure_list(
+                pinned.events, department=frame.department,
+                boundary_event_id=checkpoint.covered_through_event_id,
+                limit_tokens=self.assembler.rules.failure_list_tokens,
+                entry_chars=self.assembler.rules.failure_entry_chars,
+            )
             context = self.assembler.assemble(
                 pinned.projection, department=frame.department, session_id=frame.session_id,
                 activation_id=frame.activation_id, step_id=pinned.step_id, prompt=frame.prompt,
-                history=visible_history(replay_history, checkpoint), compaction_event_id=checkpoint_id,
+                history=visible_history(replay_history, checkpoint,
+                                        failure_list=None if failed_attempts is None else failed_attempts.item),
+                compaction_event_id=checkpoint_id,
                 context_window=limits.context_window, max_output_tokens=limits.output_limit,
                 guidance=pinned.guidance,
                 events=pinned.events, snapshot_hash=pinned.snapshot_hash,
                 input_modalities=pinned.input_modalities, definitions=frame.definitions,
+                failure_list_events=() if failed_attempts is None else failed_attempts.event_ids,
             )
         payload: dict[str, Any] = {"input": context.input_items, "tools": context.tools}
         if context.manifest.max_output_tokens is not None:

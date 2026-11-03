@@ -2,8 +2,6 @@
 // 单一来源：harness/app/labels.py 里的部门、阶段与状态名称，客户端按生成的合同取值对应显示。
 
 import type { StreamState } from "../../contract/stream-state";
-// 角色条在角色没有当前任务时显示房间状态词表里的中文状态（工单 #1230）
-import { STATUS_TEXT } from "../../pixel/room/layout.ts";
 
 export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   product: { name: "产品", role: "把用户的要求整理成有效需求" },
@@ -27,9 +25,6 @@ export interface DepartmentStateView {
   state: string;
   note?: string | null;
 }
-
-// 页面上列部门的顺序：产品、工程、质检（部门表本身的顺序，工单 #904）
-const DEPARTMENT_ORDER = Object.keys(DEPARTMENTS);
 
 export const WORK_ITEM_STATUS: Record<string, string> = {
   // not_started 是「已登记、还没开始运行」——排队等开始时也是它，页面上叫「排队中」（工单 #733）
@@ -325,7 +320,7 @@ export function departmentStatusView(data: {
 
 // 三个部门各自的状态与原因拆成一段段（三部门的循环结构第 2.1 节，工单 #904）：
 // 「产品 一轮工作中（回答工程的询问） · 工程 询问中（在等待产品的回答） · 质检 等待工作」。
-// 只写查询结果里有的部门，按产品、工程、质检的顺序；current 标出本部门那一段，
+// 顺序取查询给出的那个（事项所用的定义里的部门顺序，工单 #1372）；current 标出本部门那一段，
 // 部门工作间把它加粗（工单 #905）。没有 departments（事项没有进行中的 run）时返回 null。
 export interface DepartmentsLinePart {
   text: string;
@@ -339,11 +334,7 @@ export function departmentsLineParts(
   if (!departments || Object.keys(departments).length === 0) {
     return null;
   }
-  const order = [
-    ...DEPARTMENT_ORDER.filter((department) => department in departments),
-    ...Object.keys(departments).filter((department) => !DEPARTMENT_ORDER.includes(department)),
-  ];
-  return order.map((department) => ({
+  return Object.keys(departments).map((department) => ({
     text: `${departmentName(department)} ${departmentStateText(departments[department])}`,
     current: department === current,
   }));
@@ -376,7 +367,7 @@ export function departmentLine(
 }
 
 // 看板卡片上写正在工作的部门（三部门的循环结构第 3.1 节，工单 #904）：状态是一轮工作中或询问中的部门，
-// 按产品、工程、质检的顺序写成「工程、质检在工作」。有这样的部门时写它；没有时不写这句话
+// 按查询给出的部门顺序写成「工程、质检在工作」（工单 #1372）。有这样的部门时写它；没有时不写这句话
 // （返回空串，调用处这一格不出现）；查询结果里没有 departments（旧数据、没有进行中的 run）时
 // 退回事项所在的部门（工单 #842 的行为：没有部门的事项，这一格不写）。
 export function workingDepartmentsText(item: {
@@ -387,7 +378,7 @@ export function workingDepartmentsText(item: {
   if (departments === null) {
     return departmentName(item.department ?? null);
   }
-  const working = DEPARTMENT_ORDER.filter((department) => {
+  const working = Object.keys(departments).filter((department) => {
     const state = departments[department];
     return state !== undefined && (state.state === "working" || state.state === "asking");
   });
@@ -396,6 +387,13 @@ export function workingDepartmentsText(item: {
   }
   return `${working.map((department) => departmentName(department)).join("、")}在工作`;
 }
+
+// 角色条在角色没有当前任务时显示的房间状态词（工单 #1230）。页面自己的一份（工单 #1415）：
+// 页面上的文字归页面，不从画面取；画面那边自己的那一份在 pixel/room/layout.ts，两份不互相引用。
+export const STATUS_TEXT: Record<string, string> = {
+  idle: "未工作", working: "工作中", asking: "等待回答", paused: "已暂停", failed: "失败", done: "已完成",
+  cancelled: "已取消", interrupted: "中断", waiting_resume: "待恢复",
+};
 
 // 房间角色条上那一格的文字（工单 #1230）：角色的 task 只在有事实说明它此刻做什么时才填。
 // 现在系统里没有这样的事实（一个部门只有一个角色，没有哪一项记录写着它此刻手上的事），
@@ -449,6 +447,51 @@ export function stopNoteView(note: string | null | undefined, kept?: KeptDeliver
   return text.length <= STOP_NOTE_INLINE_LIMIT
     ? { kind: "inline", text, ...extra }
     : { kind: "folded", text, ...extra };
+}
+
+// 上游失败的细节（工单 #1373）：停止原因是模型服务时，事件里本来就有发起这次请求的部门、
+// 请求的模型、服务返回的状态码与这次失败可不可重试，此前页面只写停下的那句原文
+// 「Model provider returned HTTP 503」，用户分辨不出是上游挂了还是自己配错了。
+// 四项都有时写成一句「工程部门请求的模型 wb/cn:deepseek-v4.1-flash，服务返回 HTTP 503，不可重试」；
+// 缺哪一项就不写哪一项，四项都没有时没有这一行（返回 null）。
+export interface StopDetailView {
+  department?: string | null;
+  requested_model?: string | null;
+  status_code?: number | null;
+  retryable?: boolean | null;
+}
+
+export function stopDetailText(detail: StopDetailView | null | undefined): string | null {
+  if (!detail) {
+    return null;
+  }
+  const parts: string[] = [];
+  const department = departmentName(detail.department ?? null);
+  const model = (detail.requested_model ?? "").trim();
+  if (department !== "" && model !== "") {
+    parts.push(`${department}部门请求的模型 ${model}`);
+  } else if (department !== "") {
+    parts.push(`${department}部门`);
+  } else if (model !== "") {
+    parts.push(`请求的模型 ${model}`);
+  }
+  const status = detail.status_code;
+  if (typeof status === "number" && Number.isFinite(status)) {
+    parts.push(`服务返回 HTTP ${status}`);
+  }
+  if (detail.retryable === true) {
+    parts.push("可重试");
+  } else if (detail.retryable === false) {
+    parts.push("不可重试");
+  }
+  return parts.length === 0 ? null : parts.join("，");
+}
+
+// 停止的卡片上认事项的那一行（工单 #1373）：同一项目里几张同名的失败卡片要能分辨——
+// 哪一张（事项标识，与「当前事项」那一处的写法一致）与什么时候停的（事项结束的那条事件的时间）。
+// 时间缺失时照页面上其余时间的写法写「未知时间」。
+export function stoppedCardLine(item: { work_item_id: string; stopped_at?: string | null }): string {
+  return `事项标识 ${item.work_item_id} · 停止于 ${formatTime(item.stopped_at)}`;
 }
 
 export function formatTime(value: string | null | undefined): string {

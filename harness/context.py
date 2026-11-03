@@ -94,6 +94,10 @@ class Rules:
     round_fold_granularity: bool = True
     # R7 请求的用量上限：超过就继续折叠更旧的一轮；空表示不设
     work_limit_tokens: int | None = None
+    # 压缩以后接在摘要之后的失败清单的上限（token）与单条失败原文的上限（字符）：取值读规则登记的现值
+    # （context.failure_list_tokens、context.failure_entry_chars，工单 #1405）
+    failure_list_tokens: int = int(DEFINITIONS.rule_value("context.failure_list_tokens"))
+    failure_entry_chars: int = int(DEFINITIONS.rule_value("context.failure_entry_chars"))
 
     def to_dict(self) -> dict[str, Any]:
         # 取值的可读形式：规则清单的另一份写法按同样的字段写
@@ -346,7 +350,8 @@ class ContextAssembler:
                  events: list[Any] | None = None,
                  snapshot_hash: str | None = None,
                  input_modalities: tuple[str, ...] = ("text",),
-                 definitions: Definitions | None = None) -> AssembledContext:
+                 definitions: Definitions | None = None,
+                 failure_list_events: tuple[str, ...] = ()) -> AssembledContext:
         # 这次装配按哪一份定义取工具清单、部门说明、提案合同与工具 schema（工单 #1098 的副本、#1175 第 7 轮）：
         # 交了就按它，没交就是模块加载时的那一份
         definitions = definitions or DEFINITIONS
@@ -641,6 +646,8 @@ class ContextAssembler:
             guidance_ids=[item.id for item in guidance_items],
             rules_version=viewed.rules_version,
             folded_rounds=list(viewed.folded_rounds),
+            # 压缩以后的失败清单这一段逐条列了哪些事件（设计说明「压缩以后保留失败的尝试」）
+            failure_list_events=list(failure_list_events),
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)

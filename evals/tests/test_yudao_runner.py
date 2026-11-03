@@ -24,6 +24,9 @@ import yudao
 import yudao_metrics
 import yudao_report
 
+# 真实的评分入口：`_stub_run_once` 会换掉它，需要真评分器的用例从这里取回来
+REAL_SCORE_DELIVERY = run_yudao_eval.score_delivery
+
 # 不需要模型服务的用例使用的占位名；真实模型用例在运行时取 YUDAO_EVAL_MODEL（见 real_model_name）。
 MODEL = "test-model"
 REPO_ROOT = EVALS_DIR
@@ -164,10 +167,30 @@ def _stub_run_once(monkeypatch, tmp_path, export, calls=None):
     monkeypatch.setattr(yudao, "wait_for_end", wait_for_end)
     monkeypatch.setattr(yudao, "export_run", lambda client, run_id: export)
     monkeypatch.setattr(yudao, "stop_service", lambda process, timeout_seconds=60: ("", ""))
-    monkeypatch.setattr(run_yudao_eval, "score_delivery",
-                        lambda delivery_dir, evidence_dir:
-                        {"checks": [], "material_version": "scenario-3@2",
-                         "scorer_version": "scorer-3@2"})
+
+    def fetch_delivery(client, delivery_event, target_dir):
+        """取回封存的交付：把它的树摘要写成一个文件，评分时按这个文件区分两份交付。"""
+        digest = delivery_event["payload"]["code_tree_digest"]
+        os.makedirs(target_dir, exist_ok=True)
+        with open(os.path.join(target_dir, "tree.txt"), "w", encoding="utf-8") as handle:
+            handle.write(digest)
+        calls.setdefault("fetched", []).append(digest)
+        return ["tree.txt"]
+
+    def score_delivery(delivery_dir, evidence_dir):
+        digest = None
+        marker = os.path.join(delivery_dir, "tree.txt")
+        if os.path.isfile(marker):
+            with open(marker, encoding="utf-8") as handle:
+                digest = handle.read()
+        calls.setdefault("scored", []).append(digest)
+        return {"checks": [], "material_version": "scenario-3@2",
+                "scorer_version": "scorer-3@2", "completion": 0.5, "correctness": 1.0,
+                "not_done_count": 0, "wrong_count": 0, "requirements": {},
+                "delivery_digest": digest}
+
+    monkeypatch.setattr(yudao, "fetch_delivery", fetch_delivery)
+    monkeypatch.setattr(run_yudao_eval, "score_delivery", score_delivery)
 
 
 def test_a_tampered_check_voids_the_yudao_run(runs_root, tmp_path, monkeypatch):
@@ -675,7 +698,7 @@ def _scores(**overrides):
 
 def _run(**overrides):
     run = {"run_id": "yudao-run-1", "void": False, "void_reason": "", "delivery_files": 5,
-           "yudao_commit": "abc1234",
+           "yudao_commit": "abc1234", "score": _scores(),
            "metrics": yudao_metrics.collect(_export(), {"timed_out": False, "elapsed_seconds": 20.0,
                                                         "hidden_failures": ["cmd_3_1b"]})}
     run.update(overrides)
@@ -756,7 +779,7 @@ def test_result_aggregates_mean_min_and_max():
         {"timed_out": False, "elapsed_seconds": 40.0, "hidden_failures": []})
     summary = yudao_report.aggregate_metrics(runs)
     assert summary["elapsed_seconds"] == {"count": 2, "unknown": 0, "mean": 30.0,
-                                          "min": 20.0, "max": 40.0}
+                                          "min": 20.0, "max": 40.0, "spread": 20.0}
 
 
 def test_void_and_model_service_failures_stay_out_of_the_summary():
@@ -1340,3 +1363,503 @@ def test_wait_for_initial_prd_times_out_while_the_item_still_runs(monkeypatch):
     with pytest.raises(RuntimeError) as error:
         yudao.wait_for_initial_prd(client, "project-1", "onboarding-item", 0.2)
     assert "秒内没有给出初始 PRD 的确认请求" in str(error.value)
+
+# ---------------------------------------------------------------------------
+# 第一次与最终两份交付（design 第 5.2 节；工单 #642）
+
+def _delivery_export(deliveries=2, qa=True, definitions="defs-1", parameters="params-1"):
+    """一次运行的导出：`deliveries` 个封存的交付、可选一条质检提交、一次放行。"""
+    events = [{"type": "run_created",
+               "payload": {"definitions_version": definitions,
+                           "parameters_version": parameters}}]
+    for index in range(1, deliveries + 1):
+        events.append({"type": "delivery_accepted", "event_id": "evt-delivery-%d" % index,
+                       "payload": {"files": ["src/cli.py"],
+                                   "code_tree_digest": "tree-%d" % index,
+                                   "content_hash": "content-%d" % index}})
+    if qa:
+        events.append({"type": "qa_submitted", "event_id": "evt-qa",
+                       "payload": {"verdict": "release"}})
+    events.append({"type": "run_done", "state_after": "DONE", "stop_reason": "released",
+                   "payload": {"stop_reason": "released"}})
+    return {"run_id": "yudao-run-1",
+            "projection": {"status": "done", "stop_reason": "released"},
+            "events": events, "usage": {}}
+
+
+def test_first_and_last_archived_delivery_are_symmetric():
+    """第一次与最终封存的交付都取：两份时各取一头，只有一次时是同一个事件，没有时都是 None。"""
+    two = _delivery_export(2)
+    assert [yudao.first_archived_delivery(two)["event_id"],
+            yudao.last_archived_delivery(two)["event_id"]] == ["evt-delivery-1",
+                                                               "evt-delivery-2"]
+    one = _delivery_export(1)
+    assert yudao.first_archived_delivery(one) is yudao.last_archived_delivery(one)
+    none = _delivery_export(0)
+    assert yudao.first_archived_delivery(none) is None
+    assert yudao.last_archived_delivery(none) is None
+
+
+def test_run_once_scores_the_first_and_the_final_delivery(runs_root, tmp_path, monkeypatch):
+    """导出里有两次交付：两份都交给评分器，结果里两份评分各是各的（第 5.2 节）。"""
+    export = _delivery_export(2)
+    calls = {}
+    _stub_run_once(monkeypatch, tmp_path, export, calls)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS)
+
+    assert calls["scored"] == ["tree-1", "tree-2"]
+    assert run["first_score"]["delivery_digest"] == "tree-1"
+    assert run["score"]["delivery_digest"] == "tree-2"
+    assert run["delivery"]["first"]["delivered"] is True
+    assert run["delivery"]["final"]["delivered"] is True
+
+
+def test_one_delivery_is_scored_once_and_both_scores_are_the_same(runs_root, tmp_path,
+                                                                  monkeypatch):
+    """只有一次交付：两份评分相同，评分器只跑一次。"""
+    export = _delivery_export(1)
+    calls = {}
+    _stub_run_once(monkeypatch, tmp_path, export, calls)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS)
+
+    assert calls["scored"] == ["tree-1"]
+    assert run["first_score"] is run["score"]
+
+
+def test_no_delivery_scores_both_as_not_done(runs_root, tmp_path, monkeypatch):
+    """没有交付：两份评分都是「没有做」（真评分器对空的交付目录给出 24 条 not_done）。"""
+    export = _delivery_export(0)
+    _stub_run_once(monkeypatch, tmp_path, export)
+    monkeypatch.setattr(run_yudao_eval, "score_delivery", REAL_SCORE_DELIVERY)
+    monkeypatch.setattr(run_yudao_eval, "scenario_python", lambda: sys.executable)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS)
+
+    assert run["delivery_files"] == 0
+    assert run["first_score"] is run["score"]
+    assert run["score"]["completion"] == 0.0
+    assert len(run["score"]["checks"]) == 24
+    assert {check["status"] for check in run["score"]["checks"]} == {"not_done"}
+    assert run["delivery"]["first"]["delivered"] is False
+
+
+# ---------------------------------------------------------------------------
+# 质检带来的提高（design 第 6.3 节第 1 条）
+
+def _delivery_scores(passed, total=5, completion=0.5, correctness=1.0):
+    checks = [{"id": "check_%d" % index,
+               "status": "pass" if index < passed else "wrong", "detail": ""}
+              for index in range(total)]
+    return {"completion": completion, "correctness": correctness, "checks": checks,
+            "not_done_count": 0, "wrong_count": total - passed,
+            "not_done": [], "wrong": [], "requirements": {}}
+
+
+def test_the_improvement_counts_the_extra_hidden_checks():
+    """提高至少 1 条：最终交付比第一次交付多通过的隐藏检查条数。"""
+    metrics = yudao_metrics.delivery_metrics(_delivery_export(2), _delivery_scores(3),
+                                             _delivery_scores(1))
+
+    assert metrics["qa_within_limit"] is True
+    assert metrics["qa_improvement"]["status"] == yudao_metrics.IMPROVEMENT_IMPROVED
+    assert metrics["qa_improvement"]["passed_gain"] == 2
+    assert metrics["first"]["passed_checks"] == 1
+    assert metrics["final"]["passed_checks"] == 3
+
+
+def test_no_extra_check_passing_leaves_no_improvement():
+    metrics = yudao_metrics.delivery_metrics(_delivery_export(2), _delivery_scores(2),
+                                             _delivery_scores(2))
+
+    assert metrics["qa_improvement"]["status"] == yudao_metrics.IMPROVEMENT_NONE
+    assert metrics["qa_improvement"]["passed_gain"] == 0
+
+
+def test_a_first_delivery_that_passes_everything_is_not_counted():
+    """第一次交付已经全部通过：记「不计入」，既不算满足也不是失败。"""
+    metrics = yudao_metrics.delivery_metrics(_delivery_export(2),
+                                             _delivery_scores(5, completion=1.0),
+                                             _delivery_scores(5, completion=1.0))
+
+    assert metrics["first"]["all_passed"] is True
+    assert metrics["qa_improvement"]["status"] == yudao_metrics.IMPROVEMENT_NOT_COUNTED
+    assert metrics["qa_improvement"]["passed_gain"] is None
+
+
+def test_without_a_qa_submission_there_is_no_conclusion():
+    """质检没有给出结论：导出里没有 `qa_submitted` 事件。"""
+    metrics = yudao_metrics.delivery_metrics(_delivery_export(2, qa=False),
+                                             _delivery_scores(3), _delivery_scores(1))
+
+    assert metrics["qa_within_limit"] is False
+    assert metrics["qa_improvement"]["status"] == yudao_metrics.IMPROVEMENT_NO_CONCLUSION
+    assert metrics["qa_improvement"]["passed_gain"] is None
+
+
+# ---------------------------------------------------------------------------
+# Yudao 对单个 agent 的对照（design 第 6.3 节；D38 的 N-G1）
+
+def _delivery_run(run_id, first_passed=1, final_passed=3, total=5, qa=True,
+                  completion_first=0.4, completion_final=0.6, false_release=False):
+    """一次运行的结果：两份交付的评分、质检带来的提高与指标（对照判定用）。"""
+    export = _delivery_export(2, qa=qa)
+    first_scores = _delivery_scores(first_passed, total, completion=completion_first)
+    final_scores = _delivery_scores(final_passed, total, completion=completion_final)
+    hidden = ["check_0"] if false_release else []
+    metrics = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 20.0,
+                                             "hidden_failures": hidden})
+    return {"run_id": run_id, "yudao_commit": "abc1234", "void": False, "void_reason": "",
+            "delivery_files": total, "first_delivery_files": total, "metrics": metrics,
+            "score": final_scores, "first_score": first_scores,
+            "delivery": yudao_metrics.delivery_metrics(export, final_scores, first_scores)}
+
+
+def _yudao_side(runs):
+    return yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL, runs)
+
+
+def _opencode_run(run_id, completion=0.5, correctness=0.8, requests=100, elapsed=100.0,
+                  wrong=("cmd_0_1",)):
+    return {"run_id": run_id, "void": False, "void_reasons": [],
+            "metrics": {"status": "ended", "reason": "stop", "timed_out": False,
+                        "returncode": 0, "request_count": requests,
+                        "input_tokens": 1000, "output_tokens": 200,
+                        "cache_read_tokens": None, "cache_write_tokens": None, "cost": None,
+                        "elapsed_seconds": elapsed, "model_service_failure": False},
+            "score": {"completion": completion, "correctness": correctness,
+                      "not_done": [], "wrong": list(wrong),
+                      "checks": [{"id": "cmd_0_1",
+                                  "status": "wrong" if "cmd_0_1" in wrong else "pass"}]}}
+
+
+def _opencode_side(runs):
+    return {"scenario": "scenario-3", "material_version": "scenario-3@2",
+            "scorer_version": "scorer-3@2", "side": "opencode", "model": "opencode/model",
+            "opencode_version": "1.2.3", "runs": runs}
+
+
+def test_compare_sides_is_above_when_two_runs_meet_the_condition():
+    """「高于」：3 次运行里至少 2 次质检在时间上限以内给出结论，最终交付多通过 ≥ 1 条。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1"), _delivery_run("yudao-2"),
+            _delivery_run("yudao-3", first_passed=2, final_passed=2)]
+    comparison = yudao_compare.compare_sides(_yudao_side(runs),
+                                             _opencode_side([_opencode_run("oc-1"),
+                                                             _opencode_run("oc-2"),
+                                                             _opencode_run("oc-3")]))
+
+    assert comparison["verdict"] == "above"
+    assert comparison["verdict_label"] == "高于"
+    assert comparison["criterion"]["meeting"] == 2
+    assert comparison["criterion"]["observing"] == 3
+    assert comparison["block_reason"] is None
+
+
+def test_compare_sides_is_not_reached_without_the_improvement():
+    """「没有达到」：可以观察的运行够 2 次，但提高没有达到 1 条。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1", first_passed=3, final_passed=3),
+            _delivery_run("yudao-2", first_passed=2, final_passed=2),
+            _delivery_run("yudao-3", first_passed=1, final_passed=1)]
+    comparison = yudao_compare.compare_sides(_yudao_side(runs),
+                                             _opencode_side([_opencode_run("oc-1"),
+                                                             _opencode_run("oc-2"),
+                                                             _opencode_run("oc-3")]))
+
+    assert comparison["verdict"] == "not_reached"
+    assert comparison["verdict_label"] == "没有达到"
+    assert comparison["criterion"]["meeting"] == 0
+
+
+def test_compare_sides_is_blocked_when_two_runs_pass_everything_at_the_first_delivery():
+    """第一次交付已全部通过的运行达到 2 次以上：结论是「受阻」并写明原因。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1", first_passed=5, final_passed=5, completion_first=1.0,
+                          completion_final=1.0),
+            _delivery_run("yudao-2", first_passed=5, final_passed=5, completion_first=1.0,
+                          completion_final=1.0),
+            _delivery_run("yudao-3", first_passed=1, final_passed=4)]
+    comparison = yudao_compare.compare_sides(_yudao_side(runs),
+                                             _opencode_side([_opencode_run("oc-1"),
+                                                             _opencode_run("oc-2"),
+                                                             _opencode_run("oc-3")]))
+
+    assert comparison["verdict"] == "blocked"
+    assert comparison["verdict_label"] == "受阻"
+    assert comparison["criterion"]["not_counted"] == 2
+    assert "2 次" in comparison["block_reason"]
+    assert "第一次交付已全部通过" in comparison["block_reason"]
+
+
+def test_compare_sides_is_blocked_when_the_versions_differ():
+    """材料或评分器版本不同：不比较，结论「受阻」。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1"), _delivery_run("yudao-2"), _delivery_run("yudao-3")]
+    opencode = _opencode_side([_opencode_run("oc-1")])
+    opencode["material_version"] = "scenario-3@1"
+
+    comparison = yudao_compare.compare_sides(_yudao_side(runs), opencode)
+
+    assert comparison["verdict"] == "blocked"
+    assert "材料版本或评分器版本不同" in comparison["block_reason"]
+    assert comparison["pairs"] == []
+
+
+def test_compare_sides_is_blocked_without_the_first_delivery_scores_on_the_archived_results():
+    """场景 3 已有的两份结果没有第一次交付的评分：结论「受阻」并写明缺这一项。"""
+    import yudao_compare
+
+    archived = os.path.join(EVALS_DIR, "..", "docs", "archive", "evaluation",
+                            "scenario-3-qwen38flash-2026-10-20")
+    with open(os.path.join(archived, "yudao.json"), encoding="utf-8") as handle:
+        yudao_result = json.load(handle)
+    with open(os.path.join(archived, "opencode.json"), encoding="utf-8") as handle:
+        opencode_result = json.load(handle)
+
+    comparison = yudao_compare.compare_sides(yudao_result, opencode_result)
+
+    assert comparison["verdict"] == "blocked"
+    assert "第一次交付的评分" in comparison["block_reason"]
+    assert "yudao-q38f-start-1" in comparison["block_reason"]
+
+
+def test_compare_sides_is_blocked_when_quality_never_concludes():
+    """质检没有给出结论：缺这一项证据，结论「受阻」并写明次数（第 6.3 节第 3 条）。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1", qa=False), _delivery_run("yudao-2", qa=False),
+            _delivery_run("yudao-3", qa=False)]
+    comparison = yudao_compare.compare_sides(_yudao_side(runs),
+                                             _opencode_side([_opencode_run("oc-1"),
+                                                             _opencode_run("oc-2"),
+                                                             _opencode_run("oc-3")]))
+
+    assert comparison["verdict"] == "blocked"
+    assert comparison["criterion"]["no_conclusion"] == 3
+    assert "质检没有给出结论" in comparison["block_reason"]
+
+
+def test_compare_sides_is_not_reached_when_a_run_released_with_failing_checks():
+    """有一次运行质检误放行：不满足「都没有误放行」，结论「没有达到」。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1"), _delivery_run("yudao-2"),
+            _delivery_run("yudao-3", false_release=True)]
+    comparison = yudao_compare.compare_sides(_yudao_side(runs),
+                                             _opencode_side([_opencode_run("oc-1"),
+                                                             _opencode_run("oc-2"),
+                                                             _opencode_run("oc-3")]))
+
+    assert comparison["verdict"] == "not_reached"
+    assert comparison["criterion"]["false_release"] == 1
+    assert "误放行" in comparison["block_reason"]
+
+
+def test_compare_sides_pairs_runs_by_ordinal_and_lists_the_unpaired():
+    """逐次并排按运行序号配对：编号前缀不同的两边也配得上，序号对不上的列为没有配对。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1"), _delivery_run("yudao-2"), _delivery_run("yudao-3")]
+    opencode = _opencode_side([_opencode_run("oc-first"), _opencode_run("oc-second")])
+
+    comparison = yudao_compare.compare_sides(_yudao_side(runs), opencode)
+
+    assert [pair["run_index"] for pair in comparison["pairs"]] == [1, 2]
+    assert comparison["pairs"][0]["yudao"]["run_id"] == "yudao-1"
+    assert comparison["pairs"][0]["opencode"]["run_id"] == "oc-first"
+    assert comparison["pairs"][0]["yudao"]["completion_first"] == pytest.approx(0.4)
+    assert comparison["pairs"][0]["yudao"]["completion_final"] == pytest.approx(0.6)
+    assert comparison["pairs"][0]["opencode"]["completion_first"] is None
+    assert comparison["unpaired"] == {"yudao": [3], "opencode": []}
+
+
+def test_the_side_report_lists_the_verdict_and_the_paired_table(tmp_path):
+    """对照报告由 `yudao_report` 写出：结论、逐次并排（两边各列完成度、请求数与用量）。"""
+    import yudao_compare
+
+    runs = [_delivery_run("yudao-1"), _delivery_run("yudao-2")]
+    comparison = yudao_compare.compare_sides(_yudao_side(runs),
+                                             _opencode_side([_opencode_run("oc-1"),
+                                                             _opencode_run("oc-2")]))
+    path = str(tmp_path / "compare.md")
+    yudao_report.write_side_report(comparison, path)
+
+    text = open(path, encoding="utf-8").read()
+    assert text.startswith("# 场景 3 · Yudao 对 OpenCode 的对照")
+    assert "| 结论 | 高于 |" in text
+    assert "Yudao 第一次完成度" in text and "OpenCode 完成度" in text
+    assert "请求数" in text and "用量" in text
+    assert "质检在时间上限以内给出结论" in text
+
+
+def test_the_compare_command_writes_the_result_and_the_report(tmp_path):
+    """命令行入口 `compare_sides.py`：读两份结果，写出对照结果与中文报告。"""
+    import compare_sides
+
+    runs = [_delivery_run("yudao-1"), _delivery_run("yudao-2")]
+    yudao_path = str(tmp_path / "yudao.json")
+    opencode_path = str(tmp_path / "opencode.json")
+    with open(yudao_path, "w", encoding="utf-8") as handle:
+        json.dump(_yudao_side(runs), handle)
+    with open(opencode_path, "w", encoding="utf-8") as handle:
+        json.dump(_opencode_side([_opencode_run("oc-1"), _opencode_run("oc-2")]), handle)
+    result_path = str(tmp_path / "compare.json")
+    report_path = str(tmp_path / "compare.md")
+
+    assert compare_sides.main(["--yudao", yudao_path, "--opencode", opencode_path,
+                               "--result", result_path, "--report", report_path]) == 0
+
+    with open(result_path, encoding="utf-8") as handle:
+        result = json.load(handle)
+    assert result["verdict"] == "above"
+    assert result["verdict_label"] == "高于"
+    assert os.path.isfile(report_path)
+    assert "Yudao 对 OpenCode 的对照" in open(report_path, encoding="utf-8").read()
+
+
+# ---------------------------------------------------------------------------
+# 版本比较按运行序号配对（design 第 6.1 节）
+
+def test_version_compare_pairs_by_run_ordinal_not_by_run_id():
+    """两组运行编号前缀不同：按 `runs` 的位置配对（第 1 次对第 1 次）。"""
+    import yudao_compare
+
+    current = yudao_report.build_result(
+        "scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+        [_comparison_run("new-a", completion=0.5), _comparison_run("new-b", completion=0.7)])
+    baseline = yudao_report.build_result(
+        "scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+        [_comparison_run("old-1", completion=0.4), _comparison_run("old-2", completion=0.6)])
+
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert comparison["compared"] is True
+    assert [item["run_index"] for item in comparison["paired_tasks"]] == [1, 2]
+    assert comparison["paired_tasks"][0]["current_completion"] == pytest.approx(0.5)
+    assert comparison["paired_tasks"][0]["baseline_completion"] == pytest.approx(0.4)
+    assert comparison["paired_tasks"][1]["completion_difference"] == pytest.approx(0.1)
+    assert comparison["unpaired"] == {"current": [], "baseline": []}
+
+
+def test_version_compare_lists_the_ordinals_without_a_counterpart():
+    """序号对不上的部分列为没有配对。"""
+    import yudao_compare
+
+    current = yudao_report.build_result(
+        "scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+        [_comparison_run("new-1"), _comparison_run("new-2"), _comparison_run("new-3")])
+    baseline = yudao_report.build_result(
+        "scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+        [_comparison_run("old-1"), _comparison_run("old-2")])
+
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert [item["run_index"] for item in comparison["paired_tasks"]] == [1, 2]
+    assert comparison["unpaired"] == {"current": [3], "baseline": []}
+
+
+def test_a_void_run_leaves_its_ordinal_without_a_counterpart():
+    """作废的运行没有评分：它的序号在另一侧没有配对。"""
+    import yudao_compare
+
+    current_runs = [_comparison_run("new-1"), _comparison_run("new-2"),
+                    _comparison_run("new-3")]
+    current_runs[1]["void"] = True
+    current = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+                                        current_runs)
+    baseline = yudao_report.build_result(
+        "scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+        [_comparison_run("old-1"), _comparison_run("old-2"), _comparison_run("old-3")])
+
+    comparison = yudao_compare.compare(current, baseline)
+
+    assert [item["run_index"] for item in comparison["paired_tasks"]] == [1, 3]
+    assert comparison["unpaired"] == {"current": [], "baseline": [2]}
+
+
+# ---------------------------------------------------------------------------
+# 汇总：完成度、噪声范围、定义版本与参数版本（design 第 5.2、6 节）
+
+def test_the_summary_carries_completion_and_the_noise_range():
+    """完成度进汇总，每个指标带噪声范围（同一版本各次运行的极差）。"""
+    runs = [_run(run_id="run-1"), _run(run_id="run-2")]
+    runs[0]["score"] = {"completion": 0.5, "correctness": 0.9}
+    runs[1]["score"] = {"completion": 0.8, "correctness": 0.9}
+
+    summary = yudao_report.aggregate_metrics(runs)
+
+    assert summary["completion"]["mean"] == pytest.approx(0.65)
+    assert summary["completion"]["spread"] == pytest.approx(0.3)
+    assert summary["correctness"]["spread"] == 0.0
+
+
+def test_the_noise_range_is_unknown_with_a_single_run(tmp_path):
+    """只有一次运行时噪声范围写「未知」，不写零。"""
+    run = _run()
+    run["score"] = _delivery_scores(3, completion=0.5)
+    summary = yudao_report.aggregate_metrics([run])
+    assert summary["completion"]["spread"] is None
+
+    result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
+                                       [run])
+    path = str(tmp_path / "single.md")
+    yudao_report.write_report(result, path, [yudao_report.run_section(run, run["score"])])
+    text = open(path, encoding="utf-8").read()
+    assert "噪声范围" in text
+    assert "| 完成度 | 0.5 | 0.5 | 0.5 | 未知 | 1 | 0 |" in text
+
+
+def test_each_run_carries_the_definition_and_the_parameter_versions(runs_root, tmp_path,
+                                                                    monkeypatch):
+    """每次运行带 `run_created` 事件里的定义版本与参数版本。"""
+    export = _delivery_export(1, definitions="defs-7", parameters="params-9")
+    calls = {}
+    _stub_run_once(monkeypatch, tmp_path, export, calls)
+
+    run = run_yudao_eval.run_once("run-1", runs_root, str(tmp_path / "evidence"), MODEL, 60,
+                                  LIMITS)
+
+    assert run["definitions_version"] == "defs-7"
+    assert run["parameters_version"] == "params-9"
+    text = "\n".join(yudao_report.run_section(run, run["score"]))
+    assert "| 定义版本 | defs-7 |" in text
+    assert "| 参数版本 | params-9 |" in text
+
+
+def test_the_report_writes_unknown_versions_without_a_run_created_event():
+    """导出里没有 `run_created` 时两个版本都写「未知」。"""
+    run = _run()
+    run["definitions_version"] = None
+    run["parameters_version"] = None
+
+    text = "\n".join(yudao_report.run_section(run, _scores()))
+
+    assert "| 定义版本 | 未知 |" in text
+    assert "| 参数版本 | 未知 |" in text
+
+
+def test_the_report_lists_both_delivery_scores_and_the_qa_improvement():
+    """报告逐次列出第一次与最终的完成度、质检是否给出结论与提高的条数。"""
+    export = _delivery_export(2)
+    first_scores = _delivery_scores(1, completion=0.4)
+    final_scores = _delivery_scores(3, completion=0.6)
+    metrics = yudao_metrics.collect(export, {"timed_out": False, "elapsed_seconds": 20.0,
+                                             "hidden_failures": []})
+    run = _run(metrics=metrics, score=final_scores, first_score=first_scores,
+               delivery=yudao_metrics.delivery_metrics(export, final_scores, first_scores))
+
+    text = "\n".join(yudao_report.run_section(run, final_scores))
+
+    assert "| 第一次交付的完成度 | 0.4 |" in text
+    assert "| 完成度 | 0.6 |" in text
+    assert "| 质检在时间上限以内给出结论 | 是 |" in text
+    assert "提高 2 条" in text

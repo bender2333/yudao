@@ -14496,6 +14496,58 @@
         ],
         "title": "StepText"
       },
+      "StopDetail": {
+        "properties": {
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "requested_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Model"
+          },
+          "status_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status Code"
+          },
+          "retryable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retryable"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StopDetail",
+        "description": "上游失败的细节（工单 #1373）：事项因为模型服务停下时，写清是哪个部门、请求的哪个模型、\n服务返回的什么状态码，以及这次失败可不可重试。\n\n这几项在 `model_attempt_failed` 事件的载荷里本来就有（请求的模型、状态码、是否可重试）\n与事件上的部门，只是此前没有谁把它们带给页面：卡片上只有一句「模型服务失败」的原文，\n用户分辨不出是上游挂了还是自己配错了。"
+      },
       "StreamCapability": {
         "properties": {
           "deltas": {
@@ -15778,6 +15830,27 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/KeptDelivery"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stopped_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped At"
+          },
+          "stop_detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StopDetail"
               },
               {
                 "type": "null"
@@ -20560,6 +20633,13 @@
               "type": "integer"
             },
             "title": "Folded Rounds",
+            "type": "array"
+          },
+          "failure_list_events": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failure List Events",
             "type": "array"
           },
           "previous_usage_tokens": {

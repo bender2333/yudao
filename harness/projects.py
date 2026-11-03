@@ -362,6 +362,46 @@ def _kept_delivery(store: EventStore, run: RunProjection, status: str, *,
     return {"version": delivery.revision, "accepted_at": event.created_at}
 
 
+# 停止原因里由模型服务引起的那些（停止原因清单 stop_reasons.json）：这些停下的事件前面有一条失败的调用尝试，
+# 它带着部门、请求的模型、服务返回的状态码与是否可重试——页面要的是这三样加「可不可重试」（工单 #1373）
+MODEL_STOP_REASONS = frozenset({
+    "provider_error", "provider_timeout", "provider_protocol", "unsupported_protocol",
+    "retry_after_too_long", "context_overflow", "compaction_failed",
+})
+
+
+def _stop_facts(store: EventStore, run: RunProjection, status: str, stop_reason: str | None, *,
+                through: int | None = None) -> tuple[str | None, dict[str, Any] | None]:
+    # 停止的时刻与上游失败的细节（工单 #1373）：时刻取事项结束的那条事件（run_failed 或 run_paused）的提交时间；
+    # 停止原因是模型服务时，再取这个结束事件之前最后一次失败的调用尝试，把部门、请求的模型、服务返回的
+    # 状态码与是否可重试带给页面。这几项事件里本来就有（model_attempt_failed 的载荷与事件上的部门），
+    # 只是没有谁把它们带给页面；询问分支的失败尝试在结束事件之前、但不是让事项停下的那一条，
+    # 按位置只取结束事件之前的那一条
+    if status != "stopped":
+        return None, None
+    events = store.list_events(run.run_id, through_position=through)
+    ending = [event for event in events if event.type in (EventType.RUN_FAILED, EventType.RUN_PAUSED)]
+    if not ending:
+        return None, None
+    stop_event = ending[-1]
+    stopped_at = stop_event.created_at
+    if stop_reason not in MODEL_STOP_REASONS:
+        return stopped_at, None
+    failed = [event for event in events
+              if event.type == EventType.MODEL_ATTEMPT_FAILED and event.position <= stop_event.position]
+    if not failed:
+        return stopped_at, None
+    event = failed[-1]
+    diagnostics = event.payload.get("diagnostics")
+    status_code = diagnostics.get("status_code") if isinstance(diagnostics, dict) else None
+    return stopped_at, {
+        "department": event.department,
+        "requested_model": event.payload.get("requested_model"),
+        "status_code": status_code if isinstance(status_code, int) and not isinstance(status_code, bool) else None,
+        "retryable": event.payload.get("retryable"),
+    }
+
+
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
                       held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True,
                       through: int | None = None, awaiting_initial_prd: bool = False,
@@ -404,6 +444,9 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     # 已收下的交付（工单 #1239）：事项停止时，把「这个 run 里已经收下一版交付」这件事写在停止说明旁边，
     # 否则页面上只有一句失败原因，看不出这件事已经有一份可用的交付。用户自己取消时也写，交付仍然在
     item.kept_delivery = _kept_delivery(store, run, item.status, through=through)
+    # 停止的时刻与上游失败的细节（工单 #1373）：同一项目里几张同名的失败卡片要能分辨——哪张、什么时候停的、
+    # 为什么停；模型服务引起的停止再写清部门、请求的模型、状态码与是否可重试
+    item.stopped_at, item.stop_detail = _stop_facts(store, run, item.status, item.stop_reason, through=through)
     if include_history:
         events = store.list_events(item.run_id, through_position=through)
         item.rework = [
@@ -1268,21 +1311,6 @@ class ProjectService:
         events = self.store.list_events(run_id)
         return next((event for event in reversed(events) if event.type == event_type), None)
 
-    def _quality_check_commands(self, run_id: str) -> dict[str, str]:
-        # 质检自己在快照上运行的 run_check 调用的命令字符串（工单 #136，设计第 3.3、4.6 节）：
-        # 按 run 事件里质检的 run_check 调用取，同一个检查以后一次调用为准
-        commands: dict[str, str] = {}
-        for event in self.store.list_events(run_id):
-            if event.type != EventType.TOOL_CALLED or event.payload.get("name") != "run_check":
-                continue
-            args = event.payload.get("args") or {}
-            if not isinstance(args, dict):
-                continue
-            name, command = args.get("name"), args.get("command")
-            if isinstance(name, str) and isinstance(command, str):
-                commands[name] = command
-        return commands
-
     def _settle_run(self, transaction: Transaction, run: RunProjection) -> ProjectEvent | None:
         project = transaction.projection
         if run.status != "done":
@@ -1341,7 +1369,8 @@ class ProjectService:
             "kind": KERNEL_MODIFICATION.name, "blocks": KERNEL_MODIFICATION.blocks,
             "options": [asdict(option) for option in KERNEL_MODIFICATION.options],
             "description": f"交付改动了内核清单里的 {len(hits)} 个路径，批准以后才采纳",
-            "facts": [], "department": "engineering",
+            # 请求写交这份交付的部门（工单 #1410）：按交付的作者，不写部门名；部门取自定义
+            "facts": [], "department": delivery.issuer,
             "work_item_id": item.work_item_id, "delivery_run_id": run.run_id,
             "kernel_paths": hits, "diff": kernel_diff(baseline_tree, delivery_tree, hits),
             "held_adoption": adoption,
@@ -1402,7 +1431,10 @@ class ProjectService:
                           "code_tree_digest": structure["code_tree_digest"]},
             "baseline_review": {"event_id": review["event_id"], "content_hash": review["content_hash"],
                                 "conclusions": list(review["conclusions"]), "omissions": list(review["omissions"]),
-                                "checks": _baseline_checks(review["checks"], self._quality_check_commands(run.run_id)),
+                                "checks": _baseline_checks(
+                                    review["checks"],
+                                    _check_commands(self.store.list_events(run.run_id),
+                                                    _review_department(review_event, review))),
                                 "other_failures": list(review["other_failures"])},
             "overview_ref": run.overview_ref, "snapshot": snapshot,
         }
@@ -1414,7 +1446,9 @@ class ProjectService:
             "kind": INITIAL_PRD.name, "blocks": INITIAL_PRD.blocks,
             "options": [{"id": option.id, "label": option.label, "note_required": option.note_required}
                         for option in INITIAL_PRD.options],
-            "description": f"确认第 {round_number} 轮建档的初始 PRD", "facts": [], "department": "product",
+            "description": f"确认第 {round_number} 轮建档的初始 PRD", "facts": [],
+            # 请求写交初始 PRD 的那个部门（工单 #1410）：按提案合同，作者是写下这份 PRD 的部门，不写部门名
+            "department": spec.issuer,
             "work_item_id": item.work_item_id, "candidate_run_id": run.run_id, "round": round_number,
             "prd": candidate["prd"], "structure": candidate["structure"],
             "baseline_review": candidate["baseline_review"], "overview_ref": run.overview_ref,
@@ -1617,9 +1651,40 @@ class _NewWorkItem:
 
 
 
+def _check_commands(events: Sequence[Event], department: str | None) -> dict[str, str]:
+    # 检查的命令字符串（工单 #136，设计第 3.3、4.6 节；工单 #1410）：只看核验角色这一轮在快照上运行的
+    # run_check 调用，同一个检查以后一次调用为准。部门取自定义里核验角色的名字，不按固定的部门名取；
+    # 部门为空（旧事件没有记下核验角色）时按原有的取法取全部调用
+    commands: dict[str, str] = {}
+    for event in events:
+        if event.type != EventType.TOOL_CALLED or event.payload.get("name") != "run_check":
+            continue
+        if department is not None and event.department != department:
+            continue
+        args = event.payload.get("args") or {}
+        if not isinstance(args, dict):
+            continue
+        name, command = args.get("name"), args.get("command")
+        if isinstance(name, str) and isinstance(command, str):
+            commands[name] = command
+    return commands
+
+
+def _review_department(event: Event | None, review: dict[str, Any]) -> str | None:
+    # 提交基线核验的部门（工单 #1410）：事件信封上写的就是提交它的那个部门，旧事件没有时取内容里的作者部门；
+    # 两者都没有时为空，由调用方按没有记下作者处理
+    if event is not None and isinstance(event.department, str) and event.department:
+        return event.department
+    for key in ("artifact_issuer", "issuer"):
+        value = review.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
 def _baseline_checks(receipts: list[dict[str, Any]], commands: dict[str, str]) -> list[dict[str, Any]]:
-    # 基线核验里的检查回执（工单 #136，设计第 4.6 节）补上质检自己运行该检查时用的命令字符串：
-    # 命令取自质检在本 run 中 run_check 的调用（按检查名绑定），质检没有记录时为空
+    # 基线核验里的检查回执（工单 #136，设计第 4.6 节）补上核验角色自己运行该检查时用的命令字符串：
+    # 命令取自核验角色在本 run 中 run_check 的调用（按检查名绑定），没有记录时为空
     return [
         {"name": receipt["name"], "command": commands.get(receipt["name"], ""), "exit_code": int(receipt["exit_code"]),
          "summary": receipt["summary"], "snapshot_hash": receipt["snapshot_hash"]}

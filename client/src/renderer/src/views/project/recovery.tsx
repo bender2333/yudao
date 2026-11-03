@@ -247,9 +247,10 @@ function ReasonBlock(props: { data: RunRecoveryResult; item: WorkItemCard | null
           items={[
             ["停止原因", item?.stop_reason ? label(STOP_REASON, item.stop_reason) : "未上报"],
             // 停止说明（工单 #1162）：让事项停下的那条错误的原文，写在停止原因下面；用户自己停下时没有。
-            // 已收下的交付（工单 #1239）写在它下面一行，取自同一份事项卡片
+            // 上游失败的细节（工单 #1373）写在它下面一行，已收下的交付（工单 #1239）再下面一行，
+            // 都取自同一份事项卡片
             ["停止说明", <StopNote key="stop-note" note={item?.stop_note ?? null} kept={item?.kept_delivery}
-              empty="没有" />],
+              detail={item?.stop_detail} empty="没有" />],
             ["所在部门", item?.department ? departmentName(item.department) : "没有在部门里执行"],
             ["最后已确认", lastConfirmedText(data)],
           ]}

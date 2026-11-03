@@ -527,6 +527,28 @@
     "tighten_when": "「被上限挡在外面的条目数量」持续为 0",
     "origin": "语义系统设计说明第 509 行，轨迹节录 13107 token"
   },
+  "context.failure_list_tokens": {
+    "value": 4000,
+    "bounds": [1000, 13107],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "压缩以后的请求被失败清单挤占",
+    "cost": "更早的失败合并成一行，要按事件编号查询",
+    "relax_when": "压缩以后的请求长度分布显示清单远低于上限",
+    "tighten_when": "清单装了失败以后仍然重复同样的失败",
+    "origin": "docs/design/context-assembly.md「压缩以后保留失败的尝试」：失败清单的上限 4000 token，范围 1000 至 13107"
+  },
+  "context.failure_entry_chars": {
+    "value": 400,
+    "bounds": [100, 2000],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "单条失败原文占满清单",
+    "cost": "失败输出的开头以外的部分要按事件编号查询",
+    "relax_when": "实际失败原文的长度分布显示现值截掉了需要的信息",
+    "tighten_when": "单条失败原文的长度分布远低于现值",
+    "origin": "docs/design/context-assembly.md「压缩以后保留失败的尝试」：单条失败原文的上限 400 字符，范围 100 至 2000"
+  },
   "context.role_result_chars": {
     "value": 5000,
     "bounds": [100, 50000],

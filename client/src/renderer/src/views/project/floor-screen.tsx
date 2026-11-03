@@ -24,13 +24,12 @@ import type { FactElement } from "../../pixel/contract";
 import type { FloorModel } from "../../pixel/world/types";
 import type { SourceEvent } from "../../translate/floor";
 import { LETTER_ANSWERED_TYPE, LETTER_ASKED_TYPE } from "../../pixel/world/types";
-import { itemColor } from "../../pixel/world/floor";
 import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
-import { OVERLAY_LABELS } from "../../translate/coverage";
 import { floorActions, floorCards, floorInterrupted, floorState, loopsOverlay, recoveryOverlay, sourceCard, sourceEventOf,
          sourceOverlay, streamText, type EventAtPositionView,
          toFloorEvent, type FloorEvent } from "../../translate/floor";
+import { OVERLAY_LABELS, itemColor } from "./floor-text";
 import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
 import { paths } from "../../shell/routing";
@@ -55,7 +54,7 @@ export interface FloorScreenProps {
   at?: number | null;
 }
 
-/** 覆盖层的名称与中文标签：中文名写在翻译层（工单 #398），页面按能力清单挑出按钮条上的几个。 */
+/** 覆盖层的名称与中文标签：中文名是页面自己的（floor-text.ts，工单 #1415），页面按能力清单挑出按钮条上的几个。 */
 
 /**
  * 楼层画面要读询问链的那次运行：聚焦的事项优先，否则进行中的一项（与概览页「当前事项」同一口径）。

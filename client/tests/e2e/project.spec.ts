@@ -255,7 +255,9 @@ test.describe("项目页面（1440×900）", () => {
       const floor = await section(page, "循环画面");
       await expect(floor.locator(".floor-screen canvas")).toHaveCount(1);
       const board = await section(page, "事项看板");
-      await expect(board.locator(".board-col")).toHaveCount(7);
+      // 部门列取自事项的部门（工单 #1372）：这个项目只有一个已采纳的事项，没有进行中的事项，
+      // 因此只有按状态分的四组，没有部门列
+      await expect(board.locator(".board-col")).toHaveCount(4);
       await expect(board.locator("h3").filter({ hasText: "已采纳" })).toContainText("（1）");
       await expect(board.locator(".board-card strong")).toHaveText(SAMPLE_ITEM);
       const flow = await section(page, "流转记录");
@@ -387,6 +389,17 @@ test.describe("项目页面（1440×900）", () => {
         await expect(card).toContainText("停止原因：模型服务失败");
         await expect(card).toContainText(`停止说明：${STOP_NOTE_ERROR}`);
         await expect(card).not.toContainText("invalid_request_error");
+        // 上游失败的细节（工单 #1373）：停止说明下面写清哪个部门请求的哪个模型、服务返回什么状态码、
+        // 可不可重试——这两件事此前只在观测页签一行行的失败记录里
+        await expect(card).toContainText("上游失败：工程部门请求的模型 ");
+        await expect(card).toContainText("服务返回 HTTP 400");
+        await expect(card).toContainText("不可重试");
+        // 停止的卡片要能分辨（工单 #1373）：写出事项标识与停止的时间，同名的几张失败卡片才分得清
+        await expect(card).toContainText(`事项标识 ${stopped?.work_item_id ?? ""}`);
+        await expect(card).toContainText("停止于");
+        // 当前事项那一处写同一句提示（判据同上，只核对关键词，时间写法与卡片一致）
+        await expect(current).toContainText("上游失败：工程部门请求的模型 ");
+        await expect(current).toContainText("服务返回 HTTP 400，不可重试");
         await shot(page, "overview-stop-note.png");
 
         // 恢复页：停止原因下面写同一条错误
@@ -429,6 +442,18 @@ test.describe("项目页面（1440×900）", () => {
         const states = current.locator(".department-line");
         await expect(states).toContainText("工程 询问中（在等待产品的回答）");
         await expect(states).toContainText("产品 一轮工作中（回答工程的询问）");
+        // 看板与部门状态行说的是同一件事（工单 #1372）：产品在一轮工作中、工程在询问中，
+        // 这个事项就在产品与工程两列里；等待工作的质检列里没有它
+        const board = await section(page, "事项看板");
+        const columns = board.locator(".board-col");
+        await expect(columns).toHaveCount(7);
+        await expect(columns.nth(1).locator("h3")).toHaveText("产品（1）");
+        await expect(columns.nth(1).locator(".board-card strong")).toHaveText(PENDING_ITEM);
+        await expect(columns.nth(2).locator("h3")).toHaveText("工程（1）");
+        await expect(columns.nth(2).locator(".board-card strong")).toHaveText(PENDING_ITEM);
+        await expect(columns.nth(3).locator("h3")).toHaveText("质检（0）");
+        await expect(columns.nth(3).locator(".board-card")).toHaveCount(0);
+        await shot(page, "overview-board-two-departments.png");
         const asks = await section(page, "询问");
         const rows = asks.locator("li");
         await expect(rows).toHaveCount(1);
