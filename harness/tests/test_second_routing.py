@@ -6,13 +6,17 @@
 # （`task_pool_definitions/`，用 `load_definitions(<测试目录>)` 加载）。骨架的模块一行不改（契约模块按
 # 工单 #1164 补了可选的读事件入口，其余照旧），产品的 `harness/definitions/` 一个条目也不加，产品代码不导入它们。
 #
-# 这个文件查五件事：
+# 这个文件查六件事：
 # 1. 假模型跑完一个事项：发布任务、指派、完成、打回各至少一次；事项以**它自己那份定义里声明的**结束原因结束
 #    （`pool_drained`，内核的停止原因清单里没有它）；
 # 2. 完成一件事的部门不能自己给这件事结论（基础规则 3，由路由的收紧检查判）；
 # 3. 路由自己的应用事件种类按 #828 的登记方式登记，经写入口写入、重放读得回来，骨架事件的登记表不变；
 # 4. 定义只在测试目录里，产品的定义与成果驱动的合同没有被改动；
-# 5. 产品代码不导入它。
+# 5. 产品代码不导入它；
+# 6. 停止原因由写入口按事项所用的那份定义核对（工单 #1165）：同一份定义里写不进去，交上它才写得进去。
+#
+# 模块级 `DEFINITIONS` 不替换（工单 #1165）：停止原因与部门由薄驱动交给写入口，写入口按交进来的那份定义核对；
+# 只有组装处（`runtime.py`）按组织定义里的名称接上路由那一步仍按模块加载的定义走。
 #
 # 层：模块层（一个事项的真实运行：事件库、工作区与假模型）。守 R2（各缝的交换字段与版本：路由按组织定义的
 # 名称接上、它自己的一份定义由它自己校验、骨架只认得通用的一种成果接纳事件）与 R1（每个 run 以封闭清单里的
@@ -30,12 +34,12 @@ from typing import Any
 
 import pytest
 
-from harness import kernel_events, orchestrator as orchestrator_module, routing_contract
+from harness import kernel_events, routing_contract
 from harness import runtime as runtime_module
 from harness import write_path as write_path_module
 from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFINITIONS as PRODUCT_DEFINITIONS
-from harness.definitions import DefinitionError, load_definitions
+from harness.definitions import DefinitionError, UnknownStopReason, load_definitions
 from harness.event_store import run_stream
 from harness.kernel_events import json_dumps
 from harness.models import ArtifactRef, EventType
@@ -92,18 +96,16 @@ def _script() -> dict[str, list[Any]]:
 
 def _system(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
             script: dict[str, list[Any]] | None = None) -> tuple[LoopSystem, FakeAdapter]:
-    # 事项所用的那份定义（只在测试目录里）交给同一批薄驱动的读取处：停止原因、部门、事项种类与角色提示
-    # 都按它读。与 test_watched_relations.py、test_ask_chain.py 改模块里的定义同一个做法——
-    # 产品的定义里没有任务池的成果种类，路由自己带来的那几种只在它那份定义里
+    # 事项所用的那份定义（只在测试目录里）交给薄驱动：停止原因、部门、事项种类与角色提示都按它读。
+    # 停止原因与部门由薄驱动交给写入口，写入口按它核对（工单 #1165）；模块加载的那份定义不动，
+    # 产品的定义里没有任务池的成果种类与它声明的结束原因，路由自己带来的那几样只在它那份定义里
     definitions = second_routing.DEFINITIONS
-    monkeypatch.setattr(write_path_module, "DEFINITIONS", definitions)
-    monkeypatch.setattr(orchestrator_module, "DEFINITIONS", definitions)
     # 组装处（runtime.py）按组织定义里的名称接上路由：把事项所用的这份定义交给它的读取处，任务池因此按名称
     # 接上，并从组装处拿到只读的事件读取器（契约第三版，工单 #1164）。测试不自己给路由接事件库
     monkeypatch.setattr(runtime_module, "DEFINITIONS", definitions)
     adapter = FakeAdapter(_script() if script is None else script)
     system = LoopSystem.for_testing(tmp_path, adapter, assembly=task_pool_assembly.TaskPoolAssembly())
-    # 收紧检查是这条路由的另一半，事项所用的定义也交给薄驱动
+    # 收紧检查是这条路由的另一半，事项所用的定义也交给薄驱动（工单 #1098 的位置）
     system.orchestrator._tightening = second_routing.TIGHTENING
     system.orchestrator._definitions = definitions
     return system, adapter
@@ -158,6 +160,28 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path, monkeypatch):
     # 这条原因不在内核的停止原因清单里：它是那份路由定义版本的封闭清单里的一条
     assert projection.stop_reason not in PRODUCT_DEFINITIONS.stop_reasons
     assert projection.stop_reason not in second_routing.DEFINITIONS.stop_reasons
+
+
+def test_the_product_definitions_do_not_take_the_task_pool_end_reason(tmp_path, monkeypatch):
+    # 验收第 2 条（工单 #1165）：同样的写入，用另一份没有声明这个原因的定义时失败，错误写明是哪一个原因
+    # 与哪份定义。这里是模块加载的那份产品定义——写入口不交定义时按它核对；交上事项所用的那一份时，
+    # 同一个写入写得进去（薄驱动写结束、暂停、失败事件时就是这么交的）
+    system, _adapter = _system(tmp_path, monkeypatch)
+    run_id = system.create_run("把 README 的用法一节整理清楚")
+    ending = write_path_module.NewEvent(
+        EventType.RUN_FAILED, state_before="running", state_after="failed", actor="system",
+        department="product", stop_reason=second_routing.ITEM_END_REASON,
+        payload={"stop_reason": second_routing.ITEM_END_REASON})
+    with pytest.raises(UnknownStopReason) as raised:
+        system.writes.append(run_stream(run_id), ending)
+    message = str(raised.value)
+    assert second_routing.ITEM_END_REASON in message
+    assert "stop_reasons.json" in message and "routings.json" in message
+    assert PRODUCT_DEFINITIONS.routing in message
+
+    [event] = system.writes.append(run_stream(run_id), ending, definitions=second_routing.DEFINITIONS)
+    assert event.stop_reason == second_routing.ITEM_END_REASON
+    assert system.project(run_id).stop_reason == second_routing.ITEM_END_REASON
 
 
 def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path, monkeypatch):

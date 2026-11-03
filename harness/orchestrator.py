@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
@@ -345,6 +345,12 @@ class Orchestrator:
         # 项目服务在装配以后回填，用于结算与判断执行槽位（busy）
         self.projects: Any = None
 
+    def _transact(self, stream: str, decide: Callable[[Transaction], Any], **options: Any) -> Any:
+        # 薄驱动自己的写入（工单 #1165）：停止原因与部门按这个事项所用的那份定义核对，也就是构造时交给它的
+        # 那一份（工单 #1098 的位置）。事项在创建时冻结定义版本，第二种路由在自己那份定义里声明的结束原因
+        # 与它带的部门因此写得进事件日志；按 run 叠加 MCP 设置得到的副本只多出工具，不改这两样
+        return self.writes.transact(stream, decide, definitions=self._definitions, **options)
+
     def create_run(
         self,
         task: str,
@@ -490,7 +496,7 @@ class Orchestrator:
             artifact_hashes=[follow_up["input_ref"]["content_hash"], follow_up["intend_ref"]["content_hash"]],
         ) if follow_up is not None else None)
         # 新的 run 流从版本 0 开始；同一编号的 run 已经存在时拒绝
-        self.writes.transact(run_stream(run_id), lambda transaction: transaction.append(
+        self._transact(run_stream(run_id), lambda transaction: transaction.append(
             *((run_created, note_received) if note_received is not None
               else (run_created,))), expected_version=0)
         return run_id
@@ -589,7 +595,7 @@ class Orchestrator:
             self._require_open(run_id, transaction.projection, "This run has ended; create a new task for this input.")
             self.interactions.receive(transaction, text, command=False, base_version=base_version)
 
-        self.writes.transact(run_stream(run_id), receive, command=command)
+        self._transact(run_stream(run_id), receive, command=command)
         self._wake(run_id, restart=True)
         return self.project(run_id)
 
@@ -611,7 +617,7 @@ class Orchestrator:
             cancellation_recorded = False
             try:
                 try:
-                    self.writes.transact(run_stream(run_id), receive)
+                    self._transact(run_stream(run_id), receive)
                 except RunTerminalError:
                     raise
                 except Exception as exc:
@@ -620,7 +626,7 @@ class Orchestrator:
                     "text": text, "error_type": type(save_error).__name__, "message": str(save_error),
                 }
                 try:
-                    self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
+                    self._transact(run_stream(run_id), lambda transaction: self._fail(
                         transaction, "cancelled", "run cancelled by user command", input_save_failure=failure))
                     cancellation_recorded = True
                 except Exception as exc:
@@ -704,7 +710,7 @@ class Orchestrator:
             self._require_open(run_id, transaction.projection, "This run has ended; guidance can be sent to a new task.")
             self.interactions.receive_guidance(transaction, department, text, base_version=base_version)
 
-        self.writes.transact(run_stream(run_id), receive, command=command)
+        self._transact(run_stream(run_id), receive, command=command)
         self._wake(run_id, restart=True)
         return self.project(run_id)
 
@@ -743,7 +749,7 @@ class Orchestrator:
             blocked = blocked_by_other_session(decisions, activation.department)
             return Judgment(not stop, projection.stream_version, blocked)
 
-        return self.writes.transact(run_stream(activation.run_id), judge)
+        return self._transact(run_stream(activation.run_id), judge)
 
     def _stop_requested(self, activation: _Activation, projection: RunProjection, minimal: MinimalProjection,
                         decisions: Iterable[DecisionRequest]) -> bool:
@@ -894,7 +900,7 @@ class Orchestrator:
                 return self.project(run_id)
             self._abort.setdefault(run_id, Event()).set()
             try:
-                self.writes.transact(run_stream(run_id), lambda transaction: self._fail(
+                self._transact(run_stream(run_id), lambda transaction: self._fail(
                     transaction, "cancelled", "run cancelled"), command=command)
             finally:
                 _activation, cancel_error = self._abort_run(run_id)
@@ -908,7 +914,7 @@ class Orchestrator:
         # 因升级停止（ADR-0019，工单 #126、#322）：强制升级处理到的未结束 run 记为因升级停止，
         # 停止原因写在带版本定义的停止原因清单中；已经结束的 run 不变
         message = f"run event version differs from the current version: {reason}"
-        self.writes.transact(run_stream(run_id), lambda transaction: self._fail(transaction, STOP_REASON_UPGRADE, message))
+        self._transact(run_stream(run_id), lambda transaction: self._fail(transaction, STOP_REASON_UPGRADE, message))
         return self.project(run_id)
 
     def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
@@ -1016,7 +1022,7 @@ class Orchestrator:
                 return
             self._fail(transaction, judgment.stop_reason, judgment.message)
 
-        self.writes.transact(run_stream(run_id), end)
+        self._transact(run_stream(run_id), end)
         return await asyncio.to_thread(self._settled, run_id)
 
     def start(self, run_id: str) -> asyncio.Task[RunProjection]:
@@ -1186,7 +1192,7 @@ class Orchestrator:
         if self._running.setdefault(key, claim) is not claim:
             raise RuntimeError("department already has an active department invocation")
         try:
-            activation = self.writes.transact(
+            activation = self._transact(
                 run_stream(run_id), lambda transaction: self._prepare_activation(
                     run_id, transaction, connections, department))
             if activation is None:
@@ -1260,7 +1266,7 @@ class Orchestrator:
 
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
                 await asyncio.to_thread(self._await_cancellers, run_id)
-                self.writes.transact(run_stream(run_id), finish)
+                self._transact(run_stream(run_id), finish)
                 # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
                 self._rebase_run_clock(run_id)
                 self.sessions.get(run_id, scope.department).idle()
@@ -1608,7 +1614,7 @@ class Orchestrator:
                     payload=branch.start,
                 ))
 
-            self.writes.transact(stream, start_ask)
+            self._transact(stream, start_ask)
         # 这个分支会话之前几轮用掉的步数从这一轮的上限里扣（工单 #475）：路由给的只是这一轮的上限，
         # 扣法与其他会话一致——最小投影里的累计步数减去已结算的那一部分（工单 #1015）
         branch_limits = self._session_limits(scope.run_id, branch.session_id,
@@ -1671,7 +1677,7 @@ class Orchestrator:
                 payload=payload,
             ))
 
-        self.writes.transact(stream, record_ask_answered)
+        self._transact(stream, record_ask_answered)
         if outcome.status == "answered":
             return True, outcome.answer, None, new_contract_hash, steps
         return False, None, outcome.reason, None, steps
@@ -1713,7 +1719,7 @@ class Orchestrator:
             curr = transaction.projection
             return decision.artifact["revision"], artifact_hash(curr.effective_contract)
 
-        revision, new_contract_hash = self.writes.transact(run_stream(scope.run_id), commit_prd_revision)
+        revision, new_contract_hash = self._transact(run_stream(scope.run_id), commit_prd_revision)
         activation.scope = replace(activation.scope, basis=replace(
             activation.scope.basis, effective_contract_hash=new_contract_hash))
         return revision, new_contract_hash
@@ -1775,7 +1781,7 @@ class Orchestrator:
             ))
             return events[0]
 
-        act_event = self.writes.transact(run_stream(run_id), activate_branch)
+        act_event = self._transact(run_stream(run_id), activate_branch)
         # 这个分支会话这一段工作的起点（工单 #475）
         self._start_session_segment(run_id, session_id)
 
@@ -1845,7 +1851,7 @@ class Orchestrator:
                         "stop_reason": None,
                     },
                 ))
-            self.writes.transact(run_stream(run_id), finish_branch)
+            self._transact(run_stream(run_id), finish_branch)
             # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
             self._rebase_run_clock(run_id)
             try:
@@ -1886,7 +1892,7 @@ class Orchestrator:
                                          tightening=self._tightening, events=evaluated.events(),
                                          definitions=self.item_definitions(run_id))
             try:
-                self.writes.transact(run_stream(run_id), lambda transaction: self._commit_proposal(
+                self._transact(run_stream(run_id), lambda transaction: self._commit_proposal(
                     transaction, evaluated=evaluated, facts=facts, decision=decision, environment=environment,
                     department=department, proposal=proposal,
                     transcript_ref=transcript_ref, parent_event_id=parent_event_id, session_id=session_id,
@@ -2001,7 +2007,7 @@ class Orchestrator:
         # 只有质检的放行与基线核验的一致结论结束事项（工单 #556）：结束以后控制核心不再决定下一个谁工作
         if ends_run:
             # 进入完成状态的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
-            stop_reason = DEFINITIONS.work_item(projection.kind).stop_reason
+            stop_reason = self._definitions.work_item(projection.kind).stop_reason
             self._withdraw_decisions(transaction, stop_reason)
             transaction.append(NewEvent(
                 EventType.RUN_DONE,
@@ -2063,7 +2069,7 @@ class Orchestrator:
                 return
             self._end(transaction, reason, message, facts=facts)
 
-        self.writes.transact(run_stream(activation.run_id), end)
+        self._transact(run_stream(activation.run_id), end)
 
     @staticmethod
     def _failed_attempts(transaction: Transaction, activation_id: str) -> list[str]:
@@ -2145,7 +2151,7 @@ class Orchestrator:
         # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。完成（放行或基线核验）只由接纳写入。
         # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径。
         # facts 是暂停决定请求要带的事实引用（workspace_unrepresentable 为条目在工作区内的相对路径）
-        outcome = DEFINITIONS.stop_reason(reason).outcome
+        outcome = self._definitions.stop_reason(reason).outcome
         if outcome == "paused":
             self._pause(transaction, reason, message, facts=facts)
         elif outcome == "failed":
@@ -2179,7 +2185,7 @@ class Orchestrator:
             provider=projection.provider, model=projection.model,
             payload={
                 "stop_reason": reason,
-                "human_action": DEFINITIONS.stop_reason(reason).human_action,
+                "human_action": self._definitions.stop_reason(reason).human_action,
                 **({"message": message} if message else {}),
                 "cycle_count": projection.cycle_count,
                 "max_cycles": projection.max_cycles,
@@ -2199,7 +2205,7 @@ class Orchestrator:
                               reason: str, message: str | None,
                               facts: list[str]) -> None:
         # 暂停以后继续的决定请求：说明写明停止原因与人工处理说明，工作区无法表示的条目列为事实引用
-        human = DEFINITIONS.stop_reason(reason).human_action
+        human = self._definitions.stop_reason(reason).human_action
         description = f"运行暂停，停止原因为 {reason}。{human}"
         if message:
             description = f"{description} 停止说明：{message}"
@@ -2217,7 +2223,7 @@ class Orchestrator:
 
     def _fail(self, transaction: Transaction, reason: str, message: str,
               *, input_save_failure: dict[str, str] | None = None) -> None:
-        human = DEFINITIONS.stop_reason(reason).human_action
+        human = self._definitions.stop_reason(reason).human_action
         projection = transaction.projection
         if projection.status in TERMINAL_STATUSES:
             return
