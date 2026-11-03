@@ -5,7 +5,7 @@
 import type { ClientApp } from "../../contract/client-app";
 import type { ProjectOverviewResult, RunLoopsResult } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
-import { loopRows, loopRuleText, type LoopRow } from "../../translate/floor";
+import { loopRows, loopRuleText, type LoopRow } from "./floor-text";
 import { Empty, Section, Table, Tag } from "./common";
 import { useSnapshot } from "./use-snapshot";
 
