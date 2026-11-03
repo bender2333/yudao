@@ -3073,6 +3073,8 @@ RUN_EVENT_KINDS: tuple[str, ...] = (
     EventType.LESSON_CANDIDATE_RECORDED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
     EventType.RUN_RESUMED, EventType.RUN_CONTINUED, EventType.DECISION_REQUESTED, EventType.DECISION_ANSWERED,
     EventType.DECISION_WITHDRAWN,
+    # 派发编号（骨架事件，工单 #1397）：导出里有这一条
+    EventType.DISPATCH_NUMBER_ACQUIRED,
 )
 
 
