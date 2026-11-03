@@ -603,8 +603,6 @@ def _command_record(connection: sqlite3.Connection, command_id: str) -> CommandR
                                                   row["position"])
 
 
-
-
 def _save_projection(connection: sqlite3.Connection, stream: str, version: int, position: int,
                      epoch: int | None, state: str) -> None:
     # 保存一个流的投影：版本、最后一条事件的全局位置、记录过的最大执行权编号与投影的 JSON 文本
@@ -612,6 +610,8 @@ def _save_projection(connection: sqlite3.Connection, stream: str, version: int, 
         "INSERT INTO projections (stream, version, position, epoch, state) VALUES (?, ?, ?, ?, ?) "
         "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
         "epoch = excluded.epoch, state = excluded.state", (stream, version, position, epoch, state))
+
+
 def _save_decision(connection: sqlite3.Connection, stream: str, decision: SavedDecision) -> None:
     if decision.stream != stream:
         raise ValueError(f"decision request {decision.decision_id} belongs to {decision.stream}, not {stream}")

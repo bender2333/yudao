@@ -125,6 +125,8 @@ def test_the_envelope_hands_back_its_fields_and_summarizes_the_payload():
     event = _run_event("run_created", {"kind": "change", "goal": "逐行文本处理工具", "question": None}, "evt_1")
     assert event.to_dict()["stream_version"] == 1
     assert event.to_dict()["type"] == "run_created"
+    # 执行权编号（总图的词）与日志里的旧字段是同一份：execution_right 读出 epoch（工单 #1397）
+    assert _run_event("run_created", {}, "evt_2", epoch=4).execution_right == 4
     assert event.summary() == {"kind": "change", "goal": "逐行文本处理工具"}
     project = ProjectEvent(event_id="pevt_1", project_id="proj_1", type=ProjectEventType.PROJECT_REGISTERED,
                            payload={"name": "项目"}, created_at="2026-10-28T00:00:00+00:00", position=2,
