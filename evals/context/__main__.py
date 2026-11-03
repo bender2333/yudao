@@ -25,13 +25,13 @@ def main(argv: list[str] | None = None) -> int:
     measure = sub.add_parser("measure", help="测现状：每一步的召回与浪费")
     measure.add_argument("--db", default=DEFAULT_DB)
     measure.add_argument("--artifacts", default=None)
-    measure.add_argument("--out", default="docs/evaluation/context-assembly-2026-10-29")
+    measure.add_argument("--out", default=".tmp/context-assembly")
 
     replay = sub.add_parser("replay", help="用新视图重放，比较与记录的差异")
     replay.add_argument("--db", default=DEFAULT_DB)
     replay.add_argument("--artifacts", default=None)
     replay.add_argument("--rules", default="evals/context/rule-set.json")
-    replay.add_argument("--out", default="docs/evaluation/context-assembly-replay-2026-10-29")
+    replay.add_argument("--out", default=".tmp/context-assembly-replay")
 
     verify = sub.add_parser("verify", help="核对每一步的视图能从事件与工件一字不差地重建")
     verify.add_argument("--db", default=DEFAULT_DB)
@@ -43,7 +43,7 @@ def main(argv: list[str] | None = None) -> int:
     counter.add_argument("--rules", default="evals/context/rule-set.json")
     counter.add_argument("--sample", type=int, default=24)
     counter.add_argument("--temperature", type=float, default=0.0)
-    counter.add_argument("--out", default="docs/evaluation/context-assembly-counterfactual-2026-10-29.json")
+    counter.add_argument("--out", default=".tmp/context-assembly-counterfactual.json")
     counter.add_argument("--seed", type=int, default=912)
 
     cost = sub.add_parser("cost", help="按前缀缓存计价，折算每套规则的费用")

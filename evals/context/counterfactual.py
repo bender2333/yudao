@@ -270,4 +270,4 @@ if __name__ == "__main__":
     import sys
 
     sys.exit(main(sys.argv[1], None, "evals/context/rule-set.json", 24, 0.0,
-                  "docs/evaluation/context-assembly-counterfactual-2026-10-29.json", 912))
+                  ".tmp/context-assembly-counterfactual.json", 912))

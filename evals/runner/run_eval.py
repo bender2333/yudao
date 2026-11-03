@@ -1,7 +1,7 @@
 """一次评测：运行 OpenCode、按评分器评分、写出结果与报告。
 
 原始证据（交付副本、输出、评分日志）放在 .yudao/evals/ 下，不进入 Git；
-结果与报告提交到 docs/evaluation/（评测场景设计第 6 节）。
+结果文件提交到 docs/evaluation/，中文报告写到 .tmp/ 再发 Discussions（评测场景设计第 6 节）。
 """
 
 import argparse
