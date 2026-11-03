@@ -64,6 +64,10 @@ const COMMON: Readonly<Record<string, string>> = none({
   mcp_servers_configured: SETTINGS,
   // 探测 MCP 服务器（工单 #1174）：结果由 project.settings 的探测一节与工具快照给出
   tool_server_probe_finished: SETTINGS,
+  // MCP 服务器的生命周期（工单 #1176）：启动、关闭与启动失败由工具页与动作回执给出，画面里没有对应物
+  mcp_server_started: PAGE_ONLY,
+  mcp_server_closed: PAGE_ONLY,
+  mcp_server_failed: PAGE_ONLY,
   project_parameter_set: SETTINGS,
   home_seen: SETTINGS,
   parameter_set: SETTINGS,

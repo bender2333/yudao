@@ -84,6 +84,10 @@ RUN_EVENT_TYPES = frozenset({
     "decision_requested",
     "decision_answered",
     "decision_withdrawn",
+    # MCP 服务器的生命周期（网络与 MCP 设计说明第 7.2、10 节，工单 #1176）：应用事件，随 run 流保存
+    "mcp_server_started",
+    "mcp_server_closed",
+    "mcp_server_failed",
 })
 
 # 项目流：项目的长期事实（项目、当前 PRD 与采纳成果、事项的存在、队列位置与最终结果、项目部门设置）

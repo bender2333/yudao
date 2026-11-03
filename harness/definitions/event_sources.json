@@ -289,5 +289,14 @@
   },
   "instance_upgrade_withdrawn": {
     "source": "user"
+  },
+  "mcp_server_started": {
+    "source": "host_measurement"
+  },
+  "mcp_server_closed": {
+    "source": "host_measurement"
+  },
+  "mcp_server_failed": {
+    "source": "host_measurement"
   }
 }
