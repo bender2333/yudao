@@ -5,7 +5,7 @@ import time
 from pathlib import Path
 
 from . import graph, index, scaffold
-from .rulefacts import canon as rf_canon, view as rf_view
+from .rulefacts import canon as rf_canon, scan as rf_scan, view as rf_view
 from .scan import is_scaffold
 
 
@@ -110,6 +110,8 @@ def cmd_impact(root, args):
 def cmd_rules(root, args):
     if args.rules_cmd == "canon":
         print("\n".join(rf_canon.format_canon(rf_canon.read_canon(root))))
+    elif args.rules_cmd == "scan":
+        print("\n".join(rf_scan.format_scan(root, args.sample)))
     else:
         out, data = rf_view.view(root)
         g = data["graph"]
@@ -153,10 +155,12 @@ def main(argv=None):
     p.add_argument("--reach", action="store_true", help="同时列出只是可达的文件")
     p = sub.add_parser("impact", help="改了某个文件或小节，哪些节点引用或提到它，按角色分组")
     p.add_argument("target")
-    p = sub.add_parser("rules", help="规则事实线（只到第 1 步：读正本表格）")
+    p = sub.add_parser("rules", help="规则事实线（到第 2 步：读正本表格、粗筛盘点）")
     rs = p.add_subparsers(dest="rules_cmd", required=True)
     rs.add_parser("canon", help="把正本表格读成事实，列出附注、读不出的格子、一条事实两处正本、读不到正本的角色；永远以 0 退出")
     rs.add_parser("view", help="生成离线页面到 .tmp/doc-index/rulefacts.html：角色 × 规则矩阵与规则图")
+    p = rs.add_parser("scan", help="粗筛与盘点：列出脚手架文件里像在复述规则的句子，分已是引用、能改成句式、不是规则事实三类；永远以 0 退出")
+    p.add_argument("--sample", type=int, metavar="N", help="按固定种子随机抽 N 条候选（用来人工核对噪音率），格式相同")
     args = ap.parse_args(argv)
     root = repo_root(args.root)
     COMMANDS[args.cmd](root, args)

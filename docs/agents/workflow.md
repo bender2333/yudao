@@ -8,8 +8,8 @@
 
 | 事实 | 位置 | 谁改 |
 | --- | --- | --- |
-| 系统的形状、三环、缝 | 总图 `docs/architecture.html`、画面总图 | 总架构师与用户 |
-| 阶段、薄片、十条道 | 路线图 `docs/program-roadmap.md` | 总架构师与用户 |
+| 系统的形状、三环、缝 | 总图 `docs/architecture.html`、画面总图 | 总架构师 |
+| 阶段、薄片、十条道 | 路线图 `docs/program-roadmap.md` | 总架构师 |
 | 模块怎么分、每道缝细化在哪 | 总体架构 `docs/design/architecture/`、对照表 | 子架构师 |
 | 一个方框或一道缝怎么做 | 设计说明 `docs/design/`（[设计说明规范](design-spec.md)） | 子架构师 |
 | 为什么这样定 | 需求记录、ADR、调研、原型 | 架构师 |
@@ -17,7 +17,7 @@
 | 每次状态变化的证据 | 那张工单上一条带前缀的评论（第 5 节） | 做这次流转的角色 |
 | 代码达到合同的证据 | PR 与 CI | 执行者、CI、审查者 |
 | 观察、报告、想法 | GitHub Discussions | 任何角色 |
-| 规则 | `CLAUDE.md`、`AGENTS.md`、`docs/agents/` | 总架构师与用户 |
+| 规则 | `CLAUDE.md`、`AGENTS.md`、`docs/agents/` | 总架构师；用户不在场时架构师循环 |
 | 过程与理由 | `claude_jour.md`、`agents_jour/`、`docs/decision.md`、`docs/CHANGELOG.md` | 写的人 |
 
 Discussions 不表示工单的状态。帖子里要改代码的事转成工单，在帖子里回一句「已转 #编号」；要改设计、原型或文档的事直接改，回一句改了哪份文档；总图与规则的事开 `architecture` 工单（第 7 节）。分类：Announcements 放复盘，General 放试用报告，Ideas 放等分诊的想法，Show and tell 放只读的扫描与差异报告。
@@ -107,7 +107,7 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | 执行环境、要用户提供的条件 | 用户 | `ready-for-human`，评论写要用户做什么 |
 | 设计、规则矛盾、验收做不到、连续三轮没过 | 子架构师或架构师循环 | `ARCHITECT:` 评论，`needs-triage` |
 | 与总图冲突、总图缺了什么 | 总架构师 | 一张 `architecture` 工单，写现象、总图哪一节、要定什么；相关工单 `ready-for-human`，`TRIAGE:` 评论写明它的编号 |
-| 规则本身要改 | 总架构师 | 直接改，记入 `docs/CHANGELOG.md` 与 `claude_jour.md`；用户不在场也一样 |
+| 规则本身要改 | 总架构师；用户不在场时架构师循环 | 直接改，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` |
 | 意图要改：目的、判据、基础规则的意思 | 用户 | 一张 `architecture` 工单，写现象与要定什么，等用户；相关工单 `ready-for-human` |
 
 总架构师定了以后直接改总图或规则，在 `architecture` 工单上评论结论并关闭。被它挡住的工单由子架构师或架构师循环按 `/triage` 核对后放回。
