@@ -362,6 +362,46 @@ def _kept_delivery(store: EventStore, run: RunProjection, status: str, *,
     return {"version": delivery.revision, "accepted_at": event.created_at}
 
 
+# 停止原因里由模型服务引起的那些（停止原因清单 stop_reasons.json）：这些停下的事件前面有一条失败的调用尝试，
+# 它带着部门、请求的模型、服务返回的状态码与是否可重试——页面要的是这三样加「可不可重试」（工单 #1373）
+MODEL_STOP_REASONS = frozenset({
+    "provider_error", "provider_timeout", "provider_protocol", "unsupported_protocol",
+    "retry_after_too_long", "context_overflow", "compaction_failed",
+})
+
+
+def _stop_facts(store: EventStore, run: RunProjection, status: str, stop_reason: str | None, *,
+                through: int | None = None) -> tuple[str | None, dict[str, Any] | None]:
+    # 停止的时刻与上游失败的细节（工单 #1373）：时刻取事项结束的那条事件（run_failed 或 run_paused）的提交时间；
+    # 停止原因是模型服务时，再取这个结束事件之前最后一次失败的调用尝试，把部门、请求的模型、服务返回的
+    # 状态码与是否可重试带给页面。这几项事件里本来就有（model_attempt_failed 的载荷与事件上的部门），
+    # 只是没有谁把它们带给页面；询问分支的失败尝试在结束事件之前、但不是让事项停下的那一条，
+    # 按位置只取结束事件之前的那一条
+    if status != "stopped":
+        return None, None
+    events = store.list_events(run.run_id, through_position=through)
+    ending = [event for event in events if event.type in (EventType.RUN_FAILED, EventType.RUN_PAUSED)]
+    if not ending:
+        return None, None
+    stop_event = ending[-1]
+    stopped_at = stop_event.created_at
+    if stop_reason not in MODEL_STOP_REASONS:
+        return stopped_at, None
+    failed = [event for event in events
+              if event.type == EventType.MODEL_ATTEMPT_FAILED and event.position <= stop_event.position]
+    if not failed:
+        return stopped_at, None
+    event = failed[-1]
+    diagnostics = event.payload.get("diagnostics")
+    status_code = diagnostics.get("status_code") if isinstance(diagnostics, dict) else None
+    return stopped_at, {
+        "department": event.department,
+        "requested_model": event.payload.get("requested_model"),
+        "status_code": status_code if isinstance(status_code, int) and not isinstance(status_code, bool) else None,
+        "retryable": event.payload.get("retryable"),
+    }
+
+
 def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adoption],
                       held: dict[str, HeldCandidate], project_id: str, *, include_history: bool = True,
                       through: int | None = None, awaiting_initial_prd: bool = False,
@@ -404,6 +444,9 @@ def _derive_work_item(store: EventStore, item: WorkItem, adopted: dict[str, Adop
     # 已收下的交付（工单 #1239）：事项停止时，把「这个 run 里已经收下一版交付」这件事写在停止说明旁边，
     # 否则页面上只有一句失败原因，看不出这件事已经有一份可用的交付。用户自己取消时也写，交付仍然在
     item.kept_delivery = _kept_delivery(store, run, item.status, through=through)
+    # 停止的时刻与上游失败的细节（工单 #1373）：同一项目里几张同名的失败卡片要能分辨——哪张、什么时候停的、
+    # 为什么停；模型服务引起的停止再写清部门、请求的模型、状态码与是否可重试
+    item.stopped_at, item.stop_detail = _stop_facts(store, run, item.status, item.stop_reason, through=through)
     if include_history:
         events = store.list_events(item.run_id, through_position=through)
         item.rework = [

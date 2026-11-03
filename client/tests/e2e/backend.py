@@ -441,12 +441,13 @@ def waiting_script():
 def stop_note_script():
     # 停止说明的端到端验收（工单 #1162）：工程先问产品一次，产品的回答分支失败（分支自己的原因），
     # 工程拿到结果以后下一次请求被上游拒绝（HTTP 400），事项因此停下；页面的停止说明写的是这一条，
-    # 不是询问分支的原因。这个脚本不预置项目与事项：用例在页面打开以后自己建项目并开始事项
+    # 不是询问分支的原因。这个脚本不预置项目与事项：用例在页面打开以后自己建项目并开始事项。
+    # 上游失败的细节（工单 #1373）：这一次失败带上服务返回的状态码，页面要写得出它是 HTTP 400 且不可重试
     return {
         "product": [product_spec()],
         "engineering": [
             ask_turn("product", STOP_NOTE_QUESTION, background="实现中需要明确", expected="确认输出形式"),
-            ProviderError(STOP_NOTE_ERROR, reason="provider_error"),
+            ProviderError(STOP_NOTE_ERROR, reason="provider_error", diagnostics={"status_code": 400}),
         ],
         "product:ask": [ProviderError(BRANCH_ERROR, reason="provider_error")],
         # 质检在交付到达以前的预测性探索按事实决定做什么，轮次给得够用，免得它先因为脚本用完而失败

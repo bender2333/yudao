@@ -9,6 +9,8 @@
 
 ---
 
+solo-deepseek-v4.1-flash / 2026-11-03 13:10 / `docs/design/app-and-interface.md`：`project.overview` 一行补 `stopped_at` 与 `stop_detail`（停止的时刻；停止原因是模型服务时取最后一次失败的调用尝试的部门、请求的模型、状态码与是否可重试）与页面上的写法；第 4.3 节「事项看板在页面上的显示」加一条「停止的卡片要能分辨」（事项标识与停止时间，停止说明下面写「上游失败：哪个部门请求的哪个模型、返回什么状态码、可不可重试」）/ 工单 #1373：试用 R1-01 与 R1-02——上游失败时页面的提示不指名模型与服务，同一项目里 6 张失败卡片一模一样；这些字段本来就在 `model_attempt_failed` 事件里，只是没有谁把它们带给页面
+
 solo-deepseek-v4.1-flash / 2026-11-03 12:05 / `docs/design/app-and-interface.md` 第 4.3 节加「事项看板在页面上的显示」：五组各自的口径（排队中放还没有交给部门的事项；部门列放部门手上有的事项，几个部门同时工作时同一事项在几列里；已放行、已采纳、已停止按事项状态）、部门列的组成与顺序取自事项的部门（不写死产品、工程、质检三栏）、每组的数字是事项数 / 工单 #1372：概览的看板与部门状态行对同一部门说法不一致（试用 F1 的卡点 N-08：「工程 一轮工作中」旁边看板写「工程(0)」）。查证后不是后端投影算错、也不是数据时刻不同：看板的分组原来按事项的所在部门（单值，取最后一次主线的部门激活）分，多部门同时工作时表达不了「谁在工作」；设计说明里原来没有写过分组口径
 
 claude-opus-5-5 / 2026-10-28 11:25 / `AGENTS.md` 共同要求的日记一条加「日记在合并之前写完，合并以后不再补记」，「Solo 模式」第 6 步删去「记录合并提交号写入日记」；`.claude/skills/solo-worker/SKILL.md` 第 5、12 步随之改；`.claude/skills/solo/SKILL.md` 收账一节删去补记日记的小 PR 的说法 / 合并以后补记日记要再开一张 PR，10-25 以来合并的 130 张 PR 里 56 张标题带「日记」；合并提交与 main 上的 CI 在 GitHub 上查得到（solo 复盘，用户确认，决定记录同日一条）
@@ -405,3 +407,5 @@ solo-deepseek-v4.1-flash / 2026-11-03 07:12 / 工单 #1414：`docs/prototypes/v1
 claude-opus-5-5（子架构师） / 2026-11-03 07:45 / `docs/evaluation/seam-diff-2026-11-03-5b17fdeb.md` 新增；`docs/design/architecture/name-map.md` 改第 1 节 6 行、第 4 节 5 行到代码现在的样子；`docs/design/skeleton-and-application.md`「薄驱动」里接输入的部门改按事项的来源 / 阶段二补重构工单时重跑按缝差异；设计说明与总图 11-02 加的事项的来源不一致，属一致性修正
 
 claude-sonnet-5-5 / 2026-11-02 18:05 / 评测结果的放法改为：结果文件（JSON）留在 `docs/evaluation/`，中文报告与差异报告发 Discussions（General「证据：」、Show and tell「扫描：」）；`CLAUDE.md` 文档地址、`acceptance-evidence.md` 版本回归、`design/evaluation-scenarios.md` 第 6 节、`workflow.md` 的 Discussions 分类、`evals/README.md`（命令的 `--result`/`--report` 与新增「结果放哪里」）、`current-baseline.md`、技能 trial-intake / seam-diff / milestone-retro 同步；9 份一次性报告与 `scenario-3-qwen38flash-2026-10-20/` 用 `git mv` 移到 `docs/archive/evaluation/`，`design/context-assembly.md`、`research/`、`decision.md`、`current-baseline.md` 里指向它们的链接改指新位置，归档件里的相对链接补了一层；留在原处的是被测试固定的 `scenario-3-yudao.*`、基线 `baseline-omp-stage3.*`、各 JSON 数据与验收截图 / 用户同意：报告是某个时刻的读数，帖子有固定链接，不会被下一次运行覆盖；旧报告不补发帖子
+
+claude-sonnet-5-5 / 2026-11-03 11:46 / 新增 `docs/research/uncle-bob-ub-mode.md`（Uncle Bob 的 ub-mode 调研，开头是「做法与参数速查」），`docs/research/README.md` 索引追加一行 / 用户要记住 ub-mode 的成熟做法与参数，作为内核更高要求（变异测试与复杂度）的外部依据；调研由子代理只读一手来源写成，主会话抽查了 SKILL.md 的行号与数字、dryer 与 mutator 命令行的默认值，一致
