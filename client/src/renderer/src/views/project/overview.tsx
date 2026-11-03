@@ -30,7 +30,7 @@ import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, departmentLi
 import { askIndent, askLine } from "./asks-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
-import { BOARD_TITLES, boardColumns } from "./board";
+import { boardGroups } from "./board";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
 // 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
@@ -499,16 +499,22 @@ function InputRecords(props: {
 }
 
 export function Board(props: { items: WorkItemCard[] }) {
-  const columns = boardColumns(props.items);
+  // 分组的口径见 board.ts 与设计说明「事项看板在页面上的显示」（工单 #1372）：
+  // 部门列取自事项的部门，几个部门同时工作时同一事项出现在几列里
+  const groups = boardGroups(props.items);
 
   return (
-    <Section id="ov-board" title="事项看板" note="卡片显示标题、状态、正在工作的部门与轮次；排队中的顺序就是执行顺序">
+    <Section
+      id="ov-board"
+      title="事项看板"
+      note="卡片显示标题、状态、正在工作的部门与轮次；部门列放的是这个部门手上有的事项，几个部门同时工作时同一事项会出现在几列里；排队中的顺序就是执行顺序"
+    >
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
         <div className="y10-ov-board board">
-          {BOARD_TITLES.map(([key, title]) => (
-            <div key={key} className="y10-ov-board-col board-col">
-              <h3>{title}（{columns[key].length}）</h3>
-              {columns[key].map((item) => (
+          {groups.map((group) => (
+            <div key={group.key} className="y10-ov-board-col board-col">
+              <h3>{group.title}（{group.items.length}）</h3>
+              {group.items.map((item) => (
                 <article key={item.work_item_id} className="y10-ov-card board-card">
                   <strong>{item.title}</strong>
                   <div className="y10-ov-card-meta card-meta">
