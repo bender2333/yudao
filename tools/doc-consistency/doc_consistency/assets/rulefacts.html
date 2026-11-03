@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>规则事实：矩阵、规则图与以谁为准</title>
+<style>
+  body { margin: 0 auto; max-width: 1500px; padding: 16px 20px 60px; font: 13px/1.6 "Microsoft YaHei", "PingFang SC", sans-serif; color: #222; background: #fff; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  h2 { font-size: 16px; margin: 28px 0 6px; padding-bottom: 4px; border-bottom: 2px solid #ddd; }
+  .hint { color: #666; }
+  .stat span { display: inline-block; margin-right: 18px; }
+  .stat b { font-size: 15px; }
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border: 1px solid #ddd; padding: 3px 8px; vertical-align: top; }
+  thead th { background: #f1f1ee; font-weight: 600; position: sticky; top: 0; }
+  th.role { width: 64px; text-align: center; font-size: 12px; line-height: 1.3; }
+  td.mark { text-align: center; font-size: 15px; }
+  td.src, td.fact { white-space: nowrap; color: #555; }
+  td.key { min-width: 140px; max-width: 260px; word-break: break-all; }
+  tr.group td { background: #e8eef5; font-weight: 600; }
+  tr.group td .file { font-weight: 400; color: #666; margin-left: 8px; }
+  .read { color: #1b7f3b; }
+  .miss { color: #c62828; font-weight: 700; }
+  .na { color: #999; }
+  .tag { display: inline-block; padding: 0 6px; border-radius: 8px; background: #fff0d6; color: #8a5300; font-size: 11px; margin-left: 6px; }
+  .legend span { display: inline-block; margin-right: 16px; }
+  .chip { display: inline-block; width: 11px; height: 11px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  #wrap { display: flex; gap: 12px; align-items: stretch; }
+  #cy { flex: 1; min-width: 0; border: 1px solid #ddd; background: #fafaf8; }
+  #side { width: 340px; border: 1px solid #ddd; background: #fafaf8; padding: 8px 12px; box-sizing: border-box; overflow: auto; }
+  #side ul { margin: 4px 0; padding-left: 16px; }
+  #side li { margin: 2px 0; word-break: break-all; }
+  #side .src, .src2 { color: #777; font-size: 12px; }
+  ul.plain { margin: 4px 0; padding-left: 18px; }
+  .only { color: #8a5300; }
+  /* 第 3 步：复述处与矛盾 */
+  tr.bad > td.key { background: #fdecea; }
+  .bad, .bad b { color: #c62828; }
+  .ok { color: #1b7f3b; }
+  .tog { cursor: pointer; user-select: none; display: inline-block; padding: 0 6px; border-radius: 8px; background: #e8eef5; color: #234; font-size: 11px; margin-left: 6px; }
+  .tog.bad { background: #fbd5d1; color: #c62828; font-weight: 600; }
+  tr.re > td { background: #fafaf8; padding: 4px 12px 8px 40px; }
+  tr.re ul { margin: 0; padding-left: 16px; }
+  tr.re li { margin: 3px 0; color: #222; }
+  .st { display: inline-block; min-width: 30px; text-align: center; border-radius: 3px; font-size: 11px; padding: 0 4px; margin-right: 6px; color: #fff; background: #1b7f3b; }
+  .st.bad { background: #c62828; color: #fff; }
+  #cy2 { border: 1px solid #ddd; background: #fafaf8; }
+  .cf { border-left: 4px solid #c62828; padding: 2px 10px; margin: 8px 0; background: #fff8f7; }
+  .cf .canon { color: #555; }
+</style>
+</head>
+<body>
+<h1>规则事实：矩阵、规则图、以谁为准与矛盾</h1>
+<p class="hint">从正本表格读出的事实、脚手架文件里按句式写的复述生成（<code>doc-consistency rules view</code>），不手画；改规则仍改 Markdown。阅读范围按各角色的入口文件算，与 <code>scope</code> 命令同一套；矛盾与 <code>rules check</code> 同一份结论。</p>
+<div class="stat" id="stat"></div>
+
+<h2>一、角色 × 规则矩阵</h2>
+<p class="hint">每行是一条正本事实。<span class="read">●</span> 被点名，读得到正本所在的文件；<span class="miss">✗</span> 被点名，但读不到；<span class="na">○</span> 只标「点名」：用户不是 agent，不读规则文件，不算读不到；空格：没点名。合称（架构师、任何角色）已展开。点键旁边的「复述 n」展开这条正本事实在哪些文件哪几行被复述，一致还是矛盾；有矛盾复述的正本行整行标红。</p>
+<table id="matrix"></table>
+
+<h2>二、规则图</h2>
+<p class="hint">只画表里有的边，不补表里没有的流转。点一个节点高亮相邻的节点与边，右侧列出它的事实与出处。</p>
+<div class="legend" id="legend"></div>
+<div id="wrap">
+  <div id="cy"></div>
+  <div id="side"><span class="hint">点一个节点查看它的事实。</span></div>
+</div>
+
+<h2>三、以谁为准偏序图</h2>
+<p class="hint">节点是规则的载体，一条边是「A 与 B 冲突时以 A 为准」（箭头从优先的指向其次的，边上写出处）。实线是正本（第 11 节「冲突时以谁为准」表），虚线是文档里复述的句子；方向相反（与正本相反或复述之间相反）或绕成一圈的标红。</p>
+<div id="prec-empty" class="hint" hidden>没有读到「以谁为准」的正本或句子。</div>
+<div id="cy2"></div>
+<div id="prec-list"></div>
+
+<h2>四、需要人看的</h2>
+<div id="issues"></div>
+
+<script type="application/json" id="data">__DATA__</script>
+<script>__LIB__</script>
+<script>
+(function () {
+  var DATA = JSON.parse(document.getElementById('data').textContent);
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  // 概览
+  var st = DATA.stat;
+  document.getElementById('stat').innerHTML =
+    '<span>事实 <b>' + st.facts + '</b></span><span>附注 <b>' + st.notes + '</b></span><span>引用 <b>' + st.refs + '</b></span><span>读不出 <b>' + st.unparsed +
+    '</b></span><span>一条事实两处正本 <b>' + st.dup + '</b></span><span>读不到正本 <b>' + st.unreachable + '</b></span>' +
+    '<span>解析成功的句子 <b>' + st.parsed + '</b></span><span>复述处 <b>' + st.restates + '</b></span><span>矛盾 <b class="' + (st.conflicts ? 'bad' : '') + '">' + st.conflicts +
+    '</b></span><span>像规则但解析不了的候选 <b>' + st.unparsedHits + '</b></span>';
+
+  // 矩阵：普通表格，每行能展开复述处
+  var MARK = { read: ['●', 'read', '读得到正本所在的文件'], miss: ['✗', 'miss', '被点名，但读不到正本所在的文件'], na: ['○', 'na', '点名；不是 agent，不读规则文件'] };
+  var head = '<thead><tr><th>键</th><th>事实</th><th>值</th>' +
+    DATA.roles.map(function (r) { return '<th class="role">' + esc(r.name) + '</th>'; }).join('') + '<th>出处</th></tr></thead>';
+  var cols = 4 + DATA.roles.length;
+  var body = '<tbody>', lastTable = null;
+  DATA.matrix.forEach(function (row, ri) {
+    if (row.table !== lastTable) {
+      lastTable = row.table;
+      body += '<tr class="group"><td colspan="' + cols + '">' + esc(row.tableName) + '<span class="file">' + esc(row.file) + '</span></td></tr>';
+    }
+    var tog = row.restates.length ? '<span class="tog' + (row.bad ? ' bad' : '') + '" data-ri="' + ri + '" title="展开这条事实被复述的地方">▸ 复述 ' + row.restates.length + (row.bad ? '，有矛盾' : '') + '</span>' : '';
+    body += '<tr id="row' + ri + '"' + (row.bad ? ' class="bad"' : '') + '><td class="key">' + esc(row.key) + (row.dup ? '<span class="tag">两处正本</span>' : '') + (row.open ? '<span class="tag">词表未封闭</span>' : '') + tog + '</td><td class="fact">' + esc(row.fact) +
+      '</td><td>' + esc(row.values.join('、')) + '</td>' +
+      DATA.roles.map(function (r) {
+        var m = MARK[row.marks[r.name]];
+        return m ? '<td class="mark ' + m[1] + '" title="' + esc(r.name + '：' + m[2]) + '">' + m[0] + '</td>' : '<td class="mark"></td>';
+      }).join('') + '<td class="src">' + esc(row.src) + '</td></tr>';
+    if (row.restates.length) {
+      body += '<tr class="re" id="re' + ri + '" hidden><td colspan="' + cols + '"><ul>' + row.restates.map(function (x) {
+        return '<li class="' + x.status + '"><span class="st ' + x.status + '">' + (x.status === 'bad' ? '矛盾' : '一致') + '</span><b>' + esc(x.src) + '</b>　<span class="src2">[' + esc(x.shape) + ']</span>　' + esc(x.text) + '</li>';
+      }).join('') + '</ul></td></tr>';
+    }
+  });
+  document.getElementById('matrix').innerHTML = head + body + '</tbody>';
+  document.getElementById('matrix').addEventListener('click', function (ev) {
+    var t = ev.target.closest('.tog');
+    if (!t) { return; }
+    var r = document.getElementById('re' + t.getAttribute('data-ri'));
+    r.hidden = !r.hidden;
+    t.textContent = (r.hidden ? '▸' : '▾') + t.textContent.slice(1);
+  });
+
+  // 规则图
+  var G = DATA.graph;
+  var palette = ['#4e79a7', '#f28e2b', '#59a14f', '#e15759', '#b07aa1', '#76b7b2', '#edc948'];
+  var kindColor = {};
+  G.kinds.forEach(function (k, i) { kindColor[k] = palette[i % palette.length]; });
+  var isSource = {}, isTarget = {}, byId = {};
+  G.nodes.forEach(function (n) { byId[n.id] = n; });
+  G.edges.forEach(function (e) { isSource[byId[e.source].kind] = true; isTarget[byId[e.target].kind] = true; });
+  // 三列：往角色指的（卡在项、结论）在左，角色在中，角色往外指的（标签、证据前缀）在右
+  function column(kind) { return kind === '角色' ? 1 : (isSource[kind] && !isTarget[kind] ? 0 : 2); }
+  var STEP = 34, GAP = 28, XS = [0, 420, 840];
+  var perCol = [[], [], []];
+  G.kinds.forEach(function (k) { perCol[column(k)].push(k); });
+  var pos = {}, heights = [0, 0, 0];
+  perCol.forEach(function (kinds, c) {
+    var y = 0;
+    kinds.forEach(function (k, i) {
+      if (i > 0) { y += GAP; }
+      G.nodes.filter(function (n) { return n.kind === k; }).forEach(function (n) { pos[n.id] = { x: XS[c], y: y }; y += STEP; });
+    });
+    heights[c] = y;
+  });
+  var H = Math.max.apply(null, heights);
+  G.nodes.forEach(function (n) {  // 各列竖直居中
+    var c = column(n.kind);
+    pos[n.id].y += (H - heights[c]) / 2;
+  });
+  var box = document.getElementById('cy');
+  box.style.height = (H + 70) + 'px';
+  var cy = cytoscape({
+    container: box,
+    elements: G.nodes.map(function (n) { return { group: 'nodes', data: { id: n.id, label: n.label, kind: n.kind, color: kindColor[n.kind] }, position: pos[n.id] }; })
+      .concat(G.edges.map(function (e, i) { return { group: 'edges', data: { id: 'e' + i, source: e.source, target: e.target, fact: e.fact, label: e.label } }; })),
+    layout: { name: 'preset' },
+    wheelSensitivity: 0.25,
+    style: [
+      { selector: 'node', style: { 'background-color': 'data(color)', 'label': 'data(label)', 'font-size': 11, 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center',
+        'shape': 'round-rectangle', 'width': 150, 'height': 24, 'text-wrap': 'ellipsis', 'text-max-width': 140, 'border-width': 1, 'border-color': '#fff' } },
+      { selector: 'node[kind = "角色"]', style: { 'shape': 'ellipse', 'width': 110 } },
+      { selector: 'edge', style: { 'width': 1.4, 'line-color': '#b5b5b0', 'target-arrow-color': '#b5b5b0', 'target-arrow-shape': 'triangle',
+        'arrow-scale': 0.7, 'curve-style': 'bezier', 'opacity': 0.55, 'font-size': 9, 'color': '#333', 'text-background-color': '#fff', 'text-background-opacity': 0, 'label': '' } },
+      { selector: '.dim', style: { 'opacity': 0.1 } },
+      { selector: 'edge.hl', style: { 'line-color': '#222', 'target-arrow-color': '#222', 'opacity': 1, 'width': 2, 'label': 'data(label)', 'text-background-opacity': 0.9 } },
+      { selector: 'node.hl', style: { 'border-width': 3, 'border-color': '#222' } },
+      { selector: 'node.sel', style: { 'border-width': 4, 'border-color': '#000' } }
+    ]
+  });
+  cy.fit(undefined, 20);
+
+  var side = document.getElementById('side');
+  function clear() { cy.elements().removeClass('dim hl sel'); side.innerHTML = '<span class="hint">点一个节点查看它的事实。</span>'; }
+  cy.on('tap', 'node', function (ev) {
+    var n = ev.target, d = byId[n.id()];
+    cy.elements().addClass('dim').removeClass('hl sel');
+    n.removeClass('dim').addClass('sel');
+    n.connectedEdges().removeClass('dim').addClass('hl');
+    n.neighborhood('node').removeClass('dim').addClass('hl');
+    side.innerHTML = '<b>' + esc(d.label) + '</b> <span class="hint">（' + esc(d.kind) + '，' + d.facts.length + ' 条事实）</span><ul>' +
+      d.facts.map(function (f) { return '<li>' + esc(f.text) + '<br><span class="src">' + esc(f.src) + '</span></li>'; }).join('') + '</ul>';
+  });
+  cy.on('tap', function (ev) { if (ev.target === cy) { clear(); } });
+
+  var seenFact = {};
+  var legend = G.kinds.map(function (k) { return '<span><span class="chip" style="background:' + kindColor[k] + '"></span>' + esc(k) + '</span>'; });
+  G.edges.forEach(function (e) {
+    var key = byId[e.source].kind + '→' + e.label + '→' + byId[e.target].kind;
+    if (!seenFact[key]) { seenFact[key] = 1; legend.push('<span class="hint">' + esc(byId[e.source].kind) + ' —' + esc(e.label) + '→ ' + esc(byId[e.target].kind) + '</span>'); }
+  });
+  document.getElementById('legend').innerHTML = legend.join('');
+
+  // 以谁为准偏序图：载体为节点，prevails 为边，优先的指向其次的；成环的标红
+  var P = DATA.prec, box2 = document.getElementById('cy2');
+  if (!P.edges.length) {
+    box2.style.display = 'none';
+    document.getElementById('prec-empty').hidden = false;
+    window.__cy2 = null;
+  } else {
+    box2.style.height = Math.max(240, 60 + 46 * P.nodes.length) + 'px';
+    window.__cy2 = cytoscape({
+      container: box2,
+      elements: P.nodes.map(function (n) { return { group: 'nodes', data: { id: n.id, label: n.id, cyc: n.cyc ? 1 : 0 } }; })
+        .concat(P.edges.map(function (e, i) { return { group: 'edges', data: { id: 'p' + i, source: e.source, target: e.target, label: e.src, cyc: e.cyc ? 1 : 0, canon: e.canon ? 1 : 0 } }; })),
+      layout: { name: 'breadthfirst', directed: true, spacingFactor: 1.4, padding: 24 },
+      wheelSensitivity: 0.25,
+      style: [
+        { selector: 'node', style: { 'background-color': '#4e79a7', 'label': 'data(label)', 'font-size': 12, 'color': '#fff', 'text-valign': 'center', 'text-halign': 'center', 'shape': 'round-rectangle', 'width': 110, 'height': 28 } },
+        { selector: 'node[cyc = 1]', style: { 'background-color': '#c62828' } },
+        { selector: 'edge', style: { 'width': 2, 'line-color': '#9aa0a6', 'target-arrow-color': '#9aa0a6', 'target-arrow-shape': 'triangle', 'curve-style': 'bezier', 'label': 'data(label)', 'font-size': 9, 'color': '#333', 'text-background-color': '#fff', 'text-background-opacity': 0.85 } },
+        { selector: 'edge[canon = 0]', style: { 'line-style': 'dashed' } },
+        { selector: 'edge[cyc = 1]', style: { 'line-color': '#c62828', 'target-arrow-color': '#c62828', 'width': 3 } }
+      ]
+    });
+  }
+  document.getElementById('prec-list').innerHTML = P.edges.length ? '<ul class="plain">' + P.edges.map(function (e) {
+    return '<li class="' + (e.cyc ? 'bad' : '') + '">' + (e.canon ? '正本　' : '复述　') + esc(e.source) + ' 优先于 ' + esc(e.target) + '　<span class="src2">' + esc(e.src) + '</span>　' + esc(e.text) + (e.cyc ? '　<b>成环或方向相反</b>' : '') + '</li>';
+  }).join('') + '</ul>' : '';
+
+  // 底部：需要人看的，矛盾清单在最前
+  var out = '';
+  out += '<h3>矛盾清单（' + DATA.conflicts.length + '）</h3><p class="hint">' + DATA.kinds.map(function (k) { return esc(k.label) + ' ' + k.n; }).join('；') + '</p>';
+  out += DATA.conflicts.length ? DATA.conflicts.map(function (x) {
+    return '<div class="cf"><b class="bad">' + esc(x.label) + '</b>' + x.srcs.map(function (src, i) { return '<br>复述 <b>' + esc(src) + '</b>　' + esc(x.texts[i]); }).join('') +
+      x.canon.map(function (l) { return '<br><span class="canon">正本 ' + esc(l) + '</span>'; }).join('') + '<br>差在哪：' + esc(x.why) + '</div>';
+  }).join('') : '<p class="hint">没有。</p>';
+  out += '<h3>一条事实两处正本（' + DATA.dups.length + '）</h3>';
+  out += DATA.dups.length ? DATA.dups.map(function (d) {
+    return '<p><b>' + esc(d.key) + '</b> / ' + esc(d.fact) + '</p><ul class="plain">' + d.sides.map(function (s) {
+      return '<li>' + esc(s.src) + '（' + esc(s.table) + '）：' + esc(s.values.join('、')) + '<br><span class="only">只在这一处有：' + esc(s.only.join('、') || '（无）') + '</span></li>';
+    }).join('') + '</ul>';
+  }).join('') : '<p class="hint">没有。</p>';
+  out += '<h3>读不到正本（' + DATA.unreachable.length + '）</h3>';
+  out += DATA.unreachable.length ? '<ul class="plain">' + DATA.unreachable.map(function (u) {
+    return '<li>' + esc(u.role) + ' 被点名，但必读范围里没有 ' + esc(u.file) + '（' + esc(u.table) + '）</li>'; }).join('') + '</ul>' : '<p class="hint">没有。</p>';
+  out += '<h3>引用（' + DATA.refs.length + '，格子里只写「按第 N 节」，不出事实，不算读不出）</h3>';
+  out += DATA.refs.length ? '<ul class="plain">' + DATA.refs.map(function (u) {
+    return '<li>' + esc(u.src) + '　' + esc(u.key) + ' / 列「' + esc(u.column) + '」：' + esc(u.text) + '</li>'; }).join('') + '</ul>' : '<p class="hint">没有。</p>';
+  out += '<h3>读不出的格子（' + DATA.unparsed.length + '，原样报出，不猜）</h3>';
+  out += DATA.unparsed.length ? '<ul class="plain">' + DATA.unparsed.map(function (u) {
+    return '<li>' + esc(u.src) + '　' + esc(u.key) + ' / 列「' + esc(u.column) + '」：' + esc(u.text) + '</li>'; }).join('') + '</ul>' : '<p class="hint">没有。</p>';
+  out += '<h3>附注（' + DATA.notes.length + '，括号里的话与限定，不进事实）</h3>';
+  out += DATA.notes.length ? '<ul class="plain">' + DATA.notes.map(function (u) {
+    return '<li>' + esc(u.src) + '　' + esc(u.key) + ' / ' + esc(u.fact) + '：' + esc(u.text) + '</li>'; }).join('') + '</ul>' : '<p class="hint">没有。</p>';
+  document.getElementById('issues').innerHTML = out;
+
+  window.__cy = cy;
+  window.__rulefactsReady = true;
+})();
+</script>
+</body>
+</html>

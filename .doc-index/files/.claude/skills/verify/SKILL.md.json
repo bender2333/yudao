@@ -1,15 +1,15 @@
 {
 "schema":1,
 "path":".claude/skills/verify/SKILL.md",
-"hash":"3d49eb78d77bce8d",
+"hash":"970d174ed00ef8f7",
 "nodes":[
-{"hash":"3d49eb78d77bce8d","id":".claude/skills/verify/SKILL.md","kind":"file","title":".claude/skills/verify/SKILL.md"},
+{"hash":"970d174ed00ef8f7","id":".claude/skills/verify/SKILL.md","kind":"file","title":".claude/skills/verify/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/verify/SKILL.md#(开头)","kind":"section","parent":".claude/skills/verify/SKILL.md","title":"(开头)"},
 {"hash":"aea72dbbe1ceda03","id":".claude/skills/verify/SKILL.md#name: verifydescription: 验收：子工单全部关闭的父工单，逐条在当前 main 上找证据，每条给出过了、没过或说不清，写成 VERDICT: 评论；全过关闭父工单，否则补缺口子工单。薄片的父工单全部关闭时，把缝的变化交给总架构师。阶段的结束核对由总架构师按验收证据规则做。argument-hint: \"<父工单编号>\"","kind":"section","parent":".claude/skills/verify/SKILL.md","title":"name: verifydescription: 验收：子工单全部关闭的父工单，逐条在当前 main 上找证据，每条给出过了、没过或说不清，写成 VERDICT: 评论；全过关闭父工单，否则补缺口子工单。薄片的父工单全部关闭时，把缝的变化交给总架构师。阶段的结束核对由总架构师按验收证据规则做。argument-hint: \"<父工单编号>\""},
 {"hash":"b888e3c22dff9fa7","id":".claude/skills/verify/SKILL.md#验收","kind":"section","parent":".claude/skills/verify/SKILL.md","title":"验收"},
-{"hash":"88f9e4946b64475c","id":".claude/skills/verify/SKILL.md#验收 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/verify/SKILL.md#验收","title":"何时用 / 何时不用"},
+{"hash":"fc79b26261a9fd81","id":".claude/skills/verify/SKILL.md#验收 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/verify/SKILL.md#验收","title":"何时用 / 何时不用"},
 {"hash":"08fc3287a8f16f50","id":".claude/skills/verify/SKILL.md#验收 > 先读什么","kind":"section","parent":".claude/skills/verify/SKILL.md#验收","title":"先读什么"},
-{"hash":"ed9cd8a3bc6cecc5","id":".claude/skills/verify/SKILL.md#验收 > 步骤","kind":"section","parent":".claude/skills/verify/SKILL.md#验收","title":"步骤"},
+{"hash":"51aee42431743d36","id":".claude/skills/verify/SKILL.md#验收 > 步骤","kind":"section","parent":".claude/skills/verify/SKILL.md#验收","title":"步骤"},
 {"hash":"a3a0634fcfffb4d8","id":".claude/skills/verify/SKILL.md#验收 > 常见借口","kind":"section","parent":".claude/skills/verify/SKILL.md#验收","title":"常见借口"},
 {"hash":"bb58ab552da4a783","id":".claude/skills/verify/SKILL.md#验收 > 常见借口 > 表1 > 「子工单都关了，就是过了」","kind":"row","parent":".claude/skills/verify/SKILL.md#验收 > 常见借口","title":"「子工单都关了，就是过了」"},
 {"hash":"1cd9fd4263f0f0f2","id":".claude/skills/verify/SKILL.md#验收 > 常见借口 > 表1 > 「CI 是绿的」","kind":"row","parent":".claude/skills/verify/SKILL.md#验收 > 常见借口","title":"「CI 是绿的」"},
@@ -21,8 +21,9 @@
 "edges":[
 {"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 1. 记录身份与结论","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"a99ad5bdf3884ed5","src":".claude/skills/verify/SKILL.md#验收"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/verify/SKILL.md#验收"},
-{"dst":".claude/skills/seam-diff/SKILL.md","kind":"link","raws":["../seam-diff/SKILL.md"],"seen":"78407d61dbbaffc5","src":".claude/skills/verify/SKILL.md#验收 > 步骤"},
-{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"2b97cc0e03cbbff6","src":".claude/skills/verify/SKILL.md#验收 > 步骤"},
-{"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"84b267b88b645e51","src":".claude/skills/verify/SKILL.md#验收 > 步骤"}
+{"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 6. 阶段的结束与进入","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"a94d0f3083a85c09","src":".claude/skills/verify/SKILL.md#验收 > 何时用 / 何时不用"},
+{"dst":".claude/skills/seam-diff/SKILL.md","kind":"link","raws":["../seam-diff/SKILL.md"],"seen":"bd006cf1855865c9","src":".claude/skills/verify/SKILL.md#验收 > 步骤"},
+{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"0fccb8603e114307","src":".claude/skills/verify/SKILL.md#验收 > 步骤"},
+{"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"8e944ff99a32bbae","src":".claude/skills/verify/SKILL.md#验收 > 步骤"}
 ]
 }

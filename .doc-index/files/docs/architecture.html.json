@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":"docs/architecture.html",
-"hash":"87d89411eab59fb8",
+"hash":"2f559a3683328235",
 "nodes":[
-{"hash":"87d89411eab59fb8","id":"docs/architecture.html","kind":"file","title":"docs/architecture.html"},
+{"hash":"2f559a3683328235","id":"docs/architecture.html","kind":"file","title":"docs/architecture.html"},
 {"anchor":"s1","hash":"3c9310ef49956c5b","id":"docs/architecture.html#s1","kind":"section","parent":"docs/architecture.html","title":"全局总图与方程"},
-{"anchor":"s2","hash":"a40f436c1c34521a","id":"docs/architecture.html#s2","kind":"section","parent":"docs/architecture.html","title":"什么能动"},
-{"anchor":"s3","hash":"0e9705e0dd37530b","id":"docs/architecture.html#s3","kind":"section","parent":"docs/architecture.html","title":"一轮工作的经过"},
+{"anchor":"s2","hash":"501cedc1662adc79","id":"docs/architecture.html#s2","kind":"section","parent":"docs/architecture.html","title":"什么能动"},
+{"anchor":"s3","hash":"32ac07d30ac47cac","id":"docs/architecture.html#s3","kind":"section","parent":"docs/architecture.html","title":"一轮工作的经过"},
 {"anchor":"s4","hash":"cd45a09d24e819e9","id":"docs/architecture.html#s4","kind":"section","parent":"docs/architecture.html","title":"要守的缝"},
 {"hash":"844cc1a05bd4819f","id":"docs/architecture.html#s4 > 写入口","kind":"seam","parent":"docs/architecture.html#s4","title":"写入口"},
 {"hash":"d90555b72e6ef802","id":"docs/architecture.html#s4 > 路由","kind":"seam","parent":"docs/architecture.html#s4","title":"路由"},
@@ -26,8 +26,8 @@
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"href","raws":["#s1"],"seen":"3c9310ef49956c5b","src":"docs/architecture.html"},
-{"dst":"docs/architecture.html#s2","kind":"href","raws":["#s2"],"seen":"a40f436c1c34521a","src":"docs/architecture.html"},
-{"dst":"docs/architecture.html#s3","kind":"href","raws":["#s3"],"seen":"0e9705e0dd37530b","src":"docs/architecture.html"},
+{"dst":"docs/architecture.html#s2","kind":"href","raws":["#s2"],"seen":"501cedc1662adc79","src":"docs/architecture.html"},
+{"dst":"docs/architecture.html#s3","kind":"href","raws":["#s3"],"seen":"32ac07d30ac47cac","src":"docs/architecture.html"},
 {"dst":"docs/architecture.html#s4","kind":"href","raws":["#s4"],"seen":"cd45a09d24e819e9","src":"docs/architecture.html"},
 {"dst":"docs/architecture.html#s5","kind":"href","raws":["#s5"],"seen":"cb9066af90b3b5a9","src":"docs/architecture.html"},
 {"dst":"docs/architecture.html#s6","kind":"href","raws":["#s6"],"seen":"386c6ac472c7195e","src":"docs/architecture.html"},

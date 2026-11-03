@@ -1,0 +1,12 @@
+{
+"schema":1,
+"path":"docs/adr/0046-kernel-trusted-by-checks-not-size.md",
+"hash":"6eaa56a8e442ec8a",
+"nodes":[
+{"hash":"6eaa56a8e442ec8a","id":"docs/adr/0046-kernel-trusted-by-checks-not-size.md","kind":"file","title":"docs/adr/0046-kernel-trusted-by-checks-not-size.md"},
+{"hash":"6eaa56a8e442ec8a","id":"docs/adr/0046-kernel-trusted-by-checks-not-size.md#可信内核靠检查可信，不靠大小可信","kind":"section","parent":"docs/adr/0046-kernel-trusted-by-checks-not-size.md","title":"可信内核靠检查可信，不靠大小可信"}
+],
+"edges":[
+{"dst":"docs/decision.md#决策记录 > 2026-11-03 - 内核的更高要求靠机器检查，取消行数上限","kind":"link","raws":["../decision.md"],"seen":"89ced428778e218c","src":"docs/adr/0046-kernel-trusted-by-checks-not-size.md#可信内核靠检查可信，不靠大小可信"}
+]
+}

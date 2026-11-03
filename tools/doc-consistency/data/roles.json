@@ -1,13 +1,17 @@
 {
-  "说明": "角色名取自 docs/agents/workflow.md 第 2 节的角色表（表头「角色」），这里只补 workflow.md 得不出的东西：别名（判断一句话是对哪个角色说的）、角色的入口规则文件、入口技能。入口技能写技能目录名。workflow.md 里有而这里没有的角色会报错。",
+  "说明": "角色名取自 docs/agents/workflow.md 第 2 节的角色表（表头「角色」），这里只补 workflow.md 得不出的东西：别名（判断一句话是对哪个角色说的）、角色的入口规则文件、入口技能。入口技能写技能目录名。groups 是合称：规则事实线读格子时展开成各个角色，成员必须是角色表里的角色。workflow.md 里有而这里没有的角色会报错。",
   "workflow": "docs/agents/workflow.md",
+  "groups": {
+    "架构师": ["总架构师", "子架构师", "架构师循环"],
+    "任何角色": ["用户", "总架构师", "子架构师", "架构师循环", "solo 执行者", "审查者"]
+  },
   "roles": {
     "用户": {"agent": false},
     "总架构师": {"aliases": ["总架构师"], "rule_files": ["CLAUDE.md"], "skills": []},
     "子架构师": {"aliases": ["子架构师"], "rule_files": ["CLAUDE.md"], "skills": ["next"]},
     "架构师循环": {"aliases": ["架构师循环"], "rule_files": ["CLAUDE.md"], "skills": ["next"]},
-    "solo 执行者": {"aliases": ["solo 执行者", "solo", "执行者"], "rule_files": ["AGENTS.md"], "skills": ["solo-worker"]},
-    "审查者": {"aliases": ["审查者", "审查"], "rule_files": ["AGENTS.md"], "skills": ["reviewer"]},
-    "agent 试用者": {"aliases": ["试用者", "agent 试用"], "rule_files": [], "skills": ["trial"]}
+    "solo 执行者": {"aliases": ["solo 执行者", "solo", "执行者", "工人", "实施者"], "rule_files": ["AGENTS.md"], "skills": ["solo-worker"]},
+    "审查者": {"aliases": ["审查者", "审查", "审查子代理"], "rule_files": ["AGENTS.md"], "skills": ["reviewer"]},
+    "agent 试用者": {"aliases": ["试用者", "agent 试用"], "rule_files": ["CLAUDE.md"], "skills": ["trial"]}
   }
 }
