@@ -122,13 +122,22 @@ def response_reserve(context_window: int, output_limit: int | None) -> int:
 def visible_history(
     records: list[dict[str, Any]],
     checkpoint: CompactionCheckpoint | None = None,
+    *,
+    failure_list: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    """Build model history; originals and checkpoints remain unchanged."""
+    """Build model history; originals and checkpoints remain unchanged.
+
+    压缩生效以后，检查点的摘要放在历史开头，失败清单接在它后面（设计说明「压缩以后保留失败的尝试」）。
+    失败清单由主机从事件生成（harness/failure_list.py），每次压缩重新生成；没有压缩过的会话没有摘要，
+    也就没有这一段，历史与改动前逐字节相同。
+    """
     texts, boundaries = _validate_records(records)
     index, offset = _cursor(records, texts, boundaries, checkpoint)
     if checkpoint is not None and (offset or not checkpoint.boundary):
         raise CompactionError("Compaction must finish the current message/tool round before model work resumes")
     result = [] if checkpoint is None else [_summary_item(checkpoint)]
+    if checkpoint is not None and failure_list is not None:
+        result.append(deepcopy(failure_list))
     result.extend(deepcopy(record["item"]) for record in records[index:])
     return result
 

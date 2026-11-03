@@ -282,3 +282,43 @@ def test_a_lower_work_limit_moves_the_compaction_point(work_limit, compacts):
                             work_limit_tokens=work_limit) is not None) is compacts
 
 
+# 压缩以后的失败清单（工单 #1405）：摘要放在历史开头，失败清单接在它后面；没有压缩过的会话没有这一段。
+# 这一段由调用方从事件生成（harness/failure_list.py），这里核对它在历史里的位置与有无。
+FAILURE_SECTION = {"role": "user", "content": '[failure_list]\n{"failures": []}'}
+
+
+def test_the_failure_list_comes_right_after_the_summary_and_never_without_a_checkpoint():
+    # 守 R3（压缩保留失败的尝试）：失败清单接在摘要之后、近期回合之前；没有压缩过的会话不生成这一段，
+    # 历史与改动前逐字节相同
+    records = _history()
+    _, checkpoint = _complete_until_work_fits(records)
+    shown = visible_history(records, checkpoint, failure_list=FAILURE_SECTION)
+    assert shown[0]["content"].startswith("[department_memory]\n")
+    assert shown[1] == FAILURE_SECTION
+    assert shown[2:] == visible_history(records, checkpoint)[1:]
+    # 没有失败时（调用方交来 None）历史与改动前相同
+    assert visible_history(records, checkpoint) == visible_history(records, checkpoint, failure_list=None)
+    # 没有压缩过的会话：历史就是各条原文，没有摘要也没有这一段
+    plain = visible_history(records)
+    assert plain == [record["item"] for record in records]
+    assert all(item != FAILURE_SECTION for item in plain)
+
+
+def test_each_compaction_places_its_own_failure_list_after_its_own_summary():
+    # 守 R3：每一次压缩都重新生成清单，放在这一次的摘要之后（连续压缩两次，历史开头是新的摘要与新清单）
+    records = _history()
+    _, first = _complete_until_work_fits(records)
+    second = replace(first, summary="Second memory: keep the original requirements.")
+    first_section = {"role": "user", "content": '[failure_list]\n{"failures": [{"event_id": "event-1"}]}'}
+    second_section = {"role": "user", "content": '[failure_list]\n{"failures": [{"event_id": "event-1"}, '
+                                                 '{"event_id": "event-9"}]}'}
+    shown_first = visible_history(records, first, failure_list=first_section)
+    shown_second = visible_history(records, second, failure_list=second_section)
+    assert json.loads(shown_first[0]["content"].split("\n", 1)[1])["summary"] == first.summary
+    assert json.loads(shown_second[0]["content"].split("\n", 1)[1])["summary"] == second.summary
+    assert shown_first[1] == first_section and shown_second[1] == second_section
+    # 第一次分界之前的失败在新的清单里仍按原文出现：清单由调用方从同一份事件的开始重新生成
+    assert json.loads(shown_second[1]["content"].split("\n", 1)[1])["failures"][0] == {"event_id": "event-1"}
+
+
+
