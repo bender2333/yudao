@@ -51,7 +51,8 @@ from .providers.call import ModelResponse
 from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS, decision_call_target,
                                  event_call_target)
 from .recording import StepRecorder
-from .tools import in_force, proposal_kind, tool_action, tool_cancellable, tool_kind, tool_verification
+from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_cancellable, tool_kind,
+                    tool_verification, writes_check_materials)
 from .validation import PRD_REVISION_FIELDS, AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 
@@ -223,7 +224,8 @@ class StepDriver:
         self._artifacts = artifacts
         self._assembly = assembly
         # 记录器读到的是步骤驱动当前采用的激活范围（工单 #840）：询问带回新合同以后自动跟着变
-        self._recorder = StepRecorder(writes, artifacts, _LiveScope(self), max_attempts=limits.max_provider_attempts)
+        self._recorder = StepRecorder(writes, artifacts, _LiveScope(self), max_attempts=limits.max_provider_attempts,
+                                      definitions=self._definitions)
         self._adapter = adapter
         self._facade = facade
         self._environment = environment
@@ -617,8 +619,11 @@ class StepDriver:
                         if not isinstance(text, str) or not text.strip():
                             ok, output, error = False, None, "answer must be a non-empty string"
                         elif any(args.get(field) is not None for field in PRD_REVISION_FIELDS):
-                            if request.department != "product":
-                                ok, output, error = False, None, "only product can revise product_spec"
+                            # 回答里带 PRD 修订：这个角色能不能交这一种成果，按它的提案合同判断（工单 #1390），
+                            # 交不了时照旧拒绝；提案带交它的角色
+                            if "product_spec" not in proposal_kinds(request.department, definitions=self._definitions):
+                                ok, output, error = False, None, \
+                                    f"{request.department} cannot submit product_spec"
                             else:
                                 snapshot = self._writes.read(self._stream)
                                 projection = snapshot.projection
@@ -626,13 +631,13 @@ class StepDriver:
                                     **{k: v for k, v in args.items()
                                        if k not in ("answer", "text", "facts", "explanation") and v is not None},
                                     "kind": "product_spec",
-                                    "issuer": "product",
+                                    "issuer": request.department,
                                 }
                                 facts = self._environment.query(FactsQuery(tree=True)).tree
                                 events = snapshot.events()
                                 decision = evaluate_proposal(
                                     AdjudicationView(minimal=snapshot.minimal(), state=projection),
-                                    department="product",
+                                    department=request.department,
                                     proposal=spec_proposal,
                                     facts=facts,
                                     tightening=self._tightening,
@@ -828,7 +833,8 @@ class StepDriver:
                                    qa_tests_saved=qa_tests_saved)
 
     def _save_qa_tests_if_changed(self, request: ModelRequest | _RecoveredCall) -> dict[str, Any] | None:
-        if request.department != "quality":
+        # 检查材料只由写入范围是检查材料的角色保存（设计说明第 4.2 节第 1 条，工单 #1390）
+        if not writes_check_materials(request.department, definitions=self._definitions):
             return None
         tree = self._environment.capture_qa_tests()
         digest = qa_tests_digest(tree)

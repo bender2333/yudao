@@ -17,6 +17,7 @@ from typing import Annotated, Any, Literal, get_args
 
 from pydantic import (BaseModel, ConfigDict, Field, StringConstraints, TypeAdapter, ValidationError,
                       field_validator, model_validator)
+from ..path_rules import CHECK_MATERIALS_DIR
 
 DEFINITIONS_DIR = Path(__file__).parent
 
@@ -251,11 +252,11 @@ class VerificationDeclaration(_Definition):
 
 
 # 旧定义（organization.json 没有写核验声明）的核验关系与写入范围：与今天写死的三部门相同
-# （app/project_queries.py 的 VERIFIER_OF 与 path_rules.py 的 QA_TESTS_DIR），只为旧定义保留
+# （app/project_queries.py 的 VERIFIER_OF，目录名与 path_rules.py 的 CHECK_MATERIALS_DIR 一处来源），只为旧定义保留
 LEGACY_VERIFICATION = VerificationDeclaration(
     verifiers=(VerifierRole(role="quality",
                             verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),),
-    write_scopes={"quality": WriteScope(scope="check_materials", paths=(".yudao-qa-tests",))},
+    write_scopes={"quality": WriteScope(scope="check_materials", paths=(CHECK_MATERIALS_DIR,))},
 )
 
 
