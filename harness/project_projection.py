@@ -244,6 +244,12 @@ class WorkItem:
     # 已收下的交付（工单 #1239）：事项停止时这个 run 里已经收下的那一版交付的版本与收下的时间（{"version", "accepted_at"}）；
     # 没有已收下的交付时为空。用户自己取消也照样写：交付仍然在
     kept_delivery: dict[str, Any] | None = None
+    # 停止的时刻（工单 #1373）：事项结束的那条事件（run_failed 或 run_paused）的提交时间；只有停止的事项有
+    stopped_at: str | None = None
+    # 上游失败的细节（工单 #1373）：停止原因是模型服务时，最后一次失败的调用尝试的部门、请求的模型、
+    # 服务返回的状态码与是否可重试（{"department", "requested_model", "status_code", "retryable"}）；
+    # 不是模型服务引起的停止、或者没有失败的调用尝试时为空
+    stop_detail: dict[str, Any] | None = None
     human_action: str | None = None
     cycle_count: int = 0
     rework: list[dict[str, Any]] = field(default_factory=list)

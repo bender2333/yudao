@@ -246,6 +246,21 @@ class KeptDelivery(Contract):
     accepted_at: str
 
 
+class StopDetail(Contract):
+    """上游失败的细节（工单 #1373）：事项因为模型服务停下时，写清是哪个部门、请求的哪个模型、
+    服务返回的什么状态码，以及这次失败可不可重试。
+
+    这几项在 `model_attempt_failed` 事件的载荷里本来就有（请求的模型、状态码、是否可重试）
+    与事件上的部门，只是此前没有谁把它们带给页面：卡片上只有一句「模型服务失败」的原文，
+    用户分辨不出是上游挂了还是自己配错了。
+    """
+
+    department: str | None = None
+    requested_model: str | None = None
+    status_code: int | None = None
+    retryable: bool | None = None
+
+
 class WorkItemCard(Contract):
     work_item_id: str
     kind: str
@@ -268,6 +283,12 @@ class WorkItemCard(Contract):
     # 已收下的交付（工单 #1239）：事项停止时这个 run 里已经收下的那一版交付与收下的时间；
     # 没有已收下的交付时为空。用户自己取消时也写，交付仍然在
     kept_delivery: KeptDelivery | None = None
+    # 停止的时刻（工单 #1373）：事项结束的那条事件的提交时间；只有停止的事项有。
+    # 同一项目里几张同名的失败卡片靠它与事项标识分辨（哪张、什么时候停的）
+    stopped_at: str | None = None
+    # 上游失败的细节（工单 #1373）：停止原因是模型服务时写部门、请求的模型、状态码与是否可重试；
+    # 其余停止原因、或者没有失败的调用尝试时为空
+    stop_detail: StopDetail | None = None
     human_action: str | None
     pending_question: str | None
     adoption_id: str | None
@@ -315,6 +336,8 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
             round=item.cycle_count,
             stop_reason=item.stop_reason, stop_note=item.stop_note,
             kept_delivery=None if item.kept_delivery is None else KeptDelivery(**item.kept_delivery),
+            stopped_at=item.stopped_at,
+            stop_detail=None if item.stop_detail is None else StopDetail(**item.stop_detail),
             human_action=item.human_action,
             pending_question=item.pending_question, adoption_id=item.adoption_id,
             start_error=item.start_error,

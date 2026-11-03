@@ -1158,6 +1158,102 @@ def test_a_cancelled_item_still_reports_the_delivery_it_kept(data_dir):
     assert card.kept_delivery.version == 1
 
 
+# 上游失败的细节（工单 #1373）：停止原因是模型服务时，最后一次失败的调用尝试里本来就有
+# 发起它的部门、请求的模型、服务返回的状态码与是否可重试；此前卡片只带一句原文
+# 「Model provider returned HTTP 503」，用户分辨不出是上游挂了还是自己配错了。
+# 同一项目里几张同名的失败卡片也靠停止的时刻与事项标识分辨。
+BRANCH_STATUS = 400
+STOP_STATUS = 503
+
+
+def _stop_detail_system(data_dir):
+    # 与 _stop_note_system 同一段脚本，两处失败各带一个状态码：询问分支的失败是 400，
+    # 让事项停下的那次是 503。细节取后者，不取分支那一条
+    system = _system(data_dir, {
+        "product": [product_spec()],
+        "engineering": [
+            ask_turn(recipient="product", question="输出要不要改成大写？", background="实现中需要明确",
+                     expected="确认输出形式", call_id="ask-stop-detail"),
+            ProviderError(STOP_FAILURE, diagnostics={"status_code": STOP_STATUS}),
+        ],
+        "quality": [explore_turn(), judgement_turn(), review_turn("release", "ok")],
+        "product:ask": [ProviderError(BRANCH_FAILURE, diagnostics={"status_code": BRANCH_STATUS})],
+    })
+    project_id = system.projects.register("停止细节", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "验证停止细节")
+    system.run_until_stop(run_id)
+    return system, project_id, work_item_id, run_id
+
+
+def test_a_stopped_item_names_the_department_model_status_code_and_retryability(data_dir):
+    # 验收一与验收三（工单 #1373）：卡片写清哪个部门、请求的哪个模型、服务返回的什么状态码、
+    # 这次失败可不可重试；停止说明照旧是那条错误的原文，不改写
+    system, project_id, work_item_id, run_id = _stop_detail_system(data_dir)
+    failed = [event for event in system.store.list_events(run_id)
+              if event.type == EventType.MODEL_ATTEMPT_FAILED]
+    assert failed, "这段脚本应当留下失败的调用尝试"
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "stopped"
+    assert card.stop_note == STOP_FAILURE
+    detail = card.stop_detail
+    assert detail is not None
+    assert detail.department == "engineering"
+    assert detail.requested_model == failed[-1].payload["requested_model"]
+    assert detail.requested_model
+    assert detail.status_code == STOP_STATUS
+    # 失败不重试（脚本给的 ProviderError 默认不可重试）：页面要写得出这一件事
+    assert detail.retryable is False
+
+
+def test_the_stop_detail_is_the_fatal_attempt_not_the_asking_branch(data_dir):
+    # 询问分支的失败尝试在这条 run 流里也有（400），但让事项停下的是后面那一次（503）：
+    # 细节取结束事件之前最后一次失败的尝试
+    system, project_id, work_item_id, run_id = _stop_detail_system(data_dir)
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.stop_detail is not None
+    assert card.stop_detail.status_code == STOP_STATUS
+    assert card.stop_detail.status_code != BRANCH_STATUS
+
+
+def test_a_stopped_item_carries_the_moment_it_stopped(data_dir):
+    # 验收三（工单 #1373）：什么时候停的取事项结束的那条事件的提交时间
+    system, project_id, work_item_id, run_id = _stop_detail_system(data_dir)
+    ending = [event for event in system.store.list_events(run_id) if event.type == EventType.RUN_FAILED][-1]
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.stopped_at == ending.created_at
+
+
+def test_an_item_that_did_not_stop_has_no_stop_moment_or_detail(data_dir):
+    # 放行完成的事项不写停止的时刻，也不写上游失败的细节：它走的是正常的进度
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("没有停止细节", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.run_until_stop(run_id)
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "released_unsettled"
+    assert card.stopped_at is None
+    assert card.stop_detail is None
+
+
+def test_a_cancelled_item_has_a_stop_moment_but_no_model_detail(data_dir):
+    # 用户自己让事项停下：什么时候停的照旧写得出，但这不是上游失败，没有模型服务的细节
+    system = _system(data_dir, happy_script())
+    project_id = system.projects.register("用户取消", GOAL)
+    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
+    system.activate_once(run_id)
+    system.cancel(run_id)
+    ending = [event for event in system.store.list_events(run_id) if event.type == EventType.RUN_FAILED][-1]
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
+    assert card.status == "stopped"
+    assert card.stopped_at == ending.created_at
+    assert card.stop_detail is None
+
+
 # ---------------------------------------------------------------------------
 # 工单 #1218：replay.check 的参数组合不对时按输入问题回 422，说明只能给 run_id 或 project_id
 # 其中一个。查询只有一个参数组合是对的（图里两种目标只有一种能问），所以这里核对的是

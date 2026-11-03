@@ -449,6 +449,51 @@ export function stopNoteView(note: string | null | undefined, kept?: KeptDeliver
     : { kind: "folded", text, ...extra };
 }
 
+// 上游失败的细节（工单 #1373）：停止原因是模型服务时，事件里本来就有发起这次请求的部门、
+// 请求的模型、服务返回的状态码与这次失败可不可重试，此前页面只写停下的那句原文
+// 「Model provider returned HTTP 503」，用户分辨不出是上游挂了还是自己配错了。
+// 四项都有时写成一句「工程部门请求的模型 wb/cn:deepseek-v4.1-flash，服务返回 HTTP 503，不可重试」；
+// 缺哪一项就不写哪一项，四项都没有时没有这一行（返回 null）。
+export interface StopDetailView {
+  department?: string | null;
+  requested_model?: string | null;
+  status_code?: number | null;
+  retryable?: boolean | null;
+}
+
+export function stopDetailText(detail: StopDetailView | null | undefined): string | null {
+  if (!detail) {
+    return null;
+  }
+  const parts: string[] = [];
+  const department = departmentName(detail.department ?? null);
+  const model = (detail.requested_model ?? "").trim();
+  if (department !== "" && model !== "") {
+    parts.push(`${department}部门请求的模型 ${model}`);
+  } else if (department !== "") {
+    parts.push(`${department}部门`);
+  } else if (model !== "") {
+    parts.push(`请求的模型 ${model}`);
+  }
+  const status = detail.status_code;
+  if (typeof status === "number" && Number.isFinite(status)) {
+    parts.push(`服务返回 HTTP ${status}`);
+  }
+  if (detail.retryable === true) {
+    parts.push("可重试");
+  } else if (detail.retryable === false) {
+    parts.push("不可重试");
+  }
+  return parts.length === 0 ? null : parts.join("，");
+}
+
+// 停止的卡片上认事项的那一行（工单 #1373）：同一项目里几张同名的失败卡片要能分辨——
+// 哪一张（事项标识，与「当前事项」那一处的写法一致）与什么时候停的（事项结束的那条事件的时间）。
+// 时间缺失时照页面上其余时间的写法写「未知时间」。
+export function stoppedCardLine(item: { work_item_id: string; stopped_at?: string | null }): string {
+  return `事项标识 ${item.work_item_id} · 停止于 ${formatTime(item.stopped_at)}`;
+}
+
 export function formatTime(value: string | null | undefined): string {
   if (!value) {
     return "未知时间";
