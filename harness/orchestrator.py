@@ -1139,7 +1139,9 @@ class Orchestrator:
         if table is None:
             table = mcp_session.McpSessions(
                 self._mcp_document(run_id), credentials=self.facade.credential_chain(),
-                stderr_dir=self.data_dir)
+                stderr_dir=self.data_dir,
+                # 生命周期事件写在 run 流里（工单 #1176）：会话表在启动、关闭与失败时经这个写入方写一条
+                events=lambda event_type, payload: self._mcp_server_event(run_id, event_type, payload))
             self._mcp_sessions[run_id] = table
         return table
 
@@ -1149,6 +1151,21 @@ class Orchestrator:
             if event.type == EventType.RUN_CREATED:
                 return (event.payload or {}).get("mcp_servers")
         return None
+
+    def _mcp_server_event(self, run_id: str, event_type: str, payload: dict[str, Any]) -> None:
+        # MCP 服务器的生命周期事件（网络与 MCP 设计说明第 7.2 节，工单 #1176）：会话表在启动、关闭与
+        # 启动失败时经这里把一条应用事件写到这个 run 的流。写入不改变运行的状态（状态前后都是当时的
+        # 状态），提出者是系统；写不进去不打断会话的建立与关闭，原因记下来供运维查看（与清理错误同一做法）
+        def decide(transaction: Transaction) -> None:
+            status = transaction.projection.status
+            transaction.append(NewEvent(
+                event_type, state_before=status, state_after=status, actor="system",
+                department=transaction.projection.active_department, payload=payload))
+
+        try:
+            self._transact(run_stream(run_id), decide)
+        except Exception as exc:
+            self._close_errors.setdefault(run_id, []).append(exc)
 
     async def _close_mcp_sessions(self, run_id: str) -> None:
         # run 结束（或暂停、停止）以后关闭它的全部 MCP 会话：stdio 先关标准输入，SDK 等待以后结束
