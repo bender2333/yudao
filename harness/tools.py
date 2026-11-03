@@ -59,8 +59,7 @@ def browser_tool_definitions(response: Mapping[str, Any]) -> dict[str, dict[str,
 
 
 def in_force(definitions: Definitions | None) -> Definitions:
-    # 这次判断所用的定义：事项所用的那一份由调用方交进来，没有交时是当前加载的那一份
-    # （#861 的路由定义接上以后，由路由把那一份交进来）
+    # 这次判断所用的定义：事项所用的那一份由调用方交进来，没有交时是当前加载的那一份（#861、#1165）
     return DEFINITIONS if definitions is None else definitions
 
 
@@ -88,6 +87,11 @@ def proposal_kinds_of(*, definitions: Definitions | None = None) -> frozenset[st
     return frozenset(tool.proposal for tool in in_force(definitions).tools.values() if tool.proposal is not None)
 
 
+def writes_check_materials(department: str, *, definitions: Definitions | None = None) -> bool:
+    # 写入范围是检查材料的角色（设计说明第 4.2 节第 1 条、工单 #1390）：它的写入只进检查材料与检查副本
+    return in_force(definitions).write_scope(department).scope == "check_materials"
+
+
 def tool_kind(name: str, *, definitions: Definitions | None = None) -> str | None:
     # host：主机工具；environment：环境工具；没有定义的工具为 None
     tool = in_force(definitions).tools.get(name)
@@ -95,8 +99,7 @@ def tool_kind(name: str, *, definitions: Definitions | None = None) -> str | Non
 
 
 def tool_action(name: str, *, definitions: Definitions | None = None) -> str | None:
-    # 环境工具的动作类别（read、write、check、command，以及新增的 fetch、mcp、trial、browser）；
-    # 主机工具与没有定义的工具为 None
+    # 环境工具的动作类别（read、write、check、command 与新增的四类）；主机工具与没有定义的工具为 None
     tool = in_force(definitions).tools.get(name)
     return None if tool is None else tool.action
 

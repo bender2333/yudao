@@ -161,9 +161,10 @@ def test_the_new_work_checks_hold_when_there_is_no_effective_contract(tmp_path):
 
 
 def test_quality_write_tools_only_target_the_test_materials(tmp_path):
-    # 验收第 1、2 条（工单 #645，本地工具设计说明第 3 节「质检的文件工具」）：质检有写入与区间编辑的工具，
-    # 写测试材料目录被允许；写检查工作区里的其他文件被许可拒绝并说明原因——那是放行时核对的树。
-    # 这条规则只针对质检：工程照旧写交付文件
+    # 验收第 1、2 条（工单 #645、#1390，本地工具设计说明第 3 节「质检的文件工具」）：写入范围是检查材料的角色
+    # 有写入与区间编辑的工具，写检查材料目录被允许；写检查工作区里的其他文件被许可拒绝并说明原因——那是放行
+    # 时核对的树。原因里写明目录，不写部门名（换一个名字的核验角色得到同一句）。这条规则只针对核验角色：
+    # 工程照旧写交付文件
     system, projection = _engineering(tmp_path)
     test_file = f"{QA_TESTS_DIR}/test_echo.py"
     assert _permission(system, projection, "write_file", {"path": test_file, "content": "print('ok')\n"},
@@ -177,14 +178,16 @@ def test_quality_write_tools_only_target_the_test_materials(tmp_path):
                                        "new_text": "import os"})):
         refused = _permission(system, projection, name, args, department="quality")
         assert not refused.allowed and not refused.stopped, name
-        assert QA_TESTS_DIR in refused.reason and "quality" in refused.reason, refused.reason
+        assert QA_TESTS_DIR in refused.reason, refused.reason
+        for department in ("product", "engineering", "quality"):
+            assert department not in refused.reason, refused.reason
 
     # 测试材料目录里的路径逃逸同样被拒绝：原因来自公开路径规则
     escaped = _permission(system, projection, "write_file",
                           {"path": f"{QA_TESTS_DIR}/../src/echo.py", "content": "x"}, department="quality")
     assert not escaped.allowed and not escaped.stopped
 
-    # 工程照旧可以写交付文件：限定只加在质检这一支
+    # 工程照旧可以写交付文件：限定只加在写入范围是检查材料的角色这一支
     assert _permission(system, projection, "write_file",
                        {"path": "src/echo.py", "content": "print('delivery')\n"}).allowed
 
