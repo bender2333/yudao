@@ -6,6 +6,11 @@ delivery: it only reads a directory containing a ``src/`` folder.
 
 Completion is the mean over the 7 requirements of the per-requirement pass
 ratio. Correctness is the pass ratio among the checks that were attempted.
+
+One further check stands on its own: the data fidelity check compares the
+station and line names in the delivered data file with the ones in the
+scenario material. It is reported separately (``data_fidelity``) so that
+completion and correctness stay comparable across scorer versions.
 """
 
 import argparse
@@ -16,9 +21,13 @@ import subprocess
 import sys
 
 SCENARIO = "scenario-3"
-MATERIAL_VERSION = "scenario-3@2"
-SCORER_VERSION = "scorer-3@2"
+MATERIAL_VERSION = "scenario-3@3"
+SCORER_VERSION = "scorer-3@3"
 REQUIREMENTS = ["R1", "R2", "R3", "R4", "R5", "R6", "R7"]
+
+# 独立的数据保真检查：24 条检查都从查询结果看站名，站名整个换掉以后它们只是
+# 间接暴露；这一条直接比交付与材料里的站名与线名（工单 #1369）。
+DATA_FIDELITY_CHECK = "data_1_1"
 
 FILE_CHECKS = {
     "file_11_1": {
@@ -175,6 +184,76 @@ def _tail(text):
     return "\n".join(text.strip().splitlines()[-3:]) if text.strip() else "no output"
 
 
+def material_data_path(checks_dir):
+    """材料里的数据文件：检查目录旁边的 files/，没有就取评分器所在仓库里的那一份。
+
+    评分时隐藏检查被复制到评分目录，那份副本旁边没有 files/；两种位置都找一遍，
+    找不到时返回 None（这条检查记「没有做」，不猜路径）。
+    """
+    candidates = (
+        os.path.join(os.path.dirname(checks_dir), "files", "subway_data.json"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "scenarios",
+                     SCENARIO, "files", "subway_data.json"),
+    )
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+    return None
+
+
+def _names_and_lines(path):
+    """数据文件里的站名集合与线名集合。"""
+    with open(path, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    stations = set()
+    lines = set()
+    for item in payload.get("stations") or []:
+        name = str(item.get("name", "")).strip()
+        if name:
+            stations.add(name)
+        for line in item.get("lines") or []:
+            text = str(line).strip()
+            if text:
+                lines.add(text)
+    return stations, lines
+
+
+def check_data_fidelity(delivery_dir, checks_dir):
+    """交付的数据文件是否照材料里的站名与线名原样使用。
+
+    返回 (status, detail)：status 是 'pass'、'wrong' 或 'not_done'。
+    """
+    material_path = material_data_path(checks_dir)
+    if material_path is None:
+        return "not_done", "the scenario material data file is not available"
+    delivered_path = os.path.join(delivery_dir, "src", "subway_data.json")
+    if not os.path.isfile(delivered_path):
+        return "not_done", "the delivery has no src/subway_data.json"
+    material_stations, material_lines = _names_and_lines(material_path)
+    delivered_stations, delivered_lines = _names_and_lines(delivered_path)
+    if not delivered_stations:
+        return "not_done", "the delivered data file holds no station"
+
+    foreign_stations = sorted(delivered_stations - material_stations)
+    foreign_lines = sorted(delivered_lines - material_lines)
+    if foreign_stations or foreign_lines:
+        parts = []
+        if foreign_stations:
+            parts.append("%d station names are not in the material, for example %s"
+                         % (len(foreign_stations), ", ".join(foreign_stations[:5])))
+        if foreign_lines:
+            parts.append("%d line names are not in the material, for example %s"
+                         % (len(foreign_lines), ", ".join(foreign_lines[:5])))
+        parts.append("the delivery has %d stations, the material has %d"
+                     % (len(delivered_stations), len(material_stations)))
+        return "wrong", "; ".join(parts)
+    kept = len(delivered_stations & material_stations)
+    return "pass", ("all %d station names and %d line names come from the material; "
+                    "%d of the material's %d stations are in the delivery"
+                    % (len(delivered_stations), len(delivered_lines),
+                       kept, len(material_stations)))
+
+
 def score(delivery_dir, checks_dir, python):
     checks_dir = os.path.abspath(checks_dir)
     work_root = os.path.join(checks_dir, "_work")
@@ -206,7 +285,12 @@ def score(delivery_dir, checks_dir, python):
                         "status": status, "detail": detail})
 
     shutil.rmtree(work_root, ignore_errors=True)
-    return _aggregate(records, context["requirement_table"])
+    result = _aggregate(records, context["requirement_table"])
+    # 独立的一条检查，单独报告：完成度与正确性仍按 24 条检查算，两个指标因此
+    # 与 scorer-3@2 的结果可比（评测场景设计第 4.4 节）
+    status, detail = check_data_fidelity(delivery_dir, checks_dir)
+    result["data_fidelity"] = {"id": DATA_FIDELITY_CHECK, "status": status, "detail": detail}
+    return result
 
 
 def _requirements_of(check_id, table):
