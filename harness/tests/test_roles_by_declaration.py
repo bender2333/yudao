@@ -21,7 +21,8 @@ from typing import Any
 from harness import adjudication, tools
 from harness.actions import WorkspaceFacts
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, load_definitions
-from harness.environment import check_material_paths
+from harness.engine import product_spec_revision_error
+from harness.environment import Workspaces, check_material_paths
 from harness.minimal_projection import fold_events
 from harness.models import RunProjection
 from harness.path_rules import CHECK_MATERIALS_DIR
@@ -60,6 +61,19 @@ def renamed_definitions(tmp_path: Path, names: dict[str, str]) -> Any:
     return load_definitions(directory)
 
 
+class _Projection:
+    # 建立检查工作区与取参数只用得到这几样：这个 run 的根、参数、会话与来源（一条事件都没有的 run）
+    def __init__(self, run_id: str) -> None:
+        self.run_id = run_id
+        self.parameters = None
+        self.sessions = None
+        self.branch_sessions = set()
+        self.delivery_spec = None
+        self.baseline = None
+        self.snapshot = None
+        self.qa_tests_archive_ref = None
+
+
 def _write(definitions: Any, department: str, path: str):
     # 一次写工具调用的许可判断：只用得到定义、部门与目标路径
     return adjudication.tool_permission(
@@ -89,13 +103,33 @@ def test_a_renamed_verifier_writes_only_its_check_materials(tmp_path: Path) -> N
 
 
 def test_a_renamed_product_revises_the_prd_in_an_answer(tmp_path: Path) -> None:
-    # 验收第 3 条：把产品改名的定义里，改名后的角色能修订 PRD（回答里带 PRD 修订的那一支按提案合同判断，
-    # 引擎读的就是这里这个读数），别的角色不能
+    # 验收第 3 条：把产品改名的定义里，改名后的角色能修订 PRD，别的角色不能。回答里带 PRD 修订的那一支
+    # 判断的就是 `product_spec_revision_error`（引擎 `_execute` 的 answer 分支的第一句），所以这里测的是
+    # 那一支本身；整条回答路径由默认定义下的既有用例守（test_ask_branch.py、test_department_guidance.py）
     renamed = renamed_definitions(tmp_path, {"product": RENAMED_PRODUCT})
+    assert product_spec_revision_error(RENAMED_PRODUCT, renamed) is None
+    for other in ("engineering", "quality"):
+        assert product_spec_revision_error(other, renamed) == f"{other} cannot submit product_spec"
     assert "product_spec" in tools.proposal_kinds(RENAMED_PRODUCT, definitions=renamed)
-    for other in ("engineering", "quality"):
-        assert "product_spec" not in tools.proposal_kinds(other, definitions=renamed)
     # 默认定义下同一条规则：只有产品能交这一种成果
-    assert "product_spec" in tools.proposal_kinds("product")
+    assert product_spec_revision_error("product", DEFINITIONS) is None
     for other in ("engineering", "quality"):
-        assert "product_spec" not in tools.proposal_kinds(other)
+        assert product_spec_revision_error(other) == f"{other} cannot submit product_spec"
+
+
+def test_the_workspaces_hand_the_declared_check_materials_to_the_environments(tmp_path: Path) -> None:
+    # 验收第 2 条（工单 #1390）：执行环境拿到的检查材料角色与目录是定义推出来的那一份，不是写死的质检。
+    # 这里走 `Workspaces` 的三处接线（运行工作区、检查工作区的打开与建立），每一条都按改名后的定义给
+    renamed = renamed_definitions(tmp_path, {"quality": RENAMED_VERIFIER})
+    (tmp_path / "runs" / "run_1").mkdir(parents=True)
+    workspaces = Workspaces(tmp_path / "runs", view=_Projection, writes=None, artifacts=None,
+                            definitions=renamed)
+    assert workspaces.check_materials == {RENAMED_VERIFIER: (CHECK_MATERIALS_DIR,)}
+    run_environment = workspaces.run_environment("run_1")
+    inspection = workspaces.inspection_environment("run_1", RENAMED_VERIFIER, session_id="ses_1")
+    established = workspaces.new_inspection("run_1", "engineering", session_id="ses_2")
+    for environment in (run_environment, inspection, established):
+        assert environment._check_materials == {RENAMED_VERIFIER: (CHECK_MATERIALS_DIR,)}
+    # 名字不是默认的质检也拿到这个集合：保存与检查副本按它判
+    assert tools.writes_check_materials(RENAMED_VERIFIER, definitions=renamed)
+

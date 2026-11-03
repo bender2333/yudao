@@ -107,6 +107,16 @@ def _text_reply(response: ModelResponse) -> bool:
     return False
 
 
+def product_spec_revision_error(department: str, definitions: Definitions | None = None) -> str | None:
+    """回答里带 PRD 修订时这个角色的拒绝说明；空表示它能交这一种成果（工单 #1390）。
+
+    能不能交按它的提案合同判断，不看部门名：把产品改名的定义里，改名后的角色得到与产品相同的回答。
+    """
+    if "product_spec" in proposal_kinds(department, definitions=definitions):
+        return None
+    return f"{department} cannot submit product_spec"
+
+
 @dataclass(frozen=True)
 class _Unassembled:
     # 这一步的请求没有装配成：停止原因与原来的错误。事务提交以后以这个原因停止
@@ -621,9 +631,9 @@ class StepDriver:
                         elif any(args.get(field) is not None for field in PRD_REVISION_FIELDS):
                             # 回答里带 PRD 修订：这个角色能不能交这一种成果，按它的提案合同判断（工单 #1390），
                             # 交不了时照旧拒绝；提案带交它的角色
-                            if "product_spec" not in proposal_kinds(request.department, definitions=self._definitions):
-                                ok, output, error = False, None, \
-                                    f"{request.department} cannot submit product_spec"
+                            refusal = product_spec_revision_error(request.department, self._definitions)
+                            if refusal is not None:
+                                ok, output, error = False, None, refusal
                             else:
                                 snapshot = self._writes.read(self._stream)
                                 projection = snapshot.projection
