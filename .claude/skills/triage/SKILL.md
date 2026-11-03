@@ -11,7 +11,7 @@ argument-hint: "<工单编号 | Discussions 帖子链接>"
 ## 何时用 / 何时不用
 
 - 用：带 `needs-triage` 的工单；solo 自己转成 `ready-for-human`、架构师还没看过的工单；Discussions 的 Ideas；新报告、还没有状态标签的工单。
-- 不用：与总图冲突、要改总图的（开 `architecture` 工单交总架构师）；用户在场时要改规则的（直接和用户定）。
+- 不用：与总图冲突、要改总图的（开 `architecture` 工单，见[工作方式](../../../docs/agents/workflow.md)第 7 节「与总图冲突、总图缺了什么」一行）；用户在场时要改规则的（直接和用户定）。
 
 ## 先读什么
 
@@ -32,7 +32,7 @@ argument-hint: "<工单编号 | Discussions 帖子链接>"
    | 测试靠时长赌先后 | 写成修复工单（[测试分层设计说明](../../../docs/design/test-pyramid.md)「测试的写法」） | `ready-for-agent` |
    | 已经不需要了 | 关闭，写明依据；会改变这个阶段交给用户的东西时交给用户 | 关闭 |
    | 与总图冲突 | 开 `architecture` 工单，写现象、总图哪一节、要定什么；`TRIAGE:` 评论写明它的编号 | `ready-for-human` |
-   | 要改规则 | 用户在场时直接和用户定；不在场时开 `architecture` 工单，`TRIAGE:` 评论写明它的编号 | `ready-for-human` |
+   | 要改规则 | 规则由总架构师改，用户不在场时架构师循环直接改并记录（[工作方式](../../../docs/agents/workflow.md)第 9 节）；要改意图或总图的开一张 `architecture` 工单，`TRIAGE:` 评论写明它的编号 | 意图或总图：`ready-for-human` |
 | 要放宽验收、执行环境 | 写清要定什么、建议怎么做、不定会怎样 | `ready-for-human` |
 
 3. **先推送设计，再放出工单**：改正文与设计期间工单留在 `needs-triage`；设计说明进了 main、「依据」写上推送后的提交以后，才改回 `ready-for-agent`。完成：solo 领到时读到的一定是新设计。

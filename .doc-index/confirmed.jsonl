@@ -152,3 +152,8 @@
 {"down":"59ec65797200e301","dst":"docs/architecture.html#s2","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明","up":"a40f436c1c34521a"}
 {"down":"f176ef66880338f6","dst":"docs/architecture.html#s2","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明","up":"a40f436c1c34521a"}
 {"down":"d16eca7251049f49","dst":"docs/architecture.html#s2","src":"docs/design/trusted-kernel.md#可信内核设计说明","up":"a40f436c1c34521a"}
+{"down":"2c1efb439f06f1f5","dst":"docs/agents/workflow.md#工作方式 > 9. 技能","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能","up":"6ce7d3f567bb8d51"}
+{"down":"d3b526417a331f3c","dst":"CLAUDE.md#角色 > 子架构师","src":".claude/skills/next/SKILL.md#下一件事 > 先读什么","up":"2b2a0422c506d4cb"}
+{"down":"1ad8a6449c854133","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":".claude/skills/trial-intake/SKILL.md#试用","up":"9dab0dfc8d45e569"}
+{"down":"9a3c81a370c8f620","dst":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","src":"AGENTS.md#项目 > 架构问题","up":"cdc7d25b51dc8b09"}
+{"down":"4f3a64092c0680e3","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":"docs/agents/workflow.md#工作方式 > 6. 四个循环","up":"9dab0dfc8d45e569"}

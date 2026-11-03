@@ -1,12 +1,12 @@
 {
 "schema":1,
 "path":".claude/skills/solo/SKILL.md",
-"hash":"a3b5da2ad519475e",
+"hash":"21aa32ba8bbc21de",
 "nodes":[
-{"hash":"a3b5da2ad519475e","id":".claude/skills/solo/SKILL.md","kind":"file","title":".claude/skills/solo/SKILL.md"},
+{"hash":"21aa32ba8bbc21de","id":".claude/skills/solo/SKILL.md","kind":"file","title":".claude/skills/solo/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/solo/SKILL.md#(开头)","kind":"section","parent":".claude/skills/solo/SKILL.md","title":"(开头)"},
 {"hash":"40203ebae881fd4f","id":".claude/skills/solo/SKILL.md#name: solodescription: 以 solo 模式把一组工单做完：自己领取、实现、自测、开 PR、发交付说明、自我核对、合并；每一轮都在一个全新的子代理上下文里执行，轮与轮之间只靠 .ralph/<循环>/ 的账本传递。范围与并发都是参数，范围按外部工单每轮重算（工单会进出里程碑，里程碑会改名）；一轮最多并发 N 张，每张一个 worktree，带 @exclusive 标记的互斥（touches-core 不互斥）。设计问题与连续三轮失败交回后台架构师（needs-triage），执行环境挡住转用户（ready-for-human）。argument-hint: \"[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--并发 N] [--互斥 N] [--续 <循环名>]\"","kind":"section","parent":".claude/skills/solo/SKILL.md","title":"name: solodescription: 以 solo 模式把一组工单做完：自己领取、实现、自测、开 PR、发交付说明、自我核对、合并；每一轮都在一个全新的子代理上下文里执行，轮与轮之间只靠 .ralph/<循环>/ 的账本传递。范围与并发都是参数，范围按外部工单每轮重算（工单会进出里程碑，里程碑会改名）；一轮最多并发 N 张，每张一个 worktree，带 @exclusive 标记的互斥（touches-core 不互斥）。设计问题与连续三轮失败交回后台架构师（needs-triage），执行环境挡住转用户（ready-for-human）。argument-hint: \"[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--并发 N] [--互斥 N] [--续 <循环名>]\""},
-{"hash":"85dd1326f7bd7a16","id":".claude/skills/solo/SKILL.md#solo","kind":"section","parent":".claude/skills/solo/SKILL.md","title":"solo"},
+{"hash":"1a3174996ca9bea9","id":".claude/skills/solo/SKILL.md#solo","kind":"section","parent":".claude/skills/solo/SKILL.md","title":"solo"},
 {"hash":"a87ca565019ad082","id":".claude/skills/solo/SKILL.md#solo > 四个角色","kind":"section","parent":".claude/skills/solo/SKILL.md#solo","title":"四个角色"},
 {"hash":"e3955009c47129d3","id":".claude/skills/solo/SKILL.md#solo > 四个角色 > 表1 > 编排者：就是本会话","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 四个角色","title":"编排者：就是本会话"},
 {"hash":"844f95aca53045a7","id":".claude/skills/solo/SKILL.md#solo > 四个角色 > 表1 > 工人：每次派活一个子代理","kind":"row","parent":".claude/skills/solo/SKILL.md#solo > 四个角色","title":"工人：每次派活一个子代理"},
@@ -81,7 +81,6 @@
 {"dst":".claude/settings.json","kind":"code-path","raws":[".claude/settings.json"],"seen":"91ab181a1e3d76bc","src":".claude/skills/solo/SKILL.md#solo > 无人值守"},
 {"dst":".claude/skills/solo/scripts/hook.mjs","kind":"code-path","raws":[".claude/skills/solo/scripts/hook.mjs"],"seen":"d654dc15cf99c882","src":".claude/skills/solo/SKILL.md#solo > 无人值守"},
 {"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["../../../docs/agents/autopilot-runtime.md"],"seen":"b046e028fd6dba98","src":".claude/skills/solo/SKILL.md#solo > 机器配置（开循环之前配一次） > 表1 > worktree 根目录"},
-{"dst":".codebuddy/settings.json","kind":"code-path","raws":[".codebuddy/settings.json"],"seen":"1b1c577b153e58bb","src":".claude/skills/solo/SKILL.md#solo > 机器配置（开循环之前配一次） > 表1 > 这个目录的写权限"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":".claude/skills/solo/SKILL.md#solo > 硬规则"}
 ]
 }

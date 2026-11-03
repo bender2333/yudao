@@ -5,6 +5,7 @@ import time
 from pathlib import Path
 
 from . import graph, index, scaffold
+from .rulefacts import baseline as rf_baseline, canon as rf_canon, compare as rf_compare, scan as rf_scan, view as rf_view
 from .scan import is_scaffold
 
 
@@ -106,6 +107,22 @@ def cmd_impact(root, args):
             print("  " + show(n))
 
 
+def cmd_rules(root, args):
+    if args.rules_cmd == "canon":
+        print("\n".join(rf_canon.format_canon(rf_canon.read_canon(root))))
+    elif args.rules_cmd == "scan":
+        print("\n".join(rf_scan.format_scan(root, args.sample)))
+    elif args.rules_cmd == "check":
+        print("\n".join(rf_compare.format_check(rf_compare.check(root), args.all, args.tier, args.sample)))
+    elif args.rules_cmd == "baseline":
+        chk = rf_compare.check(root)
+        print("\n".join(rf_baseline.update(root, chk.unparsed())))
+    else:
+        out, data = rf_view.view(root)
+        g = data["graph"]
+        print(f"已生成 {out}（矩阵 {len(data['matrix'])} 行，规则图 {len(g['nodes'])} 个节点、{len(g['edges'])} 条边）")
+
+
 COMMANDS = {
     "build": cmd_build,
     "status": cmd_status,
@@ -118,6 +135,7 @@ COMMANDS = {
     "confirm": cmd_confirm,
     "scope": cmd_scope,
     "impact": cmd_impact,
+    "rules": cmd_rules,
 }
 
 
@@ -142,6 +160,17 @@ def main(argv=None):
     p.add_argument("--reach", action="store_true", help="同时列出只是可达的文件")
     p = sub.add_parser("impact", help="改了某个文件或小节，哪些节点引用或提到它，按角色分组")
     p.add_argument("target")
+    p = sub.add_parser("rules", help="规则事实线（读正本表格、粗筛盘点、句式解析与比对、基线）")
+    rs = p.add_subparsers(dest="rules_cmd", required=True)
+    rs.add_parser("canon", help="把正本表格读成事实，列出附注、读不出的格子、一条事实两处正本、读不到正本的角色；永远以 0 退出")
+    rs.add_parser("view", help="生成离线页面到 .tmp/doc-index/rulefacts.html：角色 × 规则矩阵、规则图、以谁为准偏序图与矛盾清单")
+    p = rs.add_parser("check", help="句式解析与比对：把脚手架文件里的复述读成原子，和正本比，列出矛盾与解析不了的候选（默认只列不在基线里的）；永远以 0 退出")
+    p.add_argument("--all", action="store_true", help="「像在说规则但解析不了」的提醒全部列出，基线里的也列并标「基线」（默认只列不在基线里的前 20 条）")
+    p.add_argument("--tier", choices=rf_compare.TIERS, default="A", help="提醒只留这一档：A 全部候选（默认）；B 窄口径命中、句式形状补入、机器主语；C 只留句式形状补入")
+    p.add_argument("--sample", type=int, metavar="N", help="从这一档的提醒里按固定种子抽 N 条（用来人工核对噪音率）")
+    rs.add_parser("baseline", help="把现在「像在说规则但解析不了」的提醒记进 .doc-index/rulefacts/baseline.jsonl（只追加）；rules check 默认只报不在基线里的")
+    p = rs.add_parser("scan", help="粗筛与盘点：列出脚手架文件里像在复述规则的句子，分已是引用、能改成句式、不是规则事实三类；永远以 0 退出")
+    p.add_argument("--sample", type=int, metavar="N", help="按固定种子随机抽 N 条候选（用来人工核对噪音率），格式相同")
     args = ap.parse_args(argv)
     root = repo_root(args.root)
     COMMANDS[args.cmd](root, args)

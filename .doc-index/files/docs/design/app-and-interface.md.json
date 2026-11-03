@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/app-and-interface.md",
-"hash":"3ceed09726a9b62f",
+"hash":"bce6934843e15eca",
 "nodes":[
-{"hash":"3ceed09726a9b62f","id":"docs/design/app-and-interface.md","kind":"file","title":"docs/design/app-and-interface.md"},
+{"hash":"bce6934843e15eca","id":"docs/design/app-and-interface.md","kind":"file","title":"docs/design/app-and-interface.md"},
 {"hash":"ec5a439813f16c63","id":"docs/design/app-and-interface.md#应用层与接口层设计说明","kind":"section","parent":"docs/design/app-and-interface.md","title":"应用层与接口层设计说明"},
 {"hash":"b5cd971814a6e7f9","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 1. 要解决的问题","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明","title":"1. 要解决的问题"},
 {"hash":"d48aaff361281548","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 2. 分层与模块","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明","title":"2. 分层与模块"},
@@ -19,7 +19,7 @@
 {"hash":"c64461e11d4738bb","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明","title":"4. 查询与读取模型"},
 {"hash":"63e322ab53353c53","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.1 合同","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","title":"4.1 合同"},
 {"hash":"a9836bfe2ab881eb","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.2 读取模型","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","title":"4.2 读取模型"},
-{"hash":"880929cb214bfeab","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","title":"4.3 查询清单"},
+{"hash":"9ffc149ea02cb45e","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型","title":"4.3 查询清单"},
 {"hash":"03316b09f1db7988","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单 > 规则与参数在页面上的显示","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","title":"规则与参数在页面上的显示"},
 {"hash":"bc5e8d3b62683f17","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 5. 事件流","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明","title":"5. 事件流"},
 {"hash":"d263b22889f7099a","id":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 5. 事件流 > 5.1 路径与参数","kind":"section","parent":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 5. 事件流","title":"5.1 路径与参数"},

@@ -1,0 +1,41 @@
+{
+"schema":1,
+"path":"docs/design/kernel-quality-gate.md",
+"hash":"7c04be1a568d7c96",
+"nodes":[
+{"hash":"7c04be1a568d7c96","id":"docs/design/kernel-quality-gate.md","kind":"file","title":"docs/design/kernel-quality-gate.md"},
+{"hash":"22526bbd3eba35d9","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明","kind":"section","parent":"docs/design/kernel-quality-gate.md","title":"内核的代码质量检查设计说明"},
+{"hash":"b9ece473a9a2a8c4","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 1. 功能与依据","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明","title":"1. 功能与依据"},
+{"hash":"e8a5a49a1013653f","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明","title":"2. 边界与范围"},
+{"hash":"f5f5cbc9db938807","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 3. 接口","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明","title":"3. 接口"},
+{"hash":"e564975b8dd7eb44","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明","title":"4. 方案"},
+{"hash":"3b206c00b5259b05","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.1 接入：按模块，两个开关"},
+{"hash":"eb02e3ad714e4e9b","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.2 改到的语句与函数","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.2 改到的语句与函数"},
+{"hash":"38afb25aef7bc126","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.3 复杂度检查","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.3 复杂度检查"},
+{"hash":"13c8cbc149dd661a","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.4 变异检查","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.4 变异检查"},
+{"hash":"5398b109c1a13e72","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.5 存活的出口与理由登记","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.5 存活的出口与理由登记"},
+{"hash":"7e31d58d5fa90f61","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.6 全量模式与「立住」","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.6 全量模式与「立住」"},
+{"hash":"850ebe128a4a2953","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.7 合并检查","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.7 合并检查"},
+{"hash":"370279f159659a00","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.8 评价材料","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.8 评价材料"},
+{"hash":"bb97681c37442f9f","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.9 接入的次序","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案","title":"4.9 接入的次序"},
+{"hash":"0a164c62a55a009c","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 5. 验收","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明","title":"5. 验收"},
+{"hash":"8d1f598369dbd34c","id":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 6. 未决问题","kind":"section","parent":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明","title":"6. 未决问题"}
+],
+"edges":[
+{"dst":"docs/adr/0046-kernel-trusted-by-checks-not-size.md","kind":"link","raws":["../adr/0046-kernel-trusted-by-checks-not-size.md"],"seen":"6eaa56a8e442ec8a","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「只由你批准」"],"seen":"501cedc1662adc79","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/architecture.html#s5","kind":"map-position","raws":["「内核」"],"seen":"cb9066af90b3b5a9","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 3. 登记表与共用代码","kind":"link","raws":["test-pyramid.md"],"seen":"0e0aa94b57082a5d","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"63061389a44211d5","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"0ae7a2dd97132274","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/requirements/system-intent.md#D38 系统意图与基础规则 > 基础规则","kind":"link","raws":["../requirements/system-intent.md"],"seen":"cf887607619282df","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/research/complexity-and-mutation-testing.md#圈复杂度与变异测试调研 > 1. 本仓库的实测","kind":"link","raws":["../research/complexity-and-mutation-testing.md"],"seen":"2fd3296432851eaf","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > 做法与参数速查","kind":"link","raws":["../research/uncle-bob-ub-mode.md"],"seen":"70c8fdbb9502a766","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明"},
+{"dst":"docs/design/test-pyramid.md","kind":"link","raws":["test-pyramid.md"],"seen":"34c7d5eba94d3294","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"link","raws":["test-pyramid.md"],"seen":"0ec0552adcbe7034","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
+{"dst":"docs/design/trusted-kernel.md","kind":"link","raws":["trusted-kernel.md"],"seen":"5ced538e9bf46b7d","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围"},
+{"dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.3 给子架构师：缝与设计说明","kind":"link","raws":["architecture/overall-architecture.md"],"seen":"4f9d3f25c2196e3e","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"},
+{"dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","kind":"link","raws":["trusted-kernel.md"],"seen":"8d031d63ab7955d0","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 4. 方案 > 4.1 接入：按模块，两个开关"}
+]
+}
