@@ -11,7 +11,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RELEASE_SCRIPT = REPO_ROOT / "scripts" / "release.py"
 EMPTY_FILE = Path(__file__).resolve().parent / "__init__.py"
 ABC_FILE = REPO_ROOT / "harness" / "tests" / "data" / "sha256_abc.txt"
-LARGE_FILE = REPO_ROOT / "client" / "tests" / "fixtures" / "floor" / "recordings.json"
+LARGE_FILE = REPO_ROOT / "harness" / "definitions" / "model_capabilities.json"
 
 CHUNK = 1024 * 1024
 EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"

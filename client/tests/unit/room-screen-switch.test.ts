@@ -1,7 +1,7 @@
 // 部门房间组件的部门切换（工单 #300 验收标准 2）：在页面上真实挂载 RoomScreen 组件，
 // 在项目的部门页签之间直接切换，核对画面只应用属于当前部门的模型。
 //
-// 每个部门的查询结果取录下的真实房间数据（tests/fixtures/room/recordings.json），不是手写的假数据。
+// 每个部门的查询结果取真实录下的部门房间数据（tests/fixtures/room/workspace.json），不是手写的假数据。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

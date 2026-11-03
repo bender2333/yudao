@@ -226,6 +226,7 @@
 "test_undefined_names.py" = "module"
 "test_unknown_action_handed_back.py" = "integration"
 "test_user_facing_labels.py" = "unit"
+"test_visibility_sets.py" = "module"
 "test_wait_limits.py" = "unit"
 "test_watched_outputs_renamed.py" = "module"
 "test_watched_relations.py" = "module"

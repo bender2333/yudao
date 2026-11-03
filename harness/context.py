@@ -284,6 +284,13 @@ class ContextAssembler:
         # 全体角色共同的规则文字取自定义；本角色的可见范围读这个 run 冻结的取值（工单 #1189）
         rules = definitions.organization.rules
         visible = frozen_visibility(projection, department, definitions)
+        # 交付说明给到哪几部分（工单 #357）：整份 current_delivery_spec、事实部分 delivery_facts、解释部分
+        # delivery_explanation。这三项说的是同一份材料（current_delivery_spec），后两项按事实与解释分开提供；
+        # 只有解释那一项还要看时间条件（先判断后看解释，工单 #554、#358）。可见范围里没有解释这一项的角色
+        # 一直看不到它，只有整份或事实那一项时材料里没有解释字段
+        whole_delivery = "current_delivery_spec" in visible
+        delivery_facts = whole_delivery or "delivery_facts" in visible
+        delivery_explanation = whole_delivery or "delivery_explanation" in visible
         current_delivery = projection.delivery_spec
         if current_delivery is not None and current_delivery.status != "active":
             current_delivery = None
@@ -438,9 +445,11 @@ class ContextAssembler:
                     json_dumps([_decision_payload(item) for item in projection.effective_decisions]),
                 )
             )
-        if current_delivery is not None and "current_delivery_spec" in visible:
-            payload = (engineering["delivery"] if engineering is not None
-                       else _delivery_payload(current_delivery, definitions=definitions))
+        if current_delivery is not None and delivery_facts:
+            # 解释字段进不进入这份材料：可见范围里有解释那一项，并且时间条件成立（工单 #357、#554、#358）
+            explanation_visible = delivery_explanation and (engineering is None or engineering["explanation_visible"])
+            payload = _delivery_payload(current_delivery, explanation_visible=explanation_visible,
+                                        definitions=definitions)
             parts.append(
                 ContextPart(
                     "current_delivery_spec",
@@ -452,8 +461,9 @@ class ContextAssembler:
             prior = _prior_delivery_for_repair(projection)
             if prior is not None:
                 payload = _delivery_payload(prior, purpose="repair_basis", definitions=definitions)
-                if engineering is not None and not engineering["explanation_visible"]:
-                    # 新的交付还没有结论：此前全部工程内容的解释部分都重新藏起来（工单 #554）
+                if not delivery_explanation or (engineering is not None and not engineering["explanation_visible"]):
+                    # 新的交付还没有结论：此前全部工程内容的解释部分都重新藏起来（工单 #554）；
+                    # 可见范围里没有解释那一项的角色一直看不到它（工单 #357）
                     for field in _delivery_explanation_fields(definitions):
                         payload.pop(field, None)
                 parts.append(
