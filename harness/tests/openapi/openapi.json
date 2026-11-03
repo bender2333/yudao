@@ -20562,6 +20562,13 @@
             "title": "Folded Rounds",
             "type": "array"
           },
+          "failure_list_events": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Failure List Events",
+            "type": "array"
+          },
           "previous_usage_tokens": {
             "anyOf": [
               {

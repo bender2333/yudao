@@ -311,6 +311,8 @@ class ContextManifest:
     rules_version: str | None = None
     # 这一次折叠了哪几轮（从 1 起的轮次编号，按部门历史顺序）；折叠计数是它的长度
     folded_rounds: list[int] = field(default_factory=list)
+    # 压缩以后的失败清单这一段逐条列了哪些事件（工单 #1405）：没有压缩过的会话为空
+    failure_list_events: list[str] = field(default_factory=list)
 
 
 @dataclass

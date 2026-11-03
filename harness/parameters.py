@@ -157,6 +157,8 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "context.column_limit.review_queue": "还没有代码读取它：语义系统的栏目上限还没有实现",
     "context.column_limit.touch_added": "还没有代码读取它：语义系统的栏目上限还没有实现",
     "context.column_limit.trajectory_excerpt": "还没有代码读取它：语义系统的栏目上限还没有实现",
+    "context.failure_list_tokens": "读的是定义文件里的初值（harness/context.py 的 Rules 取值，工单 #1405），参数事件改不了它：两个上限随规则版本记录，改定义文件才换一版",
+    "context.failure_entry_chars": "读的是定义文件里的初值（harness/context.py 的 Rules 取值，工单 #1405），参数事件改不了它：单条失败原文的上限随规则版本记录",
     "context.role_result_chars": "还没有代码读取它：角色结果摘要的长度上限还没有实现",
     "compaction.min_reasoning_effort": "还没有代码读取它：整理请求的最低推理档位还没有实现",
     "screenshot.max_width": "还没有代码读取它：浏览器截图的等比缩小还没有实现",

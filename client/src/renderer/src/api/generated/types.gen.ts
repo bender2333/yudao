@@ -9120,6 +9120,10 @@ export type ContextAssembledPayload = {
      */
     folded_rounds?: Array<number>;
     /**
+     * Failure List Events
+     */
+    failure_list_events?: Array<string>;
+    /**
      * Previous Usage Tokens
      */
     previous_usage_tokens?: number | null;
