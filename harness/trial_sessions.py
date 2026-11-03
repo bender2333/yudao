@@ -54,8 +54,9 @@ READY_REQUEST_TIMEOUT_SEC = 2.0
 # 程序探测的命令最多等这么久（秒）：npm 在 Windows 上第一次运行较慢
 PROBE_TIMEOUT_SEC = 90
 
-# 一条工具结果带回来的输出上限（字符）：与执行环境的工具输出上限是同一个默认值
-DEFAULT_OUTPUT_LIMIT = 20000
+# 一条工具结果带回来的输出上限（字符）：取自规则登记里的 tool_output_limit，与执行环境按同一条规则
+# 截断（读输出、结束会话与失败回执带回来的启动输出都走这个上限）
+DEFAULT_OUTPUT_LIMIT = int(DEFINITIONS.rule_value("tool_output_limit"))
 
 
 class TrialStartFailed(Exception):
@@ -188,8 +189,20 @@ def resolve_trial_call(name: str, args: dict[str, Any], delivery_spec: Any,
                        system: str | None = None) -> tuple[dict[str, Any] | None, str | None]:
     """工具许可对 trial_start 与 trial_open 的核对：交回启动方式或拒绝原因。
 
+    质检的 trial_open 按当前交付说明（`delivery_spec.launch`）里的名称解析；工程与执行环境按启动方式
+    列表解析时用 `resolve_trial_launch`（交付说明没有时按空清单处理）。
+    """
+    methods = [item for item in (getattr(delivery_spec, "launch", None) or [])
+               if isinstance(item, dict)]
+    return resolve_trial_launch(name, args, methods, system=system)
+
+
+def resolve_trial_launch(name: str, args: dict[str, Any], methods: list[dict[str, Any]],
+                         system: str | None = None) -> tuple[dict[str, Any] | None, str | None]:
+    """交回这次调用要用的启动方式，或者拒绝的原因（工具许可与执行之前是同一套核对）。
+
     工程的 trial_start 用这次调用给出的启动方式；质检的 trial_open 只接受当前交付说明里的名称，
-    名称不存在时原因写明交付说明中已有的名称，交付说明没有 launch 时写明它没有写启动方式。
+    名称不存在时原因写明交付说明中已有的名称，没有启动方式时写明交付说明没有写启动方式。
     两者都按执行位置的系统选用命令：没有这个系统的命令时拒绝，原因写明缺少哪个系统的命令。
     桌面试用会话在本机版还没有接上（屏幕工具属于 computer use 专题），先拒绝并写明原因。
     """
@@ -198,8 +211,6 @@ def resolve_trial_call(name: str, args: dict[str, Any], delivery_spec: Any,
         if not isinstance(launch, dict):
             return None, "trial_start requires a launch method object"
     elif name == "trial_open":
-        methods = [item for item in (getattr(delivery_spec, "launch", None) or [])
-                   if isinstance(item, dict)]
         if not methods:
             return None, "the DeliverySpec has no launch method"
         wanted = args.get("launch_name")
@@ -530,7 +541,7 @@ class TrialSessionTable:
                 output_path=output_path, process=process, tree=tree, file_handle=file_handle,
                 started_at=datetime.now(timezone.utc).isoformat(),
             )
-            await self._wait_ready(session, int(launch["ready_timeout_sec"]), stop)
+            await self._wait_ready(session, int(launch["ready_timeout_sec"]), stop, output_limit)
         except TrialStartFailed as exc:
             if session is not None:
                 session.mark_ended(str(exc))
@@ -545,7 +556,9 @@ class TrialSessionTable:
         head, truncated = _head(output_path, output_limit)
         return {"session": session.record(), "output": head, "truncated": truncated}
 
-    async def _wait_ready(self, session: TrialSession, timeout_sec: int, stop: Any) -> None:
+    async def _wait_ready(self, session: TrialSession, timeout_sec: int, stop: Any,
+                          output_limit: int) -> None:
+        # 失败回执带回来的启动输出按工具结果的上限截断（设计说明第 3.4 节与规则登记 tool_output_limit）
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_sec
         while True:
@@ -558,13 +571,15 @@ class TrialSessionTable:
                     session.exit_code = code
                     raise TrialStartFailed(
                         f"the launch command exited with code {code} before the trial session was ready",
-                        output={"session": session.record(), "output": _read_output(session.output_path)})
+                        output={"session": session.record(),
+                                "output": _read_output(session.output_path, output_limit)})
             if await asyncio.to_thread(_http_ready, session.ready_url):
                 return
             if loop.time() >= deadline:
                 raise TrialStartFailed(
                     f"the trial session did not become ready within {timeout_sec}s at {session.ready_url}",
-                    output={"session": session.record(), "output": _read_output(session.output_path)})
+                    output={"session": session.record(),
+                            "output": _read_output(session.output_path, output_limit)})
             await asyncio.sleep(READY_POLL_SEC)
 
     def _discard(self, process: subprocess.Popen[Any] | None, tree: ProcessTree | None,

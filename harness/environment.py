@@ -24,7 +24,6 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 import time
 from threading import Lock
-from types import SimpleNamespace
 from typing import Any, Mapping
 
 from .actions import (
@@ -50,7 +49,8 @@ from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
 from .tools import tool_action
 from .tree_archive import artifact_run, load_tree
-from .trial_sessions import TrialSessionTable, TrialStartFailed, resolve_trial_call
+from .trial_sessions import (TrialSessionTable, TrialStartFailed, resolve_trial_call,
+                            resolve_trial_launch)
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 # 一次工具结果的输出上限，取规则登记中的现值
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
@@ -1622,8 +1622,7 @@ class LocalEnvironment:
     async def _trial_open(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         # 质检的试用：启动方式按当前交付说明里的名称解析（引擎在工具许可时已经核对过一次，
         # 这里是执行之前的同一套核对）
-        delivery = SimpleNamespace(launch=self._launch_methods)
-        launch, reason = resolve_trial_call("trial_open", action.input, delivery)
+        launch, reason = resolve_trial_launch("trial_open", action.input, self._launch_methods)
         if reason is not None:
             raise TrialStartFailed(reason, output={"session": None})
         return await self._start_trial(action, launch, stop)

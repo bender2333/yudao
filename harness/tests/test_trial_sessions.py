@@ -6,10 +6,12 @@
 #    端口、就绪地址、试用副本的树摘要与启动输出；trial_output 读末尾，trial_stop 结束进程树并删掉副本；
 # 2. 同时进行的两个会话得到不同的端口；
 # 3. 缺少试用需要的程序时就绪不建立会话，回执写明缺少的程序；
-# 4. 就绪超时与进程提前退出得到真实的失败回执，带启动输出，会话不建立；
+# 4. 就绪超时与进程提前退出得到真实的失败回执，带启动输出，会话不建立；失败回执的启动输出按规则登记的
+#    tool_output_limit 截断；
 # 5. 质检按当前交付说明里的名称开始会话，试用副本的树摘要等于交付快照的摘要（工程改了工作区也不影响）；
 #    名称不存在或交付说明没有 launch 时核对不通过，原因写明已有的名称或没有写启动方式；本机系统没有
-#    启动命令时原因写明缺少哪个系统的命令；
+#    启动命令时原因写明缺少哪个系统的命令；真实激活里 `Workspaces` 交给执行环境的那两处接线
+#    （当前交付说明的 launch、交付快照）也能区分：关掉以后质检要么拿不到名称，要么副本来源变成工作区封存；
 # 6. 结束本部门原来的会话：同一个部门再开始一次时，前一个会话的副本被删掉。
 #
 # 层：集成层（真实网页服务、真实端口与子进程）。守 R3：试用会话从清单建立副本、按系统选用命令、
@@ -30,6 +32,7 @@ import pytest
 
 from harness.actions import Action
 from harness.adapters.fake import FakeAdapter
+from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec
@@ -37,6 +40,7 @@ from harness.providers.call import ModelResponse
 from harness.public_tree import capture_public_tree
 from harness.runtime import LoopSystem
 from harness.tools import tool_cancellable, tool_verification
+from harness.tree_archive import artifact_run, load_tree
 from harness.trial_sessions import TrialSessionTable, current_system, resolve_trial_call
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tiny_web_app"
@@ -303,6 +307,82 @@ def test_the_tool_permission_refuses_a_launch_name_the_delivery_spec_does_not_ca
     assert recorded.payload["refused"] is True
     assert "no launch method named 'missing'" in recorded.payload["refused_reason"]
     assert "web" in recorded.payload["refused_reason"]
+
+
+def test_a_failed_receipt_cuts_the_launch_output_at_the_tool_output_limit(tmp_path):
+    # 失败回执带回来的启动输出按规则登记的 tool_output_limit 截断，与执行环境自己的输出上限是同一条规则
+    # （工单 #1182 的验收第 6 条）：打印得比上限多的程序只交回末尾这一段，不是把整段都交给模型
+    root = _web_workspace(tmp_path)
+    environment = _environment(root)
+    limit = int(DEFINITIONS.rule_value("tool_output_limit"))
+    command = _python(
+        "import sys\n"
+        f"sys.stdout.write('x' * {limit * 2})\n"
+        "sys.stdout.write('\\nBOOT FAILED\\n')\n"
+        "sys.exit(3)\n")
+    launch = {"name": "web", "kind": "web",
+              "commands": {str(current_system()): command},
+              "ready_url": "http://127.0.0.1:{port}/", "ready_timeout_sec": 30}
+
+    receipt = _perform(environment, "trial_start", {"launch": launch})
+
+    assert receipt.ok is False and receipt.status == "failed"
+    output = receipt.output["output"]
+    assert "BOOT FAILED" in output, "失败回执没有带启动输出的末尾"
+    assert len(output) <= limit, f"启动输出没有按工具输出上限截断（{len(output)} > {limit}）"
+
+
+def test_the_workspaces_hand_the_delivery_launch_and_snapshot_to_quality(tmp_path):
+    # 真实激活里 `Workspaces` 交给执行环境的那两处接线（工单 #1182 与设计说明第 3.4 节）：当前交付说明的
+    # launch 与这次检查的交付快照。关掉 `bind_launch_methods` 时质检的 trial_open 拿不到名称（回执写着
+    # the DeliverySpec has no launch method），关掉 `_attach_trial_source` 时副本来源变成 workspace_seal、
+    # 副本从检查工作区建立；现有的用例都自己 bind，区分不了这两处接线
+    server = _python(
+        "import http.server, os\n"
+        "port = int(os.environ['PORT'])\n"
+        "print('tiny server listening on', port, flush=True)\n"
+        "http.server.HTTPServer(('127.0.0.1', port), http.server.SimpleHTTPRequestHandler).serve_forever()\n")
+    launch = {"name": "web", "kind": "web", "commands": {str(current_system()): server},
+              "ready_url": "http://127.0.0.1:{port}/", "ready_timeout_sec": 120}
+    open_call = {"id": "t1", "call_id": "t1", "type": "function_call", "name": "trial_open",
+                 "arguments": json.dumps({"launch_name": "web"}, ensure_ascii=False)}
+    stop_call = {"id": "t2", "call_id": "t2", "type": "function_call", "name": "trial_stop",
+                 "arguments": "{}"}
+    adapter = FakeAdapter({
+        "product": [product_spec()],
+        "engineering": [delivery_turn(files={"index.html": "<html>ok</html>\n"}, checks={"smoke": 0},
+                                      launch=[launch])],
+        "quality": [ModelResponse(output=[open_call, stop_call])],
+    })
+    system_under_test = LoopSystem.for_testing(tmp_path, adapter)
+    # 程序核对换成注入的那份：这条用例查的是接线，不等 npm/npx 的探测
+    system_under_test.orchestrator._workspaces.trials = TrialSessionTable(probe=lambda: [])
+    run_id = system_under_test.create_run("build a page")
+    for _ in range(3):
+        try:
+            system_under_test.activate_once(run_id)
+        except Exception:  # noqa: BLE001 - 假模型脚本用完以后这一轮以失败结束，两个调用已经写下
+            break
+
+    events = system_under_test.store.list_events(run_id)
+    opened = next(event for event in events
+                  if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("id") == "t1")
+    assert opened.payload.get("ok") is True, opened.payload.get("error")
+    record = json.loads(system_under_test.artifacts.get_text(
+        opened.payload["output_ref"]["content_hash"]))
+    session = record["session"]
+    assert session["launch_name"] == "web"
+    # 副本来源是交付快照，不是质检自己的检查工作区：关掉 `_attach_trial_source` 时这一项变成 workspace_seal
+    assert session["copy_source"] == "delivery_snapshot", "试用副本不是从交付快照建立的"
+    # 副本的内容就是这份交付的清单：实现自己在启动之前核对过副本的树摘要等于来源的摘要
+    delivery_ref = system_under_test.project(run_id).delivery_spec.tree_ref
+    delivered = load_tree(system_under_test.artifacts, artifact_run(delivery_ref.path), delivery_ref)
+    assert [item.path for item in delivered.files] == ["index.html"]
+    assert session["tree_digest"] == delivered.digest, "试用副本的树摘要不等于交付快照的摘要"
+    stopped = next(event for event in events
+                   if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("id") == "t2")
+    assert stopped.payload.get("ok") is True
+    assert not Path(session["copy"]).exists(), "会话结束以后试用副本还在"
 
 
 def test_starting_again_replaces_the_previous_session_of_the_department(tmp_path):
