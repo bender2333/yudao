@@ -91,7 +91,7 @@ Yudao（枢道）是一个协作执行系统：角色围着同一份事实工作
 - `CLAUDE.md`：架构师规则（本文件）。
 - `AGENTS.md`：solo 执行者与审查者的规则。
 - `claude_jour.md`：架构师日记，只留最近的，更早的在 `docs/archive/`。
-- `agents_jour/`：执行者与审查者的日记，一张工单一个文件（`agents_jour/<工单编号>.md`），只留最近的，更早的在 `docs/archive/agents_jour/`。
+- `agents_jour/`：执行者的日记（审查者的记录是 PR 上的审查，审查者不写日记文件），一张工单一个文件（`agents_jour/<工单编号>.md`），只留最近的，更早的在 `docs/archive/agents_jour/`。
 
 ### docs/
 - `docs/architecture.html`：总图，给用户看的一页，六节：全局总图与方程、什么能动、一轮工作的经过、要守的缝、自举与验收、拆开部署。总图只由总架构师改。

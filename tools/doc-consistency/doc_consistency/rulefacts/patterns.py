@@ -10,7 +10,7 @@
   交给          handoff(节点,卡在项,角色)
   穷尽清单      only_members(节点,键,条目) 每条目一条，加 closed(节点,键)
 
-词汇封闭：终结符从词表生成后接在文法后面（角色与别名、合称来自 roles.json；键来自 canon.json 七张表的首列，
+词汇封闭：终结符从词表生成后接在文法后面（角色与别名、合称来自 roles.json；键来自 canon.json 九张表的首列，
 第 1 节表另把「位置」一格里的载体名和反引号路径当那一行的键的别名；载体与机器来自 canon.json 的 vocab；动作词来自 rulefacts-scan.json；
 动词到事实名的映射等在 rulefacts-patterns.json）。合称先展开再出原子；括号里的话与「领取时」「之前」这类限定
 剥掉当附注，不进原子；没有主语的句子不解析、不猜。Python 只负责词表、规范化、把语法树翻成原子；比对在 rules/rulefacts/compare.lp。
@@ -162,6 +162,7 @@ def build_vocab(model, cfg, cells, keys):
     machines = {nz(m): m for m in cfg["vocab"].get("机器", [])}
     carrier_list = cfg["vocab"]["载体"]
     carriers = {nz(c): c for c in carrier_list}
+    carriers.update({nz(a): t for a, t in cfg.get("载体别名", {}).items()})  # 「其他需求记录」读成「需求记录」
     verbs = {nz(k): list(f) for k, f in pat["动词"].items() if not k.startswith("_")}
     # 谁不 的无宾语写法（审查者不推送）只认这几个动作，且必须是粗筛的动作词；其余动词都要带键（架构师循环不改总图），
     # 免得「子架构师与架构师循环不建」这种宾语在前一个分句里的句子被读成没有宾语的原子
@@ -174,6 +175,8 @@ def build_vocab(model, cfg, cells, keys):
 
     keyd, stuck, events, carrier_keys = {}, {}, {}, {}
     for tid, spec in cfg["tables"].items():
+        if any(c.get("prevail") for c in spec["columns"].values()):
+            continue  # 「以谁为准」表的首列是两个载体，不是键
         facts = {c["fact"] for c in spec["columns"].values()}
         kind = next((special[f] for f in sorted(facts) if f in special), None)
         for k in keys.get(tid, []):
@@ -189,6 +192,9 @@ def build_vocab(model, cfg, cells, keys):
                 keyd.setdefault(nz(k), k)
                 if "：" in k:  # 「意图：目的、判据…」写成「意图」
                     keyd.setdefault(nz(head_parts(k)[1]), k)
+        for k, names in spec.get("aliases", {}).items():  # canon.json 登记的别名（表级 aliases：行的键 -> 说法）
+            for a in names:
+                keyd.setdefault(nz(a), k)
         for c, k in carrier_aliases(model, tid, spec, set(carrier_list)).items():
             keyd.setdefault(nz(c), k)
             carrier_keys[nz(c)] = k

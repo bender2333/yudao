@@ -17,7 +17,7 @@
       "句式": "只由谁",
       "意思": "说只由用户加，正本里 ready-for-human 任何角色都能加",
       "插入": [
-        {"文件": "AGENTS.md", "锚点": "执行者写在工单评论里，把标签从 `in-progress` 改为 `needs-triage`", "行": ["", "`ready-for-human` 只由用户加上"]}
+        {"文件": "AGENTS.md", "锚点": "`needs-triage` 由执行者加上（标签从 `in-progress` 改为它）", "行": ["", "`ready-for-human` 只由用户加上"]}
       ],
       "期望": {"类别": "only_wrong", "正本": "ready-for-human / 由谁改成"}
     },

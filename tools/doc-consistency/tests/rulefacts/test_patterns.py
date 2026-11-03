@@ -1,7 +1,7 @@
 """规则事实线第 3 步：八种句式的解析。用 rf_repo 夹具（test_rulefacts.py）加我们写的复述文件，真文法、真 clingo、真文件。"""
 
 import pytest
-from test_rulefacts import TABLE1 as OLD_TABLE1, WF, WORKFLOW, rf_repo  # noqa: F401  复用：角色表、四张正本表、最小入口文件
+from test_rulefacts import ALIAS_ROWS, TABLE1 as OLD_TABLE1, WF, WORKFLOW, rf_repo  # noqa: F401  复用：角色表、四张正本表、最小入口文件
 
 from doc_consistency.rulefacts import compare
 
@@ -28,6 +28,7 @@ TABLE1 = (
     "| 代码与测试 | `harness/`、`client/`、`evals/` | | 执行者 |\n"
     "| 每次状态变化的证据 | 那张工单上一条带前缀的评论 | | 按第 5 节 |\n"
     "| 代码达到合同的证据 | PR 与 CI | | 执行者、审查者、CI |\n"
+    + ALIAS_ROWS
 )
 # 证据评论表补一行任何角色都能写的，让「用户」出现在正本的值里（用户走样那一类要用）
 OLD_ROW5 = "| `TRIAL:` | `TRIAL: <达到 \\| 复盘 \\| 试用>` | 架构师 |\n"
@@ -159,14 +160,14 @@ def test_sentences_without_a_subject_are_not_read_and_not_guessed(rf_repo):
         "由执行者加上",  # 键缺失
         "可以改规则",  # 没有主语和在场与否
         "执行者认为文件超过上限不是 `needs-triage` 的理由",  # 前面多出的话带了主语
-        "集成层由 CI 跑",  # 集成层不是正本的键：词汇封闭
+        "冒烟层由 CI 跑",  # 冒烟层不是任何正本表的键：词汇封闭（集成层现在是第 3 节测试分层表的键，读得了）
         "`needs-triage` 由谁加上",  # 谁不是角色
     ]
     chk = restate(rich(rf_repo), *lines)
     assert not [g for g in chk.groups if g.file == RESTATE], [(g.text, g.atoms) for g in chk.groups if g.file == RESTATE]
     # 它们照样是候选，也就是以后钩子要提醒的「像在说规则但解析不了」
     unparsed = {h.text for h in chk.unparsed() if h.file == RESTATE}
-    assert {"只由总架构师改", "由执行者加上", "执行者认为文件超过上限不是 `needs-triage` 的理由", "集成层由 CI 跑"} <= unparsed
+    assert {"只由总架构师改", "由执行者加上", "执行者认为文件超过上限不是 `needs-triage` 的理由", "冒烟层由 CI 跑"} <= unparsed
 
 
 def test_machine_subjects_are_named_but_are_not_roles(rf_repo):

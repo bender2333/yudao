@@ -336,3 +336,9 @@
 {"file": "CLAUDE.md", "hash": "b7fa20852c446e9f", "head": "阶段的结束核对由总架构师做"}
 {"file": "CLAUDE.md", "hash": "1c60c8dd6a7394f5", "head": "与子架构师定模块的走向与拆单（`/module-sync`，[skill](.claude/skills/module-"}
 {"file": "CLAUDE.md", "hash": "48079e7aee3548f2", "head": "文档、归档与规则文件的清理（改旧说法与失效链接、归档、修规则的失效入口）不开工单，架构师直接做（用户不在场时架构师循环也"}
+{"file": ".claude/skills/solo-worker/SKILL.md", "hash": "9a4ec1613c4a5ce4", "head": "界面工单除了代码与测试，还要留证据："}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "00517a958ff12d95", "head": "只做任务书上的那一张工单：领取 → 实现 → 自测 → PR → 交付说明 → 自我核对 → 合并 → 清理"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "1da43c3fcc9e4508", "head": "集成层一趟 15 到 45 分钟，正在跑的那一趟会让最后一次提交看起来静止，`reap` 一用就会留下两个活着的工人写同"}
+{"file": ".claude/skills/solo/SKILL.md", "hash": "18a627eca7c38961", "head": "工人按 [`/solo-worker`](../solo-worker/SKILL.md)「一张工单的完整做法」做，编排"}
+{"file": "CLAUDE.md", "hash": "cf33248bcc3071d9", "head": "`agents_jour/`：执行者的日记（审查者的记录是 PR 上的审查，审查者不写日记文件），一张工单一个文件（`a"}
+{"file": "docs/agents/workflow.md", "hash": "9c62ec68d96904d3", "head": "冲突时以谁为准："}

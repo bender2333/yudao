@@ -56,12 +56,25 @@ Ref = Unparsed  # 引用格：字段相同（表、键、列、原文、文件�
 
 
 @dataclass
+class Prevail:
+    """「以谁为准」表的一行：winner 优先于 loser（canon_prevails(winner,loser)）。"""
+
+    table: str
+    key: str
+    winner: str
+    loser: str
+    file: str
+    line: int
+
+
+@dataclass
 class Canon:
     tables: dict  # 表 -> 配置，按 canon.json 的顺序
     cells: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     unparsed: list = field(default_factory=list)
     refs: list = field(default_factory=list)  # 引用格
+    prevails: list = field(default_factory=list)  # 「以谁为准」的正本，Prevail
     keys: dict = field(default_factory=dict)  # 表 -> 首列的键，按文档顺序
     canon: list = field(default_factory=list)  # (键, 事实, 值)，去重后
     dup: list = field(default_factory=list)  # (键, 事实, 表1, 表2)
@@ -146,6 +159,32 @@ def read_token(token, aliases, quals, machines=()):
     return ([body], trimmed) if body in machines else (None, trimmed)
 
 
+def carrier_map(cfg):
+    """载体的各种说法 -> 载体名（去掉空白）：vocab.载体，加 canon.json 顶层「载体别名」（别名 -> 载体）。"""
+    names = {re.sub(r"\s+", "", c): c for c in cfg["vocab"]["载体"]}
+    for alias, target in cfg.get("载体别名", {}).items():
+        if target not in cfg["vocab"]["载体"]:
+            raise SystemExit(f"data/canon.json：载体别名「{alias}」指向的「{target}」不在 vocab.载体 里")
+        names[re.sub(r"\s+", "", alias)] = target
+    return names
+
+
+def read_prevail(key_text, value_text, carriers):
+    """「两边」格按「与」切成两个载体，「以谁为准」格是其中一边。
+    返回 (优先, 其次, 附注列表)；值不是两边之一时优先、其次为 None（只有附注）；两边读不出返回 None。"""
+    sides_text = PAREN.sub("", key_text).replace("`", "")
+    sides = [carriers.get(re.sub(r"\s+", "", x)) for x in sides_text.split("与")]
+    if len(sides) != 2 or None in sides or sides[0] == sides[1]:
+        return None
+    notes = [key_text] if PAREN.search(key_text) else []
+    value = carriers.get(re.sub(r"\s+", "", PAREN.sub("", value_text).replace("`", "")))
+    if value not in sides:
+        return None, None, notes + [value_text]  # 「不定优先级：…」这类：不出事实
+    if PAREN.search(value_text):
+        notes.append(value_text)
+    return value, sides[1] if value == sides[0] else sides[0], notes
+
+
 def read_closed(token, vocab):
     """写成名字的词表（可以、不可以）：第一个「，」前面必须是词表里的值，后面的话是附注。读不出返回 None。"""
     body = PAREN.sub("", token).strip()
@@ -160,7 +199,8 @@ def read_tables(model, cfg):
     aliases, _ = role_aliases()
     quals = sorted(cfg.get("qualifiers", []), key=len, reverse=True)
     machines = set(cfg.get("vocab", {}).get("机器", []))
-    cells, notes, unparsed, refs, table_keys = [], [], [], [], {}
+    cells, notes, unparsed, refs, table_keys, prevails = [], [], [], [], {}, []
+    carriers = carrier_map(cfg)
     seen = set()  # 同一格里两个合称展开出同一个角色，只记一次
     for tid, spec in cfg["tables"].items():
         file = file_of(tid)
@@ -173,6 +213,9 @@ def read_tables(model, cfg):
         if rows[0].table != spec["key"]:
             raise SystemExit(f"data/canon.json：{tid} 的首列是「{rows[0].table}」，不是「{spec['key']}」")
         table_keys[tid] = list(dict.fromkeys(n.title for n in rows))
+        for k in spec.get("aliases", {}):
+            if k not in table_keys[tid]:
+                raise SystemExit(f"data/canon.json：{tid} 的 aliases 里的「{k}」不是这张表首列的键")
         lines = model.files[file].text.split("\n")
         header = row_cells(lines[rows[0].start - 3])
         for col in spec["columns"]:
@@ -185,6 +228,16 @@ def read_tables(model, cfg):
                 text = cell_of(col)
                 if REF.fullmatch(text.replace("`", "").strip()):
                     refs.append(Ref(tid, n.title, col, text, file, n.start))
+                    continue
+                if c.get("prevail"):
+                    got = read_prevail(n.title, text, carriers)
+                    if got is None:
+                        unparsed.append(Unparsed(tid, n.title, col, n.title, file, n.start))
+                        continue
+                    win, lose, texts = got
+                    notes += [Note(tid, n.title, c["fact"], t, file, n.start) for t in texts]
+                    if win:
+                        prevails.append(Prevail(tid, n.title, win, lose, file, n.start))
                     continue
                 row_keys = [n.title]
                 if "key_from" in c:
@@ -218,13 +271,13 @@ def read_tables(model, cfg):
                             if (tid, key, c["fact"], v) not in seen:
                                 seen.add((tid, key, c["fact"], v))
                                 cells.append(Cell(tid, key, c["fact"], v, file, n.start, c.get("edge", "")))
-    return cells, notes, unparsed, refs, table_keys
+    return cells, notes, unparsed, refs, table_keys, prevails
 
 
 def read_canon(root, model=None):
     model = model or scan_repo(root)
     cfg = load_json("canon.json")
-    cells, notes, unparsed, refs, keys = read_tables(model, cfg)
+    cells, notes, unparsed, refs, keys, prevails = read_tables(model, cfg)
     # 阅读范围的事实照图谱线现成的；标签快照这条线用不到，传空集
     facts = scaffold_facts(model, set(), root)
     syms = set(facts.symbols)
@@ -241,6 +294,8 @@ def read_canon(root, model=None):
         syms.add(sym("machine", m))
     for c in cells:
         syms.add(sym("cell", c.table, c.key, c.fact, c.value))
+    for p in prevails:
+        syms.add(sym("canon_prevails", p.winner, p.loser))
     atoms = solve(syms, ["scope.lp", "rulefacts/canon.lp"])
     _, all_roles = role_aliases()
     return Canon(
@@ -249,6 +304,7 @@ def read_canon(root, model=None):
         notes=notes,
         unparsed=unparsed,
         refs=refs,
+        prevails=prevails,
         keys=keys,
         canon=pick(atoms, "canon"),
         dup=pick(atoms, "dup_canon"),
@@ -265,16 +321,19 @@ def format_canon(c):
     out = []
     n_cells = len(c.cells)
     out.append(
-        f"规则事实线：读出事实 {n_cells} 条（去重后 {len(c.canon)} 条），附注 {len(c.notes)} 条，引用 {len(c.refs)} 条，读不出 {len(c.unparsed)} 条，"
+        f"规则事实线：读出事实 {n_cells} 条（去重后 {len(c.canon)} 条），以谁为准 {len(c.prevails)} 条，附注 {len(c.notes)} 条，引用 {len(c.refs)} 条，读不出 {len(c.unparsed)} 条，"
         f"一条事实两处正本 {len(c.dup)} 条，读不到正本 {len(c.unreachable)} 条"
     )
     for tid, spec in c.tables.items():
         mine = [x for x in c.cells if x.table == tid]
+        mine_p = [x for x in c.prevails if x.table == tid]
         opened = "、".join(f"列「{col}」词表「{v['vocab']}」未封闭" for col, v in spec["columns"].items() if v.get("open"))
         keyrole = f"；键是角色，点名 {len(c.keys[tid])} 个" if spec.get("key_vocab") == "角色" else ""
-        out.append(f"== {tid}（键列「{spec['key'] or '（空）'}」，{len(mine)} 条{keyrole}{'；' + opened if opened else ''}） ==")
+        out.append(f"== {tid}（键列「{spec['key'] or '（空）'}」，{len(mine) + len(mine_p)} 条{keyrole}{'；' + opened if opened else ''}） ==")
         for x in mine:
             out.append(f"{x.key} / {x.fact} / {x.value}    {x.file}:{x.line}")
+        for x in mine_p:
+            out.append(f"{x.key} / 以谁为准 / {x.winner} 优先于 {x.loser}    {x.file}:{x.line}")
     out.append(f"== 附注：{len(c.notes)} 条（括号里的话与限定，不进事实） ==")
     for x in c.notes:
         out.append(f"{x.file}:{x.line}  {x.key} / {x.fact}：{x.text}")

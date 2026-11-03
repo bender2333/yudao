@@ -97,20 +97,27 @@ def page_data(root):
             edges.append({"source": a["id"], "target": b["id"], "fact": x.fact, "label": label, "src": src})
     kinds = ["角色"] + [k for k in dict.fromkeys(kind_of_table.values()) if k != "角色"]
 
-    # 以谁为准偏序图：载体为节点，prevails 为边（优先的指向其次的）；成环的组标红
+    # 以谁为准偏序图：载体为节点，优先的指向其次的。正本的边（实线）来自「冲突时以谁为准」表，复述的边（虚线）来自 prevails；
+    # 成环的、和正本相反的标红
     cyc = [set(x.key) for x in chk.conflicts if x.kind == "precedence_cycle"]
     in_cycle = lambda a, b: any(a in g and b in g for g in cyc)
-    pnodes = sorted({x for _, w, o in chk.edges for x in (w, o)})
+    wrong = {(x.key[0], x.key[1], x.key[2]) for x in chk.conflicts if x.kind == "prevails_wrong"}
+    pnodes = sorted({x for _, w, o in chk.edges for x in (w, o)} | {x for p in c.prevails for x in (p.winner, p.loser)})
     prec = {
         "nodes": [{"id": n, "cyc": any(n in g for g in cyc)} for n in pnodes],
         "edges": [
+            {"node": "", "source": p.winner, "target": p.loser, "src": f"{p.file}:{p.line}", "text": p.key, "canon": True, "cyc": False}
+            for p in c.prevails
+        ]
+        + [
             {
                 "node": n,
                 "source": w,
                 "target": o,
                 "src": compare.where(chk.by_node[n]),
                 "text": chk.by_node[n].text,
-                "cyc": in_cycle(w, o),
+                "canon": False,
+                "cyc": in_cycle(w, o) or (n, w, o) in wrong,
             }
             for n, w, o in chk.edges
         ],
@@ -163,6 +170,7 @@ def page_data(root):
             "facts": len(c.cells),
             "notes": len(c.notes),
             "refs": len(c.refs),
+            "prevails": len(c.prevails),
             "unparsed": len(c.unparsed),
             "dup": len(c.dup),
             "unreachable": len(c.unreachable),

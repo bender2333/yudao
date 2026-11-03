@@ -14,13 +14,15 @@ PLANTED = {
     "only_wrong": ["`DELIVERY:` 只由执行者写"],  # 正本还有审查者
     "denied": ["审查者不写 `DELIVERY:`"],  # 正本里审查者写
     "not_member_wrong": ["设计问题不是 `needs-triage` 的理由"],
-    "precedence_cycle": ["设计说明与 ADR 冲突时以设计说明为准", "设计说明与 ADR 冲突时以 ADR 为准"],
+    "precedence_cycle": ["基础规则与共同规则冲突时以基础规则为准", "基础规则与共同规则冲突时以共同规则为准"],  # 正本「冲突时以谁为准」表里没有这一对：只是两句互相打架
     "may_wrong": ["用户不在场时架构师循环可以改规则"],  # 正本：不可以
     "handoff_wrong": ["执行环境的问题交给总架构师"],  # 正本：用户
     "closed_missing": ["只有设计问题是 `needs-triage` 的理由"],  # 漏了正本里的别的
     "closed_extra": ["只有设计问题、规则矛盾、验收做不到、文件超上限是 `needs-triage` 的理由"],  # 多了文件超上限；理由清单在句号处停，正本只有这三条
     "user_hands_on": ["`HANDOFF:` 由用户写"],  # 正本里任何角色都写，用户在内，所以只有这一类
 }
+# 夹具里「冲突时以谁为准」表的七条边（优先的, 其次的）
+CANON_EDGES = {("总图", "画面总图"), ("总图", "设计说明"), ("总图", "术语表"), ("设计说明", "ADR"), ("D38", "需求记录"), ("设计说明", "父工单的验收"), ("AGENTS.md", "CLAUDE.md")}
 # 与正本一致的复述：一条矛盾也不该有
 CONSISTENT = [
     "`waiting` 由总架构师加上",  # 多值事实只说一部分，不报
@@ -74,7 +76,7 @@ def test_every_conflict_names_both_places_and_says_what_differs(rf_repo):
     assert "还有 审查者" in by_kind["only_wrong"].why
     assert "不「由谁写」DELIVERY:，正本里 审查者" in by_kind["denied"].why
     assert "正本的理由里有它" in by_kind["not_member_wrong"].why
-    assert "设计说明" in by_kind["precedence_cycle"].why and "ADR" in by_kind["precedence_cycle"].why and "绕成一圈" in by_kind["precedence_cycle"].why
+    assert "基础规则" in by_kind["precedence_cycle"].why and "共同规则" in by_kind["precedence_cycle"].why and "绕成一圈" in by_kind["precedence_cycle"].why
     assert by_kind["may_wrong"].why.endswith("正本说不可以") and re.search(rf"{WF}:\d+  改规则、CI 工作流 / 不在场可否：不可以", by_kind["may_wrong"].canon[0])
     assert by_kind["handoff_wrong"].canon[0].endswith(f"{STUCK_ENV} / 交给：用户") and "没有 总架构师" in by_kind["handoff_wrong"].why
     assert "漏了正本里的 规则矛盾、验收做不到" in by_kind["closed_missing"].why
@@ -184,9 +186,13 @@ def test_page_json_agrees_with_the_rule_conclusions(rf_repo):
     assert [x["status"] for x in row["restates"]] == ["ok"] and not row["bad"]
     # 偏序图：优先的指向其次的，成环的边与节点标出
     prec = data["prec"]
-    edges = {(e["source"], e["target"]): e["cyc"] for e in prec["edges"]}
-    assert edges[("设计说明", "ADR")] and edges[("ADR", "设计说明")] and not edges[("总图", "术语表")]
-    assert {n["id"]: n["cyc"] for n in prec["nodes"]} == {"设计说明": True, "ADR": True, "总图": False, "术语表": False}
+    # 复述的边（canon 为假，画虚线）：成环的两条标红，总图到术语表那条与正本一致，不红
+    restated = {(e["source"], e["target"]): e["cyc"] for e in prec["edges"] if not e["canon"]}
+    assert restated[("基础规则", "共同规则")] and restated[("共同规则", "基础规则")] and not restated[("总图", "术语表")]
+    assert {n["id"] for n in prec["nodes"] if n["cyc"]} == {"基础规则", "共同规则"}
+    # 正本的边（画实线）：「冲突时以谁为准」表的七行，各带出处
+    assert {(e["source"], e["target"]) for e in prec["edges"] if e["canon"]} == CANON_EDGES
+    assert all(re.fullmatch(rf"{WF}:\d+", e["src"]) and not e["cyc"] for e in prec["edges"] if e["canon"]) and data["stat"]["prevails"] == 7
     # 矛盾清单上有原句与正本出处
     cf = next(c for c in data["conflicts"] if c["kind"] == "handoff_wrong")
     assert cf["srcs"][0].startswith(RESTATE) and "执行环境的问题交给总架构师" in cf["texts"][0] and cf["canon"] and "没有 总架构师" in cf["why"]
@@ -195,5 +201,8 @@ def test_page_json_agrees_with_the_rule_conclusions(rf_repo):
 def test_page_without_restatements_has_empty_conflicts_and_no_prevails_graph(rf_repo):
     rf_repo.cli("rules", "view")
     data = page_json(rf_repo)
-    assert data["conflicts"] == [] and data["prec"] == {"nodes": [], "edges": []} and data["stat"]["conflicts"] == 0
+    # 没有复述：偏序图里只有正本的边（实线）
+    assert data["conflicts"] == [] and data["stat"]["conflicts"] == 0
+    assert {(e["source"], e["target"]) for e in data["prec"]["edges"]} == CANON_EDGES and all(e["canon"] and not e["cyc"] for e in data["prec"]["edges"])
+    assert {n["id"] for n in data["prec"]["nodes"]} == {x for e in CANON_EDGES for x in e}
     assert all(r["restates"] == [] and not r["bad"] for r in data["matrix"])

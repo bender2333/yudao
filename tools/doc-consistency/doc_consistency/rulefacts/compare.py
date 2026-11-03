@@ -14,7 +14,7 @@ from . import canon as rf
 from . import scan as S
 from .patterns import SHAPES
 
-# 矛盾的八类（五类加三类），再加方案第 3.1 节的「用户亲手改建删写」
+# 矛盾的八类（五类加三类），再加对着「冲突时以谁为准」正本表的一类，和方案第 3.1 节的「用户亲手改建删写」
 FIVE = (
     ("extra", "多说了正本没有的值"),
     ("only_wrong", "说「只由」，正本里还有别人"),
@@ -28,8 +28,9 @@ THREE = (
     ("closed_missing", "穷尽清单：复述说只有这些，正本还有别的"),
     ("closed_extra", "穷尽清单：复述里有正本没有的"),
 )
+PREC = (("prevails_wrong", "以谁为准与正本相反"),)
 USER = (("user_hands_on", "用户亲手改建删写（用户只定与确认）"),)
-KINDS = FIVE + THREE + USER
+KINDS = FIVE + THREE + PREC + USER
 LABEL = dict(KINDS)
 RULES = ["scope.lp", "rulefacts/canon.lp", "rulefacts/compare.lp"]
 RESULTS = [k for k, _ in KINDS] + ["above"]
@@ -167,6 +168,10 @@ def build_conflicts(c, groups, res):
         mine = [e for e in edges if e[1] in comp and e[2] in comp]
         why = "、".join(comp) + " 之间，" + "；".join(f"{w}优先于{o}（{where(by_node[n])}）" for n, w, o in mine) + "：方向相反或绕成一圈"
         add("precedence_cycle", [n for n, _, _ in mine], [], [], why, comp)
+    # 以谁为准与正本相反：复述说 A 优先于 B，正本是 B 优先于 A
+    for n, a, b in res["prevails_wrong"]:
+        lines = [f"{p.file}:{p.line}  {p.key}：{p.winner}优先于{p.loser}" for p in c.prevails if (p.winner, p.loser) == (b, a)]
+        add("prevails_wrong", [n], [], lines, f"复述说{a}优先于{b}（{where(by_node[n])}），正本是{b}优先于{a}", (n, a, b))
     for n, r, x, s, val in res["may_wrong"]:
         f = "在场可否" if s == "在场" else "不在场可否"
         normal = "、".join(canon_values(c, x, f))
@@ -250,7 +255,9 @@ def format_check(chk, show_all=False, tier="A", sample=None):
     ]
     five = "，".join(f"{LABEL[k]} {chk.count(k)}" for k, _ in FIVE)
     three = "，".join(f"{LABEL[k]} {chk.count(k)}" for k, _ in THREE)
-    out.append(f"矛盾 {len(chk.conflicts)} 条。五类：{five}。三类：{three}。另：{USER[0][1]} {chk.count('user_hands_on')}")
+    out.append(
+        f"矛盾 {len(chk.conflicts)} 条。五类：{five}。三类：{three}。另：{USER[0][1]} {chk.count('user_hands_on')}，{PREC[0][1]} {chk.count('prevails_wrong')}"
+    )
     for kind, label in KINDS:
         mine = [x for x in chk.conflicts if x.kind == kind]
         out.append(f"== {label}：{len(mine)} 条 ==")

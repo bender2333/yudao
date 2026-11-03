@@ -6,6 +6,7 @@
 %     may(节点,角色,事,在场或不在场,可以或不可以)
 %     handoff(节点,卡在项,角色)
 %     only_members(节点,键,条目)  closed(节点,键)
+%   canon_prevails(优先,其次)            正本「冲突时以谁为准」表的一行（canon.py 读表，随正本事实一起喂进来）
 %   hands_on(事实名)                     用户只定与确认，不亲手做的几种事实
 % 合称在喂进来以前已经展开成各个角色：复述写「由架构师」就是三条 says，正本只有总架构师，另两个按 extra 报。
 % 多值事实复述时只说一部分不报：规则里没有「正本有而复述没说」这一类（说了「只有」的 only_wrong、closed_missing 除外）。
@@ -21,6 +22,7 @@
 #defined only_members/3.
 #defined closed/2.
 #defined hands_on/1.
+#defined canon_prevails/2.
 
 % ---- 五类 ----
 % 复述多说了正本没有的值；说是某清单的一员，正本里没有这一员，也算多说
@@ -36,6 +38,8 @@ not_member_wrong(N,K,X) :- not_member(N,K,X), canon(K,"理由",X).
 above(A,B) :- prevails(_,A,B).
 above(A,C) :- above(A,B), above(B,C).
 precedence_cycle(A,B) :- above(A,B), above(B,A), A < B.
+% 复述说 A 优先于 B，而正本是 B 优先于 A。复述说的两边正本没有的，不报（多值只说一部分同理）
+prevails_wrong(N,A,B) :- prevails(N,A,B), canon_prevails(B,A).
 
 % ---- 三类 ----
 % 在场可否：复述说可以，正本说不可以，或反过来
@@ -56,6 +60,7 @@ user_hands_on(N,K,F) :- says(N,K,F,"用户"), hands_on(F).
 #show denied/4.
 #show not_member_wrong/3.
 #show precedence_cycle/2.
+#show prevails_wrong/3.
 #show above/2.
 #show may_wrong/5.
 #show handoff_wrong/3.
