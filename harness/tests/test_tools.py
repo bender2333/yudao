@@ -215,8 +215,8 @@ def test_departments_cannot_change_delivery_files(tmp_path, department):
         assert called.department == department
         assert not called.payload["ok"]
         if department == "quality" and tool in ("write_file", "edit_range"):
-            # 质检的写入工具只写测试材料目录：原因写明目录与放行核对的树
-            assert QA_TESTS_DIR in called.payload["error"] and "quality" in called.payload["error"]
+            # 写入范围是检查材料的角色只写检查材料目录：原因写明目录与放行核对的树，不写部门名（工单 #1390）
+            assert QA_TESTS_DIR in called.payload["error"] and department not in called.payload["error"]
         else:
             assert called.payload["error"] == f"{department} cannot use {tool}"
         assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == identity for event in events)
