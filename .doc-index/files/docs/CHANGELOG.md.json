@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/CHANGELOG.md",
-"hash":"bd609b7b2aae2e1b",
+"hash":"5cdafbc50f2765fa",
 "nodes":[
-{"hash":"bd609b7b2aae2e1b","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
+{"hash":"5cdafbc50f2765fa","id":"docs/CHANGELOG.md","kind":"file","title":"docs/CHANGELOG.md"},
 {"hash":"aa6145f9529bb456","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","kind":"section","parent":"docs/CHANGELOG.md","title":"文档变更记录 (Docs Changelog)"},
-{"hash":"03a9ca172b92f674","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
+{"hash":"37c74b04355014f3","id":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范","kind":"section","parent":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog)","title":"记录格式规范"}
 ],
 "edges":[
 {"dst":".claude/hooks/state-doc-dates.mjs","kind":"code-path","raws":[".claude/hooks/state-doc-dates.mjs"],"seen":"3c58bd1a758687cd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -31,7 +31,7 @@
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"47bedab1efdf5000","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"CONTEXT.md","kind":"section-ref","raws":["CONTEXT.md"],"seen":"47bedab1efdf5000","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"2f13bdd4ac8bee5e","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"554ce5dc1e0c6089","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"bc782023a8bd58fb","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/README.md","kind":"code-path","raws":["client/README.md"],"seen":"f3b270cadfc31819","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"client/tests/e2e/models.spec.ts","kind":"code-path","raws":["client/tests/e2e/models.spec.ts"],"seen":"1e081712c4c833b0","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/adr/0040-design-implementation-separation.md","kind":"code-path","raws":["docs/adr/0040-design-implementation-separation.md"],"seen":"e13e2bc72a154c3b","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -55,7 +55,7 @@
 {"dst":"docs/archive/current-baseline-2026-10-29.md","kind":"code-path","raws":["docs/archive/current-baseline-2026-10-29.md"],"seen":"9e4a89c32b73cba5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/consistency-scan-2026-11-03.md","kind":"code-path","raws":["docs/consistency-scan-2026-11-03.md"],"seen":"33cc4b05e042e29d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/current-baseline.md","kind":"code-path","raws":["docs/current-baseline.md"],"seen":"85e8497fdcdb290d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md","docs/decision.md"],"seen":"7c75a2594365e44d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/decision.md","kind":"code-path","raws":["decision.md","docs/decision.md"],"seen":"76df7b9f3a65266f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/decision.md#决策记录 > 2026-11-02 - 组织设定：五份形态两个层做目录，事项的来源进定义，用户脚本做正本","kind":"section-ref","raws":["docs/decision.md"],"seen":"dc95142753b0be44","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/README.md","kind":"code-path","raws":["design/README.md","docs/design/README.md"],"seen":"c02ee177d8ed63a3","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/design/app-and-interface.md","kind":"code-path","raws":["design/app-and-interface.md","docs/design/app-and-interface.md"],"seen":"3ceed09726a9b62f","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
@@ -150,7 +150,7 @@
 {"dst":"docs/research/README.md","kind":"code-path","raws":["docs/research/README.md","research/README.md"],"seen":"cf33f2bfc268c513","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/research/deepseek-superagent-async-framework.md","kind":"code-path","raws":["research/deepseek-superagent-async-framework.md"],"seen":"e57af7e8d698323d","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md","research/doc-consistency-concept-model.md"],"seen":"aee6360e04742851","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
-{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"code-path","raws":["research/doc-consistency-rule-facts.md"],"seen":"36dde0d8f5b6c344","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
+{"dst":"docs/research/doc-consistency-rule-facts.md","kind":"code-path","raws":["research/doc-consistency-rule-facts.md"],"seen":"48d08af4862268fa","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/trial/stage-1-guide.md","kind":"code-path","raws":["docs/trial/stage-1-guide.md"],"seen":"8639adb798d3e4fd","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"docs/trial/tasks.md","kind":"code-path","raws":["docs/trial/tasks.md"],"seen":"80f417d87d1bd0a5","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},
 {"dst":"evals/README.md","kind":"code-path","raws":["evals/README.md"],"seen":"f0db9c381e4bdfdf","src":"docs/CHANGELOG.md#文档变更记录 (Docs Changelog) > 记录格式规范"},

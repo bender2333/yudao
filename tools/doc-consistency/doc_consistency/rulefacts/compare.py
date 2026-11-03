@@ -4,6 +4,7 @@ patterns.py 把句子读成原子，这里把原子和第 1 步读出的正本�
 取回矛盾，补上两边的出处（复述 文件:行、正本 文件:行）和差在哪。Python 不判断矛盾，只摆事实。
 """
 
+import random
 from dataclasses import dataclass, field
 
 from ..scaffold import pick, solve, sym
@@ -219,9 +220,22 @@ def check(root):
 # ---------- 输出 ----------
 
 SHOW_UNPARSED = 20
+TIERS = ("A", "B", "C")
 
 
-def format_check(chk):
+def in_tier(h, tier):
+    """提醒的档（第 4 步分档，默认 A 即现在的做法）。
+    A：全部候选；B：只留窄口径命中、句式形状补入（含引导句靠句式形状补入的）、机器主语三种来源；C：只留句式形状补入。"""
+    shaped = h.by_shape or h.shape_lead
+    if tier == "C":
+        return shaped
+    if tier == "B":
+        return h.narrow or shaped or h.by_machine
+    return True
+
+
+def format_check(chk, show_all=False, tier="A", sample=None):
+    """show_all：提醒全部列出（默认前 20 条）；tier：提醒只留这一档；sample：从这一档里按固定种子抽 N 条（顺序不变）。默认参数的输出与第 3 步一字不差。"""
     sc, c = chk.sc, chk.canon
     hits = sc.hits
     cnt = S.counts(hits)
@@ -252,11 +266,22 @@ def format_check(chk):
             out.append(f"  差在哪：{x.why}")
     out += rf.format_unreachable(c)
     out += rf.format_dup(c)
-    un = chk.unparsed()
-    out.append(
-        f"== 像在说规则但解析不了：{len(un)} 条（候选 {len(hits)} − 解析成功 {cnt[S.CLS[1]]} − 纯指路 {cnt[S.CLS[0]]}），前 {min(SHOW_UNPARSED, len(un))} 条；"
-        "这是以后钩子的提醒 =="
-    )
-    for h in un[:SHOW_UNPARSED]:
+    un_all = chk.unparsed()
+    kept = [h for h in un_all if in_tier(h, tier)]
+    un = kept
+    if sample is not None:
+        picked = random.Random(S.SAMPLE_SEED).sample(un, min(sample, len(un)))
+        order = {id(h): i for i, h in enumerate(un)}
+        un = sorted(picked, key=lambda h: order[id(h)])
+    shown = un if (show_all or sample is not None) else un[:SHOW_UNPARSED]
+    base = f"候选 {len(hits)} − 解析成功 {cnt[S.CLS[1]]} − 纯指路 {cnt[S.CLS[0]]}"
+    if tier == "A" and sample is None:
+        head = f"{len(un)} 条（{base}），" + ("全部列出" if show_all else f"前 {len(shown)} 条")
+    else:
+        head = f"档 {tier}：{len(kept)} 条（全部 {len(un_all)} 条里留下的；{base}），" + (
+            f"固定种子（{S.SAMPLE_SEED}）抽 {len(shown)} 条" if sample is not None else "全部列出" if show_all else f"前 {len(shown)} 条"
+        )
+    out.append(f"== 像在说规则但解析不了：{head}；这是以后钩子的提醒 ==")
+    for h in shown:
         out += S.fmt_hit(h)
     return out
