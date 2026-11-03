@@ -51,7 +51,7 @@ from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.environment import QA_TESTS_DIR  # noqa: E402
 from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
-    answer_turn, ask_turn, baseline_review_turn, delivery_turn, product_spec,
+    answer_turn, ask_turn, baseline_review_turn, delivery_turn, judgement_turn, product_spec,
     review, review_turn, structure_turn,
 )
 from harness.providers.call import ModelResponse  # noqa: E402
@@ -455,6 +455,65 @@ def stop_note_script():
     }
 
 
+# 开环明细的端到端验收（工单 #401）：一个放行带两条开环条件（一条判定点、一条开环），
+# 离开期间的报告要逐条列出它们，条数与 acceptance.coverage 的数一致
+COVERAGE_PROJECT = "开环报告"
+COVERAGE_ITEM = "实现带开环条件的放行"
+COVERAGE_ACCEPTANCE = ["打印传入的文本", "空参数时打印用法", "退出码为 0"]
+
+
+def coverage_criteria() -> list[dict]:
+    # 三条验收条件（验证的独立性设计说明第 7.1 节）：一条命令检查（可执行、通过）、
+    # 一条带参照材料的判定点（模型阅读、不可执行）、一条开环（不可执行）。
+    # 可执行检验的条件放行时必须是 passed，不可执行的可以是 unverified
+    return [
+        {"criterion": "AC1", "method": "check", "result": "passed", "checks": ["smoke"],
+         "trial_cases": [], "note": ""},
+        {"criterion": "AC2", "method": "judgement", "result": "unverified", "checks": [],
+         "trial_cases": [], "note": "对照 Usage 段落人读"},
+        {"criterion": "AC3", "method": "open", "result": "unverified", "checks": [],
+         "trial_cases": [], "note": "没有可执行的检验"},
+    ]
+
+
+def coverage_script():
+    # 开环明细的脚本（工单 #401）：按部门给出，每一轮按请求里看到的事实决定做什么——
+    # 质检在没有交付的一轮是预测性探索，有交付的一轮先交独立判断（提交结论以前必须有它，
+    # 验证的独立性设计说明第 4 节）再放行。放行记录里因此有两条开环条件
+    judged: dict[str, bool] = {}
+
+    def quality_turn(call):
+        if not prompt_part(call, "current_delivery_spec"):
+            return explore_turn()
+        if not judged.get("committed"):
+            judged["committed"] = True
+            return judgement_turn(checks={"smoke": 0}, criteria=coverage_criteria())(call)
+        return review_turn("release", "checks passed on the current snapshot",
+                           checks={"smoke": 0}, criteria=coverage_criteria())(call)
+
+    return {
+        "product": [FakeTurn(proposal=product_spec(acceptance=COVERAGE_ACCEPTANCE))],
+        "engineering": [delivery_turn()],
+        "quality": [quality_turn] * 8,
+    }
+
+
+async def seed_coverage(application: Application, system: LoopSystem) -> None:
+    # 开环明细的预置（工单 #401）：一个项目、一个走完三部门并放行的事项，放行记录带两条开环条件。
+    # 没有走完时立即失败：报告里没有这一项时用例看不出是被测页面还是预置的问题
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=COVERAGE_PROJECT, goal="报告里列出开环明细"))
+    project_id = created.refs.project_id
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=project_id, text=COVERAGE_ITEM))
+    task = system.orchestrator.work_item_execution(item.refs.run_id)
+    if task is not None:
+        await task
+    run = system.project(item.refs.run_id)
+    if run.status != "done":
+        raise AssertionError(f"开环明细的预置没有走完：{run.status} {run.stop_reason}")
+
+
 def kernel_script():
     # 路径守卫的端到端验收（工单 #354）：预置的事项交付改动了内核清单里的路径，结算因此不采纳，
     # 发出内核修改决定请求；用例在界面上核对卡片给出改动的路径与差异，批准以后交付被采纳。
@@ -827,7 +886,7 @@ def main() -> int:
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote", "replay", "kill", "steps"),
+                                             "stopnote", "replay", "kill", "steps", "coverage"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -898,6 +957,9 @@ def main() -> int:
         adapter_script = kill_resume_script() if args.hold_resume else kill_script(signals)
     elif args.script == "steps":
         adapter_script = steps_script(data_dir)
+    elif args.script == "coverage":
+        # 开环明细（工单 #401）：一个放行带两条开环条件，离开期间的报告逐条列出它们
+        adapter_script = coverage_script()
     elif args.script == "replay":
         # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
         base_script = script()
@@ -979,6 +1041,9 @@ def main() -> int:
             asyncio.run(seed_onboarding(application))
         elif args.script == "kernel":
             asyncio.run(seed_kernel(application, system))
+        elif args.script == "coverage":
+            # 开环明细（工单 #401）：预置一个走完并放行的事项，放行记录里带两条开环条件
+            asyncio.run(seed_coverage(application, system))
         elif args.script == "replay":
             # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
             asyncio.run(seed(application, system, two_item_project=True))
