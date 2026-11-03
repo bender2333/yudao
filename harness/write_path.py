@@ -119,9 +119,7 @@ class Transaction(Snapshot):
         super().__init__(store, stream, saved, handler, minimal_of)
         self.appended: list[Any] = []
         self._command = command
-        # 这次写入核对停止原因与部门所用的定义（工单 #1165）：调用方交进来事项所用的那一份，
-        # 没有交的时候是当前加载的那一份，与工具许可、提案校验同一个取法（`in_force`）
-        self._definitions = in_force(definitions)
+        self._definitions = in_force(definitions)  # 核对停止原因与部门所用的定义：调用方交的那份，不给时是加载的那份
         self._changed_decisions: list[str] = []
         self._compensations: list[Callable[[], None]] = []
         self._committed_effects: list[Callable[[], None]] = []
@@ -207,20 +205,16 @@ class WritePath:
 
     def read(self, stream: str) -> Snapshot:
         # 读取流保存的投影与流版本，用于之后以这个版本作为期望版本提交的判断
-        return Snapshot(self._store, stream, self._store.projection(stream), self._handler_for(stream),
-                        self._minimal_at)
+        return Snapshot(self._store, stream, self._store.projection(stream), self._handler_for(stream), self._minimal_at)
 
     def transact(self, stream: str, decide: Callable[[Transaction], T], *, expected_version: int | None = None,
-                 command: Command | None = None, epoch: int | None = None,
-                 definitions: Definitions | None = None) -> T:
+                 command: Command | None = None, epoch: int | None = None, definitions: Definitions | None = None) -> T:
         # 在一个事务中读取保存的投影、由 decide 判断并追加事件、提交。
         # expected_version 为空时，提交因另一方的写入被拒绝就按写入以后的状态重新调用 decide，直到提交成功；
         # 给出 expected_version 时，读取或提交时流版本与它不同都拒绝（StreamVersionConflict），不重新判断。
         # command 是引起这次写入的命令：同一身份已经登记时不调用 decide，内容相同拒绝为 DuplicateCommand，不同为
         # CommandIdReused；被拒绝的命令不登记；追加的事件记下命令身份与提出者。epoch 是写入方的执行权编号，随事件记录，
         # 小于这个流已经记录的编号时拒绝（StaleExecutionRight）；取得执行权的规则由 3.1 加入。
-        # definitions 是这次写入核对停止原因与部门所用的定义（工单 #1165）：事项所用的那一份由调用方交进来，
-        # 不给时是当前加载的那一份。
         # 提交以后执行 on_commit 登记的效果，再通知事件日志的订阅方；这以后出的错不影响已经提交的写入
         attempt = 0
         while True:
@@ -228,8 +222,7 @@ class WritePath:
             if command is not None:
                 self._store.check_command(command)
             transaction = Transaction(self._store, stream, self._store.projection(stream),
-                                      self._handler_for(stream), command, self._minimal_at,
-                                      definitions=definitions)
+                                      self._handler_for(stream), command, self._minimal_at, definitions=definitions)
             if expected_version is not None and transaction.version != expected_version:
                 raise StreamVersionConflict(stream, expected_version, transaction.version)
             try:
@@ -252,7 +245,6 @@ class WritePath:
 
     def append(self, stream: str, *entries: NewEvent | NewProjectEvent, expected_version: int | None = None,
                epoch: int | None = None, definitions: Definitions | None = None) -> list[Any]:
-        # 不需要读取投影作判断的追加；definitions 与 transact 的同一个意思（工单 #1165）
         return self.transact(stream, lambda transaction: transaction.append(*entries),
                              expected_version=expected_version, epoch=epoch, definitions=definitions)
     def claim_execution_right(self, stream: str, decide: Callable[[Transaction], T], *,
@@ -344,8 +336,7 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, ver
             payload=payload, artifact_hashes=list(entry.artifact_hashes), session_id=entry.session_id,
             provider=entry.provider, model=entry.model, context_digest=entry.context_digest,
             stop_reason=entry.stop_reason, error=entry.error, created_at=utc_now(), position=0, stream=stream,
-            stream_version=version, project_id=None, work_item_id=None,
-            department=entry.department,
+            stream_version=version, project_id=None, work_item_id=None, department=entry.department,
             command_id=command_id, actor=actor,
         )
     return ProjectEvent(
@@ -357,10 +348,8 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, ver
 
 
 def _check_stop_reason(entry: NewEvent, definitions: Definitions) -> None:
-    # 停止原因只来自这份定义中的清单，只由结束运行的事件承载，与原因规定的结束方式及事件写入的终态一致，
-    # 载荷中的停止原因与事件的停止原因相同；否则这次写入失败。
-    # 清单取自定义（工单 #1165）：事项在创建时冻结了定义版本，第二种路由在自己那份定义里声明的结束原因
-    # 写在它自己那份定义的 routings.json 里，内核的 stop_reasons.json 里没有它
+    # 停止原因只来自定义中的清单，只由结束事件承载：原因规定的结束方式、载荷与事件的停止原因都要一致，否则失败。
+    # 清单取自定义（工单 #1165）：第二种路由在自己那份定义里声明的结束原因写在它的 routings.json 里
     ending = _STOP_EVENTS.get(entry.type)
     if entry.stop_reason is None:
         if ending is not None:
