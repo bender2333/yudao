@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from ..artifacts import ArtifactStore
+from ..definitions import DEFINITIONS
 from ..event_store import EventStore
 from ..models import Event, EventType, ProjectEvent, json_dumps
 from ..observability import AttemptFold, search_text
@@ -40,10 +41,21 @@ FLOW_TYPES = frozenset({
 DERIVATION_VERSION = 2
 # 推导版本在读取模型自己的表里：app_read_meta 的 key 是 "derivation_version"
 DERIVATION_KEY = "derivation_version"
-# 质检退回的判定到承接部门的对应；与项目流使用的退回判定必须是同一个集合，启动时核对
-_REWORK_DEPARTMENTS = {"rework_engineering": "engineering"}
-if set(_REWORK_DEPARTMENTS) != set(REWORK_VERDICTS):
-    raise ValueError("the flow read model and the project stream disagree on the rework verdicts")
+
+
+def _watchers(kind: str) -> list[str]:
+    """关注这种成果的部门（组织定义里的 watched），按定义的部门顺序。
+
+    流转记录「送到谁」按关注的成果推出，不写部门名（工单 #1391）。
+    """
+    return [department for department in DEFINITIONS.departments
+            if kind in DEFINITIONS.watched_outputs(department)]
+
+
+def _verified_departments(verifier: str, outcome: str) -> list[str]:
+    """这个核验角色核验的、交这种成果的部门：取自定义里的核验声明（工单 #1391）。"""
+    return [verified for role, verified, kind in DEFINITIONS.rejection_edges()
+            if role == verifier and kind == outcome]
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS app_read_positions (
@@ -369,30 +381,35 @@ def _upsert_flow(connection: sqlite3.Connection, row: dict[str, Any]) -> None:
 
 
 def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
-    # 一条事件产生的流转记录：迁移与质检退回产生新记录，部门之间的回答与关闭更新同一条咨询记录
+    # 一条事件产生的流转记录：迁移与退回产生新记录，部门之间的回答与关闭更新同一条咨询记录。
+    # 记录的去向按定义推出（工单 #1391）：PRD 的新版本送到关注它的部门，「交付送到谁」「返工回到谁」
+    # 由核验声明给出，来源是写这条事件的部门；代码里不写部门名
     if not isinstance(event, Event):
         return []
     payload = event.payload or {}
+    source = event.department or ""
     base = {
         "project_id": event.project_id, "work_item_id": event.work_item_id, "run_id": event.run_id,
         "position": event.position, "seq": event.stream_version, "event_id": event.event_id,
         "created_at": event.created_at,
     }
     if event.type == EventType.SPEC_ACCEPTED:
-        # PRD 被接纳（工单 #882）：产品→工程与产品→质检各一条，两个部门都关注 PRD 的新版本。
-        # 两条的编号不同（事件编号加接收部门），否则后一条会盖掉前一条。
+        # PRD 被接纳（工单 #882）：关注 PRD 新版本的每个部门一条，来源是写这份 PRD 的部门。
+        # 几条的编号不同（事件编号加接收部门），否则后一条会盖掉前一条
         content = _spec_version_content(payload)
-        return [{**base, "flow_id": f"{event.event_id}:engineering", "kind": "PRD 新版本",
-                 "direction_from": "product", "direction_to": "engineering",
-                 "status": "已完成", "content": content},
-                {**base, "flow_id": f"{event.event_id}:quality", "kind": "PRD 新版本",
-                 "direction_from": "product", "direction_to": "quality",
-                 "status": "已完成", "content": content}]
+        return [{**base, "flow_id": f"{event.event_id}:{department}", "kind": "PRD 新版本",
+                 "direction_from": source, "direction_to": department,
+                 "status": "已完成", "content": content}
+                for department in _watchers("product_spec")]
     if event.type == EventType.DELIVERY_ACCEPTED:
-        # 交付到达（工单 #556：不再有阶段迁移事件，版本交付的记录由交付到达给出）
-        return [{**base, "flow_id": event.event_id, "kind": "版本交付",
-                 "direction_from": "engineering", "direction_to": "quality",
-                 "status": "已完成", "content": payload.get("summary", "")}]
+        # 交付到达（工单 #556：不再有阶段迁移事件，版本交付的记录由交付到达给出）：送去核验这个部门交付的
+        # 核验角色；没有人核验它时（开环）记一条没有去向的记录，交付本身仍然在
+        verifiers = list(DEFINITIONS.verifiers_of(source, "delivery_spec")) or [None]
+        return [{**base,
+                 "flow_id": event.event_id if len(verifiers) == 1 else f"{event.event_id}:{verifier}",
+                 "kind": "版本交付", "direction_from": source, "direction_to": verifier,
+                 "status": "已完成", "content": payload.get("summary", "")}
+                for verifier in verifiers]
     if event.type == EventType.ASK_STARTED:
         return [{**base, "flow_id": payload["branch_session_id"], "kind": "询问",
                  "direction_from": payload["requester"], "direction_to": payload["recipient"],
@@ -403,10 +420,14 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
         return [{**base, "flow_id": event.session_id, "kind": "询问",
                  "direction_from": payload.get("requester"), "direction_to": payload.get("recipient"),
                  "status": status, "content": content}]
-    if event.type == EventType.QA_SUBMITTED and payload.get("verdict") in _REWORK_DEPARTMENTS:
-        return [{**base, "flow_id": event.event_id, "kind": "问题反馈",
-                 "direction_from": "quality", "direction_to": _REWORK_DEPARTMENTS[payload["verdict"]],
-                 "status": "已退回", "content": payload.get("rationale", "")}]
+    if event.type == EventType.QA_SUBMITTED and payload.get("verdict") in REWORK_VERDICTS:
+        # 退回（循环结构第 2.1 节）：返工回到被核验的那一方，由核验声明给出；来源是写这条结论的核验角色
+        targets = _verified_departments(source, "delivery_spec") or [None]
+        return [{**base,
+                 "flow_id": event.event_id if len(targets) == 1 else f"{event.event_id}:{target}",
+                 "kind": "问题反馈", "direction_from": source, "direction_to": target,
+                 "status": "已退回", "content": payload.get("rationale", "")}
+                for target in targets]
     return []
 
 
