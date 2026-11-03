@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import sys
+from dataclasses import replace
 
 import pytest
 
@@ -22,7 +23,7 @@ from harness import parameters
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import frozen_visibility
-from harness.definitions import DEFINITIONS
+from harness.definitions import DEFAULT_FORM, DEFINITIONS
 from harness.event_store import run_stream
 from harness.models import EventType, RunProjection
 from harness.parameters import FROZEN_PARAMETERS, ParameterOutOfBoundsError, frozen_run_parameters
@@ -353,7 +354,10 @@ def test_a_missing_run_is_not_rebuilt_after_the_item_definition_version_changes(
         def __getattr__(self, name: str):
             return getattr(DEFINITIONS, name)
 
-    monkeypatch.setattr("harness.projects.DEFINITIONS", _OtherDefinitions())
+    # 这一份形态的当前定义版本与事项记录的不同（工单 #1392：版本按事项冻结的形态取，也就是组装处加载的
+    # 那一份，不读模块里的常量）：启动时不补建使用新定义的 run
+    monkeypatch.setitem(reopened.orchestrator._forms, DEFAULT_FORM,
+                        replace(reopened.orchestrator._forms[DEFAULT_FORM], definitions=_OtherDefinitions()))
     assert startup_rebuild(reopened.projects) == []
     assert reopened.store.stream_events(run_stream(item.run_id), after_version=0) == []
     assert reopened.projects.projection(project_id).work_item(item.work_item_id) is not None

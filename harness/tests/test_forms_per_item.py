@@ -150,12 +150,14 @@ def test_two_forms_run_in_one_instance_each_under_its_frozen_definitions(tmp_pat
     system.close()
 
 
-def test_a_created_item_keeps_its_form_when_the_project_form_changes_before_it_runs(tmp_path):
-    # 验收第 2 条前半：事项创建时冻结形态；项目改了形态，这个事项仍按创建时那一份跑完
+def test_a_running_item_keeps_its_form_when_the_project_form_changes(tmp_path):
+    # 验收第 2 条前半：事项创建时冻结形态；事项已经跑起来以后项目改了形态，这个事项仍按创建时那一份跑完
     system = _system(tmp_path / "loop", merge_scripts(_three_departments_script(), _task_pool_script()),
                      resume_on_startup=False)
     project_id = system.projects.register("冻结", GOAL)
     item_id, run_id = system.projects.start_work_item(project_id, "先建事项，再改形态")
+    # 先跑一轮（产品交 PRD），事项正在跑；这时把项目的形态改成任务池
+    assert system.activate_once(run_id).status == "running"
     _set_form(system, project_id, DEFAULT_FORM, second_routing.ROUTING_NAME)
 
     ended = system.run_until_stop(run_id)
