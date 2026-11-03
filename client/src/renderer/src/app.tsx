@@ -362,7 +362,7 @@ export function App() {
           ) : route.name === "sys-runtime" ? (
             <RuntimePage app={app} systemStatus={systemStatus} />
           ) : route.name === "sys-tools" ? (
-            <ToolsPage capabilities={capabilities} />
+            <ToolsPage app={app} capabilities={capabilities} />
           ) : route.name === "sys-rules" ? (
             // 规则与参数页（工单 #1195）：读取 rules.registry，修改与撤回走参数命令
             <RulesPage app={app} />
