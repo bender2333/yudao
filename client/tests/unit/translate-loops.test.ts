@@ -1,13 +1,13 @@
 // 循环与收敛的翻译层（工单 #400 的验收）：run.loops 的结果翻成观测页的行与覆盖层「循环」的标签。
 // 这里只核对翻译：层与状态的中文名、已用量与上限的写法（含不设上限）、每棵树的实例、缺什么事实、
 // 图例与信息条。判定不在这一层，测试也不自己推状态。
+// 观测页的行是页面文字，归页面（工单 #1415）：行从 views/project/floor-text.ts 取，覆盖层的数据仍在翻译层。
 
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { RunLoopsResult } from "../../src/renderer/src/api/generated/types.gen.ts";
-import {
-  amountText, loopLayerLabel, loopRows, loopRuleText, loopStateLabel, loopsOverlay,
-} from "../../src/renderer/src/translate/floor.ts";
+import { loopStateLabel, loopsOverlay } from "../../src/renderer/src/translate/floor.ts";
+import { amountText, loopLayerLabel, loopRows, loopRuleText } from "../../src/renderer/src/views/project/floor-text.ts";
 import { OVERLAY_LABELS, overlayProblems } from "../../src/renderer/src/translate/coverage.ts";
 
 function result(overrides: Partial<RunLoopsResult> = {}): RunLoopsResult {
