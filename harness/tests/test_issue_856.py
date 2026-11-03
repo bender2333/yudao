@@ -3,7 +3,6 @@
 # 用户取消事项仍然让全部会话停下、事项以 cancelled 结束。
 
 import json
-import sys
 import uuid
 from pathlib import Path
 
@@ -15,12 +14,12 @@ from harness.projection import saved_decisions
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers.call import ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import after_event, from_another_thread, run_wait_command
+from harness.tests.helpers import after_event, from_another_thread, python_snippet, run_wait_command
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
-CHECKS = {"smoke": {"command": "python -c \"print('smoke ok')\""}}
+CHECKS = {"smoke": {"command": python_snippet("print('smoke ok')")}}
 # 一项要几秒的检查：另一个部门在工作的时候用它确定地占住那个会话
-SLOW_CHECK = {"command": f'"{sys.executable.replace(chr(92), "/")}" -c "import time; time.sleep(3)"'}
+SLOW_CHECK = {"command": python_snippet("import time; time.sleep(3)")}
 UNAVAILABLE = "Missing configuration: provider credential"
 
 
