@@ -22,7 +22,7 @@
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「裁决与边界」"],"seen":"3c9310ef49956c5b","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"0e9705e0dd37530b","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"32ac07d30ac47cac","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"f0abaea09a6b3e64","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"573c955013deada8","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},

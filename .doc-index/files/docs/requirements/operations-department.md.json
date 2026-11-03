@@ -21,7 +21,7 @@
 {"dst":"docs/requirements/self-hosting.md","kind":"link","raws":["self-hosting.md"],"seen":"21cff6a1bbd5193d","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
 {"dst":"docs/requirements/self-hosting.md#D35 自举：用 Yudao 开发 Yudao > 第二层的前置条件与完成条件","kind":"link","raws":["self-hosting.md"],"seen":"948cc02314d8bdc7","src":"docs/requirements/operations-department.md#D27 运维部门 > 已确认"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["../design/recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
-{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"87a446b045bc0a4b","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
+{"dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","kind":"link","raws":["../design/rules-and-parameters.md"],"seen":"a572c778bea9528a","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","kind":"link","raws":["../design/skeleton-and-application.md"],"seen":"d697a9c7a0bdcdd7","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
 {"dst":"docs/design/web-interface-and-release.md","kind":"link","raws":["../design/web-interface-and-release.md"],"seen":"8cd1820e9c10d23e","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"fe69deff44285b85","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行"},

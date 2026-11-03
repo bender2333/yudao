@@ -17,7 +17,7 @@
 "edges":[
 {"dst":"docs/adr/0038-function-first-commands-without-registration.md","kind":"link","raws":["../adr/0038-function-first-commands-without-registration.md"],"seen":"be2f2a8d91639563","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵"},
 {"dst":"docs/architecture.html#s4 > 动作","kind":"map-position","raws":["「动作」"],"seen":"9318b13ea3585f40","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵"},
-{"dst":"docs/architecture.html#s6","kind":"map-position","raws":["第六节"],"seen":"386c6ac472c7195e","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵"},
+{"dst":"docs/architecture.html#s6","kind":"map-position","raws":["第六节"],"seen":"e52c4fe18452782d","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵"},
 {"dst":"docs/research/organization-runtime-evolution.md#部门组织、持续运行与系统演化：研究与详细设计 > 6. 持久执行与失败恢复","kind":"link","raws":["../research/organization-runtime-evolution.md"],"seen":"861d82057fa01a56","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵"},
 {"dst":"docs/design/model-management.md#模型管理设计说明 > 5. 部门与角色的模型选择 > 5.4 生效时机","kind":"link","raws":["model-management.md"],"seen":"57239a6db6c23bd3","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 1. 四种能力分别验收"},
 {"dst":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 2. 项目的起点","kind":"link","raws":["project-initial-files.md"],"seen":"4909b10bdb240b5c","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵 > 1. 四种能力分别验收"},

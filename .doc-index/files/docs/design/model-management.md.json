@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/model-management.md",
-"hash":"9ea3b6d8e7da47c4",
+"hash":"152a3422cf1f9b2b",
 "nodes":[
-{"hash":"9ea3b6d8e7da47c4","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
+{"hash":"152a3422cf1f9b2b","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
 {"hash":"f7e1d7d7fe166ef5","id":"docs/design/model-management.md#模型管理设计说明","kind":"section","parent":"docs/design/model-management.md","title":"模型管理设计说明"},
 {"hash":"9ff2b4bf956da184","id":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"1. 参照对象与取舍"},
 {"hash":"aa9fdedc53b8e4a8","id":"docs/design/model-management.md#模型管理设计说明 > 2. 分层","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"2. 分层"},
@@ -41,7 +41,7 @@
 {"hash":"aaba6b4fe0693177","id":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.7 失败处理","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩","title":"8.7 失败处理"},
 {"hash":"6a0393db4f18e6a1","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"9. 界面"},
 {"hash":"49f3473f5d7aeead","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.1 模型管理页","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.1 模型管理页"},
-{"hash":"dbbc639d0e0d8507","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 部门详情里的模型与 Prompt","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.2 部门详情里的模型与 Prompt"},
+{"hash":"e9c580637df43575","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 部门详情里的模型与 Prompt","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.2 部门详情里的模型与 Prompt"},
 {"hash":"f520dc153efd8b37","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.3 部门工作间","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.3 部门工作间"},
 {"hash":"86365fcabc106041","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.4 不提供的元素","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.4 不提供的元素"},
 {"hash":"e0dce6408a56ab1b","id":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.5 用词","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 9. 界面","title":"9.5 用词"},
@@ -76,8 +76,8 @@
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制","kind":"link","raws":["semantic-system.md"],"seen":"ff9b18e17ff6a810","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩"},
 {"dst":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 4. 规则清单（七条）","kind":"link","raws":["context-assembly.md"],"seen":"b461989983f30483","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.3 预留与阈值"},
 {"dst":"docs/design/semantic-system.md#语义系统设计说明 > 11. 长度控制 > 11.1 工作上限与阈值","kind":"link","raws":["semantic-system.md"],"seen":"e72fa0994a8ad701","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.3 预留与阈值"},
-{"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","kind":"link","raws":["semantic-system.md"],"seen":"fefcc8b41856f076","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.6 检查点有效性"},
+{"dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","kind":"link","raws":["semantic-system.md"],"seen":"20b2c5d36ffde1dc","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.6 检查点有效性"},
 {"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"ecbb361e798404e9","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.1 模型管理页"},
-{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 部门详情","kind":"link","raws":["project-organization.md"],"seen":"e6a6e5a677d4a9cd","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 部门详情里的模型与 Prompt"}
+{"dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.9 部门详情","kind":"link","raws":["project-organization.md"],"seen":"3633b6f24538b9de","src":"docs/design/model-management.md#模型管理设计说明 > 9. 界面 > 9.2 部门详情里的模型与 Prompt"}
 ]
 }

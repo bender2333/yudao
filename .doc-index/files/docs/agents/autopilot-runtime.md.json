@@ -65,7 +65,7 @@
 {"dst":"docs/agents/main-ruleset.json","kind":"link","raws":["main-ruleset.json"],"seen":"9aab81e8d57e6178","src":"docs/agents/autopilot-runtime.md#运行配置 > 6. main 的规则"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > solo 执行者一轮的时长"},
-{"dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"link","raws":["../../.claude/skills/trial-intake/SKILL.md"],"seen":"f98886b07dd37d98","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限"},
+{"dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"link","raws":["../../.claude/skills/trial-intake/SKILL.md"],"seen":"987f6a997bc0d9f7","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限"},
 {"dst":".claude/skills/triage/SKILL.md","kind":"link","raws":["../../.claude/skills/triage/SKILL.md"],"seen":"739f5a182700aeb0","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 同一张工单分诊的上限"},
 {"dst":".claude/skills/next/SKILL.md#下一件事 > 长运行与心跳（--循环）","kind":"link","raws":["../../.claude/skills/next/SKILL.md"],"seen":"be07b40ab3a17884","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 后台长运行算作失败的超时"},
 {"dst":"docs/agents/ticket-spec.md","kind":"code-path","raws":["docs/agents/ticket-spec.md"],"seen":"03c60cf298c2dd35","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 工单大小的上限"},
