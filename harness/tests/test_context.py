@@ -2,6 +2,8 @@ import json
 from contextlib import contextmanager
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
+from harness.context import Rules
+from harness.models import EventType
 from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
 from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
@@ -178,5 +180,26 @@ def _bound_system(tmp_path, *, context_window, max_output_tokens):
     finally:
         server.shutdown()
         server.server_close()
+
+
+def test_each_assembled_request_records_the_rule_version_and_the_folded_rounds(data_dir):
+    # 守 R2（合同）：每一步的上下文清单记下这一次按哪一版规则算出来的、折叠了哪几轮，
+    # 重放时按同一份规则版本复原。规则全关时没有折叠任何一轮；模型的请求体（model_request 工件）
+    # 仍然只有发给模型的那几部分，所以「同一份事件同一版规则装配两次逐字节相同」比的始终是同一份字节
+    adapter = FakeAdapter({"product": [product_spec()]})
+    system = LoopSystem.for_testing(data_dir, adapter)
+    run_id = system.create_run("build echo")
+    system.activate_once(run_id)
+    events = [event for event in system.store.list_events(run_id)
+              if event.type == EventType.CONTEXT_ASSEMBLED]
+    assert events
+    for event in events:
+        payload = event.payload
+        assert payload["rules_version"] == Rules().version()
+        assert payload["folded_rounds"] == []
+        request = json.loads(system.artifacts.get_text(payload["request_ref"]["content_hash"]))
+        assert set(request) <= {"input", "tools", "max_output_tokens"}
+        # 部门材料那一条在请求的首位（设计说明第 6.1 节「材料恒在首位」）
+        assert request["input"][0]["role"] == "developer"
 
 
