@@ -186,9 +186,13 @@ class LoopSystem:
 
     def stop_and_restart_runs(self, run_ids: Iterable[str], *, reason: str) -> tuple[list[str], list[str]]:
         # 强制升级对一批 run 的处理：逐个记为因升级停止，对应的事项用项目的起点重新开始，
-        # 并记下「因升级重新开始」的优先级；找不到事项的 run 只停止
+        # 并记下「因升级重新开始」的优先级；找不到事项的 run 只停止。
+        # 事项冻结的形态不在发布里时不动这个 run（工单 #1392）：留着它未结束，换回带那一份形态的发布
+        # 以后由升级重新开始接着跑；原因由项目登记在这条事项的开始失败上
         stopped, restarted = [], []
         for run_id in run_ids:
+            if not self.projects.restart_form_available(run_id):
+                continue
             self.orchestrator.stop_for_upgrade(run_id, reason=reason)
             stopped.append(run_id)
             started = self.projects.restart_work_item_for_upgrade(run_id)

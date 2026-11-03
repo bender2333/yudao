@@ -195,9 +195,10 @@ def test_a_restarted_instance_resumes_an_item_with_the_form_it_was_created_with(
 
 def test_an_upgrade_restart_keeps_the_frozen_form_or_is_refused(tmp_path):
     # 第 2 轮定的边界（项目的组织设计说明「冻结与升级」只写到新建事项被拒绝）：升级重新开始时，事项冻结的
-    # 形态已经不在发布里，与新建事项同样拒绝——不换一份形态，原因记在项目流的那条事项上；同一批里形态还在
-    # 发布里的 run 照旧重新开始，实例照常起来。两条路各一条：项目现在的形态还在发布里（原来会静默换成它）、
-    # 项目现在的形态也不在发布里（原来会从批量升级里抛出去，实例起不来）
+    # 形态已经不在发布里，与新建事项同样拒绝——不换一份形态，原因记在项目流的那条事项上；**这个 run 不停**，
+    # 留着它未结束，换回带那一份形态的发布以后由升级重新开始接着跑。同一批里形态还在发布里的 run 照旧重新
+    # 开始，实例照常起来。两条路各一条：项目现在的形态还在发布里（原来会静默换成它）、项目现在的形态也不在
+    # 发布里（原来会从批量升级里抛出去、实例起不来）
     data_dir = tmp_path / "loop"
     script = merge_scripts(_three_departments_script(), _task_pool_script())
     first = _system(data_dir, script, resume_on_startup=False)
@@ -217,8 +218,12 @@ def test_an_upgrade_restart_keeps_the_frozen_form_or_is_refused(tmp_path):
     stopped, restarted = second.stop_and_restart_runs(
         [gone_run, other_run, kept_run], reason="run event version differs from the current version")
 
-    assert stopped == [gone_run, other_run, kept_run]
-    # 那一份形态不在发布里：不换形态、不建新的事项记录与 run，原因记在这条事项的开始失败上
+    # 形态不在发布里的两条不停止：run 留着未结束，换回带那一份形态的发布以后还能接着跑
+    assert stopped == [kept_run]
+    for run_id in (gone_run, other_run):
+        assert not [event for event in second.store.list_events(run_id)
+                    if event.type == EventType.RUN_FAILED]
+    # 也不换形态、不建新的事项记录，原因记在这条事项的开始失败上
     for item_id, project in ((gone_item, project_id), (other_item, other_id)):
         gone = next(item for item in second.projects.projection(project).work_items
                     if item.work_item_id == item_id)
@@ -238,6 +243,17 @@ def test_an_upgrade_restart_keeps_the_frozen_form_or_is_refused(tmp_path):
                if item.work_item_id == kept_item)
     assert (old.form, old.run_id) == (DEFAULT_FORM, kept_run)
     second.close()
+
+    # 换回带那一份形态的发布（交付说明里给用户的处理方式）：这两个 run 这时才停，事项按它自己记下的形态接着跑
+    third = _system(data_dir, script, resume_on_startup=False)
+    stopped_back, restarted_back = third.stop_and_restart_runs(
+        [gone_run], reason="run event version differs from the current version")
+    assert stopped_back == [gone_run]
+    assert len(restarted_back) == 1
+    back = next(item for item in third.projects.projection(project_id).work_items
+                if item.work_item_id == restarted_back[0])
+    assert (back.form, back.restarted_from_run_id) == (second_routing.ROUTING_NAME, gone_run)
+    third.close()
 
 
 def test_a_new_item_is_rejected_when_the_project_form_is_not_in_the_release(tmp_path):

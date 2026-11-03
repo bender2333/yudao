@@ -1019,12 +1019,36 @@ class ProjectService:
         item = self._start_in(project_id, create, command=command)
         return item.work_item_id, item.run_id
 
+    def restart_form_available(self, run_id: str) -> bool:
+        # 升级重新开始之前先核形态（工单 #1392）：事项记下的那一份不在发布里时**不停止这个 run**——
+        # 留着它未结束，换回带那一份形态的发布以后由升级重新开始接着跑；原因顺带写进项目流这条事项的
+        # 开始失败（每次启动写一条）。找不到 run 或事项时照常走原来的路（停止以后重启返回空）
+        try:
+            run = project_run(self.store, run_id)
+        except RunNotFoundError:
+            return True
+        if run.project_id is None:
+            return True
+        project = self.projection(run.project_id)
+        item = project.work_item_for_run(run_id)
+        if item is None:
+            return True
+        try:
+            self.orchestrator.require_form(item.form or project.form_name)
+        except ValueError as exc:
+            self.writes.append(project_stream(run.project_id), NewProjectEvent(
+                ProjectEventType.WORK_ITEM_START_FAILED,
+                {"work_item_id": item.work_item_id, "run_id": run_id, "error": str(exc)},
+                actor="system"))
+            return False
+        return True
+
     def _restart_form(self, transaction: Transaction, project: ProjectProjection, item: WorkItem,
                       run_id: str) -> str | None:
         # 因升级重新开始沿用事项创建时冻结的形态（工单 #1392）：这是同一个事项，换的只是 run 的应用版本。
-        # 那一份形态已经不在发布里时不换一份、也不按项目现在的形态兜底（第 2 轮定的边界）：与新建事项
-        # 同样拒绝（项目的组织设计说明「冻结与升级」），原因记在这条事项的开始失败上，事项留在因升级停止的
-        # 状态、由用户处理；同一批里其余 run 照旧重新开始，实例起得来。旧事件没有记下形态时取项目现在的形态
+        # 那一份形态已经不在发布里时不换一份、也不按项目现在的形态兜底：与新建事项同样拒绝（项目的组织
+        # 设计说明「冻结与升级」），原因记在这条事项的开始失败上。升级批量先经 `restart_form_available`
+        # 核过、不停止这样的 run，所以这里是兜底；旧事件没有记下形态时取项目现在的形态
         try:
             return self.orchestrator.require_form(item.form or project.form_name).name
         except ValueError as exc:
