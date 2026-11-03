@@ -3174,7 +3174,7 @@ export type InstanceUpgradeReport = {
     /**
      * Python Lines Max
      */
-    python_lines_max: number;
+    python_lines_max?: number | null;
     /**
      * Passed
      */

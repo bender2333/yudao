@@ -159,7 +159,9 @@ AccessMode = Literal["local", "lan"]
 # 放宽为序号或内容摘要（#1262）。
 # 版本 12：对外合同里的部门从三个固定的取值改成字符串，取值由定义给出（#1389）：事件载荷与事件对象里的
 # 部门字段不再带枚举，成果的作者部门（issuer）不再固定为某个部门的名字。
-API_VERSION = 13
+# 版本 14：实例升级报告的 python_lines_max 改为可选（#1473）：内核没有行数上限，新的发布检查不再写它，
+# 目录流里已带这个字段的旧事件仍能读。
+API_VERSION = 14
 
 
 class CatalogSelection(Contract):
