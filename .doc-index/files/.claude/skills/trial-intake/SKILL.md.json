@@ -22,7 +22,7 @@
 ],
 "edges":[
 {"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../trial/SKILL.md"],"seen":"ab9da07de18ee5d0","src":".claude/skills/trial-intake/SKILL.md#试用"},
-{"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"9dab0dfc8d45e569","src":".claude/skills/trial-intake/SKILL.md#试用"},
+{"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"1eb98bd5c8b2f747","src":".claude/skills/trial-intake/SKILL.md#试用"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/trial-intake/SKILL.md#试用"},
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b4fc41b167016dad","src":".claude/skills/trial-intake/SKILL.md#试用 > 交付"},
 {"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.4 谁在什么时候发布","kind":"section-ref","raws":["docs/design/web-interface-and-release.md"],"seen":"b330cad888400863","src":".claude/skills/trial-intake/SKILL.md#试用 > 先读什么"},

@@ -157,3 +157,55 @@
 {"down":"1ad8a6449c854133","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":".claude/skills/trial-intake/SKILL.md#试用","up":"9dab0dfc8d45e569"}
 {"down":"9a3c81a370c8f620","dst":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","src":"AGENTS.md#项目 > 架构问题","up":"cdc7d25b51dc8b09"}
 {"down":"4f3a64092c0680e3","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":"docs/agents/workflow.md#工作方式 > 6. 四个循环","up":"9dab0dfc8d45e569"}
+{"down":"72e416e9dcfa6ff2","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":".claude/skills/next/SKILL.md#下一件事 > 两种用法的权限","up":"1eb98bd5c8b2f747"}
+{"down":"41356e8f24526d38","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 5","up":"987f6a997bc0d9f7"}
+{"down":"18bc966c7e962bb8","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤","up":"dee18f30736539e9"}
+{"down":"17af40024e2d66ce","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单","up":"dee18f30736539e9"}
+{"down":"1ad8a6449c854133","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":".claude/skills/trial-intake/SKILL.md#试用","up":"1eb98bd5c8b2f747"}
+{"down":"9c909a39b62eb2ce","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","src":"AGENTS.md#项目 > 常用命令","up":"dee18f30736539e9"}
+{"down":"ff895ccbfeec5307","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限","up":"987f6a997bc0d9f7"}
+{"down":"4f3a64092c0680e3","dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","src":"docs/agents/workflow.md#工作方式 > 6. 四个循环","up":"1eb98bd5c8b2f747"}
+{"down":"b5cd971814a6e7f9","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 2. 各层的职责与边界","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 1. 要解决的问题","up":"2582bcb081cce4b8"}
+{"down":"218c63896ea00bca","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.13 新建的入口","src":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","up":"90476db0def83718"}
+{"down":"886e48f3c318e081","dst":"docs/architecture.html#s3","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照","up":"32ac07d30ac47cac"}
+{"down":"1e76702e8bea1c3e","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 6. 薄驱动","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.4 用户决定","up":"5f589b5be7f366b2"}
+{"down":"1e76702e8bea1c3e","dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.4 发布检查与探针","src":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 7. 合同 > 7.4 用户决定","up":"ec75ecd095304829"}
+{"down":"fe947a8dcc485296","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","up":"218c63896ea00bca"}
+{"down":"ef6593629178c93b","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 15. 相关文档中的浏览器与 computer use 内容","up":"0d3bf612f75349f1"}
+{"down":"ef6593629178c93b","dst":"docs/design/semantic-system.md#语义系统设计说明 > 13. 数据流核对与质检放行","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 15. 相关文档中的浏览器与 computer use 内容","up":"12ee53ebe8663fee"}
+{"down":"9de9f2df5f7bf26d","dst":"docs/design/semantic-system.md#语义系统设计说明 > 13. 数据流核对与质检放行","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 16. 用户确认的决定","up":"12ee53ebe8663fee"}
+{"down":"a3ae77b76e4ddf36","dst":"docs/design/semantic-system.md#语义系统设计说明 > 13. 数据流核对与质检放行","src":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 8. 质检从 PRD 生成测试与试用记录 > 8.3 QAReview 的逐条结论与放行","up":"12ee53ebe8663fee"}
+{"down":"9423eb9ad6869d80","dst":"docs/design/model-management.md#模型管理设计说明 > 11. TODO","src":"docs/design/context-assembly.md#上下文装配：把视图当作事件日志上的纯函数 > 7. 参照对照","up":"991ac45bfc7e6848"}
+{"down":"4ddd24b26e0fe900","dst":"docs/architecture.html#s3","src":"docs/design/department-guidance.md#部门指导的处理设计","up":"32ac07d30ac47cac"}
+{"down":"4ddd24b26e0fe900","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","src":"docs/design/department-guidance.md#部门指导的处理设计","up":"e058bca1dc991a34"}
+{"down":"ecc70bc0c73a93d7","dst":"docs/architecture.html#s3","src":"docs/design/department-loop.md#三部门的循环结构","up":"32ac07d30ac47cac"}
+{"down":"011ea6d41a931f22","dst":"docs/architecture.html#s6","src":"docs/design/execution-environment.md#执行环境服务设计说明","up":"e52c4fe18452782d"}
+{"down":"011ea6d41a931f22","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/execution-environment.md#执行环境服务设计说明","up":"218c63896ea00bca"}
+{"down":"74133bc1017b1124","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 3. 应用层命令、决定与领域事件","up":"218c63896ea00bca"}
+{"down":"337708af5fcc0f48","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","src":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 3. 应用层命令、决定与领域事件 > 3.1 命令","up":"0d3bf612f75349f1"}
+{"down":"0853195401f3a162","dst":"docs/architecture.html#s2","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","up":"501cedc1662adc79"}
+{"down":"0853195401f3a162","dst":"docs/architecture.html#s3","src":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","up":"32ac07d30ac47cac"}
+{"down":"e8a5a49a1013653f","dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","src":"docs/design/kernel-quality-gate.md#内核的代码质量检查设计说明 > 2. 边界与范围","up":"dee18f30736539e9"}
+{"down":"5ce09fddacbf7a7a","dst":"docs/architecture.html#s3","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明","up":"32ac07d30ac47cac"}
+{"down":"c895884b1e1bc0b8","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.6 通知","src":"docs/design/model-management.md#模型管理设计说明 > 8. 上下文容量与压缩 > 8.6 检查点有效性","up":"20b2c5d36ffde1dc"}
+{"down":"023e653719b5bbb9","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明","up":"218c63896ea00bca"}
+{"down":"ac338ae4d34a752c","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/network-and-mcp.md#网络取回与 MCP 工具设计说明 > 4. 项目设置中的 MCP 服务器 > 4.2 读取工具清单（探测）","up":"218c63896ea00bca"}
+{"down":"c1ecd2196cf6354a","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.4A 包图","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 3. 接口","up":"1f371d25eadb13cc"}
+{"down":"06585fc93fefd8b1","dst":"docs/design/semantic-system.md#语义系统设计说明 > 10. 上下文组装 > 10.3 当前状态栏目","src":"docs/design/outsourced-roles.md#外包角色设计说明 > 4. 方案 > 4.6 会话内部的分工","up":"8cd20d4d53cc22d2"}
+{"down":"d0866898f9277871","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系","up":"218c63896ea00bca"}
+{"down":"0c1a5db1a6b2200f","dst":"docs/architecture.html#s2","src":"docs/design/project-organization.md#项目的组织设计说明","up":"501cedc1662adc79"}
+{"down":"0c1a5db1a6b2200f","dst":"docs/architecture.html#s3","src":"docs/design/project-organization.md#项目的组织设计说明","up":"32ac07d30ac47cac"}
+{"down":"e6a242b20315c9dc","dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 6. 薄驱动","src":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.7 冻结与升级","up":"5f589b5be7f366b2"}
+{"down":"0eee1f7871fde620","dst":"docs/architecture.html#s6","src":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵","up":"e52c4fe18452782d"}
+{"down":"59ec65797200e301","dst":"docs/architecture.html#s2","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明","up":"501cedc1662adc79"}
+{"down":"fd522b8028de3a8a","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.5 采用与历史","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 2. 规则登记","up":"8a27bb166b2fab10"}
+{"down":"fd1e494c0f15aded","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.5 采用与历史","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 5. 采用与撤回","up":"8a27bb166b2fab10"}
+{"down":"edb2941f53d32e74","dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.3 用户决定的回答","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 8. 规则登记的初始内容","up":"0d3bf612f75349f1"}
+{"down":"cc558392dc49cb35","dst":"docs/design/project-organization.md#项目的组织设计说明 > 4. 方案 > 4.5 采用与历史","src":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 9. 命令与事件","up":"8a27bb166b2fab10"}
+{"down":"f176ef66880338f6","dst":"docs/architecture.html#s2","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明","up":"501cedc1662adc79"}
+{"down":"d697a9c7a0bdcdd7","dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 4. 四项技术保证 > 4.1 版本关系","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 10. 看门狗与健康协议","up":"fc818c3694b3eeae"}
+{"down":"1873dd6a8fe3079c","dst":"docs/design/architecture/overall-architecture.md#总体架构：总图与职责分层 > 1. 模块图 > 1.5 固定的结构与内核的位置","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 13. 与现有设计的关系","up":"2de0567199bdb75c"}
+{"down":"c2d5f4edc1c2c4a5","dst":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 6. 报告与版本比较","src":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 8. 应用清单与「一次完成」","up":"ab09765590ab3f45"}
+{"down":"80e8eb13d7cc6cc2","dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","src":"docs/design/test-pyramid.md#测试分层设计说明","up":"8d031d63ab7955d0"}
+{"down":"d16eca7251049f49","dst":"docs/architecture.html#s2","src":"docs/design/trusted-kernel.md#可信内核设计说明","up":"501cedc1662adc79"}
+{"down":"772422e14ed2ed85","dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","up":"a572c778bea9528a"}

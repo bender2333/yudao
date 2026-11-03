@@ -25,7 +25,7 @@
 {"dst":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 执行者常用","kind":"link","raws":["docs/agents/issue-tracker.md"],"seen":"1b772b7de702e985","src":"AGENTS.md#项目 > GitHub Issues"},
 {"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"eb9a5d218fcc4892","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"e766a4cafac32642","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"0ec0552adcbe7034","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"dee18f30736539e9","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.2 集成层在每次合并以后运行","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"f0fcbba4a05f64a2","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"harness/proposals.py","kind":"code-path","raws":["harness/proposals.py"],"seen":"3bea9b2cd6cc90c9","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"e8c40922f4168ea6","src":"AGENTS.md#项目 > 常用命令"},
