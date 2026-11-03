@@ -27,7 +27,7 @@ from harness.projects import _check_commands, _review_department
 from harness.proposals import (baseline_review_turn, delivery_turn, judgement_turn, product_spec, review_turn,
                                structure_turn)
 from harness.runtime import LoopSystem
-from harness.tests.helpers import explore_turn
+from harness.tests.helpers import explore_turn, python_snippet
 from harness.tests.onboarding_project import (ONBOARDING_GOAL as GOAL, ONBOARDING_REQUIREMENT as REQUIREMENT,
                                               onboarding_source)
 from harness.tests.saved_rewrite import rewrite_saved_projection
@@ -40,8 +40,8 @@ RENAMED_LABELS = {RENAMED_PRODUCT: "需求", RENAMED_ENGINEERING: "构建", RENA
 NAME_MAP = {"product": RENAMED_PRODUCT, "engineering": RENAMED_ENGINEERING, "quality": RENAMED_VERIFIER}
 
 # 两个部门运行同名的检查时用的命令：基线检查记下的命令必须是核验角色的那一条
-VERIFIER_COMMAND = "python -c \"print('verifier ran this check')\""
-OTHER_COMMAND = "python -c \"print('the delivering department ran this check')\""
+VERIFIER_COMMAND = python_snippet("print('verifier ran this check')")
+OTHER_COMMAND = python_snippet("print('the delivering department ran this check')")
 
 
 # ---------------------------------------------------------------------------
