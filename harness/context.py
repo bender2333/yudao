@@ -63,6 +63,91 @@ def department_work_text(pinned: AssembledContext) -> str:
     return "\n\n".join(f"[{part.source}]\n{part.text}" for part in pinned.parts if part.source not in static)
 
 
+@dataclass(frozen=True)
+class Rules:
+    """装配规则的取值（设计说明第 4 节）。布尔型的是定义的开与关，数值型的是参数。
+
+    这一版没有一条减法规则起作用：视图不减去任何东西，装配结果与改动前逐字节相同。
+    规则版本是取值的规范散列，上下文清单记它，重放才能核对「同一份规则」。
+    """
+
+    # R1 同一种部门输入只留最新一份原文
+    input_single_copy: bool = False
+    # R2 同一路径的读取只留最新一版原文
+    superseded_read_collapse: bool = False
+    # R3 历史工具结果按新到旧累计的保留量；空表示不折叠
+    tool_result_keep_tokens: int | None = None
+    # R3 折叠至少省下这么多 token 才做
+    tool_result_clear_min_tokens: int = 0
+    # R4 失败的工具结果不折叠，也不计入保留量
+    error_result_keep: bool = True
+    # R5 引证段只在这一次的工作引用指向它时整段装入
+    pinned_reference_gate: bool = False
+    # R5 受门控的引证段；project 不在其中（设计说明第 4 节 R5）
+    gated_sections: tuple[str, ...] = (
+        "current_delivery_spec", "prior_delivery", "existing_overview", "causal_chain",
+        "binding_refs", "prior_structure", "prior_initial_prd", "current_product_decisions",
+    )
+    # R5 没有指向时留下的摘要长度（字符）
+    pinned_stub_chars: int = 400
+    # R6 折叠以一轮为单位，调用与结果成对折叠
+    round_fold_granularity: bool = True
+    # R7 请求的用量上限：超过就继续折叠更旧的一轮；空表示不设
+    work_limit_tokens: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        # 取值的可读形式：规则清单的另一份写法按同样的字段写
+        return asdict(self)
+
+    def version(self) -> str:
+        # 规则版本：取值的规范散列。取值相同就是同一版，任何一个取值变了就是新的一版
+        return canonical_hash(self.to_dict())
+
+
+# 视图输入里部门材料那一条的种类：一步只有一条，恒在首位（设计说明第 6.1 节）
+MATERIALS = "materials"
+# 视图输入里部门历史的条目
+HISTORY = "history"
+
+
+@dataclass(frozen=True)
+class ContextEntry:
+    """视图的输入条目：部门材料那一条，或者部门历史里的一条，按进入请求的顺序排列。
+
+    `item` 是这一条在请求里的样子；规则的判据（同一种输入、同一路径、一轮、失败结果）从它读。
+    """
+
+    kind: str
+    item: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class View:
+    """一步的视图：发给模型的请求内容与工具，以及算出它的规则版本与折叠过的轮次。"""
+
+    input_items: list[dict[str, Any]]
+    tools: list[dict[str, Any]]
+    rules_version: str
+    # 这一次折叠了哪几轮（从 1 起的轮次编号，按部门历史顺序）；折叠计数是它的长度
+    folded_rounds: tuple[int, ...] = ()
+
+
+def view(entries: list[ContextEntry], rules: Rules, *,
+         tools: list[dict[str, Any]] | None = None) -> View:
+    """把一步的日志条目与规则版本算成请求（纯函数，装配实现的视图只在这里定义）。
+
+    同一份条目与同一版规则得到逐字节相同的请求：这里不读时间、随机数、文件与网络，
+    顺序只来自条目的顺序与规则里写明的判据。这一版没有开启的规则，条目原样进入请求。
+    """
+    if not entries or entries[0].kind != MATERIALS or any(entry.kind == MATERIALS for entry in entries[1:]):
+        raise ValueError("the department materials must be the first view entry, and there must be one of them")
+    return View(
+        input_items=[deepcopy(entry.item) for entry in entries],
+        tools=list(tools or ()),
+        rules_version=rules.version(),
+    )
+
+
 # 工具结果里的图像放进请求的张数与换出的粒度（浏览器与 computer use 设计说明第 6.2 节，取值参照
 # Anthropic 参考实现 `_maybe_filter_to_n_most_recent_images`：保留最近 3 张，换出按 3 张一组）
 REQUEST_IMAGE_KEPT = 3
@@ -243,12 +328,14 @@ def _notification_text(item: dict[str, Any]) -> str:
 
 class ContextAssembler:
     def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None, *,
-                 tightening: Tightening) -> None:
+                 tightening: Tightening, rules: Rules | None = None) -> None:
         self.artifacts = artifacts
         # 修改轮的上一轮候选属于项目流，只能按事件编号取（设计第 4.7 节）
         self.store = store
         # 请求里提供哪些工具由路由的收紧检查取舍（工单 #1095）
         self.tightening = tightening
+        # 装配规则的取值（设计说明第 4 节）：视图按它算，规则版本随上下文清单记进事实
+        self.rules = rules or Rules()
 
 
     def assemble(self, projection: RunProjection, *, department: str, session_id: str, activation_id: str,
@@ -490,11 +577,6 @@ class ContextAssembler:
             )
         parts.append(ContextPart("causal_chain", None, json_dumps(_causal_chain(projection))))
 
-        prompt_text = "\n\n".join(f"[{part.source}]\n{part.text}" for part in parts)
-        input_items = [{"role": "developer", "content": prompt_text},
-                       *deepcopy(request_history(history or [], run_id=projection.run_id,
-                                                 artifacts=self.artifacts,
-                                                 input_modalities=input_modalities))]
         from .tools import tool_definitions
 
         tools = [
@@ -502,6 +584,16 @@ class ContextAssembler:
              "parameters": item["parameters"], "strict": False}
             for item in tool_definitions(tool_names, definitions=definitions)
         ]
+        # 取视图：部门材料那一条在前，部门历史按进入请求的顺序接在后面；
+        # 视图是纯函数，同一份条目与同一版规则得到同一份请求
+        prompt_text = "\n\n".join(f"[{part.source}]\n{part.text}" for part in parts)
+        entries = [ContextEntry(MATERIALS, {"role": "developer", "content": prompt_text})]
+        entries.extend(ContextEntry(HISTORY, item) for item in request_history(
+            history or [], run_id=projection.run_id, artifacts=self.artifacts,
+            input_modalities=input_modalities))
+        viewed = view(entries, self.rules, tools=tools)
+        # 造请求与上下文清单
+        input_items = viewed.input_items
         if history:
             parts.append(ContextPart("department_history", department, json_dumps(history)))
         parts.append(ContextPart("tool_schemas", department, json_dumps(tools)))
@@ -547,6 +639,8 @@ class ContextAssembler:
             input_token_estimate=input_token_estimate,
             output_reserve_tokens=max_output_tokens or 0,
             guidance_ids=[item.id for item in guidance_items],
+            rules_version=viewed.rules_version,
+            folded_rounds=list(viewed.folded_rounds),
         )
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
@@ -624,6 +718,8 @@ class ContextAssembler:
             input_token_estimate=input_token_estimate,
             output_reserve_tokens=max_output_tokens,
             guidance_ids=list(pinned.manifest.guidance_ids),
+            # 整理请求也记这一次的规则版本；它不经过视图，折叠轮次为空
+            rules_version=self.rules.version(),
         )
         return AssembledContext(pinned.department, pinned.prompt_text, parts, manifest, deepcopy(input_items), [])
 

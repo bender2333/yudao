@@ -20544,6 +20544,24 @@
             "title": "Output Reserve Tokens",
             "type": "integer"
           },
+          "rules_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rules Version"
+          },
+          "folded_rounds": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Folded Rounds",
+            "type": "array"
+          },
           "previous_usage_tokens": {
             "anyOf": [
               {
