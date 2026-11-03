@@ -13,7 +13,7 @@
 // 说话的话术用 translate/say.ts（画面 2 的成果）。
 
 import type {
-  AskView, DecisionView, EventObject, LoopActivation, LoopAmount, LoopLayer, ProjectLoopResult, RunLoopsResult,
+  AskView, DecisionView, EventObject, LoopActivation, LoopLayer, ProjectLoopResult, RunLoopsResult,
   WorkItemLoop,
 } from "../api/generated/types.gen.ts";
 import type {
@@ -21,8 +21,7 @@ import type {
   OpenRequest, OpsView, PixelAction, RoleInfo, Source, SourceCardFace, SourceOverlayData, SourceRef, WaitingProvider,
 } from "../pixel/contract.ts";
 import { floorState as checkFloorState, SOURCES } from "../pixel/contract.ts";
-import { face } from "../views/decisions/card-logic.ts";
-import { DEPARTMENTS, departmentName, label, STOP_REASON } from "../views/project/labels.ts";
+import { DEPARTMENT_NAMES, face, label, STOP_REASON } from "./face.ts";
 import { cut, say, sayAnswer, sayAsk, sayHandoff } from "./say.ts";
 import { itemStateOf, roleStatus } from "./tables.ts";
 
@@ -257,11 +256,11 @@ export function eventKindLabel(type: string | null | undefined): string | null {
   return EVENT_KIND_LABELS[type] ?? null;
 }
 
-/** 一条事件的提出者写成页面的说法：部门名、你、系统。 */
+/** 一条事件的提出者写成画面的说法：部门名、你、系统。 */
 export function actorLabel(actor: string | null | undefined): string | null {
   if (!actor) return null;
   const [kind, value] = actor.split(":", 2);
-  if (kind === "department") return `${DEPARTMENTS[value]?.name ?? value}部门`;
+  if (kind === "department") return `${DEPARTMENT_NAMES[value] ?? value}部门`;
   if (kind === "user") return "你";
   if (kind === "system") return "系统";
   if (kind === "model") return "模型";
@@ -708,17 +707,10 @@ export function belongsTo(ev: FloorEvent, projectId: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// 循环与收敛（工单 #400，原型 v10 设计说明第 3、4 节）：把 run.loops 的结果翻成画面标签与观测页的行。
-// 判定不在这一层：状态、已用量与「缺少的事实」都照着查询结果写。
-
-/** 循环树的层的中文名。 */
-export const LOOP_LAYER_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  project_loop: "项目循环",
-  work_item: "事项",
-  run: "运行",
-  activation: "激活",
-  step: "步骤",
-});
+// 循环与收敛（工单 #400，原型 v10 设计说明第 3、4 节）：把 run.loops 的结果翻成覆盖层「循环」的数据。
+// 判定不在这一层：状态与「缺少的事实」都照着查询结果写。
+// 观测页「循环」区块的那些行是页面文字，归页面（views/project/floor-text.ts，工单 #1415）；
+// 这里只留画面覆盖层要用的一份状态词。
 
 /** 收敛状态的中文名：五种状态与「不判定」；文字与颜色同时给出，不只靠颜色区分。 */
 export const LOOP_STATE_LABELS: Readonly<Record<string, string>> = Object.freeze({
@@ -730,38 +722,8 @@ export const LOOP_STATE_LABELS: Readonly<Record<string, string>> = Object.freeze
   undetermined: "不判定",
 });
 
-/** 三项判定参数的中文名（观测页写出判定用的规则与轮数）。 */
-export const LOOP_PARAMETER_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  "convergence.rounds": "收敛判定看最近几轮",
-  "convergence.step_window": "步骤停滞看连续几步",
-  "convergence.step_repeat": "同一次调用重复几次算震荡",
-});
-
 export function loopStateLabel(state: string): string {
   return LOOP_STATE_LABELS[state] ?? state;
-}
-
-export function loopLayerLabel(layer: string): string {
-  return LOOP_LAYER_LABELS[layer] ?? layer;
-}
-
-/** 一个已用量与上限的文字：不设上限时写「不设上限」，数值照写（设计第 5 节末）。 */
-export function amountText(amount: LoopAmount | undefined, unit: string): string {
-  if (!amount) return "—";
-  return `${amount.used}${unit} / ${amount.unlimited ? "不设上限" : `${amount.limit}${unit}`}`;
-}
-
-export interface LoopRow {
-  key: string;
-  layer: string;
-  layerLabel: string;
-  instance: string;
-  rounds: number | null;
-  used: string;
-  state: string;
-  stateLabel: string;
-  stopReason: string;
-  missing: string;
 }
 
 function loopLayer(loops: RunLoopsResult, name: string): LoopLayer | undefined {
@@ -771,57 +733,6 @@ function loopLayer(loops: RunLoopsResult, name: string): LoopLayer | undefined {
 function workSteps(activation: LoopActivation): number {
   // 工作步：压缩步不是工作步（与步骤层的判定口径一致）
   return activation.steps.filter((step) => step.purpose !== "compaction").length;
-}
-
-/** 观测页「循环」区块的行：项目循环 → 事项 → run → 各部门的激活 → 每次激活中的步骤循环。 */
-export function loopRows(loops: RunLoopsResult | null): LoopRow[] {
-  if (loops === null) return [];
-  const project = loopLayer(loops, "project_loop");
-  const item = loopLayer(loops, "work_item");
-  const run = loopLayer(loops, "run");
-  const stepLayer = loopLayer(loops, "step");
-  const row = (layer: string, instance: string, rounds: number | null, used: string, state: string,
-               missing: string | null | undefined): LoopRow => ({
-    key: `${layer}|${instance}`,
-    layer,
-    layerLabel: loopLayerLabel(layer),
-    instance,
-    rounds,
-    used,
-    state,
-    stateLabel: loopStateLabel(state),
-    stopReason: "",
-    missing: missing ?? "",
-  });
-  const rows: LoopRow[] = [
-    row("project_loop", "本事项", loops.rounds, amountText(run?.amounts["model_steps"], " 步"),
-        project?.state ?? "undetermined", project?.missing),
-    row("work_item", "事项树根", loops.rounds, amountText(run?.amounts["elapsed_ms"], " 毫秒"),
-        item?.state ?? "undetermined", item?.missing),
-  ];
-  const runRow = row("run", "运行", loops.rounds,
-                     `${amountText(run?.amounts["elapsed_ms"], " 毫秒")}；${amountText(run?.amounts["model_steps"], " 步")}`,
-                     run?.state ?? "undetermined", run?.missing);
-  runRow.stopReason = loops.stop_reason ? label(STOP_REASON, loops.stop_reason) : "";
-  rows.push(runRow);
-  loops.activations.forEach((activation, index) => {
-    const name = departmentName(activation.department);
-    rows.push(row("activation", `${name} · 第 ${index + 1} 次激活`, index + 1, `${workSteps(activation)} 步`,
-                  activation.state, activation.missing));
-    rows.push(row("step", `${name} · 第 ${index + 1} 次激活 · 步骤循环`, index + 1, `${workSteps(activation)} 步`,
-                  stepLayer?.state ?? "undetermined", stepLayer?.missing));
-  });
-  return rows;
-}
-
-/** 观测页写出判定用的规则与轮数：三项冻结值与两个方法常量。 */
-export function loopRuleText(loops: RunLoopsResult | null): string {
-  if (loops === null) return "";
-  const parts = Object.entries(LOOP_PARAMETER_LABELS)
-    .filter(([name]) => loops.parameters[name] !== undefined)
-    .map(([name, caption]) => `${caption} ${loops.parameters[name]}`);
-  parts.push(`轮数达到 ${loops.method["trend_switch_rounds"]} 改用趋势检验，同一条件翻转 ${loops.method["flip_threshold"]} 次算震荡`);
-  return parts.join("；");
 }
 
 /** 覆盖层「循环」的数据：楼层信息条写 run 层，各部门房间写激活层与步骤循环，右上角写图例。 */

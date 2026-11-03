@@ -150,6 +150,7 @@
 "test_onboarding_commands.py" = "integration"
 "test_onboarding_confirmation_queries.py" = "integration"
 "test_onboarding_confirmation_round.py" = "integration"
+"test_onboarding_renamed.py" = "integration"
 "test_onboarding_revision_context.py" = "integration"
 "test_openapi_snapshot.py" = "module"
 "test_orchestrator.py" = "integration"

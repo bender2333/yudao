@@ -13,7 +13,7 @@ import type { ProjectList, ProjectLoopResult } from "../../api/generated/types.g
 import type { ClientApp } from "../../contract/client-app";
 import { createRafClock } from "../../pixel/clock";
 import { buildingTestHooks, createBuildingView, type BuildingModel, type BuildingTestHooks, type BuildingView } from "../../pixel/building/view";
-import { BUILDING_STATUS } from "../../pixel/building/status-text";
+import { BUILDING_STATUS } from "../project/floor-text";
 import { buildingActions, buildingState, toBuildingEvent } from "../../translate/building";
 import { Section } from "../project/common";
 import { emptyOrFailureText } from "../../contract/read-failure";

@@ -10,8 +10,8 @@ import type { DeliveryFileResult, EventDetailResult, ProjectOverviewResult, Work
   WorkItemCard } from "../../api/generated/types.gen";
 import { paths, type Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
-import { ITEM_COLORS } from "../../pixel/registry";
 import { Empty, KeyValue, Loading, Section, Tag, dict, list, show, text } from "./common";
+import { ITEM_COLORS } from "./floor-text";
 import { departmentName, formatTime, label, WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND } from "./labels";
 import { fileDownload } from "./materials-download";
 import { originalView, readView } from "./materials-read";
