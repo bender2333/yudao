@@ -196,7 +196,7 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def _tight_window_runner(tmp_path, respond, *, headroom=1600, task="Original intent",
+def _tight_window_runner(tmp_path, respond, *, headroom=2050, task="Original intent",
                          keys=("product", "engineering", "quality")):
     """窗口按固定材料的实测 token 数加余量推出（测试分层设计第 10 节第 3 条，不写死窗口）：
 
@@ -564,10 +564,13 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
         "quality": quality_turns("release", "the delivery implements the revised PRD"),
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
-    # 上下文窗口按这个场景的需要设置（测试分层设计说明第 10 节第 3 条）：开始时的请求（部门提示与
-    # 工程可用的工具说明）装得下、留出余量，压缩只发生在询问带回新合同以后；窗口不随工具说明的长短调整
-    # 窗口按本场景的需要设置：工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token，窗口随之上调
-    run_id = system.create_run("build echo", context_window=7000 + 346 + 200)
+    # 上下文窗口按这个场景的需要设置（测试分层设计说明第 10 节第 3 条）：工程开始时的请求（部门提示与
+    # 工程可用的工具说明）装得下、留出余量，压缩只发生在询问带回新合同以后。窗口由实测的固定材料推出，
+    # 不写死：工单 #1182 给工程加上试用工具以后固定材料多 574 个 token（4679 → 5253），余量保持
+    # 原来的 2867 个 token
+    measure_id = system.create_run("build echo", context_window=1_000_000)
+    window = pinned_input_tokens(system, measure_id, "engineering") + 2867
+    run_id = system.create_run("build echo", context_window=window)
     for index in range(1, read_count + 1):
         system.workspace(run_id).write_file(f"part{index}.txt", "x" * 1200)
 

@@ -43,6 +43,9 @@
             "bash",
             "read_output",
             "stop_job",
+            "trial_start",
+            "trial_output",
+            "trial_stop",
             "ask",
             "submit_delivery"
           ],
@@ -66,6 +69,9 @@
             "read_output",
             "stop_job",
             "run_check",
+            "trial_open",
+            "trial_output",
+            "trial_stop",
             "ask",
             "submit_review",
             "submit_independent_judgement"

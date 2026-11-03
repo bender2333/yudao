@@ -429,7 +429,7 @@ def read_file_call(request, path) -> ModelResponse:
                                   "arguments": json_dumps({"path": path})}])
 
 
-COMPACTION_HEADROOM = 1704
+COMPACTION_HEADROOM = 2404
 
 
 def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False, step_limits=StepLimits()):
@@ -491,9 +491,10 @@ def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=Fals
     # 一个上下文窗口很小、工作区里放着大文件的运行：按请求目的与部门给出剧本，第一次读取以后压缩。
     # 窗口的大小与固定材料（部门提示与工具说明）的长度相关：工单 #68 加上 fetch_url 的说明以后固定材料
     # 多 346 个 token（三个部门实测）；工单 #1178 给两个提交工具加上 requirement_mapping 的说明以后，
-    # 产品的固定材料再实测多 283 个 token（pinned_input_tokens 读 4496 → 4779）。窗口因此不写死，
-    # 按实测固定材料推出（测试分层设计说明第 10 节第 3 条）：固定材料之外留一次读取再加一轮回应的余量，
-    # 第一次工作请求装得下、读取以后必然要压缩，固定材料再长也不改变这条场景的几何关系
+    # 产品的固定材料再实测多 283 个 token（pinned_input_tokens 读 4496 → 4779）；工单 #1182 给工程与
+    # 质检加上试用工具以后，工程的固定材料实测多 574 个 token（4679 → 5253），余量随之上调，保持
+    # 「第一次工作请求装得下、读取以后必然要压缩」的几何关系。窗口因此不写死，按实测固定材料推出
+    # （测试分层设计说明第 10 节第 3 条）：固定材料之外留一次读取再加一轮回应的余量
     measure_run = system.create_run(original, context_window=1_000_000)
     window = pinned_input_tokens(system, measure_run) + COMPACTION_HEADROOM
     run_id = system.create_run(original, context_window=window)
