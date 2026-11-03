@@ -1,0 +1,616 @@
+# 试用会话（本机版的执行位置）：核对试用需要的程序、建立试用副本、分配端口、按系统选用启动命令、
+# 启动交付的软件并等到就绪，以及读输出与结束会话（浏览器与 computer use 设计说明「试用会话」
+# 「试用工具」与「恢复契约」；总图第四节「动作」缝的 trial 类别）。
+#
+# 会话记录（身份、部门、种类、启动方式、端口、试用副本、各进程的进程号与启动时间）与动作记录保存在一起：
+# 本模块交回的记录随 tool_called 的载荷写入事件。持有会话的进程重新启动、run 结束时结束会话与清理遗留进程
+# 由后续工单接上；这里只负责一个会话从建立到停止。
+#
+# 执行层的代码：只导入标准库与本层的工作树、进程树与凭据遮蔽，不导入控制核心与应用层。
+
+from __future__ import annotations
+
+import asyncio
+import json
+import os
+import re
+import shutil
+import socket
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from threading import Lock
+from typing import Any, Callable
+
+from .definitions import DEFINITIONS
+from .models import new_id
+from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
+from .public_tree import CapturedTree, capture_public_tree, materialize_tree
+from .redact import redact_text
+
+# 试用副本与输出放在这个 run 的工作区旁边，与检查工作区同一种摆法（设计说明第 3.1 节）
+TRIALS_DIR = "trials"
+OUTPUT_DIR = "outputs"
+
+# 本机进程是控制主机：系统按 Python 的 sys.platform 取值。其他系统没有启动命令的约定
+_PLATFORM_SYSTEMS = {"win32": "windows", "linux": "linux"}
+
+# 就绪时限的默认值与界限取自规则登记（设计说明第 3.3 节）
+READINESS_TIMEOUT_SEC = int(DEFINITIONS.rule_value("execution.readiness_timeout_sec"))
+
+# 试用需要的程序与版本（设计说明第 3.2 节）
+NODE_MAJOR_MIN = 24
+PLAYWRIGHT_MCP_VERSION = "0.0.83"
+
+# 就绪的轮询间隔（秒）：每次轮询先看进程是否还在，再对就绪地址发一次请求
+READY_POLL_SEC = 0.2
+# 就绪地址的一次请求最多等这么久（秒）
+READY_REQUEST_TIMEOUT_SEC = 2.0
+# 程序探测的命令最多等这么久（秒）：npm 在 Windows 上第一次运行较慢
+PROBE_TIMEOUT_SEC = 90
+
+# 一条工具结果带回来的输出上限（字符）：与执行环境的工具输出上限是同一个默认值
+DEFAULT_OUTPUT_LIMIT = 20000
+
+
+class TrialStartFailed(Exception):
+    """试用会话没有建立：原因与截至失败时的启动输出一起交回动作回执。"""
+
+    def __init__(self, message: str, *, output: dict[str, Any] | None = None,
+                 cancelled: bool = False) -> None:
+        super().__init__(message)
+        self.output = dict(output or {})
+        self.cancelled = cancelled
+
+
+@dataclass
+class TrialSession:
+    # 一个试用会话：身份、部门、种类与启动方式、端口与就绪地址、试用副本、树摘要、进程与输出。
+    # 进程的结束与输出的读取可以在另一条线程上发生（读输出、停止、动作取消），状态只在锁里改
+    session_id: str
+    run_id: str | None
+    department: str
+    kind: str
+    launch_name: str
+    launch: dict[str, Any]
+    system: str
+    port: int
+    ready_url: str
+    copy_root: Path
+    tree_digest: str
+    source: str
+    output_path: Path
+    process: subprocess.Popen[Any] | None
+    tree: ProcessTree | None
+    file_handle: Any
+    started_at: str
+    status: str = "running"
+    ended_reason: str | None = None
+    exit_code: int | None = None
+    _lock: Lock = field(default_factory=Lock)
+
+    def record(self) -> dict[str, Any]:
+        # 会话记录：身份、部门、种类、端口、试用副本、各进程的进程号与启动时间（设计说明第 3.4 节）
+        with self._lock:
+            return {
+                "session_id": self.session_id,
+                "department": self.department,
+                "kind": self.kind,
+                "launch_name": self.launch_name,
+                "system": self.system,
+                "port": self.port,
+                "ready_url": self.ready_url,
+                "tree_digest": self.tree_digest,
+                "copy_source": self.source,
+                "copy": str(self.copy_root),
+                "process_id": None if self.process is None else self.process.pid,
+                "started_at": self.started_at,
+                "status": self.status,
+                "ended_reason": self.ended_reason,
+                "exit_code": self.exit_code,
+            }
+
+    def mark_ended(self, reason: str) -> None:
+        # 会话没有建立时的记录：只改状态，进程与副本由调用方结束
+        with self._lock:
+            if self.exit_code is None and self.process is not None:
+                self.exit_code = self.process.poll()
+            self.status = "ended"
+            self.ended_reason = reason
+
+    def end(self, reason: str) -> None:
+        # 结束交付软件的整棵进程树。可以重复调用：状态已经是结束时不再动已经放掉的资源
+        with self._lock:
+            if self.status == "ended":
+                return
+            if self.process is not None and self.exit_code is None:
+                ret = self.process.poll()
+                if ret is not None:
+                    self.exit_code = ret
+            if self.tree is not None:
+                self.tree.stop()
+                self.tree.wait_stopped(STOP_LIMIT_SEC)
+                if self.process is not None and self.process.poll() is None:
+                    try:
+                        self.process.wait(timeout=1)
+                    except subprocess.TimeoutExpired:
+                        pass
+                self.tree.close()
+                self.tree = None
+            if self.file_handle is not None:
+                try:
+                    self.file_handle.close()
+                finally:
+                    self.file_handle = None
+            self.status = "ended"
+            self.ended_reason = reason
+
+
+_PORT_LOCK = Lock()
+_ALLOCATED_PORTS: set[int] = set()
+
+
+def _free_port() -> int:
+    # 取得一个空闲的 TCP 端口：bind(("127.0.0.1", 0)) 以后记下端口并关掉套接字，
+    # 端口留在进程内的已分配集合里直到会话结束（设计说明第 3.3 节）
+    with _PORT_LOCK:
+        for _ in range(64):
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                probe.bind(("127.0.0.1", 0))
+                port = int(probe.getsockname()[1])
+            if port not in _ALLOCATED_PORTS:
+                _ALLOCATED_PORTS.add(port)
+                return port
+    raise TrialStartFailed("no free TCP port could be taken on 127.0.0.1")
+
+
+def _release_port(port: int) -> None:
+    with _PORT_LOCK:
+        _ALLOCATED_PORTS.discard(port)
+
+
+def current_system() -> str | None:
+    # 执行位置的系统：本机是控制主机，取 Python 的 sys.platform。其他系统返回 None
+    return _PLATFORM_SYSTEMS.get(sys.platform)
+
+
+# 建立试用会话的两个工具：工程用 trial_start（给出启动方式），质检用 trial_open（给出交付说明中的名称）
+TRIAL_TOOLS = frozenset({"trial_start", "trial_open"})
+
+
+def resolve_trial_call(name: str, args: dict[str, Any], delivery_spec: Any,
+                       system: str | None = None) -> tuple[dict[str, Any] | None, str | None]:
+    """工具许可对 trial_start 与 trial_open 的核对：交回启动方式或拒绝原因。
+
+    工程的 trial_start 用这次调用给出的启动方式；质检的 trial_open 只接受当前交付说明里的名称，
+    名称不存在时原因写明交付说明中已有的名称，交付说明没有 launch 时写明它没有写启动方式。
+    两者都按执行位置的系统选用命令：没有这个系统的命令时拒绝，原因写明缺少哪个系统的命令。
+    桌面试用会话在本机版还没有接上（屏幕工具属于 computer use 专题），先拒绝并写明原因。
+    """
+    if name == "trial_start":
+        launch = args.get("launch")
+        if not isinstance(launch, dict):
+            return None, "trial_start requires a launch method object"
+    elif name == "trial_open":
+        methods = [item for item in (getattr(delivery_spec, "launch", None) or [])
+                   if isinstance(item, dict)]
+        if not methods:
+            return None, "the DeliverySpec has no launch method"
+        wanted = args.get("launch_name")
+        matches = [item for item in methods if item.get("name") == wanted]
+        if not matches:
+            names = ", ".join(str(item.get("name")) for item in methods)
+            return None, (f"the DeliverySpec has no launch method named {wanted!r}; "
+                          f"it carries: {names}")
+        launch = matches[0]
+    else:
+        return None, f"{name} does not start a trial session"
+    problem = _launch_shape_problem(launch)
+    if problem is not None:
+        return None, problem
+    system = system or current_system()
+    commands = launch.get("commands") or {}
+    if system is None:
+        return None, (f"this execution location runs {sys.platform}; "
+                      f"launch commands are defined for windows and linux only")
+    if system not in commands:
+        covered = ", ".join(sorted(commands)) or "nothing"
+        return None, f"the launch method has no command for {system}; commands cover: {covered}"
+    if launch.get("kind") == "desktop":
+        return None, "desktop trial sessions are not available in this build"
+    return dict(launch), None
+
+
+def _launch_shape_problem(launch: dict[str, Any]) -> str | None:
+    # 启动方式的形状（设计说明第 3.3 节）：交付说明由提案校验，trial_start 的启动方式由这里核对
+    kind = launch.get("kind")
+    if kind not in {"web", "desktop"}:
+        return "kind must be web or desktop"
+    name = launch.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return "name must be a non-empty string"
+    commands = launch.get("commands")
+    if not isinstance(commands, dict) or not commands:
+        return "commands must map at least one system to an argv list"
+    for system, argv in commands.items():
+        if system not in {"windows", "linux"}:
+            return f"commands keys must be windows or linux, not {system!r}"
+        if not isinstance(argv, list) or not argv or any(
+                not isinstance(part, str) or not part for part in argv):
+            return f"commands.{system} must be a non-empty list of non-empty strings"
+    if kind == "web":
+        ready_url = launch.get("ready_url")
+        if not isinstance(ready_url, str) or "{port}" not in ready_url:
+            return "a web app requires a ready_url containing {port}"
+    return None
+
+
+def trial_root(run_root: str | Path) -> Path:
+    # 这个 run 的试用目录：放在运行工作区旁边，与检查工作区同一种摆法
+    path = Path(run_root)
+    return path.parent / TRIALS_DIR / path.name
+
+
+def trial_session_root(run_root: str | Path, session_id: str) -> Path:
+    return trial_root(run_root) / session_id
+
+
+def _run_probe(argv: list[str], timeout: float = PROBE_TIMEOUT_SEC) -> tuple[int, str]:
+    # 程序探测的一条命令：输出与错误一起取回，找不到程序、超时都按失败交回
+    try:
+        finished = subprocess.run(argv, capture_output=True, text=True, timeout=timeout,
+                                  env={**os.environ, "npm_config_yes": "false"})
+    except (OSError, subprocess.SubprocessError) as exc:
+        return 1, f"{type(exc).__name__}: {exc}"
+    return finished.returncode, "\n".join(part for part in (finished.stdout, finished.stderr) if part)
+
+
+def _node_status() -> dict[str, str] | None:
+    # Node.js 24 LTS（设计说明第 3.2 节）：找不到或版本不是 24 时算缺少
+    executable = shutil.which("node")
+    if executable is None:
+        return {"program": "Node.js 24", "detail": "node was not found on PATH"}
+    code, output = _run_probe([executable, "--version"])
+    text = output.strip().splitlines()[-1] if output.strip() else ""
+    match = re.match(r"v(\d+)\.", text)
+    if code != 0 or match is None:
+        return {"program": "Node.js 24", "detail": f"node --version failed: {text or 'no output'}"}
+    if int(match.group(1)) != NODE_MAJOR_MIN:
+        return {"program": "Node.js 24", "detail": f"found {text}"}
+    return None
+
+
+def _installed_mcp_version(output: str) -> str | None:
+    try:
+        data = json.loads(output)
+    except ValueError:
+        return None
+    dependencies = data.get("dependencies") if isinstance(data, dict) else None
+    item = dependencies.get("@playwright/mcp") if isinstance(dependencies, dict) else None
+    if not isinstance(item, dict):
+        return None
+    version = item.get("version")
+    return version if isinstance(version, str) else None
+
+
+def _playwright_mcp_status() -> dict[str, str] | None:
+    # Playwright MCP 0.0.83：先看全局安装（CI 与用户按设计说明的装法），再看 npx 的缓存
+    # （只运行过一次、没有全局安装的机器）。都没有时算缺少
+    npm = shutil.which("npm")
+    if npm is not None:
+        code, output = _run_probe([npm, "ls", "-g", "--depth=0", "--json", "@playwright/mcp"])
+        if code == 0:
+            version = _installed_mcp_version(output)
+            if version == PLAYWRIGHT_MCP_VERSION:
+                return None
+            if version is not None:
+                return {"program": f"Playwright MCP {PLAYWRIGHT_MCP_VERSION}",
+                        "detail": f"found {version}"}
+    npx = shutil.which("npx")
+    if npx is not None:
+        code, output = _run_probe([npx, "--no-install", f"@playwright/mcp@{PLAYWRIGHT_MCP_VERSION}",
+                                   "--version"])
+        if code == 0 and PLAYWRIGHT_MCP_VERSION in output:
+            return None
+    return {"program": f"Playwright MCP {PLAYWRIGHT_MCP_VERSION}",
+            "detail": "neither a global install nor the npx cache carries this version"}
+
+
+def _playwright_browsers_dir() -> Path:
+    # Playwright 安装的 Chromium 默认在这个目录下（Windows：%LOCALAPPDATA%\ms-playwright）
+    if os.name == "nt":
+        base = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / "AppData" / "Local"))
+    else:
+        base = Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache"))
+    return base / "ms-playwright"
+
+
+def _chromium_status() -> dict[str, str] | None:
+    # Chromium 由 Playwright 自带命令安装（设计说明第 3.2 节）：有 chromium 或无界面的
+    # chromium_headless_shell 都算装好。修订号是否与 Playwright 版本对得上，由真正启动浏览器时核对
+    root = _playwright_browsers_dir()
+    installed: list[str] = []
+    if root.is_dir():
+        installed = sorted(item.name for item in root.iterdir()
+                           if item.is_dir() and (item.name.startswith("chromium-")
+                                                 or item.name.startswith("chromium_headless_shell-")))
+    if not installed:
+        return {"program": "Chromium (Playwright)", "detail": f"no Chromium under {root}"}
+    return None
+
+
+def missing_programs() -> list[dict[str, str]]:
+    # 试用需要的程序（设计说明第 3.2 节）：Node.js 24、Playwright MCP 0.0.83、Chromium。
+    # 缺一个就交回一项，回执按它写明缺少的程序，会话不建立
+    missing = [item for item in (_node_status(), _playwright_mcp_status(), _chromium_status()) if item]
+    return [dict(item) for item in missing]
+
+
+def normalize_launch(raw: Any) -> dict[str, Any]:
+    # 一个启动方式的形状（设计说明第 3.3 节）。交付说明由提案校验核对过；这里再核一次，
+    # 因为 trial_start 的启动方式是模型在这次调用里给出的
+    if not isinstance(raw, dict):
+        raise ValueError("a launch method must be an object")
+    kind = raw.get("kind")
+    if kind not in {"web", "desktop"}:
+        raise ValueError("kind must be web or desktop")
+    name = raw.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError("name must be a non-empty string")
+    commands = raw.get("commands")
+    if not isinstance(commands, dict) or not commands:
+        raise ValueError("commands must map at least one system to an argv list")
+    normalized_commands: dict[str, list[str]] = {}
+    for system, argv in commands.items():
+        if system not in {"windows", "linux"}:
+            raise ValueError(f"commands keys must be windows or linux, not {system!r}")
+        if not isinstance(argv, list) or not argv or any(not isinstance(part, str) or not part for part in argv):
+            raise ValueError(f"commands.{system} must be a non-empty list of non-empty strings")
+        normalized_commands[str(system)] = list(argv)
+    ready_url = raw.get("ready_url")
+    if kind == "web":
+        if not isinstance(ready_url, str) or "{port}" not in ready_url:
+            raise ValueError("a web app requires a ready_url containing {port}")
+    elif ready_url is not None:
+        raise ValueError("a desktop program has no ready_url")
+    timeout = raw.get("ready_timeout_sec")
+    if timeout is None:
+        timeout = READINESS_TIMEOUT_SEC
+    low, high = DEFINITIONS.rule("execution.readiness_timeout_sec").bounds
+    if type(timeout) is not int or not low <= timeout <= high:
+        raise ValueError(f"ready_timeout_sec must be an integer between {int(low)} and {int(high)}")
+    return {"name": name.strip(), "kind": kind, "commands": normalized_commands,
+            "ready_url": ready_url, "ready_timeout_sec": timeout}
+
+
+def select_command(launch: dict[str, Any], system: str | None) -> list[str]:
+    # 按执行位置的系统选用命令（设计说明第 3.3 节）：没有这个系统的命令时按缺少启动方式处理
+    commands = launch.get("commands") or {}
+    if system is None:
+        raise ValueError("this execution location has no system from which to choose a launch command")
+    if system not in commands:
+        raise ValueError(f"the launch method has no command for {system}; "
+                         f"commands cover: {', '.join(sorted(commands)) or 'nothing'}")
+    return list(commands[system])
+
+
+def _http_ready(url: str) -> bool:
+    # 就绪条件：对替换端口以后的地址的请求得到任何 HTTP 响应
+    try:
+        with urllib.request.urlopen(url, timeout=READY_REQUEST_TIMEOUT_SEC) as response:
+            response.read(64)
+        return True
+    except urllib.error.HTTPError:
+        return True
+    except (urllib.error.URLError, OSError, ValueError):
+        return False
+
+
+def _read_output(path: Path, limit: int = DEFAULT_OUTPUT_LIMIT) -> str:
+    # 失败回执带截至结束时的启动输出：按工具输出上限取末尾，避免刷屏的程序把回执撑大
+    return _tail(path, limit)[0]
+
+
+def _tail(path: Path, limit: int) -> tuple[str, bool]:
+    # 取输出的末尾部分：limit 是字节数，按它截取以后再解码
+    if not path.exists():
+        return "", False
+    data = path.read_bytes()
+    if len(data) <= limit:
+        return redact_text(data.decode("utf-8", errors="replace")), False
+    return redact_text(data[-limit:].decode("utf-8", errors="replace")), True
+
+
+def _head(path: Path, limit: int) -> tuple[str, bool]:
+    if not path.exists():
+        return "", False
+    data = path.read_bytes()
+    if len(data) <= limit:
+        return redact_text(data.decode("utf-8", errors="replace")), False
+    return redact_text(data[:limit].decode("utf-8", errors="replace")), True
+
+
+def _remove_tree(root: Path) -> None:
+    # Windows 上进程句柄可能还没放开：按固定次数与递增退避重试，仍删不掉时留下目录不报错，
+    # 由会话结束的记录与后续的清理接住
+    if not root.exists():
+        return
+    for attempt in range(3):
+        try:
+            shutil.rmtree(root)
+            return
+        except OSError:
+            if attempt == 2:
+                return
+            time.sleep(0.1 * (attempt + 1))
+
+
+class TrialSessionTable:
+    """一个进程里全部 run 的试用会话：每个 run 的每个部门同一时刻最多一个。
+
+    会话记录与动作记录一起保存（设计说明第 3.4 节）：`start` 交回会话记录与启动输出的开头，
+    `read_output` 与 `stop` 交回同一个记录与输出。程序探测可以注入，测试用它模拟缺少某个程序。
+    """
+
+    def __init__(self, probe: Callable[[], list[dict[str, str]]] | None = None) -> None:
+        self._sessions: dict[tuple[str | None, str], TrialSession] = {}
+        self._lock = Lock()
+        self._probe = probe or missing_programs
+
+    async def start(self, *, run_id: str | None, department: str, launch: dict[str, Any],
+                    source_tree: CapturedTree, run_root: Path, source: str,
+                    output_limit: int = DEFAULT_OUTPUT_LIMIT, stop: Any = None) -> dict[str, Any]:
+        # 结束本部门原来的会话（设计说明第 3.4 节），再建立新的会话
+        self.stop(run_id, department, reason="replaced by a new trial session")
+        missing = self._probe()
+        if missing:
+            names = ", ".join(item["program"] for item in missing)
+            raise TrialStartFailed(f"trial programs are missing: {names}",
+                                   output={"missing_programs": missing, "session": None})
+        try:
+            launch = normalize_launch(launch)
+            system = current_system()
+            argv = select_command(launch, system)
+        except ValueError as exc:
+            raise TrialStartFailed(str(exc), output={"session": None}) from exc
+        if launch["kind"] != "web":
+            raise TrialStartFailed("desktop trial sessions are not available in this build",
+                                   output={"session": None})
+        return await self._start_web(run_id=run_id, department=department, launch=launch, argv=argv,
+                                     system=str(system), source_tree=source_tree, run_root=Path(run_root),
+                                     source=source, output_limit=output_limit, stop=stop)
+
+    async def _start_web(self, *, run_id: str | None, department: str, launch: dict[str, Any],
+                         argv: list[str], system: str, source_tree: CapturedTree, run_root: Path,
+                         source: str, output_limit: int, stop: Any) -> dict[str, Any]:
+        session_id = new_id("trial")
+        copy_root = trial_session_root(run_root, session_id)
+        copy_root.parent.mkdir(parents=True, exist_ok=True)
+        materialize_tree(source_tree, copy_root)
+        try:
+            digest = capture_public_tree(copy_root).digest
+        except Exception as exc:
+            _remove_tree(copy_root)
+            raise TrialStartFailed(f"the trial copy could not be read back: {exc}",
+                                   output={"session": None}) from exc
+        if digest != source_tree.digest:
+            _remove_tree(copy_root)
+            raise TrialStartFailed("the trial copy does not match the source tree", output={"session": None})
+        port = _free_port()
+        ready_url = str(launch["ready_url"]).replace("{port}", str(port))
+        output_path = trial_root(run_root) / OUTPUT_DIR / f"{session_id}.output"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        file_handle = open(output_path, "wb")
+        process: subprocess.Popen[Any] | None = None
+        tree: ProcessTree | None = None
+        session: TrialSession | None = None
+        try:
+            process = subprocess.Popen(
+                argv, cwd=str(copy_root), env={**os.environ, "PORT": str(port)},
+                stdin=subprocess.DEVNULL, stdout=file_handle, stderr=subprocess.STDOUT,
+                **spawn_options(),
+            )
+            tree = ProcessTree()
+            try:
+                tree.attach(process.pid)
+            except BaseException:
+                tree.stop()
+                tree.close()
+                raise
+            session = TrialSession(
+                session_id=session_id, run_id=run_id, department=department, kind=str(launch["kind"]),
+                launch_name=str(launch["name"]), launch=launch, system=system, port=port,
+                ready_url=ready_url, copy_root=copy_root, tree_digest=digest, source=source,
+                output_path=output_path, process=process, tree=tree, file_handle=file_handle,
+                started_at=datetime.now(timezone.utc).isoformat(),
+            )
+            await self._wait_ready(session, int(launch["ready_timeout_sec"]), stop)
+        except TrialStartFailed as exc:
+            if session is not None:
+                session.mark_ended(str(exc))
+                exc.output["session"] = session.record()
+            self._discard(process, tree, file_handle, copy_root, port)
+            raise
+        except BaseException:
+            self._discard(process, tree, file_handle, copy_root, port)
+            raise
+        with self._lock:
+            self._sessions[(run_id, department)] = session
+        head, truncated = _head(output_path, output_limit)
+        return {"session": session.record(), "output": head, "truncated": truncated}
+
+    async def _wait_ready(self, session: TrialSession, timeout_sec: int, stop: Any) -> None:
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + timeout_sec
+        while True:
+            if stop is not None and stop.is_set():
+                raise TrialStartFailed("the trial session was cancelled before it was ready",
+                                       output={"session": None}, cancelled=True)
+            if session.process is not None:
+                code = session.process.poll()
+                if code is not None:
+                    session.exit_code = code
+                    raise TrialStartFailed(
+                        f"the launch command exited with code {code} before the trial session was ready",
+                        output={"session": session.record(), "output": _read_output(session.output_path)})
+            if await asyncio.to_thread(_http_ready, session.ready_url):
+                return
+            if loop.time() >= deadline:
+                raise TrialStartFailed(
+                    f"the trial session did not become ready within {timeout_sec}s at {session.ready_url}",
+                    output={"session": session.record(), "output": _read_output(session.output_path)})
+            await asyncio.sleep(READY_POLL_SEC)
+
+    def _discard(self, process: subprocess.Popen[Any] | None, tree: ProcessTree | None,
+                 file_handle: Any, copy_root: Path, port: int) -> None:
+        # 没有建立的会话：结束进程树、关掉输出、删掉副本、放掉端口，不留半成品
+        if tree is not None:
+            tree.stop()
+            tree.wait_stopped(STOP_LIMIT_SEC)
+            tree.close()
+        if process is not None and process.poll() is None:
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                pass
+        if file_handle is not None:
+            try:
+                file_handle.close()
+            finally:
+                file_handle = None
+        _remove_tree(copy_root)
+        _release_port(port)
+
+    # ---- 读输出与结束 ----
+    def session_of(self, run_id: str | None, department: str) -> TrialSession | None:
+        with self._lock:
+            return self._sessions.get((run_id, department))
+
+    def read_output(self, run_id: str | None, department: str, limit: int) -> dict[str, Any]:
+        # 交付软件到目前为止的标准输出与标准错误的末尾部分
+        session = self.session_of(run_id, department)
+        if session is None:
+            return {"session_id": None, "output": "", "truncated": False, "status": "ended"}
+        output, truncated = _tail(session.output_path, limit)
+        return {"session_id": session.session_id, "output": output, "truncated": truncated,
+                "status": session.status}
+
+    def stop(self, run_id: str | None, department: str, *, reason: str = "stopped",
+             limit: int = DEFAULT_OUTPUT_LIMIT) -> dict[str, Any]:
+        # 结束会话：结束交付软件的进程树、删掉试用副本、放掉端口；交回结束方式与输出的末尾部分
+        with self._lock:
+            session = self._sessions.pop((run_id, department), None)
+        if session is None:
+            return {"session": None, "ended": False, "reason": reason, "output": "", "truncated": False}
+        session.end(reason)
+        output, truncated = _tail(session.output_path, limit)
+        _remove_tree(session.copy_root)
+        _release_port(session.port)
+        return {"session": session.record(), "ended": True, "reason": reason,
+                "output": output, "truncated": truncated}

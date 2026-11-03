@@ -24,6 +24,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 import time
 from threading import Lock
+from types import SimpleNamespace
 from typing import Any, Mapping
 
 from .actions import (
@@ -49,6 +50,7 @@ from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
 from .tools import tool_action
 from .tree_archive import artifact_run, load_tree
+from .trial_sessions import TrialSessionTable, TrialStartFailed, resolve_trial_call
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 # 一次工具结果的输出上限，取规则登记中的现值
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
@@ -223,6 +225,9 @@ class Workspaces:
         self.check_materials = check_material_paths(definitions)
         # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
         self._source: dict[tuple[str, str], str | None] = {}
+        # 这个进程里全部 run 的试用会话表（工单 #1182）：会话跨激活保留，一个部门同一时刻最多一个；
+        # 程序探测用真实的那一份，测试可以自己构造一张表交给 LocalEnvironment
+        self.trials = TrialSessionTable()
 
     # ---- 运行工作区 ----
     def parameters_for(self, run_id: str) -> dict[str, Any]:
@@ -244,6 +249,8 @@ class Workspaces:
             run_id=run_id,
             parameters=self.parameters_for(run_id),
             check_materials=self.check_materials,
+            trials=self.trials,
+            run_root=self.root / run_id,
         )
 
     # ---- 会话用哪份工作区 ----
@@ -287,7 +294,7 @@ class Workspaces:
         # 激活里写入的文件与检查回执在提交判断时仍然可见
         if not session_id:
             raise RuntimeError(f"inspection workspace for {department} needs a session id")
-        return LocalEnvironment.open(
+        environment = LocalEnvironment.open(
             inspection_root(self.root / run_id, session_id),
             check_timeout_sec=self._check_timeout(run_id),
             jobs=jobs,
@@ -296,7 +303,18 @@ class Workspaces:
             run_id=run_id,
             parameters=self.parameters_for(run_id),
             check_materials=self.check_materials,
+            trials=self.trials,
+            run_root=self.root / run_id,
         )
+        return self._attach_trial_source(environment, run_id, department, self._view(run_id))
+
+    def _attach_trial_source(self, environment: LocalEnvironment, run_id: str, department: str,
+                             projection: Any) -> LocalEnvironment:
+        # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（设计说明第 3.4 节）；
+        # 其他部门的试用副本在 trial_start 时封存运行工作区
+        if department in self.delivery_inspecting:
+            environment.bind_trial_source(self.source_tree(department, projection))
+        return environment
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
                            jobs: Any | None = None) -> LocalEnvironment:
@@ -372,6 +390,8 @@ class Workspaces:
             run_id=run_id,
             parameters=self.parameters_for(run_id),
             check_materials=self.check_materials,
+            trials=self.trials,
+            run_root=run_root,
         )
         if department in self.delivery_inspecting:
             ref = projection.qa_tests_archive_ref
@@ -381,6 +401,7 @@ class Workspaces:
                 env.place_qa_tests(load_tree(self._artifacts, artifact_run(ref.path), ref))
             else:
                 env.place_qa_tests(None)
+        self._attach_trial_source(env, run_id, department, projection)
         self._source[(run_id, session_id)] = self.source_hash(department, projection)
         return env
 
@@ -401,6 +422,9 @@ class Workspaces:
                                 else projection.delivery_spec.content_hash),
             effective_contract_hash=effective_contract_hash,
         )
+        # 质检的 trial_open 只接受当前交付说明里的启动方式（设计说明第 3.4 节）：激活开始时交到执行环境
+        environment.bind_launch_methods(
+            None if projection.delivery_spec is None else projection.delivery_spec.launch)
 
     def refresh_for(self, round: RoundWorkspace) -> Callable[[], LocalEnvironment | None]:
         # 检查工作区按会话保留（工单 #558）：从封存交付建立的部门进行中有新的交付封存时，
@@ -505,7 +529,9 @@ _HANDLERS = {
     "read_output": "_read_output",
     "stop_job": "_stop_job",
 }
-_PROCESSES = {"run_check": "_run_check", "bash": "_bash", "fetch_url": "_fetch", "mcp": "_mcp"}
+_PROCESSES = {"run_check": "_run_check", "bash": "_bash", "fetch_url": "_fetch", "mcp": "_mcp",
+              "trial_start": "_trial_start", "trial_open": "_trial_open",
+              "trial_output": "_trial_output", "trial_stop": "_trial_stop"}
 
 # MCP 调用的参数里执行环境自己写的键（现在没有）：保留这个清单供以后扩展，模型给出的其余键原样交回服务器
 _MCP_PRIVATE_ARGUMENTS = frozenset({})
@@ -521,6 +547,7 @@ _KIND_TOOLS = {
     "check": frozenset({"run_check"}),
     "command": frozenset({"bash", "read_output", "stop_job"}),
     "mcp": frozenset(),
+    "trial": frozenset({"trial_start", "trial_open", "trial_output", "trial_stop"}),
 }
 
 # 定义中的环境工具，只要出现在某个部门或事项种类的工具清单里（模型可能被提供它），就要在它动作类别的
@@ -750,6 +777,8 @@ class LocalEnvironment:
         parameters: Mapping[str, Any] | None = None,
         mcp_sessions: Any | None = None,
         check_materials: Mapping[str, tuple[str, ...]] | None = None,
+        trials: TrialSessionTable | None = None,
+        run_root: str | Path | None = None,
     ) -> None:
         self.workspace = workspace
         self._check_timeout_sec = check_timeout_sec
@@ -771,6 +800,17 @@ class LocalEnvironment:
         # 每个 run 每台服务器一个实例，第一次 MCP 调用时启动，run 结束时由持有它的一方关闭；
         # 没有 MCP 设置的 run（大多数 run 与旧事项）为空，环境工具的分派不受影响
         self.mcp_sessions = mcp_sessions
+        # 这个 run 的试用会话表（浏览器与 computer use 设计说明第 3.4 节，工单 #1182）：
+        # 会话跨激活保留（一个部门同一时刻最多一个会话），由 Workspaces 持有；直接构造环境时各自一份
+        self._trials = trials if trials is not None else TrialSessionTable()
+        # 运行工作区的根：试用副本放在它旁边的 trials/ 下，与检查工作区同一种摆法
+        self._run_root = Path(run_root) if run_root is not None else self.workspace.root
+        # 质检的试用副本来源：这次检查的交付快照的清单（由 Workspaces 在激活开始时交来）；
+        # 工程没有这一项，trial_start 时封存当前的运行工作区
+        self._trial_source: CapturedTree | None = None
+        # 当前交付说明里的启动方式（由 Workspaces 在激活开始时交来）：trial_open 只接受这里的名称。
+        # 复核由引擎在工具许可时已经做过一次，这里是执行之前的同一套核对
+        self._launch_methods: list[dict[str, Any]] = []
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -802,6 +842,8 @@ class LocalEnvironment:
         parameters: Mapping[str, Any] | None = None,
         mcp_sessions: Any | None = None,
         check_materials: Mapping[str, tuple[str, ...]] | None = None,
+        trials: TrialSessionTable | None = None,
+        run_root: str | Path | None = None,
     ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
         if tree is not None:
@@ -809,7 +851,7 @@ class LocalEnvironment:
             materialize_tree(tree, root)
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
                    artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions,
-                   check_materials=check_materials)
+                   check_materials=check_materials, trials=trials, run_root=run_root)
 
     @classmethod
     def open(
@@ -824,11 +866,13 @@ class LocalEnvironment:
         parameters: Mapping[str, Any] | None = None,
         mcp_sessions: Any | None = None,
         check_materials: Mapping[str, tuple[str, ...]] | None = None,
+        trials: TrialSessionTable | None = None,
+        run_root: str | Path | None = None,
     ) -> LocalEnvironment:
         # 打开已经建立的工作区
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
                    artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions,
-                   check_materials=check_materials)
+                   check_materials=check_materials, trials=trials, run_root=run_root)
 
     def _limit(self, name: str, default: Any) -> Any:
         # 这个 run 冻结的参数取值；没有冻结字典时用定义文件里的初始值（工单 #1189）
@@ -845,6 +889,15 @@ class LocalEnvironment:
             activation_id=activation_id, product_spec_hash=product_spec_hash,
             delivery_spec_hash=delivery_spec_hash, effective_contract_hash=effective_contract_hash,
         )
+
+    def bind_trial_source(self, tree: CapturedTree | None) -> None:
+        # 这个会话的试用副本来源（浏览器与 computer use 设计说明第 3.4 节）：质检按当前交付快照的清单
+        # 建立副本，工程没有这一项，trial_start 时封存运行工作区
+        self._trial_source = tree
+
+    def bind_launch_methods(self, methods: list[dict[str, Any]] | None) -> None:
+        # 当前交付说明里的启动方式：trial_open 的名称按它解析（设计说明第 3.4 节）
+        self._launch_methods = [dict(item) for item in (methods or []) if isinstance(item, dict)]
 
     def verify_tree(self, snapshot: WorkspaceSnapshot) -> None:
         # 交付核对：当前公开树仍与判断所依据的快照一致
@@ -918,6 +971,16 @@ class LocalEnvironment:
                 output, status = handler(action.input), "completed"
         except UnrepresentableWorkspace:
             raise
+        except TrialStartFailed as exc:
+            # 试用会话没有建立（缺少程序、就绪超时、进程提前退出、启动方式不可用）：
+            # 失败回执带启动输出，会话不建立（浏览器与 computer use 设计说明第 3.4 节与故障矩阵）；
+            # 开始之前被取消时按取消交回，进程树已经结束
+            tree_change, after_ref = self._tree_evidence(before)
+            if exc.cancelled:
+                return ActionReceipt(action_id=action.action_id, status="cancelled", output=exc.output,
+                                     tree_change=tree_change, after_snapshot_ref=after_ref)
+            return ActionReceipt(action_id=action.action_id, status="failed", output=exc.output,
+                                 error=str(exc), tree_change=tree_change, after_snapshot_ref=after_ref)
         except FetchRefused as exc:
             # 地址指向服务自己：动作被拒绝，回执标 refused 并带原因，作为工具结果交回（工单 #1170）
             return ActionReceipt.refusal(action.action_id, str(exc))
@@ -1536,6 +1599,57 @@ class LocalEnvironment:
                 "effective_contract_hash": receipt.effective_contract_hash,
                 "qa_tests_hash": receipt.qa_tests_hash,
             }, finished.status
+
+
+    # ---- 试用会话（工单 #1182）----
+    def _trial_source_tree(self) -> CapturedTree:
+        # 质检的试用副本按这次检查的交付快照建立（激活开始时由 Workspaces 交来，工单 #1182 与设计说明第 3.4 节）；
+        # 工程没有这一项，在 trial_start 时封存当前的运行工作区。直接构造环境的测试没有 bind 时用当前工作区
+        if self._trial_source is not None:
+            return self._trial_source
+        return capture_public_tree(self.workspace.root, True)
+
+    def _trial_source_name(self) -> str:
+        return "delivery_snapshot" if self._trial_source is not None else "workspace_seal"
+
+    async def _trial_start(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 工程的试用：结束本部门原来的会话，按这次调用给出的启动方式建立会话
+        launch, reason = resolve_trial_call("trial_start", action.input, None)
+        if reason is not None:
+            raise TrialStartFailed(reason, output={"session": None})
+        return await self._start_trial(action, launch, stop)
+
+    async def _trial_open(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 质检的试用：启动方式按当前交付说明里的名称解析（引擎在工具许可时已经核对过一次，
+        # 这里是执行之前的同一套核对）
+        delivery = SimpleNamespace(launch=self._launch_methods)
+        launch, reason = resolve_trial_call("trial_open", action.input, delivery)
+        if reason is not None:
+            raise TrialStartFailed(reason, output={"session": None})
+        return await self._start_trial(action, launch, stop)
+
+    async def _start_trial(self, action: Action, launch: dict[str, Any],
+                           stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        result = await self._trials.start(
+            run_id=self._run_id, department=action.department, launch=launch,
+            source_tree=self._trial_source_tree(), run_root=self._run_root,
+            source=self._trial_source_name(), output_limit=self._output_limit(), stop=stop,
+        )
+        return result, "completed"
+
+    async def _trial_output(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 交付软件到目前为止的输出末尾部分；字节数取模型给出的，缺省用这个 run 的工具输出上限
+        limit = action.input.get("bytes")
+        if limit is None:
+            limit = self._output_limit()
+        if type(limit) is not int or limit < 1:
+            raise ValueError("bytes must be a positive integer")
+        return self._trials.read_output(self._run_id, action.department, min(limit, self._output_limit())), "completed"
+
+    async def _trial_stop(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 结束本部门的会话：结束交付软件的进程树、删掉试用副本、交回结束方式与输出末尾
+        return self._trials.stop(self._run_id, action.department,
+                                 limit=self._output_limit()), "completed"
 
 
 async def _run_process(argv: list[str], cwd: Path, env: dict[str, str], timeout_sec: float,

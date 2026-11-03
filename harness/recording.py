@@ -23,7 +23,7 @@ from .tools import in_force, writes_check_materials
 from .write_path import NewEvent, Transaction, WritePath
 from .models import Event, EventType, Usage, canonical_hash, json_dumps, utc_now
 from .providers.call import ModelResponse, ModelStreamEvent
-from .redact import redact_tool_args
+from .redact import redact_text, redact_tool_args
 
 # 一条待追加的记录：阶段在追加的事务中填入。返回 None 表示按事务里的运行状态这一刻没有要记的事实
 Draft = Callable[[Transaction], NewEvent | None]
@@ -355,7 +355,8 @@ class StepRecorder:
                     after_snapshot: dict[str, Any] | None = None,
                     qa_tests_saved: dict[str, Any] | None = None) -> None:
         # 动作后的公开树快照与结果一起写入（工单 #17）：与动作前的快照、动作参数一起构成核实依据，
-        # 放在 run 自己的对象区域，不建立提交、不改动分支索引
+        # 放在 run 自己的对象区域，不建立提交、不改动分支索引。
+        # 试用会话的记录随试用工具的结果一起存进这个动作的输出工件（工单 #1182）
         call = self._redacted_call(call)
         if after_snapshot is not None:
             after_ref = self._artifacts.put(request.run_id, "snapshot/after", json_dumps(after_snapshot),
@@ -580,7 +581,14 @@ class StepRecorder:
         args = call.get("args")
         if not isinstance(args, dict):
             return call
-        return {**call, "args": redact_tool_args(args)}
+        redacted_args = redact_tool_args(args)
+        launch = redacted_args.get("launch")
+        if isinstance(launch, dict) and isinstance(launch.get("commands"), dict):
+            # 试用启动方式的命令与 bash 的命令同一种规则（工单 #1182）：逐段遮蔽凭据原文
+            commands = {system: [redact_text(str(part)) for part in argv]
+                        for system, argv in launch["commands"].items() if isinstance(argv, list)}
+            redacted_args = {**redacted_args, "launch": {**launch, "commands": commands}}
+        return {**call, "args": redacted_args}
 
     def _draft(self, type: str, **fields: Any) -> Draft:
         # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入。

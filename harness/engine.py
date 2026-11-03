@@ -55,6 +55,7 @@ from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_c
                     tool_verification, writes_check_materials)
 from .validation import PRD_REVISION_FIELDS, AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
+from .trial_sessions import TRIAL_TOOLS, resolve_trial_call
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
 COMPACTION_REQUEST_TIER = "minimal"
@@ -1121,6 +1122,13 @@ class StepDriver:
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
                 tightening=self._tightening, events=transaction.events(), definitions=self._definitions,
             )
+            if permission.allowed and call["name"] in TRIAL_TOOLS:
+                # 试用会话的启动方式（浏览器与 computer use 设计说明第 3.3、3.4 节，工单 #1182）：
+                # 质检的 trial_open 按当前交付说明的名称解析，工程的 trial_start 用它给出的启动方式；
+                # 解析不了的按工具许可拒绝交回，动作不交给执行环境，也不写工具开始事件
+                _launch, reason = resolve_trial_call(call["name"], call["args"], projection.delivery_spec)
+                if reason is not None:
+                    permission = ToolPermission(reason=reason)
             if permission.allowed:
                 already_started = any(
                     e.type == EventType.TOOL_STARTED and (e.payload or {}).get("id") == call["id"]
