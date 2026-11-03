@@ -307,6 +307,10 @@ class ContextManifest:
     output_reserve_tokens: int = 0
     parts_ref: dict[str, Any] | None = None
     guidance_ids: list[str] = field(default_factory=list)
+    # 这一次装配按哪一版规则算出来的（设计说明第 6.1 节）：规则版本是规则取值的规范散列
+    rules_version: str | None = None
+    # 这一次折叠了哪几轮（从 1 起的轮次编号，按部门历史顺序）；折叠计数是它的长度
+    folded_rounds: list[int] = field(default_factory=list)
 
 
 @dataclass
