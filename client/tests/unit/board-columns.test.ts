@@ -5,9 +5,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { boardColumns } from "../../src/renderer/src/views/project/board.ts";
+import { boardColumns,boardGroups } from "../../src/renderer/src/views/project/board.ts";
 import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,formatTime,label,progressLabel,stopNoteView,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
-import type { WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
+import type { DepartmentState,WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 
 const STOP_REASONS = [
@@ -43,26 +43,128 @@ test("取消的事项进已停止列，不落进任何部门列", () => {
   const stopped = item({ work_item_id: "w3", status: "stopped", department: null, stop_reason: "cancelled" });
   const columns = boardColumns([stopped]);
   assert.deepEqual(columns.stopped.map((entry) => entry.work_item_id), ["w3"]);
-  assert.deepEqual(columns.product, []);
-  assert.deepEqual(columns.engineering, []);
-  assert.deepEqual(columns.quality, []);
+  assert.deepEqual(columns.departments, []);
+  assert.deepEqual(columns.queue, []);
 });
 
 test("部门列按部门分列，已放行与已采纳各自一列", () => {
+  // 进行中的事项由它所用的定义给出三个部门的状态（服务端按定义顺序给出，这里也是那个顺序）；
+  // 每件事项只有一个部门在它上面工作，因此各自只有一列放着它
+  const waiting = { state: "waiting" } as const;
+  const states = (working: string): Record<string, DepartmentState> => ({
+    product: working === "product" ? { state: "working" } : waiting,
+    engineering: working === "engineering" ? { state: "working" } : waiting,
+    quality: working === "quality" ? { state: "working" } : waiting,
+  });
   const columns = boardColumns([
     item({ work_item_id: "w1", status: "not_started" }),
-    item({ work_item_id: "w2", status: "in_progress", department: "engineering" }),
-    item({ work_item_id: "w3", status: "in_progress", department: "quality" }),
-    item({ work_item_id: "w4", status: "in_progress", department: "product" }),
+    item({ work_item_id: "w2", status: "in_progress", department: "engineering", departments: states("engineering") }),
+    item({ work_item_id: "w3", status: "in_progress", department: "quality", departments: states("quality") }),
+    item({ work_item_id: "w4", status: "in_progress", department: "product", departments: states("product") }),
     item({ work_item_id: "w5", status: "released_unsettled", department: null }),
     item({ work_item_id: "w6", status: "adopted", department: null }),
   ]);
   assert.deepEqual(columns.queue.map((entry) => entry.work_item_id), ["w1"]);
-  assert.deepEqual(columns.engineering.map((entry) => entry.work_item_id), ["w2"]);
-  assert.deepEqual(columns.quality.map((entry) => entry.work_item_id), ["w3"]);
-  assert.deepEqual(columns.product.map((entry) => entry.work_item_id), ["w4"]);
+  assert.deepEqual(columns.departments.map((column) => column.department), ["product", "engineering", "quality"]);
+  assert.deepEqual(columns.departments.map((column) => column.items.map((entry) => entry.work_item_id)), [
+    ["w4"], ["w2"], ["w3"],
+  ]);
   assert.deepEqual(columns.released.map((entry) => entry.work_item_id), ["w5"]);
   assert.deepEqual(columns.adopted.map((entry) => entry.work_item_id), ["w6"]);
+});
+
+test("两个部门同时工作时，事项在两个部门的列里，与部门状态行说的是同一件事", () => {
+  // 试用里的一次读数（试用工单 #994 的 F1，卡点 N-08）：「工程 一轮工作中 · 质检 一轮工作中（预测性探索…）」，
+  // 看板却是「工程(0) 质检(1)」。看板的分组改按各部门的状态分过去以后，同一个事项在工程与质检两列里
+  const card = item({
+    work_item_id: "w1",
+    status: "in_progress",
+    department: "quality",
+    departments: {
+      product: { state: "waiting" },
+      engineering: { state: "working" },
+      quality: { state: "working", note: "预测性探索：按 PRD r1 起草测试用例" },
+    },
+  });
+  const columns = boardColumns([card]);
+  // 部门状态行（概览「当前事项」那一行）说工程与质检在一轮工作中
+  assert.equal(
+    departmentsText(card.departments),
+    "产品 等待工作 · 工程 一轮工作中 · 质检 一轮工作中（预测性探索：按 PRD r1 起草测试用例）",
+  );
+  // 看板上这两个部门的列里都有这个事项，等待工作的产品列里没有
+  assert.deepEqual(columns.departments.map((column) => column.title), ["产品", "工程", "质检"]);
+  assert.deepEqual(columns.departments.map((column) => column.items.map((entry) => entry.work_item_id)), [
+    [], ["w1"], ["w1"],
+  ]);
+  // 状态行说在一轮工作中的每一个部门，看板上它的列里都有这个事项——两边说的是同一件事
+  for (const column of columns.departments) {
+    const working = card.departments?.[column.department]?.state === "working";
+    assert.equal(column.items.length > 0, working, column.department);
+  }
+});
+
+test("部门列取自事项的部门，换了部门名的定义，列跟着换，不写死三个部门", () => {
+  // 三个部门改名的定义（harness/tests/test_watched_outputs_renamed.py 那一份的部门编号）：
+  // 看板的分组跟着事项的部门走，默认定义的产品、工程、质检三列一列都不出现
+  const columns = boardColumns([
+    item({
+      work_item_id: "w1",
+      status: "in_progress",
+      department: "requirements",
+      departments: {
+        requirements: { state: "working" },
+        build: { state: "waiting" },
+        inspection: { state: "waiting" },
+      },
+    }),
+  ]);
+  assert.deepEqual(columns.departments.map((column) => column.department), ["requirements", "build", "inspection"]);
+  assert.deepEqual(columns.departments.map((column) => column.items.map((entry) => entry.work_item_id)), [["w1"], [], []]);
+  for (const fixed of ["product", "engineering", "quality"]) {
+    assert.equal(columns.departments.some((column) => column.department === fixed), false, fixed);
+  }
+});
+
+test("部门都在等待工作、也没有所在部门时，按所在部门放；两样都没有的事项在排队中", () => {
+  const allWaiting: Record<string, DepartmentState> = {
+    product: { state: "waiting" },
+    engineering: { state: "waiting" },
+    quality: { state: "waiting" },
+  };
+  const idle = item({ work_item_id: "w1", status: "in_progress", department: "engineering", departments: allWaiting });
+  const columns = boardColumns([idle]);
+  // 部门列还是定义里的三个（部门列不因没有人在工作而消失），事项按所在部门落在工程列
+  assert.deepEqual(columns.departments.map((column) => column.department), ["product", "engineering", "quality"]);
+  assert.deepEqual(columns.departments.map((column) => column.items.map((entry) => entry.work_item_id)), [
+    [], ["w1"], [],
+  ]);
+  // 等待确认初始 PRD 的事项没有部门在它上面工作，也没有所在部门：在排队中，不从看板上消失
+  const awaiting = item({ work_item_id: "w2", status: "awaiting_initial_prd", department: null, departments: null });
+  assert.deepEqual(boardColumns([awaiting]).queue.map((entry) => entry.work_item_id), ["w2"]);
+});
+
+test("看板按显示顺序给出各组：排队中、各部门、已放行、已采纳、已停止", () => {
+  const groups = boardGroups([
+    item({
+      work_item_id: "w1",
+      status: "in_progress",
+      department: "engineering",
+      departments: {
+        product: { state: "waiting" },
+        engineering: { state: "working" },
+        quality: { state: "waiting" },
+      },
+    }),
+  ]);
+  assert.deepEqual(groups.map((group) => group.title), ["排队中", "产品", "工程", "质检", "已放行", "已采纳", "已停止"]);
+  assert.deepEqual(groups[2].items.map((entry) => entry.work_item_id), ["w1"]);
+  // 项目里没有进行中的事项（只有已采纳的事项）时没有部门列：只有按状态分的四组
+  const adoptedOnly = boardGroups([item({ work_item_id: "w2", status: "adopted", department: null })]);
+  assert.deepEqual(adoptedOnly.map((group) => group.title), ["排队中", "已放行", "已采纳", "已停止"]);
+  assert.deepEqual(adoptedOnly[2].items.map((entry) => entry.work_item_id), ["w2"]);
+  // 一个事项都没有时也是这四组，界面按「项目还没有事项」写空态
+  assert.deepEqual(boardGroups([]).map((group) => group.title), ["排队中", "已放行", "已采纳", "已停止"]);
 });
 
 
@@ -94,7 +196,7 @@ test("停止的事项没有部门时不写「未知部门」，页面自己决�
 // 概览「当前事项」的两行与看板卡片（工单 #904）：所在部门一行写三个部门各自的状态与原因，
 // 进度行按成果写，看板卡片写正在工作的部门。期望值是字面值。
 
-test("所在部门一行写三个部门各自的状态与原因，按产品、工程、质检的顺序", () => {
+test("所在部门一行写三个部门各自的状态与原因，按查询给出的顺序", () => {
   assert.equal(
     departmentLine({
       product: { state: "waiting" },
@@ -154,7 +256,7 @@ test("进度行的三种写法：有交付、没有交付、没有结论", () =>
   );
 });
 
-test("看板卡片写正在工作的部门，按产品、工程、质检的顺序", () => {
+test("看板卡片写正在工作的部门，按查询给出的顺序", () => {
   assert.equal(
     workingDepartmentsText({
       department: "product",
