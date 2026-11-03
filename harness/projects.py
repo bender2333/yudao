@@ -1019,6 +1019,20 @@ class ProjectService:
         item = self._start_in(project_id, create, command=command)
         return item.work_item_id, item.run_id
 
+    def _restart_form(self, transaction: Transaction, project: ProjectProjection, item: WorkItem,
+                      run_id: str) -> str | None:
+        # 因升级重新开始沿用事项创建时冻结的形态（工单 #1392）：这是同一个事项，换的只是 run 的应用版本。
+        # 那一份形态已经不在发布里时不换一份、也不按项目现在的形态兜底（第 2 轮定的边界）：与新建事项
+        # 同样拒绝（项目的组织设计说明「冻结与升级」），原因记在这条事项的开始失败上，事项留在因升级停止的
+        # 状态、由用户处理；同一批里其余 run 照旧重新开始，实例起得来。旧事件没有记下形态时取项目现在的形态
+        try:
+            return self.orchestrator.require_form(item.form or project.form_name).name
+        except ValueError as exc:
+            transaction.append(NewProjectEvent(ProjectEventType.WORK_ITEM_START_FAILED, {
+                "work_item_id": item.work_item_id, "run_id": run_id, "error": str(exc),
+            }, actor="system"))
+            return None
+
     def restart_work_item_for_upgrade(self, run_id: str, *, command: Command | None = None) -> tuple[str, str] | None:
         # 因升级重新开始（ADR-0019，工单 #126）：run 事件版本与当前不同的未结束 run 由流程编排记为因升级停止，
         # 这里在项目流上以项目当前的采纳成果为基线为同一个事项登记新的 run，并记下「因升级重新开始」的优先级。
@@ -1035,8 +1049,11 @@ class ProjectService:
             item = project.work_item_for_run(run_id)
             if item is None:
                 return None
+            form = self._restart_form(transaction, project, item, run_id)
+            if form is None:
+                return None
             if item.kind == "onboarding":
-                return self._onboarding_restarted(transaction, project, item, run_id)
+                return self._onboarding_restarted(transaction, project, item, run_id, form)
             point = self._work_item_start_point(project)
             return self._work_item_created(
                 transaction, project, item.text, title=item.title, max_cycles=item.max_cycles,
@@ -1048,7 +1065,7 @@ class ProjectService:
                 # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
                 # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
                 mcp_servers=item.mcp_servers,
-                form=item.form if item.form in self.orchestrator.forms else None,
+                form=form,
             )
 
         created = self.writes.transact(project_stream(run.project_id), restart, command=command)
@@ -1066,7 +1083,7 @@ class ProjectService:
         return created.work_item_id, created.run_id
 
     def _onboarding_restarted(self, transaction: Transaction, project: ProjectProjection,
-                              item: WorkItem, run_id: str) -> _NewWorkItem:
+                              item: WorkItem, run_id: str, form: str) -> _NewWorkItem:
         # 建档事项因升级重新开始（设计第 6 节最后一行）：第一轮用建档事项记录的快照重建，与开始建档时同样
         # 从快照开始、种类为 onboarding、没有基线、轮次为 1；修改轮带上一轮候选与修改意见重新开始，与回答
         # 「提出修改」建立的 run 依据相同（轮次、上一轮候选的事件编号、修改意见原文）。
@@ -1090,7 +1107,7 @@ class ProjectService:
             # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
             # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
             mcp_servers=item.mcp_servers,
-            form=item.form if item.form in self.orchestrator.forms else None,
+            form=form,
         )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,

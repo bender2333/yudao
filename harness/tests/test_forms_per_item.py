@@ -193,6 +193,53 @@ def test_a_restarted_instance_resumes_an_item_with_the_form_it_was_created_with(
     second.close()
 
 
+def test_an_upgrade_restart_keeps_the_frozen_form_or_is_refused(tmp_path):
+    # 第 2 轮定的边界（项目的组织设计说明「冻结与升级」只写到新建事项被拒绝）：升级重新开始时，事项冻结的
+    # 形态已经不在发布里，与新建事项同样拒绝——不换一份形态，原因记在项目流的那条事项上；同一批里形态还在
+    # 发布里的 run 照旧重新开始，实例照常起来。两条路各一条：项目现在的形态还在发布里（原来会静默换成它）、
+    # 项目现在的形态也不在发布里（原来会从批量升级里抛出去，实例起不来）
+    data_dir = tmp_path / "loop"
+    script = merge_scripts(_three_departments_script(), _task_pool_script())
+    first = _system(data_dir, script, resume_on_startup=False)
+    project_id = first.projects.register("升级时形态不在发布里", GOAL)
+    kept_item, kept_run = first.projects.start_work_item(project_id, "三部门的事项")
+    assert first.activate_once(kept_run).status == "running"
+    _set_form(first, project_id, DEFAULT_FORM, second_routing.ROUTING_NAME)
+    gone_item, gone_run = first.projects.start_work_item(project_id, "任务池的事项")
+    other_id = first.projects.register("项目的形态也不在发布里", GOAL)
+    _set_form(first, other_id, DEFAULT_FORM, second_routing.ROUTING_NAME)
+    other_item, other_run = first.projects.start_work_item(other_id, "任务池的另一个事项")
+    first.close()
+
+    # 重开成只带默认形态的实例：发布里已经没有任务池那一份；第一个项目的形态改回默认，第二个项目仍是任务池
+    second = LoopSystem.for_testing(data_dir, FakeAdapter(script), resume_on_startup=False)
+    _set_form(second, project_id, second_routing.ROUTING_NAME, DEFAULT_FORM)
+    stopped, restarted = second.stop_and_restart_runs(
+        [gone_run, other_run, kept_run], reason="run event version differs from the current version")
+
+    assert stopped == [gone_run, other_run, kept_run]
+    # 那一份形态不在发布里：不换形态、不建新的事项记录与 run，原因记在这条事项的开始失败上
+    for item_id, project in ((gone_item, project_id), (other_item, other_id)):
+        gone = next(item for item in second.projects.projection(project).work_items
+                    if item.work_item_id == item_id)
+        assert gone.form == second_routing.ROUTING_NAME
+        assert gone.start_error == (f"unknown form {second_routing.ROUTING_NAME!r}: "
+                                    f"the release loads {[DEFAULT_FORM]}")
+        assert len([event for event in second.store.list_project_events(project)
+                    if event.type == ProjectEventType.WORK_ITEM_CREATED
+                    and event.payload["work_item_id"] == item_id]) == 1
+    # 同一批里其余 run 照旧重新开始：实例起得来，形态还在发布里的那一份按它自己记下的形态重开
+    assert len(restarted) == 1
+    resumed = next(item for item in second.projects.projection(project_id).work_items
+                   if item.work_item_id == restarted[0])
+    assert resumed.form == DEFAULT_FORM
+    assert resumed.restarted_from_run_id == kept_run
+    old = next(item for item in second.projects.projection(project_id).work_items
+               if item.work_item_id == kept_item)
+    assert (old.form, old.run_id) == (DEFAULT_FORM, kept_run)
+    second.close()
+
+
 def test_a_new_item_is_rejected_when_the_project_form_is_not_in_the_release(tmp_path):
     # 发布里没有那一份形态（项目的组织设计说明「冻结与升级」）：新建事项被拒绝，说明写明原因与可选的形态，
     # 不写事项、不开始 run；已经冻结了那一份的旧事项靠自己记下的定义跑，不受影响
