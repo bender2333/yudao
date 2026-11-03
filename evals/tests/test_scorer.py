@@ -223,3 +223,40 @@ def test_missing_cli_is_not_done(tmp_path):
         assert check["status"] == "not_done"
     # the unit checks do not need the entry point and still pass
     assert result["completion"] > 0.0
+
+
+def test_reference_keeps_the_station_names_of_the_material(tmp_path):
+    """独立的那条检查：交付照材料里的站名与线名原样使用时通过。"""
+    delivery = make_delivery(str(tmp_path))
+    result = run_scorer(delivery, str(tmp_path / "result.json"))
+    fidelity = result["data_fidelity"]
+    assert fidelity["id"] == "data_1_1"
+    assert fidelity["status"] == "pass"
+    # 这条检查单独报告：24 条检查与两个指标不因它改变
+    assert len(result["checks"]) == 24
+    assert result["completion"] == 1.0
+    assert result["correctness"] == 1.0
+
+
+def test_translated_station_names_are_found_by_the_fidelity_check(tmp_path):
+    """站名换成另一种写法时，这条检查直接发现，不靠查询结果间接暴露（工单 #1369）。"""
+    delivery = make_delivery(str(tmp_path))
+    data_path = os.path.join(delivery, "src", "subway_data.json")
+    with open(data_path, encoding="utf-8") as handle:
+        payload = json.load(handle)
+    payload["stations"] = [{"name": "苹果园", "lines": ["1号线"]}]
+    with open(data_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False)
+
+    result = run_scorer(delivery, str(tmp_path / "result.json"))
+    fidelity = result["data_fidelity"]
+    assert fidelity["status"] == "wrong"
+    assert "苹果园" in fidelity["detail"]
+    assert "1号线" in fidelity["detail"]
+
+
+def test_missing_data_file_is_not_done_for_the_fidelity_check(tmp_path):
+    delivery = make_delivery(str(tmp_path))
+    os.remove(os.path.join(delivery, "src", "subway_data.json"))
+    result = run_scorer(delivery, str(tmp_path / "result.json"))
+    assert result["data_fidelity"]["status"] == "not_done"

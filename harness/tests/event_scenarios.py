@@ -156,8 +156,11 @@ def _compaction_system(data_dir, summary: Callable[[Any], ModelResponse], *, ste
 
     # 窗口按本场景的需要设置：工单 #68 加上 fetch_url 的说明以后固定材料多 346 个 token（三个部门实测），
     # 工单 #1178 给两个提交工具加上 requirement_mapping 的说明以后产品的固定材料再实测多 283 个 token；
-    # 两笔都是固定材料的增长，窗口按两笔之和上调，压缩发生在哪一步与事件序列基准保持一致
-    system, _, run_id = _system(data_dir, [respond] * 20, step_limits=step_limits, context_window=6000 + 346 + 283)
+    # 工单 #1369 给产品提示加上「合同里的具体值要能指回用户原话」一段，产品的固定材料再实测多 144 个 token
+    # （pinned_input_tokens 读 5133 → 5277）；几笔都是固定材料的增长，窗口按各笔之和上调，
+    # 压缩发生在哪一步与事件序列基准保持一致
+    system, _, run_id = _system(data_dir, [respond] * 20, step_limits=step_limits,
+                                context_window=6000 + 346 + 283 + 144)
     system.workspace(run_id).write_file("large.txt", "LARGE_TOOL_OUTPUT " * 2200)
     return system, run_id
 
