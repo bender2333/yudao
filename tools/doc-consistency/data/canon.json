@@ -1,21 +1,20 @@
 {
-  "说明": "规则事实线的正本表格：哪张表的哪一列是哪种事实。词表：「角色」取自 roles.json（含别名与合称）；写成名字的词表在 vocab 里，值必须在清单里；列上写 open 的词表（「事」）还没封闭，一格按顿号与分号切开，每个短语原样当一个值。表的键是 doc-consistency nodes 查得到的节点名（小节名 > 表N）；文档里一个字不加。列的写法见 README「规则事实线」。",
+  "说明": "规则事实线的正本表格：哪张表的哪一列是哪种事实。词表：「角色」取自 roles.json（含别名与合称）；写成名字的词表在 vocab 里，值必须在清单里；没有词表的列（如理由清单）一格按顿号与分号切开，每个短语原样当一个值。机器（CI、脚本、钩子）可以出现在词表为「角色」的列里，读成值，但不是角色。整格只写「按第 N 节」的是引用，不出事实。角色表（第 2 节）只登记键是角色；「做什么」「不做什么」两列是摘要，不是正本，谁做什么的正本是第 1 节。表的键是 doc-consistency nodes 查得到的节点名（小节名 > 表N）；文档里一个字不加。列的写法见 README「规则事实线」。",
   "tables": {
     "docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1": {
       "key": "事实",
+      "node": "事实",
       "carrier_column": "位置",
       "columns": {
-        "谁改": {"fact": "由谁改", "many": true, "vocab": "角色"}
+        "谁定": {"fact": "由谁定", "many": true, "vocab": "角色", "edge": "角色→键", "edge_label": "定"},
+        "谁改": {"fact": "由谁改", "many": true, "vocab": "角色", "edge": "角色→键", "edge_label": "改"}
       }
     },
     "docs/agents/workflow.md#工作方式 > 2. 角色 > 表1": {
       "key": "角色",
       "key_vocab": "角色",
       "node": "角色",
-      "columns": {
-        "做什么": {"fact": "做", "many": true, "vocab": "事", "open": true},
-        "不做什么": {"fact": "不做", "many": true, "vocab": "事", "open": true}
-      }
+      "columns": {}
     },
     "docs/agents/workflow.md#工作方式 > 4. 状态与标签 > 表1": {
       "key": "状态",
@@ -36,8 +35,7 @@
       "key": "卡在",
       "node": "卡在项",
       "columns": {
-        "交给": {"fact": "交给", "many": true, "vocab": "角色", "edge": "键→角色"},
-        "卡在": {"fact": "理由", "many": true, "key_from": {"column": "怎么交", "tags": ["needs-triage"]}}
+        "交给": {"fact": "交给", "many": true, "vocab": "角色", "edge": "键→角色"}
       }
     },
     "docs/agents/workflow.md#工作方式 > 9. 技能 > 表1": {

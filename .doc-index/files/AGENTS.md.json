@@ -1,20 +1,21 @@
 {
 "schema":1,
 "path":"AGENTS.md",
-"hash":"ac9a7c63cead768a",
+"hash":"ecb0cd6f5e5bc94f",
 "nodes":[
-{"hash":"ac9a7c63cead768a","id":"AGENTS.md","kind":"file","title":"AGENTS.md"},
+{"hash":"ecb0cd6f5e5bc94f","id":"AGENTS.md","kind":"file","title":"AGENTS.md"},
 {"hash":"39426a4e8bdd8d8b","id":"AGENTS.md#适用范围","kind":"section","parent":"AGENTS.md","title":"适用范围"},
-{"hash":"970b3633116b9799","id":"AGENTS.md#共同要求","kind":"section","parent":"AGENTS.md","title":"共同要求"},
+{"hash":"05ff50011d2dbfca","id":"AGENTS.md#共同要求","kind":"section","parent":"AGENTS.md","title":"共同要求"},
 {"hash":"fd5b56a4a7cc98c5","id":"AGENTS.md#项目","kind":"section","parent":"AGENTS.md","title":"项目"},
 {"hash":"a937ec517e99bcea","id":"AGENTS.md#项目 > 常用命令","kind":"section","parent":"AGENTS.md#项目","title":"常用命令"},
 {"hash":"f87cc87154c8f599","id":"AGENTS.md#项目 > GitHub Issues","kind":"section","parent":"AGENTS.md#项目","title":"GitHub Issues"},
 {"hash":"9a3c81a370c8f620","id":"AGENTS.md#项目 > 架构问题","kind":"section","parent":"AGENTS.md#项目","title":"架构问题"}
 ],
 "edges":[
-{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["docs/agents/acceptance-evidence.md"],"seen":"c508339609e8ff9b","src":"AGENTS.md#共同要求"},
-{"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["docs/agents/autopilot-runtime.md"],"seen":"4a6f3b31a2e2c4cd","src":"AGENTS.md#共同要求"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":"AGENTS.md#共同要求"},
+{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["docs/agents/acceptance-evidence.md"],"seen":"d77830938346bcbd","src":"AGENTS.md#共同要求"},
+{"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["docs/agents/autopilot-runtime.md"],"seen":"b046e028fd6dba98","src":"AGENTS.md#共同要求"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["docs/agents/workflow.md"],"seen":"d40720d445eeea3c","src":"AGENTS.md#共同要求"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"87d89411eab59fb8","src":"AGENTS.md#共同要求"},
 {"dst":".claude/skills/reviewer/SKILL.md","kind":"code-path","raws":[".claude/skills/reviewer/SKILL.md"],"seen":"93fa26a42a26612d","src":"AGENTS.md#适用范围"},
 {"dst":".claude/skills/solo-worker/SKILL.md","kind":"code-path","raws":[".claude/skills/solo-worker/SKILL.md"],"seen":"baddd710fc5e8fdc","src":"AGENTS.md#适用范围"},
 {"dst":"docs/agents/shared-rules.md","kind":"link","raws":["docs/agents/shared-rules.md"],"seen":"4dac8f4cc77b0670","src":"AGENTS.md#适用范围"},

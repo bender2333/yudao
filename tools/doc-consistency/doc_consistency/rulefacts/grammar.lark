@@ -3,7 +3,7 @@
 // 词汇封闭。下面用到的这些终结符不在本文件里，由 patterns.py 从词表生成，接在本文件后面一起交给 Lark：
 //   ROLE      角色、别名与合称（roles.json）
 //   MACHINE   机器：CI、脚本、钩子（canon.json 的 vocab.机器）
-//   KEY       键：正本表格的首列，加第 1 节「位置」一格里的载体名当别名
+//   KEY       键：正本表格的首列（「：」前面的头也认），加第 1 节「位置」一格里的载体名和反引号路径当别名
 //   LISTKEY   清单的键：KEY 再加「交回」这类别名（rulefacts-patterns.json）
 //   STUCK     第 7 节「卡在」一格里的项（加「的问题」「问题」）
 //   EVENT     权限表首列里的事（改意图、拆单……）
@@ -28,7 +28,7 @@ by_who: keys "由" subjs _ADV? VERB
 only_who: keys "只由" subjs _ADV? VERB
 
 // 谁不：架构师循环不改总图；审查者不推送
-who_not: subjs "不" VERB KEY
+who_not: subjs "不" VERB kp
 who_not_bare: subjs "不" ACT
 
 // 是或不是清单一员：文件超上限不是 needs-triage 的理由
@@ -53,7 +53,9 @@ closed_count: "只有" NUM UNITW LISTKEY TAIL? "：" items_semi
 lead_member: DEM "是" LISTKEY "的理由" "：" items_semi
 lead_not_member: DEM "不是" LISTKEY "的理由" "：" items_semi
 
-keys: KEY (_SEP KEY)*
+keys: kp (_SEP kp)*
+// 键，或「载体的键」：架构师不改 harness/ 的代码与测试。两个说法必须是同一行的键（patterns.py 核对）
+kp: KEY ("的" KEY)?
 subjs: SUBJ (_SEP SUBJ)*
 items_dun: ITEM (_DUN ITEM)*
 items_semi: ITEM2 ("；" ITEM2)*

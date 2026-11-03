@@ -85,7 +85,7 @@
   // 概览
   var st = DATA.stat;
   document.getElementById('stat').innerHTML =
-    '<span>事实 <b>' + st.facts + '</b></span><span>附注 <b>' + st.notes + '</b></span><span>读不出 <b>' + st.unparsed +
+    '<span>事实 <b>' + st.facts + '</b></span><span>附注 <b>' + st.notes + '</b></span><span>引用 <b>' + st.refs + '</b></span><span>读不出 <b>' + st.unparsed +
     '</b></span><span>一条事实两处正本 <b>' + st.dup + '</b></span><span>读不到正本 <b>' + st.unreachable + '</b></span>' +
     '<span>解析成功的句子 <b>' + st.parsed + '</b></span><span>复述处 <b>' + st.restates + '</b></span><span>矛盾 <b class="' + (st.conflicts ? 'bad' : '') + '">' + st.conflicts +
     '</b></span><span>像规则但解析不了的候选 <b>' + st.unparsedHits + '</b></span>';
@@ -155,7 +155,7 @@
   var cy = cytoscape({
     container: box,
     elements: G.nodes.map(function (n) { return { group: 'nodes', data: { id: n.id, label: n.label, kind: n.kind, color: kindColor[n.kind] }, position: pos[n.id] }; })
-      .concat(G.edges.map(function (e, i) { return { group: 'edges', data: { id: 'e' + i, source: e.source, target: e.target, fact: e.fact } }; })),
+      .concat(G.edges.map(function (e, i) { return { group: 'edges', data: { id: 'e' + i, source: e.source, target: e.target, fact: e.fact, label: e.label } }; })),
     layout: { name: 'preset' },
     wheelSensitivity: 0.25,
     style: [
@@ -165,7 +165,7 @@
       { selector: 'edge', style: { 'width': 1.4, 'line-color': '#b5b5b0', 'target-arrow-color': '#b5b5b0', 'target-arrow-shape': 'triangle',
         'arrow-scale': 0.7, 'curve-style': 'bezier', 'opacity': 0.55, 'font-size': 9, 'color': '#333', 'text-background-color': '#fff', 'text-background-opacity': 0, 'label': '' } },
       { selector: '.dim', style: { 'opacity': 0.1 } },
-      { selector: 'edge.hl', style: { 'line-color': '#222', 'target-arrow-color': '#222', 'opacity': 1, 'width': 2, 'label': 'data(fact)', 'text-background-opacity': 0.9 } },
+      { selector: 'edge.hl', style: { 'line-color': '#222', 'target-arrow-color': '#222', 'opacity': 1, 'width': 2, 'label': 'data(label)', 'text-background-opacity': 0.9 } },
       { selector: 'node.hl', style: { 'border-width': 3, 'border-color': '#222' } },
       { selector: 'node.sel', style: { 'border-width': 4, 'border-color': '#000' } }
     ]
@@ -188,8 +188,8 @@
   var seenFact = {};
   var legend = G.kinds.map(function (k) { return '<span><span class="chip" style="background:' + kindColor[k] + '"></span>' + esc(k) + '</span>'; });
   G.edges.forEach(function (e) {
-    var key = byId[e.source].kind + '→' + e.fact + '→' + byId[e.target].kind;
-    if (!seenFact[key]) { seenFact[key] = 1; legend.push('<span class="hint">' + esc(byId[e.source].kind) + ' —' + esc(e.fact) + '→ ' + esc(byId[e.target].kind) + '</span>'); }
+    var key = byId[e.source].kind + '→' + e.label + '→' + byId[e.target].kind;
+    if (!seenFact[key]) { seenFact[key] = 1; legend.push('<span class="hint">' + esc(byId[e.source].kind) + ' —' + esc(e.label) + '→ ' + esc(byId[e.target].kind) + '</span>'); }
   });
   document.getElementById('legend').innerHTML = legend.join('');
 
@@ -235,6 +235,9 @@
   out += '<h3>读不到正本（' + DATA.unreachable.length + '）</h3>';
   out += DATA.unreachable.length ? '<ul class="plain">' + DATA.unreachable.map(function (u) {
     return '<li>' + esc(u.role) + ' 被点名，但必读范围里没有 ' + esc(u.file) + '（' + esc(u.table) + '）</li>'; }).join('') + '</ul>' : '<p class="hint">没有。</p>';
+  out += '<h3>引用（' + DATA.refs.length + '，格子里只写「按第 N 节」，不出事实，不算读不出）</h3>';
+  out += DATA.refs.length ? '<ul class="plain">' + DATA.refs.map(function (u) {
+    return '<li>' + esc(u.src) + '　' + esc(u.key) + ' / 列「' + esc(u.column) + '」：' + esc(u.text) + '</li>'; }).join('') + '</ul>' : '<p class="hint">没有。</p>';
   out += '<h3>读不出的格子（' + DATA.unparsed.length + '，原样报出，不猜）</h3>';
   out += DATA.unparsed.length ? '<ul class="plain">' + DATA.unparsed.map(function (u) {
     return '<li>' + esc(u.src) + '　' + esc(u.key) + ' / 列「' + esc(u.column) + '」：' + esc(u.text) + '</li>'; }).join('') + '</ul>' : '<p class="hint">没有。</p>';

@@ -1,7 +1,7 @@
 """规则事实线第 2 步：粗筛与盘点。
 
 在脚手架文件里找「像在复述规则」的句子，分三类，数出迁移量与噪音率。只读、不改任何文档、不调用 LLM。
-词表：键取自 canon.json 的六张正本表、标签快照与脚手架文件所有表格的首列；角色取自 roles.json（复用 canon.role_aliases）；
+词表：键取自 canon.json 的七张正本表、标签快照与脚手架文件所有表格的首列；角色取自 roles.json（复用 canon.role_aliases）；
 动作词与句式动词在 data/rulefacts-scan.json。
 
 粗筛：一句话里同时有键、角色、动作词，就是候选。
@@ -432,7 +432,7 @@ def scan_all(root, model=None, parse=True):
         from .canon import read_tables
 
         cfg = load_json("canon.json")
-        cells, _, _, keys = read_tables(model, cfg)
+        cells, _, _, _, keys = read_tables(model, cfg)
         pv = patterns.build_vocab(model, cfg, cells, keys)
         groups = patterns.parse_units(pv, units)
     for h in hits:

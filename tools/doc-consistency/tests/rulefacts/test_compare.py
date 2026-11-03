@@ -18,7 +18,7 @@ PLANTED = {
     "may_wrong": ["用户不在场时架构师循环可以改规则"],  # 正本：不可以
     "handoff_wrong": ["执行环境的问题交给总架构师"],  # 正本：用户
     "closed_missing": ["只有设计问题是 `needs-triage` 的理由"],  # 漏了正本里的别的
-    "closed_extra": ["只有设计问题、设计、规则矛盾、新报告的问题、文件超上限是 `needs-triage` 的理由"],  # 多了文件超上限
+    "closed_extra": ["只有设计问题、规则矛盾、验收做不到、文件超上限是 `needs-triage` 的理由"],  # 多了文件超上限；理由清单在句号处停，正本只有这三条
     "user_hands_on": ["`HANDOFF:` 由用户写"],  # 正本里任何角色都写，用户在内，所以只有这一类
 }
 # 与正本一致的复述：一条矛盾也不该有
@@ -31,7 +31,8 @@ CONSISTENT = [
     "用户在场时总架构师可以改规则",
     "用户不在场时架构师循环不可以关闭试用工单与里程碑",
     "执行环境的问题交给用户",
-    "设计问题交回子架构师",
+    "`needs-triage` 的理由交回子架构师",
+    "代码达到合同的证据由 CI 改",  # 机器也是正本里的值
     "总图和术语表不一致时以总图为准",
     "文件超上限不是 `needs-triage` 的理由",
     "`in-progress` 由执行者领取时加上",
@@ -76,9 +77,9 @@ def test_every_conflict_names_both_places_and_says_what_differs(rf_repo):
     assert "设计说明" in by_kind["precedence_cycle"].why and "ADR" in by_kind["precedence_cycle"].why and "绕成一圈" in by_kind["precedence_cycle"].why
     assert by_kind["may_wrong"].why.endswith("正本说不可以") and re.search(rf"{WF}:\d+  改规则、CI 工作流 / 不在场可否：不可以", by_kind["may_wrong"].canon[0])
     assert by_kind["handoff_wrong"].canon[0].endswith(f"{STUCK_ENV} / 交给：用户") and "没有 总架构师" in by_kind["handoff_wrong"].why
-    assert "漏了正本里的 新报告的问题、规则矛盾、设计" in by_kind["closed_missing"].why
+    assert "漏了正本里的 规则矛盾、验收做不到" in by_kind["closed_missing"].why
     assert "文件超上限，正本的理由里没有" in by_kind["closed_extra"].why
-    assert "不亲手改、建、删、写" in by_kind["user_hands_on"].why and any(ln.startswith(f"{WF}:") and "用户 / 做：定走向" in ln for ln in by_kind["user_hands_on"].canon)
+    assert "不亲手改、建、删、写" in by_kind["user_hands_on"].why and any(re.fullmatch(rf"{WF}:\d+  规则 / 由谁定：用户", ln) for ln in by_kind["user_hands_on"].canon)
 
 
 def test_group_names_are_expanded_before_comparing(rf_repo):
@@ -89,9 +90,9 @@ def test_group_names_are_expanded_before_comparing(rf_repo):
     # 正本写「架构师」，复述只写其中一个：多值只说一部分，不报
     chk = restate(rf_repo, "`waiting` 由总架构师加上", "`waiting` 由子架构师与架构师循环加上", "为什么这样定由子架构师改")
     assert chk.conflicts == []
-    # 反过来，正本只有执行者一个角色时，复述写「任何角色」多出的六个都报
+    # 反过来，正本只有执行者一个角色时，复述写「任何角色」（roles.json 列了六个）多出的五个都报
     chk = restate(rf_repo, "`in-progress` 由任何角色加上")
-    assert len(chk.conflicts) == 6 and {c.kind for c in chk.conflicts} == {"extra"}
+    assert len(chk.conflicts) == 5 and {c.kind for c in chk.conflicts} == {"extra"}
 
 
 def test_a_precedence_loop_of_three_is_one_conflict(rf_repo):
@@ -108,10 +109,11 @@ def test_a_precedence_loop_of_three_is_one_conflict(rf_repo):
     assert sorted((w, o) for _, w, o in chk.edges) == sorted([("设计说明", "ADR"), ("ADR", "需求记录"), ("需求记录", "设计说明"), ("总图", "术语表")])
 
 
-def test_the_two_places_that_disagree_on_a_reason_are_both_compared(rf_repo):
-    # needs-triage 的理由在第 4 节和第 7 节各写了一份（dup_canon）：复述的值在其中一份里就算正本有
-    chk = restate(rich(rf_repo), "设计是 `needs-triage` 的理由", "新报告的问题是 `needs-triage` 的理由", "冲突两边都丢行为是 `needs-triage` 的理由")
-    assert [(c.kind, chk.by_node[c.nodes[0]].text) for c in chk.conflicts] == [("extra", "冲突两边都丢行为是 `needs-triage` 的理由")]
+def test_a_reason_list_stops_at_the_full_stop_so_what_follows_is_not_a_reason(rf_repo):
+    # 第 4 节「交回架构师：…验收做不到。新报告的问题也标它」：句号后面的话不进理由，说它是理由要报多说；第 7 节是引用，不再有第二份清单
+    chk = restate(rich(rf_repo), "设计问题是 `needs-triage` 的理由", "验收做不到是 `needs-triage` 的理由", "新报告的问题是 `needs-triage` 的理由")
+    assert [(c.kind, chk.by_node[c.nodes[0]].text) for c in chk.conflicts] == [("extra", "新报告的问题是 `needs-triage` 的理由")]
+    assert chk.canon.dup == []
 
 
 def test_check_command_runs_for_real_exits_zero_and_prints_every_section(rf_repo):
@@ -121,7 +123,7 @@ def test_check_command_runs_for_real_exits_zero_and_prints_every_section(rf_repo
     out = out.replace("\r\n", "\n")
     assert rc == 0
     for head in ("规则事实线·比对：", "解析成功 ", "矛盾 10 条。五类：", "== 多说了正本没有的值：1 条 ==", "== 「以谁为准」方向相反或绕成一圈：1 条 ==", "== 在场可否与正本相反：1 条 ==", "== 交给的角色，正本里没有：1 条 ==",
-                 "== 穷尽清单：复述说只有这些，正本还有别的：1 条 ==", "== 穷尽清单：复述里有正本没有的：1 条 ==", "== 用户亲手改建删写（用户只定与确认）：1 条 ==", "== 读不到正本：", "== 一条事实两处正本：1 条 ==", "== 像在说规则但解析不了："):
+                 "== 穷尽清单：复述说只有这些，正本还有别的：1 条 ==", "== 穷尽清单：复述里有正本没有的：1 条 ==", "== 用户亲手改建删写（用户只定与确认）：1 条 ==", "== 读不到正本：", "== 一条事实两处正本：0 条 ==", "== 像在说规则但解析不了："):
         assert head in out, head
     assert f"复述 {RESTATE}:3  `TRIAL:` 由执行者写" in out
     assert re.search(rf"  正本 {WF}:\d+  TRIAL: / 由谁写：总架构师、子架构师、架构师循环", out)

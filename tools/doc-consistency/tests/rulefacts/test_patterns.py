@@ -1,7 +1,7 @@
 """规则事实线第 3 步：八种句式的解析。用 rf_repo 夹具（test_rulefacts.py）加我们写的复述文件，真文法、真 clingo、真文件。"""
 
 import pytest
-from test_rulefacts import WF, WORKFLOW, rf_repo  # noqa: F401  复用：角色表、四张正本表、最小入口文件
+from test_rulefacts import TABLE1 as OLD_TABLE1, WF, WORKFLOW, rf_repo  # noqa: F401  复用：角色表、四张正本表、最小入口文件
 
 from doc_consistency.rulefacts import compare
 
@@ -10,19 +10,25 @@ KEY_ZONGTU = "系统的形状、三环、缝"
 KEY_FKJ = "一个方框或一道缝怎么做"
 KEY_WHY = "为什么这样定"
 KEY_RULE = "规则"
+KEY_INTENT = "意图：目的、判据、基础规则的意思"
+KEY_CODE = "代码与测试"
 STUCK_ENV = "执行环境、要用户提供的条件"
-STUCK_DESIGN = "设计、规则矛盾、验收做不到、连续三轮没过"
+STUCK_DESIGN = "needs-triage 的理由（第 4 节）"
 EVENT_RULE = "改规则、CI 工作流"
 
-# 第 1 节「事实放在哪」补成四行：「位置」一格里的载体名当键的别名（总图、设计说明、ADR、需求记录、CLAUDE.md、AGENTS.md）
+# 第 1 节「事实放在哪」补成几行：「位置」一格里的载体名和反引号路径当键的别名（总图、设计说明、ADR、需求记录、CLAUDE.md、AGENTS.md、harness/）；
+# 「谁定」列有用户；「意图：…」写成「意图」也认；最后两行是引用格与机器，和最小夹具里的一样
 TABLE1 = (
-    "| 事实 | 位置 | 谁改 |\n| --- | --- | --- |\n"
-    "| 系统的形状、三环、缝 | 总图 `docs/architecture.html`、画面总图 | 总架构师 |\n"
-    "| 一个方框或一道缝怎么做 | 设计说明 `docs/design/`（[设计说明规范](design-spec.md)） | 子架构师 |\n"
-    "| 为什么这样定 | 需求记录、ADR、调研、原型 | 架构师 |\n"
-    "| 规则 | `CLAUDE.md`、`AGENTS.md`、`docs/agents/` | 总架构师 |\n"
+    "| 事实 | 位置 | 谁定 | 谁改 |\n| --- | --- | --- | --- |\n"
+    "| 系统的形状、三环、缝 | 总图 `docs/architecture.html`、画面总图 | 用户 | 总架构师 |\n"
+    "| 一个方框或一道缝怎么做 | 设计说明 `docs/design/`（[设计说明规范](design-spec.md)） | | 子架构师 |\n"
+    "| 为什么这样定 | 需求记录、ADR、调研、原型 | | 架构师 |\n"
+    "| 规则 | `CLAUDE.md`、`AGENTS.md`、`docs/agents/` | 用户 | 总架构师 |\n"
+    "| 意图：目的、判据、基础规则的意思 | [基础规则](../foundation-rules.md) | 用户 | 总架构师 |\n"
+    "| 代码与测试 | `harness/`、`client/`、`evals/` | | 执行者 |\n"
+    "| 每次状态变化的证据 | 那张工单上一条带前缀的评论 | | 按第 5 节 |\n"
+    "| 代码达到合同的证据 | PR 与 CI | | 执行者、审查者、CI |\n"
 )
-OLD_TABLE1 = "| 事实 | 位置 | 谁改 |\n| --- | --- | --- |\n| 规则 | `CLAUDE.md` | 总架构师 |\n"
 # 证据评论表补一行任何角色都能写的，让「用户」出现在正本的值里（用户走样那一类要用）
 OLD_ROW5 = "| `TRIAL:` | `TRIAL: <达到 \\| 复盘 \\| 试用>` | 架构师 |\n"
 NEW_ROW5 = OLD_ROW5 + "| `HANDOFF:` | 做到哪里 | 任何角色 |\n"
@@ -81,7 +87,7 @@ def test_eight_shapes_each_read_into_atoms(rf_repo):
         "用户不在场时架构师循环不可以改规则",
         # 交给
         "执行环境的问题交给用户",
-        "设计问题交回架构师",
+        "`needs-triage` 的理由交回架构师",
         # 穷尽清单
         "只有设计问题、规则矛盾是 `needs-triage` 的理由",
         "只有两种情形交回：设计问题；规则矛盾",
@@ -100,7 +106,7 @@ def test_eight_shapes_each_read_into_atoms(rf_repo):
     assert atoms(chk, "用户在场时总架构师可以改规则") == [("may", "总架构师", EVENT_RULE, "在场", "可以")]
     assert atoms(chk, "用户不在场时架构师循环不可以改规则") == [("may", "架构师循环", EVENT_RULE, "不在场", "不可以")]
     assert atoms(chk, "执行环境的问题交给用户") == [("handoff", STUCK_ENV, "用户")]
-    assert {a[2] for a in atoms(chk, "设计问题交回架构师")} == {"总架构师", "子架构师", "架构师循环"}
+    assert {a[2] for a in atoms(chk, "`needs-triage` 的理由交回架构师")} == {"总架构师", "子架构师", "架构师循环"}
     assert atoms(chk, "只有设计问题、规则矛盾是 `needs-triage` 的理由") == [
         ("only_members", "needs-triage", "设计问题"),
         ("only_members", "needs-triage", "规则矛盾"),
@@ -122,7 +128,7 @@ def test_group_names_expand_before_atoms_are_made(rf_repo):
     chk = restate(rich(rf_repo), "`waiting` 由架构师加上", "`waiting` 由子架构师与架构师循环加上", "`ready-for-human` 由任何角色加上")
     assert [a[3] for a in atoms(chk, "`waiting` 由架构师加上")] == ["总架构师", "子架构师", "架构师循环"]
     assert [a[3] for a in atoms(chk, "`waiting` 由子架构师与架构师循环加上")] == ["子架构师", "架构师循环"]
-    assert len(atoms(chk, "`ready-for-human` 由任何角色加上")) == 7
+    assert len(atoms(chk, "`ready-for-human` 由任何角色加上")) == 6  # roles.json 的「任何角色」列了六个，agent 试用者不在其中
     # 别名：执行者 -> solo 执行者；有空格的角色名与汉字连写也认
     chk = restate(rf_repo, "`in-progress` 由 solo 执行者加上", "`in-progress` 由执行者加上", name="docs/agents/restate2.md")
     assert atoms(chk, "`in-progress` 由 solo 执行者加上") == atoms(chk, "`in-progress` 由执行者加上") == [("says", "in-progress", "由谁改成", "solo 执行者")]
@@ -250,3 +256,60 @@ def test_verbs_map_to_canon_facts_from_the_json_table_not_from_code(rf_repo):
         "实现完成由执行者负责": "由谁负责",
         "实现完成由执行者做": "由谁负责",
     }
+
+
+def test_who_decides_verb_maps_to_the_decided_by_fact_and_is_compared_with_section_one(rf_repo):
+    chk = restate(
+        rich(rf_repo),
+        "总图只由用户定",  # 与第 1 节「谁定」一致
+        "总图只由总架构师定",  # 谁定只有用户：多说，也漏了用户
+        "规则由用户定",
+        "意图只由用户定",  # 键写成冒号前的「意图」
+    )
+    assert atoms(chk, "总图只由用户定") == [("says", KEY_ZONGTU, "由谁定", "用户"), ("only", KEY_ZONGTU, "由谁定", "用户")]
+    assert atoms(chk, "意图只由用户定")[0] == ("says", KEY_INTENT, "由谁定", "用户")
+    assert shapes(chk, "规则由用户定") == ["由谁"]
+    got = [(c.kind, chk.by_node[c.nodes[0]].text) for c in chk.conflicts]
+    assert got == [("extra", "总图只由总架构师定"), ("only_wrong", "总图只由总架构师定")]
+    assert "由谁定" in chk.conflicts[0].why and "用户" in chk.conflicts[0].why
+    # 用户只定与确认：写成用户改，仍作为走样报出；写成用户定不算
+    chk = restate(rich(rf_repo), "总图由用户改", "总图由用户定", name="docs/agents/restate2.md")
+    assert [(c.kind, chk.by_node[c.nodes[0]].text) for c in chk.conflicts if c.kind == "user_hands_on"] == [("user_hands_on", "总图由用户改")]
+
+
+def test_paths_in_the_location_column_are_aliases_of_the_key(rf_repo):
+    chk = restate(
+        rich(rf_repo),
+        "架构师不改 `harness/` 的代码与测试",  # 载体的键：两边是同一行
+        "solo 执行者不改 `harness/` 的代码与测试",  # 正本里 solo 执行者改：矛盾
+        "代码与测试只由执行者改",
+        "`client/` 由执行者改",
+        "`docs/design/` 由子架构师改",
+        "`docs/architecture.html` 只由总架构师改",
+        "`docs/agents/` 由总架构师改",
+        "架构师不改总图的代码与测试",  # 「的」两边不是同一行的键：不读，不猜
+        "架构师不改 `harness/` 的设计说明",  # 同上
+        "架构师不改 `docs/other/`",  # 不在位置一格里的路径：不是键
+    )
+    assert {a[1:3] for a in atoms(chk, "架构师不改 `harness/` 的代码与测试")} == {(KEY_CODE, "由谁改")}
+    assert [a[3] for a in atoms(chk, "架构师不改 `harness/` 的代码与测试")] == ["总架构师", "子架构师", "架构师循环"]
+    assert atoms(chk, "`client/` 由执行者改") == [("says", KEY_CODE, "由谁改", "solo 执行者")]
+    assert atoms(chk, "`docs/design/` 由子架构师改") == [("says", KEY_FKJ, "由谁改", "子架构师")]
+    assert atoms(chk, "`docs/architecture.html` 只由总架构师改")[0] == ("says", KEY_ZONGTU, "由谁改", "总架构师")
+    assert atoms(chk, "`docs/agents/` 由总架构师改") == [("says", KEY_RULE, "由谁改", "总架构师")]
+    for s in ("架构师不改总图的代码与测试", "架构师不改 `harness/` 的设计说明", "架构师不改 `docs/other/`"):
+        assert not by_text(chk, s), s
+    # 比对：对到第 1 节「代码与测试」那一行，只有 solo 执行者那句矛盾
+    assert [(c.kind, chk.by_node[c.nodes[0]].text, c.rows) for c in chk.conflicts] == [
+        ("denied", "solo 执行者不改 `harness/` 的代码与测试", [(KEY_CODE, "由谁改")])
+    ]
+
+
+def test_machines_in_canon_are_compared_like_roles(rf_repo):
+    # 第 1 节「代码达到合同的证据」谁改里有 CI：复述写 CI 一致，写钩子是多说，写「CI 不改」是矛盾
+    chk = restate(rich(rf_repo), "代码达到合同的证据由 CI 改", "代码达到合同的证据由钩子改", "CI 不改代码达到合同的证据")
+    assert [(c.kind, chk.by_node[c.nodes[0]].text) for c in chk.conflicts] == [
+        ("extra", "代码达到合同的证据由钩子改"),
+        ("denied", "CI 不改代码达到合同的证据"),
+    ]
+    assert atoms(chk, "代码达到合同的证据由 CI 改") == [("says", "代码达到合同的证据", "由谁改", "CI")]

@@ -185,11 +185,8 @@ def build_conflicts(c, groups, res):
                 why = f"复述的清单里有 {'、'.join(sorted(vs))}，正本的理由里没有（正本：{'、'.join(canon_values(c, k, '理由'))}）"
             add(kind, [n], [(k, "理由")], canon_lines(c, k, "理由"), why, (n, k, tuple(sorted(vs))))
     for n, k, f in res["user_hands_on"]:
-        mine = [x for x in c.cells if x.key == "用户" and x.fact in ("做", "不做")]
-        refs = {}
-        for x in mine:
-            refs.setdefault((x.file, x.line, x.fact), []).append(x.value)
-        lines = [f"{fl}:{ln}  用户 / {fa}：{'、'.join(vs)}" for (fl, ln, fa), vs in sorted(refs.items())]
+        # 正本：第 1 节「谁定」里写用户的几行（用户只定与确认）
+        lines = sorted({f"{x.file}:{x.line}  {x.key} / {x.fact}：用户" for x in c.cells if x.value == "用户" and x.fact == "由谁定"})
         add("user_hands_on", [n], [(k, f)], lines, f"复述把「{f}」{k} 归给用户；用户只定与确认，不亲手改、建、删、写，这样写会走样", (n, k, f))
     order = {k: i for i, (k, _) in enumerate(KINDS)}
     out.sort(key=lambda x: (order[x.kind], where(by_node[x.nodes[0]]) if x.nodes else "", x.key))

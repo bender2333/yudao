@@ -88,12 +88,13 @@ def page_data(root):
         if key_node is None:  # 键在别的表里才是节点（例如 needs-triage 的理由写在第 7 节）
             key_node = node(kind_of_table[x.table], x.key)
         key_node["facts"].append({"text": f"{x.key} {x.fact} {x.value}", "src": src})
-        if x.edge:
-            role_node = by_id[f"角色:{x.value}"]
+        label = next(col.get("edge_label", x.fact) for col in c.tables[x.table]["columns"].values() if col["fact"] == x.fact)
+        role_node = by_id.get(f"角色:{x.value}")
+        if x.edge and role_node is not None:  # 机器（CI、脚本、钩子）不是角色，没有角色节点，不画边；事实仍挂在键的节点上
             if role_node is not key_node:
                 role_node["facts"].append({"text": f"{x.key} {x.fact} {x.value}", "src": src})
             a, b = (role_node, key_node) if x.edge == "角色→键" else (key_node, role_node)
-            edges.append({"source": a["id"], "target": b["id"], "fact": x.fact, "src": src})
+            edges.append({"source": a["id"], "target": b["id"], "fact": x.fact, "label": label, "src": src})
     kinds = ["角色"] + [k for k in dict.fromkeys(kind_of_table.values()) if k != "角色"]
 
     # 以谁为准偏序图：载体为节点，prevails 为边（优先的指向其次的）；成环的组标红
@@ -131,6 +132,7 @@ def page_data(root):
         "matrix": matrix,
         "graph": {"nodes": nodes, "edges": edges, "kinds": kinds},
         "notes": [{"table": rf.short(x.table), "key": x.key, "fact": x.fact, "text": x.text, "src": f"{x.file}:{x.line}"} for x in c.notes],
+        "refs": [{"table": rf.short(x.table), "key": x.key, "column": x.column, "text": x.text, "src": f"{x.file}:{x.line}"} for x in c.refs],
         "unparsed": [{"table": rf.short(x.table), "key": x.key, "column": x.column, "text": x.text, "src": f"{x.file}:{x.line}"} for x in c.unparsed],
         "dups": [
             {
@@ -160,6 +162,7 @@ def page_data(root):
             "unparsedHits": len(chk.unparsed()),
             "facts": len(c.cells),
             "notes": len(c.notes),
+            "refs": len(c.refs),
             "unparsed": len(c.unparsed),
             "dup": len(c.dup),
             "unreachable": len(c.unreachable),

@@ -17,6 +17,8 @@ BR = r"<br\s*/?>"
 # 角色格：或、顿号、与、分号、逗号分开多个值；清单格（没有词表）只认顿号与分号
 SEP_ROLE = re.compile(rf"或|、|与|；|;|，|,|{BR}")
 SEP_LIST = re.compile(rf"、|；|;|{BR}")
+# 整格只写「按第 N 节」「见第 N 节」：引用，不出事实，不算读不出
+REF = re.compile(r"(?:按|见)第\s*\d+\s*节")
 
 
 @dataclass
@@ -50,12 +52,16 @@ class Unparsed:
     line: int
 
 
+Ref = Unparsed  # 引用格：字段相同（表、键、列、原文、文件、行）
+
+
 @dataclass
 class Canon:
     tables: dict  # 表 -> 配置，按 canon.json 的顺序
     cells: list = field(default_factory=list)
     notes: list = field(default_factory=list)
     unparsed: list = field(default_factory=list)
+    refs: list = field(default_factory=list)  # 引用格
     keys: dict = field(default_factory=dict)  # 表 -> 首列的键，按文档顺序
     canon: list = field(default_factory=list)  # (键, 事实, 值)，去重后
     dup: list = field(default_factory=list)  # (键, 事实, 表1, 表2)
@@ -115,8 +121,9 @@ def row_cells(line):
     return [c.strip() for c in cols]
 
 
-def read_token(token, aliases, quals):
-    """一个值。返回 (展开后的值列表或 None, 有没有剥掉括号或限定)。None 表示读不出。"""
+def read_token(token, aliases, quals, machines=()):
+    """一个值。返回 (展开后的值列表或 None, 有没有剥掉括号或限定)。None 表示读不出。
+    角色列（aliases 不是 None）也接受机器（CI、脚本、钩子）：读成值，但它们不是角色。"""
     body = PAREN.sub("", token).strip()
     trimmed = body != token.strip()
     if not body:
@@ -134,7 +141,9 @@ def read_token(token, aliases, quals):
             if body != q and body.endswith(q):
                 body, trimmed, done = body[: -len(q)].strip(), True, False
                 break
-    return (aliases[body], trimmed) if body in aliases else (None, trimmed)
+    if body in aliases:
+        return aliases[body], trimmed
+    return ([body], trimmed) if body in machines else (None, trimmed)
 
 
 def read_closed(token, vocab):
@@ -150,7 +159,8 @@ def read_closed(token, vocab):
 def read_tables(model, cfg):
     aliases, _ = role_aliases()
     quals = sorted(cfg.get("qualifiers", []), key=len, reverse=True)
-    cells, notes, unparsed, table_keys = [], [], [], {}
+    machines = set(cfg.get("vocab", {}).get("机器", []))
+    cells, notes, unparsed, refs, table_keys = [], [], [], [], {}
     seen = set()  # 同一格里两个合称展开出同一个角色，只记一次
     for tid, spec in cfg["tables"].items():
         file = file_of(tid)
@@ -173,6 +183,9 @@ def read_tables(model, cfg):
             cell_of = lambda col: vals[header.index(col)] if header.index(col) < len(vals) else ""
             for col, c in spec["columns"].items():
                 text = cell_of(col)
+                if REF.fullmatch(text.replace("`", "").strip()):
+                    refs.append(Ref(tid, n.title, col, text, file, n.start))
+                    continue
                 row_keys = [n.title]
                 if "key_from" in c:
                     kf = c["key_from"]
@@ -181,6 +194,9 @@ def read_tables(model, cfg):
                     if c["after"] not in text:
                         continue
                     text = text.split(c["after"], 1)[1]
+                    text, _, tail = text.partition("。")  # 清单在句号处停；句号后面的话不进事实，记成附注给人看
+                    if tail.strip():
+                        notes.append(Note(tid, n.title, c["fact"], tail.strip(), file, n.start))
                 is_role = c.get("vocab") == "角色"
                 closed = cfg.get("vocab", {}).get(c.get("vocab"))  # 写成名字的词表；没有则是自由短语（角色除外）
                 sep = SEP_ROLE if is_role else SEP_LIST
@@ -192,7 +208,7 @@ def read_tables(model, cfg):
                         if closed:
                             got, trimmed = read_closed(tok, closed)
                         else:
-                            got, trimmed = read_token(tok, aliases if is_role else None, quals)
+                            got, trimmed = read_token(tok, aliases if is_role else None, quals, machines)
                         if got is None:
                             unparsed.append(Unparsed(tid, key, col, tok, file, n.start))
                             continue
@@ -202,13 +218,13 @@ def read_tables(model, cfg):
                             if (tid, key, c["fact"], v) not in seen:
                                 seen.add((tid, key, c["fact"], v))
                                 cells.append(Cell(tid, key, c["fact"], v, file, n.start, c.get("edge", "")))
-    return cells, notes, unparsed, table_keys
+    return cells, notes, unparsed, refs, table_keys
 
 
 def read_canon(root, model=None):
     model = model or scan_repo(root)
     cfg = load_json("canon.json")
-    cells, notes, unparsed, keys = read_tables(model, cfg)
+    cells, notes, unparsed, refs, keys = read_tables(model, cfg)
     # 阅读范围的事实照图谱线现成的；标签快照这条线用不到，传空集
     facts = scaffold_facts(model, set(), root)
     syms = set(facts.symbols)
@@ -216,10 +232,13 @@ def read_canon(root, model=None):
         syms.add(sym("canon_table", tid))
         syms.add(sym("in_file", tid, file_of(tid)))
         if spec.get("key_vocab") == "角色":
-            syms.add(sym("key_role", tid))
+            for k in keys[tid]:
+                syms.add(sym("key_role", tid, k))
         for c in spec["columns"].values():
             if c.get("vocab") == "角色":
                 syms.add(sym("role_fact", tid, c["fact"]))
+    for m in cfg.get("vocab", {}).get("机器", []):
+        syms.add(sym("machine", m))
     for c in cells:
         syms.add(sym("cell", c.table, c.key, c.fact, c.value))
     atoms = solve(syms, ["scope.lp", "rulefacts/canon.lp"])
@@ -229,6 +248,7 @@ def read_canon(root, model=None):
         cells=cells,
         notes=notes,
         unparsed=unparsed,
+        refs=refs,
         keys=keys,
         canon=pick(atoms, "canon"),
         dup=pick(atoms, "dup_canon"),
@@ -245,18 +265,22 @@ def format_canon(c):
     out = []
     n_cells = len(c.cells)
     out.append(
-        f"规则事实线：读出事实 {n_cells} 条（去重后 {len(c.canon)} 条），附注 {len(c.notes)} 条，读不出 {len(c.unparsed)} 条，"
+        f"规则事实线：读出事实 {n_cells} 条（去重后 {len(c.canon)} 条），附注 {len(c.notes)} 条，引用 {len(c.refs)} 条，读不出 {len(c.unparsed)} 条，"
         f"一条事实两处正本 {len(c.dup)} 条，读不到正本 {len(c.unreachable)} 条"
     )
     for tid, spec in c.tables.items():
         mine = [x for x in c.cells if x.table == tid]
         opened = "、".join(f"列「{col}」词表「{v['vocab']}」未封闭" for col, v in spec["columns"].items() if v.get("open"))
-        out.append(f"== {tid}（键列「{spec['key'] or '（空）'}」，{len(mine)} 条{'；' + opened if opened else ''}） ==")
+        keyrole = f"；键是角色，点名 {len(c.keys[tid])} 个" if spec.get("key_vocab") == "角色" else ""
+        out.append(f"== {tid}（键列「{spec['key'] or '（空）'}」，{len(mine)} 条{keyrole}{'；' + opened if opened else ''}） ==")
         for x in mine:
             out.append(f"{x.key} / {x.fact} / {x.value}    {x.file}:{x.line}")
     out.append(f"== 附注：{len(c.notes)} 条（括号里的话与限定，不进事实） ==")
     for x in c.notes:
         out.append(f"{x.file}:{x.line}  {x.key} / {x.fact}：{x.text}")
+    out.append(f"== 引用：{len(c.refs)} 条（格子里只写「按第 N 节」，不出事实，不算读不出；事实在那一节的表里） ==")
+    for x in c.refs:
+        out.append(f"{x.file}:{x.line}  {x.key} / 列「{x.column}」：{x.text}")
     out.append(f"== 读不出：{len(c.unparsed)} 条（不在词表里，原样报出，不猜） ==")
     for x in c.unparsed:
         out.append(f"{x.file}:{x.line}  {x.key} / 列「{x.column}」：{x.text}")

@@ -3,7 +3,7 @@
   "workflow": "docs/agents/workflow.md",
   "groups": {
     "架构师": ["总架构师", "子架构师", "架构师循环"],
-    "任何角色": ["用户", "总架构师", "子架构师", "架构师循环", "solo 执行者", "审查者", "agent 试用者"]
+    "任何角色": ["用户", "总架构师", "子架构师", "架构师循环", "solo 执行者", "审查者"]
   },
   "roles": {
     "用户": {"agent": false},
@@ -12,6 +12,6 @@
     "架构师循环": {"aliases": ["架构师循环"], "rule_files": ["CLAUDE.md"], "skills": ["next"]},
     "solo 执行者": {"aliases": ["solo 执行者", "solo", "执行者"], "rule_files": ["AGENTS.md"], "skills": ["solo-worker"]},
     "审查者": {"aliases": ["审查者", "审查"], "rule_files": ["AGENTS.md"], "skills": ["reviewer"]},
-    "agent 试用者": {"aliases": ["试用者", "agent 试用"], "rule_files": [], "skills": ["trial"]}
+    "agent 试用者": {"aliases": ["试用者", "agent 试用"], "rule_files": ["CLAUDE.md"], "skills": ["trial"]}
   }
 }

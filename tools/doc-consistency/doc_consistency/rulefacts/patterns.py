@@ -11,7 +11,7 @@
   穷尽清单      only_members(节点,键,条目) 每条目一条，加 closed(节点,键)
 
 词汇封闭：终结符从词表生成后接在文法后面（角色与别名、合称来自 roles.json；键来自 canon.json 七张表的首列，
-第 1 节表另把「位置」一格里的载体名当键的别名；载体与机器来自 canon.json 的 vocab；动作词来自 rulefacts-scan.json；
+第 1 节表另把「位置」一格里的载体名和反引号路径当那一行的键的别名；载体与机器来自 canon.json 的 vocab；动作词来自 rulefacts-scan.json；
 动词到事实名的映射等在 rulefacts-patterns.json）。合称先展开再出原子；括号里的话与「领取时」「之前」这类限定
 剥掉当附注，不进原子；没有主语的句子不解析、不猜。Python 只负责词表、规范化、把语法树翻成原子；比对在 rules/rulefacts/compare.lp。
 """
@@ -24,7 +24,7 @@ from lark import Lark, Token, Tree
 from lark.exceptions import LarkError
 
 from ..scaffold import load_json
-from .canon import PAREN, role_aliases, row_cells, split_top
+from .canon import BACKTICK, PAREN, role_aliases, row_cells, split_top
 from .scan import LIST_MARK, SENT, bounded_src
 
 GRAMMAR = Path(__file__).with_name("grammar.lark")
@@ -93,7 +93,8 @@ def head_parts(key):
 
 
 def carrier_aliases(model, tid, spec, carriers):
-    """第 1 节表「位置」一格里的载体名 -> 这一行的键。例：「总图 `docs/architecture.html`、画面总图」里的「总图」。"""
+    """第 1 节表「位置」一格里的载体名和反引号路径 -> 这一行的键。
+    例：「总图 `docs/architecture.html`、画面总图」里的「总图」和 docs/architecture.html；「`harness/`、`client/`」里的 harness/。"""
     col = spec.get("carrier_column")
     if not col:
         return {}
@@ -112,6 +113,8 @@ def carrier_aliases(model, tid, spec, carriers):
     for n in rows:
         vals = row_cells(lines[n.start - 1])
         cell = vals[header.index(col)] if header.index(col) < len(vals) else ""
+        for path in BACKTICK.findall(PAREN.sub("", cell)):  # 括号里的路径只是顺带提到，不算
+            out.setdefault(path.strip(), n.title)
         for piece in re.split(r"、|；|;|<br\s*/?>", cell):
             p = PAREN.sub("", LINK.sub(r"\1", piece)).replace("`", "").strip()
             first = p.split()[0] if p.split() else ""
@@ -184,6 +187,8 @@ def build_vocab(model, cfg, cells, keys):
                     events.setdefault(nz(s), k)
             elif spec.get("key_vocab") != "角色":
                 keyd.setdefault(nz(k), k)
+                if "：" in k:  # 「意图：目的、判据…」写成「意图」
+                    keyd.setdefault(nz(head_parts(k)[1]), k)
         for c, k in carrier_aliases(model, tid, spec, set(carrier_list)).items():
             keyd.setdefault(nz(c), k)
             carrier_keys[nz(c)] = k
@@ -306,6 +311,14 @@ def expand(v, subjs):
     return out
 
 
+def key_of(v, kp):
+    """「键」或「载体的键」（harness/ 的代码与测试）-> 键。「的」两边必须是同一行的键，否则不读。"""
+    ks = {v.keys[str(t)] for t in kp.children}
+    if len(ks) != 1:
+        raise Reject
+    return ks.pop()
+
+
 def clean_item(v, text):
     t = text.strip().strip("。.")
     if len(t) < 2 or v.subj_rx.search(t) or re.match("下面这些|以下|这些", t):
@@ -321,18 +334,18 @@ def build(v, tree):
     atoms, carrier, elided = [], "", None
     if name in ("by_who", "only_who"):
         keys, subj, verb = ch
-        for key_tok in keys.children:
-            k = v.keys[str(key_tok)]
+        for kp in keys.children:
+            k = key_of(v, kp)
             f = pick_fact(v, k, str(verb))
             for r in expand(v, subj):
                 atoms.append(("says", k, f, r))
                 if name == "only_who":
                     atoms.append(("only", k, f, r))
-        if len(keys.children) == 1 and str(keys.children[0]) in v.carrier_surfaces:
-            carrier = str(keys.children[0])
+        if len(keys.children) == 1 and len(keys.children[0].children) == 1 and str(keys.children[0].children[0]) in v.carrier_surfaces:
+            carrier = str(keys.children[0].children[0])
     elif name == "who_not":
-        subj, verb, key_tok = ch
-        k = v.keys[str(key_tok)]
+        subj, verb, kp = ch
+        k = key_of(v, kp)
         f = pick_fact(v, k, str(verb))
         atoms = [("says_not", k, f, r) for r in expand(v, subj)]
     elif name == "who_not_bare":
