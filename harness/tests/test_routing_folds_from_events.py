@@ -27,10 +27,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from harness import runtime as runtime_module
 from harness import watched_outputs
 from harness.adapters.fake import FakeAdapter
-from harness.definitions import DEFINITIONS
+from harness.definitions import DEFAULT_FORM, DEFINITIONS
 from harness.models import EventType, json_dumps
 from harness.projection import replay_events
 from harness.proposals import delivery_turn, product_spec
@@ -38,6 +37,7 @@ from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests import second_routing, task_pool_assembly
 from harness.tests.helpers import quality_turns
+from harness.tightening import WATCHED_OUTPUTS
 
 # 三个问题：路由契约回答的就这三件（设计说明第 5.1 节）
 QUESTIONS = ("谁开工", "这一轮怎么结束", "事项是否结束")
@@ -190,12 +190,13 @@ def test_the_watched_outputs_routing_answers_the_same_way_from_the_same_events(t
     system.close()
 
 
-def test_the_task_pool_routing_answers_the_same_way_from_the_same_events(tmp_path, monkeypatch):
+def test_the_task_pool_routing_answers_the_same_way_from_the_same_events(tmp_path):
     # 任务池的一个事项（只在测试里用的第二种路由，工单 #864）：发任务、完成、打回、重做、接纳，池子见底结束。
-    # 事项所用的那份定义只在测试目录里，交给组装处按名称接上路由（与 test_second_routing.py 改模块里的定义
-    # 同一个做法；停止原因与部门由薄驱动交给写入口，工单 #1165，所以模块加载的那份定义不动）
+    # 实例同时加载两份具名的形态（工单 #1392）：三部门与任务池；任务池的那一份只在测试目录里，
+    # 组装处按每一份定义里的组织定义 routing 名称接上路由。模块加载的 DEFINITIONS 不替换
     definitions = second_routing.DEFINITIONS
-    monkeypatch.setattr(runtime_module, "DEFINITIONS", definitions)
+    forms = {DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
+             second_routing.ROUTING_NAME: (definitions, second_routing.TIGHTENING)}
     script = {
         "product": [_turn([("submit_task", {"title": "整理 README 的用法一节"})])],
         "engineering": [_turn([("complete_task", {"summary": "补了用法一节"})]),
@@ -203,12 +204,9 @@ def test_the_task_pool_routing_answers_the_same_way_from_the_same_events(tmp_pat
         "quality": [_turn([("judge_task", {"verdict": "return", "reason": "用法一节没有写退出码"})]),
                     _turn([("judge_task", {"verdict": "accept", "reason": "与任务要求一致"})])],
     }
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter(script),
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter(script), forms=forms,
                                    assembly=task_pool_assembly.TaskPoolAssembly())
-    # 收紧检查是这条路由的另一半，事项所用的定义也交给薄驱动
-    system.orchestrator._tightening = second_routing.TIGHTENING
-    system.orchestrator._definitions = definitions
-    run_id = system.create_run("把 README 的用法一节整理清楚")
+    run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
     projection = _run_to_its_end(system, run_id)
     events = system.store.list_events(run_id)
 
@@ -227,7 +225,7 @@ def test_the_task_pool_routing_answers_the_same_way_from_the_same_events(tmp_pat
         long_lived=long_lived,
         fresh=fresh,
         advance=lambda prefix: setattr(facts, "events", list(prefix)),
-        system_routing=system.orchestrator._routing,
+        system_routing=system.orchestrator._item_routing(run_id),
     )
     # 池子见底时薄驱动问的正是路由的「事项是否结束」：路由给出的原因就是这次运行记下的停止原因
     assert observed[-1]["事项是否结束"].stop_reason == second_routing.ITEM_END_REASON
