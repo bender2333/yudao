@@ -389,6 +389,17 @@ test.describe("项目页面（1440×900）", () => {
         await expect(card).toContainText("停止原因：模型服务失败");
         await expect(card).toContainText(`停止说明：${STOP_NOTE_ERROR}`);
         await expect(card).not.toContainText("invalid_request_error");
+        // 上游失败的细节（工单 #1373）：停止说明下面写清哪个部门请求的哪个模型、服务返回什么状态码、
+        // 可不可重试——这两件事此前只在观测页签一行行的失败记录里
+        await expect(card).toContainText("上游失败：工程部门请求的模型 ");
+        await expect(card).toContainText("服务返回 HTTP 400");
+        await expect(card).toContainText("不可重试");
+        // 停止的卡片要能分辨（工单 #1373）：写出事项标识与停止的时间，同名的几张失败卡片才分得清
+        await expect(card).toContainText(`事项标识 ${stopped?.work_item_id ?? ""}`);
+        await expect(card).toContainText("停止于");
+        // 当前事项那一处写同一句提示（判据同上，只核对关键词，时间写法与卡片一致）
+        await expect(current).toContainText("上游失败：工程部门请求的模型 ");
+        await expect(current).toContainText("服务返回 HTTP 400，不可重试");
         await shot(page, "overview-stop-note.png");
 
         // 恢复页：停止原因下面写同一条错误

@@ -26,7 +26,7 @@ import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { scopeAtTick, ticksOf } from "../timeline/logic";
 import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, departmentLine, formatTime, label,
-  progressLabel, workingDepartmentsText } from "./labels";
+  progressLabel, stoppedCardLine, workingDepartmentsText } from "./labels";
 import { askIndent, askLine } from "./asks-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
@@ -274,8 +274,9 @@ function CurrentItem(props: {
           ["待决问题", show(item.pending_question, "没有")],
           ["停止原因", item.stop_reason === null || item.stop_reason === "" ? "没有" : label(STOP_REASON, item.stop_reason)],
           // 停止说明（工单 #1162）：让事项停下的那条错误的原文，写在停止原因下面；
-          // 已收下的交付（工单 #1239）写在它下面一行
-          ["停止说明", <StopNote key="stop-note" note={item.stop_note} kept={item.kept_delivery} empty="没有" />],
+          // 上游失败的细节（工单 #1373）写在它下面一行，再下面是已收下的交付（工单 #1239）
+          ["停止说明", <StopNote key="stop-note" note={item.stop_note} kept={item.kept_delivery}
+            detail={item.stop_detail} empty="没有" />],
           ["未能开始", show(item.start_error, "没有")],
           ["处理进度", processing],
         ]}
@@ -523,11 +524,15 @@ export function Board(props: { items: WorkItemCard[] }) {
                     {workingDepartmentsText(item) === "" ? null : <span>{workingDepartmentsText(item)}</span>}
                     <span>第 {item.round} 轮</span>
                   </div>
+                  {/* 停止的卡片要能分辨（工单 #1373）：同一项目里几张同名的失败卡片写出事项标识与停止的时间 */}
+                  {item.status === "stopped"
+                    ? <p className="y10-muted card-note stop-identity">{stoppedCardLine(item)}</p>
+                    : null}
                   {item.pending_question ? <p className="y10-muted card-note">待决问题：{item.pending_question}</p> : null}
                   {item.stop_reason ? <p className="y10-muted card-note">停止原因：{label(STOP_REASON, item.stop_reason)}</p> : null}
-                  {/* 停止说明（工单 #1162）：停在停止原因下面，长的折起来可以展开；
-                      已收下的交付（工单 #1239）写在它下面一行 */}
-                  <StopNote note={item.stop_note} kept={item.kept_delivery} block />
+                  {/* 停止说明（工单 #1162）：停在停止原因下面，长的折起来可以展开；上游失败的细节（工单 #1373）
+                      写在它下面一行，已收下的交付（工单 #1239）再下面一行 */}
+                  <StopNote note={item.stop_note} kept={item.kept_delivery} detail={item.stop_detail} block />
                   {item.start_error ? <p className="y10-muted card-note">未能开始：{item.start_error}</p> : null}
                 </article>
               ))}

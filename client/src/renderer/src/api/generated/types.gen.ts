@@ -5966,6 +5966,35 @@ export type StepText = {
 };
 
 /**
+ * StopDetail
+ *
+ * 上游失败的细节（工单 #1373）：事项因为模型服务停下时，写清是哪个部门、请求的哪个模型、
+ * 服务返回的什么状态码，以及这次失败可不可重试。
+ *
+ * 这几项在 `model_attempt_failed` 事件的载荷里本来就有（请求的模型、状态码、是否可重试）
+ * 与事件上的部门，只是此前没有谁把它们带给页面：卡片上只有一句「模型服务失败」的原文，
+ * 用户分辨不出是上游挂了还是自己配错了。
+ */
+export type StopDetail = {
+    /**
+     * Department
+     */
+    department?: string | null;
+    /**
+     * Requested Model
+     */
+    requested_model?: string | null;
+    /**
+     * Status Code
+     */
+    status_code?: number | null;
+    /**
+     * Retryable
+     */
+    retryable?: boolean | null;
+};
+
+/**
  * StreamCapability
  */
 export type StreamCapability = {
@@ -6680,6 +6709,11 @@ export type WorkItemCard = {
      */
     stop_note?: string | null;
     kept_delivery?: KeptDelivery | null;
+    /**
+     * Stopped At
+     */
+    stopped_at?: string | null;
+    stop_detail?: StopDetail | null;
     /**
      * Human Action
      */
