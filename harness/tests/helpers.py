@@ -170,6 +170,19 @@ def perform(environment: LocalEnvironment, name: str, args: dict[str, Any], *,
         return pool.submit(asyncio.run, environment.perform(action(name, args, department=department))).result()
 
 
+def python_command(*arguments: str) -> str:
+    # 命令串交给 bash 执行时调用解释器：取跑测试的这个解释器，路径写成正斜杠并加引号（工单 #1356）。
+    # 不写 PATH 上的 python：开发机上第一个 python 可能是 Microsoft Store 的占位程序（退出码 9009），
+    # CI 上是 setup-python 的真实解释器，同一条命令在两处给出不同结果
+    executable = sys.executable.replace(chr(92), "/")
+    return " ".join([f'"{executable}"', *arguments])
+
+
+def python_snippet(code: str) -> str:
+    # 用检查命令跑一小段 Python：代码里只用单引号，外面套双引号交给 bash
+    return python_command("-c", f'"{code}"')
+
+
 # 长时间运行的进程（argv 的一项）：启动一个同样长时间运行的子进程并输出它的进程号，在第一个参数给出的位置写下
 # 标记文件以后等待；用来检查运行中的超时与取消是否结束整个进程树
 LONG_RUNNING_TREE = (

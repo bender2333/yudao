@@ -560,7 +560,7 @@ sequenceDiagram
 | 项 | 内容 | 本设计中需要保持的前提 |
 | --- | --- | --- |
 | 推理档位预填 | models.dev 的 `reasoning_options` 列出模型接受的推理取值（OpenCode @ 0027387），可以加入模型能力表，预填支持档位与推理参数方式 | 预填值标明来源，用户可以修改；准入要求模型测试通过 |
-| 部门内 SubAgent 与角色 | 设计见[部门内多角色设计说明](department-roles.md)（D26）：部门经理与固定角色，角色默认与项目角色设置；参考 OMP 的 vibe 模式（fast 与 good 两类工作者，按 OMP 文档分别对应 smol 与 task 角色的模型） | 角色选择沿用「部门默认 + 项目部门设置」的解析与引用规则 |
+| 部门内 SubAgent 与角色 | 设计见[部门内多角色设计说明](department-roles.md)（D26）：中心角色与工具角色，角色默认与项目角色设置；参考 OMP 的 vibe 模式（fast 与 good 两类工作者，按 OMP 文档分别对应 smol 与 task 角色的模型） | 角色选择沿用「部门默认 + 项目部门设置」的解析与引用规则 |
 | 切换到小窗口模型 | 当前只使用 1M 窗口的模型。OMP 的做法：切换前历史超过目标窗口时，先用当前模型压缩 | 有效窗口按每次请求的调用目标计算 |
 | 更多推理参数方式 | 开关型、GLM 的 `thinking`、Qwen 的 `enable_thinking`、Gemini 的 `thinkingLevel`，以及「关闭推理」；按模型的兼容规则处理，例如 DeepSeek 在请求带 `tool_choice` 时由上游关闭推理 | 档位限制与请求事件记录保持第 7 节 |
 | 输出耗尽恢复 | Responses 返回未完成、Chat Completions 因长度结束且没有有效产出时，参照 OMP 移除该请求、压缩后重试，连续三次后放弃 | 压缩失败处理保持第 8.7 节 |
