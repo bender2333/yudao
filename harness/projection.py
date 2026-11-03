@@ -216,7 +216,9 @@ def apply_event(state: RunProjection, event: Event) -> None:
 
     if etype == EventType.PRODUCT_INPUT_ASSIGNED:
         state.product_work_input_version = payload["through_version"]
-        state.active_department = "product"
+        # 输入分派给了谁取事件自己带的部门（工单 #1391）：写入口按事项所用的定义填这一条，
+        # 投影不认部门的名字；旧事件也带着这个字段
+        state.active_department = event.department
         return
 
     if etype == EventType.DEPARTMENT_GUIDANCE_RECEIVED:
