@@ -9,7 +9,7 @@
 
 ---
 
-solo-deepseek-v4.1-flash / 2026-11-03 16:52 / `docs/design/test-pyramid.md` 第 10 节加第 8 条：检查命令与 bash 命令里要调用解释器时取跑测试的这个解释器（`harness/tests/helpers.py` 的 `python_command`、`python_snippet`），路径写成正斜杠并加引号，不写 PATH 上的 `python` / 工单 #1356：开发机上 PATH 里第一个 `python` 是 Microsoft Store 的占位程序（退出码 9009），CI 上是 `setup-python` 的真实解释器，同一批用例「本机红、CI 绿」，每个执行者都要重新判定一次是不是自己弄坏的；换成这个写法以后两种环境的结论相同，命令文本与解释器路径都不进事件序列基准与提示快照
+solo-deepseek-v4.1-flash / 2026-11-03 23:30 / `docs/design/test-pyramid.md` 第 10 节加第 8 条：检查命令与 bash 命令里要调用解释器时取跑测试的这个解释器（`harness/tests/helpers.py` 的 `python_command`、`python_snippet`），路径写成正斜杠并加引号，不写 PATH 上的 `python`；这一条只管交给执行环境去跑的命令与会被当作检查执行的 `CHECKS` 表，作为工件正文给人看的示例文字（`how_to_run`、`purpose`、PRD 里的 `build_and_test`）不换 / 工单 #1356：开发机上 PATH 的 `python` 可能是 Microsoft Store 的占位程序（执行即结束，bash 里看到退出码 49，即 9009 的低字节），CI 上是 `setup-python` 的真实解释器，同一批用例「本机红、CI 绿」，每个执行者都要重新判定一次是不是自己弄坏的；换成这个写法以后两种环境的结论相同，命令文本与解释器路径都不进事件序列基准与提示快照
 
 solo-deepseek-v4.1-flash / 2026-11-03 13:10 / `docs/design/app-and-interface.md`：`project.overview` 一行补 `stopped_at` 与 `stop_detail`（停止的时刻；停止原因是模型服务时取最后一次失败的调用尝试的部门、请求的模型、状态码与是否可重试）与页面上的写法；第 4.3 节「事项看板在页面上的显示」加一条「停止的卡片要能分辨」（事项标识与停止时间，停止说明下面写「上游失败：哪个部门请求的哪个模型、返回什么状态码、可不可重试」）/ 工单 #1373：试用 R1-01 与 R1-02——上游失败时页面的提示不指名模型与服务，同一项目里 6 张失败卡片一模一样；这些字段本来就在 `model_attempt_failed` 事件里，只是没有谁把它们带给页面
 
