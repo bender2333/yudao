@@ -920,12 +920,18 @@ class ProjectService:
                            round: int | None = None, onboarding_basis: dict[str, Any] | None = None,
                            additional_input: str | None = None,
                            restarted_from_run_id: str | None = None,
-                           mcp_servers: dict[str, Any] | None = None) -> _NewWorkItem:
+                           mcp_servers: dict[str, Any] | None = None,
+                           form: str | None = None) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
+        # 事项创建时冻结项目当时的形态（工单 #1392）：创建事件记下形态名与它的定义版本，之后这个事项的
+        # 写入核对、路由、装配与执行都按这一份定义。没有给 form 时取项目现在的形态（没有设过时是三部门）
+        frozen_form = self.orchestrator.form_named(form or project.form_name)
+        definitions = frozen_form.definitions
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
         prompt_config_versions = {department: project.department_settings[department].version
-                                  for department in DEPARTMENTS}
+                                  if department in project.department_settings else 0
+                                  for department in definitions.departments}
         # MCP 服务器设置在事项创建时冻结（工单 #236，设计说明第 4.3 节）：事项创建事实带上当时的
         # 非秘密设置与凭据引用；因升级重新开始的事项沿用原事项冻结的那份（不给时取项目当前设置）。
         # 还没有保存过 MCP 设置的事项不带这个字段，按空设置读取
@@ -939,7 +945,9 @@ class ProjectService:
             "snapshot": snapshot,
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
             "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
-            "definitions_version": DEFINITIONS.version,
+            "definitions_version": definitions.version,
+            # 事项创建时冻结的形态名（工单 #1392）：项目后来改了形态，这个事项仍按记下的这一份运行
+            "form": frozen_form.name,
             # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
             "priority": priority,
             "kind": kind,
@@ -957,7 +965,7 @@ class ProjectService:
                 prompt_config_versions=prompt_config_versions, kind=kind,
                 round=(1 if kind == "onboarding" else 0) if round is None else round,
                 onboarding_basis=onboarding_basis, additional_input=additional_input,
-                mcp_servers=frozen_mcp,
+                mcp_servers=frozen_mcp, form=frozen_form.name,
             ),
         )
 
@@ -994,8 +1002,10 @@ class ProjectService:
                 source_run=point.source_run,
                 work_item_id=new_id("wi"), run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
                 restarted_from_run_id=run_id,
-                # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
+                # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
+                # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
                 mcp_servers=item.mcp_servers,
+                form=item.form,
             )
 
         created = self.writes.transact(project_stream(run.project_id), restart, command=command)
@@ -1034,8 +1044,10 @@ class ProjectService:
             work_item_id=item.work_item_id, run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
             kind="onboarding", round=prior.round, onboarding_basis=basis, additional_input=note,
             restarted_from_run_id=run_id,
-            # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
+            # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
+            # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
             mcp_servers=item.mcp_servers,
+            form=item.form,
         )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
@@ -1177,7 +1189,10 @@ class ProjectService:
                 if self.store.stream_events(run_stream(item.run_id), after_version=0):
                     continue
                 item_definitions_version = frozen_versions.get(item.run_id, "")
-                if item_definitions_version and item_definitions_version != DEFINITIONS.version:
+                # 事项冻结的形态（工单 #1392）：补建时版本按那一份核，与当前不同时不补建，交给定义版本
+                # 差异的恢复决定处理；同一版本时按事项记录自动补建
+                form = self.orchestrator.form_named(item.form)
+                if item_definitions_version and item_definitions_version != form.definitions.version:
                     continue
                 snapshot = item.snapshot
                 tree = None
@@ -1198,10 +1213,10 @@ class ProjectService:
                     project_context=self.artifacts.get(
                         ArtifactRef(**item.project_context_ref)).decode("utf-8"),
                     prompt_config_versions=dict(item.prompt_config_versions),
-                    item_definitions_version=item_definitions_version or DEFINITIONS.version,
+                    item_definitions_version=item_definitions_version or form.definitions.version,
                     # 补建只读 work_item_created 里冻结的 MCP 服务器设置（工单 #236）：
                     # 不取项目当前设置，旧事件没有这个字段时为空，按空设置读取
-                    mcp_servers=item.mcp_servers,
+                    mcp_servers=item.mcp_servers, form=form.name,
                 )
                 created.append(item.run_id)
         return created

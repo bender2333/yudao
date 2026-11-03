@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -10,12 +10,12 @@ from .artifacts import ArtifactStore
 from .assembly import ContextAssembly
 from .deltas import DeltaChannel
 from .decision_flow import DECISION_FLOW
-from .definitions import DEFINITIONS, configure_fetch
+from .definitions import DEFAULT_FORM, DEFINITIONS, Definitions, configure_fetch
 from . import parameters, routing_contract
 from .engine import StepDriver, StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
 from .event_store import Command, EventStore, catalog_stream
-from .models import CatalogEventType, ProjectEventType, TERMINAL_STATUSES
+from .models import CatalogEventType, Form, ProjectEventType, TERMINAL_STATUSES
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, WritePath
 from .projection import RunNotFoundError, RunProjection, project_run
@@ -36,6 +36,19 @@ __all__ = [
     "RunTerminalError",
     "configure_fetch_tools",
 ]
+
+
+# 发布带的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：名字 →（一份完整的定义，
+# 这份定义选用的收紧检查）。路由不在这里登记：组装时按每一份定义里的组织定义 routing 名称接上。
+# 单角色直做等形态由各自的工单加进来，各是一份完整的定义
+FORM_REGISTRY: dict[str, tuple[Definitions, Any]] = {DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS)}
+
+
+def load_forms(registry: Mapping[str, tuple[Definitions, Any]], store: Any) -> dict[str, Form]:
+    # 实例同时加载几份具名的形态：每份是一份完整的定义；路由按它的组织定义接上（工单 #825 的位置）
+    return {name: Form(name, definitions,
+                       routing_contract.select(definitions.routing, definitions, store=store), tightening)
+            for name, (definitions, tightening) in registry.items()}
 
 
 def configure_fetch_tools(enabled: bool) -> None:
@@ -65,6 +78,9 @@ class LoopSystem:
         resume_on_startup: bool = True,
         assembly: Any | None = None,
         execution: Any | None = None,
+        # 实例同时加载的具名形态（工单 #1392）：名字 →（一份完整的定义，这份定义选用的收紧检查）。
+        # 不给时是发布带的形态（FORM_REGISTRY）；给了就是给的这几份，默认形态必须在内
+        forms: Mapping[str, tuple[Definitions, Any]] | None = None,
     ) -> None:
         # 数据目录可能以 8.3 短路径给出（工单 #250）：在这里解析一次，工作区根、材料根与其余由它派生的根都从解析后的路径派生
         self.data_dir = Path(data_dir).absolute().resolve()
@@ -101,6 +117,11 @@ class LoopSystem:
         assembly_implementation = (ContextAssembly(self.artifacts, self.store, tightening=WATCHED_OUTPUTS)
                                    if assembly is None else assembly)
         execution_implementation = StepDriver if execution is None else execution
+        # 具名形态在这里加载（工单 #1392）：每份是一份完整的定义，路由按它的组织定义接上；事项创建时
+        # 冻结用哪一份。形态的清单是发布的内容，测试可以交进别的几份
+        self.forms = load_forms(FORM_REGISTRY if forms is None else forms, self.store)
+        if DEFAULT_FORM not in self.forms:
+            raise ValueError(f"the instance must load the default form {DEFAULT_FORM!r}")
         self.orchestrator = Orchestrator(
             self.store,
             self.writes,
@@ -116,8 +137,11 @@ class LoopSystem:
             tightening=WATCHED_OUTPUTS,
             # 路由实现按组织定义里的名称接上（工单 #825）：watched_outputs 在模块加载时登记名称，
             # 定义加载时已经核对过这个名字在 routings.json 里；这里接上、核对契约版本、让它校验同一份定义，
-            # 并把事件库的只读读取器交给声明了 use_facts 的路由（契约第三版，工单 #1164）
-            routing=routing_contract.select(DEFINITIONS.routing, DEFINITIONS, store=self.store),
+            # 并把事件库的只读读取器交给声明了 use_facts 的路由（契约第三版，工单 #1164）。
+            # 默认形态的那一份同时作为薄驱动的默认路由；其余几份随 forms 交给它（工单 #1392）
+            routing=self.forms[DEFAULT_FORM].routing,
+            # 实例同时加载的几份具名形态：事项创建时冻结用哪一份（工单 #1392）
+            forms=self.forms,
             # 决定请求的处理与建档的流转在应用层（工单 #827）：薄驱动接上它，只转交
             decision_flow=DECISION_FLOW,
             assembly=assembly_implementation,
@@ -419,17 +443,19 @@ class LoopSystem:
                     step_limits: StepLimits | None = None,
                     resume_on_startup: bool = True,
                     assembly: Any | None = None,
-                    execution: Any | None = None) -> "LoopSystem":
+                    execution: Any | None = None,
+                    forms: Mapping[str, tuple[Definitions, Any]] | None = None) -> "LoopSystem":
         # 显式提供的确定性适配器只用于确定性测试。resume_on_startup=False 用于测试自己控制激活的时机，
         # 打开数据目录时不自动继续未结束的 run（工单 #16）。
         # 模型目录放在数据目录里：调用目标（fake 模型定义）随数据目录一起保留，
         # 重开数据目录以后这一次运行按同一个调用目标继续，窗口不随进程消失（工单 #669）
         # assembly 与 execution 是装配实现与执行实现（工单 #979）：不给时由组装处接上默认的那一种，
-        # 测试给第二种实现时走同一个构造参数，其余什么也不变
+        # 测试给第二种实现时走同一个构造参数，其余什么也不变。forms 是实例加载的具名形态（工单 #1392）：
+        # 不给时是发布带的形态，测试用别的几份（例如任务池）时交进来
         config = Path(data_dir).absolute().resolve() / "providers.json"
         return cls(data_dir, test_adapter=adapter, step_limits=step_limits,
                    resume_on_startup=resume_on_startup, provider_config_path=config,
-                   assembly=assembly, execution=execution)
+                   assembly=assembly, execution=execution, forms=forms)
 
     def start_provider_watching(self, interval_sec: float = 1.0) -> None:
         # 文件重载由系统装配启动，Web 只提交命令和读取状态

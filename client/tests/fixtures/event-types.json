@@ -51,6 +51,7 @@
   "project_decision_answered",
   "project_decision_requested",
   "project_decision_withdrawn",
+  "project_form_set",
   "project_goal_changed",
   "project_parameter_set",
   "project_pinned",

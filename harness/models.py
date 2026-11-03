@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any
 
 from .actions import CheckReceipt
-from .definitions import DEFINITIONS, UnknownStopReason
+from .definitions import DEFAULT_FORM, DEFINITIONS, Definitions, UnknownStopReason
 from .kernel_events import (
     BASELINE_STATUSES,
     RUN_STATUSES,
@@ -35,6 +35,17 @@ from .kernel_events import (
 
 # 部门来自定义中的组织
 DEPARTMENTS = DEFINITIONS.departments
+
+
+@dataclass(frozen=True)
+class Form:
+    # 一份具名的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：一份完整的定义，加上按它的
+    # 组织定义选用的路由实现与收紧检查。实例同时加载几份（runtime.py 的登记处），事项创建时冻结用哪一份
+    name: str
+    definitions: Definitions
+    routing: Any
+    tightening: Any
+
 
 # run 的状态与骨架事件载荷里的封闭取值都由内核事件模块给出（它们是事件信封与骨架事件的一部分），
 # 这里随其他导入一起转出给应用用

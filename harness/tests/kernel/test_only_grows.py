@@ -60,6 +60,8 @@ SKELETON_EVENT_SNAPSHOT = {
         "mcp_servers_configured",
         # 探测 MCP 服务器（工单 #1174）
         "tool_server_probe_finished",
+        # 项目的形态（工单 #1392）：改形态写成项目流的一条事件
+        "project_form_set",
     }),
     "catalog": frozenset({
         "catalog_revised", "catalog_candidates_collected", "catalog_test_finished",

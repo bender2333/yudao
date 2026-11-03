@@ -20,8 +20,7 @@ from uuid import uuid4
 # ---------------------------------------------------------------------------
 # 事件信封里的取值：流的状态、种类，以及信封与载荷的序列化
 
-# run 的状态：进行中与三个终态（工单 #556）。状态写在事件信封的 state_before 与 state_after 上，
-# 这两个字段是信封的一部分，所以取值也在这里
+# run 的状态：进行中与三个终态（工单 #556）。状态写在事件信封的 state_before 与 state_after 上，这两个字段是信封的一部分，所以取值也在这里
 RUN_STATUSES = ("running", "done", "paused", "failed")
 
 TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
@@ -37,8 +36,7 @@ QA_RESULTS = ("passed", "failed", "unverified")
 
 
 class SkeletonEventType:
-    # 骨架事件（run 流）：内核写入或读取的种类，只增不删（设计说明第 7 节）。清单由这个类给出，
-    # 应用事件的种类在应用里声明（第 5.4 节第 1 条），不在这里
+    # 骨架事件（run 流）：内核写入或读取的种类，只增不删（设计说明第 7 节）。清单由这个类给出，应用事件的种类在应用里声明（第 5.4 节第 1 条），不在这里
     RUN_CREATED = "run_created"
     DEPARTMENT_ACTIVATED = "department_activated"
     ACTIVATION_FINISHED = "activation_finished"
@@ -99,6 +97,9 @@ class ProjectEventType:
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
     # 项目设置里的 MCP 服务器（工单 #236）
     MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
+    # 项目的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：项目现在用发布带的哪一份，
+    # 带原值、新值与理由；事项创建时冻结形态名与它的定义版本
+    PROJECT_FORM_SET = "project_form_set"
     # 探测 MCP 服务器（工单 #1174，网络与 MCP 设计说明第 4.2 节）：一次探测的结果，带工具清单快照或失败原因
     TOOL_SERVER_PROBE_FINISHED = "tool_server_probe_finished"
     # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
@@ -110,9 +111,6 @@ class ProjectEventType:
     WRITEBACK_NOT_NEEDED = "writeback_not_needed"
     WRITEBACK_HELD = "writeback_held"
     WRITEBACK_VERIFIED = "writeback_verified"
-    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本，
-    # 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
-    MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
 
 
 class CatalogEventType:

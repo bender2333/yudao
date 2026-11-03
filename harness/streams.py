@@ -109,6 +109,8 @@ PROJECT_EVENT_TYPES = frozenset({
     "baseline_adopted",
     # 项目级参数（迭代底座 B3，工单 #351）：按项目设置的检查时限与建档单轮上限
     "project_parameter_set",
+    # 项目的形态（工单 #1392）：项目现在用发布带的哪一份；之后新建的事项按它冻结，正在跑的不变
+    "project_form_set",
     # 采纳写回（迭代底座 B8，工单 #347，ADR-0034）
     "writeback_completed",
     "writeback_stopped",

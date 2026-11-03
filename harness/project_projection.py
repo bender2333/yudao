@@ -10,7 +10,7 @@ from typing import Any
 
 from pydantic import TypeAdapter
 
-from .definitions import DEFINITIONS
+from .definitions import DEFAULT_FORM, DEFINITIONS
 from .event_store import EventStore, SavedProjection, is_catalog_stream, is_run_stream, project_stream
 from .models import CatalogEvent, CatalogEventType, ProjectEvent, ProjectEventType, json_dumps
 from .projection import StreamHandler, run_handler
@@ -232,6 +232,9 @@ class WorkItem:
     # 事项创建时冻结的 MCP 服务器设置（工单 #236）：非秘密设置与凭据引用的整份文档（{"version", "servers",
     # "document_digest"}）。旧事件没有这个字段时为空，按没有 MCP 设置读取；事项创建以后修改项目设置不影响它
     mcp_servers: dict[str, Any] | None = None
+    # 事项创建时冻结的形态名（工单 #1392）：之后这个事项的写入核对、路由、装配与执行都按这一份定义。
+    # 旧事件没有这个字段时为空，按默认形态读取；项目后来改了形态不影响它
+    form: str = ""
     # 以下字段由所属 run 的投影派生，不存事件。
     status: str = "not_started"
     department: str | None = None
@@ -278,6 +281,8 @@ class ProjectProjection:
     source_directory_history: list[SourceDirectory] = field(default_factory=list)
     # 项目设置里的 MCP 服务器（工单 #236）：整份设置一个版本；旧事件按空设置读取
     mcp_servers: McpServersConfig = field(default_factory=McpServersConfig)
+    # 项目现在用的形态（工单 #1392）：项目流里最后一条形态改动的值；从来没有设过时为空，按默认形态读取
+    form: str = ""
     # 最近一次探测的结果（工单 #1174）；还没有探测时为空
     last_probe: LastProbe | None = None
     writebacks: list[WritebackRecord] = field(default_factory=list)
@@ -300,6 +305,11 @@ class ProjectProjection:
 
     def work_item_for_run(self, run_id: str) -> WorkItem | None:
         return next((item for item in self.work_items if item.run_id == run_id), None)
+
+    @property
+    def form_name(self) -> str:
+        # 项目现在用哪一份形态：从来没有设过时是发布带的默认形态（三部门）
+        return self.form or DEFAULT_FORM
 
 
 @dataclass
@@ -383,6 +393,8 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             restarted_from_run_id=payload.get("restarted_from_run_id"),
             # 事项创建时冻结的 MCP 服务器设置（工单 #236）；旧事件没有这个字段，按空设置读取
             mcp_servers=payload.get("mcp_servers"),
+            # 事项创建时冻结的形态名（工单 #1392）；旧事件没有这个字段，按默认形态读取
+            form=payload.get("form", ""),
         ))
         return
     if etype == ProjectEventType.WORK_ITEM_START_FAILED:
@@ -548,6 +560,10 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         item = state.work_item(payload["work_item_id"])
         if item is not None:
             item.writeback = rec
+        return
+    if etype == ProjectEventType.PROJECT_FORM_SET:
+        # 项目的形态（工单 #1392）：项目流只增，最后一条改动就是现在用的那一份；原值留在它自己的事件里
+        state.form = payload["form"]
         return
     if etype == ProjectEventType.MCP_SERVERS_CONFIGURED:
         # 项目设置里的 MCP 服务器（工单 #236）：整份设置一个版本，servers 是非秘密设置与凭据引用；
