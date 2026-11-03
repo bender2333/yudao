@@ -22,6 +22,21 @@
   },
   {
    "event": "<evt#2>",
+   "type": "dispatch_number_acquired",
+   "actor": "system",
+   "department": "product",
+   "state_before": "running",
+   "state_after": "running",
+   "parent_event_id": null,
+   "session_id": "<ses_pro#1>",
+   "stop_reason": null,
+   "error": null,
+   "payload": {
+    "activation_id": "<act#1>"
+   }
+  },
+  {
+   "event": "<evt#3>",
    "type": "department_activated",
    "actor": "system",
    "department": "product",
@@ -37,7 +52,7 @@
    }
   },
   {
-   "event": "<evt#3>",
+   "event": "<evt#4>",
    "type": "run_failed",
    "actor": "system",
    "department": "product",
@@ -53,7 +68,7 @@
    }
   },
   {
-   "event": "<evt#4>",
+   "event": "<evt#5>",
    "type": "lesson_candidate_recorded",
    "actor": "system",
    "department": "product",
@@ -71,13 +86,13 @@
    }
   },
   {
-   "event": "<evt#5>",
+   "event": "<evt#6>",
    "type": "activation_finished",
    "actor": "system",
    "department": "product",
    "state_before": "failed",
    "state_after": "failed",
-   "parent_event_id": "<ses_pro#1>#1",
+   "parent_event_id": "<ses_pro#1>#2",
    "session_id": "<ses_pro#1>",
    "stop_reason": null,
    "error": null,
@@ -103,7 +118,7 @@
   "input_version": 1,
   "processed_input_version": 0,
   "product_work_input_version": 1,
-  "stream_version": 5,
+  "stream_version": 6,
   "definitions_version": "<definitions>",
   "parameters_version": "<parameters>"
  },

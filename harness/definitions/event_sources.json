@@ -20,6 +20,9 @@
   "department_activated": {
     "source": "rule"
   },
+  "dispatch_number_acquired": {
+    "source": "rule"
+  },
   "department_input": {
     "source": "rule"
   },

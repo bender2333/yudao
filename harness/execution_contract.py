@@ -59,6 +59,8 @@ class ActivationScope:
     guidance_ids: tuple[str, ...]
     basis: WorkBasis
     provider: str
+    # 这一轮工作的派发编号（工单 #1397）：这一轮写入的事件都带它；没有时由写入口按这个流当前的编号写
+    dispatch_number: int = 0
 
     def versions(self) -> dict[str, Any]:
         return {"input_version": self.basis.input_version, "prompt_version": self.prompt_version,

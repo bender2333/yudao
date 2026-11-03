@@ -150,7 +150,9 @@ def test_every_event_declares_its_actor_and_the_department_lives_in_the_departme
     system_events = {EventType.RUN_CREATED, EventType.DEPARTMENT_ACTIVATED,
                      EventType.ACTIVATION_FINISHED, EventType.PRODUCT_INPUT_ASSIGNED,
                      EventType.RUN_DONE, EventType.RUN_PAUSED,
-                     EventType.RUN_FAILED, EventType.DECISION_REQUESTED}
+                     EventType.RUN_FAILED, EventType.DECISION_REQUESTED,
+                     # 取得派发编号由控制主机在开始一轮工作时写（工单 #1397）
+                     EventType.DISPATCH_NUMBER_ACQUIRED}
     system_projects = {ProjectEventType.DELIVERABLE_ADOPTED, ProjectEventType.ADOPTION_HELD,
                        ProjectEventType.WORK_ITEM_START_FAILED}
     system = actor_log
