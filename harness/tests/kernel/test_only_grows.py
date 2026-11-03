@@ -14,6 +14,7 @@
 # 守第 13 节的 R2（第二环的合同：骨架事件只增；封闭的停止原因；动作类别与回执字段只增）。
 
 import json
+import re
 from dataclasses import fields
 from pathlib import Path
 from typing import get_args
@@ -44,6 +45,8 @@ SKELETON_EVENT_SNAPSHOT = {
         "baseline_review_accepted", "artifact_accepted",
         "run_done", "run_paused", "run_failed", "run_resumed", "run_continued",
         "decision_requested", "decision_answered", "decision_withdrawn",
+        # 派发编号（工单 #1397）：每开始一轮工作写一条，这一轮写入的事件都带它
+        "dispatch_number_acquired",
     }),
     "project": frozenset({
         "project_registered", "project_renamed", "project_goal_changed", "project_pinned",
@@ -77,6 +80,8 @@ ENVELOPE_SNAPSHOT = {
         "payload", "artifact_hashes", "session_id", "provider", "model", "context_digest",
         "stop_reason", "error", "created_at", "position", "stream", "stream_version",
         "project_id", "work_item_id", "department", "epoch", "command_id", "actor",
+        # 派发编号（工单 #1397）：旧版本写入的事件没有这一项，读出来是空
+        "dispatch_number",
     ),
     "ProjectEvent": (
         "event_id", "project_id", "type", "payload", "created_at", "position", "stream",
@@ -189,6 +194,25 @@ def test_the_action_receipt_fields_only_grow():
     assert not added, (
         f"动作回执多了字段 {added}：加进回执以后，把它补进 harness/tests/kernel/test_only_grows.py 的快照"
     )
+
+
+# 事件日志只追加（总图第四节「写入口」的规矩「只追加」）：差异报告查出这条规矩没有断言，工单 #1397 补上。
+# 事件表里的一行进了日志就不再改写、不再删除：仓库里没有任何一句改写或删除事件表的 SQL。
+_EVENT_LOG_REWRITE = re.compile(r"\b(?:UPDATE|DELETE FROM|REPLACE INTO)\s+events\b")
+_HARNESS = REPO_ROOT / "harness"
+
+
+def test_the_event_log_is_only_appended():
+    offenders = []
+    for path in sorted(_HARNESS.rglob("*.py")):
+        if "tests" in path.relative_to(_HARNESS).parts:
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            if _EVENT_LOG_REWRITE.search(line):
+                offenders.append((path.name, number, line.strip()))
+    assert offenders == [], f"事件日志被改写或删除了，事实只追加：{offenders}"
+    # 反面确认：事件表的写入确实只有追加
+    assert "INSERT INTO events" in (_HARNESS / "event_store.py").read_text(encoding="utf-8")
 
 
 def test_cannot_verify_ends_the_run_as_failed():

@@ -37,6 +37,8 @@ DESIGN_SKELETON_RUN_EVENTS = frozenset({
     "spec_accepted", "spec_superseded", "contract_accepted", "delivery_accepted", "qa_submitted",
     "structure_accepted", "baseline_review_accepted", "artifact_accepted", "product_decision_accepted",
     "decision_requested", "decision_answered", "decision_withdrawn",
+    # 派发编号（工单 #1397）：每开始一轮工作写一条，这一轮写入的事件都带它
+    "dispatch_number_acquired",
 })
 
 

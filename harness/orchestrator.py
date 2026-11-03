@@ -1266,7 +1266,7 @@ class Orchestrator:
 
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
                 await asyncio.to_thread(self._await_cancellers, run_id)
-                self._transact(run_stream(run_id), finish)
+                self._transact(run_stream(run_id), finish, dispatch_number=scope.dispatch_number)
                 # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
                 self._rebase_run_clock(run_id)
                 self.sessions.get(run_id, scope.department).idle()
@@ -1348,7 +1348,15 @@ class Orchestrator:
         basis = work_basis(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
         provider_name = self._activation_provider(adapter)
-        parent = transaction.append(NewEvent(
+        # 派发编号（工单 #1397，总图第三节「重派与迟到的结果」）：开始一轮工作时写一条事件取得编号，这一轮写入的
+        # 事件都带它；重派先写事件、编号加一，旧编号交回的结果只记录、不改变事项的状态
+        transaction.claim_dispatch_number(session.session_id)
+        acquired = NewEvent(
+            EventType.DISPATCH_NUMBER_ACQUIRED, actor="system", department=department,
+            state_before=projection.status, state_after=projection.status, session_id=session.session_id,
+            payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1},
+        )
+        parent = transaction.append(acquired, NewEvent(
             EventType.DEPARTMENT_ACTIVATED,
             actor="system",
             department=department,
@@ -1362,11 +1370,11 @@ class Orchestrator:
                      "guidance_version": basis.guidance_version,
                      "input_version": basis.input_version, "prompt_version": prompt.version,
                      "prompt_hash": prompt.prompt_ref.content_hash},
-        ))[0]
+        ))[1]
         scope = ActivationScope(
             run_id, department, session.session_id, activation_id, parent.event_id,
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
-            basis=basis, provider=provider_name,
+            basis=basis, provider=provider_name, dispatch_number=parent.dispatch_number or 0,
         )
         # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
         self._start_session_segment(run_id, session.session_id)
@@ -1760,7 +1768,17 @@ class Orchestrator:
         activation_id = new_id("act_ask")
 
         def activate_branch(transaction: Transaction) -> Event:
+            # 询问分支也是一轮工作：先取得这一轮的派发编号（工单 #1397），分支写入的事件都带它
+            transaction.claim_dispatch_number(session_id)
             events = transaction.append(NewEvent(
+                EventType.DISPATCH_NUMBER_ACQUIRED,
+                actor="system",
+                department=department,
+                state_before=transaction.projection.status,
+                state_after=transaction.projection.status,
+                session_id=session_id,
+                payload={"activation_id": activation_id, "cycle": transaction.projection.cycle_count},
+            ), NewEvent(
                 EventType.DEPARTMENT_ACTIVATED,
                 actor="system",
                 department=department,
@@ -1779,7 +1797,7 @@ class Orchestrator:
                     "guidance_ids": [],
                 },
             ))
-            return events[0]
+            return events[1]
 
         act_event = self._transact(run_stream(run_id), activate_branch)
         # 这个分支会话这一段工作的起点（工单 #475）
@@ -1790,6 +1808,7 @@ class Orchestrator:
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash,
             guidance_ids=[], basis=basis,
             provider=self._activation_provider(activation.adapter),
+            dispatch_number=act_event.dispatch_number or 0,
         )
 
         environment = self._workspaces.new_inspection(run_id, department, session_id=session_id)

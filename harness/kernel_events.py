@@ -1,11 +1,8 @@
 # 内核事件模块（S5a，工单 #828）：事件日志的信封、骨架事件的种类与数据结构、骨架事件的登记表。
 #
-# 规则（设计说明第 7 节）：内核写入或读取的事件是骨架事件，种类与字段只增，停用不删除，事件一经写入不重新解释；
-# 其余 run 流里的事件是应用事件，由应用登记自己的种类，增加一种不改这个文件（第 5.4 节第 1 条）。
-# 项目流与目录流的事件全部是骨架事件：它们是长期事实，跨版本保存（ADR-0019）。
+# 规则（设计说明第 7 节）：内核写入或读取的事件是骨架事件，种类与字段只增，停用不删除，事件一经写入不重新解释； 其余 run 流里的事件是应用事件，由应用登记自己的种类，增加一种不改这个文件（第 5.4 节第 1 条）。 项目流与目录流的事件全部是骨架事件：它们是长期事实，跨版本保存（ADR-0019）。
 #
-# 这个文件只导入标准库与 pydantic（这里没有用到 pydantic），是内核清单里 kind 为 module 的一行：
-# 内核模块只从它导入事件信封与骨架事件，`models.py` 与 `projection.py` 留给应用，不在内核清单里。
+# 这个文件只导入标准库与 pydantic（这里没有用到 pydantic），是内核清单里 kind 为 module 的一行： 内核模块只从它导入事件信封与骨架事件，`models.py` 与 `projection.py` 留给应用，不在内核清单里。
 
 from __future__ import annotations
 
@@ -20,8 +17,7 @@ from uuid import uuid4
 # ---------------------------------------------------------------------------
 # 事件信封里的取值：流的状态、种类，以及信封与载荷的序列化
 
-# run 的状态：进行中与三个终态（工单 #556）。状态写在事件信封的 state_before 与 state_after 上，
-# 这两个字段是信封的一部分，所以取值也在这里
+# run 的状态：进行中与三个终态（工单 #556）。状态写在事件信封的 state_before 与 state_after 上， 这两个字段是信封的一部分，所以取值也在这里
 RUN_STATUSES = ("running", "done", "paused", "failed")
 
 TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
@@ -29,16 +25,14 @@ TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
 # 骨架事件载荷里的封闭取值，只增：qa_submitted 的结论，baseline_review_accepted 逐条结论的状态
 QA_VERDICTS = ("rework_engineering", "release", "cannot_verify")
 BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
-# 质检逐条结论用的封闭取值（验证的独立性设计说明第 7.1 节第 1、2 条，工单 #151）：六种检验方式与三种结果。
-# 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在
+# 质检逐条结论用的封闭取值（验证的独立性设计说明第 7.1 节第 1、2 条，工单 #151）：六种检验方式与三种结果。 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在
 # harness/tests/fixtures/check_methods.json 与客户端各一份，服务端核对本表与夹具一致
 QA_METHODS = ("check", "trial", "measure", "judgement", "human", "open")
 QA_RESULTS = ("passed", "failed", "unverified")
 
 
 class SkeletonEventType:
-    # 骨架事件（run 流）：内核写入或读取的种类，只增不删（设计说明第 7 节）。清单由这个类给出，
-    # 应用事件的种类在应用里声明（第 5.4 节第 1 条），不在这里
+    # 骨架事件（run 流）：内核写入或读取的种类，只增不删（设计说明第 7 节）。清单由这个类给出， 应用事件的种类在应用里声明（第 5.4 节第 1 条），不在这里
     RUN_CREATED = "run_created"
     DEPARTMENT_ACTIVATED = "department_activated"
     ACTIVATION_FINISHED = "activation_finished"
@@ -50,18 +44,15 @@ class SkeletonEventType:
     SPEC_SUPERSEDED = "spec_superseded"
     CONTRACT_ACCEPTED = "contract_accepted"
     PRODUCT_DECISION_ACCEPTED = "product_decision_accepted"
-    # 成果失效（S1b，工单 #858）：哪一种成果的哪一版因为什么失效。投影只折叠这一条，
-    # 不再从工具调用与其他接纳事件推出失效
+    # 成果失效（S1b，工单 #858）：哪一种成果的哪一版因为什么失效。投影只折叠这一条， 不再从工具调用与其他接纳事件推出失效
     ARTIFACT_INVALIDATED = "artifact_invalidated"
     DELIVERY_ACCEPTED = "delivery_accepted"
     QA_SUBMITTED = "qa_submitted"
     STRUCTURE_ACCEPTED = "structure_accepted"
     BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
-    # 通用的成果接纳（S2c，工单 #1098）：路由带来新种类时内核写这一条，载荷是收紧检查给出的内容加统一字段。
-    # 成果驱动的六种成果与契约仍写各自的接纳事件，已经写入的事件不重新解释
+    # 通用的成果接纳（S2c，工单 #1098）：路由带来新种类时内核写这一条，载荷是收紧检查给出的内容加统一字段。 成果驱动的六种成果与契约仍写各自的接纳事件，已经写入的事件不重新解释
     ARTIFACT_ACCEPTED = "artifact_accepted"
-    # 第 4 节 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它，
-    # 所以它从此是骨架事件，只加字段（第 7 节的表把 model_* 列在应用事件里，按这一条据以修正）
+    # 第 4 节 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它， 所以它从此是骨架事件，只加字段（第 7 节的表把 model_* 列在应用事件里，按这一条据以修正）
     MODEL_REQUESTED = "model_requested"
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"
@@ -71,6 +62,8 @@ class SkeletonEventType:
     DECISION_REQUESTED = "decision_requested"
     DECISION_ANSWERED = "decision_answered"
     DECISION_WITHDRAWN = "decision_withdrawn"
+    # 派发编号（总图第三节「重派与迟到的结果」，工单 #1397）：每开始一轮工作写一条，这一轮写入的事件都带它
+    DISPATCH_NUMBER_ACQUIRED = "dispatch_number_acquired"
 
 
 class ProjectEventType:
@@ -110,14 +103,12 @@ class ProjectEventType:
     WRITEBACK_NOT_NEEDED = "writeback_not_needed"
     WRITEBACK_HELD = "writeback_held"
     WRITEBACK_VERIFIED = "writeback_verified"
-    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本，
-    # 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本， 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
     MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
 
 
 class CatalogEventType:
-    # 目录流的事件全部是骨架事件：控制主机的长期事实，随部署保存
-    # 模型目录与凭据事件（设计第 10 节）：内容由 Provider 保存，事件不含 Key
+    # 目录流的事件全部是骨架事件：控制主机的长期事实，随部署保存 模型目录与凭据事件（设计第 10 节）：内容由 Provider 保存，事件不含 Key
     CATALOG_REVISED = "catalog_revised"
     CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
     CATALOG_TEST_FINISHED = "catalog_test_finished"
@@ -147,8 +138,7 @@ def _kinds(declaration: type) -> frozenset[str]:
     )
 
 
-# 骨架事件的登记表：三份种类声明各自是一个流，合起来是内核写入或读取的全部种类。
-# 应用事件的种类由应用登记（register_application_event_types），不在这张表里
+# 骨架事件的登记表：三份种类声明各自是一个流，合起来是内核写入或读取的全部种类。 应用事件的种类由应用登记（register_application_event_types），不在这张表里
 SKELETON_RUN_EVENTS = _kinds(SkeletonEventType)
 SKELETON_PROJECT_EVENTS = _kinds(ProjectEventType)
 SKELETON_CATALOG_EVENTS = _kinds(CatalogEventType)
@@ -159,8 +149,7 @@ _APPLICATION_EVENTS: dict[str, str] = {}
 
 
 def register_application_event_types(owner: str, kinds: Iterable[str]) -> None:
-    # 应用登记自己的事件种类：增加一种应用事件不改内核文件。骨架事件不由应用登记（它们的种类只由内核给出），
-    # 同一个种类由两个应用以不同的登记名登记时拒绝
+    # 应用登记自己的事件种类：增加一种应用事件不改内核文件。骨架事件不由应用登记（它们的种类只由内核给出）， 同一个种类由两个应用以不同的登记名登记时拒绝
     declared = tuple(kinds)
     clash = sorted(kind for kind in declared if kind in SKELETON_EVENTS)
     if clash:
@@ -203,8 +192,7 @@ def json_dumps(value: Any) -> str:
 
 
 def _json_default(value: Any) -> Any:
-    # 数据类按它的字段写。元组不在这里处理：json 自己就把元组写成数组（搬过来时这里有一支元组分支，
-    # 从来没有被调用过，models.py 里它历来也是没有覆盖的一行）
+    # 数据类按它的字段写。元组不在这里处理：json 自己就把元组写成数组（搬过来时这里有一支元组分支， 从来没有被调用过，models.py 里它历来也是没有覆盖的一行）
     if is_dataclass(value) and not isinstance(value, type):
         return asdict(value)
     raise TypeError(f"not json serializable: {type(value)!r}")
@@ -233,10 +221,8 @@ def spec_content_hash(kind: str, payload: dict[str, Any], *, parent_hash: str | 
 
 @dataclass
 class Event:
-    # run 流中的一条事件。position、stream、stream_version 是它在事件日志中的全局位置、所属的流与流内版本；
-    # project_id、work_item_id、department 是日志为范围读取保存的列；epoch 是写入方的执行权编号；
-    # command_id 是写入它的命令，不是由命令写入时为空；actor 是提出者：命令写入的事件为命令的提出者，
-    # 其余事件为写入方声明的提出者，没有声明时为空
+    # run 流中的一条事件。position、stream、stream_version 是它在事件日志中的全局位置、所属的流与流内版本； project_id、work_item_id、department 是日志为范围读取保存的列；epoch 是写入方的执行权编号
+    # （日志的列与已写入的字段名不改，总图的词见 execution_right）； command_id 是写入它的命令，不是由命令写入时为空；actor 是提出者：命令写入的事件为命令的提出者， 其余事件为写入方声明的提出者，没有声明时为空
     event_id: str
     run_id: str
     type: str
@@ -262,6 +248,13 @@ class Event:
     epoch: int | None = None
     command_id: str | None = None
     actor: str | None = None
+    # 派发编号：一轮工作开始时取得，这一轮写入的事件都带它；旧版本写入的事件没有，读作空
+    dispatch_number: int | None = None
+
+    @property
+    def execution_right(self) -> int | None:
+        # 执行权编号（总图的词）：字段与日志的列仍叫 epoch（只增，旧事件要读得回来）
+        return self.epoch
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -326,15 +319,12 @@ class CatalogEvent:
 
 
 # ---------------------------------------------------------------------------
-# 决定请求：由骨架事件（请求、回答与撤销）折叠成的一份数据结构，每个决定请求另存一份投影，
-# 与事件在同一个事务中更新（写入口）。它不属于任何应用：项目流与目录流的决定请求也由同一套折叠得出
+# 决定请求：由骨架事件（请求、回答与撤销）折叠成的一份数据结构，每个决定请求另存一份投影， 与事件在同一个事务中更新（写入口）。它不属于任何应用：项目流与目录流的决定请求也由同一套折叠得出
 
 
 @dataclass
 class DecisionRequest:
-    # 一个等待用户回答的决定请求（总体架构第 7.4 节），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。
-    # 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）；
-    # version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
+    # 一个等待用户回答的决定请求（总体架构第 7.4 节），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）； version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
     decision_id: str
     stream: str
     run_id: str | None
@@ -405,9 +395,7 @@ def replay_decisions(events: list[Event] | list[ProjectEvent]) -> dict[str, Deci
 
 
 class StreamHandler(Protocol):
-    # 一种流的投影的处理者：空投影、保存的投影的还原与序列化、并入一条事件、从头重放。
-    # run 流的处理者在内核里（projection.run_handler），项目流与目录流的处理者在内核以外，
-    # 由写入口的构造者注入；写入口只按这个接口使用它们，不经由投影的具体类型
+    # 一种流的投影的处理者：空投影、保存的投影的还原与序列化、并入一条事件、从头重放。 run 流的处理者在内核里（projection.run_handler），项目流与目录流的处理者在内核以外， 由写入口的构造者注入；写入口只按这个接口使用它们，不经由投影的具体类型
     def empty(self) -> Any: ...
 
     def load(self, saved: Any) -> Any: ...

@@ -1,10 +1,6 @@
-# 事件日志：系统唯一的事实来源。run 事件、项目事件与目录事件在同一份日志中：每条事件有全局位置（跨项目递增）、
-# 所属的流（run:<run_id>、project:<project_id>、catalog:main）与流内版本（同一个流内唯一）；另存项目、事项、run、部门与种类，
-# 建立索引供范围读取；另存引起事件的命令身份与事件的提出者。日志只追加，日志身份在建立日志时生成，不再改变。
-# 每个流保存一份投影，流中的每个决定请求另存一份投影（按身份查找，按项目、事项、种类与状态列出）；
-# 投影的内容由写入口计算，这里按 JSON 文本存放。提交在一个数据库事务中核对流版本、执行权编号与命令身份，
-# 追加事件并保存投影；提交以后在进程内通知订阅方。
-# 连接取自连接池：读取各用自己的连接，不等待写入；写入由 SQLite 的写入事务互斥，不依赖线程身份。
+# 事件日志：系统唯一的事实来源。run 事件、项目事件与目录事件在同一份日志中：每条事件有全局位置（跨项目递增）、 所属的流（run:<run_id>、project:<project_id>、catalog:main）与流内版本（同一个流内唯一）；另存项目、事项、run、部门与种类，
+# 建立索引供范围读取；另存引起事件的命令身份与事件的提出者。日志只追加，日志身份在建立日志时生成，不再改变。 每个流保存一份投影，流中的每个决定请求另存一份投影（按身份查找，按项目、事项、种类与状态列出）；
+# 投影的内容由写入口计算，这里按 JSON 文本存放。提交在一个数据库事务中核对流版本、执行权编号与命令身份， 追加事件并保存投影；提交以后在进程内通知订阅方。 连接取自连接池：读取各用自己的连接，不等待写入；写入由 SQLite 的写入事务互斥，不依赖线程身份。
 
 from __future__ import annotations
 
@@ -34,6 +30,7 @@ CREATE TABLE IF NOT EXISTS events (
     department TEXT,
     type TEXT NOT NULL,
     epoch INTEGER,
+    dispatch_number INTEGER,
     command_id TEXT,
     actor TEXT,
     role TEXT,
@@ -139,9 +136,8 @@ class StaleExecutionRight(Exception):
 
 
 @dataclass(frozen=True)
-class Command:
-    # 一次命令：客户端生成的身份、命令名称、请求内容的摘要（应用层的命令查重使用）与提出者。
-    # 同一身份是否重复只比较名称与摘要；这次提交追加的事件都记下身份与提出者
+class MessageIdentity:
+    # 一次命令的消息身份：客户端生成的身份、命令名称、请求内容的摘要（应用层的命令查重使用）与提出者。 同一身份是否重复只比较名称与摘要；这次提交追加的事件都记下身份与提出者
     command_id: str
     name: str
     digest: str
@@ -149,8 +145,8 @@ class Command:
 
 
 @dataclass(frozen=True)
-class CommandRecord:
-    # 登记过的命令：身份、名称、内容摘要、所写的流与这次提交最后一条事件的全局位置
+class MessageIdentityRecord:
+    # 登记过的消息身份：身份、名称、内容摘要、所写的流与这次提交最后一条事件的全局位置
     command_id: str
     name: str
     digest: str
@@ -158,18 +154,23 @@ class CommandRecord:
     position: int
 
 
-class DuplicateCommand(Exception):
-    # 同一命令身份、同一内容再次提交：原来的提交已经接受，这次不再执行
-    def __init__(self, record: CommandRecord) -> None:
+class DuplicateMessage(Exception):
+    # 同一消息身份、同一内容再次提交：原来的提交已经接受，这次不再执行
+    def __init__(self, record: MessageIdentityRecord) -> None:
         super().__init__(f"command {record.command_id} was already accepted at position {record.position}")
         self.record = record
 
 
-class CommandIdReused(Exception):
-    # 同一命令身份提交了不同的内容，拒绝
-    def __init__(self, record: CommandRecord) -> None:
+class MessageIdReused(Exception):
+    # 同一消息身份提交了不同的内容，拒绝
+    def __init__(self, record: MessageIdentityRecord) -> None:
         super().__init__(f"command id {record.command_id} was already used for different content")
         self.record = record
+
+
+# 总图的词是「消息身份、按消息身份去重」（对照表「写入口」一节）：旧名留别名一版
+Command, CommandRecord = MessageIdentity, MessageIdentityRecord
+DuplicateCommand, CommandIdReused = DuplicateMessage, MessageIdReused
 
 
 @dataclass(frozen=True)
@@ -187,8 +188,7 @@ class SavedDecision:
 
 @dataclass(frozen=True)
 class SavedProjection:
-    # 一个流保存的投影：投影所反映的流版本、最后一条事件的全局位置、记录过的最大执行权编号与投影的 JSON 文本，
-    # 以及这个流中的决定请求保存的投影（按请求的先后）
+    # 一个流保存的投影：投影所反映的流版本、最后一条事件的全局位置、记录过的最大执行权编号与投影的 JSON 文本， 以及这个流中的决定请求保存的投影（按请求的先后）
     version: int
     position: int
     epoch: int | None
@@ -217,8 +217,7 @@ def dump_decision(decision: DecisionRequest) -> SavedDecision:
 
 class EventStore:
     def __init__(self, path: str | Path, *, read_only: bool = False) -> None:
-        # read_only 用于只读的子命令：不建立目录、不写库结构，连接以只读方式打开；
-        # 写入方法在使用时直接拒绝，读取期间不会改动事件日志与保存的投影
+        # read_only 用于只读的子命令：不建立目录、不写库结构，连接以只读方式打开； 写入方法在使用时直接拒绝，读取期间不会改动事件日志与保存的投影
         self.path = Path(path)
         self.read_only = read_only
         self._idle: queue.SimpleQueue[sqlite3.Connection] = queue.SimpleQueue()
@@ -241,10 +240,7 @@ class EventStore:
     def commit(self, stream: str, expected_version: int, events: Sequence[Event | ProjectEvent], state: str, *,
                epoch: int | None = None, command: Command | None = None,
                decisions: Sequence[SavedDecision] = ()) -> None:
-        # 在一个事务中：核对流的当前版本等于 expected_version，核对执行权编号不小于这个流已经记录的编号，
-        # 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，与执行权编号一起写回事件）、
-        # 保存这个流的投影与这次改变的决定请求、登记命令。任何一项核对不通过都拒绝，什么也不写。
-        # 订阅方由写入口在提交成功以后经 notify 通知
+        # 在一个事务中：核对流的当前版本等于 expected_version，核对执行权编号不小于这个流已经记录的编号， 核对命令身份没有登记过；然后按顺序追加事件（全局位置在这里确定，与执行权编号一起写回事件）、 保存这个流的投影与这次改变的决定请求、登记命令。任何一项核对不通过都拒绝，什么也不写。 订阅方由写入口在提交成功以后经 notify 通知
         self._refuse_write()
         if decisions and not events:
             raise ValueError("decision requests change only together with the events that change them")
@@ -264,13 +260,9 @@ class EventStore:
                 event.epoch = epoch
                 event.position = _insert(connection, event)
             if events:
-                connection.execute(
-                    "INSERT INTO projections (stream, version, position, epoch, state) VALUES (?, ?, ?, ?, ?) "
-                    "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
-                    "epoch = excluded.epoch, state = excluded.state",
-                    (stream, expected_version + len(events), events[-1].position,
-                     max((value for value in (epoch, recorded) if value is not None), default=None), state),
-                )
+                _save_projection(connection, stream, expected_version + len(events), events[-1].position,
+                 max((value for value in (epoch, recorded) if value is not None),
+                     default=None), state)
             for decision in decisions:
                 _save_decision(connection, stream, decision)
             if command is not None:
@@ -299,22 +291,15 @@ class EventStore:
             ).fetchone()
             if row["version"] != version:
                 raise StreamVersionConflict(stream, version, row["version"])
-            connection.execute(
-                "INSERT INTO projections (stream, version, position, epoch, state) VALUES (?, ?, ?, ?, ?) "
-                "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
-                "epoch = excluded.epoch, state = excluded.state",
-                (stream, version, row["position"], row["epoch"], state),
-            )
+            _save_projection(connection, stream, version, row["position"], row["epoch"], state)
             connection.execute("DELETE FROM decisions WHERE stream = ?", (stream,))
             for decision in decisions:
                 _save_decision(connection, stream, decision)
 
     def claim_execution_right(self, stream: str, expected_version: int, events: Sequence[Event],
                               state: str, *, decisions: Sequence[SavedDecision] = ()) -> int:
-        # 取得一个 run 的执行权（工单 #16，ADR-0018）：在同一个写入事务中核对流版本等于 expected_version，
-        # 以这个流已经记录的执行权编号加一作为新的编号，随这次追加的事件写回，并更新保存的投影与决定请求。
-        # 编号跨进程单调：另一个进程已经取得更大的编号时，这里的 expected_version 核对失败，调用方重新判断。
-        # 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。返回这次取得的执行权编号
+        # 取得一个 run 的执行权（工单 #16，ADR-0018）：在同一个写入事务中核对流版本等于 expected_version， 以这个流已经记录的执行权编号加一作为新的编号，随这次追加的事件写回，并更新保存的投影与决定请求。
+        # 编号跨进程单调：另一个进程已经取得更大的编号时，这里的 expected_version 核对失败，调用方重新判断。 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。返回这次取得的执行权编号
         self._refuse_write()
         with self._transaction() as connection:
             saved = connection.execute(
@@ -328,19 +313,23 @@ class EventStore:
             for event in events:
                 event.epoch = epoch
                 event.position = _insert(connection, event)
-            connection.execute(
-                "INSERT INTO projections (stream, version, position, epoch, state) VALUES (?, ?, ?, ?, ?) "
-                "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
-                "epoch = excluded.epoch, state = excluded.state",
-                (stream, expected_version + len(events), events[-1].position, epoch, state),
-            )
+            _save_projection(connection, stream, expected_version + len(events), events[-1].position, epoch, state)
             for decision in decisions:
                 _save_decision(connection, stream, decision)
         return epoch
 
+    def last_dispatch_number(self, stream: str, session_id: str | None = None) -> int:
+        # 这个流已经记录的派发编号（工单 #1397）：给出会话时只看这个会话；旧版本写入的流里没有这一列，读作 0
+        narrow, params = "", [stream]
+        if session_id is not None:
+            narrow, params = " AND session_id = ?", [stream, session_id]
+        with self._connection() as connection:
+            row = connection.execute("SELECT COALESCE(MAX(dispatch_number), 0) AS number FROM events "
+                                     f"WHERE stream = ?{narrow}", params).fetchone()
+        return int(row["number"])
+
     def subscribe(self, listener: Callable[[list[Event | ProjectEvent]], None]) -> Callable[[], None]:
-        # 登记订阅方：每次提交以后在提交的线程中收到这次提交的事件（已有全局位置），此时不持有任何锁；
-        # 订阅方应当很快返回。返回取消订阅的函数
+        # 登记订阅方：每次提交以后在提交的线程中收到这次提交的事件（已有全局位置），此时不持有任何锁； 订阅方应当很快返回。返回取消订阅的函数
         self._listeners.append(listener)
         return lambda: self._listeners.remove(listener)
 
@@ -385,8 +374,7 @@ class EventStore:
 
     def decisions(self, *, projects: Sequence[str] = (), work_items: Sequence[str] = (), kinds: Sequence[str] = (),
                   statuses: Sequence[str] = ()) -> tuple[int, list[SavedDecision]]:
-        # 按项目、事项、种类与状态列出决定请求保存的投影（按请求的先后），与日志末尾的全局位置在同一个读取事务中读取。
-        # 各个条件之间取交集，同一个条件的多个值取并集；省略的条件不限制
+        # 按项目、事项、种类与状态列出决定请求保存的投影（按请求的先后），与日志末尾的全局位置在同一个读取事务中读取。 各个条件之间取交集，同一个条件的多个值取并集；省略的条件不限制
         clauses: list[str] = []
         params: list[Any] = []
         for column, values in (("project_id", projects), ("work_item_id", work_items), ("kind", kinds),
@@ -414,8 +402,7 @@ class EventStore:
     def stream_events(self, stream: str, *, after_version: int = 0,
                       through_version: int | None = None,
                       through_position: int | None = None) -> list[Event] | list[ProjectEvent]:
-        # 一个流中流内版本大于 after_version（且不大于 through_version）的事件，按版本排列；
-        # through_position 给出全局位置的上界时只取位置不大于它的事件（按位置读取，工单 #127）
+        # 一个流中流内版本大于 after_version（且不大于 through_version）的事件，按版本排列； through_position 给出全局位置的上界时只取位置不大于它的事件（按位置读取，工单 #127）
         sql = "SELECT * FROM events WHERE stream = ? AND stream_version > ?"
         params: list[Any] = [stream, after_version]
         if through_version is not None:
@@ -441,8 +428,7 @@ class EventStore:
     def read(self, after: int = 0, *, through: int | None = None, limit: int = 1000,
              projects: Sequence[str] = (), work_items: Sequence[str] = (), runs: Sequence[str] = (),
              departments: Sequence[str] = (), types: Sequence[str] = ()) -> list[Event | ProjectEvent]:
-        # 按全局位置分批读取：位置大于 after（且不大于 through）的事件，按位置排列，至多 limit 条。
-        # 各个范围之间取交集，同一个范围的多个值取并集；省略的范围不限制
+        # 按全局位置分批读取：位置大于 after（且不大于 through）的事件，按位置排列，至多 limit 条。 各个范围之间取交集，同一个范围的多个值取并集；省略的范围不限制
         if limit < 1:
             raise ValueError("limit must be positive")
         clauses: list[str] = ["position > ?"]
@@ -468,8 +454,7 @@ class EventStore:
             return _end_position(connection)
 
     def events_at(self, positions: Sequence[int]) -> dict[int, Event | ProjectEvent | CatalogEvent]:
-        # 按全局位置取事件（工单 #1342）：位置 → 那一条事件；这个位置上没有事件时不出现在结果里。
-        # 位置是全库自增的，一个位置最多一条事件；请求里重复的位置只查一次
+        # 按全局位置取事件（工单 #1342）：位置 → 那一条事件；这个位置上没有事件时不出现在结果里。 位置是全库自增的，一个位置最多一条事件；请求里重复的位置只查一次
         wanted = sorted({int(position) for position in positions})
         if not wanted:
             return {}
@@ -484,8 +469,7 @@ class EventStore:
         return found
 
     def stream_position_range(self, stream: str) -> tuple[int, int] | None:
-        # 这个流里事件的最早与最末全局位置（工单 #1342）：按位置取事件时用来分辨
-        # 「位置早于这个流的第一条（更早的事件已经归档搬走）」与「范围内缺这一条（已经压缩掉）」
+        # 这个流里事件的最早与最末全局位置（工单 #1342）：按位置取事件时用来分辨 「位置早于这个流的第一条（更早的事件已经归档搬走）」与「范围内缺这一条（已经压缩掉）」
         with self._connection() as connection:
             row = connection.execute(
                 "SELECT MIN(position) AS first, MAX(position) AS last FROM events WHERE stream = ?", (stream,),
@@ -493,8 +477,7 @@ class EventStore:
         return None if row is None or row["first"] is None else (int(row["first"]), int(row["last"]))
 
     def run_time_bounds(self, run_id: str, *, through: int | None = None) -> tuple[str, str] | None:
-        # 一个 run 的第一条与最后一条事件的创建时间；没有事件时为空。按 run 与位置的索引读取。
-        # through 给出全局位置的上界时只看到该位置以前的最后一条（按位置读取，工单 #127）
+        # 一个 run 的第一条与最后一条事件的创建时间；没有事件时为空。按 run 与位置的索引读取。 through 给出全局位置的上界时只看到该位置以前的最后一条（按位置读取，工单 #127）
         sql_tail = " AND position <= ?" if through is not None else ""
         params: list[Any] = [run_id] if through is None else [run_id, through]
         with self._connection() as connection:
@@ -592,8 +575,7 @@ class EventStore:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        # 写入事务：开始时取得数据库的写入锁，其他写入在 SQLite 中等待这个短事务结束。
-        # 提交或其间的任何一步出错都回滚，连接放回连接池时不带着未结束的事务
+        # 写入事务：开始时取得数据库的写入锁，其他写入在 SQLite 中等待这个短事务结束。 提交或其间的任何一步出错都回滚，连接放回连接池时不带着未结束的事务
         with self._connection() as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
@@ -621,6 +603,15 @@ def _command_record(connection: sqlite3.Connection, command_id: str) -> CommandR
                                                   row["position"])
 
 
+
+
+def _save_projection(connection: sqlite3.Connection, stream: str, version: int, position: int,
+                     epoch: int | None, state: str) -> None:
+    # 保存一个流的投影：版本、最后一条事件的全局位置、记录过的最大执行权编号与投影的 JSON 文本
+    connection.execute(
+        "INSERT INTO projections (stream, version, position, epoch, state) VALUES (?, ?, ?, ?, ?) "
+        "ON CONFLICT(stream) DO UPDATE SET version = excluded.version, position = excluded.position, "
+        "epoch = excluded.epoch, state = excluded.state", (stream, version, position, epoch, state))
 def _save_decision(connection: sqlite3.Connection, stream: str, decision: SavedDecision) -> None:
     if decision.stream != stream:
         raise ValueError(f"decision request {decision.decision_id} belongs to {decision.stream}, not {stream}")
@@ -654,13 +645,14 @@ def _insert(connection: sqlite3.Connection, event: Event | ProjectEvent | Catalo
         """
         INSERT INTO events (
             event_id, stream, stream_version, project_id, work_item_id, run_id, department, type, epoch,
-            command_id, actor, role, parent_event_id, state_before, state_after, artifact_hashes_json,
-            session_id, provider, model, context_digest, stop_reason, error, payload_json, created_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            dispatch_number, command_id, actor, role, parent_event_id, state_before, state_after,
+            artifact_hashes_json, session_id, provider, model, context_digest, stop_reason, error,
+            payload_json, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (event.event_id, event.stream, event.stream_version, event.project_id, event.work_item_id,
-         event.run_id, event.department, event.type, event.epoch, event.command_id, event.actor, *run_columns,
-         json_dumps(event.payload), event.created_at),
+         event.run_id, event.department, event.type, event.epoch, getattr(event, "dispatch_number", None),
+         event.command_id, event.actor, *run_columns, json_dumps(event.payload), event.created_at),
     )
     return int(cursor.lastrowid)
 
@@ -676,7 +668,8 @@ def _from_row(row: sqlite3.Row) -> Event | ProjectEvent | CatalogEvent:
             stop_reason=row["stop_reason"], error=row["error"], created_at=row["created_at"],
             position=row["position"], stream=row["stream"], stream_version=row["stream_version"],
             project_id=row["project_id"], work_item_id=row["work_item_id"], department=row["department"],
-            epoch=row["epoch"], command_id=row["command_id"], actor=row["actor"],
+            epoch=row["epoch"], dispatch_number=row["dispatch_number"], command_id=row["command_id"],
+            actor=row["actor"],
         )
     if row["stream"].startswith(_CATALOG):
         return CatalogEvent(

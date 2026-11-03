@@ -1,8 +1,5 @@
-# 写入口：所有领域写入唯一的入口。流程编排、步骤驱动的记录、提交、交互与项目服务写入事件都经过这里。
-# 一次写入是一个事务（transact）：读取流保存的投影、决定请求与流版本，由调用方判断并追加事件，提交时在同一个
-# 数据库事务中核对流版本、执行权编号与命令身份，追加事件并更新保存的投影与改变的决定请求；提交以后事件日志通知订阅方。
-# 判断期间不持有锁：另一方在读取以后写入了同一个流时，提交因版本不符被拒绝，调用方按写入以后的状态重新判断；
-# 互斥由提交时的版本核对与数据库的写入事务完成，不依赖线程身份，也没有调用方在另一方的判断期间等待。
+# 写入口：所有领域写入唯一的入口。流程编排、步骤驱动的记录、提交、交互与项目服务写入事件都经过这里。 一次写入是一个事务（transact）：读取流保存的投影、决定请求与流版本，由调用方判断并追加事件，提交时在同一个
+# 数据库事务中核对流版本、执行权编号、派发编号与消息身份，追加事件并更新保存的投影与改变的决定请求；提交以后事件日志通知订阅方。 判断期间不持有锁：另一方在读取以后写入了同一个流时，提交因版本不符被拒绝，调用方按写入以后的状态重新判断； 互斥由提交时的版本核对与数据库的写入事务完成，不依赖线程身份，也没有调用方在另一方的判断期间等待。
 
 from __future__ import annotations
 
@@ -13,8 +10,8 @@ from typing import Any, TypeVar
 
 from .definitions import Definitions
 from .event_store import (
-    Command, EventStore, SavedDecision, SavedProjection, StreamVersionConflict, dump_decision, is_catalog_stream,
-    is_run_stream, load_decisions,
+    EventStore, MessageIdentity, SavedDecision, SavedProjection, StreamVersionConflict, dump_decision,
+    is_catalog_stream, is_run_stream, load_decisions,
 )
 from .kernel_events import (
     CatalogEvent, DecisionRequest, Event, ProjectEvent, SkeletonEventType, StreamHandler, apply_decision_event,
@@ -25,8 +22,7 @@ from .tools import in_force
 
 T = TypeVar("T")
 
-# 一次写入因为另一方先写入同一个流而重新判断的最多次数；每次被拒绝都说明另一方的写入已经提交，
-# 超过这个次数时交回最后一次的版本冲突
+# 一次写入因为另一方先写入同一个流而重新判断的最多次数；每次被拒绝都说明另一方的写入已经提交， 超过这个次数时交回最后一次的版本冲突
 MAX_JUDGMENTS = 100
 
 # 结束运行的事件：它承载的停止原因规定的结束方式，与事件写入的终态
@@ -36,8 +32,7 @@ _STOP_EVENTS = {SkeletonEventType.RUN_DONE: ("done", "done"), SkeletonEventType.
 
 @dataclass(frozen=True)
 class NewEvent:
-    # 一条要追加的 run 事件；事件编号、日志位置、流内版本与创建时间在追加时确定。
-    # actor 是写入方声明的提出者；由命令写入时提出者是命令的提出者
+    # 一条要追加的 run 事件；事件编号、日志位置、流内版本与创建时间在追加时确定。 actor 是写入方声明的提出者；由命令写入时提出者是命令的提出者
     type: str
     _: KW_ONLY
     state_before: str
@@ -98,24 +93,33 @@ class Snapshot:
         return self._store.stream_events(self.stream, after_version=version, through_version=self.version)
 
     def minimal(self) -> MinimalProjection:
-        # 到这个版本为止的最小投影（设计说明第 4 节）：裁决只读这一份，由骨架事件折叠而成。
-        # 只看已提交的事件，事务里追加的事件由 Transaction 接着折
+        # 到这个版本为止的最小投影（设计说明第 4 节）：裁决只读这一份，由骨架事件折叠而成。 只看已提交的事件，事务里追加的事件由 Transaction 接着折
         if self._minimal is None:
-            events = Snapshot.events(self)
+            events = accepted(Snapshot.events(self))
             folded = fold_events(events) if self._minimal_of is None else self._minimal_of(self.stream, self.version,
                                                                                           events)
             self._minimal = folded
         return self._minimal
 
 
+def accepted(events: list[Any]) -> list[Any]:
+    # 派发编号只增（工单 #1397）：编号低于同一个会话此前最大编号的事件只记录，不并入投影与最小投影；旧版本写入的事件没有编号，照常并入
+    highest: dict[str | None, int] = {}
+    kept = []
+    for event in events:
+        number, key = getattr(event, "dispatch_number", None) or 0, getattr(event, "session_id", None)
+        if number >= highest.get(key, 0):
+            kept.append(event)
+            highest[key] = number
+    return kept
+
+
 class Transaction(Snapshot):
-    # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection、decisions 与 events()，提交时一起写入。
-    # 判断可能因为版本冲突重新进行，判断中只做可以重复的事；只应在提交以后发生的进程内效果用 on_commit 登记，
-    # 没有提交（判断出错、版本冲突或存储失败）时要撤回的外部效果用 on_abort 登记
+    # 一次「读取保存的投影、判断、追加」：追加的事件立即并入 projection、decisions 与 events()，提交时一起写入。 判断可能因为版本冲突重新进行，判断中只做可以重复的事；只应在提交以后发生的进程内效果用 on_commit 登记， 没有提交（判断出错、版本冲突或存储失败）时要撤回的外部效果用 on_abort 登记
     def __init__(self, store: EventStore, stream: str, saved: SavedProjection | None,
-                 handler: StreamHandler, command: Command | None = None,
+                 handler: StreamHandler, command: MessageIdentity | None = None,
                  minimal_of: Callable[[str, int, list[Any]], MinimalProjection] | None = None, *,
-                 definitions: Definitions | None = None) -> None:
+                 definitions: Definitions | None = None, dispatch_number: int | None = None) -> None:
         super().__init__(store, stream, saved, handler, minimal_of)
         self.appended: list[Any] = []
         self._command = command
@@ -124,14 +128,37 @@ class Transaction(Snapshot):
         self._compensations: list[Callable[[], None]] = []
         self._committed_effects: list[Callable[[], None]] = []
         self._appended_minimal: MinimalProjection | None = None
+        self._dispatch, self._recorded, self._late = dispatch_number, {}, False
+
+    def recorded_dispatch_number(self, session_id: str | None = None) -> int:
+        # 这个流已经记录的派发编号：一个部门的一轮工作看它自己的会话，不指明会话时看整个流（旧流与项目流是 0）
+        if session_id not in self._recorded:
+            self._recorded[session_id] = (self._store.last_dispatch_number(self.stream, session_id)
+                                          if is_run_stream(self.stream) else 0)
+        return self._recorded[session_id]
+
+    def claim_dispatch_number(self, session_id: str | None = None) -> int:
+        # 开始一轮工作：这个会话取得已记录的编号加一，之后在这个事务里追加的事件都带它（总图第三节）
+        self._dispatch = self.recorded_dispatch_number(session_id) + 1
+        return self._dispatch
+
+    def late(self, session_id: str | None = None) -> bool:
+        # 拿已被重派取代的旧编号提交：这一轮的写入只记录，不改变投影与决定请求
+        return self._dispatch is not None and self._dispatch < self.recorded_dispatch_number(session_id)
 
     def append(self, *entries: NewEvent | NewProjectEvent) -> list[Any]:
-        # 先得出全部事件（载荷无法保存时在这里失败，什么也不追加），再依次并入投影与决定请求。
-        # 由命令写入的事件记下命令身份，提出者是命令的提出者
+        # 先得出全部事件（载荷无法保存时在这里失败，什么也不追加），再依次并入投影与决定请求。 由命令写入的事件记下消息身份，提出者是命令的提出者；不交出编号时，这个流当前这一轮的编号照旧写在事件上
         first = self.version + len(self.appended) + 1
-        events = [_event(self.stream, entry, first + offset, self._command, self._definitions)
+        session_id = next((entry.session_id for entry in entries if getattr(entry, "session_id", None)), None)
+        number = self._dispatch if self._dispatch is not None else (self.recorded_dispatch_number(session_id) or None)
+        late = self._late = self._late or self.late(session_id)
+        events = [_event(self.stream, entry, first + offset, self._command, self._definitions, number)
                   for offset, entry in enumerate(entries)]
         for event in events:
+            if late:
+                # 旧编号交回的结果只记录，不并入投影与决定请求
+                self.appended.append(event)
+                continue
             self.handler.fold(self.projection, event)
             if isinstance(event, Event):
                 # run 所属的项目与事项取自它的 run_created 事件
@@ -142,13 +169,13 @@ class Transaction(Snapshot):
             self.appended.append(event)
         if self._appended_minimal is not None:
             # 事务里已经折过一份最小投影：这次追加的事件接在后面折，不必整条流重算
-            self._appended_minimal = fold_more(self._appended_minimal, events)
+            self._appended_minimal = fold_more(self._appended_minimal, [] if late else accepted(events))
         return events
 
     def minimal(self) -> MinimalProjection:
         # 到这个事务此刻的状态（含已追加、还没提交的事件）为止的最小投影：裁决在一个事务里读这一份
         if self._appended_minimal is None:
-            self._appended_minimal = fold_more(Snapshot.minimal(self), self.appended)
+            self._appended_minimal = fold_more(Snapshot.minimal(self), [] if self._late else accepted(self.appended))
         return self._appended_minimal
 
     def changed_decisions(self) -> list[SavedDecision]:
@@ -194,7 +221,8 @@ class WritePath:
         return self._minimal_at(stream, version, self._store.stream_events(stream, through_version=version))
 
     def _minimal_at(self, stream: str, version: int, events: list[Any]) -> MinimalProjection:
-        # 到这个版本为止的最小投影：有更早版本的缓存时只折后面的事件
+        # 到这个版本为止的最小投影：有更早版本的缓存时只折后面的事件；只记录的事件（旧派发编号）不并入
+        events = accepted(events)
         cached = self._minimals.get(stream)
         if cached is not None and cached[0] <= version:
             state = fold_more(cached[1], [event for event in events if event.stream_version > cached[0]])
@@ -208,21 +236,20 @@ class WritePath:
         return Snapshot(self._store, stream, self._store.projection(stream), self._handler_for(stream), self._minimal_at)
 
     def transact(self, stream: str, decide: Callable[[Transaction], T], *, expected_version: int | None = None,
-                 command: Command | None = None, epoch: int | None = None, definitions: Definitions | None = None) -> T:
-        # 在一个事务中读取保存的投影、由 decide 判断并追加事件、提交。
-        # expected_version 为空时，提交因另一方的写入被拒绝就按写入以后的状态重新调用 decide，直到提交成功；
-        # 给出 expected_version 时，读取或提交时流版本与它不同都拒绝（StreamVersionConflict），不重新判断。
-        # command 是引起这次写入的命令：同一身份已经登记时不调用 decide，内容相同拒绝为 DuplicateCommand，不同为
-        # CommandIdReused；被拒绝的命令不登记；追加的事件记下命令身份与提出者。epoch 是写入方的执行权编号，随事件记录，
-        # 小于这个流已经记录的编号时拒绝（StaleExecutionRight）；取得执行权的规则由 3.1 加入。
-        # 提交以后执行 on_commit 登记的效果，再通知事件日志的订阅方；这以后出的错不影响已经提交的写入
+                 command: MessageIdentity | None = None, epoch: int | None = None,
+                 definitions: Definitions | None = None, dispatch_number: int | None = None) -> T:
+        # 在一个事务中读取保存的投影、由 decide 判断并追加事件、提交。 expected_version 为空时，提交因另一方的写入被拒绝就按写入以后的状态重新调用 decide，直到提交成功；
+        # 给出 expected_version 时，读取或提交时流版本与它不同都拒绝（StreamVersionConflict），不重新判断。 command 是引起这次写入的命令：同一身份已经登记时不调用 decide，内容相同拒绝为 DuplicateMessage，不同为
+        # MessageIdReused；被拒绝的命令不登记；追加的事件记下消息身份与提出者。epoch 是写入方的执行权编号，随事件记录， 小于这个流已经记录的编号时拒绝（StaleExecutionRight）；取得执行权的规则由 3.1 加入。
+        # dispatch_number 是这一轮工作的派发编号：低于这个流已经记录的编号时，写入只记录、不改变投影与决定请求； 提交以后执行 on_commit 登记的效果，再通知事件日志的订阅方；这以后出的错不影响已经提交的写入
         attempt = 0
         while True:
             attempt += 1
             if command is not None:
                 self._store.check_command(command)
             transaction = Transaction(self._store, stream, self._store.projection(stream),
-                                      self._handler_for(stream), command, self._minimal_at, definitions=definitions)
+                                      self._handler_for(stream), command, self._minimal_at, definitions=definitions,
+                                      dispatch_number=dispatch_number)
             if expected_version is not None and transaction.version != expected_version:
                 raise StreamVersionConflict(stream, expected_version, transaction.version)
             try:
@@ -249,12 +276,8 @@ class WritePath:
                              expected_version=expected_version, epoch=epoch, definitions=definitions)
     def claim_execution_right(self, stream: str, decide: Callable[[Transaction], T], *,
                               expected_version: int | None = None) -> tuple[int, T]:
-        # 取得这个 run 的执行权（工单 #16，ADR-0018）：读取保存的投影，由 decide 判断并追加事件，
-        # 在一个事务中核对流版本、以已记录的执行权编号加一作为新编号，随这次追加的事件一起写入并更新保存的投影。
-        # 返回这次取得的执行权编号与 decide 的结果；调用方之后的有权推进的写入都携带这个编号，
-        # 编号小于这个流已经记录的编号时由写入口拒绝（StaleExecutionRight）。
-        # 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。
-        # 判断期间不持有锁：另一方先写入同一个流时提交因版本不符被拒绝，按写入以后的状态重新判断
+        # 取得这个 run 的执行权（工单 #16，ADR-0018）：读取保存的投影，由 decide 判断并追加事件， 在一个事务中核对流版本、以已记录的执行权编号加一作为新编号，随这次追加的事件一起写入并更新保存的投影。
+        # 返回这次取得的执行权编号与 decide 的结果；调用方之后的有权推进的写入都携带这个编号， 编号小于这个流已经记录的编号时由写入口拒绝（StaleExecutionRight）。 执行权没有期限与续期，编号只用于进程重启与两个进程同时恢复的情况。 判断期间不持有锁：另一方先写入同一个流时提交因版本不符被拒绝，按写入以后的状态重新判断
         attempt = 0
         while True:
             attempt += 1
@@ -282,11 +305,11 @@ class WritePath:
             return epoch, result
 
     def rebuild(self, stream: str) -> Any:
-        # 从这个流的第一条事件重放投影与决定请求，替换保存的投影
+        # 从这个流的第一条事件重放投影与决定请求，替换保存的投影；只记录的事件（旧派发编号）不并入重放
         handler = self._handler_for(stream)
         events = self._store.stream_events(stream)
-        state = handler.replay(stream, events)
-        decisions = replay_decisions(events)
+        state = handler.replay(stream, accepted(events))
+        decisions = replay_decisions(accepted(events))
         self._store.replace_projection(stream, len(events), handler.dump(state),
                                        [dump_decision(decision) for decision in decisions.values()])
         return state
@@ -299,9 +322,8 @@ class WritePath:
         return streams
 
 
-def _resolve_actor(entry_actor: str | None, command: Command | None, stream: str) -> str:
-    # 提出者由写入方经写入口声明（设计第 5.2 节）：由命令写入时取命令的提出者，
-    # 其余取写入方声明的提出者；两者都没有时这次写入失败（每条事件都有提出者，不允许落空）
+def _resolve_actor(entry_actor: str | None, command: MessageIdentity | None, stream: str) -> str:
+    # 提出者由写入方经写入口声明（设计第 5.2 节）：由命令写入时取命令的提出者， 其余取写入方声明的提出者；两者都没有时这次写入失败（每条事件都有提出者，不允许落空）
     actor = command.actor if command is not None else entry_actor
     if not isinstance(actor, str) or not actor:
         raise ValueError(f"{stream} event requires a declared actor")
@@ -309,7 +331,8 @@ def _resolve_actor(entry_actor: str | None, command: Command | None, stream: str
 
 
 def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, version: int,
-           command: Command | None, definitions: Definitions) -> Event | ProjectEvent | CatalogEvent:
+           command: MessageIdentity | None, definitions: Definitions,
+           dispatch_number: int | None = None) -> Event | ProjectEvent | CatalogEvent:
     identity = stream.split(":", 1)[1]
     # 载荷取它在日志中保存的形式（JSON），并入投影的内容与从日志重放时读到的完全相同
     payload = json.loads(json_dumps(entry.payload))
@@ -337,7 +360,7 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, ver
             provider=entry.provider, model=entry.model, context_digest=entry.context_digest,
             stop_reason=entry.stop_reason, error=entry.error, created_at=utc_now(), position=0, stream=stream,
             stream_version=version, project_id=None, work_item_id=None, department=entry.department,
-            command_id=command_id, actor=actor,
+            command_id=command_id, actor=actor, dispatch_number=dispatch_number,
         )
     return ProjectEvent(
         event_id=new_id("pevt"), project_id=identity, type=entry.type, payload=payload, created_at=utc_now(),
@@ -348,8 +371,7 @@ def _event(stream: str, entry: NewEvent | NewProjectEvent | NewCatalogEvent, ver
 
 
 def _check_stop_reason(entry: NewEvent, definitions: Definitions) -> None:
-    # 停止原因只来自定义中的清单，只由结束事件承载：原因规定的结束方式、载荷与事件的停止原因都要一致，否则失败。
-    # 清单取自定义（工单 #1165）：第二种路由在自己那份定义里声明的结束原因写在它的 routings.json 里
+    # 停止原因只来自定义中的清单，只由结束事件承载：原因规定的结束方式、载荷与事件的停止原因都要一致，否则失败。 清单取自定义（工单 #1165）：第二种路由在自己那份定义里声明的结束原因写在它的 routings.json 里
     ending = _STOP_EVENTS.get(entry.type)
     if entry.stop_reason is None:
         if ending is not None:
