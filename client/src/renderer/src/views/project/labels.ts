@@ -2,8 +2,6 @@
 // 单一来源：harness/app/labels.py 里的部门、阶段与状态名称，客户端按生成的合同取值对应显示。
 
 import type { StreamState } from "../../contract/stream-state";
-// 角色条在角色没有当前任务时显示房间状态词表里的中文状态（工单 #1230）
-import { STATUS_TEXT } from "../../pixel/room/layout.ts";
 
 export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   product: { name: "产品", role: "把用户的要求整理成有效需求" },
@@ -396,6 +394,13 @@ export function workingDepartmentsText(item: {
   }
   return `${working.map((department) => departmentName(department)).join("、")}在工作`;
 }
+
+// 角色条在角色没有当前任务时显示的房间状态词（工单 #1230）。页面自己的一份（工单 #1415）：
+// 页面上的文字归页面，不从画面取；画面那边自己的那一份在 pixel/room/layout.ts，两份不互相引用。
+export const STATUS_TEXT: Record<string, string> = {
+  idle: "未工作", working: "工作中", asking: "等待回答", paused: "已暂停", failed: "失败", done: "已完成",
+  cancelled: "已取消", interrupted: "中断", waiting_resume: "待恢复",
+};
 
 // 房间角色条上那一格的文字（工单 #1230）：角色的 task 只在有事实说明它此刻做什么时才填。
 // 现在系统里没有这样的事实（一个部门只有一个角色，没有哪一项记录写着它此刻手上的事），

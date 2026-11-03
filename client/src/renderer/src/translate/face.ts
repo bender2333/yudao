@@ -1,0 +1,353 @@
+// 画面自己留的一份卡片文字与部门名（画面与播放设计说明「搬出：画面成为单独的应用」的「先补页面」：
+// 画面要用同样的文字时自己写一份；工单 #1415）。
+//
+// 大厅板上决定卡片的文字原来由页面的 views/decisions/card-logic.ts 写好，翻译层反过来导入页面的文件。
+// 现在画面这一侧自己留一份：卡片上写什么（材料的行、挡住什么、等待多久、选项的标记）与部门名都在这里，
+// 不从页面取；页面那边自己那一份照旧在 views/ 里，两份不互相引用，改一边不动另一边。
+// 卡片上的提示文字由 pixel/floor/card.ts 按同样的话术给出（那边本来就有自己的一份）。
+//
+// 这一份是页面那一份的副本，逐字照抄页面上的话术与材料的整理方式：搬家这一步只切断导入方向，不改可见行为。
+
+import type { DecisionView } from "../api/generated/types.gen.ts";
+import type { DecisionFace } from "../pixel/contract.ts";
+
+export type MaterialRow = { term: string; value: string };
+export type MaterialLink = { label: string; href: string };
+
+// 决定请求的载荷：决定请求携带的材料与选项（类型由生成的合同给出，未知种类按原样显示）
+type Payload = Record<string, unknown>;
+
+/** 部门标识 → 中文名（卡片材料的「部门」一栏与提出者用）。 */
+export const DEPARTMENT_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  product: "产品", engineering: "工程", quality: "质检", operations: "运维",
+});
+
+/** 停止原因的中文名（harness/definitions/stop_reasons.json 的取值）：卡片材料里按中文写。 */
+export const STOP_REASON: Readonly<Record<string, string>> = Object.freeze({
+  released: "已完成并放行",
+  baseline_verified: "已完成基线核验",
+  max_cycles: "循环次数已达上限",
+  model_steps_exhausted: "部门步数已达上限",
+  no_tool_call: "部门连续多次没有调用工具",
+  workspace_unrepresentable: "工作区有无法表示的条目",
+  time_limit: "运行时间已达上限",
+  cancelled: "运行已被取消",
+  user_cancelled: "用户已取消",
+  provider_error: "模型服务失败",
+  provider_timeout: "模型服务请求超时",
+  provider_protocol: "模型服务协议不符",
+  unsupported_protocol: "不支持的协议",
+  retry_after_too_long: "要求等待的时间过长",
+  context_overflow: "上下文超过窗口",
+  compaction_failed: "上下文压缩失败",
+  host_commit_error: "主机保存失败",
+  run_event_version_changed: "因 Yudao 升级停止",
+});
+
+/** 决定请求里写的原因（model_unavailable 一类请求的 reason 取值）：与停止原因同一套词，多一项。 */
+export const DECISION_REASON: Readonly<Record<string, string>> = Object.freeze({
+  ...STOP_REASON,
+  provider_unavailable: "模型或凭据不可用",
+});
+
+/** 决定请求的种类名（卡片头上那一行）。 */
+export const DECISION_KIND: Readonly<Record<string, string>> = Object.freeze({
+  model_unavailable: "模型引用无法使用，等待恢复",
+  no_tool_call: "已暂停（模型没有调用工具），等待继续",
+  workspace_unrepresentable: "已暂停（工作区无法表示），等待继续",
+  definitions_changed: "定义版本不同，等待选择",
+  initial_prd: "接入已有项目的初始需求文档等待确认",
+  kernel_modification: "交付改动了内核路径，等待批准",
+  qa_cannot_verify: "质检无法核验，等待回答",
+});
+
+/** 词表 → 文字：空值写「未知」，词表里没有的取值原样写（不猜）。 */
+export function label(map: Readonly<Record<string, string>>, value: string | null | undefined): string {
+  if (value === null || value === undefined || value === "") {
+    return "未知";
+  }
+  return map[value] ?? value;
+}
+
+// 等待时长：从发出时间到现在，按秒向上取整（画面不自行推进状态，取的是当前时间与发出时间的差）
+export function waitedSeconds(requestedAt: string, now: number): number {
+  const requested = new Date(requestedAt).getTime();
+  if (Number.isNaN(requested)) {
+    return 0;
+  }
+  return Math.max(0, Math.round((now - requested) / 1000));
+}
+
+// 初始 PRD 的材料（第 138 号工单，设计第 3.2 节）：PRD 摘要与工件引用、现有结构说明、
+// 基线核验汇总、快照来源与轮次。上一轮的修改意见原文由卡片按事项补一行（工单 #138），
+// 修改意见的工件路径是内部引用，不显示给用户。
+// 载荷由 InitialPrdRequested 给出，每一项都按接口合同的原样显示，没有上报的项目写「未上报」。
+function initialPrdRows(request: Payload, push: (term: string, value: unknown) => void): void {
+  const prd = (request.prd ?? {}) as Payload;
+  const structure = (request.structure ?? {}) as Payload;
+  const review = (request.baseline_review ?? {}) as Payload;
+  const snapshot = (request.snapshot ?? {}) as Payload;
+  push("轮次", `第 ${typeof request.round === "number" ? request.round : "?"} 轮`);
+  push("初始 PRD 摘要", showText(prd.summary, "没有摘要"));
+  push("PRD.md 工件", refPath(prd.prd_ref));
+  push("PRD 指纹", fingerprint(prd.content_hash));
+  // 要求与验收标准的对应声明（工单 #1349）：每条要求一行，值是对应的 AC 位置，写不出验收标准的写 gap 原因
+  for (const row of requirementRows(prd)) {
+    push(row.term, row.value);
+  }
+  push("现有结构说明", refPath(structure.structure_ref));
+  push("结构说明指纹", fingerprint(structure.code_tree_digest));
+  push("基线核验汇总", baselineSummary(review));
+  push("快照来源", showText(snapshot.source, "未上报"));
+  push("快照提交", provenanceText(snapshot.provenance));
+  push("快照规模", `文件 ${countText(snapshot.files)} 项，目录 ${countText(snapshot.directories)} 项，共 ${bytesText(snapshot.bytes)} 字节`);
+}
+
+// 初始 PRD 的要求与验收标准的对应声明（工单 #1349）：逐条要求一行，值是对应的 AC 位置；
+// 写不出验收标准的要求写它标明的 gap 原因；旧事件的 prd 没有这三项时不出这些行
+function requirementRows(prd: Payload): MaterialRow[] {
+  const requirements = Array.isArray(prd.requirements) ? prd.requirements : [];
+  const mapping = Array.isArray(prd.requirement_mapping) ? prd.requirement_mapping : [];
+  const rows: MaterialRow[] = [];
+  for (const item of mapping) {
+    const entry = (item ?? {}) as Payload;
+    const position = typeof entry.requirement === "number" ? entry.requirement : 0;
+    if (position <= 0) {
+      continue;
+    }
+    const refs = Array.isArray(entry.criteria) ? entry.criteria.map((ref) => String(ref)) : [];
+    const gap = showText(entry.gap, "");
+    const value = refs.length > 0 ? refs.join("、") : gap !== "" ? `未写验收标准：${gap}` : "没有对应声明";
+    const requirement = showText(requirements[position - 1], "");
+    rows.push({ term: `要求 ${position}`, value: requirement === "" ? value : `${value}（${requirement}）` });
+  }
+  return rows;
+}
+
+// 工件引用给出的路径：引用的 path 就是工件的相对路径（PRD.md 与 STRUCTURE.md 按它显示）
+function refPath(value: unknown): string {
+  const ref = (value ?? {}) as Payload;
+  return showText(ref.path, "未上报");
+}
+
+// 指纹只显示前 12 位：完整值由资料页按轮的原始材料给出
+function fingerprint(value: unknown): string {
+  const shown = showText(value, "");
+  return shown === "" ? "未上报" : shown.slice(0, 12);
+}
+
+// 空值与空串写成给定的占位文字：卡片不补造内容
+function showText(value: unknown, empty: string): string {
+  return typeof value === "string" && value.trim() !== "" ? value : empty;
+}
+
+// 快照的 git 来源（harness/projects.py 给项目上下文的同一份文案）：没有仓库时写明采集时的目录内容
+function provenanceText(value: unknown): string {
+  const provenance = (value ?? {}) as Payload;
+  const commit = showText(provenance.commit, "");
+  if (commit === "") {
+    return "没有 git 仓库，快照采集时的目录内容";
+  }
+  const branch = showText(provenance.branch, "未知");
+  return `git 提交 ${commit}（分支 ${branch}，${provenance.dirty ? "有未提交的修改" : "没有未提交的修改"}）`;
+}
+
+// 基线核验汇总（设计第 3.2 节）：按核实结果分组的条数、现有缺陷、遗漏的能力与其他失败
+function baselineSummary(review: Payload): string {
+  const conclusions = listOf(review.conclusions);
+  const counts: Record<string, number> = {};
+  for (const item of conclusions) {
+    const status = text(item.status);
+    if (status !== "") {
+      counts[status] = (counts[status] ?? 0) + 1;
+    }
+  }
+  const names: Record<string, string> = {
+    verified: "已核实", read_only: "只读", existing_defect: "现有缺陷", unsupported: "不支持",
+  };
+  const parts = [`核验 ${conclusions.length} 条要求`];
+  for (const status of Object.keys(names)) {
+    const count = counts[status];
+    if (count !== undefined) {
+      parts.push(`${names[status]} ${count} 条`);
+    }
+  }
+  parts.push(`遗漏的能力 ${listOf(review.omissions).length} 条`);
+  parts.push(`其他失败 ${listOf(review.other_failures).length} 条`);
+  return parts.join("；");
+}
+
+function listOf(value: unknown): Payload[] {
+  return Array.isArray(value) ? value.filter((item): item is Payload => item !== null && typeof item === "object") : [];
+}
+
+function text(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function countText(value: unknown): string {
+  return Array.isArray(value) ? String(value.length) : "未上报";
+}
+
+function bytesText(value: unknown): string {
+  return typeof value === "number" && Number.isFinite(value) ? value.toLocaleString("zh-CN") : "未上报";
+}
+
+// 每种决定请求需要的材料：来源是决定请求的载荷（原型 v8 设计说明第 6 节的表）。
+// 种类在合同里以后增加时，把它的材料写在这里；未知种类返回空表，不伪造内容。
+export function materialRows(decision: DecisionView): MaterialRow[] {
+  const request = (decision.request ?? {}) as Payload;
+  const rows: MaterialRow[] = [];
+  const push = (term: string, value: unknown) => {
+    const shown = typeof value === "number" ? String(value) : typeof value === "string" ? value : "";
+    if (shown !== "") {
+      rows.push({ term, value: shown });
+    }
+  };
+  const dept = (value: unknown) => {
+    const key = typeof value === "string" ? value : "";
+    return key === "" ? "" : DEPARTMENT_NAMES[key] ?? key;
+  };
+  switch (decision.kind) {
+    case "model_unavailable":
+      push("部门", dept(request.department));
+      push("模型", (request.target as Payload | null | undefined)?.model_id);
+      push("具体问题", request.message);
+      // 原因按中文写（工单 #181）：provider_unavailable 这样的机器标识不写进画面
+      push("原因", typeof request.reason === "string" && request.reason !== ""
+        ? label(DECISION_REASON, request.reason) : "");
+      break;
+    case "no_tool_call":
+    case "workspace_unrepresentable":
+      push("部门", dept(request.department));
+      push("停止原因", typeof request.stop_reason === "string" && request.stop_reason !== ""
+        ? label(STOP_REASON, request.stop_reason) : "");
+      break;
+    case "kernel_modification":
+      push("改动的内核路径", Array.isArray(request.kernel_paths) ? request.kernel_paths.join("\n") : "");
+      push("差异", request.diff);
+      break;
+    case "qa_cannot_verify":
+      // 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：逐条列出无法核验的
+      // 验收条件与原因，再列出「重新核验」「停止事项」两个选项的说明
+      push("部门", dept(request.department));
+      for (const row of Array.isArray(request.criteria) ? request.criteria : []) {
+        const entry = row as Payload;
+        push(String(entry.criterion ?? ""), String(entry.note ?? "没有写原因"));
+      }
+      break;
+    case "initial_prd":
+      initialPrdRows(request, push);
+      break;
+    default:
+      break;
+  }
+  // 决定请求自带的说明按行列出，保证任何种类都能看到请求给出的说明
+  push("说明", request.description);
+  return rows;
+}
+
+// 材料里的跳转：决定请求给出目标页面，没有时按种类落到对应页面
+export function decisionLinks(decision: DecisionView): MaterialLink[] {
+  const request = (decision.request ?? {}) as Payload;
+  const links: MaterialLink[] = [];
+  // 待恢复的决定：前往模型管理与本项目的部门设置（原型 v8 第 6 节的材料表）。
+  // 部门设置落在设置页的那一节上（工单 #1161）：路径带上节名，设置页据此滚到部门设置
+  if (decision.kind === "model_unavailable") {
+    links.push({ label: "前往模型管理", href: "#/sys/models" });
+    if (decision.project_id) {
+      links.push({ label: "前往本项目的部门设置", href: `#/p/${decision.project_id}/settings?section=departments` });
+    }
+  }
+  // 初始 PRD 的两个工件：PRD.md 与 STRUCTURE.md 指向资料页，资料页按轮展示的正是这两个工件的内容
+  const materials = decision.kind === "initial_prd" ? materialsHref(decision) : null;
+  if (materials !== null) {
+    for (const fileName of ["PRD.md", "STRUCTURE.md"]) {
+      links.push({ label: fileName, href: materials });
+    }
+  }
+  // 请求显式给出的页面（合同以后增加时也生效）
+  const target = typeof request.view === "string" ? request.view : "";
+  if (target !== "") {
+    links.push({ label: "在项目中查看", href: target });
+  }
+  return links;
+}
+
+// 初始 PRD 决定所属项目的资料页：资料页按轮列出初始 PRD 与结构说明的原文，
+// 带上卡片的轮次供资料页定位（工单 #573）
+function materialsHref(decision: DecisionView): string | null {
+  const request = (decision.request ?? {}) as Payload;
+  if (decision.project_id === null) {
+    return null;
+  }
+  const workItem = typeof request.work_item_id === "string" ? request.work_item_id : decision.work_item_id;
+  const round = typeof request.round === "number" ? request.round : null;
+  const query = new URLSearchParams();
+  if (workItem !== null && workItem !== "") {
+    query.set("w", workItem);
+  }
+  if (round !== null) {
+    query.set("round", String(round));
+  }
+  const suffix = query.toString();
+  return `#/p/${decision.project_id}/materials${suffix ? `?${suffix}` : ""}`;
+}
+
+// 挡住了什么：被阻塞的事项，以及同一项目中排在它后面的事项数量（v8 第 6 节）。
+// 不挡住任何事项的请求按 muted 显示（例如不阻塞的已阅通知）。
+// 被挡住的事项写标题，不写事项标识（工单 #802，原型 v11 的 Y11.ui.cards.blocksText 同一写法）：
+// 标题由调用处按项目的事项列表解析；挡住的事项就是决定请求所属的事项
+// （服务端按这个事项给出挡住的对象，harness/app/decision_queries.py 的 _blocked），
+// 取不到标题时写「挡住本事项」，不拿标识凑数。
+export function blockedText(decision: DecisionView, workItemTitle = ""): { text: string; muted: boolean } {
+  if (decision.blocks === "" || decision.blocked === null) {
+    return { text: "不挡住事项", muted: true };
+  }
+  const parts: string[] = [];
+  const title = workItemTitle.trim();
+  if (title !== "") {
+    parts.push(`挡住「${title}」`);
+  }
+  if (decision.blocked.queued_after > 0) {
+    parts.push(`同一项目中排在它后面的事项 ${decision.blocked.queued_after} 个`);
+  }
+  return { text: parts.length === 0 ? "挡住本事项" : parts.join("，"), muted: false };
+}
+
+// 决定卡片头的一行：项目名与事项标题（工单 #802，原型 v11 的 Y11.ui.cards.render 同一写法）。
+// 事项标题由调用处按项目的事项列表解析；取不到时只写项目名，不写事项标识——
+// 画面上不出现内部标识（页面那一处的做法一样，views/project/scope-name.ts）。
+export function metaLine(
+  decision: DecisionView,
+  names: { projectName: string; workItemTitle: string },
+): string {
+  const project = names.projectName || decision.project_id || "项目流";
+  const item = names.workItemTitle.trim();
+  return item === "" ? project : `${project} · ${item}`;
+}
+
+// 大厅板上那张卡片（原型 v10 的 Y10.cards.face）：与页面卡片同一份材料，不含界面元素。
+// where 是「项目 · 事项」，由调用处按快照把标识解析成名称；解析不到时不写标识（工单 #802）。
+// options 保留 note_required（原型选项的标记）：为真时，没有写说明就不提交。
+export function face(
+  decision: DecisionView,
+  now: number,
+  names?: { projectName: string; workItemTitle: string },
+): DecisionFace {
+  const request = (decision.request ?? {}) as Record<string, unknown>;
+  const options = (request.options ?? []) as { id: string; label: string; note_required?: boolean }[];
+  return {
+    id: decision.decision_id,
+    kind: decision.kind,
+    version: decision.version,
+    title: label(DECISION_KIND, decision.kind),
+    work_item_id: decision.work_item_id,
+    where: metaLine(decision, { projectName: names?.projectName ?? "", workItemTitle: names?.workItemTitle ?? "" }),
+    waited: `已等待 ${waitedSeconds(decision.requested_at, now)} 秒`,
+    blocks: blockedText(decision, names?.workItemTitle ?? "").text,
+    rows: materialRows(decision),
+    links: decisionLinks(decision),
+    options: options.map((option) => ({ id: option.id, label: option.label, note_required: Boolean(option.note_required) })),
+  };
+}
