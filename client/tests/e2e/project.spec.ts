@@ -255,7 +255,9 @@ test.describe("项目页面（1440×900）", () => {
       const floor = await section(page, "循环画面");
       await expect(floor.locator(".floor-screen canvas")).toHaveCount(1);
       const board = await section(page, "事项看板");
-      await expect(board.locator(".board-col")).toHaveCount(7);
+      // 部门列取自事项的部门（工单 #1372）：这个项目只有一个已采纳的事项，没有进行中的事项，
+      // 因此只有按状态分的四组，没有部门列
+      await expect(board.locator(".board-col")).toHaveCount(4);
       await expect(board.locator("h3").filter({ hasText: "已采纳" })).toContainText("（1）");
       await expect(board.locator(".board-card strong")).toHaveText(SAMPLE_ITEM);
       const flow = await section(page, "流转记录");
@@ -429,6 +431,18 @@ test.describe("项目页面（1440×900）", () => {
         const states = current.locator(".department-line");
         await expect(states).toContainText("工程 询问中（在等待产品的回答）");
         await expect(states).toContainText("产品 一轮工作中（回答工程的询问）");
+        // 看板与部门状态行说的是同一件事（工单 #1372）：产品在一轮工作中、工程在询问中，
+        // 这个事项就在产品与工程两列里；等待工作的质检列里没有它
+        const board = await section(page, "事项看板");
+        const columns = board.locator(".board-col");
+        await expect(columns).toHaveCount(7);
+        await expect(columns.nth(1).locator("h3")).toHaveText("产品（1）");
+        await expect(columns.nth(1).locator(".board-card strong")).toHaveText(PENDING_ITEM);
+        await expect(columns.nth(2).locator("h3")).toHaveText("工程（1）");
+        await expect(columns.nth(2).locator(".board-card strong")).toHaveText(PENDING_ITEM);
+        await expect(columns.nth(3).locator("h3")).toHaveText("质检（0）");
+        await expect(columns.nth(3).locator(".board-card")).toHaveCount(0);
+        await shot(page, "overview-board-two-departments.png");
         const asks = await section(page, "询问");
         const rows = asks.locator("li");
         await expect(rows).toHaveCount(1);
