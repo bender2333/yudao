@@ -14,6 +14,14 @@ from .event_log import (
     load_decisions, project_stream, run_stream,
 )
 
+# 这些名字从内核的 event_log 转出：应用与测试一直从 harness.event_store 导入它们，导入处不改（工单 #1452）
+__all__ = [
+    "CatalogEvent", "Command", "CommandIdReused", "CommandRecord", "DuplicateCommand", "Event", "EventLog",
+    "EventStore", "ProjectEvent", "SavedDecision", "SavedProjection", "StaleExecutionRight",
+    "StreamVersionConflict", "catalog_stream", "dump_decision", "is_catalog_stream", "is_run_stream",
+    "load_decision", "load_decisions", "project_stream", "run_stream",
+]
+
 
 class EventStore(EventLog):
     def subscribe(self, listener: Callable[[list[Event | ProjectEvent]], None]) -> Callable[[], None]:
