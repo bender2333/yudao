@@ -14,6 +14,6 @@
 | [文档一致性核对：概念模型与符号推理方案](doc-consistency-concept-model.md) | [决策记录](../decision.md)「文档一致性」四条 | 方向已定，索引与确定性规则已建在 `tools/doc-consistency/`，不开工单；只服务 Yudao 开发，分设计与脚手架两条线；文件图谱、关系与 hash 放在 `.doc-index/`，判断走样靠 clingo 规则；LLM 开放提取的试验没有通过（第 13 节），定向提取待验证 |
 | [文档一致性：规则事实线方案](doc-consistency-rule-facts.md) | [决策记录](../decision.md)「文档一致性：规则事实单独成线」 | 给 LLM 读的规则文件单独成线，先做：规则类事实只在正本表格写一行，别处引用或用固定句式复述，clingo 比对，写文件时钩子提醒；工具没有改，第 1 至 4 步不改文档，用植入的矛盾验收 |
 | [Uncle Bob 的 ub-mode 调研](uncle-bob-ub-mode.md) | [总体路线图](../program-roadmap.md)第 3 节「内核的代码质量门槛」、[可信内核设计说明](../design/trusted-kernel.md) | ub-mode 的做法与参数速查、它调用的 crapper、dryer、mutator 三个工具的阈值与用法、他本人关于不读代码的公开说法，以及与内核质量门槛的逐项对照（只写事实） |
-| [Yudao 自身的本体建模：调研与方案](yudao-ontology.md) | [概念模型方案](doc-consistency-concept-model.md)、[规则事实线方案](doc-consistency-rule-facts.md)、[语义系统设计说明](../design/semantic-system.md)第 5 节 | 只在分支 `research/yudao-ontology` 上，不合进 main；第 9 节的选择用户还没定。MOF 式分层（写法、Yudao 本体、产品领域模型、事实），clingo 闭世界检查本体自检、实例符合、分层、演化只增；与规则事实线的三种共用做法；分层规则的原型结果 |
+| [Yudao 自身的本体建模：调研与方案](yudao-ontology.md) | [概念模型方案](doc-consistency-concept-model.md)、[规则事实线方案](doc-consistency-rule-facts.md)、[语义系统设计说明](../design/semantic-system.md)第 5 节 | 只在分支 `research/yudao-ontology` 上，不合进 main；第 9 节的选择用户还没定。MOF 式分层（写法、Yudao 本体、产品领域模型、事实），从意图、需求、总图到代码、测试、守卫的整条链放进同一份模型；clingo 闭世界检查本体自检、实例符合、分层、演化只增与链上的断点；和反射模型、代码事实库、可追踪模型等业界做法的对照；与规则事实线的三种共用做法；分层规则的原型结果 |
 
 已归档的调研见 `docs/archive/research/`，索引是 [README-2026-09-06.md](../archive/research/README-2026-09-06.md)。
