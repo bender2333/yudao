@@ -77,10 +77,10 @@
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 00:01 设计说明去掉指向归档的链接"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 00:11 去掉没有链接的旧原型引用，补可观测性的两条"},
 {"dst":"docs/design/visualization.md","kind":"code-path","raws":["docs/design/visualization.md"],"seen":"f32e507ada24faef","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 00:55 画面那条线不在这里派"},
-{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"d54de39b4c1ac1da","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"c4ce281d9a5ca1a9","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
 {"dst":"CLAUDE.md","kind":"section-ref","raws":["CLAUDE.md"],"seen":"595a55b228fea4f6","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
-{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"02a53afaca452a9a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
-{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"bd0f826e14480197","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
+{"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"f4bc9b4af9f6fddc","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
+{"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"9bdcbc74f028c915","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
 {"dst":"docs/consistency-scan-2026-11-03.md","kind":"code-path","raws":["docs/consistency-scan-2026-11-03.md"],"seen":"33cc4b05e042e29d","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
 {"dst":"docs/design/kernel-quality-gate.md","kind":"code-path","raws":["docs/design/kernel-quality-gate.md"],"seen":"7c04be1a568d7c96","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
 {"dst":"docs/design/network-and-mcp.md","kind":"code-path","raws":["docs/design/network-and-mcp.md"],"seen":"9e6977a76f2a0c55","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-01 02:02 D18、D24 去掉「判定点的升级」"},
@@ -98,9 +98,9 @@
 {"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"5dc994ffdb573bcc","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
 {"dst":"docs/prototypes/v16/walkthrough.md","kind":"code-path","raws":["docs/prototypes/v16/walkthrough.md"],"seen":"e90f4883c67ec082","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
 {"dst":"docs/research/doc-consistency-concept-model.md","kind":"code-path","raws":["docs/research/doc-consistency-concept-model.md"],"seen":"8a6d8b37ae99405b","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-02 13:58 文档一致性方案入库"},
-{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"595a55b228fea4f6","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 10:28 规则事实线定稿、用户权限入核对、第 1 步交付"},
-{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"d54de39b4c1ac1da","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
-{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"595a55b228fea4f6","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
-{"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md:16"],"seen":"d54de39b4c1ac1da","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表"}
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"eb28b96ab4232c74","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 10:28 规则事实线定稿、用户权限入核对、第 1 步交付"},
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
+{"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"eb28b96ab4232c74","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 11:27 第 2 步盘点：噪音 42.5%，句式缺三种"},
+{"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md:16"],"seen":"ac9a7c63cead768a","src":"claude_jour.md#Claude 执行日记 (Claude Journal) > 2026-11-03 12:15 第 3 步：文法立住，4 句解析，瓶颈在词表"}
 ]
 }
