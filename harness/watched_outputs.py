@@ -238,6 +238,12 @@ _WATCHED_CHECKS = {
 }
 
 
+# 这份路由认得的关注项（工单 #1456：名称写错要在加载时拒绝）：触发一轮工作的那些，加上不再触发
+# 一轮工作、但旧定义里还写着的那一个。工单 #1455 起 user_input 由接来源的部门开始一轮，不由关注它的
+# 部门开始；旧定义没有写 sources 时仍靠这个名称解释两种来源，写进定义的文件要照旧加载
+_RECOGNIZED_WATCHED = ("user_input", *_WATCHED_CHECKS)
+
+
 def watched_new_work(projection: RunProjection, department: str,
                       definitions: Any | None = None) -> list[str]:
     """部门现在的新工作（按定义的顺序）：接来源的部门收到输入，或者关注的成果有了新东西。
@@ -526,9 +532,10 @@ def check_definition(definitions: Any) -> None:
         if department not in declared.departments:
             issues.append(f"departments：组织定义里的部门 {department} 没有列进路由的部门清单")
         # 关注的成果（工单 #1456）：组织定义里的名称由这一份路由实现认。内核只认字符串，
-        # 名称的含义归路由——写错的名称要在这里拒绝，不能等到运行到 has_new_work 才抛 KeyError
+        # 名称的含义归路由——写错的名称要在这里拒绝，不能等到运行到 has_new_work 才抛 KeyError。
+        # user_input 认得但不再触发一轮工作（工单 #1455），旧定义里写着它，不能因此拒绝整份定义
         for index, name in enumerate(definitions.watched_outputs(department)):
-            if name not in _WATCHED_CHECKS:
+            if name not in _RECOGNIZED_WATCHED:
                 issues.append(f"departments[{department}].watched[{index}]：关注的成果 {name} 没有这一种")
     submitted = [definitions.tools[method].proposal for index, method in enumerate(declared.proposal_methods)
                  if method in definitions.tools and definitions.tools[method].proposal is not None]
