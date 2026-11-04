@@ -19,8 +19,7 @@ from typing import Any
 from . import routing_contract
 from .contracts import artifact_hash
 from .definitions import DEFINITIONS
-from .models import Event, EventType, RunProjection, new_id
-from .validation import PRD_REVISION_FIELDS
+from .models import PRD_REVISION_FIELDS, Event, EventType, RunProjection, new_id
 
 # 组织定义 organization.json 的 routing 里写这个名称
 ROUTING_NAME = "watched_outputs"
@@ -504,17 +503,24 @@ def check_definition(definitions: Any) -> None:
     for department in departments:
         if department not in declared.departments:
             issues.append(f"departments：组织定义里的部门 {department} 没有列进路由的部门清单")
+        # 关注的成果（工单 #1456）：组织定义里的名称由这一份路由实现认。内核只认字符串，
+        # 名称的含义归路由——写错的名称要在这里拒绝，不能等到运行到 has_new_work 才抛 KeyError
+        for index, name in enumerate(definitions.watched_outputs(department)):
+            if name not in _WATCHED_CHECKS:
+                issues.append(f"departments[{department}].watched[{index}]：关注的成果 {name} 没有这一种")
     submitted = [definitions.tools[method].proposal for index, method in enumerate(declared.proposal_methods)
                  if method in definitions.tools and definitions.tools[method].proposal is not None]
     for index, method in enumerate(declared.proposal_methods):
         if method not in definitions.tools or definitions.tools[method].proposal is None:
             issues.append(f"proposal_methods[{index}]：工具 {method} 不是定义里的提交类工具")
-    for index, kind in enumerate(declared.outcome_kinds):
+    # 这份路由认得的成果种类：它的定义按名称引用 outcome_kinds.json 里的一组（工单 #1456）
+    outcomes = definitions.outcomes_of(ROUTING_NAME)
+    for index, kind in enumerate(outcomes):
         if kind not in submitted:
-            issues.append(f"outcome_kinds[{index}]：成果种类 {kind} 没有由这里列出的提议方式提交")
+            issues.append(f"outcomes[{index}]：成果种类 {kind} 没有由这里列出的提议方式提交")
     for kind in [tool.proposal for tool in definitions.tools.values() if tool.proposal is not None]:
-        if kind not in declared.outcome_kinds:
-            issues.append(f"outcome_kinds：提交类工具提交的成果种类 {kind} 没有列进成果种类")
+        if kind not in outcomes:
+            issues.append(f"outcomes：提交类工具提交的成果种类 {kind} 没有列进成果种类")
     for reason in declared.end_reasons:
         if reason in definitions.stop_reasons:
             issues.append(f"end_reasons.{reason}：与内核的停止原因同名")

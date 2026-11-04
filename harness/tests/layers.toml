@@ -17,6 +17,7 @@
 "kernel/test_minimal_projection.py" = "module"
 "kernel/test_minimal_projection_baselines.py" = "integration"
 "kernel/test_only_grows.py" = "unit"
+"kernel/test_outcome_kinds_from_the_definition.py" = "unit"
 "kernel/test_single_write_path.py" = "unit"
 "kernel/test_skeleton_events.py" = "unit"
 "kernel/test_tightening_only_rejects_or_waits.py" = "module"

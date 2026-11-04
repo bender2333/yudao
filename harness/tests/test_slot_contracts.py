@@ -34,7 +34,7 @@ from harness.tightening import WATCHED_OUTPUTS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STOP_REASONS = REPO_ROOT / "harness" / "definitions" / "stop_reasons.json"
-ROUTINGS = REPO_ROOT / "harness" / "definitions" / "routings.json"
+OUTCOME_KINDS = REPO_ROOT / "harness" / "definitions" / "outcome_kinds.json"
 
 # 两种实现的名称：参数化的检查对它们各跑一遍
 ASSEMBLIES = ["the real assembly", "the second assembly"]
@@ -331,12 +331,8 @@ def test_each_execution_implementations_result_carries_no_outcome_kind(name, rou
     # 结果是一轮工作写下的事件范围与停止原因（第 5.3 节输出）；这一轮算不算结束、结束成什么由路由按事件判断
     assert isinstance(result, execution_contract.RoundResult)
     assert isinstance(result.events, tuple)
-    kinds = []
-    for routing in json.loads(ROUTINGS.read_text(encoding="utf-8"))["routings"]:
-        for kind in routing["outcome_kinds"]:
-            if kind not in kinds:
-                kinds.append(kind)
-    assert kinds, "路由自己的定义里没有成果种类，这条检查无从判断"
+    kinds = [item["id"] for item in json.loads(OUTCOME_KINDS.read_text(encoding="utf-8"))["kinds"]]
+    assert kinds, "定义里没有成果种类，这条检查无从判断"
     # 结果的种类里没有成果驱动的种类：字段名与契约源码里都不出现路由定义的成果种类
     fields = set(execution_contract.RoundResult.__dataclass_fields__)
     assert not (fields & set(kinds)), f"结果的种类里出现了成果种类：{sorted(fields & set(kinds))}"
