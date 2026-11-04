@@ -310,5 +310,18 @@
   },
   "trial_session_ended": {
     "source": "host_measurement"
+  },
+  "trial_case_opened": {
+    "source": "role_statement",
+    "fields": {
+      "session_id": "host_measurement",
+      "tree_digest": "host_measurement"
+    }
+  },
+  "trial_case_concluded": {
+    "source": "role_statement",
+    "fields": {
+      "evidence_steps": "host_measurement"
+    }
   }
 }
