@@ -15,11 +15,12 @@ import {
   Empty, Section, SubmitButton, Table, TextArea, TextInput, pageKey,
 } from "./common";
 import {
-  MCP_DEFAULT_DEPARTMENTS, MCP_TRANSPORTS, type McpServerDraft, type McpToolRow, type McpVariableDraft,
+  MCP_TRANSPORTS, type McpServerDraft, type McpToolRow, type McpVariableDraft,
   credentialNamesOfSettings, credentialState, credentialVersion, departmentsText, draftIssue, draftOfServer,
   emptyDraft, mcpDocumentPayload, mcpServerPayload, probeFailureText, probeOf, probeStateLabel, probeTools,
   saveNotice, sectionNote, serverInfoText, snapshotTools, toolCountText, transportLabel,
 } from "./mcp-servers-logic";
+import { departmentLabel, departmentLabels, type DepartmentView } from "./organization";
 import { useCommand } from "./use-snapshot";
 import { commandProblemText } from "../../contract/command-problem.ts";
 
@@ -48,16 +49,19 @@ export function probeViewOf(event: EventObject): McpProbeResultView | null {
   };
 }
 
-export function McpServersSection(props: { app: ClientApp; data: ProjectSettingsResult }) {
+export function McpServersSection(props: { app: ClientApp; data: ProjectSettingsResult;
+  departments: DepartmentView[] }) {
   const servers = props.data.mcp_servers.servers ?? {};
   const statuses = props.data.mcp_servers.credentials ?? {};
   const lastProbe = props.data.last_probe ?? null;
-  // 部门选项取自项目的组织（没有给出部门时用默认三个部门）
-  const departmentOptions = Object.keys(props.data.departments ?? {});
+  // 可以使用的部门取自项目现在的组织（工单 #1457）；组织还没有数据时用设置里已有的部门兜底
+  const labels = departmentLabels(props.departments);
+  const departmentOptions = props.departments.length > 0
+    ? props.departments.map((department) => department.id)
+    : Object.keys(props.data.departments ?? {});
 
   const [editing, setEditing] = useState<Editing | null>(null);
-  const [draft, setDraft] = useState<McpServerDraft>(() => emptyDraft(departmentOptions.length ? departmentOptions
-    : [...MCP_DEFAULT_DEPARTMENTS]));
+  const [draft, setDraft] = useState<McpServerDraft>(() => emptyDraft(departmentOptions));
   // 表单的基准版本：打开表单那一刻读到的版本。期间别人改过设置时保存会被拒绝，页面提示重新读取
   // （设计说明第 4.3 节：命令带基准版本，版本过期时拒绝）
   const [baseVersion, setBaseVersion] = useState(0);
@@ -136,7 +140,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
     setBaseVersion(currentVersion());
     setDraft(next.mode === "edit" && servers[next.name] !== undefined
       ? draftOfServer(servers[next.name])
-      : emptyDraft(departmentOptions.length ? departmentOptions : [...MCP_DEFAULT_DEPARTMENTS]));
+      : emptyDraft(departmentOptions));
   };
 
   const submitSave = async () => {
@@ -223,7 +227,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
           rows={Object.entries(servers).map(([name, server]) => [
             name,
             transportLabel(server.transport),
-            departmentsText(server.departments),
+            departmentsText(server.departments, labels),
             toolCountText(server),
             probeStateLabel(probeOf(name, lastProbe, localProbes)),
             <span className="y10-row" key={`${name}-actions`}>
@@ -284,7 +288,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
           )}
           <fieldset className="y10-field field mcp-departments">
             <legend>可以使用的部门</legend>
-            {(departmentOptions.length ? departmentOptions : [...MCP_DEFAULT_DEPARTMENTS]).map((department) => (
+            {departmentOptions.map((department) => (
               <label className="y10-check checkbox" key={department}>
                 <input type="checkbox" checked={draft.departments.includes(department)}
                        data-testid={`mcp-department-${department}`}
@@ -294,7 +298,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
                            ? [...draft.departments, department]
                            : draft.departments.filter((item) => item !== department),
                        })} />
-                <span>{departmentLabel(department)}</span>
+                <span>{departmentLabel(department, labels)}</span>
               </label>
             ))}
           </fieldset>
@@ -381,10 +385,6 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
   );
 }
 
-function departmentLabel(department: string): string {
-  return department === "product" ? "产品" : department === "engineering" ? "工程" : department === "quality" ? "质检"
-    : department;
-}
 
 // 变量与请求头的几行：名字、取值方式与值（凭据只写名称，值在下面的「凭据值」里写）
 function VariablesEditor(props: {

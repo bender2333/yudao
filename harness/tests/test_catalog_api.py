@@ -138,6 +138,16 @@ def test_startup_backfills_catalog_revised_and_stale_base_is_rejected(tmp_path):
         assert _catalog(client)["revision"] == after["revision"]
 
 
+def test_catalog_lists_the_definition_departments_with_their_labels(tmp_path):
+    # 工单 #1457：部门使用一栏的部门清单与显示名从定义来（这一版加载的定义里的部门），
+    # 客户端不再写死三个部门
+    opened = _Opened(tmp_path)
+    with running_api(opened) as client:
+        catalog = _catalog(client)
+        assert [(department["id"], department["label"]) for department in catalog["departments"]] == [
+            ("product", "产品"), ("engineering", "工程"), ("quality", "质检")]
+
+
 def test_connection_delete_lists_referrers_and_removes_the_definitions(tmp_path):
     bindings = {department: {"provider_id": "p1", "model_id": "m1"} for department in DEPARTMENTS}
     opened = _Opened(tmp_path, _document(bindings=bindings))

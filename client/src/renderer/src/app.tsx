@@ -3,7 +3,7 @@
 // （网页界面的提供与发布设计说明第 5.1 节）。
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
+import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOrganizationResult, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
 import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
 import { callQuery } from "./contract/invoke";
@@ -27,6 +27,8 @@ import { ObserveDetailPage, ObservePage } from "./views/project/observe";
 import { OverviewPage } from "./views/project/overview";
 import { RecoveryPage } from "./views/project/recovery";
 import { SettingsPage } from "./views/project/settings";
+import { departmentTabs, projectDepartments, type DepartmentView } from "./views/project/organization";
+import { useSnapshot } from "./views/project/use-snapshot";
 import { projectsListParams } from "./views/project/project-list";
 
 // 图鉴页只在开发时用到；用动态导入把它挡在正式包之外
@@ -109,6 +111,13 @@ export function App() {
   }, [disconnected]);
   // 已连接以后读取项目列表与系统状态；这些视图按事件种类重新查询
   const connected = state.kind === "connected" ? state : null;
+  // 项目现在的组织（工单 #1457）：部门页签、部门页的默认部门与部门显示名都从这里取。
+  // 没有项目、还没有连上或者服务没有登记这条查询时不打开，部门页签因此不出现——不拿写死的三个顶替
+  const organization = useSnapshot<ProjectOrganizationResult>(
+    state.kind === "connected" ? app : null, "shell.organization", "project.organization",
+    { project_id: route.projectId ?? "" },
+    route.projectId === null || state.kind !== "connected");
+  const departments: DepartmentView[] = projectDepartments(organization.data);
   // 侧栏「显示归档的项目」开关：项目列表按它取数，勾上时已归档的项目也在列表里（工单 #672）
   const [includeArchived, setIncludeArchived] = useState(false);
   useEffect(() => {
@@ -306,7 +315,7 @@ export function App() {
   }
 
   const capabilities = state.capabilities;
-  const tabs = buildTabs(route, capabilities);
+  const tabs = buildTabs(route, capabilities, departments);
   const project = projects.find((item) => item.project_id === route.projectId) ?? null;
 
   return (
@@ -338,6 +347,7 @@ export function App() {
           pending={pending}
           projectDecisions={projectDecisions}
           stream={state.stream}
+          departments={departments}
           provider={systemStatus === null ? null : systemStatus.provider}
           onPendingClick={() => navigate(paths.home())}
           onToggleDrawer={() => setDrawerOpen((open) => !open)}
@@ -369,7 +379,8 @@ export function App() {
           ) : route.name === "sys-reserved" ? (
             <ReservedPage which={route.systemPage} />
           ) : (
-            <ProjectRouter app={app} route={route} systemStatus={systemStatus} onNavigate={navigate} />
+            <ProjectRouter app={app} route={route} systemStatus={systemStatus} departments={departments}
+              onNavigate={navigate} />
           )}
         </main>
       </div>
@@ -419,16 +430,17 @@ function TokenGate(props: { onSubmit: (token: string) => void }) {
 
 // 项目页面（原型 v8 设计说明第 3.3 节的路径，工单 #80）：按路径分派到具体页面。
 // 概览、部门工作间、资料、观测、设置与恢复由本工单实现；未实现的系统页显示占位，写明由哪个工单填入。
-function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null; onNavigate: (hash: string) => void }) {
+function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: SystemStatus | null;
+  departments: DepartmentView[]; onNavigate: (hash: string) => void }) {
   const { route } = props;
   if (route.projectId === null) {
     return <PlaceholderPage route={route} systemStatus={props.systemStatus} />;
   }
   switch (route.name) {
     case "overview":
-      return <OverviewPage app={props.app} route={route} onNavigate={props.onNavigate} />;
+      return <OverviewPage app={props.app} route={route} departments={props.departments} onNavigate={props.onNavigate} />;
     case "dept":
-      return <DepartmentPage app={props.app} route={route} />;
+      return <DepartmentPage app={props.app} route={route} departments={props.departments} />;
     case "materials":
       return <MaterialsPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     case "observe":
@@ -436,7 +448,7 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
     case "observe-detail":
       return <ObserveDetailPage app={props.app} route={route} />;
     case "settings":
-      return <SettingsPage app={props.app} route={route} />;
+      return <SettingsPage app={props.app} route={route} departments={props.departments} />;
     case "recovery":
       return <RecoveryPage app={props.app} route={route} onNavigate={props.onNavigate} />;
     default:
@@ -447,7 +459,8 @@ function ProjectRouter(props: { app: ClientApp; route: Route; systemStatus: Syst
 // 项目标签（原型 v8 设计说明第 3.2 节）：按能力清单显示，缺少查询的标签不出现
 // 页签的地址带着当前的事项范围（工单 #746）：切页签不丢范围，
 // 范围是项目级的一份（写在 ?w= 中），设置页不按范围筛选内容，但范围同样带着
-function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
+// 部门页签取自项目现在的组织（工单 #1457）：一个角色直做的项目只有一个部门页签，不写死三个
+function buildTabs(route: Route, capabilities: Capabilities, departments: DepartmentView[] = []): Tab[] {
   if (!route.projectId) {
     return [];
   }
@@ -456,9 +469,7 @@ function buildTabs(route: Route, capabilities: Capabilities): Tab[] {
   const scope = { workItem: route.workItemId };
   const candidates: { label: string; hash: string; query: string }[] = [
     { label: "概览", hash: paths.overview(projectId, scope), query: "project.overview" },
-    { label: "产品", hash: paths.dept(projectId, "product", scope), query: "department.workspace" },
-    { label: "工程", hash: paths.dept(projectId, "engineering", scope), query: "department.workspace" },
-    { label: "质检", hash: paths.dept(projectId, "quality", scope), query: "department.workspace" },
+    ...departmentTabs(projectId, departments, scope),
     { label: "资料", hash: paths.materials(projectId, scope), query: "work_item.materials" },
     // 观测页的部门筛选条件带着（工单 #801）：点当前的观测页签不会把这一格筛选丢掉
     { label: "观测", hash: paths.observe(projectId, { ...scope, department: route.departmentFilter }), query: "project.attempts" },

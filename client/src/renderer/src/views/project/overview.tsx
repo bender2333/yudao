@@ -10,6 +10,7 @@ import type {
   AwayReport,
   EventDetailResult,
   ProjectFlowResult,
+  ProjectLoopResult,
   ProjectOverviewResult,
   RunAsksResult,
   WorkItemCard,
@@ -31,6 +32,7 @@ import { askIndent, askLine } from "./asks-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
 import { boardGroups } from "./board";
+import { itemDepartments as itemDepartmentsOf, type DepartmentView } from "./organization";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
 
 // 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
@@ -50,7 +52,8 @@ function itemStatus(status: string): React.ReactNode {
   return kind === undefined ? text : <StatusMark kind={kind} text={text} />;
 }
 
-export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: (hash: string) => void }) {
+export function OverviewPage(props: { app: ClientApp; route: Route; departments: DepartmentView[];
+  onNavigate: (hash: string) => void }) {
   const projectId = props.route.projectId ?? "";
   const workItem = props.route.workItemId;
   // 回放位置（全局位置）写在路径的 ?at= 中（设计说明第 3.3 节）；为 null 时是实时画面
@@ -63,6 +66,11 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
     project_id: projectId,
     work_item: workItem,
   });
+  // 每个事项冻结的组织（工单 #1457）：看板的部门列按它取每个事项的部门，中途换了形态时老事项按旧组织
+  const loop = useSnapshot<ProjectLoopResult>(props.app, "page.overview.loop", "project.loop", {
+    project_id: projectId,
+  });
+  const itemDepartments = useMemo(() => itemDepartmentsOf(loop.data), [loop.data]);
 
   // 时间轴的刻度：本项目范围内的关键事实（home.away_report 按项目筛选）
   const report = useSnapshot<AwayReport>(props.app, "page.overview.timeline", "home.away_report", {
@@ -125,7 +133,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; onNavigate: 
           />
           <Asks app={props.app} item={current} />
           <RestartOnboarding app={props.app} projectId={projectId} />
-          <Board items={items} />
+          <Board items={items} departments={props.departments} itemDepartments={itemDepartments} />
           <FlowTable app={props.app} flow={flow} />
         </>
       ) : null}
@@ -499,10 +507,15 @@ function InputRecords(props: {
   );
 }
 
-export function Board(props: { items: WorkItemCard[] }) {
+export function Board(props: { items: WorkItemCard[]; departments?: DepartmentView[];
+  itemDepartments?: Record<string, DepartmentView[]> }) {
   // 分组的口径见 board.ts 与设计说明「事项看板在页面上的显示」（工单 #1372）：
-  // 部门列取自事项的部门，几个部门同时工作时同一事项出现在几列里
-  const groups = boardGroups(props.items);
+  // 部门列取自事实（项目现在组织里的部门与事项冻结的组织，工单 #1457），几个部门同时工作时
+  // 同一事项出现在几列里
+  const groups = boardGroups(props.items, {
+    departments: props.departments === undefined || props.departments.length === 0 ? undefined : props.departments,
+    itemDepartments: props.itemDepartments,
+  });
 
   return (
     <Section

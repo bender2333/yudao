@@ -38,6 +38,14 @@ class FormChoice(Contract):
     open_loop: bool
 
 
+class OrganizationDepartment(Contract):
+    # 项目现在用的形态里的一个部门（工单 #1457）：标识、显示名，以及它是不是核验角色。
+    # 页面的部门页签、看板列与默认部门按这一项排；显示名也取这里，不另写一份部门清单
+    id: str
+    label: str
+    verifier: bool = False
+
+
 class FormChange(Contract):
     # 一次形态改动（项目流上的一条 project_form_set）：原值、新值、理由（没写时为空）、时间与谁改的
     event_id: str
@@ -56,6 +64,9 @@ class ProjectOrganizationResult(Contract):
     form: str
     version: str | None
     form_in_release: bool
+    # 现在这一份形态里的部门（按定义里的顺序）：页面的部门页签、看板列、部门页的默认部门与
+    # 部门显示名都取这里（工单 #1457）。这一份不在发布里时为空，不拿别的形态顶替
+    departments: list[OrganizationDepartment]
     forms: list[FormChoice]
     history: list[FormChange]
 
@@ -99,14 +110,21 @@ def _project_organization(application: Application,
         raise NotFound(f"project not found: {request.project_id}") from None
     forms = _release_forms(application.system)
     current = state.form_name
+    current_definitions = forms.get(current)
     changes = [event for event in store.list_project_events(request.project_id)
                if event.type == ProjectEventType.PROJECT_FORM_SET]
     return Snapshot[ProjectOrganizationResult](
         position=store.end_position(),
         data=ProjectOrganizationResult(
             project_id=state.project_id, form=current,
-            version=None if current not in forms else forms[current].version,
-            form_in_release=current in forms,
+            version=None if current_definitions is None else current_definitions.version,
+            form_in_release=current_definitions is not None,
+            departments=[] if current_definitions is None else [
+                OrganizationDepartment(
+                    id=department,
+                    label=current_definitions.department_labels.get(department, department),
+                    verifier=current_definitions.is_verifier(department))
+                for department in current_definitions.departments],
             forms=[_choice(name, definitions) for name, definitions in forms.items()],
             history=[FormChange(
                 event_id=event.event_id, previous_form=event.payload["previous_form"],
