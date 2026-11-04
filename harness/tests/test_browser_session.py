@@ -1,14 +1,16 @@
 # 浏览器工具与会话：Playwright MCP + Chromium + 一个小网页（浏览器与 computer use 设计说明
 # 「浏览器工具（Playwright MCP）」「保存与绑定」与「恢复契约」，工单 #1184；总图第四节「动作」缝的 browser 类别）。
 #
-# 这个文件查六件事：
+# 这个文件查七件事：
 # 1. 对会话中启动的真实网页完成导航、输入、点击与 browser_verify_* 断言：每一步的结果带页面的可访问性结构，
 #    改变页面的步骤各带一张截图工件，回执里的摘要与保存下来的字节一致；
 # 2. 调用目标只有文本时：进入部门历史的工具结果只有可访问性结构（没有图像），截图仍然保存为工件；
 # 3. browser_file_upload 与 browser_drop 的路径在试用副本之外时被拒绝，副本之内的不被拒绝；
 # 4. 导航到 Yudao 服务自己的地址与端口（127.0.0.1、localhost、本机网卡地址、本机主机名）被拒绝，
 #    导航到会话中启动的软件自己的端口与一个真实外网地址可以访问；
-# 5. 结果未知：browser_click 没有结果时重新启动 Yudao（新的系统打开同一数据目录）以后会话记为中断、
+# 5. 来源限制不只看工具直接导航：页面上的链接点过去、页面脚本发出的请求都由浏览器按来源挡下，
+#    服务那一侧一次请求都收不到（启动参数 --blocked-origins，工单 #1184 的审查第 3 条）；
+# 6. 结果未知：browser_click 没有结果时重新启动 Yudao（新的系统打开同一数据目录）以后会话记为中断、
 #    没有决定请求；动作进行期间结束 Playwright MCP 进程时回执为失败、会话记为中断。
 #
 # 层：集成层（真实的 Playwright MCP、真实的 Chromium、真实的小网页服务与子进程）。
@@ -24,6 +26,7 @@ import json
 import socket
 import subprocess
 import sys
+import textwrap
 import threading
 import time
 import urllib.error
@@ -65,6 +68,80 @@ _SERVER = (
 )
 _EXTERNAL_URL = "https://example.com/"
 
+# Yudao 服务自己的地址与端口：一个真实的小服务，把收到的每一个请求写进日志，回报能认出来的内容。
+# 浏览器挡下来时这个日志一行都不会多，所以「内容没出现」之外还有一条不依赖页面文字的判据
+_SERVICE_PAGE_SERVER = textwrap.dedent("""
+    import http.server, socket, sys
+    from pathlib import Path
+    LOG = Path(sys.argv[1])
+    PAGE = (b"<html><head><title>Service page</title></head><body>"
+            b"<h1>Service page</h1><p>service data</p></body></html>")
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            with LOG.open("a", encoding="utf-8") as handle:
+                handle.write(self.path + "\\n")
+            data = self.path.startswith("/data")
+            body = b"service data" if data else PAGE
+            self.send_response(200)
+            self.send_header("Content-Type",
+                             "text/plain; charset=utf-8" if data else "text/html; charset=utf-8")
+            if data:
+                # 页面脚本的普通（非 no-cors）请求在没被挡下时应当成功：服务这边允许跨来源读
+                self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    probe = socket.socket(); probe.bind(("127.0.0.1", 0)); port = probe.getsockname()[1]; probe.close()
+    print(port, flush=True)
+    http.server.HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+""")
+
+# 试用会话启动的小网页：整站就是给定的那一页，端口由试用会话经 PORT 交来（与 fixture 的做法相同）
+_PAGE_SERVER = textwrap.dedent("""
+    import http.server, os, sys
+    from pathlib import Path
+    HTML = Path(sys.argv[1]).read_bytes()
+
+    class Handler(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(HTML)))
+            self.end_headers()
+            self.wfile.write(HTML)
+
+        def log_message(self, *args):
+            pass
+
+    http.server.HTTPServer(("127.0.0.1", int(os.environ["PORT"])), Handler).serve_forever()
+""")
+
+# 页面脚本发起的请求：服务那边允许跨来源读，所以请求发得出去时 Promise 成功（写下 got），
+# 只有被浏览器按来源挡下来才转入 catch（写下 blocked）。两个结论都是页面自己写下的，不靠时长去猜
+_SCRIPT_PAGE = """<!DOCTYPE html>
+<html><head><title>script page</title></head><body>
+<h1>app page</h1>
+<div id="fetch-result">script pending</div>
+<script>
+fetch("__SERVICE__data").then(r => r.text()).then(t => {
+  document.getElementById("fetch-result").textContent = "script got " + t;
+}).catch(() => {
+  document.getElementById("fetch-result").textContent = "script blocked";
+});
+</script>
+</body></html>"""
+
+_LINK_PAGE = """<!DOCTYPE html>
+<html><head><title>linked page</title></head><body>
+<h1>app page</h1>
+<a id="to-service" href="__SERVICE__service">open the service</a>
+</body></html>"""
+
 
 def _launch(*, ready_timeout_sec: int = 120) -> dict[str, Any]:
     return {"name": "web", "kind": "web",
@@ -103,8 +180,8 @@ class _BrowserCase:
     def perform(self, tool: str, args: dict[str, Any], *, kind: str = "browser"):
         return self.loop.run_until_complete(self.environment.perform(_action(tool, args, kind=kind)))
 
-    def start(self) -> dict[str, Any]:
-        receipt = self.perform("trial_start", {"launch": _launch()}, kind="trial")
+    def start(self, launch: dict[str, Any] | None = None) -> dict[str, Any]:
+        receipt = self.perform("trial_start", {"launch": launch or _launch()}, kind="trial")
         assert receipt.ok is True and receipt.status == "completed", receipt.error
         return receipt.output
 
@@ -157,6 +234,55 @@ class _TinyApp:
             self.process.wait(timeout=10)
         except subprocess.TimeoutExpired:  # pragma: no cover - 服务自己会退出
             self.process.kill()
+
+
+class _ServicePage:
+    """Yudao 服务自己的地址与端口：收到什么请求就记一行，请求路径决定回报什么内容。"""
+
+    def __init__(self, root: Path) -> None:
+        self.log = root / "service-requests.log"
+        self.log.write_text("", encoding="utf-8")
+        script = root / "service_page_server.py"
+        script.write_text(_SERVICE_PAGE_SERVER, encoding="utf-8")
+        self.process = subprocess.Popen([sys.executable, str(script), str(self.log)],
+                                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+        self.port = int(self.process.stdout.readline().strip())
+        self.url = f"http://127.0.0.1:{self.port}/"
+        # 等它真的在监听，再把日志清空：之后的每一行都是别人发来的请求
+        _wait_until_ready(self.url)
+        self.log.write_text("", encoding="utf-8")
+
+    def requests(self) -> list[str]:
+        return [line for line in self.log.read_text(encoding="utf-8").splitlines() if line]
+
+    def body(self, path: str = "service") -> str:
+        # 从浏览器外面取一次：证明这个地址与端口是通的，页面上被挡下来不是因为服务没有起来
+        with urllib.request.urlopen(f"{self.url}{path}", timeout=10) as response:
+            assert response.status == 200
+            return response.read().decode("utf-8")
+
+    def close(self) -> None:
+        self.process.terminate()
+        try:
+            self.process.wait(timeout=10)
+        except subprocess.TimeoutExpired:  # pragma: no cover - 服务自己会退出
+            self.process.kill()
+
+
+class _PageServer:
+    """试用会话启动的小网页：整站是给定的那一页，端口由试用会话交来。"""
+
+    def __init__(self, root: Path, html: str) -> None:
+        page = root / "page.html"
+        page.write_text(html, encoding="utf-8")
+        script = root / "page_server.py"
+        script.write_text(_PAGE_SERVER, encoding="utf-8")
+        self.command = [sys.executable, str(script), str(page)]
+
+    def launch(self) -> dict[str, Any]:
+        return {"name": "web", "kind": "web",
+                "commands": {str(current_system()): list(self.command)},
+                "ready_url": "http://127.0.0.1:{port}/", "ready_timeout_sec": 120}
 
 
 def test_a_real_page_navigates_types_clicks_and_verifies_with_screenshots(tmp_path):
@@ -306,6 +432,64 @@ def test_navigation_to_the_service_itself_is_refused_and_other_addresses_are_all
             clear_service_address()
             case.stop()
             case.close()
+
+
+def test_a_link_on_the_page_cannot_reach_the_service(tmp_path):
+    # 来源限制的第二条路：工具直接导航被动作层拒绝（上一条），页面上的链接由浏览器自己挡下
+    service = _ServicePage(tmp_path)
+    page = _PageServer(tmp_path, _LINK_PAGE.replace("__SERVICE__", service.url))
+    try:
+        # 控制组：这个地址与端口是通的（从浏览器外面取一次）
+        assert "Service page" in service.body()
+        before = service.requests()
+        configure_service_address("127.0.0.1", service.port)
+        with _event_loop() as loop:
+            case = _BrowserCase(tmp_path, loop)
+            try:
+                opened = case.start(page.launch())
+                assert "open the service" in opened["accessibility"], opened["accessibility"]
+                clicked = case.perform("browser_click", {"target": "#to-service"})
+                assert clicked.ok is True, clicked.error
+                structure = clicked.output["accessibility"]
+                # 页面停在 Chromium 的拦截页上：错误码不是页面文字，不受浏览器语言影响
+                assert "ERR_BLOCKED_BY_CLIENT" in structure, structure
+                assert "Service page" not in structure, "链接把浏览器带到了服务页面"
+                # 服务那一侧一次请求都没有收到（控制组那一次之外）
+                assert service.requests() == before, f"浏览器向服务发出了请求：{service.requests()}"
+            finally:
+                case.stop()
+                case.close()
+    finally:
+        clear_service_address()
+        service.close()
+
+
+def test_a_request_from_page_script_cannot_reach_the_service(tmp_path):
+    # 来源限制的第三条路：页面脚本发出的请求同样由浏览器挡下，服务那一侧收不到
+    service = _ServicePage(tmp_path)
+    page = _PageServer(tmp_path, _SCRIPT_PAGE.replace("__SERVICE__", service.url))
+    try:
+        assert "service data" in service.body("data")
+        before = service.requests()
+        configure_service_address("127.0.0.1", service.port)
+        with _event_loop() as loop:
+            case = _BrowserCase(tmp_path, loop)
+            try:
+                case.start(page.launch())
+                # 页面自己写下结论：请求发得出去是 got，被浏览器挡下才是 blocked。等 pending 消失这个信号
+                # （不用时长去赌），再取一次页面结构看它写了什么
+                settled = case.perform("browser_wait_for", {"textGone": "script pending"})
+                assert settled.ok is True and not settled.output.get("tool_error"), settled.error
+                structure = case.perform("browser_snapshot", {}).output["accessibility"]
+                assert "script blocked" in structure, structure
+                assert "script got" not in structure, "页面脚本的请求发出去了"
+                assert service.requests() == before, f"页面脚本的请求到了服务：{service.requests()}"
+            finally:
+                case.stop()
+                case.close()
+    finally:
+        clear_service_address()
+        service.close()
 
 
 def _append_lost_click(system: LoopSystem, run_id: str) -> None:

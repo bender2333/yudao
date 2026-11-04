@@ -2,7 +2,8 @@
 # 「截图作为证据」与第 9 章「恢复契约」；总图第四节「动作」缝的 browser 类别）。
 #
 # 每个网页种类的试用会话一个 Playwright MCP 进程（stdio，`--browser chromium --headless --isolated
-# --viewport-size 1280x800 --caps testing --image-responses allow --snapshot-mode full --output-dir <会话目录>`）。
+# --viewport-size 1280x800 --caps testing --image-responses allow --snapshot-mode full
+# --blocked-origins <服务自己监听的地址与端口> --output-dir <会话目录>`）。
 # 一次浏览器动作是：地址与路径的拒绝（导航目标用取回那一套服务地址规则，本地文件限试用副本内）→ 调用 MCP →
 # 只读标注为否的工具再截一张图并把它存成工件 → 结果带页面的可访问性结构。工具失败（is_error）交回错误文本，
 # 动作记为完成；MCP 进程退出、调用超时或取消时会话记为中断，动作按失败交回（第 9 节）。
@@ -27,7 +28,7 @@ from typing import Any
 
 from .artifacts import ArtifactStore
 from .definitions import DEFINITIONS
-from .fetch import FetchFailed, FetchRefused, _refuse_service_address
+from .fetch import FetchFailed, FetchRefused, _refuse_service_address, _service_endpoints
 from .mcp_client import (McpCallError, McpClient, McpStartupError, ServerLaunch, StdioServer,
                          terminate_legacy_process)
 from .models import ArtifactRef, new_id
@@ -57,6 +58,11 @@ BROWSER_ARGUMENTS: tuple[tuple[str, str | None], ...] = (
 )
 # 会话目录里的输出子目录：工具以文件名保存的内容留在这里，会话结束时删除（设计说明第 4.1 节）
 OUTPUT_DIR_NAME = "mcp-output"
+
+# 来源限制的启动参数（设计说明第 4.1、10 节）：服务自己监听的地址与端口，浏览器自己不向这些来源发出请求，
+# 所以页面上点过去的链接、页面脚本发出的请求都由浏览器挡下。它只按字面来源匹配，挡不住指向本机的域名别名，
+# 别名由动作层的 check_navigation 补（第二道）
+BLOCKED_ORIGINS_ARGUMENT = "--blocked-origins"
 
 # 截图与结构的两个工具
 SCREENSHOT_TOOL = "browser_take_screenshot"
@@ -243,13 +249,36 @@ def find_program() -> BrowserProgram:
         f"cache and found: {found}")
 
 
+def blocked_origins() -> tuple[str, ...]:
+    """服务自己监听的地址与端口，写成 `--blocked-origins` 认的来源（设计说明第 4.1、10 节）。
+
+    MCP 把这个取值变成 `origin/**` 的请求拦截（0.0.83 的 `originOrHostGlob`），所以在页面上点过去的链接与
+    页面脚本发出的请求都不会到达服务。来源按字面匹配：指向同一个地址的域名别名（`localhost`、本机主机名）
+    不在这里，由动作层的 check_navigation 补。服务没有配置地址与端口时没有可以拒绝的来源。
+    """
+    try:
+        endpoints = _service_endpoints()
+    except FetchFailed as failure:
+        # 地址解析不出来时无法告诉浏览器要拒绝什么：会话不建立，写明原因（不静默地少一道限制）
+        raise BrowserSessionFailed(
+            f"the browser cannot refuse the Yudao service's own address: {failure}") from failure
+    origins: list[str] = []
+    for address, port in sorted(endpoints):
+        host = f"[{address}]" if ":" in address else address
+        origins.append(f"http://{host}:{port}")
+    return tuple(origins)
+
+
 def launch_arguments(output_dir: str | Path) -> tuple[str, ...]:
-    # 启动参数（设计说明第 4.1 节）：输出目录放这次会话的文件，其余按表
+    # 启动参数（设计说明第 4.1 节）：输出目录放这次会话的文件，其余按表；服务自己的来源由浏览器拒绝
     arguments: list[str] = []
     for name, value in BROWSER_ARGUMENTS:
         arguments.append(name)
         if value is not None:
             arguments.append(value)
+    origins = blocked_origins()
+    if origins:
+        arguments.extend((BLOCKED_ORIGINS_ARGUMENT, ";".join(origins)))
     arguments.extend(("--output-dir", str(output_dir)))
     return tuple(arguments)
 
@@ -266,8 +295,9 @@ def is_read_only(tool: str) -> bool:
 def check_navigation(url: Any) -> str:
     """导航目标的来源限制（设计说明第 4.1、10 节）：与取回同一个函数检查服务自己的地址与端口。
 
-    MCP 的 --blocked-origins 只按字面来源匹配，挡不住指向本机的域名别名，所以动作层再查一次实际地址。
-    指向服务自己的地址与端口时抛 BrowserRefused，其余地址（含回环与内网）照常访问。
+    浏览器那一层由启动参数 `--blocked-origins` 承担（第一道，见 blocked_origins），它只按字面来源匹配，
+    挡不住指向本机的域名别名，所以动作层再查一次实际地址（第二道）。指向服务自己的地址与端口时抛
+    BrowserRefused，其余地址（含回环与内网）照常访问。
     """
     if not isinstance(url, str) or not url.strip():
         raise BrowserRefused("browser_navigate requires a url")
