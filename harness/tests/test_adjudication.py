@@ -198,7 +198,7 @@ def test_quality_write_tools_only_target_the_test_materials(tmp_path):
 
 
 def test_the_submission_basis_covers_every_accepted_artifact():
-    # 提交前复核的依据是投影里每一种成果的当前版本（工单 #1456）：校验以后任何一样换了，这次提交就不能按原来的
+    # 守 R1（写入先过裁决）：提交前复核的依据是投影里每一种成果的当前版本（工单 #1456）：校验以后任何一样换了，这次提交就不能按原来的
     # 依据接纳。这里只看「哪几样在依据里」——不跑整圈，也不数别的部门的成果
     base = MinimalProjection(run_id="run_basis", artifacts={
         "product_spec": AcceptedArtifact(version=1, content_hash="sha256:spec"),

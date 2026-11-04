@@ -9,6 +9,7 @@
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -146,25 +147,66 @@ def test_an_end_reason_named_like_a_kernel_stop_reason_is_rejected(tmp_path):
     assert "end_reasons.released：与内核的停止原因同名" in "\n".join(raised.value.issues)
 
 
-def test_a_condition_naming_an_outcome_kind_that_is_not_defined_fails_at_load(tmp_path):
+# 提案合同里按名字引用成果的七处（工单 #1456 的审查要求逐个守住）：每处写错一个字母时都要在加载时被拒绝
+_MISSPELLED_REFERENCES = [
+    (("qa_review", 0, "target"), "conditions.qa_review[0].target"),
+    (("qa_review", 1, "artifact"), "conditions.qa_review[1].artifact"),
+    (("qa_review", 1, "referenced", 0, "target"), "conditions.qa_review[1].referenced[0].target"),
+    (("qa_review", 2, "recorded_in"), "conditions.qa_review[2].recorded_in"),
+    (("qa_review", 3, "bind", 0, "target"), "conditions.qa_review[3].bind[0].target"),
+    (("qa_review", 4, "evaluated"), "conditions.qa_review[4].evaluated"),
+    (("product_decision", 0, "collection"), "conditions.product_decision[0].collection"),
+]
+
+
+def _misspell(contracts: dict, path: tuple) -> None:
+    # 把这条路径上的成果名改错一个字母：product_spec → product_spce
+    node: Any = contracts["conditions"]
+    for step in path[:-1]:
+        node = node[step]
+    node[path[-1]] = "product_spce"
+
+
+@pytest.mark.parametrize(("path", "field"), _MISSPELLED_REFERENCES)
+def test_a_condition_naming_an_outcome_kind_that_is_not_defined_fails_at_load(tmp_path, path, field):
     # R2：提案合同按名字引用成果种类，加载时按成果种类那一项核对（工单 #1456 的审查发现）：
-    # 写错一个字母时整份拒绝并写明是哪一条条件的哪个字段，不留「一处手误把内核的判断静默关掉」
-    (tmp_path / "condition").mkdir()
-    directory = _copy(tmp_path / "condition")
+    # 写错一个字母时整份拒绝并写明是哪一条条件的哪个字段，不留「一处手误把内核的判断静默关掉」。
+    # 七处各来一条：target、artifact、referenced[]、recorded_in、bind[]、evaluated、collection
+    runner = tmp_path / "condition"
+    runner.mkdir()
+    directory = _copy(runner)
     contracts = _read(directory, "proposal_contracts.json")
-    contracts["conditions"]["qa_review"][0]["target"] = "product_spce"
+    _misspell(contracts, path)
     _write(directory, "proposal_contracts.json", contracts)
     with pytest.raises(DefinitionError) as raised:
         load_definitions(directory)
     [issue] = raised.value.issues
-    assert issue[:2] == ("proposal_contracts.json", "conditions.qa_review[0].target")
+    assert issue[:2] == ("proposal_contracts.json", field)
     assert "product_spce" in issue[2] and "product_spec" in issue[2]
 
-    # 骨架自己产生的那两种成果（有效合同、代码树快照）也可以按名字引用：它们写在成果种类那一项的 skeleton 里
+
+def test_an_old_definitions_directory_without_the_outcome_kinds_item_still_loads(tmp_path):
+    # R2：字段只增——旧的定义目录没有 outcome_kinds.json 时照旧加载（那时没有词表可对），路由那一段
+    # 按旧写法直接列出成果种类（工单 #1456）
+    directory = _copy(tmp_path)
+    (directory / "outcome_kinds.json").unlink()
+    routings = _read(directory, "routings.json")
+    routings["routings"][0].pop("outcomes")
+    routings["routings"][0]["outcome_kinds"] = ["product_spec", "product_decision", "delivery_spec",
+                                                "independent_judgement", "qa_review", "structure",
+                                                "baseline_review"]
+    _write(directory, "routings.json", routings)
+    loaded = load_definitions(directory)
+    assert loaded.routings.routings[0].outcome_kinds[0] == "product_spec"
+    assert loaded.outcomes_of("watched_outputs")[0] == "product_spec"
+
+def test_the_skeleton_outcome_kinds_can_be_named_by_a_contract(tmp_path):
+    # R2：骨架自己产生的那两种成果（有效合同、代码树快照）写在成果种类那一项的 skeleton 里，
+    # 提案合同照样可以按名字引用它们：快照记着树摘要，tree_matches 用它
     (tmp_path / "skeleton").mkdir()
     directory = _copy(tmp_path / "skeleton")
     contracts = _read(directory, "proposal_contracts.json")
-    contracts["conditions"]["qa_review"][2]["recorded_in"] = "contract"
+    contracts["conditions"]["qa_review"][2]["recorded_in"] = "snapshot"
     _write(directory, "proposal_contracts.json", contracts)
     assert load_definitions(directory).routing == "watched_outputs"
 

@@ -10,6 +10,9 @@
 # （事实与裁决、循环两层不认识部门），旧定义的三部门默认值例外，写在下面的固定名单里。
 #
 # 这一项在源码里按整词检索命中即失败；命中时逐条写出是哪份文件、哪一行、命中了哪个名称。
+# 检索的是路由认得的那几种成果（outcome_kinds.json 的 kinds）：骨架自己产生的那两种（skeleton 里的
+# 有效合同与代码树快照）内核本来就要按名字用，不在检索范围；minimal_projection.py 的 SNAPSHOT_KIND
+# 就是后者（工单 #1456）。
 # 比较按整词：`product_spec` 命中 `projection.product_spec` 与 `"product_spec"`，不命中 `product_spec_hash`
 # 这类以它开头的另一个名字（下划线是词内字符），也不命中大写的运行状态名 `PRODUCT_SPEC`。
 #
