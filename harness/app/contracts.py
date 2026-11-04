@@ -161,7 +161,9 @@ AccessMode = Literal["local", "lan"]
 # 部门字段不再带枚举，成果的作者部门（issuer）不再固定为某个部门的名字。
 # 版本 14：实例升级报告的 python_lines_max 改为可选（#1473）：内核没有行数上限，新的发布检查不再写它，
 # 目录流里已带这个字段的旧事件仍能读。
-API_VERSION = 14
+# 版本 15：停止原因的封闭清单多一条 open_loop（开环完成，结果是完成），创建事件多一个默认值为否的
+# open_loop 字段（#1394）：这两处的取值集合扩大，按生成出来的合同核对会算作已有取值的改变，版本随之提高。
+API_VERSION = 15
 
 
 class CatalogSelection(Contract):
