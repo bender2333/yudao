@@ -90,13 +90,14 @@ def _relative(path: Path) -> str:
 
 
 def _block(source: str, start: str) -> tuple[int, int] | None:
-    # 允许的区块：start 那一行到它后面第一个顶格写的 `)`，两头都算在区块里；找不到时是 None
+    # 允许的区块：start 那一行到它后面第一个顶格写的 `)`，两头都算在区块里。
+    # 开头那一行或结束那一行找不到时是 None：找不到结束行时不许把文件余下的部分整段遮掉
     lines = source.splitlines()
     first = next((index for index, line in enumerate(lines) if line.startswith(start)), None)
     if first is None:
         return None
-    last = next((index for index in range(first + 1, len(lines)) if lines[index].rstrip() == ")"), len(lines))
-    return first, last
+    last = next((index for index in range(first + 1, len(lines)) if lines[index].rstrip() == ")"), None)
+    return None if last is None else (first, last)
 
 
 def exempted(source: str, start: str) -> str:
@@ -154,9 +155,11 @@ def test_the_guard_reads_every_file_of_the_two_upper_layers():
               if entry["kind"] == "module"}
     assert listed <= set(files), "内核清单里 kind 为 module 的文件没有全部检索"
     assert {REPO_ROOT / name for name in FIXED_NAMES} <= set(files)
-    # 对照表那几处点到名的文件都在清单里
-    for name in ("harness/orchestrator.py", "harness/runtime.py", "harness/engine.py", "harness/assembly.py",
-                 "harness/context.py", "harness/watched_outputs.py", "harness/tightening.py"):
+    # 对照表四层一行点到名的文件逐个核对：少了哪一个（不再被检索）都失败
+    for name in ("harness/contract_versions.py", "harness/execution_contract.py", "harness/assembly_contract.py",
+                 "harness/tightening_contract.py", "harness/routing_contract.py", "harness/orchestrator.py",
+                 "harness/runtime.py", "harness/engine.py", "harness/assembly.py", "harness/context.py",
+                 "harness/watched_outputs.py", "harness/tightening.py"):
         assert REPO_ROOT / name in files, f"{name} 不在检索的文件清单里"
 
 
