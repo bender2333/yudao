@@ -10,12 +10,21 @@
 // 只读页面（与画面测试不同，不读画布）：页签、看板列、部门页的标题与部门状态行。
 
 import { expect, test } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { startBackend, startClient, type Backend } from "./fixtures";
 
 const PROJECT = "页面的部门";
 const OLD_ITEM = "换形态之前的事项";
 const NEW_ITEM = "换形态之后的事项";
 const SINGLE_ROLE_FORM = "single_role";
+// 截图放在工作目录的 .tmp/1457-shots/，文件名写清页面与状态（不进仓库）
+const SHOTS = join(process.cwd(), "..", ".tmp", "1457-shots");
+
+async function shot(page: import("@playwright/test").Page, name: string): Promise<void> {
+  mkdirSync(SHOTS, { recursive: true });
+  await page.screenshot({ path: join(SHOTS, `${name}.png`), fullPage: true });
+}
 
 type QueryEnvelope<T> = { data?: T; status?: string; reason?: string; message?: string };
 
@@ -153,6 +162,7 @@ test("页面的部门取自事实：默认三部门照旧，换成一个角色�
     expect(oldItem).not.toBeNull();
     await waitUntil(async () => (await boardTitles(page)).length === 3, "看板出现三个部门列");
     expect(await boardTitles(page)).toEqual(["产品", "工程", "质检"]);
+    await shot(page, "01-default-three-departments");
     // 部门页的默认部门：地址里没有写部门时取现在组织里的第一个部门（产品）
     await goto(page, `#/p/${id}/dept`);
     await expect(page.locator("#ws-head-block h1")).toContainText("产品部门");
@@ -162,6 +172,7 @@ test("页面的部门取自事实：默认三部门照旧，换成一个角色�
     expect(oldLine).toContain("产品");
     expect(oldLine).toContain("工程");
     expect(oldLine).toContain("质检");
+    await shot(page, "02-old-item-three-departments");
 
     // 等这一轮慢慢流式返回结束、事项停下（执行槽位空出来，才能换形态再建事项）
     await waitUntil(async () => (await itemOf(page, id, OLD_ITEM))?.status !== "in_progress", "老事项停下",
@@ -186,6 +197,7 @@ test("页面的部门取自事实：默认三部门照旧，换成一个角色�
     const newItem = await itemOf(page, id, NEW_ITEM);
     await waitUntil(async () => (await boardTitles(page)).length === 1, "看板只有一个部门列");
     expect(await boardTitles(page)).toEqual(["工程"]);
+    await shot(page, "03-single-role-one-department");
     await goto(page, `#/p/${id}/dept/engineering?w=${newItem?.work_item_id ?? ""}`);
     await expect(page.locator("#ws-head-block h1")).toContainText("工程部门");
     const newLine = await page.locator(".department-line").innerText();
@@ -197,6 +209,7 @@ test("页面的部门取自事实：默认三部门照旧，换成一个角色�
     // 而是没有「产品部门」「质检部门」这样的部门入口与标题
     expect(text).not.toContain("产品部门");
     expect(text).not.toContain("质检部门");
+    await shot(page, "04-new-item-one-department");
   } finally {
     await client.close();
   }
