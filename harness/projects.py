@@ -331,11 +331,14 @@ def _initial_prd_requests(store: EventStore, project_id: str, through: int | Non
 
 
 
-def _default_settings(state: ProjectProjection) -> ProjectProjection:
-    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认
-    for department in DEPARTMENTS:
+def _default_settings(state: ProjectProjection, definitions: Any | None = None) -> ProjectProjection:
+    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认。
+    # 部门清单与默认 Prompt 按项目现在的形态取（工单 #1509）：换一份把部门改了名的形态，默认 Prompt 也取
+    # 那一份的；没有交时按进程加载的定义
+    definition = DEFINITIONS if definitions is None else definitions
+    for department in definition.departments:
         state.department_settings.setdefault(department, DepartmentSetting(
-            department=department, version=0, text=DEFINITIONS.role(department).prompt, source="default",
+            department=department, version=0, text=definition.role(department).prompt, source="default",
         ))
     return state
 
@@ -664,20 +667,34 @@ class ProjectService:
         projects.sort(key=lambda item: not item.pinned)
         return projects
 
+    def _form_definitions(self, project: ProjectProjection) -> Any:
+        # 项目现在的形态那一份定义（工单 #1509）：项目一级按部门名核对的读与写都按它取。
+        # 记下的形态不在这个发布里时按进程加载的那一份（事项那边不换一份顶替、停在原处；
+        # 项目一级的读取不该因此挡住页面，写命令仍由 app 层核对）
+        try:
+            return self.orchestrator.form_named(project.form_name).definitions
+        except ValueError:
+            return DEFINITIONS
+
     def read_department_setting(self, project_id: str, department: str) -> dict[str, Any]:
-        if department not in DEPARTMENTS:
+        state = self.projection(project_id)
+        definitions = self._form_definitions(state)
+        if department not in definitions.departments:
             raise ValueError("unknown department")
-        return _setting_view(self.projection(project_id).department_settings[department])
+        _default_settings(state, definitions)
+        return _setting_view(state.department_settings[department])
 
     def read_projection_setting(self, project_id: str, department: str) -> DepartmentSetting | None:
         # 运行层每次请求读取的当前设置：直接取保存的项目投影，不拼接事项状态（避免每次请求重算全部事项）。
-        # 没有这个项目或部门不存在时为空，由调用方按内置默认 Prompt 处理
-        if department not in DEPARTMENTS:
-            return None
+        # 没有这个项目或部门不存在时为空，由调用方按内置默认 Prompt 处理。部门清单按项目现在的形态取
+        # （工单 #1509）：改名后的部门照常读到它的设置
         state = saved_project(self.store, project_id)
         if state is None:
             return None
-        _default_settings(state)
+        definitions = self._form_definitions(state)
+        if department not in definitions.departments:
+            return None
+        _default_settings(state, definitions)
         return state.department_settings.get(department)
 
     # 项目登记与状态
@@ -1539,7 +1556,10 @@ class ProjectService:
         # 并发修改时按版本拒绝后提交的修改（设计说明第 5.2 节）。选择「跟随部门默认」清除本项目的模型选择，
         # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt。
         # reminders 是这次保存算出的建议能力提醒（设计说明第 5.6 节），随事件保存
-        if department not in DEPARTMENTS:
+        # 部门清单按项目现在的形态取（工单 #1509）：改名后的部门照常保存它的设置
+        state = saved_project(self.store, project_id)
+        definitions = DEFINITIONS if state is None else self._form_definitions(state)
+        if department not in definitions.departments:
             raise ValueError("unknown department")
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
@@ -1548,7 +1568,7 @@ class ProjectService:
 
         def configure(transaction: Transaction) -> dict[str, Any] | None:
             current = _default_settings(
-                deepcopy(self._writable_in(transaction, project_id))).department_settings[department]
+                deepcopy(self._writable_in(transaction, project_id)), definitions).department_settings[department]
             if base_version != current.version:
                 raise DepartmentSettingConflict(_setting_view(current))
             unchanged = (current.provider_id == selection.provider_id
@@ -1559,7 +1579,8 @@ class ProjectService:
                 return {**_setting_view(current), "unchanged": True}
             payload = selection.event_payload()
             if selection.department_prompt is not None:
-                ref = save_department_prompt(self.artifacts, project_id, department, selection.department_prompt)
+                ref = save_department_prompt(self.artifacts, project_id, department,
+                                            selection.department_prompt, definitions)
                 payload["department_prompt_ref"] = asdict(ref)
             payload.update({"department": department, "version": current.version + 1,
                             "base_version": base_version, "reminders": list(reminders or ())})
@@ -1663,7 +1684,10 @@ class ProjectService:
     def record_material(self, project_id: str, text: str, *, department: str | None = None,
                         command: Command | None = None) -> str:
         _require_text("text", text)
-        if department is not None and department not in DEPARTMENTS:
+        # 部门清单按项目现在的形态取（工单 #1509）：改名后的部门照常记它的材料
+        state = saved_project(self.store, project_id)
+        definitions = DEFINITIONS if state is None else self._form_definitions(state)
+        if department is not None and department not in definitions.departments:
             raise ValueError("unknown department")
 
         def record(transaction: Transaction) -> str:

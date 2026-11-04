@@ -7,6 +7,7 @@ from collections.abc import Callable
 from typing import Any
 
 from .adapters.fake import FakeTurn, prompt_part
+from .definitions import DEFINITIONS
 from .providers.call import ModelCall
 
 
@@ -321,8 +322,20 @@ def review_turn(
         )
 
     return factory
+
+
+def _ask_recipient() -> str:
+    # 默认问谁：交要求的那一个部门（能在一次询问里修订 PRD 的部门），按定义里的提案合同取，不写部门名
+    # （工单 #1509：换一份把产品改了名的定义，默认收件人跟着定义走）
+    for department in DEFINITIONS.departments:
+        contract = DEFINITIONS.proposal_contract(department, "change")
+        if "product_spec" in (contract.get("kinds") or ()):
+            return department
+    raise ValueError("no department in the loaded definitions can submit product_spec")
+
+
 def ask_turn(
-    recipient: str = "product",
+    recipient: str | None = None,
     question: str = "Should the output format be revised?",
     *,
     background: str = "Clarification needed during implementation.",
@@ -330,6 +343,8 @@ def ask_turn(
     call_id: str = "ask-1",
 ) -> Any:
     from .providers.call import ModelResponse
+    if recipient is None:
+        recipient = _ask_recipient()
     return ModelResponse(output=[{
         "id": call_id,
         "call_id": call_id,

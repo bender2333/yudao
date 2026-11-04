@@ -415,8 +415,10 @@ class WatchedOutputsTightening:
         errors.extend(defect_errors)
         if errors:
             return Tightened(errors=tuple(errors))
-        # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：在提交事务里再判一次
-        if request.commit and verdict == "release" and pending_product_input(projection, list(request.events)):
+        # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：在提交事务里再判一次。
+        # 谁收输入按这个事项所用的那份定义取（工单 #1509）：换一份把产品改了名的定义，等的是改名后的那个部门
+        if request.commit and verdict == "release" \
+                and pending_product_input(projection, list(request.events), definitions=request.definitions):
             return Tightened(wait=True)
         # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
         changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
