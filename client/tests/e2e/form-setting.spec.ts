@@ -163,8 +163,11 @@ test("换成另一份并写理由，历史多一条；点改回以后回到三�
     await expect(rows.nth(1)).toContainText(`${WITHOUT_VERIFIER} → ${THREE}`);
     // 改回这一次没有写理由：照实写「没有写理由」
     await expect(rows.nth(1)).toContainText("没有写理由");
-    // 已经是现在这一份的那些行不再给「改回这一份」：只剩第二条（它的原值是另一份）
-    await expect(page.getByTestId("form-history").getByRole("button", { name: "改回这一份" })).toHaveCount(1);
+    // 每一条历史都有「改回这一份」（验收）：原值已经是现在用的这一份的那一条点了等于没改，因此禁用
+    const backButtons = page.getByTestId("form-history").getByRole("button", { name: "改回这一份" });
+    await expect(backButtons).toHaveCount(2);
+    await expect(backButtons.nth(0)).toBeDisabled();
+    await expect(backButtons.nth(1)).toBeEnabled();
 
     // 服务端的两条事件与页面一致
     const saved = await queryServer<OrganizationView>("project.organization", { project_id: id });

@@ -20,8 +20,8 @@ import {
   useDraft,
 } from "./common";
 import {
-  FORM_CHANGE_HINT, adoptPayload, canAdopt, changeBackPayload, currentFormText, formChoices, historyRows,
-  otherChoices,
+  FORM_CHANGE_HINT, type FormHistoryRow, adoptPayload, canAdopt, changeBackPayload, currentFormText, formChoices,
+  historyRows, otherChoices,
 } from "./form-section-logic";
 import { formatTime } from "./labels";
 import { useCommand, useSnapshot } from "./use-snapshot";
@@ -59,6 +59,30 @@ export function FormSection(props: { app: ClientApp; projectId: string }) {
         setReason("");
       }
     });
+  };
+
+  // 历史每一行的「改回这一份」（工单验收：每一条都有）：等于用原值再改一次。
+  // 原值已经是现在用的那一份时，点了等于没改，因此这一条禁用并在提示里说明原因
+  const changeBackCell = (row: FormHistoryRow): React.ReactNode => {
+    if (!editable || data === null) {
+      return null;
+    }
+    return (
+      <button
+        key="back"
+        type="button"
+        data-testid={`form-change-back-${row.eventId}`}
+        disabled={command.busy || !row.canChangeBack}
+        title={row.canChangeBack ? undefined : "现在用的就是这一份"}
+        onClick={() => {
+          void command.submit("organization.adopt", changeBackPayload({
+            projectId: data.project_id, previousForm: row.previous, baseVersion: data.version,
+          }));
+        }}
+      >
+        改回这一份
+      </button>
+    );
   };
 
   return (
@@ -139,21 +163,7 @@ export function FormSection(props: { app: ClientApp; projectId: string }) {
                   row.reason,
                   formatTime(row.at),
                   row.actor,
-                  row.canChangeBack && editable ? (
-                    <button
-                      key="back"
-                      type="button"
-                      data-testid={`form-change-back-${row.eventId}`}
-                      disabled={command.busy}
-                      onClick={() => {
-                        void command.submit("organization.adopt", changeBackPayload({
-                          projectId: data.project_id, previousForm: row.previous, baseVersion: data.version,
-                        }));
-                      }}
-                    >
-                      改回这一份
-                    </button>
-                  ) : null,
+                  changeBackCell(row),
                 ])}
               />
             )}
