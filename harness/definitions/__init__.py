@@ -1143,22 +1143,26 @@ def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], t
 
 def _delivery_part_issues(contracts: ProposalContracts) -> list[tuple[str, str, str]]:
     # 交付说明的事实与解释归属（proposal_contracts.json 的 parts，工单 #357）：只核对 delivery_spec，合同写给
-    # 模型的每个字段必须恰好归入 facts 与 explanation 之一，缺了或两边都写都指出具体字段；没有 parts 的旧文件照旧加载
-    description = getattr(contracts.roles.get("engineering"), "kinds", {}).get("delivery_spec") or {}
-    declared = description.get("parts")
-    if declared is None:
-        return []
-    file, at = "proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts"
-    parts = {name: ({str(field).strip() for field in declared.get(name)}
-                    if isinstance(declared.get(name), (list, tuple)) else set())
-             for name in ("facts", "explanation")}
-    written = {str(item).split("=", 1)[0].strip() for item in description.get("required") or ()}
-    written |= {str(item).strip() for item in description.get("optional") or ()}
-    twice = [(file, at, f"字段 {field} 同时归入交付事实与解释")
-             for field in sorted(parts["facts"] & parts["explanation"])]
-    missing = [(file, at, f"字段 {field} 没有归入交付事实或解释")
-               for field in sorted(written - parts["facts"] - parts["explanation"] - {""})]
-    return twice + missing
+    # 模型的每个字段必须恰好归入 facts 与 explanation 之一，缺了或两边都写都指出具体字段；没有 parts 的旧文件照旧加载。
+    # 哪个角色交这份交付说明按合同自己的 roles 找，不写死部门名（工单 #1404）：谁声明了 delivery_spec 就核对谁
+    file = "proposal_contracts.json"
+    issues: list[tuple[str, str, str]] = []
+    for role, contract in contracts.roles.items():
+        description = getattr(contract, "kinds", {}).get("delivery_spec") or {}
+        declared = description.get("parts")
+        if declared is None:
+            continue
+        at = f"roles.{role}.kinds.delivery_spec.parts"
+        parts = {name: ({str(field).strip() for field in declared.get(name)}
+                        if isinstance(declared.get(name), (list, tuple)) else set())
+                 for name in ("facts", "explanation")}
+        written = {str(item).split("=", 1)[0].strip() for item in description.get("required") or ()}
+        written |= {str(item).strip() for item in description.get("optional") or ()}
+        issues.extend((file, at, f"字段 {field} 同时归入交付事实与解释")
+                      for field in sorted(parts["facts"] & parts["explanation"]))
+        issues.extend((file, at, f"字段 {field} 没有归入交付事实或解释")
+                      for field in sorted(written - parts["facts"] - parts["explanation"] - {""}))
+    return issues
 
 
 def _condition_references(contracts: ProposalContracts, organization: Organization) -> list[tuple[str, str, str]]:

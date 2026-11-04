@@ -324,11 +324,13 @@ _CONDITION_CHECKS = {
 
 def _tightening_errors(tightened: Tightened, field: str = "proposal") -> list[FieldError]:
     # 收紧检查的拒绝转成字段错误，通过时是空清单。等待在提案校验这一步同样当作拒绝：
-    # 这次提交不当场生效，原因写明（新输入在许可之后、提交之前到达，工单 #561）
+    # 这次提交不当场生效，原因写明（新输入在许可之后、提交之前到达，工单 #561）。默认的这句说明不写
+    # 是哪个部门收的输入：部门名由定义给出（工单 #1404）
     if tightened.errors:
         return list(tightened.errors)
     if tightened.wait:
-        return [FieldError("kind", tightened.reason or "the submission must wait for the product input")]
+        return [FieldError("kind", tightened.reason
+                           or "the submission must wait until the pending input is handled")]
     if tightened.reason is not None:
         return [FieldError(field, tightened.reason)]
     return []
