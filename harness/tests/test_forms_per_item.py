@@ -17,14 +17,18 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.app.contracts import EVENT_TYPES
+from harness.app.application import Application
+from harness.app.contracts import EVENT_TYPES, Accepted, Rejected
+from harness.app.decision_commands import DecisionAnswer
 from harness.definitions import DEFAULT_FORM, DEFINITIONS as PRODUCT_DEFINITIONS
 from harness.event_store import Command, catalog_stream, project_stream, run_stream
 from harness.models import CatalogEventType, EventType, ProjectEventType, TERMINAL_STATUSES, json_dumps, new_id
@@ -471,21 +475,25 @@ def test_an_onboarding_revision_run_keeps_the_item_form(tmp_path):
     system.close()
 
 
-def test_revise_is_not_recorded_when_the_item_form_is_not_in_the_release(tmp_path):
-    # 第六次审查要求的边界（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：建档修改轮建 run 之前
-    # 先核事项冻结的形态。只带默认形态的发布里回答「提出修改」——不抛错、不写这条回答（决定请求还在等待）、
-    # 不建 run，原因写在这条事项的开始失败上，项目流里没有 onboarding_revision_started；
-    # 换回带副本的发布以后同一条请求还能回答，修改轮按副本建起来
+def test_revise_is_refused_by_the_command_layer_when_the_item_form_is_not_in_the_release(tmp_path):
+    # 第六、七次审查要求的边界（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：建档修改轮建 run
+    # 之前先核事项冻结的形态。只带默认形态的发布里从命令层回答「提出修改」——收成命令层已定义的拒绝
+    # （not_allowed，不是 500），回答没有写入（决定请求仍在等待）、不建 run，原因写在这条事项的开始失败上，
+    # 项目流里没有 onboarding_revision_started；换回带副本的发布以后同一条请求还能回答，修改轮按副本建起来
     data_dir = tmp_path / "loop"
     fixture = _onboarding_setup(tmp_path, TWO_FORMS)
     project_id, decision = fixture["project_id"], fixture["decision"]
     fixture["system"].close()
 
     gone = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script()), resume_on_startup=False)
-    assert gone.orchestrator.answer_decision(
-        decision.decision_id, "revise", "把用法说明写进初始 PRD", base_version=decision.version,
-        command=_answer_command()) is None
-    # 回答没有写进去，决定请求仍在等待
+    application = Application(gone)
+    rejected = asyncio.run(application.command("decision.answer", DecisionAnswer(
+        command_id=str(uuid.uuid4()), decision_id=decision.decision_id, option="revise",
+        base_version=decision.version, note="把用法说明写进初始 PRD"), actor="user:local"))
+    assert isinstance(rejected, Rejected)
+    assert rejected.reason == "not_allowed"
+    assert rejected.message
+    # 回答没有写进去，决定请求仍在等待；没有修改轮事件；原因写在这条事项的开始失败上
     _position, open_decisions = saved_decisions(gone.store, statuses=("open",))
     assert [entry.decision_id for entry in open_decisions] == [decision.decision_id]
     assert not [event for event in gone.store.list_project_events(project_id)
@@ -493,19 +501,20 @@ def test_revise_is_not_recorded_when_the_item_form_is_not_in_the_release(tmp_pat
     failures = _start_failures(gone, project_id, fixture["run_id"])
     assert len(failures) == 1
     assert COPIED_FORM in failures[0].payload["error"]
-    gone.close()
+    application.close()
 
-    # 换回带副本的发布：同一条请求这时能回答，修改轮按副本建起来
+    # 换回带副本的发布：同一条请求这时被接受，修改轮按副本建起来
     back = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script()), forms=TWO_FORMS,
                                   resume_on_startup=False)
     _position, open_decisions = saved_decisions(back.store, statuses=("open",))
     [still] = open_decisions
-    revision_run = back.orchestrator.answer_decision(
-        still.decision_id, "revise", "把用法说明写进初始 PRD", base_version=still.version,
-        command=_answer_command())
-    assert revision_run is not None
-    assert _run_created(back, revision_run)["form"] == COPIED_FORM
-    back.close()
+    application = Application(back)
+    accepted = asyncio.run(application.command("decision.answer", DecisionAnswer(
+        command_id=str(uuid.uuid4()), decision_id=still.decision_id, option="revise",
+        base_version=still.version, note="把用法说明写进初始 PRD"), actor="user:local"))
+    assert isinstance(accepted, Accepted)
+    assert _run_created(back, accepted.refs.run_id)["form"] == COPIED_FORM
+    application.close()
 
 
 def test_a_revision_run_is_rebuilt_when_its_form_returns(tmp_path):
@@ -540,3 +549,4 @@ def test_a_revision_run_is_rebuilt_when_its_form_returns(tmp_path):
     assert ended.status == "done", ended.error
     assert _run_created(back, revision_run)["form"] == COPIED_FORM
     back.close()
+

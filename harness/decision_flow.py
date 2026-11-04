@@ -22,7 +22,7 @@ from typing import Any, Protocol
 from . import parameters as parameter_values
 from .artifacts import ArtifactStore
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, QA_CANNOT_VERIFY,
+    AnswerNotAllowed, DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, QA_CANNOT_VERIFY,
     RESUMABLE_PAUSE_KINDS,
     DecisionClosed, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
 )
@@ -69,13 +69,15 @@ class DecisionFlow:
         # 不在发布里时不写这条回答、也不建修改轮的 run，原因由项目服务写进这条事项的开始失败；决定请求保持
         # 等待，换回带那一份形态的发布以后可以再回答。核对放在回答事务提交之前：否则事务里会留下一条没有
         # run 的 onboarding_revision_started，启动补建时它没有形态可建。回答本身已经不符合条件时（已关、
-        # 版本旧、选项不对）不写这条原因，留给事务里的核对报出原来的错
+        # 版本旧、选项不对）不写这条原因，留给事务里的核对报出原来的错。以命令层已定义的拒绝收场
+        # （`AnswerNotAllowed` → `not_allowed`）：命令没有登记任何写入，接口层是拒绝而不是 500
         if (option == "revise" and saved.kind == INITIAL_PRD.name and saved.status == "open"
                 and base_version == saved.version
                 and option in [entry["id"] for entry in saved.request["options"]]):
             candidate_run_id = saved.request.get("candidate_run_id")
             if candidate_run_id is not None and not driver.projects.item_form_available(candidate_run_id):
-                return None
+                raise AnswerNotAllowed(
+                    "这个事项冻结的形态不在当前发布里，这条回答没有生效；换回带那一份形态的发布以后再回答")
 
         def answer(transaction: Transaction) -> str | None:
             decision = transaction.decisions[decision_id]
