@@ -234,6 +234,60 @@ def test_a_verification_declaration_that_does_not_hold_is_rejected_naming_the_fi
     assert f"organization.json {expected[1]}：" in str(raised.value)
 
 
+def test_a_definition_must_name_a_department_for_every_item_source(tmp_path):
+    # 验收第 3 条（工单 #1455）：一种来源没有部门接时整份拒绝，错误写明文件与项
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["sources"] = {"user_input": "product"}
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("organization.json", "sources.onboarding", "事项的来源 onboarding 没有部门接"),)
+    assert "organization.json sources.onboarding：" in str(raised.value)
+
+
+def test_a_source_received_by_a_department_outside_the_definition_is_rejected(tmp_path):
+    # 验收第 3 条：接它的部门不在这份定义里时整份拒绝，错误写明文件与项
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["sources"] = {"user_input": "product", "onboarding": "reviewer"}
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("organization.json", "sources.onboarding", "接来源 onboarding 的部门 reviewer 不属于任何部门"),)
+    assert "organization.json sources.onboarding：" in str(raised.value)
+
+
+def test_a_definition_without_item_sources_reads_the_department_that_watches_user_input(tmp_path):
+    # 验收第 4 条：不写新字段的旧定义加载成功，两种来源都由关注用户输入的部门接
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    del organization["sources"]
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    assert loaded.version != DEFINITIONS.version
+    assert loaded.organization.sources is None
+    assert loaded.source_department("user_input") == "product"
+    assert loaded.source_department("onboarding") == "product"
+
+
+def test_an_old_definition_without_a_department_watching_user_input_is_rejected(tmp_path):
+    # 验收第 4 条：旧定义没有关注用户输入的部门时拒绝
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    del organization["sources"]
+    for department in organization["departments"]:
+        department["watched"] = [kind for kind in department.get("watched", []) if kind != "user_input"]
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("organization.json", "sources",
+         "没有写事项的来源，也没有部门关注用户输入：你的输入与建档没有人接"),)
+
+
 def test_tool_categories_and_references_are_checked(tmp_path):
     directory = _copy(tmp_path)
     tools = _read(directory, "tools.json")
