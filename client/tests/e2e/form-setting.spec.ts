@@ -6,7 +6,7 @@
 // 点「改回这一份」以后项目回到三部门，两条历史都在；当前值已被别处改过时提交被拒绝，页面原样显示拒绝说明，
 // 服务端没有因此多写一条改动；改动只对之后新建的事项生效这一句提示在页面上；控制台错误为零。
 
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
 const PROJECT = "形态项目";
@@ -65,7 +65,7 @@ async function adoptOnServer(projectId: string, form: string, baseVersion: strin
   }
 }
 
-async function projectId(page: Page): Promise<string> {
+async function projectId(): Promise<string> {
   const listed = await queryServer<{ projects: { name: string; project_id: string }[] }>("projects.list");
   const row = listed.projects.find((project) => project.name === PROJECT);
   if (row === undefined) {
@@ -77,7 +77,7 @@ async function projectId(page: Page): Promise<string> {
 // 打开设置页并等「形态」这一节画出来
 async function openSettings(client: ClientApp): Promise<string> {
   const page = client.page;
-  const id = await projectId(page);
+  const id = await projectId();
   await page.evaluate((hash) => {
     window.location.hash = hash;
   }, `#/p/${id}/settings`);
@@ -106,7 +106,6 @@ test("现在用哪一份、发布带的每一份各叫什么、一句说明，�
   try {
     const page = client.page;
     await openSettings(client);
-    const section = page.locator("#form");
 
     // 现在用的是发布带里的三部门，写明组织版本
     await expect(page.getByTestId("form-current")).toHaveText(new RegExp(`^现在用 ${THREE}（组织版本 sha256:`));
