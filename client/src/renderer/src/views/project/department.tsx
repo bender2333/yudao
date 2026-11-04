@@ -241,7 +241,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
   const itemDepartments = (props.loopItem?.organization?.roles ?? []).map((role) => ({
     id: role.id, label: role.label,
   }));
-  const labels = { ...departmentLabels(itemDepartments), ...departmentLabels(props.departments) };
+  const labels = { ...departmentLabels(props.departments), ...departmentLabels(itemDepartments) };
   // 去观测页时带着当前的范围（工单 #746）与本部门的筛选条件（工单 #801）：
   // 范围是项目级的一份，换页面不丢掉；部门是筛选条件，观测页按它只显示这个部门的请求
   const observeLink = paths.observe(data.project_id, { workItem: props.scopeWorkItem, department: data.department });
