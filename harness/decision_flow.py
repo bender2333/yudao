@@ -256,6 +256,10 @@ class DecisionFlow:
             prompt_config_versions=dict(item.prompt_config_versions),
             # 修改轮沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
             mcp_servers=item.mcp_servers,
+            # 修改轮沿用事项创建时冻结的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：
+            # 这一轮仍是同一个事项，换的只是 run 的应用版本。不交这一项时 create_run 会取默认的三部门，
+            # 形态的部门与默认那一份不同的时候（#1395 的第二份形态）部门核对会失败
+            form=item.form,
             round=round_number,
             onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
                               "note_ref": note_ref},

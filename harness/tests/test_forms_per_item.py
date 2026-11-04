@@ -23,16 +23,18 @@ from typing import Any
 
 import pytest
 
-from harness.adapters.fake import FakeAdapter
+from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.contracts import EVENT_TYPES
 from harness.definitions import DEFAULT_FORM, DEFINITIONS as PRODUCT_DEFINITIONS
 from harness.event_store import Command, catalog_stream, project_stream, run_stream
 from harness.models import CatalogEventType, EventType, ProjectEventType, TERMINAL_STATUSES, json_dumps, new_id
-from harness.projection import project_run
+from harness.projection import project_run, saved_decisions
+from harness.proposals import baseline_review_turn, structure_turn
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests import second_routing
 from harness.tests.helpers import delivery_turn, merge_scripts, product_spec, quality_turns
+from harness.tests.onboarding_project import ONBOARDING_GOAL, ONBOARDING_REQUIREMENT, onboarding_source
 from harness.tightening import WATCHED_OUTPUTS
 from harness.write_path import NewProjectEvent
 
@@ -407,3 +409,52 @@ def test_force_upgrade_leaves_the_run_then_it_continues_under_its_own_form(tmp_p
     assert ended.stop_reason == second_routing.ITEM_END_REASON
     assert _departments(back, run_id) >= set(second_routing.DEFINITIONS.departments)
     back.close()
+
+
+def _onboarding_script() -> dict[str, list[Any]]:
+    # 建档第一轮的三部门回答（与 test_onboarding_revision_context 的做法相同）：产品交初始 PRD、工程交结构说明、
+    # 质检做基线核验；质检一轮里可能被唤醒两次，给两条同一轮的回答
+    requirement = ONBOARDING_REQUIREMENT
+    return {
+        "product": [FakeTurn(proposal=product_spec(
+            goal=ONBOARDING_GOAL, requirements=[requirement], acceptance=["run the CLI with a word"]))],
+        "engineering": [structure_turn(
+            requirement_locations=[{"requirement": requirement, "locations": ["src/echo.py"]}],
+            overall="第 1 轮的结构说明：一个包加一个命令行入口")],
+        "quality": [baseline_review_turn(conclusions=[
+            {"requirement": requirement, "status": "verified", "evidence": "smoke"}]) for _ in range(2)],
+    }
+
+
+def test_an_onboarding_revision_run_keeps_the_item_form(tmp_path):
+    # 第五次审查指出的入口（工单 #1392）：建档修改轮建立新的 run 时沿用事项冻结的形态，不取默认那一份。
+    # 形态用默认三部门的一份副本（部门相同、名字不同）：run_created 记的名字能分辨本轮按哪一份建，
+    # 部门对得上，所以这里靠名字而不是部门核对发现取错
+    copied = f"{DEFAULT_FORM}_copy"
+    system = LoopSystem.for_testing(
+        tmp_path / "loop", FakeAdapter(_onboarding_script()),
+        forms={DEFAULT_FORM: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS),
+               copied: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS)},
+        resume_on_startup=False)
+    project_id = system.projects.register("两轮建档", ONBOARDING_GOAL, source="existing")
+    system.projects.configure_source_directory(project_id, "src", str(onboarding_source(tmp_path / "source")),
+                                               base_version=0)
+    _set_form(system, project_id, DEFAULT_FORM, copied)
+    item_id, first_run = system.projects.restart_onboarding(project_id, "src")
+    assert _created(system, project_id, item_id)["form"] == copied
+    first = system.run_until_stop(first_run)
+    assert first.status == "done", first.error
+    assert system.projects.settle(first_run) is not None
+
+    # 用户回答「提出修改」：修改轮的 run 在回答提交以后建立
+    _position, open_decisions = saved_decisions(system.store, statuses=("open",))
+    [decision] = open_decisions
+    assert decision.kind == "initial_prd"
+    revision_run = system.orchestrator.answer_decision(
+        decision.decision_id, "revise", "把用法说明写进初始 PRD", base_version=decision.version,
+        command=Command(command_id=new_id("cmd"), name="decision.answer", digest="test", actor="user"))
+    assert revision_run is not None
+    # 修改轮的 run 记的仍是事项冻结的那一份；建 run 时不交 form 的话这里会是默认的三部门
+    assert _run_created(system, revision_run)["form"] == copied
+    assert system.orchestrator.item_form(revision_run).name == copied
+    system.close()
