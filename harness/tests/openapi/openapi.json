@@ -1943,6 +1943,57 @@
         }
       }
     },
+    "/api/commands/organization.adopt": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "organization.adopt",
+        "operationId": "command_organization_adopt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationAdopt"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/system.status": {
       "get": {
         "tags": [
@@ -3959,6 +4010,48 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Snapshot_RunLoopsResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queries/project.organization": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "project.organization",
+        "operationId": "query_project_organization",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ProjectOrganizationResult_"
                 }
               }
             }
@@ -9373,6 +9466,83 @@
         ],
         "title": "FlowRecord"
       },
+      "FormChange": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "previous_form": {
+            "type": "string",
+            "title": "Previous Form"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "previous_form",
+          "form",
+          "reason",
+          "at",
+          "actor"
+        ],
+        "title": "FormChange"
+      },
+      "FormChoice": {
+        "properties": {
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "verifier_roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Verifier Roles"
+          },
+          "open_loop": {
+            "type": "boolean",
+            "title": "Open Loop"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form",
+          "description",
+          "version",
+          "verifier_roles",
+          "open_loop"
+        ],
+        "title": "FormChoice"
+      },
       "GuidanceRecord": {
         "properties": {
           "guidance_id": {
@@ -11180,6 +11350,55 @@
         ],
         "title": "OnboardingRound"
       },
+      "OrganizationAdopt": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Project Id"
+          },
+          "form": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Form"
+          },
+          "changes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Changes"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "project_id",
+          "form"
+        ],
+        "title": "OrganizationAdopt"
+      },
       "OverlayCapability": {
         "properties": {
           "name": {
@@ -11692,6 +11911,58 @@
           "source_path"
         ],
         "title": "ProjectOnboard"
+      },
+      "ProjectOrganizationResult": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "form_in_release": {
+            "type": "boolean",
+            "title": "Form In Release"
+          },
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/FormChoice"
+            },
+            "type": "array",
+            "title": "Forms"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/FormChange"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "form",
+          "version",
+          "form_in_release",
+          "forms",
+          "history"
+        ],
+        "title": "ProjectOrganizationResult"
       },
       "ProjectOverviewResult": {
         "properties": {
@@ -14033,6 +14304,24 @@
           "data"
         ],
         "title": "Snapshot[ProjectLoopResult]"
+      },
+      "Snapshot_ProjectOrganizationResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProjectOrganizationResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ProjectOrganizationResult]"
       },
       "Snapshot_ProjectOverviewResult_": {
         "properties": {
