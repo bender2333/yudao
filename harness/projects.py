@@ -11,7 +11,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .definitions import DEFINITIONS
+from .definitions import DEFAULT_FORM, DEFINITIONS
 from .department_prompts import save_department_prompt
 from .event_store import Command, EventStore, catalog_stream, project_stream, run_stream
 from .kernel_events import canonical_hash
@@ -331,11 +331,14 @@ def _initial_prd_requests(store: EventStore, project_id: str, through: int | Non
 
 
 
-def _default_settings(state: ProjectProjection) -> ProjectProjection:
-    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认
-    for department in DEPARTMENTS:
+def _default_settings(state: ProjectProjection, definitions: Any | None = None) -> ProjectProjection:
+    # 没有配置过的部门使用内置默认 Prompt（版本 0），模型与请求档位都跟随部门默认。
+    # 部门清单与默认 Prompt 按项目现在的形态取（工单 #1509）：换一份把部门改了名的形态，默认 Prompt 也取
+    # 那一份的；没有交时按进程加载的定义
+    definition = DEFINITIONS if definitions is None else definitions
+    for department in definition.departments:
         state.department_settings.setdefault(department, DepartmentSetting(
-            department=department, version=0, text=DEFINITIONS.role(department).prompt, source="default",
+            department=department, version=0, text=definition.role(department).prompt, source="default",
         ))
     return state
 
@@ -664,20 +667,34 @@ class ProjectService:
         projects.sort(key=lambda item: not item.pinned)
         return projects
 
+    def _form_definitions(self, project: ProjectProjection) -> Any:
+        # 项目现在的形态那一份定义（工单 #1509）：项目一级按部门名核对的读与写都按它取。
+        # 记下的形态不在这个发布里时按进程加载的那一份（事项那边不换一份顶替、停在原处；
+        # 项目一级的读取不该因此挡住页面，写命令仍由 app 层核对）
+        try:
+            return self.orchestrator.form_named(project.form_name).definitions
+        except ValueError:
+            return DEFINITIONS
+
     def read_department_setting(self, project_id: str, department: str) -> dict[str, Any]:
-        if department not in DEPARTMENTS:
+        state = self.projection(project_id)
+        definitions = self._form_definitions(state)
+        if department not in definitions.departments:
             raise ValueError("unknown department")
-        return _setting_view(self.projection(project_id).department_settings[department])
+        _default_settings(state, definitions)
+        return _setting_view(state.department_settings[department])
 
     def read_projection_setting(self, project_id: str, department: str) -> DepartmentSetting | None:
         # 运行层每次请求读取的当前设置：直接取保存的项目投影，不拼接事项状态（避免每次请求重算全部事项）。
-        # 没有这个项目或部门不存在时为空，由调用方按内置默认 Prompt 处理
-        if department not in DEPARTMENTS:
-            return None
+        # 没有这个项目或部门不存在时为空，由调用方按内置默认 Prompt 处理。部门清单按项目现在的形态取
+        # （工单 #1509）：改名后的部门照常读到它的设置
         state = saved_project(self.store, project_id)
         if state is None:
             return None
-        _default_settings(state)
+        definitions = self._form_definitions(state)
+        if department not in definitions.departments:
+            return None
+        _default_settings(state, definitions)
         return state.department_settings.get(department)
 
     # 项目登记与状态
@@ -963,12 +980,18 @@ class ProjectService:
                            round: int | None = None, onboarding_basis: dict[str, Any] | None = None,
                            additional_input: str | None = None,
                            restarted_from_run_id: str | None = None,
-                           mcp_servers: dict[str, Any] | None = None) -> _NewWorkItem:
+                           mcp_servers: dict[str, Any] | None = None,
+                           form: str | None = None) -> _NewWorkItem:
         # 在事务中追加 work_item_created，交回创建 run 需要的内容
         title = work_item_title(text) if title is None else title
+        # 事项创建时冻结项目当时的形态（工单 #1392）：创建事件记下形态名与它的定义版本，之后这个事项的
+        # 写入核对、路由、装配与执行都按这一份定义。没有给 form 时取项目现在的形态（没有设过时是三部门）
+        frozen_form = self.orchestrator.form_named(form or project.form_name)
+        definitions = frozen_form.definitions
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
         prompt_config_versions = {department: project.department_settings[department].version
-                                  for department in DEPARTMENTS}
+                                  if department in project.department_settings else 0
+                                  for department in definitions.departments}
         # MCP 服务器设置在事项创建时冻结（工单 #236，设计说明第 4.3 节）：事项创建事实带上当时的
         # 非秘密设置与凭据引用；因升级重新开始的事项沿用原事项冻结的那份（不给时取项目当前设置）。
         # 还没有保存过 MCP 设置的事项不带这个字段，按空设置读取
@@ -982,7 +1005,9 @@ class ProjectService:
             "snapshot": snapshot,
             "project_context_ref": asdict(context_ref), "prompt_config_versions": prompt_config_versions,
             "max_cycles": max_cycles, "run_time_limit_sec": run_time_limit_sec, "context_window": context_window,
-            "definitions_version": DEFINITIONS.version,
+            "definitions_version": definitions.version,
+            # 事项创建时冻结的形态名（工单 #1392）：项目后来改了形态，这个事项仍按记下的这一份运行
+            "form": frozen_form.name,
             # 事项在队列中的优先级：因升级重新开始的事项排在队列最前面（顺序由 3.4A 的 #19 实现）
             "priority": priority,
             "kind": kind,
@@ -1000,7 +1025,7 @@ class ProjectService:
                 prompt_config_versions=prompt_config_versions, kind=kind,
                 round=(1 if kind == "onboarding" else 0) if round is None else round,
                 onboarding_basis=onboarding_basis, additional_input=additional_input,
-                mcp_servers=frozen_mcp,
+                mcp_servers=frozen_mcp, form=frozen_form.name,
             ),
         )
 
@@ -1010,6 +1035,54 @@ class ProjectService:
         # 从登记之前到 run 创建完成，这个项目算作有事项正在开始
         item = self._start_in(project_id, create, command=command)
         return item.work_item_id, item.run_id
+
+    def item_form_available(self, run_id: str) -> bool:
+        # 继续与升级重新开始之前先核事项记下的形态（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：
+        # 那一份不在发布里时**不动这个 run**——不停止、不继续、不换一份定义顶替，留着它未结束，换回带那一份
+        # 形态的发布以后接着跑；原因写进项目流这条事项的开始失败（每次启动至多一条）。创建记录里没有形态名的
+        # 旧事项按默认形态算。找不到 run 或事项时照常走原来的路（停止以后重启返回空）
+        try:
+            run = project_run(self.store, run_id)
+        except RunNotFoundError:
+            return True
+        if run.project_id is None:
+            return True
+        try:
+            project = self.projection(run.project_id)
+        except ProjectNotFoundError:
+            # 没有项目的事项（直接建 run 的调用与旧数据）：没有形态可核，照原路走
+            return True
+        item = project.work_item_for_run(run_id)
+        if item is None:
+            return True
+        return self.item_form_in_release(run.project_id, item, run_id)
+
+    def item_form_in_release(self, project_id: str, item: WorkItem, run_id: str) -> bool:
+        # 这个事项冻结的形态在发布里（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：创建记录里
+        # 没有形态名的旧事项按默认形态算。不在发布里时在项目流写一条开始失败（work_item_id、run_id、error）
+        # 并返回 False；恢复、升级重新开始与建档修改轮共用这一处判断（修改轮这时还没有 run，按事项记录核）
+        try:
+            self.orchestrator.form_named(item.form)
+        except ValueError as exc:
+            self.writes.append(project_stream(project_id), NewProjectEvent(
+                ProjectEventType.WORK_ITEM_START_FAILED,
+                {"work_item_id": item.work_item_id, "run_id": run_id, "error": str(exc)},
+                actor="system"))
+            return False
+        return True
+
+    def _restart_form(self, transaction: Transaction, item: WorkItem, run_id: str) -> str | None:
+        # 因升级重新开始沿用事项创建时冻结的形态（工单 #1392）：这是同一个事项，换的只是 run 的应用版本。
+        # 那一份形态已经不在发布里时不换一份、也不按项目现在的形态兜底：与新建事项同样拒绝（项目的组织
+        # 设计说明「冻结与升级」），原因记在这条事项的开始失败上。升级批量先经 `item_form_available`
+        # 核过、不停止这样的 run，所以这里是兜底；旧事件没有记下形态时用默认形态
+        try:
+            return self.orchestrator.form_named(item.form).name
+        except ValueError as exc:
+            transaction.append(NewProjectEvent(ProjectEventType.WORK_ITEM_START_FAILED, {
+                "work_item_id": item.work_item_id, "run_id": run_id, "error": str(exc),
+            }, actor="system"))
+            return None
 
     def restart_work_item_for_upgrade(self, run_id: str, *, command: Command | None = None) -> tuple[str, str] | None:
         # 因升级重新开始（ADR-0019，工单 #126）：run 事件版本与当前不同的未结束 run 由流程编排记为因升级停止，
@@ -1027,8 +1100,11 @@ class ProjectService:
             item = project.work_item_for_run(run_id)
             if item is None:
                 return None
+            form = self._restart_form(transaction, item, run_id)
+            if form is None:
+                return None
             if item.kind == "onboarding":
-                return self._onboarding_restarted(transaction, project, item, run_id)
+                return self._onboarding_restarted(transaction, project, item, run_id, form)
             point = self._work_item_start_point(project)
             return self._work_item_created(
                 transaction, project, item.text, title=item.title, max_cycles=item.max_cycles,
@@ -1037,8 +1113,10 @@ class ProjectService:
                 source_run=point.source_run,
                 work_item_id=new_id("wi"), run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
                 restarted_from_run_id=run_id,
-                # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
+                # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
+                # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
                 mcp_servers=item.mcp_servers,
+                form=form,
             )
 
         created = self.writes.transact(project_stream(run.project_id), restart, command=command)
@@ -1056,7 +1134,7 @@ class ProjectService:
         return created.work_item_id, created.run_id
 
     def _onboarding_restarted(self, transaction: Transaction, project: ProjectProjection,
-                              item: WorkItem, run_id: str) -> _NewWorkItem:
+                              item: WorkItem, run_id: str, form: str) -> _NewWorkItem:
         # 建档事项因升级重新开始（设计第 6 节最后一行）：第一轮用建档事项记录的快照重建，与开始建档时同样
         # 从快照开始、种类为 onboarding、没有基线、轮次为 1；修改轮带上一轮候选与修改意见重新开始，与回答
         # 「提出修改」建立的 run 依据相同（轮次、上一轮候选的事件编号、修改意见原文）。
@@ -1077,8 +1155,10 @@ class ProjectService:
             work_item_id=item.work_item_id, run_id=new_id("run"), priority=PRIORITY_UPGRADE_RESTART,
             kind="onboarding", round=prior.round, onboarding_basis=basis, additional_input=note,
             restarted_from_run_id=run_id,
-            # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
+            # 因升级重新开始沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置；
+            # 形态同样沿用（工单 #1392）：这是同一个事项，换的只是 run 的应用版本
             mcp_servers=item.mcp_servers,
+            form=form,
         )
 
     def queue_work_item(self, project_id: str, text: str, *, title: str | None = None,
@@ -1192,6 +1272,10 @@ class ProjectService:
                 item = state.work_item(event.payload["work_item_id"])
                 if candidate is None or item is None:
                     continue
+                # 建档修改轮建 run 之前先核事项冻结的形态（工单 #1392）：不在发布里时不补建这个 run，
+                # 原因写在事项的开始失败上，换回带那一份形态的发布以后下一次启动补建
+                if not self.item_form_in_release(project_id, item, run_id):
+                    continue
                 self.orchestrator.create_revision_run(
                     project_id, candidate, run_id, int(event.payload["round"]), event.payload.get("note"))
                 created.append(run_id)
@@ -1220,7 +1304,13 @@ class ProjectService:
                 if self.store.stream_events(run_stream(item.run_id), after_version=0):
                     continue
                 item_definitions_version = frozen_versions.get(item.run_id, "")
-                if item_definitions_version and item_definitions_version != DEFINITIONS.version:
+                # 事项冻结的形态（工单 #1392）：补建时版本按那一份核，与当前不同时不补建，交给定义版本
+                # 差异的恢复决定处理；同一版本时按事项记录自动补建
+                form = self.orchestrator.forms.get(item.form or DEFAULT_FORM)
+                if form is None:
+                    # 事项冻结的形态已经不在发布里（项目的组织设计说明「冻结与升级」）：不补建，保留事项记录
+                    continue
+                if item_definitions_version and item_definitions_version != form.definitions.version:
                     continue
                 snapshot = item.snapshot
                 tree = None
@@ -1241,10 +1331,10 @@ class ProjectService:
                     project_context=self.artifacts.get(
                         ArtifactRef(**item.project_context_ref)).decode("utf-8"),
                     prompt_config_versions=dict(item.prompt_config_versions),
-                    item_definitions_version=item_definitions_version or DEFINITIONS.version,
+                    item_definitions_version=item_definitions_version or form.definitions.version,
                     # 补建只读 work_item_created 里冻结的 MCP 服务器设置（工单 #236）：
                     # 不取项目当前设置，旧事件没有这个字段时为空，按空设置读取
-                    mcp_servers=item.mcp_servers,
+                    mcp_servers=item.mcp_servers, form=form.name,
                 )
                 created.append(item.run_id)
         return created
@@ -1466,7 +1556,10 @@ class ProjectService:
         # 并发修改时按版本拒绝后提交的修改（设计说明第 5.2 节）。选择「跟随部门默认」清除本项目的模型选择，
         # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt。
         # reminders 是这次保存算出的建议能力提醒（设计说明第 5.6 节），随事件保存
-        if department not in DEPARTMENTS:
+        # 部门清单按项目现在的形态取（工单 #1509）：改名后的部门照常保存它的设置
+        state = saved_project(self.store, project_id)
+        definitions = DEFINITIONS if state is None else self._form_definitions(state)
+        if department not in definitions.departments:
             raise ValueError("unknown department")
         if type(base_version) is not int or base_version < 0:
             raise ValueError("base_version must be a non-negative integer")
@@ -1475,7 +1568,7 @@ class ProjectService:
 
         def configure(transaction: Transaction) -> dict[str, Any] | None:
             current = _default_settings(
-                deepcopy(self._writable_in(transaction, project_id))).department_settings[department]
+                deepcopy(self._writable_in(transaction, project_id)), definitions).department_settings[department]
             if base_version != current.version:
                 raise DepartmentSettingConflict(_setting_view(current))
             unchanged = (current.provider_id == selection.provider_id
@@ -1486,7 +1579,8 @@ class ProjectService:
                 return {**_setting_view(current), "unchanged": True}
             payload = selection.event_payload()
             if selection.department_prompt is not None:
-                ref = save_department_prompt(self.artifacts, project_id, department, selection.department_prompt)
+                ref = save_department_prompt(self.artifacts, project_id, department,
+                                            selection.department_prompt, definitions)
                 payload["department_prompt_ref"] = asdict(ref)
             payload.update({"department": department, "version": current.version + 1,
                             "base_version": base_version, "reminders": list(reminders or ())})
@@ -1590,7 +1684,10 @@ class ProjectService:
     def record_material(self, project_id: str, text: str, *, department: str | None = None,
                         command: Command | None = None) -> str:
         _require_text("text", text)
-        if department is not None and department not in DEPARTMENTS:
+        # 部门清单按项目现在的形态取（工单 #1509）：改名后的部门照常记它的材料
+        state = saved_project(self.store, project_id)
+        definitions = DEFINITIONS if state is None else self._form_definitions(state)
+        if department is not None and department not in definitions.departments:
             raise ValueError("unknown department")
 
         def record(transaction: Transaction) -> str:

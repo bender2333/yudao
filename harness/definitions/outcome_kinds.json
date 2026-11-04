@@ -1,0 +1,67 @@
+{
+  "kinds": [
+    {
+      "id": "product_spec",
+      "label": "PRD",
+      "why": "产品交的要求：目标、要求、验收标准与边界，修订写明改了什么"
+    },
+    {
+      "id": "product_decision",
+      "label": "产品决定",
+      "why": "产品对一项补充决定的正式接纳，多版并存，按内容去重"
+    },
+    {
+      "id": "delivery_spec",
+      "label": "交付",
+      "why": "工程交的交付说明与检查回执，绑定当前的 PRD 与有效合同"
+    },
+    {
+      "id": "independent_judgement",
+      "label": "独立判断",
+      "why": "核验角色只看事实时对当前交付的逐条判断，先于结论写下"
+    },
+    {
+      "id": "qa_review",
+      "label": "质检结论",
+      "why": "核验角色对当前交付的结论：放行结束事项，打回让被核验的角色重做"
+    },
+    {
+      "id": "structure",
+      "label": "结构说明",
+      "why": "建档时工程对已有项目的结构描述，核验角色据此核验基线"
+    },
+    {
+      "id": "baseline_review",
+      "label": "基线核验",
+      "why": "建档时核验角色对初始 PRD 与已有结构的逐条结论"
+    }
+  ],
+  "groups": [
+    {
+      "id": "watched_outputs",
+      "label": "成果驱动的成果",
+      "why": "成果驱动这份定义认得、由提议方式提交的正式成果；路由的定义按名称引用这一组",
+      "kinds": [
+        "product_spec",
+        "product_decision",
+        "delivery_spec",
+        "independent_judgement",
+        "qa_review",
+        "structure",
+        "baseline_review"
+      ]
+    }
+  ],
+  "skeleton": [
+    {
+      "id": "contract",
+      "label": "有效合同",
+      "why": "主机在接纳以后重新签发，算一种成果种类；由骨架写入，不由部门提交"
+    },
+    {
+      "id": "snapshot",
+      "label": "代码树快照",
+      "why": "事项创建事件里记下的代码树快照，最小投影把它折成一条成果；由骨架写入"
+    }
+  ]
+}

@@ -91,6 +91,9 @@ class ProjectEventType:
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
     # 项目设置里的 MCP 服务器（工单 #236）
     MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
+    # 项目的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：项目现在用发布带的哪一份，
+    # 带原值、新值与理由；事项创建时冻结形态名与它的定义版本
+    PROJECT_FORM_SET = "project_form_set"
     # 探测 MCP 服务器（工单 #1174，网络与 MCP 设计说明第 4.2 节）：一次探测的结果，带工具清单快照或失败原因
     TOOL_SERVER_PROBE_FINISHED = "tool_server_probe_finished"
     # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）

@@ -11,12 +11,13 @@ import threading
 from typing import Any
 
 from .artifacts import ArtifactStore
+from .definitions import DEFINITIONS
 from .event_store import EventStore
 from .projection import project_run
 from .write_path import NewEvent, Transaction
 from .git_versions import GitVersionStore
 from .materials import append_intend
-from .models import ArtifactRef, DEPARTMENTS, Event, EventType, new_id
+from .models import ArtifactRef, Event, EventType, new_id
 
 
 class RunTerminalError(ValueError):
@@ -72,8 +73,10 @@ class InteractionWriter:
         ))[0]
 
     def receive_guidance(self, transaction: Transaction, department: str, text: str, *,
-                         base_version: int | None = None) -> Event:
-        if department not in DEPARTMENTS:
+                         base_version: int | None = None, definitions: Any | None = None) -> Event:
+        # 部门清单按这个事项冻结的那份定义核对（工单 #1509）：不给时读进程加载的那一份
+        definition = DEFINITIONS if definitions is None else definitions
+        if department not in definition.departments:
             raise ValueError("unknown department")
         if not isinstance(text, str) or not text.strip():
             raise ValueError("guidance must be a non-empty string")

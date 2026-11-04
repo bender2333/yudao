@@ -3,7 +3,9 @@ from harness.tests.helpers import adjudication_view, work_basis
 
 from harness.actions import FactsQuery
 from harness.adapters.fake import FakeAdapter
-from harness.adjudication import WorkBasis, commit_decision, facts_query, proposal_decision, tool_permission
+from harness.adjudication import (WorkBasis, commit_decision, facts_query, proposal_decision, submission_basis,
+                                  tool_permission)
+from harness.minimal_projection import AcceptedArtifact, MinimalProjection
 from harness.watched_outputs import has_new_work
 from harness.environment import LocalEnvironment
 from harness.models import SessionRecord
@@ -193,3 +195,19 @@ def test_quality_write_tools_only_target_the_test_materials(tmp_path):
 
 
 
+
+
+def test_the_submission_basis_covers_every_accepted_artifact():
+    # 守 R1（写入先过裁决）：提交前复核的依据是投影里每一种成果的当前版本（工单 #1456）：校验以后任何一样换了，这次提交就不能按原来的
+    # 依据接纳。这里只看「哪几样在依据里」——不跑整圈，也不数别的部门的成果
+    base = MinimalProjection(run_id="run_basis", artifacts={
+        "product_spec": AcceptedArtifact(version=1, content_hash="sha256:spec"),
+        "contract": AcceptedArtifact(version=1, content_hash="sha256:contract")})
+    assert submission_basis(base) == {"artifacts": {"product_spec": "sha256:spec",
+                                                    "contract": "sha256:contract"}}
+    # 多接纳了一样成果（例如产品决定追加进合同以后又多了一份结构说明）以后，依据跟着变
+    widened = replace(base, artifacts={**base.artifacts,
+                                       "structure": AcceptedArtifact(version=1, content_hash="sha256:structure")})
+    assert submission_basis(widened) != submission_basis(base)
+    # 同一版成果重新接纳（摘要相同）不算依据变了
+    assert submission_basis(replace(base, artifacts=dict(base.artifacts))) == submission_basis(base)

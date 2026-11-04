@@ -6,7 +6,7 @@ import pygit2
 import pytest
 
 from harness.adapters.fake import FakeAdapter
-from harness.event_store import Command, catalog_stream
+from harness.event_store import Command, catalog_stream, project_stream
 from harness.models import ArtifactRef, CatalogEventType, EventType, ProjectEventType
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.selection import ModelSelection
@@ -16,7 +16,7 @@ from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tests.helpers import merge_scripts, quality_turns
 from harness.tree_archive import artifact_run, load_tree
-from harness.write_path import NewCatalogEvent
+from harness.write_path import NewCatalogEvent, NewProjectEvent
 
 # 应用层合同中的事件载荷类型与控制核心实际写入的载荷一致。run 事件的各种路径由事件序列对照的全部场景核对
 # （test_event_sequence.py），这里从系统整体运行一个项目：登记、配置、材料、归档与恢复、事项开始失败、
@@ -35,10 +35,10 @@ def _release_script(summary, files=None):
     }
 
 def _release_report() -> ReleaseCheckReport:
-    # 一次通过的发布检查结果：与 harness/release_check.py 写进决定请求的同一形状
+    # 一次通过的发布检查结果：与 harness/release_check.py 写进决定请求的同一形状（工单 #1473 起没有行数上限）
     return ReleaseCheckReport(
         repository="D:/repo", pending_commit="0123456789abcdef", base_tag="v0.1.0",
-        kernel_changes=("harness/bounds.py",), kernel_python_lines=5290, python_lines_max=5471,
+        kernel_changes=("harness/bounds.py",), kernel_python_lines=5290,
         findings=(), text="发布检查：通过")
 
 
@@ -140,6 +140,11 @@ def test_every_event_of_a_project_follows_the_payload_contract(data_dir):
     project_id = projects.register("载荷", "核对每种事件的载荷")
     projects.rename(project_id, "载荷核对")
     projects.set_goal(project_id, "核对修改以后的长期目标")
+    # 项目的形态（工单 #1392）：改形态的命令与查询在 #1402，这里经写入口直接写这条项目事件，核对它的载荷合同
+    system.writes.append(project_stream(project_id), NewProjectEvent(
+        ProjectEventType.PROJECT_FORM_SET,
+        {"previous_form": "three_departments", "form": "three_departments", "reason": "核对载荷"},
+        actor="user:local"))
     projects.pin(project_id, True)
     projects.configure_department_settings(
         project_id, "engineering", ModelSelection(department_prompt="先写计划再写代码。"), 0)

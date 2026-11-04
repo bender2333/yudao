@@ -1943,6 +1943,57 @@
         }
       }
     },
+    "/api/commands/organization.adopt": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "organization.adopt",
+        "operationId": "command_organization_adopt",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationAdopt"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/system.status": {
       "get": {
         "tags": [
@@ -3976,6 +4027,48 @@
         }
       }
     },
+    "/api/queries/project.organization": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "project.organization",
+        "operationId": "query_project_organization",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ProjectOrganizationResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "tags": [
@@ -4939,6 +5032,29 @@
           "media_type"
         ],
         "title": "ArtifactRef"
+      },
+      "AskRelation": {
+        "properties": {
+          "requester": {
+            "type": "string",
+            "title": "Requester"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requester",
+          "recipient",
+          "ref"
+        ],
+        "title": "AskRelation"
       },
       "AskView": {
         "properties": {
@@ -6005,6 +6121,13 @@
             "type": "object",
             "title": "Bindings"
           },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogDepartment"
+            },
+            "type": "array",
+            "title": "Departments"
+          },
           "department_reminders": {
             "additionalProperties": {
               "items": {
@@ -6050,6 +6173,7 @@
           "models",
           "admissions",
           "bindings",
+          "departments",
           "department_reminders",
           "model_reminders"
         ],
@@ -6683,6 +6807,25 @@
           "version"
         ],
         "title": "CatalogCredential"
+      },
+      "CatalogDepartment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "CatalogDepartment"
       },
       "CatalogDepartmentDefaultsSave": {
         "properties": {
@@ -8505,7 +8648,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 13
+            "example": 15
           },
           "contract_digest": {
             "type": "string",
@@ -9373,6 +9516,83 @@
         ],
         "title": "FlowRecord"
       },
+      "FormChange": {
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "title": "Event Id"
+          },
+          "previous_form": {
+            "type": "string",
+            "title": "Previous Form"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "At"
+          },
+          "actor": {
+            "type": "string",
+            "title": "Actor"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "event_id",
+          "previous_form",
+          "form",
+          "reason",
+          "at",
+          "actor"
+        ],
+        "title": "FormChange"
+      },
+      "FormChoice": {
+        "properties": {
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "verifier_roles": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Verifier Roles"
+          },
+          "open_loop": {
+            "type": "boolean",
+            "title": "Open Loop"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form",
+          "description",
+          "version",
+          "verifier_roles",
+          "open_loop"
+        ],
+        "title": "FormChoice"
+      },
       "GuidanceRecord": {
         "properties": {
           "guidance_id": {
@@ -9874,7 +10094,14 @@
             "title": "Kernel Python Lines"
           },
           "python_lines_max": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Python Lines Max"
           },
           "passed": {
@@ -9898,7 +10125,6 @@
           "base_tag",
           "kernel_changes",
           "kernel_python_lines",
-          "python_lines_max",
           "passed",
           "findings"
         ],
@@ -11174,6 +11400,128 @@
         ],
         "title": "OnboardingRound"
       },
+      "OrganizationAdopt": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Version"
+          },
+          "project_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Project Id"
+          },
+          "form": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Form"
+          },
+          "changes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Changes"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "project_id",
+          "form"
+        ],
+        "title": "OrganizationAdopt"
+      },
+      "OrganizationDepartment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "verifier": {
+            "type": "boolean",
+            "title": "Verifier",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "OrganizationDepartment"
+      },
+      "OrganizationRole": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "ref"
+        ],
+        "title": "OrganizationRole"
+      },
+      "OrganizationVerifier": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "verifies": {
+            "items": {
+              "$ref": "#/components/schemas/VerifiedRole"
+            },
+            "type": "array",
+            "title": "Verifies"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "verifies",
+          "ref"
+        ],
+        "title": "OrganizationVerifier"
+      },
       "OverlayCapability": {
         "properties": {
           "name": {
@@ -11686,6 +12034,66 @@
           "source_path"
         ],
         "title": "ProjectOnboard"
+      },
+      "ProjectOrganizationResult": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "form_in_release": {
+            "type": "boolean",
+            "title": "Form In Release"
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDepartment"
+            },
+            "type": "array",
+            "title": "Departments"
+          },
+          "forms": {
+            "items": {
+              "$ref": "#/components/schemas/FormChoice"
+            },
+            "type": "array",
+            "title": "Forms"
+          },
+          "history": {
+            "items": {
+              "$ref": "#/components/schemas/FormChange"
+            },
+            "type": "array",
+            "title": "History"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "form",
+          "version",
+          "form_in_release",
+          "departments",
+          "forms",
+          "history"
+        ],
+        "title": "ProjectOrganizationResult"
       },
       "ProjectOverviewResult": {
         "properties": {
@@ -12521,6 +12929,34 @@
           "message"
         ],
         "title": "Rejected"
+      },
+      "RejectionRelation": {
+        "properties": {
+          "verifier": {
+            "type": "string",
+            "title": "Verifier"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "verifier",
+          "role",
+          "outcome",
+          "ref"
+        ],
+        "title": "RejectionRelation"
       },
       "ReplayCheckResult": {
         "properties": {
@@ -14027,6 +14463,24 @@
           "data"
         ],
         "title": "Snapshot[ProjectLoopResult]"
+      },
+      "Snapshot_ProjectOrganizationResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ProjectOrganizationResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ProjectOrganizationResult]"
       },
       "Snapshot_ProjectOverviewResult_": {
         "properties": {
@@ -15595,6 +16049,28 @@
         ],
         "title": "VerificationRecord"
       },
+      "VerifiedRole": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "outcomes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outcomes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "outcomes"
+        ],
+        "title": "VerifiedRole"
+      },
       "VersionEntry": {
         "properties": {
           "event_id": {
@@ -15662,6 +16138,34 @@
           "files"
         ],
         "title": "VersionEntry"
+      },
+      "WatchedRelation": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "recipient",
+          "outcome",
+          "ref"
+        ],
+        "title": "WatchedRelation"
       },
       "WorkItemAppendInput": {
         "properties": {
@@ -16159,6 +16663,16 @@
             },
             "type": "object",
             "title": "Refs"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkItemOrganization"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -16259,6 +16773,77 @@
           "old_runs"
         ],
         "title": "WorkItemMaterialsResult"
+      },
+      "WorkItemOrganization": {
+        "properties": {
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "routing": {
+            "type": "string",
+            "title": "Routing"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationRole"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "verifiers": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationVerifier"
+            },
+            "type": "array",
+            "title": "Verifiers"
+          },
+          "completing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "watched": {
+            "items": {
+              "$ref": "#/components/schemas/WatchedRelation"
+            },
+            "type": "array",
+            "title": "Watched"
+          },
+          "asks": {
+            "items": {
+              "$ref": "#/components/schemas/AskRelation"
+            },
+            "type": "array",
+            "title": "Asks"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/RejectionRelation"
+            },
+            "type": "array",
+            "title": "Rejections"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form",
+          "routing",
+          "roles",
+          "verifiers",
+          "completing",
+          "watched",
+          "asks",
+          "rejections"
+        ],
+        "title": "WorkItemOrganization",
+        "description": "事项冻结定义里的组织（工单 #1381，画面与播放设计说明「画面跟着定义伸缩」的输入）。\n\n取值来自这个事项创建时冻结的那份定义（形态与核验角色设计说明「形态随事项冻结」），不读进程加载时的那份；\n每项事实带给出它的事件位置与来源种类，与 project.loop 已有的几个事实元素一样。"
       },
       "WorkItemProgress": {
         "properties": {
@@ -16759,6 +17344,26 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/FileActionComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrowserSessionState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrowserObservation"
               },
               {
                 "type": "null"
@@ -18738,6 +19343,76 @@
           "git_version"
         ],
         "title": "BaselineReviewAcceptedPayload",
+        "type": "object"
+      },
+      "BrowserObservation": {
+        "additionalProperties": false,
+        "properties": {
+          "accessibility": {
+            "title": "Accessibility",
+            "type": "string"
+          },
+          "screenshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "structure_truncated": {
+            "default": false,
+            "title": "Structure Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accessibility"
+        ],
+        "title": "BrowserObservation",
+        "type": "object"
+      },
+      "BrowserSessionState": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "interrupted",
+              "ended"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tree Digest"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "BrowserSessionState",
         "type": "object"
       },
       "CatalogCandidatesCollectedEvent": {
@@ -21799,6 +22474,7 @@
                 "enum": [
                   "released",
                   "baseline_verified",
+                  "open_loop",
                   "max_cycles",
                   "model_steps_exhausted",
                   "cannot_verify",
@@ -31871,6 +32547,175 @@
         "title": "ProjectDecisionWithdrawnPayload",
         "type": "object"
       },
+      "ProjectFormSetEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_form_set",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectFormSetPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectFormSetEvent",
+        "type": "object"
+      },
+      "ProjectFormSetPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "previous_form": {
+            "title": "Previous Form",
+            "type": "string"
+          },
+          "form": {
+            "title": "Form",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "previous_form",
+          "form"
+        ],
+        "title": "ProjectFormSetPayload",
+        "type": "object"
+      },
       "ProjectGoalChangedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -34425,6 +35270,16 @@
             "title": "Run Event Version",
             "type": "integer"
           },
+          "form": {
+            "default": "",
+            "title": "Form",
+            "type": "string"
+          },
+          "open_loop": {
+            "default": false,
+            "title": "Open Loop",
+            "type": "boolean"
+          },
           "onboarding_basis": {
             "anyOf": [
               {
@@ -34617,7 +35472,8 @@
           "stop_reason": {
             "enum": [
               "released",
-              "baseline_verified"
+              "baseline_verified",
+              "open_loop"
             ],
             "title": "Stop Reason",
             "type": "string"
@@ -37404,6 +38260,13 @@
             ],
             "title": "Refused Reason"
           },
+          "images": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactRef"
+            },
+            "title": "Images",
+            "type": "array"
+          },
           "after_snapshot_ref": {
             "anyOf": [
               {
@@ -38533,6 +39396,874 @@
         "title": "ToolStartedPayload",
         "type": "object"
       },
+      "TrialCaseConcludedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "trial_case_concluded",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TrialCaseConcludedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "TrialCaseConcludedEvent",
+        "type": "object"
+      },
+      "TrialCaseConcludedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "result": {
+            "enum": [
+              "passed",
+              "failed",
+              "unverified",
+              "interrupted"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "observed": {
+            "default": "",
+            "title": "Observed",
+            "type": "string"
+          },
+          "evidence_steps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Steps",
+            "type": "array"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "session_id",
+          "department",
+          "result"
+        ],
+        "title": "TrialCaseConcludedPayload",
+        "type": "object"
+      },
+      "TrialCaseOpenedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "trial_case_opened",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TrialCaseOpenedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "TrialCaseOpenedEvent",
+        "type": "object"
+      },
+      "TrialCaseOpenedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "trial_session_id": {
+            "title": "Trial Session Id",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "activation_id": {
+            "title": "Activation Id",
+            "type": "string"
+          },
+          "product_spec_hash": {
+            "title": "Product Spec Hash",
+            "type": "string"
+          },
+          "tree_digest": {
+            "title": "Tree Digest",
+            "type": "string"
+          },
+          "criteria": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Criteria",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "plan": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Plan",
+            "type": "array"
+          },
+          "expected": {
+            "title": "Expected",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id",
+          "session_id",
+          "trial_session_id",
+          "department",
+          "activation_id",
+          "product_spec_hash",
+          "tree_digest",
+          "criteria",
+          "title",
+          "plan",
+          "expected"
+        ],
+        "title": "TrialCaseOpenedPayload",
+        "type": "object"
+      },
+      "TrialSessionEndedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "trial_session_ended",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TrialSessionEndedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "TrialSessionEndedEvent",
+        "type": "object"
+      },
+      "TrialSessionEndedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "web",
+              "desktop"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "stopped",
+              "replaced",
+              "interrupted",
+              "user_stopped",
+              "run_ended"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "create_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
+          },
+          "ended": {
+            "default": false,
+            "title": "Ended",
+            "type": "boolean"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          }
+        },
+        "required": [
+          "session_id",
+          "department",
+          "kind",
+          "reason"
+        ],
+        "title": "TrialSessionEndedPayload",
+        "type": "object"
+      },
+      "TrialSessionStartedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "trial_session_started",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TrialSessionStartedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "TrialSessionStartedEvent",
+        "type": "object"
+      },
+      "TrialSessionStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "web",
+              "desktop"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "launch_name": {
+            "title": "Launch Name",
+            "type": "string"
+          },
+          "system": {
+            "enum": [
+              "windows",
+              "linux"
+            ],
+            "title": "System",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "ready_url": {
+            "title": "Ready Url",
+            "type": "string"
+          },
+          "tree_digest": {
+            "title": "Tree Digest",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "delivery_snapshot",
+              "workspace_seal"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "create_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
+          }
+        },
+        "required": [
+          "session_id",
+          "department",
+          "kind",
+          "launch_name",
+          "system",
+          "port",
+          "ready_url",
+          "tree_digest",
+          "source"
+        ],
+        "title": "TrialSessionStartedPayload",
+        "type": "object"
+      },
       "Usage": {
         "additionalProperties": false,
         "properties": {
@@ -39420,6 +41151,11 @@
                 "type": "null"
               }
             ]
+          },
+          "form": {
+            "default": "",
+            "title": "Form",
+            "type": "string"
           }
         },
         "required": [
@@ -40728,6 +42464,7 @@
             "project_decision_answered": "#/components/schemas/ProjectDecisionAnsweredEvent",
             "project_decision_requested": "#/components/schemas/ProjectDecisionRequestedEvent",
             "project_decision_withdrawn": "#/components/schemas/ProjectDecisionWithdrawnEvent",
+            "project_form_set": "#/components/schemas/ProjectFormSetEvent",
             "project_goal_changed": "#/components/schemas/ProjectGoalChangedEvent",
             "project_parameter_set": "#/components/schemas/ProjectParameterSetEvent",
             "project_pinned": "#/components/schemas/ProjectPinnedEvent",
@@ -40756,6 +42493,10 @@
             "tool_server_probe_finished": "#/components/schemas/ToolServerProbeFinishedEvent",
             "tool_skipped": "#/components/schemas/ToolSkippedEvent",
             "tool_started": "#/components/schemas/ToolStartedEvent",
+            "trial_case_concluded": "#/components/schemas/TrialCaseConcludedEvent",
+            "trial_case_opened": "#/components/schemas/TrialCaseOpenedEvent",
+            "trial_session_ended": "#/components/schemas/TrialSessionEndedEvent",
+            "trial_session_started": "#/components/schemas/TrialSessionStartedEvent",
             "user_input_received": "#/components/schemas/UserInputReceivedEvent",
             "work_item_created": "#/components/schemas/WorkItemCreatedEvent",
             "work_item_start_failed": "#/components/schemas/WorkItemStartFailedEvent",
@@ -40904,6 +42645,18 @@
             "$ref": "#/components/schemas/McpServerFailedEvent"
           },
           {
+            "$ref": "#/components/schemas/TrialSessionStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TrialSessionEndedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TrialCaseOpenedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TrialCaseConcludedEvent"
+          },
+          {
             "$ref": "#/components/schemas/RunDoneEvent"
           },
           {
@@ -40986,6 +42739,9 @@
           },
           {
             "$ref": "#/components/schemas/ProjectParameterSetEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectFormSetEvent"
           },
           {
             "$ref": "#/components/schemas/WritebackCompletedEvent"

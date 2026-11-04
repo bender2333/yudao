@@ -3,10 +3,13 @@
 # 「试用工具」与「恢复契约」；总图第四节「动作」缝的 trial 类别）。
 #
 # 会话记录（身份、部门、种类、启动方式、端口、试用副本、各进程的进程号与启动时间）与动作记录保存在一起：
-# 本模块交回的记录随 tool_called 的载荷写入事件。持有会话的进程重新启动、run 结束时结束会话与清理遗留进程
-# 由后续工单接上；这里只负责一个会话从建立到停止。
+# 本模块交回的记录随 tool_called 的载荷写入事件。会话的开始与结束各写一条应用事件
+# （`trial_session_started`、`trial_session_ended`，设计说明第 12 节）；run 进入终态时由 run 的收尾
+# 结束全部会话，持有会话的进程重新启动时由启动扫描按会话记录里的进程号与创建时间结束遗留的进程树
+# （工单 #1183）。
 #
 # 执行层的代码：只导入标准库与本层的工作树、进程树与凭据遮蔽，不导入控制核心与应用层。
+# 事件的写入方由装配一方（薄驱动）交进来（`bind_events`），与 MCP 会话的生命周期事件同一个做法。
 
 from __future__ import annotations
 
@@ -27,8 +30,10 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Callable
 
+import psutil
+
 from .definitions import DEFINITIONS
-from .models import new_id
+from .models import EventType, new_id
 from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .redact import redact_text
@@ -57,6 +62,17 @@ PROBE_TIMEOUT_SEC = 90
 # 一条工具结果带回来的输出上限（字符）：取自规则登记里的 tool_output_limit，与执行环境按同一条规则
 # 截断（读输出、结束会话与失败回执带回来的启动输出都走这个上限）
 DEFAULT_OUTPUT_LIMIT = int(DEFINITIONS.rule_value("tool_output_limit"))
+
+# 会话的结束方式（设计说明第 12 节 `trial_session_ended` 的取值）：停止、被新会话替换、中断（持有会话的
+# 进程重新启动）、用户停止（停止使用桌面，本机版的桌面会话还没有接上，取值先留着）、run 结束
+END_STOPPED = "stopped"
+END_REPLACED = "replaced"
+END_INTERRUPTED = "interrupted"
+END_USER_STOPPED = "user_stopped"
+END_RUN_ENDED = "run_ended"
+
+# 会话事件写到 run 流的接口：装配一方（薄驱动）给出，参数是 run 身份、事件种类与载荷
+EventSink = Callable[[str, str, dict[str, Any]], None]
 
 
 class TrialStartFailed(Exception):
@@ -90,6 +106,9 @@ class TrialSession:
     tree: ProcessTree | None
     file_handle: Any
     started_at: str
+    # 直接子进程的创建时间（psutil，秒）：与进程号一起记进会话记录。持有会话的进程重新启动时按这两项
+    # 核对并结束遗留的进程树——进程号可能已经被别的进程复用（设计说明第 3.4 节、工单 #1183）
+    process_create_time: float | None = None
     status: str = "running"
     ended_reason: str | None = None
     exit_code: int | None = None
@@ -110,6 +129,7 @@ class TrialSession:
                 "copy_source": self.source,
                 "copy": str(self.copy_root),
                 "process_id": None if self.process is None else self.process.pid,
+                "process_create_time": self.process_create_time,
                 "started_at": self.started_at,
                 "status": self.status,
                 "ended_reason": self.ended_reason,
@@ -124,11 +144,13 @@ class TrialSession:
             self.status = "ended"
             self.ended_reason = reason
 
-    def end(self, reason: str) -> None:
-        # 结束交付软件的整棵进程树。可以重复调用：状态已经是结束时不再动已经放掉的资源
+    def end(self, reason: str) -> bool:
+        # 结束交付软件的整棵进程树。可以重复调用：状态已经是结束时不再动已经放掉的资源。
+        # 返回这一次是否结束了仍然在的进程树（启动扫描据此写 `ended`：进程已经不在了也是正常结束）
         with self._lock:
             if self.status == "ended":
-                return
+                return False
+            was_running = self.tree is not None
             if self.process is not None and self.exit_code is None:
                 ret = self.process.poll()
                 if ret is not None:
@@ -150,6 +172,7 @@ class TrialSession:
                     self.file_handle = None
             self.status = "ended"
             self.ended_reason = reason
+            return was_running
 
 
 _PORT_LOCK = Lock()
@@ -411,6 +434,15 @@ def select_command(launch: dict[str, Any], system: str | None) -> list[str]:
     return list(commands[system])
 
 
+def _process_create_time(pid: int) -> float | None:
+    # 进程的创建时间（psutil）：与进程号一起记进会话记录。读不到时为空，遗留进程的结束因此找不到它，
+    # 不按只剩进程号去杀进程（进程号可能已经被别的进程复用）
+    try:
+        return float(psutil.Process(pid).create_time())
+    except (psutil.NoSuchProcess, psutil.AccessDenied):
+        return None
+
+
 def _http_ready(url: str) -> bool:
     # 就绪条件：对替换端口以后的地址的请求得到任何 HTTP 响应
     try:
@@ -467,18 +499,59 @@ class TrialSessionTable:
 
     会话记录与动作记录一起保存（设计说明第 3.4 节）：`start` 交回会话记录与启动输出的开头，
     `read_output` 与 `stop` 交回同一个记录与输出。程序探测可以注入，测试用它模拟缺少某个程序。
+    会话开始与结束时经装配一方交来的写入方（`bind_events`）写一条应用事件；run 进入终态时由
+    `stop_run` 结束这个 run 的全部会话，结束事件排在 `flush` 里写（工单 #1183）。
     """
 
-    def __init__(self, probe: Callable[[], list[dict[str, str]]] | None = None) -> None:
+    def __init__(self, probe: Callable[[], list[dict[str, str]]] | None = None,
+                 *, events: EventSink | None = None) -> None:
         self._sessions: dict[tuple[str | None, str], TrialSession] = {}
         self._lock = Lock()
         self._probe = probe or missing_programs
+        # 写会话事件的写入方（装配一方给出）；没有给时只维护会话表，不写事件（单一模块的用例）
+        self._events = events
+        # run 结束时会话已经结束、结束事件还没有写的记录（工单 #1183）：run 进入终态的事件正在提交时
+        # 不能再写一条事件（事件的位置会乱序），由调用方在安全的时候 flush
+        self._pending: list[tuple[str, str, dict[str, Any]]] = []
+
+    def bind_events(self, events: EventSink | None) -> None:
+        # 交入写入方：会话开始与结束时经它写一条应用事件（装配的一方在构造它以后接上）
+        self._events = events
+
+    def _record(self, run_id: str | None, event_type: str, payload: dict[str, Any], *,
+                defer: bool = False) -> None:
+        # 一条会话事件：没有 run 身份（直接构造执行环境的用例）时不写；defer 时排队等 flush
+        if run_id is None:
+            return
+        if defer:
+            with self._lock:
+                self._pending.append((run_id, event_type, payload))
+            return
+        if self._events is not None:
+            self._events(run_id, event_type, payload)
+
+    def flush(self, run_id: str | None = None) -> int:
+        """写排队的会话结束事件（run 的终态事件已经提交以后调用）；交回写了几条。
+
+        还没有接上写入方时队列留着，不等（装配之前不会有会话）。
+        """
+        if self._events is None:
+            return 0
+        with self._lock:
+            if run_id is None:
+                queued, self._pending = self._pending, []
+            else:
+                queued = [item for item in self._pending if item[0] == run_id]
+                self._pending = [item for item in self._pending if item[0] != run_id]
+        for item_run, event_type, payload in queued:
+            self._events(item_run, event_type, payload)
+        return len(queued)
 
     async def start(self, *, run_id: str | None, department: str, launch: dict[str, Any],
                     source_tree: CapturedTree, run_root: Path, source: str,
                     output_limit: int = DEFAULT_OUTPUT_LIMIT, stop: Any = None) -> dict[str, Any]:
         # 结束本部门原来的会话（设计说明第 3.4 节），再建立新的会话
-        self.stop(run_id, department, reason="replaced by a new trial session")
+        self.stop(run_id, department, reason=END_REPLACED)
         missing = self._probe()
         if missing:
             names = ", ".join(item["program"] for item in missing)
@@ -540,6 +613,7 @@ class TrialSessionTable:
                 ready_url=ready_url, copy_root=copy_root, tree_digest=digest, source=source,
                 output_path=output_path, process=process, tree=tree, file_handle=file_handle,
                 started_at=datetime.now(timezone.utc).isoformat(),
+                process_create_time=_process_create_time(process.pid),
             )
             await self._wait_ready(session, int(launch["ready_timeout_sec"]), stop, output_limit)
         except TrialStartFailed as exc:
@@ -553,6 +627,9 @@ class TrialSessionTable:
             raise
         with self._lock:
             self._sessions[(run_id, department)] = session
+        # 会话建立以后写一条开始事件（设计说明第 12 节）：身份、部门、种类、启动方式、选用命令的系统、
+        # 端口与就绪地址、试用副本的树摘要与清单来源，以及进程号与创建时间（启动扫描按这两项结束遗留进程）
+        self._record(run_id, EventType.TRIAL_SESSION_STARTED, _started_payload(session))
         head, truncated = _head(output_path, output_limit)
         return {"session": session.record(), "output": head, "truncated": truncated}
 
@@ -616,16 +693,162 @@ class TrialSessionTable:
         return {"session_id": session.session_id, "output": output, "truncated": truncated,
                 "status": session.status}
 
-    def stop(self, run_id: str | None, department: str, *, reason: str = "stopped",
+    def stop(self, run_id: str | None, department: str, *, reason: str = END_STOPPED,
              limit: int = DEFAULT_OUTPUT_LIMIT) -> dict[str, Any]:
-        # 结束会话：结束交付软件的进程树、删掉试用副本、放掉端口；交回结束方式与输出的末尾部分
+        # 结束会话：结束交付软件的进程树、删掉试用副本、放掉端口；交回结束方式与输出的末尾部分。
+        # 这一条在工具执行里调用（trial_stop，或开始新会话时结束原来的会话），没有事务正在进行，
+        # 结束事件在这里直接写
         with self._lock:
             session = self._sessions.pop((run_id, department), None)
         if session is None:
             return {"session": None, "ended": False, "reason": reason, "output": "", "truncated": False}
-        session.end(reason)
+        ended = session.end(reason)
         output, truncated = _tail(session.output_path, limit)
         _remove_tree(session.copy_root)
         _release_port(session.port)
+        self._record(run_id, EventType.TRIAL_SESSION_ENDED,
+                     _ended_payload(session, reason, ended=ended))
         return {"session": session.record(), "ended": True, "reason": reason,
                 "output": output, "truncated": truncated}
+
+    def stop_run(self, run_id: str | None, *, reason: str = END_RUN_ENDED) -> list[dict[str, Any]]:
+        """结束这个 run 的全部会话（run 进入终态时由 run 的收尾调用，工单 #1183）。
+
+        结束交付软件的进程树、删掉试用副本、放掉端口，交回结束时的会话记录。结束事件在这里排队，
+        由调用方在安全的时候用 `flush` 写：这条路径在 run 的终态事件提交之后的效果里运行，
+        那时再写一条事件会让订阅方先看到后面那条，终态事件被当成旧位置丢掉。
+        """
+        with self._lock:
+            keys = [key for key in self._sessions if key[0] == run_id]
+            sessions = [self._sessions.pop(key) for key in keys]
+        records: list[dict[str, Any]] = []
+        for session in sessions:
+            ended = session.end(reason)
+            _remove_tree(session.copy_root)
+            _release_port(session.port)
+            records.append(session.record())
+            self._record(run_id, EventType.TRIAL_SESSION_ENDED,
+                         _ended_payload(session, reason, ended=ended), defer=True)
+        return records
+
+
+# ---------------------------------------------------------------------------
+# 会话事件的载荷（设计说明第 12 节 `trial_session_started`、`trial_session_ended`）
+
+
+def _started_payload(session: TrialSession) -> dict[str, Any]:
+    # 开始时的事实：身份、部门、种类、启动方式的名称、选用命令的系统、端口与就绪地址、试用副本的树摘要
+    # 与清单来源，以及进程号与创建时间（启动扫描按后两项结束遗留进程）。
+    # 完整的启动方式不在这里重复记一份：它是模型给出的工具参数，已经按 ADR-0038 脱敏记在工具事件里
+    record = session.record()
+    return {
+        "session_id": record["session_id"],
+        "department": record["department"],
+        "kind": record["kind"],
+        "launch_name": record["launch_name"],
+        "system": record["system"],
+        "port": record["port"],
+        "ready_url": record["ready_url"],
+        "tree_digest": record["tree_digest"],
+        "source": record["copy_source"],
+        "pid": record["process_id"],
+        "create_time": record["process_create_time"],
+    }
+
+
+def _ended_payload(session: TrialSession, reason: str, *, ended: bool) -> dict[str, Any]:
+    # 结束时的事实：与开始事件按（run、会话身份）配对；reason 是结束方式，ended 说明这一次是否真的
+    # 结束了仍然存活的进程（进程已经不在了也是 False）
+    record = session.record()
+    return {
+        "session_id": record["session_id"],
+        "department": record["department"],
+        "kind": record["kind"],
+        "reason": reason,
+        "pid": record["process_id"],
+        "create_time": record["process_create_time"],
+        "ended": bool(ended),
+        "exit_code": record["exit_code"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# 遗留的会话（设计说明第 3.4、13 节，工单 #1183）：Yudao 启动时结束没有结束记录的会话留下的进程树，
+# 补写 trial_session_ended。进程号与创建时间都取自会话记录（开始事件的载荷）
+
+
+@dataclass(frozen=True)
+class LeftoverSession:
+    # 一条没有结束记录的开始：哪个 run 的哪个会话，部门的种类，以及它记录的进程号与创建时间
+    run_id: str
+    session_id: str
+    department: str
+    kind: str
+    pid: int | None
+    create_time: float | None
+
+
+# 按（run、会话身份）配对的两类事件：开始与结束。结束记录一到就配成一对
+_LEFTOVER_TYPES = (EventType.TRIAL_SESSION_STARTED, EventType.TRIAL_SESSION_ENDED)
+# 一次读多少条：按种类过滤、按位置翻页，不把全部事件读进内存
+_LEFTOVER_PAGE = 1000
+
+
+def leftover_sessions(store, *, limit: int = _LEFTOVER_PAGE) -> list[LeftoverSession]:
+    """有开始记录、没有结束记录的会话（按（run、会话身份）配对，先开始先配对）。
+
+    Yudao 启动时用这份清单结束遗留的进程树并补写结束事件（设计说明第 3.4、13 节）：
+    进程崩溃时结束事件没有写下来，交付软件的进程树可能还活着。
+    """
+    open_starts: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    after = 0
+    while True:
+        batch = store.read(after, types=_LEFTOVER_TYPES, limit=limit)
+        if not batch:
+            break
+        for event in batch:
+            after = max(after, int(event.position))
+            payload = event.payload or {}
+            key = (str(event.run_id or ""), str(payload.get("session_id") or ""))
+            if event.type == EventType.TRIAL_SESSION_STARTED:
+                open_starts.setdefault(key, []).append(payload)
+                continue
+            pending = open_starts.get(key)
+            if pending:
+                pending.pop(0)
+    return [LeftoverSession(run_id=run_id, session_id=session_id,
+                            department=str(payload.get("department") or ""),
+                            kind=str(payload.get("kind") or "web"),
+                            pid=payload.get("pid"), create_time=payload.get("create_time"))
+            for (run_id, session_id), pending in open_starts.items() for payload in pending]
+
+
+def end_leftover_session(leftover: LeftoverSession) -> bool:
+    """按进程号与创建时间结束遗留的进程树；两项都对得上才结束（进程号可能已经被别的进程复用）。
+
+    交回这一次是否真的结束了仍然存活的进程。
+    """
+    if leftover.pid is None or leftover.create_time is None:
+        return False
+    return terminate_process_tree(int(leftover.pid), float(leftover.create_time))
+
+
+def terminate_process_tree(pid: int, create_time: float) -> bool:
+    # 结束一棵进程树（先子进程、后它自己），等它们真的停下；进程不在、没有权限或对不上时交回 False
+    try:
+        process = psutil.Process(pid)
+        if abs(process.create_time() - create_time) > 1.0:
+            return False
+        tree = process.children(recursive=True)
+        for child in tree:
+            child.kill()
+        process.kill()
+        psutil.wait_procs([*tree, process], timeout=5)
+    except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+        return False
+    return True
+
+
+def remove_trial_copy(run_root: str | Path, session_id: str) -> None:
+    # 删掉一个会话的试用副本（启动扫描结束遗留会话时用：结束事件没有写下来的会话，副本也还在）
+    _remove_tree(trial_session_root(run_root, session_id))

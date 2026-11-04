@@ -51,7 +51,7 @@
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"d38dff4bd587076c","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"a93297d0617646aa","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../docs/agents/workflow.md"],"seen":"3851a47f4f6c331d","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能"},
-{"dst":"docs/agents/workflow.md#工作方式 > 9. 技能","kind":"link","raws":["../../docs/agents/workflow.md"],"seen":"6ce7d3f567bb8d51","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能"},
+{"dst":"docs/agents/workflow.md#工作方式 > 9. 技能","kind":"link","raws":["../../docs/agents/workflow.md"],"seen":"c4489715b1654278","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能"},
 {"dst":"docs/agents/autopilot-runtime.md#运行配置 > 3. 命令","kind":"link","raws":["../../docs/agents/autopilot-runtime.md"],"seen":"85e3f3ab74ffee9d","src":".claude/skills/README.md#技能使用说明 > 常见用法"},
 {"dst":".claude/skills/discuss/SKILL.md","kind":"link","raws":["discuss/SKILL.md"],"seen":"101b2fa9de41f1cb","src":".claude/skills/README.md#技能使用说明 > 技能一览 > 入口与架构师的技能 > 表1 > discuss"},
 {"dst":".claude/skills/milestone-retro/SKILL.md","kind":"link","raws":["milestone-retro/SKILL.md"],"seen":"7ef6f2dfc03fa6f9","src":".claude/skills/README.md#技能使用说明 > 技能一览 > 入口与架构师的技能 > 表1 > milestone-retro"},

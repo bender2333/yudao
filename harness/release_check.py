@@ -3,12 +3,12 @@
 #   1. 内核差异：上一次发布标签到待发布提交之间，内核清单里的路径有哪些改动，列进报告供用户查看，不算不通过
 #      （阶段一由外部模型开发这个仓库，改内核路径不事前批准，守它的是 CI 里的内核测试；
 #      运行中的系统改自己的内核才经决定请求「内核修改」批准，见可信内核设计说明第 3 节）；
-#   2. 行数：内核清单里的 Python 文件的总行数不超过清单的上限；
-#   3. 导入方向：内核清单里的模块只导入内核文件、标准库与 pydantic；
-#   4. 评测专有内容：部门 Prompt、定义、工具说明、技能里出现评测场景专有内容即为不通过。
+#   2. 导入方向：内核清单里的模块只导入内核文件、标准库与 pydantic；
+#   3. 评测专有内容：部门 Prompt、定义、工具说明、技能里出现评测场景专有内容即为不通过。
 # 检查结果写进决定请求「实例升级」（目录流），由用户批准或拒绝；升级已安装的那一份是一次用户决定。
+# 内核 Python 总行数写进报告，只作读数：内核没有行数这类总量上限（基础规则四，ADR-0046），这一项不判通过。
 #
-# 清单、上限与检查都取自运行的这一份实例：待发布提交里的清单与检查改不动这次的结果，
+# 清单与检查都取自运行的这一份实例：待发布提交里的清单与检查改不动这次的结果，
 # 改清单是内核修改，本身要经决定请求「内核修改」由用户批准。
 
 from __future__ import annotations
@@ -54,13 +54,13 @@ class Finding:
 
 @dataclass(frozen=True)
 class ReleaseCheckReport:
-    # 一次发布检查的结果：被检查的提交与基准标签、四项检查的结论、是否通过，以及给人看的报告文本
+    # 一次发布检查的结果：被检查的提交与基准标签、两项检查的结论、是否通过，以及给人看的报告文本。
+    # 内核 Python 总行数只是读数，不判通过与否
     repository: str
     pending_commit: str
     base_tag: str | None
     kernel_changes: tuple[str, ...]
     kernel_python_lines: int
-    python_lines_max: int
     findings: tuple[Finding, ...]
     text: str
 
@@ -71,10 +71,9 @@ class ReleaseCheckReport:
 
 @dataclass(frozen=True)
 class _Manifest:
-    # 运行这一份实例的内核清单：模块路径、材料路径的匹配式、Python 行数上限与允许的导入
+    # 运行这一份实例的内核清单：模块路径、材料路径的匹配式与允许的导入
     modules: tuple[str, ...]
     material_globs: tuple[str, ...]
-    python_lines_max: int
     allowed_imports: tuple[str, ...]
 
 
@@ -89,7 +88,6 @@ def load_manifest(path: Path = MANIFEST_PATH) -> _Manifest:
         else:
             materials.append(entry["path"])
     return _Manifest(modules=tuple(modules), material_globs=tuple(materials),
-                     python_lines_max=int(document["python_lines_max"]),
                      allowed_imports=tuple(document["allowed_imports"]))
 
 
@@ -337,48 +335,47 @@ def check_repository(repo_root: Path, manifest: _Manifest | None = None) -> Rele
 
     findings: list[Finding] = []
 
+    # 内核 Python 总行数：只统计，写进报告作读数。内核没有行数上限，这里不判通过
     lines = 0
     for path in manifest.modules:
         entry = _tree_entry(repository, tree, path)
         if entry is None:
-            findings.append(Finding("行数", "内核清单里的模块在待发布提交中不存在", path))
+            findings.append(Finding("导入方向", "内核清单里的模块在待发布提交中不存在，没法核对它的导入方向",
+                                    path))
             continue
         source = entry_source(repository, entry)
         lines += len(source.splitlines())
         for number, name in _kernel_imports(source):
             if not _import_allowed(name, manifest):
                 findings.append(Finding("导入方向", f"导入了不允许的模块 {name}", f"{path}:{number}"))
-    if lines > manifest.python_lines_max:
-        findings.append(Finding("行数", f"内核 Python 总行数 {lines} 超过清单上限 {manifest.python_lines_max}",
-                                "内核清单的 python_lines_max"))
 
     findings += _proprietary_findings(repository, tree, _eval_tokens(repository, tree))
 
     return ReleaseCheckReport(
         repository=str(repo_root), pending_commit=str(pending.id), base_tag=base_tag,
-        kernel_changes=kernel_changes, kernel_python_lines=lines, python_lines_max=manifest.python_lines_max,
+        kernel_changes=kernel_changes, kernel_python_lines=lines,
         findings=tuple(findings), text=report_text(
             repository=str(repo_root), pending_commit=str(pending.id), base_tag=base_tag,
-            kernel_changes=kernel_changes, kernel_python_lines=lines, python_lines_max=manifest.python_lines_max,
+            kernel_changes=kernel_changes, kernel_python_lines=lines,
             findings=tuple(findings),
         ),
     )
 
 
 def report_text(*, repository: str, pending_commit: str, base_tag: str | None, kernel_changes: tuple[str, ...],
-                kernel_python_lines: int, python_lines_max: int, findings: tuple[Finding, ...]) -> str:
-    # 给人看的报告：结论、基准与待发布提交、四项检查的结果，不通过时逐项写明位置
+                kernel_python_lines: int, findings: tuple[Finding, ...]) -> str:
+    # 给人看的报告：结论、基准与待发布提交、两项检查的结果，不通过时逐项写明位置
     lines = [f"发布检查：{'通过' if not findings else '不通过'}",
              f"仓库：{repository}",
              f"待发布提交：{pending_commit[:12]}",
              f"基准标签：{base_tag or '无（第一个发布）'}",
              f"内核路径改动：{'、'.join(kernel_changes) if kernel_changes else '无'}",
-             f"内核 Python 行数：{kernel_python_lines}（上限 {python_lines_max}）"]
+             f"内核 Python 行数：{kernel_python_lines}（只作读数）"]
     if findings:
         lines.append("不通过项：")
         lines += [f"  [{item.check}] {item.where}：{item.reason}" for item in findings]
     else:
-        lines.append("三项检查（行数、导入方向、评测专有内容）全部通过；内核路径改动列在上面，供用户查看。")
+        lines.append("两项检查（导入方向、评测专有内容）全部通过；内核路径改动列在上面，供用户查看。")
     return "\n".join(lines)
 
 
@@ -394,7 +391,7 @@ def decision_request_payload(report: ReleaseCheckReport) -> dict[str, object]:
         "report": {
             "repository": report.repository, "pending_commit": report.pending_commit, "base_tag": report.base_tag,
             "kernel_changes": list(report.kernel_changes), "kernel_python_lines": report.kernel_python_lines,
-            "python_lines_max": report.python_lines_max, "passed": report.passed,
+            "passed": report.passed,
             "findings": [{"check": item.check, "reason": item.reason, "where": item.where}
                          for item in report.findings],
         },

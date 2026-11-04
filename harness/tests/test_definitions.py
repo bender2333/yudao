@@ -234,6 +234,60 @@ def test_a_verification_declaration_that_does_not_hold_is_rejected_naming_the_fi
     assert f"organization.json {expected[1]}：" in str(raised.value)
 
 
+def test_a_definition_must_name_a_department_for_every_item_source(tmp_path):
+    # 验收第 3 条（工单 #1455）：一种来源没有部门接时整份拒绝，错误写明文件与项
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["sources"] = {"user_input": "product"}
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("organization.json", "sources.onboarding", "事项的来源 onboarding 没有部门接"),)
+    assert "organization.json sources.onboarding：" in str(raised.value)
+
+
+def test_a_source_received_by_a_department_outside_the_definition_is_rejected(tmp_path):
+    # 验收第 3 条：接它的部门不在这份定义里时整份拒绝，错误写明文件与项
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["sources"] = {"user_input": "product", "onboarding": "reviewer"}
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("organization.json", "sources.onboarding", "接来源 onboarding 的部门 reviewer 不属于任何部门"),)
+    assert "organization.json sources.onboarding：" in str(raised.value)
+
+
+def test_a_definition_without_item_sources_reads_the_department_that_watches_user_input(tmp_path):
+    # 验收第 4 条：不写新字段的旧定义加载成功，两种来源都由关注用户输入的部门接
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    del organization["sources"]
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    assert loaded.version != DEFINITIONS.version
+    assert loaded.organization.sources is None
+    assert loaded.source_department("user_input") == "product"
+    assert loaded.source_department("onboarding") == "product"
+
+
+def test_an_old_definition_without_a_department_watching_user_input_is_rejected(tmp_path):
+    # 验收第 4 条：旧定义没有关注用户输入的部门时拒绝
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    del organization["sources"]
+    for department in organization["departments"]:
+        department["watched"] = [kind for kind in department.get("watched", []) if kind != "user_input"]
+    _write(directory, "organization.json", organization)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert raised.value.issues == (
+        ("organization.json", "sources",
+         "没有写事项的来源，也没有部门关注用户输入：你的输入与建档没有人接"),)
+
+
 def test_tool_categories_and_references_are_checked(tmp_path):
     directory = _copy(tmp_path)
     tools = _read(directory, "tools.json")
@@ -385,10 +439,10 @@ def test_role_visibility_is_a_closed_list(tmp_path):
     assert issue[:2] == ("roles.json", "product.visibility[0]")
 
 
-def test_the_delivery_parts_are_checked_only_for_the_delivery_spec(tmp_path):
-    # 交付说明的事实与解释归属（工单 #357）：合同写给模型的每个字段必须恰好归入 facts 与 explanation 之一。
-    # 缺了归属、两边都写同一个字段时整份拒绝并指出具体字段；没有写 parts 的旧文件照旧加载；
-    # 别的提案种类不写这两栏、写了也不核对
+def test_the_parts_of_a_kind_that_declares_them_are_checked(tmp_path):
+    # 成果的事实与解释归属（工单 #357）：合同里写了 parts 的种类，写给模型的每个字段必须恰好归入 facts 与
+    # explanation 之一。缺了归属、两边都写同一个字段时整份拒绝并指出具体字段；没有写 parts 的旧文件照旧加载；
+    # 核对按种类自己写的 parts 做，不写死是哪一种成果（工单 #1456）
     directory = _copy(tmp_path)
     contracts = _read(directory, "proposal_contracts.json")
     delivery = contracts["roles"]["engineering"]["kinds"]["delivery_spec"]
@@ -405,9 +459,9 @@ def test_the_delivery_parts_are_checked_only_for_the_delivery_spec(tmp_path):
         load_definitions(directory)
     assert raised.value.issues == (
         ("proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts",
-         "字段 basis_product_spec_hash 没有归入交付事实或解释"),
+         "字段 basis_product_spec_hash 没有归入成果事实或解释"),
         ("proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts",
-         "字段 summary 没有归入交付事实或解释"),
+         "字段 summary 没有归入成果事实或解释"),
     )
 
     contracts = _read(directory, "proposal_contracts.json")
@@ -419,16 +473,21 @@ def test_the_delivery_parts_are_checked_only_for_the_delivery_spec(tmp_path):
         load_definitions(directory)
     [issue] = raised.value.issues
     assert issue[:2] == ("proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts")
-    assert issue[2] == "字段 launch 同时归入交付事实与解释"
+    assert issue[2] == "字段 launch 同时归入成果事实与解释"
 
-    # 校验只作用于 delivery_spec：别的提案种类写了这两栏、写了不认识的栏也不拦
+    # 校验只看种类自己写的 parts（工单 #1456）：没有写 parts 的种类不核对，写了就按同一套核对
     contracts = _read(directory, "proposal_contracts.json")
     delivery = contracts["roles"]["engineering"]["kinds"]["delivery_spec"]
     delivery["parts"] = {"facts": ["kind", "basis_product_spec_hash", "files", "check_names", "checks", "launch"],
                          "explanation": ["summary", "known_risks"]}
-    contracts["roles"]["product"]["kinds"]["product_spec"]["parts"] = {"facts": ["nonsense"]}
     _write(directory, "proposal_contracts.json", contracts)
     assert load_definitions(directory).role("product").visibility
+    contracts["roles"]["product"]["kinds"]["product_spec"]["parts"] = {"facts": ["nonsense"]}
+    _write(directory, "proposal_contracts.json", contracts)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[:2] == ("proposal_contracts.json", "roles.product.kinds.product_spec.parts")
+               for issue in raised.value.issues)
 
 
 def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):
@@ -593,12 +652,33 @@ def test_a_generated_browser_tool_that_duplicates_a_handwritten_one_is_rejected(
 
 
 def test_definitions_without_the_generated_browser_tools_load_with_fewer_tools(tmp_path):
-    # 生成的浏览器工具定义可以不出现：这份定义就没有浏览器工具（测试用的另一份完整定义如此）。
-    # 发布的那一份确实带上它们，由 test_browser_tool_definitions.py 核对
+    # 生成的浏览器工具定义可以为空：让部门都不授予这批工具，这份定义就没有浏览器工具（一份只含
+    # 手写工具的定义如此）。发布的那一份授予它们、也带上这个文件，由 test_browser_tool_definitions.py 核对；
+    # 授予了却没有这份文件是定义不合法，见下一条
+    from harness.tools import BROWSER_TOOL_NAMES
+
     directory = _copy(tmp_path)
+    roles = _read(directory, "roles.json")
+    for role in roles.values():
+        role["tools"] = [tool for tool in role["tools"] if tool not in BROWSER_TOOL_NAMES]
+    _write(directory, "roles.json", roles)
+    work_items = _read(directory, "work_items.json")
+    for kind in work_items["kinds"].values():
+        for department in kind["departments"].values():
+            if "tools" in department:
+                department["tools"] = [tool for tool in department["tools"] if tool not in BROWSER_TOOL_NAMES]
+    _write(directory, "work_items.json", work_items)
     (directory / "browser_tools.json").unlink()
     loaded = load_definitions(directory)
-    from harness.tools import BROWSER_TOOL_NAMES
     assert not set(BROWSER_TOOL_NAMES) & set(loaded.tools)
     assert loaded.version != DEFINITIONS.version
+
+
+def test_a_granted_browser_tool_without_the_generated_file_fails_naming_it(tmp_path):
+    # 部门授予了浏览器工具时这份生成文件必须有：少了它定义直接不合法，并写明哪个工具没有定义
+    directory = _copy(tmp_path)
+    (directory / "browser_tools.json").unlink()
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[2] == "工具 browser_navigate 没有定义" for issue in raised.value.issues)
 

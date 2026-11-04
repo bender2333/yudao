@@ -248,11 +248,17 @@ export const paths = {
 // 恢复页按新的事项打开，没有范围时回到概览页（恢复页按事项看，没有事项就没有内容）。
 // 观测页的部门筛选条件（?dept=）跟着留着：换范围是换「哪些事项的请求」，
 // 不动「哪个部门的请求」（工单 #801）
-export function withScope(route: Route, workItemId: string | null): string {
+// defaultDepartment 是项目现在组织里的第一个部门（工单 #1457）：部门页没写部门时用它，不写死 product
+export function withScope(route: Route, workItemId: string | null, defaultDepartment = ""): string {
   const projectId = route.projectId ?? "";
   switch (route.name) {
-    case "dept":
-      return paths.dept(projectId, route.department ?? "product", { workItem: workItemId });
+    case "dept": {
+      // 部门页没有写部门、项目现在组织里也没有部门时回概览：不拼一个空的部门路径
+      const department = route.department ?? defaultDepartment;
+      return department === ""
+        ? paths.overview(projectId, { workItem: workItemId })
+        : paths.dept(projectId, department, { workItem: workItemId });
+    }
     case "materials":
       return paths.materials(projectId, { workItem: workItemId });
     case "observe":

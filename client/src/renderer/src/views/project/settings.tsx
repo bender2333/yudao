@@ -1,7 +1,8 @@
-// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、部门设置与登记的源目录。
+// 设置页（原型 v8 设计说明第 7.5 节，工单 #80）：基本信息、形态、部门设置与登记的源目录。
 // 数据全部来自 project.settings；每项修改提交对应的命令，基准版本取快照里的 version，
 // 过期时拒绝并提示重新读取（工单验收第 3 条）。部门设置里的模型与档位由 #95 加入，
 // 机器授权（3.2C）的命令尚未登记，入口按能力清单不出现。
+// 「形态」一节由 #1403 加入：现在用哪一份、换一份、改回与历史，数据来自 project.organization。
 
 import { useEffect, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
@@ -12,7 +13,9 @@ import {
   hasCommand, list, pageKey, text, useDraft,
 } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, promptWritten, useDepartmentDraft } from "./department-settings-form";
+import { FormSection } from "./form-section";
 import { McpServersSection } from "./mcp-servers";
+import type { DepartmentView } from "./organization";
 import { WritebackSection } from "./writeback";
 import {
   CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE, checkCommandsText, sourceDirectoryPayload, sourceWritebackText,
@@ -23,7 +26,7 @@ import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
 import { followDepartmentLabel, mergedModelId, modelById } from "../models/model-logic";
 
-export function SettingsPage(props: { app: ClientApp; route: Route }) {
+export function SettingsPage(props: { app: ClientApp; route: Route; departments: DepartmentView[] }) {
   const projectId = props.route.projectId ?? "";
   const settings = useSnapshot<ProjectSettingsResult>(props.app, "page.settings", "project.settings", {
     project_id: projectId,
@@ -47,7 +50,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
       <PageHead
         eyebrow="项目设置"
         title={data ? data.name : "项目设置"}
-        subtitle="基本信息、部门设置、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
+        subtitle="基本信息、形态、部门设置、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
       {settings.error !== null ? (
@@ -57,9 +60,10 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
       {data ? (
         <>
           <Basics app={props.app} data={data} command={command} />
+          <FormSection app={props.app} projectId={projectId} />
           <Departments app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
-          <McpServersSection app={props.app} data={data} />
+          <McpServersSection app={props.app} data={data} departments={props.departments} />
           <WritebackSection app={props.app} projectId={projectId} />
           <MachineAuthorization />
           <ExecutionPlacement />

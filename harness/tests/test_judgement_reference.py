@@ -42,6 +42,7 @@ def _ref(kind: str, content_hash: str) -> ArtifactRef:
 def _receipt(spec_hash: str, name: str = "smoke") -> CheckReceipt:
     # 一条本次激活的质检检查回执：绑定当前快照、当前 PRD 与当前交付
     return CheckReceipt(name=name, department="quality", exit_code=0, summary="ran", snapshot_hash=TREE,
+                        bindings={"product_spec": spec_hash, "delivery_spec": DELIVERY, "contract": CONTRACT},
                         product_spec_hash=spec_hash, delivery_spec_hash=DELIVERY, activation_id="act_q",
                         effective_contract_hash=CONTRACT, qa_tests_hash=None)
 

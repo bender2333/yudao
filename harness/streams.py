@@ -90,6 +90,14 @@ RUN_EVENT_TYPES = frozenset({
     "mcp_server_started",
     "mcp_server_closed",
     "mcp_server_failed",
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）：应用事件，
+    # run 进入终态时结束全部会话并写下结束记录
+    "trial_session_started",
+    "trial_session_ended",
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：应用事件。
+    # 用例打开期间本部门的浏览器与屏幕动作由投影记为它的步骤，会话结束时打开的用例结束为中断
+    "trial_case_opened",
+    "trial_case_concluded",
 })
 
 # 项目流：项目的长期事实（项目、当前 PRD 与采纳成果、事项的存在、队列位置与最终结果、项目部门设置）
@@ -115,6 +123,8 @@ PROJECT_EVENT_TYPES = frozenset({
     "baseline_adopted",
     # 项目级参数（迭代底座 B3，工单 #351）：按项目设置的检查时限与建档单轮上限
     "project_parameter_set",
+    # 项目的形态（工单 #1392）：项目现在用发布带的哪一份；之后新建的事项按它冻结，正在跑的不变
+    "project_form_set",
     # 采纳写回（迭代底座 B8，工单 #347，ADR-0034）
     "writeback_completed",
     "writeback_stopped",

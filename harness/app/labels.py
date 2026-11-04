@@ -9,7 +9,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..definitions import DEFINITIONS
-from ..models import (RUN_STATUSES, CatalogEventType, EventType, ProjectEventType, stop_reason_name)
+from ..models import (OPEN_LOOP_STOP_REASON, RUN_STATUSES, CatalogEventType, EventType, ProjectEventType,
+                      stop_reason_name)
 
 
 # run 状态的中文名（harness/models.py 的 RUN_STATUSES 是同一份取值）：事件说明里的状态按中文写
@@ -24,6 +25,12 @@ if set(STATUS_NAMES) != set(RUN_STATUSES):
 
 # 停止原因的中文名来自定义（stop_reasons.json 与路由自己的结束原因，工单 #861）
 STOP_REASON_NAMES = {reason: definition.label for reason, definition in DEFINITIONS.stop_reasons.items()}
+
+# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」）：没有核验角色的事项以这个停止原因结束。
+# 编号只有一处写法，在路由那一侧（harness/watched_outputs.py：路由读创建事件里的标记，给出结束原因），
+# 这里取同一条；中文名取自定义（「开环完成」，不含「放行」二字），报告与汇总按它把两种完成分开算
+OPEN_LOOP_LABEL = STOP_REASON_NAMES[OPEN_LOOP_STOP_REASON]
+
 DECISION_KIND_NAMES: dict[str, str] = {
     "model_unavailable": "模型引用无法使用，等待恢复",
     "no_tool_call": "已暂停（模型没有调用工具），等待继续",
@@ -217,6 +224,12 @@ _LABELS: dict[str, str] = {
     EventType.MCP_SERVER_STARTED: "启动了 MCP 服务器 {server}（{transport}）",
     EventType.MCP_SERVER_CLOSED: "关闭了 MCP 服务器 {server}（{transport}）",
     EventType.MCP_SERVER_FAILED: "MCP 服务器 {server} 启动失败：{error}",
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 12 节，工单 #1183）
+    EventType.TRIAL_SESSION_STARTED: "开始了试用会话（{department}，{launch_name}，第 {port} 号端口）",
+    EventType.TRIAL_SESSION_ENDED: "结束了试用会话（{department}，{reason}）",
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）
+    EventType.TRIAL_CASE_OPENED: "打开了试用用例「{title}」",
+    EventType.TRIAL_CASE_CONCLUDED: "试用用例结束：{result}",
     EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
     EventType.RUN_CONTINUED: "运行从暂停位置继续",
@@ -246,6 +259,7 @@ _LABELS: dict[str, str] = {
     ProjectEventType.ONBOARDING_REVISION_STARTED: "开始第 {round} 轮建档",
     ProjectEventType.BASELINE_ADOPTED: "采纳了建档基线：{summary}",
     ProjectEventType.PARAMETER_SET: "把项目参数 {name} 从 {old_value} 改为 {new_value}：{reason}（{modified_by} 修改）",
+    ProjectEventType.PROJECT_FORM_SET: "把项目的形态从 {previous_form} 改为 {form}：{reason}",
     ProjectEventType.WRITEBACK_COMPLETED: "写回了采纳成果：分支 {branch}，最终树 {final_tree_digest}",
     ProjectEventType.WRITEBACK_STOPPED: "写回停止：{reason}",
     ProjectEventType.WRITEBACK_NOT_NEEDED: "无需写回：本事项的变更已经在目标分支上",

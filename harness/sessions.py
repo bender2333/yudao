@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 from .environment import BackgroundJobTable, cleanup_inspection_workspace
 from .models import DEPARTMENTS, new_id
+from .trial_sessions import END_RUN_ENDED, TrialSessionTable
 
 @dataclass
 class DepartmentSession:
@@ -37,12 +39,20 @@ class SessionFactory:
         self._sessions: dict[str, dict[str, DepartmentSession]] = {}
         self._workspace_root = Path(workspace_root) if workspace_root is not None else None
         self.jobs = BackgroundJobTable()
+        # 这个进程里全部 run 的试用会话（浏览器与 computer use 设计说明第 3.4 节，工单 #1183）：
+        # 表由 Workspaces 用同一张（会话的记录与执行环境共用一份），run 进入终态时先结束会话再删工作区。
+        # 会话事件的写入方由薄驱动经 Workspaces 接上（trial_events）
+        self.trials = TrialSessionTable()
 
-    def create_run_sessions(self, run_id: str, session_ids: dict[str, str] | None = None) -> dict[str, DepartmentSession]:
-        ids = session_ids or {department: new_id(f"ses_{department[:3]}") for department in DEPARTMENTS}
+    def create_run_sessions(self, run_id: str, session_ids: dict[str, str] | None = None, *,
+                            departments: Iterable[str] | None = None) -> dict[str, DepartmentSession]:
+        # 建会话收事项那份形态的部门清单（工单 #1509）：部门取自这个事项冻结的定义，不取进程加载的那一份。
+        # 不给时按进程加载的定义（直接建 run 的调用与只跑三部门的测试）
+        names = tuple(DEPARTMENTS if departments is None else departments)
+        ids = session_ids or {department: new_id(f"ses_{department[:3]}") for department in names}
         sessions = {
             department: DepartmentSession(session_id=ids[department], run_id=run_id, department=department)
-            for department in DEPARTMENTS
+            for department in names
         }
         self._sessions[run_id] = sessions
         return sessions
@@ -54,7 +64,10 @@ class SessionFactory:
 
     def cleanup_run(self, run_id: str) -> list[Exception]:
         # 删除 run 的全部会话检查工作区；返回未删除会话的错误清单，由调用方决定如何处理。
-        # 没有 workspace_root（纯内存测试）时直接返回空
+        # 没有 workspace_root（纯内存测试）时直接返回空。
+        # 先结束这个 run 的试用会话（交付软件的进程树、试用副本），再删工作区（工单 #1183）：
+        # 会话的进程可能还在用工作区旁边的试用副本，顺序反过来会把还在用的目录删掉
+        self.trials.stop_run(run_id, reason=END_RUN_ENDED)
         sessions = list(self._sessions.get(run_id, {}).values())
         session_ids = [s.session_id for s in sessions]
         self.jobs.stop_for_sessions(session_ids)
@@ -67,6 +80,12 @@ class SessionFactory:
             except RuntimeError as exc:
                 errors.append(exc)
         return errors
+
+    def flush_trial_events(self, run_id: str | None = None) -> int:
+        # 写 run 结束时会话排队的结束事件（工单 #1183）：这条路径的调用点在 run 的终态事件提交之后的效果里，
+        # 那时写事件会让事件的位置乱序，所以先排队，由 run 的收尾在事务之外写。
+        # run_id 给出时只写这个 run 的，不给时写全部（强制升级、服务关闭）。交回写了几条
+        return self.trials.flush(run_id)
 
     def close_run(self, run_id: str) -> list[Exception]:
         # 关闭 run 的所有会话并清理检查工作区；保留原副作用关闭会话，清理错误作为返回值由编排器写到事件

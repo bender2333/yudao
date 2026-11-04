@@ -356,6 +356,13 @@ class RunCreatedPayload(Payload):
     mcp_servers: McpServersDocument | None = None
     # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
     run_event_version: int
+    # 创建这个 run 时冻结的形态名（工单 #1392）：这个 run 的部门、路由与停止原因按它的那份定义；
+    # 旧事件没有这个字段时按默认形态（三部门）读取
+    form: str = ""
+    # 事项创建时按冻结的定义算出的开环标记（工单 #1394）：定义里没有核验角色，事项最后采纳的成果没有人
+    # 独立核验，结束原因是开环完成而不是放行（形态与核验角色设计说明「开环完成」「定义的校验」第 4 条）。
+    # 旧事件没有这个字段时按不是开环读取：那时的定义只有默认的三部门，有核验角色
+    open_loop: bool = False
     # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮候选事件与修改意见的工件引用。
     # 普通事项与建档第一轮没有这个字段，读取时按没有上一轮处理
     onboarding_basis: OnboardingBasis | None = None
@@ -632,6 +639,8 @@ class ToolCallResult(ToolRecord):
     output_ref: ArtifactRef | None = None
     refused: bool = False
     refused_reason: str | None = None
+    # 动作结果里的截图工件引用（工单 #1180）：试用记录的步骤按它给出每一步的截图，原文在工件库里
+    images: list[ArtifactRef] = Field(default_factory=list)
     # 动作后的公开树快照（工单 #17）：与事件 tool_started 上的动作前快照、动作参数一起构成核实依据
     after_snapshot_ref: ArtifactRef | None = None
 
@@ -690,6 +699,23 @@ class FileActionComparison(Payload):
     detail: dict[str, Any]
 
 
+class BrowserSessionState(Payload):
+    # 浏览器会话在核实记录里的状态（浏览器与 computer use 设计说明第 9 节，工单 #1184）：会话身份、
+    # 状态与试用副本的树摘要。持有会话的进程重新启动时状态为 interrupted，身份与摘要不再有值
+    session_id: str | None = None
+    status: Literal["running", "interrupted", "ended"]
+    tree_digest: str | None = None
+
+
+class BrowserObservation(Payload):
+    # 结果未知的浏览器动作被核实为「按当前实际状态继续」时取得的当前状态（设计说明第 9 节）：页面的
+    # 可访问性结构与截图。本机的浏览器会话随进程结束，恢复时只会记会话为中断，所以这一项本机不写；
+    # 它留给持有会话的执行代理（会话在远程执行位置上时由它建立并持有），归属见工单 #1184 的交付说明
+    accessibility: str
+    screenshot: ArtifactRef | None = None
+    structure_truncated: bool = False
+
+
 class ActionVerifiedPayload(Payload):
     # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
     # resolution 为 continue 表示用户选择按当前实际状态继续（旧事件保留，新版本不再写，工单 #582）；
@@ -710,6 +736,12 @@ class ActionVerifiedPayload(Payload):
     auto_retry_of: str | None = None
     # 自动核实的依据（工单 #308）：动作前快照、动作参数与当前公开树的对比结论
     verification: FileActionComparison | None = None
+    # 浏览器动作的核实依据（工单 #1184，设计说明第 9 节）：会话状态与新取得的页面结构、截图；
+    # 非浏览器动作没有这两项。设计说明第 9 节的「会话仍然存在 → 按当前实际状态继续」这一支本机不写
+    # `observation`：MCP 的 stdio 会话属于建立它的进程，恢复在启动序列里跑，那时浏览器会话表是空的，
+    # 所以本地只会记会话为中断（`resolution=handed_back`）。这一支留给持有会话的执行代理
+    session: BrowserSessionState | None = None
+    observation: BrowserObservation | None = None
     note: str | None = None
     decision_id: str | None = None
 
@@ -1374,6 +1406,9 @@ class WorkItemCreatedPayload(Payload):
     # 事项创建时冻结的 MCP 服务器设置（工单 #236）：非秘密设置与凭据引用的整份文档，或可解析出它们的
     # 版本引用（document_digest 与 version）。旧事件没有这个字段时为空，按空设置读取
     mcp_servers: McpServersDocument | None = None
+    # 事项创建时冻结的形态名（工单 #1392）：之后这个事项的写入核对、路由、装配与执行都按它的那份定义；
+    # 旧事件没有这个字段时按默认形态（三部门）读取
+    form: str = ""
 
 
 class McpServersConfiguredPayload(Payload):
@@ -1434,6 +1469,72 @@ class McpServerFailedPayload(Payload):
     server: str
     transport: Literal["stdio", "http"]
     error: str
+
+
+class TrialSessionStartedPayload(Payload):
+    # 一个试用会话的开始（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）：会话身份、部门、
+    # 种类、启动方式的名称、选用命令的系统、端口与就绪地址、试用副本的树摘要与清单来源，以及
+    # 交付软件直接子进程的进程号与创建时间——Yudao 启动时按后两项结束进程崩溃留下的遗留进程树，
+    # 所以它们必须随事件保存。完整的启动方式不在这里重复记一份：它是模型给出的工具参数，
+    # 已经按 ADR-0038 脱敏记在工具事件里
+    session_id: str
+    department: Department
+    kind: Literal["web", "desktop"]
+    launch_name: str
+    system: Literal["windows", "linux"]
+    port: int
+    ready_url: str
+    tree_digest: str
+    source: Literal["delivery_snapshot", "workspace_seal"]
+    pid: int | None = None
+    create_time: float | None = None
+
+
+class TrialSessionEndedPayload(Payload):
+    # 一个试用会话的结束（工单 #1183）：与开始事件按（run、会话身份）配对。reason 是结束方式：
+    # 停止（trial_stop）、被新会话替换（replaced）、持有会话的进程重新启动（interrupted）、
+    # 用户停止（user_stopped，桌面会话的「停止使用桌面」）、run 结束（run_ended）；
+    # ended 说明这一次是否真的结束了仍然存活的进程（启动时结束遗留进程并补写时用）
+    session_id: str
+    department: Department
+    kind: Literal["web", "desktop"]
+    reason: Literal["stopped", "replaced", "interrupted", "user_stopped", "run_ended"]
+    pid: int | None = None
+    create_time: float | None = None
+    ended: bool = False
+    exit_code: int | None = None
+
+
+class TrialCaseOpenedPayload(Payload):
+    # 一个试用用例的开始（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：用例身份、部门会话
+    # （哪些动作是它的步骤）与试用会话（会话结束或中断时用例结束为中断）两个身份、部门与激活、
+    # 当前 ProductSpec 的内容摘要、试用副本的树摘要（放行时按它核对用例属于当前交付）、
+    # 引用的验收条件与计划（标题、操作、预期结果）。之后这个部门在同一会话中的浏览器与屏幕动作由投影
+    # 记为它的步骤
+    case_id: str
+    session_id: str
+    trial_session_id: str
+    department: Department
+    activation_id: str
+    product_spec_hash: str
+    tree_digest: str
+    criteria: list[str]
+    title: str
+    plan: list[str]
+    expected: str
+
+
+class TrialCaseConcludedPayload(Payload):
+    # 一个试用用例的结束（工单 #1180）：结论 passed、failed、unverified 由质检给出；会话结束或中断时
+    # 主机记为 interrupted（这时 reason 写 session_ended），中断的用例不能作为证据。
+    # evidence_steps 是作为证据的步骤的动作身份（模型给出的调用编号）
+    case_id: str
+    session_id: str
+    department: Department
+    result: Literal["passed", "failed", "unverified", "interrupted"]
+    observed: str = ""
+    evidence_steps: list[str] = Field(default_factory=list)
+    reason: str = ""
 
 
 class WorkItemStartFailedPayload(Payload):
@@ -1727,7 +1828,9 @@ class InstanceUpgradeReport(Payload):
     base_tag: str | None
     kernel_changes: list[str]
     kernel_python_lines: int
-    python_lines_max: int
+    # 旧事件里的内核行数上限（工单 #1473 取消）：载荷是对外合同、目录流里已有的「实例升级」事件仍要能读，
+    # 所以字段留着、改成可选；新的发布检查不再写它（内核没有行数上限，ADR-0046）
+    python_lines_max: int | None = None
     passed: bool
     findings: list[dict[str, Any]]
 
@@ -1771,6 +1874,15 @@ class ProjectParameterSetPayload(Payload):
     bounds: list[Any]
     # 撤回时目标修改记录的稳定身份（工单 #1262）：普通修改没有这个字段；读取方不依赖它，只为事件留痕
     expected_change_id: str | None = None
+
+
+class ProjectFormSetPayload(Payload):
+    # 项目的形态改动（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：project_form_set 携带
+    # previous_form（改动前的那一份）、form（改动后的那一份）与理由；两个值都是发布带的形态名，
+    # 从来没有设过时按默认的三部门（three_departments）算。之后新建的事项按新的那一份冻结，正在跑的不变
+    previous_form: str
+    form: str
+    reason: str = ""
 
 
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
@@ -1821,6 +1933,12 @@ PAYLOADS: dict[str, Any] = {
     EventType.MCP_SERVER_STARTED: McpServerStartedPayload,
     EventType.MCP_SERVER_CLOSED: McpServerClosedPayload,
     EventType.MCP_SERVER_FAILED: McpServerFailedPayload,
+    # 试用会话的开始与结束（工单 #1183）：应用事件，run 流
+    EventType.TRIAL_SESSION_STARTED: TrialSessionStartedPayload,
+    EventType.TRIAL_SESSION_ENDED: TrialSessionEndedPayload,
+    # 试用用例的开始与结束（工单 #1180）：应用事件，run 流
+    EventType.TRIAL_CASE_OPENED: TrialCaseOpenedPayload,
+    EventType.TRIAL_CASE_CONCLUDED: TrialCaseConcludedPayload,
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,
@@ -1849,6 +1967,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.ONBOARDING_REVISION_STARTED: OnboardingRevisionStartedPayload,
     ProjectEventType.BASELINE_ADOPTED: BaselineAdoptedPayload,
     ProjectEventType.PARAMETER_SET: ProjectParameterSetPayload,
+    ProjectEventType.PROJECT_FORM_SET: ProjectFormSetPayload,
     ProjectEventType.WRITEBACK_COMPLETED: WritebackCompletedPayload,
     ProjectEventType.WRITEBACK_STOPPED: WritebackStoppedPayload,
     ProjectEventType.WRITEBACK_NOT_NEEDED: WritebackNotNeededPayload,

@@ -429,7 +429,31 @@ def read_file_call(request, path) -> ModelResponse:
                                   "arguments": json_dumps({"path": path})}])
 
 
-COMPACTION_HEADROOM = 2404
+# 压缩阈值（窗口的 85%）与固定材料之间的余量：够写一次摘要（(阈值 − 固定材料) // 2 不低于 32 个 token），
+# 也够放一次工具调用与结果本身的记录。窗口按「最长固定材料 + 这个余量」推出（pinned_window）。
+COMPACTION_ROOM = 2600
+
+
+def pinned_window(system: LoopSystem, run_id: str, *departments: str, room: int = COMPACTION_ROOM) -> int:
+    """窗口按这些部门里最长的固定材料推出（测试分层设计第 10 节第 3 条：依赖说明长度的场景按场景需要
+    设置窗口与阈值，不写死数字）。
+
+    压缩阈值是窗口的 85%（`compaction.response_reserve`，没有声明输出上限时）：把窗口取成
+    「最长固定材料 + room」换算回窗口的值，阈值就落在固定材料之上的那一截余量里——固定材料放得下摘要，
+    一次读到的大材料又能把历史顶过阈值。哪一次工作请求都要放得下，所以按这些部门里最长的一份算。
+    """
+    longest = max(pinned_input_tokens(system, run_id, department) for department in departments)
+    return (longest + room) * 100 // 85
+
+
+def oversized_file(window: int, fixed: int, *, unit: str = "TOOL_OUTPUT ", margin: int = 400) -> str:
+    """一份读一次就把历史顶过压缩阈值、而这条历史仍放得进窗口的材料（工单 #1184）。
+
+    阈值是窗口的 85%：这份材料要补上的就是「阈值减去这个部门不带历史时一次请求的实测 token 数」，
+    再加 margin（这次工具调用与它的结果本身的记录）。工具结果的正文进历史，按 UTF-8 字节数 ÷ 4 折算。
+    """
+    tokens = window * 85 // 100 - fixed + margin
+    return unit * (tokens * 4 // len(unit) + 1)
 
 
 def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=False, step_limits=StepLimits()):
@@ -489,15 +513,15 @@ def compacted_runner(tmp_path, *, cancelled_summary=None, reject_first_spec=Fals
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=step_limits)
     original = "  Original intent\r\nDo not rewrite this. \n"
     # 一个上下文窗口很小、工作区里放着大文件的运行：按请求目的与部门给出剧本，第一次读取以后压缩。
-    # 窗口的大小与固定材料（部门提示与工具说明）的长度相关：工单 #68 加上 fetch_url 的说明以后固定材料
-    # 多 346 个 token（三个部门实测）；工单 #1178 给两个提交工具加上 requirement_mapping 的说明以后，
-    # 产品的固定材料再实测多 283 个 token（pinned_input_tokens 读 4496 → 4779）；工单 #1182 给工程与
-    # 质检加上试用工具以后，工程的固定材料实测多 574 个 token（4679 → 5253），余量随之上调，保持
-    # 「第一次工作请求装得下、读取以后必然要压缩」的几何关系。窗口因此不写死，按实测固定材料推出
-    # （测试分层设计说明第 10 节第 3 条）：固定材料之外留一次读取再加一轮回应的余量
+    # 窗口的大小与固定材料（部门提示与工具说明）的长度相关：工单 #68 加上 fetch_url 的说明、#1178 给提交
+    # 工具加上 requirement_mapping 的说明、#1182 与 #1184 给工程与质检加上试用工具与 28 个浏览器工具的
+    # 说明，每一笔都让固定材料变大。窗口因此不写死，按三个部门里最长的固定材料推出（pinned_window）：
+    # 阈值落在固定材料之上那一截余量里，「第一次工作请求装得下、读取以后必然要压缩」的几何关系不变。
     measure_run = system.create_run(original, context_window=1_000_000)
-    window = pinned_input_tokens(system, measure_run) + COMPACTION_HEADROOM
+    window = pinned_window(system, measure_run, "product", "engineering", "quality")
     run_id = system.create_run(original, context_window=window)
+    # 这份材料读一次约一万个 token，远过阈值之上的那截余量：读完以后这一步就要压缩，未压缩的工作请求
+    # 放不下窗口（这就是 partial 压缩与「摘要被截断时以上下文超限结束」两条用例的输入）
     system.workspace(run_id).write_file("large.txt", "FIRST_TOOL_ORIGINAL " * 2200)
     return system, adapter, run_id, original
 

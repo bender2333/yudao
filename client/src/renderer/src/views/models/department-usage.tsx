@@ -5,13 +5,15 @@
 // 建议能力提醒沿用（设计说明第 5.6 节）：保存时带回的提醒一直显示在该项旁。
 
 import type { CatalogBinding, CatalogModel } from "../../api/generated/types.gen";
-import { DEPARTMENT_LABELS, tierOptions, type AdmissionGroup } from "./model-logic";
+import { tierOptions, type AdmissionGroup } from "./model-logic";
 
 export type DepartmentStatus = { kind: "ok" | "error"; message: string };
 
 export type DepartmentUsageProps = {
-  /** 部门默认涉及的部门：定义里的部门（默认三部门） */
+  /** 部门默认涉及的部门：这一版加载的定义里的部门与目录里已有绑定的部门 */
   departments: string[];
+  /** 部门的显示名：取自这一版加载的定义（工单 #1457），没有的部门按标识显示 */
+  labels: Record<string, string>;
   /** 已启用的模型，按连接分组 */
   groups: AdmissionGroup[];
   /** 当前的部门默认 */
@@ -51,7 +53,7 @@ export function DepartmentUsage(props: DepartmentUsageProps) {
           <div className="mm-usage-row" key={department}
                data-testid={`department-${department}`}>
             <label className="y10-field" htmlFor={`department-model-${department}`}>
-              <span>{DEPARTMENT_LABELS[department]}</span>
+              <span>{props.labels[department] ?? department}</span>
               <select id={`department-model-${department}`} className="y10-select"
                       value={current} disabled={props.busy}
                       data-testid={`department-model-${department}`}

@@ -93,7 +93,7 @@
             "method": "check | trial | measure | judgement | human | open",
             "result": "passed | failed | unverified",
             "checks": "quality check names from this activation that support this criterion",
-            "trial_cases": "leave it empty (trial cases arrive with a later ticket)",
+            "trial_cases": "trial case ids of this activation that support this criterion; each must be concluded, its session trial copy tree digest must equal the current delivery snapshot, and its result must equal this criterion result",
             "note": "free text"
           },
           "bind": [
@@ -114,7 +114,7 @@
             "method": "check | trial | measure | judgement | human | open; check, trial and measure are executable, the others are open",
             "result": "passed | failed | unverified",
             "checks": "quality check names from this activation that support this criterion",
-            "trial_cases": "leave it empty (trial cases arrive with a later ticket)",
+            "trial_cases": "trial case ids of this activation that support this criterion; each must be concluded, its session trial copy tree digest must equal the current delivery snapshot, and its result must equal this criterion result",
             "note": "free text",
             "change_reason": "required when result differs from the result the independent judgement recorded for the same criterion: why the conclusion changed"
           },
@@ -151,7 +151,7 @@
         "criteria 覆盖当前 ProductSpec 的全部验收条件，每条一项：criterion 是 AC<序号>（验收条件在 ProductSpec 里的位置，从 1 开始），method 是检验方式，result 只有 passed、failed、unverified。",
         "结论引用独立判断：judgement_event 写判断的事件编号，省略时主机取当前交付的那一条判断。判断不存在、不是当前交付与当前 PRD 的、写在这份交付被接纳之前，或者不覆盖全部验收条件时，结论被拒绝。",
         "判断与结论不一致的条目在 criteria 里逐条写 change_reason（改判理由）：结果从判断的 passed 改成 failed、或从 failed 改成 passed，没有写理由的结论被拒绝。改判的条数由主机算好写进放行记录，不自己填。",
-        "可执行检验（check、trial、measure）写成 passed 时要有证据：checks 里列出本次激活的质检 run_check 回执；trial_cases 现在必须为空。不可执行检验（judgement、human、open）的条件可以是 unverified，放行时列进开环明细。",
+        "可执行检验（check、trial、measure）写成 passed 时要有证据：checks 里列出本次激活的质检 run_check 回执，或 trial_cases 里列出本次激活的试用用例。trial_cases 引用的试用用例必须属于本次激活、所在会话的试用副本树摘要等于当前交付的 code_snapshot_hash、结论与这一项的 result 一致；含结果未知步骤的用例与中断的用例被拒绝。只凭截图由模型判断的试用用例算模型阅读，它的条件计入开环。不可执行检验（judgement、human、open）的条件可以是 unverified，放行时列进开环明细。",
         "release 要求缺陷为空、质量检查 exit_code 均为 0、没有 failed 的条目、可执行检验的条目都是 passed。",
         "rework 至少包含一条缺陷。"
       ]
@@ -162,7 +162,7 @@
       {"condition": "basis_current", "field": "basis_product_spec_hash", "target": "product_spec"}
     ],
     "product_decision": [
-      {"condition": "no_duplicate_content", "collection": "product_decisions", "content": ["statement", "rationale"],
+      {"condition": "no_duplicate_content", "collection": "product_decision", "content": ["statement", "rationale"],
        "bind": [{"field": "product_spec_hash", "target": "product_spec"}],
        "field": "statement", "message": "this product decision has already been accepted"}
     ],
