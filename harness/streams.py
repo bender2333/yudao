@@ -90,6 +90,10 @@ RUN_EVENT_TYPES = frozenset({
     "mcp_server_started",
     "mcp_server_closed",
     "mcp_server_failed",
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）：应用事件，
+    # run 进入终态时结束全部会话并写下结束记录
+    "trial_session_started",
+    "trial_session_ended",
 })
 
 # 项目流：项目的长期事实（项目、当前 PRD 与采纳成果、事项的存在、队列位置与最终结果、项目部门设置）

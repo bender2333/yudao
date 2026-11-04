@@ -244,6 +244,8 @@ export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
   tool_server_probe_finished: "读取 MCP 服务器工具清单",
   tool_skipped: "跳过工具",
   tool_started: "开始执行工具",
+  trial_session_ended: "结束试用会话",
+  trial_session_started: "开始试用会话",
   user_input_received: "收到用户输入",
   work_item_created: "建立事项",
   work_item_start_failed: "事项未能开始",

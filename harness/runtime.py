@@ -13,6 +13,7 @@ from .decision_flow import DECISION_FLOW
 from .definitions import DEFAULT_FORM, DEFINITIONS, Definitions, configure_fetch
 from . import parameters, routing_contract
 from . import mcp_session
+from . import trial_sessions
 from .engine import StepDriver, StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
 from .event_store import Command, EventStore, catalog_stream, run_stream
@@ -167,6 +168,9 @@ class LoopSystem:
         # 启动时结束遗留的 MCP 服务器进程并补写关闭事件（网络与 MCP 设计说明第 7.2 节，工单 #1176）：
         # 放在继续未结束的 run 之前，继续时按同一台服务器重新建立会话
         self.ended_leftover_servers = self._end_leftover_mcp_servers_on_startup()
+        # 启动时结束遗留的试用会话：持有会话的进程重新启动时，会话记为中断，进程树按会话记录里的
+        # 进程号与创建时间结束（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）
+        self.ended_leftover_trials = self._end_leftover_trial_sessions_on_startup()
         # 启动时补建缺少的普通事项 run（工单 #321，设计第 7 节）：work_item_created 已提交而 run 还没有创建时
         # 进程中断，这里按事项记录（含起始文件夹快照）补建
         self.recovered_work_item_runs = self.projects.create_missing_work_item_runs_on_startup()
@@ -193,6 +197,7 @@ class LoopSystem:
         # 并记下「因升级重新开始」的优先级；找不到事项的 run 只停止。
         # 事项冻结的形态不在发布里时不动这个 run（工单 #1392）：留着它未结束，换回带那一份形态的发布
         # 以后由升级重新开始接着跑；原因由项目登记在这条事项的开始失败上
+        # 停止的 run 的试用会话在 cleanup_run 里结束、结束事件排了队，这里在事务之外把它们写出来
         stopped, restarted = [], []
         for run_id in run_ids:
             if not self.projects.item_form_available(run_id):
@@ -202,6 +207,7 @@ class LoopSystem:
             started = self.projects.restart_work_item_for_upgrade(run_id)
             if started is not None:
                 restarted.append(started[0])
+        self.flush_trial_events()
         return stopped, restarted
 
     def resume_startup_runs(self) -> dict[str, int]:
@@ -475,7 +481,9 @@ class LoopSystem:
 
     def close(self) -> None:
         # 服务关闭停止轮询并释放存储；还在的 MCP 会话一并关闭（网络与 MCP 设计说明第 7.2 节，
-        # 工单 #1175）：正常路径下每个 run 的会话随运行收尾关闭，这里收掉剩余的（例如等待用户回答时关闭服务）
+        # 工单 #1175）：正常路径下每个 run 的会话随运行收尾关闭，这里收掉剩余的（例如等待用户回答时关闭服务）。
+        # run 结束时结束的试用会话的结束事件也在这里补写（工单 #1183），不再有事务在进行
+        self.flush_trial_events()
         for run_id in list(self.orchestrator.mcp_sessions_open()):
             self.orchestrator.close_mcp_sessions_sync(run_id)
         self.facade.stop_watching()
@@ -507,7 +515,10 @@ class LoopSystem:
         return asyncio.run(self.orchestrator.run_until_stop(run_id))
 
     def activate_once(self, run_id: str) -> RunProjection:
-        return asyncio.run(self.orchestrator.activate_once(run_id))
+        # 一次激活也可能把 run 带到终态（试用会话随之结束、结束事件排在队里）：在事务之外把它们写出来
+        projection = asyncio.run(self.orchestrator.activate_once(run_id))
+        self.flush_trial_events()
+        return projection
 
     def cancel(self, run_id: str) -> RunProjection:
         return self.orchestrator.cancel(run_id)
@@ -568,6 +579,37 @@ class LoopSystem:
                 continue
             ended.append(f"{leftover.run_id}:{leftover.server}")
         return ended
+
+    def _end_leftover_trial_sessions_on_startup(self) -> list[str]:
+        # 上一次进程没有写下 trial_session_ended 的试用会话（浏览器与 computer use 设计说明第 3.4、12 节，
+        # 工单 #1183）：按会话记录里的进程号与创建时间结束仍然存活的进程树，删掉它的试用副本，然后补写
+        # 一条 trial_session_ended（结束方式：中断；写明这一次有没有真的结束进程）。进程已经不在了也补写：
+        # 开始与结束的记录要配对，恢复时「有开始没有结束」就等于还有遗留进程。事件写不进去不阻塞启动
+        ended: list[str] = []
+        for leftover in trial_sessions.leftover_sessions(self.store):
+            was_ended = trial_sessions.end_leftover_session(leftover)
+            trial_sessions.remove_trial_copy(self.workspace_root / leftover.run_id, leftover.session_id)
+            payload = {"session_id": leftover.session_id, "department": leftover.department,
+                       "kind": leftover.kind, "reason": trial_sessions.END_INTERRUPTED,
+                       "pid": leftover.pid, "create_time": leftover.create_time, "ended": was_ended}
+
+            def decide(transaction, payload=payload) -> None:
+                status = transaction.projection.status
+                transaction.append(NewEvent(
+                    EventType.TRIAL_SESSION_ENDED, state_before=status, state_after=status,
+                    actor="system", department=payload.get("department"), payload=payload))
+
+            try:
+                self.writes.transact(run_stream(leftover.run_id), decide)
+            except Exception:
+                continue
+            ended.append(f"{leftover.run_id}:{leftover.session_id}")
+        return ended
+
+    def flush_trial_events(self) -> int:
+        # 写排队的试用会话结束事件（工单 #1183）：run 的终态事件提交之后的效果里不能写事件（位置会乱序），
+        # 所以 run 结束时结束的会话把结束记录排进队，在事务之外由这里写。交回写了几条
+        return self.orchestrator.sessions.flush_trial_events()
 
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)

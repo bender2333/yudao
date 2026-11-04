@@ -208,6 +208,7 @@ class Workspaces:
         sessions: Any = None,
         check_timeout: Callable[[str], int] | None = None,
         definitions: Any = None,
+        trial_events: Callable[[str, str, dict[str, Any]], None] | None = None,
     ) -> None:
         self.root = Path(root)
         # 运行状态投影由薄驱动给（它只读最小投影，运行状态投影是它自己的事实）
@@ -226,8 +227,27 @@ class Workspaces:
         # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
         self._source: dict[tuple[str, str], str | None] = {}
         # 这个进程里全部 run 的试用会话表（工单 #1182）：会话跨激活保留，一个部门同一时刻最多一个；
-        # 程序探测用真实的那一份，测试可以自己构造一张表交给 LocalEnvironment
-        self.trials = TrialSessionTable()
+        # 程序探测用真实的那一份，测试可以自己构造一张表交给 LocalEnvironment。
+        # 表与会话工厂共用同一张（工单 #1183）：run 进入终态时 cleanup_run 先结束会话再删工作区。
+        # 会话的开始与结束由薄驱动的写入方写一条应用事件（trial_events），与 MCP 会话的生命周期同一个做法
+        self._trials = getattr(sessions, "trials", None) or TrialSessionTable()
+        self._trial_events = trial_events
+        if trial_events is not None:
+            self._trials.bind_events(trial_events)
+
+    @property
+    def trials(self) -> TrialSessionTable:
+        return self._trials
+
+    @trials.setter
+    def trials(self, table: TrialSessionTable) -> None:
+        # 换一张会话表（测试用）：会话工厂与执行环境用同一张，run 结束时 cleanup_run 结束的就是它。
+        # 新的表接上同一份写入方：换表不该让会话事件消失
+        self._trials = table
+        if self._trial_events is not None:
+            table.bind_events(self._trial_events)
+        if self.sessions is not None:
+            self.sessions.trials = table
 
     # ---- 运行工作区 ----
     def parameters_for(self, run_id: str) -> dict[str, Any]:

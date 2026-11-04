@@ -320,6 +320,9 @@ class Orchestrator:
             artifacts=self.artifacts,
             sessions=self.sessions,
             check_timeout=lambda run_id: parameter_values.frozen_check_timeout(self.store, run_id),
+            # 试用会话的开始与结束写成 run 流里的应用事件（浏览器与 computer use 设计说明第 12 节，
+            # 工单 #1183）：会话表在执行环境一层，写入方是薄驱动——与 MCP 会话的生命周期同一个做法
+            trial_events=self._trial_session_event,
         )
         # 恢复的零件在 `recovery.py`（S4c 工单 #863）：核对定义版本、核实结果未知的动作、取得执行权
         self._recovery = RunRecovery(
@@ -943,6 +946,9 @@ class Orchestrator:
                     self._abort_run(run_id)
         if cancel_error is not None:
             raise cancel_error
+        # run 进入终态时结束的试用会话把结束事件排了队（cleanup_run 在终态事件的提交之后的效果里运行）：
+        # 这里已经在事务之外，把排队的结束事件写出来（工单 #1183）
+        self.sessions.flush_trial_events(run_id)
         return self.project(run_id)
 
     def stop_for_upgrade(self, run_id: str, *, reason: str) -> RunProjection:
@@ -1031,6 +1037,10 @@ class Orchestrator:
         finally:
             self._run_wakeups.pop(run_id, None)
             await self._stop_sessions(run_id, tasks)
+            # run 进入终态时结束的试用会话在这里补写结束事件（工单 #1183）：结束本身在 cleanup_run 里
+            # 已经做完（那时在终态事件的提交之后的效果里，不能再写事件），这里已经在事务之外，
+            # 写进来的事件位置接在终态事件后面
+            self.sessions.flush_trial_events(run_id)
             # 这个 run 的 MCP 会话随运行一起关闭（网络与 MCP 设计说明第 7.2 节，工单 #1175）：
             # 到达终态、被决定请求阻塞、中止或没有新工作，运行都从这一条退出；会话表清空，
             # 继续同一个 run 时按同一台服务器重新建立。持久化生命周期事件归 #1176
@@ -1245,6 +1255,21 @@ class Orchestrator:
             transaction.append(NewEvent(
                 event_type, state_before=status, state_after=status, actor="system",
                 department=transaction.projection.active_department, payload=payload))
+
+        try:
+            self._transact(run_stream(run_id), decide)
+        except Exception as exc:
+            self._close_errors.setdefault(run_id, []).append(exc)
+
+    def _trial_session_event(self, run_id: str, event_type: str, payload: dict[str, Any]) -> None:
+        # 试用会话的开始与结束事件（浏览器与 computer use 设计说明第 12 节，工单 #1183）：会话表在开始与
+        # 结束时经这里把一条应用事件写到这个 run 的流。与 MCP 的生命周期事件同一个做法：写入不改变运行的
+        # 状态，提出者是系统，部门是会话所在的那一个；写不进去不打断会话的建立与结束，原因记下来供运维查看
+        def decide(transaction: Transaction) -> None:
+            status = transaction.projection.status
+            transaction.append(NewEvent(
+                event_type, state_before=status, state_after=status, actor="system",
+                department=payload.get("department"), payload=payload))
 
         try:
             self._transact(run_stream(run_id), decide)
