@@ -19,7 +19,8 @@ from typing import Any
 from . import routing_contract
 from .contracts import artifact_hash
 from .definitions import DEFINITIONS
-from .models import PRD_REVISION_FIELDS, Event, EventType, RunProjection, new_id
+from .models import (OPEN_LOOP_STOP_REASON, PRD_REVISION_FIELDS, Event, EventType, RunProjection,
+                     new_id)
 
 # 组织定义 organization.json 的 routing 里写这个名称
 ROUTING_NAME = "watched_outputs"
@@ -395,6 +396,30 @@ def item_end(projection: RunProjection) -> routing_contract.ItemEnd | None:
     return routing_contract.ItemEnd(stop_reason=ITEM_END_REASON, message="no department has new work")
 
 
+def recorded_open_loop(events: list[Event]) -> bool:
+    """事项创建事件里记下的开环标记（工单 #1394，形态与核验角色设计说明「定义的校验」第 4 条）。
+
+    标记由薄驱动在创建事项时按冻结的定义算出并记下，路由与重放都读这条记录，不按定义重新算。
+    旧事件没有这一项时读作不是开环：那时的定义只有默认的三部门，事项最后采纳的成果有核验角色核验。
+    """
+    for event in events:
+        if event.type == EventType.RUN_CREATED:
+            return bool((event.payload or {}).get("open_loop", False))
+    return False
+
+
+def completion_reason(projection: RunProjection,
+                      events: list[Event]) -> routing_contract.CompletionReason | None:
+    """事项完成时的结束原因：创建时记下的开环标记为真时是开环完成，其余按事项种类取（返回 None）。
+
+    这一条判断归路由（设计说明第 5.1 节输出、第 4.7 节第 4 条）：薄驱动进入完成状态时问一次，
+    只把这里给的原因写进事实。没标开环的事项不给原因，薄驱动照旧按事项种类取。
+    """
+    if recorded_open_loop(events):
+        return routing_contract.CompletionReason(stop_reason=OPEN_LOOP_STOP_REASON)
+    return None
+
+
 def work_reference(projection: RunProjection, department: str) -> Any:
     """这一轮工作的路由自己的工作引用（设计说明第 5.1 节输出、第 5.4 节第 4 条）：成果驱动不用它，为空。"""
     return None
@@ -563,6 +588,10 @@ def check_definition(definitions: Any) -> None:
             issues.append(f"end_reasons.{reason}：与内核的停止原因同名")
     if ITEM_END_REASON not in declared.end_reasons:
         issues.append(f"end_reasons：没有声明事项结束用的原因 {ITEM_END_REASON}")
+    # 事项最后采纳的成果种类（工单 #1394）：开环的标记按它判断，所以它必须是这份路由认得的成果种类之一；
+    # 没写这一项不算错：这样的路由不标开环，结束原因由它自己给
+    if declared.final_outcome is not None and declared.final_outcome not in outcomes:
+        issues.append(f"final_outcome：成果种类 {declared.final_outcome} 不是这份路由认得的成果种类")
     if issues:
         raise routing_contract.InvalidRoutingDefinition(ROUTING_NAME, issues)
 
@@ -607,6 +636,10 @@ class WatchedOutputs:
 
     def item_end(self, view: RunProjection) -> routing_contract.ItemEnd | None:
         return item_end(view)
+
+    def completion_reason(self, view: RunProjection,
+                          events: list[Event]) -> routing_contract.CompletionReason | None:
+        return completion_reason(view, events)
 
     def ask_branch(self, view: RunProjection, events: list[Event], *, requester: str, session_id: str,
                    call: dict[str, Any], limits: routing_contract.AskLimits):

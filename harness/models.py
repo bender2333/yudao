@@ -548,6 +548,12 @@ class RunProjection:
 
 
 
+# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」与「定义的校验」第 4 条）：事项最后采纳的成果
+# 没有核验角色核验时，事项创建时标为开环，完成后以这个停止原因结束，不记成放行。编号与
+# harness/definitions/stop_reasons.json 的那一条一致；路由（给出结束原因）与事件标签、汇总都取这一处
+OPEN_LOOP_STOP_REASON = "open_loop"
+
+
 # 停止原因的中文名与结束方式都在定义里：内核的清单在 stop_reasons.json，路由自己的结束原因在
 # 它自己的一份定义里（routings.json，工单 #861），两者都按定义查，不在代码里另写一份
 def stop_reason_name(reason: str | None) -> str:

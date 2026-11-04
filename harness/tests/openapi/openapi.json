@@ -8621,7 +8621,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 14
+            "example": 15
           },
           "contract_digest": {
             "type": "string",
@@ -22415,6 +22415,7 @@
                 "enum": [
                   "released",
                   "baseline_verified",
+                  "open_loop",
                   "max_cycles",
                   "model_steps_exhausted",
                   "cannot_verify",
@@ -35215,6 +35216,11 @@
             "title": "Form",
             "type": "string"
           },
+          "open_loop": {
+            "default": false,
+            "title": "Open Loop",
+            "type": "boolean"
+          },
           "onboarding_basis": {
             "anyOf": [
               {
@@ -35407,7 +35413,8 @@
           "stop_reason": {
             "enum": [
               "released",
-              "baseline_verified"
+              "baseline_verified",
+              "open_loop"
             ],
             "title": "Stop Reason",
             "type": "string"

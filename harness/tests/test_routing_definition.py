@@ -125,6 +125,21 @@ def test_the_shipped_routing_definition_passes_the_routing_own_check():
     assert ROUTING.check_definition(DEFINITIONS) is None
 
 
+def test_a_final_outcome_outside_the_outcome_kinds_is_rejected(tmp_path):
+    # R2：事项最后采纳的成果种类（开环的标记按它判断，工单 #1394）必须是这份路由认得的成果种类之一；
+    # 写在成果种类以外时校验失败，写明是哪一项
+    directory = _copy(tmp_path)
+    entry = _routing(directory)
+    entry["final_outcome"] = "audit_note"
+    loaded = load_definitions(_rewrite_routing(directory, entry))
+    with pytest.raises(routing_contract.InvalidRoutingDefinition) as raised:
+        ROUTING.check_definition(loaded)
+    assert "final_outcome：成果种类 audit_note 不是这份路由认得的成果种类" in "\n".join(raised.value.issues)
+    # 不写这一项不算错：这样的路由不标开环，结束原因由它自己给
+    entry.pop("final_outcome")
+    ROUTING.check_definition(load_definitions(_rewrite_routing(directory, entry)))
+
+
 def test_a_watched_name_the_routing_does_not_know_fails_the_routing_own_check(tmp_path):
     # R2：关注的成果（organization.json 的 watched）松开成字符串以后，名称的含义归路由（工单 #1456）：
     # 写错的名称在启动时被拒绝并写明哪一项，不会等到运行到 has_new_work 才抛 KeyError
