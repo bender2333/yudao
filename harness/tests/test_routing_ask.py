@@ -217,8 +217,9 @@ def test_the_thin_driver_only_connects_the_ask_branch():
                      "branch failed to answer"):
         assert judgment not in driver, judgment
         assert judgment in route, judgment
-    assert "self._routing.ask_branch(" in driver
-    assert "self._routing.ask_outcome(" in driver
+    # 路由按事项冻结的形态取（工单 #1392）：薄驱动仍只经路由契约问这一轮与结果
+    assert "self._item_routing(scope.run_id).ask_branch(" in driver
+    assert "self._item_routing(scope.run_id).ask_outcome(" in driver
     assert "branch.work_ref" in driver
     # 询问这一段不按部门写死：部门取自路由的判断与它组好的成果（`issuer`）
     for name in ("_execute_ask", "_run_ask_branch", "_commit_answer_revision", "_branch_steps"):

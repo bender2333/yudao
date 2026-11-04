@@ -35,9 +35,9 @@ from typing import Any
 import pytest
 
 from harness import kernel_events, routing_contract
-from harness import runtime as runtime_module
 from harness import write_path as write_path_module
 from harness.adapters.fake import FakeAdapter
+from harness.definitions import DEFAULT_FORM
 from harness.definitions import DEFINITIONS as PRODUCT_DEFINITIONS
 from harness.definitions import DefinitionError, UnknownStopReason, load_definitions
 from harness.event_store import run_stream
@@ -46,6 +46,7 @@ from harness.models import ArtifactRef, EventType
 from harness.projection import replay_events
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
+from harness.tightening import WATCHED_OUTPUTS
 from harness.tests import second_routing, task_pool_assembly
 from harness.validation import TightenRequest
 
@@ -94,20 +95,17 @@ def _script() -> dict[str, list[Any]]:
     return {department: [_turn(calls) for calls in turns] for department, turns in SCRIPT.items()}
 
 
-def _system(tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
-            script: dict[str, list[Any]] | None = None) -> tuple[LoopSystem, FakeAdapter]:
-    # 事项所用的那份定义（只在测试目录里）交给薄驱动：停止原因、部门、事项种类与角色提示都按它读。
-    # 停止原因与部门由薄驱动交给写入口，写入口按它核对（工单 #1165）；模块加载的那份定义不动，
-    # 产品的定义里没有任务池的成果种类与它声明的结束原因，路由自己带来的那几样只在它那份定义里
-    definitions = second_routing.DEFINITIONS
-    # 组装处（runtime.py）按组织定义里的名称接上路由：把事项所用的这份定义交给它的读取处，任务池因此按名称
-    # 接上，并从组装处拿到只读的事件读取器（契约第三版，工单 #1164）。测试不自己给路由接事件库
-    monkeypatch.setattr(runtime_module, "DEFINITIONS", definitions)
+def _system(tmp_path: Path, script: dict[str, list[Any]] | None = None) -> tuple[LoopSystem, FakeAdapter]:
+    # 实例同时加载两份具名的形态（工单 #1392）：产品的三部门与测试目录里的任务池。每个 run 建的时候
+    # 冻结用哪一份，之后停止原因、部门、路由、装配与收紧检查都按那一份；模块级的 DEFINITIONS 不替换
+    # （工单 #1165、#1392），组装处按每一份定义里的组织定义 routing 名称接上路由（工单 #825、#1164）
+    forms = {
+        DEFAULT_FORM: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS),
+        second_routing.ROUTING_NAME: (second_routing.DEFINITIONS, second_routing.TIGHTENING),
+    }
     adapter = FakeAdapter(_script() if script is None else script)
-    system = LoopSystem.for_testing(tmp_path, adapter, assembly=task_pool_assembly.TaskPoolAssembly())
-    # 收紧检查是这条路由的另一半，事项所用的定义也交给薄驱动（工单 #1098 的位置）
-    system.orchestrator._tightening = second_routing.TIGHTENING
-    system.orchestrator._definitions = definitions
+    system = LoopSystem.for_testing(tmp_path, adapter, assembly=task_pool_assembly.TaskPoolAssembly(),
+                                    forms=forms)
     return system, adapter
 
 
@@ -121,9 +119,9 @@ def _parts_of(system: LoopSystem, event: Any) -> list[dict[str, Any]]:
                                                    ArtifactRef(**event.payload["parts_ref"])))
 
 
-def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path, monkeypatch):
-    system, _adapter = _system(tmp_path, monkeypatch)
-    run_id = system.create_run("把 README 的用法一节整理清楚")
+def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path):
+    system, _adapter = _system(tmp_path)
+    run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
 
     projection = system.run_until_stop(run_id)
 
@@ -162,12 +160,12 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path, monkeypatch):
     assert projection.stop_reason not in second_routing.DEFINITIONS.stop_reasons
 
 
-def test_the_product_definitions_do_not_take_the_task_pool_end_reason(tmp_path, monkeypatch):
+def test_the_product_definitions_do_not_take_the_task_pool_end_reason(tmp_path):
     # 验收第 2 条（工单 #1165）：同样的写入，用另一份没有声明这个原因的定义时失败，错误写明是哪一个原因
     # 与哪份定义。这里是模块加载的那份产品定义——写入口不交定义时按它核对；交上事项所用的那一份时，
     # 同一个写入写得进去（薄驱动写结束、暂停、失败事件时就是这么交的）
-    system, _adapter = _system(tmp_path, monkeypatch)
-    run_id = system.create_run("把 README 的用法一节整理清楚")
+    system, _adapter = _system(tmp_path)
+    run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
     ending = write_path_module.NewEvent(
         EventType.RUN_FAILED, state_before="running", state_after="failed", actor="system",
         department="product", stop_reason=second_routing.ITEM_END_REASON,
@@ -184,11 +182,11 @@ def test_the_product_definitions_do_not_take_the_task_pool_end_reason(tmp_path, 
     assert system.project(run_id).stop_reason == second_routing.ITEM_END_REASON
 
 
-def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path, monkeypatch):
+def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path):
     # 组装处把只读的事件读取器交给路由（契约第三版，工单 #1164）：测试代码里没有自己给路由接事件库的调用，
     # 路由按定义里的名称由组装处接上，读取器是同一处交出来的
-    system, _adapter = _system(tmp_path, monkeypatch)
-    assert system.orchestrator._routing is second_routing.ROUTING
+    system, _adapter = _system(tmp_path)
+    assert system.forms[second_routing.ROUTING_NAME].routing is second_routing.ROUTING
     # 路由不再有自己接线的入口
     assert not hasattr(second_routing.TaskPool, "bind")
 
@@ -198,18 +196,18 @@ def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path, monkey
     for writing in ("commit", "append", "replace_projection", "claim_execution_right", "close"):
         assert not hasattr(reader, writing)
 
-    run_id = system.create_run("把 README 的用法一节整理清楚")
+    run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
     system.run_until_stop(run_id)
     # 读到的是这个事项事件库里的那些事件
     assert [event.event_id for event in reader.list_events(run_id)] == [
         event.event_id for event in system.store.list_events(run_id)]
 
 
-def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_path, monkeypatch):
+def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_path):
     # 基础规则 3「生成者不裁决自己」：路由用自己的方式满足（骨架与应用设计说明第 5.4 节），
     # 这里用这次运行里真实写下的事件折出的池子现状来判，不构造假的池子
-    system, _adapter = _system(tmp_path, monkeypatch)
-    run_id = system.create_run("把 README 的用法一节整理清楚")
+    system, _adapter = _system(tmp_path)
+    run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
     system.run_until_stop(run_id)
 
     events = system.store.list_events(run_id)

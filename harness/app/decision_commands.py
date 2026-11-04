@@ -6,7 +6,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..decisions import DecisionClosed, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision
+from ..decisions import (AnswerNotAllowed, DecisionClosed, DecisionNotFound, InvalidOption, NoteRequired,
+                         StaleDecision)
 from ..event_store import Command
 from ..models import Event, ProjectEvent
 from .commands import Rejection
@@ -48,6 +49,9 @@ async def _answer_decision(application: Application, command: Command, request: 
         raise Rejection("option_invalid", f"所选选项不是这个决定请求给出的选项，可选的选项：{offered}") from invalid
     except NoteRequired as missing_note:
         raise Rejection("not_allowed", f"选择「{missing_note.option}」必须填写说明") from missing_note
+    except AnswerNotAllowed as not_allowed:
+        # 事项冻结的形态不在发布里（工单 #1392）：回答没有写入，决定请求仍在等待
+        raise Rejection("not_allowed", not_allowed.message) from not_allowed
     if run_id is not None:
         application.system.orchestrator.start(run_id)
 

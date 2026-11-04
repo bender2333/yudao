@@ -13,7 +13,7 @@ from typing import Any
 
 from .actions import FactsQuery
 from .decisions import DEFINITIONS_CHANGED, blocks_run
-from .definitions import DEFINITIONS
+from .definitions import DEFINITIONS, Definitions
 from .event_store import run_stream
 from .models import TERMINAL_STATUSES, ArtifactRef, DecisionRequest, Event, EventType, hash_bytes, json_dumps
 from .streams import RUN_EVENT_VERSION
@@ -333,13 +333,16 @@ class RunRecovery:
     """
 
     def __init__(self, *, writes: Any, store: Any, view: Callable[[str], Any], artifacts: Any,
-                 run_environment: Callable[[str], Any], wake: Callable[[str], None]) -> None:
+                 run_environment: Callable[[str], Any], wake: Callable[[str], None],
+                 definitions_of: Callable[[str], Definitions] | None = None) -> None:
         self._writes = writes
         self._store = store
         self._view = view
         self._artifacts = artifacts
         self._run_environment = run_environment
         self._wake = wake
+        # 事项所用的那份定义（工单 #1392）：版本核对与写入的部门按事项冻结的形态取；不给时是加载的那一份
+        self._definitions_of = (lambda _run_id: DEFINITIONS) if definitions_of is None else definitions_of
 
     def resume(self, run_id: str) -> tuple[int, Any] | None:
         # 启动时自动继续一个因进程中断而未结束的 run（ADR-0018、恢复契约第 5.2 节）：
@@ -354,7 +357,7 @@ class RunRecovery:
         decisions = self._writes.read(run_stream(run_id)).decisions.values()
         if blocks_run(decisions):
             return None
-        if projection.definitions_version != DEFINITIONS.version:
+        if projection.definitions_version != self._definitions_of(run_id).version:
             self.await_definitions(run_id)
             return None
         # 工单 #17：检查是否有未确认的动作，为结果未知的动作写核实记录
@@ -382,16 +385,16 @@ class RunRecovery:
                     "facts": [], "department": current.active_department,
                     "reason": "definitions_version_changed",
                     "recorded_definitions_version": current.definitions_version,
-                    "current_definitions_version": DEFINITIONS.version,
+                    "current_definitions_version": self._definitions_of(run_id).version,
                     "description": (
                         f"事项使用的定义版本 {current.definitions_version or '（未记录）'} 与当前加载的版本 "
-                        f"{DEFINITIONS.version} 不同。按新版本继续以后，后续的模型请求与裁决记录新版本；"
+                        f"{self._definitions_of(run_id).version} 不同。按新版本继续以后，后续的模型请求与裁决记录新版本；"
                         "选择停止事项则运行结束。"),
                 },
             ))
             transaction.on_commit(lambda: self._wake(run_id))
 
-        self._writes.transact(run_stream(run_id), request)
+        self._writes.transact(run_stream(run_id), request, definitions=self._definitions_of(run_id))
 
     def await_unknown_actions(self, run_id: str) -> None:
         # 工单 #581（ADR-0038，恢复契约第 4 节）：恢复时找出结果未知的动作。
@@ -454,7 +457,7 @@ class RunRecovery:
                     comparison=comparison,
                 ))
 
-        self._writes.transact(run_stream(run_id), request)
+        self._writes.transact(run_stream(run_id), request, definitions=self._definitions_of(run_id))
 
     def _handed_back_action(self, started: Any, status: str, *,
                             error: str,
