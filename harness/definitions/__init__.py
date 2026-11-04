@@ -812,8 +812,9 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     # 生成的浏览器工具定义（浏览器与 computer use 设计说明第 4.1 节，工单 #147）：与 tools.json 合并成工具清单
     "browser_tools.json": ("browser_tools", TypeAdapter(dict[Identifier, Tool])),
 }
-# 可以不存在的定义文件：浏览器工具是随系统发布的一份生成定义，只用于测试的另一份完整定义里没有它时
-# 这份定义就没有浏览器工具（发布的那一份由 harness/tests/test_browser_tool_definitions.py 核对确实加载得到）
+# 可以不存在的定义文件：浏览器工具是随系统发布的一份生成定义，只含手写工具的另一份定义里没有它时
+# 这份定义就没有浏览器工具（那份定义也不在部门清单里授予它们，否则加载写明工具没有定义）。
+# 发布的那一份授予这些工具，也确实带上这个文件，由 harness/tests/test_browser_tool_definitions.py 核对
 _OPTIONAL_FILES = frozenset({"browser_tools.json"})
 
 

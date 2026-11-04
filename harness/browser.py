@@ -17,6 +17,7 @@ import json
 import os
 import re
 import shutil
+import subprocess
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -36,6 +37,8 @@ from .models import ArtifactRef, new_id
 MCP_PACKAGE = "@playwright/mcp"
 MCP_VERSION = "0.0.83"
 NODE = "node"
+# 问 npm 全局根目录（`npm root -g`）的时限（秒）：一次探测，结果缓存在 _CLI_CACHE 里
+NPM_QUERY_TIMEOUT_SEC = 30
 
 # 浏览器工具的名称（定义里动作类别是 browser 的那一组，工单 #147 从 Playwright MCP 的 tools/list 生成）：
 # 恢复按它判断一个结果未知的动作是不是浏览器动作
@@ -165,16 +168,9 @@ def _package_version(cli: Path) -> str | None:
 
 
 def _cli_candidates() -> list[Path]:
-    # 全局安装（CI 与用户按设计说明的装法）与 npx 缓存（只运行过一次、没有全局安装的机器）；
-    # Windows 的全局前缀在 %APPDATA%\npm，其他系统在 npm 的 lib 目录下
-    candidates: list[Path] = []
-    if os.name == "nt":
-        appdata = os.environ.get("APPDATA")
-        if appdata:
-            candidates.append(Path(appdata) / "npm" / "node_modules" / "@playwright" / "mcp" / "cli.js")
-    else:
-        for prefix in ("/usr/local/lib", "/usr/lib", str(Path.home() / ".local" / "lib")):
-            candidates.append(Path(prefix) / "node_modules" / "@playwright" / "mcp" / "cli.js")
+    # 全局安装（CI 与用户按设计说明的装法）与 npx 缓存（只运行过一次、没有全局安装的机器）
+    node, npm = shutil.which(NODE), shutil.which("npm")
+    candidates = [root / MCP_PACKAGE / "cli.js" for root in _node_module_roots(node, npm, _npm_global_root(npm))]
     cache_roots = [Path(os.environ.get("XDG_CACHE_HOME") or (Path.home() / ".cache")) / "npm" / "_npx"]
     local = os.environ.get("LOCALAPPDATA")
     if local:
@@ -185,6 +181,42 @@ def _cli_candidates() -> list[Path]:
     return candidates
 
 
+def _npm_global_root(npm: str | None) -> Path | None:
+    """全局安装的根目录，由 npm 自己给出（`npm root -g`）。
+
+    不能只按目录猜：GitHub Actions 的 Windows 宿主把全局前缀放在 `C:\\npm\\prefix`，不在 `%APPDATA%\\npm`，
+    按目录猜会漏掉 CI 上按设计说明 `npm install --global` 装的那一份（工单 #1184 的分支集成层就是这么红的）。
+    """
+    if npm is None:
+        return None
+    try:
+        finished = subprocess.run([npm, "root", "-g"], capture_output=True, text=True,
+                                  timeout=NPM_QUERY_TIMEOUT_SEC)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    lines = finished.stdout.strip().splitlines() if finished.returncode == 0 else []
+    return Path(lines[-1]) if lines else None
+
+
+def _node_module_roots(node: str | None, npm: str | None, npm_root: Path | None) -> list[Path]:
+    """全局装的那份 `node_modules` 可能在哪，按可信程度排：npm 报出的全局根目录、node 与 npm 所在的目录
+    （Windows 的宿主把全局前缀与 node 放在一起）、各系统的默认前缀。"""
+    roots: list[Path] = []
+    if npm_root is not None:
+        roots.append(npm_root)
+    for executable in (node, npm):
+        if executable is not None:
+            roots.append(Path(executable).parent / "node_modules")
+    if os.name == "nt":
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            roots.append(Path(appdata) / "npm" / "node_modules")
+    else:
+        for prefix in ("/usr/local/lib", "/usr/lib", str(Path.home() / ".local" / "lib")):
+            roots.append(Path(prefix) / "node_modules")
+    return list(dict.fromkeys(roots))
+
+
 def find_program() -> BrowserProgram:
     """找到 Playwright MCP 0.0.83 的入口，与启动它的 node。找不到时抛 BrowserSessionFailed。"""
     global _CLI_CACHE
@@ -193,6 +225,8 @@ def find_program() -> BrowserProgram:
     node = shutil.which(NODE)
     if node is None:
         raise BrowserSessionFailed("Node.js was not found on PATH; the browser tools need Node.js 24")
+    npm = shutil.which("npm")
+    roots = _node_module_roots(node, npm, _npm_global_root(npm))
     seen: list[str] = []
     for candidate in _cli_candidates():
         if not candidate.is_file():
@@ -203,9 +237,10 @@ def find_program() -> BrowserProgram:
             _CLI_CACHE = BrowserProgram(node=node, cli=str(candidate))
             return _CLI_CACHE
     found = ", ".join(seen) or "nothing"
+    looked = ", ".join(str(root) for root in roots) or "no global root"
     raise BrowserSessionFailed(
-        f"Playwright MCP {MCP_VERSION} was not found; looked for a global install and in the npx cache "
-        f"and found: {found}")
+        f"Playwright MCP {MCP_VERSION} was not found; looked for a global install ({looked}) and in the npx "
+        f"cache and found: {found}")
 
 
 def launch_arguments(output_dir: str | Path) -> tuple[str, ...]:
