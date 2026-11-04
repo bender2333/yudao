@@ -7181,6 +7181,8 @@ export type ActionVerifiedPayload = {
      */
     auto_retry_of?: string | null;
     verification?: FileActionComparison | null;
+    session?: BrowserSessionState | null;
+    observation?: BrowserObservation | null;
     /**
      * Note
      */
@@ -8188,6 +8190,39 @@ export type BaselineReviewAcceptedPayload = {
      */
     id: string;
     git_version: GitVersion;
+};
+
+/**
+ * BrowserObservation
+ */
+export type BrowserObservation = {
+    /**
+     * Accessibility
+     */
+    accessibility: string;
+    screenshot?: ArtifactRef | null;
+    /**
+     * Structure Truncated
+     */
+    structure_truncated?: boolean;
+};
+
+/**
+ * BrowserSessionState
+ */
+export type BrowserSessionState = {
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Status
+     */
+    status: 'running' | 'interrupted' | 'ended';
+    /**
+     * Tree Digest
+     */
+    tree_digest?: string | null;
 };
 
 /**

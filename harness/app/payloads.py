@@ -690,6 +690,22 @@ class FileActionComparison(Payload):
     detail: dict[str, Any]
 
 
+class BrowserSessionState(Payload):
+    # 浏览器会话在核实记录里的状态（浏览器与 computer use 设计说明第 9 节，工单 #1184）：会话身份、
+    # 状态与试用副本的树摘要。持有会话的进程重新启动时状态为 interrupted，身份与摘要不再有值
+    session_id: str | None = None
+    status: Literal["running", "interrupted", "ended"]
+    tree_digest: str | None = None
+
+
+class BrowserObservation(Payload):
+    # 核实一个结果未知的浏览器动作时取得的当前状态（设计说明第 9 节「按当前实际状态继续」）：
+    # 页面的可访问性结构，与取得的截图
+    accessibility: str
+    screenshot: ArtifactRef | None = None
+    structure_truncated: bool = False
+
+
 class ActionVerifiedPayload(Payload):
     # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
     # resolution 为 continue 表示用户选择按当前实际状态继续（旧事件保留，新版本不再写，工单 #582）；
@@ -710,6 +726,10 @@ class ActionVerifiedPayload(Payload):
     auto_retry_of: str | None = None
     # 自动核实的依据（工单 #308）：动作前快照、动作参数与当前公开树的对比结论
     verification: FileActionComparison | None = None
+    # 浏览器动作的核实依据（工单 #1184，设计说明第 9 节）：会话状态与新取得的页面结构、截图；
+    # 非浏览器动作没有这两项
+    session: BrowserSessionState | None = None
+    observation: BrowserObservation | None = None
     note: str | None = None
     decision_id: str | None = None
 
