@@ -385,10 +385,10 @@ def test_role_visibility_is_a_closed_list(tmp_path):
     assert issue[:2] == ("roles.json", "product.visibility[0]")
 
 
-def test_the_delivery_parts_are_checked_only_for_the_delivery_spec(tmp_path):
-    # 交付说明的事实与解释归属（工单 #357）：合同写给模型的每个字段必须恰好归入 facts 与 explanation 之一。
-    # 缺了归属、两边都写同一个字段时整份拒绝并指出具体字段；没有写 parts 的旧文件照旧加载；
-    # 别的提案种类不写这两栏、写了也不核对
+def test_the_parts_of_a_kind_that_declares_them_are_checked(tmp_path):
+    # 成果的事实与解释归属（工单 #357）：合同里写了 parts 的种类，写给模型的每个字段必须恰好归入 facts 与
+    # explanation 之一。缺了归属、两边都写同一个字段时整份拒绝并指出具体字段；没有写 parts 的旧文件照旧加载；
+    # 核对按种类自己写的 parts 做，不写死是哪一种成果（工单 #1456）
     directory = _copy(tmp_path)
     contracts = _read(directory, "proposal_contracts.json")
     delivery = contracts["roles"]["engineering"]["kinds"]["delivery_spec"]
@@ -405,9 +405,9 @@ def test_the_delivery_parts_are_checked_only_for_the_delivery_spec(tmp_path):
         load_definitions(directory)
     assert raised.value.issues == (
         ("proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts",
-         "字段 basis_product_spec_hash 没有归入交付事实或解释"),
+         "字段 basis_product_spec_hash 没有归入成果事实或解释"),
         ("proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts",
-         "字段 summary 没有归入交付事实或解释"),
+         "字段 summary 没有归入成果事实或解释"),
     )
 
     contracts = _read(directory, "proposal_contracts.json")
@@ -419,16 +419,21 @@ def test_the_delivery_parts_are_checked_only_for_the_delivery_spec(tmp_path):
         load_definitions(directory)
     [issue] = raised.value.issues
     assert issue[:2] == ("proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts")
-    assert issue[2] == "字段 launch 同时归入交付事实与解释"
+    assert issue[2] == "字段 launch 同时归入成果事实与解释"
 
-    # 校验只作用于 delivery_spec：别的提案种类写了这两栏、写了不认识的栏也不拦
+    # 校验只看种类自己写的 parts（工单 #1456）：没有写 parts 的种类不核对，写了就按同一套核对
     contracts = _read(directory, "proposal_contracts.json")
     delivery = contracts["roles"]["engineering"]["kinds"]["delivery_spec"]
     delivery["parts"] = {"facts": ["kind", "basis_product_spec_hash", "files", "check_names", "checks", "launch"],
                          "explanation": ["summary", "known_risks"]}
-    contracts["roles"]["product"]["kinds"]["product_spec"]["parts"] = {"facts": ["nonsense"]}
     _write(directory, "proposal_contracts.json", contracts)
     assert load_definitions(directory).role("product").visibility
+    contracts["roles"]["product"]["kinds"]["product_spec"]["parts"] = {"facts": ["nonsense"]}
+    _write(directory, "proposal_contracts.json", contracts)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[:2] == ("proposal_contracts.json", "roles.product.kinds.product_spec.parts")
+               for issue in raised.value.issues)
 
 
 def test_malformed_json_duplicate_keys_and_missing_files_are_reported(tmp_path):

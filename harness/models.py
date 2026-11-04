@@ -180,6 +180,22 @@ class ProductSpec:
     requirement_mapping: list[dict[str, Any]] = field(default_factory=list)
 
 
+# PRD 的内容字段（工单 #553、#1456）：回答里带这些字段就是随回答修订 PRD，那一份要走提案校验。
+# 这是 PRD 这一种成果的内容知识，归应用层（工单 #1456 从内核的 validation.py 搬到这里，与 ProductSpec 同处）；
+# 内核不认识它
+PRD_REVISION_FIELDS = frozenset({
+    "goal",
+    "requirements",
+    "acceptance_criteria",
+    "boundaries",
+    "constraints",
+    "fatal_conditions",
+    "non_goals",
+    "change_record",
+    "decision_changes",
+})
+
+
 @dataclass(frozen=True)
 class ProductDecision:
     id: str

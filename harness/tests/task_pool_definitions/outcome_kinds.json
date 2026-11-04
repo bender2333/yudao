@@ -1,0 +1,15 @@
+{
+  "kinds": [
+    {"id": "pool_task", "label": "池里的任务", "why": "发任务的部门写下的一条待办任务"},
+    {"id": "task_completion", "label": "完成说明", "why": "领到任务的部门交的完成说明"},
+    {"id": "task_verdict", "label": "验收结论", "why": "另一个部门对完成说明的结论：接纳或者打回"}
+  ],
+  "groups": [
+    {
+      "id": "task_pool",
+      "label": "任务池的成果",
+      "why": "任务池这份测试定义认得、由提议方式提交的三种成果；只在测试里用（工单 #864）",
+      "kinds": ["pool_task", "task_completion", "task_verdict"]
+    }
+  ]
+}

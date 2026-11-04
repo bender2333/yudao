@@ -202,9 +202,9 @@ class Department(_Definition):
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
     # 部门关注的成果（三部门的循环结构第 2 节）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
-    # 关注关系写在定义里，代码里只有一条通用规则
-    watched: tuple[Literal["user_input", "guidance", "product_spec", "defect_record", "delivery",
-                          "structure", "baseline_review"], ...] = ()
+    # 关注关系写在定义里，代码里只有一条通用规则。名称的含义归路由：哪些名称认得出由那份路由的定义与它的
+    # 校验给出，内核只核对它是字符串（工单 #1456）
+    watched: tuple[Identifier, ...] = ()
 
 
 # 写入范围是内核认识的通用权限（设计说明第 4.2 节第 1 条）：workspace 写这个事项的工作区；
@@ -337,20 +337,21 @@ class ProposalContract(_Definition):
 # 条件名与参数是封闭清单，装载定义时逐条核对；写错的条件在程序启动时以 DefinitionError 报出。
 ConditionName = Literal["basis_current", "referenced_current", "check_receipts", "tree_matches",
                         "author_separation", "no_duplicate_content"]
-# 条件读的成果：名称与运行状态投影里的当前版本一一对应（validation.py 的条件实现）
-ArtifactName = Literal["product_spec", "delivery_spec", "contract", "structure", "snapshot", "product_decisions"]
+# 条件读的成果：名称是定义里的字符串，内核按名字去最小投影里取当前版本；取不到时由条件报「没有这一项」。
+# 内核不认识具体有哪几种成果（工单 #1456）：加一种成果种类只写定义，不改这里
 
 
 class ConditionBinding(_Definition):
-    # 绑定到当前版本的一处：field 是登记在回执或内容摘要上的字段名，target 是取当前版本的成果
+    # 绑定到当前版本的一处：field 是登记在回执或内容摘要上的字段名，target 是取当前版本的成果。
+    # 两种名称都是定义里的字符串：内核按名字去最小投影里取成果，不认识具体有哪几种（工单 #1456）
     field: Identifier
-    target: ArtifactName
+    target: Identifier
 
 
 class ReferencedField(_Definition):
     # 被引用的成果里要等于当前版本的字段，与不相等时的拒绝理由；错误指向哪一字段可以另写
     field: Identifier
-    target: ArtifactName
+    target: Identifier
     message: str = Field(min_length=1)
     error_field: Identifier | None = None
 
@@ -405,24 +406,24 @@ class ProposalCondition(_Definition):
     # no_duplicate_content：错误指向的提案字段
     field: str = ""
     # basis_current：依据的是哪一份成果
-    target: ArtifactName | None = None
+    target: Identifier | None = None
     # referenced_current：引用的是哪一份成果
-    artifact: ArtifactName | None = None
+    artifact: Identifier | None = None
     # referenced_current：被引用的成果里要求等于当前版本的字段
     referenced: tuple[ReferencedField, ...] = ()
     # referenced_current：被引用的成果不存在时怎么写错误
     missing: ConditionFailure | None = None
-    # tree_matches：树摘要是哪一份成果记下的（建档时的快照或当前交付）
-    recorded_in: Literal["snapshot", "delivery_spec"] | None = None
+    # tree_matches：树摘要是哪一份成果记下的（名称与提案合同里的成果名同一套，内核按名字取，工单 #1456）
+    recorded_in: Identifier | None = None
     # author_separation：评价的是哪一份成果
-    evaluated: ArtifactName | None = None
+    evaluated: Identifier | None = None
     # check_receipts：列出的检查名在提案里的位置、在哪个部门取回执、回执绑定哪些当前版本、是否必须是这一轮
     names: ConditionNames | None = None
     department: Identifier | None = None
     bind: tuple[ConditionBinding, ...] = ()
     activation: bool = False
     # no_duplicate_content：与哪一份已接纳成果的历史比较，内容由哪些提案字段组成
-    collection: ArtifactName | None = None
+    collection: Identifier | None = None
     content: tuple[str, ...] = ()
     # 不满足时的拒绝理由（check_receipts 里 {name} 换成检查名）
     message: str = ""
@@ -590,6 +591,38 @@ class EventSource(_Definition):
 
 
 
+class OutcomeKind(_Definition):
+    # 一种正式成果（outcome_kinds.json，工单 #1456）：定义里单独的一项，内核不认识具体有哪几种。
+    # 成果怎么提交、按什么条件接纳都由这一份定义里的工具与提案合同给出
+    id: Identifier
+    # 中文名，给用户看
+    label: str = ""
+    # 这一种成果是什么
+    why: str = ""
+
+
+class OutcomeGroup(_Definition):
+    # 一组成果种类，给一份路由定义按名称引用（routings.json 的 outcomes）：路由认得哪几种成果写在这里，
+    # 不写进路由自己的那一段
+    id: Identifier
+    label: str = ""
+    why: str = ""
+    kinds: tuple[Identifier, ...] = Field(min_length=1)
+
+
+class OutcomeKinds(_Definition):
+    # outcome_kinds.json：这份定义里的成果种类与它们的分组
+    kinds: tuple[OutcomeKind, ...] = Field(min_length=1)
+    groups: tuple[OutcomeGroup, ...] = Field(min_length=1)
+
+    freeze_kinds = _frozen("kinds")
+    freeze_groups = _frozen("groups")
+
+    def group(self, name: str) -> OutcomeGroup | None:
+        # 名称指向的那一组；加载时核对过每份路由引用的组都在，这里取不到时由调用方按空处理
+        return next((item for item in self.groups if item.id == name), None)
+
+
 class Routing(_Definition):
     # 一种路由实现（routings.json，工单 #825），下面一段是它自己的一份定义（设计说明第 5.4 节第 2 条）：
     # 部门、成果种类、提议方式、路由自己的上限与结束原因。内核只核对这份定义的结构（字段、类型与非空），
@@ -602,8 +635,12 @@ class Routing(_Definition):
     why: str = ""
     # 部门：按名称引用组织定义里的部门
     departments: tuple[Identifier, ...] = Field(min_length=1)
-    # 成果种类：这种路由认得的正式成果，按名称引用提交类工具提交的提案种类
-    outcome_kinds: tuple[Identifier, ...] = Field(min_length=1)
+    # 成果种类：按名称引用 outcome_kinds.json 里的一组（工单 #1456）。路由认得哪几种成果是定义的一项，
+    # 不写进路由自己的那一段；引用不存在的组时加载失败
+    outcomes: Identifier | None = None
+    # 旧定义文件的写法：成果种类直接列在路由这一段里。字段只增，旧的 routings.json 照旧能读（工单 #1456）；
+    # 与 outcomes 一起写时加载失败
+    outcome_kinds: tuple[Identifier, ...] = ()
     # 提议方式：提交类工具的名称，按名称引用工具定义
     proposal_methods: tuple[Identifier, ...] = Field(min_length=1)
     # 路由自己的上限（例如任务数、打回次数）：数值，归路由，不进最小投影
@@ -612,6 +649,15 @@ class Routing(_Definition):
     end_reasons: Mapping[Identifier, RoutingEndReason] = Field(min_length=1)
 
     freeze_routing = _frozen("limits", "end_reasons")
+
+    @model_validator(mode="after")
+    def _outcome_reference(self) -> "Routing":
+        # 成果种类只能写一处：引用分组，或者旧写法直接列出（工单 #1456）。两样都写时说不出以哪一份为准
+        if self.outcomes is not None and self.outcome_kinds:
+            raise ValueError("outcomes and outcome_kinds cannot both be set")
+        if self.outcomes is None and not self.outcome_kinds:
+            raise ValueError("outcomes is required: name a group from outcome_kinds.json")
+        return self
 
 
 class Routings(_Definition):
@@ -640,6 +686,8 @@ class Definitions(_Definition):
     work_items: WorkItems
     # 可用的路由实现，来自 routings.json（工单 #825）
     routings: Routings
+    # 这份定义里的成果种类与分组，来自 outcome_kinds.json（工单 #1456）：定义里单独的一项，路由按名称引用
+    outcome_kinds: OutcomeKinds
     # 事件种类的来源表，来自 event_sources.json（工单 #396）：键是事件种类
     event_sources: Mapping[Identifier, EventSource]
 
@@ -766,6 +814,18 @@ class Definitions(_Definition):
         # 组织定义写明的路由自己的一份定义（设计说明第 5.4 节第 2 条）：加载时核对过它在 routings.json 里
         return next(item for item in self.routings.routings if item.id == self.routing)
 
+    def outcomes_of(self, routing_name: str) -> tuple[str, ...]:
+        """一份路由认得的成果种类：它的定义按名称引用 outcome_kinds.json 里的一组。
+
+        旧定义文件把种类直接列在路由那一段里（字段只增），那种写法按它自己列的读。引用的组不在定义里时加载
+        已经失败；这里取不到时按空清单处理，不猜。调用方交来的路由名称同样在加载时核对过。
+        """
+        declared = next(item for item in self.routings.routings if item.id == routing_name)
+        if declared.outcomes is None:
+            return tuple(declared.outcome_kinds)
+        group = self.outcome_kinds.group(declared.outcomes)
+        return tuple(group.kinds) if group is not None else ()
+
     def stop_reason(self, reason: str) -> StopReason:
         # 停止原因来自定义中的清单；组织定义所选的路由自己声明的结束原因同样可以写入（设计说明第 5.4 节第 7 条）
         definition = self.stop_reasons.get(reason)
@@ -808,13 +868,17 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "model_capabilities.json": ("model_capabilities", TypeAdapter(ModelCapabilities)),
     "work_items.json": ("work_items", TypeAdapter(WorkItems)),
     "routings.json": ("routings", TypeAdapter(Routings)),
+    "outcome_kinds.json": ("outcome_kinds", TypeAdapter(OutcomeKinds)),
     "event_sources.json": ("event_sources", TypeAdapter(dict[Identifier, EventSource])),
     # 生成的浏览器工具定义（浏览器与 computer use 设计说明第 4.1 节，工单 #147）：与 tools.json 合并成工具清单
     "browser_tools.json": ("browser_tools", TypeAdapter(dict[Identifier, Tool])),
 }
-# 可以不存在的定义文件：浏览器工具是随系统发布的一份生成定义，只用于测试的另一份完整定义里没有它时
-# 这份定义就没有浏览器工具（发布的那一份由 harness/tests/test_browser_tool_definitions.py 核对确实加载得到）
-_OPTIONAL_FILES = frozenset({"browser_tools.json"})
+# 可以不存在的定义文件（字段只增，旧文件新版本能读）：浏览器工具是随系统发布的一份生成定义，只用于测试的另一份
+# 完整定义里没有它时这份定义就没有浏览器工具；成果种类这一项是后加的，旧的定义目录没有它时按没有分组读，
+# 那种目录里的路由定义按旧写法直接列出成果种类（工单 #1456）
+_OPTIONAL_FILES = frozenset({"browser_tools.json", "outcome_kinds.json"})
+# 可选文件缺省时的取值：浏览器工具是空清单；成果种类这一项没有时没有分组，那种目录里的路由定义按旧写法读
+_OPTIONAL_DEFAULTS: dict[str, Any] = {"outcome_kinds.json": OutcomeKinds.model_construct(kinds=(), groups=())}
 
 
 class _DuplicateKey(ValueError):
@@ -847,8 +911,8 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
         path = directory / file
         if not path.is_file():
             if file in _OPTIONAL_FILES:
-                # 可选的生成定义缺省为空：这份定义里没有那批工具
-                parts[field] = {}
+                # 可选的定义文件缺省为空：没有那批工具，或者旧目录没有成果种类这一项（工单 #1456）
+                parts[field] = _OPTIONAL_DEFAULTS.get(file, {})
                 continue
             issues.append((file, "（整个文件）", "定义文件不存在"))
             continue
@@ -920,9 +984,12 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
             if tool not in tools:
                 issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
     issues.extend(_work_item_references(parts["work_items"], organization, tools, parts["stop_reasons"]))
+    issues.extend(_outcome_kind_references(parts["outcome_kinds"], parts["routings"]))
     issues.extend(_routing_references(organization, parts["routings"]))
-    issues.extend(verification_issues(organization, {tool.proposal for tool in tools.values()
-                                                    if tool.proposal is not None}))
+    # 核验声明里的成果种类在这份定义里：取定义里单独那一项（outcome_kinds.json，工单 #1456）与提交类工具提交的
+    # 种类；旧目录没有那一项时只有后者
+    issues.extend(verification_issues(organization, {kind.id for kind in parts["outcome_kinds"].kinds}
+                                      | {tool.proposal for tool in tools.values() if tool.proposal is not None}))
     issues.extend(_rule_references(parts["rules"], roles))
     submitters: dict[str, str] = {}
     for name, tool in tools.items():
@@ -932,7 +999,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
         elif tool.proposal is not None:
             submitters[tool.proposal] = name
     issues.extend(_contract_references(parts["proposal_contracts"], roles, tools, parts["work_items"]))
-    issues.extend(_delivery_part_issues(parts["proposal_contracts"]))
+    issues.extend(_part_issues(parts["proposal_contracts"]))
     issues.extend(_condition_references(parts["proposal_contracts"], organization))
     presets: ServicePresets = parts["service_presets"]
     identities = [preset.id for preset in presets.presets]
@@ -1129,24 +1196,55 @@ def _contract_references(contracts: ProposalContracts, roles: dict[str, Role], t
     return issues
 
 
-def _delivery_part_issues(contracts: ProposalContracts) -> list[tuple[str, str, str]]:
-    # 交付说明的事实与解释归属（proposal_contracts.json 的 parts，工单 #357）：只核对 delivery_spec，合同写给
-    # 模型的每个字段必须恰好归入 facts 与 explanation 之一，缺了或两边都写都指出具体字段；没有 parts 的旧文件照旧加载
-    description = getattr(contracts.roles.get("engineering"), "kinds", {}).get("delivery_spec") or {}
-    declared = description.get("parts")
-    if declared is None:
-        return []
-    file, at = "proposal_contracts.json", "roles.engineering.kinds.delivery_spec.parts"
-    parts = {name: ({str(field).strip() for field in declared.get(name)}
-                    if isinstance(declared.get(name), (list, tuple)) else set())
-             for name in ("facts", "explanation")}
-    written = {str(item).split("=", 1)[0].strip() for item in description.get("required") or ()}
-    written |= {str(item).strip() for item in description.get("optional") or ()}
-    twice = [(file, at, f"字段 {field} 同时归入交付事实与解释")
-             for field in sorted(parts["facts"] & parts["explanation"])]
-    missing = [(file, at, f"字段 {field} 没有归入交付事实或解释")
-               for field in sorted(written - parts["facts"] - parts["explanation"] - {""})]
-    return twice + missing
+def _outcome_kind_references(outcome_kinds: OutcomeKinds, routings: Routings) -> list[tuple[str, str, str]]:
+    # 成果种类这一项（outcome_kinds.json，工单 #1456）：种类不重复，分组里的每个名称都有定义，
+    # 每份路由定义引用的那一组存在。名称指向的内容（哪种成果由哪个工具提交、按哪些条件接纳）在提案合同里核对
+    issues: list[tuple[str, str, str]] = []
+    file = "outcome_kinds.json"
+    seen: set[str] = set()
+    for index, kind in enumerate(outcome_kinds.kinds):
+        if kind.id in seen:
+            issues.append((file, f"kinds[{index}].id", f"重复的成果种类 {kind.id}"))
+        seen.add(kind.id)
+    declared = {kind.id for kind in outcome_kinds.kinds}
+    for index, group in enumerate(outcome_kinds.groups):
+        for position, kind in enumerate(group.kinds):
+            if kind not in declared:
+                issues.append((file, f"groups[{index}].kinds[{position}]", f"成果种类 {kind} 没有定义"))
+    available = [group.id for group in outcome_kinds.groups]
+    for index, routing in enumerate(routings.routings):
+        if routing.outcomes is None:
+            continue  # 旧写法：种类直接列在路由那一段里，由路由自己的校验核对
+        if routing.outcomes not in available:
+            issues.append(("routings.json", f"routings[{index}].outcomes",
+                           f"成果种类分组 {routing.outcomes} 没有在 {file} 里定义；"
+                           f"有的是：{'、'.join(available)}"))
+    return issues
+
+
+def _part_issues(contracts: ProposalContracts) -> list[tuple[str, str, str]]:
+    # 成果的事实与解释归属（proposal_contracts.json 的 parts，工单 #357）：合同里写了 parts 的种类，
+    # 写给模型的每个字段必须恰好归入 facts 与 explanation 之一，缺了或两边都写都指出具体字段；
+    # 没有 parts 的旧文件照旧加载。角色、种类与字段都从合同里取，加一种成果不改这里（工单 #1456）
+    issues: list[tuple[str, str, str]] = []
+    file = "proposal_contracts.json"
+    described = [(f"roles.{role}.kinds.{kind}", description)
+                 for role, contract in contracts.roles.items() for kind, description in contract.kinds.items()]
+    described += [(f"shared.kinds.{kind}", description) for kind, description in contracts.shared.kinds.items()]
+    for at, description in described:
+        declared = description.get("parts")
+        if declared is None:
+            continue
+        parts = {name: ({str(field).strip() for field in declared.get(name)}
+                        if isinstance(declared.get(name), (list, tuple)) else set())
+                 for name in ("facts", "explanation")}
+        written = {str(item).split("=", 1)[0].strip() for item in description.get("required") or ()}
+        written |= {str(item).strip() for item in description.get("optional") or ()}
+        issues.extend((file, f"{at}.parts", f"字段 {field} 同时归入成果事实与解释")
+                      for field in sorted(parts["facts"] & parts["explanation"]))
+        issues.extend((file, f"{at}.parts", f"字段 {field} 没有归入成果事实或解释")
+                      for field in sorted(written - parts["facts"] - parts["explanation"] - {""}))
+    return issues
 
 
 def _condition_references(contracts: ProposalContracts, organization: Organization) -> list[tuple[str, str, str]]:

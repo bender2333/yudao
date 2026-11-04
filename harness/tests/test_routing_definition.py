@@ -66,6 +66,7 @@ def test_the_kernel_loads_a_routing_definition_with_names_and_structure_only(tmp
     # 内容由路由实现自己校验
     directory = _copy(tmp_path)
     entry = _routing(directory)
+    entry.pop("outcomes", None)  # 旧写法：成果种类直接列在路由那一段里（字段只增，工单 #1456）
     entry.update({
         "departments": ["risks"], "outcome_kinds": ["audit_note"], "proposal_methods": ["submit_audit_note"],
         "limits": {"max_tasks": 3},
@@ -82,7 +83,10 @@ def test_the_kernel_loads_a_routing_definition_with_names_and_structure_only(tmp
 
 
 @pytest.mark.parametrize(("change", "field"), [
-    (lambda entry: {**entry, "outcome_kinds": "audit_note"}, "routings[0].outcome_kinds"),
+    (lambda entry: {**{k: v for k, v in entry.items() if k != "outcomes"}, "outcome_kinds": "audit_note"},
+     "routings[0].outcome_kinds"),
+    (lambda entry: {**entry, "outcome_kinds": ["audit_note"]}, "routings[0]"),
+    (lambda entry: {k: v for k, v in entry.items() if k != "outcomes"}, "routings[0]"),
     (lambda entry: {**entry, "limits": {"max_tasks": -1}}, "routings[0].limits.max_tasks"),
     (lambda entry: {**entry, "end_reasons": {"queue_empty": {"label": "任务池是空的", "outcome": "halted"}}},
      "routings[0].end_reasons.queue_empty.outcome"),
@@ -101,6 +105,7 @@ def test_the_routing_rejects_content_that_is_not_in_the_definitions(tmp_path):
     # R2：按名称指向的内容由路由实现自己校验，逐项写明是哪一项（工单 #861）
     directory = _copy(tmp_path)
     entry = _routing(directory)
+    entry.pop("outcomes", None)
     entry.update({"departments": ["risks"], "outcome_kinds": ["audit_note"],
                   "proposal_methods": ["submit_audit_note"]})
     loaded = load_definitions(_rewrite_routing(directory, entry))
@@ -110,8 +115,8 @@ def test_the_routing_rejects_content_that_is_not_in_the_definitions(tmp_path):
     assert "departments[0]：部门 risks 不在组织定义里" in issues
     assert "departments：组织定义里的部门 product 没有列进路由的部门清单" in issues
     assert "proposal_methods[0]：工具 submit_audit_note 不是定义里的提交类工具" in issues
-    assert "outcome_kinds[0]：成果种类 audit_note 没有由这里列出的提议方式提交" in issues
-    assert "outcome_kinds：提交类工具提交的成果种类 product_spec 没有列进成果种类" in issues
+    assert "outcomes[0]：成果种类 audit_note 没有由这里列出的提议方式提交" in issues
+    assert "outcomes：提交类工具提交的成果种类 product_spec 没有列进成果种类" in issues
 
 
 def test_the_shipped_routing_definition_passes_the_routing_own_check():
@@ -175,3 +180,37 @@ def test_the_label_of_a_routing_end_reason_comes_from_the_definition(tmp_path, m
     assert models.stop_reason_name("released") == "已完成并放行"
     # 没有登记的取值原样返回，说明里不丢掉这个事实
     assert models.stop_reason_name("not_a_reason") == "not_a_reason"
+
+
+def test_outcome_kind_references_are_checked_at_load(tmp_path):
+    # 成果种类这一项（outcome_kinds.json，工单 #1456）：种类不重复，分组里的名称都有定义，
+    # 每份路由定义引用的那一组存在；不满足时整份拒绝并写明文件与字段
+    (tmp_path / "duplicate").mkdir()
+    directory = _copy(tmp_path / "duplicate")
+    kinds = _read(directory, "outcome_kinds.json")
+    kinds["kinds"].append({"id": "product_spec", "label": "重复的一种"})
+    _write(directory, "outcome_kinds.json", kinds)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert ("outcome_kinds.json", "kinds[7].id", "重复的成果种类 product_spec") in raised.value.issues
+
+    (tmp_path / "group").mkdir()
+    directory = _copy(tmp_path / "group")
+    kinds = _read(directory, "outcome_kinds.json")
+    kinds["groups"][0]["kinds"].append("no_such_kind")
+    _write(directory, "outcome_kinds.json", kinds)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[:2] == ("outcome_kinds.json", "groups[0].kinds[7]") and "no_such_kind" in issue[2]
+               for issue in raised.value.issues), raised.value.issues
+
+    (tmp_path / "routing").mkdir()
+    directory = _copy(tmp_path / "routing")
+    routings = _read(directory, "routings.json")
+    routings["routings"][0]["outcomes"] = "no_such_group"
+    _write(directory, "routings.json", routings)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("routings.json", "routings[0].outcomes")
+    assert "no_such_group" in issue[2]

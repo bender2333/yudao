@@ -106,6 +106,7 @@ def _delivery(**overrides) -> DeliverySpec:
 def _receipt(department: str, *, activation: str = "act", snapshot: str = TREE,
              delivery_hash: str | None = None) -> CheckReceipt:
     return CheckReceipt(name="smoke", department=department, exit_code=0, summary="ran", snapshot_hash=snapshot,
+                        bindings={"product_spec": SPEC_HASH, "delivery_spec": delivery_hash, "contract": CONTRACT_HASH},
                         product_spec_hash=SPEC_HASH, delivery_spec_hash=delivery_hash, activation_id=activation,
                         effective_contract_hash=CONTRACT_HASH)
 

@@ -8,8 +8,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Literal
+from dataclasses import dataclass, field
+from typing import Any, Literal, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -29,12 +29,20 @@ class CheckReceipt:
     exit_code: int
     summary: str
     snapshot_hash: str
+    # 这份回执绑定的成果种类与它们的版本摘要（工单 #1456）：回执只说「绑定了哪一种成果的哪一版」，
+    # 内核按定义里写的名称核对，不认识具体有哪几种成果；新加一种成果种类不用改这里
+    bindings: dict[str, str] = field(default_factory=dict)
+    # 旧字段：绑定的两种成果与这一轮的工作依据各有一个字段名（字段只增，旧的读法与旧的回执文件照旧能读）
     product_spec_hash: str | None = None
     delivery_spec_hash: str | None = None
     activation_id: str | None = None
     tree_changed: bool = False
     effective_contract_hash: str | None = None
     qa_tests_hash: str | None = None
+
+    def binds(self, bindings: Mapping[str, str]) -> bool:
+        # 这份回执绑定的成果版本是不是都在 bindings 里写的那些（种类 → 摘要）
+        return all(self.bindings.get(kind) == digest for kind, digest in bindings.items())
 
 
 class Preconditions(BaseModel):
@@ -140,25 +148,21 @@ class TreeFacts(BaseModel):
         department: str,
         name: str,
         *,
-        product_spec_hash: str | None = None,
-        delivery_spec_hash: str | None = None,
+        bindings: Mapping[str, str] | None = None,
         activation_id: str | None = None,
-        effective_contract_hash: str | None = None,
     ) -> CheckReceipt | None:
+        # 这条检查在这一次一轮工作里、绑定当前几份成果的最近一条回执。要绑定的成果按定义里写的名称给
+        # （种类 → 当前版本的摘要），内核不认识具体有哪几种（工单 #1456）
         found = [
             item
             for item in self.checks
             if item.department == department and item.name == name and item.snapshot_hash == self.digest
             and not item.tree_changed
         ]
-        if product_spec_hash is not None:
-            found = [item for item in found if item.product_spec_hash == product_spec_hash]
-        if delivery_spec_hash is not None:
-            found = [item for item in found if item.delivery_spec_hash == delivery_spec_hash]
+        if bindings:
+            found = [item for item in found if item.binds(bindings)]
         if activation_id is not None:
             found = [item for item in found if item.activation_id == activation_id]
-        if effective_contract_hash is not None:
-            found = [item for item in found if item.effective_contract_hash == effective_contract_hash]
         return found[-1] if found else None
 
 
