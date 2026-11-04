@@ -14791,6 +14791,95 @@ export type ProjectDecisionWithdrawnPayload = {
 };
 
 /**
+ * ProjectFormSetEvent
+ */
+export type ProjectFormSetEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'project_form_set';
+    payload: ProjectFormSetPayload;
+};
+
+/**
+ * ProjectFormSetPayload
+ */
+export type ProjectFormSetPayload = {
+    /**
+     * Previous Form
+     */
+    previous_form: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Reason
+     */
+    reason?: string;
+};
+
+/**
  * ProjectGoalChangedEvent
  */
 export type ProjectGoalChangedEvent = {
@@ -16103,6 +16192,10 @@ export type RunCreatedPayload = {
      * Run Event Version
      */
     run_event_version: number;
+    /**
+     * Form
+     */
+    form?: string;
     onboarding_basis?: OnboardingBasis | null;
     /**
      * Round
@@ -18842,6 +18935,10 @@ export type WorkItemCreatedPayload = {
      */
     restarted_from_run_id?: string | null;
     mcp_servers?: McpServersDocument | null;
+    /**
+     * Form
+     */
+    form?: string;
 };
 
 /**
@@ -19663,6 +19760,8 @@ export type EventObject = ({
 } & BaselineAdoptedEvent) | ({
     type: 'project_parameter_set';
 } & ProjectParameterSetEvent) | ({
+    type: 'project_form_set';
+} & ProjectFormSetEvent) | ({
     type: 'writeback_completed';
 } & WritebackCompletedEvent) | ({
     type: 'writeback_stopped';

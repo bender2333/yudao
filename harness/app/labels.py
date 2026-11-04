@@ -249,6 +249,7 @@ _LABELS: dict[str, str] = {
     ProjectEventType.ONBOARDING_REVISION_STARTED: "开始第 {round} 轮建档",
     ProjectEventType.BASELINE_ADOPTED: "采纳了建档基线：{summary}",
     ProjectEventType.PARAMETER_SET: "把项目参数 {name} 从 {old_value} 改为 {new_value}：{reason}（{modified_by} 修改）",
+    ProjectEventType.PROJECT_FORM_SET: "把项目的形态从 {previous_form} 改为 {form}：{reason}",
     ProjectEventType.WRITEBACK_COMPLETED: "写回了采纳成果：分支 {branch}，最终树 {final_tree_digest}",
     ProjectEventType.WRITEBACK_STOPPED: "写回停止：{reason}",
     ProjectEventType.WRITEBACK_NOT_NEEDED: "无需写回：本事项的变更已经在目标分支上",

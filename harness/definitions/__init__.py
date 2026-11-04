@@ -1170,4 +1170,7 @@ def _version(contents: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
+# 发布带的默认形态（工单 #1392）：项目没有设过形态时的事项用它；这个名字与 runtime.py 的形态登记处一致
+DEFAULT_FORM = "three_departments"
+
 DEFINITIONS = load_definitions()

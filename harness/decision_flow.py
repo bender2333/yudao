@@ -22,7 +22,7 @@ from typing import Any, Protocol
 from . import parameters as parameter_values
 from .artifacts import ArtifactStore
 from .decisions import (
-    DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, QA_CANNOT_VERIFY,
+    AnswerNotAllowed, DEFINITIONS_CHANGED, INITIAL_PRD, KERNEL_MODIFICATION, MODEL_UNAVAILABLE, QA_CANNOT_VERIFY,
     RESUMABLE_PAUSE_KINDS,
     DecisionClosed, DecisionNotFound, InvalidOption, NoteRequired, StaleDecision, blocks_run,
 )
@@ -65,6 +65,19 @@ class DecisionFlow:
         saved = saved_decision(driver.store, decision_id)
         if saved is None:
             raise DecisionNotFound(decision_id)
+        # 建档修改轮建 run 之前先核事项冻结的形态（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：
+        # 不在发布里时不写这条回答、也不建修改轮的 run，原因由项目服务写进这条事项的开始失败；决定请求保持
+        # 等待，换回带那一份形态的发布以后可以再回答。核对放在回答事务提交之前：否则事务里会留下一条没有
+        # run 的 onboarding_revision_started，启动补建时它没有形态可建。回答本身已经不符合条件时（已关、
+        # 版本旧、选项不对）不写这条原因，留给事务里的核对报出原来的错。以命令层已定义的拒绝收场
+        # （`AnswerNotAllowed` → `not_allowed`）：命令没有登记任何写入，接口层是拒绝而不是 500
+        if (option == "revise" and saved.kind == INITIAL_PRD.name and saved.status == "open"
+                and base_version == saved.version
+                and option in [entry["id"] for entry in saved.request["options"]]):
+            candidate_run_id = saved.request.get("candidate_run_id")
+            if candidate_run_id is not None and not driver.projects.item_form_available(candidate_run_id):
+                raise AnswerNotAllowed(
+                    "这个事项冻结的形态不在当前发布里，这条回答没有生效；换回带那一份形态的发布以后再回答")
 
         def answer(transaction: Transaction) -> str | None:
             decision = transaction.decisions[decision_id]
@@ -104,6 +117,11 @@ class DecisionFlow:
                                   if entry.event_id == event.payload["candidate_event_id"]), None)
                 if candidate is None:
                     raise ValueError(f"onboarding candidate {event.payload['candidate_event_id']} is gone")
+                item = state.work_item(event.payload["work_item_id"])
+                # 形态不在发布里时（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：不建这个 run，
+                # 原因写进这条事项的开始失败；换回带那一份形态的发布以后启动补建再建
+                if item is not None and not driver.projects.item_form_in_release(project_id, item, run_id):
+                    return
                 self.create_revision_run(driver, project_id, candidate, run_id, int(event.payload["round"]),
                                          event.payload.get("note"))
                 return
@@ -256,6 +274,10 @@ class DecisionFlow:
             prompt_config_versions=dict(item.prompt_config_versions),
             # 修改轮沿用事项创建时冻结的 MCP 服务器设置（工单 #236），不取项目当前设置
             mcp_servers=item.mcp_servers,
+            # 修改轮沿用事项创建时冻结的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：
+            # 这一轮仍是同一个事项，换的只是 run 的应用版本。不交这一项时 create_run 会取默认的三部门，
+            # 形态的部门与默认那一份不同的时候（#1395 的第二份形态）部门核对会失败
+            form=item.form,
             round=round_number,
             onboarding_basis={"candidate_event_id": candidate.event_id, "round": round_number,
                               "note_ref": note_ref},

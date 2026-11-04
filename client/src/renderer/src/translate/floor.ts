@@ -213,6 +213,7 @@ export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
   project_decision_answered: "项目决定有回答",
   project_decision_requested: "请求用户决定",
   project_decision_withdrawn: "撤回项目决定",
+  project_form_set: "修改项目的形态",
   project_goal_changed: "修改项目长期目标",
   project_parameter_set: "修改项目参数",
   project_pinned: "固定项目",

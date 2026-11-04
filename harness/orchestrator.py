@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import time
-from collections.abc import Callable, Iterable, Iterator, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict, dataclass, replace
@@ -51,7 +51,7 @@ from .streams import (
 )
 from .git_versions import GitVersionStore
 from .interactions import CancelledInputSaveError, InteractionWriter, RunTerminalError
-from .definitions import DEFINITIONS, Definitions
+from .definitions import DEFAULT_FORM, DEFINITIONS, Definitions
 from .department_prompts import save_department_prompt
 from .overview import repository_overview
 from . import parameters as parameter_values
@@ -61,6 +61,7 @@ from .models import (
     DecisionRequest,
     DepartmentPrompt,
     EventType,
+    Form,
     ProjectEvent,
     TERMINAL_STATUSES,
     new_id,
@@ -186,6 +187,7 @@ def _validate_run_ownership(
     code_snapshot: dict[str, Any] | None,
     project_context: str | None,
     prompt_config_versions: dict[str, int] | None,
+    departments: frozenset[str] = frozenset(DEFINITIONS.departments),
 ) -> None:
     """项目归属参数要么全给（项目层）要么全不给（bare run）；基线与初始树成对出现。"""
     ownership = {
@@ -213,8 +215,8 @@ def _validate_run_ownership(
         for name in ("project_id", "work_item_id", "project_context"):
             if not isinstance(ownership[name], str) or not ownership[name].strip():
                 raise ValueError(f"{name} must be a non-empty string")
-        if not isinstance(prompt_config_versions, dict) or set(prompt_config_versions) != set(DEFINITIONS.departments):
-            raise ValueError("prompt_config_versions must cover exactly the three departments")
+        if not isinstance(prompt_config_versions, dict) or set(prompt_config_versions) != set(departments):
+            raise ValueError("prompt_config_versions must cover exactly the departments of the item's form")
         if any(type(version) is not int or version < 0 for version in prompt_config_versions.values()):
             raise ValueError("prompt_config_versions must be non-negative integers")
     if baseline is not None:
@@ -248,6 +250,9 @@ class Orchestrator:
         assembly: Any,
         execution: Any,
         definitions: Definitions | None = None,
+        # 实例同时加载的具名形态（工单 #1392）：名字 → 一份完整的定义与它选用的路由实现、收紧检查。
+        # 不给时只有默认的三部门那一份（就是上面三样参数给的那一份）
+        forms: Mapping[str, Form] | None = None,
     ) -> None:
         self.store = store
         self.writes = writes
@@ -271,8 +276,18 @@ class Orchestrator:
         # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判；
         # 没有交的时候是当前加载的那一份
         self._definitions = in_force(definitions)
+        # 按事项冻结的形态（工单 #1392）：上面三样是默认形态的，事项创建时记下的形态名决定这个事项用哪一份。
+        # 每份形态的路由实现在组装时核对过契约版本
+        self._forms: dict[str, Form] = dict(forms or {})
+        self._forms.setdefault(DEFAULT_FORM, Form(DEFAULT_FORM, self._definitions, routing, tightening))
+        for form in self._forms.values():
+            routing_contract.accept(form.routing)
+        # 实例加载的具名形态（工单 #1392）：新建事项按项目现在的形态取，发布里没有那一份时拒绝
+        self.forms: dict[str, Form] = self._forms
         # 事项定义副本（工单 #1175）：按 run_created 里冻结的 MCP 设置叠加一次，按 run 记住
         self._item_definitions: dict[str, Any] = {}
+        # 事项冻结的形态（工单 #1392）：按 run 记住，取自 run_created 里记下的形态名
+        self._item_forms: dict[str, Form] = {}
         # MCP 会话表（工单 #1175）：按 run 记住，run 结束时在会话收尾里关闭
         self._mcp_sessions: dict[str, mcp_session.McpSessions] = {}
         # 数据目录：MCP 服务器标准错误输出的日志文件放在它的 mcp-logs 下（与探测同一处，设计说明第 7.2 节）
@@ -317,6 +332,8 @@ class Orchestrator:
             artifacts=self.artifacts,
             run_environment=self._workspaces.run_environment,
             wake=self._wake,
+            # 定义版本的核对与恢复时的写入按事项冻结的形态取（工单 #1392）
+            definitions_of=self.item_definitions,
         )
         # 每个 run 正在进行的取消（cancel 或 /stop）；一个取消结束时通知等待它的激活与运行循环
         self._cancellers: dict[str, set[object]] = {}
@@ -350,10 +367,12 @@ class Orchestrator:
         self.projects: Any = None
 
     def _transact(self, stream: str, decide: Callable[[Transaction], Any], **options: Any) -> Any:
-        # 薄驱动自己的写入（工单 #1165）：停止原因与部门按这个事项所用的那份定义核对，也就是构造时交给它的
-        # 那一份（工单 #1098 的位置）。事项在创建时冻结定义版本，第二种路由在自己那份定义里声明的结束原因
-        # 与它带的部门因此写得进事件日志；按 run 叠加 MCP 设置得到的副本只多出工具，不改这两样
-        return self.writes.transact(stream, decide, definitions=self._definitions, **options)
+        # 薄驱动自己的写入（工单 #1165）：停止原因与部门按这个事项所用的那份定义核对；事项创建时冻结的
+        # 形态决定用哪一份（工单 #1392），第二种路由在自己那份定义里声明的结束原因与它带的部门因此写得进
+        # 事件日志。按 run 叠加 MCP 设置得到的副本只多出工具，不改这两样
+        if "definitions" not in options and stream.startswith("run:"):
+            options["definitions"] = self.item_definitions(stream.split(":", 1)[1])
+        return self.writes.transact(stream, decide, **options)
 
     def create_run(
         self,
@@ -385,7 +404,12 @@ class Orchestrator:
         # 事项创建时冻结的 MCP 服务器设置（工单 #236）：非秘密设置与凭据引用的整份文档；
         # 不给时是 None（旧事项与没有 MCP 设置的事项按空设置读取）。run 期间只读这份冻结值
         mcp_servers: dict[str, Any] | None = None,
+        # 事项创建时冻结的形态名（工单 #1392）：这个 run 的部门、路由与停止原因按它的那份定义；
+        # 不给时是默认的三部门那一份（直接建 run 的调用与旧数据）
+        form: str | None = None,
     ) -> str:
+        frozen_form = self.form_named(form)
+        definitions = frozen_form.definitions
         if not isinstance(task, str) or not task.strip():
             raise ValueError("task must be non-empty")
         if max_cycles < 1:
@@ -400,7 +424,7 @@ class Orchestrator:
             raise ValueError("check_timeout_sec must be positive")
         if self.facade is None and self.test_adapter_factory is None:
             raise ValueError("provider facade is required for production runs")
-        if kind not in DEFINITIONS.work_items.kinds:
+        if kind not in definitions.work_items.kinds:
             raise ValueError(f"work item kind {kind!r} is not defined in work_items.json")
         if kind == "onboarding":
             # 建档事项由快照开始：没有采纳成果，也没有可写的工作区（工单 #134）
@@ -411,6 +435,7 @@ class Orchestrator:
             code_snapshot=code_snapshot,
             project_context=project_context,
             prompt_config_versions=prompt_config_versions,
+            departments=frozenset(definitions.departments),
         )
         run_id = run_id or new_id("run")
         # 窗口是调用目标的属性，不再随 run 冻结（工单 #669）：声明的窗口写进调用目标（目录），
@@ -453,7 +478,7 @@ class Orchestrator:
             "onboarding.round_time_limit_sec": parameter_values.value_for_project(
                 self.store, project_id, "onboarding.round_time_limit_sec"),
         }
-        frozen_definitions_version = item_definitions_version or DEFINITIONS.version
+        frozen_definitions_version = item_definitions_version or definitions.version
         frozen_parameters = parameter_values.frozen_snapshot(
             self.store, project_id=project_id, definitions_version=frozen_definitions_version,
             item_limits=item_limits,
@@ -461,7 +486,7 @@ class Orchestrator:
         run_created = NewEvent(
             EventType.RUN_CREATED,
             actor="system",
-            department=self._input_department,
+            department=self._input_department_of(definitions),
             state_before="running",
             state_after="running",
             payload={
@@ -484,6 +509,8 @@ class Orchestrator:
                 "project_context_ref": project_context_ref,
                 "prompt_config_versions": dict(prompt_config_versions or {}),
                 "definitions_version": frozen_definitions_version,
+                # 事项创建时冻结的形态名（工单 #1392）：这个 run 的部门、路由与停止原因都按它的那份定义
+                "form": frozen_form.name,
                 "parameters_version": parameter_values.current_version(self.store),
                 "parameters": frozen_parameters,
                 # 事项创建时冻结的 MCP 服务器设置（工单 #236）：与事项创建事实同一份；没有时为空
@@ -494,7 +521,7 @@ class Orchestrator:
             },
         )
         note_received = (NewEvent(
-            EventType.USER_INPUT_RECEIVED, actor="user:local", department=self._input_department,
+            EventType.USER_INPUT_RECEIVED, actor="user:local", department=self._input_department_of(definitions),
             state_before="running", state_after="running",
             payload=follow_up,
             artifact_hashes=[follow_up["input_ref"]["content_hash"], follow_up["intend_ref"]["content_hash"]],
@@ -502,7 +529,7 @@ class Orchestrator:
         # 新的 run 流从版本 0 开始；同一编号的 run 已经存在时拒绝
         self._transact(run_stream(run_id), lambda transaction: transaction.append(
             *((run_created, note_received) if note_received is not None
-              else (run_created,))), expected_version=0)
+              else (run_created,))), expected_version=0, definitions=definitions)
         return run_id
 
     def project(self, run_id: str) -> RunProjection:
@@ -549,14 +576,18 @@ class Orchestrator:
             # 调用目标随数据目录一起落盘：重开数据目录以后按同一个调用目标继续（工单 #669）
             self.facade.persist_document(self.facade.config_path)
 
-    @property
-    def _input_department(self) -> str:
-        # 开始在哪个部门处理用户输入：组织定义里关注用户输入的那一个（watched 含 user_input）。
-        # 薄驱动不含部门的名称（设计说明第 6 节），部门身份从定义取
-        for department in DEFINITIONS.departments:
-            if "user_input" in DEFINITIONS.watched_outputs(department):
+    def _input_department_of(self, definitions: Definitions) -> str:
+        # 开始在哪个部门处理用户输入：定义里关注用户输入的那一个（watched 含 user_input）。
+        # 薄驱动不含部门的名称（设计说明第 6 节），部门身份从事项所用的定义取（工单 #1392）
+        for department in definitions.departments:
+            if "user_input" in definitions.watched_outputs(department):
                 return department
         raise ValueError("organization.json declares no department that watches user input")
+
+    @property
+    def _input_department(self) -> str:
+        # 默认形态里收用户输入的部门：没有事项定义的写入用它
+        return self._input_department_of(self._definitions)
 
     @staticmethod
     def _round_workspace(activation: _Activation) -> RoundWorkspace:
@@ -570,9 +601,11 @@ class Orchestrator:
 
     def _waiting_departments(self, run_id: str) -> set[str]:
         # 在等待工作的部门：这个进程里没有正在工作的会话的那些（工单 #16 的恢复口径）。
-        # 「谁在等」的判断归路由实现（工单 #825），薄驱动只交出会话状态这份事实
+        # 「谁在等」的判断归路由实现（工单 #825），薄驱动只交出会话状态这份事实；
+        # 部门清单按事项冻结的形态取（工单 #1392）
+        definitions = self.item_definitions(run_id)
         return waiting_departments({department: self._session_status(run_id, department)
-                                    for department in DEFINITIONS.departments})
+                                    for department in definitions.departments})
 
     def _session_status(self, run_id: str, department: str) -> str | None:
         # 这个进程里这个部门会话的状态；还没有会话时为空（那时它同样在等待，可以被重新激活）
@@ -584,7 +617,7 @@ class Orchestrator:
     def _department_ready(self, run_id: str, projection: RunProjection, department: str) -> bool:
         # 这个部门现在可以开始一轮工作：由路由判断（在等待工作，并且关注的成果有了新东西）。
         # 同时运行（工单 #557）：准备激活的事务里重新核对，别的会话在这期间做完了就开始
-        return self._routing.department_ready(
+        return self._item_routing(run_id).department_ready(
             projection, department=department, waiting=self._waiting_departments(run_id))
 
 
@@ -707,7 +740,7 @@ class Orchestrator:
 
     def add_guidance(self, run_id: str, department: str, text: str, *,
                      base_version: int | None = None, command: Command | None = None) -> RunProjection:
-        if department not in DEFINITIONS.departments:
+        if department not in self.item_definitions(run_id).departments:
             raise ValueError("unknown department")
 
         def receive(transaction: Transaction) -> None:
@@ -730,7 +763,8 @@ class Orchestrator:
         if projection.status in TERMINAL_STATUSES or projection.input_version <= projection.product_work_input_version:
             return projection
         transaction.append(NewEvent(
-            EventType.PRODUCT_INPUT_ASSIGNED, actor="system", department=self._input_department,
+            EventType.PRODUCT_INPUT_ASSIGNED, actor="system",
+            department=self._input_department_of(self.item_definitions(projection.run_id)),
             state_before=projection.status, state_after="PRODUCT_SPEC",
             payload={"through_version": projection.input_version},
         ))
@@ -927,7 +961,11 @@ class Orchestrator:
     def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
         # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约第 5.2 节）：
         # 核对定义版本、核实结果未知的动作、取得执行权这三步在 `recovery.py`（S4c 工单 #863），
-        # 薄驱动只把它接上并转交
+        # 薄驱动只把它接上并转交。
+        # 事项冻结的形态不在发布里时（工单 #1392）：这个 run 停在原处，不换一份定义顶替、不进定义版本核对、
+        # 不发决定请求、不报错；启动流程把原因写进项目流，换回带那一份形态的发布以后接着跑
+        if not self.item_form_available(run_id):
+            return None
         return self._recovery.resume(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
@@ -950,6 +988,10 @@ class Orchestrator:
         # 这个循环也醒过来重新找一遍可以开始的部门；部门的判断本身不变
         # 停下其余会话只停这些会话，不改变事项的状态（工单 #856）：
         # 停下以后重新读取再交回，交回的投影里被停下的会话已经收尾
+        # 事项冻结的形态不在发布里时（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：这个 run
+        # 停在原处，不写事件、不换一份定义顶替；换回带那一份形态的发布以后从停住的地方接着跑
+        if not self.item_form_available(run_id):
+            return self.project(run_id)
         connections = ProviderConnections()
         tasks: dict[str, asyncio.Task[RunProjection]] = {}
         loop = asyncio.get_running_loop()
@@ -1009,7 +1051,7 @@ class Orchestrator:
         # 现在可以开始一轮工作的部门：等待工作、关注的成果有了新东西的那些（工单 #557）。
         # 判断归路由实现（工单 #825）
         projection = self.project(run_id)
-        return self._routing.ready_departments(projection, waiting=self._waiting_departments(run_id))
+        return self._item_routing(run_id).ready_departments(projection, waiting=self._waiting_departments(run_id))
 
     async def _stop_sessions(self, run_id: str, tasks: dict[str, asyncio.Task[RunProjection]]) -> None:
         # 事项到终态或被未回答的决定请求阻塞：其余会话停止并收尾。
@@ -1028,7 +1070,7 @@ class Orchestrator:
     async def _no_new_work(self, run_id: str) -> RunProjection:
         # 没有部门可以开始一轮工作：事项以什么结束由路由判断（工单 #825），薄驱动只把它的判断写成停止
         def end(transaction: Transaction) -> None:
-            judgment = self._routing.item_end(transaction.projection)
+            judgment = self._item_routing(run_id).item_end(transaction.projection)
             if judgment is None:
                 return
             self._fail(transaction, judgment.stop_reason, judgment.message)
@@ -1127,19 +1169,61 @@ class Orchestrator:
             await connections.aclose()
 
     def item_definitions(self, run_id: str):
-        # 这个 run 的定义副本（网络与 MCP 设计说明第 4.3、5.1 节，工单 #1175）：当前定义加上
-        # run_created 里冻结的 MCP 设置带来的工具；没有设置或没有可用快照时就是当前定义本身
+        # 这个 run 的定义副本（网络与 MCP 设计说明第 4.3、5.1 节，工单 #1175）：事项冻结的形态（工单 #1392）
+        # 加上 run_created 里冻结的 MCP 设置带来的工具；没有设置或没有可用快照时就是那一份形态的定义本身
         cached = self._item_definitions.get(run_id)
         if cached is not None:
             return cached
-        document = None
+        definitions = mcp_session.item_definitions(self.item_form(run_id).definitions, self._mcp_document(run_id))
+        if self.store.list_events(run_id):
+            # 还没有 run_created 的 run 不记：创建时按给出的那份形态算
+            self._item_definitions[run_id] = definitions
+        return definitions
+
+    def form_named(self, name: str | None) -> Form:
+        # 名字对应的形态（工单 #1392，项目的组织设计说明「冻结与升级」）：没有记形态名（旧事项）时用默认的
+        # 那一份；记了而发布里没有这一份时**不回退**默认形态——新建事项被拒绝并给同样的说明，已经在跑的事项
+        # 停在原处（见 `item_form_available`）
+        if not name:
+            return self._forms[DEFAULT_FORM]
+        form = self._forms.get(name)
+        if form is None:
+            raise ValueError(f"unknown form {name!r}: the release loads {sorted(self._forms)}")
+        return form
+
+    def item_form(self, run_id: str) -> Form:
+        # 这个事项创建时冻结的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：
+        # 取 run_created 里记下的形态名；旧事件没有记时用默认的那一份。项目后来改了形态不影响它；
+        # 记了而发布里没有这一份时抛出（见 `form_named`），不换一份定义顶替
+        cached = self._item_forms.get(run_id)
+        if cached is not None:
+            return cached
+        form = self.form_named(self.recorded_form(run_id))
+        if self.store.list_events(run_id):
+            # 还没有 run_created 的 run 不记：创建时按给出的那份形态算
+            self._item_forms[run_id] = form
+        return form
+
+    def recorded_form(self, run_id: str) -> str | None:
+        # run_created 里记下的形态名（工单 #1392）：旧事件没有这个字段时为空，按默认的那一份读
         for event in self.store.list_events(run_id):
             if event.type == EventType.RUN_CREATED:
-                document = (event.payload or {}).get("mcp_servers")
-                break
-        definitions = mcp_session.item_definitions(self._definitions, document)
-        self._item_definitions[run_id] = definitions
-        return definitions
+                return (event.payload or {}).get("form")
+        return None
+
+    def item_form_available(self, run_id: str) -> bool:
+        # 这个 run 冻结的形态在发布里（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：
+        # 创建记录里没有形态名的旧事项按默认形态算。不在发布里时事项停在原处，不换一份定义顶替
+        name = self.recorded_form(run_id)
+        return not name or name in self._forms
+
+    def _item_routing(self, run_id: str) -> Any:
+        # 这个事项用的路由实现：由它冻结的形态决定（工单 #1392）
+        return self.item_form(run_id).routing
+
+    def _item_tightening(self, run_id: str) -> Any:
+        # 这个事项用的收紧检查：由它冻结的形态决定（工单 #1392）
+        return self.item_form(run_id).tightening
 
     def mcp_sessions(self, run_id: str) -> mcp_session.McpSessions:
         # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：每台服务器一个会话实例，
@@ -1221,7 +1305,7 @@ class Orchestrator:
 
     async def _activate_once(self, run_id: str, connections: ProviderConnections) -> RunProjection:
         projection = self.project(run_id)
-        department = self._routing.next_department(projection, waiting=self._waiting_departments(run_id))
+        department = self._item_routing(run_id).next_department(projection, waiting=self._waiting_departments(run_id))
         if department is None:
             return await self._no_new_work(run_id)
         return await self._activate_department(run_id, department, connections)
@@ -1285,7 +1369,7 @@ class Orchestrator:
                     # 与激活结束在同一个事务里，部门不提交。事件记下是哪一轮、这一轮怎么结束的；
                     # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入。
                     # 一轮以什么结束由路由判断（工单 #825）：不是正常结束的一轮没有结果，也照旧不写已回答
-                    ended = self._routing.round_end(
+                    ended = self._item_routing(scope.run_id).round_end(
                         current, happened, department=scope.department, session_id=scope.session_id,
                         activation_id=scope.activation_id)
                     if ended is None:
@@ -1449,7 +1533,7 @@ class Orchestrator:
         if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
             # 没有项目部门设置的部门 Prompt 时，固定取内置默认 Prompt（roles.json 的角色说明）；
             # 事项种类的工作说明是单独的请求材料，由上下文装配在部门 Prompt 之后放入（工单 #248）
-            text = DEFINITIONS.role(department).prompt
+            text = self.item_definitions(projection.run_id).role(department).prompt
             ref = save_department_prompt(self.artifacts, projection.run_id, department, text)
             return DepartmentPrompt(department, 0, text, ref, "")
         return DepartmentPrompt(
@@ -1554,14 +1638,14 @@ class Orchestrator:
             request = execution_contract.RoundRequest(
                 scope=scope, prompt=activation.prompt,
                 limits=self._session_limits(run_id, scope.session_id),
-                work_ref=self._routing.work_reference(projection, department=department),
+                work_ref=self._item_routing(run_id).work_reference(projection, department=department),
             )
             activation.driver = self._execution.start(
                 request, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
                 nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
-                deltas=self.deltas, tightening=self._tightening,
+                deltas=self.deltas, tightening=self._item_tightening(run_id),
                 refresh_workspace=self._workspaces.refresh_for(self._round_workspace(activation)),
                 definitions=self.item_definitions(activation.scope.run_id),
                 mcp_sessions=self.mcp_sessions(activation.scope.run_id),
@@ -1597,8 +1681,8 @@ class Orchestrator:
             return
         # 薄驱动拿到一轮结果以后问路由这一轮以什么结束，再按回答经写入口提交（设计说明第 5.3 节输出、
         # 第 5.4 节第 5 条；工单 #861）：路由说这一轮不是正常结束时不提交
-        ended = self._routing.round_end(current, list(result.events), department=department,
-                                        session_id=scope.session_id, activation_id=scope.activation_id)
+        ended = self._item_routing(run_id).round_end(current, list(result.events), department=department,
+                                                     session_id=scope.session_id, activation_id=scope.activation_id)
         if ended is None:
             return
         submission = result
@@ -1631,7 +1715,7 @@ class Orchestrator:
         # 以及把这个分支会话已经用掉的步数与时间从这一轮的上限里扣掉，归薄驱动（工单 #1015 的读法）
         stream = run_stream(scope.run_id)
         ask_limits = self._run_step_limits(scope.run_id)
-        asked = self._routing.ask_branch(
+        asked = self._item_routing(scope.run_id).ask_branch(
             self.project(scope.run_id), list(self.writes.read(stream).events()),
             requester=scope.department, session_id=scope.session_id, call=call,
             limits=routing_contract.AskLimits(
@@ -1688,7 +1772,7 @@ class Orchestrator:
             time.monotonic() >= deadline
             or time_used_up(self.writes.minimal(stream), self._elapsed_sec(scope.run_id))
         )
-        outcome = self._routing.ask_outcome(
+        outcome = self._item_routing(scope.run_id).ask_outcome(
             self.project(scope.run_id), branch=branch,
             result=routing_contract.AskRoundResult(
                 submission=submission, stop_reason=stop_reason, message=message,
@@ -1748,7 +1832,7 @@ class Orchestrator:
                 department=issuer,
                 proposal=proposal,
                 facts=env.query(FactsQuery(tree=True)).tree,
-                tightening=self._tightening,
+                tightening=self._item_tightening(projection.run_id),
                 events=transaction.events(),
                 definitions=self.item_definitions(scope.run_id),
             )
@@ -1880,7 +1964,7 @@ class Orchestrator:
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
             environment=environment,
             nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
-            deltas=self.deltas, tightening=self._tightening,
+            deltas=self.deltas, tightening=self._item_tightening(branch_activation.scope.run_id),
             refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
             definitions=self.item_definitions(branch_activation.scope.run_id),
         )
@@ -1952,7 +2036,7 @@ class Orchestrator:
             facts = environment.query(FactsQuery(tree=True)).tree
             view = AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection)
             decision = proposal_decision(view, department=department, proposal=proposal, facts=facts,
-                                         tightening=self._tightening, events=evaluated.events(),
+                                         tightening=self._item_tightening(run_id), events=evaluated.events(),
                                          definitions=self.item_definitions(run_id))
             try:
                 self._transact(run_stream(run_id), lambda transaction: self._commit_proposal(
@@ -1992,7 +2076,7 @@ class Orchestrator:
             decision, department=department, proposal=proposal,
             evaluated=AdjudicationView(minimal=evaluated.minimal(), state=evaluated.projection), facts=facts,
             current=AdjudicationView(minimal=transaction.minimal(), state=current), current_facts=snapshot.facts,
-            events=transaction.events(), tightening=self._tightening,
+            events=transaction.events(), tightening=self._item_tightening(run_id),
             definitions=self.item_definitions(run_id),
         )
         if proposal is not None:
@@ -2003,7 +2087,7 @@ class Orchestrator:
                 session_id=session_id, provider=provider, model=model,
                 payload={"kind": proposal.get("kind"), "transcript_ref": transcript_ref,
                          "raw_keys": sorted(proposal.keys()), "input_version": current.input_version,
-                         "definitions_version": DEFINITIONS.version,
+                         "definitions_version": self.item_definitions(run_id).version,
                          "parameters_version": current.parameters_version},
             ))
             # 提交被写入以后唤醒正在安全节点等待的会话（工单 #561）：质检的放行可能正等着产品这一轮处理完输入
@@ -2019,7 +2103,7 @@ class Orchestrator:
                     "transcript_ref": transcript_ref,
                     "kind": None if proposal is None else proposal.get("kind"),
                     "input_version": current.input_version,
-                    "definitions_version": DEFINITIONS.version,
+                    "definitions_version": self.item_definitions(run_id).version,
                     "parameters_version": current.parameters_version,
                 },
             ))
@@ -2070,7 +2154,7 @@ class Orchestrator:
         # 只有质检的放行与基线核验的一致结论结束事项（工单 #556）：结束以后控制核心不再决定下一个谁工作
         if ends_run:
             # 进入完成状态的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
-            stop_reason = self._definitions.work_item(projection.kind).stop_reason
+            stop_reason = self.item_definitions(projection.run_id).work_item(projection.kind).stop_reason
             self._withdraw_decisions(transaction, stop_reason)
             transaction.append(NewEvent(
                 EventType.RUN_DONE,
@@ -2209,12 +2293,16 @@ class Orchestrator:
             return False
         return guidance_version(projection, activation.department) > basis.guidance_version
 
+    def _stop_reason(self, transaction: Transaction, reason: str):
+        # 停止原因按这个事项冻结的形态的那份定义核对（工单 #1392）：路由自己的结束原因也在它那份清单里
+        return self.item_definitions(transaction.projection.run_id).stop_reason(reason)
+
     def _end(self, transaction: Transaction, reason: str, message: str,
              *, facts: list[str] | None = None) -> None:
         # 按定义中停止原因规定的方式暂停或结束运行；已经结束的运行不再写入。完成（放行或基线核验）只由接纳写入。
         # 暂停与失败同样带停止说明（message）：例如 workspace_unrepresentable 的说明列出相对路径。
         # facts 是暂停决定请求要带的事实引用（workspace_unrepresentable 为条目在工作区内的相对路径）
-        outcome = self._definitions.stop_reason(reason).outcome
+        outcome = self._stop_reason(transaction, reason).outcome
         if outcome == "paused":
             self._pause(transaction, reason, message, facts=facts)
         elif outcome == "failed":
@@ -2248,7 +2336,7 @@ class Orchestrator:
             provider=projection.provider, model=projection.model,
             payload={
                 "stop_reason": reason,
-                "human_action": self._definitions.stop_reason(reason).human_action,
+                "human_action": self._stop_reason(transaction, reason).human_action,
                 **({"message": message} if message else {}),
                 "cycle_count": projection.cycle_count,
                 "max_cycles": projection.max_cycles,
@@ -2268,7 +2356,7 @@ class Orchestrator:
                               reason: str, message: str | None,
                               facts: list[str]) -> None:
         # 暂停以后继续的决定请求：说明写明停止原因与人工处理说明，工作区无法表示的条目列为事实引用
-        human = self._definitions.stop_reason(reason).human_action
+        human = self._stop_reason(transaction, reason).human_action
         description = f"运行暂停，停止原因为 {reason}。{human}"
         if message:
             description = f"{description} 停止说明：{message}"
@@ -2286,7 +2374,7 @@ class Orchestrator:
 
     def _fail(self, transaction: Transaction, reason: str, message: str,
               *, input_save_failure: dict[str, str] | None = None) -> None:
-        human = self._definitions.stop_reason(reason).human_action
+        human = self._stop_reason(transaction, reason).human_action
         projection = transaction.projection
         if projection.status in TERMINAL_STATUSES:
             return

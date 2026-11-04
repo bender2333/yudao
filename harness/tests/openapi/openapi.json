@@ -31967,6 +31967,175 @@
         "title": "ProjectDecisionWithdrawnPayload",
         "type": "object"
       },
+      "ProjectFormSetEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "project_form_set",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/ProjectFormSetPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "ProjectFormSetEvent",
+        "type": "object"
+      },
+      "ProjectFormSetPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "previous_form": {
+            "title": "Previous Form",
+            "type": "string"
+          },
+          "form": {
+            "title": "Form",
+            "type": "string"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "previous_form",
+          "form"
+        ],
+        "title": "ProjectFormSetPayload",
+        "type": "object"
+      },
       "ProjectGoalChangedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -34520,6 +34689,11 @@
           "run_event_version": {
             "title": "Run Event Version",
             "type": "integer"
+          },
+          "form": {
+            "default": "",
+            "title": "Form",
+            "type": "string"
           },
           "onboarding_basis": {
             "anyOf": [
@@ -39972,6 +40146,11 @@
                 "type": "null"
               }
             ]
+          },
+          "form": {
+            "default": "",
+            "title": "Form",
+            "type": "string"
           }
         },
         "required": [
@@ -41280,6 +41459,7 @@
             "project_decision_answered": "#/components/schemas/ProjectDecisionAnsweredEvent",
             "project_decision_requested": "#/components/schemas/ProjectDecisionRequestedEvent",
             "project_decision_withdrawn": "#/components/schemas/ProjectDecisionWithdrawnEvent",
+            "project_form_set": "#/components/schemas/ProjectFormSetEvent",
             "project_goal_changed": "#/components/schemas/ProjectGoalChangedEvent",
             "project_parameter_set": "#/components/schemas/ProjectParameterSetEvent",
             "project_pinned": "#/components/schemas/ProjectPinnedEvent",
@@ -41546,6 +41726,9 @@
           },
           {
             "$ref": "#/components/schemas/ProjectParameterSetEvent"
+          },
+          {
+            "$ref": "#/components/schemas/ProjectFormSetEvent"
           },
           {
             "$ref": "#/components/schemas/WritebackCompletedEvent"
