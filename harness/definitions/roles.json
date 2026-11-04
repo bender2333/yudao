@@ -17,7 +17,8 @@
       "ask"
     ],
     "visibility": [
-      "qa_defects"
+      "qa_defects",
+      "prior_round"
     ]
   },
   "engineering": {
@@ -75,7 +76,8 @@
       "current_delivery_spec",
       "prior_delivery",
       "qa_defects",
-      "existing_structure"
+      "existing_structure",
+      "prior_round"
     ]
   },
   "quality": {

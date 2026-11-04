@@ -5,7 +5,8 @@
 # 2. 建 run 之后改参数只作用于之后创建的 run；已有 run 的事件重放与重新启动都读冻结值，不取现值；
 # 3. 旧事件没有冻结字典时按定义初值解释，不取现值；
 # 4. 10 个参数各自有一条行为用例：参数改了，新 run 的行为跟着变，旧 run 不变；
-# 5. 3 条可见范围在建 run 时冻结，词表以外的取值在参数校验处被拒绝；
+# 5. 每个角色一条可见范围在建 run 时冻结（工单 #1401：名字跟着角色编号走），词表以外的取值在参数校验处被拒绝；
+#    三个部门都改名的定义下，每个角色的可见范围参数照常冻结、照常生效；
 # 6. 中断（事项已提交、run 未创建）与定义版本差异两条恢复路径。
 #
 # 层：集成层（有两条用例要起真实进程验证命令与检查的时限上限；其余用例只用到工作区文件与一次激活，
@@ -16,6 +17,8 @@ from __future__ import annotations
 import json
 import sys
 from dataclasses import replace
+from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -23,12 +26,13 @@ from harness import parameters
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.context import frozen_visibility
-from harness.definitions import DEFAULT_FORM, DEFINITIONS
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.event_store import run_stream
 from harness.models import EventType, RunProjection
 from harness.parameters import FROZEN_PARAMETERS, ParameterOutOfBoundsError, frozen_run_parameters
 from harness.projection import project_run
 from harness.proposals import product_spec
+from harness.tightening import WATCHED_OUTPUTS
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.helpers import pinned_input_tokens, summary_message
@@ -284,6 +288,66 @@ def test_visibility_is_frozen_and_values_outside_the_vocabulary_are_rejected(tmp
     assert frozen_visibility(projection, "engineering") == tuple(DEFINITIONS.role("engineering").visibility)
     with pytest.raises(ParameterOutOfBoundsError, match="词表"):
         _set(system, "roles.quality.visibility", ["not_a_declared_value"])
+    system.close()
+
+
+# 三个部门都改名的一份测试定义（与 test_department_names.py 同一做法：定义里表示部门的字符串与按部门分段的
+# 规则条目名一起换）
+RENAMED_DEPARTMENTS = {"product": "requirements", "engineering": "build", "quality": "inspection"}
+DELIVERY_SUMMARY = "SECRET_DELIVERY_SUMMARY"
+
+
+def _renamed(value: Any, old: str, new: str) -> Any:
+    if isinstance(value, dict):
+        return {_renamed_key(key, old, new): _renamed(item, old, new) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_renamed(item, old, new) for item in value]
+    return new if value == old else value
+
+
+def _renamed_key(key: Any, old: str, new: str) -> Any:
+    if not isinstance(key, str):
+        return key
+    return ".".join(new if part == old else part for part in key.split("."))
+
+
+def _renamed_definitions(tmp_path: Path, names: dict[str, str],
+                         visibility: dict[str, list[str]] | None = None):
+    directory = tmp_path / "definitions"
+    directory.mkdir()
+    for path in DEFINITIONS_DIR.glob("*.json"):
+        content = json.loads(path.read_text(encoding="utf-8"))
+        for old, new in names.items():
+            content = _renamed(content, old, new)
+        (directory / path.name).write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
+    for role, values in (visibility or {}).items():
+        # 改名后的角色的可见范围写在两处：角色的取值与规则登记的同一项（加载时核对两处相同）
+        roles = json.loads((directory / "roles.json").read_text(encoding="utf-8"))
+        roles[role]["visibility"] = values
+        (directory / "roles.json").write_text(json.dumps(roles, ensure_ascii=False, indent=2), encoding="utf-8")
+        rules = json.loads((directory / "rules.json").read_text(encoding="utf-8"))
+        rules[f"roles.{role}.visibility"]["value"] = values
+        (directory / "rules.json").write_text(json.dumps(rules, ensure_ascii=False, indent=2), encoding="utf-8")
+    return load_definitions(directory)
+
+
+def test_every_role_of_a_renamed_definition_freezes_its_own_visibility_parameter(tmp_path):
+    # 验收第 3 条（工单 #1401）：三个部门都改名的定义下，每个角色的可见范围参数照常冻结、照常生效。
+    # 冻结字典里每个角色各有一条，名字跟着角色编号走；装配读的就是这一份（frozen_visibility 按角色取），
+    # 核验角色改成只给事实的取值时，冻结的与装配读到的都是它
+    renamed = _renamed_definitions(tmp_path, RENAMED_DEPARTMENTS,
+                                    visibility={"inspection": ["delivery_facts"]})
+    system = LoopSystem.for_testing(tmp_path / "runs", FakeAdapter({}),
+                                    forms={DEFAULT_FORM: (renamed, WATCHED_OUTPUTS)})
+    project_id = system.projects.register("改名", GOAL)
+    _item, run_id = system.projects.start_work_item(project_id, GOAL)
+
+    frozen = _frozen(system, run_id)["values"]
+    projection = project_run(system.store, run_id)
+    for role in renamed.departments:
+        assert frozen[f"roles.{role}.visibility"] == list(renamed.role(role).visibility), role
+        assert frozen_visibility(projection, role, renamed) == renamed.role(role).visibility, role
+    assert frozen["roles.inspection.visibility"] == ["delivery_facts"]
     system.close()
 
 

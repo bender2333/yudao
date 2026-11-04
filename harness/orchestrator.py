@@ -481,7 +481,7 @@ class Orchestrator:
         frozen_definitions_version = item_definitions_version or definitions.version
         frozen_parameters = parameter_values.frozen_snapshot(
             self.store, project_id=project_id, definitions_version=frozen_definitions_version,
-            item_limits=item_limits,
+            item_limits=item_limits, definitions=definitions,
         )
         run_created = NewEvent(
             EventType.RUN_CREATED,
