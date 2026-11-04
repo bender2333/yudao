@@ -343,6 +343,7 @@ def test_a_timed_out_check_is_treated_like_a_failing_check(tmp_path):
     structure = projection.structure
     receipt = CheckReceipt(name="slow", department="quality", exit_code=TIMEOUT_EXIT_CODE,
                            summary="check timed out after 600s", snapshot_hash=facts.digest,
+                           bindings={"product_spec": spec.content_hash},
                            product_spec_hash=spec.content_hash, activation_id=projection.last_activations.get("quality"))
     facts = facts.model_copy(update={"checks": (*facts.checks, receipt)})
     unexplained = {
@@ -448,6 +449,7 @@ def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
     spec = projection.product_spec
     receipt = CheckReceipt(name="smoke", department="quality", exit_code=1,
                            summary="not implemented", snapshot_hash=facts.digest,
+                           bindings={"product_spec": spec.content_hash},
                            product_spec_hash=spec.content_hash, activation_id=projection.last_activations.get("quality"))
     facts = facts.model_copy(update={"checks": (*facts.checks, receipt)})
     proposal = {

@@ -41,6 +41,10 @@ ANSWER_ONLY_IN_BRANCH = "answer tool is only available in an ask branch session"
 BRANCH_CANNOT_WRITE = "The branch session cannot modify files in the running workspace"
 BRANCH_CANNOT_DELIVER = "The branch session cannot submit delivery"
 BRANCH_CANNOT_REVIEW = "The branch session cannot submit QA review"
+# 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：等不等、为什么等是这一份收紧检查的
+# 判断与说明（工单 #1456），内核只把原因交回部门
+PENDING_INPUT_RELEASE = ("New user input has not been handled yet; the release is judged after the round that "
+                         "received it has ended.")
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
 # 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
@@ -419,7 +423,7 @@ class WatchedOutputsTightening:
         # 谁收输入按这个事项所用的那份定义取（工单 #1509）：换一份把产品改了名的定义，等的是改名后的那个部门
         if request.commit and verdict == "release" \
                 and pending_product_input(projection, list(request.events), definitions=request.definitions):
-            return Tightened(wait=True)
+            return Tightened(wait=True, reason=PENDING_INPUT_RELEASE)
         # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
         changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
         return Tightened(content={

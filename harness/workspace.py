@@ -46,6 +46,10 @@ class Workspace:
         (self.root / CHECKS_DIR).mkdir(exist_ok=True)
         self._receipts_path = self.root / CHECKS_DIR / "receipts.jsonl"
         self.check_activation_id: str | None = None
+        # 这份检查回执绑定的成果种类与版本摘要（工单 #1456）：由调用方按运行状态给出，回执照抄；
+        # 哪一种成果参与由应用决定，内核按定义里写的名称核对
+        self.check_bindings: dict[str, str] = {}
+        # 旧回执格式里的两个字段（字段只增，回执文件与工具结果里照旧写出）
         self.check_product_spec_hash: str | None = None
         self.check_delivery_spec_hash: str | None = None
         self.check_effective_contract_hash: str | None = None
@@ -54,14 +58,26 @@ class Workspace:
         self,
         *,
         activation_id: str | None,
-        product_spec_hash: str | None,
-        delivery_spec_hash: str | None,
+        bindings: dict[str, str] | None = None,
+        product_spec_hash: str | None = None,
+        delivery_spec_hash: str | None = None,
         effective_contract_hash: str | None = None,
     ) -> None:
+        # 检查回执绑定这一刻的几份成果：bindings 按种类给（工单 #1456），旧的两个字段名照旧收，
+        # 合成同一份 bindings；调用方给哪一种写法都行
         self.check_activation_id = activation_id
-        self.check_product_spec_hash = product_spec_hash
-        self.check_delivery_spec_hash = delivery_spec_hash
-        self.check_effective_contract_hash = effective_contract_hash
+        merged = {kind: digest for kind, digest in (bindings or {}).items() if digest is not None}
+        if product_spec_hash is not None:
+            merged.setdefault("product_spec", product_spec_hash)
+        if delivery_spec_hash is not None:
+            merged.setdefault("delivery_spec", delivery_spec_hash)
+        if effective_contract_hash is not None:
+            merged.setdefault("contract", effective_contract_hash)
+        self.check_bindings = merged
+        # 旧字段从这里取同一份值：回执文件与工具结果里照旧写出来，与 bindings 说的是同一件事
+        self.check_product_spec_hash = merged.get("product_spec")
+        self.check_delivery_spec_hash = merged.get("delivery_spec")
+        self.check_effective_contract_hash = merged.get("contract")
 
     def resolve(self, rel: str) -> Path:
         return resolve_public_path(self.root, rel)
@@ -152,6 +168,7 @@ class Workspace:
             exit_code=int(exit_code),
             summary=summary,
             snapshot_hash=snapshot_hash or self.digest(),
+            bindings=dict(self.check_bindings),
             product_spec_hash=self.check_product_spec_hash,
             delivery_spec_hash=self.check_delivery_spec_hash,
             activation_id=self.check_activation_id,
@@ -179,6 +196,7 @@ class Workspace:
                     exit_code=int(data["exit_code"]),
                     summary=data["summary"],
                     snapshot_hash=data["snapshot_hash"],
+                    bindings=_recorded_bindings(data),
                     product_spec_hash=data.get("product_spec_hash"),
                     delivery_spec_hash=data.get("delivery_spec_hash"),
                     activation_id=data.get("activation_id"),
@@ -193,9 +211,23 @@ class Workspace:
         return WorkspaceSnapshot(tree=self._public_tree(), checks=tuple(self.receipts()))
 
 
+def _recorded_bindings(data: dict[str, object]) -> dict[str, str]:
+    # 回执文件里绑定的成果种类与版本摘要（工单 #1456）。旧回执只有两个按种类的字段与工作依据那一个，
+    # 按「种类 + _hash」的字段名读回来；三种都只是回执自己的历史格式，不是内核的判断
+    recorded = data.get("bindings")
+    if isinstance(recorded, dict):
+        return {str(kind): str(digest) for kind, digest in recorded.items() if digest is not None}
+    bindings = {kind: data[f"{kind}_hash"] for kind in ("product_spec", "delivery_spec")
+                if isinstance(data.get(f"{kind}_hash"), str)}
+    if isinstance(data.get("effective_contract_hash"), str):
+        bindings["contract"] = data["effective_contract_hash"]
+    return bindings
+
+
 def _receipt_dict(receipt: CheckReceipt) -> dict[str, object]:
     return {
         "activation_id": receipt.activation_id,
+        "bindings": dict(receipt.bindings),
         "delivery_spec_hash": receipt.delivery_spec_hash,
         "department": receipt.department,
         "exit_code": receipt.exit_code,

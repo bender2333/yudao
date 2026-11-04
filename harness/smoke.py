@@ -1086,9 +1086,12 @@ def _receipt_evidence(system: LoopSystem, run_id: str, receipts: list[dict[str, 
     executions, read_notes = _host_check_executions(system, run_id)
     notes.extend(read_notes)
     for receipt in receipts:
+        # 回执文件里还带 bindings（绑定的成果种类与版本摘要，工单 #1456）：工具结果里的主机执行不写这一项，
+        # 这里核对两边都有的字段
         match = next((index for index, (role, output) in enumerate(executions)
                       if role == receipt.get("department") and all(
-                          output.get(key) == value for key, value in receipt.items() if key != "department"
+                          output.get(key) == value for key, value in receipt.items()
+                          if key not in ("department", "bindings")
                       )), None)
         if match is None:
             notes.append(f"{receipt.get('department')}/{receipt.get('name')}: no matching host execution")

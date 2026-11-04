@@ -162,7 +162,7 @@
       {"condition": "basis_current", "field": "basis_product_spec_hash", "target": "product_spec"}
     ],
     "product_decision": [
-      {"condition": "no_duplicate_content", "collection": "product_decisions", "content": ["statement", "rationale"],
+      {"condition": "no_duplicate_content", "collection": "product_decision", "content": ["statement", "rationale"],
        "bind": [{"field": "product_spec_hash", "target": "product_spec"}],
        "field": "statement", "message": "this product decision has already been accepted"}
     ],

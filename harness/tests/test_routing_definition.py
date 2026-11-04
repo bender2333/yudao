@@ -9,6 +9,7 @@
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -66,6 +67,7 @@ def test_the_kernel_loads_a_routing_definition_with_names_and_structure_only(tmp
     # 内容由路由实现自己校验
     directory = _copy(tmp_path)
     entry = _routing(directory)
+    entry.pop("outcomes", None)  # 旧写法：成果种类直接列在路由那一段里（字段只增，工单 #1456）
     entry.update({
         "departments": ["risks"], "outcome_kinds": ["audit_note"], "proposal_methods": ["submit_audit_note"],
         "limits": {"max_tasks": 3},
@@ -82,7 +84,10 @@ def test_the_kernel_loads_a_routing_definition_with_names_and_structure_only(tmp
 
 
 @pytest.mark.parametrize(("change", "field"), [
-    (lambda entry: {**entry, "outcome_kinds": "audit_note"}, "routings[0].outcome_kinds"),
+    (lambda entry: {**{k: v for k, v in entry.items() if k != "outcomes"}, "outcome_kinds": "audit_note"},
+     "routings[0].outcome_kinds"),
+    (lambda entry: {**entry, "outcome_kinds": ["audit_note"]}, "routings[0]"),
+    (lambda entry: {k: v for k, v in entry.items() if k != "outcomes"}, "routings[0]"),
     (lambda entry: {**entry, "limits": {"max_tasks": -1}}, "routings[0].limits.max_tasks"),
     (lambda entry: {**entry, "end_reasons": {"queue_empty": {"label": "任务池是空的", "outcome": "halted"}}},
      "routings[0].end_reasons.queue_empty.outcome"),
@@ -101,6 +106,7 @@ def test_the_routing_rejects_content_that_is_not_in_the_definitions(tmp_path):
     # R2：按名称指向的内容由路由实现自己校验，逐项写明是哪一项（工单 #861）
     directory = _copy(tmp_path)
     entry = _routing(directory)
+    entry.pop("outcomes", None)
     entry.update({"departments": ["risks"], "outcome_kinds": ["audit_note"],
                   "proposal_methods": ["submit_audit_note"]})
     loaded = load_definitions(_rewrite_routing(directory, entry))
@@ -110,13 +116,28 @@ def test_the_routing_rejects_content_that_is_not_in_the_definitions(tmp_path):
     assert "departments[0]：部门 risks 不在组织定义里" in issues
     assert "departments：组织定义里的部门 product 没有列进路由的部门清单" in issues
     assert "proposal_methods[0]：工具 submit_audit_note 不是定义里的提交类工具" in issues
-    assert "outcome_kinds[0]：成果种类 audit_note 没有由这里列出的提议方式提交" in issues
-    assert "outcome_kinds：提交类工具提交的成果种类 product_spec 没有列进成果种类" in issues
+    assert "outcomes[0]：成果种类 audit_note 没有由这里列出的提议方式提交" in issues
+    assert "outcomes：提交类工具提交的成果种类 product_spec 没有列进成果种类" in issues
 
 
 def test_the_shipped_routing_definition_passes_the_routing_own_check():
     # R2：发布的成果驱动定义与现有的定义文件对得上，内容校验通过
     assert ROUTING.check_definition(DEFINITIONS) is None
+
+
+def test_a_watched_name_the_routing_does_not_know_fails_the_routing_own_check(tmp_path):
+    # R2：关注的成果（organization.json 的 watched）松开成字符串以后，名称的含义归路由（工单 #1456）：
+    # 写错的名称在启动时被拒绝并写明哪一项，不会等到运行到 has_new_work 才抛 KeyError
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["departments"][1]["watched"] = ["product_spce", "guidance"]
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    with pytest.raises(routing_contract.InvalidRoutingDefinition) as raised:
+        ROUTING.check_definition(loaded)
+    issues = "\n".join(raised.value.issues)
+    assert "departments[engineering].watched[0]：关注的成果 product_spce 没有这一种" in issues
+    assert "watched[1]" not in issues
 
 
 def test_a_routing_that_does_not_declare_its_item_end_reason_is_rejected(tmp_path):
@@ -139,6 +160,71 @@ def test_an_end_reason_named_like_a_kernel_stop_reason_is_rejected(tmp_path):
     with pytest.raises(routing_contract.InvalidRoutingDefinition) as raised:
         ROUTING.check_definition(loaded)
     assert "end_reasons.released：与内核的停止原因同名" in "\n".join(raised.value.issues)
+
+
+# 提案合同里按名字引用成果的七处（工单 #1456 的审查要求逐个守住）：每处写错一个字母时都要在加载时被拒绝
+_MISSPELLED_REFERENCES = [
+    (("qa_review", 0, "target"), "conditions.qa_review[0].target"),
+    (("qa_review", 1, "artifact"), "conditions.qa_review[1].artifact"),
+    (("qa_review", 1, "referenced", 0, "target"), "conditions.qa_review[1].referenced[0].target"),
+    (("qa_review", 2, "recorded_in"), "conditions.qa_review[2].recorded_in"),
+    (("qa_review", 3, "bind", 0, "target"), "conditions.qa_review[3].bind[0].target"),
+    (("qa_review", 4, "evaluated"), "conditions.qa_review[4].evaluated"),
+    (("product_decision", 0, "collection"), "conditions.product_decision[0].collection"),
+]
+
+
+def _misspell(contracts: dict, path: tuple) -> None:
+    # 把这条路径上的成果名改错一个字母：product_spec → product_spce
+    node: Any = contracts["conditions"]
+    for step in path[:-1]:
+        node = node[step]
+    node[path[-1]] = "product_spce"
+
+
+@pytest.mark.parametrize(("path", "field"), _MISSPELLED_REFERENCES)
+def test_a_condition_naming_an_outcome_kind_that_is_not_defined_fails_at_load(tmp_path, path, field):
+    # R2：提案合同按名字引用成果种类，加载时按成果种类那一项核对（工单 #1456 的审查发现）：
+    # 写错一个字母时整份拒绝并写明是哪一条条件的哪个字段，不留「一处手误把内核的判断静默关掉」。
+    # 七处各来一条：target、artifact、referenced[]、recorded_in、bind[]、evaluated、collection
+    runner = tmp_path / "condition"
+    runner.mkdir()
+    directory = _copy(runner)
+    contracts = _read(directory, "proposal_contracts.json")
+    _misspell(contracts, path)
+    _write(directory, "proposal_contracts.json", contracts)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("proposal_contracts.json", field)
+    assert "product_spce" in issue[2] and "product_spec" in issue[2]
+
+
+def test_an_old_definitions_directory_without_the_outcome_kinds_item_still_loads(tmp_path):
+    # R2：字段只增——旧的定义目录没有 outcome_kinds.json 时照旧加载（那时没有词表可对），路由那一段
+    # 按旧写法直接列出成果种类（工单 #1456）
+    directory = _copy(tmp_path)
+    (directory / "outcome_kinds.json").unlink()
+    routings = _read(directory, "routings.json")
+    routings["routings"][0].pop("outcomes")
+    routings["routings"][0]["outcome_kinds"] = ["product_spec", "product_decision", "delivery_spec",
+                                                "independent_judgement", "qa_review", "structure",
+                                                "baseline_review"]
+    _write(directory, "routings.json", routings)
+    loaded = load_definitions(directory)
+    assert loaded.routings.routings[0].outcome_kinds[0] == "product_spec"
+    assert loaded.outcomes_of("watched_outputs")[0] == "product_spec"
+
+
+def test_the_skeleton_outcome_kinds_can_be_named_by_a_contract(tmp_path):
+    # R2：骨架自己产生的那两种成果（有效合同、代码树快照）写在成果种类那一项的 skeleton 里，
+    # 提案合同照样可以按名字引用它们：快照记着树摘要，tree_matches 用它
+    (tmp_path / "skeleton").mkdir()
+    directory = _copy(tmp_path / "skeleton")
+    contracts = _read(directory, "proposal_contracts.json")
+    contracts["conditions"]["qa_review"][2]["recorded_in"] = "snapshot"
+    _write(directory, "proposal_contracts.json", contracts)
+    assert load_definitions(directory).routing == "watched_outputs"
 
 
 def test_a_routing_declared_end_reason_is_written_as_an_item_stop_reason(tmp_path):
@@ -175,3 +261,37 @@ def test_the_label_of_a_routing_end_reason_comes_from_the_definition(tmp_path, m
     assert models.stop_reason_name("released") == "已完成并放行"
     # 没有登记的取值原样返回，说明里不丢掉这个事实
     assert models.stop_reason_name("not_a_reason") == "not_a_reason"
+
+
+def test_outcome_kind_references_are_checked_at_load(tmp_path):
+    # 成果种类这一项（outcome_kinds.json，工单 #1456）：种类不重复，分组里的名称都有定义，
+    # 每份路由定义引用的那一组存在；不满足时整份拒绝并写明文件与字段
+    (tmp_path / "duplicate").mkdir()
+    directory = _copy(tmp_path / "duplicate")
+    kinds = _read(directory, "outcome_kinds.json")
+    kinds["kinds"].append({"id": "product_spec", "label": "重复的一种"})
+    _write(directory, "outcome_kinds.json", kinds)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert ("outcome_kinds.json", "kinds[7].id", "重复的成果种类 product_spec") in raised.value.issues
+
+    (tmp_path / "group").mkdir()
+    directory = _copy(tmp_path / "group")
+    kinds = _read(directory, "outcome_kinds.json")
+    kinds["groups"][0]["kinds"].append("no_such_kind")
+    _write(directory, "outcome_kinds.json", kinds)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[:2] == ("outcome_kinds.json", "groups[0].kinds[7]") and "no_such_kind" in issue[2]
+               for issue in raised.value.issues), raised.value.issues
+
+    (tmp_path / "routing").mkdir()
+    directory = _copy(tmp_path / "routing")
+    routings = _read(directory, "routings.json")
+    routings["routings"][0]["outcomes"] = "no_such_group"
+    _write(directory, "routings.json", routings)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("routings.json", "routings[0].outcomes")
+    assert "no_such_group" in issue[2]
