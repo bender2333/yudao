@@ -48,6 +48,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
     WorkItemCreate,
 )
 from harness.app.project_queries import ProjectsList  # noqa: E402
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, VerificationDeclaration  # noqa: E402
 from harness.environment import QA_TESTS_DIR  # noqa: E402
 from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
@@ -61,6 +62,7 @@ from harness.tests.helpers import run_wait_command  # noqa: E402
 from harness.tests.protocol_helpers import (  # noqa: E402
     chat_responder, messages_responder, model_test_responder, preset_base_urls, serve,
 )
+from harness.tightening import WATCHED_OUTPUTS  # noqa: E402
 
 UNAVAILABLE = "Missing configuration: provider credential"
 # 硬杀重启以后事件库的文件还会被短暂占用（与 harness/tests/process_kill.py 的处理相同）：打开时重试的上限
@@ -119,6 +121,33 @@ TOOLS_HTTP_SERVER = "search"
 
 # 两个项目各自取回的本机地址路径（同一个真实 HTTP 服务上的两页）
 TOOLS_FETCH_PATHS = ("/echo", "/notes")
+
+
+# 形态一节（工单 #1403）：项目设置页的「形态」一节要有一个项目与一份带两份形态的发布。
+# 发布带现在只有默认的三部门一份（单角色直做等形态由各自的工单加进发布带），因此这里交进第二份：
+# 一份定义内容与三部门相同、核验声明为空的副本（harness/tests/test_form_setting.py 同一做法），
+# 它与发布带里「一个角色直做」在页面上的样子一致——没有核验角色，以开环完成结束。
+FORMS_PROJECT = "形态项目"
+OPEN_LOOP_FORM = "three_departments_without_verifier"
+OPEN_LOOP_DEFINITIONS = DEFINITIONS.model_copy(update={
+    "version": "sha256:three-departments-without-verifier",
+    "organization": DEFINITIONS.organization.model_copy(
+        update={"verification": VerificationDeclaration(verifiers=())}),
+})
+
+
+def release_forms() -> dict[str, tuple[object, object]]:
+    # 这个发布带的形态（形态名 → 一份完整的定义与它的收紧检查）：交给组装处，实例同时加载这几份
+    return {
+        DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
+        OPEN_LOOP_FORM: (OPEN_LOOP_DEFINITIONS, WATCHED_OUTPUTS),
+    }
+
+
+def forms_script() -> dict[str, list[FakeTurn]]:
+    # 形态一节的预置只有一个项目、没有事项：模型轮次一次也用不着（用到就是这里的脚本不够，
+    # 应当报错而不是给一份假的回答）
+    return {}
 
 
 def lan_address() -> str:
@@ -748,6 +777,14 @@ async def wait_for_probe(application: Application, project_id: str, name: str,
     raise AssertionError(f"工具与扩展页的探测在 {timeout_sec:g} 秒内没有出结果")
 
 
+async def seed_forms(application: Application) -> None:
+    # 「形态」一节的预置（工单 #1403）：一个项目、没有事项。这一节只看项目现在用哪一份形态与它的改动历史，
+    # 事项与模型轮次都不需要；要两份形态的发布在起服务时交给组装处（见 release_forms）。
+    # 项目设置页读到的是真实的 project.organization 与 organization.adopt。
+    await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=FORMS_PROJECT, goal="换一份形态、改回与历史"))
+
+
 def project_id_of(application: Application, name: str) -> str:
     # 预置的项目按名字取标识：用例与预置脚本对同一个项目（projects.list 是应用层自己的查询）
     listed = application.query("projects.list", ProjectsList(include_archived=True)).data
@@ -1009,7 +1046,7 @@ def main() -> int:
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote", "replay", "kill", "steps", "coverage", "tools"),
+                                             "stopnote", "replay", "kill", "steps", "coverage", "tools", "forms"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -1092,6 +1129,9 @@ def main() -> int:
         # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
         base_script = script()
         adapter_script = {department: turns * 2 for department, turns in base_script.items()}
+    elif args.script == "forms":
+        # 形态一节（工单 #1403）：这个预置不跑事项，模型轮次一次也用不着
+        adapter_script = forms_script()
     else:
         adapter_script = script()
     # 流式片段的停顿（秒）：进行中的询问模式要有一段够长的窗口，回答分支每段停 0.5 秒，
@@ -1110,6 +1150,9 @@ def main() -> int:
         system = open_after_kill(lambda: LoopSystem.for_testing(
             data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap), resume_on_startup=False))
         system.resume_startup_runs()
+    elif args.script == "forms":
+        # 形态一节（工单 #1403）：实例同时加载两份形态（见 release_forms），页面才有的可换
+        system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script), forms=release_forms())
     else:
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap))
     # 一步连接把 Key 写进 .env（catalog.connect 的既定行为，设计说明第 4.2 节）：
@@ -1179,6 +1222,9 @@ def main() -> int:
         elif args.script == "replay":
             # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
             asyncio.run(seed(application, system, two_item_project=True))
+        elif args.script == "forms":
+            # 形态一节（工单 #1403）：一个项目、没有事项；两份形态在起服务时已经交给组装处
+            asyncio.run(seed_forms(application))
         elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）
