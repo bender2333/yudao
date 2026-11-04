@@ -316,7 +316,7 @@ def last_parameter_change_id(store: Any, name: str) -> str | None:
 
 def frozen_check_timeout(store: Any, run_id: str) -> int:
     # 一个 run 中检查的时限（迭代底座 B3，工单 #351）：run_created 事件里冻结的取值，运行中不再跟随修改。
-    # 旧事件没有这个字段时按当时的全局现值。取值不进运行投影：投影是内核模块，行数受内核清单上限约束
+    # 旧事件没有这个字段时按当时的全局现值。取值不进运行投影：投影是内核模块，只放裁决要读的内容
     from .event_store import run_stream
     from .models import EventType
 

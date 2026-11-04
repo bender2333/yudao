@@ -1,6 +1,6 @@
-# 发布检查（可信内核设计说明第 4.4 节，工单 #355）：在临时 git 仓库里植入四类问题，
-# 每类都被报成对应的不通过项；干净的仓库通过；改待发布提交里的清单与内核测试不改变结果。
-# 目录流中的决定请求「实例升级」带着检查结果。
+# 发布检查（可信内核设计说明第 4.4 节，工单 #355）：在临时 git 仓库里植入两类问题（导入方向、
+# 评测专有内容），每类都被报成对应的不通过项；干净的仓库通过；改待发布提交里的清单与内核测试不改变结果。
+# 目录流中的决定请求「实例升级」带着检查结果，旧事件里的行数上限仍能读（工单 #1473）。
 
 import json
 from pathlib import Path
@@ -10,15 +10,18 @@ import pytest
 
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
+from harness.event_store import catalog_stream
 from harness.models import CatalogEventType, ProjectEventType
 from harness.release_check import (
     MANIFEST_PATH,
     Finding,
     check_repository,
+    decision_request_payload,
     load_manifest,
     request_instance_upgrade,
 )
 from harness.runtime import LoopSystem
+from harness.write_path import NewCatalogEvent
 
 # 内核清单里的一个模块，改动它用来制造内核差异
 KERNEL_MODULE = "harness/bounds.py"
@@ -60,13 +63,13 @@ class Repository:
         self.repository.create_reference(f"refs/tags/{name}", self.repository.head.target)
 
 
-def _manifest_payload(*, python_lines_max: int = 100000) -> str:
-    # 待发布提交里的内核清单：它与实例自带的清单无关，改它不改变检查结果
+def _manifest_payload(*, module_paths: tuple[str, ...] = (KERNEL_MODULE,)) -> str:
+    # 待发布提交里的内核清单：它与实例自带的清单无关，改它不改变检查结果。
+    # 工单 #1473 起清单里没有行数上限，module_paths 让「待发布提交里改清单」的用例换一个字段
     return json.dumps({
         "owner": "user", "updated": "2026-10-10",
         "kinds": {"module": "控制核心的裁决模块", "material": "评价材料与守卫自身"},
-        "paths": [{"path": KERNEL_MODULE, "kind": "module", "why": "边界的核对"}],
-        "python_lines_max": python_lines_max,
+        "paths": [{"path": path, "kind": "module", "why": "边界的核对"} for path in module_paths],
         "allowed_imports": ["内核文件", "标准库", "pydantic"],
     })
 
@@ -101,11 +104,23 @@ def _findings(report) -> dict[str, list[Finding]]:
 
 
 def test_a_clean_pending_commit_passes(repository):
-    # 干净的仓库通过：内核没有改动，行数在上限内，导入方向正确，四处表面没有评测专有内容
+    # 干净的仓库通过：内核没有改动，导入方向正确，四处表面没有评测专有内容
     report = check_repository(repository.path)
     assert report.passed, report.text
     assert report.base_tag == "v0.1.0"
     assert report.kernel_changes == ()
+
+
+def test_the_report_has_two_checks_and_no_line_cap(repository):
+    # 工单 #1473：取消内核行数上限以后，发布检查只剩导入方向与评测专有内容两项，
+    # 内核 Python 总行数仍写进报告，只作读数、不写上限，也不判通过
+    repository.write(KERNEL_MODULE, "import pygit2\n")
+    repository.commit("import a third-party package")
+    report = check_repository(repository.path)
+    assert {item.check for item in report.findings} == {"导入方向"}
+    assert "上限" not in report.text
+    assert f"内核 Python 行数：{report.kernel_python_lines}" in report.text
+    assert "python_lines_max" not in decision_request_payload(report)["report"]
 
 
 def test_a_changed_kernel_path_is_reported(repository):
@@ -118,16 +133,6 @@ def test_a_changed_kernel_path_is_reported(repository):
     assert KERNEL_MODULE in report.text
 
 
-def test_kernel_python_lines_over_the_cap_are_reported(repository, tmp_path):
-    # 行数超过上限：报成行数不通过。上限取自实例自带的清单，把行数抬到它以上
-    cap = load_manifest().python_lines_max
-    repository.write(KERNEL_MODULE, KERNEL_SOURCE + "".join(f"LINE_{index} = {index}\n" for index in range(cap)))
-    repository.commit("grow the kernel")
-    report = check_repository(repository.path)
-    assert report.kernel_python_lines > report.python_lines_max
-    assert any(item.check == "行数" for item in report.findings)
-
-
 def test_an_import_outside_the_allowed_direction_is_reported(repository):
     # 导入方向：内核模块导入清单以外的第三方包时报成导入方向不通过，位置带行号
     repository.write(KERNEL_MODULE, "import pygit2\n")
@@ -135,6 +140,16 @@ def test_an_import_outside_the_allowed_direction_is_reported(repository):
     report = check_repository(repository.path)
     assert any(item.check == "导入方向" and item.where.startswith(f"{KERNEL_MODULE}:")
                for item in report.findings)
+
+
+def test_a_kernel_module_missing_from_the_pending_commit_is_reported(repository):
+    # 内核清单里的模块在待发布提交里被删掉：依赖它位置的检查都没法做，报成导入方向不通过。
+    # 工单 #1473 去掉行数检查以后这条仍守着，位置写模块的路径
+    (repository.path / KERNEL_MODULE).unlink()
+    repository.repository.index.remove(KERNEL_MODULE)
+    repository.commit("delete a kernel module")
+    report = check_repository(repository.path)
+    assert any(item.check == "导入方向" and item.where == KERNEL_MODULE for item in report.findings), report.text
 
 
 def test_eval_proprietary_content_in_a_department_prompt_is_reported(repository):
@@ -182,16 +197,19 @@ def test_eval_proprietary_content_in_a_definition_is_reported(repository):
 
 def test_editing_the_pending_manifest_does_not_change_the_result(repository):
     # 待发布提交里的清单与内核测试改不动结果：检查用的是实例自带的清单与检查。
-    # 把待发布提交里的行数上限改成 1，清单与内核测试列进内核路径改动、结果仍通过，行数上限仍按实例自带的算
-    repository.write("harness/definitions/kernel-manifest.json", _manifest_payload(python_lines_max=1))
+    # 待发布提交里把清单改成一条模块都不列（照它自己的清单，那个内核模块的导入不会被核对），
+    # 内核模块又导入了清单以外的 pygit2：导入方向仍按实例自带的清单报出来，
+    # 清单与内核测试列进内核路径改动
+    repository.write(KERNEL_MODULE, "import pygit2\n")
+    repository.write("harness/definitions/kernel-manifest.json", _manifest_payload(module_paths=()))
     repository.write("harness/tests/kernel/test_manifest.py",
                      "def test_manifest():\n    assert True  # 待发布提交里改成一律通过\n")
     repository.commit("rewrite the manifest in the pending commit")
     report = check_repository(repository.path)
-    assert report.passed, report.text
+    assert any(item.check == "导入方向" and item.where.startswith(f"{KERNEL_MODULE}:")
+               for item in report.findings), report.text
     assert "harness/definitions/kernel-manifest.json" in report.kernel_changes
-    assert report.python_lines_max == load_manifest().python_lines_max
-    assert report.kernel_python_lines > 1
+    assert "harness/tests/kernel/test_manifest.py" in report.kernel_changes
 
 
 def test_editing_the_pending_check_code_does_not_change_the_result(repository):
@@ -226,6 +244,37 @@ def test_the_query_lists_the_instance_upgrade_request_with_its_report(repository
         assert report.text in view.request.facts
         assert view.request.report.pending_commit == report.pending_commit
         assert view.request.report.passed == report.passed
+        # 工单 #1473：新生成的报告里没有行数上限这一项，写进目录流的载荷也不带这个字段
+        assert view.request.report.python_lines_max is None
+        [written] = [event for event in system.store.read(0, limit=1000)
+                     if event.type == CatalogEventType.INSTANCE_UPGRADE_REQUESTED]
+        assert "python_lines_max" not in written.payload["report"]
+    finally:
+        system.close()
+
+
+def test_an_old_instance_upgrade_event_with_the_line_cap_still_reads(tmp_path):
+    # 工单 #1473：目录流里已有的「实例升级」旧事件带着取消以前的行数上限。载荷合同把字段改成可选，
+    # 这些事件仍能读取并经决定请求的投影返回，读到的上限就是当时记下的值
+    system = LoopSystem(tmp_path / "data")
+    try:
+        old_report = {"repository": "D:/repo", "pending_commit": "0123456789abcdef", "base_tag": "v0.1.0",
+                      "kernel_changes": [], "kernel_python_lines": 4093, "python_lines_max": 4096,
+                      "passed": True, "findings": []}
+        payload = {"kind": "instance_upgrade", "blocks": "instance",
+                   "options": [{"id": "approve", "label": "批准升级"}, {"id": "reject", "label": "拒绝"}],
+                   "description": "发布检查通过：是否把这台电脑上安装的那一份升级？",
+                   "facts": ["发布检查：通过"], "report": old_report}
+
+        def decide(transaction):
+            return transaction.append(NewCatalogEvent(CatalogEventType.INSTANCE_UPGRADE_REQUESTED, payload,
+                                                      actor="system"))
+
+        [event] = system.writes.transact(catalog_stream(), decide)
+        listed = Application(system).query("decisions.list", DecisionsList(kind="instance_upgrade"))
+        [view] = [item for item in listed.data.decisions if item.decision_id == event.event_id]
+        assert view.request.report.kernel_python_lines == 4093
+        assert view.request.report.python_lines_max == 4096
     finally:
         system.close()
 

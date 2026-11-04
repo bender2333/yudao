@@ -8505,7 +8505,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 13
+            "example": 14
           },
           "contract_digest": {
             "type": "string",
@@ -9874,7 +9874,14 @@
             "title": "Kernel Python Lines"
           },
           "python_lines_max": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Python Lines Max"
           },
           "passed": {
@@ -9898,7 +9905,6 @@
           "base_tag",
           "kernel_changes",
           "kernel_python_lines",
-          "python_lines_max",
           "passed",
           "findings"
         ],
