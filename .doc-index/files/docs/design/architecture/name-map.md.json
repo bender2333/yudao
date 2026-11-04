@@ -23,7 +23,7 @@
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["第一节"],"seen":"3c9310ef49956c5b","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"0e9705e0dd37530b","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"32ac07d30ac47cac","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
 {"dst":"docs/architecture.html#s4","kind":"map-position","raws":["「要守的缝」"],"seen":"cd45a09d24e819e9","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
 {"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"e8c40922f4168ea6","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 1. 系统里的九道缝 > 接口"},
 {"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"1155373f0753c2aa","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝"},

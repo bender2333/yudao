@@ -25,9 +25,9 @@ from harness.proposals import (
 )
 from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import guidance_reply, quality_turns
+from harness.tests.helpers import guidance_reply, python_snippet, quality_turns
 
-CHECKS = {"smoke": {"command": "python -c \"print('smoke ok')\""}}
+CHECKS = {"smoke": {"command": python_snippet("print('smoke ok')")}}
 ECHO = "import sys\nprint(sys.argv[1])\n"
 TEST_FILE = f"{QA_TESTS_DIR}/test_echo.py"
 TEST_CONTENT = "import sys\nprint('QA_TEST_DRAFTED')\nsys.exit(0)\n"

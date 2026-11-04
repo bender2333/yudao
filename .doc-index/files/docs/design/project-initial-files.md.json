@@ -27,7 +27,7 @@
 {"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 5. 确认以后：当前有效要求与第一次采纳","kind":"link","raws":["existing-project-onboarding.md"],"seen":"f1972ee5044a2d04","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件"},
 {"dst":"harness/snapshot.py","kind":"code-path","raws":["harness/snapshot.py"],"seen":"30f148f28f93eb62","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 3. 命令与事件"},
 {"dst":"docs/design/evaluation-scenarios.md#评测场景：版本回归与 OpenCode 对照 > 3. 两边的运行条件","kind":"link","raws":["evaluation-scenarios.md"],"seen":"54962cc191afe368","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 5. 界面与评测"},
-{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"34ec35f3d8594f1a","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 3. 命令 > 3.2 命令清单","kind":"link","raws":["app-and-interface.md"],"seen":"218c63896ea00bca","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系"},
 {"dst":"docs/design/existing-project-onboarding.md#接入已有项目设计说明 > 12. 用户确认的决定","kind":"link","raws":["existing-project-onboarding.md"],"seen":"a4436dcb9f04b27c","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md#恢复契约与故障矩阵","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"0eee1f7871fde620","src":"docs/design/project-initial-files.md#项目的起始文件夹设计说明 > 9. 与现有设计的关系"}
 ]

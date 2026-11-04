@@ -1,16 +1,16 @@
 {
 "schema":1,
 "path":"docs/design/loops-and-convergence.md",
-"hash":"6fd682a298c49e26",
+"hash":"5a15e3fde808c433",
 "nodes":[
-{"hash":"6fd682a298c49e26","id":"docs/design/loops-and-convergence.md","kind":"file","title":"docs/design/loops-and-convergence.md"},
+{"hash":"5a15e3fde808c433","id":"docs/design/loops-and-convergence.md","kind":"file","title":"docs/design/loops-and-convergence.md"},
 {"hash":"5ce09fddacbf7a7a","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明","kind":"section","parent":"docs/design/loops-and-convergence.md","title":"循环与收敛设计说明"},
 {"hash":"40a5974469b95df7","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 1. 要解决的问题","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"1. 要解决的问题"},
 {"hash":"22e73c5fce93f7e6","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 2. 循环层的声明","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"2. 循环层的声明"},
 {"hash":"a3fa6f2b5f39177f","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 3. 一定会停","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"3. 一定会停"},
 {"hash":"17753feda56e1f0c","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 4. 子循环","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"4. 子循环"},
 {"hash":"6ac3b5bdf91bc8f6","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 5. 收敛的检测","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"5. 收敛的检测"},
-{"hash":"b48cac0d03222665","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 5. 收敛的检测 > 5.1 判定参数","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 5. 收敛的检测","title":"5.1 判定参数"},
+{"hash":"8a8372f1ab681986","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 5. 收敛的检测 > 5.1 判定参数","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 5. 收敛的检测","title":"5.1 判定参数"},
 {"hash":"6659e0d5bd66077a","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 6. 防止滑向静态编排的判据","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"6. 防止滑向静态编排的判据"},
 {"hash":"7a5f4a3cfbfe703e","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 7. 容纳变化的判据","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明","title":"7. 容纳变化的判据"},
 {"hash":"57de95b11eac66d2","id":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 7. 容纳变化的判据 > 7.1 组成的变化","kind":"section","parent":"docs/design/loops-and-convergence.md#循环与收敛设计说明 > 7. 容纳变化的判据","title":"7.1 组成的变化"},
@@ -22,7 +22,7 @@
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「裁决与边界」"],"seen":"3c9310ef49956c5b","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"0e9705e0dd37530b","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"32ac07d30ac47cac","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/design/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"f0abaea09a6b3e64","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/design/recovery-contract-and-fault-matrix.md","kind":"link","raws":["recovery-contract-and-fault-matrix.md"],"seen":"99f201c1620de693","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
 {"dst":"docs/requirements/execution-limits.md","kind":"link","raws":["../requirements/execution-limits.md"],"seen":"573c955013deada8","src":"docs/design/loops-and-convergence.md#循环与收敛设计说明"},
