@@ -94,6 +94,10 @@ RUN_EVENT_TYPES = frozenset({
     # run 进入终态时结束全部会话并写下结束记录
     "trial_session_started",
     "trial_session_ended",
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：应用事件。
+    # 用例打开期间本部门的浏览器与屏幕动作由投影记为它的步骤，会话结束时打开的用例结束为中断
+    "trial_case_opened",
+    "trial_case_concluded",
 })
 
 # 项目流：项目的长期事实（项目、当前 PRD 与采纳成果、事项的存在、队列位置与最终结果、项目部门设置）

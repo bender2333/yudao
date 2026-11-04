@@ -17,6 +17,7 @@ from .event_store import (
 from .kernel_events import (
     StreamHandler, accepted, apply_decision_event, replay_decisions,
 )
+from .coverage import is_trial_step_tool
 from .models import (
     CatalogEventType,
     DecisionRequest,
@@ -39,6 +40,10 @@ from .models import (
     QAReview,
     RunProjection,
     SessionRecord,
+    TrialCase,
+    TrialCaseStep,
+    TRIAL_CASE_STATUS_CONCLUDED,
+    TRIAL_CASE_STATUS_OPEN,
     UserInput,
     TERMINAL_STATUSES,
     waiting_reason_for,
@@ -392,6 +397,21 @@ def apply_event(state: RunProjection, event: Event) -> None:
         if event.model:
             _bind_actual_model(state, event)
         return
+
+    if etype == EventType.TRIAL_CASE_OPENED:
+        _open_trial_case(state, event)
+        return
+
+    if etype == EventType.TRIAL_CASE_CONCLUDED:
+        _conclude_trial_case(state, event)
+        return
+
+    if etype == EventType.TRIAL_SESSION_ENDED:
+        _interrupt_trial_cases(state, event)
+        return
+
+    if etype in {EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.ACTION_VERIFIED}:
+        _associate_trial_step(state, event)
 
     if etype == EventType.TOOL_CALLED:
         if payload.get("name") != "provider_usage":
@@ -800,3 +820,118 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
         judgement_event=str(payload.get("judgement_event") or ""),
         changed=int((payload.get("coverage") or {}).get("changed") or 0),
     )
+
+# ---------------------------------------------------------------------------
+# 试用记录（浏览器与 computer use 设计说明第 8.2、7.2 节，工单 #1180）：试用用例与它们的步骤由事件派生，
+# 不另外保存。用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份（模型给出的调用编号）
+# 关联为它的步骤；产生检查回执的一步同样计入。哪些工具算一步、哪一步是可执行的检验在 coverage 模块
+
+
+def _open_case(state: RunProjection, department: Any, session_id: str | None) -> TrialCase | None:
+    # 这个部门在这个会话里打开着的用例：用例打开期间同一个部门只有一个（设计说明第 8.2 节）
+    for case in state.trial_cases:
+        if (case.status == TRIAL_CASE_STATUS_OPEN and case.department == department
+                and case.session_id == session_id):
+            return case
+    return None
+
+
+def _open_trial_case(state: RunProjection, event: Event) -> None:
+    payload = event.payload
+    state.trial_cases.append(TrialCase(
+        case_id=str(payload["case_id"]),
+        session_id=str(payload["session_id"]),
+        department=str(payload.get("department") or event.department or ""),
+        activation_id=str(payload.get("activation_id") or ""),
+        product_spec_hash=str(payload.get("product_spec_hash") or ""),
+        tree_digest=str(payload.get("tree_digest") or ""),
+        criteria=[str(item) for item in payload.get("criteria") or ()],
+        title=str(payload.get("title") or ""),
+        plan=[str(item) for item in payload.get("plan") or ()],
+        expected=str(payload.get("expected") or ""),
+        opened_event_id=event.event_id,
+    ))
+
+
+def _pending_case(state: RunProjection, case_id: str) -> TrialCase | None:
+    for case in state.trial_cases:
+        if case.case_id == case_id and case.status == TRIAL_CASE_STATUS_OPEN:
+            return case
+    return None
+
+
+def _conclude_trial_case(state: RunProjection, event: Event) -> None:
+    payload = event.payload
+    case = _pending_case(state, str(payload.get("case_id") or ""))
+    if case is None:
+        return
+    case.status = TRIAL_CASE_STATUS_CONCLUDED
+    case.result = str(payload.get("result") or "")
+    case.observed = str(payload.get("observed") or "")
+    case.evidence_steps = [str(item) for item in payload.get("evidence_steps") or ()]
+    case.reason = str(payload.get("reason") or "")
+    case.concluded_event_id = event.event_id
+
+
+def _interrupt_trial_cases(state: RunProjection, event: Event) -> None:
+    # 会话结束或中断时打开的用例自动结束为中断（设计说明第 8.2 节）：会话的结束已经由这条事件写明，
+    # 用例跟着它结束，结果不能作为证据。进程崩溃以后由恢复补写的会话结束事件走同一条路
+    payload = event.payload
+    session_id = str(payload.get("session_id") or "")
+    department = payload.get("department") or event.department
+    for case in state.trial_cases:
+        if (case.status == TRIAL_CASE_STATUS_OPEN and case.session_id == session_id
+                and case.department == department):
+            case.status = TRIAL_CASE_STATUS_CONCLUDED
+            case.result = "interrupted"
+            case.reason = "session_ended"
+            case.concluded_event_id = event.event_id
+
+
+def _associate_trial_step(state: RunProjection, event: Event) -> None:
+    # 一次动作的开始、结果与核实记录按动作身份挂到打开着的用例上。没有打开着的用例时什么也不做
+    payload = event.payload
+    department = event.department
+    case = _open_case(state, department, event.session_id)
+    if case is None:
+        return
+    identity = str(payload.get("id") or "")
+    name = str(payload.get("name") or "")
+    if event.type == EventType.TOOL_STARTED:
+        if not identity or not is_trial_step_tool(name):
+            return
+        case.steps.append(TrialCaseStep(
+            identity=identity, tool=name,
+            activation_id=str(payload.get("activation_id") or ""),
+            step_id=payload.get("step_id") if isinstance(payload.get("step_id"), int) else None,
+        ))
+        return
+    step = _case_step(case, payload)
+    if step is None:
+        return
+    if event.type == EventType.TOOL_CALLED:
+        step.status = "completed"
+        step.ok = bool(payload.get("ok"))
+        step.error = payload.get("error")
+        images = payload.get("images")
+        if isinstance(images, list):
+            step.screenshots = [dict(item) for item in images if isinstance(item, dict)]
+        return
+    # 动作核实记录：交还会话的核实没有确定的结果，这个步骤仍然是结果未知的
+    step.status = "unknown" if payload.get("resolution") == "handed_back" else "verified"
+    step.ok = bool(payload.get("ok"))
+
+
+def _case_step(case: TrialCase, payload: dict[str, Any]) -> TrialCaseStep | None:
+    identity = str(payload.get("id") or "")
+    step_id = payload.get("step_id") if isinstance(payload.get("step_id"), int) else None
+    activation_id = str(payload.get("activation_id") or "")
+    for item in case.steps:
+        if item.identity != identity:
+            continue
+        if item.step_id is not None and step_id is not None and item.step_id != step_id:
+            continue
+        if item.activation_id and activation_id and item.activation_id != activation_id:
+            continue
+        return item
+    return None

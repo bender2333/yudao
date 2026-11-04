@@ -105,6 +105,8 @@
             "trial_open",
             "trial_output",
             "trial_stop",
+            "trial_case_begin",
+            "trial_case_end",
             "browser_navigate",
             "browser_navigate_back",
             "browser_click",

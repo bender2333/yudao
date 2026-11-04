@@ -93,6 +93,12 @@ class EventType(SkeletonEventType):
     # 用户停止、run 结束）。Yudao 启动时按开始事件里的进程号与创建时间结束遗留的进程树
     TRIAL_SESSION_STARTED = "trial_session_started"
     TRIAL_SESSION_ENDED = "trial_session_ended"
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：应用事件，run 流。
+    # 开始事件带用例身份、会话身份、ProductSpec 摘要、试用副本的树摘要、引用的验收条件与计划；
+    # 结束事件带结论（passed、failed、unverified，会话结束时由主机记为 interrupted）、观察到的结果、
+    # 作为证据的步骤的动作身份与 unverified 的理由
+    TRIAL_CASE_OPENED = "trial_case_opened"
+    TRIAL_CASE_CONCLUDED = "trial_case_concluded"
 
 # ProjectEventType 与 CatalogEventType 由内核事件模块给出：项目流与目录流的事件全部是骨架事件
 
@@ -360,6 +366,74 @@ class SessionRecord:
     activations: int = 0
 
 
+# 试用用例的步骤与用例本身（浏览器与 computer use 设计说明第 8.2 节、第 7.2 节的查询，工单 #1180）。
+# 用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份记为它的步骤；步骤的分类（可执行的检验
+# 与模型阅读）在 coverage 模块按工具名判断，这里只保存事实
+
+# 用例的状态与结论：结论 passed、failed、unverified 由质检给出，interrupted 是会话结束或中断时主机
+# 记下的（不能作为证据）
+TRIAL_CASE_STATUS_OPEN = "open"
+TRIAL_CASE_STATUS_CONCLUDED = "concluded"
+
+
+@dataclass
+class TrialCaseStep:
+    # 一个步骤：动作身份（模型给出的调用编号）、工具名、结果状态与截图工件引用。
+    # status：completed（有 tool_called 回执）、verified（动作核实记录了确定的结果）、
+    # unknown（发出了但没有确定的结果——核实交还会话也算这一种，用例不能以 passed 结束）
+    identity: str
+    tool: str
+    activation_id: str = ""
+    step_id: int | None = None
+    status: str = "unknown"
+    ok: bool | None = None
+    error: str | None = None
+    screenshots: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def unknown(self) -> bool:
+        return self.status == "unknown"
+
+
+@dataclass
+class TrialCase:
+    # 一个试用用例：引用的验收条件、计划、实际步骤与结论。由 trial_case_opened/trial_case_concluded
+    # 与期间的动作事件折叠而成，不另外保存
+    case_id: str
+    session_id: str
+    department: str
+    activation_id: str
+    product_spec_hash: str
+    tree_digest: str
+    criteria: list[str]
+    title: str
+    plan: list[str]
+    expected: str
+    status: str = TRIAL_CASE_STATUS_OPEN
+    result: str | None = None
+    observed: str = ""
+    evidence_steps: list[str] = field(default_factory=list)
+    reason: str = ""
+    opened_event_id: str = ""
+    concluded_event_id: str | None = None
+    steps: list[TrialCaseStep] = field(default_factory=list)
+
+    @property
+    def interrupted(self) -> bool:
+        return self.result == "interrupted"
+
+    def step(self, identity: str) -> TrialCaseStep | None:
+        # 按动作身份取这个用例的步骤：证据步骤必须是它的步骤之一
+        for item in self.steps:
+            if item.identity == identity:
+                return item
+        return None
+
+    def has_unknown_step(self) -> bool:
+        # 含结果未知步骤的用例不能以 passed 结束，也不能作为证据（设计说明第 8.2 节、第 9 节）
+        return any(item.unknown for item in self.steps)
+
+
 @dataclass
 class Usage:
     input_tokens: int = 0
@@ -456,6 +530,8 @@ class RunProjection:
     delivery_specs: list[DeliverySpec] = field(default_factory=list)
     product_decisions: list[ProductDecision] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
+    # 试用用例（工单 #1180）：本 run 里质检打开过的全部用例，按打开的顺序；旧保存的投影没有这一项
+    trial_cases: list[TrialCase] = field(default_factory=list)
     structures: list[dict[str, Any]] = field(default_factory=list)
     baseline_reviews: list[dict[str, Any]] = field(default_factory=list)
     lesson_candidates: list[LessonCandidate] = field(default_factory=list)

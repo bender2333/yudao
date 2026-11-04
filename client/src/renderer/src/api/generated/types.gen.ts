@@ -17981,6 +17981,10 @@ export type ToolCallResult = {
      * Refused Reason
      */
     refused_reason?: string | null;
+    /**
+     * Images
+     */
+    images?: Array<ArtifactRef>;
     after_snapshot_ref?: ArtifactRef | null;
 };
 
@@ -18516,6 +18520,228 @@ export type ToolStartedPayload = {
      * Verification Reason
      */
     verification_reason?: 'not_happened' | null;
+};
+
+/**
+ * TrialCaseConcludedEvent
+ */
+export type TrialCaseConcludedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_case_concluded';
+    payload: TrialCaseConcludedPayload;
+};
+
+/**
+ * TrialCaseConcludedPayload
+ */
+export type TrialCaseConcludedPayload = {
+    /**
+     * Case Id
+     */
+    case_id: string;
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Result
+     */
+    result: 'passed' | 'failed' | 'unverified' | 'interrupted';
+    /**
+     * Observed
+     */
+    observed?: string;
+    /**
+     * Evidence Steps
+     */
+    evidence_steps?: Array<string>;
+    /**
+     * Reason
+     */
+    reason?: string;
+};
+
+/**
+ * TrialCaseOpenedEvent
+ */
+export type TrialCaseOpenedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_case_opened';
+    payload: TrialCaseOpenedPayload;
+};
+
+/**
+ * TrialCaseOpenedPayload
+ */
+export type TrialCaseOpenedPayload = {
+    /**
+     * Case Id
+     */
+    case_id: string;
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Tree Digest
+     */
+    tree_digest: string;
+    /**
+     * Criteria
+     */
+    criteria: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Plan
+     */
+    plan: Array<string>;
+    /**
+     * Expected
+     */
+    expected: string;
 };
 
 /**
@@ -19975,6 +20201,10 @@ export type EventObject = ({
 } & TrialSessionStartedEvent) | ({
     type: 'trial_session_ended';
 } & TrialSessionEndedEvent) | ({
+    type: 'trial_case_opened';
+} & TrialCaseOpenedEvent) | ({
+    type: 'trial_case_concluded';
+} & TrialCaseConcludedEvent) | ({
     type: 'run_done';
 } & RunDoneEvent) | ({
     type: 'run_paused';
