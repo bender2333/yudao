@@ -110,6 +110,24 @@ def _departments(system: LoopSystem, run_id: str) -> set[str]:
             if event.department is not None}
 
 
+def _start_failures(system: LoopSystem, project_id: str, run_id: str) -> list[Any]:
+    # 项目流上这条 run 的开始失败：形态不在发布里时写的那些，一条写明原因
+    return [event for event in system.store.list_project_events(project_id)
+            if event.type == ProjectEventType.WORK_ITEM_START_FAILED
+            and event.payload["run_id"] == run_id]
+
+
+def _definitions_requests(system: LoopSystem, run_id: str) -> list[Any]:
+    # run 流上「定义版本不同」的决定请求（没有进核对的 run 一条也没有）
+    return [decision for decision in system.writes.read(run_stream(run_id)).decisions.values()
+            if decision.request["kind"] == "definitions_changed"]
+
+
+def _answer_command() -> Command:
+    # 回答决定请求经应用层的命令：测试直接调用流程编排时造一个身份（与恢复用例相同）
+    return Command(command_id=new_id("cmd"), name="decision.answer", digest="test", actor="user")
+
+
 def test_two_forms_run_in_one_instance_each_under_its_frozen_definitions(tmp_path):
     # 验收第 1 条：项目的形态是三部门时建一个事项，再改成任务池建一个事项，两个都跑完，
     # 各按自己冻结的定义核对停止原因与部门
@@ -243,6 +261,12 @@ def test_an_upgrade_restart_keeps_the_frozen_form_or_is_refused(tmp_path):
     old = next(item for item in second.projects.projection(project_id).work_items
                if item.work_item_id == kept_item)
     assert (old.form, old.run_id) == (DEFAULT_FORM, kept_run)
+    # 直接调重新开始、不经过上面的前置判断（别处直接调它时的那条路）：同一个拒绝，仍然不建新的事项记录
+    failures_before = len(_start_failures(second, project_id, gone_run))
+    assert second.projects.restart_work_item_for_upgrade(gone_run) is None
+    assert len(_start_failures(second, project_id, gone_run)) == failures_before + 1
+    assert not [item for item in second.projects.projection(project_id).work_items
+                if item.restarted_from_run_id == gone_run]
     second.close()
 
     # 换回带那一份形态的发布（交付说明里给用户的处理方式）：这两个 run 这时才停，事项按它自己记下的形态接着跑
@@ -277,24 +301,6 @@ def test_the_new_project_event_is_registered_on_both_ends():
     assert ProjectEventType.PROJECT_FORM_SET in {
         event for event in json.loads(FIXTURE.read_text(encoding="utf-8"))}
     assert "project_form_set" == ProjectEventType.PROJECT_FORM_SET
-
-
-def _start_failures(system: LoopSystem, project_id: str, run_id: str) -> list[Any]:
-    # 项目流上这条 run 的开始失败：形态不在发布里时写的那些，一条写明原因
-    return [event for event in system.store.list_project_events(project_id)
-            if event.type == ProjectEventType.WORK_ITEM_START_FAILED
-            and event.payload["run_id"] == run_id]
-
-
-def _definitions_requests(system: LoopSystem, run_id: str) -> list[Any]:
-    # run 流上「定义版本不同」的决定请求（没有进核对的 run 一条也没有）
-    return [decision for decision in system.writes.read(run_stream(run_id)).decisions.values()
-            if decision.request["kind"] == "definitions_changed"]
-
-
-def _answer_command() -> Command:
-    # 回答决定请求经应用层的命令：测试直接调用流程编排时造一个身份（与恢复用例相同）
-    return Command(command_id=new_id("cmd"), name="decision.answer", digest="test", actor="user")
 
 
 def test_a_run_whose_form_is_not_in_the_release_waits_where_it_is(tmp_path):
