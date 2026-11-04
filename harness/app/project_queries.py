@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field, ValidationError, field_validator
 
-from ..definitions import DEFINITIONS, SourceKind
+from ..definitions import DEFAULT_FORM, DEFINITIONS, SourceKind
 from ..git_versions import GitVersionError
 from ..event_store import project_stream, run_stream
 from ..kernel_events import accepted
@@ -36,6 +36,7 @@ from ..recovery import (
     OBSERVATION_PAUSED, OBSERVATION_RUNNING, OBSERVATION_STOPPED, OBSERVATION_WAITING_RESUME,
     action_identity, classify_actions, observation_state, open_decisions, open_resume_decisions,
 )
+from ..runtime import FORM_REGISTRY
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
 from .labels import actor_name, department_name, event_label, status_name
@@ -401,6 +402,69 @@ class FactRef(Contract):
     source: SourceKind
 
 
+class OrganizationRole(Contract):
+    # 组织里的一个角色（工单 #1381）：标识、显示名，以及给出它的那条事实事件的来源。
+    # 画面的屋子与人物按标识取外观（画面与播放设计说明「画面跟着定义伸缩」的外观一段），定义不带外观
+    id: str
+    label: str
+    ref: FactRef
+
+
+class VerifiedRole(Contract):
+    # 一个核验角色核验的一个角色与它核验的成果种类（核验声明给出的那一对）
+    role: str
+    outcomes: list[str]
+
+
+class OrganizationVerifier(Contract):
+    # 一个核验角色与它核验谁（工单 #1381）：画面按它在核验角色的屋里有盖章台
+    role: str
+    verifies: list[VerifiedRole]
+    ref: FactRef
+
+
+class WatchedRelation(Contract):
+    # 关注关系（工单 #1381）：谁交出哪种成果、谁接收。画面按它画两间屋之间的管道
+    source: str
+    recipient: str
+    outcome: str
+    ref: FactRef
+
+
+class AskRelation(Contract):
+    # 询问关系（工单 #1381）：谁能问谁。画面按它画传信管
+    requester: str
+    recipient: str
+    ref: FactRef
+
+
+class RejectionRelation(Contract):
+    # 打回关系（工单 #1381）：核验角色打回给谁、打回的是哪种成果。画面按它在两间屋之间画红色回流管
+    verifier: str
+    role: str
+    outcome: str
+    ref: FactRef
+
+
+class WorkItemOrganization(Contract):
+    """事项冻结定义里的组织（工单 #1381，画面与播放设计说明「画面跟着定义伸缩」的输入）。
+
+    取值来自这个事项创建时冻结的那份定义（形态与核验角色设计说明「形态随事项冻结」），不读进程加载时的那份；
+    每项事实带给出它的事件位置与来源种类，与 project.loop 已有的几个事实元素一样。
+    """
+
+    # 事项冻结的形态名与它的轮转方式：直做与成果驱动以不同的方式结束，读这一项才知道交完成为什么是空的
+    form: str
+    routing: str
+    roles: list[OrganizationRole]
+    verifiers: list[OrganizationVerifier]
+    # 直做时交完成的角色（它的屋里有出口托盘）；成果驱动以核验角色的放行结束，为空
+    completing: OrganizationRole | None
+    watched: list[WatchedRelation]
+    asks: list[AskRelation]
+    rejections: list[RejectionRelation]
+
+
 class WorkItemLoop(Contract):
     work_item_id: str
     kind: str
@@ -432,6 +496,9 @@ class WorkItemLoop(Contract):
     # 每个事实元素的来源（工单 #396，设计说明第 4.3 节）：门牌 sign、轮次 round、已用时间 elapsed、
     # 包裹 parcel（当前交付）、盖章 stamp（放行结论）、成果库的箱子 box（采纳的成果）。没有 run 的事项只有门牌
     refs: dict[str, FactRef] = Field(default_factory=dict)
+    # 这个事项冻结的那份定义里的组织（工单 #1381）：角色、核验角色、交完成的角色与三种关系。
+    # 形态不在这一版发布加载的清单里时为空（不换一份定义顶替，见 `_work_item_organization`）
+    organization: WorkItemOrganization | None = None
 
 
 class ProjectLoopResult(Contract):
@@ -447,6 +514,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
     if request.work_item is not None:
         _work_item(state, request.work_item)
     at_time = None if through is None else store.created_at_at(through)
+    forms = _release_definitions(application.system)
     rows: list[WorkItemLoop] = []
     for index, item in enumerate(state.work_items):
         if request.work_item is not None and item.work_item_id != request.work_item:
@@ -466,6 +534,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
             recovery_state=observation, stop_reason=item.stop_reason,
             last_department=_last_department(store, item, through=through), version=item.stream_version,
             refs=_fact_refs(store, item, run, state),
+            organization=_work_item_organization(forms, store, item, through),
         ))
     return Snapshot[ProjectLoopResult](
         position=_snapshot_position(store, through),
@@ -603,6 +672,113 @@ def _fact_refs(store: Any, item: Any, run: Any, state: Any) -> dict[str, FactRef
     if review is not None:
         refs["stamp"] = _fact_ref(store, review.created_event_id, "盖章")
     return refs
+
+
+def _release_definitions(system: Any) -> dict[str, Any]:
+    """这一版发布加载的每一份形态的定义（工单 #1381）：形态名 → 一份定义。
+
+    与 `project.organization` 同一做法（`harness/app/form_queries.py` 的 `_release_forms`）：组装处有一份时
+    按它取，只读打开（没有组装处）时按发布带的登记处取。只读这几个名字与定义，不接路由
+    """
+    forms = getattr(system, "forms", None)
+    if forms is not None:
+        return {name: form.definitions for name, form in forms.items()}
+    return {name: definitions for name, (definitions, _tightening) in FORM_REGISTRY.items()}
+
+
+def _organization_event(store: Any, item: Any, through: int | None = None) -> Any:
+    """冻结这个事项的组织的那条事件（工单 #1381）：创建这个 run 的第一条事件。
+
+    形态名写在 run_created 里（工单 #1392），它是这个事项用哪一份定义的来源；还没有 run 的事项
+    （排队等升级的）用事项创建的那条项目流事件，它同样记着形态名与定义版本。两条都找不到时报错：
+    组织不能没有来源。按位置回放（`at`）时，run_created 在那个位置以后就用事项创建的那条：
+    给出的位置不能超出这份快照
+    """
+    created = store.stream_events(run_stream(item.run_id), through_version=1)
+    if created and (through is None or created[0].position <= through):
+        return created[0]
+    event = store.get_project_event(item.event_id)
+    if event is None:
+        raise NotFound(f"组织 的来源事件不在事件日志里：{item.event_id}")
+    return event
+
+
+def _organization_ref(definitions: Any, event: Any) -> FactRef:
+    # 组织里每项事实的来源（工单 #1381）：给出它们的都是冻结定义的那条事件，来源种类按这份定义的登记处取
+    return FactRef(position=event.position, source=definitions.event_source(event.type).source)
+
+
+def _handed_in(definitions: Any, kind: str) -> dict[str, tuple[str, ...]]:
+    """成果种类 → 交得出这种成果的角色（工单 #1381）。
+
+    按这份定义与这个事项种类的提案合同取，不按部门名取（与工具许可、提案校验同一取法，工单 #1391）：
+    一个角色的提案合同里有这种成果，它就是交出这一种成果的角色
+    """
+    handed_in: dict[str, list[str]] = {}
+    for role in definitions.departments:
+        for outcome in definitions.proposal_contract(role, kind).get("kinds") or ():
+            handed_in.setdefault(outcome, []).append(role)
+    return {outcome: tuple(roles) for outcome, roles in handed_in.items()}
+
+
+def _watched_relations(definitions: Any, kind: str, ref: FactRef) -> list[WatchedRelation]:
+    """关注关系（工单 #1381，设计说明第 4.2 节的推出规则表）：谁接收谁的哪种成果。
+
+    两处定义给出它：组织定义里每个角色关注的成果——交出这一种成果的是提案合同里有它的角色；
+    核验声明——核验角色收到它核验的那个角色的那种成果。用户输入与指导不是角色交出的成果，不在这里。
+    按定义的顺序给出，同一个（交出、接收、成果）只给一次
+    """
+    handed_in = _handed_in(definitions, kind)
+    relations: list[WatchedRelation] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    def add(source: str, recipient: str, outcome: str) -> None:
+        if (source, recipient, outcome) in seen:
+            return
+        seen.add((source, recipient, outcome))
+        relations.append(WatchedRelation(source=source, recipient=recipient, outcome=outcome, ref=ref))
+
+    for recipient in definitions.departments:
+        for outcome in definitions.watched_outputs(recipient):
+            for source in handed_in.get(outcome, ()):
+                add(source, recipient, outcome)
+    for verifier, verified, outcome in definitions.rejection_edges():
+        add(verified, verifier, outcome)
+    return relations
+
+
+def _work_item_organization(forms: dict[str, Any], store: Any, item: Any,
+                            through: int | None = None) -> WorkItemOrganization | None:
+    """这个事项冻结定义里的组织（工单 #1381）。
+
+    取法与工具许可、提案校验读事项所用定义的做法相同（工单 #1165、#1392）：按事项创建时记下的形态名，
+    在这一版发布加载的那几份里取那一份，不读进程加载时的模块级定义；项目后来换了形态、换了定义都不影响它。
+    形态不在这一版发布里时为空，不换一份定义顶替（项目的组织设计说明「冻结与升级」）
+    """
+    form = item.form or DEFAULT_FORM
+    definitions = forms.get(form)
+    if definitions is None:
+        return None
+    ref = _organization_ref(definitions, _organization_event(store, item, through))
+    roles = [OrganizationRole(id=role, label=definitions.department_labels.get(role, role), ref=ref)
+             for role in definitions.departments]
+    return WorkItemOrganization(
+        form=form, routing=definitions.routing, roles=roles,
+        verifiers=[OrganizationVerifier(
+            role=verifier.role,
+            verifies=[VerifiedRole(role=verified.role, outcomes=list(verified.outcomes))
+                      for verified in verifier.verifies],
+            ref=ref) for verifier in definitions.verification.verifiers],
+        # 直做（一个角色的组织）由它自己交完成，它的屋里有出口托盘；成果驱动以核验角色的放行结束，
+        # 没有交完成的角色（设计说明「直做」第 3 条、「开环完成」与「画面跟着定义伸缩」的推出规则表）
+        completing=roles[0] if len(roles) == 1 else None,
+        watched=_watched_relations(definitions, item.kind, ref),
+        asks=[AskRelation(requester=requester, recipient=recipient, ref=ref)
+              for requester in definitions.departments if "ask" in definitions.tools_for(requester, item.kind)
+              for recipient in definitions.departments if recipient != requester],
+        rejections=[RejectionRelation(verifier=verifier, role=verified, outcome=outcome, ref=ref)
+                    for verifier, verified, outcome in definitions.rejection_edges()],
+    )
 
 
 def _item_sources(application: Application, run_id: str, *, through: int | None = None
