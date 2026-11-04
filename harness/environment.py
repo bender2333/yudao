@@ -1778,6 +1778,12 @@ class LocalEnvironment:
         # 这个部门当前的浏览器会话记录（恢复时据此把结果未知的动作与会话对上）
         return self.browsers.record(self._run_id, department)
 
+    def trial_session(self, department: str) -> dict[str, Any] | None:
+        # 这个部门进行中的试用会话记录（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：
+        # trial_case_begin 记下会话身份与试用副本的树摘要，放行时按后者核对用例属于当前交付
+        session = self._trials.session_of(self._run_id, department)
+        return None if session is None else session.record()
+
 
 async def _run_process(argv: list[str], cwd: Path, env: dict[str, str], timeout_sec: float,
                        stop: asyncio.Event) -> _Finished:

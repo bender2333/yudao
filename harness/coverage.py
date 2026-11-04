@@ -13,27 +13,83 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from .kernel_events import QA_METHODS
+from .tools import BROWSER_TOOL_NAMES
 
 # 可执行的检验：命令检查、试用用例、主机测量。其余三种（带参照材料的判定点、人、开环）不可执行
 EXECUTABLE_METHODS = frozenset({"check", "trial", "measure"})
 # 模型阅读：只凭模型读截图或读文字作判断的条件，含于开环
 MODEL_READING_METHODS = frozenset({"judgement"})
 
+# 试用用例的步骤按工具分类（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：含断言工具
+# （browser_verify_*）或检查回执（run_check）的一步是可执行的检验；只凭截图由质检的模型判断的是模型阅读
+ASSERTION_TOOL_PREFIX = "browser_verify"
+RECEIPT_TOOL = "run_check"
+
+
+def is_trial_step_tool(name: str) -> bool:
+    # 用例打开期间算作它的一步的工具：浏览器与屏幕动作，以及产生检查回执的 run_check
+    return name in BROWSER_TOOL_NAMES or name.startswith("screen_") or name == RECEIPT_TOOL
+
+
+def step_is_executable(tool: str) -> bool:
+    # 一步是不是可执行的检验：断言工具或检查回执
+    return tool.startswith(ASSERTION_TOOL_PREFIX) or tool == RECEIPT_TOOL
+
+
+def _step_tool(step: Any) -> str:
+    if isinstance(step, Mapping):
+        return str(step.get("tool") or "")
+    return str(getattr(step, "tool", "") or "")
+
+
+def case_steps_are_executable(steps: Sequence[Any]) -> bool:
+    # 用例的步骤里有没有可执行的检验：一步都没有时不算（只凭模型判断）
+    return any(step_is_executable(_step_tool(step)) for step in steps)
+
+
+def _case_is_model_reading(cases: Mapping[str, Any] | None, case_ids: Sequence[str]) -> bool:
+    # 一条验收条件引用的用例是不是只凭模型阅读：至少一个用例，且每个用例都没有可执行的检验
+    if not cases or not case_ids:
+        return False
+    described = [cases.get(str(case_id)) for case_id in case_ids]
+    if any(item is None for item in described):
+        return False
+    return not any(case_steps_are_executable(item) for item in described)
+
 
 def method_is_executable(method: str) -> bool:
     return method in EXECUTABLE_METHODS
 
 
-def coverage_report(criteria: Sequence[Mapping[str, Any]], *, changed: int = 0) -> dict[str, Any]:
+def criterion_is_executable(criterion: Mapping[str, Any], cases: Mapping[str, Any] | None = None) -> bool:
+    """一条验收条件的检验是不是可执行的（工单 #1180）。
+
+    检验方式是可执行的那三种，并且试用用例引用的用例里有可执行的检验：只凭截图由模型判断的用例算模型阅读，
+    它的条件含于开环（验证的独立性设计说明第 7.1 节第 4 点）。
+    """
+    if not method_is_executable(str(criterion.get("method"))):
+        return False
+    trial_cases = [str(item) for item in criterion.get("trial_cases") or ()]
+    if str(criterion.get("method")) == "trial" and _case_is_model_reading(cases, trial_cases):
+        return False
+    return True
+
+
+def coverage_report(criteria: Sequence[Mapping[str, Any]], *, changed: int = 0,
+                    cases: Mapping[str, Any] | None = None) -> dict[str, Any]:
     # 检验覆盖比例 = 可执行检验的条件里已在当前快照上运行并通过的条数 ÷ 条件总数；
     # 开环的条件数 = 条件总数 − 可执行检验的条件数；模型阅读的条件数含于开环。
     # 条件总数为 0 时比例是 0.0（放行不会走到这里：criteria 必须覆盖当前 ProductSpec 的每条验收条件）。
-    # changed 是改判的条数（工单 #1190）：与三个数一起写进放行记录，查询与画面读存下的这一份
+    # changed 是改判的条数（工单 #1190）：与三个数一起写进放行记录，查询与画面读存下的这一份。
+    # cases 是用例身份到步骤的对照（工单 #1180）：只凭模型阅读的用例让它的条件算模型阅读
     total = len(criteria)
-    executable = sum(1 for item in criteria if method_is_executable(str(item.get("method"))))
+    executable = sum(1 for item in criteria if criterion_is_executable(item, cases))
     covered = sum(1 for item in criteria
-                  if method_is_executable(str(item.get("method"))) and item.get("result") == "passed")
-    model_reading = sum(1 for item in criteria if str(item.get("method")) in MODEL_READING_METHODS)
+                  if criterion_is_executable(item, cases) and item.get("result") == "passed")
+    model_reading = sum(1 for item in criteria
+                        if str(item.get("method")) in MODEL_READING_METHODS
+                        or (str(item.get("method")) == "trial"
+                            and _case_is_model_reading(cases, [str(case) for case in item.get("trial_cases") or ()])))
     return {
         "criteria_total": total,
         "executable": executable,
@@ -45,10 +101,11 @@ def coverage_report(criteria: Sequence[Mapping[str, Any]], *, changed: int = 0) 
     }
 
 
-def open_criteria(criteria: Sequence[Mapping[str, Any]]) -> list[str]:
+def open_criteria(criteria: Sequence[Mapping[str, Any]],
+                  cases: Mapping[str, Any] | None = None) -> list[str]:
     # 放行记录里的开环明细：不可执行检验的验收条件，按 AC 序号
     return [str(item.get("criterion")) for item in criteria
-            if not method_is_executable(str(item.get("method")))]
+            if not criterion_is_executable(item, cases)]
 
 
 def changed_criteria(judged: Sequence[Mapping[str, Any]],

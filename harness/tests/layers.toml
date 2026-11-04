@@ -242,6 +242,8 @@
 "test_tree_archive.py" = "module"
 "test_trial_sessions.py" = "integration"
 "test_trial_session_recovery.py" = "integration"
+"test_trial_cases.py" = "module"
+"test_trial_case_browser.py" = "integration"
 "test_undefined_names.py" = "module"
 "test_unknown_action_handed_back.py" = "integration"
 "test_user_facing_labels.py" = "unit"

@@ -155,7 +155,8 @@ def test_release_rejects_failed_criteria_and_unpassed_executable_criteria():
 
 
 def test_the_criterion_shape_is_closed():
-    # 字段封闭、检验方式与结果在封闭取值里、criterion 是 AC<序号>、trial_cases 现在必须为空（守 R2）
+    # 字段封闭、检验方式与结果在封闭取值里、criterion 是 AC<序号>；trial_cases 是本次激活的试用用例身份，
+    # 引用它的核对在收紧检查里按用例与步骤判（工单 #1180）
     proposal = {"criteria": [{"criterion": "AC1", "method": "check", "result": "passed",
                               "checks": ["qa"], "trial_cases": [], "note": "", "extra": 1}]}
     assert [error.field for error in _qa_criteria_errors(proposal)] == ["criteria[0].extra"]
@@ -164,11 +165,14 @@ def test_the_criterion_shape_is_closed():
                         ({"criterion": "AC1", "method": "probe", "result": "passed"}, "criteria[0].method"),
                         ({"criterion": "AC1", "method": "check", "result": "ok"}, "criteria[0].result"),
                         ({"criterion": "AC1", "method": "check", "result": "passed",
-                          "trial_cases": ["case-1"]}, "criteria[0].trial_cases")):
+                          "trial_cases": [1]}, "criteria[0].trial_cases")):
         errors = _qa_criteria_errors({"criteria": [item]})
         assert field in [error.field for error in errors], (item, errors)
 
     assert _qa_criteria_errors({})[0].field == "criteria"
     rows, errors = _qa_criteria({"criteria": [_criterion("AC1")]})
     assert errors == [] and rows[0]["criterion"] == "AC1" and rows[0]["trial_cases"] == []
+    # 引用试用用例的条目照常收下：用例属于本次激活、与结果一致等核对在 _trial_case_errors 里
+    rows, errors = _qa_criteria({"criteria": [{**_criterion("AC1"), "trial_cases": ["case-1"]}]})
+    assert errors == [] and rows[0]["trial_cases"] == ["case-1"]
 

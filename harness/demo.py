@@ -103,6 +103,10 @@ def demo_script():
     quality_state = {"defect_recorded": False, "judged": None}
 
     def quality_turn(call):
+        if call.purpose == "compaction":
+            # 质检的材料随工具与提示词的增加而变长，演示的固定脚本走到压缩这一条路径时回一段摘要
+            # （工单 #1180）：脚本的轮次与四个画面按原来的样子走完
+            return FakeTurn(transcript="质检已经核验过交付的要点、缺陷记录与检查回执；按当前交付继续核验。")
         delivery = prompt_part(call, "current_delivery_spec")
         if not delivery:
             return FakeTurn(
@@ -181,7 +185,9 @@ def demo_script():
             engineering_turn,
         ],
         "quality": [
-            # 先按 PRD 起草测试用例（预测性探索），再询问工程；交付到达以后核验
+            # 先按 PRD 起草测试用例（预测性探索），再询问工程；交付到达以后核验。
+            # 质检的材料随工具与提示增长，脚本的轮次会多出压缩这一条路径，所以多给几轮的余量
+            # （与工单 #1274 给够质检的回答同一个做法）
             quality_turn,
             ask_turn(
                 recipient="engineering",
@@ -189,6 +195,8 @@ def demo_script():
                 background="Quality is preparing its independent checks.",
                 expected="Identify the existing executable path without changing the delivery.",
             ),
+            quality_turn,
+            quality_turn,
             quality_turn,
             quality_turn,
             quality_turn,

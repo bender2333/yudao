@@ -520,6 +520,85 @@
       "additionalProperties": false
     }
   },
+  "trial_case_begin": {
+    "kind": "host",
+    "description": "Open a trial case: the acceptance criteria it covers, the planned operations and the expected result. Requires a running trial session in this department and no other open case; every criterion must exist in the current ProductSpec. While the case is open, this department's browser and screen actions in the same session are recorded as its steps by action identity. End it with trial_case_end.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "AC<position> of the acceptance criteria this case covers, at least one"
+        },
+        "title": {
+          "type": "string",
+          "description": "What this case exercises"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The planned operations, in the order you will perform them"
+        },
+        "expected": {
+          "type": "string",
+          "description": "The expected result"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "criteria",
+        "title",
+        "steps",
+        "expected"
+      ]
+    }
+  },
+  "trial_case_end": {
+    "kind": "host",
+    "description": "End the open trial case with a conclusion: result, what you observed, the action identities of the steps you cite as evidence, and a reason when unverified. passed and failed need at least one evidence step; a case with a step whose result is unknown cannot end as passed, and a case that a session ended under is concluded interrupted by the host and cannot be evidence.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "unverified"
+          ]
+        },
+        "observed": {
+          "type": "string",
+          "description": "What you actually observed"
+        },
+        "evidence_steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Action identities (call ids) of the steps of this case that support the conclusion"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Required when the result is unverified: why you could not verify it"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "observed",
+        "evidence_steps"
+      ]
+    }
+  },
   "submit_product_spec": {
     "kind": "host",
     "proposal": "product_spec",
@@ -1099,7 +1178,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Trial case ids; leave it empty (trial cases arrive with a later ticket)"
+                "description": "Trial case ids of this activation that support this criterion: each must be concluded by trial_case_end, its session's trial copy tree digest must equal the current delivery snapshot, and its result must equal this criterion's result"
               },
               "note": {
                 "type": [
@@ -1312,7 +1391,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Trial case ids; leave it empty (trial cases arrive with a later ticket)"
+                "description": "Trial case ids of this activation that support this criterion: each must be concluded by trial_case_end, its session's trial copy tree digest must equal the current delivery snapshot, and its result must equal this criterion's result"
               },
               "note": {
                 "type": [
