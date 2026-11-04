@@ -71,6 +71,9 @@ const COMMON: Readonly<Record<string, string>> = none({
   // 试用会话的开始与结束（工单 #1183）：会话与试用副本由动作回执与试用记录给出，画面里没有对应物
   trial_session_started: PAGE_ONLY,
   trial_session_ended: PAGE_ONLY,
+  // 试用用例的开始与结束（工单 #1180）：用例、步骤与结论由试用记录与放行记录给出，画面里没有对应物
+  trial_case_opened: PAGE_ONLY,
+  trial_case_concluded: PAGE_ONLY,
   project_parameter_set: SETTINGS,
   home_seen: SETTINGS,
   parameter_set: SETTINGS,

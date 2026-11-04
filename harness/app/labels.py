@@ -227,6 +227,9 @@ _LABELS: dict[str, str] = {
     # 试用会话的开始与结束（浏览器与 computer use 设计说明第 12 节，工单 #1183）
     EventType.TRIAL_SESSION_STARTED: "开始了试用会话（{department}，{launch_name}，第 {port} 号端口）",
     EventType.TRIAL_SESSION_ENDED: "结束了试用会话（{department}，{reason}）",
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）
+    EventType.TRIAL_CASE_OPENED: "打开了试用用例「{title}」",
+    EventType.TRIAL_CASE_CONCLUDED: "试用用例结束：{result}",
     EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
     EventType.RUN_CONTINUED: "运行从暂停位置继续",

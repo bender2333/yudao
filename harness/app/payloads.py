@@ -639,6 +639,8 @@ class ToolCallResult(ToolRecord):
     output_ref: ArtifactRef | None = None
     refused: bool = False
     refused_reason: str | None = None
+    # 动作结果里的截图工件引用（工单 #1180）：试用记录的步骤按它给出每一步的截图，原文在工件库里
+    images: list[ArtifactRef] = Field(default_factory=list)
     # 动作后的公开树快照（工单 #17）：与事件 tool_started 上的动作前快照、动作参数一起构成核实依据
     after_snapshot_ref: ArtifactRef | None = None
 
@@ -1503,6 +1505,38 @@ class TrialSessionEndedPayload(Payload):
     exit_code: int | None = None
 
 
+class TrialCaseOpenedPayload(Payload):
+    # 一个试用用例的开始（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：用例身份、部门会话
+    # （哪些动作是它的步骤）与试用会话（会话结束或中断时用例结束为中断）两个身份、部门与激活、
+    # 当前 ProductSpec 的内容摘要、试用副本的树摘要（放行时按它核对用例属于当前交付）、
+    # 引用的验收条件与计划（标题、操作、预期结果）。之后这个部门在同一会话中的浏览器与屏幕动作由投影
+    # 记为它的步骤
+    case_id: str
+    session_id: str
+    trial_session_id: str
+    department: Department
+    activation_id: str
+    product_spec_hash: str
+    tree_digest: str
+    criteria: list[str]
+    title: str
+    plan: list[str]
+    expected: str
+
+
+class TrialCaseConcludedPayload(Payload):
+    # 一个试用用例的结束（工单 #1180）：结论 passed、failed、unverified 由质检给出；会话结束或中断时
+    # 主机记为 interrupted（这时 reason 写 session_ended），中断的用例不能作为证据。
+    # evidence_steps 是作为证据的步骤的动作身份（模型给出的调用编号）
+    case_id: str
+    session_id: str
+    department: Department
+    result: Literal["passed", "failed", "unverified", "interrupted"]
+    observed: str = ""
+    evidence_steps: list[str] = Field(default_factory=list)
+    reason: str = ""
+
+
 class WorkItemStartFailedPayload(Payload):
     work_item_id: str
     run_id: str
@@ -1902,6 +1936,9 @@ PAYLOADS: dict[str, Any] = {
     # 试用会话的开始与结束（工单 #1183）：应用事件，run 流
     EventType.TRIAL_SESSION_STARTED: TrialSessionStartedPayload,
     EventType.TRIAL_SESSION_ENDED: TrialSessionEndedPayload,
+    # 试用用例的开始与结束（工单 #1180）：应用事件，run 流
+    EventType.TRIAL_CASE_OPENED: TrialCaseOpenedPayload,
+    EventType.TRIAL_CASE_CONCLUDED: TrialCaseConcludedPayload,
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,
