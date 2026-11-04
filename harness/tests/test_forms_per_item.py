@@ -411,50 +411,132 @@ def test_force_upgrade_leaves_the_run_then_it_continues_under_its_own_form(tmp_p
     back.close()
 
 
-def _onboarding_script() -> dict[str, list[Any]]:
-    # 建档第一轮的三部门回答（与 test_onboarding_revision_context 的做法相同）：产品交初始 PRD、工程交结构说明、
-    # 质检做基线核验；质检一轮里可能被唤醒两次，给两条同一轮的回答
+# 修改轮用的那份形态（工单 #1392）：默认三部门的一份同名副本——部门相同、名字不同，
+# 这样 run_created 记的名字能分辨按哪一份建
+COPIED_FORM = f"{DEFAULT_FORM}_copy"
+TWO_FORMS = {DEFAULT_FORM: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS),
+             COPIED_FORM: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS)}
+DEFAULT_ONLY = {DEFAULT_FORM: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS)}
+
+
+def _onboarding_script(rounds: int = 1) -> dict[str, list[Any]]:
+    # 建档每轮的三部门回答（与 test_onboarding_revision_context 的做法相同）：产品交初始 PRD、工程交结构说明、
+    # 质检做基线核验；质检一轮里可能被唤醒两次，每轮给两条回答
     requirement = ONBOARDING_REQUIREMENT
-    return {
-        "product": [FakeTurn(proposal=product_spec(
-            goal=ONBOARDING_GOAL, requirements=[requirement], acceptance=["run the CLI with a word"]))],
-        "engineering": [structure_turn(
+    script: dict[str, list[Any]] = {"product": [], "engineering": [], "quality": []}
+    for round_number in range(1, rounds + 1):
+        script["product"].append(FakeTurn(proposal=product_spec(
+            goal=f"{ONBOARDING_GOAL}（第 {round_number} 轮）", requirements=[requirement],
+            acceptance=["run the CLI with a word"])))
+        script["engineering"].append(structure_turn(
             requirement_locations=[{"requirement": requirement, "locations": ["src/echo.py"]}],
-            overall="第 1 轮的结构说明：一个包加一个命令行入口")],
-        "quality": [baseline_review_turn(conclusions=[
-            {"requirement": requirement, "status": "verified", "evidence": "smoke"}]) for _ in range(2)],
-    }
+            overall=f"第 {round_number} 轮的结构说明：一个包加一个命令行入口"))
+        script["quality"].extend(baseline_review_turn(conclusions=[
+            {"requirement": requirement, "status": "verified", "evidence": "smoke"}]) for _ in range(2))
+    return script
 
 
-def test_an_onboarding_revision_run_keeps_the_item_form(tmp_path):
-    # 第五次审查指出的入口（工单 #1392）：建档修改轮建立新的 run 时沿用事项冻结的形态，不取默认那一份。
-    # 形态用默认三部门的一份副本（部门相同、名字不同）：run_created 记的名字能分辨本轮按哪一份建，
-    # 部门对得上，所以这里靠名字而不是部门核对发现取错
-    copied = f"{DEFAULT_FORM}_copy"
-    system = LoopSystem.for_testing(
-        tmp_path / "loop", FakeAdapter(_onboarding_script()),
-        forms={DEFAULT_FORM: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS),
-               copied: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS)},
-        resume_on_startup=False)
+def _onboarding_setup(tmp_path: Path, forms: dict[str, Any], *, rounds: int = 1) -> dict[str, Any]:
+    # 接入已有项目的项目：形态设成副本那一份，第一轮建档跑完并结算，留一条等待回答的 initial_prd 请求
+    system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter(_onboarding_script(rounds)),
+                                    forms=forms, resume_on_startup=False)
     project_id = system.projects.register("两轮建档", ONBOARDING_GOAL, source="existing")
     system.projects.configure_source_directory(project_id, "src", str(onboarding_source(tmp_path / "source")),
                                                base_version=0)
-    _set_form(system, project_id, DEFAULT_FORM, copied)
+    _set_form(system, project_id, DEFAULT_FORM, COPIED_FORM)
     item_id, first_run = system.projects.restart_onboarding(project_id, "src")
-    assert _created(system, project_id, item_id)["form"] == copied
+    assert _created(system, project_id, item_id)["form"] == COPIED_FORM
     first = system.run_until_stop(first_run)
     assert first.status == "done", first.error
     assert system.projects.settle(first_run) is not None
-
-    # 用户回答「提出修改」：修改轮的 run 在回答提交以后建立
     _position, open_decisions = saved_decisions(system.store, statuses=("open",))
     [decision] = open_decisions
     assert decision.kind == "initial_prd"
+    return {"system": system, "project_id": project_id, "item_id": item_id, "run_id": first_run,
+            "decision": decision}
+
+
+def test_an_onboarding_revision_run_keeps_the_item_form(tmp_path):
+    # 第五次审查指出的入口（工单 #1392）：建档修改轮建立新的 run 时沿用事项冻结的形态，不取默认那一份
+    fixture = _onboarding_setup(tmp_path, TWO_FORMS)
+    system = fixture["system"]
+    decision = fixture["decision"]
     revision_run = system.orchestrator.answer_decision(
         decision.decision_id, "revise", "把用法说明写进初始 PRD", base_version=decision.version,
-        command=Command(command_id=new_id("cmd"), name="decision.answer", digest="test", actor="user"))
+        command=_answer_command())
     assert revision_run is not None
     # 修改轮的 run 记的仍是事项冻结的那一份；建 run 时不交 form 的话这里会是默认的三部门
-    assert _run_created(system, revision_run)["form"] == copied
-    assert system.orchestrator.item_form(revision_run).name == copied
+    assert _run_created(system, revision_run)["form"] == COPIED_FORM
+    assert system.orchestrator.item_form(revision_run).name == COPIED_FORM
     system.close()
+
+
+def test_revise_is_not_recorded_when_the_item_form_is_not_in_the_release(tmp_path):
+    # 第六次审查要求的边界（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：建档修改轮建 run 之前
+    # 先核事项冻结的形态。只带默认形态的发布里回答「提出修改」——不抛错、不写这条回答（决定请求还在等待）、
+    # 不建 run，原因写在这条事项的开始失败上，项目流里没有 onboarding_revision_started；
+    # 换回带副本的发布以后同一条请求还能回答，修改轮按副本建起来
+    data_dir = tmp_path / "loop"
+    fixture = _onboarding_setup(tmp_path, TWO_FORMS)
+    project_id, decision = fixture["project_id"], fixture["decision"]
+    fixture["system"].close()
+
+    gone = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script()), resume_on_startup=False)
+    assert gone.orchestrator.answer_decision(
+        decision.decision_id, "revise", "把用法说明写进初始 PRD", base_version=decision.version,
+        command=_answer_command()) is None
+    # 回答没有写进去，决定请求仍在等待
+    _position, open_decisions = saved_decisions(gone.store, statuses=("open",))
+    assert [entry.decision_id for entry in open_decisions] == [decision.decision_id]
+    assert not [event for event in gone.store.list_project_events(project_id)
+                if event.type == ProjectEventType.ONBOARDING_REVISION_STARTED]
+    failures = _start_failures(gone, project_id, fixture["run_id"])
+    assert len(failures) == 1
+    assert COPIED_FORM in failures[0].payload["error"]
+    gone.close()
+
+    # 换回带副本的发布：同一条请求这时能回答，修改轮按副本建起来
+    back = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script()), forms=TWO_FORMS,
+                                  resume_on_startup=False)
+    _position, open_decisions = saved_decisions(back.store, statuses=("open",))
+    [still] = open_decisions
+    revision_run = back.orchestrator.answer_decision(
+        still.decision_id, "revise", "把用法说明写进初始 PRD", base_version=still.version,
+        command=_answer_command())
+    assert revision_run is not None
+    assert _run_created(back, revision_run)["form"] == COPIED_FORM
+    back.close()
+
+
+def test_a_revision_run_is_rebuilt_when_its_form_returns(tmp_path):
+    # 第六次审查要求的边界（工单 #1392）：项目流里已有 onboarding_revision_started、run 还没建（回答事务与
+    # 建 run 之间的窗口）时，开成只带默认形态的实例——实例起得来、不抛错，这条事项一条开始失败、没有 run；
+    # 换回带副本的发布再开一次，修改轮的 run 补建并按副本跑完
+    data_dir = tmp_path / "loop"
+    fixture = _onboarding_setup(tmp_path, TWO_FORMS, rounds=2)
+    system = fixture["system"]
+    candidate = next(entry for entry in system.projects.projection(fixture["project_id"]).initial_prd_candidates)
+    revision_run = new_id("run")
+    system.writes.append(project_stream(fixture["project_id"]), NewProjectEvent(
+        ProjectEventType.ONBOARDING_REVISION_STARTED,
+        {"work_item_id": fixture["item_id"], "run_id": revision_run,
+         "candidate_event_id": candidate.event_id, "round": candidate.round + 1,
+         "note": "把用法说明写进初始 PRD"}, actor="system"))
+    system.close()
+
+    # 只带默认形态：实例起得来，这个 run 没有建，原因写在事项的开始失败上
+    gone = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script()), resume_on_startup=False)
+    assert gone.store.stream_events(run_stream(revision_run), after_version=0) == []
+    failures = _start_failures(gone, fixture["project_id"], revision_run)
+    assert len(failures) == 1
+    assert COPIED_FORM in failures[0].payload["error"]
+    gone.close()
+
+    # 换回带副本的发布：启动补建这个 run，它按副本跑完
+    back = LoopSystem.for_testing(data_dir, FakeAdapter(_onboarding_script(2)), forms=TWO_FORMS,
+                                  resume_on_startup=False)
+    assert back.recovered_revision_runs == [revision_run]
+    ended = back.run_until_stop(revision_run)
+    assert ended.status == "done", ended.error
+    assert _run_created(back, revision_run)["form"] == COPIED_FORM
+    back.close()

@@ -65,6 +65,17 @@ class DecisionFlow:
         saved = saved_decision(driver.store, decision_id)
         if saved is None:
             raise DecisionNotFound(decision_id)
+        # 建档修改轮建 run 之前先核事项冻结的形态（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：
+        # 不在发布里时不写这条回答、也不建修改轮的 run，原因由项目服务写进这条事项的开始失败；决定请求保持
+        # 等待，换回带那一份形态的发布以后可以再回答。核对放在回答事务提交之前：否则事务里会留下一条没有
+        # run 的 onboarding_revision_started，启动补建时它没有形态可建。回答本身已经不符合条件时（已关、
+        # 版本旧、选项不对）不写这条原因，留给事务里的核对报出原来的错
+        if (option == "revise" and saved.kind == INITIAL_PRD.name and saved.status == "open"
+                and base_version == saved.version
+                and option in [entry["id"] for entry in saved.request["options"]]):
+            candidate_run_id = saved.request.get("candidate_run_id")
+            if candidate_run_id is not None and not driver.projects.item_form_available(candidate_run_id):
+                return None
 
         def answer(transaction: Transaction) -> str | None:
             decision = transaction.decisions[decision_id]
@@ -104,6 +115,11 @@ class DecisionFlow:
                                   if entry.event_id == event.payload["candidate_event_id"]), None)
                 if candidate is None:
                     raise ValueError(f"onboarding candidate {event.payload['candidate_event_id']} is gone")
+                item = state.work_item(event.payload["work_item_id"])
+                # 形态不在发布里时（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：不建这个 run，
+                # 原因写进这条事项的开始失败；换回带那一份形态的发布以后启动补建再建
+                if item is not None and not driver.projects.item_form_in_release(project_id, item, run_id):
+                    return
                 self.create_revision_run(driver, project_id, candidate, run_id, int(event.payload["round"]),
                                          event.payload.get("note"))
                 return

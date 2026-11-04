@@ -1038,10 +1038,16 @@ class ProjectService:
         item = project.work_item_for_run(run_id)
         if item is None:
             return True
+        return self.item_form_in_release(run.project_id, item, run_id)
+
+    def item_form_in_release(self, project_id: str, item: WorkItem, run_id: str) -> bool:
+        # 这个事项冻结的形态在发布里（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：创建记录里
+        # 没有形态名的旧事项按默认形态算。不在发布里时在项目流写一条开始失败（work_item_id、run_id、error）
+        # 并返回 False；恢复、升级重新开始与建档修改轮共用这一处判断（修改轮这时还没有 run，按事项记录核）
         try:
             self.orchestrator.form_named(item.form)
         except ValueError as exc:
-            self.writes.append(project_stream(run.project_id), NewProjectEvent(
+            self.writes.append(project_stream(project_id), NewProjectEvent(
                 ProjectEventType.WORK_ITEM_START_FAILED,
                 {"work_item_id": item.work_item_id, "run_id": run_id, "error": str(exc)},
                 actor="system"))
@@ -1248,6 +1254,10 @@ class ProjectService:
                 candidate = candidates.get(event.payload["candidate_event_id"])
                 item = state.work_item(event.payload["work_item_id"])
                 if candidate is None or item is None:
+                    continue
+                # 建档修改轮建 run 之前先核事项冻结的形态（工单 #1392）：不在发布里时不补建这个 run，
+                # 原因写在事项的开始失败上，换回带那一份形态的发布以后下一次启动补建
+                if not self.item_form_in_release(project_id, item, run_id):
                     continue
                 self.orchestrator.create_revision_run(
                     project_id, candidate, run_id, int(event.payload["round"]), event.payload.get("note"))
