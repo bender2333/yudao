@@ -86,14 +86,14 @@ export function FormSection(props: { app: ClientApp; projectId: string }) {
                   {choice.form}
                   {choice.isCurrent ? <Tag tone="ok">现在用这一份</Tag> : null}
                 </span>,
-                <span key="description">
+                <div key="description">
                   {choice.description}
                   {choice.openLoop === "" ? null : (
                     <p className="y10-note note is-warn" data-testid={`form-open-loop-${choice.form}`}>
                       {choice.openLoop}
                     </p>
                   )}
-                </span>,
+                </div>,
               ])}
             />
           </div>
