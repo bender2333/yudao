@@ -2857,6 +2857,62 @@ export type FlowRecord = {
 };
 
 /**
+ * FormChange
+ */
+export type FormChange = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Previous Form
+     */
+    previous_form: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Actor
+     */
+    actor: string;
+};
+
+/**
+ * FormChoice
+ */
+export type FormChoice = {
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Verifier Roles
+     */
+    verifier_roles: Array<string>;
+    /**
+     * Open Loop
+     */
+    open_loop: boolean;
+};
+
+/**
  * GuidanceRecord
  */
 export type GuidanceRecord = {
@@ -3992,6 +4048,38 @@ export type OnboardingRound = {
 };
 
 /**
+ * OrganizationAdopt
+ */
+export type OrganizationAdopt = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: string | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Changes
+     */
+    changes?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Reason
+     */
+    reason?: string;
+};
+
+/**
  * OverlayCapability
  */
 export type OverlayCapability = {
@@ -4299,6 +4387,36 @@ export type ProjectOnboard = {
      * Source Path
      */
     source_path: string;
+};
+
+/**
+ * ProjectOrganizationResult
+ */
+export type ProjectOrganizationResult = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Version
+     */
+    version: string | null;
+    /**
+     * Form In Release
+     */
+    form_in_release: boolean;
+    /**
+     * Forms
+     */
+    forms: Array<FormChoice>;
+    /**
+     * History
+     */
+    history: Array<FormChange>;
 };
 
 /**
@@ -5670,6 +5788,17 @@ export type SnapshotProjectLoopResult = {
      */
     position: number;
     data: ProjectLoopResult;
+};
+
+/**
+ * Snapshot[ProjectOrganizationResult]
+ */
+export type SnapshotProjectOrganizationResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ProjectOrganizationResult;
 };
 
 /**
@@ -20959,6 +21088,35 @@ export type CommandParameterWithdrawResponses = {
 
 export type CommandParameterWithdrawResponse = CommandParameterWithdrawResponses[keyof CommandParameterWithdrawResponses];
 
+export type CommandOrganizationAdoptData = {
+    body: OrganizationAdopt;
+    path?: never;
+    query?: never;
+    url: '/api/commands/organization.adopt';
+};
+
+export type CommandOrganizationAdoptErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandOrganizationAdoptError = CommandOrganizationAdoptErrors[keyof CommandOrganizationAdoptErrors];
+
+export type CommandOrganizationAdoptResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandOrganizationAdoptResponse = CommandOrganizationAdoptResponses[keyof CommandOrganizationAdoptResponses];
+
 export type QuerySystemStatusData = {
     body?: never;
     path?: never;
@@ -22086,6 +22244,36 @@ export type QueryRunLoopsResponses = {
 };
 
 export type QueryRunLoopsResponse = QueryRunLoopsResponses[keyof QueryRunLoopsResponses];
+
+export type QueryProjectOrganizationData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    url: '/api/queries/project.organization';
+};
+
+export type QueryProjectOrganizationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryProjectOrganizationError = QueryProjectOrganizationErrors[keyof QueryProjectOrganizationErrors];
+
+export type QueryProjectOrganizationResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotProjectOrganizationResult;
+};
+
+export type QueryProjectOrganizationResponse = QueryProjectOrganizationResponses[keyof QueryProjectOrganizationResponses];
 
 export type CapabilitiesData = {
     body?: never;

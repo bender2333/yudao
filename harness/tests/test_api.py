@@ -253,6 +253,10 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
          "reasons": ["not_found", "not_wired", "out_of_bounds", "stale_base", "command_id_reused"]},
         {"name": "parameter.withdraw",
          "reasons": ["not_found", "not_wired", "out_of_bounds", "stale_base", "command_id_reused"]},
+        # 项目设置里「形态」的采用（工单 #1402）：名字不在发布带的清单里、本项目的改动这一版不接受，
+        # 都以 not_allowed 拒绝
+        {"name": "organization.adopt",
+         "reasons": ["not_found", "stale_base", "project_archived", "not_allowed", "command_id_reused"]},
     ]
     catalog_changed_by = ["catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
                           "credential_changed"]
@@ -266,7 +270,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "catalog.document", "changed_by": catalog_changed_by, "replayable": False},
         {"name": "catalog.change_impact", "changed_by": catalog_impact_changed_by, "replayable": False},
     ]
-    assert capabilities["queries"][-4] == {
+    assert capabilities["queries"][-5] == {
         "name": "home.away_report", "replayable": False,
         "changed_by": sorted([
             "ask_started", "ask_answered",
@@ -281,20 +285,24 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         ],
     }
     # 规则登记：现值是参数事件折叠的结果，参数修改触发重查（工单 #349）
-    assert capabilities["queries"][-3] == {
+    assert capabilities["queries"][-4] == {
         "name": "rules.registry", "changed_by": ["parameter_set"], "replayable": True,
     }
     # 工具登记（工单 #1177）：MCP 服务器的设置与最近一次探测、取回动作的取回记录
-    assert capabilities["queries"][-2] == {
+    assert capabilities["queries"][-3] == {
         "name": "tools.registry",
         "changed_by": ["project_registered", "project_renamed", "mcp_servers_configured",
                        "tool_server_probe_finished", "tool_started", "tool_called"],
         "replayable": False,
     }
     # 收敛状态（工单 #397）：按运行实例标识返回五层循环树，按位置回放
-    assert capabilities["queries"][-1]["name"] == "run.loops"
-    assert capabilities["queries"][-1]["replayable"] is True
-    assert "model_requested" in capabilities["queries"][-1]["changed_by"]
+    assert capabilities["queries"][-2]["name"] == "run.loops"
+    assert capabilities["queries"][-2]["replayable"] is True
+    assert "model_requested" in capabilities["queries"][-2]["changed_by"]
+    # 项目现在的组织（工单 #1402）：这一版只有形态这一节，形态改动改变它
+    assert capabilities["queries"][-1] == {
+        "name": "project.organization", "changed_by": ["project_form_set"], "replayable": False,
+    }
     queries = capabilities["queries"]
     assert {item["name"] for item in queries} == set(DEFAULT_REGISTRY.queries) == {
         "system.status", "attempt.live", "decisions.list", "projects.list", "project.overview", "project.loop",
@@ -304,6 +312,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
         "evidence.external_source", "tools.registry", "run.loops", "acceptance.coverage",
+        "project.organization",
     }
     # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {

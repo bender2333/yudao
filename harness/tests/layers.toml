@@ -88,6 +88,7 @@
 "test_fetch_interrupted.py" = "integration"
 "test_frozen_parameters.py" = "integration"
 "test_forms_per_item.py" = "integration"
+"test_form_setting.py" = "integration"
 "test_event_store_batch.py" = "module"
 "test_event_store_read_only.py" = "module"
 "test_event_stream.py" = "module"
