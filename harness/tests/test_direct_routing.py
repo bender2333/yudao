@@ -25,6 +25,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -37,7 +38,7 @@ from harness.direct import (COMPLETION_KIND, DIRECT_TIGHTENING, ITEM_END_REASON,
                             SINGLE_ROLE_DIRECT, completing_departments, check_definition,
                             ready_departments, routing_departments, waiting_departments)
 from harness.event_store import project_stream
-from harness.models import EventType, ProjectEventType, RunProjection
+from harness.models import ArtifactRef, DepartmentGuidance, EventType, ProjectEventType, RunProjection
 from harness.proposals import completion_turn
 from harness.runtime import FORM_REGISTRY, LoopSystem
 from harness.tests.helpers import happy_script
@@ -216,6 +217,27 @@ def test_the_routing_lets_the_completing_role_start_until_it_hands_in_completion
     # 在等待工作的角色按会话状态取：进程里没有正在工作的会话的都算（工单 #16 的恢复口径）
     assert waiting_departments({ENGINEERING: None}, SINGLE_ROLE_DIRECT_DEFINITIONS) == {ENGINEERING}
     assert waiting_departments({ENGINEERING: "active"}, SINGLE_ROLE_DIRECT_DEFINITIONS) == set()
+
+
+def test_a_role_with_pending_guidance_starts_a_round():
+    # 有指导时没有在工作的角色开始一轮（工单正文的第一句）：指导是这份形态的部门关注的那一项
+    guidance = DepartmentGuidance(id="gd_1", run_id="run", department=ENGINEERING, version=1,
+                                  text="用法一节写清楚",
+                                  guidance_ref=ArtifactRef(kind="department_guidance",
+                                                           content_hash="sha256:0",
+                                                           path="materials/run/guidance.md"),
+                                  created_event_id="evt_1", status="received")
+    # 一条已经处理过的输入（没有新的输入）+ 一段待处理的指导：这一轮只有指导是新的工作
+    view = RunProjection(run_id="run", task="补一份用法说明", department_guidance=[guidance])
+    view.input_version = 1
+    view.processed_input_version = 1
+    assert ready_departments(view, {ENGINEERING}, SINGLE_ROLE_DIRECT_DEFINITIONS) == [ENGINEERING]
+    # 这段指导已经进入过模型输入（in_input）时它不再触发新一轮；能交完成的角色照旧开工
+    view.department_guidance[0] = replace(guidance, status="in_input")
+    assert ready_departments(view, {ENGINEERING}, SINGLE_ROLE_DIRECT_DEFINITIONS) == [ENGINEERING]
+    # 开工名单只看这份形态的部门：别的部门有指导也不在直做的名单里
+    view.department_guidance[0] = replace(guidance, department="quality")
+    assert ready_departments(view, {"quality"}, SINGLE_ROLE_DIRECT_DEFINITIONS) == []
 
 
 def test_the_item_end_reason_is_the_one_the_definition_declares():
