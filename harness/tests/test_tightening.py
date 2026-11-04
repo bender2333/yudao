@@ -66,6 +66,9 @@ def _receipt(name: str, department: str, *, spec_hash: str, activation: str, exi
              delivery_hash: str | None = None, qa_tests_hash: str | None = None) -> CheckReceipt:
     # 一条检查回执：绑定当前快照、当前 PRD（质检的还绑定当前交付与合同）
     return CheckReceipt(name=name, department=department, exit_code=exit_code, summary="ran", snapshot_hash=TREE,
+                        bindings={**({"product_spec": spec_hash} if spec_hash else {}),
+                                  **({"delivery_spec": delivery_hash} if delivery_hash else {}),
+                                  **({"contract": CONTRACT} if delivery_hash is not None else {})},
                         product_spec_hash=spec_hash, delivery_spec_hash=delivery_hash,
                         activation_id=activation, effective_contract_hash=None if delivery_hash is None else CONTRACT,
                         qa_tests_hash=qa_tests_hash)

@@ -44,7 +44,8 @@ from .event_store import run_stream
 from . import execution_contract
 from .execution_contract import ActivationScope, Judgment, RoundRequest, RoundResult, SafeNode, StepLimits
 from .write_path import Transaction, WritePath
-from .models import TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, Event, EventType, RunProjection, json_dumps
+from .models import (PRD_REVISION_FIELDS, TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, Event, EventType,
+                     RunProjection, json_dumps)
 from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
@@ -53,7 +54,7 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
 from .recording import StepRecorder
 from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_cancellable, tool_kind,
                     tool_verification, writes_check_materials)
-from .validation import PRD_REVISION_FIELDS, AdjudicationView, Tightening, evaluate_proposal
+from .validation import AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 from .trial_sessions import TRIAL_TOOLS, resolve_trial_call
 

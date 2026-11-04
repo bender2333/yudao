@@ -9,11 +9,7 @@
         "engineering",
         "quality"
       ],
-      "outcome_kinds": [
-        "pool_task",
-        "task_completion",
-        "task_verdict"
-      ],
+      "outcomes": "task_pool",
       "proposal_methods": [
         "submit_task",
         "complete_task",

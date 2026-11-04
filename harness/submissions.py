@@ -13,7 +13,6 @@ import tempfile
 from typing import Any
 
 from .artifacts import ArtifactStore
-from .contracts import render_structure
 from .event_store import run_stream
 from .write_path import NewEvent, Transaction
 from .environment import LocalEnvironment
@@ -38,6 +37,34 @@ _BASIS_FIELDS = (
 # 一种成果可以多版并存（设计说明第 4 节 2026-10-27 补）：产品决定各自是一件成果，新的决定不让旧的失效，
 # 最小投影按种类记当前有效各版的摘要清单（通用条件 6 的不重复接纳读它）
 _MULTIPLE_KINDS = frozenset({"product_decision"})
+
+
+def render_structure(description: dict[str, Any]) -> str:
+    # 现有结构说明的材料（docs/design/existing-project-onboarding.md 第 4.4 节）：主机由接纳结果生成。
+    # 结构说明这一种成果的内容长什么样是应用的事（工单 #1456）：签名与写法住在这里，内核模块不再认识它
+    lines = ["# 现有结构说明", "",
+             f"结构说明：{description['content_hash']}",
+             f"初始 PRD：{description['product_spec_hash']}",
+             f"所描述的代码树摘要：{description['code_tree_digest']}", "",
+             "## 总体说明", "", description["overall"], "", "## 模块", ""]
+    lines.extend(f"- `{item['path']}`：{item['responsibility']}" for item in description["modules"])
+    lines.extend(["", "## 入口", ""])
+    lines.extend(f"- {item['kind']}：`{item['path']}`，运行方式：`{item['how_to_run']}`"
+                 for item in description["entry_points"])
+    lines.extend(["", "## 构建与测试", ""])
+    for item in description["build_and_test"]:
+        lines.append(f"- {item['name']}（`{item['command']}`）：{item['purpose']}")
+        receipt = item["receipt"]
+        lines.append(f"  本次激活的回执：退出状态 {receipt['exit_code']}；{receipt['summary']}")
+    lines.extend(["", "## 要求所在的位置", ""])
+    for item in description["requirement_locations"]:
+        lines.append(f"- {item['requirement']}")
+        lines.extend(f"  - `{path}`" for path in item["locations"])
+    lines.extend(["", "## 约定与注意事项", ""])
+    lines.extend(f"- {item}" for item in description["conventions"])
+    if not description["conventions"]:
+        lines.append("无。")
+    return "\n".join(lines).rstrip() + "\n"
 
 # 质检退回工程的放行结论（S4c 工单 #863 从薄驱动搬来）：接纳的一方认成果种类与结论取值，
 # 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用设计说明第 6 节）

@@ -77,7 +77,8 @@ def _receipt(department: str, *, activation: str = "act", exit_code: int = 0,
              delivery_hash: str | None = None) -> CheckReceipt:
     # 主机记录的一条 run_check 回执：绑定当前快照、当前 ProductSpec 与当前合同
     return CheckReceipt(name="smoke", department=department, exit_code=exit_code, summary="ran",
-                        snapshot_hash=TREE, product_spec_hash=SPEC_HASH, delivery_spec_hash=delivery_hash,
+                        snapshot_hash=TREE, bindings={"product_spec": SPEC_HASH, "delivery_spec": delivery_hash, "contract": CONTRACT_HASH},
+                        product_spec_hash=SPEC_HASH, delivery_spec_hash=delivery_hash,
                         activation_id=activation, effective_contract_hash=CONTRACT_HASH)
 
 
