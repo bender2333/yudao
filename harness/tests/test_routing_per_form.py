@@ -9,8 +9,8 @@
 建会话收事项那份形态的部门清单。
 
 层：集成层（两个事项各跑完一次完整的三部门循环，第二个跨一次进程重启）。同一文件里也有不需要完整循环的
-用例（路由实例、会话的部门清单），按分层设计说明第 2 节「一个文件中的测试用到不同层级的资源时，整个文件
-登记为其中最高的一层」一起登记为集成层。
+用例（路由实例、注入的可选性、会话的部门清单、默认收件人），按分层设计说明第 2 节「一个文件中的测试用到
+不同层级的资源时，整个文件登记为其中最高的一层」一起登记为集成层。
 
 守 R3（路线图阶段二写明的「形态随事项冻结」：同一个实例里两份形态各自按自己冻结的那份定义取值）；
 R2 的两条也守：路由契约只增（旧的实现照旧被接受、不被调用）与建会话的部门清单来自定义。
@@ -24,15 +24,18 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from harness import routing_contract
+import pytest
+
+from harness import proposals, routing_contract
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.contracts import Accepted
 from harness.app.form_commands import OrganizationAdopt
 from harness.app.form_queries import ProjectOrganization
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
-from harness.models import RunProjection
-from harness.proposals import delivery_turn, product_spec
+from harness.environment import Workspaces
+from harness.models import RunProjection, SessionRecord
+from harness.proposals import ask_turn, delivery_turn, product_spec
 from harness.runtime import LoopSystem, load_forms
 from harness.sessions import SessionFactory
 from harness.tests.helpers import quality_turns
@@ -191,6 +194,24 @@ def test_a_routing_that_declares_the_injection_gets_its_own_instance_and_the_oth
     assert not hasattr(other, "use_definitions")
 
 
+def test_a_routing_that_declares_the_injection_but_is_not_callable_is_rejected(tmp_path, monkeypatch):
+    # R2：注入是契约上的可选方法，声明了却不是可调用的，在开始一轮工作之前失败、写明是哪一种路由
+    monkeypatch.setattr(routing_contract, "_REGISTRY", dict(routing_contract._REGISTRY))
+
+    class _Broken:
+        NAME = "broken_injection"
+        CONTRACT_VERSION = routing_contract.CURRENT_VERSION
+        use_definitions = "not a method"
+
+        def check_definition(self, definitions: Any) -> None:
+            return None
+
+    routing_contract.register(_Broken())
+    with pytest.raises(routing_contract.UnavailableRouting) as raised:
+        routing_contract.select("broken_injection", DEFINITIONS)
+    assert "use_definitions" in str(raised.value) and "broken_injection" in str(raised.value)
+
+
 def test_sessions_are_created_for_the_departments_of_the_item_form():
     # 验收第 1 条的会话那一半：建会话收事项那份形态的部门清单；不给时按进程加载的定义（直接建 run 的调用）
     factory = SessionFactory()
@@ -198,6 +219,39 @@ def test_sessions_are_created_for_the_departments_of_the_item_form():
     assert tuple(sessions) == RENAMED_NAMES
     assert factory.get("run-1", "inspector").department == "inspector"
     assert tuple(factory.create_run_sessions("run-2")) == DEFINITIONS.departments
+
+
+def test_sessions_are_rebuilt_from_the_projection_of_a_renamed_item(tmp_path):
+    # 环境层问会话时会话表里还没有这个部门：按投影里的部门补建，不按进程加载的定义建那三个会话
+    view = RunProjection(run_id="run-1")
+    view.sessions = {"spec_owner": SessionRecord(session_id="ses_spec", department="spec_owner", status="idle")}
+    factory = SessionFactory()
+    workspaces = Workspaces(tmp_path / "runs", view=lambda run_id: view, writes=None, artifacts=None,
+                            sessions=factory)
+    assert workspaces.session_of("run-1", "spec_owner")[0] == "ses_spec"
+    assert factory.get("run-1", "spec_owner").session_id == "ses_spec"
+    with pytest.raises(KeyError):
+        factory.get("run-1", "product")
+
+
+def test_the_default_ask_recipient_follows_the_proposal_contract():
+    # 顺手去掉的第二处写死的部门名（工单 #1509）：默认收件人按提案合同取，默认定义下是能交 PRD 的产品；
+    # 给了收件人时照旧用给的那一个
+    assert json.loads(ask_turn().output[0]["arguments"])["recipient"] == "product"
+    assert json.loads(ask_turn("engineering").output[0]["arguments"])["recipient"] == "engineering"
+
+
+def test_the_default_ask_recipient_says_so_when_no_department_can_submit_a_product_spec(monkeypatch):
+    # 定义里没有能交 PRD 的部门时，默认收件人给不出来的原因写清楚，不悄悄退回某个部门名
+    class _NoProduct:
+        departments = ("only",)
+
+        def proposal_contract(self, department: str, kind: str) -> dict[str, Any]:
+            return {"kinds": {}}
+
+    monkeypatch.setattr(proposals, "DEFINITIONS", _NoProduct())
+    with pytest.raises(ValueError, match="product_spec"):
+        ask_turn()
 
 
 # ---------------------------------------------------------------------------
