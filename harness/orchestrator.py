@@ -84,8 +84,8 @@ from .workspace import WorkspaceSnapshot
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
 _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED})
 
-# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」）：定义里没有核验角色的事项，最后采纳的成果
-# 没有人独立核验，以这个停止原因结束，不写成放行。编号与 harness/definitions/stop_reasons.json 的那一条一致
+# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」）：事项最后采纳的成果没有核验角色核验时，
+# 以这个停止原因结束，不写成放行。编号与 harness/definitions/stop_reasons.json 的那一条一致
 OPEN_LOOP_STOP_REASON = "open_loop"
 
 
