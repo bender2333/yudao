@@ -39749,6 +39749,10 @@
             "title": "Session Id",
             "type": "string"
           },
+          "trial_session_id": {
+            "title": "Trial Session Id",
+            "type": "string"
+          },
           "department": {
             "title": "Department",
             "type": "string"
@@ -39791,6 +39795,7 @@
         "required": [
           "case_id",
           "session_id",
+          "trial_session_id",
           "department",
           "activation_id",
           "product_spec_hash",

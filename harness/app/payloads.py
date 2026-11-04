@@ -1506,12 +1506,14 @@ class TrialSessionEndedPayload(Payload):
 
 
 class TrialCaseOpenedPayload(Payload):
-    # 一个试用用例的开始（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：用例身份、所在会话、
-    # 部门与激活、当前 ProductSpec 的内容摘要、会话的试用副本树摘要（放行时按它核对用例属于当前交付）、
+    # 一个试用用例的开始（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：用例身份、部门会话
+    # （哪些动作是它的步骤）与试用会话（会话结束或中断时用例结束为中断）两个身份、部门与激活、
+    # 当前 ProductSpec 的内容摘要、试用副本的树摘要（放行时按它核对用例属于当前交付）、
     # 引用的验收条件与计划（标题、操作、预期结果）。之后这个部门在同一会话中的浏览器与屏幕动作由投影
     # 记为它的步骤
     case_id: str
     session_id: str
+    trial_session_id: str
     department: Department
     activation_id: str
     product_spec_hash: str

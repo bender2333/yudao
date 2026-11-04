@@ -33,6 +33,7 @@ from harness.write_path import NewEvent, WritePath
 
 SESSION = "ses_quality_1"
 OTHER_SESSION = "ses_quality_2"
+TRIAL = "trial_session_1"
 ACTIVATION = "act_quality_1"
 SPEC_HASH = "sha256:spec"
 TREE_DIGEST = "sha256:delivery"
@@ -65,7 +66,8 @@ def _opened(case_id: str = "case_1", *, criteria=("AC1",), session_id: str = SES
             spec_hash: str = SPEC_HASH) -> NewEvent:
     return NewEvent(EventType.TRIAL_CASE_OPENED, state_before="running", state_after="running",
                     actor="department:quality", department="quality", session_id=session_id,
-                    payload={"case_id": case_id, "session_id": session_id, "department": "quality",
+                    payload={"case_id": case_id, "session_id": session_id, "trial_session_id": TRIAL,
+                             "department": "quality",
                              "activation_id": activation_id, "product_spec_hash": spec_hash,
                              "tree_digest": tree_digest, "criteria": list(criteria), "title": "待办清单",
                              "plan": ["打开页面", "添加一条待办"], "expected": "列表里出现这条待办"})
@@ -99,7 +101,7 @@ def _concluded(result: str, *, case_id: str = "case_1", evidence=(), reason: str
                              "reason": reason})
 
 
-def _session_ended(*, session_id: str = SESSION) -> NewEvent:
+def _session_ended(*, session_id: str = TRIAL) -> NewEvent:
     return NewEvent(EventType.TRIAL_SESSION_ENDED, state_before="running", state_after="running",
                     actor="system", department="quality", payload={"session_id": session_id,
                                                                    "department": "quality", "kind": "web",
@@ -222,13 +224,13 @@ def test_a_step_without_a_result_or_handed_back_stays_unknown(tmp_path):
 
         # 用例结束成 passed 被拒绝：结果未知的步骤不让它通过
         outcome = trial_case_end({"result": "passed", "observed": "看到了", "evidence_steps": ["call-1"]},
-                                 projection=run.projection(), department="quality",
-                                 session={"session_id": SESSION, "tree_digest": TREE_DIGEST})
+                                 projection=run.projection(), department="quality", session_id=SESSION,
+                                 session={"session_id": TRIAL, "tree_digest": TREE_DIGEST})
         assert outcome.ok is False and "result is unknown" in outcome.error
         # 交成 failed 可以：未知的步骤可以作为不通过的理由
         outcome = trial_case_end({"result": "failed", "observed": "页面没有反应", "evidence_steps": ["call-1"]},
-                                 projection=run.projection(), department="quality",
-                                 session={"session_id": SESSION, "tree_digest": TREE_DIGEST})
+                                 projection=run.projection(), department="quality", session_id=SESSION,
+                                 session={"session_id": TRIAL, "tree_digest": TREE_DIGEST})
         assert outcome.ok is True and outcome.payload["result"] == "failed"
     finally:
         run.close()
@@ -285,7 +287,7 @@ def _with_cases(projection: RunProjection) -> RunProjection:
 def _open_case(*, case_id: str = "case_1", criteria=("AC1",), session_id: str = SESSION,
                activation_id: str = ACTIVATION, tree_digest: str = TREE_DIGEST, result=None,
                steps=()) -> TrialCase:
-    return TrialCase(case_id=case_id, session_id=session_id, department="quality",
+    return TrialCase(case_id=case_id, session_id=session_id, trial_session_id=TRIAL, department="quality",
                      activation_id=activation_id, product_spec_hash=SPEC_HASH, tree_digest=tree_digest,
                      criteria=list(criteria), title="待办清单", plan=["打开页面"], expected="看到待办",
                      status="open" if result is None else "concluded", result=result,
@@ -298,23 +300,23 @@ def test_begin_requires_a_running_session_no_other_case_and_existing_criteria():
     args = {"criteria": ["AC1"], "title": "待办清单", "steps": ["打开页面"], "expected": "看到待办"}
 
     missing = trial_case_begin(args, projection=_projection(), department="quality",
-                               activation_id=ACTIVATION, session=None)
+                               session_id=SESSION, activation_id=ACTIVATION, session=None)
     assert missing.ok is False and "trial session" in missing.error
 
     busy = trial_case_begin(args, projection=_projection(cases=[_open_case()]), department="quality",
-                            activation_id=ACTIVATION, session=session)
+                            session_id=SESSION, activation_id=ACTIVATION, session=session)
     assert busy.ok is False and "still open" in busy.error
 
     unknown = trial_case_begin({**args, "criteria": ["AC3"]}, projection=_projection(), department="quality",
-                               activation_id=ACTIVATION, session=session)
+                               session_id=SESSION, activation_id=ACTIVATION, session=session)
     assert unknown.ok is False and "AC3" in unknown.error
 
     bad_shape = trial_case_begin({**args, "criteria": ["a1"]}, projection=_projection(), department="quality",
-                                 activation_id=ACTIVATION, session=session)
+                                 session_id=SESSION, activation_id=ACTIVATION, session=session)
     assert bad_shape.ok is False and "AC<position>" in bad_shape.error
 
     opened = trial_case_begin(args, projection=_projection(), department="quality",
-                              activation_id=ACTIVATION, session=session)
+                              session_id=SESSION, activation_id=ACTIVATION, session=session)
     assert opened.ok is True and opened.event_type == EventType.TRIAL_CASE_OPENED
     assert opened.payload["session_id"] == SESSION and opened.payload["tree_digest"] == TREE_DIGEST
     assert opened.payload["product_spec_hash"] == SPEC_HASH and opened.payload["criteria"] == ["AC1"]
@@ -327,27 +329,27 @@ def test_end_requires_evidence_of_this_case_a_reason_when_unverified_and_no_unkn
     projection = _projection(cases=[_open_case(steps=steps)])
 
     none_open = trial_case_end({"result": "passed", "observed": "x", "evidence_steps": ["call-1"]},
-                               projection=_projection(), department="quality", session=session)
+                               projection=_projection(), department="quality", session_id=SESSION, session=session)
     assert none_open.ok is False and "no open trial case" in none_open.error
 
     stranger = trial_case_end({"result": "passed", "observed": "x", "evidence_steps": ["call-9"]},
-                              projection=projection, department="quality", session=session)
+                              projection=projection, department="quality", session_id=SESSION, session=session)
     assert stranger.ok is False and "not a step of trial case" in stranger.error
 
     no_evidence = trial_case_end({"result": "passed", "observed": "x", "evidence_steps": []},
-                                 projection=projection, department="quality", session=session)
+                                 projection=projection, department="quality", session_id=SESSION, session=session)
     assert no_evidence.ok is False and "at least one evidence step" in no_evidence.error
 
     no_reason = trial_case_end({"result": "unverified", "observed": "x", "evidence_steps": []},
-                               projection=projection, department="quality", session=session)
+                               projection=projection, department="quality", session_id=SESSION, session=session)
     assert no_reason.ok is False and "requires a reason" in no_reason.error
 
     bad_result = trial_case_end({"result": "interrupted", "observed": "x", "evidence_steps": []},
-                                projection=projection, department="quality", session=session)
+                                projection=projection, department="quality", session_id=SESSION, session=session)
     assert bad_result.ok is False and "passed, failed, or unverified" in bad_result.error
 
     passed = trial_case_end({"result": "passed", "observed": "列表里有这条待办", "evidence_steps": ["call-1"]},
-                            projection=projection, department="quality", session=session)
+                            projection=projection, department="quality", session_id=SESSION, session=session)
     assert passed.ok is True and passed.event_type == EventType.TRIAL_CASE_CONCLUDED
     assert passed.payload["evidence_steps"] == ["call-1"] and passed.payload["result"] == "passed"
 

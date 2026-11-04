@@ -1217,13 +1217,10 @@ class StepDriver:
 
     def _trial_session(self) -> dict[str, Any] | None:
         # 这个部门进行中的试用会话（身份与试用副本的树摘要）：用例打开时记下它，放行时按它核对当前交付
-        table = getattr(self._environment, "trials", None)
-        if table is None:
+        session = self._environment.trial_session(self._scope.department)
+        if session is None or session.get("status") != "running":
             return None
-        session = table.session_of(self._scope.run_id, self._scope.department)
-        if session is None or session.status != "running":
-            return None
-        return {"session_id": session.session_id, "tree_digest": session.tree_digest}
+        return {"session_id": str(session["session_id"]), "tree_digest": str(session["tree_digest"])}
 
     def _trial_case_call(self, name: str, args: dict[str, Any]) -> TrialCaseOutcome:
         # 试用用例的两个主机工具：输入与结论在控制这一侧核对，读的是当前的运行状态投影与本部门的会话
@@ -1231,9 +1228,10 @@ class StepDriver:
         scope = self._scope
         if name == TRIAL_CASE_BEGIN:
             return trial_case_begin(args, projection=projection, department=scope.department,
-                                    activation_id=scope.activation_id, session=self._trial_session())
+                                    session_id=scope.session_id or "", activation_id=scope.activation_id,
+                                    session=self._trial_session())
         return trial_case_end(args, projection=projection, department=scope.department,
-                              session=self._trial_session())
+                              session_id=scope.session_id or "", session=self._trial_session())
 
     def _trial_case_draft(self, outcome: TrialCaseOutcome) -> Any:
         # 用例事件与触发它的工具结果写在同一个事务里（工单 #1180）：两件事要么一起写进去，要么都不写
@@ -1251,11 +1249,11 @@ class StepDriver:
         if case is None:
             return None
         current = self._trial_session()
-        if current is not None and current["session_id"] == case.session_id:
+        if current is not None and current["session_id"] == case.trial_session_id:
             return None
         return self._recorder.trial_case_event(EventType.TRIAL_CASE_CONCLUDED, {
             "case_id": case.case_id,
-            "session_id": case.session_id,
+            "session_id": case.trial_session_id,
             "department": scope.department,
             "result": "interrupted",
             "observed": case.observed,
@@ -1351,7 +1349,8 @@ def _text_field(value: Any, field: str) -> tuple[str, str | None]:
 
 
 def trial_case_begin(args: dict[str, Any], *, projection: RunProjection, department: str,
-                     activation_id: str, session: dict[str, Any] | None) -> TrialCaseOutcome:
+                     session_id: str, activation_id: str,
+                     session: dict[str, Any] | None) -> TrialCaseOutcome:
     """打开一个试用用例（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）。
 
     主机的核对：本部门有进行中的试用会话；没有另一个打开的用例；引用的验收条件存在于当前 ProductSpec。
@@ -1393,7 +1392,9 @@ def trial_case_begin(args: dict[str, Any], *, projection: RunProjection, departm
     case_id = new_id("case")
     payload = {
         "case_id": case_id,
-        "session_id": session["session_id"],
+        # 部门会话与试用会话：前者决定哪些动作是它的步骤，后者结束或中断时用例结束为中断
+        "session_id": session_id,
+        "trial_session_id": session["session_id"],
         "department": department,
         "activation_id": activation_id,
         "product_spec_hash": spec.content_hash,
@@ -1409,7 +1410,7 @@ def trial_case_begin(args: dict[str, Any], *, projection: RunProjection, departm
                             None, EventType.TRIAL_CASE_OPENED, payload)
 
 
-def trial_case_end(args: dict[str, Any], *, projection: RunProjection, department: str,
+def trial_case_end(args: dict[str, Any], *, projection: RunProjection, department: str, session_id: str,
                    session: dict[str, Any] | None) -> TrialCaseOutcome:
     """结束一个试用用例并给出结论（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）。
 
@@ -1420,7 +1421,7 @@ def trial_case_end(args: dict[str, Any], *, projection: RunProjection, departmen
                                              "start one with trial_open first")
     case: TrialCase | None = next((item for item in projection.trial_cases
                                    if item.status == "open" and item.department == department
-                                   and item.session_id == session["session_id"]), None)
+                                   and item.session_id == session_id), None)
     if case is None:
         return TrialCaseOutcome(False, error="there is no open trial case in this session; "
                                              "open one with trial_case_begin first")

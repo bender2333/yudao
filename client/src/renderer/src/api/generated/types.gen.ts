@@ -18751,6 +18751,10 @@ export type TrialCaseOpenedPayload = {
      */
     session_id: string;
     /**
+     * Trial Session Id
+     */
+    trial_session_id: string;
+    /**
      * Department
      */
     department: string;

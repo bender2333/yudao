@@ -400,7 +400,10 @@ class TrialCase:
     # 一个试用用例：引用的验收条件、计划、实际步骤与结论。由 trial_case_opened/trial_case_concluded
     # 与期间的动作事件折叠而成，不另外保存
     case_id: str
+    # 部门会话的身份（用例打开期间这个会话里的浏览器与屏幕动作是它的步骤）与试用会话的身份
+    # （会话结束或中断时用例结束为中断）
     session_id: str
+    trial_session_id: str
     department: str
     activation_id: str
     product_spec_hash: str

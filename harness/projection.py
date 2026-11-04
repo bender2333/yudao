@@ -840,7 +840,8 @@ def _open_trial_case(state: RunProjection, event: Event) -> None:
     payload = event.payload
     state.trial_cases.append(TrialCase(
         case_id=str(payload["case_id"]),
-        session_id=str(payload["session_id"]),
+        session_id=str(payload.get("session_id") or event.session_id or ""),
+        trial_session_id=str(payload.get("trial_session_id") or ""),
         department=str(payload.get("department") or event.department or ""),
         activation_id=str(payload.get("activation_id") or ""),
         product_spec_hash=str(payload.get("product_spec_hash") or ""),
@@ -880,7 +881,7 @@ def _interrupt_trial_cases(state: RunProjection, event: Event) -> None:
     session_id = str(payload.get("session_id") or "")
     department = payload.get("department") or event.department
     for case in state.trial_cases:
-        if (case.status == TRIAL_CASE_STATUS_OPEN and case.session_id == session_id
+        if (case.status == TRIAL_CASE_STATUS_OPEN and case.trial_session_id == session_id
                 and case.department == department):
             case.status = TRIAL_CASE_STATUS_CONCLUDED
             case.result = "interrupted"
