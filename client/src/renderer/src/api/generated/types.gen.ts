@@ -18155,6 +18155,236 @@ export type ToolStartedPayload = {
 };
 
 /**
+ * TrialSessionEndedEvent
+ */
+export type TrialSessionEndedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_session_ended';
+    payload: TrialSessionEndedPayload;
+};
+
+/**
+ * TrialSessionEndedPayload
+ */
+export type TrialSessionEndedPayload = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Kind
+     */
+    kind: 'web' | 'desktop';
+    /**
+     * Reason
+     */
+    reason: 'stopped' | 'replaced' | 'interrupted' | 'user_stopped' | 'run_ended';
+    /**
+     * Pid
+     */
+    pid?: number | null;
+    /**
+     * Create Time
+     */
+    create_time?: number | null;
+    /**
+     * Ended
+     */
+    ended?: boolean;
+    /**
+     * Exit Code
+     */
+    exit_code?: number | null;
+};
+
+/**
+ * TrialSessionStartedEvent
+ */
+export type TrialSessionStartedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_session_started';
+    payload: TrialSessionStartedPayload;
+};
+
+/**
+ * TrialSessionStartedPayload
+ */
+export type TrialSessionStartedPayload = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Kind
+     */
+    kind: 'web' | 'desktop';
+    /**
+     * Launch Name
+     */
+    launch_name: string;
+    /**
+     * System
+     */
+    system: 'windows' | 'linux';
+    /**
+     * Port
+     */
+    port: number;
+    /**
+     * Ready Url
+     */
+    ready_url: string;
+    /**
+     * Tree Digest
+     */
+    tree_digest: string;
+    /**
+     * Source
+     */
+    source: 'delivery_snapshot' | 'workspace_seal';
+    /**
+     * Pid
+     */
+    pid?: number | null;
+    /**
+     * Create Time
+     */
+    create_time?: number | null;
+};
+
+/**
  * Usage
  */
 export type Usage = {
@@ -19373,6 +19603,10 @@ export type EventObject = ({
 } & McpServerClosedEvent) | ({
     type: 'mcp_server_failed';
 } & McpServerFailedEvent) | ({
+    type: 'trial_session_started';
+} & TrialSessionStartedEvent) | ({
+    type: 'trial_session_ended';
+} & TrialSessionEndedEvent) | ({
     type: 'run_done';
 } & RunDoneEvent) | ({
     type: 'run_paused';

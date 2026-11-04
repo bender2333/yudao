@@ -217,6 +217,9 @@ _LABELS: dict[str, str] = {
     EventType.MCP_SERVER_STARTED: "启动了 MCP 服务器 {server}（{transport}）",
     EventType.MCP_SERVER_CLOSED: "关闭了 MCP 服务器 {server}（{transport}）",
     EventType.MCP_SERVER_FAILED: "MCP 服务器 {server} 启动失败：{error}",
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 12 节，工单 #1183）
+    EventType.TRIAL_SESSION_STARTED: "开始了试用会话（{department}，{launch_name}，第 {port} 号端口）",
+    EventType.TRIAL_SESSION_ENDED: "结束了试用会话（{department}，{reason}）",
     EventType.RUN_DONE: "运行结束：{stop_reason}",
     EventType.RUN_PAUSED: "运行暂停，等待用户处理：{stop_reason}",
     EventType.RUN_CONTINUED: "运行从暂停位置继续",

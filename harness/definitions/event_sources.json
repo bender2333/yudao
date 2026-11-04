@@ -301,5 +301,11 @@
   },
   "mcp_server_failed": {
     "source": "host_measurement"
+  },
+  "trial_session_started": {
+    "source": "host_measurement"
+  },
+  "trial_session_ended": {
+    "source": "host_measurement"
   }
 }

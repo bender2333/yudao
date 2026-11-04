@@ -1456,6 +1456,40 @@ class McpServerFailedPayload(Payload):
     error: str
 
 
+class TrialSessionStartedPayload(Payload):
+    # 一个试用会话的开始（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）：会话身份、部门、
+    # 种类、启动方式的名称、选用命令的系统、端口与就绪地址、试用副本的树摘要与清单来源，以及
+    # 交付软件直接子进程的进程号与创建时间——Yudao 启动时按后两项结束进程崩溃留下的遗留进程树，
+    # 所以它们必须随事件保存。完整的启动方式不在这里重复记一份：它是模型给出的工具参数，
+    # 已经按 ADR-0038 脱敏记在工具事件里
+    session_id: str
+    department: Department
+    kind: Literal["web", "desktop"]
+    launch_name: str
+    system: Literal["windows", "linux"]
+    port: int
+    ready_url: str
+    tree_digest: str
+    source: Literal["delivery_snapshot", "workspace_seal"]
+    pid: int | None = None
+    create_time: float | None = None
+
+
+class TrialSessionEndedPayload(Payload):
+    # 一个试用会话的结束（工单 #1183）：与开始事件按（run、会话身份）配对。reason 是结束方式：
+    # 停止（trial_stop）、被新会话替换（replaced）、持有会话的进程重新启动（interrupted）、
+    # 用户停止（user_stopped，桌面会话的「停止使用桌面」）、run 结束（run_ended）；
+    # ended 说明这一次是否真的结束了仍然存活的进程（启动时结束遗留进程并补写时用）
+    session_id: str
+    department: Department
+    kind: Literal["web", "desktop"]
+    reason: Literal["stopped", "replaced", "interrupted", "user_stopped", "run_ended"]
+    pid: int | None = None
+    create_time: float | None = None
+    ended: bool = False
+    exit_code: int | None = None
+
+
 class WorkItemStartFailedPayload(Payload):
     work_item_id: str
     run_id: str
@@ -1843,6 +1877,9 @@ PAYLOADS: dict[str, Any] = {
     EventType.MCP_SERVER_STARTED: McpServerStartedPayload,
     EventType.MCP_SERVER_CLOSED: McpServerClosedPayload,
     EventType.MCP_SERVER_FAILED: McpServerFailedPayload,
+    # 试用会话的开始与结束（工单 #1183）：应用事件，run 流
+    EventType.TRIAL_SESSION_STARTED: TrialSessionStartedPayload,
+    EventType.TRIAL_SESSION_ENDED: TrialSessionEndedPayload,
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,
