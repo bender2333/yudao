@@ -94,3 +94,71 @@ def test_real_repo_runs_and_m3_conforms_to_itself():
     assert "角色" in facts.kinds
     viol, leak = cli.layering(REAL_REPO)
     assert all(len(r) == 5 for r in viol + leak)
+
+
+T1 = "w.md#文 > 1. 事实放在哪 > 表1"
+T9 = "w.md#文 > 9. 技能 > 表1"
+T11 = "w.md#文 > 11. 写法 > 表2"
+CANON2 = {
+    "vocab": {"可否": ["可以"], "载体": ["总图", "设计说明", "工单正文", "子工单"]},
+    "载体别名": {},
+    "tables": {
+        T1: {
+            "key": "事实",
+            "node": "事实",
+            "carrier_column": "位置",
+            "aliases": {"工单正文、依赖、子工单": ["工单正文", "依赖", "子工单"]},
+            "columns": {"谁改": {"fact": "由谁改", "many": True, "vocab": "角色"}},
+        },
+        T9: {"key": "", "columns": {"用户在场": {"fact": "在场可否", "many": False, "vocab": "可否"}}},
+        T11: {"key": "两边", "columns": {"以谁为准": {"fact": "以谁为准", "prevail": True}}},
+    },
+}
+KEYS2 = {T1: ["系统的形状", "工单正文、依赖、子工单", "合并"], T9: ["改意图"], T11: ["总图与设计说明"]}
+OVERLAY = {
+    "tables": {T9: {"node": "动作"}, T11: {"between": "载体"}},
+    "kinds": [{"name": "路径"}],
+    "relations": [{"name": "关于", "from": "事实", "to": "载体", "card": "multi"}],
+}
+LOCATED = {T1: {"总图": "系统的形状", "docs/architecture.html": "系统的形状"}}
+
+
+def remodel(**kw):
+    args = dict(overlay=OVERLAY, prevails=[("总图", "设计说明")], located=LOCATED)
+    args.update(kw)
+    return compile_facts(CANON2, ROLES, KEYS2, **args)
+
+
+def test_carrier_alias_becomes_about_not_alias():
+    s = {str(x) for x in remodel().symbols}
+    assert 'about("工单正文、依赖、子工单","工单正文","aliases")' in s
+    assert 'about("工单正文、依赖、子工单","子工单","aliases")' in s
+    assert 'alias("依赖","工单正文、依赖、子工单","w.md#文 > 1. 事实放在哪 > 表1")' in s
+    assert not any(x.startswith('alias("工单正文"') for x in s)
+    assert 'about("系统的形状","总图","位置")' in s
+    assert 'located_in("系统的形状","docs/architecture.html")' in s
+    found = check(remodel())
+    assert found["alias_shadows"] == []
+    assert found["fact_no_carrier"] == [("合并",)]
+
+
+def test_overlay_fills_the_two_gaps_without_touching_canon():
+    found = check(remodel())
+    assert found["rel_no_domain"] == []
+    s = {str(x) for x in remodel().symbols}
+    assert 'instance_of("改意图","动作")' in s
+    assert 'rel("以谁为准","载体","载体","multi","w.md#文 > 11. 写法 > 表2")' in s
+    assert check(compile_facts(CANON2, ROLES, KEYS2))["rel_no_domain"] != []
+
+
+def test_prevail_cycle_and_overlay_conflict():
+    found = check(remodel(prevails=[("总图", "设计说明"), ("设计说明", "总图")]))
+    assert found["prevail_cycle"] == [("总图", "设计说明")]
+    canon = {**CANON2, "tables": {**CANON2["tables"], T9: {**CANON2["tables"][T9], "node": "事"}}}
+    found = check(compile_facts(canon, ROLES, KEYS2, overlay=OVERLAY))
+    assert found["overlay_conflict"] == [(T9, "动作", "事")]
+
+
+def test_real_repo_has_no_word_used_two_ways():
+    found = check(compile_repo(REAL_REPO))
+    assert found["alias_shadows"] == [] and found["rel_no_domain"] == []

@@ -38,8 +38,18 @@ CHECKS = [
     ("alias_shadows", "别名和另一个种类的实例同名（一个词指两样东西；可能有意，比如载体和事实同名，要人看）"),
     ("alias_dangling", "别名指向的东西不是任何种类的实例"),
     ("group_bad_member", "合称的成员不是角色"),
+    ("about_bad_source", "「关于」的起点不是第 1 节的一行"),
+    ("about_bad_target", "「关于」的终点不是载体"),
+    ("located_bad", "「放在」的起点不是第 1 节的一行"),
+    ("prevail_bad", "以谁为准的一边不是载体"),
+    ("prevail_cycle", "以谁为准成环"),
+    ("overlay_conflict", "overlay.json 和 canon.json 给同一张表声明了不同的种类"),
 ]
-GAPS = [("rel_no_domain", "待补：关系所在的表没有声明 node，起点种类空着")]
+GAPS = [
+    ("rel_no_domain", "待补：关系所在的表没有声明 node，overlay.json 也没有，起点种类空着"),
+    ("fact_no_carrier", "待补：第 1 节这一行说不出它关于哪个载体、放在哪个路径"),
+    ("overlay_redundant", "提醒：canon.json 已经自己声明了，overlay.json 里这一条可以删"),
+]
 
 
 def repo_root(arg):
@@ -57,7 +67,7 @@ def selfcheck(facts):
 def format_selfcheck(facts, found):
     kinds = sorted(facts.kinds)
     lines = [
-        f"本体第一块：{len(kinds)} 个种类，{len(facts.rels)} 条关系声明（来自 canon.json、roles.json，层都是脚手架）",
+        f"本体第一块：{len(kinds)} 个种类，{len(facts.rels)} 条关系声明（来自 canon.json、roles.json，本体自己加的在 overlay.json；层都是脚手架）",
         "种类：" + "、".join(kinds),
     ]
     n = 0
