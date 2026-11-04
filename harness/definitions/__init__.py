@@ -50,10 +50,10 @@ ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]]
 # 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明第 18 节）
 ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
 
-# 取回工具（网络与 MCP 设计说明第 5.1、12.4 节）：部门按定义都有这两个工具；以关闭取回的启动参数（`--no-fetch`）
-# 运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里不动：取舍发生在
-# 「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，因此一处生效。
-# 评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明第 3 节）
+# 取回工具（网络与 MCP 设计说明第 5.1、12.4 节）：部门按定义都有这两个工具；以关闭取回的启动参数
+# （`--no-fetch`）运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里
+# 不动：取舍发生在「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，
+# 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明第 3 节）
 FETCH_TOOLS: tuple[str, ...] = ("fetch_url", "read_external_source")
 
 # 取回是否可用：进程范围的启动设置，默认可用；只在启动时由命令行改一次（工单 #1172）
@@ -587,6 +587,7 @@ class EventSource(_Definition):
     source: SourceKind
     # 载荷字段名 → 这个字段的来源种类
     fields: Mapping[Identifier, SourceKind] = Field(default_factory=dict)
+
 
 
 class Routing(_Definition):

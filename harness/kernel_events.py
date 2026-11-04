@@ -89,7 +89,7 @@ class ProjectEventType:
     PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
     # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
-    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本， 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
+    # 项目设置里的 MCP 服务器（工单 #236）
     MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
     # 项目的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：项目现在用发布带的哪一份，
     # 带原值、新值与理由；事项创建时冻结形态名与它的定义版本
@@ -105,6 +105,8 @@ class ProjectEventType:
     WRITEBACK_NOT_NEEDED = "writeback_not_needed"
     WRITEBACK_HELD = "writeback_held"
     WRITEBACK_VERIFIED = "writeback_verified"
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本， 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
+    MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
 
 
 class CatalogEventType:
