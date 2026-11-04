@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 from harness.adapters.fake import FakeAdapter
@@ -25,6 +26,7 @@ from harness.definitions import (DEFAULT_FORM, DEFINITIONS, VerificationDeclarat
                                  VerifierRole)
 from harness.event_store import project_stream
 from harness.models import EventType, ProjectEventType
+from harness.orchestrator import Orchestrator
 from harness.runtime import LoopSystem
 from harness.tests.helpers import delivery_turn, merge_scripts, product_spec, quality_turns
 from harness.tightening import WATCHED_OUTPUTS
@@ -205,5 +207,12 @@ def test_the_away_report_counts_open_loop_completions_apart_from_releases(tmp_pa
 
 
 def test_a_creation_event_without_the_field_reads_as_not_open_loop():
-    # 只增的读法：旧事项的创建事件没有这个字段，按「不是开环」读——那时只有默认的三部门，有核验角色
+    # 只增的读法：旧事项的创建事件没有这个字段，按「不是开环」读——那时只有默认的三部门，有核验角色。
+    # 读的是薄驱动取这个事实的那一处（recorded_open_loop），不只是载荷类型的缺省值：把那一处的缺省读反，
+    # 这条用例会失败
     assert RunCreatedPayload.model_fields["open_loop"].default is False
+    old = SimpleNamespace(type=EventType.RUN_CREATED, payload={"task": "旧事项", "kind": "change"})
+    with_field = SimpleNamespace(type=EventType.RUN_CREATED, payload={"task": "新事项", "open_loop": True})
+    for events, expected in (([old], False), ([with_field], True), (([old, with_field]), False)):
+        reader = SimpleNamespace(store=SimpleNamespace(list_events=lambda _run_id, _events=events: _events))
+        assert Orchestrator.recorded_open_loop(reader, "run_any") is expected
