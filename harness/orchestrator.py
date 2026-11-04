@@ -84,6 +84,10 @@ from .workspace import WorkspaceSnapshot
 # 由用户提出的事件：输入与部门指导（提出者为 user:local）
 _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED})
 
+# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」）：定义里没有核验角色的事项，最后采纳的成果
+# 没有人独立核验，以这个停止原因结束，不写成放行。编号与 harness/definitions/stop_reasons.json 的那一条一致
+OPEN_LOOP_STOP_REASON = "open_loop"
+
 
 def guidance_version(projection: RunProjection, department: str) -> int:
     # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（设计说明第 4 节，S1d），
@@ -483,6 +487,10 @@ class Orchestrator:
             self.store, project_id=project_id, definitions_version=frozen_definitions_version,
             item_limits=item_limits,
         )
+        # 事项创建时按冻结的定义算出是不是开环（工单 #1394，形态与核验角色设计说明「开环完成」与
+        # 「定义的校验」第 4 条）：定义里没有核验角色，最后采纳的成果没有人独立核验，记进创建事件；
+        # 进入完成状态时按这条记下的事实取停止原因，不重新算。核验角色取自 #1388 的核验声明
+        open_loop = not definitions.verifier_roles()
         run_created = NewEvent(
             EventType.RUN_CREATED,
             actor="system",
@@ -511,6 +519,8 @@ class Orchestrator:
                 "definitions_version": frozen_definitions_version,
                 # 事项创建时冻结的形态名（工单 #1392）：这个 run 的部门、路由与停止原因都按它的那份定义
                 "form": frozen_form.name,
+                # 事项创建时按冻结的定义算出的开环标记（工单 #1394）：为真时这个事项以开环完成结束
+                "open_loop": open_loop,
                 "parameters_version": parameter_values.current_version(self.store),
                 "parameters": frozen_parameters,
                 # 事项创建时冻结的 MCP 服务器设置（工单 #236）：与事项创建事实同一份；没有时为空
@@ -1210,6 +1220,14 @@ class Orchestrator:
             if event.type == EventType.RUN_CREATED:
                 return (event.payload or {}).get("form")
         return None
+
+    def recorded_open_loop(self, run_id: str) -> bool:
+        # run_created 里记下的开环标记（工单 #1394）：创建时按冻结的定义算出的事实。
+        # 旧事件没有这个字段时按不是开环读：那时的定义只有默认的三部门，有核验角色
+        for event in self.store.list_events(run_id):
+            if event.type == EventType.RUN_CREATED:
+                return bool((event.payload or {}).get("open_loop", False))
+        return False
 
     def item_form_available(self, run_id: str) -> bool:
         # 这个 run 冻结的形态在发布里（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：
@@ -2153,8 +2171,10 @@ class Orchestrator:
             return
         # 只有质检的放行与基线核验的一致结论结束事项（工单 #556）：结束以后控制核心不再决定下一个谁工作
         if ends_run:
-            # 进入完成状态的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified
-            stop_reason = self.item_definitions(projection.run_id).work_item(projection.kind).stop_reason
+            # 进入完成状态的停止原因按 run 的事项种类取自定义：普通事项为 released，建档事项为 baseline_verified。
+            # 开环事项按创建时记下的开环标记以开环完成结束（工单 #1394）：没有核验角色核验，记录上不写成放行
+            stop_reason = (OPEN_LOOP_STOP_REASON if self.recorded_open_loop(projection.run_id)
+                           else self.item_definitions(projection.run_id).work_item(projection.kind).stop_reason)
             self._withdraw_decisions(transaction, stop_reason)
             transaction.append(NewEvent(
                 EventType.RUN_DONE,

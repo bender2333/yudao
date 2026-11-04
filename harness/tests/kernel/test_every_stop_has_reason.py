@@ -49,9 +49,9 @@ def _reasons() -> dict:
 
 def test_every_baseline_ends_with_a_reasoned_stop_event_or_waits():
     reasons = _reasons()
-    # 封闭清单的项数：18 项（第 18 项是 user_cancelled，用户放弃建档，工单 #707，
-    # 依据是决策记录「M0 走查问题的五项口径」第 2 项）
-    assert len(reasons) == 19, f"停止原因的封闭清单有 {len(reasons)} 项"
+    # 封闭清单的项数：20 项（第 18 项是 user_cancelled，用户放弃建档，工单 #707，依据是决策记录
+    # 「M0 走查问题的五项口径」第 2 项；第 20 项是 open_loop，开环完成，工单 #1394）
+    assert len(reasons) == 20, f"停止原因的封闭清单有 {len(reasons)} 项"
     checked = 0
     for path in sorted(BASELINE_DIR.glob("*.json")):
         document = json.loads(path.read_text(encoding="utf-8"))
@@ -169,6 +169,21 @@ def _ending(reason: str, *, event_type: str = "run_failed", department: str = "p
     return write_path.NewEvent(event_type, state_before="running", state_after="failed", actor="system",
                                department=department, stop_reason=reason,
                                payload={"stop_reason": reason})
+
+
+def test_the_open_loop_reason_ends_a_run_as_done():
+    # 工单 #1394：开环完成的结果是完成，去向是 run_done。写入口收下它，状态迁移与载荷里的原因
+    # 与清单一致；写成暂停或失败被拒绝（原因规定的结束方式与事件对不上）
+    writes, _store = _writes()
+    [event] = writes.append(run_stream("run_open_loop"), write_path.NewEvent(
+        "run_done", state_before="running", state_after="done", actor="system", department="product",
+        stop_reason="open_loop", payload={"stop_reason": "open_loop"}))
+    assert (event.type, event.stop_reason, event.state_after) == ("run_done", "open_loop", "done")
+    assert _reasons()["open_loop"]["outcome"] == "done"
+    with pytest.raises(ValueError, match="open_loop"):
+        writes.append(run_stream("run_open_loop_failed"), write_path.NewEvent(
+            "run_failed", state_before="running", state_after="failed", actor="system", department="product",
+            stop_reason="open_loop", payload={"stop_reason": "open_loop"}))
 
 
 def test_the_write_path_takes_the_stop_reason_of_the_matter_definition():

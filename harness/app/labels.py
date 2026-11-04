@@ -24,6 +24,13 @@ if set(STATUS_NAMES) != set(RUN_STATUSES):
 
 # 停止原因的中文名来自定义（stop_reasons.json 与路由自己的结束原因，工单 #861）
 STOP_REASON_NAMES = {reason: definition.label for reason, definition in DEFINITIONS.stop_reasons.items()}
+
+# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」）：没有核验角色的事项以这个停止原因结束。
+# 编号与 stop_reasons.json 的那一条一致，中文名取自那份定义（「开环完成」，不含「放行」二字），
+# 报告与汇总按它把开环完成与放行分开算，不另写一份文字
+OPEN_LOOP_STOP_REASON = "open_loop"
+OPEN_LOOP_LABEL = STOP_REASON_NAMES[OPEN_LOOP_STOP_REASON]
+
 DECISION_KIND_NAMES: dict[str, str] = {
     "model_unavailable": "模型引用无法使用，等待恢复",
     "no_tool_call": "已暂停（模型没有调用工具），等待继续",
