@@ -26,6 +26,7 @@ from harness.app.contracts import Accepted, Rejected
 from harness.app.form_commands import ORGANIZATION_ADOPT, OrganizationAdopt
 from harness.app.form_queries import PROJECT_ORGANIZATION, ProjectOrganization
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, VerificationDeclaration
+from harness.direct import SINGLE_ROLE_DIRECT
 from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
 from harness.tests import second_routing
@@ -281,7 +282,11 @@ def test_the_query_answers_from_the_release_the_cli_loaded_without_an_assembly(t
     organization = _organization(application, project_id)
     assert (organization.form, organization.version, organization.form_in_release) == (
         DEFAULT_FORM, DEFINITIONS.version, True)
-    assert [choice.form for choice in organization.forms] == [DEFAULT_FORM]
+    # 发布带的两份形态都列出来（工单 #1395 加了单角色直做）：说明与开环与否由每份定义得出
+    assert [choice.form for choice in organization.forms] == [DEFAULT_FORM, SINGLE_ROLE_DIRECT]
+    single = next(choice for choice in organization.forms if choice.form == SINGLE_ROLE_DIRECT)
+    assert (single.verifier_roles, single.open_loop) == ([], True)
+    assert single.description == "工程；没有核验角色，事项以开环完成结束。"
     application.close()
 
 
