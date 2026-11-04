@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Literal, Mapping
 
+from ..definitions import DEFINITIONS
 from ..models import DEPARTMENTS, CatalogEventType, EventType, ProjectEventType
 from ..providers import DEFAULT_TIMEOUT_SEC, capabilities
 from ..providers.errors import CatalogValidationError
@@ -120,6 +121,13 @@ class CatalogBinding(Contract):
     requested_tier: str | None = None
 
 
+class CatalogDepartment(Contract):
+    # 部门默认可选的部门（工单 #1457）：这一版加载的定义里的部门，标识与显示名。
+    # 模型的部门使用一栏按它列，不再由客户端写死三个部门
+    id: str
+    label: str
+
+
 class CatalogPresets(Contract):
     # 服务方案预置表与它的 revision 与来源
     revision: str
@@ -149,6 +157,8 @@ class Catalog(Contract):
     models: list[CatalogModel]
     admissions: list[CatalogAdmission]
     bindings: dict[str, CatalogBinding]
+    # 这一版加载的定义里的部门（工单 #1457）：部门使用一栏的部门清单与显示名取自这里
+    departments: list[CatalogDepartment]
     # 部门默认当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）
     department_reminders: dict[str, list[str]]
     # 目录中每条模型访问定义在各部门的建议能力提醒（模型 ID → 部门 → 提醒）：
@@ -250,6 +260,10 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
         models=[_model(item) for item in view["models"]],
         admissions=[CatalogAdmission.model_validate(item) for item in view["admissions"]],
         bindings=bindings,
+        # 部门使用一栏的部门（工单 #1457）：这一版加载的定义里的部门与它们的显示名
+        departments=[CatalogDepartment(id=department,
+                                      label=DEFINITIONS.department_labels.get(department, department))
+                     for department in DEFINITIONS.departments],
         selections=view["selections"],
         # 部门默认各自当前绑定的模型的建议能力提醒（设计说明第 5.6 节）
         department_reminders={department: facade.model_reminders(

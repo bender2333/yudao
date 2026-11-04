@@ -330,12 +330,14 @@ export interface DepartmentsLinePart {
 export function departmentsLineParts(
   departments: Record<string, DepartmentStateView> | null | undefined,
   current: string | null,
+  // 部门显示名（工单 #1457）：组织给出了就用它，没有时按页面上原来的写法
+  labels: Record<string, string> = {},
 ): DepartmentsLinePart[] | null {
   if (!departments || Object.keys(departments).length === 0) {
     return null;
   }
   return Object.keys(departments).map((department) => ({
-    text: `${departmentName(department)} ${departmentStateText(departments[department])}`,
+    text: `${labels[department] ?? departmentName(department)} ${departmentStateText(departments[department])}`,
     current: department === current,
   }));
 }
@@ -344,8 +346,9 @@ export function departmentsLineParts(
 // 没有 departments（事项没有进行中的 run）时返回 null，由调用处照旧写「所在部门：X」。
 export function departmentsText(
   departments: Record<string, DepartmentStateView> | null | undefined,
+  labels: Record<string, string> = {},
 ): string | null {
-  return departmentsLineParts(departments, null)?.map((part) => part.text).join(" · ") ?? null;
+  return departmentsLineParts(departments, null, labels)?.map((part) => part.text).join(" · ") ?? null;
 }
 
 // 房间信息里的传信管一行（原型 v12 第 3.3 节、工单 #905）：N 封询问等待本部门回答，

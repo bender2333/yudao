@@ -10,9 +10,19 @@
 
 import type { WorkItemCard } from "../../api/generated/types.gen";
 import { departmentName } from "./labels.ts";
+import { boardDepartments, type DepartmentView } from "./organization.ts";
 
 // 按状态分的四组，与事项的部门无关
 export type FixedBoardGroup = "queue" | "released" | "adopted" | "stopped";
+
+// 看板上的部门从事实来（工单 #1457）：项目现在组织里的部门与每个事项冻结的组织里的部门。
+// 两样都没有时（旧服务、查询还没有数据）按事项卡片上的 departments 推导，与原来的做法一样
+export interface BoardOrganization {
+  /** 项目现在组织里的部门，按定义里的顺序 */
+  departments?: readonly DepartmentView[];
+  /** 每个事项冻结的组织里的部门（project.loop 的 organization.roles） */
+  itemDepartments?: Record<string, readonly DepartmentView[]>;
+}
 
 export const BOARD_TITLES: [FixedBoardGroup, string][] = [
   ["queue", "排队中"], ["released", "已放行"], ["adopted", "已采纳"], ["stopped", "已停止"],
@@ -86,9 +96,37 @@ function departmentsOf(item: WorkItemCard): string[] {
   return item.department ? [item.department] : [];
 }
 
-export function boardColumns(items: WorkItemCard[]): BoardColumns {
+// 部门列标题用的显示名：项目现在组织里的部门与事项冻结的组织里的部门都算；都没有时用页面上原来的写法
+function departmentTitles(organization: BoardOrganization): Record<string, string> {
+  const titles: Record<string, string> = {};
+  for (const department of organization.departments ?? []) {
+    if (!(department.id in titles)) {
+      titles[department.id] = department.label;
+    }
+  }
+  for (const departments of Object.values(organization.itemDepartments ?? {})) {
+    for (const department of departments) {
+      if (!(department.id in titles)) {
+        titles[department.id] = department.label;
+      }
+    }
+  }
+  return titles;
+}
+
+export function boardColumns(items: WorkItemCard[], organization: BoardOrganization = {}): BoardColumns {
   const columns: BoardColumns = { queue: [], departments: [], released: [], adopted: [], stopped: [] };
-  const byDepartment = new Map<string, WorkItemCard[]>(definitionDepartments(items).map((department) => [department, []]));
+  // 部门列的部门：组织里有数据时取项目现在组织里的部门 + 还在跑的事项里旧组织的部门（工单 #1457）；
+  // 没有时按事项卡片上的 departments 推导（旧服务、查询还没有数据）
+  const columnDepartments = organization.departments === undefined
+    ? definitionDepartments(items)
+    : boardDepartments({
+      current: organization.departments,
+      items,
+      itemDepartments: organization.itemDepartments ?? {},
+    }).map((department) => department.id);
+  const titles = departmentTitles(organization);
+  const byDepartment = new Map<string, WorkItemCard[]>(columnDepartments.map((department) => [department, []]));
   for (const item of items) {
     const fixed = fixedGroupOf(item);
     if (fixed !== null) {
@@ -111,14 +149,14 @@ export function boardColumns(items: WorkItemCard[]): BoardColumns {
     }
   }
   columns.departments = [...byDepartment.entries()].map(([department, groupItems]) => ({
-    department, title: departmentName(department), items: groupItems,
+    department, title: titles[department] ?? departmentName(department), items: groupItems,
   }));
   return columns;
 }
 
 // 界面按显示顺序用的一组一组（排队中、各部门、已放行、已采纳、已停止）
-export function boardGroups(items: WorkItemCard[]): BoardGroup[] {
-  const columns = boardColumns(items);
+export function boardGroups(items: WorkItemCard[], organization: BoardOrganization = {}): BoardGroup[] {
+  const columns = boardColumns(items, organization);
   return [
     { key: "queue", title: fixedTitle("queue"), items: columns.queue },
     ...columns.departments.map((column) => ({

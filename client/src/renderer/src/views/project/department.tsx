@@ -29,11 +29,13 @@ import { RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
 import { scopeName } from "./scope-name";
+import { defaultDepartment, departmentLabel, departmentLabels, type DepartmentView } from "./organization";
 import { readFailureText } from "../../contract/read-failure";
 
-export function DepartmentPage(props: { app: ClientApp; route: Route }) {
+export function DepartmentPage(props: { app: ClientApp; route: Route; departments: DepartmentView[] }) {
   const projectId = props.route.projectId ?? "";
-  const department = props.route.department ?? "product";
+  // 部门页的默认部门取自项目现在的组织（工单 #1457）：地址里写了就用地址里的，没有时取第一个部门
+  const department = defaultDepartment(props.route.department, props.departments);
   // 顶栏没有选中事项时取进行中的那一项，其次取最近一项；与资料页的取法相同，
   // 部门工作间的状态、消息与检查区都需要一个事项才有内容可显示
   const picked = useSnapshot<ProjectOverviewResult>(props.app, "page.dept.pick", "project.overview", {
@@ -49,7 +51,14 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
     project_id: projectId,
     department,
     work_item: workItem,
+  }, workItem === null || department === "");
+  // 这个事项冻结的组织（工单 #1381）：部门名与这一行部门状态按它列，中途换了形态时老事项仍按旧组织
+  const loop = useSnapshot<ProjectLoopResult>(props.app, "page.dept.loop", "project.loop", {
+    project_id: projectId,
+    work_item: workItem ?? "",
   }, workItem === null);
+  const loopItem = (loop.data?.work_items ?? []).find(
+    (entry) => entry.work_item_id === workItem) ?? null;
   const data = workspace.data;
   // 事项标识取不到时 department.workspace 不被打开：那一处没有读取动作，页面显示空态，
   // 不显示「正在读取数据」（工单 #295 第 3 项）
@@ -69,10 +78,13 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
         // 部门工作间读不出来：这一处本来有内容（工单 #775）
         <p className="y10-note note" role="status">{readFailureText(workspace.error)}</p>
       ) : null}
+      {department === "" ? <Empty text="项目现在用的组织里没有部门，部门工作间没有内容可显示" /> : null}
       {noWorkItem ? <Empty text="项目还没有事项，部门工作间没有内容可显示" /> : null}
       {data ? (
         <TitleArea
           data={data}
+          loopItem={loopItem}
+          departments={props.departments}
           // 所选事项用名字说明，不显示事项标识这类内部标识（工单 #746）
           workItemTitle={scopeName(items, data.work_item_id)}
           scopeWorkItem={requested}
@@ -82,7 +94,7 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
           onOpenSettings={() => setSettingsOpen(true)}
         />
       ) : null}
-      <RoomSection app={props.app} department={department} data={data} />
+      <RoomSection app={props.app} department={department} data={data} loopItem={loopItem} />
 
       {data ? (
         <>
@@ -101,7 +113,8 @@ export function DepartmentPage(props: { app: ClientApp; route: Route }) {
   );
 }
 
-export function RoomSection(props: { app: ClientApp; department: string; data: DepartmentWorkspaceResult | null }) {
+export function RoomSection(props: { app: ClientApp; department: string; data: DepartmentWorkspaceResult | null;
+  loopItem?: WorkItemLoop | null }) {
   return (
     <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
       <div className="y10-ws-stage stage">
@@ -109,7 +122,7 @@ export function RoomSection(props: { app: ClientApp; department: string; data: D
       </div>
       {props.data ? (
         <div className="y10-ws-room-info room-info" data-ws-info>
-          <RoomInfoArea app={props.app} data={props.data} />
+          <RoomInfoArea app={props.app} data={props.data} loopItem={props.loopItem ?? null} />
         </div>
       ) : null}
     </Section>
@@ -125,19 +138,15 @@ export function elapsedLimitText(item: WorkItemLoop | null): string {
   return `${formatDuration(item.elapsed_sec)} / ${formatDuration(item.time_limit_sec)}`;
 }
 
-function RoomInfoArea(props: { app: ClientApp; data: DepartmentWorkspaceResult }) {
+function RoomInfoArea(props: { app: ClientApp; data: DepartmentWorkspaceResult; loopItem: WorkItemLoop | null }) {
   const { data } = props;
   const room = data.room;
   // 传信管：等待本部门回答的询问数（原型 v12 第 3.3 节，工单 #905）；为 0 时不写这一行
   const letters = lettersWaitingText(room.pipes?.letters_waiting);
   // 已用时间与上限在 project.loop（department.workspace 不带这两项）：取当前事项的 elapsed_sec 与
-  // time_limit_sec，与恢复页「已用时间与时间上限」同一个查询、同一对字段、同一种写法（工单 #1229）
-  const loop = useSnapshot<ProjectLoopResult>(props.app, "page.dept.loop", "project.loop", {
-    project_id: data.project_id,
-    work_item: data.work_item_id ?? "",
-  }, data.work_item_id === null);
-  const loopItem = (loop.data?.work_items ?? []).find(
-    (entry) => entry.work_item_id === data.work_item_id) ?? null;
+  // time_limit_sec，与恢复页「已用时间与时间上限」同一个查询、同一对字段、同一种写法（工单 #1229）。
+  // 这份数据由部门页取一次，事项冻结的组织也从这里读（工单 #1457）
+  const loopItem = props.loopItem;
   return (
     <>
       <KeyValue
@@ -189,18 +198,27 @@ function selectionSourceLabel(value: string | null): string {
 }
 
 // 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构第 2.1 节，工单 #905）：
-// 标题区另起一行列出三个部门，本部门加粗；没有部门状态（事项没有进行中）时这一行不出现。
+// 标题区另起一行列出这个事项的组织里的部门，本部门加粗；没有部门状态（事项没有进行中）时这一行不出现。
+// 部门清单与显示名取自事实（工单 #1457）：事项冻结的组织里的部门，不写死三个。
 export function DepartmentsLine(props: {
   departments?: Record<string, DepartmentStateView> | null;
   department: string;
+  /** 这个事项的组织里的部门标识与显示名；为空时按数据里的部门逐个显示（旧数据） */
+  labels?: Record<string, string>;
+  /** 部门清单只保留这些部门；为空时不筛 */
+  keep?: string[];
 }) {
-  const parts = departmentsLineParts(props.departments, props.department);
+  const kept = props.keep === undefined
+    ? props.departments ?? null
+    : Object.fromEntries(Object.entries(props.departments ?? {})
+      .filter(([department]) => props.keep?.includes(department)));
+  const parts = departmentsLineParts(kept, props.department, props.labels);
   if (parts === null) {
     return null;
   }
   return (
     <p className="y10-ws-item y10-ws-states department-line">
-      <span className="y10-muted">三个部门</span>
+      <span className="y10-muted">{parts.length > 1 ? "三个部门" : "部门"}</span>
       {parts.map((part, index) => (
         <Fragment key={part.text}>
           {index === 0 ? "　" : " · "}
@@ -211,11 +229,19 @@ export function DepartmentsLine(props: {
   );
 }
 
-function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: string; scopeWorkItem: string | null; scopeNote: string; onOpenSettings: () => void }) {
+function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemLoop | null;
+  departments: DepartmentView[]; workItemTitle: string; scopeWorkItem: string | null; scopeNote: string;
+  onOpenSettings: () => void }) {
   const data = props.data;
   const effective = data.effective;
   const lastCall = data.last_call === null ? null : dict(data.last_call);
   const info = DEPARTMENTS[data.department];
+  // 部门名取自这个事项冻结的组织（工单 #1457）：先看事项的组织，再看项目现在的组织；
+  // 两处都没有这个部门时退回页面上原来的写法
+  const itemDepartments = (props.loopItem?.organization?.roles ?? []).map((role) => ({
+    id: role.id, label: role.label,
+  }));
+  const labels = { ...departmentLabels(itemDepartments), ...departmentLabels(props.departments) };
   // 去观测页时带着当前的范围（工单 #746）与本部门的筛选条件（工单 #801）：
   // 范围是项目级的一份，换页面不丢掉；部门是筛选条件，观测页按它只显示这个部门的请求
   const observeLink = paths.observe(data.project_id, { workItem: props.scopeWorkItem, department: data.department });
@@ -229,7 +255,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: stri
           <p className="y10-eyebrow">部门工作间</p>
           <div className="y10-ws-title-row">
             <h1 className="y10-h1 title" style={{ margin: 0, fontSize: "20px", fontWeight: 700 }}>
-              {departmentName(data.department)}部门
+              {departmentLabel(data.department, labels)}部门
             </h1>
             <span className={`y10-status is-${status.kind}`}>{status.text}</span>
             {status.note === "" ? null : <small className="y10-muted">{status.note}</small>}
@@ -242,7 +268,12 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; workItemTitle: stri
               : `所选事项${props.workItemTitle === "" ? "" : ` ${props.workItemTitle}`}`}</strong>
             {props.scopeNote ? <span className="y10-muted">{props.scopeNote}</span> : null}
           </p>
-          <DepartmentsLine departments={data.departments} department={data.department} />
+          <DepartmentsLine
+            departments={data.departments}
+            department={data.department}
+            labels={labels}
+            keep={itemDepartments.length > 0 ? itemDepartments.map((department) => department.id) : undefined}
+          />
           <div className="y10-ws-inline">
             <span className="y10-ws-k">当前生效模型</span>
             <strong>

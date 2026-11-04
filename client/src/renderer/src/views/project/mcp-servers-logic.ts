@@ -19,8 +19,8 @@ import { departmentName } from "./labels.ts";
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];
 
-// 默认的三个部门（设计说明第 4.1 节「可以使用的部门」）：项目组织里没有给出部门时用它
-export const MCP_DEFAULT_DEPARTMENTS = ["product", "engineering", "quality"];
+// 默认的三个部门（设计说明第 4.1 节「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
+// （工单 #1457），组织还没有数据时由调用处按设置里已有的部门兜底
 
 // 默认的时限与输出上限（设计说明第 7.2 节；后端 MCP_OUTPUT_LIMIT_DEFAULTS 是同一组值）：
 // 表单留空时按这组默认，不把默认值写死在客户端提交的内容里
@@ -69,7 +69,7 @@ export type McpServerDraft = {
   output_limit: string;
 };
 
-export function emptyDraft(departments: string[] = MCP_DEFAULT_DEPARTMENTS): McpServerDraft {
+export function emptyDraft(departments: string[] = []): McpServerDraft {
   return {
     name: "",
     transport: "stdio",
@@ -512,8 +512,10 @@ export function sectionNote(servers: Record<string, McpServerSettingView> | unde
   return `${items.length} 台服务器，其中 ${withTools} 台已经读到工具清单`;
 }
 
-// 可以使用的部门一列：部门的显示名，逗号分开
-export function departmentsText(departments: string[] | undefined): string {
-  const names = (departments ?? []).map((item) => departmentName(item) || item);
+// 可以使用的部门一列：部门的显示名，逗号分开。显示名取项目现在组织里的部门（工单 #1457），
+// 组织里没有的旧部门才用页面上原来的写法
+export function departmentsText(departments: string[] | undefined,
+                                labels: Record<string, string> = {}): string {
+  const names = (departments ?? []).map((item) => labels[item] ?? (departmentName(item) || item));
   return names.length === 0 ? "没有选部门" : names.join("、");
 }

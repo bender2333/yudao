@@ -1002,6 +1002,10 @@ export type Catalog = {
         [key: string]: CatalogBinding;
     };
     /**
+     * Departments
+     */
+    departments: Array<CatalogDepartment>;
+    /**
      * Department Reminders
      */
     department_reminders: {
@@ -1376,6 +1380,20 @@ export type CatalogCredential = {
      * Persisted
      */
     persisted?: boolean;
+};
+
+/**
+ * CatalogDepartment
+ */
+export type CatalogDepartment = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
 };
 
 /**
@@ -4095,6 +4113,24 @@ export type OrganizationAdopt = {
 };
 
 /**
+ * OrganizationDepartment
+ */
+export type OrganizationDepartment = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Verifier
+     */
+    verifier?: boolean;
+};
+
+/**
  * OrganizationRole
  */
 export type OrganizationRole = {
@@ -4454,6 +4490,10 @@ export type ProjectOrganizationResult = {
      * Form In Release
      */
     form_in_release: boolean;
+    /**
+     * Departments
+     */
+    departments: Array<OrganizationDepartment>;
     /**
      * Forms
      */

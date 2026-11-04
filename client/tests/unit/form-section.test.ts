@@ -74,6 +74,7 @@ function organization(overrides: Partial<ProjectOrganizationResult> = {}): Proje
     form: THREE,
     version: "sha256:three",
     form_in_release: true,
+    departments: [],
     forms: [choice(), openLoopChoice()],
     history: [],
     ...overrides,
