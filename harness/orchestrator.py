@@ -495,7 +495,7 @@ class Orchestrator:
         run_created = NewEvent(
             EventType.RUN_CREATED,
             actor="system",
-            department=self._input_department_of(definitions),
+            department=self._start_department_of(definitions, kind),
             state_before="running",
             state_after="running",
             payload={
@@ -590,13 +590,15 @@ class Orchestrator:
             # 调用目标随数据目录一起落盘：重开数据目录以后按同一个调用目标继续（工单 #669）
             self.facade.persist_document(self.facade.config_path)
 
+    def _start_department_of(self, definitions: Definitions, kind: str) -> str:
+        # 事项开始时开始第一轮的是接它来源的部门（工单 #1455）：来源从事项的种类取（建档或你的输入），
+        # 部门从定义取。部门名不在这里写（设计说明第 6 节）
+        return definitions.source_department(definitions.item_source(kind))
+
     def _input_department_of(self, definitions: Definitions) -> str:
-        # 开始在哪个部门处理用户输入：定义里关注用户输入的那一个（watched 含 user_input）。
-        # 薄驱动不含部门的名称（设计说明第 6 节），部门身份从事项所用的定义取（工单 #1392）
-        for department in definitions.departments:
-            if "user_input" in definitions.watched_outputs(department):
-                return department
-        raise ValueError("organization.json declares no department that watches user input")
+        # 接你的输入的部门（工单 #1455）：新输入分派给它。不再看谁关注用户输入——关注用户输入是另一件事，
+        # 留在关注关系里。薄驱动不含部门的名称（设计说明第 6 节），部门身份从事项所用的定义取（工单 #1392）
+        return definitions.input_department()
 
     @property
     def _input_department(self) -> str:
