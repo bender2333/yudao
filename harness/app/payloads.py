@@ -702,8 +702,9 @@ class BrowserSessionState(Payload):
 
 
 class BrowserObservation(Payload):
-    # 核实一个结果未知的浏览器动作时取得的当前状态（设计说明第 9 节「按当前实际状态继续」）：
-    # 页面的可访问性结构，与取得的截图
+    # 结果未知的浏览器动作被核实为「按当前实际状态继续」时取得的当前状态（设计说明第 9 节）：页面的
+    # 可访问性结构与截图。本机的浏览器会话随进程结束，恢复时只会记会话为中断，所以这一项本机不写；
+    # 它留给持有会话的执行代理（会话在远程执行位置上时由它建立并持有），归属见工单 #1184 的交付说明
     accessibility: str
     screenshot: ArtifactRef | None = None
     structure_truncated: bool = False
@@ -730,7 +731,9 @@ class ActionVerifiedPayload(Payload):
     # 自动核实的依据（工单 #308）：动作前快照、动作参数与当前公开树的对比结论
     verification: FileActionComparison | None = None
     # 浏览器动作的核实依据（工单 #1184，设计说明第 9 节）：会话状态与新取得的页面结构、截图；
-    # 非浏览器动作没有这两项
+    # 非浏览器动作没有这两项。设计说明第 9 节的「会话仍然存在 → 按当前实际状态继续」这一支本机不写
+    # `observation`：MCP 的 stdio 会话属于建立它的进程，恢复在启动序列里跑，那时浏览器会话表是空的，
+    # 所以本地只会记会话为中断（`resolution=handed_back`）。这一支留给持有会话的执行代理
     session: BrowserSessionState | None = None
     observation: BrowserObservation | None = None
     note: str | None = None

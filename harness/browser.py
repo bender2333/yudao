@@ -73,6 +73,9 @@ CLOSE_TOOL = "browser_close"
 FILE_PATH_TOOLS = frozenset({"browser_file_upload", "browser_drop"})
 # 导航类工具：目标地址在执行之前按服务自己的地址规则检查（第 4.1 节「来源限制」）
 NAVIGATION_TOOLS = frozenset({"browser_navigate"})
+# 新建标签页时带 url 的工具：`{"action": "new", "url": …}` 同样是工具直接发起的导航，动作层要查
+# （浏览器那一层只按字面来源挡，别名挡不住；工单 #1184 的审查 6625033513 第 1 条）
+TAB_TOOL = "browser_tabs"
 # 一次调用最多等这么久（规则登记 browser.call_timeout_sec）：Playwright MCP 自己的动作时限 5 秒、
 # 导航时限 60 秒，这里是它们之外的上限
 CALL_TIMEOUT_SEC = int(DEFINITIONS.rule_value("browser.call_timeout_sec"))
@@ -448,8 +451,13 @@ class BrowserSessions:
                 output={"session": session.record()})
         is_read_only(tool)
         prepared = resolve_paths(session, tool, args)
-        if tool in NAVIGATION_TOOLS:
-            prepared = {**prepared, "url": check_navigation(prepared.get("url"))}
+        # 工具直接发起的导航：browser_navigate 的 url，与 browser_tabs 新建标签页时带的 url。
+        # 没有 url 的新建标签页是空白页，不是导航，不按来源拒绝
+        target: str | None = None
+        if tool in NAVIGATION_TOOLS or (tool == TAB_TOOL and prepared.get("action") == "new"
+                                        and prepared.get("url") is not None):
+            target = check_navigation(prepared.get("url"))
+            prepared = {**prepared, "url": target}
         result = await self._call_mcp(session, tool, prepared, stop=stop)
         text = result["text"]
         images: list[dict[str, Any]] = []
@@ -464,8 +472,8 @@ class BrowserSessions:
             if image is not None:
                 images.append(image)
             text = await self._with_structure(session, text, stop=stop)
-        if tool in NAVIGATION_TOOLS:
-            session.last_url = prepared["url"]
+        if target is not None:
+            session.last_url = target
         clipped, truncated = _clip(text, structure_limit)
         output: dict[str, Any] = {"accessibility": clipped, "images": images,
                                   "session": session.minimal_record()}
@@ -474,17 +482,6 @@ class BrowserSessions:
         if result["is_error"]:
             output["tool_error"] = True
         return output
-
-    async def verify(self, run_id: str | None, department: str) -> dict[str, Any] | None:
-        """结果未知的浏览器动作的核实依据（设计说明第 9 节）：会话仍然存在时取当前页面结构与截图。"""
-        session = self.session_of(run_id, department)
-        if session is None or session.status != "running":
-            return None
-        snapshot = await self._call_mcp(session, SNAPSHOT_TOOL, {})
-        image = await self._screenshot(session)
-        text, truncated = _clip(snapshot["text"])
-        return {"accessibility": text, "session": session.record(), "screenshot": image,
-                "structure_truncated": truncated}
 
     async def stop(self, run_id: str | None, department: str, *, reason: str = "stopped") -> dict[str, Any]:
         # 关闭 MCP 与浏览器（客户端关闭时结束整棵进程树），删掉会话目录
@@ -598,3 +595,5 @@ class BrowserSessions:
             session.screenshots += 1
         return {"kind": ref.kind, "content_hash": ref.content_hash, "path": ref.path,
                 "media_type": ref.media_type}
+
+

@@ -7,7 +7,8 @@
 # 2. 调用目标只有文本时：进入部门历史的工具结果只有可访问性结构（没有图像），截图仍然保存为工件；
 # 3. browser_file_upload 与 browser_drop 的路径在试用副本之外时被拒绝，副本之内的不被拒绝；
 # 4. 导航到 Yudao 服务自己的地址与端口（127.0.0.1、localhost、本机网卡地址、本机主机名）被拒绝，
-#    导航到会话中启动的软件自己的端口与一个真实外网地址可以访问；
+#    导航到会话中启动的软件自己的端口与一个真实外网地址可以访问；工具直接发起的导航包括
+#    browser_navigate 的 url 与 browser_tabs 新建标签页时带的 url；
 # 5. 来源限制不只看工具直接导航：页面上的链接点过去、页面脚本发出的请求都由浏览器按来源挡下，
 #    服务那一侧一次请求都收不到（启动参数 --blocked-origins，工单 #1184 的审查第 3 条）；
 # 6. 结果未知：browser_click 没有结果时重新启动 Yudao（新的系统打开同一数据目录）以后会话记为中断、
@@ -428,6 +429,14 @@ def test_navigation_to_the_service_itself_is_refused_and_other_addresses_are_all
             external = case.perform("browser_navigate", {"url": _EXTERNAL_URL})
             assert external.refused is False and external.ok is True, external.error
             assert "Example Domain" in external.output["accessibility"], external.output["accessibility"]
+            # 新建标签页带的 url 也是工具直接发起的导航：同样按服务地址检查（工单 #1184 的审查第 1 条）
+            for host in _local_targets():
+                tab = case.perform("browser_tabs", {"action": "new", "url": f"http://{host}:{service_port}/"})
+                assert tab.refused is True, f"新建标签页导航到 {host}:{service_port} 没有被拒绝"
+                assert "own address and port" in tab.error, tab.error
+            # 不带 url 的新建标签页是空白页，不是导航，不按来源拒绝
+            blank = case.perform("browser_tabs", {"action": "new"})
+            assert blank.refused is False, blank.error
         finally:
             clear_service_address()
             case.stop()

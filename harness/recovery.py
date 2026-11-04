@@ -404,8 +404,9 @@ class RunRecovery:
         # 的核实记录，说明核实确认没有发生；unclear 或无法核实的按非文件动作处理。
         # 其余结果未知的动作（命令、检查、读取等）记一条 resolution="handed_back" 的核实记录交还会话，
         # 说明执行被中断、结果未知，由模型检查后决定是否重新执行。
-        # 浏览器动作按设计说明第 9 节核实（工单 #1184）：会话仍然存在时记「按当前实际状态继续」并带上
-        # 新取得的页面结构与截图；会话已经不存在时记会话为中断、交还会话重新开始。
+        # 浏览器动作按设计说明第 9 节核实（工单 #1184）：本机的浏览器会话随进程结束（MCP 的 stdio 会话
+        # 属于建立它的进程），恢复在启动序列里跑、那时浏览器会话表是空的，所以记会话为中断、交还会话重新
+        # 开始。设计说明第 9 节「会话仍然存在 → 按当前实际状态继续」那一支留给持有会话的执行代理。
         # 不再发出任何 unknown_action 决定请求，事项直接继续。
         # 浏览器动作的核实要在事务之外先取得（取页面结构是一次 MCP 调用），所以这里先读一次事件
         browser_evidence = self._browser_evidence(run_id)
@@ -448,7 +449,8 @@ class RunRecovery:
                 action_id = identity[2]
                 comparison = comparisons.get(action_id)
                 if info["tool"] in BROWSER_TOOL_NAMES:
-                    # 浏览器动作：会话仍然存在时按当前实际状态继续，否则记会话为中断（设计说明第 9 节）
+                    # 浏览器动作：本机只可能是会话已经不存在，记会话为中断并交还（设计说明第 9 节）；
+                    # 「会话仍然存在 → 按当前实际状态继续」留给持有会话的执行代理
                     transaction.append(self._verified_browser(
                         started, projection.status, evidence=browser_evidence.get(action_id)))
                     continue
