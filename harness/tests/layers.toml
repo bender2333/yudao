@@ -210,6 +210,7 @@
 "test_routing_contract.py" = "unit"
 "test_routing_definition.py" = "module"
 "test_routing_folds_from_events.py" = "module"
+"test_routing_per_form.py" = "integration"
 "test_run_event_version.py" = "module"
 "test_run_steps.py" = "module"
 "test_run_time_limit.py" = "integration"
