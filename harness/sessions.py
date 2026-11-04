@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 from .environment import BackgroundJobTable, cleanup_inspection_workspace
 from .models import DEPARTMENTS, new_id
@@ -43,11 +44,15 @@ class SessionFactory:
         # 会话事件的写入方由薄驱动经 Workspaces 接上（trial_events）
         self.trials = TrialSessionTable()
 
-    def create_run_sessions(self, run_id: str, session_ids: dict[str, str] | None = None) -> dict[str, DepartmentSession]:
-        ids = session_ids or {department: new_id(f"ses_{department[:3]}") for department in DEPARTMENTS}
+    def create_run_sessions(self, run_id: str, session_ids: dict[str, str] | None = None, *,
+                            departments: Iterable[str] | None = None) -> dict[str, DepartmentSession]:
+        # 建会话收事项那份形态的部门清单（工单 #1509）：部门取自这个事项冻结的定义，不取进程加载的那一份。
+        # 不给时按进程加载的定义（直接建 run 的调用与只跑三部门的测试）
+        names = tuple(DEPARTMENTS if departments is None else departments)
+        ids = session_ids or {department: new_id(f"ses_{department[:3]}") for department in names}
         sessions = {
             department: DepartmentSession(session_id=ids[department], run_id=run_id, department=department)
-            for department in DEPARTMENTS
+            for department in names
         }
         self._sessions[run_id] = sessions
         return sessions

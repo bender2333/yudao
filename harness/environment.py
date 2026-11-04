@@ -214,6 +214,9 @@ class Workspaces:
         sessions: Any = None,
         check_timeout: Callable[[str], int] | None = None,
         definitions: Any = None,
+        # 按 run 取这个事项冻结的那份定义（工单 #1509）：工作区政策（谁交出交付、谁从封存交付建立检查副本、
+        # 检查材料写在哪里）按事项所用的定义推，不按进程加载的那一份；不给时用上面那一份
+        definitions_for: Callable[[str], Any] | None = None,
         trial_events: Callable[[str, str, dict[str, Any]], None] | None = None,
     ) -> None:
         self.root = Path(root)
@@ -230,6 +233,9 @@ class Workspaces:
         self.delivery_inspecting = delivery_inspecting_departments(definitions)
         # 写入范围是检查材料的角色与它们能写的目录（工单 #1390）：由定义声明，检查副本按它带上这些目录
         self.check_materials = check_material_paths(definitions)
+        # 按事项冻结的定义算出来的政策（工单 #1509）：键是定义版本，同一份定义只算一次
+        self._definitions_for = definitions_for
+        self._policies: dict[str, tuple[frozenset[str], frozenset[str], dict[str, tuple[str, ...]]]] = {}
         # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
         self._source: dict[tuple[str, str], str | None] = {}
         # 这个进程里全部 run 的试用会话表（工单 #1182）：会话跨激活保留，一个部门同一时刻最多一个；
@@ -259,6 +265,24 @@ class Workspaces:
             self.sessions.trials = table
 
     # ---- 运行工作区 ----
+    def policies(self, run_id: str) -> tuple[frozenset[str], frozenset[str], dict[str, tuple[str, ...]]]:
+        """这个 run 的三样工作区政策：交出交付的部门、从封存交付建立检查副本的部门、检查材料写在哪里。
+
+        按这个事项冻结的那份定义推（工单 #1509）：换一份把部门改了名的定义，改名后的交交付的部门照常
+        在自己的运行工作区工作、改名后的核验角色照常从封存交付建立检查副本。没有按 run 取定义时用构造时那一份。
+        """
+        if self._definitions_for is None:
+            return self.handing_over, self.delivery_inspecting, self.check_materials
+        definitions = self._definitions_for(run_id)
+        key = getattr(definitions, "version", "")
+        cached = self._policies.get(key)
+        if cached is None:
+            cached = (handing_over_departments(definitions),
+                      delivery_inspecting_departments(definitions),
+                      check_material_paths(definitions))
+            self._policies[key] = cached
+        return cached
+
     def parameters_for(self, run_id: str) -> dict[str, Any]:
         # 这个 run 冻结的参数取值（工单 #1189）：执行环境的输出上限、命令与检查的时限上限读它，
         # 建 run 之后改参数事件不影响已经创建的 run。旧 run 没有冻结字典时按定义初值解释
@@ -277,7 +301,7 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            check_materials=self.check_materials,
+            check_materials=self.policies(run_id)[2],
             trials=self.trials,
             browsers=self.browsers,
             run_root=self.root / run_id,
@@ -307,13 +331,16 @@ class Workspaces:
             projection = self._view(run_id)
             ids = ({item.department: item.session_id for item in projection.sessions.values()}
                    if projection.sessions else None)
-            sessions = self.sessions.create_run_sessions(run_id, ids)
+            # 补建的会话按这个事项冻结的形态的部门建（工单 #1509）：run_created 里记下的会话已经是那一份的，
+            # 没有记下时按投影里的部门
+            sessions = self.sessions.create_run_sessions(run_id, ids, departments=ids.keys() if ids else None)
             session = sessions[department]
         return session.session_id, getattr(self.sessions, "jobs", None)
 
     def hands_over(self, department: str, session_id: str | None, projection: Any) -> bool:
-        # 产出进入运行工作区的主线会话：交出交付的部门，且不在询问分支里
-        if department not in self.handing_over:
+        # 产出进入运行工作区的主线会话：交出交付的部门，且不在询问分支里。
+        # 谁交出交付按这个事项冻结的定义推（工单 #1509）
+        if department not in self.policies(projection.run_id)[0]:
             return False
         return session_id not in projection.branch_sessions
 
@@ -332,7 +359,7 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            check_materials=self.check_materials,
+            check_materials=self.policies(run_id)[2],
             trials=self.trials,
             browsers=self.browsers,
             run_root=self.root / run_id,
@@ -344,8 +371,9 @@ class Workspaces:
         # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（设计说明第 3.4 节）；
         # 其他部门的试用副本在 trial_start 时封存运行工作区。
         # 两处打开检查工作区的地方都走这里：激活开始时新建（new_inspection），以及会话用过文件工具以后
-        # 检查工作区按会话保留、后面一次激活重新打开（session_inspection → inspection_environment）
-        if department in self.delivery_inspecting:
+        # 检查工作区按会话保留、后面一次激活重新打开（session_inspection → inspection_environment）。
+        # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        if department in self.policies(run_id)[1]:
             environment.bind_trial_source(self.source_tree(department, projection))
         return environment
 
@@ -369,8 +397,9 @@ class Workspaces:
 
     def source_hash(self, department: str, projection: Any) -> str | None:
         # 从封存交付建立的部门（质检）的检查工作区：这份交付的摘要就是工作区的来源；
-        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）
-        if department not in self.delivery_inspecting:
+        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）。
+        # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        if department not in self.policies(projection.run_id)[1]:
             return None
         delivery = projection.delivery_spec
         return None if delivery is None else delivery.content_hash
@@ -381,8 +410,8 @@ class Workspaces:
         # 不读运行工作区；其他会话从当前运行工作区快照建立。
         # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 第 2 节
         # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
-        # host_commit_error 正式报告
-        if department in self.delivery_inspecting:
+        # host_commit_error 正式报告。谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        if department in self.policies(projection.run_id)[1]:
             if projection.delivery_spec is not None and projection.delivery_spec.tree_ref is not None:
                 tree_ref = projection.delivery_spec.tree_ref
                 return load_tree(self._artifacts, artifact_run(tree_ref.path), tree_ref)
@@ -422,12 +451,12 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            check_materials=self.check_materials,
+            check_materials=self.policies(run_id)[2],
             trials=self.trials,
             browsers=self.browsers,
             run_root=run_root,
         )
-        if department in self.delivery_inspecting:
+        if department in self.policies(run_id)[1]:
             ref = projection.qa_tests_archive_ref
             if ref is not None:
                 if isinstance(ref, dict):
@@ -462,9 +491,10 @@ class Workspaces:
 
     def refresh_for(self, round: RoundWorkspace) -> Callable[[], LocalEnvironment | None]:
         # 检查工作区按会话保留（工单 #558）：从封存交付建立的部门进行中有新的交付封存时，
-        # 在它的下一步从这份交付重建；询问与通知都不重建
+        # 在它的下一步从这份交付重建；询问与通知都不重建。谁从封存交付建立检查副本按这个事项
+        # 冻结的定义推（工单 #1509）
         def refresh() -> LocalEnvironment | None:
-            if round.department not in self.delivery_inspecting:
+            if round.department not in self.policies(round.run_id)[1]:
                 return None
             projection = self._view(round.run_id)
             current = self.source_hash(round.department, projection)

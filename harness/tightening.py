@@ -421,7 +421,8 @@ class WatchedOutputsTightening:
         if errors:
             return Tightened(errors=tuple(errors))
         # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：在提交事务里再判一次。
-        # 接输入的部门按事项所用的定义取（工单 #1455），不按进程加载的默认定义
+        # 谁收输入按这个事项所用的那份定义取（工单 #1509），接输入的部门由事项的来源写明（工单 #1455），
+        # 不按进程加载的默认定义
         if request.commit and verdict == "release" \
                 and pending_product_input(projection, list(request.events), definitions=request.definitions):
             return Tightened(wait=True, reason=PENDING_INPUT_RELEASE)

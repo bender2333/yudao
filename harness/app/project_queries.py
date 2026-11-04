@@ -1468,9 +1468,10 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
     letters_waiting = 0 if run is None else sum(1 for ask in run.ask_stack if ask.get("recipient") == department)
     waiting_provider = False
     scrolls = 0
-    if run is not None and department == "product":
-        # 卷轴数的来源是产品写出的 PRD 版本数（v8 设计说明第 8.1 节的卷轴架）
-        scrolls = len(run.product_specs)
+    if run is not None:
+        # 卷轴数的来源是产品写出的 PRD 版本数（v8 设计说明第 8.1 节的卷轴架）。按成果的作者部门算，不按
+        # 部门名算（工单 #1509）：换一份把产品改了名的定义，写出 PRD 的那个部门照常记着它的卷轴
+        scrolls = sum(1 for spec in run.product_specs if spec.issuer == department)
     summaries = 0
     if run is not None:
         summaries = max((int(entry.get("n") or 0) for entry in run.compactions), default=0)
