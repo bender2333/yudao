@@ -236,6 +236,9 @@
   "project_parameter_set": {
     "source": "user"
   },
+  "project_form_set": {
+    "source": "user"
+  },
   "writeback_completed": {
     "source": "host_measurement"
   },
