@@ -203,9 +203,17 @@ class Department(_Definition):
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
     # 部门关注的成果（三部门的循环结构第 2 节）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
-    # 关注关系写在定义里，代码里只有一条通用规则
+    # 关注关系写在定义里，代码里只有一条通用规则。user_input 只在旧定义里有用：它指出谁关注用户输入，
+    # 没有写 sources 的旧定义按它解释两种来源（Definitions.source_department）
     watched: tuple[Literal["user_input", "guidance", "product_spec", "defect_record", "delivery",
                           "structure", "baseline_review"], ...] = ()
+
+
+# 事项的来源（术语表「事项的来源」，形态与核验角色设计说明「定义的校验」第 1 条、工单 #1455）：
+# 一个事项因为什么开始——现在是你的输入与建档。每一种来源写明了接它的部门，事项开始时开始第一轮的就是
+# 那个部门。子事项的「上一层交来的任务」与运维发现的故障在它们进来时只增，这次不预留
+ItemSource = Literal["user_input", "onboarding"]
+ITEM_SOURCES: tuple[ItemSource, ...] = get_args(ItemSource)
 
 
 # 写入范围是内核认识的通用权限（设计说明第 4.2 节第 1 条）：workspace 写这个事项的工作区；
@@ -271,6 +279,10 @@ class OrganizationRules(_Definition):
 class Organization(_Definition):
     # 部门按这个顺序排列
     departments: tuple[Department, ...] = Field(min_length=1)
+    # 每一种事项的来源由哪个部门接（工单 #1455）：来源 → 部门。事项开始时开始第一轮的是接这个来源的部门。
+    # 字段只增：没有写这个字段的旧定义按「关注用户输入的部门」解释两种来源（Definitions.source_department）；
+    # 写了就必须每一种来源都写明，接它的部门要在这份定义里（加载时由 source_issues 核对）
+    sources: Mapping[ItemSource, Identifier] | None = None
     # 路由实现的名称（骨架与应用设计说明第 5.1 节、工单 #825）：启动时按这个名称接上实现，
     # 名称必须是 routings.json 里登记的其中一个。默认是成果驱动
     routing: Identifier = "watched_outputs"
@@ -278,6 +290,8 @@ class Organization(_Definition):
     # 所以字段只增，旧文件照旧能读
     verification: VerificationDeclaration | None = None
     rules: OrganizationRules
+
+    freeze_sources = _frozen("sources")
 
 
 class Role(_Definition):
@@ -683,6 +697,33 @@ class Definitions(_Definition):
                 return item.watched
         raise ValueError(f"unknown department {department!r}")
 
+    def item_source(self, kind: str) -> str:
+        """事项的种类对应的来源（工单 #1455）：建档事项从建档开始，其余从你的输入开始。
+
+        现在只有这两种来源；子事项的「上一层交来的任务」与运维发现的故障在它们进来时只增。
+        """
+        return "onboarding" if kind == "onboarding" else "user_input"
+
+    def source_department(self, source: str) -> str:
+        """接这种来源的部门（工单 #1455）：事项开始时开始第一轮的是它，新输入也先进它的工作。
+
+        定义写明了 sources 就用写明的那个；旧定义没有写时两种来源都按关注用户输入的部门解释。
+        没有部门接的来源在加载时整份拒绝（source_issues），这里的报错给直接构造出来的定义。
+        """
+        declared = self.organization.sources
+        if declared is None:
+            for department in self.departments:
+                if "user_input" in self.watched_outputs(department):
+                    return department
+            raise ValueError("organization.json declares no department that receives the item sources")
+        if source not in declared:
+            raise ValueError(f"item source {source!r} is not in this definition")
+        return declared[source]
+
+    def input_department(self) -> str:
+        """接你的输入的部门（工单 #1455）：新输入分派给它、放行等它处理完，不看谁关注用户输入。"""
+        return self.source_department("user_input")
+
     @property
     def verification(self) -> VerificationDeclaration:
         # 核验声明：定义写明了就用它；旧定义没有写时按今天写死的三部门解释（字段只增，旧文件新版本能读）
@@ -932,6 +973,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
             if tool not in tools:
                 issues.append(("roles.json", f"{name}.tools[{index}]", f"工具 {tool} 没有定义"))
     issues.extend(_work_item_references(parts["work_items"], organization, tools, parts["stop_reasons"]))
+    issues.extend(source_issues(organization))
     issues.extend(_routing_references(organization, parts["routings"]))
     issues.extend(verification_issues(organization, {tool.proposal for tool in tools.values()
                                                     if tool.proposal is not None}))
@@ -1029,6 +1071,31 @@ def _routing_references(organization: Organization, routings: Routings) -> list[
         return []
     return [("organization.json", "routing",
              f"路由实现 {organization.routing} 不存在；可用的是：{'、'.join(available)}")]
+
+
+def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
+    """事项的来源都有部门接（设计说明第 4.7 节第 1 条，工单 #1455）：不满足的整份拒绝，写出是哪一项。
+
+    旧定义没有写 sources 时，两种来源都按关注用户输入的部门解释：没有这样的部门，两种来源就没人接。
+    写了 sources 时，每一种来源都要写明，接它的部门要在这份定义里；少一种、指到不存在的部门都拒绝。
+    """
+    file = "organization.json"
+    declared = organization.sources
+    if declared is None:
+        if any("user_input" in department.watched for department in organization.departments):
+            return []
+        return [(file, "sources", "没有写事项的来源，也没有部门关注用户输入：你的输入与建档没有人接")]
+    members = {department.id for department in organization.departments}
+    issues: list[tuple[str, str, str]] = []
+    for source in ITEM_SOURCES:
+        if source not in declared:
+            issues.append((file, f"sources.{source}", f"事项的来源 {source} 没有部门接"))
+            continue
+        department = declared[source]
+        if department not in members:
+            issues.append((file, f"sources.{source}",
+                           f"接来源 {source} 的部门 {department} 不属于任何部门"))
+    return issues
 
 
 def verification_issues(organization: Organization, outcomes: Collection[str]) -> list[tuple[str, str, str]]:
