@@ -41,7 +41,7 @@ def _renamed_definitions(directory: Path) -> Any:
     """一份改了名、只有一个角色的定义（用真实的定义加载读它，不替换模块级的定义）。
 
     从产品的定义目录复制一份，把三部门里的工程那一个改名、其余两个去掉，核验声明写明没有核验角色；
-    工具、规则与事项种类照旧，各表里只留这一个角色。用户输入也由它接（三部门里那是产品的关注）
+    工具、规则与事项种类照旧，各表里只留这一个角色。用户输入与建档也由它接（三部门里那是产品的关注）
     """
     shutil.copytree(DEFINITIONS_DIR, directory)
 
@@ -55,6 +55,8 @@ def _renamed_definitions(directory: Path) -> Any:
     kept = next(item for item in organization["departments"] if item["id"] == KEPT)
     organization["departments"] = [dict(kept, id=RENAMED, label=RENAMED_LABEL, roles=[RENAMED],
                                         watched=["user_input", *kept["watched"]])]
+    # 两种事项的来源都由留下的这个角色接（工单 #1455）：接来源的部门要在这份定义里
+    organization["sources"] = {"user_input": RENAMED, "onboarding": RENAMED}
     # 没有核验角色：写明空的核验声明，旧定义缺这一项时按三部门解释，那不是这份定义要的
     organization["verification"] = {"verifiers": []}
     save("organization.json", organization)

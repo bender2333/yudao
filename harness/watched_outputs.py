@@ -44,15 +44,13 @@ def routing_departments(definitions: Any | None = None) -> tuple[str, ...]:
 
 
 def input_department(definitions: Any | None = None) -> str:
-    """收用户输入的部门：组织定义里关注用户输入的那一个（watched 含 user_input）。
+    """收用户输入的部门（工单 #1455）：定义里事项的来源写明的那个部门。
 
-    部门的名称从定义取，代码里不写（工单 #1391）：谁收输入与发给它的指导，看谁关注用户输入。
+    不再看谁关注用户输入：关注用户输入是另一件事，留在关注关系里。部门的名称从定义取，代码里不写
+    （工单 #1391）：新输入分派给它，发给它的指导也由它的处理算完。
     """
     definition = DEFINITIONS if definitions is None else definitions
-    for department in definition.departments:
-        if "user_input" in definition.watched_outputs(department):
-            return department
-    raise ValueError("organization.json declares no department that watches user input")
+    return definition.input_department()
 
 
 def proposal_kinds_for(department: str, kind: str = "change", definitions: Any | None = None) -> set[str]:
@@ -109,8 +107,19 @@ def waiting_departments(statuses: Mapping[str, str | None],
 
 
 def _has_new_user_input(projection: RunProjection) -> bool:
-    """用户的输入：还有没被产品处理的输入。"""
+    """用户的输入：还有没被处理完的输入（按输入交上的成果被接纳才算处理完）。"""
     return projection.input_version > projection.processed_input_version
+
+
+def _has_new_input(projection: RunProjection, department: str, definition: Any) -> bool:
+    """接这个事项来源的部门还有没处理完的输入：事项开始时与新的输入到达时，先是它的一轮工作。
+
+    哪个部门接取自定义（工单 #1455）：来源由事项的种类给出（建档或你的输入），不按关注用户输入判断。
+    「处理完」只有一个说法：按输入交上的成果被接纳，processed_input_version 前进——与旧的行为相同。
+    """
+    if department != definition.source_department(definition.item_source(projection.kind)):
+        return False
+    return _has_new_user_input(projection)
 
 
 def _has_new_guidance(projection: RunProjection, department: str) -> bool:
@@ -224,7 +233,7 @@ def has_new_baseline_review(projection: RunProjection) -> bool:
 
 
 _WATCHED_CHECKS = {
-    "user_input": lambda projection, department, definitions: _has_new_user_input(projection),
+    # user_input 不在这里：用户输入由接这个事项来源的部门开始，不再由关注它的部门开始（工单 #1455）
     "guidance": lambda projection, department, definitions: _has_new_guidance(projection, department),
     "product_spec": _has_new_product_spec,
     "defect_record": lambda projection, department, definitions: _has_new_defect_record(projection),
@@ -234,20 +243,30 @@ _WATCHED_CHECKS = {
 }
 
 
-def watched_new_work(projection: RunProjection, department: str,
-                     definitions: Any | None = None) -> list[str]:
-    """部门关注的成果里，现在有新东西的那些（按定义的顺序）。
+# 这份路由认得的关注项（工单 #1456：名称写错要在加载时拒绝）：触发一轮工作的那些，加上不再触发
+# 一轮工作、但旧定义里还写着的那一个。工单 #1455 起 user_input 由接来源的部门开始一轮，不由关注它的
+# 部门开始；旧定义没有写 sources 时仍靠这个名称解释两种来源，写进定义的文件要照旧加载
+_RECOGNIZED_WATCHED = ("user_input", *_WATCHED_CHECKS)
 
+
+def watched_new_work(projection: RunProjection, department: str,
+                      definitions: Any | None = None) -> list[str]:
+    """部门现在的新工作（按定义的顺序）：接来源的部门收到输入，或者关注的成果有了新东西。
+
+    输入那一项记作 user_input，但它是按来源的接部门给的，不看谁关注用户输入（工单 #1455）。
     关注关系与核验声明都从这份形态的定义取（工单 #1509）：没有交时读进程加载的那一份。
     """
     definition = DEFINITIONS if definitions is None else definitions
-    return [kind for kind in definition.watched_outputs(department)
-            if _WATCHED_CHECKS[kind](projection, department, definition)]
+    kinds = [kind for kind in definition.watched_outputs(department)
+             if kind in _WATCHED_CHECKS and _WATCHED_CHECKS[kind](projection, department, definition)]
+    if _has_new_input(projection, department, definition):
+        kinds.insert(0, "user_input")
+    return kinds
 
 
 def has_new_work(projection: RunProjection, department: str,
                  definitions: Any | None = None) -> bool:
-    """部门现在有没有新的工作：关注的成果有了新东西。"""
+    """部门现在有没有新的工作：接它的输入，或者关注的成果有了新东西。"""
     return bool(watched_new_work(projection, department, definitions))
 
 
@@ -271,7 +290,7 @@ def _free(projection: RunProjection, waiting: set[str] | None, department: str) 
 
 def department_ready(projection: RunProjection, department: str, waiting: set[str] | None = None,
                      definitions: Any | None = None) -> bool:
-    """这个部门现在可以开始一轮工作：在等待工作，并且关注的成果有了新东西。
+    """这个部门现在可以开始一轮工作：在等待工作，并且有新的工作。
 
     同时运行（工单 #557）：准备激活的事务里由薄驱动重新问一次，别的会话在这期间做完了就开始。
     """
@@ -303,7 +322,7 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
                       definitions: Any | None = None) -> list[str]:
     """现在可以开始一轮工作的部门（按定义顺序），各自一个会话同时运行（工单 #557）。
 
-    关注的成果有了新版本、又在等待工作的部门都列出来：控制核心让它们同时开始，
+    有新的工作、又在等待的部门都列出来：控制核心让它们同时开始，
     一个部门同一时刻最多一轮工作（循环结构第 3.2 节第 6 条）。
 
     指导与其他关注的成果一样：有待处理指导、又在等待工作的部门以这段指导开始一轮完整的
@@ -546,9 +565,10 @@ def check_definition(definitions: Any) -> None:
         if department not in declared.departments:
             issues.append(f"departments：组织定义里的部门 {department} 没有列进路由的部门清单")
         # 关注的成果（工单 #1456）：组织定义里的名称由这一份路由实现认。内核只认字符串，
-        # 名称的含义归路由——写错的名称要在这里拒绝，不能等到运行到 has_new_work 才抛 KeyError
+        # 名称的含义归路由——写错的名称要在这里拒绝，不能等到运行到 has_new_work 才抛 KeyError。
+        # user_input 认得但不再触发一轮工作（工单 #1455），旧定义里写着它，不能因此拒绝整份定义
         for index, name in enumerate(definitions.watched_outputs(department)):
-            if name not in _WATCHED_CHECKS:
+            if name not in _RECOGNIZED_WATCHED:
                 issues.append(f"departments[{department}].watched[{index}]：关注的成果 {name} 没有这一种")
     submitted = [definitions.tools[method].proposal for index, method in enumerate(declared.proposal_methods)
                  if method in definitions.tools and definitions.tools[method].proposal is not None]
