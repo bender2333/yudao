@@ -6121,6 +6121,13 @@
             "type": "object",
             "title": "Bindings"
           },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogDepartment"
+            },
+            "type": "array",
+            "title": "Departments"
+          },
           "department_reminders": {
             "additionalProperties": {
               "items": {
@@ -6166,6 +6173,7 @@
           "models",
           "admissions",
           "bindings",
+          "departments",
           "department_reminders",
           "model_reminders"
         ],
@@ -6799,6 +6807,25 @@
           "version"
         ],
         "title": "CatalogCredential"
+      },
+      "CatalogDepartment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "CatalogDepartment"
       },
       "CatalogDepartmentDefaultsSave": {
         "properties": {
@@ -11422,6 +11449,30 @@
         ],
         "title": "OrganizationAdopt"
       },
+      "OrganizationDepartment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "verifier": {
+            "type": "boolean",
+            "title": "Verifier",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "OrganizationDepartment"
+      },
       "OrganizationRole": {
         "properties": {
           "id": {
@@ -12009,6 +12060,13 @@
             "type": "boolean",
             "title": "Form In Release"
           },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationDepartment"
+            },
+            "type": "array",
+            "title": "Departments"
+          },
           "forms": {
             "items": {
               "$ref": "#/components/schemas/FormChoice"
@@ -12031,6 +12089,7 @@
           "form",
           "version",
           "form_in_release",
+          "departments",
           "forms",
           "history"
         ],

@@ -230,6 +230,11 @@ def test_the_query_lists_every_form_of_the_release_and_marks_the_one_without_a_v
     assert (choices[OPEN_LOOP_FORM].verifier_roles, choices[OPEN_LOOP_FORM].open_loop) == ([], True)
     assert "没有核验角色" in choices[OPEN_LOOP_FORM].description
     assert choices[OPEN_LOOP_FORM].version == "sha256:three-departments-without-verifier"
+    # 现在这一份形态里的部门（工单 #1457）：标识、显示名与是不是核验角色，按定义里的顺序。
+    # 页面的部门页签、看板列与默认部门按这一项取，不写死三个
+    assert [(department.id, department.label, department.verifier)
+            for department in organization.departments] == [
+        ("product", "产品", False), ("engineering", "工程", False), ("quality", "质检", True)]
     system.close()
 
 
@@ -251,6 +256,8 @@ def test_the_current_form_leaving_the_release_is_reported_and_can_be_repaired(tm
     organization = _organization(application, project_id)
     assert organization.form == second_routing.ROUTING_NAME
     assert (organization.version, organization.form_in_release) == (None, False)
+    # 现在这一份不在发布里时部门也为空：不拿别的形态的部门顶替
+    assert organization.departments == []
     assert [choice.form for choice in organization.forms] == [DEFAULT_FORM]
 
     # 这时候用户看到的版本就是「没有版本」：带上空版本选回发布里的那一份照常成立

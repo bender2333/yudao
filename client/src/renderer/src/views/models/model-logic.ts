@@ -12,6 +12,7 @@ import type {
   CatalogProvider,
 } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure.ts";
+import { departmentName } from "../project/labels.ts";
 
 // 推理档位全集，由低到高（模型管理设计说明第 7.1 节，与后端 REASONING_LEVELS 一致）
 export const REASONING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
@@ -39,14 +40,8 @@ export const PROTOCOL_LABELS: Record<string, string> = {
   messages: "Anthropic Messages",
 };
 
-export const DEPARTMENT_LABELS: Record<string, string> = {
-  product: "产品",
-  engineering: "工程",
-  quality: "质检",
-};
-
-// 三个部门（设计说明第 5.1 节）
-export const DEPARTMENTS = ["product", "engineering", "quality"] as const;
+// 部门清单与中文名不在这里写死：部门默认可的部门取自这一版加载的定义（catalog 查询的 departments，
+// 工单 #1457）；旧数据里不在定义里的部门按标识显示，调用处也可以给出显示名
 
 // 预填值的来源标注（设计说明第 4.3 节「界面标明每个预填值的来源」）
 export const SOURCE_LABELS: Record<string, string> = {
@@ -530,22 +525,23 @@ export const STALE_ADMISSION_LABEL = "无法使用：准入已作废";
 // 取消选用被拒绝时的引用方
 // ---------------------------------------------------------------------------
 
-// 引用方清单的一项 → 看得懂的文字
-export function referrerLabel(location: string): string {
+// 引用方清单的一项 → 看得懂的文字。部门显示名取这个项目组织或这一版定义里给出的名字（labels，
+// 工单 #1457）；没有时按页面上原来的写法（旧数据里的部门）
+export function referrerLabel(location: string, labels: Record<string, string> = {}): string {
   const binding = /^bindings\.([a-z_]+)$/.exec(location);
   if (binding) {
-    return `部门默认：${DEPARTMENT_LABELS[binding[1]] ?? binding[1]}`;
+    return `部门默认：${labels[binding[1]] ?? departmentName(binding[1])}`;
   }
   const project = /^projects\.([^.]+)\.department_settings\.([a-z_]+)$/.exec(location);
   if (project) {
-    return `项目部门设置：${DEPARTMENT_LABELS[project[2]] ?? project[2]}`;
+    return `项目部门设置：${labels[project[2]] ?? departmentName(project[2])}`;
   }
   return location;
 }
 
 // 取消选用被拒绝时服务端给的是位置串，这里换成看得懂的文字（设计说明第 4.5 节）
 // 例：「仍被引用，无法移除：bindings.product」→「仍被引用，无法移除：部门默认：产品」
-export function removalRejectionText(message: string): string {
+export function removalRejectionText(message: string, labels: Record<string, string> = {}): string {
   const index = message.indexOf("：");
   if (index < 0) {
     return message;
@@ -555,7 +551,7 @@ export function removalRejectionText(message: string): string {
   if (locations.length === 0) {
     return message;
   }
-  return head + locations.map(referrerLabel).join("、");
+  return head + locations.map((location) => referrerLabel(location, labels)).join("、");
 }
 
 // ---------------------------------------------------------------------------
@@ -566,15 +562,16 @@ export function removalRejectionText(message: string): string {
 export type BindingInput = { provider_id: string; model_id: string; requested_tier: string | null };
 
 // 换一个部门的模型以后要写的一整份部门默认：服务端按整份替换（catalog.department_defaults.save），
-// 所以其余部门照当前的值一起写回去
+// 所以其余部门照当前的值一起写回去。部门清单由调用处从目录查询的 departments 给出（工单 #1457）；
+// 没有给出时用目录里已有绑定的部门加上这一次要改的部门
 export function departmentBindings(
   catalog: { bindings: Record<string, CatalogBinding>; models: CatalogModel[] },
   department: string,
   modelId: string,
-  departments: readonly string[] = DEPARTMENTS,
+  departments?: readonly string[],
 ): Record<string, BindingInput> {
   const bindings: Record<string, BindingInput> = {};
-  for (const dept of departments) {
+  for (const dept of departments ?? [...new Set([...Object.keys(catalog.bindings), department])]) {
     const binding = catalog.bindings[dept];
     const chosen = dept === department ? modelId : binding?.model_id ?? "";
     if (chosen === "") {
@@ -598,10 +595,10 @@ export function departmentTierBindings(
   catalog: { bindings: Record<string, CatalogBinding> },
   department: string,
   tier: string,
-  departments: readonly string[] = DEPARTMENTS,
+  departments?: readonly string[],
 ): Record<string, BindingInput> {
   const bindings: Record<string, BindingInput> = {};
-  for (const dept of departments) {
+  for (const dept of departments ?? [...new Set([...Object.keys(catalog.bindings), department])]) {
     const item = catalog.bindings[dept];
     if (!item) {
       continue;
@@ -615,16 +612,17 @@ export function departmentTierBindings(
   return bindings;
 }
 
-// 部门默认涉及的部门：定义里的部门（默认三部门），目录里已有绑定的部门也算
-// （模型管理设计说明第 5.1 节：部门默认按定义里的每个部门各设一项）
-export function departmentsOf(bindings: Record<string, CatalogBinding> | undefined): string[] {
-  const departments: string[] = [...DEPARTMENTS];
+// 部门默认涉及的部门：这一版加载的定义里的部门（catalog 查询的 departments，工单 #1457），
+// 目录里已有绑定的部门也算（模型管理设计说明第 5.1 节：部门默认按定义里的每个部门各设一项）
+export function departmentsOf(bindings: Record<string, CatalogBinding> | undefined,
+                             departments: readonly string[] = []): string[] {
+  const merged: string[] = [...departments];
   for (const key of Object.keys(bindings ?? {})) {
-    if (!departments.includes(key)) {
-      departments.push(key);
+    if (!merged.includes(key)) {
+      merged.push(key);
     }
   }
-  return departments;
+  return merged;
 }
 
 // 目录里的定义 → 保存时要写的一份（catalog.connection.save 的 models 字段）
