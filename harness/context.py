@@ -225,7 +225,8 @@ def _request_image(image: dict[str, Any], *, run_id: str, artifacts: ArtifactSto
 
 
 def work_notifications(projection: RunProjection, events: list[Any] | None, department: str,
-                       session_id: str | None) -> list[dict[str, Any]]:
+                       session_id: str | None,
+                       definitions: Definitions | None = None) -> list[dict[str, Any]]:
     # 这个会话还没有看到的新东西（工单 #558、工单 #964）：PRD 的新版本、交付到达与用户追加的输入。
     # 判据是「这个会话上一次装配请求以后」写下的东西：它在这个会话的下一步作为通知送达，
     # 部门接着工作，这一轮不因此结束。通知只在会话之间比较，同一会话里下一次请求不再重复送达同一份通知。
@@ -271,8 +272,9 @@ def work_notifications(projection: RunProjection, events: list[Any] | None, depa
             "change_record": spec.change_record,
             "decision_changes": spec.decision_changes,
         })
-    if department == "quality":
-        # 交付到达只通知质检：它面对的代码随交付变化，检查工作区因此重建（local-tools 第 2 节）
+    if department in (definitions or DEFINITIONS).verified_by("delivery_spec"):
+        # 交付到达只通知核验交付的那个角色（核验声明，工单 #1401）：它面对的代码随交付变化，
+        # 检查工作区因此重建（local-tools 第 2 节）
         for delivery in projection.delivery_specs:
             if delivery.status != "active":
                 continue
@@ -386,16 +388,19 @@ class ContextAssembler:
         current_delivery = projection.delivery_spec
         if current_delivery is not None and current_delivery.status != "active":
             current_delivery = None
-        # 质检请求里可以放入的工程内容（工单 #554）：事实部分总在，解释部分看质检有没有对当前交付下结论
-        engineering = (quality_engineering_content(events or [], delivery=current_delivery,
-                                                  definitions=definitions)
-                       if department == "quality" else None)
+        # 核验角色请求里可以放入的被核验方内容（工单 #554、#1401）：事实部分总在，
+        # 解释部分看它有没有对当前交付下结论。是核验角色的判断按核验声明取，不按部门名
+        verified_content = (quality_engineering_content(events or [], delivery=current_delivery,
+                                                       definitions=definitions)
+                            if department in definitions.verified_by("delivery_spec") else None)
         # 这个会话要回答的那一次询问：询问分支看自己那一次（一个部门可以同时有几个分支，工单 #559），
         # 主线会话沿用询问链上最内层的那一次
         pending_ask = projection.ask_by_branch(session_id) or projection.active_ask
         # 钉住材料顺序：intend → current_work → project（项目 run）→ department_guidance（有待处理指导）→ department_rules。
-        notifications = work_notifications(projection, events, department, session_id)
-        current_work = _current_work(projection, department, engineering, notifications, ask=pending_ask)
+        notifications = work_notifications(projection, events, department, session_id,
+                                           definitions=definitions)
+        current_work = _current_work(projection, department, verified_content, notifications,
+                                     definitions=definitions, ask=pending_ask)
         parts: list[ContextPart] = [
             ContextPart("intend", str(projection.input_version), projection.task),
             ContextPart("current_work", _current_work_version(current_work),
@@ -445,7 +450,7 @@ class ContextAssembler:
                     "revision": structure["revision"],
                 }),
             ))
-        parts.extend(self._prior_parts(projection, department))
+        parts.extend(self._prior_parts(projection, department, visible, definitions))
         if guidance_items:
             parts.append(ContextPart(
                 "department_guidance",
@@ -493,14 +498,14 @@ class ContextAssembler:
             ask = pending_ask
             if ask.get("recipient") == department:
                 payload = dict(ask)
-                if engineering is not None and not engineering["explanation_visible"]:
-                    # 质检分支看到的问题：解释部分在质检对当前交付下结论以前不给（工单 #554）
+                if verified_content is not None and not verified_content["explanation_visible"]:
+                    # 核验分支看到的问题：解释部分在它对当前交付下结论以前不给（工单 #554）
                     payload.pop("explanation", None)
                 parts.append(ContextPart("pending_ask", ask.get("branch_session_id"), json_dumps(payload)))
-        if engineering is not None and engineering["explanations"]:
-            # 质检对当前交付下结论以后，工程在问答里的解释部分进入它之后的请求（工单 #554）
+        if verified_content is not None and verified_content["explanations"]:
+            # 核验角色对当前交付下结论以后，被核验方在问答里的解释部分进入它之后的请求（工单 #554）
             parts.append(ContextPart("engineering_explanation", None,
-                                     json_dumps(engineering["explanations"])))
+                                     json_dumps(verified_content["explanations"])))
         if projection.product_spec and projection.product_spec.status == "active":
             spec = projection.product_spec
             parts.append(
@@ -539,7 +544,8 @@ class ContextAssembler:
             )
         if current_delivery is not None and delivery_facts:
             # 解释字段进不进入这份材料：可见范围里有解释那一项，并且时间条件成立（工单 #357、#554、#358）
-            explanation_visible = delivery_explanation and (engineering is None or engineering["explanation_visible"])
+            explanation_visible = delivery_explanation and (
+                verified_content is None or verified_content["explanation_visible"])
             payload = _delivery_payload(current_delivery, explanation_visible=explanation_visible,
                                         definitions=definitions)
             parts.append(
@@ -552,12 +558,12 @@ class ContextAssembler:
         elif current_delivery is None and "prior_delivery" in visible:
             prior = _prior_delivery_for_repair(projection)
             if prior is not None:
-                payload = _delivery_payload(prior, purpose="repair_basis", definitions=definitions)
-                if not delivery_explanation or (engineering is not None and not engineering["explanation_visible"]):
-                    # 新的交付还没有结论：此前全部工程内容的解释部分都重新藏起来（工单 #554）；
-                    # 可见范围里没有解释那一项的角色一直看不到它（工单 #357）
-                    for field in _delivery_explanation_fields(definitions):
-                        payload.pop(field, None)
+                # 新的交付还没有结论：此前全部被核验方内容的解释部分都重新藏起来（工单 #554）；
+                # 可见范围里没有解释那一项的角色一直看不到它（工单 #357）
+                payload = _delivery_payload(
+                    prior, purpose="repair_basis", definitions=definitions,
+                    explanation_visible=delivery_explanation and (
+                        verified_content is None or verified_content["explanation_visible"]))
                 parts.append(
                     ContextPart(
                         "prior_delivery",
@@ -652,10 +658,13 @@ class ContextAssembler:
         return AssembledContext(department=department, prompt_text=prompt_text, parts=parts, manifest=manifest,
                                 input_items=input_items, tools=tools)
 
-    def _prior_parts(self, projection: RunProjection, department: str) -> list[ContextPart]:
-        # 修改轮的常驻材料：产品看到上一轮的初始 PRD 与这一轮用户的修改意见，工程看到上一轮的结构说明，
-        # 质检只核验这一轮新写出的初始 PRD，上一轮的原文都不给它（设计第 4.7 节最后一段）
-        if department not in {"product", "engineering"} or self.store is None or self.artifacts is None:
+    def _prior_parts(self, projection: RunProjection, department: str, visible: tuple[str, ...],
+                     definitions: Definitions) -> list[ContextPart]:
+        # 修改轮的常驻材料（工单 #1401）：可见范围里有这一项的角色，看到上一轮里它自己会交出的那两种成果的原文。
+        # 哪一种按它的提案合同取，不按部门名：会交产品要求的是初始 PRD 与这一轮用户的修改意见，
+        # 会交结构说明的是上一轮的结构说明；不交这两种成果的角色（核验角色）看不到上一轮的原文
+        # （设计第 4.7 节最后一段）
+        if "prior_round" not in visible or self.store is None or self.artifacts is None:
             return []
         basis = projection.onboarding_basis
         if basis is None:
@@ -667,7 +676,10 @@ class ContextAssembler:
         prior_run_id, round_number = candidate["run_id"], candidate["round"]
         prd = candidate["prd"]
         parts: list[ContextPart] = []
-        if department == "product":
+        material = prior_round_outcome(definitions.proposal_contract(department, projection.kind)["kinds"])
+        if material is None:
+            return []
+        if material == "product_spec":
             parts.append(ContextPart(
                 "prior_initial_prd",
                 prd["content_hash"].split(":", 1)[1][:12],
@@ -737,34 +749,25 @@ def _current_work_version(current_work: dict[str, Any]) -> str:
 
 
 def _current_work(projection: RunProjection, department: str,
-                  engineering: dict[str, Any] | None = None,
+                  verified_content: dict[str, Any] | None = None,
                   notifications: list[dict[str, Any]] | None = None,
+                  definitions: Definitions | None = None,
                   ask: dict[str, Any] | None = None) -> dict[str, Any]:
-    if projection.kind == "onboarding":
-        # 建档事项中的工作文字（工单 #134）：读取与核验现有代码，没有实现与放行
-        work = {
-            "product": "依据 existing_overview 与读取到的代码、文档、测试，形成并提交描述现有行为的初始 PRD。",
-            "engineering": "读取现有代码，用 run_check 运行构建与测试的命令，提交绑定当前快照的现有结构说明。",
-            "quality": "独立核验初始 PRD 与现有行为是否一致，提交基线核验。",
-        }[department]
-    else:
-        work = {
-            "product": "形成并提交当前产品要求。",
-            "engineering": "依据当前产品要求实现、运行检查并提交交付。",
-            "quality": "独立验证当前交付，提交放行或返工决定。",
-        }[department]
-    if department == "product" and has_new_baseline_review(projection):
-        work = ("根据基线核验中 unsupported 的结论与遗漏修改初始 PRD 的描述，并提交新的 ProductSpec。"
-                if projection.kind == "onboarding"
-                else "根据当前质检缺陷修改产品要求，并提交新的 ProductSpec。")
-    elif department == "engineering" and projection.effective_decisions:
-        work = "依据 current_product_decisions 中已正式接纳的有效决定继续当前工程工作。"
+    # 「现在要做的事」一句话从定义里读（工单 #1401）：事项种类为每个角色写了一条，两种情形各有一条替代。
+    # 定义里没写这个角色在本种类里做什么时（例如只给了部门清单的形态），这一句为空
+    declared = (definitions or DEFINITIONS).department_work(department, projection.kind)
+    work = declared.current_work if declared is not None else ""
+    if declared is not None and declared.current_work_after_baseline_review \
+            and has_new_baseline_review(projection):
+        work = declared.current_work_after_baseline_review
+    elif declared is not None and declared.current_work_after_decisions and projection.effective_decisions:
+        work = declared.current_work_after_decisions
     if ask is not None:
         if ask.get("recipient") == department:
             question = str(ask.get("question") or "")
             background = str(ask.get("background") or "")
-            if engineering is not None:
-                # 质检分支看到的问题：只留事实部分，解释部分等质检对当前交付下结论以后（工单 #554）
+            if verified_content is not None:
+                # 核验分支看到的问题：只留事实部分，解释部分等它对当前交付下结论以后（工单 #554）
                 question = str(ask.get("facts") or question)
                 background = ""
             work = (f"回答来自 {ask.get('requester')} 的询问：{question}。"
@@ -864,15 +867,16 @@ def _delivery_payload(delivery: DeliverySpec, *, purpose: str | None = None,
     if purpose is not None:
         payload["purpose"] = purpose
     if not explanation_visible:
-        # 解释部分还没有到质检看的时候：只留事实部分（工单 #554）
-        for field in _delivery_explanation_fields(definitions):
+        # 解释部分还没有到核验角色看的时候：只留事实部分（工单 #554）
+        for field in _delivery_explanation_fields(definitions, delivery.issuer):
             payload.pop(field, None)
     return payload
 
 
-def _delivery_explanation_fields(definitions: Definitions | None = None) -> tuple[str, ...]:
-    # 交付说明里属于解释部分的字段：提案合同里标明（工单 #554）；按这次激活使用的定义取（#1175 第 7 轮）
-    contract = (definitions or DEFINITIONS).proposal_contracts.roles["engineering"].kinds["delivery_spec"]
+def _delivery_explanation_fields(definitions: Definitions | None, issuer: str) -> tuple[str, ...]:
+    # 交付说明里属于解释部分的字段（工单 #554）：读被核验方（交这份说明的角色）的提案合同，
+    # 不按部门名取（工单 #1401）；按这次激活使用的定义取（#1175 第 7 轮）
+    contract = (definitions or DEFINITIONS).proposal_contracts.roles[issuer].kinds["delivery_spec"]
     parts = contract.get("parts") or {}
     return tuple(str(field) for field in parts.get("explanation") or ())
 
@@ -883,7 +887,9 @@ def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec |
     # 事实部分总在；解释部分在核验角色提交了当前交付的独立判断（independent_judgement_committed）
     # 以后进入它之后的请求——先判断后看解释，解释不再等质检的结论；新的交付到达后按新交付重新计算：
     # 解释部分重新藏起来，等核验角色对新交付的独立判断。
-    # 三条通道：交付说明、核验角色收到的工程回答、核验角色分支看到的工程的问题。
+    # 三条通道：交付说明、核验角色收到的被核验方的回答、核验角色分支看到的被核验方的问题。
+    # 哪两个角色是这一对按核验声明取（工单 #1401），不按部门名。
+    pairs = set((definitions or DEFINITIONS).verification_pairs("delivery_spec"))
     delivery_hash = delivery.content_hash if delivery is not None else _latest_delivery_hash(events)
     explanation_visible = delivery_hash is not None and any(
         event.type in (EventType.QA_SUBMITTED, EventType.INDEPENDENT_JUDGEMENT_COMMITTED)
@@ -906,12 +912,12 @@ def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec |
                 "explanation": payload.get("explanation", ""),
             }
             asks[str(payload.get("branch_session_id"))] = item
-            if payload.get("requester") == "engineering" and payload.get("recipient") == "quality":
-                # 工程问质检的问题：分事实与解释两部分（工单 #554）
+            if (payload.get("recipient"), payload.get("requester")) in pairs:
+                # 被核验方问核验角色的问题：分事实与解释两部分（工单 #554）
                 questions.append(item)
         elif event.type == EventType.ASK_ANSWERED \
-                and payload.get("requester") == "quality" and payload.get("recipient") == "engineering":
-            # 工程回答质检的回答：分事实与解释两部分（工单 #554）
+                and (payload.get("requester"), payload.get("recipient")) in pairs:
+            # 被核验方回答核验角色的回答：分事实与解释两部分（工单 #554）
             asked = asks.get(event.session_id, {})
             answers.append({
                 "event_id": event.event_id,
@@ -964,6 +970,15 @@ def engineering_facts_text(item: dict[str, Any], *, part: str = "answer",
     if explanation_visible and explanation:
         return f"{text}\n{explanation}" if text else explanation
     return text
+
+
+def prior_round_outcome(kinds: Any) -> str | None:
+    # 修改轮的常驻材料给这个角色看哪种成果的原文（工单 #1401）：会交产品要求的给上一轮的初始 PRD 与修改意见，
+    # 会交结构说明的给上一轮的结构说明；两种都不交的角色（例如核验角色）不给上一轮的原文
+    for outcome in ("product_spec", "structure"):
+        if outcome in kinds:
+            return outcome
+    return None
 
 
 def _prior_delivery_for_repair(projection: RunProjection) -> DeliverySpec | None:

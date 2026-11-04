@@ -93,11 +93,12 @@ def check_contract(kind: ActionKind, verification: Verification | None, cancella
 # context.column_limit.catalog
 RuleName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")]
 
-# 可见范围的封闭词表（roles.json 的 visibility 一栏）：三条 roles.<部门>.visibility 参数的取值只能是其中的子集
-# （工单 #1189）。词表只在这里写一份，参数的取值核对与角色定义共用它。交付说明三项（工单 #357）：整份
-# current_delivery_spec、事实部分 delivery_facts、解释部分 delivery_explanation；其余三项是共享材料
+# 可见范围的封闭词表（roles.json 的 visibility 一栏）：每个角色的 roles.<角色>.visibility 参数的取值只能是其中的
+# 子集（工单 #1189）。词表只在这里写一份，参数的取值核对与角色定义共用它。交付说明三项（工单 #357）：整份
+# current_delivery_spec、事实部分 delivery_facts、解释部分 delivery_explanation；共享材料三项是既有结构、上一份
+# 交付与质检缺陷；修改轮的常驻材料是原样给出上一轮的产出（工单 #1401，只给会产出的那个角色）
 VisibilityValue = Literal["current_delivery_spec", "delivery_facts", "delivery_explanation", "existing_structure",
-                          "prior_delivery", "qa_defects"]
+                          "prior_delivery", "qa_defects", "prior_round"]
 VISIBILITY_VALUES: frozenset[str] = frozenset(get_args(VisibilityValue))
 
 
@@ -540,6 +541,11 @@ class DepartmentWork(_Definition):
     prompt: str = Field(min_length=1)
     tools: tuple[Identifier, ...] = Field(min_length=1)
     notes: tuple[str, ...] = ()
+    # 这个角色在本种类里「现在要做的事」一句话，装配写进 current_work 交给模型（工单 #1401）；
+    # 下面两条是同一句话在两种情形下的替代：有新到的基线核验要求返工、有已接纳的补充决定
+    current_work: str = Field(min_length=1)
+    current_work_after_baseline_review: str = ""
+    current_work_after_decisions: str = ""
 
 
 class WorkItemKind(_Definition):
@@ -706,6 +712,11 @@ class Definitions(_Definition):
         """核验这种成果的核验角色，不论被核验的是哪个角色；按声明顺序，重复的不列。"""
         return tuple(dict.fromkeys(verifier for verifier, _verified, kind in self.rejection_edges()
                                    if kind == outcome))
+
+    def verification_pairs(self, outcome: str) -> tuple[tuple[str, str], ...]:
+        """这种成果的（核验角色，被核验方）一对一对，按声明顺序；装配按它取双方的问答与解释字段。"""
+        return tuple((verifier, verified) for verifier, verified, kind in self.rejection_edges()
+                     if kind == outcome)
 
     def write_scope(self, role: str) -> WriteScope:
         """角色的写入范围：声明了就用它，没有声明的角色写这个事项的工作区。"""
