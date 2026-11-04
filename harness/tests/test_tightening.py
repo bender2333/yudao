@@ -13,10 +13,13 @@
 # 与 R3（设计说明第 5.5 节写明的行为，经这条缝检查，不看收紧检查内部怎么组织）。
 from harness.tests.helpers import adjudication_view, minimal_of, work_basis
 
+import json
+import shutil
 from dataclasses import replace
 
 from harness.actions import CheckReceipt, TreeFacts
 from harness.adapters.fake import FakeAdapter
+from harness.definitions import DEFINITIONS_DIR, load_definitions
 from harness.kernel_events import Event
 from harness.models import (ArtifactRef, DeliverySpec, EffectiveContract, EventType, SessionRecord)
 from harness.proposals import baseline_review, product_spec, review, structure
@@ -108,6 +111,22 @@ def _delivery_ready(projection, *, qa_tests_hash="sha256:current", receipt_mater
 
 def _errors(tightened) -> list[tuple[str, str]]:
     return [(error.field, error.message) for error in tightened.errors]
+
+
+def _definitions_received_by_engineering(tmp_path):
+    # 工单 #1455 的一份定义：工程接两种来源，产品关注成果但不看用户输入。
+    # 与发布的定义只差这两处（默认定义里接输入的是产品）。
+    directory = tmp_path / "definitions"
+    directory.mkdir()
+    for path in DEFINITIONS_DIR.glob("*.json"):
+        shutil.copyfile(path, directory / path.name)
+    organization = json.loads((directory / "organization.json").read_text(encoding="utf-8"))
+    organization["sources"] = {"user_input": "engineering", "onboarding": "engineering"}
+    next(item for item in organization["departments"] if item["id"] == "product")["watched"] = [
+        "delivery", "guidance"]
+    (directory / "organization.json").write_text(
+        json.dumps(organization, ensure_ascii=False, indent=2), encoding="utf-8")
+    return load_definitions(directory)
 
 
 def test_the_tightening_check_declares_the_contract_version():
@@ -218,6 +237,24 @@ def test_a_release_waits_for_the_product_input_inside_the_commit(tmp_path):
         review("release", "verified", checks=["smoke"], basis_delivery_spec_hash=DELIVERY),
         facts=_facts(receipt),
         events=(*events, _judgement_event(spec_hash=projection.product_spec.content_hash)), commit=True))
+    assert tightened.wait and not tightened.accepted
+
+
+def test_a_release_waits_for_the_input_the_definitions_in_force_give(tmp_path):
+    # R3（工单 #1455）：提交事务里的这一次判断按事项所用的定义找接输入的部门，不按进程加载的默认定义。
+    # 这份定义里工程接输入，工程还没处理过这一版输入：放行在提交事务里等。
+    # 默认定义里接输入的是产品，而产品在第一次激活里就把这一版输入处理完了，所以判断用的是默认定义时
+    # 这里不会等——两种读法的结果在这条用例里不同。
+    definitions = _definitions_received_by_engineering(tmp_path)
+    system, run_id = _accepted(tmp_path)
+    projection, receipt = _delivery_ready(system.project(run_id))
+    events = tuple(system.store.list_events(run_id))
+    tightened = WATCHED_OUTPUTS.submission(_structured(
+        projection, "quality",
+        review("release", "verified", checks=["smoke"], basis_delivery_spec_hash=DELIVERY),
+        facts=_facts(receipt),
+        events=(*events, _judgement_event(spec_hash=projection.product_spec.content_hash)),
+        commit=True, definitions=definitions))
     assert tightened.wait and not tightened.accepted
 
 
