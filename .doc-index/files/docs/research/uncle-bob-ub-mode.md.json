@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/research/uncle-bob-ub-mode.md",
-"hash":"7255ede915f29344",
+"hash":"2507f5137b9b3647",
 "nodes":[
-{"hash":"7255ede915f29344","id":"docs/research/uncle-bob-ub-mode.md","kind":"file","title":"docs/research/uncle-bob-ub-mode.md"},
+{"hash":"2507f5137b9b3647","id":"docs/research/uncle-bob-ub-mode.md","kind":"file","title":"docs/research/uncle-bob-ub-mode.md"},
 {"hash":"72a7f20c00f82f77","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md","title":"Uncle Bob 的 ub-mode 调研"},
 {"hash":"70c8fdbb9502a766","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > 做法与参数速查","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研","title":"做法与参数速查"},
 {"hash":"7f8bbed2bf80d953","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > 做法与参数速查 > 参数表","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > 做法与参数速查","title":"参数表"},
@@ -12,9 +12,9 @@
 {"hash":"857c8acc1bceece5","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > B. 它调用的质量检查工具","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研","title":"B. 它调用的质量检查工具"},
 {"hash":"12ac3d0e4812d11e","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > C. 他本人关于不读代码、靠自动检查的说法","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研","title":"C. 他本人关于不读代码、靠自动检查的说法"},
 {"hash":"9557c89c7d820e40","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研","title":"D. 与本仓库设想的对照"},
-{"hash":"2b4d92bca54aded0","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照 > (1) 有对应的检查","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照","title":"(1) 有对应的检查"},
+{"hash":"4506295f0e0ecd6d","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照 > (1) 有对应的检查","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照","title":"(1) 有对应的检查"},
 {"hash":"d4b3a056695c351b","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照 > (2) ub-mode 有而本仓库设想里没有的做法","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照","title":"(2) ub-mode 有而本仓库设想里没有的做法"},
-{"hash":"53a5eec2e4363959","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照 > (3) 阈值或步骤不同","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照","title":"(3) 阈值或步骤不同"},
+{"hash":"53f7e947a91cabe5","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照 > (3) 阈值或步骤不同","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照","title":"(3) 阈值或步骤不同"},
 {"hash":"f0f53f8ac27a1500","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照 > (4) 与共同规则的冲突","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > D. 与本仓库设想的对照","title":"(4) 与共同规则的冲突"},
 {"hash":"1f33895093a61eba","id":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研 > 未能确认的事项","kind":"section","parent":"docs/research/uncle-bob-ub-mode.md#Uncle Bob 的 ub-mode 调研","title":"未能确认的事项"}
 ],
