@@ -14,12 +14,12 @@ from __future__ import annotations
 
 import asyncio
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Iterator
 
 import pytest
-from contextlib import contextmanager
 
 from harness.actions import Action
 from harness.artifacts import ArtifactStore
@@ -47,6 +47,8 @@ _SERVER = (
 RUN_ID = "run-trial-cases"
 DEPARTMENT = "quality"
 ACTIVATION = "act_quality_1"
+# 质检这次工作的部门会话：用例打开到结束之间这个会话里的浏览器动作是它的步骤
+SESSION = "ses_quality_1"
 
 
 def _launch() -> dict[str, Any]:
@@ -129,9 +131,6 @@ class _Case:
     def close(self) -> None:
         self.loop.run_until_complete(self.environment.browsers.close_all("test cleanup"))
         self.store.close()
-
-
-SESSION = "ses_quality_1"
 
 
 def _criteria(case_id: str, result: str = "passed") -> list[dict[str, Any]]:
