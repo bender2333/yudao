@@ -125,6 +125,21 @@ def test_the_shipped_routing_definition_passes_the_routing_own_check():
     assert ROUTING.check_definition(DEFINITIONS) is None
 
 
+def test_a_watched_name_the_routing_does_not_know_fails_the_routing_own_check(tmp_path):
+    # R2：关注的成果（organization.json 的 watched）松开成字符串以后，名称的含义归路由（工单 #1456）：
+    # 写错的名称在启动时被拒绝并写明哪一项，不会等到运行到 has_new_work 才抛 KeyError
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["departments"][1]["watched"] = ["product_spce", "guidance"]
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    with pytest.raises(routing_contract.InvalidRoutingDefinition) as raised:
+        ROUTING.check_definition(loaded)
+    issues = "\n".join(raised.value.issues)
+    assert "departments[engineering].watched[0]：关注的成果 product_spce 没有这一种" in issues
+    assert "watched[1]" not in issues
+
+
 def test_a_routing_that_does_not_declare_its_item_end_reason_is_rejected(tmp_path):
     # R3：事项结束用的原因要写在它自己的一份定义里（设计说明第 5.4 节第 7 条）
     directory = _copy(tmp_path)
@@ -199,6 +214,7 @@ def test_an_old_definitions_directory_without_the_outcome_kinds_item_still_loads
     loaded = load_definitions(directory)
     assert loaded.routings.routings[0].outcome_kinds[0] == "product_spec"
     assert loaded.outcomes_of("watched_outputs")[0] == "product_spec"
+
 
 def test_the_skeleton_outcome_kinds_can_be_named_by_a_contract(tmp_path):
     # R2：骨架自己产生的那两种成果（有效合同、代码树快照）写在成果种类那一项的 skeleton 里，

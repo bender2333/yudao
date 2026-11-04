@@ -503,6 +503,11 @@ def check_definition(definitions: Any) -> None:
     for department in departments:
         if department not in declared.departments:
             issues.append(f"departments：组织定义里的部门 {department} 没有列进路由的部门清单")
+        # 关注的成果（工单 #1456）：组织定义里的名称由这一份路由实现认。内核只认字符串，
+        # 名称的含义归路由——写错的名称要在这里拒绝，不能等到运行到 has_new_work 才抛 KeyError
+        for index, name in enumerate(definitions.watched_outputs(department)):
+            if name not in _WATCHED_CHECKS:
+                issues.append(f"departments[{department}].watched[{index}]：关注的成果 {name} 没有这一种")
     submitted = [definitions.tools[method].proposal for index, method in enumerate(declared.proposal_methods)
                  if method in definitions.tools and definitions.tools[method].proposal is not None]
     for index, method in enumerate(declared.proposal_methods):
