@@ -44,15 +44,13 @@ def routing_departments(definitions: Any | None = None) -> tuple[str, ...]:
 
 
 def input_department(definitions: Any | None = None) -> str:
-    """收用户输入的部门：组织定义里关注用户输入的那一个（watched 含 user_input）。
+    """收用户输入的部门（工单 #1455）：定义里事项的来源写明的那个部门。
 
-    部门的名称从定义取，代码里不写（工单 #1391）：谁收输入与发给它的指导，看谁关注用户输入。
+    不再看谁关注用户输入：关注用户输入是另一件事，留在关注关系里。部门的名称从定义取，代码里不写
+    （工单 #1391）：新输入分派给它，发给它的指导也由它的处理算完。
     """
     definition = DEFINITIONS if definitions is None else definitions
-    for department in definition.departments:
-        if "user_input" in definition.watched_outputs(department):
-            return department
-    raise ValueError("organization.json declares no department that watches user input")
+    return definition.input_department()
 
 
 def proposal_kinds_for(department: str, kind: str = "change", definitions: Any | None = None) -> set[str]:
@@ -107,8 +105,19 @@ def waiting_departments(statuses: Mapping[str, str | None]) -> set[str]:
 
 
 def _has_new_user_input(projection: RunProjection) -> bool:
-    """用户的输入：还有没被产品处理的输入。"""
+    """用户的输入：还有没被处理完的输入（按输入交上的成果被接纳才算处理完）。"""
     return projection.input_version > projection.processed_input_version
+
+
+def _has_new_input(projection: RunProjection, department: str, definition: Any) -> bool:
+    """接这个事项来源的部门还有没处理完的输入：事项开始时与新的输入到达时，先是它的一轮工作。
+
+    哪个部门接取自定义（工单 #1455）：来源由事项的种类给出（建档或你的输入），不按关注用户输入判断。
+    「处理完」只有一个说法：按输入交上的成果被接纳，processed_input_version 前进——与旧的行为相同。
+    """
+    if department != definition.source_department(definition.item_source(projection.kind)):
+        return False
+    return _has_new_user_input(projection)
 
 
 def _has_new_guidance(projection: RunProjection, department: str) -> bool:
@@ -220,7 +229,7 @@ def has_new_baseline_review(projection: RunProjection) -> bool:
 
 
 _WATCHED_CHECKS = {
-    "user_input": lambda projection, department: _has_new_user_input(projection),
+    # user_input 不在这里：用户输入由接这个事项来源的部门开始，不再由关注它的部门开始（工单 #1455）
     "guidance": _has_new_guidance,
     "product_spec": _has_new_product_spec,
     "defect_record": lambda projection, department: _has_new_defect_record(projection),
@@ -230,15 +239,23 @@ _WATCHED_CHECKS = {
 }
 
 
-def watched_new_work(projection: RunProjection, department: str) -> list[str]:
-    """部门关注的成果里，现在有新东西的那些（按定义的顺序）。"""
-    return [kind for kind in DEFINITIONS.watched_outputs(department)
-            if _WATCHED_CHECKS[kind](projection, department)]
+def watched_new_work(projection: RunProjection, department: str,
+                      definitions: Any | None = None) -> list[str]:
+    """部门现在的新工作（按定义的顺序）：接来源的部门收到输入，或者关注的成果有了新东西。
+
+    输入那一项记作 user_input，但它是按来源的接部门给的，不看谁关注用户输入（工单 #1455）。
+    """
+    definition = DEFINITIONS if definitions is None else definitions
+    kinds = [kind for kind in definition.watched_outputs(department)
+             if kind in _WATCHED_CHECKS and _WATCHED_CHECKS[kind](projection, department)]
+    if _has_new_input(projection, department, definition):
+        kinds.insert(0, "user_input")
+    return kinds
 
 
-def has_new_work(projection: RunProjection, department: str) -> bool:
-    """部门现在有没有新的工作：关注的成果有了新东西。"""
-    return bool(watched_new_work(projection, department))
+def has_new_work(projection: RunProjection, department: str, definitions: Any | None = None) -> bool:
+    """部门现在有没有新的工作：接它的输入，或者关注的成果有了新东西。"""
+    return bool(watched_new_work(projection, department, definitions))
 
 
 def pending_ask_department(projection: RunProjection) -> str | None:
@@ -259,17 +276,19 @@ def _free(projection: RunProjection, waiting: set[str] | None, department: str) 
     return department in waiting if waiting is not None else is_waiting(projection, department)
 
 
-def department_ready(projection: RunProjection, department: str, waiting: set[str] | None = None) -> bool:
-    """这个部门现在可以开始一轮工作：在等待工作，并且关注的成果有了新东西。
+def department_ready(projection: RunProjection, department: str, waiting: set[str] | None = None,
+                     definitions: Any | None = None) -> bool:
+    """这个部门现在可以开始一轮工作：在等待工作，并且有新的工作。
 
     同时运行（工单 #557）：准备激活的事务里由薄驱动重新问一次，别的会话在这期间做完了就开始。
     """
     if not _free(projection, waiting, department):
         return False
-    return has_new_work(projection, department)
+    return has_new_work(projection, department, definitions)
 
 
-def next_department(projection: RunProjection, waiting: set[str] | None = None) -> str | None:
+def next_department(projection: RunProjection, waiting: set[str] | None = None,
+                    definitions: Any | None = None) -> str | None:
     """下一个开始一轮工作的部门：先看还没回答的询问，再按定义里的部门顺序取第一个
     在等待且有新的工作的。
 
@@ -277,25 +296,28 @@ def next_department(projection: RunProjection, waiting: set[str] | None = None) 
     waiting 给出在等待的部门（进程中断以后会话是新开的，投影里那条「工作中」的记录不再算数）；
     没有给出时按投影里的会话记录判断。
     """
+    definition = DEFINITIONS if definitions is None else definitions
     asking = pending_ask_department(projection)
     if asking is not None and _free(projection, waiting, asking):
         return asking
-    for department in DEFINITIONS.departments:
-        if _free(projection, waiting, department) and has_new_work(projection, department):
+    for department in definition.departments:
+        if _free(projection, waiting, department) and has_new_work(projection, department, definition):
             return department
     return None
 
 
-def ready_departments(projection: RunProjection, waiting: set[str] | None = None) -> list[str]:
+def ready_departments(projection: RunProjection, waiting: set[str] | None = None,
+                      definitions: Any | None = None) -> list[str]:
     """现在可以开始一轮工作的部门（按定义顺序），各自一个会话同时运行（工单 #557）。
 
-    关注的成果有了新版本、又在等待工作的部门都列出来：控制核心让它们同时开始，
+    有新的工作、又在等待的部门都列出来：控制核心让它们同时开始，
     一个部门同一时刻最多一轮工作（循环结构第 3.2 节第 6 条）。
 
     指导与其他关注的成果一样：有待处理指导、又在等待工作的部门以这段指导开始一轮完整的
     工作（循环结构第 6 节，工单 #560），不为它另设一种只回应指导的轮次。
     还没回答的询问是另一类：提问方的会话要继续，在它自己的会话里跑。
     """
+    definition = DEFINITIONS if definitions is None else definitions
     ready: list[str] = []
 
     def take(department: str) -> None:
@@ -305,8 +327,8 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     asking = pending_ask_department(projection)
     if asking is not None and _free(projection, waiting, asking):
         take(asking)
-    for department in DEFINITIONS.departments:
-        if _free(projection, waiting, department) and has_new_work(projection, department):
+    for department in definition.departments:
+        if _free(projection, waiting, department) and has_new_work(projection, department, definition):
             take(department)
     return ready
 

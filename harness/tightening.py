@@ -56,8 +56,9 @@ def pending_product_input(projection: RunProjection, events: list[Event],
     取消、暂停、上限与运行时间用完不算正常结束，事项已结束当作处理完。
 
     不用 ``processed_input_version``：它只在 PRD 被接纳时前进，一个决定不改 PRD 时永远不前进，
-    放行会一直等。只看收输入的部门：用户输入（``input_version``）与发给它的指导（它的「已回答」读的是同一件事）。
-    哪个部门收输入取自定义里关注用户输入的那一个，不写部门名（工单 #1391）。
+    放行会一直等。只看接输入的那个部门：用户输入（``input_version``）与发给它的指导（它的「已回答」读的是同一件事）。
+    哪个部门接输入取自定义里事项的来源写明的那个部门，不写部门名（工单 #1455；#1391 起从定义读，
+    此前是关注用户输入的那一个）。
     """
     department = input_department(definitions)
     if projection.status in TERMINAL_STATUSES:
@@ -116,7 +117,7 @@ def allowed_proposal_kinds(projection: RunProjection, department: str,
     definition = in_force(definitions)
     if projection.status in TERMINAL_STATUSES or department not in definition.departments:
         return set()
-    if is_working(projection, department) or has_new_work(projection, department):
+    if is_working(projection, department) or has_new_work(projection, department, definition):
         return proposal_kinds(department, projection.kind, definitions=definition)
     return set()
 
