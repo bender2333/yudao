@@ -90,6 +90,8 @@ const COMMON: Readonly<Record<string, string>> = none({
   instance_upgrade_requested: PAGE_ONLY,
   instance_upgrade_answered: PAGE_ONLY,
   instance_upgrade_withdrawn: PAGE_ONLY,
+  // 项目的形态（工单 #1392）：与项目参数同一类设置修改，画面里没有对应物
+  project_form_set: SETTINGS,
   decision_withdrawn: WITHDRAWN,
   project_decision_withdrawn: WITHDRAWN,
 });

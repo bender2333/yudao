@@ -356,6 +356,9 @@ class RunCreatedPayload(Payload):
     mcp_servers: McpServersDocument | None = None
     # 创建这个 run 时的 run 事件版本：run 流跟随应用版本，版本不同的未结束 run 按因升级停止处理（ADR-0019）
     run_event_version: int
+    # 创建这个 run 时冻结的形态名（工单 #1392）：这个 run 的部门、路由与停止原因按它的那份定义；
+    # 旧事件没有这个字段时按默认形态（三部门）读取
+    form: str = ""
     # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮候选事件与修改意见的工件引用。
     # 普通事项与建档第一轮没有这个字段，读取时按没有上一轮处理
     onboarding_basis: OnboardingBasis | None = None
@@ -1374,6 +1377,9 @@ class WorkItemCreatedPayload(Payload):
     # 事项创建时冻结的 MCP 服务器设置（工单 #236）：非秘密设置与凭据引用的整份文档，或可解析出它们的
     # 版本引用（document_digest 与 version）。旧事件没有这个字段时为空，按空设置读取
     mcp_servers: McpServersDocument | None = None
+    # 事项创建时冻结的形态名（工单 #1392）：之后这个事项的写入核对、路由、装配与执行都按它的那份定义；
+    # 旧事件没有这个字段时按默认形态（三部门）读取
+    form: str = ""
 
 
 class McpServersConfiguredPayload(Payload):
@@ -1809,6 +1815,15 @@ class ProjectParameterSetPayload(Payload):
     expected_change_id: str | None = None
 
 
+class ProjectFormSetPayload(Payload):
+    # 项目的形态改动（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：project_form_set 携带
+    # previous_form（改动前的那一份）、form（改动后的那一份）与理由；两个值都是发布带的形态名，
+    # 从来没有设过时按默认的三部门（three_departments）算。之后新建的事项按新的那一份冻结，正在跑的不变
+    previous_form: str
+    form: str
+    reason: str = ""
+
+
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷
 PAYLOADS: dict[str, Any] = {
     EventType.RUN_CREATED: RunCreatedPayload,
@@ -1888,6 +1903,7 @@ PAYLOADS: dict[str, Any] = {
     ProjectEventType.ONBOARDING_REVISION_STARTED: OnboardingRevisionStartedPayload,
     ProjectEventType.BASELINE_ADOPTED: BaselineAdoptedPayload,
     ProjectEventType.PARAMETER_SET: ProjectParameterSetPayload,
+    ProjectEventType.PROJECT_FORM_SET: ProjectFormSetPayload,
     ProjectEventType.WRITEBACK_COMPLETED: WritebackCompletedPayload,
     ProjectEventType.WRITEBACK_STOPPED: WritebackStoppedPayload,
     ProjectEventType.WRITEBACK_NOT_NEEDED: WritebackNotNeededPayload,
