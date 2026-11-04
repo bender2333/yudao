@@ -122,6 +122,9 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "roles.product.visibility": "",
     "roles.engineering.visibility": "",
     "roles.quality.visibility": "",
+    # 已接入（工单 #1184）：浏览器动作的调用时限由 harness/browser.py 读现值，是 Playwright MCP
+    # 自己的动作时限与导航时限之外的上限
+    "browser.call_timeout_sec": "",
 
     # 还没有读取方：取值不影响任何行为
     "adjudication.plan_before_write": "没有代码读取这条登记的取值：写入前的计划检查还没有实现",

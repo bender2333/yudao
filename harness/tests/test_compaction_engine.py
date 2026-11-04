@@ -16,10 +16,13 @@ from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import (
+    COMPACTION_ROOM,
     FAST_RETRIES,
     compacted_runner as _runner,
     department_history,
+    oversized_file,
     pinned_input_tokens,
+    pinned_window,
     quality_turns,
     read_file_call as _read,
     recorded_context,
@@ -196,19 +199,22 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
-def _tight_window_runner(tmp_path, respond, *, headroom=2050, task="Original intent",
+def _tight_window_runner(tmp_path, respond, *, room=COMPACTION_ROOM, task="Original intent",
                          keys=("product", "engineering", "quality")):
-    """窗口按固定材料的实测 token 数加余量推出（测试分层设计第 10 节第 3 条，不写死窗口）：
+    """窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计第 10 节第 3 条，不写死窗口）：
 
-    历史超过压缩阈值，而未压缩的工作请求仍放得下。余量低于实测的可行区间时未压缩的工作请求放不下
+    历史超过压缩阈值，而未压缩的工作请求仍放得下。窗口低于实测的可行区间时未压缩的工作请求放不下
     （这一步以 context_overflow 结束），高于区间时压缩不会被触发。假模型按脚本位取用，
     询问分支的脚本位是「部门:ask」（工单 #473）。
     """
     adapter = FakeAdapter({key: [respond] * 200 for key in keys})
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     measure_id = system.create_run(task, context_window=1_000_000)
-    run_id = system.create_run(task, context_window=pinned_input_tokens(system, measure_id) + headroom)
-    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 340)
+    window = pinned_window(system, measure_id, "product", "engineering", "quality", room=room)
+    run_id = system.create_run(task, context_window=window)
+    # 大文件按「窗口的 85%（压缩阈值）减去产品的固定材料」定尺寸：读一次就顶过阈值，未压缩的请求仍放得下
+    system.workspace(run_id).write_file(
+        "large.txt", oversized_file(window, pinned_input_tokens(system, measure_id, "product")))
     system.workspace(run_id).write_file("small.txt", "SMALL_TOOL_OUTPUT " * 4)
     return system, adapter, run_id
 
@@ -565,11 +571,11 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
     # 上下文窗口按这个场景的需要设置（测试分层设计说明第 10 节第 3 条）：工程开始时的请求（部门提示与
-    # 工程可用的工具说明）装得下、留出余量，压缩只发生在询问带回新合同以后。窗口由实测的固定材料推出，
-    # 不写死：工单 #1182 给工程加上试用工具以后固定材料多 574 个 token（4679 → 5253），余量保持
-    # 原来的 2867 个 token
+    # 工程可用的工具说明）装得下，压缩只发生在询问带回新合同以后。窗口按工程固定材料的实测值推出
+    # （pinned_window），不写死：工单 #1182 给工程加上试用工具以后固定材料多 574 个 token（4679 → 5253），
+    # 工单 #1184 加上 28 个浏览器工具的说明以后再多 4655 个 token（5251 → 9906）
     measure_id = system.create_run("build echo", context_window=1_000_000)
-    window = pinned_input_tokens(system, measure_id, "engineering") + 2867
+    window = pinned_window(system, measure_id, "engineering")
     run_id = system.create_run("build echo", context_window=window)
     for index in range(1, read_count + 1):
         system.workspace(run_id).write_file(f"part{index}.txt", "x" * 1200)
@@ -877,7 +883,11 @@ def _delivery_then_stalled_quality(tmp_path, *, stall_compactions: int):
     adapter = FakeAdapter({department: [respond] * 200 for department in ("product", "engineering", "quality")})
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
     run_id = system.create_run("Original intent", context_window=1_000_000)
-    system.workspace(run_id).write_file("large.txt", "TOOL_OUTPUT " * 340)
+    # 大文件按「窗口的 85%（压缩阈值）减去质检的固定材料」定尺寸（oversized_file）：交付以前量不全质检的
+    # 固定材料（PRD 与交付到货以后才进材料），按交付以前推出的窗口估；交付以后窗口按那时的实测值再定
+    system.workspace(run_id).write_file(
+        "large.txt", oversized_file(pinned_window(system, run_id, "quality"),
+                                    pinned_input_tokens(system, run_id, "quality")))
     system.workspace(run_id).write_file("small.txt", "SMALL_TOOL_OUTPUT " * 4)
     return system, adapter, run_id, compactions
 
@@ -890,10 +900,10 @@ def _delivery_accepted(system, run_id):
             break
     projection = system.project(run_id)
     assert (projection.status, len(projection.delivery_specs)) == ("running", 1)
-    # 余量 1800：除了让大文件的读取超过压缩阈值，还要留住摘要请求的额度（摘要上限 =
-    # (阈值 − 固定材料) // 2 不得低于 32 个 token）。质检的固定材料随工单 #1190 的提案合同与提交工具说明
-    # 增加约 400 个 token，原来的 1600 落到 28 个 token 的摘要上限，三次用例以 compaction_failed 结束
-    system.orchestrator._test_context_windows[run_id] = pinned_input_tokens(system, run_id, "quality") + 1800
+    # 窗口按交付以后质检的固定材料推出（pinned_window）：固定材料里有 PRD 与交付说明，交付之前量不全。
+    # 阈值（窗口的 85%）落在固定材料之上的那一截余量里——摘要请求有额度，质检读过大文件以后历史
+    # 又顶过阈值，而未压缩的工作请求仍放得下
+    system.orchestrator._test_context_windows[run_id] = pinned_window(system, run_id, "quality")
     return projection
 
 

@@ -693,6 +693,23 @@ class FileActionComparison(Payload):
     detail: dict[str, Any]
 
 
+class BrowserSessionState(Payload):
+    # 浏览器会话在核实记录里的状态（浏览器与 computer use 设计说明第 9 节，工单 #1184）：会话身份、
+    # 状态与试用副本的树摘要。持有会话的进程重新启动时状态为 interrupted，身份与摘要不再有值
+    session_id: str | None = None
+    status: Literal["running", "interrupted", "ended"]
+    tree_digest: str | None = None
+
+
+class BrowserObservation(Payload):
+    # 结果未知的浏览器动作被核实为「按当前实际状态继续」时取得的当前状态（设计说明第 9 节）：页面的
+    # 可访问性结构与截图。本机的浏览器会话随进程结束，恢复时只会记会话为中断，所以这一项本机不写；
+    # 它留给持有会话的执行代理（会话在远程执行位置上时由它建立并持有），归属见工单 #1184 的交付说明
+    accessibility: str
+    screenshot: ArtifactRef | None = None
+    structure_truncated: bool = False
+
+
 class ActionVerifiedPayload(Payload):
     # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约第 4 节）：不改写原来的观察。
     # resolution 为 continue 表示用户选择按当前实际状态继续（旧事件保留，新版本不再写，工单 #582）；
@@ -713,6 +730,12 @@ class ActionVerifiedPayload(Payload):
     auto_retry_of: str | None = None
     # 自动核实的依据（工单 #308）：动作前快照、动作参数与当前公开树的对比结论
     verification: FileActionComparison | None = None
+    # 浏览器动作的核实依据（工单 #1184，设计说明第 9 节）：会话状态与新取得的页面结构、截图；
+    # 非浏览器动作没有这两项。设计说明第 9 节的「会话仍然存在 → 按当前实际状态继续」这一支本机不写
+    # `observation`：MCP 的 stdio 会话属于建立它的进程，恢复在启动序列里跑，那时浏览器会话表是空的，
+    # 所以本地只会记会话为中断（`resolution=handed_back`）。这一支留给持有会话的执行代理
+    session: BrowserSessionState | None = None
+    observation: BrowserObservation | None = None
     note: str | None = None
     decision_id: str | None = None
 
