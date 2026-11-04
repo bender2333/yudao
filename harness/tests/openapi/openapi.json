@@ -5033,6 +5033,29 @@
         ],
         "title": "ArtifactRef"
       },
+      "AskRelation": {
+        "properties": {
+          "requester": {
+            "type": "string",
+            "title": "Requester"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requester",
+          "recipient",
+          "ref"
+        ],
+        "title": "AskRelation"
+      },
       "AskView": {
         "properties": {
           "id": {
@@ -11399,6 +11422,55 @@
         ],
         "title": "OrganizationAdopt"
       },
+      "OrganizationRole": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "ref"
+        ],
+        "title": "OrganizationRole"
+      },
+      "OrganizationVerifier": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "verifies": {
+            "items": {
+              "$ref": "#/components/schemas/VerifiedRole"
+            },
+            "type": "array",
+            "title": "Verifies"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "verifies",
+          "ref"
+        ],
+        "title": "OrganizationVerifier"
+      },
       "OverlayCapability": {
         "properties": {
           "name": {
@@ -12798,6 +12870,34 @@
           "message"
         ],
         "title": "Rejected"
+      },
+      "RejectionRelation": {
+        "properties": {
+          "verifier": {
+            "type": "string",
+            "title": "Verifier"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "verifier",
+          "role",
+          "outcome",
+          "ref"
+        ],
+        "title": "RejectionRelation"
       },
       "ReplayCheckResult": {
         "properties": {
@@ -15890,6 +15990,28 @@
         ],
         "title": "VerificationRecord"
       },
+      "VerifiedRole": {
+        "properties": {
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "outcomes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outcomes"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "role",
+          "outcomes"
+        ],
+        "title": "VerifiedRole"
+      },
       "VersionEntry": {
         "properties": {
           "event_id": {
@@ -15957,6 +16079,34 @@
           "files"
         ],
         "title": "VersionEntry"
+      },
+      "WatchedRelation": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "recipient": {
+            "type": "string",
+            "title": "Recipient"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/FactRef"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "recipient",
+          "outcome",
+          "ref"
+        ],
+        "title": "WatchedRelation"
       },
       "WorkItemAppendInput": {
         "properties": {
@@ -16454,6 +16604,16 @@
             },
             "type": "object",
             "title": "Refs"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkItemOrganization"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -16554,6 +16714,77 @@
           "old_runs"
         ],
         "title": "WorkItemMaterialsResult"
+      },
+      "WorkItemOrganization": {
+        "properties": {
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "routing": {
+            "type": "string",
+            "title": "Routing"
+          },
+          "roles": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationRole"
+            },
+            "type": "array",
+            "title": "Roles"
+          },
+          "verifiers": {
+            "items": {
+              "$ref": "#/components/schemas/OrganizationVerifier"
+            },
+            "type": "array",
+            "title": "Verifiers"
+          },
+          "completing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OrganizationRole"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "watched": {
+            "items": {
+              "$ref": "#/components/schemas/WatchedRelation"
+            },
+            "type": "array",
+            "title": "Watched"
+          },
+          "asks": {
+            "items": {
+              "$ref": "#/components/schemas/AskRelation"
+            },
+            "type": "array",
+            "title": "Asks"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/RejectionRelation"
+            },
+            "type": "array",
+            "title": "Rejections"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "form",
+          "routing",
+          "roles",
+          "verifiers",
+          "completing",
+          "watched",
+          "asks",
+          "rejections"
+        ],
+        "title": "WorkItemOrganization",
+        "description": "事项冻结定义里的组织（工单 #1381，画面与播放设计说明「画面跟着定义伸缩」的输入）。\n\n取值来自这个事项创建时冻结的那份定义（形态与核验角色设计说明「形态随事项冻结」），不读进程加载时的那份；\n每项事实带给出它的事件位置与来源种类，与 project.loop 已有的几个事实元素一样。"
       },
       "WorkItemProgress": {
         "properties": {

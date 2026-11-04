@@ -421,6 +421,21 @@ export type ArtifactRef = {
 };
 
 /**
+ * AskRelation
+ */
+export type AskRelation = {
+    /**
+     * Requester
+     */
+    requester: string;
+    /**
+     * Recipient
+     */
+    recipient: string;
+    ref: FactRef;
+};
+
+/**
  * AskView
  */
 export type AskView = {
@@ -4080,6 +4095,36 @@ export type OrganizationAdopt = {
 };
 
 /**
+ * OrganizationRole
+ */
+export type OrganizationRole = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    ref: FactRef;
+};
+
+/**
+ * OrganizationVerifier
+ */
+export type OrganizationVerifier = {
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Verifies
+     */
+    verifies: Array<VerifiedRole>;
+    ref: FactRef;
+};
+
+/**
  * OverlayCapability
  */
 export type OverlayCapability = {
@@ -4919,6 +4964,25 @@ export type Rejected = {
      * Current Version
      */
     current_version?: number | string | null;
+};
+
+/**
+ * RejectionRelation
+ */
+export type RejectionRelation = {
+    /**
+     * Verifier
+     */
+    verifier: string;
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Outcome
+     */
+    outcome: string;
+    ref: FactRef;
 };
 
 /**
@@ -6705,6 +6769,20 @@ export type VerificationRecord = {
 };
 
 /**
+ * VerifiedRole
+ */
+export type VerifiedRole = {
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Outcomes
+     */
+    outcomes: Array<string>;
+};
+
+/**
  * VersionEntry
  */
 export type VersionEntry = {
@@ -6736,6 +6814,25 @@ export type VersionEntry = {
      * Files
      */
     files: Array<string>;
+};
+
+/**
+ * WatchedRelation
+ */
+export type WatchedRelation = {
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Recipient
+     */
+    recipient: string;
+    /**
+     * Outcome
+     */
+    outcome: string;
+    ref: FactRef;
 };
 
 /**
@@ -6998,6 +7095,7 @@ export type WorkItemLoop = {
     refs?: {
         [key: string]: FactRef;
     };
+    organization?: WorkItemOrganization | null;
 };
 
 /**
@@ -7040,6 +7138,46 @@ export type WorkItemMaterialsResult = {
      * Old Runs
      */
     old_runs: Array<OldRunView>;
+};
+
+/**
+ * WorkItemOrganization
+ *
+ * 事项冻结定义里的组织（工单 #1381，画面与播放设计说明「画面跟着定义伸缩」的输入）。
+ *
+ * 取值来自这个事项创建时冻结的那份定义（形态与核验角色设计说明「形态随事项冻结」），不读进程加载时的那份；
+ * 每项事实带给出它的事件位置与来源种类，与 project.loop 已有的几个事实元素一样。
+ */
+export type WorkItemOrganization = {
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Routing
+     */
+    routing: string;
+    /**
+     * Roles
+     */
+    roles: Array<OrganizationRole>;
+    /**
+     * Verifiers
+     */
+    verifiers: Array<OrganizationVerifier>;
+    completing: OrganizationRole | null;
+    /**
+     * Watched
+     */
+    watched: Array<WatchedRelation>;
+    /**
+     * Asks
+     */
+    asks: Array<AskRelation>;
+    /**
+     * Rejections
+     */
+    rejections: Array<RejectionRelation>;
 };
 
 /**
