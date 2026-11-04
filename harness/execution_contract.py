@@ -1,8 +1,11 @@
-# 执行契约第二版（骨架与应用设计说明第 3.2、5.3 节；总图第四节「执行」缝）：
-# 输入一轮工作（部门、会话、提示、这一轮的上限、路由的工作引用；工作引用原样交给装配）；
-# 每一步经安全节点问薄驱动继续或停止；工具调用经裁决入口；输出一轮工作的结果：这一轮写下的事件的范围与
-# 停止原因。这一轮算不算结束、结束成什么，由路由按事件判断，契约不写死「提交了正式成果」「回答了询问」
-# 这类结果种类（第二版：#861 从第一版改形状；阶段一首次发布以后按字段只增）。
+# 执行契约第三版（骨架与应用设计说明第 3.2、5.3 节；总图第四节「执行」缝）：
+# 输入一轮工作（部门、会话、提示、这一轮的上限、路由的工作引用、按部门取模型与提示词的来源；工作引用原样
+# 交给装配）；每一步经安全节点问薄驱动继续或停止；工具调用经裁决入口；输出一轮工作的结果：这一轮写下的事件
+# 的范围与停止原因。这一轮算不算结束、结束成什么，由路由按事件判断，契约不写死「提交了正式成果」「回答了
+# 询问」这类结果种类（第二版：#861 从第一版改形状；阶段一首次发布以后按字段与条款只增）。
+# 第三版（#1511）：按部门取模型与提示词从安全节点移出——它们属于路由与定义，由开始一轮工作时交进来的
+# 内容给出（`RoundRequest.department_settings`），薄驱动不再按部门回答；安全节点只剩继续还是停止、结算、
+# 等待、结束、询问这五样。不在安全节点上的旧方法留一版（`PreviousSafeNode`）。
 # 本模块只导入内核与标准库，以及契约圈的 contract_versions；实现（engine.py 的 StepDriver）声明实现这一版，
 # 薄驱动接受当前版与上一版。
 
@@ -22,9 +25,9 @@ from .definitions import DEFINITIONS
 from .kernel_events import Event
 from .write_path import Transaction
 
-# 这一版契约的版本号；上一版是第一版（结果的种类还写死成「提交了正式成果」与「回答了询问」，工单 #826）
-CURRENT_VERSION = 2
-PREVIOUS_VERSION: int | None = 1
+# 这一版契约的版本号；上一版是第二版（结果换成 RoundResult 那一版，工单 #861）
+CURRENT_VERSION = 3
+PREVIOUS_VERSION: int | None = 2
 
 
 def accept(implementation: Any) -> int:
@@ -88,17 +91,36 @@ class StepLimits:
 class RoundRequest:
     # 开始一轮工作的请求（第 5.3 节输入）：部门、会话在 scope 里，prompt 是这一轮采用的提示，
     # limits 是这一轮的上限，work_ref 是路由自己的工作引用（例如任务池的任务）。
-    # work_ref 原样交给装配（第 5.4 节第 4 条），骨架不解释它
+    # work_ref 原样交给装配（第 5.4 节第 4 条），骨架不解释它。
+    # department_settings 是按部门取模型与提示词的来源（第三版，工单 #1511）：它们属于路由与定义，
+    # 从安全节点移出，随开始一轮工作一起交进来；执行实现要用的时候问它，不再问薄驱动。
+    # 交来的是实现自己的类型，契约原样转交，不解释它的返回值
     scope: ActivationScope
     prompt: Any
     limits: StepLimits
     work_ref: Any = None
+    department_settings: Any = None
+
+
+class DepartmentSettings(Protocol):
+    # 按部门取模型与提示词（第三版从安全节点移出，工单 #1511）：项目部门设置优先，没有写入时用这个事项所用
+    # 定义里的角色说明。交给执行实现的是这样一个来源：每取得一次调用目标问一次——项目部门设置在轮中改了，
+    # 同一次激活的下一次请求就用新的
+    def department_selection(self, department: str) -> Any | None:
+        # 这个部门的模型选择；不属于项目的运行时为空，全部使用部门默认
+        ...
+
+    def department_prompt(self, department: str) -> Any:
+        # 这个部门的提示词（实现自己的提示类型，原样交回）
+        ...
 
 
 class SafeNode(Protocol):
     # 安全节点接口：步骤驱动在安全节点调用它，流程编排在这里分派新输入、关闭因此过时的协作请求，回答继续还是停止。
     # 这是唯一一处由下层调用上层的接口，按依赖倒置处理：接口在步骤驱动一侧定义，流程编排实现并在开始时交给步骤驱动，
-    # 步骤驱动不引用流程编排
+    # 步骤驱动不引用流程编排。
+    # 第三版只剩设计说明写的五样：继续还是停止、结算、等待、结束、询问。按部门取模型与提示词不在其中
+    # （工单 #1511），它们随开始一轮工作的请求交进来（RoundRequest.department_settings）
 
     def proceed(self) -> Judgment:
         # 分派新输入，回答是否继续
@@ -116,19 +138,16 @@ class SafeNode(Protocol):
         # 以停止原因结束运行：运行的结束与调用方在同一事务中刚写下的记录一起提交
         ...
 
-    def department_selection(self, department: str) -> Any | None:
-        # 设置来源（项目层）：本次请求该项目该部门的项目部门设置中的模型选择；
-        # 不属于项目的运行时为空，全部使用部门默认（设计说明第 6 节）。返回的是实现自己的选择类型
-        # （providers.selection.ModelSelection），契约原样交回实现
-        ...
-
-    def department_prompt(self, department: str) -> Any:
-        # 部门 Prompt 每次请求从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）
-        ...
-
     async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None, int]:
         # 开一个询问分支，等待分支回答，返回 (ok, output, error, new_contract_hash, branch_steps)
         ...
+
+
+class PreviousSafeNode(SafeNode, DepartmentSettings, Protocol):
+    # 第二版的安全节点（第三版起不再交给按第三版写的执行实现，只留一版，工单 #1511）：按部门取模型与提示词
+    # 那两项那时在安全节点上。声明第二版的执行实现还会问这两个方法，薄驱动照旧回答；一版之后去掉。
+    # 它们不再由薄驱动自己查，值从开始一轮工作时交进来的那份来源读
+    ...
 
 
 @dataclass(frozen=True)

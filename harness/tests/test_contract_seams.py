@@ -18,11 +18,11 @@ from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tightening import WATCHED_OUTPUTS
 
-# 测试里的薄驱动一侧：开始一轮工作，第一步继续、第二步停下；提供步骤驱动要问的两样设置
+# 测试里的薄驱动一侧：开始一轮工作，第一步继续、第二步停下。安全节点只剩设计说明写的五样
+# （执行契约第三版，工单 #1511），按部门取模型与提示词随开始一轮工作的请求交进来
 class _ThinDriver:
-    def __init__(self, projection, prompt) -> None:
+    def __init__(self, projection) -> None:
         self._projection = projection
-        self._prompt = prompt
         self._asked = 0
 
     def proceed(self):
@@ -37,12 +37,6 @@ class _ThinDriver:
 
     def end(self, transaction, reason, message):
         pass
-
-    def department_selection(self, department):
-        return None
-
-    def department_prompt(self, department):
-        return self._prompt
 
     async def ask(self, scope, call):
         raise AssertionError("this round does not ask")
@@ -71,10 +65,12 @@ class _RecordingAssembly:
 
 
 def _round_request(system, run_id, work_ref):
-    # 一次开始一轮工作的请求：身份、提示与上限取自当前运行状态，工作引用由调用方给出
+    # 一次开始一轮工作的请求：身份、提示与上限取自当前运行状态，工作引用由调用方给出；
+    # 按部门取模型与提示词的来源随请求交进来（执行契约第三版，工单 #1511）
     orchestrator = system.orchestrator
     projection = orchestrator.project(run_id)
-    prompt = orchestrator._department_prompt(projection, "product")
+    settings = orchestrator._department_settings(projection)
+    prompt = settings.department_prompt("product")
     session_id = orchestrator.sessions.get(run_id, "product").session_id
     parent = system.store.list_events(run_id)[-1].event_id
     scope = execution_contract.ActivationScope(
@@ -83,7 +79,7 @@ def _round_request(system, run_id, work_ref):
         basis=work_basis(projection, "product"), provider="test",
     )
     return execution_contract.RoundRequest(
-        scope, prompt, StepLimits(max_model_steps=1), work_ref=work_ref)
+        scope, prompt, StepLimits(max_model_steps=1), work_ref=work_ref, department_settings=settings)
 
 
 def test_the_route_work_reference_reaches_the_assembly_input(tmp_path):
@@ -96,7 +92,7 @@ def test_the_route_work_reference_reaches_the_assembly_input(tmp_path):
     work_ref = {"task": "T-17", "queue": ["write the spec"]}
     request = _round_request(system, run_id, work_ref)
     recording = _RecordingAssembly(system.orchestrator.assembly)
-    node = _ThinDriver(system.orchestrator.project(run_id), request.prompt)
+    node = _ThinDriver(system.orchestrator.project(run_id))
 
     async def run():
         driver = StepDriver.start(
