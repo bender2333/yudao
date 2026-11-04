@@ -1,6 +1,6 @@
 ---
 name: next
-description: 子架构师的入口：从 GitHub 读状态，按固定顺序找到第一件能做的事（交回的工单、该验收的父工单、达到的薄片、设计未写的桶、等拆的父工单、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论。用户在场时一次做一件、先出一张等用户的卡；用户不在场时就是架构师循环，每一轮一个全新子代理做一件、写心跳。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。
+description: 子架构师的入口：从 GitHub 读状态，按固定顺序找到第一件能做的事（到期的 waiting 工单、交回的工单、该验收的父工单、达到的薄片、设计未写的桶、等拆的父工单、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论。用户在场时一次做一件、先出一张等用户的卡；用户不在场时就是架构师循环，每一轮一个全新子代理做一件、写心跳。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。
 argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--循环] [--轮数 N]"
 ---
 
@@ -53,22 +53,37 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | 先后 | 哪一件 | 怎么认 | 交给 |
 | --- | --- | --- | --- |
 | 1 | 等用户的事（只在用户在场时） | `ready-for-human`；`architecture`；试用工单最后一条是 `TRIAL: 导游卡` | 先出一张不超过 10 行的卡：每条一句话，写要用户定什么、建议、不定会怎样；`architecture` 的列出来交总架构师 |
-| 2 | 交回的工单 | `needs-triage` | [`/triage`](../triage/SKILL.md) |
-| 3 | solo 直接交给用户、架构师还没看过的；总架构师已经定了的 | `ready-for-human`，没有架构师的 `TRIAGE:` 评论，或者 `TRIAGE:` 评论写的 `architecture` 工单已关闭 | [`/triage`](../triage/SKILL.md)「交给用户的工单」 |
-| 4 | 该验收的父工单 | `parent`，子工单全部关闭，自己还开着 | [`/verify`](../verify/SKILL.md) |
-| 5 | 薄片推进 | 薄片里除试用工单以外都已关闭、没有「设计未写」的行，试用工单还有下一步 | [`/trial-intake`](../trial-intake/SKILL.md)「薄片推进」 |
-| 6 | 设计未写的桶 | 阶段工单的薄片清单里写着「设计未写」的行 | [`/to-design`](../to-design/SKILL.md) |
-| 7 | 还没拆的父工单 | `parent`，没有子工单 | [`/to-children`](../to-children/SKILL.md) |
-| 8 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
+| 2 | 到期的 `waiting` 工单 | `waiting`，不是 `parent`，最后一条 `WAITING:` 评论的第一行是 `WAITING: 日期 YYYY-MM-DD`，日期是今天或更早 | 下面「放回到期的 waiting 工单」，同一轮把到期的都放回 |
+| 3 | 交回的工单 | `needs-triage` | [`/triage`](../triage/SKILL.md) |
+| 4 | solo 直接交给用户、架构师还没看过的；总架构师已经定了的 | `ready-for-human`，没有架构师的 `TRIAGE:` 评论，或者 `TRIAGE:` 评论写的 `architecture` 工单已关闭 | [`/triage`](../triage/SKILL.md)「交给用户的工单」 |
+| 5 | 该验收的父工单 | `parent`，子工单全部关闭，自己还开着 | [`/verify`](../verify/SKILL.md) |
+| 6 | 薄片推进 | 薄片里除试用工单以外都已关闭、没有「设计未写」的行，试用工单还有下一步 | [`/trial-intake`](../trial-intake/SKILL.md)「薄片推进」 |
+| 7 | 设计未写的桶 | 阶段工单的薄片清单里写着「设计未写」的行 | [`/to-design`](../to-design/SKILL.md) |
+| 8 | 还没拆的父工单 | `parent`，没有子工单 | [`/to-children`](../to-children/SKILL.md) |
+| 9 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
 
 ```bash
 gh issue list --state open --limit 300 --json number,title,labels,milestone \
   --jq '.[] | "\(.number)\t\(.milestone.title // "-")\t\([.labels[].name]|join(","))\t\(.title)"'
 gh api graphql -f query='query { repository(owner:"bender2333", name:"yudao") { issue(number:<编号>) { state subIssuesSummary { total completed } } } }'
 gh issue view <编号> --json comments --jq '.comments[-5:][] | "\(.author.login)\t\(.body[0:80])"'
+# 第 2 项：带 waiting、不带 parent 的工单，各自最后一条 WAITING: 评论的第一行
+gh issue list --state open --label waiting --limit 100 --json number,title,labels,comments \
+  --jq '.[] | select([.labels[].name] | index("parent") | not) | {n: .number, t: .title, w: ([.comments[].body | select(startswith("WAITING:"))] | last)} | select(.w != null) | "\(.n)\t\(.w | split("\n")[0])\t\(.t)"'
 ```
 
 都没有：用户在场时告诉用户范围内没有要做的；`--循环` 时写心跳，结束回合。
+
+### 放回到期的 waiting 工单
+
+只做机械的一步，不替分诊判断：
+
+1. 取今天的日期（本机时间）。上面命令列出的工单里，第一行不是 `WAITING: 日期 YYYY-MM-DD` 的（例如放回时写的那条不带日期的），不算；日期晚于今天的不动。
+2. 逐张读最近的几条评论（`gh issue view <编号> --comments`）：`WAITING:` 评论之后有改了条件的评论（继续等别的东西、日期改了）就不放，需要时补一条新的 `WAITING:` 评论写清现在等什么、等到哪天。
+3. 放回：`gh issue edit <编号> --remove-label waiting --add-label ready-for-agent`，再留一条评论，第一行 `WAITING: 已放回`，写日期已到、到期以后第一件要核对的事见上一条 `WAITING:` 评论；用户不在场时末行署名 `— claude-架构师`。
+4. 同一张工单在 `waiting` 与 `ready-for-agent` 之间来回满两次，不再放回，按[工作方式](../../../docs/agents/workflow.md)第 7 节「同一张工单分诊满两次」交给用户。
+
+完成：到期的都放回了，每张有一条 `WAITING: 已放回` 评论；没放的写明原因。
 
 ## 做一件事
 
@@ -135,6 +150,7 @@ NEXT: 建议下一轮做什么；没有写 none
 
 - 两个工人写同一个 worktree。
 - 同一张工单在 `needs-triage` 与 `ready-for-agent` 之间来回超过两次。
+- 同一张工单在 `waiting` 与 `ready-for-agent` 之间来回超过两次。
 - 心跳停了，GitHub 上的状态还在变。
 - 工单状态变了，却没有对应的证据评论。
 
