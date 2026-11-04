@@ -40,10 +40,10 @@ from harness.projects import project_projection
 from harness.proposals import answer_turn, ask_turn, delivery_turn, product_spec
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem
-from harness.tests.helpers import guidance_reply, quality_turns
+from harness.tests.helpers import guidance_reply, python_snippet, quality_turns
 from harness.write_path import NewEvent
 
-CHECKS = {"smoke": {"command": "python -c \"print('smoke ok')\""}}
+CHECKS = {"smoke": {"command": python_snippet("print('smoke ok')")}}
 ECHO = "import sys\nprint(sys.argv[1])\n"
 GOAL = "核对查询的刷新清单"
 

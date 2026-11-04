@@ -103,6 +103,8 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "department_guidance_responded": ("activation_id", "guidance_id", "outcome"),
     "department_activated": ("activation_id", "effective_contract_hash", "guidance_ids",
                              "guidance_version", "input_version", "prompt_version"),
+    # 开始一轮工作时取得派发编号（工单 #1397）：编号在信封上，不进入基准；载荷只记这一轮是谁
+    "dispatch_number_acquired": ("activation_id",),
     "department_input": ("activation_id", "effective_contract_hash", "guidance_ids",
                          "input_version", "prompt_version", "step_id"),
     "tool_call_required": ("activation_id", "attempt_id", "context_event_id", "count", "effective_contract_hash",

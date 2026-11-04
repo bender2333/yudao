@@ -2,7 +2,9 @@
 # 返回它的控制核心、run 身份与规整时要替换的规则。test_event_sequence.py 用它把规整后的事件序列与
 # harness/tests/event_sequences/<场景名>.json 比对；其他测试也按名字取一个场景跑完整序列。
 # 每一项的第一段文字（也写进基准文件的 covers 字段）说明这个场景覆盖的行为。
-# 检查命令一律写成 ["python", ...]，由主机解析解释器，基准中不出现本机路径。
+# 检查命令里的解释器一律用 helpers.python_command 取跑测试的这个解释器（工单 #1356）：不写 PATH 上的 python，
+# 开发机上它可能是 Microsoft Store 的占位程序，同一条命令在开发机与 CI 上结果不同。命令文本不进基准与快照，
+# 解释器路径在规整里写成 <python>。
 
 import json
 import threading
@@ -31,7 +33,8 @@ from harness.proposals import (
 )
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
-from harness.tests.helpers import FAST_RETRIES, guidance_reply, pinned_input_tokens
+from harness.tests.helpers import (FAST_RETRIES, guidance_reply, pinned_input_tokens, python_command,
+                                   python_snippet)
 from harness.tests.protocol_helpers import ScriptedProvider, provider_system, send_reply, serve
 from harness.tests.provider_replies import (
     BROKEN_STREAMS,
@@ -45,7 +48,7 @@ from harness.tests.provider_replies import (
 )
 
 
-CHECKS = {"smoke": {"command": "python -c \"print('smoke ok')\""}}
+CHECKS = {"smoke": {"command": python_snippet("print('smoke ok')")}}
 ECHO = "import sys\nprint(sys.argv[1])\n"
 
 
@@ -395,8 +398,6 @@ def no_tool_call_pause(data_dir):
 
 
 def bash_is_not_a_check_receipt(data_dir):
-    argv = ["python", "src/echo.py", "hello"]
-
     def submit(call, identity):
         return _call(identity, "submit_delivery",
                      {"summary": "echo CLI", "check_names": ["unit-tests"],
@@ -404,16 +405,18 @@ def bash_is_not_a_check_receipt(data_dir):
 
     def first(call):
         return ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
-                                     _call("command-1", "bash", {"command": "python src/echo.py hello"}),
+                                     _call("command-1", "bash", {"command": python_command("src/echo.py", "hello")}),
                                      submit(call, "submit-1")])
 
     def second(call):
-        return ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}),
+        return ModelResponse(output=[_call("check-2", "run_check", {"name": "unit-tests",
+                                                                    "command": python_command("src/echo.py", "hello")}),
                                      _call("write-2", "write_file", {"path": "src/echo.py", "content": ECHO + "\n"}),
                                      submit(call, "submit-2")])
 
     def third(call):
-        return ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests", "command": "python src/echo.py hello"}),
+        return ModelResponse(output=[_call("check-3", "run_check", {"name": "unit-tests",
+                                                                    "command": python_command("src/echo.py", "hello")}),
                                      submit(call, "submit-3")])
 
     system, _, run_id = _system(data_dir, {
@@ -454,7 +457,7 @@ def cancel_while_check_runs(data_dir):
     # 标记文件在检查开始一秒以后写下：取消发生在质检那一轮工作结束以后，
     # 事件序列不依赖取消落在别的会话的哪一步（工单 #557，与 cancel_while_bash_runs 同一做法）
     marker = (data_dir / "check-running").as_posix()
-    command = f'python -c "{_running("check", delay_sec=5)}" "{marker}"'
+    command = python_snippet(_running("check", delay_sec=5)) + f' "{marker}"'
     def deliver(call):
         return ModelResponse(output=[_call("write-1", "write_file", {"path": "src/echo.py", "content": ECHO}),
                                      _call("check-1", "run_check", {"name": "smoke", "command": command}),

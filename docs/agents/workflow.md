@@ -161,7 +161,7 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | `solo-worker` | 子工单 → PR → `DELIVERY:` → 合并 | tdd、diagnosing-bugs |
 | `reviewer` | 内核 PR → `REVIEW:` | code-review |
 | `verify` | 父工单与阶段 → `VERDICT:` | seam-diff |
-| `trial-intake` | 薄片：agent 试用、缺陷、发布走查、`TOUR:`、反馈分流 | trial、discussion-note |
+| `trial-intake` | 薄片：agent 试用、缺陷、发布走查、`TRIAL:`、反馈分流 | trial、discussion-note |
 | `triage` | `needs-triage`、Ideas、外部报告 → `TRIAGE:`；代替 Matt 的 `/triage` | grilling |
 | `milestone-retro` | 证据 → 教训 → 检查或技能改动 | — |
 

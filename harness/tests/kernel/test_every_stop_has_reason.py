@@ -147,6 +147,10 @@ class _Store:
     def projection(self, stream: str) -> None:
         return None
 
+    def last_dispatch_number(self, stream: str, session_id: str | None = None) -> int:
+        # 这几条用例不核对派发编号：这个流里还没有取得过编号
+        return 0
+
     def commit(self, stream: str, expected_version: int, events: list[Any], state: str, *,
                epoch: int | None = None, command: Any = None, decisions: Any = ()) -> None:
         self.committed.extend(events)

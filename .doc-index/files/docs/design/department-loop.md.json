@@ -29,7 +29,7 @@
 {"hash":"82827ba053ee6175","id":"docs/design/department-loop.md#三部门的循环结构 > 11. 要点汇总","kind":"section","parent":"docs/design/department-loop.md#三部门的循环结构","title":"11. 要点汇总"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"0e9705e0dd37530b","src":"docs/design/department-loop.md#三部门的循环结构"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"32ac07d30ac47cac","src":"docs/design/department-loop.md#三部门的循环结构"},
 {"dst":"docs/architecture.html#s4 > 路由","kind":"map-position","raws":["「路由」"],"seen":"d90555b72e6ef802","src":"docs/design/department-loop.md#三部门的循环结构"},
 {"dst":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.1 四层各认识什么","kind":"link","raws":["forms-and-verifier-role.md"],"seen":"c5baa1f917b5a5e3","src":"docs/design/department-loop.md#三部门的循环结构"},
 {"dst":"docs/design/skeleton-and-application.md#骨架与应用设计说明 > 5. 三道缝的契约 > 5.1 路由契约","kind":"link","raws":["skeleton-and-application.md"],"seen":"41b9da751567f740","src":"docs/design/department-loop.md#三部门的循环结构"},

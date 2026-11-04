@@ -1,0 +1,21 @@
+{
+"schema":1,
+"path":"docs/prototypes/v19/walkthrough.md",
+"hash":"8f4cba32d72df40f",
+"nodes":[
+{"hash":"8f4cba32d72df40f","id":"docs/prototypes/v19/walkthrough.md","kind":"file","title":"docs/prototypes/v19/walkthrough.md"},
+{"hash":"cbbd130ed0cf07ea","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","kind":"section","parent":"docs/prototypes/v19/walkthrough.md","title":"页面原型 v19 走查"},
+{"hash":"aaab2bfc3b292534","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 怎么打开","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"怎么打开"},
+{"hash":"fc8da1fb7a7c6ba1","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"这一版只试两件事"},
+{"hash":"451f1c25e882711c","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事 > 一、折叠后的线程刷不刷屏","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事","title":"一、折叠后的线程刷不刷屏"},
+{"hash":"e0adf7105bb7619a","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事 > 二、带收件人的输入框投不投错","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事","title":"二、带收件人的输入框投不投错"},
+{"hash":"f5c5f73e27ebada8","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 脚本二：一个角色直做（个人博客）","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"脚本二：一个角色直做（个人博客）"},
+{"hash":"ff6b38eb622d0fe7","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 脚本三：几个角色直做（活动报名小程序）","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"脚本三：几个角色直做（活动报名小程序）"},
+{"hash":"0ad4304a74d32c91","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 脚本四：三部门（订单系统重构）","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"脚本四：三部门（订单系统重构）"},
+{"hash":"2b4821029cdbd619","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 最后两个判断","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"最后两个判断"}
+],
+"edges":[
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["../../design/project-organization.md"],"seen":"b799219cc1388f12","src":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查"},
+{"dst":"docs/prototypes/v19/index.html","kind":"code-path","raws":["docs/prototypes/v19/index.html"],"seen":"65bdce813ef5efa7","src":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 怎么打开"}
+]
+}

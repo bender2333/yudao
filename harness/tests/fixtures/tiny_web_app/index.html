@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh">
+  <head>
+    <meta charset="utf-8" />
+    <title>tiny web app</title>
+  </head>
+  <body>
+    <h1 id="title">tiny web app</h1>
+    <p id="greeting">hello</p>
+    <label for="name">your name</label>
+    <input id="name" name="name" />
+    <button id="greet" type="button">greet</button>
+    <p id="result"></p>
+    <script>
+      document.getElementById('greet').addEventListener('click', () => {
+        const name = document.getElementById('name').value;
+        document.getElementById('result').textContent = `hello ${name}`;
+      });
+    </script>
+  </body>
+</html>

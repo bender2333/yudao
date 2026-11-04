@@ -14,8 +14,8 @@
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「你」"],"seen":"3c9310ef49956c5b","src":"docs/design/department-guidance.md#部门指导的处理设计"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「你中途的指导」"],"seen":"0e9705e0dd37530b","src":"docs/design/department-guidance.md#部门指导的处理设计"},
-{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","kind":"link","raws":["app-and-interface.md"],"seen":"0dd04bfbe949905c","src":"docs/design/department-guidance.md#部门指导的处理设计"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「你中途的指导」"],"seen":"32ac07d30ac47cac","src":"docs/design/department-guidance.md#部门指导的处理设计"},
+{"dst":"docs/design/app-and-interface.md#应用层与接口层设计说明 > 4. 查询与读取模型 > 4.3 查询清单","kind":"link","raws":["app-and-interface.md"],"seen":"e058bca1dc991a34","src":"docs/design/department-guidance.md#部门指导的处理设计"},
 {"dst":"docs/design/department-loop.md#三部门的循环结构 > 6. 指导","kind":"link","raws":["department-loop.md"],"seen":"5138aa51796e4a84","src":"docs/design/department-guidance.md#部门指导的处理设计"},
 {"dst":"docs/requirements/department-guidance.md","kind":"link","raws":["../requirements/department-guidance.md"],"seen":"75bd259dd3147210","src":"docs/design/department-guidance.md#部门指导的处理设计"},
 {"dst":"docs/design/department-loop.md#三部门的循环结构 > 6. 指导","kind":"link","raws":["department-loop.md"],"seen":"5138aa51796e4a84","src":"docs/design/department-guidance.md#部门指导的处理设计 > 2. 送达"},

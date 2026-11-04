@@ -13,11 +13,13 @@ import hashlib
 import json
 import re
 import time
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from typing import Any
 
 from .definitions import DepartmentWork, Role, Tool, WorkItemKind, WorkItems
-from .mcp_client import McpClient, McpStartupError, ServerLaunch
+from .mcp_client import McpClient, McpStartupError, ServerLaunch, terminate_legacy_process
+from .models import EventType
 
 TOOL_PREFIX = "mcp__"
 # 模型接口与静态定义对工具名的长度上限；超过它时改用确定性别名
@@ -33,6 +35,14 @@ _DISALLOWED = re.compile(r"[^a-z0-9_]")
 MCP_DISPATCH_TOOL = "mcp"
 # 轮询取消信号与调用时限的间隔（秒）：取消从另一条线程的 Event 到达，轮询把它转给客户端的取消
 _CANCEL_POLL_SEC = 0.1
+# 调用超时或取消以后的错误码：这一次尝试没有完整结果，按结果未知交还发出它的会话（设计说明第 7.3、8 节）
+CANCELLED_CODE = "cancelled"
+# 会话关闭的原因（写进 mcp_server_closed 的载荷）：run 收尾、超时或取消以后关闭、启动时结束遗留进程
+CLOSE_ON_RUN_END = "closed"
+CLOSE_AFTER_CANCEL = "cancelled"
+CLOSE_LEFTOVER = "leftover"
+# 生命周期事件写到 run 流的接口：种类与载荷，由装配一方给出写入口（orchestrator 的 run 流）
+EventSink = Callable[[str, dict[str, Any]], None]
 
 
 class ToolAliasConflict(Exception):
@@ -196,11 +206,15 @@ class McpSessions:
     run 之间、项目之间不共享：一张表只属于一个 run。
     """
 
-    def __init__(self, document: dict | None, *, credentials, stderr_dir) -> None:
+    def __init__(self, document: dict | None, *, credentials, stderr_dir,
+                 events: EventSink | None = None) -> None:
         self._document = document or {}
         self._credentials = credentials
         self._stderr_dir = str(stderr_dir)
         self._sessions: dict[str, McpClient] = {}
+        # 生命周期事件的写入方（工单 #1176）：没有给时只维护会话表，不写事件（单一模块的用例）；
+        # 写入口一侧负责把写入失败记下来，不打断会话的建立与关闭
+        self._events = events
 
     def server_names(self) -> list[str]:
         # 冻结设置里的服务器名称（非秘密的名称，可以有）
@@ -235,14 +249,20 @@ class McpSessions:
                    *, stop=None) -> McpOutcome:
         # 一次 MCP 调用（第 7.2、7.3 节）：按原名调这台服务器的工具，工具失败（is_error）交回错误文本，
         # 动作记为已完成；协议错误与启动失败是失败的动作，原因写明（凭据值已替换为星号）。
-        # stop 是执行环境的取消信号：到达时取消这次调用（进程已结束时能确认停止）
+        # stop 是执行环境的取消信号：到达时取消这次调用（进程已结束时能确认停止）。
+        # 超时与取消没有完整结果：先取消，再按结果未知交还发出它的会话（第 8 节，工单 #1176）
         try:
             client = await self._session_for(server)
         except McpRefused as refusal:
-            # 服务器不在这份冻结设置里、或缺凭据等组装失败：失败的动作，原因交回模型
-            return self._failure_outcome(alias, server, "stdio", str(refusal), "startup_failed")
+            # 服务器不在这份冻结设置里、或缺凭据等组装失败：失败的动作，原因交回模型，
+            # 生命周期记一条 mcp_server_failed（这一次会话没有建立）
+            transport = self._transport_of(server)
+            self._record_failed(server, transport, str(refusal))
+            return self._failure_outcome(alias, server, transport, str(refusal), "startup_failed")
         except McpStartupError as failure:
-            return self._failure_outcome(alias, server, "stdio", str(failure), "startup_failed")
+            # 启动失败的 mcp_server_failed 由 _session_for 写下（它知道这次会话用的传输）
+            return self._failure_outcome(alias, server, self._transport_of(server), str(failure),
+                                         "startup_failed")
         try:
             return await self._call_once(client, alias, server, tool, arguments, stop=stop)
         except McpStartupError as failure:
@@ -255,12 +275,35 @@ class McpSessions:
                                          reason, str(code) if code is not None else "call_failed")
 
     async def close(self) -> None:
-        # run 结束、暂停或停止时关闭全部会话（stdio 先关标准输入，SDK 等待以后结束进程树；HTTP 关闭会话）
+        # run 结束、暂停或停止时关闭全部会话（stdio 先关标准输入，SDK 等待以后结束进程树；HTTP 关闭会话），
+        # 每关闭一台写一条 mcp_server_closed（第 7.2 节）：关闭以后调用方在事件里读得到这件事
         sessions, self._sessions = self._sessions, {}
-        for client in sessions.values():
-            await client.close()
+        for name, client in sessions.items():
+            try:
+                await client.close()
+            finally:
+                self._record_closed(name, client, CLOSE_ON_RUN_END)
 
     # ---- 内部 ----
+
+    def _record(self, event_type: str, payload: dict[str, Any]) -> None:
+        # 生命周期事件（第 7.2 节）：种类与载荷交给装配一方给出的写入方。
+        # 没有给写入方时什么也不写（单一模块的用例按会话表本身核对行为）
+        if self._events is None:
+            return
+        self._events(event_type, payload)
+
+    def _record_closed(self, server_name: str, client: McpClient, reason: str, *,
+                       ended: bool = False) -> None:
+        self._record(EventType.MCP_SERVER_CLOSED, {
+            "server": server_name, "transport": client.launch.transport, "reason": reason,
+            "pid": client.pid, "create_time": client.process_create_time, "ended": ended,
+        })
+
+    def _record_failed(self, server_name: str, transport: str, error: str) -> None:
+        self._record(EventType.MCP_SERVER_FAILED, {
+            "server": server_name, "transport": transport, "error": error,
+        })
 
     def _plan(self, server_name: str) -> _ServerLaunchPlan:
         # 冻结设置里这台服务器的启动参数：凭据按名称在开始时取值，值只进客户端的脱敏清单
@@ -278,29 +321,56 @@ class McpSessions:
             raise McpRefused(str(failure)) from failure
         return _ServerLaunchPlan(launch=launch)
 
+    def _transport_of(self, server_name: str) -> str:
+        # 冻结设置里这台服务器的传输（启动失败时客户端还没有建立，事件里照样要写传输）
+        for server in (self._document.get("servers") or {}).values():
+            if str(server.get("name") or "") == server_name:
+                return str(server.get("transport") or "stdio")
+        return "stdio"
+
     async def _session_for(self, server_name: str) -> McpClient:
         client = self._sessions.get(server_name)
         if client is not None:
             return client
         plan = self._plan(server_name)
-        client = await McpClient.start(plan.launch)
+        try:
+            client = await McpClient.start(plan.launch)
+        except McpStartupError as failure:
+            # 启动或连接失败：写 mcp_server_failed，原因带标准错误输出的末尾部分（凭据值已替换为星号）
+            self._record_failed(server_name, plan.launch.transport, str(failure))
+            raise
         self._sessions[server_name] = client
+        self._record(EventType.MCP_SERVER_STARTED, {
+            "server": server_name, "transport": client.launch.transport,
+            "pid": client.pid, "create_time": client.process_create_time,
+        })
         return client
 
     async def _call_once(self, client: McpClient, alias: str, server: str, tool: str,
                          arguments: dict | None, *, stop) -> McpOutcome:
-        call = asyncio.ensure_future(client.call_tool(tool, arguments or {}))
+        # 调用在**这个任务**里进行（工单 #1176）：SDK 的会话由建立它的任务关闭，超时或取消以后
+        # 客户端会关闭会话（`_cancelled_result`），换一个任务关闭会在 anyio 的取消范围上报错、
+        # 并把调用方一起取消掉。取消信号因此不取消这个任务，而是交给客户端的 `cancel()`
+        # （它取消 SDK 的调用任务，SDK 发出取消通知），本任务照常等到取消结果
+        watcher = None if stop is None else asyncio.ensure_future(_cancel_when_stopped(client, stop))
         try:
-            if stop is None:
-                result = await call
-            else:
-                result = await self._call_with_stop(call, stop)
-        except BaseException:
-            if not call.done():
-                call.cancel()
-            raise
+            result = await client.call_tool(tool, arguments or {})
+        finally:
+            if watcher is not None and not watcher.done():
+                watcher.cancel()
         # 结果文本与结构化输出都把凭据值替换为星号再保存（设计说明第 4.4 节：
         # 「保存的标准错误输出、错误文本与结果文本在写入之前，把已取得的凭据值替换为星号」）
+        if result.cancelled:
+            # 超时或被取消：客户端已经先发取消通知、等应答最多 10 秒，stdio 随后结束整个进程树，
+            # HTTP 关闭会话（第 7.2、8 节，工单 #1176）。这一次没有完整结果：按结果未知交还发出它的
+            # 会话，回执写明取消能否确认。会话已经关闭，从表里去掉，下一次调用按同一台服务器重新建立
+            self._sessions.pop(server, None)
+            self._close_after_cancel(server, client)
+            text = _cancelled_text(server, tool, bool(result.cancel_confirmed),
+                                   _redacted(result.text, client.launch.secrets))
+            return McpOutcome(result_text=text, is_error=True, error_code=CANCELLED_CODE,
+                              structured=None, elapsed_ms=result.elapsed_ms, server=server,
+                              tool=tool, transport=client.launch.transport)
         text = _redacted(result.text, client.launch.secrets)
         structured = _redacted_value(result.structured_content, client.launch.secrets)
         if isinstance(structured, (dict, list)) and structured:
@@ -311,16 +381,11 @@ class McpSessions:
                           elapsed_ms=result.elapsed_ms, server=server, tool=tool,
                           transport=client.launch.transport)
 
-    async def _call_with_stop(self, call: "asyncio.Future", stop) -> object:
-        # 调用与取消信号谁先到：取消到达时取消这次调用（客户端发取消通知、stdio 随后结束进程树），
-        # 交回取消的结果；结果未知时向哪里查、持久化生命周期事件归 #1176
-        while True:
-            done, _pending = await asyncio.wait({call}, timeout=_CANCEL_POLL_SEC)
-            if call in done:
-                return call.result()
-            if stop is not None and stop.is_set():
-                await client_cancel(call)
-                return call.result()
+    def _close_after_cancel(self, server: str, client: McpClient) -> None:
+        # 客户端关闭会话时已经结束了进程树（stdio，进程已不在）或终止了会话（HTTP，服务器那边无法确认）：
+        # 补写关闭事件，原因写明这一次是超时或取消以后关闭的
+        self._record_closed(server, client, CLOSE_AFTER_CANCEL,
+                            ended=client.launch.transport == "stdio")
 
     def _failure_outcome(self, alias: str, server: str, transport: str,
                          reason: str, code: str) -> McpOutcome:
@@ -329,13 +394,85 @@ class McpSessions:
                           elapsed_ms=0, server=server, tool=alias, transport=transport)
 
 
-async def client_cancel(call: "asyncio.Future") -> None:
-    # 等待中的调用被取消：交回客户端已经组好的取消结果（_cancelled_result 会关闭会话）
-    call.cancel()
-    try:
-        await call
-    except asyncio.CancelledError:
-        pass
+async def _cancel_when_stopped(client: McpClient, stop) -> None:
+    # 取消信号到达：交给客户端的 cancel（它取消 SDK 的调用任务，SDK 发出取消通知并等应答）。
+    # 这里不取消调用所在的任务：会话的关闭必须发生在建立它的那个任务里（工单 #1176）
+    while not stop.is_set():
+        await asyncio.sleep(_CANCEL_POLL_SEC)
+    await client.cancel()
+
+
+def _cancelled_text(server: str, tool: str, confirmable: bool, client_text: str) -> str:
+    # 超时或取消以后的工具结果（设计说明第 8 节，工单 #1176）：写明已经先取消、取消能否确认服务器停止，
+    # 以及这一次尝试执行被中断、结果未知；由发出这次调用的会话决定是否重新调用（没有自动重试）
+    confirmation = ("能确认服务器已停止（stdio 服务器随后结束整个进程树）" if confirmable
+                    else "不能确认服务器已停止（HTTP 会话已关闭，服务器端已处理的请求无法撤回）")
+    lines = [f"MCP 调用没有完整结果：服务器 {server} 的工具 {tool} 超时或被取消。",
+             f"已发出取消通知，等服务器应答最多 10 秒；取消{confirmation}。",
+             "执行被中断，结果未知：这次尝试没有保存为外部来源工件的结果，由发出这次调用的会话决定是否重新调用。"]
+    if client_text.strip():
+        lines.append(client_text.strip())
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# 遗留的服务器进程（第 7.2 节，工单 #1176）：Yudao 启动时结束没有关闭记录的进程，补写 mcp_server_closed。
+
+
+@dataclass(frozen=True)
+class LeftoverServer:
+    # 一条没有关闭记录的启动：哪个 run 的哪台服务器，以及它记录的进程标识与创建时间（HTTP 没有进程）
+    run_id: str
+    server: str
+    transport: str
+    pid: int | None
+    create_time: float | None
+
+
+# 按（run、服务器名称）配对的两类事件：启动与关闭。启动以后的关闭记录一到就配成一对
+_LEFTOVER_TYPES = (EventType.MCP_SERVER_STARTED, EventType.MCP_SERVER_CLOSED)
+# 一次读多少条：按种类过滤、按位置翻页，不把全部事件读进内存
+_LEFTOVER_PAGE = 1000
+
+
+def leftover_servers(store, *, limit: int = _LEFTOVER_PAGE) -> list[LeftoverServer]:
+    """有启动记录、没有关闭记录的服务器（按（run、服务器名称）配对，先启动先配对）。
+
+    Yudao 启动时用这份清单结束遗留的服务器进程并补写关闭事件（设计说明第 7.2 节）：
+    进程崩溃时关闭事件没有写下来，服务器进程可能还活着；同一台服务器在一个 run 里可以
+    启动与关闭多次，所以按启动的先后一一配对，不按服务器名称去重。
+    """
+    open_starts: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    after = 0
+    while True:
+        batch = store.read(after, types=_LEFTOVER_TYPES, limit=limit)
+        if not batch:
+            break
+        for event in batch:
+            after = max(after, int(event.position))
+            payload = event.payload or {}
+            key = (str(event.run_id or ""), str(payload.get("server") or ""))
+            if event.type == EventType.MCP_SERVER_STARTED:
+                open_starts.setdefault(key, []).append(payload)
+                continue
+            pending = open_starts.get(key)
+            if pending:
+                pending.pop(0)
+    return [LeftoverServer(run_id=run_id, server=server,
+                           transport=str(payload.get("transport") or "stdio"),
+                           pid=payload.get("pid"), create_time=payload.get("create_time"))
+            for (run_id, server), pending in open_starts.items() for payload in pending]
+
+
+def end_leftover_server(leftover: LeftoverServer) -> bool:
+    """按进程标识与创建时间结束遗留的服务器进程；HTTP 没有进程标识，没有要结束的进程。
+
+    两项都对得上才结束（进程标识可能已经被别的进程复用），整棵进程树一起结束。
+    返回是否真的结束了仍然存活的进程。
+    """
+    if leftover.pid is None or leftover.create_time is None:
+        return False
+    return terminate_legacy_process(int(leftover.pid), float(leftover.create_time))
 
 
 def _redacted(text: str, secrets) -> str:

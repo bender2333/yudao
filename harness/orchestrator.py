@@ -43,6 +43,7 @@ from .environment import (
 )
 from .deltas import DeltaChannel
 from .event_store import (Command, EventStore, StreamVersionConflict, project_stream, run_stream)
+from .kernel_events import accepted
 from .write_path import NewEvent, Snapshot, Transaction, WritePath
 from .engine import Judgment, StepLimits
 from .streams import (
@@ -1138,7 +1139,9 @@ class Orchestrator:
         if table is None:
             table = mcp_session.McpSessions(
                 self._mcp_document(run_id), credentials=self.facade.credential_chain(),
-                stderr_dir=self.data_dir)
+                stderr_dir=self.data_dir,
+                # 生命周期事件写在 run 流里（工单 #1176）：会话表在启动、关闭与失败时经这个写入方写一条
+                events=lambda event_type, payload: self._mcp_server_event(run_id, event_type, payload))
             self._mcp_sessions[run_id] = table
         return table
 
@@ -1148,6 +1151,21 @@ class Orchestrator:
             if event.type == EventType.RUN_CREATED:
                 return (event.payload or {}).get("mcp_servers")
         return None
+
+    def _mcp_server_event(self, run_id: str, event_type: str, payload: dict[str, Any]) -> None:
+        # MCP 服务器的生命周期事件（网络与 MCP 设计说明第 7.2 节，工单 #1176）：会话表在启动、关闭与
+        # 启动失败时经这里把一条应用事件写到这个 run 的流。写入不改变运行的状态（状态前后都是当时的
+        # 状态），提出者是系统；写不进去不打断会话的建立与关闭，原因记下来供运维查看（与清理错误同一做法）
+        def decide(transaction: Transaction) -> None:
+            status = transaction.projection.status
+            transaction.append(NewEvent(
+                event_type, state_before=status, state_after=status, actor="system",
+                department=transaction.projection.active_department, payload=payload))
+
+        try:
+            self._transact(run_stream(run_id), decide)
+        except Exception as exc:
+            self._close_errors.setdefault(run_id, []).append(exc)
 
     async def _close_mcp_sessions(self, run_id: str) -> None:
         # run 结束（或暂停、停止）以后关闭它的全部 MCP 会话：stdio 先关标准输入，SDK 等待以后结束
@@ -1266,7 +1284,7 @@ class Orchestrator:
 
                 # 激活进行中开始的取消先写入，再记录激活结束：结束事件按取消以后的运行状态关闭会话
                 await asyncio.to_thread(self._await_cancellers, run_id)
-                self._transact(run_stream(run_id), finish)
+                self._transact(run_stream(run_id), finish, dispatch_number=scope.dispatch_number or None)
                 # 这一轮的累计量已经写进事件：已结算量改由投影给出，停过表的段清零（S1e 工单 #1015）
                 self._rebase_run_clock(run_id)
                 self.sessions.get(run_id, scope.department).idle()
@@ -1348,7 +1366,15 @@ class Orchestrator:
         basis = work_basis(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
         provider_name = self._activation_provider(adapter)
-        parent = transaction.append(NewEvent(
+        # 派发编号（工单 #1397，总图第三节「重派与迟到的结果」）：开始一轮工作时写一条事件取得编号，这一轮写入的
+        # 事件都带它；重派先写事件、编号加一，旧编号交回的结果只记录、不改变事项的状态
+        transaction.claim_dispatch_number(session.session_id)
+        acquired = NewEvent(
+            EventType.DISPATCH_NUMBER_ACQUIRED, actor="system", department=department,
+            state_before=projection.status, state_after=projection.status, session_id=session.session_id,
+            payload={"activation_id": activation_id, "cycle": projection.cycle_count + 1},
+        )
+        parent = transaction.append(acquired, NewEvent(
             EventType.DEPARTMENT_ACTIVATED,
             actor="system",
             department=department,
@@ -1362,11 +1388,11 @@ class Orchestrator:
                      "guidance_version": basis.guidance_version,
                      "input_version": basis.input_version, "prompt_version": prompt.version,
                      "prompt_hash": prompt.prompt_ref.content_hash},
-        ))[0]
+        ))[1]
         scope = ActivationScope(
             run_id, department, session.session_id, activation_id, parent.event_id,
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash, guidance_ids=guidance_ids,
-            basis=basis, provider=provider_name,
+            basis=basis, provider=provider_name, dispatch_number=parent.dispatch_number or 0,
         )
         # 会话这一段工作的起点（工单 #475）：这一段用掉的时间算到这个会话的累计已用时间里
         self._start_session_segment(run_id, session.session_id)
@@ -1740,7 +1766,8 @@ class Orchestrator:
                 if isinstance(branch, str) and branch not in sessions:
                     sessions.add(branch)
                     grew = True
-        minimal = fold_events(events)
+        # 只记录的事件（旧派发编号）不并入，与写入口折最小投影用的是同一条规则
+        minimal = fold_events(accepted(events))
         return sum(minimal.sessions.get(session_id, SessionState()).model_steps for session_id in sessions)
 
     async def _run_ask_branch(
@@ -1760,7 +1787,17 @@ class Orchestrator:
         activation_id = new_id("act_ask")
 
         def activate_branch(transaction: Transaction) -> Event:
+            # 询问分支也是一轮工作：先取得这一轮的派发编号（工单 #1397），分支写入的事件都带它
+            transaction.claim_dispatch_number(session_id)
             events = transaction.append(NewEvent(
+                EventType.DISPATCH_NUMBER_ACQUIRED,
+                actor="system",
+                department=department,
+                state_before=transaction.projection.status,
+                state_after=transaction.projection.status,
+                session_id=session_id,
+                payload={"activation_id": activation_id, "cycle": transaction.projection.cycle_count},
+            ), NewEvent(
                 EventType.DEPARTMENT_ACTIVATED,
                 actor="system",
                 department=department,
@@ -1779,7 +1816,7 @@ class Orchestrator:
                     "guidance_ids": [],
                 },
             ))
-            return events[0]
+            return events[1]
 
         act_event = self._transact(run_stream(run_id), activate_branch)
         # 这个分支会话这一段工作的起点（工单 #475）
@@ -1790,6 +1827,7 @@ class Orchestrator:
             prompt_version=prompt.version, prompt_hash=prompt.prompt_ref.content_hash,
             guidance_ids=[], basis=basis,
             provider=self._activation_provider(activation.adapter),
+            dispatch_number=act_event.dispatch_number or 0,
         )
 
         environment = self._workspaces.new_inspection(run_id, department, session_id=session_id)

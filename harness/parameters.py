@@ -163,7 +163,7 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "compaction.min_reasoning_effort": "还没有代码读取它：整理请求的最低推理档位还没有实现",
     "screenshot.max_width": "还没有代码读取它：浏览器截图的等比缩小还没有实现",
     "screenshot.max_height": "还没有代码读取它：浏览器截图的等比缩小还没有实现",
-    "execution.readiness_timeout_sec": "还没有代码读取它：执行环境服务的就绪时限还没有实现",
+    "execution.readiness_timeout_sec": "读的是定义文件里的初值（harness/trial_sessions.py 的就绪时限与上下限，工单 #1182），参数事件改不了它；执行环境服务的远程就绪时限还没有实现",
     "execution.heartbeat_interval_sec": "还没有代码读取它：执行代理的心跳还没有实现",
     "execution.heartbeat_timeout_sec": "还没有代码读取它：执行代理的心跳还没有实现",
     "execution.dispatch_ack_timeout_sec": "还没有代码读取它：动作派发的确认时限还没有实现",
