@@ -240,7 +240,8 @@ def test_capability_lookup_by_preset_and_model():
 
 
 def _copy_definitions(target: Path) -> Path:
-    for name in ("organization.json", "roles.json", "tools.json", "proposal_contracts.json",
+    # 一份完整的定义副本：部门清单里授予的浏览器工具在生成的 browser_tools.json 里（工单 #147、#1184）
+    for name in ("organization.json", "roles.json", "tools.json", "browser_tools.json", "proposal_contracts.json",
                  "rules.json", "stop_reasons.json", "service_presets.json",
                  "model_capabilities.json", "work_items.json", "routings.json", "outcome_kinds.json",
                  "event_sources.json"):

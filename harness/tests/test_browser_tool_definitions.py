@@ -76,6 +76,15 @@ def test_trial_open_and_trial_start_take_different_parameters():
     assert list(launch["required"]) == ["name", "kind", "commands"]
 
 
+def test_engineering_and_quality_can_use_every_browser_tool():
+    # 第 6.3 节：工程与质检都用这批浏览器工具（只有文本的调用目标在请求里去掉截图那一支，由下一条核对），
+    # 产品一个也没有。建档事项不启动试用会话，也不授予它们（工单 #1184）
+    for department in ("engineering", "quality"):
+        assert set(BROWSER_TOOL_NAMES) <= set(DEFINITIONS.tools_for(department)), department
+        assert not set(BROWSER_TOOL_NAMES) & set(DEFINITIONS.tools_for(department, "onboarding")), department
+    assert not set(BROWSER_TOOL_NAMES) & set(DEFINITIONS.tools_for("product"))
+
+
 def test_offering_drops_image_tools_when_the_call_target_cannot_take_images():
     # 按调用目标的输入方式提供工具（第 6.1、6.3 节）：只有文本时声明需要图像输入的工具不出现，
     # 每次请求重新选一次（同一角色任务中途换模型时，下一次请求按新的输入方式选出）

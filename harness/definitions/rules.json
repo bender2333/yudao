@@ -670,6 +670,17 @@
     "tighten_when": "模型的图像输入能力下降",
     "origin": "浏览器与 computer use 设计说明第 5.2 节，截图等比缩小到 1280×800 以内"
   },
+  "browser.call_timeout_sec": {
+    "value": 90,
+    "bounds": [10, 600],
+    "kind": "parameter",
+    "form": "boundary",
+    "guards": "浏览器动作停住不返回，占住这个部门的试用会话",
+    "cost": "真实页面响应慢时动作被判为超时，会话因此中断",
+    "relax_when": "实际页面加载与动作的用时分布经常接近现值",
+    "tighten_when": "超时从未发生在页面真的需要这么久的动作上",
+    "origin": "浏览器与 computer use 设计说明第 4.1 节：Playwright MCP 的动作时限 5 秒、导航时限 60 秒是它自己的默认值，Yudao 的调用时限是它们之外的上限"
+  },
   "desktop.consent_per_session": {
     "value": true,
     "bounds": [0, 1],
