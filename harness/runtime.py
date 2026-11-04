@@ -195,7 +195,7 @@ class LoopSystem:
         # 以后由升级重新开始接着跑；原因由项目登记在这条事项的开始失败上
         stopped, restarted = [], []
         for run_id in run_ids:
-            if not self.projects.restart_form_available(run_id):
+            if not self.projects.item_form_available(run_id):
                 continue
             self.orchestrator.stop_for_upgrade(run_id, reason=reason)
             stopped.append(run_id)
@@ -209,12 +209,16 @@ class LoopSystem:
         # run 事件版本与当前不同的 run 已在启动序列里按强制升级处理，这里只有版本相同的 run；
         # 每个 run 由流程编排先核对事项记录的定义版本（不同时发出决定请求，不取得执行权），
         # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
+        # 事项冻结的形态不在发布里时（工单 #1392）：不进定义版本核对、不发决定请求、不报错，这个 run
+        # 留在未结束，原因写进项目流这条事项的开始失败（每次启动至多一条），换回带那一份形态的发布以后接着跑。
         # 3.1 保持单任务运行：取得执行权以后串行运行到停止，不并发推进两个 run。
         # 运行到停止与结算都经流程编排的 run_until_stop_and_settle（工单 #299）：这条入口与事项开始、
         # 回答决定以后继续共用同一处结算，不在这里各补一遍；服务进程里它是事件循环中的任务（_continue_run）
         # 返回取得执行权的 run 与它这次取得的执行权编号
         resumed: dict[str, int] = {}
         for run_id in self.startup_runs.same_version:
+            if not self.projects.item_form_available(run_id):
+                continue
             claimed = self.orchestrator.resume_incomplete_run(run_id)
             if claimed is None:
                 continue

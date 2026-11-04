@@ -7,9 +7,9 @@
 这份用例用测试目录里的任务池定义当第二份形态（它不进产品）：发布的那一份与它各跑完一个事项，各按自己
 冻结的定义核对停止原因与部门；改形态只影响之后新建的事项；重开数据目录以后按记下的那一份接着跑。
 
-层：集成层（第一、二、三条用例各跑完整的三部门或任务池循环、真实事件库、真实工作区与假模型）。守 R2
-（骨架事件与对外合同只增：新的项目流事件在服务端合同与客户端夹具两端登记）与 R3（形态随事项冻结：换一份
-定义就换形态，看得见、能撤回，事项按创建时那一份运行）。
+层：集成层（每一条都开真实事件库与真实工作区、跑完整的三部门或任务池循环，模型回答由假模型按部门给出）。
+守 R2（骨架事件与对外合同只增：新的项目流事件在服务端合同与客户端夹具两端登记）与 R3（形态随事项冻结：
+换一份定义就换形态，看得见、能撤回，事项按创建时那一份运行）。
 
 先后由事件决定，不用时长赌（测试分层设计说明第 10 节第 7 条）：两个事项一个跑完再建下一个，脚本按部门
 给出；任务池那一份定义与装配只在测试里用，产品代码不导入它们。
@@ -26,8 +26,9 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.app.contracts import EVENT_TYPES
 from harness.definitions import DEFAULT_FORM, DEFINITIONS as PRODUCT_DEFINITIONS
-from harness.event_store import project_stream
-from harness.models import EventType, ProjectEventType, json_dumps
+from harness.event_store import Command, catalog_stream, project_stream, run_stream
+from harness.models import CatalogEventType, EventType, ProjectEventType, TERMINAL_STATUSES, json_dumps, new_id
+from harness.projection import project_run
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests import second_routing
@@ -276,3 +277,127 @@ def test_the_new_project_event_is_registered_on_both_ends():
     assert ProjectEventType.PROJECT_FORM_SET in {
         event for event in json.loads(FIXTURE.read_text(encoding="utf-8"))}
     assert "project_form_set" == ProjectEventType.PROJECT_FORM_SET
+
+
+def _start_failures(system: LoopSystem, project_id: str, run_id: str) -> list[Any]:
+    # 项目流上这条 run 的开始失败：形态不在发布里时写的那些，一条写明原因
+    return [event for event in system.store.list_project_events(project_id)
+            if event.type == ProjectEventType.WORK_ITEM_START_FAILED
+            and event.payload["run_id"] == run_id]
+
+
+def _definitions_requests(system: LoopSystem, run_id: str) -> list[Any]:
+    # run 流上「定义版本不同」的决定请求（没有进核对的 run 一条也没有）
+    return [decision for decision in system.writes.read(run_stream(run_id)).decisions.values()
+            if decision.request["kind"] == "definitions_changed"]
+
+
+def _answer_command() -> Command:
+    # 回答决定请求经应用层的命令：测试直接调用流程编排时造一个身份（与恢复用例相同）
+    return Command(command_id=new_id("cmd"), name="decision.answer", digest="test", actor="user")
+
+
+def test_a_run_whose_form_is_not_in_the_release_waits_where_it_is(tmp_path):
+    # 验收（第一条：main 32bc22ed 补的设计说明「冻结与升级」最后一条）：事项记下的形态名在发布里找不到时，
+    # 恢复不换一份定义顶替、不回退默认形态、不发定义版本的决定请求、不报错；这个 run 留在未结束，原因写进
+    # 项目流这条事项的开始失败（每次启动一条）。换回带那一份形态的发布以后接着跑
+    data_dir = tmp_path / "loop"
+    script = _task_pool_script()
+    first = _system(data_dir, script, resume_on_startup=False)
+    project_id = first.projects.register("恢复时形态不在发布里", GOAL)
+    _set_form(first, project_id, DEFAULT_FORM, second_routing.ROUTING_NAME)
+    item_id, run_id = first.projects.start_work_item(project_id, "任务池的事项")
+    assert first.activate_once(run_id).status == "running"
+    first.close()
+
+    # 只带默认形态的发布：事项记下的任务池那一份不在发布里
+    second = LoopSystem.for_testing(data_dir, FakeAdapter(script))
+    assert run_id not in second.resumed_runs
+    assert project_run(second.store, run_id).status not in TERMINAL_STATUSES
+    # 进不了执行入口也一样：直接要求继续，这个 run 停在原处，不写事件、不换一份定义顶替
+    assert second.run_until_stop(run_id).status not in TERMINAL_STATUSES
+    # 不进定义版本核对：没有决定请求，也没有继续的事件
+    assert _definitions_requests(second, run_id) == []
+    assert not [event for event in second.store.list_events(run_id) if event.type == EventType.RUN_RESUMED]
+    # 名字查不到时不回退默认形态，也不拿默认那份定义顶替
+    assert second.orchestrator.item_form_available(run_id) is False
+    for lookup in (second.orchestrator.item_form, second.orchestrator.item_definitions):
+        with pytest.raises(ValueError, match=f"unknown form {second_routing.ROUTING_NAME!r}"):
+            lookup(run_id)
+    # 原因写在项目流这条事项上；找不到 run 以外的路不报错，实例起得来
+    failures = _start_failures(second, project_id, run_id)
+    assert len(failures) == 1
+    assert second_routing.ROUTING_NAME in failures[0].payload["error"]
+    assert failures[0].payload["work_item_id"] == item_id
+    second.close()
+
+    # 下一次启动再写一条（每次启动至多一条），仍然不继续
+    again = LoopSystem.for_testing(data_dir, FakeAdapter(script))
+    assert run_id not in again.resumed_runs
+    assert len(_start_failures(again, project_id, run_id)) == 2
+    again.close()
+
+    # 换回带那一份形态的发布：事项从停住的地方接着跑，仍是创建时那份任务池
+    back = _system(data_dir, script)
+    assert run_id in back.resumed_runs
+    assert back.orchestrator.item_form(run_id).name == second_routing.ROUTING_NAME
+    assert back.project(run_id).stop_reason == second_routing.ITEM_END_REASON
+    back.close()
+
+
+def test_force_upgrade_leaves_the_run_then_it_continues_under_its_own_form(tmp_path):
+    # 验收（第二条）：force_upgrade 把事件版本相同的 run 也交给同一批时，前置判断一样跳过它：不停止、不重启。
+    # 换回带那份形态的发布以后事项接着跑；这时定义版本与记下的不同，照旧发「定义版本不同」的决定请求，
+    # 回答「按新版本继续」以后仍按创建时那份形态运行
+    data_dir = tmp_path / "loop"
+    script = _task_pool_script()
+    first = _system(data_dir, script, resume_on_startup=False)
+    project_id = first.projects.register("强制升级时形态不在发布里", GOAL)
+    _set_form(first, project_id, DEFAULT_FORM, second_routing.ROUTING_NAME)
+    item_id, run_id = first.projects.start_work_item(project_id, "任务池的事项")
+    assert first.activate_once(run_id).status == "running"
+    first.close()
+
+    # 只带默认形态的发布：强制升级看到的是版本相同、形态不在发布里的一条
+    gone = LoopSystem.for_testing(data_dir, FakeAdapter(script), resume_on_startup=False)
+    gone.force_upgrade()
+    forced = next(event for event in gone.store.stream_events(catalog_stream())
+                   if event.type == CatalogEventType.RUNTIME_FORCE_UPGRADE_REQUESTED)
+    assert forced.payload["stopped_runs"] == []
+    assert forced.payload["restarted_work_items"] == []
+    # 不停止这个 run，也不为它新建事项记录
+    assert project_run(gone.store, run_id).status not in TERMINAL_STATUSES
+    assert not [event for event in gone.store.list_events(run_id) if event.type == EventType.RUN_FAILED]
+    assert [item.work_item_id for item in gone.projects.projection(project_id).work_items] == [item_id]
+    assert len(_start_failures(gone, project_id, run_id)) == 1
+    gone.close()
+
+    # 换回带那份形态的发布，但这一份的定义版本与记下的不同（升级以后典型的样子）
+    class _NewerTaskPoolDefinitions:
+        version = "sha256:task-pool-after-upgrade"
+
+        def __getattr__(self, name: str):
+            return getattr(second_routing.DEFINITIONS, name)
+
+    newer = {
+        DEFAULT_FORM: (PRODUCT_DEFINITIONS, WATCHED_OUTPUTS),
+        second_routing.ROUTING_NAME: (_NewerTaskPoolDefinitions(), second_routing.TIGHTENING),
+    }
+    back = LoopSystem.for_testing(data_dir, FakeAdapter(script), forms=newer)
+    assert run_id not in back.resumed_runs
+    requests = _definitions_requests(back, run_id)
+    assert len(requests) == 1
+    request = requests[0]
+    assert request.request["recorded_definitions_version"] == second_routing.DEFINITIONS.version
+    assert request.request["current_definitions_version"] == _NewerTaskPoolDefinitions.version
+
+    # 回答「按新版本继续」：仍按创建时那份任务池运行，停止原因来自那一份定义
+    back.orchestrator.answer_decision(request.decision_id, "continue", None,
+                                      base_version=request.version, command=_answer_command())
+    back.run_until_stop(run_id)
+    ended = back.project(run_id)
+    assert back.orchestrator.item_form(run_id).name == second_routing.ROUTING_NAME
+    assert ended.status == "failed"
+    assert ended.stop_reason == second_routing.ITEM_END_REASON
+    assert _departments(back, run_id) >= set(second_routing.DEFINITIONS.departments)
+    back.close()

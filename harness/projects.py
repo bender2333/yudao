@@ -969,7 +969,7 @@ class ProjectService:
         title = work_item_title(text) if title is None else title
         # 事项创建时冻结项目当时的形态（工单 #1392）：创建事件记下形态名与它的定义版本，之后这个事项的
         # 写入核对、路由、装配与执行都按这一份定义。没有给 form 时取项目现在的形态（没有设过时是三部门）
-        frozen_form = self.orchestrator.require_form(form or project.form_name)
+        frozen_form = self.orchestrator.form_named(form or project.form_name)
         definitions = frozen_form.definitions
         # 项目部门设置的版本随事项记下：部门 Prompt 与模型不在事项内留副本，每次请求从项目读取当前设置
         prompt_config_versions = {department: project.department_settings[department].version
@@ -1019,22 +1019,27 @@ class ProjectService:
         item = self._start_in(project_id, create, command=command)
         return item.work_item_id, item.run_id
 
-    def restart_form_available(self, run_id: str) -> bool:
-        # 升级重新开始之前先核形态（工单 #1392）：事项记下的那一份不在发布里时**不停止这个 run**——
-        # 留着它未结束，换回带那一份形态的发布以后由升级重新开始接着跑；原因顺带写进项目流这条事项的
-        # 开始失败（每次启动写一条）。找不到 run 或事项时照常走原来的路（停止以后重启返回空）
+    def item_form_available(self, run_id: str) -> bool:
+        # 继续与升级重新开始之前先核事项记下的形态（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：
+        # 那一份不在发布里时**不动这个 run**——不停止、不继续、不换一份定义顶替，留着它未结束，换回带那一份
+        # 形态的发布以后接着跑；原因写进项目流这条事项的开始失败（每次启动至多一条）。创建记录里没有形态名的
+        # 旧事项按默认形态算。找不到 run 或事项时照常走原来的路（停止以后重启返回空）
         try:
             run = project_run(self.store, run_id)
         except RunNotFoundError:
             return True
         if run.project_id is None:
             return True
-        project = self.projection(run.project_id)
+        try:
+            project = self.projection(run.project_id)
+        except ProjectNotFoundError:
+            # 没有项目的事项（直接建 run 的调用与旧数据）：没有形态可核，照原路走
+            return True
         item = project.work_item_for_run(run_id)
         if item is None:
             return True
         try:
-            self.orchestrator.require_form(item.form or project.form_name)
+            self.orchestrator.form_named(item.form)
         except ValueError as exc:
             self.writes.append(project_stream(run.project_id), NewProjectEvent(
                 ProjectEventType.WORK_ITEM_START_FAILED,
@@ -1043,14 +1048,13 @@ class ProjectService:
             return False
         return True
 
-    def _restart_form(self, transaction: Transaction, project: ProjectProjection, item: WorkItem,
-                      run_id: str) -> str | None:
+    def _restart_form(self, transaction: Transaction, item: WorkItem, run_id: str) -> str | None:
         # 因升级重新开始沿用事项创建时冻结的形态（工单 #1392）：这是同一个事项，换的只是 run 的应用版本。
         # 那一份形态已经不在发布里时不换一份、也不按项目现在的形态兜底：与新建事项同样拒绝（项目的组织
-        # 设计说明「冻结与升级」），原因记在这条事项的开始失败上。升级批量先经 `restart_form_available`
-        # 核过、不停止这样的 run，所以这里是兜底；旧事件没有记下形态时取项目现在的形态
+        # 设计说明「冻结与升级」），原因记在这条事项的开始失败上。升级批量先经 `item_form_available`
+        # 核过、不停止这样的 run，所以这里是兜底；旧事件没有记下形态时用默认形态
         try:
-            return self.orchestrator.require_form(item.form or project.form_name).name
+            return self.orchestrator.form_named(item.form).name
         except ValueError as exc:
             transaction.append(NewProjectEvent(ProjectEventType.WORK_ITEM_START_FAILED, {
                 "work_item_id": item.work_item_id, "run_id": run_id, "error": str(exc),
@@ -1073,7 +1077,7 @@ class ProjectService:
             item = project.work_item_for_run(run_id)
             if item is None:
                 return None
-            form = self._restart_form(transaction, project, item, run_id)
+            form = self._restart_form(transaction, item, run_id)
             if form is None:
                 return None
             if item.kind == "onboarding":

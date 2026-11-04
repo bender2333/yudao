@@ -955,7 +955,11 @@ class Orchestrator:
     def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
         # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约第 5.2 节）：
         # 核对定义版本、核实结果未知的动作、取得执行权这三步在 `recovery.py`（S4c 工单 #863），
-        # 薄驱动只把它接上并转交
+        # 薄驱动只把它接上并转交。
+        # 事项冻结的形态不在发布里时（工单 #1392）：这个 run 停在原处，不换一份定义顶替、不进定义版本核对、
+        # 不发决定请求、不报错；启动流程把原因写进项目流，换回带那一份形态的发布以后接着跑
+        if not self.item_form_available(run_id):
+            return None
         return self._recovery.resume(run_id)
 
     def _cancel_driver(self, activation: _Activation) -> None:
@@ -978,6 +982,10 @@ class Orchestrator:
         # 这个循环也醒过来重新找一遍可以开始的部门；部门的判断本身不变
         # 停下其余会话只停这些会话，不改变事项的状态（工单 #856）：
         # 停下以后重新读取再交回，交回的投影里被停下的会话已经收尾
+        # 事项冻结的形态不在发布里时（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：这个 run
+        # 停在原处，不写事件、不换一份定义顶替；换回带那一份形态的发布以后从停住的地方接着跑
+        if not self.item_form_available(run_id):
+            return self.project(run_id)
         connections = ProviderConnections()
         tasks: dict[str, asyncio.Task[RunProjection]] = {}
         loop = asyncio.get_running_loop()
@@ -1163,31 +1171,41 @@ class Orchestrator:
         return definitions
 
     def form_named(self, name: str | None) -> Form:
-        # 名字对应的形态：没有给或没有这个名字（旧事件、发布里已经没有的那一份）时用默认的那一份。
-        # 只给读旧事实用；新建事项要走 require_form，发布里没有那一份时拒绝
-        return self._forms.get(name or DEFAULT_FORM) or self._forms[DEFAULT_FORM]
-
-    def require_form(self, name: str | None) -> Form:
-        # 名字对应的形态；发布里没有这一份时失败，说明写明可选的形态（工单 #1392，项目的组织设计说明
-        # 「冻结与升级」：形态已经不在发布里时，新建事项被拒绝并给同样的原因）
-        form = self._forms.get(name or DEFAULT_FORM)
+        # 名字对应的形态（工单 #1392，项目的组织设计说明「冻结与升级」）：没有记形态名（旧事项）时用默认的
+        # 那一份；记了而发布里没有这一份时**不回退**默认形态——新建事项被拒绝并给同样的说明，已经在跑的事项
+        # 停在原处（见 `item_form_available`）
+        if not name:
+            return self._forms[DEFAULT_FORM]
+        form = self._forms.get(name)
         if form is None:
-            raise ValueError(
-                f"unknown form {name!r}: the release loads {sorted(self._forms)}")
+            raise ValueError(f"unknown form {name!r}: the release loads {sorted(self._forms)}")
         return form
 
     def item_form(self, run_id: str) -> Form:
         # 这个事项创建时冻结的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：
-        # 取 run_created 里记下的形态名；旧事件没有记时用默认的那一份。项目后来改了形态不影响它
+        # 取 run_created 里记下的形态名；旧事件没有记时用默认的那一份。项目后来改了形态不影响它；
+        # 记了而发布里没有这一份时抛出（见 `form_named`），不换一份定义顶替
         cached = self._item_forms.get(run_id)
         if cached is not None:
             return cached
+        form = self.form_named(self.recorded_form(run_id))
+        if self.store.list_events(run_id):
+            # 还没有 run_created 的 run 不记：创建时按给出的那份形态算
+            self._item_forms[run_id] = form
+        return form
+
+    def recorded_form(self, run_id: str) -> str | None:
+        # run_created 里记下的形态名（工单 #1392）：旧事件没有这个字段时为空，按默认的那一份读
         for event in self.store.list_events(run_id):
             if event.type == EventType.RUN_CREATED:
-                form = self.form_named((event.payload or {}).get("form"))
-                self._item_forms[run_id] = form
-                return form
-        return self._forms[DEFAULT_FORM]
+                return (event.payload or {}).get("form")
+        return None
+
+    def item_form_available(self, run_id: str) -> bool:
+        # 这个 run 冻结的形态在发布里（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：
+        # 创建记录里没有形态名的旧事项按默认形态算。不在发布里时事项停在原处，不换一份定义顶替
+        name = self.recorded_form(run_id)
+        return not name or name in self._forms
 
     def _item_routing(self, run_id: str) -> Any:
         # 这个事项用的路由实现：由它冻结的形态决定（工单 #1392）
