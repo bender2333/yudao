@@ -76,9 +76,10 @@ class SessionFactory:
                 errors.append(exc)
         return errors
 
-    def flush_trial_events(self, run_id: str) -> int:
+    def flush_trial_events(self, run_id: str | None = None) -> int:
         # 写 run 结束时会话排队的结束事件（工单 #1183）：这条路径的调用点在 run 的终态事件提交之后的效果里，
-        # 那时写事件会让事件的位置乱序，所以先排队，由 run 的收尾在安全的时候写。交回写了几条
+        # 那时写事件会让事件的位置乱序，所以先排队，由 run 的收尾在事务之外写。
+        # run_id 给出时只写这个 run 的，不给时写全部（强制升级、服务关闭）。交回写了几条
         return self.trials.flush(run_id)
 
     def close_run(self, run_id: str) -> list[Exception]:

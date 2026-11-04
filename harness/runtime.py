@@ -575,7 +575,7 @@ class LoopSystem:
     def flush_trial_events(self) -> int:
         # 写排队的试用会话结束事件（工单 #1183）：run 的终态事件提交之后的效果里不能写事件（位置会乱序），
         # 所以 run 结束时结束的会话把结束记录排进队，在事务之外由这里写。交回写了几条
-        return self.orchestrator.sessions.trials.flush()
+        return self.orchestrator.sessions.flush_trial_events()
 
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)
