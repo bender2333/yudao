@@ -323,6 +323,9 @@ class Orchestrator:
             # 试用会话的开始与结束写成 run 流里的应用事件（浏览器与 computer use 设计说明第 12 节，
             # 工单 #1183）：会话表在执行环境一层，写入方是薄驱动——与 MCP 会话的生命周期同一个做法
             trial_events=self._trial_session_event,
+            # 工作区政策（谁交出交付、谁从封存交付建立检查副本、检查材料写在哪里）按这个事项冻结的
+            # 形态推（工单 #1509）：换一份把部门改了名的定义，改名后的部门照常按自己的角色工作
+            definitions_for=self.item_definitions,
         )
         # 恢复的零件在 `recovery.py`（S4c 工单 #863）：核对定义版本、核实结果未知的动作、取得执行权
         self._recovery = RunRecovery(
@@ -444,7 +447,7 @@ class Orchestrator:
         if context_window is not None:
             self._test_context_windows[run_id] = context_window
             if self.test_adapter_factory is not None and self.facade is not None:
-                self._install_test_call_target(context_window)
+                self._install_test_call_target(context_window, definitions.departments)
         material_dir = self.materials_root / run_id
         if material_dir == self.materials_root or not material_dir.is_relative_to(self.materials_root):
             raise ValueError("run_id must stay within the run materials directory")
@@ -456,7 +459,7 @@ class Orchestrator:
         initial = self.interactions.initial(run_id, task)
         follow_up = (None if additional_input is None else self.interactions.next_input(
             run_id, initial["initial_input"], additional_input, version=2))
-        sessions = self.sessions.create_run_sessions(run_id)
+        sessions = self.sessions.create_run_sessions(run_id, departments=definitions.departments)
         self._abort[run_id] = Event()
         project_context_ref = None
         if project_context is not None:
@@ -543,12 +546,15 @@ class Orchestrator:
     def project(self, run_id: str) -> RunProjection:
         return project_run(self.store, run_id)
 
-    def _install_test_call_target(self, context_window: int | None) -> None:
+    def _install_test_call_target(self, context_window: int | None,
+                                  departments: Any | None = None) -> None:
         # 测试系统的确定性适配器：用它的名称与模型名登记一个 fake 协议的模型访问定义。
         # 声明的输出上限取不改变默认保留的值，使既有的阈值行为与事项窗口一致。
         # 目录里已有内容时按合并处理：保留已有的连接、定义与部门默认，只补上缺的 fake 连接，
         # 并且只给它补上还没有默认的部门——测试适配器不覆盖用户在目录与项目里写入的模型选择。
         # 窗口是调用目标的属性：给了就用给的，不给时保留目录里已经登记的窗口（工单 #669）
+        # 补绑定的部门清单按这个事项冻结的形态取（工单 #1509）：改名后的部门也要有模型可解析；
+        # 不给时是进程加载的那一份
         if self.facade is None:
             raise ValueError("a provider facade is required for runs")
         provider_id = self.test_provider
@@ -577,7 +583,7 @@ class Orchestrator:
             # fake 模型的窗口是这一次声明的（工单 #669）：同一个 fake 模型登记过的窗口要跟着这一次走
             existing["context_window"] = context_window
             existing["max_output_tokens"] = response_reserve(context_window, None)
-        for department in DEFINITIONS.departments:
+        for department in (DEFINITIONS.departments if departments is None else departments):
             bindings.setdefault(department, {"provider_id": provider_id, "model_id": model_id})
         self.facade.store_document({"providers": providers, "models": models, "bindings": bindings})
         if self.facade.config_path is not None:
@@ -610,10 +616,10 @@ class Orchestrator:
     def _waiting_departments(self, run_id: str) -> set[str]:
         # 在等待工作的部门：这个进程里没有正在工作的会话的那些（工单 #16 的恢复口径）。
         # 「谁在等」的判断归路由实现（工单 #825），薄驱动只交出会话状态这份事实；
-        # 部门清单按事项冻结的形态取（工单 #1392）
+        # 部门清单按事项冻结的形态取（工单 #1392）：在等待的是这份定义里的部门（工单 #1509）
         definitions = self.item_definitions(run_id)
         return waiting_departments({department: self._session_status(run_id, department)
-                                    for department in definitions.departments})
+                                    for department in definitions.departments}, definitions)
 
     def _session_status(self, run_id: str, department: str) -> str | None:
         # 这个进程里这个部门会话的状态；还没有会话时为空（那时它同样在等待，可以被重新激活）
@@ -753,7 +759,9 @@ class Orchestrator:
 
         def receive(transaction: Transaction) -> None:
             self._require_open(run_id, transaction.projection, "This run has ended; guidance can be sent to a new task.")
-            self.interactions.receive_guidance(transaction, department, text, base_version=base_version)
+            # 部门清单按这个事项冻结的定义核对（工单 #1509）
+            self.interactions.receive_guidance(transaction, department, text, base_version=base_version,
+                                               definitions=self.item_definitions(run_id))
 
         self._transact(run_stream(run_id), receive, command=command)
         self._wake(run_id, restart=True)
@@ -1460,8 +1468,9 @@ class Orchestrator:
         if self.test_adapter_factory is not None:
             # 确定性测试适配器没有目录条目：表示成一个 fake 协议的模型访问定义并绑定三个部门，
             # 用这一次声明的窗口（没有声明时保留目录里已登记的窗口），使步骤驱动的每次解析与真实
-            # Provider 走同一条路径（#45 架构答复第 6 条）
-            self._install_test_call_target(self._test_context_windows.get(projection.run_id))
+            # Provider 走同一条路径（#45 架构答复第 6 条）。部门按这个事项冻结的形态绑定（工单 #1509）
+            self._install_test_call_target(self._test_context_windows.get(projection.run_id),
+                                           self.item_definitions(run_id).departments)
             try:
                 adapter = self.test_adapter_factory(department)
             except Exception as exc:
@@ -1486,7 +1495,9 @@ class Orchestrator:
             session = self.sessions.get(run_id, department)
         except KeyError:
             ids = {item.department: item.session_id for item in projection.sessions.values()}
-            self.sessions.create_run_sessions(run_id, ids)
+            # 会话按这个事项冻结的形态的部门建（工单 #1509）：改名后的部门也要有自己的会话
+            self.sessions.create_run_sessions(run_id, ids,
+                                              departments=self.item_definitions(run_id).departments)
             session = self.sessions.get(run_id, department)
 
         activation_id = new_id("act")
@@ -1555,7 +1566,9 @@ class Orchestrator:
             # 没有项目部门设置的部门 Prompt 时，固定取内置默认 Prompt（roles.json 的角色说明）；
             # 事项种类的工作说明是单独的请求材料，由上下文装配在部门 Prompt 之后放入（工单 #248）
             text = self.item_definitions(projection.run_id).role(department).prompt
-            ref = save_department_prompt(self.artifacts, projection.run_id, department, text)
+            # 部门清单按这个事项冻结的定义核对（工单 #1509）
+            ref = save_department_prompt(self.artifacts, projection.run_id, department, text,
+                                        self.item_definitions(projection.run_id))
             return DepartmentPrompt(department, 0, text, ref, "")
         return DepartmentPrompt(
             department=department, version=setting.version, text=setting.text,

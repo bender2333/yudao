@@ -631,11 +631,13 @@ class StepRecorder:
         return self.scope.provider
 
     def _record(self, *drafts: Draft) -> list[Event]:
-        # 在写入口开一个事务追加一次调用的全部记录
+        # 在写入口开一个事务追加一次调用的全部记录；部门与停止原因按这个事项所用的那份定义核对（工单 #1509），
+        # 记录器在开始一轮工作时拿到的是事项冻结的那份定义
         if not drafts:
             return []
         return self._writes.transact(run_stream(self.scope.run_id),
                                      lambda transaction: self._record_in(transaction, *drafts),
+                                     definitions=self._definitions,
                                      dispatch_number=self.scope.dispatch_number or None)
 
     @staticmethod

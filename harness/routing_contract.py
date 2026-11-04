@@ -25,10 +25,16 @@
 # 路由（成果驱动）不受影响，也不会被调用。第二版的路由实现照旧被接受（一版兼容，contract_versions）。
 # 这样第二种路由按设计说明第 5.1 节的输入自己折事件，不必再把事件库从外面塞进路由。
 #
+# 第三版之后（工单 #1509，只增）：输入那一条里的「事项创建时冻结的定义」有了交进来的入口。契约新增可选方法
+# use_definitions：声明了它的路由，组装处 select 接上它以后把**这份形态自己那份定义**交给它，之后路由按它
+# 取值；组装处给每份形态一份路由实例，不与其他形态共用。没有声明的路由实现照旧被接受（读进程加载的那份
+# 定义），也不会被调用，所以测试里的第二种路由不用改。注入是只增的可选方法：实现与调用方都不必改，
+# 契约版本不动。
+#
 # 第三版的输出里补一件（#1394）：事项完成时的结束原因由路由给。可选方法 completion_reason(view, events)
 # 由薄驱动在进入完成状态时调用，路由按事项创建事件里记下的开环标记判断这次完成记成哪一种结束原因，
 # 薄驱动只把它写进事实，不认这两个名字。没有声明这个方法的路由（第二版与任务池那一种），以及它不给原因的
-# 情况，薄驱动照旧按事项种类取——这一条不改变契约版本：声明了第三版而没有这个方法的实现照旧被接受。
+# 情况，薄驱动照旧按事项种类取——这一条也不改变契约版本：声明了第三版而没有这个方法的实现照旧被接受。
 
 from __future__ import annotations
 
@@ -115,9 +121,27 @@ def _hand_facts(name: str, implementation: Any, store: Any) -> bool:
     return True
 
 
+def _hand_definitions(name: str, implementation: Any, definitions: Any) -> Any:
+    # 组装处把这份形态自己那份定义交给声明了 use_definitions 的路由（工单 #1509）：注入方法交出按这一份
+    # 定义取值的实例，一份形态一份、不与其他形态共用（共用时后接上的那份会盖掉前一份的部门）；返回空表示
+    # 就地使用登记的那一个。没有声明的实现照旧交出登记的那一个，也不会被调用：它读进程加载的那份定义。
+    # 没有交定义时也没有东西可注入
+    if definitions is None:
+        return implementation
+    method = getattr(implementation, "use_definitions", None)
+    if method is None:
+        return implementation
+    if not callable(method):
+        raise UnavailableRouting(
+            f"routing implementation {name!r} declares use_definitions, and it is not callable")
+    bound = method(definitions)
+    return implementation if bound is None else bound
+
+
 def select(name: str, definitions: Any = None, *, store: Any = None) -> Any:
     # 启动时按组织定义里写明的名称接上路由实现，核对它声明的契约版本，再让它校验自己那份定义的内容
     # （设计说明第 5.4 节第 2 条：结构由内核核对，内容归路由）。名称没有实现时失败，说明里写明有哪些可用的名称。
+    # 交了定义时，声明了 use_definitions 的路由拿到的是接上这份定义的一份实例（工单 #1509）；
     # store 是组装处手里的事件库：声明了 use_facts 的路由在这里拿到它的只读读取器
     implementation = _REGISTRY.get(name)
     if implementation is None:
@@ -125,9 +149,10 @@ def select(name: str, definitions: Any = None, *, store: Any = None) -> Any:
             f"no routing implementation is registered under {name!r}; "
             f"registered names: {sorted(_REGISTRY)}")
     accept(implementation)
-    implementation.check_definition(DEFINITIONS if definitions is None else definitions)
-    _hand_facts(name, implementation, store)
-    return implementation
+    routing = _hand_definitions(name, implementation, definitions)
+    routing.check_definition(DEFINITIONS if definitions is None else definitions)
+    _hand_facts(name, routing, store)
+    return routing
 
 
 def registered() -> tuple[str, ...]:
@@ -236,6 +261,13 @@ class Routing(Protocol):
         # 可选（第三版，工单 #1164）：声明了这个方法的路由，在组装处 select 接上它以后拿到事件库的只读读取器
         # reader（只有 list_events(run_id)），据此按设计说明第 5.1 节的输入自己折事件。没有这个方法的路由实现
         # （第二版与成果驱动）照常被接受，也不会被调用
+        ...
+
+    def use_definitions(self, definitions: Any) -> Any:
+        # 可选（第三版只增，工单 #1509）：声明了这个方法的路由，在组装处 select 接上它以后拿到**这份形态自己
+        # 那份定义**（事项创建时冻结的那一份），之后按它取部门、成果种类与核验声明。注入方法交出按这一份定义
+        # 取值的实例：组装处给每份形态一份，不与其他形态共用；返回空表示就地使用登记的那一个。
+        # 没有这个方法的路由实现（第二种路由）照常被接受，也不会被调用：它读进程加载的那份
         ...
 
     def ready_departments(self, view: Any, *, waiting: set[str] | None = None) -> list[str]:

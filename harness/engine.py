@@ -88,13 +88,15 @@ def tool_call_required_text(count: int, limit: int | None = None) -> str:
     )
 
 
-def _guidance_only_round(projection: RunProjection, scope: ActivationScope) -> bool:
+def _guidance_only_round(projection: RunProjection, scope: ActivationScope,
+                         definitions: Definitions | None = None) -> bool:
     # 一轮开始时只有指导是新的工作，而且这段指导是这一轮收到的：这一轮没有要做的工作，
     # 模型不调用工具的文字回复就是回答用户（部门指导设计说明第 3 节，工单 #1037）。
     # 询问分支不是部门的一轮工作，它的文字回复仍按「要求调用工具」处理。
+    # 关注关系按这个事项所用的那份定义取（工单 #1509）：不给时是进程加载的那一份
     if not scope.guidance_ids or scope.session_id in projection.branch_sessions:
         return False
-    return watched_new_work(projection, scope.department) == ["guidance"]
+    return watched_new_work(projection, scope.department, definitions) == ["guidance"]
 
 
 def _text_reply(response: ModelResponse) -> bool:
@@ -251,7 +253,7 @@ class StepDriver:
         # shortcut: 这个判断不持久化；进程重新启动以后同一轮由新会话接着做的，丢掉它并退回要求调用工具，
         # 这是可以接受的限制（工单 #1037）
         opened = writes.read(run_stream(scope.run_id))
-        self._text_reply_answers = _guidance_only_round(opened.projection, scope)
+        self._text_reply_answers = _guidance_only_round(opened.projection, scope, self._definitions)
         # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：编排层按 run 持有，
         # 会话结束（run 关闭）时由它关闭。检查工作区按会话保留会换掉环境对象，会话表重新接上
         self._mcp_sessions = mcp_sessions
@@ -286,6 +288,13 @@ class StepDriver:
         # 待恢复的决定请求要写明部门与模型
         self._compaction_stalled_out = False
         self._compaction_stalled_target: dict[str, Any] | None = None
+
+    def _transact(self, decide: Callable[[Transaction], Any]) -> Any:
+        # 执行层写 run 流的事件：部门与停止原因按这个事项所用的那份定义核对（工单 #1509）。
+        # 驱动在开始一轮工作时拿到的是事项冻结的那份定义，写入口不给时默认只认进程加载的那一份，
+        # 换一份把部门改了名的定义以后第一个事件就会被拒
+        return self._writes.transact(self._stream, decide, definitions=self._definitions,
+                                     dispatch_number=self._scope.dispatch_number or None)
 
     @property
     def scope(self) -> ActivationScope:
@@ -955,7 +964,7 @@ class StepDriver:
                 return None
             return request, step
 
-        prepared = self._writes.transact(self._stream, prepare, dispatch_number=self._scope.dispatch_number or None)
+        prepared = self._transact(prepare)
         if isinstance(prepared, _Unassembled):
             facts = list(prepared.error.paths) if isinstance(prepared.error, UnrepresentableWorkspace) else []
             raise ProviderError(str(prepared.error), reason=prepared.reason, facts=facts) from prepared.error
@@ -972,7 +981,7 @@ class StepDriver:
             self._recorder.request_started(transaction, request)
             return True
 
-        return self._writes.transact(self._stream, start, dispatch_number=self._scope.dispatch_number or None)
+        return self._transact(start)
 
     async def _call_model(self, request: ModelRequest) -> ModelResponse:
         # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果；
@@ -1006,7 +1015,7 @@ class StepDriver:
             self._recorder.retry_scheduled(transaction, request, error, delay, next_step_id)
             return True
 
-        return self._writes.transact(self._stream, schedule, dispatch_number=self._scope.dispatch_number or None)
+        return self._transact(schedule)
 
     def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> _CompactionOutcome | None:
         # 整理请求的回答生成检查点。请求没有声明工具，回应里的工具调用不执行、不进入有效历史；
@@ -1032,7 +1041,7 @@ class StepDriver:
             self._recorder.compaction(transaction, request, result, response)
             return _CompactionOutcome(covered_digest=result.checkpoint.covered_digest)
 
-        outcome = self._writes.transact(self._stream, finish, dispatch_number=self._scope.dispatch_number or None)
+        outcome = self._transact(finish)
         message = self._advance_compaction(outcome)
         if message is not None:
             self._compaction_stalled_target = dict(request.call_target or {})
@@ -1147,7 +1156,7 @@ class StepDriver:
                                                 before_snapshot=before_snapshot)
             return permission, facts
 
-        return self._writes.transact(self._stream, begin, dispatch_number=self._scope.dispatch_number or None)
+        return self._transact(begin)
 
     async def _begin_tool_waiting_for_input(
         self, request: ModelRequest | _RecoveredCall, call: dict[str, Any]
