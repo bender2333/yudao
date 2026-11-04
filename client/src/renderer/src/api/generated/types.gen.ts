@@ -3174,7 +3174,7 @@ export type InstanceUpgradeReport = {
     /**
      * Python Lines Max
      */
-    python_lines_max: number;
+    python_lines_max?: number | null;
     /**
      * Passed
      */
@@ -10594,6 +10594,91 @@ export type DepartmentSettingsConfiguredPayload = {
 };
 
 /**
+ * DispatchNumberAcquiredEvent
+ */
+export type DispatchNumberAcquiredEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'dispatch_number_acquired';
+    payload: DispatchNumberAcquiredPayload;
+};
+
+/**
+ * DispatchNumberAcquiredPayload
+ */
+export type DispatchNumberAcquiredPayload = {
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Cycle
+     */
+    cycle: number;
+};
+
+/**
  * FailureObservation
  */
 export type FailureObservation = {
@@ -11518,6 +11603,196 @@ export type MaterialRecordedPayload = {
 };
 
 /**
+ * McpServerClosedEvent
+ */
+export type McpServerClosedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'mcp_server_closed';
+    payload: McpServerClosedPayload;
+};
+
+/**
+ * McpServerClosedPayload
+ */
+export type McpServerClosedPayload = {
+    /**
+     * Server
+     */
+    server: string;
+    /**
+     * Transport
+     */
+    transport: 'stdio' | 'http';
+    /**
+     * Reason
+     */
+    reason: 'closed' | 'cancelled' | 'leftover';
+    /**
+     * Pid
+     */
+    pid?: number | null;
+    /**
+     * Create Time
+     */
+    create_time?: number | null;
+    /**
+     * Ended
+     */
+    ended?: boolean;
+};
+
+/**
+ * McpServerFailedEvent
+ */
+export type McpServerFailedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'mcp_server_failed';
+    payload: McpServerFailedPayload;
+};
+
+/**
+ * McpServerFailedPayload
+ */
+export type McpServerFailedPayload = {
+    /**
+     * Server
+     */
+    server: string;
+    /**
+     * Transport
+     */
+    transport: 'stdio' | 'http';
+    /**
+     * Error
+     */
+    error: string;
+};
+
+/**
  * McpServerInfo
  */
 export type McpServerInfo = {
@@ -11597,6 +11872,99 @@ export type McpServerSetting = {
      * Config Digest
      */
     config_digest?: string;
+};
+
+/**
+ * McpServerStartedEvent
+ */
+export type McpServerStartedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'mcp_server_started';
+    payload: McpServerStartedPayload;
+};
+
+/**
+ * McpServerStartedPayload
+ */
+export type McpServerStartedPayload = {
+    /**
+     * Server
+     */
+    server: string;
+    /**
+     * Transport
+     */
+    transport: 'stdio' | 'http';
+    /**
+     * Pid
+     */
+    pid?: number | null;
+    /**
+     * Create Time
+     */
+    create_time?: number | null;
 };
 
 /**
@@ -18991,6 +19359,8 @@ export type EventObject = ({
 } & DepartmentGuidanceRespondedEvent) | ({
     type: 'department_activated';
 } & DepartmentActivatedEvent) | ({
+    type: 'dispatch_number_acquired';
+} & DispatchNumberAcquiredEvent) | ({
     type: 'department_input';
 } & DepartmentInputEvent) | ({
     type: 'tool_call_required';
@@ -19059,6 +19429,12 @@ export type EventObject = ({
 } & ArtifactAcceptedEvent) | ({
     type: 'lesson_candidate_recorded';
 } & LessonCandidateRecordedEvent) | ({
+    type: 'mcp_server_started';
+} & McpServerStartedEvent) | ({
+    type: 'mcp_server_closed';
+} & McpServerClosedEvent) | ({
+    type: 'mcp_server_failed';
+} & McpServerFailedEvent) | ({
     type: 'run_done';
 } & RunDoneEvent) | ({
     type: 'run_paused';

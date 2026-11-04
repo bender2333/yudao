@@ -1,20 +1,21 @@
 {
 "schema":1,
 "path":"AGENTS.md",
-"hash":"ac9a7c63cead768a",
+"hash":"d54de39b4c1ac1da",
 "nodes":[
-{"hash":"ac9a7c63cead768a","id":"AGENTS.md","kind":"file","title":"AGENTS.md"},
+{"hash":"d54de39b4c1ac1da","id":"AGENTS.md","kind":"file","title":"AGENTS.md"},
 {"hash":"39426a4e8bdd8d8b","id":"AGENTS.md#适用范围","kind":"section","parent":"AGENTS.md","title":"适用范围"},
-{"hash":"970b3633116b9799","id":"AGENTS.md#共同要求","kind":"section","parent":"AGENTS.md","title":"共同要求"},
+{"hash":"d8fb6f93c09b3cd8","id":"AGENTS.md#共同要求","kind":"section","parent":"AGENTS.md","title":"共同要求"},
 {"hash":"fd5b56a4a7cc98c5","id":"AGENTS.md#项目","kind":"section","parent":"AGENTS.md","title":"项目"},
-{"hash":"a937ec517e99bcea","id":"AGENTS.md#项目 > 常用命令","kind":"section","parent":"AGENTS.md#项目","title":"常用命令"},
+{"hash":"9c909a39b62eb2ce","id":"AGENTS.md#项目 > 常用命令","kind":"section","parent":"AGENTS.md#项目","title":"常用命令"},
 {"hash":"f87cc87154c8f599","id":"AGENTS.md#项目 > GitHub Issues","kind":"section","parent":"AGENTS.md#项目","title":"GitHub Issues"},
 {"hash":"9a3c81a370c8f620","id":"AGENTS.md#项目 > 架构问题","kind":"section","parent":"AGENTS.md#项目","title":"架构问题"}
 ],
 "edges":[
-{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["docs/agents/acceptance-evidence.md"],"seen":"c508339609e8ff9b","src":"AGENTS.md#共同要求"},
-{"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["docs/agents/autopilot-runtime.md"],"seen":"4a6f3b31a2e2c4cd","src":"AGENTS.md#共同要求"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":"AGENTS.md#共同要求"},
+{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["docs/agents/acceptance-evidence.md"],"seen":"89e3daa46e774c2b","src":"AGENTS.md#共同要求"},
+{"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["docs/agents/autopilot-runtime.md"],"seen":"ba53e8f45155a828","src":"AGENTS.md#共同要求"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["docs/agents/workflow.md"],"seen":"9a98d51d5b558853","src":"AGENTS.md#共同要求"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"5d3b42fc542e8c54","src":"AGENTS.md#共同要求"},
 {"dst":".claude/skills/reviewer/SKILL.md","kind":"code-path","raws":[".claude/skills/reviewer/SKILL.md"],"seen":"93fa26a42a26612d","src":"AGENTS.md#适用范围"},
 {"dst":".claude/skills/solo-worker/SKILL.md","kind":"code-path","raws":[".claude/skills/solo-worker/SKILL.md"],"seen":"baddd710fc5e8fdc","src":"AGENTS.md#适用范围"},
 {"dst":"docs/agents/shared-rules.md","kind":"link","raws":["docs/agents/shared-rules.md"],"seen":"4dac8f4cc77b0670","src":"AGENTS.md#适用范围"},
@@ -23,11 +24,11 @@
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"bf7f2025603ef66f","src":"AGENTS.md#项目"},
 {"dst":"docs/agents/issue-tracker.md#工单系统：GitHub Issues > 执行者常用","kind":"link","raws":["docs/agents/issue-tracker.md"],"seen":"1b772b7de702e985","src":"AGENTS.md#项目 > GitHub Issues"},
 {"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"eb9a5d218fcc4892","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"6ed7870024cc25f6","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"0ec0552adcbe7034","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"docs/design/test-pyramid.md","kind":"code-path","raws":["docs/design/test-pyramid.md"],"seen":"e766a4cafac32642","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"dee18f30736539e9","src":"AGENTS.md#项目 > 常用命令"},
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.2 集成层在每次合并以后运行","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"f0fcbba4a05f64a2","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"harness/proposals.py","kind":"code-path","raws":["harness/proposals.py"],"seen":"7f1f7edb4a80f2c2","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"266c758f0cf38a07","src":"AGENTS.md#项目 > 常用命令"},
-{"dst":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","kind":"link","raws":["docs/agents/workflow.md"],"seen":"0270a0d1b6b470b0","src":"AGENTS.md#项目 > 架构问题"}
+{"dst":"harness/proposals.py","kind":"code-path","raws":["harness/proposals.py"],"seen":"3bea9b2cd6cc90c9","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"e8c40922f4168ea6","src":"AGENTS.md#项目 > 常用命令"},
+{"dst":"docs/agents/workflow.md#工作方式 > 7. 出问题往哪交","kind":"link","raws":["docs/agents/workflow.md"],"seen":"cdc7d25b51dc8b09","src":"AGENTS.md#项目 > 架构问题"}
 ]
 }

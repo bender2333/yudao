@@ -83,6 +83,11 @@ class EventType(SkeletonEventType):
     INDEPENDENT_JUDGEMENT_COMMITTED = "independent_judgement_committed"
     QA_TESTS_SAVED = "qa_tests_saved"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
+    # MCP 服务器的生命周期（网络与 MCP 设计说明第 7.2 节，工单 #1176）：一台服务器的一次会话启动、关闭与
+    # 启动失败各记一条。应用事件：内核不认识它们，重放时跳过；进程标识与创建时间是遗留进程的核对依据
+    MCP_SERVER_STARTED = "mcp_server_started"
+    MCP_SERVER_CLOSED = "mcp_server_closed"
+    MCP_SERVER_FAILED = "mcp_server_failed"
 
 # ProjectEventType 与 CatalogEventType 由内核事件模块给出：项目流与目录流的事件全部是骨架事件
 

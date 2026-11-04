@@ -163,7 +163,7 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "compaction.min_reasoning_effort": "还没有代码读取它：整理请求的最低推理档位还没有实现",
     "screenshot.max_width": "还没有代码读取它：浏览器截图的等比缩小还没有实现",
     "screenshot.max_height": "还没有代码读取它：浏览器截图的等比缩小还没有实现",
-    "execution.readiness_timeout_sec": "还没有代码读取它：执行环境服务的就绪时限还没有实现",
+    "execution.readiness_timeout_sec": "读的是定义文件里的初值（harness/trial_sessions.py 的就绪时限与上下限，工单 #1182），参数事件改不了它；执行环境服务的远程就绪时限还没有实现",
     "execution.heartbeat_interval_sec": "还没有代码读取它：执行代理的心跳还没有实现",
     "execution.heartbeat_timeout_sec": "还没有代码读取它：执行代理的心跳还没有实现",
     "execution.dispatch_ack_timeout_sec": "还没有代码读取它：动作派发的确认时限还没有实现",
@@ -316,7 +316,7 @@ def last_parameter_change_id(store: Any, name: str) -> str | None:
 
 def frozen_check_timeout(store: Any, run_id: str) -> int:
     # 一个 run 中检查的时限（迭代底座 B3，工单 #351）：run_created 事件里冻结的取值，运行中不再跟随修改。
-    # 旧事件没有这个字段时按当时的全局现值。取值不进运行投影：投影是内核模块，行数受内核清单上限约束
+    # 旧事件没有这个字段时按当时的全局现值。取值不进运行投影：投影是内核模块，只放裁决要读的内容
     from .event_store import run_stream
     from .models import EventType
 

@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":"docs/trial/stage-1-guide.md",
-"hash":"8639adb798d3e4fd",
+"hash":"305b7e8cddddfe59",
 "nodes":[
-{"hash":"8639adb798d3e4fd","id":"docs/trial/stage-1-guide.md","kind":"file","title":"docs/trial/stage-1-guide.md"},
-{"hash":"18fbd7c856e1cfdc","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","kind":"section","parent":"docs/trial/stage-1-guide.md","title":"阶段一试用指南：网页上跑完一个事项（0.2.0）"},
+{"hash":"305b7e8cddddfe59","id":"docs/trial/stage-1-guide.md","kind":"file","title":"docs/trial/stage-1-guide.md"},
+{"hash":"4660e53aee0a7713","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","kind":"section","parent":"docs/trial/stage-1-guide.md","title":"阶段一试用指南：网页上跑完一个事项（0.2.0）"},
 {"hash":"5a1dee0b433b449d","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 1. 试用前的准备","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"1. 试用前的准备"},
 {"hash":"e60b6262958ce8ad","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 2. 安装与启动","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"2. 安装与启动"},
 {"hash":"1e79bd2e76a994c2","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 3. 配置模型","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"3. 配置模型"},
-{"hash":"7a0caef7fc6bf536","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 4. 试用要做的六件事","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"4. 试用要做的六件事"},
+{"hash":"bc1dd63d08c4ec6f","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 4. 试用要做的六件事","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"4. 试用要做的六件事"},
 {"hash":"a0c0905709677769","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 5. 卡住的时候","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"5. 卡住的时候"},
 {"hash":"f97be024d35b150f","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 6. 试完怎么给结论","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"6. 试完怎么给结论"},
 {"hash":"8f98b0a123598e27","id":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0） > 7. 这次不看的","kind":"section","parent":"docs/trial/stage-1-guide.md#阶段一试用指南：网页上跑完一个事项（0.2.0）","title":"7. 这次不看的"}

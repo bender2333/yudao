@@ -64,6 +64,10 @@ const COMMON: Readonly<Record<string, string>> = none({
   mcp_servers_configured: SETTINGS,
   // 探测 MCP 服务器（工单 #1174）：结果由 project.settings 的探测一节与工具快照给出
   tool_server_probe_finished: SETTINGS,
+  // MCP 服务器的生命周期（工单 #1176）：启动、关闭与启动失败由工具页与动作回执给出，画面里没有对应物
+  mcp_server_started: PAGE_ONLY,
+  mcp_server_closed: PAGE_ONLY,
+  mcp_server_failed: PAGE_ONLY,
   project_parameter_set: SETTINGS,
   home_seen: SETTINGS,
   parameter_set: SETTINGS,
@@ -141,6 +145,8 @@ const FLOOR_NONE: Readonly<Record<string, string>> = none({
   department_input: INTERNAL,
   tool_call_required: INTERNAL,
   activation_finished: STATE_ONLY,
+  // 派发编号（骨架事件，工单 #1397）：一轮工作开始时的编号，由下一份状态表示，没有一次性的动作
+  dispatch_number_acquired: STATE_ONLY,
   model_reasoning: MODEL_IO,
   model_message: MODEL_IO,
   action_verified: PAGE_ONLY,
@@ -204,6 +210,8 @@ const ROOM_NONE: Readonly<Record<string, string>> = none({
   department_input: INTERNAL,
   tool_call_required: INTERNAL,
   activation_finished: STATE_ONLY,
+  // 派发编号（骨架事件，工单 #1397）：一轮工作开始时的编号，由下一份状态表示，没有一次性的动作
+  dispatch_number_acquired: STATE_ONLY,
   model_reasoning: MODEL_IO,
   model_message: MODEL_IO,
   action_verified: PAGE_ONLY,
@@ -256,6 +264,8 @@ const BUILDING_NONE: Readonly<Record<string, string>> = none({
   department_input: INTERNAL,
   tool_call_required: INTERNAL,
   activation_finished: STATE_ONLY,
+  // 派发编号（骨架事件，工单 #1397）：楼上看不出一次性的动作，由下一份状态表示
+  dispatch_number_acquired: STATE_ONLY,
   context_assembled: TOO_SMALL,
   model_request_serialized: TOO_SMALL,
   model_reasoning: MODEL_IO,

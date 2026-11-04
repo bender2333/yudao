@@ -13,7 +13,8 @@ from harness.path_rules import QA_TESTS_DIR
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
-from harness.tests.helpers import action, perform, run_tree_command, wait_for_file, wait_until_stopped
+from harness.tests.helpers import (action, perform, python_command, run_tree_command, wait_for_file,
+                                   wait_until_stopped)
 from harness.definitions import DEFINITIONS
 from harness.tools import tools_for
 from harness.workspace import Workspace
@@ -28,7 +29,7 @@ def test_quality_checks_only_through_run_check(tmp_path):
     assert [name for name in tools_for("quality") if TOOLS[name].action == "check"] == ["run_check"]
     workspace = Workspace(tmp_path)
     workspace.write_file("ok.py", "raise SystemExit(0)\n")
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python ok.py"},
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": python_command("ok.py")},
                      department="quality")
     assert result.ok is True and result.output["executor"] == "host"
     assert workspace.snapshot().facts.latest_check("quality", "smoke").exit_code == 0
@@ -49,7 +50,7 @@ def test_run_check_executes_host_process_and_ignores_self_reported_exit_code(tmp
     workspace = Workspace(tmp_path)
     environment = LocalEnvironment(workspace)
     workspace.write_file("ok.py", "raise SystemExit(3)\n")
-    result = perform(environment, "run_check", {"name": "smoke", "command": "python ok.py", "exit_code": 0})
+    result = perform(environment, "run_check", {"name": "smoke", "command": python_command("ok.py"), "exit_code": 0})
     assert result.ok is True
     assert result.status == "completed"
     assert result.output["exit_code"] == 3
@@ -74,7 +75,7 @@ def test_check_cannot_persist_forged_receipt(tmp_path):
         "forge.py",
         "from pathlib import Path\nPath('.checks/receipts.jsonl').write_text('forged\\n')\n",
     )
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python forge.py"})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": python_command("forge.py")})
     assert result.ok is True
     text = (tmp_path / ".checks" / "receipts.jsonl").read_text(encoding="utf-8")
     assert text.strip() != "forged"
@@ -95,7 +96,7 @@ def test_check_subprocess_inherits_environment_and_redacts_secrets(tmp_path, mon
         "print(os.environ.get('BLACKROUTER_API_KEY'))\n"
         "raise SystemExit(0)\n",
     )
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "env", "command": "python env.py"})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "env", "command": python_command("env.py")})
     assert result.ok is True
     assert "has" in result.output["summary"]
     assert "super-secret-value-123456" not in result.output["summary"]
@@ -112,7 +113,7 @@ def test_mutating_check_does_not_bind_pass_to_original_snapshot(tmp_path):
         "assert 'FIXED' in p.read_text()\n",
     )
     original = workspace.digest()
-    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": "python fix.py"})
+    result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": python_command("fix.py")})
     assert result.ok is True
     assert result.output["exit_code"] == 0
     assert workspace.read_file("app.py") == "BROKEN = True\n"
@@ -243,7 +244,7 @@ def test_check_records_source_workspace_change(tmp_path):
         "Path(sys.argv[1]).write_text('changed after the check\\n')\nraise SystemExit(7)\n",
     )
     result = perform(LocalEnvironment(workspace), "run_check", {
-        "name": "source", "command": 'python app.py "' + str(workspace.root / "app.py") + '"',
+        "name": "source", "command": python_command("app.py", f'"{workspace.root / "app.py"}"'),
     })
     assert result.ok and result.output["exit_code"] == 7
     assert result.output["tree_changed"] is True

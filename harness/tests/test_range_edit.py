@@ -3,7 +3,7 @@ import os
 import pytest
 
 from harness.environment import LocalEnvironment
-from harness.tests.helpers import perform
+from harness.tests.helpers import perform, python_command
 from harness.workspace import Workspace
 
 def _environment(root):
@@ -129,7 +129,7 @@ def test_stale_pass_verdict_cannot_be_reused_after_tree_changes(tmp_path):
     workspace, environment = _environment(tmp_path)
     workspace.write_file("app.py", "print('ok')\n")
     workspace.write_file("check.py", "raise SystemExit(0)\n")
-    passed = perform(environment, "run_check", {"name": "smoke", "command": "python check.py"})
+    passed = perform(environment, "run_check", {"name": "smoke", "command": python_command("check.py")})
     assert passed.ok and passed.output["exit_code"] == 0, passed.error
     assert workspace.snapshot().facts.latest_check("engineering", "smoke") is not None
     content_hash = _read_content_hash(environment, "app.py", 1, 1)

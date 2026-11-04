@@ -9,6 +9,7 @@
 [layers]
 "kernel/test_contract_surface.py" = "unit"
 "kernel/test_definitions_decide.py" = "unit"
+"kernel/test_dispatch_number.py" = "module"
 "kernel/test_every_stop_has_reason.py" = "unit"
 "kernel/test_judge_before_explanation.py" = "module"
 "kernel/test_limits_survive_restart.py" = "integration"
@@ -134,6 +135,7 @@
 "test_loops_run_layer.py" = "unit"
 "test_malformed_tool_arguments.py" = "integration"
 "test_mcp_client.py" = "integration"
+"test_mcp_lifecycle.py" = "integration"
 "test_mcp_probe.py" = "integration"
 "test_mcp_settings.py" = "module"
 "test_mcp_tools.py" = "unit"
@@ -229,6 +231,7 @@
 "test_tools.py" = "integration"
 "test_tools_registry.py" = "module"
 "test_tree_archive.py" = "module"
+"test_trial_sessions.py" = "integration"
 "test_undefined_names.py" = "module"
 "test_unknown_action_handed_back.py" = "integration"
 "test_user_facing_labels.py" = "unit"

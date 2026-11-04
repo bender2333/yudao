@@ -12,12 +12,13 @@ from .deltas import DeltaChannel
 from .decision_flow import DECISION_FLOW
 from .definitions import DEFAULT_FORM, DEFINITIONS, Definitions, configure_fetch
 from . import parameters, routing_contract
+from . import mcp_session
 from .engine import StepDriver, StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
-from .event_store import Command, EventStore, catalog_stream
-from .models import CatalogEventType, Form, ProjectEventType, TERMINAL_STATUSES
+from .event_store import Command, EventStore, catalog_stream, run_stream
+from .models import CatalogEventType, EventType, Form, ProjectEventType, TERMINAL_STATUSES
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
-from .write_path import NewCatalogEvent, WritePath
+from .write_path import NewCatalogEvent, NewEvent, WritePath
 from .projection import RunNotFoundError, RunProjection, project_run
 from .project_projection import catalog_handler, handler_for
 from .projects import ProjectService, project_projection
@@ -163,6 +164,9 @@ class LoopSystem:
         # 启动时扫描上次异常退出留下的检查工作区（工单 #481）：run 已经结束但 on_commit 没有跑过
         # 的目录在这里清掉；文件未删除时不阻塞启动
         self._cleanup_orphaned_inspections_on_startup()
+        # 启动时结束遗留的 MCP 服务器进程并补写关闭事件（网络与 MCP 设计说明第 7.2 节，工单 #1176）：
+        # 放在继续未结束的 run 之前，继续时按同一台服务器重新建立会话
+        self.ended_leftover_servers = self._end_leftover_mcp_servers_on_startup()
         # 启动时补建缺少的普通事项 run（工单 #321，设计第 7 节）：work_item_created 已提交而 run 还没有创建时
         # 进程中断，这里按事项记录（含起始文件夹快照）补建
         self.recovered_work_item_runs = self.projects.create_missing_work_item_runs_on_startup()
@@ -536,6 +540,30 @@ class LoopSystem:
                 cleanup_run_inspections(self.workspace_root / run_id)
             except (OSError, RuntimeError):
                 pass
+
+    def _end_leftover_mcp_servers_on_startup(self) -> list[str]:
+        # 上一次进程崩溃时没有写下 mcp_server_closed 的服务器（网络与 MCP 设计说明第 7.2 节，工单 #1176）：
+        # 按记录的进程标识与创建时间结束仍然存活的进程（整棵进程树），然后补写一条 mcp_server_closed
+        # （原因为遗留，写明这一次有没有真的结束进程）。进程已经不在了也补写：事件里的关闭记录要与启动配对，
+        # 恢复时「有启动没有关闭」就等于还有遗留进程。事件写不进去不阻塞启动，留给下一次启动再补
+        ended: list[str] = []
+        for leftover in mcp_session.leftover_servers(self.store):
+            was_ended = mcp_session.end_leftover_server(leftover)
+            payload = {"server": leftover.server, "transport": leftover.transport, "reason": mcp_session.CLOSE_LEFTOVER,
+                       "pid": leftover.pid, "create_time": leftover.create_time, "ended": was_ended}
+
+            def decide(transaction, payload=payload) -> None:
+                status = transaction.projection.status
+                transaction.append(NewEvent(
+                    EventType.MCP_SERVER_CLOSED, state_before=status, state_after=status,
+                    actor="system", department=transaction.projection.active_department, payload=payload))
+
+            try:
+                self.writes.transact(run_stream(leftover.run_id), decide)
+            except Exception:
+                continue
+            ended.append(f"{leftover.run_id}:{leftover.server}")
+        return ended
 
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)

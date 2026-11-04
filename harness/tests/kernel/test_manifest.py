@@ -1,10 +1,8 @@
-# 内核清单本身的两项检查（可信内核设计说明第 3 节）：
-# 1. 内核模块只导入内核模块、标准库与 pydantic；
-# 2. 内核模块的总行数不超过清单里的上限。
+# 内核清单本身的检查（可信内核设计说明第 3 节）：内核模块只导入内核模块、标准库与 pydantic。
 #
-# 清单是数据，由用户所有；这两项检查按清单里 kind 为 module 的条目判定，
+# 清单是数据，由用户所有；这项检查按清单里 kind 为 module 的条目判定，
 # kind 为 material 的条目（内核自己的测试、评测材料、发布脚本与基础规则文本）由路径守卫保护，
-# 不参加这两项检查——测试要导入 pytest，评分器按场景运行，文档与发布脚本不是裁决模块。
+# 不参加这项检查——测试要导入 pytest，评分器按场景运行，文档与发布脚本不是裁决模块。
 # 读仓库里的静态文件，不开数据库、不用子进程、不用网络，属于单元层。
 
 import ast
@@ -25,7 +23,7 @@ def _manifest() -> dict:
 
 
 def _modules(manifest: dict) -> list[str]:
-    # 内核的 Python 模块：清单里 kind 为 module 的文件。两项检查只按它们判定。
+    # 内核的 Python 模块：清单里 kind 为 module 的文件。导入方向的检查只按它们判定。
     return [entry["path"] for entry in manifest["paths"]
             if entry["kind"] == "module" and entry["path"].endswith(".py") and (REPO_ROOT / entry["path"]).exists()]
 
@@ -126,15 +124,3 @@ def test_kernel_files_import_only_kernel_files_stdlib_and_pydantic():
             elif top not in sys.stdlib_module_names and module != "__future__" and top != "pydantic":
                 offenders.append((relative, line, module, "不是内核文件、标准库或 pydantic"))
     assert offenders == [], f"内核文件导入了清单以外的模块：{offenders}"
-
-
-def test_kernel_python_lines_stay_within_the_manifest_cap():
-    manifest = _manifest()
-    kernel = _modules(manifest)
-    counts = {relative: len((REPO_ROOT / relative).read_text(encoding="utf-8").splitlines())
-              for relative in kernel}
-    total = sum(counts.values())
-    assert total <= manifest["python_lines_max"], (
-        f"内核 Python 文件共 {total} 行，超过清单上限 {manifest['python_lines_max']} 行；"
-        f"按文件的行数：{counts}"
-    )

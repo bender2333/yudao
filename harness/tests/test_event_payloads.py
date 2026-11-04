@@ -35,10 +35,10 @@ def _release_script(summary, files=None):
     }
 
 def _release_report() -> ReleaseCheckReport:
-    # 一次通过的发布检查结果：与 harness/release_check.py 写进决定请求的同一形状
+    # 一次通过的发布检查结果：与 harness/release_check.py 写进决定请求的同一形状（工单 #1473 起没有行数上限）
     return ReleaseCheckReport(
         repository="D:/repo", pending_commit="0123456789abcdef", base_tag="v0.1.0",
-        kernel_changes=("harness/bounds.py",), kernel_python_lines=5290, python_lines_max=5471,
+        kernel_changes=("harness/bounds.py",), kernel_python_lines=5290,
         findings=(), text="发布检查：通过")
 
 

@@ -406,6 +406,12 @@ class DepartmentActivatedPayload(Versions, WorkBasis):
     guidance_version: int
 
 
+class DispatchNumberAcquiredPayload(Payload):
+    # 开始一轮工作时取得派发编号（工单 #1397）：编号本身在事件信封上，载荷只写这一轮是谁、第几个周期
+    activation_id: str
+    cycle: int
+
+
 class DepartmentInputPayload(Versions, WorkBasis):
     activation_id: str
     step_id: int
@@ -1406,6 +1412,36 @@ class ToolServerProbeFinishedPayload(Payload):
     error: str = ""
 
 
+class McpServerStartedPayload(Payload):
+    # 一台 MCP 服务器的一次会话启动（网络与 MCP 设计说明第 7.2 节，工单 #1176）：服务器名称、传输，
+    # 以及 stdio 服务器子进程的进程标识与创建时间——Yudao 启动时按这两项结束进程崩溃留下的遗留进程，
+    # 所以它们必须随事件保存。HTTP 服务器没有进程，两项为空
+    server: str
+    transport: Literal["stdio", "http"]
+    pid: int | None = None
+    create_time: float | None = None
+
+
+class McpServerClosedPayload(Payload):
+    # 一台 MCP 服务器的一次会话关闭（工单 #1176）：与启动事件按（run、服务器名称）配对。
+    # reason 是关闭的原因：run 收尾（closed）、调用超时或取消以后关闭（cancelled）、
+    # Yudao 启动时结束遗留进程并补写（leftover）；ended 说明这次是否真的结束了仍然存活的进程
+    server: str
+    transport: Literal["stdio", "http"]
+    reason: Literal["closed", "cancelled", "leftover"]
+    pid: int | None = None
+    create_time: float | None = None
+    ended: bool = False
+
+
+class McpServerFailedPayload(Payload):
+    # 一台 MCP 服务器启动或连接失败（工单 #1176）：原因带标准错误输出的末尾部分，凭据值已替换为星号。
+    # 失败的动作照旧把原因作为工具结果交回部门，事项不停止（设计说明第 7.2 节）
+    server: str
+    transport: Literal["stdio", "http"]
+    error: str
+
+
 class WorkItemStartFailedPayload(Payload):
     work_item_id: str
     run_id: str
@@ -1697,7 +1733,9 @@ class InstanceUpgradeReport(Payload):
     base_tag: str | None
     kernel_changes: list[str]
     kernel_python_lines: int
-    python_lines_max: int
+    # 旧事件里的内核行数上限（工单 #1473 取消）：载荷是对外合同、目录流里已有的「实例升级」事件仍要能读，
+    # 所以字段留着、改成可选；新的发布检查不再写它（内核没有行数上限，ADR-0046）
+    python_lines_max: int | None = None
     passed: bool
     findings: list[dict[str, Any]]
 
@@ -1761,6 +1799,7 @@ PAYLOADS: dict[str, Any] = {
     EventType.DEPARTMENT_GUIDANCE_APPLIED: DepartmentGuidanceAppliedPayload,
     EventType.DEPARTMENT_GUIDANCE_RESPONDED: DepartmentGuidanceRespondedPayload,
     EventType.DEPARTMENT_ACTIVATED: DepartmentActivatedPayload,
+    EventType.DISPATCH_NUMBER_ACQUIRED: DispatchNumberAcquiredPayload,
     EventType.DEPARTMENT_INPUT: DepartmentInputPayload,
     EventType.TOOL_CALL_REQUIRED: ToolCallRequiredPayload,
     EventType.ACTIVATION_FINISHED: ActivationFinishedPayload,
@@ -1795,6 +1834,10 @@ PAYLOADS: dict[str, Any] = {
     EventType.BASELINE_REVIEW_ACCEPTED: BaselineReviewAcceptedPayload,
     EventType.ARTIFACT_ACCEPTED: ArtifactAcceptedPayload,
     EventType.LESSON_CANDIDATE_RECORDED: LessonCandidateRecordedPayload,
+    # MCP 服务器的生命周期（工单 #1176）：应用事件，run 流
+    EventType.MCP_SERVER_STARTED: McpServerStartedPayload,
+    EventType.MCP_SERVER_CLOSED: McpServerClosedPayload,
+    EventType.MCP_SERVER_FAILED: McpServerFailedPayload,
     EventType.RUN_DONE: RunDonePayload,
     EventType.RUN_PAUSED: RunPausedPayload,
     EventType.RUN_FAILED: RunFailedPayload,

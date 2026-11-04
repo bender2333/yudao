@@ -1,16 +1,16 @@
 {
 "schema":1,
 "path":".claude/skills/reviewer/SKILL.md",
-"hash":"93fa26a42a26612d",
+"hash":"19ba33562125e7ff",
 "nodes":[
-{"hash":"93fa26a42a26612d","id":".claude/skills/reviewer/SKILL.md","kind":"file","title":".claude/skills/reviewer/SKILL.md"},
+{"hash":"19ba33562125e7ff","id":".claude/skills/reviewer/SKILL.md","kind":"file","title":".claude/skills/reviewer/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/reviewer/SKILL.md#(开头)","kind":"section","parent":".claude/skills/reviewer/SKILL.md","title":"(开头)"},
 {"hash":"6b907b93dbc4e97c","id":".claude/skills/reviewer/SKILL.md#name: reviewerdescription: 独立审查改到可信内核代码的 PR：solo 执行者在合并前派一个全新上下文的子代理按这一份审，规范检查、内容核对、反向验证，结论写成 PR 上的 REVIEW: 评论（批准或要求修改）。只审内核 PR；其余 PR 由 solo 自己核对。argument-hint: \"<PR 编号或分支 issue-<编号>>\"","kind":"section","parent":".claude/skills/reviewer/SKILL.md","title":"name: reviewerdescription: 独立审查改到可信内核代码的 PR：solo 执行者在合并前派一个全新上下文的子代理按这一份审，规范检查、内容核对、反向验证，结论写成 PR 上的 REVIEW: 评论（批准或要求修改）。只审内核 PR；其余 PR 由 solo 自己核对。argument-hint: \"<PR 编号或分支 issue-<编号>>\""},
 {"hash":"b94906c6c0c97fc1","id":".claude/skills/reviewer/SKILL.md#审查者","kind":"section","parent":".claude/skills/reviewer/SKILL.md","title":"审查者"},
 {"hash":"1ec602e46c30381e","id":".claude/skills/reviewer/SKILL.md#审查者 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/reviewer/SKILL.md#审查者","title":"何时用 / 何时不用"},
 {"hash":"f5fa33376026b6b1","id":".claude/skills/reviewer/SKILL.md#审查者 > 你是谁","kind":"section","parent":".claude/skills/reviewer/SKILL.md#审查者","title":"你是谁"},
 {"hash":"1717edfc50dd98b1","id":".claude/skills/reviewer/SKILL.md#审查者 > 先读什么","kind":"section","parent":".claude/skills/reviewer/SKILL.md#审查者","title":"先读什么"},
-{"hash":"358d11badfb9ae47","id":".claude/skills/reviewer/SKILL.md#审查者 > 步骤","kind":"section","parent":".claude/skills/reviewer/SKILL.md#审查者","title":"步骤"},
+{"hash":"18bc966c7e962bb8","id":".claude/skills/reviewer/SKILL.md#审查者 > 步骤","kind":"section","parent":".claude/skills/reviewer/SKILL.md#审查者","title":"步骤"},
 {"hash":"a3a0634fcfffb4d8","id":".claude/skills/reviewer/SKILL.md#审查者 > 常见借口","kind":"section","parent":".claude/skills/reviewer/SKILL.md#审查者","title":"常见借口"},
 {"hash":"79856527fbe7d8eb","id":".claude/skills/reviewer/SKILL.md#审查者 > 常见借口 > 表1 > 「CI 绿了，覆盖率也没降」","kind":"row","parent":".claude/skills/reviewer/SKILL.md#审查者 > 常见借口","title":"「CI 绿了，覆盖率也没降」"},
 {"hash":"aea32c58f248ea0f","id":".claude/skills/reviewer/SKILL.md#审查者 > 常见借口 > 表1 > 「交付说明写得很全」","kind":"row","parent":".claude/skills/reviewer/SKILL.md#审查者 > 常见借口","title":"「交付说明写得很全」"},
@@ -23,7 +23,7 @@
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/reviewer/SKILL.md#审查者"},
 {"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"1155373f0753c2aa","src":".claude/skills/reviewer/SKILL.md#审查者 > 何时用 / 何时不用"},
 {"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":".claude/skills/reviewer/SKILL.md#审查者 > 你是谁"},
-{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"0ec0552adcbe7034","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤"}
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"c4ce281d9a5ca1a9","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"dee18f30736539e9","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤"}
 ]
 }
