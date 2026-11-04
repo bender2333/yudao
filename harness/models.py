@@ -77,6 +77,11 @@ class EventType(SkeletonEventType):
     MCP_SERVER_STARTED = "mcp_server_started"
     MCP_SERVER_CLOSED = "mcp_server_closed"
     MCP_SERVER_FAILED = "mcp_server_failed"
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 12 节，工单 #1183）：应用事件，run 流。
+    # 开始事件带选用命令的系统与进程号、创建时间；结束事件带结束方式（停止、被新会话替换、中断、
+    # 用户停止、run 结束）。Yudao 启动时按开始事件里的进程号与创建时间结束遗留的进程树
+    TRIAL_SESSION_STARTED = "trial_session_started"
+    TRIAL_SESSION_ENDED = "trial_session_ended"
 
 # ProjectEventType 与 CatalogEventType 由内核事件模块给出：项目流与目录流的事件全部是骨架事件
 

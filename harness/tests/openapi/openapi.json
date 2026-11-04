@@ -38539,6 +38539,462 @@
         "title": "ToolStartedPayload",
         "type": "object"
       },
+      "TrialSessionEndedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "trial_session_ended",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TrialSessionEndedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "TrialSessionEndedEvent",
+        "type": "object"
+      },
+      "TrialSessionEndedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "web",
+              "desktop"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "stopped",
+              "replaced",
+              "interrupted",
+              "user_stopped",
+              "run_ended"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "create_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
+          },
+          "ended": {
+            "default": false,
+            "title": "Ended",
+            "type": "boolean"
+          },
+          "exit_code": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Code"
+          }
+        },
+        "required": [
+          "session_id",
+          "department",
+          "kind",
+          "reason"
+        ],
+        "title": "TrialSessionEndedPayload",
+        "type": "object"
+      },
+      "TrialSessionStartedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "at": {
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "stream_version": {
+            "title": "Stream Version",
+            "type": "integer"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project Id"
+          },
+          "work_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Work Item Id"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "department": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Department"
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Role"
+          },
+          "actor": {
+            "title": "Actor",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "rule",
+              "decision_model",
+              "role_statement",
+              "host_measurement",
+              "user"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "command_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command Id"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "type": {
+            "const": "trial_session_started",
+            "title": "Type",
+            "type": "string"
+          },
+          "payload": {
+            "$ref": "#/components/schemas/TrialSessionStartedPayload"
+          }
+        },
+        "required": [
+          "position",
+          "previous",
+          "event_id",
+          "at",
+          "stream",
+          "stream_version",
+          "project_id",
+          "work_item_id",
+          "run_id",
+          "department",
+          "role",
+          "actor",
+          "source",
+          "command_id",
+          "label",
+          "type",
+          "payload"
+        ],
+        "title": "TrialSessionStartedEvent",
+        "type": "object"
+      },
+      "TrialSessionStartedPayload": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "department": {
+            "title": "Department",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "web",
+              "desktop"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "launch_name": {
+            "title": "Launch Name",
+            "type": "string"
+          },
+          "system": {
+            "enum": [
+              "windows",
+              "linux"
+            ],
+            "title": "System",
+            "type": "string"
+          },
+          "port": {
+            "title": "Port",
+            "type": "integer"
+          },
+          "ready_url": {
+            "title": "Ready Url",
+            "type": "string"
+          },
+          "tree_digest": {
+            "title": "Tree Digest",
+            "type": "string"
+          },
+          "source": {
+            "enum": [
+              "delivery_snapshot",
+              "workspace_seal"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "create_time": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Create Time"
+          }
+        },
+        "required": [
+          "session_id",
+          "department",
+          "kind",
+          "launch_name",
+          "system",
+          "port",
+          "ready_url",
+          "tree_digest",
+          "source"
+        ],
+        "title": "TrialSessionStartedPayload",
+        "type": "object"
+      },
       "Usage": {
         "additionalProperties": false,
         "properties": {
@@ -40762,6 +41218,8 @@
             "tool_server_probe_finished": "#/components/schemas/ToolServerProbeFinishedEvent",
             "tool_skipped": "#/components/schemas/ToolSkippedEvent",
             "tool_started": "#/components/schemas/ToolStartedEvent",
+            "trial_session_ended": "#/components/schemas/TrialSessionEndedEvent",
+            "trial_session_started": "#/components/schemas/TrialSessionStartedEvent",
             "user_input_received": "#/components/schemas/UserInputReceivedEvent",
             "work_item_created": "#/components/schemas/WorkItemCreatedEvent",
             "work_item_start_failed": "#/components/schemas/WorkItemStartFailedEvent",
@@ -40908,6 +41366,12 @@
           },
           {
             "$ref": "#/components/schemas/McpServerFailedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TrialSessionStartedEvent"
+          },
+          {
+            "$ref": "#/components/schemas/TrialSessionEndedEvent"
           },
           {
             "$ref": "#/components/schemas/RunDoneEvent"

@@ -83,6 +83,8 @@
   "tool_server_probe_finished",
   "tool_skipped",
   "tool_started",
+  "trial_session_ended",
+  "trial_session_started",
   "user_input_received",
   "work_item_created",
   "work_item_start_failed",
