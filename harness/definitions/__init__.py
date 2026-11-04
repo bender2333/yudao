@@ -604,6 +604,10 @@ class Routing(_Definition):
     departments: tuple[Identifier, ...] = Field(min_length=1)
     # 成果种类：这种路由认得的正式成果，按名称引用提交类工具提交的提案种类
     outcome_kinds: tuple[Identifier, ...] = Field(min_length=1)
+    # 本路由下事项最后采纳的成果种类（工单 #1394，形态与核验角色设计说明「定义的校验」第 4 条）：
+    # 成果驱动是交付，直做是交完成的那一份。开环的标记按它判断——它有没有核验角色核验。
+    # 没写时按定义里有没有核验角色判断（没有这一项的旧定义与别种路由）
+    final_outcome: Identifier | None = None
     # 提议方式：提交类工具的名称，按名称引用工具定义
     proposal_methods: tuple[Identifier, ...] = Field(min_length=1)
     # 路由自己的上限（例如任务数、打回次数）：数值，归路由，不进最小投影

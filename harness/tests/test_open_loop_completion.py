@@ -20,7 +20,8 @@ from harness.app.application import Application
 from harness.app.home import AwayReportRequest
 from harness.app.labels import OPEN_LOOP_LABEL, event_label
 from harness.app.payloads import RunCreatedPayload
-from harness.definitions import DEFAULT_FORM, DEFINITIONS, VerificationDeclaration
+from harness.definitions import (DEFAULT_FORM, DEFINITIONS, VerificationDeclaration, VerifiedOutcomes,
+                                 VerifierRole)
 from harness.event_store import project_stream
 from harness.models import EventType, ProjectEventType
 from harness.runtime import LoopSystem
@@ -38,9 +39,19 @@ OPEN_LOOP_DEFINITIONS = DEFINITIONS.model_copy(update={
     "organization": DEFINITIONS.organization.model_copy(
         update={"verification": VerificationDeclaration(verifiers=())}),
 })
+# 有核验角色、但它只核验中途的成果（设计说明第 4.7 节第 4 条后半句）：最后采纳的成果（交付）没有人核验，
+# 同样标为开环。核验角色在定义里，检查也是它做，只是它核验的不是交付
+MIDWAY_FORM = "three_departments_verifier_of_a_midway_outcome"
+MIDWAY_DEFINITIONS = DEFINITIONS.model_copy(update={
+    "version": "sha256:three-departments-verifier-of-a-midway-outcome",
+    "organization": DEFINITIONS.organization.model_copy(update={"verification": VerificationDeclaration(
+        verifiers=(VerifierRole(role="quality", verifies=(
+            VerifiedOutcomes(role="engineering", outcomes=("product_spec",)),)),))}),
+})
 FORMS = {
     DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
     OPEN_LOOP_FORM: (OPEN_LOOP_DEFINITIONS, WATCHED_OUTPUTS),
+    MIDWAY_FORM: (MIDWAY_DEFINITIONS, WATCHED_OUTPUTS),
 }
 
 
@@ -106,6 +117,29 @@ def test_an_item_without_a_verifier_is_created_open_loop_and_ends_open_loop(tmp_
     assert _decisions(system, run_id) == []
     # 采纳照常进行：交付被采纳，项目流上的采纳事件照常写下
     assert system.projects.settle(run_id).type == ProjectEventType.DELIVERABLE_ADOPTED
+    system.close()
+
+
+def test_a_verifier_of_a_midway_outcome_still_marks_the_item_open_loop(tmp_path):
+    # 验收第 2 条的后半句（设计说明第 4.7 节第 4 条）：核验角色只核验中途的成果时，事项最后采纳的成果
+    # （交付）没有人核验，创建时同样标为开环，结束时同样写开环完成、不算放行
+    system = _system(tmp_path / "loop")
+    application = Application(system)
+    project_id = system.projects.register("只核验中途成果的形态", GOAL)
+    _set_form(system, project_id, DEFAULT_FORM, MIDWAY_FORM)
+    _item_id, run_id = system.projects.start_work_item(project_id, "补一份用法说明")
+
+    created = _run_created(system, run_id)
+    assert created["form"] == MIDWAY_FORM
+    assert created["open_loop"] is True
+
+    ended = system.run_until_stop(run_id)
+    assert (ended.status, ended.stop_reason) == ("done", "open_loop")
+    assert system.projects.settle(run_id).type == ProjectEventType.DELIVERABLE_ADOPTED
+    report = application.query("home.away_report", AwayReportRequest(range="24h")).data
+    items = {item.id: item for item in report.summary}
+    assert "released" not in items, sorted(items)
+    assert items["open_loop"].value == 1
     system.close()
 
 

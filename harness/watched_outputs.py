@@ -520,6 +520,10 @@ def check_definition(definitions: Any) -> None:
             issues.append(f"end_reasons.{reason}：与内核的停止原因同名")
     if ITEM_END_REASON not in declared.end_reasons:
         issues.append(f"end_reasons：没有声明事项结束用的原因 {ITEM_END_REASON}")
+    # 事项最后采纳的成果种类（工单 #1394）：开环的标记按它判断，所以它必须是这份路由认得的成果种类之一；
+    # 没写时按定义里有没有核验角色判断，不算错
+    if declared.final_outcome is not None and declared.final_outcome not in declared.outcome_kinds:
+        issues.append(f"final_outcome：成果种类 {declared.final_outcome} 没有列进 outcome_kinds")
     if issues:
         raise routing_contract.InvalidRoutingDefinition(ROUTING_NAME, issues)
 

@@ -172,8 +172,8 @@ def _ending(reason: str, *, event_type: str = "run_failed", department: str = "p
 
 
 def test_the_open_loop_reason_ends_a_run_as_done():
-    # 工单 #1394：开环完成的结果是完成，去向是 run_done。写入口收下它，状态迁移与载荷里的原因
-    # 与清单一致；写成暂停或失败被拒绝（原因规定的结束方式与事件对不上）
+    # R1：开环完成的结果是完成，去向是 run_done。写入口收下它，状态迁移与载荷里的原因与清单一致；
+    # 写成暂停或失败被拒绝（原因规定的结束方式与事件对不上，工单 #1394）
     writes, _store = _writes()
     [event] = writes.append(run_stream("run_open_loop"), write_path.NewEvent(
         "run_done", state_before="running", state_after="done", actor="system", department="product",

@@ -119,6 +119,21 @@ def test_the_shipped_routing_definition_passes_the_routing_own_check():
     assert ROUTING.check_definition(DEFINITIONS) is None
 
 
+def test_a_final_outcome_outside_the_outcome_kinds_is_rejected(tmp_path):
+    # R2：事项最后采纳的成果种类（开环的标记按它判断，工单 #1394）必须是这份路由认得的成果种类之一；
+    # 写在 outcome_kinds 以外时校验失败，写明是哪一项
+    directory = _copy(tmp_path)
+    entry = _routing(directory)
+    entry["final_outcome"] = "audit_note"
+    loaded = load_definitions(_rewrite_routing(directory, entry))
+    with pytest.raises(routing_contract.InvalidRoutingDefinition) as raised:
+        ROUTING.check_definition(loaded)
+    assert "final_outcome：成果种类 audit_note 没有列进 outcome_kinds" in "\n".join(raised.value.issues)
+    # 不写这一项不算错：按定义里有没有核验角色判断
+    entry.pop("final_outcome")
+    ROUTING.check_definition(load_definitions(_rewrite_routing(directory, entry)))
+
+
 def test_a_routing_that_does_not_declare_its_item_end_reason_is_rejected(tmp_path):
     # R3：事项结束用的原因要写在它自己的一份定义里（设计说明第 5.4 节第 7 条）
     directory = _copy(tmp_path)

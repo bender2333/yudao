@@ -488,9 +488,12 @@ class Orchestrator:
             item_limits=item_limits,
         )
         # 事项创建时按冻结的定义算出是不是开环（工单 #1394，形态与核验角色设计说明「开环完成」与
-        # 「定义的校验」第 4 条）：定义里没有核验角色，最后采纳的成果没有人独立核验，记进创建事件；
-        # 进入完成状态时按这条记下的事实取停止原因，不重新算。核验角色取自 #1388 的核验声明
-        open_loop = not definitions.verifier_roles()
+        # 「定义的校验」第 4 条）：看事项最后采纳的成果有没有核验角色核验。最后采纳的成果种类由这份定义
+        # 所选的路由声明（成果驱动是交付，直做是交完成的那一份；`is_open_loop` 按 #1388 的核验声明判断）；
+        # 路由没有声明时按定义里有没有核验角色判断。记进创建事件，进入完成状态时按这条记下的事实取停止原因
+        final_outcome = definitions.routing_definition().final_outcome
+        open_loop = (definitions.is_open_loop(final_outcome) if final_outcome is not None
+                     else not definitions.verifier_roles())
         run_created = NewEvent(
             EventType.RUN_CREATED,
             actor="system",

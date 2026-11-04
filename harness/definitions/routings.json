@@ -27,6 +27,7 @@
         "submit_structure",
         "submit_baseline_review"
       ],
+      "final_outcome": "delivery_spec",
       "limits": {},
       "end_reasons": {
         "no_new_work": {

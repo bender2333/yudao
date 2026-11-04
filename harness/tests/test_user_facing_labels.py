@@ -61,8 +61,8 @@ def test_stop_events_name_stop_reasons_in_chinese():
 
 
 def test_the_open_loop_completion_is_named_in_chinese_without_the_word_release():
-    # 工单 #1394：开环完成的停止原因有中文名，写「开环完成」，不带「放行」二字；中文名取自定义，不另写一份。
-    # 结束的说明照中文写，用户看得到是开环完成还是放行
+    # R2：开环完成的停止原因有中文名，写「开环完成」，不带「放行」二字；中文名取自同一份定义，不另写一份。
+    # 结束的说明照中文写，用户看得到是开环完成还是放行（工单 #1394）
     assert OPEN_LOOP_STOP_REASON in STOP_REASON_NAMES
     assert OPEN_LOOP_LABEL == "开环完成"
     assert "放行" not in OPEN_LOOP_LABEL
