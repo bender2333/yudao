@@ -236,8 +236,17 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     [catalog],
   );
 
-  // 部门默认涉及的部门：定义里的部门（默认三部门），目录里已有绑定的部门也算
-  const departments = useMemo(() => departmentsOf(catalog?.bindings), [catalog]);
+  // 部门默认涉及的部门：这一版加载的定义里的部门（catalog 查询的 departments，工单 #1457），
+  // 目录里已有绑定的部门也算；显示名同样取查询给的
+  const departmentViews = useMemo(() => catalog?.departments ?? [], [catalog]);
+  const departments = useMemo(
+    () => departmentsOf(catalog?.bindings, departmentViews.map((department) => department.id)),
+    [catalog, departmentViews],
+  );
+  const departmentLabels = useMemo(
+    () => Object.fromEntries(departmentViews.map((department) => [department.id, department.label])),
+    [departmentViews],
+  );
 
   // 部门使用的选项：已启用的模型，按连接分组
   const departmentGroups = useMemo(
@@ -369,7 +378,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     if (!outcome.ok) {
       setSelectionStatus((current) => ({
         ...current,
-        [key]: { kind: "error", message: removalRejectionText(commandProblemText(outcome.problem)) },
+        [key]: { kind: "error", message: removalRejectionText(commandProblemText(outcome.problem), departmentLabels) },
       }));
       return false;
     }
@@ -640,6 +649,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       >
         <DepartmentUsage
           departments={departments}
+          labels={departmentLabels}
           groups={departmentGroups}
           bindings={catalog.bindings}
           models={catalog.models}

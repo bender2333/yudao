@@ -15,6 +15,7 @@ import {
 import { DepartmentSettingsFields, DepartmentSettingsSave, ReminderList, promptWritten, useDepartmentDraft } from "./department-settings-form";
 import { FormSection } from "./form-section";
 import { McpServersSection } from "./mcp-servers";
+import type { DepartmentView } from "./organization";
 import { WritebackSection } from "./writeback";
 import {
   CHECK_COMMANDS_LABEL, CHECK_COMMANDS_NOTE, checkCommandsText, sourceDirectoryPayload, sourceWritebackText,
@@ -25,7 +26,7 @@ import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
 import { followDepartmentLabel, mergedModelId, modelById } from "../models/model-logic";
 
-export function SettingsPage(props: { app: ClientApp; route: Route }) {
+export function SettingsPage(props: { app: ClientApp; route: Route; departments: DepartmentView[] }) {
   const projectId = props.route.projectId ?? "";
   const settings = useSnapshot<ProjectSettingsResult>(props.app, "page.settings", "project.settings", {
     project_id: projectId,
@@ -62,7 +63,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route }) {
           <FormSection app={props.app} projectId={projectId} />
           <Departments app={props.app} data={data} />
           <SourceDirectories app={props.app} data={data} />
-          <McpServersSection app={props.app} data={data} />
+          <McpServersSection app={props.app} data={data} departments={props.departments} />
           <WritebackSection app={props.app} projectId={projectId} />
           <MachineAuthorization />
           <ExecutionPlacement />

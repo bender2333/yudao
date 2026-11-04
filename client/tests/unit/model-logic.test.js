@@ -5,7 +5,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  DEPARTMENTS,
   FIRST_BATCH,
   MORE_BATCH,
   admittedModels,
@@ -18,6 +17,7 @@ import {
   currentEffectiveLabel,
   departmentBindings,
   departmentTierBindings,
+  departmentsOf,
   filterCandidates,
   followDepartmentLabel,
   groupAdmittedModels,
@@ -302,5 +302,8 @@ test("档位选项、跟随说明与设置的取值", () => {
 test("项目设置的模型取值与合并", () => {
   assert.equal(modelById([{ id: "d1", model: "glm-4.6" }], "d1").model, "glm-4.6");
   assert.equal(modelById([], "d1"), null);
-  assert.deepEqual(DEPARTMENTS, ["product", "engineering", "quality"]);
+  // 部门清单取自这一版加载的定义（catalog 查询的 departments，工单 #1457），目录里已有绑定的部门也算
+  assert.deepEqual(departmentsOf(undefined, ["engineering"]), ["engineering"]);
+  assert.deepEqual(departmentsOf({ role: { provider_id: "p", model_id: "m" } }, ["engineering", "quality"]),
+    ["engineering", "quality", "role"]);
 });
