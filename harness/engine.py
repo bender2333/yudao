@@ -227,7 +227,7 @@ class StepDriver:
         self._scope = scope
         basis = scope.basis
         # 按部门取模型与提示词的来源（执行契约第三版，工单 #1511）：随开始一轮工作交进来，不再经安全节点问
-        # 薄驱动。没有交时用这一轮的提示与部门默认，只有不关心项目部门设置的接入会这样
+        # 薄驱动。开始一轮工作的这一轮必须有它，每次逻辑调用从它读一次（见 `_department_settings_of`）
         self._department_settings = request.department_settings
         # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判，
         # 没有交的时候是当前加载的那一份；装配也按这一份取（工单 #1175 第 7 轮的契约 v2）
@@ -365,10 +365,9 @@ class StepDriver:
 
     def _department_settings_of(self, department: str) -> tuple[Any, DepartmentPrompt]:
         # 按部门取模型与提示词（执行契约第三版，工单 #1511）：从开始一轮工作时一起交进来的那份来源读，
-        # 每次逻辑调用读一次。没有交时没有项目部门设置，提示就用这一轮开始时的这一份
+        # 每次逻辑调用读一次。来源是开始一轮工作的一份，没交是接入错了（例如直接构造请求却漏了这个字段）：
+        # 不替它写兜底，按薄驱动的通用异常处理收尾
         settings = self._department_settings
-        if settings is None:
-            return None, self._prompt
         return settings.department_selection(department), settings.department_prompt(department)
 
     def _begin_call(self, requested_tier: str | None = None) -> RoundResult | None:

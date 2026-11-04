@@ -99,7 +99,7 @@ class RoundRequest:
     prompt: Any
     limits: StepLimits
     work_ref: Any = None
-    department_settings: Any = None
+    department_settings: "DepartmentSettings | None" = None
 
 
 class DepartmentSettings(Protocol):

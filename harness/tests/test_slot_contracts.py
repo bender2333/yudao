@@ -329,7 +329,8 @@ def test_each_execution_implementation_stops_at_the_step_limit_with_a_closed_rea
     # 这一轮一步都不许走：上限为零
     request = execution_contract.RoundRequest(request.scope, request.prompt,
                                              execution_contract.StepLimits(max_model_steps=0),
-                                             work_ref=request.work_ref)
+                                             work_ref=request.work_ref,
+                                             department_settings=request.department_settings)
     node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=99)
 
     result = _drive(name, system, adapter, request, node)
@@ -345,7 +346,8 @@ def test_each_execution_implementations_result_carries_no_outcome_kind(name, rou
     request = _round_request(system, run_id)
     request = execution_contract.RoundRequest(request.scope, request.prompt,
                                              execution_contract.StepLimits(max_model_steps=0),
-                                             work_ref=request.work_ref)
+                                             work_ref=request.work_ref,
+                                             department_settings=request.department_settings)
     node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=99)
 
     result = _drive(name, system, adapter, request, node)
