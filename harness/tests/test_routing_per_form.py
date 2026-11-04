@@ -255,6 +255,36 @@ def test_the_default_ask_recipient_says_so_when_no_department_can_submit_a_produ
 
 
 # ---------------------------------------------------------------------------
+# 项目的读取：形态不在这个发布里时按进程加载的那份
+# ---------------------------------------------------------------------------
+
+
+def test_project_reads_fall_back_to_the_loaded_definitions_when_the_form_is_gone(tmp_path):
+    # 项目记下的形态不在这个发布里：项目一级的读取按进程加载的那份，不挡住页面；未知部门照旧为空
+    renamed = renamed_definitions(tmp_path)
+    data_dir = tmp_path / "loop"
+    system = LoopSystem.for_testing(data_dir, FakeAdapter(_script(DEFAULT_NAMES)), forms=_forms(renamed),
+                                    resume_on_startup=False)
+    application = Application(system)
+    try:
+        project_id = system.projects.register("形态走了", GOAL)
+        _adopt(application, project_id, RENAMED_FORM)
+    finally:
+        application.close()
+        system.close()
+
+    shrunk = LoopSystem.for_testing(data_dir, FakeAdapter(_script(DEFAULT_NAMES)),
+                                    forms={DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS)},
+                                    resume_on_startup=False)
+    try:
+        assert shrunk.projects.read_department_setting(project_id, "product")["version"] == 0
+        assert shrunk.projects.read_projection_setting(project_id, "product") is not None
+        assert shrunk.projects.read_projection_setting(project_id, "nobody") is None
+    finally:
+        shrunk.close()
+
+
+# ---------------------------------------------------------------------------
 # 同一个实例里两个事项，各按自己冻结的那份定义跑完
 # ---------------------------------------------------------------------------
 
