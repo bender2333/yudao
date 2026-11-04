@@ -84,10 +84,38 @@ def _web_workspace(tmp_path: Path, name: str = "run-1") -> Path:
     return root
 
 
+class _StubBrowsers:
+    """不起真实的 Playwright MCP：这个文件查试用会话本身（#1182），浏览器会话由 #1184 的用例查。
+
+    网页种类的会话建立时会启动浏览器并打开就绪地址（设计说明第 3.4 节），这里只记下这一次启动，
+    交回一个运行中的会话，让回执的形状与真实的一致。
+    """
+
+    def __init__(self) -> None:
+        self.starts: list[dict[str, Any]] = []
+
+    async def start(self, *, run_id, department, copy_root, tree_digest, ready_url,
+                    output_dir=None) -> dict[str, Any]:
+        self.starts.append({"department": department, "ready_url": ready_url})
+        return {"session": {"session_id": "browser_stub", "department": department, "status": "running",
+                            "tree_digest": tree_digest, "copy": str(copy_root)},
+                "accessibility": "stub structure", "images": []}
+
+    async def call(self, **_kwargs):  # pragma: no cover - 这个文件里没有浏览器动作
+        raise AssertionError("this test does not run browser actions")
+
+    def record(self, run_id, department):
+        return None
+
+    async def stop(self, run_id, department, *, reason="stopped") -> dict[str, Any]:
+        return {"session": None, "ended": False, "reason": reason}
+
+
 def _environment(root: Path, *, trials: TrialSessionTable | None = None,
                  run_id: str = "run-1", parameters: dict[str, Any] | None = None) -> LocalEnvironment:
     return LocalEnvironment.open(root, run_id=run_id, parameters=parameters,
-                                 trials=trials if trials is not None else TrialSessionTable(probe=lambda: []))
+                                 trials=trials if trials is not None else TrialSessionTable(probe=lambda: []),
+                                 browsers=_StubBrowsers())
 
 
 def _python(argv_source: str) -> list[str]:
@@ -142,7 +170,7 @@ def test_two_sessions_in_flight_get_different_ports(tmp_path):
     quality_tree = capture_public_tree(quality_root)
     inspection = quality_root / "inspection"
     inspection.mkdir()
-    quality = LocalEnvironment.open(inspection, run_id="run-b", trials=trials)
+    quality = LocalEnvironment.open(inspection, run_id="run-b", trials=trials, browsers=_StubBrowsers())
     quality.bind_trial_source(quality_tree)
     quality.bind_launch_methods([_launch()])
 
@@ -214,7 +242,8 @@ def test_quality_starts_a_copy_of_the_delivery_snapshot_by_its_launch_name(tmp_p
     snapshot = capture_public_tree(FIXTURE)
     workspace = tmp_path / "inspections" / "run-1" / "session-quality"
     environment = LocalEnvironment.establish(workspace, snapshot, run_id="run-1",
-                                             trials=TrialSessionTable(probe=lambda: []))
+                                             trials=TrialSessionTable(probe=lambda: []),
+                                             browsers=_StubBrowsers())
     environment.bind_trial_source(snapshot)
     environment.bind_launch_methods([_launch()])
     # 质检在自己的检查工作区里写下的文件不在交付快照里：试用副本按交付快照建立
@@ -360,8 +389,9 @@ def test_the_workspaces_hand_the_delivery_launch_and_snapshot_to_quality(tmp_pat
         "quality": [ModelResponse(output=[open_call, stop_call])],
     })
     system_under_test = LoopSystem.for_testing(tmp_path, adapter)
-    # 程序核对换成注入的那份：这条用例查的是接线，不等 npm/npx 的探测
+    # 程序核对换成注入的那份：这条用例查的是接线，不等 npm/npx 的探测；浏览器会话同样换成不起进程的那份
     system_under_test.orchestrator._workspaces.trials = TrialSessionTable(probe=lambda: [])
+    system_under_test.orchestrator._workspaces.browsers = _StubBrowsers()
     run_id = system_under_test.create_run("build a page")
     for _ in range(3):
         try:
@@ -420,6 +450,7 @@ def test_a_retained_inspection_workspace_still_takes_the_trial_copy_from_the_del
     workspaces = Workspaces(tmp_path / "runs", view=view, writes=_UsedSession("ses_1"),
                             artifacts=artifacts, definitions=DEFINITIONS)
     workspaces.trials = TrialSessionTable(probe=lambda: [])
+    workspaces.browsers = _StubBrowsers()
     workspaces.new_inspection("run-1", "quality", session_id="ses_1")
     # 质检在自己的检查工作区里写的东西不在交付快照里
     workspace_root = inspection_root(tmp_path / "runs" / "run-1", "ses_1")

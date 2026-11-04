@@ -593,12 +593,33 @@ def test_a_generated_browser_tool_that_duplicates_a_handwritten_one_is_rejected(
 
 
 def test_definitions_without_the_generated_browser_tools_load_with_fewer_tools(tmp_path):
-    # 生成的浏览器工具定义可以不出现：这份定义就没有浏览器工具（测试用的另一份完整定义如此）。
-    # 发布的那一份确实带上它们，由 test_browser_tool_definitions.py 核对
+    # 生成的浏览器工具定义可以为空：让部门都不授予这批工具，这份定义就没有浏览器工具（一份只含
+    # 手写工具的定义如此）。发布的那一份授予它们、也带上这个文件，由 test_browser_tool_definitions.py 核对；
+    # 授予了却没有这份文件是定义不合法，见下一条
+    from harness.tools import BROWSER_TOOL_NAMES
+
     directory = _copy(tmp_path)
+    roles = _read(directory, "roles.json")
+    for role in roles.values():
+        role["tools"] = [tool for tool in role["tools"] if tool not in BROWSER_TOOL_NAMES]
+    _write(directory, "roles.json", roles)
+    work_items = _read(directory, "work_items.json")
+    for kind in work_items["kinds"].values():
+        for department in kind["departments"].values():
+            if "tools" in department:
+                department["tools"] = [tool for tool in department["tools"] if tool not in BROWSER_TOOL_NAMES]
+    _write(directory, "work_items.json", work_items)
     (directory / "browser_tools.json").unlink()
     loaded = load_definitions(directory)
-    from harness.tools import BROWSER_TOOL_NAMES
     assert not set(BROWSER_TOOL_NAMES) & set(loaded.tools)
     assert loaded.version != DEFINITIONS.version
+
+
+def test_a_granted_browser_tool_without_the_generated_file_fails_naming_it(tmp_path):
+    # 部门授予了浏览器工具时这份生成文件必须有：少了它定义直接不合法，并写明哪个工具没有定义
+    directory = _copy(tmp_path)
+    (directory / "browser_tools.json").unlink()
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    assert any(issue[2] == "工具 browser_navigate 没有定义" for issue in raised.value.issues)
 

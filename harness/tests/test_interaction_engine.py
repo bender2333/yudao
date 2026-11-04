@@ -19,7 +19,8 @@ from harness.providers.call import ModelResponse
 from harness.providers.selection import ModelSelection
 from harness.runtime import LoopSystem, RunTerminalError
 from harness.tests.helpers import (WAIT_FOR_RELEASE, after_event, department_history,
-                                    from_another_thread, list_files_turn, quality_turns,
+                                    from_another_thread, list_files_turn, oversized_file,
+                                    pinned_input_tokens, pinned_window, quality_turns,
                                     recorded_context, wait_for_file)
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
@@ -454,8 +455,16 @@ def test_compaction_keeps_activation_versions_and_carries_the_new_input(tmp_path
         return product_spec()
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([respond] * 100))
-    run_id = system.create_run("build echo", context_window=8000)
-    system.workspace(run_id).write_file("notes.txt", "PRESERVED_TOOL_BYTES " * 1800)
+    # 窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计第 10 节第 3 条，不写死窗口）：
+    # 工程与质检也要在这个窗口里装配请求。材料按「窗口 × 85% − 产品的固定材料」的那一截的两倍给：
+    # 一次读进来以后压缩要分几轮，输入在轮与轮之间到达，后一轮按新的输入版本装配（工单 #964 的场景，
+    # 工单 #1184 按新的固定材料重推）
+    measure_id = system.create_run("build echo", context_window=1_000_000)
+    window = pinned_window(system, measure_id, "product", "engineering", "quality")
+    notes = oversized_file(window, pinned_input_tokens(system, measure_id, "product"),
+                           unit="PRESERVED_TOOL_BYTES ") * 2
+    run_id = system.create_run("build echo", context_window=window)
+    system.workspace(run_id).write_file("notes.txt", notes)
     first = system.activate_once(run_id)
     # 压缩照常生效：输入到达不再作废这次压缩
     assert first.compactions and first.input_version == 2
@@ -477,7 +486,8 @@ def test_compaction_keeps_activation_versions_and_carries_the_new_input(tmp_path
                     if event.payload.get("name") == "read_file")
     # 这一轮的压缩保留了工具结果：原始记录里的字节仍在
     assert original.event_id in {ref["event_id"] for item in first.compactions for ref in item["source_refs"]}
-    assert system.artifacts.get_text(original.payload["output_ref"]["content_hash"]).count("PRESERVED_TOOL_BYTES") == 1800
+    assert system.artifacts.get_text(original.payload["output_ref"]["content_hash"]).count("PRESERVED_TOOL_BYTES") \
+        == notes.count("PRESERVED_TOOL_BYTES")
     versions = [_manifest(system, request).input_version for request in system.test_adapter.invocations]
     # 第一条请求在输入到达以前装配，以后的请求带着新的输入版本
     assert versions[0] == 1 and versions[-1] == 2

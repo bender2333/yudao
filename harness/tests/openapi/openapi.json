@@ -17060,6 +17060,26 @@
               }
             ]
           },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrowserSessionState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BrowserObservation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "note": {
             "anyOf": [
               {
@@ -19033,6 +19053,76 @@
           "git_version"
         ],
         "title": "BaselineReviewAcceptedPayload",
+        "type": "object"
+      },
+      "BrowserObservation": {
+        "additionalProperties": false,
+        "properties": {
+          "accessibility": {
+            "title": "Accessibility",
+            "type": "string"
+          },
+          "screenshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ArtifactRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "structure_truncated": {
+            "default": false,
+            "title": "Structure Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accessibility"
+        ],
+        "title": "BrowserObservation",
+        "type": "object"
+      },
+      "BrowserSessionState": {
+        "additionalProperties": false,
+        "properties": {
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "status": {
+            "enum": [
+              "running",
+              "interrupted",
+              "ended"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tree Digest"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "BrowserSessionState",
         "type": "object"
       },
       "CatalogCandidatesCollectedEvent": {
