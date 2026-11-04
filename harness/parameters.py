@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
-from .definitions import DEFINITIONS, VISIBILITY_VALUES
+from .definitions import DEFINITIONS, VISIBILITY_VALUES, Definitions
 from .models import CatalogEvent, CatalogEventType, ProjectEventType, json_dumps
 
 # 建 run 时冻结的参数（工单 #1189）：这 10 项在 run 创建时从参数现值取样，这个 run 一直用它，
@@ -31,10 +31,17 @@ RUN_PARAMETERS = (
     "convergence.step_repeat",
 )
 
-# 三条可见范围也在建 run 时冻结：取值是定义 roles.json 词表里的子集（工单 #1189）
-VISIBILITY_PARAMETERS = ("roles.product.visibility", "roles.engineering.visibility", "roles.quality.visibility")
 
-# 每个 run 的冻结快照里的全部参数名：运行参数与三条可见范围都在这一个字典里（工单 #1189、#397），不另立字段
+def visibility_parameters(definitions: Definitions = DEFINITIONS) -> tuple[str, ...]:
+    # 每个角色的可见范围各是一条参数，也在建 run 时冻结（工单 #1189）：角色清单与顺序取自定义，
+    # 名字跟着角色编号走（工单 #1401）；取值是定义 roles.json 词表里的子集
+    return tuple(f"roles.{role}.visibility" for role in definitions.roles)
+
+
+VISIBILITY_PARAMETERS = visibility_parameters()
+
+# 每个 run 的冻结快照里的全部参数名：运行参数与每个角色一条的可见范围都在这一个字典里（工单 #1189、#397），
+# 不另立字段
 FROZEN_PARAMETERS = (*RUN_PARAMETERS, *VISIBILITY_PARAMETERS)
 
 
@@ -118,10 +125,6 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "bash_timeout_max_sec": "",
     "check_timeout_max_sec": "",
     "compaction.stalled_limit": "",
-    # 已接入（工单 #1189）：三条可见范围在建 run 时冻结，上下文装配只读冻结的那份
-    "roles.product.visibility": "",
-    "roles.engineering.visibility": "",
-    "roles.quality.visibility": "",
     # 已接入（工单 #1184）：浏览器动作的调用时限由 harness/browser.py 读现值，是 Playwright MCP
     # 自己的动作时限与导航时限之外的上限
     "browser.call_timeout_sec": "",
@@ -179,6 +182,9 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "wait.desktop_unlock.max_sec": "还没有代码读取它：等待超过时长上限时发出决定请求的判定还没有实现",
     "provider.model_test_timeout_sec": "模型测试读取定义文件 rules.json 的初值作为逐请求等待上限，参数事件尚未接入 Provider 模块",
 }
+# 已接入（工单 #1189、#1401）：每个角色的可见范围在建 run 时冻结，上下文装配只读冻结的那份。
+# 每个角色一条，名字跟着角色编号走，所以按定义里的角色补进同一份清单
+NOT_WIRED_REASONS.update({name: "" for name in VISIBILITY_PARAMETERS})
 
 
 def not_wired_reason(name: str) -> str:
@@ -330,17 +336,21 @@ def frozen_check_timeout(store: Any, run_id: str) -> int:
 
 
 def frozen_snapshot(store: Any, *, project_id: str | None, definitions_version: str,
-                    item_limits: Mapping[str, Any]) -> dict[str, Any]:
+                    item_limits: Mapping[str, Any], definitions: Definitions | None = None) -> dict[str, Any]:
     # 建 run 时写进 run_created 的参数快照（工单 #1189，设计说明第 3 节第 3 条）：先取全局现值，再取项目的
     # 覆盖，事项已经解析出来的实际限额单独记下，四项与定义版本合在一起构成这个 run 的有效快照。
-    # 取值按当时的定义核对界限；可见范围的词表核对在 check_bounds 里
+    # 取值按当时的定义核对界限；可见范围的词表核对在 check_bounds 里。
+    # 可见范围每个角色一条、名字跟着角色编号走（工单 #1401），角色清单取这个 run 用的定义
+    definitions = definitions or DEFINITIONS
     values = current_values(store)
-    for name in FROZEN_PARAMETERS:
+    for name in RUN_PARAMETERS:
         check_bounds(name, values[name])
+    visibility = {name: _visibility_value(name, values, definitions)
+                  for name in visibility_parameters(definitions)}
     overrides = ({name: value_for_project(store, project_id, name) for name in PROJECT_PARAMETERS}
                  if project_id is not None else {})
     return {
-        "values": {name: values[name] for name in FROZEN_PARAMETERS},
+        "values": {**{name: values[name] for name in RUN_PARAMETERS}, **visibility},
         "global_version": parameters_version(values),
         "project_overrides": overrides,
         "project_version": parameters_version(overrides),
@@ -349,11 +359,22 @@ def frozen_snapshot(store: Any, *, project_id: str | None, definitions_version: 
     }
 
 
+def _visibility_value(name: str, values: Mapping[str, Any], definitions: Definitions) -> Any:
+    # 一条可见范围在冻结快照里的取值：登记里有这个角色时取参数现值（参数事件改得了），
+    # 没有时取角色自己的可见范围（roles.json 的现值；旧定义与换过角色的定义没有登记条目）
+    declared = values.get(name)
+    if declared is not None:
+        return check_bounds(name, declared)
+    return list(definitions.role(name.split(".")[1]).visibility)
+
+
 def frozen_values(frozen: Mapping[str, Any] | None) -> dict[str, Any]:
     # 冻结快照里的参数取值（工单 #1189 写进 run_created 的参数字典，工单 #397 的收敛判定参数也从这里取）：
-    # 旧事件没有冻结字典时按定义初值解释；定义初值是发布时的那份，不取进程重启时的现值，也不取项目当前的覆盖
+    # 旧事件没有冻结字典时按定义初值解释；定义初值是发布时的那份，不取进程重启时的现值，也不取项目当前的覆盖。
+    # 完整性核对的是 10 个运行参数：可见范围的条目每个角色一条、名字跟着定义里的角色走（工单 #1401），
+    # 缺一项时由读它的地方按角色自己的可见范围解释（见 context.frozen_visibility）
     values = (frozen or {}).get("values")
-    if isinstance(values, dict) and all(name in values for name in FROZEN_PARAMETERS):
+    if isinstance(values, dict) and all(name in values for name in RUN_PARAMETERS):
         return dict(values)
     initial = initial_values()
     return {name: initial[name] for name in FROZEN_PARAMETERS}
@@ -417,8 +438,8 @@ def check_bounds(name: str, value: Any) -> Any:
             raise ParameterOutOfBoundsError(
                 f"参数 {name} 的取值应为字符串列表，收到 {value!r}，界限为 {list(rule.bounds)!r}",
                 bounds=rule.bounds)
-        if name in VISIBILITY_PARAMETERS:
-            # 三条可见范围只能是封闭词表里的值（工单 #1189）：词表外的取值在参数校验处就拒绝
+        if name.startswith("roles.") and name.endswith(".visibility"):
+            # 每个角色的可见范围只能是封闭词表里的值（工单 #1189）：词表外的取值在参数校验处就拒绝
             unknown = [item for item in value if item not in VISIBILITY_VALUES]
             if unknown:
                 raise ParameterOutOfBoundsError(

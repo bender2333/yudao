@@ -9,7 +9,8 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from ..definitions import DEFINITIONS
-from ..models import (RUN_STATUSES, CatalogEventType, EventType, ProjectEventType, stop_reason_name)
+from ..models import (OPEN_LOOP_STOP_REASON, RUN_STATUSES, CatalogEventType, EventType, ProjectEventType,
+                      stop_reason_name)
 
 
 # run 状态的中文名（harness/models.py 的 RUN_STATUSES 是同一份取值）：事件说明里的状态按中文写
@@ -26,9 +27,8 @@ if set(STATUS_NAMES) != set(RUN_STATUSES):
 STOP_REASON_NAMES = {reason: definition.label for reason, definition in DEFINITIONS.stop_reasons.items()}
 
 # 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」）：没有核验角色的事项以这个停止原因结束。
-# 编号与 stop_reasons.json 的那一条一致，中文名取自那份定义（「开环完成」，不含「放行」二字），
-# 报告与汇总按它把开环完成与放行分开算，不另写一份文字
-OPEN_LOOP_STOP_REASON = "open_loop"
+# 编号只有一处写法，在路由那一侧（harness/watched_outputs.py：路由读创建事件里的标记，给出结束原因），
+# 这里取同一条；中文名取自定义（「开环完成」，不含「放行」二字），报告与汇总按它把两种完成分开算
 OPEN_LOOP_LABEL = STOP_REASON_NAMES[OPEN_LOOP_STOP_REASON]
 
 DECISION_KIND_NAMES: dict[str, str] = {

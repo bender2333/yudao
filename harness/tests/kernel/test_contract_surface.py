@@ -65,9 +65,9 @@ SNAPSHOT: dict[str, dict] = {
         "version": 2,
         "names": (
             "AskBranch", "AskLimits", "AskOutcome", "AskRejection", "AskRoundResult",
-            "CURRENT_VERSION", "InvalidRoutingDefinition", "ItemEnd", "PREVIOUS_VERSION", "RoundEnd",
-            "Routing", "UnavailableRouting", "accept", "definition_of", "register", "registered",
-            "select",
+            "CURRENT_VERSION", "CompletionReason", "InvalidRoutingDefinition", "ItemEnd",
+            "PREVIOUS_VERSION", "RoundEnd", "Routing", "UnavailableRouting", "accept",
+            "definition_of", "register", "registered", "select",
         ),
     },
 }

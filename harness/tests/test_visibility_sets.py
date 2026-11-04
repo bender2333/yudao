@@ -3,7 +3,7 @@
 # current_delivery_spec，质检默认用隔离的一套（事实与解释），共享的一套再在它上面加既有结构、上一份交付与质检缺陷。
 #
 # 这个文件查四件事：
-# 1. 封闭词表正好六项，各角色的取值都在词表里；
+# 1. 封闭词表正好七项（工单 #1401 加了修改轮的常驻材料），各角色的取值都在词表里；
 # 2. 质检的两套取值都能加载，共享的一套只在隔离的一套上加材料，条目数在规则的界限以内；
 # 3. 交付说明的 parts 把 kind 与 basis_product_spec_hash 归入事实（加载时的归属校验在 test_definitions.py）；
 # 4. 装配按词表给材料：可见范围里只有事实这一项的角色看不到解释，连独立判断提交以后也看不到。
@@ -31,10 +31,10 @@ SHARED = ("delivery_facts", "delivery_explanation", "existing_structure", "prior
 DELIVERY_SUMMARY = "SECRET_DELIVERY_SUMMARY"
 
 
-def test_the_visibility_vocabulary_is_the_six_materials():
-    # 守 R2：封闭词表是定义文件格式的一部分，各角色的取值只能是这六项
+def test_the_visibility_vocabulary_is_the_seven_materials():
+    # 守 R2：封闭词表是定义文件格式的一部分，各角色的取值只能是这七项
     assert VISIBILITY_VALUES == {"current_delivery_spec", "delivery_facts", "delivery_explanation",
-                                 "existing_structure", "prior_delivery", "qa_defects"}
+                                 "existing_structure", "prior_delivery", "qa_defects", "prior_round"}
     for role, definition in DEFINITIONS.roles.items():
         assert set(definition.visibility) <= VISIBILITY_VALUES, role
 
