@@ -160,13 +160,6 @@ def _sessions(names: tuple[str, str, str]) -> dict[str, str]:
     return {f"ses_{name[:3]}": f"session{index}" for index, name in enumerate(names)}
 
 
-def _versions(system: LoopSystem, run_id: str) -> dict[str, str]:
-    created = next(event.payload for event in system.store.list_events(run_id)
-                   if event.type == EventType.RUN_CREATED)
-    return {"definitions_version": created["definitions_version"],
-            "parameters_version": created["parameters_version"]}
-
-
 def comparable(system: LoopSystem, run_id: str, names: tuple[str, str, str]) -> Any:
     """这次 run 的完整事件序列与投影，部门名与它衍生出来的生成值换成占位。"""
     mapping = {name: DEPARTMENT_PLACEHOLDER.format(index) for index, name in enumerate(names)}

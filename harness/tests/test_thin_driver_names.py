@@ -18,10 +18,11 @@
 # 比较按整词：`product_spec` 命中 `projection.product_spec` 与 `"product_spec"`，不命中 `product_spec_hash`
 # 这类以它开头的另一个名字（下划线是词内字符），也不命中大写的运行状态名 `PRODUCT_SPEC`。
 #
-# 允许留下名称的两处，各自写明理由：
+# 允许留下名称的两处，各自写明理由；两处各管一种名称，不互相借用：
 # - EXEMPT_BLOCKS：旧定义兜底 `LEGACY_VERIFICATION` 的三处部门名。它是不写核验声明时的解释，不是按部门名
 #   分支：旧定义没有核验声明，读它的那一份就只能按默认的三部门解释，否则旧数据读不回来（总图第四节「定义」
-#   缝的守卫 `test_definitions.py`）。只遮这一处区块，遮完还核对该区块里恰好是这三个名称、没有被扩大。
+#   缝的守卫 `test_definitions.py`）。只遮这一处区块，遮完还核对该区块里恰好是这三个名称、没有被扩大；
+#   这一处例外只给部门名的检索用，成果种类的检索照样查区块里（下面的用例守着）。
 # - ALLOWED：与成果种类同名但指别的东西的取值，逐条写理由；理由空了、或者这一条已经不再命中时用例失败，
 #   固定名单不能留下一笔查不到来源的例外。
 #
@@ -159,17 +160,23 @@ def describe(hit: dict[str, object]) -> str:
     return f"{hit['file']}:{hit['line']}: {hit['name']} — {hit['text']}"
 
 
-def offenders(names: list[str], files: list[str] | None = None) -> list[str]:
+def reported(names: list[str], source: str, *, file: str, exempt: bool = False) -> list[str]:
+    """一份源码里出现、又不在固定名单里的名称，逐条写出来。
+
+    exempt 只给部门名用：旧定义区块那处例外是部门名的例外，成果种类的检索不走它（工单 #1456 的守卫不因为
+    部门名的例外变松）。
+    """
+    block = EXEMPT_BLOCKS.get(file) if exempt else None
+    return [describe(hit) for hit in hits(exempted(source, block) if block else source, names, file=file)
+            if (file, str(hit["name"])) not in ALLOWED]
+
+
+def offenders(names: list[str], files: list[str] | None = None, *, exempt: bool = False) -> list[str]:
     """这些名称在这些文件里出现、又不在两处允许名单里的，逐条写出来。"""
-    reported: list[str] = []
+    found: list[str] = []
     for file in files if files is not None else kernel_modules():
-        source = _read(REPO_ROOT / file)
-        block = EXEMPT_BLOCKS.get(file)
-        for hit in hits(exempted(source, block) if block else source, names, file=file):
-            if (file, str(hit["name"])) in ALLOWED:
-                continue
-            reported.append(describe(hit))
-    return reported
+        found.extend(reported(names, _read(REPO_ROOT / file), file=file, exempt=exempt))
+    return found
 
 
 def test_the_names_the_thin_driver_must_not_know_are_not_empty():
@@ -197,7 +204,8 @@ def test_the_guard_reads_every_file_of_the_two_upper_layers():
 
 
 def test_the_two_upper_layers_name_no_department_from_the_definitions():
-    found = offenders(department_names(), guarded_files())
+    # exempt=True：部门名有一处区块例外（旧定义兜底），只在这一项里遮掉
+    found = offenders(department_names(), guarded_files(), exempt=True)
     assert found == [], (
         "上面两层里出现了组织定义的部门标识，这些标识应当从事项所用的那份定义取"
         "（形态与核验角色设计说明第 4.1 节，工单 #1404）。确实要留下的写进固定名单并写一句理由：\n"
@@ -251,6 +259,20 @@ def test_the_exempted_block_explains_the_three_departments_of_the_old_definition
     found = hits("\n".join(lines[bounds[0]:bounds[1] + 1]), department_names(), file=file)
     names = sorted(str(hit["name"]) for hit in found)
     assert names == ["engineering", "quality", "quality"]
+
+
+def test_an_outcome_kind_inside_the_exempted_block_is_still_reported():
+    # 区块例外只给部门名：旧定义区块里写回一个成果种类，成果种类的守卫照样报出来（遮掉区块的只是部门名那一项，
+    # 否则这个区块对成果种类整段失明，比工单 #1456 的守卫更松）
+    file = "harness/definitions/__init__.py"
+    source = _read(REPO_ROOT / file)
+    bounds = _block(source, EXEMPT_BLOCKS[file])
+    assert bounds is not None, "允许的区块没有找到，这条核对失去了依据"
+    lines = source.splitlines()
+    probe = "\n".join([*lines[:bounds[1]], "# probe: qa_review", *lines[bounds[1]:]])
+    assert reported(["qa_review"], probe, file=file) == [
+        f"{file}:{bounds[1] + 1}: qa_review — # probe: qa_review"]
+    assert hits(exempted(probe, EXEMPT_BLOCKS[file]), ["qa_review"], file=file) == []
 
 
 def test_an_outcome_kind_written_into_a_temporary_text_fails_with_file_line_and_name():
