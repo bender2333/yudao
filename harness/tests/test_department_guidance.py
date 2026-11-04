@@ -18,7 +18,7 @@ from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import after_event, from_another_thread, guidance_reply, quality_turns
-from harness.tools import tools_for
+from harness.tools import offers_with_input, tools_for
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 ECHO_UPPER = "import sys\nprint(sys.argv[1].upper())\n"
@@ -135,8 +135,9 @@ def test_guidance_for_a_waiting_department_starts_a_full_round(tmp_path):
     assert result.department_guidance[0].status == "answered"
     names = _tool_names(adapter.invocations[-1])
     assert {"read_file", "write_file", "run_check", "ask", "submit_delivery"} <= set(names)
-    # 待处理指导不再带来额外的提交工具：这一轮提供的工具正好是角色的工具清单（工单 #1038）
-    assert names == list(tools_for("engineering"))
+    # 待处理指导不再带来额外的提交工具：这一轮提供的工具正好是角色的工具清单，按调用目标的输入方式
+    # 去掉需要图像输入的那一个（浏览器截图；工单 #1038、#1184）。这台假模型的调用目标只有文本
+    assert names == offers_with_input(list(tools_for("engineering")), ("text",))
 
 
 def test_guidance_received_during_model_request_becomes_a_notification(tmp_path):
