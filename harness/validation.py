@@ -42,19 +42,6 @@ class FieldError:
         return {"field": self.field, "message": self.message}
 
 
-PRD_REVISION_FIELDS = frozenset({
-    "goal",
-    "requirements",
-    "acceptance_criteria",
-    "boundaries",
-    "constraints",
-    "fatal_conditions",
-    "non_goals",
-    "change_record",
-    "decision_changes",
-})
-
-
 @dataclass
 class ProposalDecision:
     accepted: bool
@@ -193,17 +180,6 @@ class _ConditionContext:
     facts: TreeFacts
 
 
-# 条件读的当前成果：合同里的名称与最小投影里的成果种类；product_decisions 是多版并存的那一种
-_ARTIFACTS = {
-    "product_spec": "product_spec",
-    "delivery_spec": "delivery_spec",
-    "contract": "contract",
-    "structure": "structure",
-    "snapshot": "snapshot",
-    "product_decisions": "product_decision",
-}
-
-
 def evaluate_conditions(kind: str, *, department: str, proposal: dict[str, Any], minimal: MinimalProjection,
                         facts: TreeFacts, definitions: Definitions | None = None) -> ConditionOutcome:
     """按提案合同核对一种提案的通用条件（设计说明第 5.5 节）。
@@ -220,7 +196,10 @@ def evaluate_conditions(kind: str, *, department: str, proposal: dict[str, Any],
 
 
 def _current_artifact(minimal: MinimalProjection, name: str) -> Any:
-    return minimal.artifact(_ARTIFACTS[name])
+    # 合同里写的成果名称（定义的数据）直接用来取最小投影里的当前版本：内核不认识具体有哪几种成果，
+    # 加一种成果种类只写定义（工单 #1456）。名称写错时加载定义就失败（定义里按成果种类那一项核对）；
+    # 名称对、但那一版成果还没有时是 None，由条件按自己写的 missing 报，没写 missing 的条件在这一步不报
+    return minimal.artifact(name)
 
 
 def _missing_error(condition: ProposalCondition) -> list[FieldError]:
@@ -275,13 +254,16 @@ def _condition_author_separation(condition: ProposalCondition, context: _Conditi
 
 
 def _condition_check_receipts(condition: ProposalCondition, context: _ConditionContext, outcome: ConditionOutcome) -> None:
-    # 通用条件 3：列出的检查都有主机执行的回执，回执来自这个会话的这一轮，并绑定当前的依据
+    # 通用条件 3：列出的检查都有主机执行的回执，回执来自这个会话的这一轮，并绑定当前的依据。
+    # 绑定的是哪几份成果由合同写（种类 → 当前版本的摘要），内核按名字取，不认识具体有哪几种（工单 #1456）
     names = _condition_check_names(condition.names, context.proposal)
     activation = context.minimal.rounds.get(condition.department) if condition.activation else None
-    bindings = {item.field: artifact_hash(_current_artifact(context.minimal, item.target))
+    bindings = {item.target: artifact_hash(_current_artifact(context.minimal, item.target))
                 for item in condition.bind}
+    required = {kind: digest for kind, digest in bindings.items() if digest is not None}
     for name, field_name in names:
-        receipt = context.facts.latest_check(condition.department, name, activation_id=activation, **bindings)
+        receipt = context.facts.latest_check(condition.department, name, activation_id=activation,
+                                             bindings=required)
         if receipt is None:
             outcome.errors.append(FieldError(field_name, condition.message.format(name=name)))
             continue
@@ -305,7 +287,7 @@ def _condition_no_duplicate_content(condition: ProposalCondition, context: _Cond
     content.update({item.field: artifact_hash(_current_artifact(context.minimal, item.target))
                     for item in condition.bind})
     content_hash = canonical_hash(content)
-    accepted = context.minimal.versions_of(_ARTIFACTS[condition.collection])
+    accepted = context.minimal.versions_of(condition.collection)
     if any(item.content_hash == content_hash for item in accepted):
         outcome.errors.append(FieldError(condition.field, condition.message))
     outcome.content = content
@@ -324,13 +306,12 @@ _CONDITION_CHECKS = {
 
 def _tightening_errors(tightened: Tightened, field: str = "proposal") -> list[FieldError]:
     # 收紧检查的拒绝转成字段错误，通过时是空清单。等待在提案校验这一步同样当作拒绝：
-    # 这次提交不当场生效，原因写明（新输入在许可之后、提交之前到达，工单 #561）。默认的这句说明不写
-    # 是哪个部门收的输入：部门名由定义给出（工单 #1404）
+    # 这次提交不当场生效，原因写明（新输入在许可之后、提交之前到达，工单 #561）。
+    # 「为什么等」是路由的判断与说明，内核只把它的原因交回去；路由没有写原因时用一句通用的
     if tightened.errors:
         return list(tightened.errors)
     if tightened.wait:
-        return [FieldError("kind", tightened.reason
-                           or "the submission must wait until the pending input is handled")]
+        return [FieldError("kind", tightened.reason or "the submission must wait for the work in between to end")]
     if tightened.reason is not None:
         return [FieldError(field, tightened.reason)]
     return []
@@ -407,6 +388,11 @@ def _accepted(kind: str, content: dict[str, Any], *, department: str, minimal: M
 
 
 def _receipt_evidence(receipt: Any) -> dict[str, Any]:
+    """回执里随成果内容一起写下的证据：对外合同里回执的那几个字段（harness/app/payloads.py 的 CheckReceipt）。
+
+    字段名是接口合同已经写下的，不是内核按成果种类写的判断：回执见哪一种成果、绑的是哪一版由回执自己带的
+    bindings 决定（工单 #1456），这里只按合同把两个旧字段名与工作依据写出去，老事件与老读法照旧。
+    """
     return {
         "activation_id": receipt.activation_id,
         "delivery_spec_hash": receipt.delivery_spec_hash,

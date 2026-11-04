@@ -47,7 +47,9 @@ FORM_REGISTRY: dict[str, tuple[Definitions, Any]] = {DEFAULT_FORM: (DEFINITIONS,
 
 
 def load_forms(registry: Mapping[str, tuple[Definitions, Any]], store: Any) -> dict[str, Form]:
-    # 实例同时加载几份具名的形态：每份是一份完整的定义；路由按它的组织定义接上（工单 #825 的位置）
+    # 实例同时加载几份具名的形态：每份是一份完整的定义；路由按它的组织定义接上（工单 #825 的位置）。
+    # 每份形态得到自己的一份路由实例，接上它自己那份定义（工单 #1509）：形态之间的部门清单不共用，
+    # 一份形态的部门不会盖掉另一份（select 按交进去的定义给一份实例）
     return {name: Form(name, definitions,
                        routing_contract.select(definitions.routing, definitions, store=store), tightening)
             for name, (definitions, tightening) in registry.items()}

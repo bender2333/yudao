@@ -191,6 +191,22 @@ class ProductSpec:
     requirement_mapping: list[dict[str, Any]] = field(default_factory=list)
 
 
+# PRD 的内容字段（工单 #553、#1456）：回答里带这些字段就是随回答修订 PRD，那一份要走提案校验。
+# 这是 PRD 这一种成果的内容知识，归应用层（工单 #1456 从内核的 validation.py 搬到这里，与 ProductSpec 同处）；
+# 内核不认识它
+PRD_REVISION_FIELDS = frozenset({
+    "goal",
+    "requirements",
+    "acceptance_criteria",
+    "boundaries",
+    "constraints",
+    "fatal_conditions",
+    "non_goals",
+    "change_record",
+    "decision_changes",
+})
+
+
 @dataclass(frozen=True)
 class ProductDecision:
     id: str
@@ -530,6 +546,12 @@ class RunProjection:
 
 
 
+
+
+# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」与「定义的校验」第 4 条）：事项最后采纳的成果
+# 没有核验角色核验时，事项创建时标为开环，完成后以这个停止原因结束，不记成放行。编号与
+# harness/definitions/stop_reasons.json 的那一条一致；路由（给出结束原因）与事件标签、汇总都取这一处
+OPEN_LOOP_STOP_REASON = "open_loop"
 
 
 # 停止原因的中文名与结束方式都在定义里：内核的清单在 stop_reasons.json，路由自己的结束原因在

@@ -9,6 +9,11 @@
     "outcome": "done",
     "human_action": null
   },
+  "open_loop": {
+    "label": "开环完成",
+    "outcome": "done",
+    "human_action": null
+  },
   "max_cycles": {
     "label": "循环次数已达上限",
     "outcome": "paused",

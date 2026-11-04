@@ -8,8 +8,9 @@ import typing
 
 import pytest
 
-from harness.app.labels import (DECISION_KIND_NAMES, STATUS_NAMES, STOP_REASON_NAMES, _LABELS, decision_kind_name,
-                                event_label, status_name, stop_reason_name)
+from harness.app.labels import (DECISION_KIND_NAMES, OPEN_LOOP_LABEL, OPEN_LOOP_STOP_REASON, STATUS_NAMES,
+                                STOP_REASON_NAMES, _LABELS, decision_kind_name, event_label, status_name,
+                                stop_reason_name)
 from harness.app.payloads import PAYLOADS
 from harness.definitions import DEFINITIONS
 from harness.models import (
@@ -57,6 +58,16 @@ def test_stop_events_name_stop_reasons_in_chinese():
     assert event_label(EventType.RUN_PAUSED, {"stop_reason": "max_cycles"}) == \
         "运行暂停，等待用户处理：循环次数已达上限"
     assert event_label(EventType.RUN_CONTINUED, {"decision_id": "d1"}) == "运行从暂停位置继续"
+
+
+def test_the_open_loop_completion_is_named_in_chinese_without_the_word_release():
+    # R2：开环完成的停止原因有中文名，写「开环完成」，不带「放行」二字；中文名取自同一份定义，不另写一份。
+    # 结束的说明照中文写，用户看得到是开环完成还是放行（工单 #1394）
+    assert OPEN_LOOP_STOP_REASON in STOP_REASON_NAMES
+    assert OPEN_LOOP_LABEL == "开环完成"
+    assert "放行" not in OPEN_LOOP_LABEL
+    assert OPEN_LOOP_LABEL == stop_reason_name(OPEN_LOOP_STOP_REASON)
+    assert event_label(EventType.RUN_DONE, {"stop_reason": OPEN_LOOP_STOP_REASON}) == "运行结束：开环完成"
 
 def test_decision_kind_names_cover_all_decision_kinds():
     from harness.decisions import DECISION_KINDS

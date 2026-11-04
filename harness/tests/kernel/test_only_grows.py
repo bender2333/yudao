@@ -95,9 +95,10 @@ ENVELOPE_SNAPSHOT = {
     ),
 }
 
-# 放出 S6a 时封闭的停止原因清单（stop_reasons.json 的键，18 项）
+# 放出 S6a 时封闭的停止原因清单（stop_reasons.json 的键）与之后按只增补进来的原因
+# （cannot_verify 随工单 #1179、open_loop 随工单 #1394）
 STOP_REASON_SNAPSHOT = frozenset({
-    "released", "baseline_verified",
+    "released", "baseline_verified", "open_loop",
     "max_cycles", "model_steps_exhausted", "no_tool_call", "workspace_unrepresentable",
     "time_limit", "cancelled", "user_cancelled",
     "provider_error", "provider_timeout", "provider_protocol", "unsupported_protocol",

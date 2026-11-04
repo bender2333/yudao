@@ -15,7 +15,7 @@ from ..event_store import Command
 from ..models import CatalogEventType, Event, EventType, ProjectEvent, ProjectEventType, utc_now
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Snapshot
-from .labels import event_label
+from .labels import OPEN_LOOP_LABEL, OPEN_LOOP_STOP_REASON, event_label
 from .registry import CommandDefinition, QueryDefinition, UnchangedEvent
 
 if TYPE_CHECKING:
@@ -67,9 +67,12 @@ FACT_KINDS: dict[str, str] = {
 }
 
 def _fact_kind(event: Event | ProjectEvent) -> str | None:
-    # 一条关键事实的种类：质检按结论分为放行与返工，其余按事件种类查表；不是关键事实时返回 None
+    # 一条关键事实的种类：质检按结论分为放行与返工，其余按事件种类查表；不是关键事实时返回 None。
+    # 以开环完成结束的事项不算放行（工单 #1394）：结束原因写在事件上，这里按它分类
     if event.type == EventType.QA_SUBMITTED:
         return "rework" if event.payload.get("verdict") in REWORK_VERDICTS else "release"
+    if event.type == EventType.RUN_DONE and event.stop_reason == OPEN_LOOP_STOP_REASON:
+        return "open_loop"
     return FACT_KINDS.get(event.type)
 
 class AwayReportRequest(Contract):
@@ -174,15 +177,25 @@ def _summary(application: Application, events: list[Event | ProjectEvent],
     # 「完成与放行的事项」只数成果被采纳（deliverable_adopted）或被质检放行的事项：
     # 跑完一轮（run_done）不算——被用户放弃的建档也是跑完过的，但它的成果没有采纳（工单 #707）
     items: list[ReportItem] = []
+    # 开环完成的事项（工单 #1394）：以开环完成结束的事项不进「完成与放行」，另起一项。结束原因写在
+    # run_done 事件上（记录上写明是开环完成还是放行），报告读这条记录，不重新判断
+    open_loop_events = [event for event in events
+                        if event.type == EventType.RUN_DONE and event.stop_reason == OPEN_LOOP_STOP_REASON]
+    open_loop_items = {event.work_item_id for event in open_loop_events if event.work_item_id is not None}
     released_events = [
         event for event in events
         if (event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") == "release")
         or event.type == ProjectEventType.DELIVERABLE_ADOPTED
     ]
+    # 开环完成的事项连同它的放行记录与采纳一起移出「完成与放行」：它的成果没有经过独立核验
+    released_events = [event for event in released_events if event.work_item_id not in open_loop_items]
     released_items = {event.work_item_id for event in released_events if event.work_item_id is not None}
     if released_events:
         items.append(ReportItem(id="released", label="完成与放行的事项", value=len(released_items), unit="项",
                                 refs=[event.position for event in released_events]))
+    if open_loop_items:
+        items.append(ReportItem(id="open_loop", label=OPEN_LOOP_LABEL, value=len(open_loop_items), unit="项",
+                                refs=[event.position for event in open_loop_events]))
     attempts = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FINISHED]
     tokens = sum(int((event.payload.get("usage") or {}).get("total_tokens") or 0) for event in attempts)
     if tokens:

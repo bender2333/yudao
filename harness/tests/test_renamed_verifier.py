@@ -22,12 +22,15 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.contracts import Accepted
 from harness.app.form_commands import OrganizationAdopt
 from harness.app.form_queries import ProjectOrganization
-from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, Definitions, load_definitions
+from harness.definitions import (DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, DefinitionError, Definitions,
+                                 load_definitions)
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec
 from harness.runtime import LoopSystem
@@ -64,8 +67,8 @@ def _renamed_key(key: Any, old: str, new: str) -> Any:
     return ".".join(new if part == old else part for part in key.split("."))
 
 
-def renamed_definitions(tmp_path: Path) -> Definitions:
-    """产品定义的一份副本：三个部门的编号换成 RENAMED 里的名字，其余内容（含中文名）照旧。"""
+def renamed_directory(tmp_path: Path) -> Path:
+    """产品定义的一份副本目录：三个部门的编号换成 RENAMED 里的名字，其余内容（含中文名）照旧。"""
     directory = tmp_path / "renamed" / "definitions"
     directory.mkdir(parents=True)
     for path in DEFINITIONS_DIR.glob("*.json"):
@@ -73,7 +76,12 @@ def renamed_definitions(tmp_path: Path) -> Definitions:
         for old, new in RENAMED.items():
             content = _renamed(content, old, new)
         (directory / path.name).write_text(json.dumps(content, ensure_ascii=False, indent=2), encoding="utf-8")
-    return load_definitions(directory)
+    return directory
+
+
+def renamed_definitions(tmp_path: Path) -> Definitions:
+    """产品定义的副本，三个部门的编号换成 RENAMED 里的名字。"""
+    return load_definitions(renamed_directory(tmp_path))
 
 
 # ---------------------------------------------------------------------------
@@ -145,13 +153,30 @@ def _versions(system: LoopSystem, run_id: str) -> dict[str, str]:
             "parameters_version": created["parameters_version"]}
 
 
+def _sessions(names: tuple[str, str, str]) -> dict[str, str]:
+    # 会话编号里的部门名：`sessions.new_id` 用 `ses_<部门[:3]>` 起头，规整事件序列以后这段还留在会话标签里
+    # （`<ses_pro#1>`，引用事件的字段写 `<ses_pro#1>#2`）。两边都换成按定义次序编号的占位，改名带来的差别
+    # 就只剩部门名本身
+    return {f"ses_{name[:3]}": f"session{index}" for index, name in enumerate(names)}
+
+
+def _versions(system: LoopSystem, run_id: str) -> dict[str, str]:
+    created = next(event.payload for event in system.store.list_events(run_id)
+                   if event.type == EventType.RUN_CREATED)
+    return {"definitions_version": created["definitions_version"],
+            "parameters_version": created["parameters_version"]}
+
+
 def comparable(system: LoopSystem, run_id: str, names: tuple[str, str, str]) -> Any:
-    """这次 run 的完整事件序列与投影，部门名换成占位；这份定义自己的两个版本号写成与默认那一边相同的占位。"""
+    """这次 run 的完整事件序列与投影，部门名与它衍生出来的生成值换成占位。"""
     mapping = {name: DEPARTMENT_PLACEHOLDER.format(index) for index, name in enumerate(names)}
-    versions = _versions(system, run_id)
-    mapping[versions["definitions_version"]] = "<definitions>"
-    mapping[versions["parameters_version"]] = "<parameters>"
-    return _canonical(normalized_run(system, run_id), mapping)
+    mapping.update(_sessions(names))
+    # 两份定义的版本不同：规整事件序列时先把这份 run 自己的版本号换成同一个占位（`_Normalizer` 的
+    # `replacements`），否则改名那一边的定义版本与默认那一边处处不同
+    created = _versions(system, run_id)
+    replacements = {created["definitions_version"]: "<definitions>",
+                    created["parameters_version"]: "<parameters>"}
+    return _canonical(normalized_run(system, run_id, replacements), mapping)
 
 
 # ---------------------------------------------------------------------------
@@ -178,3 +203,21 @@ def test_the_same_item_under_the_renamed_definition_runs_to_the_same_event_seque
         comparable(default_system, default_run, default_names)
     default_system.close()
     renamed_system.close()
+
+
+def test_the_delivery_parts_error_names_the_role_of_the_item_definition(tmp_path):
+    # 交付说明的事实与解释归属按合同自己的 roles 核对（工单 #1456 的 `_part_issues`）：改名以后报出来的位置
+    # 跟着那一份定义走，不写死 `roles.engineering`。内核因此不认部门名，换一份改了名的定义照样读得出来
+    directory = renamed_directory(tmp_path)
+    path = directory / "proposal_contracts.json"
+    contracts = json.loads(path.read_text(encoding="utf-8"))
+    delivery = contracts["roles"][RENAMED["engineering"]]["kinds"]["delivery_spec"]
+    delivery["parts"] = {"facts": ["kind"], "explanation": ["summary"]}
+    path.write_text(json.dumps(contracts, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    at = f"roles.{RENAMED['engineering']}.kinds.delivery_spec.parts"
+    assert ("proposal_contracts.json", at, "字段 basis_product_spec_hash 没有归入成果事实或解释") in raised.value.issues
+    assert all(issue[0] == "proposal_contracts.json" for issue in raised.value.issues)
+    assert {issue[1] for issue in raised.value.issues} == {at}

@@ -20,20 +20,19 @@ from .validation import (
 _STALE_BASIS = ("The contract or current work changed after this activation began; "
                 "stale results cannot be rebound.")
 _STALE_SNAPSHOT = "The workspace snapshot changed after this activation began; stale results cannot be rebound."
-_PENDING_INPUT_RELEASE = ("New user input has not been handled yet; the release is judged after the round that "
-                          "received it has ended.")
+# 收紧检查要求这次提交等一等、但没有写原因时交回部门的一句通用说明（工单 #1456）
+_PENDING_SUBMISSION = "this submission waits for the work in between to end; submit it again after it settles"
 _CHECK_MATERIALS_WRITE_OUTSIDE = ("a check materials write scope only allows {dirs}: the other files in the check "
                                   "workspace are the tree the release is judged against")
 
 
 def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
-    # 一次提交所依据的成果版本：当前有效合同与当前交付（设计说明第 4 节，S1d 工单 #860）。
-    # 校验以后这两样里任何一样变了，这次提交就不能再按原来的依据接纳。
-    # 用户输入与指导的版本读的是成果的内容，不在这里（归路由的收紧检查，工单 #1095）
-    return {
-        "effective_contract_hash": projection.artifact_hash("contract"),
-        "delivery_spec_hash": projection.artifact_hash("delivery_spec"),
-    }
+    # 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（设计说明第 4 节，S1d 工单 #860）。
+    # 校验以后其中任何一样变了，这次提交就不能再按原来的依据接纳。有哪几种成果、各自是哪一版，
+    # 来自定义与投影，内核不写死（工单 #1456）；用户输入与指导的版本读的是成果的内容，不在这里
+    # （归路由的收紧检查，工单 #1095）
+    return {"artifacts": {kind: artifact.content_hash
+                          for kind, artifact in projection.artifacts.items()}}
 
 
 @dataclass(frozen=True)
@@ -176,13 +175,13 @@ def commit_decision(
         decision = proposal_decision(current, department=department, proposal=proposal, definitions=definition,
                                      facts=current_facts, tightening=tightening, events=events)
     if decision.accepted:
-        # 新输入在工具许可之后、提交之前到达：这次提交不当场生效，交回部门，等产品处理完再提交
-        # （部门指导设计说明第 2.1 节，工单 #561）。这件事由路由的收紧检查在提交事务里再判一次（工单 #1095）
+        # 还有没处理完的输入时这次提交不当场生效：等不等、为什么等是路由的收紧检查的判断与说明
+        # （部门指导设计说明第 2.1 节，工单 #561、#1456），内核只把它的原因交回部门
         tight = tightening.submission(TightenRequest(department=department, state=current.state, proposal=proposal,
                                                      events=tuple(events), commit=True, definitions=definition,
                                                      minimal=current.minimal, facts=current_facts))
         if tight.wait:
-            return ProposalDecision(False, [FieldError("kind", _PENDING_INPUT_RELEASE)])
+            return ProposalDecision(False, [FieldError("kind", tight.reason or _PENDING_SUBMISSION)])
     return decision
 
 
