@@ -613,10 +613,16 @@ class OutcomeGroup(_Definition):
 class OutcomeKinds(_Definition):
     # outcome_kinds.json：这份定义里的成果种类与它们的分组
     kinds: tuple[OutcomeKind, ...] = Field(min_length=1)
+    # 骨架自己产生的成果种类（有效合同、代码树快照）：部门不提交它们，提案合同可以按名字引用
+    skeleton: tuple[OutcomeKind, ...] = ()
     groups: tuple[OutcomeGroup, ...] = Field(min_length=1)
 
     freeze_kinds = _frozen("kinds")
     freeze_groups = _frozen("groups")
+
+    def vocabulary(self) -> set[str]:
+        # 提案合同里可以引用的成果名：这份定义的成果种类，加上骨架自己产生的那几个
+        return {kind.id for kind in self.kinds} | {item.id for item in self.skeleton}
 
     def group(self, name: str) -> OutcomeGroup | None:
         # 名称指向的那一组；加载时核对过每份路由引用的组都在，这里取不到时由调用方按空处理
@@ -1000,7 +1006,7 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
             submitters[tool.proposal] = name
     issues.extend(_contract_references(parts["proposal_contracts"], roles, tools, parts["work_items"]))
     issues.extend(_part_issues(parts["proposal_contracts"]))
-    issues.extend(_condition_references(parts["proposal_contracts"], organization))
+    issues.extend(_condition_references(parts["proposal_contracts"], organization, parts["outcome_kinds"]))
     presets: ServicePresets = parts["service_presets"]
     identities = [preset.id for preset in presets.presets]
     for index, identity in enumerate(identities):
@@ -1247,17 +1253,38 @@ def _part_issues(contracts: ProposalContracts) -> list[tuple[str, str, str]]:
     return issues
 
 
-def _condition_references(contracts: ProposalContracts, organization: Organization) -> list[tuple[str, str, str]]:
-    # 提案合同里的通用条件（设计说明第 5.5 节）：取回执的部门在组织里。条件的种类与提案字段
-    # 与其他定义的关系不在这里核对：条件只在内核核对一种提案时按名字查，取不到时提交被拒绝，不会静默放过
+def _condition_artifact_names(condition: ProposalCondition) -> list[tuple[str, str]]:
+    # 一条条件按名字引用的成果：字段路径与名称。内核核对一种提案时按这些名字去最小投影里取，
+    # 写错一个字母就会让这条条件静默放过（工单 #1456 的审查发现），所以加载时逐个核对
+    names = [("target", condition.target), ("artifact", condition.artifact),
+             ("recorded_in", condition.recorded_in), ("evaluated", condition.evaluated),
+             ("collection", condition.collection)]
+    names += [(f"referenced[{index}].target", item.target) for index, item in enumerate(condition.referenced)]
+    names += [(f"bind[{index}].target", item.target) for index, item in enumerate(condition.bind)]
+    return [(field, name) for field, name in names if name is not None]
+
+
+def _condition_references(contracts: ProposalContracts, organization: Organization,
+                          outcome_kinds: OutcomeKinds) -> list[tuple[str, str, str]]:
+    # 提案合同里的通用条件（设计说明第 5.5 节）：取回执的部门在组织里；条件引用的成果种类在这份定义里
+    # （成果种类那一项，工单 #1456）。名称写错时整份拒绝——否则一处手误会把内核的几条判断静默关掉。
+    # 旧的定义目录没有成果种类这一项，没有词表可对，照旧加载
     issues: list[tuple[str, str, str]] = []
     file = "proposal_contracts.json"
     members = {department.id for department in organization.departments}
+    vocabulary = outcome_kinds.vocabulary() if outcome_kinds.kinds else set()
     for kind, conditions in contracts.conditions.items():
         for index, condition in enumerate(conditions):
             if condition.department is not None and condition.department not in members:
                 issues.append((file, f"conditions.{kind}[{index}].department",
                                f"部门 {condition.department} 不属于任何组织"))
+            if not vocabulary:
+                continue
+            for field, name in _condition_artifact_names(condition):
+                if name not in vocabulary:
+                    issues.append((file, f"conditions.{kind}[{index}].{field}",
+                                   f"成果种类 {name} 没有在这份定义里定义；"
+                                   f"有的是：{'、'.join(sorted(vocabulary))}"))
     return issues
 
 

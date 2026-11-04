@@ -197,7 +197,8 @@ def evaluate_conditions(kind: str, *, department: str, proposal: dict[str, Any],
 
 def _current_artifact(minimal: MinimalProjection, name: str) -> Any:
     # 合同里写的成果名称（定义的数据）直接用来取最小投影里的当前版本：内核不认识具体有哪几种成果，
-    # 加一种成果种类只写定义（工单 #1456）。名称取不到时是 None，由条件报「没有这一项」
+    # 加一种成果种类只写定义（工单 #1456）。名称写错时加载定义就失败（定义里按成果种类那一项核对）；
+    # 名称对、但那一版成果还没有时是 None，由条件按自己写的 missing 报，没写 missing 的条件在这一步不报
     return minimal.artifact(name)
 
 

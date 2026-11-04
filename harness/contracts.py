@@ -1,4 +1,4 @@
-"""Effective contract identity and its host-owned Markdown representations."""
+"""有效合同的身份与公开路径的规范写法（结构说明这类材料的渲染在接纳的一侧，见 submissions.py）。"""
 
 from __future__ import annotations
 

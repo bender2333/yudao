@@ -146,6 +146,29 @@ def test_an_end_reason_named_like_a_kernel_stop_reason_is_rejected(tmp_path):
     assert "end_reasons.released：与内核的停止原因同名" in "\n".join(raised.value.issues)
 
 
+def test_a_condition_naming_an_outcome_kind_that_is_not_defined_fails_at_load(tmp_path):
+    # R2：提案合同按名字引用成果种类，加载时按成果种类那一项核对（工单 #1456 的审查发现）：
+    # 写错一个字母时整份拒绝并写明是哪一条条件的哪个字段，不留「一处手误把内核的判断静默关掉」
+    (tmp_path / "condition").mkdir()
+    directory = _copy(tmp_path / "condition")
+    contracts = _read(directory, "proposal_contracts.json")
+    contracts["conditions"]["qa_review"][0]["target"] = "product_spce"
+    _write(directory, "proposal_contracts.json", contracts)
+    with pytest.raises(DefinitionError) as raised:
+        load_definitions(directory)
+    [issue] = raised.value.issues
+    assert issue[:2] == ("proposal_contracts.json", "conditions.qa_review[0].target")
+    assert "product_spce" in issue[2] and "product_spec" in issue[2]
+
+    # 骨架自己产生的那两种成果（有效合同、代码树快照）也可以按名字引用：它们写在成果种类那一项的 skeleton 里
+    (tmp_path / "skeleton").mkdir()
+    directory = _copy(tmp_path / "skeleton")
+    contracts = _read(directory, "proposal_contracts.json")
+    contracts["conditions"]["qa_review"][2]["recorded_in"] = "contract"
+    _write(directory, "proposal_contracts.json", contracts)
+    assert load_definitions(directory).routing == "watched_outputs"
+
+
 def test_a_routing_declared_end_reason_is_written_as_an_item_stop_reason(tmp_path):
     # R3：路由声明的结束原因可以作为事项的停止原因写入，中文名与处理说明来自它自己的一份定义
     system, run_id = _system(tmp_path)
