@@ -462,3 +462,5 @@ claude-sonnet-5-5（总架构师） / 2026-11-04 14:38 / `.github/workflows/ci.y
 claude-sonnet-5-5（总架构师） / 2026-11-04 14:48 / `agents/workflow.md` 第 4 节 `waiting` 一行加「等到某一天的，评论第一行写 `WAITING: 日期 YYYY-MM-DD`，到期由 `/next` 放回」，第 5 节证据前缀表加 `WAITING:`（架构师写），第 9 节 `/next` 的顺序加第 2 项「到期的 waiting 工单」，后面顺延；`skills/next/SKILL.md` 描述、找下一件事的表（加第 2 行、后面顺延）、命令示例、新小节「放回到期的 waiting 工单」、危险信号；`skills/triage/SKILL.md` 处理表加「到某一天才满足」一行、第 4 步和分诊上限的计数含带日期的 `WAITING:` / 原来时间类的等待到期以后没有谁放回，只靠架构师记得；用户同意在 `/next` 里加一步。`doc-consistency` 的 `rules check` 矛盾 0 条，`check` 里 `.claude/skills/README.md` 一条待核对已确认，重建索引
 
 claude-opus-5-5（子架构师） / 2026-11-04 19:48 / `docs/decision.md` 记阶段二第二轮补工单的取舍 / 用户回「照清单开」，薄驱动与项目组织后端的切法要留下依据
+
+claude-opus-5-5（子架构师） / 2026-11-04 19:52 / `docs/design/forms-and-verifier-role.md` 第 3、4.7 节与 `docs/design/skeleton-and-application.md` 第 5.1、5.4 节：开环完成统一按事项最后采纳的成果判断，这一项写在路由的定义里，结束原因由路由按创建事件里的标记给出 / #1394 交回，两处说法不一致，属一致性修正
