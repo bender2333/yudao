@@ -439,6 +439,31 @@ C 的接法（已定，按这个做）：
 
 不改 `CONTEXT.md`，不碰规则事实线已有的文件。
 
+**已做（2026-11-04，只在本分支）**：第 1 步与第 2 步，全是新增文件，规则事实线和工具已有的文件一个没改（命令行入口也没加，单独用 `python -m` 跑）：
+
+| 新增 | 做什么 |
+| --- | --- |
+| `tools/doc-consistency/doc_consistency/ontology/compile.py` | 只读 `canon.json`、`roles.json` 与正本表格的首列，编译成本体事实：种类、关系（起点、终点、单多值）、实例、别名、合称，层都是脚手架 |
+| `tools/doc-consistency/doc_consistency/ontology/layering.py` | 分层的事实：`kernel-manifest.json` 的内核模块、`organization.json` 的部门，ast 找出内核模块里等于部门或脚手架实例名的字符串常量与所在函数 |
+| `tools/doc-consistency/doc_consistency/ontology/__main__.py` | 入口：`check`（本体自检）、`layering`（分层）、`facts`、`baseline` |
+| `tools/doc-consistency/rules/ontology/meta.lp`、`layers.lp`、`selfcheck.lp`、`layering.lp` | M3 自描述与自检、层、本体自检十五类、分层与「脚手架实例进了内核」 |
+| `tools/doc-consistency/data/ontology/layering-baseline.json`、`layering-allow.json` | 分层命中的基线（存量 4 处记成 3 个键：文件、所在函数、实例名），有理由的例外清单（空，理由等人认可再写） |
+| `tools/doc-consistency/tests/ontology/test_ontology.py` | 6 个测试：编译、自检、分层规则用造的事实，真仓库跑一遍 |
+
+运行（仓库根目录）：
+
+```
+uv run --project tools/doc-consistency python -m doc_consistency.ontology check
+uv run --project tools/doc-consistency python -m doc_consistency.ontology layering
+```
+
+在合并了 main 的 cf0290a 上跑的结果：
+
+- 本体第一块：11 个种类，11 条关系声明；M3 符合它自己。
+- 自检提醒 2 条：「子工单」「工单正文」既是第 1 节「工单正文、依赖、子工单」那一行的别名，又是载体的实例，一个词指两样东西。可能是有意的（载体与事实同名），要人看。
+- 待补 3 条：第 9 节权限表和第 11 节「以谁为准」表没有声明 `node`，「在场可否」「不在场可否」「以谁为准」三条关系的起点种类空着。这是本体看得出、规则事实线不需要的缺口，补不补归规则事实线定。
+- 分层：内核模块点名部门 4 处，都在 `harness/definitions/__init__.py`，和第 8 节 8c979df 那次一样，已记成基线，以后只报新的；内核点名脚手架实例 0 处。
+
 1. 分层规则：在 `tools/doc-consistency/rules/` 加一份分层规则，事实从 `kernel-manifest.json`、`organization.json` 和 ast 提取，先只看内核模块；有理由的例外写进白名单并带理由；存量记成基线，之后只报新增；再给循环、路由的模块标层，从对照表读。
 2. 第 10 节第 1 条已定 C，所以这一步要做：写第 10.1 节接法第 3 条那个小脚本，只读 `canon.json` 与 `roles.json`，跑本体自检。
 3. 代码与测试：先做第 5.2 节里只用现成正本、不改任何文件就能算的三条：守卫丢了（对照表第 4 节对 `layers.toml`）、导入越层（对照表的层对 ast 的导入）、对照表走样（对照表的代码名对 ast）。「规矩没有守卫」等第 10 节第 5 条。

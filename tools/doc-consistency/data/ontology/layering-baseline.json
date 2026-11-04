@@ -1,0 +1,20 @@
+{
+  "说明": "分层命中的基线：只追加，用 baseline 命令写。键是文件、所在函数、实例名，不记行号（行号会挪）。有理由的例外不放这里，放 layering-allow.json 并写理由。",
+  "items": [
+    {
+      "path": "harness/definitions/__init__.py",
+      "scope": "<模块>",
+      "instance": "quality"
+    },
+    {
+      "path": "harness/definitions/__init__.py",
+      "scope": "<模块>",
+      "instance": "engineering"
+    },
+    {
+      "path": "harness/definitions/__init__.py",
+      "scope": "_delivery_part_issues",
+      "instance": "engineering"
+    }
+  ]
+}
