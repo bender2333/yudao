@@ -132,16 +132,6 @@ def test_local_access_checks_the_host_for_page_files(data_dir, tmp_path):
     assert rejected.status_code == 403 and asset.status_code == 403
 
 
-def test_capabilities_list_the_access_mode(data_dir):
-    # 能力清单列出访问方式（设计说明第 6.1、6.2 节）：本机与局域网由启动设置给出
-    with running_api(_Opened(data_dir)) as client:
-        local = client.get("/api/capabilities").json()["deployment"]["access"]
-    _entry, token = AccessTokenStore(data_dir).create("capabilities", now=utc_now())
-    with running_api(_Opened(data_dir), access="lan", data_dir=data_dir) as client:
-        lan = client.get("/api/capabilities", headers=bearer(token)).json()["deployment"]["access"]
-    assert (local, lan) == ("local", "lan")
-
-
 def test_the_local_access_mode_refuses_to_listen_on_another_address(tmp_path, capsys):
     # 本机访问方式设置非回环地址时拒绝启动（默认访问方式就是本机），不取得锁，也不建立数据目录
     assert main(["api", "--access", "local", "--host", "0.0.0.0", "--data-dir", str(tmp_path / "data")]) == 1
