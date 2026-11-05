@@ -51,6 +51,10 @@ SKIP_DIRS = {"__pycache__", "node_modules", ".git", ".venv"}
 # 与转换脚本跳过同一批路径（工单 #1411 的「自定的边界」）
 SKIP_PREFIXES = ("evals/scenarios/",)
 
+# 这两个文件是这条规则的工具：正文里要写出这个写法本身（正则、示例、自检用例），
+# 扫它们没有意义。列在这里只是跳过这两个文件，不放过仓库里别的任何文件。
+SKIP_FILES = ("scripts/convert_design_section_refs.py", "harness/tests/test_design_section_refs.py")
+
 # 节号的写法：「第」+ 编号 + 「节」，编号可以带小数点，也可以连写几个（「第 3、4 节」），
 # 也可以是范围（「第 3-5 节」「第 7.1 至 7.3 节」）；「第 3 步」「第 2 项」不算
 SECTION = re.compile(
@@ -73,6 +77,16 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("client/tests/unit/model-logic.test.js", "选用的状态按设计说明第 9.5 节的用词"),
     ("harness/definitions/routings.json", "三部门的循环结构第 2 节"),
     ("evals/baseline/compute.py", "program-roadmap.md)第 6.1 节"),
+    # 失败信息与报告里的文字（用户能看到的文字常量，不是注释）：只改的清单没有包含它们
+    ("evals/runner/yudao_report.py", "判定按 D38 的 N-G1（评测场景设计第 6.3 节）"),
+    ("evals/runner/yudao_report.py", "建档与事项是两个 run：下面这些数值不计入上面的指标汇总，也不进均值与噪声（第 5.2 节）"),
+    ("harness/tests/kernel/test_only_grows.py", "先把设计说明第 7 节的表与内核事件模块一起改"),
+    ("harness/tests/kernel/test_only_grows.py", "如果是有意改，先在设计说明第 3.1 节写明"),
+    ("harness/tests/kernel/test_only_grows.py", "如果确实要停用一个原因，先在设计说明第 3.1 节写明"),
+    ("harness/tests/kernel/test_only_grows.py", "先在恢复契约第 4 节写明"),
+    ("harness/tests/test_thin_driver_names.py", "形态与核验角色设计说明第 4.1 节，工单 #1404"),
+    ("harness/tests/test_thin_driver_names.py", "这些种类应当从定义取（骨架与应用设计说明第 6 节）"),
+    ("scripts/ci_layers.py", "（测试分层设计说明第 10 节第 5 条）；改名的用例显示为一删一增"),
 )
 
 # 注释里把原型的设计说明写成「设计说明第 N 节」的那几行：按写的工单核过，依据是原型的设计
@@ -103,6 +117,8 @@ def text_files():
                 if path.suffix not in SUFFIXES:
                     continue
                 if path.relative_to(ROOT).as_posix().startswith(SKIP_PREFIXES):
+                    continue
+                if path.relative_to(ROOT).as_posix() in SKIP_FILES:
                     continue
                 yield path
 
@@ -207,7 +223,7 @@ def test_a_requirement_record_is_not_a_design_doc():
 
 def test_the_prototype_exemption_follows_the_file_header_not_one_mention():
     """原型豁免只看文件开头：正文里提一次原型，后面的无主节号仍然要报。"""
-    body_only = "// 页面路径的写法\n// 原型 v8 设计说明第 3.3 节：首页 #/home\n// 另一处按设计说明第 7 节实现\n"
+    body_only = "// 页面路径的写法\nconst a = 1;\n// 原型 v8 设计说明第 3.3 节：首页 #/home\n// 另一处按设计说明第 7 节实现\n"
     assert scan("client/src/example.ts", body_only), "正文里提一次原型不该整文件豁免"
 
     header_declares = "// 页面路径（原型 v8 设计说明第 3.3 节）\n// 回放位置写在 ?at= 中（设计说明第 3.3 节）\n"

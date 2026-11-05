@@ -1,8 +1,8 @@
 """报告：机器可读的结果与中文报告。
 
 结果记录 OpenCode 版本号、模型、模型的容量与来源、材料版本、评分器版本、宿主环境与
-每次运行的全部指标与失败条目（第 6 节）。多次运行时每个指标报告平均值、最小值、
-最大值与噪声范围（极差，第 5.2 节）；缺字段的样本按未知处理，不转成零。
+每次运行的全部指标与失败条目（docs/design/evaluation-scenarios.md「报告与版本比较」）。多次运行时每个指标报告平均值、最小值、
+最大值与噪声范围（极差，docs/design/evaluation-scenarios.md「指标」）；缺字段的样本按未知处理，不转成零。
 原始证据放在 .yudao/evals/ 下；结果文件提交到 docs/evaluation/，中文报告写到 .tmp/ 再发 Discussions（见 evals/README.md「结果放哪里」）。
 """
 
@@ -17,7 +17,7 @@ import model_service
 AGGREGATED_METRICS = ("request_count", "input_tokens", "output_tokens",
                       "cache_read_tokens", "cache_write_tokens", "cost",
                       "elapsed_seconds")
-# 评分器给出的两项：完成度与正确性（第 5.2 节，来自 run["score"]）
+# 评分器给出的两项：完成度与正确性（docs/design/evaluation-scenarios.md「指标」，来自 run["score"]）
 SCORED_METRICS = ("completion", "correctness")
 
 
@@ -33,7 +33,7 @@ def host_environment():
 
 
 def _version(name):
-    """记录宿主环境里的工具版本（第 6 节）。"""
+    """记录宿主环境里的工具版本（docs/design/evaluation-scenarios.md「报告与版本比较」）。"""
     executable = shutil.which(name)
     if executable is None:
         return "not installed"
@@ -43,7 +43,7 @@ def _version(name):
 
 
 def aggregate(runs):
-    """多次运行的汇总（第 5.2 节）：平均值、最小值、最大值与噪声范围。
+    """多次运行的汇总（docs/design/evaluation-scenarios.md「指标」）：平均值、最小值、最大值与噪声范围。
 
     噪声范围是同一版本各次运行的取值极差（最大值减最小值）；只有一次运行时写「未知」，
     不写零。缺字段的样本按未知处理：不进上面四项，另计有效样本数与未知样本数。
@@ -322,7 +322,7 @@ def _number(value):
 
 
 def _maybe(value):
-    """缺字段或取不到的用量写「未知」，不记 0（第 5.2 节）。"""
+    """缺字段或取不到的用量写「未知」，不记 0（docs/design/evaluation-scenarios.md「指标」）。"""
     return "未知" if value is None else _number(value)
 
 

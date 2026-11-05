@@ -1,13 +1,13 @@
 # 工单 #827（S4a）：决定请求的处理与建档的流转在应用层，薄驱动只转交
-# （骨架与应用设计说明第 6、12 节；总图第二节「薄驱动」，第三节外环「等用户」）。
+# （骨架与应用设计说明「薄驱动」；总图第二节「薄驱动」，第三节外环「等用户」）。
 #
 # 守 R1（第三环的不变式）与 R3（路线图阶段一写明的行为）：
 # - R1：回答只在写入口的一个事务里写成事实——回答与它解除的阻塞同一批写入，命令身份绑在这两条事件上；
 #   核对不通过时一个事件都不写、命令不登记。
 # - R3：决定请求得到回答以后 run 继续执行（应用层给出要继续执行的 run，由调用方开始）；
-#   这些处理在应用层，薄驱动里不再有（设计说明第 6 节「薄驱动只连接」）。
+#   这些处理在应用层，薄驱动里不再有（docs/design/skeleton-and-application.md「薄驱动」中「薄驱动只连接」）。
 #
-# 一次部门激活、SQLite 事件库与数据目录，属于模块层（test-pyramid 第 2 节）。
+# 一次部门激活、SQLite 事件库与数据目录，属于模块层（docs/design/test-pyramid.md「三层的定义」）。
 # 事项级的决定、基线采纳与建档修改轮的行为由 test_projects.py、test_onboarding_confirmation_round.py、
 # test_onboarding_revision_context.py 守着（集成层），这里不重复。
 
@@ -141,7 +141,7 @@ def test_the_thin_driver_forwards_the_answer_without_deciding_anything_itself(tm
 
 
 def test_the_thin_driver_only_forwards_the_decision_and_onboarding_flow():
-    # R3、第 6 节「薄驱动只连接」：这些处理在应用层；薄驱动里只剩两个转交，一处写事件都没有
+    # R3、docs/design/skeleton-and-application.md「薄驱动」中「薄驱动只连接」：这些处理在应用层；薄驱动里只剩两个转交，一处写事件都没有
     driver = _driver_source()
     for name in MOVED_METHODS + MOVED_FUNCTIONS:
         assert f"def {name}(" not in driver, name

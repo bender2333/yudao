@@ -1,6 +1,6 @@
 # 工具结果带图像：装配里的减法与三个协议各自的图像输入写法。
-# 依据：浏览器与 computer use 设计说明第 6.2 节「请求中的图像」、第 7.1 节「保存与绑定」；
-# 模型管理设计说明第 5.6 节「按模型输入方式提供工具」与第 8.2 节「用量」。
+# 依据：浏览器与 computer use 设计说明「请求中的图像」、「保存与绑定」；
+# 模型管理设计说明「部门的建议能力」中「按模型输入方式提供工具」与「用量」。
 # 守 R2（第二环的合同：装配缝交给模型的工具结果、三个协议各自的交换形状）与
 # R3（阶段二：模型看到最近 3 张截图，更早的带证据编号，只有文本的模型不收到图像）。
 
@@ -144,7 +144,7 @@ def test_messages_gets_the_screenshots_inside_the_tool_result(tmp_path):
 
 
 def test_screenshots_are_replaced_three_at_a_time(tmp_path):
-    # 换出按 3 张一组（设计说明第 6.2 节，减少请求前段的变化）：5 张时一张也不换，
+    # 换出按 3 张一组（docs/design/browser-and-computer-use.md「请求中的图像」，减少请求前段的变化）：5 张时一张也不换，
     # 第 6 张进来时一次换出 3 张，第 7 张以后保留 4 张
     for count, kept, replaced in ((5, 5, 0), (6, 3, 3), (7, 4, 3)):
         artifacts, images = _screenshots(tmp_path / f"case-{count}", count)
@@ -154,7 +154,7 @@ def test_screenshots_are_replaced_three_at_a_time(tmp_path):
 
 
 def test_a_text_only_call_target_gets_no_images_and_no_placeholder(tmp_path):
-    # 调用目标只有文本时，工具结果里没有图像，也没有占位文字：截图只作为证据保存（第 6.2 节第 2 条）
+    # 调用目标只有文本时，工具结果里没有图像，也没有占位文字：截图只作为证据保存（docs/design/browser-and-computer-use.md「请求中的图像」）
     _artifacts, images = _screenshots(tmp_path, 1)
     history = _history(images, input_modalities=("text",))
     assert "images" not in history[1]
@@ -163,7 +163,7 @@ def test_a_text_only_call_target_gets_no_images_and_no_placeholder(tmp_path):
 
 
 def test_switching_to_a_text_only_model_replaces_the_screenshots_in_the_next_request(tmp_path):
-    # 同一角色任务中途换成不含图像的模型：下一次请求里已有的截图全部换成占位文字（第 6.2 节第 3 条）
+    # 同一角色任务中途换成不含图像的模型：下一次请求里已有的截图全部换成占位文字（docs/design/browser-and-computer-use.md「请求中的图像」）
     artifacts, images = _screenshots(tmp_path, 3)
     items = _items(_history(images), artifacts, input_modalities=("text",))
     assert _images(items) == []
@@ -267,7 +267,7 @@ def test_request_history_needs_the_artifacts_of_the_screenshots(tmp_path):
 
 
 def test_the_tool_result_images_follow_the_call_target_modalities(tmp_path):
-    # 工具结果里的截图是否随结果进入历史，按这次请求的调用目标的输入方式决定（模型管理设计说明第 5.6 节）
+    # 工具结果里的截图是否随结果进入历史，按这次请求的调用目标的输入方式决定（模型管理设计说明「部门的建议能力」）
     class _Request:
         call_target = {"input_modalities": ["text", "image"]}
 
@@ -276,7 +276,7 @@ def test_the_tool_result_images_follow_the_call_target_modalities(tmp_path):
 
 
 def test_a_screenshot_counts_as_one_image_in_the_local_estimate():
-    # 本地估算（设计说明第 8.2 节）里图像按张计固定值：几百 KB 的 data URL 不当文字估成几十万 token
+    # 本地估算（docs/design/model-management.md「用量」）里图像按张计固定值：几百 KB 的 data URL 不当文字估成几十万 token
     data = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 300_000).decode("ascii")
     item = {"type": "function_call_output", "call_id": "call-1", "output": [
         {"type": "input_text", "text": json.dumps({"ok": True, "output": "页面结构", "error": None})},
@@ -291,7 +291,7 @@ def test_a_screenshot_counts_as_one_image_in_the_local_estimate():
 
 
 def _plan_at_a_boundary(records):
-    # 找一档窗口，使整理请求在步骤边界上停下（分界位置只能在步骤边界上，模型管理设计说明第 8.5 节）。
+    # 找一档窗口，使整理请求在步骤边界上停下（分界位置只能在步骤边界上，模型管理设计说明「旧工具结果清理、分界位置与保留」）。
     # 窗口按场景的需要试出来，不写死一个数：摘要规则本身的长短由它自己决定
     from harness.compaction import CompactionError
 

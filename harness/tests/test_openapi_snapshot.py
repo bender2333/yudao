@@ -13,7 +13,7 @@ from harness.tests.client_types_check import check_client_types
 # python -m pytest harness/tests/test_openapi_snapshot.py --write-openapi-snapshot 重写快照，
 # 再在 harness/tests/openapi 中运行 npm run check，由快照生成 TypeScript 类型并编译。
 # 合同里删掉或改变已有的东西（路径、查询、命令、事件种类及其字段）时要同时提高 API_VERSION
-# （应用层与接口层设计说明第 6.1 节、第 9 节第 1 条），重写快照也不例外。
+# （应用层与接口层设计说明「能力清单」、「验收」中「OpenAPI 由 pydantic 类型生成；OpenAPI 文档的快照测试在合同变化时失败，已有的查询、命令或字段被删除或改变类型而接口版本没有提高时同样失败；由它生成的 TypeScript 类型在页面代码中编译通过，页面代码中提交的生成类型与快照逐文件相同」），重写快照也不例外。
 
 SNAPSHOT = Path(__file__).parent / "openapi" / "openapi.json"
 # 包版本号不属于接口合同：比较与重写都把两边的 info.version 取成这个固定值，
@@ -135,7 +135,7 @@ def test_the_committed_client_types_match_the_snapshot(request):
 
 
 def test_the_interface_version_rises_when_an_existing_contract_disappears():
-    # 守 R2（对外合同，测试分层设计说明第 13 节）：已有的查询、命令、事件种类及其字段被删除或改变类型时，
+    # 守 R2（对外合同，测试分层设计说明「测试按三环留」）：已有的查询、命令、事件种类及其字段被删除或改变类型时，
     # 接口版本必须提高；只增加时不要求提高。旧页面按自己记录的版本调用，版本没升就拿到它没有的类型。
     regressions = _contract_regressions(_read_snapshot(), _openapi_document())
     assert not regressions, "合同里少了或改了已有的东西而接口版本没有提高：\n" + "\n".join(regressions)

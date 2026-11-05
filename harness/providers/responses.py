@@ -83,7 +83,7 @@ class _InvokeRequest:
     attempt_id: str
     emit: Emit
     config: ResponsesConfig
-    # 输出片段（设计说明第 5.6 节）：按通道保存已发出的字数，作为下一段的起始位置
+    # 输出片段（docs/design/model-management.md「部门的建议能力」）：按通道保存已发出的字数，作为下一段的起始位置
     channel_offsets: dict[str, int] = field(default_factory=dict)
 
 
@@ -464,7 +464,7 @@ class _ResponsesInvoker:
                 **({"tool_choice": "required"} if provider_input.tool_choice == "required" else {}),
                 store=False,
                 stream=True,
-                # 推理内容（设计说明第 7.6 节）：要求上游返回加密的推理内容，供下次同模型请求回放
+                # 推理内容（docs/design/model-management.md「历史中的推理内容」）：要求上游返回加密的推理内容，供下次同模型请求回放
                 include=[RESPONSES_REASONING_INCLUDE],
                 **output_limit,
                 **({} if reasoning is None else {"reasoning": reasoning}),
@@ -608,7 +608,7 @@ class _ResponsesInvoker:
             part.get("text", "") for part in (item.get("content") or [])
             if isinstance(part, dict) and part.get("type") == "output_text"
         )
-        # 推理内容（设计说明第 7.6 节）：以 reasoning 观察交回，按它在回答中的位置保存，
+        # 推理内容（docs/design/model-management.md「历史中的推理内容」）：以 reasoning 观察交回，按它在回答中的位置保存，
         # 供下次同模型的请求原样回放
         if item.get("type") == "reasoning":
             await invocation.emit({
@@ -704,7 +704,7 @@ def _responses_input_items(provider_input: ProviderInput) -> list[dict[str, Any]
 
 
 def _responses_tool_output(result: ToolResult) -> str | list[dict[str, Any]]:
-    # 工具结果带图像时写成内容块：文字块在前，图像块按顺序（Responses 的图像输入写法，设计说明第 6.2 节）
+    # 工具结果带图像时写成内容块：文字块在前，图像块按顺序（Responses 的图像输入写法，docs/design/model-management.md「模型访问定义与准入」）
     if not result.images:
         return result.output
     parts = [tool_text_part(result.output)] if result.output else []
@@ -767,7 +767,7 @@ def _http_status_diagnostics(
     secrets: tuple[str, ...] = (),
     error_text: str | None = None,
 ) -> dict[str, Any]:
-    # 上游以 HTTP 状态拒绝请求时的诊断：状态码，加上它给出的错误码、错误类型、参数与错误原文（设计说明第 13.4 节）
+    # 上游以 HTTP 状态拒绝请求时的诊断：状态码，加上它给出的错误码、错误类型、参数与错误原文（docs/design/model-management.md「观测」）
     error = _error_object(exc.body)
     diagnostics: dict[str, Any] = {
         "status_code": exc.status_code,
@@ -787,13 +787,13 @@ def _http_status_diagnostics(
     return _redact_sdk_json(diagnostics, secrets=secrets)
 
 
-# 上游拒绝请求时记下的错误原文的长度上限（设计说明第 13.4 节）
+# 上游拒绝请求时记下的错误原文的长度上限（docs/design/model-management.md「观测」）
 _UPSTREAM_ERROR_TEXT_LIMIT = 2000
 
 
 def _upstream_error_text(exc: openai.APIStatusError, *, secrets: tuple[str, ...] = ()) -> str | None:
     # 上游给出的错误原文：错误对象的 message，没有错误对象时取文本回应体。
-    # 先替换凭据再截断（设计说明第 13.4 节）；401 与 403 的回应体不记，因为它可能回显凭据
+    # 先替换凭据再截断（docs/design/model-management.md「观测」）；401 与 403 的回应体不记，因为它可能回显凭据
     if exc.status_code in _CREDENTIAL_REJECTED_STATUSES:
         return None
     raw = _raw_upstream_error_text(exc.body, getattr(exc, "response", None))
@@ -807,7 +807,7 @@ def _upstream_error_text(exc: openai.APIStatusError, *, secrets: tuple[str, ...]
 
 def _redact_credentials(text: str, *, secrets: tuple[str, ...]) -> str:
     # 先替换本次请求的 Key，再替换环境里的密钥。harness.redact 到这里才导入：
-    # 导入 Provider 模块只加载模块自身与定义（设计说明第 2 节），这一点由 test_providers_module 检查
+    # 导入 Provider 模块只加载模块自身与定义（docs/design/model-management.md「分层」），这一点由 test_providers_module 检查
     from ..redact import redact_text
 
     return redact_text(_redact_sdk_json(text, secrets=secrets))
@@ -956,7 +956,7 @@ def _safe_error_code(code: Any) -> str | None:
     return normalized if normalized in _KNOWN_ERROR_CODES else None
 
 
-# 上下文超限在错误原文里的写法（设计说明第 8.7 节），大小写不敏感
+# 上下文超限在错误原文里的写法（docs/design/model-management.md「失败处理」），大小写不敏感
 _CONTEXT_OVERFLOW_TEXT_MARKERS = (
     "context_length_exceeded",
     "prompt is too long",
@@ -967,7 +967,7 @@ _CONTEXT_OVERFLOW_TEXT_MARKERS = (
 
 
 def _is_context_overflow(code: Any, error_text: str | None = None) -> bool:
-    # 上下文超限按错误码与错误原文识别（设计说明第 8.7 节）：OpenAI 兼容的中转服务常常只给一个 400 与一段文字
+    # 上下文超限按错误码与错误原文识别（docs/design/model-management.md「失败处理」）：OpenAI 兼容的中转服务常常只给一个 400 与一段文字
     if _safe_error_code(code) == "context_length_exceeded":
         return True
     if isinstance(error_text, str):

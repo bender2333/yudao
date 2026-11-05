@@ -5,7 +5,7 @@
 #   重新启动以后它剩下的步数与中断前一致，不多给；因此「一定会停」在重启以后仍然成立。
 # - R2：恢复页（run.recovery）的激活次数、模型步数与执行权，与同一组事件折叠出的最小投影一致。
 #
-# 读事件日志、写数据目录、用一次部门激活，属于模块层（test-pyramid 第 2 节）。
+# 读事件日志、写数据目录、用一次部门激活，属于模块层（docs/design/test-pyramid.md「三层的定义」）。
 
 import asyncio
 import json
@@ -118,7 +118,7 @@ def test_the_recovery_page_reads_its_numbers_from_the_minimal_projection(tmp_pat
         minimal = fold_events(events)
         recovery = Application(restarted).query("run.recovery", RunRecovery(run_id=run_id)).data
 
-        # 激活次数与模型步数：与同一组事件折叠出的最小投影一致（设计说明第 4 节第 4 条）
+        # 激活次数与模型步数：与同一组事件折叠出的最小投影一致（docs/design/skeleton-and-application.md「最小投影」中「应用可以读最小投影，内核不为应用加字段」）
         assert recovery.limits.activations == minimal.used.activations, recovery.limits.activations
         assert recovery.limits.model_steps == minimal.used.model_steps, recovery.limits.model_steps
         assert recovery.limits.activations >= 1 and recovery.limits.model_steps >= 1

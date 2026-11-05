@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 
 
-# 同一个数据目录只允许一个服务进程（应用层与接口层设计说明第 7.2 节）：新接口（python -m harness api）
+# 同一个数据目录只允许一个服务进程（应用层与接口层设计说明「执行与结算的归属」）：新接口（python -m harness api）
 # 取得数据目录的进程锁。测试启动真实的服务进程，经 HTTP 确认服务在运行。
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -57,7 +57,7 @@ def _start(workdir: Path, command: str, data_dir: Path, port: int, log: Path, *,
 
 
 def _wait_until_serving(process: subprocess.Popen, url: str, log: Path, *, token: str | None = None) -> None:
-    # 就绪的判断是第一次成功收到 200：局域网访问方式的接口路径需要访问令牌（第 6.3 节），
+    # 就绪的判断是第一次成功收到 200：局域网访问方式的接口路径需要访问令牌（docs/design/app-and-interface.md「令牌与 TLS」），
     # 没有令牌时一直是 401，因此请求带上这次建好的令牌
     headers = {} if token is None else {"Authorization": f"Bearer {token}"}
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC

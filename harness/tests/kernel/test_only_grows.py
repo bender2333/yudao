@@ -1,17 +1,17 @@
-# 「只增」的清单（S6a，工单 #829；骨架与应用设计说明第 3.1、3.2、7 节；总图第二节第二环「契约」）：
+# 「只增」的清单（S6a，工单 #829；骨架与应用设计说明「可信内核」、「契约」、「骨架事件与应用事件」；总图第二节第二环「契约」）：
 # 骨架事件的种类、事件信封的字段、封闭的停止原因清单都只增——新增可以，删除与改名不行。
-# 动作的缝（工单 #1170；恢复契约第 4 节）同样只增：动作类别与回执的字段。
+# 动作的缝（工单 #1170；恢复契约「动作分类与处置」）同样只增：动作类别与回执的字段。
 #
 # 快照是放出这一版时的清单。删掉其中一项时这几项测试失败，信息写明是哪一种事件、哪一个字段、
-# 哪一个停止原因：已经写进日志的事件不会因为一个发布而被重新解释（第 7 节），停止原因清单外的原因
+# 哪一个停止原因：已经写进日志的事件不会因为一个发布而被重新解释（docs/design/trusted-kernel.md「模块交互」），停止原因清单外的原因
 # 写入口也写不进去（基础规则 3）。新加一项以后同步更新快照；新加不需要提版本，削掉已有的一项不行。
 #
-# 与 kernel/test_skeleton_events.py 的分工：那一个核对登记表与设计说明第 7 节的表逐项相同（增删都报警），
+# 与 kernel/test_skeleton_events.py 的分工：那一个核对登记表与 docs/design/trusted-kernel.md「模块交互」的表逐项相同（增删都报警），
 # 这一个守住「只增」本身——删除与改名报错，新增在这里是允许的。与 kernel/test_every_stop_has_reason.py
 # 的分工：那一个核对每个基准的结束事件都带清单里的原因，这一个守住清单本身不缩。
 #
 # 读仓库里的静态声明与定义文件，不开数据库、不用子进程、不用网络，属于单元层。
-# 守第 13 节的 R2（第二环的合同：骨架事件只增；封闭的停止原因；动作类别与回执字段只增）。
+# 守 docs/design/test-pyramid.md「测试按三环留」的 R2（第二环的合同：骨架事件只增；封闭的停止原因；动作类别与回执字段只增）。
 
 import json
 import re
@@ -33,7 +33,7 @@ from harness.kernel_events import (
 REPO_ROOT = Path(__file__).resolve().parents[3]
 STOP_REASONS = REPO_ROOT / "harness" / "definitions" / "stop_reasons.json"
 
-# 放出 S6a 时的骨架事件种类，按三个流分开：run 流、项目流、目录流（设计说明第 7 节的表）
+# 放出 S6a 时的骨架事件种类，按三个流分开：run 流、项目流、目录流（docs/design/trusted-kernel.md「模块交互」的表）
 SKELETON_EVENT_SNAPSHOT = {
     "run": frozenset({
         "run_created", "department_activated", "activation_finished",
@@ -75,7 +75,7 @@ SKELETON_EVENT_SNAPSHOT = {
     }),
 }
 
-# 放出 S6a 时事件信封的字段（设计说明第 3.1 节：全局位置、流、流内版本、种类、来源、时间只增）
+# 放出 S6a 时事件信封的字段（docs/design/skeleton-and-application.md「可信内核」：全局位置、流、流内版本、种类、来源、时间只增）
 ENVELOPE_SNAPSHOT = {
     "Event": (
         "event_id", "run_id", "type", "role", "parent_event_id", "state_before", "state_after",
@@ -112,7 +112,7 @@ _DECLARATIONS = {
     "catalog": SKELETON_CATALOG_EVENTS,
 }
 
-# 放出动作合同时的动作类别（恢复契约第 4 节的表；工单 #1170）：原来的四类加新增的四类
+# 放出动作合同时的动作类别（恢复契约「动作分类与处置」的表；工单 #1170）：原来的四类加新增的四类
 ACTION_KIND_SNAPSHOT = frozenset({"read", "write", "check", "command", "fetch", "mcp", "trial", "browser"})
 
 # 放出动作合同时回执的字段（工单 #1170）：动作身份、状态、输出、原因，以及工具许可拒绝的两项。
@@ -124,7 +124,7 @@ _CLASSES = {"Event": Event, "ProjectEvent": ProjectEvent, "CatalogEvent": Catalo
 
 
 def test_the_skeleton_event_kinds_only_grow():
-    # 骨架事件的种类只增：删掉一种或改名，读过旧日志的内核就少了它（第 7 节「停用不删除」）
+    # 骨架事件的种类只增：删掉一种或改名，读过旧日志的内核就少了它（docs/design/trusted-kernel.md「模块交互」「停用不删除」）
     for stream, declared in _DECLARATIONS.items():
         missing = sorted(SKELETON_EVENT_SNAPSHOT[stream] - declared)
         assert not missing, (
@@ -141,7 +141,7 @@ def test_the_skeleton_event_kinds_only_grow():
 
 
 def test_the_envelope_fields_only_grow():
-    # 信封的字段只增：删掉一个字段，日志里那一列就没有了，旧的事件读不回来（第 3.1 节）
+    # 信封的字段只增：删掉一个字段，日志里那一列就没有了，旧的事件读不回来（docs/design/skeleton-and-application.md「可信内核」）
     for name, declaration in _CLASSES.items():
         current = [field.name for field in fields(declaration)]
         missing = [field for field in ENVELOPE_SNAPSHOT[name] if field not in current]
@@ -157,7 +157,7 @@ def test_the_envelope_fields_only_grow():
 
 
 def test_the_stop_reasons_only_grow():
-    # 停止原因的封闭清单只增：删掉一项，已经写过这个原因的结束事件不再认得它（第 3.1 节）
+    # 停止原因的封闭清单只增：删掉一项，已经写过这个原因的结束事件不再认得它（docs/design/skeleton-and-application.md「可信内核」）
     reasons = set(json.loads(STOP_REASONS.read_text(encoding="utf-8")))
     missing = sorted(STOP_REASON_SNAPSHOT - reasons)
     assert not missing, (
@@ -187,7 +187,7 @@ def test_the_action_kinds_only_grow():
 
 
 def test_the_action_receipt_fields_only_grow():
-    # 回执的字段只增：删掉一个字段，动作的记录与工具结果就少了它（恢复契约第 4 节）
+    # 回执的字段只增：删掉一个字段，动作的记录与工具结果就少了它（恢复契约「动作分类与处置」）
     current = list(ActionReceipt.model_fields)
     missing = [field for field in ACTION_RECEIPT_SNAPSHOT if field not in current]
     assert not missing, (

@@ -6,7 +6,7 @@ from pathlib import Path
 from harness.data_directory import (configure_logging, default_data_dir, default_dotenv,
                                     default_provider_config, user_data_root)
 
-# 数据目录与日志的默认位置（设计说明第 3.4、4.2 节）：Windows 为 %LOCALAPPDATA%\Yudao，
+# 数据目录与日志的默认位置（docs/design/web-interface-and-release.md「数据目录」、「启动与停止」）：Windows 为 %LOCALAPPDATA%\Yudao，
 # Linux 为 $XDG_DATA_HOME 或 ~/.local/share，遵守环境变量，不写用户的真实目录。
 
 def test_windows_default_data_dir_is_local_app_data(tmp_path, monkeypatch):

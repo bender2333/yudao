@@ -64,7 +64,7 @@ RUN_EVENT_TYPES = frozenset({
     "contract_accepted",
     "ask_started",
     "ask_answered",
-    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：应用事件，核验角色先判断后看解释
+    # 独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：应用事件，核验角色先判断后看解释
     "independent_judgement_committed",
     "product_decision_accepted",
     # 成果失效（骨架事件，S1b，工单 #858）
@@ -86,15 +86,15 @@ RUN_EVENT_TYPES = frozenset({
     "decision_withdrawn",
     # 派发编号（工单 #1397）：每开始一轮工作写一条，这一轮写入的事件都带它
     "dispatch_number_acquired",
-    # MCP 服务器的生命周期（网络与 MCP 设计说明第 7.2、10 节，工单 #1176）：应用事件，随 run 流保存
+    # MCP 服务器的生命周期（网络与 MCP 设计说明「运行规则」、「应用层接口」，工单 #1176）：应用事件，随 run 流保存
     "mcp_server_started",
     "mcp_server_closed",
     "mcp_server_failed",
-    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）：应用事件，
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明「试用工具」、「事件、决定请求与查询」，工单 #1183）：应用事件，
     # run 进入终态时结束全部会话并写下结束记录
     "trial_session_started",
     "trial_session_ended",
-    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：应用事件。
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：应用事件。
     # 用例打开期间本部门的浏览器与屏幕动作由投影记为它的步骤，会话结束时打开的用例结束为中断
     "trial_case_opened",
     "trial_case_concluded",

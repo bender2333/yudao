@@ -1,4 +1,4 @@
-// 项目部门设置的共用表单（模型管理设计说明第 9.2、9.1 节，工单 #95）：模型、推理档位与部门 Prompt。
+// 项目部门设置的共用表单（模型管理设计说明「部门详情里的模型与 Prompt」、「模型管理页」，工单 #95）：模型、推理档位与部门 Prompt。
 // 部门设置弹窗与设置页的部门设置都用这一份：两者写入同一处项目部门设置，字段与校验完全一致。
 // 模型下拉第一项是「跟随部门默认（当前：…）」，选择它即清除项目的模型选择；档位第一项是「跟随」。
 // 已保存的档位不在当前生效模型的支持档位内时额外保留这一项并标明按模型限制（保存只核对档位属于档位全集）。
@@ -72,7 +72,7 @@ export function promptDraftUseDefault(draft: DepartmentSettingsDraft): Departmen
 }
 
 // 草稿按项目部门设置的版本重置：设置随事件流更新（别人改了、自己保存成功）以后，草稿回到当前值，
-// 未提交的修改不跨越版本（第 9.2 节的基准版本语义）
+// 未提交的修改不跨越版本（docs/design/model-management.md「部门详情里的模型与 Prompt」的基准版本语义）
 // 第三项是已保存的那一份：撤销本次修改时还原成它
 export function useDepartmentDraft(setting: DepartmentSetting | null): [
   DepartmentSettingsDraft,
@@ -91,7 +91,7 @@ export function useDepartmentDraft(setting: DepartmentSetting | null): [
   return [draft, setDraft, draftFromSetting(setting)];
 }
 
-// 建议能力提醒（第 5.6 节）：保存结果带回的提醒，以及当前生效模型（含跟随）已有的提醒。
+// 建议能力提醒（docs/design/model-management.md「部门的建议能力」）：保存结果带回的提醒，以及当前生效模型（含跟随）已有的提醒。
 // 弹窗打开期间一直显示，直到换成具备该能力的模型
 export function ReminderList(props: { items: string[]; testId?: string }) {
   if (props.items.length === 0) {
@@ -129,7 +129,7 @@ export function DepartmentSettingsFields(props: {
     () => groupAdmittedModels(choices, catalog.data?.providers ?? []),
     [choices, catalog.data],
   );
-  // 当前生效模型的说明：跟随部门默认时写明部门默认的模型与来源（第 9.2 节）
+  // 当前生效模型的说明：跟随部门默认时写明部门默认的模型与来源（docs/design/model-management.md「部门详情里的模型与 Prompt」）
   const followText = followDepartmentLabel(currentEffectiveLabel(props.effective));
   // 档位选项来自当前生效模型声明的支持档位；随选择变化（选新模型以后按新模型声明取档位）
   const pickedModelId = selectionPair(props.draft.model).model_id;

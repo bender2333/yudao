@@ -1,5 +1,5 @@
 // 项目楼层的画面对象：画布挂在宿主元素上，提供 setState、jump、play、setDecisions、stream、focus、
-// setOverlay、resize、destroy（原型 v13 js/pixel/floor.js 的 createFloorScene 与画面与播放设计说明第 4、5 节，
+// setOverlay、resize、destroy（原型 v13 js/pixel/floor.js 的 createFloorScene 与画面与播放设计说明「画面合同」、「画面层」，
 // 工单 #82、#953）。
 //
 // 画面的输入只有画面合同（pixel/contract.ts）：状态带位置、动作带位置与 kind，实时内容（决定卡片、流式文字）
@@ -65,7 +65,7 @@ export interface FloorView {
   resize(): void;
   destroy(): void;
   /**
-   * 关掉或打开表演层（待机活动与动作）的测试入口（设计说明第 8.1 节的 H2）。
+   * 关掉或打开表演层（待机活动与动作）的测试入口（docs/design/visualization.md「视觉通道表」的 H2）。
    * 关掉以后动作与特效不演，画面只画状态给出的样子；承载事实的通道不受影响。
    */
   performance(on: boolean): void;
@@ -74,7 +74,7 @@ export interface FloorView {
   /** 世界的当前状态、驱动与场景（测试与回放读取），以及承载事实的视觉通道。 */
   inspect(): {
     driver: FloorDriver; scene: SceneLike; state: FloorState; renderer: FloorRenderer; card: DecisionCard;
-    /** 承载事实的视觉通道（设计说明第 8.1 节的楼层那一行）。 */
+    /** 承载事实的视觉通道（docs/design/visualization.md「视觉通道表」的楼层那一行）。 */
     channels: () => FloorChannels;
   };
   /** 大厅决定板在画面逻辑坐标里的矩形（点击与测试共用）。 */
@@ -88,7 +88,7 @@ export interface FloorView {
 }
 
 /**
- * 楼层承载事实的视觉通道（画面与播放设计说明第 8.1 节的楼层那一行）：事项在哪个房间或在大厅、事项的颜色，
+ * 楼层承载事实的视觉通道（画面与播放设计说明「视觉通道表」的楼层那一行）：事项在哪个房间或在大厅、事项的颜色，
  * 房间亮灯与屏幕滚动，门口的小旗与牌子文字，大厅板上的决定单，成果库里的成果，传信管里等待回答的询问数，
  * 等待模型服务的文字，各部门的角色与角色的状态。
  *

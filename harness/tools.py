@@ -2,7 +2,7 @@
 # 取自定义的角色（definitions/roles.json）与事项种类（definitions/work_items.json）；这里是读取它们的函数，
 # 主机工具由步骤驱动执行，环境工具的动作由执行环境（environment.py）执行。
 #
-# 读的是交给它的那份定义（工单 #1098，设计说明第 5.4 节第 3 条）：工具许可与提案校验把事项所用的定义
+# 读的是交给它的那份定义（工单 #1098，docs/design/browser-and-computer-use.md「执行」）：工具许可与提案校验把事项所用的定义
 # （组织定义与它引用的路由定义所在的那个定义版本）交进来；没有交的时候是当前加载的那一份。
 # 装配、显示与其他读取当前定义的调用方不交，交给它们的是哪一份定义不改变它们看到的东西。
 
@@ -13,7 +13,7 @@ from typing import Any
 
 from .definitions import DEFINITIONS, Definitions, Verification, thaw
 
-# 浏览器工具（浏览器与 computer use 设计说明第 4.2 节，工单 #147）：由 scripts/extract_browser_tools.py 从
+# 浏览器工具（浏览器与 computer use 设计说明「提供的工具」，工单 #147）：由 scripts/extract_browser_tools.py 从
 # Playwright MCP 0.0.83 的 tools/list 生成定义，按这张表筛选。browser_drop 能把本机路径的文件投给页面，
 # 路径规则与 browser_file_upload 相同（限试用副本内）。
 BROWSER_TOOL_NAMES: tuple[str, ...] = (
@@ -29,14 +29,14 @@ BROWSER_TOOL_NAMES: tuple[str, ...] = (
     "browser_generate_locator",
     "browser_take_screenshot",
 )
-# 不提供的工具（设计说明第 4.2 节）：脚本能绕过界面直接改页面状态，这样得到的结论不能说明用户能完成这项操作
+# 不提供的工具（docs/design/browser-and-computer-use.md「提供的工具」）：脚本能绕过界面直接改页面状态，这样得到的结论不能说明用户能完成这项操作
 EXCLUDED_BROWSER_TOOLS: tuple[str, ...] = ("browser_evaluate", "browser_run_code_unsafe")
-# 需要图像输入的工具（设计说明第 6.1 节）：调用目标不含图像时它不出现在请求里
+# 需要图像输入的工具（docs/design/browser-and-computer-use.md「工具定义的声明」）：调用目标不含图像时它不出现在请求里
 IMAGE_INPUT_BROWSER_TOOLS: tuple[str, ...] = ("browser_take_screenshot",)
 
 
 def browser_tool_definitions(response: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    # 从 Playwright MCP 的 tools/list 响应生成浏览器工具的定义（设计说明第 4.1、4.2 节与第 9 节）：
+    # 从 Playwright MCP 的 tools/list 响应生成浏览器工具的定义（设计说明「运行方式」、「提供的工具」与 docs/design/browser-and-computer-use.md「恢复契约」）：
     # 名称、说明与参数原样取用；动作类别是 browser；只读标注为是的工具按「无需查询」核对，
     # 其余按动作记录查询；都可以取消；截图需要图像输入。清单以外的工具（含不提供的两个）不进来
     listed = {str(tool.get("name")): tool for tool in response.get("result", {}).get("tools", [])}
@@ -88,7 +88,7 @@ def proposal_kinds_of(*, definitions: Definitions | None = None) -> frozenset[st
 
 
 def writes_check_materials(department: str, *, definitions: Definitions | None = None) -> bool:
-    # 写入范围是检查材料的角色（设计说明第 4.2 节第 1 条、工单 #1390）：它的写入只进检查材料与检查副本
+    # 写入范围是检查材料的角色（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」、工单 #1390）：它的写入只进检查材料与检查副本
     return in_force(definitions).write_scope(department).scope == "check_materials"
 
 
@@ -131,7 +131,7 @@ def submit_tool(kind: str, *, definitions: Definitions | None = None) -> str | N
 def offers_with_input(tool_names: list[str], input_modalities: tuple[str, ...], *,
                       definitions: Definitions | None = None) -> list[str]:
     # 这次请求提供的工具：按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具
-    # （设计说明第 5.6 节「请求时」；浏览器设计第 6.1 节的屏幕工具与 browser_take_screenshot 属于这一类）
+    # （设计说明「请求中的图像」「请求时」；浏览器设计「工具定义的声明」的屏幕工具与 browser_take_screenshot 属于这一类）
     if "image" in input_modalities:
         return list(tool_names)
     tools = in_force(definitions).tools

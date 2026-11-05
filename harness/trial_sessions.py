@@ -4,7 +4,7 @@
 #
 # 会话记录（身份、部门、种类、启动方式、端口、试用副本、各进程的进程号与启动时间）与动作记录保存在一起：
 # 本模块交回的记录随 tool_called 的载荷写入事件。会话的开始与结束各写一条应用事件
-# （`trial_session_started`、`trial_session_ended`，设计说明第 12 节）；run 进入终态时由 run 的收尾
+# （`trial_session_started`、`trial_session_ended`，设计说明「事件、决定请求与查询」）；run 进入终态时由 run 的收尾
 # 结束全部会话，持有会话的进程重新启动时由启动扫描按会话记录里的进程号与创建时间结束遗留的进程树
 # （工单 #1183）。
 #
@@ -38,17 +38,17 @@ from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
 from .redact import redact_text
 
-# 试用副本与输出放在这个 run 的工作区旁边，与检查工作区同一种摆法（设计说明第 3.1 节）
+# 试用副本与输出放在这个 run 的工作区旁边，与检查工作区同一种摆法（docs/design/browser-and-computer-use.md「试用的位置」）
 TRIALS_DIR = "trials"
 OUTPUT_DIR = "outputs"
 
 # 本机进程是控制主机：系统按 Python 的 sys.platform 取值。其他系统没有启动命令的约定
 _PLATFORM_SYSTEMS = {"win32": "windows", "linux": "linux"}
 
-# 就绪时限的默认值与界限取自规则登记（设计说明第 3.3 节）
+# 就绪时限的默认值与界限取自规则登记（设计说明「参数怎样成为带版本的数据」中「创建 run 时按事项冻结的定义校验当前参数值，并把本 run 使用的参数取值与参数版本写进运行开始事件；该 run 进行期间不变」）
 READINESS_TIMEOUT_SEC = int(DEFINITIONS.rule_value("execution.readiness_timeout_sec"))
 
-# 试用需要的程序与版本（设计说明第 3.2 节）
+# 试用需要的程序与版本（docs/design/browser-and-computer-use.md「执行位置上的程序」）
 NODE_MAJOR_MIN = 24
 PLAYWRIGHT_MCP_VERSION = "0.0.83"
 
@@ -63,7 +63,7 @@ PROBE_TIMEOUT_SEC = 90
 # 截断（读输出、结束会话与失败回执带回来的启动输出都走这个上限）
 DEFAULT_OUTPUT_LIMIT = int(DEFINITIONS.rule_value("tool_output_limit"))
 
-# 会话的结束方式（设计说明第 12 节 `trial_session_ended` 的取值）：停止、被新会话替换、中断（持有会话的
+# 会话的结束方式（docs/design/browser-and-computer-use.md「事件、决定请求与查询」 `trial_session_ended` 的取值）：停止、被新会话替换、中断（持有会话的
 # 进程重新启动）、用户停止（停止使用桌面，本机版的桌面会话还没有接上，取值先留着）、run 结束
 END_STOPPED = "stopped"
 END_REPLACED = "replaced"
@@ -107,7 +107,7 @@ class TrialSession:
     file_handle: Any
     started_at: str
     # 直接子进程的创建时间（psutil，秒）：与进程号一起记进会话记录。持有会话的进程重新启动时按这两项
-    # 核对并结束遗留的进程树——进程号可能已经被别的进程复用（设计说明第 3.4 节、工单 #1183）
+    # 核对并结束遗留的进程树——进程号可能已经被别的进程复用（docs/design/browser-and-computer-use.md「试用工具」、工单 #1183）
     process_create_time: float | None = None
     status: str = "running"
     ended_reason: str | None = None
@@ -115,7 +115,7 @@ class TrialSession:
     _lock: Lock = field(default_factory=Lock)
 
     def record(self) -> dict[str, Any]:
-        # 会话记录：身份、部门、种类、端口、试用副本、各进程的进程号与启动时间（设计说明第 3.4 节）
+        # 会话记录：身份、部门、种类、端口、试用副本、各进程的进程号与启动时间（docs/design/browser-and-computer-use.md「试用工具」）
         with self._lock:
             return {
                 "session_id": self.session_id,
@@ -181,7 +181,7 @@ _ALLOCATED_PORTS: set[int] = set()
 
 def _free_port() -> int:
     # 取得一个空闲的 TCP 端口：bind(("127.0.0.1", 0)) 以后记下端口并关掉套接字，
-    # 端口留在进程内的已分配集合里直到会话结束（设计说明第 3.3 节）
+    # 端口留在进程内的已分配集合里直到会话结束（docs/design/browser-and-computer-use.md「启动方式」）
     with _PORT_LOCK:
         for _ in range(64):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -262,7 +262,7 @@ def resolve_trial_launch(name: str, args: dict[str, Any], methods: list[dict[str
 
 
 def _launch_shape_problem(launch: dict[str, Any]) -> str | None:
-    # 启动方式的形状（设计说明第 3.3 节）：交付说明由提案校验，trial_start 的启动方式由这里核对
+    # 启动方式的形状（docs/design/browser-and-computer-use.md「启动方式」）：交付说明由提案校验，trial_start 的启动方式由这里核对
     kind = launch.get("kind")
     if kind not in {"web", "desktop"}:
         return "kind must be web or desktop"
@@ -306,7 +306,7 @@ def _run_probe(argv: list[str], timeout: float = PROBE_TIMEOUT_SEC) -> tuple[int
 
 
 def _node_status() -> dict[str, str] | None:
-    # Node.js 24 LTS（设计说明第 3.2 节）：找不到或版本不是 24 时算缺少
+    # Node.js 24 LTS（docs/design/browser-and-computer-use.md「执行位置上的程序」）：找不到或版本不是 24 时算缺少
     executable = shutil.which("node")
     if executable is None:
         return {"program": "Node.js 24", "detail": "node was not found on PATH"}
@@ -366,7 +366,7 @@ def _playwright_browsers_dir() -> Path:
 
 
 def _chromium_status() -> dict[str, str] | None:
-    # Chromium 由 Playwright 自带命令安装（设计说明第 3.2 节）：有 chromium 或无界面的
+    # Chromium 由 Playwright 自带命令安装（docs/design/browser-and-computer-use.md「执行位置上的程序」）：有 chromium 或无界面的
     # chromium_headless_shell 都算装好。修订号是否与 Playwright 版本对得上，由真正启动浏览器时核对
     root = _playwright_browsers_dir()
     installed: list[str] = []
@@ -380,14 +380,14 @@ def _chromium_status() -> dict[str, str] | None:
 
 
 def missing_programs() -> list[dict[str, str]]:
-    # 试用需要的程序（设计说明第 3.2 节）：Node.js 24、Playwright MCP 0.0.83、Chromium。
+    # 试用需要的程序（docs/design/browser-and-computer-use.md「执行位置上的程序」）：Node.js 24、Playwright MCP 0.0.83、Chromium。
     # 缺一个就交回一项，回执按它写明缺少的程序，会话不建立
     missing = [item for item in (_node_status(), _playwright_mcp_status(), _chromium_status()) if item]
     return [dict(item) for item in missing]
 
 
 def normalize_launch(raw: Any) -> dict[str, Any]:
-    # 一个启动方式的形状（设计说明第 3.3 节）。交付说明由提案校验核对过；这里再核一次，
+    # 一个启动方式的形状（docs/design/browser-and-computer-use.md「启动方式」）。交付说明由提案校验核对过；这里再核一次，
     # 因为 trial_start 的启动方式是模型在这次调用里给出的
     if not isinstance(raw, dict):
         raise ValueError("a launch method must be an object")
@@ -424,7 +424,7 @@ def normalize_launch(raw: Any) -> dict[str, Any]:
 
 
 def select_command(launch: dict[str, Any], system: str | None) -> list[str]:
-    # 按执行位置的系统选用命令（设计说明第 3.3 节）：没有这个系统的命令时按缺少启动方式处理
+    # 按执行位置的系统选用命令（docs/design/browser-and-computer-use.md「启动方式」）：没有这个系统的命令时按缺少启动方式处理
     commands = launch.get("commands") or {}
     if system is None:
         raise ValueError("this execution location has no system from which to choose a launch command")
@@ -497,7 +497,7 @@ def _remove_tree(root: Path) -> None:
 class TrialSessionTable:
     """一个进程里全部 run 的试用会话：每个 run 的每个部门同一时刻最多一个。
 
-    会话记录与动作记录一起保存（设计说明第 3.4 节）：`start` 交回会话记录与启动输出的开头，
+    会话记录与动作记录一起保存（docs/design/browser-and-computer-use.md「试用工具」）：`start` 交回会话记录与启动输出的开头，
     `read_output` 与 `stop` 交回同一个记录与输出。程序探测可以注入，测试用它模拟缺少某个程序。
     会话开始与结束时经装配一方交来的写入方（`bind_events`）写一条应用事件；run 进入终态时由
     `stop_run` 结束这个 run 的全部会话，结束事件排在 `flush` 里写（工单 #1183）。
@@ -550,7 +550,7 @@ class TrialSessionTable:
     async def start(self, *, run_id: str | None, department: str, launch: dict[str, Any],
                     source_tree: CapturedTree, run_root: Path, source: str,
                     output_limit: int = DEFAULT_OUTPUT_LIMIT, stop: Any = None) -> dict[str, Any]:
-        # 结束本部门原来的会话（设计说明第 3.4 节），再建立新的会话
+        # 结束本部门原来的会话（docs/design/browser-and-computer-use.md「试用工具」），再建立新的会话
         self.stop(run_id, department, reason=END_REPLACED)
         missing = self._probe()
         if missing:
@@ -627,7 +627,7 @@ class TrialSessionTable:
             raise
         with self._lock:
             self._sessions[(run_id, department)] = session
-        # 会话建立以后写一条开始事件（设计说明第 12 节）：身份、部门、种类、启动方式、选用命令的系统、
+        # 会话建立以后写一条开始事件（docs/design/browser-and-computer-use.md「事件、决定请求与查询」）：身份、部门、种类、启动方式、选用命令的系统、
         # 端口与就绪地址、试用副本的树摘要与清单来源，以及进程号与创建时间（启动扫描按这两项结束遗留进程）
         self._record(run_id, EventType.TRIAL_SESSION_STARTED, _started_payload(session))
         head, truncated = _head(output_path, output_limit)
@@ -635,7 +635,7 @@ class TrialSessionTable:
 
     async def _wait_ready(self, session: TrialSession, timeout_sec: int, stop: Any,
                           output_limit: int) -> None:
-        # 失败回执带回来的启动输出按工具结果的上限截断（设计说明第 3.4 节与规则登记 tool_output_limit）
+        # 失败回执带回来的启动输出按工具结果的上限截断（docs/design/browser-and-computer-use.md「试用工具」与规则登记 tool_output_limit）
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_sec
         while True:
@@ -733,7 +733,7 @@ class TrialSessionTable:
 
 
 # ---------------------------------------------------------------------------
-# 会话事件的载荷（设计说明第 12 节 `trial_session_started`、`trial_session_ended`）
+# 会话事件的载荷（docs/design/browser-and-computer-use.md「事件、决定请求与查询」 `trial_session_started`、`trial_session_ended`）
 
 
 def _started_payload(session: TrialSession) -> dict[str, Any]:
@@ -773,7 +773,7 @@ def _ended_payload(session: TrialSession, reason: str, *, ended: bool) -> dict[s
 
 
 # ---------------------------------------------------------------------------
-# 遗留的会话（设计说明第 3.4、13 节，工单 #1183）：Yudao 启动时结束没有结束记录的会话留下的进程树，
+# 遗留的会话（docs/design/browser-and-computer-use.md「试用工具」、「故障与处理」，工单 #1183）：Yudao 启动时结束没有结束记录的会话留下的进程树，
 # 补写 trial_session_ended。进程号与创建时间都取自会话记录（开始事件的载荷）
 
 
@@ -797,7 +797,7 @@ _LEFTOVER_PAGE = 1000
 def leftover_sessions(store, *, limit: int = _LEFTOVER_PAGE) -> list[LeftoverSession]:
     """有开始记录、没有结束记录的会话（按（run、会话身份）配对，先开始先配对）。
 
-    Yudao 启动时用这份清单结束遗留的进程树并补写结束事件（设计说明第 3.4、13 节）：
+    Yudao 启动时用这份清单结束遗留的进程树并补写结束事件（docs/design/browser-and-computer-use.md「试用工具」、「故障与处理」）：
     进程崩溃时结束事件没有写下来，交付软件的进程树可能还活着。
     """
     open_starts: dict[tuple[str, str], list[dict[str, Any]]] = {}

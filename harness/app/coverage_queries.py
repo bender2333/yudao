@@ -1,9 +1,9 @@
-# 检验覆盖的查询（工单 #399；应用层与接口层设计说明第 4.3 节 `acceptance.coverage`；
-# 验证的独立性设计说明第 7、7.1 节）：读核验角色放行记录里一次算好的数与逐条结论（工单 #151 在
+# 检验覆盖的查询（工单 #399；应用层与接口层设计说明「查询清单」 `acceptance.coverage`；
+# 验证的独立性设计说明「检验覆盖与开环」、「口径」）：读核验角色放行记录里一次算好的数与逐条结论（工单 #151 在
 # 提交放行时用 harness/coverage.py 算好写进事实），这里不重新计算；查询只读，按位置回放同一段事件流
 # 得到同一份结果。
 #
-# 逐条结论的检验方式与结果词表（第 7.1 节）：`check`、`trial`、`measure` 是可执行的检验，
+# 逐条结论的检验方式与结果词表（「口径」）：`check`、`trial`、`measure` 是可执行的检验，
 # `judgement`、`human`、`open` 不可执行；结果是 `passed`、`failed`、`unverified`。
 # 是否开环按可执行与否判定，开环明细读放行记录里存下的那一份。
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class CoverageNumbers(Contract):
-    # 放行记录里的三个数（第 7.1 节第 4 点）：条件总数、可执行检验的条件数、已在当前快照上运行并通过的条数、
+    # 放行记录里的三个数（docs/design/independent-verification.md「口径」第 4 点）：条件总数、可执行检验的条件数、已在当前快照上运行并通过的条数、
     # 检验覆盖比例、模型阅读的条件数（含于开环）与开环的条件数。原样取自放行记录，不重新计算
     criteria_total: int
     executable: int
@@ -56,7 +56,7 @@ class AcceptanceCoverageResult(Contract):
 
 
 class AcceptanceCoverage(ReplayRequest):
-    # 可回放（设计说明第 4.1 节）：at 是全局位置，省略时读取现在的事实
+    # 可回放（docs/design/app-and-interface.md「合同」）：at 是全局位置，省略时读取现在的事实
     run_id: str
 
 

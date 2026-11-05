@@ -93,7 +93,7 @@ class Snapshot:
         return self._store.stream_events(self.stream, after_version=version, through_version=self.version)
 
     def minimal(self) -> MinimalProjection:
-        # 到这个版本为止的最小投影（设计说明第 4 节）：裁决只读这一份，由骨架事件折叠而成。 只看已提交的事件，事务里追加的事件由 Transaction 接着折
+        # 到这个版本为止的最小投影（docs/design/skeleton-and-application.md「最小投影」）：裁决只读这一份，由骨架事件折叠而成。 只看已提交的事件，事务里追加的事件由 Transaction 接着折
         if self._minimal is None:
             events = accepted(Snapshot.events(self))
             folded = fold_events(events) if self._minimal_of is None else self._minimal_of(self.stream, self.version,
@@ -203,7 +203,7 @@ class WritePath:
         self._minimals: dict[str, tuple[int, MinimalProjection]] = {}
 
     def minimal(self, stream: str) -> MinimalProjection:
-        # 一个流当前的最小投影：裁决只读这一份（设计说明第 4 节，S1d 工单 #860）
+        # 一个流当前的最小投影：裁决只读这一份（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）
         saved = self._store.projection(stream)
         version = 0 if saved is None else saved.version
         return self._minimal_at(stream, version, self._store.stream_events(stream, through_version=version))
@@ -311,7 +311,7 @@ class WritePath:
 
 
 def _resolve_actor(entry_actor: str | None, command: MessageIdentity | None, stream: str) -> str:
-    # 提出者由写入方经写入口声明（设计第 5.2 节）：由命令写入时取命令的提出者， 其余取写入方声明的提出者；两者都没有时这次写入失败（每条事件都有提出者，不允许落空）
+    # 提出者由写入方经写入口声明（docs/design/app-and-interface.md「事件对象」）：由命令写入时取命令的提出者， 其余取写入方声明的提出者；两者都没有时这次写入失败（每条事件都有提出者，不允许落空）
     actor = command.actor if command is not None else entry_actor
     if not isinstance(actor, str) or not actor:
         raise ValueError(f"{stream} event requires a declared actor")

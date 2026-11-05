@@ -60,7 +60,7 @@ from .validation import AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 from .trial_sessions import TRIAL_TOOLS, resolve_trial_call
 
-# 试用用例的两个主机工具（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：质检用 trial_case_begin
+# 试用用例的两个主机工具（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：质检用 trial_case_begin
 # 打开一个用例、按计划在浏览器里操作，用 trial_case_end 给出结论。用例打开到结束之间本部门在同一会话中的
 # 浏览器与屏幕动作由运行状态投影记为它的步骤（按动作身份）；会话结束或中断时打开的用例结束为中断。
 # 两个工具都不交给执行环境：输入核对、结论核对与事件在控制这一侧完成
@@ -71,16 +71,16 @@ TRIAL_CASE_TOOLS = frozenset({TRIAL_CASE_BEGIN, TRIAL_CASE_END})
 TRIAL_CASE_RESULTS = ("passed", "failed", "unverified")
 # 结束试用会话的三个工具：执行完以后看打开的用例是不是随会话结束了
 TRIAL_SESSION_TOOLS = frozenset({"trial_start", "trial_open", "trial_stop"})
-# 引用验收条件的形式（浏览器与 computer use 设计说明第 8.1 节）：AC<序号>，序号是它在 ProductSpec 里的位置
+# 引用验收条件的形式（浏览器与 computer use 设计说明「验收条件的引用」）：AC<序号>，序号是它在 ProductSpec 里的位置
 _CRITERION_ID = re.compile(r"^AC[1-9][0-9]*$")
 
-# 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
+# 整理请求使用的请求档位（docs/design/model-management.md「压缩与测试」）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
 COMPACTION_REQUEST_TIER = "minimal"
 
-# 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
+# 整理请求使用的请求档位（docs/design/model-management.md「压缩与测试」）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
 COMPACTION_REQUEST_TIER = "minimal"
 
-# 整理请求自己失败时不按「这一次压缩不生效」处理的原因（设计说明第 8.7 节，工单 #1213）：未压缩的
+# 整理请求自己失败时不按「这一次压缩不生效」处理的原因（docs/design/model-management.md「失败处理」，工单 #1213）：未压缩的
 # 历史放不进窗口是停下来的一条；取消与运行时间到、模型步数用完在决定是否重试的那一处先判定
 _COMPACTION_STOP_REASONS = frozenset({"context_overflow"})
 
@@ -107,7 +107,7 @@ def tool_call_required_text(count: int, limit: int | None = None) -> str:
 def _guidance_only_round(projection: RunProjection, scope: ActivationScope,
                          definitions: Definitions | None = None) -> bool:
     # 一轮开始时只有指导是新的工作，而且这段指导是这一轮收到的：这一轮没有要做的工作，
-    # 模型不调用工具的文字回复就是回答用户（部门指导设计说明第 3 节，工单 #1037）。
+    # 模型不调用工具的文字回复就是回答用户（部门指导设计说明「处理结果与来源」，工单 #1037）。
     # 询问分支不是部门的一轮工作，它的文字回复仍按「要求调用工具」处理。
     # 关注关系按这个事项所用的那份定义取（工单 #1509）：不给时是进程加载的那一份
     if not scope.guidance_ids or scope.session_id in projection.branch_sessions:
@@ -248,7 +248,7 @@ class StepDriver:
         # 没有交的时候是当前加载的那一份；装配也按这一份取（工单 #1175 第 7 轮的契约 v2）
         self._definitions = in_force(definitions)
         # 这一步交给装配的输入：身份、提示、采用的版本、这一份定义，以及路由的工作引用（原样带过去，
-        # 第 5.4 节第 4 条）
+        # docs/design/model-management.md「生效时机」）
         self._frame = StepFrame(scope.department, scope.session_id, scope.activation_id, prompt,
                                 basis.effective_contract_hash, basis.input_version,
                                 definitions=self._definitions, work_ref=request.work_ref)
@@ -273,7 +273,7 @@ class StepDriver:
         # 这是可以接受的限制（工单 #1037）
         opened = writes.read(run_stream(scope.run_id))
         self._text_reply_answers = _guidance_only_round(opened.projection, scope, self._definitions)
-        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：编排层按 run 持有，
+        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明「运行规则」，工单 #1175）：编排层按 run 持有，
         # 会话结束（run 关闭）时由它关闭。检查工作区按会话保留会换掉环境对象，会话表重新接上
         self._mcp_sessions = mcp_sessions
         if mcp_sessions is not None:
@@ -368,7 +368,7 @@ class StepDriver:
         finally:
             self._release_call()
             self._recorder.close()
-        # 一轮工作的结果（设计说明第 5.3 节输出）：这一轮写下的事件范围、停止判断时的版本与停止原因。
+        # 一轮工作的结果（docs/design/model-management.md「解析规则」输出）：这一轮写下的事件范围、停止判断时的版本与停止原因。
         # 这一轮算不算结束、结束成什么，由薄驱动问路由（工单 #861）
         return replace(result, version=self._version, events=self._written())
 
@@ -387,7 +387,7 @@ class StepDriver:
 
     def _begin_call(self, requested_tier: str | None = None) -> RoundResult | None:
         # 新的逻辑调用：从开始一轮工作交进来的那份来源读该项目该部门当前的部门设置（模型选择与部门 Prompt），
-        # 交 Provider 解析调用目标；请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
+        # 交 Provider 解析调用目标；请求档位与模型访问定义按同一顺序取第一个写入了的（docs/design/model-management.md「解析规则」），
         # 给出请求档位时按它解析，实际发送的档位由 Provider 按模型声明限制。
         # 选择来源是提供模型访问定义的那一层。失败时不发送请求，交回待恢复的停止结果
         self._release_call()
@@ -431,7 +431,7 @@ class StepDriver:
     def _stop_now(self, judgment: Judgment) -> RoundResult:
         # 这个会话停下。别的会话已经写下待恢复的决定请求时，它照常停下（事项的状态不变，工单 #856）；
         # 它自己也被挡住时（这次的模型请求发不出去），它写下自己的那一条决定请求，
-        # 各写明自己的部门、模型与问题（模型管理设计说明第 5.5 节）。
+        # 各写明自己的部门、模型与问题（模型管理设计说明「引用无法使用时」）。
         # 写下以后由流程编排走待恢复那一条路，与它自己走到被挡住那一步时写下的完全一样
         if judgment.blocked_by_other_session and self._facade is not None:
             unavailable = self._begin_call()
@@ -454,7 +454,7 @@ class StepDriver:
         limits = self._limits
         self._consumed_steps = 0
         # 工单 #17：上一次激活的完整模型响应里还有没执行的合法动作时，先补执行这些动作，不重新调用模型
-        # （恢复契约第 4、5 节）。补执行以后照常进入步骤循环，下一次模型请求带上这些工具结果
+        # （恢复契约「动作分类与处置」、「角色任务的恢复」）。补执行以后照常进入步骤循环，下一次模型请求带上这些工具结果
         await self._continue_unexecuted_calls()
         attempt = 1
         root_step_id = 1
@@ -483,7 +483,7 @@ class StepDriver:
                 request.attempt_finished_monotonic = time.monotonic()
                 undeclared = _undeclared_tool_calls(request, response)
                 # 整理请求没有声明工具、回应里却带了工具调用：回应里有文字时，文字照常经校验作为整理结果，
-                # 工具调用不执行、不进入有效历史（工单 #1155，设计说明第 8.7 节）
+                # 工具调用不执行、不进入有效历史（工单 #1155，docs/design/model-management.md「失败处理」）
                 summary_with_tool_calls = bool(undeclared) and request.purpose == "compaction" \
                     and _text_reply(response)
                 if undeclared and not summary_with_tool_calls:
@@ -525,9 +525,9 @@ class StepDriver:
                     if request.purpose == "compaction" and retry_error.reason not in _COMPACTION_STOP_REASONS:
                         # 整理请求失败（尝试次数用完）：这一次压缩不生效，不写检查点。这一步的工作请求按
                         # 未压缩的历史照常发送，下一步再次尝试压缩；连续没有推进的次数达到上限时在这里
-                        # 以压缩失败停止（设计说明第 8.7 节第一条，工单 #1155、#1213）。失败的原因不限：
+                        # 以压缩失败停止（docs/design/model-management.md「失败处理」第一条，工单 #1155、#1213）。失败的原因不限：
                         # 空响应、上游故障与连接失败都走这一条；未压缩的历史放不进窗口（context_overflow，
-                        # 第 8.7 节第三条）照旧停止；取消与运行时间到、模型步数用完在上面先判定
+                        # docs/design/model-management.md「失败处理」第三条）照旧停止；取消与运行时间到、模型步数用完在上面先判定
                         self._compaction_request_failed(request, f"整理请求失败：{retry_error}")
                         self._compaction_deferred = True
                         attempt = 1
@@ -769,7 +769,7 @@ class StepDriver:
                             reason="model_steps_exhausted")
 
     async def _continue_unexecuted_calls(self) -> None:
-        # 工单 #17（恢复契约第 4、5 节）：上一次激活的完整模型响应里，有 Function Call 既没有 tool_started，
+        # 工单 #17（恢复契约「动作分类与处置」、「角色任务的恢复」）：上一次激活的完整模型响应里，有 Function Call 既没有 tool_started，
         # 也没有 tool_called 或 tool_skipped——进程在把整个响应执行完之前退出。这里补执行这些动作，
         # 每个都照常经过工具许可与执行环境，写好 tool_called；不重新调用模型，也不整批重发已经执行过的动作
         calls, request = self._unexecuted_calls()
@@ -896,7 +896,7 @@ class StepDriver:
                                    trial_case=trial_case_draft)
 
     def _save_qa_tests_if_changed(self, request: ModelRequest | _RecoveredCall) -> dict[str, Any] | None:
-        # 检查材料只由写入范围是检查材料的角色保存（设计说明第 4.2 节第 1 条，工单 #1390）
+        # 检查材料只由写入范围是检查材料的角色保存（docs/design/model-management.md「Provider 配置」，工单 #1390）
         if not writes_check_materials(request.department, definitions=self._definitions):
             return None
         tree = self._environment.capture_qa_tests()
@@ -967,11 +967,11 @@ class StepDriver:
             except CompactionError as exc:
                 return _Unassembled("context_overflow" if pinned.fills_window else "compaction_failed", exc)
             except (ValueError, FileNotFoundError) as exc:
-                # 按未压缩的历史装配工作请求时放不下：按上下文超限结束（设计说明第 8.7 节，工单 #1155）
+                # 按未压缩的历史装配工作请求时放不下：按上下文超限结束（docs/design/model-management.md「失败处理」，工单 #1155）
                 return _Unassembled("context_overflow" if (deferred or pinned.fills_window)
                                     else "compaction_failed", exc)
             assembled = step.context
-            # 用户追加的输入在这个会话的下一步作为通知送达（工单 #964，循环结构第 5 节与第 6 节）：
+            # 用户追加的输入在这个会话的下一步作为通知送达（工单 #964，循环结构「工作中途要求变化」与「指导」）：
             # 这个会话采用新的输入版本并接着工作，一轮工作不因此结束。
             # 采用以后模型就看见了这一版输入，正式成果才能按它提交。
             self._adopt_input_version(assembled.manifest.input_version)
@@ -1027,7 +1027,7 @@ class StepDriver:
 
     async def _call_model(self, request: ModelRequest) -> ModelResponse:
         # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果；
-        # 每条观察里的文字片段同时发布到控制核心的输出片段通道，转发给 live=1 的连接（设计说明第 5.6 节）
+        # 每条观察里的文字片段同时发布到控制核心的输出片段通道，转发给 live=1 的连接（docs/design/model-management.md「部门的建议能力」）
         attempt_id = request.attempt_id or ""
         try:
             async with aclosing(self._adapter.stream(request.model_call())) as items:
@@ -1093,14 +1093,14 @@ class StepDriver:
     def _compaction_request_failed(self, request: ModelRequest, reason: str) -> None:
         # 整理请求自己失败（尝试次数用完）：这一次压缩不生效，不写检查点。它与「整理不生效」「覆盖范围
         # 没有往前走」计入同一个连续不推进的次数，达到上限时以 compaction_failed 停下，由薄驱动按待恢复
-        # 处理（设计说明第 8.7 节，工单 #1155、#1238）
+        # 处理（docs/design/model-management.md「失败处理」，工单 #1155、#1238）
         message = self._advance_compaction(_CompactionOutcome(stalled=reason, retry_as_work=True))
         if message is not None:
             self._compaction_stalled_target = dict(request.call_target or {})
             raise ProviderError(message, reason="compaction_failed")
 
     def _advance_compaction(self, outcome: _CompactionOutcome | None) -> str | None:
-        # 压缩连续没有推进时计数，达到上限时交出停止说明（设计说明第 8.7 节，工单 #840、#1238）。
+        # 压缩连续没有推进时计数，达到上限时交出停止说明（docs/design/model-management.md「失败处理」，工单 #840、#1238）。
         # 没有推进有三种：整理请求自己失败（尝试次数用完，或回应不是摘要文字），整理不生效
         # （摘要为空或超过上限），或者这一次压缩的覆盖范围与上一次相同（下一次压缩没有被上一次接上）。
         # 合同变了以后检查点作废、从原始记录重建是现在的行为，不算没有推进。
@@ -1122,7 +1122,7 @@ class StepDriver:
             self._compaction_contract = contract
         limit = self._limits.compaction_stalled_limit
         if self._compaction_stalls >= limit:
-            # 达到上限：这次停下按待恢复处理（第 8.7 节最后一条，工单 #1238）。说明只写事实，
+            # 达到上限：这次停下按待恢复处理（docs/design/model-management.md「失败处理」最后一条，工单 #1238）。说明只写事实，
             # 「结束还是等用户回答」不写在这里：用户答「停止事项」时同一段文字作为停止说明
             self._compaction_stalled_out = True
             return (f"压缩连续 {self._compaction_stalls} 次没有推进（{self._compaction_reason}），"
@@ -1131,7 +1131,7 @@ class StepDriver:
 
     def _adopt_current_contract(self) -> None:
         # PRD 有了新版本：这个会话在下一步收到通知（新版本与改动），采用新的有效合同并接着工作，
-        # 这一轮不因此结束（工单 #558，循环结构第 5 节）。采用以后检查回执绑定新的合同，
+        # 这一轮不因此结束（工单 #558，循环结构「工作中途要求变化」）。采用以后检查回执绑定新的合同，
         # 部门按新版本重做的检查才能被交付与放行认下。
         projection = self._writes.read(self._stream).projection
         current = artifact_hash(projection.effective_contract)
@@ -1141,7 +1141,7 @@ class StepDriver:
 
     def _adopt_input_version(self, version: int) -> None:
         # 用户追加了输入：这次请求的上下文里已经有这条输入的通知（工单 #964，
-        # 循环结构第 5 节与第 6 节）。这个会话采用这一版输入版本并接着工作，一轮工作不因此结束；
+        # 循环结构「工作中途要求变化」与「指导」）。这个会话采用这一版输入版本并接着工作，一轮工作不因此结束；
         # 采用以后模型就看见了这一版输入，正式成果才能按它提交。
         if version == self._scope.basis.input_version:
             return
@@ -1151,7 +1151,7 @@ class StepDriver:
 
     def _refresh_workspace_now(self) -> None:
         # 检查工作区按会话保留（工单 #558）：检查工作区只在会话建立时与新交付封存以后重建，
-        # 询问与通知都不重建。新的交付封存以后，质检的会话在下一步从这份交付重建（local-tools 第 2 节）。
+        # 询问与通知都不重建。新的交付封存以后，质检的会话在下一步从这份交付重建（docs/design/local-tools.md「工作区」）。
         if self._refresh_workspace is None:
             return
         refreshed = self._refresh_workspace()
@@ -1175,7 +1175,7 @@ class StepDriver:
                 tightening=self._tightening, events=transaction.events(), definitions=self._definitions,
             )
             if permission.allowed and call["name"] in TRIAL_TOOLS:
-                # 试用会话的启动方式（浏览器与 computer use 设计说明第 3.3、3.4 节，工单 #1182）：
+                # 试用会话的启动方式（浏览器与 computer use 设计说明「启动方式」、「试用工具」，工单 #1182）：
                 # 质检的 trial_open 按当前交付说明的名称解析，工程的 trial_start 用它给出的启动方式；
                 # 解析不了的按工具许可拒绝交回，动作不交给执行环境，也不写工具开始事件
                 _launch, reason = resolve_trial_call(call["name"], call["args"], projection.delivery_spec)
@@ -1204,7 +1204,7 @@ class StepDriver:
         self, request: ModelRequest | _RecoveredCall, call: dict[str, Any]
     ) -> tuple[ToolPermission, WorkspaceFacts]:
         # 工具许可：质检提交放行时还有没处理完的输入，就在安全节点上等到处理完再重新做一次许可
-        # （部门指导设计说明第 2.1 节，工单 #561）。等待发生在 tool_started 写入之前，这一次调用不返回模型、
+        # （部门指导设计说明「放行怎么等」，工单 #561）。等待发生在 tool_started 写入之前，这一次调用不返回模型、
         # 不写事件、不占步数；重新启动以后没有处置的工具调用照常重新执行，重新进入同一个等待。
         # 取消、暂停、运行时间用完照常生效：安全节点回答停止时这一段按停止结果交回
         while True:
@@ -1250,7 +1250,7 @@ class StepDriver:
         return self._recorder.trial_case_event(outcome.event_type, outcome.payload)
 
     def _interrupted_trial_case(self) -> Any:
-        # 会话结束或中断时打开的用例结束为中断（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：
+        # 会话结束或中断时打开的用例结束为中断（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：
         # 会话的结束已经由执行环境写好，这里补一条用例的结论；用例的投影在会话结束时已经记为中断
         scope = self._scope
         projection = self._writes.read(self._stream).projection
@@ -1292,7 +1292,7 @@ def _tree_snapshot(tree: TreeFacts | None) -> dict[str, Any] | None:
 
 
 # 动作回执的输出里带图像的写法：键 images 是一串图像工件引用（浏览器与 computer use 设计说明
-# 第 7.1 节：截图存成工件，工具结果带它的引用）
+# 「保存与绑定」：截图存成工件，工具结果带它的引用）
 TOOL_IMAGE_KEY = "images"
 TOOL_IMAGE_FIELDS = ("kind", "content_hash", "path", "media_type")
 
@@ -1314,14 +1314,14 @@ def tool_output_images(output: Any) -> tuple[dict[str, Any], ...]:
 
 
 def tool_input_modalities(request: Any) -> tuple[str, ...]:
-    # 这次调用请求的调用目标的输入方式（模型管理设计说明第 4.3 节）：工具结果里的截图是否进入请求按它决定
+    # 这次调用请求的调用目标的输入方式（模型管理设计说明「模型访问定义与准入」）：工具结果里的截图是否进入请求按它决定
     return tuple((getattr(request, "call_target", None) or {}).get("input_modalities") or ())
 
 
 def tool_result_item(identity: str, ok: bool, output: Any, error: str | None, *,
                      input_modalities: tuple[str, ...]) -> dict[str, Any]:
     # 工具结果进入部门历史的条目。调用目标包含图像时，回执里的截图作为工件引用随结果进入历史，
-    # 由上下文装配按「最近 3 张」放进请求（设计说明第 6.2 节）；不含图像时截图只保存为证据，
+    # 由上下文装配按「最近 3 张」放进请求（docs/design/browser-and-computer-use.md「请求中的图像」）；不含图像时截图只保存为证据，
     # 工具结果里既没有图像，也没有占位文字。条目就是回执的三项，模型输入审计按事件里的结果重新装配它
     images = tool_output_images(output)
     if isinstance(output, dict) and TOOL_IMAGE_KEY in output:
@@ -1361,7 +1361,7 @@ def _text_field(value: Any, field: str) -> tuple[str, str | None]:
 def trial_case_begin(args: dict[str, Any], *, projection: RunProjection, department: str,
                      session_id: str, activation_id: str,
                      session: dict[str, Any] | None) -> TrialCaseOutcome:
-    """打开一个试用用例（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）。
+    """打开一个试用用例（浏览器与 computer use 设计说明「试用用例」，工单 #1180）。
 
     主机的核对：本部门有进行中的试用会话；没有另一个打开的用例；引用的验收条件存在于当前 ProductSpec。
     """
@@ -1408,7 +1408,7 @@ def trial_case_begin(args: dict[str, Any], *, projection: RunProjection, departm
         "department": department,
         "activation_id": activation_id,
         "product_spec_hash": spec.content_hash,
-        # 所在会话的试用副本的树摘要：放行时按它核对用例属于当前交付（设计说明第 8.3 节）
+        # 所在会话的试用副本的树摘要：放行时按它核对用例属于当前交付（docs/design/model-management.md「预留与阈值」）
         "tree_digest": session["tree_digest"],
         "criteria": criteria,
         "title": title,
@@ -1422,7 +1422,7 @@ def trial_case_begin(args: dict[str, Any], *, projection: RunProjection, departm
 
 def trial_case_end(args: dict[str, Any], *, projection: RunProjection, department: str, session_id: str,
                    session: dict[str, Any] | None) -> TrialCaseOutcome:
-    """结束一个试用用例并给出结论（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）。
+    """结束一个试用用例并给出结论（浏览器与 computer use 设计说明「试用用例」，工单 #1180）。
 
     主机的核对：证据步骤属于这个用例；passed 时用例中没有结果未知的步骤；unverified 必须写明理由。
     """

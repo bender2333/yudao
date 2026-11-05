@@ -4,7 +4,7 @@
 // 多个标签互相遮挡（原型 v10 js/ui/scenes.js 的 overlayData）。
 //
 // 返工按流转种类「问题反馈」判断（工单 #866）：质检提交缺陷记录让工程返工，这一类流转就是
-// 返工那条（设计说明 department-loop 第 2 节）。阶段状态机删掉以后（工单 #556）流转种类只剩
+// 返工那条（设计说明 docs/design/department-loop.md「部门按关注的成果开始工作」）。阶段状态机删掉以后（工单 #556）流转种类只剩
 // 版本交付、询问与问题反馈三种，没有单独的「返工」种类。
 
 import type { FlowRecord } from "../../api/generated/types.gen";

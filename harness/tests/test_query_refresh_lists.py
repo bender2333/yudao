@@ -1,4 +1,4 @@
-# 刷新清单的重放核对（设计说明第 4.2 节，工单 #891）。
+# 刷新清单的重放核对（docs/design/app-and-interface.md「读取模型」，工单 #891）。
 #
 # 每个查询登记两份清单：会改变结果的事件种类（刷新清单，QueryDefinition.changed_by）与已核对过不改变结果的
 # 事件种类（不刷新清单，QueryDefinition.unchanged_by）。这里用假模型跑出带项目的场景，把事件按位置逐条写进
@@ -259,7 +259,7 @@ def _requests(scope: _Scope) -> dict[str, Any]:
     }
 
 
-# 不参与比较的读数（设计说明第 4.2 节列出的几类，逐个写明字段与理由）
+# 不参与比较的读数（docs/design/app-and-interface.md「读取模型」列出的几类，逐个写明字段与理由）
 EXCLUDED_READINGS = (
     # 最近活动时间：每条事件到达都更新它，变化本身没有意义
     ("projects.list", "projects.*.last_activity_at"),
@@ -425,7 +425,7 @@ def test_the_scenario_covers_the_asked_for_behaviours(data_dir):
 
 
 def test_the_registry_checks_the_unchanged_list():
-    # 注册时的两项检查：种类都已登记；与刷新清单不重叠（设计说明第 4.2 节）
+    # 注册时的两项检查：种类都已登记；与刷新清单不重叠（docs/design/app-and-interface.md「读取模型」）
     def query(**kwargs) -> QueryDefinition:
         return QueryDefinition(name="q", request=None, result=dict, handle=lambda application, request: None,
                                **kwargs)

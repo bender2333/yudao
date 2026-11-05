@@ -1,4 +1,4 @@
-# 模型目录与凭据的命令（设计说明第 3.2 节「模型管理」）。
+# 模型目录与凭据的命令（docs/design/app-and-interface.md「命令清单」中「模型管理」）。
 # 目录内容仍由 Provider 模块保存；每次被接受的修改、测试结果与凭据变化经写入口追加事件（只含修订号、变化与结果，不含 Key）。
 # 连接测试、获取模型列表与模型测试作为任务进行：命令先被接受，结果以后以事件出现。
 
@@ -52,7 +52,7 @@ def _format_candidate_source(candidate: Mapping[str, Any]) -> str:
 
 
 class ProviderInput(Contract):
-    # 一份 Provider 配置：一条服务连接，不声明协议（模型管理设计说明第 4.2 节）；
+    # 一份 Provider 配置：一条服务连接，不声明协议（模型管理设计说明「Provider 配置」）；
     # 自定义服务的地址是请求基址，内置服务方案按访问定义的协议取预置表中的基址
     id: Text
     name: Text
@@ -64,7 +64,7 @@ class ProviderInput(Contract):
 
 
 class ModelInput(Contract):
-    # 一条模型访问定义；调用协议必填（模型管理设计说明第 4.3 节），从候选建立时直接采用预填容量（工单 #562）。
+    # 一条模型访问定义；调用协议必填（模型管理设计说明「模型访问定义与准入」），从候选建立时直接采用预填容量（工单 #562）。
     # 两处都没有窗口或输出上限的候选，必须在请求里给出才能保存，否则拒绝并写明缺少哪一项。
     id: Text
     model: Text
@@ -74,7 +74,7 @@ class ModelInput(Contract):
     capability_source: str = ""
     source_details: dict[str, dict[str, str | None]] = {}
     accepts_required_tool_call: bool = True
-    # 输入方式（设计说明第 4.3 节）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
+    # 输入方式（docs/design/model-management.md「模型访问定义与准入」）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
     # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
     input_modalities: list[Literal["text", "image"]] = ["text"]
     # 推理档位声明（#87）：三项一起声明，缺任一项或整体缺省时请求不带推理参数
@@ -97,7 +97,7 @@ class ModelInput(Contract):
         default_reasoning_level: str | None = None,
         reasoning_mode: str = "",
     ) -> ModelInput:
-        # 从候选建立模型访问定义（工单 #562，设计说明第 4.3 节）：
+        # 从候选建立模型访问定义（工单 #562，docs/design/model-management.md「模型访问定义与准入」）：
         # 窗口、输出上限与协议取候选的预填值，来源随定义保存（以后可以修改）；
         # 两处都没有窗口或输出上限的候选，必须在请求里给出才能保存
         raw_id = str(candidate.get("id") or "").strip()
@@ -164,7 +164,7 @@ class CatalogConnect(CommandRequest):
     api_key: str | None = None
 
 class CatalogDepartmentDefaultsSaveRefs(Contract):
-    # 部门默认保存以后，各部门当前绑定的模型不具备建议能力时的提醒（设计说明第 5.6 节「保存时」）
+    # 部门默认保存以后，各部门当前绑定的模型不具备建议能力时的提醒（docs/design/model-management.md「部门的建议能力」中「保存时」）
     reminders: list[str] = []
 
 
@@ -179,7 +179,7 @@ class CatalogDocumentSave(CommandRequest):
 
 
 class CatalogModelRemove(CommandRequest):
-    # 移除一条模型访问定义：被部门默认或任何项目部门设置引用时拒绝并列出引用方（设计说明第 4.5 节）
+    # 移除一条模型访问定义：被部门默认或任何项目部门设置引用时拒绝并列出引用方（docs/design/model-management.md「删除」）
     base_version: int
     provider_id: Text
     model_id: Text
@@ -249,7 +249,7 @@ def _register(application: Application, command: Command) -> None:
 def _revised(application: Application, command: Command, operation: str, before: int, after: int,
              *, provider_id: str | None, reminders: list[str] | None = None,
              credential: dict[str, Any] | None = None, credential_action: str = "set") -> None:
-    # reminders 是这次保存算出的建议能力提醒（设计说明第 5.6 节），随事件一起保存，接受结果重新计算时能得到同样的值
+    # reminders 是这次保存算出的建议能力提醒（docs/design/model-management.md「部门的建议能力」），随事件一起保存，接受结果重新计算时能得到同样的值
     payload = {"revision": after, "base_revision": before, "operation": operation, "provider_id": provider_id,
                "reminders": list(reminders or ())}
     def append(transaction):
@@ -283,7 +283,7 @@ def _check_not_registered(application: Application, command: Command) -> None:
 
 
 def _project_model_referrers(application: Application, model_id: str) -> list[str]:
-    # 各项目的项目部门设置中引用这条模型访问定义的引用方（设计说明第 4.5 节：与部门默认同样拒绝）。
+    # 各项目的项目部门设置中引用这条模型访问定义的引用方（docs/design/model-management.md「删除」：与部门默认同样拒绝）。
     # 项目部门设置保存在项目事件里，Provider 模块看不到，由应用层汇总
     referrers: list[str] = []
     for project in application.system.projects.list_projects(include_archived=True):
@@ -307,7 +307,7 @@ def _project_provider_referrers(application: Application, provider_id: str) -> l
     return referrers
 
 def _document_removed_referrers(application: Application, document: Mapping[str, Any]) -> list[str]:
-    # 导入整份目录文档时，文档缺少仍被引用的模型访问定义（或缺少引用方指向的连接）时的引用方（设计说明第 4.6 节）。
+    # 导入整份目录文档时，文档缺少仍被引用的模型访问定义（或缺少引用方指向的连接）时的引用方（docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」）。
     # 与移除单条定义同一套规则：部门默认与项目部门设置都算引用方，按移除单条定义的同一个顺序列出，
     # 比对用文档里的原始身份，文档自身的结构与准入校验由 Provider 模块完成
     if not isinstance(document, Mapping):
@@ -338,7 +338,7 @@ def _document_removed_referrers(application: Application, document: Mapping[str,
     return referrers
 
 def _binding_reminders(application: Application) -> list[str]:
-    # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「保存时」）。
+    # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」中「保存时」）。
     # 没有绑定模型的不检查；提醒随事件保存，接受结果按事件重新得出同样的值
     facade = application.system.facade
     view = facade.providers_view()
@@ -694,7 +694,7 @@ def _credential_event(action: str, status: dict[str, Any], version: int, persist
 
 def _credential_stale_base(facade, ref: str, base_version: int) -> None:
     # 凭据命令的基准版本是目录查询里这个引用自己的 credential.version，不是目录修订号
-    # （设计说明 app-and-interface 第 3.1 节）；拒绝时写明比的是哪一个版本与当前值（工单 #1158）
+    # （设计说明 docs/design/app-and-interface.md「合同」）；拒绝时写明比的是哪一个版本与当前值（工单 #1158）
     current = facade.credential_version(ref)
     if base_version != current:
         raise Rejection(

@@ -153,7 +153,7 @@ def test_the_default_definition_gives_three_roles_the_verifier_and_the_three_rel
             for verifier in organization.verifiers] == [("quality", [("engineering", ["delivery_spec"])])]
     # 成果驱动以核验角色的放行结束，没有交完成的角色
     assert organization.completing is None
-    # 三条关注关系：产品交的 PRD 送到工程与质检，工程交的交付送到质检（设计说明第 4.2 节的推出规则表）
+    # 三条关注关系：产品交的 PRD 送到工程与质检，工程交的交付送到质检（docs/design/department-loop.md「询问分支」的推出规则表）
     assert _pairs(organization.watched, "source", "recipient", "outcome") == [
         ("product", "engineering", "product_spec"),
         ("product", "quality", "product_spec"),

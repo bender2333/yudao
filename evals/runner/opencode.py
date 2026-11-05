@@ -23,7 +23,7 @@ NETWORK_TOOLS = ("webfetch", "websearch")
 MODEL_SERVICE_BASE_URL_ENV = model_service.MODEL_SERVICE_BASE_URL_ENV
 MODEL_SERVICE_API_KEY_ENV = model_service.MODEL_SERVICE_API_KEY_ENV
 
-# Windows 的保留设备名：复制交付与评分时跳过它们，不分大小写，带不带扩展名都算（第 3 节「隔离」）
+# Windows 的保留设备名：复制交付与评分时跳过它们，不分大小写，带不带扩展名都算（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）
 RESERVED_DEVICE_NAMES = ("nul", "con", "prn", "aux") + tuple(
     prefix + str(index) for prefix in ("com", "lpt") for index in range(1, 10))
 
@@ -37,9 +37,9 @@ def scenario(name=None):
 def write_run_config(run_dir, model, model_id, limits):
     """写运行配置：关闭取回与搜索工具，模型服务由环境变量给出，模型限额取模型服务的容量。
 
-    被测模型由用户提供（评测场景设计第 3 节），凭据只留在环境变量里，
+    被测模型由用户提供（评测场景设计「两边的运行条件」），凭据只留在环境变量里，
     配置里用 {env:...} 引用，不写进运行目录与仓库。`limit` 的 `context` 与 `output`
-    是与 Yudao 一侧模型访问定义相同的那对数（第 3 节「模型的容量」）。
+    是与 Yudao 一侧模型访问定义相同的那对数（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）。
     """
     config_dir = os.path.join(run_dir, ".opencode-config")
     os.makedirs(config_dir, exist_ok=True)
@@ -216,13 +216,13 @@ def material_path_hits(text, scenario_name=None, extra_dirs=None):
     return hits
 
 def upstream_hits(text, scenario_name=None):
-    """在 JSON 输出中查找对任务上游仓库的访问：找到时这次运行作废（第 3 节「联网」）。"""
+    """在 JSON 输出中查找对任务上游仓库的访问：找到时这次运行作废（docs/design/evaluation-scenarios.md「两边的运行条件」中「联网」）。"""
     urls = scenario(scenario_name).upstream_urls()
     return material_integrity.upstream_hits(text, urls)
 
 
 def digest_reasons(base, scenario_name=None):
-    """场景材料的摘要与材料版本记录比较：不同时这次运行作废（第 3 节「隔离」）。"""
+    """场景材料的摘要与材料版本记录比较：不同时这次运行作废（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。"""
     return material_integrity.digest_reasons(
         base, set(scenario(scenario_name).SCORING_INPUTS) | {"reference"})
 
@@ -243,7 +243,7 @@ def delivery_copy_ignore(run_dir, patterns, skipped):
 
     Windows 上不能把名为 `nul` 的文件写进复制目标（写进去的是设备），被测模型留下
     这类文件时原来的复制会中止整组运行；跳过的文件按相对运行目录的路径记进 `skipped`，
-    报告列出（第 3 节「隔离」）。
+    报告列出（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。
     """
     def ignore(directory, names):
         ignored = set()

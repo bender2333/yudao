@@ -1,4 +1,4 @@
-"""Yudao 对单个 agent 的对照入口（`docs/design/evaluation-scenarios.md` 第 6.3 节）。
+"""Yudao 对单个 agent 的对照入口（`docs/design/evaluation-scenarios.md` 「Yudao 对单个 agent」）。
 
 读同一场景的两份结果文件——Yudao 一侧与 OpenCode 一侧——按 D38 的 N-G1 给出「高于」
 「没有达到」「受阻」之一，写出机器可读的对照结果（JSON）与中文报告。判定与逐次并排
@@ -23,7 +23,7 @@ def load_result(path):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
-        description="Yudao 对 OpenCode 的对照（评测场景设计第 6.3 节）")
+        description="Yudao 对 OpenCode 的对照（评测场景设计「Yudao 对单个 agent」）")
     parser.add_argument("--yudao", required=True, help="Yudao 一侧的结果文件（JSON）")
     parser.add_argument("--opencode", required=True, help="OpenCode 一侧的结果文件（JSON）")
     parser.add_argument("--result", help="对照结果（JSON）的路径")

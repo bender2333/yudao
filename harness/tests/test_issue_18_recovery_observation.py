@@ -1,4 +1,4 @@
-# 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵第 4 节「动作分类与处置」、第 6 节「故障矩阵」）。
+# 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵「动作分类与处置」、「故障矩阵」）。
 # 数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，模型回答由 FakeAdapter 给出；
 # 中断由「进程关闭、重新以新的系统打开同一数据目录」表示。查询只读取，事件流重连只补观察事实。
 
@@ -284,7 +284,7 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
 
 
 def test_unknown_actions_keep_the_handling_and_what_was_handed_back(data_dir):
-    # 结果未知的动作交还以后仍列在查询里（工单 #181，设计说明第 4.3 节）：处理方式、发出它的会话、
+    # 结果未知的动作交还以后仍列在查询里（工单 #181，docs/design/app-and-interface.md「查询清单」）：处理方式、发出它的会话、
     # 执行前快照与交还给模型的内容都在，项目不因它进入等待用户（没有决定卡片）
     system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
     _lost_write(system, run_id)
@@ -313,7 +313,7 @@ def test_unknown_actions_keep_the_handling_and_what_was_handed_back(data_dir):
 
 
 def test_sessions_report_the_usage_of_each_session(data_dir):
-    # 各会话的用量（工单 #181，三部门的循环结构第 9 节）：部门主线与会话分支各一行，
+    # 各会话的用量（工单 #181，三部门的循环结构「停止与恢复」）：部门主线与会话分支各一行，
     # 写部门、主线或分支、已用秒、轮数与步数。分支是工程询问产品时产品的那次旁支工作
     script = {
         "product": [product_spec()],

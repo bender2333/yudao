@@ -50,6 +50,10 @@ SCOPES = ("harness/", "client/src/", "client/tests/", "evals/", "scripts/", ".gi
 # 「自定的边界」写明）；守卫同样不扫这里。
 SKIP_PREFIXES = ("evals/scenarios/",)
 
+# 这两个文件是这条规则的工具：正文里要写出这个写法本身（正则、示例、自检用例），
+# 扫它们没有意义。列在这里只是跳过这两个文件，不放过仓库里别的任何文件。
+SKIP_FILES = ("scripts/convert_design_section_refs.py", "harness/tests/test_design_section_refs.py")
+
 DESIGN_DIR = "docs/design"
 
 # 设计说明的名字（注释里的写法）→ 文件。长的写在前面，先匹配长的。
@@ -383,6 +387,16 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("client/tests/unit/model-logic.test.js", "选用的状态按设计说明第 9.5 节的用词"),
     ("harness/definitions/routings.json", "三部门的循环结构第 2 节"),
     ("evals/baseline/compute.py", "program-roadmap.md)第 6.1 节"),
+    # 失败信息与报告里的文字（用户能看到的文字常量，不是注释）：只改的清单没有包含它们
+    ("evals/runner/yudao_report.py", "判定按 D38 的 N-G1（评测场景设计第 6.3 节）"),
+    ("evals/runner/yudao_report.py", "建档与事项是两个 run：下面这些数值不计入上面的指标汇总，也不进均值与噪声（第 5.2 节）"),
+    ("harness/tests/kernel/test_only_grows.py", "先把设计说明第 7 节的表与内核事件模块一起改"),
+    ("harness/tests/kernel/test_only_grows.py", "如果是有意改，先在设计说明第 3.1 节写明"),
+    ("harness/tests/kernel/test_only_grows.py", "如果确实要停用一个原因，先在设计说明第 3.1 节写明"),
+    ("harness/tests/kernel/test_only_grows.py", "先在恢复契约第 4 节写明"),
+    ("harness/tests/test_thin_driver_names.py", "形态与核验角色设计说明第 4.1 节，工单 #1404"),
+    ("harness/tests/test_thin_driver_names.py", "这些种类应当从定义取（骨架与应用设计说明第 6 节）"),
+    ("scripts/ci_layers.py", "（测试分层设计说明第 10 节第 5 条）；改名的用例显示为一删一增"),
 )
 
 # 同一行里点名的既是原型又是设计说明、而节号属于原型那份设计的（不在本单）。
@@ -715,7 +729,7 @@ def mapping_doc(path: str, line: int | None = None) -> str | None:
 
 
 def in_scope(path: str) -> bool:
-    if path.startswith(SKIP_PREFIXES):
+    if path.startswith(SKIP_PREFIXES) or path in SKIP_FILES:
         return False
     return any(path.startswith(s) for s in SCOPES)
 
@@ -1189,6 +1203,8 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
 
     # 「文件:行」的对照表最后覆盖一次：人定的优先
     for ref in refs:
+        if ref.status.startswith("排除"):
+            continue
         key = f"{ref.file}:{ref.line}"
         if key not in MAPPING:
             continue

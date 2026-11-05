@@ -12,14 +12,14 @@
 成果与它的提交工具、把核验声明与写入范围写进组织定义。产品的那份形态一行不改。
 
 层：集成层（有完整循环的用例开真实事件库与真实工作区，模型回答由假模型按部门给出；也有不经循环、只看路由
-与收紧检查判断的用例。按分层设计说明第 2 节「一个文件中的测试用到不同层级的资源时，整个文件登记为其中最高
+与收紧检查判断的用例。按分层 docs/design/test-pyramid.md「三层的定义」「一个文件中的测试用到不同层级的资源时，整个文件登记为其中最高
 的一层」一起登记为集成层）。
 
 守 R2（合同只增：路由实现用契约第三版已有的可选方法 `use_facts` 读事件，定义一个字段都不加；核验结论是定义
 里的一种成果，按现有的通用成果接纳事件写下）与 R3（形态与核验角色：直做加核验角色以后交完成等放行、打回再做
 一轮，核验结论绑定当前这一版；没有核验角色的形态仍以开环完成结束）。
 
-先后由事件决定，不用时长赌（测试分层设计说明第 10 节第 7 条）：事项跑完再断言事件；脚本按部门给出。
+先后由事件决定，不用时长赌（测试分层设计说明「测试的写法」中「两件同时进行的事谁先谁后，由事件、信号文件或提交通知决定，不用时长去赌」）：事项跑完再断言事件；脚本按部门给出。
 """
 
 from __future__ import annotations
@@ -407,7 +407,7 @@ def test_the_form_declares_one_verifier_with_the_check_material_write_scope():
     assert WITH_VERIFIER.departments == (ENGINEERING, QUALITY)
     assert WITH_VERIFIER.verifiers_of(ENGINEERING, COMPLETION_KIND) == (QUALITY,)
     assert WITH_VERIFIER.verifier_roles() == (QUALITY,)
-    # 写入范围是检查材料：它写的东西只进检查材料，不让被核验方的成果失效（设计说明第 4.2 节第 1 条）
+    # 写入范围是检查材料：它写的东西只进检查材料，不让被核验方的成果失效（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」）
     scope = organization.verification.write_scopes[QUALITY]
     assert (scope.scope, scope.paths) == ("check_materials", (".yudao-qa-tests",))
     # 核验结论是这份路由认得的一种成果，由核验角色的提交工具提交

@@ -1,4 +1,4 @@
-# 循环与收敛状态的查询（工单 #397，应用层与接口层设计说明第 4.3 节 `run.loops`）：按运行实例标识请求
+# 循环与收敛状态的查询（工单 #397，应用层与接口层设计说明「查询清单」 `run.loops`）：按运行实例标识请求
 # 一个事项树的投影。投影本身在 harness/loops.py（纯函数、只读）；这一层只负责取事件、按位置回放与把结果
 # 换成接口合同，不另行计数，也不做判定。
 #
@@ -88,7 +88,7 @@ class RunLoopsResult(Contract):
 
 
 class RunLoops(ReplayRequest):
-    # 可回放（设计说明第 4.1 节）：at 是全局位置，省略时读取现在的树
+    # 可回放（docs/design/app-and-interface.md「合同」）：at 是全局位置，省略时读取现在的树
     run_id: str
 
 

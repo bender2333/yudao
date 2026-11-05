@@ -1,4 +1,4 @@
-# 决定请求的处理与建档的流转（应用层；骨架与应用设计说明第 6、12 节 S4a，工单 #827）。
+# 决定请求的处理与建档的流转（应用层；骨架与应用设计说明「薄驱动」，工单 #827）。
 #
 # 从流程编排搬出来的四件事：
 #   1. 回答一个决定请求（run 流、项目流、目录流三种）：在写入口的一个事务里核对请求仍在等待、基准版本与
@@ -8,7 +8,7 @@
 #   4. 继续一个暂停的 run（把 run 从暂停恢复成进行中，下一次激活由薄驱动接着开始）。
 #
 # 薄驱动把它接上并只转交（`Orchestrator.answer_decision`、`Orchestrator.create_revision_run`），自己不再写
-# 这些处理（设计说明第 6 节「薄驱动只连接」）。这里用到的薄驱动只有三件不属于应用层的事：建立 run、
+# 这些处理（docs/design/existing-project-onboarding.md「失败与中断」「薄驱动只连接」）。这里用到的薄驱动只有三件不属于应用层的事：建立 run、
 # 唤醒等待的会话、记一次失败的运行，另加事实的存储、写入口、工件库与项目服务。
 #
 # 不导入流程编排：薄驱动在调用时把自己作为 `driver` 交进来（与路由实现收投影、收紧检查收申请同一个做法），
@@ -102,7 +102,7 @@ class DecisionFlow:
         revision_run_id = driver.writes.transact(saved.stream, answer, command=command)
         if revision_run_id is not None and not driver.store.stream_events(run_stream(revision_run_id),
                                                                          after_version=0):
-            # 建档修改轮：run 在回答事务提交以后单独建立，进程在两者之间中断时启动时按事件补建（设计第 6 节）
+            # 建档修改轮：run 在回答事务提交以后单独建立，进程在两者之间中断时启动时按事件补建（docs/design/existing-project-onboarding.md「失败与中断」）
             self._create_missing_revision_run(driver, revision_run_id)
         return revision_run_id
 
@@ -147,7 +147,7 @@ class DecisionFlow:
                 return transaction.projection.run_id
             return None
         if decision.kind == QA_CANNOT_VERIFY.name:
-            # 质检无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：回答「停止事项」时
+            # 质检无法核验（浏览器与 computer use 设计说明「无法核验」，工单 #1179）：回答「停止事项」时
             # 事项结束、交付不被采纳；回答「重新核验」不作别的动作，run 继续以后质检重新检查同一份交付
             # （watched_outputs 的 _has_new_delivery 把 cannot_verify 的结论排除在外）
             if option == "stop":
@@ -159,7 +159,7 @@ class DecisionFlow:
             return projection.run_id
         if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
             if decision.request.get("reason") == "compaction_failed":
-                # 整理连续没有推进的待恢复（模型管理设计说明第 8.7 节最后一条，工单 #1238）：答「停止事项」
+                # 整理连续没有推进的待恢复（模型管理设计说明「失败处理」最后一条，工单 #1238）：答「停止事项」
                 # 时事项以 compaction_failed 结束，停止说明沿用请求里写明的连续的次数与最后一次的原因
                 driver.fail_run(transaction, "compaction_failed",
                                 str(decision.request.get("message") or "run stopped by the user's decision"))
@@ -175,7 +175,7 @@ class DecisionFlow:
                                  decision_id: str) -> str | None:
         # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted；
         # 提出修改时在同一个事务中追加回答与 onboarding_revision_started，返回新 run 编号，
-        # 由调用方 start：run 在事务提交以后单独建立（设计第 4.7、6 节）
+        # 由调用方 start：run 在事务提交以后单独建立（docs/design/skeleton-and-application.md「用户确认与修改的往返」、「用户确认与修改的往返」）
         if option == "revise" and not (note or "").strip():
             raise NoteRequired(decision, option)
         request = decision.request
@@ -200,7 +200,7 @@ class DecisionFlow:
         return self._start_onboarding_revision(transaction, candidate, note)
 
     def _settle_kernel_modification(self, transaction: Transaction, decision: DecisionRequest, option: str) -> None:
-        # 内核修改的批准与拒绝（受控内核设计说明第 4.2 节，工单 #354）：批准时把请求携带的采纳载荷写入
+        # 内核修改的批准与拒绝（受控内核设计说明「路径守卫」，工单 #354）：批准时把请求携带的采纳载荷写入
         # 项目流，交付自此成为当前采纳成果；拒绝时什么都不写，交付保持未采纳
         if option != "approve":
             return
@@ -210,7 +210,7 @@ class DecisionFlow:
         transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, adoption, actor="system"))
 
     def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
-        # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
+        # 采纳建档基线（工单 #136，docs/design/existing-project-onboarding.md「确认以后：当前有效要求与第一次采纳」）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
         # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险。
         # 没有核验角色的形态没有基线核验这一步（工单 #1510，形态与核验角色设计说明「开环完成」第 6 条）：
         # 这一项为空，现有缺陷与基线检查也为空，摘要写明这份基线没有经过基线核验；采纳本身照常进行
@@ -236,7 +236,7 @@ class DecisionFlow:
         }, actor="system"))
 
     def _start_onboarding_revision(self, transaction: Transaction, candidate: Any, note: str | None) -> str:
-        # 建档修改轮（工单 #136，设计第 3.3、4.7、6 节）：修改轮事件与回答在同一个事务中写入，返回新 run 编号；
+        # 建档修改轮（工单 #136，docs/design/existing-project-onboarding.md「领域事件」、「用户确认与修改的往返」、「失败与中断」）：修改轮事件与回答在同一个事务中写入，返回新 run 编号；
         # run 在事务提交以后单独一步建立（事务之间中断时，启动时按 onboarding_revision_started 补建）。
         # 事务提交到 run 建立之间是一个可以单独被终止的窗口
         round_number = candidate.round + 1

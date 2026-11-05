@@ -1,7 +1,7 @@
-# 浏览器工具定义的提取脚本（浏览器与 computer use 设计说明第 4.1、4.2 节，工单 #147）。
+# 浏览器工具定义的提取脚本（浏览器与 computer use 设计说明「运行方式」、「提供的工具」，工单 #147）。
 #
 # 浏览器工具的定义由 Playwright MCP 固定版本的 tools/list 生成，写进 harness/definitions/browser_tools.json，
-# 随 Yudao 发布；升级 Playwright MCP 时同时更新设计说明第 3.2 节的版本与这份生成的定义。
+# 随 Yudao 发布；升级 Playwright MCP 时同时更新设计说明「执行位置上的程序」的版本与这份生成的定义。
 #
 # 用法（仓库根目录）：
 #   uv run python scripts/extract_browser_tools.py --record      # 起真实的 Playwright MCP，记下 tools/list 的回复
@@ -30,7 +30,7 @@ from harness.tools import BROWSER_TOOL_NAMES, EXCLUDED_BROWSER_TOOLS, browser_to
 PACKAGE = "@playwright/mcp@0.0.83"
 RECORDED_PATH = REPO_ROOT / "harness" / "tests" / "data" / "playwright_mcp_tools_list.json"
 OUTPUT_PATH = REPO_ROOT / "harness" / "definitions" / "browser_tools.json"
-# 设计说明第 4.1 节的启动参数：Chromium、无头、隔离、与屏幕工具相同的视口、启用断言工具、
+#docs/design/browser-and-computer-use.md「运行方式」的启动参数：Chromium、无头、隔离、与屏幕工具相同的视口、启用断言工具、
 # 截图以图像内容返回、每个动作带完整的可访问性结构
 LAUNCH_ARGS = ["--browser", "chromium", "--headless", "--isolated", "--viewport-size", "1280x800",
                "--caps", "testing", "--image-responses", "allow", "--snapshot-mode", "full"]

@@ -1,4 +1,4 @@
-// 楼层的翻译层（画面与播放设计说明第 6 节、原型 v13 js/translate/translate.js 的楼层部分，工单 #953）。
+// 楼层的翻译层（画面与播放设计说明「翻译层」、原型 v13 js/translate/translate.js 的楼层部分，工单 #953）。
 //
 // 这一层是唯一同时认识 Yudao 的说法与画面的说法的地方：
 //   - floorState：project.loop（带位置）加上各部门的角色与运行的询问链 → 画面合同的楼层状态
@@ -9,7 +9,7 @@
 //   - floorCards：决定请求 → 大厅板上贴着的卡片，卡片上的文字在这里写好；
 //   - streamText：输出片段 → 流式文字（实时内容，不进播放时间线）。
 //
-// 事实只来自查询：状态由查询结果翻译，翻译层不把事件累加成事实（设计说明第 6 节）。
+// 事实只来自查询：状态由查询结果翻译，翻译层不把事件累加成事实（docs/design/visualization.md「翻译层」）。
 // 说话的话术用 translate/say.ts（画面 2 的成果）。
 
 import type {
@@ -121,7 +121,7 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     sign: row.sign,
     color_index: row.color_index ?? index + 1,
     // 因升级停止的事项没有当前部门（project.loop 的 department 为空）：门口牌子立在最后工作的那个部门
-    // （工单 #1186，设计说明第 4.3 节 2026-10-29 补充）
+    // （工单 #1186，docs/design/visualization.md「实时内容」 2026-10-29 补充）
     department: row.department ?? (status === "upgrade_stopped" ? row.last_department : null),
     round: row.round,
     started_at: row.started_at,
@@ -224,7 +224,7 @@ export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
   proposal_submitted: "提交提案",
   qa_submitted: "质检提交结论",
   qa_tests_saved: "保存质检测试材料",
-  // 质检先交独立判断、再看解释（验证的独立性设计说明第 4 节，工单 #358）
+  // 质检先交独立判断、再看解释（验证的独立性设计说明「先判断后看解释」，工单 #358）
   independent_judgement_committed: "提交独立判断",
   run_continued: "运行继续",
   run_created: "建立事项",
@@ -455,7 +455,7 @@ const RECOVERY_OVERLAY_TEXT: Readonly<Record<"interrupted" | "waiting_resume", s
 };
 
 /**
- * 整层「中断」的取值（工单 #1188，设计说明第 4.3 节 2026-10-29 补充）：事件流断开，或者任一事项的
+ * 整层「中断」的取值（工单 #1188，docs/design/visualization.md「实时内容」 2026-10-29 补充）：事件流断开，或者任一事项的
  * 恢复观察状态是 interrupted。整层变暗、时钟停住，不是弹窗也不是空白；画面本身照旧画着最后一份状态。
  * 服务进程被强行结束时读不到 interrupted（未结束的激活在 finally 才结束），所以以事件流断开为准；
  * 服务回来、页面重新连接并看到自动继续以后恢复。

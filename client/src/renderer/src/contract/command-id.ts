@@ -1,5 +1,5 @@
 // 命令标识（command_id）的生成：一条命令每次提交都要有一个唯一标识，控制核心按它把重复提交
-// 识别为同一件事（接口合同第 6.3 节）。
+// 识别为同一件事（接口合同 docs/design/app-and-interface.md「令牌与 TLS」）。
 // crypto.randomUUID 只在安全上下文（https 与本机地址）里存在；局域网访问方式下页面经
 // http://<局域网地址> 提供，那不是安全上下文，页面里没有 randomUUID。因此按 RFC 4122 第 4 节
 // 用 crypto.getRandomValues 取随机字节拼出第 4 版标识：getRandomValues 在任何上下文里都有，

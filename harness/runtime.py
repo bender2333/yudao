@@ -63,7 +63,7 @@ def load_forms(registry: Mapping[str, tuple[Definitions, Any]], store: Any) -> d
 
 
 def configure_fetch_tools(enabled: bool) -> None:
-    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明第 5.1、12.4 节）。
+    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）。
 
     由命令行在启动时调用一次：以关闭取回的启动参数（`--no-fetch`）运行时，这个服务的部门没有
     `fetch_url` 与 `read_external_source`；不带参数时三个部门都有。进程内只有一个服务实例，
@@ -97,7 +97,7 @@ class LoopSystem:
         self.data_dir = Path(data_dir).absolute().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.store = EventStore(self.data_dir / "events.sqlite")
-        # 输出片段通道：步骤驱动发布，应用层订阅并转发给 live=1 的连接（设计说明第 5.6 节）
+        # 输出片段通道：步骤驱动发布，应用层订阅并转发给 live=1 的连接（docs/design/app-and-interface.md「模型输出片段」）
         self.deltas = DeltaChannel()
         # 唯一的写入口；保存的投影缺失的流（例如投影被删除）在启动时由重放补建
         self.writes = WritePath(self.store, handler_for)
@@ -122,7 +122,7 @@ class LoopSystem:
             # 启动读取一致版本：缺文件空态，有效修订与重载错误由模块记录，不抛错
             self.facade.reload()
         self.workspace_root = self.data_dir / "workspaces"
-        # 装配实现与执行实现由组装处接上（工单 #979，骨架与应用设计说明第 5.2、5.3 节「接法」）：
+        # 装配实现与执行实现由组装处接上（工单 #979，骨架与应用设计说明「装配契约」中「接法」、「执行契约」中「接法」）：
         # 现在各只有一种产品实现，定义里不写它们的名字，默认接上的就是这一种；测试入口（for_testing）
         # 用同一个构造参数换成第二种。薄驱动不认这两个类的名字，只经装配契约与执行契约调用它们
         assembly_implementation = (ContextAssembly(self.artifacts, self.store, tightening=WATCHED_OUTPUTS)
@@ -160,7 +160,7 @@ class LoopSystem:
         )
         self.git_versions = self.orchestrator.git_versions
         self.projects = ProjectService(self.store, self.writes, self.artifacts, self.orchestrator)
-        # 流程编排的结算与执行槽位判断经项目服务完成（应用层与接口层设计说明第 7.2 节）
+        # 流程编排的结算与执行槽位判断经项目服务完成（应用层与接口层设计说明「执行与结算的归属」）
         self.orchestrator.projects = self.projects
         # 排空在服务下一次启动时结束（工单 #731）：启动时把还没结束的排空记成已结束，
         # 这个实例重新开始新事项。这一步在补建排队事项的 run 之前：
@@ -168,19 +168,19 @@ class LoopSystem:
         self.drain_finished_on_startup = self.finish_drain_on_startup()
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
-        # 启动时补建缺少的建档修改轮 run（工单 #136，设计第 6 节）：回答「提出修改」以后
+        # 启动时补建缺少的建档修改轮 run（工单 #136，docs/design/app-and-interface.md「能力清单与认证」）：回答「提出修改」以后
         # 修改轮事件已经写入项目流，run 在事务提交以后创建，两者之间中断时在这里补建
         self.recovered_revision_runs = self.projects.create_missing_revision_runs_on_startup()
         # 启动时扫描上次异常退出留下的检查工作区（工单 #481）：run 已经结束但 on_commit 没有跑过
         # 的目录在这里清掉；文件未删除时不阻塞启动
         self._cleanup_orphaned_inspections_on_startup()
-        # 启动时结束遗留的 MCP 服务器进程并补写关闭事件（网络与 MCP 设计说明第 7.2 节，工单 #1176）：
+        # 启动时结束遗留的 MCP 服务器进程并补写关闭事件（网络与 MCP 设计说明「运行规则」，工单 #1176）：
         # 放在继续未结束的 run 之前，继续时按同一台服务器重新建立会话
         self.ended_leftover_servers = self._end_leftover_mcp_servers_on_startup()
         # 启动时结束遗留的试用会话：持有会话的进程重新启动时，会话记为中断，进程树按会话记录里的
-        # 进程号与创建时间结束（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）
+        # 进程号与创建时间结束（浏览器与 computer use 设计说明「试用工具」、「事件、决定请求与查询」，工单 #1183）
         self.ended_leftover_trials = self._end_leftover_trial_sessions_on_startup()
-        # 启动时补建缺少的普通事项 run（工单 #321，设计第 7 节）：work_item_created 已提交而 run 还没有创建时
+        # 启动时补建缺少的普通事项 run（工单 #321，docs/design/app-and-interface.md「接口路径、执行归属与命令行」）：work_item_created 已提交而 run 还没有创建时
         # 进程中断，这里按事项记录（含起始文件夹快照）补建
         self.recovered_work_item_runs = self.projects.create_missing_work_item_runs_on_startup()
         # 启动时核对 run 事件版本（ADR-0019，工单 #126、#322）：版本不同的未结束 run 按强制升级处理，
@@ -190,11 +190,11 @@ class LoopSystem:
         self.upgrade_other_version_runs()
         # 启动的最后一步：自动继续未结束的 run（工单 #16）
         self.resumed_runs = self.resume_startup_runs() if resume_on_startup else {}
-        # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明第 10 节第 1 项）
+        # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明「决定」中「模型目录与凭据的写入」）
         self.facade.set_reload_listener(self.sync_catalog_revision)
 
     def upgrade_other_version_runs(self) -> tuple[list[str], list[str]]:
-        # 启动时把 run 事件版本不同的未结束 run 按强制升级处理（ADR-0019，恢复契约第 1 节）：
+        # 启动时把 run 事件版本不同的未结束 run 按强制升级处理（ADR-0019，恢复契约「四种能力分别验收」）：
         # 与排空期间由用户发起的强制升级同样停止并重新开始，启动时不记目录事件；处理完重新分类
         stopped, restarted = self.stop_and_restart_runs(self.startup_runs.other_version,
                                                          reason="run event version differs from the current version")
@@ -220,7 +220,7 @@ class LoopSystem:
         return stopped, restarted
 
     def resume_startup_runs(self) -> dict[str, int]:
-        # 启动时自动继续所有因进程中断而未结束的 run（工单 #16，恢复契约第 3、5.2 节）：
+        # 启动时自动继续所有因进程中断而未结束的 run（工单 #16，恢复契约「执行权与一致边界」、「事件对象」）：
         # run 事件版本与当前不同的 run 已在启动序列里按强制升级处理，这里只有版本相同的 run；
         # 每个 run 由流程编排先核对事项记录的定义版本（不同时发出决定请求，不取得执行权），
         # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
@@ -243,7 +243,7 @@ class LoopSystem:
         return resumed
 
     def _continue_run(self, run_id: str) -> None:
-        # 取得执行权以后运行到停止并结算：服务进程里控制核心在接口层的事件循环中运行（总体架构第 3 节第 2 条），
+        # 取得执行权以后运行到停止并结算：服务进程里控制核心在接口层的事件循环中运行（总体架构「十项长期决定」中「异步执行」），
         # 这次运行是那个循环里的任务（与事项开始、回答决定以后继续同一条路径）；
         # 打开数据目录时还没有事件循环（测试、演示、命令行）时由 asyncio.run 运行到停止
         try:
@@ -265,11 +265,11 @@ class LoopSystem:
                 system.resumed_runs[run_id] = claimed[0]
         return system.resumed_runs
 
-    # 排空与强制升级（应用层与接口层设计说明第 3.2 节「升级」，ADR-0019）
+    # 排空与强制升级（应用层与接口层设计说明「命令清单」中「升级」，ADR-0019）
 
     @property
     def running_runs(self) -> int:
-        # 还没有结束的 run 数：客户端在停止之前用它显示确认，也用于排空状态（设计说明第 4.4 节）
+        # 还没有结束的 run 数：客户端在停止之前用它显示确认，也用于排空状态（docs/design/network-and-mcp.md「凭据」）
         unfinished = classify_startup_runs(self.store)
         return len(unfinished.same_version) + len(unfinished.other_version)
 
@@ -306,7 +306,7 @@ class LoopSystem:
                 for run_id in (*unfinished.same_version, *unfinished.other_version)]
 
     def finish_drain_on_startup(self) -> bool:
-        # 排空在服务下一次启动时结束（工单 #731，应用层与接口层设计说明第 3.2 节「升级」）：
+        # 排空在服务下一次启动时结束（工单 #731，应用层与接口层设计说明「命令清单」中「升级」）：
         # 排空的用处是让服务可以停下来升级，服务一旦重新启动，这个用处就完成了。
         # 记一条「排空已结束」的事件，排空状态以后从事件里读得出来（跨版本保存的长期事实）。
         last = last_drain_event(self.store.stream_events(catalog_stream()))
@@ -402,7 +402,7 @@ class LoopSystem:
                       base_version: str | None = None, expected_change_id: str | None = None,
                       command: Command | None = None) -> str:
         # 界内修改一次全局参数现值：先核对条目、是否已经接入行为与界限，通过后在目录流写一条 parameter_set。
-        # 未接入的条目拒绝修改（工单 #643）。提出者以认证身份为准（工单 #1262，设计说明第 3.1 节）：
+        # 未接入的条目拒绝修改（工单 #643）。提出者以认证身份为准（工单 #1262，docs/design/app-and-interface.md「合同」）：
         # 经命令进来时取命令的提出者，请求体里的旧字段 modified_by 不再决定提出者；直接调用（没有命令）
         # 必须给出 modified_by。基准版本是查询返回的全局参数版本（内容摘要），过期返回 ParameterStaleError；
         # expected_change_id 是撤回的目标修改记录身份，在同一写事务核对它仍是这个参数最近的一次修改。
@@ -489,7 +489,7 @@ class LoopSystem:
         self.facade.start_watching(interval_sec)
 
     def close(self) -> None:
-        # 服务关闭停止轮询并释放存储；还在的 MCP 会话一并关闭（网络与 MCP 设计说明第 7.2 节，
+        # 服务关闭停止轮询并释放存储；还在的 MCP 会话一并关闭（网络与 MCP 设计说明「运行规则」，
         # 工单 #1175）：正常路径下每个 run 的会话随运行收尾关闭，这里收掉剩余的（例如等待用户回答时关闭服务）。
         # run 结束时结束的试用会话的结束事件也在这里补写（工单 #1183），不再有事务在进行
         self.flush_trial_events()
@@ -566,7 +566,7 @@ class LoopSystem:
                 pass
 
     def _end_leftover_mcp_servers_on_startup(self) -> list[str]:
-        # 上一次进程崩溃时没有写下 mcp_server_closed 的服务器（网络与 MCP 设计说明第 7.2 节，工单 #1176）：
+        # 上一次进程崩溃时没有写下 mcp_server_closed 的服务器（网络与 MCP 设计说明「运行规则」，工单 #1176）：
         # 按记录的进程标识与创建时间结束仍然存活的进程（整棵进程树），然后补写一条 mcp_server_closed
         # （原因为遗留，写明这一次有没有真的结束进程）。进程已经不在了也补写：事件里的关闭记录要与启动配对，
         # 恢复时「有启动没有关闭」就等于还有遗留进程。事件写不进去不阻塞启动，留给下一次启动再补
@@ -590,7 +590,7 @@ class LoopSystem:
         return ended
 
     def _end_leftover_trial_sessions_on_startup(self) -> list[str]:
-        # 上一次进程没有写下 trial_session_ended 的试用会话（浏览器与 computer use 设计说明第 3.4、12 节，
+        # 上一次进程没有写下 trial_session_ended 的试用会话（浏览器与 computer use 设计说明「试用工具」、「事件、决定请求与查询」，
         # 工单 #1183）：按会话记录里的进程号与创建时间结束仍然存活的进程树，删掉它的试用副本，然后补写
         # 一条 trial_session_ended（结束方式：中断；写明这一次有没有真的结束进程）。进程已经不在了也补写：
         # 开始与结束的记录要配对，恢复时「有开始没有结束」就等于还有遗留进程。事件写不进去不阻塞启动

@@ -1,13 +1,13 @@
-# 检验覆盖的三个数（验证的独立性设计说明第 7.1 节第 4 点，工单 #151）：放行记录一次算好，
+# 检验覆盖的三个数（验证的独立性设计说明「口径」第 4 点，工单 #151）：放行记录一次算好，
 # 查询（#399）与画面（#154）读这个数，不重新计算。纯函数：输入是质检逐条结论的清单，
 # 不读事件、不读文件、不算模型调用。检验方式的代码名在 kernel_events.QA_METHODS（封闭取值，只增），
 # 两端共读的同一份夹具在 harness/tests/fixtures/check_methods.json 与客户端各一份。
 #
-# 改判（验证的独立性设计说明第 4 节，工单 #1190）：质检看过解释以后改了判断的条目，
+# 改判（验证的独立性设计说明「先判断后看解释」，工单 #1190）：质检看过解释以后改了判断的条目，
 # 放行记录里记下条数，以后要算解释翻转率时从这里取。改判由这里的纯函数比对得出：
 # 判断的逐条结果与结论的逐条结果按 AC 序号一一对照，不看别的字段。
 #
-# 检验的有效性（第 7.2 节，工单 #1181）：命令检查的覆盖还要求这条检验在基线副本上失败、
+# 检验的有效性（「检验的有效性」，工单 #1181）：命令检查的覆盖还要求这条检验在基线副本上失败、
 # 在交付快照上通过。基线回执由主机在基线副本上写下，退出码非零且不是 124（超时）与 130（取消）
 # 才是可用的失败；基线通过、缺少回执、超时或取消都不计入覆盖，写进放行记录。
 
@@ -24,15 +24,15 @@ EXECUTABLE_METHODS = frozenset({"check", "trial", "measure"})
 # 模型阅读：只凭模型读截图或读文字作判断的条件，含于开环
 MODEL_READING_METHODS = frozenset({"judgement"})
 
-# 试用用例的步骤按工具分类（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：含断言工具
+# 试用用例的步骤按工具分类（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：含断言工具
 # （browser_verify_*）或检查回执（run_check）的一步是可执行的检验；只凭截图由质检的模型判断的是模型阅读
 ASSERTION_TOOL_PREFIX = "browser_verify"
 RECEIPT_TOOL = "run_check"
 
-# 基线退出码的两种无法运行（第 7.2 节）：124 与 timeout 命令相同，130 是被中断的进程的惯例
+# 基线退出码的两种无法运行（docs/design/independent-verification.md「检验的有效性」）：124 与 timeout 命令相同，130 是被中断的进程的惯例
 BASELINE_TIMEOUT_EXIT_CODE = 124
 BASELINE_CANCELLED_EXIT_CODE = 130
-# 放行记录里基线异常的写法（第 7.2 节的表）：通过、缺少回执与超时取消各有一种记录
+# 放行记录里基线异常的写法（docs/design/independent-verification.md「检验的有效性」的表）：通过、缺少回执与超时取消各有一种记录
 BASELINE_UNAVAILABLE = "unable_to_run"
 
 
@@ -72,7 +72,7 @@ def method_is_executable(method: str) -> bool:
 
 
 def baseline_outcome(exit_code: Any) -> str:
-    """一条基线回执的结果词（第 7.2 节的表）：failed、passed 或 unable_to_run。
+    """一条基线回执的结果词（docs/design/independent-verification.md「检验的有效性」的表）：failed、passed 或 unable_to_run。
 
     退出码非零且不是 124（超时）与 130（取消）时是可用的失败；通过、超时与取消分别记为
     基线也通过与无法运行。主机只记录运行结果，不判断失败原因。
@@ -114,7 +114,7 @@ def baseline_records(receipts: Sequence[Any], checks: Sequence[str]) -> dict[str
 
 
 def criterion_baseline_covered(row: Mapping[str, Any], baseline: Mapping[str, Any]) -> bool:
-    """一条命令检查的结论满足检验的有效性没有（第 7.2 节）：交付通过且同名基线回执失败。
+    """一条命令检查的结论满足检验的有效性没有（「检验的有效性」）：交付通过且同名基线回执失败。
 
     只有命令检查受它约束；试用用例与主机测量沿用各自的证据路径，其他方式不可执行、本来不进分子。
     """
@@ -133,7 +133,7 @@ def criterion_is_executable(criterion: Mapping[str, Any], cases: Mapping[str, An
     """一条验收条件的检验是不是可执行的（工单 #1180）。
 
     检验方式是可执行的那三种，并且试用用例引用的用例里有可执行的检验：只凭截图由模型判断的用例算模型阅读，
-    它的条件含于开环（验证的独立性设计说明第 7.1 节第 4 点）。
+    它的条件含于开环（验证的独立性设计说明「口径」第 4 点）。
     """
     if not method_is_executable(str(criterion.get("method"))):
         return False
@@ -158,7 +158,7 @@ def coverage_report(criteria: Sequence[Mapping[str, Any]], *, changed: int = 0,
     covered = sum(1 for item in criteria
                   if criterion_is_executable(item, cases) and item.get("result") == "passed")
     if baseline is not None:
-        # 第 7.2 节：命令检查只有基线失败且交付通过才计入分子；其他基线异常不计入
+        # docs/design/independent-verification.md「检验的有效性」：命令检查只有基线失败且交付通过才计入分子；其他基线异常不计入
         covered = sum(1 for item in criteria
                       if criterion_baseline_covered(item, baseline)
                       or (criterion_is_executable(item, cases) and item.get("result") == "passed"
@@ -198,7 +198,7 @@ def open_criteria(criteria: Sequence[Mapping[str, Any]],
 
 def baseline_open_records(criteria: Sequence[Mapping[str, Any]],
                           baseline: Mapping[str, Any] | None) -> list[dict[str, str]]:
-    """放行记录里的基线明细（第 7.2 节的表，工单 #1181）：命令检查写成 passed 的条目逐条列出基线结果。
+    """放行记录里的基线明细（docs/design/independent-verification.md「检验的有效性」的表，工单 #1181）：命令检查写成 passed 的条目逐条列出基线结果。
 
     每一项是 {criterion, checks, outcome}；outcome 取 failed（计入覆盖）、passed（基线也通过）、
     missing（缺少回执）或 unable_to_run（超时或取消）。放行不因此改变：结果词与准入保持现状。
@@ -228,7 +228,7 @@ def baseline_open_records(criteria: Sequence[Mapping[str, Any]],
 
 def changed_criteria(judged: Sequence[Mapping[str, Any]],
                      concluded: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """改判的条目（验证的独立性设计说明第 4 节，工单 #1190）。
+    """改判的条目（验证的独立性设计说明「先判断后看解释」，工单 #1190）。
 
     独立判断的逐条结果与结论的逐条结果按 AC 序号对照：结果不同的条目列出来，带序号、
     判断的结果与结论的结果（后两个方向分开，算解释翻转率时按它们分类）。只看 result，

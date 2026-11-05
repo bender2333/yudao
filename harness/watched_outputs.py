@@ -1,10 +1,10 @@
-# 成果驱动的路由实现（应用层；工单 #825，骨架与应用设计说明第 5.1 节、三部门的循环结构）。
+# 成果驱动的路由实现（应用层；工单 #825，骨架与应用设计说明「路由契约」、三部门的循环结构）。
 #
 # 调度住在这里：谁在等、谁能开工、一轮以什么结束、事项以什么结束。它由内核的 collaboration.py（S1d 之前列在内核清单里）
 # 与流程编排的对应部分搬来，行为不变，事件序列基准不变。
 #
 # 它读运行流的投影（从事件日志折叠而来）与组织定义里写明的关注关系，不保存事件之外的状态，不读最小投影，
-# 不写事件、不调模型、不核对边界、不执行工具（设计说明第 5.1 节）。换一种路由（任务池）时整体换掉这一份，
+# 不写事件、不调模型、不核对边界、不执行工具（docs/design/skeleton-and-application.md「路由契约」）。换一种路由（任务池）时整体换掉这一份，
 # 内核不改：名称写在组织定义的 routing 里，实现在模块加载时用 routing_contract.register 登记，启动时按名称接上。
 #
 # 每个部门在组织定义里写明关注的成果；这里只有一条通用规则：关注的成果有了新东西、部门在等待工作时，它开始一轮工作。
@@ -34,7 +34,7 @@ _PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
 
 
 def routing_departments(definitions: Any | None = None) -> tuple[str, ...]:
-    """这个路由的部门清单：它自己的一份定义里写的（设计说明第 5.4 节第 2 条）。
+    """这个路由的部门清单：它自己的一份定义里写的（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）。
 
     一次询问只能问清单里的部门；清单随定义变，不在这里写死（工单 #1391）。
     """
@@ -66,7 +66,7 @@ def proposal_kinds_for(department: str, kind: str = "change", definitions: Any |
     return set(contract.get("kinds") or ())
 
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
-# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）。
+# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明「处理结果与来源」）。
 # 这两种不算正常结束，这一轮不写指导的已回答、也没有结束结果（工单 #1039、#825）：暂停以后继续的是同一轮，
 # 它在继续以后正常结束时才算。
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
@@ -125,9 +125,9 @@ def _has_new_input(projection: RunProjection, department: str, definition: Any) 
 def _has_new_guidance(projection: RunProjection, department: str) -> bool:
     """发给这个部门的指导：还没有进入它的一轮工作的。
 
-    指导是部门关注的成果，控制核心让它以这段指导开始一轮工作（循环结构第 6 节）；
+    指导是部门关注的成果，控制核心让它以这段指导开始一轮工作（循环结构「指导」）；
     它进入这一轮的模型输入以后（assembly.PENDING_GUIDANCE 的两种状态由那一轮送出），这一轮就是
-    它的处理，不再算新的工作。一轮正常结束时主机为它写已回答事件（部门指导设计说明第 3 节，
+    它的处理，不再算新的工作。一轮正常结束时主机为它写已回答事件（部门指导设计说明「处理结果与来源」，
     工单 #1039）。没有这一个收窄，收到指导的部门在主机写已回答以前会一轮接一轮地重新开始。
     """
     return any(item.department == department and item.status == "received"
@@ -159,9 +159,9 @@ def _has_new_product_spec(projection: RunProjection, department: str,
 
     交要求的部门关注的是 PRD 与它最近一次成果依据的版本不同（还没有成果时为真）；PRD 没有新版本时，
     它最近一份交付依据的合同不是当前有效合同也算新工作：一个决定只重算合同、不产生新的 PRD
-    版本，过期的交付要按新合同重新交付（部门指导设计说明第 2.1 节第 2 点、工单 #1079）。
+    版本，过期的交付要按新合同重新交付（部门指导设计说明「放行怎么等」第 2 点、工单 #1079）。
     核验角色关注的是「PRD 被接纳」：当前有效合同与它上一次工作的依据不同，并且还没有交付要核验
-    （有交付时它核验交付，预测性探索在交付到达以前做，循环结构第 3.1 节）。谁核验谁取自定义里的
+    （有交付时它核验交付，预测性探索在交付到达以前做，循环结构「各部门在什么时候工作」）。谁核验谁取自定义里的
     核验声明，不按部门名判断（工单 #1391）；取哪一份定义由这份形态决定（工单 #1509）。
     """
     definition = DEFINITIONS if definitions is None else definitions
@@ -323,10 +323,10 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     """现在可以开始一轮工作的部门（按定义顺序），各自一个会话同时运行（工单 #557）。
 
     有新的工作、又在等待的部门都列出来：控制核心让它们同时开始，
-    一个部门同一时刻最多一轮工作（循环结构第 3.2 节第 6 条）。
+    一个部门同一时刻最多一轮工作（循环结构「同时运行的条件」中「一个部门同一时刻最多一轮工作；提交以后等待，关注的成果有了新版本才开始下一轮，不会接连提交新版本让别人的结论过期」）。
 
     指导与其他关注的成果一样：有待处理指导、又在等待工作的部门以这段指导开始一轮完整的
-    工作（循环结构第 6 节，工单 #560），不为它另设一种只回应指导的轮次。
+    工作（循环结构「指导」，工单 #560），不为它另设一种只回应指导的轮次。
     还没回答的询问是另一类：提问方的会话要继续，在它自己的会话里跑。部门清单按这份形态的定义取（工单 #1509）。
     """
     definition = DEFINITIONS if definitions is None else definitions
@@ -381,7 +381,7 @@ def round_end(projection: RunProjection, events: list[Event], *, department: str
               activation_id: str) -> routing_contract.RoundEnd | None:
     """这一轮以什么结束：正常结束的一轮交出结果（提交被接纳，或是文字回答）；暂停与失败不算正常结束。
 
-    成果驱动只认这两种正常结束（设计说明第 5.1 节：一轮以提交正式成果或回答用户结束）。
+    成果驱动只认这两种正常结束（docs/design/skeleton-and-application.md「路由契约」：一轮以提交正式成果或回答用户结束）。
     """
     if projection.status in _NOT_A_NORMAL_ROUND_END:
         return None
@@ -391,7 +391,7 @@ def round_end(projection: RunProjection, events: list[Event], *, department: str
 
 def item_end(projection: RunProjection) -> routing_contract.ItemEnd | None:
     """事项以什么结束：没有部门可以开始一轮工作时，成果驱动的事项没有新的工作，运行以路由自己声明的
-    结束原因结束（设计说明第 5.4 节第 7 条：路由自己的结束原因写在它自己的一份定义里，工单 #861）。
+    结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」：路由自己的结束原因写在它自己的一份定义里，工单 #861）。
     """
     return routing_contract.ItemEnd(stop_reason=ITEM_END_REASON, message="no department has new work")
 
@@ -412,7 +412,7 @@ def completion_reason(projection: RunProjection,
                       events: list[Event]) -> routing_contract.CompletionReason | None:
     """事项完成时的结束原因：创建时记下的开环标记为真时是开环完成，其余按事项种类取（返回 None）。
 
-    这一条判断归路由（设计说明第 5.1 节输出、第 4.7 节第 4 条）：薄驱动进入完成状态时问一次，
+    这一条判断归路由（docs/design/skeleton-and-application.md「路由契约」输出、docs/design/department-loop.md「询问的记录与查询」）：薄驱动进入完成状态时问一次，
     只把这里给的原因写进事实。没标开环的事项不给原因，薄驱动照旧按事项种类取。
     """
     if recorded_open_loop(events):
@@ -421,7 +421,7 @@ def completion_reason(projection: RunProjection,
 
 
 def work_reference(projection: RunProjection, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明第 5.1 节输出、第 5.4 节第 4 条）：成果驱动不用它，为空。"""
+    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）：成果驱动不用它，为空。"""
     return None
 
 
@@ -452,7 +452,7 @@ def ask_branch(projection: RunProjection, events: list[Event], *, requester: str
     询问的开始归路由：这个会话自己那次没结束的询问接着那一层，不新开一层（工单 #473 的嵌套询问）；
     新开一层时回复的部门要在这个路由自己的部门清单里、不是提问方自己，问题与背景至少给一份（工单 #554）。
     这一轮的上限取被问部门的声明量与提问方这一步剩下的量里小的那个；已经用掉的量由薄驱动扣，
-    路由不读最小投影（设计说明第 5.1 节）。部门清单按这份形态的定义取（工单 #1509）。
+    路由不读最小投影（docs/design/skeleton-and-application.md「路由契约」）。部门清单按这份形态的定义取（工单 #1509）。
     """
     args = call.get("args") or {}
     pending = projection.ask_by_origin(session_id)
@@ -502,7 +502,7 @@ def ask_branch(projection: RunProjection, events: list[Event], *, requester: str
         max_model_steps=min(declared_steps, remaining),
         max_time_sec=float(declared_time),
         start=start,
-        # 这一轮工作的路由自己的工作引用指向这次询问（设计说明第 5.1 节输出、第 5.4 节第 4 条）
+        # 这一轮工作的路由自己的工作引用指向这次询问（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）
         work_ref={"ask": {"branch_session_id": branch_session_id, "requester": requester,
                           "recipient": recipient}},
     )
@@ -513,8 +513,8 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
                 definitions: Any | None = None) -> routing_contract.AskOutcome:
     """分支这一轮以什么结束：把回答交回提问方，还是没能回答与原因。
 
-    回答的内容、回答同时交上的成果由路由组装（设计说明第 5.5 节）：能交要求的部门在回答一次询问时
-    可以修订 PRD（循环结构第 4.3 节），修订的提案参数随结果交给薄驱动，由它经写入口提交。谁能交要求
+    回答的内容、回答同时交上的成果由路由组装（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：能交要求的部门在回答一次询问时
+    可以修订 PRD（循环结构「回答能做什么」），修订的提案参数随结果交给薄驱动，由它经写入口提交。谁能交要求
     按提案合同判断，不在代码里写部门名（工单 #1391）；提案合同从这份形态的定义取（工单 #1509）。
     没能回答的原因按这一轮的实际情形取：一步也走不了、时间用完、这一轮的说明或停止原因、跑完没交上回答。
     """
@@ -548,7 +548,7 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
 
 
 def check_definition(definitions: Any) -> None:
-    """校验成果驱动这份定义的内容（设计说明第 5.4 节第 2 条）：内核只核对结构，内容归路由自己。
+    """校验成果驱动这份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：内核只核对结构，内容归路由自己。
 
     部门、成果种类与提议方式都是按名称引用现有定义的，几种名称互相对得上；路由自己的结束原因不能与内核的
     停止原因同名，事项结束用的那一个要声明。不合格时抛出 InvalidRoutingDefinition，逐项写明是哪一项。
@@ -597,7 +597,7 @@ def check_definition(definitions: Any) -> None:
 
 
 class WatchedOutputs:
-    # 成果驱动的路由（设计说明第 5.1 节）：默认路由，组织定义的 routing 写 watched_outputs。
+    # 成果驱动的路由（docs/design/skeleton-and-application.md「路由契约」）：默认路由，组织定义的 routing 写 watched_outputs。
     # 实现在应用层；薄驱动只按契约的三个问题调用它。
     # 部门、关注关系与核验声明按**这份形态自己的定义**取（工单 #1509）：组装处交给它这一份时就按这一份，
     # 没有交时读进程加载的那一份。一份形态一份实例（routing_contract.select 每次选择给一份副本），

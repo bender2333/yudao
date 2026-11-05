@@ -1,5 +1,5 @@
-# 决定请求的查询（设计说明第 4.3 节「外壳」）：列出决定请求，按项目、事项、种类与状态筛选（状态可以多选，
-# 省略时不限制）；位置是与决定请求在同一个读取事务中看到的日志末尾，按位置读取时等于 at（第 4.1 节）。
+# 决定请求的查询（docs/design/app-and-interface.md「查询清单」中「外壳」）：列出决定请求，按项目、事项、种类与状态筛选（状态可以多选，
+# 省略时不限制）；位置是与决定请求在同一个读取事务中看到的日志末尾，按位置读取时等于 at（docs/design/app-and-interface.md「合同」）。
 # 查询不写入任何内容。
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from .application import Application
 
 class DecisionsList(ReplayRequest):
-    # 可回放（设计说明第 4.1 节）：at 是全局位置，省略时读取现在的快照。
+    # 可回放（docs/design/app-and-interface.md「合同」）：at 是全局位置，省略时读取现在的快照。
     # 筛选条件：省略的条件不限制；状态可以给出多个（HTTP 上是重复的同名参数），省略状态时不限制。等待用户的
     # 列表只取「等待回答」（status=open），run 结束时撤销的请求不在其中
     project_id: str | None = None

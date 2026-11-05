@@ -1,6 +1,6 @@
 # 内核事件模块（S5a，工单 #828）：事件日志的信封、骨架事件的种类与数据结构、骨架事件的登记表。
 #
-# 规则（设计说明第 7 节）：内核写入或读取的事件是骨架事件，种类与字段只增，停用不删除，事件一经写入不重新解释； 其余 run 流里的事件是应用事件，由应用登记自己的种类，增加一种不改这个文件（第 5.4 节第 1 条）。 项目流与目录流的事件全部是骨架事件：它们是长期事实，跨版本保存（ADR-0019）。
+# 规则（设计说明「模块交互」）：内核写入或读取的事件是骨架事件，种类与字段只增，停用不删除，事件一经写入不重新解释； 其余 run 流里的事件是应用事件，由应用登记自己的种类，增加一种不改这个文件（docs/design/trusted-kernel.md「内核清单」）。 项目流与目录流的事件全部是骨架事件：它们是长期事实，跨版本保存（ADR-0019）。
 #
 # 这个文件只导入标准库与 pydantic（这里没有用到 pydantic），是内核清单里 kind 为 module 的一行： 内核模块只从它导入事件信封与骨架事件，`models.py` 与 `projection.py` 留给应用，不在内核清单里。
 
@@ -25,13 +25,13 @@ TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
 # 骨架事件载荷里的封闭取值，只增：qa_submitted 的结论，baseline_review_accepted 逐条结论的状态
 QA_VERDICTS = ("rework_engineering", "release", "cannot_verify")
 BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
-# 质检逐条结论用的封闭取值（验证的独立性设计说明第 7.1 节第 1、2 条，工单 #151）：六种检验方式与三种结果。 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在 harness/tests/fixtures/check_methods.json 与客户端各一份，服务端核对本表与夹具一致
+# 质检逐条结论用的封闭取值（验证的独立性设计说明「口径」第 1、2 条，工单 #151）：六种检验方式与三种结果。 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在 harness/tests/fixtures/check_methods.json 与客户端各一份，服务端核对本表与夹具一致
 QA_METHODS = ("check", "trial", "measure", "judgement", "human", "open")
 QA_RESULTS = ("passed", "failed", "unverified")
 
 
 class SkeletonEventType:
-    # 骨架事件（run 流）：内核写入或读取的种类，只增不删（设计说明第 7 节）。清单由这个类给出， 应用事件的种类在应用里声明（第 5.4 节第 1 条），不在这里
+    # 骨架事件（run 流）：内核写入或读取的种类，只增不删（设计说明「模块交互」）。清单由这个类给出， 应用事件的种类在应用里声明（docs/design/trusted-kernel.md「内核清单」），不在这里
     RUN_CREATED = "run_created"
     DEPARTMENT_ACTIVATED = "department_activated"
     ACTIVATION_FINISHED = "activation_finished"
@@ -51,7 +51,7 @@ class SkeletonEventType:
     BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
     # 通用的成果接纳（S2c，工单 #1098）：路由带来新种类时内核写这一条，载荷是收紧检查给出的内容加统一字段。 成果驱动的六种成果与契约仍写各自的接纳事件，已经写入的事件不重新解释
     ARTIFACT_ACCEPTED = "artifact_accepted"
-    # 第 4 节 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它， 所以它从此是骨架事件，只加字段（第 7 节的表把 model_* 列在应用事件里，按这一条据以修正）
+    # 「四项技术保证」 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它， 所以它从此是骨架事件，只加字段（docs/design/trusted-kernel.md「模块交互」的表把 model_* 列在应用事件里，按这一条据以修正）
     MODEL_REQUESTED = "model_requested"
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"
@@ -81,22 +81,22 @@ class ProjectEventType:
     DEPARTMENT_SETTINGS_CONFIGURED = "department_prompt_configured"
     MATERIAL_RECORDED = "material_recorded"
     SOURCE_DIRECTORY_CONFIGURED = "source_directory_configured"
-    # 建档候选（设计第 3.2 节）：记下候选引用与核验结论
+    # 建档候选（docs/design/existing-project-onboarding.md「决定种类」）：记下候选引用与核验结论
     INITIAL_PRD_PROPOSED = "initial_prd_proposed"
     # 确认初始 PRD 可能等待数天，run 已结束，请求与回答记在项目流，字段与 run 流相同
     PROJECT_DECISION_REQUESTED = "project_decision_requested"
     PROJECT_DECISION_ANSWERED = "project_decision_answered"
     PROJECT_DECISION_WITHDRAWN = "project_decision_withdrawn"
-    # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run（设计第 3.3、6 节）
+    # 用户提出修改：项目流记下这一轮依据，启动时据此补建缺少的 run（docs/design/existing-project-onboarding.md「领域事件」、「失败与中断」）
     ONBOARDING_REVISION_STARTED = "onboarding_revision_started"
     # 项目设置里的 MCP 服务器（工单 #236）
     MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
     # 项目的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：项目现在用发布带的哪一份，
     # 带原值、新值与理由；事项创建时冻结形态名与它的定义版本
     PROJECT_FORM_SET = "project_form_set"
-    # 探测 MCP 服务器（工单 #1174，网络与 MCP 设计说明第 4.2 节）：一次探测的结果，带工具清单快照或失败原因
+    # 探测 MCP 服务器（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」）：一次探测的结果，带工具清单快照或失败原因
     TOOL_SERVER_PROBE_FINISHED = "tool_server_probe_finished"
-    # 用户确认初始 PRD：这个成果成为项目的建档基线（设计第 3.2 节）
+    # 用户确认初始 PRD：这个成果成为项目的建档基线（docs/design/existing-project-onboarding.md「决定种类」）
     BASELINE_ADOPTED = "baseline_adopted"
     # 项目级参数（迭代底座 B3，工单 #351）：project_parameter_set
     PARAMETER_SET = "project_parameter_set"
@@ -105,12 +105,12 @@ class ProjectEventType:
     WRITEBACK_NOT_NEEDED = "writeback_not_needed"
     WRITEBACK_HELD = "writeback_held"
     WRITEBACK_VERIFIED = "writeback_verified"
-    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本， 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明「版本与固定」）：整份设置一个版本， 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
     MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
 
 
 class CatalogEventType:
-    # 目录流的事件全部是骨架事件：控制主机的长期事实，随部署保存 模型目录与凭据事件（设计第 10 节）：内容由 Provider 保存，事件不含 Key
+    # 目录流的事件全部是骨架事件：控制主机的长期事实，随部署保存 模型目录与凭据事件（docs/design/existing-project-onboarding.md「验收」）：内容由 Provider 保存，事件不含 Key
     CATALOG_REVISED = "catalog_revised"
     CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
     CATALOG_TEST_FINISHED = "catalog_test_finished"
@@ -146,7 +146,7 @@ SKELETON_PROJECT_EVENTS = _kinds(ProjectEventType)
 SKELETON_CATALOG_EVENTS = _kinds(CatalogEventType)
 SKELETON_EVENTS = SKELETON_RUN_EVENTS | SKELETON_PROJECT_EVENTS | SKELETON_CATALOG_EVENTS
 
-# 应用登记的事件种类与登记它的应用（第 5.4 节第 1 条）：只是登记，内核不解释它们的内容
+# 应用登记的事件种类与登记它的应用（docs/design/trusted-kernel.md「内核清单」）：只是登记，内核不解释它们的内容
 _APPLICATION_EVENTS: dict[str, str] = {}
 
 
@@ -326,7 +326,7 @@ class CatalogEvent:
 
 @dataclass
 class DecisionRequest:
-    # 一个等待用户回答的决定请求（总体架构第 7.4 节），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）； version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
+    # 一个等待用户回答的决定请求（总体架构「用户决定」），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）； version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
     decision_id: str
     stream: str
     run_id: str | None

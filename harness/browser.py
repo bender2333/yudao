@@ -6,7 +6,7 @@
 # --blocked-origins <服务自己监听的地址与端口> --output-dir <会话目录>`）。
 # 一次浏览器动作是：地址与路径的拒绝（导航目标用取回那一套服务地址规则，本地文件限试用副本内）→ 调用 MCP →
 # 只读标注为否的工具再截一张图并把它存成工件 → 结果带页面的可访问性结构。工具失败（is_error）交回错误文本，
-# 动作记为完成；MCP 进程退出、调用超时或取消时会话记为中断，动作按失败交回（第 9 节）。
+# 动作记为完成；MCP 进程退出、调用超时或取消时会话记为中断，动作按失败交回（docs/design/browser-and-computer-use.md「恢复契约」）。
 #
 # 执行层的代码：只导入标准库、同一层的工作树与客户端模块、定义与工件存储，不导入控制核心与应用层。
 
@@ -33,7 +33,7 @@ from .mcp_client import (McpCallError, McpClient, McpStartupError, ServerLaunch,
                          terminate_legacy_process)
 from .models import ArtifactRef, new_id
 
-# 试用需要的程序（设计说明第 3.2 节）：Playwright MCP 0.0.83 与它依赖的 Playwright 装出来的 Chromium。
+# 试用需要的程序（docs/design/browser-and-computer-use.md「执行位置上的程序」）：Playwright MCP 0.0.83 与它依赖的 Playwright 装出来的 Chromium。
 # 内核之外的这一层只负责找到并启动，版本由试用会话的程序核对负责报出
 MCP_PACKAGE = "@playwright/mcp"
 MCP_VERSION = "0.0.83"
@@ -45,7 +45,7 @@ NPM_QUERY_TIMEOUT_SEC = 30
 # 恢复按它判断一个结果未知的动作是不是浏览器动作
 BROWSER_TOOL_NAMES = frozenset(name for name, tool in DEFINITIONS.tools.items() if tool.action == "browser")
 
-# 启动参数（设计说明第 4.1 节的表）：--browser chromium 在 0.0.83 里落到 Playwright 自带的 Chromium
+# 启动参数（docs/design/browser-and-computer-use.md「运行方式」的表）：--browser chromium 在 0.0.83 里落到 Playwright 自带的 Chromium
 # （chrome-for-testing 渠道），--caps testing 多出四个 browser_verify_* 断言工具。没有取值的开关写成 None
 BROWSER_ARGUMENTS: tuple[tuple[str, str | None], ...] = (
     ("--browser", "chromium"),
@@ -56,10 +56,10 @@ BROWSER_ARGUMENTS: tuple[tuple[str, str | None], ...] = (
     ("--image-responses", "allow"),
     ("--snapshot-mode", "full"),
 )
-# 会话目录里的输出子目录：工具以文件名保存的内容留在这里，会话结束时删除（设计说明第 4.1 节）
+# 会话目录里的输出子目录：工具以文件名保存的内容留在这里，会话结束时删除（docs/design/browser-and-computer-use.md「运行方式」）
 OUTPUT_DIR_NAME = "mcp-output"
 
-# 来源限制的启动参数（设计说明第 4.1、10 节）：服务自己监听的地址与端口，浏览器自己不向这些来源发出请求，
+# 来源限制的启动参数（docs/design/browser-and-computer-use.md「运行方式」、「安全」）：服务自己监听的地址与端口，浏览器自己不向这些来源发出请求，
 # 所以页面上点过去的链接、页面脚本发出的请求都由浏览器挡下。它只按字面来源匹配，挡不住指向本机的域名别名，
 # 别名由动作层的 check_navigation 补（第二道）
 BLOCKED_ORIGINS_ARGUMENT = "--blocked-origins"
@@ -69,9 +69,9 @@ SCREENSHOT_TOOL = "browser_take_screenshot"
 SNAPSHOT_TOOL = "browser_snapshot"
 # 关闭浏览器的工具：它执行以后没有页面可以截图，会话本身还在（下一次导航会重新启动浏览器）
 CLOSE_TOOL = "browser_close"
-# 可以带本地文件路径的两个工具（设计说明第 4.2 节）：路径按试用副本解析，副本之外的拒绝
+# 可以带本地文件路径的两个工具（docs/design/browser-and-computer-use.md「提供的工具」）：路径按试用副本解析，副本之外的拒绝
 FILE_PATH_TOOLS = frozenset({"browser_file_upload", "browser_drop"})
-# 导航类工具：目标地址在执行之前按服务自己的地址规则检查（第 4.1 节「来源限制」）
+# 导航类工具：目标地址在执行之前按服务自己的地址规则检查（docs/design/browser-and-computer-use.md「运行方式」中「来源限制」）
 NAVIGATION_TOOLS = frozenset({"browser_navigate"})
 # 新建标签页时带 url 的工具：`{"action": "new", "url": …}` 同样是工具直接发起的导航，动作层要查
 # （浏览器那一层只按字面来源挡，别名挡不住；工单 #1184 的审查 6625033513 第 1 条）
@@ -140,7 +140,7 @@ class BrowserSession:
             }
 
     def minimal_record(self) -> dict[str, Any]:
-        # 回执里的会话身份与树摘要（设计说明第 7.1 节）：每一步都带，不重复整份记录
+        # 回执里的会话身份与树摘要（docs/design/browser-and-computer-use.md「保存与绑定」）：每一步都带，不重复整份记录
         with self._lock:
             return {"session_id": self.session_id, "status": self.status,
                     "tree_digest": self.tree_digest}
@@ -253,7 +253,7 @@ def find_program() -> BrowserProgram:
 
 
 def blocked_origins() -> tuple[str, ...]:
-    """服务自己监听的地址与端口，写成 `--blocked-origins` 认的来源（设计说明第 4.1、10 节）。
+    """服务自己监听的地址与端口，写成 `--blocked-origins` 认的来源（docs/design/browser-and-computer-use.md「运行方式」、「安全」）。
 
     MCP 把这个取值变成 `origin/**` 的请求拦截（0.0.83 的 `originOrHostGlob`），所以在页面上点过去的链接与
     页面脚本发出的请求都不会到达服务。来源按字面匹配：指向同一个地址的域名别名（`localhost`、本机主机名）
@@ -273,7 +273,7 @@ def blocked_origins() -> tuple[str, ...]:
 
 
 def launch_arguments(output_dir: str | Path) -> tuple[str, ...]:
-    # 启动参数（设计说明第 4.1 节）：输出目录放这次会话的文件，其余按表；服务自己的来源由浏览器拒绝
+    # 启动参数（docs/design/browser-and-computer-use.md「运行方式」）：输出目录放这次会话的文件，其余按表；服务自己的来源由浏览器拒绝
     arguments: list[str] = []
     for name, value in BROWSER_ARGUMENTS:
         arguments.append(name)
@@ -287,7 +287,7 @@ def launch_arguments(output_dir: str | Path) -> tuple[str, ...]:
 
 
 def is_read_only(tool: str) -> bool:
-    """这个浏览器工具的只读标注（设计说明第 4.2 节）：定义里按 Playwright 的标注生成，
+    """这个浏览器工具的只读标注（docs/design/browser-and-computer-use.md「提供的工具」）：定义里按 Playwright 的标注生成，
     只读标注为是的工具核实方法为 none（工单 #147）。"""
     definition = DEFINITIONS.tools.get(tool)
     if definition is None or definition.action != "browser":
@@ -296,7 +296,7 @@ def is_read_only(tool: str) -> bool:
 
 
 def check_navigation(url: Any) -> str:
-    """导航目标的来源限制（设计说明第 4.1、10 节）：与取回同一个函数检查服务自己的地址与端口。
+    """导航目标的来源限制（docs/design/browser-and-computer-use.md「运行方式」、「安全」）：与取回同一个函数检查服务自己的地址与端口。
 
     浏览器那一层由启动参数 `--blocked-origins` 承担（第一道，见 blocked_origins），它只按字面来源匹配，
     挡不住指向本机的域名别名，所以动作层再查一次实际地址（第二道）。指向服务自己的地址与端口时抛
@@ -317,7 +317,7 @@ def check_navigation(url: Any) -> str:
 
 
 def resolve_paths(session: BrowserSession, tool: str, args: dict[str, Any]) -> dict[str, Any]:
-    """browser_file_upload 与 browser_drop 的路径（设计说明第 4.2 节）：相对路径按试用副本解析，
+    """browser_file_upload 与 browser_drop 的路径（docs/design/browser-and-computer-use.md「提供的工具」）：相对路径按试用副本解析，
     副本之外的拒绝。交回替换成执行位置上的绝对路径的参数。"""
     if tool not in FILE_PATH_TOOLS:
         return dict(args)
@@ -392,7 +392,7 @@ class BrowserSessions:
 
     async def start(self, *, run_id: str | None, department: str, copy_root: str | Path,
                     tree_digest: str, ready_url: str, output_dir: str | Path | None = None) -> dict[str, Any]:
-        # 结束本部门原来的会话，再按启动参数起 Playwright MCP，打开就绪地址并截一张图（设计说明第 3.4 节）
+        # 结束本部门原来的会话，再按启动参数起 Playwright MCP，打开就绪地址并截一张图（docs/design/browser-and-computer-use.md「试用工具」）
         await self.stop(run_id, department, reason="replaced by a new browser session")
         if self._artifacts is None or run_id is None:
             raise BrowserSessionFailed(
@@ -462,7 +462,7 @@ class BrowserSessions:
         text = result["text"]
         images: list[dict[str, Any]] = []
         if tool == SCREENSHOT_TOOL:
-            # 模型自己调的截图（设计说明第 4.3 节）：返回的图像同样保存为证据
+            # 模型自己调的截图（docs/design/browser-and-computer-use.md「每一步交给模型的内容」）：返回的图像同样保存为证据
             image = await self._save_image(session, result.get("image"))
             if image is not None:
                 images.append(image)
@@ -511,7 +511,7 @@ class BrowserSessions:
         try:
             await client.close()
         except Exception:  # noqa: BLE001 - 换一个任务关闭时 SDK 的取消范围不允许，进程树自己结束
-            # 与 `McpSessions.close` 的处理相同（网络与 MCP 设计说明第 7.2 节）：关闭失败不挡住会话结束。
+            # 与 `McpSessions.close` 的处理相同（网络与 MCP 设计说明「运行规则」）：关闭失败不挡住会话结束。
             # 客户端建立时记下的进程标识与创建时间在这里结束整棵进程树；它打开的标准错误输出日志文件
             # 也没有关（关闭在 SDK 的退出之后），这里一并关掉，否则会话目录删不掉
             if pid is not None and created is not None:
@@ -527,7 +527,7 @@ class BrowserSessions:
 
     async def _call_mcp(self, session: BrowserSession, tool: str, args: dict[str, Any],
                         stop: Any = None) -> dict[str, Any]:
-        # 一次 MCP 调用：进程退出、协议错误与取消都让会话不能再使用，按中断交回（设计说明第 9 节）。
+        # 一次 MCP 调用：进程退出、协议错误与取消都让会话不能再使用，按中断交回（docs/design/browser-and-computer-use.md「恢复契约」）。
         # 取消信号到达时交给客户端的 cancel（它取消 SDK 的调用任务、发取消通知），本任务等取消结果
         watcher = None if stop is None else asyncio.ensure_future(_cancel_when_stopped(session.client, stop))
         try:
@@ -554,7 +554,7 @@ class BrowserSessions:
         return {"text": result.text, "is_error": bool(result.is_error), "image": image}
 
     async def _with_structure(self, session: BrowserSession, text: str, stop: Any = None) -> str:
-        # 结果里的可访问性结构：MCP 把它存成会话目录里的文件时读出来接在结果后面（设计说明第 4.3 节）；
+        # 结果里的可访问性结构：MCP 把它存成会话目录里的文件时读出来接在结果后面（docs/design/browser-and-computer-use.md「每一步交给模型的内容」）；
         # 结果里没有结构时（例如输入文字不改变页面结构的那一步）再取一次页面结构
         match = _SNAPSHOT_LINK.search(text)
         if match is not None:

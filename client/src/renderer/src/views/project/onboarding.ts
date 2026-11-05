@@ -1,4 +1,4 @@
-// 建档状态（3.8，docs/design/existing-project-onboarding.md 第 3.1、3.3、3.4 节）：接入已有项目的
+// 建档状态（3.8，docs/design/existing-project-onboarding.md 「命令」、「领域事件」、「查询的变化」）：接入已有项目的
 // 拒绝原因、建档状态标记，以及由 tool_started 事件驱动的「阅读已有项目」动作。取值全部来自应用层的
 // 命令结果与查询，没有对应数据时没有标记，界面不猜。
 
@@ -22,11 +22,11 @@ export const ONBOARDING_MARKS: Record<string, string> = {
   awaiting_onboarding: "等待建档",
 };
 
-// 驱动「阅读已有项目」动作的读取工具（设计第 3.3 节：读取、搜索与区间阅读工具的 tool_started）
+// 驱动「阅读已有项目」动作的读取工具（docs/design/existing-project-onboarding.md「领域事件」：读取、搜索与区间阅读工具的 tool_started）
 export const READ_EXISTING_TOOLS = ["read_file", "search", "read_range"] as const;
 
 // 接入命令的拒绝原因的中文说明。界面同时给出原因名、服务端的原因说明与其中列出的相对路径，
-// 用户按相对路径处理以后重新提交（设计第 3.1 节 source_invalid 的 message 列出相对路径与处理方法）
+// 用户按相对路径处理以后重新提交（docs/design/existing-project-onboarding.md「命令」 source_invalid 的 message 列出相对路径与处理方法）
 export const ONBOARDING_REJECTION_REASONS: Record<string, string> = {
   source_invalid: "源目录不能作为代码快照的来源",
   not_allowed: "现在不能重新开始建档",
@@ -73,7 +73,7 @@ export function projectOnboardingMark(
   return ONBOARDING_MARKS[status] ?? null;
 }
 
-/** 事件流里的一条事件是否是「阅读已有项目」的工具开始（设计第 3.3 节），返回工具名，不是则为空。 */
+/** 事件流里的一条事件是否是「阅读已有项目」的工具开始（docs/design/existing-project-onboarding.md「领域事件」），返回工具名，不是则为空。 */
 export function readExistingAction(event: EventObject): string | null {
   if (event.type !== "tool_started") {
     return null;
@@ -87,7 +87,7 @@ export function readExistingAction(event: EventObject): string | null {
 /** 已结束的读取动作（run.actions 的动作行）：返回最近一次读取的工具、部门与开始时间，不是读取工具时为空。
  *
  * 部门房间的页面可能在读取发生以后才打开，事件订阅只收到订阅之后的事件，
- * 已发生的读取按 run.actions 的动作列表读出（设计第 3.4 节：状态以查询为准）。
+ * 已发生的读取按 run.actions 的动作列表读出（docs/design/existing-project-onboarding.md「查询的变化」：状态以查询为准）。
  */
 export function lastReadExistingAction(
   actions: readonly Pick<ActionView, "tool" | "department" | "created_at">[],

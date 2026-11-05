@@ -154,7 +154,7 @@ def test_file_deleted_after_being_read_is_still_a_deletion(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_cli_default_command(tmp_path):
-    # 不写子命令时启动新接口（应用层与接口层设计说明第 7.3、7.4 节）：默认端口 8765，
+    # 不写子命令时启动新接口（应用层与接口层设计说明「命令行」）：默认端口 8765，
     # 没有 serve 子命令；服务以空态启动，system.status 返回 Provider 不可用与默认的模型目录路径
     from harness.__main__ import build_parser
 
@@ -210,7 +210,7 @@ def _startup_config(state: str):
 def test_service_starts_in_every_unready_state_and_blocks_the_first_request(tmp_path, monkeypatch, state):
     # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：服务照常启动，system.status 与 catalog
     # 返回 Provider 不可用；创建事项不再解析调用目标（#45），第一次请求解析失败时进入待恢复，运行不是失败结束。
-    # 凭据文件默认在数据目录内（设计说明第 3.4 节）
+    # 凭据文件默认在数据目录内（docs/design/web-interface-and-release.md「数据目录」）
     from harness.projection import saved_decisions
 
     monkeypatch.delenv(_ABSENT_KEY, raising=False)
@@ -309,7 +309,7 @@ def test_clear_withdraw(tmp_path):
     facade.load_document(config_path)
     saved_rev = facade.revision
 
-    # 删除文件：目录与部门默认一起清空，config_state 记为 deleted（设计说明第 4.7 节）
+    # 删除文件：目录与部门默认一起清空，config_state 记为 deleted（docs/design/model-management.md「删除」）
     config_path.unlink()
     result = facade.reload()
     assert result["ok"] is True  # 删除不是损坏，reload_error 为 None

@@ -1,4 +1,4 @@
-# 可见范围的词表扩到交付说明的事实与解释（工单 #357；验证的独立性设计说明第 2、3 节；总图第四节「装配」缝）：
+# 可见范围的词表扩到交付说明的事实与解释（工单 #357；验证的独立性设计说明「共享的与隔开的」、「可见范围作为参数」；总图第四节「装配」缝）：
 # 词表从「整份当前交付说明」扩到「交付事实」与「交付解释」两项，按事实与解释分开提供；工程保留整份
 # current_delivery_spec，质检默认用隔离的一套（事实与解释），共享的一套再在它上面加既有结构、上一份交付与质检缺陷。
 #
@@ -24,7 +24,7 @@ from harness.parameters import check_bounds
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 
-# 质检的两套取值（设计说明第 3 节）：现值的隔离一套，共享的一套在它上面加三项共享材料
+# 质检的两套取值（docs/design/independent-verification.md「可见范围作为参数」）：现值的隔离一套，共享的一套在它上面加三项共享材料
 ISOLATED = ("delivery_facts", "delivery_explanation")
 SHARED = ("delivery_facts", "delivery_explanation", "existing_structure", "prior_delivery", "qa_defects")
 
@@ -40,11 +40,11 @@ def test_the_visibility_vocabulary_is_the_seven_materials():
 
 
 def test_the_quality_role_starts_isolated_and_the_engineering_role_keeps_the_whole_spec():
-    # 守 R3：设计说明第 3 节的默认取值——质检用隔离的一套，工程保留整份当前交付说明
+    # 守 R3：docs/design/independent-verification.md「可见范围作为参数」的默认取值——质检用隔离的一套，工程保留整份当前交付说明
     assert DEFINITIONS.role("quality").visibility == ISOLATED
     assert DEFINITIONS.rule_value("roles.quality.visibility") == list(ISOLATED)
     assert "current_delivery_spec" in DEFINITIONS.role("engineering").visibility
-    # 共享的一套只在隔离的一套上加材料，条目数在规则的界限以内（设计说明第 3 节）
+    # 共享的一套只在隔离的一套上加材料，条目数在规则的界限以内（docs/design/independent-verification.md「可见范围作为参数」）
     assert set(SHARED) - set(ISOLATED) == {"existing_structure", "prior_delivery", "qa_defects"}
     low, high = DEFINITIONS.rule("roles.quality.visibility").bounds
     assert low <= len(SHARED) <= high
@@ -53,7 +53,7 @@ def test_the_quality_role_starts_isolated_and_the_engineering_role_keeps_the_who
 
 @pytest.mark.parametrize("values", [ISOLATED, SHARED])
 def test_both_quality_visibility_sets_load(tmp_path, values):
-    # 守 R2 与设计说明第 11 节的验收：两套取值都是定义文件里能写的值，换一份定义就换一套，不修改代码
+    # 守 R2 与 docs/design/independent-verification.md「验收」的验收：两套取值都是定义文件里能写的值，换一份定义就换一套，不修改代码
     directory = _copy(tmp_path)
     _set_quality_visibility(directory, values)
     loaded = load_definitions(directory)
@@ -69,7 +69,7 @@ def test_a_definition_with_the_old_quality_value_still_loads(tmp_path):
 
 
 def test_the_delivery_parts_put_the_kind_and_the_basis_into_the_facts():
-    # 守 R2：交付说明的种类与它所依据的产品合同摘要属于事实（设计说明第 4 节），解释只有实现的理由与已知的不足
+    # 守 R2：交付说明的种类与它所依据的产品合同摘要属于事实（docs/design/independent-verification.md「先判断后看解释」），解释只有实现的理由与已知的不足
     parts = _delivery_contract()["parts"]
     facts, explanation = set(parts["facts"]), set(parts["explanation"])
     assert {"kind", "basis_product_spec_hash"} <= facts

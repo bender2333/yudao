@@ -1,4 +1,4 @@
-# 找 Playwright MCP 的程序位置（浏览器与 computer use 设计说明第 3.2、4.1 节；工单 #1184）。
+# 找 Playwright MCP 的程序位置（浏览器与 computer use 设计说明「执行位置上的程序」、「运行方式」；工单 #1184）。
 #
 # 全局安装的位置不能只按目录猜：CI 的集成层用 `npm install --global @playwright/mcp@0.0.83` 装，
 # GitHub Actions 的 Windows 宿主把全局前缀放在 `C:\npm\prefix`，不在 `%APPDATA%\npm`，按目录猜会漏掉它，

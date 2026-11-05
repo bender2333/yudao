@@ -153,7 +153,7 @@ def test_failed_partial_output_is_observation_only_but_attempt_keeps_it(tmp_path
 
 
 def test_usage_totals_count_only_reported_attempts(tmp_path: Path):
-    # 用量汇总只累加上报的用量（设计说明第 4.3 节「未上报的项为空」，D09 规定不猜算用量）：
+    # 用量汇总只累加上报的用量（docs/design/app-and-interface.md「查询清单」中「未上报的项为空」，D09 规定不猜算用量）：
     # 未上报的尝试计入总数与用时，各项用量为空，也不进入上报计数
     reported_usage = Usage(input_tokens=11, output_tokens=3, cache_read_tokens=1, cache_write_tokens=2,
                            total_tokens=17, reported=True)

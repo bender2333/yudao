@@ -1,5 +1,5 @@
-# 检验覆盖的查询与离开期间的报告新增的两项（工单 #399；应用层与接口层设计说明第 4.3 节
-# `acceptance.coverage` 与 System 首页；验证的独立性设计说明第 7、7.1 节）。
+# 检验覆盖的查询与离开期间的报告新增的两项（工单 #399；应用层与接口层设计说明「查询清单」
+# `acceptance.coverage` 与 System 首页；验证的独立性设计说明「检验覆盖与开环」、「口径」）。
 #
 # 这里核对：查询读的是放行记录里一次算好的数与逐条结论（不重新计算），逐条结论带检验方式与结果、
 # 开环明细；按位置回放同一段事件流得到同一份结果，放行之前的那个位置没有结果；
@@ -36,7 +36,7 @@ SMOKE_COMMAND = f'"{PYTHON}" src/lib.py'
 
 def _criteria() -> list[dict]:
     # 三条验收条件：一条命令检查（可执行、通过）、一条带参照材料的判定点（模型阅读、无法运行）、
-    # 一条开环。可执行检验的条件放行时必须是 passed，不可执行的可以是 unverified（第 7.1 节第 3 点）
+    # 一条开环。可执行检验的条件放行时必须是 passed，不可执行的可以是 unverified（docs/design/independent-verification.md「口径」第 3 点）
     return [
         {"criterion": "AC1", "method": "check", "result": "passed", "checks": ["smoke"],
          "trial_cases": [], "note": ""},

@@ -1,4 +1,4 @@
-# 动作合同的共用契约测试（工单 #1170；执行环境服务设计说明第 4 节「执行环境的合同」；总图第四节「动作」缝）。
+# 动作合同的共用契约测试（工单 #1170；执行环境服务设计说明「执行环境服务的合同」「执行环境的合同」；总图第四节「动作」缝）。
 #
 # 立缝的样子：两个实际的环境实现（本机的 `LocalEnvironment` 与测试用的 `SecondEnvironment`）接受同一份动作合同
 # （`harness/actions.py` 的 `Action` 与 `ActionReceipt`），不按实现的名字分派，也不读请求里的部门与阶段。
@@ -271,7 +271,7 @@ def test_an_action_the_implementation_does_not_execute_fails(implementation):
     name, _root, environment = implementation
     # 第二种实现没有 MCP 的处理分支：类别不在它的分派里立刻失败；
     # 本机执行环境的 MCP 分支由工单 #1175 接上，没有会话表（没有冻结的 MCP 设置）时动作被拒绝，
-    # 回执带被拒绝标记与原因（网络与 MCP 设计说明第 5.2 节）
+    # 回执带被拒绝标记与原因（网络与 MCP 设计说明「工具许可」）
     if name == "second":
         with pytest.raises(ValueError, match="does not execute mcp"):
             _perform(environment, _action("mcp__time__now", "mcp", {"tool": "now"},

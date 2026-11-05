@@ -1,4 +1,4 @@
-# MCP 服务器探测（工单 #1174，网络与 MCP 设计说明第 4.2 节）：把项目设置里的一台服务器
+# MCP 服务器探测（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」）：把项目设置里的一台服务器
 # （#236 校验与保存的非秘密设置文档）变成 #69 客户端的启动参数，在控制主机上临时启动或连接它，
 # 读到服务器信息与工具清单以后关闭。探测绑定所提交的非秘密配置及其内容摘要（normalize_mcp_servers
 # 归一化时算出的 config_digest），凭据引用按名称在探测开始时解析，凭据值参加脱敏、不参加摘要。
@@ -52,7 +52,7 @@ async def probe(server: dict[str, Any], *, credentials: CredentialChain,
 
 
 def _kept(launch: ServerLaunch, error: str) -> str:
-    # 探测结束以后把标准错误输出日志里的凭据值替换为星号（设计说明第 4.4 节「保存的标准错误输出」）：
+    # 探测结束以后把标准错误输出日志里的凭据值替换为星号（docs/design/network-and-mcp.md「凭据」中「保存的标准错误输出」）：
     # 日志文件留在数据目录里供诊断，凭据值不出现在保存的内容里
     path = launch.stderr_log_path
     if path and os.path.exists(path) and launch.secrets:
@@ -78,7 +78,7 @@ class ProbeOutcome:
 
 
 def _resolve_variable(entry: dict[str, Any], credentials: CredentialChain, server_name: str, where: str) -> str:
-    # 一个环境变量或请求头的取值（设计说明第 4.4 节）：固定文本原样，凭据按名称解析；
+    # 一个环境变量或请求头的取值（docs/design/network-and-mcp.md「凭据」）：固定文本原样，凭据按名称解析；
     # 缺失时启动失败，原因写明凭据名称
     kind = entry.get("kind")
     if kind == "text":
@@ -91,7 +91,7 @@ def _resolve_variable(entry: dict[str, Any], credentials: CredentialChain, serve
 
 
 def _tool_document(tool: ToolSpec) -> dict[str, Any]:
-    # 一个工具的快照项：名称、说明、参数结构与服务器标注的提示（只供参考，第 4.1 节）
+    # 一个工具的快照项：名称、说明、参数结构与服务器标注的提示（只供参考，docs/design/network-and-mcp.md「服务器设置」）
     document: dict[str, Any] = {"name": tool.name, "description": tool.description,
                                 "input_schema": dict(tool.input_schema or {}), "hints": None}
     annotations = tool.hints
@@ -104,7 +104,7 @@ def _tool_document(tool: ToolSpec) -> dict[str, Any]:
 
 
 def launch_for(server: dict[str, Any], *, credentials: CredentialChain, stderr_log_path: str) -> ServerLaunch:
-    # 一台已归一化的服务器设置变成客户端的启动参数（设计说明第 7.1、7.2 节）。
+    # 一台已归一化的服务器设置变成客户端的启动参数（docs/design/network-and-mcp.md「客户端模块」、「运行规则」）。
     # secrets 传入已经解析的凭据值：错误文本与标准错误输出在写进事件之前把值替换为星号
     name = str(server.get("name") or "")
     values: list[str] = []
@@ -130,7 +130,7 @@ def launch_for(server: dict[str, Any], *, credentials: CredentialChain, stderr_l
 
 
 def stderr_log_path_for(data_dir: str | os.PathLike[str], server_name: str) -> str:
-    # 标准错误输出的日志文件（SDK 要求真实文件，设计说明第 7.2 节）：数据目录下的 mcp-logs，
+    # 标准错误输出的日志文件（SDK 要求真实文件，docs/design/network-and-mcp.md「运行规则」）：数据目录下的 mcp-logs，
     # 按服务器命名，探测之间追加
     directory = os.path.join(str(data_dir), "mcp-logs")
     os.makedirs(directory, exist_ok=True)
@@ -138,6 +138,6 @@ def stderr_log_path_for(data_dir: str | os.PathLike[str], server_name: str) -> s
 
 
 def credentials_of(facade: ProviderFacade) -> CredentialChain:
-    # 控制主机的凭据来源（进程内存、进程环境、数据目录的 .env，设计说明第 4.4 节）：
+    # 控制主机的凭据来源（进程内存、进程环境、数据目录的 .env，docs/design/network-and-mcp.md「凭据」）：
     # Provider 模块持有它，探测经这个入口取值
     return facade.credential_chain()

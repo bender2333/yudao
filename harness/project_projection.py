@@ -1,6 +1,6 @@
 # 项目投影与目录投影：不由裁决读取的两个投影及其折叠规则。
 # 它们是事件的同一种折叠结果，但控制核心的裁决（工具许可、提案校验、停止原因、边界）不读取它们，
-# 因此放在内核文件以外（可信内核设计说明第 3 节）；写入口按流的处理者把它们与 run 投影一视同仁地折叠与保存。
+# 因此放在内核文件以外（可信内核设计说明「内核清单」）；写入口按流的处理者把它们与 run 投影一视同仁地折叠与保存。
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ class Adoption:
     adopted_at: str
     stream_version: int
     event_id: str
-    # 建档基线特有的三项（工单 #136，设计第 5 节）：被确认的初始 PRD、现有结构说明与代码快照。
+    # 建档基线特有的三项（工单 #136，docs/design/existing-project-onboarding.md「确认以后：当前有效要求与第一次采纳」）：被确认的初始 PRD、现有结构说明与代码快照。
     # 普通事项的交付采纳没有这三项，它们为空
     prd_ref: dict[str, Any] | None = None
     product_spec_hash: str | None = None
@@ -53,7 +53,7 @@ class Adoption:
 
 @dataclass
 class InitialPrdCandidate:
-    # 一个建档候选（工单 #136，设计第 3.3 节）：建档 run 结束以后提出的初始 PRD 及其依据。
+    # 一个建档候选（工单 #136，docs/design/app-and-interface.md「用户决定的回答」）：建档 run 结束以后提出的初始 PRD 及其依据。
     # prd、structure、baseline_review 是这一轮三份产物的事件编号、内容哈希与工件引用；
     # 没有核验角色的形态没有基线核验这一步（工单 #1510），这一份产物是一份空记录，由 baseline_verified 记下；
     # overview_ref 是仓库概况的工件引用；snapshot 是这一轮建档使用的代码快照；
@@ -96,7 +96,7 @@ class HeldCandidate:
 @dataclass
 class DepartmentSetting:
     # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；
-    # 三项一起保存、一个版本（设计说明第 5.2 节）。没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt。
+    # 三项一起保存、一个版本（docs/design/model-management.md「项目部门设置与项目角色设置」）。没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt。
     department: str
     version: int
     text: str
@@ -150,7 +150,7 @@ class SourceDirectory:
 
 @dataclass
 class McpServersConfig:
-    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明第 4.3 节）：整份设置一个版本。
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明「版本与固定」）：整份设置一个版本。
     # servers 是这个版本的非秘密设置与凭据引用（凭据值在调用时按凭据来源解析，不在这里）；
     # document_digest 是这份非秘密文档的摘要，事项冻结与工具清单快照按它核对。
     # 旧事件没有 MCP 设置时按空设置读取（version 0、没有服务器）。
@@ -172,7 +172,7 @@ class McpServersConfig:
 
 @dataclass
 class LastProbe:
-    # 最近一次探测的结果（工单 #1174，网络与 MCP 设计说明第 4.2、10 节）：project.settings 返回它。
+    # 最近一次探测的结果（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」、「应用层接口」）：project.settings 返回它。
     # 成功带服务器信息与工具清单快照，失败带原因（凭据值已替换为星号）；旧事件没有探测时按没有读
     server_name: str
     status: str

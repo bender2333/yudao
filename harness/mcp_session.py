@@ -1,10 +1,10 @@
-# MCP 工具在事项定义里的形状（网络与 MCP 设计说明第 5.1 节）：名称规则与原名反查。
+# MCP 工具在事项定义里的形状（网络与 MCP 设计说明「工具的提供」）：名称规则与原名反查。
 #
 # 事项固定的工具清单快照给出每个工具的原名（可能含点号、大写、连字符等 MCP 允许、静态定义不允许的字符）；
 # 模型看到的工具名、事项定义里的键与许可判断用的是同一个**标识**（小写字母、数字与下划线，字母开头），
-# 原名只在调用时按映射还原（工单 #1175 第 2 轮，设计说明第 5.1 节）。
+# 原名只在调用时按映射还原（工单 #1175 第 2 轮，设计说明「工具的提供」）。
 # 冲突（与内置或动态工具重名、或两个不同的工具收敛成同一个别名）在装配时拒绝。
-# 第 7 节的会话部分也在这里（工单 #1175 第 8 轮）：`McpSessions` 管每个 run 每台服务器一个会话实例，
+# docs/design/network-and-mcp.md「MCP 服务器」的会话部分也在这里（工单 #1175 第 8 轮）：`McpSessions` 管每个 run 每台服务器一个会话实例，
 # 从冻结的设置文档（item_definitions 读的同一份）组出启动参数，`call` 经客户端调用并交回已脱敏的结果；
 # run 之间与跨 run 的生命周期（持久化生命周期事件、遗留进程、取消后的结果未知处理）归工单 #1176。
 
@@ -35,7 +35,7 @@ _DISALLOWED = re.compile(r"[^a-z0-9_]")
 MCP_DISPATCH_TOOL = "mcp"
 # 轮询取消信号与调用时限的间隔（秒）：取消从另一条线程的 Event 到达，轮询把它转给客户端的取消
 _CANCEL_POLL_SEC = 0.1
-# 调用超时或取消以后的错误码：这一次尝试没有完整结果，按结果未知交还发出它的会话（设计说明第 7.3、8 节）
+# 调用超时或取消以后的错误码：这一次尝试没有完整结果，按结果未知交还发出它的会话（docs/design/network-and-mcp.md「调用与结果」、「恢复契约」）
 CANCELLED_CODE = "cancelled"
 # 会话关闭的原因（写进 mcp_server_closed 的载荷）：run 收尾、超时或取消以后关闭、启动时结束遗留进程
 CLOSE_ON_RUN_END = "closed"
@@ -46,23 +46,23 @@ EventSink = Callable[[str, dict[str, Any]], None]
 
 
 class ToolAliasConflict(Exception):
-    # 与内置或动态工具重名，或两个不同的工具收敛成同一个别名：拒绝保存（第 5.1 节）
+    # 与内置或动态工具重名，或两个不同的工具收敛成同一个别名：拒绝保存（docs/design/network-and-mcp.md「工具的提供」）
     pass
 
 
 class UnknownToolAlias(Exception):
-    # 别名不在这个事项的名称表里：工具许可拒绝，原因作为工具结果返回（第 5.2 节）
+    # 别名不在这个事项的名称表里：工具许可拒绝，原因作为工具结果返回（docs/design/network-and-mcp.md「工具许可」）
     pass
 
 
 class McpRefused(Exception):
-    # 这次 MCP 调用被拒绝（别名不在冻结设置带来的名称表里）：原因作为工具结果交回模型（第 5.2 节）
+    # 这次 MCP 调用被拒绝（别名不在冻结设置带来的名称表里）：原因作为工具结果交回模型（docs/design/network-and-mcp.md「工具许可」）
     pass
 
 
 @dataclass(frozen=True)
 class McpOutcome:
-    # 一次 MCP 调用的结果（第 7.3 节）：回执与保存外部来源工件要用的两部分。
+    # 一次 MCP 调用的结果（docs/design/network-and-mcp.md「调用与结果」）：回执与保存外部来源工件要用的两部分。
     # result_text 已把凭据值替换为星号（客户端一侧），调用目标的模型直接读它；
     # is_error 的调用记为已完成的动作，错误文本在 result_text 里
     result_text: str
@@ -87,7 +87,7 @@ def tool_alias(server: str, tool: str) -> str:
 
     收敛以后超过 64 个字符时，取前 51 个字符、加下划线、追加 `alias_suffix(server, tool)`；
     结果总是标识（前缀 `mcp__` 以字母开头），且同一个（服务器、工具）总是得到同一个别名。
-    两个不同的工具收敛成同一个别名时不在这里改名：由 `ToolAliases.add` 拒绝（第 5.1 节）。
+    两个不同的工具收敛成同一个别名时不在这里改名：由 `ToolAliases.add` 拒绝（docs/design/network-and-mcp.md「工具的提供」）。
     """
     name = _DISALLOWED.sub("_", (TOOL_PREFIX + server + "__" + tool).lower())
     if len(name) > TOOL_NAME_MAX:
@@ -134,7 +134,7 @@ def item_definitions(base, document):
 
     document 是 
 un_created 里冻结的那份 MCP 设置（非秘密设置与凭据引用的整份文档，
-    见设计说明第 4.3 节），ase 是当前定义。规则（第 5.1 节）：
+    见 docs/design/model-management.md「模型访问定义与准入」），ase 是当前定义。规则（docs/design/network-and-mcp.md「工具的提供」）：
 
     - 只用工具清单快照，且快照的配置摘要必须与这台服务器的配置摘要一致；没有快照或摘要不符的
       服务器不提供工具（本函数不探测）。
@@ -143,7 +143,7 @@ un_created 里冻结的那份 MCP 设置（非秘密设置与凭据引用的整�
 one，取消能否确认停止按传输方式（stdio 能确认）。
     - 只给服务器设置里写明的部门：别名追加到这些部门的角色工具清单与每一种事项种类的工具清单，
       其他部门看不到它。
-    - 没有 MCP 设置、或没有可用快照时返回 ase 本身（副本与当前定义等价，第 4.3 节「旧事项按空设置读取」）。
+    - 没有 MCP 设置、或没有可用快照时返回 ase 本身（副本与当前定义等价，docs/design/network-and-mcp.md「版本与固定」「旧事项按空设置读取」）。
     """
     servers = (document or {}).get("servers") or {}
     aliases = ToolAliases(reserved=tuple(base.tools))
@@ -186,7 +186,7 @@ one，取消能否确认停止按传输方式（stdio 能确认）。
 
 
 # ---------------------------------------------------------------------------
-# MCP 会话（第 7.2、7.3 节，工单 #1175 第 8 轮）：一个 run 一张表，每台服务器一个会话实例。
+# MCP 会话（docs/design/network-and-mcp.md「运行规则」、「调用与结果」，工单 #1175 第 8 轮）：一个 run 一张表，每台服务器一个会话实例。
 #
 
 
@@ -198,7 +198,7 @@ class _ServerLaunchPlan:
 
 
 class McpSessions:
-    """一个 run 的 MCP 会话表（第 7.2 节）：每台服务器一个实例，第一次调用时启动。
+    """一个 run 的 MCP 会话表（docs/design/network-and-mcp.md「运行规则」）：每台服务器一个实例，第一次调用时启动。
 
     document 是 run_created 里冻结的那份 MCP 设置（与 `item_definitions` 读同一份）；
     credentials 是控制主机的凭据来源（调用时按名称取值），stderr_dir 放标准错误输出的日志文件。
@@ -222,7 +222,7 @@ class McpSessions:
 
     def original(self, alias: str) -> tuple[str, str]:
         # 别名反查（服务器、原工具名）：按冻结设置里的可用快照重建名称表（与 item_definitions
-        # 叠加定义副本用的是同一条名称规则，第 5.1 节）。没有冻结设置、或别名不在其中
+        # 叠加定义副本用的是同一条名称规则，docs/design/network-and-mcp.md「工具的提供」）。没有冻结设置、或别名不在其中
         # （例如别的工具名）时抛 UnknownToolAlias，执行环境据此拒绝
         aliases = ToolAliases()
         for server in (self._document.get("servers") or {}).values():
@@ -247,10 +247,10 @@ class McpSessions:
 
     async def call(self, alias: str, server: str, tool: str, arguments: dict | None,
                    *, stop=None) -> McpOutcome:
-        # 一次 MCP 调用（第 7.2、7.3 节）：按原名调这台服务器的工具，工具失败（is_error）交回错误文本，
+        # 一次 MCP 调用（docs/design/network-and-mcp.md「运行规则」、「调用与结果」）：按原名调这台服务器的工具，工具失败（is_error）交回错误文本，
         # 动作记为已完成；协议错误与启动失败是失败的动作，原因写明（凭据值已替换为星号）。
         # stop 是执行环境的取消信号：到达时取消这次调用（进程已结束时能确认停止）。
-        # 超时与取消没有完整结果：先取消，再按结果未知交还发出它的会话（第 8 节，工单 #1176）
+        # 超时与取消没有完整结果：先取消，再按结果未知交还发出它的会话（docs/design/network-and-mcp.md「恢复契约」，工单 #1176）
         try:
             client = await self._session_for(server)
         except McpRefused as refusal:
@@ -276,7 +276,7 @@ class McpSessions:
 
     async def close(self) -> None:
         # run 结束、暂停或停止时关闭全部会话（stdio 先关标准输入，SDK 等待以后结束进程树；HTTP 关闭会话），
-        # 每关闭一台写一条 mcp_server_closed（第 7.2 节）：关闭以后调用方在事件里读得到这件事
+        # 每关闭一台写一条 mcp_server_closed（docs/design/network-and-mcp.md「运行规则」）：关闭以后调用方在事件里读得到这件事
         sessions, self._sessions = self._sessions, {}
         for name, client in sessions.items():
             try:
@@ -287,7 +287,7 @@ class McpSessions:
     # ---- 内部 ----
 
     def _record(self, event_type: str, payload: dict[str, Any]) -> None:
-        # 生命周期事件（第 7.2 节）：种类与载荷交给装配一方给出的写入方。
+        # 生命周期事件（docs/design/network-and-mcp.md「运行规则」）：种类与载荷交给装配一方给出的写入方。
         # 没有给写入方时什么也不写（单一模块的用例按会话表本身核对行为）
         if self._events is None:
             return
@@ -358,11 +358,11 @@ class McpSessions:
         finally:
             if watcher is not None and not watcher.done():
                 watcher.cancel()
-        # 结果文本与结构化输出都把凭据值替换为星号再保存（设计说明第 4.4 节：
+        # 结果文本与结构化输出都把凭据值替换为星号再保存（docs/design/network-and-mcp.md「凭据」：
         # 「保存的标准错误输出、错误文本与结果文本在写入之前，把已取得的凭据值替换为星号」）
         if result.cancelled:
             # 超时或被取消：客户端已经先发取消通知、等应答最多 10 秒，stdio 随后结束整个进程树，
-            # HTTP 关闭会话（第 7.2、8 节，工单 #1176）。这一次没有完整结果：按结果未知交还发出它的
+            # HTTP 关闭会话（docs/design/network-and-mcp.md「运行规则」、「恢复契约」，工单 #1176）。这一次没有完整结果：按结果未知交还发出它的
             # 会话，回执写明取消能否确认。会话已经关闭，从表里去掉，下一次调用按同一台服务器重新建立
             self._sessions.pop(server, None)
             self._close_after_cancel(server, client)
@@ -403,7 +403,7 @@ async def _cancel_when_stopped(client: McpClient, stop) -> None:
 
 
 def _cancelled_text(server: str, tool: str, confirmable: bool, client_text: str) -> str:
-    # 超时或取消以后的工具结果（设计说明第 8 节，工单 #1176）：写明已经先取消、取消能否确认服务器停止，
+    # 超时或取消以后的工具结果（docs/design/network-and-mcp.md「恢复契约」，工单 #1176）：写明已经先取消、取消能否确认服务器停止，
     # 以及这一次尝试执行被中断、结果未知；由发出这次调用的会话决定是否重新调用（没有自动重试）
     confirmation = ("能确认服务器已停止（stdio 服务器随后结束整个进程树）" if confirmable
                     else "不能确认服务器已停止（HTTP 会话已关闭，服务器端已处理的请求无法撤回）")
@@ -416,7 +416,7 @@ def _cancelled_text(server: str, tool: str, confirmable: bool, client_text: str)
 
 
 # ---------------------------------------------------------------------------
-# 遗留的服务器进程（第 7.2 节，工单 #1176）：Yudao 启动时结束没有关闭记录的进程，补写 mcp_server_closed。
+# 遗留的服务器进程（docs/design/network-and-mcp.md「运行规则」，工单 #1176）：Yudao 启动时结束没有关闭记录的进程，补写 mcp_server_closed。
 
 
 @dataclass(frozen=True)
@@ -438,7 +438,7 @@ _LEFTOVER_PAGE = 1000
 def leftover_servers(store, *, limit: int = _LEFTOVER_PAGE) -> list[LeftoverServer]:
     """有启动记录、没有关闭记录的服务器（按（run、服务器名称）配对，先启动先配对）。
 
-    Yudao 启动时用这份清单结束遗留的服务器进程并补写关闭事件（设计说明第 7.2 节）：
+    Yudao 启动时用这份清单结束遗留的服务器进程并补写关闭事件（docs/design/network-and-mcp.md「运行规则」）：
     进程崩溃时关闭事件没有写下来，服务器进程可能还活着；同一台服务器在一个 run 里可以
     启动与关闭多次，所以按启动的先后一一配对，不按服务器名称去重。
     """

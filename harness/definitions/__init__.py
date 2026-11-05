@@ -29,13 +29,13 @@ Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
 # 本模块不依赖动作合同，只导入本模块的 Provider 模块因此不会带上动作层（工单 #1275）
 ActionKind = Literal["read", "write", "check", "command", "fetch", "mcp", "trial", "browser"]
 
-# 核实方法（恢复契约第 4 节「结果未知时向哪里查」）：none 不查询外部结果，snapshot 以动作前后的公开树快照
+# 核实方法（恢复契约「动作分类与处置」中「结果未知时向哪里查」）：none 不查询外部结果，snapshot 以动作前后的公开树快照
 # 核对实际效果，query 按尝试身份查询执行环境的动作记录、检查回执或试用会话记录
 Verification = Literal["none", "snapshot", "query"]
 
 # 每类动作的既定合同：（核实方法，取消能否确认停止）。None 表示这一类里随工具不同，必须由定义写明。
 # 前四类是在这份合同之前就有的动作：读取与命令没有可以查询的外部结果，写入以树快照核实，检查的结果是检查回执、
-# 经执行环境的查询取得；它们的定义可以省略这两项，按这里的值解释（恢复契约第 4 节「动作分类与处置」）
+# 经执行环境的查询取得；它们的定义可以省略这两项，按这里的值解释（恢复契约「动作分类与处置」）
 ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]] = {
     "read": ("none", True),
     "write": ("snapshot", True),
@@ -47,13 +47,13 @@ ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]]
     "browser": (None, True),
 }
 
-# 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明第 18 节）
+# 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明「本机的做法」）
 ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
 
-# 取回工具（网络与 MCP 设计说明第 5.1、12.4 节）：部门按定义都有这两个工具；以关闭取回的启动参数
+# 取回工具（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）：部门按定义都有这两个工具；以关闭取回的启动参数
 # （`--no-fetch`）运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里
 # 不动：取舍发生在「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，
-# 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明第 3 节）
+# 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明「两边的运行条件」）
 FETCH_TOOLS: tuple[str, ...] = ("fetch_url", "read_external_source")
 
 # 取回是否可用：进程范围的启动设置，默认可用；只在启动时由命令行改一次（工单 #1172）
@@ -88,7 +88,7 @@ def check_contract(kind: ActionKind, verification: Verification | None, cancella
     if kind in ADDED_KINDS and (verification is None or cancellable is None):
         raise ValueError(f"a {kind} action requires verification and cancellable")
 
-# 规则登记中的条目名：由点号连接的小写标识，每一段与 Identifier 相同（设计说明第 2、8 节）。
+# 规则登记中的条目名：由点号连接的小写标识，每一段与 Identifier 相同（设计说明「规则登记」、「规则登记的初始内容」）。
 # 前一段是领域，最后一段是条目；等待的时长上限与栏目上限因此写作 wait.desktop.max_sec、
 # context.column_limit.catalog
 RuleName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")]
@@ -149,7 +149,7 @@ def _frozen(*fields: str) -> Any:
 
 
 class Rule(_Definition):
-    # 规则登记的一个条目（设计说明第 2 节）：在现值之外带四项记录与取值界限，
+    # 规则登记的一个条目（设计说明「规则登记」）：在现值之外带四项记录与取值界限，
     # 全部条目合起来就是规则登记，不另建系统
     # 现值的类型：数值（int 或 float，取值与界限都是有限的数）、开关（bool）、
     # 可见范围（字符串列表，界限约束条目数）、档位名（字符串，界限给的是档位表的长度）
@@ -199,10 +199,10 @@ class Department(_Definition):
     label: str = ""
     # 部门的角色：现在每个部门一个角色，角色编号与部门编号相同（事件的 role 字段记录部门）
     roles: tuple[Identifier, ...] = Field(min_length=1)
-    # 本部门模型的建议能力（设计说明第 5.6 节）：取值来自模型访问定义的输入方式。
+    # 本部门模型的建议能力（docs/design/model-management.md「部门的建议能力」）：取值来自模型访问定义的输入方式。
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
-    # 部门关注的成果（三部门的循环结构第 2 节）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
+    # 部门关注的成果（三部门的循环结构「部门按关注的成果开始工作」）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
     # 关注关系写在定义里，代码里只有一条通用规则。名称的含义归路由：哪些名称认得出由那份路由的定义与它的
     # 校验给出，内核只核对它是字符串（工单 #1456）。user_input 只在旧定义里还有解释来源的用处：没有写
     # sources 的旧定义按「关注用户输入的部门」解释两种来源（Definitions.source_department，工单 #1455）
@@ -216,7 +216,7 @@ ItemSource = Literal["user_input", "onboarding"]
 ITEM_SOURCES: tuple[ItemSource, ...] = get_args(ItemSource)
 
 
-# 写入范围是内核认识的通用权限（设计说明第 4.2 节第 1 条）：workspace 写这个事项的工作区；
+# 写入范围是内核认识的通用权限（docs/design/rules-and-parameters.md「对照」中「重新运行的对照按实验规约」）：workspace 写这个事项的工作区；
 # check_materials 只写检查材料的目录，写的东西不进入公开树与交付，不让被核验方的成果失效
 WriteScopeKind = Literal["workspace", "check_materials"]
 
@@ -252,7 +252,7 @@ class VerifierRole(_Definition):
 
 
 class VerificationDeclaration(_Definition):
-    # 组织定义的核验声明（设计说明第 4.2、4.7 节）：谁核验谁、角色的写入范围。
+    # 组织定义的核验声明（docs/design/rules-and-parameters.md「对照」中「重新运行的对照按实验规约」、「对照」中「优先使用波动小的指标」）：谁核验谁、角色的写入范围。
     # 谁能拒绝谁由核验声明推出，不另写一份
     verifiers: tuple[VerifierRole, ...] = ()
     write_scopes: Mapping[Identifier, WriteScope] = Field(default_factory=dict)
@@ -283,7 +283,7 @@ class Organization(_Definition):
     # 字段只增：没有写这个字段的旧定义按「关注用户输入的部门」解释两种来源（Definitions.source_department）；
     # 写了就必须每一种来源都写明，接它的部门要在这份定义里（加载时由 source_issues 核对）
     sources: Mapping[ItemSource, Identifier] | None = None
-    # 路由实现的名称（骨架与应用设计说明第 5.1 节、工单 #825）：启动时按这个名称接上实现，
+    # 路由实现的名称（骨架与应用设计说明「路由契约」、工单 #825）：启动时按这个名称接上实现，
     # 名称必须是 routings.json 里登记的其中一个。默认是成果驱动
     routing: Identifier = "watched_outputs"
     # 核验声明：谁核验谁的哪种成果、角色的写入范围。没有写时按旧定义的三部门解释（LEGACY_VERIFICATION），
@@ -310,13 +310,13 @@ class Tool(_Definition):
     # 环境工具的动作类别：读取、写入、检查、本地命令与新增的四类（网络取回、MCP、试用会话、浏览器）；
     # 许可规则与执行环境的分派按动作类别适用，实际工具名仍供许可、提案与装配读取
     action: ActionKind | None = None
-    # 这一类动作的核实方法与取消能否确认停止（恢复契约第 4 节）：旧类别可以省略，按类别的既定值解释；
+    # 这一类动作的核实方法与取消能否确认停止（恢复契约「动作分类与处置」）：旧类别可以省略，按类别的既定值解释；
     # 新增的类别必须写明（动作合同：harness/actions.py 的 check_contract）
     verification: Verification | None = None
     cancellable: bool | None = None
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
-    # 声明这个工具需要图像输入（设计说明第 5.6 节与浏览器设计第 6.1 节）：调用目标不含图像时
+    # 声明这个工具需要图像输入（设计说明「工具定义的声明」与浏览器 docs/design/model-management.md「工具定义的声明」）：调用目标不含图像时
     # 步骤驱动不在这次请求的工具定义中提供它。现在声明为需要的工具由 3.2D 的浏览器与 computer use 提供
     requires_image_input: bool = False
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
@@ -348,7 +348,7 @@ class ProposalContract(_Definition):
     freeze_kinds = _frozen("kinds")
 
 
-# 提案合同里的通用条件（设计说明第 5.5 节）：内核按合同核对，成果驱动写死的关系规则改写成这几种。
+# 提案合同里的通用条件（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：内核按合同核对，成果驱动写死的关系规则改写成这几种。
 # 条件名与参数是封闭清单，装载定义时逐条核对；写错的条件在程序启动时以 DefinitionError 报出。
 ConditionName = Literal["basis_current", "referenced_current", "check_receipts", "tree_matches",
                         "author_separation", "no_duplicate_content"]
@@ -394,7 +394,7 @@ class ConditionNames(_Definition):
         return self
 
 
-# 每种条件用到哪些参数：装载时按它核对，多写的参数与缺少的参数各自报出（设计说明第 5.5 节）
+# 每种条件用到哪些参数：装载时按它核对，多写的参数与缺少的参数各自报出（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
 _CONDITION_PARAMETERS: dict[str, frozenset[str]] = {
     "basis_current": frozenset({"field", "target"}),
     "referenced_current": frozenset({"artifact", "referenced", "missing"}),
@@ -464,7 +464,7 @@ class ProposalContracts(_Definition):
     # 各角色自己的部分；shared 是每个角色都有的部分（协作请求、回应与指导的回应），接在角色自己的部分之后
     roles: Mapping[Identifier, ProposalContract]
     shared: ProposalContract
-    # 各提案种类的通用条件（设计说明第 5.5 节）：键是提案种类，值是按顺序核对的条件
+    # 各提案种类的通用条件（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：键是提案种类，值是按顺序核对的条件
     conditions: Mapping[Identifier, tuple[ProposalCondition, ...]] = Field(default_factory=dict)
 
     freeze_roles = _frozen("roles")
@@ -478,7 +478,7 @@ class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（设计说明第 4.3 节）；默认协议：模型没有单独声明协议时预填（设计说明第 4.1 节）
+    # 获取模型列表与连接测试使用的认证方式（设计说明「对照」中「噪声范围来自同一版本的重复运行」）；默认协议：模型没有单独声明协议时预填（docs/design/rules-and-parameters.md「对照」中「改动分两类」）
     default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
@@ -495,14 +495,14 @@ class ServicePreset(_Definition):
 
 
 class ServicePresets(_Definition):
-    # 服务方案预置表（设计说明第 4.1 节）：整张表的 revision 与来源随界面显示；每个服务方案一项
+    # 服务方案预置表（docs/design/rules-and-parameters.md「对照」中「改动分两类」）：整张表的 revision 与来源随界面显示；每个服务方案一项
     revision: str = Field(min_length=1)
     source: str = Field(min_length=1)
     presets: tuple[ServicePreset, ...]
 
 
 class ModelCapability(_Definition):
-    # 模型能力表中的一条：取自 models.dev 的快照，只保留设计说明第 4.1 节的字段。
+    # 模型能力表中的一条：取自 models.dev 的快照，只保留 docs/design/model-management.md「服务方案预置表与模型能力表」的字段。
     # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
     # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务商接入包。
@@ -589,14 +589,14 @@ class WorkItems(_Definition):
 
 
 class RoutingEndReason(_Definition):
-    # 路由自己的结束原因（设计说明第 5.4 节第 7 条）：属于那份路由定义版本的封闭清单，与内核的停止原因分开；
+    # 路由自己的结束原因（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）：属于那份路由定义版本的封闭清单，与内核的停止原因分开；
     # 内核的停止原因（上限、取消、升级等）对所有路由相同
     label: str = Field(min_length=1)
     outcome: Literal["done", "paused", "failed"]
     human_action: str | None = None
 
 
-# 事件的主要事实从哪里来（应用层与接口层设计说明第 5.2 节「事件对象」）：确定规则的判定、决策模型的判定、
+# 事件的主要事实从哪里来（应用层与接口层设计说明「事件对象」）：确定规则的判定、决策模型的判定、
 # 角色的陈述、主机的测量、用户。事件载荷不带来源字段，来源由 event_sources.json 按事件种类给出
 SourceKind = Literal["rule", "decision_model", "role_statement", "host_measurement", "user"]
 
@@ -650,7 +650,7 @@ class OutcomeKinds(_Definition):
 
 
 class Routing(_Definition):
-    # 一种路由实现（routings.json，工单 #825），下面一段是它自己的一份定义（设计说明第 5.4 节第 2 条）：
+    # 一种路由实现（routings.json，工单 #825），下面一段是它自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：
     # 部门、成果种类、提议方式、路由自己的上限与结束原因。内核只核对这份定义的结构（字段、类型与非空），
     # 名称指向的内容由路由实现自己校验（routing_contract.select）；成果驱动的这一份按名称引用现有的定义文件，
     # 内容不搬动（工单 #861）。组织定义的 routing 写的名称就是这里的 id
@@ -705,12 +705,12 @@ class Definitions(_Definition):
     # 工具定义，键是工具名称
     tools: Mapping[Identifier, Tool]
     proposal_contracts: ProposalContracts
-    # 规则登记（设计说明第 2 节）：键是条目名，全部条目合起来就是登记，不另建系统
+    # 规则登记（设计说明「规则登记」）：键是条目名，全部条目合起来就是登记，不另建系统
     rules: Mapping[RuleName, Rule]
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: Mapping[Identifier, StopReason]
     service_presets: ServicePresets
-    # 模型能力表：models.dev 快照，带 revision、快照日期与来源，只用于预填（设计说明第 4.1 节）
+    # 模型能力表：models.dev 快照，带 revision、快照日期与来源，只用于预填（docs/design/model-management.md「服务方案预置表与模型能力表」）
     model_capabilities: ModelCapabilities
     # 事项种类与仓库概况的模式表，来自 work_items.json
     work_items: WorkItems
@@ -742,14 +742,14 @@ class Definitions(_Definition):
         return self.roles[department]
 
     def suggested_capabilities(self, department: str) -> tuple[str, ...]:
-        # 部门的建议能力（设计说明第 5.6 节）：部门内的角色继承部门的建议能力
+        # 部门的建议能力（docs/design/model-management.md「部门的建议能力」）：部门内的角色继承部门的建议能力
         for item in self.organization.departments:
             if item.id == department:
                 return item.suggested_capabilities
         raise ValueError(f"unknown department {department!r}")
 
     def watched_outputs(self, department: str) -> tuple[str, ...]:
-        """部门关注的成果（循环结构第 2 节）：关注关系写在组织定义里，代码里只有一条通用规则。"""
+        """部门关注的成果（循环结构「部门按关注的成果开始工作」）：关注关系写在组织定义里，代码里只有一条通用规则。"""
         for item in self.organization.departments:
             if item.id == department:
                 return item.watched
@@ -824,7 +824,7 @@ class Definitions(_Definition):
         return self.verification.write_scopes.get(role, WORKSPACE_WRITE_SCOPE)
 
     def is_open_loop(self, outcome: str) -> bool:
-        """事项最后采纳的成果没有核验角色核验时为开环（设计说明第 4.7 节第 4 条）。
+        """事项最后采纳的成果没有核验角色核验时为开环（docs/design/rules-and-parameters.md「对照」中「优先使用波动小的指标」）。
 
         outcome 是事项最后采纳的成果种类（成果驱动下是交付），按成果种类与核验声明算，判断里不写部门名。
         """
@@ -869,11 +869,11 @@ class Definitions(_Definition):
         return {"submit_tools": submit_tools, "kinds": thaw(kinds), "notes": notes}
 
     def proposal_conditions(self, kind: str) -> tuple[ProposalCondition, ...]:
-        # 一种提案的通用条件（设计说明第 5.5 节）：按合同里列出的顺序由内核核对；没有列出时没有通用条件
+        # 一种提案的通用条件（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：按合同里列出的顺序由内核核对；没有列出时没有通用条件
         return self.proposal_contracts.conditions.get(kind, ())
 
     def routing_definition(self) -> Routing:
-        # 组织定义写明的路由自己的一份定义（设计说明第 5.4 节第 2 条）：加载时核对过它在 routings.json 里
+        # 组织定义写明的路由自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：加载时核对过它在 routings.json 里
         return next(item for item in self.routings.routings if item.id == self.routing)
 
     def outcomes_of(self, routing_name: str) -> tuple[str, ...]:
@@ -889,7 +889,7 @@ class Definitions(_Definition):
         return tuple(group.kinds) if group is not None else ()
 
     def stop_reason(self, reason: str) -> StopReason:
-        # 停止原因来自定义中的清单；组织定义所选的路由自己声明的结束原因同样可以写入（设计说明第 5.4 节第 7 条）
+        # 停止原因来自定义中的清单；组织定义所选的路由自己声明的结束原因同样可以写入（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）
         definition = self.stop_reasons.get(reason)
         if definition is not None:
             return definition
@@ -932,7 +932,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "routings.json": ("routings", TypeAdapter(Routings)),
     "outcome_kinds.json": ("outcome_kinds", TypeAdapter(OutcomeKinds)),
     "event_sources.json": ("event_sources", TypeAdapter(dict[Identifier, EventSource])),
-    # 生成的浏览器工具定义（浏览器与 computer use 设计说明第 4.1 节，工单 #147）：与 tools.json 合并成工具清单
+    # 生成的浏览器工具定义（浏览器与 computer use 设计说明「运行方式」，工单 #147）：与 tools.json 合并成工具清单
     "browser_tools.json": ("browser_tools", TypeAdapter(dict[Identifier, Tool])),
 }
 # 可以不存在的定义文件（字段只增，旧文件新版本能读）。
@@ -1153,7 +1153,7 @@ def _routing_references(organization: Organization, routings: Routings) -> list[
 
 
 def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
-    """事项的来源都有部门接（设计说明第 4.7 节第 1 条，工单 #1455）：不满足的整份拒绝，写出是哪一项。
+    """事项的来源都有部门接（docs/design/rules-and-parameters.md「对照」中「优先使用波动小的指标」，工单 #1455）：不满足的整份拒绝，写出是哪一项。
 
     旧定义没有写 sources 时，两种来源都按关注用户输入的部门解释：没有这样的部门，两种来源就没人接。
     写了 sources 时，每一种来源都要写明，接它的部门要在这份定义里；少一种、指到不存在的部门都拒绝。
@@ -1178,7 +1178,7 @@ def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
 
 
 def verification_issues(organization: Organization, outcomes: Collection[str]) -> list[tuple[str, str, str]]:
-    """核验声明的核对（设计说明第 4.7 节第 2、3 条）：核验角色与被核验的角色都在这份定义里，
+    """核验声明的核对（docs/design/rules-and-parameters.md「对照」中「优先使用波动小的指标」第 2、3 条）：核验角色与被核验的角色都在这份定义里，
     成果种类在这份定义里，谁能拒绝谁无环（角色核验自己也是环）。
 
     旧定义没有这份声明，读的时候按今天写死的三部门解释；那种解释不是定义的一部分，这里不核对。
@@ -1351,7 +1351,7 @@ def _condition_artifact_names(condition: ProposalCondition) -> list[tuple[str, s
 
 def _condition_references(contracts: ProposalContracts, organization: Organization,
                           outcome_kinds: OutcomeKinds) -> list[tuple[str, str, str]]:
-    # 提案合同里的通用条件（设计说明第 5.5 节）：取回执的部门在组织里；条件引用的成果种类在这份定义里
+    # 提案合同里的通用条件（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：取回执的部门在组织里；条件引用的成果种类在这份定义里
     # （成果种类那一项，工单 #1456）。名称写错时整份拒绝——否则一处手误会把内核的几条判断静默关掉。
     # 旧的定义目录没有成果种类这一项，没有词表可对，照旧加载
     issues: list[tuple[str, str, str]] = []

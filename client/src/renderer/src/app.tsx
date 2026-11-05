@@ -1,6 +1,6 @@
 // 页面的应用：连接状态、路由、外壳与页面（原型 v8 设计说明第 3 节，工单 #79 与 #80）。
 // 页面由 Yudao 服务提供，接口地址就是页面自己的来源，页面内的导航写在地址 # 之后
-// （网页界面的提供与发布设计说明第 5.1 节）。
+// （网页界面的提供与发布设计说明「接口层提供页面文件」）。
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOrganizationResult, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
@@ -185,9 +185,9 @@ export function App() {
     window.location.hash = hash;
   }, []);
 
-  // 系统通知与标签页标题（工单 #375，网页界面的提供与发布设计说明第 5.3 节）：
+  // 系统通知与标签页标题（工单 #375，网页界面的提供与发布设计说明「系统通知与「安装此站点为应用」」）：
   // 页面打开期间由不按项目筛选的事件流连接给出决定请求与等待模型服务（提醒只依据事件流与查询，
-  // 不另设通知接口，应用层与接口层设计说明第 5.7 节）
+  // 不另设通知接口，应用层与接口层设计说明「页面的同步规则」）
   const notifier = useMemo(() => new SystemNotifier(), []);
   // 标签页的标题：待决定的数量，没有待决定的事时不显示数字（标题的基础部分是页面自己的标题）
   const baseTitle = useRef(document.title);
@@ -388,7 +388,7 @@ export function App() {
   );
 }
 
-// 填写访问令牌的表单（应用层与接口层设计说明第 6.3 节）：局域网访问方式下服务对全部接口路径
+// 填写访问令牌的表单（应用层与接口层设计说明「令牌与 TLS」）：局域网访问方式下服务对全部接口路径
 // 要求 Authorization: Bearer <令牌>，页面文件不需要令牌，因此页面能打开而接口返回 401。
 // 令牌由用户在控制主机上用 token create 建立，在这里的浏览器中填写一次并保存在这个浏览器里；
 // 输入框用密码类型，页面不回显填过的令牌。

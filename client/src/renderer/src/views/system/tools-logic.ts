@@ -1,4 +1,4 @@
-// 工具与扩展页的纯计算（工单 #239，网络与 MCP 设计说明第 11.3 节）。
+// 工具与扩展页的纯计算（工单 #239，网络与 MCP 设计说明「系统「工具与扩展」页」）。
 //
 // 这一页是只读汇总：网络取回列各项目最近的取回记录，MCP 工具列各项目的服务器、最近一次状态与工具。
 // 这里只把 tools.registry 的结果变成页面上要写的字与要显示的行，不触碰网络与界面；
@@ -183,7 +183,7 @@ export const PENDING_SECTIONS: readonly PendingSection[] = [
   {
     id: "browser",
     title: "浏览器工具",
-    // 浏览器工具的动作在浏览器里做（浏览器与 computer use 设计说明第 2 节）
+    // 浏览器工具的动作在浏览器里做（浏览器与 computer use 设计说明「概念与分层」）
     subtitle: "浏览器里的页面操作与截图",
     stage: "阶段三",
     note: "这一阶段随后接入；在那以前这一页不列浏览器工具。",
@@ -191,7 +191,7 @@ export const PENDING_SECTIONS: readonly PendingSection[] = [
   {
     id: "computer-use",
     title: "computer use",
-    // 桌面操作在控制主机的桌面上进行（浏览器与 computer use 设计说明第 5 节）
+    // 桌面操作在控制主机的桌面上进行（浏览器与 computer use 设计说明「computer use」）
     subtitle: "在控制主机的桌面上截图、点击与输入文字",
     stage: "阶段四",
     note: "桌面操作进入阶段四以后接入。",
