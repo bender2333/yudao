@@ -375,7 +375,52 @@ class Workspaces:
         # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
         if department in self.policies(run_id)[1]:
             environment.bind_trial_source(self.source_tree(department, projection))
+            # 基线副本与起点到交付的改动清单（检验的有效性设计说明第 7.2 节，工单 #1181）：
+            # 起点树是事项开始时的项目起点，返工后保持不变；改动清单从这里一次算好。
+            # 同名检查的命令与声明文件的内容取自当前交付的说明与封存树
+            start, changed = self._baseline_facts(projection)
+            environment.bind_baseline_source(start, changed)
+            delivery = projection.delivery_spec
+            if delivery is not None and delivery.tree_ref is not None:
+                try:
+                    sealed = load_tree(self._artifacts, artifact_run(delivery.tree_ref.path), delivery.tree_ref)
+                except (ValueError, OSError):
+                    sealed = None
+                environment.bind_delivery_checks(getattr(delivery, "checks", None), sealed)
+            else:
+                environment.bind_delivery_checks(None, None)
         return environment
+
+    def _baseline_facts(self, projection: Any) -> tuple[CapturedTree | None, tuple[str, ...]]:
+        # 事项起点树与起点到交付的改动清单：起点是 run_created 记下的采纳成果或起始文件夹快照
+        # （还没有交付时为空树），改动清单是交付封存的树相对起点多出或改了内容的文件，按路径排序。
+        # 两者都由封存树算出，不读运行工作区（工单 #1181）
+        start = self._start_tree(projection)
+        delivery = projection.delivery_spec
+        if delivery is None or delivery.tree_ref is None:
+            return start, ()
+        try:
+            sealed = load_tree(self._artifacts, artifact_run(delivery.tree_ref.path), delivery.tree_ref)
+        except (ValueError, OSError):
+            return start, ()
+        start_hashes = {item.path: hash_bytes(item.data) for item in start.files}
+        changed = sorted(item.path for item in sealed.files
+                         if item.path not in start_hashes
+                         or start_hashes[item.path] != hash_bytes(item.data))
+        return start, tuple(changed)
+
+    def _start_tree(self, projection: Any) -> CapturedTree:
+        # 事项起点树：run_created 写下的采纳成果或项目的起始文件夹快照，两者都没有时为空树；
+        # 封存的交付本身不是起点。读不出来时按没有基线处理（基线检查会拒绝执行并写明原因）
+        for record in (projection.baseline, projection.snapshot):
+            if not record:
+                continue
+            start_ref = ArtifactRef(**record["tree_ref"])
+            try:
+                return load_tree(self._artifacts, artifact_run(start_ref.path), start_ref)
+            except (ValueError, OSError):
+                return None
+        return CapturedTree(directories=(), files=())
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
                            jobs: Any | None = None) -> LocalEnvironment:
@@ -593,7 +638,7 @@ _HANDLERS = {
     "read_output": "_read_output",
     "stop_job": "_stop_job",
 }
-_PROCESSES = {"run_check": "_run_check", "bash": "_bash", "fetch_url": "_fetch", "mcp": "_mcp",
+_PROCESSES = {"run_check": "_run_check", "run_baseline_check": "_run_baseline_check", "bash": "_bash", "fetch_url": "_fetch", "mcp": "_mcp",
               "browser": "_browser",
               "trial_start": "_trial_start", "trial_open": "_trial_open",
               "trial_output": "_trial_output", "trial_stop": "_trial_stop"}
@@ -609,7 +654,7 @@ _KIND_TOOLS = {
     "read": frozenset({"read_file", "list_files", "search", "read_range", "read_external_source"}),
     "fetch": frozenset({"fetch_url"}),
     "write": frozenset({"write_file", "edit_range", "delete_file", "move_file"}),
-    "check": frozenset({"run_check"}),
+    "check": frozenset({"run_check", "run_baseline_check"}),
     "command": frozenset({"bash", "read_output", "stop_job"}),
     "mcp": frozenset(),
     "trial": frozenset({"trial_start", "trial_open", "trial_output", "trial_stop"}),
@@ -882,6 +927,14 @@ class LocalEnvironment:
         # 质检的试用副本来源：这次检查的交付快照的清单（由 Workspaces 在激活开始时交来）；
         # 工程没有这一项，trial_start 时封存当前的运行工作区
         self._trial_source: CapturedTree | None = None
+        # 基线副本的来源：事项起点树与起点到交付的改动清单（由 Workspaces 在激活开始时交来，工单 #1181）；
+        # 没有绑定时基线检查拒绝执行
+        self._baseline_source: CapturedTree | None = None
+        self._baseline_changed: tuple[str, ...] = ()
+        # 基线命令与声明文件内容的来源：当前交付的说明（同名检查的命令）与封存的交付树（声明文件的内容），
+        # 由 Workspaces 在激活开始时交来；没有绑定时基线检查按没有交付记录拒绝执行
+        self._delivery_checks: tuple[dict[str, Any], ...] = ()
+        self._delivery_tree: CapturedTree | None = None
         # 当前交付说明里的启动方式（由 Workspaces 在激活开始时交来）：trial_open 只接受这里的名称。
         # 复核由引擎在工具许可时已经做过一次，这里是执行之前的同一套核对
         self._launch_methods: list[dict[str, Any]] = []
@@ -970,6 +1023,21 @@ class LocalEnvironment:
         # 这个会话的试用副本来源（浏览器与 computer use 设计说明第 3.4 节）：质检按当前交付快照的清单
         # 建立副本，工程没有这一项，trial_start 时封存运行工作区
         self._trial_source = tree
+
+    def bind_baseline_source(self, tree: CapturedTree | None, changed: tuple[str, ...] = ()) -> None:
+        # 基线副本的来源（检验的有效性设计说明第 7.2 节，工单 #1181）：事项起点树的引用，以及起点到
+        # 交付的改动清单（声明涉及的交付文件必须属于它）。事项返工时起点树保持不变（run_created 里
+        # 记下的采纳成果或起始文件夹快照），由 Workspaces 在激活开始时交来；
+        # 直接构造环境的测试没有绑定时按没有基线处理
+        self._baseline_source = tree
+        self._baseline_changed = tuple(changed)
+
+    def bind_delivery_checks(self, checks: list[dict[str, Any]] | None,
+                             tree: CapturedTree | None) -> None:
+        # 基线命令与声明文件内容的来源（工单 #1181）：交付说明里记录的检查（name → command）与封存的交付树。
+        # 质检声明文件时内容从封存树取，不读检查工作区
+        self._delivery_checks = tuple(dict(item) for item in (checks or ()) if isinstance(item, dict))
+        self._delivery_tree = tree
 
     def bind_launch_methods(self, methods: list[dict[str, Any]] | None) -> None:
         # 当前交付说明里的启动方式：trial_open 的名称按它解析（设计说明第 3.4 节）
@@ -1672,6 +1740,7 @@ class LocalEnvironment:
                 snapshot_hash=snapshot_hash,
                 tree_changed=tree_changed,
                 qa_tests_hash=qa_tests_hash,
+                command=command,
             )
             return {
                 "name": receipt.name,
@@ -1685,7 +1754,138 @@ class LocalEnvironment:
                 "delivery_spec_hash": receipt.delivery_spec_hash,
                 "effective_contract_hash": receipt.effective_contract_hash,
                 "qa_tests_hash": receipt.qa_tests_hash,
+                "command": receipt.command,
+                "baseline": receipt.baseline,
             }, finished.status
+
+    def _delivery_check_command(self, name: str) -> str | None:
+        # 同名交付检查已经记录的命令：交付封存时主机把工程 run_check 的命令一起记下（DeliverySpec.checks）。
+        # 基线运行不能改写命令（第 7.2 节）：这里只取记录，模型给不出 command 这个参数
+        for check in getattr(self, "_delivery_checks", ()) or ():
+            if isinstance(check, dict) and check.get("name") == name and isinstance(check.get("command"), str):
+                return check["command"]
+        return None
+
+    async def _run_baseline_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 基线检查（检验的有效性设计说明第 7.2 节，工单 #1181）：主机在基线副本上运行同名交付检查，
+        # 回执先写进检查工作区，提交放行决定读取事实时它已经在了。基线副本由事项起点树、这个部门的
+        # 检查材料与声明的交付文件组成；命令取交付检查记录的那一条。时限、输出截断、进程树清理与
+        # 树变化核对与 run_check 相同。退出码非零且不是 124（超时）或 130（取消）时基线失败，
+        # 交付检查通过才有资格计入检验覆盖；124 与 130 记为无法运行。
+        args = action.input
+        name = str(args.get("name") or "").strip()
+        if not name:
+            raise ValueError("check name is required")
+        declared = args.get("files")
+        if declared is None:
+            declared = []
+        if not isinstance(declared, list) or any(not isinstance(item, str) or not item.strip()
+                                                 for item in declared):
+            raise ValueError("files must be a list of workspace-relative delivery file paths")
+        declared = [item.strip().replace("\\", "/") for item in declared]
+        if self._baseline_source is None:
+            raise ValueError("the work item's start tree is not available for a baseline check; "
+                             "the item started without a start tree or the archive cannot be read")
+        start_paths = {item.path: hash_bytes(item.data) for item in self._baseline_source.files}
+        unknown = sorted(set(declared) - set(self._baseline_changed))
+        if unknown:
+            raise ValueError("declared files must be paths changed between the start tree and the delivery: "
+                             + ", ".join(unknown))
+        command = self._delivery_check_command(name)
+        if command is None:
+            raise ValueError(f"the delivery records no check named {name!r}; run the delivery check first, "
+                             "the baseline runs the same command")
+        timeout_sec = self._check_timeout_sec
+        # 两处动作前的读取（与 run_check 相同的树变化核对口径）：源工作区（检查工作区）在动作前的那次读取，
+        # 与基线副本本身的摘要
+        workspace_digest = self.workspace.snapshot().digest
+        with self.workspace.check_copy(self._baseline_source) as copy_root:
+            for directory in self._check_materials.get(action.department, ()):
+                source = self.workspace.root / directory
+                if source.exists():
+                    shutil.copytree(source, copy_root / directory, dirs_exist_ok=True)
+            for relative in declared:
+                content = self._delivery_file(relative)
+                if content is None:
+                    raise ValueError(f"declared delivery file {relative!r} is not in the sealed delivery tree")
+                target = copy_root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+            original_digest = capture_public_tree(copy_root, True).digest
+            finished = await _run_process(
+                [_resolve_bash(), "-c", command], copy_root,
+                {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                timeout_sec, stop,
+            )
+            if finished.status == "completed":
+                exit_code = finished.returncode
+                output = _summarize_output(finished.stdout, finished.stderr, self._output_limit())
+            else:
+                if finished.status == "timeout":
+                    exit_code, output = TIMEOUT_EXIT_CODE, f"check timed out after {timeout_sec}s"
+                else:
+                    exit_code, output = CANCELLED_EXIT_CODE, "check cancelled; the process tree was stopped"
+                if finished.stdout:
+                    output += "\n" + finished.stdout
+                if finished.stderr:
+                    output += "\n" + finished.stderr
+            snapshot_hash = original_digest
+            verification_errors = []
+            # 树变化核对与 run_check 相同（说明文字只出现标签，主机路径不进入模型可见的回执）：
+            # 基线副本与源工作区任何一个改了内容，通过都不绑定到原来的快照
+            for label, root, expected in (("tested tree", copy_root, original_digest),
+                                          ("source workspace", self.workspace.root, workspace_digest)):
+                try:
+                    observed_digest = capture_public_tree(root, True).digest
+                    if label == "tested tree":
+                        snapshot_hash = observed_digest
+                    if observed_digest != expected:
+                        verification_errors.append(f"{label} changed")
+                except Exception as exc:  # noqa: BLE001 - 与 run_check 的核对同口径
+                    verification_errors.append(f"{label} could not be verified: {exc}")
+            tree_changed = bool(verification_errors)
+            if tree_changed:
+                output = (output + "\n" if output else "") + "; ".join(verification_errors)
+                output += "; pass is not bound to the original snapshot"
+            summary = redact_text(
+                f"host-executed baseline command={command} exit={exit_code}\n{output}".strip()
+            )
+            qa_tests_hash = None
+            if action.department in self._check_materials:
+                qa_tests_hash = qa_tests_digest(self.capture_qa_tests())
+            receipt = self.workspace.record_check(
+                action.department,
+                name,
+                exit_code,
+                summary,
+                snapshot_hash=snapshot_hash,
+                tree_changed=tree_changed,
+                qa_tests_hash=qa_tests_hash,
+                baseline=True,
+                command=command,
+            )
+            return {
+                "name": receipt.name,
+                "exit_code": receipt.exit_code,
+                "summary": receipt.summary,
+                "snapshot_hash": receipt.snapshot_hash,
+                "executor": "host",
+                "tree_changed": receipt.tree_changed,
+                "activation_id": receipt.activation_id,
+                "product_spec_hash": receipt.product_spec_hash,
+                "delivery_spec_hash": receipt.delivery_spec_hash,
+                "effective_contract_hash": receipt.effective_contract_hash,
+                "qa_tests_hash": receipt.qa_tests_hash,
+                "baseline": receipt.baseline,
+            }, finished.status
+
+    def _delivery_file(self, relative: str) -> bytes | None:
+        # 声明的交付文件在封存交付树里的内容：Workspaces 把封存树交给这里（bind_delivery_checks），
+        # 直接构造环境的测试没有绑定时按没有这份文件处理
+        tree = getattr(self, "_delivery_tree", None)
+        if tree is None:
+            return None
+        return next((item.data for item in tree.files if item.path == relative), None)
 
 
     # ---- 试用会话（工单 #1182）----

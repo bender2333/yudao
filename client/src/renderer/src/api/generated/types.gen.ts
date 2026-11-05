@@ -8335,6 +8335,24 @@ export type BaselineAdoptedPayload = {
 };
 
 /**
+ * BaselineCheckRecord
+ */
+export type BaselineCheckRecord = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Checks
+     */
+    checks: string;
+    /**
+     * Outcome
+     */
+    outcome: 'failed' | 'passed' | 'missing' | 'unable_to_run';
+};
+
+/**
  * BaselineReviewAcceptedEvent
  */
 export type BaselineReviewAcceptedEvent = {
@@ -8927,6 +8945,14 @@ export type CheckReceipt = {
      * Qa Tests Hash
      */
     qa_tests_hash?: string | null;
+    /**
+     * Command
+     */
+    command?: string | null;
+    /**
+     * Baseline
+     */
+    baseline?: boolean;
 };
 
 /**
@@ -15932,6 +15958,10 @@ export type QaCoveragePayload = {
      * Changed
      */
     changed?: number;
+    /**
+     * Baseline Valid
+     */
+    baseline_valid?: boolean;
 };
 
 /**
@@ -16115,6 +16145,10 @@ export type QaSubmittedPayload = {
      * Open Criteria
      */
     open_criteria: Array<string>;
+    /**
+     * Baseline Checks
+     */
+    baseline_checks?: Array<BaselineCheckRecord>;
     /**
      * Evidence Refs
      */

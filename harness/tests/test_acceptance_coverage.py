@@ -10,6 +10,9 @@
 
 from __future__ import annotations
 
+import json
+import sys
+
 import pytest
 
 from harness.adapters.fake import FakeAdapter
@@ -17,13 +20,18 @@ from harness.app.application import Application
 from harness.app.coverage_queries import AcceptanceCoverage
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import NotFound
-from harness.models import EventType
+from harness.models import EventType, json_dumps
+from harness.providers.call import ModelResponse
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 from harness.tests.helpers import explore_turn
 
 GOAL = "把文本按行处理清楚"
 ACCEPTANCE = ["打印传入的文本", "空参数时打印用法", "退出码为 0"]
+# 交付检查跑交付里的新文件（工单 #1181）：起点树还没有它，基线副本（起点树，声明不带交付文件）上
+# 这条命令失败，交付快照上通过——这一条检验满足「基线失败、交付通过」，计入覆盖
+PYTHON = sys.executable.replace("\\", "/")
+SMOKE_COMMAND = f'"{PYTHON}" src/lib.py'
 
 
 def _criteria() -> list[dict]:
@@ -42,13 +50,26 @@ def _criteria() -> list[dict]:
 def _script() -> dict:
     return {
         "product": [product_spec(acceptance=ACCEPTANCE)],
-        "engineering": [delivery_turn()],
+        "engineering": [delivery_turn(files={"src/lib.py": "print('delivered')\n"},
+                                      checks={"smoke": {"command": SMOKE_COMMAND}})],
         # 先判断后看解释（工单 #358）：交付到达以后先交独立判断（一轮），再带本激活的检查回执下结论。
-        # 判断的逐条结论与结论相同（工单 #1190 比对两者：结果不同的条目要写改判理由，这里没有改判）
-        "quality": [explore_turn(), judgement_turn(checks={"smoke": 0}, criteria=_criteria()),
+        # 判断的逐条结论与结论相同（工单 #1190 比对两者：结果不同的条目要写改判理由，这里没有改判）。
+        # 检验的有效性（工单 #1181）：下结论以前用 run_baseline_check 在基线副本上跑同名的交付检查；
+        # 声明不带交付文件，基线副本只有事项起点树（本项目还没有起点）——命令失败，交付通过
+        "quality": [explore_turn(),
+                    _baseline_turn,
+                    judgement_turn(checks={"smoke": 0}, criteria=_criteria()),
                     review_turn("release", "checks passed on the current snapshot",
                                 checks={"smoke": 0}, criteria=_criteria())],
     }
+
+
+def _baseline_turn(call) -> ModelResponse:
+    # 基线检查的假模型轮：主机在基线副本上运行同名交付检查记录的命令（工单 #1181）
+    return ModelResponse(output=[{
+        "id": "qa-baseline", "call_id": "qa-baseline", "type": "function_call", "name": "run_baseline_check",
+        "arguments": json_dumps({"name": "smoke"}),
+    }])
 
 
 def _finished_run(tmp_path) -> tuple[LoopSystem, Application, str, str]:
@@ -81,11 +102,14 @@ def test_the_query_reads_the_numbers_and_criteria_the_release_recorded(tmp_path)
     assert data.run_id == run_id and data.work_item_id == work_item_id
     assert data.verdict == "release"
     assert data.review_event_id == _review_event(system, run_id).event_id
-    # 三个数与放行记录里存的那一份逐项相同：查询不重新计算
+    # 三个数与放行记录里存的那一份逐项相同：查询不重新计算。
+    # 这一次激活没有跑基线检查（工单 #1181）：命令检查的覆盖不计入分子，基线明细写明缺少回执
     recorded = stored["coverage"]
     assert data.numbers.model_dump() == {key: recorded[key] for key in data.numbers.model_dump()}
     assert data.numbers.criteria_total == 3 and data.numbers.executable == 1
     assert data.numbers.covered == 1 and data.numbers.model_reading == 1 and data.numbers.open == 2
+    assert stored["coverage"]["baseline_valid"] is True
+    assert stored["baseline_checks"] == [{"criterion": "AC1", "checks": "smoke", "outcome": "failed"}]
     # 逐条结论：方式、结果、是否可执行、是否开环
     assert [(row.criterion, row.method, row.result, row.executable, row.open) for row in data.criteria] == [
         ("AC1", "check", "passed", True, False),

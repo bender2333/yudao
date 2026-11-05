@@ -26,7 +26,9 @@ def _call(identity, name, **arguments):
             "arguments": json_dumps(arguments)}
 
 def test_quality_checks_only_through_run_check(tmp_path):
-    assert [name for name in tools_for("quality") if TOOLS[name].action == "check"] == ["run_check"]
+    # 检查类别的两个工具（工单 #1181）：run_check 运行交付检查，run_baseline_check 在基线副本上
+    # 运行同名交付检查；两者都由主机执行，基线回执不是交付检查的证据
+    assert [name for name in tools_for("quality") if TOOLS[name].action == "check"] == ["run_check", "run_baseline_check"]
     workspace = Workspace(tmp_path)
     workspace.write_file("ok.py", "raise SystemExit(0)\n")
     result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": python_command("ok.py")},

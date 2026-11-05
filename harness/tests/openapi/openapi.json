@@ -19015,6 +19015,36 @@
         "title": "BaselineAdoptedPayload",
         "type": "object"
       },
+      "BaselineCheckRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "criterion": {
+            "title": "Criterion",
+            "type": "string"
+          },
+          "checks": {
+            "title": "Checks",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "failed",
+              "passed",
+              "missing",
+              "unable_to_run"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion",
+          "checks",
+          "outcome"
+        ],
+        "title": "BaselineCheckRecord",
+        "type": "object"
+      },
       "BaselineReviewAcceptedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -20211,6 +20241,22 @@
               }
             ],
             "title": "Qa Tests Hash"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "baseline": {
+            "default": false,
+            "title": "Baseline",
+            "type": "boolean"
           }
         },
         "required": [
@@ -34160,6 +34206,11 @@
             "default": 0,
             "title": "Changed",
             "type": "integer"
+          },
+          "baseline_valid": {
+            "default": false,
+            "title": "Baseline Valid",
+            "type": "boolean"
           }
         },
         "required": [
@@ -34519,6 +34570,14 @@
               "type": "string"
             },
             "title": "Open Criteria",
+            "type": "array"
+          },
+          "baseline_checks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BaselineCheckRecord"
+            },
+            "title": "Baseline Checks",
             "type": "array"
           },
           "evidence_refs": {

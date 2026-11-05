@@ -161,6 +161,8 @@ class Workspace:
         snapshot_hash: str | None = None,
         tree_changed: bool = False,
         qa_tests_hash: str | None = None,
+        baseline: bool = False,
+        command: str | None = None,
     ) -> CheckReceipt:
         receipt = CheckReceipt(
             name=name,
@@ -168,6 +170,7 @@ class Workspace:
             exit_code=int(exit_code),
             summary=summary,
             snapshot_hash=snapshot_hash or self.digest(),
+            command=command,
             bindings=dict(self.check_bindings),
             product_spec_hash=self.check_product_spec_hash,
             delivery_spec_hash=self.check_delivery_spec_hash,
@@ -175,6 +178,7 @@ class Workspace:
             tree_changed=bool(tree_changed),
             effective_contract_hash=self.check_effective_contract_hash,
             qa_tests_hash=qa_tests_hash,
+            baseline=bool(baseline),
         )
         self._receipts_path.parent.mkdir(parents=True, exist_ok=True)
         with self._receipts_path.open("a", encoding="utf-8") as handle:
@@ -196,6 +200,7 @@ class Workspace:
                     exit_code=int(data["exit_code"]),
                     summary=data["summary"],
                     snapshot_hash=data["snapshot_hash"],
+                    command=data.get("command"),
                     bindings=_recorded_bindings(data),
                     product_spec_hash=data.get("product_spec_hash"),
                     delivery_spec_hash=data.get("delivery_spec_hash"),
@@ -203,6 +208,7 @@ class Workspace:
                     tree_changed=bool(data.get("tree_changed", False)),
                     effective_contract_hash=data.get("effective_contract_hash"),
                     qa_tests_hash=data.get("qa_tests_hash"),
+                    baseline=bool(data.get("baseline", False)),
                 )
             )
         return items
@@ -232,10 +238,12 @@ def _receipt_dict(receipt: CheckReceipt) -> dict[str, object]:
         "department": receipt.department,
         "exit_code": receipt.exit_code,
         "name": receipt.name,
+        "command": receipt.command,
         "product_spec_hash": receipt.product_spec_hash,
         "snapshot_hash": receipt.snapshot_hash,
         "summary": receipt.summary,
         "tree_changed": receipt.tree_changed,
         "effective_contract_hash": receipt.effective_contract_hash,
         "qa_tests_hash": receipt.qa_tests_hash,
+        "baseline": receipt.baseline,
     }

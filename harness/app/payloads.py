@@ -79,6 +79,9 @@ class CheckReceipt(Payload):
     snapshot_hash: str
     summary: str
     qa_tests_hash: str | None = None
+    # 主机执行的命令（工单 #1181）：交付检查回执照抄；基线检查回执同样带它，baseline 标明这是基线回执
+    command: str | None = None
+    baseline: bool = False
 
 
 
@@ -925,7 +928,9 @@ class QaCriterionPayload(Payload):
 class QaCoveragePayload(Payload):
     # 放行记录里的三个数（第 7.1 节第 4 点）：一次算好，查询与画面读这个数，不重新计算。
     # coverage_ratio 是可执行检验里已在当前快照上通过的条件数除以条件总数；
-    # changed 是改判的条数（第 4 节，工单 #1190），以后算解释翻转率时从这里取，旧事件没有这一项
+    # changed 是改判的条数（第 4 节，工单 #1190），以后算解释翻转率时从这里取，旧事件没有这一项。
+    # baseline_valid 是检验有效性的结论（第 7.2 节，工单 #1181）：命令检查的覆盖都满足
+    # 「基线失败、交付通过」时为真；旧事件没有这一项
     criteria_total: int
     executable: int
     covered: int
@@ -933,6 +938,16 @@ class QaCoveragePayload(Payload):
     model_reading: int
     open: int
     changed: int = 0
+    baseline_valid: bool = False
+
+
+class BaselineCheckRecord(Payload):
+    # 放行记录里的基线明细（第 7.2 节的表，工单 #1181）：一条命令检查的结论带它的基线结果——
+    # failed（计入覆盖）、passed（基线也通过）、missing（缺少回执）或 unable_to_run（超时或取消）。
+    # 结果词与放行准入不因此改变；旧事件没有这一项
+    criterion: str
+    checks: str
+    outcome: Literal["failed", "passed", "missing", "unable_to_run"]
 
 
 class IndependentJudgementPayload(Payload):
@@ -963,6 +978,8 @@ class QaSubmittedPayload(AcceptanceFields):
     criteria: list[QaCriterionPayload]
     coverage: QaCoveragePayload
     open_criteria: list[str]
+    # 基线明细（第 7.2 节，工单 #1181）：命令检查的条目逐条带基线结果，旧事件没有这一项
+    baseline_checks: list[BaselineCheckRecord] = []
     evidence_refs: list[ArtifactRef]
     judgement_event: str = ""
     kind: Literal["qa_review"]

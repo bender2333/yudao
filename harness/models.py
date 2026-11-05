@@ -288,6 +288,8 @@ class QAReview:
     criteria: list[dict[str, Any]] = field(default_factory=list)
     coverage: dict[str, Any] = field(default_factory=dict)
     open_criteria: list[str] = field(default_factory=list)
+    # 基线明细（第 7.2 节，工单 #1181）：命令检查的条目逐条带基线结果；旧事件没有这一项
+    baseline_checks: list[dict[str, str]] = field(default_factory=list)
     # 这份结论引用的独立判断事件与改判的条数（验证的独立性设计说明第 4 节，工单 #1190）：
     # 放行记录与判断成对，以后算解释翻转率时按这一对取；旧事件没有这两项
     judgement_event: str = ""

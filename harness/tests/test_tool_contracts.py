@@ -35,7 +35,8 @@ def test_tools_are_host_tools_or_environment_actions():
     assert by_action["read"] == {"read_file", "list_files", "search", "read_range", "read_external_source"}
     assert by_action["fetch"] == {"fetch_url"}
     assert by_action["write"] == {"write_file", "edit_range", "delete_file", "move_file"}
-    assert by_action["check"] == {"run_check"}
+    # 检查类别的两个工具（工单 #1181）：run_check 运行交付检查，run_baseline_check 在基线副本上运行同名交付检查
+    assert by_action["check"] == {"run_check", "run_baseline_check"}
     assert by_action["command"] == {"bash", "read_output", "stop_job"}
     # 试用工具与浏览器工具（工单 #147）：定义随系统发布，到 #1182 能执行时才放进角色的工具清单
     assert by_action["trial"] == {"trial_start", "trial_open", "trial_output", "trial_stop"}
