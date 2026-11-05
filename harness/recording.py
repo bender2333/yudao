@@ -353,10 +353,12 @@ class StepRecorder:
 
     def tool_called(self, request: ModelRequest, call: dict[str, Any],
                     after_snapshot: dict[str, Any] | None = None,
-                    qa_tests_saved: dict[str, Any] | None = None) -> None:
+                    qa_tests_saved: dict[str, Any] | None = None,
+                    trial_case: Draft | None = None) -> None:
         # 动作后的公开树快照与结果一起写入（工单 #17）：与动作前的快照、动作参数一起构成核实依据，
         # 放在 run 自己的对象区域，不建立提交、不改动分支索引。
-        # 试用会话的记录随试用工具的结果一起存进这个动作的输出工件（工单 #1182）
+        # 试用会话的记录随试用工具的结果一起存进这个动作的输出工件（工单 #1182）；
+        # 试用用例的开始与结束与对应的工具结果写在同一个事务里（工单 #1180）
         call = self._redacted_call(call)
         if after_snapshot is not None:
             after_ref = self._artifacts.put(request.run_id, "snapshot/after", json_dumps(after_snapshot),
@@ -371,7 +373,13 @@ class StepRecorder:
                 payload=qa_tests_saved,
             ))
         drafts.extend(self._observe(request, _Observation(call["id"], "tool", call)))
+        if trial_case is not None:
+            drafts.append(trial_case)
         self._record(*drafts)
+
+    def trial_case_event(self, type: str, payload: dict[str, Any]) -> Draft:
+        # 试用用例事件（工单 #1180）：部门、会话与激活取自这次激活，与触发它的工具结果同一个事务
+        return self._draft(type, payload=payload)
 
     def tool_skipped(self, request: ModelRequest, call: dict[str, Any]) -> None:
         self._record(*self._observe(request, _Observation(call["id"], "skipped_tool", self._redacted_call(call))))
@@ -631,11 +639,13 @@ class StepRecorder:
         return self.scope.provider
 
     def _record(self, *drafts: Draft) -> list[Event]:
-        # 在写入口开一个事务追加一次调用的全部记录
+        # 在写入口开一个事务追加一次调用的全部记录；部门与停止原因按这个事项所用的那份定义核对（工单 #1509），
+        # 记录器在开始一轮工作时拿到的是事项冻结的那份定义
         if not drafts:
             return []
         return self._writes.transact(run_stream(self.scope.run_id),
                                      lambda transaction: self._record_in(transaction, *drafts),
+                                     definitions=self._definitions,
                                      dispatch_number=self.scope.dispatch_number or None)
 
     @staticmethod
@@ -785,6 +795,11 @@ class StepRecorder:
                 ref = self._artifacts.put(scope.run_id, "tool_output", json_dumps(output),
                                           media_type="application/json")
                 payload["output_ref"] = asdict(ref)
+                images = output.get("images") if isinstance(output, dict) else None
+                if isinstance(images, list) and images:
+                    # 截图作为证据的工件引用随结果留在事件里（浏览器与 computer use 设计说明第 7.1 节、
+                    # 试用记录的步骤，工单 #1180）：原文在工件库里，事件里只有引用
+                    payload["images"] = [dict(item) for item in images if isinstance(item, dict)]
             event_type = EventType.TOOL_CALLED if observation.kind == "tool" else EventType.TOOL_SKIPPED
         elif observation.kind == "message":
             safe_text = _redact(observation.text)

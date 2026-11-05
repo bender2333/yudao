@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass, field, is_dataclass
 from typing import Any
 
 from .actions import CheckReceipt
-from .definitions import DEFINITIONS, UnknownStopReason
+from .definitions import DEFAULT_FORM, DEFINITIONS, Definitions, UnknownStopReason
 from .kernel_events import (
     BASELINE_STATUSES,
     RUN_STATUSES,
@@ -35,6 +35,17 @@ from .kernel_events import (
 
 # 部门来自定义中的组织
 DEPARTMENTS = DEFINITIONS.departments
+
+
+@dataclass(frozen=True)
+class Form:
+    # 一份具名的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：一份完整的定义，加上按它的
+    # 组织定义选用的路由实现与收紧检查。实例同时加载几份（runtime.py 的登记处），事项创建时冻结用哪一份
+    name: str
+    definitions: Definitions
+    routing: Any
+    tightening: Any
+
 
 # run 的状态与骨架事件载荷里的封闭取值都由内核事件模块给出（它们是事件信封与骨架事件的一部分），
 # 这里随其他导入一起转出给应用用
@@ -77,6 +88,17 @@ class EventType(SkeletonEventType):
     MCP_SERVER_STARTED = "mcp_server_started"
     MCP_SERVER_CLOSED = "mcp_server_closed"
     MCP_SERVER_FAILED = "mcp_server_failed"
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 12 节，工单 #1183）：应用事件，run 流。
+    # 开始事件带选用命令的系统与进程号、创建时间；结束事件带结束方式（停止、被新会话替换、中断、
+    # 用户停止、run 结束）。Yudao 启动时按开始事件里的进程号与创建时间结束遗留的进程树
+    TRIAL_SESSION_STARTED = "trial_session_started"
+    TRIAL_SESSION_ENDED = "trial_session_ended"
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：应用事件，run 流。
+    # 开始事件带用例身份、会话身份、ProductSpec 摘要、试用副本的树摘要、引用的验收条件与计划；
+    # 结束事件带结论（passed、failed、unverified，会话结束时由主机记为 interrupted）、观察到的结果、
+    # 作为证据的步骤的动作身份与 unverified 的理由
+    TRIAL_CASE_OPENED = "trial_case_opened"
+    TRIAL_CASE_CONCLUDED = "trial_case_concluded"
 
 # ProjectEventType 与 CatalogEventType 由内核事件模块给出：项目流与目录流的事件全部是骨架事件
 
@@ -175,6 +197,22 @@ class ProductSpec:
     requirement_mapping: list[dict[str, Any]] = field(default_factory=list)
 
 
+# PRD 的内容字段（工单 #553、#1456）：回答里带这些字段就是随回答修订 PRD，那一份要走提案校验。
+# 这是 PRD 这一种成果的内容知识，归应用层（工单 #1456 从内核的 validation.py 搬到这里，与 ProductSpec 同处）；
+# 内核不认识它
+PRD_REVISION_FIELDS = frozenset({
+    "goal",
+    "requirements",
+    "acceptance_criteria",
+    "boundaries",
+    "constraints",
+    "fatal_conditions",
+    "non_goals",
+    "change_record",
+    "decision_changes",
+})
+
+
 @dataclass(frozen=True)
 class ProductDecision:
     id: str
@@ -250,6 +288,8 @@ class QAReview:
     criteria: list[dict[str, Any]] = field(default_factory=list)
     coverage: dict[str, Any] = field(default_factory=dict)
     open_criteria: list[str] = field(default_factory=list)
+    # 基线明细（第 7.2 节，工单 #1181）：命令检查的条目逐条带基线结果；旧事件没有这一项
+    baseline_checks: list[dict[str, str]] = field(default_factory=list)
     # 这份结论引用的独立判断事件与改判的条数（验证的独立性设计说明第 4 节，工单 #1190）：
     # 放行记录与判断成对，以后算解释翻转率时按这一对取；旧事件没有这两项
     judgement_event: str = ""
@@ -326,6 +366,77 @@ class SessionRecord:
     department: str
     status: str
     activations: int = 0
+
+
+# 试用用例的步骤与用例本身（浏览器与 computer use 设计说明第 8.2 节、第 7.2 节的查询，工单 #1180）。
+# 用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份记为它的步骤；步骤的分类（可执行的检验
+# 与模型阅读）在 coverage 模块按工具名判断，这里只保存事实
+
+# 用例的状态与结论：结论 passed、failed、unverified 由质检给出，interrupted 是会话结束或中断时主机
+# 记下的（不能作为证据）
+TRIAL_CASE_STATUS_OPEN = "open"
+TRIAL_CASE_STATUS_CONCLUDED = "concluded"
+
+
+@dataclass
+class TrialCaseStep:
+    # 一个步骤：动作身份（模型给出的调用编号）、工具名、结果状态与截图工件引用。
+    # status：completed（有 tool_called 回执）、verified（动作核实记录了确定的结果）、
+    # unknown（发出了但没有确定的结果——核实交还会话也算这一种，用例不能以 passed 结束）
+    identity: str
+    tool: str
+    activation_id: str = ""
+    step_id: int | None = None
+    status: str = "unknown"
+    ok: bool | None = None
+    error: str | None = None
+    screenshots: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def unknown(self) -> bool:
+        return self.status == "unknown"
+
+
+@dataclass
+class TrialCase:
+    # 一个试用用例：引用的验收条件、计划、实际步骤与结论。由 trial_case_opened/trial_case_concluded
+    # 与期间的动作事件折叠而成，不另外保存
+    case_id: str
+    # 部门会话的身份（用例打开期间这个会话里的浏览器与屏幕动作是它的步骤）与试用会话的身份
+    # （会话结束或中断时用例结束为中断）
+    session_id: str
+    trial_session_id: str
+    department: str
+    activation_id: str
+    product_spec_hash: str
+    tree_digest: str
+    criteria: list[str]
+    title: str
+    plan: list[str]
+    expected: str
+    status: str = TRIAL_CASE_STATUS_OPEN
+    result: str | None = None
+    observed: str = ""
+    evidence_steps: list[str] = field(default_factory=list)
+    reason: str = ""
+    opened_event_id: str = ""
+    concluded_event_id: str | None = None
+    steps: list[TrialCaseStep] = field(default_factory=list)
+
+    @property
+    def interrupted(self) -> bool:
+        return self.result == "interrupted"
+
+    def step(self, identity: str) -> TrialCaseStep | None:
+        # 按动作身份取这个用例的步骤：证据步骤必须是它的步骤之一
+        for item in self.steps:
+            if item.identity == identity:
+                return item
+        return None
+
+    def has_unknown_step(self) -> bool:
+        # 含结果未知步骤的用例不能以 passed 结束，也不能作为证据（设计说明第 8.2 节、第 9 节）
+        return any(item.unknown for item in self.steps)
 
 
 @dataclass
@@ -424,6 +535,8 @@ class RunProjection:
     delivery_specs: list[DeliverySpec] = field(default_factory=list)
     product_decisions: list[ProductDecision] = field(default_factory=list)
     reviews: list[QAReview] = field(default_factory=list)
+    # 试用用例（工单 #1180）：本 run 里质检打开过的全部用例，按打开的顺序；旧保存的投影没有这一项
+    trial_cases: list[TrialCase] = field(default_factory=list)
     structures: list[dict[str, Any]] = field(default_factory=list)
     baseline_reviews: list[dict[str, Any]] = field(default_factory=list)
     lesson_candidates: list[LessonCandidate] = field(default_factory=list)
@@ -514,6 +627,12 @@ class RunProjection:
 
 
 
+
+
+# 开环完成（工单 #1394，形态与核验角色设计说明「开环完成」与「定义的校验」第 4 条）：事项最后采纳的成果
+# 没有核验角色核验时，事项创建时标为开环，完成后以这个停止原因结束，不记成放行。编号与
+# harness/definitions/stop_reasons.json 的那一条一致；路由（给出结束原因）与事件标签、汇总都取这一处
+OPEN_LOOP_STOP_REASON = "open_loop"
 
 
 # 停止原因的中文名与结束方式都在定义里：内核的清单在 stop_reasons.json，路由自己的结束原因在

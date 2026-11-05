@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -10,13 +10,15 @@ from .artifacts import ArtifactStore
 from .assembly import ContextAssembly
 from .deltas import DeltaChannel
 from .decision_flow import DECISION_FLOW
-from .definitions import DEFINITIONS, configure_fetch
+from .definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, Definitions, configure_fetch, load_definitions
 from . import parameters, routing_contract
+from .direct import DIRECT_TIGHTENING, SINGLE_ROLE_DIRECT
 from . import mcp_session
+from . import trial_sessions
 from .engine import StepDriver, StepLimits
 from .environment import LocalEnvironment, cleanup_run_inspections
 from .event_store import Command, EventStore, catalog_stream, run_stream
-from .models import CatalogEventType, EventType, ProjectEventType, TERMINAL_STATUSES
+from .models import CatalogEventType, EventType, Form, ProjectEventType, TERMINAL_STATUSES
 from .orchestrator import CancelledInputSaveError, Orchestrator, RunTerminalError
 from .write_path import NewCatalogEvent, NewEvent, WritePath
 from .projection import RunNotFoundError, RunProjection, project_run
@@ -37,6 +39,27 @@ __all__ = [
     "RunTerminalError",
     "configure_fetch_tools",
 ]
+
+
+# 发布带的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：名字 →（一份完整的定义，
+# 这份定义选用的收紧检查）。路由不在这里登记：组装时按每一份定义里的组织定义 routing 名称接上。
+# 单角色直做（工单 #1395）是第二个：一份完整的定义（一个人工程部门、直做路由、没有核验角色，
+# harness/definitions/forms/single_role_direct/）与直做的收紧检查。几个角色直做（#1454）等形态由各自的
+# 工单加进来，各是一份完整的定义
+SINGLE_ROLE_DIRECT_DEFINITIONS = load_definitions(DEFINITIONS_DIR / "forms" / SINGLE_ROLE_DIRECT)
+FORM_REGISTRY: dict[str, tuple[Definitions, Any]] = {
+    DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
+    SINGLE_ROLE_DIRECT: (SINGLE_ROLE_DIRECT_DEFINITIONS, DIRECT_TIGHTENING),
+}
+
+
+def load_forms(registry: Mapping[str, tuple[Definitions, Any]], store: Any) -> dict[str, Form]:
+    # 实例同时加载几份具名的形态：每份是一份完整的定义；路由按它的组织定义接上（工单 #825 的位置）。
+    # 每份形态得到自己的一份路由实例，接上它自己那份定义（工单 #1509）：形态之间的部门清单不共用，
+    # 一份形态的部门不会盖掉另一份（select 按交进去的定义给一份实例）
+    return {name: Form(name, definitions,
+                       routing_contract.select(definitions.routing, definitions, store=store), tightening)
+            for name, (definitions, tightening) in registry.items()}
 
 
 def configure_fetch_tools(enabled: bool) -> None:
@@ -66,6 +89,9 @@ class LoopSystem:
         resume_on_startup: bool = True,
         assembly: Any | None = None,
         execution: Any | None = None,
+        # 实例同时加载的具名形态（工单 #1392）：名字 →（一份完整的定义，这份定义选用的收紧检查）。
+        # 不给时是发布带的形态（FORM_REGISTRY）；给了就是给的这几份，默认形态必须在内
+        forms: Mapping[str, tuple[Definitions, Any]] | None = None,
     ) -> None:
         # 数据目录可能以 8.3 短路径给出（工单 #250）：在这里解析一次，工作区根、材料根与其余由它派生的根都从解析后的路径派生
         self.data_dir = Path(data_dir).absolute().resolve()
@@ -102,6 +128,11 @@ class LoopSystem:
         assembly_implementation = (ContextAssembly(self.artifacts, self.store, tightening=WATCHED_OUTPUTS)
                                    if assembly is None else assembly)
         execution_implementation = StepDriver if execution is None else execution
+        # 具名形态在这里加载（工单 #1392）：每份是一份完整的定义，路由按它的组织定义接上；事项创建时
+        # 冻结用哪一份。形态的清单是发布的内容，测试可以交进别的几份
+        self.forms = load_forms(FORM_REGISTRY if forms is None else forms, self.store)
+        if DEFAULT_FORM not in self.forms:
+            raise ValueError(f"the instance must load the default form {DEFAULT_FORM!r}")
         self.orchestrator = Orchestrator(
             self.store,
             self.writes,
@@ -117,8 +148,11 @@ class LoopSystem:
             tightening=WATCHED_OUTPUTS,
             # 路由实现按组织定义里的名称接上（工单 #825）：watched_outputs 在模块加载时登记名称，
             # 定义加载时已经核对过这个名字在 routings.json 里；这里接上、核对契约版本、让它校验同一份定义，
-            # 并把事件库的只读读取器交给声明了 use_facts 的路由（契约第三版，工单 #1164）
-            routing=routing_contract.select(DEFINITIONS.routing, DEFINITIONS, store=self.store),
+            # 并把事件库的只读读取器交给声明了 use_facts 的路由（契约第三版，工单 #1164）。
+            # 默认形态的那一份同时作为薄驱动的默认路由；其余几份随 forms 交给它（工单 #1392）
+            routing=self.forms[DEFAULT_FORM].routing,
+            # 实例同时加载的几份具名形态：事项创建时冻结用哪一份（工单 #1392）
+            forms=self.forms,
             # 决定请求的处理与建档的流转在应用层（工单 #827）：薄驱动接上它，只转交
             decision_flow=DECISION_FLOW,
             assembly=assembly_implementation,
@@ -143,6 +177,9 @@ class LoopSystem:
         # 启动时结束遗留的 MCP 服务器进程并补写关闭事件（网络与 MCP 设计说明第 7.2 节，工单 #1176）：
         # 放在继续未结束的 run 之前，继续时按同一台服务器重新建立会话
         self.ended_leftover_servers = self._end_leftover_mcp_servers_on_startup()
+        # 启动时结束遗留的试用会话：持有会话的进程重新启动时，会话记为中断，进程树按会话记录里的
+        # 进程号与创建时间结束（浏览器与 computer use 设计说明第 3.4、12 节，工单 #1183）
+        self.ended_leftover_trials = self._end_leftover_trial_sessions_on_startup()
         # 启动时补建缺少的普通事项 run（工单 #321，设计第 7 节）：work_item_created 已提交而 run 还没有创建时
         # 进程中断，这里按事项记录（含起始文件夹快照）补建
         self.recovered_work_item_runs = self.projects.create_missing_work_item_runs_on_startup()
@@ -166,14 +203,20 @@ class LoopSystem:
 
     def stop_and_restart_runs(self, run_ids: Iterable[str], *, reason: str) -> tuple[list[str], list[str]]:
         # 强制升级对一批 run 的处理：逐个记为因升级停止，对应的事项用项目的起点重新开始，
-        # 并记下「因升级重新开始」的优先级；找不到事项的 run 只停止
+        # 并记下「因升级重新开始」的优先级；找不到事项的 run 只停止。
+        # 事项冻结的形态不在发布里时不动这个 run（工单 #1392）：留着它未结束，换回带那一份形态的发布
+        # 以后由升级重新开始接着跑；原因由项目登记在这条事项的开始失败上
+        # 停止的 run 的试用会话在 cleanup_run 里结束、结束事件排了队，这里在事务之外把它们写出来
         stopped, restarted = [], []
         for run_id in run_ids:
+            if not self.projects.item_form_available(run_id):
+                continue
             self.orchestrator.stop_for_upgrade(run_id, reason=reason)
             stopped.append(run_id)
             started = self.projects.restart_work_item_for_upgrade(run_id)
             if started is not None:
                 restarted.append(started[0])
+        self.flush_trial_events()
         return stopped, restarted
 
     def resume_startup_runs(self) -> dict[str, int]:
@@ -181,12 +224,16 @@ class LoopSystem:
         # run 事件版本与当前不同的 run 已在启动序列里按强制升级处理，这里只有版本相同的 run；
         # 每个 run 由流程编排先核对事项记录的定义版本（不同时发出决定请求，不取得执行权），
         # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
+        # 事项冻结的形态不在发布里时（工单 #1392）：不进定义版本核对、不发决定请求、不报错，这个 run
+        # 留在未结束，原因写进项目流这条事项的开始失败（每次启动至多一条），换回带那一份形态的发布以后接着跑。
         # 3.1 保持单任务运行：取得执行权以后串行运行到停止，不并发推进两个 run。
         # 运行到停止与结算都经流程编排的 run_until_stop_and_settle（工单 #299）：这条入口与事项开始、
         # 回答决定以后继续共用同一处结算，不在这里各补一遍；服务进程里它是事件循环中的任务（_continue_run）
         # 返回取得执行权的 run 与它这次取得的执行权编号
         resumed: dict[str, int] = {}
         for run_id in self.startup_runs.same_version:
+            if not self.projects.item_form_available(run_id):
+                continue
             claimed = self.orchestrator.resume_incomplete_run(run_id)
             if claimed is None:
                 continue
@@ -423,17 +470,19 @@ class LoopSystem:
                     step_limits: StepLimits | None = None,
                     resume_on_startup: bool = True,
                     assembly: Any | None = None,
-                    execution: Any | None = None) -> "LoopSystem":
+                    execution: Any | None = None,
+                    forms: Mapping[str, tuple[Definitions, Any]] | None = None) -> "LoopSystem":
         # 显式提供的确定性适配器只用于确定性测试。resume_on_startup=False 用于测试自己控制激活的时机，
         # 打开数据目录时不自动继续未结束的 run（工单 #16）。
         # 模型目录放在数据目录里：调用目标（fake 模型定义）随数据目录一起保留，
         # 重开数据目录以后这一次运行按同一个调用目标继续，窗口不随进程消失（工单 #669）
         # assembly 与 execution 是装配实现与执行实现（工单 #979）：不给时由组装处接上默认的那一种，
-        # 测试给第二种实现时走同一个构造参数，其余什么也不变
+        # 测试给第二种实现时走同一个构造参数，其余什么也不变。forms 是实例加载的具名形态（工单 #1392）：
+        # 不给时是发布带的形态，测试用别的几份（例如任务池）时交进来
         config = Path(data_dir).absolute().resolve() / "providers.json"
         return cls(data_dir, test_adapter=adapter, step_limits=step_limits,
                    resume_on_startup=resume_on_startup, provider_config_path=config,
-                   assembly=assembly, execution=execution)
+                   assembly=assembly, execution=execution, forms=forms)
 
     def start_provider_watching(self, interval_sec: float = 1.0) -> None:
         # 文件重载由系统装配启动，Web 只提交命令和读取状态
@@ -441,7 +490,9 @@ class LoopSystem:
 
     def close(self) -> None:
         # 服务关闭停止轮询并释放存储；还在的 MCP 会话一并关闭（网络与 MCP 设计说明第 7.2 节，
-        # 工单 #1175）：正常路径下每个 run 的会话随运行收尾关闭，这里收掉剩余的（例如等待用户回答时关闭服务）
+        # 工单 #1175）：正常路径下每个 run 的会话随运行收尾关闭，这里收掉剩余的（例如等待用户回答时关闭服务）。
+        # run 结束时结束的试用会话的结束事件也在这里补写（工单 #1183），不再有事务在进行
+        self.flush_trial_events()
         for run_id in list(self.orchestrator.mcp_sessions_open()):
             self.orchestrator.close_mcp_sessions_sync(run_id)
         self.facade.stop_watching()
@@ -473,7 +524,10 @@ class LoopSystem:
         return asyncio.run(self.orchestrator.run_until_stop(run_id))
 
     def activate_once(self, run_id: str) -> RunProjection:
-        return asyncio.run(self.orchestrator.activate_once(run_id))
+        # 一次激活也可能把 run 带到终态（试用会话随之结束、结束事件排在队里）：在事务之外把它们写出来
+        projection = asyncio.run(self.orchestrator.activate_once(run_id))
+        self.flush_trial_events()
+        return projection
 
     def cancel(self, run_id: str) -> RunProjection:
         return self.orchestrator.cancel(run_id)
@@ -534,6 +588,37 @@ class LoopSystem:
                 continue
             ended.append(f"{leftover.run_id}:{leftover.server}")
         return ended
+
+    def _end_leftover_trial_sessions_on_startup(self) -> list[str]:
+        # 上一次进程没有写下 trial_session_ended 的试用会话（浏览器与 computer use 设计说明第 3.4、12 节，
+        # 工单 #1183）：按会话记录里的进程号与创建时间结束仍然存活的进程树，删掉它的试用副本，然后补写
+        # 一条 trial_session_ended（结束方式：中断；写明这一次有没有真的结束进程）。进程已经不在了也补写：
+        # 开始与结束的记录要配对，恢复时「有开始没有结束」就等于还有遗留进程。事件写不进去不阻塞启动
+        ended: list[str] = []
+        for leftover in trial_sessions.leftover_sessions(self.store):
+            was_ended = trial_sessions.end_leftover_session(leftover)
+            trial_sessions.remove_trial_copy(self.workspace_root / leftover.run_id, leftover.session_id)
+            payload = {"session_id": leftover.session_id, "department": leftover.department,
+                       "kind": leftover.kind, "reason": trial_sessions.END_INTERRUPTED,
+                       "pid": leftover.pid, "create_time": leftover.create_time, "ended": was_ended}
+
+            def decide(transaction, payload=payload) -> None:
+                status = transaction.projection.status
+                transaction.append(NewEvent(
+                    EventType.TRIAL_SESSION_ENDED, state_before=status, state_after=status,
+                    actor="system", department=payload.get("department"), payload=payload))
+
+            try:
+                self.writes.transact(run_stream(leftover.run_id), decide)
+            except Exception:
+                continue
+            ended.append(f"{leftover.run_id}:{leftover.session_id}")
+        return ended
+
+    def flush_trial_events(self) -> int:
+        # 写排队的试用会话结束事件（工单 #1183）：run 的终态事件提交之后的效果里不能写事件（位置会乱序），
+        # 所以 run 结束时结束的会话把结束记录排进队，在事务之外由这里写。交回写了几条
+        return self.orchestrator.sessions.flush_trial_events()
 
     def replay(self, run_id: str) -> RunProjection:
         return verify_replay(self.store, self.artifacts, self.git_versions, run_id)

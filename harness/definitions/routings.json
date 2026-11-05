@@ -9,15 +9,7 @@
         "engineering",
         "quality"
       ],
-      "outcome_kinds": [
-        "product_spec",
-        "product_decision",
-        "delivery_spec",
-        "independent_judgement",
-        "qa_review",
-        "structure",
-        "baseline_review"
-      ],
+      "outcomes": "watched_outputs",
       "proposal_methods": [
         "submit_product_spec",
         "submit_product_decision",
@@ -27,6 +19,7 @@
         "submit_structure",
         "submit_baseline_review"
       ],
+      "final_outcome": "delivery_spec",
       "limits": {},
       "end_reasons": {
         "no_new_work": {

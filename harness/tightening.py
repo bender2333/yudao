@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -25,7 +26,9 @@ from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .watched_outputs import has_new_work, input_department, is_working, proposal_kinds_for
 from .contracts import normalize_scope
-from .coverage import changed_criteria, coverage_report, method_is_executable, open_criteria
+from .coverage import (baseline_open_records, baseline_records, changed_criteria, coverage_report,
+                       criterion_is_executable, method_is_executable,
+                       open_criteria)
 from .definitions import DEFINITIONS, Definitions
 from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS
 from .models import TERMINAL_STATUSES, Event, EventType, ProductSpec, RunProjection
@@ -41,6 +44,10 @@ ANSWER_ONLY_IN_BRANCH = "answer tool is only available in an ask branch session"
 BRANCH_CANNOT_WRITE = "The branch session cannot modify files in the running workspace"
 BRANCH_CANNOT_DELIVER = "The branch session cannot submit delivery"
 BRANCH_CANNOT_REVIEW = "The branch session cannot submit QA review"
+# 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：等不等、为什么等是这一份收紧检查的
+# 判断与说明（工单 #1456），内核只把原因交回部门
+PENDING_INPUT_RELEASE = ("New user input has not been handled yet; the release is judged after the round that "
+                         "received it has ended.")
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
 # 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
@@ -56,8 +63,9 @@ def pending_product_input(projection: RunProjection, events: list[Event],
     取消、暂停、上限与运行时间用完不算正常结束，事项已结束当作处理完。
 
     不用 ``processed_input_version``：它只在 PRD 被接纳时前进，一个决定不改 PRD 时永远不前进，
-    放行会一直等。只看收输入的部门：用户输入（``input_version``）与发给它的指导（它的「已回答」读的是同一件事）。
-    哪个部门收输入取自定义里关注用户输入的那一个，不写部门名（工单 #1391）。
+    放行会一直等。只看接输入的那个部门：用户输入（``input_version``）与发给它的指导（它的「已回答」读的是同一件事）。
+    哪个部门接输入取自定义里事项的来源写明的那个部门，不写部门名（工单 #1455；#1391 起从定义读，
+    此前是关注用户输入的那一个）。
     """
     department = input_department(definitions)
     if projection.status in TERMINAL_STATUSES:
@@ -116,7 +124,7 @@ def allowed_proposal_kinds(projection: RunProjection, department: str,
     definition = in_force(definitions)
     if projection.status in TERMINAL_STATUSES or department not in definition.departments:
         return set()
-    if is_working(projection, department) or has_new_work(projection, department):
+    if is_working(projection, department) or has_new_work(projection, department, definition):
         return proposal_kinds(department, projection.kind, definitions=definition)
     return set()
 
@@ -390,14 +398,19 @@ class WatchedOutputsTightening:
         # 逐条结论（验证的独立性设计说明第 7、7.1 节，工单 #151）在前面这些检查通过以后才判：
         # 覆盖当前 ProductSpec 的全部验收条件、可执行检验的 passed 至少一个本轮核验回执、放行的三条规则
         criteria: list[dict[str, Any]] = []
+        # 试用用例（工单 #1180）：引用它的条目按用例与步骤核对，三个数按步骤分类算
+        cases = trial_case_records(projection)
+        case_steps = trial_case_steps(projection)
         if not errors:
             criteria, criteria_errors = _qa_criteria(proposal)
             errors.extend(criteria_errors)
             if not errors:
                 errors.extend(_criteria_coverage_errors(criteria, projection, outcome.receipts, department))
                 errors.extend(_criteria_evidence_errors(criteria, department))
+                errors.extend(_trial_case_errors(criteria, projection, department=department,
+                                                 spec_hash=spec_hash, snapshot_hash=facts.digest))
                 if verdict == "release":
-                    errors.extend(_release_criteria_errors(criteria))
+                    errors.extend(_release_criteria_errors(criteria, case_steps))
                 if verdict == "cannot_verify":
                     errors.extend(_cannot_verify_criteria_errors(criteria))
         # 先判断后看解释的门（第 4 节，工单 #358）与引用校验（工单 #1190）：提交结论前这份交付必须已有
@@ -415,11 +428,19 @@ class WatchedOutputsTightening:
         errors.extend(defect_errors)
         if errors:
             return Tightened(errors=tuple(errors))
-        # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：在提交事务里再判一次
-        if request.commit and verdict == "release" and pending_product_input(projection, list(request.events)):
-            return Tightened(wait=True)
+        # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：在提交事务里再判一次。
+        # 谁收输入按这个事项所用的那份定义取（工单 #1509），接输入的部门由事项的来源写明（工单 #1455），
+        # 不按进程加载的默认定义
+        if request.commit and verdict == "release" \
+                and pending_product_input(projection, list(request.events), definitions=request.definitions):
+            return Tightened(wait=True, reason=PENDING_INPUT_RELEASE)
         # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
         changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
+        # 检验的有效性（第 7.2 节，工单 #1181）：本次激活的基线回执按检查名归并，命令检查的覆盖
+        # 要求同名基线在基线副本上失败。基线回执先于这次提交写进工作区事实（主机执行先写回执），
+        # 这里只读事实，不补运行
+        baseline = baseline_records(facts.checks, sorted({name for row in criteria
+                                                          for name in row["checks"]}))
         return Tightened(content={
             "product_spec_hash": spec_hash,
             "effective_contract_hash": contract_hash,
@@ -434,9 +455,13 @@ class WatchedOutputsTightening:
             # 结论引用的独立判断事件（工单 #1190）：以后算解释翻转率时按这一对事件取
             "judgement_event": judgement.event_id,
             # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算；
-            # 改判的条数随它写进放行记录（工单 #1190）
-            "coverage": coverage_report(criteria, changed=len(changed)),
-            "open_criteria": open_criteria(criteria),
+            # 改判的条数随它写进放行记录（工单 #1190）。baseline_valid 随三个数一起算好（第 7.2 节）
+            "coverage": coverage_report(criteria, changed=len(changed), cases=case_steps,
+                                        baseline=baseline),
+            "open_criteria": open_criteria(criteria, case_steps),
+            # 基线明细（第 7.2 节的表）：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
+            # 缺少回执与无法运行都不计入，放行记录里看得到
+            "baseline_checks": baseline_open_records(criteria, baseline),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
             "evidence_refs": _check_evidence_refs(criteria, request.events),
         }, ends_run=verdict == "release")
@@ -984,11 +1009,10 @@ def _qa_criteria(proposal: dict[str, Any]) -> tuple[list[dict[str, Any]], list[F
                     continue
                 checks.append(name.strip())
         trial_cases = item.get("trial_cases", [])
-        if not isinstance(trial_cases, list) or any(not isinstance(name, str) for name in trial_cases):
+        if not isinstance(trial_cases, list) or any(not isinstance(name, str) or not name.strip()
+                                                    for name in trial_cases):
             errors.append(FieldError(f"criteria[{index}].trial_cases", "trial_cases must be a list of trial case ids"))
-        elif trial_cases:
-            # 试用用例由 #1180 接上：在那之前这一项必须为空
-            errors.append(FieldError(f"criteria[{index}].trial_cases", "trial cases are not accepted yet; leave trial_cases empty"))
+            trial_cases = []
         note = item.get("note")
         if note is not None and not isinstance(note, str):
             errors.append(FieldError(f"criteria[{index}].note", "note must be a string"))
@@ -998,7 +1022,8 @@ def _qa_criteria(proposal: dict[str, Any]) -> tuple[list[dict[str, Any]], list[F
                                      "change_reason must be a string: the reason the result differs from the independent judgement"))
         if method in QA_METHODS and result in QA_RESULTS:
             rows.append({"criterion": criterion.strip(), "method": method, "result": result,
-                         "checks": checks, "trial_cases": [], "note": (note or "").strip(),
+                         "checks": checks, "trial_cases": [item.strip() for item in trial_cases],
+                         "note": (note or "").strip(),
                          "change_reason": (change_reason or "").strip()})
     return rows, errors
 
@@ -1044,25 +1069,93 @@ def _criteria_coverage_errors(criteria: list[dict[str, Any]], projection: RunPro
 
 def _criteria_evidence_errors(criteria: list[dict[str, Any]],
                               department: str | None = None) -> list[FieldError]:
-    # 可执行检验（check、trial、measure）的 passed 至少一个证据：本次激活的核验检查回执
+    # 可执行检验（check、trial、measure）的 passed 至少一个证据：本次激活的核验检查回执，
+    # 或引用的试用用例（浏览器与 computer use 设计说明第 8.3 节，工单 #1180）
     verifying = _verifying_department(department)
     errors: list[FieldError] = []
     for index, row in enumerate(criteria):
-        if row["result"] == "passed" and method_is_executable(row["method"]) and not row["checks"]:
+        if (row["result"] == "passed" and method_is_executable(row["method"])
+                and not row["checks"] and not row["trial_cases"]):
             errors.append(FieldError(f"criteria[{index}].checks",
-                                     f"a passed executable criterion needs at least one {verifying} check receipt"))
+                                     f"a passed executable criterion needs at least one {verifying} check receipt "
+                                     "or one passed trial case"))
     return errors
 
 
-def _release_criteria_errors(criteria: list[dict[str, Any]]) -> list[FieldError]:
+def _release_criteria_errors(criteria: list[dict[str, Any]],
+                            cases: Mapping[str, Any] | None = None) -> list[FieldError]:
     # 放行（第 7.1 节第 3 点）：没有 failed；可执行检验的验收条件都是 passed。
-    # 不可执行检验的条件可以是 unverified，列进放行记录的开环明细
+    # 不可执行检验的条件可以是 unverified，列进放行记录的开环明细。只凭模型阅读的试用用例让它的条件算模型阅读
     errors: list[FieldError] = []
     for index, row in enumerate(criteria):
         if row["result"] == "failed":
             errors.append(FieldError(f"criteria[{index}].result", "release cannot carry a failed acceptance criterion"))
-        elif method_is_executable(row["method"]) and row["result"] != "passed":
+        elif criterion_is_executable(row, cases) and row["result"] != "passed":
             errors.append(FieldError(f"criteria[{index}].result", "release requires executable criteria to be passed"))
+    return errors
+
+
+def trial_case_records(projection: RunProjection) -> dict[str, Any]:
+    # 这个 run 里的试用用例，按用例身份：逐条结论引用的用例从这里取（工单 #1180）
+    return {case.case_id: case for case in projection.trial_cases}
+
+
+def trial_case_steps(projection: RunProjection) -> dict[str, Any]:
+    # 用例身份到它的步骤：覆盖的三个数按步骤分类算（工单 #1180）
+    return {case.case_id: case.steps for case in projection.trial_cases}
+
+
+def _trial_case_errors(criteria: list[dict[str, Any]], projection: RunProjection, *,
+                       department: str | None, spec_hash: str | None,
+                       snapshot_hash: str | None) -> list[FieldError]:
+    """逐条结论引用的试用用例（浏览器与 computer use 设计说明第 8.3 节，工单 #1180）。
+
+    用例属于本次激活与这个部门、绑定当前 ProductSpec；所在会话的试用副本的树摘要等于当前交付的
+    `code_snapshot_hash`；用例已结束，结论与该项的 result 一致，引用它的那条验收条件在它的 criteria 里。
+    含结果未知步骤的用例与会话结束时中断的用例不能作为证据。
+    """
+    cases = trial_case_records(projection)
+    activation_id = projection.last_activations.get(department or "")
+    errors: list[FieldError] = []
+    for index, row in enumerate(criteria):
+        for position, case_id in enumerate(row["trial_cases"]):
+            field = f"criteria[{index}].trial_cases[{position}]"
+            case = cases.get(case_id)
+            if case is None:
+                errors.append(FieldError(field, f"trial case {case_id} does not belong to this run"))
+                continue
+            if activation_id is not None and case.activation_id != activation_id:
+                errors.append(FieldError(field, f"trial case {case_id} was opened in another activation; "
+                                                 "open the case again in this one"))
+                continue
+            if department is not None and case.department != department:
+                errors.append(FieldError(field, f"trial case {case_id} was opened by another department"))
+                continue
+            if spec_hash is not None and case.product_spec_hash != spec_hash:
+                errors.append(FieldError(field, f"trial case {case_id} was opened against another ProductSpec"))
+                continue
+            if case.status != "concluded":
+                errors.append(FieldError(field, f"trial case {case_id} is still open; end it with trial_case_end "
+                                                 "before citing it"))
+                continue
+            if case.interrupted:
+                errors.append(FieldError(field, f"trial case {case_id} was interrupted when its session ended and "
+                                                 "cannot be evidence"))
+                continue
+            if case.has_unknown_step():
+                errors.append(FieldError(field, f"trial case {case_id} has a step whose result is unknown and "
+                                                 "cannot be evidence; run the case again"))
+                continue
+            if snapshot_hash is not None and case.tree_digest != snapshot_hash:
+                errors.append(FieldError(field, f"the trial copy tree digest of case {case_id} does not equal the "
+                                                 "current delivery snapshot"))
+                continue
+            if case.result != row["result"]:
+                errors.append(FieldError(field, f"trial case {case_id} concluded {case.result} but this criterion "
+                                                 f"says {row['result']}"))
+                continue
+            if row["criterion"] not in case.criteria:
+                errors.append(FieldError(field, f"trial case {case_id} was not opened for {row['criterion']}"))
     return errors
 
 

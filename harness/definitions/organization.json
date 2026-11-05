@@ -20,6 +20,10 @@
       "watched": ["delivery", "guidance", "structure", "product_spec"]
     }
   ],
+  "sources": {
+    "user_input": "product",
+    "onboarding": "product"
+  },
   "routing": "watched_outputs",
   "verification": {
     "verifiers": [

@@ -15,11 +15,12 @@ import asyncio
 import contextlib
 import json
 import os
+import shutil
+import socket
 import sqlite3
 import sys
-import socket
-import threading
 import tempfile
+import threading
 import time
 import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -48,6 +49,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
     WorkItemCreate,
 )
 from harness.app.project_queries import ProjectsList  # noqa: E402
+from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, VerificationDeclaration, load_definitions  # noqa: E402
 from harness.environment import QA_TESTS_DIR  # noqa: E402
 from harness.models import Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
@@ -61,6 +63,7 @@ from harness.tests.helpers import run_wait_command  # noqa: E402
 from harness.tests.protocol_helpers import (  # noqa: E402
     chat_responder, messages_responder, model_test_responder, preset_base_urls, serve,
 )
+from harness.tightening import WATCHED_OUTPUTS  # noqa: E402
 
 UNAVAILABLE = "Missing configuration: provider credential"
 # 硬杀重启以后事件库的文件还会被短暂占用（与 harness/tests/process_kill.py 的处理相同）：打开时重试的上限
@@ -119,6 +122,118 @@ TOOLS_HTTP_SERVER = "search"
 
 # 两个项目各自取回的本机地址路径（同一个真实 HTTP 服务上的两页）
 TOOLS_FETCH_PATHS = ("/echo", "/notes")
+
+
+# 形态一节（工单 #1403）：项目设置页的「形态」一节要有一个项目与一份带两份形态的发布。
+# 发布带现在只有默认的三部门一份（单角色直做等形态由各自的工单加进发布带），因此这里交进第二份：
+# 一份定义内容与三部门相同、核验声明为空的副本（harness/tests/test_form_setting.py 同一做法），
+# 它与发布带里「一个角色直做」在页面上的样子一致——没有核验角色，以开环完成结束。
+FORMS_PROJECT = "形态项目"
+OPEN_LOOP_FORM = "three_departments_without_verifier"
+OPEN_LOOP_DEFINITIONS = DEFINITIONS.model_copy(update={
+    "version": "sha256:three-departments-without-verifier",
+    "organization": DEFINITIONS.organization.model_copy(
+        update={"verification": VerificationDeclaration(verifiers=())}),
+})
+
+
+def release_forms(*, single_role: bool = False) -> dict[str, tuple[object, object]]:
+    # 这个发布带的形态（形态名 → 一份完整的定义与它的收紧检查）：交给组装处，实例同时加载这几份。
+    # 单角色直做那一份只在需要它的用例里交进来（工单 #1457），别的用例看到的发布带不变
+    forms = {
+        DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
+        OPEN_LOOP_FORM: (OPEN_LOOP_DEFINITIONS, WATCHED_OUTPUTS),
+    }
+    if single_role:
+        forms[SINGLE_ROLE_FORM] = (single_role_definitions(), WATCHED_OUTPUTS)
+    return forms
+
+
+def forms_script() -> dict[str, list[FakeTurn]]:
+    # 形态一节的预置只有一个项目、没有事项：模型轮次一次也用不着（用到就是这里的脚本不够，
+    # 应当报错而不是给一份假的回答）
+    return {}
+
+
+# 一个角色直做（工单 #1457）：页面只看得到那一个部门。发布带里还没有这份形态（#1395），
+# 这里从定义目录复制一份，只留工程一个部门、核验声明为空（与 harness/tests/test_project_loop_organization.py
+# 的改名副本同一做法，只是部门不换名——一个角色直做用的就是工程的名字与工具）
+SINGLE_ROLE_FORM = "single_role"
+ORGANIZATION_PROJECT = "页面的部门"
+
+
+def single_role_definitions() -> object:
+    directory = Path(tempfile.mkdtemp(prefix="yudao-e2e-single-role-"))
+    shutil.copytree(DEFINITIONS_DIR, directory, dirs_exist_ok=True)
+
+    def load(name: str) -> dict:
+        return json.loads((directory / name).read_text(encoding="utf-8"))
+
+    def save(name: str, document: dict) -> None:
+        (directory / name).write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
+
+    organization = load("organization.json")
+    kept = next(item for item in organization["departments"] if item["id"] == "engineering")
+    organization["departments"] = [dict(kept, watched=["user_input", *kept["watched"]])]
+    # 没有核验角色：写明空的核验声明，旧定义缺这一项时按三部门解释
+    organization["verification"] = {"verifiers": []}
+    save("organization.json", organization)
+    save("roles.json", {"engineering": load("roles.json")["engineering"]})
+    work_items = load("work_items.json")
+    for kind in work_items["kinds"].values():
+        kind["departments"] = {"engineering": kind["departments"]["engineering"]}
+    save("work_items.json", work_items)
+    contracts = load("proposal_contracts.json")
+    contracts["roles"] = {"engineering": contracts["roles"]["engineering"]}
+    conditions = set(contracts["roles"]["engineering"]["kinds"])
+    contracts["conditions"] = {name: value for name, value in contracts["conditions"].items()
+                               if name in conditions}
+    save("proposal_contracts.json", contracts)
+    routings = load("routings.json")
+    for routing in routings["routings"]:
+        routing["departments"] = ["engineering"]
+    save("routings.json", routings)
+    rules = load("rules.json")
+    save("rules.json", {name: value for name, value in rules.items()
+                        if name not in {"roles.product.visibility", "roles.quality.visibility"}})
+    return load_definitions(directory)
+
+
+def slow_turn(label: str, chunks: int = 150):
+    # 一个慢慢流式返回、最后失败的一轮：事项在页面上检查的这段时间里一直在进行中（部门状态不是空），
+    # 结束时照实停下（假模型的这一份脚本用完了）。与 pending_ask_script 的慢回答同一写法
+    from harness.providers.call import ModelDelta, ModelStreamEvent
+
+    def turn(call):
+        offset = 0
+        for index in range(chunks):
+            text = f"{label}（第 {index + 1} 段）"
+            yield ModelStreamEvent(
+                kind="stream_event", id=f"stream-{label}-{index}",
+                payload={"type": "response.output_text.delta", "delta": text},
+                text=text, sequence=index, stage="output", source="provider_sdk",
+                deltas=(ModelDelta(channel="output", offset=offset, text=text),))
+            offset += len(text)
+        raise ProviderError("页面的部门预置：慢回答到此结束")
+
+    return turn
+
+
+def organization_script() -> dict[str, list]:
+    # 页面的部门从事实来（工单 #1457）：用例先在页面上建一个三部门的事项（产品慢慢流式返回，
+    # 部门状态因此在页面上看得见），等它停下以后再换成只有一个部门的形态、建一个新事项
+    # （工程慢慢流式返回）。两轮都不需要真的跑完三部门循环
+    return {
+        "product": [slow_turn("整理需求")],
+        "engineering": [slow_turn("写实现")],
+    }
+
+
+async def seed_organization(application: Application) -> None:
+    # 页面的部门从事实来（工单 #1457）：一个三部门的项目，没有事项。
+    # 用例在页面上先建一个三部门的事项，再采用一个角色直做的形态、建一个新事项
+    await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=ORGANIZATION_PROJECT, goal="页面的部门从事实来"))
 
 
 def lan_address() -> str:
@@ -748,6 +863,14 @@ async def wait_for_probe(application: Application, project_id: str, name: str,
     raise AssertionError(f"工具与扩展页的探测在 {timeout_sec:g} 秒内没有出结果")
 
 
+async def seed_forms(application: Application) -> None:
+    # 「形态」一节的预置（工单 #1403）：一个项目、没有事项。这一节只看项目现在用哪一份形态与它的改动历史，
+    # 事项与模型轮次都不需要；要两份形态的发布在起服务时交给组装处（见 release_forms）。
+    # 项目设置页读到的是真实的 project.organization 与 organization.adopt。
+    await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=FORMS_PROJECT, goal="换一份形态、改回与历史"))
+
+
 def project_id_of(application: Application, name: str) -> str:
     # 预置的项目按名字取标识：用例与预置脚本对同一个项目（projects.list 是应用层自己的查询）
     listed = application.query("projects.list", ProjectsList(include_archived=True)).data
@@ -1009,7 +1132,8 @@ def main() -> int:
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote", "replay", "kill", "steps", "coverage", "tools"),
+                                             "stopnote", "replay", "kill", "steps", "coverage", "tools", "forms",
+                                             "organization"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -1023,8 +1147,6 @@ def main() -> int:
     # 访问令牌，把令牌明文报给测试，测试在页面上填写它
     parser.add_argument("--token-name", default=None)
     args = parser.parse_args()
-
-    import tempfile
 
     data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
     # 测试内启动的真实 HTTP 上游：三种协议的推理服务与模型列表服务（工单 #93）。
@@ -1092,11 +1214,18 @@ def main() -> int:
         # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
         base_script = script()
         adapter_script = {department: turns * 2 for department, turns in base_script.items()}
+    elif args.script == "forms":
+        # 形态一节（工单 #1403）：这个预置不跑事项，模型轮次一次也用不着
+        adapter_script = forms_script()
+    elif args.script == "organization":
+        # 页面的部门从事实来（工单 #1457）：事项建好就停住，页面只看部门、页签与看板
+        adapter_script = organization_script()
     else:
         adapter_script = script()
     # 流式片段的停顿（秒）：进行中的询问模式要有一段够长的窗口，回答分支每段停 0.5 秒，
     # 120 段约一分钟（工单 #477 的验收第 2 条）；房间模式按 2.5 秒；其余模式不停顿
-    stream_gap = 2.5 if args.room else (0.5 if args.script in ("pending", "steps") else 0.0)
+    stream_gap = 2.5 if args.room else (0.5 if args.script in ("pending", "steps") else
+                                        (0.2 if args.script == "organization" else 0.0))
     if args.catalog_driven:
         # 工单 #319 第 6 项：用例要在界面上核对「缺少部门默认」的真实拒绝。
         # 就绪检查只按目录里的部门默认判断（LoopSystem.provider_status），单适配器方式直接返回
@@ -1110,6 +1239,14 @@ def main() -> int:
         system = open_after_kill(lambda: LoopSystem.for_testing(
             data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap), resume_on_startup=False))
         system.resume_startup_runs()
+    elif args.script == "forms":
+        # 形态一节（工单 #1403）：实例同时加载两份形态（见 release_forms），页面才有的可换
+        system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script), forms=release_forms())
+    elif args.script == "organization":
+        # 只做工程的项目（工单 #1457）：发布带多加载一份只有一个部门的形态；
+        # 慢流式返回让页面检查时事项还在进行中
+        system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap),
+                                        forms=release_forms(single_role=True))
     else:
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap))
     # 一步连接把 Key 写进 .env（catalog.connect 的既定行为，设计说明第 4.2 节）：
@@ -1179,6 +1316,13 @@ def main() -> int:
         elif args.script == "replay":
             # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
             asyncio.run(seed(application, system, two_item_project=True))
+        elif args.script == "forms":
+            # 形态一节（工单 #1403）：一个项目、没有事项；两份形态在起服务时已经交给组装处
+            asyncio.run(seed_forms(application))
+        elif args.script == "organization":
+            # 页面的部门从事实来（工单 #1457）：一个三部门的项目，没有事项；
+            # 用例在页面上先建一个事项、再把形态换成一个角色直做、再建一个事项
+            asyncio.run(seed_organization(application))
         elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）

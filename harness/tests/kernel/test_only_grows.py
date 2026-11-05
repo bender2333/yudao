@@ -63,6 +63,8 @@ SKELETON_EVENT_SNAPSHOT = {
         "mcp_servers_configured",
         # 探测 MCP 服务器（工单 #1174）
         "tool_server_probe_finished",
+        # 项目的形态（工单 #1392）：改形态写成项目流的一条事件
+        "project_form_set",
     }),
     "catalog": frozenset({
         "catalog_revised", "catalog_candidates_collected", "catalog_test_finished",
@@ -93,9 +95,10 @@ ENVELOPE_SNAPSHOT = {
     ),
 }
 
-# 放出 S6a 时封闭的停止原因清单（stop_reasons.json 的键，18 项）
+# 放出 S6a 时封闭的停止原因清单（stop_reasons.json 的键）与之后按只增补进来的原因
+# （cannot_verify 随工单 #1179、open_loop 随工单 #1394）
 STOP_REASON_SNAPSHOT = frozenset({
-    "released", "baseline_verified",
+    "released", "baseline_verified", "open_loop",
     "max_cycles", "model_steps_exhausted", "no_tool_call", "workspace_unrepresentable",
     "time_limit", "cancelled", "user_cancelled",
     "provider_error", "provider_timeout", "provider_protocol", "unsupported_protocol",

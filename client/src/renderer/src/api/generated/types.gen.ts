@@ -421,6 +421,21 @@ export type ArtifactRef = {
 };
 
 /**
+ * AskRelation
+ */
+export type AskRelation = {
+    /**
+     * Requester
+     */
+    requester: string;
+    /**
+     * Recipient
+     */
+    recipient: string;
+    ref: FactRef;
+};
+
+/**
  * AskView
  */
 export type AskView = {
@@ -987,6 +1002,10 @@ export type Catalog = {
         [key: string]: CatalogBinding;
     };
     /**
+     * Departments
+     */
+    departments: Array<CatalogDepartment>;
+    /**
      * Department Reminders
      */
     department_reminders: {
@@ -1361,6 +1380,20 @@ export type CatalogCredential = {
      * Persisted
      */
     persisted?: boolean;
+};
+
+/**
+ * CatalogDepartment
+ */
+export type CatalogDepartment = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
 };
 
 /**
@@ -2857,6 +2890,62 @@ export type FlowRecord = {
 };
 
 /**
+ * FormChange
+ */
+export type FormChange = {
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * Previous Form
+     */
+    previous_form: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Actor
+     */
+    actor: string;
+};
+
+/**
+ * FormChoice
+ */
+export type FormChoice = {
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Verifier Roles
+     */
+    verifier_roles: Array<string>;
+    /**
+     * Open Loop
+     */
+    open_loop: boolean;
+};
+
+/**
  * GuidanceRecord
  */
 export type GuidanceRecord = {
@@ -3992,6 +4081,86 @@ export type OnboardingRound = {
 };
 
 /**
+ * OrganizationAdopt
+ */
+export type OrganizationAdopt = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: string | null;
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Changes
+     */
+    changes?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Reason
+     */
+    reason?: string;
+};
+
+/**
+ * OrganizationDepartment
+ */
+export type OrganizationDepartment = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Verifier
+     */
+    verifier?: boolean;
+};
+
+/**
+ * OrganizationRole
+ */
+export type OrganizationRole = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    ref: FactRef;
+};
+
+/**
+ * OrganizationVerifier
+ */
+export type OrganizationVerifier = {
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Verifies
+     */
+    verifies: Array<VerifiedRole>;
+    ref: FactRef;
+};
+
+/**
  * OverlayCapability
  */
 export type OverlayCapability = {
@@ -4299,6 +4468,40 @@ export type ProjectOnboard = {
      * Source Path
      */
     source_path: string;
+};
+
+/**
+ * ProjectOrganizationResult
+ */
+export type ProjectOrganizationResult = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Version
+     */
+    version: string | null;
+    /**
+     * Form In Release
+     */
+    form_in_release: boolean;
+    /**
+     * Departments
+     */
+    departments: Array<OrganizationDepartment>;
+    /**
+     * Forms
+     */
+    forms: Array<FormChoice>;
+    /**
+     * History
+     */
+    history: Array<FormChange>;
 };
 
 /**
@@ -4801,6 +5004,25 @@ export type Rejected = {
      * Current Version
      */
     current_version?: number | string | null;
+};
+
+/**
+ * RejectionRelation
+ */
+export type RejectionRelation = {
+    /**
+     * Verifier
+     */
+    verifier: string;
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Outcome
+     */
+    outcome: string;
+    ref: FactRef;
 };
 
 /**
@@ -5670,6 +5892,17 @@ export type SnapshotProjectLoopResult = {
      */
     position: number;
     data: ProjectLoopResult;
+};
+
+/**
+ * Snapshot[ProjectOrganizationResult]
+ */
+export type SnapshotProjectOrganizationResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ProjectOrganizationResult;
 };
 
 /**
@@ -6576,6 +6809,20 @@ export type VerificationRecord = {
 };
 
 /**
+ * VerifiedRole
+ */
+export type VerifiedRole = {
+    /**
+     * Role
+     */
+    role: string;
+    /**
+     * Outcomes
+     */
+    outcomes: Array<string>;
+};
+
+/**
  * VersionEntry
  */
 export type VersionEntry = {
@@ -6607,6 +6854,25 @@ export type VersionEntry = {
      * Files
      */
     files: Array<string>;
+};
+
+/**
+ * WatchedRelation
+ */
+export type WatchedRelation = {
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Recipient
+     */
+    recipient: string;
+    /**
+     * Outcome
+     */
+    outcome: string;
+    ref: FactRef;
 };
 
 /**
@@ -6869,6 +7135,7 @@ export type WorkItemLoop = {
     refs?: {
         [key: string]: FactRef;
     };
+    organization?: WorkItemOrganization | null;
 };
 
 /**
@@ -6911,6 +7178,46 @@ export type WorkItemMaterialsResult = {
      * Old Runs
      */
     old_runs: Array<OldRunView>;
+};
+
+/**
+ * WorkItemOrganization
+ *
+ * 事项冻结定义里的组织（工单 #1381，画面与播放设计说明「画面跟着定义伸缩」的输入）。
+ *
+ * 取值来自这个事项创建时冻结的那份定义（形态与核验角色设计说明「形态随事项冻结」），不读进程加载时的那份；
+ * 每项事实带给出它的事件位置与来源种类，与 project.loop 已有的几个事实元素一样。
+ */
+export type WorkItemOrganization = {
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Routing
+     */
+    routing: string;
+    /**
+     * Roles
+     */
+    roles: Array<OrganizationRole>;
+    /**
+     * Verifiers
+     */
+    verifiers: Array<OrganizationVerifier>;
+    completing: OrganizationRole | null;
+    /**
+     * Watched
+     */
+    watched: Array<WatchedRelation>;
+    /**
+     * Asks
+     */
+    asks: Array<AskRelation>;
+    /**
+     * Rejections
+     */
+    rejections: Array<RejectionRelation>;
 };
 
 /**
@@ -7181,6 +7488,8 @@ export type ActionVerifiedPayload = {
      */
     auto_retry_of?: string | null;
     verification?: FileActionComparison | null;
+    session?: BrowserSessionState | null;
+    observation?: BrowserObservation | null;
     /**
      * Note
      */
@@ -8026,6 +8335,24 @@ export type BaselineAdoptedPayload = {
 };
 
 /**
+ * BaselineCheckRecord
+ */
+export type BaselineCheckRecord = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Checks
+     */
+    checks: string;
+    /**
+     * Outcome
+     */
+    outcome: 'failed' | 'passed' | 'missing' | 'unable_to_run';
+};
+
+/**
  * BaselineReviewAcceptedEvent
  */
 export type BaselineReviewAcceptedEvent = {
@@ -8188,6 +8515,39 @@ export type BaselineReviewAcceptedPayload = {
      */
     id: string;
     git_version: GitVersion;
+};
+
+/**
+ * BrowserObservation
+ */
+export type BrowserObservation = {
+    /**
+     * Accessibility
+     */
+    accessibility: string;
+    screenshot?: ArtifactRef | null;
+    /**
+     * Structure Truncated
+     */
+    structure_truncated?: boolean;
+};
+
+/**
+ * BrowserSessionState
+ */
+export type BrowserSessionState = {
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Status
+     */
+    status: 'running' | 'interrupted' | 'ended';
+    /**
+     * Tree Digest
+     */
+    tree_digest?: string | null;
 };
 
 /**
@@ -8585,6 +8945,14 @@ export type CheckReceipt = {
      * Qa Tests Hash
      */
     qa_tests_hash?: string | null;
+    /**
+     * Command
+     */
+    command?: string | null;
+    /**
+     * Baseline
+     */
+    baseline?: boolean;
 };
 
 /**
@@ -9726,7 +10094,7 @@ export type DecisionWithdrawnPayload = {
     /**
      * Reason
      */
-    reason: 'released' | 'baseline_verified' | 'max_cycles' | 'model_steps_exhausted' | 'cannot_verify' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed' | 'superseded_by_hand_back';
+    reason: 'released' | 'baseline_verified' | 'open_loop' | 'max_cycles' | 'model_steps_exhausted' | 'cannot_verify' | 'no_tool_call' | 'workspace_unrepresentable' | 'time_limit' | 'cancelled' | 'user_cancelled' | 'provider_error' | 'provider_timeout' | 'provider_protocol' | 'unsupported_protocol' | 'retry_after_too_long' | 'context_overflow' | 'compaction_failed' | 'host_commit_error' | 'run_event_version_changed' | 'superseded_by_hand_back';
 };
 
 /**
@@ -14756,6 +15124,95 @@ export type ProjectDecisionWithdrawnPayload = {
 };
 
 /**
+ * ProjectFormSetEvent
+ */
+export type ProjectFormSetEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'project_form_set';
+    payload: ProjectFormSetPayload;
+};
+
+/**
+ * ProjectFormSetPayload
+ */
+export type ProjectFormSetPayload = {
+    /**
+     * Previous Form
+     */
+    previous_form: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Reason
+     */
+    reason?: string;
+};
+
+/**
  * ProjectGoalChangedEvent
  */
 export type ProjectGoalChangedEvent = {
@@ -15501,6 +15958,10 @@ export type QaCoveragePayload = {
      * Changed
      */
     changed?: number;
+    /**
+     * Baseline Valid
+     */
+    baseline_valid?: boolean;
 };
 
 /**
@@ -15684,6 +16145,10 @@ export type QaSubmittedPayload = {
      * Open Criteria
      */
     open_criteria: Array<string>;
+    /**
+     * Baseline Checks
+     */
+    baseline_checks?: Array<BaselineCheckRecord>;
     /**
      * Evidence Refs
      */
@@ -16068,6 +16533,14 @@ export type RunCreatedPayload = {
      * Run Event Version
      */
     run_event_version: number;
+    /**
+     * Form
+     */
+    form?: string;
+    /**
+     * Open Loop
+     */
+    open_loop?: boolean;
     onboarding_basis?: OnboardingBasis | null;
     /**
      * Round
@@ -16153,7 +16626,7 @@ export type RunDonePayload = {
     /**
      * Stop Reason
      */
-    stop_reason: 'released' | 'baseline_verified';
+    stop_reason: 'released' | 'baseline_verified' | 'open_loop';
 };
 
 /**
@@ -17582,6 +18055,10 @@ export type ToolCallResult = {
      * Refused Reason
      */
     refused_reason?: string | null;
+    /**
+     * Images
+     */
+    images?: Array<ArtifactRef>;
     after_snapshot_ref?: ArtifactRef | null;
 };
 
@@ -18120,6 +18597,462 @@ export type ToolStartedPayload = {
 };
 
 /**
+ * TrialCaseConcludedEvent
+ */
+export type TrialCaseConcludedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_case_concluded';
+    payload: TrialCaseConcludedPayload;
+};
+
+/**
+ * TrialCaseConcludedPayload
+ */
+export type TrialCaseConcludedPayload = {
+    /**
+     * Case Id
+     */
+    case_id: string;
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Result
+     */
+    result: 'passed' | 'failed' | 'unverified' | 'interrupted';
+    /**
+     * Observed
+     */
+    observed?: string;
+    /**
+     * Evidence Steps
+     */
+    evidence_steps?: Array<string>;
+    /**
+     * Reason
+     */
+    reason?: string;
+};
+
+/**
+ * TrialCaseOpenedEvent
+ */
+export type TrialCaseOpenedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_case_opened';
+    payload: TrialCaseOpenedPayload;
+};
+
+/**
+ * TrialCaseOpenedPayload
+ */
+export type TrialCaseOpenedPayload = {
+    /**
+     * Case Id
+     */
+    case_id: string;
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Trial Session Id
+     */
+    trial_session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Activation Id
+     */
+    activation_id: string;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Tree Digest
+     */
+    tree_digest: string;
+    /**
+     * Criteria
+     */
+    criteria: Array<string>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Plan
+     */
+    plan: Array<string>;
+    /**
+     * Expected
+     */
+    expected: string;
+};
+
+/**
+ * TrialSessionEndedEvent
+ */
+export type TrialSessionEndedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_session_ended';
+    payload: TrialSessionEndedPayload;
+};
+
+/**
+ * TrialSessionEndedPayload
+ */
+export type TrialSessionEndedPayload = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Kind
+     */
+    kind: 'web' | 'desktop';
+    /**
+     * Reason
+     */
+    reason: 'stopped' | 'replaced' | 'interrupted' | 'user_stopped' | 'run_ended';
+    /**
+     * Pid
+     */
+    pid?: number | null;
+    /**
+     * Create Time
+     */
+    create_time?: number | null;
+    /**
+     * Ended
+     */
+    ended?: boolean;
+    /**
+     * Exit Code
+     */
+    exit_code?: number | null;
+};
+
+/**
+ * TrialSessionStartedEvent
+ */
+export type TrialSessionStartedEvent = {
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
+    /**
+     * Event Id
+     */
+    event_id: string;
+    /**
+     * At
+     */
+    at: string;
+    /**
+     * Stream
+     */
+    stream: string;
+    /**
+     * Stream Version
+     */
+    stream_version: number;
+    /**
+     * Project Id
+     */
+    project_id: string | null;
+    /**
+     * Work Item Id
+     */
+    work_item_id: string | null;
+    /**
+     * Run Id
+     */
+    run_id: string | null;
+    /**
+     * Department
+     */
+    department: string | null;
+    /**
+     * Role
+     */
+    role: string | null;
+    /**
+     * Actor
+     */
+    actor: string;
+    /**
+     * Source
+     */
+    source: 'rule' | 'decision_model' | 'role_statement' | 'host_measurement' | 'user';
+    /**
+     * Command Id
+     */
+    command_id: string | null;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Type
+     */
+    type: 'trial_session_started';
+    payload: TrialSessionStartedPayload;
+};
+
+/**
+ * TrialSessionStartedPayload
+ */
+export type TrialSessionStartedPayload = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Kind
+     */
+    kind: 'web' | 'desktop';
+    /**
+     * Launch Name
+     */
+    launch_name: string;
+    /**
+     * System
+     */
+    system: 'windows' | 'linux';
+    /**
+     * Port
+     */
+    port: number;
+    /**
+     * Ready Url
+     */
+    ready_url: string;
+    /**
+     * Tree Digest
+     */
+    tree_digest: string;
+    /**
+     * Source
+     */
+    source: 'delivery_snapshot' | 'workspace_seal';
+    /**
+     * Pid
+     */
+    pid?: number | null;
+    /**
+     * Create Time
+     */
+    create_time?: number | null;
+};
+
+/**
  * Usage
  */
 export type Usage = {
@@ -18577,6 +19510,10 @@ export type WorkItemCreatedPayload = {
      */
     restarted_from_run_id?: string | null;
     mcp_servers?: McpServersDocument | null;
+    /**
+     * Form
+     */
+    form?: string;
 };
 
 /**
@@ -19338,6 +20275,14 @@ export type EventObject = ({
 } & McpServerClosedEvent) | ({
     type: 'mcp_server_failed';
 } & McpServerFailedEvent) | ({
+    type: 'trial_session_started';
+} & TrialSessionStartedEvent) | ({
+    type: 'trial_session_ended';
+} & TrialSessionEndedEvent) | ({
+    type: 'trial_case_opened';
+} & TrialCaseOpenedEvent) | ({
+    type: 'trial_case_concluded';
+} & TrialCaseConcludedEvent) | ({
     type: 'run_done';
 } & RunDoneEvent) | ({
     type: 'run_paused';
@@ -19394,6 +20339,8 @@ export type EventObject = ({
 } & BaselineAdoptedEvent) | ({
     type: 'project_parameter_set';
 } & ProjectParameterSetEvent) | ({
+    type: 'project_form_set';
+} & ProjectFormSetEvent) | ({
     type: 'writeback_completed';
 } & WritebackCompletedEvent) | ({
     type: 'writeback_stopped';
@@ -20591,6 +21538,35 @@ export type CommandParameterWithdrawResponses = {
 
 export type CommandParameterWithdrawResponse = CommandParameterWithdrawResponses[keyof CommandParameterWithdrawResponses];
 
+export type CommandOrganizationAdoptData = {
+    body: OrganizationAdopt;
+    path?: never;
+    query?: never;
+    url: '/api/commands/organization.adopt';
+};
+
+export type CommandOrganizationAdoptErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, stale_base, project_archived, not_allowed, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandOrganizationAdoptError = CommandOrganizationAdoptErrors[keyof CommandOrganizationAdoptErrors];
+
+export type CommandOrganizationAdoptResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandOrganizationAdoptResponse = CommandOrganizationAdoptResponses[keyof CommandOrganizationAdoptResponses];
+
 export type QuerySystemStatusData = {
     body?: never;
     path?: never;
@@ -21718,6 +22694,36 @@ export type QueryRunLoopsResponses = {
 };
 
 export type QueryRunLoopsResponse = QueryRunLoopsResponses[keyof QueryRunLoopsResponses];
+
+export type QueryProjectOrganizationData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+    };
+    url: '/api/queries/project.organization';
+};
+
+export type QueryProjectOrganizationErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryProjectOrganizationError = QueryProjectOrganizationErrors[keyof QueryProjectOrganizationErrors];
+
+export type QueryProjectOrganizationResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotProjectOrganizationResult;
+};
+
+export type QueryProjectOrganizationResponse = QueryProjectOrganizationResponses[keyof QueryProjectOrganizationResponses];
 
 export type CapabilitiesData = {
     body?: never;

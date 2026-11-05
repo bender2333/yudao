@@ -127,3 +127,11 @@ class NoteRequired(Exception):
         super().__init__(f"option {option} of decision request {decision.decision_id} requires a note")
         self.decision_id = decision.decision_id
         self.option = option
+
+
+class AnswerNotAllowed(Exception):
+    # 这条回答现在不能收（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：事项冻结的形态不在发布里，
+    # 回答没有写入、决定请求仍在等待；换回带那一份形态的发布以后可以再回答。message 是给用户看的那句话
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
+        self.message = message

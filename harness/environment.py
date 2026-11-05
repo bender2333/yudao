@@ -38,16 +38,22 @@ from .actions import (
     snapshot_payload,
 )
 from .artifacts import ArtifactStore, ExternalSource
+from .browser import (
+    OUTPUT_DIR_NAME as BROWSER_OUTPUT_DIR,
+    BrowserRefused,
+    BrowserSessionFailed,
+    BrowserSessions,
+)
 from .event_store import run_stream
 from .fetch import EXTERNAL_CONTENT_NOTICE, FetchCancelled, FetchRefused, fetch_url
-from .mcp_session import MCP_DISPATCH_TOOL, McpOutcome, McpRefused, UnknownToolAlias
+from .mcp_session import McpOutcome, McpRefused, UnknownToolAlias
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
 from .definitions import DEFINITIONS, DefinitionError
 from .path_rules import CHECK_MATERIALS_DIR, QA_TESTS_DIR, TreeError  # QA_TESTS_DIR 是旧名，demo.py 还从这里取
 from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
-from .tools import tool_action
+from .tools import BROWSER_TOOL_NAMES, tool_action
 from .tree_archive import artifact_run, load_tree
 from .trial_sessions import (TrialSessionTable, TrialStartFailed, resolve_trial_call,
                             resolve_trial_launch)
@@ -208,6 +214,10 @@ class Workspaces:
         sessions: Any = None,
         check_timeout: Callable[[str], int] | None = None,
         definitions: Any = None,
+        # 按 run 取这个事项冻结的那份定义（工单 #1509）：工作区政策（谁交出交付、谁从封存交付建立检查副本、
+        # 检查材料写在哪里）按事项所用的定义推，不按进程加载的那一份；不给时用上面那一份
+        definitions_for: Callable[[str], Any] | None = None,
+        trial_events: Callable[[str, str, dict[str, Any]], None] | None = None,
     ) -> None:
         self.root = Path(root)
         # 运行状态投影由薄驱动给（它只读最小投影，运行状态投影是它自己的事实）
@@ -223,13 +233,56 @@ class Workspaces:
         self.delivery_inspecting = delivery_inspecting_departments(definitions)
         # 写入范围是检查材料的角色与它们能写的目录（工单 #1390）：由定义声明，检查副本按它带上这些目录
         self.check_materials = check_material_paths(definitions)
+        # 按事项冻结的定义算出来的政策（工单 #1509）：键是定义版本，同一份定义只算一次
+        self._definitions_for = definitions_for
+        self._policies: dict[str, tuple[frozenset[str], frozenset[str], dict[str, tuple[str, ...]]]] = {}
         # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
         self._source: dict[tuple[str, str], str | None] = {}
         # 这个进程里全部 run 的试用会话表（工单 #1182）：会话跨激活保留，一个部门同一时刻最多一个；
-        # 程序探测用真实的那一份，测试可以自己构造一张表交给 LocalEnvironment
-        self.trials = TrialSessionTable()
+        # 程序探测用真实的那一份，测试可以自己构造一张表交给 LocalEnvironment。
+        # 表与会话工厂共用同一张（工单 #1183）：run 进入终态时 cleanup_run 先结束会话再删工作区。
+        # 会话的开始与结束由薄驱动的写入方写一条应用事件（trial_events），与 MCP 会话的生命周期同一个做法
+        self._trials = getattr(sessions, "trials", None) or TrialSessionTable()
+        self._trial_events = trial_events
+        if trial_events is not None:
+            self._trials.bind_events(trial_events)
+        # 这个进程里全部 run 的浏览器会话表（工单 #1184）：网页种类的试用会话启动与关闭 Playwright MCP，
+        # 截图存进这个 run 的工件库；测试同样可以换成自己构造的一张表
+        self.browsers = BrowserSessions(self._artifacts)
+
+    @property
+    def trials(self) -> TrialSessionTable:
+        return self._trials
+
+    @trials.setter
+    def trials(self, table: TrialSessionTable) -> None:
+        # 换一张会话表（测试用）：会话工厂与执行环境用同一张，run 结束时 cleanup_run 结束的就是它。
+        # 新的表接上同一份写入方：换表不该让会话事件消失
+        self._trials = table
+        if self._trial_events is not None:
+            table.bind_events(self._trial_events)
+        if self.sessions is not None:
+            self.sessions.trials = table
 
     # ---- 运行工作区 ----
+    def policies(self, run_id: str) -> tuple[frozenset[str], frozenset[str], dict[str, tuple[str, ...]]]:
+        """这个 run 的三样工作区政策：交出交付的部门、从封存交付建立检查副本的部门、检查材料写在哪里。
+
+        按这个事项冻结的那份定义推（工单 #1509）：换一份把部门改了名的定义，改名后的交交付的部门照常
+        在自己的运行工作区工作、改名后的核验角色照常从封存交付建立检查副本。没有按 run 取定义时用构造时那一份。
+        """
+        if self._definitions_for is None:
+            return self.handing_over, self.delivery_inspecting, self.check_materials
+        definitions = self._definitions_for(run_id)
+        key = getattr(definitions, "version", "")
+        cached = self._policies.get(key)
+        if cached is None:
+            cached = (handing_over_departments(definitions),
+                      delivery_inspecting_departments(definitions),
+                      check_material_paths(definitions))
+            self._policies[key] = cached
+        return cached
+
     def parameters_for(self, run_id: str) -> dict[str, Any]:
         # 这个 run 冻结的参数取值（工单 #1189）：执行环境的输出上限、命令与检查的时限上限读它，
         # 建 run 之后改参数事件不影响已经创建的 run。旧 run 没有冻结字典时按定义初值解释
@@ -248,8 +301,9 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            check_materials=self.check_materials,
+            check_materials=self.policies(run_id)[2],
             trials=self.trials,
+            browsers=self.browsers,
             run_root=self.root / run_id,
         )
 
@@ -277,13 +331,16 @@ class Workspaces:
             projection = self._view(run_id)
             ids = ({item.department: item.session_id for item in projection.sessions.values()}
                    if projection.sessions else None)
-            sessions = self.sessions.create_run_sessions(run_id, ids)
+            # 补建的会话按这个事项冻结的形态的部门建（工单 #1509）：run_created 里记下的会话已经是那一份的，
+            # 没有记下时按投影里的部门
+            sessions = self.sessions.create_run_sessions(run_id, ids, departments=ids.keys() if ids else None)
             session = sessions[department]
         return session.session_id, getattr(self.sessions, "jobs", None)
 
     def hands_over(self, department: str, session_id: str | None, projection: Any) -> bool:
-        # 产出进入运行工作区的主线会话：交出交付的部门，且不在询问分支里
-        if department not in self.handing_over:
+        # 产出进入运行工作区的主线会话：交出交付的部门，且不在询问分支里。
+        # 谁交出交付按这个事项冻结的定义推（工单 #1509）
+        if department not in self.policies(projection.run_id)[0]:
             return False
         return session_id not in projection.branch_sessions
 
@@ -302,8 +359,9 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            check_materials=self.check_materials,
+            check_materials=self.policies(run_id)[2],
             trials=self.trials,
+            browsers=self.browsers,
             run_root=self.root / run_id,
         )
         return self._attach_trial_source(environment, run_id, department, self._view(run_id))
@@ -313,10 +371,56 @@ class Workspaces:
         # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（设计说明第 3.4 节）；
         # 其他部门的试用副本在 trial_start 时封存运行工作区。
         # 两处打开检查工作区的地方都走这里：激活开始时新建（new_inspection），以及会话用过文件工具以后
-        # 检查工作区按会话保留、后面一次激活重新打开（session_inspection → inspection_environment）
-        if department in self.delivery_inspecting:
+        # 检查工作区按会话保留、后面一次激活重新打开（session_inspection → inspection_environment）。
+        # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        if department in self.policies(run_id)[1]:
             environment.bind_trial_source(self.source_tree(department, projection))
+            # 基线副本与起点到交付的改动清单（检验的有效性设计说明第 7.2 节，工单 #1181）：
+            # 起点树是事项开始时的项目起点，返工后保持不变；改动清单从这里一次算好。
+            # 同名检查的命令与声明文件的内容取自当前交付的说明与封存树
+            start, changed = self._baseline_facts(projection)
+            environment.bind_baseline_source(start, changed)
+            delivery = projection.delivery_spec
+            if delivery is not None and delivery.tree_ref is not None:
+                try:
+                    sealed = load_tree(self._artifacts, artifact_run(delivery.tree_ref.path), delivery.tree_ref)
+                except (ValueError, OSError):
+                    sealed = None
+                environment.bind_delivery_checks(getattr(delivery, "checks", None), sealed)
+            else:
+                environment.bind_delivery_checks(None, None)
         return environment
+
+    def _baseline_facts(self, projection: Any) -> tuple[CapturedTree | None, tuple[str, ...]]:
+        # 事项起点树与起点到交付的改动清单：起点是 run_created 记下的采纳成果或起始文件夹快照
+        # （还没有交付时为空树），改动清单是交付封存的树相对起点多出或改了内容的文件，按路径排序。
+        # 两者都由封存树算出，不读运行工作区（工单 #1181）
+        start = self._start_tree(projection)
+        delivery = projection.delivery_spec
+        if delivery is None or delivery.tree_ref is None:
+            return start, ()
+        try:
+            sealed = load_tree(self._artifacts, artifact_run(delivery.tree_ref.path), delivery.tree_ref)
+        except (ValueError, OSError):
+            return start, ()
+        start_hashes = {item.path: hash_bytes(item.data) for item in start.files}
+        changed = sorted(item.path for item in sealed.files
+                         if item.path not in start_hashes
+                         or start_hashes[item.path] != hash_bytes(item.data))
+        return start, tuple(changed)
+
+    def _start_tree(self, projection: Any) -> CapturedTree:
+        # 事项起点树：run_created 写下的采纳成果或项目的起始文件夹快照，两者都没有时为空树；
+        # 封存的交付本身不是起点。读不出来时按没有基线处理（基线检查会拒绝执行并写明原因）
+        for record in (projection.baseline, projection.snapshot):
+            if not record:
+                continue
+            start_ref = ArtifactRef(**record["tree_ref"])
+            try:
+                return load_tree(self._artifacts, artifact_run(start_ref.path), start_ref)
+            except (ValueError, OSError):
+                return None
+        return CapturedTree(directories=(), files=())
 
     def session_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
                            jobs: Any | None = None) -> LocalEnvironment:
@@ -338,8 +442,9 @@ class Workspaces:
 
     def source_hash(self, department: str, projection: Any) -> str | None:
         # 从封存交付建立的部门（质检）的检查工作区：这份交付的摘要就是工作区的来源；
-        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）
-        if department not in self.delivery_inspecting:
+        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）。
+        # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        if department not in self.policies(projection.run_id)[1]:
             return None
         delivery = projection.delivery_spec
         return None if delivery is None else delivery.content_hash
@@ -350,8 +455,8 @@ class Workspaces:
         # 不读运行工作区；其他会话从当前运行工作区快照建立。
         # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 第 2 节
         # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
-        # host_commit_error 正式报告
-        if department in self.delivery_inspecting:
+        # host_commit_error 正式报告。谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        if department in self.policies(projection.run_id)[1]:
             if projection.delivery_spec is not None and projection.delivery_spec.tree_ref is not None:
                 tree_ref = projection.delivery_spec.tree_ref
                 return load_tree(self._artifacts, artifact_run(tree_ref.path), tree_ref)
@@ -391,11 +496,12 @@ class Workspaces:
             artifacts=self._artifacts,
             run_id=run_id,
             parameters=self.parameters_for(run_id),
-            check_materials=self.check_materials,
+            check_materials=self.policies(run_id)[2],
             trials=self.trials,
+            browsers=self.browsers,
             run_root=run_root,
         )
-        if department in self.delivery_inspecting:
+        if department in self.policies(run_id)[1]:
             ref = projection.qa_tests_archive_ref
             if ref is not None:
                 if isinstance(ref, dict):
@@ -430,9 +536,10 @@ class Workspaces:
 
     def refresh_for(self, round: RoundWorkspace) -> Callable[[], LocalEnvironment | None]:
         # 检查工作区按会话保留（工单 #558）：从封存交付建立的部门进行中有新的交付封存时，
-        # 在它的下一步从这份交付重建；询问与通知都不重建
+        # 在它的下一步从这份交付重建；询问与通知都不重建。谁从封存交付建立检查副本按这个事项
+        # 冻结的定义推（工单 #1509）
         def refresh() -> LocalEnvironment | None:
-            if round.department not in self.delivery_inspecting:
+            if round.department not in self.policies(round.run_id)[1]:
                 return None
             projection = self._view(round.run_id)
             current = self.source_hash(round.department, projection)
@@ -531,7 +638,8 @@ _HANDLERS = {
     "read_output": "_read_output",
     "stop_job": "_stop_job",
 }
-_PROCESSES = {"run_check": "_run_check", "bash": "_bash", "fetch_url": "_fetch", "mcp": "_mcp",
+_PROCESSES = {"run_check": "_run_check", "run_baseline_check": "_run_baseline_check", "bash": "_bash", "fetch_url": "_fetch", "mcp": "_mcp",
+              "browser": "_browser",
               "trial_start": "_trial_start", "trial_open": "_trial_open",
               "trial_output": "_trial_output", "trial_stop": "_trial_stop"}
 
@@ -546,22 +654,27 @@ _KIND_TOOLS = {
     "read": frozenset({"read_file", "list_files", "search", "read_range", "read_external_source"}),
     "fetch": frozenset({"fetch_url"}),
     "write": frozenset({"write_file", "edit_range", "delete_file", "move_file"}),
-    "check": frozenset({"run_check"}),
+    "check": frozenset({"run_check", "run_baseline_check"}),
     "command": frozenset({"bash", "read_output", "stop_job"}),
     "mcp": frozenset(),
     "trial": frozenset({"trial_start", "trial_open", "trial_output", "trial_stop"}),
+    # 浏览器类别的工具由 #147 从 Playwright MCP 的 tools/list 生成，#1184 起能执行：分派按类别进入
+    # 唯一的处理方法（_PROCESSES["browser"]），地址与路径的拒绝在那一边
+    "browser": frozenset(BROWSER_TOOL_NAMES),
 }
 
 # 定义中的环境工具，只要出现在某个部门或事项种类的工具清单里（模型可能被提供它），就要在它动作类别的
-# 分派里有执行方法，否则启动失败。试用与浏览器工具的定义先随系统发布（工单 #147），到 #1182 能执行时
-# 才放进工具清单：只写进定义、还没有在任何清单里出现的工具不需要实现
+# 分派里有执行方法，否则启动失败。试用与浏览器工具的定义先随系统发布（工单 #147），到 #1182、#1184 能执行时
+# 才放进工具清单：只写进定义、还没有在任何清单里出现的工具不需要实现。一个类别共用一个处理方法时
+# （MCP 的别名、浏览器工具），分派表里的键是动作类别，不是工具名
 _OFFERED_TOOLS = frozenset(tool for role in DEFINITIONS.roles.values() for tool in role.tools) | frozenset(
     tool for kind in DEFINITIONS.work_items.kinds.values()
     for work in kind.departments.values() for tool in work.tools)
 _UNIMPLEMENTED = sorted(name for name, tool in DEFINITIONS.tools.items()
                         if tool.kind == "environment" and name in _OFFERED_TOOLS
                         and (name not in _KIND_TOOLS.get(tool.action, ())
-                             or (name not in _HANDLERS and name not in _PROCESSES)))
+                             or (name not in _HANDLERS and name not in _PROCESSES
+                                 and tool.action not in _PROCESSES)))
 if _UNIMPLEMENTED:
     raise DefinitionError([("tools.json", name, "执行环境没有这个环境工具的实现") for name in _UNIMPLEMENTED])
 
@@ -780,6 +893,7 @@ class LocalEnvironment:
         mcp_sessions: Any | None = None,
         check_materials: Mapping[str, tuple[str, ...]] | None = None,
         trials: TrialSessionTable | None = None,
+        browsers: BrowserSessions | None = None,
         run_root: str | Path | None = None,
     ) -> None:
         self.workspace = workspace
@@ -805,11 +919,22 @@ class LocalEnvironment:
         # 这个 run 的试用会话表（浏览器与 computer use 设计说明第 3.4 节，工单 #1182）：
         # 会话跨激活保留（一个部门同一时刻最多一个会话），由 Workspaces 持有；直接构造环境时各自一份
         self._trials = trials if trials is not None else TrialSessionTable()
+        # 这个 run 的浏览器会话表（设计说明第 4.1 节，工单 #1184）：网页种类的试用会话建立与结束时
+        # 由这里启动与关闭 Playwright MCP；动作按（run、部门）找到会话。与试用会话一样由 Workspaces 持有
+        self.browsers = browsers if browsers is not None else BrowserSessions(artifacts)
         # 运行工作区的根：试用副本放在它旁边的 trials/ 下，与检查工作区同一种摆法
         self._run_root = Path(run_root) if run_root is not None else self.workspace.root
         # 质检的试用副本来源：这次检查的交付快照的清单（由 Workspaces 在激活开始时交来）；
         # 工程没有这一项，trial_start 时封存当前的运行工作区
         self._trial_source: CapturedTree | None = None
+        # 基线副本的来源：事项起点树与起点到交付的改动清单（由 Workspaces 在激活开始时交来，工单 #1181）；
+        # 没有绑定时基线检查拒绝执行
+        self._baseline_source: CapturedTree | None = None
+        self._baseline_changed: tuple[str, ...] = ()
+        # 基线命令与声明文件内容的来源：当前交付的说明（同名检查的命令）与封存的交付树（声明文件的内容），
+        # 由 Workspaces 在激活开始时交来；没有绑定时基线检查按没有交付记录拒绝执行
+        self._delivery_checks: tuple[dict[str, Any], ...] = ()
+        self._delivery_tree: CapturedTree | None = None
         # 当前交付说明里的启动方式（由 Workspaces 在激活开始时交来）：trial_open 只接受这里的名称。
         # 复核由引擎在工具许可时已经做过一次，这里是执行之前的同一套核对
         self._launch_methods: list[dict[str, Any]] = []
@@ -845,6 +970,7 @@ class LocalEnvironment:
         mcp_sessions: Any | None = None,
         check_materials: Mapping[str, tuple[str, ...]] | None = None,
         trials: TrialSessionTable | None = None,
+        browsers: BrowserSessions | None = None,
         run_root: str | Path | None = None,
     ) -> LocalEnvironment:
         # 从封存快照建立工作区：快照给出时按它的内容新建目录并核对，没有快照时建立空的工作区
@@ -853,7 +979,7 @@ class LocalEnvironment:
             materialize_tree(tree, root)
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
                    artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions,
-                   check_materials=check_materials, trials=trials, run_root=run_root)
+                   check_materials=check_materials, trials=trials, browsers=browsers, run_root=run_root)
 
     @classmethod
     def open(
@@ -869,12 +995,13 @@ class LocalEnvironment:
         mcp_sessions: Any | None = None,
         check_materials: Mapping[str, tuple[str, ...]] | None = None,
         trials: TrialSessionTable | None = None,
+        browsers: BrowserSessions | None = None,
         run_root: str | Path | None = None,
     ) -> LocalEnvironment:
         # 打开已经建立的工作区
         return cls(Workspace(root), check_timeout_sec=check_timeout_sec, jobs=jobs, session_id=session_id,
                    artifacts=artifacts, run_id=run_id, parameters=parameters, mcp_sessions=mcp_sessions,
-                   check_materials=check_materials, trials=trials, run_root=run_root)
+                   check_materials=check_materials, trials=trials, browsers=browsers, run_root=run_root)
 
     def _limit(self, name: str, default: Any) -> Any:
         # 这个 run 冻结的参数取值；没有冻结字典时用定义文件里的初始值（工单 #1189）
@@ -896,6 +1023,21 @@ class LocalEnvironment:
         # 这个会话的试用副本来源（浏览器与 computer use 设计说明第 3.4 节）：质检按当前交付快照的清单
         # 建立副本，工程没有这一项，trial_start 时封存运行工作区
         self._trial_source = tree
+
+    def bind_baseline_source(self, tree: CapturedTree | None, changed: tuple[str, ...] = ()) -> None:
+        # 基线副本的来源（检验的有效性设计说明第 7.2 节，工单 #1181）：事项起点树的引用，以及起点到
+        # 交付的改动清单（声明涉及的交付文件必须属于它）。事项返工时起点树保持不变（run_created 里
+        # 记下的采纳成果或起始文件夹快照），由 Workspaces 在激活开始时交来；
+        # 直接构造环境的测试没有绑定时按没有基线处理
+        self._baseline_source = tree
+        self._baseline_changed = tuple(changed)
+
+    def bind_delivery_checks(self, checks: list[dict[str, Any]] | None,
+                             tree: CapturedTree | None) -> None:
+        # 基线命令与声明文件内容的来源（工单 #1181）：交付说明里记录的检查（name → command）与封存的交付树。
+        # 质检声明文件时内容从封存树取，不读检查工作区
+        self._delivery_checks = tuple(dict(item) for item in (checks or ()) if isinstance(item, dict))
+        self._delivery_tree = tree
 
     def bind_launch_methods(self, methods: list[dict[str, Any]] | None) -> None:
         # 当前交付说明里的启动方式：trial_open 的名称按它解析（设计说明第 3.4 节）
@@ -935,9 +1077,10 @@ class LocalEnvironment:
         if action.kind != "mcp" and action.tool not in tools:
             raise ValueError(f"{action.tool} is not a {action.kind} action")
         process = self._processes.get(action.tool)
-        if process is None and action.kind == "mcp":
-            # MCP 动作的执行方法按分派键取（_PROCESSES 里的 "mcp"），别名的核对在处理方法里
-            process = self._processes.get(MCP_DISPATCH_TOOL)
+        if process is None and action.kind in {"mcp", "browser"}:
+            # 这两类的执行方法按动作类别取（_PROCESSES 里的 "mcp"、"browser"）：MCP 的别名与浏览器工具名
+            # 都不到分派表里逐项登记，名称的核对在处理方法里
+            process = self._processes.get(action.kind)
         if process is None:
             handler = self._handlers.get(action.tool)
             if handler is None:
@@ -986,6 +1129,16 @@ class LocalEnvironment:
         except FetchRefused as exc:
             # 地址指向服务自己：动作被拒绝，回执标 refused 并带原因，作为工具结果交回（工单 #1170）
             return ActionReceipt.refusal(action.action_id, str(exc))
+        except BrowserRefused as exc:
+            # 浏览器动作的拒绝（工单 #1184）：导航目标指向服务自己的地址与端口，或本地文件路径在
+            # 试用副本之外。回执标 refused，原因作为工具结果交回
+            return ActionReceipt.refusal(action.action_id, str(exc))
+        except BrowserSessionFailed as exc:
+            # 浏览器会话没有建立、已经中断，或执行时 Playwright MCP 退出（设计说明第 9 节）：
+            # 回执为失败，带会话记录（状态已记为中断）
+            tree_change, after_ref = self._tree_evidence(before)
+            return ActionReceipt(action_id=action.action_id, status="failed", output=exc.output,
+                                 error=str(exc), tree_change=tree_change, after_snapshot_ref=after_ref)
         except McpRefused as exc:
             # 工具许可与名称表（网络与 MCP 设计说明第 5.2 节）：别名不在这个事项的名称表里等拒绝情形，
             # 回执标 refused 并带原因，作为工具结果交回（工单 #1170 的回执字段）
@@ -1587,6 +1740,7 @@ class LocalEnvironment:
                 snapshot_hash=snapshot_hash,
                 tree_changed=tree_changed,
                 qa_tests_hash=qa_tests_hash,
+                command=command,
             )
             return {
                 "name": receipt.name,
@@ -1600,7 +1754,138 @@ class LocalEnvironment:
                 "delivery_spec_hash": receipt.delivery_spec_hash,
                 "effective_contract_hash": receipt.effective_contract_hash,
                 "qa_tests_hash": receipt.qa_tests_hash,
+                "command": receipt.command,
+                "baseline": receipt.baseline,
             }, finished.status
+
+    def _delivery_check_command(self, name: str) -> str | None:
+        # 同名交付检查已经记录的命令：交付封存时主机把工程 run_check 的命令一起记下（DeliverySpec.checks）。
+        # 基线运行不能改写命令（第 7.2 节）：这里只取记录，模型给不出 command 这个参数
+        for check in getattr(self, "_delivery_checks", ()) or ():
+            if isinstance(check, dict) and check.get("name") == name and isinstance(check.get("command"), str):
+                return check["command"]
+        return None
+
+    async def _run_baseline_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 基线检查（检验的有效性设计说明第 7.2 节，工单 #1181）：主机在基线副本上运行同名交付检查，
+        # 回执先写进检查工作区，提交放行决定读取事实时它已经在了。基线副本由事项起点树、这个部门的
+        # 检查材料与声明的交付文件组成；命令取交付检查记录的那一条。时限、输出截断、进程树清理与
+        # 树变化核对与 run_check 相同。退出码非零且不是 124（超时）或 130（取消）时基线失败，
+        # 交付检查通过才有资格计入检验覆盖；124 与 130 记为无法运行。
+        args = action.input
+        name = str(args.get("name") or "").strip()
+        if not name:
+            raise ValueError("check name is required")
+        declared = args.get("files")
+        if declared is None:
+            declared = []
+        if not isinstance(declared, list) or any(not isinstance(item, str) or not item.strip()
+                                                 for item in declared):
+            raise ValueError("files must be a list of workspace-relative delivery file paths")
+        declared = [item.strip().replace("\\", "/") for item in declared]
+        if self._baseline_source is None:
+            raise ValueError("the work item's start tree is not available for a baseline check; "
+                             "the item started without a start tree or the archive cannot be read")
+        start_paths = {item.path: hash_bytes(item.data) for item in self._baseline_source.files}
+        unknown = sorted(set(declared) - set(self._baseline_changed))
+        if unknown:
+            raise ValueError("declared files must be paths changed between the start tree and the delivery: "
+                             + ", ".join(unknown))
+        command = self._delivery_check_command(name)
+        if command is None:
+            raise ValueError(f"the delivery records no check named {name!r}; run the delivery check first, "
+                             "the baseline runs the same command")
+        timeout_sec = self._check_timeout_sec
+        # 两处动作前的读取（与 run_check 相同的树变化核对口径）：源工作区（检查工作区）在动作前的那次读取，
+        # 与基线副本本身的摘要
+        workspace_digest = self.workspace.snapshot().digest
+        with self.workspace.check_copy(self._baseline_source) as copy_root:
+            for directory in self._check_materials.get(action.department, ()):
+                source = self.workspace.root / directory
+                if source.exists():
+                    shutil.copytree(source, copy_root / directory, dirs_exist_ok=True)
+            for relative in declared:
+                content = self._delivery_file(relative)
+                if content is None:
+                    raise ValueError(f"declared delivery file {relative!r} is not in the sealed delivery tree")
+                target = copy_root / relative
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+            original_digest = capture_public_tree(copy_root, True).digest
+            finished = await _run_process(
+                [_resolve_bash(), "-c", command], copy_root,
+                {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                timeout_sec, stop,
+            )
+            if finished.status == "completed":
+                exit_code = finished.returncode
+                output = _summarize_output(finished.stdout, finished.stderr, self._output_limit())
+            else:
+                if finished.status == "timeout":
+                    exit_code, output = TIMEOUT_EXIT_CODE, f"check timed out after {timeout_sec}s"
+                else:
+                    exit_code, output = CANCELLED_EXIT_CODE, "check cancelled; the process tree was stopped"
+                if finished.stdout:
+                    output += "\n" + finished.stdout
+                if finished.stderr:
+                    output += "\n" + finished.stderr
+            snapshot_hash = original_digest
+            verification_errors = []
+            # 树变化核对与 run_check 相同（说明文字只出现标签，主机路径不进入模型可见的回执）：
+            # 基线副本与源工作区任何一个改了内容，通过都不绑定到原来的快照
+            for label, root, expected in (("tested tree", copy_root, original_digest),
+                                          ("source workspace", self.workspace.root, workspace_digest)):
+                try:
+                    observed_digest = capture_public_tree(root, True).digest
+                    if label == "tested tree":
+                        snapshot_hash = observed_digest
+                    if observed_digest != expected:
+                        verification_errors.append(f"{label} changed")
+                except Exception as exc:  # noqa: BLE001 - 与 run_check 的核对同口径
+                    verification_errors.append(f"{label} could not be verified: {exc}")
+            tree_changed = bool(verification_errors)
+            if tree_changed:
+                output = (output + "\n" if output else "") + "; ".join(verification_errors)
+                output += "; pass is not bound to the original snapshot"
+            summary = redact_text(
+                f"host-executed baseline command={command} exit={exit_code}\n{output}".strip()
+            )
+            qa_tests_hash = None
+            if action.department in self._check_materials:
+                qa_tests_hash = qa_tests_digest(self.capture_qa_tests())
+            receipt = self.workspace.record_check(
+                action.department,
+                name,
+                exit_code,
+                summary,
+                snapshot_hash=snapshot_hash,
+                tree_changed=tree_changed,
+                qa_tests_hash=qa_tests_hash,
+                baseline=True,
+                command=command,
+            )
+            return {
+                "name": receipt.name,
+                "exit_code": receipt.exit_code,
+                "summary": receipt.summary,
+                "snapshot_hash": receipt.snapshot_hash,
+                "executor": "host",
+                "tree_changed": receipt.tree_changed,
+                "activation_id": receipt.activation_id,
+                "product_spec_hash": receipt.product_spec_hash,
+                "delivery_spec_hash": receipt.delivery_spec_hash,
+                "effective_contract_hash": receipt.effective_contract_hash,
+                "qa_tests_hash": receipt.qa_tests_hash,
+                "baseline": receipt.baseline,
+            }, finished.status
+
+    def _delivery_file(self, relative: str) -> bytes | None:
+        # 声明的交付文件在封存交付树里的内容：Workspaces 把封存树交给这里（bind_delivery_checks），
+        # 直接构造环境的测试没有绑定时按没有这份文件处理
+        tree = getattr(self, "_delivery_tree", None)
+        if tree is None:
+            return None
+        return next((item.data for item in tree.files if item.path == relative), None)
 
 
     # ---- 试用会话（工单 #1182）----
@@ -1636,7 +1921,30 @@ class LocalEnvironment:
             source_tree=self._trial_source_tree(), run_root=self._run_root,
             source=self._trial_source_name(), output_limit=self._output_limit(), stop=stop,
         )
+        session = result.get("session")
+        if session is not None and session.get("kind") == "web":
+            # 网页种类的会话：启动 Playwright MCP 并打开就绪地址，回执带页面的可访问性结构与截图
+            # （设计说明第 3.4、4.3 节）。浏览器没有起来时会话不保留：结束交付软件的进程树再按失败交回
+            try:
+                page = await self._open_browser(action, session)
+            except BrowserSessionFailed as failure:
+                self._trials.stop(self._run_id, action.department,
+                                  reason="the browser session could not be started")
+                failure.output.setdefault("session", session)
+                raise
+            session["browser"] = page["session"]
+            result["accessibility"] = page["accessibility"]
+            result["images"] = page["images"]
         return result, "completed"
+
+    async def _open_browser(self, action: Action, session: dict[str, Any]) -> dict[str, Any]:
+        # 浏览器会话的目录：试用副本旁边的 mcp-output/<会话身份>，会话结束时删掉（设计说明第 4.1 节）
+        copy_root = Path(str(session["copy"]))
+        return await self.browsers.start(
+            run_id=self._run_id, department=action.department, copy_root=copy_root,
+            tree_digest=str(session["tree_digest"]), ready_url=str(session["ready_url"]),
+            output_dir=copy_root.parent / BROWSER_OUTPUT_DIR / str(session["session_id"]),
+        )
 
     async def _trial_output(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         # 交付软件到目前为止的输出末尾部分；字节数取模型给出的，缺省用这个 run 的工具输出上限
@@ -1648,9 +1956,33 @@ class LocalEnvironment:
         return self._trials.read_output(self._run_id, action.department, min(limit, self._output_limit())), "completed"
 
     async def _trial_stop(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 结束本部门的会话：结束交付软件的进程树、删掉试用副本、交回结束方式与输出末尾
-        return self._trials.stop(self._run_id, action.department,
-                                 limit=self._output_limit()), "completed"
+        # 结束本部门的会话：先关 MCP 与浏览器，再结束交付软件的进程树、删掉试用副本、
+        # 交回结束方式与输出末尾（设计说明第 3.4 节）
+        browser = await self.browsers.stop(self._run_id, action.department, reason="stopped")
+        result = self._trials.stop(self._run_id, action.department, limit=self._output_limit())
+        result["browser"] = browser
+        return result, "completed"
+
+    # ---- 浏览器动作（工单 #1184）----
+    async def _browser(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
+        # 一次浏览器动作（设计说明第 4 章）：会话来自这个部门网页种类的试用会话；导航目标按服务地址规则
+        # 检查、本地文件路径按试用副本检查，被拒绝时 browser 模块抛 BrowserRefused，由 perform 变成
+        # refused 的回执；MCP 进程退出或调用超时让会话记为中断，回执照常为失败
+        output = await self.browsers.call(
+            run_id=self._run_id, department=action.department, tool=action.tool,
+            args=dict(action.input), structure_limit=self._output_limit(), stop=stop,
+        )
+        return output, "completed"
+
+    def browser_session(self, department: str) -> dict[str, Any] | None:
+        # 这个部门当前的浏览器会话记录（恢复时据此把结果未知的动作与会话对上）
+        return self.browsers.record(self._run_id, department)
+
+    def trial_session(self, department: str) -> dict[str, Any] | None:
+        # 这个部门进行中的试用会话记录（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：
+        # trial_case_begin 记下会话身份与试用副本的树摘要，放行时按后者核对用例属于当前交付
+        session = self._trials.session_of(self._run_id, department)
+        return None if session is None else session.record()
 
 
 async def _run_process(argv: list[str], cwd: Path, env: dict[str, str], timeout_sec: float,

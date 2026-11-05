@@ -8,6 +8,9 @@
 # 核验声明（工单 #1388）：定义声明谁核验谁的哪种成果、角色的写入范围，答得出事项最后采纳的成果
 # 是不是开环；加载时的核对把核验对象不存在、谁能拒绝谁有环的定义整份拒绝。这部分用例只换声明，
 # 看查询与核对跟着它变。
+#
+# 事项的来源（工单 #1455）：每一种来源由哪个部门接写在定义里，事项开始时开始第一轮的是它；
+# 旧定义没有写时两种来源都按关注用户输入的部门解释，没有这样的部门时加载拒绝。
 
 from __future__ import annotations
 
@@ -17,7 +20,7 @@ from pydantic import ValidationError
 from harness import adjudication, kernel_events, submissions, tools, validation
 from harness.actions import TreeFacts, WorkspaceFacts
 from harness.definitions import (DEFINITIONS, LEGACY_VERIFICATION, Definitions, Tool, VerificationDeclaration,
-                                 VerifiedOutcomes, VerifierRole, WriteScope, verification_issues)
+                                 VerifiedOutcomes, VerifierRole, WriteScope, source_issues, verification_issues)
 from harness.minimal_projection import fold_events
 from harness.models import RunProjection, SessionRecord
 from harness.path_rules import QA_TESTS_DIR
@@ -365,3 +368,66 @@ def test_an_old_definition_without_the_declaration_reads_the_three_departments()
     assert old.verification == LEGACY_VERIFICATION
     assert old.is_open_loop("delivery_spec") is False
     assert verification_issues(old.organization, set()) == []
+
+
+# 事项的来源（工单 #1455）：每一种来源由哪个部门接写在定义里；旧定义没有写时两种来源都按
+# 关注用户输入的部门解释，没有这样的部门就拒绝。加载时的这一项由 source_issues 报出，整份拒绝
+def _with_sources(sources=None) -> Definitions:
+    # 这份定义把事项的来源换成给出的这一份（None 是没有写的旧定义）
+    return DEFINITIONS.model_copy(update={"organization": DEFINITIONS.organization.model_copy(
+        update={"sources": sources})})
+
+
+def test_the_default_definition_gives_both_item_sources_to_one_department() -> None:
+    assert dict(DEFINITIONS.organization.sources) == {"user_input": "product", "onboarding": "product"}
+    assert DEFINITIONS.source_department("user_input") == "product"
+    assert DEFINITIONS.source_department("onboarding") == "product"
+    assert DEFINITIONS.input_department() == "product"
+    # 事项的种类到来源：建档事项从建档开始，其余从你的输入开始
+    assert (DEFINITIONS.item_source("change"), DEFINITIONS.item_source("onboarding")) == (
+        "user_input", "onboarding")
+    assert source_issues(DEFINITIONS.organization) == []
+
+
+def test_an_old_definition_reads_both_sources_as_the_department_that_watches_user_input() -> None:
+    # 验收第 4 条：不写新字段的旧定义，两种来源都由关注用户输入的部门接
+    old = _with_sources(None)
+    assert old.source_department("user_input") == "product"
+    assert old.source_department("onboarding") == "product"
+    assert source_issues(old.organization) == []
+
+
+def test_an_old_definition_without_a_department_watching_user_input_is_rejected() -> None:
+    # 验收第 4 条：旧定义没有这样的部门时拒绝
+    organization = DEFINITIONS.organization.model_copy(update={
+        "sources": None,
+        "departments": tuple(item.model_copy(update={"watched": tuple(
+            kind for kind in item.watched if kind != "user_input")})
+            for item in DEFINITIONS.organization.departments)})
+    assert source_issues(organization) == [(
+        "organization.json", "sources",
+        "没有写事项的来源，也没有部门关注用户输入：你的输入与建档没有人接")]
+    old = DEFINITIONS.model_copy(update={"organization": organization})
+    with pytest.raises(ValueError, match="no department that receives the item sources"):
+        old.source_department("user_input")
+
+
+def test_a_source_without_a_department_is_rejected() -> None:
+    # 验收第 3 条：一种来源没有部门接，写明是哪一种来源
+    issues = source_issues(_with_sources({"user_input": "product"}).organization)
+    assert issues == [("organization.json", "sources.onboarding", "事项的来源 onboarding 没有部门接")]
+
+
+def test_a_source_received_by_a_department_outside_the_definition_is_rejected() -> None:
+    # 验收第 3 条：接它的部门不在这份定义里，同样拒绝，写明来源与部门
+    issues = source_issues(_with_sources({"user_input": "product", "onboarding": "reviewer"}).organization)
+    assert issues == [("organization.json", "sources.onboarding",
+                       "接来源 onboarding 的部门 reviewer 不属于任何部门")]
+
+
+def test_an_unknown_item_source_has_no_department() -> None:
+    # 定义里没有这种来源时交回报错，不留回退取值
+    declared = _with_sources({"user_input": "engineering", "onboarding": "engineering"})
+    assert declared.source_department("user_input") == "engineering"
+    with pytest.raises(ValueError, match="item source 'operations' is not in this definition"):
+        declared.source_department("operations")

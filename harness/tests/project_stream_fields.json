@@ -94,6 +94,11 @@
       "run_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中的决定请求不属于任何 run 时为空",
       "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中决定请求所属的事项"
     },
+    "project_form_set": {
+      "form": "这个事件种类是新增的，旧版本的项目流中没有它：没有这一条之前项目用的是默认的三部门形态，读取时按 three_departments 处理",
+      "previous_form": "这个事件种类是新增的，旧版本的项目流中没有它：第一次改形态时原值是默认的 three_departments",
+      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：原因可以为空，读取时不依赖它"
+    },
     "project_goal_changed": {
       "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
       "goal_ref": "这个事件种类是新增的，旧版本的项目流中没有它：目标原文的引用取自 project_registered（或此前最后一条 project_goal_changed）"
@@ -118,6 +123,7 @@
       "writeback_enabled": "旧事件没有采纳写回开关；没有这个字段时默认为 false，不执行写回"
     },
     "work_item_created": {
+      "form": "旧事件没有这个字段（工单 #1392），读取时按默认形态（three_departments）处理：形态随事项冻结之前登记的事项都按当时加载的定义运行",
       "kind": "旧事件没有这个字段，读取时按普通事项（change）处理：接入已有项目出现之前登记的事项都是普通事项",
       "mcp_servers": "旧事件没有这个字段（工单 #236），读取时按空设置处理：保存 MCP 服务器设置之前登记的事项没有冻结的设置，后续 run 也不带",
       "priority": "旧事件没有这个字段，读取时按用户新要求（user）处理：不经升级重新开始的事项都是用户新建的",
@@ -388,6 +394,11 @@
       "run_id": "string?",
       "work_item_id": "string"
     },
+    "project_form_set": {
+      "form": "string",
+      "previous_form": "string",
+      "reason": "string"
+    },
     "project_goal_changed": {
       "goal": "string",
       "goal_ref": "object"
@@ -430,6 +441,7 @@
       "baseline": "object?",
       "context_window": "integer",
       "definitions_version": "string",
+      "form": "string",
       "kind": "string",
       "mcp_servers": "object?",
       "max_cycles": "integer",

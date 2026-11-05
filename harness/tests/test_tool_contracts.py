@@ -24,16 +24,19 @@ TOOLS = DEFINITIONS.tools
 
 
 def test_tools_are_host_tools_or_environment_actions():
-    # 主机工具由控制核心处理（提交类工具与询问/回答工具）；其余工具是环境工具，各有动作类别
+    # 主机工具由控制核心处理（提交类工具与询问/回答工具）；试用用例的两个工具也由控制核心处理，
+    # 它们写事件、不交给执行环境（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）
     assert {name for name, tool in TOOLS.items() if tool.kind == "host"} == {
-        *{name for name in TOOLS if name.startswith("submit_")}, "ask", "answer"}
+        *{name for name in TOOLS if name.startswith("submit_")}, "ask", "answer",
+        "trial_case_begin", "trial_case_end"}
     environment = {name: tool.action for name, tool in TOOLS.items() if tool.kind == "environment"}
     by_action = {action: {name for name, value in environment.items() if value == action}
                  for action in set(environment.values())}
     assert by_action["read"] == {"read_file", "list_files", "search", "read_range", "read_external_source"}
     assert by_action["fetch"] == {"fetch_url"}
     assert by_action["write"] == {"write_file", "edit_range", "delete_file", "move_file"}
-    assert by_action["check"] == {"run_check"}
+    # 检查类别的两个工具（工单 #1181）：run_check 运行交付检查，run_baseline_check 在基线副本上运行同名交付检查
+    assert by_action["check"] == {"run_check", "run_baseline_check"}
     assert by_action["command"] == {"bash", "read_output", "stop_job"}
     # 试用工具与浏览器工具（工单 #147）：定义随系统发布，到 #1182 能执行时才放进角色的工具清单
     assert by_action["trial"] == {"trial_start", "trial_open", "trial_output", "trial_stop"}

@@ -18,6 +18,7 @@ import { scopeName } from "../views/project/scope-name";
 import { DecisionCardList } from "../views/decisions/card";
 import { sortByRequested } from "../views/decisions/card-logic";
 import { type Route, withScope } from "./routing";
+import type { DepartmentView } from "../views/project/organization";
 
 export type TopbarProps = {
   app: ClientApp | null;
@@ -31,6 +32,8 @@ export type TopbarProps = {
   projectDecisions: DecisionView[];
   // 事件流的三种状态（工单 #653）：顶栏按它显示连接中、已连接或连接中断
   stream: StreamState;
+  // 项目现在组织里的部门（工单 #1457）：换事项范围时留在部门页的那个部门没写时用它
+  departments: DepartmentView[];
   // 模型服务是否可用（工单 #718）：不可用时顶栏给出一处提示，点一下进模型管理页
   provider: ProviderReadiness | null;
   onPendingClick: () => void;
@@ -61,7 +64,8 @@ export function Topbar(props: TopbarProps) {
       </nav>
       <div className="y10-top-actions">
         {props.projectId ? (
-          <WorkItemPicker route={props.route} items={workItems} onNavigate={props.onNavigate} />
+          <WorkItemPicker route={props.route} items={workItems} departments={props.departments}
+            onNavigate={props.onNavigate} />
         ) : null}
         {/* 顶栏的状态项：跨项目与本项目的等待回答的决定请求，亮起时可以直接点开 */}
         <div className="y10-top-stats">
@@ -158,6 +162,7 @@ function ThemeSwitch() {
 function WorkItemPicker(props: {
   route: Route;
   items: WorkItemCard[];
+  departments: DepartmentView[];
   onNavigate: (hash: string) => void;
 }) {
   const items = list(props.items);
@@ -171,7 +176,8 @@ function WorkItemPicker(props: {
         aria-label="事项范围"
         onChange={(event) => {
           const chosen = event.target.value;
-          props.onNavigate(withScope(props.route, chosen === "" ? null : chosen));
+          props.onNavigate(withScope(props.route, chosen === "" ? null : chosen,
+            props.departments[0]?.id ?? ""));
         }}
       >
         <option value="">整个项目</option>

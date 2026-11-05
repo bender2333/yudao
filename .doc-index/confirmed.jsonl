@@ -209,3 +209,4 @@
 {"down":"80e8eb13d7cc6cc2","dst":"docs/design/trusted-kernel.md#可信内核设计说明 > 3. 内核清单","src":"docs/design/test-pyramid.md#测试分层设计说明","up":"8d031d63ab7955d0"}
 {"down":"d16eca7251049f49","dst":"docs/architecture.html#s2","src":"docs/design/trusted-kernel.md#可信内核设计说明","up":"501cedc1662adc79"}
 {"down":"772422e14ed2ed85","dst":"docs/design/rules-and-parameters.md#规则登记与参数设计说明 > 6. 规则复查与淘汰","src":"docs/requirements/operations-department.md#D27 运维部门 > 长时间运行","up":"a572c778bea9528a"}
+{"down":"e3c77a24f6ad7dd9","dst":"docs/agents/workflow.md#工作方式 > 9. 技能","src":".claude/skills/README.md#技能使用说明 > 写或改一个技能","up":"c4489715b1654278"}

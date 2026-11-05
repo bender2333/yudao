@@ -329,6 +329,33 @@
       ]
     }
   },
+  "run_baseline_check": {
+    "kind": "environment",
+    "action": "check",
+    "verification": "query",
+    "cancellable": true,
+    "description": "Host-executes the delivery check recorded under the same name on the baseline copy and records exit_code, summary, and snapshot hash. The baseline copy is the work item's start tree, the check materials of this department, plus the delivery files given in files; every declared file must be a path changed between the start tree and the delivery. The command is the one the delivery already recorded and cannot be given here. Time limit, output truncation, process tree cleanup and the tree change verification are the same as run_check. Exit code 0 means the baseline passed; a non-zero exit code other than 124 (timeout) and 130 (cancelled) means the baseline failed, which is what makes a passing delivery check count as evidence for a new capability. A baseline receipt is not check evidence for a delivery.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Check name of a delivery check, e.g. smoke"
+        },
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Delivery files to add on top of the start tree; each must be a path changed between the start tree and the delivery"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "name"
+      ]
+    }
+  },
   "bash": {
     "kind": "environment",
     "action": "command",
@@ -518,6 +545,85 @@
       "type": "object",
       "properties": {},
       "additionalProperties": false
+    }
+  },
+  "trial_case_begin": {
+    "kind": "host",
+    "description": "Open a trial case: the acceptance criteria it covers, the planned operations and the expected result. Requires a running trial session in this department and no other open case; every criterion must exist in the current ProductSpec. While the case is open, this department's browser and screen actions in the same session are recorded as its steps by action identity. End it with trial_case_end.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "AC<position> of the acceptance criteria this case covers, at least one"
+        },
+        "title": {
+          "type": "string",
+          "description": "What this case exercises"
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The planned operations, in the order you will perform them"
+        },
+        "expected": {
+          "type": "string",
+          "description": "The expected result"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "criteria",
+        "title",
+        "steps",
+        "expected"
+      ]
+    }
+  },
+  "trial_case_end": {
+    "kind": "host",
+    "description": "End the open trial case with a conclusion: result, what you observed, the action identities of the steps you cite as evidence, and a reason when unverified. passed and failed need at least one evidence step; a case with a step whose result is unknown cannot end as passed, and a case that a session ended under is concluded interrupted by the host and cannot be evidence.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "unverified"
+          ]
+        },
+        "observed": {
+          "type": "string",
+          "description": "What you actually observed"
+        },
+        "evidence_steps": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Action identities (call ids) of the steps of this case that support the conclusion"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Required when the result is unverified: why you could not verify it"
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "result",
+        "observed",
+        "evidence_steps"
+      ]
     }
   },
   "submit_product_spec": {
@@ -1099,7 +1205,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Trial case ids; leave it empty (trial cases arrive with a later ticket)"
+                "description": "Trial case ids of this activation that support this criterion: each must be concluded by trial_case_end, its session's trial copy tree digest must equal the current delivery snapshot, and its result must equal this criterion's result"
               },
               "note": {
                 "type": [
@@ -1312,7 +1418,7 @@
                 "items": {
                   "type": "string"
                 },
-                "description": "Trial case ids; leave it empty (trial cases arrive with a later ticket)"
+                "description": "Trial case ids of this activation that support this criterion: each must be concluded by trial_case_end, its session's trial copy tree digest must equal the current delivery snapshot, and its result must equal this criterion's result"
               },
               "note": {
                 "type": [

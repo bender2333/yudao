@@ -45,7 +45,9 @@ def test_the_service_method_table_matches_the_shared_fixture():
 
 def test_coverage_counts_covered_open_and_model_reading():
     # 第 7.1 节第 4 点：比例的分母是条件总数，分子是可执行检验里通过的那些；开环 = 条件总数 −
-    # 可执行检验的条件数；模型阅读（judgement）含于开环。守 R2（三个数的口径）
+    # 可执行检验的条件数；模型阅读（judgement）含于开环。守 R2（三个数的口径）。
+    # 不给基线归并（工单 #1181）时是旧读法：命令检查按交付通过计入，baseline_valid 记 False——
+    # 放行记录里写明缺少基线回执
     criteria = [
         {"criterion": "AC1", "method": "check", "result": "passed"},
         {"criterion": "AC2", "method": "measure", "result": "failed"},
@@ -55,7 +57,7 @@ def test_coverage_counts_covered_open_and_model_reading():
     # changed 是改判的条数（工单 #1190）：不给时是 0
     assert coverage_report(criteria) == {
         "criteria_total": 4, "executable": 2, "covered": 1, "coverage_ratio": 0.25,
-        "model_reading": 1, "open": 2, "changed": 0,
+        "model_reading": 1, "open": 2, "changed": 0, "baseline_valid": False,
     }
     assert open_criteria(criteria) == ["AC3", "AC4"]
     assert method_is_executable("trial") and not method_is_executable("human")
@@ -70,8 +72,10 @@ def test_an_unverified_executable_criterion_is_not_counted_as_covered():
 
 
 def test_an_empty_criteria_list_reports_a_zero_ratio():
+    # 没有条件就没有命令检查要满足的基线条件：baseline_valid 保持真（工单 #1181）
     assert coverage_report([]) == {"criteria_total": 0, "executable": 0, "covered": 0,
-                                   "coverage_ratio": 0.0, "model_reading": 0, "open": 0, "changed": 0}
+                                   "coverage_ratio": 0.0, "model_reading": 0, "open": 0, "changed": 0,
+                                   "baseline_valid": True}
     assert open_criteria([]) == []
 
 
@@ -155,7 +159,8 @@ def test_release_rejects_failed_criteria_and_unpassed_executable_criteria():
 
 
 def test_the_criterion_shape_is_closed():
-    # 字段封闭、检验方式与结果在封闭取值里、criterion 是 AC<序号>、trial_cases 现在必须为空（守 R2）
+    # 字段封闭、检验方式与结果在封闭取值里、criterion 是 AC<序号>；trial_cases 是本次激活的试用用例身份，
+    # 引用它的核对在收紧检查里按用例与步骤判（工单 #1180）
     proposal = {"criteria": [{"criterion": "AC1", "method": "check", "result": "passed",
                               "checks": ["qa"], "trial_cases": [], "note": "", "extra": 1}]}
     assert [error.field for error in _qa_criteria_errors(proposal)] == ["criteria[0].extra"]
@@ -164,11 +169,14 @@ def test_the_criterion_shape_is_closed():
                         ({"criterion": "AC1", "method": "probe", "result": "passed"}, "criteria[0].method"),
                         ({"criterion": "AC1", "method": "check", "result": "ok"}, "criteria[0].result"),
                         ({"criterion": "AC1", "method": "check", "result": "passed",
-                          "trial_cases": ["case-1"]}, "criteria[0].trial_cases")):
+                          "trial_cases": [1]}, "criteria[0].trial_cases")):
         errors = _qa_criteria_errors({"criteria": [item]})
         assert field in [error.field for error in errors], (item, errors)
 
     assert _qa_criteria_errors({})[0].field == "criteria"
     rows, errors = _qa_criteria({"criteria": [_criterion("AC1")]})
     assert errors == [] and rows[0]["criterion"] == "AC1" and rows[0]["trial_cases"] == []
+    # 引用试用用例的条目照常收下：用例属于本次激活、与结果一致等核对在 _trial_case_errors 里
+    rows, errors = _qa_criteria({"criteria": [{**_criterion("AC1"), "trial_cases": ["case-1"]}]})
+    assert errors == [] and rows[0]["trial_cases"] == ["case-1"]
 

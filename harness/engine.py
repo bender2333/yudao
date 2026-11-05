@@ -5,15 +5,17 @@
 # 其间另一方的写入使提交被拒绝时按写入以后的状态重新判断。
 # 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：这一轮写下的事件范围与停止原因）；
 # 步骤驱动向上只经过安全节点接口（SafeNode）。
-# 这一份是执行契约第二版（execution_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
+# 这一份是执行契约第三版（execution_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
 # 接口（开始一轮工作的请求、安全节点、上下限、结果）在契约模块里，这里只实现。结果的种类不写死：
-# 这一轮算不算结束、结束成什么，由薄驱动问路由（工单 #861）。
+# 这一轮算不算结束、结束成什么，由薄驱动问路由（工单 #861）。按部门取模型与提示词随开始一轮工作的请求
+# 交进来（第三版，工单 #1511），不再经安全节点问薄驱动。
 
 from __future__ import annotations
 
 import asyncio
 import json
 import math
+import re
 import time
 from collections.abc import Callable, Sequence
 from contextlib import aclosing
@@ -44,7 +46,8 @@ from .event_store import run_stream
 from . import execution_contract
 from .execution_contract import ActivationScope, Judgment, RoundRequest, RoundResult, SafeNode, StepLimits
 from .write_path import Transaction, WritePath
-from .models import TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, Event, EventType, RunProjection, json_dumps
+from .models import (PRD_REVISION_FIELDS, TERMINAL_STATUSES, ArtifactRef, DepartmentPrompt, Event, EventType,
+                     RunProjection, TrialCase, json_dumps, new_id)
 from .public_tree import UnrepresentableWorkspace
 from .providers import ProviderFacade
 from .providers.call import ModelResponse
@@ -53,9 +56,23 @@ from .providers.resolve import (CALL_TARGET_FIELDS, CALL_TARGET_REQUIRED_STRINGS
 from .recording import StepRecorder
 from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_cancellable, tool_kind,
                     tool_verification, writes_check_materials)
-from .validation import PRD_REVISION_FIELDS, AdjudicationView, Tightening, evaluate_proposal
+from .validation import AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
 from .trial_sessions import TRIAL_TOOLS, resolve_trial_call
+
+# 试用用例的两个主机工具（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：质检用 trial_case_begin
+# 打开一个用例、按计划在浏览器里操作，用 trial_case_end 给出结论。用例打开到结束之间本部门在同一会话中的
+# 浏览器与屏幕动作由运行状态投影记为它的步骤（按动作身份）；会话结束或中断时打开的用例结束为中断。
+# 两个工具都不交给执行环境：输入核对、结论核对与事件在控制这一侧完成
+TRIAL_CASE_BEGIN = "trial_case_begin"
+TRIAL_CASE_END = "trial_case_end"
+TRIAL_CASE_TOOLS = frozenset({TRIAL_CASE_BEGIN, TRIAL_CASE_END})
+# 结论的三种取值；'interrupted' 由主机在会话结束时记下，质检不能自己交
+TRIAL_CASE_RESULTS = ("passed", "failed", "unverified")
+# 结束试用会话的三个工具：执行完以后看打开的用例是不是随会话结束了
+TRIAL_SESSION_TOOLS = frozenset({"trial_start", "trial_open", "trial_stop"})
+# 引用验收条件的形式（浏览器与 computer use 设计说明第 8.1 节）：AC<序号>，序号是它在 ProductSpec 里的位置
+_CRITERION_ID = re.compile(r"^AC[1-9][0-9]*$")
 
 # 整理请求使用的请求档位（设计说明第 7.5 节）：Provider 按模型声明限制，最低支持档位即为实际发送的档位
 COMPACTION_REQUEST_TIER = "minimal"
@@ -87,13 +104,15 @@ def tool_call_required_text(count: int, limit: int | None = None) -> str:
     )
 
 
-def _guidance_only_round(projection: RunProjection, scope: ActivationScope) -> bool:
+def _guidance_only_round(projection: RunProjection, scope: ActivationScope,
+                         definitions: Definitions | None = None) -> bool:
     # 一轮开始时只有指导是新的工作，而且这段指导是这一轮收到的：这一轮没有要做的工作，
     # 模型不调用工具的文字回复就是回答用户（部门指导设计说明第 3 节，工单 #1037）。
     # 询问分支不是部门的一轮工作，它的文字回复仍按「要求调用工具」处理。
+    # 关注关系按这个事项所用的那份定义取（工单 #1509）：不给时是进程加载的那一份
     if not scope.guidance_ids or scope.session_id in projection.branch_sessions:
         return False
-    return watched_new_work(projection, scope.department) == ["guidance"]
+    return watched_new_work(projection, scope.department, definitions) == ["guidance"]
 
 
 def _text_reply(response: ModelResponse) -> bool:
@@ -222,6 +241,9 @@ class StepDriver:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
+        # 按部门取模型与提示词的来源（执行契约第三版，工单 #1511）：随开始一轮工作交进来，不再经安全节点问
+        # 薄驱动。开始一轮工作的这一轮必须有它，每次逻辑调用从它读一次（见 `_department_settings_of`）
+        self._department_settings = request.department_settings
         # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判，
         # 没有交的时候是当前加载的那一份；装配也按这一份取（工单 #1175 第 7 轮的契约 v2）
         self._definitions = in_force(definitions)
@@ -250,7 +272,7 @@ class StepDriver:
         # shortcut: 这个判断不持久化；进程重新启动以后同一轮由新会话接着做的，丢掉它并退回要求调用工具，
         # 这是可以接受的限制（工单 #1037）
         opened = writes.read(run_stream(scope.run_id))
-        self._text_reply_answers = _guidance_only_round(opened.projection, scope)
+        self._text_reply_answers = _guidance_only_round(opened.projection, scope, self._definitions)
         # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：编排层按 run 持有，
         # 会话结束（run 关闭）时由它关闭。检查工作区按会话保留会换掉环境对象，会话表重新接上
         self._mcp_sessions = mcp_sessions
@@ -285,6 +307,13 @@ class StepDriver:
         # 待恢复的决定请求要写明部门与模型
         self._compaction_stalled_out = False
         self._compaction_stalled_target: dict[str, Any] | None = None
+
+    def _transact(self, decide: Callable[[Transaction], Any]) -> Any:
+        # 执行层写 run 流的事件：部门与停止原因按这个事项所用的那份定义核对（工单 #1509）。
+        # 驱动在开始一轮工作时拿到的是事项冻结的那份定义，写入口不给时默认只认进程加载的那一份，
+        # 换一份把部门改了名的定义以后第一个事件就会被拒
+        return self._writes.transact(self._stream, decide, definitions=self._definitions,
+                                     dispatch_number=self._scope.dispatch_number or None)
 
     @property
     def scope(self) -> ActivationScope:
@@ -349,16 +378,22 @@ class StepDriver:
         return tuple(event for event in self._writes.read(self._stream).events()
                      if event.stream_version > self._start_version)
 
+    def _department_settings_of(self, department: str) -> tuple[Any, DepartmentPrompt]:
+        # 按部门取模型与提示词（执行契约第三版，工单 #1511）：从开始一轮工作时一起交进来的那份来源读，
+        # 每次逻辑调用读一次。来源是开始一轮工作的一份，没交是接入错了（例如直接构造请求却漏了这个字段）：
+        # 不替它写兜底，按薄驱动的通用异常处理收尾
+        settings = self._department_settings
+        return settings.department_selection(department), settings.department_prompt(department)
+
     def _begin_call(self, requested_tier: str | None = None) -> RoundResult | None:
-        # 新的逻辑调用：读取该项目该部门当前的部门设置（模型选择与部门 Prompt），交 Provider 解析调用目标；
-        # 请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
+        # 新的逻辑调用：从开始一轮工作交进来的那份来源读该项目该部门当前的部门设置（模型选择与部门 Prompt），
+        # 交 Provider 解析调用目标；请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
         # 给出请求档位时按它解析，实际发送的档位由 Provider 按模型声明限制。
         # 选择来源是提供模型访问定义的那一层。失败时不发送请求，交回待恢复的停止结果
         self._release_call()
         if self._facade is None:
             raise ProviderError("model calls require the provider facade", reason="provider_error")
-        project = self._nodes.department_selection(self._scope.department)
-        self._prompt = self._nodes.department_prompt(self._scope.department)
+        project, self._prompt = self._department_settings_of(self._scope.department)
         self._frame = replace(self._frame, prompt=self._prompt)
         resolution = self._facade.resolve_department_default(
             self._scope.department, requested_tier, project=project)
@@ -582,6 +617,7 @@ class StepDriver:
                 raw_args = item.get("arguments")
                 after_snapshot = None
                 qa_tests_saved = None
+                trial_case_draft = None
                 deferred = False
                 # 动作被拒绝的原因（工具许可或取回时的地址规则）：进入事件载荷，界面按「被拒绝」显示
                 refused_reason = None
@@ -661,6 +697,11 @@ class StepDriver:
                                     ok, output, error = True, text, None
                         else:
                             ok, output, error = True, text, None
+                    elif name in TRIAL_CASE_TOOLS:
+                        # 试用用例的两个主机工具（工单 #1180）：不交给执行环境，结果与用例事件一起写
+                        outcome = self._trial_case_call(name, args)
+                        ok, output, error = outcome.ok, outcome.output, outcome.error
+                        trial_case_draft = self._trial_case_draft(outcome)
                     elif tool_kind(name, definitions=self._definitions) == "host":
                         ok, output, error = True, _run_host_tool(name, args, self._definitions), None
                     else:
@@ -686,6 +727,10 @@ class StepDriver:
                         except UnrepresentableWorkspace:
                             after_snapshot = None
                         qa_tests_saved = self._save_qa_tests_if_changed(request)
+                        if name in TRIAL_SESSION_TOOLS:
+                            # 会话结束或中断时打开的用例结束为中断（工单 #1180）：用例的结论事件与这次会话
+                            # 结束的工具结果写在同一个事务里
+                            trial_case_draft = self._interrupted_trial_case()
                 input_item = tool_result_item(identity, ok, output, error,
                                               input_modalities=tool_input_modalities(request))
                 call = {"id": identity, "name": name, "args": args, "ok": ok,
@@ -693,7 +738,8 @@ class StepDriver:
                 if refused_reason is not None:
                     call["refused"] = True
                     call["refused_reason"] = refused_reason
-                self._recorder.tool_called(request, call, after_snapshot=after_snapshot, qa_tests_saved=qa_tests_saved)
+                self._recorder.tool_called(request, call, after_snapshot=after_snapshot,
+                                           qa_tests_saved=qa_tests_saved, trial_case=trial_case_draft)
                 # 登记命令结束后主机核对公开树发现无法表示的条目：回执已记录，运行在这里暂停
                 if isinstance(output, dict) and output.get("workspace_unrepresentable"):
                     failure = output["workspace_unrepresentable"]
@@ -793,6 +839,7 @@ class StepDriver:
         raw_args = item.get("arguments")
         after_snapshot = None
         qa_tests_saved = None
+        trial_case_draft = None
         try:
             args = json.loads(raw_args)
             if not isinstance(args, dict):
@@ -818,6 +865,10 @@ class StepDriver:
                 ok, output, error = ask_ok, ask_output, ask_error
                 if ok and new_contract_hash is not None:
                     self._adopt_contract(new_contract_hash)
+            elif name in TRIAL_CASE_TOOLS:
+                outcome = self._trial_case_call(name, args)
+                ok, output, error = outcome.ok, outcome.output, outcome.error
+                trial_case_draft = self._trial_case_draft(outcome)
             elif tool_kind(name, definitions=self._definitions) == "host":
                 ok, output, error = True, _run_host_tool(name, args, self._definitions), None
             else:
@@ -841,7 +892,8 @@ class StepDriver:
                                    {"id": identity, "name": name, "args": args, "ok": ok, "output": output,
                                     "error": error, "step_id": request.step_id, "input_item": input_item},
                                    after_snapshot=after_snapshot,
-                                   qa_tests_saved=qa_tests_saved)
+                                   qa_tests_saved=qa_tests_saved,
+                                   trial_case=trial_case_draft)
 
     def _save_qa_tests_if_changed(self, request: ModelRequest | _RecoveredCall) -> dict[str, Any] | None:
         # 检查材料只由写入范围是检查材料的角色保存（设计说明第 4.2 节第 1 条，工单 #1390）
@@ -954,7 +1006,7 @@ class StepDriver:
                 return None
             return request, step
 
-        prepared = self._writes.transact(self._stream, prepare, dispatch_number=self._scope.dispatch_number or None)
+        prepared = self._transact(prepare)
         if isinstance(prepared, _Unassembled):
             facts = list(prepared.error.paths) if isinstance(prepared.error, UnrepresentableWorkspace) else []
             raise ProviderError(str(prepared.error), reason=prepared.reason, facts=facts) from prepared.error
@@ -971,7 +1023,7 @@ class StepDriver:
             self._recorder.request_started(transaction, request)
             return True
 
-        return self._writes.transact(self._stream, start, dispatch_number=self._scope.dispatch_number or None)
+        return self._transact(start)
 
     async def _call_model(self, request: ModelRequest) -> ModelResponse:
         # 流式输出逐条记录完成以后才取下一条（请求记录以后才发出请求），最后一条是这次调用尝试的结果；
@@ -1005,7 +1057,7 @@ class StepDriver:
             self._recorder.retry_scheduled(transaction, request, error, delay, next_step_id)
             return True
 
-        return self._writes.transact(self._stream, schedule, dispatch_number=self._scope.dispatch_number or None)
+        return self._transact(schedule)
 
     def _finish_compaction(self, request: ModelRequest, response: ModelResponse) -> _CompactionOutcome | None:
         # 整理请求的回答生成检查点。请求没有声明工具，回应里的工具调用不执行、不进入有效历史；
@@ -1031,7 +1083,7 @@ class StepDriver:
             self._recorder.compaction(transaction, request, result, response)
             return _CompactionOutcome(covered_digest=result.checkpoint.covered_digest)
 
-        outcome = self._writes.transact(self._stream, finish, dispatch_number=self._scope.dispatch_number or None)
+        outcome = self._transact(finish)
         message = self._advance_compaction(outcome)
         if message is not None:
             self._compaction_stalled_target = dict(request.call_target or {})
@@ -1146,7 +1198,7 @@ class StepDriver:
                                                 before_snapshot=before_snapshot)
             return permission, facts
 
-        return self._writes.transact(self._stream, begin, dispatch_number=self._scope.dispatch_number or None)
+        return self._transact(begin)
 
     async def _begin_tool_waiting_for_input(
         self, request: ModelRequest | _RecoveredCall, call: dict[str, Any]
@@ -1172,6 +1224,52 @@ class StepDriver:
             return await self._environment.perform(action)
         finally:
             self._action = None
+
+    def _trial_session(self) -> dict[str, Any] | None:
+        # 这个部门进行中的试用会话（身份与试用副本的树摘要）：用例打开时记下它，放行时按它核对当前交付
+        session = self._environment.trial_session(self._scope.department)
+        if session is None or session.get("status") != "running":
+            return None
+        return {"session_id": str(session["session_id"]), "tree_digest": str(session["tree_digest"])}
+
+    def _trial_case_call(self, name: str, args: dict[str, Any]) -> TrialCaseOutcome:
+        # 试用用例的两个主机工具：输入与结论在控制这一侧核对，读的是当前的运行状态投影与本部门的会话
+        projection = self._writes.read(self._stream).projection
+        scope = self._scope
+        if name == TRIAL_CASE_BEGIN:
+            return trial_case_begin(args, projection=projection, department=scope.department,
+                                    session_id=scope.session_id or "", activation_id=scope.activation_id,
+                                    session=self._trial_session())
+        return trial_case_end(args, projection=projection, department=scope.department,
+                              session_id=scope.session_id or "", session=self._trial_session())
+
+    def _trial_case_draft(self, outcome: TrialCaseOutcome) -> Any:
+        # 用例事件与触发它的工具结果写在同一个事务里（工单 #1180）：两件事要么一起写进去，要么都不写
+        if outcome.event_type is None or outcome.payload is None:
+            return None
+        return self._recorder.trial_case_event(outcome.event_type, outcome.payload)
+
+    def _interrupted_trial_case(self) -> Any:
+        # 会话结束或中断时打开的用例结束为中断（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：
+        # 会话的结束已经由执行环境写好，这里补一条用例的结论；用例的投影在会话结束时已经记为中断
+        scope = self._scope
+        projection = self._writes.read(self._stream).projection
+        case = next((item for item in projection.trial_cases
+                     if item.status == "open" and item.department == scope.department), None)
+        if case is None:
+            return None
+        current = self._trial_session()
+        if current is not None and current["session_id"] == case.trial_session_id:
+            return None
+        return self._recorder.trial_case_event(EventType.TRIAL_CASE_CONCLUDED, {
+            "case_id": case.case_id,
+            "session_id": case.trial_session_id,
+            "department": scope.department,
+            "result": "interrupted",
+            "observed": case.observed,
+            "evidence_steps": [],
+            "reason": "session_ended",
+        })
 
     def _skip(self, request: ModelRequest, output: list[dict[str, Any]], error: str) -> None:
         for item in output:
@@ -1242,6 +1340,136 @@ def _run_host_tool(name: str, args: dict[str, Any],
     payload["kind"] = proposal_kind(name, definitions=definitions)
     payload.pop("exit_code", None)
     return payload
+
+
+@dataclass(frozen=True)
+class TrialCaseOutcome:
+    # 一次试用用例工具的结果：交给模型的回执，以及要写进同一个事务的用例事件
+    ok: bool
+    output: dict[str, Any] | None = None
+    error: str | None = None
+    event_type: str | None = None
+    payload: dict[str, Any] | None = None
+
+
+def _text_field(value: Any, field: str) -> tuple[str, str | None]:
+    if not isinstance(value, str) or not value.strip():
+        return "", f"{field} must be a non-empty string"
+    return value.strip(), None
+
+
+def trial_case_begin(args: dict[str, Any], *, projection: RunProjection, department: str,
+                     session_id: str, activation_id: str,
+                     session: dict[str, Any] | None) -> TrialCaseOutcome:
+    """打开一个试用用例（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）。
+
+    主机的核对：本部门有进行中的试用会话；没有另一个打开的用例；引用的验收条件存在于当前 ProductSpec。
+    """
+    if session is None:
+        return TrialCaseOutcome(False, error="trial_case_begin requires a running trial session; "
+                                             "start one with trial_open first")
+    open_case = next((case for case in projection.trial_cases
+                      if case.status == "open" and case.department == department), None)
+    if open_case is not None:
+        return TrialCaseOutcome(False, error=f"trial case {open_case.case_id} is still open; "
+                                             "end it with trial_case_end first")
+    spec = projection.product_spec
+    if spec is None:
+        return TrialCaseOutcome(False, error="trial_case_begin requires a current ProductSpec")
+    raw_criteria = args.get("criteria")
+    if not isinstance(raw_criteria, list) or not raw_criteria:
+        return TrialCaseOutcome(False, error="criteria must list at least one AC<position>")
+    criteria: list[str] = []
+    for item in raw_criteria:
+        if not isinstance(item, str) or not _CRITERION_ID.match(item.strip()):
+            return TrialCaseOutcome(False, error=f"criterion {item!r} must be AC<position>, the acceptance "
+                                                 "criterion's position in the current ProductSpec")
+        position = int(item.strip()[2:])
+        if position > len(spec.acceptance_criteria):
+            return TrialCaseOutcome(False, error=f"{item.strip()} is not an acceptance criterion of the current "
+                                                 "ProductSpec")
+        criteria.append(item.strip())
+    title, error = _text_field(args.get("title"), "title")
+    if error is not None:
+        return TrialCaseOutcome(False, error=error)
+    expected, error = _text_field(args.get("expected"), "expected")
+    if error is not None:
+        return TrialCaseOutcome(False, error=error)
+    raw_plan = args.get("steps", [])
+    if not isinstance(raw_plan, list) or any(not isinstance(item, str) for item in raw_plan):
+        return TrialCaseOutcome(False, error="steps must be a list of planned operations")
+    plan = [item.strip() for item in raw_plan if item.strip()]
+    case_id = new_id("case")
+    payload = {
+        "case_id": case_id,
+        # 部门会话与试用会话：前者决定哪些动作是它的步骤，后者结束或中断时用例结束为中断
+        "session_id": session_id,
+        "trial_session_id": session["session_id"],
+        "department": department,
+        "activation_id": activation_id,
+        "product_spec_hash": spec.content_hash,
+        # 所在会话的试用副本的树摘要：放行时按它核对用例属于当前交付（设计说明第 8.3 节）
+        "tree_digest": session["tree_digest"],
+        "criteria": criteria,
+        "title": title,
+        "plan": plan,
+        "expected": expected,
+    }
+    return TrialCaseOutcome(True, {"case_id": case_id, "status": "open", "criteria": criteria,
+                                   "session_id": session["session_id"], "tree_digest": session["tree_digest"]},
+                            None, EventType.TRIAL_CASE_OPENED, payload)
+
+
+def trial_case_end(args: dict[str, Any], *, projection: RunProjection, department: str, session_id: str,
+                   session: dict[str, Any] | None) -> TrialCaseOutcome:
+    """结束一个试用用例并给出结论（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）。
+
+    主机的核对：证据步骤属于这个用例；passed 时用例中没有结果未知的步骤；unverified 必须写明理由。
+    """
+    if session is None:
+        return TrialCaseOutcome(False, error="trial_case_end requires a running trial session; "
+                                             "start one with trial_open first")
+    case: TrialCase | None = next((item for item in projection.trial_cases
+                                   if item.status == "open" and item.department == department
+                                   and item.session_id == session_id), None)
+    if case is None:
+        return TrialCaseOutcome(False, error="there is no open trial case in this session; "
+                                             "open one with trial_case_begin first")
+    result = args.get("result")
+    if result not in TRIAL_CASE_RESULTS:
+        return TrialCaseOutcome(False, error="result must be passed, failed, or unverified")
+    observed, error = _text_field(args.get("observed"), "observed")
+    if error is not None:
+        return TrialCaseOutcome(False, error=error)
+    raw_evidence = args.get("evidence_steps", [])
+    if not isinstance(raw_evidence, list) or any(not isinstance(item, str) or not item.strip()
+                                                 for item in raw_evidence):
+        return TrialCaseOutcome(False, error="evidence_steps must be the action identities of steps of this case")
+    evidence = [item.strip() for item in raw_evidence]
+    for identity in evidence:
+        if case.step(identity) is None:
+            return TrialCaseOutcome(False, error=f"evidence step {identity} is not a step of trial case {case.case_id}")
+    reason = args.get("reason")
+    reason = reason.strip() if isinstance(reason, str) else ""
+    if result in ("passed", "failed") and not evidence:
+        return TrialCaseOutcome(False, error=f"result {result} requires at least one evidence step")
+    if result == "unverified" and not reason:
+        return TrialCaseOutcome(False, error="result unverified requires a reason")
+    if result == "passed" and case.has_unknown_step():
+        return TrialCaseOutcome(False, error=f"trial case {case.case_id} has a step whose result is unknown; "
+                                             "it cannot end as passed. Run the case again")
+    payload = {
+        "case_id": case.case_id,
+        "session_id": case.session_id,
+        "department": department,
+        "result": result,
+        "observed": observed,
+        "evidence_steps": evidence,
+        "reason": reason,
+    }
+    return TrialCaseOutcome(True, {"case_id": case.case_id, "status": "concluded", "result": result,
+                                   "evidence_steps": evidence}, None,
+                            EventType.TRIAL_CASE_CONCLUDED, payload)
 
 
 def _retry_delay(error: ProviderError, attempt: int, limits: StepLimits) -> float:
