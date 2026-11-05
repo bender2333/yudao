@@ -1492,10 +1492,12 @@ class ProjectService:
             return None
         if run.product_spec is None or run.structure is None or run.overview_ref is None:
             return None
-        # 这一轮有没有经过基线核验：有核验角色的形态以基线核验结束，没有的以开环完成结束且没有这一份产物
-        verified = run.baseline_review is not None and run.stop_reason == BASELINE_VERIFIED_REASON
-        open_loop = run.baseline_review is None and run.stop_reason == OPEN_LOOP_STOP_REASON
-        if not (verified or open_loop):
+        # 这一轮有没有经过基线核验：有核验角色的形态以基线核验结束，没有的以开环完成结束且没有这一份产物。
+        # 两种结束原因都照常提出候选；以基线核验结束而没有这一份产物时不提（那份记录不完整）
+        if run.stop_reason not in (BASELINE_VERIFIED_REASON, OPEN_LOOP_STOP_REASON):
+            return None
+        verified = run.baseline_review is not None
+        if not verified and run.stop_reason == BASELINE_VERIFIED_REASON:
             return None
         if run.effective_contract is None or run.effective_contract.prd_ref is None:
             return None
