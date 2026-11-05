@@ -1,0 +1,34 @@
+{
+  "roles": {
+    "engineering": {
+      "submit_tools": [
+        "submit_completion"
+      ],
+      "kinds": {
+        "completion": {
+          "description": "这件事的完成说明：做了什么、怎么验的、还有哪些拿不准的地方。交完成就是这件事的结束；没有核验角色，事项记为开环完成，不写成放行",
+          "required": [
+            "kind=completion",
+            "summary"
+          ],
+          "optional": [
+            "uncertain",
+            "known_risks"
+          ],
+          "uncertain": "拿不准、没有把握的地方，逐条写；用户可以据此接着做",
+          "known_risks": "已知的风险，可选"
+        }
+      },
+      "notes": [
+        "交完成不是宣布合格：这份形态没有核验角色，事项以开环完成结束，记录上不写放行。",
+        "拿不准的地方列进 uncertain，不要为了小问题停下来问；检查一律以主机执行的 run_check 为准。"
+      ]
+    }
+  },
+  "shared": {
+    "submit_tools": [],
+    "kinds": {},
+    "notes": []
+  },
+  "conditions": {}
+}

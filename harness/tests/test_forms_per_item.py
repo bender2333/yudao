@@ -30,6 +30,7 @@ from harness.app.application import Application
 from harness.app.contracts import EVENT_TYPES, Accepted, Rejected
 from harness.app.decision_commands import DecisionAnswer
 from harness.definitions import DEFAULT_FORM, DEFINITIONS as PRODUCT_DEFINITIONS
+from harness.direct import SINGLE_ROLE_DIRECT
 from harness.event_store import Command, catalog_stream, project_stream, run_stream
 from harness.models import CatalogEventType, EventType, ProjectEventType, TERMINAL_STATUSES, json_dumps, new_id
 from harness.projection import project_run, saved_decisions
@@ -254,7 +255,7 @@ def test_an_upgrade_restart_keeps_the_frozen_form_or_is_refused(tmp_path):
                     if item.work_item_id == item_id)
         assert gone.form == second_routing.ROUTING_NAME
         assert gone.start_error == (f"unknown form {second_routing.ROUTING_NAME!r}: "
-                                    f"the release loads {[DEFAULT_FORM]}")
+                                    f"the release loads {[SINGLE_ROLE_DIRECT, DEFAULT_FORM]}")
         assert len([event for event in second.store.list_project_events(project)
                     if event.type == ProjectEventType.WORK_ITEM_CREATED
                     and event.payload["work_item_id"] == item_id]) == 1
