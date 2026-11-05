@@ -99,6 +99,9 @@ DOC_ALIASES: dict[str, str] = {
     "网页界面的提供与发布设计说明": "web-interface-and-release.md",
     "网页界面的提供与发布": "web-interface-and-release.md",
     "网页界面设计说明": "web-interface-and-release.md",
+    "桌面客户端的安装、更新与发布设计说明": "web-interface-and-release.md",
+    "桌面客户端的安装、更新与发布": "web-interface-and-release.md",
+    "桌面客户端的安装与更新设计说明": "web-interface-and-release.md",
     "项目的组织设计说明": "project-organization.md",
     "项目的组织": "project-organization.md",
     "语义系统设计说明": "semantic-system.md",
@@ -142,6 +145,8 @@ DOC_ALIASES: dict[str, str] = {
 # 工单 #1411：引用原型、需求记录、ADR、调研、归档文档、路线图、规则文件与运行配置的节号不在本单。
 EXCLUDED_TOKENS: tuple[str, ...] = (
     r"原型[^。；，）)第与]{0,40}",
+    # 别的目录下的文档（需求记录、路线图、ADR、调研、运行配置）：写明了路径的不是设计说明
+    r"docs/(?!design/)[\w./-]*\.md",
     r"RFC\s*\d+",
     r"(?<![\w.])v\d+(?![\w.])",
     r"[\w-]+\.(?:js|ts|tsx|jsx|html)",
@@ -193,13 +198,205 @@ MAPPING: dict[str, str] = {
     "client/tests/unit/translate-coverage.test.ts:6": "test-pyramid.md",
 }
 
+# 按文件的对照表：这些模块的注释里只写「设计说明第 N 节」，没点名是哪一份。逐条读模块的职责定的：
+# 一个文件的注释都在讲同一份说明时写文件，讲几份的写「文件:行」。
+FILE_MAPPING: dict[str, str] = {
+    "harness/__main__.py": "web-interface-and-release.md",
+    "harness/api/server.py": "web-interface-and-release.md",
+    "harness/app/catalog_queries.py": "app-and-interface.md",
+    "harness/app/contracts.py": "app-and-interface.md",
+    "harness/app/decision_queries.py": "app-and-interface.md",
+    "harness/app/form_commands.py": "app-and-interface.md",
+    "harness/app/home.py": "app-and-interface.md",
+    "harness/app/parameter_commands.py": "app-and-interface.md",
+    "harness/app/project_and_work_item_commands.py": "app-and-interface.md",
+    "harness/app/registry.py": "app-and-interface.md",
+    "harness/app/replay.py": "app-and-interface.md",
+    "harness/app/system_queries.py": "app-and-interface.md",
+    "harness/browser.py": "browser-and-computer-use.md",
+    "harness/context.py": "context-assembly.md",
+    "harness/decisions.py": "existing-project-onboarding.md",
+    "harness/decision_flow.py": "existing-project-onboarding.md",
+    "harness/environment.py": "execution-environment.md",
+    "harness/engine.py": "model-management.md",
+    "harness/kernel_events.py": "trusted-kernel.md",
+    "harness/loops.py": "loops-and-convergence.md",
+    "harness/mcp_client.py": "network-and-mcp.md",
+    "harness/parameters.py": "rules-and-parameters.md",
+    "harness/projection.py": "skeleton-and-application.md",
+    "harness/projects.py": "existing-project-onboarding.md",
+    "harness/providers/facade.py": "model-management.md",
+    "harness/providers/reasoning.py": "model-management.md",
+    "harness/providers/selection.py": "model-management.md",
+    "harness/providers/suggested.py": "model-management.md",
+    "harness/recording.py": "model-management.md",
+    "harness/recovery.py": "recovery-contract-and-fault-matrix.md",
+    "harness/runtime.py": "app-and-interface.md",
+    "harness/snapshot.py": "existing-project-onboarding.md",
+    "harness/tightening.py": "independent-verification.md",
+    "harness/trial_sessions.py": "browser-and-computer-use.md",
+    "harness/tests/layers.toml": "test-pyramid.md",
+    "harness/tests/process_kill.py": "existing-project-onboarding.md",
+    "harness/tests/test_cli_entry.py": "web-interface-and-release.md",
+    "harness/tests/test_data_directory.py": "web-interface-and-release.md",
+    "harness/tests/test_event_kind_registration.py": "test-pyramid.md",
+    "harness/tests/test_event_sources.py": "app-and-interface.md",
+    "harness/tests/test_event_type_fixture.py": "test-pyramid.md",
+    "harness/tests/test_interaction_engine.py": "model-management.md",
+    "harness/tests/test_issue_89.py": "model-management.md",
+    "harness/tests/test_issue_90.py": "model-management.md",
+    "harness/tests/test_mcp_lifecycle.py": "network-and-mcp.md",
+    "harness/tests/test_message_protocol_contract.py": "model-management.md",
+    "harness/tests/test_onboarding_renamed.py": "test-pyramid.md",
+    "harness/tests/test_project_loop_organization.py": "department-loop.md",
+    "harness/tests/test_project_queries.py": "app-and-interface.md",
+    "harness/tests/test_release_waits_for_input.py": "department-guidance.md",
+    "harness/tests/test_routing_ask.py": "skeleton-and-application.md",
+    "harness/tests/test_routing_per_form.py": "test-pyramid.md",
+    "harness/tests/test_startup_reload.py": "web-interface-and-release.md",
+    "harness/tests/test_tool_contracts.py": "network-and-mcp.md",
+    "harness/tests/test_tools_registry.py": "network-and-mcp.md",
+    "harness/tests/test_trial_sessions.py": "execution-environment.md",
+    "harness/tests/kernel/test_judge_before_explanation.py:16": "test-pyramid.md",
+    "harness/tests/kernel/test_only_grows.py:14": "test-pyramid.md",
+    "harness/tests/kernel/test_skeleton_events.py:8": "test-pyramid.md",
+    "harness/tests/kernel/test_only_grows.py": "trusted-kernel.md",
+    "harness/tests/kernel/test_skeleton_events.py": "trusted-kernel.md",
+    "harness/watched_outputs.py": "skeleton-and-application.md",
+    "harness/assembly.py": "model-management.md",
+    "harness/submissions.py": "skeleton-and-application.md",
+    "harness/direct.py": "forms-and-verifier-role.md",
+    "harness/definitions/__init__.py": "rules-and-parameters.md",
+    "client/src/renderer/src/contract/command-id.ts": "app-and-interface.md",
+    "client/src/renderer/src/views/project/floor-screen.tsx": "visualization.md",
+    "client/src/renderer/src/views/project/floor-text.ts": "loops-and-convergence.md",
+    "client/src/renderer/src/views/project/read-existing.tsx": "existing-project-onboarding.md",
+    "client/src/renderer/src/translate/face.ts": "existing-project-onboarding.md",
+    "client/tests/e2e/backend.py": "app-and-interface.md",
+    "client/tests/e2e/department-settings.spec.ts": "model-management.md",
+    "client/tests/e2e/home.spec.ts": "app-and-interface.md",
+    "client/tests/e2e/project.spec.ts": "model-management.md",
+    "client/tests/e2e/shell.spec.ts": "web-interface-and-release.md",
+    "client/tests/unit/translate-tables.test.ts": "test-pyramid.md",
+    "client/tests/unit/view-sync.test.js": "test-pyramid.md",
+    "evals/tests/test_report.py": "test-pyramid.md",
+    "evals/runner/yudao.py:488": "existing-project-onboarding.md",
+    "evals/runner/yudao.py:531": "existing-project-onboarding.md",
+    # 讲几份说明的文件：逐行定
+    "harness/orchestrator.py:528": "existing-project-onboarding.md",
+    "harness/orchestrator.py:652": "skeleton-and-application.md",
+    "harness/orchestrator.py:957": "loops-and-convergence.md",
+    "harness/orchestrator.py:1758": "skeleton-and-application.md",
+    "harness/app/project_queries.py:86": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:547": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:620": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:725": "department-loop.md",
+    "harness/app/project_queries.py:1120": "model-management.md",
+    "harness/app/project_queries.py:1200": "model-management.md",
+    "harness/app/project_queries.py:2275": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:2286": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:2337": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:2416": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:2448": "existing-project-onboarding.md",
+    "harness/app/project_queries.py:2878": "model-management.md",
+    "harness/app/payloads.py:916": "independent-verification.md",
+    "harness/app/payloads.py:1834": "rules-and-parameters.md",
+    "harness/app/catalog_queries.py:220": "app-and-interface.md",
+    "harness/definitions/__init__.py:319": "model-management.md",
+    "harness/decision_flow.py:178": "skeleton-and-application.md",
+    "harness/recovery.py:407": "browser-and-computer-use.md",
+    "harness/tightening.py:632": "existing-project-onboarding.md",
+    "harness/tightening.py:1433": "execution-environment.md",
+    "harness/tests/kernel/test_only_grows.py:132": "trusted-kernel.md",
+    "harness/tests/kernel/test_only_grows.py:165": "trusted-kernel.md",
+}
+
+# 逐行定的那些（讲几份说明的文件）：这一行指的是哪一份
+LINE_MAPPING: dict[str, str] = {
+    "harness/__main__.py:44": "web-interface-and-release.md",
+    "harness/__main__.py:121": "web-interface-and-release.md",
+    "harness/app/catalog_queries.py:220": "app-and-interface.md",
+    "harness/app/catalog_queries.py:383": "app-and-interface.md",
+    "harness/app/form_commands.py:7": "project-organization.md",
+    "harness/context.py:339": "existing-project-onboarding.md",
+    "harness/context.py:438": "existing-project-onboarding.md",
+    "harness/context.py:666": "existing-project-onboarding.md",
+    "harness/decision_flow.py:178": "existing-project-onboarding.md",
+    "harness/definitions/__init__.py:202": "model-management.md",
+    "harness/definitions/__init__.py:319": "browser-and-computer-use.md",
+    "harness/definitions/__init__.py:397": "skeleton-and-application.md",
+    "harness/definitions/__init__.py:467": "skeleton-and-application.md",
+    "harness/definitions/__init__.py:592": "skeleton-and-application.md",
+    "harness/definitions/__init__.py:713": "model-management.md",
+    "harness/definitions/__init__.py:745": "model-management.md",
+    "harness/definitions/__init__.py:872": "skeleton-and-application.md",
+    "harness/definitions/__init__.py:876": "skeleton-and-application.md",
+    "harness/definitions/__init__.py:892": "skeleton-and-application.md",
+    "harness/definitions/__init__.py:1354": "skeleton-and-application.md",
+    "harness/kernel_events.py:84": "existing-project-onboarding.md",
+    "harness/kernel_events.py:90": "existing-project-onboarding.md",
+    "harness/kernel_events.py:99": "existing-project-onboarding.md",
+    "harness/projects.py:1586": "model-management.md",
+    "harness/tests/kernel/test_only_grows.py:165": "skeleton-and-application.md",
+    "harness/tests/test_startup_reload.py:312": "model-management.md",
+    "harness/tightening.py:254": "skeleton-and-application.md",
+    "harness/tightening.py:266": "skeleton-and-application.md",
+    "harness/tightening.py:282": "skeleton-and-application.md",
+    "harness/tightening.py:288": "skeleton-and-application.md",
+    "harness/tightening.py:381": "skeleton-and-application.md",
+    "harness/tightening.py:515": "skeleton-and-application.md",
+    "harness/tightening.py:556": "skeleton-and-application.md",
+    "harness/tightening.py:1433": "browser-and-computer-use.md",
+    "harness/app/project_queries.py": "app-and-interface.md",
+}
+MAPPING.update(LINE_MAPPING)
+
+# 文件级的对照表与「文件:行」的条目一起用：mapping_doc 先查「文件:行」，再查文件，最后查目录。
+MAPPING.update(FILE_MAPPING)
+
 # 整份改写、节号对不上的，按内容对上现在的小节（工单 #1411 的「自定的边界」）。
 TITLE_OVERRIDES: dict[str, str] = {
     "harness/definitions/rules.json:220": "审查者的上下文",
     "harness/definitions/rules.json:572": "角色清单",
+    # 原来的节号在现在这份说明里没有了（那一节改过名或并进了别的一节），按内容对上现在的小节
+    "harness/__main__.py:44": "数据目录",
+    "harness/__main__.py:121": "数据目录",
+    "harness/app/catalog_queries.py:220": "查询清单",
+    "harness/app/catalog_queries.py:383": "查询清单",
+    "harness/definitions/__init__.py:319": "工具定义的声明",
+    "harness/definitions/__init__.py:713": "服务方案预置表与模型能力表",
+    "harness/tests/test_startup_reload.py:312": "删除",
+    "harness/tightening.py:1433": "启动方式",
+    "harness/decision_flow.py:178": "用户确认与修改的往返",
+    "harness/tests/kernel/test_only_grows.py:165": "可信内核",
+    "harness/recovery.py:318": "角色任务的恢复",
+    "harness/recovery.py:349": "角色任务的恢复",
 }
+# 这两处写的是「恢复契约第 5.2 节」：那一份说明现在把恢复讲在第 5 节里，没有 5.2 这样的小节
+MAPPING["harness/recovery.py:318"] = "recovery-contract-and-fault-matrix.md"
+MAPPING["harness/recovery.py:349"] = "recovery-contract-and-fault-matrix.md"
+
+# 工单 #1411 的「只改」没有把这几处包含进来（用例名、`routings.json` 的 `why`、
+# 用户能看到的文字常量），脚本不动它们，原样保留节号；守卫同样不报。按「文件 + 那一行的片段」记，
+# 行号变化以后仍然对得上。原因在工单评论与交付说明的「自定的边界」里。
+KEEP_AS_IS: tuple[tuple[str, str], ...] = (
+    ("client/tests/unit/model-logic.test.js", "选用的状态按设计说明第 9.5 节的用词"),
+    ("harness/definitions/routings.json", "三部门的循环结构第 2 节"),
+    ("evals/baseline/compute.py", "program-roadmap.md)第 6.1 节"),
+)
+
+# 同一行里点名的既是原型又是设计说明、而节号属于原型那份设计的（不在本单）。
+# 这几个文件的注释里把原型的设计说明写成「设计说明第 N 节」，按写的工单核过：工单的依据是原型
+# v8/v13 的设计说明。与 client/ 下声明了原型的文件同一个结论，只是没有写在文件开头。
+PROTO_AS_IS: tuple[tuple[str, str], ...] = (
+    ("client/src/renderer/src/pixel/floor/render.ts", "原型 v10 floor.js 的绘制部分"),
+    ("client/src/renderer/src/views/project/floor-screen.tsx", "回放到过去的时间点时不显示决定请求"),
+    ("client/src/renderer/src/views/project/floor-screen.tsx", "回到那个位置的概览回放"),
+    ("client/tests/e2e/shell.spec.ts", "连接断开时窗口整体变灰"),
+)
 
 # 已经删去的小节：指向它的那一部分引用去掉，注释的其余部分照旧。
+
 # （工单 #1411 正文第 3 步点名的四处，加上清理时删去的两处。）
 DELETED: set[tuple[str, str]] = {
     ("skeleton-and-application.md", "从现有代码过去的路径"),
@@ -300,8 +497,13 @@ def doc_at(commit: str, doc: str) -> str | None:
 
 @lru_cache(maxsize=None)
 def blame_commits(path: str) -> tuple[str, ...]:
+    key = f"blame:{path}"
+    if key in _CACHE:
+        return tuple(_CACHE[key])  # type: ignore[arg-type]
     out = run(["git", "blame", "--line-porcelain", "--", path])
-    return tuple(m.group(1) for m in map(BLAME_LINE_RE.match, out.splitlines()) if m)
+    commits = tuple(m.group(1) for m in map(BLAME_LINE_RE.match, out.splitlines()) if m)
+    _CACHE[key] = list(commits)  # type: ignore[assignment]
+    return commits
 
 
 @lru_cache(maxsize=None)
@@ -366,10 +568,13 @@ def mentions(text: str) -> list[tuple[int, int, str]]:
     for m in DOC_PATH_RE.finditer(text):
         if m.group(1) in all_docs():
             hits.append((m.start(), m.end(), m.group(1)))
-    # 注释里也有只写文件名的（文件名 + 节号）
+    # 注释里也有只写文件名或文件名的词干的（`local-tools 第 2 节`、`test-pyramid 第 2 节`）
     for m in re.finditer(r"([\w-]+)\.md", text):
         if f"{m.group(1)}.md" in all_docs():
             hits.append((m.start(), m.end(), f"{m.group(1)}.md"))
+    for stem, doc in doc_stems().items():
+        for m in re.finditer(rf"(?<![\w./-]){re.escape(stem)}(?![\w-])", text):
+            hits.append((m.start(), m.end(), doc))
     # 去掉被更长的名字包住的（「网络与 MCP」包在「网络取回与 MCP」里）
     hits.sort(key=lambda h: (h[0], -(h[1] - h[0])))
     kept: list[tuple[int, int, str]] = []
@@ -380,6 +585,16 @@ def mentions(text: str) -> list[tuple[int, int, str]]:
     return kept
 
 
+@lru_cache(maxsize=None)
+def doc_stems() -> dict[str, str]:
+    """设计说明文件名的词干 → 文件（注释里常只写 `local-tools`、`test-pyramid`）。"""
+    out: dict[str, str] = {}
+    for doc in all_docs():
+        stem = doc.rsplit("/", 1)[-1][:-3]
+        out.setdefault(stem, doc)
+    return out
+
+
 def nearest_before(text: str, pos: int, hits: list[tuple[int, int, str]]) -> str | None:
     """紧挨在 pos 前面的那个名字（中间只有标点）：名字写在同一行的写法。"""
     for start, end, doc in reversed(hits):
@@ -388,13 +603,34 @@ def nearest_before(text: str, pos: int, hits: list[tuple[int, int, str]]) -> str
     return None
 
 
+def bare_name_before(text: str, pos: int, doc: str) -> int | None:
+    """紧挨在 pos 前面的是设计说明的**文件名**（`local-tools`、`test-pyramid`）时，给出它的起点。
+
+    这种写法要把文件名一起换成路径（工单 #1411 第 4 步的写法），只写「小节标题」会留下
+    「local-tools 「工作区」」这种半截的引用。
+    """
+    for start, end, hit_doc in mentions(text):
+        if hit_doc == doc and end <= pos and GAP_OK.fullmatch(text[end:pos]) and text[start:end] == Path(doc).stem:
+            return start
+    return None
+
+
 def excluded_before(text: str, pos: int) -> str | None:
-    """紧挨在节号前面的「原型 v8」「ADR-0007」这类词。"""
+    """紧挨在节号前面的「原型 v8」「ADR-0007」「docs/requirements/x.md」这类词。"""
     for pat in EXCLUDED_TOKENS:
         for m in re.finditer(pat, text):
-            if m.end() <= pos and GAP_OK.fullmatch(text[m.end() : pos]):
+            if m.end() <= pos:
+                if GAP_OK.fullmatch(text[m.end() : pos]):
+                    return m.group(0)
+            elif m.start() < pos <= m.end():
+                # 贪婪匹配（「路线图…第 6.1 节」）把节号一起吞掉了：这一处仍然算别的文档
                 return m.group(0)
     return None
+
+
+def kept_as_is(path: str, line: str) -> bool:
+    """「只改」之外、原样保留节号的那几处。"""
+    return any(path == p and snippet in line for p, snippet in KEEP_AS_IS)
 
 
 # ---------------------------------------------------------------- 换算
@@ -415,6 +651,10 @@ class Ref:
     status: str = "未定"
     score: float = 0.0
     quote: str = ""
+    named: bool = False
+    pinned: str | None = None
+    pinned_strict: bool = False
+    bare: bool = False
 
     @property
     def ok(self) -> bool:
@@ -445,17 +685,21 @@ class Group:
 
 
 @lru_cache(maxsize=None)
-def prototype_sections(path: str) -> frozenset[str]:
-    """这份文件里原型的设计说明按节号引用的节。"""
-    text = (ROOT / path).read_text(encoding="utf-8")
-    out = set()
-    for m in PROTO_RE.finditer(text):
+def proto_file(path: str) -> bool:
+    """这份文件是照原型的设计做的：客户端文件的**开头**声明了「原型 vN 设计说明第 K 节」。
+
+    工单 #1411 把引用原型的节号排除在外；客户端页面是原型的移植，注释里的无主节号指的是原型，
+    不是 docs/design 下的某一份。只在文件开头声明时成立：正文里偶尔提一次原型不再整文件豁免。
+    """
+    if not path.startswith("client/"):
+        return False
+    for m in PROTO_RE.finditer(header_block(file_lines(path))):
         head = m.group(0).rsplit("第", 1)[0]
         if "与设计说明" in head or "及设计说明" in head:
-            # 「原型 v10 floor.js 与设计说明第 5.2 节」：这一处指的是设计说明本身
+            # 「原型 v10 floor.js 的绘制部分与设计说明第 5.2 节」：这一处指的是设计说明本身
             continue
-        out.add(m.group(1))
-    return frozenset(out)
+        return True
+    return False
 
 
 def mapping_doc(path: str, line: int | None = None) -> str | None:
@@ -494,8 +738,7 @@ def collect(files: list[str]) -> tuple[list[Group], dict[str, str]]:
             for m in RANGE_RE.finditer(line):
                 if any(a <= m.start() < b for a, b in taken):
                     continue
-                lo, hi = m.group(1), m.group(2)
-                secs = (lo, hi) if "." in lo or "." in hi else tuple(str(x) for x in range(int(lo), int(hi) + 1))
+                secs = expand_range(m.group(1), m.group(2))
                 groups.append(Group(path, i, m.start(), m.end(), [Ref(path, i, m.start(), m.end(), s, secs) for s in secs]))
                 taken.append((m.start(), m.end()))
             for m in ITEM_RE.finditer(line):
@@ -513,6 +756,19 @@ def collect(files: list[str]) -> tuple[list[Group], dict[str, str]]:
 def commit_of(ref: Ref) -> str | None:
     commits = blame_commits(ref.file)
     return commits[ref.line - 1] if ref.line - 1 < len(commits) else None
+
+
+def expand_range(lo: str, hi: str) -> tuple[str, ...]:
+    """「第 3-5 节」「第 7.1 至 7.3 节」展开成逐节的编号；对不上就只留两头。"""
+    if "." in lo or "." in hi:
+        head_lo, _, last_lo = lo.rpartition(".")
+        head_hi, _, last_hi = hi.rpartition(".")
+        if head_lo == head_hi and last_lo.isdigit() and last_hi.isdigit() and 0 <= int(last_hi) - int(last_lo) <= 12:
+            return tuple(f"{head_lo}.{i}" for i in range(int(last_lo), int(last_hi) + 1))
+        return (lo, hi)
+    if not (lo.isdigit() and hi.isdigit()) or int(hi) < int(lo) or int(hi) - int(lo) > 12:
+        return (lo, hi)
+    return tuple(str(i) for i in range(int(lo), int(hi) + 1))
 
 
 def renamed(doc: str, old: str) -> str | None:
@@ -641,9 +897,10 @@ def item_texts(doc_text: str, sec: str) -> list[tuple[str, str]]:
 
 
 def item_name(text: str) -> str:
+    """一项的名字：去掉加粗与句读，照抄到底，不截断（截断会把标题断在半句上）。"""
     t = re.sub(r"^\*\*(.+?)\*\*\s*", r"\1", text.strip())
     t = re.split(r"[。：:（(]\s*", t, maxsplit=1)[0]
-    return t.strip("* 「」")[:40]
+    return t.strip("* 「」")
 
 
 @lru_cache(maxsize=None)
@@ -693,6 +950,11 @@ def similarity(text: str, doc: str, title: str) -> float:
 
 def line_text(ref: Ref) -> str:
     return file_lines(ref.file)[ref.line - 1]
+
+
+def normalized_line(ref: Ref) -> str:
+    """同一句话在别处出现时用来认：去掉空白与行首的注释符号。"""
+    return re.sub(r"\s+", "", re.sub(r"^\s*(?:#|//|\*|/\*|--)+", "", line_text(ref)))
 
 
 def comment_text(ref: Ref) -> str:
@@ -753,6 +1015,31 @@ def rank(ref: Ref, docs: list[str]) -> list[tuple[float, str, str]]:
     return sorted(scored, reverse=True)
 
 
+def section_by_text(ref: Ref, doc: str) -> tuple[str, float] | None:
+    """写明了哪份说明、但节号对不上现在的编号时，在这份说明的小节里按文字挑一节。
+
+    只在人定的或同行点名的说明里找，不跨说明猜；分不开或不明显时返回 None，留给对照表。
+    """
+    text = comment_text(ref)
+    quote = quote_after(ref)
+    scored: list[tuple[float, str]] = []
+    for title in now_headings(doc).values():
+        score = similarity(text, doc, title)
+        grams = bigrams(title)
+        if grams:
+            score += 0.30 * len(grams & bigrams(text)) / len(grams)
+        if quote and (quote in title or quote in body_by_title(doc, title)):
+            score += 0.40
+        scored.append((round(score, 3), title))
+    if not scored:
+        return None
+    scored.sort(reverse=True)
+    best, second = scored[0], (scored[1][0] if len(scored) > 1 else 0.0)
+    if best[0] >= 0.36 and best[0] >= 1.2 * second:
+        return "「" + best[1] + "」", best[0]
+    return None
+
+
 def resolve(groups: list[Group], texts: dict[str, str]) -> None:
     refs = [r for g in groups for r in g.refs]
     file_doc: dict[str, Counter[str]] = {}
@@ -761,63 +1048,119 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
         for _start, _end, doc in mentions(texts[path]):
             counter[doc] += 1
         file_doc[path] = counter
+    by_line: dict[tuple[str, int], list[Ref]] = defaultdict(list)
+    for ref in refs:
+        by_line[(ref.file, ref.line)].append(ref)
+    for items in by_line.values():
+        items.sort(key=lambda r: r.start)
 
-    # 第一轮：名字写在同一行（确定）、同一段注释、文件开头（可能是别的说明）
+    # 第一轮：这一行、这一段注释写明了是哪份说明（确定）。
+    # 写明了名字而换算不成的（当时那份说明没有这一节、标题对不上），钉在这份说明上，
+    # 不再拿「同文件的多数」或「文字最相近」去改到别的说明——那样改出来的句子自相矛盾。
     for ref in refs:
         line = line_text(ref)
+        if kept_as_is(ref.file, line):
+            ref.status, ref.how = "排除（只改之外）", "排除"
+            continue
+        if any(ref.file == p and snippet in line for p, snippet in PROTO_AS_IS):
+            ref.status, ref.how = "排除（原型）", "排除"
+            continue
         if excluded_before(line, ref.start):
             ref.status, ref.how = "排除（别的文档）", "排除"
             continue
         doc = nearest_before(line, ref.start, mentions(line))
         if doc:
-            # 名字就写在这一处：这一份说明里没有这一节就是这一节删了，不再猜别的说明
+            ref.named = True
             if not consider(ref, doc, "同行名字"):
-                ref.doc = doc
+                ref.doc, ref.pinned, ref.pinned_strict = doc, doc, True
+            stem = bare_name_before(line, ref.start, doc)
+            if stem is not None:
+                # 写的是文件名：换成路径时把文件名一起换掉
+                ref.bare = True
+                ref.start = stem
             continue
-        if ref.sec in prototype_sections(ref.file):
-            # 同一份文件里原型的设计说明按这个节号引用过，这一处指的是原型
+        if proto_file(ref.file):
+            # 文件开头声明了照原型的设计做：客户端注释里的无主节号指的是原型（不在本单）
             ref.status, ref.how = "排除（原型）", "排除"
             continue
         above = block_above(file_lines(ref.file), ref.line)
         doc = nearest_before(above + "\n", len(above), mentions(above)) if above else None
         if doc:
-            consider(ref, doc, "同段注释")
-            continue
-        header = header_block(file_lines(ref.file))
-        if header and mentions(header):
-            consider(ref, mentions(header)[-1][2], "文件头")
+            ref.named = True
+            if not consider(ref, doc, "同段注释"):
+                ref.doc, ref.pinned = doc, doc
 
-    # 一个引用里连写的几个节号用同一份设计说明
-    for g in groups:
-        head = next((r for r in g.refs if r.doc), None)
-        if head is None:
-            continue
-        for r in g.refs:
-            if r.doc is None and not r.status.startswith("排除"):
-                if not consider(r, head.doc, "同行名字"):
-                    r.doc = head.doc
+    # 同一行的几个节号共用这一行点名的说明：第一个引用定下来的那一份，后面的沿用它，
+    # 除非那一处自己写了另一份说明（工单 #1411 审查第 2 条）。
+    for items in by_line.values():
+        current: str | None = None
+        for ref in items:
+            if ref.status.startswith("排除"):
+                continue
+            if ref.named:
+                current = ref.doc
+                continue
+            if ref.ok:
+                current = ref.doc
+                continue
+            if current:
+                if not consider(ref, current, "同一行"):
+                    ref.doc, ref.pinned = current, current
 
-    # 第二轮：对照表里人定的那一份
+    # 同一句话在别处已经写明是哪份说明的，沿用那一份（同一句注释在多处重复，比如
+    # 「装配规则的取值（设计说明第 4 节）」）。整行文字相同才算，不用相似度。
+    sentence_doc: dict[str, str] = {}
+    for ref in refs:
+        if ref.named and ref.ok and ref.doc:
+            sentence_doc.setdefault(normalized_line(ref), ref.doc)
+    for ref in refs:
+        if ref.ok or ref.dropped or ref.pinned or ref.status.startswith("排除"):
+            continue
+        doc = sentence_doc.get(normalized_line(ref))
+        if doc:
+            if not consider(ref, doc, "同一句话"):
+                ref.doc, ref.pinned = doc, doc
+
+    # 第二轮：对照表里人定的那一份（pinned 的也按人定的换算，人定的优先）
     for ref in refs:
         if ref.ok or ref.dropped or ref.status.startswith("排除"):
             continue
         doc = mapping_doc(ref.file, ref.line)
         if doc:
-            consider(ref, doc, "对照表")
+            if not consider(ref, doc, "对照表"):
+                ref.doc, ref.pinned = doc, doc
 
-    # 第三轮：按注释文字与各说明的小节正文比对；同一份文件里已经定下来的说明、文件开头写明的
-    # 那一份、文件里提到过的说明，都是候选上的少许加分
+
+    # 第二轮之半：写明了哪份说明（同行点名或对照表）、节号却对不上现在编号的：
+    # 先退到这份文件的注释里点名过的说明（按点名的多少，最多三份），再在这几份里按文字挑一节。
+    # 跨说明地猜是不做的（工单 #1411 审查第 5 条）。
+    votes: dict[str, Counter[str]] = defaultdict(Counter)
+    for ref in refs:
+        if ref.ok and ref.doc:
+            votes[ref.file][ref.doc] += 1
+    for ref in refs:
+        if ref.ok or ref.dropped or ref.status.startswith("排除") or not ref.pinned:
+            continue
+        if not ref.pinned_strict:
+            for doc, _count in votes[ref.file].most_common(3):
+                if doc != ref.pinned and consider(ref, doc, "同一份文件点名的说明"):
+                    break
+            if ref.ok:
+                continue
+        found = section_by_text(ref, ref.pinned)
+        if found:
+            ref.doc, ref.how, ref.title, ref.status, ref.score = ref.pinned, "指名说明里按文字对节", found[0], "ok", found[1]
+
+    # 第三轮：按注释文字与各说明的小节正文比对，只在候选里取一名；同一份文件里已经定下来的
+    # 说明、文件开头写明的那一份、文件里提到过的说明，都只是少许加分。分不开的记为未定，
+    # 不替人猜（工单 #1411 审查第 5 条）。
     header_doc = {}
     for path in {r.file for r in refs}:
         header = header_block(file_lines(path))
         found = {doc for _s, _e, doc in mentions(header)}
         header_doc[path] = found.pop() if len(found) == 1 else None
-    votes: dict[str, Counter[str]] = defaultdict(Counter)
     for ref in refs:
-        if ref.doc and not ref.status.startswith("排除"):
-            votes[ref.file][ref.doc] += 1
-    for ref in refs:
-        if ref.ok or ref.dropped or ref.status.startswith("排除"):
+        if ref.ok or ref.dropped or ref.pinned or ref.status.startswith("排除"):
             continue
         total = sum(file_doc[ref.file].values()) or 1
         prior = {doc: 0.06 * count / total for doc, count in file_doc[ref.file].items()}
@@ -843,55 +1186,6 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
         else:
             ref.doc, ref.score = best[1], best[0]
             ref.status = "未定：两种读法都可能"
-
-    # 第五轮：同一份文件（或同一个目录）里定下来的多数；都推不出来时退回文字最相符的一份。
-    # 这几类的把握低于上面几轮，报告里单独标出来，交付说明的「自定的边界」逐条写明。
-    for ref in refs:
-        if ref.ok or ref.dropped or ref.status.startswith("排除"):
-            continue
-        counted = sum(votes[ref.file].values()) or 0
-        if counted:
-            for doc, _count in votes[ref.file].most_common(3):
-                if consider(ref, doc, "同文件的多数"):
-                    break
-        if ref.ok:
-            continue
-        directory = str(Path(ref.file).parent.as_posix()) + "/"
-        tally: Counter[str] = Counter()
-        for path, counter in votes.items():
-            if str(Path(path).parent.as_posix()) + "/" == directory:
-                tally.update(counter)
-        for doc, _count in tally.most_common(3):
-            if consider(ref, doc, "同目录的多数"):
-                break
-    for ref in refs:
-        if ref.ok or ref.dropped or ref.status.startswith("排除"):
-            continue
-        for _score, doc, _title in (
-            sorted(
-                (
-                    (score_of(ref, doc), doc, title)
-                    for doc in all_docs()
-                    for title, status in [title_for(ref, doc)]
-                    if title is not None
-                ),
-                reverse=True,
-            )[:3]
-        ):
-            if consider(ref, doc, "文字最相符"):
-                ref.score = score_of(ref, doc)
-                break
-    for ref in refs:
-        if ref.ok or ref.dropped or ref.status.startswith("排除"):
-            continue
-        counted = sum(votes[ref.file].values()) or 0
-        if not counted:
-            continue
-        doc, count = votes[ref.file].most_common(1)[0]
-        if count / counted < 0.6:
-            continue
-        if consider(ref, doc, "同文件的多数"):
-            ref.score = score_of(ref, doc)
 
     # 「文件:行」的对照表最后覆盖一次：人定的优先
     for ref in refs:
@@ -930,7 +1224,10 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                 doc = next((r.doc for r in g.refs if r.doc), None)
                 context = line + "\n" + block_above(file_lines(path), lineno)
                 named = bool(doc) and doc in {d for _s, _e, d in mentions(context)}
-                start, end = g.start, max([g.end] + [r.end for r in g.refs])
+                if any(r.bare for r in g.refs if r.doc == doc):
+                    # 注释里写的是设计说明的文件名：连文件名一起换成路径
+                    named = False
+                start, end = min([g.start] + [r.start for r in g.refs]), max([g.end] + [r.end for r in g.refs])
                 if any(r.dropped for r in g.refs):
                     slice_match = SLICE_RE.match(line, end)
                     if slice_match:
