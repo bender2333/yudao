@@ -1,0 +1,5 @@
+{
+  "revision": "2026-10-11.1",
+  "source": "服务方案预置按进程加载的那一份定义读取（harness/providers/presets.py）：形态的定义不重复这张表",
+  "presets": []
+}
