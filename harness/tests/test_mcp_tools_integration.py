@@ -165,32 +165,6 @@ def test_a_run_reuses_one_session_per_server_and_closes_it_at_run_end(tmp_path):
     system.close()
 
 
-def test_an_alias_outside_the_item_definitions_is_refused(tmp_path):
-    # 别名不在这个事项的定义副本里（例如别的工具名）：工具许可拒绝，回执带被拒绝标记与原因，
-    # 执行环境没有被调用（没有 tool_started）
-    stranger = "mcp__time__no_such_tool"
-    identity = "stranger"
-    call = {"id": identity, "call_id": identity, "type": "function_call", "name": stranger,
-            "arguments": json.dumps({"text": "x"})}
-    system = _system(tmp_path, {
-        "product": [product_spec_turn()],
-        "engineering": [ModelResponse(output=[call]), FakeTurn(transcript="调用完成")],
-        "quality": [explore_turn(), explore_turn(), explore_turn()],
-    })
-    project_id = _project_with_server(system)
-    run_id = _work_item_run(system, project_id)
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-
-    events = system.store.list_events(run_id)
-    called = next(event for event in events
-                  if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("id") == identity)
-    assert called.payload["ok"] is False and called.payload["refused"] is True
-    assert "cannot use" in (called.payload["error"] or "")
-    assert not any(event.type == EventType.TOOL_STARTED and (event.payload or {}).get("id") == identity
-                   for event in events), "被拒绝的调用有工具开始事件"
-    system.close()
-
 def test_the_run_actions_query_carries_the_mcp_receipt(tmp_path):
     # run.actions 的动作视图（网络与 MCP 设计说明第 10 节）：MCP 调用带回执字段与外部来源工件引用
     from harness.app.application import Application

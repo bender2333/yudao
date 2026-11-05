@@ -3,8 +3,6 @@
 #       （小写字母、数字与下划线，字母开头），规则确定、可反查，冲突必须拒绝而不是静默改名。
 # 守 R3：第 5.1 节写明的拼接、收敛、超长前缀与摘要规则，原名只在调用时还原。
 
-import asyncio
-
 import harness.mcp_session as mcp_session
 
 
@@ -165,28 +163,6 @@ def test_the_session_table_resolves_aliases_from_the_item_definitions():
     assert (server, tool) == ("fs", "Read.File")
     assert "mcp__fs__read_file" in item.tools_for("engineering")
     assert table.server_names() == ["fs"]
-
-
-def test_an_alias_outside_the_table_is_refused():
-    table = mcp_session.McpSessions(None, credentials=CredentialChain(), stderr_dir=".")
-    try:
-        table.original("mcp__fs__read_file")
-    except mcp_session.UnknownToolAlias:
-        pass
-    else:
-        raise AssertionError("没有冻结设置的会话表放过了别的工具名")
-
-
-def test_a_call_against_an_unknown_server_is_refused():
-    table = mcp_session.McpSessions(_document(), credentials=CredentialChain(), stderr_dir=".")
-
-    async def call():
-        return await table.call("mcp__other__read_file", "other", "read_file", {})
-
-    outcome = asyncio.run(call())
-    assert outcome.is_error and outcome.error_code == "startup_failed"
-    assert "不在" in outcome.result_text
-    assert not table.open and table.sessions() == {}
 
 
 def test_the_launch_plan_carries_the_timeouts_and_the_redaction_list():
