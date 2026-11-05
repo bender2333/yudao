@@ -105,7 +105,7 @@ def test_void_runs_stay_out_of_every_summary_column():
 
 
 def test_the_report_records_the_model_capacity_and_its_source(tmp_path):
-    """结果与报告写明模型容量的取值与来源（docs/design/evaluation-scenarios.md「两边的运行条件」「模型的容量」）。"""
+    """结果与报告写明模型容量的取值与来源（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）。"""
     result, text = _report_text(tmp_path, [_run("run-1")])
     assert result["model_capacity"] == LIMITS
     assert "上下文窗口 262144（模型服务的模型列表），单次输出上限 64000（模型服务的模型列表）" in text

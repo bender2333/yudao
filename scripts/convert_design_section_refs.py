@@ -483,15 +483,15 @@ TEXT_MAPPING: tuple[tuple[str, str, str, str | None], ...] = (
     ("harness/tests/kernel/test_definitions_decide.py", "工单 #1098", "test-pyramid.md", "测试往下层移"),
     ("harness/tests/kernel/test_skeleton_events.py", "这张表与设计说明", "skeleton-and-application.md", "骨架事件与应用事件"),
     ("harness/tests/kernel/test_skeleton_events.py", "所以它也在表里", "skeleton-and-application.md", "骨架事件与应用事件"),
-    ("harness/tests/kernel/test_skeleton_events.py", "守 R2（第二环的合同", "test-pyramid.md", "测试按三环留"),
+    ("harness/tests/kernel/test_skeleton_events.py", "第二环的合同", "test-pyramid.md", "测试按三环留"),
     ("harness/tests/kernel/test_skeleton_events.py", "一列，加", "skeleton-and-application.md", "骨架事件与应用事件"),
     ("client/tests/unit/view-sync.test.js", "工单 #952 验收标准 1", "visualization.md", "状态"),
     ("evals/tests/test_report.py", "评分器给出的完成度", "evaluation-scenarios.md", "指标"),
     ("evals/tests/test_report.py", "只有一次运行时噪声范围", "evaluation-scenarios.md", "指标"),
-    ("evals/tests/test_report.py", "模型容量的取值与来源", "evaluation-scenarios.md", "两边的运行条件"),
+    ("evals/tests/test_report.py", "模型容量的取值与来源", "evaluation-scenarios.md", None),
     ("harness/tests/test_prompts.py", "守 R3（独立核验", "independent-verification.md", None),
-    ("harness/engine.py", "用户追加的输入在这个会话的下一步", "department-loop.md", "工作中途要求变化"),
-    ("harness/engine.py", "这个会话采用这一版输入版本", "department-loop.md", "工作中途要求变化"),
+    ("harness/engine.py", "用户追加的输入在这个会话的下一步", "department-loop.md", None),
+    ("harness/engine.py", "这个会话采用这一版输入版本", "department-loop.md", None),
 )
 
 # 已经删去的小节：指向它的那一部分引用去掉，注释的其余部分照旧。
