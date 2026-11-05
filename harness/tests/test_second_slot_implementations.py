@@ -109,6 +109,51 @@ def test_an_execution_version_outside_the_accepted_range_fails_at_construction(t
     assert f"current {execution_contract.CURRENT_VERSION}" in message
 
 
+def test_the_second_execution_reads_the_model_and_the_prompt_from_the_round_request(tmp_path):
+    # 验收（工单 #1511）：第二种执行实现用开始一轮工作的请求里的新字段拿到模型与提示词，不再问安全节点。
+    # 不属于项目的运行没有项目部门设置，选择为空；提示是这个事项所用定义里的角色说明（版本 0）
+    adapter = FakeAdapter({"product": [product_spec()]})
+    second_execution.SecondExecution.settings_read = {}
+    system = LoopSystem.for_testing(
+        tmp_path, adapter, step_limits=StepLimits(max_model_steps=1),
+        execution=second_execution.SecondExecution,
+    )
+    run_id = system.create_run("print the argument in uppercase")
+
+    system.activate_once(run_id)
+
+    read = second_execution.SecondExecution.settings_read
+    assert read["selection"] is None, "不属于项目的运行没有项目部门设置"
+    assert read["prompt"] is not None, "第二种执行实现没有从请求里拿到提示词"
+    assert read["prompt"].version == 0
+    assert read["prompt"].text == system.orchestrator.item_definitions(run_id).role("product").prompt
+
+
+def test_the_previous_execution_version_still_connects_and_runs_a_round(tmp_path):
+    # 合同侧（工单 #1511）：旧版本的执行实现（测试里留一份，声明第二版）接上照旧通过。
+    # 一个发布接受当前版与上一版；那一版按部门取模型与提示词在安全节点上，薄驱动照旧回答
+    adapter = FakeAdapter({"product": [product_spec()]})
+    second_execution.SecondExecutionV2.settings_read = {}
+    system = LoopSystem.for_testing(
+        tmp_path, adapter, step_limits=StepLimits(max_model_steps=2),
+        execution=second_execution.SecondExecutionV2,
+    )
+    run_id = system.create_run("print the argument in uppercase")
+
+    projection = system.activate_once(run_id)
+
+    # 这一轮照旧跑完：每一步都写回事件日志，步数用完属于暂停
+    steps = [event for event in system.store.list_events(run_id)
+             if event.type == EventType.DEPARTMENT_INPUT and "step_id" in (event.payload or {})]
+    assert [event.payload["step_id"] for event in steps] == [1, 2]
+    assert projection.stop_reason == "model_steps_exhausted"
+    assert projection.status == "paused"
+    # 那两样在第二版的安全节点上问到：值从随请求交进来的那份来源读，不是薄驱动自己查
+    read = second_execution.SecondExecutionV2.settings_read
+    assert read["selection"] is None
+    assert read["prompt"] is not None and read["prompt"].version == 0
+
+
 def test_the_thin_driver_source_names_neither_product_implementation():
     # 薄驱动不认识实现的名字以外的东西：两个产品实现的类名不在它的源码里（交付说明附同一条 grep）
     source = THIN_DRIVER.read_text(encoding="utf-8")
