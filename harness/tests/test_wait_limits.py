@@ -1,16 +1,35 @@
-# 等待主机工作的上限与集成层给每条用例的上限的大小关系（docs/design/test-pyramid.md 第 2.2 节）。
-# 两个数各在一处集中定义：等待的上限在 harness/tests/wait_limits.py（取层上限的一半），
-# 层上限在根 conftest.py 的 TIMEOUTS。这里核对它们的关系：等待的上限比层上限短，卡住时用例自己
-# 以一条失败结束，不等 pytest-timeout 结束 worker。
+# 等待主机工作的上限按层取值：取本层给每条用例上限的一半，并严格小于本层上限
+# （docs/design/test-pyramid.md 第 2.2 节）。两个数各在一处集中定义：等待的上限在
+# harness/tests/wait_limits.py（按层的表，比例写成除法），层上限在根 conftest.py 的 TIMEOUTS。
+# 这里逐层核对，失败时写明是哪一层。
 
-from conftest import INTEGRATION, TIMEOUTS
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+import pytest
+
+from conftest import INTEGRATION, MODULE, TIMEOUTS
+from harness.tests.wait_limits import (
+    MODULE_WAIT_FOR_HOST_WORK_SEC,
+    WAIT_FOR_HOST_WORK_BY_LAYER,
+    WAIT_FOR_HOST_WORK_SEC,
+)
+
+# 会等待主机工作的层，以及各层在用的名字：模块层的四个文件用模块层的上限，
+# 集成层二十几个文件与两个辅助文件用集成层的上限（取值不变）。
+WAIT_LIMITS_BY_LAYER = {
+    MODULE: ("模块层", MODULE_WAIT_FOR_HOST_WORK_SEC),
+    INTEGRATION: ("集成层", WAIT_FOR_HOST_WORK_SEC),
+}
 
 
-def test_wait_limit_is_half_of_the_integration_case_timeout():
-    assert WAIT_FOR_HOST_WORK_SEC * 2 <= TIMEOUTS[INTEGRATION], (
-        f"等待主机工作的上限 {WAIT_FOR_HOST_WORK_SEC} 秒的两倍不小于集成层给每条用例的 "
-        f"{TIMEOUTS[INTEGRATION]} 秒上限")
-    assert WAIT_FOR_HOST_WORK_SEC == TIMEOUTS[INTEGRATION] / 2, (
-        f"等待主机工作的上限 {WAIT_FOR_HOST_WORK_SEC} 秒不等于集成层给每条用例的 "
-        f"{TIMEOUTS[INTEGRATION]} 秒上限的一半")
+@pytest.mark.parametrize("layer", list(WAIT_LIMITS_BY_LAYER))
+def test_wait_limit_is_half_of_the_layer_case_timeout(layer):
+    name, wait_limit = WAIT_LIMITS_BY_LAYER[layer]
+    layer_timeout = TIMEOUTS[layer]
+    assert wait_limit == WAIT_FOR_HOST_WORK_BY_LAYER[layer], (
+        f"{name}在用的等待上限 {wait_limit} 秒与按层的表里的 "
+        f"{WAIT_FOR_HOST_WORK_BY_LAYER[layer]} 秒不一致")
+    assert wait_limit == layer_timeout / 2, (
+        f"{name}等待主机工作的上限 {wait_limit} 秒不等于本层给每条用例的 "
+        f"{layer_timeout} 秒上限的一半")
+    assert wait_limit < layer_timeout, (
+        f"{name}等待主机工作的上限 {wait_limit} 秒不小于本层给每条用例的 "
+        f"{layer_timeout} 秒上限")

@@ -28,13 +28,13 @@ from harness.tests.helpers import (
     recorded_context,
     summary_message as _message,
 )
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.wait_limits import MODULE_WAIT_FOR_HOST_WORK_SEC
 
 # 这个文件里等待压缩线程到达模型回调、等待会合点释放、等待这次激活收尾的墙钟界限，
 # 只用来防止测试一直等待，按 #107 的裁定（架构师 2026-09-27 16:55，docs/archive/architecture-issues-2026-09-10.md）
 # 设为远大于负载下正常用时的值。被等待的是一次激活走到压缩请求，正常用时数秒，
 # 并发负载下更慢；这些界限不判定被测行为，被等待的动作是否发生由等待之后的断言核对。
-_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
+_WAIT_LIMIT = MODULE_WAIT_FOR_HOST_WORK_SEC
 
 
 def test_compaction_preserves_originals_then_resumes_work_with_summary(tmp_path):

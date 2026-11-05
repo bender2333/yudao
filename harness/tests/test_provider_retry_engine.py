@@ -13,7 +13,7 @@ from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import FAST_RETRIES, after_event, department_history
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.wait_limits import MODULE_WAIT_FOR_HOST_WORK_SEC
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
@@ -118,7 +118,7 @@ def test_cancel_interrupts_retry_backoff_without_next_attempt(tmp_path):
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
-        assert scheduled.wait(WAIT_FOR_HOST_WORK_SEC)
+        assert scheduled.wait(MODULE_WAIT_FOR_HOST_WORK_SEC)
         system.cancel(run_id)
         try:
             result = future.result(timeout=_INTERRUPTED_WITHIN_SEC)
