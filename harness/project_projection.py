@@ -55,7 +55,7 @@ class Adoption:
 class InitialPrdCandidate:
     # 一个建档候选（工单 #136，设计第 3.3 节）：建档 run 结束以后提出的初始 PRD 及其依据。
     # prd、structure、baseline_review 是这一轮三份产物的事件编号、内容哈希与工件引用；
-    # 没有核验角色的形态没有基线核验这一步（工单 #1510），这一份产物为空；
+    # 没有核验角色的形态没有基线核验这一步（工单 #1510），这一份产物是一份空记录，由 baseline_verified 记下；
     # overview_ref 是仓库概况的工件引用；snapshot 是这一轮建档使用的代码快照；
     # revision_note_ref 是上一轮用户的修改意见（第二轮起）
     work_item_id: str
@@ -63,12 +63,13 @@ class InitialPrdCandidate:
     round: int
     prd: dict[str, Any]
     structure: dict[str, Any]
-    baseline_review: dict[str, Any] | None
+    baseline_review: dict[str, Any]
     overview_ref: dict[str, Any]
     snapshot: dict[str, Any]
     proposed_at: str
     stream_version: int
     event_id: str
+    baseline_verified: bool = True
     revision_note_ref: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
@@ -472,14 +473,15 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
         return
     if etype == ProjectEventType.INITIAL_PRD_PROPOSED:
         # 建档候选（工单 #136）：记下这一轮的产物与快照，等待用户确认。
-        # 没有核验角色的形态没有基线核验这一步，这一项为空（工单 #1510）
-        review = payload.get("baseline_review")
+        # 没有核验角色的形态没有基线核验这一步（工单 #1510）：这一份产物是空记录，baseline_verified 记下这一点
         state.initial_prd_candidates.append(InitialPrdCandidate(
             work_item_id=payload["work_item_id"], run_id=payload["run_id"], round=int(payload["round"]),
             prd=dict(payload["prd"]), structure=dict(payload["structure"]),
-            baseline_review=None if review is None else dict(review),
+            baseline_review=dict(payload["baseline_review"]),
             overview_ref=dict(payload["overview_ref"]),
             snapshot=dict(payload["snapshot"]), revision_note_ref=payload.get("revision_note_ref"),
+            # 旧候选没有这一项时按「经过了」读（字段只增）
+            baseline_verified=bool(payload.get("baseline_verified", True)),
             proposed_at=event.created_at, stream_version=event.stream_version, event_id=event.event_id,
         ))
         return

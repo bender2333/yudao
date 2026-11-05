@@ -1276,7 +1276,7 @@ class UnknownActionRequested(Payload):
 # round 是这一轮建档的轮次（第一次为 1，每次提出修改以后加一）；department 恒为 product。
 # prd、structure、baseline_review 是这一轮的三份产物，snapshot 与 overview_ref 是档案的来源与仓库概况；
 # revision_note_ref 是上一轮用户的修改意见（第二轮起）。
-# 没有核验角色的形态没有基线核验这一步（工单 #1510）：baseline_review 为空，baseline_verified 为否，
+# 没有核验角色的形态没有基线核验这一步（工单 #1510）：baseline_review 是空的一份、baseline_verified 为否，
 # 说明里写明没有经过基线核验；旧事件没有 baseline_verified 时按「经过了」读
 class InitialPrdRequested(Payload):
     kind: Literal["initial_prd"]
@@ -1291,7 +1291,8 @@ class InitialPrdRequested(Payload):
     round: int
     prd: InitialPrdProposal
     structure: StructureProposal
-    baseline_review: BaselineReviewProposal | None = None
+    baseline_review: BaselineReviewProposal
+    # 这一轮的基线有没有经过基线核验（工单 #1510）：旧事件没有这一项时按「经过了」读
     baseline_verified: bool = True
     overview_ref: ArtifactRef
     snapshot: CodeSnapshot
@@ -1679,14 +1680,15 @@ class InitialPrdProposedPayload(Payload):
     # 建档候选（工单 #136，接入已有项目设计说明第 3.2、3.3 节）：建档 run 以基线核验或开环完成结束以后，
     # 这一轮的产物与代码快照写进项目流，等待用户确认。round 是轮次（第一次为 1）；
     # revision_note_ref 是上一轮用户的修改意见（第二轮起）；snapshot 是这一轮建档使用的代码快照。
-    # 没有核验角色的形态没有基线核验这一步（工单 #1510）：baseline_review 为空、baseline_verified 为否，
+    # 没有核验角色的形态没有基线核验这一步（工单 #1510）：baseline_review 是空的一份、baseline_verified 为否，
     # 旧候选没有 baseline_verified 时按「经过了」读
     work_item_id: str
     run_id: str
     round: int
     prd: InitialPrdProposal
     structure: StructureProposal
-    baseline_review: BaselineReviewProposal | None = None
+    baseline_review: BaselineReviewProposal
+    # 这一轮的基线有没有经过基线核验（工单 #1510）：旧事件没有这一项时按「经过了」读
     baseline_verified: bool = True
     overview_ref: ArtifactRef
     snapshot: CodeSnapshot

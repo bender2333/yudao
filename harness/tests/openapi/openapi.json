@@ -8648,7 +8648,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 16
+            "example": 15
           },
           "contract_digest": {
             "type": "string",
@@ -9966,14 +9966,7 @@
             "$ref": "#/components/schemas/StructureProposal"
           },
           "baseline_review": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BaselineReviewProposal"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/BaselineReviewProposal"
           },
           "baseline_verified": {
             "type": "boolean",
@@ -10011,6 +10004,7 @@
           "round",
           "prd",
           "structure",
+          "baseline_review",
           "overview_ref",
           "snapshot"
         ],
@@ -11385,14 +11379,7 @@
             "title": "Revision Note"
           },
           "baseline_review": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BaselineReviewView"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/BaselineReviewView"
           },
           "baseline_review_note": {
             "anyOf": [
@@ -11424,6 +11411,7 @@
           "structure",
           "overview",
           "revision_note",
+          "baseline_review",
           "decisions"
         ],
         "title": "OnboardingRound"
@@ -25133,14 +25121,7 @@
             "$ref": "#/components/schemas/StructureProposal"
           },
           "baseline_review": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BaselineReviewProposal"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "$ref": "#/components/schemas/BaselineReviewProposal"
           },
           "baseline_verified": {
             "default": true,
@@ -25170,6 +25151,7 @@
           "round",
           "prd",
           "structure",
+          "baseline_review",
           "overview_ref",
           "snapshot"
         ],

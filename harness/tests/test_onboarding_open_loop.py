@@ -117,24 +117,28 @@ def test_a_single_role_direct_project_onboards_without_a_baseline_review(tmp_pat
     assert EventType.BASELINE_REVIEW_ACCEPTED not in kinds
     assert result.baseline_review is None and result.structure is not None and result.product_spec is not None
 
-    # 结算照常：初始 PRD 候选与确认请求在同一个事务里写入。候选里没有基线核验这一份产物
+    # 结算照常：初始 PRD 候选与确认请求在同一个事务里写入。候选里没有基线核验的内容，
+    # 项目流只增加字段（ADR-0019），所以这一份是空记录，另由 baseline_verified 记下没有经过基线核验
     proposed = system.projects.settle(run_id)
     assert proposed is not None and proposed.type == ProjectEventType.INITIAL_PRD_PROPOSED
     candidate = system.projects.projection(project_id).initial_prd_candidates[-1]
-    assert candidate.round == 1 and candidate.baseline_review is None
+    assert candidate.round == 1 and candidate.baseline_verified is False
+    assert (candidate.baseline_review["event_id"], candidate.baseline_review["content_hash"]) == ("", "")
+    assert candidate.baseline_review["conclusions"] == []
     assert candidate.prd["content_hash"] == result.product_spec.content_hash
 
     decision = _open_decision(system)
     assert decision.kind == "initial_prd"
     # 确认请求写明这一轮没有经过基线核验
     assert decision.request["baseline_verified"] is False
-    assert decision.request["baseline_review"] is None
+    assert decision.request["baseline_review"]["content_hash"] == ""
     assert NO_BASELINE_REVIEW_LABEL in decision.request["description"]
-    # 资料页同样写明：基线核验一项为空，另有一句「没有经过基线核验」
+    # 资料页同样写明：基线核验是空的一份，另有一句「没有经过基线核验」
     materials = Application(system).query(
         "work_item.materials", WorkItemMaterials(project_id=project_id, work_item=item_id)).data
     [round_view] = materials.onboarding_rounds
-    assert (round_view.baseline_review, round_view.baseline_review_note) == (None, NO_BASELINE_REVIEW_LABEL)
+    assert (round_view.baseline_review.content_hash, round_view.baseline_review.conclusions) == ("", [])
+    assert round_view.baseline_review_note == NO_BASELINE_REVIEW_LABEL
 
     # 用户确认：基线照常采纳，第一次采纳的成果是快照本身
     system.orchestrator.answer_decision(decision.decision_id, "confirm", None,

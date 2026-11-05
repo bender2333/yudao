@@ -64,6 +64,13 @@ USER_STOP_REASONS = frozenset({"cancelled", "user_cancelled"})
 BASELINE_VERIFIED_REASON = "baseline_verified"
 
 
+def _empty_baseline_review() -> dict[str, Any]:
+    # 没有基线核验的那一种建档（工单 #1510）在候选与确认请求里写的空记录：项目流只增加字段、不改变已有字段的
+    # 类型（ADR-0019，工单 #126），所以没有这一份产物时字段照旧在，内容为空，另由 baseline_verified 记下这一点
+    return {"event_id": "", "content_hash": "", "conclusions": [], "omissions": [], "checks": [],
+            "other_failures": []}
+
+
 class ProjectNotFoundError(KeyError):
     pass
 
@@ -1533,7 +1540,7 @@ class ProjectService:
             "structure": {"event_id": structure["event_id"], "content_hash": structure["content_hash"],
                           "structure_ref": structure["structure_ref"],
                           "code_tree_digest": structure["code_tree_digest"]},
-            "baseline_review": None if review is None else {
+            "baseline_review": _empty_baseline_review() if review is None else {
                 "event_id": review["event_id"], "content_hash": review["content_hash"],
                 "conclusions": list(review["conclusions"]), "omissions": list(review["omissions"]),
                 "checks": _baseline_checks(

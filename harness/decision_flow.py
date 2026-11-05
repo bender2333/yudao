@@ -215,7 +215,7 @@ class DecisionFlow:
         # 没有核验角色的形态没有基线核验这一步（工单 #1510，形态与核验角色设计说明「开环完成」第 6 条）：
         # 这一项为空，现有缺陷与基线检查也为空，摘要写明这份基线没有经过基线核验；采纳本身照常进行
         snapshot = candidate.snapshot
-        review = candidate.baseline_review or {}
+        review = candidate.baseline_review if candidate.baseline_verified else {}
         defects = [item["requirement"] for item in review.get("conclusions") or []
                    if item["status"] == "existing_defect"]
         known_risks = [f'现有缺陷：{item["requirement"]}（{item["evidence"]}）'
@@ -309,7 +309,7 @@ class DecisionFlow:
 def _onboarding_summary(candidate: Any) -> str:
     # 建档基线的摘要（工单 #136）：把这一轮的轮次与三条产物的内容摘要写成一句话。
     # 没有基线核验的那一种（工单 #1510）只有两份产物，写明这份基线没有经过基线核验，不编一条核验的摘要
-    if not candidate.baseline_review:
+    if not candidate.baseline_verified:
         return (f"第 {candidate.round} 轮建档的初始 PRD 已确认（没有经过基线核验）："
                 f"PRD {candidate.prd['content_hash']}、现有结构说明 {candidate.structure['content_hash']}")
     return (f"第 {candidate.round} 轮建档的初始 PRD 已确认：PRD {candidate.prd['content_hash']}、"
