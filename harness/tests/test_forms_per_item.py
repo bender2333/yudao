@@ -36,7 +36,7 @@ from harness.models import CatalogEventType, EventType, ProjectEventType, TERMIN
 from harness.projection import project_run, saved_decisions
 from harness.proposals import baseline_review_turn, structure_turn
 from harness.providers.call import ModelResponse
-from harness.runtime import LoopSystem
+from harness.runtime import SEVERAL_ROLES_DIRECT, LoopSystem
 from harness.tests import second_routing
 from harness.tests.helpers import delivery_turn, merge_scripts, product_spec, quality_turns
 from harness.tests.onboarding_project import ONBOARDING_GOAL, ONBOARDING_REQUIREMENT, onboarding_source
@@ -255,7 +255,7 @@ def test_an_upgrade_restart_keeps_the_frozen_form_or_is_refused(tmp_path):
                     if item.work_item_id == item_id)
         assert gone.form == second_routing.ROUTING_NAME
         assert gone.start_error == (f"unknown form {second_routing.ROUTING_NAME!r}: "
-                                    f"the release loads {[SINGLE_ROLE_DIRECT, DEFAULT_FORM]}")
+                                    f"the release loads {[SEVERAL_ROLES_DIRECT, SINGLE_ROLE_DIRECT, DEFAULT_FORM]}")
         assert len([event for event in second.store.list_project_events(project)
                     if event.type == ProjectEventType.WORK_ITEM_CREATED
                     and event.payload["work_item_id"] == item_id]) == 1

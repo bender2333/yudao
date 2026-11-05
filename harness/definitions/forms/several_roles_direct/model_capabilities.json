@@ -1,0 +1,8 @@
+{
+  "version": 2,
+  "providers": {},
+  "presets": {},
+  "revision": "single-role-direct-1",
+  "snapshot_date": "2026-10-30",
+  "source": "模型能力表按进程加载的那一份定义读取（harness/capabilities.py）：形态的定义不重复这张表"
+}
