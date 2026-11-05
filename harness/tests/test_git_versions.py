@@ -122,9 +122,6 @@ def test_identical_snapshot_can_be_prepared_again(store, frozen_git_time):
     assert store.read_files(RUN, first) == store.read_files(RUN, second)
 
 
-_ORIGINAL_READ_TREE = GitVersionStore._read_tree
-
-
 def test_a_repository_and_commit_created_by_git_can_be_read_only(tmp_path):
     # 验收对照：版本库与提交由 Git 命令建立，进程内实现只读读取同样的对象与引用
     root = tmp_path / "git"
