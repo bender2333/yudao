@@ -375,8 +375,6 @@ LINE_MAPPING: dict[str, str] = {
     "harness/tests/kernel/test_only_grows.py:9": "skeleton-and-application.md",
     "harness/tests/kernel/test_only_grows.py:36": "skeleton-and-application.md",
     "harness/tests/kernel/test_only_grows.py:127": "skeleton-and-application.md",
-    "harness/tests/kernel/test_skeleton_events.py:2": "skeleton-and-application.md",
-    "harness/tests/kernel/test_skeleton_events.py:85": "skeleton-and-application.md",
     "harness/app/project_queries.py:1566": "model-management.md",
     "harness/orchestrator.py:957": "loops-and-convergence.md",
     "harness/tightening.py:815": "existing-project-onboarding.md",
@@ -407,8 +405,6 @@ TITLE_OVERRIDES: dict[str, str] = {
     "harness/tests/kernel/test_only_grows.py:9": "骨架事件与应用事件",
     "harness/tests/kernel/test_only_grows.py:36": "骨架事件与应用事件",
     "harness/tests/kernel/test_only_grows.py:127": "骨架事件与应用事件",
-    "harness/tests/kernel/test_skeleton_events.py:2": "骨架事件与应用事件",
-    "harness/tests/kernel/test_skeleton_events.py:85": "骨架事件与应用事件",
     "harness/app/project_queries.py:1566": "部门工作间",
     "harness/__main__.py:128": "命令行",
     "harness/tests/test_startup_reload.py:157": "命令行",
@@ -452,7 +448,6 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("harness/app/project_and_work_item_commands.py", "建档之前的事项（3.8 第 2 节）"),
     ("harness/app/project_commands.py", "3.8"),
     ("harness/projects.py", "3.8"),
-    ("evals/runner/yudao_report.py", "高于」看质检这一段"),
 )
 
 # 同一行里点名的既是原型又是设计说明、而节号属于原型那份设计的（不在本单）。
@@ -477,21 +472,29 @@ DROP_SECTIONS: tuple[tuple[str, str], ...] = (
 
 
 # 按行里的文字锚定的对照表：合并 main 以后行号会移动，按「文件:行」的条目会失准。
-# 这一组按那一行里的一段文字认（文件 + 片段 → 说明与标题），行号变了也命中。
-TEXT_MAPPING: tuple[tuple[str, str, str, str | None], ...] = (
-    ("harness/runtime.py", "启动时补建缺少的建档修改轮 run", "existing-project-onboarding.md", "失败与中断"),
-    ("harness/tests/kernel/test_definitions_decide.py", "工单 #1098", "test-pyramid.md", "测试往下层移"),
-    ("harness/tests/kernel/test_skeleton_events.py", "这张表与设计说明", "skeleton-and-application.md", "骨架事件与应用事件"),
-    ("harness/tests/kernel/test_skeleton_events.py", "所以它也在表里", "skeleton-and-application.md", "骨架事件与应用事件"),
-    ("harness/tests/kernel/test_skeleton_events.py", "第二环的合同", "test-pyramid.md", "测试按三环留"),
-    ("harness/tests/kernel/test_skeleton_events.py", "一列，加", "skeleton-and-application.md", "骨架事件与应用事件"),
-    ("client/tests/unit/view-sync.test.js", "工单 #952 验收标准 1", "visualization.md", "状态"),
-    ("evals/tests/test_report.py", "评分器给出的完成度", "evaluation-scenarios.md", "指标"),
-    ("evals/tests/test_report.py", "只有一次运行时噪声范围", "evaluation-scenarios.md", "指标"),
-    ("evals/tests/test_report.py", "模型容量的取值与来源", "evaluation-scenarios.md", None),
-    ("harness/tests/test_prompts.py", "守 R3（独立核验", "independent-verification.md", None),
-    ("harness/engine.py", "用户追加的输入在这个会话的下一步", "department-loop.md", None),
-    ("harness/engine.py", "这个会话采用这一版输入版本", "department-loop.md", None),
+# 这一组按那一行里的一段文字认（文件 + 片段 → 说明、标题与节号），行号变了也命中。
+# 同一行里有几个节号、各自属于不同的小节时，最后一项写明这条只对哪个节号生效；
+# 其余节号照常按编号换算。标题写 None 的按编号（「第 N 节第 M 项」按那一项的名字）换算。
+TEXT_MAPPING: tuple[tuple[str, str, str, str | None, str | None], ...] = (
+    ("harness/runtime.py", "启动时补建缺少的建档修改轮 run", "existing-project-onboarding.md", "失败与中断", None),
+    ("harness/tests/kernel/test_skeleton_events.py", "应用登记一种新的种类不改内核文件", "skeleton-and-application.md", None, None),
+    ("harness/tests/kernel/test_skeleton_events.py", "应用登记一种新的应用事件", "skeleton-and-application.md", None, None),
+    ("harness/tests/kernel/test_definitions_decide.py", "工单 #1098", "skeleton-and-application.md", None, None),
+    ("harness/tests/kernel/test_skeleton_events.py", "这张表与设计说明", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
+    ("harness/tests/kernel/test_skeleton_events.py", "这张表与设计说明", "skeleton-and-application.md", "最小投影", "4"),
+    ("harness/tests/kernel/test_skeleton_events.py", "所以它也在表里", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
+    ("harness/tests/kernel/test_skeleton_events.py", "所以它也在表里", "skeleton-and-application.md", "最小投影", "4"),
+    ("harness/tests/kernel/test_skeleton_events.py", "第二环的合同", "test-pyramid.md", "测试按三环留", "13"),
+    ("harness/tests/kernel/test_skeleton_events.py", "第二环的合同", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
+    ("harness/tests/kernel/test_skeleton_events.py", "一列，加", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
+    ("harness/tests/kernel/test_skeleton_events.py", "一列，加", "skeleton-and-application.md", "最小投影", "4"),
+    ("client/tests/unit/view-sync.test.js", "工单 #952 验收标准 1", "app-and-interface.md", "合同", None),
+    ("evals/tests/test_report.py", "评分器给出的完成度", "evaluation-scenarios.md", "指标", None),
+    ("evals/tests/test_report.py", "只有一次运行时噪声范围", "evaluation-scenarios.md", "指标", None),
+    ("evals/tests/test_report.py", "模型容量的取值与来源", "evaluation-scenarios.md", None, None),
+    ("harness/tests/test_prompts.py", "守 R3（独立核验", "independent-verification.md", None, None),
+    ("harness/engine.py", "用户追加的输入在这个会话的下一步", "department-loop.md", None, None),
+    ("harness/engine.py", "这个会话采用这一版输入版本", "department-loop.md", None, None),
 )
 
 # 已经删去的小节：指向它的那一部分引用去掉，注释的其余部分照旧。
@@ -925,6 +928,22 @@ def item_home(doc: str, name: str) -> str | None:
     return None
 
 
+def quote_key(text: str) -> str:
+    """引号写法不同（「」与『』）的同一个名字按同一个键比。"""
+    return text.replace("『", "「").replace("』", "」").replace("“", "「").replace("”", "」")
+
+
+def item_ref(name: str) -> str:
+    """一项的名字包在「」里；名字自身带引号、又不配对时不再补，免得写出落单的」。"""
+    if name.startswith("「") and name.count("「") == name.count("」"):
+        return name
+    if name.count("「") < name.count("」"):
+        return "「" + name
+    if name.count("「") > name.count("」"):
+        return name + "」"
+    return "「" + name + "」"
+
+
 def render_ref(ref: Ref, doc: str, title: str, hist: str | None) -> str:
     """一节一处的写法：小节标题；带项号或后面已有引号的，保留那一项的名字。"""
     if ref.items and hist is not None:
@@ -937,10 +956,10 @@ def render_ref(ref: Ref, doc: str, title: str, hist: str | None) -> str:
                 break
             names.append(name)
         if names and all(len(name) <= 30 for name in names):
-            return "「" + title + "」中" + "".join("「" + name + "」" for name in names)
+            return "「" + title + "」中" + "".join(item_ref(name) for name in names)
     quote = quote_after(ref)
     if quote:
-        if quote == title or quote in title:
+        if quote == title or quote in title or quote_key(quote.strip("「」")) == quote_key(title):
             ref.end = max(ref.end, quote_end(ref))
         elif quote in body_by_title(doc, title):
             ref.end = max(ref.end, quote_end(ref))
@@ -1161,7 +1180,14 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
         if (f"{ref.file}:{ref.line}", ref.sec) in DROP_SECTIONS:
             ref.status, ref.how = "去掉（工单点名的已删小节）", "去掉"
             continue
-        anchor = next((m for m in TEXT_MAPPING if m[0] == ref.file and m[1] in line), None)
+        anchor = next(
+            (
+                m
+                for m in TEXT_MAPPING
+                if m[0] == ref.file and m[1] in line and (m[4] is None or m[4] == ref.sec)
+            ),
+            None,
+        )
         if anchor is not None:
             doc, title = anchor[2], anchor[3]
             ref.doc, ref.how, ref.status, ref.named = doc, "按行的文字锚定", "ok", True
@@ -1379,7 +1405,9 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                                     start -= 1
                             elif start > 0 and line[start - 1] == "的":
                                 start -= 1
-                            if start > 0 and re.match(r"[\w\u4e00-\u9fff]", line[start - 1]):
+                            if start > 0 and (
+                                re.match(r"[\w\u4e00-\u9fff]", line[start - 1]) or line[start - 1] in "#/"
+                            ):
                                 new = " " + new
                     line = line[:start] + new + line[end:]
                 touched += 1

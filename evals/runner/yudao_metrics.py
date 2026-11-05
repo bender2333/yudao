@@ -15,7 +15,7 @@ from metrics import FAILURE_MARKERS
 
 MODEL_SERVICE_FAILURE = "model_service_failure"
 TIME_LIMIT = "time_limit"
-#docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「run 在限额内结束，状态为放行」：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
+# docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「run 在限额内结束，状态为放行」：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
 # 都不能通过「放行」这一项；放行等于 `status == "done"` 且 `stop_reason == "released"`
 RELEASE_STOP_REASONS = frozenset({"released"})
 RELEASE_STATUSES = frozenset({"done"})
@@ -167,7 +167,7 @@ def _count(events, event_type):
 # ---------------------------------------------------------------------------
 # 第一次与最终两份交付（docs/design/evaluation-scenarios.md「指标」）：两份评分由运行器交给评分器
 
-# 质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）的四种取值
+# 质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）的四种取值
 IMPROVEMENT_IMPROVED = "improved"          # 最终交付比第一次多通过至少 1 条隐藏检查
 IMPROVEMENT_NONE = "none"                  # 没有多通过
 IMPROVEMENT_NOT_COUNTED = "not_counted"    # 第一次交付已经全部通过，这次运行不计入
@@ -217,7 +217,7 @@ def _delivery_summary(scores, delivered):
 
 
 def _qa_improvement(first, final, concluded):
-    """质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）：最终交付比第一次交付多通过的隐藏检查条数。"""
+    """质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）：最终交付比第一次交付多通过的隐藏检查条数。"""
     if not concluded:
         return {"status": IMPROVEMENT_NO_CONCLUSION, "passed_gain": None,
                 "detail": "导出中没有质检提交（qa_submitted）：质检没有给出结论"}

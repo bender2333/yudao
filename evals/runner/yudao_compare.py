@@ -13,7 +13,7 @@ import yudao_metrics
 PRIMARY_METRIC = "qa_false_release"
 SECONDARY_METRICS = ("asks", "reworks", "completion", "requests", "cost", "elapsed")
 
-# N-G1（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）：同一个场景 3 次运行中至少 2 次满足条件
+# N-G1（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）：同一个场景 3 次运行中至少 2 次满足条件
 REQUIRED_RUNS = 2
 
 VERDICT_LABELS = {"above": "高于", "not_reached": "没有达到", "blocked": "受阻"}
@@ -216,7 +216,7 @@ def compare_sides(yudao_result, opencode_result):
 
 
 def qa_advantage(runs):
-    """N-G1 的判定（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）：3 次运行中至少 2 次满足「高于」的条件。
+    """N-G1 的判定（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）：3 次运行中至少 2 次满足「高于」的条件。
 
     「至少 2 次」指不计入以外的运行里至少 2 次满足条件；不计入的运行不算满足，也不是
     失败。可以观察质检提高的运行不到 2 次、或者第一次交付的评分缺失时结论是「受阻」，

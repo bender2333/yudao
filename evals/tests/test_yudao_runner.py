@@ -1449,7 +1449,7 @@ def test_no_delivery_scores_both_as_not_done(runs_root, tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 质检带来的提高（design docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）
+# 质检带来的提高（design docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）
 
 def _delivery_scores(passed, total=5, completion=0.5, correctness=1.0):
     checks = [{"id": "check_%d" % index,

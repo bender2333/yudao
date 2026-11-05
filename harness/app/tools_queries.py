@@ -108,7 +108,7 @@ def _probe_states(store: Any, project_id: str) -> dict[str, ToolsRegistryProbeSt
 
 def _recent_fetch_records(store: Any, project_id: str) -> list[ToolsRegistryFetchRecord]:
     # 这个项目最近的取回记录，最近的在前：只认名字是 fetch_url 的工具结果（工单 #68 的取回动作，
-    #docs/design/network-and-mcp.md「应用层接口」的「事件（run 流）… 调用沿用 tool_started、tool_called」）。边读边丢最旧的，
+    # docs/design/network-and-mcp.md「应用层接口」的「事件（run 流）… 调用沿用 tool_started、tool_called」）。边读边丢最旧的，
     # 只留最后 FETCH_RECORD_LIMIT 条；只有开始、还没有结果的取回不在这里（结果未知的动作在 run.actions 里看）
     recent: deque[ToolsRegistryFetchRecord] = deque(maxlen=FETCH_RECORD_LIMIT)
     for event in _events_of(store, project_id, (EventType.TOOL_CALLED,)):

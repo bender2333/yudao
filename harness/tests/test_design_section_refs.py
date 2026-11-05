@@ -98,7 +98,6 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("harness/app/project_and_work_item_commands.py", "建档之前的事项（3.8 第 2 节）"),
     ("harness/app/project_commands.py", "3.8"),
     ("harness/projects.py", "3.8"),
-    ("evals/runner/yudao_report.py", "高于」看质检这一段"),
 )
 
 # 注释里把原型的设计说明写成「设计说明第 N 节」的那几行：按写的工单核过，依据是原型的设计
@@ -219,22 +218,24 @@ def test_design_docs_are_referenced_by_title_not_by_section_number():
 
 
 # 下面三条是工单 #1411 审查第 4 条点出的三个口子，各用一段文字说明它现在报得出/报不出。
+# 三条守的都是 R2（只能向后兼容的一环：合同）的同一个合同——代码与测试引用设计说明时写路径与
+# 现在的小节标题：守卫漏报一种写法，合同就会被绕过去。
 
 def test_a_range_of_sections_is_still_reported():
-    """「第 3-5 节」这类范围写法与连写一样算引用。"""
+    """「第 3-5 节」这类范围写法与连写一样算引用（守 R2：写法的合同，节号的每一种写法都要认）。"""
     assert scan("harness/example.py", "# 覆盖 docs/design/local-tools.md 的本地行为（第 3-5 节）。\n")
     assert scan("harness/example.py", "# 按设计说明第 7.1 至 7.3 节实现。\n")
     assert scan("harness/example.py", "# 按设计说明第 3、4 节实现。\n")
 
 
 def test_a_requirement_record_is_not_a_design_doc():
-    """需求记录、路线图这些别的目录下的文档按路径写明时不算设计说明。"""
+    """需求记录、路线图这些别的目录下的文档按路径写明时不算设计说明（守 R2：范围只限设计说明的引用）。"""
     assert not scan("harness/example.py", "# 覆盖 docs/requirements/startup-provider-reload.md 第 3-5 节的本地行为。\n")
     assert not scan("harness/example.py", "\"供对照使用（[总体路线图](../program-roadmap.md)第 6.1 节）。\"\n")
 
 
 def test_the_prototype_exemption_follows_the_file_header_not_one_mention():
-    """原型豁免只看文件开头：正文里提一次原型，后面的无主节号仍然要报。"""
+    """原型豁免只看文件开头：正文里提一次原型，后面的无主节号仍然要报（守 R2：客户端照原型的设计不算本合同的引用）。"""
     body_only = "// 页面路径的写法\nconst a = 1;\n// 原型 v8 设计说明第 3.3 节：首页 #/home\n// 另一处按设计说明第 7 节实现\n"
     assert scan("client/src/example.ts", body_only), "正文里提一次原型不该整文件豁免"
 

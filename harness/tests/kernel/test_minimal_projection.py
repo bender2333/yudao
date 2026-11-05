@@ -49,7 +49,7 @@ def _run_created(version: int = 1) -> Event:
 
 
 def test_the_minimal_projection_folds_the_items_the_design_lists():
-    #docs/design/skeleton-and-application.md「最小投影」那张表的六项与之后补齐的几样，每一样都来自骨架事件
+    # docs/design/skeleton-and-application.md「最小投影」那张表的六项与之后补齐的几样，每一样都来自骨架事件
     events = [
         _run_created(),
         _event(EventType.DEPARTMENT_ACTIVATED, 2, session="ses_pro", department="product",

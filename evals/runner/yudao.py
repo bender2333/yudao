@@ -612,7 +612,7 @@ def first_archived_delivery(export):
     """第一次封存的交付：与 `last_archived_delivery` 对称（docs/design/evaluation-scenarios.md「指标」）。
 
     只有一次交付时两次取到同一个事件，没有交付时都是 None。两份都交给评分器：
-    第一次交付的完成度与质检带来的提高都从它算（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）。
+    第一次交付的完成度与质检带来的提高都从它算（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）。
     """
     deliveries = [event for event in export["events"] if event["type"] == "delivery_accepted"]
     return deliveries[0] if deliveries else None

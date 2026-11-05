@@ -1,11 +1,11 @@
 # 骨架事件的登记表（S5a，工单 #828）：内核事件模块给出内核写入或读取的事件种类；应用事件的种类由应用
-# 自己登记，应用登记一种新的种类不改内核文件（docs/design/skeleton-and-application.md「骨架事件与应用事件」）。
+# 自己登记，应用登记一种新的种类不改内核文件（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」）。
 #
-# 这张表与设计说明「骨架事件与应用事件」逐项对照，含 S1b 的成果失效；docs/design/skeleton-and-application.md「骨架事件与应用事件」 2026-10-25 第 1 条把「模型请求」改为骨架事件
-# （模型步数按请求一条条数，最小投影读它），所以它也在表里：「骨架事件与应用事件」的表把它列在应用事件里，按 docs/design/skeleton-and-application.md「骨架事件与应用事件」更正。
+# 这张表与设计说明「骨架事件与应用事件」逐项对照，含 S1b 的成果失效；docs/design/skeleton-and-application.md「最小投影」 2026-10-25 第 1 条把「模型请求」改为骨架事件
+# （模型步数按请求一条条数，最小投影读它），所以它也在表里：「骨架事件与应用事件」的表把它列在应用事件里，按 docs/design/skeleton-and-application.md「最小投影」更正。
 #
 # 读仓库里的静态声明与内存中的登记表，不开数据库、不用子进程、不用网络，属于单元层。
-# 守「测试按三环留」的 R2（第二环的合同：骨架事件只增，种类与 docs/design/test-pyramid.md「测试按三环留」一致）。
+# 守 docs/design/test-pyramid.md「测试按三环留」的 R2（第二环的合同：骨架事件只增，种类与 docs/design/skeleton-and-application.md「骨架事件与应用事件」一致）。
 
 import pytest
 
@@ -27,7 +27,7 @@ from harness.kernel_events import (
     replay_decisions,
 )
 
-# 设计说明「骨架事件与应用事件」「骨架事件」一列，加 docs/design/skeleton-and-application.md「骨架事件与应用事件」 2026-10-25 第 1 条的「模型请求」
+# 设计说明「骨架事件与应用事件」「骨架事件」一列，加 docs/design/skeleton-and-application.md「最小投影」 2026-10-25 第 1 条的「模型请求」
 DESIGN_SKELETON_RUN_EVENTS = frozenset({
     "run_created", "run_done", "run_paused", "run_failed", "run_resumed", "run_continued",
     "department_activated", "activation_finished",
@@ -82,7 +82,7 @@ def test_the_model_request_is_a_skeleton_event():
 
 
 def test_an_application_registers_its_own_event_kinds():
-    # 应用登记一种新的应用事件：登记表认得它，骨架事件的登记表不变（docs/design/skeleton-and-application.md「骨架事件与应用事件」）
+    # 应用登记一种新的应用事件：登记表认得它，骨架事件的登记表不变（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」）
     before = frozenset(SKELETON_EVENTS)
     novel = "task_pool_task_published"
     assert event_type_owner(novel) is None

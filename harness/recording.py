@@ -834,7 +834,7 @@ class StepRecorder:
                 and not writes_check_materials(scope.department, definitions=self._definitions)
                 and payload.get("ok") and payload.get("name") in _WRITE_TOOLS):
             # 写入范围不是检查材料的角色写了文件：当前交付失效，紧跟着这条工具结果记一条成果失效事件（S1b，
-            #docs/design/model-management.md「模型目录」）。检查材料角色的写入只落在检查工作区与检查材料里，运行工作区与交付不变
+            # docs/design/model-management.md「模型目录」）。检查材料角色的写入只落在检查工作区与检查材料里，运行工作区与交付不变
             drafts.append(self._delivery_invalidated("workspace_changed"))
         if observation.usage is not None and (observation.usage.reported or observation.usage.total_tokens
                                               or observation.usage.cost):

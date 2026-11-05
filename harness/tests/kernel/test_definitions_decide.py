@@ -1,4 +1,4 @@
-# 工具许可与提案校验读这个事项所用的那份定义（工单 #1098，docs/design/test-pyramid.md「测试往下层移」）。
+# 工具许可与提案校验读这个事项所用的那份定义（工单 #1098，docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「第二种路由可以带来新的工具、提案与成果种类」）。
 #
 # 守 R1「工具调用先有许可」与「写入先过裁决」（docs/design/test-pyramid.md 「一个测试凭什么留」）：
 # 一个工具能不能用、一份提案能不能接纳，只看交给它的那份定义里的工具、部门与提案种类，
@@ -134,7 +134,7 @@ def test_proposal_department_comes_from_the_matter_definition() -> None:
 
 def test_a_branch_session_judges_a_proposal_by_the_matter_definition() -> None:
     # 询问分支里的会话不能用提交提案的工具；「这个工具提交的是提案」也按事项所用的那份定义判
-    # （工单 #1098，docs/design/test-pyramid.md「测试往下层移」）
+    # （工单 #1098，docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「第二种路由可以带来新的工具、提案与成果种类」）
     projection = RunProjection(run_id="run_branch", status="running",
                                ask_stack=[{"requester": "engineering", "recipient": "quality",
                                            "question": "这一项怎么验？", "branch_session_id": "ses_ask_qa"}])
@@ -254,7 +254,7 @@ def test_a_verifier_of_a_midway_outcome_leaves_the_delivery_open_loop() -> None:
 
 
 def test_several_verifiers_of_one_outcome_all_answer() -> None:
-    #docs/design/forms-and-verifier-role.md「定义的校验」：几个核验角色核验同一份成果时，每一个都放行才算放行
+    # docs/design/forms-and-verifier-role.md「定义的校验」：几个核验角色核验同一份成果时，每一个都放行才算放行
     both = _declared(verifiers=[
         VerifierRole(role="quality", verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),
         VerifierRole(role="product", verifies=(VerifiedOutcomes(role="engineering", outcomes=("delivery_spec",)),)),

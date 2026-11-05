@@ -30,7 +30,7 @@ from harness.tools import BROWSER_TOOL_NAMES, EXCLUDED_BROWSER_TOOLS, browser_to
 PACKAGE = "@playwright/mcp@0.0.83"
 RECORDED_PATH = REPO_ROOT / "harness" / "tests" / "data" / "playwright_mcp_tools_list.json"
 OUTPUT_PATH = REPO_ROOT / "harness" / "definitions" / "browser_tools.json"
-#docs/design/browser-and-computer-use.md「运行方式」的启动参数：Chromium、无头、隔离、与屏幕工具相同的视口、启用断言工具、
+# docs/design/browser-and-computer-use.md「运行方式」的启动参数：Chromium、无头、隔离、与屏幕工具相同的视口、启用断言工具、
 # 截图以图像内容返回、每个动作带完整的可访问性结构
 LAUNCH_ARGS = ["--browser", "chromium", "--headless", "--isolated", "--viewport-size", "1280x800",
                "--caps", "testing", "--image-responses", "allow", "--snapshot-mode", "full"]

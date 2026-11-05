@@ -1424,7 +1424,7 @@ class ProjectService:
             return None
         if run.kind == "onboarding":
             # 建档 run 以基线核验或开环完成结束：提出初始 PRD 候选并请求用户确认（工单 #136、#1510，
-            #docs/design/existing-project-onboarding.md「决定种类」、「领域事件」）。建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
+            # docs/design/existing-project-onboarding.md「决定种类」、「领域事件」）。建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
             return self._propose_initial_prd(transaction, run, item)
         if not run.delivery_specs:
             return None

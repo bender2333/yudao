@@ -1,6 +1,6 @@
 # 参数的现值与修改历史：由目录流中的参数事件折叠而成。参数是全局的，事件写进目录流（跨版本保存的长期事实）。
 # 定义里的条目是初始值与取值界限，现值是事件日志折叠的结果；run 创建时冻结参数版本，运行中不再跟随。
-#docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」、「采用与撤回」。
+# docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」、「采用与撤回」。
 
 from __future__ import annotations
 
