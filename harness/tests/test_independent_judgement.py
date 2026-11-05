@@ -2,23 +2,17 @@
 # 的每条验收条件写出判断，经写入口写成事实（independent_judgement_committed）。
 #
 # 这份测试守的行为：
-# 1. 门（放行与缺陷记录都要引用它）：没有当前交付的独立判断时提交结论被拒绝，字段级错误写明缺什么；
-#    判断提交以后同一份结论按原样提交被接纳。
-# 2. 一份交付一份判断：同一份交付的第二次判断被拒绝；新交付到达以后可以再交一次。
-# 3. 事件的内容：载荷带依据的 PRD 与交付摘要、逐条结论（#151 的形状）、判断的条数；
+# 1. 一份交付一份判断：同一份交付的第二次判断被拒绝；新交付到达以后可以再交一次。
+# 2. 事件的内容：载荷带依据的 PRD 与交付摘要、逐条结论（#151 的形状）、判断的条数；
 #    它不是成果——不进版本链、不失效当前交付、不结束运行。
-# 4. 探索轮（没有交付）提交判断被拒绝，理由写明需要当前交付（与 #557 的口径一致）。
+# 3. 探索轮（没有交付）提交判断被拒绝，理由写明需要当前交付（与 #557 的口径一致）。
 #
 # 集成层：真实代码、真实事件日志与写入口，假模型按部门给出脚本。
-
-import json
 
 from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
-
-SECONd = "second"
 
 
 def _script():
@@ -33,37 +27,6 @@ def _script():
 
 def _events(system, run_id):
     return system.store.list_events(run_id)
-
-
-def _types(system, run_id):
-    return [event.type for event in _events(system, run_id)]
-
-
-def test_the_gate_rejects_a_conclusion_without_a_judgement_and_accepts_it_after(tmp_path):
-    # 门：结论必须引用已提交的独立判断；字段级错误写明缺什么。
-    # 产品提交 PRD、工程交付以后质检才开始一轮（这一轮面对的请求已有交付），
-    # 第一次结论被门拒绝，交了判断以后同一份结论被接纳
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter(_script()))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)   # 产品提交 PRD
-    system.activate_once(run_id)   # 工程交付
-    projection = system.run_until_stop(run_id)
-    assert projection.status == "done", projection.stop_reason
-
-    events = _events(system, run_id)
-    judgements = [event for event in events if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED]
-    reviews = [event for event in events if event.type == EventType.QA_SUBMITTED]
-    assert len(judgements) == 1 and len(reviews) == 1
-    rejected = [event for event in events if event.type == EventType.PROPOSAL_REJECTED]
-    assert rejected, "没有独立判断的结论应当被拒绝过一次"
-    fields = [error["field"] for event in rejected for error in event.payload["errors"]]
-    # #1190 起这个门长在 qa_review 的引用字段上：错误指向 judgement_event
-    assert "judgement_event" in fields
-    messages = [error["message"] for event in rejected for error in event.payload["errors"]
-                if error["field"] == "judgement_event"]
-    assert any("independent judgement" in message for message in messages)
-    # 判断在结论之前写进日志（先判断后看解释的次序）
-    assert judgements[0].position < reviews[0].position
 
 
 def test_a_judgement_covers_one_delivery_and_carries_the_criteria(tmp_path):

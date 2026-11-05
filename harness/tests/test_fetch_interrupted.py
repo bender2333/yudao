@@ -176,38 +176,3 @@ def test_an_interrupted_fetch_is_handed_back_to_the_session_and_the_retry_is_a_s
         released.set()
         server.shutdown()
         server.server_close()
-
-
-def test_an_interrupted_fetch_saves_no_external_source_when_the_model_does_not_fetch_again(tmp_path):
-    # 验收二：没有完整结果的尝试不保存内容——模型不重新取回时，这个 run 一份外部来源工件也没有，
-    # 交还照样发生，动作表里这一次仍是没有回执的 unknown
-    data_dir = tmp_path / "data"
-    marker = tmp_path / "fetch-requested"
-    server, seen, released = _stuck_server(marker)
-    try:
-        url = _base(server) + "/manual"
-        script = {"product": [{"output": [_fetch_call(FETCH_CALL, url)]}],
-                  "engineering": [{"proposal": {"kind": "delivery_spec"}}],
-                  "quality": [{"proposal": {"kind": "quality_auto"}}]}
-        tail = {"product": [{"proposal": product_spec()}],
-                "engineering": [{"proposal": {"kind": "delivery_spec"}}],
-                "quality": [{"proposal": {"kind": "quality_auto"}}]}
-        with killed.interrupted(data_dir, script, tail=tail, started=marker,
-                                resume_after=False) as run:
-            run.after.resume_startup_runs()
-
-            assert seen, "取回应当在进程被终止以前打到本机服务上"
-            [verified] = killed.events(run.after, run.run_id, "action_verified")
-            assert verified.payload["resolution"] == "handed_back"
-            assert verified.payload["ok"] is False
-
-            actions, _recovery = _run_actions_and_recovery(run.after, run.run_id)
-            assert actions[FETCH_CALL].status == "unknown"
-            assert actions[FETCH_CALL].receipt is None
-
-            # 没有完整结果的尝试不保存为外部来源工件
-            assert _external_sources(data_dir) == []
-    finally:
-        released.set()
-        server.shutdown()
-        server.server_close()

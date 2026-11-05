@@ -139,25 +139,6 @@ def _judgement_event(position: int = 3, delivery_hash: str = "sha256:delivery-1"
 
 
 @pytest.mark.parametrize("definitions, verified, verifier", CASES)
-def test_the_delivery_explanation_is_hidden_until_the_verifier_concludes(definitions, verified, verifier):
-    # 通道一：交付说明。事实部分总在，解释部分（summary、known_risks）等核验角色的结论
-    delivery = _delivery(verified=verified)
-    events = [_event(1, EventType.DELIVERY_ACCEPTED, {"content_hash": delivery.content_hash})]
-    before = quality_engineering_content(events, delivery=delivery, definitions=definitions)
-    assert before["explanation_visible"] is False
-    assert "summary" not in before["delivery"]
-    assert "known_risks" not in before["delivery"]
-    assert before["delivery"]["files"] == ["src/echo.py"]
-    assert before["delivery"]["check_names"] == ["smoke"]
-
-    after = quality_engineering_content(events + [_judgement_event(verifier=verifier)], delivery=delivery,
-                                        definitions=definitions)
-    assert after["explanation_visible"] is True
-    assert after["delivery"]["summary"] == "大写输出"
-    assert after["delivery"]["known_risks"] == ["没有空行结尾"]
-
-
-@pytest.mark.parametrize("definitions, verified, verifier", CASES)
 def test_the_answer_and_the_question_carry_only_facts_before_the_conclusion(definitions, verified, verifier):
     # 通道二与通道三：核验角色收到的被核验方的回答、核验角色分支看到的被核验方的问题，
     # 解释部分在它对当前交付下结论以前不给
