@@ -199,6 +199,16 @@ async function evaluate(cdp, expression) {
   return result.result?.value;
 }
 
+// 页面被别的窗口盖住、或者在后台标签里时，Chrome 不渲染它，也不把 CDP 合成的鼠标与按键事件交给
+// 渲染器：click 报告成功而页面毫无反应、Ctrl+A 不选中都是这一种。Input.insertText 走另一条路，
+// 不受影响，所以看起来只坏了「一半」。先让页面到前台；仍然是隐藏状态时截一帧，逼渲染器产出一帧，
+// 命中测试与输入处理才有数据（图丢掉，这里要的是那一帧，不是截图）。
+async function ensureInputReady(cdp) {
+  await cdp.send('Page.bringToFront').catch(() => {});
+  if ((await evaluate(cdp, 'document.visibilityState')) === 'visible') return;
+  await cdp.send('Page.captureScreenshot', { format: 'png' }).catch(() => {});
+}
+
 const KEYS = {
   Enter: { key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, text: '\r' },
   Tab: { key: 'Tab', code: 'Tab', windowsVirtualKeyCode: 9 },
@@ -258,6 +268,10 @@ async function start(args) {
       '--no-default-browser-check',
       '--disable-search-engine-choice-screen',
       '--disable-features=Translate,MediaRouter',
+      // 窗口被别的窗口盖住时也继续渲染：不渲染的页面收不到 CDP 合成的鼠标与按键事件（Playwright 起浏览器也用这几个旗标）
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-background-timer-throttling',
       `--window-size=${size}`,
       'about:blank',
     ],
@@ -380,6 +394,7 @@ async function text(args) {
 async function click(args) {
   const p = port(args);
   await withPage(p, async (cdp) => {
+    await ensureInputReady(cdp);
     const expression = resolverExpression(args);
     if (!expression) fail('需要 --css 或 --text');
     const box = await evaluate(cdp, `(() => { const found = ${expression}; if (!found.ok) return found;
@@ -421,18 +436,21 @@ async function type(args) {
   await withPage(p, async (cdp) => {
     const expression = resolverExpression(args);
     if (!expression) fail('需要 --css 或 --text');
+    const replace = Boolean(args.replace);
     const focused = await evaluate(cdp, `(() => { const found = ${expression}; if (!found.ok) return found;
       const el = found.el; el.scrollIntoView({ block: 'center' }); el.focus();
-      if (typeof el.setSelectionRange === 'function' && typeof el.value === 'string') {
+      if (${replace}) {
+        // 全选在页面里做：页面不渲染时 Chrome 会丢掉合成的 Ctrl+A 键，没选中就变成在末尾追加
+        // （试用里输入框变成 ag/gemini-3.8ag/gemini-3.8-flash-high 就是这个原因）。
+        // 选中以后 insertText 替换的是真实的选择区，受控组件照常收到 input 事件。
+        if (typeof el.select === 'function' && typeof el.value === 'string') el.select();
+        else if (el.isContentEditable) document.execCommand('selectAll');
+      } else if (typeof el.setSelectionRange === 'function' && typeof el.value === 'string') {
         el.setSelectionRange(el.value.length, el.value.length);
       }
       return { ok: true, tag: el.tagName, type: el.getAttribute('type'), name: el.getAttribute('name') || el.getAttribute('placeholder') || '' }; })()`);
     if (!focused.ok) fail(focused.reason ?? '没有找到输入位置');
     if (args.env && (focused.tag !== 'INPUT' || focused.type !== 'password')) fail('--env 只向 password 输入框填入凭据');
-    if (args.replace) {
-      await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
-      await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'a', code: 'KeyA', modifiers: 2, windowsVirtualKeyCode: 65 });
-    }
     await cdp.send('Input.insertText', { text: value });
     await new Promise((resolve) => setTimeout(resolve, Number(args.wait ?? 300)));
     out(args.env
@@ -446,6 +464,7 @@ async function press(args) {
   if (!spec) fail(`不支持的键：${args.key}（支持 ${Object.keys(KEYS).join('、')}）`);
   const p = port(args);
   await withPage(p, async (cdp) => {
+    await ensureInputReady(cdp);
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyDown', ...spec });
     await cdp.send('Input.dispatchKeyEvent', { type: 'keyUp', ...spec });
     await new Promise((resolve) => setTimeout(resolve, Number(args.wait ?? 300)));
