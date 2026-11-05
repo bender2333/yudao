@@ -450,6 +450,9 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("evals/runner/run_yudao_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),
     ("client/tests/unit/rules-view.test.ts", "origin: \"规则登记第 8 节表格\""),
     ("harness/app/project_and_work_item_commands.py", "建档之前的事项（3.8 第 2 节）"),
+    ("harness/app/project_commands.py", "3.8"),
+    ("harness/projects.py", "3.8"),
+    ("evals/runner/yudao_report.py", "高于」看质检这一段"),
 )
 
 # 同一行里点名的既是原型又是设计说明、而节号属于原型那份设计的（不在本单）。
@@ -470,6 +473,25 @@ DROP_SECTIONS: tuple[tuple[str, str], ...] = (
     ("harness/tests/test_routing_contract.py:1", "12"),
     ("harness/tests/test_routing_definition.py:1", "12"),
     ("harness/tests/test_second_routing.py:1", "12"),
+)
+
+
+# 按行里的文字锚定的对照表：合并 main 以后行号会移动，按「文件:行」的条目会失准。
+# 这一组按那一行里的一段文字认（文件 + 片段 → 说明与标题），行号变了也命中。
+TEXT_MAPPING: tuple[tuple[str, str, str, str | None], ...] = (
+    ("harness/runtime.py", "启动时补建缺少的建档修改轮 run", "existing-project-onboarding.md", "失败与中断"),
+    ("harness/tests/kernel/test_definitions_decide.py", "工单 #1098", "test-pyramid.md", "测试往下层移"),
+    ("harness/tests/kernel/test_skeleton_events.py", "这张表与设计说明", "skeleton-and-application.md", "骨架事件与应用事件"),
+    ("harness/tests/kernel/test_skeleton_events.py", "所以它也在表里", "skeleton-and-application.md", "骨架事件与应用事件"),
+    ("harness/tests/kernel/test_skeleton_events.py", "守 R2（第二环的合同", "test-pyramid.md", "测试按三环留"),
+    ("harness/tests/kernel/test_skeleton_events.py", "一列，加", "skeleton-and-application.md", "骨架事件与应用事件"),
+    ("client/tests/unit/view-sync.test.js", "工单 #952 验收标准 1", "visualization.md", "状态"),
+    ("evals/tests/test_report.py", "评分器给出的完成度", "evaluation-scenarios.md", "指标"),
+    ("evals/tests/test_report.py", "只有一次运行时噪声范围", "evaluation-scenarios.md", "指标"),
+    ("evals/tests/test_report.py", "模型容量的取值与来源", "evaluation-scenarios.md", "两边的运行条件"),
+    ("harness/tests/test_prompts.py", "守 R3（独立核验", "independent-verification.md", None),
+    ("harness/engine.py", "用户追加的输入在这个会话的下一步", "department-loop.md", "工作中途要求变化"),
+    ("harness/engine.py", "这个会话采用这一版输入版本", "department-loop.md", "工作中途要求变化"),
 )
 
 # 已经删去的小节：指向它的那一部分引用去掉，注释的其余部分照旧。
@@ -1138,6 +1160,15 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
         line = line_text(ref)
         if (f"{ref.file}:{ref.line}", ref.sec) in DROP_SECTIONS:
             ref.status, ref.how = "去掉（工单点名的已删小节）", "去掉"
+            continue
+        anchor = next((m for m in TEXT_MAPPING if m[0] == ref.file and m[1] in line), None)
+        if anchor is not None:
+            doc, title = anchor[2], anchor[3]
+            ref.doc, ref.how, ref.status, ref.named = doc, "按行的文字锚定", "ok", True
+            ref.title = "「" + (title or "") + "」" if title else None
+            if title is None:
+                t, _st = title_for(ref, doc)
+                ref.title, ref.status = (t, "ok") if t else (None, "未定：锚定的说明没有这一节")
             continue
         if kept_as_is(ref.file, line):
             ref.status, ref.how = "排除（只改之外）", "排除"

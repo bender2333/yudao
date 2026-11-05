@@ -96,6 +96,9 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("evals/runner/run_yudao_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),
     ("client/tests/unit/rules-view.test.ts", "origin: \"规则登记第 8 节表格\""),
     ("harness/app/project_and_work_item_commands.py", "建档之前的事项（3.8 第 2 节）"),
+    ("harness/app/project_commands.py", "3.8"),
+    ("harness/projects.py", "3.8"),
+    ("evals/runner/yudao_report.py", "高于」看质检这一段"),
 )
 
 # 注释里把原型的设计说明写成「设计说明第 N 节」的那几行：按写的工单核过，依据是原型的设计

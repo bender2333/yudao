@@ -16,7 +16,7 @@ def _product_prompts() -> dict[str, str]:
 
 def test_acceptance_criteria_must_become_one_assertion():
     # 每条验收标准都要能直接写成一条断言，写死输入与期望结果；条件式的一般规则不算（工单 #736 验收第 1 条）。
-    # 守 R3（独立核验 docs/design/test-pyramid.md「前端与浏览器测试」：验收条件要能检验），也是防回退护栏：这两处内容被删掉时失败
+    # 守 R3（独立核验 docs/design/independent-verification.md「检验覆盖与开环」：验收条件要能检验），也是防回退护栏：这两处内容被删掉时失败
     for source, prompt in _product_prompts().items():
         assert "能直接写成一条断言" in prompt, source
         assert "条件式的一般规则不算" in prompt, source

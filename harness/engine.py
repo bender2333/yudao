@@ -971,7 +971,7 @@ class StepDriver:
                 return _Unassembled("context_overflow" if (deferred or pinned.fills_window)
                                     else "compaction_failed", exc)
             assembled = step.context
-            # 用户追加的输入在这个会话的下一步作为通知送达（工单 #964，循环结构「工作中途要求变化」与 docs/design/model-management.md「每次模型请求」）：
+            # 用户追加的输入在这个会话的下一步作为通知送达（工单 #964，循环结构「工作中途要求变化」与「工作中途要求变化」）：
             # 这个会话采用新的输入版本并接着工作，一轮工作不因此结束。
             # 采用以后模型就看见了这一版输入，正式成果才能按它提交。
             self._adopt_input_version(assembled.manifest.input_version)
@@ -1141,7 +1141,7 @@ class StepDriver:
 
     def _adopt_input_version(self, version: int) -> None:
         # 用户追加了输入：这次请求的上下文里已经有这条输入的通知（工单 #964，
-        # 循环结构「工作中途要求变化」与 docs/design/model-management.md「每次模型请求」）。这个会话采用这一版输入版本并接着工作，一轮工作不因此结束；
+        # 循环结构「工作中途要求变化」与「工作中途要求变化」）。这个会话采用这一版输入版本并接着工作，一轮工作不因此结束；
         # 采用以后模型就看见了这一版输入，正式成果才能按它提交。
         if version == self._scope.basis.input_version:
             return

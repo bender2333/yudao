@@ -741,7 +741,7 @@ class ProjectService:
                run_time_limit_sec: int | None = None,
                 context_window: int = 32_000,
                 command: Command | None = None) -> tuple[str, str, str]:
-        # 接入已有项目（3.8 「命令」）：同一个项目流事务中登记项目（source 为 existing）、登记源目录、
+        # 接入已有项目（3.8 第 3.1 节）：同一个项目流事务中登记项目（source 为 existing）、登记源目录、
         # 登记建档事项（kind 为 onboarding，带快照记录），随后创建建档 run。
         # 快照在事务之前采集：采集失败时命令被拒绝，不建立项目，不写入任何事件。
         # 调用方（应用层）先采集快照并把错误转成 source_invalid
@@ -779,7 +779,7 @@ class ProjectService:
                           run_time_limit_sec: int | None = None,
                            context_window: int = 32_000,
                            command: Command | None = None) -> tuple[str, str]:
-        # 重新开始建档（3.8 docs/design/existing-project-onboarding.md「命令」）：从登记的源目录重新采集快照，开始新的建档事项。
+        # 重新开始建档（3.8 第 3.1 节）：从登记的源目录重新采集快照，开始新的建档事项。
         # 只在项目来源为已有项目、还没有基线采纳、没有进行中或等待确认的建档事项时可用
         _require_text("source_name", source_name)
         project = self._writable(project_id)

@@ -152,7 +152,7 @@ test("重查失败保留旧快照与旧位置，不抛出", async () => {
 });
 
 test("监听者的位置等于快照的位置，重新查询以后跟着更新", async () => {
-  // 工单 #952 验收标准 1：页面经 useSnapshot 交出这个位置，翻译层把它写进画面状态（docs/design/test-pyramid.md「常用命令」）
+  // 工单 #952 验收标准 1：页面经 useSnapshot 交出这个位置，翻译层把它写进画面状态（docs/design/visualization.md「状态」）
   // 守 docs/design/test-pyramid.md「测试按三环留」的 R2（各缝的交换字段：同步层交给监听者的快照位置）
   let position = 7;
   const views = new ViewSync(async () => ({ position, data: { value: position } }), CAPABILITIES);

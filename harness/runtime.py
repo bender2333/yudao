@@ -173,7 +173,7 @@ class LoopSystem:
         self.drain_finished_on_startup = self.finish_drain_on_startup()
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
-        # 启动时补建缺少的建档修改轮 run（工单 #136，docs/design/app-and-interface.md「能力清单与认证」）：回答「提出修改」以后
+        # 启动时补建缺少的建档修改轮 run（工单 #136，docs/design/existing-project-onboarding.md「失败与中断」）：回答「提出修改」以后
         # 修改轮事件已经写入项目流，run 在事务提交以后创建，两者之间中断时在这里补建
         self.recovered_revision_runs = self.projects.create_missing_revision_runs_on_startup()
         # 启动时扫描上次异常退出留下的检查工作区（工单 #481）：run 已经结束但 on_commit 没有跑过
