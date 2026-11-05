@@ -8,7 +8,7 @@ from typing import Any
 
 from .adapters.fake import FakeTurn, prompt_part
 from .definitions import DEFINITIONS
-from .providers.call import ModelCall
+from .providers.call import ModelCall, ModelResponse
 
 
 def default_requirement_mapping(requirements: list[str], acceptance: list[str]) -> list[dict[str, Any]]:
@@ -320,6 +320,40 @@ def review_turn(
             checks=checks,
             transcript=transcript,
         )
+
+    return factory
+
+
+def completion(
+    summary: str = "补了用法一节",
+    *,
+    uncertain: list[str] | None = None,
+    known_risks: list[str] | None = None,
+) -> dict[str, Any]:
+    # 交完成（工单 #1395）：直做下事项最后采纳的那一份。没有核验角色时它交上来，事项以开环完成结束；
+    # uncertain 是拿不准、没有把握的地方（形态与核验角色设计说明「开环完成」第 3 条）
+    return {"kind": "completion", "summary": summary,
+            "uncertain": list(uncertain or []), "known_risks": list(known_risks or [])}
+
+
+# 直做形态的提交工具名：直做的提议方式写在它自己的那份定义里（发布的那一份定义的提议方式没有它），
+# 假模型的全局对照表认不出这个种类，所以这一轮的调用直接按名称给出
+SUBMIT_COMPLETION = "submit_completion"
+
+
+def completion_turn(
+    summary: str = "补了用法一节",
+    *,
+    uncertain: list[str] | None = None,
+    known_risks: list[str] | None = None,
+) -> Callable[[Any], ModelResponse]:
+    # 假模型的一轮：交完成。与 delivery_turn 同一个形状，只是提交工具按直做形态的定义直接给出
+    proposal = completion(summary, uncertain=uncertain, known_risks=known_risks)
+
+    def factory(call: Any) -> ModelResponse:
+        identity = f"completion-{call.activation_id}-{call.step_id}"
+        return ModelResponse(output=[{"id": identity, "call_id": identity, "type": "function_call",
+                                      "name": SUBMIT_COMPLETION, "arguments": json.dumps(proposal)}])
 
     return factory
 

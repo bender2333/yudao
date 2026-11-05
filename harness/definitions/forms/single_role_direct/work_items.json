@@ -1,0 +1,143 @@
+{
+  "kinds": {
+    "change": {
+      "label": "普通事项（一个角色直做）",
+      "stop_reason": "released",
+      "departments": {
+        "engineering": {
+          "prompt": "普通事项中，你按用户的原文直接写代码、运行公开检查，然后交完成。写入范围是这件事的工作区；需要删除或移动文件时用 delete_file、move_file，并记录理由。必须实际写文件，并用 run_check 让主机执行检查；不能自报 exit_code。交完成的说明写清做了什么、怎么验的、还有哪些拿不准的地方；使用 submit_completion 提交。",
+          "tools": [
+            "read_file",
+            "list_files",
+            "search",
+            "read_range",
+            "read_external_source",
+            "fetch_url",
+            "write_file",
+            "edit_range",
+            "delete_file",
+            "move_file",
+            "run_check",
+            "bash",
+            "read_output",
+            "stop_job",
+            "trial_start",
+            "trial_output",
+            "trial_stop",
+            "browser_navigate",
+            "browser_navigate_back",
+            "browser_click",
+            "browser_hover",
+            "browser_drag",
+            "browser_type",
+            "browser_fill_form",
+            "browser_select_option",
+            "browser_press_key",
+            "browser_file_upload",
+            "browser_handle_dialog",
+            "browser_drop",
+            "browser_wait_for",
+            "browser_tabs",
+            "browser_resize",
+            "browser_emulate_media",
+            "browser_close",
+            "browser_snapshot",
+            "browser_find",
+            "browser_console_messages",
+            "browser_network_requests",
+            "browser_network_request",
+            "browser_verify_element_visible",
+            "browser_verify_text_visible",
+            "browser_verify_list_visible",
+            "browser_verify_value",
+            "browser_generate_locator",
+            "browser_take_screenshot",
+            "submit_completion"
+          ],
+          "current_work": "按用户的原文完成这件事，然后交完成。",
+          "notes": [
+            "交完成不是宣布合格：这份形态没有核验角色，事项以开环完成结束，记录上不写放行。",
+            "拿不准的地方列进交完成的 uncertain；检查结果以主机执行的 run_check 为准。"
+          ]
+        }
+      }
+    }
+  },
+  "repository_overview": {
+    "documentation": {
+      "limit": 20,
+      "patterns": [
+        "README*",
+        "docs/",
+        "CHANGELOG*"
+      ]
+    },
+    "manifests": {
+      "limit": 20,
+      "patterns": [
+        "pyproject.toml",
+        "package.json",
+        "go.mod",
+        "Cargo.toml",
+        "requirements*.txt",
+        "setup.py",
+        "pom.xml",
+        "build.gradle",
+        "Gemfile",
+        "composer.json",
+        "*.csproj"
+      ]
+    },
+    "build_and_test_config": {
+      "limit": 20,
+      "patterns": [
+        "Makefile",
+        "tox.ini",
+        "pytest.ini",
+        "noxfile.py",
+        "setup.cfg",
+        "jest.config.*",
+        "vitest.config.*",
+        "playwright.config.*",
+        "karma.conf.*",
+        "cypress.config.*",
+        ".mocharc.*"
+      ]
+    },
+    "continuous_integration": {
+      "limit": 20,
+      "patterns": [
+        ".github/workflows/*",
+        ".gitlab-ci.yml",
+        ".circleci/*",
+        "azure-pipelines.yml",
+        ".travis.yml",
+        "Jenkinsfile"
+      ]
+    },
+    "agent_instructions": {
+      "limit": 20,
+      "patterns": [
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".cursor/rules/",
+        ".cursorrules",
+        ".github/copilot-instructions.md"
+      ]
+    },
+    "tests": {
+      "limit": 50,
+      "patterns": [
+        "tests/",
+        "test/",
+        "conftest.py",
+        "*_test.py",
+        "*_test.go",
+        "*.test.ts",
+        "*.test.js",
+        "*.spec.ts",
+        "*.spec.js"
+      ]
+    }
+  }
+}
