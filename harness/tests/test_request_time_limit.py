@@ -1,6 +1,5 @@
 import time
 from dataclasses import replace
-from pathlib import Path
 
 import pytest
 
@@ -15,7 +14,6 @@ from harness.tests.provider_replies import HTTP_REPLIES, HTTP_SCRIPT
 # SDK 的一次性初始化、请求发出前的记录与输出片段的记录都不计入。三种协议相同。
 
 PROTOCOLS = ["responses", "chat_completions", "messages"]
-REPOSITORY = Path(__file__).resolve().parents[2]
 
 
 def _reply(protocol: str) -> bytes:
@@ -35,44 +33,6 @@ def _delayed(protocol: str, delay: float):
 def _close(server) -> None:
     server.shutdown()
     server.server_close()
-
-
-# 新进程中创建 Provider 门面并读入模型目录（服务启动），目录用到三种协议；
-# 列出解析流事件要用的 SDK 模型是否已经构建
-CATALOG_WITH_THE_THREE_PROTOCOLS = """
-from harness.providers import ProviderFacade
-ProviderFacade().store_document({
-    "providers": [{"id": "go", "name": "Go", "base_url": "http://127.0.0.1:1/v1",
-                   "credential_ref": "GO_KEY", "timeout_sec": 20.0, "preset_id": ""}],
-    "models": [{"id": "m-" + protocol, "provider_id": "go", "model": "target-model", "protocol": protocol,
-                "context_window": 32000, "max_output_tokens": 2048, "capability_source": "preset-v1"}
-               for protocol in ("responses", "chat_completions", "messages")],
-    "bindings": {},
-})
-"""
-
-SDK_MODELS_BUILT = CATALOG_WITH_THE_THREE_PROTOCOLS + """
-import json
-from anthropic.types import RawContentBlockDeltaEvent, RawMessageStartEvent
-from openai.types.chat import ChatCompletionChunk
-from openai.types.responses import (
-    Response, ResponseCompletedEvent, ResponseFunctionToolCall, ResponseOutputMessage, ResponseUsage,
-)
-from pydantic_core import SchemaSerializer, SchemaValidator
-models = [Response, ResponseCompletedEvent, ResponseFunctionToolCall, ResponseOutputMessage, ResponseUsage,
-          ChatCompletionChunk, RawMessageStartEvent, RawContentBlockDeltaEvent]
-print(json.dumps({model.__name__: isinstance(model.__pydantic_validator__, SchemaValidator)
-                  and isinstance(model.__pydantic_serializer__, SchemaSerializer) for model in models}))
-"""
-
-
-# 新进程中读入用到三种协议的模型目录（服务启动），再按两个 SDK 的方式识别平台（platform.system 与 platform.platform），
-# 打印识别期间查询系统版本（platform.win32_ver）的次数
-PLATFORM_IDENTIFIED = CATALOG_WITH_THE_THREE_PROTOCOLS + """
-import platform
-from harness.tests.helpers import calls_during as _calls_during
-print(_calls_during(platform.win32_ver, lambda: (platform.system(), platform.platform())))
-"""
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)

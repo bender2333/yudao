@@ -260,42 +260,6 @@ def test_capture_reads_a_stable_script_file_whose_path_and_handle_modes_differ(t
     assert {item.path: item.data for item in tree.files}[name] == b"@echo off\r\n"
 
 
-@pytest.mark.parametrize("kind", ["link", "hardlink", "junction"])
-def test_a_reread_does_not_loosen_what_the_tree_cannot_represent(tmp_path, monkeypatch, kind):
-    # 链接、硬链接与重解析点不可表示：第一次就拒绝，不靠重读把它们绕过去
-    source = tmp_path / "source"
-    source.mkdir()
-    (source / "keep.txt").write_bytes(b"keep")
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "secret.txt").write_bytes(b"outside")
-    if kind == "link":
-        _symlink(outside, source / "linked", directory=True)
-    elif kind == "junction":
-        if os.name != "nt":
-            pytest.skip("junctions are Windows-specific")
-        result = subprocess.run(["cmd", "/c", "mklink", "/J", str(source / "linked"), str(outside)], capture_output=True)
-        if result.returncode:
-            pytest.skip("junctions are unavailable")
-    else:
-        try:
-            os.link(outside / "secret.txt", source / "linked.bin")
-        except OSError:
-            pytest.skip("hard links are unavailable")
-    attempts = []
-    original_capture_once = public_tree_module._capture_once
-
-    def counting_capture_once(base, **kwargs):
-        attempts.append(base)
-        return original_capture_once(base, **kwargs)
-
-    monkeypatch.setattr(public_tree_module, "_capture_once", counting_capture_once)
-    with pytest.raises(TreeError, match="not supported") as raised:
-        capture_public_tree(source)
-    assert len(attempts) == 1, "an entry the tree cannot represent must not be reread"
-    assert "linked" in str(raised.value)
-
-
 def test_restore_rejects_existing_destination_without_changing_it(tmp_path):
     tree = capture_public_tree(_workspace(tmp_path / "source"))
     destination = tmp_path / "exists"

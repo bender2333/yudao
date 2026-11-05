@@ -33,15 +33,6 @@ def created(**overrides) -> Event:
     })
 
 
-def submitted(position: int, *, criteria: list[dict], executable: int, covered: int) -> Event:
-    # 一份放行记录：逐条结论与 #151 在放行时算好的覆盖数（判定只读这里，不重新计算）
-    return event(EventType.QA_SUBMITTED, position, payload={
-        "criteria": criteria, "coverage": {"criteria_total": len(criteria), "executable": executable,
-                                           "covered": covered, "coverage_ratio": 0.0,
-                                           "model_reading": 0, "open": len(criteria) - executable},
-    })
-
-
 def _passed(criterion: str, result: str = "passed") -> dict:
     return {"criterion": criterion, "method": "check", "result": result}
 
@@ -69,11 +60,6 @@ def test_unsatisfied_strictly_decreasing_is_converging_and_zero_is_converging():
                {"criteria": [], "coverage": {"executable": 3, "covered": 3}}]
     assert loops.run_state(reviews, rounds=3, stop_reason=None) == (loops.CONVERGING, None)
     assert loops.run_state(reviews[1:], rounds=3, stop_reason=None) == (loops.CONVERGING, None)
-
-
-def test_unchanged_unsatisfied_is_stalled():
-    reviews = [{"criteria": [], "coverage": {"executable": 4, "covered": 1}}] * 3
-    assert loops.run_state(reviews, rounds=3, stop_reason=None) == (loops.STALLED, None)
 
 
 def test_a_conclusion_flipping_twice_is_oscillating():

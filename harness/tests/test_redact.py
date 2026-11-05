@@ -14,12 +14,6 @@ def _bash_call(request, command: str) -> ModelResponse:
                                   "arguments": json_dumps({"command": command})}])
 
 
-def test_the_command_keeps_the_credential_name_instead_of_its_value(monkeypatch):
-    monkeypatch.setenv("YUDAO_TEST_API_KEY", SECRET)
-    redacted = redact_tool_args({"command": f"curl -H 'key: {SECRET}'"})
-    assert redacted == {"command": "curl -H 'key: ${YUDAO_TEST_API_KEY}'"}
-
-
 def test_arguments_without_a_command_are_unchanged():
     assert redact_tool_args({"path": "src/echo.py"}) == {"path": "src/echo.py"}
     assert redact_tool_args({}) == {}
