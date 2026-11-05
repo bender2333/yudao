@@ -44,12 +44,17 @@ __all__ = [
 # 发布带的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：名字 →（一份完整的定义，
 # 这份定义选用的收紧检查）。路由不在这里登记：组装时按每一份定义里的组织定义 routing 名称接上。
 # 单角色直做（工单 #1395）是第二个：一份完整的定义（一个人工程部门、直做路由、没有核验角色，
-# harness/definitions/forms/single_role_direct/）与直做的收紧检查。几个角色直做（#1454）等形态由各自的
-# 工单加进来，各是一份完整的定义
+# harness/definitions/forms/single_role_direct/）与直做的收紧检查。几个角色直做（工单 #1454）是第三个：
+# 产品与工程两个角色、同一条直做路由、没有核验角色（harness/definitions/forms/several_roles_direct/）。
+# 其余形态由各自的工单加进来，各是一份完整的定义
 SINGLE_ROLE_DIRECT_DEFINITIONS = load_definitions(DEFINITIONS_DIR / "forms" / SINGLE_ROLE_DIRECT)
+# 几个角色直做形态的名字（工单 #1454）：产品回答询问、工程接输入并交完成
+SEVERAL_ROLES_DIRECT = "several_roles_direct"
+SEVERAL_ROLES_DIRECT_DEFINITIONS = load_definitions(DEFINITIONS_DIR / "forms" / SEVERAL_ROLES_DIRECT)
 FORM_REGISTRY: dict[str, tuple[Definitions, Any]] = {
     DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
     SINGLE_ROLE_DIRECT: (SINGLE_ROLE_DIRECT_DEFINITIONS, DIRECT_TIGHTENING),
+    SEVERAL_ROLES_DIRECT: (SEVERAL_ROLES_DIRECT_DEFINITIONS, DIRECT_TIGHTENING),
 }
 
 
