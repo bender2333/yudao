@@ -158,12 +158,14 @@ class TreeFacts(BaseModel):
         activation_id: str | None = None,
     ) -> CheckReceipt | None:
         # 这条检查在这一次一轮工作里、绑定当前几份成果的最近一条回执。要绑定的成果按定义里写的名称给
-        # （种类 → 当前版本的摘要），内核不认识具体有哪几种（工单 #1456）
+        # （种类 → 当前版本的摘要），内核不认识具体有哪几种（工单 #1456）。
+        # 基线回执不是交付检查的证据（检验的有效性设计说明第 7.2 节，工单 #1181）：即使基线副本的
+        # 摘要与工作区相同（声明带全部改动文件的那一角），交付证据也不取它
         found = [
             item
             for item in self.checks
             if item.department == department and item.name == name and item.snapshot_hash == self.digest
-            and not item.tree_changed
+            and not item.tree_changed and not item.baseline
         ]
         if bindings:
             found = [item for item in found if item.binds(bindings)]

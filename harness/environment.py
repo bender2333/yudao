@@ -1880,7 +1880,7 @@ class LocalEnvironment:
             }, finished.status
 
     def _delivery_file(self, relative: str) -> bytes | None:
-        # 声明的交付文件在封存交付树里的内容：Workspaces 把封存树交给这里（bind_delivery_tree），
+        # 声明的交付文件在封存交付树里的内容：Workspaces 把封存树交给这里（bind_delivery_checks），
         # 直接构造环境的测试没有绑定时按没有这份文件处理
         tree = getattr(self, "_delivery_tree", None)
         if tree is None:

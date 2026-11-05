@@ -131,8 +131,38 @@ def test_baseline_receipt_is_recorded_as_a_baseline_fact(tmp_path):
     baselines = [item for item in facts.checks if item.baseline]
     assert len(baselines) == 1 and baselines[0].name == "smoke"
     assert baselines[0].command is not None
-    # 同名的交付检查回执还没有：基线回执不是交付检查的证据
+    # 同名的交付检查回执还没有：基线回执不是交付检查的证据（latest_check 不取它）
     assert environment.query(FactsQuery(tree=True)).tree.latest_check("quality", "smoke") is None
+
+
+def test_a_baseline_receipt_is_never_the_delivery_evidence_even_when_the_digests_match(tmp_path):
+    # 审查观察事项 ①（PR #1526）：质检声明全部改动文件、且检查工作区就是交付内容时，
+    # 基线副本的摘要可以等于工作区（交付）的摘要；latest_check 在这一角也不把基线回执当交付回执取——
+    # 交付证据仍要一份真正的交付检查回执
+    start = _tree((START_FILE, START_BODY))
+    sealed = _tree((START_FILE, DELIVERY_BODY))
+    workspace = Workspace(tmp_path / "run")
+    workspace.write_file(START_FILE, DELIVERY_BODY)
+    command = f'"{PYTHON}" -c "print(\'delivered check\')"'
+    environment = LocalEnvironment(workspace, check_timeout_sec=60)
+    environment.bind_baseline_source(start, (START_FILE,))
+    environment.bind_delivery_checks(
+        [{"name": "smoke", "exit_code": 0, "summary": "ran", "command": command}], sealed)
+    # 先跑基线检查（树变化核对通过），再放一份同名交付回执：两者的摘要相同
+    perform(environment, "run_baseline_check", _baseline_call("smoke", files=[START_FILE]),
+            department="quality")
+    facts = environment.query(FactsQuery(tree=True)).tree
+    baselines = [item for item in facts.checks if item.baseline]
+    assert baselines and baselines[0].snapshot_hash == facts.digest, \
+        "前提：这个角上基线副本的摘要与工作区相同"
+    workspace.bind_check(activation_id="act_q", product_spec_hash="sha256:" + "1" * 64,
+                         delivery_spec_hash="sha256:" + "2" * 64,
+                         effective_contract_hash="sha256:" + "3" * 64)
+    workspace.record_check("quality", "smoke", 0, "delivered check", snapshot_hash=facts.digest)
+    facts = environment.query(FactsQuery(tree=True)).tree
+    receipt = facts.latest_check("quality", "smoke")
+    assert receipt is not None and receipt.baseline is False
+    assert "delivered check" in receipt.summary
 
 
 def test_baseline_time_limit_truncation_and_cleanup_match_run_check(tmp_path):
