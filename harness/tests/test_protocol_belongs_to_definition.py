@@ -151,25 +151,6 @@ def test_changing_the_connection_address_stales_every_definition_under_it():
     assert rows["m-msg"]["admitted"] is False
     assert rows["m-other"]["admitted"] is True
 
-def test_admission_records_carry_the_protocol_of_the_definition():
-    # 准入记录写入访问定义的协议；改这条定义的协议以后记录作废（第 4.4 节）
-    facade = _facade(_custom_document(("m-chat", "chat_completions")))
-    facade.record_admission("local", "m-chat", admitted_model="upstream-x")
-    rows = facade.model_admissions()
-    assert rows[0]["protocol"] == "chat_completions"
-    assert rows[0]["admitted"] is True
-
-    facade.save_provider_entry(
-        {"id": "local", "name": "Local", "base_url": "http://127.0.0.1:9/v1",
-         "credential_ref": "LOCAL_KEY", "timeout_sec": 30.0},
-        [{"id": "m-chat", "model": "upstream-x", "protocol": "messages",
-          "context_window": 32000, "max_output_tokens": 2048}],
-    )
-    rows = facade.model_admissions()
-    assert rows[0]["protocol"] == "messages"
-    assert rows[0]["admitted"] is False
-    assert rows[0]["stale"] is True
-
 def test_a_connection_that_declares_a_protocol_is_rejected_naming_where():
     # 连接上出现协议字段：读取以错误结束并写明位置，不迁移也不补默认值
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))

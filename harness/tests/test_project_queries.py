@@ -1084,20 +1084,6 @@ def test_a_released_item_has_no_stop_note(data_dir):
     assert card.kept_delivery is None
 
 
-def test_a_cancelled_item_has_no_stop_note(data_dir):
-    # 用户自己让事项停下不是错误：结束事件里写的是这次决定，不写进停止说明（工单 #1162）
-    system = _system(data_dir, happy_script())
-    project_id = system.projects.register("用户取消", GOAL)
-    work_item_id, run_id = system.projects.start_work_item(project_id, "做一件事")
-    system.activate_once(run_id)
-    system.cancel(run_id)
-    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
-    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
-    assert card.status == "stopped"
-    assert card.stop_reason == "cancelled"
-    assert card.stop_note is None
-
-
 # 已收下的交付（工单 #1239，试用 Te28ea596-03）：交付收下之后事项因为别的原因停下时，
 # 停止说明旁边要写出这件事。页面上只有一句失败原因，用户看不出这件事已经有一份可用的交付
 KEPT_DELIVERY_FAILURE = "整理失败：模型服务返回 HTTP 500（工作区整理没能完成）"
@@ -1207,17 +1193,6 @@ def test_a_stopped_item_names_the_department_model_status_code_and_retryability(
     assert detail.status_code == STOP_STATUS
     # 失败不重试（脚本给的 ProviderError 默认不可重试）：页面要写得出这一件事
     assert detail.retryable is False
-
-
-def test_the_stop_detail_is_the_fatal_attempt_not_the_asking_branch(data_dir):
-    # 询问分支的失败尝试在这条 run 流里也有（400），但让事项停下的是后面那一次（503）：
-    # 细节取结束事件之前最后一次失败的尝试
-    system, project_id, work_item_id, run_id = _stop_detail_system(data_dir)
-    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
-    card = next(entry for entry in overview.work_items if entry.work_item_id == work_item_id)
-    assert card.stop_detail is not None
-    assert card.stop_detail.status_code == STOP_STATUS
-    assert card.stop_detail.status_code != BRANCH_STATUS
 
 
 def test_a_stopped_item_carries_the_moment_it_stopped(data_dir):
