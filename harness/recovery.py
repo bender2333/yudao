@@ -406,7 +406,7 @@ class RunRecovery:
         # 说明执行被中断、结果未知，由模型检查后决定是否重新执行。
         # 浏览器动作按 docs/design/browser-and-computer-use.md「恢复契约」核实（工单 #1184）：本机的浏览器会话随进程结束（MCP 的 stdio 会话
         # 属于建立它的进程），恢复在启动序列里跑、那时浏览器会话表是空的，所以记会话为中断、交还会话重新
-        # 开始。docs/design/architecture/overall-architecture.md「使用的技术」「会话仍然存在 → 按当前实际状态继续」那一支留给持有会话的执行代理。
+        # 开始。docs/design/browser-and-computer-use.md「恢复契约」「会话仍然存在 → 按当前实际状态继续」那一支留给持有会话的执行代理。
         # 不再发出任何 unknown_action 决定请求，事项直接继续。
         # 浏览器动作的核实要在事务之外先取得（取页面结构是一次 MCP 调用），所以这里先读一次事件
         browser_evidence = self._browser_evidence(run_id)
@@ -449,7 +449,7 @@ class RunRecovery:
                 action_id = identity[2]
                 comparison = comparisons.get(action_id)
                 if info["tool"] in BROWSER_TOOL_NAMES:
-                    # 浏览器动作：本机只可能是会话已经不存在，记会话为中断并交还（docs/design/architecture/overall-architecture.md「使用的技术」）；
+                    # 浏览器动作：本机只可能是会话已经不存在，记会话为中断并交还（docs/design/browser-and-computer-use.md「恢复契约」）；
                     # 「会话仍然存在 → 按当前实际状态继续」留给持有会话的执行代理
                     transaction.append(self._verified_browser(
                         started, projection.status, evidence=browser_evidence.get(action_id)))
@@ -503,7 +503,7 @@ class RunRecovery:
             payload=event_payload,
         )
 
-    # ---- 浏览器动作的核实（工单 #1184，docs/design/architecture/overall-architecture.md「使用的技术」）----
+    # ---- 浏览器动作的核实（工单 #1184，docs/design/browser-and-computer-use.md「恢复契约」）----
 
     def _browser_evidence(self, run_id: str) -> dict[str, dict[str, Any]]:
         # 结果未知的浏览器动作的核实依据：会话记的是哪一次、现在是什么状态。按动作身份（调用编号）对应。
@@ -522,7 +522,7 @@ class RunRecovery:
 
     def _browser_state(self, run_id: str, department: str) -> dict[str, Any]:
         # 这个部门的浏览器会话现在的状态：会话记录已经结束或中断时照记，否则按中断记
-        # （持有会话的进程不在了，页面结构与截图都取不到，恢复按 docs/design/architecture/overall-architecture.md「使用的技术」交还会话）
+        # （持有会话的进程不在了，页面结构与截图都取不到，恢复按 docs/design/browser-and-computer-use.md「恢复契约」交还会话）
         try:
             environment = self._run_environment(run_id)
         except Exception:  # noqa: BLE001 - 取不到执行环境时按会话已中断处理，不挡住恢复
@@ -536,7 +536,7 @@ class RunRecovery:
                             "tree_digest": session.get("tree_digest")}}
 
     def _verified_browser(self, started: Any, status: str, *, evidence: Mapping[str, Any] | None) -> NewEvent:
-        # 结果未知的浏览器动作的核实记录（docs/design/architecture/overall-architecture.md「使用的技术」）：会话已经不存在，记会话为中断、把结果交还，
+        # 结果未知的浏览器动作的核实记录（docs/design/browser-and-computer-use.md「恢复契约」）：会话已经不存在，记会话为中断、把结果交还，
         # 模型读到的是「会话已中断，需要重新开始会话」。系统不做用户才能做的「按当前实际状态继续」：
         # 那是决定请求的取值（app/payloads.py 的 resolution=continue），恢复这里没有请求也没有用户
         payload = started.payload or {}

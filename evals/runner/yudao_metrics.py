@@ -15,7 +15,7 @@ from metrics import FAILURE_MARKERS
 
 MODEL_SERVICE_FAILURE = "model_service_failure"
 TIME_LIMIT = "time_limit"
-#docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「run 在限额内结束，状态为放行」：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
+#docs/design/evaluation-scenarios.md「Yudao 的过程检查点」：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
 # 都不能通过「放行」这一项；放行等于 `status == "done"` 且 `stop_reason == "released"`
 RELEASE_STOP_REASONS = frozenset({"released"})
 RELEASE_STATUSES = frozenset({"done"})
@@ -23,7 +23,7 @@ RELEASE_STATUSES = frozenset({"done"})
 # 用量字段：模型未上报时为未知，进度时按 `notes[].reason` 写明原因
 USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens",
                 "cache_write_tokens", "total_tokens", "cost", "model_latency_ms")
-# 冻结参数只通过 `run_created` 事件的 `parameters_version` 摘要给出（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「质检的放行绑定最后提交的交付树；放行引用的检查回执取自主机，其中 `verification.recheck_ratio` 要求质检重新运行的检查，回执由质检自己取得」）。
+# 冻结参数只通过 `run_created` 事件的 `parameters_version` 摘要给出（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」）。
 # 摘要本身不携带参数现值，run.export 之外无法读取；读不到时这一项写「未核实」，
 # 不引用仓库内任何规则文件（评测工具与 harness 分层，docs/design/evaluation-scenarios.md「模块划分」）。
 
@@ -100,7 +100,7 @@ def _event_span_seconds(export):
 
 
 def _end_state(projection, outcome, model_service_failure):
-    """结束状态与原因（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「run 在限额内结束，状态为放行」）：
+    """结束状态与原因（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」）：
     - 放行等于 `status == "done"` 且 `stop_reason == "released"`；
     - 其余 `status == "done"` 但 stop_reason 不是 released 的（不会发生，留作防御）按 ended 计；
     - 超时记 `time_limit`；
@@ -167,7 +167,7 @@ def _count(events, event_type):
 # ---------------------------------------------------------------------------
 # 第一次与最终两份交付（docs/design/evaluation-scenarios.md「指标」）：两份评分由运行器交给评分器
 
-# 质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）的四种取值
+# 质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）的四种取值
 IMPROVEMENT_IMPROVED = "improved"          # 最终交付比第一次多通过至少 1 条隐藏检查
 IMPROVEMENT_NONE = "none"                  # 没有多通过
 IMPROVEMENT_NOT_COUNTED = "not_counted"    # 第一次交付已经全部通过，这次运行不计入
@@ -217,7 +217,7 @@ def _delivery_summary(scores, delivered):
 
 
 def _qa_improvement(first, final, concluded):
-    """质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）：最终交付比第一次交付多通过的隐藏检查条数。"""
+    """质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）：最终交付比第一次交付多通过的隐藏检查条数。"""
     if not concluded:
         return {"status": IMPROVEMENT_NO_CONCLUSION, "passed_gain": None,
                 "detail": "导出中没有质检提交（qa_submitted）：质检没有给出结论"}
@@ -254,7 +254,7 @@ def checkpoints_of(events, status, replay, outcome, parameters_version=None,
 
 def _check_release_and_limit(events, outcome, status, parameters_version,
                              model_service_failure=False):
-    """docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「run 在限额内结束，状态为放行」：放行等于状态 done 且停止原因 released，另核质检放行与冻结限额。"""
+    """docs/design/evaluation-scenarios.md「Yudao 的过程检查点」：放行等于状态 done 且停止原因 released，另核质检放行与冻结限额。"""
     end_status = _status_from_events(events)
     stop_reason = _stop_reason_from_events(events)
     reasons = []
@@ -325,7 +325,7 @@ def _within_frozen_limits(events, parameters_version):
 # --- 第 2 项：质检放行绑定最后交付 + recheck_ratio 核对 -------------------
 
 def _check_release_binding(events, parameters_version, released):
-    """docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「质检的放行绑定最后提交的交付树；放行引用的检查回执取自主机，其中 `verification.recheck_ratio` 要求质检重新运行的检查，回执由质检自己取得」：
+    """docs/design/evaluation-scenarios.md「Yudao 的过程检查点」：
     - 质检最后引用的 `code_snapshot_hash` 等于最后一次封存的 `code_tree_digest`；
     - 引用的 `delivery_spec_hash` 等于最后一次封存的 `content_hash`；
     - 引用的每条 `checks[i].activation_id` 在质检本次激活的部门激活列表里；
@@ -440,7 +440,7 @@ def _check_false_release(released, outcome):
 
 
 def _check_release_coverage(events, released):
-    """docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「每次放行附检验覆盖比例、靠模型阅读作出判断的条件数与开环的条件数；开环的条件列在放行记录里」：放行记录附检验覆盖比例、模型阅读条件数、开环条件数。
+    """docs/design/evaluation-scenarios.md「Yudao 的过程检查点」：放行记录附检验覆盖比例、模型阅读条件数、开环条件数。
     没有放行时本项不适用，按通过计。无逐条覆盖数据的历史记录写未知。
     """
     if not released:

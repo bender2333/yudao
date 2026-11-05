@@ -171,7 +171,7 @@ def _add_query(api: FastAPI, definition: QueryDefinition) -> None:
 def _add_events(api: FastAPI, *, keepalive_sec: float) -> None:
     # GET /api/events（docs/design/app-and-interface.md「路径与参数」）：SSE 事件流。参数 after（或 Last-Event-ID 请求头，请求头优先）、
     # 项目、事项、run、部门、角色、种类与 live。事件与检查点的 SSE id 是位置，片段的事件名为 delta、不带 id；
-    # 空闲每 15 秒发送一次 SSE 注释作为保活（docs/design/app-and-interface.md「补齐与实时」中「每 15 秒发送一次 SSE 注释作为保活」）
+    # 空闲每 15 秒发送一次 SSE 注释作为保活（docs/design/app-and-interface.md「补齐与实时」）
     async def events(
         request: Request,
         after: Annotated[int | None, Query(ge=0)] = None,

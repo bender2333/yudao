@@ -712,7 +712,7 @@
     "cost": "每个动作的心跳次数",
     "relax_when": "执行代理的心跳延迟分布显示现值过密",
     "tighten_when": "网络稳定且心跳没有丢失",
-    "origin": "执行环境服务设计说明「时间」，Kubernetes 节点 Lease 每 10 秒续约"
+    "origin": "执行环境服务设计说明「三层设置」，Kubernetes 节点 Lease 每 10 秒续约"
   },
   "execution.heartbeat_timeout_sec": {
     "value": 40,
@@ -723,7 +723,7 @@
     "cost": "结果未知的时间",
     "relax_when": "开发板在构建负载与无线网络下偶尔延迟不会被误判",
     "tighten_when": "心跳丢失以后迟到回执的比例高",
-    "origin": "执行环境服务设计说明「时间」，Kubernetes 的 Lease 时长 40 秒，间隔与时限之比为 1:4"
+    "origin": "执行环境服务设计说明「三层设置」，Kubernetes 的 Lease 时长 40 秒，间隔与时限之比为 1:4"
   },
   "execution.dispatch_ack_timeout_sec": {
     "value": 40,
@@ -734,7 +734,7 @@
     "cost": "重复派发的次数",
     "relax_when": "执行代理的启动延迟分布显示现值过短",
     "tighten_when": "重复派发以后确认总是立刻到达",
-    "origin": "执行环境服务设计说明「时间」，与心跳时限相同"
+    "origin": "执行环境服务设计说明「三层设置」，与心跳时限相同"
   },
   "execution.probe_interval_sec": {
     "value": 10,
@@ -745,7 +745,7 @@
     "cost": "每次探测的请求",
     "relax_when": "探测结果不参与决策时减少",
     "tighten_when": "探测请求成为机器的负担",
-    "origin": "执行环境服务设计说明「时间」，与心跳间隔相同"
+    "origin": "执行环境服务设计说明「三层设置」，与心跳间隔相同"
   },
   "execution.probe_timeout_sec": {
     "value": 5,
@@ -756,7 +756,7 @@
     "cost": "每一次探测都占满间隔",
     "relax_when": "探测用时分布显示现值过短",
     "tighten_when": "探测从不超时",
-    "origin": "执行环境服务设计说明「时间」，每次请求最长 5 秒"
+    "origin": "执行环境服务设计说明「三层设置」，每次请求最长 5 秒"
   },
   "execution.offline_after_sec": {
     "value": 40,
@@ -767,7 +767,7 @@
     "cost": "等待机器的时长",
     "relax_when": "网络波动频繁把在线机器判为离线",
     "tighten_when": "离线判断以后立即有迟到结果",
-    "origin": "执行环境服务设计说明「时间」，40 秒内没有一次成功的探测"
+    "origin": "执行环境服务设计说明「三层设置」，40 秒内没有一次成功的探测"
   },
   "wait.model_service.max_sec": {
     "value": 86400,
@@ -789,7 +789,7 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "循环与收敛设计说明「一定会停」；执行环境服务设计说明「等待机器」"
+    "origin": "循环与收敛设计说明「一定会停」；执行环境服务设计说明「时间」"
   },
   "wait.desktop.max_sec": {
     "value": 28800,

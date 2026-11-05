@@ -455,7 +455,7 @@ def test_compaction_keeps_activation_versions_and_carries_the_new_input(tmp_path
         return product_spec()
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([respond] * 100))
-    # 窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计「测试的写法」中「测试不决定产品的文字」，不写死窗口）：
+    # 窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计「测试的写法」，不写死窗口）：
     # 工程与质检也要在这个窗口里装配请求。材料按「窗口 × 85% − 产品的固定材料」的那一截的两倍给：
     # 一次读进来以后压缩要分几轮，输入在轮与轮之间到达，后一轮按新的输入版本装配（工单 #964 的场景，
     # 工单 #1184 按新的固定材料重推）

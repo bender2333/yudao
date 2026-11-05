@@ -1,4 +1,4 @@
-# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用设计说明「其他路由：骨架要满足的条件」中「证明」、；
+# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用设计说明「其他路由：骨架要满足的条件」中「证明」；
 # 总图第四节「路由」缝）。
 #
 # 证明的样子：同一副骨架（写入口、裁决、边界、薄驱动、最小投影、定义加载）接上另一套应用——
@@ -150,7 +150,7 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path):
     assert {item["artifact_issuer"] for item in verdicts} == {"quality"}
     assert all(item["completion"] in {done["content_hash"] for done in completions} for item in verdicts)
 
-    # 事项以它自己那份定义里声明的结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）
+    # 事项以它自己那份定义里声明的结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
     declared = second_routing.DEFINITIONS.routing_definition().end_reasons
     assert projection.stop_reason == second_routing.ITEM_END_REASON
     assert projection.stop_reason in declared
@@ -233,7 +233,7 @@ def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_p
 
 
 def test_the_task_pool_registers_its_own_application_event_kinds(tmp_path):
-    # 设计说明「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」、docs/design/skeleton-and-application.md「骨架事件与应用事件」：应用登记自己的事件种类，增加一种不改内核文件
+    # 设计说明「其他路由：骨架要满足的条件」、docs/design/skeleton-and-application.md「骨架事件与应用事件」：应用登记自己的事件种类，增加一种不改内核文件
     registered = kernel_events.application_event_types()
     for kind in second_routing.APPLICATION_EVENT_KINDS:
         assert registered.get(kind) == second_routing.APPLICATION
@@ -270,7 +270,7 @@ def test_the_task_pool_definitions_live_only_in_the_test_directory():
 
 
 def test_the_routing_rejects_its_own_definition_without_its_end_reason(tmp_path):
-    # 内容由路由自己校验（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：事项结束用的那一条必须声明在这份定义里
+    # 内容由路由自己校验（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：事项结束用的那一条必须声明在这份定义里
     directory = tmp_path / "definitions"
     shutil.copytree(POOL_DEFINITIONS, directory)
     path = directory / "routings.json"

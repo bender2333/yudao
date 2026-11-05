@@ -190,7 +190,7 @@ def _is_write(name: str, definitions: Definitions | None = None) -> bool:
 
 
 def _write_path_error(name: str, args: dict[str, Any], facts: WorkspaceFacts, scope: Any) -> str | None:
-    # 写入范围是检查材料的角色只写检查材料目录（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」）：检查工作区里其余文件参与放行时
+    # 写入范围是检查材料的角色只写检查材料目录（docs/design/forms-and-verifier-role.md「核验角色」）：检查工作区里其余文件参与放行时
     # 核对的树（提案条件 tree_matches），改动它们会让放行被拒绝；原因里不写部门名。
     # 写入目标在工作区中不能表示时直接拒绝，原因就是执行环境给出的原因（计划范围检查已随 #470 删除）
     for target in _write_targets(name, args):

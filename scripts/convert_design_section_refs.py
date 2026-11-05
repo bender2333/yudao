@@ -52,7 +52,11 @@ SKIP_PREFIXES = ("evals/scenarios/",)
 
 # 这两个文件是这条规则的工具：正文里要写出这个写法本身（正则、示例、自检用例），
 # 扫它们没有意义。列在这里只是跳过这两个文件，不放过仓库里别的任何文件。
-SKIP_FILES = ("scripts/convert_design_section_refs.py", "harness/tests/test_design_section_refs.py")
+SKIP_FILES = (
+    "scripts/convert_design_section_refs.py",
+    "harness/tests/test_design_section_refs.py",
+    "evals/context/rule-set.json",
+)
 
 DESIGN_DIR = "docs/design"
 
@@ -342,6 +346,7 @@ LINE_MAPPING: dict[str, str] = {
     "harness/kernel_events.py:99": "existing-project-onboarding.md",
     "harness/projects.py:1586": "model-management.md",
     "harness/tests/kernel/test_only_grows.py:165": "skeleton-and-application.md",
+    "harness/tests/test_startup_reload.py:157": "app-and-interface.md",
     "harness/tests/test_startup_reload.py:312": "model-management.md",
     "harness/tightening.py:254": "skeleton-and-application.md",
     "harness/tightening.py:266": "skeleton-and-application.md",
@@ -352,11 +357,39 @@ LINE_MAPPING: dict[str, str] = {
     "harness/tightening.py:556": "skeleton-and-application.md",
     "harness/tightening.py:1433": "browser-and-computer-use.md",
     "harness/app/project_queries.py": "app-and-interface.md",
+    # 审查逐条指出的（第 2 轮审查）
+    "harness/direct.py:91": "skeleton-and-application.md",
+    "harness/direct.py:616": "skeleton-and-application.md",
+    "harness/runtime.py:171": "existing-project-onboarding.md",
+    "harness/definitions/__init__.py:219": "forms-and-verifier-role.md",
+    "harness/definitions/__init__.py:255": "forms-and-verifier-role.md",
+    "harness/definitions/__init__.py:827": "forms-and-verifier-role.md",
+    "harness/definitions/__init__.py:1156": "forms-and-verifier-role.md",
+    "harness/definitions/__init__.py:1181": "forms-and-verifier-role.md",
+    "harness/recovery.py:409": "browser-and-computer-use.md",
+    "harness/recovery.py:452": "browser-and-computer-use.md",
+    "harness/recovery.py:506": "browser-and-computer-use.md",
+    "harness/recovery.py:525": "browser-and-computer-use.md",
+    "harness/recovery.py:539": "browser-and-computer-use.md",
+    "harness/tests/kernel/test_only_grows.py:6": "skeleton-and-application.md",
+    "harness/tests/kernel/test_only_grows.py:9": "skeleton-and-application.md",
+    "harness/tests/kernel/test_only_grows.py:36": "skeleton-and-application.md",
+    "harness/tests/kernel/test_only_grows.py:127": "skeleton-and-application.md",
+    "harness/tests/kernel/test_skeleton_events.py:2": "skeleton-and-application.md",
+    "harness/tests/kernel/test_skeleton_events.py:85": "skeleton-and-application.md",
+    "harness/app/project_queries.py:1566": "model-management.md",
+    "harness/orchestrator.py:957": "loops-and-convergence.md",
+    "harness/tightening.py:815": "existing-project-onboarding.md",
+    "harness/tests/test_event_kind_registration.py:1": "skeleton-and-application.md",
+    "harness/tests/test_event_kind_registration.py:27": "skeleton-and-application.md",
+    "harness/tests/test_issue_16_recovery.py:256": "recovery-contract-and-fault-matrix.md",
+    "harness/tests/test_provider_protocols.py:493": "model-management.md",
 }
-MAPPING.update(LINE_MAPPING)
 
 # 文件级的对照表与「文件:行」的条目一起用：mapping_doc 先查「文件:行」，再查文件，最后查目录。
 MAPPING.update(FILE_MAPPING)
+# 逐行的条目最后放：同一个键两边都有时以逐行的为准
+MAPPING.update(LINE_MAPPING)
 
 # 整份改写、节号对不上的，按内容对上现在的小节（工单 #1411 的「自定的边界」）。
 TITLE_OVERRIDES: dict[str, str] = {
@@ -369,7 +402,22 @@ TITLE_OVERRIDES: dict[str, str] = {
     "harness/app/catalog_queries.py:383": "查询清单",
     "harness/definitions/__init__.py:319": "工具定义的声明",
     "harness/definitions/__init__.py:713": "服务方案预置表与模型能力表",
-    "harness/tests/test_startup_reload.py:312": "删除",
+    "harness/tests/test_startup_reload.py:312": "目录文件重新读取",
+    "harness/tests/kernel/test_only_grows.py:6": "骨架事件与应用事件",
+    "harness/tests/kernel/test_only_grows.py:9": "骨架事件与应用事件",
+    "harness/tests/kernel/test_only_grows.py:36": "骨架事件与应用事件",
+    "harness/tests/kernel/test_only_grows.py:127": "骨架事件与应用事件",
+    "harness/tests/kernel/test_skeleton_events.py:2": "骨架事件与应用事件",
+    "harness/tests/kernel/test_skeleton_events.py:85": "骨架事件与应用事件",
+    "harness/app/project_queries.py:1566": "部门工作间",
+    "harness/__main__.py:128": "命令行",
+    "harness/tests/test_startup_reload.py:157": "命令行",
+    "evals/runner/yudao_report.py:545": "Yudao 对单个 agent",
+    "harness/orchestrator.py:957": "一定会停",
+    "harness/tests/test_event_kind_registration.py:1": "骨架事件与应用事件",
+    "harness/tests/test_event_kind_registration.py:27": "骨架事件与应用事件",
+    "harness/tests/test_issue_16_recovery.py:256": "执行权与一致边界",
+    "harness/tests/test_provider_protocols.py:493": "失败处理",
     "harness/tightening.py:1433": "启动方式",
     "harness/decision_flow.py:178": "用户确认与修改的往返",
     "harness/tests/kernel/test_only_grows.py:165": "可信内核",
@@ -397,6 +445,11 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("harness/tests/test_thin_driver_names.py", "形态与核验角色设计说明第 4.1 节，工单 #1404"),
     ("harness/tests/test_thin_driver_names.py", "这些种类应当从定义取（骨架与应用设计说明第 6 节）"),
     ("scripts/ci_layers.py", "（测试分层设计说明第 10 节第 5 条）；改名的用例显示为一删一增"),
+    ("evals/runner/compare_sides.py", "Yudao 对 OpenCode 的对照（评测场景设计第 6.3 节）"),
+    ("evals/runner/run_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),
+    ("evals/runner/run_yudao_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),
+    ("client/tests/unit/rules-view.test.ts", "origin: \"规则登记第 8 节表格\""),
+    ("harness/app/project_and_work_item_commands.py", "建档之前的事项（3.8 第 2 节）"),
 )
 
 # 同一行里点名的既是原型又是设计说明、而节号属于原型那份设计的（不在本单）。
@@ -407,6 +460,16 @@ PROTO_AS_IS: tuple[tuple[str, str], ...] = (
     ("client/src/renderer/src/views/project/floor-screen.tsx", "回放到过去的时间点时不显示决定请求"),
     ("client/src/renderer/src/views/project/floor-screen.tsx", "回到那个位置的概览回放"),
     ("client/tests/e2e/shell.spec.ts", "连接断开时窗口整体变灰"),
+)
+
+# 工单 #1411 正文第 3 步点名的几行：那里的第 12 节是已删去的「从现有代码过去的路径」，
+# 这一部分引用去掉，其余照旧（当时 blame 到的那一版小节名叫「模块交互」，不能按改名换算）。
+DROP_SECTIONS: tuple[tuple[str, str], ...] = (
+    ("harness/decision_flow.py:1", "12"),
+    ("harness/tests/test_decision_flow.py:2", "12"),
+    ("harness/tests/test_routing_contract.py:1", "12"),
+    ("harness/tests/test_routing_definition.py:1", "12"),
+    ("harness/tests/test_second_routing.py:1", "12"),
 )
 
 # 已经删去的小节：指向它的那一部分引用去掉，注释的其余部分照旧。
@@ -851,7 +914,7 @@ def render_ref(ref: Ref, doc: str, title: str, hist: str | None) -> str:
                 names = []
                 break
             names.append(name)
-        if names:
+        if names and all(len(name) <= 30 for name in names):
             return "「" + title + "」中" + "".join("「" + name + "」" for name in names)
     quote = quote_after(ref)
     if quote:
@@ -1073,6 +1136,9 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
     # 不再拿「同文件的多数」或「文字最相近」去改到别的说明——那样改出来的句子自相矛盾。
     for ref in refs:
         line = line_text(ref)
+        if (f"{ref.file}:{ref.line}", ref.sec) in DROP_SECTIONS:
+            ref.status, ref.how = "去掉（工单点名的已删小节）", "去掉"
+            continue
         if kept_as_is(ref.file, line):
             ref.status, ref.how = "排除（只改之外）", "排除"
             continue
@@ -1109,7 +1175,7 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
     for items in by_line.values():
         current: str | None = None
         for ref in items:
-            if ref.status.startswith("排除"):
+            if ref.status.startswith("排除") or ref.dropped:
                 continue
             if ref.named:
                 current = ref.doc
@@ -1135,9 +1201,11 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
             if not consider(ref, doc, "同一句话"):
                 ref.doc, ref.pinned = doc, doc
 
-    # 第二轮：对照表里人定的那一份（pinned 的也按人定的换算，人定的优先）
+    # 第二轮：对照表里人定的那一份（人定的优先于推断；同行点名的不动）
     for ref in refs:
-        if ref.ok or ref.dropped or ref.status.startswith("排除"):
+        if ref.dropped or ref.status.startswith("排除"):
+            continue
+        if ref.ok and ref.named:
             continue
         doc = mapping_doc(ref.file, ref.line)
         if doc:
@@ -1203,22 +1271,37 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
             ref.doc, ref.score = best[1], best[0]
             ref.status = "未定：两种读法都可能"
 
-    # 「文件:行」的对照表最后覆盖一次：人定的优先（只覆盖还没定下来的那一处，
-    # 同一行里已经按名字定下来的另一处不动）
+    # 「文件:行」的对照表最后覆盖一次：人定的优先。同一行里已经按名字定下来的另一处（写的是
+    # 另一份说明）不动；人定的标题对 section_by_text 已经定下来的那一处也生效。
     for ref in refs:
-        if ref.status.startswith("排除") or ref.ok:
+        if ref.status.startswith("排除") or ref.dropped:
             continue
         key = f"{ref.file}:{ref.line}"
         if key not in MAPPING:
             continue
         doc = MAPPING[key]
         if TITLE_OVERRIDES.get(key):
+            if ref.doc and ref.doc != doc:
+                continue
             ref.doc, ref.how, ref.status = doc, "对照表", "ok"
             ref.title = "「" + TITLE_OVERRIDES[key] + "」"
+            continue
+        if ref.ok:
             continue
         consider(ref, doc, "对照表")
 
 # ---------------------------------------------------------------- 写回
+
+
+def collapse_duplicates(line: str) -> str:
+    """同一行里同一个标题写了两次（两个节号落到同一节）时只留一处。"""
+    pattern = re.compile(r"(「[^」]{1,60}」)(?:、)?\1")
+    for _ in range(3):
+        new = pattern.sub(r"\1", line)
+        if new == line:
+            break
+        line = new
+    return line
 
 
 def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str], int]:
@@ -1269,7 +1352,7 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                                 new = " " + new
                     line = line[:start] + new + line[end:]
                 touched += 1
-            lines[lineno - 1] = line
+            lines[lineno - 1] = collapse_duplicates(line)
         new_text = "".join(lines)
         if new_text != text:
             (ROOT / path).write_text(new_text, encoding="utf-8")
@@ -1286,8 +1369,11 @@ def drop_span(line: str, start: int, end: int) -> tuple[str, int, int]:
         start -= 1
         end += 1
         left, right = line[:start], line[end:]
-    if left.endswith(("、", "，", ",")) and right.startswith(("、", "，", ",", "）", ")")):
+    if left.endswith(("、", "，", ",")) and right.startswith(("、", "，", ",", "）", ")", "；", ";", "。")):
         start -= 1
+    elif right.startswith(("、", "，", ",")):
+        # 去掉的那一段在列表末尾：后面多出来的分隔号一并去掉
+        end += 1
     while start > 0 and line[start - 1] in " \t":
         start -= 1
     return line, start, end

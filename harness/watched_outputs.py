@@ -34,7 +34,7 @@ _PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
 
 
 def routing_departments(definitions: Any | None = None) -> tuple[str, ...]:
-    """这个路由的部门清单：它自己的一份定义里写的（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）。
+    """这个路由的部门清单：它自己的一份定义里写的（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）。
 
     一次询问只能问清单里的部门；清单随定义变，不在这里写死（工单 #1391）。
     """
@@ -323,7 +323,7 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     """现在可以开始一轮工作的部门（按定义顺序），各自一个会话同时运行（工单 #557）。
 
     有新的工作、又在等待的部门都列出来：控制核心让它们同时开始，
-    一个部门同一时刻最多一轮工作（循环结构「同时运行的条件」中「一个部门同一时刻最多一轮工作；提交以后等待，关注的成果有了新版本才开始下一轮，不会接连提交新版本让别人的结论过期」）。
+    一个部门同一时刻最多一轮工作（循环结构「同时运行的条件」）。
 
     指导与其他关注的成果一样：有待处理指导、又在等待工作的部门以这段指导开始一轮完整的
     工作（循环结构「指导」，工单 #560），不为它另设一种只回应指导的轮次。
@@ -391,7 +391,7 @@ def round_end(projection: RunProjection, events: list[Event], *, department: str
 
 def item_end(projection: RunProjection) -> routing_contract.ItemEnd | None:
     """事项以什么结束：没有部门可以开始一轮工作时，成果驱动的事项没有新的工作，运行以路由自己声明的
-    结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」：路由自己的结束原因写在它自己的一份定义里，工单 #861）。
+    结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」：路由自己的结束原因写在它自己的一份定义里，工单 #861）。
     """
     return routing_contract.ItemEnd(stop_reason=ITEM_END_REASON, message="no department has new work")
 
@@ -421,7 +421,7 @@ def completion_reason(projection: RunProjection,
 
 
 def work_reference(projection: RunProjection, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）：成果驱动不用它，为空。"""
+    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果驱动不用它，为空。"""
     return None
 
 
@@ -502,7 +502,7 @@ def ask_branch(projection: RunProjection, events: list[Event], *, requester: str
         max_model_steps=min(declared_steps, remaining),
         max_time_sec=float(declared_time),
         start=start,
-        # 这一轮工作的路由自己的工作引用指向这次询问（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）
+        # 这一轮工作的路由自己的工作引用指向这次询问（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
         work_ref={"ask": {"branch_session_id": branch_session_id, "requester": requester,
                           "recipient": recipient}},
     )
@@ -548,7 +548,7 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
 
 
 def check_definition(definitions: Any) -> None:
-    """校验成果驱动这份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：内核只核对结构，内容归路由自己。
+    """校验成果驱动这份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：内核只核对结构，内容归路由自己。
 
     部门、成果种类与提议方式都是按名称引用现有定义的，几种名称互相对得上；路由自己的结束原因不能与内核的
     停止原因同名，事项结束用的那一个要声明。不合格时抛出 InvalidRoutingDefinition，逐项写明是哪一项。

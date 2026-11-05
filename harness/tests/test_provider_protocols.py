@@ -490,7 +490,7 @@ CONTEXT_OVERFLOW_MESSAGE = (
 @pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
 def test_context_overflow_is_recognised_from_the_upstream_error_text(protocol):
     # 400 带一段写明最大上下文长度的原文：停止原因是上下文超限（不再是模型服务失败），诊断里留下原文、
-    # 错误类型与参数（设计说明「失败处理」、docs/design/model-management.md「观测」）
+    # 错误类型与参数（设计说明「失败处理」、docs/design/model-management.md「失败处理」）
     def overflowed(_provider: ScriptedProvider, handler) -> None:
         body = json.dumps({"error": {"message": CONTEXT_OVERFLOW_MESSAGE,
                                      "type": "invalid_request_error", "param": "messages"}})

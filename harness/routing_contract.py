@@ -140,7 +140,7 @@ def _hand_definitions(name: str, implementation: Any, definitions: Any) -> Any:
 
 def select(name: str, definitions: Any = None, *, store: Any = None) -> Any:
     # 启动时按组织定义里写明的名称接上路由实现，核对它声明的契约版本，再让它校验自己那份定义的内容
-    # （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」：结构由内核核对，内容归路由）。名称没有实现时失败，说明里写明有哪些可用的名称。
+    # （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」：结构由内核核对，内容归路由）。名称没有实现时失败，说明里写明有哪些可用的名称。
     # 交了定义时，声明了 use_definitions 的路由拿到的是接上这份定义的一份实例（工单 #1509）；
     # store 是组装处手里的事件库：声明了 use_facts 的路由在这里拿到它的只读读取器
     implementation = _REGISTRY.get(name)
@@ -253,7 +253,7 @@ class Routing(Protocol):
     CONTRACT_VERSION: int
 
     def check_definition(self, definitions: Any) -> None:
-        # 校验自己那份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：名称指向的部门、成果种类与提议方式都在定义里、
+        # 校验自己那份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：名称指向的部门、成果种类与提议方式都在定义里、
         # 几种名称互相对得上。不合格时抛出 InvalidRoutingDefinition，逐项写明是哪一项
         ...
 
@@ -285,7 +285,7 @@ class Routing(Protocol):
 
     def work_reference(self, view: Any, *, department: str) -> Any:
         # 这一轮工作的路由自己的工作引用（例如任务池的任务），原样交给装配与执行（docs/design/skeleton-and-application.md「路由契约」输出、
-        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）；不用它时为空。任务池不在这里：成果驱动不用
+        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）；不用它时为空。任务池不在这里：成果驱动不用
         ...
 
     def round_end(self, view: Any, events: list[Event], *, department: str, session_id: str | None,

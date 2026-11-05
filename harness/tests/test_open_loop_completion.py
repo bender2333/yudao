@@ -45,7 +45,7 @@ OPEN_LOOP_DEFINITIONS = DEFINITIONS.model_copy(update={
     "organization": DEFINITIONS.organization.model_copy(
         update={"verification": VerificationDeclaration(verifiers=())}),
 })
-# 有核验角色、但它只核验中途的成果（docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」后半句）：最后采纳的成果（交付）没有人核验，
+# 有核验角色、但它只核验中途的成果（docs/design/forms-and-verifier-role.md「定义的校验」后半句）：最后采纳的成果（交付）没有人核验，
 # 同样标为开环。核验角色在定义里，检查也是它做，只是它核验的不是交付
 MIDWAY_FORM = "three_departments_verifier_of_a_midway_outcome"
 MIDWAY_DEFINITIONS = DEFINITIONS.model_copy(update={
@@ -127,7 +127,7 @@ def test_an_item_without_a_verifier_is_created_open_loop_and_ends_open_loop(tmp_
 
 
 def test_a_verifier_of_a_midway_outcome_still_marks_the_item_open_loop(tmp_path):
-    # 验收第 2 条的后半句（docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」）：核验角色只核验中途的成果时，事项最后采纳的成果
+    # 验收第 2 条的后半句（docs/design/forms-and-verifier-role.md「定义的校验」）：核验角色只核验中途的成果时，事项最后采纳的成果
     # （交付）没有人核验，创建时同样标为开环，结束时同样写开环完成、不算放行
     system = _system(tmp_path / "loop")
     application = Application(system)

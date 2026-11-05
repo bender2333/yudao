@@ -1,4 +1,4 @@
-# 工具许可与提案校验读这个事项所用的那份定义（工单 #1098，docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「第二种路由可以带来新的工具、提案与成果种类」）。
+# 工具许可与提案校验读这个事项所用的那份定义（工单 #1098，docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）。
 #
 # 守 R1「工具调用先有许可」与「写入先过裁决」（docs/design/test-pyramid.md 「一个测试凭什么留」）：
 # 一个工具能不能用、一份提案能不能接纳，只看交给它的那份定义里的工具、部门与提案种类，
@@ -134,7 +134,7 @@ def test_proposal_department_comes_from_the_matter_definition() -> None:
 
 def test_a_branch_session_judges_a_proposal_by_the_matter_definition() -> None:
     # 询问分支里的会话不能用提交提案的工具；「这个工具提交的是提案」也按事项所用的那份定义判
-    # （工单 #1098，docs/design/test-pyramid.md「测试往下层移」中「OpenAPI 快照测试中核对接口说明的一项直接取 `harness.api.app.create_app` 返回的 FastAPI 应用的 `openapi」）
+    # （工单 #1098，docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
     projection = RunProjection(run_id="run_branch", status="running",
                                ask_stack=[{"requester": "engineering", "recipient": "quality",
                                            "question": "这一项怎么验？", "branch_session_id": "ses_ask_qa"}])

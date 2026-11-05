@@ -309,7 +309,7 @@ def test_clear_withdraw(tmp_path):
     facade.load_document(config_path)
     saved_rev = facade.revision
 
-    # 删除文件：目录与部门默认一起清空，config_state 记为 deleted（docs/design/model-management.md「删除」）
+    # 删除文件：目录与部门默认一起清空，config_state 记为 deleted（docs/design/model-management.md「目录文件重新读取」）
     config_path.unlink()
     result = facade.reload()
     assert result["ok"] is True  # 删除不是损坏，reload_error 为 None

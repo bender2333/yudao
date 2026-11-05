@@ -53,7 +53,11 @@ SKIP_PREFIXES = ("evals/scenarios/",)
 
 # 这两个文件是这条规则的工具：正文里要写出这个写法本身（正则、示例、自检用例），
 # 扫它们没有意义。列在这里只是跳过这两个文件，不放过仓库里别的任何文件。
-SKIP_FILES = ("scripts/convert_design_section_refs.py", "harness/tests/test_design_section_refs.py")
+SKIP_FILES = (
+    "scripts/convert_design_section_refs.py",
+    "harness/tests/test_design_section_refs.py",
+    "evals/context/rule-set.json",
+)
 
 # 节号的写法：「第」+ 编号 + 「节」，编号可以带小数点，也可以连写几个（「第 3、4 节」），
 # 也可以是范围（「第 3-5 节」「第 7.1 至 7.3 节」）；「第 3 步」「第 2 项」不算
@@ -87,6 +91,11 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("harness/tests/test_thin_driver_names.py", "形态与核验角色设计说明第 4.1 节，工单 #1404"),
     ("harness/tests/test_thin_driver_names.py", "这些种类应当从定义取（骨架与应用设计说明第 6 节）"),
     ("scripts/ci_layers.py", "（测试分层设计说明第 10 节第 5 条）；改名的用例显示为一删一增"),
+    ("evals/runner/compare_sides.py", "Yudao 对 OpenCode 的对照（评测场景设计第 6.3 节）"),
+    ("evals/runner/run_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),
+    ("evals/runner/run_yudao_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),
+    ("client/tests/unit/rules-view.test.ts", "origin: \"规则登记第 8 节表格\""),
+    ("harness/app/project_and_work_item_commands.py", "建档之前的事项（3.8 第 2 节）"),
 )
 
 # 注释里把原型的设计说明写成「设计说明第 N 节」的那几行：按写的工单核过，依据是原型的设计

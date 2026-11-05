@@ -216,7 +216,7 @@ ItemSource = Literal["user_input", "onboarding"]
 ITEM_SOURCES: tuple[ItemSource, ...] = get_args(ItemSource)
 
 
-# 写入范围是内核认识的通用权限（docs/design/model-management.md「Provider 配置」）：workspace 写这个事项的工作区；
+# 写入范围是内核认识的通用权限（docs/design/forms-and-verifier-role.md「核验角色」）：workspace 写这个事项的工作区；
 # check_materials 只写检查材料的目录，写的东西不进入公开树与交付，不让被核验方的成果失效
 WriteScopeKind = Literal["workspace", "check_materials"]
 
@@ -252,7 +252,7 @@ class VerifierRole(_Definition):
 
 
 class VerificationDeclaration(_Definition):
-    # 组织定义的核验声明（docs/design/model-management.md「Provider 配置」、「目录文件重新读取」）：谁核验谁、角色的写入范围。
+    # 组织定义的核验声明（docs/design/forms-and-verifier-role.md「核验角色」、「定义的校验」）：谁核验谁、角色的写入范围。
     # 谁能拒绝谁由核验声明推出，不另写一份
     verifiers: tuple[VerifierRole, ...] = ()
     write_scopes: Mapping[Identifier, WriteScope] = Field(default_factory=dict)
@@ -316,7 +316,7 @@ class Tool(_Definition):
     cancellable: bool | None = None
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
-    # 声明这个工具需要图像输入（docs/design/model-management.md「部门的建议能力」与浏览器设计「工具定义的声明」）：调用目标不含图像时
+    # 声明这个工具需要图像输入（设计说明「工具定义的声明」与浏览器设计「工具定义的声明」）：调用目标不含图像时
     # 步骤驱动不在这次请求的工具定义中提供它。现在声明为需要的工具由 3.2D 的浏览器与 computer use 提供
     requires_image_input: bool = False
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
@@ -478,7 +478,7 @@ class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（设计说明「模型访问定义与准入」）；默认协议：模型没有单独声明协议时预填（docs/design/model-management.md「服务方案预置表与模型能力表」）
+    # 获取模型列表与连接测试使用的认证方式（设计说明「直做」）；默认协议：模型没有单独声明协议时预填（docs/design/forms-and-verifier-role.md「四层各认识什么」）
     default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
@@ -495,14 +495,14 @@ class ServicePreset(_Definition):
 
 
 class ServicePresets(_Definition):
-    # 服务方案预置表（docs/design/model-management.md「服务方案预置表与模型能力表」）：整张表的 revision 与来源随界面显示；每个服务方案一项
+    # 服务方案预置表（docs/design/forms-and-verifier-role.md「四层各认识什么」）：整张表的 revision 与来源随界面显示；每个服务方案一项
     revision: str = Field(min_length=1)
     source: str = Field(min_length=1)
     presets: tuple[ServicePreset, ...]
 
 
 class ModelCapability(_Definition):
-    # 模型能力表中的一条：取自 models.dev 的快照，只保留 docs/design/model-management.md「服务方案预置表与模型能力表」的字段。
+    # 模型能力表中的一条：取自 models.dev 的快照，只保留 docs/design/forms-and-verifier-role.md「四层各认识什么」的字段。
     # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
     # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务商接入包。
@@ -824,7 +824,7 @@ class Definitions(_Definition):
         return self.verification.write_scopes.get(role, WORKSPACE_WRITE_SCOPE)
 
     def is_open_loop(self, outcome: str) -> bool:
-        """事项最后采纳的成果没有核验角色核验时为开环（docs/design/model-management.md「目录文件重新读取」）。
+        """事项最后采纳的成果没有核验角色核验时为开环（docs/design/forms-and-verifier-role.md「定义的校验」）。
 
         outcome 是事项最后采纳的成果种类（成果驱动下是交付），按成果种类与核验声明算，判断里不写部门名。
         """
@@ -1153,7 +1153,7 @@ def _routing_references(organization: Organization, routings: Routings) -> list[
 
 
 def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
-    """事项的来源都有部门接（docs/design/model-management.md「目录文件重新读取」，工单 #1455）：不满足的整份拒绝，写出是哪一项。
+    """事项的来源都有部门接（docs/design/forms-and-verifier-role.md「定义的校验」，工单 #1455）：不满足的整份拒绝，写出是哪一项。
 
     旧定义没有写 sources 时，两种来源都按关注用户输入的部门解释：没有这样的部门，两种来源就没人接。
     写了 sources 时，每一种来源都要写明，接它的部门要在这份定义里；少一种、指到不存在的部门都拒绝。
@@ -1178,7 +1178,7 @@ def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
 
 
 def verification_issues(organization: Organization, outcomes: Collection[str]) -> list[tuple[str, str, str]]:
-    """核验声明的核对（docs/design/model-management.md「目录文件重新读取」第 2、3 条）：核验角色与被核验的角色都在这份定义里，
+    """核验声明的核对（docs/design/forms-and-verifier-role.md「定义的校验」第 2、3 条）：核验角色与被核验的角色都在这份定义里，
     成果种类在这份定义里，谁能拒绝谁无环（角色核验自己也是环）。
 
     旧定义没有这份声明，读的时候按今天写死的三部门解释；那种解释不是定义的一部分，这里不核对。

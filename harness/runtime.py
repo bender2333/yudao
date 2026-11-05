@@ -63,7 +63,7 @@ def load_forms(registry: Mapping[str, tuple[Definitions, Any]], store: Any) -> d
 
 
 def configure_fetch_tools(enabled: bool) -> None:
-    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）。
+    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明「工具的提供」、「查询清单」）。
 
     由命令行在启动时调用一次：以关闭取回的启动参数（`--no-fetch`）运行时，这个服务的部门没有
     `fetch_url` 与 `read_external_source`；不带参数时三个部门都有。进程内只有一个服务实例，
@@ -168,7 +168,7 @@ class LoopSystem:
         self.drain_finished_on_startup = self.finish_drain_on_startup()
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
-        # 启动时补建缺少的建档修改轮 run（工单 #136，docs/design/app-and-interface.md「能力清单与认证」）：回答「提出修改」以后
+        # 启动时补建缺少的建档修改轮 run（工单 #136，docs/design/existing-project-onboarding.md「失败与中断」中「提出修改」以后
         # 修改轮事件已经写入项目流，run 在事务提交以后创建，两者之间中断时在这里补建
         self.recovered_revision_runs = self.projects.create_missing_revision_runs_on_startup()
         # 启动时扫描上次异常退出留下的检查工作区（工单 #481）：run 已经结束但 on_commit 没有跑过
@@ -190,7 +190,7 @@ class LoopSystem:
         self.upgrade_other_version_runs()
         # 启动的最后一步：自动继续未结束的 run（工单 #16）
         self.resumed_runs = self.resume_startup_runs() if resume_on_startup else {}
-        # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明「决定」中「模型目录与凭据的写入」）
+        # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明「决定」）
         self.facade.set_reload_listener(self.sync_catalog_revision)
 
     def upgrade_other_version_runs(self) -> tuple[list[str], list[str]]:
@@ -243,7 +243,7 @@ class LoopSystem:
         return resumed
 
     def _continue_run(self, run_id: str) -> None:
-        # 取得执行权以后运行到停止并结算：服务进程里控制核心在接口层的事件循环中运行（总体架构「十项长期决定」中「异步执行」），
+        # 取得执行权以后运行到停止并结算：服务进程里控制核心在接口层的事件循环中运行（总体架构「十项长期决定」），
         # 这次运行是那个循环里的任务（与事项开始、回答决定以后继续同一条路径）；
         # 打开数据目录时还没有事件循环（测试、演示、命令行）时由 asyncio.run 运行到停止
         try:

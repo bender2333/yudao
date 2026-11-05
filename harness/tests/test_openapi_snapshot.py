@@ -13,7 +13,7 @@ from harness.tests.client_types_check import check_client_types
 # python -m pytest harness/tests/test_openapi_snapshot.py --write-openapi-snapshot 重写快照，
 # 再在 harness/tests/openapi 中运行 npm run check，由快照生成 TypeScript 类型并编译。
 # 合同里删掉或改变已有的东西（路径、查询、命令、事件种类及其字段）时要同时提高 API_VERSION
-# （应用层与接口层设计说明「能力清单」、「验收」中「OpenAPI 由 pydantic 类型生成；OpenAPI 文档的快照测试在合同变化时失败，已有的查询、命令或字段被删除或改变类型而接口版本没有提高时同样失败；由它生成的 TypeScript 类型在页面代码中编译通过，页面代码中提交的生成类型与快照逐文件相同」），重写快照也不例外。
+# （应用层与接口层设计说明「能力清单」、「验收」），重写快照也不例外。
 
 SNAPSHOT = Path(__file__).parent / "openapi" / "openapi.json"
 # 包版本号不属于接口合同：比较与重写都把两边的 info.version 取成这个固定值，

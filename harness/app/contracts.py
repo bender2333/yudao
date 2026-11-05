@@ -1,4 +1,4 @@
-# 应用层的合同：客户端与服务之间交换的数据类型（docs/design/app-and-interface.md「合同」、「合同」、「事件对象」、「模型输出片段」、「能力清单」）。
+# 应用层的合同：客户端与服务之间交换的数据类型（docs/design/app-and-interface.md「合同」、「事件对象」、「模型输出片段」、「能力清单」）。
 # 只含可以序列化的数据；OpenAPI 与客户端的接口类型都由这里的 pydantic 类型生成。
 
 from typing import Annotated, Any, Generic, Literal, TypeVar, Union, get_args

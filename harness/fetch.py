@@ -25,7 +25,7 @@ from .kernel_events import utc_now
 from .models import ArtifactRef
 from .providers.tls import ssl_context
 
-# 限额（「请求规则」）：写在工具定义里，不登记成可改参数（docs/design/network-and-mcp.md「本机的做法」中「限额」）
+# 限额（「请求规则」）：写在工具定义里，不登记成可改参数（docs/design/network-and-mcp.md「本机的做法」）
 REDIRECT_LIMIT = 5
 DOWNLOAD_LIMIT_BYTES = 5 * 1024 * 1024
 TOTAL_TIMEOUT_SEC = 30.0

@@ -38,7 +38,7 @@ function entry(overrides: Partial<RuleEntry> = {}): RuleEntry {
     cost: "长检查无法运行",
     relax_when: "按项目记录的检查用时分布设定",
     tighten_when: "同一项目的检查用时分布长期低于现值的四分之一",
-    origin: "规则登记「规则登记的初始内容」表格",
+    origin: "规则登记第 8 节表格",
     changes: [],
     ...overrides,
   };

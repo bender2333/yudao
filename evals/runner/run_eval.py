@@ -153,7 +153,7 @@ def parse_args(argv=None):
     parser.add_argument("--limit-seconds", type=float, default=TIME_LIMIT_SECONDS,
                         help="单次运行的墙钟上限")
     parser.add_argument("--context-window", type=int, default=None,
-                        help="上下文窗口；模型列表没有报告这个模型时用它（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）")
+                        help="上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）")
     parser.add_argument("--max-output-tokens", type=int, default=None,
                         help="单次输出上限；模型列表没有报告这个模型时用它")
     parser.add_argument("--run-id-prefix", default="run")

@@ -263,7 +263,7 @@ class WatchedOutputsTightening:
     }
 
     def submission(self, request: TightenRequest) -> Tightened:
-        # 一次提案提交的检查与内容组装（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：
+        # 一次提案提交的检查与内容组装（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」中「成果的内容由路由组装」）：
         # 先按种类查提案的形状，再按成果的内容判、把成果的内容组装出来。路由不组装的种类不给内容——
         # 内核按提案的参数当内容，照常写通用的接纳事件。内核不再按成果种类写分支
         proposal = request.proposal
@@ -812,7 +812,7 @@ def _location_known(relative: str, facts: TreeFacts) -> bool:
 
 def _baseline_conclusions(proposal: dict[str, Any], bound: dict[str, dict[str, Any]],
                           facts: TreeFacts) -> tuple[list[dict[str, str]], list[FieldError]]:
-    # 每条结论的依据按状态检查（docs/design/department-guidance.md「必验反例」中「同一个部门连续收到两段指导，按接收的顺序处理」）。逐条结论覆盖初始 PRD 的每条要求读的是 PRD 的内容，
+    # 每条结论的依据按状态检查（docs/design/existing-project-onboarding.md「质检：基线核验」）。逐条结论覆盖初始 PRD 的每条要求读的是 PRD 的内容，
     # 不在这里：由路由的收紧检查核对（S1d，工单 #860）
     declared = [item["requirement"].strip() for item in proposal["conclusions"]]
     errors: list[FieldError] = []
@@ -1430,7 +1430,7 @@ _LAUNCH_SYSTEMS = frozenset({"windows", "linux"})
 
 
 def _launch_errors(proposal: dict[str, Any]) -> list[FieldError]:
-    # launch 的形状与 docs/design/execution-environment.md「启动方式」的五项核对：名称不重复、种类是 web 或 desktop、commands 至少一项且键是
+    # launch 的形状与 docs/design/browser-and-computer-use.md「启动方式」的五项核对：名称不重复、种类是 web 或 desktop、commands 至少一项且键是
     # windows 或 linux、网页应用有本机 http 地址且带 {port}、桌面程序没有 ready_url、就绪时限不超过上限
     raw = proposal.get("launch")
     if raw is None:

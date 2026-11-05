@@ -118,7 +118,7 @@ def test_the_recovery_page_reads_its_numbers_from_the_minimal_projection(tmp_pat
         minimal = fold_events(events)
         recovery = Application(restarted).query("run.recovery", RunRecovery(run_id=run_id)).data
 
-        # 激活次数与模型步数：与同一组事件折叠出的最小投影一致（docs/design/skeleton-and-application.md「最小投影」中「应用可以读最小投影，内核不为应用加字段」）
+        # 激活次数与模型步数：与同一组事件折叠出的最小投影一致（docs/design/skeleton-and-application.md「最小投影」）
         assert recovery.limits.activations == minimal.used.activations, recovery.limits.activations
         assert recovery.limits.model_steps == minimal.used.model_steps, recovery.limits.model_steps
         assert recovery.limits.activations >= 1 and recovery.limits.model_steps >= 1

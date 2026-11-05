@@ -184,7 +184,7 @@ async def _create_work_item(application: "Application", command: Command, reques
         raise Rejection("not_found", "没有这个项目，请重新读取以后提交") from missing
     if project.archived:
         raise Rejection("project_archived", "项目已归档，恢复以后才能新建事项")
-    # 建档之前的事项（3.8 docs/design/app-and-interface.md「分层与模块」）：接入已有项目还没有基线时，普通事项不能开始
+    # 建档之前的事项（3.8 第 2 节）：接入已有项目还没有基线时，普通事项不能开始
     onboarding = [item for item in project.work_items if item.kind == "onboarding"]
     if project.source == "existing" and project.current_adoption is None and onboarding:
         if any(item.status in ("in_progress", "awaiting_initial_prd") for item in onboarding):

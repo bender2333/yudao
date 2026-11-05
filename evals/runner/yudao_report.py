@@ -542,7 +542,7 @@ def _passed_checks_text(item):
 
 
 def _improvement_text(improvement):
-    """质检带来的提高：条数、不计入与没有结论各写清楚（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）。"""
+    """质检带来的提高：条数、不计入与没有结论各写清楚（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）。"""
     improvement = improvement or {}
     status = improvement.get("status")
     if status == "improved":

@@ -53,7 +53,7 @@ export interface Anim {
   total: number;
 }
 
-/** 动作说明（设计说明书 docs/design/visualization.md「动作」、「动作」）：驱动它的事实、在哪个画面里、小人做什么。
+/** 动作说明（设计说明书 docs/design/visualization.md「动作」）：驱动它的事实、在哪个画面里、小人做什么。
  * v13 起不再写「来源事件」一列：事件由哪种事件给出写在翻译层（js/translate/sources.js）。 */
 export interface ActionInfo {
   label: string;

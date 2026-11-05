@@ -23,7 +23,7 @@ def load_result(path):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
-        description="Yudao 对 OpenCode 的对照（评测场景设计「Yudao 对单个 agent」）")
+        description="Yudao 对 OpenCode 的对照（评测场景设计第 6.3 节）")
     parser.add_argument("--yudao", required=True, help="Yudao 一侧的结果文件（JSON）")
     parser.add_argument("--opencode", required=True, help="OpenCode 一侧的结果文件（JSON）")
     parser.add_argument("--result", help="对照结果（JSON）的路径")

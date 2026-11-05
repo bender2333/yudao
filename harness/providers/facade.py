@@ -241,7 +241,7 @@ class ProviderFacade:
         # 整份文档的全部绑定在此核对，与现有绑定相同的条目不豁免（工单 #1310）；
         # 准入有效性按保存前的配置核对（effective_store=self._store，与 save_bindings 同一基准）：
         # 文档自带连接字段的重新配置（如改地址）不作废引用，由保存后的重测重新准入
-        # （设计说明「引用无法使用时」引用保留、docs/design/model-management.md「验收」验收第 10 条）。
+        # （docs/design/model-management.md「引用无法使用时」引用保留、docs/design/network-and-mcp.md「用户确认的决定」验收第 10 条）。
         # 导入移除被引用的定义、或移除被引用定义所属的连接时由应用层按移除单条定义的同一规则拒绝
         # （docs/design/model-management.md「删除」、「目录文档（编辑 JSON、导入、导出）」），引用方包含各部门默认与项目部门设置；
         # 启动读取目录文件容错陈旧引用与未准入的默认，两者走出不同的入口
@@ -1965,7 +1965,7 @@ def _admission_state_text(record: AdmissionRecord | None) -> str:
 
 def _model_test_failure_reason(error: ProviderError) -> str:
     # 模型测试失败时写上游给出的原因（docs/design/model-management.md「模型管理页」，工单 #294）：上游有错误原文时写原文，
-    # 没有时照旧写状态码那句（401 与 403 不记回应体，见 docs/design/model-management.md「观测」）
+    # 没有时照旧写状态码那句（401 与 403 不记回应体，见 docs/design/model-management.md「模型访问定义与准入」）
     status = (error.diagnostics or {}).get("status_code")
     if status in {401, 403}:
         return f"HTTP {status}：" + ("凭据无效" if status == 401 else "没有访问权限")

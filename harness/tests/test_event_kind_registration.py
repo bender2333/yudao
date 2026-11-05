@@ -1,4 +1,4 @@
-# 应用登记自己的事件种类（docs/design/test-pyramid.md「测试往下层移」中「OpenAPI 快照测试中核对接口说明的一项直接取 `harness.api.app.create_app` 返回的 FastAPI 应用的 `openapi」，S5a 工单 #828）：一种新的应用事件种类经写入口写入，
+# 应用登记自己的事件种类（docs/design/skeleton-and-application.md「骨架事件与应用事件」，S5a 工单 #828）：一种新的应用事件种类经写入口写入，
 # 重放读得回来，改动的只有登记它的应用与它的测试，内核文件不变。
 #
 # 用的资源是真实的 SQLite 事件库与写入口的一次事务，没有完整的三部门循环，属于模块层。
@@ -24,7 +24,7 @@ NEW_KIND = "task_pool_task_published"
 
 
 def test_the_application_registers_the_run_events_it_owns():
-    # 应用登记的正是 run 流里除骨架事件以外的那些种类：骨架事件由内核给出，其余归应用（docs/design/test-pyramid.md「测试往下层移」中「OpenAPI 快照测试中核对接口说明的一项直接取 `harness.api.app.create_app` 返回的 FastAPI 应用的 `openapi」）
+    # 应用登记的正是 run 流里除骨架事件以外的那些种类：骨架事件由内核给出，其余归应用（docs/design/skeleton-and-application.md「骨架事件与应用事件」）
     assert set(APPLICATION_EVENT_TYPES) == set(RUN_EVENT_TYPES) - set(SKELETON_RUN_EVENTS)
     registered = application_event_types()
     for kind in APPLICATION_EVENT_TYPES:

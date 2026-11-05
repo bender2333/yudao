@@ -129,7 +129,7 @@ _ROUND_TASK_SOURCE = "round_task"
 
 
 def _task_line(projection: RunProjection, frame: assembly_contract.StepFrame) -> str:
-    # 这一轮的任务一句：事项的任务，加上路由原样交来的工作引用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」，骨架不解释它）
+    # 这一轮的任务一句：事项的任务，加上路由原样交来的工作引用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，骨架不解释它）
     line = f"这一轮的任务：{projection.task}"
     if frame.work_ref is not None:
         line += f"\n这一轮的工作引用：{json_dumps(frame.work_ref)}"

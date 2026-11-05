@@ -8,13 +8,13 @@
 # 形状：
 # - 发任务的部门把用户的输入写成池子里的一条任务（提议方式 `submit_task`，成果种类 `pool_task`）；
 # - 路由把池子里待办的任务**指派**给能做它的部门：这一轮工作的路由自己的工作引用就是那件任务
-#   （设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」，原样交给装配与执行）；
+#   （设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，原样交给装配与执行）；
 # - 领到任务的部门交完成说明（`complete_task` / `task_completion`）；
 # - 另一个部门给结论：接纳或者打回（`judge_task` / `task_verdict`）。打回以后任务回到池子，由完成它的
 #   部门重做。完成一件事的部门不能自己宣布它合格（基础规则 3）：这一条由本路由的收紧检查判（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」
 #   「路由提供收紧检查」），不靠内核。
 # - 池子里没有待办的任务时事项结束，结束原因是**它自己那份定义里声明的** `pool_drained`
-#   （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」，不进内核的停止原因清单）。
+#   （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，不进内核的停止原因清单）。
 #
 # 成果怎么被接纳（2026-10-28 总架构师补的做法）：三种成果都不新增内核事件种类，经工具许可与提案校验以后
 # 写通用的一种「成果接纳」事件（`artifact_accepted`，S2c 工单 #1098），最小投影按它带的统一字段折叠出
@@ -56,7 +56,7 @@ VERDICT_KIND = "task_verdict"
 ACCEPT = "accept"
 RETURN = "return"
 
-# 路由自己的应用事件种类（设计说明「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」、docs/design/skeleton-and-application.md「骨架事件与应用事件」）：任务池自己记的两件事——一件任务被指派出去、
+# 路由自己的应用事件种类（设计说明「其他路由：骨架要满足的条件」、docs/design/skeleton-and-application.md「骨架事件与应用事件」）：任务池自己记的两件事——一件任务被指派出去、
 # 一件任务被打回以后回到池子。登记归登记，内核不解释它们的内容；它们不进骨架事件的那张表
 TAKEN_EVENT = "task_pool_task_taken"
 RETURNED_EVENT = "task_pool_task_returned"
@@ -203,7 +203,7 @@ def _free(department: str, waiting: set[str] | None) -> bool:
 
 
 def work_reference(state: PoolState, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）：指派给它的那件任务。
+    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：指派给它的那件任务。
 
     发任务的一轮没有任务可指派（任务由这一轮写出来），为空。原样交给装配与执行，骨架不解释它。
     """
@@ -252,7 +252,7 @@ def submitted_in_round(events: list[Event], *, session_id: str | None, activatio
 
 
 def check_definition(definitions: Any) -> None:
-    """校验任务池这份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：内核只核对结构，内容归路由自己。"""
+    """校验任务池这份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：内核只核对结构，内容归路由自己。"""
     declared = routing_contract.definition_of(definitions, ROUTING_NAME)
     if declared is None:
         raise routing_contract.InvalidRoutingDefinition(
@@ -352,7 +352,7 @@ class TaskPool:
         return routing_contract.RoundEnd(outcome="proposal_accepted" if submitted else "text_reply")
 
     def item_end(self, view: Any) -> routing_contract.ItemEnd | None:
-        # 池子里没有待办的任务：事项以这条路由自己声明的结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）
+        # 池子里没有待办的任务：事项以这条路由自己声明的结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
         if not self.state(view.run_id).drained():
             return None
         return routing_contract.ItemEnd(stop_reason=ITEM_END_REASON,

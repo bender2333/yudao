@@ -175,7 +175,7 @@ class DecisionFlow:
                                  decision_id: str) -> str | None:
         # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted；
         # 提出修改时在同一个事务中追加回答与 onboarding_revision_started，返回新 run 编号，
-        # 由调用方 start：run 在事务提交以后单独建立（docs/design/skeleton-and-application.md「用户确认与修改的往返」、「用户确认与修改的往返」）
+        # 由调用方 start：run 在事务提交以后单独建立（docs/design/existing-project-onboarding.md「用户确认与修改的往返」）
         if option == "revise" and not (note or "").strip():
             raise NoteRequired(decision, option)
         request = decision.request

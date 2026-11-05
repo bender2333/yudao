@@ -340,7 +340,7 @@ def start_service(data_dir, port, python_executable=None):
 
     `--no-browser`：运行器不需要在控制主机上打开页面，评测运行与测试都按无界面启动。
     `--no-fetch`：关闭取回，这个实例的部门没有 `fetch_url` 与 `read_external_source`
-    （网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」、评测场景设计说明「两边的运行条件」中「两边都不联网」）。
+    （网络与 MCP 设计说明「工具的提供」、「两边的运行条件」、评测场景设计说明「两边的运行条件」中「两边都不联网」）。
     """
     command = [python_executable or sys.executable, "-m", "harness", "api",
                "--data-dir", data_dir, "--port", str(port), "--no-browser", "--no-fetch"]
@@ -612,7 +612,7 @@ def first_archived_delivery(export):
     """第一次封存的交付：与 `last_archived_delivery` 对称（docs/design/evaluation-scenarios.md「指标」）。
 
     只有一次交付时两次取到同一个事件，没有交付时都是 None。两份都交给评分器：
-    第一次交付的完成度与质检带来的提高都从它算（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）。
+    第一次交付的完成度与质检带来的提高都从它算（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）。
     """
     deliveries = [event for event in export["events"] if event["type"] == "delivery_accepted"]
     return deliveries[0] if deliveries else None

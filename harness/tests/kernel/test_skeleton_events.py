@@ -1,5 +1,5 @@
 # 骨架事件的登记表（S5a，工单 #828）：内核事件模块给出内核写入或读取的事件种类；应用事件的种类由应用
-# 自己登记，应用登记一种新的种类不改内核文件（docs/design/test-pyramid.md「测试往下层移」中「OpenAPI 快照测试中核对接口说明的一项直接取 `harness.api.app.create_app` 返回的 FastAPI 应用的 `openapi」）。
+# 自己登记，应用登记一种新的种类不改内核文件（docs/design/skeleton-and-application.md「骨架事件与应用事件」）。
 #
 # 这张表与设计说明「模块交互」逐项对照，含 S1b 的成果失效；docs/design/trusted-kernel.md「四项技术保证」 2026-10-25 第 1 条把「模型请求」改为骨架事件
 # （模型步数按请求一条条数，最小投影读它），所以它也在表里：「模块交互」的表把它列在应用事件里，按 docs/design/trusted-kernel.md「四项技术保证」更正。
@@ -82,7 +82,7 @@ def test_the_model_request_is_a_skeleton_event():
 
 
 def test_an_application_registers_its_own_event_kinds():
-    # 应用登记一种新的应用事件：登记表认得它，骨架事件的登记表不变（docs/design/test-pyramid.md「测试往下层移」中「OpenAPI 快照测试中核对接口说明的一项直接取 `harness.api.app.create_app` 返回的 FastAPI 应用的 `openapi」）
+    # 应用登记一种新的应用事件：登记表认得它，骨架事件的登记表不变（docs/design/skeleton-and-application.md「骨架事件与应用事件」）
     before = frozenset(SKELETON_EVENTS)
     novel = "task_pool_task_published"
     assert event_type_owner(novel) is None

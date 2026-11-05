@@ -88,7 +88,7 @@ def proposal_kinds_of(*, definitions: Definitions | None = None) -> frozenset[st
 
 
 def writes_check_materials(department: str, *, definitions: Definitions | None = None) -> bool:
-    # 写入范围是检查材料的角色（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」、工单 #1390）：它的写入只进检查材料与检查副本
+    # 写入范围是检查材料的角色（docs/design/forms-and-verifier-role.md「核验角色」、工单 #1390）：它的写入只进检查材料与检查副本
     return in_force(definitions).write_scope(department).scope == "check_materials"
 
 
