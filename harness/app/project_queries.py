@@ -39,7 +39,7 @@ from ..recovery import (
 from ..runtime import FORM_REGISTRY
 from ..tree_archive import load_tree
 from .contracts import Contract, Snapshot, Text
-from .labels import actor_name, department_name, event_label, status_name
+from .labels import NO_BASELINE_REVIEW_LABEL, actor_name, department_name, event_label, status_name
 from .payloads import (PAYLOADS, BaselineCheck, BaselineConclusion, BaselineOmission, BaselineOtherFailure,
                        Department)
 from .read_models import AttemptStatus, ReadModels
@@ -2285,7 +2285,9 @@ class OnboardingDecisionRecord(Contract):
 class OnboardingRound(Contract):
     # 一次建档候选（工单 #136，设计第 3.3、4.7 节）：轮次、这一轮 run、候选事件与提出时间，
     # 三份产物与仓库概况的原文、上一轮的修改意见原文、基线核验与这一轮的决定记录。
-    # 工件按候选自己的 run 目录存放；提出修改以后开始的修改轮才有修改意见
+    # 工件按候选自己的 run 目录存放；提出修改以后开始的修改轮才有修改意见。
+    # 没有核验角色的形态没有基线核验这一步（工单 #1510）：baseline_review 为空，
+    # baseline_review_note 写「没有经过基线核验」，资料页据此写明
     round: int
     run_id: str
     candidate_event_id: str
@@ -2294,7 +2296,8 @@ class OnboardingRound(Contract):
     structure: str
     overview: str
     revision_note: str | None
-    baseline_review: BaselineReviewView
+    baseline_review: BaselineReviewView | None = None
+    baseline_review_note: str | None = None
     decisions: list[OnboardingDecisionRecord]
 
 
@@ -2425,13 +2428,15 @@ def _onboarding_rounds(application: Application, state: Any,
             overview=_artifact_text(application, candidate.run_id, candidate.overview_ref),
             revision_note=None if candidate.revision_note_ref is None else
             _artifact_text(application, candidate.run_id, candidate.revision_note_ref),
-            baseline_review=BaselineReviewView(
+            # 没有核验角色的形态没有基线核验这一步（工单 #1510）：这一轮没有这一份产物，写明没有经过基线核验
+            baseline_review=None if review is None else BaselineReviewView(
                 event_id=review["event_id"], content_hash=review["content_hash"],
                 conclusions=[BaselineConclusion(**item) for item in review["conclusions"]],
                 omissions=[BaselineOmission(**item) for item in review["omissions"]],
                 checks=[BaselineCheck(**item) for item in review["checks"]],
                 other_failures=[BaselineOtherFailure(**item) for item in review["other_failures"]],
             ),
+            baseline_review_note=None if review is not None else NO_BASELINE_REVIEW_LABEL,
             decisions=decided.get(candidate.event_id, []),
         ))
     return rounds

@@ -10,6 +10,10 @@
 # 一轮工作在交完成以前可以有很多轮：可以交完成、还没有交的那些角色一直可以开始下一轮，直到交了完成
 # （事项结束）或者内核的时间、轮次与步数上限把它停下（设计说明第 5.4 节第 7 条：一定会停靠内核的上限）。
 #
+# 建档（工单 #1510，接入已有项目设计说明第 4.1 节）：同一个路由也跑建档事项。接「建档」这一来源的角色交初始
+# PRD 与现有结构说明，然后交完成；这份形态没有核验角色，建档没有基线核验这一步，交完成以后以开环完成结束，
+# 项目层照常提出初始 PRD 候选并请用户确认（确认请求写明这份基线没有经过基线核验）。
+#
 # 直做加核验角色（交完成以后等核验结论、打回则再做一轮）归 #1396：这一版定义了核验角色核验交完成的，
 # 加载时整份拒绝——不把没有人核验的完成记成放行（check_definition 的最后两条）。
 #
@@ -25,7 +29,7 @@ from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .definitions import DEFINITIONS
 from .models import OPEN_LOOP_STOP_REASON, Event, EventType, RunProjection, TERMINAL_STATUSES, new_id
 from .tools import in_force, offers_with_input, proposal_kind, tool_action, tools_for
-from .validation import FieldError, TightenRequest, Tightened
+from .validation import FieldError, TightenRequest, Tightened, evaluate_conditions
 
 # 组织定义 organization.json 的 routing 里写这个名称（设计说明第 5.1 节「选择」）
 ROUTING_NAME = "direct"
@@ -36,6 +40,12 @@ SINGLE_ROLE_DIRECT = "single_role_direct"
 # 交完成这种成果的种类：这份路由的最后采纳是它（routings.json 的 final_outcome）。直做下的完成说明
 # 就是事项最后采纳的那一份，交完成的事件由通用的成果接纳写法写下（S2c，工单 #1098）
 COMPLETION_KIND = "completion"
+
+# 建档的两份产物（工单 #1510，接入已有项目设计说明第 4.1 节）：直做下接建档的那个角色既写初始 PRD，
+# 也写现有结构说明。没有核验角色的形态没有基线核验这一步，交完成为止；两份产物由定义里给的提交工具提交，
+# 内容按内核的通用条件组装（内核不认识具体有哪几种成果，工单 #1456）
+PRODUCT_SPEC_KIND = "product_spec"
+STRUCTURE_KIND = "structure"
 
 # 一份直做定义必须写明事项结束用的那一个原因：它的定义里声明的封闭清单中的一条
 ITEM_END_REASON = "no_open_work"
@@ -552,10 +562,19 @@ class DirectTightening:
         return None
 
     def submission(self, request: TightenRequest) -> Tightened:
-        # 一次提案提交的检查与内容组装：直做只组装交完成；通过时结束事项（薄驱动按路由给的结束原因记成
-        # 开环完成）。其余种类照常由内核按提案合同核对，内容就是提案的参数
+        # 一次提案提交的检查与内容组装：直做组装交完成（通过时结束事项，薄驱动按路由给的结束原因记成
+        # 开环完成），以及建档的两份产物——初始 PRD 带上这一版覆盖到的输入版本，现有结构说明带上工作区的
+        # 树摘要与当时的初始 PRD（工单 #1510，接入已有项目设计说明第 4.1 节）。其余种类照常由内核按提案合同
+        # 核对，内容就是提案的参数
         proposal = request.proposal
-        if not isinstance(proposal, dict) or str(proposal.get("kind")) != COMPLETION_KIND:
+        if not isinstance(proposal, dict):
+            return Tightened()
+        kind = str(proposal.get("kind"))
+        if kind == STRUCTURE_KIND:
+            return self._structure(request)
+        if kind == PRODUCT_SPEC_KIND:
+            return self._product_spec(request)
+        if kind != COMPLETION_KIND:
             return Tightened()
         errors = _completion_errors(proposal)
         if errors:
@@ -566,6 +585,40 @@ class DirectTightening:
             "known_risks": [str(item).strip() for item in proposal.get("known_risks") or ()],
         }
         return Tightened(content=content, ends_run=True)
+
+    def _product_spec(self, request: TightenRequest) -> Tightened:
+        # 初始 PRD 的内容：提案给出的字段，加上这一版覆盖到的用户输入版本（有效合同按它记下依据）。
+        # 引用当前版本这类条件由提案合同给出，内核按名字核对（工单 #1456）
+        proposal = request.proposal or {}
+        outcome = evaluate_conditions(PRODUCT_SPEC_KIND, department=request.department, proposal=proposal,
+                                      minimal=request.minimal, facts=request.facts,
+                                      definitions=request.definitions)
+        if outcome.errors:
+            return Tightened(errors=tuple(outcome.errors))
+        content = {key: value for key, value in proposal.items() if key != "kind"}
+        content["input_version"] = int(request.state.input_version)
+        return Tightened(content=content)
+
+    def _structure(self, request: TightenRequest) -> Tightened:
+        # 现有结构说明的内容：提案给出的字段，加上工作区的树摘要与当时的初始 PRD。构建与测试的每一项
+        # 要带本次激活中绑定当前快照与当前 PRD 的 run_check 回执，由提案合同的通用条件取（设计说明第 5.5 节）
+        proposal = request.proposal or {}
+        spec_hash = request.minimal.artifact_hash(PRODUCT_SPEC_KIND)
+        if spec_hash is None:
+            return Tightened(errors=(FieldError(PRODUCT_SPEC_KIND, "no active ProductSpec"),))
+        outcome = evaluate_conditions(STRUCTURE_KIND, department=request.department, proposal=proposal,
+                                      minimal=request.minimal, facts=request.facts,
+                                      definitions=request.definitions)
+        if outcome.errors:
+            return Tightened(errors=tuple(outcome.errors))
+        build_and_test = [{**item, "name": str(item["name"]).strip(),
+                           "receipt": outcome.receipts[str(item["name"]).strip()]}
+                          for item in proposal.get("build_and_test") or ()]
+        content = {key: value for key, value in proposal.items() if key != "kind"}
+        content["build_and_test"] = build_and_test
+        content["product_spec_hash"] = spec_hash
+        content["code_tree_digest"] = request.facts.digest
+        return Tightened(content=content)
 
 
 DIRECT_TIGHTENING = DirectTightening()

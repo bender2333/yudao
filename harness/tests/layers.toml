@@ -158,6 +158,7 @@
 "test_onboarding_commands.py" = "integration"
 "test_onboarding_confirmation_queries.py" = "integration"
 "test_onboarding_confirmation_round.py" = "integration"
+"test_onboarding_open_loop.py" = "integration"
 "test_onboarding_renamed.py" = "integration"
 "test_onboarding_revision_context.py" = "integration"
 "test_open_loop_completion.py" = "integration"

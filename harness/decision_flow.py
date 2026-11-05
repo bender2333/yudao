@@ -211,23 +211,27 @@ class DecisionFlow:
 
     def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
         # 采纳建档基线（工单 #136，设计第 5 节）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
-        # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险
+        # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险。
+        # 没有核验角色的形态没有基线核验这一步（工单 #1510，形态与核验角色设计说明「开环完成」第 6 条）：
+        # 这一项为空，现有缺陷与基线检查也为空，摘要写明这份基线没有经过基线核验；采纳本身照常进行
         snapshot = candidate.snapshot
-        defects = [item["requirement"] for item in candidate.baseline_review["conclusions"]
+        review = candidate.baseline_review or {}
+        defects = [item["requirement"] for item in review.get("conclusions") or []
                    if item["status"] == "existing_defect"]
         known_risks = [f'现有缺陷：{item["requirement"]}（{item["evidence"]}）'
-                       for item in candidate.baseline_review["conclusions"]
+                       for item in review.get("conclusions") or []
                        if item["status"] == "existing_defect"]
         known_risks += [f'检查 {item["check"]} 未通过：{item["reason"]}'
-                        for item in candidate.baseline_review["other_failures"]]
+                        for item in review.get("other_failures") or []]
+        checks = list(review.get("checks") or [])
         transaction.append(NewProjectEvent(ProjectEventType.BASELINE_ADOPTED, {
             "adoption_id": new_id("adopt"), "work_item_id": candidate.work_item_id, "run_id": candidate.run_id,
             "candidate_event_id": candidate.event_id, "tree_ref": snapshot["tree_ref"],
             "code_tree_digest": snapshot["tree_digest"], "summary": _onboarding_summary(candidate),
             "prd_ref": candidate.prd["prd_ref"], "product_spec_hash": candidate.prd["content_hash"],
             "structure_ref": candidate.structure["structure_ref"], "files": list(snapshot.get("files") or []),
-            "check_names": [item["name"] for item in candidate.baseline_review["checks"]],
-            "checks": list(candidate.baseline_review["checks"]), "known_risks": known_risks,
+            "check_names": [item["name"] for item in checks],
+            "checks": checks, "known_risks": known_risks,
             "snapshot": snapshot, "previous_adoption_id": None, "existing_defects": defects,
         }, actor="system"))
 
@@ -303,7 +307,11 @@ class DecisionFlow:
 
 
 def _onboarding_summary(candidate: Any) -> str:
-    # 建档基线的摘要（工单 #136）：把这一轮的轮次与三条产物的内容摘要写成一句话
+    # 建档基线的摘要（工单 #136）：把这一轮的轮次与三条产物的内容摘要写成一句话。
+    # 没有基线核验的那一种（工单 #1510）只有两份产物，写明这份基线没有经过基线核验，不编一条核验的摘要
+    if not candidate.baseline_review:
+        return (f"第 {candidate.round} 轮建档的初始 PRD 已确认（没有经过基线核验）："
+                f"PRD {candidate.prd['content_hash']}、现有结构说明 {candidate.structure['content_hash']}")
     return (f"第 {candidate.round} 轮建档的初始 PRD 已确认：PRD {candidate.prd['content_hash']}、"
             f"现有结构说明 {candidate.structure['content_hash']}、"
             f"基线核验 {candidate.baseline_review['content_hash']}")
