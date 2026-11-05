@@ -694,14 +694,14 @@
   },
   "execution.readiness_timeout_sec": {
     "value": 300,
-    "bounds": [10, 3600],
+    "bounds": [10, 1800],
     "kind": "parameter",
     "form": "boundary",
     "guards": "启动失败的交付占住试用会话",
     "cost": "启动慢的交付被判为失败",
     "relax_when": "按项目记录的启动用时分布调整",
     "tighten_when": "启动用时分布长期低于现值的四分之一",
-    "origin": "浏览器与 computer use 设计说明第 52 行，就绪时限默认 300 秒"
+    "origin": "浏览器与 computer use 设计说明，启动方式一节的参数表"
   },
   "execution.heartbeat_interval_sec": {
     "value": 10,

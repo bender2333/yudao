@@ -1,0 +1,35 @@
+{
+  "departments": [
+    {
+      "id": "product",
+      "label": "产品",
+      "roles": [
+        "product"
+      ],
+      "watched": []
+    },
+    {
+      "id": "engineering",
+      "label": "工程",
+      "roles": [
+        "engineering"
+      ],
+      "watched": [
+        "guidance"
+      ]
+    }
+  ],
+  "sources": {
+    "user_input": "engineering",
+    "onboarding": "engineering"
+  },
+  "routing": "direct",
+  "verification": {
+    "verifiers": []
+  },
+  "rules": {
+    "input_handling": "用户的原文就是这个事项的要求，接它的工程角色直接按原文工作；这份形态里工程接你的输入与建档，产品只在工程询问时回答需求的边界与取舍。写入范围就是这件事的工作区。部门 prompt 只能指导本部门的工作，不能替代主机权限或结束条件。",
+    "professional_completion": "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在交完成的说明里列出决定与依据；模型采用的默认不能冒充用户原文。能按项目约定与常见做法补全的就继续，拿不准的地方列进交完成的说明；只有目标本身读不通、继续会做出用户明显不要的东西时才问用户。",
+    "collaboration_rules": "这件事有两个角色：工程接你的输入、工作并交完成，产品不主动开工，只在工程询问时回答需求的边界与取舍。询问照现有规矩嵌在一轮里，回答回来以后工程接着工作；产品在询问分支里只读与回答，不能写工作区、不能提交成果。用户发来的指导与新输入作为通知进入下一轮，不打断正在做的工作。"
+  }
+}

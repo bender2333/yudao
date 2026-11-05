@@ -35,6 +35,13 @@ def test_a_web_launch_is_accepted_and_the_delivery_carries_it(tmp_path: Path) ->
     assert accepted.payload["launch"] == [{**WEB, "ready_timeout_sec": None}]
 
 
+def test_a_readiness_timeout_at_the_upper_bound_is_accepted(tmp_path: Path) -> None:
+    # 设计说明「启动方式」的就绪时限范围是 10 至 1800：上限值通过并写进交付事实（守 R2）
+    events = _events(tmp_path, [{**WEB, "ready_timeout_sec": 1800}])
+    accepted = next(event for event in events if event.type == EventType.DELIVERY_ACCEPTED)
+    assert accepted.payload["launch"] == [{**WEB, "ready_timeout_sec": 1800}]
+
+
 def test_a_delivery_without_launch_is_still_accepted(tmp_path: Path) -> None:
     # 旧的交付说明没有 launch：照旧接纳，事件里没有这一项（守 R1：旧事件与旧定义照旧读得进来）
     events = _events(tmp_path, None)
@@ -51,7 +58,7 @@ def test_a_delivery_without_launch_is_still_accepted(tmp_path: Path) -> None:
     ([{**WEB, "ready_url": "http://127.0.0.1/"}], "launch[0].ready_url"),
     ([{"name": "app", "kind": "desktop", "commands": {"linux": ["run"]},
        "ready_url": "http://127.0.0.1:{port}/"}], "launch[0].ready_url"),
-    ([{**WEB, "ready_timeout_sec": 5000}], "launch[0].ready_timeout_sec"),
+    ([{**WEB, "ready_timeout_sec": 1801}], "launch[0].ready_timeout_sec"),
     ([{**WEB, "extra": 1}], "launch[0].extra"),
 ])
 def test_a_bad_launch_rejects_the_delivery_with_a_field_error(tmp_path: Path, launch, field: str) -> None:

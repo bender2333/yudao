@@ -1,0 +1,152 @@
+{
+  "roles": {
+    "product": {
+      "submit_tools": [],
+      "kinds": {},
+      "notes": [
+        "你是被询问的一方：在询问分支里用 answer 回答工程的问题，写清需求的边界、取舍与理由。",
+        "这份形态里你不主动开工，也不提交任何成果；回答不了时在回答里写明，并可以建议去问谁。"
+      ]
+    },
+    "engineering": {
+      "submit_tools": [
+        "submit_product_spec",
+        "submit_structure",
+        "submit_completion"
+      ],
+      "kinds": {
+        "product_spec": {
+          "description": "建档的初始 PRD：描述这个仓库现在做得到的事，作为项目以后的当前有效要求。每条要求写一项使用者能观察到的能力，写到能用一条检查或一段操作核实的程度；边界写不作为产品行为承诺的部分。",
+          "required": [
+            "kind=product_spec",
+            "goal",
+            "requirements",
+            "acceptance_criteria",
+            "requirement_mapping",
+            "basis_product_spec_hash"
+          ],
+          "optional": [
+            "boundaries",
+            "constraints",
+            "fatal_conditions",
+            "non_goals",
+            "change_record"
+          ],
+          "requirement_mapping": [
+            {
+              "requirement": "1-based position of the requirement in requirements",
+              "criteria": [
+                "AC<position> of an acceptance criterion"
+              ],
+              "gap": "reason when no acceptance criterion can be written; give either criteria or gap"
+            }
+          ],
+          "basis_product_spec_hash": "content hash of the ProductSpec this revision is based on; null for the first spec"
+        },
+        "structure": {
+          "description": "建档的现有结构说明：仓库的组成与运行方式、构建与测试命令。只写读多个文件才立得住、以后的工作容易看错的内容；每条 build_and_test 要有这一轮 run_check 的回执（名称、命令与退出状态照实写）。建档中你没有写入、编辑、删除与移动文件的工具，工作区必须仍是快照。",
+          "required": [
+            "kind=structure",
+            "overall",
+            "modules",
+            "entry_points",
+            "build_and_test",
+            "requirement_locations"
+          ],
+          "optional": [
+            "conventions"
+          ],
+          "modules": [
+            {
+              "path": "workspace-relative file or directory",
+              "responsibility": "what it is responsible for"
+            }
+          ],
+          "entry_points": [
+            {
+              "kind": "program|command_line|service",
+              "path": "workspace-relative file",
+              "how_to_run": "the command that starts it"
+            }
+          ],
+          "build_and_test": [
+            {
+              "name": "name passed to run_check",
+              "command": "the command string",
+              "purpose": "what it builds or tests"
+            }
+          ],
+          "requirement_locations": [
+            {
+              "requirement": "an initial PRD requirement",
+              "locations": [
+                "main files or directories"
+              ]
+            }
+          ]
+        },
+        "completion": {
+          "description": "这件事的完成说明：做了什么、怎么验的、还有哪些拿不准的地方。交完成就是这件事的结束；没有核验角色，事项记为开环完成，不写成放行",
+          "required": [
+            "kind=completion",
+            "summary"
+          ],
+          "optional": [
+            "uncertain",
+            "known_risks"
+          ],
+          "uncertain": "拿不准、没有把握的地方，逐条写；用户可以据此接着做",
+          "known_risks": "已知的风险，可选"
+        }
+      },
+      "notes": [
+        "需要定需求的边界与取舍、自己拿不准时，用 ask 问产品；回答回来以后接着工作。",
+        "交完成不是宣布合格：这份形态没有核验角色，事项以开环完成结束，记录上不写放行。",
+        "拿不准、又不必问产品的地方列进 uncertain，不要为了小问题停下来问；检查一律以主机执行的 run_check 为准。"
+      ]
+    }
+  },
+  "shared": {
+    "submit_tools": [],
+    "kinds": {},
+    "notes": []
+  },
+  "conditions": {
+    "product_spec": [
+      {
+        "condition": "basis_current",
+        "field": "basis_product_spec_hash",
+        "target": "product_spec"
+      }
+    ],
+    "structure": [
+      {
+        "condition": "tree_matches",
+        "recorded_in": "snapshot",
+        "field": "code_snapshot_hash",
+        "missing": {
+          "field": "snapshot",
+          "message": "an onboarding proposal requires the code snapshot recorded when the run was created"
+        },
+        "message": "the workspace tree {actual} no longer matches the snapshot {recorded}"
+      },
+      {
+        "condition": "check_receipts",
+        "department": "engineering",
+        "names": {
+          "items": "build_and_test",
+          "item": "name",
+          "trim": true
+        },
+        "bind": [
+          {
+            "field": "product_spec_hash",
+            "target": "product_spec"
+          }
+        ],
+        "activation": true,
+        "message": "no run_check receipt named {name} in this activation bound to the current snapshot and ProductSpec; call run_check with this name, then submit_structure again"
+      }
+    ]
+  }
+}

@@ -40,7 +40,7 @@ from harness.direct import (COMPLETION_KIND, DIRECT_TIGHTENING, ITEM_END_REASON,
 from harness.event_store import project_stream
 from harness.models import ArtifactRef, DepartmentGuidance, EventType, ProjectEventType, RunProjection
 from harness.proposals import completion_turn
-from harness.runtime import FORM_REGISTRY, LoopSystem
+from harness.runtime import FORM_REGISTRY, SEVERAL_ROLES_DIRECT, LoopSystem
 from harness.tests.helpers import happy_script
 from harness.tightening import WATCHED_OUTPUTS
 from harness.write_path import NewProjectEvent
@@ -306,10 +306,11 @@ def test_a_direct_definition_without_a_role_that_can_hand_in_completion_is_rejec
         raise AssertionError("a direct definition without a role that can hand in completion must be rejected")
 
 
-def test_both_forms_are_registered_and_the_release_keeps_the_default():
-    # 登记处（工单 #1392 的形态机制）：发布带两份形态，默认仍是三部门；新的一份按它的组织定义接上直做。
+def test_the_forms_are_registered_and_the_release_keeps_the_default():
+    # 登记处（工单 #1392 的形态机制）：发布带三份形态（#1395 的单角色直做，#1454 的几个角色直做），
+    # 默认仍是三部门；新的一份按它的组织定义接上直做。
     # 直做声明了 use_facts（工单 #1396 读交完成与核验结论），所以接上时要有事件库，这里给一个没有事件的
-    assert set(FORM_REGISTRY) == {DEFAULT_FORM, SINGLE_ROLE_DIRECT}
+    assert set(FORM_REGISTRY) == {DEFAULT_FORM, SINGLE_ROLE_DIRECT, SEVERAL_ROLES_DIRECT}
     forms = __import__("harness.runtime", fromlist=["load_forms"]).load_forms(FORM_REGISTRY, store=_NoEvents())
     assert forms[DEFAULT_FORM].definitions.routing == "watched_outputs"
     direct_form = forms[SINGLE_ROLE_DIRECT]
