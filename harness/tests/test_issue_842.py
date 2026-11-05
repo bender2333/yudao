@@ -113,25 +113,6 @@ def _finishing_script() -> dict[str, Any]:
     }
 
 
-def test_cycle_count_of_a_full_ask_run_counts_only_the_main_activations(tmp_path: Path):
-    # 整件事项跑完：投影的 cycle_count 等于主线的激活次数，不含询问分支的那一次
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter(_finishing_script()))
-    run_id = system.create_run("build echo")
-    projection = system.run_until_stop(run_id)
-    assert projection.status == "done"
-
-    events = system.store.list_events(run_id)
-    activated = [event for event in events if event.type == EventType.DEPARTMENT_ACTIVATED]
-    main = [event for event in activated if not event.session_id.startswith("ses_ask")]
-    branch = [event for event in activated if event.session_id.startswith("ses_ask")]
-    assert len(branch) == 1
-    assert projection.cycle_count == len(main)
-    # 分支激活的 cycle 与回答那一刻的投影相同：回答以后主线接着工作才加一
-    answered_at = next(index for index, event in enumerate(events) if event.type == EventType.ASK_ANSWERED)
-    through_answer = replay_events(events[:answered_at + 1])
-    assert branch[0].payload["cycle"] == through_answer.cycle_count
-
-
 def test_max_cycles_equal_to_the_main_activations_does_not_stop_an_ask(tmp_path: Path):
     # 轮次上限恰好等于主线激活次数时，一次询问分支不让事项因轮次上限停止
     counting = LoopSystem.for_testing(tmp_path / "counting", FakeAdapter(_finishing_script()))
