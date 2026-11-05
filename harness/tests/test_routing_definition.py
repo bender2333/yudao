@@ -1,10 +1,10 @@
-# 路由自己的一份定义与它自己的结束原因（工单 #861；骨架与应用设计说明第 5.1、5.4 节第 2、7 条、第 12 节 S2b）。
+# 路由自己的一份定义与它自己的结束原因（工单 #861；骨架与应用设计说明「路由契约」、「其他路由：骨架要满足的条件」第 2、7 条）。
 #
 # 守的是 R2：定义文件的格式——routings.json 里一种路由自己的一份定义（部门、成果种类、提议方式、路由自己的
 # 上限与结束原因）由内核核对结构，按名称指向的内容由路由实现自己校验；以及 R3：路由声明的结束原因可以
 # 作为事项的停止原因写入，既没有声明、也不在内核清单里的被拒绝并写明原因。
 #
-# 复制发布的定义文件到临时目录再改，加载定义、写事件，属于模块层（第 2 节：临时目录与事件库）。
+# 复制发布的定义文件到临时目录再改，加载定义、写事件，属于模块层（docs/design/skeleton-and-application.md「两层的判据」：临时目录与事件库）。
 
 import json
 import shutil
@@ -63,7 +63,7 @@ def _fail(transaction, reason: str) -> None:
 
 
 def test_the_kernel_loads_a_routing_definition_with_names_and_structure_only(tmp_path):
-    # R2：内核只核对名称与结构（设计说明第 5.4 节第 2 条）：名称指向的东西都不存在也照常加载，
+    # R2：内核只核对名称与结构（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：名称指向的东西都不存在也照常加载，
     # 内容由路由实现自己校验
     directory = _copy(tmp_path)
     entry = _routing(directory)
@@ -156,7 +156,7 @@ def test_a_watched_name_the_routing_does_not_know_fails_the_routing_own_check(tm
 
 
 def test_a_routing_that_does_not_declare_its_item_end_reason_is_rejected(tmp_path):
-    # R3：事项结束用的原因要写在它自己的一份定义里（设计说明第 5.4 节第 7 条）
+    # R3：事项结束用的原因要写在它自己的一份定义里（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）
     directory = _copy(tmp_path)
     entry = _routing(directory)
     entry["end_reasons"] = {"queue_empty": {"label": "任务池是空的", "outcome": "paused", "human_action": None}}
@@ -167,7 +167,7 @@ def test_a_routing_that_does_not_declare_its_item_end_reason_is_rejected(tmp_pat
 
 
 def test_an_end_reason_named_like_a_kernel_stop_reason_is_rejected(tmp_path):
-    # R2：路由自己的结束原因与内核的停止原因分开（设计说明第 5.4 节第 7 条）：同名时校验失败，写明是哪一项
+    # R2：路由自己的结束原因与内核的停止原因分开（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）：同名时校验失败，写明是哪一项
     directory = _copy(tmp_path)
     entry = _routing(directory)
     entry["end_reasons"]["released"] = {"label": "放行", "outcome": "done", "human_action": None}

@@ -1,9 +1,9 @@
-# 最小投影（骨架与应用设计说明第 4 节）：裁决只读这一份，由骨架事件折叠而成，纯函数，可以重算。
-# 折叠的内容是第 4 节那张表的六项与之后补齐的几样：每条流的当前版本、谁持有执行权、已用的时间与次数、
+# 最小投影（骨架与应用设计说明「最小投影」）：裁决只读这一份，由骨架事件折叠而成，纯函数，可以重算。
+# 折叠的内容是「最小投影」那张表的六项与之后补齐的几样：每条流的当前版本、谁持有执行权、已用的时间与次数、
 # 每种正式成果的当前版本与工件引用、运行状态与待回答的决定请求、当前定义版本与参数版本，
 # 以及事项种类、项目与事项的编号、上限的数值与每个部门主线会话当前这一轮的编号。
 #
-# 三条不按事件种类逐个写的规则（设计说明第 4 节末尾与第 5.4 节第 6 条）：
+# 三条不按事件种类逐个写的规则（设计说明「最小投影」末尾与「其他路由：骨架要满足的条件」）：
 # 1. 成果按接纳事件的统一字段（成果种类、版本、依据、内容摘要、作者部门、记下的树摘要）折叠，
 #    加一种成果种类不改这里的代码，内核也不认识具体有哪几种；契约（contract_accepted）同样是这些字段里的一种。
 #    成果失效按「成果失效」事件（artifact_invalidated）折叠：失效是记下来的事实，不从这里从别的事件推出，
@@ -13,12 +13,12 @@
 #    开始与结束事件里的用量字段，中断那一轮还没结算的运行时间不计（第 2 条）。
 # 3. 重试次数不是上限，不在这里（第 4 条）；应用的查询与恢复页改读这一份是 S1e 的事。
 #
-# 2026-10-27（S1d，工单 #860）为第 5.5 节的六条通用条件补的几样，仍然只来自接纳事件与骨架事件，不是成果的内容：
+# 2026-10-27（S1d，工单 #860）为 docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」的六条通用条件补的几样，仍然只来自接纳事件与骨架事件，不是成果的内容：
 # - 接纳事件的统一字段加作者部门（issuer）与记下的树摘要（有这一项的成果才带，交付记代码树、建档记快照的树）：
 #   通用条件 5 的作者分离与条件 4 的树一致读它们；
 # - 一种成果可以多版并存时（现在只有产品决定），按种类记当前有效各版的摘要清单，通用条件 6 读它；
 # - 每个部门主线会话当前这一轮的编号按部门取（一轮工作开始事件带部门），通用条件 3 的「回执来自这一轮」读它。
-# 不在这里、归收紧检查的：质检测试材料的摘要、PRD 的内容、用户输入与指导的版本（设计说明第 4 节）。
+# 不在这里、归收紧检查的：质检测试材料的摘要、PRD 的内容、用户输入与指导的版本（docs/design/skeleton-and-application.md「最小投影」）。
 
 from __future__ import annotations
 
@@ -208,7 +208,7 @@ class _Fold:
                 session.settled_ms, int(payload.get("session_elapsed_ms") or 0)), settled_steps=session.model_steps)
             return
         if etype == SkeletonEventType.MODEL_REQUESTED:
-            # 模型步数按请求一条条数（设计说明第 4 节 2026-10-25 第 1 条）
+            # 模型步数按请求一条条数（docs/design/skeleton-and-application.md「最小投影」 2026-10-25 第 1 条）
             self.used = replace(self.used, model_steps=self.used.model_steps + 1)
             session = self.sessions.get(session_id, SessionState())
             self.sessions[session_id] = replace(session, model_steps=session.model_steps + 1)
@@ -231,7 +231,7 @@ class _Fold:
 
 def _fold_run(state: MinimalProjection, event: Event) -> MinimalProjection:
     # 事项的编号、种类、冻结的定义与参数版本、上限，以及运行状态；事项创建时记下每个部门的主线会话。
-    # 状态只看事项的状态事件（设计说明第 4 节）：其他事件的前后状态不在这里重新推断
+    # 状态只看事项的状态事件（docs/design/skeleton-and-application.md「最小投影」）：其他事件的前后状态不在这里重新推断
     payload = event.payload if isinstance(event.payload, dict) else {}
     etype = event.type
     if etype == SkeletonEventType.RUN_CREATED:

@@ -1,4 +1,4 @@
-# MCP 客户端模块（网络与 MCP 设计说明第 7.1 至 7.3 节；执行环境服务设计说明第 5 节的分层与职责）。
+# MCP 客户端模块（网络与 MCP 设计说明「客户端模块」、「调用与结果」；执行环境服务设计说明「实现与执行位置上的程序」的分层与职责）。
 #
 # 这一份不导入 Yudao 的其他模块：只用官方 MCP Python SDK、psutil、pydantic 与标准库，
 # 由 pyproject.toml 的 import-linter 合同守住（工单 #69）。阶段四搬进执行代码包时只改导入路径。
@@ -29,15 +29,15 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 from mcp_types import REQUEST_TIMEOUT
 
-# 标准错误输出读末尾这么多字符（设计说明第 7.2 节「读取末尾部分用于诊断」）
+# 标准错误输出读末尾这么多字符（docs/design/execution-environment.md「核对」「读取末尾部分用于诊断」）
 STDERR_TAIL_CHARS = 4000
-# 超时或取消以后等服务器应答的最长时间。这个数取自设计说明第 8 节的两处：
+# 超时或取消以后等服务器应答的最长时间。这个数取自 docs/design/execution-environment.md「代码的权限、认证与加密」的两处：
 # 「stdio：发取消通知，等服务器应答最多 10 秒，随后结束进程树」与「MCP 调用超时的处理顺序」。
 # 不够用的情况：服务器在收到取消通知之前正要开始一次慢操作（冷启动一个 npx 包、一次大结果的序列化），
 # 应答会晚于 10 秒——这时按设计说明的顺序直接结束进程树（stdio 已能确认停止），HTTP 一侧本来就无法确认
 CANCEL_ACK_TIMEOUT_SEC = 10.0
 # 子进程需要的系统变量：SDK 默认已给 APPDATA、LOCALAPPDATA、PATH、PATHEXT、SYSTEMROOT、TEMP、USERPROFILE 等，
-# 少了 Windows 上命令行程序自己再起子进程时用的 COMSPEC 与 WINDIR（设计说明第 7.2 节，工单 #69）
+# 少了 Windows 上命令行程序自己再起子进程时用的 COMSPEC 与 WINDIR（docs/design/execution-environment.md「核对」，工单 #69）
 EXTRA_ENVIRONMENT = ("COMSPEC", "WINDIR", "PATH", "APPDATA", "LOCALAPPDATA", "USERPROFILE", "TEMP")
 REDACTED = "***"
 
@@ -92,7 +92,7 @@ class ServerInfo(BaseModel):
 class ToolSpec(BaseModel):
     # 一个工具的清单项：名称、说明与参数结构；服务器自己的提示只作参考。
     # hints 保留服务器标注的提示对象（SDK 的 ToolAnnotations：标题与只读、幂等、破坏性、开放世界提示），
-    # 探测把它写进工具清单快照（工单 #1174，设计说明第 4.1 节「工具清单」）；服务器没有标注时为空
+    # 探测把它写进工具清单快照（工单 #1174，docs/design/execution-environment.md「操作」「工具清单」）；服务器没有标注时为空
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str
@@ -102,7 +102,7 @@ class ToolSpec(BaseModel):
 
 
 class ContentBlock(BaseModel):
-    # 工具结果的一块内容，各自的类型保留下来（设计说明第 7.3 节）：
+    # 工具结果的一块内容，各自的类型保留下来（docs/design/execution-environment.md「项目没有设置执行位置时」）：
     # 文本、图像（base64 与媒体类型）、嵌入资源（原文或二进制与地址）、音频（base64 与媒体类型）
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -143,7 +143,7 @@ def redact(text: str, secrets: tuple[str, ...] | list[str]) -> str:
 
 
 def server_environment(values: dict[str, str]) -> dict[str, str]:
-    """子进程的环境变量：只有传入的变量与操作系统运行所需的基础变量（设计说明第 7.2 节）。"""
+    """子进程的环境变量：只有传入的变量与操作系统运行所需的基础变量（docs/design/execution-environment.md「核对」）。"""
     environment = get_default_environment()
     for key in EXTRA_ENVIRONMENT:
         value = os.environ.get(key)
@@ -167,7 +167,7 @@ def read_stderr_tail(path: str | None, *, secrets: tuple[str, ...] | list[str] =
 
 
 def terminate_legacy_process(pid: int, create_time: float) -> bool:
-    """按进程标识与进程创建时间结束遗留的服务器进程；两项都对得上才结束（设计说明第 7.2 节）。"""
+    """按进程标识与进程创建时间结束遗留的服务器进程；两项都对得上才结束（docs/design/execution-environment.md「核对」）。"""
     try:
         process = psutil.Process(pid)
         if abs(process.create_time() - create_time) > 1.0:
@@ -322,7 +322,7 @@ class McpClient:
             return
         self._closed = True
         # 先记下服务器起的整棵进程树：SDK 关掉服务器以后这些进程就找不到父进程了，
-        # 而设计说明第 7.2 节要求关闭时整个进程树都结束
+        # 而 docs/design/execution-environment.md「核对」要求关闭时整个进程树都结束
         tree = self._process_tree()
         # stdio：SDK 关闭时先关标准输入、等 2 秒，再结束它起的子进程；HTTP：终止会话
         if self._stack is not None:

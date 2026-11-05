@@ -1,6 +1,6 @@
-# 用户决定的命令（设计说明第 3.3 节）：所有决定种类共用同一个命令 decision.answer，可选项由决定请求给出。
+# 用户决定的命令（docs/design/app-and-interface.md「用户决定的回答」）：所有决定种类共用同一个命令 decision.answer，可选项由决定请求给出。
 # 回答在写入口的一个事务中核对请求仍未回答、基准版本与选项，并追加回答事件；需要继续执行时由流程编排的开始
-# 入口在当前事件循环中把这个 run 作为任务继续运行，结果以后续事件出现（第 3.1 节「处理」）。
+# 入口在当前事件循环中把这个 run 作为任务继续运行，结果以后续事件出现（docs/design/app-and-interface.md「合同」中「处理」）。
 
 from __future__ import annotations
 

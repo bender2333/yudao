@@ -1,7 +1,7 @@
 # 工单 #91：目录文档的整份校验与目录文件的重新读取。
 # 从运行系统整体测试：真实启动 FastAPI 应用，目录文件与 .env 是真实文件，事件日志是真实 SQLite，
 # 模型回答由测试内启动的真实 HTTP 上游给出（响应协议，带工具调用与普通回答两种）。
-# 覆盖设计说明第 4.6、4.7 节：
+# 覆盖 docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」、「目录文件重新读取」：
 #   1) 编辑 JSON 与界面表单对同一份无效内容给出相同的字段位置（未知字段、未准入的默认、请求档位不属于全集）；
 #   2) 部门默认引用候选的文档、请求档位不属于支持范围的文档都被整份拒绝，目录不变；
 #   3) 外部修改目录文件中某份连接的地址以后，该连接下的定义回到候选；使用它们的进行中事项的下一次请求进入待恢复；
@@ -271,7 +271,7 @@ def test_form_and_json_report_the_same_field_location_for_invalid_content(tmp_pa
         assert _catalog(client)["revision"] == base
         assert [item["id"] for item in _document(client)["models"]] == ["model-a", "model-a2", "model-b"]
 
-        # #1310：整份文档都要满足第 4.6 节，取出的文档原样保存（绑定与现有完全相同，没有条目变化）
+        # #1310：整份文档都要满足 docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」，取出的文档原样保存（绑定与现有完全相同，没有条目变化）
         # 也整份拒绝；引用的定义通过模型测试以后，同一份文档再保存就被接受——
         # 「选用以后保存同一份文档不被自己的旧状态挡住」由准入先发生来保证
         same = {"providers": document["providers"], "models": document["models"],
@@ -329,7 +329,7 @@ def test_external_address_change_returns_definitions_to_candidates(tmp_path):
             assert opened.system.facade.get_bindings()["engineering"]["model_id"] == "model-a"
 
             # 被挡住的是两个同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，
-            # 每条写明自己的部门（模型管理设计说明第 5.5 节：这次模型请求不发送，事项停在这次请求之前）
+            # 每条写明自己的部门（模型管理设计说明「引用无法使用时」：这次模型请求不发送，事项停在这次请求之前）
             blocked = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
             assert {item["request"]["department"] for item in blocked} == {"engineering", "quality"}
             # 回答这两条以后运行继续：工程的下一次模型请求按作废的准入再次进入待恢复，说明写明原因
@@ -366,7 +366,7 @@ def test_deleting_the_catalog_file_clears_defaults_and_recovers_after_answer(tmp
             item = opened.system.projects.projection(project_id).work_items[-1]
             assert item.status == "in_progress", (item.status, item.status)
             # 被挡住的是两个同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，
-            # 每条写明自己的部门（模型管理设计说明第 5.5 节）；先记下它们，删除目录文件以后不再新增请求
+            # 每条写明自己的部门（模型管理设计说明「引用无法使用时」）；先记下它们，删除目录文件以后不再新增请求
             first = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
             assert {item["request"]["department"] for item in first} == {"engineering", "quality"}
             if parked.get("record") is not None:

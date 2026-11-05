@@ -27,7 +27,7 @@ _CHECK_MATERIALS_WRITE_OUTSIDE = ("a check materials write scope only allows {di
 
 
 def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
-    # 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（设计说明第 4 节，S1d 工单 #860）。
+    # 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）。
     # 校验以后其中任何一样变了，这次提交就不能再按原来的依据接纳。有哪几种成果、各自是哪一版，
     # 来自定义与投影，内核不写死（工单 #1456）；用户输入与指导的版本读的是成果的内容，不在这里
     # （归路由的收紧检查，工单 #1095）
@@ -38,7 +38,7 @@ def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
 @dataclass(frozen=True)
 class WorkBasis:
     # 激活开始时采用的工作依据；有效合同、指导与用户输入变了以后，这个会话在下一步收到通知（新版本与改动、
-    # 新的输入），接着工作，一轮工作不因此结束（工单 #558、#964，循环结构第 5 节与第 6 节）。合同摘要来自
+    # 新的输入），接着工作，一轮工作不因此结束（工单 #558、#964，循环结构「工作中途要求变化」与「指导」）。合同摘要来自
     # 最小投影，输入与指导的版本是应用的数据，由流程编排在开始一轮工作时填进来（S1d，工单 #860）
     effective_contract_hash: str | None
     input_version: int
@@ -79,7 +79,7 @@ def offered_tools(state: Any, department: str, *, tightening: Tightening,
                   session_id: str | None = None, input_modalities: tuple[str, ...] = ("text",),
                   definitions: Definitions | None = None) -> list[str]:
     # 请求中提供给模型的工具：内核给出部门完整的工具清单，由路由的收紧检查按这一轮的工作与询问分支取舍，
-    # 再按调用目标的输入方式去掉声明需要图像输入的工具（设计说明第 5.6 节，工单 #1095）。
+    # 再按调用目标的输入方式去掉声明需要图像输入的工具（docs/design/model-management.md「部门的建议能力」，工单 #1095）。
     # state 是应用侧的运行状态投影：提供的工具由收紧检查按内容判断，内核不读它，原样交过去。
     # 部门的工具清单读这个事项所用的那份定义（工单 #1098），不读模块加载时的那一份
     return tightening.offered(TightenRequest(department=department, state=state, session_id=session_id,
@@ -113,7 +113,7 @@ def tool_permission(
     # 工具许可读这个事项所用的那份定义（工单 #1098）：部门有没有这个工具、这个工具提交什么种类按它判；
     # 没有交的时候是当前加载的那一份
     # 有效合同、指导与用户输入变了都不再停止这次激活：它们作为通知送达，部门接着工作，
-    # 这一轮不因此结束（工单 #558、工单 #964，循环结构第 5 节与第 6 节）
+    # 这一轮不因此结束（工单 #558、工单 #964，循环结构「工作中途要求变化」与「指导」）
     projection = view.minimal
     definition = in_force(definitions)
     if projection.status in TERMINAL_STATUSES or aborted:
@@ -165,7 +165,7 @@ def commit_decision(
     # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。校验以后工作区改变，
     # 或者当前工作已经不是校验时的那一份，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
     # 有效合同、指导与用户输入变了不再让这次提交作废：它们作为通知送达，部门接着工作，
-    # 提交的成果按当前版本核对（工单 #558、工单 #964，循环结构第 5 节、第 6 节与第 7 节）
+    # 提交的成果按当前版本核对（工单 #558、工单 #964，循环结构「工作中途要求变化」、「指导」与「提交与版本」）
     definition = in_force(definitions)
     if submission_basis(current.minimal) != submission_basis(evaluated.minimal):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
@@ -176,7 +176,7 @@ def commit_decision(
                                      facts=current_facts, tightening=tightening, events=events)
     if decision.accepted:
         # 还有没处理完的输入时这次提交不当场生效：等不等、为什么等是路由的收紧检查的判断与说明
-        # （部门指导设计说明第 2.1 节，工单 #561、#1456），内核只把它的原因交回部门
+        # （部门指导设计说明「放行怎么等」，工单 #561、#1456），内核只把它的原因交回部门
         tight = tightening.submission(TightenRequest(department=department, state=current.state, proposal=proposal,
                                                      events=tuple(events), commit=True, definitions=definition,
                                                      minimal=current.minimal, facts=current_facts))
@@ -190,7 +190,7 @@ def _is_write(name: str, definitions: Definitions | None = None) -> bool:
 
 
 def _write_path_error(name: str, args: dict[str, Any], facts: WorkspaceFacts, scope: Any) -> str | None:
-    # 写入范围是检查材料的角色只写检查材料目录（设计说明第 4.2 节第 1 条）：检查工作区里其余文件参与放行时
+    # 写入范围是检查材料的角色只写检查材料目录（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」）：检查工作区里其余文件参与放行时
     # 核对的树（提案条件 tree_matches），改动它们会让放行被拒绝；原因里不写部门名。
     # 写入目标在工作区中不能表示时直接拒绝，原因就是执行环境给出的原因（计划范围检查已随 #470 删除）
     for target in _write_targets(name, args):

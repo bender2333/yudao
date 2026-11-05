@@ -1,4 +1,4 @@
-# 装配契约第一版（骨架与应用设计说明第 3.2、5.2 节；总图第四节「装配」缝）：
+# 装配契约第一版（骨架与应用设计说明「契约」、「装配契约」；总图第四节「装配」缝）：
 # 输入事件日志里这个部门与会话的历史、定义、材料、调用目标的窗口与输出上限，以及路由的工作引用；
 # 输出装配好的请求与上下文清单，两者都记进日志；不改事实。
 # 本模块只导入内核（kernel_events、definitions）与标准库，以及契约圈的 contract_versions；实现（assembly.py 的 ContextAssembly）声明实现这一版，
@@ -39,7 +39,7 @@ class ModelLimits:
 @dataclass(frozen=True)
 class StepFrame:
     # 一次激活装配每一步所需的身份与激活时采用的版本；压缩检查点按这些版本选取。
-    # work_ref 是路由自己的工作引用，从开始一轮工作的请求原样带到这里，供装配实现取用（第 5.4 节第 4 条）
+    # work_ref 是路由自己的工作引用，从开始一轮工作的请求原样带到这里，供装配实现取用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）
     department: str
     session_id: str
     activation_id: str
@@ -71,7 +71,7 @@ class ContextAssembly(Protocol):
     def request(self, pinned: Any, history: list[dict[str, Any]], *,
                 defer_compaction: bool = False) -> Any:
         # 在固定部分之后接上部门历史，得到装配好的请求与上下文清单。
-        # defer_compaction 为真时，这一次不另发整理请求，按未压缩的历史交出工作请求（第 8.7 节，工单 #1155）
+        # defer_compaction 为真时，这一次不另发整理请求，按未压缩的历史交出工作请求（docs/design/model-management.md「失败处理」，工单 #1155）
         ...
 
     def finish_compaction(self, step: Any, output: list[dict[str, Any]]) -> Any | None:

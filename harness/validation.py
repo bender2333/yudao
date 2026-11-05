@@ -1,9 +1,9 @@
 """提案校验：内核的通用检查，以及一次接纳的统一字段与内容摘要。控制层普通代码，不调用模型。
 
-裁决读的是最小投影（设计说明第 4 节，S1d 工单 #860）：投影没有的内容（PRD 的内容、用户输入与指导的版本、
+裁决读的是最小投影（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）：投影没有的内容（PRD 的内容、用户输入与指导的版本、
 质检测试材料）由路由的收紧检查给出，内核不读成果的内容。
 
-S2c（工单 #1098，设计说明第 5.4 节第 3 条、第 5.5 节）之后这里只做通用检查：种类在事项所用的那份定义里、
+S2c（工单 #1098，设计说明「其他路由：骨架要满足的条件」中「第二种路由可以带来新的工具、提案与成果种类」、docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）之后这里只做通用检查：种类在事项所用的那份定义里、
 部门有这个工具、提案合同里的通用条件（`evaluate_conditions`，条件是合同数据）。成果的格式检查、按内容的
 检查与成果内容的组装都在路由的收紧检查里（`harness/tightening.py`）；内核在它给出的内容之外盖统一字段
 （种类、版本、依据、作者部门、记下的树摘要）、算内容摘要，写入口写接纳事件。这里不再按成果种类写分支。
@@ -27,8 +27,8 @@ if TYPE_CHECKING:  # 工作依据住在 adjudication.py，它导入这里：只�
 
 @dataclass(frozen=True)
 class AdjudicationView:
-    # 裁决一次判断要读的全部内容。minimal 是内核唯一的判断依据（由骨架事件折叠，设计说明第 4 节）；
-    # state 是应用侧的运行状态投影（RunProjection），内核不读它，只原样交给路由的收紧检查（第 5.5 节）
+    # 裁决一次判断要读的全部内容。minimal 是内核唯一的判断依据（由骨架事件折叠，docs/design/skeleton-and-application.md「最小投影」）；
+    # state 是应用侧的运行状态投影（RunProjection），内核不读它，只原样交给路由的收紧检查（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
     minimal: MinimalProjection
     state: Any = None
 
@@ -56,7 +56,7 @@ class ProposalDecision:
         return [item.to_dict() for item in self.errors]
 
 
-# 路由的收紧检查（工单 #1095，设计说明第 5.5 节）：内核的通用检查通过以后，在同一个写入事务里再问一次路由。
+# 路由的收紧检查（工单 #1095，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：内核的通用检查通过以后，在同一个写入事务里再问一次路由。
 # 结果只有三种：通过、拒绝（写明原因）、等待（写入口按安全节点等待，工单 #561）；收紧检查不能放行内核已经
 # 拒绝的东西。接口放在这里是因为 validation 是 adjudication 的下游，放到那边反向导入会成环；
 # 实现是应用层的事（现在是一份成果驱动的收紧检查，见 harness/tightening.py），版本与接受实现放在
@@ -66,7 +66,7 @@ class ProposalDecision:
 @dataclass(frozen=True)
 class TightenRequest:
     # 收紧检查的输入：这一轮的运行状态、正在做的工具或者要提交的提案，以及内核已经核对过的支撑材料。
-    # state 是应用侧的运行状态投影（RunProjection）：内核不读它，原样交给收紧检查，内容是应用的（第 5.5 节）
+    # state 是应用侧的运行状态投影（RunProjection）：内核不读它，原样交给收紧检查，内容是应用的（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
     department: str
     state: Any
     session_id: str | None = None
@@ -99,9 +99,9 @@ class Tightened:
     # 部门工具清单里没有这个工具，由收紧检查放行：询问分支里的回答不属于任何部门的工具（工单 #473）
     permitted: bool = False
     # 通过时一并给出、内核算内容时需要而最小投影里没有的事实（S1d，工单 #860）：
-    # 例如 PRD 记下的用户输入版本——它是成果的内容，按设计说明第 4 节不进最小投影
+    # 例如 PRD 记下的用户输入版本——它是成果的内容，按 docs/design/skeleton-and-application.md「最小投影」不进最小投影
     facts: dict[str, Any] = field(default_factory=dict)
-    # 通过时给出的成果内容（S2c，工单 #1098，设计说明第 5.5 节「成果的内容由路由组装」）：
+    # 通过时给出的成果内容（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」中「成果的内容由路由组装」）：
     # 内核在它之外盖统一字段、算内容摘要；这里为空时内容就是提案的参数（路由不组装的种类）
     content: dict[str, Any] | None = None
     # 收紧检查自己给出的内容摘要：产品决定按内容去重，摘要来自通用条件，不是内核重算的那一份
@@ -182,7 +182,7 @@ class _ConditionContext:
 
 def evaluate_conditions(kind: str, *, department: str, proposal: dict[str, Any], minimal: MinimalProjection,
                         facts: TreeFacts, definitions: Definitions | None = None) -> ConditionOutcome:
-    """按提案合同核对一种提案的通用条件（设计说明第 5.5 节）。
+    """按提案合同核对一种提案的通用条件（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）。
 
     条件与参数来自 proposal_contracts.json，内核只按条件名分派：改合同数据就能放宽或收紧这条规则，
     代码里不再写死哪一种成果要绑定哪一份当前版本。条件按合同里列出的顺序核对，
@@ -343,7 +343,7 @@ def _evaluate_proposal(
                              definitions=definition)
     if kind not in tightening.kinds(request):
         return ProposalDecision(False, [FieldError("kind", f"{department} cannot issue {kind} in the current work")])
-    # 格式检查、成果驱动的内容检查与成果内容的组装都归路由（设计说明第 5.5 节，工单 #1098）：
+    # 格式检查、成果驱动的内容检查与成果内容的组装都归路由（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」，工单 #1098）：
     # 内核问它一次，通过时它给出成果的内容；路由不组装的种类，内容就是提案的参数
     tightened = tightening.submission(request)
     errors = _tightening_errors(tightened)
@@ -366,7 +366,7 @@ def _evaluate_proposal(
 
 def _accepted(kind: str, content: dict[str, Any], *, department: str, minimal: MinimalProjection,
               facts: TreeFacts, content_hash: str | None = None) -> dict[str, Any]:
-    """内核在成果的内容之外盖的统一字段（设计说明第 5.5 节，工单 #1098）。
+    """内核在成果的内容之外盖的统一字段（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」，工单 #1098）。
 
     内核不认识成果的内容：种类、版本、依据、作者部门与记下的树摘要都由这里按最小投影与工作区事实给出，
     内容摘要也由这里算（内容本身不参与判断）。收紧检查自己给出了内容摘要时用它——产品决定按内容去重，

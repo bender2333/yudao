@@ -1,4 +1,4 @@
-# 仓库概况（docs/design/existing-project-onboarding.md 第 4.1 节）：建档事项里部门读取的第一项材料。
+# 仓库概况（docs/design/existing-project-onboarding.md 「总体」）：建档事项里部门读取的第一项材料。
 # 只由快照的公开树清单与定义中的模式表确定生成：同一份快照生成同一份文字，不含文件内容，不含主机绝对路径。
 # 属于控制核心，不导入应用层与接口层。
 

@@ -14,7 +14,7 @@ from collections.abc import Iterable
 from .kernel_events import json_dumps, utc_now
 from .models import ArtifactRef, hash_bytes
 
-# 外部来源工件（网络取回与 MCP 设计说明第 9 节）：取回的正文与 MCP 的结果按行保存成工件，
+# 外部来源工件（网络取回与 MCP 设计说明「结果、工件与证据」）：取回的正文与 MCP 的结果按行保存成工件，
 # 来源字段写在与正文同一个目录的 `<摘要>.source.json` 中；正文仍按内容哈希落盘，
 # 摘要值因此与工件引用里的 content_hash 相同
 EXTERNAL_SOURCE_KIND = "external_source"
@@ -132,7 +132,7 @@ class ArtifactStore:
             raise ValueError("artifact content hash mismatch")
         return raw
 
-    # ---- 外部来源工件（网络取回与 MCP 设计说明第 9 节） ----
+    # ---- 外部来源工件（网络取回与 MCP 设计说明「结果、工件与证据」） ----
 
     def put_external_source(self, run_id: str, text: str, *, source: str,
                             final_url: str | None = None, status_code: int | None = None,

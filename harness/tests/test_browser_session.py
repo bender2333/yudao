@@ -293,7 +293,7 @@ def test_a_real_page_navigates_types_clicks_and_verifies_with_screenshots(tmp_pa
             opened = case.start()
             session = opened["session"]
             browser = session["browser"]
-            # 会话开始时已经打开就绪地址：回执带页面的可访问性结构与一张截图（设计说明第 3.4 节）
+            # 会话开始时已经打开就绪地址：回执带页面的可访问性结构与一张截图（docs/design/browser-and-computer-use.md「试用工具」）
             assert browser["status"] == "running" and browser["session_id"].startswith("browser_")
             assert browser["tree_digest"] == session["tree_digest"], "浏览器会话没有带试用副本的树摘要"
             assert "tiny web app" in opened["accessibility"], opened["accessibility"]
@@ -425,7 +425,7 @@ def test_navigation_to_the_service_itself_is_refused_and_other_addresses_are_all
             app_page = case.perform("browser_navigate", {"url": f"http://127.0.0.1:{own_port}/"})
             assert app_page.refused is False and app_page.ok is True, app_page.error
             assert "tiny web app" in app_page.output["accessibility"]
-            # 真实外网地址可以访问（设计说明第 10 节：其余来源不设限制）
+            # 真实外网地址可以访问（docs/design/browser-and-computer-use.md「安全」：其余来源不设限制）
             external = case.perform("browser_navigate", {"url": _EXTERNAL_URL})
             assert external.refused is False and external.ok is True, external.error
             assert "Example Domain" in external.output["accessibility"], external.output["accessibility"]

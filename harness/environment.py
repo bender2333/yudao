@@ -83,7 +83,7 @@ _CLEANUP_INITIAL_BACKOFF_SEC = 0.05
 def inspection_root(run_root: str | Path, session_id: str) -> Path:
     # 每个会话的检查工作区根：<运行工作区同级>/inspections/<run_id>/<会话>。
     # 放在运行工作区外面以免被 capture_public_tree 当作运行内容（工单 #481）。
-    # 每个会话一个（本地通用工具设计说明第 2 节）：主线会话与它在询问分支里的会话各用各的，
+    # 每个会话一个（本地通用工具设计说明「工作区」）：主线会话与它在询问分支里的会话各用各的，
     # 嵌套询问时同一部门的两个会话不共用一个目录，也就不互相删除对方的检查工作区（工单 #473）
     path = Path(run_root)
     return path.parent / INSPECTIONS_DIR / path.name / session_id
@@ -143,13 +143,13 @@ def cleanup_inspection_workspace(run_root: str | Path, session_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 运行工作区与会话的检查工作区（骨架与应用设计说明第 6 节、本地通用工具设计说明第 2 节；S4c 工单 #863）
+# 运行工作区与会话的检查工作区（骨架与应用设计说明「薄驱动」、本地通用工具设计说明「工作区」；S4c 工单 #863）
 #
 # 这一块从薄驱动搬来（工单 #473、#481、#558）：薄驱动只问两件事——这个部门在这个会话里用哪份工作区，
 # 这一轮进行中检查工作区要不要换成新的交付。来源是哪份快照、什么时候建立或重建、检查回执绑定哪几样，
 # 都在执行实现这里。
 #
-# 部门按两件定义事实分，代码里不写部门的名称（薄驱动不含部门与成果的名称，设计说明第 6 节）：
+# 部门按两件定义事实分，代码里不写部门的名称（薄驱动不含部门与成果的名称，docs/design/skeleton-and-application.md「薄驱动」）：
 #   · 交出交付的部门（它的工具清单里有提议成「交付」的那件工具）的主线会话用运行工作区；
 #   · 关注交付的部门（组织定义的 watched 里有「交付」）的检查工作区从最新的封存交付建立，
 #     有新的交付封存时在它的下一步重建；其余部门的检查工作区从当前运行工作区建立。
@@ -178,7 +178,7 @@ def delivery_inspecting_departments(definitions: Any = None) -> frozenset[str]:
 
 
 def check_material_paths(definitions: Any = None) -> dict[str, tuple[str, ...]]:
-    # 写入范围是检查材料的角色与它们能写的目录（设计说明第 4.2 节第 1 条，工单 #1390）：由定义声明，
+    # 写入范围是检查材料的角色与它们能写的目录（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」，工单 #1390）：由定义声明，
     # 代码里没有部门名；保存检查材料、把检查材料放进检查副本、拒绝别的角色写这些目录，都按它判
     definitions = DEFINITIONS if definitions is None else definitions
     scopes = {department: definitions.write_scope(department) for department in definitions.departments}
@@ -368,14 +368,14 @@ class Workspaces:
 
     def _attach_trial_source(self, environment: LocalEnvironment, run_id: str, department: str,
                              projection: Any) -> LocalEnvironment:
-        # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（设计说明第 3.4 节）；
+        # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（docs/design/browser-and-computer-use.md「试用工具」）；
         # 其他部门的试用副本在 trial_start 时封存运行工作区。
         # 两处打开检查工作区的地方都走这里：激活开始时新建（new_inspection），以及会话用过文件工具以后
         # 检查工作区按会话保留、后面一次激活重新打开（session_inspection → inspection_environment）。
         # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
         if department in self.policies(run_id)[1]:
             environment.bind_trial_source(self.source_tree(department, projection))
-            # 基线副本与起点到交付的改动清单（检验的有效性设计说明第 7.2 节，工单 #1181）：
+            # 基线副本与起点到交付的改动清单（检验的有效性设计说明「检验的有效性」，工单 #1181）：
             # 起点树是事项开始时的项目起点，返工后保持不变；改动清单从这里一次算好。
             # 同名检查的命令与声明文件的内容取自当前交付的说明与封存树
             start, changed = self._baseline_facts(projection)
@@ -453,7 +453,7 @@ class Workspaces:
         # 检查工作区的建立源：从封存交付建立的部门取它当前面对的快照——最新的封存交付，
         # 还没有交付时是事项开始时的项目起点（采纳成果或项目的起始文件夹快照，都没有时为空树），
         # 不读运行工作区；其他会话从当前运行工作区快照建立。
-        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 第 2 节
+        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools docs/design/local-tools.md「工作区」
         # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
         # host_commit_error 正式报告。谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
         if department in self.policies(projection.run_id)[1]:
@@ -530,7 +530,7 @@ class Workspaces:
                                 else projection.delivery_spec.content_hash),
             effective_contract_hash=effective_contract_hash,
         )
-        # 质检的 trial_open 只接受当前交付说明里的启动方式（设计说明第 3.4 节）：激活开始时交到执行环境
+        # 质检的 trial_open 只接受当前交付说明里的启动方式（docs/design/browser-and-computer-use.md「试用工具」）：激活开始时交到执行环境
         environment.bind_launch_methods(
             None if projection.delivery_spec is None else projection.delivery_spec.launch)
 
@@ -647,7 +647,7 @@ _PROCESSES = {"run_check": "_run_check", "run_baseline_check": "_run_baseline_ch
 _MCP_PRIVATE_ARGUMENTS = frozenset({})
 
 # 动作类别与属于它的工具：执行环境按类别分派，再从上面两种执行方式里按实际工具名取执行方法。
-# 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明第 18 节）。
+# 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明「本机的做法」）。
 # MCP 类别的工具名是各事项自己的动态别名，静态清单列不出它们：类别进入唯一的处理方法（_PROCESSES["mcp"]），
 # 由会话表核对别名并还原原名
 _KIND_TOOLS = {
@@ -912,14 +912,14 @@ class LocalEnvironment:
         self._run_id = run_id
         # 这个 run 冻结的参数取值（工单 #1189）；直接构造环境（测试、没有冻结字典的旧 run）时为空
         self._parameters = dict(parameters or {})
-        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明第 7.2 节，工单 #1175）：
+        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明「运行规则」，工单 #1175）：
         # 每个 run 每台服务器一个实例，第一次 MCP 调用时启动，run 结束时由持有它的一方关闭；
         # 没有 MCP 设置的 run（大多数 run 与旧事项）为空，环境工具的分派不受影响
         self.mcp_sessions = mcp_sessions
-        # 这个 run 的试用会话表（浏览器与 computer use 设计说明第 3.4 节，工单 #1182）：
+        # 这个 run 的试用会话表（浏览器与 computer use 设计说明「试用工具」，工单 #1182）：
         # 会话跨激活保留（一个部门同一时刻最多一个会话），由 Workspaces 持有；直接构造环境时各自一份
         self._trials = trials if trials is not None else TrialSessionTable()
-        # 这个 run 的浏览器会话表（设计说明第 4.1 节，工单 #1184）：网页种类的试用会话建立与结束时
+        # 这个 run 的浏览器会话表（docs/design/browser-and-computer-use.md「运行方式」，工单 #1184）：网页种类的试用会话建立与结束时
         # 由这里启动与关闭 Playwright MCP；动作按（run、部门）找到会话。与试用会话一样由 Workspaces 持有
         self.browsers = browsers if browsers is not None else BrowserSessions(artifacts)
         # 运行工作区的根：试用副本放在它旁边的 trials/ 下，与检查工作区同一种摆法
@@ -1020,12 +1020,12 @@ class LocalEnvironment:
         )
 
     def bind_trial_source(self, tree: CapturedTree | None) -> None:
-        # 这个会话的试用副本来源（浏览器与 computer use 设计说明第 3.4 节）：质检按当前交付快照的清单
+        # 这个会话的试用副本来源（浏览器与 computer use 设计说明「试用工具」）：质检按当前交付快照的清单
         # 建立副本，工程没有这一项，trial_start 时封存运行工作区
         self._trial_source = tree
 
     def bind_baseline_source(self, tree: CapturedTree | None, changed: tuple[str, ...] = ()) -> None:
-        # 基线副本的来源（检验的有效性设计说明第 7.2 节，工单 #1181）：事项起点树的引用，以及起点到
+        # 基线副本的来源（检验的有效性设计说明「检验的有效性」，工单 #1181）：事项起点树的引用，以及起点到
         # 交付的改动清单（声明涉及的交付文件必须属于它）。事项返工时起点树保持不变（run_created 里
         # 记下的采纳成果或起始文件夹快照），由 Workspaces 在激活开始时交来；
         # 直接构造环境的测试没有绑定时按没有基线处理
@@ -1040,7 +1040,7 @@ class LocalEnvironment:
         self._delivery_tree = tree
 
     def bind_launch_methods(self, methods: list[dict[str, Any]] | None) -> None:
-        # 当前交付说明里的启动方式：trial_open 的名称按它解析（设计说明第 3.4 节）
+        # 当前交付说明里的启动方式：trial_open 的名称按它解析（docs/design/browser-and-computer-use.md「试用工具」）
         self._launch_methods = [dict(item) for item in (methods or []) if isinstance(item, dict)]
 
     def verify_tree(self, snapshot: WorkspaceSnapshot) -> None:
@@ -1118,7 +1118,7 @@ class LocalEnvironment:
             raise
         except TrialStartFailed as exc:
             # 试用会话没有建立（缺少程序、就绪超时、进程提前退出、启动方式不可用）：
-            # 失败回执带启动输出，会话不建立（浏览器与 computer use 设计说明第 3.4 节与故障矩阵）；
+            # 失败回执带启动输出，会话不建立（浏览器与 computer use 设计说明「试用工具」与故障矩阵）；
             # 开始之前被取消时按取消交回，进程树已经结束
             tree_change, after_ref = self._tree_evidence(before)
             if exc.cancelled:
@@ -1134,13 +1134,13 @@ class LocalEnvironment:
             # 试用副本之外。回执标 refused，原因作为工具结果交回
             return ActionReceipt.refusal(action.action_id, str(exc))
         except BrowserSessionFailed as exc:
-            # 浏览器会话没有建立、已经中断，或执行时 Playwright MCP 退出（设计说明第 9 节）：
+            # 浏览器会话没有建立、已经中断，或执行时 Playwright MCP 退出（docs/design/browser-and-computer-use.md「恢复契约」）：
             # 回执为失败，带会话记录（状态已记为中断）
             tree_change, after_ref = self._tree_evidence(before)
             return ActionReceipt(action_id=action.action_id, status="failed", output=exc.output,
                                  error=str(exc), tree_change=tree_change, after_snapshot_ref=after_ref)
         except McpRefused as exc:
-            # 工具许可与名称表（网络与 MCP 设计说明第 5.2 节）：别名不在这个事项的名称表里等拒绝情形，
+            # 工具许可与名称表（网络与 MCP 设计说明「工具许可」）：别名不在这个事项的名称表里等拒绝情形，
             # 回执标 refused 并带原因，作为工具结果交回（工单 #1170 的回执字段）
             return ActionReceipt.refusal(action.action_id, str(exc))
         except Exception as exc:
@@ -1323,7 +1323,7 @@ class LocalEnvironment:
         }
 
     def _read_external_source(self, args: dict[str, Any]) -> dict[str, Any]:
-        # 读一份已经存下来的外部来源（网络取回与 MCP 设计说明第 6.4 节）：按来源编号与行范围读，
+        # 读一份已经存下来的外部来源（网络取回与 MCP 设计说明「内容与保存」）：按来源编号与行范围读，
         # 不重新取回；游标做法与 read_range 相同，并绑定这份正文的摘要
         source = args.get("source")
         if not isinstance(source, str) or not source:
@@ -1376,7 +1376,7 @@ class LocalEnvironment:
         return self._artifacts.external_source(self._run_id, source)
 
     async def _fetch(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 取回一个网页（网络与 MCP 设计说明第 3、6 节）：取回本身在 fetch 模块里，这里把正文存成
+        # 取回一个网页（网络与 MCP 设计说明「放置」、「网络取回」）：取回本身在 fetch 模块里，这里把正文存成
         # 这个 run 的外部来源工件，再把工件的第一页按 read_external_source 的同一套分页交回。
         # 地址指向服务自己时 fetch 模块抛 FetchRefused，由 perform 变成 refused 的回执
         url = action.input.get("url")
@@ -1406,10 +1406,10 @@ class LocalEnvironment:
         }, "completed"
 
     async def _mcp(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 调用项目设置中 MCP 服务器的工具（网络与 MCP 设计说明第 5.2、7.2、7.3 节，工单 #1175）。
+        # 调用项目设置中 MCP 服务器的工具（网络与 MCP 设计说明「工具许可」、「运行规则」、「调用与结果」，工单 #1175）。
         # 执行环境只认识这一个处理键（分派按动作类别进入，再按工具名取处理方法）；
         # 别名与原名由会话表还原：别名不在这个事项的名称表里时拒绝，原因作为工具结果交回。
-        # 结果保存为这个 run 的外部来源工件（第 7.3 节，接 #1171 的工件路径），第一页按
+        # 结果保存为这个 run 的外部来源工件（「调用与结果」，接 #1171 的工件路径），第一页按
         # read_external_source 的同一套分页交回；工具失败（is_error）交回错误文本，动作记为已完成
         alias = action.tool
         if self.mcp_sessions is None:
@@ -1477,7 +1477,7 @@ class LocalEnvironment:
             raise FileNotFoundError(f"file not found: {rel}")
         if not target.is_file():
             raise ValueError(f"edit_range requires an existing regular file: {rel}")
-        # 原文按目标文件本身读取：公开树不含质检的测试材料目录（本地工具第 2 节），
+        # 原文按目标文件本身读取：公开树不含质检的测试材料目录（本地工具「工作区」），
         # 区间编辑与写入工具作用在同一批可写的目标文件上
         raw = target.read_bytes()
         # 文件级摘要只绑定目标文件，其它文件的改动不影响本次核对
@@ -1730,7 +1730,7 @@ class LocalEnvironment:
             )
             qa_tests_hash = None
             if action.department in self._check_materials:
-                # 检查回执绑定这一刻的检查材料摘要（设计说明第 4.2 节第 2 条）：只有写检查材料的角色有
+                # 检查回执绑定这一刻的检查材料摘要（docs/design/forms-and-verifier-role.md「核验角色」中「检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要」）：只有写检查材料的角色有
                 qa_tests_hash = qa_tests_digest(self.capture_qa_tests())
             receipt = self.workspace.record_check(
                 action.department,
@@ -1760,14 +1760,14 @@ class LocalEnvironment:
 
     def _delivery_check_command(self, name: str) -> str | None:
         # 同名交付检查已经记录的命令：交付封存时主机把工程 run_check 的命令一起记下（DeliverySpec.checks）。
-        # 基线运行不能改写命令（第 7.2 节）：这里只取记录，模型给不出 command 这个参数
+        # 基线运行不能改写命令（docs/design/network-and-mcp.md「运行规则」）：这里只取记录，模型给不出 command 这个参数
         for check in getattr(self, "_delivery_checks", ()) or ():
             if isinstance(check, dict) and check.get("name") == name and isinstance(check.get("command"), str):
                 return check["command"]
         return None
 
     async def _run_baseline_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 基线检查（检验的有效性设计说明第 7.2 节，工单 #1181）：主机在基线副本上运行同名交付检查，
+        # 基线检查（检验的有效性设计说明「检验的有效性」，工单 #1181）：主机在基线副本上运行同名交付检查，
         # 回执先写进检查工作区，提交放行决定读取事实时它已经在了。基线副本由事项起点树、这个部门的
         # 检查材料与声明的交付文件组成；命令取交付检查记录的那一条。时限、输出截断、进程树清理与
         # 树变化核对与 run_check 相同。退出码非零且不是 124（超时）或 130（取消）时基线失败，
@@ -1890,7 +1890,7 @@ class LocalEnvironment:
 
     # ---- 试用会话（工单 #1182）----
     def _trial_source_tree(self) -> CapturedTree:
-        # 质检的试用副本按这次检查的交付快照建立（激活开始时由 Workspaces 交来，工单 #1182 与设计说明第 3.4 节）；
+        # 质检的试用副本按这次检查的交付快照建立（激活开始时由 Workspaces 交来，工单 #1182 与 docs/design/browser-and-computer-use.md「试用工具」）；
         # 工程没有这一项，在 trial_start 时封存当前的运行工作区。直接构造环境的测试没有 bind 时用当前工作区
         if self._trial_source is not None:
             return self._trial_source
@@ -1924,7 +1924,7 @@ class LocalEnvironment:
         session = result.get("session")
         if session is not None and session.get("kind") == "web":
             # 网页种类的会话：启动 Playwright MCP 并打开就绪地址，回执带页面的可访问性结构与截图
-            # （设计说明第 3.4、4.3 节）。浏览器没有起来时会话不保留：结束交付软件的进程树再按失败交回
+            # （docs/design/browser-and-computer-use.md「试用工具」、「版本与固定」）。浏览器没有起来时会话不保留：结束交付软件的进程树再按失败交回
             try:
                 page = await self._open_browser(action, session)
             except BrowserSessionFailed as failure:
@@ -1938,7 +1938,7 @@ class LocalEnvironment:
         return result, "completed"
 
     async def _open_browser(self, action: Action, session: dict[str, Any]) -> dict[str, Any]:
-        # 浏览器会话的目录：试用副本旁边的 mcp-output/<会话身份>，会话结束时删掉（设计说明第 4.1 节）
+        # 浏览器会话的目录：试用副本旁边的 mcp-output/<会话身份>，会话结束时删掉（docs/design/browser-and-computer-use.md「运行方式」）
         copy_root = Path(str(session["copy"]))
         return await self.browsers.start(
             run_id=self._run_id, department=action.department, copy_root=copy_root,
@@ -1957,7 +1957,7 @@ class LocalEnvironment:
 
     async def _trial_stop(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         # 结束本部门的会话：先关 MCP 与浏览器，再结束交付软件的进程树、删掉试用副本、
-        # 交回结束方式与输出末尾（设计说明第 3.4 节）
+        # 交回结束方式与输出末尾（docs/design/browser-and-computer-use.md「试用工具」）
         browser = await self.browsers.stop(self._run_id, action.department, reason="stopped")
         result = self._trials.stop(self._run_id, action.department, limit=self._output_limit())
         result["browser"] = browser
@@ -1979,7 +1979,7 @@ class LocalEnvironment:
         return self.browsers.record(self._run_id, department)
 
     def trial_session(self, department: str) -> dict[str, Any] | None:
-        # 这个部门进行中的试用会话记录（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：
+        # 这个部门进行中的试用会话记录（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：
         # trial_case_begin 记下会话身份与试用副本的树摘要，放行时按后者核对用例属于当前交付
         session = self._trials.session_of(self._run_id, department)
         return None if session is None else session.record()

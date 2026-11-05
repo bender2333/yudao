@@ -1,5 +1,5 @@
-# MCP 服务器探测（工单 #1174；网络与 MCP 设计说明第 4.2 节「读取工具清单（探测）」、第 4.4 节「凭据」、
-# 第 10 节应用层接口表；总图第四节「接口」缝的命令）。这个文件查九件事：
+# MCP 服务器探测（工单 #1174；网络与 MCP 设计说明「读取工具清单（探测）」、docs/design/test-pyramid.md「用例的变化」「凭据」、
+# docs/design/test-pyramid.md「测试的写法」应用层接口表；总图第四节「接口」缝的命令）。这个文件查九件事：
 # 1. 用官方 mcp-server-time（stdio）与本机 SDK HTTP 测试服务器探测，读到工具清单快照；
 # 2. 探测结果以项目流事件 tool_server_probe_finished 出现（真实 MCP 进程）；
 # 3. 启动失败给出原因与标准错误输出末尾，凭据值已替换为星号；
@@ -11,7 +11,7 @@
 #    时快照按同一摘要被接受；
 # 9. 凭据值不出现在事件、投影与设置里（只出现名称），日志里的值同样被替换。
 #
-# 层：集成层（真实 MCP 子进程与真实本机端口，测试分层设计说明第 2 节）。
+# 层：集成层（真实 MCP 子进程与真实本机端口，测试分层设计说明「三层的定义」）。
 # 守 R2（第二环的合同：项目流事件与 project.settings 的载荷）与 R3（用户读到的探测结果与真实服务器一致）。
 
 from __future__ import annotations
@@ -66,7 +66,7 @@ def _http_server(url: str) -> dict:
 
 
 def _probe(application: Application, project_id: str, name: str, server: dict):
-    # 提交探测命令：命令立即接受，探测作为任务在应用层的事件循环里进行（设计说明第 4.2 节）。
+    # 提交探测命令：命令立即接受，探测作为任务在应用层的事件循环里进行（docs/design/test-pyramid.md「集成层在每次合并以后运行」）。
     # 测试在同一个事件循环里等那个任务完成，再核对结果事件
     from harness.app.commands import execute
 
@@ -277,7 +277,7 @@ def test_probe_before_save_and_writeback_binds_the_same_config_digest(tmp_path):
 
 
 def test_an_old_probe_result_after_a_config_change_keeps_but_never_covers(tmp_path):
-    # 探测期间修改配置：旧结果保留（事件里有），但不得覆盖新配置的可用快照（设计说明第 4.2 节）
+    # 探测期间修改配置：旧结果保留（事件里有），但不得覆盖新配置的可用快照（docs/design/test-pyramid.md「集成层在每次合并以后运行」）
     system = _system(tmp_path)
     project_id = system.projects.register("配置变化", GOAL)
     application = Application(system)

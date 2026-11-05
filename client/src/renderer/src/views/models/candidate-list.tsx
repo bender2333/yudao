@@ -1,4 +1,4 @@
-// 候选列表（工单 #1297；模型管理设计说明第 4.3 节「候选的内容与呈现」、第 9.1 节「选择模型」行）。
+// 候选列表（工单 #1297；模型管理设计说明「模型访问定义与准入」中「候选的内容与呈现」、「模型管理页」中「选择模型」行）。
 // 搜索（名称、提供方、上游模型 ID）、筛选（可自动配置、支持图像、支持推理、全部模型、已选用）与分批显示。
 // 候选带勾选框；勾选即补全参数并验证（catalog.model.select），页面不预填参数：
 // 协议、窗口与输出上限按服务端给的候选值显示，来源一并标出。
@@ -48,7 +48,7 @@ export type CandidateListProps = {
   onManualSubmit: () => void;
 };
 
-// 一个值的来源标注（设计说明第 4.3 节「界面标明每个预填值的来源」）
+// 一个值的来源标注（docs/design/model-management.md「模型访问定义与准入」「界面标明每个预填值的来源」）
 function sourceLabel(source: string | null | undefined): string {
   if (!source) {
     return "";

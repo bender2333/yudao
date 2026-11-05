@@ -22,15 +22,15 @@ export type DecisionCardProps = {
   // 事项标题取不到时是空串，卡片不写事项标识（工单 #802）
   projectName: string;
   workItemTitle: string;
-  // 上一轮的修改意见原文（工单 #138，设计第 3.2 节）：由调用处按项目与事项解析，第一轮为空
+  // 上一轮的修改意见原文（工单 #138，docs/design/browser-and-computer-use.md「执行位置上的程序」）：由调用处按项目与事项解析，第一轮为空
   revisionNote?: string | null;
-  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）
   targetDecision?: string | null;
   onNavigate: (hash: string) => void;
 };
 
 
-// 决定卡片列表的修改意见（工单 #138，设计第 3.2 节）：提出修改以后开始的修改轮，卡片要显示
+// 决定卡片列表的修改意见（工单 #138，docs/design/existing-project-onboarding.md「决定种类」）：提出修改以后开始的修改轮，卡片要显示
 // 这一轮提交的修改意见原文。决定请求只带工件的引用（revision_note_ref），原文在 work_item.materials
 // 的 onboarding_rounds 里；对这些项目打开该查询，按事项与候选轮次汇总出各轮的修改意见。
 // 同一个决定可能同时出现在几处卡片列表里（顶栏下拉、概览的文字列表、首页、恢复页），
@@ -261,7 +261,7 @@ export function DecisionCardList(props: {
   now: number;
   names: (decision: DecisionView) => { projectName: string; workItemTitle: string };
   onNavigate: (hash: string) => void;
-  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）
   targetDecision?: string | null;
   emptyText: string;
   // 这一处列表的视图标识前缀（工单 #138）：同一个决定出现在几处列表里，每处的修改意见查询

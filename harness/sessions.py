@@ -39,7 +39,7 @@ class SessionFactory:
         self._sessions: dict[str, dict[str, DepartmentSession]] = {}
         self._workspace_root = Path(workspace_root) if workspace_root is not None else None
         self.jobs = BackgroundJobTable()
-        # 这个进程里全部 run 的试用会话（浏览器与 computer use 设计说明第 3.4 节，工单 #1183）：
+        # 这个进程里全部 run 的试用会话（浏览器与 computer use 设计说明「试用工具」，工单 #1183）：
         # 表由 Workspaces 用同一张（会话的记录与执行环境共用一份），run 进入终态时先结束会话再删工作区。
         # 会话事件的写入方由薄驱动经 Workspaces 接上（trial_events）
         self.trials = TrialSessionTable()

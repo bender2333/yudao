@@ -171,7 +171,7 @@ def test_confirming_the_first_round_adopts_the_snapshot_as_the_baseline(data_dir
 
 
 def test_confirming_the_second_round_adopts_and_a_new_work_item_starts(data_dir, tmp_path):
-    # 验收（5 节、第 10 节第 10 项）：第二轮候选确认以后采纳的是第二轮的快照工件（属于第二轮 run），
+    # 验收（5 节、docs/design/existing-project-onboarding.md「验收」中「建档之前的事项」）：第二轮候选确认以后采纳的是第二轮的快照工件（属于第二轮 run），
     # 采纳以后可以新建普通事项，它的 run 从这个基线的快照开始
     context, client, opened, refs = _run_onboarding_http(data_dir, tmp_path, _two_rounds(), rounds=1)
     try:

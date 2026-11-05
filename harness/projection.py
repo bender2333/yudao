@@ -1,5 +1,5 @@
 # 状态投影：运行状态投影由 run 流的事件折叠而成，决定请求由所在流中的请求、回答与撤销事件折叠而成。
-# Agent 不能写投影。项目投影与目录投影不由裁决读取，放在内核文件以外（可信内核设计说明第 3 节），
+# Agent 不能写投影。项目投影与目录投影不由裁决读取，放在内核文件以外（可信内核设计说明「内核清单」），
 # 由写入口按流的处理者与 run 投影一视同仁地折叠与保存。
 # 投影随写入保存（写入口在追加事件的同一个事务中更新），读取时直接读取保存的投影；
 # 从头重放只用于重建保存的投影与核对它与重放结果一致。
@@ -190,7 +190,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.prompt_config_versions = dict(payload["prompt_config_versions"])
         # 创建这个 run 时记录的 run 事件版本；旧事件没有这个字段时为 0，与当前版本不同（ADR-0019）
         state.run_event_version = int(payload.get("run_event_version", 0))
-        # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（总体架构第 3 节第 7 条）
+        # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（总体架构「十项长期决定」中「带版本的定义」）
         state.definitions_version = str(payload.get("definitions_version", ""))
         # 创建这个 run 时冻结的参数版本；旧 run 没有这个字段时为空（工单 #349）
         state.parameters_version = str(payload.get("parameters_version", ""))
@@ -264,7 +264,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             # 事项的「所在部门」也只由主线会话的激活推出（工单 #842）：询问分支是被询问方的
             # 一次旁支工作，它的激活不接管所在部门，否则提问方拿到回答以后继续工作，
             # 页面上仍然显示被询问的部门。
-            # 轮次同样只计主线会话的激活（工单 #857，设计第 4.2 节）：分支是提问方这一轮里
+            # 轮次同样只计主线会话的激活（工单 #857，docs/design/trusted-kernel.md「路径守卫」）：分支是提问方这一轮里
             # 的一次旁支工作，它不推进轮次、不占用轮次上限（harness/bounds.py 的
             # activation_bound 按 cycle_count 判断），页面上的「第 N 轮」也不因询问多一轮；
             # 分支激活事件里的 cycle 本来就写提问方所在的这一轮。
@@ -762,7 +762,7 @@ def _clear_feedback(state: RunProjection, role: str | None) -> None:
 
 
 def _invalidate_artifact(state: RunProjection, payload: dict[str, Any]) -> None:
-    # 一条成果失效事件折叠成什么（设计说明第 4 节、第 7 节）：载荷给出成果种类、版本与原因，
+    # 一条成果失效事件折叠成什么（设计说明「四项技术保证」、docs/design/trusted-kernel.md「模块交互」）：载荷给出成果种类、版本与原因，
     # 指名的那一版不再是当前版本。现在会失效的成果只有当前交付：换了一版交付、PRD 或合同变了、
     # 返工，或者非质检部门改动了工作区，都由成果驱动记下原因
     if payload.get("artifact_kind") != "delivery_spec":
@@ -825,13 +825,13 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
     )
 
 # ---------------------------------------------------------------------------
-# 试用记录（浏览器与 computer use 设计说明第 8.2、7.2 节，工单 #1180）：试用用例与它们的步骤由事件派生，
+# 试用记录（浏览器与 computer use 设计说明「试用用例」、「查询」，工单 #1180）：试用用例与它们的步骤由事件派生，
 # 不另外保存。用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份（模型给出的调用编号）
 # 关联为它的步骤；产生检查回执的一步同样计入。哪些工具算一步、哪一步是可执行的检验在 coverage 模块
 
 
 def _open_case(state: RunProjection, department: Any, session_id: str | None) -> TrialCase | None:
-    # 这个部门在这个会话里打开着的用例：用例打开期间同一个部门只有一个（设计说明第 8.2 节）
+    # 这个部门在这个会话里打开着的用例：用例打开期间同一个部门只有一个（docs/design/browser-and-computer-use.md「试用用例」）
     for case in state.trial_cases:
         if (case.status == TRIAL_CASE_STATUS_OPEN and case.department == department
                 and case.session_id == session_id):
@@ -878,7 +878,7 @@ def _conclude_trial_case(state: RunProjection, event: Event) -> None:
 
 
 def _interrupt_trial_cases(state: RunProjection, event: Event) -> None:
-    # 会话结束或中断时打开的用例自动结束为中断（设计说明第 8.2 节）：会话的结束已经由这条事件写明，
+    # 会话结束或中断时打开的用例自动结束为中断（docs/design/browser-and-computer-use.md「试用用例」）：会话的结束已经由这条事件写明，
     # 用例跟着它结束，结果不能作为证据。进程崩溃以后由恢复补写的会话结束事件走同一条路
     payload = event.payload
     session_id = str(payload.get("session_id") or "")

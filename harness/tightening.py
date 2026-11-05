@@ -44,19 +44,19 @@ ANSWER_ONLY_IN_BRANCH = "answer tool is only available in an ask branch session"
 BRANCH_CANNOT_WRITE = "The branch session cannot modify files in the running workspace"
 BRANCH_CANNOT_DELIVER = "The branch session cannot submit delivery"
 BRANCH_CANNOT_REVIEW = "The branch session cannot submit QA review"
-# 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：等不等、为什么等是这一份收紧检查的
+# 放行要等发给产品的输入处理完（部门指导设计说明「放行怎么等」，工单 #561）：等不等、为什么等是这一份收紧检查的
 # 判断与说明（工单 #1456），内核只把原因交回部门
 PENDING_INPUT_RELEASE = ("New user input has not been handled yet; the release is judged after the round that "
                          "received it has ended.")
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
-# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明第 3 节）
+# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明「处理结果与来源」）
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
 
 def pending_product_input(projection: RunProjection, events: list[Event],
                           *, definitions: Definitions | None = None) -> bool:
     """发给收输入的部门的输入里，还有没处理完的：核验角色的放行等它处理完再裁决
-    （部门指导设计说明第 2.1、3 节，工单 #561）。
+    （部门指导设计说明「放行怎么等」、「处理结果与来源」，工单 #561）。
 
     「处理完」只有一个说法：收到这条输入的那一轮主线工作正常结束了。输入进入模型输入时由这一轮的工作消息
     （部门输入事件）或者装配好的请求（上下文清单里的输入版本）记下，一轮正常结束时由轮结束事件接上；
@@ -162,7 +162,7 @@ class WatchedOutputsTightening:
     CONTRACT_VERSION = tightening_contract.CURRENT_VERSION
 
     def kinds(self, request: TightenRequest) -> set[str]:
-        # 这个部门此刻能提交的提案种类。能交要求的部门在回答一次询问时可以修订 PRD（循环结构第 4.3 节），
+        # 这个部门此刻能提交的提案种类。能交要求的部门在回答一次询问时可以修订 PRD（循环结构「回答能做什么」），
         # 谁能交要求按提案合同判断，不写部门名（工单 #1391）；
         # 同时运行的会话让待回答的询问不止一条（工单 #557）：看的是还有哪些询问等着这个部门回答
         projection, department, definitions = request.state, request.department, request.definitions
@@ -212,7 +212,7 @@ class WatchedOutputsTightening:
         reason = tool_error(projection, department, name, args, definitions=definitions)
         if reason:
             return Tightened(reason=reason)
-        # 放行要等发给收输入的部门的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：还有没处理完的
+        # 放行要等发给收输入的部门的输入处理完（部门指导设计说明「放行怎么等」，工单 #561）：还有没处理完的
         # 输入时，这一次调用在安全节点上等，醒来以后按此刻的 PRD 与交付重新做许可。只有核验角色的放行等，
         # 缺陷记录不等；还没有交付的预测性探索也不等：没有可以放行的交付，这次提交本来就只会被拒绝
         if (_is_release_submission(department, name, args, definitions=definitions)
@@ -251,7 +251,7 @@ class WatchedOutputsTightening:
         return None
 
     # 这一版路由自己组装的成果种类：其余种类（第二种路由带来的新种类）只按提案的参数当内容，
-    # 形状由带它来的那份定义给出，这里不判（S2c，工单 #1098，设计说明第 5.5 节）
+    # 形状由带它来的那份定义给出，这里不判（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
     BUILDERS = {
         "product_spec": "_product_spec",
         "product_decision": "_product_decision",
@@ -263,7 +263,7 @@ class WatchedOutputsTightening:
     }
 
     def submission(self, request: TightenRequest) -> Tightened:
-        # 一次提案提交的检查与内容组装（S2c，工单 #1098，设计说明第 5.5 节「成果的内容由路由组装」）：
+        # 一次提案提交的检查与内容组装（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」中「成果的内容由路由组装」）：
         # 先按种类查提案的形状，再按成果的内容判、把成果的内容组装出来。路由不组装的种类不给内容——
         # 内核按提案的参数当内容，照常写通用的接纳事件。内核不再按成果种类写分支
         proposal = request.proposal
@@ -279,13 +279,13 @@ class WatchedOutputsTightening:
 
     def _conditions(self, kind: str, request: TightenRequest) -> ConditionOutcome:
         # 提案合同里的通用条件：条件是内核的数据与核对（evaluate_conditions），由这里在需要的地方问一次，
-        # 结果既是拒绝的理由，也是组装内容时要用的检查回执（设计说明第 5.5 节）
+        # 结果既是拒绝的理由，也是组装内容时要用的检查回执（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
         return evaluate_conditions(kind, department=request.department, proposal=request.proposal or {},
                                    minimal=request.minimal, facts=request.facts,
                                    definitions=request.definitions)
 
     def _product_spec(self, request: TightenRequest) -> Tightened:
-        # 输入版本、修订说明、有效决定逐条处置都是成果驱动的检查：PRD 是读内容才能判断的对象（第 5.5 节）。
+        # 输入版本、修订说明、有效决定逐条处置都是成果驱动的检查：PRD 是读内容才能判断的对象（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）。
         # 输入版本最先判（新输入还没进产品这一轮时只报这一条），修订说明与有效决定排在通用条件之后，
         # 与搬动以前各条报错的先后一致。输入版本是成果的内容，不进最小投影，由这里并进内容给回（S1d）
         projection = request.state
@@ -357,7 +357,7 @@ class WatchedOutputsTightening:
         return Tightened(content=content)
 
     def _review(self, request: TightenRequest) -> Tightened:
-        # 核验角色的结论是对当前交付的核验（循环结构第 3.1 节）：这一轮开始时没有交付就没有可以核验的对象；
+        # 核验角色的结论是对当前交付的核验（循环结构「各部门在什么时候工作」）：这一轮开始时没有交付就没有可以核验的对象；
         # 放行要用它当前的测试材料；提交事务里再判一次输入有没有处理完（工具许可之后、提交之前新输入到达）。
         # 部门名取自定义：这一轮正是提交结论的那个部门在做核验（工单 #1391）
         minimal, facts = request.minimal, request.facts
@@ -378,7 +378,7 @@ class WatchedOutputsTightening:
         if contract_hash is None:
             return Tightened(errors=(FieldError(
                 "effective_contract", f"{department} review requires a current contract"),))
-        # 依据版本、交付绑定的当前版本、工作区的树与检查回执都由合同里的通用条件核对（设计说明第 5.5 节），
+        # 依据版本、交付绑定的当前版本、工作区的树与检查回执都由合同里的通用条件核对（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」），
         # 提出评价的部门与交付的作者部门分开也由通用条件核对（基础规则 3）
         outcome = self._conditions("qa_review", request)
         errors: list[FieldError] = list(outcome.errors)
@@ -395,7 +395,7 @@ class WatchedOutputsTightening:
             # 放行要用当前的核验测试材料：材料摘要的比较读的是内容
             if any(item.get("qa_tests_hash") != projection.qa_tests_hash for item in bound_checks):
                 errors.append(FieldError("checks", "测试材料已经改变，用当前的测试材料重新运行检查"))
-        # 逐条结论（验证的独立性设计说明第 7、7.1 节，工单 #151）在前面这些检查通过以后才判：
+        # 逐条结论（验证的独立性设计说明「检验覆盖与开环」、「口径」，工单 #151）在前面这些检查通过以后才判：
         # 覆盖当前 ProductSpec 的全部验收条件、可执行检验的 passed 至少一个本轮核验回执、放行的三条规则
         criteria: list[dict[str, Any]] = []
         # 试用用例（工单 #1180）：引用它的条目按用例与步骤核对，三个数按步骤分类算
@@ -413,14 +413,14 @@ class WatchedOutputsTightening:
                     errors.extend(_release_criteria_errors(criteria, case_steps))
                 if verdict == "cannot_verify":
                     errors.extend(_cannot_verify_criteria_errors(criteria))
-        # 先判断后看解释的门（第 4 节，工单 #358）与引用校验（工单 #1190）：提交结论前这份交付必须已有
+        # 先判断后看解释的门（docs/design/skeleton-and-application.md「最小投影」，工单 #358）与引用校验（工单 #1190）：提交结论前这份交付必须已有
         # 独立判断事件，结论引用的是这一条判断——它对这个交付与这一版 PRD、写在这份交付被接纳之后，
         # 并且它的逐条结论覆盖当前 PRD 的全部验收条件。字段级错误写明缺什么、哪一条不符
         judgement = None
         if not errors:
             judgement, reference_errors = _qa_judgement(proposal, request.events, projection, delivery_hash, spec_hash)
             errors.extend(reference_errors)
-        # 改判（第 4 节，工单 #1190）：判断与结论不一致的条目逐条写明改判理由，缺了被拒绝；
+        # 改判（docs/design/skeleton-and-application.md「最小投影」，工单 #1190）：判断与结论不一致的条目逐条写明改判理由，缺了被拒绝；
         # 改判的条数随放行记录写进事实，以后算解释翻转率时从这里取
         if not errors and judgement is not None:
             errors.extend(_judgement_change_errors(criteria, judgement))
@@ -428,7 +428,7 @@ class WatchedOutputsTightening:
         errors.extend(defect_errors)
         if errors:
             return Tightened(errors=tuple(errors))
-        # 放行要等发给产品的输入处理完（部门指导设计说明第 2.1 节，工单 #561）：在提交事务里再判一次。
+        # 放行要等发给产品的输入处理完（部门指导设计说明「放行怎么等」，工单 #561）：在提交事务里再判一次。
         # 谁收输入按这个事项所用的那份定义取（工单 #1509），接输入的部门由事项的来源写明（工单 #1455），
         # 不按进程加载的默认定义
         if request.commit and verdict == "release" \
@@ -436,7 +436,7 @@ class WatchedOutputsTightening:
             return Tightened(wait=True, reason=PENDING_INPUT_RELEASE)
         # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
         changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
-        # 检验的有效性（第 7.2 节，工单 #1181）：本次激活的基线回执按检查名归并，命令检查的覆盖
+        # 检验的有效性（「检验的有效性」，工单 #1181）：本次激活的基线回执按检查名归并，命令检查的覆盖
         # 要求同名基线在基线副本上失败。基线回执先于这次提交写进工作区事实（主机执行先写回执），
         # 这里只读事实，不补运行
         baseline = baseline_records(facts.checks, sorted({name for row in criteria
@@ -454,12 +454,12 @@ class WatchedOutputsTightening:
             "criteria": _criteria_with_judgement(criteria, judgement),
             # 结论引用的独立判断事件（工单 #1190）：以后算解释翻转率时按这一对事件取
             "judgement_event": judgement.event_id,
-            # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算；
-            # 改判的条数随它写进放行记录（工单 #1190）。baseline_valid 随三个数一起算好（第 7.2 节）
+            # 放行记录一次算好三个数（docs/design/independent-verification.md「口径」第 4 点）：查询与画面读这个数，不重新计算；
+            # 改判的条数随它写进放行记录（工单 #1190）。baseline_valid 随三个数一起算好（docs/design/browser-and-computer-use.md「查询」）
             "coverage": coverage_report(criteria, changed=len(changed), cases=case_steps,
                                         baseline=baseline),
             "open_criteria": open_criteria(criteria, case_steps),
-            # 基线明细（第 7.2 节的表）：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
+            # 基线明细（docs/design/independent-verification.md「检验的有效性」的表）：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
             # 缺少回执与无法运行都不计入，放行记录里看得到
             "baseline_checks": baseline_open_records(criteria, baseline),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
@@ -467,7 +467,7 @@ class WatchedOutputsTightening:
         }, ends_run=verdict == "release")
 
     def _independent_judgement(self, request: TightenRequest) -> Tightened:
-        # 独立判断的提交（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里
+        # 独立判断的提交（验证的独立性设计说明「先判断后看解释」，工单 #358）：核验角色在只看事实的上下文里
         # 对当前交付的每条验收条件写出判断（#151 逐条结论的形状），经写入口写成事实。
         # 它不是成果：没有结论、缺陷与检查回执的绑定——判断只依据主机已经给出的回执引用检查名，
         # 每条引用的检查名仍是本次激活里绑定当前快照、ProductSpec 与交付的核验回执（事实通道不变）。
@@ -510,9 +510,9 @@ class WatchedOutputsTightening:
         })
 
     def _structure(self, request: TightenRequest) -> Tightened:
-        # 现有结构说明（docs/design/existing-project-onboarding.md 第 4.4 节）：构建与测试的每一项都要有本次
+        # 现有结构说明（docs/design/existing-project-onboarding.md 「工程：现有结构说明」）：构建与测试的每一项都要有本次
         # 激活中绑定当前快照与当前初始 PRD 的 run_check 回执，退出状态照实记录（不要求为 0）；建档中工作区的树不变。
-        # 树与回执由合同里的通用条件核对（设计说明第 5.5 节）
+        # 树与回执由合同里的通用条件核对（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
         minimal, facts = request.minimal, request.facts
         proposal = request.proposal or {}
         spec_hash = minimal.artifact_hash("product_spec")
@@ -551,9 +551,9 @@ class WatchedOutputsTightening:
         })
 
     def _baseline_review(self, request: TightenRequest) -> Tightened:
-        # 基线核验（docs/design/existing-project-onboarding.md 第 4.5 节）：逐条结论覆盖初始 PRD 的每条要求，
+        # 基线核验（docs/design/existing-project-onboarding.md 「质检：基线核验」）：逐条结论覆盖初始 PRD 的每条要求，
         # 基线检查绑定当前快照与当前 ProductSpec，退出状态不为 0 的检查都有说明；这里不使用普通事项的放行规则。
-        # 结构说明对应当前 PRD、工作区的树与检查回执由合同里的通用条件核对（设计说明第 5.5 节）
+        # 结构说明对应当前 PRD、工作区的树与检查回执由合同里的通用条件核对（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
         minimal, facts = request.minimal, request.facts
         proposal = request.proposal or {}
         spec_hash = minimal.artifact_hash("product_spec")
@@ -629,7 +629,7 @@ def _requirement_location_errors(request: TightenRequest) -> list[FieldError]:
 
 
 def _baseline_requirement_errors(request: TightenRequest) -> list[FieldError]:
-    # 带标记的边界条目不是现有行为（设计第 4.3 节）：要求文档描述而代码尚未实现的能力不记为现有缺陷；
+    # 带标记的边界条目不是现有行为（docs/design/existing-project-onboarding.md「产品：初始 PRD」）：要求文档描述而代码尚未实现的能力不记为现有缺陷；
     # 逐条结论覆盖初始 PRD 的每条要求，不许多也不重复——两条都读 PRD 的内容（S1d 从内核搬来，工单 #860）
     spec = request.state.product_spec
     if spec is None:
@@ -702,7 +702,7 @@ def _schema_errors(kind: str, proposal: dict[str, Any]) -> list[FieldError]:
     if kind == "baseline_review":
         return _baseline_review_schema_errors(proposal)
     if kind == "independent_judgement":
-        # 独立判断的形状（验证的独立性设计说明第 4 节，工单 #358）：逐条结论（复用 #151 的核对）
+        # 独立判断的形状（验证的独立性设计说明「先判断后看解释」，工单 #358）：逐条结论（复用 #151 的核对）
         # 加本次激活的检查名清单；没有结论与缺陷——判断先于解释，这一步不下结论
         return _qa_criteria_errors(proposal) + _qa_check_name_errors(proposal)
     return [FieldError("kind", "unknown kind")]
@@ -812,7 +812,7 @@ def _location_known(relative: str, facts: TreeFacts) -> bool:
 
 def _baseline_conclusions(proposal: dict[str, Any], bound: dict[str, dict[str, Any]],
                           facts: TreeFacts) -> tuple[list[dict[str, str]], list[FieldError]]:
-    # 每条结论的依据按状态检查（设计第 4.5 节）。逐条结论覆盖初始 PRD 的每条要求读的是 PRD 的内容，
+    # 每条结论的依据按状态检查（docs/design/existing-project-onboarding.md「质检：基线核验」）。逐条结论覆盖初始 PRD 的每条要求读的是 PRD 的内容，
     # 不在这里：由路由的收紧检查核对（S1d，工单 #860）
     declared = [item["requirement"].strip() for item in proposal["conclusions"]]
     errors: list[FieldError] = []
@@ -962,10 +962,10 @@ def _qa_defects(proposal: dict[str, Any]) -> tuple[list[dict[str, str]], list[Fi
     return defects, errors
 
 
-# 验收条件的引用形式（浏览器与 computer use 设计说明第 8.1 节）：AC<序号>，序号是它在 ProductSpec 里的位置
+# 验收条件的引用形式（浏览器与 computer use 设计说明「验收条件的引用」）：AC<序号>，序号是它在 ProductSpec 里的位置
 _CRITERION_ID = re.compile(r"^AC[1-9][0-9]*$")
-# 逐条结论一项的字段（独立性说明第 7.1 节、浏览器说明第 8.3 节）：封闭，多写的字段报错。
-# change_reason 是改判理由（第 4 节，工单 #1190）：结论与独立判断不一致的条目必须写明
+# 逐条结论一项的字段（独立性说明「口径」、浏览器说明「QAReview 的逐条结论与放行」）：封闭，多写的字段报错。
+# change_reason 是改判理由（docs/design/skeleton-and-application.md「最小投影」，工单 #1190）：结论与独立判断不一致的条目必须写明
 _QA_CRITERION_FIELDS = frozenset({"criterion", "method", "result", "checks", "trial_cases", "note", "change_reason"})
 
 
@@ -1070,7 +1070,7 @@ def _criteria_coverage_errors(criteria: list[dict[str, Any]], projection: RunPro
 def _criteria_evidence_errors(criteria: list[dict[str, Any]],
                               department: str | None = None) -> list[FieldError]:
     # 可执行检验（check、trial、measure）的 passed 至少一个证据：本次激活的核验检查回执，
-    # 或引用的试用用例（浏览器与 computer use 设计说明第 8.3 节，工单 #1180）
+    # 或引用的试用用例（浏览器与 computer use 设计说明「QAReview 的逐条结论与放行」，工单 #1180）
     verifying = _verifying_department(department)
     errors: list[FieldError] = []
     for index, row in enumerate(criteria):
@@ -1084,7 +1084,7 @@ def _criteria_evidence_errors(criteria: list[dict[str, Any]],
 
 def _release_criteria_errors(criteria: list[dict[str, Any]],
                             cases: Mapping[str, Any] | None = None) -> list[FieldError]:
-    # 放行（第 7.1 节第 3 点）：没有 failed；可执行检验的验收条件都是 passed。
+    # 放行（docs/design/independent-verification.md「口径」第 3 点）：没有 failed；可执行检验的验收条件都是 passed。
     # 不可执行检验的条件可以是 unverified，列进放行记录的开环明细。只凭模型阅读的试用用例让它的条件算模型阅读
     errors: list[FieldError] = []
     for index, row in enumerate(criteria):
@@ -1108,7 +1108,7 @@ def trial_case_steps(projection: RunProjection) -> dict[str, Any]:
 def _trial_case_errors(criteria: list[dict[str, Any]], projection: RunProjection, *,
                        department: str | None, spec_hash: str | None,
                        snapshot_hash: str | None) -> list[FieldError]:
-    """逐条结论引用的试用用例（浏览器与 computer use 设计说明第 8.3 节，工单 #1180）。
+    """逐条结论引用的试用用例（浏览器与 computer use 设计说明「QAReview 的逐条结论与放行」，工单 #1180）。
 
     用例属于本次激活与这个部门、绑定当前 ProductSpec；所在会话的试用副本的树摘要等于当前交付的
     `code_snapshot_hash`；用例已结束，结论与该项的 result 一致，引用它的那条验收条件在它的 criteria 里。
@@ -1160,7 +1160,7 @@ def _trial_case_errors(criteria: list[dict[str, Any]], projection: RunProjection
 
 
 def _cannot_verify_criteria_errors(criteria: list[dict[str, Any]]) -> list[FieldError]:
-    # 无法核验（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）：没有 failed 的条目，
+    # 无法核验（浏览器与 computer use 设计说明「无法核验」，工单 #1179）：没有 failed 的条目，
     # 至少一条 unverified，每条 unverified 都写明原因。不满足时按无法核验提交会被拒绝
     errors: list[FieldError] = []
     for index, row in enumerate(criteria):
@@ -1203,7 +1203,7 @@ def _check_output_ref(events: tuple[Event, ...] | list[Event], name: str) -> dic
 
 
 def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: str | None) -> bool:
-    # 这份交付已经有独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：门的依据，装配也用它。
+    # 这份交付已经有独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：门的依据，装配也用它。
     # 事件与逐条结论里的交付摘要一致才算：写进日志的独立判断是对当前交付的判断
     if delivery_hash is None:
         return False
@@ -1217,7 +1217,7 @@ def _judgement_exists(events: tuple[Event, ...] | list[Event], delivery_hash: st
 def _qa_judgement(proposal: dict[str, Any], events: tuple[Event, ...] | list[Event],
                   projection: RunProjection, delivery_hash: str,
                   spec_hash: str) -> tuple[Event | None, list[FieldError]]:
-    """结论引用的独立判断（验证的独立性设计说明第 4 节，工单 #1190）。
+    """结论引用的独立判断（验证的独立性设计说明「先判断后看解释」，工单 #1190）。
 
     三件事：
     · 引用存在——结论可以在 judgement_event 里写明它引用的判断的事件编号；没写明时由主机取当前交付的
@@ -1293,7 +1293,7 @@ def _judgement_coverage_result(judgement: Event,
 
 
 def _judgement_change_errors(criteria: list[dict[str, Any]], judgement: Event) -> list[FieldError]:
-    # 判断与结论不一致的条目逐条写明改判理由（第 4 节，工单 #1190）：缺理由的被拒绝，错误指向那一条
+    # 判断与结论不一致的条目逐条写明改判理由（docs/design/skeleton-and-application.md「最小投影」，工单 #1190）：缺理由的被拒绝，错误指向那一条
     judged = _judged_results(judgement)
     errors: list[FieldError] = []
     for index, row in enumerate(criteria):
@@ -1324,7 +1324,7 @@ def _requirement_mapping_errors(proposal: dict[str, Any]) -> list[FieldError]:
 
 
 def _requirement_mapping(proposal: dict[str, Any]) -> tuple[list[dict[str, Any]], list[FieldError]]:
-    # 要求与验收标准的对应声明（工单 #1178，验证的独立性设计说明第 7 节第 1 点）：每条要求一条，
+    # 要求与验收标准的对应声明（工单 #1178，验证的独立性设计说明「检验覆盖与开环」第 1 点）：每条要求一条，
     # requirement 是要求在 requirements 里的位置（从 1 起），criteria 是它对应的验收标准（AC<序号>，约定见 #151），
     # 写不出验收标准时用 gap 写明原因。每条要求要么有至少一条验收标准，要么有显式标注
     requirements = proposal.get("requirements")
@@ -1423,14 +1423,14 @@ def _optional_string_list(payload: dict[str, Any], field: str) -> list[FieldErro
     return []
 
 
-# 交付说明的启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #148）：可选，需要试用的每个入口一项
+# 交付说明的启动方式（浏览器与 computer use 设计说明「启动方式」，工单 #148）：可选，需要试用的每个入口一项
 _LAUNCH_FIELDS = frozenset({"name", "kind", "commands", "ready_url", "ready_timeout_sec"})
 _LAUNCH_KINDS = frozenset({"web", "desktop"})
 _LAUNCH_SYSTEMS = frozenset({"windows", "linux"})
 
 
 def _launch_errors(proposal: dict[str, Any]) -> list[FieldError]:
-    # launch 的形状与第 3.3 节的五项核对：名称不重复、种类是 web 或 desktop、commands 至少一项且键是
+    # launch 的形状与 docs/design/browser-and-computer-use.md「启动方式」的五项核对：名称不重复、种类是 web 或 desktop、commands 至少一项且键是
     # windows 或 linux、网页应用有本机 http 地址且带 {port}、桌面程序没有 ready_url、就绪时限不超过上限
     raw = proposal.get("launch")
     if raw is None:

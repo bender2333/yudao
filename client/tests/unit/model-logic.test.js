@@ -131,7 +131,7 @@ test("候选先显示 8 个，之后每次再显示 12 个", () => {
 
 // —— 状态的文字 ——
 
-test("选用的状态按设计说明第 9.5 节的用词", () => {
+test("选用的状态按 docs/design/model-management.md「用词」的用词", () => {
   assert.equal(selectionStatusLabel("completing"), "补全参数");
   assert.equal(selectionStatusLabel("waiting"), "等待验证");
   assert.equal(selectionStatusLabel("testing"), "验证调用");

@@ -401,7 +401,7 @@ def test_store_rejects_base_url_with_credentials_and_missing_reference():
 
 
 def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests():
-    # 服务方案预置表带默认协议与认证方式（设计说明第 4.1 节）：OpenCode Go 是 Chat Completions
+    # 服务方案预置表带默认协议与认证方式（docs/design/model-management.md「服务方案预置表与模型能力表」）：OpenCode Go 是 Chat Completions
     preset = next(item for item in DEFINITIONS.service_presets.presets if item.id == "opencode-go")
     assert preset.default_protocol == "chat_completions"
     assert preset.auth == "api_key"
@@ -411,7 +411,7 @@ def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests(
     assert preset_default_protocol("") == ""
     assert preset_auth("") == ""
     assert preset_default_protocol("custom") == ""
-    # 获取模型列表与连接测试的认证头按服务方案的认证方式（设计说明第 4.2 节）：
+    # 获取模型列表与连接测试的认证头按服务方案的认证方式（docs/design/model-management.md「Provider 配置」）：
     # 预置方案 api_key 用 Bearer；认证方式为 x-api-key 的方案用同名头，这一项由测试临时改预置表索引取得
     # （预置表里现在只有 api_key 一种方案）；自定义服务用 Bearer；没有凭据时不带认证头，由上游决定拒绝
     go = ProviderDefinition(id="p", name="P", base_url="https://a.example/v1", preset_id="opencode-go")

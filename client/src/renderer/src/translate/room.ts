@@ -1,4 +1,4 @@
-// 翻译层：部门房间（画面与播放设计说明第 6 节、原型 v13 js/translate/translate.js 的 T.room，工单 #954）。
+// 翻译层：部门房间（画面与播放设计说明「翻译层」、原型 v13 js/translate/translate.js 的 T.room，工单 #954）。
 //
 // 唯一同时认识 Yudao 的说法与画面的说法的地方：
 //   state   —— department.workspace（带位置）→ 房间的状态（画面合同 pixel/contract.ts 的 RoomState）；

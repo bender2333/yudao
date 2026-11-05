@@ -38,7 +38,7 @@ function entry(overrides: Partial<RuleEntry> = {}): RuleEntry {
     cost: "长检查无法运行",
     relax_when: "按项目记录的检查用时分布设定",
     tighten_when: "同一项目的检查用时分布长期低于现值的四分之一",
-    origin: "规则登记第 8 节表格",
+    origin: "规则登记「规则登记的初始内容」表格",
     changes: [],
     ...overrides,
   };
@@ -176,7 +176,7 @@ test("页面说明写明修改只作用于之后创建的 run，四项记录的�
   // 设计说明：修改只作用于之后创建的 run，正在运行的 run 按自己冻结的值结束
   assert.match(RULES_PAGE_NOTE, /之后创建的 run/);
   assert.match(RULES_PAGE_NOTE, /冻结/);
-  // 四项记录：拦截什么、花费多少、放松与收紧的证据（设计说明第 2 节）
+  // 四项记录：拦截什么、花费多少、放松与收紧的证据（docs/design/rules-and-parameters.md「规则登记」）
   assert.deepEqual(RECORD_FIELD_LABELS.map(([, label]) => label), ["拦截什么", "花费多少", "放松的证据", "收紧的证据"]);
   assert.deepEqual(RECORD_FIELD_LABELS.map(([field]) => field), ["guards", "cost", "relax_when", "tighten_when"]);
 });

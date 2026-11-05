@@ -1,4 +1,4 @@
-// 事件流的帧解析与位置核对（应用层与接口层设计说明第 5.4、5.5、5.6 节）。
+// 事件流的帧解析与位置核对（应用层与接口层设计说明「补齐与实时」、「缺口检测与重新同步」、「模型输出片段」）。
 // 从 eventsource 收到的 SSE 帧里解析出事件、检查点、片段与 resync，并核对 previous。
 // 这里只做数据转换，不接触网络，便于用 node --test 直接核对。
 
@@ -26,7 +26,7 @@ export function parseFrame(eventName: string, data: string, lastPosition: number
       : { kind: "gap", expected: lastPosition, got: frame.previous };
   }
   if (eventName === "delta") {
-    // 片段不带 id，不改变续传位置（第 5.6 节）
+    // 片段不带 id，不改变续传位置（docs/design/app-and-interface.md「模型输出片段」）
     return { kind: "delta", delta: JSON.parse(data) as OutputDelta };
   }
   if (eventName === "resync") {

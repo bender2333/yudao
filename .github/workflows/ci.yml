@@ -1,5 +1,5 @@
 # 每个 PR 与 main 的每次推送都运行，也可以手动触发。合并 main 要求 check 通过（docs/agents/autopilot-runtime.md「main 的规则」）。
-# 测试按层与时机运行（docs/design/test-pyramid.md 第 4 节）：
+# 测试按层与时机运行（docs/design/test-pyramid.md 「各角色运行哪一层」）：
 #   合并前（PR、main 的推送与手动触发）：① 单元层、② 模块层、评测工具、客户端、工作台脚本、内核检查六个作业并行，check 汇总六项的结果
 #     并在运行摘要里写出各层的表；PR 上另有「用例变化」，列出合并前后各层用例的增减，只显示，不挡合并
 #   合并以后（main 的推送与手动触发）：③ 集成层，不挡合并
@@ -127,7 +127,7 @@ jobs:
       - name: 安装依赖
         run: uv sync --frozen
 
-      # 需要真实模型的用例标 real_model，默认不选（docs/design/test-pyramid.md 第 4 节），CI 上没有模型服务的凭据
+      # 需要真实模型的用例标 real_model，默认不选（docs/design/test-pyramid.md 「各角色运行哪一层」），CI 上没有模型服务的凭据
       - name: 评测工具
         run: uv run python -m pytest evals/tests --junitxml=.tmp/test-results/evals.xml
 
@@ -297,7 +297,7 @@ jobs:
           test "${{ needs.workbench.result }}" = success
           test "${{ needs.kernel.result }}" = success
 
-  # PR 合并前后的用例清单（只收集，不运行），按层列出新增、删除与换层（docs/design/test-pyramid.md 第 4.4 节）。
+  # PR 合并前后的用例清单（只收集，不运行），按层列出新增、删除与换层（docs/design/test-pyramid.md 「用例的变化」）。
   # 只显示，不是合并必须通过的检查；删除的用例由审查者与交付说明逐条核对
   inventory:
     name: 用例变化
@@ -345,7 +345,7 @@ jobs:
             --base-layers .tmp/inventory/base-layers.toml --head-layers harness/tests/layers.toml \
             | tee -a "$GITHUB_STEP_SUMMARY"
 
-  # ③ 集成层全部（docs/design/test-pyramid.md 第 4.2 节）。不是合并必须通过的检查：
+  # ③ 集成层全部（docs/design/test-pyramid.md 「集成层在每次合并以后运行」）。不是合并必须通过的检查：
   # main 的每次推送（每次合并以后）与手动触发时运行，PR 上不运行。失败由 solo 执行者按 solo-worker 技能「main 上的 CI」处理
   integration:
     name: ③ 集成层
@@ -377,7 +377,7 @@ jobs:
         run: uv sync --frozen
 
       # #1182、#1184 的集成用例起真实的 Playwright MCP 与 Chromium。程序按 docs/design/browser-and-computer-use.md
-      # 第 3.2 节由使用者安装，这台机器照同样的办法装，版本与那一节同步；Chromium 用 Playwright MCP 依赖的
+      # 「执行位置上的程序」由使用者安装，这台机器照同样的办法装，版本与那一节同步；Chromium 用 Playwright MCP 依赖的
       # playwright 版本自带的安装命令，浏览器修订号才对得上
       - uses: actions/setup-node@v4
         with:
@@ -400,7 +400,7 @@ jobs:
           uv run --no-sync python scripts/ci_layers.py summary --layers harness/tests/layers.toml \
             --junit integration=.tmp/test-results/integration.xml | tee -a "$GITHUB_STEP_SUMMARY"
 
-      # 失败时从这份结果读出失败项名称，用于单进程重新运行（docs/design/test-pyramid.md 第 6 节）
+      # 失败时从这份结果读出失败项名称，用于单进程重新运行（docs/design/test-pyramid.md 「输出的读取」）
       - name: 保存结果
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4

@@ -775,7 +775,7 @@ def test_key_changes_through_credentials_reload_and_dotenv_watch_share_one_conne
 
 def test_candidate_protocol_prefers_the_capability_table_then_the_plan_default(tmp_path):
     # R2、R3：使用当前能力表的真实非默认协议记录，候选请求走本地真实HTTP，来源反映实际预填。
-    # 连接的地址取预置方案的请求基址：能力资料按连接地址识别服务商（设计说明第 4.3 节），
+    # 连接的地址取预置方案的请求基址：能力资料按连接地址识别服务商（docs/design/model-management.md「模型访问定义与准入」），
     # 模型列表仍走本地真实 HTTP 服务。
     upstream = ScriptedProvider([responder([{"id": "claude-haiku-5-5"}, {"id": "unrecorded"}])] * 4)
     opened = Opened(tmp_path)

@@ -1,4 +1,4 @@
-# 事件标签（应用层与接口层设计说明第 5.2 节）：每条事件的一句中文说明，由应用层按事件种类生成。
+# 事件标签（应用层与接口层设计说明「事件对象」）：每条事件的一句中文说明，由应用层按事件种类生成。
 # 客户端与命令行共用同一份标签，不在各处重复拼写。种类来自 payloads 中登记的全部事件种类，
 # 出现未登记的种类时在这里失败（事件种类与载荷类型的联合同源）。模板里的占位只能取载荷里的字段：
 # 载荷没有的字段让这里直接失败，说明里不出现空白的占位（工单 #319）。
@@ -56,7 +56,7 @@ def decision_kind_name(kind: Any) -> str:
     return DECISION_KIND_NAMES.get(str(kind or ""), str(kind or ""))
 
 
-# 收到指导的那一轮工作怎么结束的（部门指导设计说明第 3 节，工单 #1039）：提交被接纳，或者用文字回答
+# 收到指导的那一轮工作怎么结束的（部门指导设计说明「处理结果与来源」，工单 #1039）：提交被接纳，或者用文字回答
 GUIDANCE_OUTCOME_NAMES: dict[str, str] = {
     "proposal_accepted": "提交被接纳",
     "text_reply": "用文字回答",
@@ -82,7 +82,7 @@ def modifier_name(value: Any) -> str:
     return text
 
 
-# 提出者（事件对象第 5.2 节的 actor，工单 #1342）：部门的事件写部门名，用户与主机各写各的，
+# 提出者（事件对象 docs/design/app-and-interface.md「事件对象」的 actor，工单 #1342）：部门的事件写部门名，用户与主机各写各的，
 # 认不出的标识原样写（不编一个说法）
 def actor_name(actor: Any) -> str:
     text = str(actor or "")
@@ -224,14 +224,14 @@ _LABELS: dict[str, str] = {
     EventType.BASELINE_REVIEW_ACCEPTED: "质检提交了基线核验：{verdict}",
     EventType.ARTIFACT_ACCEPTED: "采纳了成果：{artifact_kind}（第 {artifact_version} 版）",
     EventType.LESSON_CANDIDATE_RECORDED: "记下了一条经验候选：{suggestion}",
-    # MCP 服务器的生命周期（网络与 MCP 设计说明第 7.2 节，工单 #1176）
+    # MCP 服务器的生命周期（网络与 MCP 设计说明「运行规则」，工单 #1176）
     EventType.MCP_SERVER_STARTED: "启动了 MCP 服务器 {server}（{transport}）",
     EventType.MCP_SERVER_CLOSED: "关闭了 MCP 服务器 {server}（{transport}）",
     EventType.MCP_SERVER_FAILED: "MCP 服务器 {server} 启动失败：{error}",
-    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 12 节，工单 #1183）
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明「事件、决定请求与查询」，工单 #1183）
     EventType.TRIAL_SESSION_STARTED: "开始了试用会话（{department}，{launch_name}，第 {port} 号端口）",
     EventType.TRIAL_SESSION_ENDED: "结束了试用会话（{department}，{reason}）",
-    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明「试用用例」，工单 #1180）
     EventType.TRIAL_CASE_OPENED: "打开了试用用例「{title}」",
     EventType.TRIAL_CASE_CONCLUDED: "试用用例结束：{result}",
     EventType.RUN_DONE: "运行结束：{stop_reason}",

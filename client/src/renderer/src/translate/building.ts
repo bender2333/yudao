@@ -1,4 +1,4 @@
-// 首页的楼的翻译层（画面与播放设计说明第 6 节、原型 v13 js/translate/translate.js 的 T.building 与
+// 首页的楼的翻译层（画面与播放设计说明「翻译层」、原型 v13 js/translate/translate.js 的 T.building 与
 // js/ui/scenes.js 的 buildingStates，工单 #955）。
 //
 // 这一层是唯一同时认识 Yudao 的说法与画面的说法的地方：
@@ -6,7 +6,7 @@
 //     （每层的状态灯、亮灯的房间、小旗、阀门、决定计数）。服务端的状态值只经 translate/tables.ts 的对应表翻好；
 //   - buildingActions：一条事件 → 零个或一个楼的动作（kind 取楼的声明表 pixel/building/building-decl.ts）。
 //
-// 事实只来自查询：状态由查询结果翻译，翻译层不把事件累加成事实（设计说明第 6 节）。
+// 事实只来自查询：状态由查询结果翻译，翻译层不把事件累加成事实（docs/design/visualization.md「翻译层」）。
 // 原来写在画面层里的组装（pixel/building/model.ts 的 buildingModelOf、sceneStatus、floorStatus、IN_ROOM、ACTIVE）
 // 搬到这里：服务端的说法到画面的说法的对应只剩 tables.ts 一处。
 //

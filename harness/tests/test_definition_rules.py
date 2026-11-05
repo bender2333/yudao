@@ -36,7 +36,7 @@ def test_every_registered_rule_has_a_wiring_conclusion():
 
 
 def test_the_evaluation_run_limit_starts_at_120_minutes_and_has_no_consumer():
-    # 守 R3（评测场景设计说明第 3 节的每次运行 120 分钟）：初值是 120 分钟；
+    # 守 R3（评测场景设计说明「两边的运行条件」的每次运行 120 分钟）：初值是 120 分钟；
     # 两个独立运行器读自己的默认值，不读运行时规则，所以这条登记保持未接入（#324）
     assert DEFINITIONS.rule_value("evaluation.run_minutes") == 120
     assert wired("evaluation.run_minutes") is False

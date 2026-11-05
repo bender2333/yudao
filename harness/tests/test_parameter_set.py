@@ -476,7 +476,7 @@ def test_withdraw_rejects_when_the_latest_change_has_moved_on(data_dir):
 
 def test_withdraw_in_the_same_transaction_checks_the_latest_identity_before_writing(data_dir):
     # 守 R1（同事务核对）：撤回的最近修改身份与基准版本在同一个写事务里核对；
-    # 通过核对以后才追加事件，核对不过时什么也不写（工单 #1262，设计说明第 4.3 节）
+    # 通过核对以后才追加事件，核对不过时什么也不写（工单 #1262，docs/design/rules-and-parameters.md「对照」中「噪声范围来自同一版本的重复运行」）
     opened = _Opened(data_dir)
     with running_api(opened) as client:
         assert _post(client, "project.create", name="参数",

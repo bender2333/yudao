@@ -7,7 +7,7 @@ from urllib.parse import urlsplit, urlunsplit
 from ..definitions import DEFINITIONS, ServicePreset, thaw
 
 # 服务方案预置表是带版本的定义（definitions/service_presets.json），整张表带 revision 与来源，
-# 不做远端热更（模型管理设计说明第 4.1 节）；新增服务方案等于在定义中新增一项
+# 不做远端热更（模型管理设计说明「服务方案预置表与模型能力表」）；新增服务方案等于在定义中新增一项
 _TABLE = DEFINITIONS.service_presets
 PRESET_TABLE_VERSION = _TABLE.revision
 PRESET_TABLE_SOURCE = _TABLE.source
@@ -64,21 +64,21 @@ def preset_header_profile(preset_id: str) -> str:
 
 
 def preset_default_protocol(preset_id: str) -> str:
-    # 服务方案的默认协议（设计说明第 4.1 节）：能力表中没有这个模型时预填它；
+    # 服务方案的默认协议（docs/design/model-management.md「服务方案预置表与模型能力表」）：能力表中没有这个模型时预填它；
     # 不是预置方案（自定义服务）时返回空串，由调用方预填 Chat Completions
     item = _PRESET_INDEX.get(str(preset_id))
     return "" if item is None else item.default_protocol
 
 
 def preset_base_url(preset_id: str, protocol: str) -> str:
-    # 内置服务方案按访问定义的协议取请求基址（模型管理设计说明第 4.2 节）；没有该协议的基址或不是预置方案时返回空串，
+    # 内置服务方案按访问定义的协议取请求基址（模型管理设计说明「Provider 配置」）；没有该协议的基址或不是预置方案时返回空串，
     # 由调用方回落到连接的地址
     item = _PRESET_INDEX.get(str(preset_id))
     return "" if item is None else item.base_urls.get(str(protocol), "")
 
 
 def preset_auth(preset_id: str) -> str:
-    # 服务方案要求的认证方式，供连接测试与候选采集按方案取（模型管理设计说明第 4.1 节）
+    # 服务方案要求的认证方式，供连接测试与候选采集按方案取（模型管理设计说明「服务方案预置表与模型能力表」）
     item = _PRESET_INDEX.get(str(preset_id))
     return "" if item is None else item.auth
 

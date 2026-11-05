@@ -62,7 +62,7 @@ def test_the_rule_version_is_the_canonical_hash_of_the_values():
 
 
 def test_the_department_materials_must_come_first_and_only_once():
-    # 守 R3（材料恒在首位，设计说明第 6.1 节）：条目排错时视图直接失败，不交出一份没有材料的请求
+    # 守 R3（材料恒在首位，docs/design/context-assembly.md「确定性（通过）」）：条目排错时视图直接失败，不交出一份没有材料的请求
     with pytest.raises(ValueError):
         view(entries()[1:], Rules(), tools=[])
     with pytest.raises(ValueError):

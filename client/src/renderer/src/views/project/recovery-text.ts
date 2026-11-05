@@ -37,7 +37,7 @@ export const UNFINISHED_CLASS: Record<string, string> = {
   unknown: "is-unknown",
 };
 
-// 最后已确认的位置（设计说明第 4.3 节）：文字取自这条事件，页面据此写出这一步做完了什么；
+// 最后已确认的位置（docs/design/app-and-interface.md「查询清单」）：文字取自这条事件，页面据此写出这一步做完了什么；
 // 事件还没有说明时写第几条事件，还没有事件时照实说没有
 export function lastConfirmedText(data: {
   last_confirmed_text: string | null;
@@ -139,7 +139,7 @@ export function showsInterruptionRecord(data: { state: string; owner: RecoveryOw
   return data.state === "running" || data.state === "interrupted";
 }
 
-// 因升级重新开始时的起点（工单 #1186，设计说明第 4.3 节）：与项目开始事项时取起点的顺序相同——
+// 因升级重新开始时的起点（工单 #1186，docs/design/app-and-interface.md「查询清单」）：与项目开始事项时取起点的顺序相同——
 // 有采纳成果时是采纳成果，其次是起始文件夹快照，都没有时是空树
 export const UPGRADE_START_POINT: Record<string, string> = {
   adoption: "采纳成果",

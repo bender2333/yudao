@@ -1,5 +1,5 @@
-# 项目设置里的 MCP 服务器：保存、版本与事项创建时冻结（工单 #236；网络与 MCP 设计说明第 4.1 至 4.4 节、
-# 第 18 节「本机的做法」第 3、5 条；总图第四节「写入口」的缝）。这个文件查七件事：
+# 项目设置里的 MCP 服务器：保存、版本与事项创建时冻结（工单 #236；网络与 MCP 设计说明「服务器设置」、「凭据」、
+# 「本机的做法」第 3、5 条；总图第四节「写入口」的缝）。这个文件查七件事：
 # 1. mcp_servers.save 保存非秘密设置与凭据引用，project.settings 读回，版本加一；
 # 2. 基准版本过期时拒绝并带当前版本，提示重新读取；
 # 3. 名称与传输等字段级校验有错误；
@@ -13,7 +13,7 @@
 # restart_work_item_for_upgrade、启动补建读的都是 _work_item_created 写进事项事实的同一份冻结值）。
 #
 # 层：模块层（FakeAdapter 的一次激活或不出激活；SQLite 事件库与工作区文件，不用网络与完整循环，
-# 测试分层设计说明第 2 节）。守 R1（边界与冻结）、R2（第二环的合同：项目流事件与 run_created 载荷、
+# 测试分层设计说明「三层的定义」）。守 R1（边界与冻结）、R2（第二环的合同：项目流事件与 run_created 载荷、
 # 两端共读的事件种类清单）与 R3（用户读到的设置与保存的一致，凭据值不出现）。
 
 from __future__ import annotations
@@ -97,7 +97,7 @@ def test_save_is_read_back_with_a_raised_version_and_the_next_save_needs_the_new
     stored = saved["servers"]["time"]
     assert stored["transport"] == "stdio" and stored["command"] == "uvx"
     assert stored["env"]["API_KEY"] == {"kind": "credential", "value": "", "credential_ref": "MCP_TIME_KEY"}
-    # 默认时限与输出上限按设计说明第 7.2 节写进保存的设置
+    # 默认时限与输出上限按 docs/design/network-and-mcp.md「运行规则」写进保存的设置
     assert stored["startup_timeout_sec"] == 60 and stored["call_timeout_sec"] == 120
     assert stored["output_limit"] == 20000
 
@@ -157,7 +157,7 @@ def test_field_level_errors_are_reported_per_field(servers, message):
 
 
 def test_a_tool_snapshot_with_a_mismatched_config_digest_is_rejected_and_unprobed_saves(tmp_path):
-    # 工具清单快照必须带与本台服务器配置一致的摘要（设计说明第 4.2 节）；配置改变后旧快照不可继续使用；
+    # 工具清单快照必须带与本台服务器配置一致的摘要（docs/design/test-pyramid.md「集成层在每次合并以后运行」）；配置改变后旧快照不可继续使用；
     # 保存未探测的配置允许（实际探测与更新由后续探测工单完成）。快照的摘要按归一化后的配置算出，
     # 与保存归一化的同一份配置得到的摘要相同
     system = _system(tmp_path)
@@ -375,7 +375,7 @@ def test_project_settings_query_returns_the_mcp_section(tmp_path):
 
 
 def test_project_settings_gives_the_state_of_the_credential_names_in_the_settings(tmp_path):
-    # 工单 #237：界面在凭据名称旁写「已设置」或「缺失」，判断来自后端（网络与 MCP 设计说明第 11.1 节）。
+    # 工单 #237：界面在凭据名称旁写「已设置」或「缺失」，判断来自后端（网络与 MCP 设计说明「项目设置的「MCP 服务器」一节」）。
     # 变量与请求头里出现的凭据名称各给一项，状态与凭据命令读的是同一个来源；只给名称与状态，不含凭据值
     system = _system(tmp_path)
     project_id = system.projects.register("凭据状态", GOAL)

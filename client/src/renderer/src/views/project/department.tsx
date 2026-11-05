@@ -197,7 +197,7 @@ function selectionSourceLabel(value: string | null): string {
   return show(value, "未上报");
 }
 
-// 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构第 2.1 节，工单 #905）：
+// 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构「部门的状态」，工单 #905）：
 // 标题区另起一行列出这个事项的组织里的部门，本部门加粗；没有部门状态（事项没有进行中）时这一行不出现。
 // 部门清单与显示名取自事实（工单 #1457）：事项冻结的组织里的部门，不写死三个。
 export function DepartmentsLine(props: {
@@ -306,7 +306,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
               ? `无法使用：${show(effective.message)}`
               : `${show(optionalText(effective.model))}（来源 ${selectionSourceLabel(optionalText(effective.selection_source))}）`],
           // 最近一次请求实际使用的模型：取自请求事件的调用目标（解析出的模型就是这次请求使用的模型），
-          // 上游回报的实际模型只作为对照；这里显示调用目标的模型（设计说明第 9.3 节）
+          // 上游回报的实际模型只作为对照；这里显示调用目标的模型（docs/design/model-management.md「部门工作间」）
           ["最近一次请求实际使用的模型", lastCall === null
             ? "未上报"
             : show(optionalText(lastCall.requested_model) ?? optionalText(lastCall.actual_model))],
@@ -316,7 +316,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
             : `请求 ${show(optionalText(lastCall.requested_tier))}，实际发送 ${show(optionalText(lastCall.sent_tier))}`],
         ]}
       />
-      {/* 当前生效模型不具备本部门建议能力的角色，提醒显示在该角色的当前模型旁（第 5.6 节） */}
+      {/* 当前生效模型不具备本部门建议能力的角色，提醒显示在该角色的当前模型旁（docs/design/model-management.md「部门的建议能力」） */}
       {data.reminders.length > 0 ? (
         <p className="y10-note is-warn warn" role="status" data-testid={`workshop-reminder-${data.department}`}>
           {data.reminders.join("；")}
@@ -465,7 +465,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
     { event_id: openEvent ?? "" },
     openEvent === null,
   );
-  // 本部门发出与收到的询问（原型 v12 第 3.3 节、三部门的循环结构第 4.7 节，工单 #905）：
+  // 本部门发出与收到的询问（原型 v12 第 3.3 节、三部门的循环结构「询问的记录与查询」，工单 #905）：
   // 用 run.asks，写法与概览的询问一行相同（共用的 asks-text）
   const asks = useSnapshot<RunAsksResult>(
     props.app, "page.dept.asks", "run.asks", { run_id: data.run_id ?? "" }, data.run_id === null);
@@ -580,7 +580,7 @@ export function GuidanceSection(props: {
   );
 }
 
-// 部门设置弹窗（第 9.2 节）：标题为「本项目 · 某部门设置」，写入本项目该部门的项目部门设置。
+// 部门设置弹窗（docs/design/model-management.md「部门详情里的模型与 Prompt」）：标题为「本项目 · 某部门设置」，写入本项目该部门的项目部门设置。
 // 模型、推理档位与部门 Prompt 三项一起保存；模型第一项为「跟随部门默认（当前：…）」，
 // 档位第一项为「跟随」；保存以后提示「从本部门下一次模型请求起生效」；
 // 版本冲突时服务端按 stale_base 拒绝，反馈提示重新读取（useCommand 的 rejection）。
@@ -589,7 +589,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
   const [draft, setDraft, saved] = useDepartmentDraft(data.setting);
   const command = useCommand(props.app, pageKey([data.setting.version, draft.model, draft.tier, draft.text]));
   const canSave = hasCommand(props.app, "department_settings.save");
-  // 保存结果带回的提醒（第 5.6 节「保存时」）：照常保存，提醒在设置旁显示
+  // 保存结果带回的提醒（docs/design/model-management.md「部门的建议能力」中「保存时」）：照常保存，提醒在设置旁显示
   const savedReminders = list(command.accepted?.reminders).map((item) => text(item)).filter((item) => item !== "");
   const reminders = [...data.reminders, ...savedReminders];
 

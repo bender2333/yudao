@@ -1,4 +1,4 @@
-# 规则登记的查询（设计说明第 2 节「规则登记」与第 8 节的表格，工单 #343）。
+# 规则登记的查询（设计说明「规则登记」与「规则登记的初始内容」的表格，工单 #343）。
 # 规则登记就是定义里的全部条目，不另建系统：这一条查询把登记的现值、四项记录、取值界限、来源、种类与形式读出来。
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ class RuleEntry(Contract):
     name: str
     value: Any
     # 默认值：定义里的初值（Rule.value）。参数被修改过时现值 value 可能不同于默认值；
-    # structure 条目与从未修改的参数两者相同（工单 #1262，设计说明第 2 节「登记照着实现」）
+    # structure 条目与从未修改的参数两者相同（工单 #1262，docs/design/rules-and-parameters.md「规则登记」中「登记照着实现」）
     default_value: Any
     bounds: list[Any]
     kind: Literal["parameter", "structure"]
@@ -57,7 +57,7 @@ class RuleEntry(Contract):
 class RuleRegistry(Contract):
     # 全部条目按名称排列；definitions_version 指出这批条目出自哪一版的定义，
     # 读取历史位置时给出当时生效的定义版本，查询结果里不混入现在才有的条目。
-    # parameters_version 是当前全局参数版本（全部参数现值的内容摘要，设计说明第 4.3 节）：
+    # parameters_version 是当前全局参数版本（全部参数现值的内容摘要，docs/design/rules-and-parameters.md「对照」中「噪声范围来自同一版本的重复运行」）：
     # 页面把它作为 parameter.set 与 parameter.withdraw 的基准版本 base_version 提交（工单 #1262）
     rules: list[RuleEntry]
     definitions_version: str
@@ -65,7 +65,7 @@ class RuleRegistry(Contract):
 
 
 class RulesRegistryRequest(ReplayRequest):
-    # 可回放（设计说明第 8 节表格）：at 是全局位置，省略时读取现在的登记
+    # 可回放（docs/design/rules-and-parameters.md「规则登记的初始内容」表格）：at 是全局位置，省略时读取现在的登记
     pass
 
 

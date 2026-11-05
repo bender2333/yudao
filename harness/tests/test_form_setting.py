@@ -10,7 +10,7 @@ organization.adopt 把项目现在用的形态换成发布带的某一份，带�
 守 R2（对外合同只增：新命令与新查询在注册表与接口快照两端登记）与 R3（形态可换：生效、看得见、能改回、历史
 在案，事项按创建时那一份运行）。
 
-先后由事件决定，不用时长赌（测试分层设计说明第 10 节第 7 条）：改形态、建事项、跑完依次进行，脚本按部门给出。
+先后由事件决定，不用时长赌（测试分层设计说明「测试的写法」中「两件同时进行的事谁先谁后，由事件、信号文件或提交通知决定，不用时长去赌」）：改形态、建事项、跑完依次进行，脚本按部门给出。
 """
 
 from __future__ import annotations
@@ -113,7 +113,7 @@ def test_changing_the_form_and_changing_back_writes_two_events_and_the_history_l
     changed = _organization(application, project_id)
     assert (changed.form, changed.version) == (second_routing.ROUTING_NAME, second_routing.DEFINITIONS.version)
 
-    # 改回就是再采用一次原值：理由可以不写（设计说明第 4.12 节）
+    # 改回就是再采用一次原值：理由可以不写（docs/design/project-organization.md「模板一键选用」）
     back = _adopt(application, project_id, DEFAULT_FORM, base_version=changed.version)
     assert isinstance(back, Accepted), back
 

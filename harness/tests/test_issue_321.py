@@ -239,7 +239,7 @@ def test_a_run_missing_after_an_interruption_is_rebuilt_from_the_record(data_dir
 
 def test_a_queued_work_item_is_started_at_the_next_start_after_the_drain(data_dir, tmp_path):
     # 排空期间排队的事项登记在项目流里而 run 流为空，与进程中断留下的事项在数据上相同。
-    # 区别在于排空：排空在下一次启动时结束（工单 #731，应用层与接口层设计说明第 3.2 节「升级」：
+    # 区别在于排空：排空在下一次启动时结束（工单 #731，应用层与接口层设计说明「命令清单」中「升级」：
     # 排空在服务下一次启动时结束），那批排队的事项这一次补建 run 并开始
     source = _initial_directory(tmp_path)
     system = _opened(data_dir, _blocked_script())

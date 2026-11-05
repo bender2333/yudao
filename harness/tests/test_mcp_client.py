@@ -1,7 +1,7 @@
-# MCP 客户端模块的集成层用例（工单 #69；网络与 MCP 设计说明第 7.1 至 7.3 节、第 8 节「取消能否确认停止」）。
+# MCP 客户端模块的集成层用例（工单 #69；网络与 MCP 设计说明「客户端模块」、「调用与结果」、docs/design/test-pyramid.md「模块交互」「取消能否确认停止」）。
 # 守 R2（MCP 客户端的交换形状：会话、工具清单、结果里的各类内容、取消能否确认）与
 # R3（阶段二：MCP 工具经真实进程与真实本机端口调用）。真实子进程、进程树、本机端口与系统环境变量都在用，
-# 按测试分层设计说明第 2 节登记为集成层。
+# 按测试分层设计说明「三层的定义」登记为集成层。
 import asyncio
 import contextlib
 import json
@@ -219,7 +219,7 @@ def test_a_streamable_http_server_lists_its_tools_and_answers_calls(tmp_path):
 
 
 def test_an_http_timeout_reports_that_the_cancel_cannot_be_confirmed(tmp_path):
-    # HTTP 一侧：超时以后关闭会话，无法确认服务器已停止（设计说明第 8 节）
+    # HTTP 一侧：超时以后关闭会话，无法确认服务器已停止（docs/design/test-pyramid.md「模块交互」）
     async def scenario(url):
         client = await McpClient.start(_http_launch(url, call_timeout=2.0))
         try:
@@ -235,7 +235,7 @@ def test_an_http_timeout_reports_that_the_cancel_cannot_be_confirmed(tmp_path):
 
 
 def test_an_unknown_tool_is_reported_as_a_tool_failure(tmp_path):
-    # 服务器把认不出的工具当成工具失败回答（is_error）：动作记为已完成，错误文本交回模型（设计说明第 7.3 节）
+    # 服务器把认不出的工具当成工具失败回答（is_error）：动作记为已完成，错误文本交回模型（docs/design/network-and-mcp.md「调用与结果」）
     async def scenario():
         client = await McpClient.start(_launch(tmp_path))
         try:
@@ -248,7 +248,7 @@ def test_an_unknown_tool_is_reported_as_a_tool_failure(tmp_path):
 
 
 def test_a_protocol_error_carries_the_error_code(tmp_path):
-    # 协议错误（JSON-RPC 的 error 应答）不是工具失败：抛出带错误码的 McpCallError（设计说明第 7.3 节）
+    # 协议错误（JSON-RPC 的 error 应答）不是工具失败：抛出带错误码的 McpCallError（docs/design/network-and-mcp.md「调用与结果」）
     async def scenario():
         client = await McpClient.start(_launch(tmp_path, args=["-c", PROTOCOL_ERROR_SERVER]))
         try:
@@ -322,7 +322,7 @@ def test_the_child_gets_the_passed_variables_and_the_base_ones_only(tmp_path):
     assert environment["YUDAO_MCP_TEST"] == "passed"
     assert environment[secret_key] == SECRET
     assert "PATH" in environment and "SYSTEMROOT" in environment
-    # 没有传给它的变量不出现：调用方的整个环境变量不进入子进程（本模块自己的语义，设计说明第 7.2 节）
+    # 没有传给它的变量不出现：调用方的整个环境变量不进入子进程（本模块自己的语义，docs/design/network-and-mcp.md「运行规则」）
     for name in os.environ:
         if name not in server_environment({"YUDAO_MCP_TEST": "passed", secret_key: SECRET}):
             assert name not in environment

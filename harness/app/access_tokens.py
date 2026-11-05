@@ -1,4 +1,4 @@
-# 访问令牌（应用层与接口层设计说明第 6.3 节）：局域网访问方式的凭据。
+# 访问令牌（应用层与接口层设计说明「令牌与 TLS」）：局域网访问方式的凭据。
 # 服务只保存令牌的 SHA-256 摘要、名称与建立时间，令牌本身不落盘；撤销只记下时间，撤销以后立即失效。
 # 令牌管理只在服务所在机器的命令行进行，不提供命令。
 
@@ -11,9 +11,9 @@ import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
-# 数据目录中的令牌文件（第 6.3 节）
+# 数据目录中的令牌文件（docs/design/app-and-interface.md「令牌与 TLS」）
 FILE_NAME = "access-tokens.json"
-# 256 位随机令牌：secrets.token_hex 给出的十六进制串（第 6.3 节）
+# 256 位随机令牌：secrets.token_hex 给出的十六进制串（docs/design/app-and-interface.md「令牌与 TLS」）
 TOKEN_BYTES = 32
 
 
@@ -98,7 +98,7 @@ class AccessTokenStore:
 
 
 def digest(token: str) -> str:
-    # 令牌的 SHA-256 摘要（第 6.3 节）：服务只保存摘要，令牌本身不落盘
+    # 令牌的 SHA-256 摘要（docs/design/app-and-interface.md「令牌与 TLS」）：服务只保存摘要，令牌本身不落盘
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 

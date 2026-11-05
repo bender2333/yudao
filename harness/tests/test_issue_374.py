@@ -1,11 +1,11 @@
-# 手动启动、停止与升级 Yudao 服务（工单 #374，网页界面的提供与发布设计说明第 4.2、5.1 节）。
+# 手动启动、停止与升级 Yudao 服务（工单 #374，网页界面的提供与发布设计说明「启动与停止」、「接口层提供页面文件」）。
 #
 # 启动、停止、浏览器与进程锁用真实的服务进程：启动方式与用户在命令行里做的一样（yudao api），
 # BROWSER 环境变量指向一个记录地址的脚本，核对打开的是哪个地址。停止用 Windows 的
 # CTRL_BREAK_EVENT（与 Ctrl+C 同一条路径：uvicorn 的 HANDLED_SIGNALS 含 SIGBREAK），POSIX 上发 SIGINT。
 # 进行中的 run 在服务进程里自动继续，用真实的 uvicorn 事件循环核对（那里没有 asyncio.run 的位置）。
 # 服务监听的端口由操作系统分配（--port 0），服务就绪以后在输出里报告实际端口：先占一个空闲端口
-# 再交给服务进程绑定的写法在多进程运行中会冲突（测试分层设计说明第 5 节第 6 项）。
+# 再交给服务进程绑定的写法在多进程运行中会冲突（测试分层设计说明「测试往下层移」）。
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ def _wait_port(process: subprocess.Popen, log: Path, data_dir: Path) -> int:
         time.sleep(0.1)
 
 def _recording_browser(directory: Path, recorded: Path) -> Path:
-    # 标准库 webbrowser 读 BROWSER 环境变量（设计说明第 12 节），用一条命令把打开的地址记进文件
+    # 标准库 webbrowser 读 BROWSER 环境变量（docs/design/web-interface-and-release.md「使用的技术」），用一条命令把打开的地址记进文件
     script = directory / "record-browser.cmd"
     script.write_text(f'@echo off\r\necho %1 > "{recorded}"\r\n', encoding="utf-8")
     return script

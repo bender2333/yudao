@@ -1,4 +1,4 @@
-# 数据目录与日志的默认位置（桌面客户端的安装、更新与发布设计说明第 3.4、4.2 节）。
+# 数据目录与日志的默认位置（桌面客户端的安装、更新与发布 docs/design/browser-and-computer-use.md「试用工具」、「读取工具清单（探测）」）。
 # 默认放在用户数据目录，不相对当前目录；开发、测试与评测用 --data-dir 指向其他目录。
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 DISTRIBUTION = "yudao-harness"
 LOG_DIR = "logs"
 LOG_FILE = "yudao.log"
-# 单个日志文件的上限与保留份数：按大小轮换（第 4.2 节）
+# 单个日志文件的上限与保留份数：按大小轮换（docs/design/network-and-mcp.md「读取工具清单（探测）」）
 LOG_MAX_BYTES = 1_000_000
 LOG_BACKUP_COUNT = 5
 

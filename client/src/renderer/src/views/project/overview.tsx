@@ -171,7 +171,7 @@ function Summary(props: { app: ClientApp; projectId: string; data: ProjectOvervi
               onboardingBaseline={baseline}
             />
           )],
-          // 接入已有项目时的建档基线（工单 #138，设计第 3.4 节）：快照来源与现有缺陷数
+          // 接入已有项目时的建档基线（工单 #138，设计「查询的变化」）：快照来源与现有缺陷数
           ...(baseline ? [
             ["建档基线", "当前成果来自接入的代码快照：下面的来源与缺陷数按快照采集时的原样显示"],
             ["快照来源", show(adoption.snapshot_source, "未上报")],
@@ -289,7 +289,7 @@ function CurrentItem(props: {
           ["处理进度", processing],
         ]}
       />
-      {/* 三个部门各自的状态与原因（三部门的循环结构第 2.1 节，工单 #904）：没有 departments 时照旧写所在部门 */}
+      {/* 三个部门各自的状态与原因（三部门的循环结构「部门的状态」，工单 #904）：没有 departments 时照旧写所在部门 */}
       <p className="y10-note note department-line">{departmentLine(item.departments, item.department)}</p>
       {/* 恢复与动作核实的入口（工单 #181）：恢复页按事项打开，没有运行记录的事项不给这个入口 */}
       {item.run_id === null ? null : (
@@ -320,7 +320,7 @@ function CurrentItem(props: {
         </div>
       ) : null}
       {/* 建档事项等用户确认初始 PRD 时事项本身没有在执行，取消撤销那条决定请求（工单 #136），
-          用户因此能回到「等待建档」并重新开始建档（设计第 3.1 节） */}
+          用户因此能回到「等待建档」并重新开始建档（docs/design/department-loop.md「各部门在什么时候工作」） */}
       {(item.status === "in_progress" || item.status === "awaiting_initial_prd")
         && hasCommand(props.app, "work_item.cancel") ? (
         <div className="y10-ov-composer composer">
@@ -338,7 +338,7 @@ function CurrentItem(props: {
   );
 }
 
-// 询问（三部门的循环结构第 4.7 节、原型 v12 第 3.3 节，工单 #904）：这个事项里的询问，一次一行，
+// 询问（三部门的循环结构「询问的记录与查询」、原型 v12 第 3.3 节，工单 #904）：这个事项里的询问，一次一行，
 // 写状态、询问链、回问标记、时间与问题，有回答时写回答（附带 PRD 时标版本），没能回答写原因；回问按深度缩进。
 // 没有询问时这一节不出现。
 function Asks(props: { app: ClientApp; item: WorkItemCard | null }) {

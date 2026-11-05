@@ -1,6 +1,6 @@
 // 概览页的循环画面：把查询结果交给翻译层，把翻译层给出的状态与动作交给楼层画面（工单 #82、#953）。
 //
-// 这个组件只做连接（画面与播放设计说明第 3 节）：
+// 这个组件只做连接（画面与播放设计说明「分层与边界」）：
 //   - 同步层的数据（project.loop、decisions.list）与当前事项那次运行的询问链（run.asks）经 translate/floor.ts
 //     翻成画面合同的状态与卡片；
 //   - 事件流里本项目的事件经翻译层翻成动作，回放期间不播动作；
@@ -163,7 +163,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     work_item: props.workItemId,
     ...(at === null ? {} : { at }),
   });
-  // 回放到过去的时间点时不显示决定请求（设计说明第 5.5 节、原型 v13 第 1 节）
+  // 回放到过去的时间点时不显示决定请求（docs/design/model-management.md「引用无法使用时」、原型 v13 第 1 节）
   const decisions = useSnapshot<DecisionList>(props.app, "page.decisions", "decisions.list", {
     project_id: props.projectId, status: ["open"],
   }, replaying);
@@ -172,7 +172,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const runId = useMemo(() => asksRunId(loop.data, props.workItemId), [loop.data, props.workItemId]);
   const asks = useSnapshot<RunAsksResult>(props.app, "page.loop.asks", "run.asks", { run_id: runId },
     replaying || runId === "");
-  // 循环状态（工单 #400）：覆盖层「循环」的数据来源；覆盖层在回放时不画（画面与播放设计说明第 8 节），
+  // 循环状态（工单 #400）：覆盖层「循环」的数据来源；覆盖层在回放时不画（画面与播放设计说明「画面诚实性的不变式」），
   // 没有运行时也不查
   const loopsQuery = useSnapshot<RunLoopsResult>(props.app, "page.loop.loops", "run.loops", { run_id: runId },
     replaying || runId === "");
@@ -231,7 +231,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
             window.location.hash = target.startsWith("#") ? target.slice(1) : target;
           },
           onOpenSource: (workItemId, element) => openSourceRef.current?.(workItemId, element),
-          // 来源卡片上的「在时间轴上查看」：回到那个位置的概览回放（设计说明第 3.3 节，位置写在 ?at= 中）
+          // 来源卡片上的「在时间轴上查看」：回到那个位置的概览回放（docs/design/existing-project-onboarding.md「领域事件」，位置写在 ?at= 中）
           onGoTimeline: (position) => {
             window.location.hash = paths.overviewAt(props.projectId, position, { workItem: props.workItemId });
           },
@@ -315,7 +315,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     else viewRef.current?.setState(model);
   }, [model, replaying]);
 
-  // 回放拖动时间轴：直接显示那个位置的状态，不播动作（设计说明第 5.2 节）
+  // 回放拖动时间轴：直接显示那个位置的状态，不播动作（docs/design/visualization.md「播放时间线」）
   const atKey = at === null ? "live" : String(at);
   useEffect(() => {
     if (modelRef.current) viewRef.current?.jump(modelRef.current);
@@ -355,7 +355,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
       if (modelRef.current) viewRef.current?.jump(modelRef.current);
     };
     const off = props.app.subscribeResync(jumpLatest);
-    // 标签页从后台切回：浏览器在后台暂停了动画，队里可能积了几分钟的事件，直接跳到最新（设计说明第 5.2 节）
+    // 标签页从后台切回：浏览器在后台暂停了动画，队里可能积了几分钟的事件，直接跳到最新（docs/design/visualization.md「播放时间线」）
     const onVisible = (): void => {
       if (document.visibilityState === "visible") jumpLatest();
     };
@@ -480,7 +480,7 @@ function FloorTextList(props: {
             ))}
           </ul>
         )}
-        {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答（设计说明第 9 节） */}
+        {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答（docs/design/visualization.md「与其他文档的关系」） */}
         <DecisionCardList
           app={props.app}
           decisions={props.decisions}

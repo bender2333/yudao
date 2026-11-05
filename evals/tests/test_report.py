@@ -1,6 +1,6 @@
-"""多次运行的汇总：完成度与正确性、每个指标的噪声范围、费用未知（评测场景设计第 5.2 节）。
+"""多次运行的汇总：完成度与正确性、每个指标的噪声范围、费用未知（评测场景设计「指标」）。
 
-守第 13 节的 R2：结果与报告里的汇总形状是公开合同，版本比较与报告页面按它读数。
+守 docs/design/network-and-mcp.md「验收」的 R2：结果与报告里的汇总形状是公开合同，版本比较与报告页面按它读数。
 用例只读真实代码（`report.aggregate`、`report.build_result`、`report.write_report`），
 不访问模型服务。
 """
@@ -45,7 +45,7 @@ def _report_text(tmp_path, runs, name="report.md"):
 
 
 def test_summary_holds_the_scorer_completion_and_correctness():
-    """汇总里有评分器给出的完成度与正确性（第 5.2 节）。"""
+    """汇总里有评分器给出的完成度与正确性（docs/design/evaluation-scenarios.md「指标」）。"""
     runs = [_run("run-1", completion=0.5, correctness=0.4),
             _run("run-2", completion=0.75, correctness=0.5)]
     summary = report.aggregate(runs)
@@ -65,7 +65,7 @@ def test_noise_range_is_the_extremes_of_the_runs():
 
 
 def test_a_single_run_has_no_noise_range(tmp_path):
-    """只有一次运行时噪声范围写「未知」，不写零（第 5.2 节）。"""
+    """只有一次运行时噪声范围写「未知」，不写零（docs/design/evaluation-scenarios.md「指标」）。"""
     summary = report.aggregate([_run("run-1")])
     assert summary["completion"]["spread"] is None
 
@@ -105,7 +105,7 @@ def test_void_runs_stay_out_of_every_summary_column():
 
 
 def test_the_report_records_the_model_capacity_and_its_source(tmp_path):
-    """结果与报告写明模型容量的取值与来源（第 3 节「模型的容量」）。"""
+    """结果与报告写明模型容量的取值与来源（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）。"""
     result, text = _report_text(tmp_path, [_run("run-1")])
     assert result["model_capacity"] == LIMITS
     assert "上下文窗口 262144（模型服务的模型列表），单次输出上限 64000（模型服务的模型列表）" in text

@@ -23,7 +23,7 @@ from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
 
 
-# 成果接纳事件的统一字段（设计说明第 4 节、第 5.4 节第 6 条）：成果种类、版本、依据与内容摘要。
+# 成果接纳事件的统一字段（设计说明「最小投影」、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果种类、版本、依据与内容摘要。
 # 最小投影按这组字段折叠，不按事件种类逐个写，加一种成果种类不改最小投影的代码。
 # 「依据」按「成果种类 → 内容摘要」记下这一版建立在哪些成果版本上：载荷里指名所依据成果版本的字段
 # 就是这几种；上一版（parent_hash）的依据是同一类成果的上一版。
@@ -34,13 +34,13 @@ _BASIS_FIELDS = (
     ("delivery_spec_hash", "delivery_spec"),
 )
 
-# 一种成果可以多版并存（设计说明第 4 节 2026-10-27 补）：产品决定各自是一件成果，新的决定不让旧的失效，
+# 一种成果可以多版并存（docs/design/skeleton-and-application.md「最小投影」 2026-10-27 补）：产品决定各自是一件成果，新的决定不让旧的失效，
 # 最小投影按种类记当前有效各版的摘要清单（通用条件 6 的不重复接纳读它）
 _MULTIPLE_KINDS = frozenset({"product_decision"})
 
 
 def render_structure(description: dict[str, Any]) -> str:
-    # 现有结构说明的材料（docs/design/existing-project-onboarding.md 第 4.4 节）：主机由接纳结果生成。
+    # 现有结构说明的材料（docs/design/existing-project-onboarding.md 「工程：现有结构说明」）：主机由接纳结果生成。
     # 结构说明这一种成果的内容长什么样是应用的事（工单 #1456）：签名与写法住在这里，内核模块不再认识它
     lines = ["# 现有结构说明", "",
              f"结构说明：{description['content_hash']}",
@@ -67,7 +67,7 @@ def render_structure(description: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 # 质检退回工程的放行结论（S4c 工单 #863 从薄驱动搬来）：接纳的一方认成果种类与结论取值，
-# 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用设计说明第 6 节）
+# 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用设计说明「薄驱动」）
 REVIEW_KIND = "qa_review"
 # 质检无法核验的结论（工单 #1179）：薄驱动只问这一句，不写成果种类与结论的字面值
 CANNOT_VERIFY_VERDICT = "cannot_verify"
@@ -105,7 +105,7 @@ def acceptance_fields(kind: str, artifact: dict[str, Any], *, version: int,
 
 
 def contract_payload(projection: RunProjection) -> dict[str, Any]:
-    # 有效合同的身份：它记下的 PRD 与有效决定的摘要，加上进入了模型输入的用户输入版本（设计说明第 3.1 节）。
+    # 有效合同的身份：它记下的 PRD 与有效决定的摘要，加上进入了模型输入的用户输入版本（docs/design/skeleton-and-application.md「可信内核」）。
     # 读的是成果的内容，住在应用侧（S1d 从内核的 contracts.py 搬来，工单 #860）
     spec = projection.product_spec
     if spec is None or spec.status != "active":
@@ -168,7 +168,7 @@ def generic_acceptance(artifact: dict[str, Any], *,
 
 
 def invalidation(current: RunProjection, reason: str) -> tuple[str, dict[str, Any]] | None:
-    # 接纳以后当前交付失效的一条事件（骨架事件「成果失效」，S1b，设计说明第 4 节）：
+    # 接纳以后当前交付失效的一条事件（骨架事件「成果失效」，S1b，docs/design/skeleton-and-application.md「最小投影」）：
     # 载荷给出成果种类、版本与原因。没有当前交付时没有要失效的成果，这一刻不记事件
     delivery = current.delivery_spec
     if delivery is None:
@@ -204,7 +204,7 @@ class SubmissionWriter:
         # 流程编排给出事务中的运行状态。出错时事务中没有追加任何事件，已经写出的材料恢复原样
         run_id = projection.run_id
         artifact = dict(artifact)
-        # 角色任务的提交记录由部门提出（设计第 5.2 节）；接纳事件与预览的 Event 用同一份元数据
+        # 角色任务的提交记录由部门提出（docs/design/skeleton-and-application.md「装配契约」）；接纳事件与预览的 Event 用同一份元数据
         metadata = dict(actor=f"department:{department}", department=department,
                         parent_event_id=parent_event_id, state_before=projection.status,
                         state_after=projection.status, session_id=session_id, provider=provider, model=model)
@@ -225,7 +225,7 @@ class SubmissionWriter:
             return len(prepared) - 1
 
         def invalidate(reason: str) -> None:
-            # 接纳以后当前交付失效：记一条成果失效事件（S1b，设计说明第 4 节）。没有当前交付时不记
+            # 接纳以后当前交付失效：记一条成果失效事件（S1b，docs/design/skeleton-and-application.md「最小投影」）。没有当前交付时不记
             event = invalidation(current, reason)
             if event is not None:
                 append(*event)
@@ -290,7 +290,7 @@ class SubmissionWriter:
                 # 质检退回工程：工程要重新交付，当前交付失效（S1b）
                 invalidate("qa_rework_engineering")
         elif kind == "structure":
-            # 建档事项的现有结构说明：接纳时再核对一次工作区的树摘要与快照相同（设计第 4.1 节）
+            # 建档事项的现有结构说明：接纳时再核对一次工作区的树摘要与快照相同（docs/design/existing-project-onboarding.md「总体」）
             if projection.snapshot is None or artifact["code_tree_digest"] != projection.snapshot["tree_digest"]:
                 raise ValueError("Structure does not match the snapshot of the onboarding run")
             environment.verify_tree(snapshot)
@@ -315,13 +315,13 @@ class SubmissionWriter:
                 # 建档事项的工程部门没有提交交付的工具，这一刻通常没有当前交付，也就不记事件
                 invalidate("baseline_rework_product")
         elif kind == "independent_judgement":
-            # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：不是成果——不进版本链、
+            # 独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：不是成果——不进版本链、
             # 不失效任何东西、不渲染材料、没有工件。内核的提案路径盖上的统一字段在这里去掉，
             # 事件载荷只带判断本身；装配与放行的门按这条事件的存在与它写的交付摘要判断
             payload = {key: value for key, value in artifact.items() if key not in _UNIFIED_FIELDS}
             event = append(EventType.INDEPENDENT_JUDGEMENT_COMMITTED, payload)
         else:
-            # 新种类的成果写一种通用的接纳事件（S2c，工单 #1098，设计说明第 5.5 节）：载荷是收紧检查给出的
+            # 新种类的成果写一种通用的接纳事件（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：载荷是收紧检查给出的
             # 内容加统一字段。材料文件、Git 版本与 PRD 渲染这些附带写入仍按上面的种类做，
             # 通用种类只写这一条事件
             event = append(*generic_acceptance(artifact, tree_digest=snapshot.digest))
@@ -401,7 +401,7 @@ class SubmissionWriter:
     def record_accepted_lesson(self, transaction: Transaction, source: Event, projection: RunProjection,
                                artifact: dict[str, Any]) -> None:
         # 接纳以后的记录：质检退回工程的放行结论另记一条经验教训候选。
-        # 成果种类与结论取值由这里认——薄驱动不含这两样（骨架与应用设计说明第 6 节），
+        # 成果种类与结论取值由这里认——薄驱动不含这两样（骨架与应用设计说明「薄驱动」），
         # 只把这次接纳转交过来（S4c 工单 #863）
         if artifact.get("kind") != REVIEW_KIND or artifact.get("verdict") != REWORK_VERDICT:
             return
@@ -451,5 +451,5 @@ def _json_bytes(value: dict[str, Any]) -> bytes:
 
 
 def asks_cannot_verify(artifact: dict[str, Any]) -> bool:
-    # 这一份成果是「质检无法核验」的结论吗（浏览器与 computer use 设计说明第 8.4 节，工单 #1179）
+    # 这一份成果是「质检无法核验」的结论吗（浏览器与 computer use 设计说明「无法核验」，工单 #1179）
     return artifact.get("kind") == REVIEW_KIND and artifact.get("verdict") == CANNOT_VERIFY_VERDICT

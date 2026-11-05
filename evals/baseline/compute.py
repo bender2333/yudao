@@ -549,7 +549,7 @@ def build_report(result):
              % (result["collected_at"], refresh, runs_note),
              "",
              "这份报告给出 omp 流程（执行者与审查者都由 omp 运行）在 Stage 3 里程碑下的基线数字，"
-             "供自举第一层的配对验收对照使用（[总体路线图](../program-roadmap.md)第 6.1 节）。"
+             "供自举第一层的配对验收对照使用（[总体路线图](../program-roadmap.md)docs/design/evaluation-scenarios.md「噪声范围与三种结论」）。"
              "计算只读取数据文件，不访问 GitHub 与运行目录。",
              "",
              "## 一、口径",

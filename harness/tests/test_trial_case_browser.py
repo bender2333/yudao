@@ -1,4 +1,4 @@
-# 试用用例与真实的浏览器（浏览器与 computer use 设计说明第 8.2、8.3 节；工单 #1180）。
+# 试用用例与真实的浏览器（浏览器与 computer use 设计说明「试用用例」、「QAReview 的逐条结论与放行」；工单 #1180）。
 #
 # 这个文件查两件事，都用真实的 Playwright MCP、真实的 Chromium 与一个真实的小网页：
 # 1. 质检在一个真实会话里打开试用用例、在浏览器里操作、以 passed 结束：用例的步骤是这几步真实动作（按动作身份），
@@ -140,7 +140,7 @@ def _criteria(case_id: str, result: str = "passed") -> list[dict[str, Any]]:
 
 def test_a_real_browser_case_collects_its_steps_and_ends_as_passed(tmp_path):
     # 质检在真实会话里打开用例、在浏览器里操作、以 passed 结束：步骤是真实动作，截图是真实工件，
-    # 放行引用它时通过核对（设计说明第 8.2、8.3 节）。守 R3
+    # 放行引用它时通过核对（docs/design/browser-and-computer-use.md「试用用例」、「QAReview 的逐条结论与放行」）。守 R3
     with _event_loop() as loop:
         case = _Case(tmp_path, loop)
         try:
@@ -198,7 +198,7 @@ def test_a_real_browser_case_collects_its_steps_and_ends_as_passed(tmp_path):
 
 
 def test_a_session_that_ends_under_an_open_case_concludes_it_as_interrupted(tmp_path):
-    # 用例打开期间会话结束：用例结束为 interrupted，引用它作为证据的结论被拒绝（设计说明第 8.2 节）。守 R3
+    # 用例打开期间会话结束：用例结束为 interrupted，引用它作为证据的结论被拒绝（docs/design/browser-and-computer-use.md「试用用例」）。守 R3
     with _event_loop() as loop:
         case = _Case(tmp_path, loop)
         try:

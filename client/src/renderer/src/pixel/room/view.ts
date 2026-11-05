@@ -1,5 +1,5 @@
 // 部门房间的画面对象：画布挂在宿主元素上，提供 setState、jump、play、stream、resize、destroy、inspect
-// （原型 v13 js/pixel/room.js 的接口与画面与播放设计说明第 3 至 5 节，工单 #954）。
+// （原型 v13 js/pixel/room.js 的接口与画面与播放设计说明「分层与边界」、「画面合同」、「画面层」，工单 #954）。
 //
 // 世界的推进（driver.ts）与绘制（render.ts）都不依赖画布与 WebGL；这里只把画好的画布挂到页面上，
 // 画布按设备分辨率绘制（surface.ts：像素尺寸为逻辑尺寸乘整数倍 k，先设缩放再按逻辑坐标绘制，
@@ -23,7 +23,7 @@ export interface RoomStreamWho {
 }
 
 /**
- * 房间承载事实的视觉通道（画面与播放设计说明第 8.1 节的房间那一行）：房间状态与状态文字、状态给出的姿势、
+ * 房间承载事实的视觉通道（画面与播放设计说明「视觉通道表」的房间那一行）：房间状态与状态文字、状态给出的姿势、
  * 角色与角色的状态、信箱与卷轴等物件的数量、头顶的流式文字。
  *
  * 只读状态给出的东西：工作台上的零件、抽屉、灯、动作的姿势与说话气泡属于表演层，不在这里。
@@ -90,7 +90,7 @@ export interface RoomView {
   resize(): void;
   destroy(): void;
   /**
-   * 关掉或打开表演层（待机活动与动作）的测试入口（设计说明第 8.1 节的 H2）。
+   * 关掉或打开表演层（待机活动与动作）的测试入口（docs/design/visualization.md「视觉通道表」的 H2）。
    * 关掉以后动作与特效不演，画面只画状态给出的样子；承载事实的通道不受影响。
    */
   performance(on: boolean): void;
@@ -99,7 +99,7 @@ export interface RoomView {
   /** 世界（角色、场景与临时状态）与驱动（测试与回放读取），以及承载事实的视觉通道。 */
   inspect(): {
     driver: RoomDriver; scene: SceneLike; renderer: RoomRenderer;
-    /** 承载事实的视觉通道（设计说明第 8.1 节的房间那一行）。 */
+    /** 承载事实的视觉通道（docs/design/visualization.md「视觉通道表」的房间那一行）。 */
     channels: () => RoomChannels;
   };
 }
