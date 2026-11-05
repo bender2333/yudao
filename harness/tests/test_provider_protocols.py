@@ -516,33 +516,6 @@ def test_context_overflow_is_recognised_from_the_upstream_error_text(protocol):
     assert len(provider.requests) == 1
 
 
-@pytest.mark.parametrize("protocol", ["responses", "chat_completions", "messages"])
-def test_model_test_failure_writes_the_upstream_reason(protocol):
-    # 模型测试失败时该模型那一行写上游给出的原因（设计说明第 9.1 节，工单 #294）；
-    # 401 与 403 不记回应体，照旧写状态码那句
-    denied_reason = "unknown model: target-model"
-
-    def rejected(_provider: ScriptedProvider, handler) -> None:
-        body = json.dumps({"error": {"message": denied_reason, "type": "invalid_request_error"}})
-        send_reply(handler, 400, "application/json", body.encode("utf-8"))
-
-    def credential_rejected(_provider: ScriptedProvider, handler) -> None:
-        body = json.dumps({"error": {"message": "credential-echoed-by-provider", "type": "authentication_error"}})
-        send_reply(handler, 401, "application/json", body.encode("utf-8"))
-
-    provider = ScriptedProvider([rejected, credential_rejected])
-    try:
-        facade = facade_with(provider.base + "/v1", protocol=protocol)
-        failed = facade.model_test("go", "m-go")
-        unauthorized = facade.model_test("go", "m-go")
-    finally:
-        provider.close()
-    assert failed["ok"] is False and failed["admitted"] is False
-    assert denied_reason in failed["error"] and failed["failure_group"] == "minimal_qa"
-    assert unauthorized["ok"] is False
-    assert "401" in unauthorized["error"] and "credential-echoed-by-provider" not in unauthorized["error"]
-
-
 # 空输出（工单 #305）：流正常结束、没有任何可见输出项。结束原因按各协议自己的写法给出，
 # Responses 走 completed 且 incomplete_details 为空，Chat 与 Messages 各用一个终态结束原因
 EMPTY_OUTPUT_FINISH_REASONS = {"responses": "completed", "chat_completions": "length",

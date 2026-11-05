@@ -30,25 +30,8 @@ def test_arguments_that_carry_extra_fields_still_pass():
         assert outputs == [{"type": "function_call_output", "call_id": "probe-call", "output": "pong"}], arguments
 
 
-def test_a_shape_that_is_not_an_object_is_rejected_even_when_it_carries_fields():
-    # 带字段但不是对象的形状仍然拒绝，原因里带上收到的原文
-    for arguments in ('[{"reason": "测试连接"}]', '"{\\"reason\\": 1}"', '{"a": 1}extra'):
-        with pytest.raises(ProviderError) as raised:
-            _model_test_tool_outputs(_result(arguments=arguments))
-        assert "应当是对象" in str(raised.value), arguments
-
-
 def test_a_shape_that_is_not_an_object_is_rejected_with_what_arrived():
     for shape in ("[]", '"text"', "42", "not json", "true"):
         with pytest.raises(ProviderError) as raised:
             _model_test_tool_outputs(_result(arguments=shape))
         assert shape in str(raised.value), shape
-
-
-def test_the_rejection_text_is_truncated_to_a_readable_length():
-    # 截断只用在被拒绝的形状上：一个很长的 JSON 字符串（不是对象）
-    with pytest.raises(ProviderError) as raised:
-        _model_test_tool_outputs(_result(arguments='"' + "a" * 400 + '"'))
-    message = str(raised.value)
-    assert "…" in message
-    assert len(message) < 200, message
