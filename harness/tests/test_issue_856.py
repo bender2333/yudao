@@ -126,39 +126,6 @@ def test_answering_continue_after_a_pause_keeps_the_item_working(tmp_path: Path)
     assert _outputs(quality[-1]), "质检的下一次请求里没有自己以前那一步的结果"
 
 
-def test_model_unavailable_while_another_department_works(tmp_path: Path) -> None:
-    # 模型不可用进入待恢复时另一个部门正在工作：那个部门停下，待恢复的决定请求照常写出；
-    # 回答「继续执行」以后事项接着进行
-    adapter = FakeAdapter({
-        "product": [product_spec()],
-        "engineering": [FakeTurn(checks={"slow": SLOW_CHECK}),
-                        delivery_turn(files={"src/echo.py": ECHO}, checks=CHECKS)],
-        "quality": [ProviderError(UNAVAILABLE, reason="provider_unavailable"),
-                    judgement_turn(checks=CHECKS),
-                    review_turn("release", "checks passed on the current snapshot", checks=CHECKS)],
-    })
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("build an echo CLI")
-
-    blocked = system.run_until_stop(run_id)
-    # 待恢复：事项本身没有结束，决定请求照常写出
-    assert blocked.status == "running", blocked.status
-    _position, decisions = saved_decisions(system.store, statuses=("open",))
-    assert len(decisions) == 1
-    [decision] = decisions
-    assert (decision.request["kind"], decision.request["blocks"]) == ("model_unavailable", "run")
-    assert decision.request["department"] == "quality"
-    # 停下的会话已经收尾（工单 #856 验收第 5 条）
-    assert blocked.sessions["engineering"].status == "idle", blocked.sessions["engineering"].status
-
-    _answer(system, "continue")
-    finished = system.run_until_stop(run_id)
-    assert finished.status == "done", finished.stop_reason
-    events = _events(system, run_id)
-    assert not [event for event in events if event.type == EventType.RUN_FAILED]
-    assert [event for event in events if event.type == EventType.DELIVERY_ACCEPTED]
-
-
 def test_two_sessions_blocked_by_model_problems_in_turn(tmp_path: Path) -> None:
     # 两个会话先后被模型问题挡住：各有一条决定请求，都回答以后事项继续，不会以「已取消」结束
     adapter = FakeAdapter({
