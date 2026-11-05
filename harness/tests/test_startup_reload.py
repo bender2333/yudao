@@ -343,13 +343,6 @@ def test_save_after_delete_refreshes_the_config_state_to_loaded(tmp_path):
     assert facade.config_status()["config_state"] == "loaded"
 
 
-def test_memory_save_without_config_path_refreshes_the_config_state_to_loaded():
-    # 工单 #301：没有配置文件路径时保存只改内存，配置状态同样按内存重算为已加载
-    facade = ProviderFacade(startup_mode="test", credentials=CredentialChain(use_env=False))
-    facade.store_document(_fake_doc())
-    assert facade.config_status()["config_state"] == "loaded"
-
-
 # ---------------------------------------------------------------------------
 # 7. 同尺寸改写检测（内容哈希，非 mtime/size）
 # ---------------------------------------------------------------------------

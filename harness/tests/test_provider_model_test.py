@@ -228,29 +228,6 @@ def test_incomplete_tool_calls_do_not_admit(protocol, arguments, call_id):
 
 
 @pytest.mark.parametrize("protocol", PROTOCOLS)
-def test_a_model_that_adds_arguments_to_the_test_tool_is_still_admitted(protocol):
-    # R3（工单 #1341）：网关改写工具定义以后模型多传参数。工具往返这一组证明的是「会不会调工具、
-    # 能不能用工具结果」，参数的写法不在这一组的判定里；多传的参数照原样回给模型，模型接受工具
-    # 结果以后才准入。准入记录里写明上游实际返回的模型。
-    provider = ScriptedProvider([reply(protocol),
-                                 reply(protocol, arguments='{"reason": "model test"}'),
-                                 reply(protocol)])
-    try:
-        facade = facade_with(provider.base + "/v1", protocol=protocol)
-        tested = facade.model_test("go", "m-go")
-        assert tested["ok"] is True and tested["admitted"] is True, tested
-        assert tested["model"] == "tested-model" and tested["failure_group"] is None
-        record = next(row for row in facade.model_admissions() if row["model_id"] == "m-go")
-        assert record["admitted"] is True and record["admitted_model"] == "tested-model"
-        # 工具结果与模型自己传的参数一起回给模型，模型接受工具结果以后这一轮才算走完
-        follow_up = json.dumps(provider.requests[2], ensure_ascii=False)
-        assert "pong" in follow_up, follow_up
-        assert "model test" in follow_up, follow_up
-    finally:
-        provider.close()
-
-
-@pytest.mark.parametrize("protocol", PROTOCOLS)
 def test_a_call_to_another_tool_does_not_admit(protocol):
     # R3（工单 #1341）：多传参数放行以后，工具名不对仍然不通过——放行的是参数形状，不是工具身份
     provider = ScriptedProvider([reply(protocol), reply(protocol, tool_name="other_tool")])

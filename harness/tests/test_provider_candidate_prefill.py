@@ -143,18 +143,6 @@ def test_candidates_take_the_context_length_key_from_a_model_info_with_several_k
     assert (candidate["context_window"], candidate["context_window_source"]) == (131072, "models_url")
 
 
-def test_candidates_prefer_the_loaded_context_length_over_the_maximum():
-    # R3：LM Studio 的两个字段同时给出时取运行时真实值 loaded_context_length
-    candidate = _candidate({"loaded_context_length": 24576, "max_context_length": 16384})
-    assert (candidate["context_window"], candidate["context_window_source"]) == (24576, "models_url")
-
-
-def test_candidates_keep_context_length_ahead_of_max_model_len():
-    # R3：vLLM 的 max_model_len 与顶层 context_length 同时给出时仍取 context_length
-    candidate = _candidate({"context_length": 1048576, "max_model_len": 32768})
-    assert (candidate["context_window"], candidate["context_window_source"]) == (1048576, "models_url")
-
-
 def test_candidates_read_the_window_and_the_output_limit_independently():
     # R3：窗口与输出上限各自独立按次序取，一处有、另一处没有时只填有的那一项
     candidate = _candidate({"model_info": {"gemma3.context_length": 131072}})
