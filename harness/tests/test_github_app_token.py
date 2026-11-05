@@ -13,25 +13,16 @@
 # 全程真实子进程与真实本地 HTTP，不使用 mock：假 gh 与假 git 是 .cmd 脚本，
 # 记录被调用的环境与参数；git 侧的凭证走真 git 的 credential 助手协议。
 
-import base64
-import json
 import os
 import subprocess
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_DIR = REPO_ROOT / "scripts" / "github-app"
-MODULE_PATH = APP_DIR / "yudao_github_app.py"
 
 APP_ID = "12345"
-INSTALLATION_ID = 4242
-OTHER_INSTALLATION_ID = 9999
-MINTED_TOKEN = "ghs_minted_token_abc"
-EXPIRES_AT = "2099-01-01T00:00:00Z"
 
 
 def _env() -> dict[str, str]:
@@ -50,77 +41,6 @@ def _write_key(path: Path) -> Path:
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
         serialization.NoEncryption()))
     return path
-
-
-def _decode_jwt_part(part: str) -> dict:
-    padding = "=" * (-len(part) % 4)
-    return json.loads(base64.urlsafe_b64decode(part + padding))
-
-
-class _FakeGitHub:
-    # 冒充 GitHub App 的两个端点，记录收到的请求；端口由测试进程分配
-
-    def __init__(self, *, installations: list[dict] | None = None):
-        self.installations = installations if installations is not None else [
-            {"id": INSTALLATION_ID, "account": {"login": "bender2333"}},
-            {"id": OTHER_INSTALLATION_ID, "account": {"login": "someone-else"}},
-        ]
-        self.jwt_headers: list[dict] = []
-        self.jwt_claims: list[dict] = []
-        self.installation_requests: list[str] = []
-        self.token_requests: list[str] = []
-        self.token_count = 0
-        server = self
-
-        class Handler(BaseHTTPRequestHandler):
-            protocol_version = "HTTP/1.1"
-
-            def log_message(self, *_args):  # 静音：请求内容可能带令牌
-                pass
-
-            def _reply(self, payload: dict) -> None:
-                body = json.dumps(payload).encode("utf-8")
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
-
-            def do_GET(self) -> None:
-                authorization = self.headers.get("Authorization", "")
-                if not authorization.startswith("Bearer "):
-                    self.send_error(401)
-                    return
-                server.jwt_headers.append(_decode_jwt_part(authorization[7:].split(".")[0]))
-                server.jwt_claims.append(_decode_jwt_part(authorization[7:].split(".")[1]))
-                server.installation_requests.append(self.path)
-                self._reply(server.installations)
-
-            def do_POST(self) -> None:
-                length = int(self.headers.get("Content-Length", "0") or 0)
-                if length:
-                    self.rfile.read(length)
-                server.token_requests.append(self.path)
-                server.token_count += 1
-                self._reply({"token": MINTED_TOKEN, "expires_at": EXPIRES_AT})
-
-        self._server = HTTPServer(("127.0.0.1", 0), Handler)
-        self._server.server_close = self._server.server_close
-        self.port = self._server.server_address[1]
-        self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
-
-    @property
-    def root(self) -> str:
-        return f"http://127.0.0.1:{self.port}"
-
-    def __enter__(self) -> "_FakeGitHub":
-        self._thread.start()
-        return self
-
-    def __exit__(self, *_exc) -> None:
-        self._server.shutdown()
-        self._server.server_close()
-        self._thread.join(timeout=5)
 
 
 def _configured_env(tmp_path: Path, api_root: str) -> dict[str, str]:

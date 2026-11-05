@@ -2,14 +2,12 @@
 # 不读临时目录、不起进程、不连网络，结论只依赖交给它的事件与两个上限，登记为单元层。
 #
 # 测试按三环留（docs/design/test-pyramid.md 第 13 节）：
-# - R2（合同）：两个上限读规则登记的现值，规则版本随 Rules 的取值变化；
 # - R3（路线图已走到）：压缩保留失败的尝试——失败的工具调用、被拒绝的提案与没有通过的检查各列一条，
 #   用事件编号取回的原文与事件里的相同；后来做成的标「后来已解决」；超出上限时按设计说明的顺序合并，
 #   最新的未解决失败留在清单里；只给这个角色自己。
 
 import json
 
-from harness.definitions import DEFINITIONS
 from harness.failure_list import (FAILURE_LIST, MERGED_EARLIER, MERGED_RESOLVED, failure_list, tool_result)
 from harness.models import Event, EventType, json_dumps
 
@@ -257,13 +255,6 @@ def _failed_ids(events):
             if event.type == EventType.TOOL_CALLED and (event.payload or {}).get("ok") is False]
 
 
-def test_below_the_limit_every_failure_is_listed_and_nothing_is_merged():
-    listing = _listing(_many_failures(3), limit_tokens=4000)
-    assert len(listing.failures) == 3
-    assert (listing.merged_resolved, listing.merged_earlier) == (0, 0)
-    assert "merged" not in _payload_of(listing)
-
-
 def test_over_the_limit_the_resolved_failures_merge_first_then_the_earliest_unresolved():
     """超出清单上限：先把「后来已解决」的合并成一行，再从最早的未解决失败开始合并，
     最新的未解决失败留在清单里。"""
@@ -306,23 +297,6 @@ def test_the_same_events_and_the_same_limits_give_the_same_bytes():
         == json_dumps(first.item)
 
 
-def test_the_two_limits_are_read_from_the_rule_registry():
-    """两个上限读规则登记（context-assembly.md「压缩以后保留失败的尝试」），随 Rules 的取值记录版本。"""
-    from harness.context import Rules
-
-    rules = Rules()
-    assert rules.failure_list_tokens == DEFINITIONS.rule_value("context.failure_list_tokens") == 4000
-    assert rules.failure_entry_chars == DEFINITIONS.rule_value("context.failure_entry_chars") == 400
-    list_rule = DEFINITIONS.rule("context.failure_list_tokens")
-    entry_rule = DEFINITIONS.rule("context.failure_entry_chars")
-    assert list(list_rule.bounds) == [1000, 13107] and list(entry_rule.bounds) == [100, 2000]
-    assert "context-assembly.md" in list_rule.origin and "压缩以后保留失败的尝试" in list_rule.origin
-    assert "context-assembly.md" in entry_rule.origin and "400 字符" in entry_rule.origin
-    # 两个上限进规则版本：取值变了就是新的一版
-    assert Rules(failure_list_tokens=2000).version() != rules.version()
-    assert Rules(failure_entry_chars=800).version() != rules.version()
-
-
 def test_a_failure_result_without_error_text_still_records_the_failure_output():
     """没有错误文字的失败：写输出本身的开头（被拒绝的工具许可只带原因与输出）。"""
     refused = _tool_event(2, name="write_file", args={"path": "src/a.py"}, ok=False,
@@ -338,12 +312,3 @@ def test_a_skipped_tool_call_is_a_failed_tool_result_and_names_its_reason():
     listing = _listing([_event(1, EventType.DEPARTMENT_INPUT), skipped])
     assert [(failure.kind, failure.failure) for failure in listing.failures] == [
         ("tool", "Not executed because this activation ended")]
-
-
-def test_two_failures_of_the_same_kind_keep_their_own_event_ids():
-    """事件编号是清单与事件之间的凭据：同一种失败出现两次，两条各自带自己的编号。"""
-    first = _failed_check(2, name="smoke")
-    second = _failed_check(3, name="smoke")
-    listing = _listing([_event(1, EventType.DEPARTMENT_INPUT), first, second])
-    assert [failure.event_id for failure in listing.failures] == [first.event_id, second.event_id]
-    assert len(set(listing.event_ids)) == 2

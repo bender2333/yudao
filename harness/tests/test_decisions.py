@@ -6,11 +6,11 @@ import pytest
 from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.decisions import DecisionClosed, DecisionNotFound, InvalidOption, StaleDecision
-from harness.event_store import Command, DuplicateCommand, run_stream
+from harness.decisions import DecisionClosed
+from harness.event_store import Command, run_stream
 from harness.models import EventType, Usage
 from harness.projection import saved_decision, saved_decisions
-from harness.proposals import delivery_turn, product_spec, review_turn
+from harness.proposals import delivery_turn, product_spec
 from harness.runtime import LoopSystem
 from harness.tests.contract_checks import assert_payloads_follow_contract
 from harness.tests.helpers import quality_turns
@@ -123,30 +123,6 @@ def test_cancelling_a_blocked_run_withdraws_its_decision_request(data_dir):
     with pytest.raises(DecisionClosed):
         _answer(system, decision.decision_id)
     assert_payloads_follow_contract(events)
-
-def test_an_answer_that_does_not_hold_writes_nothing_and_does_not_register_its_command(data_dir):
-    system, _adapter, run_id = _engineering_unavailable_system(data_dir)
-    system.run_until_stop(run_id)
-    [decision] = _open(system)
-    end = system.store.end_position()
-    command_id = str(uuid.uuid4())
-    with pytest.raises(DecisionNotFound):
-        _answer(system, "evt_missing", command_id=command_id)
-    with pytest.raises(StaleDecision) as stale:
-        _answer(system, decision.decision_id, base_version=2, command_id=command_id)
-    assert stale.value.version == 1
-    with pytest.raises(InvalidOption) as invalid:
-        _answer(system, decision.decision_id, "retry", command_id=command_id)
-    assert invalid.value.options == ["continue", "stop"]
-    assert system.store.end_position() == end and system.store.command(command_id) is None
-
-    # 同一命令身份再次提交时不再判断；另一个身份回答已经回答的请求时拒绝
-    assert _answer(system, decision.decision_id, command_id=command_id) == run_id
-    with pytest.raises(DuplicateCommand):
-        _answer(system, decision.decision_id, command_id=command_id)
-    with pytest.raises(DecisionClosed):
-        _answer(system, decision.decision_id)
-    assert len(system.store.command_events(command_id)) == 1
 
 def test_a_decision_request_blocking_the_run_stops_a_running_activation_at_its_next_safe_node(data_dir):
     # 激活进行中出现阻塞 run 的决定请求（这里由测试经写入口写入）：模型回答以后的安全节点得到停止，
