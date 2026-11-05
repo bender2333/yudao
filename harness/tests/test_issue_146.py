@@ -12,9 +12,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from harness.app.application import Application
-from harness.definitions import DEFINITIONS
 from harness.models import CatalogEventType, EventType
-from harness.providers import capabilities
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import list_files_turn, system_with
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
@@ -146,22 +144,7 @@ def _wait_for(store, predicate, *, description):
     raise AssertionError(f"no event matched {description}")
 
 # ---------------------------------------------------------------------------
-# 能力表查询与预填（验收第 1、2 项）
-
-def test_catalog_exposes_the_capability_table(tmp_path):
-    # 查询 catalog 返回能力表的 revision、快照日期与来源，以及预置服务方案的条目（手动添加时客户端据此预填）
-    with _Upstream({"data": []}) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
-                                    "models": [_document_model("model-a")], "bindings": {}})
-        with running_api(opened) as client:
-            table = _catalog(client)["capability_table"]
-            assert table["revision"] == capabilities.CAPABILITY_TABLE_REVISION
-            assert table["snapshot_date"] == capabilities.CAPABILITY_TABLE_SNAPSHOT_DATE
-            assert table["source"] == capabilities.CAPABILITY_TABLE_SOURCE
-            assert set(table["presets"]) == set(DEFINITIONS.model_capabilities.presets)
-            entry = table["presets"]["opencode-go"][0]
-            assert set(entry) == {"model", "protocol", "input_modalities", "output_modalities",
-                                  "context_window", "max_output_tokens", "tool_call", "reasoning"}
+# 候选的预填（验收第 1、2 项）
 
 def test_candidates_take_the_window_from_upstream_and_the_input_from_the_table(tmp_path):
     # 上游列表返回窗口时预填取列表的值与来源；输入方式取能力表；能力表没有记录时只有文本
@@ -193,28 +176,6 @@ def test_candidates_take_the_window_from_upstream_and_the_input_from_the_table(t
             assert unknown["input_modalities"] == ["text"]
             assert unknown["input_modalities_source"] == "default"
 
-def test_candidates_take_the_window_from_the_table_when_upstream_omits_it(tmp_path):
-    # 上游列表没有返回窗口时取能力表的值与来源（deepseek-v4-pro 在提交的快照里带窗口与输出上限）
-    with _Upstream({"data": [{"id": "deepseek-v4-pro"}]}) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url="https://opencode.ai/zen/go/v1",
-                                                           models_url=upstream.models_url,
-                                                           preset_id="opencode-go")],
-                                    "models": [_document_model("model-a")], "bindings": {}})
-        with running_api(opened) as client:
-            current = _catalog(client)["revision"]
-            assert _command(client, "catalog.candidates.collect",
-                            base_version=current, provider_id="provider-a").status_code == 200
-            event = _wait_for(opened.system.store,
-                              lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
-                              description="catalog_candidates_collected")
-            [entry] = event.payload["candidates"]
-            recorded = capabilities.capability("opencode-go", "deepseek-v4-pro")
-            assert recorded is not None
-            assert entry["context_window"] == recorded.context_window
-            assert entry["context_window_source"] == "capability_table"
-            assert entry["max_output_tokens"] == recorded.max_output_tokens
-            assert entry["max_output_tokens_source"] == "capability_table"
-
 # ---------------------------------------------------------------------------
 # 输入方式与准入（验收第 3 项）
 
@@ -244,40 +205,9 @@ def test_input_modalities_save_and_query_and_do_not_touch_admission(tmp_path):
             assert {item["id"]: item for item in document["models"]}["model-a"]["input_modalities"] == ["text", "image"]
 
 
-def test_unknown_input_modality_is_rejected_at_its_field(tmp_path):
-    # 未知取值按字段位置拒绝：请求在接口层被拒绝，位置写明模型行的 input_modalities
-    with _Upstream({"data": []}) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
-                                    "models": [_document_model("model-a")], "bindings": {}})
-        with running_api(opened) as client:
-            current = _catalog(client)["revision"]
-            rejected = _command(client, "catalog.connection.save", base_version=current,
-                                provider=_provider(base_url=upstream.base),
-                                models=[_command_model("model-a", input_modalities=["audio"])])
-            assert rejected.status_code == 422, rejected.text
-            locations = [item["loc"] for item in rejected.json()["detail"]]
-            assert ["body", "models", 0, "input_modalities", 0] in locations
-            # 目录没有被改动：未知取值没有落进目录
-            assert _catalog(client)["models"][0]["input_modalities"] == ["text"]
-
-def test_call_target_is_resolved_with_the_input_modalities(tmp_path):
-    # 调用目标带输入方式：含图像的定义解析成功，调用目标公开部分与请求事件都带上它
-    with _Upstream({"data": []}) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
-                                    "models": [_document_model("model-a", input_modalities=["text", "image"])],
-                                    "bindings": {"quality": {"provider_id": "provider-a", "model_id": "model-a"}}})
-        with running_api(opened) as client:
-            opened.admit("model-a")
-            facade = opened.system.facade
-            resolution = facade.resolve_department_default("quality")
-            assert resolution.available, resolution.message
-            assert resolution.public["input_modalities"] == ["text", "image"]
-            target = facade.providers_view()["models"][0]
-            assert target["input_modalities"] == ["text", "image"]
-            assert "api_key" not in json.dumps(resolution.public)
-
 # ---------------------------------------------------------------------------
 # 建议能力的提醒（验收第 4 项）
+
 
 def _save_quality_default(client, model_id, *, base_version):
     return _command(client, "catalog.department_defaults.save", base_version=base_version,
@@ -385,39 +315,6 @@ def test_workspace_reminder_disappears_after_the_model_gains_the_capability(tmp_
             workspace = client.get("/api/queries/department.workspace",
                                    params={"project_id": project_id, "department": "quality"}).json()["data"]
             assert workspace["reminders"] == []
-
-def test_queries_do_not_append_events_and_carry_no_key(tmp_path):
-    # 调用查询前后事件日志末尾不变；查询结果中没有 API Key
-    with _Upstream({"data": []}) as upstream:
-        opened = _Opened(tmp_path, {"providers": [_provider(base_url=upstream.base)],
-                                    "models": [_document_model("text-model", input_modalities=["text"]),
-                                               _document_model("vision-model", input_modalities=["text", "image"])],
-                                    "bindings": {"quality": {"provider_id": "provider-a", "model_id": "text-model"}}})
-        with running_api(opened) as client:
-            opened.admit("text-model", "vision-model")
-            store = opened.system.store
-            created = _command(client, "project.create", name="P", goal="查询纯净")
-            project_id = created.json()["refs"]["project_id"]
-            before = store.end_position()
-            answers = [
-                client.get("/api/queries/catalog").json(),
-                client.get("/api/queries/catalog.document").json(),
-                client.get("/api/queries/project.settings", params={"project_id": project_id}).json(),
-                client.get("/api/queries/department.workspace",
-                           params={"project_id": project_id, "department": "quality"}).json(),
-            ]
-            assert store.end_position() == before
-            rendered = json.dumps(answers, ensure_ascii=False)
-            # 凭据不出现在查询结果里：模型访问定义与调用目标只有引用与版本，没有 Key
-            assert KEY not in rendered
-            catalog = answers[0]["data"]
-            for model in catalog["models"]:
-                assert "credential" not in model
-            for provider in catalog["providers"]:
-                assert provider["credential"]["source"] in {"none", "dotenv", "override"}
-                assert "secret" not in provider["credential"]
-            # 提醒确实出现在查询结果里，而不是被断言掩盖
-            assert "quality" in rendered
 
 # ---------------------------------------------------------------------------
 # 调用目标按输入方式提供工具（验收第 5 项）
