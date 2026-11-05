@@ -3190,7 +3190,11 @@ export type InitialPrdRequested = {
     round: number;
     prd: InitialPrdProposal;
     structure: StructureProposal;
-    baseline_review: BaselineReviewProposal;
+    baseline_review?: BaselineReviewProposal | null;
+    /**
+     * Baseline Verified
+     */
+    baseline_verified?: boolean;
     overview_ref: ArtifactRef;
     snapshot: CodeSnapshot;
     revision_note_ref?: ArtifactRef | null;
@@ -4073,7 +4077,11 @@ export type OnboardingRound = {
      * Revision Note
      */
     revision_note: string | null;
-    baseline_review: BaselineReviewView;
+    baseline_review?: BaselineReviewView | null;
+    /**
+     * Baseline Review Note
+     */
+    baseline_review_note?: string | null;
     /**
      * Decisions
      */
@@ -11421,7 +11429,11 @@ export type InitialPrdProposedPayload = {
     round: number;
     prd: InitialPrdProposal;
     structure: StructureProposal;
-    baseline_review: BaselineReviewProposal;
+    baseline_review?: BaselineReviewProposal | null;
+    /**
+     * Baseline Verified
+     */
+    baseline_verified?: boolean;
     overview_ref: ArtifactRef;
     snapshot: CodeSnapshot;
     revision_note_ref?: ArtifactRef | null;

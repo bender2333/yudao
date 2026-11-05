@@ -8648,7 +8648,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 15
+            "example": 16
           },
           "contract_digest": {
             "type": "string",
@@ -9966,7 +9966,19 @@
             "$ref": "#/components/schemas/StructureProposal"
           },
           "baseline_review": {
-            "$ref": "#/components/schemas/BaselineReviewProposal"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BaselineReviewProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline_verified": {
+            "type": "boolean",
+            "title": "Baseline Verified",
+            "default": true
           },
           "overview_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
@@ -9999,7 +10011,6 @@
           "round",
           "prd",
           "structure",
-          "baseline_review",
           "overview_ref",
           "snapshot"
         ],
@@ -11374,7 +11385,25 @@
             "title": "Revision Note"
           },
           "baseline_review": {
-            "$ref": "#/components/schemas/BaselineReviewView"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BaselineReviewView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline_review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Review Note"
           },
           "decisions": {
             "items": {
@@ -11395,7 +11424,6 @@
           "structure",
           "overview",
           "revision_note",
-          "baseline_review",
           "decisions"
         ],
         "title": "OnboardingRound"
@@ -25105,7 +25133,19 @@
             "$ref": "#/components/schemas/StructureProposal"
           },
           "baseline_review": {
-            "$ref": "#/components/schemas/BaselineReviewProposal"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BaselineReviewProposal"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "baseline_verified": {
+            "default": true,
+            "title": "Baseline Verified",
+            "type": "boolean"
           },
           "overview_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
@@ -25130,7 +25170,6 @@
           "round",
           "prd",
           "structure",
-          "baseline_review",
           "overview_ref",
           "snapshot"
         ],
