@@ -1329,7 +1329,7 @@ class RoomView(Contract):
     self_test: dict[str, Any] | None
 
 class EffectiveModel(Contract):
-    # 本部门当前生效的模型及来源（设计说明「查询清单」）：按 docs/design/app-and-interface.md「范围筛选」的选择规则与当前目录计算，不发送请求。
+    # 本部门当前生效的模型及来源（设计说明「验收」中「对已登记的每个查询，在有数据的系统上调用以后，事件日志末尾位置与保存的投影不变」）：按 docs/design/app-and-interface.md「范围筛选」的选择规则与当前目录计算，不发送请求。
     # state 为 effective 时给出模型与来源；为 unusable 时给出 reason 与 message；
     # 为 unset 时都没有设置。unusable 与 unset 时不返回其他连接或模型
     state: Literal["effective", "unusable", "unset"]
@@ -1376,7 +1376,7 @@ def _project_selection(setting: Any) -> ModelSelection | None:
                           requested_tier=setting.requested_tier)
 
 def _effective_model(application: Application, setting: Any, department: str) -> EffectiveModel:
-    # 本部门当前生效的模型及来源（设计说明「查询清单」）：按 docs/design/app-and-interface.md「范围筛选」的顺序解析，不发送请求。
+    # 本部门当前生效的模型及来源（设计说明「验收」中「对已登记的每个查询，在有数据的系统上调用以后，事件日志末尾位置与保存的投影不变」）：按 docs/design/app-and-interface.md「范围筛选」的顺序解析，不发送请求。
     # 没有任何一层写入模型时为「未设置」，引用无法使用时为「无法使用」并带回原因；
     # 这两种情况都不返回其他连接或模型
     resolution = application.system.facade.resolve_effective_model(department, _project_selection(setting))
@@ -2877,7 +2877,7 @@ class ProjectSettingsResult(Contract):
     # 各部门生效模型不具备该部门建议能力时的提醒（docs/design/app-and-interface.md「模型输出片段」「一直显示」）；
     # 生效模型按 docs/design/model-management.md「解析规则」解析，包括跟随部门默认的情况
     department_reminders: dict[str, list[str]]
-    # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明「参数怎样成为带版本的数据」）：
+    # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明「参数怎样成为带版本的数据」中「参数的当前值写成事件，带修改者、原值、新值与理由」）：
     # 项目级参数命令的基准版本，全局现值加本项目覆盖的内容摘要；与 parameter.set 按项目核对的是同一份
     effective_parameters_version: str = ""
 
@@ -3604,7 +3604,7 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     store = application.system.store
     run = _run(application, request.run_id)
     events = store.list_events(request.run_id)
-    # 已用量读最小投影（骨架与应用设计说明「最小投影」，S1e 工单 #1015）：
+    # 已用量读最小投影（骨架与应用设计说明「最小投影」中「应用可以读最小投影，内核不为应用加字段」，S1e 工单 #1015）：
     # 激活次数、模型步数与执行权都由它折出来，不在这里从事件数一遍；只记录的事件（旧派发编号）不并入，
     # 与写入口折最小投影用的是同一条规则
     minimal = fold_events(accepted(events))

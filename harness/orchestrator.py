@@ -893,7 +893,7 @@ class Orchestrator:
         return total_ms
 
     def _session_used(self, run_id: str, session_id: str) -> SessionState:
-        # 一个会话的已用量（docs/design/skeleton-and-application.md「最小投影」，S1e 工单 #1015）：驱动与应用都读最小投影，
+        # 一个会话的已用量（docs/design/skeleton-and-application.md「最小投影」中「应用可以读最小投影，内核不为应用加字段」，S1e 工单 #1015）：驱动与应用都读最小投影，
         # 不各自从事件数一遍；没有激活过的会话在投影里没有条目，按全零处理
         return self.writes.minimal(run_stream(run_id)).sessions.get(session_id, SessionState())
 
@@ -1706,7 +1706,7 @@ class Orchestrator:
             declared = execution_contract.accept(self._execution)
             assembly_contract.accept(self.assembly)
             # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
-            # 剩余步数决定；路由自己的工作引用经契约原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」），
+            # 剩余步数决定；路由自己的工作引用经契约原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」），
             # 成果驱动不用它时为空（工单 #861）；按部门取模型与提示词的来源随请求交给执行实现
             # （第三版，工单 #1511），不再由安全节点回答
             request = execution_contract.RoundRequest(
@@ -1755,7 +1755,7 @@ class Orchestrator:
                 self._end_run(activation, TIME_BOUND, time_limit_message(minimal, elapsed), result.version)
             return
         # 薄驱动拿到一轮结果以后问路由这一轮以什么结束，再按回答经写入口提交（docs/design/skeleton-and-application.md「执行契约」输出、
-        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」；工单 #861）：路由说这一轮不是正常结束时不提交
+        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一轮工作怎么结束由路由按事件判断，执行契约不写死结果的种类」；工单 #861）：路由说这一轮不是正常结束时不提交
         ended = self._item_routing(run_id).round_end(current, list(result.events), department=department,
                                                      session_id=scope.session_id, activation_id=scope.activation_id)
         if ended is None:
@@ -2032,7 +2032,7 @@ class Orchestrator:
         assembly_contract.accept(self.assembly)
         # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，这一轮的上限来自路由的请求
         # （薄驱动已经把这个分支会话之前用掉的步数扣掉）；路由自己的工作引用指向这次询问
-        # （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，工单 #861、#862）
+        # （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」，工单 #861、#862）
         driver = self._execution.start(
             execution_contract.RoundRequest(
                 scope=branch_scope, prompt=prompt, limits=limits, work_ref=branch.work_ref,

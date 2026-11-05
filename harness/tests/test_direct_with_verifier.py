@@ -407,7 +407,7 @@ def test_the_form_declares_one_verifier_with_the_check_material_write_scope():
     assert WITH_VERIFIER.departments == (ENGINEERING, QUALITY)
     assert WITH_VERIFIER.verifiers_of(ENGINEERING, COMPLETION_KIND) == (QUALITY,)
     assert WITH_VERIFIER.verifier_roles() == (QUALITY,)
-    # 写入范围是检查材料：它写的东西只进检查材料，不让被核验方的成果失效（docs/design/forms-and-verifier-role.md「核验角色」）
+    # 写入范围是检查材料：它写的东西只进检查材料，不让被核验方的成果失效（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」）
     scope = organization.verification.write_scopes[QUALITY]
     assert (scope.scope, scope.paths) == ("check_materials", (".yudao-qa-tests",))
     # 核验结论是这份路由认得的一种成果，由核验角色的提交工具提交

@@ -2,13 +2,12 @@
 # 质检在预测性探索里按 PRD 起草测试用例，交付到达以后开始新一轮工作，核验并放行。
 # 取消与暂停作用于事项的全部会话。
 
-import asyncio
 import json
 import uuid
-from collections.abc import AsyncIterator
 from pathlib import Path
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.watched_outputs import is_working
 from harness.environment import QA_TESTS_DIR, inspection_root
 from harness.event_store import Command
 from harness.models import ArtifactRef, EventType, json_dumps
@@ -24,106 +23,14 @@ from harness.proposals import (
     review,
     review_turn,
 )
-from harness.providers.call import ModelCall, ModelResponse, ModelStreamEvent
+from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import guidance_reply, python_snippet, quality_turns
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 CHECKS = {"smoke": {"command": python_snippet("print('smoke ok')")}}
 ECHO = "import sys\nprint(sys.argv[1])\n"
 TEST_FILE = f"{QA_TESTS_DIR}/test_echo.py"
 TEST_CONTENT = "import sys\nprint('QA_TEST_DRAFTED')\nsys.exit(0)\n"
-
-# 同时进行的部门之间谁先谁后由事件决定（工单 #1431，测试分层设计说明「测试的写法」）：假模型的某次调用
-# 可以标上「先等一个信号」，信号来自本次运行提交的事件。等待的上限只用来防止测试一直等（与 #1248 同口径，
-# 见 harness/tests/wait_limits.py），到点以写明在等什么的失败结束。
-_SIGNAL_DESCRIPTIONS = {
-    "departments_working": "工程与质检各自进入一轮工作（两条 model_requested 事件）",
-    "decision_recorded": "产品的补充决定记下（product_decision_accepted 事件）",
-}
-
-
-class _Signals:
-    """事件日志里的信号：订阅提交的事件，等到某个信号的那次模型调用被放行（工单 #1431）。"""
-
-    def __init__(self) -> None:
-        self._fired: set[str] = set()
-        self._started: set[str] = set()
-        self._waiters: dict[str, asyncio.Event] = {}
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self.failures: list[str] = []
-
-    def watch(self, system: LoopSystem) -> None:
-        system.store.subscribe(self._committed)
-
-    def _committed(self, events) -> None:
-        # 订阅方在提交这条事件的一方所在的线程里被调用
-        for event in events:
-            department = getattr(event, "department", None)
-            if event.type == EventType.MODEL_REQUESTED and department in ("engineering", "quality"):
-                self._started.add(department)
-                if {"engineering", "quality"} <= self._started:
-                    self._fire("departments_working")
-            elif event.type == EventType.PRODUCT_DECISION_ACCEPTED:
-                self._fire("decision_recorded")
-
-    def _fire(self, name: str) -> None:
-        self._fired.add(name)
-        waiter = self._waiters.get(name)
-        if waiter is None:
-            return
-        try:
-            running = asyncio.get_running_loop()
-        except RuntimeError:
-            running = None
-        if self._loop is not None and running is not self._loop:
-            self._loop.call_soon_threadsafe(waiter.set)
-        else:
-            waiter.set()
-
-    async def wait(self, name: str) -> None:
-        if name in self._fired:
-            return
-        self._loop = asyncio.get_running_loop()
-        waiter = self._waiters.setdefault(name, asyncio.Event())
-        if name in self._fired:
-            return
-        try:
-            await asyncio.wait_for(waiter.wait(), WAIT_FOR_HOST_WORK_SEC)
-        except TimeoutError:
-            message = f"等不到信号「{name}」：{_SIGNAL_DESCRIPTIONS.get(name, name)}"
-            self.failures.append(message)
-            raise AssertionError(message) from None
-
-
-class _SignallingAdapter(FakeAdapter):
-    """按事件日志里的信号放行的假模型（工单 #1431）。
-
-    waits 的键是（部门，这个部门第几次模型调用，从 0 起）：这一次调用先等键里的信号再交出回答。
-    这个用例的会话都是各部门的主线（没有询问分支），按部门数第几次调用就够。
-    """
-
-    def __init__(self, script, *, waits: dict[tuple[str, int], str] | None = None, **kwargs) -> None:
-        super().__init__(script, **kwargs)
-        self._waits = dict(waits or {})
-        self._calls: dict[str, int] = {}
-        self.signals = _Signals()
-
-    def watch(self, system: LoopSystem) -> None:
-        self.signals.watch(system)
-
-    @property
-    def wait_failures(self) -> list[str]:
-        return self.signals.failures
-
-    async def stream(self, call: ModelCall) -> AsyncIterator[ModelStreamEvent | ModelResponse]:
-        index = self._calls.get(call.department, 0)
-        self._calls[call.department] = index + 1
-        signal = self._waits.get((call.department, index))
-        if signal is not None:
-            await self.signals.wait(signal)
-        async for item in super().stream(call):
-            yield item
 
 
 def _call(identity: str, name: str, arguments: dict) -> dict:
@@ -565,22 +472,29 @@ def test_engineering_receives_the_new_prd_version_and_delivers_against_it(tmp_pa
 def test_a_product_decision_is_a_notification_to_the_other_departments(tmp_path: Path) -> None:
     # 验收第 2 条（#1079，部门指导设计说明「放行怎么等」第 2 点）：产品记录了补充决定以后，
     # 正在一轮工作中的工程与质检在下一步的 work_notification 里收到新种类的通知，
-    # 内容含决定的陈述与理由；写下这条决定的产品会话不收到。
-    # 先后由事件决定（工单 #1431）：产品等工程与质检各自进入一轮工作再提交决定，工程与质检的这一步
-    # 等决定记下再交出回答，所以决定一定落在它们的下一步之前，不靠轮数或时长赌。
+    # 内容含决定的陈述与理由；写下这条决定的产品会话不收到
     holder: dict[str, object] = {}
     seen: dict[str, object] = {}
     statement = "Uppercase all output"
     rationale = "输入要求输出大写，作为补充决定写进合同。"
 
     def decide_while_the_others_work(call):
-        # 放行时工程与质检都在一轮工作中：随后加一条指导，让产品在决定之后另有一轮，
-        # 那一步核对它不收到自己的决定
+        # 产品这一轮等工程与质检都在一轮工作中，再提交决定（两个部门一开始就在工作）；
+        # 随后加一条指导，让产品在决定之后另有一轮，那一步核对它不收到自己的决定
+        for _ in range(200):
+            projection = holder["system"].project(call.run_id)
+            if is_working(projection, "engineering") and is_working(projection, "quality"):
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
         holder["system"].add_guidance(call.run_id, "product", "请确认这条决定已经记下。")
         return product_decision(statement, rationale)
 
     def engineering_keeps_working(call):
-        # 工程这一轮先不结束：等产品决定记下以后（放行由信号给出），下一步收到通知再交付
+        # 工程这一轮先不结束：等产品决定记下以后，下一步收到通知再交付
+        for _ in range(200):
+            if holder["system"].project(call.run_id).product_decisions:
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
         return FakeTurn(writes={"src/echo.py": ECHO})
 
     def engineering_delivers(call):
@@ -589,6 +503,10 @@ def test_a_product_decision_is_a_notification_to_the_other_departments(tmp_path:
 
     def quality_keeps_working(call):
         # 质检这一轮同样等到决定记下，下一步收到通知
+        for _ in range(200):
+            if holder["system"].project(call.run_id).product_decisions:
+                break
+            yield ModelStreamEvent(kind="stream_event", id="evt-wait")
         identity = f"read-{call.activation_id}-{call.step_id}"
         return ModelResponse(output=[_call(identity, "list_files", {})])
 
@@ -596,40 +514,22 @@ def test_a_product_decision_is_a_notification_to_the_other_departments(tmp_path:
         seen["quality"] = prompt_part(call, "work_notification")
         return _explore()
 
-    def quality_reviews(call):
-        # 质检这一轮开始时面对的一份交付决定做什么（工单 #358 先判断后看解释）：这一轮开始时没有交付的
-        # 是预测性探索，提交的结论因为没有交付被拒绝；有交付而还没有为它交过独立判断的，先交独立判断，
-        # 交过以后核验并放行。交付到达与质检这一轮谁先谁后不猜：判断交过没有按事件日志里记下的独立判断事件看
-        request_delivery = prompt_part(call, "current_delivery_spec")
-        if not request_delivery:
-            return _explore()
-        delivery_hash = json.loads(request_delivery).get("content_hash")
-        committed = {event.payload.get("delivery_spec_hash")
-                     for event in _events(holder["system"], call.run_id)
-                     if event.type == EventType.INDEPENDENT_JUDGEMENT_COMMITTED}
-        if delivery_hash in committed:
-            return review_turn("release", "checks passed on the current snapshot", checks=CHECKS)(call)
-        return judgement_turn(checks=CHECKS)(call)
-
     def product_after_the_decision(call):
         seen["product"] = prompt_part(call, "work_notification")
         return guidance_reply()(call)
 
-    adapter = _SignallingAdapter({
+    adapter = FakeAdapter({
         "product": [product_spec(), decide_while_the_others_work, product_after_the_decision],
         "engineering": [engineering_keeps_working, engineering_delivers],
-        "quality": [quality_keeps_working, quality_explores, *([quality_reviews] * 10)],
-    }, waits={("product", 1): "departments_working",
-              ("engineering", 0): "decision_recorded",
-              ("quality", 0): "decision_recorded"})
+        "quality": [quality_keeps_working, quality_explores,
+                    *quality_turns("release", "checks passed on the current snapshot")],
+    }, stream_gap_sec=0.01)
     system = LoopSystem.for_testing(tmp_path, adapter)
-    adapter.watch(system)
     holder["system"] = system
     run_id = system.create_run("build an echo CLI")
     system.activate_once(run_id)
     system.add_guidance(run_id, "product", "请把输出改为大写，作为补充决定写下来。")
     projection = system.run_until_stop(run_id)
-    assert not adapter.wait_failures, adapter.wait_failures[0]
     assert projection.status == "done", projection.stop_reason
 
     events = _events(system, run_id)

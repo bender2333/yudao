@@ -845,7 +845,7 @@ class StepRecorder:
 
     def _stream_progress(self, request: ModelRequest, capture: _AttemptCapture, observation: _Observation,
                          observed_at: str) -> list[Draft]:
-        # 流式进度：同一次调用尝试中只在阶段变化时记录一条（docs/design/model-management.md「涉及的模块」）。
+        # 流式进度：同一次调用尝试中只在阶段变化时记录一条（docs/design/browser-and-computer-use.md「安全」）。
         # 阶段之内的文字增量由输出片段通道转发，不写入事件日志
         scope = self.scope
         payload = observation.payload

@@ -39,7 +39,7 @@ class ModelLimits:
 @dataclass(frozen=True)
 class StepFrame:
     # 一次激活装配每一步所需的身份与激活时采用的版本；压缩检查点按这些版本选取。
-    # work_ref 是路由自己的工作引用，从开始一轮工作的请求原样带到这里，供装配实现取用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
+    # work_ref 是路由自己的工作引用，从开始一轮工作的请求原样带到这里，供装配实现取用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）
     department: str
     session_id: str
     activation_id: str

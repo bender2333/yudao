@@ -435,7 +435,7 @@ COMPACTION_ROOM = 2600
 
 
 def pinned_window(system: LoopSystem, run_id: str, *departments: str, room: int = COMPACTION_ROOM) -> int:
-    """窗口按这些部门里最长的固定材料推出（测试分层设计「测试的写法」：依赖说明长度的场景按场景需要
+    """窗口按这些部门里最长的固定材料推出（测试分层设计「测试的写法」中「测试不决定产品的文字」：依赖说明长度的场景按场景需要
     设置窗口与阈值，不写死数字）。
 
     压缩阈值是窗口的 85%（`compaction.response_reserve`，没有声明输出上限时）：把窗口取成

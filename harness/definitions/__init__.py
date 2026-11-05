@@ -50,7 +50,7 @@ ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]]
 # 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明「本机的做法」）
 ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
 
-# 取回工具（网络与 MCP 设计说明「工具的提供」）：部门按定义都有这两个工具；以关闭取回的启动参数
+# 取回工具（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）：部门按定义都有这两个工具；以关闭取回的启动参数
 # （`--no-fetch`）运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里
 # 不动：取舍发生在「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，
 # 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明「两边的运行条件」）
@@ -216,7 +216,7 @@ ItemSource = Literal["user_input", "onboarding"]
 ITEM_SOURCES: tuple[ItemSource, ...] = get_args(ItemSource)
 
 
-# 写入范围是内核认识的通用权限（docs/design/forms-and-verifier-role.md「核验角色」）：workspace 写这个事项的工作区；
+# 写入范围是内核认识的通用权限（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」）：workspace 写这个事项的工作区；
 # check_materials 只写检查材料的目录，写的东西不进入公开树与交付，不让被核验方的成果失效
 WriteScopeKind = Literal["workspace", "check_materials"]
 
@@ -478,7 +478,7 @@ class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（设计说明「直做」）；默认协议：模型没有单独声明协议时预填（docs/design/forms-and-verifier-role.md「四层各认识什么」）
+    # 获取模型列表与连接测试使用的认证方式（设计说明「对照」中「噪声范围来自同一版本的重复运行」）；默认协议：模型没有单独声明协议时预填（docs/design/rules-and-parameters.md「对照」中「改动分两类」）
     default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
@@ -495,7 +495,7 @@ class ServicePreset(_Definition):
 
 
 class ServicePresets(_Definition):
-    # 服务方案预置表（docs/design/forms-and-verifier-role.md「四层各认识什么」）：整张表的 revision 与来源随界面显示；每个服务方案一项
+    # 服务方案预置表（docs/design/rules-and-parameters.md「对照」中「改动分两类」）：整张表的 revision 与来源随界面显示；每个服务方案一项
     revision: str = Field(min_length=1)
     source: str = Field(min_length=1)
     presets: tuple[ServicePreset, ...]
@@ -589,7 +589,7 @@ class WorkItems(_Definition):
 
 
 class RoutingEndReason(_Definition):
-    # 路由自己的结束原因（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：属于那份路由定义版本的封闭清单，与内核的停止原因分开；
+    # 路由自己的结束原因（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）：属于那份路由定义版本的封闭清单，与内核的停止原因分开；
     # 内核的停止原因（上限、取消、升级等）对所有路由相同
     label: str = Field(min_length=1)
     outcome: Literal["done", "paused", "failed"]
@@ -650,7 +650,7 @@ class OutcomeKinds(_Definition):
 
 
 class Routing(_Definition):
-    # 一种路由实现（routings.json，工单 #825），下面一段是它自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：
+    # 一种路由实现（routings.json，工单 #825），下面一段是它自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：
     # 部门、成果种类、提议方式、路由自己的上限与结束原因。内核只核对这份定义的结构（字段、类型与非空），
     # 名称指向的内容由路由实现自己校验（routing_contract.select）；成果驱动的这一份按名称引用现有的定义文件，
     # 内容不搬动（工单 #861）。组织定义的 routing 写的名称就是这里的 id
@@ -824,7 +824,7 @@ class Definitions(_Definition):
         return self.verification.write_scopes.get(role, WORKSPACE_WRITE_SCOPE)
 
     def is_open_loop(self, outcome: str) -> bool:
-        """事项最后采纳的成果没有核验角色核验时为开环（docs/design/forms-and-verifier-role.md「定义的校验」）。
+        """事项最后采纳的成果没有核验角色核验时为开环（docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」）。
 
         outcome 是事项最后采纳的成果种类（成果驱动下是交付），按成果种类与核验声明算，判断里不写部门名。
         """
@@ -873,7 +873,7 @@ class Definitions(_Definition):
         return self.proposal_contracts.conditions.get(kind, ())
 
     def routing_definition(self) -> Routing:
-        # 组织定义写明的路由自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：加载时核对过它在 routings.json 里
+        # 组织定义写明的路由自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：加载时核对过它在 routings.json 里
         return next(item for item in self.routings.routings if item.id == self.routing)
 
     def outcomes_of(self, routing_name: str) -> tuple[str, ...]:
@@ -889,7 +889,7 @@ class Definitions(_Definition):
         return tuple(group.kinds) if group is not None else ()
 
     def stop_reason(self, reason: str) -> StopReason:
-        # 停止原因来自定义中的清单；组织定义所选的路由自己声明的结束原因同样可以写入（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
+        # 停止原因来自定义中的清单；组织定义所选的路由自己声明的结束原因同样可以写入（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）
         definition = self.stop_reasons.get(reason)
         if definition is not None:
             return definition
@@ -1153,7 +1153,7 @@ def _routing_references(organization: Organization, routings: Routings) -> list[
 
 
 def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
-    """事项的来源都有部门接（docs/design/forms-and-verifier-role.md「定义的校验」，工单 #1455）：不满足的整份拒绝，写出是哪一项。
+    """事项的来源都有部门接（docs/design/forms-and-verifier-role.md「定义的校验」中「事项的来源有部门接」，工单 #1455）：不满足的整份拒绝，写出是哪一项。
 
     旧定义没有写 sources 时，两种来源都按关注用户输入的部门解释：没有这样的部门，两种来源就没人接。
     写了 sources 时，每一种来源都要写明，接它的部门要在这份定义里；少一种、指到不存在的部门都拒绝。

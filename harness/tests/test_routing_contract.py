@@ -219,7 +219,7 @@ def test_the_routing_implementation_does_not_import_the_thin_driver_or_the_minim
 
 def test_the_item_end_judgment_comes_from_the_routing():
     # R3：事项以什么结束由路由给出；薄驱动只把它的判断写成停止，不再自己写这个判断与这句话。
-    # 原因出自路由自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，工单 #861），不在内核的停止原因清单里
+    # 原因出自路由自己的一份定义（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」，工单 #861），不在内核的停止原因清单里
     judgment = ROUTING.item_end(_running())
     assert judgment.stop_reason == "no_new_work"
     assert judgment.message == "no department has new work"
@@ -297,7 +297,7 @@ def test_a_round_that_called_a_proposal_method_has_submitted_a_formal_output():
 
 
 def test_the_routing_work_reference_is_empty_for_watched_outputs():
-    # R2：开始一轮工作的请求带路由自己的工作引用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，工单 #861）；
+    # R2：开始一轮工作的请求带路由自己的工作引用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」，工单 #861）；
     # 成果驱动不用它时为空
     assert ROUTING.work_reference(_running(), department="product") is None
     # 执行契约的请求与结果都带这一项：请求里的工作引用原样交给装配（工单 #826）

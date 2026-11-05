@@ -30,7 +30,7 @@ import yudao_report
 # 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（「指标」、「前提与未决事项」）
 TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
-# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目设计说明「用户确认的决定」）
+# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目设计说明「用户确认的决定」中「建档 run 的运行时间上限与普通事项相同」）
 ONBOARDING_TIMEOUT_SECONDS = 120 * 60
 # `--wait-prd-confirmation` 等人在浏览器的决定卡片里确认初始 PRD 的上限
 PRD_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60

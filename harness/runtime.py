@@ -63,7 +63,7 @@ def load_forms(registry: Mapping[str, tuple[Definitions, Any]], store: Any) -> d
 
 
 def configure_fetch_tools(enabled: bool) -> None:
-    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明「工具的提供」、「查询清单」）。
+    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）。
 
     由命令行在启动时调用一次：以关闭取回的启动参数（`--no-fetch`）运行时，这个服务的部门没有
     `fetch_url` 与 `read_external_source`；不带参数时三个部门都有。进程内只有一个服务实例，
@@ -190,7 +190,7 @@ class LoopSystem:
         self.upgrade_other_version_runs()
         # 启动的最后一步：自动继续未结束的 run（工单 #16）
         self.resumed_runs = self.resume_startup_runs() if resume_on_startup else {}
-        # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明「决定」）
+        # 目录文件被外部修改并发布以后补写 catalog_revised（应用层与接口层设计说明「决定」中「模型目录与凭据的写入」）
         self.facade.set_reload_listener(self.sync_catalog_revision)
 
     def upgrade_other_version_runs(self) -> tuple[list[str], list[str]]:
@@ -243,7 +243,7 @@ class LoopSystem:
         return resumed
 
     def _continue_run(self, run_id: str) -> None:
-        # 取得执行权以后运行到停止并结算：服务进程里控制核心在接口层的事件循环中运行（总体架构「十项长期决定」），
+        # 取得执行权以后运行到停止并结算：服务进程里控制核心在接口层的事件循环中运行（总体架构「十项长期决定」中「异步执行」），
         # 这次运行是那个循环里的任务（与事项开始、回答决定以后继续同一条路径）；
         # 打开数据目录时还没有事件循环（测试、演示、命令行）时由 asyncio.run 运行到停止
         try:

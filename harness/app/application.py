@@ -194,7 +194,7 @@ class Application:
         if listen is not None:
             fetch.configure_service_address(*listen)
         system = LoopSystem(data_dir, provider_config_path=provider_config, dotenv_path=dotenv)
-        # 启动时目录修订号与最后一条 catalog_revised 不同则补写（docs/design/app-and-interface.md「决定」）
+        # 启动时目录修订号与最后一条 catalog_revised 不同则补写（docs/design/app-and-interface.md「决定」中「模型目录与凭据的写入」）
         system.sync_catalog_revision(operation="startup")
         system.start_provider_watching()
         return cls(system)

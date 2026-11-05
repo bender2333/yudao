@@ -306,7 +306,7 @@ def value_for_project(store: Any, project_id: str | None, name: str) -> Any:
 
 
 def effective_parameter_version(store: Any, project_id: str | None) -> str:
-    # 项目参数命令的基准版本（工单 #1262，docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」）：项目级修改以该项目有效参数的版本为基准。
+    # 项目参数命令的基准版本（工单 #1262，docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」中「参数的当前值写成事件，带修改者、原值、新值与理由」）：项目级修改以该项目有效参数的版本为基准。
     # 基准版本按内容摘要核对，与参数写路径核对的是同一份数据：全局现值上先应用这个项目的覆盖。
     # project_id 为空时就是全局参数版本
     values = current_values(store)

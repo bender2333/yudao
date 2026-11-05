@@ -54,7 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-config", default=None)
     # 服务就绪以后打开页面的浏览器（docs/design/web-interface-and-release.md「启动与停止」）：默认打开，带 --no-browser 时不打开
     parser.add_argument("--no-browser", action="store_true", default=False)
-    # 关闭取回（网络与 MCP 设计说明「工具的提供」）：以它运行时这个服务的部门没有 fetch_url 与
+    # 关闭取回（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）：以它运行时这个服务的部门没有 fetch_url 与
     # read_external_source；评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明「两边的运行条件」）
     parser.add_argument("--no-fetch", action="store_true", default=False)
     sub = parser.add_subparsers(dest="command")

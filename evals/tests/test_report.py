@@ -45,7 +45,7 @@ def _report_text(tmp_path, runs, name="report.md"):
 
 
 def test_summary_holds_the_scorer_completion_and_correctness():
-    """汇总里有评分器给出的完成度与正确性（docs/design/evaluation-scenarios.md「指标」）。"""
+    """汇总里有评分器给出的完成度与正确性（docs/design/test-pyramid.md「测试往下层移」中「检查单个部门一步的结论」）。"""
     runs = [_run("run-1", completion=0.5, correctness=0.4),
             _run("run-2", completion=0.75, correctness=0.5)]
     summary = report.aggregate(runs)
@@ -65,7 +65,7 @@ def test_noise_range_is_the_extremes_of_the_runs():
 
 
 def test_a_single_run_has_no_noise_range(tmp_path):
-    """只有一次运行时噪声范围写「未知」，不写零（docs/design/evaluation-scenarios.md「指标」）。"""
+    """只有一次运行时噪声范围写「未知」，不写零（docs/design/test-pyramid.md「测试往下层移」中「检查单个部门一步的结论」）。"""
     summary = report.aggregate([_run("run-1")])
     assert summary["completion"]["spread"] is None
 

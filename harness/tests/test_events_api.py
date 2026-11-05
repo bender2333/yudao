@@ -340,7 +340,7 @@ def test_two_live_connections_each_receive_the_full_fragments(data_dir):
     assert "".join(data["text"] for data in second_deltas) == "第一段第二段第三段"
 
 def test_keepalive_comment_is_sent_when_the_stream_is_idle(data_dir):
-    # 空闲超过保活间隔时连接收到一条 SSE 注释（docs/design/app-and-interface.md「补齐与实时」）；注释没有 id，不改变续传位置
+    # 空闲超过保活间隔时连接收到一条 SSE 注释（docs/design/app-and-interface.md「补齐与实时」中「每 15 秒发送一次 SSE 注释作为保活」）；注释没有 id，不改变续传位置
     opened = _Opened(data_dir)
     with running_api(opened, keepalive_sec=0.2) as client:
         project_id = _create_project(client)

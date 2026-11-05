@@ -56,7 +56,7 @@ class Form:
 
 class EventType(SkeletonEventType):
     # run 流的事件种类：骨架事件的种类由内核事件模块给出（SkeletonEventType），这里接着声明应用事件的部分。
-    # 应用事件由应用登记（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，S5a 工单 #828），骨架事件不在这里重复写一遍
+    # 应用事件由应用登记（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」，S5a 工单 #828），骨架事件不在这里重复写一遍
     USER_INPUT_RECEIVED = "user_input_received"
     PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
     DEPARTMENT_GUIDANCE_RECEIVED = "department_guidance_received"
@@ -559,7 +559,7 @@ class RunProjection:
     stream_version: int = 0
     # 创建这个 run 时记录的 run 事件版本（ADR-0019）；旧 run 没有这个字段时为 0，与当前版本不同
     run_event_version: int = 0
-    # 创建这个 run 时记录的定义版本（总体架构「十项长期决定」）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
+    # 创建这个 run 时记录的定义版本（总体架构「十项长期决定」中「带版本的定义」）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
     definitions_version: str = ""
     # 创建这个 run 时冻结的参数版本（工单 #349）：运行中不跟随参数修改
     parameters_version: str = ""

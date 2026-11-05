@@ -1751,7 +1751,7 @@ class BaselineAdoptedPayload(Payload):
     previous_adoption_id: str | None = None
 
 
-# 模型目录与凭据（应用层与接口层设计说明「决定」）：只含修订号、变化与结果，不含 Key
+# 模型目录与凭据（应用层与接口层设计说明「决定」中「模型目录与凭据的写入」）：只含修订号、变化与结果，不含 Key
 
 class CatalogRevisedPayload(Payload):
     # 目录内容（连接、访问定义、部门默认）或文件被外部修改与重读以后的修订号；
@@ -2047,7 +2047,7 @@ def is_known_event_type(event_type: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# 应用登记自己的事件种类（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，S5a 工单 #828）：内核只认识骨架事件，
+# 应用登记自己的事件种类（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」，S5a 工单 #828）：内核只认识骨架事件，
 # 其余的 run 流事件是应用事件，种类由应用在这份载荷声明里给出，并登记到内核的登记表。
 # 增加一种应用事件只改这里与它的载荷类型，不改内核文件；骨架事件的种类由内核给出，不在这里登记。
 

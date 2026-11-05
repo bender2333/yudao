@@ -45,7 +45,7 @@ OUTPUT_DIR = "outputs"
 # 本机进程是控制主机：系统按 Python 的 sys.platform 取值。其他系统没有启动命令的约定
 _PLATFORM_SYSTEMS = {"win32": "windows", "linux": "linux"}
 
-# 就绪时限的默认值与界限取自规则登记（docs/design/browser-and-computer-use.md「启动方式」）
+# 就绪时限的默认值与界限取自规则登记（设计说明「参数怎样成为带版本的数据」中「创建 run 时按事项冻结的定义校验当前参数值，并把本 run 使用的参数取值与参数版本写进运行开始事件；该 run 进行期间不变」）
 READINESS_TIMEOUT_SEC = int(DEFINITIONS.rule_value("execution.readiness_timeout_sec"))
 
 # 试用需要的程序与版本（docs/design/browser-and-computer-use.md「执行位置上的程序」）

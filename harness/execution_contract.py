@@ -91,7 +91,7 @@ class StepLimits:
 class RoundRequest:
     # 开始一轮工作的请求（docs/design/skeleton-and-application.md「执行契约」输入）：部门、会话在 scope 里，prompt 是这一轮采用的提示，
     # limits 是这一轮的上限，work_ref 是路由自己的工作引用（例如任务池的任务）。
-    # work_ref 原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」），骨架不解释它。
+    # work_ref 原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」），骨架不解释它。
     # department_settings 是按部门取模型与提示词的来源（第三版，工单 #1511）：它们属于路由与定义，
     # 从安全节点移出，随开始一轮工作一起交进来；执行实现要用的时候问它，不再问薄驱动。
     # 交来的是实现自己的类型，契约原样转交，不解释它的返回值
@@ -153,7 +153,7 @@ class PreviousSafeNode(SafeNode, DepartmentSettings, Protocol):
 @dataclass(frozen=True)
 class RoundResult:
     # 一轮工作的结果（docs/design/skeleton-and-application.md「执行契约」输出）：这一轮写下的事件范围与停止原因。这一轮算不算正常结束、
-    # 结束成什么，由路由按事件判断（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」；routing_contract.RoundEnd），契约里没有结果种类。
+    # 结束成什么，由路由按事件判断（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一轮工作怎么结束由路由按事件判断，执行契约不写死结果的种类」；routing_contract.RoundEnd），契约里没有结果种类。
     # stop_reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由薄驱动按当时的运行状态
     # 收尾；否则是停止原因的编号与说明，由薄驱动暂停或结束运行。version 是作出停止判断时 run 流的版本。
     # target 是这次失败对应的调用目标公开部分（不含密钥）；facts 是停止原因要带给决定请求的事实引用

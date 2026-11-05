@@ -718,7 +718,7 @@ def test_result_records_the_yudao_commit_and_the_host_environment():
 
 
 def test_start_service_turns_fetch_off(monkeypatch, tmp_path):
-    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP 设计说明「工具的提供」、「两边的运行条件」、
+    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」、
     评测场景设计说明「两边的运行条件」中「两边都不联网」）：启动命令里有 --no-fetch 与 --no-browser。"""
     seen = {}
 
@@ -1449,7 +1449,7 @@ def test_no_delivery_scores_both_as_not_done(runs_root, tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 质检带来的提高（design docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）
+# 质检带来的提高（design docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）
 
 def _delivery_scores(passed, total=5, completion=0.5, correctness=1.0):
     checks = [{"id": "check_%d" % index,
