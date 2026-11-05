@@ -68,11 +68,12 @@
     const w = Y19.W();
     const info = O.itemOrg(p, opts.form || '');
     if (info.rejects.length) return { ok: false, rejects: info.rejects };
-    const recv = O.firstReceivers(info.c)[0];
+    const recv = opts.source ? O.sourceReceiver(info.c, opts.source) : O.firstReceivers(info.c)[0];
+    if (!recv) return { ok: false, rejects: ['该事项来源没有接收方'] };
     const n = (w.doorNext[p.id] = (w.doorNext[p.id] || 1));
     w.doorNext[p.id] += 1;
     const it = { id: 'w' + p.id.replace(/\W/g, '') + n, door: (p.letter || 'N') + '-' + n, title: opts.title, color: n % 6, dept: recv.id, status: 'working', round: 1, round_limit: 8, used: 0, limit: 14400,
-      reason: opts.reason || (recv.name + '接到你的输入，正在开始第 1 轮'), created: nowIso(), org: info.org, text: opts.text };
+      reason: opts.reason || (recv.name + '接到输入，正在开始第 1 轮'), created: nowIso(), org: info.org, text: opts.text, source: opts.source || 'input' };
     p.items.unshift(it);
     const inId = 'o-' + it.id + '-in';
     const o = { id: inId, project: p.id, item: it.id, kind: 'input', text: opts.text, from: 'user', to: recv.id, at: nowIso() };
@@ -103,9 +104,10 @@
       slots: { used: 0, limit: 3, waiting: 0 }, provider_wait: [], hand: {}, outcomes: [], candidates: [],
       settings: o.from ? clone(o.from.settings) : { dept: {}, roles: {}, nodes: {} },
       org: { form: o.form, changes: clone(o.changes), keys: {}, history: [{ at: nowIso(), by: '你', fromVersion: '', toVersion: O.version(c0), form: o.form, changes: clone(o.changes),
-        reason: (o.from ? '建项目时和「' + o.from.name + '」一样' : o.kind === 'form' ? '建项目时选用发布带的「' + c0.formName + '」' : '建项目时选用默认的三部门') + (o.layers.length ? '，加上' + o.layers.join('、') : ''),
+        reason: (o.from ? '建项目时和「' + o.from.name + '」一样' : o.kind === 'form' ? (o.form.endsWith('_preview') ? '建项目时选用设计预览「' : '建项目时选用发布带的「') + c0.formName + '」' : '建项目时选用默认的三部门') + (o.layers.length ? '，加上' + o.layers.join('、') : ''),
         diff: ['建项目，选用「' + c0.formName + '」'].concat(o.layers.map((t) => '加上「' + t + '」')).concat(o.from ? ['复制了「' + o.from.name + '」的 ' + O.count(o.changes) + ' 处改动、项目部门设置与项目角色设置；机器授权、执行位置、源目录、MCP 服务器没有复制'] : []) }] } };
     X.ensure(p);
+    if (Y19.designPreview) Y19.designPreview.init(p);
     O.refresh(p);
     w.projects.push(p);
     w.doorNext[id] = 1;
