@@ -43,6 +43,15 @@ def test_the_evaluation_run_limit_starts_at_120_minutes_and_has_no_consumer():
     assert not_wired_reason("evaluation.run_minutes")
 
 
+def test_readiness_timeout_matches_the_design_range():
+    # R2：规则登记的就绪时限与设计说明「启动方式」的参数表一致：初值 300、范围 10 至 1800；
+    # origin 指向小节，不写行号（设计说明与登记的关系）
+    rule = DEFINITIONS.rule("execution.readiness_timeout_sec")
+    assert rule.value == 300 and list(rule.bounds) == [10, 1800]
+    assert "浏览器与 computer use 设计说明" in rule.origin and "启动方式" in rule.origin
+    assert "第" not in rule.origin and "行" not in rule.origin
+
+
 def test_model_test_request_timeout_matches_the_design():
     # R2：模型测试的等待上限属于规则登记合同；参数事件尚未接入，接入说明如实声明初值消费者。
     rule = DEFINITIONS.rule("provider.model_test_timeout_sec")

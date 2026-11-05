@@ -465,3 +465,5 @@ claude-opus-5-5（子架构师） / 2026-11-04 19:48 / `docs/decision.md` 记阶
 
 claude-opus-5-5（子架构师） / 2026-11-04 19:52 / `docs/design/forms-and-verifier-role.md` 第 3、4.7 节与 `docs/design/skeleton-and-application.md` 第 5.1、5.4 节：开环完成统一按事项最后采纳的成果判断，这一项写在路由的定义里，结束原因由路由按创建事件里的标记给出 / #1394 交回，两处说法不一致，属一致性修正
 claude-sonnet-5-5 / 2026-11-05 10:30 / `agents/ticket-spec.md` 清理单：不放进里程碑 → 放进当前阶段的里程碑，加「清理单先做」（别的工单的「只改」与它落在同一份文件时以清理单为前置，汇总文件不算）；「不靠排队错开」后补清理单例外；`skills/to-parents`、`skills/ticket` 同步 / 清理单的描述位置会被后做的工单改掉，且没有里程碑时 solo 按里程碑取范围不会取到它们
+
+solo-deepseek-v4.1-flash / 2026-11-06 01:38 / `docs/design/browser-and-computer-use.md` 第 3.3 节「启动方式」的参数表：`ready_timeout_sec` 的范围回到 10 至 1800（与规则登记 `execution.readiness_timeout_sec` 相同），删去「取值与界限取自规则登记」的括注 / 工单 #1251：这一行在 #147（48ee22b6）里被按规则登记改成 10 至 3600，与《rules-and-parameters》「设计说明是来源、登记照着实现」相反；就绪时限的登记与设计说明一起回到设计说明原来的范围

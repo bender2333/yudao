@@ -139,7 +139,7 @@ flowchart LR
 | `kind` | `web`（网页应用）或 `desktop`（桌面程序） |
 | `commands` | 按执行位置的系统给出的 argv 列表，键是 `windows` 或 `linux`，至少一项，例如 `{"linux": ["sh", "-c", "npm ci && npm run build && npm start"], "windows": ["cmd", "/c", "npm ci && npm run build && npm start"]}` |
 | `ready_url` | 只用于网页应用：执行位置本机（`127.0.0.1` 或 `localhost`）上带 `{port}` 的一个 `http` 地址，例如 `http://127.0.0.1:{port}/`；执行代码把 `{port}` 替换成这个会话的端口以后使用 |
-| `ready_timeout_sec` | 可选，默认 300、范围 10 至 3600（取值与界限取自规则登记里的 `execution.readiness_timeout_sec`） |
+| `ready_timeout_sec` | 可选，默认 300，范围 10 至 1800 |
 
 就绪条件：网页应用是对替换端口以后的 `ready_url` 的请求得到任何 HTTP 响应，会话随后在浏览器中打开这个地址；桌面程序是启动的进程树中出现第一个可见的顶层窗口，执行代码把它放在主显示器上（第 5.2 节）。
 
