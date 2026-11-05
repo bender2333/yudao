@@ -265,9 +265,16 @@ def _run_created_event(payload: dict[str, Any]) -> Any:
     return SimpleNamespace(type=EventType.RUN_CREATED, payload=payload)
 
 
-def test_a_direct_definition_that_verifies_the_completion_is_rejected_at_load():
-    # 这一版还没有「交完成以后等核验结论」的路（#1396）：定义了核验角色核验交完成的，加载时整份拒绝，
-    # 不把没有人核验的完成记成放行
+class _NoEvents:
+    # 接形态时要交的事件库：登记处这一条用例只接上路由，不读事件（直做声明了 use_facts，工单 #1396）
+    def list_events(self, run_id: str) -> list[Any]:
+        return []
+
+
+def test_a_direct_definition_whose_verifier_cannot_conclude_is_rejected_at_load():
+    # #1396 起直做可以带核验角色（交完成以后等它的结论），所以 #1395 的「核验交完成的那一份就整份拒绝」
+    # 这条临时限制换成了两条：核验的双方都要交得出自己的那一样。这一份的核验角色交不了核验结论
+    # （completion_review），事项交完成以后等不到放行——加载时整份拒绝，原因写明是哪一项
     verified = SINGLE_ROLE_DIRECT_DEFINITIONS.model_copy(update={
         "organization": SINGLE_ROLE_DIRECT_DEFINITIONS.organization.model_copy(update={
             "verification": VerificationDeclaration(verifiers=(
@@ -278,9 +285,9 @@ def test_a_direct_definition_that_verifies_the_completion_is_rejected_at_load():
     try:
         check_definition(verified)
     except routing_contract.InvalidRoutingDefinition as rejected:
-        assert any("final_outcome" in issue for issue in rejected.issues)
+        assert any("verification" in issue for issue in rejected.issues)
     else:  # pragma: no cover - 走不到时让用例失败
-        raise AssertionError("a direct definition that verifies the completion must be rejected")
+        raise AssertionError("a direct definition whose verifier cannot conclude must be rejected")
 
 
 def test_a_direct_definition_without_a_role_that_can_hand_in_completion_is_rejected():
@@ -300,9 +307,10 @@ def test_a_direct_definition_without_a_role_that_can_hand_in_completion_is_rejec
 
 
 def test_both_forms_are_registered_and_the_release_keeps_the_default():
-    # 登记处（工单 #1392 的形态机制）：发布带两份形态，默认仍是三部门；新的一份按它的组织定义接上直做
+    # 登记处（工单 #1392 的形态机制）：发布带两份形态，默认仍是三部门；新的一份按它的组织定义接上直做。
+    # 直做声明了 use_facts（工单 #1396 读交完成与核验结论），所以接上时要有事件库，这里给一个没有事件的
     assert set(FORM_REGISTRY) == {DEFAULT_FORM, SINGLE_ROLE_DIRECT}
-    forms = __import__("harness.runtime", fromlist=["load_forms"]).load_forms(FORM_REGISTRY, store=None)
+    forms = __import__("harness.runtime", fromlist=["load_forms"]).load_forms(FORM_REGISTRY, store=_NoEvents())
     assert forms[DEFAULT_FORM].definitions.routing == "watched_outputs"
     direct_form = forms[SINGLE_ROLE_DIRECT]
     assert direct_form.definitions.routing == ROUTING_NAME
