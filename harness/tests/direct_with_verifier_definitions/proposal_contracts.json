@@ -1,0 +1,54 @@
+{
+  "roles": {
+    "engineering": {
+      "submit_tools": [
+        "submit_completion"
+      ],
+      "kinds": {
+        "completion": {
+          "description": "这件事的完成说明：做了什么、怎么验的、还有哪些拿不准的地方。交了完成以后事项不结束：等核验角色对当前这一版下结论，放行才结束，打回则再做一轮",
+          "required": [
+            "kind=completion",
+            "summary"
+          ],
+          "optional": [
+            "uncertain",
+            "known_risks"
+          ],
+          "uncertain": "拿不准、没有把握的地方，逐条写；用户可以据此接着做",
+          "known_risks": "已知的风险，可选"
+        }
+      },
+      "notes": [
+        "交了完成以后等核验角色的结论：打回则再做一轮，交出新的一版；新的一版让旧结论失效。",
+        "拿不准的地方列进 uncertain，不要为了小问题停下来问；检查一律以主机执行的 run_check 为准。"
+      ]
+    },
+    "quality": {
+      "submit_tools": [
+        "submit_completion_review"
+      ],
+      "kinds": {
+        "completion_review": {
+          "description": "对工程交完成的当前这一版的结论：release 放行、rework 打回。结论由主机绑定到提交时当前的那一版；工程交了新的一版，这一条结论不再作数",
+          "required": [
+            "kind=completion_review",
+            "verdict",
+            "rationale"
+          ],
+          "optional": []
+        }
+      },
+      "notes": [
+        "先看事实再看工程写的说明；你的写入只进检查材料，不改工程的成果。",
+        "结论只对当前这一版有效：工程交了新的一版，就要对新的那一版重新下结论。"
+      ]
+    }
+  },
+  "shared": {
+    "submit_tools": [],
+    "kinds": {},
+    "notes": []
+  },
+  "conditions": {}
+}

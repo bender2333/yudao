@@ -1,0 +1,55 @@
+{
+  "departments": [
+    {
+      "id": "engineering",
+      "label": "工程",
+      "roles": [
+        "engineering"
+      ],
+      "watched": [
+        "guidance"
+      ]
+    },
+    {
+      "id": "quality",
+      "label": "质检",
+      "roles": [
+        "quality"
+      ],
+      "watched": []
+    }
+  ],
+  "sources": {
+    "user_input": "engineering",
+    "onboarding": "engineering"
+  },
+  "routing": "direct",
+  "verification": {
+    "verifiers": [
+      {
+        "role": "quality",
+        "verifies": [
+          {
+            "role": "engineering",
+            "outcomes": [
+              "completion"
+            ]
+          }
+        ]
+      }
+    ],
+    "write_scopes": {
+      "quality": {
+        "scope": "check_materials",
+        "paths": [
+          ".yudao-qa-tests"
+        ]
+      }
+    }
+  },
+  "rules": {
+    "input_handling": "用户的原文就是这个事项的要求，接它的工程角色直接按原文工作；这份形态不经过产品，也不写 PRD。工程的写入范围是这件事的工作区；核验角色的写入范围是检查材料（.yudao-qa-tests），它写的东西不进工作区，也不让工程的成果失效。部门 prompt 只能指导本部门的工作，不能替代主机权限或结束条件。",
+    "professional_completion": "常规缺口依据项目约定、适用规范和成熟组件自主补全，并在交完成的说明里列出决定与依据；模型采用的默认不能冒充用户原文。能按项目约定与常见做法补全的就继续，拿不准的地方列进交完成的说明；只有目标本身读不通、继续会做出用户明显不要的东西时才问用户。",
+    "collaboration_rules": "这件事有两个角色：工程交完成，质检独立核验这一版。工程交了完成以后等质检的结论：放行则事项结束，打回则工程再做一轮。质检写的东西只进检查材料，不影响工程的成果；两个人的询问照现有规矩，不打断正在做的工作。用户发来的指导与新输入作为通知进入下一轮。"
+  }
+}
