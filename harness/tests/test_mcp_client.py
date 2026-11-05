@@ -4,6 +4,7 @@
 # 按测试分层设计说明第 2 节登记为集成层。
 import asyncio
 import contextlib
+from datetime import datetime, timedelta, timezone
 import json
 import os
 import shutil
@@ -23,6 +24,8 @@ SERVERS = Path(__file__).resolve().parent / "mcp_servers"
 STDIO_SERVER = SERVERS / "stdio_server.py"
 HTTP_SERVER = SERVERS / "http_server.py"
 SECRET = "mcp-secret-value"
+# 上海全年是 UTC+8，不用时区库（依赖里没有 tzdata，Windows 上 ZoneInfo 取不到 Asia/Shanghai）
+SHANGHAI = timezone(timedelta(hours=8), "Asia/Shanghai")
 
 # 只说 JSON-RPC 的服务器：握手正常，工具调用一律用协议错误回答（验收第 2 条「协议错误」）
 PROTOCOL_ERROR_SERVER = """
@@ -297,8 +300,12 @@ def test_the_official_mcp_server_time_starts_through_uvx(tmp_path):
             pytest.skip(f"取不到官方 mcp-server-time（uvx 启动失败）：{failure}")
         try:
             assert "get_current_time" in {tool.name for tool in await client.list_tools()}
+            started = datetime.now(SHANGHAI)
             result = await client.call_tool("get_current_time", {"timezone": "Asia/Shanghai"})
-            assert "2026-" in result.text or "2027-" in result.text
+            finished = datetime.now(SHANGHAI)
+            # 服务器在两次读数之间给出时间；跨年的几个小时里，前一年与后一年都算对
+            years = {started.year, finished.year}
+            assert any(f"{year}-" in result.text for year in years), f"返回文字里没有 {sorted(years)} 年的日期：{result.text}"
             return result.text
         finally:
             await client.close()
