@@ -17,6 +17,7 @@ from .event_store import Command, EventStore, catalog_stream, project_stream, ru
 from .kernel_events import canonical_hash
 from .materials import save_text_material
 from .models import (
+    OPEN_LOOP_STOP_REASON,
     ArtifactRef,
     DEPARTMENTS,
     Event,
@@ -57,6 +58,17 @@ REWORK_VERDICTS = frozenset({"rework_engineering"})
 # 用户自己让事项停下的两种停止原因：结束事件里写的是这次决定（"run cancelled"，
 # "run cancelled by user command"），不是让事项自己停下的错误，因此不带停止说明（工单 #1162）
 USER_STOP_REASONS = frozenset({"cancelled", "user_cancelled"})
+# 建档 run 的正常结束（工单 #136、#1510，形态与核验角色设计说明「开环完成」第 6 条）：有核验角色的形态以
+# 基线核验结束，这一轮带着基线核验；没有核验角色的形态没有基线核验这一步，以开环完成结束。
+# 两种都照常提出初始 PRD 候选，后一种在候选与确认请求里写明这份基线没有经过基线核验
+BASELINE_VERIFIED_REASON = "baseline_verified"
+
+
+def _empty_baseline_review() -> dict[str, Any]:
+    # 没有基线核验的那一种建档（工单 #1510）在候选与确认请求里写的空记录：项目流只增加字段、不改变已有字段的
+    # 类型（ADR-0019，工单 #126），所以没有这一份产物时字段照旧在，内容为空，另由 baseline_verified 记下这一点
+    return {"event_id": "", "content_hash": "", "conclusions": [], "omissions": [], "checks": [],
+            "other_failures": []}
 
 
 class ProjectNotFoundError(KeyError):
@@ -1411,8 +1423,8 @@ class ProjectService:
         if item is None or item.work_item_id != run.work_item_id:
             return None
         if run.kind == "onboarding":
-            # 建档 run 以 baseline_verified 结束：提出初始 PRD 候选并请求用户确认（工单 #136，设计第 3.2、3.3 节）。
-            # 建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
+            # 建档 run 以基线核验或开环完成结束：提出初始 PRD 候选并请求用户确认（工单 #136、#1510，
+            # 设计第 3.2、3.3 节）。建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
             return self._propose_initial_prd(transaction, run, item)
         if not run.delivery_specs:
             return None
@@ -1479,13 +1491,20 @@ class ProjectService:
     def _propose_initial_prd(self, transaction: Transaction, run: RunProjection,
                              item: WorkItem) -> ProjectEvent | None:
         # 提出初始 PRD 候选并请求用户确认：候选与决定请求在一个事务中写入（工单 #136，设计第 4.7 节）。
-        # 幂等：这个 run 已经提出过候选时不再写入，也不会重复发出决定请求
+        # 幂等：这个 run 已经提出过候选时不再写入，也不会重复发出决定请求。
+        # 建档可以用没有核验角色的形态（工单 #1510，形态与核验角色设计说明「开环完成」第 6 条）：那种形态没有
+        # 基线核验这一步，run 以开环完成结束；候选照常提出，只是没有基线核验这一份产物，确认请求写明这一点
         project = transaction.projection
         if any(entry.run_id == run.run_id for entry in project.initial_prd_candidates):
             return None
-        if run.product_spec is None or run.structure is None or run.baseline_review is None:
+        if run.product_spec is None or run.structure is None or run.overview_ref is None:
             return None
-        if run.stop_reason != "baseline_verified" or run.overview_ref is None:
+        # 这一轮有没有经过基线核验：有核验角色的形态以基线核验结束，没有的以开环完成结束且没有这一份产物。
+        # 两种结束原因都照常提出候选；以基线核验结束而没有这一份产物时不提（那份记录不完整）
+        if run.stop_reason not in (BASELINE_VERIFIED_REASON, OPEN_LOOP_STOP_REASON):
+            return None
+        verified = run.baseline_review is not None
+        if not verified and run.stop_reason == BASELINE_VERIFIED_REASON:
             return None
         if run.effective_contract is None or run.effective_contract.prd_ref is None:
             return None
@@ -1493,11 +1512,13 @@ class ProjectService:
         if snapshot is None:
             return None
         structure_event = self._accepted_event(run.run_id, EventType.STRUCTURE_ACCEPTED)
-        review_event = self._accepted_event(run.run_id, EventType.BASELINE_REVIEW_ACCEPTED)
         structure = run.structure if structure_event is None else {
             **run.structure, "event_id": structure_event.event_id}
-        review = run.baseline_review if review_event is None else {
-            **run.baseline_review, "event_id": review_event.event_id}
+        review = None
+        if verified:
+            review_event = self._accepted_event(run.run_id, EventType.BASELINE_REVIEW_ACCEPTED)
+            review = run.baseline_review if review_event is None else {
+                **run.baseline_review, "event_id": review_event.event_id}
         round_number = run.round
         spec = run.product_spec
         errors = _requirement_mapping_errors(spec)
@@ -1519,13 +1540,16 @@ class ProjectService:
             "structure": {"event_id": structure["event_id"], "content_hash": structure["content_hash"],
                           "structure_ref": structure["structure_ref"],
                           "code_tree_digest": structure["code_tree_digest"]},
-            "baseline_review": {"event_id": review["event_id"], "content_hash": review["content_hash"],
-                                "conclusions": list(review["conclusions"]), "omissions": list(review["omissions"]),
-                                "checks": _baseline_checks(
-                                    review["checks"],
-                                    _check_commands(self.store.list_events(run.run_id),
-                                                    _review_department(review_event, review))),
-                                "other_failures": list(review["other_failures"])},
+            "baseline_review": _empty_baseline_review() if review is None else {
+                "event_id": review["event_id"], "content_hash": review["content_hash"],
+                "conclusions": list(review["conclusions"]), "omissions": list(review["omissions"]),
+                "checks": _baseline_checks(
+                    review["checks"],
+                    _check_commands(self.store.list_events(run.run_id),
+                                    _review_department(review_event, review))),
+                "other_failures": list(review["other_failures"])},
+            # 这一轮的基线有没有经过基线核验（工单 #1510）：字段只增，旧候选没有这一项时按「经过了」读
+            "baseline_verified": verified,
             "overview_ref": run.overview_ref, "snapshot": snapshot,
         }
         if run.onboarding_basis is not None and run.onboarding_basis.get("note_ref") is not None:
@@ -1536,12 +1560,16 @@ class ProjectService:
             "kind": INITIAL_PRD.name, "blocks": INITIAL_PRD.blocks,
             "options": [{"id": option.id, "label": option.label, "note_required": option.note_required}
                         for option in INITIAL_PRD.options],
-            "description": f"确认第 {round_number} 轮建档的初始 PRD", "facts": [],
+            # 确认请求写明这一轮有没有经过基线核验（工单 #1510）：没有核验角色的形态没有这一步，用户要知道
+            "description": (f"确认第 {round_number} 轮建档的初始 PRD" if verified else
+                            f"确认第 {round_number} 轮建档的初始 PRD（没有经过基线核验）"),
+            "facts": [],
             # 请求写交初始 PRD 的那个部门（工单 #1410）：按提案合同，作者是写下这份 PRD 的部门，不写部门名
             "department": spec.issuer,
             "work_item_id": item.work_item_id, "candidate_run_id": run.run_id, "round": round_number,
             "prd": candidate["prd"], "structure": candidate["structure"],
-            "baseline_review": candidate["baseline_review"], "overview_ref": run.overview_ref,
+            "baseline_review": candidate["baseline_review"], "baseline_verified": verified,
+            "overview_ref": run.overview_ref,
             "snapshot": snapshot, "revision_note_ref": candidate.get("revision_note_ref"),
         }, actor="system"))
         return proposed
