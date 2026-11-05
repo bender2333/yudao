@@ -56,7 +56,7 @@ class Form:
 
 class EventType(SkeletonEventType):
     # run 流的事件种类：骨架事件的种类由内核事件模块给出（SkeletonEventType），这里接着声明应用事件的部分。
-    # 应用事件由应用登记（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」，S5a 工单 #828），骨架事件不在这里重复写一遍
+    # 应用事件由应用登记（设计说明第 5.4 节第 1 条，S5a 工单 #828），骨架事件不在这里重复写一遍
     USER_INPUT_RECEIVED = "user_input_received"
     PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
     DEPARTMENT_GUIDANCE_RECEIVED = "department_guidance_received"
@@ -77,23 +77,23 @@ class EventType(SkeletonEventType):
     ACTION_VERIFIED = "action_verified"
     ASK_STARTED = "ask_started"
     ASK_ANSWERED = "ask_answered"
-    # 独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：核验角色在只看事实的上下文里对当前交付
+    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：核验角色在只看事实的上下文里对当前交付
     # 的每条验收条件写出判断，经写入口提交成事实；之后工程的解释才并入它的请求，质检结论必须引用它。
     # 应用事件：装配看它存在、放行的门引用它，内核不解释内容
     INDEPENDENT_JUDGEMENT_COMMITTED = "independent_judgement_committed"
     QA_TESTS_SAVED = "qa_tests_saved"
     LESSON_CANDIDATE_RECORDED = "lesson_candidate_recorded"
-    # MCP 服务器的生命周期（网络与 MCP 设计说明「运行规则」，工单 #1176）：一台服务器的一次会话启动、关闭与
+    # MCP 服务器的生命周期（网络与 MCP 设计说明第 7.2 节，工单 #1176）：一台服务器的一次会话启动、关闭与
     # 启动失败各记一条。应用事件：内核不认识它们，重放时跳过；进程标识与创建时间是遗留进程的核对依据
     MCP_SERVER_STARTED = "mcp_server_started"
     MCP_SERVER_CLOSED = "mcp_server_closed"
     MCP_SERVER_FAILED = "mcp_server_failed"
-    # 试用会话的开始与结束（浏览器与 computer use 设计说明「事件、决定请求与查询」，工单 #1183）：应用事件，run 流。
+    # 试用会话的开始与结束（浏览器与 computer use 设计说明第 12 节，工单 #1183）：应用事件，run 流。
     # 开始事件带选用命令的系统与进程号、创建时间；结束事件带结束方式（停止、被新会话替换、中断、
     # 用户停止、run 结束）。Yudao 启动时按开始事件里的进程号与创建时间结束遗留的进程树
     TRIAL_SESSION_STARTED = "trial_session_started"
     TRIAL_SESSION_ENDED = "trial_session_ended"
-    # 试用用例的开始与结束（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：应用事件，run 流。
+    # 试用用例的开始与结束（浏览器与 computer use 设计说明第 8.2 节，工单 #1180）：应用事件，run 流。
     # 开始事件带用例身份、会话身份、ProductSpec 摘要、试用副本的树摘要、引用的验收条件与计划；
     # 结束事件带结论（passed、failed、unverified，会话结束时由主机记为 interrupted）、观察到的结果、
     # 作为证据的步骤的动作身份与 unverified 的理由
@@ -116,7 +116,7 @@ def hash_bytes(data: bytes) -> str:
 
 
 def estimate_tokens(text: str) -> int:
-    # 本地估算按 UTF-8 字节数除以 4（模型管理设计说明「用量」）：中文一个字至少三个字节，
+    # 本地估算按 UTF-8 字节数除以 4（模型管理设计说明第 8.2 节）：中文一个字至少三个字节，
     # 按字符数除以 4 会把以中文为主的材料估成实际用量的一半以下。
     if not text:
         return 0
@@ -163,7 +163,7 @@ class DepartmentGuidance:
     text: str
     guidance_ref: ArtifactRef
     created_event_id: str
-    # 三种状态（部门指导设计说明「处理结果与来源」，工单 #1039）：received 已接收、in_input 已进入模型输入、
+    # 三种状态（部门指导设计说明第 3 节，工单 #1039）：received 已接收、in_input 已进入模型输入、
     # answered 已回答。已回答由主机在收到它的那一轮工作正常结束时写入，部门不提交（工单 #1038、#1039）
     status: str
     applied_activation_id: str | None = None
@@ -254,7 +254,7 @@ class DeliverySpec:
     known_risks: list[str]
     code_tree_digest: str
     tree_ref: ArtifactRef
-    # 交付说明的启动方式（浏览器与 computer use 设计说明「启动方式」，工单 #148）：旧交付没有这一项
+    # 交付说明的启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #148）：旧交付没有这一项
     launch: list[dict[str, Any]] = field(default_factory=list)
     invalidation_reason: str | None = None
 
@@ -284,13 +284,13 @@ class QAReview:
     checks: list[dict[str, Any]]
     defects: list[Defect]
     evidence_refs: list[ArtifactRef]
-    # 逐条结论与放行记录里的三个数（验证的独立性设计说明「口径」，工单 #151）：旧事件没有这几项
+    # 逐条结论与放行记录里的三个数（验证的独立性设计说明第 7.1 节，工单 #151）：旧事件没有这几项
     criteria: list[dict[str, Any]] = field(default_factory=list)
     coverage: dict[str, Any] = field(default_factory=dict)
     open_criteria: list[str] = field(default_factory=list)
-    # 基线明细（docs/design/independent-verification.md「检验的有效性」，工单 #1181）：命令检查的条目逐条带基线结果；旧事件没有这一项
+    # 基线明细（第 7.2 节，工单 #1181）：命令检查的条目逐条带基线结果；旧事件没有这一项
     baseline_checks: list[dict[str, str]] = field(default_factory=list)
-    # 这份结论引用的独立判断事件与改判的条数（验证的独立性设计说明「先判断后看解释」，工单 #1190）：
+    # 这份结论引用的独立判断事件与改判的条数（验证的独立性设计说明第 4 节，工单 #1190）：
     # 放行记录与判断成对，以后算解释翻转率时按这一对取；旧事件没有这两项
     judgement_event: str = ""
     changed: int = 0
@@ -352,7 +352,7 @@ class ContextManifest:
     output_reserve_tokens: int = 0
     parts_ref: dict[str, Any] | None = None
     guidance_ids: list[str] = field(default_factory=list)
-    # 这一次装配按哪一版规则算出来的（docs/design/context-assembly.md「确定性（通过）」）：规则版本是规则取值的规范散列
+    # 这一次装配按哪一版规则算出来的（设计说明第 6.1 节）：规则版本是规则取值的规范散列
     rules_version: str | None = None
     # 这一次折叠了哪几轮（从 1 起的轮次编号，按部门历史顺序）；折叠计数是它的长度
     folded_rounds: list[int] = field(default_factory=list)
@@ -368,7 +368,7 @@ class SessionRecord:
     activations: int = 0
 
 
-# 试用用例的步骤与用例本身（浏览器与 computer use 设计说明「试用用例」、「查询」的查询，工单 #1180）。
+# 试用用例的步骤与用例本身（浏览器与 computer use 设计说明第 8.2 节、第 7.2 节的查询，工单 #1180）。
 # 用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份记为它的步骤；步骤的分类（可执行的检验
 # 与模型阅读）在 coverage 模块按工具名判断，这里只保存事实
 
@@ -435,7 +435,7 @@ class TrialCase:
         return None
 
     def has_unknown_step(self) -> bool:
-        # 含结果未知步骤的用例不能以 passed 结束，也不能作为证据（设计说明「试用用例」、docs/design/browser-and-computer-use.md「恢复契约」）
+        # 含结果未知步骤的用例不能以 passed 结束，也不能作为证据（设计说明第 8.2 节、第 9 节）
         return any(item.unknown for item in self.steps)
 
 
@@ -514,11 +514,11 @@ class RunProjection:
     last_review: QAReview | None = None
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
     kind: str = "change"
-    # 建档事项的产出：仓库概况与现有结构的工件引用（docs/design/existing-project-onboarding.md「总体」、「仓库概况与读取范围」）
+    # 建档事项的产出：仓库概况与现有结构的工件引用（设计第 4.1、4.2 节）
     overview_ref: dict[str, Any] | None = None
     structure: dict[str, Any] | None = None
     baseline_review: dict[str, Any] | None = None
-    # 建档修改轮的依据（工单 #136，docs/design/existing-project-onboarding.md「领域事件」）：上一轮建档候选的事件编号与修改意见的工件引用；
+    # 建档修改轮的依据（工单 #136，设计第 3.3 节）：上一轮建档候选的事件编号与修改意见的工件引用；
     # 建档第一轮与普通事项没有这个字段
     onboarding_basis: dict[str, Any] | None = None
     # 建档的轮次（工单 #136）：第一轮为 1，修改轮逐轮加一；普通事项与旧 run 为 0
@@ -559,7 +559,7 @@ class RunProjection:
     stream_version: int = 0
     # 创建这个 run 时记录的 run 事件版本（ADR-0019）；旧 run 没有这个字段时为 0，与当前版本不同
     run_event_version: int = 0
-    # 创建这个 run 时记录的定义版本（总体架构「十项长期决定」中「带版本的定义」）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
+    # 创建这个 run 时记录的定义版本（总体架构第 3 节第 7 条）：恢复继续旧事项时与当前加载的版本比较（工单 #16）
     definitions_version: str = ""
     # 创建这个 run 时冻结的参数版本（工单 #349）：运行中不跟随参数修改
     parameters_version: str = ""

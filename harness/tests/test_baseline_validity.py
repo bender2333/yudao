@@ -1,4 +1,4 @@
-# 检验的有效性（验证的独立性设计说明「检验的有效性」，工单 #1181）：新功能的检验在基线快照上失败、
+# 检验的有效性（验证的独立性设计说明第 7.2 节，工单 #1181）：新功能的检验在基线快照上失败、
 # 在交付快照上通过，两次都由主机执行。run_baseline_check 由主机在基线副本上运行同名交付检查：
 # 基线副本 = 事项起点树 + 质检测试材料 + 声明涉及的交付文件（必须在起点到交付的改动清单里）；
 # 命令取交付检查已经记录的那一条，质检不能改写；时限、输出截断、进程树清理与树变化核对与 run_check 相同。
@@ -7,7 +7,7 @@
 #
 # 层：模块层。直接构造执行环境跑真实的基线检查进程（与 test_tools.py 的 run_check 用例同一层），
 # 覆盖计数与放行记录的核对是纯函数与收紧检查的内存判断；不起完整三部门循环。
-# 守 R2（基线回执是工作区事实，覆盖计数读它）与 R3（docs/design/independent-verification.md「检验的有效性」的口径）。
+# 守 R2（基线回执是工作区事实，覆盖计数读它）与 R3（第 7.2 节的口径）。
 
 from __future__ import annotations
 
@@ -265,7 +265,7 @@ def test_a_changed_tree_baseline_receipt_is_not_evidence():
 
 
 def test_non_check_methods_keep_their_own_evidence_path():
-    # 试用用例与主机测量沿用各自的证据路径：检验有效性只适用于命令检查（docs/design/independent-verification.md「检验的有效性」最后一句）
+    # 试用用例与主机测量沿用各自的证据路径：检验有效性只适用于命令检查（第 7.2 节最后一句）
     trial = [{"criterion": "AC1", "method": "trial", "result": "passed",
               "checks": [], "trial_cases": [], "note": ""}]
     baseline = baseline_records([], ["smoke"])

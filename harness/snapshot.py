@@ -41,7 +41,7 @@ def ingest_snapshot(source_dir: str | Path, artifacts: ArtifactStore, scope: str
 
 def git_provenance(source_dir: str | Path) -> dict[str, Any]:
     # 在进程内用 libgit2 读取基线对应的提交、分支与是否有未提交的修改；源目录不是工作树时为空
-    # 只看源目录自己（工单 #841，docs/design/existing-project-onboarding.md「已有测试与 git 历史作为基线的证据」）：源目录本身是 Git 工作树的根目录（有自己的 .git）时才读取，
+    # 只看源目录自己（工单 #841，设计第 4.6 节）：源目录本身是 Git 工作树的根目录（有自己的 .git）时才读取，
     # 不向上层目录查找——上层目录里的仓库（例如用户主目录下的 .git）既不影响结果也不被打开。
     # 源目录本身是仓库但打不开时抛 TreeError：建项目命令把它变成 source_invalid 拒绝并写明目录与原因，
     # 不是 500。快照是这个文件夹，上层仓库的提交与「有没有未提交的修改」说的是整个仓库，会误导。
@@ -83,7 +83,7 @@ def restore_snapshot(
 
 def _reject_private_paths(source_dir: str | Path) -> None:
     # 采集会静默跳过宿主私有路径；快照接入必须明确拒绝并给出原因。
-    # 仓库自身的 Git 元数据（.git）按 docs/design/network-and-mcp.md「读取工具清单（探测）」从公开树排除、不触发拒绝：任何 git 仓库的源目录都含它，
+    # 仓库自身的 Git 元数据（.git）按设计第 4.2 节从公开树排除、不触发拒绝：任何 git 仓库的源目录都含它，
     # git 来源由进程内的 libgit2 读取；其余宿主私有路径（.checks）与无法表示的条目仍然拒绝
     base = Path(source_dir).absolute()
     pending = [(base, "")]

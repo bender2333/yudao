@@ -190,7 +190,7 @@ def judgement(
     basis_delivery_spec_hash: str | None = None,
     criteria_count: int = 1,
 ) -> dict[str, Any]:
-    # 独立判断的提案（验证的独立性设计说明「先判断后看解释」，工单 #358）：先判断后看解释——
+    # 独立判断的提案（验证的独立性设计说明第 4 节，工单 #358）：先判断后看解释——
     # 在只看事实的上下文里对当前交付的每条验收条件写出判断，门（提交结论前必须有它）读这个事件
     names = checks or ["smoke"]
     return {
@@ -256,7 +256,7 @@ def review(
         "criteria": default_criteria(criteria_count, list(names)) if criteria is None else criteria,
         "basis_delivery_spec_hash": basis_delivery_spec_hash,
     }
-    # 结论引用的独立判断（验证的独立性设计说明「先判断后看解释」，工单 #1190）：不写编号时由主机取当前交付的
+    # 结论引用的独立判断（验证的独立性设计说明第 4 节，工单 #1190）：不写编号时由主机取当前交付的
     # 那一条判断；写明的编号必须是这一轮核验引用的那条判断
     if judgement_event is not None:
         payload["judgement_event"] = judgement_event

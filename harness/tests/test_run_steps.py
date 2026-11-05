@@ -1,4 +1,4 @@
-# 工单 #1234：run.steps 按激活与步骤给出推理、模型文字、动作与回执（应用层与接口层设计说明「查询清单」），
+# 工单 #1234：run.steps 按激活与步骤给出推理、模型文字、动作与回执（应用层与接口层设计说明第 4.3 节），
 # event.detail 给出推理与模型输出的可读文字。夹具直接写入主机写的那几种事件与工件，形状参照
 # harness/tests/test_protocol_reasoning.py 里三种协议的真实回答：Chat Completions 的 reasoning_content、
 # Messages 的 thinking 块、Responses 的 summary 与加密内容；一条回答里同时有文字条目与工具调用条目。

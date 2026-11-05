@@ -1,4 +1,4 @@
-# 发布脚本的验收（工单 #373，网页界面的提供与发布设计说明「发布脚本」）：把仓库复制到临时目录，
+# 发布脚本的验收（工单 #373，网页界面的提供与发布设计说明第 6.3 节）：把仓库复制到临时目录，
 # 建立 main 分支与一个本地 bare 远端，运行 scripts/release.py（不带 --publish），核对 wheel 的路径、
 # SHA-256、wheel 内含页面文件且与页面构建输出逐个一致、不含客户端安装程序与更新清单，
 # 以及 wheel 的发布资源目录里只有本次构建的文件（#313 的清理逻辑沿用）。
@@ -244,7 +244,7 @@ def test_script_rejects_a_dirty_worktree(release_template, tmp_path):
     assert "工作区不干净" in result.stderr
 
 def test_script_rejects_an_already_released_version(release_template, tmp_path):
-    # 版本号只核对 pyproject.toml 与标签（docs/design/web-interface-and-release.md「版本号」）：这个版本已经打过标签时脚本拒绝，
+    # 版本号只核对 pyproject.toml 与标签（设计说明第 6.2 节）：这个版本已经打过标签时脚本拒绝，
     # 避免重复发布覆盖上一次的记录
     source, _remote = _clone_checkout(release_template, tmp_path)
     version = _version(source / "pyproject.toml")

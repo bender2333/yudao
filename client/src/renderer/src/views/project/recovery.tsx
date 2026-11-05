@@ -68,7 +68,7 @@ export function RecoveryPage(props: { app: ClientApp; route: Route; onNavigate: 
   const settled = overview.data?.work_items.find((entry) => entry.work_item_id === workItemId) ?? null;
   const title = settled?.title ?? workItemId;
   // 决定卡片写事项标题；取不到时不写事项标识（工单 #802）。
-  // 卡片头写项目名：项目名取自己读的概览，不把项目标识写进页面（docs/design/existing-project-onboarding.md「总体」）
+  // 卡片头写项目名：项目名取自己读的概览，不把项目标识写进页面（设计说明第 4.1 节）
   const cardTitle = settled?.title ?? "";
   const projectName = overview.data?.name ?? "";
   const runId = item?.run_id ?? null;

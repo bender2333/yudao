@@ -22,7 +22,7 @@ export const OPEN_LOOP_SENTENCE = "没有核验角色，事项以开环完成结
 // 改动只对之后新建的事项生效（工单验收第 4 条）：正在跑的事项按创建时冻结的那一份跑完
 export const FORM_CHANGE_HINT = "改动只对之后新建的事项生效，正在跑的事项按原来的形态跑完。";
 
-// 这一次没有写理由时的写法：理由可以不写（docs/design/project-organization.md「模板一键选用」），历史里仍记一条
+// 这一次没有写理由时的写法：理由可以不写（设计说明第 4.12 节），历史里仍记一条
 export const NO_REASON = "没有写理由";
 
 // 现在用的那一份不在这一版发布里（设计说明「冻结与升级」）：照实写明，不换一份顶替
@@ -145,7 +145,7 @@ export function canChangeBack(previousForm: string, currentForm: string): boolea
   return previousForm !== currentForm;
 }
 
-// 改回：把那一条的原值再采用一次（docs/design/project-organization.md「采用与历史」）。理由不编一句，记为空；
+// 改回：把那一条的原值再采用一次（设计说明第 4.5 节）。理由不编一句，记为空；
 // 页面看到的当前值照样带上，服务端按它对不上时照常拒绝
 export function changeBackPayload(props: {
   projectId: string;

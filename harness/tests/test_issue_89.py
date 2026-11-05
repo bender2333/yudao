@@ -336,7 +336,7 @@ def test_the_run_has_no_department_prompt_copy_and_records_the_project_version(t
         _close(server_a, server_b)
 
 def test_a_project_setting_tier_outside_the_model_levels_is_saved_and_limited_on_request(tmp_path):
-    # 项目部门设置与部门默认同一套保存规则（docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」、「调用与结果」）：保存只核对请求档位属于档位全集，
+    # 项目部门设置与部门默认同一套保存规则（设计说明第 4.6、7.3 节）：保存只核对请求档位属于档位全集，
     # 超出所选模型支持档位的档位照常保存，下一次请求按该模型的支持档位限制
     server_a, capture_a, base_a = serve(_department_aware("upstream-a"))
     server_b, capture_b, base_b = serve(_department_aware("upstream-b"))
@@ -387,7 +387,7 @@ def test_a_project_setting_rejects_a_tier_outside_the_full_set(tmp_path):
         _close(server_a, server_b)
 
 def test_a_project_setting_rejects_a_tier_outside_the_full_set_without_writing_a_model(tmp_path):
-    # 模型访问定义与请求档位分别继承（docs/design/model-management.md「项目部门设置与项目角色设置」、「解析规则」、「部门详情里的模型与 Prompt」）：只写入请求档位、模型跟随部门默认时，
+    # 模型访问定义与请求档位分别继承（设计说明第 5.2、5.3、9.2 节）：只写入请求档位、模型跟随部门默认时，
     # 写入的请求档位同样要属于档位全集，不因此跳过核对
     server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
     server_b, _capture_b, base_b = serve(lambda _body: _text_reply(response_id="rb", model="upstream-b", text="ok"))

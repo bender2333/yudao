@@ -81,7 +81,7 @@ async function openProjectClient(size: { width: number; height: number }): Promi
 function watchErrors(client: ClientApp): string[] {
   const errors: string[] = [];
   client.page.on("console", (message) => {
-    // 服务端按设计用 409 拒绝命令（基准版本过期等，docs/design/existing-project-onboarding.md「命令」），界面已经把原因显示给用户；
+    // 服务端按设计用 409 拒绝命令（基准版本过期等，第 3.1 节），界面已经把原因显示给用户；
     // 浏览器对非 2xx 响应自己记一条控制台消息，那不是应用的错误
     if (message.type() === "error" && !message.text().startsWith("Failed to load resource: the server responded with a status of 409")) {
       errors.push(message.text());
@@ -627,7 +627,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(record.locator(".section-head .note")).toContainText("范围：整个项目");
       const all = page.locator("section.card table").first();
       // 第一轮：产品、工程各一次模型请求，质检两次（PRD 被接纳以后先做一轮预测性探索，
-      // 交付到达以后核验，循环结构「各部门在什么时候工作」）：共四条
+      // 交付到达以后核验，循环结构第 3.1 节）：共四条
       await expect(all.locator("tbody tr")).toHaveCount(4);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
       // 用量列（工单 #744）：列名是「用量」，与请求详情同一口径；预置项目的模型回答没有上报用量，写「未上报」
@@ -645,7 +645,7 @@ test.describe("项目页面（1440×900）", () => {
       await keyword.fill("");
       await record.getByRole("button", { name: "按条件筛选" }).click();
       await expect(page.locator("section.card table").first().locator("tbody tr")).toHaveCount(4);
-      // Provider 配置筛选（docs/design/app-and-interface.md「命令行」）：命中 0 条时写明没有请求记录，改回空条件以后恢复
+      // Provider 配置筛选（第 7.4 节）：命中 0 条时写明没有请求记录，改回空条件以后恢复
       const providerFilter = record.locator("label.field").filter({ hasText: "Provider 配置" }).locator("input");
       await providerFilter.fill("no-such-provider");
       await record.getByRole("button", { name: "按条件筛选" }).click();
@@ -662,7 +662,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(detail).toContainText("模型");
       await expect(detail).toContainText("请求 fake-script，实际 fake-script");
       await expect(detail).toContainText("调用目标");
-      // 调用目标与选择来源（docs/design/app-and-interface.md「命令行」）：连接、协议、地址与来源层都写在这里
+      // 调用目标与选择来源（第 7.4 节）：连接、协议、地址与来源层都写在这里
       await expect(detail).toContainText("选择来源");
       await expect(detail).toContainText("部门默认");
       await expect(detail).toContainText("是否可重试");

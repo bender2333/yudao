@@ -18,7 +18,7 @@ from harness.providers.call import ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 
 from harness.tests.helpers import after_event
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.wait_limits import MODULE_WAIT_FOR_HOST_WORK_SEC
 GOAL = "把文本按行处理清楚"
 
 
@@ -68,7 +68,7 @@ class _BlockingPartialAdapter:
         yield ModelStreamEvent(kind="message", id=item["id"], payload=item, text="PARTIAL_OUTPUT",
                                provider=self.name, model=self.model)
         self.started.set()
-        self.release.wait(WAIT_FOR_HOST_WORK_SEC)
+        self.release.wait(MODULE_WAIT_FOR_HOST_WORK_SEC)
         yield ModelResponse(
             finish_reason="aborted", error="aborted",
             provider=self.name, model=self.model,
@@ -103,7 +103,7 @@ def test_running_partial_output_is_in_attempt_detail_and_is_observation_only(tmp
     after_event(system, EventType.MODEL_MESSAGE, lambda _: msg_event.set())
     worker = threading.Thread(target=system.activate_once, args=(run_id,), daemon=True)
     worker.start()
-    assert msg_event.wait(WAIT_FOR_HOST_WORK_SEC)
+    assert msg_event.wait(MODULE_WAIT_FOR_HOST_WORK_SEC)
 
     row = _attempts(application, project_id, work_item_id).data.attempts[0]
     assert row.status == "running"
@@ -115,7 +115,7 @@ def test_running_partial_output_is_in_attempt_detail_and_is_observation_only(tmp
     assert detail.data.response is None
 
     system.cancel(run_id)
-    worker.join(timeout=WAIT_FOR_HOST_WORK_SEC)
+    worker.join(timeout=MODULE_WAIT_FOR_HOST_WORK_SEC)
     assert not worker.is_alive()
     cancelled = application.query("run.attempt", RunAttempt(run_id=run_id, attempt_id=row.attempt_id))
     assert cancelled.data.attempt["status"] == "cancelled"
@@ -153,7 +153,7 @@ def test_failed_partial_output_is_observation_only_but_attempt_keeps_it(tmp_path
 
 
 def test_usage_totals_count_only_reported_attempts(tmp_path: Path):
-    # 用量汇总只累加上报的用量（docs/design/app-and-interface.md「查询清单」中「未上报的项为空」，D09 规定不猜算用量）：
+    # 用量汇总只累加上报的用量（设计说明第 4.3 节「未上报的项为空」，D09 规定不猜算用量）：
     # 未上报的尝试计入总数与用时，各项用量为空，也不进入上报计数
     reported_usage = Usage(input_tokens=11, output_tokens=3, cache_read_tokens=1, cache_write_tokens=2,
                            total_tokens=17, reported=True)

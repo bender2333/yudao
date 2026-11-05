@@ -18,7 +18,7 @@ export type Route = {
   // 回放位置（全局位置，设计说明第 3.3 节写在 ?at= 中）：刷新、后退与分享链接都回到同一位置；
   // 为 null 时是实时画面
   at: number | null;
-  // 资料页选中的建档轮次（工单 #573，docs/design/browser-and-computer-use.md「试用工具」写在 ?round= 中）：进入资料页时滚到对应轮次
+  // 资料页选中的建档轮次（工单 #573，设计第 3.4 节写在 ?round= 中）：进入资料页时滚到对应轮次
   round: number | null;
   /**
    * 设置页要滚到的那一节（工单 #1161，写在 ?section= 中）：决定卡片上的「前往本项目的部门设置」
@@ -36,7 +36,7 @@ const SYSTEM_PAGES: Record<string, string> = {
   rules: "sys-rules",
 };
 
-// 顶栏的路径里的页名（docs/design/architecture/overall-architecture.md「十项长期决定」中「合同」、「验收」中「OpenAPI 由 pydantic 类型生成；OpenAPI 文档的快照测试在」）：项目内页面写页名，系统页写它自己的页名。
+// 顶栏的路径里的页名（设计说明第 3.4、9.1 节）：项目内页面写页名，系统页写它自己的页名。
 // 系统页的页名与页面里的标题一致，不写路由里的英文段名（工单 #702）
 const PAGE_LABELS: Record<string, string> = {
   overview: "概览",
@@ -54,7 +54,7 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 /**
- * 顶栏的路径：项目内页面写「项目名 / 页名」，系统页只写页名（docs/design/app-and-interface.md「验收」中「OpenAPI 由 pydantic 类型生成；OpenAPI 文档的快照测试在」）。
+ * 顶栏的路径：项目内页面写「项目名 / 页名」，系统页只写页名（设计说明第 9.1 节）。
  * 部门页的页名就是部门名，与页签一致（产品、工程、质检）。
  */
 export function pathLabel(route: Route, projects: { project_id: string; name: string }[]): string {

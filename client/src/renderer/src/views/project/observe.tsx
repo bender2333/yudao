@@ -59,7 +59,7 @@ function writeDepartment(projectId: string, workItem: string | null, department:
   }
 }
 
-// 选择来源的显示（docs/design/model-management.md「解析规则」）：提供模型访问定义的那一层。
+// 选择来源的显示（设计说明第 5.3、7.4 节）：提供模型访问定义的那一层。
 // 取值由 Provider 模块给出（department_default / project_department_setting），未知值原样显示
 function selectionSourceName(value: string | null): string {
   if (value === "department_default") {
@@ -430,7 +430,7 @@ function AttemptDetail(props: { app: ClientApp; data: RunAttemptResult; projectI
   const events = list(props.data.events);
   const tools = list(props.data.tools);
   const refs = dict(props.data.artifact_refs);
-  // 调用目标的公开部分（不含 Key）、选择来源与请求/实际发送的档位（docs/design/model-management.md「每次模型请求」）
+  // 调用目标的公开部分（不含 Key）、选择来源与请求/实际发送的档位（设计说明第 6 节）
   const callTarget = dict(attempt.call_target);
   // 失败类型与结束原因（工单 #305）：取值规则抽在 attempt-failure.ts，便于单元测试核对
   const failure = failureRows(attempt);

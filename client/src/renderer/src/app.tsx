@@ -1,6 +1,6 @@
 // 页面的应用：连接状态、路由、外壳与页面（原型 v8 设计说明第 3 节，工单 #79 与 #80）。
 // 页面由 Yudao 服务提供，接口地址就是页面自己的来源，页面内的导航写在地址 # 之后
-// （网页界面的提供与发布设计说明「接口层提供页面文件」）。
+// （网页界面的提供与发布设计说明第 5.1 节）。
 
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOrganizationResult, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
@@ -48,9 +48,9 @@ export function App() {
   const [route, setRoute] = useState<Route>(() => parseRoute(window.location.hash));
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
-  // 局域网访问方式的访问令牌（docs/design/web-interface-and-release.md「发布脚本」）：在这个浏览器里保存，刷新以后不用再次填写
+  // 局域网访问方式的访问令牌（第 6.3 节）：在这个浏览器里保存，刷新以后不用再次填写
   const [token, setToken] = useState<string>(() => storedToken());
-  // 系统通知点击后要打开的决定卡片（工单 #375，docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）
+  // 系统通知点击后要打开的决定卡片（工单 #375，设计说明第 5.3 节）
   const [targetDecision, setTargetDecision] = useState<string | null>(null);
 
   // 页面应用：查询经生成的调用发出，事件到达时更新状态与待决定数量
@@ -71,7 +71,7 @@ export function App() {
     return () => app.close();
   }, [app, galleryOnly, token]);
 
-  // 用户在页面上填写令牌：先按它连接，服务接受以后才写进这个浏览器（docs/design/web-interface-and-release.md「发布脚本」）。
+  // 用户在页面上填写令牌：先按它连接，服务接受以后才写进这个浏览器（第 6.3 节）。
   // 被拒绝的令牌不保存，否则刷新以后浏览器里留着服务已经拒绝的令牌
   const submitToken = useCallback((value: string) => {
     setToken(value.trim());
@@ -185,9 +185,9 @@ export function App() {
     window.location.hash = hash;
   }, []);
 
-  // 系统通知与标签页标题（工单 #375，网页界面的提供与发布设计说明「系统通知与「安装此站点为应用」」）：
+  // 系统通知与标签页标题（工单 #375，网页界面的提供与发布设计说明第 5.3 节）：
   // 页面打开期间由不按项目筛选的事件流连接给出决定请求与等待模型服务（提醒只依据事件流与查询，
-  // 不另设通知接口，应用层与接口层设计说明「页面的同步规则」）
+  // 不另设通知接口，应用层与接口层设计说明第 5.7 节）
   const notifier = useMemo(() => new SystemNotifier(), []);
   // 标签页的标题：待决定的数量，没有待决定的事时不显示数字（标题的基础部分是页面自己的标题）
   const baseTitle = useRef(document.title);
@@ -300,7 +300,7 @@ export function App() {
     );
   }
   if (state.kind === "unauthorized") {
-    // 局域网访问方式：服务按 docs/design/web-interface-and-release.md「发布脚本」要求访问令牌，页面文件不需要令牌，所以这里能打开页面。
+    // 局域网访问方式：服务按第 6.3 节要求访问令牌，页面文件不需要令牌，所以这里能打开页面。
     // 用户在这个浏览器里填写一次，令牌随后保存在这个浏览器里
     return <TokenGate onSubmit={submitToken} />;
   }
@@ -388,7 +388,7 @@ export function App() {
   );
 }
 
-// 填写访问令牌的表单（应用层与接口层设计说明「令牌与 TLS」）：局域网访问方式下服务对全部接口路径
+// 填写访问令牌的表单（应用层与接口层设计说明第 6.3 节）：局域网访问方式下服务对全部接口路径
 // 要求 Authorization: Bearer <令牌>，页面文件不需要令牌，因此页面能打开而接口返回 401。
 // 令牌由用户在控制主机上用 token create 建立，在这里的浏览器中填写一次并保存在这个浏览器里；
 // 输入框用密码类型，页面不回显填过的令牌。

@@ -1,6 +1,6 @@
 # 参数的现值与修改历史：由目录流中的参数事件折叠而成。参数是全局的，事件写进目录流（跨版本保存的长期事实）。
 # 定义里的条目是初始值与取值界限，现值是事件日志折叠的结果；run 创建时冻结参数版本，运行中不再跟随。
-#docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」、「采用与撤回」。
+# 设计说明第 3、5 节。
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from .definitions import DEFINITIONS, VISIBILITY_VALUES, Definitions
 from .models import CatalogEvent, CatalogEventType, ProjectEventType, json_dumps
 
 # 建 run 时冻结的参数（工单 #1189）：这 10 项在 run 创建时从参数现值取样，这个 run 一直用它，
-# 参数事件只作用于之后创建的 run（规则登记与参数设计说明「参数怎样成为带版本的数据」）
+# 参数事件只作用于之后创建的 run（规则登记与参数设计说明第 3 节）
 RUN_PARAMETERS = (
     "tool_call_required_limit",
     "max_model_steps",
@@ -25,7 +25,7 @@ RUN_PARAMETERS = (
     "bash_timeout_max_sec",
     "check_timeout_max_sec",
     "compaction.stalled_limit",
-    # #397 的三项收敛判定参数（循环与收敛设计说明「判定参数」）：实例创建时冻结，投影按冻结值重放
+    # #397 的三项收敛判定参数（循环与收敛设计说明第 5.1 节）：实例创建时冻结，投影按冻结值重放
     "convergence.rounds",
     "convergence.step_window",
     "convergence.step_repeat",
@@ -306,7 +306,7 @@ def value_for_project(store: Any, project_id: str | None, name: str) -> Any:
 
 
 def effective_parameter_version(store: Any, project_id: str | None) -> str:
-    # 项目参数命令的基准版本（工单 #1262，docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」中「参数的当前值写成事件，带修改者、原值、新值与理由」）：项目级修改以该项目有效参数的版本为基准。
+    # 项目参数命令的基准版本（工单 #1262，设计说明第 3 节第 2 条）：项目级修改以该项目有效参数的版本为基准。
     # 基准版本按内容摘要核对，与参数写路径核对的是同一份数据：全局现值上先应用这个项目的覆盖。
     # project_id 为空时就是全局参数版本
     values = current_values(store)
@@ -337,7 +337,7 @@ def frozen_check_timeout(store: Any, run_id: str) -> int:
 
 def frozen_snapshot(store: Any, *, project_id: str | None, definitions_version: str,
                     item_limits: Mapping[str, Any], definitions: Definitions | None = None) -> dict[str, Any]:
-    # 建 run 时写进 run_created 的参数快照（工单 #1189，docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」中「创建 run 时按事项冻结的定义校验当前参数值，并把本 run 使用的参数取值与」）：先取全局现值，再取项目的
+    # 建 run 时写进 run_created 的参数快照（工单 #1189，设计说明第 3 节第 3 条）：先取全局现值，再取项目的
     # 覆盖，事项已经解析出来的实际限额单独记下，四项与定义版本合在一起构成这个 run 的有效快照。
     # 取值按当时的定义核对界限；可见范围的词表核对在 check_bounds 里。
     # 可见范围每个角色一条、名字跟着角色编号走（工单 #1401），角色清单取这个 run 用的定义

@@ -90,7 +90,7 @@ async function expectAccepted(page: Page, name: string, request: Record<string, 
 }
 
 // 给已保存的连接设置在内存里的 Key：走真实命令与真实凭据链（与模型管理页的用例同一做法）。
-// 生效模型要求凭据可用（docs/design/app-and-interface.md「缺口检测与重新同步」），因此验收生效模型的用例先设置它
+// 生效模型要求凭据可用（设计说明第 5.5 节），因此验收生效模型的用例先设置它
 async function setKey(page: Page, ref: string): Promise<void> {
   const status = await page.evaluate(async (payload: { address: string; ref: string }) => {
     const listed = await (await fetch(`${payload.address}/api/queries/catalog`)).json();
@@ -268,7 +268,7 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
     try {
       const id = await projectId(page, BLOCKED);
       await setKey(page, "OPENCODE_GO_KEY");
-      // 待恢复的决定请求写明是哪个部门的下一次请求不发送（docs/design/model-management.md「引用无法使用时」）
+      // 待恢复的决定请求写明是哪个部门的下一次请求不发送（第 5.5 节）
       const decisions = await fetchQuery<{ decisions: { decision_id: string; version: number;
         request: { department: string | null } }[] }>(
         page, "decisions.list", { status: "open", project_id: id });
@@ -277,7 +277,7 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
       const department = decision.request.department;
       expect(department).not.toBeNull();
 
-      // 运行中把该部门另选为 glm-4.6、档位 high 并保存，随后回答决定请求让下一次请求按新模型发送（docs/design/app-and-interface.md「补齐与实时」）
+      // 运行中把该部门另选为 glm-4.6、档位 high 并保存，随后回答决定请求让下一次请求按新模型发送（第 5.4 节）
       const version = await settingsVersion(page, id, department as string);
       await expectAccepted(page, "department_settings.save", {
         project_id: id, department, base_version: version,
@@ -312,7 +312,7 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
     try {
       const id = await projectId(page, SAMPLE);
       await setKey(page, "OPENCODE_GO_KEY");
-      // 让产品部门引用 glm-4.6，再作废它的准入：修改连接的地址（docs/design/model-management.md「修改与准入」，该连接下全部定义回到候选）
+      // 让产品部门引用 glm-4.6，再作废它的准入：修改连接的地址（第 4.4 节，该连接下全部定义回到候选）
       const version = await settingsVersion(page, id, "product");
       await expectAccepted(page, "department_settings.save", {
         project_id: id, department: "product", base_version: version,
@@ -323,7 +323,7 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
         page, "catalog");
       const provider = catalog.providers.find((item) => item.id === "opencode-go");
       expect(provider).toBeDefined();
-      // 只取连接保存命令的字段（docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」：未知字段拒绝），改地址让它的准入作废；
+      // 只取连接保存命令的字段（第 4.6 节：未知字段拒绝），改地址让它的准入作废；
       // 模型访问定义按原样带上，因此引用保留、显示「准入已作废」而不是「定义不存在」
       const models = await fetchQuery<{ models: { id: string; provider_id: string; model: string; protocol: string;
         context_window: number | null; max_output_tokens: number; capability_source: string;

@@ -243,14 +243,14 @@ def _local_tokens(records, pinned=PINNED, tools=TOOLS):
 
 
 def test_the_local_estimate_counts_utf8_bytes_not_characters():
-    """3 万个汉字的历史：按 UTF-8 字节数估成约 22500 token，不是按字符数的约 7500（docs/design/model-management.md「用量」）。"""
+    """3 万个汉字的历史：按 UTF-8 字节数估成约 22500 token，不是按字符数的约 7500（设计说明第 8.2 节）。"""
     text = "汉" * 30_000
     assert estimate_tokens(text) == 22_500
     assert estimate_tokens(text) != 7_500
 
 
 def test_a_larger_previous_upstream_usage_triggers_compaction_before_the_local_estimate():
-    """上一次请求上游回报的用量超过阈值、本地估算没有超过：这一步先压缩（docs/design/model-management.md「用量」）。"""
+    """上一次请求上游回报的用量超过阈值、本地估算没有超过：这一步先压缩（设计说明第 8.2 节）。"""
     records = _history(2, 100)
     assert _local_tokens(records) < 3400
     assert plan_compaction(records, None, 4000, PINNED, TOOLS) is None
@@ -264,7 +264,7 @@ def test_a_larger_previous_upstream_usage_triggers_compaction_before_the_local_e
 @pytest.mark.parametrize("work_limit, compacts", [(100_000, True), (200_000, False)])
 def test_a_million_token_window_compacts_at_the_work_limit(work_limit, compacts):
     """窗口 1,000,000 的模型在工作上限处压缩：用量约 105000 token，上限 100000 时压缩、200000 时不压缩
-    （docs/design/model-management.md「预留与阈值」）。"""
+    （设计说明第 8.3 节）。"""
     records = _history(52, 8000)
     tokens = _local_tokens(records)
     assert 100_000 < tokens < 200_000
@@ -274,7 +274,7 @@ def test_a_million_token_window_compacts_at_the_work_limit(work_limit, compacts)
 
 @pytest.mark.parametrize("work_limit, compacts", [(50_000, True), (100_000, False)])
 def test_a_lower_work_limit_moves_the_compaction_point(work_limit, compacts):
-    """把工作上限从 100000 改成 50000：用量约 60000 token 时按新的上限压缩（docs/design/model-management.md「预留与阈值」）。"""
+    """把工作上限从 100000 改成 50000：用量约 60000 token 时按新的上限压缩（设计说明第 8.3 节）。"""
     records = _history(30, 8000)
     tokens = _local_tokens(records)
     assert 50_000 < tokens < 100_000

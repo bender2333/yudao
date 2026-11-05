@@ -1,4 +1,4 @@
-// 页面的连接生命周期（应用层与接口层设计说明「页面的同步规则」、「能力清单」，原型 v8 设计说明第 3.4 节）。
+// 页面的连接生命周期（应用层与接口层设计说明第 5.7、6.1 节，原型 v8 设计说明第 3.4 节）。
 // 状态：连接中 / 已连接 / 接口版本不同 / 连接失败。
 // 已连接以后：保持一条不按项目筛选的事件流连接；收到事件按视图同步规则重新查询；
 // 发现缺口或收到 resync 时重新查询已打开的视图，再按快照位置中最小的一个重新订阅；
@@ -21,7 +21,7 @@ export type ClientState =
   // connecting 是还没连上（正在建立），connected 是连上了，interrupted 是连上以后断开的。
   // interrupted 自己带着断开的时间：界面分「还没连上过」与「连上以后断了」不靠猜。
   | { kind: "connected"; address: string; capabilities: Capabilities; stream: StreamState }
-  // unauthorized 是局域网访问方式下没有令牌或令牌无效（docs/design/app-and-interface.md「令牌与 TLS」）：页面显示填写令牌的表单
+  // unauthorized 是局域网访问方式下没有令牌或令牌无效（第 6.3 节）：页面显示填写令牌的表单
   | { kind: "unauthorized"; address: string };
 
 export type ClientListeners = {
@@ -53,7 +53,7 @@ const defaultDeps: ClientAppDeps = {
 };
 
 /**
- * 断线以后重新连上时，本次启动的身份是否变了（docs/design/app-and-interface.md「能力清单」）。
+ * 断线以后重新连上时，本次启动的身份是否变了（设计说明第 6.1 节）。
  * 变了（服务重启）：页面重新读取能力清单并重新同步；没变：照旧从原位置续上，不整页重读。
  */
 export function bootIdentityChanged(before: string | null, next: string | null): boolean {
@@ -68,7 +68,7 @@ export class ClientApp {
   private capabilities: Capabilities | null = null;
   // 事件流的状态：连接中、已连接、连上以后断开（工单 #653）
   private streamState: StreamState = { kind: "connecting" };
-  // 局域网访问方式的访问令牌（docs/design/app-and-interface.md「令牌与 TLS」）：查询、命令与事件流都在请求头里带上它
+  // 局域网访问方式的访问令牌（第 6.3 节）：查询、命令与事件流都在请求头里带上它
   private token = "";
   // 页面级的事件订阅：视图同步之外，页面还需要测试与候选等事件的结果内容（工单 #93），
   // 项目楼层这类按事件播放动作的画面也用它（工单 #82）
@@ -115,7 +115,7 @@ export class ClientApp {
   }
 
   // 连接页面自己的来源：读取能力清单并核对接口版本。
-  // token 是局域网访问方式的访问令牌（docs/design/app-and-interface.md「令牌与 TLS」）：本机访问方式为空串
+  // token 是局域网访问方式的访问令牌（第 6.3 节）：本机访问方式为空串
   async open(address: string, token = ""): Promise<void> {
     this.closeStream();
     this.token = token;
@@ -156,19 +156,19 @@ export class ClientApp {
     return this.runQuery<T>(this.iface.client, name, params);
   }
 
-  // 页面按需查询一次（docs/design/app-and-interface.md「页面的同步规则」）：与视图同步走同一条查询通道，
+  // 页面按需查询一次（设计说明第 5.7 节）：与视图同步走同一条查询通道，
   // 结果不进入视图缓存。删除与保存前取回影响列表（工单 #94）使用这个入口
   queryOne<T>(name: string, params: Record<string, unknown> | undefined): Promise<{ position: number; data: T }> {
     return this.query<T>(name, params);
   }
 
-  // 不按项目筛选的事件流：窗口关闭时也保持（docs/design/app-and-interface.md「页面的同步规则」）。
+  // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）。
   // live=1：连接接收模型输出片段（delta 帧），部门房间的思考气泡据此逐字显示（工单 #177）
   private startStream(after: number): void {
     this.stream = this.deps.openStream(this.iface!.baseUrl, { live: true }, {
       onConnected: (info) => {
         this.setStreamConnected(true);
-        // 断开以后重新连上：核对一次本次启动的身份（工单 #1159，docs/design/app-and-interface.md「能力清单」）
+        // 断开以后重新连上：核对一次本次启动的身份（工单 #1159，设计说明第 6.1 节）
         if (info.reconnected) {
           void this.checkBootIdentity();
         }
@@ -242,7 +242,7 @@ export class ClientApp {
       if (result.state !== "connected") {
         return;
       }
-      // 本次启动的身份改变：重新读取能力清单（docs/design/app-and-interface.md「能力清单」）
+      // 本次启动的身份改变：重新读取能力清单（设计说明第 6.1 节）
       if (bootIdentityChanged(this.boot, result.capabilities.deployment.boot_id)) {
         this.adoptCapabilities(result.capabilities);
       }
@@ -252,7 +252,7 @@ export class ClientApp {
     }
   }
 
-  // 断线以后重新连上：核对一次本次启动的身份（工单 #1159，docs/design/app-and-interface.md「能力清单」）。
+  // 断线以后重新连上：核对一次本次启动的身份（工单 #1159，设计说明第 6.1 节）。
   // 同一次启动就照旧从原位置续上，不整页重读；换了服务（重启）就与发现缺口时一样重新同步
   private async checkBootIdentity(): Promise<void> {
     if (!this.iface || !this.views) {
@@ -284,7 +284,7 @@ export class ClientApp {
   }
 
   // 重新同步的做法：重新查询全部已打开的视图，从快照位置里更晚的那个重新订阅事件流，
-  // 再让画面回到查询给出的状态（docs/design/app-and-interface.md「缺口检测与重新同步」）
+  // 再让画面回到查询给出的状态（设计说明第 5.5 节）
   private async refreshAndResubscribe(): Promise<void> {
     if (!this.views) {
       return;

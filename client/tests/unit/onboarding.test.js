@@ -1,4 +1,4 @@
-// 建档状态的纯逻辑单元测试（工单 #137，docs/design/existing-project-onboarding.md 「命令」、「领域事件」、「查询的变化」）：
+// 建档状态的纯逻辑单元测试（工单 #137，docs/design/existing-project-onboarding.md 第 3.1、3.3、3.4 节）：
 // 接入拒绝说明的分行、建档状态标记的三种取值，以及由 tool_started 事件驱动的「阅读已有项目」动作。
 // 判定全部来自应用层给出的项目行与事件，测试用真实形状的数据驱动这些纯函数。
 // 用 node --test 运行，不依赖 Electron 与网络。

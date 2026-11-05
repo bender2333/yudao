@@ -1,4 +1,4 @@
-# 最小投影模块（骨架与应用设计说明「最小投影」）：从骨架事件折叠裁决要读的几样。
+# 最小投影模块（骨架与应用设计说明第 4 节）：从骨架事件折叠裁决要读的几样。
 # 守 R1（第三环的不变式：同样的事件重放出同样的状态）与 R2（第二环的合同：成果的种类来自定义，
 # 加一种成果不改最小投影的代码；模块只导入内核、标准库与 pydantic）。
 #
@@ -49,7 +49,7 @@ def _run_created(version: int = 1) -> Event:
 
 
 def test_the_minimal_projection_folds_the_items_the_design_lists():
-    #docs/design/skeleton-and-application.md「最小投影」那张表的六项与之后补齐的几样，每一样都来自骨架事件
+    # 设计说明第 4 节那张表的六项与之后补齐的几样，每一样都来自骨架事件
     events = [
         _run_created(),
         _event(EventType.DEPARTMENT_ACTIVATED, 2, session="ses_pro", department="product",
@@ -109,7 +109,7 @@ def test_the_minimal_projection_folds_the_items_the_design_lists():
 
 
 def test_a_new_artifact_kind_from_the_definitions_folds_without_changing_the_module(tmp_path: Path):
-    # 第二环的合同（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果的种类来自定义，加一种成果不改最小投影的代码。
+    # 第二环的合同（设计说明第 5.4 节第 6 条）：成果的种类来自定义，加一种成果不改最小投影的代码。
     # 定义里加一个提交新成果种类的工具，写一条它的接纳事件，模块代码一行不改就能折叠出它的当前版本
     root = _definitions_with_a_new_artifact_kind(tmp_path)
     definitions = load_definitions(root)

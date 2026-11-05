@@ -1,4 +1,4 @@
-# 契约的公开名称与版本（S6a，工单 #829；骨架与应用设计说明「契约」、「三道缝的契约」、「对外合同的兼容」；总图第二节第二环「契约」）：
+# 契约的公开名称与版本（S6a，工单 #829；骨架与应用设计说明第 3.2、5、9 节；总图第二节第二环「契约」）：
 # 每道契约带版本号，实现声明它实现哪一版，薄驱动在一个发布里同时接受当前版与上一版；
 # 契约模块的公开名称有快照——删掉或改掉一个已有名称而版本没有提高时这里失败，信息写明是哪一个名称。
 #
@@ -6,7 +6,7 @@
 # 这一个把「公开名称」与「版本」两样东西钉成快照，守的是兼容：删名称要提版，提版要有新的快照。
 #
 # 读模块的源码（抽象语法树）与模块自己的常量，不开数据库、不用子进程、不用网络，属于单元层。
-# 守 docs/design/skeleton-and-application.md「模块交互」的 R2（第二环的合同：契约的公开名称与版本）。
+# 守第 13 节的 R2（第二环的合同：契约的公开名称与版本）。
 
 from __future__ import annotations
 
@@ -99,7 +99,7 @@ def _version(module_name: str) -> int | None:
 
 @pytest.mark.parametrize("module_name", SEAM_CONTRACTS)
 def test_every_seam_contract_declares_a_version(module_name: str) -> None:
-    # 每道契约带版本号（docs/design/skeleton-and-application.md「契约」、「三道缝的契约」）：没有版本号，薄驱动就无从判断实现声明的是哪一版
+    # 每道契约带版本号（第 3.2、5 节）：没有版本号，薄驱动就无从判断实现声明的是哪一版
     version = _version(module_name)
     assert type(version) is int and version >= 1, f"{module_name} 没有给出整数的 CURRENT_VERSION：{version!r}"
     previous = getattr(MODULES[module_name], "PREVIOUS_VERSION", None)

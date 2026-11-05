@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from typing import Any, Mapping
 
 # 选择层保存的三项：模型访问定义引用、请求档位与部门 Prompt。项目部门设置只写入覆盖的项，
-# 没有写入的项使用部门默认；部门 Prompt 没有写入时使用内置默认 Prompt（docs/design/model-management.md「项目部门设置与项目角色设置」）。
+# 没有写入的项使用部门默认；部门 Prompt 没有写入时使用内置默认 Prompt（设计说明第 5.2 节）。
 # 每一项都可以为空，三项一起保存、一个版本。
 
-# 选择来源：提供模型访问定义的那一层（docs/design/model-management.md「解析规则」）。角色两层由 #63 加入
+# 选择来源：提供模型访问定义的那一层（设计说明第 5.3 节）。角色两层由 #63 加入
 DEPARTMENT_DEFAULT_SOURCE = "department_default"
 PROJECT_DEPARTMENT_SETTING_SOURCE = "project_department_setting"
 
@@ -76,7 +76,7 @@ def merge_selection(
     project: ModelSelection | None,
     department: ModelSelection | None,
 ) -> SelectionResolution:
-    # 选择合并是一个没有副作用的规则（docs/design/model-management.md「解析规则」）：流程编排的新建检查与应用层的
+    # 选择合并是一个没有副作用的规则（设计说明第 5.3 节）：流程编排的新建检查与应用层的
     # 生效模型查询使用同一个规则。项目为 None 表示没有项目层（命令行与测试的运行）。
     source = PROJECT_DEPARTMENT_SETTING_SOURCE if _chosen_for_model(project) else DEPARTMENT_DEFAULT_SOURCE
     chosen = project if _chosen_for_model(project) else department

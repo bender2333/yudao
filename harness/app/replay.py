@@ -1,4 +1,4 @@
-# 按位置读取（回放，docs/design/app-and-interface.md「合同」，工单 #127）：可回放的查询接受 at（全局位置），
+# 按位置读取（回放，设计说明第 4.1 节，工单 #127）：可回放的查询接受 at（全局位置），
 # 在内存中从事件重放到该位置，不写入、不调用模型与工具。折叠是纯函数（折叠规则不读时钟、不读工件），
 # 喂给它 position <= at 的事件前缀就得到该位置时的投影；前缀单调性由写入口在同一个事务中折叠保存的投影与 replay_check 保证。
 # 宿主是只读打开（Application.open_readonly），不写保存的投影。
@@ -12,18 +12,18 @@ from ..projection import replay_decisions
 from .contracts import Contract
 
 class ReplayOutOfRange(Exception):
-    # at 大于日志末尾：接口层把它转成 422（docs/design/app-and-interface.md「合同」）
+    # at 大于日志末尾：接口层把它转成 422（设计说明第 4.1 节）
     def __init__(self, at: int, end_position: int) -> None:
         super().__init__(f"position {at} is beyond the log end {end_position}")
         self.at = at
         self.end_position = end_position
 
 class ReplayRequest(Contract):
-    # 可回放查询的请求基类：at 是全局位置，省略时读取现在的快照（docs/design/app-and-interface.md「合同」）
+    # 可回放查询的请求基类：at 是全局位置，省略时读取现在的快照（设计说明第 4.1 节）
     at: int | None = None
 
 def check_position(application, at: int | None) -> int | None:
-    # 核对 at 不超过日志末尾，返回它（省略时返回 None）；超过时抛出 ReplayOutOfRange，由接口层转成 422（docs/design/app-and-interface.md「合同」）
+    # 核对 at 不超过日志末尾，返回它（省略时返回 None）；超过时抛出 ReplayOutOfRange，由接口层转成 422（第 4.1 节）
     if at is None:
         return None
     end = application.system.store.end_position()

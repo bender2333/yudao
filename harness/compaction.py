@@ -37,7 +37,7 @@ class CompactionPlan:
 
 SUMMARY_OUTPUT_TOKENS = 4096
 
-# 工具结果里的一张图像在本地估算中按这个值计（浏览器与 computer use 设计说明「请求中的图像」）。
+# 工具结果里的一张图像在本地估算中按这个值计（浏览器与 computer use 设计说明第 6.2 节）。
 # 图像的真实用量由上游按像素计算，请求里 data URL 的字节数不是它的用量：1280×800 的截图按
 # Anthropic 的宽高公式约 1400 token、按 OpenAI 的分块约 1100 token，取偏大的固定值
 IMAGE_TOKEN_ESTIMATE = 1600
@@ -45,7 +45,7 @@ IMAGE_TOKEN_ESTIMATE = 1600
 
 def request_input_tokens(items: list[dict[str, Any]], tools: list[dict[str, Any]],
                          max_output_tokens: int | None = None) -> int:
-    """本地估算（模型管理设计说明「用量」）：文字按 UTF-8 字节数除以 4，图像按张计固定值。"""
+    """本地估算（模型管理设计说明第 8.2 节）：文字按 UTF-8 字节数除以 4，图像按张计固定值。"""
     payload = {"input": _without_image_bytes(items), "tools": tools}
     if max_output_tokens is not None:
         payload["max_output_tokens"] = max_output_tokens
@@ -173,7 +173,7 @@ def plan_compaction(
     output_reserve = response_reserve(context_window, output_limit)
     if output_reserve < 1:
         raise CompactionError("The model output limit leaves no room for a compaction summary")
-    # 压缩阈值 = min(窗口 − 预留量, 工作上限)（docs/design/model-management.md「预留与阈值」）：窗口很大时也在工作上限处压缩
+    # 压缩阈值 = min(窗口 − 预留量, 工作上限)（设计说明第 8.3 节）：窗口很大时也在工作上限处压缩
     threshold = context_window - output_reserve
     if work_limit_tokens is not None:
         threshold = min(threshold, work_limit_tokens)
@@ -184,7 +184,7 @@ def plan_compaction(
         record["item"] for record in records[start:]
     ]
     before = request_input_tokens([*pinned_input, *active], tools, output_limit)
-    # 用量取上一次请求的上游回报用量与本次本地估算中较大的一个（docs/design/model-management.md「用量」）；
+    # 用量取上一次请求的上游回报用量与本次本地估算中较大的一个（设计说明第 8.2 节）；
     # 没有上一次或上游没有回报时只用估算
     used = before if previous_usage_tokens is None else max(before, previous_usage_tokens)
     unfinished = checkpoint is not None and not checkpoint.boundary

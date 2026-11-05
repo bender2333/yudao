@@ -1,6 +1,6 @@
 """Yudao 运行器：只经 HTTP 接口驱动 Yudao，只从导出的事件日志观察它。
 
-评测场景设计「模块划分」：运行器只把起点与公开部分交给被测方；不导入 `harness` 的任何
+评测场景设计第 7 节：运行器只把起点与公开部分交给被测方；不导入 `harness` 的任何
 模块，同一套工具因此可以评测不同版本的 Yudao。凭据只从环境变量读（被测模型的地址
 与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中），不写进代码、
 事件、日志与提交。
@@ -30,25 +30,25 @@ import uuid
 import material_integrity
 import model_service
 
-# 一次评测运行的场景（评测场景设计「三个场景」）：场景 3 从较长的 PRD 新建项目，场景 2 接入已有仓库。
+# 一次评测运行的场景（评测场景设计第 2 节）：场景 3 从较长的 PRD 新建项目，场景 2 接入已有仓库。
 # 入口按 `--scenario` 设一次；测试用 `scenario()` 临时切换，结束后恢复
 SCENARIO_2 = "scenario-2"
 SCENARIO_3 = "scenario-3"
 SCENARIOS = (SCENARIO_2, SCENARIO_3)
 SCENARIO = SCENARIO_3
 
-# 场景 3 的运行模型在三个部门都使用同一条连接与同一个访问定义（评测场景设计「两边的运行条件」）
+# 场景 3 的运行模型在三个部门都使用同一条连接与同一个访问定义（评测场景设计第 3 节）
 PROVIDER_ID = "yudao-eval"
 MODEL_DEFINITION_ID = "yudao-eval-model"
 PROTOCOL = "chat_completions"
-# 场景 3 交给 Yudao 的起点：只有题目提供的数据文件（docs/design/evaluation-scenarios.md「两边的运行条件」中「输入」）
+# 场景 3 交给 Yudao 的起点：只有题目提供的数据文件（第 3 节「输入」）
 START_FILES = ("subway_data.json",)
-# 场景 2 的起点是检出好的上游仓库，经 `project.onboard` 接入；建档的那个事项的种类（接入已有项目设计说明「领域事件」）
+# 场景 2 的起点是检出好的上游仓库，经 `project.onboard` 接入；建档的那个事项的种类（接入已有项目设计说明第 3.3 节）
 ONBOARDING_SOURCE_NAME = "upstream"
 INITIAL_PRD_KIND = "initial_prd"
 CONFIRM_OPTION = "confirm"
 TERMINAL_STATUSES = ("done", "paused", "failed")
-# 建档事项还在执行、或者在等用户确认初始 PRD 时的状态（接入已有项目设计说明「查询的变化」）
+# 建档事项还在执行、或者在等用户确认初始 PRD 时的状态（接入已有项目设计说明第 3.4 节）
 ONBOARDING_RUNNING_STATUSES = ("in_progress", "not_started", "awaiting_initial_prd")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
 POLL_INTERVAL_SECONDS = 3.0
@@ -84,7 +84,7 @@ _SCENARIO_MODULES = {}
 def scenario_module():
     """当前场景的运行器专用部分：材料目录、评分输入与上游仓库地址由它给出。
 
-    两边的运行器共用同一个 `scenarioN` 模块（评测场景设计「模块划分」），场景 2 与场景 3
+    两边的运行器共用同一个 `scenarioN` 模块（评测场景设计第 7 节），场景 2 与场景 3
     的评分输入与上游地址都在里面。按文件路径加载：场景 2 的运行器模块与评分器的模块
     同名（`runner/scenario2.py` 与 `scorer/scenario2.py`），同一个进程里先导入的那个
     会占住 `scenario2` 这个名字，按模块名查找会拿到评分器。
@@ -100,7 +100,7 @@ def scenario_module():
 
 
 def material_version():
-    """当前场景的材料版本（材料 manifest 的 `material_version`，docs/design/evaluation-scenarios.md「报告与版本比较」）。"""
+    """当前场景的材料版本（材料 manifest 的 `material_version`，第 6 节）。"""
     with open(os.path.join(materials_dir(), "manifest.json"), encoding="utf-8") as handle:
         return json.load(handle).get("material_version")
 
@@ -122,7 +122,7 @@ def fresh_start_dir(runs_root, run_id):
     """每次运行新建的起点文件夹：只含题目提供的数据文件，放在运行目录之外。
 
     运行目录是这次运行的数据目录（`data_dir_for`），起点文件夹与它并列；仓库内的路径
-    与已经存在的文件夹都拒绝，与数据目录同一条规矩（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。
+    与已经存在的文件夹都拒绝，与数据目录同一条规矩（第 3 节「隔离」）。
     """
     path = os.path.abspath(os.path.join(runs_root, run_id, "start"))
     repo_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
@@ -148,17 +148,17 @@ def hidden_dirs():
 
 
 def source_install_command():
-    """场景 2 评分副本建立环境用的命令：材料 manifest 的 `runtime.install`（docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」）。"""
+    """场景 2 评分副本建立环境用的命令：材料 manifest 的 `runtime.install`（第 2.2 节）。"""
     with open(os.path.join(materials_dir(), "manifest.json"), encoding="utf-8") as handle:
         return str(json.load(handle)["runtime"]["install"])
 
 
 def prepare_source_dir(runs_root, run_id, *, repo_url=None, commit=None, install_command=None):
-    """场景 2 的起点：在运行目录之外检出任务上游仓库的基准提交（docs/design/evaluation-scenarios.md「两边的运行条件」中「输入」「隔离」）。
+    """场景 2 的起点：在运行目录之外检出任务上游仓库的基准提交（第 3 节「输入」「隔离」）。
 
     检出方式沿用 OpenCode 一侧的 `scenario2.fill_run_dir`：按材料里的基准提交号从
     上游检出，再用仓库自己的锁文件建立 Python 3.13 环境。两处不同：`.git` 保留，
-    快照要记下 git 提交（接入已有项目设计说明「已有测试与 git 历史作为基线的证据」）；不放需求原文，评测材料
+    快照要记下 git 提交（接入已有项目设计说明第 4.6 节）；不放需求原文，评测材料
     不进入被接入的目录。远端地址检出以后去掉，工作区里不留回到上游的入口。
 
     `repo_url`、`commit`、`install_command` 只由测试给出：用测试里建的本地小仓库
@@ -191,7 +191,7 @@ def _git(arguments, cwd, check=True):
 
 
 def install_environment(repo_dir, install_command=None):
-    """按材料的 `runtime.install` 在检出好的仓库里建立运行环境（需要联网，docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」）。
+    """按材料的 `runtime.install` 在检出好的仓库里建立运行环境（需要联网，第 2.2 节）。
 
     测试给出空串时跳过：本地小仓库没有锁文件，也不为它建立环境。
     """
@@ -206,13 +206,13 @@ def install_environment(repo_dir, install_command=None):
 
 
 # 场景 3 的任务上游仓库（PRDBench）。运行器在导出的事件日志里查找对它的访问，
-# 与材料目录的路径使用同一条作废处理（评测场景设计「两边的运行条件」中「联网」）。
+# 与材料目录的路径使用同一条作废处理（评测场景设计第 3 节「联网」）。
 UPSTREAM_REPOSITORY = "AGI-Eval-Official/PRDBench"
 UPSTREAM_URLS = ("https://github.com/" + UPSTREAM_REPOSITORY,)
 
 
 def upstream_urls():
-    """当前场景的任务上游仓库地址：导出的事件日志里出现时这次运行作废（docs/design/evaluation-scenarios.md「两边的运行条件」中「联网」）。
+    """当前场景的任务上游仓库地址：导出的事件日志里出现时这次运行作废（第 3 节「联网」）。
 
     场景 2 的上游是 `openai/openai-agents-python`（`scenario2.UPSTREAM_URL`），
     场景 3 的是 PRDBench；两边都在各自的 `scenarioN` 模块里，与 OpenCode 一侧同一份。
@@ -221,7 +221,7 @@ def upstream_urls():
 
 
 def requirement_text():
-    """交给 Yudao 的用户原始意图（评测场景设计「两边的运行条件」中「输入」）。
+    """交给 Yudao 的用户原始意图（评测场景设计第 3 节「输入」）。
 
     场景 3 是需求原文加接口约定：两边的输入是同一份，全文写在这条原文里，工作区里
     没有这两个文件，工程不需要去读它们；起点文件（`subway_data.json`）由运行器经
@@ -241,7 +241,7 @@ def requirement_text():
 
 
 def _scenario_python():
-    """场景 3 的运行环境是 uv 管理的 Python 3.13（评测场景设计「两边的运行条件」）。"""
+    """场景 3 的运行环境是 uv 管理的 Python 3.13（评测场景设计第 3 节）。"""
     found = subprocess.run(["uv", "python", "find", "3.13"],
                            capture_output=True, encoding="utf-8", errors="replace")
     path = (found.stdout or "").strip()
@@ -326,7 +326,7 @@ def free_port():
 
 
 def data_dir_for(runs_root, run_id):
-    """被测 Yudao 的数据目录：每次运行新建，必须在仓库之外（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。"""
+    """被测 Yudao 的数据目录：每次运行新建，必须在仓库之外（第 3 节「隔离」）。"""
     path = os.path.abspath(os.path.join(runs_root, run_id, "data"))
     repo_root = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
     if _is_inside(path, repo_root):
@@ -340,7 +340,7 @@ def start_service(data_dir, port, python_executable=None):
 
     `--no-browser`：运行器不需要在控制主机上打开页面，评测运行与测试都按无界面启动。
     `--no-fetch`：关闭取回，这个实例的部门没有 `fetch_url` 与 `read_external_source`
-    （网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」、评测场景设计说明「两边的运行条件」中「两边都不联网」）。
+    （网络与 MCP 设计说明第 5.1、12.4 节、评测场景设计说明第 3 节「两边都不联网」）。
     """
     command = [python_executable or sys.executable, "-m", "harness", "api",
                "--data-dir", data_dir, "--port", str(port), "--no-browser", "--no-fetch"]
@@ -389,7 +389,7 @@ def model_service_url():
 
 
 def model_definition(model_name, limits):
-    """写进目录文档的模型访问定义：容量取模型服务报告的值或运行器参数（docs/design/evaluation-scenarios.md「两边的运行条件」）。"""
+    """写进目录文档的模型访问定义：容量取模型服务报告的值或运行器参数（第 3 节）。"""
     return {
         "id": MODEL_DEFINITION_ID, "provider_id": PROVIDER_ID, "model": model_name, "protocol": PROTOCOL,
         "context_window": limits["context_window"],
@@ -428,14 +428,14 @@ def register_model(client, model_name, limits):
 
 
 def create_project(client, name, goal, initial_directory=None):
-    """新建项目；`initial_directory` 是这次运行的起点文件夹（评测场景设计「两边的运行条件」中「输入」）。"""
+    """新建项目；`initial_directory` 是这次运行的起点文件夹（评测场景设计第 3 节「输入」）。"""
     created = client.command("project.create", {"name": name, "goal": goal,
                                                 "initial_directory": initial_directory})
     return created["refs"]["project_id"]
 
 
 def save_department_settings(client, project_id):
-    """三个部门的项目部门设置都使用被测模型（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型」一行）。"""
+    """三个部门的项目部门设置都使用被测模型（第 3 节「模型」一行）。"""
     settings = client.query("project.settings", {"project_id": project_id})["data"]["departments"]
     reminders = {}
     for department in ("product", "engineering", "quality"):
@@ -448,16 +448,16 @@ def save_department_settings(client, project_id):
 
 
 def submit_requirement(client, project_id, text):
-    """以用户原始意图提交需求原文加接口约定（评测场景设计「两边的运行条件」中「输入」）。"""
+    """以用户原始意图提交需求原文加接口约定（评测场景设计第 3 节「输入」）。"""
     created = client.command("work_item.create", {"project_id": project_id, "text": text})
     return created["refs"]["work_item_id"], created["refs"]["run_id"]
 
 
 # ---------------------------------------------------------------------------
-# 场景 2 的建档：接入已有仓库、确认初始 PRD（接入已有项目设计说明「应用层命令、决定与领域事件」、「建档流程」）
+# 场景 2 的建档：接入已有仓库、确认初始 PRD（接入已有项目设计说明第 3、4 节）
 
 def onboard_project(client, name, goal, source_path):
-    """接入已有项目：新建项目、登记源目录、采集快照、开始建档事项（「命令」）。
+    """接入已有项目：新建项目、登记源目录、采集快照、开始建档事项（第 3.1 节）。
 
     返回项目、建档事项与建档 run 三个编号：建档的导出按 run 取，与事项的导出分开。
     """
@@ -471,7 +471,7 @@ def onboard_project(client, name, goal, source_path):
 def initial_prd_decision(client, project_id):
     """这个项目的初始 PRD 决定请求；还没有出现时为 None。
 
-    请求写在项目流中，`decisions.list` 同时返回项目流与 run 流中的请求（docs/design/existing-project-onboarding.md「决定种类」）。
+    请求写在项目流中，`decisions.list` 同时返回项目流与 run 流中的请求（第 3.2 节）。
     """
     listed = client.query("decisions.list", {"project_id": project_id,
                                              "kind": INITIAL_PRD_KIND})["data"]["decisions"]
@@ -485,7 +485,7 @@ def onboarding_status(client, project_id, work_item_id):
 
 
 def wait_for_initial_prd(client, project_id, work_item_id, timeout_seconds):
-    """等建档跑完并出现初始 PRD 的确认请求，返回这个请求（docs/design/existing-project-onboarding.md「用户确认与修改的往返」）。
+    """等建档跑完并出现初始 PRD 的确认请求，返回这个请求（第 4.7 节）。
 
     建档只回答一次确认：请求出现时它就是这次等待的结果。状态离开 running 与请求写入几乎
     同时发生（工单 #1360：两次真实运行都先看到事项结束、后看到请求）：这时再查一次请求，
@@ -528,7 +528,7 @@ def wait_for_confirmation(client, project_id, timeout_seconds):
 
 
 def answer_initial_prd(client, decision):
-    """经 `decision.answer` 确认初始 PRD：基准版本是请求的版本（docs/design/existing-project-onboarding.md「决定种类」）。"""
+    """经 `decision.answer` 确认初始 PRD：基准版本是请求的版本（第 3.2 节）。"""
     return client.command("decision.answer", {"base_version": decision["version"],
                                               "decision_id": decision["decision_id"],
                                               "option": CONFIRM_OPTION})
@@ -541,7 +541,7 @@ def work_item_status(client, project_id, work_item_id):
 
 
 def wait_for_end(client, project_id, work_item_id, limit_seconds):
-    """等待事项结束；到时间上限时经 `work_item.cancel` 结束并标记超时（docs/design/evaluation-scenarios.md「两边的运行条件」中「时间上限」）。"""
+    """等待事项结束；到时间上限时经 `work_item.cancel` 结束并标记超时（第 3 节「时间上限」）。"""
     deadline = time.monotonic() + limit_seconds
     while True:
         card = work_item_status(client, project_id, work_item_id)
@@ -609,17 +609,17 @@ def last_archived_delivery(export):
 
 
 def first_archived_delivery(export):
-    """第一次封存的交付：与 `last_archived_delivery` 对称（docs/design/evaluation-scenarios.md「指标」）。
+    """第一次封存的交付：与 `last_archived_delivery` 对称（设计第 5.2 节）。
 
     只有一次交付时两次取到同一个事件，没有交付时都是 None。两份都交给评分器：
-    第一次交付的完成度与质检带来的提高都从它算（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）。
+    第一次交付的完成度与质检带来的提高都从它算（第 6.3 节第 1 条）。
     """
     deliveries = [event for event in export["events"] if event["type"] == "delivery_accepted"]
     return deliveries[0] if deliveries else None
 
 
 def quality_released(export):
-    """质检是否已经放行：最后一次质检提交为 `release`（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」）。"""
+    """质检是否已经放行：最后一次质检提交为 `release`（设计说明第 5.1 节）。"""
     reviews = [event for event in export["events"] if event["type"] == "qa_submitted"]
     return bool(reviews) and reviews[-1]["payload"].get("verdict") == "release"
 
@@ -650,7 +650,7 @@ def _write_bytes(path, data):
 
 
 def material_path_hits(text, extra_dirs=None):
-    """在导出的事件日志中查找材料目录的路径：找到时这次运行作废（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。
+    """在导出的事件日志中查找材料目录的路径：找到时这次运行作废（第 3 节「隔离」）。
 
     匹配完整路径（含目录名），父目录前缀太短，日志里正常的片段会误判。日志是
     JSON 文本，Windows 路径的反斜杠在载荷里写成两个，因此每条路径按原样、正斜杠
@@ -680,7 +680,7 @@ def describe_hits(hits):
 
 
 def digest_reasons(base):
-    """材料摘要与材料版本记录比较：不同时这次运行作废（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。
+    """材料摘要与材料版本记录比较：不同时这次运行作废（第 3 节「隔离」）。
 
     摘要算在场景目录的材料原件上，不算评分目录里的副本：评分目录紧接在运行
     之后从原件复制，两者相同，而真正要防的是被测方在运行途中改掉仓库里的原件。
@@ -712,7 +712,7 @@ def void_reasons(text):
 
 
 def yudao_commit(repo_root=None):
-    """被测 Yudao 的提交号（报告 docs/design/evaluation-scenarios.md「报告与版本比较」：结果记录 Yudao 提交号）。"""
+    """被测 Yudao 的提交号（报告第 6 节：结果记录 Yudao 提交号）。"""
     root = repo_root or os.path.abspath(
         os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
     result = subprocess.run(["git", "-C", root, "rev-parse", "--short", "HEAD"],

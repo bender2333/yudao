@@ -13,7 +13,7 @@ from harness.proposals import product_spec
 from harness.providers.call import CallUsage, ModelResponse, ModelStreamEvent
 from harness.runtime import LoopSystem
 from harness.tests.helpers import FAST_RETRIES, after_event, department_history
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.wait_limits import MODULE_WAIT_FOR_HOST_WORK_SEC
 
 
 def test_transient_failure_retries_same_logical_request_then_succeeds(tmp_path):
@@ -118,7 +118,7 @@ def test_cancel_interrupts_retry_backoff_without_next_attempt(tmp_path):
     after_event(system, EventType.MODEL_RETRY_SCHEDULED, lambda _event: scheduled.set())
     with ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(system.activate_once, run_id)
-        assert scheduled.wait(WAIT_FOR_HOST_WORK_SEC)
+        assert scheduled.wait(MODULE_WAIT_FOR_HOST_WORK_SEC)
         system.cancel(run_id)
         try:
             result = future.result(timeout=_INTERRUPTED_WITHIN_SEC)
@@ -262,7 +262,7 @@ def test_compaction_uses_the_same_retry_path(tmp_path):
 
     adapter = FakeAdapter([respond] * 8)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
-    # 上下文窗口按这个场景的需要设置（测试分层设计说明「测试的写法」中「测试不决定产品的文字」）：读一个大文件以后历史装不下、
+    # 上下文窗口按这个场景的需要设置（测试分层设计说明第 10 节第 3 条）：读一个大文件以后历史装不下、
     # 要压缩，固定材料（部门提示与事项种类的说明）装得下并留出余量；窗口不随提示词的篇幅调整
     run_id = system.create_run("echo", context_window=7000)
     system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5000)

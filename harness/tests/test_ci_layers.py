@@ -1,4 +1,4 @@
-# CI 的分层摘要与用例变化（scripts/ci_layers.py，测试分层设计说明「CI 中的分层」、「用例的变化」）：只调用函数，
+# CI 的分层摘要与用例变化（scripts/ci_layers.py，测试分层设计说明第 4.3、4.4 节）：只调用函数，
 # 输入写在用例里，不读临时文件，不启动子进程
 import importlib.util
 import sys

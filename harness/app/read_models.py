@@ -1,4 +1,4 @@
-# 应用层保存的读取模型（docs/design/app-and-interface.md「读取模型」）：调用尝试表（请求记录、用量、请求详情的索引）与流转记录。
+# 应用层保存的读取模型（设计说明第 4.2 节）：调用尝试表（请求记录、用量、请求详情的索引）与流转记录。
 # 两者按事件订阅逐步更新，各自记录已处理到的位置；删除以后从事件重放重建，重放不调用模型与工具。
 # 写入只发生在这个 SQLite 文件里，不写事件日志与保存的投影；查询在一个读取事务中读取所需的表。
 
@@ -421,7 +421,7 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "direction_from": payload.get("requester"), "direction_to": payload.get("recipient"),
                  "status": status, "content": content}]
     if event.type == EventType.QA_SUBMITTED and payload.get("verdict") in REWORK_VERDICTS:
-        # 退回（循环结构「部门的状态」）：返工回到被核验的那一方，由核验声明给出；来源是写这条结论的核验角色
+        # 退回（循环结构第 2.1 节）：返工回到被核验的那一方，由核验声明给出；来源是写这条结论的核验角色
         targets = _verified_departments(source, "delivery_spec") or [None]
         return [{**base,
                  "flow_id": event.event_id if len(targets) == 1 else f"{event.event_id}:{target}",

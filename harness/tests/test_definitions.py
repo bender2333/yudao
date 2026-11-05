@@ -106,7 +106,7 @@ def test_a_routing_name_outside_the_routings_definition_fails_naming_the_field_a
 
 
 def test_the_default_routing_is_the_watched_outputs_routing(tmp_path):
-    # 默认值是成果驱动（docs/design/skeleton-and-application.md「路由契约」），它在 routings.json 里；不写 routing 的组织定义照常加载
+    # 默认值是成果驱动（设计说明第 5.1 节），它在 routings.json 里；不写 routing 的组织定义照常加载
     assert DEFINITIONS.routing == "watched_outputs"
     assert [item.id for item in DEFINITIONS.routings.routings] == ["watched_outputs"]
     directory = _copy(tmp_path)

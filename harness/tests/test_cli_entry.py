@@ -1,5 +1,5 @@
-# 命令行入口（工单 #206、#373，docs/design/web-interface-and-release.md「命令行入口」）：yudao --version 输出发布版本号。
-# 模型目录与凭据文件的默认位置（工单 #298，docs/design/architecture/overall-architecture.md「十项长期决定」中「合同」）：按生效的 --data-dir 求出。
+# 命令行入口（工单 #206、#373，设计说明第 4.1 节）：yudao --version 输出发布版本号。
+# 模型目录与凭据文件的默认位置（工单 #298，设计说明第 3.4 节）：按生效的 --data-dir 求出。
 # --data-dir 与 --provider-config 写在子命令之前或之后都生效（工单 #315）：解析器自身不给默认值，
 # 生效值由 _data_dir 按子命令求出。
 #

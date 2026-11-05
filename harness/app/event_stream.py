@@ -1,13 +1,13 @@
-# 应用层的事件流（应用层与接口层设计说明「事件流」）：一个 GET /api/events 连接的读取与转发。
+# 应用层的事件流（应用层与接口层设计说明第 5 节）：一个 GET /api/events 连接的读取与转发。
 #
-# 连接的处理顺序（「补齐与实时」）：先向事件日志登记一个有界队列订阅，再从 after 按范围分批读取历史事件并发送，
+# 连接的处理顺序（第 5.4 节）：先向事件日志登记一个有界队列订阅，再从 after 按范围分批读取历史事件并发送，
 # 然后把队列里位置更大的事件继续发出；空闲 5 秒或连续跳过 1000 条不在范围内的事件时发出检查点；
-# 保活注释由接口层每 15 秒发送。队列溢出或 after 大于日志末尾时发出 resync 并关闭（「缺口检测与重新同步」）。
+# 保活注释由接口层每 15 秒发送。队列溢出或 after 大于日志末尾时发出 resync 并关闭（第 5.5 节）。
 #
-# 范围筛选与按相同条件读取事件日志共用同一组条件（docs/design/app-and-interface.md「范围筛选」）：历史读取经 EventStore.read 的 SQL 条件，
+# 范围筛选与按相同条件读取事件日志共用同一组条件（第 5.3 节）：历史读取经 EventStore.read 的 SQL 条件，
 # 队列里的事件经 matches 判定，两者语义一致。
 #
-# 模型输出片段不在事件日志中（docs/design/app-and-interface.md「模型输出片段」）：带 live=1 的连接接收片段泵按同样范围合并后的片段。
+# 模型输出片段不在事件日志中（第 5.6 节）：带 live=1 的连接接收片段泵按同样范围合并后的片段。
 
 from __future__ import annotations
 
@@ -42,7 +42,7 @@ StoredEvent = Union[Event, ProjectEvent, CatalogEvent]
 _EVENT_OBJECT = TypeAdapter(EventObject)
 
 class EventScope(BaseModel):
-    # 事件流的范围（docs/design/app-and-interface.md「路径与参数」、「范围筛选」）：省略项目为跨项目；同一参数的多个值取并集，各参数之间取交集
+    # 事件流的范围（第 5.1、5.3 节）：省略项目为跨项目；同一参数的多个值取并集，各参数之间取交集
     model_config = {"extra": "forbid"}
 
     projects: tuple[str, ...] = ()
@@ -53,7 +53,7 @@ class EventScope(BaseModel):
     types: tuple[str, ...] = ()
 
 class StreamEvent(BaseModel):
-    # 一条要发送的事件：事件对象（docs/design/app-and-interface.md「事件对象」）与接口层编码 SSE 需要的位置
+    # 一条要发送的事件：事件对象（第 5.2 节）与接口层编码 SSE 需要的位置
     kind: Literal["event"] = "event"
     position: int
     previous: int
@@ -66,13 +66,13 @@ class StreamCheckpoint(BaseModel):
     previous: int
 
 class StreamResync(BaseModel):
-    # 重新同步：原因与当前日志末尾位置，连接随后关闭（docs/design/app-and-interface.md「缺口检测与重新同步」）
+    # 重新同步：原因与当前日志末尾位置，连接随后关闭（第 5.5 节）
     kind: Literal["resync"] = "resync"
     reason: Literal["queue_overflow", "position_unknown"]
     end_position: int
 
 class StreamDelta(BaseModel):
-    # 转发给 live=1 连接的一段模型输出片段（docs/design/app-and-interface.md「模型输出片段」）：SSE 事件名为 delta，不带 id
+    # 转发给 live=1 连接的一段模型输出片段（第 5.6 节）：SSE 事件名为 delta，不带 id
     kind: Literal["delta"] = "delta"
     delta: OutputDelta
 
@@ -106,11 +106,11 @@ class EventStream:
         self._queue_limit = queue_limit
         self._checkpoint_idle_sec = checkpoint_idle_sec
         self._checkpoint_skipped = checkpoint_skipped
-        # 本连接上一条事件或检查点的位置；第一条为 after（docs/design/app-and-interface.md「缺口检测与重新同步」）
+        # 本连接上一条事件或检查点的位置；第一条为 after（第 5.5 节）
         self._previous = self._after
         self._scanned = self._after
         self._skipped = 0
-        # 本连接在片段泵上的待发队列（docs/design/app-and-interface.md「模型输出片段」）：连接建立时登记，连接结束时取消
+        # 本连接在片段泵上的待发队列（第 5.6 节）：连接建立时登记，连接结束时取消
         self._delta_queue: deque[DeltaFragment] | None = None
         self._unsubscribe_deltas: Callable[[], None] | None = None
         # 停止请求到达时置位（工单 #301）：等待中的连接干净结束，不等优雅退出的超时
@@ -125,7 +125,7 @@ class EventStream:
         self._closed.set()
 
     def matches(self, event: StoredEvent) -> bool:
-        # 一条事件是否在范围内（docs/design/app-and-interface.md「范围筛选」）：省略的范围不限制，给出的范围取并集；
+        # 一条事件是否在范围内（第 5.3 节）：省略的范围不限制，给出的范围取并集；
         # 项目与目录事件没有部门或种类以外的列时为 None，None 不属于任何给出的范围
         scope = self._scope
         return (_within(scope.projects, getattr(event, "project_id", None))
@@ -245,7 +245,7 @@ class EventStream:
         return not is_known_event_type(event.type)
 
     def _object(self, event: StoredEvent) -> Contract:
-        # 事件对象（docs/design/app-and-interface.md「事件对象」）：公共字段加上按种类确定的 type 与 payload
+        # 事件对象（第 5.2 节）：公共字段加上按种类确定的 type 与 payload
         fields = {
             "position": event.position, "previous": self._previous, "event_id": event.event_id,
             "at": event.created_at, "stream": event.stream, "stream_version": event.stream_version,
@@ -261,7 +261,7 @@ class EventStream:
 
     def _drain_deltas(self) -> list[StreamDelta]:
         # 这一合并周期里本连接的片段：先驱动一次泵的合并周期（把被接受的片段分发进每个登记的待发队列，
-        # 各连接再从自己的队列弹出），先到的连接取走不影响其他连接（docs/design/app-and-interface.md「模型输出片段」）
+        # 各连接再从自己的队列弹出），先到的连接取走不影响其他连接（第 5.6 节）
         if not self._live or self._pump is None or self._delta_queue is None:
             return []
         self._pump.drain()

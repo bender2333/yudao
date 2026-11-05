@@ -1,4 +1,4 @@
-# 系统首页的查询与命令（docs/design/app-and-interface.md「查询清单」中「系统首页」，工单 #127）：
+# 系统首页的查询与命令（设计说明第 4.3 节「系统首页」，工单 #127）：
 # home.away_report 返回上次查看的位置与时间、所选范围内的汇总与关键事实列表，供画面回放与时间轴使用；
 # home.mark_seen 把上次查看的位置更新为用户看到的全局位置，保存在控制主机上，只有一个。
 # 汇总与关键事实都由事件得到，没有来源事件的项不返回，不写成零。
@@ -38,11 +38,11 @@ STATE_NAMES: dict[str, str] = {
     "undetermined": "无法判定",
 }
 
-# 报告范围（docs/design/app-and-interface.md「查询清单」）：自上次查看、最近 24 小时、最近 7 天
+# 报告范围（设计说明第 4.3 节）：自上次查看、最近 24 小时、最近 7 天
 RANGES: dict[str, str] = {"since_seen": "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天"}
 RANGE_SECONDS = {"24h": 24 * 3600, "7d": 7 * 24 * 3600}
 
-# 范围内的关键事实种类（docs/design/app-and-interface.md「查询清单」）：询问与回答、返工、放行、采纳、决定请求的发出与回答。
+# 范围内的关键事实种类（设计说明第 4.3 节）：询问与回答、返工、放行、采纳、决定请求的发出与回答。
 # 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，所属工作包完成之前没有数据
 FACT_TYPES: frozenset[str] = frozenset({
     EventType.ASK_STARTED, EventType.ASK_ANSWERED,
@@ -52,7 +52,7 @@ FACT_TYPES: frozenset[str] = frozenset({
 })
 REWORK_VERDICTS = frozenset({"rework_engineering"})
 
-# 关键事实的种类（时间轴刻度与离开期间的报告使用，docs/design/app-and-interface.md「缺口检测与重新同步」）：刻度按种类着色。
+# 关键事实的种类（时间轴刻度与离开期间的报告使用，设计说明第 5.5 节）：刻度按种类着色。
 # 故障、修复、部署与回滚、进入与离开等待属于 Stage 4，事件种类登记以后在这里补上
 FACT_KINDS: dict[str, str] = {
     EventType.ASK_STARTED: "ask",

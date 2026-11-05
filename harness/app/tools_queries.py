@@ -1,4 +1,4 @@
-# 工具登记查询（工单 #1177，网络与 MCP 设计说明「应用层接口」「查询 tools.registry」、「系统「工具与扩展」页」；总图第四节「接口」缝）。
+# 工具登记查询（工单 #1177，网络与 MCP 设计说明第 10 节「查询 tools.registry」、第 11.3 节；总图第四节「接口」缝）。
 # 返回各项目最近的取回记录与各项目的 MCP 服务器（设置、最近一次探测的状态、工具清单）。
 #
 # 数据来源（2026-11-03，main 6ad1fd3e；两个前置都已合并）：
@@ -25,7 +25,7 @@ from .registry import QueryDefinition
 if TYPE_CHECKING:
     from .application import Application
 
-# 每个项目最多给出多少条取回记录。docs/design/network-and-mcp.md「系统「工具与扩展」页」中「最近的取回记录」，没有写条数：这一页是只读的
+# 每个项目最多给出多少条取回记录。设计说明第 11.3 节只说要「最近的取回记录」，没有写条数：这一页是只读的
 # 汇总，取最近 20 条足够看出近期取回的结果分布，也不让一条长跑的项目把这一页撑大
 FETCH_RECORD_LIMIT = 20
 
@@ -38,9 +38,9 @@ _PROBE_OK = "ok"
 
 
 class ToolsRegistryProbeState(Contract):
-    # 一台 MCP 服务器最近一次探测的状态（设计说明「读取工具清单（探测）」、docs/design/network-and-mcp.md「系统「工具与扩展」页」）：还没有探测过时
+    # 一台 MCP 服务器最近一次探测的状态（设计说明第 4.2 节「读取工具清单」、第 11.3 节）：还没有探测过时
     # 三项都为空。config_digest 是那次探测绑定的配置摘要，与服务器当前的 config_digest 不同时这次结果已经过期
-    # （docs/design/network-and-mcp.md「读取工具清单（探测）」：旧结果保留供查询，不得覆盖新配置的可用状态）
+    # （设计说明第 4.2 节：旧结果保留供查询，不得覆盖新配置的可用状态）
     finished_at: str | None = None
     ok: bool | None = None
     error: str | None = None
@@ -55,7 +55,7 @@ class ToolsRegistryServerView(McpServerSettingView):
 
 
 class ToolsRegistryFetchRecord(Contract):
-    # 一条取回记录（docs/design/network-and-mcp.md「系统「工具与扩展」页」：时间、地址、项目、结果）。项目由它所在的条目给出：at 是取回动作
+    # 一条取回记录（设计说明第 11.3 节：时间、地址、项目、结果）。项目由它所在的条目给出：at 是取回动作
     # 的时间，url 是动作请求的地址，ok 为假时 error 写明原因（取回失败，或被地址规则与工具许可拒绝）
     at: str = ""
     url: str = ""
@@ -108,7 +108,7 @@ def _probe_states(store: Any, project_id: str) -> dict[str, ToolsRegistryProbeSt
 
 def _recent_fetch_records(store: Any, project_id: str) -> list[ToolsRegistryFetchRecord]:
     # 这个项目最近的取回记录，最近的在前：只认名字是 fetch_url 的工具结果（工单 #68 的取回动作，
-    #docs/design/network-and-mcp.md「应用层接口」的「事件（run 流）… 调用沿用 tool_started、tool_called」）。边读边丢最旧的，
+    # 设计说明第 10 节的「事件（run 流）… 调用沿用 tool_started、tool_called」）。边读边丢最旧的，
     # 只留最后 FETCH_RECORD_LIMIT 条；只有开始、还没有结果的取回不在这里（结果未知的动作在 run.actions 里看）
     recent: deque[ToolsRegistryFetchRecord] = deque(maxlen=FETCH_RECORD_LIMIT)
     for event in _events_of(store, project_id, (EventType.TOOL_CALLED,)):

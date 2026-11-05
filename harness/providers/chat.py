@@ -176,7 +176,7 @@ class _ChatInvoker:
             **(call_params | ({"extra_headers": headers} if headers else {})),
         ), trace)
         event_index = 0
-        # 输出片段（docs/design/app-and-interface.md「模型输出片段」）：按通道记录已发出的字数作为下一段的起始位置
+        # 输出片段（设计说明第 5.6 节）：按通道记录已发出的字数作为下一段的起始位置
         channel_offsets: dict[str, int] = {}
         async for chunk in _provider_events(stream, trace):
             payload = _sdk_json(chunk, secrets=(invocation.frozen_target.api_key,))
@@ -204,7 +204,7 @@ class _ChatInvoker:
                 content = delta.get("content")
                 if isinstance(content, str) and content:
                     text_parts.append(content)
-                # 推理内容（docs/design/model-management.md「历史中的推理内容」）：Chat Completions 的 reasoning_content，逐块累加
+                # 推理内容（设计说明第 7.6 节）：Chat Completions 的 reasoning_content，逐块累加
                 reasoning_content = delta.get("reasoning_content")
                 if isinstance(reasoning_content, str) and reasoning_content:
                     reasoning_parts.append(reasoning_content)
@@ -399,7 +399,7 @@ def _chat_messages(provider_input: ProviderInput) -> list[dict[str, Any]]:
 
 
 def _flush_tool_images(messages: list[dict[str, Any]], pending: list[tuple[str, ToolImage]]) -> None:
-    # Chat Completions 的 tool 消息只收文字（docs/design/browser-and-computer-use.md「请求中的图像」），工具结果里的图像写成紧跟其后的一条
+    # Chat Completions 的 tool 消息只收文字（设计说明第 6.2 节），工具结果里的图像写成紧跟其后的一条
     # user 消息：每张图前面一行写明它是哪个工具调用的结果，图像按出现顺序
     if not pending:
         return

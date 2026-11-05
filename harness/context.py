@@ -65,7 +65,7 @@ def department_work_text(pinned: AssembledContext) -> str:
 
 @dataclass(frozen=True)
 class Rules:
-    """装配规则的取值（docs/design/context-assembly.md「规则清单（七条）」）。布尔型的是定义的开与关，数值型的是参数。
+    """装配规则的取值（设计说明第 4 节）。布尔型的是定义的开与关，数值型的是参数。
 
     这一版没有一条减法规则起作用：视图不减去任何东西，装配结果与改动前逐字节相同。
     规则版本是取值的规范散列，上下文清单记它，重放才能核对「同一份规则」。
@@ -83,7 +83,7 @@ class Rules:
     error_result_keep: bool = True
     # R5 引证段只在这一次的工作引用指向它时整段装入
     pinned_reference_gate: bool = False
-    # R5 受门控的引证段；project 不在其中（docs/design/context-assembly.md「规则清单（七条）」 R5）
+    # R5 受门控的引证段；project 不在其中（设计说明第 4 节 R5）
     gated_sections: tuple[str, ...] = (
         "current_delivery_spec", "prior_delivery", "existing_overview", "causal_chain",
         "binding_refs", "prior_structure", "prior_initial_prd", "current_product_decisions",
@@ -108,7 +108,7 @@ class Rules:
         return canonical_hash(self.to_dict())
 
 
-# 视图输入里部门材料那一条的种类：一步只有一条，恒在首位（docs/design/browser-and-computer-use.md「工具定义的声明」）
+# 视图输入里部门材料那一条的种类：一步只有一条，恒在首位（设计说明第 6.1 节）
 MATERIALS = "materials"
 # 视图输入里部门历史的条目
 HISTORY = "history"
@@ -152,7 +152,7 @@ def view(entries: list[ContextEntry], rules: Rules, *,
     )
 
 
-# 工具结果里的图像放进请求的张数与换出的粒度（浏览器与 computer use 设计说明「请求中的图像」，取值参照
+# 工具结果里的图像放进请求的张数与换出的粒度（浏览器与 computer use 设计说明第 6.2 节，取值参照
 # Anthropic 参考实现 `_maybe_filter_to_n_most_recent_images`：保留最近 3 张，换出按 3 张一组）
 REQUEST_IMAGE_KEPT = 3
 REQUEST_IMAGE_BATCH = 3
@@ -177,7 +177,7 @@ def frozen_visibility(projection: RunProjection, department: str,
 
 def request_history(history: list[dict[str, Any]], *, run_id: str, artifacts: ArtifactStore | None,
                     input_modalities: tuple[str, ...] = ("text",)) -> list[dict[str, Any]]:
-    """部门历史里的工具结果按调用目标的输入方式放进请求（docs/design/browser-and-computer-use.md「请求中的图像」）。
+    """部门历史里的工具结果按调用目标的输入方式放进请求（设计说明第 6.2 节）。
 
     调用目标包含图像时读出图像字节，只保留最近 3 张，更早的换成一行占位文字，换出按 3 张一组；
     不含图像时截图不放进请求，历史里已有的图像全部换成占位文字。
@@ -274,7 +274,7 @@ def work_notifications(projection: RunProjection, events: list[Any] | None, depa
         })
     if department in (definitions or DEFINITIONS).verified_by("delivery_spec"):
         # 交付到达只通知核验交付的那个角色（核验声明，工单 #1401）：它面对的代码随交付变化，
-        # 检查工作区因此重建（local-tools docs/design/local-tools.md「工作区」）
+        # 检查工作区因此重建（local-tools 第 2 节）
         for delivery in projection.delivery_specs:
             if delivery.status != "active":
                 continue
@@ -336,11 +336,11 @@ class ContextAssembler:
     def __init__(self, artifacts: ArtifactStore | None = None, store: EventStore | None = None, *,
                  tightening: Tightening, rules: Rules | None = None) -> None:
         self.artifacts = artifacts
-        # 修改轮的上一轮候选属于项目流，只能按事件编号取（docs/design/existing-project-onboarding.md「用户确认与修改的往返」）
+        # 修改轮的上一轮候选属于项目流，只能按事件编号取（设计第 4.7 节）
         self.store = store
         # 请求里提供哪些工具由路由的收紧检查取舍（工单 #1095）
         self.tightening = tightening
-        # 装配规则的取值（docs/design/browser-and-computer-use.md「浏览器工具（Playwright MCP）」）：视图按它算，规则版本随上下文清单记进事实
+        # 装配规则的取值（设计说明第 4 节）：视图按它算，规则版本随上下文清单记进事实
         self.rules = rules or Rules()
 
 
@@ -424,7 +424,7 @@ class ContextAssembler:
                 project_text,
             ))
         if projection.kind == "onboarding" and projection.overview_ref is not None:
-            # 仓库概况：建档中三个部门都看得见的常驻栏目，由控制核心按快照生成（docs/design/existing-project-onboarding.md「仓库概况与读取范围」）
+            # 仓库概况：建档中三个部门都看得见的常驻栏目，由控制核心按快照生成（设计第 4.2 节）
             if self.artifacts is None:
                 raise ValueError("the repository overview requires an artifact store")
             parts.append(ContextPart(
@@ -435,7 +435,7 @@ class ContextAssembler:
                 ).decode("utf-8"),
             ))
         if "existing_structure" in visible and projection.structure is not None:
-            # 现有结构说明：只有工程的可见范围包含它（docs/design/existing-project-onboarding.md「工程：现有结构说明」，工单 #134 验收第 5 项）
+            # 现有结构说明：只有工程的可见范围包含它（设计第 4.4 节，工单 #134 验收第 5 项）
             if self.artifacts is None:
                 raise ValueError("the structure description requires an artifact store")
             structure = projection.structure
@@ -663,7 +663,7 @@ class ContextAssembler:
         # 修改轮的常驻材料（工单 #1401）：可见范围里有这一项的角色，看到上一轮里它自己会交出的那两种成果的原文。
         # 哪一种按它的提案合同取，不按部门名：会交产品要求的是初始 PRD 与这一轮用户的修改意见，
         # 会交结构说明的是上一轮的结构说明；不交这两种成果的角色（核验角色）看不到上一轮的原文
-        # （docs/design/existing-project-onboarding.md「用户确认与修改的往返」最后一段）
+        # （设计第 4.7 节最后一段）
         if "prior_round" not in visible or self.store is None or self.artifacts is None:
             return []
         basis = projection.onboarding_basis
@@ -883,7 +883,7 @@ def _delivery_explanation_fields(definitions: Definitions | None, issuer: str) -
 
 def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec | None = None,
                                 definitions: Definitions | None = None) -> dict[str, Any]:
-    # 质检请求里可以放入的工程内容（工单 #554、#358，验证的独立性设计说明「先判断后看解释」）：
+    # 质检请求里可以放入的工程内容（工单 #554、#358，验证的独立性设计说明第 4 节）：
     # 事实部分总在；解释部分在核验角色提交了当前交付的独立判断（independent_judgement_committed）
     # 以后进入它之后的请求——先判断后看解释，解释不再等质检的结论；新的交付到达后按新交付重新计算：
     # 解释部分重新藏起来，等核验角色对新交付的独立判断。

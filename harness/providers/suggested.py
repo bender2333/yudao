@@ -1,6 +1,6 @@
-# 部门建议能力的提醒（模型管理设计说明「部门的建议能力」）。
+# 部门建议能力的提醒（模型管理设计说明第 5.6 节）。
 # 部门定义写明本部门模型的建议能力，质检为图像输入，其他部门没有。提醒只用于提示，不阻止保存或请求。
-# 判断只读模型访问定义中的输入方式，不读模型能力表（能力表只用于预填，见设计说明「服务方案预置表与模型能力表」的用途）。
+# 判断只读模型访问定义中的输入方式，不读模型能力表（能力表只用于预填，见设计说明第 4.1 节的用途）。
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from ..definitions import DEFINITIONS
 from .store import ModelDefinition
 
-# 缺少某项能力时的影响：按 docs/design/model-management.md「部门的建议能力」抄录浏览器与 computer use 设计说明「无法核验」的结论
+# 缺少某项能力时的影响：按设计说明第 5.6 节抄录浏览器与 computer use 设计说明第 8.4 节的结论
 _MISSING_IMPACT: Mapping[str, str] = {
     "image": "不提供 computer use，浏览器只给可访问性结构，不给截图；依赖桌面程序或外观的验收条件无法核验",
 }
@@ -29,7 +29,7 @@ def missing_capabilities(department: str, model: ModelDefinition | Mapping[str, 
 
 def reminder(department: str, model: ModelDefinition | Mapping[str, Any],
               model_id: str | None = None) -> str | None:
-    # 一条提醒：写明部门、模型、缺少的能力与影响（docs/design/model-management.md「部门的建议能力」）。
+    # 一条提醒：写明部门、模型、缺少的能力与影响（设计说明第 5.6 节）。
     # 模型具备本部门的建议能力，或部门没有建议能力时没有提醒
     missing = missing_capabilities(department, model)
     if not missing:

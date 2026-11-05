@@ -1,10 +1,10 @@
-"""版本比较与两侧对照（`docs/design/evaluation-scenarios.md` 「报告与版本比较」）。
+"""版本比较与两侧对照（`docs/design/evaluation-scenarios.md` 第 6 节）。
 
-- 版本比较（docs/design/evaluation-scenarios.md「噪声范围与三种结论」）：同一场景按运行的序号配对，第 1 次对第 1 次，不按运行编号；
+- 版本比较（第 6.1 节）：同一场景按运行的序号配对，第 1 次对第 1 次，不按运行编号；
   只有材料版本与评分器版本都相同时才配对，否则拒绝比较；噪声来自同一版本的重复运行，
   差值用配对的随机化检验；三种结论：改进 / 无差别 / 退化；必需证据缺失时标受阻并保留
   已算指标。
-- 两侧对照（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）：Yudao 对单个 agent（OpenCode），判定按 D38 的 N-G1，结论是
+- 两侧对照（第 6.3 节）：Yudao 对单个 agent（OpenCode），判定按 D38 的 N-G1，结论是
   「高于」「没有达到」「受阻」之一；逐次并排的表只报告，不据此判定。
 """
 
@@ -13,7 +13,7 @@ import yudao_metrics
 PRIMARY_METRIC = "qa_false_release"
 SECONDARY_METRICS = ("asks", "reworks", "completion", "requests", "cost", "elapsed")
 
-# N-G1（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）：同一个场景 3 次运行中至少 2 次满足条件
+# N-G1（第 6.3 节第 1 条）：同一个场景 3 次运行中至少 2 次满足条件
 REQUIRED_RUNS = 2
 
 VERDICT_LABELS = {"above": "高于", "not_reached": "没有达到", "blocked": "受阻"}
@@ -96,7 +96,7 @@ def compare(current, baseline):
 def _run_scores(result):
     """逐次运行的评分：键是运行的序号（`runs` 数组的位置，从 1 起），不按 run_id。
 
-    运行编号前缀随批次变化（docs/design/evaluation-scenarios.md「噪声范围与三种结论」），按 run_id 配对时两组结果一对也配不上。作废的
+    运行编号前缀随批次变化（第 6.1 节），按 run_id 配对时两组结果一对也配不上。作废的
     运行没有评分，它的序号在另一侧没有配对。
     """
     scores = {}
@@ -147,7 +147,7 @@ def _secondary(paired):
 
 
 def _verdict(paired, noise):
-    """三种结论（docs/design/evaluation-scenarios.md「评分」）：
+    """三种结论（第 4 节第 4 条）：
     - 退化：任一运行误放行增加，或出现基线没有的新检查点失败，或完成度下降超出噪声范围；
     - 改进：误放行总数下降超出噪声范围，并且没有任何运行退化；
     - 无差别：其余情况。
@@ -174,11 +174,11 @@ def _verdict(paired, noise):
 
 
 # ---------------------------------------------------------------------------
-# 两侧对照：Yudao 对单个 agent（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）
+# 两侧对照：Yudao 对单个 agent（第 6.3 节）
 
 
 def compare_sides(yudao_result, opencode_result):
-    """Yudao 对 OpenCode 的对照（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」、D38 的 N-G1）：三种结论之一。
+    """Yudao 对 OpenCode 的对照（第 6.3 节、D38 的 N-G1）：三种结论之一。
 
     材料版本与评分器版本相同才比较，否则「受阻」。判定看质检这一段：同一个场景至少
     2 次运行里，质检在时间上限以内给出结论、最终交付比本次第一次交付多通过至少 1 条
@@ -216,7 +216,7 @@ def compare_sides(yudao_result, opencode_result):
 
 
 def qa_advantage(runs):
-    """N-G1 的判定（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）：3 次运行中至少 2 次满足「高于」的条件。
+    """N-G1 的判定（第 6.3 节第 1 条）：3 次运行中至少 2 次满足「高于」的条件。
 
     「至少 2 次」指不计入以外的运行里至少 2 次满足条件；不计入的运行不算满足，也不是
     失败。可以观察质检提高的运行不到 2 次、或者第一次交付的评分缺失时结论是「受阻」，
@@ -302,7 +302,7 @@ def qa_advantage(runs):
 
 
 def _false_release(run):
-    """质检误放行：放行而隐藏检查中存在失败（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「质检误放行」）。"""
+    """质检误放行：放行而隐藏检查中存在失败（第 5.1 节第 4 项）。"""
     checkpoints = (run.get("metrics") or {}).get("checkpoints") or {}
     return (checkpoints.get("no_false_release") or {}).get("passed") is False
 

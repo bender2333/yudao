@@ -1,4 +1,4 @@
-# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用设计说明「其他路由：骨架要满足的条件」中「证明」、；
+# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用设计说明第 5.4 节「证明」、第 12 节 S6b；
 # 总图第四节「路由」缝）。
 #
 # 证明的样子：同一副骨架（写入口、裁决、边界、薄驱动、最小投影、定义加载）接上另一套应用——
@@ -22,8 +22,8 @@
 # 名称接上、它自己的一份定义由它自己校验、骨架只认得通用的一种成果接纳事件）与 R1（每个 run 以封闭清单里的
 # 原因结束：这里的那份清单是路由自己声明的那份）。
 #
-# 先后由事件决定，不用时长赌（docs/design/skeleton-and-application.md「看门狗与健康协议」）：这个事项一轮一个部门，薄驱动按路由的指派依次开始；
-# 假模型的脚本按部门给出（docs/design/skeleton-and-application.md「看门狗与健康协议」），每一步读的是前面写下的事件。
+# 先后由事件决定，不用时长赌（第 10 节第 7 条）：这个事项一轮一个部门，薄驱动按路由的指派依次开始；
+# 假模型的脚本按部门给出（第 10 节第 6 条），每一步读的是前面写下的事件。
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ POOL_DEFINITIONS = second_routing.DEFINITIONS_DIR
 
 TASK = {"title": "README 的用法一节补上退出码说明"}
 
-# 假模型的脚本：按部门给出（docs/design/skeleton-and-application.md「看门狗与健康协议」）。发一次任务、完成两次（中间被打回一次）、给一次打回与一次
+# 假模型的脚本：按部门给出（第 10 节第 6 条）。发一次任务、完成两次（中间被打回一次）、给一次打回与一次
 # 接纳的结论。路由自己的提议方式不是产品的提交类工具，所以答复直接写成函数调用（FakeAdapter 的脚本项可以是
 # 返回 ModelResponse 的函数）
 SCRIPT = {
@@ -150,7 +150,7 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path):
     assert {item["artifact_issuer"] for item in verdicts} == {"quality"}
     assert all(item["completion"] in {done["content_hash"] for done in completions} for item in verdicts)
 
-    # 事项以它自己那份定义里声明的结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）
+    # 事项以它自己那份定义里声明的结束原因结束（设计说明第 5.4 节第 7 条）
     declared = second_routing.DEFINITIONS.routing_definition().end_reasons
     assert projection.stop_reason == second_routing.ITEM_END_REASON
     assert projection.stop_reason in declared
@@ -191,7 +191,7 @@ def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path):
     assert not hasattr(second_routing.TaskPool, "bind")
 
     reader = second_routing.ROUTING._facts
-    # 读取器只有 list_events：写事件仍然只经薄驱动交给写入口（docs/design/skeleton-and-application.md「路由契约」中「不做」）
+    # 读取器只有 list_events：写事件仍然只经薄驱动交给写入口（设计说明第 5.1 节「不做」）
     assert {name for name in dir(reader) if not name.startswith("_")} == {"list_events"}
     for writing in ("commit", "append", "replace_projection", "claim_execution_right", "close"):
         assert not hasattr(reader, writing)
@@ -204,7 +204,7 @@ def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path):
 
 
 def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_path):
-    # 基础规则 3「生成者不裁决自己」：路由用自己的方式满足（骨架与应用设计说明「其他路由：骨架要满足的条件」），
+    # 基础规则 3「生成者不裁决自己」：路由用自己的方式满足（骨架与应用设计说明第 5.4 节），
     # 这里用这次运行里真实写下的事件折出的池子现状来判，不构造假的池子
     system, _adapter = _system(tmp_path)
     run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
@@ -233,7 +233,7 @@ def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_p
 
 
 def test_the_task_pool_registers_its_own_application_event_kinds(tmp_path):
-    # 设计说明「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」、docs/design/skeleton-and-application.md「骨架事件与应用事件」：应用登记自己的事件种类，增加一种不改内核文件
+    # 设计说明第 5.4 节第 1 条、第 7 节：应用登记自己的事件种类，增加一种不改内核文件
     registered = kernel_events.application_event_types()
     for kind in second_routing.APPLICATION_EVENT_KINDS:
         assert registered.get(kind) == second_routing.APPLICATION
@@ -270,7 +270,7 @@ def test_the_task_pool_definitions_live_only_in_the_test_directory():
 
 
 def test_the_routing_rejects_its_own_definition_without_its_end_reason(tmp_path):
-    # 内容由路由自己校验（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：事项结束用的那一条必须声明在这份定义里
+    # 内容由路由自己校验（设计说明第 5.4 节第 2 条）：事项结束用的那一条必须声明在这份定义里
     directory = tmp_path / "definitions"
     shutil.copytree(POOL_DEFINITIONS, directory)
     path = directory / "routings.json"

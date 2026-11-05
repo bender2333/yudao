@@ -188,10 +188,10 @@ function Basics(props: { app: ClientApp; data: ProjectSettingsResult; command: C
   );
 }
 
-// 部门设置（7.5 节第 2 项）：各部门的项目部门设置，内容同部门设置弹窗（docs/design/model-management.md「部门详情里的模型与 Prompt」）。
+// 部门设置（7.5 节第 2 项）：各部门的项目部门设置，内容同部门设置弹窗（第 9.2 节）。
 // 模型、推理档位与部门 Prompt 三项一起保存；模型与档位由 #95 加入，
 // 读取与保存的版本由 project.settings 给出，部门默认来自 catalog 的 bindings，
-// 生效模型的跟随说明与建议能力提醒按 docs/design/model-management.md「解析规则」、「部门的建议能力」计算
+// 生效模型的跟随说明与建议能力提醒按第 5.3、5.6 节计算
 function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
   const { data } = props;
   const entries = Object.entries(data.departments);

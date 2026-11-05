@@ -167,7 +167,7 @@ def test_rules_registry_returns_every_entry_with_its_four_notes_bounds_kind_form
         assert item["form"] in {"permission", "boundary", "admission"}
         assert item["kind"] in {"parameter", "structure"}
         assert all(item[note] for note in ("guards", "cost", "relax_when", "tighten_when", "origin"))
-    # docs/design/rules-and-parameters.md「规则登记的初始内容」表里的数值保持现值
+    # 第 8 节表里的数值保持现值
     values = {item["name"]: item["value"] for item in entries}
     assert values["run_time_limit_sec"] == 7200 and values["max_cycles"] == 999999
     assert values["tool_call_required_limit"] == 3 and values["check_timeout_sec"] == 600
@@ -314,13 +314,13 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "evidence.external_source", "tools.registry", "run.loops", "acceptance.coverage",
         "project.organization",
     }
-    # 可回放的查询：接受 docs/design/app-and-interface.md「合同」的 at（按位置读取）
+    # 可回放的查询：接受第 4.1 节的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {
         "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry", "run.loops",
         "acceptance.coverage",
     }
     # 覆盖层只列出依赖的查询都已登记的：flow、waiting 与 recovery 的依赖已登记，其余依赖的查询尚未加入；
-    # 事实来源不依赖查询，事件对象带上 source 以后列出（工单 #396，docs/design/app-and-interface.md「查询清单」）
+    # 事实来源不依赖查询，事件对象带上 source 以后列出（工单 #396，设计说明第 4.3 节）
     assert capabilities["overlays"] == [
         {"name": "flow", "queries": ["project.flow"]},
         {"name": "waiting", "queries": ["project.loop", "decisions.list"]},

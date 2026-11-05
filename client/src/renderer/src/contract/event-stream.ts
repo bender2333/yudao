@@ -1,4 +1,4 @@
-// 事件流客户端（应用层与接口层设计说明「补齐与实时」、「缺口检测与重新同步」、「模型输出片段」）。
+// 事件流客户端（应用层与接口层设计说明第 5.4、5.5、5.6 节）。
 // 用 npm eventsource 传入自定义 fetch（加入令牌以后在请求头中带令牌）；按位置续传；
 // 核对 previous；处理 checkpoint、resync、delta；断线时报告「连接中断，数据可能过时」。
 // 帧的解析与位置核对放在 stream-frames.ts，这里只负责连接、订阅与上报。
@@ -16,7 +16,7 @@ export type StreamHandlers = {
   onMessage: (message: StreamMessage) => void;
   // 发现缺口或收到 resync：客户端把已打开的视图标为「数据可能过时」并重新同步快照
   onResync: (reason: string) => void;
-  // 断线：保留最后已知的状态，整体显示「连接中断，数据可能过时」（docs/design/app-and-interface.md「页面的同步规则」）
+  // 断线：保留最后已知的状态，整体显示「连接中断，数据可能过时」（设计说明第 5.7 节）
   onInterrupted: () => void;
 };
 
@@ -115,7 +115,7 @@ export class EventStreamClient {
     this.backoff.stoodUp();
     const parsed = parseFrame(name, message.data, this.lastPosition);
     if (parsed.kind === "gap") {
-      // previous 与本连接最后收到的不符：缺口，交给重新同步（docs/design/app-and-interface.md「缺口检测与重新同步」）
+      // previous 与本连接最后收到的不符：缺口，交给重新同步（第 5.5 节）
       this.handlers.onResync(`position gap: expected ${parsed.expected}, got ${parsed.got}`);
       return;
     }

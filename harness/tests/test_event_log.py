@@ -144,7 +144,7 @@ def test_cross_project_reads_follow_the_order_of_writing(data_dir):
     assert [event.position for event in events] == sorted(event.position for event in events)
 
 def test_every_event_declares_its_actor_and_the_department_lives_in_the_department_column(actor_log):
-    # 提出者由写入方声明（docs/design/app-and-interface.md「事件对象」）：命令写入的事件为命令的提出者、角色任务中的记录与提案为
+    # 提出者由写入方声明（设计第 5.2 节）：命令写入的事件为命令的提出者、角色任务中的记录与提案为
     # department:<部门>、流程编排与控制核心自己的判断为 system；role 列为空，部门只在 department 列
     user_events = {EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GUIDANCE_RECEIVED}
     system_events = {EventType.RUN_CREATED, EventType.DEPARTMENT_ACTIVATED,

@@ -116,7 +116,7 @@ test("要求写说明的选项在说明为空时不提交，有说明时通过",
   assert.equal(missingNoteText(confirm, "补充说明"), "");
 });
 
-// 初始 PRD 的决定卡片（工单 #138，docs/design/existing-project-onboarding.md「决定种类」）：轮次、PRD 与结构说明的工件引用、
+// 初始 PRD 的决定卡片（工单 #138，设计第 3.2 节）：轮次、PRD 与结构说明的工件引用、
 // 基线核验汇总、快照来源；两个链接都指向资料页
 function initialPrd(overrides) {
   const request = {
@@ -211,7 +211,7 @@ test("界面不再包含已删除的 unknown_action 与 pending_verification", (
 });
 
 test("质检无法核验的决定卡片逐条列出无法核验的条件与原因", () => {
-  // 浏览器与 computer use 设计说明「无法核验」（工单 #1179）：说明列出每条无法核验的验收条件与原因
+  // 浏览器与 computer use 设计说明第 8.4 节（工单 #1179）：说明列出每条无法核验的验收条件与原因
   const rows = materialRows(decision({
     kind: "qa_cannot_verify",
     request: {

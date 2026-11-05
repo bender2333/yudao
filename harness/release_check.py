@@ -1,8 +1,8 @@
-# 发布检查（可信内核设计说明「发布检查与探针」，网页界面的提供与发布设计说明「发布脚本」，工单 #355）。
+# 发布检查（可信内核设计说明第 4.4 节，网页界面的提供与发布设计说明第 6.3 节，工单 #355）。
 # 已安装的实例用它检查待发布的提交：用这一份实例的内核清单与检查，对待发布提交的内容做
 #   1. 内核差异：上一次发布标签到待发布提交之间，内核清单里的路径有哪些改动，列进报告供用户查看，不算不通过
 #      （阶段一由外部模型开发这个仓库，改内核路径不事前批准，守它的是 CI 里的内核测试；
-#      运行中的系统改自己的内核才经决定请求「内核修改」批准，见可信内核设计说明「内核清单」）；
+#      运行中的系统改自己的内核才经决定请求「内核修改」批准，见可信内核设计说明第 3 节）；
 #   2. 导入方向：内核清单里的模块只导入内核文件、标准库与 pydantic；
 #   3. 评测专有内容：部门 Prompt、定义、工具说明、技能里出现评测场景专有内容即为不通过。
 # 检查结果写进决定请求「实例升级」（目录流），由用户批准或拒绝；升级已安装的那一份是一次用户决定。
@@ -30,7 +30,7 @@ from .write_path import NewCatalogEvent
 
 # 内核清单在包内的位置；它在 wheel 中随包发布（pyproject.toml 的 package-data）
 MANIFEST_PATH = Path(__file__).resolve().parent / "definitions" / "kernel-manifest.json"
-# 上一次发布的标签的前缀（网页界面的提供与发布设计说明「版本号」）
+# 上一次发布的标签的前缀（网页界面的提供与发布设计说明第 6.2 节）
 TAG_PREFIX = "v"
 # 允许的导入：内核文件、标准库与 pydantic（内核清单的 allowed_imports）
 PYDANTIC_TOP = "pydantic"
@@ -117,7 +117,7 @@ def _tree_entry(repository: pygit2.Repository, tree: pygit2.Tree, path: str) -> 
 
 def _previous_tag(repository: pygit2.Repository) -> tuple[str, pygit2.Commit] | None:
     # 上一次发布的标签：名字以 v 开头、指向提交的标签中提交时间最晚的那一个；没有时为空。
-    # 标签按提交时间排序，与发布的先后一致（docs/design/evaluation-scenarios.md「留出场景」：标签 v<版本>）
+    # 标签按提交时间排序，与发布的先后一致（设计说明第 6.2 节：标签 v<版本>）
     tagged: list[tuple[int, str, pygit2.Commit]] = []
     for reference in repository.references.objects:
         name = reference if isinstance(reference, str) else reference.name

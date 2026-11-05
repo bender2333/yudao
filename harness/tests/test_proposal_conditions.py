@@ -1,4 +1,4 @@
-# 提案合同里的通用条件（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」，工单 #859）：六种条件各有用例，满足与不满足两种情形都有。
+# 提案合同里的通用条件（设计说明第 5.5 节，工单 #859）：六种条件各有用例，满足与不满足两种情形都有。
 # 条件与参数来自 harness/definitions/proposal_contracts.json；这里在内存里构造运行状态投影与工作区事实，
 # 经 evaluate_proposal 的公开入口核对，不读临时目录、不起进程。
 #

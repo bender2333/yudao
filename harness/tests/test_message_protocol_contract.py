@@ -7,7 +7,7 @@ from harness.providers.messages import _messages_input
 
 
 def test_messages_history_merges_consecutive_turns_into_alternating_roles():
-    # Anthropic Messages 要求 role 交替，且每个 tool_result 紧跟对应的 tool_use 所在消息（docs/design/model-management.md「历史中的推理内容」）：
+    # Anthropic Messages 要求 role 交替，且每个 tool_result 紧跟对应的 tool_use 所在消息（设计说明第 7.6 节）：
     # 历史里连续的工具调用合并成一条 assistant 消息（多个 tool_use），连续的工具结果合并成一条 user 消息
     # （多个 tool_result）。分两轮工具调用的部门历史按这个形状翻译，真实上游才接受
     items = [

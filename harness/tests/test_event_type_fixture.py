@@ -7,7 +7,7 @@
 
 EVENT_TYPES 以后换位置时（M0.5 的 S5a 把事件种类分成骨架事件与应用事件，工单 #828），这个测试跟着它取。
 
-守 docs/design/skeleton-and-application.md「模块交互」的 R2（两端共读的清单：事件种类）。
+守第 13 节的 R2（两端共读的清单：事件种类）。
 """
 
 import json

@@ -1,6 +1,6 @@
 """参数扫描：同一个规则集上只改一个参数的取值，看省下多少用量、丢掉多少召回。
 
-用途是给参数定默认值（docs/design/evaluation-scenarios.md「评分」 R3）：`tool_result_keep_tokens` 的取值应当来自
+用途是给参数定默认值（设计说明第 4 节 R3）：`tool_result_keep_tokens` 的取值应当来自
 「保留量 → 省量 / 召回」的曲线，而不是抄一个来源不明的数。
 
     python -m evals.context sweep --db <events.sqlite> --param tool_result_keep_tokens \

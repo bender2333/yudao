@@ -1,4 +1,4 @@
-// 「MCP 服务器」一节的纯计算（工单 #237，网络与 MCP 设计说明「服务器设置」、「读取工具清单（探测）」、「项目设置的「MCP 服务器」一节」）。
+// 「MCP 服务器」一节的纯计算（工单 #237，网络与 MCP 设计说明第 4.1、4.2、11.1 节）。
 // 这里只做取值、组装与判断，不触碰网络与界面：保存参数的组装、表单的必填与格式、
 // 工具清单快照的保留、列表里的说法都由这里给出，页面组件只按它们渲染，单元测试直接核对。
 //
@@ -15,14 +15,14 @@ import { type CommandProblem, commandProblemText } from "../../contract/command-
 import { intFromInput } from "../models/model-logic.ts";
 import { departmentName } from "./labels.ts";
 
-// 传输：本机进程（stdio）与 streamable HTTP。docs/design/network-and-mcp.md「服务器设置」明确不支持 SSE
+// 传输：本机进程（stdio）与 streamable HTTP。设计说明第 4.1 节明确不支持 SSE
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];
 
-// 默认的三个部门（docs/design/network-and-mcp.md「服务器设置」中「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
+// 默认的三个部门（设计说明第 4.1 节「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
 // （工单 #1457），组织还没有数据时由调用处按设置里已有的部门兜底
 
-// 默认的时限与输出上限（docs/design/network-and-mcp.md「运行规则」；后端 MCP_OUTPUT_LIMIT_DEFAULTS 是同一组值）：
+// 默认的时限与输出上限（设计说明第 7.2 节；后端 MCP_OUTPUT_LIMIT_DEFAULTS 是同一组值）：
 // 表单留空时按这组默认，不把默认值写死在客户端提交的内容里
 export const MCP_DEFAULTS = { startup_timeout_sec: 60, call_timeout_sec: 120, output_limit: 20000 } as const;
 
@@ -58,7 +58,7 @@ export type McpServerDraft = {
   name: string;
   transport: McpTransport;
   command: string;
-  // 参数一行一个（docs/design/network-and-mcp.md「服务器设置」「stdio 的命令与参数」）
+  // 参数一行一个（设计说明第 4.1 节「stdio 的命令与参数」）
   args: string;
   env: McpVariableDraft[];
   url: string;
@@ -127,7 +127,7 @@ export function splitLines(text: string): string[] {
   return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "");
 }
 
-// 一行变量或请求头 → 保存时的取值：固定文本写值，凭据只写名称（docs/design/network-and-mcp.md「服务器设置」）
+// 一行变量或请求头 → 保存时的取值：固定文本写值，凭据只写名称（设计说明第 4.1 节）
 export function variableEntry(draft: McpVariableDraft): Record<string, unknown> {
   if (draft.kind === "credential") {
     return { kind: "credential", credential_ref: draft.credential_ref.trim() };
@@ -249,7 +249,7 @@ export function draftIssue(draft: McpServerDraft): string {
 
 // 一台设置的比较依据：默认值补齐以后，两种传输各自的字段都在，按名称顺序拼接。
 // 配置没有改动时保留原来的工具清单快照；配置改过以后旧快照带的摘要对不上，不能继续用
-// （docs/design/network-and-mcp.md「读取工具清单（探测）」：配置改变后旧快照失效）
+// （设计说明第 4.2 节：配置改变后旧快照失效）
 export function configurationSignature(server: Record<string, unknown> | McpServerSettingView): string {
   const input = server as Record<string, unknown>;
   const defaults = MCP_DEFAULTS;
@@ -301,7 +301,7 @@ export function serverDocument(server: McpServerSettingView | null, draft: McpSe
 }
 
 // 一份服务器文档：其余服务器照原样带回去，改动的这一台按草稿换掉（改名时去掉原来那个名称），
-// previous_name 为 null 表示新增。删掉一台时 draft 传 null（docs/design/network-and-mcp.md「版本与固定」：整份设置一个版本）
+// previous_name 为 null 表示新增。删掉一台时 draft 传 null（设计说明第 4.3 节：整份设置一个版本）
 export function mcpDocumentPayload(
   servers: Record<string, McpServerSettingView> | undefined,
   draft: McpServerDraft | null,
@@ -391,7 +391,7 @@ const HINT_LABELS: [string, string][] = [
   ["open_world_hint", "访问外部"],
 ];
 
-// 服务器自己标注的提示：只供参考，不参与判断（docs/design/network-and-mcp.md「服务器设置」中「工具清单」）
+// 服务器自己标注的提示：只供参考，不参与判断（设计说明第 4.1 节「工具清单」）
 export function hintText(hints: unknown): string {
   if (hints === null || typeof hints !== "object") {
     return "";
@@ -479,7 +479,7 @@ export function serverInfoText(probe: McpProbeResultView | null): string {
 }
 
 // 探测结果与当前配置是否还对得上：配置改过以后旧结果保留供查看，但不能再当可用快照
-// （docs/design/network-and-mcp.md「读取工具清单（探测）」）。两个摘要都由后端给出，页面只比较，不自己算、也不显示摘要本身
+// （设计说明第 4.2 节）。两个摘要都由后端给出，页面只比较，不自己算、也不显示摘要本身
 export function probeIsStale(probe: McpProbeResultView | null, server: McpServerSettingView | null): boolean {
   if (probe === null || server === null || probe.status !== "ok") {
     return false;

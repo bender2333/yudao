@@ -12,7 +12,7 @@ from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.tests.helpers import department_history
 
-# 三种协议的推理内容保存与回放（工单 #88，docs/design/model-management.md「历史中的推理内容」）：
+# 三种协议的推理内容保存与回放（工单 #88，设计说明第 7.6 节）：
 # 本机 HTTP 服务在第一轮流里返回推理内容，记录第二流的真实请求体，核对回放
 
 class _Capture:

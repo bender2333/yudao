@@ -120,7 +120,7 @@ async function handleUpstream(request: IncomingMessage, response: ServerResponse
   response.end("{}");
 }
 
-// 自定义服务按 Bearer 带凭据（模型管理设计说明「Provider 配置」）
+// 自定义服务按 Bearer 带凭据（模型管理设计说明第 4.2 节）
 function authorized(request: IncomingMessage): boolean {
   return request.headers.authorization === `Bearer ${UPSTREAM_KEY}`;
 }

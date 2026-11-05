@@ -1,4 +1,4 @@
-# 试用用例（浏览器与 computer use 设计说明「验收条件的引用」、「QAReview 的逐条结论与放行」、「检验的有效性」；独立性说明「口径」；工单 #1180）。
+# 试用用例（浏览器与 computer use 设计说明第 8.1 至 8.3 节、第 7.2 节；独立性说明第 7.1 节；工单 #1180）。
 #
 # 这个文件查六件事：
 # 1. 用例与它的步骤由事件折叠而成：用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份
@@ -176,7 +176,7 @@ def test_the_same_events_replay_to_the_same_trial_cases(tmp_path):
 
 
 def test_a_session_that_ends_while_a_case_is_open_concludes_it_as_interrupted(tmp_path):
-    # 会话结束或中断时打开的用例自动结束为中断，不能作为证据（docs/design/browser-and-computer-use.md「试用用例」）。守 R3
+    # 会话结束或中断时打开的用例自动结束为中断，不能作为证据（设计说明第 8.2 节）。守 R3
     run = _Run(tmp_path)
     try:
         run.append(_opened())
@@ -203,7 +203,7 @@ def test_a_session_that_ends_while_a_case_is_open_concludes_it_as_interrupted(tm
 
 def test_a_step_without_a_result_or_handed_back_stays_unknown(tmp_path):
     # 发出了但没有回执的步骤是结果未知；核实把结果交还会话（handed_back）同样是结果未知。
-    # 含这样一步的用例不能以 passed 结束（docs/design/browser-and-computer-use.md「试用用例」、docs/design/independent-verification.md「什么事到用户面前」）。守 R3
+    # 含这样一步的用例不能以 passed 结束（设计说明第 8.2 节、第 9 节）。守 R3
     run = _Run(tmp_path)
     try:
         run.append(_opened())
@@ -241,7 +241,7 @@ def test_a_step_without_a_result_or_handed_back_stays_unknown(tmp_path):
 
 
 def test_assertions_and_check_receipts_are_executable_and_screenshots_are_model_reading():
-    # 步骤分类（docs/design/browser-and-computer-use.md「QAReview 的逐条结论与放行」）：含断言工具或检查回执的是可执行的检验，只凭截图的是模型阅读。守 R3
+    # 步骤分类（设计说明第 8.3 节）：含断言工具或检查回执的是可执行的检验，只凭截图的是模型阅读。守 R3
     assert step_is_executable("browser_verify_text_visible")
     assert step_is_executable("run_check")
     assert not step_is_executable("browser_take_screenshot")
@@ -295,7 +295,7 @@ def _open_case(*, case_id: str = "case_1", criteria=("AC1",), session_id: str = 
 
 
 def test_begin_requires_a_running_session_no_other_case_and_existing_criteria():
-    # trial_case_begin 的主机核对（docs/design/browser-and-computer-use.md「试用用例」）。守 R3
+    # trial_case_begin 的主机核对（设计说明第 8.2 节）。守 R3
     session = {"session_id": SESSION, "tree_digest": TREE_DIGEST}
     args = {"criteria": ["AC1"], "title": "待办清单", "steps": ["打开页面"], "expected": "看到待办"}
 
@@ -323,7 +323,7 @@ def test_begin_requires_a_running_session_no_other_case_and_existing_criteria():
 
 
 def test_end_requires_evidence_of_this_case_a_reason_when_unverified_and_no_unknown_steps():
-    # trial_case_end 的主机核对（docs/design/browser-and-computer-use.md「试用用例」）。守 R3
+    # trial_case_end 的主机核对（设计说明第 8.2 节）。守 R3
     session = {"session_id": SESSION, "tree_digest": TREE_DIGEST}
     steps = [TrialCaseStep("call-1", "browser_verify_text_visible", status="completed")]
     projection = _projection(cases=[_open_case(steps=steps)])
@@ -363,7 +363,7 @@ def _review_criterion(case_id: str, result: str = "passed", method: str = "trial
 
 
 def test_a_case_from_another_activation_or_another_tree_digest_is_rejected():
-    # 用例属于本次激活、所在会话的试用副本树摘要等于当前交付的 code_snapshot_hash（docs/design/browser-and-computer-use.md「QAReview 的逐条结论与放行」）。守 R3
+    # 用例属于本次激活、所在会话的试用副本树摘要等于当前交付的 code_snapshot_hash（设计说明第 8.3 节）。守 R3
     old = _open_case(case_id="case_old", activation_id="act_older", result="passed")
     errors = _trial_case_errors([_review_criterion("case_old")], _projection(cases=[old]),
                                 department="quality", spec_hash=SPEC_HASH, snapshot_hash=TREE_DIGEST)
@@ -428,7 +428,7 @@ def test_a_passed_trial_case_is_evidence_and_a_model_reading_case_is_open():
 
 
 def test_the_two_tools_are_offered_to_quality_only():
-    # 两个主机工具只在质检的工具清单里（docs/design/browser-and-computer-use.md「各部门可用的工具」）。守 R2
+    # 两个主机工具只在质检的工具清单里（设计说明第 6.3 节）。守 R2
     for department in DEFINITIONS.departments:
         tools = DEFINITIONS.tools_for(department, "change")
         if DEFINITIONS.is_verifier(department):

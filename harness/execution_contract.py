@@ -1,4 +1,4 @@
-# 执行契约第三版（骨架与应用设计说明「契约」、「执行契约」；总图第四节「执行」缝）：
+# 执行契约第三版（骨架与应用设计说明第 3.2、5.3 节；总图第四节「执行」缝）：
 # 输入一轮工作（部门、会话、提示、这一轮的上限、路由的工作引用、按部门取模型与提示词的来源；工作引用原样
 # 交给装配）；每一步经安全节点问薄驱动继续或停止；工具调用经裁决入口；输出一轮工作的结果：这一轮写下的事件
 # 的范围与停止原因。这一轮算不算结束、结束成什么，由路由按事件判断，契约不写死「提交了正式成果」「回答了
@@ -41,7 +41,7 @@ def accept(implementation: Any) -> int:
 @dataclass(frozen=True)
 class Judgment:
     # 安全节点的回答：是否继续，以及作出判断时 run 流的版本；
-    # blocked_by_other_session 说明别的会话已经写下待恢复的决定请求（模型管理设计说明「引用无法使用时」）：
+    # blocked_by_other_session 说明别的会话已经写下待恢复的决定请求（模型管理设计说明第 5.5 节）：
     # 这个会话照常停下（事项的状态不变，工单 #856），它自己也被挡住时它要写下自己的那一条
     proceed: bool
     version: int
@@ -89,9 +89,9 @@ class StepLimits:
 
 @dataclass(frozen=True)
 class RoundRequest:
-    # 开始一轮工作的请求（docs/design/skeleton-and-application.md「执行契约」输入）：部门、会话在 scope 里，prompt 是这一轮采用的提示，
+    # 开始一轮工作的请求（第 5.3 节输入）：部门、会话在 scope 里，prompt 是这一轮采用的提示，
     # limits 是这一轮的上限，work_ref 是路由自己的工作引用（例如任务池的任务）。
-    # work_ref 原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」），骨架不解释它。
+    # work_ref 原样交给装配（第 5.4 节第 4 条），骨架不解释它。
     # department_settings 是按部门取模型与提示词的来源（第三版，工单 #1511）：它们属于路由与定义，
     # 从安全节点移出，随开始一轮工作一起交进来；执行实现要用的时候问它，不再问薄驱动。
     # 交来的是实现自己的类型，契约原样转交，不解释它的返回值
@@ -152,8 +152,8 @@ class PreviousSafeNode(SafeNode, DepartmentSettings, Protocol):
 
 @dataclass(frozen=True)
 class RoundResult:
-    # 一轮工作的结果（docs/design/skeleton-and-application.md「执行契约」输出）：这一轮写下的事件范围与停止原因。这一轮算不算正常结束、
-    # 结束成什么，由路由按事件判断（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一轮工作怎么结束由路由按事件判断，执行契约不写死结果的种类」；routing_contract.RoundEnd），契约里没有结果种类。
+    # 一轮工作的结果（设计说明第 5.3 节输出）：这一轮写下的事件范围与停止原因。这一轮算不算正常结束、
+    # 结束成什么，由路由按事件判断（第 5.4 节第 5 条；routing_contract.RoundEnd），契约里没有结果种类。
     # stop_reason 为空：在安全节点停止（中止、运行时间用完、终态、输入或依据改变），由薄驱动按当时的运行状态
     # 收尾；否则是停止原因的编号与说明，由薄驱动暂停或结束运行。version 是作出停止判断时 run 流的版本。
     # target 是这次失败对应的调用目标公开部分（不含密钥）；facts 是停止原因要带给决定请求的事实引用
@@ -164,7 +164,7 @@ class RoundResult:
     target: dict[str, Any] | None = None
     facts: tuple[str, ...] = ()
     # 整理连续没有推进达到 compaction.stalled_limit（stop_reason 为 compaction_failed，模型管理设计说明
-    # 「失败处理」最后一条，工单 #1238）：薄驱动让 run 进入待恢复、等用户回答，不结束运行。其余
+    # 第 8.7 节最后一条，工单 #1238）：薄驱动让 run 进入待恢复、等用户回答，不结束运行。其余
     # compaction_failed（整理请求本身装不进窗口）照旧结束运行，所以由实现标明是哪一种
     stalled_compaction: bool = False
     # 这一轮里模型用提交类工具交上来的参数（原样的工具回执，或参数加上工具声明的种类），带来它的这次回答，

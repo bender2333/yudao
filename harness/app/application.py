@@ -1,4 +1,4 @@
-# 应用层的入口：在控制核心之上执行已登记的命令与查询，生成能力清单。接口层与命令行都经过它（docs/design/app-and-interface.md「分层与模块」）。
+# 应用层的入口：在控制核心之上执行已登记的命令与查询，生成能力清单。接口层与命令行都经过它（设计说明第 2 节）。
 # 修改只经过控制核心的写入口与流程编排；查询只读取。只读的打开供命令行使用：以只读方式打开数据目录，
 # 不写保存的投影，不需要进程锁。
 
@@ -149,7 +149,7 @@ class Application:
         # 应用层保存的读取模型：调用尝试表与流转记录。可写打开时保存在数据目录里，只读打开时在内存中重建
         path = None if system.read_only else Path(system.data_dir) / "read-models.sqlite"
         self.read_models = ReadModels(system.store, system.artifacts, path)
-        # 输出片段通道的订阅方（docs/design/app-and-interface.md「模型输出片段」）：按 100 毫秒合并一次片段，转发给带 live=1 的连接，
+        # 输出片段通道的订阅方（第 5.6 节）：按 100 毫秒合并一次片段，转发给带 live=1 的连接，
         # 并保存每个进行中调用尝试已收到的文字供 attempt.live 查询。只读打开没有通道，也没有片段。
         # 订阅在应用层建立时登记：片段在调用进行中持续到达，客户端可能在调用开始以后才连上连接
         self.deltas: DeltaPump | None = None if system.read_only else DeltaPump(channel=system.deltas)
@@ -189,12 +189,12 @@ class Application:
     def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path,
              listen: tuple[str, int] | None = None) -> Application:
         # 服务进程使用的控制核心：读取模型目录与凭据文件，并在文件被外部修改时重新读取。
-        # listen 是接口层实际的监听地址与端口（网络与 MCP 设计说明「拒绝的地址」、「本机的做法」）：取回与浏览器导航
+        # listen 是接口层实际的监听地址与端口（网络与 MCP 设计说明第 6.3、18 节）：取回与浏览器导航
         # 只拒绝这些地址与端口，所以由接口层在启动时交给应用，应用交给取回
         if listen is not None:
             fetch.configure_service_address(*listen)
         system = LoopSystem(data_dir, provider_config_path=provider_config, dotenv_path=dotenv)
-        # 启动时目录修订号与最后一条 catalog_revised 不同则补写（docs/design/app-and-interface.md「决定」中「模型目录与凭据的写入」）
+        # 启动时目录修订号与最后一条 catalog_revised 不同则补写（设计说明第 10 节第 1 项）
         system.sync_catalog_revision(operation="startup")
         system.start_provider_watching()
         return cls(system)
@@ -253,7 +253,7 @@ class Application:
         ))
 
     def open_event_stream(self, scope: EventScope, *, after: int, live: bool, **options: Any) -> EventStream:
-        # 一个事件流连接（docs/design/app-and-interface.md「事件流」）。带 live=1 时连接接收模型输出片段（订阅在应用层建立时已登记）。
+        # 一个事件流连接（第 5 节）。带 live=1 时连接接收模型输出片段（订阅在应用层建立时已登记）。
         # options 透传批次大小、队列长度与检查点参数（默认值见 event_stream 模块）
         stream = EventStream(self.system.store, scope, after=after, live=live and self.deltas is not None,
                              pump=self.deltas,
@@ -268,7 +268,7 @@ class Application:
             stream.close()
 
     def live_attempt(self, attempt_id: str) -> dict[str, str]:
-        # 一个进行中调用尝试各通道已收到的文字（docs/design/app-and-interface.md「模型输出片段」）；没有进行中的尝试时为空
+        # 一个进行中调用尝试各通道已收到的文字（第 5.6 节）；没有进行中的尝试时为空
         if self.deltas is None:
             return {}
         return self.deltas.live_text(attempt_id)

@@ -66,7 +66,7 @@ def prompt_part(call: ModelCall, source: str) -> str | None:
 
 def received_images(call: ModelCall) -> list[dict[str, Any]]:
     # 这次调用收到的图像内容块：工具结果带图像时，它的输出是文字块与图像块组成的列表
-    # （浏览器与 computer use 设计说明「请求中的图像」）。测试按它核对模型实际看到了哪几张
+    # （浏览器与 computer use 设计说明第 6.2 节）。测试按它核对模型实际看到了哪几张
     images: list[dict[str, Any]] = []
     for item in call.input_items:
         output = item.get("output")

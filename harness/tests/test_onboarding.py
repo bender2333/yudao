@@ -396,7 +396,7 @@ def test_structure_rejects_requirement_coverage_mismatch(tmp_path):
     assert any("requirement_locations" in error["field"] for event in rejected for error in event.payload["errors"])
 
 def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
-    # 接纳时核对工作区的树摘要等于快照摘要，不相等时拒绝（docs/design/existing-project-onboarding.md「总体」）
+    # 接纳时核对工作区的树摘要等于快照摘要，不相等时拒绝（设计第 4.1 节）
     from harness.validation import evaluate_proposal
 
     system, run_id = _onboarding_run(tmp_path, {

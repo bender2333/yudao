@@ -28,13 +28,13 @@ from harness.tests.helpers import (
     recorded_context,
     summary_message as _message,
 )
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.wait_limits import MODULE_WAIT_FOR_HOST_WORK_SEC
 
 # 这个文件里等待压缩线程到达模型回调、等待会合点释放、等待这次激活收尾的墙钟界限，
 # 只用来防止测试一直等待，按 #107 的裁定（架构师 2026-09-27 16:55，docs/archive/architecture-issues-2026-09-10.md）
 # 设为远大于负载下正常用时的值。被等待的是一次激活走到压缩请求，正常用时数秒，
 # 并发负载下更慢；这些界限不判定被测行为，被等待的动作是否发生由等待之后的断言核对。
-_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
+_WAIT_LIMIT = MODULE_WAIT_FOR_HOST_WORK_SEC
 
 
 def test_compaction_preserves_originals_then_resumes_work_with_summary(tmp_path):
@@ -201,7 +201,7 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
 
 def _tight_window_runner(tmp_path, respond, *, room=COMPACTION_ROOM, task="Original intent",
                          keys=("product", "engineering", "quality")):
-    """窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计「测试的写法」中「测试不决定产品的文字」，不写死窗口）：
+    """窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计第 10 节第 3 条，不写死窗口）：
 
     历史超过压缩阈值，而未压缩的工作请求仍放得下。窗口低于实测的可行区间时未压缩的工作请求放不下
     （这一步以 context_overflow 结束），高于区间时压缩不会被触发。假模型按脚本位取用，
@@ -276,7 +276,7 @@ def test_a_compaction_failure_in_an_ask_branch_does_not_make_it_unanswerable(tmp
 
 def test_compaction_request_failure_keeps_the_step_and_sends_the_work_request_uncompressed(tmp_path):
     """整理请求三次尝试都回未声明的工具调用、没有文字：没有写检查点，这一步的工作请求按未压缩的历史
-    照常发出，事项不停止；下一步再次发出整理请求（工单 #1155，docs/design/model-management.md「失败处理」）。"""
+    照常发出，事项不停止；下一步再次发出整理请求（工单 #1155，设计说明第 8.7 节）。"""
     work_counts = {}
     compactions = 0
 
@@ -324,7 +324,7 @@ def test_compaction_request_failure_keeps_the_step_and_sends_the_work_request_un
 
 def test_summary_text_with_an_undeclared_tool_call_is_kept_without_retry(tmp_path):
     """整理回应同时带文字与一个 bash 调用：文字成为检查点，bash 没有执行、不在下一步的有效历史里，
-    原始回应能从事件里查到；这一次不重试（工单 #1155，docs/design/model-management.md「失败处理」）。"""
+    原始回应能从事件里查到；这一次不重试（工单 #1155，设计说明第 8.7 节）。"""
     summary_text = "Product memory: the large file was read; keep the original requirements."
 
     def respond(request):
@@ -362,7 +362,7 @@ def test_summary_text_with_an_undeclared_tool_call_is_kept_without_retry(tmp_pat
 def test_mixed_compaction_failures_enter_recovery_at_the_stall_limit_with_the_last_reason(tmp_path):
     """同一会话的整理连续失败（请求失败与「摘要为空」混在一起）达到 compaction.stalled_limit：
     事项进入待恢复，待恢复的决定请求写明连续的次数与最后一次的原因；答「停止事项」时以
-    compaction_failed 结束（工单 #1155、#1238，docs/design/model-management.md「失败处理」最后一条）。"""
+    compaction_failed 结束（工单 #1155、#1238，设计说明第 8.7 节最后一条）。"""
     limit = DEFINITIONS.rule_value("compaction.stalled_limit")
     compactions = 0
 
@@ -429,7 +429,7 @@ def test_a_compaction_that_progresses_clears_the_stall_count(tmp_path):
 
 def test_truncated_summary_is_not_adopted_and_the_run_stops_on_overflow(tmp_path):
     """被输出上限截断的整理回应是一次终局的上游回应：不采用、不重试、不写检查点。这一次压缩因此不生效
-    （设计说明「失败处理」第一条），这一步的工作请求按未压缩的历史装配；这个窗口里放不下，所以按 docs/design/model-management.md「失败处理」
+    （设计说明第 8.7 节第一条），这一步的工作请求按未压缩的历史装配；这个窗口里放不下，所以按第 8.7 节
     第三条以上下文超限结束，而不是把整项按模型服务故障停下（工单 #1213）。"""
     def truncated(request):
         item = _message(request, "Decisions: the first half of the memory and then")
@@ -570,7 +570,7 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
         "quality": quality_turns("release", "the delivery implements the revised PRD"),
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
-    # 上下文窗口按这个场景的需要设置（测试分层设计说明「测试的写法」中「测试不决定产品的文字」）：工程开始时的请求（部门提示与
+    # 上下文窗口按这个场景的需要设置（测试分层设计说明第 10 节第 3 条）：工程开始时的请求（部门提示与
     # 工程可用的工具说明）装得下，压缩只发生在询问带回新合同以后。窗口按工程固定材料的实测值推出
     # （pinned_window），不写死：工单 #1182 给工程加上试用工具以后固定材料多 574 个 token（4679 → 5253），
     # 工单 #1184 加上 28 个浏览器工具的说明以后再多 4655 个 token（5251 → 9906）
@@ -613,7 +613,7 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
 
 def test_reported_upstream_usage_triggers_compaction_when_the_local_estimate_does_not(tmp_path):
     """上一次工作请求上游回报的用量超过压缩阈值、本地估算没有超过：下一步先发出整理请求；
-    压缩以后历史换成摘要，不再因为压缩之前的回报用量重复压缩（设计说明「用量」、docs/design/model-management.md「整理请求」）。"""
+    压缩以后历史换成摘要，不再因为压缩之前的回报用量重复压缩（设计说明第 8.2 节、第 8.4 节）。"""
     window = {}
     work_counts = {}
 
@@ -691,7 +691,7 @@ def test_repeated_empty_summaries_enter_recovery_at_the_stall_limit(tmp_path):
 
 
 # 工单 #1213：整理请求自己的失败不止「回应带未声明的工具调用」一种。空响应（上游流正常结束却没有
-# 输出项）与请求失败（上游故障、连接失败）都按 docs/design/model-management.md「失败处理」第一条处理：这一次压缩不生效、
+# 输出项）与请求失败（上游故障、连接失败）都按设计说明第 8.7 节第一条处理：这一次压缩不生效、
 # 不写检查点，这一步的工作请求按未压缩的历史照常发送，下一步再次尝试压缩。
 
 
@@ -711,7 +711,7 @@ def _upstream_unavailable_failure():
 
 def test_empty_summary_replies_keep_the_step_and_send_the_work_request_uncompressed(tmp_path):
     """整理请求三次尝试都回空响应（没有输出项）：没有写检查点，这一步的工作请求按未压缩的历史照常
-    发出，事项不停止；下一步再次发出整理请求并成功（工单 #1213，docs/design/model-management.md「失败处理」第一条）。"""
+    发出，事项不停止；下一步再次发出整理请求并成功（工单 #1213，设计说明第 8.7 节第一条）。"""
     work_counts = {}
     compactions = 0
 
@@ -796,7 +796,7 @@ def test_mixed_empty_and_failed_compaction_requests_enter_recovery_at_the_stall_
 
 def test_the_work_request_after_a_failed_compaction_fails_on_its_own_path(tmp_path):
     """整理请求失败以后紧接着的工作请求如果自己也失败：它走普通的请求失败路径停下，不在别处被吞成
-    「这一次压缩不生效」（工单 #1213「改完反问一句」，docs/design/model-management.md「失败处理」第一条只讲整理请求）。"""
+    「这一次压缩不生效」（工单 #1213「改完反问一句」，设计说明第 8.7 节第一条只讲整理请求）。"""
     compactions = 0
 
     def respond(request):
@@ -821,7 +821,7 @@ def test_the_work_request_after_a_failed_compaction_fails_on_its_own_path(tmp_pa
 
 def test_compaction_request_overflow_still_stops_the_run(tmp_path):
     """整理请求的失败原因是 context_overflow 时照旧以上下文超限停止，不被吞成「不生效」（工单 #1213，
-docs/design/model-management.md「失败处理」第三条）。"""
+    设计说明第 8.7 节第三条）。"""
     def respond(request):
         if request.purpose == "compaction":
             return ProviderError("prompt is too long", reason="context_overflow", retryable=False,
@@ -841,7 +841,7 @@ docs/design/model-management.md「失败处理」第三条）。"""
 
 
 # ---------------------------------------------------------------------------
-# 整理连续失败进入待恢复（工单 #1238，模型管理设计说明「失败处理」最后一条）
+# 整理连续失败进入待恢复（工单 #1238，模型管理设计说明第 8.7 节最后一条）
 #
 # 交付已经收下以后，质检的整理连续没有推进：run 不结束，进入待恢复，发出待恢复的决定请求（reason 为
 # compaction_failed）。用户可以换这个部门的模型以后选「继续执行」，事项从这次整理接着进行；选「停止事项」
@@ -852,7 +852,7 @@ def _delivery_then_stalled_quality(tmp_path, *, stall_compactions: int):
     大文件把历史顶过压缩阈值，之后的整理都回空摘要（不生效）；前 stall_compactions 次整理这样回，
     之后回真正的摘要。质检提交放行结论的那一轮在读完文件以后的第四步，整理出事的这几步到不了。
 
-    窗口在交付收下以后按质检部门的固定材料实测 token 数加余量推出（测试分层设计「测试的写法」中「测试不决定产品的文字」，
+    窗口在交付收下以后按质检部门的固定材料实测 token 数加余量推出（测试分层设计第 10 节第 3 条，
     不写死数字）：质检的固定材料里有 PRD 与交付，交付之前量不全。
     """
     work_counts = {}

@@ -33,14 +33,14 @@ export function HomePage(props: {
   app: ClientApp;
   onNavigate: (hash: string) => void;
   at: number | null;
-  // 系统通知点击后要打开并标出的决定卡片（工单 #375，docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
   targetDecision: string | null;
 }) {
   const [range, setRange] = useState<AwayRangeId>("since_seen");
   const [openItem, setOpenItem] = useState<string | null>(null);
-  // 回放位置（全局位置）写在路径的 ?at= 中（docs/design/architecture/overall-architecture.md「十项长期决定」中「部署形态与执行权」）：刷新、后退与分享链接回到同一位置
+  // 回放位置（全局位置）写在路径的 ?at= 中（设计说明第 3.3 节）：刷新、后退与分享链接回到同一位置
   const at = props.at;
-  // 时间轴上选中的刻度：报告项与刻度互相高亮（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
+  // 时间轴上选中的刻度：报告项与刻度互相高亮（设计说明第 5.4 节）
   const [selected, setSelected] = useState<number | null>(null);
 
   // 换范围以后回到现在：起点状态由新的范围给出，路径上的回放位置也跟着清掉
@@ -59,7 +59,7 @@ export function HomePage(props: {
   );
   const report = useSnapshot<AwayReport>(props.app, "page.home.report", "home.away_report", { range });
   const projects = useSnapshot<ProjectList>(props.app, "page.home.projects", "projects.list", {});
-  // 回放时的项目列表：带 at 读取，画面与项目列表都按该时刻的状态显示（docs/design/visualization.md「状态」）
+  // 回放时的项目列表：带 at 读取，画面与项目列表都按该时刻的状态显示（设计说明第 4.1 节）
   const replayProjects = useSnapshot<ProjectList>(
     props.app,
     "page.home.replay.projects",
@@ -198,7 +198,7 @@ export function HomePage(props: {
   );
 }
 
-// 项目行上的建档状态标记（3.8 docs/design/existing-project-onboarding.md「查询的变化」）：来自 projects.list 与等待回答的初始 PRD 决定请求，
+// 项目行上的建档状态标记（3.8 第 3.4 节）：来自 projects.list 与等待回答的初始 PRD 决定请求，
 // 项目没有建档状态时不显示标记
 function OnboardingMark(props: { project: ProjectRow; decisions: DecisionView[] }) {
   const mark = projectOnboardingMark(props.project, props.decisions);
@@ -213,7 +213,7 @@ function DecisionNames(props: {
   now: number;
   projectNames: Record<string, string>;
   onNavigate: (hash: string) => void;
-  // 系统通知点击后要打开并标出的决定卡片（工单 #375，docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）
+  // 系统通知点击后要打开并标出的决定卡片（工单 #375，设计说明第 5.3 节）
   targetDecision: string | null;
 }) {
   const titles = useWorkItemTitles(props.app, props.decisions);

@@ -1,4 +1,4 @@
-# 项目的命令（docs/design/app-and-interface.md「命令清单」中「项目」）。
+# 项目的命令（设计说明第 3.2 节「项目」）。
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ def _project_refs(events: list[Event | ProjectEvent]) -> ProjectRefs:
 
 
 class ProjectOnboard(CommandRequest):
-    # 接入已有项目：新建项目、登记源目录、采集代码快照、开始建档事项（3.8 docs/design/app-and-interface.md「合同」）
+    # 接入已有项目：新建项目、登记源目录、采集代码快照、开始建档事项（3.8 第 3.1 节）
     base_version: None = None
     name: Text
     goal: Text
@@ -81,7 +81,7 @@ async def _onboard_project(application: Application, command: Command, request: 
     system.orchestrator.start_work_item(run_id)
 
 class OnboardingRestart(CommandRequest):
-    # 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项（3.8 docs/design/app-and-interface.md「合同」）
+    # 重新开始建档：从登记的源目录重新采集快照，开始新的建档事项（3.8 第 3.1 节）
     base_version: None = None
     project_id: str
     source_name: Text

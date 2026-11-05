@@ -31,7 +31,7 @@ REAL_SCORE_DELIVERY = run_yudao_eval.score_delivery
 MODEL = "test-model"
 REPO_ROOT = EVALS_DIR
 
-# 模型列表报告的容量（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）：用例把它写进模型访问定义，不访问模型服务
+# 模型列表报告的容量（第 3 节「模型的容量」）：用例把它写进模型访问定义，不访问模型服务
 LIMITS = {"context_window": 262_144, "context_window_source": "model_list",
           "max_output_tokens": 64_000, "max_output_tokens_source": "model_list"}
 
@@ -67,7 +67,7 @@ def test_data_directory_inside_the_repository_is_rejected():
 
 
 def test_starting_folder_holds_only_the_data_file(runs_root):
-    """起点文件夹只含题目提供的 `subway_data.json`，与材料里的原件逐字节相同（docs/design/evaluation-scenarios.md「两边的运行条件」中「输入」）。"""
+    """起点文件夹只含题目提供的 `subway_data.json`，与材料里的原件逐字节相同（第 3 节「输入」）。"""
     start = yudao.fresh_start_dir(runs_root, "run-1")
     assert sorted(os.listdir(start)) == ["subway_data.json"]
     with open(os.path.join(start, "subway_data.json"), "rb") as handle:
@@ -243,7 +243,7 @@ def test_the_project_gets_the_starting_folder(runs_root, tmp_path, monkeypatch):
 
 
 def test_the_real_system_records_the_starting_folder(runs_root):
-    """真实服务新建项目时接纳起点文件夹：项目概览记下 1 个起点文件（docs/design/evaluation-scenarios.md「两边的运行条件」中「输入」）。
+    """真实服务新建项目时接纳起点文件夹：项目概览记下 1 个起点文件（第 3 节「输入」）。
 
     起的是被测的 Yudao 服务（仓库之外的新数据目录），不需要模型：新建项目不需要模型，
     起点文件夹在项目登记时采集。起点文件夹的内容由 `test_starting_folder_holds_only_the_data_file`
@@ -267,7 +267,7 @@ def test_the_real_system_records_the_starting_folder(runs_root):
 
 
 def test_default_time_limit_is_two_hours():
-    """两个运行器的默认时间上限都是 120 分钟（docs/design/evaluation-scenarios.md「两边的运行条件」中「时间上限」）。"""
+    """两个运行器的默认时间上限都是 120 分钟（第 3 节「时间上限」）。"""
     assert run_yudao_eval.TIME_LIMIT_SECONDS == 120 * 60
     args = run_yudao_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs"])
     assert args.limit_seconds == 120 * 60
@@ -290,7 +290,7 @@ def test_explicit_time_limit_still_wins(runs_root, tmp_path, monkeypatch):
 
 
 def test_model_definition_carries_the_reported_capacity():
-    """模型访问定义里的容量取模型服务报告的值或运行器参数（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）。"""
+    """模型访问定义里的容量取模型服务报告的值或运行器参数（第 3 节「模型的容量」）。"""
     definition = yudao.model_definition(MODEL, LIMITS)
     assert definition["context_window"] == LIMITS["context_window"]
     assert definition["max_output_tokens"] == LIMITS["max_output_tokens"]
@@ -302,7 +302,7 @@ def test_model_definition_carries_the_reported_capacity():
 
 
 def test_the_model_list_reports_the_capacity():
-    """模型列表报告了 `context_length` 与 `max_completion_tokens` 时取这两个值（docs/design/evaluation-scenarios.md「两边的运行条件」）。"""
+    """模型列表报告了 `context_length` 与 `max_completion_tokens` 时取这两个值（第 3 节）。"""
     payload = {"data": [
         {"id": "another-model", "context_length": 8_192, "max_completion_tokens": 1_024},
         {"id": MODEL, "context_length": 262_144, "max_completion_tokens": 64_000},
@@ -444,7 +444,7 @@ def test_request_count_falls_back_to_the_attempts_in_the_usage_report():
 
 
 def test_usage_that_the_model_did_not_report_is_unknown_not_zero():
-    """模型服务没有上报的用量记未知：不记 0、不进均值（docs/design/evaluation-scenarios.md「指标」）。"""
+    """模型服务没有上报的用量记未知：不记 0、不进均值（第 5.2 节）。"""
     export = _export(projection={"status": "paused"})
     export["usage"] = {"totals": {"attempts": 11, "input_tokens": None, "output_tokens": None,
                                   "total_tokens": 216_649, "cost": None}}
@@ -490,7 +490,7 @@ def test_a_normal_release_is_not_a_model_service_failure():
 
 
 # ---------------------------------------------------------------------------
-# 五项过程检查点（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」）
+# 五项过程检查点（设计第 5.1 节）
 
 # 系统事件序列（fake 适配器）：harness 自带的测试序列，文件头 `adapter: fake`。
 # 它们用于驱动同一套 `run.export` 形状的判定逻辑；真实系统导出的证据不可取回
@@ -718,8 +718,8 @@ def test_result_records_the_yudao_commit_and_the_host_environment():
 
 
 def test_start_service_turns_fetch_off(monkeypatch, tmp_path):
-    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」、
-    评测场景设计说明「两边的运行条件」中「两边都不联网」）：启动命令里有 --no-fetch 与 --no-browser。"""
+    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP 设计说明第 5.1、12.4 节、
+    评测场景设计说明第 3 节「两边都不联网」）：启动命令里有 --no-fetch 与 --no-browser。"""
     seen = {}
 
     class Process:
@@ -740,7 +740,7 @@ def test_start_service_turns_fetch_off(monkeypatch, tmp_path):
 
 
 def test_report_network_says_the_service_runs_with_fetch_off(tmp_path):
-    """报告的网络一栏写明以关闭取回的启动参数启动，与运行器的启动命令一致（docs/design/evaluation-scenarios.md「两边的运行条件」中「联网」）。"""
+    """报告的网络一栏写明以关闭取回的启动参数启动，与运行器的启动命令一致（第 3 节「联网」）。"""
     result = yudao_report.build_result("scenario-3", "scenario-3@2", "scorer-3@2", MODEL,
                                         [_run()], model_capacity=LIMITS)
     assert result["network"]["allowed"] is False
@@ -900,8 +900,8 @@ def _inside(path, parent):
 
 
 # ---------------------------------------------------------------------------
-# 场景 2：接入已有仓库、确认初始 PRD、再新建事项（评测场景设计「场景 2：模型设置透传参数」、「前提与未决事项」；
-# 接入已有项目设计说明「应用层命令、决定与领域事件」、「建档流程」）
+# 场景 2：接入已有仓库、确认初始 PRD、再新建事项（评测场景设计第 2.2、9 节；
+# 接入已有项目设计说明第 3、4 节）
 #
 # 评测工具不得导入 harness（`test_no_harness_import.py`），因此这里按本文件已有的做法
 # 脚本化服务端的回答：三步命令与两次导出按写好的顺序回答，运行器的调用点保持真实。
@@ -1050,7 +1050,7 @@ def test_scenario_two_onboards_confirms_and_starts_the_item(runs_root, tmp_path,
 
 
 def test_the_time_limit_starts_when_the_item_starts(runs_root, tmp_path, monkeypatch):
-    """建档用了多久不影响事项的超时判断：时间上限从新建事项开始量（docs/design/evaluation-scenarios.md「指标」、「前提与未决事项」）。"""
+    """建档用了多久不影响事项的超时判断：时间上限从新建事项开始量（第 5.2、9 节）。"""
     client = _OnboardingClient()
     _stub_scenario2(monkeypatch, tmp_path, client)
     limit = 0.3
@@ -1112,7 +1112,7 @@ def test_wait_prd_confirmation_times_out_and_voids_the_run(runs_root, tmp_path, 
 
 
 def test_the_onboarded_repository_keeps_git_and_no_evaluation_material(runs_root, tmp_path):
-    """接入的目录是上游仓库本身：带 `.git`，没有需求原文与隐藏检查（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。"""
+    """接入的目录是上游仓库本身：带 `.git`，没有需求原文与隐藏检查（第 3 节「隔离」）。"""
     repository, head = _local_repository(str(tmp_path / "upstream"))
     with yudao.scenario(SCENARIO_2):
         source = yudao.prepare_source_dir(runs_root, "run-1", repo_url=repository, commit=head,
@@ -1131,7 +1131,7 @@ def test_the_onboarded_repository_keeps_git_and_no_evaluation_material(runs_root
 
 
 def test_the_onboarded_repository_inside_the_yudao_repository_is_rejected(tmp_path):
-    """接入的目录与数据目录同一条规矩：必须在 Yudao 仓库之外（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。"""
+    """接入的目录与数据目录同一条规矩：必须在 Yudao 仓库之外（第 3 节「隔离」）。"""
     repository, head = _local_repository(str(tmp_path / "upstream"))
     with yudao.scenario(SCENARIO_2):
         with pytest.raises(ValueError, match="outside the Yudao repository"):
@@ -1141,7 +1141,7 @@ def test_the_onboarded_repository_inside_the_yudao_repository_is_rejected(tmp_pa
 
 
 def test_scenario_two_scores_with_the_scenario_two_scorer(runs_root, tmp_path, monkeypatch):
-    """评分用场景 2 的评分器与评分命令，评分前在评分副本里建立运行环境（docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」）。"""
+    """评分用场景 2 的评分器与评分命令，评分前在评分副本里建立运行环境（第 2.2 节）。"""
     delivery = tmp_path / "delivery"
     delivery.mkdir()
     (delivery / "app.py").write_text("def add(a, b):\n    return a + b\n", encoding="utf-8")
@@ -1218,7 +1218,7 @@ def test_scenario_option_defaults_to_three_and_selects_two():
 
 
 def test_the_result_lists_the_onboarding_separately(tmp_path):
-    """结果里建档单独成段：请求数、用量与耗时进 `onboarding`，不进指标汇总（docs/design/evaluation-scenarios.md「指标」）。"""
+    """结果里建档单独成段：请求数、用量与耗时进 `onboarding`，不进指标汇总（第 5.2 节）。"""
     run = _run()
     run["onboarding"] = yudao_metrics.onboarding_metrics(
         _onboarding_export(requests=7, tokens=1234), 42.0)
@@ -1365,7 +1365,7 @@ def test_wait_for_initial_prd_times_out_while_the_item_still_runs(monkeypatch):
     assert "秒内没有给出初始 PRD 的确认请求" in str(error.value)
 
 # ---------------------------------------------------------------------------
-# 第一次与最终两份交付（design docs/design/evaluation-scenarios.md「指标」；工单 #642）
+# 第一次与最终两份交付（design 第 5.2 节；工单 #642）
 
 def _delivery_export(deliveries=2, qa=True, definitions="defs-1", parameters="params-1"):
     """一次运行的导出：`deliveries` 个封存的交付、可选一条质检提交、一次放行。"""
@@ -1401,7 +1401,7 @@ def test_first_and_last_archived_delivery_are_symmetric():
 
 
 def test_run_once_scores_the_first_and_the_final_delivery(runs_root, tmp_path, monkeypatch):
-    """导出里有两次交付：两份都交给评分器，结果里两份评分各是各的（docs/design/evaluation-scenarios.md「指标」）。"""
+    """导出里有两次交付：两份都交给评分器，结果里两份评分各是各的（第 5.2 节）。"""
     export = _delivery_export(2)
     calls = {}
     _stub_run_once(monkeypatch, tmp_path, export, calls)
@@ -1449,7 +1449,7 @@ def test_no_delivery_scores_both_as_not_done(runs_root, tmp_path, monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 质检带来的提高（design docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段」）
+# 质检带来的提高（design 第 6.3 节第 1 条）
 
 def _delivery_scores(passed, total=5, completion=0.5, correctness=1.0):
     checks = [{"id": "check_%d" % index,
@@ -1502,7 +1502,7 @@ def test_without_a_qa_submission_there_is_no_conclusion():
 
 
 # ---------------------------------------------------------------------------
-# Yudao 对单个 agent 的对照（design docs/design/evaluation-scenarios.md「Yudao 对单个 agent」；D38 的 N-G1）
+# Yudao 对单个 agent 的对照（design 第 6.3 节；D38 的 N-G1）
 
 def _delivery_run(run_id, first_passed=1, final_passed=3, total=5, qa=True,
                   completion_first=0.4, completion_final=0.6, false_release=False):
@@ -1633,7 +1633,7 @@ def test_compare_sides_is_blocked_without_the_first_delivery_scores_on_the_archi
 
 
 def test_compare_sides_is_blocked_when_quality_never_concludes():
-    """质检没有给出结论：缺这一项证据，结论「受阻」并写明次数（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「结论写成「高于」「没有达到」「受阻」之一；受阻写明缺哪项证据，例如质检没有在时间」）。"""
+    """质检没有给出结论：缺这一项证据，结论「受阻」并写明次数（第 6.3 节第 3 条）。"""
     import yudao_compare
 
     runs = [_delivery_run("yudao-1", qa=False), _delivery_run("yudao-2", qa=False),
@@ -1727,7 +1727,7 @@ def test_the_compare_command_writes_the_result_and_the_report(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 版本比较按运行序号配对（design docs/design/evaluation-scenarios.md「噪声范围与三种结论」）
+# 版本比较按运行序号配对（design 第 6.1 节）
 
 def test_version_compare_pairs_by_run_ordinal_not_by_run_id():
     """两组运行编号前缀不同：按 `runs` 的位置配对（第 1 次对第 1 次）。"""
@@ -1787,7 +1787,7 @@ def test_a_void_run_leaves_its_ordinal_without_a_counterpart():
 
 
 # ---------------------------------------------------------------------------
-# 汇总：完成度、噪声范围、定义版本与参数版本（design docs/design/evaluation-scenarios.md「指标」、「报告与版本比较」）
+# 汇总：完成度、噪声范围、定义版本与参数版本（design 第 5.2、6 节）
 
 def test_the_summary_carries_completion_and_the_noise_range():
     """完成度进汇总，每个指标带噪声范围（同一版本各次运行的极差）。"""

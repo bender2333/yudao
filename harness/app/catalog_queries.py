@@ -1,4 +1,4 @@
-# 系统页的目录查询（docs/design/model-management.md「模型访问定义与准入」「系统页」）。
+# 系统页的目录查询（设计说明第 4.3 节「系统页」）。
 # 目录内容仍由 Provider 模块保存；这里把目录、准入与凭据状态整理成界面需要的形状，只读取，不写入。
 
 from __future__ import annotations
@@ -70,7 +70,7 @@ class CatalogCandidatesResult(Contract):
 
 
 class CatalogModel(Contract):
-    # 模型访问定义；调用协议是定义自己的字段（模型管理设计说明「模型访问定义与准入」）。准入记录由 catalog.admissions 单独返回（工单 #86）
+    # 模型访问定义；调用协议是定义自己的字段（模型管理设计说明第 4.3 节）。准入记录由 catalog.admissions 单独返回（工单 #86）
     id: str
     provider_id: str
     model: str
@@ -80,7 +80,7 @@ class CatalogModel(Contract):
     capability_source: str
     source_details: dict[str, CatalogCandidateSource] = {}
     accepts_required_tool_call: bool
-    # 输入方式（docs/design/model-management.md「模型访问定义与准入」）：模型访问定义中的值，文本总是包含
+    # 输入方式（设计说明第 4.3 节）：模型访问定义中的值，文本总是包含
     input_modalities: list[str]
     reasoning_levels: list[str]
     default_reasoning_level: str | None
@@ -137,7 +137,7 @@ class CatalogPresets(Contract):
 
 class CatalogCapabilityTable(Contract):
     # 模型能力表：整张表的 revision、快照日期与来源，以及预置服务方案在表中的条目
-    # （docs/design/model-management.md「服务方案预置表与模型能力表」；手动添加模型访问定义时客户端据此预填，运行时不从远端刷新）
+    # （设计说明第 4.1 节；手动添加模型访问定义时客户端据此预填，运行时不从远端刷新）
     revision: str
     snapshot_date: str
     source: str
@@ -159,10 +159,10 @@ class Catalog(Contract):
     bindings: dict[str, CatalogBinding]
     # 这一版加载的定义里的部门（工单 #1457）：部门使用一栏的部门清单与显示名取自这里
     departments: list[CatalogDepartment]
-    # 部门默认当前绑定的模型不具备该部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」中「一直显示」）
+    # 部门默认当前绑定的模型不具备该部门建议能力时的提醒（设计说明第 5.6 节「一直显示」）
     department_reminders: dict[str, list[str]]
     # 目录中每条模型访问定义在各部门的建议能力提醒（模型 ID → 部门 → 提醒）：
-    # 部门默认的下拉选中一条定义时界面立即给出提醒，不等保存（docs/design/model-management.md「部门的建议能力」）
+    # 部门默认的下拉选中一条定义时界面立即给出提醒，不等保存（设计说明第 5.6 节）
     model_reminders: dict[str, dict[str, list[str]]]
     selections: list[CatalogSelection] = []
 
@@ -182,7 +182,7 @@ class ChangeImpactRequest(Contract):
     # 拟议的修改（get 查询参数）：kind 决定改动的形状，document 是 JSON 文本。
     # connection：{"provider": {...}, "models": [...]}（catalog.connection.save 的两个字段，models 可省，省略时保留当前值）；
     # provider：不使用 document，按 provider_id 算出删除该份配置之后的影响；
-    # document：与目录文件同形的整份目录文档（编辑 JSON 与导入，docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」）
+    # document：与目录文件同形的整份目录文档（编辑 JSON 与导入，设计说明第 4.6 节）
     kind: Literal["connection", "provider", "document"]
     provider_id: str | None = None
     document: str | None = None
@@ -207,9 +207,9 @@ class ImpactProjectSetting(Contract):
     provider_id: str
 
 class ImpactWorkItem(Contract):
-    # 正在使用受影响定义的进行中事项（docs/design/model-management.md「解析规则」的生效模型：项目部门设置优先，否则部门默认）。
+    # 正在使用受影响定义的进行中事项（设计说明第 5.3 节的生效模型：项目部门设置优先，否则部门默认）。
     # 按（事项，部门）逐条列出：事项里哪个部门的模型选择落在受影响的定义上就写哪个部门，
-    # 与它此刻在不在工作无关（docs/design/model-management.md「修改与准入」，工单 #872）
+    # 与它此刻在不在工作无关（设计说明第 4.4 节，工单 #872）
     project_id: str
     project_name: str
     work_item_id: str
@@ -217,7 +217,7 @@ class ImpactWorkItem(Contract):
     department: str
 
 class ChangeImpact(Contract):
-    # catalog.change_impact 的结果：只读取，不写入任何内容（docs/design/model-management.md「修改与准入」、「删除」）
+    # catalog.change_impact 的结果：只读取，不写入任何内容（设计说明第 4.4、4.5 节）
     revision: int
     impacted: list[ImpactDefinition] = []
     deletions: list[ImpactDefinition] = []
@@ -265,7 +265,7 @@ def _catalog(application: Application, _request: None) -> Snapshot[Catalog]:
                                       label=DEFINITIONS.department_labels.get(department, department))
                      for department in DEFINITIONS.departments],
         selections=view["selections"],
-        # 部门默认各自当前绑定的模型的建议能力提醒（docs/design/model-management.md「部门的建议能力」）
+        # 部门默认各自当前绑定的模型的建议能力提醒（设计说明第 5.6 节）
         department_reminders={department: facade.model_reminders(
             None if bindings.get(department) is None else bindings[department].model_id, department)
             for department in DEPARTMENTS},
@@ -380,10 +380,10 @@ def _proposed_document(current: Mapping[str, Any], request: ChangeImpactRequest)
 
 
 def _change_impact(application: Application, request: ChangeImpactRequest) -> Snapshot[ChangeImpact]:
-    # 保存会作废准入的修改之前的影响列表（设计说明「修改与准入」最后一段）与删除时的一并删除清单（docs/design/model-management.md「删除」）：
+    # 保存会作废准入的修改之前的影响列表（设计说明第 4.4 节最后一段）与删除时的一并删除清单（第 4.5 节）：
     # 只读取，不写入任何内容。Provider 模块只返回受影响与将被删除的定义；
     # 引用方与进行中事项由应用层汇总：目录中的部门默认、各项目的项目部门设置、运行状态投影中的进行中事项。
-    # 角色默认与项目角色设置（docs/design/model-management.md「部门默认与角色默认」、「项目部门设置与项目角色设置」）还没有实现，这两层引用方尚未汇总
+    # 角色默认与项目角色设置（第 5.1、5.2 节）还没有实现，这两层引用方尚未汇总
     system = application.system
     facade = system.facade
     position = system.store.end_position()
@@ -421,7 +421,7 @@ def _change_impact(application: Application, request: ChangeImpactRequest) -> Sn
                 else project.work_item(project.active_work_item_id))
         if item is None or item.status != "in_progress":
             continue
-        # 进行中事项按（事项，部门）逐条列出（docs/design/model-management.md「修改与准入」，工单 #872）：
+        # 进行中事项按（事项，部门）逐条列出（设计说明第 4.4 节，工单 #872）：
         # 事项里哪个部门的模型选择（项目部门设置，没有时取部门默认）落在受影响的定义上，就列出这个部门，
         # 不论它此刻在不在工作——它下一次开始工作时同样会被挡住。一个事项可以出现几次。
         for department in DEPARTMENTS:

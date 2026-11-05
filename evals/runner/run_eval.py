@@ -1,7 +1,7 @@
 """一次评测：运行 OpenCode、按评分器评分、写出结果与报告。
 
 原始证据（交付副本、输出、评分日志）放在 .yudao/evals/ 下，不进入 Git；
-结果文件提交到 docs/evaluation/，中文报告写到 .tmp/ 再发 Discussions（评测场景设计「报告与版本比较」）。
+结果文件提交到 docs/evaluation/，中文报告写到 .tmp/ 再发 Discussions（评测场景设计第 6 节）。
 """
 
 import argparse
@@ -19,13 +19,13 @@ import model_service
 import opencode
 import report
 
-# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计「两边的运行条件」中「时间上限」）
+# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计第 3 节「时间上限」）
 TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
 
 
 def scenario_python():
-    """运行环境是 uv 管理的 Python 3.13（评测场景设计「两边的运行条件」）。"""
+    """运行环境是 uv 管理的 Python 3.13（评测场景设计第 3 节）。"""
     found = subprocess.run(["uv", "python", "find", SCENARIO_PYTHON],
                            capture_output=True, encoding="utf-8", errors="replace")
     path = (found.stdout or "").strip()
@@ -38,7 +38,7 @@ def prepare_scoring_dir(scenario_module, run_dir, evidence_dir, skipped):
     """运行结束以后把隐藏检查与条目表复制到评分目录，再复制一份交付。
 
     隐藏部分与交付副本各自独立：被测方在运行期间见不到检查与条目表。Windows 的保留
-    设备名（`nul` 等）不复制，跳过的文件记进 `skipped`（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。
+    设备名（`nul` 等）不复制，跳过的文件记进 `skipped`（第 3 节「隔离」）。
     """
     scoring_dir = os.path.join(evidence_dir, "scoring")
     if os.path.exists(scoring_dir):
@@ -153,7 +153,7 @@ def parse_args(argv=None):
     parser.add_argument("--limit-seconds", type=float, default=TIME_LIMIT_SECONDS,
                         help="单次运行的墙钟上限")
     parser.add_argument("--context-window", type=int, default=None,
-                        help="上下文窗口；模型列表没有报告这个模型时用它（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）")
+                        help="上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）")
     parser.add_argument("--max-output-tokens", type=int, default=None,
                         help="单次输出上限；模型列表没有报告这个模型时用它")
     parser.add_argument("--run-id-prefix", default="run")

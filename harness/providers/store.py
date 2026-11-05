@@ -19,15 +19,15 @@ from .presets import preset_exists
 SUPPORTED_PROTOCOLS = frozenset({"responses", "chat_completions", "messages", "fake"})
 _IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 
-# 一份连接的默认请求时限，单位秒（模型管理设计说明「模型访问定义与准入」）：真实模型的请求常常超过一分钟，
+# 一份连接的默认请求时限，单位秒（模型管理设计说明第 4.3 节）：真实模型的请求常常超过一分钟，
 # 目录文件、目录命令与界面表单使用同一个值，界面从目录合同的 default_timeout_sec 取它（工单 #294）
 DEFAULT_TIMEOUT_SEC: float = 600.0
 
-# 推理档位全集，由低到高排列（模型管理设计说明「档位与声明」）；模型访问定义声明其中的一个子集
+# 推理档位全集，由低到高排列（模型管理设计说明第 7.1 节）；模型访问定义声明其中的一个子集
 REASONING_LEVELS = ("minimal", "low", "medium", "high", "xhigh", "max")
-# 推理参数方式：一份声明只使用一种，只用于与它相符的协议（docs/design/model-management.md「协议映射」）
+# 推理参数方式：一份声明只使用一种，只用于与它相符的协议（设计说明第 7.4 节）
 REASONING_MODES = frozenset({"effort", "adaptive", "budget"})
-# 输入方式的取值（模型管理设计说明「模型访问定义与准入」）：文本总是包含，图像可选
+# 输入方式的取值（模型管理设计说明第 4.3 节）：文本总是包含，图像可选
 INPUT_MODALITIES = frozenset({"text", "image"})
 # 推理参数方式与协议的相符关系
 REASONING_MODE_PROTOCOLS: Mapping[str, frozenset[str]] = MappingProxyType({
@@ -35,13 +35,13 @@ REASONING_MODE_PROTOCOLS: Mapping[str, frozenset[str]] = MappingProxyType({
     "adaptive": frozenset({"messages"}),
     "budget": frozenset({"messages"}),
 })
-# 预算方式各档位的思考预算，单位 token（docs/design/model-management.md「协议映射」）
+# 预算方式各档位的思考预算，单位 token（设计说明第 7.4 节）
 REASONING_BUDGET_TOKENS: Mapping[str, int] = MappingProxyType({
     "minimal": 1024, "low": 4096, "medium": 8192, "high": 16384, "xhigh": 32768, "max": 32768,
 })
 
 
-# Provider 配置：一份服务连接（模型管理设计说明「Provider 配置」）。连接不声明协议，协议由它下面的每个模型访问定义声明；
+# Provider 配置：一份服务连接（模型管理设计说明第 4.2 节）。连接不声明协议，协议由它下面的每个模型访问定义声明；
 # 自定义服务的地址保存请求基址，内置服务方案的请求基址按访问定义的协议取自预置表
 @dataclass(frozen=True)
 class ProviderDefinition:
@@ -71,7 +71,7 @@ class ProviderDefinition:
         }
 
 
-# 模型访问定义：某份 Provider 配置下的一个模型访问定义，必填调用协议（模型管理设计说明「模型访问定义与准入」）
+# 模型访问定义：某份 Provider 配置下的一个模型访问定义，必填调用协议（模型管理设计说明第 4.3 节）
 # 容量是声明值：窗口可以未知（None），未知时只作候选，不可用于任务；输出上限必须有值。
 # 准入记录不属于目录定义（工单 #86），保存在 ProviderFacade 的独立记录中
 @dataclass(frozen=True)
@@ -86,10 +86,10 @@ class ModelDefinition:
     source_details: Mapping[str, Mapping[str, str | None]] = field(default_factory=dict)
     # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
     accepts_required_tool_call: bool = True
-    # 输入方式（模型管理设计说明「模型访问定义与准入」）：取值为 text 与 image，文本总是包含；
-    # 运行层按它决定提供哪些工具、哪些内容可以放入请求（「部门的建议能力」）。预填来自模型能力表，用户可以修改
+    # 输入方式（模型管理设计说明第 4.3 节）：取值为 text 与 image，文本总是包含；
+    # 运行层按它决定提供哪些工具、哪些内容可以放入请求（第 5.6 节）。预填来自模型能力表，用户可以修改
     input_modalities: tuple[str, ...] = ("text",)
-    # 推理档位声明（模型管理设计说明「档位与声明」）：支持档位是全集的一个子集（按由低到高保存），默认档位属于支持档位，
+    # 推理档位声明（模型管理设计说明第 7.1 节）：支持档位是全集的一个子集（按由低到高保存），默认档位属于支持档位，
     # 推理参数方式与本定义的协议相符；三项一起声明，没有任何一项时不发送推理参数
     reasoning_levels: tuple[str, ...] = ()
     default_reasoning_level: str | None = None
@@ -126,7 +126,7 @@ class ModelDefinition:
 # 准入记录：一次模型测试通过时写入的事实，与目录分开保存（工单 #86）。
 # 地址、凭据引用取自所属连接，协议、上游模型 ID 与推理参数方式取自定义，是测试时的受影响字段快照；
 # 有效性逐项比较：改连接的地址或凭据引用则整条连接的定义全部回候选，
-# 改本定义的协议、上游模型 ID 或推理参数方式只影响该条定义（模型管理设计说明「修改与准入」）
+# 改本定义的协议、上游模型 ID 或推理参数方式只影响该条定义（模型管理设计说明第 4.4 节）
 @dataclass(frozen=True)
 class AdmissionRecord:
     model_id: str
@@ -433,7 +433,7 @@ class ProviderStore:
 def _validate_reasoning_declaration(model: ModelDefinition, location: str,
                                     issues: list[ValidationIssue]) -> None:
     # 推理档位声明：三项一起声明，部分声明直接拒绝；默认档位属于支持档位；
-    # 推理参数方式取值受限并与本定义的协议相符（docs/design/model-management.md「档位与声明」、「协议映射」）
+    # 推理参数方式取值受限并与本定义的协议相符（设计说明第 7.1、7.4 节）
     declared = (bool(model.reasoning_levels), model.default_reasoning_level is not None,
                 bool(model.reasoning_mode))
     if any(declared) and not all(declared):
@@ -503,7 +503,7 @@ def _parse_provider(raw: Any, location: str) -> tuple[ProviderDefinition | None,
         return None, [ValidationIssue(location, "应为对象")]
     allowed = {"id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url"}
     issues = [ValidationIssue(f"{location}.{key}", "未知字段") for key in sorted(set(raw) - allowed, key=str)]
-    # 连接上出现协议字段时直接拒绝，不迁移、不补默认值（模型管理设计说明「目录文档（编辑 JSON、导入、导出）」）
+    # 连接上出现协议字段时直接拒绝，不迁移、不补默认值（模型管理设计说明第 4.6 节）
     if "protocol" in raw:
         issues.append(ValidationIssue(
             f"{location}.protocol", "连接不再声明调用协议，请在每个模型访问定义上声明"))
@@ -556,7 +556,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         mode = mode.strip()
     modalities = raw.get("input_modalities", ("text",))
     if isinstance(modalities, list) and all(isinstance(item, str) for item in modalities):
-        # 输入方式去重，已知取值按文本、图像排列，未知取值保留在末尾供形状校验指出（docs/design/model-management.md「模型访问定义与准入」）
+        # 输入方式去重，已知取值按文本、图像排列，未知取值保留在末尾供形状校验指出（设计说明第 4.3 节）
         declared: list[str] = []
         for item in modalities:
             name = item.strip()

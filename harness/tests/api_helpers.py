@@ -28,7 +28,7 @@ STARTUP_TIMEOUT_SEC = 30
 
 
 def bearer(token: str) -> dict[str, str]:
-    # 请求头里的访问令牌（应用层与接口层设计说明「令牌与 TLS」）：令牌只放在请求头中，不出现在地址里
+    # 请求头里的访问令牌（应用层与接口层设计说明第 6.3 节）：令牌只放在请求头中，不出现在地址里
     return {"Authorization": f"Bearer {token}"}
 
 
@@ -56,7 +56,7 @@ def running_server(open_application: Callable[[], Application], *,
                    http_protocol: type[asyncio.Protocol] | None = None) -> Iterator[RunningServer]:
     # 与 running_api 相同的启动方式，另外把服务句柄交给调用方。
     # pages 是页面文件目录；不给出时用一个不存在的目录，页面请求按「没有页面文件」回答。
-    # data_dir 是令牌文件所在的数据目录，局域网访问方式按它校验访问令牌（docs/design/app-and-interface.md「令牌与 TLS」）。
+    # data_dir 是令牌文件所在的数据目录，局域网访问方式按它校验访问令牌（第 6.3 节）。
     # disable_uvicorn_logging 交给真实的服务日志处理时用：日志写进数据目录里的日志文件
     # http_protocol 让并发测试通过真实协议处理器发出关闭信号。
     server = uvicorn.Server(uvicorn.Config(

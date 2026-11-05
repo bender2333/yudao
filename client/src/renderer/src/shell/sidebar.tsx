@@ -321,7 +321,7 @@ function NewProject(props: {
               placeholder="控制主机上的文件夹路径，留空则从空项目开始"
               onChange={(event) => setInitialDirectory(event.target.value)}
             />
-            {/* 起始文件夹是一份快照（项目的起始文件夹设计说明「界面与评测」）：原型 v13 的说明，工单 #1160 */}
+            {/* 起始文件夹是一份快照（项目的起始文件夹设计说明第 5 节）：原型 v13 的说明，工单 #1160 */}
             <small className="y10-muted">填写时，新建项目取这个文件夹的一份快照，作为项目的起点；以后对这个文件夹的修改不影响项目。不填时从空目录开始。</small>
           </label>
         ) : null}

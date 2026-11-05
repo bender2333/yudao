@@ -1,4 +1,4 @@
-# 调用协议属于模型访问定义的验收（模型管理设计说明「模型访问定义与准入」，工单 #382）。
+# 调用协议属于模型访问定义的验收（模型管理设计说明第 4.3 节，工单 #382）。
 # 同一份连接下的多个访问定义可以各用一种协议，请求基址按访问定义的协议取：
 # 内置服务方案取预置表中该协议的请求基址，自定义服务取连接的地址；
 # 改动协议只让它自己的准入作废，改动连接地址让该连接下全部定义作废。
@@ -152,7 +152,7 @@ def test_changing_the_connection_address_stales_every_definition_under_it():
     assert rows["m-other"]["admitted"] is True
 
 def test_admission_records_carry_the_protocol_of_the_definition():
-    # 准入记录写入访问定义的协议；改这条定义的协议以后记录作废（docs/design/model-management.md「修改与准入」）
+    # 准入记录写入访问定义的协议；改这条定义的协议以后记录作废（第 4.4 节）
     facade = _facade(_custom_document(("m-chat", "chat_completions")))
     facade.record_admission("local", "m-chat", admitted_model="upstream-x")
     rows = facade.model_admissions()

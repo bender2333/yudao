@@ -1,4 +1,4 @@
-// 视图同步（应用层与接口层设计说明「页面的同步规则」）。
+// 视图同步（应用层与接口层设计说明第 5.7 节）。
 // 每个视图保存快照与位置；位置不大于快照位置的事件不作用于这个视图；按能力清单中查询声明的事件种类
 // 重新查询，200 毫秒内的多条事件合并为一次；切换项目或事项以后丢弃迟到的旧查询结果。
 
@@ -8,7 +8,7 @@ import { failureReason } from "./read-failure.ts";
 export type QueryRunner = <T>(name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
 
 // 一份数据的监听者：拿到查询结果与它来自的快照的位置（工单 #952）。
-// 画面合同的状态要带位置（画面与播放设计说明「状态」），页面从 useSnapshot 拿到它再交给翻译层。
+// 画面合同的状态要带位置（画面与播放设计说明第 4.1 节），页面从 useSnapshot 拿到它再交给翻译层。
 export type ViewListener<T> = (value: T, position: number) => void;
 
 // 打开一个视图时登记的内容：查询名称与参数
@@ -22,7 +22,7 @@ type Entry = {
   params: Record<string, unknown> | undefined;
   changedBy: Set<string>;
   listeners: Set<ViewListener<unknown>>;
-  // 快照已经包含的最大全局位置；位置不大于它的事件不作用（docs/design/app-and-interface.md「页面的同步规则」）
+  // 快照已经包含的最大全局位置；位置不大于它的事件不作用（设计说明第 5.7 节）
   position: number;
   active: boolean;
 };
@@ -140,7 +140,7 @@ export class ViewSync {
     }
   }
 
-  // 重新查询全部已打开的视图，返回它们快照位置中最小的一个（重新订阅的起点，docs/design/app-and-interface.md「缺口检测与重新同步」）
+  // 重新查询全部已打开的视图，返回它们快照位置中最小的一个（重新订阅的起点，设计说明第 5.5 节）
   async refreshAll(): Promise<number> {
     const ids = [...this.entries.keys()];
     await Promise.all(ids.map((id) => this.refresh(id)));

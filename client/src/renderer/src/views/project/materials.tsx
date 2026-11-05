@@ -1,7 +1,7 @@
 // 资料页（原型 v10 设计说明第 7.3 节，工单 #380）：只读，先按事项索引，再按 intend、PRD、
 // 交付、质检、项目材料的顺序查看。数据仍来自 project.overview 与 work_item.materials 两个已登记的查询。
 // 范围跟随顶栏的 ?w=；没有选中事项时取进行中的一项，并在索引卡上写明当前查看的是哪一项。
-// 接入已有项目的建档各轮（工单 #138，设计「领域事件」、「产品：初始 PRD」）按轮列出初始 PRD、结构说明、基线核验
+// 接入已有项目的建档各轮（工单 #138，设计第 3.3、4.3 节）按轮列出初始 PRD、结构说明、基线核验
 // 与确认记录；旧版本的执行（原型里的 mt-oldruns）在所属工作包登记查询以后加入。
 
 import { useEffect, useState, type CSSProperties } from "react";
@@ -185,7 +185,7 @@ function IntendBlock(props: { rows: WorkItemMaterialsResult["inputs"] }) {
   );
 }
 
-// 建档各轮（工单 #138，设计「领域事件」、「产品：初始 PRD」）：接入已有项目的每一轮候选，逐轮列出初始 PRD 与
+// 建档各轮（工单 #138，设计第 3.3、4.3 节）：接入已有项目的每一轮候选，逐轮列出初始 PRD 与
 // 结构说明的原文、上一轮的修改意见、基线核验的各条结论与检查、这一轮的确认记录
 function OnboardingBlock(props: { rounds: WorkItemMaterialsResult["onboarding_rounds"] }) {
   return (
@@ -224,7 +224,7 @@ function OnboardingBlock(props: { rounds: WorkItemMaterialsResult["onboarding_ro
   );
 }
 
-// 某一轮基线核验的结论（工单 #138，docs/design/existing-project-onboarding.md「决定种类」）：逐条结论、遗漏的能力、检查回执与其他失败。
+// 某一轮基线核验的结论（工单 #138，设计第 3.2 节）：逐条结论、遗漏的能力、检查回执与其他失败。
 // 没有核验角色的形态没有基线核验这一步（工单 #1510）：这一轮是空的一份，服务端另给一句说明，
 // 有那一句时按它写（「没有经过基线核验」），不把空的一份画成一串「无」
 function BaselineReviewBlock(props: { review: WorkItemMaterialsResult["onboarding_rounds"][number]["baseline_review"];
@@ -256,7 +256,7 @@ function BaselineReviewBlock(props: { review: WorkItemMaterialsResult["onboardin
   );
 }
 
-// 某一轮的确认记录（工单 #138，docs/design/existing-project-onboarding.md「用户确认与修改的往返」）：回答与撤销各自一条
+// 某一轮的确认记录（工单 #138，设计第 4.7 节）：回答与撤销各自一条
 function DecisionRecords(props: { rows: WorkItemMaterialsResult["onboarding_rounds"][number]["decisions"] }) {
   return (
     <>
@@ -299,7 +299,7 @@ function baselineCheckRow(value: { name?: string; command?: string; exit_code?: 
   const summary = text(value.summary);
   return [name, cmd, exit, summary].filter((part) => part !== "").join(" · ");
 }
-// 逐条结论按 要求 / 状态 / 依据 一行一条（docs/design/existing-project-onboarding.md「决定种类」的「各要求核实结果」）
+// 逐条结论按 要求 / 状态 / 依据 一行一条（设计第 3.2 节的「各要求核实结果」）
 function conclusionRow(value: { requirement?: string; status?: string; evidence?: string }): string {
   return [text(value.requirement) || "未写明要求", conclusionName(text(value.status)), text(value.evidence)]
     .filter((part) => part !== "").join(" · ");

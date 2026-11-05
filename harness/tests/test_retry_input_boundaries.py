@@ -13,12 +13,12 @@ from harness.models import EventType
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.tests.helpers import after_event
-from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
+from harness.tests.wait_limits import MODULE_WAIT_FOR_HOST_WORK_SEC
 
 # 等待一次激活收尾或等待对方线程到达会合点的墙钟界限只用来防止测试一直等待，按 #107 的裁定
 # （架构师 2026-09-27 16:55，docs/archive/architecture-issues-2026-09-10.md）设为远大于正常用时的值。
-# 收尾含一次版本存储写入，正常用时数秒。
-_WAIT_LIMIT = WAIT_FOR_HOST_WORK_SEC
+# 收尾含一次版本存储写入，正常用时数秒；上限取模块层给每条用例的上限的一半。
+_WAIT_LIMIT = MODULE_WAIT_FOR_HOST_WORK_SEC
 
 
 def test_retryable_failure_after_new_input_retries_and_carries_it(tmp_path):
@@ -54,7 +54,7 @@ def test_retryable_failure_after_new_input_retries_and_carries_it(tmp_path):
 def test_input_during_retry_backoff_is_carried_by_the_retry(tmp_path):
     # 工单 #964：输入在工作期间到达时，它在这个会话的下一步作为通知加入历史，
     # 这一轮不因此结束：重试照常进行，重试的请求里带着这条输入。
-    # 工单 #1226：先后由事件决定，不用时长去赌（测试分层设计说明「测试的写法」中「两件同时进行的事谁先谁后，由事件、信号文件或提交通知决定，不用时长去赌」）：
+    # 工单 #1226：先后由事件决定，不用时长去赌（测试分层设计说明第 10 节第 7 条）：
     # 退避安排的事件交给订阅方时退避还没有开始走，订阅方在这里等测试线程写完输入再放行，
     # 重试的请求在放行之后才装配。退避有多长、测试线程慢到什么时候都不影响判定
     text = "NEW USER ORIGINAL\nwith exact spacing"

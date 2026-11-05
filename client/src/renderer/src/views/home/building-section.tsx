@@ -1,7 +1,7 @@
 // 首页的楼（原型 v13 设计说明第 3 至 5 节、原型 js/ui/scenes.js 的 mountBuilding，工单 #178、#955）：
 // 每个项目一层，画成缩小的项目楼层。
 //
-// 页面只做连接（画面与播放设计说明「分层与边界」）：
+// 页面只做连接（画面与播放设计说明第 3 节）：
 //   - projects.list 与每个项目的 project.loop 交给翻译层（translate/building.ts），翻成画面合同的楼的状态；
 //   - 事件流不按项目筛选，每条事件先经翻译层翻成楼的动作，再交给画面播放；
 //   - 打开画面、重新同步、标签页从后台切回都用 jump：直接显示最新状态，不补播；
@@ -183,7 +183,7 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
   }, [props.model, props.live]);
 
   // 事件只决定动作的起点：事件经翻译层翻成楼的动作（楼的远层动作不按项目筛选，事件本身带项目标识）。
-  // 回放期间不按事件流更新画面（docs/design/visualization.md「状态」：客户端不按事件流更新回放的视图）
+  // 回放期间不按事件流更新画面（设计说明第 4.1 节：客户端不按事件流更新回放的视图）
   useEffect(() => {
     const off = props.app.subscribeEvents((event) => {
       if (!liveRef.current) return;
@@ -192,7 +192,7 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
     return off;
   }, [props.app]);
 
-  // 重新同步与标签页从后台切回：清空时间线，直接显示最新状态，不补播（docs/design/visualization.md「播放时间线」）
+  // 重新同步与标签页从后台切回：清空时间线，直接显示最新状态，不补播（设计说明第 5.2 节）
   useEffect(() => {
     const jumpLatest = (): void => {
       if (modelRef.current) viewRef.current?.jump(modelRef.current);

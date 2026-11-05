@@ -60,7 +60,7 @@ class _MessagesInvocation:
     session_id: str
     attempt_id: str
     emit: Emit
-    # 输出片段（docs/design/app-and-interface.md「模型输出片段」）：按通道保存已发出的字数，作为下一段的起始位置
+    # 输出片段（设计说明第 5.6 节）：按通道保存已发出的字数，作为下一段的起始位置
     channel_offsets: dict[str, int] = field(default_factory=dict)
 
 
@@ -275,7 +275,7 @@ class _MessagesInvoker:
                             "arguments": "",
                         }
                     elif block.get("type") == "thinking":
-                        # 推理内容（docs/design/model-management.md「历史中的推理内容」）：thinking 块与它的 signature 一起保存
+                        # 推理内容（设计说明第 7.6 节）：thinking 块与它的 signature 一起保存
                         thinking_blocks[int(payload.get("index", 0))] = {
                             "type": "thinking",
                             "thinking": str(block.get("thinking") or ""),
@@ -451,7 +451,7 @@ def _messages_input(provider_input: ProviderInput) -> tuple[str, list[dict[str, 
 
 
 def _messages_tool_result(call_id: str, text: str, images: tuple[ToolImage, ...]) -> dict[str, Any]:
-    # Anthropic 的 tool_result 自带图像块：文字块在前，图像块按顺序（Messages 的图像输入写法，docs/design/browser-and-computer-use.md「请求中的图像」）
+    # Anthropic 的 tool_result 自带图像块：文字块在前，图像块按顺序（Messages 的图像输入写法，设计说明第 6.2 节）
     if not images:
         return {"type": "tool_result", "tool_use_id": call_id, "content": text}
     content: list[dict[str, Any]] = [{"type": "text", "text": text}] if text else []

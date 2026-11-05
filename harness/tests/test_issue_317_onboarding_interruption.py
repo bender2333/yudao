@@ -1,5 +1,5 @@
-# 工单 #317：建档在进程中断时的行为（docs/design/existing-project-onboarding.md 「失败与中断」前三行，
-# 「验收」中「失败与中断」的前三段）。三个场景都用真实的子进程运行系统并被终止：检查是真实进程，等它写下
+# 工单 #317：建档在进程中断时的行为（docs/design/existing-project-onboarding.md 第 6 节前三行，
+# 第 10 节第 11 项的前三段）。三个场景都用真实的子进程运行系统并被终止：检查是真实进程，等它写下
 # started 标记以后终止；「run 结束以后、结算以前」与「回答以后、新 run 建立以前」这两个窗口没有子进程
 # 可等，在对应事件提交以后停住。每次终止以后都用同一个数据目录重新打开系统，走启动时的自动继续。
 # 「补做之前」的状态从只读连接读出（run.observed）：系统打开数据目录时会立刻补做结算与补建缺少的 run。
@@ -26,7 +26,7 @@ def _product_turn() -> dict:
 
 
 def _structure_turn(checks: dict | None = None) -> dict:
-    # 结构说明与它要求的检查写在同一次回答里：回执必须绑定同一次激活（docs/design/existing-project-onboarding.md「总体」）
+    # 结构说明与它要求的检查写在同一次回答里：回执必须绑定同一次激活（设计第 4.1 节）
     checks = {"smoke": 0} if checks is None else checks
     turn = structure_turn(requirement_locations=[{"requirement": REQUIREMENT,
                                                  "locations": ["src/echo.py"]}], checks=checks)

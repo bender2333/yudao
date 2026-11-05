@@ -1,6 +1,6 @@
-# 接口层：FastAPI 应用（docs/design/app-and-interface.md「模块」、「接口路径」）。路由、OpenAPI 与能力清单由应用层的注册表生成；
+# 接口层：FastAPI 应用（设计说明第 2.2、7.1 节）。路由、OpenAPI 与能力清单由应用层的注册表生成；
 # 处理函数不含业务规则，只调用应用层。生命周期中在服务的事件循环里建立控制核心与应用层，关闭时释放。
-# 其余的 GET 路径提供页面文件（网页界面的提供与发布设计说明「接口层提供页面文件」）。
+# 其余的 GET 路径提供页面文件（网页界面的提供与发布设计说明第 5.1 节）。
 
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ def create_app(open_application: Callable[[], Application], *, registry: Registr
 
     api.add_api_route("/api/capabilities", capabilities, methods=["GET"], response_model=Capabilities,
                       operation_id="capabilities", tags=["capabilities"])
-    # 页面与接口同一来源（docs/design/web-interface-and-release.md「版本号」）：Origin 由 AccessMiddleware 核对，不发送 CORS 响应头
+    # 页面与接口同一来源（第 6.2 节）：Origin 由 AccessMiddleware 核对，不发送 CORS 响应头
     api.add_middleware(AccessMiddleware, access=access, tokens=tokens)
     api.openapi = lambda: _openapi(api)
     _add_events(api, keepalive_sec=keepalive_sec)
@@ -150,7 +150,7 @@ def _add_query(api: FastAPI, definition: QueryDefinition) -> None:
         except NotFound as exc:
             return JSONResponse(status_code=404, content={"error": str(exc)})
         except ReplayOutOfRange as exc:
-            # at 大于日志末尾：按位置读取的合同拒绝（docs/design/web-interface-and-release.md「命令行入口」）
+            # at 大于日志末尾：按位置读取的合同拒绝（设计说明第 4.1 节）
             return JSONResponse(status_code=422, content={"error": str(exc)})
         except CatalogQueryInvalid as exc:
             # 查询的拟议文档或选择结构非法：按输入问题返回 422，原因写出字段位置（工单 #261）
@@ -169,9 +169,9 @@ def _add_query(api: FastAPI, definition: QueryDefinition) -> None:
 
 
 def _add_events(api: FastAPI, *, keepalive_sec: float) -> None:
-    # GET /api/events（docs/design/web-interface-and-release.md「接口层提供页面文件」）：SSE 事件流。参数 after（或 Last-Event-ID 请求头，请求头优先）、
+    # GET /api/events（设计说明第 5.1 节）：SSE 事件流。参数 after（或 Last-Event-ID 请求头，请求头优先）、
     # 项目、事项、run、部门、角色、种类与 live。事件与检查点的 SSE id 是位置，片段的事件名为 delta、不带 id；
-    # 空闲每 15 秒发送一次 SSE 注释作为保活（docs/design/app-and-interface.md「补齐与实时」中「每 15 秒发送一次 SSE 注释作为保活」）
+    # 空闲每 15 秒发送一次 SSE 注释作为保活（第 5.4 节第 5 项）
     async def events(
         request: Request,
         after: Annotated[int | None, Query(ge=0)] = None,
@@ -189,7 +189,7 @@ def _add_events(api: FastAPI, *, keepalive_sec: float) -> None:
                            types=tuple(type or ()))
         start = _resume_position(last_event_id, after)
         if start is None:
-            # 续传位置不是非负整数：客户端记录的位置无法按位置解释，按位置未知重新同步（docs/design/app-and-interface.md「缺口检测与重新同步」）
+            # 续传位置不是非负整数：客户端记录的位置无法按位置解释，按位置未知重新同步（第 5.5 节）
             yield _frame("resync", {"reason": "position_unknown", "end_position": 0}, None)
             return
         stream = _application(request).open_event_stream(scope, after=start, live=live)
@@ -239,7 +239,7 @@ def _add_events(api: FastAPI, *, keepalive_sec: float) -> None:
 
 def _resume_position(last_event_id: str | None, after: int | None) -> int | None:
     # 续传位置：Last-Event-ID 请求头优先，其次 after，都没有时从 0 开始。
-    # 请求头不是非负整数时按位置未知处理（返回 None），连接随后发送 resync 并关闭（docs/design/app-and-interface.md「缺口检测与重新同步」）
+    # 请求头不是非负整数时按位置未知处理（返回 None），连接随后发送 resync 并关闭（第 5.5 节）
     if last_event_id is not None and last_event_id.strip():
         try:
             position = int(last_event_id)
