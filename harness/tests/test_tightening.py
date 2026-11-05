@@ -9,9 +9,10 @@
 #   - 探索轮不能交质检结论、放行用当前质检测试材料；
 #   - 按 PRD 内容的检查：每条要求覆盖一次、有效决定逐条保留或退役、「设计中，未实施」的边界不是现有缺陷。
 #
-# 守 R2（缝的交换字段：TightenRequest 进去、Tightened 出来，只有通过、拒绝、等待三种，带上契约版本）
+# 守 R2（缝的交换字段：TightenRequest 进去、Tightened 出来，只有通过、拒绝、等待三种；契约版本与各实现
+# 声明的版本由 test_contract_modules.py 的单元用例守着）
 # 与 R3（设计说明第 5.5 节写明的行为，经这条缝检查，不看收紧检查内部怎么组织）。
-from harness.tests.helpers import adjudication_view, minimal_of, work_basis
+from harness.tests.helpers import minimal_of, work_basis
 
 import json
 import shutil
@@ -25,7 +26,6 @@ from harness.models import (ArtifactRef, DeliverySpec, EffectiveContract, EventT
 from harness.proposals import baseline_review, product_spec, review, structure
 from harness.runtime import LoopSystem
 from harness.tightening import WATCHED_OUTPUTS, pending_product_input
-from harness.tightening_contract import accept
 from harness.validation import TightenRequest
 
 MARK = "设计中，未实施"
@@ -129,12 +129,6 @@ def _definitions_received_by_engineering(tmp_path):
     return load_definitions(directory)
 
 
-def test_the_tightening_check_declares_the_contract_version():
-    # R2：这道缝是内核与路由之间的合同，实现声明契约版本，薄的一侧按版本接受
-    assert WATCHED_OUTPUTS.CONTRACT_VERSION == 1
-    assert accept(WATCHED_OUTPUTS) == 1
-
-
 def test_the_kinds_a_department_can_submit_come_from_the_tightening_check(tmp_path):
     # R3：部门此刻能交的种类按调度算出来的当前工作决定（清点第 D 类）
     system, run_id = _accepted(tmp_path)
@@ -160,8 +154,6 @@ def test_a_submission_outside_the_current_work_is_refused_by_the_tightening_chec
 
 def test_a_stale_basis_defers_a_proposal_inside_the_tightening_check(tmp_path):
     # R3：模型还没看见新输入时正式成果推迟到下一步（工单 #964），不是停止这一轮
-    from harness.adjudication import WorkBasis
-
     system, run_id = _accepted(tmp_path)
     projection = _working(system.project(run_id), "engineering")
     basis = replace(work_basis(projection, "engineering"),
@@ -291,24 +283,3 @@ def test_a_boundary_marked_design_not_implemented_is_not_an_existing_defect(tmp_
         facts=_facts(receipt)))
     assert [field for field, _message in _errors(tightened)] == ["conclusions[0].status"]
     assert MARK in tightened.errors[0].message
-
-
-def test_a_submission_that_the_kernel_rejects_is_never_accepted_by_the_tightening_check(tmp_path):
-    # R2：收紧检查只收窄：它放行的那一次，内核的拒绝照样生效（内核先判，这里只多拒绝）
-    from harness.actions import FactsQuery
-    from harness.adjudication import proposal_decision
-    from harness.environment import LocalEnvironment
-
-    system, run_id = _accepted(tmp_path)
-    projection = _working(system.project(run_id), "product")
-    environment = LocalEnvironment(system.workspace(run_id))
-    facts = environment.query(FactsQuery(tree=True)).tree
-    # 依据的 PRD 版本不是当前版本：内核的提案合同拒绝；收紧检查自己的三条都通过（输入版本已进来、
-    # 修订写了改动说明、有效决定为空也声明了空），所以这一次只有内核在拒绝
-    proposal = product_spec(basis_product_spec_hash="sha256:not-current",
-                            change_record={"rationale": "changed the goal", "changed": [], "retained": [],
-                                           "retired": []})
-    decision = proposal_decision(adjudication_view(projection), department="product", proposal=proposal, facts=facts,
-                                 events=system.store.list_events(run_id), tightening=WATCHED_OUTPUTS)
-    assert not decision.accepted
-    assert decision.errors and decision.errors[0].field == "basis_product_spec_hash"

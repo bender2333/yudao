@@ -29,6 +29,7 @@
     },
     "initial_prd_proposed": {
       "baseline_review": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选出现之前的基线核验只留在 run 流中",
+      "baseline_verified": "旧事件没有这一项（工单 #1510），读取时按「经过了基线核验」处理：没有核验角色的形态出现之前，建档都带基线核验",
       "overview_ref": "这个事件种类是新增的，旧版本的项目流中没有它：仓库概况的工件引用取自建档 run 的 run_created",
       "prd": "这个事件种类是新增的，旧版本的项目流中没有它：建档候选出现之前的初始 PRD 只留在 run 流中",
       "revision_note_ref": "旧事件没有这个字段：第一轮建档没有上一轮的修改意见，读取时按没有修改意见处理",
@@ -69,6 +70,7 @@
     },
     "project_decision_requested": {
       "baseline_review": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求带的基线核验取自被确认前的候选",
+      "baseline_verified": "旧事件没有这一项（工单 #1510），读取时按「经过了基线核验」处理：没有核验角色的形态出现之前，建档都带基线核验",
       "blocks": "这个事件种类是新增的，旧版本的项目流中没有它：建档请求挡住所属事项，内核修改请求挡住交付所属的 run",
       "candidate_run_id": "这个事件种类是新增的，旧版本的项目流中没有它：候选所属的建档 run，请求本身不属于任何 run",
       "department": "这个事件种类是新增的，旧版本的项目流中没有它：建档确认属于产品部门",
@@ -322,6 +324,7 @@
     },
     "initial_prd_proposed": {
       "baseline_review": "object",
+      "baseline_verified": "boolean",
       "overview_ref": "object",
       "prd": "object",
       "revision_note_ref": "object?",
@@ -369,6 +372,7 @@
     },
     "project_decision_requested": {
       "baseline_review": "object",
+      "baseline_verified": "boolean",
       "blocks": "enum string[run, work_item]",
       "candidate_run_id": "string",
       "delivery_run_id": "string",

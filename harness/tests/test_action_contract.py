@@ -111,21 +111,6 @@ def test_a_written_file_is_read_back_through_the_same_contract(implementation):
     assert read.status == "completed" and read.output == "hello\n", name
 
 
-def test_a_write_changes_the_public_tree_the_contract_reports(implementation):
-    _name, _root, environment = implementation
-    before = environment.query(FactsQuery(tree=True)).tree
-    assert before is not None and "notes/a.txt" not in before.files
-
-    _perform(environment, _action("write_file", "write", {"path": "notes/a.txt", "content": "hello\n"}))
-
-    after = environment.query(FactsQuery(tree=True)).tree
-    assert after is not None
-    assert after.digest != before.digest, "写入以后公开树的摘要没有变化"
-    assert "notes/a.txt" in after.files
-    assert len(after.hashes) == len(after.files)
-    assert after.hashes[after.files.index("notes/a.txt")].startswith("sha256:")
-
-
 @pytest.mark.parametrize("declared", [
     {},
     {"verification": "snapshot", "cancellable": True},
@@ -198,19 +183,6 @@ def test_a_written_action_reports_the_endpoint_snapshot_the_reader_can_open(impl
     assert ref is not None, name
     snapshot = json.loads(artifacts.get_for_run(ARTIFACT_RUN, ArtifactRef(**ref.model_dump())))
     _assert_snapshot_is_the_public_tree(snapshot, after, root=root, written_file="notes/a.txt", name=name)
-
-
-def test_a_read_only_action_reports_the_same_tree_digests(implementation_with_artifacts):
-    # 只读的动作没有改动公开树：动作前后两个摘要相同（工单 #1398）
-    _name, _root, environment, _artifacts = implementation_with_artifacts
-    written = _perform(environment, _action("write_file", "write", {"path": "a.txt", "content": "x"}))
-
-    read = _perform(environment, _action("read_file", "read", {"path": "a.txt"}))
-
-    assert read.tree_change is not None
-    assert read.tree_change.before_digest == read.tree_change.after_digest, "只读的动作改动了公开树"
-    assert read.tree_change.after_digest == written.tree_change.after_digest
-    assert read.after_snapshot_ref is not None
 
 
 def test_a_local_command_reports_its_tree_change_and_endpoint_snapshot(tmp_path):

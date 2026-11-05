@@ -1,0 +1,27 @@
+{
+  "routings": [
+    {
+      "id": "direct",
+      "label": "直做",
+      "why": "有用户输入或指导时，没有在工作的角色开始一轮；角色之间照现有规矩询问；交完成的那个角色交了完成，事项结束。事项最后采纳交完成的那一份：没有核验角色核验它时记为开环完成，不写成放行",
+      "departments": [
+        "engineering"
+      ],
+      "outcomes": "direct",
+      "final_outcome": "completion",
+      "proposal_methods": [
+        "submit_product_spec",
+        "submit_structure",
+        "submit_completion"
+      ],
+      "limits": {},
+      "end_reasons": {
+        "no_open_work": {
+          "label": "没有角色可以开始一轮工作",
+          "outcome": "failed",
+          "human_action": "没有角色可以开始一轮工作：没有新输入、没有待处理的指导，也没有还没交完成的人。查看事件记录确认这件事还缺什么，处理后作为新事项继续。"
+        }
+      }
+    }
+  ]
+}

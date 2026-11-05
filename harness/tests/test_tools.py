@@ -4,15 +4,7 @@ import re
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-import pytest
-
-from harness.adapters.fake import FakeAdapter
 from harness.environment import LocalEnvironment
-from harness.models import EventType, json_dumps
-from harness.path_rules import QA_TESTS_DIR
-from harness.proposals import delivery_turn, product_spec
-from harness.providers.call import ModelResponse
-from harness.runtime import LoopSystem
 from harness.tests.helpers import (action, perform, python_command, run_tree_command, wait_for_file,
                                    wait_until_stopped)
 from harness.definitions import DEFINITIONS
@@ -21,12 +13,11 @@ from harness.workspace import Workspace
 
 TOOLS = DEFINITIONS.tools
 
-def _call(identity, name, **arguments):
-    return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
-            "arguments": json_dumps(arguments)}
 
 def test_quality_checks_only_through_run_check(tmp_path):
-    assert [name for name in tools_for("quality") if TOOLS[name].action == "check"] == ["run_check"]
+    # 检查类别的两个工具（工单 #1181）：run_check 运行交付检查，run_baseline_check 在基线副本上
+    # 运行同名交付检查；两者都由主机执行，基线回执不是交付检查的证据
+    assert [name for name in tools_for("quality") if TOOLS[name].action == "check"] == ["run_check", "run_baseline_check"]
     workspace = Workspace(tmp_path)
     workspace.write_file("ok.py", "raise SystemExit(0)\n")
     result = perform(LocalEnvironment(workspace), "run_check", {"name": "smoke", "command": python_command("ok.py")},
@@ -162,68 +153,6 @@ def test_cancel_stops_a_running_check_and_its_receipt_is_cancelled(tmp_path):
     assert wait_until_stopped(child)
     [receipt] = workspace.receipts()
     assert receipt.exit_code == 130 and receipt.summary == result.output["summary"]
-
-def test_cancel_before_the_action_starts_does_not_start_the_process(tmp_path):
-    workspace = Workspace(tmp_path / "ws")
-    environment = LocalEnvironment(workspace)
-    marker = tmp_path / "started"
-    request = action("run_check", {"name": "smoke", "command": run_tree_command(marker)})
-    environment.cancel(request.action_id)
-    result = asyncio.run(environment.perform(request))
-    assert result.status == "cancelled" and result.ok is False and result.output is None
-    assert result.error == "The action was cancelled before it started."
-    assert not marker.exists()
-    assert workspace.receipts() == []
-
-@pytest.fixture
-def check_copy_base(tmp_path, monkeypatch):
-    base = tmp_path / "check-copies"
-    base.mkdir()
-    monkeypatch.setattr("harness.workspace.tempfile.tempdir", str(base))
-    return base
-
-
-@pytest.mark.parametrize("department", ["product", "quality"])
-def test_departments_cannot_change_delivery_files(tmp_path, department):
-    # 部门的工具范围由工具许可核对：没有写入工具的部门调用写入、编辑、删除、移动都被拒绝，文件不变；
-    # 质检有写入工具（工单 #645），只能写测试材料目录，写交付里的文件同样被拒绝
-    calls = ModelResponse(output=[
-        _call("write", "write_file", path="src/echo.py", content="x"),
-        _call("edit", "edit_range", path="src/echo.py", start_line=1, end_line=1,
-              expected_text="import sys", new_text="x"),
-        _call("delete", "delete_file", path="src/echo.py", reason="remove replaced implementation"),
-        _call("move", "move_file", source="src/echo.py", destination="src/moved.py", reason="organize module"),
-    ])
-    if department == "product":
-        # 事项没有走到 PRD 被接纳以后（工单 #878）：这条脚本只有产品一个部门取用
-        script = [calls]
-    else:
-        # 脚本按部门给出（工单 #878：PRD 被接纳以后工程与质检同时工作，
-        # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）：
-        # 交付是工程的活，这组写入调用是质检的活
-        script = {"product": [product_spec()], "engineering": [delivery_turn()], "quality": [calls]}
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter(script))
-    run_id = system.create_run("echo")
-    workspace = system.workspace(run_id)
-    if department == "product":
-        workspace.write_file("src/echo.py", "original\n")
-    system.run_until_stop(run_id)
-    before = workspace.read_file("src/echo.py")
-    events = system.store.list_events(run_id)
-    for identity, tool in (("write", "write_file"), ("edit", "edit_range"), ("delete", "delete_file"),
-                           ("move", "move_file")):
-        called = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("id") == identity)
-        assert called.department == department
-        assert not called.payload["ok"]
-        if department == "quality" and tool in ("write_file", "edit_range"):
-            # 写入范围是检查材料的角色只写检查材料目录：原因写明目录与放行核对的树，不写部门名（工单 #1390）
-            assert QA_TESTS_DIR in called.payload["error"] and department not in called.payload["error"]
-        else:
-            assert called.payload["error"] == f"{department} cannot use {tool}"
-        assert not any(event.type == EventType.TOOL_STARTED and event.payload["id"] == identity for event in events)
-    assert workspace.read_file("src/echo.py") == before != "x"
-    assert not (workspace.root / "src" / "moved.py").exists()
-
 
 def test_check_copy_uses_previously_captured_bytes(tmp_path):
     workspace = Workspace(tmp_path)

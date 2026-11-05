@@ -214,7 +214,7 @@ function OnboardingBlock(props: { rounds: WorkItemMaterialsResult["onboarding_ro
               <pre className="y10-pre raw">{round.prd}</pre>
               <h3 className="y10-mt-sub">现有结构说明</h3>
               <pre className="y10-pre raw">{round.structure}</pre>
-              <BaselineReviewBlock review={round.baseline_review} />
+              <BaselineReviewBlock review={round.baseline_review} note={round.baseline_review_note} />
               <DecisionRecords rows={round.decisions} />
             </li>
           ))}
@@ -224,9 +224,20 @@ function OnboardingBlock(props: { rounds: WorkItemMaterialsResult["onboarding_ro
   );
 }
 
-// 某一轮基线核验的结论（工单 #138，设计第 3.2 节）：逐条结论、遗漏的能力、检查回执与其他失败
-function BaselineReviewBlock(props: { review: WorkItemMaterialsResult["onboarding_rounds"][number]["baseline_review"] }) {
+// 某一轮基线核验的结论（工单 #138，设计第 3.2 节）：逐条结论、遗漏的能力、检查回执与其他失败。
+// 没有核验角色的形态没有基线核验这一步（工单 #1510）：这一轮是空的一份，服务端另给一句说明，
+// 有那一句时按它写（「没有经过基线核验」），不把空的一份画成一串「无」
+function BaselineReviewBlock(props: { review: WorkItemMaterialsResult["onboarding_rounds"][number]["baseline_review"];
+                                      note: WorkItemMaterialsResult["onboarding_rounds"][number]["baseline_review_note"] }) {
   const review = props.review;
+  if (props.note !== null && props.note !== undefined && props.note !== "") {
+    return (
+      <>
+        <h3 className="y10-mt-sub">基线核验</h3>
+        <p className="y10-note note">{props.note}</p>
+      </>
+    );
+  }
   return (
     <>
       <h3 className="y10-mt-sub">基线核验</h3>

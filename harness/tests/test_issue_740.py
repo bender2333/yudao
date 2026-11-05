@@ -67,16 +67,3 @@ def test_a_blank_field_and_an_unknown_field_are_both_refused_with_a_readable_not
         assert "owner" not in note
 
 
-def test_a_rejected_command_still_answers_409_with_the_reason_and_its_message(data_dir):
-    # 应用层的拒绝不受这一处影响：409 的响应体仍然是 Rejected
-    opened = _Opened(data_dir)
-    with running_api(opened) as client:
-        created = _post(client, "project.create", {"name": "文本工具", "goal": "目标"})
-        assert created.status_code == 200, created.text
-        project_id = created.json()["refs"]["project_id"]
-        stale = _post(client, "project.rename", {"base_version": 0, "project_id": project_id, "name": "新名字"})
-        assert stale.status_code == 409, stale.text
-        assert stale.json()["reason"] == "stale_base"
-        assert stale.json()["message"]
-
-

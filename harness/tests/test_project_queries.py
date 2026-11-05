@@ -137,6 +137,8 @@ def _all_requests(system, project_id, work_item_id, run_id):
     delivery_event_id = system.project(run_id).delivery_spec.created_event_id
     return [
         ("system.status", SystemStatusRequest()),
+        ("catalog", None),
+        ("catalog.document", None),
         ("decisions.list", DecisionsList()),
         ("projects.list", ProjectsList()),
         ("home.away_report", AwayReportRequest()),
@@ -148,6 +150,7 @@ def _all_requests(system, project_id, work_item_id, run_id):
         ("department.workspace", DepartmentWorkspace(project_id=project_id, department="product",
                                                      work_item=work_item_id)),
         ("run.actions", RunActions(run_id=run_id)),
+        ("run.recovery", RunRecovery(run_id=run_id)),
         ("run.asks", RunAsks(run_id=run_id)),
         ("work_item.materials", WorkItemMaterials(project_id=project_id, work_item=work_item_id)),
         ("delivery.file", DeliveryFile(event_id=delivery_event_id, path="src/echo.py")),

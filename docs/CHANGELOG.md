@@ -464,6 +464,9 @@ claude-sonnet-5-5（总架构师） / 2026-11-04 14:48 / `agents/workflow.md` �
 claude-opus-5-5（子架构师） / 2026-11-04 19:48 / `docs/decision.md` 记阶段二第二轮补工单的取舍 / 用户回「照清单开」，薄驱动与项目组织后端的切法要留下依据
 
 claude-opus-5-5（子架构师） / 2026-11-04 19:52 / `docs/design/forms-and-verifier-role.md` 第 3、4.7 节与 `docs/design/skeleton-and-application.md` 第 5.1、5.4 节：开环完成统一按事项最后采纳的成果判断，这一项写在路由的定义里，结束原因由路由按创建事件里的标记给出 / #1394 交回，两处说法不一致，属一致性修正
+claude-sonnet-5-5 / 2026-11-05 10:30 / `agents/ticket-spec.md` 清理单：不放进里程碑 → 放进当前阶段的里程碑，加「清理单先做」（别的工单的「只改」与它落在同一份文件时以清理单为前置，汇总文件不算）；「不靠排队错开」后补清理单例外；`skills/to-parents`、`skills/ticket` 同步 / 清理单的描述位置会被后做的工单改掉，且没有里程碑时 solo 按里程碑取范围不会取到它们
+
+solo-deepseek-v4.1-flash / 2026-11-06 01:38 / `docs/design/browser-and-computer-use.md` 第 3.3 节「启动方式」的参数表：`ready_timeout_sec` 的范围回到 10 至 1800（与规则登记 `execution.readiness_timeout_sec` 相同），删去「取值与界限取自规则登记」的括注 / 工单 #1251：这一行在 #147（48ee22b6）里被按规则登记改成 10 至 3600，与《rules-and-parameters》「设计说明是来源、登记照着实现」相反；就绪时限的登记与设计说明一起回到设计说明原来的范围
 claude（本体方案线程，用户要求） / 2026-11-03 18:44 / 新增 `research/yudao-ontology.md`（Yudao 自身的本体建模：调研与方案），`research/README.md` 加一行索引；只在分支 `research/yudao-ontology` 上 / 用户要一个专门放本体建模方案的分支，不合进 main；第 9 节的选择用户还没定
 claude（本体方案线程，用户要求） / 2026-11-03 18:49 / `research/yudao-ontology.md` 加第 1.1 节（业界做法对照与定位）、第 3.4 节（代码与测试的概念与关系）、第 4.3 节（代码与测试的事实从哪来）、第 5.2 节（跨设计、代码、测试的检查），第 9 节加四条待定、第 10 节加一步；`research/README.md` 那一行跟着改；只在分支 `research/yudao-ontology` 上 / 用户要把代码与测试也放进本体做整体建模，并问业界怎么做
 claude（本体方案线程，用户要求） / 2026-11-03 18:56 / `research/yudao-ontology.md` 第 1 节开头写明两个用途（按规格查一致、给 agent 装上下文），新增第 6 节（同一份事实按关系挑上下文：记忆加 RAG 缺什么、和语义系统第 10 节与上下文装配设计说明的关系、选择规则的样子、先给谁用、业界对照），原第 6 至 11 节顺延为第 7 至 12 节，第 4.3 节加五种事实的来源，第 10 节加两条待定、第 11 节加一步；上一行时间改正为提交时间；`research/README.md` 那一行跟着改；只在分支 `research/yudao-ontology` 上 / 用户说明本体的两个目的，要把第二个（上下文装配）写清

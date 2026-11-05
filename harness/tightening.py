@@ -26,7 +26,8 @@ from .actions import TreeFacts
 from .adjudication import ask_chain_decision, ask_chain_max_depth
 from .watched_outputs import has_new_work, input_department, is_working, proposal_kinds_for
 from .contracts import normalize_scope
-from .coverage import (changed_criteria, coverage_report, criterion_is_executable, method_is_executable,
+from .coverage import (baseline_open_records, baseline_records, changed_criteria, coverage_report,
+                       criterion_is_executable, method_is_executable,
                        open_criteria)
 from .definitions import DEFINITIONS, Definitions
 from .kernel_events import BASELINE_STATUSES, QA_METHODS, QA_RESULTS, QA_VERDICTS
@@ -435,6 +436,11 @@ class WatchedOutputsTightening:
             return Tightened(wait=True, reason=PENDING_INPUT_RELEASE)
         # 只有放行结束事项（工单 #556）：缺陷记录让工程开始一轮返工，返工的结论由下一个谁工作决定
         changed = changed_criteria((judgement.payload or {}).get("criteria") or [], criteria)
+        # 检验的有效性（第 7.2 节，工单 #1181）：本次激活的基线回执按检查名归并，命令检查的覆盖
+        # 要求同名基线在基线副本上失败。基线回执先于这次提交写进工作区事实（主机执行先写回执），
+        # 这里只读事实，不补运行
+        baseline = baseline_records(facts.checks, sorted({name for row in criteria
+                                                          for name in row["checks"]}))
         return Tightened(content={
             "product_spec_hash": spec_hash,
             "effective_contract_hash": contract_hash,
@@ -449,9 +455,13 @@ class WatchedOutputsTightening:
             # 结论引用的独立判断事件（工单 #1190）：以后算解释翻转率时按这一对事件取
             "judgement_event": judgement.event_id,
             # 放行记录一次算好三个数（第 7.1 节第 4 点）：查询与画面读这个数，不重新计算；
-            # 改判的条数随它写进放行记录（工单 #1190）
-            "coverage": coverage_report(criteria, changed=len(changed), cases=case_steps),
+            # 改判的条数随它写进放行记录（工单 #1190）。baseline_valid 随三个数一起算好（第 7.2 节）
+            "coverage": coverage_report(criteria, changed=len(changed), cases=case_steps,
+                                        baseline=baseline),
             "open_criteria": open_criteria(criteria, case_steps),
+            # 基线明细（第 7.2 节的表）：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
+            # 缺少回执与无法运行都不计入，放行记录里看得到
+            "baseline_checks": baseline_open_records(criteria, baseline),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
             "evidence_refs": _check_evidence_refs(criteria, request.events),
         }, ends_run=verdict == "release")

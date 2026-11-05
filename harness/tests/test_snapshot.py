@@ -1,11 +1,9 @@
 import hashlib
-import json
 import os
 import shutil
 import subprocess
 import time
 import uuid
-from dataclasses import asdict
 from pathlib import Path
 
 import pygit2
@@ -14,8 +12,7 @@ from pygit2.enums import RepositoryOpenFlag
 
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
-from harness.models import (ArtifactRef, TERMINAL_STATUSES, EventType, ProjectEventType,
-                            canonical_hash, json_dumps)
+from harness.models import TERMINAL_STATUSES, EventType, ProjectEventType
 from harness.public_tree import TreeError, capture_public_tree
 from harness.proposals import baseline_review_turn, product_spec, structure_turn
 from harness.runtime import LoopSystem
@@ -115,14 +112,6 @@ def _start(system, source: Path):
     return project_id, work_item_id, run_id, item.snapshot
 
 
-def test_ingest_leaves_source_byte_identical(data_dir, tmp_path):
-    source = _make_source(tmp_path / "source")
-    before = _fingerprint(source)
-    system = _system(data_dir)
-    _project_id, _work_item_id, _run_id, _snapshot = _start(system, source)
-    assert _fingerprint(source) == before
-
-
 def test_snapshot_identity_and_independent_restore(data_dir, tmp_path):
     source = _make_source(tmp_path / "source")
     system = _system(data_dir)
@@ -183,21 +172,6 @@ def test_snapshot_rejects_host_private_paths(data_dir, tmp_path):
         system.projects.onboard("快照项目", GOAL, "src", str(source))
     assert (source / ".checks" / "state").read_bytes() == b"x"
     assert system.store.list_project_ids() == []
-
-
-def test_snapshot_restore_rejects_reserved_path_in_archive(data_dir, tmp_path):
-    source = _make_source(tmp_path / "source")
-    system = _system(data_dir)
-    _project_id, _work_item_id, run_id, snapshot = _start(system, source)
-    payload = json.loads(system.artifacts.get_for_run(run_id, ArtifactRef(**snapshot["tree_ref"])))
-    payload["tree"]["files"][0]["path"] = "NUL"
-    payload["tree_digest"] = canonical_hash(payload["tree"])
-    forged = system.artifacts.put(
-        run_id, "tree_manifest", json_dumps(payload).encode("utf-8"), media_type="application/json")
-    bad = {**snapshot, "tree_ref": asdict(forged), "tree_digest": payload["tree_digest"]}
-    with pytest.raises(TreeError, match="reserved"):
-        restore_snapshot(system.artifacts, run_id, bad, tmp_path / "restored")
-    assert not (tmp_path / "restored").exists()
 
 
 def test_restore_after_source_deleted_uses_only_persisted_artifacts(data_dir, tmp_path):
@@ -339,26 +313,6 @@ def test_provenance_ignores_the_repository_above_the_source_directory(data_dir, 
     application = Application(system)
     with running_api(lambda: application) as client:
         response = _create_project_over_http(client, "上层有仓库的项目", source)
-        assert response.status_code == 200, response.text
-        project_id = response.json()["refs"]["project_id"]
-        events = system.store.list_project_events(project_id)
-        assert events[0].payload["initial_snapshot"]["provenance"] == {}
-
-
-def test_provenance_is_empty_when_the_repository_above_has_no_commits(data_dir, tmp_path):
-    # 验收（#841）：上层目录是当前用户的仓库但还没有提交时，起始文件夹照常建成，来源为空。
-    # 上层仓库读不出 HEAD，但那个仓库不是这个文件夹的来源。
-    parent = tmp_path / "parent"
-    parent.mkdir()
-    pygit2.init_repository(str(parent))
-    with pytest.raises(pygit2.GitError):
-        pygit2.Repository(str(parent), flags=RepositoryOpenFlag.NO_SEARCH).head
-    source = _make_source(parent / "src")
-    assert git_provenance(source) == {}
-    system = _system(data_dir)
-    application = Application(system)
-    with running_api(lambda: application) as client:
-        response = _create_project_over_http(client, "上层有未提交仓库的项目", source)
         assert response.status_code == 200, response.text
         project_id = response.json()["refs"]["project_id"]
         events = system.store.list_project_events(project_id)

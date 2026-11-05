@@ -1,9 +1,11 @@
 # 第二种执行实现（工单 #979；只在测试里用，产品代码不导入它）。
 #
-# 执行契约第二版（`harness/execution_contract.py`；骨架与应用设计说明第 5.3 节；总图第四节「执行」缝）的
+# 执行契约第三版（`harness/execution_contract.py`；骨架与应用设计说明第 5.3 节；总图第四节「执行」缝）的
 # 第二种实现。形状与真实现（`engine.py` 的 `StepDriver`）不同，行为最小：
 #
 # - 每一步先经安全节点问薄驱动继续或停止（契约里唯一一处下层调上层的接口）。
+# - 按部门取模型与提示词从开始一轮工作的请求取（第三版，工单 #1511）：`request.department_settings`，
+#   不再问安全节点。第二版的那份留在 `SecondExecutionV2` 里，一个发布接受上一版。
 # - 它不调模型、不装配请求、不执行工具：只经写入口记一条「这一步」的事件。
 # - 按契约交回一轮工作的结果 `RoundResult`：这一轮写下的事件范围与停止原因（上限用封闭清单里的编号）。
 #   这一轮算不算结束、结束成什么由路由按事件判断，这里不写「提交了成果」这类种类。
@@ -24,8 +26,11 @@ from harness.write_path import NewEvent
 
 
 class SecondExecution:
-    # 执行契约第二版的第二种实现；薄驱动在开始一轮工作之前核对下面这一版
+    # 执行契约第三版的第二种实现；薄驱动在开始一轮工作之前核对下面这一版
     CONTRACT_VERSION = execution_contract.CURRENT_VERSION
+    # 这一轮按部门拿到的模型与提示词：第三版从开始一轮工作的请求取，第二版从安全节点取。
+    # 测试查「新字段拿得到模型与提示词」时读它
+    settings_read: dict[str, Any] = {}
 
     @classmethod
     def start(cls, request: execution_contract.RoundRequest, *, nodes: execution_contract.SafeNode,
@@ -46,6 +51,17 @@ class SecondExecution:
         self._cancel_requested = False
         self._steps = 0
         self._task: asyncio.Task[execution_contract.RoundResult] | None = None
+        settings = self._department_settings(request, nodes)
+        department = request.scope.department
+        type(self).settings_read = {
+            "selection": None if settings is None else settings.department_selection(department),
+            "prompt": None if settings is None else settings.department_prompt(department),
+        }
+
+    def _department_settings(self, request: execution_contract.RoundRequest,
+                             nodes: execution_contract.SafeNode) -> Any:
+        # 第三版：按部门取模型与提示词随开始一轮工作的请求交进来（工单 #1511）
+        return request.department_settings
 
     def cancel(self) -> None:
         # 取消这一轮：之后的核对都得到停止。这一版没有在进行的动作与调用尝试，只记下取消
@@ -92,3 +108,14 @@ class SecondExecution:
             ))
 
         return list(self._writes.transact(run_stream(scope.run_id), append))
+
+
+class SecondExecutionV2(SecondExecution):
+    # 第二版的那一份（工单 #1511）：一个发布接受当前版与上一版，声明第二版的实现接上照旧通过。
+    # 那一版按部门取模型与提示词还在安全节点上，这里照旧问安全节点；值由薄驱动从随请求交进来的
+    # 那份来源读（第三版起它不自己查）。一版之后与执行契约的 `PreviousSafeNode` 一起去掉
+    CONTRACT_VERSION = 2
+
+    def _department_settings(self, request: execution_contract.RoundRequest,
+                             nodes: execution_contract.SafeNode) -> Any:
+        return nodes

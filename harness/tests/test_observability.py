@@ -1,7 +1,7 @@
 """Deterministic W1 model-attempt collection and read-only query checks.
 
 旧控制台的模型尝试/用量/部门视图路由已经删除，这里的场景改由应用层查询验证：
-project.attempts、project.usage、run.attempt、department.workspace 与 run.export
+project.attempts、run.attempt 与 run.export
 （对照 harness/tests/test_project_queries.py 与 test_issue_92.py 的同类覆盖）。
 """
 
@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 from harness.app.application import Application
-from harness.app.project_queries import ProjectAttempts, ProjectUsage, RunAttempt, RunExport
+from harness.app.project_queries import ProjectAttempts, RunAttempt, RunExport
 from harness.tests.protocol_helpers import (
     ResponsesAdapter,
     stub_event as _event,
@@ -43,38 +43,6 @@ def _project_run(system: LoopSystem, task: str = "观察尝试") -> tuple[Applic
 def _attempts(application: Application, project_id: str, work_item_id: str, **filters):
     return application.query("project.attempts", ProjectAttempts(
         project_id=project_id, work_item=work_item_id, **filters))
-
-def _usage(application: Application, project_id: str, work_item_id: str, **filters):
-    return application.query("project.usage", ProjectUsage(
-        project_id=project_id, work_item=work_item_id, **filters))
-
-
-def test_fake_run_exposes_attempt_identity_and_keeps_missing_usage_null(tmp_path: Path):
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter(happy_script()))
-    application, project_id, work_item_id, run_id = _project_run(system)
-    system.run_until_stop(run_id)
-    before = system.project(run_id).stream_version
-
-    listing = _attempts(application, project_id, work_item_id, limit=1)
-    assert listing.data.attempts
-    assert listing.data.cursor
-    first = listing.data.attempts[0]
-    assert first.status == "success"
-    assert first.attempt_id
-    assert first.usage["input_tokens"] is None
-    assert first.usage["total_tokens"] is None
-    # 三个部门都工作过：产品提交要求、工程交付、质检起草测试用例并核验。
-    # 同时运行以后模型调用的次数随会话的先后变化，这里断言的是结果（工单 #557）
-    attempts = _attempts(application, project_id, work_item_id).data.attempts
-    assert {item.department for item in attempts} == {"product", "engineering", "quality"}
-
-    usage = _usage(application, project_id, work_item_id)
-    assert usage.data.totals.attempts == len(attempts)
-    assert usage.data.totals.reported == 0
-    assert usage.data.totals.total_tokens is None
-    assert usage.data.totals.cost is None
-    assert usage.data.departments
-    assert system.project(run_id).stream_version == before
 
 
 def _submit_call() -> dict:

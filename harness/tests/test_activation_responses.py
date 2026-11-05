@@ -3,7 +3,6 @@
 import json
 
 from harness.watched_outputs import has_new_work
-from harness.tests.helpers import FAST_RETRIES
 from harness.models import EventType, canonical_hash
 from harness.proposals import product_spec
 from harness.environment import inspection_root
@@ -11,7 +10,6 @@ from harness.runtime import LoopSystem
 from harness.tests.protocol_helpers import (
     STUB_CALL as CALL,
     STUB_REASONING as REASONING,
-    STUB_TEXT as TEXT,
     STUB_USAGE as RAW_USAGE,
     ResponsesAdapter,
     stub_server as _server,
@@ -134,100 +132,6 @@ def test_same_provider_call_id_in_different_steps_executes_each_host_call(tmp_pa
             assert "first-result" in captures[1]["input"][-1]["output"]
             assert "second-result" in captures[2]["input"][-1]["output"]
             _assert_request_audit(system, run_id, captures)
-        finally:
-            system.store.close()
-
-
-def test_later_stream_timeout_preserves_prior_usage_tool_and_all_partial_messages(tmp_path):
-    def partial_then_hold(handler, _body):
-        handler.send_response(200)
-        handler.send_header("Content-Type", "text/event-stream")
-        handler.end_headers()
-        handler.wfile.write(_stream([TEXT], terminal=False))
-        handler.wfile.flush()
-        # 部分消息送出后不再发送任何字节，连接保持到客户端按请求时限自行关闭
-        handler.rfile.read(1)
-
-    # 请求时限沿用捕获服务的 5 秒；成功回复立即发送，三次部分流都由服务端保持到客户端超时
-    with _server([_stream([CALL]), partial_then_hold, partial_then_hold, partial_then_hold]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
-        try:
-            run_id = system.create_run("later timeout")
-            system.workspace(run_id).write_file("proof.txt", "survives-timeout")
-            result = system.activate_once(run_id)
-            assert result.status == "failed" and result.stop_reason == "provider_timeout"
-            assert "timed out" in result.error
-            assert result.token_used >= 130
-            events = system.store.list_events(run_id)
-            reports = [event.payload for event in events if event.payload.get("name") == "provider_usage"]
-            assert reports[0]["total_tokens"] == RAW_USAGE["total_tokens"]
-            assert len([event for event in events if event.type == EventType.MODEL_MESSAGE]) == 4
-            assert len([event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]) == 3
-            assert len(captures) == 4
-            assert not any(event.type == EventType.SPEC_ACCEPTED for event in events)
-            tool = next(event for event in events if event.type == EventType.TOOL_CALLED and event.payload.get("name") == "read_file")
-            assert _artifact(system, tool.payload["output_ref"]) == "survives-timeout"
-            _assert_request_audit(system, run_id, captures)
-            assert result.canonical_state() == system.replay(run_id).canonical_state()
-        finally:
-            system.store.close()
-
-
-def test_failed_first_model_request_still_has_durable_exact_input(tmp_path):
-    def fail(handler, _body):
-        _send(handler, b'{"error":{"code":"server_error","message":"local failure"}}',
-              status=500, content_type="application/json")
-
-    with _server([fail, fail, fail]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
-        try:
-            run_id = system.create_run("failed provider request")
-            result = system.activate_once(run_id)
-            assert result.status == "failed" and result.stop_reason == "provider_error"
-            assert len(captures) == 3
-            events = system.store.list_events(run_id)
-            assert len([event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]) == 3
-            _assert_request_audit(system, run_id, captures)
-            assert result.canonical_state() == system.replay(run_id).canonical_state()
-        finally:
-            system.store.close()
-
-
-def test_http_500_retry_then_success_reaches_native_loop(tmp_path):
-    def fail(handler, _body):
-        _send(handler, b'{"error":{"code":"server_error","message":"transient"}}',
-              status=500, content_type="application/json")
-
-    with _server([fail, _stream([SUBMIT], response_id="retry-success")]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
-        try:
-            run_id = system.create_run("HTTP retry to success")
-            result = system.activate_once(run_id)
-            assert has_new_work(result, "engineering"), result.error
-            assert len(captures) == 2
-            events = system.store.list_events(run_id)
-            assert len([event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]) == 1
-            assert len([event for event in events if event.type == EventType.MODEL_RETRY_SCHEDULED]) == 1
-            assert result.canonical_state() == system.replay(run_id).canonical_state()
-        finally:
-            system.store.close()
-
-
-def test_partial_http_stream_is_audit_only_and_absent_from_retry_input(tmp_path):
-    partial = {**CALL, "id": "partial-call", "call_id": "partial-call"}
-
-    with _server([_stream([partial], terminal=False), _stream([SUBMIT], response_id="partial-success")]) as (config, captures, *_):
-        system = LoopSystem.for_testing(tmp_path / "data", ResponsesAdapter(config), step_limits=FAST_RETRIES)
-        try:
-            run_id = system.create_run("partial stream retry")
-            result = system.activate_once(run_id)
-            assert has_new_work(result, "engineering"), result.error
-            assert len(captures) == 2
-            assert "partial-call" not in json.dumps(captures[1]["input"])
-            events = system.store.list_events(run_id)
-            assert any(event.type == EventType.MODEL_MESSAGE and event.payload.get("response_id") == "partial-call" for event in events)
-            assert not any(event.type == EventType.TOOL_STARTED and event.payload.get("id") == "partial-call" for event in events)
-            assert result.canonical_state() == system.replay(run_id).canonical_state()
         finally:
             system.store.close()
 

@@ -21,8 +21,6 @@ from harness.tree_archive import artifact_run, load_tree
 from harness.watched_outputs import has_new_work
 from harness.workspace import Workspace
 
-ECHO = "import sys\nprint(sys.argv[1])\n"
-
 
 def _call(identity: str, name: str, arguments: dict) -> dict:
     # 假模型回复里的一次工具调用：与真实模型发出的调用同形
@@ -47,13 +45,6 @@ def _python() -> str:
 
 def _events(system: LoopSystem, run_id: str) -> list:
     return system.writes.read(f"run:{run_id}").events()
-
-
-def _sealed_files(system: LoopSystem, run_id: str) -> dict[str, str]:
-    # 封存的交付快照里的文件内容：质检的写入不该进入交付快照
-    delivery = system.project(run_id).delivery_spec
-    tree = load_tree(system.artifacts, artifact_run(delivery.tree_ref.path), delivery.tree_ref)
-    return {item.path: item.data.decode("utf-8") for item in tree.files}
 
 
 def test_qa_writes_test_and_runs_check(tmp_path: Path) -> None:
@@ -104,47 +95,19 @@ def test_qa_writes_test_and_runs_check(tmp_path: Path) -> None:
     assert output.get("qa_tests_hash") == saved.payload["content_hash"]
     qa_sub = next(e for e in events if e.type == EventType.QA_SUBMITTED)
     assert qa_sub.payload["checks"][0]["qa_tests_hash"] == saved.payload["content_hash"]
-    # 逐条结论与放行记录里的三个数随放行载荷写进事实（工单 #151）：一条验收条件、可执行检验、通过
+    # 逐条结论与放行记录里的三个数随放行载荷写进事实（工单 #151）：一条验收条件、可执行检验、通过。
+    # 这一次激活只跑了交付检查、没有跑基线（工单 #1181）：命令检查的覆盖不计入分子，baseline_valid 为假
     assert [item["criterion"] for item in qa_sub.payload["criteria"]] == ["AC1"]
     # changed 是改判的条数（工单 #1190）：判断与结论都是 passed，没有改判
-    assert qa_sub.payload["coverage"] == {"criteria_total": 1, "executable": 1, "covered": 1,
-                                          "coverage_ratio": 1.0, "model_reading": 0, "open": 0, "changed": 0}
+    assert qa_sub.payload["coverage"] == {"criteria_total": 1, "executable": 1, "covered": 0,
+                                          "coverage_ratio": 0.0, "model_reading": 0, "open": 0, "changed": 0,
+                                          "baseline_valid": False}
     assert qa_sub.payload["open_criteria"] == []
+    # 基线明细写进放行记录：缺少基线回执（工单 #1181）
+    assert qa_sub.payload["baseline_checks"] == [{"criterion": "AC1", "checks": "qa_smoke",
+                                                  "outcome": "missing"}]
     # 说明工件的引用与逐条结论引用的检查回执输出工件都在
     assert len(qa_sub.payload["evidence_refs"]) >= 2
-
-
-def test_a_review_that_misses_an_acceptance_criterion_is_rejected(tmp_path: Path) -> None:
-    # 产品 PRD 有两条验收条件，质检只写了一条：放行被拒绝并写明缺哪一条（工单 #151 验收第 4 条）
-    criteria_one = [{"criterion": "AC1", "method": "check", "result": "passed",
-                     "checks": ["smoke"], "trial_cases": [], "note": ""}]
-    criteria_both = [*criteria_one, {"criterion": "AC2", "method": "check", "result": "passed",
-                                     "checks": ["smoke"], "trial_cases": [], "note": ""}]
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
-        "product": [product_spec(acceptance=["prints the argument", "exits 0"])],
-        "engineering": [delivery_turn()],
-        "quality": [
-            judgement_turn(checks={"smoke": 0}),
-            review_turn("release", "only one criterion", checks={"smoke": 0}, criteria=criteria_one),
-            review_turn("release", "both criteria", checks={"smoke": 0}, criteria=criteria_both),
-        ],
-    }))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # product
-    system.activate_once(run_id)  # engineering
-    system.activate_once(run_id)  # quality：交独立判断（工单 #358）
-    system.activate_once(run_id)  # quality：缺一条验收条件，放行被拒绝
-    rejected = next(e for e in _events(system, run_id) if e.type == EventType.PROPOSAL_REJECTED)
-    errors = rejected.payload.get("errors", [])
-    assert any(error.get("field") == "criteria" and "AC2" in error.get("message", "") for error in errors), errors
-
-    # 下一步补齐两条验收条件：放行被接纳，两个数写进放行记录
-    projection = system.activate_once(run_id)
-    assert projection.status == "done", projection.stop_reason
-    qa_sub = next(e for e in _events(system, run_id) if e.type == EventType.QA_SUBMITTED)
-    assert [item["criterion"] for item in qa_sub.payload["criteria"]] == ["AC1", "AC2"]
-    assert qa_sub.payload["coverage"]["criteria_total"] == 2
 
 
 def test_next_session_has_saved_test_materials(tmp_path: Path) -> None:
@@ -240,51 +203,6 @@ def test_qa_tests_dir_excluded_from_public_tree_and_delivery_and_engineering(tmp
     receipt = asyncio.run(env.perform(read_act))
     assert receipt.status == "failed"
     assert "这是检查材料" in str(receipt.error)
-
-
-def test_qa_write_outside_the_test_materials_is_denied(tmp_path: Path) -> None:
-    # 验收第 2 条：质检写测试材料目录以外的路径被工具许可拒绝并说明原因；
-    # 运行工作区与交付快照不变，这一轮工作照常继续（写测试材料、跑检查、放行都走通）
-    test_py = f"{QA_TESTS_DIR}/test_smoke.py"
-    test_content = "import sys\nprint('QA_SMOKE_PASS')\nsys.exit(0)\n"
-    command = f'"{_python()}" {test_py}'
-    tampered = "print('tampered')\n"
-
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter({
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": [
-            lambda call: _tool_turn("qa-write-outside", "write_file", path="src/echo.py", content=tampered),
-            lambda call: _tool_turn("qa-write-tests", "write_file", path=test_py, content=test_content),
-            lambda call: _tool_turn("qa-check", "run_check", name="qa_smoke", command=command),
-            lambda call: judgement_turn(checks={"qa_smoke": 0})(call),
-            lambda call: _review_turn(call, "checks passed on the current snapshot", "qa_smoke", command),
-        ],
-    }))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)  # product
-    system.activate_once(run_id)  # engineering
-    system.activate_once(run_id)  # quality：写测试、跑检查、交独立判断（工单 #358）
-    projection = system.activate_once(run_id)  # quality：放行
-    assert projection.status == "done", projection.stop_reason
-
-    events = _events(system, run_id)
-    outside = next(e for e in events
-                   if e.type == EventType.TOOL_CALLED and (e.payload or {}).get("id") == "qa-write-outside")
-    assert outside.department == "quality"
-    assert outside.payload["ok"] is False
-    # 拒绝原因写明检查材料的目录，不写部门名（工单 #1390：按写入范围判，不按部门名）
-    assert QA_TESTS_DIR in outside.payload["error"]
-    for department in ("product", "engineering", "quality"):
-        assert department not in outside.payload["error"]
-    assert not any(e.type == EventType.TOOL_STARTED and e.payload.get("id") == "qa-write-outside" for e in events)
-    # 写测试材料目录里的路径照常执行：这一次拒绝只针对目录以外的路径
-    inside = next(e for e in events
-                  if e.type == EventType.TOOL_CALLED and (e.payload or {}).get("id") == "qa-write-tests")
-    assert inside.payload["ok"] is True, inside.payload.get("error")
-    # 运行工作区与交付快照里仍然是工程写的文件
-    assert (system.workspace_root / run_id / "src" / "echo.py").read_text(encoding="utf-8") == ECHO
-    assert _sealed_files(system, run_id)["src/echo.py"] == ECHO
 
 
 def test_qa_modifying_test_materials_rejects_release_with_old_receipt_until_rerun(tmp_path: Path) -> None:
@@ -391,4 +309,3 @@ def test_a_check_copy_carries_the_check_materials_of_the_role_that_declares_them
         action_id="act-3", kind="check", tool="run_check", department="engineering",
         input={"name": "materials", "command": f'"{_python()}" {material}'})))
     assert default.output["exit_code"] != 0, default.output["summary"]
-

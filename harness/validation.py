@@ -403,6 +403,9 @@ def _receipt_evidence(receipt: Any) -> dict[str, Any]:
         "snapshot_hash": receipt.snapshot_hash,
         "summary": receipt.summary,
         "qa_tests_hash": getattr(receipt, "qa_tests_hash", None),
+        # 主机执行的命令（工单 #1181）：交付检查的回执照抄，基线检查按名字取它，不能改写
+        "command": getattr(receipt, "command", None),
+        "baseline": getattr(receipt, "baseline", False),
     }
 
 

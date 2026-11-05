@@ -3191,6 +3191,10 @@ export type InitialPrdRequested = {
     prd: InitialPrdProposal;
     structure: StructureProposal;
     baseline_review: BaselineReviewProposal;
+    /**
+     * Baseline Verified
+     */
+    baseline_verified?: boolean;
     overview_ref: ArtifactRef;
     snapshot: CodeSnapshot;
     revision_note_ref?: ArtifactRef | null;
@@ -4074,6 +4078,10 @@ export type OnboardingRound = {
      */
     revision_note: string | null;
     baseline_review: BaselineReviewView;
+    /**
+     * Baseline Review Note
+     */
+    baseline_review_note?: string | null;
     /**
      * Decisions
      */
@@ -8335,6 +8343,24 @@ export type BaselineAdoptedPayload = {
 };
 
 /**
+ * BaselineCheckRecord
+ */
+export type BaselineCheckRecord = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Checks
+     */
+    checks: string;
+    /**
+     * Outcome
+     */
+    outcome: 'failed' | 'passed' | 'missing' | 'unable_to_run';
+};
+
+/**
  * BaselineReviewAcceptedEvent
  */
 export type BaselineReviewAcceptedEvent = {
@@ -8927,6 +8953,14 @@ export type CheckReceipt = {
      * Qa Tests Hash
      */
     qa_tests_hash?: string | null;
+    /**
+     * Command
+     */
+    command?: string | null;
+    /**
+     * Baseline
+     */
+    baseline?: boolean;
 };
 
 /**
@@ -11396,6 +11430,10 @@ export type InitialPrdProposedPayload = {
     prd: InitialPrdProposal;
     structure: StructureProposal;
     baseline_review: BaselineReviewProposal;
+    /**
+     * Baseline Verified
+     */
+    baseline_verified?: boolean;
     overview_ref: ArtifactRef;
     snapshot: CodeSnapshot;
     revision_note_ref?: ArtifactRef | null;
@@ -15932,6 +15970,10 @@ export type QaCoveragePayload = {
      * Changed
      */
     changed?: number;
+    /**
+     * Baseline Valid
+     */
+    baseline_valid?: boolean;
 };
 
 /**
@@ -16115,6 +16157,10 @@ export type QaSubmittedPayload = {
      * Open Criteria
      */
     open_criteria: Array<string>;
+    /**
+     * Baseline Checks
+     */
+    baseline_checks?: Array<BaselineCheckRecord>;
     /**
      * Evidence Refs
      */

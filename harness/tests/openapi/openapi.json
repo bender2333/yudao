@@ -9968,6 +9968,11 @@
           "baseline_review": {
             "$ref": "#/components/schemas/BaselineReviewProposal"
           },
+          "baseline_verified": {
+            "type": "boolean",
+            "title": "Baseline Verified",
+            "default": true
+          },
           "overview_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
           },
@@ -11375,6 +11380,17 @@
           },
           "baseline_review": {
             "$ref": "#/components/schemas/BaselineReviewView"
+          },
+          "baseline_review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Review Note"
           },
           "decisions": {
             "items": {
@@ -19015,6 +19031,36 @@
         "title": "BaselineAdoptedPayload",
         "type": "object"
       },
+      "BaselineCheckRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "criterion": {
+            "title": "Criterion",
+            "type": "string"
+          },
+          "checks": {
+            "title": "Checks",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "failed",
+              "passed",
+              "missing",
+              "unable_to_run"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          }
+        },
+        "required": [
+          "criterion",
+          "checks",
+          "outcome"
+        ],
+        "title": "BaselineCheckRecord",
+        "type": "object"
+      },
       "BaselineReviewAcceptedEvent": {
         "additionalProperties": false,
         "properties": {
@@ -20211,6 +20257,22 @@
               }
             ],
             "title": "Qa Tests Hash"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "baseline": {
+            "default": false,
+            "title": "Baseline",
+            "type": "boolean"
           }
         },
         "required": [
@@ -25060,6 +25122,11 @@
           },
           "baseline_review": {
             "$ref": "#/components/schemas/BaselineReviewProposal"
+          },
+          "baseline_verified": {
+            "default": true,
+            "title": "Baseline Verified",
+            "type": "boolean"
           },
           "overview_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
@@ -34160,6 +34227,11 @@
             "default": 0,
             "title": "Changed",
             "type": "integer"
+          },
+          "baseline_valid": {
+            "default": false,
+            "title": "Baseline Valid",
+            "type": "boolean"
           }
         },
         "required": [
@@ -34519,6 +34591,14 @@
               "type": "string"
             },
             "title": "Open Criteria",
+            "type": "array"
+          },
+          "baseline_checks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/BaselineCheckRecord"
+            },
+            "title": "Baseline Checks",
             "type": "array"
           },
           "evidence_refs": {

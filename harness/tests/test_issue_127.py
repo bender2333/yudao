@@ -2,6 +2,8 @@
 # 数据目录是真实的 SQLite 事件日志，运行经真实的 LoopSystem，模型回答由 FakeAdapter 脚本给出；
 # 事件日志、工件与工作区都是真实实现，不使用模拟对象。查询不写入事件这一点在模块层与接口层都核对。
 
+import json
+import sys
 import uuid
 
 import pytest
@@ -14,10 +16,11 @@ from harness.app.home import AwayReportRequest
 from harness.app.project_queries import ProjectLoop, ProjectsList
 from harness.app.system_queries import SystemStatusRequest
 from harness.models import Usage
-from harness.proposals import product_spec
+from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
+from harness.providers.call import ModelResponse
 from harness.runtime import LoopSystem
 from harness.tests.api_helpers import running_api
-from harness.tests.helpers import happy_script, quality_turns
+from harness.tests.helpers import explore_turn, happy_script, quality_turns
 
 GOAL = "把文本按行处理清楚"
 
@@ -82,8 +85,30 @@ def test_at_beyond_the_log_end_is_refused(data_dir):
 # ---------------------------------------------------------------------------
 # 离开期间的报告与已看过
 
+def _converging_script():
+    # 与 happy_script 同一件事跑完，但质检下结论以前在基线副本上跑一次同名的交付检查（工单 #1181）：
+    # 检验的有效性成立（起点没有交付文件，命令失败、交付通过），覆盖计入分子，
+    # run 层收敛判定读到「未满足数 = 0」，离开期间的报告里这一项从「无法判定」走到「收敛中」
+    return {
+        "product": [product_spec()],
+        "engineering": [delivery_turn(files={"src/echo.py": "print('delivered')\n"},
+                                      checks={"smoke": {"command": f'"{sys.executable.replace(chr(92), "/")}" src/echo.py'}})],
+        "quality": [explore_turn(), _baseline_turn,
+                    judgement_turn(checks={"smoke": 0}),
+                    review_turn("release", "checks passed on the current snapshot", checks={"smoke": 0})],
+    }
+
+
+def _baseline_turn(_call):
+    # 基线检查的假模型轮：主机在基线副本上运行同名交付检查记录的命令（工单 #1181）
+    return ModelResponse(output=[{
+        "id": "qa-baseline", "call_id": "qa-baseline", "type": "function_call", "name": "run_baseline_check",
+        "arguments": json.dumps({"name": "smoke"}),
+    }])
+
+
 def test_away_report_summarises_real_events_with_sources_and_omits_empty_items(data_dir):
-    system = _system(data_dir)
+    system = _system(data_dir, _converging_script())
     project_id, work_item_id, _run_id = _run_once(system)
     application = Application(system)
     report = application.query("home.away_report", AwayReportRequest(range="24h")).data
