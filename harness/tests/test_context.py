@@ -1,15 +1,11 @@
 import json
-from contextlib import contextmanager
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part, prompt_parts
 from harness.context import Rules
 from harness.models import EventType
 from harness.proposals import answer_turn, ask_turn, delivery_turn, judgement_turn, product_spec, review_turn
-from harness.providers import CredentialChain, ProviderFacade
 from harness.runtime import LoopSystem
 from harness.tests.helpers import developer_text, explore_turn, quality_turns, recorded_context
-from harness.tests.protocol_helpers import serve
-from harness.tests.provider_replies import HTTP_REPLIES, http_script, reply_index, request_department
 
 def _part(call, source: str):
     text = prompt_part(call, source)
@@ -147,39 +143,6 @@ def test_superseded_delivery_is_not_injected_as_current(data_dir):
     assert _part(before_judgement, "prior_delivery") is None
     after_judgement = _part(quality_calls[-1], "current_delivery_spec")
     assert after_judgement is not None and "summary" in after_judgement
-
-
-@contextmanager
-def _bound_system(tmp_path, *, context_window, max_output_tokens):
-    # 三个部门绑定测试内启动的 HTTP 服务上的模型（Responses 协议），模型声明给定的窗口与输出上限；
-    # 服务按部门回放各自的脚本中的工具调用，记录收到的请求。提交依据的版本取自本次请求装配好的材料
-    # （工单 #557：同时运行的会话各自取用自己的脚本，按请求里的工具分派到部门）
-    state = {"product": 0, "engineering": 0, "quality": 0}
-
-    def responder(body):
-        department = request_department(body)
-        index = state[department]
-        state[department] += 1
-        calls = http_script(body)[department][index]
-        return 200, "text/event-stream", [HTTP_REPLIES["responses"](reply_index(department, index), calls)]
-
-    server, capture, base = serve(responder)
-    try:
-        facade = ProviderFacade(credentials=CredentialChain(overrides={"CONTEXT_KEY": "context-secret"}, use_env=False))
-        facade.store_document({
-            "providers": [{"id": "local", "name": "Local", "base_url": base + "/v1",
-                           "credential_ref": "CONTEXT_KEY", "timeout_sec": 30}],
-            "models": [{"id": "model", "provider_id": "local", "model": "model",
-                        "protocol": "responses",
-                        "context_window": context_window, "max_output_tokens": max_output_tokens}],
-            "bindings": {department: {"provider_id": "local", "model_id": "model"}
-                         for department in ("product", "engineering", "quality")},
-        })
-        facade.record_admission("local", "model", admitted_model="model")
-        yield LoopSystem(tmp_path, facade=facade), capture
-    finally:
-        server.shutdown()
-        server.server_close()
 
 
 def test_each_assembled_request_records_the_rule_version_and_the_folded_rounds(data_dir):
