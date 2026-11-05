@@ -131,10 +131,13 @@ class _Activation:
     stop_flag: Event
     adapter: ModelAdapter
     version: int
-    # 步骤驱动由执行实现交出（执行契约第二版）：薄驱动只经契约调 start、cancel 与 result，不认它的类
+    # 步骤驱动由执行实现交出（执行契约）：薄驱动只经契约调 start、cancel 与 result，不认它的类
     driver: Any = None
     wakeup: tuple[asyncio.AbstractEventLoop, asyncio.Event] | None = None
     deadline: float | None = None
+    # 按部门取模型与提示词的来源（执行契约第三版，工单 #1511）：开始一轮工作时与请求一起交给执行实现，
+    # 安全节点上不再有这两个方法
+    settings: Any = None
 
     @property
     def run_id(self) -> str:
@@ -146,8 +149,10 @@ class _Activation:
 
 
 class _SafeNode:
-    # 流程编排为一次激活实现的安全节点接口（执行契约第一版的 SafeNode）。接口由契约定义、步骤驱动在安全节点上调用，
-    # 这里实现并在开始一轮工作时交给它（依赖倒置）：每一步先经这里问薄驱动继续还是停止
+    # 流程编排为一次激活实现的安全节点接口（执行契约第三版）。接口由契约定义、步骤驱动在安全节点上调用，
+    # 这里实现并在开始一轮工作时交给它（依赖倒置）：每一步先经这里问薄驱动继续还是停止。
+    # 第三版只剩设计说明写的五样（工单 #1511）：按部门取模型与提示词不在其中，它们随开始一轮工作的请求
+    # 一起交给执行实现
     def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
         self._orchestrator = orchestrator
         self._activation = activation
@@ -164,15 +169,67 @@ class _SafeNode:
     def end(self, transaction: Transaction, reason: str, message: str) -> None:
         self._orchestrator._end(transaction, reason, message)
 
-    def department_selection(self, department: str) -> ModelSelection | None:
-        return self._orchestrator._department_selection(self._activation.run_id, department)
-
-    def department_prompt(self, department: str) -> DepartmentPrompt:
-        projection = self._orchestrator.project(self._activation.run_id)
-        return self._orchestrator._department_prompt(projection, department)
     async def ask(self, scope: ActivationScope, call: dict[str, Any]) -> tuple[bool, Any, str | None, str | None, int]:
         return await self._orchestrator._execute_ask(self._activation, scope, call)
 
+
+class _SafeNodeV2(_SafeNode):
+    # 第二版的安全节点（工单 #1511）：按第二版写的执行实现还会问按部门取模型与提示词。
+    # 这两个方法已经从安全节点移出，只给声明第二版的实现留一版；值从开始一轮工作时交进来的那份来源读，
+    # 薄驱动不自己查。一版之后连同本类一起去掉
+    def __init__(self, orchestrator: Orchestrator, activation: _Activation) -> None:
+        super().__init__(orchestrator, activation)
+        self._settings = activation.settings
+
+    def department_selection(self, department: str) -> ModelSelection | None:
+        return self._settings.department_selection(department)
+
+    def department_prompt(self, department: str) -> DepartmentPrompt:
+        return self._settings.department_prompt(department)
+
+
+@dataclass(frozen=True)
+class _DepartmentSettings:
+    # 按部门取模型与提示词（执行契约第三版，工单 #1511）：项目部门设置优先，没有写入时用这个事项所用定义里
+    # 的角色说明（版本 0）。它随开始一轮工作的请求交给执行实现——这两样属于路由与定义，不是安全节点的事
+    run_id: str
+    project_id: str | None
+    projects: Any
+    artifacts: ArtifactStore
+    definitions: Definitions
+
+    def _project_setting(self, department: str):
+        # 运行层的设置来源：事项创建时由项目层提供，每次请求读取该项目该部门当前的项目部门设置。
+        # 不属于项目的运行（命令行与测试）没有项目层，返回空设置（设计说明第 6 节）
+        if self.project_id is None or self.projects is None:
+            return None
+        return self.projects.read_projection_setting(self.project_id, department)
+
+    def department_selection(self, department: str) -> ModelSelection | None:
+        # 这个部门的项目部门设置中的模型选择；不属于项目的运行时为空（全部使用部门默认）
+        setting = self._project_setting(department)
+        if setting is None:
+            return None
+        return ModelSelection(provider_id=setting.provider_id, model_id=setting.model_id,
+                              requested_tier=setting.requested_tier)
+
+    def department_prompt(self, department: str) -> DepartmentPrompt:
+        # 部门 Prompt 从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）。
+        # 请求事件记录的 Prompt 版本是项目部门设置中写入的部门 Prompt 版本，没有写入时为 0。
+        # Prompt 原文的工件在项目层写入项目作用域，这里只取它的引用与版本
+        setting = self._project_setting(department)
+        if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
+            # 没有项目部门设置的部门 Prompt 时，固定取内置默认 Prompt（roles.json 的角色说明）；
+            # 事项种类的工作说明是单独的请求材料，由上下文装配在部门 Prompt 之后放入（工单 #248）
+            text = self.definitions.role(department).prompt
+            # 部门清单按这个事项冻结的定义核对（工单 #1509）
+            ref = save_department_prompt(self.artifacts, self.run_id, department, text, self.definitions)
+            return DepartmentPrompt(department, 0, text, ref, "")
+        return DepartmentPrompt(
+            department=department, version=setting.version, text=setting.text,
+            prompt_ref=ArtifactRef(**setting.prompt_ref),
+            created_event_id="" if setting.event_id is None else setting.event_id,
+        )
 
 
 BASELINE_FIELDS = frozenset({"adoption_id", "source_run_id", "delivery_event_id", "tree_ref", "code_tree_digest"})
@@ -1504,8 +1561,10 @@ class Orchestrator:
 
         activation_id = new_id("act")
         transaction.on_commit(lambda: session.activate(activation_id))
-        # 部门 Prompt 每次激活从项目部门设置读取，run 内没有副本；没有写入时使用内置默认 Prompt（第 5.3 节）
-        prompt = self._department_prompt(projection, department)
+        # 部门 Prompt 每次激活从项目部门设置读取，run 内没有副本；没有写入时使用内置默认 Prompt（第 5.3 节）。
+        # 按部门取模型与提示词的这份来源随开始一轮工作的请求一起交给执行实现（第三版，工单 #1511）
+        settings = self._department_settings(projection)
+        prompt = settings.department_prompt(department)
         basis = work_basis(projection, department)
         guidance_ids = tuple(item.id for item in pending_guidance(projection, department))
         provider_name = self._activation_provider(adapter)
@@ -1541,42 +1600,20 @@ class Orchestrator:
         self._start_session_segment(run_id, session.session_id)
         # 这个会话自己的停止开关（工单 #856）：停这个会话只停这个会话，不改变事项的状态
         return _Activation(scope, prompt, Event(), adapter,
-                           transaction.projection.stream_version)
+                           transaction.projection.stream_version, settings=settings)
 
-    def _project_department_setting(self, projection: RunProjection, department: str):
-        # 运行层的设置来源：事项创建时由项目层提供，每次请求读取该项目该部门当前的项目部门设置。
-        # 不属于项目的运行（命令行与测试）没有项目层，返回空设置（第 6 节）
-        if projection.project_id is None or self.projects is None:
-            return None
-        return self.projects.read_projection_setting(projection.project_id, department)
+    def _department_settings(self, projection: RunProjection) -> _DepartmentSettings:
+        # 按部门取模型与提示词的来源（执行契约第三版，工单 #1511）：事项所用定义与项目层在开始一轮工作时取一次，
+        # 每个部门的值在问的时候读——项目部门设置在轮中改了，同一次激活的下一次请求就用新的
+        return _DepartmentSettings(projection.run_id, projection.project_id, self.projects,
+                                   self.artifacts, self.item_definitions(projection.run_id))
 
-    def _department_selection(self, run_id: str, department: str) -> ModelSelection | None:
-        # 本次请求该部门的项目部门设置中的模型选择；不属于项目的运行时为空（全部使用部门默认）
-        projection = self.project(run_id)
-        setting = self._project_department_setting(projection, department)
-        if setting is None:
-            return None
-        return ModelSelection(provider_id=setting.provider_id, model_id=setting.model_id,
-                              requested_tier=setting.requested_tier)
-
-    def _department_prompt(self, projection: RunProjection, department: str) -> DepartmentPrompt:
-        # 部门 Prompt 从项目部门设置读取；没有写入时使用内置默认 Prompt（版本 0）。
-        # 请求事件记录的 Prompt 版本是项目部门设置中写入的部门 Prompt 版本，没有写入时为 0。
-        # Prompt 原文的工件在项目层写入项目作用域，这里只取它的引用与版本
-        setting = self._project_department_setting(projection, department)
-        if setting is None or not setting.configured_prompt or setting.prompt_ref is None:
-            # 没有项目部门设置的部门 Prompt 时，固定取内置默认 Prompt（roles.json 的角色说明）；
-            # 事项种类的工作说明是单独的请求材料，由上下文装配在部门 Prompt 之后放入（工单 #248）
-            text = self.item_definitions(projection.run_id).role(department).prompt
-            # 部门清单按这个事项冻结的定义核对（工单 #1509）
-            ref = save_department_prompt(self.artifacts, projection.run_id, department, text,
-                                        self.item_definitions(projection.run_id))
-            return DepartmentPrompt(department, 0, text, ref, "")
-        return DepartmentPrompt(
-            department=department, version=setting.version, text=setting.text,
-            prompt_ref=ArtifactRef(**setting.prompt_ref),
-            created_event_id="" if setting.event_id is None else setting.event_id,
-        )
+    def _safe_node(self, activation: _Activation, declared: int) -> _SafeNode:
+        # 交给执行实现的安全节点按它声明的契约版本给（工单 #1511）：当前版拿到设计说明写的五样；
+        # 声明上一版（第二版）的实现还会问按部门取模型与提示词——那时它们还在安全节点上，留一版
+        if declared == execution_contract.PREVIOUS_VERSION:
+            return _SafeNodeV2(self, activation)
+        return _SafeNode(self, activation)
 
     def _activation_provider(self, adapter: ModelAdapter) -> str:
         # 激活事件上的提供方名称：确定性测试适配器用它的名称；目录驱动的运行在每次请求解析出连接
@@ -1666,21 +1703,23 @@ class Orchestrator:
             # 薄驱动只经执行契约与装配契约调用实现：先核对两个实现声明的版本（构造时已核对过，
             # 这里再看一眼这一轮开始时的引用没有被换掉），版本不合时在开始这一轮之前失败，
             # 说明里写明实现的声明与薄驱动接受的版本
-            execution_contract.accept(self._execution)
+            declared = execution_contract.accept(self._execution)
             assembly_contract.accept(self.assembly)
             # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
             # 剩余步数决定；路由自己的工作引用经契约原样交给装配（设计说明第 5.4 节第 4 条），
-            # 成果驱动不用它时为空（工单 #861）
+            # 成果驱动不用它时为空（工单 #861）；按部门取模型与提示词的来源随请求交给执行实现
+            # （第三版，工单 #1511），不再由安全节点回答
             request = execution_contract.RoundRequest(
                 scope=scope, prompt=activation.prompt,
                 limits=self._session_limits(run_id, scope.session_id),
                 work_ref=self._item_routing(run_id).work_reference(projection, department=department),
+                department_settings=activation.settings,
             )
             activation.driver = self._execution.start(
                 request, writes=self.writes, artifacts=self.artifacts,
                 assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
                 environment=environment,
-                nodes=_SafeNode(self, activation), cancelled=activation.stop_flag,
+                nodes=self._safe_node(activation, declared), cancelled=activation.stop_flag,
                 deltas=self.deltas, tightening=self._item_tightening(run_id),
                 refresh_workspace=self._workspaces.refresh_for(self._round_workspace(activation)),
                 definitions=self.item_definitions(activation.scope.run_id),
@@ -1927,7 +1966,9 @@ class Orchestrator:
         run_id, department, session_id = scope.run_id, branch.recipient, branch.session_id
         parent_event_id = scope.parent_event_id
         projection = self.project(run_id)
-        prompt = self._department_prompt(projection, department)
+        # 按部门取模型与提示词的来源随这个分支的请求交给执行实现（第三版，工单 #1511）
+        settings = self._department_settings(projection)
+        prompt = settings.department_prompt(department)
         basis = work_basis(projection, department)
         activation_id = new_id("act_ask")
 
@@ -1983,11 +2024,11 @@ class Orchestrator:
             # 询问分支属于提问方的那个会话：它的停止开关就是那个会话的（工单 #856），
             # 那个会话停下时分支一起停下
             branch_scope, prompt, activation.stop_flag, activation.adapter, None, projection.stream_version,
-            deadline=deadline,
+            deadline=deadline, settings=settings,
         )
         # 薄驱动只经执行契约与装配契约调用实现：核对两个实现声明的版本（构造时已核对过），
         # 版本不合时这一轮不开始
-        execution_contract.accept(self._execution)
+        declared = execution_contract.accept(self._execution)
         assembly_contract.accept(self.assembly)
         # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，这一轮的上限来自路由的请求
         # （薄驱动已经把这个分支会话之前用掉的步数扣掉）；路由自己的工作引用指向这次询问
@@ -1995,11 +2036,12 @@ class Orchestrator:
         driver = self._execution.start(
             execution_contract.RoundRequest(
                 scope=branch_scope, prompt=prompt, limits=limits, work_ref=branch.work_ref,
+                department_settings=settings,
             ),
             writes=self.writes, artifacts=self.artifacts,
             assembly=self.assembly, adapter=activation.adapter, facade=self.facade,
             environment=environment,
-            nodes=_SafeNode(self, branch_activation), cancelled=branch_activation.stop_flag,
+            nodes=self._safe_node(branch_activation, declared), cancelled=branch_activation.stop_flag,
             deltas=self.deltas, tightening=self._item_tightening(branch_activation.scope.run_id),
             refresh_workspace=self._workspaces.refresh_for(self._round_workspace(branch_activation)),
             definitions=self.item_definitions(branch_activation.scope.run_id),

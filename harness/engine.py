@@ -5,9 +5,10 @@
 # 其间另一方的写入使提交被拒绝时按写入以后的状态重新判断。
 # 流程编排只调用开始（StepDriver.start）、取消（cancel）与取得结果（result：这一轮写下的事件范围与停止原因）；
 # 步骤驱动向上只经过安全节点接口（SafeNode）。
-# 这一份是执行契约第二版（execution_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
+# 这一份是执行契约第三版（execution_contract）的实现：它声明 CONTRACT_VERSION，薄驱动在开始一轮工作之前核对；
 # 接口（开始一轮工作的请求、安全节点、上下限、结果）在契约模块里，这里只实现。结果的种类不写死：
-# 这一轮算不算结束、结束成什么，由薄驱动问路由（工单 #861）。
+# 这一轮算不算结束、结束成什么，由薄驱动问路由（工单 #861）。按部门取模型与提示词随开始一轮工作的请求
+# 交进来（第三版，工单 #1511），不再经安全节点问薄驱动。
 
 from __future__ import annotations
 
@@ -240,6 +241,9 @@ class StepDriver:
         scope, prompt, limits = request.scope, request.prompt, request.limits
         self._scope = scope
         basis = scope.basis
+        # 按部门取模型与提示词的来源（执行契约第三版，工单 #1511）：随开始一轮工作交进来，不再经安全节点问
+        # 薄驱动。开始一轮工作的这一轮必须有它，每次逻辑调用从它读一次（见 `_department_settings_of`）
+        self._department_settings = request.department_settings
         # 这个事项所用的那份定义（工单 #1098）：工具许可与提案校验按它的部门、工具与提案种类判，
         # 没有交的时候是当前加载的那一份；装配也按这一份取（工单 #1175 第 7 轮的契约 v2）
         self._definitions = in_force(definitions)
@@ -374,16 +378,22 @@ class StepDriver:
         return tuple(event for event in self._writes.read(self._stream).events()
                      if event.stream_version > self._start_version)
 
+    def _department_settings_of(self, department: str) -> tuple[Any, DepartmentPrompt]:
+        # 按部门取模型与提示词（执行契约第三版，工单 #1511）：从开始一轮工作时一起交进来的那份来源读，
+        # 每次逻辑调用读一次。来源是开始一轮工作的一份，没交是接入错了（例如直接构造请求却漏了这个字段）：
+        # 不替它写兜底，按薄驱动的通用异常处理收尾
+        settings = self._department_settings
+        return settings.department_selection(department), settings.department_prompt(department)
+
     def _begin_call(self, requested_tier: str | None = None) -> RoundResult | None:
-        # 新的逻辑调用：读取该项目该部门当前的部门设置（模型选择与部门 Prompt），交 Provider 解析调用目标；
-        # 请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
+        # 新的逻辑调用：从开始一轮工作交进来的那份来源读该项目该部门当前的部门设置（模型选择与部门 Prompt），
+        # 交 Provider 解析调用目标；请求档位与模型访问定义按同一顺序取第一个写入了的（设计说明第 5.3 节），
         # 给出请求档位时按它解析，实际发送的档位由 Provider 按模型声明限制。
         # 选择来源是提供模型访问定义的那一层。失败时不发送请求，交回待恢复的停止结果
         self._release_call()
         if self._facade is None:
             raise ProviderError("model calls require the provider facade", reason="provider_error")
-        project = self._nodes.department_selection(self._scope.department)
-        self._prompt = self._nodes.department_prompt(self._scope.department)
+        project, self._prompt = self._department_settings_of(self._scope.department)
         self._frame = replace(self._frame, prompt=self._prompt)
         resolution = self._facade.resolve_department_default(
             self._scope.department, requested_tier, project=project)

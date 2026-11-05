@@ -65,10 +65,12 @@ def round_system(tmp_path):
 
 
 def _round_request(system, run_id, work_ref=None):
-    # 一次开始一轮工作的请求：身份、提示与上限取自当前运行状态，工作引用由调用方给出
+    # 一次开始一轮工作的请求：身份、提示与上限取自当前运行状态，工作引用由调用方给出；
+    # 按部门取模型与提示词的来源随请求交进来（执行契约第三版，工单 #1511）
     orchestrator = system.orchestrator
     projection = orchestrator.project(run_id)
-    prompt = orchestrator._department_prompt(projection, "product")
+    settings = orchestrator._department_settings(projection)
+    prompt = settings.department_prompt("product")
     session_id = orchestrator.sessions.get(run_id, "product").session_id
     parent = system.store.list_events(run_id)[-1].event_id
     scope = execution_contract.ActivationScope(
@@ -77,7 +79,7 @@ def _round_request(system, run_id, work_ref=None):
         basis=work_basis(projection, "product"), provider="test",
     )
     return execution_contract.RoundRequest(
-        scope, prompt, StepLimits(max_model_steps=1), work_ref=work_ref)
+        scope, prompt, StepLimits(max_model_steps=1), work_ref=work_ref, department_settings=settings)
 
 
 def _frame(system, run_id, work_ref=None):
@@ -99,10 +101,10 @@ def _assembly(name, system):
 
 
 class _ThinDriver:
-    # 测试里的薄驱动一侧：安全节点问它继续还是停止
-    def __init__(self, projection, prompt, *, steps_allowed: int) -> None:
+    # 测试里的薄驱动一侧：安全节点问它继续还是停止。第三版只剩设计说明写的五样，按部门取模型与提示词
+    # 不在这里（工单 #1511）：执行实现从开始一轮工作的请求取
+    def __init__(self, projection, *, steps_allowed: int) -> None:
         self._projection = projection
-        self._prompt = prompt
         self._steps_allowed = steps_allowed
         self.asked = 0
 
@@ -118,12 +120,6 @@ class _ThinDriver:
 
     def end(self, transaction, reason, message):
         pass
-
-    def department_selection(self, department):
-        return None
-
-    def department_prompt(self, department):
-        return self._prompt
 
     async def ask(self, scope, call):
         raise AssertionError("this round does not ask")
@@ -245,7 +241,7 @@ def test_each_assembly_implementation_gets_the_route_work_reference_and_both_rec
     work_ref = {"task": "T-17", "queue": ["write the spec"]}
     request = _round_request(system, run_id, work_ref)
     recording = _RecordingAssembly(_assembly(name, system))
-    node = _ThinDriver(system.orchestrator.project(run_id), request.prompt, steps_allowed=1)
+    node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=1)
 
     _drive(EXECUTIONS[0], system, adapter, request, node, assembly=recording)
 
@@ -265,6 +261,32 @@ def test_each_assembly_implementation_gets_the_route_work_reference_and_both_rec
 # ———————————————————————— 执行契约 ————————————————————————
 
 
+def test_the_safe_node_has_only_the_five_things_the_design_names():
+    # 验收（工单 #1511）：安全节点里只剩继续还是停止、结算、等待、结束、询问。
+    # 按部门取模型与提示词属于路由与定义，随开始一轮工作的请求交进来
+    members = {name for name in dir(execution_contract.SafeNode) if not name.startswith("_")}
+    assert members == {"proceed", "settle", "wait", "end", "ask"}
+
+
+def test_the_previous_safe_node_keeps_the_two_department_methods_one_more_version():
+    # 第三版只加不减（工单 #1511）：移出安全节点的那两个方法留在第二版的安全节点里一版，
+    # 声明第二版的执行实现接上照旧通过
+    assert execution_contract.CURRENT_VERSION == 3
+    assert execution_contract.PREVIOUS_VERSION == 2
+    members = {name for name in dir(execution_contract.PreviousSafeNode) if not name.startswith("_")}
+    assert members == {"proceed", "settle", "wait", "end", "ask",
+                       "department_selection", "department_prompt"}
+
+
+def test_the_execution_implementation_takes_the_department_settings_from_the_round_request():
+    # 验收（工单 #1511）：engine.py 不再调 department_selection、department_prompt；
+    # 这两样从开始一轮工作的请求取。安全节点的五样里没有它们，所以这里按源码查一次
+    source = Path(execution_contract.__file__).with_name("engine.py").read_text(encoding="utf-8")
+    assert "nodes.department_selection(" not in source
+    assert "nodes.department_prompt(" not in source
+    assert "_department_settings" in source, "执行实现没有从请求里取按部门的那两样"
+
+
 @pytest.mark.parametrize("name", EXECUTIONS)
 def test_each_execution_implementation_declares_a_version_the_thin_driver_accepts(name):
     implementation = StepDriver if name == EXECUTIONS[0] else second_execution.SecondExecution
@@ -275,7 +297,7 @@ def test_each_execution_implementation_declares_a_version_the_thin_driver_accept
 def test_each_execution_implementation_asks_the_safe_node_before_doing_anything(name, round_system):
     system, adapter, run_id = round_system
     request = _round_request(system, run_id)
-    node = _ThinDriver(system.orchestrator.project(run_id), request.prompt, steps_allowed=0)
+    node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=0)
     before = len(system.store.list_events(run_id))
 
     result = _drive(name, system, adapter, request, node)
@@ -291,7 +313,7 @@ def test_each_execution_implementation_asks_the_safe_node_before_doing_anything(
 def test_each_execution_implementation_stops_when_cancelled(name, round_system):
     system, adapter, run_id = round_system
     request = _round_request(system, run_id)
-    node = _ThinDriver(system.orchestrator.project(run_id), request.prompt, steps_allowed=99)
+    node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=99)
 
     result = _drive(name, system, adapter, request, node, cancel=True)
 
@@ -307,8 +329,9 @@ def test_each_execution_implementation_stops_at_the_step_limit_with_a_closed_rea
     # 这一轮一步都不许走：上限为零
     request = execution_contract.RoundRequest(request.scope, request.prompt,
                                              execution_contract.StepLimits(max_model_steps=0),
-                                             work_ref=request.work_ref)
-    node = _ThinDriver(system.orchestrator.project(run_id), request.prompt, steps_allowed=99)
+                                             work_ref=request.work_ref,
+                                             department_settings=request.department_settings)
+    node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=99)
 
     result = _drive(name, system, adapter, request, node)
 
@@ -323,8 +346,9 @@ def test_each_execution_implementations_result_carries_no_outcome_kind(name, rou
     request = _round_request(system, run_id)
     request = execution_contract.RoundRequest(request.scope, request.prompt,
                                              execution_contract.StepLimits(max_model_steps=0),
-                                             work_ref=request.work_ref)
-    node = _ThinDriver(system.orchestrator.project(run_id), request.prompt, steps_allowed=99)
+                                             work_ref=request.work_ref,
+                                             department_settings=request.department_settings)
+    node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=99)
 
     result = _drive(name, system, adapter, request, node)
 

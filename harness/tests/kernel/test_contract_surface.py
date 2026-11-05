@@ -44,10 +44,13 @@ SNAPSHOT: dict[str, dict] = {
         "names": ("ContractVersionError", "accepted_versions", "require_version"),
     },
     "execution_contract": {
-        "version": 2,
+        # 第三版（工单 #1511）：加 `DepartmentSettings`（按部门取模型与提示词的来源，随开始一轮工作的请求
+        # 交给执行实现）与 `PreviousSafeNode`（第二版的安全节点，`SafeNode` 之外还带着那两个按部门的方法，留一版）
+        "version": 3,
         "names": (
-            "ActivationScope", "CURRENT_VERSION", "Judgment", "PREVIOUS_VERSION", "RoundRequest",
-            "RoundResult", "SafeNode", "StepDriver", "StepLimits", "accept",
+            "ActivationScope", "CURRENT_VERSION", "DepartmentSettings", "Judgment", "PREVIOUS_VERSION",
+            "PreviousSafeNode", "RoundRequest", "RoundResult", "SafeNode", "StepDriver", "StepLimits",
+            "accept",
         ),
     },
     "assembly_contract": {
