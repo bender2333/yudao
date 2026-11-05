@@ -9968,6 +9968,11 @@
           "baseline_review": {
             "$ref": "#/components/schemas/BaselineReviewProposal"
           },
+          "baseline_verified": {
+            "type": "boolean",
+            "title": "Baseline Verified",
+            "default": true
+          },
           "overview_ref": {
             "$ref": "#/components/schemas/ArtifactRef"
           },
@@ -11375,6 +11380,17 @@
           },
           "baseline_review": {
             "$ref": "#/components/schemas/BaselineReviewView"
+          },
+          "baseline_review_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseline Review Note"
           },
           "decisions": {
             "items": {
@@ -25106,6 +25122,11 @@
           },
           "baseline_review": {
             "$ref": "#/components/schemas/BaselineReviewProposal"
+          },
+          "baseline_verified": {
+            "default": true,
+            "title": "Baseline Verified",
+            "type": "boolean"
           },
           "overview_ref": {
             "$ref": "#/components/schemas/ArtifactRef"

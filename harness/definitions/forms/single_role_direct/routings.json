@@ -10,6 +10,8 @@
       "outcomes": "direct",
       "final_outcome": "completion",
       "proposal_methods": [
+        "submit_product_spec",
+        "submit_structure",
         "submit_completion"
       ],
       "limits": {},

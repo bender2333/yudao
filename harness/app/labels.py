@@ -31,6 +31,10 @@ STOP_REASON_NAMES = {reason: definition.label for reason, definition in DEFINITI
 # 这里取同一条；中文名取自定义（「开环完成」，不含「放行」二字），报告与汇总按它把两种完成分开算
 OPEN_LOOP_LABEL = STOP_REASON_NAMES[OPEN_LOOP_STOP_REASON]
 
+# 没有经过基线核验的建档（工单 #1510，形态与核验角色设计说明「开环完成」第 6 条）：没有核验角色的形态没有
+# 基线核验这一步，确认请求、资料页与采纳记录都写明这一句，用户据此知道这份基线没有经过独立核验
+NO_BASELINE_REVIEW_LABEL = "没有经过基线核验"
+
 DECISION_KIND_NAMES: dict[str, str] = {
     "model_unavailable": "模型引用无法使用，等待恢复",
     "no_tool_call": "已暂停（模型没有调用工具），等待继续",
