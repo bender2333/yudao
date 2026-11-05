@@ -217,7 +217,7 @@ class ImpactWorkItem(Contract):
     department: str
 
 class ChangeImpact(Contract):
-    # catalog.change_impact 的结果：只读取，不写入任何内容（docs/design/app-and-interface.md「查询清单」、「查询清单」）
+    # catalog.change_impact 的结果：只读取，不写入任何内容（docs/design/app-and-interface.md「查询清单」）
     revision: int
     impacted: list[ImpactDefinition] = []
     deletions: list[ImpactDefinition] = []

@@ -690,7 +690,7 @@ class Group:
     refs: list[Ref] = field(default_factory=list)
 
     def render(self) -> str | None:
-        names = [r.title for r in self.refs if r.title]
+        names = list(dict.fromkeys(r.title for r in self.refs if r.title))
         if not names:
             if any(r.dropped for r in self.refs) or all(r.doc is None for r in self.refs):
                 return "" if any(r.dropped for r in self.refs) else None
@@ -1143,6 +1143,8 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
         if doc:
             if not consider(ref, doc, "对照表"):
                 ref.doc, ref.pinned = doc, doc
+                # 「文件:行」是逐行定的：不再退到同一份文件点名的说明（按文件的对照表可以退）
+                ref.pinned_strict = f"{ref.file}:{ref.line}" in MAPPING
 
 
     # 第二轮之半：写明了哪份说明（同行点名或对照表）、节号却对不上现在编号的：
@@ -1201,9 +1203,10 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
             ref.doc, ref.score = best[1], best[0]
             ref.status = "未定：两种读法都可能"
 
-    # 「文件:行」的对照表最后覆盖一次：人定的优先
+    # 「文件:行」的对照表最后覆盖一次：人定的优先（只覆盖还没定下来的那一处，
+    # 同一行里已经按名字定下来的另一处不动）
     for ref in refs:
-        if ref.status.startswith("排除"):
+        if ref.status.startswith("排除") or ref.ok:
             continue
         key = f"{ref.file}:{ref.line}"
         if key not in MAPPING:
