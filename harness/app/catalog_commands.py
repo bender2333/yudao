@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, Sequence
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import PositiveInt
 
@@ -24,31 +24,6 @@ if TYPE_CHECKING:
 
 # 与 Provider 模块支持的协议同一份清单
 ProtocolName = Literal[tuple(sorted(SUPPORTED_PROTOCOLS))]
-
-_PREFILL_SOURCE_LABELS: Mapping[str, str] = {
-    "models_url": "上游模型列表",
-    "capability_table": "能力表",
-    "preset_default": "服务方案默认",
-    "default": "默认",
-}
-
-
-def _format_candidate_source(candidate: Mapping[str, Any]) -> str:
-    parts: list[str] = []
-    proto_src = candidate.get("protocol_source")
-    if proto_src:
-        parts.append(f"协议：{_PREFILL_SOURCE_LABELS.get(str(proto_src), str(proto_src))}")
-    window_src = candidate.get("context_window_source")
-    if window_src:
-        parts.append(f"窗口：{_PREFILL_SOURCE_LABELS.get(str(window_src), str(window_src))}")
-    output_src = candidate.get("max_output_tokens_source")
-    if output_src:
-        parts.append(f"输出上限：{_PREFILL_SOURCE_LABELS.get(str(output_src), str(output_src))}")
-    modalities_src = candidate.get("input_modalities_source")
-    if modalities_src:
-        parts.append(f"输入方式：{_PREFILL_SOURCE_LABELS.get(str(modalities_src), str(modalities_src))}")
-    return " · ".join(parts)
-
 
 
 class ProviderInput(Contract):
@@ -82,52 +57,6 @@ class ModelInput(Contract):
     default_reasoning_level: str | None = None
     reasoning_mode: str = ""
 
-    @classmethod
-    def from_candidate(
-        cls,
-        candidate: Mapping[str, Any],
-        *,
-        id: str | None = None,
-        context_window: int | None = None,
-        max_output_tokens: int | None = None,
-        protocol: ProtocolName | None = None,
-        capability_source: str | None = None,
-        accepts_required_tool_call: bool = True,
-        reasoning_levels: Sequence[str] = (),
-        default_reasoning_level: str | None = None,
-        reasoning_mode: str = "",
-    ) -> ModelInput:
-        # 从候选建立模型访问定义（工单 #562，设计说明第 4.3 节）：
-        # 窗口、输出上限与协议取候选的预填值，来源随定义保存（以后可以修改）；
-        # 两处都没有窗口或输出上限的候选，必须在请求里给出才能保存
-        raw_id = str(candidate.get("id") or "").strip()
-        entry_id = str(id).strip() if id is not None else raw_id
-        proto = protocol or candidate.get("protocol") or "chat_completions"
-        window = context_window if context_window is not None else candidate.get("context_window")
-        output = max_output_tokens if max_output_tokens is not None else candidate.get("max_output_tokens")
-        if capability_source is not None:
-            source = capability_source
-        elif candidate.get("capability_source"):
-            source = str(candidate["capability_source"])
-        else:
-            source = _format_candidate_source(candidate)
-        modalities = candidate.get("input_modalities") or ["text"]
-        return cls(
-            id=entry_id,
-            model=raw_id,
-            protocol=proto,
-            context_window=window,
-            max_output_tokens=output,
-            capability_source=source,
-            accepts_required_tool_call=accepts_required_tool_call,
-            input_modalities=[item for item in modalities if item in ("text", "image")],
-            reasoning_levels=list(reasoning_levels),
-            default_reasoning_level=default_reasoning_level,
-            reasoning_mode=reasoning_mode,
-        )
-
-
-model_input_from_candidate = ModelInput.from_candidate
 
 class DocumentModelInput(ModelInput):
     # 目录文档中的定义自己带上所属连接

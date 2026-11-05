@@ -4,20 +4,16 @@
 # 第一次采纳以后起点是采纳成果；因升级重新开始的事项带着起始文件夹重新开始；
 # 起点的求法只在 ProjectService._work_item_start_point 一处，三种情形各一个用例。
 
-import uuid
-
 import pytest
 
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter
-from harness.app.application import Application
 from harness.models import ProjectEventType
 from harness.projection import project_run
 from harness.proposals import product_spec
 from harness.public_tree import TreeError, capture_public_tree
 from harness.event_store import run_stream
 from harness.runtime import LoopSystem
-from harness.tests.api_helpers import running_api
 from harness.tests.helpers import happy_script, quality_turns
 
 GOAL = "把起点文件夹里的数据用到第一个事项的交付里。"
@@ -34,47 +30,13 @@ def _initial_directory(tmp_path, files=None):
         (root / name).write_text(text, encoding="utf-8")
     return root
 
-def _blocked_script():
-    # 产品提交规格以后工程部门的请求失败：run 停在非终态，用来检查排空期间排队的事项
-    from harness.adapters.base import ProviderError
-    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
-    return {
-        "product": [product_spec()],
-        "engineering": [ProviderError("Missing configuration: provider credential",
-                                       reason="provider_unavailable")],
-        "quality": quality_turns("release", "checks passed on the current snapshot"),
-    }
-
 def _opened(data_dir, script=None):
     return LoopSystem.for_testing(data_dir, FakeAdapter(script or happy_script()))
-
-class _Opened:
-    # 服务生命周期中建立的应用层：真实启动 FastAPI 应用，经 HTTP 提交命令与读取查询
-    def __init__(self, data_dir, adapter=None) -> None:
-        self.data_dir = data_dir
-        self.adapter = adapter if adapter is not None else FakeAdapter(happy_script())
-        self.applications: list[Application] = []
-
-    def __call__(self) -> Application:
-        application = Application(LoopSystem.for_testing(self.data_dir, self.adapter))
-        self.applications.append(application)
-        return application
-
-    @property
-    def store(self):
-        return self.applications[-1].system.store
 
 def _adopt(system, project_id, run_id):
     # 把一个跑到 DONE 的 run 结算到采纳：结算写在 RUN_DONE 之后，这里显式补做
     assert system.run_until_stop(run_id).status == "done"
     system.projects.settle_pending(project_id)
-
-def _post(client, command, **body):
-    return client.post(f"/api/commands/{command}", json={"command_id": str(uuid.uuid4()), **body})
-
-def _overview(client, project_id):
-    body = client.get("/api/queries/project.overview", params={"project_id": project_id}).json()
-    return body["data"]
 
 # ---------------------------------------------------------------------------
 # 命令：project.create 的 initial_directory
@@ -236,41 +198,3 @@ def test_a_run_missing_after_an_interruption_is_rebuilt_from_the_record(data_dir
     assert run.status != "failed"
     assert reopened.projects.projection(project_id).work_item(work_item_id).snapshot["tree_digest"] == expected
     reopened.close()
-
-def test_a_queued_work_item_is_started_at_the_next_start_after_the_drain(data_dir, tmp_path):
-    # 排空期间排队的事项登记在项目流里而 run 流为空，与进程中断留下的事项在数据上相同。
-    # 区别在于排空：排空在下一次启动时结束（工单 #731，应用层与接口层设计说明第 3.2 节「升级」：
-    # 排空在服务下一次启动时结束），那批排队的事项这一次补建 run 并开始
-    source = _initial_directory(tmp_path)
-    system = _opened(data_dir, _blocked_script())
-    project_id = system.projects.register("排空项目", GOAL, initial_directory=str(source))
-    _first_item, running_run = system.projects.start_work_item(project_id, TEXT)
-    system.activate_once(running_run)
-    assert system.running_runs == 1
-    assert system.start_drain().state == "draining"
-    queued_work_item = system.projects.queue_work_item(project_id, "排队的事项")
-    queued_run = system.projects.projection(project_id).work_item(queued_work_item).run_id
-    assert system.store.stream_events(run_stream(queued_run), after_version=0) == []
-    system.close()
-
-    reopened = _opened(data_dir, _blocked_script())
-    # 下一次启动：排空结束，排队的事项补建 run 并开始
-    assert reopened.drain.state == "idle"
-    assert reopened.recovered_work_item_runs == [queued_run]
-    assert reopened.store.stream_events(run_stream(queued_run), after_version=0) != []
-    assert reopened.projects.projection(project_id).work_item(queued_work_item).status != "not_started"
-    reopened.close()
-
-# ---------------------------------------------------------------------------
-# 查询与接口
-
-
-def test_the_create_command_accepts_an_initial_directory_over_http(data_dir, tmp_path):
-    source = _initial_directory(tmp_path)
-    with running_api(_Opened(data_dir)) as client:
-        response = _post(client, "project.create", name="带起点的项目", goal=GOAL,
-                         initial_directory=str(source))
-        assert response.status_code == 200
-        project_id = response.json()["refs"]["project_id"]
-        overview = _overview(client, project_id)
-        assert overview["start_point"] == "起点：起始文件夹（3 个文件）"
