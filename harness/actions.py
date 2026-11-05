@@ -29,6 +29,9 @@ class CheckReceipt:
     exit_code: int
     summary: str
     snapshot_hash: str
+    # 这次检查主机执行的命令（检验的有效性设计说明第 7.2 节，工单 #1181）：交付检查的回执带它，
+    # 基线检查按名字取同名交付检查的命令运行，质检不能改写；旧回执没有这一项，读出来是空
+    command: str | None = None
     # 这份回执绑定的成果种类与它们的版本摘要（工单 #1456）：回执只说「绑定了哪一种成果的哪一版」，
     # 内核按定义里写的名称核对，不认识具体有哪几种成果；新加一种成果种类不用改这里
     bindings: dict[str, str] = field(default_factory=dict)
@@ -39,6 +42,9 @@ class CheckReceipt:
     tree_changed: bool = False
     effective_contract_hash: str | None = None
     qa_tests_hash: str | None = None
+    # 基线回执（检验的有效性设计说明第 7.2 节，工单 #1181）：主机在基线副本上运行同名交付检查写下的回执。
+    # 它不是交付检查的证据：`binds` 只被交付回执使用，基线回执按这一位识别
+    baseline: bool = False
 
     def binds(self, bindings: Mapping[str, str]) -> bool:
         # 这份回执绑定的成果版本是不是都在 bindings 里写的那些（种类 → 摘要）

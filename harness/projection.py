@@ -816,6 +816,9 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
         criteria=[dict(item) for item in payload.get("criteria", [])],
         coverage=dict(payload.get("coverage") or {}),
         open_criteria=[str(item) for item in payload.get("open_criteria", [])],
+        # 基线明细（工单 #1181）：旧事件没有这一项，缺省是空
+        baseline_checks=[dict(item) for item in payload.get("baseline_checks", [])
+                         if isinstance(item, dict)],
         # 结论文档引用的独立判断与改判的条数（工单 #1190）：旧事件没有这两项
         judgement_event=str(payload.get("judgement_event") or ""),
         changed=int((payload.get("coverage") or {}).get("changed") or 0),
