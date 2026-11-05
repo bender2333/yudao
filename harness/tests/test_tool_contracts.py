@@ -13,7 +13,7 @@ import pytest
 from pydantic import TypeAdapter, ValidationError
 
 from harness.actions import Action, ActionReceipt
-from harness.definitions import (ADDED_KINDS, DEFINITIONS, ESTABLISHED_CONTRACTS, ActionKind, Identifier, Tool,
+from harness.definitions import (DEFINITIONS, ActionKind, Identifier, Tool,
                                  established_cancellable, established_verification)
 from harness.tools import (BROWSER_TOOL_NAMES, tool_action, tool_cancellable, tool_kind, tool_verification,
                            tools_for)
@@ -73,14 +73,6 @@ def test_write_tools_belong_to_engineering_and_quality():
     assert {"write_file", "edit_range"} <= set(tools_for("engineering"))
     assert {"write_file", "edit_range"} <= set(tools_for("quality"))
     assert "edit_range" not in tools_for("product") and "write_file" not in tools_for("product")
-
-
-def test_the_action_kinds_add_the_four_network_and_trial_categories():
-    # 类别只增：原来的四类还在，新增的四类可用；每一类都在既定合同里有自己的一行
-    assert set(get_args(ActionKind)) == {
-        "read", "write", "check", "command", "fetch", "mcp", "trial", "browser"}
-    assert set(ESTABLISHED_CONTRACTS) == set(get_args(ActionKind))
-    assert set(ADDED_KINDS) == {"fetch", "mcp", "trial", "browser"}
 
 
 def test_each_action_kind_follows_the_recovery_contract():

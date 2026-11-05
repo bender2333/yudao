@@ -10,6 +10,7 @@
 # 读源码文件与投影对象，不起服务、不写文件，属于单元层。
 
 import ast
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -314,3 +315,11 @@ def test_the_execution_result_has_no_outcome_kinds():
     for removed in ("class Submitted", "class Answered", "class Stopped", "StepResult"):
         assert removed not in contract.replace("RoundResult", ""), removed
         assert removed not in engine, removed
+    # 路由定义里的成果种类既不是结果的字段名，也不出现在契约源码里
+    kinds = [item["id"] for item in json.loads((HARNESS / "definitions" / "outcome_kinds.json")
+                                               .read_text(encoding="utf-8"))["kinds"]]
+    assert kinds, "定义里没有成果种类，这条检查无从判断"
+    fields = set(execution_contract.RoundResult.__dataclass_fields__)
+    assert not (fields & set(kinds)), f"结果的种类里出现了成果种类：{sorted(fields & set(kinds))}"
+    assert not [kind for kind in kinds if kind in contract], (
+        "执行契约的源码里出现了路由定义的成果种类：结果种类应当由路由按事件判断")
