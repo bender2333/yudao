@@ -358,7 +358,7 @@ class McpSessions:
         finally:
             if watcher is not None and not watcher.done():
                 watcher.cancel()
-        # 结果文本与结构化输出都把凭据值替换为星号再保存（：
+        # 结果文本与结构化输出都把凭据值替换为星号再保存（
         # 「保存的标准错误输出、错误文本与结果文本在写入之前，把已取得的凭据值替换为星号」）
         if result.cancelled:
             # 超时或被取消：客户端已经先发取消通知、等应答最多 10 秒，stdio 随后结束整个进程树，

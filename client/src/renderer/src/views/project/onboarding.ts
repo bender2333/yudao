@@ -22,7 +22,7 @@ export const ONBOARDING_MARKS: Record<string, string> = {
   awaiting_onboarding: "等待建档",
 };
 
-// 驱动「阅读已有项目」动作的读取工具（：读取、搜索与区间阅读工具的 tool_started）
+// 驱动「阅读已有项目」动作的读取工具（读取、搜索与区间阅读工具的 tool_started）
 export const READ_EXISTING_TOOLS = ["read_file", "search", "read_range"] as const;
 
 // 接入命令的拒绝原因的中文说明。界面同时给出原因名、服务端的原因说明与其中列出的相对路径，
@@ -87,7 +87,7 @@ export function readExistingAction(event: EventObject): string | null {
 /** 已结束的读取动作（run.actions 的动作行）：返回最近一次读取的工具、部门与开始时间，不是读取工具时为空。
  *
  * 部门房间的页面可能在读取发生以后才打开，事件订阅只收到订阅之后的事件，
- * 已发生的读取按 run.actions 的动作列表读出（：状态以查询为准）。
+ * 已发生的读取按 run.actions 的动作列表读出（状态以查询为准）。
  */
 export function lastReadExistingAction(
   actions: readonly Pick<ActionView, "tool" | "department" | "created_at">[],

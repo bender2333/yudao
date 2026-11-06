@@ -2334,7 +2334,7 @@ class TrialCaseEvidenceView(Contract):
 
 
 class UnverifiedCriterionView(Contract):
-    # 无法核验的条目与原因（：原因写在逐条结论的 note 里）
+    # 无法核验的条目与原因（原因写在逐条结论的 note 里）
     criterion: str
     method: str
     note: str

@@ -55,7 +55,7 @@ def serve(open_application: Callable[[], Application], *, access: AccessMode = "
           data_dir: str | Path | None = None) -> None:
     # 服务进程持有 uvicorn 的 Server：停止服务就是结束这个进程（Ctrl+C）；
     # 进程退出以后由启动处释放数据目录的进程锁。
-    # on_ready 在服务开始接受请求以后调用一次（：此时报告绑定的端口、输出页面地址并打开浏览器）。
+    # on_ready 在服务开始接受请求以后调用一次（此时报告绑定的端口、输出页面地址并打开浏览器）。
     # 局域网访问方式按数据目录里的令牌文件校验
     error = listen_error(access, host)
     if error is not None:

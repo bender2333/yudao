@@ -183,7 +183,7 @@ function BuildingCanvas(props: { app: ClientApp; model: BuildingModel; onNavigat
   }, [props.model, props.live]);
 
   // 事件只决定动作的起点：事件经翻译层翻成楼的动作（楼的远层动作不按项目筛选，事件本身带项目标识）。
-  // 回放期间不按事件流更新画面（：客户端不按事件流更新回放的视图）
+  // 回放期间不按事件流更新画面（客户端不按事件流更新回放的视图）
   useEffect(() => {
     const off = props.app.subscribeEvents((event) => {
       if (!liveRef.current) return;

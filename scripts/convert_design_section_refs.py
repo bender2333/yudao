@@ -747,6 +747,7 @@ DROP_FIXES: tuple[tuple[str, str, str], ...] = (
     ("harness/projects.py", "（表），", "，"),
     ("harness/coverage.py", "（表）：", "："),
     ("harness/tightening.py", "（表）：", "："),
+    ("evals/context/replay.py", "写成要的表", "写成表"),
 )
 
 
@@ -1711,6 +1712,10 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
             ref.status, ref.how = "去掉", "去掉"
             ref.reason = "工单点名的已删小节"
             continue
+        if ref.doc is None:
+            named_here = {h[2] for h in mentions(line)}
+            if len(named_here) == 1:
+                ref.doc = named_here.pop()
         if kept_as_is(ref.file, line):
             ref.status, ref.how = "排除", "排除"
             ref.reason = "只改之外"
@@ -1786,7 +1791,7 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                         if before_char and ("\u4e00" <= before_char <= "\u9fff" or before_char in "（(#*/"):
                             end += 1
                     _, start, end = drop_span(line, start, end)
-                    line = line[:start] + line[end:]
+                    line = (line[:start] + line[end:]).replace("（：", "（").replace("(: ", "(")
                 else:
                     trimmed = line[:start].rstrip(" \t")
                     if trimmed.endswith(".md") and trimmed != line[:start]:
@@ -1847,7 +1852,8 @@ def write_report(path: str, refs: list[Ref]) -> None:
         "# 换算报告（工单 #1411）",
         "",
         f"处数 {len(refs)}，换算 {len(ok)}（其中人定 {len(fixed)}），去掉 {len(dropped)}，"
-        f"排除（别的文档、原型、只改之外）{len(excluded)}，未定 0",
+        f"排除（别的文档、原型、只改之外）{len(excluded)}，"
+        f"未定 {len(refs) - len(ok) - len(dropped) - len(excluded)}",
         "",
         "证据一栏的五档：⑤ 人定；① 同一段注释点名；② 同一段引用的标题或条目名全库唯一；"
         "④ 文件开头人写的归属；③ 写这行的提交的工单「依据」点名的说明。",
@@ -1880,9 +1886,9 @@ def write_report(path: str, refs: list[Ref]) -> None:
     rows += ["", "## 人定", "", "| 文件:行 | 第几节 | 依据 | 现在的标题 |", "| --- | --- | --- | --- |"]
     for r in sorted(fixed, key=lambda x: (x.file, x.line, x.start)):
         rows.append(f"| `{r.file}:{r.line}` | {r.sec} | {r.evidence} | {r.now} |")
-    rows += ["", "## 排除", "", "| 文件:行 | 原因 |", "| --- | --- |"]
+    rows += ["", "## 排除", "", "| 文件:行 | 选中的说明 | 原因 |", "| --- | --- | --- |"]
     for r in sorted(excluded, key=lambda x: (x.file, x.line, x.start)):
-        rows.append(f"| `{r.file}:{r.line}` | {r.reason} |")
+        rows.append(f"| `{r.file}:{r.line}` | {r.doc or ''} | {r.reason} |")
     Path(path).write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 

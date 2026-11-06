@@ -323,7 +323,7 @@ test.describe("部门设置弹窗与部门工作间（1440×900）", () => {
         page, "catalog");
       const provider = catalog.providers.find((item) => item.id === "opencode-go");
       expect(provider).toBeDefined();
-      // 只取连接保存命令的字段（：未知字段拒绝），改地址让它的准入作废；
+      // 只取连接保存命令的字段（未知字段拒绝），改地址让它的准入作废；
       // 模型访问定义按原样带上，因此引用保留、显示「准入已作废」而不是「定义不存在」
       const models = await fetchQuery<{ models: { id: string; provider_id: string; model: string; protocol: string;
         context_window: number | null; max_output_tokens: number; capability_source: string;

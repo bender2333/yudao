@@ -212,7 +212,7 @@ def _check_not_registered(application: Application, command: Command) -> None:
 
 
 def _project_model_referrers(application: Application, model_id: str) -> list[str]:
-    # 各项目的项目部门设置中引用这条模型访问定义的引用方（：与部门默认同样拒绝）。
+    # 各项目的项目部门设置中引用这条模型访问定义的引用方（与部门默认同样拒绝）。
     # 项目部门设置保存在项目事件里，Provider 模块看不到，由应用层汇总
     referrers: list[str] = []
     for project in application.system.projects.list_projects(include_archived=True):

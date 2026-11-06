@@ -278,7 +278,7 @@ def test_a_run_end_closes_the_server_ends_its_process_tree_and_records_the_event
     assert _gone(int(started[0]["pid"]))
     assert _gone(server_pid) and _gone(child_pid)
 
-    # 结果照常交回模型，动作记为已完成（：工具失败以外都是已完成的动作）
+    # 结果照常交回模型，动作记为已完成（工具失败以外都是已完成的动作）
     assert called_event.payload["ok"] is True
     assert "生命周期" in _result_text(system, run_id, ECHO_CALL)
     assert _payloads(system, run_id, EventType.MCP_SERVER_FAILED) == []

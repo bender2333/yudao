@@ -75,7 +75,7 @@ SKELETON_EVENT_SNAPSHOT = {
     }),
 }
 
-# 放出 S6a 时事件信封的字段（：全局位置、流、流内版本、种类、来源、时间只增）
+# 放出 S6a 时事件信封的字段（全局位置、流、流内版本、种类、来源、时间只增）
 ENVELOPE_SNAPSHOT = {
     "Event": (
         "event_id", "run_id", "type", "role", "parent_event_id", "state_before", "state_after",

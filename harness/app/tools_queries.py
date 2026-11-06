@@ -59,7 +59,7 @@ class ToolsRegistryServerView(McpServerSettingView):
 
 
 class ToolsRegistryFetchRecord(Contract):
-    # 一条取回记录（：时间、地址、项目、结果）。项目由它所在的条目给出：at 是取回动作
+    # 一条取回记录（时间、地址、项目、结果）。项目由它所在的条目给出：at 是取回动作
     # 的时间，url 是动作请求的地址，ok 为假时 error 写明原因（取回失败，或被地址规则与工具许可拒绝）
     at: str = ""
     url: str = ""

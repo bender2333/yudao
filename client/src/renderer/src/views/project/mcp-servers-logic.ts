@@ -301,7 +301,7 @@ export function serverDocument(server: McpServerSettingView | null, draft: McpSe
 }
 
 // 一份服务器文档：其余服务器照原样带回去，改动的这一台按草稿换掉（改名时去掉原来那个名称），
-// previous_name 为 null 表示新增。删掉一台时 draft 传 null（：整份设置一个版本）
+// previous_name 为 null 表示新增。删掉一台时 draft 传 null（整份设置一个版本）
 export function mcpDocumentPayload(
   servers: Record<string, McpServerSettingView> | undefined,
   draft: McpServerDraft | null,
