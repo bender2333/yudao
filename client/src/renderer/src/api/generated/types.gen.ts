@@ -7736,6 +7736,10 @@ export type WorkItemStats = {
      */
     released_unsettled: number;
     /**
+     * Open Loop
+     */
+    open_loop: number;
+    /**
      * Stopped
      */
     stopped: number;

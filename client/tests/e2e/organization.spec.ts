@@ -127,8 +127,8 @@ async function tabTexts(page: import("@playwright/test").Page): Promise<string[]
   return page.locator(".tabbar .tab").allTextContents();
 }
 
-// 看板的部门列：固定四组（排队中、已放行、已采纳、已停止）之外的那些列，去掉计数
-const FIXED_BOARD_TITLES = ["排队中", "已放行", "已采纳", "已停止"];
+// 看板的部门列：固定五组（排队中、已放行、开环完成、已采纳、已停止）之外的那些列，去掉计数
+const FIXED_BOARD_TITLES = ["排队中", "已放行", "开环完成", "已采纳", "已停止"];
 
 async function boardTitles(page: import("@playwright/test").Page): Promise<string[]> {
   const titles = await page.locator(".y10-ov-board-col h3").allTextContents();

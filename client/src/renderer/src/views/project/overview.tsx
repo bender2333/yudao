@@ -26,8 +26,8 @@ import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Section, StopNo
 import { FloorScreen } from "./floor-screen";
 import { Timeline } from "../timeline/timeline";
 import { scopeAtTick, ticksOf } from "../timeline/logic";
-import { INPUT_KIND, STOP_REASON, WORK_ITEM_STATUS, departmentName, departmentLine, formatTime, label,
-  progressLabel, stoppedCardLine, workingDepartmentsText } from "./labels";
+import { INPUT_KIND, STOP_REASON, departmentName, departmentLine, formatTime, label,
+  progressLabel, stoppedCardLine, workItemStatusText, workingDepartmentsText } from "./labels";
 import { askIndent, askLine } from "./asks-text";
 import { RestartOnboarding } from "./restart-onboarding";
 import { WritebackState } from "./writeback";
@@ -45,10 +45,11 @@ const ITEM_STATUS_KIND: Record<string, string> = {
   awaiting_initial_prd: "asking",
 };
 
-// 状态文字能用原型标记显示的才用标记；没有对应的（排队中、已停止）保留纯文字
-function itemStatus(status: string): React.ReactNode {
-  const kind = ITEM_STATUS_KIND[status];
-  const text = label(WORK_ITEM_STATUS, status);
+// 状态文字能用原型标记显示的才用标记；没有对应的（排队中、已停止）保留纯文字。
+// 文字按事项卡上的状态与结束原因取（工单 #1421）：开环完成写在 released_unsettled 上，与已放行分开
+function itemStatus(item: { status: string; stop_reason?: string | null }): React.ReactNode {
+  const kind = ITEM_STATUS_KIND[item.status];
+  const text = workItemStatusText(item);
   return kind === undefined ? text : <StatusMark kind={kind} text={text} />;
 }
 
@@ -195,12 +196,15 @@ function startPointText(value: string | null | undefined): string {
 
 // 事项统计那一行（工单 #1160）：每一项只写这一种状态，不写累计。
 // released_unsettled 是「放行了、还没采纳」这一个状态，所以写「放行待采纳」，不写「已放行」；
+// 开环完成与放行分开写（工单 #1421）：事项的 status 仍是 released_unsettled、结束原因是 open_loop 的
+// 计入「开环完成」，不再算进「放行待采纳」——服务端把两处分开数，页面按它的两个数写。
 // held（成果挂起）也要有一项，否则各项加起来不等于「共 N」。看板的列名另有一套，不跟这一行。
 // 服务端的统计没有 awaiting_initial_prd（要改接口快照才能加，本工单不加）：等待确认初始 PRD 的事项
 // 因此只计入「共 N」，这一行不单列它，界面不猜它的数量。
 export function statsText(stats: WorkItemStats): string {
   return `共 ${stats.total}：进行中 ${stats.in_progress}、排队中 ${stats.not_started}、已采纳 ${stats.adopted}`
-    + `、放行待采纳 ${stats.released_unsettled}、成果挂起 ${stats.held}、已停止 ${stats.stopped}`;
+    + `、放行待采纳 ${stats.released_unsettled}、开环完成 ${stats.open_loop}`
+    + `、成果挂起 ${stats.held}、已停止 ${stats.stopped}`;
 }
 
 // 命令受理回执里的标识：project.create 带 project_id、work_item.create 带 work_item_id（都在 refs 里），
@@ -278,7 +282,7 @@ function CurrentItem(props: {
     <Section id="ov-current" title="当前事项" note={note}>
       <KeyValue
         items={[
-          ["状态", <span key="status" className="y10-row">{itemStatus(item.status)}{progress === null ? null : <span className="y10-muted"> · {progress}</span>}</span>],
+          ["状态", <span key="status" className="y10-row">{itemStatus(item)}{progress === null ? null : <span className="y10-muted"> · {progress}</span>}</span>],
           ["待决问题", show(item.pending_question, "没有")],
           ["停止原因", item.stop_reason === null || item.stop_reason === "" ? "没有" : label(STOP_REASON, item.stop_reason)],
           // 停止说明（工单 #1162）：让事项停下的那条错误的原文，写在停止原因下面；
@@ -532,7 +536,7 @@ export function Board(props: { items: WorkItemCard[]; departments?: DepartmentVi
                 <article key={item.work_item_id} className="y10-ov-card board-card">
                   <strong>{item.title}</strong>
                   <div className="y10-ov-card-meta card-meta">
-                    <span>{itemStatus(item.status)}</span>
+                    <span>{itemStatus(item)}</span>
                     {/* 正在工作的部门（工单 #904）：一轮工作中或询问中的部门；没有时不写这一格（工单 #842 的旧数据显示所在部门） */}
                     {workingDepartmentsText(item) === "" ? null : <span>{workingDepartmentsText(item)}</span>}
                     <span>第 {item.round} 轮</span>

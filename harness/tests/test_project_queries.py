@@ -38,24 +38,27 @@ from harness.app.project_queries import (
 from harness.app.registry import QueryDefinition, Registry
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import SYSTEM_STATUS, SystemStatusRequest
-from harness.event_store import run_stream
+from harness.event_store import project_stream, run_stream
 from harness.models import EventType, ProjectEventType
 from harness.project_projection import replay_project
 from harness.streams import PRIORITY_UPGRADE_RESTART, RUN_EVENT_VERSION, STOP_REASON_UPGRADE
 from harness.proposals import (
     product_spec, delivery_turn, judgement_turn, review_turn,
-    ask_turn, answer_turn,
+    ask_turn, answer_turn, completion_turn,
     baseline_review_turn, structure_turn,
 )
 from harness.providers.selection import ModelSelection
 from harness.providers.call import ModelCall, ModelResponse
-from harness.runtime import LoopSystem
+from harness.runtime import SINGLE_ROLE_DIRECT_DEFINITIONS, LoopSystem
+from harness.direct import DIRECT_TIGHTENING, SINGLE_ROLE_DIRECT
+from harness.definitions import DEFAULT_FORM, DEFINITIONS
+from harness.tightening import WATCHED_OUTPUTS
 from harness.tests.api_helpers import running_api
 from harness.tests.helpers import (
     after_event, explore_turn, from_another_thread, happy_script, merge_scripts, quality_turns,
 )
 from harness.tests.onboarding_project import onboarding_source
-from harness.write_path import NewEvent
+from harness.write_path import NewEvent, NewProjectEvent
 
 GOAL = "把文本按行处理清楚"
 
@@ -1439,4 +1442,62 @@ def test_loop_facts_carry_their_source_position_and_kind(data_dir):
     rebuilt = replay_project(system.store, project_id)
     assert rebuilt.work_item(work_item_id).event_id == created.event_id
     assert rebuilt.adoptions[-1].event_id == settled.event_id
+    system.close()
+
+
+# 开环完成与放行的统计分开（工单 #1421）：两种结束方式在项目流里是同一个事项状态 released_unsettled，
+# 统计里要分开数。用发布带里的单角色直做形态造一件以开环完成结束的事项（没有核验角色，
+# 形态与核验角色设计说明「开环完成」），用默认三部门造一件以放行结束的事项，再留一件没有开始的事项
+DIRECT_FORMS = {
+    DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
+    SINGLE_ROLE_DIRECT: (SINGLE_ROLE_DIRECT_DEFINITIONS, DIRECT_TIGHTENING),
+}
+
+
+def _set_form(system: LoopSystem, project_id: str, previous: str, form: str) -> None:
+    # 改形态写成 #1392 的那条项目事件（与 organization.adopt 命令同一个落点）；本文件只核对统计，不经过命令
+    system.writes.append(project_stream(project_id), NewProjectEvent(
+        ProjectEventType.PROJECT_FORM_SET, {"previous_form": previous, "form": form, "reason": ""},
+        actor="user:local"))
+
+
+def test_the_stats_count_open_loop_completions_apart_from_released_ones(data_dir):
+    # 验收（工单 #1421）：以开环完成结束的事项不再算进「放行待采纳」，单独计入 open_loop；
+    # 放行结束的事项仍算放行待采纳。两处互不重复，加上已采纳、已停止、成果挂起、进行中、排队中等于事项总数
+    system = LoopSystem.for_testing(
+        data_dir,
+        FakeAdapter({
+            # 单角色直做的那一件交完成；默认三部门的那一件交交付（脚本按部门给出，前一件用第一项）
+            "engineering": [completion_turn("补了用法一节"), delivery_turn()],
+            "product": [product_spec()],
+            "quality": quality_turns("release", "checks passed on the current snapshot"),
+        }),
+        forms=DIRECT_FORMS, resume_on_startup=False)
+    project_id = system.projects.register("统计", GOAL)
+    # 三件事项都在跑起来之前登记：开始下一件时的补结算不会把已经停在 released_unsettled 的那一件结算掉
+    _set_form(system, project_id, DEFAULT_FORM, SINGLE_ROLE_DIRECT)
+    open_loop_item, open_loop_run = system.projects.start_work_item(project_id, "以开环完成结束")
+    _set_form(system, project_id, SINGLE_ROLE_DIRECT, DEFAULT_FORM)
+    released_item, released_run = system.projects.start_work_item(project_id, "以放行结束")
+    # 第三件已经开始（run 已经建立）但还没跑：留在进行中，统计里也要有一项
+    running_item, _running_run = system.projects.start_work_item(project_id, "还在进行中")
+
+    assert system.run_until_stop(open_loop_run).stop_reason == "open_loop"
+    assert system.run_until_stop(released_run).stop_reason == "released"
+
+    overview = _application(system).query("project.overview", ProjectOverview(project_id=project_id)).data
+    cards = {card.work_item_id: card for card in overview.work_items}
+    # 项目流里事项的 status 不改：两件结束的事项都是 released_unsettled，只有结束原因不同
+    assert (cards[open_loop_item].status, cards[open_loop_item].stop_reason) == ("released_unsettled", "open_loop")
+    assert (cards[released_item].status, cards[released_item].stop_reason) == ("released_unsettled", "released")
+    assert cards[running_item].status == "in_progress"
+
+    stats = overview.stats
+    # 开环完成单列，放行待采纳不再包含它：两处各一件，互不重复
+    assert (stats.open_loop, stats.released_unsettled) == (1, 1)
+    assert (stats.total, stats.in_progress) == (3, 1)
+    assert (stats.adopted, stats.stopped, stats.held, stats.not_started) == (0, 0, 0, 0)
+    # 各项加起来等于事项总数
+    assert (stats.open_loop + stats.released_unsettled + stats.adopted + stats.stopped
+            + stats.held + stats.in_progress + stats.not_started) == stats.total
     system.close()

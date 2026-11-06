@@ -18,8 +18,8 @@ from ..event_store import project_stream, run_stream
 from ..kernel_events import accepted
 from ..minimal_projection import MinimalProjection, fold_events
 from ..models import (
-    ArtifactRef, DEPARTMENTS, TERMINAL_STATUSES, CatalogEventType, EventType, GIT_VERSION_EVENTS,
-    ProjectEventType, hash_bytes, stop_reason_name,
+    OPEN_LOOP_STOP_REASON, ArtifactRef, DEPARTMENTS, TERMINAL_STATUSES, CatalogEventType, EventType,
+    GIT_VERSION_EVENTS, ProjectEventType, hash_bytes, stop_reason_name,
 )
 from ..observability import ObservabilityQuery
 from ..providers.selection import ModelSelection
@@ -301,7 +301,12 @@ class WorkItemStats(Contract):
     total: int
     in_progress: int
     adopted: int
+    # 放行待采纳（工单 #1421）：status 是 released_unsettled 的事项里，结束原因不是开环完成的那些。
+    # 以开环完成结束的事项不再算进这一项，另计入 open_loop：它不是放行，页面上与放行分开写
     released_unsettled: int
+    # 开环完成（工单 #1421）：status 是 released_unsettled、结束原因是 open_loop 的事项。
+    # 项目流里这些事项的 status 不变，这一项只把「放行待采纳」拆成两种结束方式，各项之和仍是总数
+    open_loop: int
     stopped: int
     held: int
     not_started: int
@@ -359,9 +364,14 @@ def _project_overview(application: Application, request: ProjectOverview) -> Sna
 
 def _work_item_stats(items: list[Any]) -> WorkItemStats:
     statuses = [item.status for item in items]
+    # 开环完成与放行在项目流里是同一个状态（工单 #1421）：都是运行结束、成果还没采纳。
+    # 两处互不重复：放行待采纳只数结束原因不是 open_loop 的那些
+    open_loop = [item for item in items
+                 if item.status == "released_unsettled" and item.stop_reason == OPEN_LOOP_STOP_REASON]
     return WorkItemStats(
         total=len(statuses), in_progress=statuses.count("in_progress"), adopted=statuses.count("adopted"),
-        released_unsettled=statuses.count("released_unsettled"), stopped=statuses.count("stopped"),
+        released_unsettled=statuses.count("released_unsettled") - len(open_loop),
+        open_loop=len(open_loop), stopped=statuses.count("stopped"),
         held=statuses.count("held"), not_started=statuses.count("not_started"),
     )
 

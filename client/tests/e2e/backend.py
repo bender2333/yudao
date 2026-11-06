@@ -42,6 +42,7 @@ from harness.app.catalog_commands import (  # noqa: E402
 )
 from harness.app.mcp_commands import McpServersSave, ToolServerProbe  # noqa: E402
 from harness.app.contracts import Accepted, Rejected  # noqa: E402
+from harness.app.form_commands import OrganizationAdopt  # noqa: E402
 from harness.app.project_commands import ProjectCreate  # noqa: E402
 from harness.app.project_and_work_item_commands import (  # noqa: E402
     DepartmentSettingsSave,
@@ -51,7 +52,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, VerificationDeclaration, load_definitions  # noqa: E402
 from harness.environment import QA_TESTS_DIR  # noqa: E402
-from harness.models import Usage, json_dumps, utc_now  # noqa: E402
+from harness.models import ProjectEventType, Usage, json_dumps, utc_now  # noqa: E402
 from harness.proposals import (  # noqa: E402
     answer_turn, ask_turn, baseline_review_turn, delivery_turn, judgement_turn, product_spec,
     review, review_turn, structure_turn,
@@ -59,7 +60,7 @@ from harness.proposals import (  # noqa: E402
 from harness.providers.call import ModelResponse  # noqa: E402
 from harness.runtime import LoopSystem  # noqa: E402
 # 等待放行的真实命令：与恢复契约的集成层用例（harness/tests/process_kill.py）同一套装置（工单 #1188）
-from harness.tests.helpers import run_wait_command  # noqa: E402
+from harness.tests.helpers import run_wait_command, quality_turns  # noqa: E402
 from harness.tests.protocol_helpers import (  # noqa: E402
     chat_responder, messages_responder, model_test_responder, preset_base_urls, serve,
 )
@@ -135,6 +136,16 @@ OPEN_LOOP_DEFINITIONS = DEFINITIONS.model_copy(update={
     "organization": DEFINITIONS.organization.model_copy(
         update={"verification": VerificationDeclaration(verifiers=())}),
 })
+
+# 开环完成与放行在页面上的写法（工单 #1421）：一个项目里两件事项都停在「放行待采纳」这一个状态上，
+# 一件以开环完成结束（没有核验角色的形态）、一件以放行结束（默认三部门）。另一个项目里造出一件
+# 成果挂起（held）的事项，核对概览的「成果挂起」计数（并入的 #1185）
+OPEN_LOOP_PROJECT = "开环完成与放行"
+OPEN_LOOP_ITEM = "没有核验角色，交了完成就结束"
+RELEASED_ITEM = "经过质检放行"
+HELD_PROJECT = "成果挂起"
+HELD_FIRST_ITEM = "先跑完并被采纳的事项"
+HELD_SECOND_ITEM = "基线变了以后放行的事项"
 
 
 def release_forms(*, single_role: bool = False) -> dict[str, tuple[object, object]]:
@@ -643,6 +654,49 @@ async def seed_coverage(application: Application, system: LoopSystem) -> None:
         raise AssertionError(f"开环明细的预置没有走完：{run.status} {run.stop_reason}")
 
 
+def open_loop_script():
+    # 开环完成与放行（工单 #1421）：产品与工程的轮次沿用默认脚本，质检按请求里的事实决定——
+    # 交付到达以前是预测性探索，到达以后先交独立判断再给结论（验证的独立性设计说明第 4 节）。
+    # 默认脚本的质检不交独立判断（e2e 的预置数据在 main 上因此跑不完，见交接说明），这里给足轮次
+    return {**script(), "quality": quality_turns("release", "checks passed on the current snapshot", times=40)}
+
+
+async def seed_open_loop(application: Application, system: LoopSystem) -> None:
+    # 开环完成与放行（工单 #1421）：一个项目里两件事项都停在「放行待采纳」这一个状态上，一件以开环完成
+    # 结束、一件以放行结束；另一个项目里造出一件成果挂起（held）的事项，供概览的「成果挂起」计数核对。
+    # 事项直接用项目的写入口开始、跑到结束，不经流程编排的自动结算：开环完成与放行的两种结束方式都停在
+    # 采纳之前的那一个状态上，页面才看得见它们（这正是工单 #1421 要分开写的那两个状态）
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=OPEN_LOOP_PROJECT, goal="页面上分开写开环完成与放行"))
+    project_id = created.refs.project_id
+    # 换成没有核验角色的形态再建第一件事项：事项创建时冻结这一份，结束时是开环完成
+    await accept(application, "organization.adopt", OrganizationAdopt(
+        command_id=str(uuid.uuid4()), project_id=project_id, form=OPEN_LOOP_FORM, changes={}, reason="",
+        base_version=DEFINITIONS.version))
+    _open_item, open_run = system.projects.start_work_item(project_id, OPEN_LOOP_ITEM)
+    # 改回默认三部门再建第二件：它在结束原因上是放行。两件都在跑起来之前登记，开始第二件时的补结算
+    # 不会把第一件结算掉（那时它还没有跑）
+    await accept(application, "organization.adopt", OrganizationAdopt(
+        command_id=str(uuid.uuid4()), project_id=project_id, form=DEFAULT_FORM, changes={}, reason="",
+        base_version=OPEN_LOOP_DEFINITIONS.version))
+    _released_item, released_run = system.projects.start_work_item(project_id, RELEASED_ITEM)
+    # 两件都不结算：它们都停在 released_unsettled 上，结束原因一个是 open_loop、一个是 released
+    assert (await system.orchestrator.run_until_stop(open_run)).stop_reason == "open_loop"
+    assert (await system.orchestrator.run_until_stop(released_run)).stop_reason == "released"
+
+    # 成果挂起（并入的 #1185）：两件事项都在第一次采纳之前登记，先跑完的那一件被采纳、当前采纳因此改变，
+    # 后一件放行时基线已变，结算写成 adoption_held——概览把它数进「成果挂起」
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=HELD_PROJECT, goal="成果挂起的计数"))
+    held_project = created.refs.project_id
+    _first_item, first_run = system.projects.start_work_item(held_project, HELD_FIRST_ITEM)
+    _second_item, second_run = system.projects.start_work_item(held_project, HELD_SECOND_ITEM)
+    assert (await system.orchestrator.run_until_stop(first_run)).status == "done"
+    assert system.projects.settle(first_run).type == ProjectEventType.DELIVERABLE_ADOPTED
+    assert (await system.orchestrator.run_until_stop(second_run)).status == "done"
+    assert system.projects.settle(second_run).type == ProjectEventType.ADOPTION_HELD
+
+
 def kernel_script():
     # 路径守卫的端到端验收（工单 #354）：预置的事项交付改动了内核清单里的路径，结算因此不采纳，
     # 发出内核修改决定请求；用例在界面上核对卡片给出改动的路径与差异，批准以后交付被采纳。
@@ -1133,7 +1187,7 @@ def main() -> int:
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
                                              "stopnote", "replay", "kill", "steps", "coverage", "tools", "forms",
-                                             "organization"),
+                                             "organization", "openloop"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -1220,6 +1274,9 @@ def main() -> int:
     elif args.script == "organization":
         # 页面的部门从事实来（工单 #1457）：事项建好就停住，页面只看部门、页签与看板
         adapter_script = organization_script()
+    elif args.script == "openloop":
+        # 开环完成与放行（工单 #1421）：质检的轮次要交独立判断，预置的事项才跑得完
+        adapter_script = open_loop_script()
     else:
         adapter_script = script()
     # 流式片段的停顿（秒）：进行中的询问模式要有一段够长的窗口，回答分支每段停 0.5 秒，
@@ -1247,6 +1304,9 @@ def main() -> int:
         # 慢流式返回让页面检查时事项还在进行中
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap),
                                         forms=release_forms(single_role=True))
+    elif args.script == "openloop":
+        # 开环完成与放行（工单 #1421）：发布带里要有「没有核验角色的三部门」那一份，事项才能以开环完成结束
+        system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script), forms=release_forms())
     else:
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap))
     # 一步连接把 Key 写进 .env（catalog.connect 的既定行为，设计说明第 4.2 节）：
@@ -1323,6 +1383,10 @@ def main() -> int:
             # 页面的部门从事实来（工单 #1457）：一个三部门的项目，没有事项；
             # 用例在页面上先建一个事项、再把形态换成一个角色直做、再建一个事项
             asyncio.run(seed_organization(application))
+        elif args.script == "openloop":
+            # 开环完成与放行（工单 #1421）：一个项目里两件事项分别以开环完成与放行结束，
+            # 另一个项目里一件成果挂起的事项
+            asyncio.run(seed_open_loop(application, system))
         elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）

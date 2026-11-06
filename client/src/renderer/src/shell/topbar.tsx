@@ -12,7 +12,7 @@ import { useCommand, useSnapshot } from "../views/project/use-snapshot";
 import { Icon } from "./kit";
 import { providerNotice, type ProviderReadiness } from "./provider-status";
 import { useTheme, type ThemeChoice } from "./theme";
-import { WORK_ITEM_STATUS, connectionText, label } from "../views/project/labels";
+import { connectionText, workItemStatusText } from "../views/project/labels";
 import { list, text } from "../views/project/common";
 import { scopeName } from "../views/project/scope-name";
 import { DecisionCardList } from "../views/decisions/card";
@@ -185,7 +185,7 @@ function WorkItemPicker(props: {
           const id = text(item.work_item_id);
           return (
             <option key={id} value={id}>
-              {text(item.title)}（{label(WORK_ITEM_STATUS, text(item.status))}）
+              {text(item.title)}（{workItemStatusText({ status: text(item.status), stop_reason: text(item.stop_reason) })}）
             </option>
           );
         })}
