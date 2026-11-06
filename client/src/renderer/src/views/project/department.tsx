@@ -3,6 +3,10 @@
 // 房间信息写传信管上等待本部门回答的询问数；检查区页签：动作与回执（run.actions）、Context（清单与压缩记录）、部门 Prompt；
 // 询问、部门消息与指导（run.asks 的询问、department.workspace 的消息与 guidance.send 的指导）；
 // 部门设置弹窗只改部门 Prompt，模型与档位由 #95 加入。标题区与询问的写法按原型 v12 第 3.1、3.3 节（工单 #905）。
+//
+// 工单 #1416：原来只在部门房间画布上看得到的事实补成页面上的文字——实时的模型输出（room-screen 的
+// RoomLiveOutput）、手边的摘要与笔记的数量、等模型服务、远程结果未知。房间信息条原有的四格不动
+// （样式与排法由工单 #1229 的用例核对）。
 
 import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
@@ -21,11 +25,12 @@ import { paths, type Route } from "../../shell/routing";
 import { CommandFeedback, Empty, EventDetail, KeyValue, Loading, Modal, Section, SubmitButton, Table, TextArea,
   dict, formatNumberOr, hasCommand, list, numberValue, optionalText, pageKey, show, text, useDraft } from "./common";
 import { DepartmentSettingsFields, DepartmentSettingsSave, promptWritten, useDepartmentDraft } from "./department-settings-form";
-import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts, formatDuration,
+import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, departmentsLineParts,
   formatTime, itemSource, label, lettersWaitingText, roleBarText, type DepartmentStateView } from "./labels";
+import { elapsedLimitText } from "./floor-text";
 import { askIndent, askLine } from "./asks-text";
 import { StepTimeline } from "./step-timeline.tsx";
-import { RoomScreen } from "./room-screen";
+import { RoomLiveOutput, RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
 import { scopeName } from "./scope-name";
@@ -120,6 +125,8 @@ export function RoomSection(props: { app: ClientApp; department: string; data: D
       <div className="y10-ws-stage stage">
         <RoomScreen app={props.app} department={props.department} data={props.data} />
       </div>
+      {/* 实时的模型输出（工单 #1416）：画布上的思考气泡在页面上另有一份文字，来源与拼接规则相同 */}
+      <RoomLiveOutput app={props.app} department={props.department} />
       {props.data ? (
         <div className="y10-ws-room-info room-info" data-ws-info>
           <RoomInfoArea app={props.app} data={props.data} loopItem={props.loopItem ?? null} />
@@ -127,15 +134,6 @@ export function RoomSection(props: { app: ClientApp; department: string; data: D
       ) : null}
     </Section>
   );
-}
-
-// 「已用时间 / 上限」的读数（工单 #1229）：事项进行中时用 project.loop 里的 elapsed_sec 与 time_limit_sec
-// 写成两个时长，写法与恢复页「已用时间与时间上限」一致；没有进行中的事项、或者查询还没有数据时显示「—」。
-export function elapsedLimitText(item: WorkItemLoop | null): string {
-  if (item === null || item.status !== "in_progress" || item.elapsed_sec === null) {
-    return "—";
-  }
-  return `${formatDuration(item.elapsed_sec)} / ${formatDuration(item.time_limit_sec)}`;
 }
 
 function RoomInfoArea(props: { app: ClientApp; data: DepartmentWorkspaceResult; loopItem: WorkItemLoop | null }) {
@@ -158,6 +156,16 @@ function RoomInfoArea(props: { app: ClientApp; data: DepartmentWorkspaceResult; 
           ["已用时间 / 上限", elapsedLimitText(loopItem)],
           ["执行机器", room.machine ? room.machine : "—"],
           ["信箱", `${room.mailbox} 封未读指导`],
+        ]}
+      />
+      <KeyValue
+        className="is-inline y10-ws-page-facts facts"
+        items={[
+          // 手边的摘要与笔记的数量（工单 #1416）：房间里档案柜与便签板上的数，页面写出数量
+          ["手边的摘要与笔记", `摘要 ${room.summaries} 份、笔记 ${room.pinned_notes} 条`],
+          // 等模型服务与远程结果未知（工单 #1416）：画布上是一条提示，页面上写一句
+          ["等模型服务", room.waiting_provider ? "正在等待模型服务" : "没有在等待模型服务"],
+          ["远程结果未知", room.remote_unknown ? "有结果未知的远程动作" : "没有结果未知的远程动作"],
         ]}
       />
       {letters === null ? null : <p className="y10-note note ws-tube" data-ws-tube>{letters}</p>}

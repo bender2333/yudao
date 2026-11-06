@@ -2,11 +2,12 @@
 // 每个项目一层，画成缩小的项目楼层。
 //
 // 页面只做连接（画面与播放 docs/design/visualization.md「分层与边界」）：
-//   - projects.list 与每个项目的 project.loop 交给翻译层（translate/building.ts），翻成画面合同的楼的状态；
+//   - 每个项目的 project.loop 由首页取好（views/home/page.tsx 的 useProjectLoops）交给这里，翻译层
+//     （translate/building.ts）把它翻成画面合同的楼的状态；
 //   - 事件流不按项目筛选，每条事件先经翻译层翻成楼的动作，再交给画面播放；
 //   - 打开画面、重新同步、标签页从后台切回都用 jump：直接显示最新状态，不补播；
 //   - 画面的回调（点击楼层）变成跳转。
-// 文字列表不属于画面，照旧按查询结果写。
+// 文字列表不属于画面，照旧按查询结果写；项目一览的列在首页的「项目」一节，由同一份 project.loop 推出。
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProjectList, ProjectLoopResult } from "../../api/generated/types.gen";
@@ -18,6 +19,15 @@ import { buildingActions, buildingState, toBuildingEvent } from "../../translate
 import { Section } from "../project/common";
 import { emptyOrFailureText } from "../../contract/read-failure";
 
+/** 每个项目的事项查询结果（首页取一次，楼与项目一览共用）。 */
+export interface ProjectLoops {
+  byProject: Record<string, ProjectLoopResult>;
+  /** 读取失败的项目：首页项目一览的三样事实写「读不出来」。 */
+  failed: Record<string, boolean>;
+  /** 这些查询里最新的位置（画面合同的状态要带位置）。 */
+  position: number;
+}
+
 export interface BuildingSectionProps {
   app: ClientApp;
   projects: ProjectList | null;
@@ -25,13 +35,15 @@ export interface BuildingSectionProps {
   error: string | null;
   /** 回放位置（全局位置）：不为 null 时每个项目的 project.loop 按位置带 at 读取。 */
   at?: number | null;
+  /** 每个项目的 project.loop：楼的状态与首页项目一览的列都由它推出。 */
+  loops: ProjectLoops;
   onNavigate: (hash: string) => void;
 }
 
-/** 首页的楼：画布、按项目打开的事项查询与事件流接线。 */
+/** 首页的楼：画布与事件流接线。 */
 export function BuildingSection(props: BuildingSectionProps): React.JSX.Element {
   const at = props.at ?? null;
-  const loops = useProjectLoops(props.app, props.projects, at);
+  const loops = props.loops;
   // 状态只由查询结果翻出来：projects.list 的行与各项目的 project.loop
   const model = useMemo(() => buildingState({
     position: loops.position,
@@ -72,53 +84,6 @@ function litText(lit: Record<string, boolean>): string {
     ["product", "产品"], ["engineering", "工程"], ["quality", "质检"], ["operations", "运维"],
   ] as const).filter(([key]) => lit[key]).map(([, label]) => label);
   return names.length ? `${names.join("、")}在工作` : "没有部门在工作";
-}
-
-// ---------------------------------------------------------------------------
-// 每个项目的事项：为每行项目打开一次 project.loop，连同查询快照的位置一起记下。
-// 项目集合变化时重新打开；查询随事件刷新。位置只增不减：跳到最新以后晚回来的旧结果不再上画面。
-
-interface ProjectLoops {
-  byProject: Record<string, ProjectLoopResult>;
-  /** 这些查询里最新的位置（画面合同的状态要带位置）。 */
-  position: number;
-}
-
-function useProjectLoops(app: ClientApp, projects: ProjectList | null, at: number | null): ProjectLoops {
-  const ids = useMemo(
-    () => [...new Set((projects?.projects ?? []).map((p) => p.project_id))].sort(),
-    [projects],
-  );
-  const key = ids.join(",");
-  const [loops, setLoops] = useState<ProjectLoops>({ byProject: {}, position: 0 });
-  useEffect(() => {
-    const views = app.viewSync;
-    if (!views || key === "") {
-      // 没有项目：楼层清空，位置保留（时间线按位置决定状态上不上画面，位置回到 0 会让空状态上不去）
-      setLoops((current) => ({ byProject: {}, position: current.position }));
-      return;
-    }
-    const open = key.split(",");
-    for (const projectId of open) {
-      const params: Record<string, unknown> = { project_id: projectId };
-      if (at !== null) params.at = at;
-      void views.open<ProjectLoopResult>(`home.building.${projectId}`, {
-        query: "project.loop",
-        params,
-      }, (data, position) => {
-        setLoops((current) => ({
-          byProject: { ...current.byProject, [projectId]: data },
-          position: Math.max(current.position, position),
-        }));
-      });
-    }
-    return () => {
-      for (const projectId of open) {
-        views.close(`home.building.${projectId}`);
-      }
-    };
-  }, [app, key, at]);
-  return loops;
 }
 
 // ---------------------------------------------------------------------------
