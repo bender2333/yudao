@@ -8,7 +8,7 @@
     "cost": "超过上限的选用需要等待正在进行的测试结束",
     "relax_when": "上游允许更多并发并且用户愿意承担同时测试的费用",
     "tighten_when": "模型测试触发上游限流或同时测试的费用过高",
-    "origin": "docs/design/model-management.md「模型访问定义与准入」「选用」：同时测试默认 3 个，范围 1 至 8"
+    "origin": "docs/design/model-management.md docs/design/model-management.md「模型访问定义与准入」「选用」：同时测试默认 3 个，范围 1 至 8"
   },
   "provider.model_test_timeout_sec": {
     "value": 60,
@@ -19,7 +19,7 @@
     "cost": "较慢的模型需要重新测试或提高等待上限",
     "relax_when": "正常的最小问答与工具往返经常超过当前等待上限",
     "tighten_when": "失败的模型请求长期等待且没有得到有效回应",
-    "origin": "docs/design/model-management.md「模型访问定义与准入」中「模型测试」：每次请求默认 60 秒，范围 10 至 300 秒"
+    "origin": "docs/design/model-management.md docs/design/model-management.md「模型访问定义与准入」中「模型测试」：每次请求默认 60 秒，范围 10 至 300 秒"
   },
   "run_time_limit_sec": {
     "value": 7200,
@@ -74,7 +74,7 @@
     "cost": "长检查无法运行，Yudao 自己的集成层超过这个时限",
     "relax_when": "成为项目级参数，按项目记录的检查用时分布设定",
     "tighten_when": "同一项目的检查用时分布长期低于现值的四分之一",
-    "origin": "规则登记「规则登记的初始内容」表格，检查的时限；D17 单次请求等待的暂定默认值 600 秒"
+    "origin": "规则登记 docs/design/rules-and-parameters.md「规则登记的初始内容」表格，检查的时限；D17 单次请求等待的暂定默认值 600 秒"
   },
   "check_timeout_max_sec": {
     "value": 3600,
@@ -85,7 +85,7 @@
     "cost": "长时间占住执行环境的一次检查位",
     "relax_when": "项目需要更长的检查时限时按项目设置",
     "tighten_when": "超时以后从未取回结果的检查占多数",
-    "origin": "本地工具设计说明「工具边界」；工单 #480，单次检查时限的最大值"
+    "origin": "本地工具 docs/design/local-tools.md「工具边界」；工单 #480，单次检查时限的最大值"
   },
   "onboarding.round_time_limit_sec": {
     "value": 7200,
@@ -96,7 +96,7 @@
     "cost": "一轮建档占用的时间过长，用户等待修改意见的时间变长",
     "relax_when": "按项目记录的一轮建档用时分布设定（项目级参数，迭代底座 B3）",
     "tighten_when": "同一项目的一轮建档用时分布长期低于现值的四分之一",
-    "origin": "接入已有项目设计说明「仓库概况与读取范围」：建档每一轮是一个新的 run，单独计算运行时间，上限与普通事项相同"
+    "origin": "接入已有项目 docs/design/existing-project-onboarding.md「仓库概况与读取范围」：建档每一轮是一个新的 run，单独计算运行时间，上限与普通事项相同"
   },
   "bash_timeout_default_sec": {
     "value": 300,
@@ -107,7 +107,7 @@
     "cost": "长时间占住执行环境的一次工具位",
     "relax_when": "项目级参数，命令用时分布记录后按项目设置",
     "tighten_when": "同一项目的命令用时分布长期低于现值的四分之一",
-    "origin": "本地工具设计说明「工具边界」；ADR-0038，bash 单次调用的默认时限"
+    "origin": "本地工具 docs/design/local-tools.md「工具边界」；ADR-0038，bash 单次调用的默认时限"
   },
   "bash_timeout_max_sec": {
     "value": 3600,
@@ -118,7 +118,7 @@
     "cost": "长时间占住执行环境的一次工具位",
     "relax_when": "项目需要更长的命令时限时按项目设置",
     "tighten_when": "超时以后从未取回结果的 bash 调用占多数",
-    "origin": "本地工具设计说明「工具边界」；ADR-0038，bash 单次调用时限的最大值"
+    "origin": "本地工具 docs/design/local-tools.md「工具边界」；ADR-0038，bash 单次调用时限的最大值"
   },
   "max_provider_attempts": {
     "value": 3,
@@ -162,7 +162,7 @@
     "cost": "长输出被截断，模型需要继续读取",
     "relax_when": "登记命令的输出分布超出现值",
     "tighten_when": "多数结果远小于现值",
-    "origin": "规则登记「规则登记的初始内容」表格以外的现有限额：一次工具结果的输出上限（字符）"
+    "origin": "规则登记 docs/design/rules-and-parameters.md「规则登记的初始内容」表格以外的现有限额：一次工具结果的输出上限（字符）"
   },
   "adjudication.plan_before_write": {
     "value": true,
@@ -173,7 +173,7 @@
     "cost": "每个事项至少多一次激活；小修改同样付出",
     "relax_when": "回归场景与小工单上对照开启与关闭，完成度、范围外修改的次数与请求数都不劣化",
     "tighten_when": "对照中出现范围外修改",
-    "origin": "harness/adjudication.py 的写入许可校验；规则登记「规则登记的初始内容」表格"
+    "origin": "harness/adjudication.py 的写入许可校验；规则登记 docs/design/rules-and-parameters.md「规则登记的初始内容」表格"
   },
   "roles.product.visibility": {
     "value": ["qa_defects", "prior_round"],
@@ -206,7 +206,7 @@
     "cost": "重复探索与部门之间的询问",
     "relax_when": "D32 新增的一组对照显示共享可见范围不劣化",
     "tighten_when": "D32 对照中验证者的结论明显依赖作者的可见材料",
-    "origin": "roles.json 的可见范围；验证的独立性设计说明「可见范围作为参数」的两套取值，现值是隔离的一套（交付事实与交付解释），共享的一套在这份现值上加 existing_structure、prior_delivery、qa_defects，默认取「共享上下文的一组对照」的对照决定"
+    "origin": "roles.json 的可见范围；验证的独立性 docs/design/independent-verification.md「可见范围作为参数」的两套取值，现值是隔离的一套（交付事实与交付解释），共享的一套在这份现值上加 existing_structure、prior_delivery、qa_defects，默认取 docs/design/independent-verification.md「共享上下文的一组对照」的对照决定"
   },
   "review.isolation": {
     "value": true,
@@ -250,7 +250,7 @@
     "cost": "更深的拆分不可用",
     "relax_when": "数值随子循环的运行记录调整，经用户批准",
     "tighten_when": "子循环的运行记录显示更深处的记录无法审计",
-    "origin": "循环与收敛设计说明「子循环」；总图第三节：嵌套深度的上限来自定义，由内核的边界核对"
+    "origin": "循环与收敛 docs/design/loops-and-convergence.md「子循环」；总图第三节：嵌套深度的上限来自定义，由内核的边界核对"
   },
   "organization.ask_chain_max_depth": {
     "value": 3,
@@ -261,7 +261,7 @@
     "cost": "超过层数的追问被拒绝，提问方要把问题写进回答",
     "relax_when": "被层数上限拒绝的询问记录显示挡住了需要的追问",
     "tighten_when": "询问链的花费记录显示深链很少带来新信息",
-    "origin": "三部门的循环结构「询问与回答」，默认 3 覆盖质检询问工程、工程询问产品、产品再询问质检"
+    "origin": "三部门的循环结构 docs/design/department-loop.md「询问与回答」，默认 3 覆盖质检询问工程、工程询问产品、产品再询问质检"
   },
   "stall.rounds": {
     "value": 3,
@@ -393,7 +393,7 @@
     "cost": "同一快照上的同一检查重复运行",
     "relax_when": "Stage 5 的调节规则按复核批次的结论在界限以内取值",
     "tighten_when": "复核发现的放行错误来自重复使用工程的结果",
-    "origin": "规则登记「规则登记的初始内容」表格 verification.recheck_ratio；harness/validation.py 质检只接受本次激活的回执"
+    "origin": "规则登记 docs/design/rules-and-parameters.md「规则登记的初始内容」表格 verification.recheck_ratio；harness/validation.py 质检只接受本次激活的回执"
   },
   "context.work_limit_tokens": {
     "value": 100000,
@@ -591,7 +591,7 @@
     "cost": "任一角色的引用失效都挡住整个项目",
     "relax_when": "只解析本事项种类会用到的角色",
     "tighten_when": "只解析用到的角色以后仍然频繁失败",
-    "origin": "模型管理设计说明「部门与角色的模型选择」，新建事项之前解析每个部门的每个角色"
+    "origin": "模型管理 docs/design/model-management.md「部门与角色的模型选择」，新建事项之前解析每个部门的每个角色"
   },
   "compaction.min_reasoning_effort": {
     "value": "minimal",
@@ -602,7 +602,7 @@
     "cost": "摘要质量",
     "relax_when": "压缩失败率与压缩后的返工率下降",
     "tighten_when": "摘要质量不足导致返工",
-    "origin": "模型管理设计说明「压缩与测试」，摘要与整理请求使用模型声明的最低推理档位"
+    "origin": "模型管理 docs/design/model-management.md「压缩与测试」，摘要与整理请求使用模型声明的最低推理档位"
   },
   "compaction.stalled_limit": {
     "value": 3,
@@ -657,7 +657,7 @@
     "cost": "细节丢失",
     "relax_when": "按模型的图像输入能力调整",
     "tighten_when": "模型的图像输入能力下降",
-    "origin": "浏览器与 computer use 设计说明「坐标空间与截图」，截图等比缩小到 1280×800 以内"
+    "origin": "浏览器与 computer use docs/design/browser-and-computer-use.md「坐标空间与截图」，截图等比缩小到 1280×800 以内"
   },
   "screenshot.max_height": {
     "value": 800,
@@ -668,7 +668,7 @@
     "cost": "细节丢失",
     "relax_when": "按模型的图像输入能力调整",
     "tighten_when": "模型的图像输入能力下降",
-    "origin": "浏览器与 computer use 设计说明「坐标空间与截图」，截图等比缩小到 1280×800 以内"
+    "origin": "浏览器与 computer use docs/design/browser-and-computer-use.md「坐标空间与截图」，截图等比缩小到 1280×800 以内"
   },
   "browser.call_timeout_sec": {
     "value": 90,
@@ -679,7 +679,7 @@
     "cost": "真实页面响应慢时动作被判为超时，会话因此中断",
     "relax_when": "实际页面加载与动作的用时分布经常接近现值",
     "tighten_when": "超时从未发生在页面真的需要这么久的动作上",
-    "origin": "浏览器与 computer use 设计说明「运行方式」：Playwright MCP 的动作时限 5 秒、导航时限 60 秒是它自己的默认值，Yudao 的调用时限是它们之外的上限"
+    "origin": "浏览器与 computer use docs/design/browser-and-computer-use.md「运行方式」：Playwright MCP 的动作时限 5 秒、导航时限 60 秒是它自己的默认值，Yudao 的调用时限是它们之外的上限"
   },
   "desktop.consent_per_session": {
     "value": true,
@@ -690,7 +690,7 @@
     "cost": "等待用户",
     "relax_when": "在用户不在场的时段可以改为常设授权",
     "tighten_when": "会话期间用户正在操作同一个桌面",
-    "origin": "浏览器与 computer use 设计说明「屏幕与桌面会话」，每个桌面会话开始前经用户同意"
+    "origin": "浏览器与 computer use docs/design/browser-and-computer-use.md「屏幕与桌面会话」，每个桌面会话开始前经用户同意"
   },
   "execution.readiness_timeout_sec": {
     "value": 300,
@@ -712,7 +712,7 @@
     "cost": "每个动作的心跳次数",
     "relax_when": "执行代理的心跳延迟分布显示现值过密",
     "tighten_when": "网络稳定且心跳没有丢失",
-    "origin": "执行环境服务设计说明「时间」，Kubernetes 节点 Lease 每 10 秒续约"
+    "origin": "执行环境服务 docs/design/execution-environment.md「时间」，Kubernetes 节点 Lease 每 10 秒续约"
   },
   "execution.heartbeat_timeout_sec": {
     "value": 40,
@@ -723,7 +723,7 @@
     "cost": "结果未知的时间",
     "relax_when": "开发板在构建负载与无线网络下偶尔延迟不会被误判",
     "tighten_when": "心跳丢失以后迟到回执的比例高",
-    "origin": "执行环境服务设计说明「时间」，Kubernetes 的 Lease 时长 40 秒，间隔与时限之比为 1:4"
+    "origin": "执行环境服务 docs/design/execution-environment.md「时间」，Kubernetes 的 Lease 时长 40 秒，间隔与时限之比为 1:4"
   },
   "execution.dispatch_ack_timeout_sec": {
     "value": 40,
@@ -734,7 +734,7 @@
     "cost": "重复派发的次数",
     "relax_when": "执行代理的启动延迟分布显示现值过短",
     "tighten_when": "重复派发以后确认总是立刻到达",
-    "origin": "执行环境服务设计说明「时间」，与心跳时限相同"
+    "origin": "执行环境服务 docs/design/execution-environment.md「时间」，与心跳时限相同"
   },
   "execution.probe_interval_sec": {
     "value": 10,
@@ -745,7 +745,7 @@
     "cost": "每次探测的请求",
     "relax_when": "探测结果不参与决策时减少",
     "tighten_when": "探测请求成为机器的负担",
-    "origin": "执行环境服务设计说明「时间」，与心跳间隔相同"
+    "origin": "执行环境服务 docs/design/execution-environment.md「时间」，与心跳间隔相同"
   },
   "execution.probe_timeout_sec": {
     "value": 5,
@@ -756,7 +756,7 @@
     "cost": "每一次探测都占满间隔",
     "relax_when": "探测用时分布显示现值过短",
     "tighten_when": "探测从不超时",
-    "origin": "执行环境服务设计说明「时间」，每次请求最长 5 秒"
+    "origin": "执行环境服务 docs/design/execution-environment.md「时间」，每次请求最长 5 秒"
   },
   "execution.offline_after_sec": {
     "value": 40,
@@ -767,7 +767,7 @@
     "cost": "等待机器的时长",
     "relax_when": "网络波动频繁把在线机器判为离线",
     "tighten_when": "离线判断以后立即有迟到结果",
-    "origin": "执行环境服务设计说明「时间」，40 秒内没有一次成功的探测"
+    "origin": "执行环境服务 docs/design/execution-environment.md「时间」，40 秒内没有一次成功的探测"
   },
   "wait.model_service.max_sec": {
     "value": 86400,
@@ -778,7 +778,7 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "循环与收敛设计说明「一定会停」与 D17；浏览器与 computer use 设计说明「屏幕与桌面会话」"
+    "origin": "循环与收敛 docs/design/loops-and-convergence.md「一定会停」与 D17；浏览器与 computer use docs/design/browser-and-computer-use.md「屏幕与桌面会话」"
   },
   "wait.machine.max_sec": {
     "value": 86400,
@@ -789,7 +789,7 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "循环与收敛设计说明「一定会停」；执行环境服务设计说明「等待机器」"
+    "origin": "循环与收敛 docs/design/loops-and-convergence.md「一定会停」；执行环境服务 docs/design/execution-environment.md「等待机器」"
   },
   "wait.desktop.max_sec": {
     "value": 28800,
@@ -800,7 +800,7 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "循环与收敛设计说明「一定会停」；浏览器与 computer use 设计说明「屏幕与桌面会话」"
+    "origin": "循环与收敛 docs/design/loops-and-convergence.md「一定会停」；浏览器与 computer use docs/design/browser-and-computer-use.md「屏幕与桌面会话」"
   },
   "wait.desktop_unlock.max_sec": {
     "value": 28800,
@@ -811,6 +811,6 @@
     "cost": "超过时占用用户一次",
     "relax_when": "用户在超过以后多数选择继续等待",
     "tighten_when": "等待的实际时长分布长期短于现值",
-    "origin": "循环与收敛设计说明「一定会停」；浏览器与 computer use 设计说明「屏幕与桌面会话」"
+    "origin": "循环与收敛 docs/design/loops-and-convergence.md「一定会停」；浏览器与 computer use docs/design/browser-and-computer-use.md「屏幕与桌面会话」"
   }
 }

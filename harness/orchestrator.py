@@ -86,7 +86,7 @@ _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GU
 
 
 def guidance_version(projection: RunProjection, department: str) -> int:
-    # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（设计说明「必验反例」，S1d），
+    # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（docs/design/department-guidance.md「必验反例」，S1d），
     # 所以由薄驱动按运行状态投影给出，随一轮工作的开始事件记下
     return max((item.version for item in projection.department_guidance
                 if item.department == department), default=0)
@@ -377,7 +377,7 @@ class Orchestrator:
             artifacts=self.artifacts,
             sessions=self.sessions,
             check_timeout=lambda run_id: parameter_values.frozen_check_timeout(self.store, run_id),
-            # 试用会话的开始与结束写成 run 流里的应用事件（浏览器与 computer use 设计说明「事件、决定请求与查询」，
+            # 试用会话的开始与结束写成 run 流里的应用事件（浏览器与 computer use docs/design/browser-and-computer-use.md「事件、决定请求与查询」，
             # 工单 #1183）：会话表在执行环境一层，写入方是薄驱动——与 MCP 会话的生命周期同一个做法
             trial_events=self._trial_session_event,
             # 工作区政策（谁交出交付、谁从封存交付建立检查副本、检查材料写在哪里）按这个事项冻结的
@@ -858,7 +858,7 @@ class Orchestrator:
             stop = self._stop_requested(activation, projection, transaction.minimal(), decisions)
             # 别的会话已经写下待恢复的决定请求：这个会话照常停下（事项的状态不变，工单 #856）；
             # 它自己也被挡住时（这次的模型请求发不出去），它要写下自己的那一条，
-            # 各写明自己的部门、模型与问题（模型管理设计说明「引用无法使用时」）
+            # 各写明自己的部门、模型与问题（模型管理 docs/design/model-management.md「引用无法使用时」）
             blocked = blocked_by_other_session(decisions, activation.department)
             return Judgment(not stop, projection.stream_version, blocked)
 
@@ -871,7 +871,7 @@ class Orchestrator:
         # 会话自己的开关与事项的开关都看（工单 #856）：停下一个会话只停这个会话，
         # 用户取消事项时全部会话都停
         # 有效合同、指导与用户输入变了都不再停止：它们作为通知送达，部门接着工作，一轮工作因此不结束
-        # （工单 #558、工单 #964，循环结构「工作中途要求变化」与「指导」）。
+        # （工单 #558、工单 #964，循环结构 docs/design/department-loop.md「工作中途要求变化」与 docs/design/department-loop.md「指导」）。
         # 输入仍然分派给产品部门处理（工单 #556）：产品在自己的那一轮处理它。
         return (activation.stop_flag.is_set()
                 or self._aborted(activation.run_id)
@@ -1034,7 +1034,7 @@ class Orchestrator:
         return self.project(run_id)
 
     def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
-        # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约「角色任务的恢复」）：
+        # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约 docs/design/recovery-contract-and-fault-matrix.md「角色任务的恢复」）：
         # 核对定义版本、核实结果未知的动作、取得执行权这三步在 `recovery.py`（S4c 工单 #863），
         # 薄驱动只把它接上并转交。
         # 事项冻结的形态不在发布里时（工单 #1392）：这个 run 停在原处，不换一份定义顶替、不进定义版本核对、
@@ -1116,7 +1116,7 @@ class Orchestrator:
             # 已经做完（那时在终态事件的提交之后的效果里，不能再写事件），这里已经在事务之外，
             # 写进来的事件位置接在终态事件后面
             self.sessions.flush_trial_events(run_id)
-            # 这个 run 的 MCP 会话随运行一起关闭（网络与 MCP 设计说明「运行规则」，工单 #1175）：
+            # 这个 run 的 MCP 会话随运行一起关闭（网络与 MCP docs/design/network-and-mcp.md「运行规则」，工单 #1175）：
             # 到达终态、被决定请求阻塞、中止或没有新工作，运行都从这一条退出；会话表清空，
             # 继续同一个 run 时按同一台服务器重新建立。持久化生命周期事件归 #1176
             await self._close_mcp_sessions(run_id)
@@ -1171,7 +1171,7 @@ class Orchestrator:
         # 这个事项的 run 正在进行的执行任务（由 start_work_item 建立）；没有时为空
         return self._work_item_tasks.get(run_id)
 
-    # 执行与结算的入口（应用层与接口层设计说明「执行与结算的归属」）。
+    # 执行与结算的入口（应用层与接口层 docs/design/app-and-interface.md「执行与结算的归属」）。
     # 3.4A 之前只有一个执行槽位：已有事项在执行时新建被拒绝（busy）
 
     def busy(self) -> bool:
@@ -1207,7 +1207,7 @@ class Orchestrator:
         return projection
 
     async def run_until_stop_and_settle(self, run_id: str) -> tuple[RunProjection, ProjectEvent | None]:
-        # 运行一个 run 直到停止，停止以后由流程编排结算（应用层与接口层设计说明「执行与结算的归属」，工单 #299）。
+        # 运行一个 run 直到停止，停止以后由流程编排结算（应用层与接口层 docs/design/app-and-interface.md「执行与结算的归属」，工单 #299）。
         # 把 run 运行到停止的入口都在这里结算，不在各调用方各补一遍：事项开始（start_work_item）、
         # 回答决定以后继续（start）与启动时的自动继续（LoopSystem.resume_startup_runs）。
         # 结算是幂等的：不在终态、不属于事项、已经结算过或者没有交付与放行的 run 不再写入（projects.settle）
@@ -1234,7 +1234,7 @@ class Orchestrator:
     async def activate_once(self, run_id: str) -> RunProjection:
         # 开始一个部门的一轮工作（单步入口）：按关注的成果取下一个可以工作的部门。
         # 这条入口自成一个事件循环（LoopSystem.activate_once 用 asyncio.run 运行它），激活结束时
-        # 这个循环退出：这个 run 的 MCP 会话随收尾关闭（网络与 MCP 设计说明「运行规则」「run 结束、
+        # 这个循环退出：这个 run 的 MCP 会话随收尾关闭（网络与 MCP docs/design/network-and-mcp.md「运行规则」「run 结束、
         # 暂停或停止时关闭」，工单 #1175），下一次激活按同一台服务器重新建立
         connections = ProviderConnections()
         try:
@@ -1244,7 +1244,7 @@ class Orchestrator:
             await connections.aclose()
 
     def item_definitions(self, run_id: str):
-        # 这个 run 的定义副本（网络与 MCP 设计说明「版本与固定」、「工具的提供」，工单 #1175）：事项冻结的形态（工单 #1392）
+        # 这个 run 的定义副本（网络与 MCP docs/design/network-and-mcp.md「版本与固定」、「工具的提供」，工单 #1175）：事项冻结的形态（工单 #1392）
         # 加上 run_created 里冻结的 MCP 设置带来的工具；没有设置或没有可用快照时就是那一份形态的定义本身
         cached = self._item_definitions.get(run_id)
         if cached is not None:
@@ -1288,7 +1288,7 @@ class Orchestrator:
 
     def completion_stop_reason(self, transaction: Transaction) -> str:
         # 事项完成时的结束原因由路由给（工单 #1394，形态与核验角色设计说明「开环完成」与「定义的校验」
-        # 第 4 条，骨架与应用设计说明「路由契约」输出）：路由读事项创建事件里记下的开环标记，经契约的可选方法
+        # 第 4 条，骨架与应用 docs/design/skeleton-and-application.md「路由契约」输出）：路由读事项创建事件里记下的开环标记，经契约的可选方法
         # 给出这个事项完成时的结束原因；薄驱动只把路由给的原因写进事实，不判断它是哪一种。
         # 没有声明这个方法的路由（例如任务池那一种）与路由不给原因时，按事项种类取（原来的做法）
         projection = transaction.projection
@@ -1314,7 +1314,7 @@ class Orchestrator:
         return self.item_form(run_id).tightening
 
     def mcp_sessions(self, run_id: str) -> mcp_session.McpSessions:
-        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明「运行规则」，工单 #1175）：每台服务器一个会话实例，
+        # 这个 run 的 MCP 会话表（网络与 MCP docs/design/network-and-mcp.md「运行规则」，工单 #1175）：每台服务器一个会话实例，
         # 第一次 MCP 调用时启动，run 结束、暂停或停止时关闭（`_on_close_run`）。会话表按 run 记住；
         # 没有冻结的 MCP 设置的 run 也有这张表（空表，调用在名称表核对时拒绝）
         table = self._mcp_sessions.get(run_id)
@@ -1335,7 +1335,7 @@ class Orchestrator:
         return None
 
     def _mcp_server_event(self, run_id: str, event_type: str, payload: dict[str, Any]) -> None:
-        # MCP 服务器的生命周期事件（网络与 MCP 设计说明「运行规则」，工单 #1176）：会话表在启动、关闭与
+        # MCP 服务器的生命周期事件（网络与 MCP docs/design/network-and-mcp.md「运行规则」，工单 #1176）：会话表在启动、关闭与
         # 启动失败时经这里把一条应用事件写到这个 run 的流。写入不改变运行的状态（状态前后都是当时的
         # 状态），提出者是系统；写不进去不打断会话的建立与关闭，原因记下来供运维查看（与清理错误同一做法）
         def decide(transaction: Transaction) -> None:
@@ -1350,7 +1350,7 @@ class Orchestrator:
             self._close_errors.setdefault(run_id, []).append(exc)
 
     def _trial_session_event(self, run_id: str, event_type: str, payload: dict[str, Any]) -> None:
-        # 试用会话的开始与结束事件（浏览器与 computer use 设计说明「事件、决定请求与查询」，工单 #1183）：会话表在开始与
+        # 试用会话的开始与结束事件（浏览器与 computer use docs/design/browser-and-computer-use.md「事件、决定请求与查询」，工单 #1183）：会话表在开始与
         # 结束时经这里把一条应用事件写到这个 run 的流。与 MCP 的生命周期事件同一个做法：写入不改变运行的
         # 状态，提出者是系统，部门是会话所在的那一个；写不进去不打断会话的建立与结束，原因记下来供运维查看
         def decide(transaction: Transaction) -> None:
@@ -1453,7 +1453,7 @@ class Orchestrator:
                             "stop_reason": current.stop_reason,
                         },
                     ))
-                    # 这一轮收到的指导在这一轮正常结束时由主机写已回答（部门指导设计说明「处理结果与来源」，工单 #1039）：
+                    # 这一轮收到的指导在这一轮正常结束时由主机写已回答（部门指导 docs/design/department-guidance.md「处理结果与来源」，工单 #1039）：
                     # 与激活结束在同一个事务里，部门不提交。事件记下是哪一轮、这一轮怎么结束的；
                     # 取消、运行时间用完、上限停下与暂停都不算正常结束，指导停在已进入模型输入。
                     # 一轮以什么结束由路由判断（工单 #825）：不是正常结束的一轮没有结果，也照旧不写已回答
@@ -1517,7 +1517,7 @@ class Orchestrator:
             else:
                 self._pause(transaction, bound)
             return None
-        # 开始一轮工作的部门由它关注的成果决定（循环结构「部门按关注的成果开始工作」）：
+        # 开始一轮工作的部门由它关注的成果决定（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）：
         # 关注的成果有了新东西、部门在等待工作时，它开始一轮工作。
         # 同时运行（工单 #557）：这个部门在准备激活之前可能已经别人的工作做完了，
         # 这时不再开始一轮工作。
@@ -1785,7 +1785,7 @@ class Orchestrator:
         scope: ActivationScope,
         call: dict[str, Any],
     ) -> tuple[bool, Any, str | None, str | None, int]:
-        # 询问分支由路由请求一轮工作（工单 #862，骨架与应用设计说明「路由契约」）：询问的开始、回问、
+        # 询问分支由路由请求一轮工作（工单 #862，骨架与应用 docs/design/skeleton-and-application.md「路由契约」）：询问的开始、回问、
         # 回复给谁与这一轮的上限都归路由；薄驱动照常把这一轮交给执行契约运行。写事件、跑这一轮，
         # 以及把这个分支会话已经用掉的步数与时间从这一轮的上限里扣掉，归薄驱动（工单 #1015 的读法）
         stream = run_stream(scope.run_id)
@@ -1895,7 +1895,7 @@ class Orchestrator:
     def _commit_answer_revision(self, activation: _Activation, scope: ActivationScope,
                                 branch: routing_contract.AskBranch, proposal: dict[str, Any],
                                 response: Any) -> tuple[int, str]:
-        # 回答同时交上的正式成果（循环结构「回答能做什么」）：提案与提出它的部门都由路由组装（`issuer`），
+        # 回答同时交上的正式成果（循环结构 docs/design/department-loop.md「回答能做什么」）：提案与提出它的部门都由路由组装（`issuer`），
         # 薄驱动按读取时的运行状态与工作区事实校验，经写入口提交，并把新的合同带回这一步的提问方
         issuer = str(proposal["issuer"])
 
@@ -2224,7 +2224,7 @@ class Orchestrator:
         source_event = acceptance.append(transaction)
         self.submissions.record_accepted_lesson(transaction, source_event, projection, artifact)
         if asks_cannot_verify(artifact):
-            # 质检无法核验（浏览器与 computer use 设计说明「无法核验」，工单 #1179）：不是放行也不是退回，
+            # 质检无法核验（浏览器与 computer use docs/design/browser-and-computer-use.md「无法核验」，工单 #1179）：不是放行也不是退回，
             # 由流程编排发出决定请求，阻塞整个 run；等待回答期间恢复页显示待恢复
             self._await_cannot_verify(transaction, department=department, artifact=artifact,
                                       parent_event_id=parent_event_id)
@@ -2287,7 +2287,7 @@ class Orchestrator:
             if version is not None and reason != TIME_BOUND and self._superseded(transaction, activation, version):
                 return
             if reason == "provider_unavailable" or (reason == "compaction_failed" and stalled_compaction):
-                # 整理连续没有推进（模型管理设计说明「失败处理」最后一条）：停在这次整理之前，等用户决定换模型
+                # 整理连续没有推进（模型管理 docs/design/model-management.md「失败处理」最后一条）：停在这次整理之前，等用户决定换模型
                 # 继续还是停止事项；已收下的交付与已完成的工作都留在投影里
                 scope = activation.scope
                 self._await_model(transaction, scope.department, target, reason, message,
@@ -2306,7 +2306,7 @@ class Orchestrator:
 
     def _await_model(self, transaction: Transaction, department: str, target: dict[str, Any] | None,
                      reason: str, message: str, *, facts: list[str] | None = None) -> None:
-        # 待恢复（模型管理设计说明「引用无法使用时」、「失败处理」最后一条）：run 进入待恢复，停在这次请求（对整理是这次
+        # 待恢复（模型管理 docs/design/model-management.md「引用无法使用时」、docs/design/model-management.md「失败处理」最后一条）：run 进入待恢复，停在这次请求（对整理是这次
         # 整理）之前，发出待恢复的决定请求，写明部门、模型与具体问题；不改用其他模型。已经结束或正在取消的
         # 运行不再写入
         projection = transaction.projection
@@ -2361,7 +2361,7 @@ class Orchestrator:
     def _superseded(self, transaction: Transaction, activation: _Activation, version: int) -> bool:
         # 停止判断过期：这次激活的工作期间有新的用户输入到达（输入版本变了），
         # 停止判断不再适用：这一轮按安全节点结束，运行继续，由下一次激活处理新的输入
-        # （工单 #964，循环结构「工作中途要求变化」与「指导」）。输入到达不再结束部门当前这一轮：
+        # （工单 #964，循环结构 docs/design/department-loop.md「工作中途要求变化」与 docs/design/department-loop.md「指导」）。输入到达不再结束部门当前这一轮：
         # 它作为通知在这个会话的下一步送达，部门接着工作。
         projection = transaction.projection
         basis = activation.scope.basis

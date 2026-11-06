@@ -1,10 +1,10 @@
-# 部门调用 MCP 服务器的工具（工单 #1175；网络与 MCP 设计说明「工具的提供与工具许可」、「运行规则」、「调用与结果」、「结果、工件与证据」、「应用层接口」；总图第四节「动作」缝）。
+# 部门调用 MCP 服务器的工具（工单 #1175；网络与 MCP docs/design/network-and-mcp.md「工具的提供与工具许可」、「运行规则」、「调用与结果」、「结果、工件与证据」、「应用层接口」；总图第四节「动作」缝）。
 # 验收 4、5 与回执字段的集成层：事项创建时冻结的 MCP 设置叠加成定义副本，工程的一轮工作按这个事项的
 # 别名调用本机启动的真实 MCP 进程（官方 SDK 写的测试服务器），调用按事项定义分派到执行环境的 MCP 分支；
 # 同一个 run 的同一台服务器复用一个会话实例（两次调用拿到同一个服务器进程），run 结束时关闭；
 # 回执带结果与外部来源工件，run.actions 的动作视图带 MCP 的回执字段。
 #
-# 层：集成层（完整循环、真实 MCP 子进程，测试分层设计说明「三层的定义」）。
+# 层：集成层（完整循环、真实 MCP 子进程，测试分层 docs/design/test-pyramid.md「三层的定义」）。
 # 守 R2（装配、许可、分派与回执按同一份事项定义工作；回执的交换字段与外部来源工件引用）
 # 与 R3（MCP 工具经真实进程与真实凭据来源调用，结果保存为外部来源工件）。
 
@@ -166,7 +166,7 @@ def test_a_run_reuses_one_session_per_server_and_closes_it_at_run_end(tmp_path):
 
 
 def test_the_run_actions_query_carries_the_mcp_receipt(tmp_path):
-    # run.actions 的动作视图（网络与 MCP 设计说明「应用层接口」）：MCP 调用带回执字段与外部来源工件引用
+    # run.actions 的动作视图（网络与 MCP docs/design/network-and-mcp.md「应用层接口」）：MCP 调用带回执字段与外部来源工件引用
     from harness.app.application import Application
     from harness.app.project_queries import RunActions
 

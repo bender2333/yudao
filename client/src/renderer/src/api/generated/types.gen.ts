@@ -2389,7 +2389,7 @@ export type DepartmentSettingsSaveRefs = {
 /**
  * DepartmentState
  *
- * 一个部门在这个事项上的状态与原因（三部门的循环结构「部门的状态」）。
+ * 一个部门在这个事项上的状态与原因（三部门的循环结构 docs/design/department-loop.md「部门的状态」）。
  *
  * state 取总图外环的五个词；note 是一句话，没有原因时为空。
  */
@@ -7677,7 +7677,7 @@ export type WorkItemOrganization = {
 /**
  * WorkItemProgress
  *
- * 事项的进度：从成果推算（循环结构「部门按关注的成果开始工作」）。
+ * 事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）。
  *
  * 阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
  * 最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。

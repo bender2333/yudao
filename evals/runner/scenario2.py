@@ -48,7 +48,7 @@ def materials_dir():
 
 
 def is_inside(path, parent):
-    """运行目录必须在 Yudao 仓库之外（评测场景设计「两边的运行条件」）。"""
+    """运行目录必须在 Yudao 仓库之外（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）。"""
     path = os.path.normcase(os.path.abspath(path))
     parent = os.path.normcase(os.path.abspath(parent))
     return path == parent or path.startswith(parent + os.sep)
@@ -117,7 +117,7 @@ def build_environment(repo_dir):
 def message():
     """交给 `opencode run` 的消息。
 
-    需求原文用 `-f` 附加：两边的输入是同一份（评测场景设计「两边的运行条件」），但 Windows
+    需求原文用 `-f` 附加：两边的输入是同一份（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」），但 Windows
     的命令行有长度上限，全文放进命令行会被系统拒绝。环境已经建好，测试用
     `uv run --python 3.13 python -m pytest` 运行。
     """

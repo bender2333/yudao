@@ -1,11 +1,11 @@
-# 手动启动、停止与升级 Yudao 服务（工单 #374，网页界面的提供与发布设计说明「启动与停止」、「接口层提供页面文件」）。
+# 手动启动、停止与升级 Yudao 服务（工单 #374，网页界面的提供与发布 docs/design/web-interface-and-release.md「启动与停止」、「接口层提供页面文件」）。
 #
 # 启动、停止、浏览器与进程锁用真实的服务进程：启动方式与用户在命令行里做的一样（yudao api），
 # BROWSER 环境变量指向一个记录地址的脚本，核对打开的是哪个地址。停止用 Windows 的
 # CTRL_BREAK_EVENT（与 Ctrl+C 同一条路径：uvicorn 的 HANDLED_SIGNALS 含 SIGBREAK），POSIX 上发 SIGINT。
 # 进行中的 run 在服务进程里自动继续，用真实的 uvicorn 事件循环核对（那里没有 asyncio.run 的位置）。
 # 服务监听的端口由操作系统分配（--port 0），服务就绪以后在输出里报告实际端口：先占一个空闲端口
-# 再交给服务进程绑定的写法在多进程运行中会冲突（测试分层设计说明「测试往下层移」）。
+# 再交给服务进程绑定的写法在多进程运行中会冲突（测试分层 docs/design/test-pyramid.md「测试往下层移」）。
 
 from __future__ import annotations
 

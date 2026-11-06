@@ -1,6 +1,6 @@
 # 评测工具
 
-本目录是与 `harness/` 分开的评测工具，只通过公开接口观察 Yudao（[评测场景设计](../docs/design/evaluation-scenarios.md)「模块划分」）。场景 3 是从较长的 PRD 新建项目，场景 2 是在已有代码上加功能，场景 1 是网页应用（WebGen-Bench 000080 待办清单）。
+本目录是与 `harness/` 分开的评测工具，只通过公开接口观察 Yudao（[评测场景设计](../docs/design/evaluation-scenarios.md)docs/design/evaluation-scenarios.md「模块划分」）。场景 3 是从较长的 PRD 新建项目，场景 2 是在已有代码上加功能，场景 1 是网页应用（WebGen-Bench 000080 待办清单）。
 
 ## 目录结构
 
@@ -60,9 +60,9 @@ uv run python -c "import sys; sys.path.insert(0, 'evals/runner'); import materia
 
 ## 需求条目与检查
 
-场景 3 有 7 个需求条目与 24 条检查，对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 12 条、命令行 10 条、文件比对 2 条。评分器（`scorer-3@3`）另有一条独立的数据保真检查 `data_1_1`：它把交付数据文件里的站名与线名与材料里的逐字比，单独报告，不计入完成度与正确性（[评测场景设计](../docs/design/evaluation-scenarios.md)「数据保真（场景 3）」）。
+场景 3 有 7 个需求条目与 24 条检查，对应见 `scenarios/scenario-3/materials/requirement-table.json`（评分器内的对应表在 `checks/command_checks.py` 的 `REQUIREMENT_TABLE`，两者一致）。检查分三类：单元 12 条、命令行 10 条、文件比对 2 条。评分器（`scorer-3@3`）另有一条独立的数据保真检查 `data_1_1`：它把交付数据文件里的站名与线名与材料里的逐字比，单独报告，不计入完成度与正确性（[评测场景设计](../docs/design/evaluation-scenarios.md)docs/design/evaluation-scenarios.md「数据保真（场景 3）」）。
 
-场景 2 有 6 个需求条目与 8 条 F2P 的对应，见 `scenarios/scenario-2/materials/requirement-table.json`。8 条 F2P 计入完成度与正确性；331 条 P2P 是原有功能测试，失败条数单独报告，不影响完成度（[评测场景设计](../docs/design/evaluation-scenarios.md)「原有功能（场景 2）」）。隐藏测试文件以文件形态放在 `checks/tests/` 下，评分时盖掉交付里的同名文件，被测方改测试不改变评分。
+场景 2 有 6 个需求条目与 8 条 F2P 的对应，见 `scenarios/scenario-2/materials/requirement-table.json`。8 条 F2P 计入完成度与正确性；331 条 P2P 是原有功能测试，失败条数单独报告，不影响完成度（[评测场景设计](../docs/design/evaluation-scenarios.md)docs/design/evaluation-scenarios.md「原有功能（场景 2）」）。隐藏测试文件以文件形态放在 `checks/tests/` 下，评分时盖掉交付里的同名文件，被测方改测试不改变评分。
 
 场景 1 有 8 个需求条目与 8 条用例，见 `scenarios/scenario-1/materials/requirement-table.json` 与 `checks/cases.json`。由界面智能体在浏览器中按可见内容执行，每条最多 15 步，给出通过（1）、部分通过（0.5）、不通过（0）；找不到对应元素或入口时记为「没有做」（0）。此外，多模态裁判（`ag/gemini-3.8-flash-high`）按 ArtifactsBench 1278 号题的 10 项丰富程度清单（`checks/richness.json`）结合代码与各用例关键截图打 0 至 10 分（满分 100）。
 ## 运行评分器
@@ -164,7 +164,7 @@ uv run python evals/runner/run_yudao_eval.py \
 2. **确认初始 PRD，再新建事项。** 建档给出初始 PRD 的确认请求以后，运行器经 `decision.answer` 选「确认」（基准版本取请求的版本），项目的基线从此采纳；随后 `work_item.create` 以用户原始意图提交需求原文（`scenarios/scenario-2/materials/requirement.md`），这一步是事项的开始。
 
 - `--wait-prd-confirmation`：不经接口回答，等运行的人在浏览器的决定卡片里确认；运行器轮询决定请求的状态，被回答以后继续。`--prd-confirmation-timeout-seconds`（默认 600 秒）是等它的上限，到时限仍没有被回答时这次运行作废，报告写明原因；这个选项给需要在界面上确认并截图的那次真实运行用。
-- `--onboarding-timeout-seconds`（默认 7200 秒）是等建档给出确认请求的上限，与建档 run 自己的运行时间上限相同（[接入已有项目设计说明](../docs/design/existing-project-onboarding.md)「用户确认的决定」）。
+- `--onboarding-timeout-seconds`（默认 7200 秒）是等建档给出确认请求的上限，与建档 run 自己的运行时间上限相同（[接入已有项目设计说明](../docs/design/existing-project-onboarding.md)docs/design/existing-project-onboarding.md「用户确认的决定」）。
 - 建档与事项是两个 run，各自导出、分开保存：`onboarding-run-export.json` 与 `run-export.json`，建档的指标在 `onboarding-metrics.json`。建档的模型请求数、用量与耗时在结果与报告里单独成段，不计入事项的指标（docs/design/evaluation-scenarios.md「指标」）。
 - 时间上限（默认 120 分钟）从新建事项开始计算：建档用了多久不影响事项的超时判断。
 - 评分环境：Yudao 封存的交付没有虚拟环境，运行器在评分副本里按材料 `manifest.json` 的 `runtime.install` 建立 Python 3.13 环境（需要联网），再用 `evals/scorer/scenario2.py` 与 `runner/scenario2.py` 的评分命令评 F2P 与 P2P；评分器不改。
@@ -175,7 +175,7 @@ Yudao 一侧的运行器保证下面这些：
 - 被测的 Yudao 在仓库之外的数据目录上启动，每次运行新建一个数据目录，用默认的执行位置（控制主机上的本机进程），以 `--no-browser` 启动（评测运行不在控制主机上开页面）。
 - 起点：场景 3 每次运行新建一个只含题目提供的数据文件 `subway_data.json` 的起始文件夹，放在运行目录之外，经 `project.create` 的 `initial_directory` 带入；事项文字不另写起点文件的说明。场景 2 的起点是检出好的上游仓库，经 `project.onboard` 接入，见上一节。
 - 三个部门的部门默认绑定与项目部门设置都使用被测模型；模型先经 `catalog.model.test` 准入，报告记录模型服务实际服务的模型名。
-- 被测的 Yudao 以关闭取回的启动参数（`--no-fetch`）启动：这个实例的三个部门都没有取回工具（`fetch_url`、`read_external_source`），评测项目也不设置 MCP 服务器，运行中因此没有这两类工具的调用（网络与 MCP 设计说明「工具的提供」）。
+- 被测的 Yudao 以关闭取回的启动参数（`--no-fetch`）启动：这个实例的三个部门都没有取回工具（`fetch_url`、`read_external_source`），评测项目也不设置 MCP 服务器，运行中因此没有这两类工具的调用（网络与 MCP docs/design/network-and-mcp.md「工具的提供」）。
 - 每次运行的提交号在启动服务之前记下，结果逐次记录；各次不一致时顶层写明不一致并逐次列出。
 - 到墙钟上限（默认 120 分钟，`--limit-seconds` 可覆盖）时经 `work_item.cancel` 结束事项，标记超时，按最后一次封存的交付评分；没有交付时全部检查记为「没有做」。
 - 评分之前做三项核对，任一命中这次运行作废，写进报告：事件日志导出中出现材料目录的路径、场景材料的摘要与 `materials/manifest.json` 的 `digests` 块不同、事件日志导出中出现对任务上游仓库的访问（场景 3 的上游仓库是 `AGI-Eval-Official/PRDBench`，场景 2 的是 `openai/openai-agents-python`）。

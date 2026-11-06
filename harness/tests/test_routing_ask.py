@@ -1,4 +1,4 @@
-# 询问分支按路由请求运行（工单 #862；骨架与应用设计说明「路由契约」、「执行契约」、「其他路由：骨架要满足的条件」、三部门的循环结构；
+# 询问分支按路由请求运行（工单 #862；骨架与应用 docs/design/skeleton-and-application.md「路由契约」、「执行契约」、「其他路由：骨架要满足的条件」、三部门的循环结构；
 # 总图第四节「路由」缝）。
 #
 # 守的是 R2：路由契约给询问分支的输出——询问的开始、这一轮的上限、回答与没能回答——按定义取部门与上限；
@@ -158,7 +158,7 @@ def test_the_answer_the_branch_submitted_is_what_the_route_hands_back():
 
 
 def test_a_product_answer_that_revises_the_prd_hands_the_proposal_to_the_driver():
-    # R3：回答同时交上的成果由路由组装（循环结构「回答能做什么」）：产品在回答一次询问时
+    # R3：回答同时交上的成果由路由组装（循环结构 docs/design/department-loop.md「回答能做什么」）：产品在回答一次询问时
     # 可以修订 PRD，提案参数随结果交给薄驱动，由薄驱动经写入口提交
     outcome = ROUTING.ask_outcome(
         _running(), branch=_branch(),

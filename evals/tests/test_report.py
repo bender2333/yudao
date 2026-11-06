@@ -1,4 +1,4 @@
-"""多次运行的汇总：完成度与正确性、每个指标的噪声范围、费用未知（评测场景设计「指标」）。
+"""多次运行的汇总：完成度与正确性、每个指标的噪声范围、费用未知（评测场景 docs/design/evaluation-scenarios.md「指标」）。
 
 守 docs/design/test-pyramid.md「测试按三环留」的 R2：结果与报告里的汇总形状是公开合同，版本比较与报告页面按它读数。
 用例只读真实代码（`report.aggregate`、`report.build_result`、`report.write_report`），

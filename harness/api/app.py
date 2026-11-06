@@ -1,6 +1,6 @@
 # 接口层：FastAPI 应用。路由、OpenAPI 与能力清单由应用层的注册表生成；
 # 处理函数不含业务规则，只调用应用层。生命周期中在服务的事件循环里建立控制核心与应用层，关闭时释放。
-# 其余的 GET 路径提供页面文件（网页界面的提供与发布设计说明「接口层提供页面文件」）。
+# 其余的 GET 路径提供页面文件（网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）。
 
 from __future__ import annotations
 

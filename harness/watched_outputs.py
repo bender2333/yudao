@@ -1,4 +1,4 @@
-# 成果驱动的路由实现（应用层；工单 #825，骨架与应用设计说明「路由契约」、三部门的循环结构）。
+# 成果驱动的路由实现（应用层；工单 #825，骨架与应用 docs/design/skeleton-and-application.md「路由契约」、三部门的循环结构）。
 #
 # 调度住在这里：谁在等、谁能开工、一轮以什么结束、事项以什么结束。它由内核的 collaboration.py（S1d 之前列在内核清单里）
 # 与流程编排的对应部分搬来，行为不变，事件序列基准不变。
@@ -66,7 +66,7 @@ def proposal_kinds_for(department: str, kind: str = "change", definitions: Any |
     return set(contract.get("kinds") or ())
 
 # 一轮没有正常结束的两种状态：暂停与失败（取消、上限、运行时间用完都落在这两种里）。
-# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导设计说明「处理结果与来源」）。
+# 正常结束包括事项随这一轮完成（done）：那一轮结束时状态还是 running（部门指导 docs/design/department-guidance.md「处理结果与来源」）。
 # 这两种不算正常结束，这一轮不写指导的已回答、也没有结束结果（工单 #1039、#825）：暂停以后继续的是同一轮，
 # 它在继续以后正常结束时才算。
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
@@ -125,9 +125,9 @@ def _has_new_input(projection: RunProjection, department: str, definition: Any) 
 def _has_new_guidance(projection: RunProjection, department: str) -> bool:
     """发给这个部门的指导：还没有进入它的一轮工作的。
 
-    指导是部门关注的成果，控制核心让它以这段指导开始一轮工作（循环结构「指导」）；
+    指导是部门关注的成果，控制核心让它以这段指导开始一轮工作（循环结构 docs/design/department-loop.md「指导」）；
     它进入这一轮的模型输入以后（assembly.PENDING_GUIDANCE 的两种状态由那一轮送出），这一轮就是
-    它的处理，不再算新的工作。一轮正常结束时主机为它写已回答事件（部门指导设计说明「处理结果与来源」，
+    它的处理，不再算新的工作。一轮正常结束时主机为它写已回答事件（部门指导 docs/design/department-guidance.md「处理结果与来源」，
     工单 #1039）。没有这一个收窄，收到指导的部门在主机写已回答以前会一轮接一轮地重新开始。
     """
     return any(item.department == department and item.status == "received"
@@ -159,9 +159,9 @@ def _has_new_product_spec(projection: RunProjection, department: str,
 
     交要求的部门关注的是 PRD 与它最近一次成果依据的版本不同（还没有成果时为真）；PRD 没有新版本时，
     它最近一份交付依据的合同不是当前有效合同也算新工作：一个决定只重算合同、不产生新的 PRD
-    版本，过期的交付要按新合同重新交付（部门指导设计说明「放行怎么等」第 2 点、工单 #1079）。
+    版本，过期的交付要按新合同重新交付（部门指导 docs/design/department-guidance.md「放行怎么等」第 2 点、工单 #1079）。
     核验角色关注的是「PRD 被接纳」：当前有效合同与它上一次工作的依据不同，并且还没有交付要核验
-    （有交付时它核验交付，预测性探索在交付到达以前做，循环结构「各部门在什么时候工作」）。谁核验谁取自定义里的
+    （有交付时它核验交付，预测性探索在交付到达以前做，循环结构 docs/design/department-loop.md「各部门在什么时候工作」）。谁核验谁取自定义里的
     核验声明，不按部门名判断（工单 #1391）；取哪一份定义由这份形态决定（工单 #1509）。
     """
     definition = DEFINITIONS if definitions is None else definitions
@@ -323,10 +323,10 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
     """现在可以开始一轮工作的部门（按定义顺序），各自一个会话同时运行（工单 #557）。
 
     有新的工作、又在等待的部门都列出来：控制核心让它们同时开始，
-    一个部门同一时刻最多一轮工作（循环结构「同时运行的条件」）。
+    一个部门同一时刻最多一轮工作（循环结构 docs/design/department-loop.md「同时运行的条件」）。
 
     指导与其他关注的成果一样：有待处理指导、又在等待工作的部门以这段指导开始一轮完整的
-    工作（循环结构「指导」，工单 #560），不为它另设一种只回应指导的轮次。
+    工作（循环结构 docs/design/department-loop.md「指导」，工单 #560），不为它另设一种只回应指导的轮次。
     还没回答的询问是另一类：提问方的会话要继续，在它自己的会话里跑。部门清单按这份形态的定义取（工单 #1509）。
     """
     definition = DEFINITIONS if definitions is None else definitions
@@ -514,7 +514,7 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
     """分支这一轮以什么结束：把回答交回提问方，还是没能回答与原因。
 
     回答的内容、回答同时交上的成果由路由组装：能交要求的部门在回答一次询问时
-    可以修订 PRD（循环结构「回答能做什么」），修订的提案参数随结果交给薄驱动，由它经写入口提交。谁能交要求
+    可以修订 PRD（循环结构 docs/design/department-loop.md「回答能做什么」），修订的提案参数随结果交给薄驱动，由它经写入口提交。谁能交要求
     按提案合同判断，不在代码里写部门名（工单 #1391）；提案合同从这份形态的定义取（工单 #1509）。
     没能回答的原因按这一轮的实际情形取：一步也走不了、时间用完、这一轮的说明或停止原因、跑完没交上回答。
     """

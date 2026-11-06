@@ -718,8 +718,8 @@ def test_result_records_the_yudao_commit_and_the_host_environment():
 
 
 def test_start_service_turns_fetch_off(monkeypatch, tmp_path):
-    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP 设计说明「工具的提供」、
-    评测场景设计说明「两边的运行条件」「两边都不联网」）：启动命令里有 --no-fetch 与 --no-browser。"""
+    """被测的 Yudao 以关闭取回的启动参数启动（网络与 MCP docs/design/network-and-mcp.md「工具的提供」、
+    评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「两边都不联网」）：启动命令里有 --no-fetch 与 --no-browser。"""
     seen = {}
 
     class Process:
@@ -900,8 +900,8 @@ def _inside(path, parent):
 
 
 # ---------------------------------------------------------------------------
-# 场景 2：接入已有仓库、确认初始 PRD、再新建事项（评测场景设计「场景 2：模型设置透传参数」、「前提与未决事项」；
-# 接入已有项目设计说明「应用层命令、决定与领域事件」、「建档流程」）
+# 场景 2：接入已有仓库、确认初始 PRD、再新建事项（评测场景 docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」、「前提与未决事项」；
+# 接入已有项目 docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」、「建档流程」）
 #
 # 评测工具不得导入 harness（`test_no_harness_import.py`），因此这里按本文件已有的做法
 # 脚本化服务端的回答：三步命令与两次导出按写好的顺序回答，运行器的调用点保持真实。

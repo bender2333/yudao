@@ -1,4 +1,4 @@
-# 决定请求的处理与建档的流转（应用层；骨架与应用设计说明「薄驱动」，工单 #827）。
+# 决定请求的处理与建档的流转（应用层；骨架与应用 docs/design/skeleton-and-application.md「薄驱动」，工单 #827）。
 #
 # 从流程编排搬出来的四件事：
 #   1. 回答一个决定请求（run 流、项目流、目录流三种）：在写入口的一个事务里核对请求仍在等待、基准版本与
@@ -147,7 +147,7 @@ class DecisionFlow:
                 return transaction.projection.run_id
             return None
         if decision.kind == QA_CANNOT_VERIFY.name:
-            # 质检无法核验（浏览器与 computer use 设计说明「无法核验」，工单 #1179）：回答「停止事项」时
+            # 质检无法核验（浏览器与 computer use docs/design/browser-and-computer-use.md「无法核验」，工单 #1179）：回答「停止事项」时
             # 事项结束、交付不被采纳；回答「重新核验」不作别的动作，run 继续以后质检重新检查同一份交付
             # （watched_outputs 的 _has_new_delivery 把 cannot_verify 的结论排除在外）
             if option == "stop":
@@ -159,7 +159,7 @@ class DecisionFlow:
             return projection.run_id
         if option == "stop" and decision.kind in (MODEL_UNAVAILABLE.name, DEFINITIONS_CHANGED.name):
             if decision.request.get("reason") == "compaction_failed":
-                # 整理连续没有推进的待恢复（模型管理设计说明「失败处理」最后一条，工单 #1238）：答「停止事项」
+                # 整理连续没有推进的待恢复（模型管理 docs/design/model-management.md「失败处理」最后一条，工单 #1238）：答「停止事项」
                 # 时事项以 compaction_failed 结束，停止说明沿用请求里写明的连续的次数与最后一次的原因
                 driver.fail_run(transaction, "compaction_failed",
                                 str(decision.request.get("message") or "run stopped by the user's decision"))
@@ -200,7 +200,7 @@ class DecisionFlow:
         return self._start_onboarding_revision(transaction, candidate, note)
 
     def _settle_kernel_modification(self, transaction: Transaction, decision: DecisionRequest, option: str) -> None:
-        # 内核修改的批准与拒绝（受控内核设计说明「路径守卫」，工单 #354）：批准时把请求携带的采纳载荷写入
+        # 内核修改的批准与拒绝（受控内核 docs/design/trusted-kernel.md「路径守卫」，工单 #354）：批准时把请求携带的采纳载荷写入
         # 项目流，交付自此成为当前采纳成果；拒绝时什么都不写，交付保持未采纳
         if option != "approve":
             return

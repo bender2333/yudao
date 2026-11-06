@@ -287,7 +287,7 @@ def score(delivery_dir, checks_dir, python):
     shutil.rmtree(work_root, ignore_errors=True)
     result = _aggregate(records, context["requirement_table"])
     # 独立的一条检查，单独报告：完成度与正确性仍按 24 条检查算，两个指标因此
-    # 与 scorer-3@2 的结果可比（评测场景设计「数据保真（场景 3）」）
+    # 与 scorer-3@2 的结果可比（评测场景 docs/design/evaluation-scenarios.md「数据保真（场景 3）」）
     status, detail = check_data_fidelity(delivery_dir, checks_dir)
     result["data_fidelity"] = {"id": DATA_FIDELITY_CHECK, "status": status, "detail": detail}
     return result

@@ -127,7 +127,7 @@ def _adoption_payload(delivery: Any, release: Any, run: Any, item: WorkItem) -> 
 
 
 # ---------------------------------------------------------------------------
-# MCP 服务器设置（工单 #236，网络与 MCP 设计说明「服务器设置」、「读取工具清单（探测）」、「版本与固定」、「凭据」）
+# MCP 服务器设置（工单 #236，网络与 MCP docs/design/network-and-mcp.md「服务器设置」、「读取工具清单（探测）」、「版本与固定」、「凭据」）
 #
 # 设置里只写凭据名称（凭据值按现有的边界，由调用时读取的凭据来源解析）；
 # 校验只认非秘密字段。整份设置一个版本，保存经 mcp_servers.save 带基准版本，
@@ -285,7 +285,7 @@ _AC_REF = re.compile(r"^AC[1-9][0-9]*$")
 
 
 def _requirement_mapping_errors(spec: Any) -> list[str]:
-    # 建档候选的初始 PRD 与后来提交的要求用同一套规则（工单 #1349，验证的独立性设计说明「检验覆盖与开环」第 1 点）：
+    # 建档候选的初始 PRD 与后来提交的要求用同一套规则（工单 #1349，验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」第 1 点）：
     # 每条要求要么指向存在的 AC<序号>，要么写明 gap 原因；漏项、重复、指向不存在、两者都给或都不给都不合格
     requirements = list(getattr(spec, "requirements", None) or [])
     criteria = list(getattr(spec, "acceptance_criteria", None) or [])
@@ -716,7 +716,7 @@ class ProjectService:
                  command: Command | None = None) -> str:
         # command 是引起登记的命令：同一命令身份已经登记时写入口在判断之前拒绝（DuplicateCommand、CommandIdReused），
         # 不保存目标原文，也不新建项目。source 为 idea（想法新建）或 existing（接入已有项目）
-        # initial_directory 是新建项目时一次性的起点文件夹（工单 #321，设计「应用层命令、决定与领域事件」）：
+        # initial_directory 是新建项目时一次性的起点文件夹（工单 #321，docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」）：
         # 在事务之前与 project.onboard 相同的采集路径只读采集公开树，采集失败时命令被拒绝，
         # 不建立项目，不写入任何事件。采集的快照所属范围是项目（与 project_goal 工件相同），不属于任何 run
         _require_text("name", name)
@@ -1260,7 +1260,7 @@ class ProjectService:
         return written
 
     def settle_pending_on_startup(self) -> list[ProjectEvent]:
-        """服务启动时由流程编排补做未完成的结算（应用层与接口层设计说明「执行与结算的归属」）。"""
+        """服务启动时由流程编排补做未完成的结算（应用层与接口层 docs/design/app-and-interface.md「执行与结算的归属」）。"""
         written: list[ProjectEvent] = []
         for project_id in self.store.list_project_ids():
             written.extend(self.settle_pending(project_id))
@@ -1454,7 +1454,7 @@ class ProjectService:
 
     def _guard_kernel_paths(self, transaction: Transaction, run: RunProjection, item: WorkItem,
                             delivery: Any, adoption: dict[str, Any]) -> dict[str, Any] | bool:
-        # 路径守卫（受控内核设计说明「路径守卫」，工单 #354）：把交付相对基线的改动路径与运行实例的内核清单
+        # 路径守卫（受控内核 docs/design/trusted-kernel.md「路径守卫」，工单 #354）：把交付相对基线的改动路径与运行实例的内核清单
         # 比较，有交集时不自动采纳，请求用户批准，材料附改动的路径与差异；没有交集时返回空，照常采纳。
         # 已经发出过请求时返回真：请求待回答或已被拒绝，这个 run 都不再采纳，也不重复请求。
         # held_adoption 是批准以后要写入的采纳载荷，previous_adoption_id 在批准时按当时状态补上
@@ -1663,7 +1663,7 @@ class ProjectService:
 
     def configure_mcp_servers(self, project_id: str, servers: dict[str, Any], *, base_version: int,
                               command: Command | None = None) -> dict[str, Any]:
-        # 保存项目设置里的 MCP 服务器（网络与 MCP 设计说明「版本与固定」）：整份设置一个版本，
+        # 保存项目设置里的 MCP 服务器（网络与 MCP docs/design/network-and-mcp.md「版本与固定」）：整份设置一个版本，
         # 基准版本是当前设置的版本（第一次保存为 0），不相等时拒绝并返回当前版本，提示重新读取。
         # 保存只写非秘密设置与凭据引用：凭据值按现有的边界由调用时的凭据来源解析，不进入事件
         if type(base_version) is not int or base_version < 0:
@@ -1689,7 +1689,7 @@ class ProjectService:
         return _mcp_settings_view(self.projection(project_id).mcp_servers)
 
     def record_tool_snapshot(self, project_id: str, server_name: str, snapshot: dict[str, Any]) -> bool:
-        # 探测成功以后把工具清单快照写回设置里这台服务器（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」）。
+        # 探测成功以后把工具清单快照写回设置里这台服务器（工单 #1174，网络与 MCP docs/design/network-and-mcp.md「读取工具清单（探测）」）。
         # 写回经 mcp_servers_configured 事件（整份设置一个版本）：用当前版本作基准重存整份设置，
         # 事件里这台服务器的 tool_snapshot 换成探测快照；快照带的配置摘要与这台服务器当前配置不一致时
         # 写回中止（返回 False）：旧结果保留在事件里供查询，不得覆盖新配置的可用状态；

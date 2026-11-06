@@ -1,4 +1,4 @@
-// 楼层的翻译层（画面与播放设计说明「翻译层」、原型 v13 js/translate/translate.js 的楼层部分，工单 #953）。
+// 楼层的翻译层（画面与播放 docs/design/visualization.md「翻译层」、原型 v13 js/translate/translate.js 的楼层部分，工单 #953）。
 //
 // 这一层是唯一同时认识 Yudao 的说法与画面的说法的地方：
 //   - floorState：project.loop（带位置）加上各部门的角色与运行的询问链 → 画面合同的楼层状态
@@ -224,7 +224,7 @@ export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = {
   proposal_submitted: "提交提案",
   qa_submitted: "质检提交结论",
   qa_tests_saved: "保存质检测试材料",
-  // 质检先交独立判断、再看解释（验证的独立性设计说明「先判断后看解释」，工单 #358）
+  // 质检先交独立判断、再看解释（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）
   independent_judgement_committed: "提交独立判断",
   run_continued: "运行继续",
   run_created: "建立事项",

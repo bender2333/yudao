@@ -1,4 +1,4 @@
-# 接口层的认证（应用层与接口层设计说明「模块」、「访问方式与认证」、「令牌与 TLS」）：访问方式、Host 与 Origin 检查、
+# 接口层的认证（应用层与接口层 docs/design/app-and-interface.md「模块」、「访问方式与认证」、「令牌与 TLS」）：访问方式、Host 与 Origin 检查、
 # 访问令牌与命令的媒体类型，都在路由处理之前完成。
 
 from __future__ import annotations

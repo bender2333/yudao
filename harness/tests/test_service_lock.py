@@ -8,7 +8,7 @@ from pathlib import Path
 import httpx
 
 
-# 同一个数据目录只允许一个服务进程（应用层与接口层设计说明「执行与结算的归属」）：新接口（python -m harness api）
+# 同一个数据目录只允许一个服务进程（应用层与接口层 docs/design/app-and-interface.md「执行与结算的归属」）：新接口（python -m harness api）
 # 取得数据目录的进程锁。测试启动真实的服务进程，经 HTTP 确认服务在运行。
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

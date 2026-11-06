@@ -1,5 +1,5 @@
-# MCP 服务器探测（工单 #1174；网络与 MCP 设计说明「读取工具清单（探测）」、「凭据」、
-# 「应用层接口」应用层接口表；总图第四节「接口」缝的命令）。这个文件查八件事：
+# MCP 服务器探测（工单 #1174；网络与 MCP docs/design/network-and-mcp.md「读取工具清单（探测）」、docs/design/network-and-mcp.md「凭据」、
+# docs/design/network-and-mcp.md「应用层接口」应用层接口表；总图第四节「接口」缝的命令）。这个文件查八件事：
 # 1. 用本机 SDK 的 stdio 与 HTTP 测试服务器探测，读到工具清单快照；
 # 2. 探测结果以项目流事件 tool_server_probe_finished 出现（真实 MCP 进程）；
 # 3. 缺凭据时启动失败，原因写明凭据名称；
@@ -11,7 +11,7 @@
 # 8. 凭据值不出现在事件、投影与设置里（只出现名称），日志里的值同样被替换。
 # 官方 mcp-server-time 经 uvx 启动、启动失败的标准错误输出末尾与脱敏都在客户端用例（test_mcp_client）里核对。
 #
-# 层：集成层（真实 MCP 子进程与真实本机端口，测试分层设计说明「三层的定义」）。
+# 层：集成层（真实 MCP 子进程与真实本机端口，测试分层 docs/design/test-pyramid.md「三层的定义」）。
 # 守 R2（第二环的合同：项目流事件与 project.settings 的载荷）与 R3（用户读到的探测结果与真实服务器一致）。
 
 from __future__ import annotations

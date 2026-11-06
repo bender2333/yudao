@@ -1,5 +1,5 @@
 // 首页楼的画面对象：画布挂在宿主元素上，提供 setState、jump、play、resize、destroy、inspect
-// （原型 v13 js/pixel/building.js 的 createBuildingScene 与画面与播放设计说明「分层与边界」、「画面合同」、「画面层」，工单 #178、#955）。
+// （原型 v13 js/pixel/building.js 的 createBuildingScene 与画面与播放 docs/design/visualization.md「分层与边界」、「画面合同」、「画面层」，工单 #178、#955）。
 //
 // 画面的输入只有画面合同（pixel/contract.ts）：状态带位置、动作带位置与 kind（kind 取楼的声明表
 // pixel/building/building-decl.ts）。打开画面、重新同步、标签页从后台切回都用 jump：清空时间线，
@@ -24,7 +24,7 @@ import type { SceneLike } from "../world/types.ts";
 export type { BuildingFloor, BuildingModel } from "../world/building.ts";
 
 /**
- * 楼承载事实的视觉通道（画面与播放设计说明「视觉通道表」的楼那一行）：每层的状态灯、亮灯的房间、小旗，
+ * 楼承载事实的视觉通道（画面与播放 docs/design/visualization.md「视觉通道表」的楼那一行）：每层的状态灯、亮灯的房间、小旗，
  * 以及同一幅画上的名牌、入口阀门与决定计数。只读状态给出的东西：闪光、彩带与小人的走位属于表演层。
  */
 export interface BuildingChannels {

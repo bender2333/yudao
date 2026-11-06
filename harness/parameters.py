@@ -13,7 +13,7 @@ from .definitions import DEFINITIONS, VISIBILITY_VALUES, Definitions
 from .models import CatalogEvent, CatalogEventType, ProjectEventType, json_dumps
 
 # 建 run 时冻结的参数（工单 #1189）：这 10 项在 run 创建时从参数现值取样，这个 run 一直用它，
-# 参数事件只作用于之后创建的 run（规则登记与参数设计说明「参数怎样成为带版本的数据」）
+# 参数事件只作用于之后创建的 run（规则登记与参数 docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」）
 RUN_PARAMETERS = (
     "tool_call_required_limit",
     "max_model_steps",
@@ -25,7 +25,7 @@ RUN_PARAMETERS = (
     "bash_timeout_max_sec",
     "check_timeout_max_sec",
     "compaction.stalled_limit",
-    # #397 的三项收敛判定参数（循环与收敛设计说明「判定参数」）：实例创建时冻结，投影按冻结值重放
+    # #397 的三项收敛判定参数（循环与收敛 docs/design/loops-and-convergence.md「判定参数」）：实例创建时冻结，投影按冻结值重放
     "convergence.rounds",
     "convergence.step_window",
     "convergence.step_repeat",

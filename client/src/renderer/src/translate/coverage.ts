@@ -1,4 +1,4 @@
-// 翻译覆盖核对（画面与播放设计说明「翻译层」与「画面诚实性的不变式」最后一行、原型 v13 js/translate/translate.js 的 T.coverage，工单 #952）。
+// 翻译覆盖核对（画面与播放 docs/design/visualization.md「翻译层」与 docs/design/visualization.md「画面诚实性的不变式」最后一行、原型 v13 js/translate/translate.js 的 T.coverage，工单 #952）。
 //
 // 能力清单里的每种事件，在楼、楼层、房间三个场景里各属于一类：
 //   drawn    —— 翻成这个场景的动作；
@@ -403,7 +403,7 @@ export function overlayProblems(names: readonly string[], labels: Readonly<Recor
 }
 
 // ---------------------------------------------------------------------------
-// 检验方式的名称（验证的独立性设计说明「口径」，工单 #151）
+// 检验方式的名称（验证的独立性 docs/design/independent-verification.md「口径」，工单 #151）
 //
 // 质检的逐条结论里每种检验方式用代码名保存：check（命令检查）、trial（试用用例）、measure（主机测量）、
 // judgement（带参照材料的判定点）、human（人）、open（开环）；前三种是可执行的检验，后三种不可执行。

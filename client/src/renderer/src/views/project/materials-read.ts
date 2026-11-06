@@ -44,8 +44,8 @@ export function originalView<T>(
 }
 
 // ---------------------------------------------------------------------------
-// 质检一项的逐条结论表（工单 #154；浏览器与 computer use 设计说明「页面与画面」、「QAReview 的逐条结论与放行」、「无法核验」；
-// 验证的独立性设计说明「口径」）
+// 质检一项的逐条结论表（工单 #154；浏览器与 computer use docs/design/browser-and-computer-use.md「页面与画面」、「QAReview 的逐条结论与放行」、「无法核验」；
+// 验证的独立性 docs/design/independent-verification.md「口径」）
 //
 // 每条验收条件一行：检验方式与结果写中文，证据是检查名称与试用用例，截图是试用用例各步骤上的
 // 工件引用。开环的判定与表头的三个数取自 `acceptance.coverage`（放行记录里一次算好），页面不重算；

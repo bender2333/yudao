@@ -1,5 +1,5 @@
-// 连接：读取能力清单并核对接口版本（应用层与接口层设计说明「能力清单」）。地址是页面自己的来源
-// （网页界面的提供与发布设计说明「接口层提供页面文件」）。相同时返回能力清单；不同时返回两份版本，不打开任何页面、不执行命令。
+// 连接：读取能力清单并核对接口版本（应用层与接口层 docs/design/app-and-interface.md「能力清单」）。地址是页面自己的来源
+// （网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）。相同时返回能力清单；不同时返回两份版本，不打开任何页面、不执行命令。
 
 import { type Client, type ClientOptions, createClient, createConfig } from "../api/generated/client";
 import { capabilities as fetchCapabilities } from "../api/generated/sdk.gen";
@@ -76,7 +76,7 @@ export async function connect(address: string, token = ""): Promise<Connection> 
       || typeof deployment.version !== "string") {
     return { state: "failed", address, message: "没有取到能力清单" };
   }
-  // 页面与服务同出一个发布（网页界面的提供与发布设计说明「接口层提供页面文件」）：服务的发布版本与页面构建时的
+  // 页面与服务同出一个发布（网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）：服务的发布版本与页面构建时的
   // 版本不同时重新加载页面，取到与服务同一个版本的页面文件。每次连接都核对，包括服务重启以后的重新连接。
   // 接口版本不同时也重载一次（工单 #704）：接口一变，页面文件多半要重新构建过；重载取到新文件就用新的。
   // 同一会话只重载一次：页面与服务一直不匹配时（例如页面文件还没重建），不停重载只会一直闪。

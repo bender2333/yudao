@@ -1,4 +1,4 @@
-"""版本比较与两侧对照（`docs/design/evaluation-scenarios.md` 「报告与版本比较」）。
+"""版本比较与两侧对照（`docs/design/evaluation-scenarios.md` docs/design/evaluation-scenarios.md「报告与版本比较」）。
 
 - 版本比较（docs/design/evaluation-scenarios.md「噪声范围与三种结论」）：同一场景按运行的序号配对，第 1 次对第 1 次，不按运行编号；
   只有材料版本与评分器版本都相同时才配对，否则拒绝比较；噪声来自同一版本的重复运行，

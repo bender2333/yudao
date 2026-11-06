@@ -201,7 +201,7 @@ def test_undeclared_tool_call_in_summary_is_a_retryable_failure_that_never_execu
 
 def _tight_window_runner(tmp_path, respond, *, room=COMPACTION_ROOM, task="Original intent",
                          keys=("product", "engineering", "quality")):
-    """窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计「测试的写法」中「测试不决定产品的文字」，不写死窗口）：
+    """窗口按三个部门里最长的固定材料推出（pinned_window，测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」，不写死窗口）：
 
     历史超过压缩阈值，而未压缩的工作请求仍放得下。窗口低于实测的可行区间时未压缩的工作请求放不下
     （这一步以 context_overflow 结束），高于区间时压缩不会被触发。假模型按脚本位取用，
@@ -535,7 +535,7 @@ def test_compaction_after_prd_revision_continues_the_previous_checkpoint(tmp_pat
         "quality": quality_turns("release", "the delivery implements the revised PRD"),
     })
     system = LoopSystem.for_testing(tmp_path, adapter)
-    # 上下文窗口按这个场景的需要设置（测试分层设计说明「测试的写法」中「测试不决定产品的文字」）：工程开始时的请求（部门提示与
+    # 上下文窗口按这个场景的需要设置（测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」）：工程开始时的请求（部门提示与
     # 工程可用的工具说明）装得下，压缩只发生在询问带回新合同以后。窗口按工程固定材料的实测值推出
     # （pinned_window），不写死：工单 #1182 给工程加上试用工具以后固定材料多 574 个 token（4679 → 5253），
     # 工单 #1184 加上 28 个浏览器工具的说明以后再多 4655 个 token（5251 → 9906）
@@ -676,7 +676,7 @@ def test_compaction_request_overflow_still_stops_the_run(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 整理连续失败进入待恢复（工单 #1238，模型管理设计说明「失败处理」最后一条）
+# 整理连续失败进入待恢复（工单 #1238，模型管理 docs/design/model-management.md「失败处理」最后一条）
 #
 # 交付已经收下以后，质检的整理连续没有推进：run 不结束，进入待恢复，发出待恢复的决定请求（reason 为
 # compaction_failed）。用户可以换这个部门的模型以后选「继续执行」，事项从这次整理接着进行；选「停止事项」
@@ -687,7 +687,7 @@ def _delivery_then_stalled_quality(tmp_path, *, stall_compactions: int):
     大文件把历史顶过压缩阈值，之后的整理都回空摘要（不生效）；前 stall_compactions 次整理这样回，
     之后回真正的摘要。质检提交放行结论的那一轮在读完文件以后的第四步，整理出事的这几步到不了。
 
-    窗口在交付收下以后按质检部门的固定材料实测 token 数加余量推出（测试分层设计「测试的写法」中「测试不决定产品的文字」，
+    窗口在交付收下以后按质检部门的固定材料实测 token 数加余量推出（测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」，
     不写死数字）：质检的固定材料里有 PRD 与交付，交付之前量不全。
     """
     work_counts = {}

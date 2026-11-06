@@ -40,7 +40,7 @@ _MULTIPLE_KINDS = frozenset({"product_decision"})
 
 
 def render_structure(description: dict[str, Any]) -> str:
-    # 现有结构说明的材料（docs/design/existing-project-onboarding.md「工程：现有结构说明」）：主机由接纳结果生成。
+    # 现有结构说明的材料（docs/design/existing-project-onboarding.md docs/design/existing-project-onboarding.md「工程：现有结构说明」）：主机由接纳结果生成。
     # 结构说明这一种成果的内容长什么样是应用的事（工单 #1456）：签名与写法住在这里，内核模块不再认识它
     lines = ["# 现有结构说明", "",
              f"结构说明：{description['content_hash']}",
@@ -67,7 +67,7 @@ def render_structure(description: dict[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 # 质检退回工程的放行结论（S4c 工单 #863 从薄驱动搬来）：接纳的一方认成果种类与结论取值，
-# 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用设计说明「薄驱动」）
+# 薄驱动只把这次接纳转交过来，不含这两样（骨架与应用 docs/design/skeleton-and-application.md「薄驱动」）
 REVIEW_KIND = "qa_review"
 # 质检无法核验的结论（工单 #1179）：薄驱动只问这一句，不写成果种类与结论的字面值
 CANNOT_VERIFY_VERDICT = "cannot_verify"
@@ -315,7 +315,7 @@ class SubmissionWriter:
                 # 建档事项的工程部门没有提交交付的工具，这一刻通常没有当前交付，也就不记事件
                 invalidate("baseline_rework_product")
         elif kind == "independent_judgement":
-            # 独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：不是成果——不进版本链、
+            # 独立判断事件（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：不是成果——不进版本链、
             # 不失效任何东西、不渲染材料、没有工件。内核的提案路径盖上的统一字段在这里去掉，
             # 事件载荷只带判断本身；装配与放行的门按这条事件的存在与它写的交付摘要判断
             payload = {key: value for key, value in artifact.items() if key not in _UNIFIED_FIELDS}
@@ -401,7 +401,7 @@ class SubmissionWriter:
     def record_accepted_lesson(self, transaction: Transaction, source: Event, projection: RunProjection,
                                artifact: dict[str, Any]) -> None:
         # 接纳以后的记录：质检退回工程的放行结论另记一条经验教训候选。
-        # 成果种类与结论取值由这里认——薄驱动不含这两样（骨架与应用设计说明「薄驱动」），
+        # 成果种类与结论取值由这里认——薄驱动不含这两样（骨架与应用 docs/design/skeleton-and-application.md「薄驱动」），
         # 只把这次接纳转交过来（S4c 工单 #863）
         if artifact.get("kind") != REVIEW_KIND or artifact.get("verdict") != REWORK_VERDICT:
             return
@@ -451,5 +451,5 @@ def _json_bytes(value: dict[str, Any]) -> bytes:
 
 
 def asks_cannot_verify(artifact: dict[str, Any]) -> bool:
-    # 这一份成果是「质检无法核验」的结论吗（浏览器与 computer use 设计说明「无法核验」，工单 #1179）
+    # 这一份成果是「质检无法核验」的结论吗（浏览器与 computer use docs/design/browser-and-computer-use.md「无法核验」，工单 #1179）
     return artifact.get("kind") == REVIEW_KIND and artifact.get("verdict") == CANNOT_VERIFY_VERDICT

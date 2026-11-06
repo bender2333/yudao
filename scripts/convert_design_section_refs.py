@@ -1774,10 +1774,8 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                 if new is None:
                     continue
                 doc = next((r.doc for r in g.refs if r.doc), None)
-                context = original + "\n" + block_above(file_lines(path), lineno)
-                named = bool(doc) and doc in {d for _s, _e, d in mentions(context)}
-                if any(r.bare for r in g.refs if r.doc == doc):
-                    named = False
+                # 每一处引用都写 docs/design/<文件>.md（工单「换算的规矩」第 7 条，2026-11-06 改）
+                named = False
                 start, end = min([g.start] + [r.start for r in g.refs]), max([g.end] + [r.end for r in g.refs])
                 if any(r.dropped for r in g.refs):
                     slice_match = SLICE_RE.match(line, end)

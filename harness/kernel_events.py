@@ -25,7 +25,7 @@ TERMINAL_STATUSES = frozenset({"done", "paused", "failed"})
 # 骨架事件载荷里的封闭取值，只增：qa_submitted 的结论，baseline_review_accepted 逐条结论的状态
 QA_VERDICTS = ("rework_engineering", "release", "cannot_verify")
 BASELINE_STATUSES = ("verified", "read_only", "existing_defect", "unsupported")
-# 质检逐条结论用的封闭取值（验证的独立性设计说明「口径」第 1、2 条，工单 #151）：六种检验方式与三种结果。 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在 harness/tests/fixtures/check_methods.json 与客户端各一份，服务端核对本表与夹具一致
+# 质检逐条结论用的封闭取值（验证的独立性 docs/design/independent-verification.md「口径」第 1、2 条，工单 #151）：六种检验方式与三种结果。 检验方式里 check、trial、measure 是可执行的检验，judgement、human、open 不可执行。两端共读的代码名在 harness/tests/fixtures/check_methods.json 与客户端各一份，服务端核对本表与夹具一致
 QA_METHODS = ("check", "trial", "measure", "judgement", "human", "open")
 QA_RESULTS = ("passed", "failed", "unverified")
 
@@ -94,7 +94,7 @@ class ProjectEventType:
     # 项目的形态（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：项目现在用发布带的哪一份，
     # 带原值、新值与理由；事项创建时冻结形态名与它的定义版本
     PROJECT_FORM_SET = "project_form_set"
-    # 探测 MCP 服务器（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」）：一次探测的结果，带工具清单快照或失败原因
+    # 探测 MCP 服务器（工单 #1174，网络与 MCP docs/design/network-and-mcp.md「读取工具清单（探测）」）：一次探测的结果，带工具清单快照或失败原因
     TOOL_SERVER_PROBE_FINISHED = "tool_server_probe_finished"
     # 用户确认初始 PRD：这个成果成为项目的建档基线
     BASELINE_ADOPTED = "baseline_adopted"
@@ -105,7 +105,7 @@ class ProjectEventType:
     WRITEBACK_NOT_NEEDED = "writeback_not_needed"
     WRITEBACK_HELD = "writeback_held"
     WRITEBACK_VERIFIED = "writeback_verified"
-    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明「版本与固定」）：整份设置一个版本， 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP docs/design/network-and-mcp.md「版本与固定」）：整份设置一个版本， 保存写入这个事件，事项创建时把当时的设置冻结进事项事实
     MCP_SERVERS_CONFIGURED = "mcp_servers_configured"
 
 
@@ -326,7 +326,7 @@ class CatalogEvent:
 
 @dataclass
 class DecisionRequest:
-    # 一个等待用户回答的决定请求（总体架构「用户决定」），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）； version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
+    # 一个等待用户回答的决定请求（总体架构 docs/design/architecture/overall-architecture.md「用户决定」），由请求、回答与撤销三种事件折叠而成，是控制核心另外保存的投影。 身份是请求事件的编号；request 是请求事件的载荷（种类、阻塞范围、选项与说明、事实引用与种类自己的内容）； version 是请求的版本，回答命令的基准版本与它核对；status 为 open、answered 或 withdrawn
     decision_id: str
     stream: str
     run_id: str | None

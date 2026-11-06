@@ -172,7 +172,7 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "contract_accepted": ("content_hash", "input_version", "product_spec_hash", "revision"),
     "ask_started": ("branch_session_id", "question", "recipient", "requester"),
     "ask_answered": ("answer", "reason", "recipient", "requester", "revision", "status", "with_spec_revision"),
-    # 独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：不是成果，事件载荷只带判断本身
+    # 独立判断事件（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：不是成果，事件载荷只带判断本身
     # （提案路径盖上的统一字段在写入时去掉），依据的交付摘要与条数进基准
     "independent_judgement_committed": ("checks", "criteria_count", "delivery_spec_hash",
                                         "kind", "product_spec_hash"),

@@ -27,7 +27,7 @@ ProtocolName = Literal[tuple(sorted(SUPPORTED_PROTOCOLS))]
 
 
 class ProviderInput(Contract):
-    # 一份 Provider 配置：一条服务连接，不声明协议（模型管理设计说明「Provider 配置」）；
+    # 一份 Provider 配置：一条服务连接，不声明协议（模型管理 docs/design/model-management.md「Provider 配置」）；
     # 自定义服务的地址是请求基址，内置服务方案按访问定义的协议取预置表中的基址
     id: Text
     name: Text
@@ -39,7 +39,7 @@ class ProviderInput(Contract):
 
 
 class ModelInput(Contract):
-    # 一条模型访问定义；调用协议必填（模型管理设计说明「模型访问定义与准入」），从候选建立时直接采用预填容量（工单 #562）。
+    # 一条模型访问定义；调用协议必填（模型管理 docs/design/model-management.md「模型访问定义与准入」），从候选建立时直接采用预填容量（工单 #562）。
     # 两处都没有窗口或输出上限的候选，必须在请求里给出才能保存，否则拒绝并写明缺少哪一项。
     id: Text
     model: Text

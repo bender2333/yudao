@@ -1,4 +1,4 @@
-# 试用记录的查询（工单 #152；浏览器与 computer use 设计说明「查询」 `run.trials`；应用层与接口层设计说明
+# 试用记录的查询（工单 #152；浏览器与 computer use docs/design/browser-and-computer-use.md「查询」 `run.trials`；应用层与接口层设计说明
 # 「查询清单」；总图第四节「接口」缝）。
 #
 # 数据来源（2026-11-06，main 5083953e）：

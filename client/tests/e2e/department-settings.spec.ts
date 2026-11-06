@@ -90,7 +90,7 @@ async function expectAccepted(page: Page, name: string, request: Record<string, 
 }
 
 // 给已保存的连接设置在内存里的 Key：走真实命令与真实凭据链（与模型管理页的用例同一做法）。
-// 生效模型要求凭据可用（设计说明「引用无法使用时」），因此验收生效模型的用例先设置它
+// 生效模型要求凭据可用（docs/design/model-management.md「引用无法使用时」），因此验收生效模型的用例先设置它
 async function setKey(page: Page, ref: string): Promise<void> {
   const status = await page.evaluate(async (payload: { address: string; ref: string }) => {
     const listed = await (await fetch(`${payload.address}/api/queries/catalog`)).json();

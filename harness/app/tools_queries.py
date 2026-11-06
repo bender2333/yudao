@@ -1,4 +1,4 @@
-# 工具登记查询（工单 #1177，网络与 MCP 设计说明「应用层接口」「查询 tools.registry」、「系统「工具与扩展」页」；总图第四节「接口」缝）。
+# 工具登记查询（工单 #1177，网络与 MCP docs/design/network-and-mcp.md「应用层接口」「查询 tools.registry」、docs/design/network-and-mcp.md「系统「工具与扩展」页」；总图第四节「接口」缝）。
 # 返回各项目最近的取回记录与各项目的 MCP 服务器（设置、最近一次探测的状态、工具清单），以及内置工具一节
 # （工单 #152：Playwright MCP 的版本、浏览器工具与恢复契约、每个工具是否需要图像输入）。
 #
@@ -77,7 +77,7 @@ class ToolsRegistryProject(Contract):
 
 
 class BuiltinToolView(Contract):
-    # 一个内置的浏览器工具（工单 #152；浏览器与 computer use 设计说明「提供的工具」、「工具定义的声明」）：恢复契约的核实方法
+    # 一个内置的浏览器工具（工单 #152；浏览器与 computer use docs/design/browser-and-computer-use.md「提供的工具」、「工具定义的声明」）：恢复契约的核实方法
     # （verification）与取消能否确认停止（cancellable），以及这个工具是否需要图像输入——需要时调用目标
     # 不含图像的请求里不提供它
     name: str

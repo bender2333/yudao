@@ -1,7 +1,7 @@
-# MCP 客户端模块的集成层用例（工单 #69；网络与 MCP 设计说明「客户端模块」、「运行规则」、「调用与结果」、「恢复契约」「取消能否确认停止」）。
+# MCP 客户端模块的集成层用例（工单 #69；网络与 MCP docs/design/network-and-mcp.md「客户端模块」、「运行规则」、「调用与结果」、docs/design/network-and-mcp.md「恢复契约」「取消能否确认停止」）。
 # 守 R2（MCP 客户端的交换形状：会话、工具清单、结果里的各类内容、取消能否确认）与
 # R3（阶段二：MCP 工具经真实进程与真实本机端口调用）。真实子进程、进程树、本机端口与系统环境变量都在用，
-# 按测试分层设计说明「三层的定义」登记为集成层。
+# 按测试分层 docs/design/test-pyramid.md「三层的定义」登记为集成层。
 import asyncio
 import contextlib
 from datetime import datetime, timedelta, timezone

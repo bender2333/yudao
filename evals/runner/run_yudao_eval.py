@@ -2,12 +2,12 @@
 
 与 OpenCode 一侧（`run_eval.py`）同一套形状：原始证据（事件日志导出、交付副本、
 评分日志）放在 `.yudao/evals/` 下，不进入 Git；结果文件提交到 `docs/evaluation/`，
-中文报告写到 `.tmp/` 再发 Discussions（评测场景设计「报告与版本比较」）。
+中文报告写到 `.tmp/` 再发 Discussions（评测场景 docs/design/evaluation-scenarios.md「报告与版本比较」）。
 
 场景 3 从较长的 PRD 新建项目：新建项目并带入起始文件夹，提交需求原文加接口约定，
 等待结束。场景 2 在已有代码上加功能：接入已有仓库（`project.onboard`）、确认初始
 PRD（`decision.answer`，或者等人确认）、再新建事项提交需求原文（docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」、「前提与未决事项」；
-接入已有项目设计说明「应用层命令、决定与领域事件」、「建档流程」）。
+接入已有项目 docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」、「建档流程」）。
 """
 
 import argparse
@@ -26,11 +26,11 @@ import yudao
 import yudao_metrics
 import yudao_report
 
-# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计「两边的运行条件」「时间上限」）。
-# 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（「指标」、「前提与未决事项」）
+# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「时间上限」）。
+# 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（docs/design/evaluation-scenarios.md「指标」、「前提与未决事项」）
 TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
-# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目设计说明「用户确认的决定」）
+# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目 docs/design/existing-project-onboarding.md「用户确认的决定」）
 ONBOARDING_TIMEOUT_SECONDS = 120 * 60
 # `--wait-prd-confirmation` 等人在浏览器的决定卡片里确认初始 PRD 的上限
 PRD_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60
@@ -48,7 +48,7 @@ def empty_output_note(runs):
 
 
 def scenario_python():
-    """场景 2、3 的运行环境是 uv 管理的 Python 3.13（评测场景设计「两边的运行条件」）。"""
+    """场景 2、3 的运行环境是 uv 管理的 Python 3.13（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）。"""
     found = subprocess.run(["uv", "python", "find", SCENARIO_PYTHON],
                            capture_output=True, encoding="utf-8", errors="replace")
     path = (found.stdout or "").strip()
@@ -105,7 +105,7 @@ def _score_scenario2(delivery_dir, evidence_dir):
     """场景 2 的评分：评分副本按材料的 `runtime.install` 建立环境，再用场景 2 的评分命令。
 
     Yudao 封存的交付没有虚拟环境（部门在自己的工作区里跑检查），评分副本因此由运行器
-    建立 Python 3.13 环境（需要联网，评测场景设计「场景 2：模型设置透传参数」）；评分器与评分命令沿用
+    建立 Python 3.13 环境（需要联网，评测场景 docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」）；评分器与评分命令沿用
     OpenCode 一侧的 `scenario2.scorer_command`，评分器不改。
     """
     scenario2 = yudao.scenario_module()

@@ -154,7 +154,7 @@ def test_file_deleted_after_being_read_is_still_a_deletion(tmp_path):
 # ---------------------------------------------------------------------------
 
 def test_cli_default_command(tmp_path):
-    # 不写子命令时启动新接口（应用层与接口层设计说明「命令行」）：默认端口 8765，
+    # 不写子命令时启动新接口（应用层与接口层 docs/design/app-and-interface.md「命令行」）：默认端口 8765，
     # 没有 serve 子命令；服务以空态启动，system.status 返回 Provider 不可用与默认的模型目录路径
     from harness.__main__ import build_parser
 

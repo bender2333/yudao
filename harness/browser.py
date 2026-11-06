@@ -511,7 +511,7 @@ class BrowserSessions:
         try:
             await client.close()
         except Exception:  # noqa: BLE001 - 换一个任务关闭时 SDK 的取消范围不允许，进程树自己结束
-            # 与 `McpSessions.close` 的处理相同（网络与 MCP 设计说明「运行规则」）：关闭失败不挡住会话结束。
+            # 与 `McpSessions.close` 的处理相同（网络与 MCP docs/design/network-and-mcp.md「运行规则」）：关闭失败不挡住会话结束。
             # 客户端建立时记下的进程标识与创建时间在这里结束整棵进程树；它打开的标准错误输出日志文件
             # 也没有关（关闭在 SDK 的退出之后），这里一并关掉，否则会话目录删不掉
             if pid is not None and created is not None:

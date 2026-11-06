@@ -38,7 +38,7 @@ def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
 @dataclass(frozen=True)
 class WorkBasis:
     # 激活开始时采用的工作依据；有效合同、指导与用户输入变了以后，这个会话在下一步收到通知（新版本与改动、
-    # 新的输入），接着工作，一轮工作不因此结束（工单 #558、#964，循环结构「工作中途要求变化」与「指导」）。合同摘要来自
+    # 新的输入），接着工作，一轮工作不因此结束（工单 #558、#964，循环结构 docs/design/department-loop.md「工作中途要求变化」与 docs/design/department-loop.md「指导」）。合同摘要来自
     # 最小投影，输入与指导的版本是应用的数据，由流程编排在开始一轮工作时填进来（S1d，工单 #860）
     effective_contract_hash: str | None
     input_version: int
@@ -113,7 +113,7 @@ def tool_permission(
     # 工具许可读这个事项所用的那份定义（工单 #1098）：部门有没有这个工具、这个工具提交什么种类按它判；
     # 没有交的时候是当前加载的那一份
     # 有效合同、指导与用户输入变了都不再停止这次激活：它们作为通知送达，部门接着工作，
-    # 这一轮不因此结束（工单 #558、工单 #964，循环结构「工作中途要求变化」与「指导」）
+    # 这一轮不因此结束（工单 #558、工单 #964，循环结构 docs/design/department-loop.md「工作中途要求变化」与 docs/design/department-loop.md「指导」）
     projection = view.minimal
     definition = in_force(definitions)
     if projection.status in TERMINAL_STATUSES or aborted:
@@ -165,7 +165,7 @@ def commit_decision(
     # 提交判断：提交之前按最新的投影与工作区事实复核校验结果。校验以后工作区改变，
     # 或者当前工作已经不是校验时的那一份，都拒绝，不重新绑定到新的依据；仍然成立时按最新状态再校验。
     # 有效合同、指导与用户输入变了不再让这次提交作废：它们作为通知送达，部门接着工作，
-    # 提交的成果按当前版本核对（工单 #558、工单 #964，循环结构「工作中途要求变化」、「指导」与「提交与版本」）
+    # 提交的成果按当前版本核对（工单 #558、工单 #964，循环结构 docs/design/department-loop.md「工作中途要求变化」、docs/design/department-loop.md「指导」与 docs/design/department-loop.md「提交与版本」）
     definition = in_force(definitions)
     if submission_basis(current.minimal) != submission_basis(evaluated.minimal):
         decision = ProposalDecision(False, [FieldError("execution_basis", _STALE_BASIS)])
@@ -176,7 +176,7 @@ def commit_decision(
                                      facts=current_facts, tightening=tightening, events=events)
     if decision.accepted:
         # 还有没处理完的输入时这次提交不当场生效：等不等、为什么等是路由的收紧检查的判断与说明
-        # （部门指导设计说明「放行怎么等」，工单 #561、#1456），内核只把它的原因交回部门
+        # （部门指导 docs/design/department-guidance.md「放行怎么等」，工单 #561、#1456），内核只把它的原因交回部门
         tight = tightening.submission(TightenRequest(department=department, state=current.state, proposal=proposal,
                                                      events=tuple(events), commit=True, definitions=definition,
                                                      minimal=current.minimal, facts=current_facts))

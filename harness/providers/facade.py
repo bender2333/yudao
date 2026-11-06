@@ -528,7 +528,7 @@ class ProviderFacade:
     def save_dotenv_value(self, dotenv_path: str | Path, ref: str, secret: str) -> dict[str, object]:
         # 持久化单个凭据到独立 .env：先按 .env 的键名规则核对引用，再用读 .env 的同一个解析器
         # 核对要写的内容，都通过了才原子替换文件；不落盘时文件与内存都不动，
-        # 也不悄悄降级为只在内存生效（模型管理设计说明「Provider 配置」，工单 #1158）
+        # 也不悄悄降级为只在内存生效（模型管理 docs/design/model-management.md「Provider 配置」，工单 #1158）
         key = str(ref).strip()
         if not key:
             raise CatalogValidationError((ValidationIssue("credentials.ref", "凭据引用不能为空"),))
@@ -578,7 +578,7 @@ class ProviderFacade:
 
     def credential_chain(self) -> CredentialChain:
         # 控制主机的凭据来源本体（进程内存、进程环境、数据目录的 .env）：
-        # MCP 服务器的探测与调用按名称从这里取值（网络与 MCP 设计说明「凭据」）
+        # MCP 服务器的探测与调用按名称从这里取值（网络与 MCP docs/design/network-and-mcp.md「凭据」）
         return self._credentials
 
     def credential_status(self, ref: str) -> dict[str, Any]:

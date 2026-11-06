@@ -1,5 +1,5 @@
 // 项目楼层的画面对象：画布挂在宿主元素上，提供 setState、jump、play、setDecisions、stream、focus、
-// setOverlay、resize、destroy（原型 v13 js/pixel/floor.js 的 createFloorScene 与画面与播放设计说明「画面合同」、「画面层」，
+// setOverlay、resize、destroy（原型 v13 js/pixel/floor.js 的 createFloorScene 与画面与播放 docs/design/visualization.md「画面合同」、「画面层」，
 // 工单 #82、#953）。
 //
 // 画面的输入只有画面合同（pixel/contract.ts）：状态带位置、动作带位置与 kind，实时内容（决定卡片、流式文字）
@@ -88,7 +88,7 @@ export interface FloorView {
 }
 
 /**
- * 楼层承载事实的视觉通道（画面与播放设计说明「视觉通道表」的楼层那一行）：事项在哪个房间或在大厅、事项的颜色，
+ * 楼层承载事实的视觉通道（画面与播放 docs/design/visualization.md「视觉通道表」的楼层那一行）：事项在哪个房间或在大厅、事项的颜色，
  * 房间亮灯与屏幕滚动，门口的小旗与牌子文字，大厅板上的决定单，成果库里的成果，传信管里等待回答的询问数，
  * 等待模型服务的文字，各部门的角色与角色的状态。
  *

@@ -568,7 +568,7 @@ class StepRecorder:
     def tool_started(self, transaction: Transaction, request: ModelRequest, call: dict[str, Any],
                      before_snapshot: dict[str, Any] | None = None) -> None:
         # 工具许可允许以后、执行之前记录。
-        # 动作前的公开树快照与这条事件一起写入（工单 #17，恢复契约「动作分类与处置」）：中断以后按这份快照与
+        # 动作前的公开树快照与这条事件一起写入（工单 #17，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）：中断以后按这份快照与
         # 动作参数核对实际效果，快照放在 run 自己的对象区域，不建立提交、不改动分支索引
         scope = self.scope
         payload = {**self._redacted_call(call), "activation_id": request.activation_id,
@@ -797,7 +797,7 @@ class StepRecorder:
                 payload["output_ref"] = asdict(ref)
                 images = output.get("images") if isinstance(output, dict) else None
                 if isinstance(images, list) and images:
-                    # 截图作为证据的工件引用随结果留在事件里（浏览器与 computer use 设计说明「保存与绑定」、
+                    # 截图作为证据的工件引用随结果留在事件里（浏览器与 computer use docs/design/browser-and-computer-use.md「保存与绑定」、
                     # 试用记录的步骤，工单 #1180）：原文在工件库里，事件里只有引用
                     payload["images"] = [dict(item) for item in images if isinstance(item, dict)]
             event_type = EventType.TOOL_CALLED if observation.kind == "tool" else EventType.TOOL_SKIPPED

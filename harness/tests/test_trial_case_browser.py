@@ -1,4 +1,4 @@
-# 试用用例与真实的浏览器（浏览器与 computer use 设计说明「试用用例」、「QAReview 的逐条结论与放行」；工单 #1180）。
+# 试用用例与真实的浏览器（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」、「QAReview 的逐条结论与放行」；工单 #1180）。
 #
 # 这个文件查两件事，都用真实的 Playwright MCP、真实的 Chromium 与一个真实的小网页：
 # 1. 质检在一个真实会话里打开试用用例、在浏览器里操作、以 passed 结束：用例的步骤是这几步真实动作（按动作身份），

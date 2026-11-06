@@ -1,6 +1,6 @@
 # 项目投影与目录投影：不由裁决读取的两个投影及其折叠规则。
 # 它们是事件的同一种折叠结果，但控制核心的裁决（工具许可、提案校验、停止原因、边界）不读取它们，
-# 因此放在内核文件以外（可信内核设计说明「内核清单」）；写入口按流的处理者把它们与 run 投影一视同仁地折叠与保存。
+# 因此放在内核文件以外（可信内核 docs/design/trusted-kernel.md「内核清单」）；写入口按流的处理者把它们与 run 投影一视同仁地折叠与保存。
 
 from __future__ import annotations
 
@@ -150,7 +150,7 @@ class SourceDirectory:
 
 @dataclass
 class McpServersConfig:
-    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP 设计说明「版本与固定」）：整份设置一个版本。
+    # 项目设置里的 MCP 服务器（工单 #236，网络与 MCP docs/design/network-and-mcp.md「版本与固定」）：整份设置一个版本。
     # servers 是这个版本的非秘密设置与凭据引用（凭据值在调用时按凭据来源解析，不在这里）；
     # document_digest 是这份非秘密文档的摘要，事项冻结与工具清单快照按它核对。
     # 旧事件没有 MCP 设置时按空设置读取（version 0、没有服务器）。
@@ -172,7 +172,7 @@ class McpServersConfig:
 
 @dataclass
 class LastProbe:
-    # 最近一次探测的结果（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」、「应用层接口」）：project.settings 返回它。
+    # 最近一次探测的结果（工单 #1174，网络与 MCP docs/design/network-and-mcp.md「读取工具清单（探测）」、「应用层接口」）：project.settings 返回它。
     # 成功带服务器信息与工具清单快照，失败带原因（凭据值已替换为星号）；旧事件没有探测时按没有读
     server_name: str
     status: str

@@ -1,7 +1,7 @@
-# 浏览器工具定义的提取脚本（浏览器与 computer use 设计说明「运行方式」、「提供的工具」，工单 #147）。
+# 浏览器工具定义的提取脚本（浏览器与 computer use docs/design/browser-and-computer-use.md「运行方式」、「提供的工具」，工单 #147）。
 #
 # 浏览器工具的定义由 Playwright MCP 固定版本的 tools/list 生成，写进 harness/definitions/browser_tools.json，
-# 随 Yudao 发布；升级 Playwright MCP 时同时更新设计说明「执行位置上的程序」的版本与这份生成的定义。
+# 随 Yudao 发布；升级 Playwright MCP 时同时更新 docs/design/browser-and-computer-use.md「执行位置上的程序」的版本与这份生成的定义。
 #
 # 用法（仓库根目录）：
 #   uv run python scripts/extract_browser_tools.py --record      # 起真实的 Playwright MCP，记下 tools/list 的回复

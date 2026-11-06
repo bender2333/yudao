@@ -37,7 +37,7 @@ class CompactionPlan:
 
 SUMMARY_OUTPUT_TOKENS = 4096
 
-# 工具结果里的一张图像在本地估算中按这个值计（浏览器与 computer use 设计说明「请求中的图像」）。
+# 工具结果里的一张图像在本地估算中按这个值计（浏览器与 computer use docs/design/browser-and-computer-use.md「请求中的图像」）。
 # 图像的真实用量由上游按像素计算，请求里 data URL 的字节数不是它的用量：1280×800 的截图按
 # Anthropic 的宽高公式约 1400 token、按 OpenAI 的分块约 1100 token，取偏大的固定值
 IMAGE_TOKEN_ESTIMATE = 1600
@@ -45,7 +45,7 @@ IMAGE_TOKEN_ESTIMATE = 1600
 
 def request_input_tokens(items: list[dict[str, Any]], tools: list[dict[str, Any]],
                          max_output_tokens: int | None = None) -> int:
-    """本地估算（模型管理设计说明「用量」）：文字按 UTF-8 字节数除以 4，图像按张计固定值。"""
+    """本地估算（模型管理 docs/design/model-management.md「用量」）：文字按 UTF-8 字节数除以 4，图像按张计固定值。"""
     payload = {"input": _without_image_bytes(items), "tools": tools}
     if max_output_tokens is not None:
         payload["max_output_tokens"] = max_output_tokens

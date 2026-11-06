@@ -1,4 +1,4 @@
-# 循环与收敛状态的只读投影（工单 #397，循环与收敛设计说明「收敛的检测」、「判定参数」；总图第三节的边界、停止与
+# 循环与收敛状态的只读投影（工单 #397，循环与收敛 docs/design/loops-and-convergence.md「收敛的检测」、「判定参数」；总图第三节的边界、停止与
 # 子循环）：只由事件计算，不写事实、不调用模型。判定是确定的阈值规则，短序列的趋势不交给模型。
 #
 # 五层：项目循环 → 事项（项目循环的一轮，事项树的根）→ run → 激活 → 步骤。步骤以一次模型请求为单位
@@ -201,7 +201,7 @@ def missing_for_step(steps: Sequence[Step], *, window: int, state: str) -> str |
 
 
 def _reviews(events: Sequence[Event]) -> list[Mapping[str, Any]]:
-    # 放行记录：qa_submitted 事件上的逐条结论与覆盖数（验证的独立性设计说明「口径」，工单 #151/#1194）。
+    # 放行记录：qa_submitted 事件上的逐条结论与覆盖数（验证的独立性 docs/design/independent-verification.md「口径」，工单 #151/#1194）。
     # 旧事件没有这两项，交给 run_state 当作「缺少逐条结论」
     return [event.payload for event in events
             if event.type == EventType.QA_SUBMITTED and isinstance(event.payload, dict)]

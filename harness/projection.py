@@ -1,5 +1,5 @@
 # 状态投影：运行状态投影由 run 流的事件折叠而成，决定请求由所在流中的请求、回答与撤销事件折叠而成。
-# Agent 不能写投影。项目投影与目录投影不由裁决读取，放在内核文件以外（可信内核设计说明「内核清单」），
+# Agent 不能写投影。项目投影与目录投影不由裁决读取，放在内核文件以外（可信内核 docs/design/trusted-kernel.md「内核清单」），
 # 由写入口按流的处理者与 run 投影一视同仁地折叠与保存。
 # 投影随写入保存（写入口在追加事件的同一个事务中更新），读取时直接读取保存的投影；
 # 从头重放只用于重建保存的投影与核对它与重放结果一致。
@@ -190,7 +190,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
         state.prompt_config_versions = dict(payload["prompt_config_versions"])
         # 创建这个 run 时记录的 run 事件版本；旧事件没有这个字段时为 0，与当前版本不同（ADR-0019）
         state.run_event_version = int(payload.get("run_event_version", 0))
-        # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（总体架构「十项长期决定」中「带版本的定义」）
+        # 创建这个 run 时记录的定义版本；旧事件没有这个字段时为空（总体架构 docs/design/architecture/overall-architecture.md「十项长期决定」中「带版本的定义」）
         state.definitions_version = str(payload.get("definitions_version", ""))
         # 创建这个 run 时冻结的参数版本；旧 run 没有这个字段时为空（工单 #349）
         state.parameters_version = str(payload.get("parameters_version", ""))
@@ -825,7 +825,7 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
     )
 
 # ---------------------------------------------------------------------------
-# 试用记录（浏览器与 computer use 设计说明「试用用例」、「查询」，工单 #1180）：试用用例与它们的步骤由事件派生，
+# 试用记录（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」、「查询」，工单 #1180）：试用用例与它们的步骤由事件派生，
 # 不另外保存。用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份（模型给出的调用编号）
 # 关联为它的步骤；产生检查回执的一步同样计入。哪些工具算一步、哪一步是可执行的检验在 coverage 模块
 

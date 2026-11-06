@@ -236,7 +236,7 @@ def demo_script():
 
 
 def run_demo(data_dir: str | Path) -> tuple[LoopSystem, str]:
-    # demo 经应用层的命令新建项目与事项（应用层与接口层设计说明「命令行」）：
+    # demo 经应用层的命令新建项目与事项（应用层与接口层 docs/design/app-and-interface.md「命令行」）：
     # 事项由流程编排在接口进程的事件循环中作为任务运行，run 结束时由流程编排结算
     system = LoopSystem.for_testing(data_dir, FakeAdapter(demo_script(), stream_gap_sec=0.05))
     application = Application(system)

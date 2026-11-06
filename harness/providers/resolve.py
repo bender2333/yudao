@@ -55,7 +55,7 @@ class FrozenTarget:
     accepts_required_tool_call: bool = True
     # 模型访问定义声明的输入方式：步骤驱动按它决定这次请求提供的工具
     input_modalities: tuple[str, ...] = ("text",)
-    # 推理档位声明（模型管理设计说明「档位与声明」）与本次请求实际发送的档位；未声明档位时不发送推理参数
+    # 推理档位声明（模型管理 docs/design/model-management.md「档位与声明」）与本次请求实际发送的档位；未声明档位时不发送推理参数
     reasoning_levels: tuple[str, ...] = ()
     default_reasoning_level: str | None = None
     reasoning_mode: str = ""

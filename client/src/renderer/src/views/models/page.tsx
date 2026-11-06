@@ -1,4 +1,4 @@
-// 模型管理页（工单 #1297；模型管理设计说明「模型管理页」，原型 docs/prototypes/v14）。
+// 模型管理页（工单 #1297；模型管理 docs/design/model-management.md「模型管理页」，原型 docs/prototypes/v14）。
 // 页面按「连接服务 → 搜索筛选候选 → 勾选模型即补全参数并验证 → 部门使用」的单页流程组织。
 // 页面只读写服务端交付的命令与查询：连接与取候选用 catalog.connect 与 catalog.candidates.collect，
 // 选用用 catalog.model.select，取消选用用 catalog.model.remove，部门使用用 catalog.department_defaults.save，

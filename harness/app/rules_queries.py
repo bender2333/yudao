@@ -1,4 +1,4 @@
-# 规则登记的查询（设计说明「规则登记」与「规则登记的初始内容」的表格，工单 #343）。
+# 规则登记的查询（docs/design/rules-and-parameters.md「规则登记」与 docs/design/rules-and-parameters.md「规则登记的初始内容」的表格，工单 #343）。
 # 规则登记就是定义里的全部条目，不另建系统：这一条查询把登记的现值、四项记录、取值界限、来源、种类与形式读出来。
 
 from __future__ import annotations

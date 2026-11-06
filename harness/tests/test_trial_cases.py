@@ -1,4 +1,4 @@
-# 试用用例（浏览器与 computer use 设计说明「验收条件的引用」、「试用用例」、「QAReview 的逐条结论与放行」、「查询」；独立性说明「口径」；工单 #1180）。
+# 试用用例（浏览器与 computer use docs/design/browser-and-computer-use.md「验收条件的引用」、「试用用例」、「QAReview 的逐条结论与放行」、docs/design/browser-and-computer-use.md「查询」；独立性 docs/design/independent-verification.md「口径」；工单 #1180）。
 #
 # 这个文件查六件事：
 # 1. 用例与它的步骤由事件折叠而成：用例打开到结束之间，本部门在同一会话中的浏览器与屏幕动作按动作身份

@@ -174,7 +174,7 @@ def write_report(result, path, run_reports):
     _write(path, "\n".join(lines) + "\n")
 
 def _comparison_section(comparison):
-    """版本比较（`docs/design/rules-and-parameters.md` 「对照」）：结论与逐任务差值。"""
+    """版本比较（`docs/design/rules-and-parameters.md` docs/design/rules-and-parameters.md「对照」）：结论与逐任务差值。"""
     labels = {"improved": "改进", "no_difference": "无差别", "regressed": "退化", "blocked": "受阻"}
     verdict = labels.get(comparison.get("verdict"), "未判定")
     lines = ["| 项目 | 取值 |", "| --- | --- |",

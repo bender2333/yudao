@@ -1,4 +1,4 @@
-// 视图同步（应用层与接口层设计说明「页面的同步规则」）。
+// 视图同步（应用层与接口层 docs/design/app-and-interface.md「页面的同步规则」）。
 // 每个视图保存快照与位置；位置不大于快照位置的事件不作用于这个视图；按能力清单中查询声明的事件种类
 // 重新查询，200 毫秒内的多条事件合并为一次；切换项目或事项以后丢弃迟到的旧查询结果。
 
@@ -8,7 +8,7 @@ import { failureReason } from "./read-failure.ts";
 export type QueryRunner = <T>(name: string, params: Record<string, unknown> | undefined) => Promise<{ position: number; data: T }>;
 
 // 一份数据的监听者：拿到查询结果与它来自的快照的位置（工单 #952）。
-// 画面合同的状态要带位置（画面与播放设计说明「状态」），页面从 useSnapshot 拿到它再交给翻译层。
+// 画面合同的状态要带位置（画面与播放 docs/design/visualization.md「状态」），页面从 useSnapshot 拿到它再交给翻译层。
 export type ViewListener<T> = (value: T, position: number) => void;
 
 // 打开一个视图时登记的内容：查询名称与参数

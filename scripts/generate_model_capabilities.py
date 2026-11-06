@@ -1,4 +1,4 @@
-# 模型能力表的提取脚本（模型管理设计说明「服务方案预置表与模型能力表」）。
+# 模型能力表的提取脚本（模型管理 docs/design/model-management.md「服务方案预置表与模型能力表」）。
 # 发布前运行：读取 models.dev 的 api.json，收录全部服务商与设计规定的模型字段，
 # 写出 harness/definitions/model_capabilities.json，随 Yudao 新版本发布；运行时不从远端刷新。
 #

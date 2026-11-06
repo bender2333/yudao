@@ -1,7 +1,7 @@
 # 工具定义本身的规则：工具种类与动作类别、工具说明写明的证据要求、回执的显示方式、唯一的可重复判断入口，
 # 以及按输入方式提供工具的机制。这些结论只读取仓库内的定义与纯函数，登记为单元层。
 #
-# 动作合同的两项元数据（工单 #1170；恢复契约「动作分类与处置」；网络取回与 MCP 设计说明「本机的做法」；总图第四节「动作」缝）：
+# 动作合同的两项元数据（工单 #1170；恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」；网络取回与 MCP docs/design/network-and-mcp.md「本机的做法」；总图第四节「动作」缝）：
 # 类别只增、每类有自己的既定合同，定义与动作请求写明这两项，写错立刻拒绝，旧合同与旧定义照旧读得进来。
 # 定义与动作合同的导入方向（工单 #1275）：取值在定义一侧，定义不反过来导入动作合同。
 
@@ -25,7 +25,7 @@ TOOLS = DEFINITIONS.tools
 
 def test_tools_are_host_tools_or_environment_actions():
     # 主机工具由控制核心处理（提交类工具与询问/回答工具）；试用用例的两个工具也由控制核心处理，
-    # 它们写事件、不交给执行环境（浏览器与 computer use 设计说明「试用用例」，工单 #1180）
+    # 它们写事件、不交给执行环境（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）
     assert {name for name, tool in TOOLS.items() if tool.kind == "host"} == {
         *{name for name in TOOLS if name.startswith("submit_")}, "ask", "answer",
         "trial_case_begin", "trial_case_end"}
@@ -45,7 +45,7 @@ def test_tools_are_host_tools_or_environment_actions():
 
 
 def test_every_department_reads_saved_external_sources_and_fetches():
-    # 网络取回与 MCP 设计说明「工具的提供」：三个部门始终都有取回工具 fetch_url 与读已保存来源的
+    # 网络取回与 MCP docs/design/network-and-mcp.md「工具的提供」：三个部门始终都有取回工具 fetch_url 与读已保存来源的
     # read_external_source；普通事项与建档事项的工具清单都是显式写的，两份都要有（工单 #1171、#68）
     assert tool_kind("read_external_source") == "environment"
     assert tool_action("read_external_source") == "read"
@@ -76,7 +76,7 @@ def test_write_tools_belong_to_engineering_and_quality():
 
 
 def test_each_action_kind_follows_the_recovery_contract():
-    # 恢复契约「动作分类与处置」：读取与命令没有可以查询的外部结果，写入以树快照核实，检查的结果是检查回执、经查询取得；
+    # 恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」：读取与命令没有可以查询的外部结果，写入以树快照核实，检查的结果是检查回执、经查询取得；
     # 取回与 MCP 没有可以验证的查询；试用会话与浏览器按动作记录与会话记录查询，取消能否确认停止随工具不同
     assert {kind: (established_verification(kind), established_cancellable(kind))
             for kind in get_args(ActionKind)} == {

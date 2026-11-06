@@ -186,7 +186,7 @@ def _unavailable_report(data_dir: Path, config_path: Path, message: str, *,
 
 
 def _run_scenario(system: LoopSystem, name: str) -> dict[str, Any]:
-    # smoke 经应用层的命令新建项目与事项（应用层与接口层设计说明「命令行」）：
+    # smoke 经应用层的命令新建项目与事项（应用层与接口层 docs/design/app-and-interface.md「命令行」）：
     # run 结束时由流程编排结算（采纳）
     task = HAPPY_TASK if name == "happy" else ASK_TASK
     application = Application(system)

@@ -1,5 +1,5 @@
 // 资料页质检一项的逐条结论表与交付一项的启动方式（工单 #154；浏览器与 computer use 设计说明
-// 「页面与画面」、「QAReview 的逐条结论与放行」、「无法核验」；验证的独立性设计说明「检验覆盖与开环」、「口径」）。
+// docs/design/browser-and-computer-use.md「页面与画面」、「QAReview 的逐条结论与放行」、「无法核验」；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」）。
 //
 // 页面上要写的三样东西在这里先按查询结果的形状核对：
 //   - 六种检验方式的中文名：夹具 client/tests/fixtures/check-methods.json 的每个代码名都有一行，

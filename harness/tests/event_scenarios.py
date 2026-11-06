@@ -77,12 +77,12 @@ def _release(rationale: str = "checks passed on the current snapshot") -> Callab
 
 
 def _judgement(checks: dict[str, int | dict[str, Any]] | None = None) -> Callable[[ModelCall], FakeTurn]:
-    # 独立判断（验证的独立性设计说明「先判断后看解释」，工单 #358）：按请求里的当前交付填写依据版本
+    # 独立判断（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：按请求里的当前交付填写依据版本
     return judgement_turn(checks=checks if checks is not None else CHECKS)
 
 
 def _explore(name: str = "test_echo.py") -> FakeTurn:
-    # 质检的预测性探索（循环结构「各部门在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
+    # 质检的预测性探索（循环结构 docs/design/department-loop.md「各部门在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
     # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
     # 提交的结论被拒绝，这一轮到这里结束；交付到达以后质检开始新一轮工作。
     return FakeTurn(
@@ -371,7 +371,7 @@ def context_overflow(data_dir):
 def history_exceeds_the_window(data_dir):
     # 固定材料放得下；激活第一步的部门工作消息再次带上整段原始意图，加上部门历史以后超过窗口，
     # 摘要请求也放不下，运行以 compaction_failed 结束，没有模型调用。
-    # 窗口按固定材料的实测 token 数加余量推出，不写死数字（测试分层设计「测试的写法」中「测试不决定产品的文字」）。
+    # 窗口按固定材料的实测 token 数加余量推出，不写死数字（测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」）。
     # 余量的可行区间由实测确定：低于下界时错误变成「固定材料放不下摘要」，
     # 高于上界时摘要请求放得下，运行会真的调用模型（适配器脚本耗尽）。
     # 摘要请求里没有工具清单（固定材料里有），加一个工具时固定材料与窗口一起变大、摘要请求不变，

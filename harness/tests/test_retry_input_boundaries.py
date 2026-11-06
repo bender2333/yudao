@@ -54,7 +54,7 @@ def test_retryable_failure_after_new_input_retries_and_carries_it(tmp_path):
 def test_input_during_retry_backoff_is_carried_by_the_retry(tmp_path):
     # 工单 #964：输入在工作期间到达时，它在这个会话的下一步作为通知加入历史，
     # 这一轮不因此结束：重试照常进行，重试的请求里带着这条输入。
-    # 工单 #1226：先后由事件决定，不用时长去赌（测试分层设计说明「测试的写法」）：
+    # 工单 #1226：先后由事件决定，不用时长去赌（测试分层 docs/design/test-pyramid.md「测试的写法」）：
     # 退避安排的事件交给订阅方时退避还没有开始走，订阅方在这里等测试线程写完输入再放行，
     # 重试的请求在放行之后才装配。退避有多长、测试线程慢到什么时候都不影响判定
     text = "NEW USER ORIGINAL\nwith exact spacing"

@@ -132,7 +132,7 @@ def guidance_reply(text: str = "已按新的要求处理。"):
     """部门对待处理指导的收尾：以指导独占的一轮用文字回答结束。
 
     这一轮开始时关注的成果里只有指导，模型不调用工具的文字回复就是对用户的回答，
-    一轮工作就此正常结束（部门指导设计说明「处理结果与来源」，工单 #1037）；主机在一轮正常结束时
+    一轮工作就此正常结束（部门指导 docs/design/department-guidance.md「处理结果与来源」，工单 #1037）；主机在一轮正常结束时
     写已回答事件（工单 #1039）。"""
     def factory(request: ModelCall) -> FakeTurn:
         return FakeTurn(transcript=text)
@@ -418,7 +418,7 @@ COMPACTION_ROOM = 2600
 
 
 def pinned_window(system: LoopSystem, run_id: str, *departments: str, room: int = COMPACTION_ROOM) -> int:
-    """窗口按这些部门里最长的固定材料推出（测试分层设计「测试的写法」中「测试不决定产品的文字」：依赖说明长度的场景按场景需要
+    """窗口按这些部门里最长的固定材料推出（测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」：依赖说明长度的场景按场景需要
     设置窗口与阈值，不写死数字）。
 
     压缩阈值是窗口的 85%（`compaction.response_reserve`，没有声明输出上限时）：把窗口取成

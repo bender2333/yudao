@@ -1,4 +1,4 @@
-# 装配契约与执行契约的同一套契约检查（工单 #979；骨架与应用设计说明「装配契约」、「执行契约」、「其他路由：骨架要满足的条件」；总图第四节
+# 装配契约与执行契约的同一套契约检查（工单 #979；骨架与应用 docs/design/skeleton-and-application.md「装配契约」、「执行契约」、「其他路由：骨架要满足的条件」；总图第四节
 # 「装配」「执行」缝）。同一套参数化的检查各跑一遍真实实现与第二种实现：
 # 真实装配是 `assembly.py` 的 `ContextAssembly`，第二种是 `second_assembly.SecondAssembly`；
 # 真实执行是 `engine.py` 的 `StepDriver`，第二种是 `second_execution.SecondExecution`。

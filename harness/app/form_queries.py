@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class ProjectOrganization(Contract):
-    # 一个项目的组织：这一版只问形态这一节（设计说明「接口」「接口：查询」的组织那一行，
+    # 一个项目的组织：这一版只问形态这一节（docs/design/project-organization.md「接口」「接口：查询」的组织那一行，
     # 合成结果、每项来源、观察者开关与和上一个事项用的组织的不同由别的工单加进来）
     project_id: str
 

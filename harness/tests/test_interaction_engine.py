@@ -280,7 +280,7 @@ def test_user_input_during_a_quality_round_is_delivered_as_a_notification(tmp_pa
 
 def test_input_received_during_quality_model_response_is_delivered_as_a_notification(tmp_path):
     # 工单 #964：输入到达不再结束质检这一轮，它作为通知在这个会话的下一步送达，质检接着工作。
-    # 模型还没有看见新输入时，这次放行推迟到下一步；输入处理完以前不放行（循环结构「指导」）。
+    # 模型还没有看见新输入时，这次放行推迟到下一步；输入处理完以前不放行（循环结构 docs/design/department-loop.md「指导」）。
     # 工单 #561：下一步的放行同样要等产品把输入处理完，所以这一条改成运行到停止
     def stale_release(request):
         system.add_input(request.run_id, "Print uppercase instead")
@@ -316,7 +316,7 @@ def test_input_received_during_quality_model_response_is_delivered_as_a_notifica
 
 def test_input_committed_while_the_release_is_prepared_rejects_the_release(tmp_path, monkeypatch):
     # 质检放行正在准备接纳时另一个线程写入新输入：放行的提交因流版本改变被写入口拒绝，按写入以后的状态重新判断；
-    # 输入处理完以前不放行（循环结构「指导」），新输入保留，运行没有结束
+    # 输入处理完以前不放行（循环结构 docs/design/department-loop.md「指导」），新输入保留，运行没有结束
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
     system = LoopSystem.for_testing(tmp_path, FakeAdapter({
         "product": [product_spec()],
@@ -455,7 +455,7 @@ def test_compaction_keeps_activation_versions_and_carries_the_new_input(tmp_path
         return product_spec()
 
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([respond] * 100))
-    # 窗口按三个部门里最长的固定材料推出（pinned_window，测试分层设计「测试的写法」中「测试不决定产品的文字」，不写死窗口）：
+    # 窗口按三个部门里最长的固定材料推出（pinned_window，测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」，不写死窗口）：
     # 工程与质检也要在这个窗口里装配请求。材料按「窗口 × 85% − 产品的固定材料」的那一截的两倍给：
     # 一次读进来以后压缩要分几轮，输入在轮与轮之间到达，后一轮按新的输入版本装配（工单 #964 的场景，
     # 工单 #1184 按新的固定材料重推）

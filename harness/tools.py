@@ -13,7 +13,7 @@ from typing import Any
 
 from .definitions import DEFINITIONS, Definitions, Verification, thaw
 
-# 浏览器工具（浏览器与 computer use 设计说明「提供的工具」，工单 #147）：由 scripts/extract_browser_tools.py 从
+# 浏览器工具（浏览器与 computer use docs/design/browser-and-computer-use.md「提供的工具」，工单 #147）：由 scripts/extract_browser_tools.py 从
 # Playwright MCP 0.0.83 的 tools/list 生成定义，按这张表筛选。browser_drop 能把本机路径的文件投给页面，
 # 路径规则与 browser_file_upload 相同（限试用副本内）。
 BROWSER_TOOL_NAMES: tuple[str, ...] = (
@@ -131,7 +131,7 @@ def submit_tool(kind: str, *, definitions: Definitions | None = None) -> str | N
 def offers_with_input(tool_names: list[str], input_modalities: tuple[str, ...], *,
                       definitions: Definitions | None = None) -> list[str]:
     # 这次请求提供的工具：按调用目标的输入方式去掉声明需要图像输入而调用目标不含图像的工具
-    # （docs/design/model-management.md「部门的建议能力」「请求时」；浏览器设计「工具定义的声明」的屏幕工具与 browser_take_screenshot 属于这一类）
+    # （docs/design/model-management.md「部门的建议能力」「请求时」；浏览器 docs/design/browser-and-computer-use.md「工具定义的声明」的屏幕工具与 browser_take_screenshot 属于这一类）
     if "image" in input_modalities:
         return list(tool_names)
     tools = in_force(definitions).tools

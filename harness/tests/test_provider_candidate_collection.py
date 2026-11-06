@@ -8,7 +8,7 @@ from harness.providers import capabilities
 from harness.tests.protocol_helpers import ScriptedProvider, send_reply
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
-# 候选采集从上游模型列表取窗口与输出上限（模型管理设计说明「模型访问定义与准入」）：上游用 context_length 与
+# 候选采集从上游模型列表取窗口与输出上限（模型管理 docs/design/model-management.md「模型访问定义与准入」）：上游用 context_length 与
 # max_completion_tokens 两种顶层字段时，采集结果里的候选带着这两项，来源仍是上游模型列表；
 # 列表没有返回容量的候选里没有这两个键。模型列表由测试内启动的真实 HTTP 服务给出（集成层）。
 

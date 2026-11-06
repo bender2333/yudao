@@ -26,9 +26,9 @@ TREE_FORMAT = "yudao-public-tree-v1"
 _HASH = re.compile(r"sha256:[0-9a-f]{64}")
 # 工作区忽略规则探测用的 Git 目录：放在工作区自身之外，避免它成为公开树的条目
 IGNORE_PROBE_DIR = ".yudao-ignore-probe.git"
-# 捕获撞上并发写入时的重读（工单 #1214，[设计说明](docs/design/local-tools.md)「工具边界」「公开树」）：
+# 捕获撞上并发写入时的重读（工单 #1214，[设计说明](docs/design/local-tools.md)docs/design/local-tools.md「工具边界」「公开树」）：
 # 文件、目录或整棵树在两次扫描之间变了，读这一侧重读整份捕获，次数有界；
-# 工作区本来就有多会话并发读写（「工作区」「每块内容只有一个写入者」是纪律，不是锁），
+# 工作区本来就有多会话并发读写（docs/design/local-tools.md「工作区」「每块内容只有一个写入者」是纪律，不是锁），
 # 因此一次并发写入不结束事项。次数用完仍不稳定才以 TreeError 交出文件与原因。
 CAPTURE_ATTEMPTS = 3
 # 每次重读前的等待（秒），递减：一直变的工作区不会因为等得更久而稳定，

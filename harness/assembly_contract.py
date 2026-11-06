@@ -1,4 +1,4 @@
-# 装配契约第一版（骨架与应用设计说明「契约」、「装配契约」；总图第四节「装配」缝）：
+# 装配契约第一版（骨架与应用 docs/design/skeleton-and-application.md「契约」、「装配契约」；总图第四节「装配」缝）：
 # 输入事件日志里这个部门与会话的历史、定义、材料、调用目标的窗口与输出上限，以及路由的工作引用；
 # 输出装配好的请求与上下文清单，两者都记进日志；不改事实。
 # 本模块只导入内核（kernel_events、definitions）与标准库，以及契约圈的 contract_versions；实现（assembly.py 的 ContextAssembly）声明实现这一版，

@@ -1,6 +1,6 @@
 """Yudao 运行器：只经 HTTP 接口驱动 Yudao，只从导出的事件日志观察它。
 
-评测场景设计「模块划分」：运行器只把起点与公开部分交给被测方；不导入 `harness` 的任何
+评测场景 docs/design/evaluation-scenarios.md「模块划分」：运行器只把起点与公开部分交给被测方；不导入 `harness` 的任何
 模块，同一套工具因此可以评测不同版本的 Yudao。凭据只从环境变量读（被测模型的地址
 与 Key 在用户环境变量 `YUDAO_EVAL_BASE_URL`、`YUDAO_EVAL_API_KEY` 中），不写进代码、
 事件、日志与提交。
@@ -30,25 +30,25 @@ import uuid
 import material_integrity
 import model_service
 
-# 一次评测运行的场景（评测场景设计「三个场景」）：场景 3 从较长的 PRD 新建项目，场景 2 接入已有仓库。
+# 一次评测运行的场景（评测场景 docs/design/evaluation-scenarios.md「三个场景」）：场景 3 从较长的 PRD 新建项目，场景 2 接入已有仓库。
 # 入口按 `--scenario` 设一次；测试用 `scenario()` 临时切换，结束后恢复
 SCENARIO_2 = "scenario-2"
 SCENARIO_3 = "scenario-3"
 SCENARIOS = (SCENARIO_2, SCENARIO_3)
 SCENARIO = SCENARIO_3
 
-# 场景 3 的运行模型在三个部门都使用同一条连接与同一个访问定义（评测场景设计「两边的运行条件」）
+# 场景 3 的运行模型在三个部门都使用同一条连接与同一个访问定义（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）
 PROVIDER_ID = "yudao-eval"
 MODEL_DEFINITION_ID = "yudao-eval-model"
 PROTOCOL = "chat_completions"
 # 场景 3 交给 Yudao 的起点：只有题目提供的数据文件
 START_FILES = ("subway_data.json",)
-# 场景 2 的起点是检出好的上游仓库，经 `project.onboard` 接入；建档的那个事项的种类（接入已有项目设计说明「领域事件」）
+# 场景 2 的起点是检出好的上游仓库，经 `project.onboard` 接入；建档的那个事项的种类（接入已有项目 docs/design/existing-project-onboarding.md「领域事件」）
 ONBOARDING_SOURCE_NAME = "upstream"
 INITIAL_PRD_KIND = "initial_prd"
 CONFIRM_OPTION = "confirm"
 TERMINAL_STATUSES = ("done", "paused", "failed")
-# 建档事项还在执行、或者在等用户确认初始 PRD 时的状态（接入已有项目设计说明「查询的变化」）
+# 建档事项还在执行、或者在等用户确认初始 PRD 时的状态（接入已有项目 docs/design/existing-project-onboarding.md「查询的变化」）
 ONBOARDING_RUNNING_STATUSES = ("in_progress", "not_started", "awaiting_initial_prd")
 # 目录文档里的模型 id 与被测模型名是同一个字符串，按 #88 由用户提供的模型决定
 POLL_INTERVAL_SECONDS = 3.0
@@ -84,7 +84,7 @@ _SCENARIO_MODULES = {}
 def scenario_module():
     """当前场景的运行器专用部分：材料目录、评分输入与上游仓库地址由它给出。
 
-    两边的运行器共用同一个 `scenarioN` 模块（评测场景设计「模块划分」），场景 2 与场景 3
+    两边的运行器共用同一个 `scenarioN` 模块（评测场景 docs/design/evaluation-scenarios.md「模块划分」），场景 2 与场景 3
     的评分输入与上游地址都在里面。按文件路径加载：场景 2 的运行器模块与评分器的模块
     同名（`runner/scenario2.py` 与 `scorer/scenario2.py`），同一个进程里先导入的那个
     会占住 `scenario2` 这个名字，按模块名查找会拿到评分器。
@@ -158,7 +158,7 @@ def prepare_source_dir(runs_root, run_id, *, repo_url=None, commit=None, install
 
     检出方式沿用 OpenCode 一侧的 `scenario2.fill_run_dir`：按材料里的基准提交号从
     上游检出，再用仓库自己的锁文件建立 Python 3.13 环境。两处不同：`.git` 保留，
-    快照要记下 git 提交（接入已有项目设计说明「已有测试与 git 历史作为基线的证据」）；不放需求原文，评测材料
+    快照要记下 git 提交（接入已有项目 docs/design/existing-project-onboarding.md「已有测试与 git 历史作为基线的证据」）；不放需求原文，评测材料
     不进入被接入的目录。远端地址检出以后去掉，工作区里不留回到上游的入口。
 
     `repo_url`、`commit`、`install_command` 只由测试给出：用测试里建的本地小仓库
@@ -206,7 +206,7 @@ def install_environment(repo_dir, install_command=None):
 
 
 # 场景 3 的任务上游仓库（PRDBench）。运行器在导出的事件日志里查找对它的访问，
-# 与材料目录的路径使用同一条作废处理（评测场景设计「两边的运行条件」「联网」）。
+# 与材料目录的路径使用同一条作废处理（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「联网」）。
 UPSTREAM_REPOSITORY = "AGI-Eval-Official/PRDBench"
 UPSTREAM_URLS = ("https://github.com/" + UPSTREAM_REPOSITORY,)
 
@@ -221,7 +221,7 @@ def upstream_urls():
 
 
 def requirement_text():
-    """交给 Yudao 的用户原始意图（评测场景设计「两边的运行条件」「输入」）。
+    """交给 Yudao 的用户原始意图（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「输入」）。
 
     场景 3 是需求原文加接口约定：两边的输入是同一份，全文写在这条原文里，工作区里
     没有这两个文件，工程不需要去读它们；起点文件（`subway_data.json`）由运行器经
@@ -241,7 +241,7 @@ def requirement_text():
 
 
 def _scenario_python():
-    """场景 3 的运行环境是 uv 管理的 Python 3.13（评测场景设计「两边的运行条件」）。"""
+    """场景 3 的运行环境是 uv 管理的 Python 3.13（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）。"""
     found = subprocess.run(["uv", "python", "find", "3.13"],
                            capture_output=True, encoding="utf-8", errors="replace")
     path = (found.stdout or "").strip()
@@ -340,7 +340,7 @@ def start_service(data_dir, port, python_executable=None):
 
     `--no-browser`：运行器不需要在控制主机上打开页面，评测运行与测试都按无界面启动。
     `--no-fetch`：关闭取回，这个实例的部门没有 `fetch_url` 与 `read_external_source`
-    （网络与 MCP 设计说明「工具的提供」、评测场景设计说明「两边的运行条件」「两边都不联网」）。
+    （网络与 MCP docs/design/network-and-mcp.md「工具的提供」、评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「两边都不联网」）。
     """
     command = [python_executable or sys.executable, "-m", "harness", "api",
                "--data-dir", data_dir, "--port", str(port), "--no-browser", "--no-fetch"]
@@ -428,7 +428,7 @@ def register_model(client, model_name, limits):
 
 
 def create_project(client, name, goal, initial_directory=None):
-    """新建项目；`initial_directory` 是这次运行的起点文件夹（评测场景设计「两边的运行条件」「输入」）。"""
+    """新建项目；`initial_directory` 是这次运行的起点文件夹（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「输入」）。"""
     created = client.command("project.create", {"name": name, "goal": goal,
                                                 "initial_directory": initial_directory})
     return created["refs"]["project_id"]
@@ -448,16 +448,16 @@ def save_department_settings(client, project_id):
 
 
 def submit_requirement(client, project_id, text):
-    """以用户原始意图提交需求原文加接口约定（评测场景设计「两边的运行条件」「输入」）。"""
+    """以用户原始意图提交需求原文加接口约定（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「输入」）。"""
     created = client.command("work_item.create", {"project_id": project_id, "text": text})
     return created["refs"]["work_item_id"], created["refs"]["run_id"]
 
 
 # ---------------------------------------------------------------------------
-# 场景 2 的建档：接入已有仓库、确认初始 PRD（接入已有项目设计说明「应用层命令、决定与领域事件」、「建档流程」）
+# 场景 2 的建档：接入已有仓库、确认初始 PRD（接入已有项目 docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」、「建档流程」）
 
 def onboard_project(client, name, goal, source_path):
-    """接入已有项目：新建项目、登记源目录、采集快照、开始建档事项（「命令」）。
+    """接入已有项目：新建项目、登记源目录、采集快照、开始建档事项（docs/design/existing-project-onboarding.md「命令」）。
 
     返回项目、建档事项与建档 run 三个编号：建档的导出按 run 取，与事项的导出分开。
     """

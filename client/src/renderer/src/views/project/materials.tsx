@@ -1,7 +1,7 @@
 // 资料页（原型 v10 设计说明第 7.3 节，工单 #380）：只读，先按事项索引，再按 intend、PRD、
 // 交付、质检、项目材料的顺序查看。数据仍来自 project.overview 与 work_item.materials 两个已登记的查询。
 // 范围跟随顶栏的 ?w=；没有选中事项时取进行中的一项，并在索引卡上写明当前查看的是哪一项。
-// 接入已有项目的建档各轮（工单 #138，设计「领域事件」、「产品：初始 PRD」）按轮列出初始 PRD、结构说明、基线核验
+// 接入已有项目的建档各轮（工单 #138，docs/design/existing-project-onboarding.md「领域事件」、「产品：初始 PRD」）按轮列出初始 PRD、结构说明、基线核验
 // 与确认记录；旧版本的执行（原型里的 mt-oldruns）在所属工作包登记查询以后加入。
 
 import { useEffect, useState, type CSSProperties } from "react";
@@ -187,7 +187,7 @@ function IntendBlock(props: { rows: WorkItemMaterialsResult["inputs"] }) {
   );
 }
 
-// 建档各轮（工单 #138，设计「领域事件」、「产品：初始 PRD」）：接入已有项目的每一轮候选，逐轮列出初始 PRD 与
+// 建档各轮（工单 #138，docs/design/existing-project-onboarding.md「领域事件」、「产品：初始 PRD」）：接入已有项目的每一轮候选，逐轮列出初始 PRD 与
 // 结构说明的原文、上一轮的修改意见、基线核验的各条结论与检查、这一轮的确认记录
 function OnboardingBlock(props: { rounds: WorkItemMaterialsResult["onboarding_rounds"] }) {
   return (

@@ -8695,7 +8695,7 @@
           "state"
         ],
         "title": "DepartmentState",
-        "description": "一个部门在这个事项上的状态与原因（三部门的循环结构「部门的状态」）。\n\nstate 取总图外环的五个词；note 是一句话，没有原因时为空。"
+        "description": "一个部门在这个事项上的状态与原因（三部门的循环结构 docs/design/department-loop.md「部门的状态」）。\n\nstate 取总图外环的五个词；note 是一句话，没有原因时为空。"
       },
       "DepartmentWorkspaceResult": {
         "properties": {
@@ -17792,7 +17792,7 @@
           "conclusion"
         ],
         "title": "WorkItemProgress",
-        "description": "事项的进度：从成果推算（循环结构「部门按关注的成果开始工作」）。\n\n阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、\n最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。"
+        "description": "事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）。\n\n阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、\n最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。"
       },
       "WorkItemRefs": {
         "properties": {

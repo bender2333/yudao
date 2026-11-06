@@ -1,7 +1,7 @@
 """Yudao 一侧的指标与过程检查点：全部从导出的事件日志计算，不使用模型。
 
-设计依据：`docs/design/evaluation-scenarios.md` 「过程检查点与指标」、「报告与版本比较」；版本比较与
-对照实验约束见 `docs/design/rules-and-parameters.md` 「对照」。
+设计依据：`docs/design/evaluation-scenarios.md` docs/design/evaluation-scenarios.md「过程检查点与指标」、「报告与版本比较」；版本比较与
+对照实验约束见 `docs/design/rules-and-parameters.md` docs/design/rules-and-parameters.md「对照」。
 """
 
 import json

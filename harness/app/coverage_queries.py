@@ -1,9 +1,9 @@
-# 检验覆盖的查询（工单 #399；应用层与接口层设计说明「查询清单」 `acceptance.coverage`；
-# 验证的独立性设计说明「检验覆盖与开环」、「口径」）：读核验角色放行记录里一次算好的数与逐条结论（工单 #151 在
+# 检验覆盖的查询（工单 #399；应用层与接口层 docs/design/app-and-interface.md「查询清单」 `acceptance.coverage`；
+# 验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」）：读核验角色放行记录里一次算好的数与逐条结论（工单 #151 在
 # 提交放行时用 harness/coverage.py 算好写进事实），这里不重新计算；查询只读，按位置回放同一段事件流
 # 得到同一份结果。
 #
-# 逐条结论的检验方式与结果词表（「口径」）：`check`、`trial`、`measure` 是可执行的检验，
+# 逐条结论的检验方式与结果词表（docs/design/independent-verification.md「口径」）：`check`、`trial`、`measure` 是可执行的检验，
 # `judgement`、`human`、`open` 不可执行；结果是 `passed`、`failed`、`unverified`。
 # 是否开环按可执行与否判定，开环明细读放行记录里存下的那一份。
 

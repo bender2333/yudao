@@ -1,4 +1,4 @@
-// 项目设置页的「MCP 服务器」一节（工单 #237；网络与 MCP 设计说明「服务器设置」、「读取工具清单（探测）」、「项目设置的「MCP 服务器」一节」）。
+// 项目设置页的「MCP 服务器」一节（工单 #237；网络与 MCP docs/design/network-and-mcp.md「服务器设置」、「读取工具清单（探测）」、「项目设置的「MCP 服务器」一节」）。
 // 数据来自 project.settings 的 mcp_servers：保存的非秘密设置、版本，与设置里各凭据名称的状态。
 // 保存走 mcp_servers.save（带基准版本，过期时拒绝并提示重新读取）；探测走 tool_server.probe，
 // 命令接受以后作为任务进行，结果以项目流事件 tool_server_probe_finished 出现，到达之前显示「测试中」。

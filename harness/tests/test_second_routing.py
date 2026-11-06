@@ -1,4 +1,4 @@
-# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用设计说明「其他路由：骨架要满足的条件」「证明」；
+# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用 docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」「证明」；
 # 总图第四节「路由」缝）。
 #
 # 证明的样子：同一副骨架（写入口、裁决、边界、薄驱动、最小投影、定义加载）接上另一套应用——
@@ -160,7 +160,7 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path):
 
 
 def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_path):
-    # 基础规则 3「生成者不裁决自己」：路由用自己的方式满足（骨架与应用设计说明「其他路由：骨架要满足的条件」），
+    # 基础规则 3「生成者不裁决自己」：路由用自己的方式满足（骨架与应用 docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」），
     # 这里用这次运行里真实写下的事件折出的池子现状来判，不构造假的池子
     system, _adapter = _system(tmp_path)
     run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)

@@ -192,7 +192,7 @@ class Application:
     def open(cls, data_dir: str | Path, *, provider_config: Path | None, dotenv: Path,
              listen: tuple[str, int] | None = None) -> Application:
         # 服务进程使用的控制核心：读取模型目录与凭据文件，并在文件被外部修改时重新读取。
-        # listen 是接口层实际的监听地址与端口（网络与 MCP 设计说明「拒绝的地址」、「本机的做法」）：取回与浏览器导航
+        # listen 是接口层实际的监听地址与端口（网络与 MCP docs/design/network-and-mcp.md「拒绝的地址」、「本机的做法」）：取回与浏览器导航
         # 只拒绝这些地址与端口，所以由接口层在启动时交给应用，应用交给取回
         if listen is not None:
             fetch.configure_service_address(*listen)

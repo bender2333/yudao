@@ -576,7 +576,7 @@ def test_archived_unsettled_release_settles_on_read_not_on_start(data_dir):
     assert project.work_items[0].status == "adopted"
 
 def test_release_touching_kernel_paths_is_not_adopted_without_approval(data_dir):
-    # 受控内核设计说明「路径守卫」：交付改动了内核清单里的路径时，结算不自动采纳，
+    # 受控内核 docs/design/trusted-kernel.md「路径守卫」：交付改动了内核清单里的路径时，结算不自动采纳，
     # 而是发出内核修改决定请求，材料附改动的路径与差异
     kernel_files = {"src/echo.py": "LOWER = True\n", "harness/bounds.py": "# 被交付改动的内核文件\n"}
     system = _system(data_dir, _kernel_release_script(files=kernel_files))

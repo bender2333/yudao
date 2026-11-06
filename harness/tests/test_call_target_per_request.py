@@ -360,7 +360,7 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path, monk
     # 重新测试通过并回答以后继续执行；引用保留，已完成的工作与已用限额保留（工单 #86）
     # 同一次运行跨越产品与工程两个部门：产品请求返回产品要求，工程请求返回交付文件
     # 同时运行的会话（工单 #557）：工程与质检各自走到被挡住的那一步，各发一条待恢复的决定请求
-    # （模型管理设计说明「引用无法使用时」：同一事项里同时有几个会话被挡住时，各发一条，各写明自己的部门、模型与问题，
+    # （模型管理 docs/design/model-management.md「引用无法使用时」：同一事项里同时有几个会话被挡住时，各发一条，各写明自己的部门、模型与问题，
     # 事项等这几条都回答以后再继续）
     # 质检的驱动器在安全节点以前让出一次：确定地走到「两个会话同时被挡住」的场景，不靠时序碰运气
     _yield_before_the_safe_node(monkeypatch, "quality")
@@ -392,7 +392,7 @@ def test_revoked_admission_blocks_the_next_request_until_retested(tmp_path, monk
         # 它自己也被挡住时（这次的模型请求发不出去），它写下自己的那一条（docs/design/model-management.md「引用无法使用时」）。
         assert set(facade.blocked_departments) == {"engineering", "quality"}, facade.blocked_departments
         # 同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，每条写明自己的部门
-        # （模型管理设计说明「引用无法使用时」：这次模型请求不发送，事项停在这次请求之前）
+        # （模型管理 docs/design/model-management.md「引用无法使用时」：这次模型请求不发送，事项停在这次请求之前）
         _position, decisions = saved_decisions(system.store, statuses=("open",))
         assert [decision.request["kind"] for decision in decisions] == ["model_unavailable", "model_unavailable"]
         assert {decision.request["department"] for decision in decisions} == {"engineering", "quality"}

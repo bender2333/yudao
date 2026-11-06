@@ -28,7 +28,7 @@ STARTUP_TIMEOUT_SEC = 30
 
 
 def bearer(token: str) -> dict[str, str]:
-    # 请求头里的访问令牌（应用层与接口层设计说明「令牌与 TLS」）：令牌只放在请求头中，不出现在地址里
+    # 请求头里的访问令牌（应用层与接口层 docs/design/app-and-interface.md「令牌与 TLS」）：令牌只放在请求头中，不出现在地址里
     return {"Authorization": f"Bearer {token}"}
 
 

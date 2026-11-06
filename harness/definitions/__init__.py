@@ -29,13 +29,13 @@ Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
 # 本模块不依赖动作合同，只导入本模块的 Provider 模块因此不会带上动作层（工单 #1275）
 ActionKind = Literal["read", "write", "check", "command", "fetch", "mcp", "trial", "browser"]
 
-# 核实方法（恢复契约「动作分类与处置」「结果未知时向哪里查」）：none 不查询外部结果，snapshot 以动作前后的公开树快照
+# 核实方法（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」「结果未知时向哪里查」）：none 不查询外部结果，snapshot 以动作前后的公开树快照
 # 核对实际效果，query 按尝试身份查询执行环境的动作记录、检查回执或试用会话记录
 Verification = Literal["none", "snapshot", "query"]
 
 # 每类动作的既定合同：（核实方法，取消能否确认停止）。None 表示这一类里随工具不同，必须由定义写明。
 # 前四类是在这份合同之前就有的动作：读取与命令没有可以查询的外部结果，写入以树快照核实，检查的结果是检查回执、
-# 经执行环境的查询取得；它们的定义可以省略这两项，按这里的值解释（恢复契约「动作分类与处置」）
+# 经执行环境的查询取得；它们的定义可以省略这两项，按这里的值解释（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）
 ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]] = {
     "read": ("none", True),
     "write": ("snapshot", True),
@@ -47,13 +47,13 @@ ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]]
     "browser": (None, True),
 }
 
-# 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明「本机的做法」）
+# 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP docs/design/network-and-mcp.md「本机的做法」）
 ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
 
-# 取回工具（网络与 MCP 设计说明「工具的提供」）：部门按定义都有这两个工具；以关闭取回的启动参数
+# 取回工具（网络与 MCP docs/design/network-and-mcp.md「工具的提供」）：部门按定义都有这两个工具；以关闭取回的启动参数
 # （`--no-fetch`）运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里
 # 不动：取舍发生在「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，
-# 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明「两边的运行条件」）
+# 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）
 FETCH_TOOLS: tuple[str, ...] = ("fetch_url", "read_external_source")
 
 # 取回是否可用：进程范围的启动设置，默认可用；只在启动时由命令行改一次（工单 #1172）
@@ -88,7 +88,7 @@ def check_contract(kind: ActionKind, verification: Verification | None, cancella
     if kind in ADDED_KINDS and (verification is None or cancellable is None):
         raise ValueError(f"a {kind} action requires verification and cancellable")
 
-# 规则登记中的条目名：由点号连接的小写标识，每一段与 Identifier 相同（设计说明「规则登记」、「规则登记的初始内容」）。
+# 规则登记中的条目名：由点号连接的小写标识，每一段与 Identifier 相同（docs/design/rules-and-parameters.md「规则登记」、「规则登记的初始内容」）。
 # 前一段是领域，最后一段是条目；等待的时长上限与栏目上限因此写作 wait.desktop.max_sec、
 # context.column_limit.catalog
 RuleName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")]
@@ -149,7 +149,7 @@ def _frozen(*fields: str) -> Any:
 
 
 class Rule(_Definition):
-    # 规则登记的一个条目（设计说明「规则登记」）：在现值之外带四项记录与取值界限，
+    # 规则登记的一个条目（docs/design/rules-and-parameters.md「规则登记」）：在现值之外带四项记录与取值界限，
     # 全部条目合起来就是规则登记，不另建系统
     # 现值的类型：数值（int 或 float，取值与界限都是有限的数）、开关（bool）、
     # 可见范围（字符串列表，界限约束条目数）、档位名（字符串，界限给的是档位表的长度）
@@ -202,7 +202,7 @@ class Department(_Definition):
     # 本部门模型的建议能力：取值来自模型访问定义的输入方式。
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
-    # 部门关注的成果（三部门的循环结构「部门按关注的成果开始工作」）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
+    # 部门关注的成果（三部门的循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
     # 关注关系写在定义里，代码里只有一条通用规则。名称的含义归路由：哪些名称认得出由那份路由的定义与它的
     # 校验给出，内核只核对它是字符串（工单 #1456）。user_input 只在旧定义里还有解释来源的用处：没有写
     # sources 的旧定义按「关注用户输入的部门」解释两种来源（Definitions.source_department，工单 #1455）
@@ -283,7 +283,7 @@ class Organization(_Definition):
     # 字段只增：没有写这个字段的旧定义按「关注用户输入的部门」解释两种来源（Definitions.source_department）；
     # 写了就必须每一种来源都写明，接它的部门要在这份定义里（加载时由 source_issues 核对）
     sources: Mapping[ItemSource, Identifier] | None = None
-    # 路由实现的名称（骨架与应用设计说明「路由契约」、工单 #825）：启动时按这个名称接上实现，
+    # 路由实现的名称（骨架与应用 docs/design/skeleton-and-application.md「路由契约」、工单 #825）：启动时按这个名称接上实现，
     # 名称必须是 routings.json 里登记的其中一个。默认是成果驱动
     routing: Identifier = "watched_outputs"
     # 核验声明：谁核验谁的哪种成果、角色的写入范围。没有写时按旧定义的三部门解释（LEGACY_VERIFICATION），
@@ -310,13 +310,13 @@ class Tool(_Definition):
     # 环境工具的动作类别：读取、写入、检查、本地命令与新增的四类（网络取回、MCP、试用会话、浏览器）；
     # 许可规则与执行环境的分派按动作类别适用，实际工具名仍供许可、提案与装配读取
     action: ActionKind | None = None
-    # 这一类动作的核实方法与取消能否确认停止（恢复契约「动作分类与处置」）：旧类别可以省略，按类别的既定值解释；
+    # 这一类动作的核实方法与取消能否确认停止（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）：旧类别可以省略，按类别的既定值解释；
     # 新增的类别必须写明（动作合同：harness/actions.py 的 check_contract）
     verification: Verification | None = None
     cancellable: bool | None = None
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
-    # 声明这个工具需要图像输入（与浏览器设计「工具定义的声明」）：调用目标不含图像时
+    # 声明这个工具需要图像输入（与浏览器 docs/design/browser-and-computer-use.md「工具定义的声明」）：调用目标不含图像时
     # 步骤驱动不在这次请求的工具定义中提供它。现在声明为需要的工具由 3.2D 的浏览器与 computer use 提供
     requires_image_input: bool = False
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
@@ -596,7 +596,7 @@ class RoutingEndReason(_Definition):
     human_action: str | None = None
 
 
-# 事件的主要事实从哪里来（应用层与接口层设计说明「事件对象」）：确定规则的判定、决策模型的判定、
+# 事件的主要事实从哪里来（应用层与接口层 docs/design/app-and-interface.md「事件对象」）：确定规则的判定、决策模型的判定、
 # 角色的陈述、主机的测量、用户。事件载荷不带来源字段，来源由 event_sources.json 按事件种类给出
 SourceKind = Literal["rule", "decision_model", "role_statement", "host_measurement", "user"]
 
@@ -705,7 +705,7 @@ class Definitions(_Definition):
     # 工具定义，键是工具名称
     tools: Mapping[Identifier, Tool]
     proposal_contracts: ProposalContracts
-    # 规则登记（设计说明「规则登记」）：键是条目名，全部条目合起来就是登记，不另建系统
+    # 规则登记（docs/design/rules-and-parameters.md「规则登记」）：键是条目名，全部条目合起来就是登记，不另建系统
     rules: Mapping[RuleName, Rule]
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: Mapping[Identifier, StopReason]
@@ -749,7 +749,7 @@ class Definitions(_Definition):
         raise ValueError(f"unknown department {department!r}")
 
     def watched_outputs(self, department: str) -> tuple[str, ...]:
-        """部门关注的成果（循环结构「部门按关注的成果开始工作」）：关注关系写在组织定义里，代码里只有一条通用规则。"""
+        """部门关注的成果（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）：关注关系写在组织定义里，代码里只有一条通用规则。"""
         for item in self.organization.departments:
             if item.id == department:
                 return item.watched
@@ -932,7 +932,7 @@ _FILES: dict[str, tuple[str, TypeAdapter[Any]]] = {
     "routings.json": ("routings", TypeAdapter(Routings)),
     "outcome_kinds.json": ("outcome_kinds", TypeAdapter(OutcomeKinds)),
     "event_sources.json": ("event_sources", TypeAdapter(dict[Identifier, EventSource])),
-    # 生成的浏览器工具定义（浏览器与 computer use 设计说明「运行方式」，工单 #147）：与 tools.json 合并成工具清单
+    # 生成的浏览器工具定义（浏览器与 computer use docs/design/browser-and-computer-use.md「运行方式」，工单 #147）：与 tools.json 合并成工具清单
     "browser_tools.json": ("browser_tools", TypeAdapter(dict[Identifier, Tool])),
 }
 # 可以不存在的定义文件（字段只增，旧文件新版本能读）。

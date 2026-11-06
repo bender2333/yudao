@@ -115,7 +115,7 @@ def test_guidance_goes_from_received_to_in_input_to_answered(tmp_path):
 
 def test_guidance_for_a_waiting_department_starts_a_full_round(tmp_path):
     # 验收第 1 条（在等待工作）：指导是接收部门关注的成果，它在这一轮开始一轮完整的工作，
-    # 可以读取、写入、运行检查、询问与提交正式成果（循环结构「指导」，工单 #560）；
+    # 可以读取、写入、运行检查、询问与提交正式成果（循环结构 docs/design/department-loop.md「指导」，工单 #560）；
     # 不为它另设一种只回应指导的轮次（工单 #556 的过渡做法已删除），也没有提交回应的工具（工单 #1038）
     adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
@@ -141,7 +141,7 @@ def test_guidance_for_a_waiting_department_starts_a_full_round(tmp_path):
 
 def test_guidance_received_during_model_request_becomes_a_notification(tmp_path):
     # 工单 #558：指导在工作期间到达时，它在这个会话的下一步作为通知加入历史；
-    # 这次提交不再因为指导到达而作废（循环结构「指导」）
+    # 这次提交不再因为指导到达而作废（循环结构 docs/design/department-loop.md「指导」）
     holder = {}
 
     def old_response(request):
@@ -233,7 +233,7 @@ def test_product_guidance_revises_the_prd_and_engineering_starts_a_new_round(tmp
 
 def test_guidance_round_changes_the_running_workspace_and_delivers(tmp_path):
     # 验收第 2 条：发给在等待工作的工程的修改要求，工程在这一轮里修改运行工作区并提交交付，
-    # 质检随之核验（循环结构「指导」，工单 #560）
+    # 质检随之核验（循环结构 docs/design/department-loop.md「指导」，工单 #560）
     adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()], "quality": []})
     system = LoopSystem.for_testing(tmp_path, adapter)
     run_id = system.create_run("echo")
@@ -402,7 +402,7 @@ def test_guidance_to_a_finished_item_is_rejected(data_dir):
 
 def test_product_guidance_revision_is_delivered_to_the_working_department_and_starts_the_waiting_one(tmp_path):
     # 验收第 3 条：发给产品的指导修订了 PRD，正在工作的部门在下一步收到通知，
-    # 在等待工作的工程开始一轮工作（循环结构「指导」，工单 #560）
+    # 在等待工作的工程开始一轮工作（循环结构 docs/design/department-loop.md「指导」，工单 #560）
     holder = {}
     seen = {}
 

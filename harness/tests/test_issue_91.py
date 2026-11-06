@@ -329,7 +329,7 @@ def test_external_address_change_returns_definitions_to_candidates(tmp_path):
             assert opened.system.facade.get_bindings()["engineering"]["model_id"] == "model-a"
 
             # 被挡住的是两个同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，
-            # 每条写明自己的部门（模型管理设计说明「引用无法使用时」：这次模型请求不发送，事项停在这次请求之前）
+            # 每条写明自己的部门（模型管理 docs/design/model-management.md「引用无法使用时」：这次模型请求不发送，事项停在这次请求之前）
             blocked = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
             assert {item["request"]["department"] for item in blocked} == {"engineering", "quality"}
             # 回答这两条以后运行继续：工程的下一次模型请求按作废的准入再次进入待恢复，说明写明原因
@@ -366,7 +366,7 @@ def test_deleting_the_catalog_file_clears_defaults_and_recovers_after_answer(tmp
             item = opened.system.projects.projection(project_id).work_items[-1]
             assert item.status == "in_progress", (item.status, item.status)
             # 被挡住的是两个同时运行的会话（工单 #557）：工程与质检各发一条待恢复的决定请求，
-            # 每条写明自己的部门（模型管理设计说明「引用无法使用时」）；先记下它们，删除目录文件以后不再新增请求
+            # 每条写明自己的部门（模型管理 docs/design/model-management.md「引用无法使用时」）；先记下它们，删除目录文件以后不再新增请求
             first = _decisions(client, project_id=project_id, kind="model_unavailable", status="open")
             assert {item["request"]["department"] for item in first} == {"engineering", "quality"}
             if parked.get("record") is not None:

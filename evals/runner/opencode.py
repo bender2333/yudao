@@ -37,7 +37,7 @@ def scenario(name=None):
 def write_run_config(run_dir, model, model_id, limits):
     """写运行配置：关闭取回与搜索工具，模型服务由环境变量给出，模型限额取模型服务的容量。
 
-    被测模型由用户提供（评测场景设计「两边的运行条件」），凭据只留在环境变量里，
+    被测模型由用户提供（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」），凭据只留在环境变量里，
     配置里用 {env:...} 引用，不写进运行目录与仓库。`limit` 的 `context` 与 `output`
     是与 Yudao 一侧模型访问定义相同的那对数（docs/design/evaluation-scenarios.md「两边的运行条件」「模型的容量」）。
     """

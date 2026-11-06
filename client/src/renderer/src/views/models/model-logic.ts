@@ -1,4 +1,4 @@
-// 模型管理页的纯计算（工单 #1297，模型管理设计说明「模型访问定义与准入」、「删除」、「模型管理页」、「用词」）。
+// 模型管理页的纯计算（工单 #1297，模型管理 docs/design/model-management.md「模型访问定义与准入」、「删除」、「模型管理页」、「用词」）。
 // 这里只做取值与判断，不触碰网络与界面；页面组件引用这些函数，单元测试直接核对它们。
 //
 // 主路径（连接服务 → 搜索筛选候选 → 勾选即补全并验证 → 部门使用）不在客户端预填参数、
@@ -14,7 +14,7 @@ import type {
 import { readFailureText } from "../../contract/read-failure.ts";
 import { departmentName } from "../project/labels.ts";
 
-// 推理档位全集，由低到高（模型管理设计说明「档位与声明」，与后端 REASONING_LEVELS 一致）
+// 推理档位全集，由低到高（模型管理 docs/design/model-management.md「档位与声明」，与后端 REASONING_LEVELS 一致）
 export const REASONING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
 // 推理参数方式与它相符的协议
@@ -613,7 +613,7 @@ export function departmentTierBindings(
 }
 
 // 部门默认涉及的部门：这一版加载的定义里的部门（catalog 查询的 departments，工单 #1457），
-// 目录里已有绑定的部门也算（模型管理设计说明「部门默认与角色默认」：部门默认按定义里的每个部门各设一项）
+// 目录里已有绑定的部门也算（模型管理 docs/design/model-management.md「部门默认与角色默认」：部门默认按定义里的每个部门各设一项）
 export function departmentsOf(bindings: Record<string, CatalogBinding> | undefined,
                              departments: readonly string[] = []): string[] {
   const merged: string[] = [...departments];

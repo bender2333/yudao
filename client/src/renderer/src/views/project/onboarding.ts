@@ -1,4 +1,4 @@
-// 建档状态（3.8，docs/design/existing-project-onboarding.md「命令」、「领域事件」、「查询的变化」）：接入已有项目的
+// 建档状态（3.8，docs/design/existing-project-onboarding.md docs/design/existing-project-onboarding.md「命令」、「领域事件」、「查询的变化」）：接入已有项目的
 // 拒绝原因、建档状态标记，以及由 tool_started 事件驱动的「阅读已有项目」动作。取值全部来自应用层的
 // 命令结果与查询，没有对应数据时没有标记，界面不猜。
 

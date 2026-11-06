@@ -1,4 +1,4 @@
-# Yudao 版本的发布脚本（网页界面的提供与发布设计说明「发布」）。
+# Yudao 版本的发布脚本（网页界面的提供与发布 docs/design/web-interface-and-release.md「发布」）。
 # 架构师在里程碑交给用户之前运行：核对版本与工作区，构建页面文件，组装 Yudao 服务的 wheel，
 # 输出 wheel 的路径与 SHA-256；带 --publish 时另外打标签、推送并把 wheel 上传到私有仓库的 Release。
 #
@@ -270,7 +270,7 @@ def publish(repo_root: Path, version: str, wheel: Path, *, remote: str) -> None:
           "--notes", f"Yudao {version}"], cwd=repo_root)
 
 def _check_release(repo_root: Path) -> None:
-    # 发布检查（网页界面的提供与发布设计说明「发布脚本」、「谁在什么时候发布」）：由已安装的实例提供，
+    # 发布检查（网页界面的提供与发布 docs/design/web-interface-and-release.md「发布脚本」、「谁在什么时候发布」）：由已安装的实例提供，
     # 用当前运行版本里的清单与检查检查待发布的提交；脚本不运行也不修改这些检查。
     # 命令不存在或检查不通过时拒绝上传；检查通过以后才打标签与上传
     yudao = _tool("yudao")

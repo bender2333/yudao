@@ -1,6 +1,6 @@
-# MCP 服务器设置的命令（工单 #236，网络与 MCP 设计说明「版本与固定」、「应用层接口」）：
+# MCP 服务器设置的命令（工单 #236，网络与 MCP docs/design/network-and-mcp.md「版本与固定」、docs/design/network-and-mcp.md「应用层接口」）：
 # mcp_servers.save 保存整份设置，带基准版本；版本过期时拒绝并提示重新读取。
-# tool_server.probe 读取一台服务器的工具清单（工单 #1174，「读取工具清单（探测）」）：接受以后作为任务进行，
+# tool_server.probe 读取一台服务器的工具清单（工单 #1174，docs/design/network-and-mcp.md「读取工具清单（探测）」）：接受以后作为任务进行，
 # 结果以项目流事件 tool_server_probe_finished 出现；探测绑定请求所带的非秘密服务器配置，
 # 与保存用同一个归一化与配置摘要（projects.normalize_mcp_servers）。
 # 凭据值不进入命令的请求与事件：设置里只写凭据名称（取值时读取当前的凭据来源）。

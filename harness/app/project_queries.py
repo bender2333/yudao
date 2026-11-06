@@ -201,7 +201,7 @@ class ProjectOverview(Contract):
     work_item: str | None = None
 
 
-# 部门状态的取值：总图第三节外环的五个词（三部门的循环结构「部门的状态」，工单 #903）
+# 部门状态的取值：总图第三节外环的五个词（三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）
 DEPARTMENT_STATES = ("waiting_user", "working", "asking", "verifying", "waiting")
 # 阻塞事项的决定请求：回答以前事项（它的 run）不推进（decisions.py 的 blocks）
 BLOCKING_SCOPES = ("run", "work_item")
@@ -216,7 +216,7 @@ def _verifiers_of(department: str) -> tuple[str, ...]:
 
 
 class DepartmentState(Contract):
-    """一个部门在这个事项上的状态与原因（三部门的循环结构「部门的状态」）。
+    """一个部门在这个事项上的状态与原因（三部门的循环结构 docs/design/department-loop.md「部门的状态」）。
 
     state 取总图外环的五个词；note 是一句话，没有原因时为空。
     """
@@ -225,7 +225,7 @@ class DepartmentState(Contract):
 
 
 class WorkItemProgress(Contract):
-    """事项的进度：从成果推算（循环结构「部门按关注的成果开始工作」）。
+    """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）。
 
     阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
     最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
@@ -273,9 +273,9 @@ class WorkItemCard(Contract):
     created_at: str
     status: str
     department: str | None
-    # 事项的进度：从成果推算（循环结构「部门按关注的成果开始工作」、工单 #556）
+    # 事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」、工单 #556）
     progress: WorkItemProgress | None
-    # 三个部门各自的状态与原因（循环结构「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
+    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
     departments: dict[str, DepartmentState] | None = None
     round: int
     stop_reason: str | None
@@ -484,7 +484,7 @@ class WorkItemLoop(Contract):
     status: str
     department: str | None
     progress: WorkItemProgress | None
-    # 三个部门各自的状态与原因（循环结构「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
+    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
     departments: dict[str, DepartmentState] | None = None
     round: int
     started_at: str | None
@@ -568,7 +568,7 @@ def _last_department(store: Any, item: Any, *, through: int | None = None) -> st
 
 
 def _work_item_progress(run: Any) -> WorkItemProgress | None:
-    """事项的进度：从成果推算（循环结构「部门按关注的成果开始工作」）。
+    """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）。
 
     当前有效的 PRD 是第几版、最新一份交付是第几版、它依据的 PRD 版本，
     以及对最新交付的结论（缺陷记录或放行）。
@@ -824,7 +824,7 @@ def _observation(run: Any, decisions: Any, events: list[Any]) -> str | None:
 
 def _departments(run: Any, progress: WorkItemProgress | None, observation: str | None,
                  decisions: dict[str, Any]) -> dict[str, DepartmentState] | None:
-    """三个部门各自的状态与原因（三部门的循环结构「部门的状态」，工单 #903）。
+    """三个部门各自的状态与原因（三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）。
 
     状态不单独记录，由已经记录的事实现算：会话的状态、进行中的询问、没有回答的决定请求与成果。
     同时满足几条时按设计说明的顺序取第一条：等用户、在分支里回答、询问中、主线的一轮工作中、核验中、等待工作。
@@ -851,7 +851,7 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
         elif own_ask is not None:
             state, note = "asking", f"在等待{_department_label(own_ask.get('recipient') or '')}的回答"
         elif active:
-            # 核验角色在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构「各部门在什么时候工作」）；
+            # 核验角色在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构 docs/design/department-loop.md「各部门在什么时候工作」）；
             # 谁是核验角色取自定义里的核验声明（工单 #1391）
             predictive = (DEFINITIONS.is_verifier(department) and not run.delivery_specs and progress is not None
                           and progress.product_spec_revision is not None)
@@ -869,7 +869,7 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
 
 def _awaiting_verification(department: str, progress: WorkItemProgress | None) -> bool:
     # 核验中：最新的正式成果在等下游的结论。核验这个部门交付的角色从定义的核验声明取（工单 #1391）：
-    # 交付还没有它的缺陷记录或放行（循环结构「部门的状态」）
+    # 交付还没有它的缺陷记录或放行（循环结构 docs/design/department-loop.md「部门的状态」）
     if not _verifiers_of(department) or progress is None or progress.delivery_revision is None:
         return False
     return progress.conclusion is None
@@ -1279,7 +1279,7 @@ class DepartmentSettingState(Contract):
 
 
 class GuidanceRecord(Contract):
-    # 指导的三种状态（部门指导设计说明「处理结果与来源」，工单 #1039）：received 已接收、in_input 已进入模型输入、
+    # 指导的三种状态（部门指导 docs/design/department-guidance.md「处理结果与来源」，工单 #1039）：received 已接收、in_input 已进入模型输入、
     # answered 已回答。已回答由主机在收到它的那一轮正常结束时写，事件记下那一轮与怎么结束的
     guidance_id: str
     version: int
@@ -1361,7 +1361,7 @@ class DepartmentWorkspaceResult(Contract):
     run_id: str | None
     # run 的状态（进行中与三个终态）：部门进行到哪一步不记在这里（工单 #556）
     run_status: str | None
-    # 三个部门各自的状态与原因（循环结构「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
+    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
     departments: dict[str, DepartmentState] | None = None
     # 事项状态与停止原因：用户停止的事项在部门页写「已停止」，不写「执行失败」（工单 #319）
     status: str | None
@@ -1474,7 +1474,7 @@ def _room_view(application: Application, state: Any, item: Any, run: Any, depart
     role_status = "working" if status == "working" else "idle"
     role_name = f"{_department_label(department)}部门 Agent"
     pose = {"role_id": role_id, "action": "typing"} if status == "working" else None
-    # 传信数：问本部门、还没有回答的询问数（循环结构「询问的记录与查询」，工单 #903）
+    # 传信数：问本部门、还没有回答的询问数（循环结构 docs/design/department-loop.md「询问的记录与查询」，工单 #903）
     letters_waiting = 0 if run is None else sum(1 for ask in run.ask_stack if ask.get("recipient") == department)
     waiting_provider = False
     scrolls = 0
@@ -1715,7 +1715,7 @@ class RunActions(Contract):
 
 
 class FetchReceipt(Contract):
-    # 一次取回的回执（网络与 MCP 设计说明「回执」、「应用层接口」）：最终地址、状态码、内容类型、字节数、
+    # 一次取回的回执（网络与 MCP docs/design/network-and-mcp.md「回执」、「应用层接口」）：最终地址、状态码、内容类型、字节数、
     # 是否因为超过下载上限被截断、摘要值、外部来源工件的引用、重定向链与耗时
     final_url: str
     status_code: int
@@ -1739,7 +1739,7 @@ class ActionReceipt(Contract):
     refused: bool = False
     refused_reason: str | None = None
     fetch: FetchReceipt | None = None
-    # 浏览器与屏幕动作的截图工件引用与浏览器会话身份（浏览器与 computer use 设计说明「查询」，工单 #152）：
+    # 浏览器与屏幕动作的截图工件引用与浏览器会话身份（浏览器与 computer use docs/design/browser-and-computer-use.md「查询」，工单 #152）：
     # 截图取自工具结果事件里的工件引用；会话身份与试用副本的树摘要取自结果工件里的会话记录。
     # 非浏览器动作没有这三项
     screenshots: list[dict[str, Any]] = Field(default_factory=list)
@@ -1842,7 +1842,7 @@ def _run_action_views(application: Application, run_id: str
                     started_at=started_at,
                     status=status,
                 )))
-    # 有 tool_started、还没有结果的动作用运行状态区分（工单 #17，恢复契约「四种能力分别验收」）：这次激活仍在进行
+    # 有 tool_started、还没有结果的动作用运行状态区分（工单 #17，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「四种能力分别验收」）：这次激活仍在进行
     # 的时候是运行中，否则是结果未知，等待核实
     live = _live_activations(events)
     for identity, event in started.items():
@@ -2192,7 +2192,7 @@ class RunAsks(Contract):
 
 
 class AskView(Contract):
-    # 一次询问（三部门的循环结构「询问的记录与查询」）：提问方、被询问的部门、问题、状态与回答。
+    # 一次询问（三部门的循环结构 docs/design/department-loop.md「询问的记录与查询」）：提问方、被询问的部门、问题、状态与回答。
     # 工单 #903 补上询问的编号（分支会话）、上一层询问、询问链与层数、产品的回答附带的 PRD 修订号与起止时间
     id: str
     requester: str
@@ -2294,7 +2294,7 @@ class WorkItemMaterials(Contract):
 
 
 class LaunchMethodView(Contract):
-    # 交付说明里的一个启动方式（浏览器与 computer use 设计说明「启动方式」，工单 #152）：资料页的交付一项
+    # 交付说明里的一个启动方式（浏览器与 computer use docs/design/browser-and-computer-use.md「启动方式」，工单 #152）：资料页的交付一项
     # 据此显示这份交付怎么启动。commands 按系统给出命令（windows、linux）
     name: str
     kind: str
@@ -2990,7 +2990,7 @@ class McpServerSettingView(Contract):
 
 
 class McpCredentialStatusView(Contract):
-    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP 设计说明「项目设置的「MCP 服务器」一节」）：
+    # 设置里出现的一个凭据名称此刻的状态（工单 #237，网络与 MCP docs/design/network-and-mcp.md「项目设置的「MCP 服务器」一节」）：
     # 页面在凭据名称旁写「已设置」或「缺失」与来源，与后端同一份判断，不自己猜；
     # 只有名称、状态与来源，没有凭据值。version 是 credential.set 的基准版本
     ref: str
@@ -3012,7 +3012,7 @@ class McpServersSetting(Contract):
 
 
 class McpProbeResultView(Contract):
-    # 最近一次探测的结果（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」、「应用层接口」）：成功带服务器信息与
+    # 最近一次探测的结果（工单 #1174，网络与 MCP docs/design/network-and-mcp.md「读取工具清单（探测）」、「应用层接口」）：成功带服务器信息与
     # 工具清单快照，失败带原因（凭据值已替换为星号）；config_digest 是探测绑定的配置摘要
     server_name: str
     status: str
@@ -3039,7 +3039,7 @@ class ProjectSettingsResult(Contract):
     # 各部门生效模型不具备该部门建议能力时的提醒
     # 生效模型按解析，包括跟随部门默认的情况
     department_reminders: dict[str, list[str]]
-    # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明「参数怎样成为带版本的数据」）：
+    # 这个项目有效参数的版本（工单 #1262，规则登记与参数 docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」）：
     # 项目级参数命令的基准版本，全局现值加本项目覆盖的内容摘要；与 parameter.set 按项目核对的是同一份
     effective_parameters_version: str = ""
 
@@ -3049,7 +3049,7 @@ MCP_CREDENTIAL_KINDS = ("env", "headers")
 
 def _mcp_credential_refs(servers: dict[str, Any]) -> list[str]:
     # 设置里出现的凭据名称，按出现的先后各记一次：变量与请求头的取值方式为「凭据名称」的那些
-    # （网络与 MCP 设计说明「服务器设置」「变量与请求头的值」）
+    # （网络与 MCP docs/design/network-and-mcp.md「服务器设置」「变量与请求头的值」）
     refs: list[str] = []
     for server in servers.values():
         if not isinstance(server, dict):
@@ -3409,7 +3409,7 @@ RUN_EVENT_KINDS: tuple[str, ...] = (
     EventType.TOOL_CALLED, EventType.TOOL_STARTED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED,
     EventType.PROPOSAL_SUBMITTED, EventType.PROPOSAL_REJECTED, EventType.SPEC_ACCEPTED,
     EventType.SPEC_SUPERSEDED, EventType.CONTRACT_ACCEPTED, EventType.ASK_STARTED, EventType.ASK_ANSWERED,
-    # 独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：导出的全部事件里有它
+    # 独立判断事件（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：导出的全部事件里有它
     EventType.INDEPENDENT_JUDGEMENT_COMMITTED,
     EventType.PRODUCT_DECISION_ACCEPTED,
     # 成果失效（骨架事件，S1b，工单 #858）
@@ -3674,7 +3674,7 @@ class RecoveryOwner(Contract):
 class UnknownAction(Contract):
     # 重新启动时结果未知的动作与它的处理方式（工单 #181，docs/design/app-and-interface.md「查询清单」）：核实确认（自动核实，或者
     # 用户选择按当前实际状态接受）或交还发出它的会话。交还以后动作仍列在这里，不等同于「没有发生过」：
-    # 原始观察不改写，处理方式与交还给模型的内容照实写出（恢复契约「动作分类与处置」）
+    # 原始观察不改写，处理方式与交还给模型的内容照实写出（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）
     action_id: str
     tool: str
     department: str | None
@@ -3687,7 +3687,7 @@ class UnknownAction(Contract):
     at: str
 
 class RecoverySession(Contract):
-    # 一个会话的已用量（设计说明「回答能做什么」，三部门的循环结构「停止与恢复」）：部门主线与询问分支各是一个会话，
+    # 一个会话的已用量（docs/design/department-loop.md「回答能做什么」，三部门的循环结构 docs/design/department-loop.md「停止与恢复」）：部门主线与询问分支各是一个会话，
     # 用量各自累计。已用秒是已结算的运行时间，中断的那一轮不计
     session_id: str
     department: str | None
@@ -3766,7 +3766,7 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
     store = application.system.store
     run = _run(application, request.run_id)
     events = store.list_events(request.run_id)
-    # 已用量读最小投影（骨架与应用设计说明「最小投影」中「应用可以读最小投影，内核不为应用加字段」，S1e 工单 #1015）：
+    # 已用量读最小投影（骨架与应用 docs/design/skeleton-and-application.md「最小投影」中「应用可以读最小投影，内核不为应用加字段」，S1e 工单 #1015）：
     # 激活次数、模型步数与执行权都由它折出来，不在这里从事件数一遍；只记录的事件（旧派发编号）不并入，
     # 与写入口折最小投影用的是同一条规则
     minimal = fold_events(accepted(events))
@@ -3854,7 +3854,7 @@ def _recovery_upgrade(application: Application, run: Any) -> RecoveryUpgrade | N
     )
 
 def _upgrade_start_point(item: Any) -> str:
-    # 因升级重新开始时的起点（项目的起始文件夹设计说明「项目的起点」）：有采纳成果时是采纳成果，
+    # 因升级重新开始时的起点（项目的起始文件夹 docs/design/project-initial-files.md「项目的起点」）：有采纳成果时是采纳成果，
     # 其次是起始文件夹快照，都没有时是空树。与事项的起点按同一个顺序取
     if item.baseline is not None:
         return "adoption"

@@ -46,7 +46,7 @@ class ArtifactRef(Payload):
 
 
 class AcceptanceFields(Payload):
-    # 成果接纳事件的统一字段（骨架与应用设计说明「最小投影」、「其他路由：骨架要满足的条件」）：成果种类、版本、依据与
+    # 成果接纳事件的统一字段（骨架与应用 docs/design/skeleton-and-application.md「最小投影」、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果种类、版本、依据与
     # 内容摘要。只增不改；最小投影按这组字段折叠，加一种成果种类不改最小投影的代码。旧事件没有这几个
     # 字段，所以都有缺省值：没有 artifact_kind 的事件不是按统一字段接纳的成果。
     artifact_kind: str | None = None
@@ -123,7 +123,7 @@ class InputRecord(Payload):
 
 
 class McpVariableValue(Payload):
-    # 环境变量或请求头的值（网络与 MCP 设计说明「服务器设置」）：固定文本，或凭据名称（取值时读取当前的凭据来源）。
+    # 环境变量或请求头的值（网络与 MCP docs/design/network-and-mcp.md「服务器设置」）：固定文本，或凭据名称（取值时读取当前的凭据来源）。
     # 凭据只出现名称：值不进入事件、投影、导出与日志
     kind: Literal["text", "credential"]
     # 固定文本；凭据名称时为空
@@ -133,7 +133,7 @@ class McpVariableValue(Payload):
 
 
 class McpServerSetting(Payload):
-    # 一台 MCP 服务器的非秘密设置（网络与 MCP 设计说明「服务器设置」、「凭据」）：名称、传输与对应传输的参数、
+    # 一台 MCP 服务器的非秘密设置（网络与 MCP docs/design/network-and-mcp.md「服务器设置」、「凭据」）：名称、传输与对应传输的参数、
     # 可以使用的部门、时限与输出上限；凭据只以名称出现，值在调用时按凭据来源解析
     name: str
     transport: Literal["stdio", "http"]
@@ -164,7 +164,7 @@ class McpServersDocument(Payload):
 
 
 class McpToolHint(Payload):
-    # 服务器标注的工具提示（网络与 MCP 设计说明「服务器设置」「工具清单」）：只读、幂等与破坏性提示，
+    # 服务器标注的工具提示（网络与 MCP docs/design/network-and-mcp.md「服务器设置」「工具清单」）：只读、幂等与破坏性提示，
     # 只显示给用户参考；模型看到的工具定义不带它
     title: str = ""
     read_only_hint: bool | None = None
@@ -210,7 +210,7 @@ class FunctionCallOutput(Payload):
     call_id: str
     output: str
     # 工具结果带的图像：截图存成工件，这里只放工件引用（证据编号是工件的内容哈希）。
-    # 上下文装配按调用目标的输入方式决定放进请求的最近 3 张（浏览器与 computer use 设计说明「请求中的图像」）
+    # 上下文装配按调用目标的输入方式决定放进请求的最近 3 张（浏览器与 computer use docs/design/browser-and-computer-use.md「请求中的图像」）
     images: list[ArtifactRef] = []
 
 
@@ -400,7 +400,7 @@ class DepartmentGuidanceAppliedPayload(Payload):
 
 
 class DepartmentGuidanceRespondedPayload(Payload):
-    # 主机写：收到这条指导的那一轮工作正常结束（部门指导设计说明「处理结果与来源」，工单 #1039）。
+    # 主机写：收到这条指导的那一轮工作正常结束（部门指导 docs/design/department-guidance.md「处理结果与来源」，工单 #1039）。
     # activation_id 是那一轮的激活编号，outcome 是这一轮怎么结束的：提交被接纳，或者用文字回答
     guidance_id: str
     activation_id: str
@@ -488,7 +488,7 @@ class ContextAssembledPayload(Versions, WorkBasis, CallTarget):
     folded_rounds: list[int] = Field(default_factory=list)
     # 压缩以后的失败清单这一段逐条列了哪些事件（工单 #1405）
     failure_list_events: list[str] = Field(default_factory=list)
-    # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量（模型管理设计说明「用量」）
+    # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量（模型管理 docs/design/model-management.md「用量」）
     previous_usage_tokens: int | None = None
     parts_ref: ArtifactRef
     run_id: str
@@ -703,7 +703,7 @@ class FileActionComparison(Payload):
 
 
 class BrowserSessionState(Payload):
-    # 浏览器会话在核实记录里的状态（浏览器与 computer use 设计说明「恢复契约」，工单 #1184）：会话身份、
+    # 浏览器会话在核实记录里的状态（浏览器与 computer use docs/design/browser-and-computer-use.md「恢复契约」，工单 #1184）：会话身份、
     # 状态与试用副本的树摘要。持有会话的进程重新启动时状态为 interrupted，身份与摘要不再有值
     session_id: str | None = None
     status: Literal["running", "interrupted", "ended"]
@@ -720,7 +720,7 @@ class BrowserObservation(Payload):
 
 
 class ActionVerifiedPayload(Payload):
-    # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约「动作分类与处置」）：不改写原来的观察。
+    # 核实一个结果未知的动作产生的核实记录（工单 #17，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）：不改写原来的观察。
     # resolution 为 continue 表示用户选择按当前实际状态继续（旧事件保留，新版本不再写，工单 #582）；
     # handed_back 表示交还会话由模型处置（工单 #581）；
     # auto_verify 表示自动核实确认动作已经完成（工单 #308）。
@@ -875,7 +875,7 @@ class AskAnsweredPayload(Payload):
 
 
 class LaunchMethodPayload(Payload):
-    # 交付说明里的一个启动方式（浏览器与 computer use 设计说明「启动方式」，工单 #148）：需要试用的每个入口一项
+    # 交付说明里的一个启动方式（浏览器与 computer use docs/design/browser-and-computer-use.md「启动方式」，工单 #148）：需要试用的每个入口一项
     name: str
     kind: Literal["web", "desktop"]
     commands: dict[str, list[str]]
@@ -911,9 +911,9 @@ class Defect(Payload):
 
 
 class QaCriterionPayload(Payload):
-    # 质检的逐条结论（验证的独立性设计说明「口径」、浏览器与 computer use 设计说明「QAReview 的逐条结论与放行」，工单 #151）：
+    # 质检的逐条结论（验证的独立性 docs/design/independent-verification.md「口径」、浏览器与 computer use docs/design/browser-and-computer-use.md「QAReview 的逐条结论与放行」，工单 #151）：
     # criterion 是验收条件在 ProductSpec 里的位置写成的 AC<序号>，method 是检验方式，result 只有三种。
-    # judged 是独立判断当时对这条验收条件的结果，change_reason 是改判理由（「先判断后看解释」，工单 #1190）：
+    # judged 是独立判断当时对这条验收条件的结果，change_reason 是改判理由（docs/design/independent-verification.md「先判断后看解释」，工单 #1190）：
     # 结论与判断不一致的条目才写；判断事件里的同一形状没有这两项，旧事件也没有
     criterion: str
     method: Literal["check", "trial", "measure", "judgement", "human", "open"]
@@ -951,7 +951,7 @@ class BaselineCheckRecord(Payload):
 
 
 class IndependentJudgementPayload(Payload):
-    # 独立判断事件（验证的独立性设计说明「先判断后看解释」，工单 #358）：核验角色在只看事实的上下文里对当前交付
+    # 独立判断事件（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：核验角色在只看事实的上下文里对当前交付
     # 的每条验收条件写出的判断，按 #151 逐条结论的形状（同一份 QaCriterionPayload，字段封闭）。
     # 它不是成果：不进版本链、不失效任何东西；门（放行要引用它）与装配（解释并进的时机）读它的存在。
     # checks 是本次激活的质检检查名（逐条结论引用的回执），criteria_count 是判断的条数：
@@ -1147,7 +1147,7 @@ class RunFailedPayload(Payload):
     input_save_failure: InputSaveFailure | None = None
 
 
-# 用户决定（总体架构「用户决定」）：决定请求的身份是请求事件的编号
+# 用户决定（总体架构 docs/design/architecture/overall-architecture.md「用户决定」）：决定请求的身份是请求事件的编号
 
 
 class DecisionOption(Payload):
@@ -1200,7 +1200,7 @@ class BaselineReviewProposal(Payload):
 
 
 class ModelUnavailableRequested(Payload):
-    # 待恢复：模型引用无法使用（模型管理设计说明「引用无法使用时」），回答之前整个 run 不推进。
+    # 待恢复：模型引用无法使用（模型管理 docs/design/model-management.md「引用无法使用时」），回答之前整个 run 不推进。
     # description 写明部门、模型与具体问题；facts 是涉及的事实（失败的调用尝试等事件的编号）；
     # target 是调用目标的公开部分（没有找到调用目标时为空）；reason 与 message 是 Provider 或主机给出的原因与说明
     kind: Literal["model_unavailable"]
@@ -1216,7 +1216,7 @@ class ModelUnavailableRequested(Payload):
 
 class DefinitionsChangedRequested(Payload):
     # 继续旧事项时事项记录的定义版本与当前加载的不同（工单 #16、#894、
-    # 总体架构「用户决定」）：回答之前这个 run 不推进。recorded_definitions_version 是事项开始时记录的版本
+    # 总体架构 docs/design/architecture/overall-architecture.md「用户决定」）：回答之前这个 run 不推进。recorded_definitions_version 是事项开始时记录的版本
     # （旧事项没有记录时为空），current_definitions_version 是当前加载的版本；reason 恒为
     # definitions_version_changed；facts 为空，请求不引用事实
     kind: Literal["definitions_changed"]
@@ -1244,7 +1244,7 @@ class PauseRequested(Payload):
 
 
 class CannotVerifyRequested(Payload):
-    # 质检无法核验（浏览器与 computer use 设计说明「无法核验」，工单 #1179）：阻塞整个 run，
+    # 质检无法核验（浏览器与 computer use docs/design/browser-and-computer-use.md「无法核验」，工单 #1179）：阻塞整个 run，
     # criteria 是每条无法核验的验收条件与原因；选项是「重新核验」与「停止事项」
     kind: Literal["qa_cannot_verify"]
     blocks: Literal["run"]
@@ -1271,7 +1271,7 @@ class UnknownActionRequested(Payload):
     verification: FileActionComparison | None = None
 
 
-# 确认接入已有项目的初始 PRD（工单 #136，接入已有项目设计说明「决定种类」）：请求写在项目流中，
+# 确认接入已有项目的初始 PRD（工单 #136，接入已有项目 docs/design/existing-project-onboarding.md「决定种类」）：请求写在项目流中，
 # 阻塞建档事项与同一项目中排在它后面的事项（blocks="work_item"），不属于任何 run。
 # round 是这一轮建档的轮次（第一次为 1，每次提出修改以后加一）；department 恒为 product。
 # prd、structure、baseline_review 是这一轮的三份产物，snapshot 与 overview_ref 是档案的来源与仓库概况；
@@ -1433,7 +1433,7 @@ class WorkItemCreatedPayload(Payload):
 
 
 class McpServersConfiguredPayload(Payload):
-    # 项目设置里的 MCP 服务器保存（工单 #236，网络与 MCP 设计说明「版本与固定」）：整份设置一个版本。
+    # 项目设置里的 MCP 服务器保存（工单 #236，网络与 MCP docs/design/network-and-mcp.md「版本与固定」）：整份设置一个版本。
     # servers 是这个版本的非秘密设置与凭据引用（McpServerSetting），凭据值不进入事件、投影、导出与日志；
     # document_digest 是这份非秘密文档的摘要，事项冻结与工具清单快照按它核对
     version: int
@@ -1450,7 +1450,7 @@ class McpServerInfo(Payload):
 
 
 class ToolServerProbeFinishedPayload(Payload):
-    # 一次探测的结果（工单 #1174，网络与 MCP 设计说明「读取工具清单（探测）」）：成功带服务器信息与工具清单快照
+    # 一次探测的结果（工单 #1174，网络与 MCP docs/design/network-and-mcp.md「读取工具清单（探测）」）：成功带服务器信息与工具清单快照
     # （快照带它绑定的配置摘要），失败带原因（带服务器标准错误输出的末尾部分，凭据值已替换为星号）。
     # config_digest 是这次探测针对的非秘密服务器配置的内容摘要：与待保存配置摘要一致的成功结果
     # 才能成为可用快照；凭据引用参加摘要，凭据值不参加、不进入事件
@@ -1463,7 +1463,7 @@ class ToolServerProbeFinishedPayload(Payload):
 
 
 class McpServerStartedPayload(Payload):
-    # 一台 MCP 服务器的一次会话启动（网络与 MCP 设计说明「运行规则」，工单 #1176）：服务器名称、传输，
+    # 一台 MCP 服务器的一次会话启动（网络与 MCP docs/design/network-and-mcp.md「运行规则」，工单 #1176）：服务器名称、传输，
     # 以及 stdio 服务器子进程的进程标识与创建时间——Yudao 启动时按这两项结束进程崩溃留下的遗留进程，
     # 所以它们必须随事件保存。HTTP 服务器没有进程，两项为空
     server: str
@@ -1493,7 +1493,7 @@ class McpServerFailedPayload(Payload):
 
 
 class TrialSessionStartedPayload(Payload):
-    # 一个试用会话的开始（浏览器与 computer use 设计说明「试用工具」、「事件、决定请求与查询」，工单 #1183）：会话身份、部门、
+    # 一个试用会话的开始（浏览器与 computer use docs/design/browser-and-computer-use.md「试用工具」、「事件、决定请求与查询」，工单 #1183）：会话身份、部门、
     # 种类、启动方式的名称、选用命令的系统、端口与就绪地址、试用副本的树摘要与清单来源，以及
     # 交付软件直接子进程的进程号与创建时间——Yudao 启动时按后两项结束进程崩溃留下的遗留进程树，
     # 所以它们必须随事件保存。完整的启动方式不在这里重复记一份：它是模型给出的工具参数，
@@ -1527,7 +1527,7 @@ class TrialSessionEndedPayload(Payload):
 
 
 class TrialCaseOpenedPayload(Payload):
-    # 一个试用用例的开始（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：用例身份、部门会话
+    # 一个试用用例的开始（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）：用例身份、部门会话
     # （哪些动作是它的步骤）与试用会话（会话结束或中断时用例结束为中断）两个身份、部门与激活、
     # 当前 ProductSpec 的内容摘要、试用副本的树摘要（放行时按它核对用例属于当前交付）、
     # 引用的验收条件与计划（标题、操作、预期结果）。之后这个部门在同一会话中的浏览器与屏幕动作由投影
@@ -1677,7 +1677,7 @@ class WritebackVerifiedPayload(Payload):
     verified_fact: dict[str, Any]
 
 class InitialPrdProposedPayload(Payload):
-    # 建档候选（工单 #136，接入已有项目设计说明「决定种类」、「领域事件」）：建档 run 以基线核验或开环完成结束以后，
+    # 建档候选（工单 #136，接入已有项目 docs/design/existing-project-onboarding.md「决定种类」、「领域事件」）：建档 run 以基线核验或开环完成结束以后，
     # 这一轮的产物与代码快照写进项目流，等待用户确认。round 是轮次（第一次为 1）；
     # revision_note_ref 是上一轮用户的修改意见（第二轮起）；snapshot 是这一轮建档使用的代码快照。
     # 没有核验角色的形态没有基线核验这一步（工单 #1510）：baseline_review 是空的一份、baseline_verified 为否，
@@ -1751,7 +1751,7 @@ class BaselineAdoptedPayload(Payload):
     previous_adoption_id: str | None = None
 
 
-# 模型目录与凭据（应用层与接口层设计说明「决定」中「模型目录与凭据的写入」）：只含修订号、变化与结果，不含 Key
+# 模型目录与凭据（应用层与接口层 docs/design/app-and-interface.md「决定」中「模型目录与凭据的写入」）：只含修订号、变化与结果，不含 Key
 
 class CatalogRevisedPayload(Payload):
     # 目录内容（连接、访问定义、部门默认）或文件被外部修改与重读以后的修订号；
@@ -1814,7 +1814,7 @@ class RuntimeDrainStartedPayload(Payload):
 
 class RuntimeDrainFinishedPayload(Payload):
     # 排空结束：服务下一次启动时记下，此后这个实例重新开始新事项（工单 #731，
-    # 应用层与接口层设计说明「命令清单」「升级」：排空在下一次启动时结束）
+    # 应用层与接口层 docs/design/app-and-interface.md「命令清单」「升级」：排空在下一次启动时结束）
     version: int
 
 class RuntimeForceUpgradeRequestedPayload(Payload):
@@ -1846,7 +1846,7 @@ class ParameterSetPayload(Payload):
 
 
 class InstanceUpgradeReport(Payload):
-    # 发布检查的结果（工单 #355，发布检查设计说明「发布检查与探针」）：被检查的提交与基准标签、内核清单里的
+    # 发布检查的结果（工单 #355，发布检查 docs/design/trusted-kernel.md「发布检查与探针」）：被检查的提交与基准标签、内核清单里的
     # 改动路径与 Python 行数、是否通过，以及逐项不通过（检查项、说明与位置）
     repository: str
     pending_commit: str

@@ -32,7 +32,7 @@ export interface TaskFx {
 
 /** 任务目录里的一项（原型 v13 floor-decl.js 的 TASKS；键就是画面的动作种类）。 */
 export interface TaskDef {
-  /** 动作的级别：关键、普通、进度（画面与播放设计说明「声明表」）。 */
+  /** 动作的级别：关键、普通、进度（画面与播放 docs/design/visualization.md「声明表」）。 */
   tier?: "key" | "normal" | "progress";
   /** 为真时是一个动作里的一步（交接的放下与取出、传信、决定单的送出与收下、分派与交回），不单独作为动作。 */
   part?: boolean;
@@ -513,7 +513,7 @@ export interface SceneLike {
   focusId: string | null;
   /**
    * 表演层开关（默认为开）：关掉以后待机活动与动作都不演，只画状态给出的样子
-   * （画面与播放设计说明「视觉通道表」的 H2：关掉表演层前后，承载事实的视觉通道的取值相同）。
+   * （画面与播放 docs/design/visualization.md「视觉通道表」的 H2：关掉表演层前后，承载事实的视觉通道的取值相同）。
    */
   performance?: boolean;
   /** 决定卡片上的盖章（画面提供；驱动在收到回答事件时调用）。 */

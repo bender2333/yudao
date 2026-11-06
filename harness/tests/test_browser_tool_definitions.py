@@ -1,4 +1,4 @@
-# 试用与浏览器工具的定义（浏览器与 computer use 设计说明「运行方式」、「提供的工具」、「工具定义的声明」、「恢复契约」，工单 #147）。
+# 试用与浏览器工具的定义（浏览器与 computer use docs/design/browser-and-computer-use.md「运行方式」、「提供的工具」、「工具定义的声明」、「恢复契约」，工单 #147）。
 #
 # 浏览器工具由 scripts/extract_browser_tools.py 从 Playwright MCP 0.0.83 的 tools/list 生成；记下的真实回复在
 # harness/tests/data/playwright_mcp_tools_list.json，测试读它核对提交的 harness/definitions/browser_tools.json，

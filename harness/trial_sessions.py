@@ -4,7 +4,7 @@
 #
 # 会话记录（身份、部门、种类、启动方式、端口、试用副本、各进程的进程号与启动时间）与动作记录保存在一起：
 # 本模块交回的记录随 tool_called 的载荷写入事件。会话的开始与结束各写一条应用事件
-# （`trial_session_started`、`trial_session_ended`，设计说明「事件、决定请求与查询」）；run 进入终态时由 run 的收尾
+# （`trial_session_started`、`trial_session_ended`，docs/design/browser-and-computer-use.md「事件、决定请求与查询」）；run 进入终态时由 run 的收尾
 # 结束全部会话，持有会话的进程重新启动时由启动扫描按会话记录里的进程号与创建时间结束遗留的进程树
 # （工单 #1183）。
 #

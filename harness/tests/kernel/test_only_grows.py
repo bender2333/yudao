@@ -1,9 +1,9 @@
-# 「只增」的清单（S6a，工单 #829；骨架与应用设计说明「可信内核」、「契约」、「骨架事件与应用事件」；总图第二节第二环「契约」）：
+# 「只增」的清单（S6a，工单 #829；骨架与应用 docs/design/skeleton-and-application.md「可信内核」、「契约」、「骨架事件与应用事件」；总图第二节第二环「契约」）：
 # 骨架事件的种类、事件信封的字段、封闭的停止原因清单都只增——新增可以，删除与改名不行。
-# 动作的缝（工单 #1170；恢复契约「动作分类与处置」）同样只增：动作类别与回执的字段。
+# 动作的缝（工单 #1170；恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）同样只增：动作类别与回执的字段。
 #
 # 快照是放出这一版时的清单。删掉其中一项时这几项测试失败，信息写明是哪一种事件、哪一个字段、
-# 哪一个停止原因：已经写进日志的事件不会因为一个发布而被重新解释（「骨架事件与应用事件」），停止原因清单外的原因
+# 哪一个停止原因：已经写进日志的事件不会因为一个发布而被重新解释（docs/design/skeleton-and-application.md「骨架事件与应用事件」），停止原因清单外的原因
 # 写入口也写不进去（基础规则 3）。新加一项以后同步更新快照；新加不需要提版本，削掉已有的一项不行。
 #
 # 与 kernel/test_skeleton_events.py 的分工：那一个核对登记表与 docs/design/skeleton-and-application.md「骨架事件与应用事件」的表逐项相同（增删都报警），
@@ -112,7 +112,7 @@ _DECLARATIONS = {
     "catalog": SKELETON_CATALOG_EVENTS,
 }
 
-# 放出动作合同时的动作类别（恢复契约「动作分类与处置」的表；工单 #1170）：原来的四类加新增的四类
+# 放出动作合同时的动作类别（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」的表；工单 #1170）：原来的四类加新增的四类
 ACTION_KIND_SNAPSHOT = frozenset({"read", "write", "check", "command", "fetch", "mcp", "trial", "browser"})
 
 # 放出动作合同时回执的字段（工单 #1170）：动作身份、状态、输出、原因，以及工具许可拒绝的两项。
@@ -187,7 +187,7 @@ def test_the_action_kinds_only_grow():
 
 
 def test_the_action_receipt_fields_only_grow():
-    # 回执的字段只增：删掉一个字段，动作的记录与工具结果就少了它（恢复契约「动作分类与处置」）
+    # 回执的字段只增：删掉一个字段，动作的记录与工具结果就少了它（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）
     current = list(ActionReceipt.model_fields)
     missing = [field for field in ACTION_RECEIPT_SNAPSHOT if field not in current]
     assert not missing, (

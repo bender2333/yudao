@@ -1,9 +1,9 @@
-# 试用记录与截图的查询（工单 #152；浏览器与 computer use 设计说明「查询」；应用层与接口层设计说明
+# 试用记录与截图的查询（工单 #152；浏览器与 computer use docs/design/browser-and-computer-use.md「查询」；应用层与接口层设计说明
 # 「查询清单」；总图第四节「接口」缝）。
 #
 # 这个文件查八件事：
 # 1. `run.trials` 按部门列出试用会话：种类、启动方式、试用副本的树摘要，质检的会话标明树摘要是否等于
-#    交付快照，开始与结束、结束方式（设计「查询」）；
+#    交付快照，开始与结束、结束方式（docs/design/browser-and-computer-use.md「查询」）；
 # 2. `run.trials` 给出质检的试用用例：引用的验收条件与原文、计划的操作与预期结果、步骤（工具、输入、
 #    结果状态、截图的工件引用、可访问性结构的摘录、收到这个结果的请求是否包含图像）、结论与观察到的结果、
 #    作为证据的步骤；
@@ -79,7 +79,7 @@ def _ref(ref: object) -> dict:
 
 def _output(data_dir: Path, accessibility: str, *, session_id: str = "brs_1",
             tree_digest: str = DELIVERY_DIGEST) -> object:
-    # 浏览器动作的输出：可访问性结构与浏览器会话身份（浏览器与 computer use 设计说明「保存与绑定」）
+    # 浏览器动作的输出：可访问性结构与浏览器会话身份（浏览器与 computer use docs/design/browser-and-computer-use.md「保存与绑定」）
     body = {"accessibility": accessibility, "images": [],
             "session": {"session_id": session_id, "tree_digest": tree_digest, "status": "running"}}
     return ArtifactStore(data_dir / "artifacts").put(RUN, "tool_output", json_dumps(body),

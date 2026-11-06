@@ -28,7 +28,7 @@ from .runtime import LoopSystem, configure_fetch_tools
 from .smoke import DEFAULT_DIR as SMOKE_DIR
 from .smoke import run_smoke, smoke_exit_code
 
-# 数据目录的进程锁：同一个数据目录只允许一个服务进程（应用层与接口层设计说明「执行与结算的归属」），锁在进程退出时释放
+# 数据目录的进程锁：同一个数据目录只允许一个服务进程（应用层与接口层 docs/design/app-and-interface.md「执行与结算的归属」），锁在进程退出时释放
 SERVICE_LOCK = "service.lock"
 
 def release_version() -> str:
@@ -54,8 +54,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--provider-config", default=None)
     # 服务就绪以后打开页面的浏览器：默认打开，带 --no-browser 时不打开
     parser.add_argument("--no-browser", action="store_true", default=False)
-    # 关闭取回（网络与 MCP 设计说明「工具的提供」）：以它运行时这个服务的部门没有 fetch_url 与
-    # read_external_source；评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明「两边的运行条件」）
+    # 关闭取回（网络与 MCP docs/design/network-and-mcp.md「工具的提供」）：以它运行时这个服务的部门没有 fetch_url 与
+    # read_external_source；评测运行器用它启动被测的 Yudao，两边都不联网（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）
     parser.add_argument("--no-fetch", action="store_true", default=False)
     sub = parser.add_subparsers(dest="command")
     demo = sub.add_parser("demo", help="run a fake end-to-end sample")
@@ -125,7 +125,7 @@ def _data_dir(args: argparse.Namespace, command: str) -> str:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    # 不写子命令时启动新接口（应用层与接口层设计说明「命令行」）
+    # 不写子命令时启动新接口（应用层与接口层 docs/design/app-and-interface.md「命令行」）
     command = args.command or "api"
     args.data_dir = _data_dir(args, command)
     # 关闭取回的启动参数在装配之前交给定义（工单 #1172）：此后这个进程的部门都没有取回工具
@@ -219,7 +219,7 @@ def _token_command(args: argparse.Namespace) -> int:
     return 0
 
 def _release_check_command(args: argparse.Namespace) -> int:
-    # 发布检查（可信内核设计说明「发布检查与探针」，工单 #355）：用这一份实例的清单与检查检查待发布的提交，
+    # 发布检查（可信内核 docs/design/trusted-kernel.md「发布检查与探针」，工单 #355）：用这一份实例的清单与检查检查待发布的提交，
     # 把结果写进决定请求「实例升级」，由用户在界面上批准或拒绝。检查不通过时状态为非零，
     # 发布脚本据此拒绝上传；决定请求照旧写入，用户看到的是不通过的结果
     report = check_repository(Path(args.repository).resolve())
@@ -272,7 +272,7 @@ def _provider_paths(data_dir: str | Path, provider_config: str | Path | None) ->
 
 
 def page_address(port: int) -> str:
-    # 页面的本机地址（网页界面的提供与发布设计说明「启动与停止」、「浏览器与显示」）：在控制主机的浏览器上打开它。
+    # 页面的本机地址（网页界面的提供与发布 docs/design/web-interface-and-release.md「启动与停止」、「浏览器与显示」）：在控制主机的浏览器上打开它。
     # 局域网访问方式下打开的同样是这个本机地址：系统通知与「安装此站点为应用」在浏览器上按地址保留设置
     return f"http://127.0.0.1:{port}/"
 

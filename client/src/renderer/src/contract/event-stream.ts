@@ -1,4 +1,4 @@
-// 事件流客户端（应用层与接口层设计说明「补齐与实时」、「缺口检测与重新同步」、「模型输出片段」）。
+// 事件流客户端（应用层与接口层 docs/design/app-and-interface.md「补齐与实时」、「缺口检测与重新同步」、「模型输出片段」）。
 // 用 npm eventsource 传入自定义 fetch（加入令牌以后在请求头中带令牌）；按位置续传；
 // 核对 previous；处理 checkpoint、resync、delta；断线时报告「连接中断，数据可能过时」。
 // 帧的解析与位置核对放在 stream-frames.ts，这里只负责连接、订阅与上报。

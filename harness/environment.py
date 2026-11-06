@@ -83,7 +83,7 @@ _CLEANUP_INITIAL_BACKOFF_SEC = 0.05
 def inspection_root(run_root: str | Path, session_id: str) -> Path:
     # 每个会话的检查工作区根：<运行工作区同级>/inspections/<run_id>/<会话>。
     # 放在运行工作区外面以免被 capture_public_tree 当作运行内容（工单 #481）。
-    # 每个会话一个（本地通用工具设计说明「工作区」）：主线会话与它在询问分支里的会话各用各的，
+    # 每个会话一个（本地通用工具 docs/design/local-tools.md「工作区」）：主线会话与它在询问分支里的会话各用各的，
     # 嵌套询问时同一部门的两个会话不共用一个目录，也就不互相删除对方的检查工作区（工单 #473）
     path = Path(run_root)
     return path.parent / INSPECTIONS_DIR / path.name / session_id
@@ -143,7 +143,7 @@ def cleanup_inspection_workspace(run_root: str | Path, session_id: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 运行工作区与会话的检查工作区（骨架与应用设计说明「薄驱动」、本地通用工具设计说明「工作区」；S4c 工单 #863）
+# 运行工作区与会话的检查工作区（骨架与应用 docs/design/skeleton-and-application.md「薄驱动」、本地通用工具 docs/design/local-tools.md「工作区」；S4c 工单 #863）
 #
 # 这一块从薄驱动搬来（工单 #473、#481、#558）：薄驱动只问两件事——这个部门在这个会话里用哪份工作区，
 # 这一轮进行中检查工作区要不要换成新的交付。来源是哪份快照、什么时候建立或重建、检查回执绑定哪几样，
@@ -375,7 +375,7 @@ class Workspaces:
         # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
         if department in self.policies(run_id)[1]:
             environment.bind_trial_source(self.source_tree(department, projection))
-            # 基线副本与起点到交付的改动清单（检验的有效性设计说明「检验的有效性」，工单 #1181）：
+            # 基线副本与起点到交付的改动清单（检验的有效性 docs/design/independent-verification.md「检验的有效性」，工单 #1181）：
             # 起点树是事项开始时的项目起点，返工后保持不变；改动清单从这里一次算好。
             # 同名检查的命令与声明文件的内容取自当前交付的说明与封存树
             start, changed = self._baseline_facts(projection)
@@ -647,7 +647,7 @@ _PROCESSES = {"run_check": "_run_check", "run_baseline_check": "_run_baseline_ch
 _MCP_PRIVATE_ARGUMENTS = frozenset({})
 
 # 动作类别与属于它的工具：执行环境按类别分派，再从上面两种执行方式里按实际工具名取执行方法。
-# 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP 设计说明「本机的做法」）。
+# 实际工具名仍供工具许可、提案与装配读取；新增的类别由各自的处理分支提供（网络取回与 MCP docs/design/network-and-mcp.md「本机的做法」）。
 # MCP 类别的工具名是各事项自己的动态别名，静态清单列不出它们：类别进入唯一的处理方法（_PROCESSES["mcp"]），
 # 由会话表核对别名并还原原名
 _KIND_TOOLS = {
@@ -912,11 +912,11 @@ class LocalEnvironment:
         self._run_id = run_id
         # 这个 run 冻结的参数取值（工单 #1189）；直接构造环境（测试、没有冻结字典的旧 run）时为空
         self._parameters = dict(parameters or {})
-        # 这个 run 的 MCP 会话表（网络与 MCP 设计说明「运行规则」，工单 #1175）：
+        # 这个 run 的 MCP 会话表（网络与 MCP docs/design/network-and-mcp.md「运行规则」，工单 #1175）：
         # 每个 run 每台服务器一个实例，第一次 MCP 调用时启动，run 结束时由持有它的一方关闭；
         # 没有 MCP 设置的 run（大多数 run 与旧事项）为空，环境工具的分派不受影响
         self.mcp_sessions = mcp_sessions
-        # 这个 run 的试用会话表（浏览器与 computer use 设计说明「试用工具」，工单 #1182）：
+        # 这个 run 的试用会话表（浏览器与 computer use docs/design/browser-and-computer-use.md「试用工具」，工单 #1182）：
         # 会话跨激活保留（一个部门同一时刻最多一个会话），由 Workspaces 持有；直接构造环境时各自一份
         self._trials = trials if trials is not None else TrialSessionTable()
         # 这个 run 的浏览器会话表（工单 #1184）：网页种类的试用会话建立与结束时
@@ -1020,12 +1020,12 @@ class LocalEnvironment:
         )
 
     def bind_trial_source(self, tree: CapturedTree | None) -> None:
-        # 这个会话的试用副本来源（浏览器与 computer use 设计说明「试用工具」）：质检按当前交付快照的清单
+        # 这个会话的试用副本来源（浏览器与 computer use docs/design/browser-and-computer-use.md「试用工具」）：质检按当前交付快照的清单
         # 建立副本，工程没有这一项，trial_start 时封存运行工作区
         self._trial_source = tree
 
     def bind_baseline_source(self, tree: CapturedTree | None, changed: tuple[str, ...] = ()) -> None:
-        # 基线副本的来源（检验的有效性设计说明「检验的有效性」，工单 #1181）：事项起点树的引用，以及起点到
+        # 基线副本的来源（检验的有效性 docs/design/independent-verification.md「检验的有效性」，工单 #1181）：事项起点树的引用，以及起点到
         # 交付的改动清单（声明涉及的交付文件必须属于它）。事项返工时起点树保持不变（run_created 里
         # 记下的采纳成果或起始文件夹快照），由 Workspaces 在激活开始时交来；
         # 直接构造环境的测试没有绑定时按没有基线处理
@@ -1118,7 +1118,7 @@ class LocalEnvironment:
             raise
         except TrialStartFailed as exc:
             # 试用会话没有建立（缺少程序、就绪超时、进程提前退出、启动方式不可用）：
-            # 失败回执带启动输出，会话不建立（浏览器与 computer use 设计说明「试用工具」与故障矩阵）；
+            # 失败回执带启动输出，会话不建立（浏览器与 computer use docs/design/browser-and-computer-use.md「试用工具」与故障矩阵）；
             # 开始之前被取消时按取消交回，进程树已经结束
             tree_change, after_ref = self._tree_evidence(before)
             if exc.cancelled:
@@ -1140,7 +1140,7 @@ class LocalEnvironment:
             return ActionReceipt(action_id=action.action_id, status="failed", output=exc.output,
                                  error=str(exc), tree_change=tree_change, after_snapshot_ref=after_ref)
         except McpRefused as exc:
-            # 工具许可与名称表（网络与 MCP 设计说明「工具许可」）：别名不在这个事项的名称表里等拒绝情形，
+            # 工具许可与名称表（网络与 MCP docs/design/network-and-mcp.md「工具许可」）：别名不在这个事项的名称表里等拒绝情形，
             # 回执标 refused 并带原因，作为工具结果交回（工单 #1170 的回执字段）
             return ActionReceipt.refusal(action.action_id, str(exc))
         except Exception as exc:
@@ -1323,7 +1323,7 @@ class LocalEnvironment:
         }
 
     def _read_external_source(self, args: dict[str, Any]) -> dict[str, Any]:
-        # 读一份已经存下来的外部来源（网络取回与 MCP 设计说明「内容与保存」）：按来源编号与行范围读，
+        # 读一份已经存下来的外部来源（网络取回与 MCP docs/design/network-and-mcp.md「内容与保存」）：按来源编号与行范围读，
         # 不重新取回；游标做法与 read_range 相同，并绑定这份正文的摘要
         source = args.get("source")
         if not isinstance(source, str) or not source:
@@ -1376,7 +1376,7 @@ class LocalEnvironment:
         return self._artifacts.external_source(self._run_id, source)
 
     async def _fetch(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 取回一个网页（网络与 MCP 设计说明「放置」、「网络取回」）：取回本身在 fetch 模块里，这里把正文存成
+        # 取回一个网页（网络与 MCP docs/design/network-and-mcp.md「放置」、「网络取回」）：取回本身在 fetch 模块里，这里把正文存成
         # 这个 run 的外部来源工件，再把工件的第一页按 read_external_source 的同一套分页交回。
         # 地址指向服务自己时 fetch 模块抛 FetchRefused，由 perform 变成 refused 的回执
         url = action.input.get("url")
@@ -1406,10 +1406,10 @@ class LocalEnvironment:
         }, "completed"
 
     async def _mcp(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 调用项目设置中 MCP 服务器的工具（网络与 MCP 设计说明「工具许可」、「运行规则」、「调用与结果」，工单 #1175）。
+        # 调用项目设置中 MCP 服务器的工具（网络与 MCP docs/design/network-and-mcp.md「工具许可」、「运行规则」、「调用与结果」，工单 #1175）。
         # 执行环境只认识这一个处理键（分派按动作类别进入，再按工具名取处理方法）；
         # 别名与原名由会话表还原：别名不在这个事项的名称表里时拒绝，原因作为工具结果交回。
-        # 结果保存为这个 run 的外部来源工件（「调用与结果」，接 #1171 的工件路径），第一页按
+        # 结果保存为这个 run 的外部来源工件（docs/design/network-and-mcp.md「调用与结果」，接 #1171 的工件路径），第一页按
         # read_external_source 的同一套分页交回；工具失败（is_error）交回错误文本，动作记为已完成
         alias = action.tool
         if self.mcp_sessions is None:
@@ -1477,7 +1477,7 @@ class LocalEnvironment:
             raise FileNotFoundError(f"file not found: {rel}")
         if not target.is_file():
             raise ValueError(f"edit_range requires an existing regular file: {rel}")
-        # 原文按目标文件本身读取：公开树不含质检的测试材料目录（本地工具「工作区」），
+        # 原文按目标文件本身读取：公开树不含质检的测试材料目录（本地工具 docs/design/local-tools.md「工作区」），
         # 区间编辑与写入工具作用在同一批可写的目标文件上
         raw = target.read_bytes()
         # 文件级摘要只绑定目标文件，其它文件的改动不影响本次核对
@@ -1767,7 +1767,7 @@ class LocalEnvironment:
         return None
 
     async def _run_baseline_check(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 基线检查（检验的有效性设计说明「检验的有效性」，工单 #1181）：主机在基线副本上运行同名交付检查，
+        # 基线检查（检验的有效性 docs/design/independent-verification.md「检验的有效性」，工单 #1181）：主机在基线副本上运行同名交付检查，
         # 回执先写进检查工作区，提交放行决定读取事实时它已经在了。基线副本由事项起点树、这个部门的
         # 检查材料与声明的交付文件组成；命令取交付检查记录的那一条。时限、输出截断、进程树清理与
         # 树变化核对与 run_check 相同。退出码非零且不是 124（超时）或 130（取消）时基线失败，
@@ -1979,7 +1979,7 @@ class LocalEnvironment:
         return self.browsers.record(self._run_id, department)
 
     def trial_session(self, department: str) -> dict[str, Any] | None:
-        # 这个部门进行中的试用会话记录（浏览器与 computer use 设计说明「试用用例」，工单 #1180）：
+        # 这个部门进行中的试用会话记录（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）：
         # trial_case_begin 记下会话身份与试用副本的树摘要，放行时按后者核对用例属于当前交付
         session = self._trials.session_of(self._run_id, department)
         return None if session is None else session.record()

@@ -1,4 +1,4 @@
-# 取回进行到一半终止 Yudao（工单 #1173；网络与 MCP 设计说明「工具的提供」、「恢复契约」、「与其他部分的关系」、恢复契约「动作分类与处置」）。
+# 取回进行到一半终止 Yudao（工单 #1173；网络与 MCP docs/design/network-and-mcp.md「工具的提供」、「恢复契约」、「与其他部分的关系」、恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）。
 #
 # 本机 HTTP 服务卡住响应，取回在飞行中时终止真实的 Yudao 进程；重新打开以后这次调用作为工具结果
 # 交还发出它的会话（resolution="handed_back"），写明执行被中断、结果未知，没有自动重新取回，
@@ -90,7 +90,7 @@ def _attempts(system: Any, run_id: str, call_id: str) -> list[dict[str, Any]]:
 
 
 def _run_actions_and_recovery(system: Any, run_id: str) -> tuple[dict[str, Any], Any]:
-    # 动作表与恢复页：这两个查询是界面读未完成动作处置的地方（恢复契约「动作分类与处置」）
+    # 动作表与恢复页：这两个查询是界面读未完成动作处置的地方（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）
     application = Application(system)
     try:
         actions = application.query("run.actions", RunActions(run_id=run_id)).data.actions

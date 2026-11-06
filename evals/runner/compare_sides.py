@@ -1,4 +1,4 @@
-"""Yudao 对单个 agent 的对照入口（`docs/design/evaluation-scenarios.md` 「Yudao 对单个 agent」）。
+"""Yudao 对单个 agent 的对照入口（`docs/design/evaluation-scenarios.md` docs/design/evaluation-scenarios.md「Yudao 对单个 agent」）。
 
 读同一场景的两份结果文件——Yudao 一侧与 OpenCode 一侧——按 D38 的 N-G1 给出「高于」
 「没有达到」「受阻」之一，写出机器可读的对照结果（JSON）与中文报告。判定与逐次并排

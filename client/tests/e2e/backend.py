@@ -261,7 +261,7 @@ def lan_address() -> str:
 
 
 def explore_turn() -> FakeTurn:
-    # 质检的预测性探索（循环结构「各部门在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
+    # 质检的预测性探索（循环结构 docs/design/department-loop.md「各部门在什么时候工作」、工单 #557）：PRD 被接纳以后还没有交付，
     # 质检按 PRD 起草测试用例，写进质检自己的测试材料。这一轮没有交付可以核验，
     # 提交的结论被拒绝，这一轮到此结束；交付到达以后质检开始新一轮工作。
     return FakeTurn(
@@ -337,7 +337,7 @@ def script():
         seen = marks(item, "quality")
         if not prompt_part(call, "current_delivery_spec"):
             # 预测性探索：这一轮没有交付可以核验，提交的结论被拒绝，这一轮到此结束
-            # （循环结构「各部门在什么时候工作」）。交付到达以后质检开始新一轮工作
+            # （循环结构 docs/design/department-loop.md「各部门在什么时候工作」）。交付到达以后质检开始新一轮工作
             return explore_turn()
         if item == HISTORY_ITEM:
             # 交付历史：质检先询问工程（质检 → 工程），回答以后记下缺陷记录；
@@ -607,7 +607,7 @@ COVERAGE_ACCEPTANCE = ["打印传入的文本", "空参数时打印用法", "退
 
 
 def coverage_criteria() -> list[dict]:
-    # 三条验收条件（验证的独立性设计说明「口径」）：一条命令检查（可执行、通过）、
+    # 三条验收条件（验证的独立性 docs/design/independent-verification.md「口径」）：一条命令检查（可执行、通过）、
     # 一条带参照材料的判定点（模型阅读、不可执行）、一条开环（不可执行）。
     # 可执行检验的条件放行时必须是 passed，不可执行的可以是 unverified
     return [
@@ -623,7 +623,7 @@ def coverage_criteria() -> list[dict]:
 def coverage_script():
     # 开环明细的脚本（工单 #401）：按部门给出，每一轮按请求里看到的事实决定做什么——
     # 质检在没有交付的一轮是预测性探索，有交付的一轮先交独立判断（提交结论以前必须有它，
-    # 验证的独立性设计说明「先判断后看解释」）再放行。放行记录里因此有两条开环条件
+    # 验证的独立性 docs/design/independent-verification.md「先判断后看解释」）再放行。放行记录里因此有两条开环条件
     judged: dict[str, bool] = {}
 
     def quality_turn(call):
@@ -818,7 +818,7 @@ async def seed_materials(application: Application, system: LoopSystem) -> None:
 
 def open_loop_script():
     # 开环完成与放行（工单 #1421）：产品与工程的轮次沿用默认脚本，质检按请求里的事实决定——
-    # 交付到达以前是预测性探索，到达以后先交独立判断再给结论（验证的独立性设计说明「先判断后看解释」）。
+    # 交付到达以前是预测性探索，到达以后先交独立判断再给结论（验证的独立性 docs/design/independent-verification.md「先判断后看解释」）。
     # 默认脚本的质检不交独立判断（e2e 的预置数据在 main 上因此跑不完，见交接说明），这里给足轮次
     return {**script(), "quality": quality_turns("release", "checks passed on the current snapshot", times=40)}
 
@@ -1327,7 +1327,7 @@ def main() -> int:
     # 端到端测试核对「接口版本不同」的提示：让服务报告一个不同的接口版本，
     # 就像一个已经升级或尚未升级的部署那样（真实 HTTP 响应，不改动被测代码）
     parser.add_argument("--api-version", type=int, default=None)
-    # 页面与服务同出一个发布（网页界面的提供与发布设计说明「接口层提供页面文件」）：让服务报告一个与页面构建时不同的
+    # 页面与服务同出一个发布（网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）：让服务报告一个与页面构建时不同的
     # 发布版本，页面据此自动重新加载，就像升级以后服务重启而浏览器里还是上一次的页面文件
     parser.add_argument("--release-version", default=None)
     # 只在第一次读取能力清单时报告这个版本：页面重新加载以后读到的是服务自己的版本，
@@ -1366,7 +1366,7 @@ def main() -> int:
 
     data_dir = Path(args.data_dir) if args.data_dir else Path(tempfile.mkdtemp(prefix="yudao-e2e-"))
     # 测试内启动的真实 HTTP 上游：三种协议的推理服务与模型列表服务（工单 #93）。
-    # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（模型管理设计说明「Provider 配置」），
+    # 目录里的连接带服务方案，请求基址按访问定义的协议取自预置表（模型管理 docs/design/model-management.md「Provider 配置」），
     # 因此每种协议各起一个上游，端到端的请求按协议打到不同的本机服务。
     # 「yudao api」模式不预置目录数据，但上游仍然要起：fixture 与 api 两种模式共用同一个
     # 收尾清理，api 模式的上游只在没有用例连接时空转。

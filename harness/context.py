@@ -152,7 +152,7 @@ def view(entries: list[ContextEntry], rules: Rules, *,
     )
 
 
-# 工具结果里的图像放进请求的张数与换出的粒度（浏览器与 computer use 设计说明「请求中的图像」，取值参照
+# 工具结果里的图像放进请求的张数与换出的粒度（浏览器与 computer use docs/design/browser-and-computer-use.md「请求中的图像」，取值参照
 # Anthropic 参考实现 `_maybe_filter_to_n_most_recent_images`：保留最近 3 张，换出按 3 张一组）
 REQUEST_IMAGE_KEPT = 3
 REQUEST_IMAGE_BATCH = 3
@@ -883,7 +883,7 @@ def _delivery_explanation_fields(definitions: Definitions | None, issuer: str) -
 
 def quality_engineering_content(events: list[Event], *, delivery: DeliverySpec | None = None,
                                 definitions: Definitions | None = None) -> dict[str, Any]:
-    # 质检请求里可以放入的工程内容（工单 #554、#358，验证的独立性设计说明「先判断后看解释」）：
+    # 质检请求里可以放入的工程内容（工单 #554、#358，验证的独立性 docs/design/independent-verification.md「先判断后看解释」）：
     # 事实部分总在；解释部分在核验角色提交了当前交付的独立判断（independent_judgement_committed）
     # 以后进入它之后的请求——先判断后看解释，解释不再等质检的结论；新的交付到达后按新交付重新计算：
     # 解释部分重新藏起来，等核验角色对新交付的独立判断。

@@ -1,4 +1,4 @@
-// 首页的楼的翻译层（画面与播放设计说明「翻译层」、原型 v13 js/translate/translate.js 的 T.building 与
+// 首页的楼的翻译层（画面与播放 docs/design/visualization.md「翻译层」、原型 v13 js/translate/translate.js 的 T.building 与
 // js/ui/scenes.js 的 buildingStates，工单 #955）。
 //
 // 这一层是唯一同时认识 Yudao 的说法与画面的说法的地方：

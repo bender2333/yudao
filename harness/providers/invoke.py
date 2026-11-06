@@ -73,7 +73,7 @@ class ProviderInput:
 
 
 # 工具结果的输出在请求里是文字，或者文字与图像的块列表：图像块写成 data URL 的 input_image，
-# 三种协议各自按它转成该协议的图像输入写法（浏览器与 computer use 设计说明「请求中的图像」）
+# 三种协议各自按它转成该协议的图像输入写法（浏览器与 computer use docs/design/browser-and-computer-use.md「请求中的图像」）
 TOOL_TEXT_PART = "input_text"
 TOOL_IMAGE_PART = "input_image"
 

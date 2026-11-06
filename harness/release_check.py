@@ -1,8 +1,8 @@
-# 发布检查（可信内核设计说明「发布检查与探针」，网页界面的提供与发布设计说明「发布脚本」，工单 #355）。
+# 发布检查（可信内核 docs/design/trusted-kernel.md「发布检查与探针」，网页界面的提供与发布 docs/design/web-interface-and-release.md「发布脚本」，工单 #355）。
 # 已安装的实例用它检查待发布的提交：用这一份实例的内核清单与检查，对待发布提交的内容做
 #   1. 内核差异：上一次发布标签到待发布提交之间，内核清单里的路径有哪些改动，列进报告供用户查看，不算不通过
 #      （阶段一由外部模型开发这个仓库，改内核路径不事前批准，守它的是 CI 里的内核测试；
-#      运行中的系统改自己的内核才经决定请求「内核修改」批准，见可信内核设计说明「内核清单」）；
+#      运行中的系统改自己的内核才经决定请求「内核修改」批准，见可信内核 docs/design/trusted-kernel.md「内核清单」）；
 #   2. 导入方向：内核清单里的模块只导入内核文件、标准库与 pydantic；
 #   3. 评测专有内容：部门 Prompt、定义、工具说明、技能里出现评测场景专有内容即为不通过。
 # 检查结果写进决定请求「实例升级」（目录流），由用户批准或拒绝；升级已安装的那一份是一次用户决定。
@@ -30,7 +30,7 @@ from .write_path import NewCatalogEvent
 
 # 内核清单在包内的位置；它在 wheel 中随包发布（pyproject.toml 的 package-data）
 MANIFEST_PATH = Path(__file__).resolve().parent / "definitions" / "kernel-manifest.json"
-# 上一次发布的标签的前缀（网页界面的提供与发布设计说明「版本号」）
+# 上一次发布的标签的前缀（网页界面的提供与发布 docs/design/web-interface-and-release.md「版本号」）
 TAG_PREFIX = "v"
 # 允许的导入：内核文件、标准库与 pydantic（内核清单的 allowed_imports）
 PYDANTIC_TOP = "pydantic"

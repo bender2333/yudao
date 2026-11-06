@@ -1,4 +1,4 @@
-# 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵「动作分类与处置」、「故障矩阵」）。
+# 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」、docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，模型回答由 FakeAdapter 给出；
 # 中断由「进程关闭、重新以新的系统打开同一数据目录」表示。查询只读取，事件流重连只补观察事实。
 
@@ -280,7 +280,7 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
 
 
 def test_sessions_report_the_usage_of_each_session(data_dir):
-    # 各会话的用量（工单 #181，三部门的循环结构「停止与恢复」）：部门主线与会话分支各一行，
+    # 各会话的用量（工单 #181，三部门的循环结构 docs/design/department-loop.md「停止与恢复」）：部门主线与会话分支各一行，
     # 写部门、主线或分支、已用秒、轮数与步数。分支是工程询问产品时产品的那次旁支工作
     script = {
         "product": [product_spec()],

@@ -262,7 +262,7 @@ def test_compaction_uses_the_same_retry_path(tmp_path):
 
     adapter = FakeAdapter([respond] * 8)
     system = LoopSystem.for_testing(tmp_path, adapter, step_limits=FAST_RETRIES)
-    # 上下文窗口按这个场景的需要设置（测试分层设计说明「测试的写法」中「测试不决定产品的文字」）：读一个大文件以后历史装不下、
+    # 上下文窗口按这个场景的需要设置（测试分层 docs/design/test-pyramid.md「测试的写法」中「测试不决定产品的文字」）：读一个大文件以后历史装不下、
     # 要压缩，固定材料（部门提示与事项种类的说明）装得下并留出余量；窗口不随提示词的篇幅调整
     run_id = system.create_run("echo", context_window=7000)
     system.workspace(run_id).write_file("large.txt", "ORIGINAL " * 5000)

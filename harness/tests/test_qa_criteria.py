@@ -1,4 +1,4 @@
-# 质检逐条结论的词表与检验覆盖的三个数（验证的独立性设计说明「口径」，工单 #151）。
+# 质检逐条结论的词表与检验覆盖的三个数（验证的独立性 docs/design/independent-verification.md「口径」，工单 #151）。
 #
 # 检验方式的六个代码名是内核里的封闭取值（kernel_events.QA_METHODS），可执行与不可执行的分类、三个数的
 # 算法在覆盖模块（coverage.py）里。两端共读的夹具是 harness/tests/fixtures/check_methods.json：
@@ -31,7 +31,7 @@ def test_the_two_fixtures_hold_the_same_methods():
 
 def test_the_service_method_table_matches_the_shared_fixture():
     # 两端共读的夹具与服务端的封闭取值一致：代码名逐一相同、可执行与不可执行的分类相同。
-    # 守 R2（独立性说明「口径」的词表是两端的合同）与 R3（逐条结论用的检验方式）
+    # 守 R2（独立性 docs/design/independent-verification.md「口径」的词表是两端的合同）与 R3（逐条结论用的检验方式）
     fixture = _fixture()
     assert [item["code"] for item in fixture["methods"]] == list(QA_METHODS)
     executable = {item["code"] for item in fixture["methods"] if item["executable"]}
@@ -80,7 +80,7 @@ def test_an_empty_criteria_list_reports_a_zero_ratio():
 
 
 def test_changed_criteria_compare_the_judgement_with_the_conclusion():
-    # 改判的对照（验证的独立性设计说明「先判断后看解释」，工单 #1190）：只按 AC 序号比 result，
+    # 改判的对照（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #1190）：只按 AC 序号比 result，
     # 两个方向都列出来（以后算解释翻转率时按方向分类）；判断里没有的条件不算改判
     judged = [
         {"criterion": "AC1", "method": "open", "result": "unverified"},

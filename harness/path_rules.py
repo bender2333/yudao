@@ -1,6 +1,6 @@
 # 公开路径的规则：可移植的相对路径、主机私有路径、保留组件与检查材料目录的判断。
 # 裁决（工具许可的写入范围检查）与执行层（工作区读取、封存、快照、检查副本）共用同一套规则；规则与需要
-# libgit2 的公开树采集放在两个模块里，内核因此不导入第三方代码（可信内核设计说明「内核清单」的导入方向）。
+# libgit2 的公开树采集放在两个模块里，内核因此不导入第三方代码（可信内核 docs/design/trusted-kernel.md「内核清单」的导入方向）。
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import PurePosixPath, PureWindowsPath
 
 _DEVICE = re.compile(r"(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3]|conin\$|conout\$)", re.IGNORECASE)
 
-# 检查材料的目录（[本地工具设计说明](docs/design/local-tools.md)「工作区」）：写入范围是
+# 检查材料的目录（[本地工具设计说明](docs/design/local-tools.md)docs/design/local-tools.md「工作区」）：写入范围是
 # 检查材料的角色在这里写测试，它不进入公开树与交付快照，只出现在检查工作区与检查副本中
 CHECK_MATERIALS_DIR = ".yudao-qa-tests"
 QA_TESTS_DIR = CHECK_MATERIALS_DIR  # 旧名，留一版

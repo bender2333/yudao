@@ -1,4 +1,4 @@
-# 查询 tools.registry（工单 #1177；网络与 MCP 设计说明「应用层接口」、「系统「工具与扩展」页」；
+# 查询 tools.registry（工单 #1177；网络与 MCP docs/design/network-and-mcp.md「应用层接口」、docs/design/network-and-mcp.md「系统「工具与扩展」页」；
 # 总图第四节「接口」缝）。这个文件查五件事：
 # 1. 能力清单里列出这个查询；调用前后事件日志末尾位置与保存的投影不变（验收 2 的只读一半）；
 # 2. 两个项目各写明不同的服务器时，查询内容与各自设置一致（验收 1 的 MCP 一半）；
@@ -13,7 +13,7 @@
 # #68 的 harness/tests/test_fetch.py 与 #1174 的 harness/tests/test_mcp_probe.py 在集成层核对，
 # 这里核对的是查询读到这些事实以后给出什么。
 #
-# 层：模块层（真实 SQLite 事件库与项目投影，不出激活、不用网络，测试分层设计说明「三层的定义」）。
+# 层：模块层（真实 SQLite 事件库与项目投影，不出激活、不用网络，测试分层 docs/design/test-pyramid.md「三层的定义」）。
 # 守 R2（第二环的合同：查询的结果字段、能力清单登记、只读保证）。
 
 from __future__ import annotations

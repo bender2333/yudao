@@ -1,4 +1,4 @@
-# 执行契约第三版（骨架与应用设计说明「契约」、「执行契约」；总图第四节「执行」缝）：
+# 执行契约第三版（骨架与应用 docs/design/skeleton-and-application.md「契约」、「执行契约」；总图第四节「执行」缝）：
 # 输入一轮工作（部门、会话、提示、这一轮的上限、路由的工作引用、按部门取模型与提示词的来源；工作引用原样
 # 交给装配）；每一步经安全节点问薄驱动继续或停止；工具调用经裁决入口；输出一轮工作的结果：这一轮写下的事件
 # 的范围与停止原因。这一轮算不算结束、结束成什么，由路由按事件判断，契约不写死「提交了正式成果」「回答了
@@ -41,7 +41,7 @@ def accept(implementation: Any) -> int:
 @dataclass(frozen=True)
 class Judgment:
     # 安全节点的回答：是否继续，以及作出判断时 run 流的版本；
-    # blocked_by_other_session 说明别的会话已经写下待恢复的决定请求（模型管理设计说明「引用无法使用时」）：
+    # blocked_by_other_session 说明别的会话已经写下待恢复的决定请求（模型管理 docs/design/model-management.md「引用无法使用时」）：
     # 这个会话照常停下（事项的状态不变，工单 #856），它自己也被挡住时它要写下自己的那一条
     proceed: bool
     version: int
@@ -164,7 +164,7 @@ class RoundResult:
     target: dict[str, Any] | None = None
     facts: tuple[str, ...] = ()
     # 整理连续没有推进达到 compaction.stalled_limit（stop_reason 为 compaction_failed，模型管理设计说明
-    # 「失败处理」最后一条，工单 #1238）：薄驱动让 run 进入待恢复、等用户回答，不结束运行。其余
+    # docs/design/model-management.md「失败处理」最后一条，工单 #1238）：薄驱动让 run 进入待恢复、等用户回答，不结束运行。其余
     # compaction_failed（整理请求本身装不进窗口）照旧结束运行，所以由实现标明是哪一种
     stalled_compaction: bool = False
     # 这一轮里模型用提交类工具交上来的参数（原样的工具回执，或参数加上工具声明的种类），带来它的这次回答，
