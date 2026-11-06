@@ -20,6 +20,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.app.application import DEFAULT_REGISTRY, Application
 from harness.app.catalog_queries import ChangeImpactRequest
 from harness.app.decision_queries import DecisionsList
+from harness.app.evidence_queries import ScreenshotEvidence
 from harness.app.home import AwayReportRequest
 from harness.app.project_queries import (
     DepartmentWorkspace, DeliveryFile, EventDetail, EventPositions, NotFound, ProjectAttempts,
@@ -32,6 +33,7 @@ from harness.app.loops_queries import RunLoops
 from harness.app.rules_queries import RulesRegistryRequest
 from harness.app.system_queries import LiveAttemptRequest, SystemStatusRequest
 from harness.app.tools_queries import TOOLS_REGISTRY
+from harness.app.trial_queries import RunTrials
 from harness.event_store import Command, EventStore, catalog_stream, run_stream
 from harness.models import EventType, json_dumps
 from harness.projection import dump_decision, replay_decisions, saved_decisions
@@ -237,6 +239,12 @@ def _requests(scope: _Scope) -> dict[str, Any]:
         "run.actions": RunActions(run_id=run_id),
         "run.steps": RunSteps(run_id=run_id, department=scope.department),
         "run.asks": RunAsks(run_id=run_id),
+        # 试用记录与截图（工单 #152）：场景里没有试用会话与用例，结果不变；
+        # 截图引用按一个不存在的工件请求，始终找不到
+        "run.trials": RunTrials(run_id=run_id),
+        "evidence.screenshot": ScreenshotEvidence(
+            event_id=scope.first_event_id or "none", kind="screenshot",
+            content_hash="sha256:" + "0" * 64, path="none"),
         "work_item.materials": WorkItemMaterials(project_id=project_id, work_item=work_item_id),
         "delivery.file": DeliveryFile(event_id=scope.delivery_event_id or "none",
                                       path=scope.delivery_path or "none"),

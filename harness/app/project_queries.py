@@ -1739,6 +1739,12 @@ class ActionReceipt(Contract):
     refused: bool = False
     refused_reason: str | None = None
     fetch: FetchReceipt | None = None
+    # 浏览器与屏幕动作的截图工件引用与浏览器会话身份（浏览器与 computer use 设计说明第 7.2 节，工单 #152）：
+    # 截图取自工具结果事件里的工件引用；会话身份与试用副本的树摘要取自结果工件里的会话记录。
+    # 非浏览器动作没有这三项
+    screenshots: list[dict[str, Any]] = Field(default_factory=list)
+    session_id: str | None = None
+    session_tree_digest: str | None = None
 
 
 class ActionView(Contract):
@@ -1805,7 +1811,13 @@ def _run_action_views(application: Application, run_id: str
         started_event = started.pop(identity, None)
         fetched = _fetch_receipt(application, run_id, payload) if (
             event.type == EventType.TOOL_CALLED and payload.get("name") == "fetch_url") else None
-        actions.append(_action_view(event, identity, started_event, fetch=fetched))
+        # 浏览器动作回执里的截图引用与会话身份（工单 #152）：截图引用随工具结果事件保存，
+        # 会话身份与试用副本的树摘要取自结果工件里的会话记录
+        screenshots = [dict(item) for item in payload.get("images") or [] if isinstance(item, dict)] \
+            if event.type == EventType.TOOL_CALLED else []
+        browser_session = _browser_session(application, run_id, payload) if screenshots else None
+        actions.append(_action_view(event, identity, started_event, fetch=fetched,
+                                    screenshots=screenshots, browser_session=browser_session))
         if event.type == EventType.TOOL_CALLED and payload.get("name") == "bash":
             started_payload = {} if started_event is None else (started_event.payload or {})
             args = dict(payload.get("args") or started_payload.get("args") or {})
@@ -1892,9 +1904,33 @@ def _fetch_receipt(application: Application, run_id: str, payload: dict[str, Any
     )
 
 
+def _browser_session(application: Application, run_id: str,
+                     payload: dict[str, Any]) -> dict[str, Any] | None:
+    # 浏览器动作的会话身份与试用副本的树摘要（工单 #152）：浏览器工具把会话记录放进结果工件，
+    # 回执只带所需的这两项。取不出来时为空，不影响动作的其他字段
+    output = _tool_output(application, run_id, payload.get("output_ref"))
+    session = output.get("session") if isinstance(output, dict) else None
+    if not isinstance(session, dict):
+        return None
+    return {"session_id": session.get("session_id"), "tree_digest": session.get("tree_digest")}
+
+
+def _tool_output(application: Application, run_id: str, output_ref: Any) -> dict[str, Any] | None:
+    # 一个动作的结果工件（JSON 对象）：取不出来时为空
+    if not isinstance(output_ref, dict):
+        return None
+    try:
+        output = json.loads(application.system.artifacts.get_for_run(run_id, ArtifactRef(**output_ref)))
+    except (FileNotFoundError, KeyError, TypeError, ValueError):
+        return None
+    return output if isinstance(output, dict) else None
+
+
 def _action_view(result_event: Any | None, identity: tuple[str, int | None, str],
                  started_event: Any | None, *, live: bool = False,
-                 fetch: FetchReceipt | None = None) -> ActionView:
+                 fetch: FetchReceipt | None = None,
+                 screenshots: list[dict[str, Any]] | None = None,
+                 browser_session: dict[str, Any] | None = None) -> ActionView:
     # 一个动作的读取视图（工单 #17）：状态、回执，以及动作前后的快照引用（动作前取自 tool_started，
     # 动作后取自 tool_called）。result_event 为空表示只有 tool_started、还没有结果。
     action_id = identity[2]
@@ -1925,6 +1961,7 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
     ok = bool(payload.get("ok"))
     started_payload = {} if started_event is None else (started_event.payload or {})
     refused = bool(payload.get("refused"))
+    session = browser_session or {}
     return ActionView(
         action_id=action_id, tool=str(payload.get("name") or started_payload.get("name") or ""),
         department=result_event.department,
@@ -1938,6 +1975,9 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
             output_ref=payload.get("output_ref"), event_id=result_event.event_id,
             created_at=result_event.created_at,
             refused=refused, refused_reason=payload.get("refused_reason"), fetch=fetch,
+            screenshots=list(screenshots or []),
+            session_id=session.get("session_id"),
+            session_tree_digest=session.get("tree_digest"),
         ),
         before_snapshot_ref=started_payload.get("before_snapshot_ref"),
         after_snapshot_ref=payload.get("after_snapshot_ref"),
@@ -2253,6 +2293,16 @@ class WorkItemMaterials(Contract):
     work_item: str
 
 
+class LaunchMethodView(Contract):
+    # 交付说明里的一个启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #152）：资料页的交付一项
+    # 据此显示这份交付怎么启动。commands 按系统给出命令（windows、linux）
+    name: str
+    kind: str
+    commands: dict[str, list[str]]
+    ready_url: str | None = None
+    ready_timeout_sec: int | None = None
+
+
 class VersionEntry(Contract):
     event_id: str
     kind: str
@@ -2261,6 +2311,33 @@ class VersionEntry(Contract):
     content_hash: str | None
     summary: str | None
     files: list[str]
+    # 交付说明中的启动方式（只有交付一项有；契约与旧事件没有这一项）
+    launch: list[LaunchMethodView] = Field(default_factory=list)
+
+
+class QaCriterionView(Contract):
+    # 一份 QAReview 的逐条结论（设计第 8.3 节）：验收条件、检验方式、结果与证据（检查名称与试用用例）
+    criterion: str
+    method: str
+    result: str
+    checks: list[str]
+    trial_cases: list[str]
+    note: str
+
+
+class TrialCaseEvidenceView(Contract):
+    # QAReview 引用的一个试用用例与它的截图引用（用例全部步骤上的截图，页面显示缩略图用）
+    case_id: str
+    title: str
+    result: str | None = None
+    screenshots: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class UnverifiedCriterionView(Contract):
+    # 无法核验的条目与原因（设计第 8.4 节：原因写在逐条结论的 note 里）
+    criterion: str
+    method: str
+    note: str
 
 
 class ReviewEntry(Contract):
@@ -2269,6 +2346,10 @@ class ReviewEntry(Contract):
     rationale: str
     defects: list[dict[str, Any]]
     checks: list[dict[str, Any]]
+    # 每份 QAReview 的逐条结论、试用用例的截图引用与无法核验的条目（工单 #152）
+    criteria: list[QaCriterionView] = Field(default_factory=list)
+    trial_cases: list[TrialCaseEvidenceView] = Field(default_factory=list)
+    unverified: list[UnverifiedCriterionView] = Field(default_factory=list)
 
 
 class BaselineReviewView(Contract):
@@ -2351,6 +2432,76 @@ class WorkItemMaterialsResult(Contract):
     old_runs: list[OldRunView]
 
 
+def _launch_methods(value: Any) -> list[LaunchMethodView]:
+    # 交付说明里的启动方式（工单 #152）：旧交付没有这一项时为空；只取页面需要的字段
+    methods: list[LaunchMethodView] = []
+    for item in getattr(value, "launch", None) or []:
+        if not isinstance(item, dict):
+            continue
+        commands = {
+            str(system): [str(part) for part in argv]
+            for system, argv in (item.get("commands") or {}).items() if isinstance(argv, list)}
+        methods.append(LaunchMethodView(
+            name=str(item.get("name") or ""), kind=str(item.get("kind") or ""), commands=commands,
+            ready_url=item.get("ready_url"), ready_timeout_sec=item.get("ready_timeout_sec")))
+    return methods
+
+
+def _review_criteria(value: Any) -> list[QaCriterionView]:
+    # 一份 QAReview 的逐条结论（工单 #152）：旧事件没有这一项时为空
+    criteria: list[QaCriterionView] = []
+    for item in getattr(value, "criteria", None) or []:
+        if not isinstance(item, dict):
+            continue
+        criteria.append(QaCriterionView(
+            criterion=str(item.get("criterion") or ""),
+            method=str(item.get("method") or ""),
+            result=str(item.get("result") or ""),
+            checks=[str(entry) for entry in item.get("checks") or []],
+            trial_cases=[str(entry) for entry in item.get("trial_cases") or []],
+            note=str(item.get("note") or ""),
+        ))
+    return criteria
+
+
+def _trial_case_evidence(criteria: list[QaCriterionView],
+                         cases: dict[str, Any]) -> list[TrialCaseEvidenceView]:
+    # QAReview 引用的试用用例与它们的截图引用（工单 #152）：按逐条结论里引用的顺序，同一个用例只列一次；
+    # 用例不在这个 run 的投影里时仍然列出引用，标题与截图留空（引用本身是事实）
+    referenced: list[str] = []
+    for item in criteria:
+        for case_id in item.trial_cases:
+            if case_id not in referenced:
+                referenced.append(case_id)
+    views: list[TrialCaseEvidenceView] = []
+    for case_id in referenced:
+        case = cases.get(case_id)
+        screenshots = [] if case is None else [
+            dict(shot) for step in case.steps for shot in step.screenshots if isinstance(shot, dict)]
+        views.append(TrialCaseEvidenceView(
+            case_id=case_id, title="" if case is None else case.title,
+            result=None if case is None else case.result, screenshots=screenshots))
+    return views
+
+
+def _unverified_criteria(criteria: list[QaCriterionView]) -> list[UnverifiedCriterionView]:
+    # 无法核验的条目与原因（设计第 8.4 节）：结果 unverified 的条目，原因取自逐条结论的 note
+    return [UnverifiedCriterionView(criterion=item.criterion, method=item.method, note=item.note)
+            for item in criteria if item.result == "unverified"]
+
+
+def _review_entry(value: Any, trial_cases: dict[str, Any]) -> ReviewEntry:
+    # 一份 QAReview 在资料页上的条目（工单 #152）：结论本身，加上逐条结论、试用用例的截图引用与
+    # 无法核验的条目
+    criteria = _review_criteria(value)
+    return ReviewEntry(
+        event_id=value.created_event_id, verdict=value.verdict, rationale=value.rationale,
+        defects=[defect.__dict__ for defect in value.defects], checks=list(value.checks),
+        criteria=criteria, trial_cases=_trial_case_evidence(criteria, trial_cases),
+        unverified=_unverified_criteria(criteria),
+    )
+
+
 def _work_item_materials(application: Application, request: WorkItemMaterials
                          ) -> Snapshot[WorkItemMaterialsResult]:
     store = application.system.store
@@ -2364,6 +2515,7 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
     # 有效合同按它是不是当前有效的那一版标状态（工单 #683）：「产品决定修订 PRD」产生的新合同
     # 沿用同一条产品需求，按那条需求的状态会让两版都是 active
     current_contract = None if run.effective_contract is None else run.effective_contract.content_hash
+    trial_cases = {case.case_id: case for case in run.trial_cases}
     return Snapshot[WorkItemMaterialsResult](
         position=store.end_position(),
         data=WorkItemMaterialsResult(
@@ -2374,12 +2526,10 @@ def _work_item_materials(application: Application, request: WorkItemMaterials
                                       _prd_summary(specs.get(value.product_spec_hash)), [])
                        for value in run.effective_contracts],
             deliveries=[_version_entry(value.created_event_id, "delivery", value.status, value.revision,
-                                       value.content_hash, value.summary, list(value.files))
+                                       value.content_hash, value.summary, list(value.files),
+                                       launch=_launch_methods(value))
                         for value in run.delivery_specs],
-            reviews=[ReviewEntry(event_id=value.created_event_id, verdict=value.verdict,
-                                 rationale=value.rationale,
-                                 defects=[defect.__dict__ for defect in value.defects],
-                                 checks=list(value.checks)) for value in run.reviews],
+            reviews=[_review_entry(value, trial_cases) for value in run.reviews],
             inputs=[
                 InputView(
                     input_id=value.id, version=value.version, text=value.text, kind=value.kind,
@@ -2509,9 +2659,11 @@ def _prd_summary(spec: Any) -> str | None:
 
 
 def _version_entry(event_id: str, kind: str, status: str, revision: int, content_hash: str,
-                   summary: str | None, files: list[str]) -> VersionEntry:
+                   summary: str | None, files: list[str],
+                   launch: list[LaunchMethodView] | None = None) -> VersionEntry:
     return VersionEntry(event_id=event_id, kind=kind, status=status, revision=revision,
-                        content_hash=content_hash, summary=summary, files=files)
+                        content_hash=content_hash, summary=summary, files=files,
+                        launch=list(launch or []))
 
 
 # ---------------------------------------------------------------------------
