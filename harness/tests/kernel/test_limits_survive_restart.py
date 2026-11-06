@@ -6,6 +6,8 @@
 #
 # 读事件日志、写数据目录、用子进程，属于集成层。
 
+import sys
+
 from harness.models import EventType
 from harness.proposals import product_spec
 from harness.tests import process_kill as killed
@@ -53,33 +55,39 @@ def test_accumulated_usage_does_not_decrease_across_a_restart(tmp_path):
         elapsed, activations, steps = before
         assert elapsed is not None and activations >= 1 and steps >= 1, \
             f"重启之前的已用量不完整：{before}"
-        assert after[0] >= elapsed, f"已用时间从 {elapsed}ms 变成 {after[0]}ms，重启以后重新计数了"
+        assert after[0] > elapsed, f"已用时间从 {elapsed}ms 变成 {after[0]}ms，重启以后重新计数了"
         assert after[1] >= activations, f"激活次数从 {activations} 变成 {after[1]}，重启以后重新计数了"
         assert after[2] >= steps, f"模型步数从 {steps} 变成 {after[2]}，重启以后重新计数了"
 
 
-def test_usage_keeps_accumulating_after_a_restart_instead_of_restarting(tmp_path):
-    # 重启以后的累计时间继续加上重启前的那一份，不是重新从零开始计时
-    data_dir = tmp_path / "data"
-    with killed.interrupted(data_dir, _script(), tail=_tail(), hold_after=_HOLD) as run:
-        before = _usage(run.before_events)
-        assert before is not None and before[0] > 0, \
-            f"重启之前已经用掉 {before[0] if before else None}ms 运行时间，才能核对连续累计"
-        after = _usage(run.after.store.list_events(run.run_id))
-        assert after is not None
-        assert after[0] > before[0], \
-            f"重启以后累计时间 {after[0]}ms 没有超过重启之前的 {before[0]}ms"
-
-
 def test_the_short_time_limit_still_bites_after_a_restart(tmp_path):
-    # 达到上限记为失败：累计时间跨重启连续，短上限在重启以后仍然生效，不会因为重新计数而延长
+    # 达到上限记为失败：累计时间跨重启连续，短上限在重启以后仍然生效，不会因为重新计数而延长。
+    # 重启以后的工程检查真的运行 4 秒，越过 3 秒的运行时间上限，运行在下一个安全节点以 time_limit 结束
+    # （与 harness/tests/test_issue_350_usage_resumes.py::test_accumulated_time_reaches_a_short_limit_after_restart 同一做法）
     data_dir = tmp_path / "data"
-    with killed.interrupted(data_dir, _script(), tail=_tail(), hold_after=_HOLD,
+    with killed.interrupted(data_dir, _script(), tail=_slow_tail(tmp_path), hold_after=_HOLD,
                             run_time_limit_sec=3) as run:
+        stops = [(event.payload or {}).get("stop_reason") for event in run.before_events]
+        assert "time_limit" not in stops, f"中断时 run 已经以运行时间上限停止，停止原因 {stops}"
         projection = run.after.project(run.run_id)
         assert projection.run_time_limit_sec == 3, "上限在重启以后变了"
+        assert (projection.status, projection.stop_reason) == ("failed", "time_limit"), \
+            f"重启后累计时间越过 3 秒的上限，运行应当以 time_limit 停止：{projection.status}/{projection.stop_reason}"
         after = _usage(run.after.store.list_events(run.run_id))
         assert after is not None
         limit_ms = projection.run_time_limit_sec * 1000
-        assert after[0] <= limit_ms + 600_000, \
-            f"重启后累计 {after[0]}ms，超过上限加一次调用的最长时限 {limit_ms + 600_000}ms"
+        assert after[0] >= limit_ms, f"重启后累计 {after[0]}ms，达到 {limit_ms}ms 的运行时间上限"
+
+
+def _slow_tail(tmp_path) -> dict[str, list[dict]]:
+    # 重启以后继续用的脚本：工程的交付检查是一个真实运行 4 秒的进程，越过 3 秒的运行时间上限
+    script = tmp_path / "slow-check.py"
+    script.write_text("import time\n\ntime.sleep(4)\n", encoding="utf-8")
+    command = f'"{sys.executable.replace(chr(92), chr(47))}" "{script.as_posix()}"'
+    return {
+        "engineering": [{"proposal": {"kind": "delivery_spec", "summary": "implemented echo CLI",
+                                      "check_names": ["slow"], "known_risks": []},
+                         "checks": {"slow": {"command": command}}}],
+        "quality": [{"proposal": {"kind": "quality_auto", "verdict": "release",
+                                  "rationale": "checks passed on the current snapshot", "times": 4}}],
+    }

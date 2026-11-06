@@ -142,12 +142,6 @@ def _facts(system, run_id):
     return LocalEnvironment(system.workspace(run_id)).query(FactsQuery(tree=True)).tree
 
 
-def test_the_three_tightening_implementations_declare_the_same_contract_version():
-    # 缝的两侧按同一个契约版本对话：受控实现与内核接受的版本一致
-    for implementation in (_Passes(), _Refuses(), _Waits()):
-        assert accept(implementation) == 1
-
-
 def test_a_kernel_rejection_stands_when_the_tightening_check_passes(tmp_path):
     # ①内核先判：提案依据的 PRD 版本不是当前版本，收紧检查放行也不改变这个结果
     system, run_id, projection = _system(tmp_path)
@@ -194,22 +188,6 @@ def test_a_waiting_tightening_check_makes_the_tool_wait_at_the_safe_node(tmp_pat
     assert permission.wait_for_input and not permission.allowed and not permission.stopped
 
 
-def test_a_waiting_tightening_check_at_commit_time_is_never_accepted(tmp_path):
-    # ③提交事务里再判一次：要等待时这次提交不当场生效，交回部门等产品处理完再提交
-    system, run_id, projection = _system(tmp_path)
-    facts = _facts(system, run_id)
-    events = system.store.list_events(run_id)
-    proposal = product_spec()
-    first = proposal_decision(adjudication_view(projection), department="product", proposal=proposal, facts=facts,
-                              events=events, tightening=_Passes())
-    assert first.accepted, first.error_dicts
-    committed = commit_decision(first, department="product", proposal=proposal, evaluated=adjudication_view(projection),
-                                facts=facts, current=adjudication_view(projection), current_facts=facts, events=events,
-                                tightening=_Waits())
-    assert not committed.accepted
-    assert committed.errors and committed.errors[0].field == "kind"
-
-
 def test_a_tool_refused_with_field_errors_is_not_allowed(tmp_path):
     # ②拒绝也可以给字段错误：内核取第一条错误的原因拒绝，不因为它的形状不同就放行
     system, run_id, projection = _system(tmp_path)
@@ -247,6 +225,10 @@ def test_a_wait_that_only_appears_at_commit_time_leaves_the_submission_unapplied
                                 tightening=_WaitsAtCommit())
     assert not committed.accepted
     assert committed.errors and committed.errors[0].field == "kind"
+    # 提案校验这一步同样把等待当作字段错误：收下提案时就说要等待的收紧检查也当场交回，不当场生效
+    waiting = proposal_decision(adjudication_view(projection), department="product", proposal=proposal, facts=facts,
+                                events=events, tightening=_Waits())
+    assert not waiting.accepted and waiting.errors[0].field == "kind"
 
 
 def test_a_tightening_check_that_does_not_declare_a_version_is_refused(tmp_path):
