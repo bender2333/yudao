@@ -25,6 +25,8 @@ test-results/
 
 # --- tooling / scratch ---
 .tmp/
+# 变异检查工具 poodle 的临时工作目录（tools/kernel_checks）
+.poodle-temp/
 evals/scenarios/scenario-3/checks/_work/
 .tmp-codex-test/
 .tmp-omp-profile/
