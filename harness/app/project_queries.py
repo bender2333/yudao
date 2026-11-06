@@ -1339,7 +1339,7 @@ class RoomView(Contract):
     self_test: dict[str, Any] | None
 
 class EffectiveModel(Contract):
-    # 本部门当前生效的模型及来源：按的选择规则与当前目录计算，不发送请求。
+    # 本部门当前生效的模型及来源：按选择规则与当前目录计算，不发送请求。
     # state 为 effective 时给出模型与来源；为 unusable 时给出 reason 与 message；
     # 为 unset 时都没有设置。unusable 与 unset 时不返回其他连接或模型
     state: Literal["effective", "unusable", "unset"]
@@ -1386,7 +1386,7 @@ def _project_selection(setting: Any) -> ModelSelection | None:
                           requested_tier=setting.requested_tier)
 
 def _effective_model(application: Application, setting: Any, department: str) -> EffectiveModel:
-    # 本部门当前生效的模型及来源：按的顺序解析，不发送请求。
+    # 本部门当前生效的模型及来源：按顺序解析，不发送请求。
     # 没有任何一层写入模型时为「未设置」，引用无法使用时为「无法使用」并带回原因；
     # 这两种情况都不返回其他连接或模型
     resolution = application.system.facade.resolve_effective_model(department, _project_selection(setting))

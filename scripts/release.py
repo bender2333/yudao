@@ -282,7 +282,7 @@ def _check_release(repo_root: Path) -> None:
 
 def release(repo_root: Path, *, publish_flag: bool, output_dir: Path, branch: str,
             remote: str) -> dict[str, object]:
-    # 依的顺序执行，返回 wheel 的路径与核对值
+    # 依顺序执行，返回 wheel 的路径与核对值
     version = verify(repo_root, branch=branch, remote=remote)
     pages = build_pages(repo_root, version=version)
     assets = assemble_assets(repo_root, pages)

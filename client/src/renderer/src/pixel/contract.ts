@@ -198,7 +198,7 @@ export interface FloorState extends PixelState {
 
 // ---------------------------------------------------------------------------
 // 楼层状态的完整形状：翻译层按这些字段给出状态，画面层按同一份形状画。
-// 形状放在合同里，翻译层只从合同取状态，不导入画面层的实现（「分层与边界」的依赖方向、docs/design/visualization.md「画面诚实性的不变式」 H3）。
+// 形状放在合同里，翻译层只从合同取状态，不导入画面层的实现（docs/design/visualization.md「分层与边界」的依赖方向、docs/design/visualization.md「画面诚实性的不变式」 H3）。
 
 /** 楼层上的一个部门角色。 */
 export interface RoleInfo {

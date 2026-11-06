@@ -39,7 +39,7 @@ def test_the_visibility_vocabulary_is_the_seven_materials():
 
 @pytest.mark.parametrize("values", [ISOLATED, SHARED])
 def test_both_quality_visibility_sets_load(tmp_path, values):
-    # 守 R2 与的验收：两套取值都是定义文件里能写的值，换一份定义就换一套，不修改代码
+    # 守 R2 与验收：两套取值都是定义文件里能写的值，换一份定义就换一套，不修改代码
     directory = _copy(tmp_path)
     _set_quality_visibility(directory, values)
     loaded = load_definitions(directory)

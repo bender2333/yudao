@@ -24,7 +24,7 @@ export const REASONING_MODE_PROTOCOLS: Record<string, string[]> = {
   budget: ["messages"],
 };
 
-// 推理参数方式的说明文字（的上游参数）
+// 推理参数方式的说明文字（上游参数）
 export const REASONING_MODE_LABELS: Record<string, string> = {
   effort: "effort（请求带档位名）",
   adaptive: "adaptive（Messages 的自适应思考）",
@@ -332,7 +332,7 @@ export function moreCount(remaining: number): number {
 // 选用的状态
 // ---------------------------------------------------------------------------
 
-// 状态词（设计说明「用词」用词与 docs/design/model-management.md「模型访问定义与准入」的状态机）
+// 状态词（docs/design/model-management.md「用词」用词与 docs/design/model-management.md「模型访问定义与准入」的状态机）
 export const SELECTION_STATUS_LABELS: Record<string, string> = {
   completing: "补全参数",
   waiting: "等待验证",

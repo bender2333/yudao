@@ -197,7 +197,7 @@ function selectionSourceLabel(value: string | null): string {
   return show(value, "未上报");
 }
 
-// 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构第 2.1 节，工单 #905）：
+// 三个部门各自的状态（原型 v12 第 3.1 节、三部门的循环结构「部门的状态」，工单 #905）：
 // 标题区另起一行列出这个事项的组织里的部门，本部门加粗；没有部门状态（事项没有进行中）时这一行不出现。
 // 部门清单与显示名取自事实（工单 #1457）：事项冻结的组织里的部门，不写死三个。
 export function DepartmentsLine(props: {
@@ -465,7 +465,7 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
     { event_id: openEvent ?? "" },
     openEvent === null,
   );
-  // 本部门发出与收到的询问（原型 v12 第 3.3 节、三部门的循环结构第 4.7 节，工单 #905）：
+  // 本部门发出与收到的询问（原型 v12 第 3.3 节、三部门的循环结构「询问的记录与查询」，工单 #905）：
   // 用 run.asks，写法与概览的询问一行相同（共用的 asks-text）
   const asks = useSnapshot<RunAsksResult>(
     props.app, "page.dept.asks", "run.asks", { run_id: data.run_id ?? "" }, data.run_id === null);

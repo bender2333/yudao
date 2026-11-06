@@ -315,7 +315,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "acceptance.coverage",
         "project.organization",
     }
-    # 可回放的查询：接受的 at（按位置读取）
+    # 可回放的查询：接受 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {
         "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry", "run.loops",
         "acceptance.coverage",

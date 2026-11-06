@@ -478,7 +478,7 @@ class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（设计说明「模型访问定义与准入」）；默认协议：模型没有单独声明协议时预填（docs/design/model-management.md「服务方案预置表与模型能力表」）
+    # 获取模型列表与连接测试使用的认证方式（docs/design/model-management.md「模型访问定义与准入」）；默认协议：模型没有单独声明协议时预填（docs/design/model-management.md「服务方案预置表与模型能力表」）
     default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
@@ -502,7 +502,7 @@ class ServicePresets(_Definition):
 
 
 class ModelCapability(_Definition):
-    # 模型能力表中的一条：取自 models.dev 的快照，只保留的字段。
+    # 模型能力表中的一条：取自 models.dev 的快照，只保留 docs/design/model-management.md「服务方案预置表与模型能力表」的字段。
     # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
     # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务商接入包。

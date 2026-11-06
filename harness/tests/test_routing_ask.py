@@ -52,7 +52,7 @@ def _answered_event(payload: dict[str, str], session_id: str = "ses_ask_pro_1") 
 
 def test_a_new_ask_asks_the_route_for_one_round_of_the_recipient_department():
     # R2 & R3：询问的开始归路由——回复的部门、分支会话与要写下的那一层都由路由组好，
-    # 这一轮的上限取被问部门声明的量，工作引用指向这次询问（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
+    # 这一轮的上限取被问部门声明的量，工作引用指向这次询问（docs/design/skeleton-and-application.md「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
     requested = ROUTING.ask_branch(
         _running(), [], requester="engineering", session_id="ses_eng",
         call=_ask_call(recipient="product", question="Is lowercase ok?", background="bg", expected="yes/no"),

@@ -762,7 +762,7 @@ def _clear_feedback(state: RunProjection, role: str | None) -> None:
 
 
 def _invalidate_artifact(state: RunProjection, payload: dict[str, Any]) -> None:
-    # 一条成果失效事件折叠成什么（设计说明「最小投影」、docs/design/skeleton-and-application.md「骨架事件与应用事件」）：载荷给出成果种类、版本与原因，
+    # 一条成果失效事件折叠成什么（docs/design/skeleton-and-application.md「最小投影」、docs/design/skeleton-and-application.md「骨架事件与应用事件」）：载荷给出成果种类、版本与原因，
     # 指名的那一版不再是当前版本。现在会失效的成果只有当前交付：换了一版交付、PRD 或合同变了、
     # 返工，或者非质检部门改动了工作区，都由成果驱动记下原因
     if payload.get("artifact_kind") != "delivery_spec":

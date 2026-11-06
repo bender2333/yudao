@@ -42,7 +42,7 @@ _PROBE_OK = "ok"
 
 
 class ToolsRegistryProbeState(Contract):
-    # 一台 MCP 服务器最近一次探测的状态（设计说明「读取工具清单（探测）」、docs/design/network-and-mcp.md「系统「工具与扩展」页」）：还没有探测过时
+    # 一台 MCP 服务器最近一次探测的状态（docs/design/network-and-mcp.md「读取工具清单（探测）」、docs/design/network-and-mcp.md「系统「工具与扩展」页」）：还没有探测过时
     # 三项都为空。config_digest 是那次探测绑定的配置摘要，与服务器当前的 config_digest 不同时这次结果已经过期
     # （docs/design/network-and-mcp.md「读取工具清单（探测）」：旧结果保留供查询，不得覆盖新配置的可用状态）
     finished_at: str | None = None

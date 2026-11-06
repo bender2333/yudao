@@ -459,7 +459,7 @@ class WatchedOutputsTightening:
             "coverage": coverage_report(criteria, changed=len(changed), cases=case_steps,
                                         baseline=baseline),
             "open_criteria": open_criteria(criteria, case_steps),
-            # 基线明细（的表）：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
+            # 基线明细：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
             # 缺少回执与无法运行都不计入，放行记录里看得到
             "baseline_checks": baseline_open_records(criteria, baseline),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）

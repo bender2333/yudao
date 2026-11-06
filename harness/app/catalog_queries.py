@@ -207,7 +207,7 @@ class ImpactProjectSetting(Contract):
     provider_id: str
 
 class ImpactWorkItem(Contract):
-    # 正在使用受影响定义的进行中事项（的生效模型：项目部门设置优先，否则部门默认）。
+    # 正在使用受影响定义的进行中事项（生效模型：项目部门设置优先，否则部门默认）。
     # 按（事项，部门）逐条列出：事项里哪个部门的模型选择落在受影响的定义上就写哪个部门，
     # 与它此刻在不在工作无关（docs/design/model-management.md「修改与准入」，工单 #872）
     project_id: str

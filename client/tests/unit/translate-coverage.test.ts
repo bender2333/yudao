@@ -3,7 +3,7 @@
 // 每个「不画」写了一句理由；用一份多加了一种事件的清单核对时，核对失败。
 // 夹具 client/tests/fixtures/event-types.json 由服务端测试 harness/tests/test_event_type_fixture.py
 // 核对与服务端的 EVENT_TYPES 相同。
-// 守的 R2（各级之间交换的字段）：覆盖表是翻译层与三个场景之间的约定。
+// 守 docs/design/test-pyramid.md「测试按三环留」的 R2（各级之间交换的字段）：覆盖表是翻译层与三个场景之间的约定。
 // 用 node --test 运行，不依赖 Electron 与网络。
 
 import { test } from "node:test";

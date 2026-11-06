@@ -23,7 +23,7 @@ from .tree_archive import load_tree, store_tree
 from .workspace import WorkspaceSnapshot
 
 
-# 成果接纳事件的统一字段（设计说明「最小投影」、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果种类、版本、依据与内容摘要。
+# 成果接纳事件的统一字段（docs/design/skeleton-and-application.md「最小投影」、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果种类、版本、依据与内容摘要。
 # 最小投影按这组字段折叠，不按事件种类逐个写，加一种成果种类不改最小投影的代码。
 # 「依据」按「成果种类 → 内容摘要」记下这一版建立在哪些成果版本上：载荷里指名所依据成果版本的字段
 # 就是这几种；上一版（parent_hash）的依据是同一类成果的上一版。

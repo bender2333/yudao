@@ -435,7 +435,7 @@ class TrialCase:
         return None
 
     def has_unknown_step(self) -> bool:
-        # 含结果未知步骤的用例不能以 passed 结束，也不能作为证据（设计说明「试用用例」、docs/design/browser-and-computer-use.md「恢复契约」）
+        # 含结果未知步骤的用例不能以 passed 结束，也不能作为证据（docs/design/browser-and-computer-use.md「试用用例」、docs/design/browser-and-computer-use.md「恢复契约」）
         return any(item.unknown for item in self.steps)
 
 

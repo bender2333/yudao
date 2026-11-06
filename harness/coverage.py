@@ -32,7 +32,7 @@ RECEIPT_TOOL = "run_check"
 # 基线退出码的两种无法运行：124 与 timeout 命令相同，130 是被中断的进程的惯例
 BASELINE_TIMEOUT_EXIT_CODE = 124
 BASELINE_CANCELLED_EXIT_CODE = 130
-# 放行记录里基线异常的写法（的表）：通过、缺少回执与超时取消各有一种记录
+# 放行记录里基线异常的写法：通过、缺少回执与超时取消各有一种记录
 BASELINE_UNAVAILABLE = "unable_to_run"
 
 
@@ -72,7 +72,7 @@ def method_is_executable(method: str) -> bool:
 
 
 def baseline_outcome(exit_code: Any) -> str:
-    """一条基线回执的结果词（的表）：failed、passed 或 unable_to_run。
+    """一条基线回执的结果词：failed、passed 或 unable_to_run。
 
     退出码非零且不是 124（超时）与 130（取消）时是可用的失败；通过、超时与取消分别记为
     基线也通过与无法运行。主机只记录运行结果，不判断失败原因。

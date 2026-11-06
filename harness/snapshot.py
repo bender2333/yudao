@@ -83,7 +83,7 @@ def restore_snapshot(
 
 def _reject_private_paths(source_dir: str | Path) -> None:
     # 采集会静默跳过宿主私有路径；快照接入必须明确拒绝并给出原因。
-    # 仓库自身的 Git 元数据（.git）按从公开树排除、不触发拒绝：任何 git 仓库的源目录都含它，
+    # 仓库自身的 Git 元数据（.git）从公开树排除、不触发拒绝：任何 git 仓库的源目录都含它，
     # git 来源由进程内的 libgit2 读取；其余宿主私有路径（.checks）与无法表示的条目仍然拒绝
     base = Path(source_dir).absolute()
     pending = [(base, "")]

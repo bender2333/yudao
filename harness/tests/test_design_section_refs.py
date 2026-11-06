@@ -62,6 +62,8 @@ SKIP_FILES = (
     "scripts/convert_design_section_refs.py",
     "harness/tests/test_design_section_refs.py",
     "evals/context/rule-set.json",
+    # CI 工作流归架构师改（共同规则「权限」）：这 6 处注释由脚本换算，本条不扫
+    ".github/workflows/ci.yml",
 )
 
 # 节号的写法：「第」+ 编号 + 「节」，编号可以带小数点，也可以连写几个（「第 3、4 节」），
@@ -80,6 +82,16 @@ OTHER_DOC = re.compile(
 
 # 文件开头声明了照原型的设计做：注释里的无主节号指的是原型（不在本单）
 PROTO = re.compile(r"(?:原型[^。；\n]{0,60}?|(?<![\w.])v\d+[^。；\n]{0,40}?)第\s*(\d+(?:\.\d+)*)\s*节")
+
+# 一行里写明了是哪份设计说明的引用：原型文件里的这种引用照常要报（工单 #1411 第 4 轮审查第 1 条）
+DESIGN_NAME = re.compile(
+    r"docs/design/"
+    r"|三部门的循环结构|循环结构|验证的独立性|检验的有效性|恢复契约|骨架与应用|可信内核|模型管理"
+    r"|网络取回与 MCP|网络与 MCP|浏览器与 computer use|浏览器设计|画面与播放|评测场景|形态与核验角色"
+    r"|部门指导|测试分层|网页界面|桌面客户端|项目的组织|语义系统|接入已有项目|循环与收敛|执行环境服务"
+    r"|本地通用工具|本地工具|项目的起始文件夹|规则登记|部门内多角色|外包角色|内核的代码质量检查"
+    r"|上下文装配|总体架构|对照表"
+)
 
 # 「只改」之外、原样保留节号的那几处（工单 #1411 的「自定的边界」，与转换脚本的 KEEP_AS_IS 一致）
 KEEP_AS_IS: tuple[tuple[str, str], ...] = (
@@ -190,7 +202,7 @@ def scan(rel: str, text: str) -> list[str]:
             before = line[max(0, match.start() - WINDOW) : match.start()]
             if OTHER_DOC.search(before):
                 continue
-            if proto:
+            if proto and not DESIGN_NAME.search(before):
                 continue
             found.append(f"{rel}:{number}: {line.strip()}")
             break
@@ -362,3 +374,13 @@ def test_item_names_in_references_are_words_in_that_section():
     """「中「条目名」」的条目名是那一节正文里的字（守 R2：不把整句或段落小标题当条目名）。"""
     problems = [line for line in reference_problems() if "正文里的字" in line]
     assert not problems, "条目名对不上：\n" + "\n".join(problems)
+
+
+def test_a_named_design_reference_in_a_prototype_file_is_still_reported():
+    """原型文件里写明是哪份说明的引用照常要报（守 R2：豁免只给原型自己的节号）。"""
+    named = "// 页面路径（原型 v8 设计说明第 3.3 节）\n// 部门的状态（三部门的循环结构第 2.1 节）\n"
+    assert scan("client/src/example.ts", named), "写明了说明名的引用不该按原型豁免"
+
+    bare = "// 页面路径（原型 v8 设计说明第 3.3 节）\n// 回放位置写在 ?at= 中（设计说明第 3.3 节）\n"
+    assert not scan("client/src/example.ts", bare), "只写节号的原型引用仍然豁免"
+

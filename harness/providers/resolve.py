@@ -305,7 +305,7 @@ class CallTargetResolution:
 
 @dataclass(frozen=True)
 class EffectiveModelResolution:
-    # 本部门当前生效的模型及来源：按的选择规则与当前目录计算，
+    # 本部门当前生效的模型及来源：按选择规则与当前目录计算，
     # 不发送请求、不保留调用句柄。state 取 effective、unusable、unset 三者之一；
     # unusable 与 unset 时不返回其他连接或模型。resolution 是解析结果，unset 时为空。
     state: str

@@ -533,7 +533,7 @@ def _delivery_part(run, name, key=None):
 
 
 def _passed_checks_text(item):
-    """一份交付通过了几条隐藏检查；没有交付时写「没有做」（的分类）。"""
+    """一份交付通过了几条隐藏检查；没有交付时写「没有做」（分类）。"""
     if not item:
         return "未知"
     if not item.get("delivered"):

@@ -44,7 +44,7 @@ class UnchangedEvent:
 class QueryDefinition:
     # 一个查询。handle 只读取，返回快照（数据与它已经包含的最大全局位置）；changed_by 是会改变结果的事件种类，
     # 客户端收到这些事件时重新查询；unchanged_by 是已核对过不改变结果的事件种类与理由，两份清单合起来覆盖
-    # 全部已登记的事件种类；replayable 为真时接受的 at（全局位置，按位置读取）
+    # 全部已登记的事件种类；replayable 为真时接受 at（全局位置，按位置读取）
     name: str
     request: type[BaseModel] | None
     result: type[Any]

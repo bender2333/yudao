@@ -293,7 +293,7 @@ class ProviderFacade:
             return self._revision
 
     def impacted_definitions(self, document: Mapping[str, Any]) -> list[dict[str, str]]:
-        # 按拟议的目录文档算出会作废准入的模型访问定义（的受影响字段）：
+        # 按拟议的目录文档算出会作废准入的模型访问定义（受影响字段）：
         # 只比较受影响字段（连接的地址与凭据引用，定义的协议、上游模型 ID 与推理参数方式），
         # 定义本身被移除时不列在这里，由应用层按「将一并删除」处理。
         # Provider 模块只交出定义，引用方与进行中事项由应用层汇总
@@ -756,7 +756,7 @@ class ProviderFacade:
     def resolve_effective_model(self, department: str,
                                 project: ModelSelection | Mapping[str, Any] | None = None,
                                 ) -> EffectiveModelResolution:
-        # 查询用入口：按的选择规则合并项目部门设置与部门默认，并解析调用目标，
+        # 查询用入口：按选择规则合并项目部门设置与部门默认，并解析调用目标，
         # 不发送请求、不保留调用句柄（部门工作间的生效模型）。没有任何一层写入模型时为「未设置」，
         # 引用无法使用时为「无法使用」并带回原因；两种情况都不交回其他连接或模型
         with self._lock:
@@ -801,7 +801,7 @@ class ProviderFacade:
     def project_department_reminders(
             self, departments: Mapping[str, Mapping[str, Any] | None]) -> dict[str, list[str]]:
         # 项目各部门生效模型不具备该部门建议能力时的提醒。
-        # 生效模型按的顺序解析：项目部门设置写入了模型时用它，否则用部门默认
+        # 生效模型按顺序解析：项目部门设置写入了模型时用它，否则用部门默认
         notes: dict[str, list[str]] = {}
         for department, project_setting in departments.items():
             model_id = (project_setting or {}).get("model_id")

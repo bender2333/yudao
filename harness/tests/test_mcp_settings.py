@@ -93,7 +93,7 @@ def test_save_is_read_back_with_a_raised_version_and_the_next_save_needs_the_new
     stored = saved["servers"]["time"]
     assert stored["transport"] == "stdio" and stored["command"] == "uvx"
     assert stored["env"]["API_KEY"] == {"kind": "credential", "value": "", "credential_ref": "MCP_TIME_KEY"}
-    # 默认时限与输出上限按写进保存的设置
+    # 默认时限与输出上限写进保存的设置
     assert stored["startup_timeout_sec"] == 60 and stored["call_timeout_sec"] == 120
     assert stored["output_limit"] == 20000
 

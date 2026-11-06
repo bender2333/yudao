@@ -2,10 +2,10 @@
 # 自己登记，应用登记一种新的种类不改内核文件（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）。
 #
 # 这张表与 docs/design/skeleton-and-application.md「骨架事件与应用事件」逐项对照，含 S1b 的成果失效； 2026-10-25 第 1 条把「模型请求」改为骨架事件
-# （模型步数按请求一条条数，最小投影读它），所以它也在表里：的表把它列在应用事件里，按更正。
+# （模型步数按请求一条条数，最小投影读它），所以它也在表里：docs/design/skeleton-and-application.md「骨架事件与应用事件」的表把它列在应用事件里，按 docs/design/skeleton-and-application.md「最小投影」更正。
 #
 # 读仓库里的静态声明与内存中的登记表，不开数据库、不用子进程、不用网络，属于单元层。
-# 守的 R2（第二环的合同：骨架事件只增，种类与一致）。
+# 守 R2（第二环的合同：骨架事件只增，种类与 docs/design/skeleton-and-application.md「骨架事件与应用事件」一致）。
 
 import pytest
 
@@ -48,7 +48,7 @@ def _kinds(declaration: type) -> frozenset[str]:
 
 
 def test_the_skeleton_run_events_match_the_design_table():
-    # 登记表与一致：多出的种类没有位置，缺的种类内核的读取会漏掉
+    # 登记表与 docs/design/skeleton-and-application.md「骨架事件与应用事件」一致：多出的种类没有位置，缺的种类内核的读取会漏掉
     assert SKELETON_RUN_EVENTS == DESIGN_SKELETON_RUN_EVENTS, (
         f"登记表多出 {sorted(SKELETON_RUN_EVENTS - DESIGN_SKELETON_RUN_EVENTS)}，"
         f"缺少 {sorted(DESIGN_SKELETON_RUN_EVENTS - SKELETON_RUN_EVENTS)}"

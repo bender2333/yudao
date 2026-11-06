@@ -196,7 +196,7 @@ class Deployment(Contract):
 class QueryCapability(Contract):
     name: str
     changed_by: list[str]
-    # 是否接受的 at（按位置读取，回放）；由注册表的 replayable 给出
+    # 是否接受 at（按位置读取，回放）；由注册表的 replayable 给出
     replayable: bool = False
 
 

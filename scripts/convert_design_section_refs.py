@@ -61,6 +61,8 @@ SKIP_FILES = (
     "scripts/convert_design_section_refs.py",
     "harness/tests/test_design_section_refs.py",
     "evals/context/rule-set.json",
+    # CI 工作流归架构师改（共同规则「权限」），这 6 处注释不动
+    ".github/workflows/ci.yml",
 )
 
 DESIGN_DIR = "docs/design"
@@ -200,15 +202,6 @@ LINE_DECISIONS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "第 10 节「决定」第 1 条「模型目录与凭据的写入」（工单 #1411 架构师评论实测）",
     ),
     (
-        "harness/tools.py",
-        "设计说明第 5.6 节「请求时」",
-        "5.6",
-        "browser-and-computer-use.md",
-        "6.2",
-        "架构师评论：这一处说的是截图进请求，真出处是浏览器与 computer use「请求中的图像」；"
-        "写这行的提交里那一节是第 6.2 节",
-    ),
-    (
         "harness/providers/responses.py",
         "Responses 的图像输入写法",
         "6.2",
@@ -281,6 +274,142 @@ LINE_DECISIONS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "架构师评论：这一处是模型管理第 4.1 节「服务方案预置表与模型能力表」",
     ),
     (
+        "harness/definitions/__init__.py",
+        "只保留设计说明第 4.1 节的字段",
+        "4.1",
+        "model-management.md",
+        "",
+        "与本文件 :481、:498 同一条：模型管理第 4.1 节「服务方案预置表与模型能力表」",
+    ),
+    (
+        "client/tests/unit/check-methods.test.ts",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "client/tests/unit/snapshot-view.test.ts",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "client/tests/unit/translate-coverage.test.ts",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "client/tests/unit/translate-tables.test.ts",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "client/tests/unit/view-sync.test.js",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "evals/tests/test_report.py",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "harness/tests/kernel/test_contract_surface.py",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "harness/tests/kernel/test_judge_before_explanation.py",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "harness/tests/kernel/test_only_grows.py",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "harness/tests/test_artifact_invalidation.py",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "harness/tests/test_event_kind_registration.py",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "harness/tests/test_event_type_fixture.py",
+        "守第 13 节",
+        "13",
+        "test-pyramid.md",
+        "",
+        "守第 13 节的 R1/R2/R3 是测试分层设计说明第 13 节「测试按三环留」的说法；同一句里的「第二环的合同」等词与那一节一一对应",
+    ),
+    (
+        "harness/tests/kernel/test_skeleton_events.py",
+        "第 7 节的表把它列在应用事件里",
+        "7",
+        "skeleton-and-application.md",
+        "",
+        "同一段第 4、30 行的「第 7 节」已按骨架与应用「骨架事件与应用事件」换算，这里的说法相同",
+    ),
+    (
+        "harness/tests/kernel/test_skeleton_events.py",
+        "按第 4 节更正",
+        "4",
+        "skeleton-and-application.md",
+        "",
+        "同一段第 4、30 行的「第 4 节」已按骨架与应用「最小投影」换算，这里的说法相同",
+    ),
+    (
+        "harness/tests/kernel/test_skeleton_events.py",
+        "种类与设计说明第 7 节一致",
+        "7",
+        "skeleton-and-application.md",
+        "",
+        "同一段第 4、30 行的「第 7 节」已按骨架与应用「骨架事件与应用事件」换算，这里的说法相同",
+    ),
+    (
+        "harness/tests/kernel/test_skeleton_events.py",
+        "登记表与设计说明第 7 节一致",
+        "7",
+        "skeleton-and-application.md",
+        "",
+        "同一段第 4、30 行的「第 7 节」已按骨架与应用「骨架事件与应用事件」换算，这里的说法相同",
+    ),
+    (
         "harness/projects.py",
         "并发修改时按版本拒绝后提交的修改（设计说明第 5.2 节）",
         "5.2",
@@ -335,6 +464,20 @@ DROP_SECTIONS: tuple[tuple[str, str], ...] = (
     ("harness/tests/test_routing_definition.py:1", "12"),
     ("harness/tests/test_second_routing.py:1", "12"),
 )
+
+# 去掉引用以后读不通的那几句：只把剩下的半个动宾改通顺，别的字不动（每条写明改的是哪里）。
+DROP_FIXES: tuple[tuple[str, str, str], ...] = (
+    ("harness/mcp_session.py", "#的会话部分", "# 这一节的会话部分"),
+    ("harness/tests/test_department_providers.py", "窗口按上调", "窗口上调"),
+    ("harness/tests/test_mcp_settings.py", "输出上限按写进保存的设置", "输出上限写进保存的设置"),
+    ("harness/snapshot.py", "按从公开树排除", "从公开树排除"),
+    ("client/src/renderer/src/contract/connection.ts", "服务按回答 401", "服务回答 401"),
+    ("harness/app/payloads.py", "（表，工单 #1181）", "（工单 #1181）"),
+    ("harness/projects.py", "（表），", "，"),
+    ("harness/coverage.py", "（表）：", "："),
+    ("harness/tightening.py", "（表）：", "："),
+)
+
 
 # 已经删去的小节：指向它的那一部分引用去掉，注释的其余部分照旧。
 DELETED: set[tuple[str, str]] = {
@@ -1168,9 +1311,12 @@ def phrase_hit(ref: Ref, doc: str, title: str) -> str:
     return best
 
 
-def decide(ref: Ref) -> None:
-    """按五类证据与硬门槛定这一处。"""
+def decide(ref: Ref, proto: bool = False) -> None:
+    """按五类证据与硬门槛定这一处。原型文件里的引用，只有写明了是哪份说明的才换算。"""
     cands = candidates_for(ref)
+    if proto and not any(c.tier in ("⑤", "①", "②", "④") for c in cands):
+        ref.status, ref.how, ref.reason = "排除", "排除", "原型"
+        return
     reasons: list[str] = []
     strong_tiers = ("⑤", "①", "②", "④", "③a")
     for tier in strong_tiers:
@@ -1291,11 +1437,7 @@ def resolve(groups: list[Group], texts: dict[str, str]) -> None:
             ref.status, ref.how = "排除", "排除"
             ref.reason = "别的文档"
             continue
-        if proto_file(ref.file):
-            ref.status, ref.how = "排除", "排除"
-            ref.reason = "原型"
-            continue
-        decide(ref)
+        decide(ref, proto_file(ref.file))
 
 
 # ---------------------------------------------------------------- 写回
@@ -1327,12 +1469,13 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
         touched = 0
         for lineno, line_groups in by_line.items():
             line = lines[lineno - 1]
+            original = line
             for g in sorted(line_groups, key=lambda x: x.start, reverse=True):
                 new = g.render()
                 if new is None:
                     continue
                 doc = next((r.doc for r in g.refs if r.doc), None)
-                context = line + "\n" + block_above(file_lines(path), lineno)
+                context = original + "\n" + block_above(file_lines(path), lineno)
                 named = bool(doc) and doc in {d for _s, _e, d in mentions(context)}
                 if any(r.bare for r in g.refs if r.doc == doc):
                     named = False
@@ -1352,6 +1495,10 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                         start = suffix.start()
                     elif before.endswith("的"):
                         start = len(before) - 1
+                    if end < len(line) and line[end] == "的":
+                        before_char = line[start - 1] if start > 0 else ""
+                        if before_char and ("\u4e00" <= before_char <= "\u9fff" or before_char in "（(#*/"):
+                            end += 1
                     _, start, end = drop_span(line, start, end)
                     line = line[:start] + line[end:]
                 else:
@@ -1373,6 +1520,9 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                                 new = " " + new
                     line = line[:start] + new + line[end:]
                 touched += 1
+            for path_name, old, new in DROP_FIXES:
+                if path_name == path and old in line:
+                    line = line.replace(old, new)
             lines[lineno - 1] = collapse_duplicates(line)
         new_text = "".join(lines)
         if new_text != text:
@@ -1418,17 +1568,18 @@ def write_report(path: str, refs: list[Ref]) -> None:
         "",
         "## 每一处",
         "",
-        "| 文件:行 | 第几节 | 证据 | 命中的原句 | 提交 | 当时的标题 | 现在的标题 | 结果 |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| 文件:行 | 第几节 | 选中的说明 | 证据 | 命中的原句 | 提交 | 当时的标题 | 现在的标题 | 结果 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for r in sorted(refs, key=lambda x: (x.file, x.line, x.start)):
         if r.status == "排除":
             continue
         rows.append(
-            "| `{}:{}` | {} | {} | {} | {} | {} | {} | {} |".format(
+            "| `{}:{}` | {} | {} | {} | {} | {} | {} | {} | {} |".format(
                 r.file,
                 r.line,
                 r.sec,
+                r.doc or "",
                 (r.how + " " + r.evidence).replace("|", "/") if r.evidence else r.how,
                 r.quote or "",
                 r.commit[:8],

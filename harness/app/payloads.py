@@ -942,7 +942,7 @@ class QaCoveragePayload(Payload):
 
 
 class BaselineCheckRecord(Payload):
-    # 放行记录里的基线明细（的表，工单 #1181）：一条命令检查的结论带它的基线结果——
+    # 放行记录里的基线明细（工单 #1181）：一条命令检查的结论带它的基线结果——
     # failed（计入覆盖）、passed（基线也通过）、missing（缺少回执）或 unable_to_run（超时或取消）。
     # 结果词与放行准入不因此改变；旧事件没有这一项
     criterion: str

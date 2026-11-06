@@ -203,7 +203,7 @@ def test_a_session_that_ends_while_a_case_is_open_concludes_it_as_interrupted(tm
 
 def test_a_step_without_a_result_or_handed_back_stays_unknown(tmp_path):
     # 发出了但没有回执的步骤是结果未知；核实把结果交还会话（handed_back）同样是结果未知。
-    # 含这样一步的用例不能以 passed 结束（设计说明「试用用例」、docs/design/browser-and-computer-use.md「恢复契约」）。守 R3
+    # 含这样一步的用例不能以 passed 结束（docs/design/browser-and-computer-use.md「试用用例」、docs/design/browser-and-computer-use.md「恢复契约」）。守 R3
     run = _Run(tmp_path)
     try:
         run.append(_opened())

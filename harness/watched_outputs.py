@@ -421,7 +421,7 @@ def completion_reason(projection: RunProjection,
 
 
 def work_reference(projection: RunProjection, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果驱动不用它，为空。"""
+    """这一轮工作的路由自己的工作引用（docs/design/skeleton-and-application.md「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果驱动不用它，为空。"""
     return None
 
 

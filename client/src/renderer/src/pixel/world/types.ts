@@ -343,7 +343,7 @@ export interface Bubble {
 
 // ---------------------------------------------------------------------------
 // 画面数据：楼层驱动拿到的画面合同的楼层状态（pixel/contract.ts 的 FloorModel）与画面要用的几个字段。
-// 形状在画面合同里：翻译层只从合同取状态，不导入画面层的实现（设计说明「分层与边界」、docs/design/visualization.md「画面诚实性的不变式」 H3）。
+// 形状在画面合同里：翻译层只从合同取状态，不导入画面层的实现（docs/design/visualization.md「分层与边界」、docs/design/visualization.md「画面诚实性的不变式」 H3）。
 // 这里转发出去，画面与测试的入口不变。
 export type {
   DecisionFace, FloorModel, LoopItem, MachineView, OpenRequest, OpsView, RoleInfo, WaitingProvider,

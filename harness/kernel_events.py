@@ -1,6 +1,6 @@
 # 内核事件模块（S5a，工单 #828）：事件日志的信封、骨架事件的种类与数据结构、骨架事件的登记表。
 #
-# 规则（设计说明「骨架事件与应用事件」）：内核写入或读取的事件是骨架事件，种类与字段只增，停用不删除，事件一经写入不重新解释； 其余 run 流里的事件是应用事件，由应用登记自己的种类，增加一种不改这个文件（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）。 项目流与目录流的事件全部是骨架事件：它们是长期事实，跨版本保存（ADR-0019）。
+# 规则（docs/design/skeleton-and-application.md「骨架事件与应用事件」）：内核写入或读取的事件是骨架事件，种类与字段只增，停用不删除，事件一经写入不重新解释； 其余 run 流里的事件是应用事件，由应用登记自己的种类，增加一种不改这个文件（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）。 项目流与目录流的事件全部是骨架事件：它们是长期事实，跨版本保存（ADR-0019）。
 #
 # 这个文件只导入标准库与 pydantic（这里没有用到 pydantic），是内核清单里 kind 为 module 的一行： 内核模块只从它导入事件信封与骨架事件，`models.py` 与 `projection.py` 留给应用，不在内核清单里。
 
@@ -51,7 +51,7 @@ class SkeletonEventType:
     BASELINE_REVIEW_ACCEPTED = "baseline_review_accepted"
     # 通用的成果接纳（S2c，工单 #1098）：路由带来新种类时内核写这一条，载荷是收紧检查给出的内容加统一字段。 成果驱动的六种成果与契约仍写各自的接纳事件，已经写入的事件不重新解释
     ARTIFACT_ACCEPTED = "artifact_accepted"
-    # 「最小投影」 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它， 所以它从此是骨架事件，只加字段（docs/design/skeleton-and-application.md「骨架事件与应用事件」的表把 model_* 列在应用事件里，按这一条据以修正）
+    # docs/design/skeleton-and-application.md「最小投影」 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它， 所以它从此是骨架事件，只加字段（docs/design/skeleton-and-application.md「骨架事件与应用事件」的表把 model_* 列在应用事件里，按这一条据以修正）
     MODEL_REQUESTED = "model_requested"
     RUN_DONE = "run_done"
     RUN_PAUSED = "run_paused"

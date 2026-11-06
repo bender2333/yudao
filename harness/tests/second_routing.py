@@ -8,7 +8,7 @@
 # 形状：
 # - 发任务的部门把用户的输入写成池子里的一条任务（提议方式 `submit_task`，成果种类 `pool_task`）；
 # - 路由把池子里待办的任务**指派**给能做它的部门：这一轮工作的路由自己的工作引用就是那件任务
-#   （设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，原样交给装配与执行）；
+#   （docs/design/skeleton-and-application.md「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，原样交给装配与执行）；
 # - 领到任务的部门交完成说明（`complete_task` / `task_completion`）；
 # - 另一个部门给结论：接纳或者打回（`judge_task` / `task_verdict`）。打回以后任务回到池子，由完成它的
 #   部门重做。完成一件事的部门不能自己宣布它合格（基础规则 3）：这一条由本路由的收紧检查判（
@@ -203,7 +203,7 @@ def _free(department: str, waiting: set[str] | None) -> bool:
 
 
 def work_reference(state: PoolState, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：指派给它的那件任务。
+    """这一轮工作的路由自己的工作引用（docs/design/skeleton-and-application.md「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：指派给它的那件任务。
 
     发任务的一轮没有任务可指派（任务由这一轮写出来），为空。原样交给装配与执行，骨架不解释它。
     """

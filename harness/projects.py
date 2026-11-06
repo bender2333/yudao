@@ -172,7 +172,7 @@ def _mcp_variable(entry: Any, *, where: str) -> dict[str, Any]:
 
 
 def _mcp_server_document(name: str, server: Any) -> dict[str, Any]:
-    # 校验一台服务器的非秘密设置（的表），返回事件里保存的形状
+    # 校验一台服务器的非秘密设置，返回事件里保存的形状
     if not isinstance(server, dict):
         _mcp_field_error("每台服务器的设置必须是一个对象")
     server_name = _mcp_require_text("名称", server.get("name"))

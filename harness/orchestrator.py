@@ -954,7 +954,7 @@ class Orchestrator:
     async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
         # 醒来以后回到安全节点判断。唤醒在判断之前登记：判断之后才提交的改变，提交方调用 _wake 时一定看到这次登记
-        # 重试退避不在不计入运行时间的等待清单里（的封闭清单只有等待模型服务、等待用户决定、
+        # 重试退避不在不计入运行时间的等待清单里（封闭清单只有等待模型服务、等待用户决定、
         # 等待机器、等待桌面）：这一段照常计入，段计时不停表，否则 min(remaining, time_left) 的等待上限
         # 永远不会缩短，运行时间用完无法在等待期间结束运行
         loop = asyncio.get_running_loop()
