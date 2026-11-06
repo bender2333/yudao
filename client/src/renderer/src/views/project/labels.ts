@@ -129,7 +129,16 @@ export const ACTION_STATUS: Record<string, string> = {
   running: "进行中",
   completed: "已完成",
   failed: "失败",
+  // 动作被拒绝（网络与 MCP docs/design/network-and-mcp.md「调用显示」，工单 #238）：回执照常带结果与拒绝原因
+  refused: "被拒绝",
   unknown: "结果未知",
+};
+
+// 取回与 MCP 调用在动作行里的类型词（网络与 MCP docs/design/network-and-mcp.md「调用显示」，工单 #238）：
+// 页面写这两个词，不写 fetch_url 与 mcp__服务器__工具 这类内部标识
+export const ACTION_TYPE_NAMES: Record<string, string> = {
+  fetch: "网络取回",
+  mcp: "MCP 调用",
 };
 
 // 决定请求里写的原因（model_unavailable 一类请求的 reason 取值，工单 #181）：与停止原因同一套词，
