@@ -255,12 +255,15 @@ def _sync_routing_departments(organization: dict[str, Any], routings: dict[str, 
             entry["departments"] = order
 
 
-def routing_issues(definitions: Definitions) -> list[tuple[str, str, str]]:
+def routing_issues(definitions: Definitions, *, store: Any = None) -> list[tuple[str, str, str]]:
     """路由自己那份定义的内容校验：与加载时接上路由实现走同一处（`routing_contract.select` 调
     `check_definition`）。名称指向的部门、成果种类与提议方式对不上时逐项交回（文件、字段、说明），
-    草稿因此看到与加载相同的拒绝项（设计说明「草稿与校验」「拒绝与提醒」第 10 条）。"""
+    草稿因此看到与加载相同的拒绝项（设计说明「草稿与校验」「拒绝与提醒」第 10 条）。
+
+    读事件的直做路由在接上时要拿到事件库的只读读取器（与组装处同一做法），所以 store 由调用方交进来。
+    """
     try:
-        routing_contract.select(definitions.routing, definitions)
+        routing_contract.select(definitions.routing, definitions, store=store)
     except InvalidRoutingDefinition as exc:
         return [("routings.json", *_split_issue(issue)) for issue in exc.issues]
     return []

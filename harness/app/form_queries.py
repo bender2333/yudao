@@ -286,7 +286,7 @@ def _organization_draft(application: Application,
         return Snapshot[OrganizationDraftResult](position=store.end_position(),
                                                  data=_refused(request.project_id, list(exc.issues)))
     # 路由自己那份定义的内容校验与加载时同一处：草稿与加载看到同一批拒绝项
-    issues = routing_issues(definitions)
+    issues = routing_issues(definitions, store=store)
     if issues:
         return Snapshot[OrganizationDraftResult](position=store.end_position(),
                                                  data=_refused(request.project_id, issues))

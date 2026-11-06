@@ -129,6 +129,10 @@ def test_outcome_kinds_can_be_added_and_removed():
     ids = [kind.id for kind in composed.outcome_kinds.kinds]
     assert "independent_judgement" not in ids and ids[-1] == "design_note"
     assert "independent_judgement" not in composed.outcome_kinds.groups[0].kinds
+    # 合成只改定义的清单：去掉的种类仍有发布带的工具在提交它，路由自己那份定义的内容校验拒绝
+    # （这一版去掉成果种类只做到清单，见交付说明的边界）
+    issues = organization_compose.routing_issues(composed)
+    assert any("independent_judgement" in issue[2] for issue in issues), issues
 
 
 # R2：要去掉的对象在形态里已经不存在时这条改动不起作用（「合成规则」第 5 条）
@@ -254,6 +258,20 @@ def test_the_draft_query_writes_no_events(tmp_path):
         assert first.data.organization.departments[2].label == "验收"
         assert system.store.end_position() == before == first.position
         assert len(system.store.list_project_events(project_id)) == 1
+    finally:
+        application.close()
+
+
+# R1：直做形态的路由在接上时要读事件：校验草稿把事件库交给它，草稿查询对三个发布带的形态都正常
+def test_the_draft_query_reads_a_direct_form_that_reads_events(tmp_path):
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([]))
+    application = Application(system)
+    try:
+        project_id = system.projects.register("校验草稿", "把一件事做完")
+        result = application.query("organization.draft", OrganizationDraft(
+            project_id=project_id, form="single_role_direct"))
+        assert result.data.rejections == []
+        assert result.data.open_loop is True and "开环完成" in result.data.finishes
     finally:
         application.close()
 
