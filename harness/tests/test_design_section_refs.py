@@ -105,7 +105,7 @@ KEEP_AS_IS: tuple[tuple[str, str], ...] = (
     ("harness/tests/kernel/test_only_grows.py", "先在恢复契约第 4 节写明"),
     ("harness/tests/test_thin_driver_names.py", "形态与核验角色设计说明第 4.1 节，工单 #1404"),
     ("harness/tests/test_thin_driver_names.py", "这些种类应当从定义取（骨架与应用设计说明第 6 节）"),
-    ("scripts/ci_layers.py", "（测试分层设计说明第 10 节第 5 条）；改名的用例显示为一删一增"),
+    ("scripts/ci_layers.py", "（docs/design/test-pyramid.md「测试的写法」第 5 条）；改名的用例显示为一删一增"),
     ("evals/runner/compare_sides.py", "Yudao 对 OpenCode 的对照（评测场景设计第 6.3 节）"),
     ("evals/runner/run_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),
     ("evals/runner/run_yudao_eval.py", "上下文窗口；模型列表没有报告这个模型时用它（第 3 节「模型的容量」）"),

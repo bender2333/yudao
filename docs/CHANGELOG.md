@@ -467,3 +467,5 @@ claude-opus-5-5（子架构师） / 2026-11-04 19:52 / `docs/design/forms-and-ve
 claude-sonnet-5-5 / 2026-11-05 10:30 / `agents/ticket-spec.md` 清理单：不放进里程碑 → 放进当前阶段的里程碑，加「清理单先做」（别的工单的「只改」与它落在同一份文件时以清理单为前置，汇总文件不算）；「不靠排队错开」后补清理单例外；`skills/to-parents`、`skills/ticket` 同步 / 清理单的描述位置会被后做的工单改掉，且没有里程碑时 solo 按里程碑取范围不会取到它们
 
 solo-deepseek-v4.1-flash / 2026-11-06 01:38 / `docs/design/browser-and-computer-use.md` 第 3.3 节「启动方式」的参数表：`ready_timeout_sec` 的范围回到 10 至 1800（与规则登记 `execution.readiness_timeout_sec` 相同），删去「取值与界限取自规则登记」的括注 / 工单 #1251：这一行在 #147（48ee22b6）里被按规则登记改成 10 至 3600，与《rules-and-parameters》「设计说明是来源、登记照着实现」相反；就绪时限的登记与设计说明一起回到设计说明原来的范围
+
+cn:hy4free（架构师） / 2026-11-06 23:20 / `docs/design/test-pyramid.md` 删去「引入顺序」一节，后续小节编号前移一位，文内指向这些小节的自引用同步改号；`scripts/ci_layers.py` 与 `harness/tests/test_design_section_refs.py` 里按节号指向「测试的写法」的一处用户可见文字改成 `docs/design/test-pyramid.md「测试的写法」` / 工单 #1411 验收最后一条：这一节写的是迁移计划，设计说明不写计划；PR #1532 已把代码引用改成按标题，删节不会再让后来的引用指错
