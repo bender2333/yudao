@@ -675,6 +675,48 @@ def test_compaction_request_overflow_still_stops_the_run(tmp_path):
     assert result.canonical_state() == system.replay(run_id).canonical_state()
 
 
+def test_a_compaction_request_failure_reaching_the_stall_limit_waits_for_a_decision(tmp_path):
+    """整理请求自己失败（三次尝试都用完）不断把连续不推进的次数推到 compaction.stalled_limit：
+    run 不结束，进入待恢复，一条待回答的决定请求写明连续的次数与最后一次的原因，停在这次整理之前；
+    没有写检查点（docs/design/model-management.md「失败处理」最后一条，工单 #1155、#1238、#1557）。
+    守 R1（一定会停：封闭的停止原因）与 R3（「失败处理」写明的行为）。"""
+    limit = DEFINITIONS.rule_value("compaction.stalled_limit")
+    work_counts = {}
+
+    def respond(request):
+        if request.purpose == "compaction":
+            # 整理请求自己失败：上游流正常结束却没有输出项，三次尝试都用完
+            return _empty_output_failure()
+        count = work_counts.get(request.activation_id, 0)
+        work_counts[request.activation_id] = count + 1
+        # 这一步的工作请求按未压缩的历史照常发出：读一次大文件把历史顶过阈值，之后一直有工作可做，
+        # 事项不会因为部门交出成果而提前结束
+        return _read(request, "large.txt") if count == 0 else _read(request, "small.txt")
+
+    system, adapter, run_id = _tight_window_runner(tmp_path, respond)
+    result = system.activate_once(run_id)
+
+    # 待恢复：run 没有结束，有一条未回答、阻塞整个 run 的决定请求
+    assert (result.status, result.stop_reason) == ("running", None)
+    [decision] = saved_decisions(system.store, statuses=("open",))[1]
+    assert (decision.kind, decision.request["blocks"], decision.request["department"]) == \
+        ("model_unavailable", "run", "product")
+    assert decision.request["reason"] == "compaction_failed"
+    events = system.store.list_events(run_id)
+    # 事件把请求失败与计数上限定住：最后一次尝试用完以后不再重试，说明写明连续的次数与最后一次的原因
+    exhausted = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED
+                 and event.payload.get("purpose") == "compaction" and not event.payload["will_retry"]]
+    assert exhausted, "整理请求失败没有写到事件里"
+    assert exhausted[-1].payload["attempt"] == exhausted[-1].payload["max_attempts"]
+    assert f"连续 {limit} 次没有推进" in decision.request["description"]
+    assert "整理请求失败" in decision.request["description"]
+    assert f"compaction.stalled_limit={limit}" in decision.request["description"]
+    # 没有写检查点，也没有以运行失败结束
+    assert not any(event.type == EventType.COMPACTION_RECORDED for event in events)
+    assert not any(event.type == EventType.RUN_FAILED for event in events)
+    assert result.canonical_state() == system.replay(run_id).canonical_state()
+
+
 # ---------------------------------------------------------------------------
 # 整理连续失败进入待恢复（工单 #1238，模型管理 docs/design/model-management.md「失败处理」最后一条）
 #
