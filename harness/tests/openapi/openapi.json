@@ -9101,6 +9101,14 @@
             "type": "string",
             "title": "Target"
           },
+          "evidence": {
+            "type": "string",
+            "title": "Evidence"
+          },
+          "work": {
+            "type": "string",
+            "title": "Work"
+          },
           "watched": {
             "items": {
               "type": "string"
@@ -9130,6 +9138,8 @@
           "id",
           "label",
           "target",
+          "evidence",
+          "work",
           "watched",
           "outcomes",
           "verifier",

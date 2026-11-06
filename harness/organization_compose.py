@@ -24,10 +24,12 @@ from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any, Literal
 
+from . import routing_contract
 from .definitions import (
     Definitions, LEGACY_VERIFICATION, OrganizationChanges, WORKSPACE_WRITE_SCOPE, definitions_from_contents,
     submitted_outcomes,
 )
+from .routing_contract import InvalidRoutingDefinition
 
 # 提醒的种类（设计说明「拒绝与提醒」的提醒一段）：这一版只算得出由合成结果得出的三条；
 # 需要模型设置与项目事实的几条（建议能力、部门没有可用模型、还在按旧组织跑的事项）随各自的入口进来
@@ -71,14 +73,6 @@ def compose(form: Definitions, changes: OrganizationChanges) -> Definitions:
             department["watched"] = watched
         if name not in roles:
             continue
-        if change.visibility is not None:
-            roles[name]["visibility"] = list(change.visibility)
-            # 可见范围的现值在规则登记里也有一条（可见范围的参数按条目改）：与角色定义保持一致
-            rule = None if rules is None else rules.get(f"roles.{name}.visibility")
-            if rule is not None:
-                rule["value"] = list(change.visibility)
-        if change.prompt is not None:
-            roles[name]["prompt"] = change.prompt
         if change.tools.add or change.tools.remove:
             # 工具许可在两处都写：角色的清单与各事项种类里这个部门的工作说明（tools_for 先看种类的工作说明，
             # 两处都改，改动才在许可里看得到——与工单 #1098 的读法相同）
@@ -114,7 +108,8 @@ def compose(form: Definitions, changes: OrganizationChanges) -> Definitions:
         contracts["roles"][added.id] = {"submit_tools": [], "kinds": {}, "notes": []}
         _sync_contract(roles, contracts, work_items, tools, added.id)
 
-    # 第 4、5 条：成果种类的增加与去掉
+    # 第 4、5 条：成果种类的增加与去掉。新增的种类只进定义的清单（outcome_kinds.kinds）：
+    # 它要能被关注与提交，还要进路由认得的那一组并有一个提交它的工具，那是发布带的事（见交付说明的边界）
     if outcome_kinds is not None:
         for name in changes.outcome_kinds.remove:
             outcome_kinds["kinds"] = [item for item in outcome_kinds["kinds"] if item["id"] != name]
@@ -258,6 +253,23 @@ def _sync_routing_departments(organization: dict[str, Any], routings: dict[str, 
     for entry in routings["routings"]:
         if entry.get("id") == routing:
             entry["departments"] = order
+
+
+def routing_issues(definitions: Definitions) -> list[tuple[str, str, str]]:
+    """路由自己那份定义的内容校验：与加载时接上路由实现走同一处（`routing_contract.select` 调
+    `check_definition`）。名称指向的部门、成果种类与提议方式对不上时逐项交回（文件、字段、说明），
+    草稿因此看到与加载相同的拒绝项（设计说明「草稿与校验」「拒绝与提醒」第 10 条）。"""
+    try:
+        routing_contract.select(definitions.routing, definitions)
+    except InvalidRoutingDefinition as exc:
+        return [("routings.json", *_split_issue(issue)) for issue in exc.issues]
+    return []
+
+
+def _split_issue(issue: str) -> tuple[str, str]:
+    # 路由的说明写成「字段：原因」；拆成内核与页面用的那一套（字段、说明）
+    field, _, message = issue.partition("：")
+    return (field, message) if message else ("（这一份定义）", issue)
 
 
 def _labels(labels: dict[str, str], names: list[str]) -> str:

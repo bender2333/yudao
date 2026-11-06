@@ -716,15 +716,15 @@ class ListChange(_Definition):
 
 class DepartmentChange(_Definition):
     # 改动里对发布带一个部门的修改（「合成规则」第 1、2、6 条）：单值的项整项替换，清单记增加与去掉。
-    # 现在一个部门一个角色、角色编号与部门编号相同，角色的项（工具许可、可见范围、Prompt）写在这里
+    # 现在一个部门一个角色、角色编号与部门编号相同，工具许可写在部门这里。
+    # 角色的 Prompt 与可见范围不在这里：它们分别归模型与 Prompt 那一层（项目部门设置、项目角色设置）
+    # 与参数，项目上的改动只改组织
     label: str | None = None
     target: str | None = None
     evidence: str | None = None
     work: str | None = None
     watched: ListChange = Field(default_factory=ListChange)
     tools: ListChange = Field(default_factory=ListChange)
-    visibility: tuple[VisibilityValue, ...] | None = None
-    prompt: str | None = None
 
 
 class NewDepartment(_Definition):
@@ -1447,7 +1447,8 @@ def _tool_names_issues(form: Definitions, at: str, names: tuple[str, ...]) -> li
             for position, name in enumerate(names) if name not in form.tools]
 
 
-def _rejection_cycles(edges: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:    # 谁能拒绝谁有环：每条边看能不能从被核验的一方走回核验的一方，一个环报一条，
+def _rejection_cycles(edges: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
+    # 谁能拒绝谁有环：每条边看能不能从被核验的一方走回核验的一方，一个环报一条，
     # 字段是回到起点的那一项，说明写环的路径（角色核验自己是一条长度为一的环）
     graph: dict[str, list[tuple[str, str]]] = {}
     for verifier, verified, field in edges:

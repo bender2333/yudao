@@ -104,19 +104,18 @@ def test_removing_a_department_leaves_the_open_loop():
     assert reminder.kind == "open_loop" and "开环完成" in reminder.message
 
 
-# R2：单值的项整项替换——事项的来源接哪个部门、轮转方式、可见范围与 Prompt；清单类的工具加进来时
-# 提案合同跟着重算（「合成规则」第 1、2、3 条）
+# R2：单值的项整项替换——事项的来源接哪个部门、轮转方式；清单类的工具加进来时提案合同跟着重算
+# （「合成规则」第 1、2、3 条）。角色的 Prompt 与可见范围不在合成的单值项里：它们分别归项目部门设置、
+# 项目角色设置与参数的入口
 def test_single_valued_items_replace_and_a_submit_tool_brings_its_contract():
     composed = _compose({
-        "departments": {"product": {
-            "visibility": ["prior_round"], "prompt": "你是产品部门，只写要求。",
-            "tools": {"add": ["submit_structure"]}}},
+        "departments": {"product": {"tools": {"add": ["submit_structure"]}}},
         "sources": {"user_input": "engineering", "onboarding": "engineering"},
         "routing": "watched_outputs"})
     assert dict(composed.organization.sources) == {"user_input": "engineering", "onboarding": "engineering"}
     assert composed.source_department("user_input") == "engineering"
-    assert composed.role("product").visibility == ("prior_round",)
-    assert composed.role("product").prompt == "你是产品部门，只写要求。"
+    assert composed.role("product").prompt == DEFINITIONS.role("product").prompt
+    assert composed.role("product").visibility == DEFINITIONS.role("product").visibility
     contract = composed.proposal_contract("product", "change")
     assert "submit_structure" in contract["submit_tools"] and "structure" in contract["kinds"]
     assert composed.routing == "watched_outputs"
@@ -255,6 +254,24 @@ def test_the_draft_query_writes_no_events(tmp_path):
         assert first.data.organization.departments[2].label == "验收"
         assert system.store.end_position() == before == first.position
         assert len(system.store.list_project_events(project_id)) == 1
+    finally:
+        application.close()
+
+
+# R1：校验草稿跑路由自己那份定义的内容校验，与加载时同一处：关注一个路由不认得的名字时草稿就拒绝，
+# 与加载路径的拒绝项相同（设计说明「拒绝与提醒」第 10 条）
+def test_the_draft_query_runs_the_routing_check_like_loading(tmp_path):
+    system = LoopSystem.for_testing(tmp_path, FakeAdapter([]))
+    application = Application(system)
+    try:
+        project_id = system.projects.register("校验草稿", "把一件事做完")
+        result = application.query("organization.draft", OrganizationDraft(
+            project_id=project_id, form="three_departments",
+            changes=json.dumps({"departments": {"engineering": {"watched": {"add": ["product_spce"]}}}})))
+        assert result.data.organization is None and result.data.finishes is None
+        [issue] = result.data.rejections
+        assert issue.item.startswith("routings.json departments[engineering].watched[")
+        assert "product_spce" in issue.message and "没有这一种" in issue.message
     finally:
         application.close()
 

@@ -20,7 +20,7 @@ from ..definitions import (
     submitted_outcomes,
 )
 from ..models import ProjectEventType
-from ..organization_compose import compose, finish_statement, reminders, write_scopes
+from ..organization_compose import compose, finish_statement, reminders, routing_issues, write_scopes
 from ..projects import ProjectNotFoundError, project_projection
 from ..runtime import FORM_REGISTRY
 from .contracts import Contract, Snapshot
@@ -176,10 +176,13 @@ class DraftReminder(Contract):
 
 
 class DraftDepartment(Contract):
-    # 合成结果里的一个部门：身份、显示名、三样说明、关注的成果、交出的成果、是不是核验角色、写入范围
+    # 合成结果里的一个部门：身份、显示名、三样说明（它对什么负责、凭什么判断、怎么工作）、关注的成果、
+    # 交出的成果、是不是核验角色、写入范围
     id: str
     label: str
     target: str
+    evidence: str
+    work: str
     watched: list[str]
     outcomes: list[str]
     verifier: bool
@@ -242,6 +245,7 @@ def _draft_organization(form_name: str, definitions: Definitions) -> DraftOrgani
         routing_label=definitions.routing_definition().label,
         departments=[DraftDepartment(
             id=department.id, label=department.label, target=department.target,
+            evidence=department.evidence, work=department.work,
             watched=list(department.watched),
             outcomes=sorted(submitted_outcomes(definitions.roles, definitions.tools, definitions.work_items,
                                                 department.id)),
@@ -281,6 +285,11 @@ def _organization_draft(application: Application,
     except DefinitionError as exc:
         return Snapshot[OrganizationDraftResult](position=store.end_position(),
                                                  data=_refused(request.project_id, list(exc.issues)))
+    # 路由自己那份定义的内容校验与加载时同一处：草稿与加载看到同一批拒绝项
+    issues = routing_issues(definitions)
+    if issues:
+        return Snapshot[OrganizationDraftResult](position=store.end_position(),
+                                                 data=_refused(request.project_id, issues))
     finishes, open_loop = finish_statement(definitions)
     return Snapshot[OrganizationDraftResult](
         position=store.end_position(),

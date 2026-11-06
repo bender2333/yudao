@@ -2587,6 +2587,14 @@ export type DraftDepartment = {
      */
     target: string;
     /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Work
+     */
+    work: string;
+    /**
      * Watched
      */
     watched: Array<string>;
