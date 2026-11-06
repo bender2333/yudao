@@ -6,7 +6,6 @@
 @import "./styles/v10-project.css";
 @import "./styles/v10-department.css";
 @import "./styles/v10-system.css";
-@import "./styles/v10-gallery.css";
 
 /* 抽屉遮罩在 prototypes 里是常驻元素，真实系统按抽屉打开与否挂载；display 由 base.css 的
    .y10-scrim 在窄屏给出 */

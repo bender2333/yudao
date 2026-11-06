@@ -1,38 +1,19 @@
-// 概览页的循环画面：把查询结果交给翻译层，把翻译层给出的状态与动作交给楼层画面（工单 #82、#953）。
+// 概览页的循环：事项的文字列表与等待回答的决定请求（工单 #82、#953）。
 //
-// 这个组件只做连接（画面与播放 docs/design/visualization.md「分层与边界」）：
-//   - 同步层的数据（project.loop、decisions.list）与当前事项那次运行的询问链（run.asks）经 translate/floor.ts
-//     翻成画面合同的状态与卡片；
-//   - 事件流里本项目的事件经翻译层翻成动作，回放期间不播动作；
-//   - 打开画面、重新同步、标签页从后台切回与回放拖动都用 jump：直接显示最新状态，不补播；
-//   - 画面的回调（回答决定、点击跳转）变成命令。
+// 画面搬出（画面与播放 docs/design/visualization.md「搬出：画面成为单独的应用」，工单 #1418）：
+// 楼层画布、覆盖层与回放随画面搬进 view/；这一节只留页面文字，数据仍取 project.loop 与 decisions.list，
+// 与画布同一份查询结果。页面不导入画面与翻译层。
 //
-// 页面文字（下方的文字列表、覆盖层按钮条）不属于画面，照旧按查询结果显示。
+// 工单 #1416：原来只在画布上看得到的部门、轮次与中断状态已在页面的「部门」「中断与待恢复」两节；
+// 这里留的是每个事项一行的列表与可以同样回答的决定卡片。
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type {
-  Capabilities, DecisionList, DecisionView, EventObject, ProjectFlowResult, ProjectLoopResult, RunAsksResult,
-  RunLoopsResult,
-} from "../../api/generated/types.gen";
+import { useMemo } from "react";
+import type { DecisionList, DecisionView, ProjectLoopResult } from "../../api/generated/types.gen";
 import type { ClientApp } from "../../contract/client-app";
-import { newCommandId } from "../../contract/command-id.ts";
-import { commandProblemText } from "../../contract/command-problem.ts";
-import { createRafClock, type Clock } from "../../pixel/clock";
-import { createFloorView, floorTestHooks, type FloorTestHooks, type FloorView } from "../../pixel/floor/view";
-import type { DecisionAnswer, DecisionResult } from "../../pixel/floor/card";
-import type { FactElement } from "../../pixel/contract";
-import type { FloorModel } from "../../pixel/world/types";
-import type { SourceEvent } from "../../translate/floor";
-import { LETTER_ANSWERED_TYPE, LETTER_ASKED_TYPE } from "../../pixel/world/types";
-import { sortByRequested } from "../decisions/card-logic";
 import { DecisionCardList } from "../decisions/card.tsx";
-import { floorActions, floorCards, floorInterrupted, floorState, loopsOverlay, recoveryOverlay, sourceCard, sourceEventOf,
-         sourceOverlay, streamText, type EventAtPositionView,
-         toFloorEvent, type FloorEvent } from "../../translate/floor";
-import { OVERLAY_LABELS, itemColor } from "./floor-text";
-import { flowSegmentsOf, type FlowSegment } from "./flow-segments";
+import { sortByRequested } from "../decisions/card-logic";
+import { itemColor } from "./floor-text";
 import { WORK_ITEM_STATUS, departmentName, label } from "./labels";
-import { paths } from "../../shell/routing";
 import { useSnapshot } from "./use-snapshot";
 
 /** 文字列表里的一行：按查询结果原样写（页面文字不属于画面）。 */
@@ -50,21 +31,8 @@ export interface FloorScreenProps {
   app: ClientApp;
   projectId: string;
   workItemId: string | null;
-  /** 回放位置（全局位置）：不为 null 时 project.loop 按位置带 at 读取；回放期间按一个部门一个角色画，不显示决定请求。 */
+  /** 回放位置（全局位置）：不为 null 时 project.loop 按位置带 at 读取；回放期间不显示决定请求。 */
   at?: number | null;
-}
-
-/** 覆盖层的名称与中文标签：中文名是页面自己的（floor-text.ts，工单 #1415），页面按能力清单挑出按钮条上的几个。 */
-
-/**
- * 楼层画面要读询问链的那次运行：聚焦的事项优先，否则进行中的一项（与概览页「当前事项」同一口径）。
- * 没有这样的运行时为空串，页面据此不发查询。
- */
-export function asksRunId(loop: ProjectLoopResult | null, focus: string | null): string {
-  const rows = loop?.work_items ?? [];
-  const picked = (focus === null ? undefined : rows.find((row) => row.work_item_id === focus))
-    ?? rows.find((row) => row.status === "in_progress" || row.status === "awaiting_initial_prd");
-  return picked?.run_id ?? "";
 }
 
 /** 文字列表里的行：事项本身的状态，不是画面的状态名（工单 #900）。 */
@@ -80,84 +48,10 @@ export function floorTextRows(loop: ProjectLoopResult | null): FloorTextRow[] {
   }));
 }
 
-/**
- * 把事件流里的事件转成像素层的事件形状（只保留本项目的事件）。
- * 楼与部门房间的画面（画面 4、5）还在用 v10 的形状，由它们各取所需；楼层自己不再经过这里，
- * 它把同一份事件交给翻译层（translate/floor.ts）。
- */
-export function floorEventOf(event: EventObject, projectId: string): PixelFloorEventBridge | null {
-  // 事件的公共字段（ADR-0019 的事件信封）：项目、部门、角色、说明与载荷都是登记在接口合同里的。
-  if (event.project_id !== null && event.project_id !== projectId) return null;
-  const raw = event.payload as unknown as Record<string, unknown>;
-  let type: string = event.type;
-  let payload = raw;
-  let eventDept: string | null = event.department;
-  if (event.type === "ask_started") {
-    const requester = typeof raw?.requester === "string" ? raw.requester : null;
-    const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
-    if (!requester || !recipient) return null;
-    type = LETTER_ASKED_TYPE;
-    payload = { ...raw, from: requester, to: recipient };
-    if (!eventDept) eventDept = requester;
-  } else if (event.type === "ask_answered") {
-    const requester = typeof raw?.requester === "string" ? raw.requester : null;
-    const recipient = typeof raw?.recipient === "string" ? raw.recipient : null;
-    if (!requester || !recipient) return null;
-    type = LETTER_ANSWERED_TYPE;
-    payload = { ...raw, from: recipient, to: requester };
-    if (!eventDept) eventDept = recipient;
-  }
-  const toolVal = typeof payload?.tool === "string" ? payload.tool : typeof payload?.name === "string" ? payload.name : null;
-  return {
-    type,
-    event_id: event.event_id,
-    department: eventDept,
-    role: event.role,
-    // 工具类事件的工具名写在载荷的 name 字段（真实系统的 tool_started/tool_called），说话目录按 tool 取
-    tool: toolVal,
-    label: event.label,
-    work_item_id: event.work_item_id,
-    project_id: event.project_id,
-    position: event.position,
-    payload,
-  };
-}
-
-/** 转移给像素层的旧形状（楼与房间的画面用；楼层自己用翻译层的形状）。 */
-export interface PixelFloorEventBridge {
-  type: string;
-  event_id?: string | null;
-  department?: string | null;
-  role?: string | null;
-  tool?: string | null;
-  label?: string | null;
-  work_item_id?: string | null;
-  project_id?: string | null;
-  position?: number;
-  payload?: Record<string, unknown>;
-}
-
-/**
- * 事件流断开（外壳在 body 上写 is-disconnected，工单 #296）：画面据此整层变暗。
- * 只读外壳维护的那一个类名，不另开一条连接状态的来源；断开与恢复都从外壳那一处知道（工单 #1188）。
- */
-function useBodyDisconnected(): boolean {
-  const [disconnected, setDisconnected] = useState(() => document.body.classList.contains("is-disconnected"));
-  useEffect(() => {
-    const update = (): void => setDisconnected(document.body.classList.contains("is-disconnected"));
-    update();
-    const observer = new MutationObserver(update);
-    observer.observe(document.body, { attributes: true, attributeFilter: ["class"] });
-    return () => observer.disconnect();
-  }, []);
-  return disconnected;
-}
-
-/** 循环画面：画布、覆盖层切换、窄屏文字列表与决定卡片。 */
+/** 循环：事项的文字列表与等待回答的决定请求。 */
 export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const at = props.at ?? null;
   const replaying = at !== null;
-  const streamDisconnected = useBodyDisconnected();
   const loop = useSnapshot<ProjectLoopResult>(props.app, "page.loop", "project.loop", {
     project_id: props.projectId,
     work_item: props.workItemId,
@@ -167,223 +61,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const decisions = useSnapshot<DecisionList>(props.app, "page.decisions", "decisions.list", {
     project_id: props.projectId, status: ["open"],
   }, replaying);
-  // 当前事项那次运行的询问链（run.asks，工单 #903）：未回答的询问画在传信管的出口。
-  // 回放不查：这个查询不带位置，把最新的询问画到过去的画面上会讲反（画面诚实性 H7）
-  const runId = useMemo(() => asksRunId(loop.data, props.workItemId), [loop.data, props.workItemId]);
-  const asks = useSnapshot<RunAsksResult>(props.app, "page.loop.asks", "run.asks", { run_id: runId },
-    replaying || runId === "");
-  // 循环状态（工单 #400）：覆盖层「循环」的数据来源；覆盖层在回放时不画（画面与播放 docs/design/visualization.md「画面诚实性的不变式」），
-  // 没有运行时也不查
-  const loopsQuery = useSnapshot<RunLoopsResult>(props.app, "page.loop.loops", "run.loops", { run_id: runId },
-    replaying || runId === "");
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const viewRef = useRef<FloorView | null>(null);
-  const modelRef = useRef<FloorModel | null>(null);
-  const clockRef = useRef<Clock | null>(null);
-  const resyncRef = useRef<(() => void) | null>(null);
-  const decideRef = useRef<((payload: DecisionAnswer) => Promise<DecisionResult>) | null>(null);
-  // 来源卡片（工单 #398）：页面按事项与元素找到来源与原始事件，翻好一张 face 交给画面。
-  // 原始事件取不到时（这一页打开以前的事件）卡片仍写它在时间轴上的位置
-  const openSourceRef = useRef<((workItemId: string, element: FactElement) => void) | null>(null);
-  // 事件流上收到的事件按位置留着：来源卡片要读原始事件的中文说明、种类与提出者
-  const eventsRef = useRef<Map<number, SourceEvent>>(new Map());
-  const [error, setError] = useState<string | null>(null);
-  const [overlay, setOverlay] = useState<string | null>(null);
-  const capabilities = props.app.currentCapabilities;
-
-  // 画面内的回答：走与页面卡片同一条命令 decision.answer，带上决定的版本与说明；拒绝时把原因交给卡片
-  decideRef.current = async (payload) => {
-    const outcome = await props.app.command("decision.answer", {
-      command_id: newCommandId(),
-      decision_id: payload.decision_id,
-      option: payload.option,
-      ...(payload.note === "" ? {} : { note: payload.note }),
-      base_version: payload.base_version,
-    });
-    if (outcome.ok) return { accepted: true, message: "" };
-    return { accepted: false, message: commandProblemText(outcome.problem) };
-  };
-
-  // 建立画面：画布挂在宿主元素上，时钟与事件流分别订阅
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    let cancelled = false;
-    const clock = createRafClock(
-      (cb: (t: number) => void) => requestAnimationFrame(cb),
-      () => performance.now(),
-      (h: number) => cancelAnimationFrame(h),
-    );
-    clockRef.current = clock;
-    void (async () => {
-      try {
-        const view = await createFloorView({
-          host,
-          clock,
-          // 说明栏的输入框加在画布所在的容器里（画面里的横线纸上叠一个透明的输入框）
-          cardHost: host,
-          onDecide: async (payload) => {
-            const decide = decideRef.current;
-            if (!decide) throw new Error("画面还没有接上回答命令");
-            return decide(payload);
-          },
-          onGo: (target) => {
-            window.location.hash = target.startsWith("#") ? target.slice(1) : target;
-          },
-          onOpenSource: (workItemId, element) => openSourceRef.current?.(workItemId, element),
-          // 来源卡片上的「在时间轴上查看」：回到那个位置的概览回放（设计说明第 3.3 节，位置写在 ?at= 中）
-          onGoTimeline: (position) => {
-            window.location.hash = paths.overviewAt(props.projectId, position, { workItem: props.workItemId });
-          },
-        });
-        if (cancelled) {
-          view.destroy();
-          return;
-        }
-        viewRef.current = view;
-        // 打开画面：直接显示最新的状态，不补播（查询可能早于画面就绪）
-        if (modelRef.current) view.jump(modelRef.current);
-        // 端到端测试经这个入口读取画面的当前状态（只读的检查入口）
-        (window as unknown as { __floorViewForTest?: FloorTestHooks }).__floorViewForTest = floorTestHooks(view, () => resyncRef.current?.());
-      } catch (e) {
-        setError(e instanceof Error ? e.message : String(e));
-      }
-    })();
-    return () => {
-      cancelled = true;
-      viewRef.current?.destroy();
-      viewRef.current = null;
-      clock.destroy();
-      clockRef.current = null;
-    };
-  }, []);
-
-  // 查询结果经翻译层翻成楼层状态（回到过去的时间点时不显示决定请求，部门按一个部门一个角色画）。
-  // 询问链是另一处查询：状态的位置取两处快照里新的一个（与楼的翻译层同一做法）
-  const model = useMemo(
-    () => floorState({
-      position: Math.max(loop.position, asks.position),
-      loop: loop.data,
-      asks: asks.data === null ? null : { [runId]: asks.data.asks },
-      roles: null,
-      slots: null,
-      ops: null,
-      machines: null,
-      interrupted: floorInterrupted(loop.data, streamDisconnected),
-      focus: props.workItemId,
-    }),
-    [loop.position, asks.position, loop.data, asks.data, runId, props.workItemId, streamDisconnected],
-  );
-
-  // 决定卡片是实时内容：到了就贴上大厅的板（回放期间不显示）
-  const cards = useMemo(
-    () => floorCards(replaying ? null : decisions.data?.decisions ?? null, (decision) => ({
-      projectName: decision.project_id ?? "",
-      workItemTitle: titleOf(model, decision.work_item_id),
-    }), Date.now()),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [decisions.data, replaying, model],
-  );
-
-  // 点开事实元素：按这一份查询结果找到来源与原始事件，翻好来源卡片交给画面（工单 #398）。
-  // 原始事件先按位置取一次（工单 #1342 的 event.positions）：回链可能指向 run 流或项目流，两个都给；
-  // 取到以后替换卡片的内容，取不到时用手上已有的事件（页面缓存 500 条）兜底，再没有就写「取不到」。
-  openSourceRef.current = (workItemId, element) => {
-    const row = (loop.data?.work_items ?? []).find((item) => item.work_item_id === workItemId);
-    const ref = row?.refs?.[element];
-    if (!row || !ref) return;
-    const cached = eventsRef.current.get(ref.position) ?? null;
-    viewRef.current?.showSource(sourceCard(row, element, ref, cached));
-    const params: Record<string, unknown> = { project_id: props.projectId, positions: [ref.position] };
-    if (row.run_id) params.run_id = row.run_id;
-    void props.app
-      .queryOne<{ events: EventAtPositionView[] }>("event.positions", params)
-      .then((result) => {
-        const event = sourceEventOf(result.data.events ?? [], ref.position);
-        if (event) viewRef.current?.showSource(sourceCard(row, element, ref, event));
-      })
-      .catch(() => {
-        // 查询失败时留着缓存摊开的卡片（取不到就写着它在时间轴上的位置），不打断画面
-      });
-  };
-
-  // 每次查询结果到达：交给播放时间线（状态等它之前的动作演完再上画面）
-  useEffect(() => {
-    modelRef.current = model;
-    // 直播交给播放时间线（状态等它之前的动作演完再上画面），回放直接显示那个位置的状态（不播动作）
-    if (replaying) viewRef.current?.jump(model);
-    else viewRef.current?.setState(model);
-  }, [model, replaying]);
-
-  // 回放拖动时间轴：直接显示那个位置的状态，不播动作
-  const atKey = at === null ? "live" : String(at);
-  useEffect(() => {
-    if (modelRef.current) viewRef.current?.jump(modelRef.current);
-  }, [atKey]);
-
-  // 决定卡片：实时内容，到了就显示
-  useEffect(() => {
-    viewRef.current?.setDecisions(cards);
-  }, [cards]);
-
-  // 事件只决定动作：翻译层把事件翻成楼层的动作，时间线按声明演出；回放期间不播动作
-  useEffect(() => {
-    if (replaying) return;
-    const off = props.app.subscribeEvents((event) => {
-      const floorEvent = toFloorEvent(event);
-      if (floorEvent.project_id !== null && floorEvent.project_id !== props.projectId) return;
-      // 来源卡片要读原始事件（工单 #398）：按位置留最近的事件，超过 500 条时丢掉最旧的
-      const cache = eventsRef.current;
-      cache.set(event.position, event as unknown as SourceEvent);
-      if (cache.size > 500) {
-        const oldest = Math.min(...cache.keys());
-        cache.delete(oldest);
-      }
-      const stream = streamText(floorEvent);
-      if (stream) {
-        viewRef.current?.stream({ room: stream.room, role: stream.role }, stream.text);
-        return;
-      }
-      for (const action of floorActions(floorEvent)) viewRef.current?.play(action);
-    });
-    return off;
-  }, [props.app, props.projectId, replaying]);
-
-  // 重新同步：画面直接回到查询给出的状态，不补播
-  useEffect(() => {
-    const jumpLatest = (): void => {
-      if (modelRef.current) viewRef.current?.jump(modelRef.current);
-    };
-    const off = props.app.subscribeResync(jumpLatest);
-    // 标签页从后台切回：浏览器在后台暂停了动画，队里可能积了几分钟的事件，直接跳到最新
-    const onVisible = (): void => {
-      if (document.visibilityState === "visible") jumpLatest();
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    if (import.meta.env.DEV) {
-      resyncRef.current = jumpLatest;
-    }
-    return () => {
-      off();
-      document.removeEventListener("visibilitychange", onVisible);
-    };
-  }, [props.app]);
-
-  useEffect(() => {
-    viewRef.current?.focus(props.workItemId);
-  }, [props.workItemId]);
-
-  // 流转查询：覆盖层按其 segments 渲染，画面与下方文字列表共用同一份查询结果
-  const flow = useSnapshot<ProjectFlowResult>(props.app, "page.loop.flow", "project.flow", {
-    project_id: props.projectId,
-  });
-  const flowSegments = useMemo(() => flowSegmentsOf(flow.data?.records ?? null), [flow.data]);
-  useEffect(() => {
-    viewRef.current?.setOverlay(overlay, overlay === null ? null : overlayData(overlay, loop.data, decisions.data, flowSegments, loopsQuery.data));
-  }, [overlay, loop.data, decisions.data, flowSegments, loopsQuery.data]);
-
-  const overlays = (capabilities?.overlays ?? []).map((o) => o.name).filter((name) => OVERLAY_LABELS[name] !== undefined);
-  // 文字列表里的决定请求：与画面同源的查询结果，按发出时间排列
+  // 文字列表里的决定请求：与页面卡片同源的查询结果，按发出时间排列
   const openDecisions = useMemo(
     () => sortByRequested((decisions.data?.decisions ?? []).filter((d) => d.status === "open")),
     [decisions.data],
@@ -391,65 +69,10 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const rows = useMemo(() => floorTextRows(loop.data), [loop.data]);
 
   return (
-    // 覆盖层按钮条是画面上方一条独立的深色条（原型 v13 ui/scenes.js mountFloor）：不压在画面上
     <div className="floor-screen">
-      <div className="y10-scene y10-floor-wrap">
-        <div className="y10-overlay-bar floor-overlay-tabs" role="group" aria-label="覆盖层">
-          {overlays.map((name) => (
-            <button
-              key={name}
-              type="button"
-              className={`y10-seg-btn${overlay === name ? " is-on active" : ""}`}
-              onClick={() => setOverlay(overlay === name ? null : name)}
-            >
-              {OVERLAY_LABELS[name]}
-            </button>
-          ))}
-        </div>
-        <div className="floor-canvas" ref={hostRef} />
-      </div>
-      {error !== null ? <p className="pixel-canvas-error">楼层画面加载失败：{error}</p> : null}
       <FloorTextList rows={rows} decisions={openDecisions} app={props.app} />
     </div>
   );
-}
-
-/** 事项的标题（决定卡片里的「事项」一栏用）。 */
-function titleOf(model: FloorModel, workItemId: string | null): string {
-  if (!workItemId) return "";
-  return model.items.find((it) => it.work_item_id === workItemId)?.sign ?? "";
-}
-
-/** 覆盖层的数据：按能力清单里的覆盖层名称取对应查询的结果；没有登记时不给数据。 */
-function overlayData(
-  name: string,
-  loop: ProjectLoopResult | null,
-  decisions: DecisionList | null,
-  flowSegments: FlowSegment[],
-  loops: RunLoopsResult | null,
-): Record<string, unknown> | null {
-  if (name === "waiting") {
-    const entries = (loop?.work_items ?? [])
-      .filter((row) => row.status === "waiting_provider" || row.status === "asking")
-      .map((row, i) => ({
-        department: row.department ?? "",
-        text: row.status === "waiting_provider" ? "等待模型服务" : "等待回答",
-        waited_sec: row.elapsed_sec ?? 0,
-        row: i,
-      }));
-    for (const _decision of decisions?.decisions ?? []) {
-      entries.push({ department: "hall", text: "等待你的决定", waited_sec: 0, row: entries.length });
-    }
-    return { entries };
-  }
-  if (name === "flow") return { segments: flowSegments };
-  // 「恢复」覆盖层的数据在翻译层写好（工单 #1186）：这里只把查询结果交过去，不在这里写事项与状态的对应
-  if (name === "recovery") return recoveryOverlay(loop);
-  // 「来源」覆盖层的数据同样在翻译层写好（工单 #398）：五种来源的事实元素、缺来源的元素与图例计数
-  if (name === "sources") return sourceOverlay(loop) as unknown as Record<string, unknown>;
-  // 「循环」覆盖层的数据同样在翻译层写好（工单 #400）：信息条写 run 层，房间写激活层与步骤循环，图例写状态
-  if (name === "loops") return loopsOverlay(loops) as unknown as Record<string, unknown>;
-  return null;
 }
 
 /** 画面下方的文字列表：默认折叠（原型 v13 ui/scenes.js 的 floorList），每一行是事项的色点、
@@ -496,5 +119,3 @@ function FloorTextList(props: {
     </>
   );
 }
-
-export type { Capabilities, FloorEvent };

@@ -12,10 +12,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "eventsource": "5.1.2",
-    "gsap": "3.13.0",
-    "pixi.js": "8.13.1",
-    "xstate": "^5.33.2"
+    "eventsource": "5.1.2"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "0.99.0",
