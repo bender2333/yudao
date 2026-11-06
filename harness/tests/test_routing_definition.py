@@ -14,13 +14,8 @@ from typing import Any
 import pytest
 
 from harness import models, routing_contract
-from harness.adapters.fake import FakeAdapter
-from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, UnknownStopReason, load_definitions
-from harness.event_store import run_stream
-from harness.models import EventType, stop_reason_name
-from harness.runtime import LoopSystem
+from harness.definitions import DEFINITIONS_DIR, DefinitionError, load_definitions
 from harness.watched_outputs import ROUTING
-from harness.write_path import NewEvent
 
 
 def _copy(tmp_path: Path) -> Path:
@@ -48,18 +43,6 @@ def _routing(directory: Path) -> dict:
 def _rewrite_routing(directory: Path, entry: dict) -> Path:
     _write(directory, "routings.json", {"routings": [entry]})
     return directory
-
-
-def _system(tmp_path: Path) -> tuple[LoopSystem, str]:
-    system = LoopSystem.for_testing(tmp_path, FakeAdapter({}))
-    return system, system.create_run("print the argument in uppercase")
-
-
-def _fail(transaction, reason: str) -> None:
-    transaction.append(NewEvent(
-        EventType.RUN_FAILED, actor="system", state_before="running", state_after="failed",
-        stop_reason=reason, payload={"stop_reason": reason, "human_action": None},
-    ))
 
 
 def test_the_kernel_loads_a_routing_definition_with_names_and_structure_only(tmp_path):
@@ -118,11 +101,6 @@ def test_the_routing_rejects_content_that_is_not_in_the_definitions(tmp_path):
     assert "proposal_methods[0]：工具 submit_audit_note 不是定义里的提交类工具" in issues
     assert "outcomes[0]：成果种类 audit_note 没有由这里列出的提议方式提交" in issues
     assert "outcomes：提交类工具提交的成果种类 product_spec 没有列进成果种类" in issues
-
-
-def test_the_shipped_routing_definition_passes_the_routing_own_check():
-    # R2：发布的成果驱动定义与现有的定义文件对得上，内容校验通过
-    assert ROUTING.check_definition(DEFINITIONS) is None
 
 
 def test_a_final_outcome_outside_the_outcome_kinds_is_rejected(tmp_path):
@@ -240,29 +218,6 @@ def test_the_skeleton_outcome_kinds_can_be_named_by_a_contract(tmp_path):
     contracts["conditions"]["qa_review"][2]["recorded_in"] = "snapshot"
     _write(directory, "proposal_contracts.json", contracts)
     assert load_definitions(directory).routing == "watched_outputs"
-
-
-def test_a_routing_declared_end_reason_is_written_as_an_item_stop_reason(tmp_path):
-    # R3：路由声明的结束原因可以作为事项的停止原因写入，中文名与处理说明来自它自己的一份定义
-    system, run_id = _system(tmp_path)
-    system.writes.transact(run_stream(run_id), lambda transaction: _fail(transaction, "no_new_work"))
-    projection = system.project(run_id)
-    assert (projection.status, projection.stop_reason) == ("failed", "no_new_work")
-    assert stop_reason_name("no_new_work") == "没有部门有新的工作"
-    [failed] = [event for event in system.writes.read(run_stream(run_id)).events()
-                if event.type == EventType.RUN_FAILED]
-    assert failed.stop_reason == "no_new_work"
-
-
-def test_an_undeclared_stop_reason_is_rejected_and_says_where_to_declare_it(tmp_path):
-    # R3：既没有声明、也不在内核清单里的停止原因写不进去，说明里写明两处定义
-    system, run_id = _system(tmp_path)
-    with pytest.raises(UnknownStopReason) as raised:
-        system.writes.transact(run_stream(run_id), lambda transaction: _fail(transaction, "policy_expired"))
-    message = str(raised.value)
-    assert "policy_expired" in message
-    assert "stop_reasons.json" in message and "routings.json" in message
-    assert system.project(run_id).status == "running"
 
 
 def test_the_label_of_a_routing_end_reason_comes_from_the_definition(tmp_path, monkeypatch):

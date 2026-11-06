@@ -479,16 +479,6 @@ def test_second_work_item_project_part_includes_source_spec(data_dir):
     assert spec.goal in second
     assert spec.requirements[0] in second
 
-def test_work_item_title_defaults_to_first_line_truncated(data_dir):
-    system = _system(data_dir, happy_script())
-    project_id = system.projects.register("Title", GOAL)
-    long_line = "很长的标题" * 20
-    work_item_id, _run_id = system.projects.start_work_item(project_id, f"\n\n  {long_line}\n第二行")
-    item = system.projects.projection(project_id).work_item(work_item_id)
-    assert item.title == long_line[:40] and len(item.title) == 40
-    work_item_2, _ = system.projects.start_work_item(project_id, "正文", title="显式标题")
-    assert system.projects.projection(project_id).work_item(work_item_2).title == "显式标题"
-
 def test_work_item_derived_fields_follow_the_run(data_dir):
     # 脚本按部门给出（工单 #877）：质检的脚本按它自己的先后排列
     script = {

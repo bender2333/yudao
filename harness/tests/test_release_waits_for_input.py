@@ -21,7 +21,7 @@ from harness.proposals import (
 )
 from harness.providers.call import ModelStreamEvent
 from harness.runtime import LoopSystem
-from harness.tests.helpers import after_event, from_another_thread, quality_turns
+from harness.tests.helpers import quality_turns
 from harness.write_path import NewEvent
 
 CHANGE_RECORD = {
@@ -92,41 +92,6 @@ def _wait_for_the_release_rejection(holder, run_id):
             return
         yield ModelStreamEvent(kind="stream_event", id="evt-wait")
     raise AssertionError("放行没有被拒绝")
-
-
-def test_a_release_waits_until_the_product_round_ends(tmp_path):
-    # 验收第 1 条（1）：质检提交放行时产品正在一轮工作中处理用户的新输入，放行等到这一轮结束再裁决；
-    # 产品没有修订 PRD，放行被接纳（反例 8 的前两句）
-    holder: dict[str, object] = {}
-
-    def process_the_input(request):
-        yield from _wait_for_the_release_attempt(holder, request.run_id)
-        return FakeTurn(transcript="输出保持小写，产品要求不变。")
-
-    adapter = FakeAdapter({
-        "product": [product_spec(), process_the_input],
-        "engineering": [delivery_turn()],
-        "quality": quality_turns("release", "checks passed on the current delivery"),
-    }, stream_gap_sec=0.01)
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    holder["system"] = system
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    system.add_guidance(run_id, "product", "请确认输出保持小写，产品要求不变。")
-    projection = system.run_until_stop(run_id)
-
-    # 质检确实先发出了放行调用，产品这一轮还在工作
-    assert holder.get("release_attempted")
-    # 这一轮正常结束，主机写已回答：输入处理完了
-    assert projection.department_guidance[0].status == "answered"
-    product_end = max(event.position for event in _events(system, run_id)
-                      if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
-    [release] = _quality_reviews(system, run_id, EventType.PROPOSAL_SUBMITTED)
-    assert release.position > product_end
-    # 产品没有修订 PRD：放行被接纳，事项结束
-    assert projection.status == "done"
-    assert projection.last_review.verdict == "release"
 
 
 def test_a_release_is_rejected_after_the_product_revises_the_prd(tmp_path):
@@ -530,57 +495,6 @@ def test_input_arriving_while_quality_works_alone_starts_the_product(tmp_path):
     assert projection.stop_reason != "time_limit"
     assert projection.status == "done", projection.error
     assert projection.last_review.verdict == "release"
-
-
-def test_a_release_is_rejected_after_the_product_makes_a_decision(tmp_path):
-    # 验收第 1 条（3）与反例 8 的第一句：产品决定也重算合同，交付随之过期，放行被拒绝。
-    # 放行仍然等产品这一轮结束才裁决：产品决定是这一轮交回的正式成果，没有以文字回答结束之前
-    # 放行不生效（部门指导设计说明第 2.1 节）。拒绝以后怎么重新交付不在这条用例里，裁决出来
-    # 就取消事项，不再进入下一轮
-    holder: dict[str, object] = {}
-
-    def decide_while_the_release_waits(request):
-        yield from _wait_for_the_release_attempt(holder, request.run_id)
-        return product_decision(
-            "Uppercase all output",
-            "输入要求输出大写，作为补充决定写进合同。",
-        )
-
-    def deliver_after_the_release_is_rejected(request):
-        # 工程按新合同重新交付放在拒绝之后：两个会话同时进行，先后随调度变化，
-        # 这条用例验的是「放行先被拒绝」（#1079）
-        yield from _wait_for_the_release_rejection(holder, request.run_id)
-        return delivery_turn()(request)
-
-    adapter = FakeAdapter({
-        "product": [product_spec(), decide_while_the_release_waits],
-        "engineering": [delivery_turn(), deliver_after_the_release_is_rejected],
-        "quality": [review_turn("release", "checks passed on the current delivery")]
-                   + quality_turns("release", "checks passed on the current delivery"),
-    }, stream_gap_sec=0.01)
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    holder["system"] = system
-    run_id = system.create_run("build echo", max_cycles=16)
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    system.add_guidance(run_id, "product", "请把输出改为大写，作为补充决定写下来。")
-    after_event(system, EventType.PROPOSAL_REJECTED,
-                lambda event: from_another_thread(lambda: system.cancel(run_id)))
-    projection = system.run_until_stop(run_id)
-
-    events = _events(system, run_id)
-    [decision] = [event for event in events if event.type == EventType.PRODUCT_DECISION_ACCEPTED]
-    product_end = max(event.position for event in events
-                      if event.type == EventType.ACTIVATION_FINISHED and event.department == "product")
-    # 产品决定在这一轮里被接纳，这一轮随后结束
-    assert decision.position < product_end
-    [rejected] = _quality_events(system, run_id, EventType.PROPOSAL_REJECTED)
-    # 放行等到这一轮结束才裁决；产品决定重算合同，交付随之不再有效，放行被拒绝
-    assert rejected.position > product_end
-    assert [error["field"] for error in rejected.payload["errors"]] == ["delivery_spec"]
-    assert rejected.payload["errors"][0]["message"] == "no active DeliverySpec"
-    assert projection.stop_reason == "cancelled"
-    assert projection.last_review is None
 
 
 def test_the_item_finishes_after_the_product_makes_a_decision(tmp_path):

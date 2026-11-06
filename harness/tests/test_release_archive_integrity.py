@@ -16,7 +16,6 @@ from harness.tests.saved_rewrite import rewrite_saved_events, rewrite_saved_proj
 # 每项测试复制一份数据目录，在自己的副本上放行交付与检查。数据来自真实运行，登记为集成层。
 # 副本上的脚本先交独立判断再放行（先判断后看解释的门，工单 #358）
 
-REVIEW_TURN = review_turn("release", "Checks passed")
 JUDGED_REVIEW = [judgement_turn(), review_turn("release", "Checks passed")]
 
 def _saved_quality_ready(tmp_path, *, runs=1):
@@ -45,15 +44,6 @@ def ready_run(quality_ready, tmp_path):
     saved, run_ids = quality_ready
     # 保存的运行停在等待质检放行：重新打开的系统要能回答这一步，脚本里补上判断与这次放行
     return system_on_copy(saved, tmp_path / "ready", JUDGED_REVIEW), run_ids
-
-@pytest.fixture(scope="module")
-def quality_ready_two_runs(tmp_path_factory):
-    return _saved_quality_ready(tmp_path_factory.mktemp("ready-two"), runs=2)
-
-@pytest.fixture
-def two_ready_runs(quality_ready_two_runs, tmp_path):
-    saved, run_ids = quality_ready_two_runs
-    return system_on_copy(saved, tmp_path / "ready-two", [REVIEW_TURN] * len(run_ids)), run_ids
 
 def _events(system, run_id):
     return system.store.list_events(run_id)
