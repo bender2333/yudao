@@ -122,7 +122,7 @@ def test_a_killed_bash_is_handed_back_to_model(tmp_path):
         assert output_data["ok"] is False
         assert "执行被中断" in output_data["error"] and "结果未知" in output_data["error"]
 
-        # 交还以后仍在结果未知的动作里（工单 #181，设计说明第 4.3 节）：处理方式是交还会话，
+        # 交还以后仍在结果未知的动作里（工单 #181，docs/design/app-and-interface.md「查询清单」）：处理方式是交还会话，
         # 交还给模型的内容与模型读到的那条工具结果相同，发出的会话与执行前快照都在，处理时间也有。
         # 没有决定卡片：事项不因这个动作等待用户
         handed = [entry for entry in killed.run_recovery(run.after, run.run_id).unknown_actions

@@ -85,7 +85,7 @@ function definitionDepartments(items: WorkItemCard[]): string[] {
   return order;
 }
 
-// 部门在「等待工作」以外的状态下都算手上有这个事项（三部门的循环结构第 2.1 节）
+// 部门在「等待工作」以外的状态下都算手上有这个事项（三部门的循环结构 docs/design/department-loop.md「部门的状态」）
 const IDLE_DEPARTMENT_STATE = "waiting";
 
 // 这个事项要出现在哪些部门的列里

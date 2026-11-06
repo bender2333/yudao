@@ -100,7 +100,7 @@ export async function startBackend(
   if (options.releaseVersionOnce !== undefined) {
     script.push("--release-version-once", options.releaseVersionOnce);
   }
-  // 固定数据目录：断线以后用同一端口与数据目录再起一次服务（设计说明第 3.4 节的恢复）
+  // 固定数据目录：断线以后用同一端口与数据目录再起一次服务（恢复）
   if (options.dataDir !== undefined) {
     script.push("--data-dir", options.dataDir);
   }

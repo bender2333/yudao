@@ -283,7 +283,7 @@ def test_unknown_provider_error_code_is_not_persisted():
 
 
 def test_upstream_error_text_is_redacted_and_truncated():
-    # 上游给出的错误原文记进失败尝试的诊断：先替换本次请求的 Key，再截断到 2000 字符（设计说明第 13.4 节）
+    # 上游给出的错误原文记进失败尝试的诊断：先替换本次请求的 Key，再截断到 2000 字符（docs/design/model-management.md「观测」）
     def failure(handler, _body):
         body = {"error": {"code": "server_error", "type": "server_error",
                           "message": KEY + " " + "长" * 5000}}
@@ -298,7 +298,7 @@ def test_upstream_error_text_is_redacted_and_truncated():
 
 
 def test_upstream_error_text_falls_back_to_the_plain_text_body():
-    # 没有错误对象时取文本回应体：中转服务用纯文本、不是 JSON 的错误拒绝请求（设计说明第 13.4 节）
+    # 没有错误对象时取文本回应体：中转服务用纯文本、不是 JSON 的错误拒绝请求（docs/design/model-management.md「观测」）
     def failure(handler, _body):
         _send(handler, b"prompt is too long: 241669 tokens > 128000 maximum", status=400,
               content_type="text/plain")

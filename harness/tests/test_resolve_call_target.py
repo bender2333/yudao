@@ -186,7 +186,7 @@ def test_fake_protocol_needs_neither_admission_nor_credential():
 
 
 def test_requested_tier_is_limited_to_supported_levels():
-    # 工单 #87：实际发送的档位按模型声明限制到支持范围（设计说明第 7.3 节）
+    # 工单 #87：实际发送的档位按模型声明限制到支持范围
     document = _responses_document()
     document["models"][0]["reasoning_levels"] = ["low", "medium"]
     document["models"][0]["default_reasoning_level"] = "low"

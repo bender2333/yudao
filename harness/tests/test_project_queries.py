@@ -90,7 +90,7 @@ def test_overlays_list_only_when_every_dependent_query_is_registered(data_dir):
     overlays = {item.name: item.queries for item in capabilities.overlays}
     assert overlays["flow"] == ["project.flow"]
     assert overlays["waiting"] == ["project.loop", "decisions.list"]
-    # 事实来源不依赖查询，随事件对象的 source 一起可用（工单 #396，设计说明第 4.3 节）
+    # 事实来源不依赖查询，随事件对象的 source 一起可用（工单 #396，docs/design/app-and-interface.md「查询清单」）
     assert overlays["sources"] == ["project.loop"]
     assert overlays["recovery"] == ["run.recovery"]
     assert "context_usage" not in overlays
@@ -1238,7 +1238,7 @@ def test_a_cancelled_item_has_a_stop_moment_but_no_model_detail(data_dir):
 # ---------------------------------------------------------------------------
 # 工单 #1218：replay.check 的参数组合不对时按输入问题回 422，说明只能给 run_id 或 project_id
 # 其中一个。查询只有一个参数组合是对的（图里两种目标只有一种能问），所以这里核对的是
-# 拒绝按输入问题回答（设计说明第 4.1 节「按位置读取」与第 4.3 节 replay.check 一行），
+# 拒绝按输入问题回答（与 replay.check 一行），
 # 而不是未登记的异常冒到框架成为 500。
 
 
@@ -1304,7 +1304,7 @@ def test_cli_replay_refuses_neither_or_both_parameters_without_a_traceback(data_
 
 
 # ---------------------------------------------------------------------------
-# 因升级停止的新旧 run 关联（工单 #1186，设计说明第 4.3 节 2026-10-29 补充）
+# 因升级停止的新旧 run 关联（工单 #1186，docs/design/app-and-interface.md「查询清单」 2026-10-29 补充）
 
 def _upgrade_system(data_dir):
     # 产品提交规格以后工程的请求失败，run 停在非终态（与排空用例的脚本同一做法），可以发起强制升级；
@@ -1406,7 +1406,7 @@ def test_the_old_version_run_is_listed_read_only_with_its_events(data_dir):
 
 
 def test_loop_facts_carry_their_source_position_and_kind(data_dir):
-    # 守 R3（画面诚实性 H4：每条事实带来源；设计说明第 4.3 节）：project.loop 的每个事实元素给出它的事件位置与
+    # 守 R3（画面诚实性 H4：每条事实带来源；docs/design/app-and-interface.md「查询清单」）：project.loop 的每个事实元素给出它的事件位置与
     # 来源种类；同一份事件序列推出同一个位置——按位置重放与重新投影以后位置不变（工单 #396）
     system = _system(data_dir, happy_script())
     project_id = system.projects.register("来源", GOAL)

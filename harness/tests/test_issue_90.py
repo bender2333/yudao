@@ -1,6 +1,6 @@
 # 工单 #90：修改前的影响列表与删除时的引用检查。
 # 从运行系统整体测试：真实启动 FastAPI 应用，目录文件与 .env 是真实文件，事件日志是真实 SQLite。
-# 覆盖设计说明第 4.4 节最后一段（保存前的影响列表）与第 4.5 节（移除定义、删除 Provider 配置、导入整份文档）：
+# 覆盖最后一段（保存前的影响列表）与（移除定义、删除 Provider 配置、导入整份文档）：
 #   1) 修改被部门默认与两个项目引用的连接的地址：影响列表写出受影响定义、部门默认中的部门、
 #      两个项目的部门与进行中事项；保存以后这些定义回到候选；
 #   2) 移除被项目部门设置引用的定义返回 in_use 与引用方；没有引用时成功；
@@ -8,7 +8,7 @@
 #   4) 导入移除了被引用定义的目录文档被整份拒绝，错误写出引用方（部门默认与项目部门设置两类引用方都写出）；
 #   5) 移除定义写入的 catalog_revised 事件载荷通过合同类型校验，operation 记为 remove_model。
 # 工单 #872：进行中事项按（事项，部门）逐条列出——事项里哪个部门的模型选择（项目部门设置，
-# 没有时取部门默认）落在受影响的定义上就列出这个部门，不论它此刻在不在工作（设计说明第 4.4 节）。
+# 没有时取部门默认）落在受影响的定义上就列出这个部门，不论它此刻在不在工作（docs/design/model-management.md「修改与准入」）。
 
 from __future__ import annotations
 
@@ -184,7 +184,7 @@ def test_connection_address_change_lists_impact_and_returns_definitions_to_candi
             assert {item["department"] for item in impact["project_settings"]} == {"engineering"}
             assert {item["project_id"] for item in impact["work_items"]} == {project_a}
             assert {item["work_item_id"] for item in impact["work_items"]} == {item_a.work_item_id}
-            # 影响列表里的进行中事项按（事项，部门）逐条列出（工单 #872，设计说明第 4.4 节）：
+            # 影响列表里的进行中事项按（事项，部门）逐条列出（工单 #872，docs/design/model-management.md「修改与准入」）：
             # 事项里哪个部门的模型选择（项目部门设置，没有时取部门默认）落在受影响的定义上，
             # 就列出这个部门，不论它此刻在不在工作；一个事项可以出现几次。
             # 这里三个部门都选中 model-a（项目的工程部门设置与产品、质检两个部门的部门默认），因此列出三行。
@@ -217,7 +217,7 @@ def _impact_with_in_progress_item(tmp_path, *, settings: dict[str, str]) -> tupl
     # 起一个进行中的事项并算出改 provider-b 的地址时的影响列表（工单 #872）。
     # settings 写这个项目的项目部门设置（部门 → 定义），没有写设置的部门按部门默认判断。
     # 产品交完产品要求以后作废 model-a 与 model-b 的准入，工程与质检此时刻解析不到目标，
-    # 运行停在这些请求之前（设计说明第 5.5 节），事项保持「进行中」；停稳以后把准入放回，
+    # 运行停在这些请求之前事项保持「进行中」；停稳以后把准入放回，
     # 使影响列表与候选判断仍在有效准入上比较。
     parked: dict[str, Any] = {}
 

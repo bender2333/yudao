@@ -12,7 +12,7 @@ RESPONSES_REASONING_INCLUDE = "reasoning.encrypted_content"
 class ReasoningOutput:
     items: list[dict[str, Any]] = field(default_factory=list)
 
-# 推理参数编码（设计说明第 7.4 节）：三个协议适配器共用这里的取值规则，
+# 推理参数编码：三个协议适配器共用这里的取值规则，
 # 档位与推理参数方式都取自冻结目标，协议层不认识部门与请求档位
 BUDGET_OUTPUT_RESERVE_TOKENS = 4000  # 预算式思考保留给可见输出的 token
 BUDGET_MINIMUM_TOKENS = 1024  # 上游接受的最低思考预算

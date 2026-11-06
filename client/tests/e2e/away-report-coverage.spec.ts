@@ -1,11 +1,11 @@
-// 离开期间的报告里的开环明细（工单 #401 的验收第 1、2 条；应用层与接口层设计说明第 4.3 节
-// `home.away_report` 与 `acceptance.coverage`；验证的独立性设计说明第 7、7.1 节）。
+// 离开期间的报告里的开环明细（工单 #401 的验收第 1、2 条；应用层与接口层 docs/design/app-and-interface.md「查询清单」
+// `home.away_report` 与 `acceptance.coverage`；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」）。
 //
 // 一个放行带两条开环条件（一条判定点、一条开环）：报告的这一项要逐条列出它们，条数与
 // `acceptance.coverage` 的数一致；「跳到逐条结论表」的链接在逐条结论表交付以后（#154）出现；
 // 页面文字里没有英文内部标识，也没有事项一级的「开环完成」。
 //
-// 只看页面：断言读的是页面上的文字与按钮，不读画布、不用画面的测试钩子（测试分层设计说明第 7 节）。
+// 只看页面：断言读的是页面上的文字与按钮，不读画布、不用画面的测试钩子（测试分层 docs/design/test-pyramid.md「前端与浏览器测试」）。
 // 后端是 FakeAdapter 驱动的真实服务（tests/e2e/backend.py 的 --script coverage），页面文件由它提供。
 
 import { expect, test } from "@playwright/test";

@@ -1,4 +1,4 @@
-# MCP 服务器的生命周期（工单 #1176；网络与 MCP 设计说明第 7.2、7.3、8、10 节；恢复契约第 4 节
+# MCP 服务器的生命周期（工单 #1176；网络与 MCP docs/design/network-and-mcp.md「运行规则」、「调用与结果」、「恢复契约」、「应用层接口」；恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」
 # 「动作分类与处置」；总图第四节「动作」缝：每个动作有回执，结果未知时有核实办法）。
 #
 # 验收一：run 结束时关闭这个 run 的服务器实例，整个进程树结束，run 流里的生命周期事件齐全
@@ -49,7 +49,7 @@ HANG = "mcp__lifecycle__hang"
 SLOW = "mcp__http_slow__slow"
 HANG_CALL = "call-hang"
 ECHO_CALL = "call-echo"
-# 调用超时用的小时限：设置里可以改（设计说明第 7.2 节），默认 120 秒不适合用例
+# 调用超时用的小时限：设置里可以改默认 120 秒不适合用例
 SHORT_CALL_TIMEOUT_SEC = 2
 
 # 测试用的 MCP 服务器（官方 SDK 写的真实进程）：`echo` 正常回应，`hang` 写下标记以后一直不回应
@@ -117,7 +117,7 @@ def _server_script(tmp_path: Path) -> Path:
 def _stdio_document(tmp_path: Path, *, tools, call_timeout_sec: int = 120,
                     command: str | None = None, args: list[str] | None = None) -> dict:
     # 一台 stdio 服务器：命令是本机解释器加测试服务器脚本，标记目录按固定文本传进子进程的环境变量
-    # （设计说明第 4.4 节「变量与请求头的值」）。工具清单快照的摘要与归一化配置算出的同一份。
+    #。工具清单快照的摘要与归一化配置算出的同一份。
     # 可以使用的部门写上产品与工程：这两处各有一条用例按它们自己的会话调用工具
     server = {"name": SERVER_NAME, "transport": "stdio", "command": command or sys.executable,
               "args": list(args) if args is not None else [str(_server_script(tmp_path))],
@@ -136,7 +136,7 @@ def _stdio_document(tmp_path: Path, *, tools, call_timeout_sec: int = 120,
 
 
 def _http_document(url: str) -> dict:
-    # 一台 streamable HTTP 服务器：没有进程，超时以后关闭会话（取消无法确认，设计说明第 8 节）。
+    # 一台 streamable HTTP 服务器：没有进程，超时以后关闭会话（取消无法确认）。
     # 名称只能用字母、数字与连字符（projects.normalize_mcp_servers），别名里的连字符收敛成下划线
     server = {"name": "http-slow", "transport": "http", "url": url, "departments": ["engineering"],
               "call_timeout_sec": SHORT_CALL_TIMEOUT_SEC}
@@ -187,7 +187,7 @@ def _payloads(system: LoopSystem, run_id: str, event_type: str) -> list[dict]:
 
 
 def _result_text(system: LoopSystem, run_id: str, call_id: str) -> str:
-    # 一次调用的工具结果正文：回执的输出引用指向这个 run 的外部来源工件（设计说明第 7.3 节）。
+    # 一次调用的工具结果正文：回执的输出引用指向这个 run 的外部来源工件。
     # 结果按 read_external_source 的同一套分页交回，正文在 lines 里
     output = _result_output(system, run_id, call_id)
     lines = output.get("lines") or []
@@ -196,7 +196,7 @@ def _result_text(system: LoopSystem, run_id: str, call_id: str) -> str:
 
 
 def _result_output(system: LoopSystem, run_id: str, call_id: str) -> dict:
-    # 回执的输出引用指向这个 run 的外部来源工件：读出来是行页与回执字段（第 7.3 节的交换字段）
+    # 回执的输出引用指向这个 run 的外部来源工件：读出来是行页与回执字段（交换字段）
     called = next(event for event in _events(system, run_id, EventType.TOOL_CALLED)
                   if (event.payload or {}).get("id") == call_id)
     output_ref = (called.payload or {}).get("output_ref")
@@ -261,7 +261,7 @@ def test_a_run_end_closes_the_server_ends_its_process_tree_and_records_the_event
     # 一台服务器一次会话：启动一条、关闭一条
     assert len(started) == 1 and len(closed) == 1
     assert started[0]["server"] == SERVER_NAME and started[0]["transport"] == "stdio"
-    # 启动事件带着进程标识与创建时间：启动时结束遗留进程要靠这两项（设计说明第 7.2 节）
+    # 启动事件带着进程标识与创建时间：启动时结束遗留进程要靠这两项
     assert isinstance(started[0]["pid"], int) and isinstance(started[0]["create_time"], float)
     assert closed[0]["reason"] == "closed" and closed[0]["server"] == SERVER_NAME
     # 先后由事件的位置决定：调用之前启动，run 收尾时关闭
@@ -278,7 +278,7 @@ def test_a_run_end_closes_the_server_ends_its_process_tree_and_records_the_event
     assert _gone(int(started[0]["pid"]))
     assert _gone(server_pid) and _gone(child_pid)
 
-    # 结果照常交回模型，动作记为已完成（第 7.3 节：工具失败以外都是已完成的动作）
+    # 结果照常交回模型，动作记为已完成（工具失败以外都是已完成的动作）
     assert called_event.payload["ok"] is True
     assert "生命周期" in _result_text(system, run_id, ECHO_CALL)
     assert _payloads(system, run_id, EventType.MCP_SERVER_FAILED) == []
@@ -286,7 +286,7 @@ def test_a_run_end_closes_the_server_ends_its_process_tree_and_records_the_event
 
 
 def test_a_server_that_cannot_start_is_recorded_as_failed_and_does_not_stop_the_item(tmp_path):
-    # 启动失败仍然把原因作为工具结果交回部门（第 7.2 节），生命周期记一条 mcp_server_failed。
+    # 启动失败仍然把原因作为工具结果交回部门生命周期记一条 mcp_server_failed。
     # 命令照常是解释器，脚本换成一开始就写下原因并退出的那一行
     failing = _stdio_document(
         tmp_path, tools=[ECHO_TOOL], command=sys.executable,

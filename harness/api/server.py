@@ -1,4 +1,4 @@
-# 以 uvicorn 运行接口层：接口层、应用层与控制核心在同一个进程、同一个事件循环中运行（总体架构第 3 节第 2 条）。
+# 以 uvicorn 运行接口层：接口层、应用层与控制核心在同一个进程、同一个事件循环中运行（总体架构 docs/design/architecture/overall-architecture.md「十项长期决定」中「异步执行」）。
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from ..app.application import Application
 from ..app.contracts import AccessMode
 from .app import close_event_streams, create_app
 
-# 本机访问方式只能监听回环地址（设计说明第 6.2 节）
+# 本机访问方式只能监听回环地址
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "::1", "localhost"})
 
 GRACEFUL_TIMEOUT_SEC = 3.0
@@ -37,7 +37,7 @@ class _ReadyServer(uvicorn.Server):
             self._on_ready = None
 
     async def shutdown(self, sockets: list[socket.socket] | None = None) -> None:
-        # 关闭开始时先让等待中的事件流连接干净结束（设计说明第 4.2 节）：uvicorn 随后等这些连接
+        # 关闭开始时先让等待中的事件流连接干净结束：uvicorn 随后等这些连接
         # 关闭，打开着的事件流连接因此不拖到优雅退出超时，也不阻止进程退出
         close_event_streams(self._api)
         await super().shutdown(sockets)
@@ -53,10 +53,10 @@ def listen_error(access: AccessMode, host: str) -> str | None:
 def serve(open_application: Callable[[], Application], *, access: AccessMode = "local",
           host: str, port: int, on_ready: Callable[[int], None] | None = None,
           data_dir: str | Path | None = None) -> None:
-    # 服务进程持有 uvicorn 的 Server：停止服务就是结束这个进程（Ctrl+C，设计说明第 4.2 节）；
+    # 服务进程持有 uvicorn 的 Server：停止服务就是结束这个进程（Ctrl+C）；
     # 进程退出以后由启动处释放数据目录的进程锁。
-    # on_ready 在服务开始接受请求以后调用一次（第 4.2 节：此时报告绑定的端口、输出页面地址并打开浏览器）。
-    # 局域网访问方式按数据目录里的令牌文件校验（第 6.3 节）
+    # on_ready 在服务开始接受请求以后调用一次（此时报告绑定的端口、输出页面地址并打开浏览器）。
+    # 局域网访问方式按数据目录里的令牌文件校验
     error = listen_error(access, host)
     if error is not None:
         raise ValueError(error)
@@ -66,6 +66,6 @@ def serve(open_application: Callable[[], Application], *, access: AccessMode = "
     server = _ReadyServer(uvicorn.Config(
         api,
         host=host, port=port, timeout_graceful_shutdown=GRACEFUL_TIMEOUT_SEC,
-        # 不重新配置日志：服务日志由启动处写进 <数据目录>/logs/ 并按大小轮换（设计说明第 4.2 节）
+        # 不重新配置日志：服务日志由启动处写进 <数据目录>/logs/ 并按大小轮换
         log_config=None), api, on_ready)
     server.run()

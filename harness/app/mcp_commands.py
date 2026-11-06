@@ -1,6 +1,6 @@
-# MCP 服务器设置的命令（工单 #236，网络与 MCP 设计说明第 4.3 节、第 10 节）：
+# MCP 服务器设置的命令（工单 #236，网络与 MCP docs/design/network-and-mcp.md「版本与固定」、docs/design/network-and-mcp.md「应用层接口」）：
 # mcp_servers.save 保存整份设置，带基准版本；版本过期时拒绝并提示重新读取。
-# tool_server.probe 读取一台服务器的工具清单（工单 #1174，第 4.2 节）：接受以后作为任务进行，
+# tool_server.probe 读取一台服务器的工具清单（工单 #1174，docs/design/network-and-mcp.md「读取工具清单（探测）」）：接受以后作为任务进行，
 # 结果以项目流事件 tool_server_probe_finished 出现；探测绑定请求所带的非秘密服务器配置，
 # 与保存用同一个归一化与配置摘要（projects.normalize_mcp_servers）。
 # 凭据值不进入命令的请求与事件：设置里只写凭据名称（取值时读取当前的凭据来源）。
@@ -94,7 +94,7 @@ def _probe_event(name: str, server: dict[str, Any], outcome: ProbeOutcome) -> di
 
 def _probe_snapshot(server: dict[str, Any], outcome: ProbeOutcome) -> dict[str, Any]:
     # 成功探测的工具清单快照（写回设置里这台服务器）：带它绑定的配置摘要，
-    # 与待保存配置摘要一致的成功结果才能成为可用快照（设计说明第 4.2 节）
+    # 与待保存配置摘要一致的成功结果才能成为可用快照（docs/design/network-and-mcp.md「读取工具清单（探测）」）
     return {"config_digest": str(server["config_digest"]), "server_info": outcome.server_info,
             "tools": list(outcome.tools)}
 
@@ -119,7 +119,7 @@ async def _probe_server(application: "Application", command: Command, request: T
         raise Rejection("not_allowed", str(invalid)) from invalid
     server = document["servers"][request.name]
     # 结果以后以事件出现的命令：先登记命令身份（与目录的连接测试同一做法，这里登记在项目流），
-    # 探测作为任务在服务的事件循环里进行（设计说明第 4.2 节「接受以后作为任务进行」），命令立即接受
+    # 探测作为任务在服务的事件循环里进行（docs/design/network-and-mcp.md「读取工具清单（探测）」「接受以后作为任务进行」），命令立即接受
     application.system.writes.transact(project_stream(request.project_id), lambda _t: None, command=command)
     application.schedule(_probe_task(application, request.project_id, request.name, server))
 
@@ -131,7 +131,7 @@ async def _probe_task(application: "Application", project_id: str, name: str, se
     _append_probe_result(application, project_id, _probe_event(name, server, outcome))
     if outcome.error == "":
         # 成功探测把工具清单快照写回设置里这台服务器；设置在探测期间被修改时写回中止，
-        # 探测结果只保留在事件里，不得覆盖新配置的可用状态（设计说明第 4.2 节）
+        # 探测结果只保留在事件里，不得覆盖新配置的可用状态（docs/design/network-and-mcp.md「读取工具清单（探测）」）
         system.projects.record_tool_snapshot(project_id, name, _probe_snapshot(server, outcome))
 
 

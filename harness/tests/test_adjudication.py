@@ -102,7 +102,7 @@ def test_commit_decision_rejects_results_whose_workspace_changed(tmp_path):
 
 def test_pending_product_input_counts_a_finished_or_empty_item_as_processed(tmp_path):
     # 工单 #561：放行等输入处理完的只读判断（工具许可按它决定等不等）在两种边界上不等——
-    # 事项已经结束当作处理完（部门指导设计说明第 3 节），以及没有任何发给产品的输入与指导时
+    # 事项已经结束当作处理完（部门指导 docs/design/department-guidance.md「处理结果与来源」），以及没有任何发给产品的输入与指导时
     # 没有要等的。守 R3（写到设计说明里的行为），只读投影与事件，不写事件
     system = LoopSystem.for_testing(tmp_path, FakeAdapter([product_spec()]))
     run_id = system.create_run("echo")
@@ -116,7 +116,7 @@ def test_pending_product_input_counts_a_finished_or_empty_item_as_processed(tmp_
 
 
 def test_engineering_has_new_work_until_a_delivery_matches_the_current_contract(tmp_path):
-    # 验收第 3 条（#1079，部门指导设计说明第 2.1 节第 2 点）：产品决定只重算合同、不产生
+    # 验收第 3 条（#1079，部门指导 docs/design/department-guidance.md「放行怎么等」第 2 点）：产品决定只重算合同、不产生
     # 新的 PRD 版本；工程最近一份交付依据的合同不是当前有效合同时它有新工作，按当前合同
     # 重新交付以后不再有新工作。守 R3：直接对投影断言，只读，不写事件
     adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
@@ -142,7 +142,7 @@ def test_engineering_has_new_work_until_a_delivery_matches_the_current_contract(
 
 
 def test_the_new_work_checks_hold_when_there_is_no_effective_contract(tmp_path):
-    # 边界（工单 #1079，部门指导设计说明第 2.1 节第 2 点）：比合同的这一支只在
+    # 边界（工单 #1079，部门指导 docs/design/department-guidance.md「放行怎么等」第 2 点）：比合同的这一支只在
     # 合同与交付都算出来的时候决定；有效合同还没有算出来时工程与质检都没有这一项新工作，
     # PRD 的内容变了工程照旧有新工作。守 R3：直接对投影断言，只读
     adapter = FakeAdapter({"product": [product_spec()], "engineering": [delivery_turn()]})
@@ -163,7 +163,7 @@ def test_the_new_work_checks_hold_when_there_is_no_effective_contract(tmp_path):
 
 
 def test_quality_write_tools_only_target_the_test_materials(tmp_path):
-    # 验收第 1、2 条（工单 #645、#1390，本地工具设计说明第 3 节「质检的文件工具」）：写入范围是检查材料的角色
+    # 验收第 1、2 条（工单 #645、#1390，本地工具 docs/design/local-tools.md「工具边界」「质检的文件工具」）：写入范围是检查材料的角色
     # 有写入与区间编辑的工具，写检查材料目录被允许；写检查工作区里的其他文件被许可拒绝并说明原因——那是放行
     # 时核对的树。原因里写明目录，不写部门名（换一个名字的核验角色得到同一句）。这条规则只针对核验角色：
     # 工程照旧写交付文件

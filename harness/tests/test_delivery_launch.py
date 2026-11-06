@@ -1,4 +1,4 @@
-# 交付说明的启动方式 launch（浏览器与 computer use 设计说明第 3.3 节，工单 #148）。
+# 交付说明的启动方式 launch（浏览器与 computer use docs/design/browser-and-computer-use.md「启动方式」，工单 #148）。
 #
 # launch 是可选字段，需要试用的每个入口一项；五类不符合使交付被拒绝并返回字段级错误，
 # 符合时接纳、delivery_accepted 带 launch；没有 launch 的旧交付照旧接纳。
@@ -29,7 +29,7 @@ def _events(tmp_path: Path, launch) -> list:
 
 
 def test_a_web_launch_is_accepted_and_the_delivery_carries_it(tmp_path: Path) -> None:
-    # 符合第 3.3 节的一项：接纳，delivery_accepted 带 launch（守 R2：交付说明的事实字段是合同）
+    # 符合 docs/design/browser-and-computer-use.md「启动方式」的一项：接纳，delivery_accepted 带 launch（守 R2：交付说明的事实字段是合同）
     events = _events(tmp_path, [WEB])
     accepted = next(event for event in events if event.type == EventType.DELIVERY_ACCEPTED)
     assert accepted.payload["launch"] == [{**WEB, "ready_timeout_sec": None}]

@@ -1,4 +1,4 @@
-# 应用层的合同：客户端与服务之间交换的数据类型（设计说明第 3.1、4.1、5.2、5.6、6.1 节）。
+# 应用层的合同：客户端与服务之间交换的数据类型。
 # 只含可以序列化的数据；OpenAPI 与客户端的接口类型都由这里的 pydantic 类型生成。
 
 from typing import Annotated, Any, Generic, Literal, TypeVar, Union, get_args
@@ -27,7 +27,7 @@ Text = Annotated[str, StringConstraints(min_length=1), AfterValidator(_not_blank
 CommandId = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")]
 
 
-# 拒绝原因的封闭清单（第 3.1 节）；每个命令在注册表中声明自己可能返回的原因
+# 拒绝原因的封闭清单每个命令在注册表中声明自己可能返回的原因
 RejectionReason = Literal[
     "stale_base", "not_found", "already_exists", "project_archived", "work_item_in_progress", "run_terminal",
     "busy", "provider_unavailable", "catalog_invalid", "in_use", "decision_closed", "option_invalid",
@@ -90,7 +90,7 @@ class Snapshot(Contract, Generic[Data]):
 
 
 class EventEnvelope(Contract):
-    # 事件对象的公共字段（第 5.2 节）：全局位置、本连接上一条消息的位置、所属的流与对象、提出者与引起它的命令、
+    # 事件对象的公共字段：全局位置、本连接上一条消息的位置、所属的流与对象、提出者与引起它的命令、
     # 这条事件主要事实的来源种类、应用层生成的一句中文说明；type 与 payload 由各事件种类确定
     position: int
     previous: int
@@ -104,7 +104,7 @@ class EventEnvelope(Contract):
     department: Department | None
     role: str | None
     actor: str
-    # 这条事件的主要事实从哪里来（第 5.2 节）：按事件种类取自定义里的来源表（event_sources.json）
+    # 这条事件的主要事实从哪里来（docs/design/app-and-interface.md「事件对象」）：按事件种类取自定义里的来源表（event_sources.json）
     source: SourceKind
     command_id: CommandId | None
     label: str
@@ -122,7 +122,7 @@ EventObject = Annotated[Union[tuple(_event_model(name, payload) for name, payloa
 
 
 class OutputDelta(Contract):
-    # 模型输出片段（第 5.6 节）：不写入事件日志，SSE 事件名为 delta，不带 id
+    # 模型输出片段：不写入事件日志，SSE 事件名为 delta，不带 id
     attempt_id: str
     logical_call_id: str
     project_id: str | None
@@ -139,11 +139,11 @@ class OutputDelta(Contract):
 # 能力清单
 
 
-# 访问方式（第 6.2 节）：本机只能监听回环地址；局域网监听任意地址
+# 访问方式：本机只能监听回环地址；局域网监听任意地址
 AccessMode = Literal["local", "lan"]
 
 
-# 接口版本（第 6.1 节）：删除或改变已有的查询、命令、事件种类及其字段时提高；增加查询、命令、
+# 接口版本：删除或改变已有的查询、命令、事件种类及其字段时提高；增加查询、命令、
 # 事件种类或字段时不变。客户端在构建时记录生成类型所用的接口版本，与它核对。
 # 版本 3：调用协议从连接移到模型访问定义（#382）：CatalogProvider 去掉 protocol，
 # CatalogModel 增加 protocol，保存连接的命令在每个访问定义上带 protocol
@@ -183,7 +183,7 @@ class CatalogSelectionProgress(Contract):
 
 class Deployment(Contract):
     # 日志身份在换数据目录时改变，本次启动的身份在服务重启时改变；服务版本是发布版本号，接口版本
-    # 由客户端构建时的接口版本核对；合同摘要是 OpenAPI 文档的摘要；访问方式由启动设置给出（第 6.2 节）
+    # 由客户端构建时的接口版本核对；合同摘要是 OpenAPI 文档的摘要；访问方式由启动设置给出
     log_id: str
     boot_id: str
     version: str
@@ -196,7 +196,7 @@ class Deployment(Contract):
 class QueryCapability(Contract):
     name: str
     changed_by: list[str]
-    # 是否接受第 4.1 节的 at（按位置读取，回放）；由注册表的 replayable 给出
+    # 是否接受 at（按位置读取，回放）；由注册表的 replayable 给出
     replayable: bool = False
 
 
@@ -206,19 +206,19 @@ class CommandCapability(Contract):
 
 
 class OverlayCapability(Contract):
-    # 一个覆盖层：名称与它依赖的查询（设计说明第 6.1 节）；依赖的查询都已登记时才列出
+    # 一个覆盖层：名称与它依赖的查询依赖的查询都已登记时才列出
     name: str
     queries: list[str]
 
 
 class StreamCapability(Contract):
-    # 事件流的片段能力（第 6.1 节）：是否提供模型输出片段、连接可以使用的范围参数
+    # 事件流的片段能力：是否提供模型输出片段、连接可以使用的范围参数
     deltas: bool
     scopes: list[str]
 
 
 class Capabilities(Contract):
-    # 能力清单（第 6.1 节），由注册表生成：查询与改变它结果的事件种类、命令与可能的拒绝原因、
+    # 能力清单由注册表生成：查询与改变它结果的事件种类、命令与可能的拒绝原因、
     # 当前部署会发出的决定种类、会写入的事件种类、可用的覆盖层与事件流的片段能力
     deployment: Deployment
     queries: list[QueryCapability]

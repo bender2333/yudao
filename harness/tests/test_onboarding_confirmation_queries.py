@@ -1,4 +1,4 @@
-# 建档确认往返的四个查询（工单 #136，docs/design/existing-project-onboarding.md 第 3.4、4.7、5 节）：
+# 建档确认往返的四个查询（工单 #136，docs/design/existing-project-onboarding.md docs/design/existing-project-onboarding.md「查询的变化」、「用户确认与修改的往返」、「确认以后：当前有效要求与第一次采纳」）：
 # projects.list 的「等待确认初始 PRD」标记、project.overview 的建档基线成果、project.loop 的事项状态、
 # work_item.materials 按轮列出的建档材料。系统整体运行：真实启动 FastAPI 应用（uvicorn），经 HTTP 读取查询与
 # 提交 decision.answer；控制核心在服务生命周期中建立，事件日志是真实的 SQLite 文件，模型回答由 FakeAdapter 给出。

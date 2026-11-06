@@ -1,4 +1,4 @@
-# 项目的命令（设计说明第 3.2 节「项目」）。
+# 项目的命令。
 
 from __future__ import annotations
 

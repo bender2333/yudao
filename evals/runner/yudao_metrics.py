@@ -1,7 +1,7 @@
 """Yudao 一侧的指标与过程检查点：全部从导出的事件日志计算，不使用模型。
 
-设计依据：`docs/design/evaluation-scenarios.md` 第 5、6 节；版本比较与
-对照实验约束见 `docs/design/rules-and-parameters.md` 第 4 节。
+设计依据：`docs/design/evaluation-scenarios.md` docs/design/evaluation-scenarios.md「过程检查点与指标」、「报告与版本比较」；版本比较与
+对照实验约束见 `docs/design/rules-and-parameters.md` docs/design/rules-and-parameters.md「对照」。
 """
 
 import json
@@ -15,7 +15,7 @@ from metrics import FAILURE_MARKERS
 
 MODEL_SERVICE_FAILURE = "model_service_failure"
 TIME_LIMIT = "time_limit"
-# 设计第 5.1 节第 1 项：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
+#：no_tool_call / 取消 / 达到限额 / 服务故障 / 进程退出
 # 都不能通过「放行」这一项；放行等于 `status == "done"` 且 `stop_reason == "released"`
 RELEASE_STOP_REASONS = frozenset({"released"})
 RELEASE_STATUSES = frozenset({"done"})
@@ -23,9 +23,9 @@ RELEASE_STATUSES = frozenset({"done"})
 # 用量字段：模型未上报时为未知，进度时按 `notes[].reason` 写明原因
 USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens",
                 "cache_write_tokens", "total_tokens", "cost", "model_latency_ms")
-# 冻结参数只通过 `run_created` 事件的 `parameters_version` 摘要给出（第 5.1 节第 2 项）。
+# 冻结参数只通过 `run_created` 事件的 `parameters_version` 摘要给出。
 # 摘要本身不携带参数现值，run.export 之外无法读取；读不到时这一项写「未核实」，
-# 不引用仓库内任何规则文件（评测工具与 harness 分层，第 7 节）。
+# 不引用仓库内任何规则文件（评测工具与 harness 分层）。
 
 def collect(export, outcome, replay=None, parameters_version=None):
     """从一次 `run.export` 与运行器结果算指标与过程检查点。"""
@@ -46,7 +46,7 @@ def collect(export, outcome, replay=None, parameters_version=None):
         "rework": int(projection.get("rework_count") or 0),
         "collaboration": _count(events, "ask_started"),
         "model_requests": _requests(export),
-        # 用量字段缺失为未知（设计第 5.2 节）：缺失不参与均值与噪声
+        # 用量字段缺失为未知：缺失不参与均值与噪声
         "input_tokens": _usage(export, "input_tokens"),
         "output_tokens": _usage(export, "output_tokens"),
         "cache_read_tokens": _usage(export, "cache_read_tokens"),
@@ -63,7 +63,7 @@ def collect(export, outcome, replay=None, parameters_version=None):
 
 
 def onboarding_metrics(export, elapsed_seconds=None):
-    """建档的模型请求数、用量与耗时（场景 2，设计第 5.2 节）：单独列出，不计入事项的指标。
+    """建档的模型请求数、用量与耗时（场景 2，docs/design/evaluation-scenarios.md「指标」）：单独列出，不计入事项的指标。
 
     数值从建档 run 的 `run.export` 算，与事项的指标同一套字段与未知值规则（缺的记未知，
     不记零）；耗时取事件日志里第一条到最后一件事的间隔，取不到时用运行器量到的墙钟时间。
@@ -100,7 +100,7 @@ def _event_span_seconds(export):
 
 
 def _end_state(projection, outcome, model_service_failure):
-    """结束状态与原因（设计第 5.1 节第 1 项）：
+    """结束状态与原因：
     - 放行等于 `status == "done"` 且 `stop_reason == "released"`；
     - 其余 `status == "done"` 但 stop_reason 不是 released 的（不会发生，留作防御）按 ended 计；
     - 超时记 `time_limit`；
@@ -124,7 +124,7 @@ def _usage_totals(export):
 
 
 def _usage(export, name):
-    """单值用量：None / 缺失 / 非数值为未知（设计第 5.2 节）；只有来源明确上报才算有效。"""
+    """单值用量：None / 缺失 / 非数值为未知只有来源明确上报才算有效。"""
     value = _usage_totals(export).get(name)
     if isinstance(value, bool):
         return None
@@ -165,9 +165,9 @@ def _count(events, event_type):
 
 
 # ---------------------------------------------------------------------------
-# 第一次与最终两份交付（设计第 5.2 节）：两份评分由运行器交给评分器
+# 第一次与最终两份交付：两份评分由运行器交给评分器
 
-# 质检带来的提高（第 6.3 节第 1 条）的四种取值
+# 质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）的四种取值
 IMPROVEMENT_IMPROVED = "improved"          # 最终交付比第一次多通过至少 1 条隐藏检查
 IMPROVEMENT_NONE = "none"                  # 没有多通过
 IMPROVEMENT_NOT_COUNTED = "not_counted"    # 第一次交付已经全部通过，这次运行不计入
@@ -175,7 +175,7 @@ IMPROVEMENT_NO_CONCLUSION = "no_conclusion"  # 导出里没有质检提交，没
 
 
 def delivery_metrics(export, final_scores, first_scores):
-    """第一次交付与最终交付的完成度、通过的检查，以及质检带来的提高（第 5.2 节）。
+    """第一次交付与最终交付的完成度、通过的检查，以及质检带来的提高。
 
     `final_scores` 与 `first_scores` 是评分器对两份封存交付的结果（没有交付时评分器
     把每条隐藏检查记成「没有做」，两份评分相同）。每次运行的这两个值由运行器取：
@@ -194,7 +194,7 @@ def delivery_metrics(export, final_scores, first_scores):
 
 
 def qa_concluded(export):
-    """质检是否在时间上限以内给出结论：导出里有 `qa_submitted` 事件（第 5.2 节）。
+    """质检是否在时间上限以内给出结论：导出里有 `qa_submitted` 事件。
 
     导出是这一运行在时间上限以内写下的全部事件，导出里有质检提交就是它在时限以内
     给出了结论；时限到达时运行被结束，之后不会再有事件。
@@ -217,7 +217,7 @@ def _delivery_summary(scores, delivered):
 
 
 def _qa_improvement(first, final, concluded):
-    """质检带来的提高（第 6.3 节第 1 条）：最终交付比第一次交付多通过的隐藏检查条数。"""
+    """质检带来的提高（docs/design/evaluation-scenarios.md「Yudao 对单个 agent」中「高于」看质检这一段）：最终交付比第一次交付多通过的隐藏检查条数。"""
     if not concluded:
         return {"status": IMPROVEMENT_NO_CONCLUSION, "passed_gain": None,
                 "detail": "导出中没有质检提交（qa_submitted）：质检没有给出结论"}
@@ -235,12 +235,12 @@ def _qa_improvement(first, final, concluded):
 
 
 # ---------------------------------------------------------------------------
-# 过程检查点（设计第 5.1 节）：五项
+# 过程检查点：五项
 
 
 def checkpoints_of(events, status, replay, outcome, parameters_version=None,
                    model_service_failure=False):
-    """第 5.1 节的五项过程检查点：三项同检 + recheck_ratio + 覆盖比例。"""
+    """的五项过程检查点：三项同检 + recheck_ratio + 覆盖比例。"""
     released = status == "released"
     return {
         "ended_within_limit": _check_release_and_limit(events, outcome, status, parameters_version,
@@ -254,7 +254,7 @@ def checkpoints_of(events, status, replay, outcome, parameters_version=None,
 
 def _check_release_and_limit(events, outcome, status, parameters_version,
                              model_service_failure=False):
-    """设计第 5.1 节第 1 项：放行等于状态 done 且停止原因 released，另核质检放行与冻结限额。"""
+    """：放行等于状态 done 且停止原因 released，另核质检放行与冻结限额。"""
     end_status = _status_from_events(events)
     stop_reason = _stop_reason_from_events(events)
     reasons = []
@@ -325,7 +325,7 @@ def _within_frozen_limits(events, parameters_version):
 # --- 第 2 项：质检放行绑定最后交付 + recheck_ratio 核对 -------------------
 
 def _check_release_binding(events, parameters_version, released):
-    """设计第 5.1 节第 2 项：
+    """：
     - 质检最后引用的 `code_snapshot_hash` 等于最后一次封存的 `code_tree_digest`；
     - 引用的 `delivery_spec_hash` 等于最后一次封存的 `content_hash`；
     - 引用的每条 `checks[i].activation_id` 在质检本次激活的部门激活列表里；
@@ -440,7 +440,7 @@ def _check_false_release(released, outcome):
 
 
 def _check_release_coverage(events, released):
-    """设计第 5.1 节第 5 项：放行记录附检验覆盖比例、模型阅读条件数、开环条件数。
+    """：放行记录附检验覆盖比例、模型阅读条件数、开环条件数。
     没有放行时本项不适用，按通过计。无逐条覆盖数据的历史记录写未知。
     """
     if not released:

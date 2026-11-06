@@ -1,8 +1,8 @@
-# 关闭取回的启动参数（工单 #1172；网络与 MCP 设计说明第 5.1、12.4 节、评测场景设计说明第 3 节）：
+# 关闭取回的启动参数（工单 #1172；网络与 MCP docs/design/network-and-mcp.md「工具的提供」、评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）：
 # 以 `--no-fetch` 运行的服务里三个部门的请求都没有 `fetch_url` 与 `read_external_source`；
 # 不带参数时三个部门都有。工具本身留在定义里，取舍发生在「给部门哪几个工具」这一步。
 #
-# 守 R1（测试分层设计说明第 13 节）：定义给部门的工具清单与主机的装配是同一条链路，
+# 守 R1（测试分层 docs/design/test-pyramid.md「测试按三环留」）：定义给部门的工具清单与主机的装配是同一条链路，
 # 命令行的启动参数经它生效；这些用例在模块层跑一轮三个部门，不需要子进程或真实服务。
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ def run_three_departments(data_dir) -> FakeAdapter:
 
 
 def test_departments_have_both_fetch_tools_by_default():
-    # 不带参数启动：三个部门都有取回工具（网络与 MCP 设计说明第 5.1 节）
+    # 不带参数启动：三个部门都有取回工具（网络与 MCP docs/design/network-and-mcp.md「工具的提供」）
     for department in DEPARTMENTS:
         names = DEFINITIONS.tools_for(department)
         assert set(FETCH_TOOLS) <= set(names), f"{department} 默认应有取回工具：{names}"

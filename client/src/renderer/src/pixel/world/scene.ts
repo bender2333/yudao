@@ -1,5 +1,5 @@
 // 画面（scene）：走路的脚本、缓动与共用时钟，以及每个角色与每根管道的 XState 状态机（原型 engine.js
-// 第 4 至 6 节与 ecs.js 第 3.4 节，工单 #82）。
+//与 ecs.js 第 3.4 节，工单 #82）。
 //
 // 场景不依赖 PixiJS：它保存 actor（小人、包裹与陈设的显示状态）、时间、随机数与状态机，
 // 用脚本按帧推进位置与姿势。渲染层只读 actor 的当前状态；测试用确定的时钟与随机数驱动同一个场景。
@@ -17,7 +17,7 @@ import type {
 export const CHAR_ACTOR_PREFIX = "ch-";
 
 /**
- * 表演层开着吗（设计说明第 8.1 节的 H2）：关掉以后动作与特效都不演，只画状态给出的样子。
+ * 表演层开着吗（docs/design/visualization.md「视觉通道表」的 H2）：关掉以后动作与特效都不演，只画状态给出的样子。
  * 待机活动由 scene.autonomy 控制（行为开关），两者一起关掉就是「只画状态」。
  */
 function performing(scene: SceneLike): boolean {

@@ -24,7 +24,7 @@ def _provider(provider_id="p1"):
 
 
 def _model(model_id="m1"):
-    # 模型访问定义：输入方式只有文本，给质检部门用时缺图像输入（设计说明第 5.6 节）
+    # 模型访问定义：输入方式只有文本，给质检部门用时缺图像输入
     return {"id": model_id, "model": "model-x", "protocol": "responses",
             "context_window": 32000, "max_output_tokens": 2048}
 

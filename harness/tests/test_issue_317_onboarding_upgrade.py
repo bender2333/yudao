@@ -1,5 +1,5 @@
-# 工单 #317：建档在升级与取消时的行为（docs/design/existing-project-onboarding.md 第 6 节最后一行，
-# 第 10 节第 11 项的后四段）。四个场景不用真实进程终止：run 事件版本较早的数据目录由改写事件得到
+# 工单 #317：建档在升级与取消时的行为（docs/design/existing-project-onboarding.md docs/design/existing-project-onboarding.md「失败与中断」最后一行，
+# docs/design/existing-project-onboarding.md「验收」中「失败与中断」的后四段）。四个场景不用真实进程终止：run 事件版本较早的数据目录由改写事件得到
 # （旧事件没有 run_event_version 字段），强制升级由真实 HTTP 命令发起，取消由 work_item.cancel 提交。
 # 系统整体运行：真实启动 FastAPI 应用（uvicorn），模型回答由 FakeAdapter 给出，不使用 mock。
 

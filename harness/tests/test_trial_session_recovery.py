@@ -157,7 +157,7 @@ def test_starting_and_stopping_a_session_writes_the_two_events(tmp_path):
         assert payload["session_id"] == session["session_id"]
         assert payload["department"] == "engineering" and payload["kind"] == "web"
         assert payload["launch_name"] == "web"
-        # 选用命令的系统随事件保存（设计说明第 12 节）
+        # 选用命令的系统随事件保存（docs/design/browser-and-computer-use.md「事件、决定请求与查询」）
         assert payload["system"] == current_system()
         assert payload["port"] == session["port"] and payload["ready_url"] == session["ready_url"]
         assert payload["tree_digest"] == session["tree_digest"]

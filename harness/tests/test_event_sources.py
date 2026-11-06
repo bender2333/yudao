@@ -7,7 +7,7 @@ import pytest
 from harness.app.payloads import PAYLOADS
 from harness.definitions import DEFINITIONS
 
-# 来源种类的封闭清单（设计说明第 5.2 节，与客户端画面合同的 SOURCES 一致）
+# 来源种类的封闭清单（与客户端画面合同的 SOURCES 一致）
 SOURCES = {"rule", "decision_model", "role_statement", "host_measurement", "user"}
 
 
@@ -18,7 +18,7 @@ def test_every_event_type_has_a_source_row():
 
 
 def test_field_overrides_name_real_fields_and_come_from_the_host():
-    # 守 R2：按字段的覆盖指向这个种类真实的载荷字段，取值都是主机测量（设计说明第 5.2 节）
+    # 守 R2：按字段的覆盖指向这个种类真实的载荷字段，取值都是主机测量（docs/design/app-and-interface.md「事件对象」）
     for name, entry in DEFINITIONS.event_sources.items():
         fields = getattr(PAYLOADS[name], "model_fields", {})
         for field, kind in entry.fields.items():

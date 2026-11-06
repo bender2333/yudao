@@ -1,9 +1,9 @@
-# 全部源文件的未定义名称检查（测试分层设计说明第 2、3 节）。
+# 全部源文件的未定义名称检查（测试分层 docs/design/test-pyramid.md「三层的定义」、「登记表与共用代码」）。
 #
 # 搬移共用代码时容易删掉同一文件里仍在使用的 import 行，这类缺漏只在测试跑到那一行时才报
 # NameError，集成层的用例要完整跑一次才暴露。这项检查用 pyflakes 的 F821 一次找出来。
 # 它要读完 harness/ 下全部源文件再逐个检查（267 个文件，约 4 秒），机器有其他任务在跑时
-# 超过单元层 5 秒的上限，按第 2 节登记为 module。
+# 超过单元层 5 秒的上限，按 docs/design/test-pyramid.md「三层的定义」登记为 module。
 
 import ast
 from pathlib import Path

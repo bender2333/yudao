@@ -49,7 +49,7 @@ FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tiny_web_app"
 # 试用会话只在本机与控制主机两类位置上：系统不是 windows 或 linux 的机器没有启动命令的约定
 pytestmark = pytest.mark.skipif(current_system() is None,
                                 reason="trial launch commands are defined for windows and linux only")
-# 小网页的启动命令：安装依赖、构建，再启动从 PORT 读端口的服务（设计说明第 3.3 节）
+# 小网页的启动命令：安装依赖、构建，再启动从 PORT 读端口的服务（docs/design/browser-and-computer-use.md「启动方式」）
 _WEB_COMMAND = "npm install --no-audit --no-fund --offline && npm run build && npm start"
 
 
@@ -87,7 +87,7 @@ def _web_workspace(tmp_path: Path, name: str = "run-1") -> Path:
 class _StubBrowsers:
     """不起真实的 Playwright MCP：这个文件查试用会话本身（#1182），浏览器会话由 #1184 的用例查。
 
-    网页种类的会话建立时会启动浏览器并打开就绪地址（设计说明第 3.4 节），这里只记下这一次启动，
+    网页种类的会话建立时会启动浏览器并打开就绪地址（docs/design/browser-and-computer-use.md「试用工具」），这里只记下这一次启动，
     交回一个运行中的会话，让回执的形状与真实的一致。
     """
 
@@ -133,7 +133,7 @@ def test_engineering_starts_the_tiny_web_app_and_waits_until_ready(tmp_path):
     assert receipt.ok is True and receipt.status == "completed", receipt.error
     output = receipt.output
     session = output["session"]
-    # 回执带会话身份、种类、端口、就绪地址、试用副本的树摘要与启动输出（设计说明第 3.4 节）
+    # 回执带会话身份、种类、端口、就绪地址、试用副本的树摘要与启动输出（docs/design/browser-and-computer-use.md「试用工具」）
     assert session["session_id"].startswith("trial_")
     assert session["kind"] == "web" and session["launch_name"] == "web"
     assert session["system"] == system
@@ -367,7 +367,7 @@ def test_a_failed_receipt_cuts_the_launch_output_at_the_tool_output_limit(tmp_pa
 
 
 def test_the_workspaces_hand_the_delivery_launch_and_snapshot_to_quality(tmp_path):
-    # 真实激活里 `Workspaces` 交给执行环境的那两处接线（工单 #1182 与设计说明第 3.4 节）：当前交付说明的
+    # 真实激活里 `Workspaces` 交给执行环境的那两处接线（工单 #1182 与 docs/design/browser-and-computer-use.md「试用工具」）：当前交付说明的
     # launch 与这次检查的交付快照。关掉 `bind_launch_methods` 时质检的 trial_open 拿不到名称（回执写着
     # the DeliverySpec has no launch method），关掉 `_attach_trial_source` 时副本来源变成 workspace_seal、
     # 副本从检查工作区建立；现有的用例都自己 bind，区分不了这两处接线

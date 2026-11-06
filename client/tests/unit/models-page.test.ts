@@ -212,7 +212,7 @@ test("请求失败以后同样复位：失败换成空的结果时间与原因",
   const failed = providerWithResult("unknown", "", "模型列表请求 http://a/v1/models 返回 HTTP 401");
   assert.equal(collectingProvider({ providers: [failed] },
     { provider_id: "go", fetched_at: "2026-10-30T10:00:00Z", status: "ok" }), null);
-  // 原因在连接卡片旁显示（设计说明第 9.1 节「获取中、成功、失败与失败原因都写在这张卡片里」）
+  // 原因在连接卡片旁显示
   assert.deepEqual(fetchSummaryOf(failed),
     { text: "模型列表请求 http://a/v1/models 返回 HTTP 401", kind: "error" });
 });

@@ -1,4 +1,4 @@
-# 访问方式（设计说明第 6.2、6.3 节）与页面文件（网页界面的提供与发布设计说明第 5.1 节）：
+# 访问方式（docs/design/web-interface-and-release.md「版本号」、「发布脚本」）与页面文件（网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）：
 # 真实启动接口，经 HTTP 检查 Host、Origin、访问令牌、命令的媒体类型、同一来源与页面文件。
 
 import re

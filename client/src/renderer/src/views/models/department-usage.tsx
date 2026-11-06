@@ -1,8 +1,8 @@
-// 部门使用（工单 #1297；模型管理设计说明第 9.1 节「部门使用」行、第 5.1、5.6 节）。
+// 部门使用（工单 #1297；模型管理 docs/design/model-management.md「模型管理页」「部门使用」行、docs/design/model-management.md「部门默认与角色默认」、「部门的建议能力」）。
 // 产品、工程、质检各一个下拉框，选项是已启用的模型（按连接分组）与「未设置」；
 // 选中以后立即保存（catalog.department_defaults.save），说明为「从各部门下一次模型请求起生效……」。
 // 每个部门的「更多」里是请求档位；选项来自所选模型的声明，没有声明时禁用并写明原因。
-// 建议能力提醒沿用（设计说明第 5.6 节）：保存时带回的提醒一直显示在该项旁。
+// 建议能力提醒沿用（docs/design/model-management.md「部门的建议能力」）：保存时带回的提醒一直显示在该项旁。
 
 import type { CatalogBinding, CatalogModel } from "../../api/generated/types.gen";
 import { tierOptions, type AdmissionGroup } from "./model-logic";

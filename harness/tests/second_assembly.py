@@ -1,6 +1,6 @@
 # 第二种装配实现（工单 #979；只在测试里用，产品代码不导入它）。
 #
-# 装配契约第一版（`harness/assembly_contract.py`；骨架与应用设计说明第 5.2 节；总图第四节「装配」缝）的
+# 装配契约第一版（`harness/assembly_contract.py`；骨架与应用 docs/design/skeleton-and-application.md「装配契约」；总图第四节「装配」缝）的
 # 第二种实现。与真实现（`assembly.py` 的 `ContextAssembly`）的差别是形状与取法，不是合同：
 #
 # - 固定部分只有两栏：定义里的部门提示，加这一轮任务的那一句（带路由原样交来的工作引用）。
@@ -129,7 +129,7 @@ _ROUND_TASK_SOURCE = "round_task"
 
 
 def _task_line(projection: RunProjection, frame: assembly_contract.StepFrame) -> str:
-    # 这一轮的任务一句：事项的任务，加上路由原样交来的工作引用（第 5.4 节第 4 条，骨架不解释它）
+    # 这一轮的任务一句：事项的任务，加上路由原样交来的工作引用（骨架不解释它）
     line = f"这一轮的任务：{projection.task}"
     if frame.work_ref is not None:
         line += f"\n这一轮的工作引用：{json_dumps(frame.work_ref)}"

@@ -228,7 +228,7 @@ class StepRecorder:
                        effective_context_window=step.limits.context_window,
                        input_token_estimate=step.input_token_estimate,
                        output_reserve_tokens=step.output_reserve_tokens,
-                       # 判断要不要压缩用的两项数值（设计说明第 8.2 节）：本次本地估算与上一次的上游回报用量
+                       # 判断要不要压缩用的两项数值（docs/design/model-management.md「用量」）：本次本地估算与上一次的上游回报用量
                        previous_usage_tokens=step.previous_usage_tokens,
                        parts_ref=asdict(parts_ref),
                        snapshot_hash=snapshot_hash)
@@ -324,7 +324,7 @@ class StepRecorder:
 
     def response(self, request: ModelRequest, result: ModelResponse) -> None:
         # 调用尝试的结果：先写推理内容，再写每个输出条目，最后按这一步报告的用量记账。
-        # 推理内容在回答里先于它伴随的消息与工具调用出现，回放时也保持这个顺序（设计说明第 7.6 节）
+        # 推理内容在回答里先于它伴随的消息与工具调用出现，回放时也保持这个顺序
         provider = result.provider or self.scope.provider
         model = result.model
         drafts: list[Draft] = []
@@ -568,7 +568,7 @@ class StepRecorder:
     def tool_started(self, transaction: Transaction, request: ModelRequest, call: dict[str, Any],
                      before_snapshot: dict[str, Any] | None = None) -> None:
         # 工具许可允许以后、执行之前记录。
-        # 动作前的公开树快照与这条事件一起写入（工单 #17，恢复契约第 4 节）：中断以后按这份快照与
+        # 动作前的公开树快照与这条事件一起写入（工单 #17，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）：中断以后按这份快照与
         # 动作参数核对实际效果，快照放在 run 自己的对象区域，不建立提交、不改动分支索引
         scope = self.scope
         payload = {**self._redacted_call(call), "activation_id": request.activation_id,
@@ -600,7 +600,7 @@ class StepRecorder:
 
     def _draft(self, type: str, **fields: Any) -> Draft:
         # 这次激活的一条记录：部门、上级事件与会话取自激活，阶段在追加的事务中填入。
-        # 角色任务中的记录由部门提出（设计第 5.2 节）
+        # 角色任务中的记录由部门提出
         scope = self.scope
         return lambda transaction: NewEvent(type, state_before=transaction.projection.status,
                                            state_after=transaction.projection.status,
@@ -609,7 +609,7 @@ class StepRecorder:
                                            **fields)
 
     def _delivery_invalidated(self, reason: str) -> Draft:
-        # 成果失效事件（骨架事件，S1b，设计说明第 4 节）：工作区被这个部门改了以后当前交付失效。
+        # 成果失效事件（骨架事件，S1b，docs/design/skeleton-and-application.md「最小投影」）：工作区被这个部门改了以后当前交付失效。
         # 没有当前交付时没有要失效的成果，那一刻不记事件。
         # 记的是事务里的那一版交付：它与这条工具结果在同一个事务里，先后由事件的顺序决定
         scope = self.scope
@@ -797,7 +797,7 @@ class StepRecorder:
                 payload["output_ref"] = asdict(ref)
                 images = output.get("images") if isinstance(output, dict) else None
                 if isinstance(images, list) and images:
-                    # 截图作为证据的工件引用随结果留在事件里（浏览器与 computer use 设计说明第 7.1 节、
+                    # 截图作为证据的工件引用随结果留在事件里（浏览器与 computer use docs/design/browser-and-computer-use.md「保存与绑定」、
                     # 试用记录的步骤，工单 #1180）：原文在工件库里，事件里只有引用
                     payload["images"] = [dict(item) for item in images if isinstance(item, dict)]
             event_type = EventType.TOOL_CALLED if observation.kind == "tool" else EventType.TOOL_SKIPPED
@@ -834,7 +834,7 @@ class StepRecorder:
                 and not writes_check_materials(scope.department, definitions=self._definitions)
                 and payload.get("ok") and payload.get("name") in _WRITE_TOOLS):
             # 写入范围不是检查材料的角色写了文件：当前交付失效，紧跟着这条工具结果记一条成果失效事件（S1b，
-            # 设计说明第 4 节）。检查材料角色的写入只落在检查工作区与检查材料里，运行工作区与交付不变
+            #）。检查材料角色的写入只落在检查工作区与检查材料里，运行工作区与交付不变
             drafts.append(self._delivery_invalidated("workspace_changed"))
         if observation.usage is not None and (observation.usage.reported or observation.usage.total_tokens
                                               or observation.usage.cost):
@@ -845,7 +845,7 @@ class StepRecorder:
 
     def _stream_progress(self, request: ModelRequest, capture: _AttemptCapture, observation: _Observation,
                          observed_at: str) -> list[Draft]:
-        # 流式进度：同一次调用尝试中只在阶段变化时记录一条（设计说明第 10 节第 5 项）。
+        # 流式进度：同一次调用尝试中只在阶段变化时记录一条。
         # 阶段之内的文字增量由输出片段通道转发，不写入事件日志
         scope = self.scope
         payload = observation.payload

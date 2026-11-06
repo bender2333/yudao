@@ -1,6 +1,6 @@
 """OpenCode 一侧的指标收集：结束状态与原因、请求数、用量、耗时。
 
-数据来源只有 `opencode run --format json` 的输出与运行器计时（第 5.2 节）。
+数据来源只有 `opencode run --format json` 的输出与运行器计时。
 """
 
 MODEL_SERVICE_FAILURE = "model_service_failure"
@@ -52,7 +52,7 @@ def collect(outcome, events, run_dir=None):
 
 
 def _total_cost(requests):
-    """各次请求的费用合计；每一次都为空或为 0 时记未知，不记 0.0（第 5.2 节）。"""
+    """各次请求的费用合计；每一次都为空或为 0 时记未知，不记 0.0（docs/design/evaluation-scenarios.md「指标」）。"""
     values = []
     for item in requests:
         value = item.get("cost")

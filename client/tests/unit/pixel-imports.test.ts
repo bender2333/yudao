@@ -1,4 +1,4 @@
-// H3 的导入方向测试（画面与播放设计说明第 8 节 H3、第 3 节的依赖方向；工单 #959）。
+// H3 的导入方向测试（画面与播放 docs/design/visualization.md「画面诚实性的不变式」 H3、docs/design/visualization.md「分层与边界」的依赖方向；工单 #959）。
 //
 // 画面层（client/src/renderer/src/pixel/）是独立模块：它只认画面合同（pixel/contract.ts）与自己的声明表，
 // 不导入页面组件（views/）、命令接口（contract/）、接口生成的类型（api/）、翻译层（translate/）与 React。

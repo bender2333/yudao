@@ -105,7 +105,7 @@ export function loopLayerLabel(layer: string): string {
   return LOOP_LAYER_LABELS[layer] ?? layer;
 }
 
-/** 一个已用量与上限的文字：不设上限时写「不设上限」，数值照写（设计第 5 节末）。 */
+/** 一个已用量与上限的文字：不设上限时写「不设上限」，数值照写（docs/design/loops-and-convergence.md「收敛的检测」末）。 */
 export function amountText(amount: LoopAmount | undefined, unit: string): string {
   if (!amount) return "—";
   return `${amount.used}${unit} / ${amount.unlimited ? "不设上限" : `${amount.limit}${unit}`}`;

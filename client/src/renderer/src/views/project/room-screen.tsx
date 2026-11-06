@@ -141,7 +141,7 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
           return;
         }
         viewRef.current = view;
-        // 画面建立时立即跳到当前查询结果：打开画面不补播（设计说明第 5.2 节「跳到最新」）
+        // 画面建立时立即跳到当前查询结果：打开画面不补播
         if (dataRef.current !== null) view.jump(roomStateOf(dataRef.current, positionRef.current));
         // 端到端测试经这个入口读取画面的当前状态（只读的检查入口）
         (window as unknown as { __roomViewForTest?: RoomTestHooks }).__roomViewForTest = roomTestHooks(view);
@@ -235,7 +235,7 @@ export function RoomScreen(props: { app: ClientApp; department: string; data: De
       if (dataRef.current !== null) viewRef.current?.jump(roomStateOf(dataRef.current, positionRef.current));
     };
     const off = props.app.subscribeResync(jump);
-    // 标签页从后台切回：清空时间线，直接显示最新的状态（设计说明第 5.2 节）
+    // 标签页从后台切回：清空时间线，直接显示最新的状态
     const onVisible = (): void => {
       if (document.visibilityState === "visible") jump();
     };

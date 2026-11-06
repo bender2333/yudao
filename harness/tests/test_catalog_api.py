@@ -25,7 +25,7 @@ def _provider(provider_id="p1", *, base_url=UPSTREAM_BASE, models_url="", ref=RE
 
 
 def _model(model_id="m1", *, model="model-x", protocol="responses"):
-    # 连接保存用的模型访问定义：所属连接由命令参数给出，调用协议必填（模型管理设计说明第 4.3 节）；
+    # 连接保存用的模型访问定义：所属连接由命令参数给出，调用协议必填（模型管理 docs/design/model-management.md「模型访问定义与准入」）；
     return {"id": model_id, "model": model, "protocol": protocol,
             "context_window": 32000, "max_output_tokens": 2048}
 
@@ -204,7 +204,7 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
                            base_version=after_defaults["revision"], bindings={})
         assert cleared.status_code == 200, cleared.text
         current = _catalog(client)["revision"]
-        # 部门默认只能引用已准入的定义（设计说明第 4.6 节）：导入前先保存新连接并记录它的准入
+        # 部门默认只能引用已准入的定义：导入前先保存新连接并记录它的准入
         added = _command(client, "catalog.connection.save", base_version=current,
                          provider=_provider("p3"), models=[_model("m3")])
         assert added.status_code == 200, added.text
@@ -229,7 +229,7 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
 
 
 def test_department_defaults_carry_the_requested_tier(tmp_path):
-    # 部门默认保存可为空的请求档位（设计说明第 5.1 节，工单 #87）：请求档位只核对它属于档位全集，
+    # 部门默认保存可为空的请求档位（工单 #87）：请求档位只核对它属于档位全集，
     # 保存后查询把它交回；超出所选模型支持档位的档位照常保存，不属于档位全集时整份拒绝并指出字段位置
     document = _document()
     document["models"][0]["reasoning_levels"] = ["low", "medium"]

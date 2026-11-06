@@ -146,7 +146,7 @@ def test_changing_capacity_keeps_admission(tmp_path):
     assert facade.model_admissions()[0]["stale"] is False
 
 def test_replacing_the_key_under_the_same_credential_ref_keeps_admission(tmp_path):
-    # 更换同一凭据引用下的 Key 不改动引用字段，准入保持（设计第 4.4 节）
+    # 更换同一凭据引用下的 Key 不改动引用字段，准入保持
     from harness.providers import CredentialMaterial
 
     facade = ProviderFacade(credentials=CredentialChain(use_env=False))

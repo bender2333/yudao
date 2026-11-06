@@ -1,7 +1,7 @@
 // 像素画登记表：登记表由原型 v13（y13.js、pixel/sprites.js、pixel/engine.js）一次性导出（工单 #176、#956），
 // 生成脚本已随画面搬出删掉（工单 #1414），现在当普通源码维护：改画法直接改 generated/registry.json。
 // 本文件只做类型化再导出与常量，不重复登记数据。
-// v13 起 engine.js 不再有事件对照表（EVENT_ACTIONS、resolveAction）：事件翻成动作写在翻译层（画面与播放设计说明第 6 节）。
+// v13 起 engine.js 不再有事件对照表（EVENT_ACTIONS、resolveAction）：事件翻成动作写在翻译层（画面与播放 docs/design/visualization.md「翻译层」）。
 // 画面 3、4（#953、#954）以后没人再用的 EVENT_ACTIONS、STATUS_ACTIONS 不再从这里再导出：
 // 登记表里仍有 STATUS_ACTIONS，图鉴按登记表读 registry.registries.STATUS_ACTIONS。
 
@@ -53,7 +53,7 @@ export interface Anim {
   total: number;
 }
 
-/** 动作说明（设计说明书第 3.5、3.9 节）：驱动它的事实、在哪个画面里、小人做什么。
+/** 动作说明（设计说明书）：驱动它的事实、在哪个画面里、小人做什么。
  * v13 起不再写「来源事件」一列：事件由哪种事件给出写在翻译层（js/translate/sources.js）。 */
 export interface ActionInfo {
   label: string;

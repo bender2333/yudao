@@ -1,5 +1,5 @@
 // 首页楼的画面对象：画布挂在宿主元素上，提供 setState、jump、play、resize、destroy、inspect
-// （原型 v13 js/pixel/building.js 的 createBuildingScene 与画面与播放设计说明第 3 至 5 节，工单 #178、#955）。
+// （原型 v13 js/pixel/building.js 的 createBuildingScene 与画面与播放 docs/design/visualization.md「分层与边界」、「画面合同」、「画面层」，工单 #178、#955）。
 //
 // 画面的输入只有画面合同（pixel/contract.ts）：状态带位置、动作带位置与 kind（kind 取楼的声明表
 // pixel/building/building-decl.ts）。打开画面、重新同步、标签页从后台切回都用 jump：清空时间线，
@@ -24,7 +24,7 @@ import type { SceneLike } from "../world/types.ts";
 export type { BuildingFloor, BuildingModel } from "../world/building.ts";
 
 /**
- * 楼承载事实的视觉通道（画面与播放设计说明第 8.1 节的楼那一行）：每层的状态灯、亮灯的房间、小旗，
+ * 楼承载事实的视觉通道（画面与播放 docs/design/visualization.md「视觉通道表」的楼那一行）：每层的状态灯、亮灯的房间、小旗，
  * 以及同一幅画上的名牌、入口阀门与决定计数。只读状态给出的东西：闪光、彩带与小人的走位属于表演层。
  */
 export interface BuildingChannels {
@@ -69,7 +69,7 @@ export interface BuildingView {
   resize(): void;
   destroy(): void;
   /**
-   * 关掉或打开表演层（待机活动与动作）的测试入口（设计说明第 8.1 节的 H2）。
+   * 关掉或打开表演层（待机活动与动作）的测试入口（docs/design/visualization.md「视觉通道表」的 H2）。
    * 关掉以后动作与特效不演，画面只画状态给出的样子；承载事实的通道不受影响。
    */
   performance(on: boolean): void;
@@ -78,7 +78,7 @@ export interface BuildingView {
   /** 世界的当前状态、驱动、场景与绘制（测试与回放读取），以及承载事实的视觉通道。 */
   inspect(): {
     driver: BuildingDriver; scene: SceneLike; renderer: BuildingRenderer;
-    /** 承载事实的视觉通道（设计说明第 8.1 节的楼那一行）。 */
+    /** 承载事实的视觉通道（docs/design/visualization.md「视觉通道表」的楼那一行）。 */
     channels: () => BuildingChannels;
   };
 }

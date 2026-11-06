@@ -1,4 +1,4 @@
-# 页面文件（网页界面的提供与发布设计说明第 5.1 节）：/api/ 与 /openapi.json 之外的 GET 路径按文件路径
+# 页面文件（网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）：/api/ 与 /openapi.json 之外的 GET 路径按文件路径
 # 返回构建好的页面文件。页面文件只读、不含数据，不经过注册表，不列入 OpenAPI 与能力清单。
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import Scope
 
-# 发布资源目录（网页界面的提供与发布设计说明第 5.1、6.1 节）：被 git 忽略，
+# 发布资源目录（网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」、「一次发布的内容」）：被 git 忽略，
 # 发布脚本把页面文件与执行代理的 wheel 放进去，随 wheel 一起发布
 RELEASE_ASSETS = Path(__file__).resolve().parent.parent / "release_assets"
 # 页面文件对应的接口版本写在发布资源目录的这个文件里（工单 #704）

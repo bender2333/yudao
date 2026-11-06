@@ -1,4 +1,4 @@
-# 接入已有项目的命令与建档事项的开始（3.8，工单 #135，设计说明第 2、3.1、3.3、3.4、4.6 节）。
+# 接入已有项目的命令与建档事项的开始（3.8，工单 #135，docs/design/existing-project-onboarding.md「接入的位置：建档事项」、「命令」、「领域事件」、「查询的变化」、「已有测试与 git 历史作为基线的证据」）。
 # 测试从运行的系统整体进行：真实启动 FastAPI 应用（uvicorn），经 HTTP 提交命令、读取查询；
 # 控制核心在服务生命周期中建立，事件日志是真实的 SQLite 文件，模型回答由 FakeAdapter 给出。
 
@@ -149,7 +149,7 @@ def test_project_onboard_reaches_baseline_verified_over_http(data_dir, tmp_path)
         assert settings["source_directories"]["src"]["path"] == str(source)
 
 def test_git_provenance_recorded_when_the_source_is_a_repository(data_dir, tmp_path):
-    # 验收（第 10 节第 8 项）：源目录是 git 仓库时快照带提交、分支与是否有未提交的修改；不是 git 仓库时为空
+    # 验收：源目录是 git 仓库时快照带提交、分支与是否有未提交的修改；不是 git 仓库时为空
     source = _source(tmp_path / "repo")
     _git_init(source)
     (source / "src" / "echo.py").write_text("import sys\nprint('dirty')\n", encoding="utf-8")
@@ -177,7 +177,7 @@ def test_git_provenance_recorded_when_the_source_is_a_repository(data_dir, tmp_p
         assert opened.system.project(plain_run).status == "done", opened.system.project(plain_run)
 
 def test_source_invalid_rejects_without_building_the_project(data_dir, tmp_path):
-    # 验收（第 10 节第 9 项）：源目录不存在、含宿主私有路径或公开树有无法表示的条目时返回 source_invalid，
+    # 验收：源目录不存在、含宿主私有路径或公开树有无法表示的条目时返回 source_invalid，
     # 没有建立项目，也没有写入任何事件
     opened = _Opened(data_dir)
     with running_api(opened) as client:
@@ -198,7 +198,7 @@ def test_source_invalid_rejects_without_building_the_project(data_dir, tmp_path)
         assert system.store.list_project_ids() == []
 
 def test_new_work_item_is_rejected_before_the_baseline(data_dir, tmp_path):
-    # 验收（第 10 节第 10 项）：建档进行中与等待确认初始 PRD 时新建事项都被拒绝（work_item_in_progress）；
+    # 验收：建档进行中与等待确认初始 PRD 时新建事项都被拒绝（work_item_in_progress）；
     # 建档事项被取消、撤销以后返回 not_allowed，onboarding.restart 可用并开始新的建档事项
     source = _source(tmp_path / "source")
     opened = _Opened(data_dir)

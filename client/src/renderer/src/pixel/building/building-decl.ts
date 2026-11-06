@@ -1,4 +1,4 @@
-// 楼的声明表（画面与播放设计说明第 5.1 节、原型 v13 js/pixel/building-decl.js，工单 #955）：
+// 楼的声明表（画面与播放 docs/design/visualization.md「声明表」、原型 v13 js/pixel/building-decl.js，工单 #955）：
 // 楼画面认的每种动作的级别（tier）与声明的最短时长（ms）。
 //
 // 画面层唯一认的动作种类就是这里的键：翻译层（translate/building.ts）只给出这里的 kind，

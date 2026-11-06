@@ -257,7 +257,7 @@ def test_pause_and_continue_lets_each_session_resume_where_it_stopped(tmp_path: 
 def test_an_ask_branch_receives_the_new_prd_version_and_answers(tmp_path: Path) -> None:
     # 另一个会话修订了 PRD，进行中的询问分支在下一步收到 PRD 新版本的通知并接着回答，
     # 提问方拿到回答（工单 #558：删除「工作依据一变化就结束激活」的规则，
-    # PRD 的新版本作为通知送达，循环结构第 5 节）
+    # PRD 的新版本作为通知送达，循环结构 docs/design/department-loop.md「工作中途要求变化」）
     holder: dict[str, object] = {}
     seen: dict[str, str | None] = {}
 
@@ -494,7 +494,7 @@ def test_engineering_receives_the_new_prd_version_and_delivers_against_it(tmp_pa
 
 
 def test_a_product_decision_is_a_notification_to_the_other_departments(tmp_path: Path) -> None:
-    # 验收第 2 条（#1079，部门指导设计说明第 2.1 节第 2 点）：产品记录了补充决定以后，
+    # 验收第 2 条（#1079，部门指导 docs/design/department-guidance.md「放行怎么等」第 2 点）：产品记录了补充决定以后，
     # 正在一轮工作中的工程与质检在下一步的 work_notification 里收到新种类的通知，
     # 内容含决定的陈述与理由；写下这条决定的产品会话不收到。
     # 先后由事件决定（工单 #1431）：产品等工程与质检各自进入一轮工作再提交决定，工程与质检的这一步

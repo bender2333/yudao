@@ -1,5 +1,5 @@
 // 部门工作间的部门状态、三个部门一行与传信管（原型 v12 设计说明第 3.1、3.3 节、
-// 三部门的循环结构第 2.1 节，工单 #905）：
+// 三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #905）：
 // 标题区写本部门的状态与原因，另起一行列出三个部门（本部门加粗），没有部门状态时按事项的结束方式写；
 // 房间信息写传信管上等待本部门回答的询问数，为 0 时不写这一行。
 // 用 node --test 运行，不依赖 Electron 与网络；三个部门一行按组件渲染成静态标记，
@@ -69,7 +69,7 @@ test("标题区写本部门的状态与原因：状态词是 departments 里的�
     departmentStatusView(workspace({ department: "product" })),
     { text: "一轮工作中", note: "回答工程的询问", kind: "running" },
   );
-  // 「等用户」：部门有一条没有回答、阻塞事项的决定请求（三部门的循环结构第 2.1 节）
+  // 「等用户」：部门有一条没有回答、阻塞事项的决定请求（三部门的循环结构 docs/design/department-loop.md「部门的状态」）
   assert.deepEqual(
     departmentStatusView(workspace({
       department: "engineering",

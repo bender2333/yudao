@@ -1,5 +1,5 @@
 // 资料页质检一项的逐条结论表与交付一项的启动方式（工单 #154；浏览器与 computer use 设计说明
-// 第 7.3、8.3、8.4 节；验证的独立性设计说明第 7、7.1 节）。
+// docs/design/browser-and-computer-use.md「页面与画面」、「QAReview 的逐条结论与放行」、「无法核验」；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」）。
 //
 // 表头写检验覆盖比例、模型阅读与开环的条数，取自 acceptance.coverage 里的放行记录，页面不重算；
 // 每条验收条件一行：验收条件、检验方式（中文）、结果（中文）与证据；证据里列检查名称、试用用例与

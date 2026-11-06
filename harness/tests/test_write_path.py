@@ -113,7 +113,7 @@ def test_one_command_identity_is_registered_once(data_dir):
     system.writes.transact(stream, rename, command=command)
     renamed = system.store.list_project_events(project_id)[-1]
     position = renamed.position
-    # 命令追加的事件记下命令身份与提出者；不是由命令写入的事件没有命令身份，提出者由写入方声明（第 5.2 节）
+    # 命令追加的事件记下命令身份与提出者；不是由命令写入的事件没有命令身份，提出者由写入方声明
     assert (renamed.command_id, renamed.actor) == ("command-1", "user:local")
     assert (system.store.list_project_events(project_id)[0].command_id,
             system.store.list_project_events(project_id)[0].actor) == (None, "user:local")

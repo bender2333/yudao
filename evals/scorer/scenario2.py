@@ -2,7 +2,7 @@
 
 交付是 openai-agents-python 在任务基准提交上被改过的仓库。评分器先把隐藏检查的
 测试文件盖到交付的副本上，再只用 Python 3.13 运行两个清单里的用例：F2P 按需求条目
-计入完成度与正确性，P2P 单独报告失败条数（评测场景设计第 4.2 节）。
+计入完成度与正确性，P2P 单独报告失败条数（评测场景 docs/design/evaluation-scenarios.md「原有功能（场景 2）」）。
 
 Python 3.13 的虚拟环境由运行器在运行目录里按锁文件建立，这份环境是这套依赖唯一的
 安装，评分阶段直接用它，不重新建立。
@@ -24,7 +24,7 @@ TEST_COMMAND = ("uv run --python " + PYTHON_VERSION + " --project <交付> --no-
                 "python -m pytest")
 
 # 判定「没有做」的异常类型：模块、类、函数或入口不存在，单元层属于这一类
-# （评测场景设计第 4.1 节）。其余失败都是「做了但结果不对」。
+# （评测场景 docs/design/evaluation-scenarios.md「完成度与正确性」）。其余失败都是「做了但结果不对」。
 NOT_DONE_TYPES = ("AttributeError", "ImportError", "ModuleNotFoundError",
                   "NameError", "CollectionError", "ImportFileMismatchError")
 # 隐藏检查以文件的形态随材料走：评分时直接盖掉交付里的同名文件，不依赖版本控制。

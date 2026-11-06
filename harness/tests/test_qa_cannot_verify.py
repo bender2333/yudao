@@ -2,7 +2,7 @@
 # 质检自己的条件不够（模型不支持图像输入而条目依赖外观、执行位置缺少试用或运行交付需要的程序）时，
 # 不是放行也不是退回：提交 cannot_verify（没有 failed，至少一条 unverified，每条写明原因），
 # 流程编排发出决定请求，阻塞整个 run；回答「重新核验」以后质检以新的激活重新检查同一份交付，
-# 回答「停止事项」以后事项结束、交付不被采纳（浏览器与 computer use 设计说明第 8.3、8.4 节）。
+# 回答「停止事项」以后事项结束、交付不被采纳（浏览器与 computer use docs/design/browser-and-computer-use.md「QAReview 的逐条结论与放行」、「无法核验」）。
 # 模型回答由 FakeAdapter 的脚本给出，数据目录是真实的；冻结参数与运行时间上限用测试默认值。
 
 from harness.adapters.fake import FakeAdapter

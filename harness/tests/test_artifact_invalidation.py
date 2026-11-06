@@ -3,9 +3,9 @@
 # 情形 1 至 3 另外按真实的一轮工作核对发生的那一刻记下了这条事件，情形 6 的真实一轮在事件序列
 # 基准 quality_rework 里（test_event_sequence.py）；
 # 投影不再从工具调用与其他接纳事件推出失效，RunProjection 与最小投影都只折叠这一条。
-# 守第 13 节的 R1（同样的事件重放出同样的状态）：两份投影从同一组事件得出同一个当前交付。
+# 守 docs/design/test-pyramid.md「测试按三环留」的 R1（同样的事件重放出同样的状态）：两份投影从同一组事件得出同一个当前交付。
 #
-# 六种情形（骨架与应用设计说明第 4 节，清点第 4 节第 1 条）：
+# 六种情形（骨架与应用 docs/design/skeleton-and-application.md「最小投影」，清点 docs/design/skeleton-and-application.md「最小投影」）：
 # 1. 非质检部门写文件的工具调用成功（workspace_changed）
 # 2. PRD 被接纳（product_spec_changed）
 # 3. 契约被接纳（effective_contract_changed）

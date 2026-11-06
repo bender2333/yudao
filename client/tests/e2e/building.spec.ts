@@ -250,7 +250,7 @@ test("打开画面与标签页从后台切回：直接显示最新状态，不�
     await page.evaluate(() => { window.location.hash = "#/home"; });
     await waitUntil(async () => (await floors(page)).length >= 2, "楼里出现至少两层");
     // 打开画面时状态直接显示（jump）：时间线上的位置就是查询给出的位置，没有排着的状态。
-    // 建立画面以后到达的事件照演（设计说明第 5.2 节「迟到的动作」），所以这里不要求此刻没有在演的动作。
+    // 建立画面以后到达的事件照演所以这里不要求此刻没有在演的动作。
     await waitUntil(async () => {
       const info = await timeline(page);
       return (info.shown ?? 0) > 0 && info.pending === 0;

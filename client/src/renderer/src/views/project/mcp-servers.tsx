@@ -1,4 +1,4 @@
-// 项目设置页的「MCP 服务器」一节（工单 #237；网络与 MCP 设计说明第 4.1、4.2、11.1 节）。
+// 项目设置页的「MCP 服务器」一节（工单 #237；网络与 MCP docs/design/network-and-mcp.md「服务器设置」、「读取工具清单（探测）」、「项目设置的「MCP 服务器」一节」）。
 // 数据来自 project.settings 的 mcp_servers：保存的非秘密设置、版本，与设置里各凭据名称的状态。
 // 保存走 mcp_servers.save（带基准版本，过期时拒绝并提示重新读取）；探测走 tool_server.probe，
 // 命令接受以后作为任务进行，结果以项目流事件 tool_server_probe_finished 出现，到达之前显示「测试中」。
@@ -63,7 +63,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
   const [editing, setEditing] = useState<Editing | null>(null);
   const [draft, setDraft] = useState<McpServerDraft>(() => emptyDraft(departmentOptions));
   // 表单的基准版本：打开表单那一刻读到的版本。期间别人改过设置时保存会被拒绝，页面提示重新读取
-  // （设计说明第 4.3 节：命令带基准版本，版本过期时拒绝）
+  // （docs/design/network-and-mcp.md「版本与固定」：命令带基准版本，版本过期时拒绝）
   const [baseVersion, setBaseVersion] = useState(0);
   const [issue, setIssue] = useState("");
   const [probing, setProbing] = useState(false);
@@ -84,7 +84,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
   const probe = useCommand(props.app, pageKey(["mcp-probe", editing === null ? "" : JSON.stringify(draft)]));
   const credential = useCommand(props.app, pageKey(["mcp-credential", props.data.mcp_servers.version]));
 
-  // 探测结果以事件到达：结果写进这一节，探测的「测试中」随之结束（设计说明第 4.2 节）
+  // 探测结果以事件到达：结果写进这一节，探测的「测试中」随之结束
   const app = props.app;
   const subscribe = useCallback((listener: (event: EventObject) => void) => app.subscribeEvents(listener), [app]);
   const finishProbe = useRef<(event: EventObject) => void>(() => undefined);
@@ -96,7 +96,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
     setLocalProbes((current) => ({ ...current, [result.server_name]: result }));
     if (result.server_name === probingName.current) {
       setProbing(false);
-      // 探测成功时后端把工具清单快照写回设置，设置因此多了一个版本（设计说明第 4.2 节）：
+      // 探测成功时后端把工具清单快照写回设置，设置因此多了一个版本（docs/design/network-and-mcp.md「读取工具清单（探测）」）：
       // 这是页面自己那次探测写回的，等新版本到达以后把表单的基准版本换成它，
       // 不让用户保存时白撞一次「已过期」
       if (result.status === "ok") {

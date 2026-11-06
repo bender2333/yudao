@@ -1,5 +1,5 @@
-// 离开期间的报告里的开环明细（工单 #401；验证的独立性设计说明第 7、7.1 节；应用层与接口层设计说明
-// 第 4.3 节 `home.away_report` 与 `acceptance.coverage`）：
+// 离开期间的报告里的开环明细（工单 #401；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」；应用层与接口层设计说明
+// docs/design/app-and-interface.md「查询清单」 `home.away_report` 与 `acceptance.coverage`）：
 // 报告里「带开环条件的放行」一项逐条列出每个放行的开环条件，条数与明细取自 `acceptance.coverage`
 // （放行记录里一次算好，页面读这个数，不重新计算）；事项的名称取自 project.overview；
 // 「跳到逐条结论表」的链接在逐条结论表交付以后（#154）出现；页面文字里没有英文内部标识，

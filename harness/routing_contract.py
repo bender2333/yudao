@@ -1,4 +1,4 @@
-# 路由契约第二版（工单 #825 建、#861 第二版；骨架与应用设计说明第 3.2、5.1、5.4 节；总图第四节「路由」缝）。
+# 路由契约第二版（工单 #825 建、#861 第二版；骨架与应用 docs/design/skeleton-and-application.md「契约」、「路由契约」、「其他路由：骨架要满足的条件」；总图第四节「路由」缝）。
 #
 # 回答三个问题：现在让哪些部门（会话）开始一轮工作；一轮工作以什么结束；事项以什么结束。
 #
@@ -10,7 +10,7 @@
 #
 # 本模块只导入内核（kernel_events、definitions）与标准库，以及契约圈的 contract_versions；实现（这一版是
 # harness/watched_outputs.py）声明它实现的版本，薄驱动在一个发布里接受当前版与上一版。第二种路由是同一副
-# 骨架上的另一个实现：它自己登记名称与一份定义，不改这个模块（设计说明第 5.4 节）。
+# 骨架上的另一个实现：它自己登记名称与一份定义，不改这个模块（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）。
 #
 # 第二版（#861）：组织定义的 routing 指向路由自己的一份定义（部门、成果种类、提议方式、路由自己的上限与
 # 结束原因，routings.json），由路由实现自己校验、内核只核对名称与结构；一轮的结束由路由按事件判断，
@@ -23,7 +23,7 @@
 # 第三版（#1164）：输入那一条给了路由读事件的入口。契约新增可选方法 use_facts：声明了它的路由，组装处在
 # select 接上它以后把事件库的**只读**读取器交给它（只有 list_events(run_id)，没有写事件的出路）；没有声明的
 # 路由（成果驱动）不受影响，也不会被调用。第二版的路由实现照旧被接受（一版兼容，contract_versions）。
-# 这样第二种路由按设计说明第 5.1 节的输入自己折事件，不必再把事件库从外面塞进路由。
+# 这样第二种路由按 docs/design/skeleton-and-application.md「路由契约」的输入自己折事件，不必再把事件库从外面塞进路由。
 #
 # 第三版之后（工单 #1509，只增）：输入那一条里的「事项创建时冻结的定义」有了交进来的入口。契约新增可选方法
 # use_definitions：声明了它的路由，组装处 select 接上它以后把**这份形态自己那份定义**交给它，之后路由按它
@@ -78,7 +78,7 @@ def accept(implementation: Any) -> int:
 
 
 # 已接上的路由实现，键是它声明的名称：实现在自己的模块加载时登记，启动时按组织定义里的名称接上
-# （骨架与应用设计说明第 5.1 节）。这个表没有别的内容，不是事件之外的应用状态
+# （骨架与应用 docs/design/skeleton-and-application.md「路由契约」）。这个表没有别的内容，不是事件之外的应用状态
 _REGISTRY: dict[str, Any] = {}
 
 
@@ -93,7 +93,7 @@ def register(implementation: Any) -> Any:
 
 class _Facts:
     # 交给路由的只读事件读取器（第三版，工单 #1164）：只有 list_events，读哪个 run 的事件。
-    # 事件库本身留在组装处，路由借看，不写事件（设计说明第 5.1 节「不做」）。不给写出路是这一版的用意：
+    # 事件库本身留在组装处，路由借看，不写事件（docs/design/skeleton-and-application.md「路由契约」「不做」）。不给写出路是这一版的用意：
     # 契约只给读的入口，写仍然只经薄驱动交给写入口
     __slots__ = ("_store",)
 
@@ -140,7 +140,7 @@ def _hand_definitions(name: str, implementation: Any, definitions: Any) -> Any:
 
 def select(name: str, definitions: Any = None, *, store: Any = None) -> Any:
     # 启动时按组织定义里写明的名称接上路由实现，核对它声明的契约版本，再让它校验自己那份定义的内容
-    # （设计说明第 5.4 节第 2 条：结构由内核核对，内容归路由）。名称没有实现时失败，说明里写明有哪些可用的名称。
+    # （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」：结构由内核核对，内容归路由）。名称没有实现时失败，说明里写明有哪些可用的名称。
     # 交了定义时，声明了 use_definitions 的路由拿到的是接上这份定义的一份实例（工单 #1509）；
     # store 是组装处手里的事件库：声明了 use_facts 的路由在这里拿到它的只读读取器
     implementation = _REGISTRY.get(name)
@@ -167,7 +167,7 @@ def definition_of(definitions: Any, name: str) -> Any:
 
 @dataclass(frozen=True)
 class RoundEnd:
-    # 一轮工作以什么结束（成果驱动这一版沿用现在的结果种类，设计说明第 5.3 节输出）：
+    # 一轮工作以什么结束（成果驱动这一版沿用现在的结果种类，输出）：
     # 提交被接纳记 proposal_accepted，其余正常结束（含只有文字回答的一轮）记 text_reply
     outcome: str
 
@@ -194,7 +194,7 @@ class CompletionReason:
 @dataclass(frozen=True)
 class AskLimits:
     # 薄驱动给的运行配置上限：路由按被问的部门与提问方这一步剩下的量算出这一次询问这一轮的上限
-    # （设计说明第 5.1 节输出里的「这一轮的上限」）。已经用掉的步数与时间由薄驱动扣，路由不读最小投影
+    # （docs/design/skeleton-and-application.md「路由契约」输出里的「这一轮的上限」）。已经用掉的步数与时间由薄驱动扣，路由不读最小投影
     max_model_steps: int
     department_max_model_steps: Mapping[str, int] = field(default_factory=dict)
     department_max_time_sec: Mapping[str, float] = field(default_factory=dict)
@@ -204,7 +204,7 @@ class AskLimits:
 class AskBranch:
     # 这一次询问要开的一轮分支工作：回复的部门、分支会话、这一轮的上限，以及路由自己的工作引用
     # （指向这次询问，原样交给装配与执行）。start 是要写下的询问开始事件的载荷；接着上次没结束的
-    # 那一层时为空，那一层已经开始过了（设计说明第 5.1 节「询问的开始归路由」）
+    # 那一层时为空，那一层已经开始过了（docs/design/skeleton-and-application.md「路由契约」「询问的开始归路由」）
     recipient: str
     session_id: str
     max_model_steps: int
@@ -253,13 +253,13 @@ class Routing(Protocol):
     CONTRACT_VERSION: int
 
     def check_definition(self, definitions: Any) -> None:
-        # 校验自己那份定义的内容（设计说明第 5.4 节第 2 条）：名称指向的部门、成果种类与提议方式都在定义里、
+        # 校验自己那份定义的内容（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：名称指向的部门、成果种类与提议方式都在定义里、
         # 几种名称互相对得上。不合格时抛出 InvalidRoutingDefinition，逐项写明是哪一项
         ...
 
     def use_facts(self, reader: Any) -> None:
         # 可选（第三版，工单 #1164）：声明了这个方法的路由，在组装处 select 接上它以后拿到事件库的只读读取器
-        # reader（只有 list_events(run_id)），据此按设计说明第 5.1 节的输入自己折事件。没有这个方法的路由实现
+        # reader（只有 list_events(run_id)），据此按 docs/design/skeleton-and-application.md「路由契约」的输入自己折事件。没有这个方法的路由实现
         # （第二版与成果驱动）照常被接受，也不会被调用
         ...
 
@@ -284,8 +284,8 @@ class Routing(Protocol):
         ...
 
     def work_reference(self, view: Any, *, department: str) -> Any:
-        # 这一轮工作的路由自己的工作引用（例如任务池的任务），原样交给装配与执行（设计说明第 5.1 节输出、
-        # 第 5.4 节第 4 条）；不用它时为空。任务池不在这里：成果驱动不用
+        # 这一轮工作的路由自己的工作引用（例如任务池的任务），原样交给装配与执行（docs/design/skeleton-and-application.md「路由契约」输出、
+        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）；不用它时为空。任务池不在这里：成果驱动不用
         ...
 
     def round_end(self, view: Any, events: list[Event], *, department: str, session_id: str | None,
@@ -300,7 +300,7 @@ class Routing(Protocol):
     def completion_reason(self, view: Any, events: list[Event]) -> CompletionReason | None:
         # 可选（工单 #1394）：事项完成时的结束原因。薄驱动进入完成状态时问一次，events 是这个运行流的事件，
         # 路由从中读事项创建事件里记下的开环标记，按自己的定义给出这次完成记成哪一种结束原因（设计说明
-        # 第 5.1 节输出：「结束原因写明是放行还是开环完成，由路由按事项创建时记下的开环标记给出」）。
+        # docs/design/skeleton-and-application.md「路由契约」输出：「结束原因写明是放行还是开环完成，由路由按事项创建时记下的开环标记给出」）。
         # item_end 管的是没有新工作时停下，不是这件事。没有这个方法的路由（第二版与任务池那一种）与这里
         # 返回 None 时，薄驱动按事项种类取；薄驱动不认这两个名字，只把路由给的原因写进事实
         ...
@@ -309,7 +309,7 @@ class Routing(Protocol):
                    call: dict[str, Any], limits: AskLimits) -> AskBranch | AskOutcome | AskRejection:
         # 提问方这个会话的这次询问：要开一轮分支工作就给这一轮（AskBranch），已经答过或一步也走不了
         # 就给结果（AskOutcome），调用不合法就给原因（AskRejection）。询问的开始与回问都在这里判断，
-        # 回问的层数上限按路由自己的定义算（设计说明第 5.1 节）
+        # 回问的层数上限按路由自己的定义算（docs/design/skeleton-and-application.md「路由契约」）
         ...
 
     def ask_outcome(self, view: Any, *, branch: AskBranch,

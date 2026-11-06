@@ -172,7 +172,7 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "contract_accepted": ("content_hash", "input_version", "product_spec_hash", "revision"),
     "ask_started": ("branch_session_id", "question", "recipient", "requester"),
     "ask_answered": ("answer", "reason", "recipient", "requester", "revision", "status", "with_spec_revision"),
-    # 独立判断事件（验证的独立性设计说明第 4 节，工单 #358）：不是成果，事件载荷只带判断本身
+    # 独立判断事件（验证的独立性 docs/design/independent-verification.md「先判断后看解释」，工单 #358）：不是成果，事件载荷只带判断本身
     # （提案路径盖上的统一字段在写入时去掉），依据的交付摘要与条数进基准
     "independent_judgement_committed": ("checks", "criteria_count", "delivery_spec_hash",
                                         "kind", "product_spec_hash"),
@@ -198,7 +198,7 @@ KEY_FIELDS: dict[str, tuple[str, ...]] = {
     "run_failed": ("human_action", "stop_reason"),
     "run_resumed": ("acquired_epoch", "previous_epoch"),
     "run_continued": ("decision_id", "stop_reason"),
-    # decision_requested 不带 target（工单 #618，test-pyramid.md 第 11.1 节「不进入基准」）：target 里是模型与
+    # decision_requested 不带 target（工单 #618，test-pyramid.md）：target 里是模型与
     # 连接配置（provider_name、requested_model、base_url、context_window、configured_max_output_tokens 等），
     # 换一条连接或改默认输出上限不改变行为，不该让基准跟着重写；一次运行里的决定请求由 kind、department、
     # reason、options 与 blocks 识别，同一会话里同类决定的先后由事件序列本身比较。

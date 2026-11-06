@@ -1,4 +1,4 @@
-# 循环与收敛状态的只读投影（工单 #397，循环与收敛设计说明第 5、5.1 节；总图第三节的边界、停止与
+# 循环与收敛状态的只读投影（工单 #397，循环与收敛 docs/design/loops-and-convergence.md「收敛的检测」、「判定参数」；总图第三节的边界、停止与
 # 子循环）：只由事件计算，不写事实、不调用模型。判定是确定的阈值规则，短序列的趋势不交给模型。
 #
 # 五层：项目循环 → 事项（项目循环的一轮，事项树的根）→ run → 激活 → 步骤。步骤以一次模型请求为单位
@@ -20,7 +20,7 @@ from .minimal_projection import MinimalProjection, fold_events
 from .models import Event, EventType, json_dumps
 from .parameters import frozen_values
 
-# 三项可登记、可在创建循环实例时冻结的运行参数（设计第 5.1 节）
+# 三项可登记、可在创建循环实例时冻结的运行参数（docs/design/loops-and-convergence.md「判定参数」）
 CONVERGENCE_ROUNDS = "convergence.rounds"
 STEP_WINDOW = "convergence.step_window"
 STEP_REPEAT = "convergence.step_repeat"
@@ -38,7 +38,7 @@ CONVERGING = "converging"
 STALLED = "stalled"
 OSCILLATING = "oscillating"
 BOUNDARY = "boundary"
-# 本工单不判定的层与状态（写明缺少的事实，设计第 5 节末段）
+# 本工单不判定的层与状态（写明缺少的事实，末段）
 UNDETERMINED = "undetermined"
 
 FACT_ARTIFACT = "artifact"
@@ -63,7 +63,7 @@ MISSING_ACTIVATION = "激活层缺少计划条目完成的主机事实"
 
 @dataclass(frozen=True)
 class Limit:
-    # 一个已用量与它的上限：不设上限时仍然带数值，unlimited 为真（设计第 5 节末，画面显示「不设上限」）
+    # 一个已用量与它的上限：不设上限时仍然带数值，unlimited 为真（末，画面显示「不设上限」）
     used: int
     limit: int
     unlimited: bool
@@ -167,7 +167,7 @@ def _ranks(values: Sequence[float]) -> list[float]:
 
 def limit_amount(used: int, rule_name: str, limit: int) -> Limit:
     # 一个已用量与它的上限：上限达到该参数登记界限的上沿、且登记说明它拦截不到失败时标为不设上限；
-    # 无论是否不设上限都带数值（设计第 5 节末）
+    # 无论是否不设上限都带数值（末）
     rule = DEFINITIONS.rules.get(rule_name)
     bounds = tuple(getattr(rule, "bounds", ()) or ())
     unlimited = bool(bounds) and limit >= bounds[-1] and "拦截不到任何失败" in getattr(rule, "guards", "")
@@ -175,7 +175,7 @@ def limit_amount(used: int, rule_name: str, limit: int) -> Limit:
 
 
 def step_state(steps: Sequence[Step], *, window: int, repeat: int, stop_reason: str | None) -> str:
-    # 步骤层的判定（设计第 5 节）：停止原因属于限额类 → 达到边界；最近一个步骤窗口内同一调用达到重复
+    # 步骤层的判定：停止原因属于限额类 → 达到边界；最近一个步骤窗口内同一调用达到重复
     # 次数 → 震荡；窗口内有被接纳的记录 → 收敛中；窗口满了都没有 → 停滞；步数还没满一个窗口 → 不判定
     if stop_reason in LIMIT_STOP_REASONS:
         return BOUNDARY
@@ -201,7 +201,7 @@ def missing_for_step(steps: Sequence[Step], *, window: int, state: str) -> str |
 
 
 def _reviews(events: Sequence[Event]) -> list[Mapping[str, Any]]:
-    # 放行记录：qa_submitted 事件上的逐条结论与覆盖数（验证的独立性设计说明第 7.1 节，工单 #151/#1194）。
+    # 放行记录：qa_submitted 事件上的逐条结论与覆盖数（验证的独立性 docs/design/independent-verification.md「口径」，工单 #151/#1194）。
     # 旧事件没有这两项，交给 run_state 当作「缺少逐条结论」
     return [event.payload for event in events
             if event.type == EventType.QA_SUBMITTED and isinstance(event.payload, dict)]
@@ -222,7 +222,7 @@ def _flips(reviews: Sequence[Mapping[str, Any]]) -> int:
 
 def run_state(reviews: Sequence[Mapping[str, Any]], *, rounds: int,
               stop_reason: str | None) -> tuple[str, str | None]:
-    # run 层的判定（设计第 5 节，工单 #1194）：只按放行记录里算好的覆盖数——未满足数 =
+    # run 层的判定（工单 #1194）：只按放行记录里算好的覆盖数——未满足数 =
     # coverage.executable − coverage.covered（可执行检验里还没在当前快照上运行并通过的条数），
     # 不重新算逐条结论、不读文件。停止原因属于限额类 → 达到边界；没有逐条结论的旧 run 不判定并写明
     # 缺少的事实；窗口里同一条结论翻转达到方法常量 → 震荡；未满足数严格下降或为 0 → 收敛中；

@@ -1,6 +1,6 @@
 // 概览页的循环画面：把查询结果交给翻译层，把翻译层给出的状态与动作交给楼层画面（工单 #82、#953）。
 //
-// 这个组件只做连接（画面与播放设计说明第 3 节）：
+// 这个组件只做连接（画面与播放 docs/design/visualization.md「分层与边界」）：
 //   - 同步层的数据（project.loop、decisions.list）与当前事项那次运行的询问链（run.asks）经 translate/floor.ts
 //     翻成画面合同的状态与卡片；
 //   - 事件流里本项目的事件经翻译层翻成动作，回放期间不播动作；
@@ -172,7 +172,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
   const runId = useMemo(() => asksRunId(loop.data, props.workItemId), [loop.data, props.workItemId]);
   const asks = useSnapshot<RunAsksResult>(props.app, "page.loop.asks", "run.asks", { run_id: runId },
     replaying || runId === "");
-  // 循环状态（工单 #400）：覆盖层「循环」的数据来源；覆盖层在回放时不画（画面与播放设计说明第 8 节），
+  // 循环状态（工单 #400）：覆盖层「循环」的数据来源；覆盖层在回放时不画（画面与播放 docs/design/visualization.md「画面诚实性的不变式」），
   // 没有运行时也不查
   const loopsQuery = useSnapshot<RunLoopsResult>(props.app, "page.loop.loops", "run.loops", { run_id: runId },
     replaying || runId === "");
@@ -315,7 +315,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     else viewRef.current?.setState(model);
   }, [model, replaying]);
 
-  // 回放拖动时间轴：直接显示那个位置的状态，不播动作（设计说明第 5.2 节）
+  // 回放拖动时间轴：直接显示那个位置的状态，不播动作
   const atKey = at === null ? "live" : String(at);
   useEffect(() => {
     if (modelRef.current) viewRef.current?.jump(modelRef.current);
@@ -355,7 +355,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
       if (modelRef.current) viewRef.current?.jump(modelRef.current);
     };
     const off = props.app.subscribeResync(jumpLatest);
-    // 标签页从后台切回：浏览器在后台暂停了动画，队里可能积了几分钟的事件，直接跳到最新（设计说明第 5.2 节）
+    // 标签页从后台切回：浏览器在后台暂停了动画，队里可能积了几分钟的事件，直接跳到最新
     const onVisible = (): void => {
       if (document.visibilityState === "visible") jumpLatest();
     };
@@ -480,7 +480,7 @@ function FloorTextList(props: {
             ))}
           </ul>
         )}
-        {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答（设计说明第 9 节） */}
+        {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答 */}
         <DecisionCardList
           app={props.app}
           decisions={props.decisions}

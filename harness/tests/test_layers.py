@@ -2,11 +2,11 @@ from pathlib import Path
 
 from importlinter.cli import lint_imports
 
-# 分层的依赖规则（应用层与接口层设计说明第 2.4 节）：接口层只导入应用层；控制核心不导入应用层与接口层，
+# 分层的依赖规则（应用层与接口层 docs/design/app-and-interface.md「依赖规则」）：接口层只导入应用层；控制核心不导入应用层与接口层，
 # 应用层不导入接口层。合同写在 pyproject.toml 的 [tool.importlinter]，这里按源码中的导入语句检查。
 #
-# S6a（工单 #829）：合同从两条加到五条——契约模块只导入内核与标准库（骨架与应用设计说明第 3.2、5 节）、
-# 应用层只导入控制核心的公开接口（#620，清单按第 2.4 节分类，见 pyproject.toml 里的注释）、
+# S6a（工单 #829）：合同从两条加到五条——契约模块只导入内核与标准库（骨架与应用 docs/design/skeleton-and-application.md「契约」、「三道缝的契约」）、
+# 应用层只导入控制核心的公开接口（#620，清单按 docs/design/app-and-interface.md「依赖规则」分类，见 pyproject.toml 里的注释）、
 # 应用不导入薄驱动的内部。五条都在报告里出现，少一条这条断言就不过：合同被删掉时能看出来。
 
 PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
@@ -18,7 +18,7 @@ CONTRACT_NAMES = (
     "契约模块只导入内核与标准库",
     "应用层只导入控制核心的公开接口",
     "应用不导入薄驱动的内部",
-    # 工单 #69：MCP 客户端模块不导入 Yudao 的其他模块（网络与 MCP 设计说明第 7.1 节）
+    # 工单 #69：MCP 客户端模块不导入 Yudao 的其他模块（网络与 MCP docs/design/network-and-mcp.md「客户端模块」）
     "MCP 客户端模块不导入 Yudao 的其他模块",
 )
 

@@ -346,7 +346,7 @@ def test_structure_requires_activation_receipt(tmp_path):
     assert EventType.STRUCTURE_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
 def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
-    # 接纳时核对工作区的树摘要等于快照摘要，不相等时拒绝（设计第 4.1 节）
+    # 接纳时核对工作区的树摘要等于快照摘要，不相等时拒绝
     from harness.validation import evaluate_proposal
 
     system, run_id = _onboarding_run(tmp_path, {

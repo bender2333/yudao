@@ -71,7 +71,7 @@ def fill_run_dir(run_dir):
 def message():
     """交给 `opencode run` 的消息。
 
-    需求原文与接口约定用 `-f` 附加：两边的输入是同一份（评测场景设计第 3 节），
+    需求原文与接口约定用 `-f` 附加：两边的输入是同一份（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」），
     但 Windows 的命令行有长度上限，全文放进命令行会被系统拒绝。
     """
     return ("实现这份需求与接口约定。附件里的 PRD.md 是需求原文，"

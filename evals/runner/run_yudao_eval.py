@@ -2,12 +2,12 @@
 
 与 OpenCode 一侧（`run_eval.py`）同一套形状：原始证据（事件日志导出、交付副本、
 评分日志）放在 `.yudao/evals/` 下，不进入 Git；结果文件提交到 `docs/evaluation/`，
-中文报告写到 `.tmp/` 再发 Discussions（评测场景设计第 6 节）。
+中文报告写到 `.tmp/` 再发 Discussions（评测场景 docs/design/evaluation-scenarios.md「报告与版本比较」）。
 
 场景 3 从较长的 PRD 新建项目：新建项目并带入起始文件夹，提交需求原文加接口约定，
 等待结束。场景 2 在已有代码上加功能：接入已有仓库（`project.onboard`）、确认初始
-PRD（`decision.answer`，或者等人确认）、再新建事项提交需求原文（第 2.2、9 节；
-接入已有项目设计说明第 3、4 节）。
+PRD（`decision.answer`，或者等人确认）、再新建事项提交需求原文（docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」、「前提与未决事项」；
+接入已有项目 docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」、「建档流程」）。
 """
 
 import argparse
@@ -26,11 +26,11 @@ import yudao
 import yudao_metrics
 import yudao_report
 
-# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计第 3 节「时间上限」）。
-# 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（第 5.2、9 节）
+# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」「时间上限」）。
+# 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（docs/design/evaluation-scenarios.md「指标」、「前提与未决事项」）
 TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
-# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目设计说明第 12 节第 5 项）
+# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目 docs/design/existing-project-onboarding.md「用户确认的决定」）
 ONBOARDING_TIMEOUT_SECONDS = 120 * 60
 # `--wait-prd-confirmation` 等人在浏览器的决定卡片里确认初始 PRD 的上限
 PRD_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60
@@ -48,7 +48,7 @@ def empty_output_note(runs):
 
 
 def scenario_python():
-    """场景 2、3 的运行环境是 uv 管理的 Python 3.13（评测场景设计第 3 节）。"""
+    """场景 2、3 的运行环境是 uv 管理的 Python 3.13（评测场景 docs/design/evaluation-scenarios.md「两边的运行条件」）。"""
     found = subprocess.run(["uv", "python", "find", SCENARIO_PYTHON],
                            capture_output=True, encoding="utf-8", errors="replace")
     path = (found.stdout or "").strip()
@@ -105,7 +105,7 @@ def _score_scenario2(delivery_dir, evidence_dir):
     """场景 2 的评分：评分副本按材料的 `runtime.install` 建立环境，再用场景 2 的评分命令。
 
     Yudao 封存的交付没有虚拟环境（部门在自己的工作区里跑检查），评分副本因此由运行器
-    建立 Python 3.13 环境（需要联网，评测场景设计第 2.2 节）；评分器与评分命令沿用
+    建立 Python 3.13 环境（需要联网，评测场景 docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」）；评分器与评分命令沿用
     OpenCode 一侧的 `scenario2.scorer_command`，评分器不改。
     """
     scenario2 = yudao.scenario_module()
@@ -128,7 +128,7 @@ def _score_scenario2(delivery_dir, evidence_dir):
 
 
 def score_deliveries(first_dir, final_dir, evidence_dir):
-    """第一次与最终两份交付都交给评分器（设计第 5.2 节）。
+    """第一次与最终两份交付都交给评分器。
 
     `first_dir` 为空表示两份是同一份交付（只有一次交付，或者没有交付）：评分器只跑一次，
     两份评分相同。没有交付时评分目录是空的，评分器把每条隐藏检查记成「没有做」。
@@ -145,7 +145,7 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds, limits
              prd_confirmation_timeout_seconds=PRD_CONFIRMATION_TIMEOUT_SECONDS):
     """运行一次 Yudao，评分并收好原始证据。
 
-    提交号在启动服务之前记下：每次运行各带自己的提交号（第 3 节「运行环境」）。
+    提交号在启动服务之前记下：每次运行各带自己的提交号（docs/design/evaluation-scenarios.md「两边的运行条件」「运行环境」）。
     给出 `scenario` 时这次运行在它指定的场景下，结束后恢复原来的场景。
     """
     context = yudao.scenario(scenario) if scenario is not None else contextlib.nullcontext()
@@ -261,7 +261,7 @@ def _run_scenario3(run_id, runs_root, evidence_root, model_name, limit_seconds, 
 def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, limits, *,
                    wait_prd_confirmation, onboarding_timeout_seconds,
                    prd_confirmation_timeout_seconds):
-    """场景 2：接入已有仓库、确认初始 PRD、再新建事项提交需求原文（第 2.2、9 节）。
+    """场景 2：接入已有仓库、确认初始 PRD、再新建事项提交需求原文（docs/design/evaluation-scenarios.md「场景 2：模型设置透传参数」、「前提与未决事项」）。
 
     建档与事项是两个 run：建档的用量与耗时单独导出、单独列出，不计入事项的指标；
     时间上限从新建事项开始计算，建档用了多久不影响事项的超时判断。
@@ -336,7 +336,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         with open(os.path.join(evidence_dir, "service-stderr.txt"), "w", encoding="utf-8") as handle:
             handle.write(stderr)
 
-    # 建档与事项是两个 run，各自导出、分开保存（第 5.2 节）
+    # 建档与事项是两个 run，各自导出、分开保存
     if onboarding_export is not None:
         with open(os.path.join(evidence_dir, "onboarding-run-export.json"), "w",
                   encoding="utf-8") as handle:
@@ -427,7 +427,7 @@ def _empty_metrics(timed_out):
 
 
 def _run_versions(export):
-    """取 `run_created` 事件里的定义版本与参数版本（设计第 6 节）。
+    """取 `run_created` 事件里的定义版本与参数版本。
 
     取不到时那一项为空，报告写「未知」；第 2 项检查点也用这里的参数版本核对冻结限额。
     """

@@ -1,8 +1,8 @@
-# 应用登记自己的事件种类（设计说明第 5.4 节第 1 条，S5a 工单 #828）：一种新的应用事件种类经写入口写入，
+# 应用登记自己的事件种类（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，S5a 工单 #828）：一种新的应用事件种类经写入口写入，
 # 重放读得回来，改动的只有登记它的应用与它的测试，内核文件不变。
 #
 # 用的资源是真实的 SQLite 事件库与写入口的一次事务，没有完整的三部门循环，属于模块层。
-# 守第 13 节的 R1（事实只经写入口写入；同样的事件重放出同样的状态）与 R2（骨架事件只增：
+# 守 docs/design/test-pyramid.md「测试按三环留」的 R1（事实只经写入口写入；同样的事件重放出同样的状态）与 R2（骨架事件只增：
 # 应用加一种种类不进骨架事件的登记表）。
 
 from harness.adapters.fake import FakeAdapter
@@ -24,7 +24,7 @@ NEW_KIND = "task_pool_task_published"
 
 
 def test_the_application_registers_the_run_events_it_owns():
-    # 应用登记的正是 run 流里除骨架事件以外的那些种类：骨架事件由内核给出，其余归应用（第 5.4 节第 1 条）
+    # 应用登记的正是 run 流里除骨架事件以外的那些种类：骨架事件由内核给出，其余归应用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
     assert set(APPLICATION_EVENT_TYPES) == set(RUN_EVENT_TYPES) - set(SKELETON_RUN_EVENTS)
     registered = application_event_types()
     for kind in APPLICATION_EVENT_TYPES:

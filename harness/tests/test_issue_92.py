@@ -1,4 +1,4 @@
-# 工单 #92：生效模型与调用目标的查询（设计说明第 6、9.3 节；应用层与接口层设计说明第 4.3 节）。
+# 工单 #92：生效模型与调用目标的查询（docs/design/app-and-interface.md「能力清单与认证」；应用层与接口层 docs/design/app-and-interface.md「查询清单」）。
 # 从运行系统整体测试：真实启动 FastAPI 应用，目录文件与 .env 是真实文件，事件日志是真实 SQLite；
 # 模型回答由测试内启动的本机 HTTP 服务按 Responses 协议给出。
 # 覆盖：department.workspace 的生效模型与来源（项目部门设置、部门默认）、引用无法使用与未设置、

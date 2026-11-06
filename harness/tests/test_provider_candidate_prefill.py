@@ -3,7 +3,7 @@ import pytest
 from harness.providers import capabilities
 from harness.providers.discovery import _parse_candidates
 
-# 候选的窗口与输出上限预填（模型管理设计说明第 4.3 节）：上游模型列表描述容量的写法各家不同，
+# 候选的窗口与输出上限预填（模型管理 docs/design/model-management.md「模型访问定义与准入」）：上游模型列表描述容量的写法各家不同，
 # Provider 模块按列出的次序识别，取第一个有效的正整数；窗口与输出上限各自独立取值，
 # 取到的值来源写 models_url。自定义服务方案（preset_id 为空）在能力表里没有条目，
 # 候选里的容量只能来自上游模型列表，读到的值因此只说明上游模型列表这一处。

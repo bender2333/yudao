@@ -1,4 +1,4 @@
-# 第二种路由：任务池（工单 #864；骨架与应用设计说明第 3.2、5.1、5.4 节「证明」；总图第四节「路由」缝）。
+# 第二种路由：任务池（工单 #864；骨架与应用 docs/design/skeleton-and-application.md「契约」、「路由契约」、「其他路由：骨架要满足的条件」「证明」；总图第四节「路由」缝）。
 #
 # **只在测试里用，产品代码不导入它。** 它证明的是骨架：同一副骨架接上另一套应用——形状像任务池的路由，
 # 有自己的那份定义（`harness/tests/task_pool_definitions/`，用 `load_definitions(<测试目录>)` 加载）、
@@ -8,19 +8,19 @@
 # 形状：
 # - 发任务的部门把用户的输入写成池子里的一条任务（提议方式 `submit_task`，成果种类 `pool_task`）；
 # - 路由把池子里待办的任务**指派**给能做它的部门：这一轮工作的路由自己的工作引用就是那件任务
-#   （设计说明第 5.1 节输出、第 5.4 节第 4 条，原样交给装配与执行）；
+#   （输出，原样交给装配与执行）；
 # - 领到任务的部门交完成说明（`complete_task` / `task_completion`）；
 # - 另一个部门给结论：接纳或者打回（`judge_task` / `task_verdict`）。打回以后任务回到池子，由完成它的
-#   部门重做。完成一件事的部门不能自己宣布它合格（基础规则 3）：这一条由本路由的收紧检查判（第 5.5 节
+#   部门重做。完成一件事的部门不能自己宣布它合格（基础规则 3）：这一条由本路由的收紧检查判（
 #   「路由提供收紧检查」），不靠内核。
 # - 池子里没有待办的任务时事项结束，结束原因是**它自己那份定义里声明的** `pool_drained`
-#   （设计说明第 5.4 节第 7 条，不进内核的停止原因清单）。
+#   （不进内核的停止原因清单）。
 #
 # 成果怎么被接纳（2026-10-28 总架构师补的做法）：三种成果都不新增内核事件种类，经工具许可与提案校验以后
 # 写通用的一种「成果接纳」事件（`artifact_accepted`，S2c 工单 #1098），最小投影按它带的统一字段折叠出
 # 当前版本。路由自己的应用事件种类按 #828 的登记方式登记，不进骨架事件的登记表。
 #
-# 状态从事件折叠：路由自己从运行流的事件折出池子的现状（设计说明第 5.1 节输入），不保存事件之外的状态。
+# 状态从事件折叠：路由自己从运行流的事件折出池子的现状（输入），不保存事件之外的状态。
 # 契约给的入口是运行流的投影，而投影不折叠通用的成果接纳事件（见 docs/architecture-issues.md 2026-10-28
 # 的一条），所以这里声明契约第三版的可选方法 `use_facts`（工单 #1164）：组装处 select 接上这个路由以后，
 # 把事件库的只读读取器交给它，池子的现状就从那里的事件折出来。
@@ -56,7 +56,7 @@ VERDICT_KIND = "task_verdict"
 ACCEPT = "accept"
 RETURN = "return"
 
-# 路由自己的应用事件种类（设计说明第 5.4 节第 1 条、第 7 节）：任务池自己记的两件事——一件任务被指派出去、
+# 路由自己的应用事件种类：任务池自己记的两件事——一件任务被指派出去、
 # 一件任务被打回以后回到池子。登记归登记，内核不解释它们的内容；它们不进骨架事件的那张表
 TAKEN_EVENT = "task_pool_task_taken"
 RETURNED_EVENT = "task_pool_task_returned"
@@ -70,7 +70,7 @@ ITEM_END_REASON = "pool_drained"
 _DEPARTMENTS = tuple(DEFINITIONS.routing_definition().departments)
 _PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
 
-# 一轮没有正常结束的两种状态：暂停与失败（与成果驱动同一个口径，设计说明第 5.3 节输出）
+# 一轮没有正常结束的两种状态：暂停与失败（与成果驱动同一个口径，输出）
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
 
@@ -118,7 +118,7 @@ class PoolState:
 
 
 def fold(events: list[Event]) -> PoolState:
-    """从运行流的事件折出池子的现状（设计说明第 5.1 节输入）。
+    """从运行流的事件折出池子的现状（输入）。
 
     三种成果都写在通用的成果接纳事件里（S2c 工单 #1098）：种类与作者部门都在载荷的统一字段里，
     内容由本路由的收紧检查组装。内核不解释它们，这里也不读最小投影。
@@ -203,7 +203,7 @@ def _free(department: str, waiting: set[str] | None) -> bool:
 
 
 def work_reference(state: PoolState, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明第 5.1 节输出、第 5.4 节第 4 条）：指派给它的那件任务。
+    """这一轮工作的路由自己的工作引用（输出）：指派给它的那件任务。
 
     发任务的一轮没有任务可指派（任务由这一轮写出来），为空。原样交给装配与执行，骨架不解释它。
     """
@@ -252,7 +252,7 @@ def submitted_in_round(events: list[Event], *, session_id: str | None, activatio
 
 
 def check_definition(definitions: Any) -> None:
-    """校验任务池这份定义的内容（设计说明第 5.4 节第 2 条）：内核只核对结构，内容归路由自己。"""
+    """校验任务池这份定义的内容：内核只核对结构，内容归路由自己。"""
     declared = routing_contract.definition_of(definitions, ROUTING_NAME)
     if declared is None:
         raise routing_contract.InvalidRoutingDefinition(
@@ -291,7 +291,7 @@ class TaskPool:
     """任务池路由（路由契约第三版的第二种实现）。
 
     实现在测试里；薄驱动只按契约的三个问题调用它。它读运行流的事件折出池子的现状，不写事件、不调模型、
-    不核对边界、不执行工具（设计说明第 5.1 节「不做」）。
+    不核对边界、不执行工具。
     """
 
     NAME = ROUTING_NAME
@@ -352,7 +352,7 @@ class TaskPool:
         return routing_contract.RoundEnd(outcome="proposal_accepted" if submitted else "text_reply")
 
     def item_end(self, view: Any) -> routing_contract.ItemEnd | None:
-        # 池子里没有待办的任务：事项以这条路由自己声明的结束原因结束（设计说明第 5.4 节第 7 条）
+        # 池子里没有待办的任务：事项以这条路由自己声明的结束原因结束
         if not self.state(view.run_id).drained():
             return None
         return routing_contract.ItemEnd(stop_reason=ITEM_END_REASON,
@@ -370,7 +370,7 @@ class TaskPool:
 
 
 class TaskPoolTightening:
-    """任务池的收紧检查（设计说明第 5.5 节「路由提供收紧检查」）：同一条路由的另一半。
+    """任务池的收紧检查：同一条路由的另一半。
 
     内核的通用检查通过以后，在这个写入事务里由内核问它三件事：这个部门此刻能为池子交哪几种成果、
     请求里提供哪些工具、这一次提交能不能收。三种成果的内容由它组装（格式检查也在这里）。

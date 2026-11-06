@@ -1,5 +1,5 @@
-# 证据查询：按工件引用读取一份外部来源工件（网络取回与 MCP 设计说明第 9 节；应用层与接口层设计说明第 4.3 节）
-# 与一张截图（浏览器与 computer use 设计说明第 7.2 节，工单 #152）。
+# 证据查询：按工件引用读取一份外部来源工件（网络取回与 MCP docs/design/network-and-mcp.md「结果、工件与证据」；应用层与接口层 docs/design/app-and-interface.md「查询清单」）
+# 与一张截图（浏览器与 computer use docs/design/browser-and-computer-use.md「查询」，工单 #152）。
 # 界面按页读取取回的内容，证据核对读取工件保存的原文；试用记录页按截图引用取图。查询只读取，不写入任何内容；
 # 工件的内容与引用里的摘要不一致时返回找不到这份工件（内容被改动过，引用指向的工件就不在了）。
 
@@ -88,7 +88,7 @@ EVIDENCE_EXTERNAL_SOURCE = QueryDefinition(
 
 
 # ---------------------------------------------------------------------------
-# 截图（浏览器与 computer use 设计说明第 7.1、7.2 节，工单 #152）：按工件引用返回一张截图，
+# 截图（浏览器与 computer use docs/design/browser-and-computer-use.md「保存与绑定」、「查询」，工单 #152）：按工件引用返回一张截图，
 # 按摘要核对以后返回内容；所属事件的位置（快照的 position，与 delivery.file、evidence.external_source
 # 同一做法）告诉页面这张截图来自哪条事件
 

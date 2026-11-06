@@ -26,7 +26,7 @@ from harness.tests.protocol_helpers import (
     responses_responder,
 )
 
-# 工单 #84：调用协议属于模型访问定义，连接不声明协议（模型管理设计说明第 4.2、4.3 节）；服务方案预置表按协议列出请求基址（第 4.1 节）。
+# 工单 #84：调用协议属于模型访问定义，连接不声明协议（模型管理 docs/design/model-management.md「Provider 配置」、「模型访问定义与准入」）；服务方案预置表按协议列出请求基址（docs/design/model-management.md「服务方案预置表与模型能力表」）。
 # 全部用例经运行系统整体进行：真实 HTTP 服务记录请求路径与请求头，模型回答由 FakeAdapter 给出。
 
 

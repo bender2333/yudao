@@ -26,7 +26,7 @@ from .validation import Tightening
 
 PENDING_GUIDANCE = frozenset({"received", "in_input"})
 
-# 判定「同一连接、同一协议、同一上游模型」的取值来自调用目标（设计说明第 7.6 节）
+# 判定「同一连接、同一协议、同一上游模型」的取值来自调用目标
 TARGET_KEYS = ("provider_config_id", "protocol", "requested_model")
 
 def _same_target(record_target: dict[str, Any], call_target: dict[str, Any]) -> bool:
@@ -34,7 +34,7 @@ def _same_target(record_target: dict[str, Any], call_target: dict[str, Any]) -> 
         call_target.get(key) for key in TARGET_KEYS)
 
 def replayable_history(history: list[dict[str, Any]], call_target: dict[str, Any]) -> list[dict[str, Any]]:
-    # 把部门历史装配成可发给本次调用目标的形式（设计说明第 7.6 节）：
+    # 把部门历史装配成可发给本次调用目标的形式：
     # 同一条目产生时与本次调用目标同一连接、同一协议、同一上游模型时原样回放；
     # 不同时丢弃推理内容与该协议专用的条目 ID，消息与工具调用的配对（call_id）保持完整
     result: list[dict[str, Any]] = []
@@ -68,16 +68,16 @@ def model_limits(target_window: int, output_limit: int | None = None) -> ModelLi
 
 
 def work_limit_tokens() -> int:
-    # 工作上限取规则登记中的现值（模型管理设计说明第 8.3 节）：窗口很大时压缩阈值也不超过它
+    # 工作上限取规则登记中的现值（模型管理 docs/design/model-management.md「预留与阈值」）：窗口很大时压缩阈值也不超过它
     return int(DEFINITIONS.rule_value("context.work_limit_tokens"))
 
 
 def previous_usage_tokens(events: list[Event], *, department: str,
                           session_id: str | None = None) -> int | None:
-    # 上一次请求的上游回报用量：输入、缓存读写与输出之和（模型管理设计说明第 8.2 节）。
+    # 上一次请求的上游回报用量：输入、缓存读写与输出之和（模型管理 docs/design/model-management.md「用量」）。
     # 只看同一部门、同一会话的工作请求：整理请求的用量反映的是整理材料的大小，不是这一步的工作历史，
     # 拿它判断会在压缩成功以后立刻再压一次。上游没有回报时返回空，判断只用本地估算。
-    # 压缩以后部门历史换成摘要（第 8.4 节），压缩之前那次请求的回报用量不再代表这一步的输入：
+    # 压缩以后部门历史换成摘要（docs/design/model-management.md「整理请求」），压缩之前那次请求的回报用量不再代表这一步的输入：
     # 遇到比它更晚的压缩记录就返回空，回到只用本地估算
     for event in reversed(events):
         if event.department != department:
@@ -109,7 +109,7 @@ class PinnedStep:
     guidance: list[DepartmentGuidance]
     events: list[Event]
     snapshot_hash: str
-    # 调用目标的输入方式（设计说明第 5.6 节）：装配请求的工具定义时按它决定提供哪些工具
+    # 调用目标的输入方式：装配请求的工具定义时按它决定提供哪些工具
     input_modalities: tuple[str, ...]
     context: AssembledContext
     # 本次逻辑调用的调用目标（公开部分）；回放部门历史时按它筛掉来源不同的推理内容
@@ -138,7 +138,7 @@ class StepRequest:
     parts: list[dict[str, Any]]
     input_token_estimate: int
     output_reserve_tokens: int
-    # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量，没有时为 None（设计说明第 8.2 节）
+    # 判断要不要压缩用的两项数值之一：上一次工作请求的上游回报用量，没有时为 None（docs/design/model-management.md「用量」）
     previous_usage_tokens: int | None = None
 
     @property
@@ -292,7 +292,7 @@ class ContextAssembly:
                 item = json.loads(self.artifacts.get_for_run(event.run_id, ref))
                 if event.type == EventType.MODEL_MESSAGE and isinstance(item, dict) \
                         and item.get("type") == "reasoning":
-                    # 适配器为界面汇总发出的推理观测不进入历史；推理内容由 MODEL_REASONING 保存（设计说明第 7.6 节）
+                    # 适配器为界面汇总发出的推理观测不进入历史；推理内容由 MODEL_REASONING 保存
                     continue
             elif event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED} and "input_item" in event.payload:
                 if (event.payload.get("activation_id"), event.payload.get("step_id")) in failed_steps:
@@ -311,7 +311,7 @@ class ContextAssembly:
             input_modalities: tuple[str, ...] = ("text",)) -> PinnedStep:
         # 装配这一步的固定部分。待处理指导的原文在这个会话的每一步交给部门：
         # 指导在工作期间到达时，它在这个会话的下一步作为通知加入它的历史
-        # （工单 #558，循环结构第 6 节）；guidance_results 按给定的事件与工作区快照计算
+        # （工单 #558，循环结构 docs/design/department-loop.md「指导」）；guidance_results 按给定的事件与工作区快照计算
         guidance = pending_guidance(projection, frame.department)
         context = self.assembler.assemble(
             projection, department=frame.department, session_id=frame.session_id,
@@ -328,12 +328,12 @@ class ContextAssembly:
         # 在固定部分之后接上部门历史：按激活采用的版本取最近一次压缩的检查点，
         # 历史放不进窗口时装配一次压缩请求，否则装配工作请求。
         # defer_compaction：上一次整理请求失败过，这一步按未压缩的历史照常交出工作请求，整理放到下一步
-        # （设计说明第 8.7 节，工单 #1155）
-        # 回放前按本次调用目标筛掉来源不同的推理内容与该协议专用的条目 ID（设计说明第 7.6 节）
+        # （docs/design/model-management.md「失败处理」，工单 #1155）
+        # 回放前按本次调用目标筛掉来源不同的推理内容与该协议专用的条目 ID
         frame, limits = pinned.frame, pinned.limits
         replay_history = replayable_history(history, pinned.call_target)
         checkpoint, checkpoint_id = self._checkpoint(pinned)
-        # 判断要不要压缩用的用量：上一次工作请求的上游回报用量与本次本地估算中较大的一个（设计说明第 8.2 节）
+        # 判断要不要压缩用的用量：上一次工作请求的上游回报用量与本次本地估算中较大的一个（docs/design/model-management.md「用量」）
         previous = previous_usage_tokens(pinned.events, department=frame.department,
                                         session_id=frame.session_id)
         plan = None if defer_compaction else plan_compaction(

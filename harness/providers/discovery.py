@@ -107,7 +107,7 @@ def probe_connection(
 
 
 def _auth_headers(provider: ProviderDefinition, api_key: str) -> dict[str, str]:
-    # 模型列表地址要求认证时按服务方案规定的认证方式带上凭据（设计说明第 4.2 节）：
+    # 模型列表地址要求认证时按服务方案规定的认证方式带上凭据：
     # 内置方案取预置表的 auth，自定义服务使用 Bearer；没有凭据时不带认证头，由上游决定拒绝
     if not api_key:
         return {}
@@ -126,7 +126,7 @@ def effective_models_url(provider: ProviderDefinition, override: str | None = No
     return provider.base_url.rstrip("/") + "/models"
 
 
-# 上游模型列表描述容量（窗口与输出上限）的写法，按次序取到第一个有效的就停（设计说明第 4.3 节）。
+# 上游模型列表描述容量（窗口与输出上限）的写法，按次序取到第一个有效的就停（docs/design/model-management.md「模型访问定义与准入」）。
 # 固定路径：limit.context / limit.output（OpenCode 一类）、context_length / max_completion_tokens（OpenRouter 一类的顶层写法）、
 # top_provider 下的同名字段、capabilities.contextWindow / capabilities.maxOutput。
 # 各家另有的别名按同样的次序追加：model_info 里以 .context_length 结尾的键（Ollama）、max_context_window_tokens（GitHub Copilot）、
@@ -191,7 +191,7 @@ def _value_at(item: Mapping[str, Any], path: tuple[str, ...]) -> Any:
 
 def _parse_candidates(payload: Any, preset_id: str, *, base_url: str | None = None,
                       capability_index: capabilities.CapabilityIndex | None = None) -> list[dict[str, Any]]:
-    # 候选的来源规则由设计说明第 4.3 节规定；没有明确的输出类型时保持适用。
+    # 候选的来源规则由规定；没有明确的输出类型时保持适用。
     items = payload.get("data") if isinstance(payload, dict) else payload
     if not isinstance(items, list):
         kind = _content_kind(items if isinstance(payload, dict) and "data" in payload else payload)
@@ -292,7 +292,7 @@ def _content_kind(value: Any) -> str:
 
 
 def _connection_reason(exc: httpx.HTTPError) -> str:
-    # 连接失败的原因写成用户看得懂的中文：无法解析主机、连接被拒绝、超时（设计说明第 9.1 节）
+    # 连接失败的原因写成用户看得懂的中文：无法解析主机、连接被拒绝、超时
     if isinstance(exc, httpx.TimeoutException):
         return "请求超时"
     seen: set[int] = set()

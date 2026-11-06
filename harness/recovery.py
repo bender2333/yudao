@@ -1,4 +1,4 @@
-# 动作核实与恢复（工单 #17、#18、#307，恢复契约第 1、4 节）。动作的身份是（激活、步骤、模型给出的调用编号）三元组：
+# 动作核实与恢复（工单 #17、#18、#307，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「四种能力分别验收」、「动作分类与处置」）。动作的身份是（激活、步骤、模型给出的调用编号）三元组：
 # tool_started 在工具许可允许以后、执行之前写入，tool_called/tool_skipped 在执行以后写入。根据这两类事件、
 # 以及保存的模型响应中尚未得到处置的工具调用，把每个动作分成三类：未发送、已完成、结果未知。
 # 恢复观察状态（工单 #18）由 run 的事实与未回答的决定请求得出，不读取时钟、不调用模型。
@@ -20,7 +20,7 @@ from .models import TERMINAL_STATUSES, ArtifactRef, DecisionRequest, Event, Even
 from .streams import RUN_EVENT_VERSION
 from .write_path import NewEvent, Transaction
 
-# 动作的三类处置（恢复契约第 4 节）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
+# 动作的三类处置（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）：completed 已有结果；unknown 已经发出但结果没有得到确认，必须核实或
 # 交给用户；还有一类是没有发出任何事件的调用，由步骤驱动按保存的模型响应补执行，见 engine 的补执行。
 ACTION_COMPLETED = "completed"
 ACTION_UNKNOWN = "unknown"
@@ -110,7 +110,7 @@ def _snapshot_entries(snapshot: Mapping[str, Any] | None) -> dict[str, str] | No
 def verify_file_action(tool: str, args: Mapping[str, Any] | None, *,
                        before_snapshot: Mapping[str, Any] | None,
                        current_entries: Sequence[Sequence[str]]) -> dict[str, Any]:
-    # 文件工具的结果核实（工单 #308，恢复契约第 4 节第 1 步）：把动作前快照、动作参数与当前公开树对比。
+    # 文件工具的结果核实（工单 #308，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」第 1 步）：把动作前快照、动作参数与当前公开树对比。
     # 三种处置：没有变化返回 not_happened；只有目标路径变成目标内容返回 completed；其余返回 unclear。
     # 3.2C 的远程动作后来按同样的方式使用这个函数，不在各处重写。调用方在恢复的事务之内使用，不在这里读写事件
     before = _snapshot_entries(before_snapshot)
@@ -315,13 +315,13 @@ def observation_state(events: Sequence[Event], decisions: Iterable[DecisionReque
 
 
 # ---------------------------------------------------------------------------
-# 启动时继续一个未结束的 run（恢复契约第 5.2 节，工单 #16、#17、#581）
+# 启动时继续一个未结束的 run（恢复契约 docs/design/recovery-contract-and-fault-matrix.md「角色任务的恢复」，工单 #16、#17、#581）
 #
 # 这一块从薄驱动搬来（S4c 工单 #863）：薄驱动只把它接上并转交（`Orchestrator.resume_incomplete_run`），
 # 自己不再写「核对定义版本、核实结果未知的动作、取得执行权」这三步。这里用到的薄驱动只有三件事：
 # 读运行状态投影、读运行工作区、唤醒等待的会话；其余是写入口、工件库与事件。
 #
-# 定义版本不同时发出的决定请求留在这里：它只在继续一个 run 的时候发（骨架与应用设计说明第 6 节），
+# 定义版本不同时发出的决定请求留在这里：它只在继续一个 run 的时候发（骨架与应用 docs/design/skeleton-and-application.md「薄驱动」），
 # 与决定请求的处理（应用层 `decision_flow.py`，工单 #827）不是同一件事。
 # ---------------------------------------------------------------------------
 
@@ -346,9 +346,9 @@ class RunRecovery:
         self._definitions_of = (lambda _run_id: DEFINITIONS) if definitions_of is None else definitions_of
 
     def resume(self, run_id: str) -> tuple[int, Any] | None:
-        # 启动时自动继续一个因进程中断而未结束的 run（ADR-0018、恢复契约第 5.2 节）：
+        # 启动时自动继续一个因进程中断而未结束的 run（ADR-0018、恢复契约 docs/design/recovery-contract-and-fault-matrix.md「角色任务的恢复」）：
         # run 事件版本与当前不同的 run 在启动序列里已经按强制升级处理（工单 #322），这里核对事项记录的
-        # 定义版本，与当前不同就发出 definitions_changed 决定请求交给用户（总体架构第 7.4 节），
+        # 定义版本，与当前不同就发出 definitions_changed 决定请求交给用户（总体架构 docs/design/architecture/overall-architecture.md「用户决定」），
         # 用户选择「按新版本继续」以前不取得执行权；核对通过以后原子取得这个 run 的执行权，
         # 记下中断位置与继续的依据，再从已提交的状态继续运行到终态。
         # 已经结束的 run 不取得执行权、不写事件；有未回答、阻塞整个 run 的决定请求时不继续，交给用户回答
@@ -366,7 +366,7 @@ class RunRecovery:
         return self.claim_and_resume(run_id)
 
     def await_definitions(self, run_id: str) -> None:
-        # 事项记录的定义版本与当前加载的版本不同（总体架构第 7.4 节，#48 登记的架构问题的处理）：
+        # 事项记录的定义版本与当前加载的版本不同（总体架构 docs/design/architecture/overall-architecture.md「用户决定」，#48 登记的架构问题的处理）：
         # 发出一个阻塞整个 run 的决定请求，选项为「按新版本继续」与「停止事项」；选择写入事件。
         # 选择「按新版本继续」以后，这个 run 照常取得执行权并继续运行，后续事件记录新版本；
         # 请求只发一次：已经有过一个定义版本不同的请求时不重复
@@ -398,15 +398,15 @@ class RunRecovery:
         self._writes.transact(run_stream(run_id), request, definitions=self._definitions_of(run_id))
 
     def await_unknown_actions(self, run_id: str) -> None:
-        # 工单 #581（ADR-0038，恢复契约第 4 节）：恢复时找出结果未知的动作。
+        # 工单 #581（ADR-0038，恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）：恢复时找出结果未知的动作。
         # 文件动作（写入、编辑、删除、移动）先按动作前的公开树快照与当前公开树自动核实：
         # 已经完成的记一条 resolution="auto_verify" 的核实记录；没有发生的记一条 resolution="handed_back"
         # 的核实记录，说明核实确认没有发生；unclear 或无法核实的按非文件动作处理。
         # 其余结果未知的动作（命令、检查、读取等）记一条 resolution="handed_back" 的核实记录交还会话，
         # 说明执行被中断、结果未知，由模型检查后决定是否重新执行。
-        # 浏览器动作按设计说明第 9 节核实（工单 #1184）：本机的浏览器会话随进程结束（MCP 的 stdio 会话
+        # 浏览器动作按核实（工单 #1184）：本机的浏览器会话随进程结束（MCP 的 stdio 会话
         # 属于建立它的进程），恢复在启动序列里跑、那时浏览器会话表是空的，所以记会话为中断、交还会话重新
-        # 开始。设计说明第 9 节「会话仍然存在 → 按当前实际状态继续」那一支留给持有会话的执行代理。
+        # 开始。docs/design/browser-and-computer-use.md「恢复契约」「会话仍然存在 → 按当前实际状态继续」那一支留给持有会话的执行代理。
         # 不再发出任何 unknown_action 决定请求，事项直接继续。
         # 浏览器动作的核实要在事务之外先取得（取页面结构是一次 MCP 调用），所以这里先读一次事件
         browser_evidence = self._browser_evidence(run_id)
@@ -449,7 +449,7 @@ class RunRecovery:
                 action_id = identity[2]
                 comparison = comparisons.get(action_id)
                 if info["tool"] in BROWSER_TOOL_NAMES:
-                    # 浏览器动作：本机只可能是会话已经不存在，记会话为中断并交还（设计说明第 9 节）；
+                    # 浏览器动作：本机只可能是会话已经不存在，记会话为中断并交还（docs/design/browser-and-computer-use.md「恢复契约」）；
                     # 「会话仍然存在 → 按当前实际状态继续」留给持有会话的执行代理
                     transaction.append(self._verified_browser(
                         started, projection.status, evidence=browser_evidence.get(action_id)))
@@ -503,7 +503,7 @@ class RunRecovery:
             payload=event_payload,
         )
 
-    # ---- 浏览器动作的核实（工单 #1184，设计说明第 9 节）----
+    # ---- 浏览器动作的核实（工单 #1184）----
 
     def _browser_evidence(self, run_id: str) -> dict[str, dict[str, Any]]:
         # 结果未知的浏览器动作的核实依据：会话记的是哪一次、现在是什么状态。按动作身份（调用编号）对应。
@@ -522,7 +522,7 @@ class RunRecovery:
 
     def _browser_state(self, run_id: str, department: str) -> dict[str, Any]:
         # 这个部门的浏览器会话现在的状态：会话记录已经结束或中断时照记，否则按中断记
-        # （持有会话的进程不在了，页面结构与截图都取不到，恢复按设计说明第 9 节交还会话）
+        # （持有会话的进程不在了，页面结构与截图都取不到，恢复按 docs/design/browser-and-computer-use.md「恢复契约」交还会话）
         try:
             environment = self._run_environment(run_id)
         except Exception:  # noqa: BLE001 - 取不到执行环境时按会话已中断处理，不挡住恢复
@@ -536,7 +536,7 @@ class RunRecovery:
                             "tree_digest": session.get("tree_digest")}}
 
     def _verified_browser(self, started: Any, status: str, *, evidence: Mapping[str, Any] | None) -> NewEvent:
-        # 结果未知的浏览器动作的核实记录（设计说明第 9 节）：会话已经不存在，记会话为中断、把结果交还，
+        # 结果未知的浏览器动作的核实记录（docs/design/browser-and-computer-use.md「恢复契约」）：会话已经不存在，记会话为中断、把结果交还，
         # 模型读到的是「会话已中断，需要重新开始会话」。系统不做用户才能做的「按当前实际状态继续」：
         # 那是决定请求的取值（app/payloads.py 的 resolution=continue），恢复这里没有请求也没有用户
         payload = started.payload or {}
