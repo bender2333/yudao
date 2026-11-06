@@ -14,6 +14,12 @@ ERROR = "error"
 
 TITLE = "内核的代码质量检查（tools.kernel_checks check）"
 
+# 存活变异不通过时给人看的三条出路（设计说明「存活的出口与理由登记」）：补测试、删死代码、
+# 写理由登记（只限等价变异）。这段话跟着工具走，规则文件里不重复。
+MUTATION_OUTLETS = "存活的变异只有三条出路：补一条检查它的测试、删掉死代码、在理由登记里写明理由（只限等价变异）。"
+
+MODE_NAMES = {"change": "改动模式", "full": "全量模式"}
+
 
 def use_utf8_stdout() -> None:
     # 标准输出的编码换成 UTF-8：控制台的默认编码编不了中文时也不会在写报告这一步报错
@@ -53,6 +59,7 @@ def error_report(base: str, mode: str, message: str) -> dict:
         "functions": [],
         "violations": [],
         "reasons": {"path": "harness/tests/kernel/mutation_reasons.json", "count": None, "problems": []},
+        "mutation": None,
         "verdict": ERROR,
         "error": message,
     }
@@ -66,9 +73,9 @@ def render(report: dict) -> str:
         return "\n".join(lines) + "\n"
     lines.append(f"合并基点：{report['merge_base']}（--base {report['base']}）")
     if report["mode"] == "ignore-switches":
-        lines.append("模式：忽略清单里的开关，检查全部内核模块")
+        lines.append("模式：忽略清单里的复杂度开关，检查全部内核模块的复杂度")
     else:
-        lines.append("模式：按清单里的复杂度开关")
+        lines.append("模式：按清单里的开关")
     checked = report["checked_modules"]
     lines.append("检查的内核模块：" + ("、".join(checked) if checked else "无"))
     skipped = report["skipped_modules"]
@@ -93,5 +100,64 @@ def render(report: dict) -> str:
         lines.append(f"理由登记：{reasons['count']} 项（{reasons['path']}）")
     for problem in reasons["problems"]:
         lines.append(f"不通过：理由登记{problem}")
+    lines.extend(_mutation_lines(report.get("mutation")))
     lines.append("结论：" + ("通过" if report["verdict"] == PASS else "不通过"))
     return "\n".join(lines) + "\n"
+
+
+def _mutation_lines(mutation: dict | None) -> list[str]:
+    if mutation is None:
+        return []
+    lines = [
+        f"变异检查（快慢层阈值 {mutation['slow_seconds']:g} 秒，并行 {mutation['jobs']}）"
+    ]
+    if mutation.get("skipped"):
+        lines.append(f"变异检查没有运行：{mutation['skipped']}")
+        return lines
+    baseline = mutation.get("baseline")
+    if baseline is not None:
+        lines.append(f"基线：{baseline['test_files']} 个测试文件，合计 {baseline['seconds']:.1f} 秒")
+    for module in mutation.get("modules", []):
+        lines.extend(_module_lines(module))
+    return lines
+
+
+def _module_lines(module: dict) -> list[str]:
+    lines = [f"  {module['module']}（{MODE_NAMES.get(module['mode'], module['mode'])}）："]
+    lines.append(
+        f"    基线：快层 {len(module['fast_files'])} 个文件 {module['fast_seconds']:.1f} 秒；"
+        f"慢层 {len(module['slow_files'])} 个文件 {module['slow_seconds']:.1f} 秒"
+    )
+    lines.append(
+        f"    生成变异 {module['generated']} 处，杀死 {module['killed']} 处"
+        f"（快层 {module['killed_by_layer']['fast']}、慢层 {module['killed_by_layer']['slow']}），"
+        f"存活 {len(module['survived'])} 处"
+    )
+    if module["uncovered"]:
+        lines.append("    未覆盖的语句：")
+        lines.extend(f"      {item['function']}:{item['lineno']}: {item['text']}" for item in module["uncovered"])
+    if module["survived"]:
+        lines.append("    存活的变异：")
+        for item in module["survived"]:
+            mark = "（命中理由登记，单列）" if item["accepted"] else ""
+            lines.append(f"      {item['function']}:{item['lineno']}: {item['before']} → {item['after']}{mark}")
+    if module["matched"]:
+        lines.append("    命中的登记项：")
+        lines.extend(
+            f"      {item['file']}: {item['function']}: {item['reason']}" for item in module["matched"]
+        )
+    if module["stale"]:
+        lines.append("    过期的登记项：")
+        lines.extend(
+            f"      {item['file']}: {item['function']}: {item['before']} → {item['after']}" for item in module["stale"]
+        )
+    if module["timeouts"]:
+        lines.append("    超时的变异：")
+        lines.extend(
+            f"      {item['function']}:{item['lineno']}: {item['before']} → {item['after']}"
+            f"（第一次 {item['first_layer']} 层超时，重跑 {item['second_outcome']}）"
+            for item in module["timeouts"]
+        )
+    if any(not item["accepted"] for item in module["survived"]):
+        lines.append("    " + MUTATION_OUTLETS)
+    return lines
