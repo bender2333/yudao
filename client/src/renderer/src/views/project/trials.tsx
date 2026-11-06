@@ -317,7 +317,7 @@ function TrialCaseCard(props: { app: ClientApp | null; item: TrialCaseRow }) {
         <ol className="y10-mt-receipts">
           {item.steps.map((step) => (
             <li key={step.key}>
-              <TrialStepItem app={props.app} item={step} />
+              <TrialStepItem app={props.app} item={step} viewPrefix={`page.dept.trials.${item.key}`} />
             </li>
           ))}
         </ol>
@@ -326,7 +326,7 @@ function TrialCaseCard(props: { app: ClientApp | null; item: TrialCaseRow }) {
   );
 }
 
-function TrialStepItem(props: { app: ClientApp | null; item: TrialStepRow }) {
+function TrialStepItem(props: { app: ClientApp | null; item: TrialStepRow; viewPrefix: string }) {
   const item = props.item;
   return (
     <>
@@ -339,7 +339,7 @@ function TrialStepItem(props: { app: ClientApp | null; item: TrialStepRow }) {
             <ShotThumb
               key={shot.key}
               app={props.app}
-              viewId={`page.dept.trials.shot.${item.key}.${index}`}
+              viewId={`${props.viewPrefix}.shot.${item.key}.${index}`}
               shot={shot}
               label={`${item.operation} 的截图 ${index + 1}`}
               accessibility={item.accessibility}
