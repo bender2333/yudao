@@ -329,7 +329,7 @@
         : d.who && d.who.type === 'suborg' ? '「' + d.name + '」，内部是子组织' : '一个自有角色「' + d.name + '」';
     } else if (c.rotation === 'direct') {
       const cp = O.completer(c);
-      who = ds.map(tag).join('、') + (ds.every((d) => !d.who || d.who.type === 'own') ? ['', '', '两', '三', '四', '五', '六'][ds.length] + '个自有角色' : '') + '，靠询问交流' + (cp ? '，' + cp.name + '交完成' : '');
+      who = ds.map(tag).join('、') + (ds.every((d) => !d.who || d.who.type === 'own') ? '，' + ds.length + ' 个自有角色' : '') + '，靠询问交流' + (cp ? '，' + cp.name + '交完成' : '');
     } else who = ds.map(tag).join('、') + '，' + (c.rotation === 'by_outcome' ? '按成果轮转' : O.ROTATIONS[c.rotation]);
     const vs = ds.filter((d) => d.verifies);
     const verify = vs.length ? vs.map((v) => v.name + '核验' + ((byId(c, v.verifies.dept) || {}).name || '？') + (c.rotation === 'direct' ? '交的完成' : '的' + kindName(c, v.verifies.kind))).join('；') : '没有核验角色';

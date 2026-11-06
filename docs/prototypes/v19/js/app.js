@@ -12,12 +12,9 @@
   Y19.views = { register: (name, v) => { views[name] = v; } };
   Y19.actions = { register: (name, fn) => { actions[name] = fn; } };
   Y19.W = () => S.world;
-  // 简洁的对话页（lean.js 注册 overview、outcomes、settings 三个视图）；从「高级」进去以后，S.adv 记着项目，走 v19 之前的页面
+  // 项目一直使用同一套导航；高级配置只影响当前页的内容。
   Y19.leanViews = {};
-  // shortcut: 这几个示例项目还没画到线程骨架，下一版跟上
-  Y19.OLD = ['shop', 'firmware', 'logclean', 'dash'];
-  Y19.isLean = (p) => Boolean(p) && !Y19.OLD.includes(p.id) && S.adv !== p.id;
-  Y19.setAdv = (id) => { S.adv = id; };
+  Y19.isLean = (p) => Boolean(p);
   Y19.state = S;
 
   // ---------------------------------------------------------------- 取数辅助
@@ -111,7 +108,8 @@
     if (S.world.versions.server !== S.world.versions.page) { dom.content.innerHTML = ''; return; }
     const ctx = { route: S.route, world: S.world };
     const p = S.route.params.project ? H.project(S.route.params.project) : null;
-    const view = (Y19.isLean(p) && Y19.leanViews[S.route.name]) || views[S.route.name];
+    const advanced = S.route.query.advanced === '1' || S.route.query.view === 'doc';
+    const view = (!advanced && Y19.isLean(p) && Y19.leanViews[S.route.name]) || views[S.route.name];
     if (S.route.params.project && !p) dom.content.innerHTML = gate('找不到项目', '当前场景里没有项目「' + esc(S.route.params.project) + '」。');
     else if (S.route.name === 'not-found' || !view) dom.content.innerHTML = gate('找不到这个页面', '路径「' + esc(S.route.hash) + '」不对应任何页面。');
     else {
@@ -120,6 +118,7 @@
       if (view.mount) view.mount(ctx, dom.content, p);
       mounted = view;
     }
+    if (advanced && p) dom.content.insertAdjacentHTML('afterbegin', '<div class="ws-advanced-return"><span>高级配置</span><button type="button" class="y19-link" data-act="ws.return">返回原页面</button><small>组织改动影响之后新建的事项；模型与 Prompt 影响下一次模型请求。</small></div>');
     window.scrollTo(0, keepScroll ? y : 0);
     const hit = dom.content.querySelector('.is-target');
     if (hit && hit.scrollIntoView) hit.scrollIntoView({ block: 'center' });
@@ -341,7 +340,7 @@
       ['sidebar', 'topbar', 'tabs', 'content', 'toolbar', 'modal-root', 'toast-root', 'window-note'].forEach((id) => { dom[id.replace('-root', '').replace('window-', '')] = document.getElementById('y19-' + id); });
       const theme = Y19.store.get('theme', 'system', true);
       if (theme !== 'system') document.documentElement.dataset.theme = theme;
-      Y19.org.draft.prune(['orders', 'shop', 'logclean', 'blog', 'dash', 'signup', 'firmware']); // 草稿存在浏览器里；新建的项目刷新后就没有了，它们的草稿一起丢掉
+      Y19.org.draft.prune(['orders', 'shop', 'logclean', 'blog', 'dash', 'signup', 'firmware', 'pool-demo', 'ops-demo']);
       S.world = Y19.buildWorld(S.scenario);
       toolbar();
       window.addEventListener('hashchange', handle);
