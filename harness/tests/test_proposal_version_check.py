@@ -141,8 +141,14 @@ def _activate_until(system, run_id, revision):
     return projection
 
 
+def _basis_errors(projection):
+    return [item for rejection in projection.rejections for item in rejection["errors"]]
+
+
 def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path):
     # 放行前的最后一道关：交付本身依据的是已被取代的产品规格，依据字段写对了也不放行
+    # （保留：按测试分层设计说明 13.1 特别规则 7 与 #1480，守内核模块行为的结论在内核目录里要有一份，
+    #  `referenced_current` 在内核目录里还没有副本，先补副本再删由架构师决定）
     system, run_id = _system(tmp_path, product_spec(), delivery_turn())
     while system.project(run_id).delivery_spec is None:
         projection = system.activate_once(run_id)
@@ -156,20 +162,6 @@ def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path)
                                                  basis_delivery_spec_hash=projection.delivery_spec.content_hash), tightening=WATCHED_OUTPUTS)
     assert not decision.accepted
     assert "product_spec_hash" in [error["field"] for error in decision.error_dicts]
-
-
-def _basis_errors(projection):
-    return [item for rejection in projection.rejections for item in rejection["errors"]]
-
-
-def test_a_first_spec_that_declares_a_hash_is_rejected_by_the_host(tmp_path):
-    # 第一份规格声明了不存在的依据：activate_once 的提交判断拒绝，错误要求 null
-    system, run_id = _system(tmp_path, product_spec(basis_product_spec_hash="sha256:" + "1" * 64))
-    rejected = system.activate_once(run_id)
-    [error] = _basis_errors(rejected)
-    assert error["field"] == "basis_product_spec_hash" and "null" in error["message"]
-    assert not _events(system, run_id, EventType.SPEC_ACCEPTED)
-    assert rejected.product_spec is None
 
 
 def test_a_spec_that_omits_the_basis_is_rejected_by_the_host(tmp_path):

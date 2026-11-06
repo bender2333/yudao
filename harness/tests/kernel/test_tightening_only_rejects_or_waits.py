@@ -157,6 +157,8 @@ def test_a_kernel_rejection_stands_when_the_tightening_check_passes(tmp_path):
                                  facts=facts, events=system.store.list_events(run_id), tightening=_Passes())
     assert not rejected.accepted
     assert rejected.errors[0].field.startswith("basis"), rejected.errors[0].to_dict()
+    # 没有当前 PRD 时声明了依据：错误要求 null（第一份规格声明依据的同一支）
+    assert "null" in rejected.errors[0].message, rejected.errors[0].to_dict()
 
 
 def test_a_rejection_from_the_tightening_check_is_reported_with_its_own_reason(tmp_path):

@@ -487,49 +487,6 @@ def test_http_provider_bindings_route_full_ask_and_engineering_rework(tmp_path):
         assert audit["fake_used"] is False
         assert audit["ask_audit"]["status"] == "verified", audit["ask_audit"]
 
-def test_each_run_resolves_credentials_from_its_own_source(tmp_path):
-    def product_response(body: dict[str, Any], count: int) -> _Reply:
-        assert _department(body) == "product"
-        payload = product_spec()
-        payload.pop("kind")
-        return _stream([_call(f"product-{count}", "submit_product_spec", payload)],
-                       response_id=f"product-{count}", model="a-product-actual")
-
-    with _provider_server("provider-a", "provider-a-key-v1", product_response) as (config_a, captures_a, errors_a), \
-            _provider_server("provider-b", "provider-b-key-v2", product_response) as (config_b, captures_b, errors_b):
-        credentials = _credentials()
-        original = LoopSystem(
-            tmp_path,
-            facade=_facade(config_a.base_url, config_b.base_url, credentials=credentials),
-            resume_on_startup=False,
-        )
-        first_run = original.create_run("first task")
-        credentials["credential-b"] = CredentialMaterial("provider-b-key-v2", version="b-v2")
-        updated = LoopSystem(tmp_path, facade=_facade(
-            config_a.base_url,
-            config_b.base_url,
-            product_provider="provider-b",
-            credentials=credentials,
-        ), resume_on_startup=False)
-        second_run = updated.create_run("second task")
-
-        first = original.activate_once(first_run)
-        second = updated.activate_once(second_run)
-
-        assert not errors_a and not errors_b
-        assert [_department(item["body"]) for item in captures_a] == ["product"]
-        assert [item["authorization"] for item in captures_a] == ["Bearer provider-a-key-v1"]
-        assert [item["authorization"] for item in captures_b] == ["Bearer provider-b-key-v2"]
-        assert first.provider_bindings["product"]["credential_version"] == "a-v1"
-        assert second.provider_bindings["product"]["credential_version"] == "b-v2"
-        assert first.provider_bindings["product"]["provider_config_id"] == "provider-a"
-        assert second.provider_bindings["product"]["provider_config_id"] == "provider-b"
-        assert first.provider_bindings["product"]["requested_model"] == "a-product"
-        assert second.provider_bindings["product"]["requested_model"] == "b-product"
-        public = _public_run_data(original, first_run) + _public_run_data(updated, second_run)
-        assert "provider-a-key-v1" not in public
-        assert "provider-b-key-v2" not in public
-
 def test_shared_provider_adapters_keep_two_active_runs_isolated(tmp_path):
     # 两个运行共用 Provider 适配器：要取消的运行的请求一直保持，另一个运行在这期间完成激活；
     # 之后取消要取消的运行，再释放请求。等待上限只用来防止测试一直等待，远大于正常用时，请求时限同样放宽

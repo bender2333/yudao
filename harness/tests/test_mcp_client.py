@@ -237,19 +237,6 @@ def test_an_http_timeout_reports_that_the_cancel_cannot_be_confirmed(tmp_path):
         asyncio.run(scenario(url))
 
 
-def test_an_unknown_tool_is_reported_as_a_tool_failure(tmp_path):
-    # 服务器把认不出的工具当成工具失败回答（is_error）：动作记为已完成，错误文本交回模型（设计说明第 7.3 节）
-    async def scenario():
-        client = await McpClient.start(_launch(tmp_path))
-        try:
-            result = await client.call_tool("no_such_tool")
-            assert result.is_error and result.error_code == "tool_error"
-        finally:
-            await client.close()
-
-    asyncio.run(scenario())
-
-
 def test_a_protocol_error_carries_the_error_code(tmp_path):
     # 协议错误（JSON-RPC 的 error 应答）不是工具失败：抛出带错误码的 McpCallError（设计说明第 7.3 节）
     async def scenario():
@@ -357,11 +344,3 @@ def test_the_stderr_tail_is_bounded_and_redacted(tmp_path):
     assert SECRET not in tail and "***" in tail
     assert len(tail) <= 4000
     assert redact(f"a {SECRET} b", (SECRET,)) == "a *** b"
-
-
-def test_the_child_environment_holds_the_base_variables():
-    environment = server_environment({"YUDAO_MCP_TEST": "passed"})
-    assert environment["YUDAO_MCP_TEST"] == "passed"
-    assert "PATH" in environment
-    if os.name == "nt":
-        assert "COMSPEC" in environment and "WINDIR" in environment

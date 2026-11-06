@@ -3,7 +3,8 @@
 # 1. mcp_servers.save 保存非秘密设置与凭据引用，project.settings 读回，版本加一；
 # 2. 基准版本过期时拒绝并带当前版本，提示重新读取；
 # 3. 名称与传输等字段级校验有错误；
-# 4. 凭据值不进入保存的事件、事项创建事实、run 创建载荷与导出（只存引用）；
+# 4. 凭据只以引用名保存（值一栏为空），值的解析在调用时按凭据来源发生；值的有效核对在
+#    test_mcp_probe 与 test_mcp_tools_integration（先设置覆盖再查导出）；
 # 5. 事项创建时把当时的设置冻结进事项创建事实与 run_created；新建、排队、升级重启与启动补建
 #    都读冻结的那份；事项创建以后修改项目设置，已有事项的 run 仍用旧设置；
 # 6. 运行投影只保存版本与摘要，不保存整份设置；旧事件没有 MCP 设置时按空设置读取；
@@ -13,34 +14,29 @@
 # restart_work_item_for_upgrade、启动补建读的都是 _work_item_created 写进事项事实的同一份冻结值）。
 #
 # 层：模块层（FakeAdapter 的一次激活或不出激活；SQLite 事件库与工作区文件，不用网络与完整循环，
-# 测试分层设计说明第 2 节）。守 R1（边界与冻结）、R2（第二环的合同：项目流事件与 run_created 载荷、
-# 两端共读的事件种类清单）与 R3（用户读到的设置与保存的一致，凭据值不出现）。
+# 测试分层设计说明第 2 节）。守 R1（边界与冻结）、R2（第二环的合同：项目流事件与 run_created 载荷；
+# 两端共读的事件种类清单由 test_event_type_fixture.py、test_event_classification.py 与
+# test_project_stream_fields.py 逐种核对）与 R3（用户读到的设置与保存的一致，凭据只以引用名出现）。
 
 from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from pathlib import Path
 
 import pytest
 
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
-from harness.app.contracts import EVENT_TYPES
 from harness.event_store import project_stream, run_stream
-from harness.models import ArtifactRef, EventType, ProjectEvent, ProjectEventType, RunProjection, new_id
+from harness.models import EventType, ProjectEventType, RunProjection, new_id
 from harness.proposals import product_spec
-from harness.projects import McpServersConflict, McpServersInvalid, mcp_document_digest, normalize_mcp_servers
+from harness.projects import McpServersConflict, McpServersInvalid, normalize_mcp_servers
 from harness.projection import project_run
 from harness.runtime import LoopSystem
-from harness.streams import PROJECT_EVENT_TYPES
-from harness.tests.helpers import happy_script
-from harness.tests.project_stream_fields import load_manifest
 from harness.write_path import NewProjectEvent
 
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 SECRET = "sk-super-secret-value-236"
-FIXTURE = Path(__file__).resolve().parents[2] / "client" / "tests" / "fixtures" / "event-types.json"
 
 STDIO_SERVER = {
     "time": {
@@ -181,29 +177,6 @@ def test_a_tool_snapshot_with_a_mismatched_config_digest_is_rejected_and_unprobe
 
 
 # ---------------------------------------------------------------------------
-# 凭据值不出现（验收 2）
-
-
-def test_credential_values_do_not_enter_events_projections_or_the_run_created_payload(tmp_path):
-    # 凭据只以名称进入设置：值按现有的边界由调用时的凭据来源解析，不进入事件、投影、导出与日志
-    system = _system(tmp_path)
-    project_id = system.projects.register("凭据", GOAL)
-    _save(system, project_id, STDIO_SERVER, base_version=0)
-    _item, run_id = system.projects.start_work_item(project_id, GOAL)
-
-    exported = json.dumps({
-        "events": [event.to_dict() for event in system.store.list_events(run_id)],
-        "project_events": [event.to_dict() for event in system.store.list_project_events(project_id)],
-        "projection": project_run(system.store, run_id).canonical_state(),
-        "run_created_payload": _created_payload(system, run_id),
-        "settings": system.projects.read_mcp_servers(project_id),
-    }, ensure_ascii=False)
-    assert SECRET not in exported
-    assert "MCP_TIME_KEY" in exported  # 引用在，值不在
-    system.close()
-
-
-# ---------------------------------------------------------------------------
 # 冻结与继承（验收 3）
 
 
@@ -296,21 +269,6 @@ def test_a_queued_work_item_freezes_the_settings_at_queue_time(tmp_path):
 # 投影与旧事件（验收 4）
 
 
-def test_the_run_projection_keeps_only_version_digest_and_names(tmp_path):
-    # 运行投影只保存版本或摘要，不保存整份设置（验收 4）
-    system = _system(tmp_path)
-    project_id = system.projects.register("投影", GOAL)
-    _save(system, project_id, STDIO_SERVER, base_version=0)
-    _item, run_id = system.projects.start_work_item(project_id, GOAL)
-    projection = project_run(system.store, run_id)
-    state = projection.canonical_state()
-    assert state["mcp_servers_version"] == 1
-    assert state["mcp_servers_names"] == ["time"]
-    mcp_fields = json.dumps({key: value for key, value in state.items() if key.startswith("mcp")})
-    assert "uvx" not in mcp_fields and "mcp-server-time" not in mcp_fields
-    system.close()
-
-
 def test_old_events_without_mcp_settings_read_as_empty_settings(tmp_path):
     # 旧事件没有 MCP 设置时按空设置读取：手工写一条旧形状的 work_item_created 与 run_created，
     # 重放以后事项与 run 都没有 MCP 设置，保存了新设置也不改变它们
@@ -341,16 +299,6 @@ def test_old_events_without_mcp_settings_read_as_empty_settings(tmp_path):
     assert old_projection.mcp_servers_version == 0
     assert old_projection.mcp_servers_names == [] and old_projection.mcp_servers_digest == ""
     system.close()
-
-
-def test_the_new_project_stream_event_is_registered_on_both_ends():
-    # R2：新增项目流事件在服务端清单与客户端 event-types.json 登记；
-    # coverage.ts 的归属核对由客户端单元测试读这份夹具完成
-    assert "mcp_servers_configured" in PROJECT_EVENT_TYPES
-    assert "mcp_servers_configured" in EVENT_TYPES
-    manifest = load_manifest()
-    assert "mcp_servers_configured" in manifest["fields"]
-    assert "mcp_servers_configured" in json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
