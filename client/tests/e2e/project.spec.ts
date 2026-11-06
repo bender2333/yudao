@@ -236,7 +236,7 @@ async function openDecisions(page: Page): Promise<{ decision_id: string; version
 
 test.describe("项目页面（1440×900）", () => {
   
-  test("概览：摘要、循环画面、看板与流转记录都来自查询", async () => {
+  test("概览：摘要、此刻与部门、看板与流转记录都来自查询", async () => {
     const client = await openProjectClient({ width: 1440, height: 900 });
     const errors = watchErrors(client);
     const page = client.page;
@@ -251,9 +251,19 @@ test.describe("项目页面（1440×900）", () => {
       await expect(summary).toContainText("当前成果");
       await expect(summary).toContainText(ADOPTED_SUMMARY);
       await expect(summary).toContainText("共 1");
-      // 循环画面由工单 #82 填入：像素楼层画在画布上，画布之外还有文字列表
-      const floor = await section(page, "循环画面");
-      await expect(floor.locator(".floor-screen canvas")).toHaveCount(1);
+      // 循环在页面上（工单 #1416、#1417）：原来只在循环画面的画布上看得到的循环事实，现在由
+      // 「此刻」与「部门」两节按同一份 project.loop 写。这个项目只有一个已采纳的事项，没有进行中的事项，
+      // 因此「此刻」照实写没有在做的事与空着的执行槽位，「部门」写没有部门在等
+      const now = await section(page, "此刻");
+      await expect(now).toContainText("此刻在做什么");
+      await expect(now).toContainText("已用时间与上限");
+      await expect(now).toContainText("执行槽位");
+      await expect(now).toContainText("大厅");
+      await expect(now.locator(".line").filter({ hasText: "此刻在做什么" }).locator(".value")).toHaveText("没有在做的事");
+      await expect(now.locator(".line").filter({ hasText: "执行槽位" }).locator(".value"))
+        .toHaveText("没有事项正在执行，没有事项在等执行槽位");
+      const departments = await section(page, "部门");
+      await expect(departments).toContainText("项目现在没有进行中的事项，没有部门在等");
       const board = await section(page, "事项看板");
       // 部门列取自事项的部门（工单 #1372）：这个项目只有一个已采纳的事项，没有进行中的事项，
       // 因此只有按状态分的四组，没有部门列

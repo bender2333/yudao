@@ -203,23 +203,12 @@ test.describe("系统首页（1920×1080）", () => {
 
 // 事项的标题：决定卡片写它，不写事项标识（工单 #802）
 
-// 决定卡片上的两个链接（工单 #1161）：卡片出现在五处——顶栏「待你决定」下拉、首页「待你决定」、
-// 概览页循环画面里大厅的板、画面下方收起的文字列表、恢复页。五处各点一次两个链接，都要到对应的页面；
+// 决定卡片上的两个链接（工单 #1161）：卡片出现在页面的四处——顶栏「待你决定」下拉、首页「待你决定」、
+// 概览页画面下方收起的文字列表、恢复页。四处各点一次两个链接，都要到对应的页面；
 // 「前往本项目的部门设置」还要落在设置页的部门设置那一节。
-// 画面里的卡片是像素画的：链接画出来的按钮与它的点击区经 __floorViewForTest 读出来，
-// 再在画布上按缩放换成页面坐标真点一下。
-type FloorHooks = {
-  decisions: () => { faces: { id: string }[]; card: { openId: string | null } };
-  openCard: (id: string) => void;
-  cardLinks: () => {
-    href: string;
-    drawn: { x: number; y: number; w: number; h: number };
-    hit: { x: number; y: number; w: number; h: number };
-  }[];
-  size: () => { W: number; H: number };
-};
-
-test("决定卡片上的两个链接：五处卡片都到对应的页面，部门设置落在那一节", async () => {
+// 大厅板上的那张卡片画在画布上（那是画面自己的元件），这里不点它（工单 #1417）：基础部分的端到端只看页面，
+// 画布上的链接与它的点击区由画面自己的测试读。
+test("决定卡片上的两个链接：页面四处卡片都到对应的页面，部门设置落在那一节", async () => {
   test.setTimeout(240_000);
   const client = await startClient(backend, { width: 1440, height: 900 });
   const { page } = client;
@@ -299,91 +288,6 @@ test("决定卡片上的两个链接：五处卡片都到对应的页面，部�
       await expect(card).toBeVisible();
       return card;
     });
-
-    // 五、循环画面里大厅板上的卡片：打开卡片，读链接的两块位置（画出来的按钮与它的点击区），
-    // 在画布上按缩放换成页面坐标真的点一下
-    const openFloorCard = async (): Promise<void> => {
-      // 离开过这一页时，上一个画面的测试入口还挂在 window 上（它已经不画了，读出来的点击区是旧的）：
-      // 先清掉，等这一趟挂上来的新画面
-      await goTo("#/home");
-      await page.evaluate(() => {
-        delete (window as unknown as { __floorViewForTest?: unknown }).__floorViewForTest;
-      });
-      await goTo(`#/p/${projectId}/overview`);
-      // 顶栏的「待你决定」下拉盖在循环画面上面（第二条用例打开过它）：留着它，点在画布上其实点到了
-      // 下拉里的卡片，点不到画面里的链接
-      const opener = page.locator("button.status-item.is-decisions").filter({ hasText: "待你决定 · " }).first();
-      if (await opener.getAttribute("aria-expanded") === "true") {
-        await opener.click();
-      }
-      await page.waitForFunction((id) => {
-        const hooks = (window as unknown as { __floorViewForTest?: FloorHooks }).__floorViewForTest;
-        return hooks !== undefined && hooks.decisions().faces.some((face) => face.id === id);
-      }, decision.decision_id);
-      const canvas = page.locator(".floor-canvas canvas");
-      await canvas.scrollIntoViewIfNeeded();
-      await page.evaluate((id) => {
-        (window as unknown as { __floorViewForTest?: FloorHooks }).__floorViewForTest?.openCard(id);
-      }, decision.decision_id);
-      await expect.poll(async () => page.evaluate(() => {
-        const hooks = (window as unknown as { __floorViewForTest?: FloorHooks }).__floorViewForTest;
-        return hooks === undefined ? null : hooks.decisions().card.openId;
-      })).toBe(decision.decision_id);
-      // 卡片打开以后画一帧，链接的点击区才被收集
-      await expect.poll(async () => page.evaluate(() => {
-        const hooks = (window as unknown as { __floorViewForTest?: FloorHooks }).__floorViewForTest;
-        return hooks === undefined ? 0 : hooks.cardLinks().length;
-      })).toBeGreaterThan(0);
-    };
-
-    for (const [href, landed] of [
-      ["#/sys/models", page.getByRole("heading", { name: "模型管理", exact: true }).first()],
-      [settingsHash, page.locator("#departments")],
-    ] as [string, Locator][]) {
-      await openFloorCard();
-      const found = await page.evaluate((target) => {
-        const hooks = (window as unknown as { __floorViewForTest?: FloorHooks }).__floorViewForTest;
-        return hooks === undefined ? null : hooks.cardLinks().find((link) => link.href === target) ?? null;
-      }, href);
-      expect(found, `画面里的卡片上没有指向 ${href} 的链接`).not.toBeNull();
-      const size = await page.evaluate(() => {
-        const hooks = (window as unknown as { __floorViewForTest?: FloorHooks }).__floorViewForTest;
-        return hooks === undefined ? null : hooks.size();
-      });
-      const canvas = await page.locator(".floor-canvas canvas").boundingBox();
-      if (found === null || size === null || canvas === null) {
-        throw new Error("画面里的卡片没有可点的链接，或者没有画布");
-      }
-      // 链接的点击区放大到这一行文字：画出来的是 12 像素高的按钮，点击区上下各放宽几个像素，
-      // 点在这一行文字的上沿（按钮上沿外的纸上）也算点中（工单 #1161 第 2 条）
-      expect(
-        found.hit.y,
-        `画面里「${href}」的点击区没有放大到这一行文字：画出来的按钮从 ${found.drawn.y} 开始，点击区也从那里开始`,
-      ).toBeLessThan(found.drawn.y);
-      for (const [where, y] of [
-        ["按钮中间", found.drawn.y + found.drawn.h / 2],
-        ["这一行的上沿", found.hit.y + 1],
-      ] as [string, number][]) {
-        if (where === "这一行的上沿") {
-          await openFloorCard();
-        }
-        const box = await page.locator(".floor-canvas canvas").boundingBox();
-        if (box === null) {
-          throw new Error("概览页没有循环画面的画布");
-        }
-        await page.mouse.click(
-          box.x + ((found.drawn.x + found.drawn.w / 2) * box.width) / size.W,
-          box.y + (y * box.height) / size.H,
-        );
-        await expect.poll(hashOf, { message: `画面里的卡片点「${href}」（${where}）以后地址没变` }).toBe(href);
-        await expect(landed, `画面里的卡片点「${href}」（${where}）以后没有到对应的页面`).toBeVisible();
-      }
-      // 部门设置那一节要在眼前，不是停在设置页的顶部
-      if (href === settingsHash) {
-        await expect(page.locator("#departments").getByRole("heading", { name: "部门设置", exact: true }))
-          .toBeInViewport({ ratio: 0.05 });
-      }
-    }
 
     expect(errors).toEqual([]);
   } finally {
