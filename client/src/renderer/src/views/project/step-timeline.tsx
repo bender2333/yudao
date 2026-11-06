@@ -8,13 +8,16 @@ import type { ClientApp } from "../../contract/client-app";
 import type {
   ActionView,
   EventDetailResult,
+  RunRecoveryResult,
   RunStepView,
   RunStepsResult,
   StepText,
 } from "../../api/generated/types.gen";
 import { readFailureText } from "../../contract/read-failure";
-import { Empty, EventDetail, Tag } from "./common";
+import { actionKind, actionRow, toolOutput, type ActionRowView, type ExternalSourceRefView } from "./action-table.ts";
+import { Empty, EventDetail, Modal, Tag } from "./common";
 import { RunningBackgroundCommands } from "./department.tsx";
+import { ExternalSource } from "./external-source.tsx";
 import { formatTime } from "./labels";
 import { useSnapshot } from "./use-snapshot";
 import {
@@ -59,6 +62,20 @@ export function StepTimeline(props: { app: ClientApp; runId: string | null; depa
     { event_id: openEvent ?? "" },
     openEvent === null,
   );
+  // 结果未知的动作交还给模型的内容（工单 #238）：恢复查询里每个动作一条，按动作编号对到动作行上
+  const recovery = useSnapshot<RunRecoveryResult>(
+    props.app,
+    "page.dept.steps.recovery",
+    "run.recovery",
+    { run_id: props.runId ?? "" },
+    props.runId === null,
+  );
+  const returned = new Map<string, string>();
+  for (const entry of recovery.data?.unknown_actions ?? []) {
+    if (entry.returned !== null && entry.returned !== "") {
+      returned.set(entry.action_id, entry.returned);
+    }
+  }
   const toggle = (eventId: string) => {
     setExpanded((current) => ({ ...current, [eventId]: current[eventId] !== true }));
   };
@@ -86,7 +103,8 @@ export function StepTimeline(props: { app: ClientApp; runId: string | null; depa
               <li key={step.step_id} className="y10-ws-step">
                 <StepHeader step={step} />
                 {stepBlocks(step).map((block) => block.kind === "actions" ? (
-                  <ActionList key="actions" actions={block.actions} onOpenEvent={setOpenEvent} />
+                  <ActionList key="actions" app={props.app} actions={block.actions} returned={returned}
+                              onOpenEvent={setOpenEvent} />
                 ) : (
                   <section key={block.kind} className={`y10-ws-step-block is-${block.kind}`}>
                     <h3 className="y10-h3 sub">{BLOCK_TITLES[block.kind]}</h3>
@@ -108,7 +126,8 @@ export function StepTimeline(props: { app: ClientApp; runId: string | null; depa
           {unassigned === null ? null : (
             <section className="y10-ws-step-block is-unassigned">
               <h3 className="y10-h3 sub">{unassigned.title}</h3>
-              <ActionList actions={unassigned.actions} onOpenEvent={setOpenEvent} />
+              <ActionList app={props.app} actions={unassigned.actions} returned={returned}
+                          onOpenEvent={setOpenEvent} />
             </section>
           )}
         </>
@@ -217,38 +236,125 @@ function FullText(props: {
   return <div className="y10-ws-fulltext">{value}</div>;
 }
 
-// 动作列表：每个动作两行。第一行是工具名、命令原文与状态词；第二行是主机回执（结果、输出引用、时间）
-function ActionList(props: { actions: ActionView[]; onOpenEvent: (eventId: string) => void }) {
+// 动作列表：每个动作两行。其余工具的第一行是工具名、命令原文与状态词，第二行是主机回执
+// （结果、输出引用、时间）；取回与 MCP 调用的第一行是类型、目标与状态，第二行是结果、耗时、
+// 外部来源的链接与时间，结果未知时写交还给模型的内容（工单 #238）
+function ActionList(props: {
+  app: ClientApp;
+  actions: ActionView[];
+  returned: ReadonlyMap<string, string>;
+  onOpenEvent: (eventId: string) => void;
+}) {
   return (
     <ul className="y10-ws-acts">
-      {props.actions.map((action) => {
-        const lines = actionLines(action);
-        const eventId = action.receipt === null ? "" : action.receipt.event_id;
-        return (
-          <li key={action.action_id} className={`y10-ws-act is-${action.status}`}>
-            <div className="y10-ws-act-line">
-              <strong className="y10-ws-act-tool">{lines.tool}</strong>
-              {lines.command === "" ? null : (
-                <code className="y10-code y10-ws-act-command">{lines.command}</code>
-              )}
-              <span className="y10-ws-act-status">{lines.status}</span>
-            </div>
-            <div className="y10-ws-receipt">
-              <span className="y10-ws-receipt-label">主机回执</span>
-              <span className="y10-ws-receipt-text">{lines.receipt}</span>
-              <span className="y10-muted">输出引用：{lines.output}</span>
-              <button
-                type="button"
-                className="y10-link link"
-                disabled={eventId === ""}
-                onClick={() => props.onOpenEvent(eventId)}
-              >
-                {lines.time}
-              </button>
-            </div>
-          </li>
-        );
-      })}
+      {props.actions.map((action) => (
+        <ActionItem
+          key={action.action_id}
+          app={props.app}
+          action={action}
+          returned={props.returned.get(action.action_id) ?? ""}
+          onOpenEvent={props.onOpenEvent}
+        />
+      ))}
     </ul>
   );
+}
+
+// 一个动作两行。取回与 MCP 调用的结果工件只对 MCP 读一次（event.detail 的 artifacts.output）：
+// 服务器与工具的原名、耗时与外部来源的引用在它里面；取回的回执自带这些字段，不用再读
+function ActionItem(props: {
+  app: ClientApp;
+  action: ActionView;
+  returned: string;
+  onOpenEvent: (eventId: string) => void;
+}) {
+  const kind = actionKind(props.action);
+  const eventId = props.action.receipt === null ? "" : props.action.receipt.event_id;
+  const detail = useSnapshot<EventDetailResult>(
+    props.app,
+    `page.dept.steps.tool.${props.action.action_id}`,
+    "event.detail",
+    { event_id: eventId },
+    eventId === "" || kind !== "mcp",
+  );
+  const [source, setSource] = useState<ExternalSourceRefView | null>(null);
+  if (kind !== "other") {
+    const row = actionRow(props.action, {
+      returned: props.returned,
+      output: kind === "mcp" ? toolOutput(detail.data?.artifacts) : null,
+    });
+    return (
+      <li className={`y10-ws-act is-${props.action.status} is-${kind}`}>
+        <div className="y10-ws-act-line">
+          <strong className="y10-ws-act-tool">{row.typeName}</strong>
+          {row.target === "" ? null : (
+            <code className="y10-code y10-ws-act-target">{row.target}</code>
+          )}
+          <span className="y10-ws-act-status">{row.statusName}</span>
+        </div>
+        <div className="y10-ws-receipt">
+          <span className="y10-ws-receipt-label">{receiptLabel(row)}</span>
+          <span className="y10-ws-receipt-text">
+            {row.returnedText === "" ? row.summaryText : row.returnedText}
+          </span>
+          <span className="y10-muted">耗时：{row.durationText}</span>
+          {row.external === null ? null : (
+            <button
+              type="button"
+              className="y10-link link"
+              onClick={() => setSource(row.external)}
+            >
+              查看外部来源
+            </button>
+          )}
+          <button
+            type="button"
+            className="y10-link link"
+            disabled={eventId === ""}
+            onClick={() => props.onOpenEvent(eventId)}
+          >
+            {formatTime(props.action.created_at)}
+          </button>
+        </div>
+        {source === null ? null : (
+          <Modal title="外部来源" onClose={() => setSource(null)}>
+            <ExternalSource app={props.app} source={source} />
+          </Modal>
+        )}
+      </li>
+    );
+  }
+  const lines = actionLines(props.action);
+  return (
+    <li className={`y10-ws-act is-${props.action.status}`}>
+      <div className="y10-ws-act-line">
+        <strong className="y10-ws-act-tool">{lines.tool}</strong>
+        {lines.command === "" ? null : (
+          <code className="y10-code y10-ws-act-command">{lines.command}</code>
+        )}
+        <span className="y10-ws-act-status">{lines.status}</span>
+      </div>
+      <div className="y10-ws-receipt">
+        <span className="y10-ws-receipt-label">主机回执</span>
+        <span className="y10-ws-receipt-text">{lines.receipt}</span>
+        <span className="y10-muted">输出引用：{lines.output}</span>
+        <button
+          type="button"
+          className="y10-link link"
+          disabled={eventId === ""}
+          onClick={() => props.onOpenEvent(eventId)}
+        >
+          {lines.time}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+// 第二行的标题：交还的内容、拒绝原因与主机回执三选一
+function receiptLabel(row: ActionRowView): string {
+  if (row.returnedText !== "") {
+    return "交还给模型的内容";
+  }
+  return row.statusName === "被拒绝" ? "拒绝原因" : "主机回执";
 }
