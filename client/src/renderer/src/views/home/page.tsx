@@ -1,6 +1,10 @@
-// 系统首页（原型 v8 设计说明第 4 节，工单 #175）：从上到下依次是状态项、楼、待你决定、
+// 系统首页（原型 v8 设计说明第 4 节，工单 #175）：从上到下依次是状态项、项目一览、楼、待你决定、
 // 离开期间的报告、项目列表。数据来自 system.status、decisions.list、home.away_report 与 projects.list。
 // 楼由像素画面五（#178）画出（views/home/building-section）。页面上的数据都来自查询与事件流。
+//
+// 工单 #1416：原来只在楼的画布上看到的三样事实（此刻在做什么、事项在哪个部门、有没有事项在等执行槽位）
+// 补进「项目」一节的每一行；它们与楼一样由每个项目的 project.loop 推出（useProjectLoops 在这里取一次，
+// 楼只拿结果画）。画布照旧挂着，由后面的工单搬走。
 
 import { useEffect, useMemo, useState } from "react";
 import type {
@@ -8,6 +12,7 @@ import type {
   DecisionList,
   DecisionView,
   ProjectList,
+  ProjectLoopResult,
   ProjectRow,
   ProjectOverviewResult,
   SystemStatus,
@@ -16,12 +21,13 @@ import type { ClientApp } from "../../contract/client-app";
 import { Loading, Section } from "../project/common";
 import { readFailureText } from "../../contract/read-failure";
 import { formatTime } from "../project/labels";
+import { projectDoingText, projectItemsByDepartmentText, projectSlotText } from "../project/floor-text";
 import { useSnapshot } from "../project/use-snapshot";
 import { projectOnboardingMark } from "../project/onboarding";
 import { DecisionCardList } from "../decisions/card";
 import { sortByRequested } from "../decisions/card-logic";
 import { statusItems, type StatusItem } from "./status-items";
-import { BuildingSection } from "./building-section";
+import { BuildingSection, type ProjectLoops } from "./building-section";
 import { AwayReportSection, type AwayRangeId } from "./away-report";
 import { ticksInRefs, ticksOf } from "../timeline/logic";
 import { paths } from "../../shell/routing";
@@ -98,6 +104,8 @@ export function HomePage(props: {
   const replaying = at !== null;
   // 项目列表读取失败时的原因：有它时这一节说「读不出来」，不说「没有项目」（工单 #728）
   const projectError = replaying ? replayProjects.error : projects.error;
+  // 每个项目的 project.loop：项目一览的三样事实与楼共用这一份（回放时按位置读）
+  const loops = useProjectLoops(props.app, replaying ? replayProjects.data : projects.data, at);
 
   return (
     <div className={`y10-home page home${replaying ? " is-replay" : ""}`}>
@@ -109,6 +117,7 @@ export function HomePage(props: {
         projects={replaying ? replayProjects.data : projects.data}
         error={replaying ? replayProjects.error : projects.error}
         at={at}
+        loops={loops}
         onNavigate={props.onNavigate}
       />
 
@@ -146,7 +155,7 @@ export function HomePage(props: {
         onNavigate={props.onNavigate}
       />
 
-      <Section id="home-projects" title="项目" note="按项目列出长期目标、当前成果与等待数量">
+      <Section id="home-projects" title="项目" note="每个项目一行：此刻在做什么、事项在哪个部门、有没有事项在等执行槽位、待你回答的决定">
         {projectError !== null ? (
           <p className="y10-note note" role="status">{readFailureText(projectError)}</p>
         ) : (replaying ? replayProjects.data : projects.data) === null ? (
@@ -159,7 +168,9 @@ export function HomePage(props: {
                   <th scope="col">项目</th>
                   <th scope="col">长期目标</th>
                   <th scope="col">当前成果</th>
-                  <th scope="col">进行中 · 排队中</th>
+                  <th scope="col">此刻在做什么</th>
+                  <th scope="col">事项在哪个部门</th>
+                  <th scope="col">执行槽位</th>
                   <th scope="col">待回答的决定</th>
                   <th scope="col">最近活动</th>
                 </tr>
@@ -167,28 +178,35 @@ export function HomePage(props: {
               <tbody>
                 {(replaying ? replayProjects.data : projects.data)!.projects
                   .filter((project) => !project.archived)
-                  .map((project) => (
-                    <tr key={project.project_id}>
-                      <td>
-                        <button
-                          type="button"
-                          className="link"
-                          onClick={() => props.onNavigate(`#/p/${project.project_id}/overview`)}
-                        >
-                          {project.name}
-                        </button>
-                        {project.source === "existing" ? <span className="tag">已有项目</span> : null}
-                        <OnboardingMark project={project} decisions={waiting} />
-                      </td>
-                      <td>{project.goal === "" ? "没有填写" : project.goal}</td>
-                      <td>{project.current_adoption === null ? "尚未采纳" : project.current_adoption}</td>
-                      <td>
-                        {project.in_progress_count} · {project.waiting_count}
-                      </td>
-                      <td>{project.decisions_waiting > 0 ? project.decisions_waiting : "无"}</td>
-                      <td>{formatTime(project.last_activity_at)}</td>
-                    </tr>
-                  ))}
+                  .map((project) => {
+                    // 三样事实来自这个项目的 project.loop：读到之前写「正在读取」，读不出来写「读不出来」
+                    const loop = loops.byProject[project.project_id] ?? null;
+                    const loopState = loops.failed[project.project_id] === true
+                      ? "读不出来"
+                      : loop === null ? "正在读取" : null;
+                    return (
+                      <tr key={project.project_id}>
+                        <td>
+                          <button
+                            type="button"
+                            className="link"
+                            onClick={() => props.onNavigate(`#/p/${project.project_id}/overview`)}
+                          >
+                            {project.name}
+                          </button>
+                          {project.source === "existing" ? <span className="tag">已有项目</span> : null}
+                          <OnboardingMark project={project} decisions={waiting} />
+                        </td>
+                        <td>{project.goal === "" ? "没有填写" : project.goal}</td>
+                        <td>{project.current_adoption === null ? "尚未采纳" : project.current_adoption}</td>
+                        <td className="cell-stack">{loopState ?? projectDoingText(loop)}</td>
+                        <td className="cell-stack">{loopState ?? projectItemsByDepartmentText(loop)}</td>
+                        <td>{loopState ?? projectSlotText(loop)}</td>
+                        <td>{project.decisions_waiting > 0 ? project.decisions_waiting : "无"}</td>
+                        <td>{formatTime(project.last_activity_at)}</td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -196,6 +214,55 @@ export function HomePage(props: {
       </Section>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// 每个项目的事项：为每行项目打开一次 project.loop，连同查询快照的位置一起记下。
+// 项目集合变化时重新打开；查询随事件刷新。位置只增不减：跳到最新以后晚回来的旧结果不再上画面。
+// 首页项目一览的三样事实与楼共用这一份结果（工单 #1416）：打开一次，两处都按同一份快照写。
+
+export function useProjectLoops(app: ClientApp, projects: ProjectList | null, at: number | null): ProjectLoops {
+  const ids = useMemo(
+    () => [...new Set((projects?.projects ?? []).map((p) => p.project_id))].sort(),
+    [projects],
+  );
+  const key = ids.join(",");
+  const [loops, setLoops] = useState<ProjectLoops>({ byProject: {}, failed: {}, position: 0 });
+  useEffect(() => {
+    const views = app.viewSync;
+    if (!views || key === "") {
+      // 没有项目：楼层清空，位置保留（时间线按位置决定状态上不上画面，位置回到 0 会让空状态上不去）
+      setLoops((current) => ({ byProject: {}, failed: {}, position: current.position }));
+      return;
+    }
+    const open = key.split(",");
+    for (const projectId of open) {
+      const params: Record<string, unknown> = { project_id: projectId };
+      if (at !== null) params.at = at;
+      void views.open<ProjectLoopResult>(`home.building.${projectId}`, {
+        query: "project.loop",
+        params,
+      }, (data, position) => {
+        setLoops((current) => ({
+          byProject: { ...current.byProject, [projectId]: data },
+          failed: Object.fromEntries(Object.entries(current.failed).filter(([id]) => id !== projectId)),
+          position: Math.max(current.position, position),
+        }));
+      }, () => {
+        // 读不出来：这一行的三样事实写「读不出来」，不说「没有在做的事」
+        setLoops((current) => ({
+          ...current,
+          failed: { ...current.failed, [projectId]: true },
+        }));
+      });
+    }
+    return () => {
+      for (const projectId of open) {
+        views.close(`home.building.${projectId}`);
+      }
+    };
+  }, [app, key, at]);
+  return loops;
 }
 
 // 项目行上的建档状态标记（3.8 第 3.4 节）：来自 projects.list 与等待回答的初始 PRD 决定请求，

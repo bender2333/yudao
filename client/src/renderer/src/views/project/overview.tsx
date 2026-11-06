@@ -3,12 +3,22 @@
 // 与「作为新事项开始」）、事项看板与流转记录（点击打开原始事件）。
 // 页面上方不放决定区块：决定请求在大厅的板与文字列表里（v10 第 9 节，#175）。
 // 数据只来自 project.overview、work_item.inputs、project.flow 与 event.detail 这几个已登记的查询。
+//
+// 工单 #1416：原来只在楼层画布上看得到的事实补成页面上的列表与详情，排法按页面原型 v19 的「项目概览」：
+// 此刻（在做什么、已用时间与上限、执行槽位、大厅）、部门（状态、原因、在等什么、等了多久）、
+// 中断与待恢复、事实元素与它们的来源；流转记录之前多一张按方向的汇总。这些行由 project.loop 与
+// decisions.list（都带回放位置）推出，所以回放时它们跟着所选位置；project.overview 与 project.flow
+// 不带回放位置，那几节在回放时照旧显示现在的事实，页面上写明。
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClientApp } from "../../contract/client-app";
 import type {
   AwayReport,
+  DecisionList,
+  DecisionView,
+  EventAtPosition,
   EventDetailResult,
+  EventPositionsResult,
   ProjectFlowResult,
   ProjectLoopResult,
   ProjectOverviewResult,
@@ -34,6 +44,10 @@ import { WritebackState } from "./writeback";
 import { boardGroups } from "./board";
 import { itemDepartments as itemDepartmentsOf, type DepartmentView } from "./organization";
 import { type CommandState, rejectionLinks, useCommand, useSnapshot } from "./use-snapshot";
+import {
+  EVENT_POSITION_REASONS, departmentFactRows, elapsedLimitText, eventKindLabel, factElementRows, flowPairRows,
+  interruptionFactRows, projectDoingText, projectSlotText, waitedText,
+} from "./floor-text";
 
 // 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
 // held 与 stopped 在原型图标里没有对应（held 无图标），这两项保留纯文字，界面不猜
@@ -70,8 +84,30 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
   // 每个事项冻结的组织（工单 #1457）：看板的部门列按它取每个事项的部门，中途换了形态时老事项按旧组织
   const loop = useSnapshot<ProjectLoopResult>(props.app, "page.overview.loop", "project.loop", {
     project_id: projectId,
+    ...(at === null ? {} : { at }),
   });
   const itemDepartments = useMemo(() => itemDepartmentsOf(loop.data), [loop.data]);
+  // 大厅在等的决定请求（工单 #1416）：部门节与「此刻」都要写；这条查询带回放位置，回放时按所选位置读
+  const openDecisions = useSnapshot<DecisionList>(props.app, "page.overview.decisions", "decisions.list", {
+    project_id: projectId,
+    status: ["open"],
+    ...(at === null ? {} : { at }),
+  });
+  // 部门显示名：项目现在组织里的部门在前，事项冻结的组织里的部门补在后面（工单 #1457）
+  const departmentLabels = useMemo(() => {
+    const merged: Record<string, string> = {};
+    for (const department of props.departments) {
+      merged[department.id] = department.label;
+    }
+    for (const item of loop.data?.work_items ?? []) {
+      for (const role of item.organization?.roles ?? []) {
+        if (!(role.id in merged)) {
+          merged[role.id] = role.label;
+        }
+      }
+    }
+    return merged;
+  }, [props.departments, loop.data]);
 
   // 时间轴的刻度：本项目范围内的关键事实（home.away_report 按项目筛选）
   const report = useSnapshot<AwayReport>(props.app, "page.overview.timeline", "home.away_report", {
@@ -97,6 +133,37 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
       ) : data ? (
         <>
           <Summary app={props.app} projectId={projectId} data={data} />
+          <NowFacts
+            loop={loop.data}
+            decisions={openDecisions.data?.decisions ?? []}
+            labels={departmentLabels}
+            replaying={at !== null}
+          />
+          <DepartmentFacts
+            app={props.app}
+            loop={loop.data}
+            decisions={openDecisions.data?.decisions ?? []}
+            labels={departmentLabels}
+            runId={current?.run_id ?? ""}
+            replaying={at !== null}
+            onNavigate={props.onNavigate}
+            projectId={projectId}
+            scopeWorkItem={workItem}
+          />
+          <Interruptions
+            loop={loop.data}
+            labels={departmentLabels}
+            projectId={projectId}
+            onNavigate={props.onNavigate}
+          />
+          <FactSources
+            app={props.app}
+            projectId={projectId}
+            loop={loop.data}
+            scopeWorkItem={workItem}
+            replaying={at !== null}
+            onNavigate={props.onNavigate}
+          />
           <Section
             id="ov-loop"
             title="循环画面"
@@ -105,6 +172,12 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
             {at !== null ? (
               <p className="replay-banner" role="status">
                 回放中 · {formatTime(atTimeOf(report.data, at))}
+              </p>
+            ) : null}
+            {at !== null ? (
+              <p className="y10-note note replay-scope" role="status">
+                回放中：此刻、部门、中断与待恢复、事实与来源、循环画面按所选位置显示；项目摘要、当前事项、看板与流转记录显示的是现在的事实
+                （这几条查询不带回放位置）。
               </p>
             ) : null}
             <FloorScreen app={props.app} projectId={projectId} workItemId={workItem} at={at} />
@@ -135,7 +208,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
           <Asks app={props.app} item={current} />
           <RestartOnboarding app={props.app} projectId={projectId} />
           <Board items={items} departments={props.departments} itemDepartments={itemDepartments} />
-          <FlowTable app={props.app} flow={flow} />
+          <FlowTable app={props.app} flow={flow} labels={departmentLabels} />
         </>
       ) : null}
     </div>
@@ -228,10 +301,268 @@ function provenanceText(value: { [key: string]: unknown } | null): string {
   return `git 提交 ${commit}（分支 ${branch}，${value?.dirty ? "有未提交的修改" : "没有未提交的修改"}）`;
 }
 
+// ---------------------------------------------------------------------------
+// 此刻（工单 #1416）：项目此刻在做什么、进行中事项的已用时间与上限、执行槽位、大厅里在等的决定请求。
+// 数据来自 project.loop 与 decisions.list（两处都带回放位置）；这一节没有进行中的事项时照实写没有。
+
+function NowFacts(props: {
+  loop: ProjectLoopResult | null;
+  decisions: DecisionView[];
+  labels: Record<string, string>;
+  replaying: boolean;
+}) {
+  const now = Date.now();
+  const running = (props.loop?.work_items ?? []).filter((item) => item.status === "in_progress");
+  const elapsed = running.map((item) => `${item.sign}：${elapsedLimitText(item)}`);
+  // 大厅：等待回答的决定请求按发出时间算等了多久，最久的一条写在括号里
+  const hall = props.decisions.length === 0
+    ? "没有决定在等"
+    : `${props.decisions.length} 条决定在等（最久等了 ${waitedText(
+      [...props.decisions].map((row) => row.requested_at).sort()[0], now)}）`;
+  return (
+    <Section
+      id="ov-now"
+      title="此刻"
+      note={props.replaying
+        ? "按所选位置读这个项目的事项与决定请求"
+        : "项目此刻在做什么、进行中事项的已用时间与上限、执行槽位与大厅里在等的决定请求"}
+    >
+      <KeyValue
+        items={[
+          ["此刻在做什么", projectDoingText(props.loop, props.labels)],
+          ["已用时间与上限", elapsed.length === 0 ? "没有正在进行的事项" : elapsed.join("；")],
+          ["执行槽位", projectSlotText(props.loop)],
+          ["大厅", hall],
+        ]}
+      />
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 部门（工单 #1416）：每个进行中的事项的每个部门一行，写状态与原因、在等什么、等了多久、本事项的
+// 已用时间与上限；点部门名进入部门页。等待的时长只取两处精确的事实（进行中的询问、等待回答的决定请求），
+// 其余状态没有记等待的起点，写「—」——这一节的说明写清这个口径，不用事项已用的时间冒充满意。
+
+function DepartmentFacts(props: {
+  app: ClientApp;
+  loop: ProjectLoopResult | null;
+  decisions: DecisionView[];
+  labels: Record<string, string>;
+  runId: string;
+  replaying: boolean;
+  projectId: string;
+  scopeWorkItem: string | null;
+  onNavigate: (hash: string) => void;
+}) {
+  // 询问的起点来自 run.asks（不带回放位置）：回放时不查，等待那一格留「—」
+  const asks = useSnapshot<RunAsksResult>(
+    props.app, "page.overview.dept.asks", "run.asks", { run_id: props.runId },
+    props.runId === "" || props.replaying);
+  const rows = departmentFactRows({
+    loop: props.loop,
+    asks: asks.data?.asks ?? null,
+    decisions: props.decisions,
+    labels: props.labels,
+    now: Date.now(),
+  });
+  return (
+    <Section
+      id="ov-departments"
+      title="部门"
+      note="状态、原因、在等什么、等了多久；点部门名进入部门页。等待的时长按进行中的询问或等待回答的决定请求的发出时间算，其余状态没有等待的起点，写「—」"
+    >
+      {rows.length === 0 ? <Empty text="项目现在没有进行中的事项，没有部门在等" /> : (
+        <Table
+          head={["事项", "部门", "状态", "在等什么", "等了多久", "本事项已用 / 上限"]}
+          rows={rows.map((row) => [
+            row.itemTitle,
+            <button
+              key={`${row.itemId}-${row.departmentId}`}
+              type="button"
+              className="y10-link link"
+              onClick={() => props.onNavigate(paths.dept(props.projectId, row.departmentId,
+                { workItem: props.scopeWorkItem }))}
+            >
+              {row.department}
+            </button>,
+            row.note === "" ? row.state : `${row.state}（${row.note}）`,
+            row.waiting === "" ? "—" : row.waiting,
+            row.waited === "" ? "—" : row.waited,
+            row.elapsed,
+          ])}
+        />
+      )}
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 中断与待恢复（工单 #1416）：一整个项目里被打断、等待恢复的事项一行一个；单个事项的细节在恢复页。
+
+function Interruptions(props: {
+  loop: ProjectLoopResult | null;
+  labels: Record<string, string>;
+  projectId: string;
+  onNavigate: (hash: string) => void;
+}) {
+  const rows = interruptionFactRows(props.loop, props.labels);
+  return (
+    <Section
+      id="ov-interruptions"
+      title="中断与待恢复"
+      note="整个项目里被打断、等待恢复的事项；点「查看恢复与动作核实」看单个事项的细节"
+    >
+      {rows.length === 0 ? <Empty text="没有中断，也没有待恢复的工作" /> : (
+        <Table
+          head={["事项", "部门", "现在", "本事项已用 / 上限", ""]}
+          rows={rows.map((row) => [
+            row.itemTitle,
+            row.department,
+            row.state,
+            row.elapsed,
+            <button
+              key={row.itemId}
+              type="button"
+              className="y10-link link"
+              onClick={() => props.onNavigate(paths.recovery(props.projectId, row.itemId))}
+            >
+              查看恢复与动作核实
+            </button>,
+          ])}
+        />
+      )}
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 事实与来源（工单 #1416）：门牌、包裹、盖章、箱子、轮次与已用时间各带来源种类，点开按位置读那条原始
+// 事件（说明、种类、提出者、时间、差异），并能回到时间轴上同一个位置。事件按全局位置读取，
+// 页面打开以前的事件（包括画面打开以前）一样读得到。
+
+function FactSources(props: {
+  app: ClientApp;
+  projectId: string;
+  loop: ProjectLoopResult | null;
+  scopeWorkItem: string | null;
+  replaying: boolean;
+  onNavigate: (hash: string) => void;
+}) {
+  const rows = factElementRows(props.loop);
+  const [open, setOpen] = useState<{ row: ReturnType<typeof factElementRows>[number] } | null>(null);
+  const [event, setEvent] = useState<EventAtPosition | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  const read = (row: ReturnType<typeof factElementRows>[number]): void => {
+    setOpen({ row });
+    setEvent(null);
+    setFailure(null);
+    setLoading(true);
+    const params: Record<string, unknown> = { project_id: props.projectId, positions: [row.position] };
+    if (row.runId !== "") {
+      params.run_id = row.runId;
+    }
+    void props.app.queryOne<EventPositionsResult>("event.positions", params)
+      .then((result) => {
+        setEvent((result.data.events ?? []).find((item) => item.position === row.position) ?? null);
+      })
+      .catch((reason: unknown) => {
+        setFailure(reason instanceof Error ? reason.message : String(reason));
+      })
+      .finally(() => setLoading(false));
+  };
+
+  return (
+    <Section
+      id="ov-facts"
+      title="事实与来源"
+      note="门牌、包裹、盖章、箱子、轮次与已用时间各带来源种类；点开按位置读那条原始事件，并能回到时间轴上的同一个位置"
+    >
+      {rows.length === 0 ? (
+        <Empty text={props.replaying ? "这个位置还没有事实元素" : "这个项目还没有事实元素"} />
+      ) : (
+        <Table
+          head={["事项", "事实元素", "来源种类", "位置", ""]}
+          rows={rows.map((row) => [
+            row.itemTitle,
+            row.elementLabel,
+            row.sourceLabel,
+            String(row.position),
+            <button
+              key={`${row.workItemId}-${row.element}`}
+              type="button"
+              className="y10-link link"
+              data-fact-element={row.element}
+              onClick={() => read(row)}
+            >
+              点开看原始事件
+            </button>,
+          ])}
+        />
+      )}
+      {open === null ? null : (
+        <div className="y10-source-detail" data-source-detail>
+          <h3 className="y10-h3 sub">
+            位置 {open.row.position} 上的原始事件（{open.row.elementLabel} · 来源：{open.row.sourceLabel}）
+          </h3>
+          {loading ? <p className="y10-note note">正在按位置读取</p> : null}
+          {failure === null ? null : <p className="y10-note note" role="status">读不出来：{failure}</p>}
+          {event === null ? null : event.status !== "available" ? (
+            <p className="y10-note note" role="status">
+              {EVENT_POSITION_REASONS[event.reason ?? ""] ?? "这个位置上没有事件"}
+            </p>
+          ) : (
+            <KeyValue
+              items={[
+                ["说明", show(event.label)],
+                ["种类", eventKindLabel(event.type)],
+                ["提出者", show(event.actor_label ?? event.department_label)],
+                ["时间", formatTime(event.at)],
+                ["差异", diffText(event.payload)],
+              ]}
+            />
+          )}
+          {event?.payload === undefined || event.payload === null ? null : (
+            <details className="y10-details raw-event">
+              <summary>原始事件的内容</summary>
+              <pre className="y10-pre raw">{JSON.stringify(event.payload, null, 2)}</pre>
+            </details>
+          )}
+          <div className="y10-row row-actions">
+            <button
+              type="button"
+              className="y10-link link"
+              onClick={() => props.onNavigate(paths.overviewAt(props.projectId, open.row.position,
+                { workItem: props.scopeWorkItem }))}
+            >
+              在时间轴上查看
+            </button>
+            <button type="button" className="y10-link link" onClick={() => setOpen(null)}>收起</button>
+          </div>
+        </div>
+      )}
+    </Section>
+  );
+}
+
+/** 原始事件里的差异：事件自己带差异全文时写它，带文件清单时写有几份文件，其余写没有差异。 */
+function diffText(payload: Record<string, unknown> | null | undefined): string {
+  const diff = payload?.["diff"];
+  if (typeof diff === "string" && diff.trim() !== "") {
+    return diff;
+  }
+  const files = payload?.["files"];
+  if (Array.isArray(files) && files.length > 0) {
+    return `文件 ${files.length} 项：${files.map((item) => String(item)).join("、")}`;
+  }
+  return "这条事件没有差异";
+}
+
 // 当前事项：所选事项优先，否则进行中或等待确认初始 PRD 的一项；都找不到时不显示（界面不猜）。
 // 建档事项等用户确认时没有在执行，但用户要在这一处放弃它并重新开始建档（工单 #136）
-function pickCurrent(items: WorkItemCard[], selected: string | null): WorkItemCard | null {
-  if (selected) {
+function pickCurrent(items: WorkItemCard[], selected: string | null): WorkItemCard | null {  if (selected) {
     return items.find((item) => item.work_item_id === selected) ?? null;
   }
   return items.find((item) => item.status === "in_progress" || item.status === "awaiting_initial_prd") ?? null;
@@ -561,8 +892,13 @@ export function Board(props: { items: WorkItemCard[]; departments?: DepartmentVi
   );
 }
 
-// 流转记录：时间、方向、类型、内容与状态；缺陷记录行用醒目颜色，点击打开原始事件
-function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | null; loading: boolean; error: string | null } }) {
+// 流转记录：时间、方向、类型、内容与状态；缺陷记录行用醒目颜色，点击打开原始事件。
+// 工单 #1416：记录之前先按方向汇总（每对部门几次、其中几次是返工、都是些什么），逐条记录照旧在下面。
+function FlowTable(props: {
+  app: ClientApp;
+  flow: { data: ProjectFlowResult | null; loading: boolean; error: string | null };
+  labels: Record<string, string>;
+}) {
   const [openEvent, setOpenEvent] = useState<string | null>(null);
   const detail = useSnapshot<EventDetailResult>(
     props.app,
@@ -572,6 +908,7 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
     openEvent === null,
   );
   const records = props.flow.data?.records ?? [];
+  const pairs = flowPairRows(records, props.labels);
 
   if (props.flow.loading && props.flow.data === null) {
     return (
@@ -583,6 +920,20 @@ function FlowTable(props: { app: ClientApp; flow: { data: ProjectFlowResult | nu
 
   return (
     <Section id="ov-flow" title="流转记录" note="点击时间打开原始事件；缺陷记录行用醒目的颜色标出">
+      {pairs.length === 0 ? null : (
+        <>
+          <h3 className="y10-h3 sub">按方向汇总</h3>
+          <Table
+            head={["从 → 到", "流转次数", "其中返工", "都是些什么"]}
+            rows={pairs.map((pair) => [
+              `${pair.from} → ${pair.to}`,
+              String(pair.count),
+              pair.rework === 0 ? "0" : `${pair.rework}（缺陷记录退回）`,
+              pair.kinds,
+            ])}
+          />
+        </>
+      )}
       {records.length === 0 ? <Empty text={emptyOrFailureText(props.flow.error, "项目还没有流转记录")} /> : (
         <Table
           head={["时间", "方向", "类型", "内容", "状态"]}
