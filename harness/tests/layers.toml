@@ -12,7 +12,7 @@
 "kernel/test_contract_surface.py" = "unit"
 "kernel/test_definitions_decide.py" = "unit"
 "kernel/test_dispatch_number.py" = "module"
-"kernel/test_every_stop_has_reason.py" = "unit"
+"kernel/test_every_stop_has_reason.py" = "module"
 "kernel/test_judge_before_explanation.py" = "module"
 "kernel/test_limits_survive_restart.py" = "integration"
 "kernel/test_manifest.py" = "unit"

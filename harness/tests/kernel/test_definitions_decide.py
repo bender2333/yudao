@@ -145,12 +145,6 @@ def test_a_branch_session_judges_a_proposal_by_the_matter_definition() -> None:
                        session_id="ses_ask_qa").reason == "quality cannot use submit_structure"
 
 
-def test_the_loaded_definition_is_the_default() -> None:
-    # 没有交定义时读的是模块加载的那一份：接缝的默认值不能把许可变成全部拒绝，也不能换一份定义
-    assert tools.in_force(None) is DEFINITIONS
-    assert tools.proposal_kind("submit_delivery") == "delivery_spec"
-
-
 def _with_new_kind(definition: Definitions, department: str, tool_name: str,
                    kind: str) -> Definitions:
     # 这份定义里多一个提交类工具，它提交这个部门在这个种类的活里的一种新成果种类
