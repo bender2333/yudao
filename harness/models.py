@@ -593,6 +593,12 @@ class RunProjection:
         # 正在被回答的那一次询问：链上最内层的那一个（工单 #473 的嵌套询问）
         return self.ask_stack[-1] if self.ask_stack else None
 
+    @property
+    def launch_methods(self) -> list[dict[str, Any]]:
+        # 当前交付说明的启动方式（浏览器与 computer use 设计说明「启动方式」「试用工具」，工单 #1497）：
+        # 工具许可按它核对 trial_start 与 trial_open。内核读的只有这一项，不按成果种类取名
+        return list(self.delivery_spec.launch) if self.delivery_spec is not None else []
+
     def ask_by_origin(self, session_id: str | None) -> dict[str, Any] | None:
         # 这个会话发出的、还没回答的询问：恢复时继续这一层，不新开一层（工单 #473）
         if not session_id:

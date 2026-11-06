@@ -10,6 +10,7 @@ from typing import Any
 from .actions import FactsQuery, TreeFacts, WorkspaceFacts
 from .definitions import DEFINITIONS, Definitions
 from .kernel_events import TERMINAL_STATUSES, Event
+from .launch_rules import TRIAL_TOOLS, resolve_trial_launch
 from .minimal_projection import MinimalProjection
 from .path_rules import is_check_materials_path
 from .tools import has_tool, in_force, tool_action
@@ -136,6 +137,14 @@ def tool_permission(
     if _is_write(name, definition):
         reason = _write_path_error(name, args, facts, definition.write_scope(department))
         if reason:
+            return ToolPermission(reason=reason)
+    if name in TRIAL_TOOLS:
+        # 试用工具的启动方式核对（docs/design/browser-and-computer-use.md「启动方式」「试用工具」，工单 #1497）：
+        # 读视图里当前交付说明的启动方式（运行状态投影的 launch_methods），质检的 trial_open 按名称解析、
+        # 工程的 trial_start 用它给出的启动方式。核对不了时按工具许可拒绝，动作不交给执行环境；
+        # 执行侧在执行之前用同一份规则（launch_rules.py）再核对一次
+        _launch, reason = resolve_trial_launch(name, args, getattr(view.state, "launch_methods", ()))
+        if reason is not None:
             return ToolPermission(reason=reason)
     return ToolPermission()
 
