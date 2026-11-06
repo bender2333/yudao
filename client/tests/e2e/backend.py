@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import base64
 import contextlib
 import json
 import os
@@ -52,7 +53,9 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
 from harness.app.project_queries import ProjectsList  # noqa: E402
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, VerificationDeclaration, load_definitions  # noqa: E402
 from harness.environment import QA_TESTS_DIR  # noqa: E402
-from harness.models import ProjectEventType, Usage, json_dumps, utc_now  # noqa: E402
+from harness.event_store import run_stream  # noqa: E402
+from harness.models import EventType, ProjectEventType, Usage, json_dumps, utc_now  # noqa: E402
+from harness.coverage import coverage_report, open_criteria  # noqa: E402
 from harness.proposals import (  # noqa: E402
     answer_turn, ask_turn, baseline_review_turn, delivery_turn, judgement_turn, product_spec,
     review, review_turn, structure_turn,
@@ -65,6 +68,7 @@ from harness.tests.protocol_helpers import (  # noqa: E402
     chat_responder, messages_responder, model_test_responder, preset_base_urls, serve,
 )
 from harness.tightening import WATCHED_OUTPUTS  # noqa: E402
+from harness.write_path import NewEvent  # noqa: E402
 
 UNAVAILABLE = "Missing configuration: provider credential"
 # 硬杀重启以后事件库的文件还会被短暂占用（与 harness/tests/process_kill.py 的处理相同）：打开时重试的上限
@@ -654,6 +658,164 @@ async def seed_coverage(application: Application, system: LoopSystem) -> None:
         raise AssertionError(f"开环明细的预置没有走完：{run.status} {run.stop_reason}")
 
 
+# 逐条结论表与启动方式（工单 #154）：资料页质检一项与交付一项要读的事实。
+# 这个预置不调用模型：事项由项目的写入口开始，run 事件按查询需要的形状直接写进事件库，截图写进
+# 工件库。这样资料页能同时看到带启动方式的交付、一份引用试用用例的放行记录（逐条结论里有通过、
+# 无法核验与开环）、一张试用用例步骤上的截图，以及放行记录里一次算好的三个数。
+MATERIALS_PROJECT = "逐条结论"
+MATERIALS_ITEM = "实现待办清单"
+MATERIALS_SESSION = "ses_materials_quality"
+MATERIALS_SPEC_HASH = "sha256:" + "1" * 64
+MATERIALS_TREE_DIGEST = "sha256:" + "2" * 64
+MATERIALS_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+# 事件载荷要过接口层的校验：成果事件与工具事件的共用字段按真实形状给全（值与本次预置无关）
+MATERIALS_GIT = {"commit": "a" * 40, "parent_commit": None, "tree": "b" * 40}
+MATERIALS_VERSIONS = {"input_version": 1, "prompt_version": 1, "prompt_hash": None, "guidance_ids": []}
+MATERIALS_CALL_TARGET = {
+    "provider_config_id": None, "model_id": None, "provider_name": "Fake", "protocol": "chat_completions",
+    "base_url": None, "requested_provider": "Fake", "requested_protocol": "chat_completions",
+    "requested_model": "fake", "credential_ref": None, "credential_version": None,
+    "context_window": 32000, "configured_max_output_tokens": 4096,
+    "accepts_required_tool_call": True, "input_modalities": ["text"],
+    "selection_source": None, "requested_tier": None, "sent_tier": None,
+    "reasoning_levels": [], "default_reasoning_level": None, "reasoning_mode": None,
+}
+MATERIALS_ACTIVATION = "act_1"
+MATERIALS_ATTEMPT = "act_1:root-1:work:attempt-1"
+
+
+def _materials_tool_started(identity: str, tool: str, step_id: int, args: dict) -> dict:
+    return {"attempt_id": MATERIALS_ATTEMPT, "logical_call_id": "act_1:root-1:work",
+            "context_event_id": "ctx_1", "effective_contract_hash": "sha256:contract",
+            **MATERIALS_VERSIONS, "id": identity, "name": tool, "args": args, "step_id": step_id,
+            "activation_id": MATERIALS_ACTIVATION, "attempt": 1}
+
+
+def _materials_tool_called(identity: str, tool: str, step_id: int, args: dict, *,
+                           images: list[dict] | None = None) -> dict:
+    return {**MATERIALS_CALL_TARGET, **MATERIALS_VERSIONS,
+            "attempt_id": MATERIALS_ATTEMPT, "logical_call_id": "act_1:root-1:work",
+            "context_event_id": "ctx_1", "effective_contract_hash": "sha256:contract",
+            "id": identity, "name": tool, "step_id": step_id,
+            "input_item": {"type": "function_call_output", "call_id": identity, "output": "ok"},
+            "activation_id": MATERIALS_ACTIVATION, "purpose": "work", "args": args, "ok": True,
+            "error": None, "output_ref": None, "images": list(images or [])}
+
+
+def materials_criteria() -> list[dict]:
+    # 四条验收条件：一条试用用例（步骤里有断言工具，可执行的检验）、一条命令检查（可执行）、
+    # 一条带参照材料的判定点（模型阅读、无法核验）、一条开环（不可执行、无法核验）
+    return [
+        {"criterion": "AC1", "method": "trial", "result": "passed", "checks": [],
+         "trial_cases": ["case_1"], "note": ""},
+        {"criterion": "AC2", "method": "check", "result": "passed", "checks": ["smoke"],
+         "trial_cases": [], "note": ""},
+        {"criterion": "AC3", "method": "judgement", "result": "unverified", "checks": [],
+         "trial_cases": [], "note": "参照材料里没有写清楚字号"},
+        {"criterion": "AC4", "method": "open", "result": "unverified", "checks": [],
+         "trial_cases": [], "note": "需要真实打印机，这台机器上没有"},
+    ]
+
+
+def _materials_event(kind: str, payload: dict, department: str, *, session_id: str | None = None) -> NewEvent:
+    return NewEvent(kind, state_before="running", state_after="running",
+                    actor=f"department:{department}", department=department,
+                    session_id=session_id, payload=payload)
+
+
+async def seed_materials(application: Application, system: LoopSystem) -> None:
+    # 逐条结论表的预置（工单 #154）：一个项目、一件进行中的事项与它的 run
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=MATERIALS_PROJECT, goal="资料页显示逐条结论与启动方式"))
+    project_id = created.refs.project_id
+    _item, run_id = system.projects.start_work_item(project_id, MATERIALS_ITEM)
+    screenshot = system.artifacts.put(run_id, "screenshot", MATERIALS_PNG, media_type="image/png")
+    shot = {"kind": screenshot.kind, "content_hash": screenshot.content_hash,
+            "path": screenshot.path, "media_type": screenshot.media_type}
+    criteria = materials_criteria()
+    # 覆盖的三个数在服务端的放行记录里一次算好（与质检提交时同一条路径）：用例身份到步骤的对照
+    # 只需说明这个用例里有断言工具与检查回执之外的步骤
+    case_steps = {"case_1": [{"tool": "browser_click"}, {"tool": "browser_verify_text_visible"}]}
+
+    def write(transaction) -> None:
+        transaction.append(
+            _materials_event(EventType.SPEC_ACCEPTED, {
+                "id": "spec_1", "revision": 1, "content_hash": MATERIALS_SPEC_HASH,
+                "kind": "product_spec", "issuer": "product", "parent_hash": None, "status": "active",
+                "git_version": MATERIALS_GIT,
+                "goal": "做一个待办清单", "requirements": [], "boundaries": [], "constraints": [],
+                "acceptance_criteria": ["列表显示一条待办", "空列表时显示提示", "标记完成的条目不再出现", "退出时保存"],
+                "fatal_conditions": [], "non_goals": [], "decision_changes": [], "change_record": None,
+                "input_version": 1, "requirement_mapping": []}, "product"),
+            _materials_event(EventType.DELIVERY_ACCEPTED, {
+                "id": "del_1", "revision": 1, "content_hash": "sha256:delivery",
+                "kind": "delivery_spec", "issuer": "engineering", "parent_hash": None, "status": "active",
+                "git_version": MATERIALS_GIT,
+                "product_spec_hash": MATERIALS_SPEC_HASH, "effective_contract_hash": "sha256:contract",
+                "summary": "待办清单网页：列表、空列表提示与完成标记都做好了。",
+                "files": ["app.py"], "check_names": ["smoke"], "checks": [], "known_risks": [],
+                "code_tree_digest": MATERIALS_TREE_DIGEST,
+                "tree_ref": {"kind": "tree_snapshot", "content_hash": MATERIALS_TREE_DIGEST,
+                             "path": "tree", "media_type": None},
+                "launch": [{
+                    "name": "待办清单网页", "kind": "web",
+                    "commands": {"windows": ["python", "-m", "http.server", "{port}"],
+                                 "linux": ["python3", "-m", "http.server", "{port}"]},
+                    "ready_url": "http://127.0.0.1:{port}/", "ready_timeout_sec": 30}],
+                "status": "active"}, "engineering"),
+            _materials_event(EventType.TRIAL_SESSION_STARTED, {
+                "session_id": MATERIALS_SESSION, "department": "quality", "kind": "web",
+                "launch_name": "待办清单网页", "system": "windows", "port": 41000,
+                "ready_url": "http://127.0.0.1:41000/", "tree_digest": MATERIALS_TREE_DIGEST,
+                "source": "delivery_snapshot", "pid": 100, "create_time": 1.0},
+                "quality", session_id=MATERIALS_SESSION),
+            _materials_event(EventType.TRIAL_CASE_OPENED, {
+                "case_id": "case_1", "session_id": MATERIALS_SESSION,
+                "trial_session_id": MATERIALS_SESSION, "department": "quality",
+                "activation_id": "act_1", "product_spec_hash": MATERIALS_SPEC_HASH,
+                "tree_digest": MATERIALS_TREE_DIGEST, "criteria": ["AC1"], "title": "添加一条待办",
+                "plan": ["打开列表页", "点添加"], "expected": "列表里出现这条待办"},
+                "quality", session_id=MATERIALS_SESSION),
+            _materials_event(EventType.TOOL_STARTED,
+                             _materials_tool_started("call-1", "browser_click", 2, {"ref": "b1"}),
+                             "quality", session_id=MATERIALS_SESSION),
+            _materials_event(EventType.TOOL_CALLED,
+                             _materials_tool_called("call-1", "browser_click", 2, {"ref": "b1"},
+                                                    images=[shot]),
+                             "quality", session_id=MATERIALS_SESSION),
+            _materials_event(EventType.TOOL_STARTED,
+                             _materials_tool_started("call-2", "browser_verify_text_visible", 3,
+                                                     {"text": "添加一条待办"}),
+                             "quality", session_id=MATERIALS_SESSION),
+            _materials_event(EventType.TOOL_CALLED,
+                             _materials_tool_called("call-2", "browser_verify_text_visible", 3,
+                                                    {"text": "添加一条待办"}),
+                             "quality", session_id=MATERIALS_SESSION),
+            _materials_event(EventType.TRIAL_CASE_CONCLUDED, {
+                "case_id": "case_1", "session_id": MATERIALS_SESSION, "department": "quality",
+                "result": "passed", "observed": "列表里出现了这条待办", "evidence_steps": ["call-2"],
+                "reason": ""}, "quality", session_id=MATERIALS_SESSION),
+            _materials_event(EventType.QA_SUBMITTED, {
+                "id": "review_1", "revision": 1, "content_hash": "sha256:review",
+                "kind": "qa_review", "issuer": "quality", "parent_hash": None, "status": "active",
+                "git_version": MATERIALS_GIT,
+                "product_spec_hash": MATERIALS_SPEC_HASH, "effective_contract_hash": "sha256:contract",
+                "delivery_spec_hash": "sha256:delivery", "code_snapshot_hash": MATERIALS_TREE_DIGEST,
+                "verdict": "release", "rationale": "四条验收条件都有结论，两条无法核验的列进开环。",
+                "checks": [], "defects": [], "criteria": criteria,
+                "coverage": coverage_report(criteria, cases=case_steps),
+                "open_criteria": open_criteria(criteria, case_steps),
+                "evidence_refs": [], "judgement_event": ""}, "quality"),
+        )
+
+    system.writes.transact(run_stream(run_id), write)
+    # 预置出来的事项要在资料页上看得见：事项与 run 存在，逐条结论与截图读得出来
+    projection = system.project(run_id)
+    if projection.reviews[-1].verdict != "release" or not projection.trial_cases:
+        raise AssertionError("逐条结论的预置没有写进去")
+
+
 def open_loop_script():
     # 开环完成与放行（工单 #1421）：产品与工程的轮次沿用默认脚本，质检按请求里的事实决定——
     # 交付到达以前是预测性探索，到达以后先交独立判断再给结论（验证的独立性设计说明第 4 节）。
@@ -1187,7 +1349,7 @@ def main() -> int:
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
                                              "stopnote", "replay", "kill", "steps", "coverage", "tools", "forms",
-                                             "organization", "openloop"),
+                                             "organization", "openloop", "materials"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -1261,6 +1423,9 @@ def main() -> int:
     elif args.script == "coverage":
         # 开环明细（工单 #401）：一个放行带两条开环条件，离开期间的报告逐条列出它们
         adapter_script = coverage_script()
+    elif args.script == "materials":
+        # 逐条结论表与启动方式（工单 #154）：预置直接写事件，不需要模型轮次
+        adapter_script = {}
     elif args.script == "tools":
         # 工具与扩展页（工单 #239）：两个项目，工程各在事项里真实取回一次本机地址
         adapter_script = tools_script([f"{notes.base}{path}" for path in TOOLS_FETCH_PATHS])
@@ -1369,6 +1534,9 @@ def main() -> int:
         elif args.script == "coverage":
             # 开环明细（工单 #401）：预置一个走完并放行的事项，放行记录里带两条开环条件
             asyncio.run(seed_coverage(application, system))
+        elif args.script == "materials":
+            # 逐条结论表与启动方式（工单 #154）：交付带启动方式，放行记录带逐条结论与试用用例截图
+            asyncio.run(seed_materials(application, system))
         elif args.script == "tools":
             # 工具与扩展页（工单 #239）：两个项目各一台 MCP 服务器、各一次真实取回；
             # 第一台服务器真的探测过（工具清单写回设置），第二台不探测
@@ -1387,7 +1555,7 @@ def main() -> int:
             # 开环完成与放行（工单 #1421）：一个项目里两件事项分别以开环完成与放行结束，
             # 另一个项目里一件成果挂起的事项
             asyncio.run(seed_open_loop(application, system))
-        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools"):
+        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools", "materials"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）
             # 自己在界面上建项目并开始事项，不需要预置的项目与事项；进行中的询问还要求执行槽位空着，

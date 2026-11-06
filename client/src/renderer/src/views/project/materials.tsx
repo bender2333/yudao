@@ -6,18 +6,20 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import type { ClientApp } from "../../contract/client-app";
-import type { DeliveryFileResult, EventDetailResult, ProjectOverviewResult, WorkItemMaterialsResult,
-  WorkItemCard } from "../../api/generated/types.gen";
+import type { AcceptanceCoverageResult, DeliveryFileResult, EventDetailResult, ProjectOverviewResult,
+  WorkItemMaterialsResult, WorkItemCard } from "../../api/generated/types.gen";
 import { paths, type Route } from "../../shell/routing";
 import { StatusMark } from "../../shell/kit";
 import { Empty, KeyValue, Loading, Section, Tag, dict, list, show, text } from "./common";
 import { ITEM_COLORS } from "./floor-text";
-import { departmentName, formatTime, label, WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND } from "./labels";
+import { departmentName, formatTime, INPUT_KIND, label, verdictName, versionStatusName,
+  WORK_ITEM_STATUS, WORK_ITEM_STATUS_KIND } from "./labels";
 import { fileDownload } from "./materials-download";
 import { originalView, readView } from "./materials-read";
 import { useSnapshot } from "./use-snapshot";
 import { readFailureText } from "../../contract/read-failure";
 import { scopeName } from "./scope-name";
+import { CoverageUnreadable, CriteriaTable, LaunchMethods } from "./criteria-table";
 
 const COUNT_KINDS = [
   ["intend", "intend"],
@@ -90,7 +92,7 @@ export function MaterialsPage(props: { app: ClientApp; route: Route; onNavigate:
           <VersionBlock app={props.app} id="mt-prd" title="PRD" note="产品部门提交并被接纳的各版本；接入已有项目的初始 PRD 标明确认记录" rows={data.contracts} empty="产品部门还没有提交 PRD" />
           <OnboardingBlock rounds={data.onboarding_rounds} />
           <DeliveryBlock app={props.app} rows={data.deliveries} />
-          <ReviewBlock rows={data.reviews} />
+          <ReviewBlock app={props.app} runId={data.run_id} rows={data.reviews} />
           <NotesBlock rows={data.materials} scoped={requested !== null} />
         </>
       ) : null}
@@ -174,7 +176,7 @@ function IntendBlock(props: { rows: WorkItemMaterialsResult["inputs"] }) {
                 <strong>intend 原文 第 {input.version} 版</strong>
                 <Tag>{input.version === 1 ? "首次输入" : `第 ${input.version} 次输入`}</Tag>
                 <span className="y10-muted">{input.byte_start}–{input.byte_end} 字节</span>
-                <span className="y10-muted">{input.kind}</span>
+                <span className="y10-muted">{label(INPUT_KIND, input.kind)}</span>
               </header>
               <p className="y10-clamp">{input.text}</p>
             </li>
@@ -353,7 +355,7 @@ function VersionBlock(props: {
             <li className={`y10-mt-doc${index === props.rows.length - 1 ? " is-current" : " is-old"}`} key={entry.event_id}>
               <header className="y10-mt-doc-head">
                 <strong>{props.title} {entry.revision === null ? "未编号" : `第 ${entry.revision} 版`}</strong>
-                <Tag>{entry.status}</Tag>
+                <Tag>{versionStatusName(entry.status)}</Tag>
                 <span className="y10-muted">指纹 {show(entry.content_hash, "未上报")}</span>
                 <button type="button" className="y10-link link" onClick={() => setOpen(entry.event_id)}>查看原文</button>
               </header>
@@ -401,7 +403,7 @@ function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
             <li className={`y10-mt-doc delivery-block${index === props.rows.length - 1 ? " is-current" : " is-old"}`} key={entry.event_id}>
               <header className="y10-mt-doc-head">
                 <strong>交付 {entry.revision === null ? "（未编号）" : `第 ${entry.revision} 版`}</strong>
-                <Tag>{entry.status}</Tag>
+                <Tag>{versionStatusName(entry.status)}</Tag>
                 <span className="y10-muted">{show(entry.summary, "没有摘要")}</span>
               </header>
               {entry.files.length === 0 ? <p className="y10-note note">这条交付没有文件清单</p> : (
@@ -414,6 +416,7 @@ function DeliveryBlock(props: { app: ClientApp; rows: WorkItemMaterialsResult["d
                   ))}
                 </ul>
               )}
+              <LaunchMethods launch={entry.launch ?? []} />
             </li>
           ))}
         </ol>
@@ -461,45 +464,56 @@ function FileContent(props: { data: DeliveryFileResult }) {
   return <p className="y10-note note">这个文件没有返回内容</p>;
 }
 
-// 质检（原型 mt-qa）：结论、理由、检查回执与缺陷
-function ReviewBlock(props: { rows: WorkItemMaterialsResult["reviews"] }) {
+// 质检（原型 mt-qa）：结论、理由、逐条结论表、检查回执与缺陷；无法核验的条目与原因在表下列出。
+// 表头的检验覆盖比例、模型阅读与开环条数取自放行记录（acceptance.coverage），页面不重算
+function ReviewBlock(props: { app: ClientApp; runId: string; rows: WorkItemMaterialsResult["reviews"] }) {
+  const coverage = useSnapshot<AcceptanceCoverageResult>(
+    props.app,
+    "page.materials.coverage",
+    "acceptance.coverage",
+    { run_id: props.runId },
+    props.rows.length === 0 || props.runId === "",
+  );
   return (
-    <Section id="mt-qa" title="质检" note="结论、理由、检查回执；截图绑定到交付快照" className="y10-mt">
+    <Section id="mt-qa" title="质检" note="结论、理由、逐条检验结果与检查回执；截图是试用用例里的证据，绑定到交付快照" className="y10-mt">
       {props.rows.length === 0 ? <Empty text="质检部门还没有给出结论" /> : (
-        <ol className="y10-mt-list">
-          {props.rows.map((review) => (
-            <li className={`y10-mt-doc ${verdictClass(review.verdict)}`} key={review.event_id}>
-              <header className="y10-mt-doc-head">
-                <strong>质检结论</strong>
-                <Tag tone={review.verdict === "release" ? "ok" : "danger"}>{verdictName(review.verdict)}</Tag>
-              </header>
-              <KeyValue
-                items={[
-                  ["理由", show(review.rationale, "没有写明")],
-                  ["检查回执", review.checks.length === 0 ? "无" : list(review.checks).map(checkRow).join("；")],
-                  ["缺陷", review.defects.length === 0 ? "无" : list(review.defects).map(checkRow).join("；")],
-                ]}
-              />
-            </li>
-          ))}
-        </ol>
+        <>
+          {coverage.error === null ? null : <CoverageUnreadable />}
+          <ol className="y10-mt-list">
+            {props.rows.map((review) => (
+              <li className={`y10-mt-doc ${verdictClass(review.verdict)}`} key={review.event_id}>
+                <header className="y10-mt-doc-head">
+                  <strong>质检结论</strong>
+                  <Tag tone={verdictTone(review.verdict)}>{verdictName(review.verdict)}</Tag>
+                </header>
+                <KeyValue items={[["理由", show(review.rationale, "没有写明")]]} />
+                <CriteriaTable app={props.app} review={review} coverage={coverage.data} />
+                <KeyValue
+                  items={[
+                    ["检查回执", review.checks.length === 0 ? "无" : list(review.checks).map(checkRow).join("；")],
+                    ["缺陷", review.defects.length === 0 ? "无" : list(review.defects).map(checkRow).join("；")],
+                  ]}
+                />
+              </li>
+            ))}
+          </ol>
+        </>
       )}
     </Section>
   );
-}
-
-function verdictName(verdict: string): string {
-  return VERDICT_LABELS[verdict] ?? verdict;
 }
 
 function verdictClass(verdict: string): string {
   return verdict === "release" ? "is-release" : "is-rework";
 }
 
-const VERDICT_LABELS: Record<string, string> = {
-  release: "放行",
-  rework_engineering: "缺陷记录",
-};
+// 结论的标记：放行是成功，无法核验是等待回答，其余是缺陷记录
+function verdictTone(verdict: string): "ok" | "warn" | "danger" {
+  if (verdict === "release") {
+    return "ok";
+  }
+  return verdict === "cannot_verify" ? "warn" : "danger";
+}
 
 function checkRow(value: Record<string, unknown>): string {
   const name = text(value.name) || text(value.id) || text(value.check_id);
