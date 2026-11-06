@@ -45,7 +45,7 @@ OUTPUT_DIR = "outputs"
 # 本机进程是控制主机：系统按 Python 的 sys.platform 取值。其他系统没有启动命令的约定
 _PLATFORM_SYSTEMS = {"win32": "windows", "linux": "linux"}
 
-# 就绪时限的默认值与界限取自规则登记（设计说明「参数怎样成为带版本的数据」中「创建 run 时按事项冻结的定义校验当前参数值，并把本 run 使用的参数取值与参数版本写进运行开始事件；该 run 进行期间不变」）
+# 就绪时限的默认值与界限取自规则登记
 READINESS_TIMEOUT_SEC = int(DEFINITIONS.rule_value("execution.readiness_timeout_sec"))
 
 # 试用需要的程序与版本（docs/design/browser-and-computer-use.md「执行位置上的程序」）
@@ -107,7 +107,7 @@ class TrialSession:
     file_handle: Any
     started_at: str
     # 直接子进程的创建时间（psutil，秒）：与进程号一起记进会话记录。持有会话的进程重新启动时按这两项
-    # 核对并结束遗留的进程树——进程号可能已经被别的进程复用（docs/design/browser-and-computer-use.md「试用工具」、工单 #1183）
+    # 核对并结束遗留的进程树——进程号可能已经被别的进程复用（工单 #1183）
     process_create_time: float | None = None
     status: str = "running"
     ended_reason: str | None = None
@@ -181,7 +181,7 @@ _ALLOCATED_PORTS: set[int] = set()
 
 def _free_port() -> int:
     # 取得一个空闲的 TCP 端口：bind(("127.0.0.1", 0)) 以后记下端口并关掉套接字，
-    # 端口留在进程内的已分配集合里直到会话结束（docs/design/browser-and-computer-use.md「启动方式」）
+    # 端口留在进程内的已分配集合里直到会话结束
     with _PORT_LOCK:
         for _ in range(64):
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -635,7 +635,7 @@ class TrialSessionTable:
 
     async def _wait_ready(self, session: TrialSession, timeout_sec: int, stop: Any,
                           output_limit: int) -> None:
-        # 失败回执带回来的启动输出按工具结果的上限截断（docs/design/browser-and-computer-use.md「试用工具」与规则登记 tool_output_limit）
+        # 失败回执带回来的启动输出按工具结果的上限截断（与规则登记 tool_output_limit）
         loop = asyncio.get_running_loop()
         deadline = loop.time() + timeout_sec
         while True:
@@ -773,7 +773,7 @@ def _ended_payload(session: TrialSession, reason: str, *, ended: bool) -> dict[s
 
 
 # ---------------------------------------------------------------------------
-# 遗留的会话（docs/design/browser-and-computer-use.md「试用工具」、「故障与处理」，工单 #1183）：Yudao 启动时结束没有结束记录的会话留下的进程树，
+# 遗留的会话（工单 #1183）：Yudao 启动时结束没有结束记录的会话留下的进程树，
 # 补写 trial_session_ended。进程号与创建时间都取自会话记录（开始事件的载荷）
 
 
@@ -797,7 +797,7 @@ _LEFTOVER_PAGE = 1000
 def leftover_sessions(store, *, limit: int = _LEFTOVER_PAGE) -> list[LeftoverSession]:
     """有开始记录、没有结束记录的会话（按（run、会话身份）配对，先开始先配对）。
 
-    Yudao 启动时用这份清单结束遗留的进程树并补写结束事件（docs/design/browser-and-computer-use.md「试用工具」、「故障与处理」）：
+    Yudao 启动时用这份清单结束遗留的进程树并补写结束事件：
     进程崩溃时结束事件没有写下来，交付软件的进程树可能还活着。
     """
     open_starts: dict[tuple[str, str], list[dict[str, Any]]] = {}

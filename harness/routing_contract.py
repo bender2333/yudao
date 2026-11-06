@@ -93,7 +93,7 @@ def register(implementation: Any) -> Any:
 
 class _Facts:
     # 交给路由的只读事件读取器（第三版，工单 #1164）：只有 list_events，读哪个 run 的事件。
-    # 事件库本身留在组装处，路由借看，不写事件（docs/design/skeleton-and-application.md「路由契约」中「不做」）。不给写出路是这一版的用意：
+    # 事件库本身留在组装处，路由借看，不写事件（docs/design/skeleton-and-application.md「路由契约」「不做」）。不给写出路是这一版的用意：
     # 契约只给读的入口，写仍然只经薄驱动交给写入口
     __slots__ = ("_store",)
 
@@ -167,7 +167,7 @@ def definition_of(definitions: Any, name: str) -> Any:
 
 @dataclass(frozen=True)
 class RoundEnd:
-    # 一轮工作以什么结束（成果驱动这一版沿用现在的结果种类，docs/design/skeleton-and-application.md「执行契约」输出）：
+    # 一轮工作以什么结束（成果驱动这一版沿用现在的结果种类，输出）：
     # 提交被接纳记 proposal_accepted，其余正常结束（含只有文字回答的一轮）记 text_reply
     outcome: str
 
@@ -194,7 +194,7 @@ class CompletionReason:
 @dataclass(frozen=True)
 class AskLimits:
     # 薄驱动给的运行配置上限：路由按被问的部门与提问方这一步剩下的量算出这一次询问这一轮的上限
-    # （docs/design/skeleton-and-application.md「路由契约」中「这一轮的上限」）。已经用掉的步数与时间由薄驱动扣，路由不读最小投影
+    # （docs/design/skeleton-and-application.md「路由契约」输出里的「这一轮的上限」）。已经用掉的步数与时间由薄驱动扣，路由不读最小投影
     max_model_steps: int
     department_max_model_steps: Mapping[str, int] = field(default_factory=dict)
     department_max_time_sec: Mapping[str, float] = field(default_factory=dict)
@@ -285,7 +285,7 @@ class Routing(Protocol):
 
     def work_reference(self, view: Any, *, department: str) -> Any:
         # 这一轮工作的路由自己的工作引用（例如任务池的任务），原样交给装配与执行（docs/design/skeleton-and-application.md「路由契约」输出、
-        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）；不用它时为空。任务池不在这里：成果驱动不用
+        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）；不用它时为空。任务池不在这里：成果驱动不用
         ...
 
     def round_end(self, view: Any, events: list[Event], *, department: str, session_id: str | None,
@@ -300,7 +300,7 @@ class Routing(Protocol):
     def completion_reason(self, view: Any, events: list[Event]) -> CompletionReason | None:
         # 可选（工单 #1394）：事项完成时的结束原因。薄驱动进入完成状态时问一次，events 是这个运行流的事件，
         # 路由从中读事项创建事件里记下的开环标记，按自己的定义给出这次完成记成哪一种结束原因（设计说明
-        # docs/design/skeleton-and-application.md「路由契约」中「结束原因写明是放行还是开环完成，由路由按事项创建时记下的开环标记给出」）。
+        # docs/design/skeleton-and-application.md「路由契约」输出：「结束原因写明是放行还是开环完成，由路由按事项创建时记下的开环标记给出」）。
         # item_end 管的是没有新工作时停下，不是这件事。没有这个方法的路由（第二版与任务池那一种）与这里
         # 返回 None 时，薄驱动按事项种类取；薄驱动不认这两个名字，只把路由给的原因写进事实
         ...

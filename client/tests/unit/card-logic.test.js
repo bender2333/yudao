@@ -211,7 +211,7 @@ test("界面不再包含已删除的 unknown_action 与 pending_verification", (
 });
 
 test("质检无法核验的决定卡片逐条列出无法核验的条件与原因", () => {
-  // 浏览器与 computer use 设计说明「无法核验」（工单 #1179）：说明列出每条无法核验的验收条件与原因
+  // 浏览器与 computer use 设计说明第 8.4 节（工单 #1179）：说明列出每条无法核验的验收条件与原因
   const rows = materialRows(decision({
     kind: "qa_cannot_verify",
     request: {

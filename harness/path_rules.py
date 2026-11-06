@@ -9,7 +9,7 @@ from pathlib import PurePosixPath, PureWindowsPath
 
 _DEVICE = re.compile(r"(?:con|prn|aux|nul|com[1-9\u00b9\u00b2\u00b3]|lpt[1-9\u00b9\u00b2\u00b3]|conin\$|conout\$)", re.IGNORECASE)
 
-# 检查材料的目录（[本地工具设计说明](docs/design/local-tools.md)「工作区」、docs/design/trusted-kernel.md「路径守卫」）：写入范围是
+# 检查材料的目录（[本地工具设计说明](docs/design/local-tools.md)「工作区」）：写入范围是
 # 检查材料的角色在这里写测试，它不进入公开树与交付快照，只出现在检查工作区与检查副本中
 CHECK_MATERIALS_DIR = ".yudao-qa-tests"
 QA_TESTS_DIR = CHECK_MATERIALS_DIR  # 旧名，留一版
@@ -25,7 +25,7 @@ def is_private_path(relative: str) -> bool:
 
 
 def is_git_metadata(relative: str) -> bool:
-    # 仓库自身的 Git 元数据：公开树排除它（docs/design/existing-project-onboarding.md「仓库概况与读取范围」），快照接入不因为它拒绝源目录
+    # 仓库自身的 Git 元数据：公开树排除它快照接入不因为它拒绝源目录
     return ".git" in relative.replace("\\", "/").casefold().split("/")
 
 

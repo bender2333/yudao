@@ -263,7 +263,7 @@ class WatchedOutputsTightening:
     }
 
     def submission(self, request: TightenRequest) -> Tightened:
-        # 一次提案提交的检查与内容组装（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」中「成果的内容由路由组装」）：
+        # 一次提案提交的检查与内容组装（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」「成果的内容由路由组装」）：
         # 先按种类查提案的形状，再按成果的内容判、把成果的内容组装出来。路由不组装的种类不给内容——
         # 内核按提案的参数当内容，照常写通用的接纳事件。内核不再按成果种类写分支
         proposal = request.proposal
@@ -455,11 +455,11 @@ class WatchedOutputsTightening:
             # 结论引用的独立判断事件（工单 #1190）：以后算解释翻转率时按这一对事件取
             "judgement_event": judgement.event_id,
             # 放行记录一次算好三个数（docs/design/independent-verification.md「口径」第 4 点）：查询与画面读这个数，不重新计算；
-            # 改判的条数随它写进放行记录（工单 #1190）。baseline_valid 随三个数一起算好（docs/design/independent-verification.md「检验的有效性」）
+            # 改判的条数随它写进放行记录（工单 #1190）。baseline_valid 随三个数一起算好
             "coverage": coverage_report(criteria, changed=len(changed), cases=case_steps,
                                         baseline=baseline),
             "open_criteria": open_criteria(criteria, case_steps),
-            # 基线明细（docs/design/independent-verification.md「检验的有效性」的表）：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
+            # 基线明细（的表）：命令检查的条目逐条写基线结果——失败（计入覆盖）、通过、
             # 缺少回执与无法运行都不计入，放行记录里看得到
             "baseline_checks": baseline_open_records(criteria, baseline),
             # 逐条结论引用的检查回执身份：那次 run_check 的输出工件引用（说明工件的引用由接纳时补在它前面）
@@ -510,7 +510,7 @@ class WatchedOutputsTightening:
         })
 
     def _structure(self, request: TightenRequest) -> Tightened:
-        # 现有结构说明（docs/design/existing-project-onboarding.md 「工程：现有结构说明」）：构建与测试的每一项都要有本次
+        # 现有结构说明（docs/design/existing-project-onboarding.md「工程：现有结构说明」）：构建与测试的每一项都要有本次
         # 激活中绑定当前快照与当前初始 PRD 的 run_check 回执，退出状态照实记录（不要求为 0）；建档中工作区的树不变。
         # 树与回执由合同里的通用条件核对（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
         minimal, facts = request.minimal, request.facts
@@ -551,7 +551,7 @@ class WatchedOutputsTightening:
         })
 
     def _baseline_review(self, request: TightenRequest) -> Tightened:
-        # 基线核验（docs/design/existing-project-onboarding.md 「质检：基线核验」）：逐条结论覆盖初始 PRD 的每条要求，
+        # 基线核验（docs/design/existing-project-onboarding.md「质检：基线核验」）：逐条结论覆盖初始 PRD 的每条要求，
         # 基线检查绑定当前快照与当前 ProductSpec，退出状态不为 0 的检查都有说明；这里不使用普通事项的放行规则。
         # 结构说明对应当前 PRD、工作区的树与检查回执由合同里的通用条件核对（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
         minimal, facts = request.minimal, request.facts
@@ -629,7 +629,7 @@ def _requirement_location_errors(request: TightenRequest) -> list[FieldError]:
 
 
 def _baseline_requirement_errors(request: TightenRequest) -> list[FieldError]:
-    # 带标记的边界条目不是现有行为（docs/design/existing-project-onboarding.md「产品：初始 PRD」）：要求文档描述而代码尚未实现的能力不记为现有缺陷；
+    # 带标记的边界条目不是现有行为：要求文档描述而代码尚未实现的能力不记为现有缺陷；
     # 逐条结论覆盖初始 PRD 的每条要求，不许多也不重复——两条都读 PRD 的内容（S1d 从内核搬来，工单 #860）
     spec = request.state.product_spec
     if spec is None:
@@ -812,7 +812,7 @@ def _location_known(relative: str, facts: TreeFacts) -> bool:
 
 def _baseline_conclusions(proposal: dict[str, Any], bound: dict[str, dict[str, Any]],
                           facts: TreeFacts) -> tuple[list[dict[str, str]], list[FieldError]]:
-    # 每条结论的依据按状态检查（docs/design/existing-project-onboarding.md「质检：基线核验」）。逐条结论覆盖初始 PRD 的每条要求读的是 PRD 的内容，
+    # 每条结论的依据按状态检查。逐条结论覆盖初始 PRD 的每条要求读的是 PRD 的内容，
     # 不在这里：由路由的收紧检查核对（S1d，工单 #860）
     declared = [item["requirement"].strip() for item in proposal["conclusions"]]
     errors: list[FieldError] = []

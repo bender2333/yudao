@@ -16,7 +16,7 @@ export type StreamHandlers = {
   onMessage: (message: StreamMessage) => void;
   // 发现缺口或收到 resync：客户端把已打开的视图标为「数据可能过时」并重新同步快照
   onResync: (reason: string) => void;
-  // 断线：保留最后已知的状态，整体显示「连接中断，数据可能过时」（docs/design/app-and-interface.md「页面的同步规则」）
+  // 断线：保留最后已知的状态，整体显示「连接中断，数据可能过时」
   onInterrupted: () => void;
 };
 

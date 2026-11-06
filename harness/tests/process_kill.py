@@ -70,7 +70,7 @@ def build_script(items: Sequence[dict[str, Any]] | Mapping[str, Sequence[dict[st
     #   {"proposal": {...}}   提交一种提案（product_spec、delivery_spec 等）
     #   {"output": [...]}     一次回答的全部输出条目（自己写调用，例如指定编号的一次读取）
     #   其余字段              FakeTurn 的字段（checks、transcript、files 等）
-    # 提案与检查可以写在同一项里：建档的结构说明与基线核验要求检查回执绑定同一次激活（design docs/design/existing-project-onboarding.md「总体」）。
+    # 提案与检查可以写在同一项里：建档的结构说明与基线核验要求检查回执绑定同一次激活。
     # 只有提案的项仍然直接给出提案对象，行为与 #307 建立时相同
     # 正式成果的提案（product_spec、delivery_spec、qa_review）换成工厂（工单 #471）：
     # 脚本项只写提案内容，依据版本由工厂从请求里的当前版本取

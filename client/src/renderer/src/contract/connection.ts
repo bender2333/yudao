@@ -41,7 +41,7 @@ export type Interface = {
 };
 
 export function interfaceFor(address: string, token = ""): Interface {
-  // 局域网访问方式下每个请求都在请求头里带令牌（docs/design/app-and-interface.md「令牌与 TLS」）；令牌不出现在地址里
+  // 局域网访问方式下每个请求都在请求头里带令牌令牌不出现在地址里
   const client = createClient(createConfig<ClientOptions>({
     baseUrl: address,
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
@@ -60,7 +60,7 @@ export async function connect(address: string, token = ""): Promise<Connection> 
   } catch (error) {
     return { state: "failed", address, message: error instanceof Error ? error.message : String(error) };
   }
-  // 局域网访问方式下没有令牌或令牌无效：服务按 docs/design/app-and-interface.md「令牌与 TLS」回答 401，不附原因。
+  // 局域网访问方式下没有令牌或令牌无效：服务按回答 401，不附原因。
   // 页面据此显示填写令牌的表单；本机访问方式不会走到这里
   if (response !== undefined && response.status === 401) {
     return { state: "unauthorized", address };

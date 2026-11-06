@@ -8,7 +8,7 @@
 # （工单 #1394 的做法），薄驱动只把它写进事实。
 #
 # 一轮工作在交完成以前可以有很多轮：可以交完成、还没有交的那些角色一直可以开始下一轮，直到交了完成
-# （事项结束）或者内核的时间、轮次与步数上限把它停下（docs/design/forms-and-verifier-role.md「验收」中「一个角色直做的定义能跑完一个事项，以开环完成结束，记录与页面写开环完成，没有发决定请求」：一定会停靠内核的上限）。
+# （事项结束）或者内核的时间、轮次与步数上限把它停下（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」：一定会停靠内核的上限）。
 #
 # 建档（工单 #1510，接入已有项目设计说明「总体」）：同一个路由也跑建档事项。接「建档」这一来源的角色交初始
 # PRD 与现有结构说明，然后交完成；这份形态没有核验角色，建档没有基线核验这一步，交完成以后以开环完成结束，
@@ -19,12 +19,12 @@
 # 一轮；交出新的一版以后，对上一版的结论不再作数（结论绑定它核验的那一版的内容摘要）。几个核验角色核验同一份
 # 时，每一个都放行才算放行，任何一个打回就返工；核验角色不能核验自己（被核验的角色给自己下结论同样拒绝）。
 #
-# 核验本身不在这里写（docs/design/forms-and-verifier-role.md「核验角色」）：写入范围、独立副本与检查回执归定义与执行层，这一版直做的路由
+# 核验本身不在这里写：写入范围、独立副本与检查回执归定义与执行层，这一版直做的路由
 # **只问结论**——从运行流的事件折出当前这一版的完成与各核验角色对它的结论（通用的成果接纳事件，S2c 工单 #1098）。
 # 折事件要有事件的入口，所以本模块声明契约第三版的可选方法 `use_facts`（工单 #1164，与任务池同一个做法）：
 # 组装处 select 接上它以后把事件库的只读读取器交给它。收紧检查拿的是这一次提交的事务里的事件，不用它。
 #
-# 本模块不导入别的路由实现（docs/design/forms-and-verifier-role.md「四层各认识什么」：路由之间不互相导入）：询问分支、一轮怎么结束这些规矩
+# 本模块不导入别的路由实现（：路由之间不互相导入）：询问分支、一轮怎么结束这些规矩
 # 在这里自成一份，与成果驱动的那一份同口径。
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ from .models import OPEN_LOOP_STOP_REASON, Event, EventType, RunProjection, TERM
 from .tools import in_force, offers_with_input, proposal_kind, tool_action, tools_for
 from .validation import FieldError, TightenRequest, Tightened, evaluate_conditions
 
-# 组织定义 organization.json 的 routing 里写这个名称（docs/design/forms-and-verifier-role.md「验收」中「默认定义下，已有的事件序列基准与交给模型的请求快照一字不变」「选择」）
+# 组织定义 organization.json 的 routing 里写这个名称（docs/design/skeleton-and-application.md「路由契约」「选择」）
 ROUTING_NAME = "direct"
 
 # 单角色直做形态的名字（harness/runtime.py 的形态登记处、harness/definitions/forms/single_role_direct/）
@@ -65,7 +65,7 @@ REWORK_VERDICT = "rework"
 # 一份直做定义必须写明事项结束用的那一个原因：它的定义里声明的封闭清单中的一条
 ITEM_END_REASON = "no_open_work"
 
-# 一轮没有正常结束的两种状态：暂停与失败（与成果驱动同一个口径，docs/design/forms-and-verifier-role.md「验收」中「事实与裁决、循环两层的代码里不出现部门名，也不出现 PRD、交付、质检结论这些成果种类的判断」输出）
+# 一轮没有正常结束的两种状态：暂停与失败（与成果驱动同一个口径，输出）
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
 # 询问分支里的两条拒绝理由与成果驱动那一份相同（工具回执上的说明，用户看得到）
@@ -125,7 +125,7 @@ def completing_departments(definitions: Any | None = None, kind: str = "change")
 class AcceptedOutcomes:
     """运行流里通用的成果接纳事件折出来的现状：交完成的各版与核验结论（按接纳的先后）。
 
-    路由只问结论，不自己写核验（docs/design/forms-and-verifier-role.md「核验角色」中「路由不写核验，只问核验」）：交完成与核验结论都是通用的
+    路由只问结论，不自己写核验（docs/design/forms-and-verifier-role.md「核验角色」「路由不写核验，只问核验」）：交完成与核验结论都是通用的
     成果接纳事件（S2c，工单 #1098），种类与作者部门在载荷的统一字段里，内容由各自的收紧检查组装。
     """
 
@@ -150,7 +150,7 @@ NO_OUTCOMES = AcceptedOutcomes()
 
 
 def fold(events: list[Event]) -> AcceptedOutcomes:
-    """从运行流的事件折出直做要看的两种成果（docs/design/forms-and-verifier-role.md「验收」中「默认定义下，已有的事件序列基准与交给模型的请求快照一字不变」输入：路由自己折要用的状态）。"""
+    """从运行流的事件折出直做要看的两种成果（docs/design/skeleton-and-application.md「路由契约」输入：路由自己折要用的状态）。"""
     completions: list[dict[str, Any]] = []
     reviews: list[dict[str, Any]] = []
     for event in events:
@@ -400,7 +400,7 @@ def item_end(projection: RunProjection, definitions: Any | None = None,
     """事项以什么结束：没有角色可以开始一轮工作时，事项以这份路由定义里声明的原因结束。
 
     能交完成的角色还在等时它一直可以开工，所以走到这里意味着既没有输入、指导，也没有还没交完成的人：
-    这件事停在没有新的工作上（docs/design/forms-and-verifier-role.md「验收」中「一个角色直做的定义能跑完一个事项，以开环完成结束，记录与页面写开环完成，没有发决定请求」：结束原因写在路由自己的定义里）。
+    这件事停在没有新的工作上（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」：结束原因写在路由自己的定义里）。
 
     还在等核验结论时不结束（工单 #1396）：这不是没有新的工作，是等着核验角色对当前这一版下结论
     （核验角色正在工作时由它的会话接着跑；这里守着的是它还没被排上时的这一刻）。
@@ -426,7 +426,7 @@ def completion_reason(projection: RunProjection,
                       events: list[Event]) -> routing_contract.CompletionReason | None:
     """事项完成时的结束原因：创建时记下的开环标记为真时是开环完成，其余不给原因（薄驱动按事项种类取）。
 
-    这一条判断归路由（设计说明「验收」中「默认定义下，已有的事件序列基准与交给模型的请求快照一字不变」输出、docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」）：事项最后采纳交完成的那一份，没有核验
+    这一条判断归路由（docs/design/skeleton-and-application.md「路由契约」输出、docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」）：事项最后采纳交完成的那一份，没有核验
     角色核验它时以开环完成结束，不写成放行。薄驱动进入完成状态时问一次，只把这里给的原因写进事实。
     """
     if recorded_open_loop(events):
@@ -435,7 +435,7 @@ def completion_reason(projection: RunProjection,
 
 
 def work_reference(projection: RunProjection, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明「验收」中「默认定义下，已有的事件序列基准与交给模型的请求快照一字不变」输出、docs/design/forms-and-verifier-role.md「验收」中「一个角色直做的定义能跑完一个事项，以开环完成结束，记录与页面写开环完成，没有发决定请求」）：直做不用它，为空。"""
+    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：直做不用它，为空。"""
     return None
 
 
@@ -542,7 +542,7 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
 
 
 # ---------------------------------------------------------------------------
-# 定义的内容：由路由自己校验（docs/design/forms-and-verifier-role.md「验收」中「一个角色直做的定义能跑完一个事项，以开环完成结束，记录与页面写开环完成，没有发决定请求」）
+# 定义的内容：由路由自己校验（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）
 # ---------------------------------------------------------------------------
 
 
@@ -613,7 +613,7 @@ def check_definition(definitions: Any) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 收紧检查（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」中「路由提供收紧检查」）
+# 收紧检查（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」「路由提供收紧检查」）
 # ---------------------------------------------------------------------------
 
 
@@ -711,7 +711,7 @@ def _review_tightened(request: TightenRequest, proposal: dict[str, Any],
 
 
 class DirectTightening:
-    # 直做的收紧检查（docs/design/forms-and-verifier-role.md「验收」中「默认定义下，已有的事件序列基准与交给模型的请求快照一字不变」：路由实现与它的收紧检查是同一条路由的两半）。
+    # 直做的收紧检查（docs/design/skeleton-and-application.md「路由契约」：路由实现与它的收紧检查是同一条路由的两半）。
     # 一次工具调用、一份提案经这里判断；交完成通过时给出成果的内容并结束事项（有核验角色时交出的是核验
     # 结论，每一个核验角色都放行时结束事项）
     CONTRACT_VERSION = tightening_contract.CURRENT_VERSION
@@ -828,7 +828,7 @@ class DirectTightening:
 
     def _structure(self, request: TightenRequest) -> Tightened:
         # 现有结构说明的内容：提案给出的字段，加上工作区的树摘要与当时的初始 PRD。构建与测试的每一项
-        # 要带本次激活中绑定当前快照与当前 PRD 的 run_check 回执，由提案合同的通用条件取（docs/design/forms-and-verifier-role.md「验收」中「一个外包角色直做的定义能跑完一个事项，从快照进、快照出，到上限会停，以开环完成结束并注明外包」）
+        # 要带本次激活中绑定当前快照与当前 PRD 的 run_check 回执，由提案合同的通用条件取（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
         proposal = request.proposal or {}
         spec_hash = request.minimal.artifact_hash(PRODUCT_SPEC_KIND)
         if spec_hash is None:
@@ -852,7 +852,7 @@ DIRECT_TIGHTENING = DirectTightening()
 
 
 class Direct:
-    # 直做的路由（docs/design/forms-and-verifier-role.md「验收」中「默认定义下，已有的事件序列基准与交给模型的请求快照一字不变」「选择」）：组织定义的 routing 写 direct。
+    # 直做的路由（docs/design/skeleton-and-application.md「路由契约」「选择」）：组织定义的 routing 写 direct。
     # 部门与成果种类按**这份形态自己的定义**取（工单 #1509）：组装处交给它这一份时就按这一份，
     # 没有交时读进程加载的那一份。一份形态一份实例，形态之间不共用。
     # 核验结论与交完成的各版在事件里（工单 #1396）：组装处把它的事件库的只读读取器交给它（use_facts，

@@ -1,6 +1,6 @@
 """OpenCode 一侧的指标收集：结束状态与原因、请求数、用量、耗时。
 
-数据来源只有 `opencode run --format json` 的输出与运行器计时（docs/design/evaluation-scenarios.md「指标」）。
+数据来源只有 `opencode run --format json` 的输出与运行器计时。
 """
 
 MODEL_SERVICE_FAILURE = "model_service_failure"

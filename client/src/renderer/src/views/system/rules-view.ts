@@ -65,7 +65,7 @@ export function isNumeric(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
-/** 种类与形式的中文（docs/design/rules-and-parameters.md「规则登记」）：kind 与 form 都是登记封闭清单里的取值 */
+/** 种类与形式的中文（docs/design/app-and-interface.md「分层与模块」）：kind 与 form 都是登记封闭清单里的取值 */
 export const RULE_KIND_TEXT: Record<string, string> = {
   parameter: "参数",
   structure: "结构",

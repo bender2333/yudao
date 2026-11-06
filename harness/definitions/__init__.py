@@ -29,7 +29,7 @@ Identifier = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]*$")]
 # 本模块不依赖动作合同，只导入本模块的 Provider 模块因此不会带上动作层（工单 #1275）
 ActionKind = Literal["read", "write", "check", "command", "fetch", "mcp", "trial", "browser"]
 
-# 核实方法（恢复契约「动作分类与处置」中「结果未知时向哪里查」）：none 不查询外部结果，snapshot 以动作前后的公开树快照
+# 核实方法（恢复契约「动作分类与处置」「结果未知时向哪里查」）：none 不查询外部结果，snapshot 以动作前后的公开树快照
 # 核对实际效果，query 按尝试身份查询执行环境的动作记录、检查回执或试用会话记录
 Verification = Literal["none", "snapshot", "query"]
 
@@ -50,7 +50,7 @@ ESTABLISHED_CONTRACTS: dict[ActionKind, tuple[Verification | None, bool | None]]
 # 新增的四类动作：静态环境工具的定义里必须写明核实方法与能否取消；旧类别可以省略（网络取回与 MCP 设计说明「本机的做法」）
 ADDED_KINDS: frozenset[str] = frozenset({"fetch", "mcp", "trial", "browser"})
 
-# 取回工具（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）：部门按定义都有这两个工具；以关闭取回的启动参数
+# 取回工具（网络与 MCP 设计说明「工具的提供」）：部门按定义都有这两个工具；以关闭取回的启动参数
 # （`--no-fetch`）运行的服务里，这个进程的部门都没有它们。清单只有这一份，工具定义留在 tools.json 里
 # 不动：取舍发生在「给部门哪几个工具」这一步，工具许可、提案合同与请求里的工具清单都经 tools_for，
 # 因此一处生效。评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明「两边的运行条件」）
@@ -199,7 +199,7 @@ class Department(_Definition):
     label: str = ""
     # 部门的角色：现在每个部门一个角色，角色编号与部门编号相同（事件的 role 字段记录部门）
     roles: tuple[Identifier, ...] = Field(min_length=1)
-    # 本部门模型的建议能力（docs/design/model-management.md「部门的建议能力」）：取值来自模型访问定义的输入方式。
+    # 本部门模型的建议能力：取值来自模型访问定义的输入方式。
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
     # 部门关注的成果（三部门的循环结构「部门按关注的成果开始工作」）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
@@ -252,7 +252,7 @@ class VerifierRole(_Definition):
 
 
 class VerificationDeclaration(_Definition):
-    # 组织定义的核验声明（docs/design/forms-and-verifier-role.md「核验角色」、「定义的校验」）：谁核验谁、角色的写入范围。
+    # 组织定义的核验声明：谁核验谁、角色的写入范围。
     # 谁能拒绝谁由核验声明推出，不另写一份
     verifiers: tuple[VerifierRole, ...] = ()
     write_scopes: Mapping[Identifier, WriteScope] = Field(default_factory=dict)
@@ -316,7 +316,7 @@ class Tool(_Definition):
     cancellable: bool | None = None
     # 提交类主机工具提交的提案种类
     proposal: Identifier | None = None
-    # 声明这个工具需要图像输入（设计说明「工具定义的声明」与浏览器设计「工具定义的声明」）：调用目标不含图像时
+    # 声明这个工具需要图像输入（与浏览器设计「工具定义的声明」）：调用目标不含图像时
     # 步骤驱动不在这次请求的工具定义中提供它。现在声明为需要的工具由 3.2D 的浏览器与 computer use 提供
     requires_image_input: bool = False
     # 提供给模型的描述与参数（JSON Schema），原样放进请求
@@ -478,7 +478,7 @@ class ServicePreset(_Definition):
     id: str = Field(min_length=1)
     name: str = Field(min_length=1)
     auth: str = Field(min_length=1)
-    # 获取模型列表与连接测试使用的认证方式（设计说明「对照」中「噪声范围来自同一版本的重复运行」）；默认协议：模型没有单独声明协议时预填（docs/design/rules-and-parameters.md「对照」中「改动分两类」）
+    # 获取模型列表与连接测试使用的认证方式（设计说明「模型访问定义与准入」）；默认协议：模型没有单独声明协议时预填（docs/design/model-management.md「服务方案预置表与模型能力表」）
     default_protocol: Protocol
     # 按协议的请求基址，请求路径由各协议适配器拼接
     base_urls: Mapping[Protocol, str]
@@ -495,14 +495,14 @@ class ServicePreset(_Definition):
 
 
 class ServicePresets(_Definition):
-    # 服务方案预置表（docs/design/rules-and-parameters.md「对照」中「改动分两类」）：整张表的 revision 与来源随界面显示；每个服务方案一项
+    # 服务方案预置表（docs/design/model-management.md「服务方案预置表与模型能力表」）：整张表的 revision 与来源随界面显示；每个服务方案一项
     revision: str = Field(min_length=1)
     source: str = Field(min_length=1)
     presets: tuple[ServicePreset, ...]
 
 
 class ModelCapability(_Definition):
-    # 模型能力表中的一条：取自 models.dev 的快照，只保留 docs/design/forms-and-verifier-role.md「四层各认识什么」的字段。
+    # 模型能力表中的一条：取自 models.dev 的快照，只保留的字段。
     # models.dev 中 modalities 可以缺少，缺少时不记录输入方式与输出方式（空元组）
     model: str = Field(min_length=1)
     # 调用协议：取自这个模型的 provider.npm，没有单独声明时取服务商接入包。
@@ -710,7 +710,7 @@ class Definitions(_Definition):
     # 停止原因的封闭清单，键是停止原因
     stop_reasons: Mapping[Identifier, StopReason]
     service_presets: ServicePresets
-    # 模型能力表：models.dev 快照，带 revision、快照日期与来源，只用于预填（docs/design/model-management.md「服务方案预置表与模型能力表」）
+    # 模型能力表：models.dev 快照，带 revision、快照日期与来源，只用于预填
     model_capabilities: ModelCapabilities
     # 事项种类与仓库概况的模式表，来自 work_items.json
     work_items: WorkItems
@@ -742,7 +742,7 @@ class Definitions(_Definition):
         return self.roles[department]
 
     def suggested_capabilities(self, department: str) -> tuple[str, ...]:
-        # 部门的建议能力（docs/design/model-management.md「部门的建议能力」）：部门内的角色继承部门的建议能力
+        # 部门的建议能力：部门内的角色继承部门的建议能力
         for item in self.organization.departments:
             if item.id == department:
                 return item.suggested_capabilities
@@ -1351,7 +1351,7 @@ def _condition_artifact_names(condition: ProposalCondition) -> list[tuple[str, s
 
 def _condition_references(contracts: ProposalContracts, organization: Organization,
                           outcome_kinds: OutcomeKinds) -> list[tuple[str, str, str]]:
-    # 提案合同里的通用条件（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：取回执的部门在组织里；条件引用的成果种类在这份定义里
+    # 提案合同里的通用条件：取回执的部门在组织里；条件引用的成果种类在这份定义里
     # （成果种类那一项，工单 #1456）。名称写错时整份拒绝——否则一处手误会把内核的几条判断静默关掉。
     # 旧的定义目录没有成果种类这一项，没有词表可对，照旧加载
     issues: list[tuple[str, str, str]] = []

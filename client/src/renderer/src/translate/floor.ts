@@ -121,7 +121,7 @@ function itemOf(row: WorkItemLoop, index: number): LoopItem {
     sign: row.sign,
     color_index: row.color_index ?? index + 1,
     // 因升级停止的事项没有当前部门（project.loop 的 department 为空）：门口牌子立在最后工作的那个部门
-    // （工单 #1186，docs/design/visualization.md「实时内容」 2026-10-29 补充）
+    // （工单 #1186，docs/design/app-and-interface.md「查询清单」 2026-10-29 补充）
     department: row.department ?? (status === "upgrade_stopped" ? row.last_department : null),
     round: row.round,
     started_at: row.started_at,

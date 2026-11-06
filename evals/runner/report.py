@@ -33,7 +33,7 @@ def host_environment():
 
 
 def _version(name):
-    """记录宿主环境里的工具版本（docs/design/evaluation-scenarios.md「报告与版本比较」）。"""
+    """记录宿主环境里的工具版本。"""
     executable = shutil.which(name)
     if executable is None:
         return "not installed"

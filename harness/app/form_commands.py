@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 
 
 class OrganizationAdopt(CommandRequest):
-    # 采用本项目的一份组织（设计说明「采用与历史」；换模板是形态名加空改动的一次采用，docs/design/project-organization.md「模板一键选用」）：
+    # 采用本项目的一份组织（设计说明「采用与历史」；换模板是形态名加空改动的一次采用）：
     # form 是发布带里那一份形态的名字；changes 是本项目的改动，这一版只接受空（字段以后只增）；
     # reason 可以不写，写了就进历史；base_version 是用户看到的组织版本——项目现在的形态的那份定义版本
     # （现在这一份不在发布里时为空），对不上时拒绝，页面按新的版本重新读取
@@ -52,7 +52,7 @@ async def _adopt(application: "Application", command: Command, request: Organiza
         raise Rejection("not_allowed",
                         f"发布带里没有形态 {request.form}；可以选的形态是：{'、'.join(forms)}")
     if request.changes:
-        # 本项目的改动这一版只接受空：合成与结构校验还没接（docs/design/project-organization.md「草稿与校验」、「采用与历史」），先不接受改动
+        # 本项目的改动这一版只接受空：合成与结构校验还没接（docs/design/forms-and-verifier-role.md「形态随事项冻结」），先不接受改动
         raise Rejection("not_allowed", "这一版还不能改本项目的改动：只能选发布带里的一份形态，改动留空")
 
     def adopt(transaction: Any) -> None:

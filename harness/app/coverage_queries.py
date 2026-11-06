@@ -56,7 +56,7 @@ class AcceptanceCoverageResult(Contract):
 
 
 class AcceptanceCoverage(ReplayRequest):
-    # 可回放（docs/design/app-and-interface.md「合同」）：at 是全局位置，省略时读取现在的事实
+    # 可回放：at 是全局位置，省略时读取现在的事实
     run_id: str
 
 

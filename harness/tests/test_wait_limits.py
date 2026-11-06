@@ -1,5 +1,5 @@
 # 等待主机工作的上限按层取值：取本层给每条用例上限的一半，并严格小于本层上限
-# （docs/design/test-pyramid.md 「单项时间上限」）。两个数各在一处集中定义：等待的上限在
+# （docs/design/test-pyramid.md「单项时间上限」）。两个数各在一处集中定义：等待的上限在
 # harness/tests/wait_limits.py（按层的表，比例写成除法），层上限在根 conftest.py 的 TIMEOUTS。
 # 这里逐层核对，失败时写明是哪一层。
 

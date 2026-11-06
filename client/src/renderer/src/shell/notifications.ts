@@ -2,7 +2,7 @@
 // 页面打开期间保持一条不按项目筛选的事件流连接（contract/client-app.ts）：决定请求与等待模型服务
 // 由事件给出，这里把事件翻译成通知的标记、标题、正文与点击去处。
 // 通知只用页面上已经查到的名称：项目名来自 projects.list，事项标题来自 project.overview；
-// 名称还没有取到时正文写标识（与决定卡片「页面」的回落相同）。
+// 名称还没有取到时正文写标识（与决定卡片「事件流」的回落相同）。
 //
 // 浏览器只在 https 页面与本机地址提供 Web Notifications（docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）：局域网的 http 地址上
 // window.Notification 不存在，这时不发通知也不报错。权限由浏览器在第一次需要发通知时询问，
@@ -34,7 +34,7 @@ export type NoticeNames = {
 // 决定请求：run 流与项目流的两条事件（harness/projection.py 的 apply_decision_event：
 // 决定请求的身份就是发出它的事件的编号，标记因此可以取事件的编号）
 // 等待模型服务：model_retry_scheduled，模型服务不可用时按 payload.delay_sec 重试。
-// 等待模型服务的完整实现属于 Stage 4（D17、app-and-interface.md 「补齐与实时」）：
+// 等待模型服务的完整实现属于 Stage 4（D17、app-and-interface.md「补齐与实时」）：
 // 重试用完以后进入待恢复时由上面的 model_unavailable 决定请求给出通知，这里给的是等待期间的重试
 export function noticeForEvent(event: EventObject, names: NoticeNames): SystemNotice | null {
   if (event.type === "decision_requested" || event.type === "project_decision_requested") {

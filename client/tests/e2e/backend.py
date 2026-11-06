@@ -818,7 +818,7 @@ async def seed_materials(application: Application, system: LoopSystem) -> None:
 
 def open_loop_script():
     # 开环完成与放行（工单 #1421）：产品与工程的轮次沿用默认脚本，质检按请求里的事实决定——
-    # 交付到达以前是预测性探索，到达以后先交独立判断再给结论（验证的独立性设计说明第 4 节）。
+    # 交付到达以前是预测性探索，到达以后先交独立判断再给结论（验证的独立性设计说明「先判断后看解释」）。
     # 默认脚本的质检不交独立判断（e2e 的预置数据在 main 上因此跑不完，见交接说明），这里给足轮次
     return {**script(), "quality": quality_turns("release", "checks passed on the current snapshot", times=40)}
 
@@ -1474,7 +1474,7 @@ def main() -> int:
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script), forms=release_forms())
     else:
         system = LoopSystem.for_testing(data_dir, FakeAdapter(adapter_script, stream_gap_sec=stream_gap))
-    # 一步连接把 Key 写进 .env（catalog.connect 的既定行为，docs/design/app-and-interface.md「读取模型」）：
+    # 一步连接把 Key 写进 .env（catalog.connect 的既定行为）：
     # 因此给凭据文件一个路径，与目录文件放在数据目录里（工单 #1297）
     system.facade.configure_paths(system.facade.config_path, Path(data_dir) / ".env")
     application = VersionedApplication(system)

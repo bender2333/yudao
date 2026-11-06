@@ -195,7 +195,7 @@ def test_a_missing_credential_refuses_the_launch_with_the_credential_name():
 
 def test_a_call_without_its_credential_is_a_failed_action_that_names_it():
     # 一次调用在开始时取不到凭据：不建立会话，动作记为失败（startup_failed），原因交回模型并写明凭据名称
-    # （设计说明第 7.2 节）；这是 call 的拒绝包装，不是抛给调用方
+    #这是 call 的拒绝包装，不是抛给调用方
     document = _settings_document({"API_KEY": {"kind": "credential", "credential_ref": "MCP_SESSION_KEY"}})
     table = mcp_session.McpSessions(document, credentials=CredentialChain(), stderr_dir=".")
 

@@ -1,4 +1,4 @@
-# 参数修改的命令（迭代底座 B3，工单 #349、#351，docs/design/app-and-interface.md「命令」、「事件流」；工单 #1262 的认证身份、基准版本与撤回）：
+# 参数修改的命令（迭代底座 B3，工单 #349、#351；工单 #1262 的认证身份、基准版本与撤回）：
 # 界内修改一次全局参数或项目级参数的现值。全局参数的事件写进目录流，项目级参数的事件写进项目流。
 # 超出界限时拒绝，不写事件。
 
@@ -31,7 +31,7 @@ class ParameterSet(CommandRequest):
     # 核对它仍是这个参数最近的一次修改，任一不符以 stale_base 拒绝；普通修改省略，原有请求继续有效
     name: str = Field(min_length=1)
     value: Any
-    # 非空理由（docs/design/app-and-interface.md「查询清单」）：空字符串与全空白都过不了合同校验，接口层返回 422（工单 #1262）
+    # 非空理由：空字符串与全空白都过不了合同校验，接口层返回 422（工单 #1262）
     reason: Text
     modified_by: str | None = None
     project_id: str | None = None
@@ -83,7 +83,7 @@ class ParameterWithdraw(CommandRequest):
     # 撤回不删除历史记录：它自己也是一次修改，理由按「撤回：」与原理由（页面提交时已按这个格式给出）
     name: str = Field(min_length=1)
     expected_change_id: str
-    # 非空理由（docs/design/app-and-interface.md「查询清单」）：空字符串与全空白都过不了合同校验，接口层返回 422（工单 #1262）
+    # 非空理由：空字符串与全空白都过不了合同校验，接口层返回 422（工单 #1262）
     reason: Text
     modified_by: str | None = None
     project_id: str | None = None

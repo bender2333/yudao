@@ -18,12 +18,17 @@
 # 「第 3、4 节」这类连写。「原型」的豁免看文件开头：开头声明了照原型的设计做的客户端文件才算，
 # 正文里提一次原型不整文件豁免（同一个判定在转换脚本的 proto_file）。
 #
+# 写好的引用也守（工单 #1411 第 4 轮，两条新检查）：`docs/design/<文件>.md「标题」` 里的标题必须
+# 是那份说明**现在**的小节标题；写成「「小节」中「条目名」」的，条目名得是那一节正文里的字。
+# 转换脚本按同一套判断写出引用，这两条挡的是脚本「猜一个像的」与改说明以后引用失效。
+#
 # 读仓库里的静态文件，不开数据库、不用子进程、不用网络，属于单元层。
 
 from __future__ import annotations
 
 import os
 import re
+from functools import lru_cache
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -243,3 +248,117 @@ def test_the_prototype_exemption_follows_the_file_header_not_one_mention():
     assert not scan("client/src/example.ts", header_declares)
 
     assert scan("harness/example.py", "// 原型 v8 设计说明第 3.3 节\n// 按设计说明第 7 节实现\n"), "没有开头声明的不豁免"
+
+
+# ---------------------------------------------------------------- 两条新检查（工单 #1411 第 4 轮）
+
+# 写好的引用：`docs/design/<文件>.md「小节标题」`，后面可以跟「中「条目名」」
+REFERENCE = re.compile(
+    r"docs/design/((?:[\w-]+/)*[\w-]+\.md)「((?:[^「」]|「[^「」]*」){1,80})」(?:中「((?:[^「」]|「[^「」]*」){1,80})」)?"
+)
+
+DESIGN = ROOT / "docs" / "design"
+
+# 设计说明里的小节：带编号的标题、不带编号的标题，以及单独一行的加粗小标题（正文里的段落小标题）
+HEADING = re.compile(r"^(#{2,6})\s+(?:\d+(?:\.\d+)*\.?\s+)?(.+?)\s*$")
+BOLD = re.compile(r"^\*\*(.+?)\*\*\s*$")
+
+DOC_MARK = "docs/design/".encode()
+
+TEXTS: dict[str, str] | None = None
+
+
+def all_texts() -> dict[str, str]:
+    """扫描范围里带 `docs/design/` 的文件：rel → 原文。"""
+    global TEXTS
+    if TEXTS is None:
+        texts: dict[str, str] = {}
+        for path in text_files():
+            try:
+                data = path.read_bytes()
+            except OSError:
+                continue
+            if DOC_MARK not in data:
+                continue
+            try:
+                texts[path.relative_to(ROOT).as_posix()] = data.decode("utf-8")
+            except UnicodeDecodeError:
+                continue
+        TEXTS = texts
+    return TEXTS
+
+
+@lru_cache(maxsize=None)
+def design_sections(doc: str) -> tuple[tuple[str, ...], dict[str, str]]:
+    """一份设计说明现在的 (小节标题, 标题 → 那一节的正文)。"""
+    try:
+        text = (DESIGN / doc).read_text(encoding="utf-8")
+    except OSError:
+        return ((), {})
+    lines = text.splitlines()
+    marks: list[tuple[int, str]] = []
+    heads: list[tuple[int, str]] = []
+    bolds: list[tuple[int, str]] = []
+    for i, line in enumerate(lines):
+        found = HEADING.match(line)
+        if found:
+            title = bare_title(found.group(2))
+            marks.append((i, title))
+            heads.append((i, title))
+            continue
+        bold = BOLD.match(line.strip())
+        if bold:
+            title = bare_title(bold.group(1))
+            marks.append((i, title))
+            bolds.append((i, title))
+    titles = tuple(title for _i, title in marks)
+    bodies: dict[str, str] = {}
+    for n, (i, title) in enumerate(heads):
+        end = heads[n + 1][0] if n + 1 < len(heads) else len(lines)
+        bodies.setdefault(title, "\n".join(lines[i + 1 : end]))
+    for i, title in bolds:
+        end = next((start for start, _t in heads if start > i), len(lines))
+        bodies.setdefault(title, "\n".join(lines[i:end]))
+    return (titles, bodies)
+
+
+def bare_title(title: str) -> str:
+    """标题去掉整体的「」包裹（标题里的引号不删）。"""
+    t = title.strip()
+    if len(t) >= 2 and t.startswith("「") and t.endswith("」"):
+        return t[1:-1]
+    return t
+
+
+def squeeze(text: str) -> str:
+    """比字的时候不看排版：空白不算差别。"""
+    return re.sub(r"\s+", "", text)
+
+
+def reference_problems() -> list[str]:
+    """标题得是那份说明现在的小节标题；「中「条目名」」得是那一节正文里的字。"""
+    found: list[str] = []
+    for rel, text in all_texts().items():
+        for match in REFERENCE.finditer(text):
+            doc, title, item = match.group(1), match.group(2), match.group(3)
+            titles, bodies = design_sections(doc)
+            where = f"{rel}: {match.group(0)}"
+            if not titles:
+                found.append(f"{where} —— 没有 docs/design/{doc}")
+            elif title not in titles:
+                found.append(f"{where} —— 「{title}」不是 docs/design/{doc} 现在的小节标题")
+            elif item and squeeze(item) not in squeeze(bodies.get(title, "")):
+                found.append(f"{where} —— 「{item}」不是「{title}」那一节正文里的字")
+    return found
+
+
+def test_reference_titles_are_the_current_section_titles():
+    """写出的标题是那份说明现在的小节标题（守 R2：引用按标题找得到现在的那一节）。"""
+    problems = reference_problems()
+    assert not problems, "写好的引用与设计说明对不上：\n" + "\n".join(problems)
+
+
+def test_item_names_in_references_are_words_in_that_section():
+    """「中「条目名」」的条目名是那一节正文里的字（守 R2：不把整句或段落小标题当条目名）。"""
+    problems = [line for line in reference_problems() if "正文里的字" in line]
+    assert not problems, "条目名对不上：\n" + "\n".join(problems)

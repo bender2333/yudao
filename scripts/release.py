@@ -2,7 +2,7 @@
 # 架构师在里程碑交给用户之前运行：核对版本与工作区，构建页面文件，组装 Yudao 服务的 wheel，
 # 输出 wheel 的路径与 SHA-256；带 --publish 时另外打标签、推送并把 wheel 上传到私有仓库的 Release。
 #
-# 步骤（设计说明「发布脚本」）：
+# 步骤：
 #   1. 核对：工作区干净；当前提交在 main 上并已推送；pyproject.toml 的版本号；Node 不低于 22.12，uv 可用。
 #   2. 构建页面：npm ci，Vite 把页面文件构建到 client/out/renderer。
 #   3. M3 起构建执行代理的 wheel（#144 加入）。
@@ -39,7 +39,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # 默认的 wheel 输出目录，被 git 忽略
 DEFAULT_OUTPUT_DIR = REPO_ROOT / "dist"
-# Node 的最低版本（docs/design/web-interface-and-release.md「发布脚本」）
+# Node 的最低版本
 MIN_NODE = (22, 12)
 # 私有仓库的 Release 名称前缀
 TAG_PREFIX = "v"
@@ -47,7 +47,7 @@ TAG_PREFIX = "v"
 PAGES_OUTPUT = Path("out") / "renderer"
 # 页面文件对应的接口版本写在发布资源目录的这个文件里（工单 #704）
 PAGES_API_VERSION_FILE = "api-version.json"
-# 发布资源目录：页面文件与执行代理的 wheel 随 wheel 一起发布（docs/design/web-interface-and-release.md「接口层提供页面文件」、「一次发布的内容」）
+# 发布资源目录：页面文件与执行代理的 wheel 随 wheel 一起发布
 RELEASE_ASSETS = Path("harness") / "release_assets"
 
 class ReleaseError(Exception):
@@ -78,7 +78,7 @@ def _tool_exists(name: str) -> bool:
     return shutil.which(name) is not None
 
 def _pyproject_version(path: Path) -> str:
-    # 从 pyproject.toml 读取 [project] 的 version。发布版本号只以这里为准（docs/design/web-interface-and-release.md「版本号」），
+    # 从 pyproject.toml 读取 [project] 的 version。发布版本号只以这里为准
     # 用标准库 tomllib 读取
     import tomllib
 
@@ -89,7 +89,7 @@ def _pyproject_version(path: Path) -> str:
     return version
 
 def _check_node_version() -> str:
-    # Node 不低于 22.12（docs/design/web-interface-and-release.md「发布脚本」）。取 node --version 的 vX.Y.Z
+    # Node 不低于 22.12。取 node --version 的 vX.Y.Z
     raw = _capture([_tool("node"), "--version"]).lstrip("v")
     try:
         major, minor = (int(part) for part in raw.split(".")[:2])
@@ -122,7 +122,7 @@ def _check_pushed(repo_root: Path, branch: str, remote: str) -> None:
         raise ReleaseError(f"当前提交 {head[:12]} 还没有推送到 {remote}/{branch}")
 
 def _check_tag_matches_version(repo_root: Path, version: str) -> None:
-    # 版本号核对 pyproject.toml 与标签（docs/design/web-interface-and-release.md「版本号」）：标签 v<版本> 由发布步骤建立，
+    # 版本号核对 pyproject.toml 与标签：标签 v<版本> 由发布步骤建立，
     # 这个版本已经有标签时说明发布过，重复发布会覆盖上一次的记录
     tag = f"{TAG_PREFIX}{version}"
     existing = _capture(["git", "tag", "--list", tag], cwd=repo_root)
@@ -159,7 +159,7 @@ def page_files(directory: Path) -> dict[str, Path]:
 
 def build_pages(repo_root: Path, *, version: str) -> Path:
     # 第 2 步：构建页面。npm ci 安装依赖，Vite 按 vite.pages.config.ts 把页面文件构建到
-    # client/out/renderer。页面记录的版本写成已核对的发布版本，与服务同版本（docs/design/web-interface-and-release.md「接口层提供页面文件」），
+    # client/out/renderer。页面记录的版本写成已核对的发布版本，与服务同版本
     # package.json 的版本不同时页面会在每次连接时重新加载
     client_root = repo_root / "client"
     environment = {**os.environ, "YUDAO_RELEASE_VERSION": version}
@@ -235,7 +235,7 @@ def _api_version_record(content: bytes) -> int | None:
     return value
 
 def verify_wheel_contents(wheel: Path, built: Path) -> None:
-    # 核对 wheel 内的页面文件与页面构建输出逐个一致（docs/design/web-interface-and-release.md「发布脚本」第 4 步）：缺少、多出
+    # 核对 wheel 内的页面文件与页面构建输出逐个一致（第 4 步）：缺少、多出
     # 与内容不同都写明文件名退出。M3 起执行代理的 wheel 也放在发布资源目录里（#144 加入）
     #
     # 发布资源目录里除页面文件以外还有接口版本这一个元数据文件（工单 #704 写下）：
@@ -282,7 +282,7 @@ def _check_release(repo_root: Path) -> None:
 
 def release(repo_root: Path, *, publish_flag: bool, output_dir: Path, branch: str,
             remote: str) -> dict[str, object]:
-    # 依 docs/design/web-interface-and-release.md「发布脚本」的顺序执行，返回 wheel 的路径与核对值
+    # 依的顺序执行，返回 wheel 的路径与核对值
     version = verify(repo_root, branch=branch, remote=remote)
     pages = build_pages(repo_root, version=version)
     assets = assemble_assets(repo_root, pages)

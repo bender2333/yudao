@@ -361,7 +361,7 @@ def _public_attempt(record: dict[str, Any]) -> dict[str, Any]:
         "requested_model": record.get("requested_model"),
         "actual_provider": record.get("actual_provider"),
         "actual_model": record.get("actual_model"),
-        # 这次请求的调用目标公开部分（不含 Key）、选择来源与请求/实际发送的档位（docs/design/model-management.md「每次模型请求」）
+        # 这次请求的调用目标公开部分（不含 Key）、选择来源与请求/实际发送的档位
         "call_target": record.get("call_target"),
         "status": _public_status(record),
         "stage": record.get("stage", record.get("status")),
@@ -450,7 +450,7 @@ def _merge_context(record: dict[str, Any], event: Event, payload: dict[str, Any]
     })
 
 
-# 调用目标的公开字段：请求、尝试与压缩事件把 call_target_public 的结果连同选择来源写入载荷（docs/design/model-management.md「每次模型请求」）；
+# 调用目标的公开字段：请求、尝试与压缩事件把 call_target_public 的结果连同选择来源写入载荷
 # 字段清单由 Provider 模块给出，观察与分析按它取出
 def _call_target_public(payload: dict[str, Any]) -> dict[str, Any]:
     # 从请求事件载荷取出调用目标的公开部分（不含 Key）、选择来源与请求/实际发送的档位
@@ -467,7 +467,7 @@ def _merge_started(record: dict[str, Any], event: Event, payload: dict[str, Any]
         "actual_provider": payload.get("actual_provider", record.get("actual_provider")),
         "actual_model": payload.get("actual_model", record.get("actual_model")),
         "started_event_id": event.event_id,
-        # 这次请求的调用目标公开部分（不含 Key）、选择来源与请求/实际发送的档位（docs/design/model-management.md「每次模型请求」）；
+        # 这次请求的调用目标公开部分（不含 Key）、选择来源与请求/实际发送的档位
         # run.attempt 从它读取（工单 #92）
         "call_target": _call_target_public(payload),
     })

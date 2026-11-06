@@ -107,7 +107,7 @@ def probe_connection(
 
 
 def _auth_headers(provider: ProviderDefinition, api_key: str) -> dict[str, str]:
-    # 模型列表地址要求认证时按服务方案规定的认证方式带上凭据（docs/design/model-management.md「Provider 配置」）：
+    # 模型列表地址要求认证时按服务方案规定的认证方式带上凭据：
     # 内置方案取预置表的 auth，自定义服务使用 Bearer；没有凭据时不带认证头，由上游决定拒绝
     if not api_key:
         return {}
@@ -191,7 +191,7 @@ def _value_at(item: Mapping[str, Any], path: tuple[str, ...]) -> Any:
 
 def _parse_candidates(payload: Any, preset_id: str, *, base_url: str | None = None,
                       capability_index: capabilities.CapabilityIndex | None = None) -> list[dict[str, Any]]:
-    # 候选的来源规则由 docs/design/model-management.md「模型访问定义与准入」规定；没有明确的输出类型时保持适用。
+    # 候选的来源规则由规定；没有明确的输出类型时保持适用。
     items = payload.get("data") if isinstance(payload, dict) else payload
     if not isinstance(items, list):
         kind = _content_kind(items if isinstance(payload, dict) and "data" in payload else payload)
@@ -292,7 +292,7 @@ def _content_kind(value: Any) -> str:
 
 
 def _connection_reason(exc: httpx.HTTPError) -> str:
-    # 连接失败的原因写成用户看得懂的中文：无法解析主机、连接被拒绝、超时（docs/design/model-management.md「模型管理页」）
+    # 连接失败的原因写成用户看得懂的中文：无法解析主机、连接被拒绝、超时
     if isinstance(exc, httpx.TimeoutException):
         return "请求超时"
     seen: set[int] = set()

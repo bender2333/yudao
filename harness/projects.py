@@ -155,7 +155,7 @@ def _mcp_require_text(name: str, value: Any) -> str:
 
 
 def _mcp_variable(entry: Any, *, where: str) -> dict[str, Any]:
-    # 一个环境变量或请求头的值：固定文本，或凭据名称（docs/design/existing-project-onboarding.md「总体」「变量与请求头的值」）
+    # 一个环境变量或请求头的值：固定文本，或凭据名称（docs/design/network-and-mcp.md「服务器设置」「变量与请求头的值」）
     if not isinstance(entry, dict):
         _mcp_field_error(f"「{where}」的值必须是对象：{{\"kind\": \"text\" 或 \"credential\", ...}}")
     kind = str(entry.get("kind") or "")
@@ -172,7 +172,7 @@ def _mcp_variable(entry: Any, *, where: str) -> dict[str, Any]:
 
 
 def _mcp_server_document(name: str, server: Any) -> dict[str, Any]:
-    # 校验一台服务器的非秘密设置（docs/design/existing-project-onboarding.md「总体」的表），返回事件里保存的形状
+    # 校验一台服务器的非秘密设置（的表），返回事件里保存的形状
     if not isinstance(server, dict):
         _mcp_field_error("每台服务器的设置必须是一个对象")
     server_name = _mcp_require_text("名称", server.get("name"))
@@ -219,7 +219,7 @@ def _mcp_server_document(name: str, server: Any) -> dict[str, Any]:
         document["headers"] = {str(key): _mcp_variable(entry, where=f"{server_name} 的请求头 {key}")
                                for key, entry in headers.items()} if isinstance(headers, dict) else {}
     document["config_digest"] = _mcp_server_digest(document)
-    # 可选的工具清单快照（docs/design/existing-project-onboarding.md「仓库概况与读取范围」）：必须带与本台服务器配置一致的摘要，
+    # 可选的工具清单快照（docs/design/network-and-mcp.md「读取工具清单（探测）」）：必须带与本台服务器配置一致的摘要，
     # 配置改变后旧快照不可继续使用；保存未探测的配置允许，快照缺省为没有
     snapshot = server.get("tool_snapshot")
     if snapshot is not None:
@@ -233,7 +233,7 @@ def _mcp_server_document(name: str, server: Any) -> dict[str, Any]:
 
 
 def _mcp_server_digest(server: dict[str, Any]) -> str:
-    # 一台服务器配置的内容摘要：工具清单快照与它绑定（docs/design/existing-project-onboarding.md「仓库概况与读取范围」），只取配置内容本身
+    # 一台服务器配置的内容摘要：工具清单快照与它绑定（docs/design/network-and-mcp.md「读取工具清单（探测）」），只取配置内容本身
     payload = {key: value for key, value in server.items() if key != "tool_snapshot"}
     return canonical_hash(payload)
 
@@ -323,7 +323,7 @@ def _requirement_mapping_errors(spec: Any) -> list[str]:
 
 
 def _initial_prd_requests(store: EventStore, project_id: str, through: int | None) -> tuple[set[str], set[str]]:
-    # 建档事项在 initial_prd 请求上的两种状态（工单 #136，docs/design/existing-project-onboarding.md「查询的变化」）：
+    # 建档事项在 initial_prd 请求上的两种状态（工单 #136）：
     # 还没有回答的请求所属的事项在等待确认（算作进行中）；被撤销的请求所属的事项已停止
     events = store.list_project_events(project_id, through_position=through)
     open_requests = {event.event_id: event for event in events
@@ -575,7 +575,7 @@ def project_context_text(project: ProjectProjection, title: str,
 
 
 def _onboarding_baseline(project: ProjectProjection, adoption: Adoption) -> str:
-    # 建档采纳的基线（工单 #136，docs/design/existing-project-onboarding.md「确认以后：当前有效要求与第一次采纳」）：已有项目的代码快照、文件数、git 提交、
+    # 建档采纳的基线（工单 #136）：已有项目的代码快照、文件数、git 提交、
     # 基线检查与现有缺陷；不逐个列出快照中的文件
     snapshot = adoption.snapshot or {}
     provenance = snapshot.get("provenance") or {}
@@ -841,7 +841,7 @@ class ProjectService:
         # 设置项目级参数（迭代底座 B3，工单 #351）：只有检查时限与建档单轮上限可以按项目设置，
         # 取值按全局的界限核对；事件写进项目流，只作用于之后创建的 run。
         # 提出者以认证身份为准（工单 #1262）：经命令进来时取命令的提出者；基准版本按这个项目有效参数的
-        # 版本（全局现值加项目覆盖的内容摘要，docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」）核对；expected_change_id 的撤回
+        # 版本（全局现值加项目覆盖的内容摘要）核对；expected_change_id 的撤回
         # 在同一事务核对它仍是这个参数最近的项目级修改。返回这次修改以后的项目有效参数版本
         from . import parameters as parameter_values
 
@@ -954,7 +954,7 @@ class ProjectService:
         return self._start(project_id, create, command=command)
 
     def _work_item_start_point(self, project: ProjectProjection) -> _StartPoint:
-        # 事项的起点只在这里求出（工单 #321，docs/design/existing-project-onboarding.md「接入的位置：建档事项」），按下面的顺序取第一个存在的：
+        # 事项的起点只在这里求出（工单 #321），按下面的顺序取第一个存在的：
         # 当前采纳成果的代码树、项目的起始文件夹快照（只在第一次采纳之前使用）、空树。
         # 开始事项、排空期间排队的事项、因升级重新开始的事项都调用它，不各写一遍
         if project.current_adoption is not None:
@@ -1004,7 +1004,7 @@ class ProjectService:
         prompt_config_versions = {department: project.department_settings[department].version
                                   if department in project.department_settings else 0
                                   for department in definitions.departments}
-        # MCP 服务器设置在事项创建时冻结（工单 #236，docs/design/existing-project-onboarding.md「产品：初始 PRD」）：事项创建事实带上当时的
+        # MCP 服务器设置在事项创建时冻结（工单 #236，docs/design/network-and-mcp.md「版本与固定」）：事项创建事实带上当时的
         # 非秘密设置与凭据引用；因升级重新开始的事项沿用原事项冻结的那份（不给时取项目当前设置）。
         # 还没有保存过 MCP 设置的事项不带这个字段，按空设置读取
         frozen_mcp = (deepcopy(mcp_servers) if mcp_servers is not None
@@ -1147,7 +1147,7 @@ class ProjectService:
 
     def _onboarding_restarted(self, transaction: Transaction, project: ProjectProjection,
                               item: WorkItem, run_id: str, form: str) -> _NewWorkItem:
-        # 建档事项因升级重新开始（docs/design/existing-project-onboarding.md「失败与中断」最后一行）：第一轮用建档事项记录的快照重建，与开始建档时同样
+        # 建档事项因升级重新开始（最后一行）：第一轮用建档事项记录的快照重建，与开始建档时同样
         # 从快照开始、种类为 onboarding、没有基线、轮次为 1；修改轮带上一轮候选与修改意见重新开始，与回答
         # 「提出修改」建立的 run 依据相同（轮次、上一轮候选的事件编号、修改意见原文）。
         # 登记的是同一个建档事项的新 run：事项编号沿用
@@ -1267,7 +1267,7 @@ class ProjectService:
         return written
 
     def create_missing_revision_runs_on_startup(self) -> list[str]:
-        # 启动时按 onboarding_revision_started 建立缺少的修改轮 run（工单 #136，docs/design/existing-project-onboarding.md「失败与中断」）。
+        # 启动时按 onboarding_revision_started 建立缺少的修改轮 run（工单 #136）。
         # 修改轮事件在答案的同一个项目流事务中写入，run 在事务提交以后创建：
         # 进程在两者之间中断时，这里按事件补建（run 流从版本 0 开始，重复创建被拒绝）
         created: list[str] = []
@@ -1294,7 +1294,7 @@ class ProjectService:
         return created
 
     def create_missing_work_item_runs_on_startup(self) -> list[str]:
-        # 启动时按 work_item_created 建立缺少的 run（工单 #321，docs/design/existing-project-onboarding.md「模块交互」）：
+        # 启动时按 work_item_created 建立缺少的 run（工单 #321）：
         # 事项登记的事务已经提交、run 还没有创建时进程中断，事项的 run 流没有任何事件，
         # 这里按事项记录（基线或起始文件夹快照都在里面）补建。run 流从版本 0 开始，重复创建被拒绝。
         # 排空期间排队的事项同样没有 run，但它们按设计等升级完成以后才开始：排空还没有结束时这里不补建
@@ -1362,7 +1362,7 @@ class ProjectService:
         return bool(unfinished.same_version or unfinished.other_version)
 
     def withdraw_waiting_initial_prd(self, work_item_id: str, *, command: Command | None = None) -> bool:
-        # 取消等待确认初始 PRD 的建档事项：撤销项目流中还没有回答的决定请求（工单 #136，docs/design/existing-project-onboarding.md「命令」、「失败与中断」）。
+        # 取消等待确认初始 PRD 的建档事项：撤销项目流中还没有回答的决定请求（工单 #136）。
         # 返回是否撤销了一个请求；没有等待中的请求时返回假，调用方按事项已结束处理
         found = self._waiting_initial_prd(work_item_id)
         if found is None:
@@ -1424,7 +1424,7 @@ class ProjectService:
             return None
         if run.kind == "onboarding":
             # 建档 run 以基线核验或开环完成结束：提出初始 PRD 候选并请求用户确认（工单 #136、#1510，
-            # docs/design/existing-project-onboarding.md「决定种类」、「领域事件」）。建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
+            #）。建档 run 没有交付与放行评审，因此在这一支判断，不走下面的普通结算
             return self._propose_initial_prd(transaction, run, item)
         if not run.delivery_specs:
             return None
@@ -1490,7 +1490,7 @@ class ProjectService:
 
     def _propose_initial_prd(self, transaction: Transaction, run: RunProjection,
                              item: WorkItem) -> ProjectEvent | None:
-        # 提出初始 PRD 候选并请求用户确认：候选与决定请求在一个事务中写入（工单 #136，docs/design/existing-project-onboarding.md「用户确认与修改的往返」）。
+        # 提出初始 PRD 候选并请求用户确认：候选与决定请求在一个事务中写入（工单 #136）。
         # 幂等：这个 run 已经提出过候选时不再写入，也不会重复发出决定请求。
         # 建档可以用没有核验角色的形态（工单 #1510，形态与核验角色设计说明「开环完成」第 6 条）：那种形态没有
         # 基线核验这一步，run 以开环完成结束；候选照常提出，只是没有基线核验这一份产物，确认请求写明这一点
@@ -1581,9 +1581,9 @@ class ProjectService:
                                       base_version: int, *, command: Command | None = None,
                                       reminders: list[str] | None = None) -> dict[str, Any]:
         # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；三项一起保存、一个版本。
-        # 并发修改时按版本拒绝后提交的修改（docs/design/network-and-mcp.md「工具许可」）。选择「跟随部门默认」清除本项目的模型选择，
+        # 并发修改时按版本拒绝后提交的修改（docs/design/model-management.md「项目部门设置与项目角色设置」）。选择「跟随部门默认」清除本项目的模型选择，
         # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt。
-        # reminders 是这次保存算出的建议能力提醒（docs/design/model-management.md「部门的建议能力」），随事件保存
+        # reminders 是这次保存算出的建议能力提醒随事件保存
         # 部门清单按项目现在的形态取（工单 #1509）：改名后的部门照常保存它的设置
         state = saved_project(self.store, project_id)
         definitions = DEFINITIONS if state is None else self._form_definitions(state)
@@ -1759,7 +1759,7 @@ class ProjectService:
 
 @dataclass(frozen=True)
 class _StartPoint:
-    # 事项的起点（工单 #321，docs/design/existing-project-onboarding.md「接入的位置：建档事项」）：采纳成果的基线与初始树、起始文件夹快照记录、基线所属的 run。
+    # 事项的起点（工单 #321）：采纳成果的基线与初始树、起始文件夹快照记录、基线所属的 run。
     # 起始文件夹快照不是采纳成果：它的基线与 source_run 为空，snapshot 带快照记录，事项种类仍是 change
     baseline: dict[str, Any] | None
     initial_tree: Any
@@ -1777,7 +1777,7 @@ class _NewWorkItem:
 
 
 def _check_commands(events: Sequence[Event], department: str | None) -> dict[str, str]:
-    # 检查的命令字符串（工单 #136，docs/design/existing-project-onboarding.md「领域事件」、「已有测试与 git 历史作为基线的证据」；工单 #1410）：只看核验角色这一轮在快照上运行的
+    # 检查的命令字符串（工单 #136，docs/design/existing-project-onboarding.md「已有测试与 git 历史作为基线的证据」；工单 #1410）：只看核验角色这一轮在快照上运行的
     # run_check 调用，同一个检查以后一次调用为准。部门取自定义里核验角色的名字，不按固定的部门名取；
     # 部门为空（旧事件没有记下核验角色）时按原有的取法取全部调用
     commands: dict[str, str] = {}
@@ -1808,7 +1808,7 @@ def _review_department(event: Event | None, review: dict[str, Any]) -> str | Non
 
 
 def _baseline_checks(receipts: list[dict[str, Any]], commands: dict[str, str]) -> list[dict[str, Any]]:
-    # 基线核验里的检查回执（工单 #136，docs/design/existing-project-onboarding.md「已有测试与 git 历史作为基线的证据」）补上核验角色自己运行该检查时用的命令字符串：
+    # 基线核验里的检查回执（工单 #136）补上核验角色自己运行该检查时用的命令字符串：
     # 命令取自核验角色在本 run 中 run_check 的调用（按检查名绑定），没有记录时为空
     return [
         {"name": receipt["name"], "command": commands.get(receipt["name"], ""), "exit_code": int(receipt["exit_code"]),

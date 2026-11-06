@@ -102,7 +102,7 @@ def _two_round_onboarding(tmp_path: Path) -> dict:
 
 
 def test_revision_round_product_gets_prior_prd_and_note(tmp_path):
-    # 建档修改轮的常驻材料（docs/design/existing-project-onboarding.md 「用户确认与修改的往返」最后一段）：
+    # 建档修改轮的常驻材料（docs/design/existing-project-onboarding.md「用户确认与修改的往返」最后一段）：
     # 产品拿到上一轮的初始 PRD 原文与这一轮用户的修改意见
     fixture = _two_round_onboarding(tmp_path)
     captured = fixture["captured"]

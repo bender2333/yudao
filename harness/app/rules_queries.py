@@ -34,7 +34,7 @@ class RuleEntry(Contract):
     name: str
     value: Any
     # 默认值：定义里的初值（Rule.value）。参数被修改过时现值 value 可能不同于默认值；
-    # structure 条目与从未修改的参数两者相同（工单 #1262，docs/design/rules-and-parameters.md「规则登记」中「登记照着实现」）
+    # structure 条目与从未修改的参数两者相同（工单 #1262，docs/design/rules-and-parameters.md「规则登记」「登记照着实现」）
     default_value: Any
     bounds: list[Any]
     kind: Literal["parameter", "structure"]

@@ -428,7 +428,7 @@ def test_a_passed_trial_case_is_evidence_and_a_model_reading_case_is_open():
 
 
 def test_the_two_tools_are_offered_to_quality_only():
-    # 两个主机工具只在质检的工具清单里（docs/design/browser-and-computer-use.md「各部门可用的工具」）。守 R2
+    # 两个主机工具只在质检的工具清单里。守 R2
     for department in DEFINITIONS.departments:
         tools = DEFINITIONS.tools_for(department, "change")
         if DEFINITIONS.is_verifier(department):

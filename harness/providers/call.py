@@ -48,7 +48,7 @@ class ModelCall(BaseModel):
 
 
 class ModelDelta(BaseModel):
-    # 一次调用尝试中某个通道的一段文字片段（docs/design/app-and-interface.md「模型输出片段」）：offset 是这段文字在该通道中的起始字数。
+    # 一次调用尝试中某个通道的一段文字片段：offset 是这段文字在该通道中的起始字数。
     # 片段由协议实现从解码后的流事件中读出，不写入事件日志，只经输出片段通道转发
     model_config = ConfigDict(frozen=True, extra="forbid")
 

@@ -33,7 +33,7 @@ def suggested_dotenv_key(ref: str) -> str:
 
 
 def connection_credential_ref(provider_id: str) -> str:
-    # 一步连接按连接 ID 生成引用，非字母开头时使用 HOST_ 前缀（docs/design/model-management.md「Provider 配置」）。
+    # 一步连接按连接 ID 生成引用，非字母开头时使用 HOST_ 前缀。
     reference = re.sub(r"[^A-Za-z0-9]", "_", provider_id).upper() + "_KEY"
     return reference if reference[0] in "ABCDEFGHIJKLMNOPQRSTUVWXYZ" else "HOST_" + reference
 

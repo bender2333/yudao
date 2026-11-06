@@ -19,10 +19,10 @@ import { departmentName } from "./labels.ts";
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];
 
-// 默认的三个部门（docs/design/network-and-mcp.md「服务器设置」中「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
+// 默认的三个部门（docs/design/network-and-mcp.md「服务器设置」「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
 // （工单 #1457），组织还没有数据时由调用处按设置里已有的部门兜底
 
-// 默认的时限与输出上限（docs/design/network-and-mcp.md「运行规则」；后端 MCP_OUTPUT_LIMIT_DEFAULTS 是同一组值）：
+// 默认的时限与输出上限（后端 MCP_OUTPUT_LIMIT_DEFAULTS 是同一组值）：
 // 表单留空时按这组默认，不把默认值写死在客户端提交的内容里
 export const MCP_DEFAULTS = { startup_timeout_sec: 60, call_timeout_sec: 120, output_limit: 20000 } as const;
 
@@ -301,7 +301,7 @@ export function serverDocument(server: McpServerSettingView | null, draft: McpSe
 }
 
 // 一份服务器文档：其余服务器照原样带回去，改动的这一台按草稿换掉（改名时去掉原来那个名称），
-// previous_name 为 null 表示新增。删掉一台时 draft 传 null（docs/design/network-and-mcp.md「版本与固定」：整份设置一个版本）
+// previous_name 为 null 表示新增。删掉一台时 draft 传 null（：整份设置一个版本）
 export function mcpDocumentPayload(
   servers: Record<string, McpServerSettingView> | undefined,
   draft: McpServerDraft | null,
@@ -391,7 +391,7 @@ const HINT_LABELS: [string, string][] = [
   ["open_world_hint", "访问外部"],
 ];
 
-// 服务器自己标注的提示：只供参考，不参与判断（docs/design/network-and-mcp.md「服务器设置」中「工具清单」）
+// 服务器自己标注的提示：只供参考，不参与判断（docs/design/network-and-mcp.md「服务器设置」「工具清单」）
 export function hintText(hints: unknown): string {
   if (hints === null || typeof hints !== "object") {
     return "";

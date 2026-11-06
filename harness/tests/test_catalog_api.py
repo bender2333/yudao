@@ -204,7 +204,7 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
                            base_version=after_defaults["revision"], bindings={})
         assert cleared.status_code == 200, cleared.text
         current = _catalog(client)["revision"]
-        # 部门默认只能引用已准入的定义（docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」）：导入前先保存新连接并记录它的准入
+        # 部门默认只能引用已准入的定义：导入前先保存新连接并记录它的准入
         added = _command(client, "catalog.connection.save", base_version=current,
                          provider=_provider("p3"), models=[_model("m3")])
         assert added.status_code == 200, added.text
@@ -229,7 +229,7 @@ def test_document_import_and_department_defaults_write_events(tmp_path):
 
 
 def test_department_defaults_carry_the_requested_tier(tmp_path):
-    # 部门默认保存可为空的请求档位（docs/design/model-management.md「部门默认与角色默认」，工单 #87）：请求档位只核对它属于档位全集，
+    # 部门默认保存可为空的请求档位（工单 #87）：请求档位只核对它属于档位全集，
     # 保存后查询把它交回；超出所选模型支持档位的档位照常保存，不属于档位全集时整份拒绝并指出字段位置
     document = _document()
     document["models"][0]["reasoning_levels"] = ["low", "medium"]

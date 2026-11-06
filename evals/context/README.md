@@ -47,7 +47,7 @@ python -m evals.context counterfactual --sample 24
 | 召回 | 真值里「此前已经出现过」的记号有多少还在视图里 | `measure.score_view` |
 | 浪费 | 视图里此后从未被引用的记号所在的条目，用量合计 | `references.attribute` |
 
-启发式的误差写在 `references.py` 开头的说明与 docs/design/evaluation-scenarios.md「三个场景」：浪费是上界、召回是下界。
+启发式的误差写在 `references.py` 开头的说明与 docs/design/context-assembly.md「「用到了什么」：真值集合与这个启发式的误差」：浪费是上界、召回是下界。
 
 ## 文件
 
@@ -57,7 +57,7 @@ python -m evals.context counterfactual --sample 24
 - `references.py`：抽引用、把引用记给最早持有它的条目。
 - `measure.py`：逐步骤量与汇总表。
 - `view.py`：`view(events, rules)`，规则集 `Rules` 与规则版本。
-- `rule-set.json`：规则清单（默认值 + 四项记录 + 数据来源），既是代码的输入，也是 docs/design/evaluation-scenarios.md「评分」的机器可读版本。
+- `rule-set.json`：规则清单（默认值 + 四项记录 + 数据来源），既是代码的输入，也是 docs/design/context-assembly.md「规则清单（七条）」的机器可读版本。
 - `replay.py`：用新视图重放并做逐条规则的消融与逐段核对。
 - `sweep.py`：参数扫描。
 - `verify.py`：核对「视图 = 记录」逐字节一致。

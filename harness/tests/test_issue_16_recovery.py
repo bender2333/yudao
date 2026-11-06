@@ -212,7 +212,7 @@ def test_a_run_with_an_older_definitions_version_asks_the_user_before_continuing
 
 def test_the_definitions_changed_request_is_read_through_the_decisions_query(data_dir):
     # 定义版本不同的请求在接口合同里（工单 #894）：decisions.list 读得出这条请求，载荷里带两个定义版本与两个选项。
-    # 合同里缺这一种时，只要有一条这样的请求，列表就构造不出来，首页的「待你决定」读不出（docs/design/recovery-contract-and-fault-matrix.md「执行权与一致边界」）
+    # 合同里缺这一种时，只要有一条这样的请求，列表就构造不出来，首页的「待你决定」读不出（docs/design/app-and-interface.md「用户决定的回答」）
     _system, _project_id, run_id = _unfinished_run(data_dir)
     recorded = _older_definitions_version(data_dir)
 

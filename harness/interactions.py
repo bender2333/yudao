@@ -42,7 +42,7 @@ class InteractionWriter:
         self._publication = threading.Lock()
 
     def initial(self, run_id: str, text: str) -> dict[str, Any]:
-        # 写入首个输入：部门 Prompt 不在 run 内留副本，每次模型请求从项目部门设置读取（docs/design/model-management.md「生效时机」、「每次模型请求」）
+        # 写入首个输入：部门 Prompt 不在 run 内留副本，每次模型请求从项目部门设置读取
         received = self._input(run_id, text, version=1, kind="text", previous_ref=None, parent_commit=None)
         return {"initial_input": received,
                 "intend_ref": received["intend_ref"], "git_version": received["git_version"]}

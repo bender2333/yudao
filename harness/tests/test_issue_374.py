@@ -82,7 +82,7 @@ def _wait_port(process: subprocess.Popen, log: Path, data_dir: Path) -> int:
         time.sleep(0.1)
 
 def _recording_browser(directory: Path, recorded: Path) -> Path:
-    # 标准库 webbrowser 读 BROWSER 环境变量（docs/design/web-interface-and-release.md「使用的技术」），用一条命令把打开的地址记进文件
+    # 标准库 webbrowser 读 BROWSER 环境变量用一条命令把打开的地址记进文件
     script = directory / "record-browser.cmd"
     script.write_text(f'@echo off\r\necho %1 > "{recorded}"\r\n', encoding="utf-8")
     return script

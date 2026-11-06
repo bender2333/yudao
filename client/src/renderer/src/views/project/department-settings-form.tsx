@@ -91,7 +91,7 @@ export function useDepartmentDraft(setting: DepartmentSetting | null): [
   return [draft, setDraft, draftFromSetting(setting)];
 }
 
-// 建议能力提醒（docs/design/model-management.md「部门的建议能力」）：保存结果带回的提醒，以及当前生效模型（含跟随）已有的提醒。
+// 建议能力提醒：保存结果带回的提醒，以及当前生效模型（含跟随）已有的提醒。
 // 弹窗打开期间一直显示，直到换成具备该能力的模型
 export function ReminderList(props: { items: string[]; testId?: string }) {
   if (props.items.length === 0) {

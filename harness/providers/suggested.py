@@ -9,7 +9,7 @@ from typing import Any, Mapping
 from ..definitions import DEFINITIONS
 from .store import ModelDefinition
 
-# 缺少某项能力时的影响：按 docs/design/model-management.md「部门的建议能力」抄录浏览器与 computer use 设计说明「无法核验」的结论
+# 缺少某项能力时的影响：按抄录浏览器与 computer use 设计说明「无法核验」的结论
 _MISSING_IMPACT: Mapping[str, str] = {
     "image": "不提供 computer use，浏览器只给可访问性结构，不给截图；依赖桌面程序或外观的验收条件无法核验",
 }

@@ -14,7 +14,7 @@ from .models import DecisionRequest
 class Option:
     id: str
     label: str
-    # 说明必填（工单 #136，docs/design/existing-project-onboarding.md「决定种类」）：为真时这个选项必须附说明，空说明的回答由服务端拒绝
+    # 说明必填（工单 #136）：为真时这个选项必须附说明，空说明的回答由服务端拒绝
     note_required: bool = False
 
 

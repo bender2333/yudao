@@ -119,7 +119,7 @@ async def _probe_server(application: "Application", command: Command, request: T
         raise Rejection("not_allowed", str(invalid)) from invalid
     server = document["servers"][request.name]
     # 结果以后以事件出现的命令：先登记命令身份（与目录的连接测试同一做法，这里登记在项目流），
-    # 探测作为任务在服务的事件循环里进行（docs/design/network-and-mcp.md「读取工具清单（探测）」中「接受以后作为任务进行」），命令立即接受
+    # 探测作为任务在服务的事件循环里进行（docs/design/network-and-mcp.md「读取工具清单（探测）」「接受以后作为任务进行」），命令立即接受
     application.system.writes.transact(project_stream(request.project_id), lambda _t: None, command=command)
     application.schedule(_probe_task(application, request.project_id, request.name, server))
 

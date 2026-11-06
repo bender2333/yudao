@@ -86,7 +86,7 @@ _USER_EVENTS = frozenset({EventType.USER_INPUT_RECEIVED, EventType.DEPARTMENT_GU
 
 
 def guidance_version(projection: RunProjection, department: str) -> int:
-    # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（docs/design/skeleton-and-application.md「最小投影」，S1d），
+    # 这个部门指导当前这一版的编号（工单 #964）：指导是应用的数据，最小投影里没有它（设计说明「必验反例」，S1d），
     # 所以由薄驱动按运行状态投影给出，随一轮工作的开始事件记下
     return max((item.version for item in projection.department_guidance
                 if item.department == department), default=0)
@@ -200,7 +200,7 @@ class _DepartmentSettings:
 
     def _project_setting(self, department: str):
         # 运行层的设置来源：事项创建时由项目层提供，每次请求读取该项目该部门当前的项目部门设置。
-        # 不属于项目的运行（命令行与测试）没有项目层，返回空设置（docs/design/model-management.md「每次模型请求」）
+        # 不属于项目的运行（命令行与测试）没有项目层，返回空设置
         if self.project_id is None or self.projects is None:
             return None
         return self.projects.read_projection_setting(self.project_id, department)
@@ -353,7 +353,7 @@ class Orchestrator:
         # 薄驱动只按契约的三个问题调用它，组装时核对它声明的契约版本
         self._routing = routing
         routing_contract.accept(routing)
-        # 决定请求的处理与建档的流转在应用层（工单 #827，docs/design/skeleton-and-application.md「薄驱动」中「薄驱动只连接」）：这里接上它，
+        # 决定请求的处理与建档的流转在应用层（工单 #827，docs/design/skeleton-and-application.md「薄驱动」「薄驱动只连接」）：这里接上它，
         # 调用时把自己作为 driver 交进去，薄驱动自己不再写这些处理
         self.decision_flow = decision_flow
         # 装配实现与执行实现由组装处（`runtime.py`）经构造参数接上（工单 #979，骨架与应用设计说明第
@@ -525,11 +525,11 @@ class Orchestrator:
             ))
         overview_ref = None
         if kind == "onboarding":
-            # 仓库概况由快照的公开树确定性地生成，作为建档中部门读取的第一项材料（docs/design/existing-project-onboarding.md「总体」、「仓库概况与读取范围」）
+            # 仓库概况由快照的公开树确定性地生成，作为建档中部门读取的第一项材料
             overview_ref = asdict(self.artifacts.put(
                 run_id, "repository_overview", repository_overview(initial_tree), media_type="text/markdown",
             ))
-        # 建 run 时冻结的参数快照（工单 #1189，docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」）：全局现值叠加项目覆盖，
+        # 建 run 时冻结的参数快照（工单 #1189）：全局现值叠加项目覆盖，
         # 事项已经解析出来的实际限额单独记下；这个 run 之后只读这份快照
         item_limits = {
             "max_cycles": max_cycles,
@@ -649,7 +649,7 @@ class Orchestrator:
 
     def _start_department_of(self, definitions: Definitions, kind: str) -> str:
         # 事项开始时开始第一轮的是接它来源的部门（工单 #1455）：来源从事项的种类取（建档或你的输入），
-        # 部门从定义取。部门名不在这里写（docs/design/skeleton-and-application.md「薄驱动」）
+        # 部门从定义取。部门名不在这里写
         return definitions.source_department(definitions.item_source(kind))
 
     def _input_department_of(self, definitions: Definitions) -> str:
@@ -954,7 +954,7 @@ class Orchestrator:
     async def _wait_at_safe_node(self, activation: _Activation, seconds: float) -> Judgment:
         # 重试等待：在安全节点等待至多 seconds 秒；新输入、指导或取消到达时由 _wake 唤醒，运行时间用完时结束等待，
         # 醒来以后回到安全节点判断。唤醒在判断之前登记：判断之后才提交的改变，提交方调用 _wake 时一定看到这次登记
-        # 重试退避不在不计入运行时间的等待清单里（docs/design/loops-and-convergence.md「一定会停」的封闭清单只有等待模型服务、等待用户决定、
+        # 重试退避不在不计入运行时间的等待清单里（的封闭清单只有等待模型服务、等待用户决定、
         # 等待机器、等待桌面）：这一段照常计入，段计时不停表，否则 min(remaining, time_left) 的等待上限
         # 永远不会缩短，运行时间用完无法在等待期间结束运行
         loop = asyncio.get_running_loop()
@@ -1034,7 +1034,7 @@ class Orchestrator:
         return self.project(run_id)
 
     def resume_incomplete_run(self, run_id: str) -> tuple[int, RunProjection] | None:
-        # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约「执行权与一致边界」）：
+        # 启动时自动继续一个因进程中断而未结束的 run（工单 #16，ADR-0018、恢复契约「角色任务的恢复」）：
         # 核对定义版本、核实结果未知的动作、取得执行权这三步在 `recovery.py`（S4c 工单 #863），
         # 薄驱动只把它接上并转交。
         # 事项冻结的形态不在发布里时（工单 #1392）：这个 run 停在原处，不换一份定义顶替、不进定义版本核对、
@@ -1561,7 +1561,7 @@ class Orchestrator:
 
         activation_id = new_id("act")
         transaction.on_commit(lambda: session.activate(activation_id))
-        # 部门 Prompt 每次激活从项目部门设置读取，run 内没有副本；没有写入时使用内置默认 Prompt（docs/design/model-management.md「解析规则」）。
+        # 部门 Prompt 每次激活从项目部门设置读取，run 内没有副本；没有写入时使用内置默认 Prompt。
         # 按部门取模型与提示词的这份来源随开始一轮工作的请求一起交给执行实现（第三版，工单 #1511）
         settings = self._department_settings(projection)
         prompt = settings.department_prompt(department)
@@ -1690,7 +1690,7 @@ class Orchestrator:
             return
         except (ValueError, OSError) as exc:
             # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
-            # （ADR-0038 与 docs/design/local-tools.md「工作区」：检查工作区从封存的交付建立）。这次激活无法开始，
+            # （ADR-0038 与 local-tools 「工作区」：检查工作区从封存的交付建立）。这次激活无法开始，
             # 以 host_commit_error 正式终止并报告真实原因，与提交判断对同一缺陷的报告方式一致
             self._end_run(activation, "host_commit_error",
                           f"the persisted delivery tree cannot be read for the {department} "
@@ -1706,7 +1706,7 @@ class Orchestrator:
             declared = execution_contract.accept(self._execution)
             assembly_contract.accept(self.assembly)
             # 开始一轮工作的请求（执行契约的输入）：部门与会话在 scope 里，这一轮的上限由这个会话的
-            # 剩余步数决定；路由自己的工作引用经契约原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」），
+            # 剩余步数决定；路由自己的工作引用经契约原样交给装配（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」），
             # 成果驱动不用它时为空（工单 #861）；按部门取模型与提示词的来源随请求交给执行实现
             # （第三版，工单 #1511），不再由安全节点回答
             request = execution_contract.RoundRequest(
@@ -1755,7 +1755,7 @@ class Orchestrator:
                 self._end_run(activation, TIME_BOUND, time_limit_message(minimal, elapsed), result.version)
             return
         # 薄驱动拿到一轮结果以后问路由这一轮以什么结束，再按回答经写入口提交（docs/design/skeleton-and-application.md「执行契约」输出、
-        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一轮工作怎么结束由路由按事件判断，执行契约不写死结果的种类」；工单 #861）：路由说这一轮不是正常结束时不提交
+        # docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」；工单 #861）：路由说这一轮不是正常结束时不提交
         ended = self._item_routing(run_id).round_end(current, list(result.events), department=department,
                                                      session_id=scope.session_id, activation_id=scope.activation_id)
         if ended is None:
@@ -2032,7 +2032,7 @@ class Orchestrator:
         assembly_contract.accept(self.assembly)
         # 询问分支照常按执行契约开始一轮工作：身份是这个分支会话的，这一轮的上限来自路由的请求
         # （薄驱动已经把这个分支会话之前用掉的步数扣掉）；路由自己的工作引用指向这次询问
-        # （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」，工单 #861、#862）
+        # （工单 #861、#862）
         driver = self._execution.start(
             execution_contract.RoundRequest(
                 scope=branch_scope, prompt=prompt, limits=limits, work_ref=branch.work_ref,

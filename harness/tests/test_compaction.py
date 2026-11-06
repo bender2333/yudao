@@ -245,7 +245,7 @@ def _local_tokens(records, pinned=PINNED, tools=TOOLS):
 @pytest.mark.parametrize("work_limit, compacts", [(100_000, True), (200_000, False)])
 def test_a_million_token_window_compacts_at_the_work_limit(work_limit, compacts):
     """窗口 1,000,000 的模型在工作上限处压缩：用量约 105000 token，上限 100000 时压缩、200000 时不压缩
-    （设计说明第 8.3 节）。"""
+    （docs/design/model-management.md「预留与阈值」）。"""
     records = _history(52, 8000)
     tokens = _local_tokens(records)
     assert 100_000 < tokens < 200_000

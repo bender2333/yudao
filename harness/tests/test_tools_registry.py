@@ -215,7 +215,7 @@ def test_a_fetch_appears_in_its_own_projects_recent_records_only(tmp_path):
 
 def test_each_server_shows_its_own_latest_probe_and_stale_results_keep_their_digest(tmp_path):
     # 验收 1（最近一次状态，R2）：每台服务器给出自己最近一次探测的状态，不是项目里最后一次探测；
-    # 配置改过以后旧结果仍然给出（docs/design/network-and-mcp.md「读取工具清单（探测）」中「过期探测结果保留供查询」），带上它绑定的配置摘要；
+    # 配置改过以后旧结果仍然给出（docs/design/network-and-mcp.md「读取工具清单（探测）」「过期探测结果保留供查询」），带上它绑定的配置摘要；
     # 探测过但已经删掉的服务器不再列出
     system = _system(tmp_path)
     application = Application(system)

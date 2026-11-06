@@ -40,7 +40,7 @@ _MULTIPLE_KINDS = frozenset({"product_decision"})
 
 
 def render_structure(description: dict[str, Any]) -> str:
-    # 现有结构说明的材料（docs/design/existing-project-onboarding.md 「工程：现有结构说明」）：主机由接纳结果生成。
+    # 现有结构说明的材料（docs/design/existing-project-onboarding.md「工程：现有结构说明」）：主机由接纳结果生成。
     # 结构说明这一种成果的内容长什么样是应用的事（工单 #1456）：签名与写法住在这里，内核模块不再认识它
     lines = ["# 现有结构说明", "",
              f"结构说明：{description['content_hash']}",
@@ -204,7 +204,7 @@ class SubmissionWriter:
         # 流程编排给出事务中的运行状态。出错时事务中没有追加任何事件，已经写出的材料恢复原样
         run_id = projection.run_id
         artifact = dict(artifact)
-        # 角色任务的提交记录由部门提出（docs/design/skeleton-and-application.md「装配契约」）；接纳事件与预览的 Event 用同一份元数据
+        # 角色任务的提交记录由部门提出接纳事件与预览的 Event 用同一份元数据
         metadata = dict(actor=f"department:{department}", department=department,
                         parent_event_id=parent_event_id, state_before=projection.status,
                         state_after=projection.status, session_id=session_id, provider=provider, model=model)
@@ -290,7 +290,7 @@ class SubmissionWriter:
                 # 质检退回工程：工程要重新交付，当前交付失效（S1b）
                 invalidate("qa_rework_engineering")
         elif kind == "structure":
-            # 建档事项的现有结构说明：接纳时再核对一次工作区的树摘要与快照相同（docs/design/existing-project-onboarding.md「总体」）
+            # 建档事项的现有结构说明：接纳时再核对一次工作区的树摘要与快照相同
             if projection.snapshot is None or artifact["code_tree_digest"] != projection.snapshot["tree_digest"]:
                 raise ValueError("Structure does not match the snapshot of the onboarding run")
             environment.verify_tree(snapshot)

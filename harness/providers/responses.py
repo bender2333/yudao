@@ -83,7 +83,7 @@ class _InvokeRequest:
     attempt_id: str
     emit: Emit
     config: ResponsesConfig
-    # 输出片段（docs/design/model-management.md「部门的建议能力」）：按通道保存已发出的字数，作为下一段的起始位置
+    # 输出片段：按通道保存已发出的字数，作为下一段的起始位置
     channel_offsets: dict[str, int] = field(default_factory=dict)
 
 
@@ -464,7 +464,7 @@ class _ResponsesInvoker:
                 **({"tool_choice": "required"} if provider_input.tool_choice == "required" else {}),
                 store=False,
                 stream=True,
-                # 推理内容（docs/design/model-management.md「历史中的推理内容」）：要求上游返回加密的推理内容，供下次同模型请求回放
+                # 推理内容：要求上游返回加密的推理内容，供下次同模型请求回放
                 include=[RESPONSES_REASONING_INCLUDE],
                 **output_limit,
                 **({} if reasoning is None else {"reasoning": reasoning}),
@@ -608,7 +608,7 @@ class _ResponsesInvoker:
             part.get("text", "") for part in (item.get("content") or [])
             if isinstance(part, dict) and part.get("type") == "output_text"
         )
-        # 推理内容（docs/design/model-management.md「历史中的推理内容」）：以 reasoning 观察交回，按它在回答中的位置保存，
+        # 推理内容：以 reasoning 观察交回，按它在回答中的位置保存，
         # 供下次同模型的请求原样回放
         if item.get("type") == "reasoning":
             await invocation.emit({
@@ -704,7 +704,7 @@ def _responses_input_items(provider_input: ProviderInput) -> list[dict[str, Any]
 
 
 def _responses_tool_output(result: ToolResult) -> str | list[dict[str, Any]]:
-    # 工具结果带图像时写成内容块：文字块在前，图像块按顺序（Responses 的图像输入写法，docs/design/model-management.md「模型访问定义与准入」）
+    # 工具结果带图像时写成内容块：文字块在前，图像块按顺序（Responses 的图像输入写法，docs/design/browser-and-computer-use.md「请求中的图像」）
     if not result.images:
         return result.output
     parts = [tool_text_part(result.output)] if result.output else []
@@ -807,7 +807,7 @@ def _upstream_error_text(exc: openai.APIStatusError, *, secrets: tuple[str, ...]
 
 def _redact_credentials(text: str, *, secrets: tuple[str, ...]) -> str:
     # 先替换本次请求的 Key，再替换环境里的密钥。harness.redact 到这里才导入：
-    # 导入 Provider 模块只加载模块自身与定义（docs/design/model-management.md「分层」），这一点由 test_providers_module 检查
+    # 导入 Provider 模块只加载模块自身与定义这一点由 test_providers_module 检查
     from ..redact import redact_text
 
     return redact_text(_redact_sdk_json(text, secrets=secrets))

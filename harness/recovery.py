@@ -404,7 +404,7 @@ class RunRecovery:
         # 的核实记录，说明核实确认没有发生；unclear 或无法核实的按非文件动作处理。
         # 其余结果未知的动作（命令、检查、读取等）记一条 resolution="handed_back" 的核实记录交还会话，
         # 说明执行被中断、结果未知，由模型检查后决定是否重新执行。
-        # 浏览器动作按 docs/design/browser-and-computer-use.md「恢复契约」核实（工单 #1184）：本机的浏览器会话随进程结束（MCP 的 stdio 会话
+        # 浏览器动作按核实（工单 #1184）：本机的浏览器会话随进程结束（MCP 的 stdio 会话
         # 属于建立它的进程），恢复在启动序列里跑、那时浏览器会话表是空的，所以记会话为中断、交还会话重新
         # 开始。docs/design/browser-and-computer-use.md「恢复契约」「会话仍然存在 → 按当前实际状态继续」那一支留给持有会话的执行代理。
         # 不再发出任何 unknown_action 决定请求，事项直接继续。
@@ -503,7 +503,7 @@ class RunRecovery:
             payload=event_payload,
         )
 
-    # ---- 浏览器动作的核实（工单 #1184，docs/design/browser-and-computer-use.md「恢复契约」）----
+    # ---- 浏览器动作的核实（工单 #1184）----
 
     def _browser_evidence(self, run_id: str) -> dict[str, dict[str, Any]]:
         # 结果未知的浏览器动作的核实依据：会话记的是哪一次、现在是什么状态。按动作身份（调用编号）对应。

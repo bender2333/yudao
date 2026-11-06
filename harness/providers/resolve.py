@@ -18,7 +18,7 @@ from .store import (
 )
 
 def limit_reasoning_level(model: ModelDefinition, requested_tier: str | None) -> str | None:
-    # 按模型声明限制请求档位（docs/design/model-management.md「限制到支持范围」）：请求档位为空时用默认档位；
+    # 按模型声明限制请求档位：请求档位为空时用默认档位；
     # 否则取不高于请求档位的最高支持档位，没有这样的档位时取最低支持档位；
     # 模型没有声明支持档位时不发送推理参数
     if not model.reasoning_levels:
@@ -53,7 +53,7 @@ class FrozenTarget:
     capability_source: str = ""
     # 模型访问定义声明的是否接受要求调用工具（#102）
     accepts_required_tool_call: bool = True
-    # 模型访问定义声明的输入方式（设计说明「模型访问定义与准入」）：步骤驱动按它决定这次请求提供的工具（docs/design/model-management.md「部门的建议能力」）
+    # 模型访问定义声明的输入方式：步骤驱动按它决定这次请求提供的工具
     input_modalities: tuple[str, ...] = ("text",)
     # 推理档位声明（模型管理设计说明「档位与声明」）与本次请求实际发送的档位；未声明档位时不发送推理参数
     reasoning_levels: tuple[str, ...] = ()
@@ -295,7 +295,7 @@ def decision_call_target(public: Mapping[str, Any]) -> dict[str, Any] | None:
 class CallTargetResolution:
     # 一次模型调用的调用目标解析结果：public 是进入事件与界面的公开部分，不含密钥；
     # 成功时 handle_id 指向 Provider 模块内部持有的目标，执行调用时才从凭据来源取出材料。
-    # selection_source 是提供模型访问定义的那一层（部门默认或项目部门设置，docs/design/model-management.md「解析规则」）
+    # selection_source 是提供模型访问定义的那一层（部门默认或项目部门设置）
     available: bool
     reason: str
     message: str
@@ -305,7 +305,7 @@ class CallTargetResolution:
 
 @dataclass(frozen=True)
 class EffectiveModelResolution:
-    # 本部门当前生效的模型及来源（设计说明「部门工作间」）：按 docs/design/model-management.md「解析规则」的选择规则与当前目录计算，
+    # 本部门当前生效的模型及来源：按的选择规则与当前目录计算，
     # 不发送请求、不保留调用句柄。state 取 effective、unusable、unset 三者之一；
     # unusable 与 unset 时不返回其他连接或模型。resolution 是解析结果，unset 时为空。
     state: str
@@ -322,7 +322,7 @@ def resolve_call_target(
     # 每次模型请求之前解析调用目标：只接收模型访问定义引用与请求档位，不接收部门。
     # 检查定义存在、所属连接存在、协议受支持、窗口已知、准入有效、凭据引用可解析；
     # fake 只用于确定性测试，不要求准入与凭据。准入有效性按受影响字段逐项比较（工单 #86）。
-    # 请求档位原样记录，实际发送的档位按模型声明限制到支持范围（docs/design/model-management.md「限制到支持范围」），
+    # 请求档位原样记录，实际发送的档位按模型声明限制到支持范围
     # 编码在协议适配器完成
     def unavailable(message: str, public: dict[str, Any]) -> tuple[CallTargetResolution, None]:
         return CallTargetResolution(False, "provider_unavailable", message, public), None

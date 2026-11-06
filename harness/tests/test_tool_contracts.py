@@ -93,7 +93,7 @@ def test_each_action_kind_follows_the_recovery_contract():
 
 def test_every_environment_tool_declares_the_action_metadata():
     # 新发布的静态环境工具定义显式给出新增元数据；主机工具没有动作，也没有这两项。
-    # 类别有自己的既定合同时按它核对；试用与浏览器按工具不同（docs/design/network-and-mcp.md「结果、工件与证据」），由各自的定义写明后另有用例核对
+    # 类别有自己的既定合同时按它核对；试用与浏览器按工具不同由各自的定义写明后另有用例核对
     for name, tool in TOOLS.items():
         if tool.kind != "environment":
             assert tool.verification is None and tool.cancellable is None, name

@@ -1,4 +1,4 @@
-# 外壳的查询（docs/design/app-and-interface.md「查询清单」中「外壳」）。
+# 外壳的查询。
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ class DrainStatus(Contract):
     running: list[DrainRunning]
 
 class HomeStatus(Contract):
-    # 首页顶部的状态项（docs/design/app-and-interface.md「查询清单」中「系统首页」，工单 #127）：待你决定的数量与磁盘可用空间。
+    # 首页顶部的状态项（工单 #127）：待你决定的数量与磁盘可用空间。
     # 结果未知的动作数（3.1）、离线的机器数（3.2C）、等待模型服务的 run 数与正在修复的故障数（Stage 4）
     # 由所属工作包在这里加入字段；没有来源的项不返回，不写成零
     waiting_decisions: int
@@ -73,7 +73,7 @@ class SystemStatus(Contract):
 SystemStatus.model_rebuild()
 
 class SystemStatusRequest(ReplayRequest):
-    # 可回放（docs/design/app-and-interface.md「合同」）：at 是全局位置，省略时读取现在的快照
+    # 可回放：at 是全局位置，省略时读取现在的快照
     pass
 
 # 模型调用的过程事件：这些高频事件不改变系统状态，进行中的状态由输出片段实时给出（工单 #891）
@@ -144,7 +144,7 @@ SYSTEM_STATUS = QueryDefinition(
 )
 
 class LiveAttempt(Contract):
-    # 进行中的调用尝试（docs/design/app-and-interface.md「模型输出片段」）：是否在进行中，以及各通道已收到的文字。
+    # 进行中的调用尝试：是否在进行中，以及各通道已收到的文字。
     # 调用尝试结束或失败以后 live 为假，客户端改用 run.attempt 的输出
     attempt_id: str
     live: bool

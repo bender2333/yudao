@@ -1,14 +1,14 @@
-# 试用记录的查询（工单 #152；浏览器与 computer use 设计说明第 7.2 节 `run.trials`；应用层与接口层设计说明
+# 试用记录的查询（工单 #152；浏览器与 computer use 设计说明「查询」 `run.trials`；应用层与接口层设计说明
 # 「查询清单」；总图第四节「接口」缝）。
 #
 # 数据来源（2026-11-06，main 5083953e）：
 # - 试用会话的开始与结束读 run 流的 `trial_session_started` / `trial_session_ended`（工单 #1183）；
 # - 试用用例与它的步骤读运行状态投影里折叠出来的 `trial_cases`（工单 #1180）——用例与步骤都由这两类事件与
 #   动作事件得出，这里不另外保存；步骤的输入、可访问性结构与浏览器会话身份读动作事件与结果工件；
-# - 验收条件的原文读投影里当前 ProductSpec（引用形式见设计第 8.1 节：`AC<序号>` 是验收条件在 ProductSpec
+# - 验收条件的原文读投影里当前 ProductSpec（引用形式见 docs/design/browser-and-computer-use.md「验收条件的引用」：`AC<序号>` 是验收条件在 ProductSpec
 #   里的位置）；质检的会话与交付快照的比较读交付事件里的 `code_tree_digest`（会话开始时最近的那一份交付）；
 # - 「收到这个结果的请求是否包含图像」读这个结果之后同一个激活的下一次模型请求的调用目标输入方式
-#   （设计第 6.2 节：不含图像时截图不进请求）。
+#   （：不含图像时截图不进请求）。
 #
 # 查询只读取：不写事件、不改保存的投影。结果按部门列出（部门的顺序取自定义），会话按开始顺序，用例按打开
 # 顺序；快照位置是事件日志末尾（与其他 run 查询相同）。
@@ -107,7 +107,7 @@ class TrialSessionView(Contract):
 
 
 class TrialDepartmentView(Contract):
-    # 一个部门的试用记录：会话与用例。查询按部门列出（设计第 7.2 节），页面「试用记录」页签直接读它
+    # 一个部门的试用记录：会话与用例。查询按部门列出（docs/design/browser-and-computer-use.md「查询」），页面「试用记录」页签直接读它
     department: str
     sessions: list[TrialSessionView]
     cases: list[TrialCaseView]
@@ -186,7 +186,7 @@ def _session_views(events: list[Any]) -> list[TrialSessionView]:
 
 
 def _criterion_text(spec: Any, criterion: str) -> str | None:
-    # `AC<序号>` 指向当前 ProductSpec 里的位置（从 1 开始，设计第 8.1 节）；规格不在、序号越界或不是
+    # `AC<序号>` 指向当前 ProductSpec 里的位置（从 1 开始，docs/design/browser-and-computer-use.md「验收条件的引用」）；规格不在、序号越界或不是
     # 这种形式时原文为空，序号照旧给出
     if spec is None or not criterion.startswith("AC"):
         return None
@@ -221,7 +221,7 @@ def _matching_payload(entries: list[tuple[Any, dict[str, Any]]], step: Any
 
 
 def _accessibility(application: Application, run_id: str, output_ref: Any) -> str | None:
-    # 步骤结果里的可访问性结构：结果工件里的 accessibility 摘录（浏览器工具的输出，设计第 7.1 节）。
+    # 步骤结果里的可访问性结构：结果工件里的 accessibility 摘录（浏览器工具的输出，docs/design/browser-and-computer-use.md「保存与绑定」）。
     # 取不出来时为空，不影响这一步的其他字段
     if not isinstance(output_ref, dict):
         return None

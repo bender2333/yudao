@@ -315,7 +315,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
     else viewRef.current?.setState(model);
   }, [model, replaying]);
 
-  // 回放拖动时间轴：直接显示那个位置的状态，不播动作（docs/design/visualization.md「播放时间线」）
+  // 回放拖动时间轴：直接显示那个位置的状态，不播动作
   const atKey = at === null ? "live" : String(at);
   useEffect(() => {
     if (modelRef.current) viewRef.current?.jump(modelRef.current);
@@ -355,7 +355,7 @@ export function FloorScreen(props: FloorScreenProps): React.JSX.Element {
       if (modelRef.current) viewRef.current?.jump(modelRef.current);
     };
     const off = props.app.subscribeResync(jumpLatest);
-    // 标签页从后台切回：浏览器在后台暂停了动画，队里可能积了几分钟的事件，直接跳到最新（docs/design/visualization.md「播放时间线」）
+    // 标签页从后台切回：浏览器在后台暂停了动画，队里可能积了几分钟的事件，直接跳到最新
     const onVisible = (): void => {
       if (document.visibilityState === "visible") jumpLatest();
     };
@@ -480,7 +480,7 @@ function FloorTextList(props: {
             ))}
           </ul>
         )}
-        {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答（docs/design/visualization.md「与其他文档的关系」） */}
+        {/* 等待回答的决定请求：与大厅的板同源，用页面卡片，可以同样回答 */}
         <DecisionCardList
           app={props.app}
           decisions={props.decisions}

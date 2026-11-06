@@ -1,4 +1,4 @@
-# 装配契约与执行契约的同一套契约检查（工单 #979；骨架与应用设计说明第 5.2、5.3、5.4 节；总图第四节
+# 装配契约与执行契约的同一套契约检查（工单 #979；骨架与应用设计说明「装配契约」、「执行契约」、「其他路由：骨架要满足的条件」；总图第四节
 # 「装配」「执行」缝）。同一套参数化的检查各跑一遍真实实现与第二种实现：
 # 真实装配是 `assembly.py` 的 `ContextAssembly`，第二种是 `second_assembly.SecondAssembly`；
 # 真实执行是 `engine.py` 的 `StepDriver`，第二种是 `second_execution.SecondExecution`。
@@ -237,7 +237,7 @@ def test_each_assembly_implementation_gets_the_route_work_reference_and_both_rec
 
     _drive(EXECUTIONS[0], system, adapter, request, node, assembly=recording)
 
-    # 工作引用原样到达装配的输入（第 5.4 节第 4 条）
+    # 工作引用原样到达装配的输入（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
     assert recording.frames, "这一轮没有装配任何一步"
     assert recording.frames[0].work_ref is work_ref
     # 装配好的请求与上下文清单都记进日志：context_assembled 指向两者各自的工件，提供方交回的

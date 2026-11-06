@@ -27,7 +27,7 @@ _CHECK_MATERIALS_WRITE_OUTSIDE = ("a check materials write scope only allows {di
 
 
 def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
-    # 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）。
+    # 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（S1d 工单 #860）。
     # 校验以后其中任何一样变了，这次提交就不能再按原来的依据接纳。有哪几种成果、各自是哪一版，
     # 来自定义与投影，内核不写死（工单 #1456）；用户输入与指导的版本读的是成果的内容，不在这里
     # （归路由的收紧检查，工单 #1095）
@@ -79,7 +79,7 @@ def offered_tools(state: Any, department: str, *, tightening: Tightening,
                   session_id: str | None = None, input_modalities: tuple[str, ...] = ("text",),
                   definitions: Definitions | None = None) -> list[str]:
     # 请求中提供给模型的工具：内核给出部门完整的工具清单，由路由的收紧检查按这一轮的工作与询问分支取舍，
-    # 再按调用目标的输入方式去掉声明需要图像输入的工具（docs/design/model-management.md「部门的建议能力」，工单 #1095）。
+    # 再按调用目标的输入方式去掉声明需要图像输入的工具（工单 #1095）。
     # state 是应用侧的运行状态投影：提供的工具由收紧检查按内容判断，内核不读它，原样交过去。
     # 部门的工具清单读这个事项所用的那份定义（工单 #1098），不读模块加载时的那一份
     return tightening.offered(TightenRequest(department=department, state=state, session_id=session_id,

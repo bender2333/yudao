@@ -41,7 +41,7 @@ def release_version() -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     # 命令行的子命令、选项与默认值。--data-dir 自身不给默认值，写在子命令之前或之后都生效，
-    # 两处都没有给出时由 _data_dir 按子命令求出（docs/design/web-interface-and-release.md「数据目录」），因此测试用环境变量
+    # 两处都没有给出时由 _data_dir 按子命令求出因此测试用环境变量
     # 改写用户数据目录的根就能改变默认值
     # Provider 目录文件与 .env 按生效的数据目录求出，因此 --provider-config 不给默认值
     parser = argparse.ArgumentParser(description="Yudao Loop System")
@@ -49,12 +49,12 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--data-dir", default=None)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8765)
-    # 访问方式（docs/design/web-interface-and-release.md「版本号」）：本机只能监听回环地址；局域网监听任意地址
+    # 访问方式（docs/design/app-and-interface.md「访问方式与认证」）：本机只能监听回环地址；局域网监听任意地址
     parser.add_argument("--access", choices=get_args(AccessMode), default="local")
     parser.add_argument("--provider-config", default=None)
-    # 服务就绪以后打开页面的浏览器（docs/design/web-interface-and-release.md「启动与停止」）：默认打开，带 --no-browser 时不打开
+    # 服务就绪以后打开页面的浏览器：默认打开，带 --no-browser 时不打开
     parser.add_argument("--no-browser", action="store_true", default=False)
-    # 关闭取回（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）：以它运行时这个服务的部门没有 fetch_url 与
+    # 关闭取回（网络与 MCP 设计说明「工具的提供」）：以它运行时这个服务的部门没有 fetch_url 与
     # read_external_source；评测运行器用它启动被测的 Yudao，两边都不联网（评测场景设计说明「两边的运行条件」）
     parser.add_argument("--no-fetch", action="store_true", default=False)
     sub = parser.add_subparsers(dest="command")
@@ -86,7 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     project_show = project_sub.add_parser("show", help="print one project projection")
     project_show.add_argument("project_id")
     project_show.add_argument("--data-dir", default=argparse.SUPPRESS)
-    # 访问令牌（docs/design/web-interface-and-release.md「发布脚本」）：只在服务所在机器的命令行进行，不提供命令
+    # 访问令牌：只在服务所在机器的命令行进行，不提供命令
     token = sub.add_parser("token", help="manage access tokens for the lan access mode")
     token_sub = token.add_subparsers(dest="token_command", required=True)
     token_create = token_sub.add_parser("create", help="create a token and print it once")
@@ -104,7 +104,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 def _stop_on_ctrl_c() -> None:
-    # Ctrl+C 是停止服务的方式（docs/design/web-interface-and-release.md「启动与停止」）。uvicorn 在服务停止以后把收到的停止信号重新抛出
+    # Ctrl+C 是停止服务的方式。uvicorn 在服务停止以后把收到的停止信号重新抛出
     # （capture_signals），默认处置在这里结束进程：SIGINT 抛出 KeyboardInterrupt，
     # Windows 的 Ctrl+Break（SIGBREAK）按默认处置直接结束进程并给出非零状态。
     # 服务此时已经完成关闭（停止接受请求、关闭事件流连接、释放数据目录），重新抛出的信号对它
@@ -118,7 +118,7 @@ def _stop_on_ctrl_c() -> None:
 
 def _data_dir(args: argparse.Namespace, command: str) -> str:
     # 生效的数据目录：命令行给出时以它为准（写在子命令之前或之后都生效）；
-    # 没有给出时 smoke 取 harness/smoke.py 的 DEFAULT_DIR，其余子命令取用户数据目录（docs/design/web-interface-and-release.md「数据目录」）
+    # 没有给出时 smoke 取 harness/smoke.py 的 DEFAULT_DIR，其余子命令取用户数据目录
     given = getattr(args, "data_dir", None)
     return given if given is not None else str(SMOKE_DIR if command == "smoke" else default_data_dir())
 
@@ -150,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
         lock = _lock_data_dir(args.data_dir)
         if lock is None:
             return 1
-        # 服务的日志写在 <数据目录>/logs/，按大小轮换（docs/design/web-interface-and-release.md「启动与停止」）
+        # 服务的日志写在 <数据目录>/logs/，按大小轮换
         log_path = configure_logging(args.data_dir)
         print(f"logs: {log_path}")
         config, dotenv = _provider_paths(args.data_dir, args.provider_config)
@@ -192,7 +192,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _token_command(args: argparse.Namespace) -> int:
-    # 访问令牌的建立、列表与撤销（docs/design/web-interface-and-release.md「发布脚本」）：只操作数据目录里的令牌文件，
+    # 访问令牌的建立、列表与撤销：只操作数据目录里的令牌文件，
     # 不打开控制核心，因此不需要进程锁，服务运行时也能建立与撤销
     store = AccessTokenStore(args.data_dir)
     now = utc_now()
@@ -264,7 +264,7 @@ def _lock_data_dir(data_dir: str | Path) -> FileLock | None:
 
 
 def _provider_paths(data_dir: str | Path, provider_config: str | Path | None) -> tuple[Path | None, Path]:
-    # 服务进程读取的模型目录与凭据文件：默认都在数据目录内（docs/design/web-interface-and-release.md「数据目录」），解析为固定的绝对路径；
+    # 服务进程读取的模型目录与凭据文件：默认都在数据目录内解析为固定的绝对路径；
     # 没有明确给 --provider-config 时按生效的 --data-dir 求出，明确给了以它为准；目录文件为空字符串时不读取
     config = (default_provider_config_path(Path(data_dir).resolve()) if provider_config is None else
               (None if provider_config == "" else Path(provider_config).resolve()))
@@ -278,7 +278,7 @@ def page_address(port: int) -> str:
 
 
 def _ready(port: int) -> None:
-    # 服务开始接受请求以后（docs/design/web-interface-and-release.md「启动与停止」）：报告实际监听的端口。
+    # 服务开始接受请求以后：报告实际监听的端口。
     # 端口一律报告：--port 0 时实际端口由操作系统分配，启动方（测试、脚本）只能从这行得知它；
     # 带 --no-browser 时不打开浏览器，也不输出页面地址
     print(f"port: {port}", flush=True)

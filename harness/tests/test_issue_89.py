@@ -336,7 +336,7 @@ def test_a_project_setting_rejects_a_tier_outside_the_full_set(tmp_path):
         _close(server_a, server_b)
 
 def test_a_project_setting_rejects_a_tier_outside_the_full_set_without_writing_a_model(tmp_path):
-    # 模型访问定义与请求档位分别继承（设计说明第 5.2、5.3、9.2 节）：只写入请求档位、模型跟随部门默认时，
+    # 模型访问定义与请求档位分别继承：只写入请求档位、模型跟随部门默认时，
     # 写入的请求档位同样要属于档位全集，不因此跳过核对
     server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
     server_b, _capture_b, base_b = serve(lambda _body: _text_reply(response_id="rb", model="upstream-b", text="ok"))

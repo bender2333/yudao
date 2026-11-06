@@ -99,7 +99,7 @@ def test_run_configuration_denies_fetch_and_search(runs_root):
 
 
 def test_run_configuration_carries_the_same_capacity_as_the_yudao_definition(runs_root):
-    """运行配置的模型限额与 Yudao 的模型访问定义是同一对数（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）。"""
+    """运行配置的模型限额与 Yudao 的模型访问定义是同一对数（docs/design/evaluation-scenarios.md「两边的运行条件」「模型的容量」）。"""
     run_dir = opencode.create_run_dir(runs_root, "capacity", MODEL, MODEL_ID, LIMITS)
     with open(os.path.join(run_dir, ".opencode-config", "opencode.json"),
               encoding="utf-8") as handle:
@@ -316,7 +316,7 @@ def test_metrics_sum_the_costs_the_service_reports():
 
 
 def test_reserved_device_names_are_skipped_with_or_without_extension():
-    """Windows 的保留设备名不分大小写，带不带扩展名都算（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。"""
+    """Windows 的保留设备名不分大小写，带不带扩展名都算（docs/design/evaluation-scenarios.md「两边的运行条件」「隔离」）。"""
     names = ["nul", "NUL.TXT", "con.md", "aux", "com1", "lpt9.tar.gz", "src", "readme.md",
              "COM10", "nullify.py"]
     assert opencode.reserved_device_names(names) == ["NUL.TXT", "aux", "com1", "con.md",
@@ -371,7 +371,7 @@ def test_a_run_directory_holding_a_reserved_name_still_copies_and_scores(runs_ro
 
 
 def test_default_time_limit_is_two_hours():
-    """两个运行器的默认时间上限都是 120 分钟（docs/design/evaluation-scenarios.md「两边的运行条件」中「时间上限」）。"""
+    """两个运行器的默认时间上限都是 120 分钟（docs/design/evaluation-scenarios.md「两边的运行条件」「时间上限」）。"""
     assert run_eval.TIME_LIMIT_SECONDS == 120 * 60
     args = run_eval.parse_args(["--model", MODEL, "--runs-root", "C:/runs"])
     assert args.limit_seconds == 120 * 60

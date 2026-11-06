@@ -69,9 +69,9 @@ SCREENSHOT_TOOL = "browser_take_screenshot"
 SNAPSHOT_TOOL = "browser_snapshot"
 # 关闭浏览器的工具：它执行以后没有页面可以截图，会话本身还在（下一次导航会重新启动浏览器）
 CLOSE_TOOL = "browser_close"
-# 可以带本地文件路径的两个工具（docs/design/browser-and-computer-use.md「提供的工具」）：路径按试用副本解析，副本之外的拒绝
+# 可以带本地文件路径的两个工具：路径按试用副本解析，副本之外的拒绝
 FILE_PATH_TOOLS = frozenset({"browser_file_upload", "browser_drop"})
-# 导航类工具：目标地址在执行之前按服务自己的地址规则检查（docs/design/browser-and-computer-use.md「运行方式」中「来源限制」）
+# 导航类工具：目标地址在执行之前按服务自己的地址规则检查
 NAVIGATION_TOOLS = frozenset({"browser_navigate"})
 # 新建标签页时带 url 的工具：`{"action": "new", "url": …}` 同样是工具直接发起的导航，动作层要查
 # （浏览器那一层只按字面来源挡，别名挡不住；工单 #1184 的审查 6625033513 第 1 条）
@@ -140,7 +140,7 @@ class BrowserSession:
             }
 
     def minimal_record(self) -> dict[str, Any]:
-        # 回执里的会话身份与树摘要（docs/design/browser-and-computer-use.md「保存与绑定」）：每一步都带，不重复整份记录
+        # 回执里的会话身份与树摘要：每一步都带，不重复整份记录
         with self._lock:
             return {"session_id": self.session_id, "status": self.status,
                     "tree_digest": self.tree_digest}
@@ -273,7 +273,7 @@ def blocked_origins() -> tuple[str, ...]:
 
 
 def launch_arguments(output_dir: str | Path) -> tuple[str, ...]:
-    # 启动参数（docs/design/browser-and-computer-use.md「运行方式」）：输出目录放这次会话的文件，其余按表；服务自己的来源由浏览器拒绝
+    # 启动参数：输出目录放这次会话的文件，其余按表；服务自己的来源由浏览器拒绝
     arguments: list[str] = []
     for name, value in BROWSER_ARGUMENTS:
         arguments.append(name)
@@ -296,7 +296,7 @@ def is_read_only(tool: str) -> bool:
 
 
 def check_navigation(url: Any) -> str:
-    """导航目标的来源限制（docs/design/browser-and-computer-use.md「运行方式」、「安全」）：与取回同一个函数检查服务自己的地址与端口。
+    """导航目标的来源限制（docs/design/browser-and-computer-use.md「安全」）：与取回同一个函数检查服务自己的地址与端口。
 
     浏览器那一层由启动参数 `--blocked-origins` 承担（第一道，见 blocked_origins），它只按字面来源匹配，
     挡不住指向本机的域名别名，所以动作层再查一次实际地址（第二道）。指向服务自己的地址与端口时抛
@@ -527,7 +527,7 @@ class BrowserSessions:
 
     async def _call_mcp(self, session: BrowserSession, tool: str, args: dict[str, Any],
                         stop: Any = None) -> dict[str, Any]:
-        # 一次 MCP 调用：进程退出、协议错误与取消都让会话不能再使用，按中断交回（docs/design/browser-and-computer-use.md「恢复契约」）。
+        # 一次 MCP 调用：进程退出、协议错误与取消都让会话不能再使用，按中断交回。
         # 取消信号到达时交给客户端的 cancel（它取消 SDK 的调用任务、发取消通知），本任务等取消结果
         watcher = None if stop is None else asyncio.ensure_future(_cancel_when_stopped(session.client, stop))
         try:

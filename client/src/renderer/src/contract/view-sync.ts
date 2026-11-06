@@ -140,7 +140,7 @@ export class ViewSync {
     }
   }
 
-  // 重新查询全部已打开的视图，返回它们快照位置中最小的一个（重新订阅的起点，docs/design/app-and-interface.md「缺口检测与重新同步」）
+  // 重新查询全部已打开的视图，返回它们快照位置中最小的一个（重新订阅的起点）
   async refreshAll(): Promise<number> {
     const ids = [...this.entries.keys()];
     await Promise.all(ids.map((id) => this.refresh(id)));

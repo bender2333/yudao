@@ -264,7 +264,7 @@ def apply_event(state: RunProjection, event: Event) -> None:
             # 事项的「所在部门」也只由主线会话的激活推出（工单 #842）：询问分支是被询问方的
             # 一次旁支工作，它的激活不接管所在部门，否则提问方拿到回答以后继续工作，
             # 页面上仍然显示被询问的部门。
-            # 轮次同样只计主线会话的激活（工单 #857，docs/design/browser-and-computer-use.md「提供的工具」）：分支是提问方这一轮里
+            # 轮次同样只计主线会话的激活（工单 #857，docs/design/department-loop.md「询问分支」）：分支是提问方这一轮里
             # 的一次旁支工作，它不推进轮次、不占用轮次上限（harness/bounds.py 的
             # activation_bound 按 cycle_count 判断），页面上的「第 N 轮」也不因询问多一轮；
             # 分支激活事件里的 cycle 本来就写提问方所在的这一轮。
@@ -831,7 +831,7 @@ def _review_from_payload(payload: dict[str, Any], event: Event) -> QAReview:
 
 
 def _open_case(state: RunProjection, department: Any, session_id: str | None) -> TrialCase | None:
-    # 这个部门在这个会话里打开着的用例：用例打开期间同一个部门只有一个（docs/design/browser-and-computer-use.md「试用用例」）
+    # 这个部门在这个会话里打开着的用例：用例打开期间同一个部门只有一个
     for case in state.trial_cases:
         if (case.status == TRIAL_CASE_STATUS_OPEN and case.department == department
                 and case.session_id == session_id):

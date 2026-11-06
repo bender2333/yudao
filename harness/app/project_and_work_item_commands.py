@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# 项目的修改类命令（docs/design/app-and-interface.md「命令清单」中「项目」）：基准版本是项目基本信息版本，要求相等
+# 项目的修改类命令（docs/design/app-and-interface.md「命令清单」「项目」）：基准版本是项目基本信息版本，要求相等
 
 def _project_version(application: "Application", project_id: str) -> int:
     try:
@@ -200,7 +200,7 @@ async def _create_work_item(application: "Application", command: Command, reques
     status = system.provider_status()
     if not status.get("available", False):
         raise Rejection("provider_unavailable", status.get("message") or "模型调用目标不可用")
-    # 新建事项前按该项目的设置对三个部门解析：任何一个无法解析时拒绝，说明部门与具体项（docs/design/app-and-interface.md「缺口检测与重新同步」）
+    # 新建事项前按该项目的设置对三个部门解析：任何一个无法解析时拒绝，说明部门与具体项
     failure = _unresolved_department(application, request.project_id)
     if failure is not None:
         department, item, message = failure
@@ -220,7 +220,7 @@ async def _create_work_item(application: "Application", command: Command, reques
 
 def _unresolved_department(application: "Application", project_id: str) -> tuple[str, str, str] | None:
     # 按该项目的设置解析三个部门（模型访问定义与请求档位分别继承），返回第一个无法解析的部门与具体项。
-    # 没有写入任何项目部门设置的项目按部门默认检查（docs/design/app-and-interface.md「缺口检测与重新同步」最后一段）
+    # 没有写入任何项目部门设置的项目按部门默认检查（最后一段）
     system = application.system
     if system.orchestrator.test_adapter_factory is not None:
         # 确定性测试与演示的适配器在激活时按 fake 协议登记目标，这里不重复解析目录（#45 答复第 6 条）
@@ -326,7 +326,7 @@ class DepartmentSettingsSave(CommandRequest):
     department_prompt: Text | None = None
 
 class DepartmentSettingsSaveRefs(Contract):
-    # 保存以后该部门模型不具备建议能力时的提醒（docs/design/app-and-interface.md「模型输出片段」「保存时」）；具备或没有写入模型时为空
+    # 保存以后该部门模型不具备建议能力时的提醒具备或没有写入模型时为空
     reminders: list[str] = []
 
 
@@ -340,7 +340,7 @@ async def _save_department_settings(application: "Application", command: Command
         provider_id=request.provider_id, model_id=request.model_id,
         requested_tier=request.requested_tier, department_prompt=request.department_prompt,
     )
-    # 写入的模型不具备该部门建议能力时的提醒（docs/design/app-and-interface.md「模型输出片段」「保存时」）：照常保存，提醒随接受结果返回
+    # 写入的模型不具备该部门建议能力时的提醒：照常保存，提醒随接受结果返回
     notes = (application.system.facade.department_setting_reminders(request.department, project_selection)
              if project_selection.writes_model() else [])
     try:
@@ -383,7 +383,7 @@ def _no_refs(events: list[Event | ProjectEvent]) -> "NoRefs":
 
 
 def _department_settings_refs(events: list[Event | ProjectEvent]) -> "DepartmentSettingsSaveRefs":
-    # 保存以后该部门模型不具备建议能力时的提醒（docs/design/app-and-interface.md「模型输出片段」「保存时」）：提醒随事件保存。
+    # 保存以后该部门模型不具备建议能力时的提醒：提醒随事件保存。
     # 保存的内容与现值完全相同时这次保存不追加任何事件（服务层已经判断过「没有改动」），
     # 这时接受结果的提醒为空，不再按「一定有事件」去取最后一条（工单 #865）
     if not events:

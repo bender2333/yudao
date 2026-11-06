@@ -25,7 +25,7 @@ DEFAULT_TIMEOUT_SEC: float = 600.0
 
 # 推理档位全集，由低到高排列（模型管理设计说明「档位与声明」）；模型访问定义声明其中的一个子集
 REASONING_LEVELS = ("minimal", "low", "medium", "high", "xhigh", "max")
-# 推理参数方式：一份声明只使用一种，只用于与它相符的协议（docs/design/model-management.md「协议映射」）
+# 推理参数方式：一份声明只使用一种，只用于与它相符的协议
 REASONING_MODES = frozenset({"effort", "adaptive", "budget"})
 # 输入方式的取值（模型管理设计说明「模型访问定义与准入」）：文本总是包含，图像可选
 INPUT_MODALITIES = frozenset({"text", "image"})
@@ -35,7 +35,7 @@ REASONING_MODE_PROTOCOLS: Mapping[str, frozenset[str]] = MappingProxyType({
     "adaptive": frozenset({"messages"}),
     "budget": frozenset({"messages"}),
 })
-# 预算方式各档位的思考预算，单位 token（docs/design/model-management.md「协议映射」）
+# 预算方式各档位的思考预算，单位 token
 REASONING_BUDGET_TOKENS: Mapping[str, int] = MappingProxyType({
     "minimal": 1024, "low": 4096, "medium": 8192, "high": 16384, "xhigh": 32768, "max": 32768,
 })
@@ -433,7 +433,7 @@ class ProviderStore:
 def _validate_reasoning_declaration(model: ModelDefinition, location: str,
                                     issues: list[ValidationIssue]) -> None:
     # 推理档位声明：三项一起声明，部分声明直接拒绝；默认档位属于支持档位；
-    # 推理参数方式取值受限并与本定义的协议相符（docs/design/model-management.md「档位与声明」、「协议映射」）
+    # 推理参数方式取值受限并与本定义的协议相符
     declared = (bool(model.reasoning_levels), model.default_reasoning_level is not None,
                 bool(model.reasoning_mode))
     if any(declared) and not all(declared):
@@ -556,7 +556,7 @@ def _parse_model(raw: Any, location: str) -> tuple[ModelDefinition | None, list[
         mode = mode.strip()
     modalities = raw.get("input_modalities", ("text",))
     if isinstance(modalities, list) and all(isinstance(item, str) for item in modalities):
-        # 输入方式去重，已知取值按文本、图像排列，未知取值保留在末尾供形状校验指出（docs/design/model-management.md「模型访问定义与准入」）
+        # 输入方式去重，已知取值按文本、图像排列，未知取值保留在末尾供形状校验指出
         declared: list[str] = []
         for item in modalities:
             name = item.strip()

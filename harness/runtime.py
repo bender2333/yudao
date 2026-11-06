@@ -68,7 +68,7 @@ def load_forms(registry: Mapping[str, tuple[Definitions, Any]], store: Any) -> d
 
 
 def configure_fetch_tools(enabled: bool) -> None:
-    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明「工具的提供」、「与其他部分的关系」中「评测」）。
+    """设置这个进程的部门是否有取回工具（网络与 MCP 设计说明「工具的提供」）。
 
     由命令行在启动时调用一次：以关闭取回的启动参数（`--no-fetch`）运行时，这个服务的部门没有
     `fetch_url` 与 `read_external_source`；不带参数时三个部门都有。进程内只有一个服务实例，
@@ -102,7 +102,7 @@ class LoopSystem:
         self.data_dir = Path(data_dir).absolute().resolve()
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.store = EventStore(self.data_dir / "events.sqlite")
-        # 输出片段通道：步骤驱动发布，应用层订阅并转发给 live=1 的连接（docs/design/app-and-interface.md「模型输出片段」）
+        # 输出片段通道：步骤驱动发布，应用层订阅并转发给 live=1 的连接
         self.deltas = DeltaChannel()
         # 唯一的写入口；保存的投影缺失的流（例如投影被删除）在启动时由重放补建
         self.writes = WritePath(self.store, handler_for)
@@ -127,7 +127,7 @@ class LoopSystem:
             # 启动读取一致版本：缺文件空态，有效修订与重载错误由模块记录，不抛错
             self.facade.reload()
         self.workspace_root = self.data_dir / "workspaces"
-        # 装配实现与执行实现由组装处接上（工单 #979，骨架与应用设计说明「装配契约」中「接法」、「执行契约」中「接法」）：
+        # 装配实现与执行实现由组装处接上（工单 #979，骨架与应用设计说明「装配契约」、「执行契约」「接法」）：
         # 现在各只有一种产品实现，定义里不写它们的名字，默认接上的就是这一种；测试入口（for_testing）
         # 用同一个构造参数换成第二种。薄驱动不认这两个类的名字，只经装配契约与执行契约调用它们
         assembly_implementation = (ContextAssembly(self.artifacts, self.store, tightening=WATCHED_OUTPUTS)
@@ -173,7 +173,7 @@ class LoopSystem:
         self.drain_finished_on_startup = self.finish_drain_on_startup()
         # 启动时补做未完成的结算（#17 的「采纳结算幂等」）：run 已经结束、还在等结算的事项在这里补齐
         self.projects.settle_pending_on_startup()
-        # 启动时补建缺少的建档修改轮 run（工单 #136，docs/design/existing-project-onboarding.md「失败与中断」）：回答「提出修改」以后
+        # 启动时补建缺少的建档修改轮 run（工单 #136，以后
         # 修改轮事件已经写入项目流，run 在事务提交以后创建，两者之间中断时在这里补建
         self.recovered_revision_runs = self.projects.create_missing_revision_runs_on_startup()
         # 启动时扫描上次异常退出留下的检查工作区（工单 #481）：run 已经结束但 on_commit 没有跑过
@@ -185,7 +185,7 @@ class LoopSystem:
         # 启动时结束遗留的试用会话：持有会话的进程重新启动时，会话记为中断，进程树按会话记录里的
         # 进程号与创建时间结束（浏览器与 computer use 设计说明「试用工具」、「事件、决定请求与查询」，工单 #1183）
         self.ended_leftover_trials = self._end_leftover_trial_sessions_on_startup()
-        # 启动时补建缺少的普通事项 run（工单 #321，docs/design/app-and-interface.md「接口路径、执行归属与命令行」）：work_item_created 已提交而 run 还没有创建时
+        # 启动时补建缺少的普通事项 run（工单 #321）：work_item_created 已提交而 run 还没有创建时
         # 进程中断，这里按事项记录（含起始文件夹快照）补建
         self.recovered_work_item_runs = self.projects.create_missing_work_item_runs_on_startup()
         # 启动时核对 run 事件版本（ADR-0019，工单 #126、#322）：版本不同的未结束 run 按强制升级处理，
@@ -225,7 +225,7 @@ class LoopSystem:
         return stopped, restarted
 
     def resume_startup_runs(self) -> dict[str, int]:
-        # 启动时自动继续所有因进程中断而未结束的 run（工单 #16，恢复契约「执行权与一致边界」、「事件对象」）：
+        # 启动时自动继续所有因进程中断而未结束的 run（工单 #16，恢复契约「执行权与一致边界」）：
         # run 事件版本与当前不同的 run 已在启动序列里按强制升级处理，这里只有版本相同的 run；
         # 每个 run 由流程编排先核对事项记录的定义版本（不同时发出决定请求，不取得执行权），
         # 再原子取得执行权并记下中断位置与继续的依据；已经结束的 run 与等待用户回答的 run 不继续。
@@ -270,11 +270,11 @@ class LoopSystem:
                 system.resumed_runs[run_id] = claimed[0]
         return system.resumed_runs
 
-    # 排空与强制升级（应用层与接口层设计说明「命令清单」中「升级」，ADR-0019）
+    # 排空与强制升级（应用层与接口层设计说明「命令清单」「升级」，ADR-0019）
 
     @property
     def running_runs(self) -> int:
-        # 还没有结束的 run 数：客户端在停止之前用它显示确认，也用于排空状态（docs/design/network-and-mcp.md「凭据」）
+        # 还没有结束的 run 数：客户端在停止之前用它显示确认，也用于排空状态
         unfinished = classify_startup_runs(self.store)
         return len(unfinished.same_version) + len(unfinished.other_version)
 
@@ -311,7 +311,7 @@ class LoopSystem:
                 for run_id in (*unfinished.same_version, *unfinished.other_version)]
 
     def finish_drain_on_startup(self) -> bool:
-        # 排空在服务下一次启动时结束（工单 #731，应用层与接口层设计说明「命令清单」中「升级」）：
+        # 排空在服务下一次启动时结束（工单 #731，应用层与接口层设计说明「命令清单」「升级」）：
         # 排空的用处是让服务可以停下来升级，服务一旦重新启动，这个用处就完成了。
         # 记一条「排空已结束」的事件，排空状态以后从事件里读得出来（跨版本保存的长期事实）。
         last = last_drain_event(self.store.stream_events(catalog_stream()))
@@ -407,7 +407,7 @@ class LoopSystem:
                       base_version: str | None = None, expected_change_id: str | None = None,
                       command: Command | None = None) -> str:
         # 界内修改一次全局参数现值：先核对条目、是否已经接入行为与界限，通过后在目录流写一条 parameter_set。
-        # 未接入的条目拒绝修改（工单 #643）。提出者以认证身份为准（工单 #1262，docs/design/app-and-interface.md「合同」）：
+        # 未接入的条目拒绝修改（工单 #643）。提出者以认证身份为准（工单 #1262）：
         # 经命令进来时取命令的提出者，请求体里的旧字段 modified_by 不再决定提出者；直接调用（没有命令）
         # 必须给出 modified_by。基准版本是查询返回的全局参数版本（内容摘要），过期返回 ParameterStaleError；
         # expected_change_id 是撤回的目标修改记录身份，在同一写事务核对它仍是这个参数最近的一次修改。

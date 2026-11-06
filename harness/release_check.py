@@ -117,7 +117,7 @@ def _tree_entry(repository: pygit2.Repository, tree: pygit2.Tree, path: str) -> 
 
 def _previous_tag(repository: pygit2.Repository) -> tuple[str, pygit2.Commit] | None:
     # 上一次发布的标签：名字以 v 开头、指向提交的标签中提交时间最晚的那一个；没有时为空。
-    # 标签按提交时间排序，与发布的先后一致（docs/design/web-interface-and-release.md「版本号」：标签 v<版本>）
+    # 标签按提交时间排序，与发布的先后一致（：标签 v<版本>）
     tagged: list[tuple[int, str, pygit2.Commit]] = []
     for reference in repository.references.objects:
         name = reference if isinstance(reference, str) else reference.name

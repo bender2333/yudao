@@ -1,4 +1,4 @@
-"""两边的运行条件之一：被测模型的容量（评测场景设计「两边的运行条件」中「模型的容量」）。
+"""两边的运行条件之一：被测模型的容量（评测场景设计「两边的运行条件」「模型的容量」）。
 
 上下文窗口与单次输出上限取模型服务的模型列表（`YUDAO_EVAL_BASE_URL` 加 `/models`）
 为这个模型报告的值（`context_length`、`max_completion_tokens`），列表没有报告时用运行器
@@ -60,7 +60,7 @@ def reported_limits(payload, model_id):
 
 
 def resolve_limits(model_id, reported, context_window=None, max_output_tokens=None):
-    """列表报告的值优先，其次运行器参数；两者都没有时报错（docs/design/evaluation-scenarios.md「两边的运行条件」中「模型的容量」）。
+    """列表报告的值优先，其次运行器参数；两者都没有时报错（docs/design/evaluation-scenarios.md「两边的运行条件」「模型的容量」）。
 
     返回四项：两个取值与各自的来源（`model_list` 或 `argument`），报告照这两项写。
     """

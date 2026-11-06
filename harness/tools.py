@@ -2,7 +2,7 @@
 # 取自定义的角色（definitions/roles.json）与事项种类（definitions/work_items.json）；这里是读取它们的函数，
 # 主机工具由步骤驱动执行，环境工具的动作由执行环境（environment.py）执行。
 #
-# 读的是交给它的那份定义（工单 #1098，docs/design/browser-and-computer-use.md「执行」）：工具许可与提案校验把事项所用的定义
+# 读的是交给它的那份定义（工单 #1098，docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：工具许可与提案校验把事项所用的定义
 # （组织定义与它引用的路由定义所在的那个定义版本）交进来；没有交的时候是当前加载的那一份。
 # 装配、显示与其他读取当前定义的调用方不交，交给它们的是哪一份定义不改变它们看到的东西。
 
@@ -31,12 +31,12 @@ BROWSER_TOOL_NAMES: tuple[str, ...] = (
 )
 # 不提供的工具（docs/design/browser-and-computer-use.md「提供的工具」）：脚本能绕过界面直接改页面状态，这样得到的结论不能说明用户能完成这项操作
 EXCLUDED_BROWSER_TOOLS: tuple[str, ...] = ("browser_evaluate", "browser_run_code_unsafe")
-# 需要图像输入的工具（docs/design/browser-and-computer-use.md「工具定义的声明」）：调用目标不含图像时它不出现在请求里
+# 需要图像输入的工具：调用目标不含图像时它不出现在请求里
 IMAGE_INPUT_BROWSER_TOOLS: tuple[str, ...] = ("browser_take_screenshot",)
 
 
 def browser_tool_definitions(response: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    # 从 Playwright MCP 的 tools/list 响应生成浏览器工具的定义（设计说明「运行方式」、「提供的工具」与 docs/design/browser-and-computer-use.md「恢复契约」）：
+    # 从 Playwright MCP 的 tools/list 响应生成浏览器工具的定义（docs/design/browser-and-computer-use.md「提供的工具」与）：
     # 名称、说明与参数原样取用；动作类别是 browser；只读标注为是的工具按「无需查询」核对，
     # 其余按动作记录查询；都可以取消；截图需要图像输入。清单以外的工具（含不提供的两个）不进来
     listed = {str(tool.get("name")): tool for tool in response.get("result", {}).get("tools", [])}

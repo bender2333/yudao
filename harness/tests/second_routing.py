@@ -1,4 +1,4 @@
-# 第二种路由：任务池（工单 #864；骨架与应用设计说明「契约」、「路由契约」、「其他路由：骨架要满足的条件」中「证明」；总图第四节「路由」缝）。
+# 第二种路由：任务池（工单 #864；骨架与应用设计说明「契约」、「路由契约」、「其他路由：骨架要满足的条件」「证明」；总图第四节「路由」缝）。
 #
 # **只在测试里用，产品代码不导入它。** 它证明的是骨架：同一副骨架接上另一套应用——形状像任务池的路由，
 # 有自己的那份定义（`harness/tests/task_pool_definitions/`，用 `load_definitions(<测试目录>)` 加载）、
@@ -8,10 +8,10 @@
 # 形状：
 # - 发任务的部门把用户的输入写成池子里的一条任务（提议方式 `submit_task`，成果种类 `pool_task`）；
 # - 路由把池子里待办的任务**指派**给能做它的部门：这一轮工作的路由自己的工作引用就是那件任务
-#   （设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」，原样交给装配与执行）；
+#   （设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，原样交给装配与执行）；
 # - 领到任务的部门交完成说明（`complete_task` / `task_completion`）；
 # - 另一个部门给结论：接纳或者打回（`judge_task` / `task_verdict`）。打回以后任务回到池子，由完成它的
-#   部门重做。完成一件事的部门不能自己宣布它合格（基础规则 3）：这一条由本路由的收紧检查判（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」
+#   部门重做。完成一件事的部门不能自己宣布它合格（基础规则 3）：这一条由本路由的收紧检查判（
 #   「路由提供收紧检查」），不靠内核。
 # - 池子里没有待办的任务时事项结束，结束原因是**它自己那份定义里声明的** `pool_drained`
 #   （docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」，不进内核的停止原因清单）。
@@ -56,7 +56,7 @@ VERDICT_KIND = "task_verdict"
 ACCEPT = "accept"
 RETURN = "return"
 
-# 路由自己的应用事件种类（设计说明「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」、docs/design/skeleton-and-application.md「骨架事件与应用事件」）：任务池自己记的两件事——一件任务被指派出去、
+# 路由自己的应用事件种类（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：任务池自己记的两件事——一件任务被指派出去、
 # 一件任务被打回以后回到池子。登记归登记，内核不解释它们的内容；它们不进骨架事件的那张表
 TAKEN_EVENT = "task_pool_task_taken"
 RETURNED_EVENT = "task_pool_task_returned"
@@ -70,7 +70,7 @@ ITEM_END_REASON = "pool_drained"
 _DEPARTMENTS = tuple(DEFINITIONS.routing_definition().departments)
 _PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
 
-# 一轮没有正常结束的两种状态：暂停与失败（与成果驱动同一个口径，docs/design/skeleton-and-application.md「执行契约」输出）
+# 一轮没有正常结束的两种状态：暂停与失败（与成果驱动同一个口径，输出）
 _NOT_A_NORMAL_ROUND_END = frozenset({"paused", "failed"})
 
 
@@ -203,7 +203,7 @@ def _free(department: str, waiting: set[str] | None) -> bool:
 
 
 def work_reference(state: PoolState, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）：指派给它的那件任务。
+    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：指派给它的那件任务。
 
     发任务的一轮没有任务可指派（任务由这一轮写出来），为空。原样交给装配与执行，骨架不解释它。
     """
@@ -291,7 +291,7 @@ class TaskPool:
     """任务池路由（路由契约第三版的第二种实现）。
 
     实现在测试里；薄驱动只按契约的三个问题调用它。它读运行流的事件折出池子的现状，不写事件、不调模型、
-    不核对边界、不执行工具（docs/design/skeleton-and-application.md「路由契约」中「不做」）。
+    不核对边界、不执行工具（docs/design/skeleton-and-application.md「路由契约」「不做」）。
     """
 
     NAME = ROUTING_NAME
@@ -370,7 +370,7 @@ class TaskPool:
 
 
 class TaskPoolTightening:
-    """任务池的收紧检查（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」中「路由提供收紧检查」）：同一条路由的另一半。
+    """任务池的收紧检查：同一条路由的另一半。
 
     内核的通用检查通过以后，在这个写入事务里由内核问它三件事：这个部门此刻能为池子交哪几种成果、
     请求里提供哪些工具、这一次提交能不能收。三种成果的内容由它组装（格式检查也在这里）。

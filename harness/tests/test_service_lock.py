@@ -57,7 +57,7 @@ def _start(workdir: Path, command: str, data_dir: Path, port: int, log: Path, *,
 
 
 def _wait_until_serving(process: subprocess.Popen, url: str, log: Path, *, token: str | None = None) -> None:
-    # 就绪的判断是第一次成功收到 200：局域网访问方式的接口路径需要访问令牌（docs/design/app-and-interface.md「令牌与 TLS」），
+    # 就绪的判断是第一次成功收到 200：局域网访问方式的接口路径需要访问令牌
     # 没有令牌时一直是 401，因此请求带上这次建好的令牌
     headers = {} if token is None else {"Authorization": f"Bearer {token}"}
     deadline = time.monotonic() + STARTUP_TIMEOUT_SEC

@@ -1,4 +1,4 @@
-# 项目的命令（docs/design/app-and-interface.md「命令清单」中「项目」）。
+# 项目的命令。
 
 from __future__ import annotations
 

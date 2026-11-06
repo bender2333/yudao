@@ -56,7 +56,7 @@ class Form:
 
 class EventType(SkeletonEventType):
     # run 流的事件种类：骨架事件的种类由内核事件模块给出（SkeletonEventType），这里接着声明应用事件的部分。
-    # 应用事件由应用登记（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」，S5a 工单 #828），骨架事件不在这里重复写一遍
+    # 应用事件由应用登记（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，S5a 工单 #828），骨架事件不在这里重复写一遍
     USER_INPUT_RECEIVED = "user_input_received"
     PRODUCT_INPUT_ASSIGNED = "product_input_assigned"
     DEPARTMENT_GUIDANCE_RECEIVED = "department_guidance_received"
@@ -288,7 +288,7 @@ class QAReview:
     criteria: list[dict[str, Any]] = field(default_factory=list)
     coverage: dict[str, Any] = field(default_factory=dict)
     open_criteria: list[str] = field(default_factory=list)
-    # 基线明细（docs/design/independent-verification.md「检验的有效性」，工单 #1181）：命令检查的条目逐条带基线结果；旧事件没有这一项
+    # 基线明细（工单 #1181）：命令检查的条目逐条带基线结果；旧事件没有这一项
     baseline_checks: list[dict[str, str]] = field(default_factory=list)
     # 这份结论引用的独立判断事件与改判的条数（验证的独立性设计说明「先判断后看解释」，工单 #1190）：
     # 放行记录与判断成对，以后算解释翻转率时按这一对取；旧事件没有这两项
@@ -514,11 +514,11 @@ class RunProjection:
     last_review: QAReview | None = None
     # 事项种类（工单 #134）：普通事项为 change，建档事项为 onboarding；旧 run 的事件没有这个字段时为 change
     kind: str = "change"
-    # 建档事项的产出：仓库概况与现有结构的工件引用（docs/design/existing-project-onboarding.md「总体」、「仓库概况与读取范围」）
+    # 建档事项的产出：仓库概况与现有结构的工件引用
     overview_ref: dict[str, Any] | None = None
     structure: dict[str, Any] | None = None
     baseline_review: dict[str, Any] | None = None
-    # 建档修改轮的依据（工单 #136，docs/design/existing-project-onboarding.md「领域事件」）：上一轮建档候选的事件编号与修改意见的工件引用；
+    # 建档修改轮的依据（工单 #136）：上一轮建档候选的事件编号与修改意见的工件引用；
     # 建档第一轮与普通事项没有这个字段
     onboarding_basis: dict[str, Any] | None = None
     # 建档的轮次（工单 #136）：第一轮为 1，修改轮逐轮加一；普通事项与旧 run 为 0

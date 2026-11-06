@@ -162,7 +162,7 @@ def test_each_assembled_request_records_the_rule_version_and_the_folded_rounds(d
         assert payload["folded_rounds"] == []
         request = json.loads(system.artifacts.get_text(payload["request_ref"]["content_hash"]))
         assert set(request) <= {"input", "tools", "max_output_tokens"}
-        # 部门材料那一条在请求的首位（docs/design/context-assembly.md「确定性（通过）」中「材料恒在首位」）
+        # 部门材料那一条在请求的首位（docs/design/context-assembly.md「确定性（通过）」「材料恒在首位」）
         assert request["input"][0]["role"] == "developer"
 
 

@@ -8,7 +8,7 @@
 #   4. 继续一个暂停的 run（把 run 从暂停恢复成进行中，下一次激活由薄驱动接着开始）。
 #
 # 薄驱动把它接上并只转交（`Orchestrator.answer_decision`、`Orchestrator.create_revision_run`），自己不再写
-# 这些处理（docs/design/existing-project-onboarding.md「失败与中断」「薄驱动只连接」）。这里用到的薄驱动只有三件不属于应用层的事：建立 run、
+# 这些处理（docs/design/skeleton-and-application.md「薄驱动」「薄驱动只连接」）。这里用到的薄驱动只有三件不属于应用层的事：建立 run、
 # 唤醒等待的会话、记一次失败的运行，另加事实的存储、写入口、工件库与项目服务。
 #
 # 不导入流程编排：薄驱动在调用时把自己作为 `driver` 交进来（与路由实现收投影、收紧检查收申请同一个做法），
@@ -102,7 +102,7 @@ class DecisionFlow:
         revision_run_id = driver.writes.transact(saved.stream, answer, command=command)
         if revision_run_id is not None and not driver.store.stream_events(run_stream(revision_run_id),
                                                                          after_version=0):
-            # 建档修改轮：run 在回答事务提交以后单独建立，进程在两者之间中断时启动时按事件补建（docs/design/existing-project-onboarding.md「失败与中断」）
+            # 建档修改轮：run 在回答事务提交以后单独建立，进程在两者之间中断时启动时按事件补建（docs/design/skeleton-and-application.md「薄驱动」）
             self._create_missing_revision_run(driver, revision_run_id)
         return revision_run_id
 
@@ -175,7 +175,7 @@ class DecisionFlow:
                                  decision_id: str) -> str | None:
         # 项目流中的决定请求（工单 #136）：确认初始 PRD 时在同一事务中追加回答与 baseline_adopted；
         # 提出修改时在同一个事务中追加回答与 onboarding_revision_started，返回新 run 编号，
-        # 由调用方 start：run 在事务提交以后单独建立（docs/design/existing-project-onboarding.md「用户确认与修改的往返」）
+        # 由调用方 start：run 在事务提交以后单独建立
         if option == "revise" and not (note or "").strip():
             raise NoteRequired(decision, option)
         request = decision.request
@@ -210,7 +210,7 @@ class DecisionFlow:
         transaction.append(NewProjectEvent(ProjectEventType.DELIVERABLE_ADOPTED, adoption, actor="system"))
 
     def _adopt_baseline(self, transaction: Transaction, candidate: Any, decision_id: str) -> None:
-        # 采纳建档基线（工单 #136，docs/design/existing-project-onboarding.md「确认以后：当前有效要求与第一次采纳」）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
+        # 采纳建档基线（工单 #136）：第一次采纳的成果是快照本身，采纳编号、结果代码树与摘要
         # 都取自建档候选；现有缺陷与其他失败记为采纳成果的已知风险。
         # 没有核验角色的形态没有基线核验这一步（工单 #1510，形态与核验角色设计说明「开环完成」第 6 条）：
         # 这一项为空，现有缺陷与基线检查也为空，摘要写明这份基线没有经过基线核验；采纳本身照常进行
@@ -236,7 +236,7 @@ class DecisionFlow:
         }, actor="system"))
 
     def _start_onboarding_revision(self, transaction: Transaction, candidate: Any, note: str | None) -> str:
-        # 建档修改轮（工单 #136，docs/design/existing-project-onboarding.md「领域事件」、「用户确认与修改的往返」、「失败与中断」）：修改轮事件与回答在同一个事务中写入，返回新 run 编号；
+        # 建档修改轮（工单 #136）：修改轮事件与回答在同一个事务中写入，返回新 run 编号；
         # run 在事务提交以后单独一步建立（事务之间中断时，启动时按 onboarding_revision_started 补建）。
         # 事务提交到 run 建立之间是一个可以单独被终止的窗口
         round_number = candidate.round + 1

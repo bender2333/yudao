@@ -78,7 +78,7 @@ export function waitedSeconds(requestedAt: string, now: number): number {
   return Math.max(0, Math.round((now - requested) / 1000));
 }
 
-// 初始 PRD 的材料（第 138 号工单，docs/design/existing-project-onboarding.md「决定种类」）：PRD 摘要与工件引用、现有结构说明、
+// 初始 PRD 的材料（第 138 号工单）：PRD 摘要与工件引用、现有结构说明、
 // 基线核验汇总、快照来源与轮次。上一轮的修改意见原文由卡片按事项补一行（工单 #138），
 // 修改意见的工件路径是内部引用，不显示给用户。
 // 载荷由 InitialPrdRequested 给出，每一项都按接口合同的原样显示，没有上报的项目写「未上报」。
@@ -152,7 +152,7 @@ function provenanceText(value: unknown): string {
   return `git 提交 ${commit}（分支 ${branch}，${provenance.dirty ? "有未提交的修改" : "没有未提交的修改"}）`;
 }
 
-// 基线核验汇总（docs/design/existing-project-onboarding.md「决定种类」）：按核实结果分组的条数、现有缺陷、遗漏的能力与其他失败
+// 基线核验汇总：按核实结果分组的条数、现有缺陷、遗漏的能力与其他失败
 function baselineSummary(review: Payload): string {
   const conclusions = listOf(review.conclusions);
   const counts: Record<string, number> = {};

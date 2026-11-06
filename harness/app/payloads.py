@@ -1,4 +1,4 @@
-# 事件载荷的合同（docs/design/app-and-interface.md「事件对象」）：现有每个事件种类一个 pydantic 类型，字段与控制核心写入的载荷逐一对应，
+# 事件载荷的合同：现有每个事件种类一个 pydantic 类型，字段与控制核心写入的载荷逐一对应，
 # 不接受类型之外的字段。工件以引用出现，原文由查询取得。控制核心新增或修改载荷字段时同时修改这里，
 # 事件序列对照与项目流程的测试核对每条写入的事件都符合这里的类型。
 
@@ -164,7 +164,7 @@ class McpServersDocument(Payload):
 
 
 class McpToolHint(Payload):
-    # 服务器标注的工具提示（网络与 MCP 设计说明「服务器设置」中「工具清单」）：只读、幂等与破坏性提示，
+    # 服务器标注的工具提示（网络与 MCP 设计说明「服务器设置」「工具清单」）：只读、幂等与破坏性提示，
     # 只显示给用户参考；模型看到的工具定义不带它
     title: str = ""
     read_only_hint: bool | None = None
@@ -174,7 +174,7 @@ class McpToolHint(Payload):
 
 
 class McpToolSpec(Payload):
-    # 工具清单快照里一个工具的清单项（docs/design/network-and-mcp.md「服务器设置」中「工具清单」）：名称、说明与参数结构，
+    # 工具清单快照里一个工具的清单项：名称、说明与参数结构，
     # 加服务器自己的提示（只供参考）
     name: str
     description: str = ""
@@ -245,7 +245,7 @@ class CallTarget(Payload):
     configured_max_output_tokens: int | None
     # 模型访问定义声明的是否接受要求调用工具；模型尚未解析时为空
     accepts_required_tool_call: bool | None
-    # 模型访问定义声明的输入方式（docs/design/model-management.md「模型访问定义与准入」）；模型尚未解析时为空列表
+    # 模型访问定义声明的输入方式模型尚未解析时为空列表
     input_modalities: list[str]
     selection_source: str | None
     requested_tier: str | None
@@ -304,7 +304,7 @@ class ToolRecord(AttemptIdentity, WorkBasis, Versions, CallTarget):
 
 
 class OnboardingBasis(Payload):
-    # 建档修改轮的依据（工单 #136，docs/design/existing-project-onboarding.md「领域事件」）：上一轮建档候选的事件编号、这一轮的轮次与修改意见的工件引用。
+    # 建档修改轮的依据（工单 #136）：上一轮建档候选的事件编号、这一轮的轮次与修改意见的工件引用。
     # 产品据此以上一轮初始 PRD 与修改意见为依据写出新的 ProductSpec；修改意见为空时这一轮没有意见
     candidate_event_id: str
     round: int
@@ -366,7 +366,7 @@ class RunCreatedPayload(Payload):
     # 独立核验，结束原因是开环完成而不是放行（形态与核验角色设计说明「开环完成」「定义的校验」第 4 条）。
     # 旧事件没有这个字段时按不是开环读取：那时的定义只有默认的三部门，有核验角色
     open_loop: bool = False
-    # 建档修改轮的依据（工单 #136，docs/design/existing-project-onboarding.md「领域事件」）：上一轮候选事件与修改意见的工件引用。
+    # 建档修改轮的依据（工单 #136）：上一轮候选事件与修改意见的工件引用。
     # 普通事项与建档第一轮没有这个字段，读取时按没有上一轮处理
     onboarding_basis: OnboardingBasis | None = None
     # 建档的轮次（工单 #136）：第一轮为 1；普通事项与旧事件没有这个字段，读取时按 0 处理
@@ -526,7 +526,7 @@ class ModelMessagePayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
     purpose: Purpose
 
 class ModelReasoningPayload(AttemptIdentity, WorkBasis, Versions, CallTarget):
-    # 上游返回的一条推理内容（docs/design/model-management.md「历史中的推理内容」）；产生它的连接、协议与上游模型随调用目标记录
+    # 上游返回的一条推理内容产生它的连接、协议与上游模型随调用目标记录
     reasoning_ref: ArtifactRef
     activation_id: str
     step_id: int
@@ -928,8 +928,8 @@ class QaCriterionPayload(Payload):
 class QaCoveragePayload(Payload):
     # 放行记录里的三个数（docs/design/independent-verification.md「口径」第 4 点）：一次算好，查询与画面读这个数，不重新计算。
     # coverage_ratio 是可执行检验里已在当前快照上通过的条件数除以条件总数；
-    # changed 是改判的条数（docs/design/context-assembly.md「规则清单（七条）」，工单 #1190），以后算解释翻转率时从这里取，旧事件没有这一项。
-    # baseline_valid 是检验有效性的结论（docs/design/browser-and-computer-use.md「查询」，工单 #1181）：命令检查的覆盖都满足
+    # changed 是改判的条数（工单 #1190），以后算解释翻转率时从这里取，旧事件没有这一项。
+    # baseline_valid 是检验有效性的结论（工单 #1181）：命令检查的覆盖都满足
     # 「基线失败、交付通过」时为真；旧事件没有这一项
     criteria_total: int
     executable: int
@@ -942,7 +942,7 @@ class QaCoveragePayload(Payload):
 
 
 class BaselineCheckRecord(Payload):
-    # 放行记录里的基线明细（docs/design/independent-verification.md「检验的有效性」的表，工单 #1181）：一条命令检查的结论带它的基线结果——
+    # 放行记录里的基线明细（的表，工单 #1181）：一条命令检查的结论带它的基线结果——
     # failed（计入覆盖）、passed（基线也通过）、missing（缺少回执）或 unable_to_run（超时或取消）。
     # 结果词与放行准入不因此改变；旧事件没有这一项
     criterion: str
@@ -965,7 +965,7 @@ class IndependentJudgementPayload(Payload):
 
 
 class QaSubmittedPayload(AcceptanceFields):
-    # judgement_event 是这份结论引用的独立判断事件（docs/design/context-assembly.md「规则清单（七条）」，工单 #1190）：放行记录与判断成对，
+    # judgement_event 是这份结论引用的独立判断事件（docs/design/independent-verification.md「先判断后看解释」，工单 #1190）：放行记录与判断成对，
     # 以后算解释翻转率时按这一对取；旧事件没有这一项
     product_spec_hash: str
     effective_contract_hash: str
@@ -978,7 +978,7 @@ class QaSubmittedPayload(AcceptanceFields):
     criteria: list[QaCriterionPayload]
     coverage: QaCoveragePayload
     open_criteria: list[str]
-    # 基线明细（docs/design/independent-verification.md「检验的有效性」，工单 #1181）：命令检查的条目逐条带基线结果，旧事件没有这一项
+    # 基线明细（工单 #1181）：命令检查的条目逐条带基线结果，旧事件没有这一项
     baseline_checks: list[BaselineCheckRecord] = []
     evidence_refs: list[ArtifactRef]
     judgement_event: str = ""
@@ -1179,7 +1179,7 @@ class StructureProposal(Payload):
 
 
 class BaselineCheck(Payload):
-    # 基线检查（工单 #136，docs/design/existing-project-onboarding.md「已有测试与 git 历史作为基线的证据」）：质检在快照上运行的检查回执，随建档基线一起记入项目流，
+    # 基线检查（工单 #136）：质检在快照上运行的检查回执，随建档基线一起记入项目流，
     # 以后的事项据此区分原有的失败与新引入的失败。command 与 summary 取自工程结构说明中的同名构建检查与
     # 检查回执的输出摘要；snapshot_hash 是它绑定的快照摘要
     name: str
@@ -1215,7 +1215,7 @@ class ModelUnavailableRequested(Payload):
 
 
 class DefinitionsChangedRequested(Payload):
-    # 继续旧事项时事项记录的定义版本与当前加载的不同（工单 #16、#894；docs/design/app-and-interface.md「用户决定的回答」、
+    # 继续旧事项时事项记录的定义版本与当前加载的不同（工单 #16、#894、
     # 总体架构「用户决定」）：回答之前这个 run 不推进。recorded_definitions_version 是事项开始时记录的版本
     # （旧事项没有记录时为空），current_definitions_version 是当前加载的版本；reason 恒为
     # definitions_version_changed；facts 为空，请求不引用事实
@@ -1486,7 +1486,7 @@ class McpServerClosedPayload(Payload):
 
 class McpServerFailedPayload(Payload):
     # 一台 MCP 服务器启动或连接失败（工单 #1176）：原因带标准错误输出的末尾部分，凭据值已替换为星号。
-    # 失败的动作照旧把原因作为工具结果交回部门，事项不停止（docs/design/network-and-mcp.md「运行规则」）
+    # 失败的动作照旧把原因作为工具结果交回部门，事项不停止
     server: str
     transport: Literal["stdio", "http"]
     error: str
@@ -1584,7 +1584,7 @@ class DepartmentSettingsConfiguredPayload(Payload):
     requested_tier: str | None = None
     department_prompt: str | None = None
     department_prompt_ref: ArtifactRef | None = None
-    # 这次保存写入的模型不具备该部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」中「保存时」）；
+    # 这次保存写入的模型不具备该部门建议能力时的提醒
     # 没有写入模型或模型具备建议能力时为空
     reminders: list[str] = []
 
@@ -1715,10 +1715,10 @@ class ProjectDecisionWithdrawnPayload(Payload):
 
 
 class OnboardingRevisionStartedPayload(Payload):
-    # 建档修改轮（工单 #136，docs/design/existing-project-onboarding.md「领域事件」）：用户提出修改以后开始新一轮建档 run。
+    # 建档修改轮（工单 #136）：用户提出修改以后开始新一轮建档 run。
     # candidate_event_id 是被提出修改的建档候选事件编号；round 是新一轮的轮次；
     # note 是修改意见原文，它按这一轮 run 的目录存成工件，引用记在 run_created 的 onboarding_basis 中，
-    # 原文随事件写入供启动补建这一轮的 run（docs/design/existing-project-onboarding.md「失败与中断」）
+    # 原文随事件写入供启动补建这一轮的 run
     work_item_id: str
     run_id: str
     candidate_event_id: str
@@ -1727,7 +1727,7 @@ class OnboardingRevisionStartedPayload(Payload):
 
 
 class BaselineAdoptedPayload(Payload):
-    # 采纳建档基线（工单 #136，设计第 3.3、docs/design/existing-project-onboarding.md「确认以后：当前有效要求与第一次采纳」）：确认初始 PRD 以后的采纳。第一次采纳的成果是快照本身，
+    # 采纳建档基线（工单 #136，设计第 3.3）：确认初始 PRD 以后的采纳。第一次采纳的成果是快照本身，
     # tree_ref 与 code_tree_digest 就是建档采集的快照，previous_adoption_id 恒为空；
     # candidate_event_id 是被确认的建档候选事件编号；prd_ref 与 product_spec_hash 是被确认的初始 PRD；
     # known_risks 是基线核验中的现有缺陷与其他失败；checks 与 snapshot 是基线检查与快照来源
@@ -1761,7 +1761,7 @@ class CatalogRevisedPayload(Payload):
     operation: Literal["save_connection", "connect", "delete_connection", "remove_model", "select_model", "save_document",
                        "department_defaults", "reload", "startup"]
     provider_id: str | None
-    # 部门默认保存以后各部门的建议能力提醒（docs/design/model-management.md「部门的建议能力」）；其他操作为空
+    # 部门默认保存以后各部门的建议能力提醒其他操作为空
     reminders: list[str] = []
 
 
@@ -1772,7 +1772,7 @@ class CatalogCandidatesCollectedPayload(Payload):
     status: Literal["ok", "unknown"]
     source_url: str
     fetched_at: str
-    # 候选逐条带上游模型 ID，以及预填值与来源（docs/design/model-management.md「模型访问定义与准入」）：窗口与输出上限先取上游模型列表、
+    # 候选逐条带上游模型 ID，以及预填值与来源：窗口与输出上限先取上游模型列表、
     # 其次取模型能力表；输入方式取能力表；每个预填值带来源（models_url、capability_table 或 default）
     candidates: list[dict[str, Any]]
     candidate_ids: list[str]
@@ -1814,7 +1814,7 @@ class RuntimeDrainStartedPayload(Payload):
 
 class RuntimeDrainFinishedPayload(Payload):
     # 排空结束：服务下一次启动时记下，此后这个实例重新开始新事项（工单 #731，
-    # 应用层与接口层设计说明「命令清单」中「升级」：排空在下一次启动时结束）
+    # 应用层与接口层设计说明「命令清单」「升级」：排空在下一次启动时结束）
     version: int
 
 class RuntimeForceUpgradeRequestedPayload(Payload):
@@ -1831,7 +1831,7 @@ class HomeSeenPayload(Payload):
 
 
 class ParameterSetPayload(Payload):
-    # 参数修改（工单 #349，docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」、「采用与撤回」）：界内修改一次全局参数的现值。
+    # 参数修改（工单 #349）：界内修改一次全局参数的现值。
     # old_value 与 new_value 是修改前后按定义界限核对过的取值；parameters_version 是修改以后的参数版本摘要
     name: str
     old_value: Any
@@ -2047,7 +2047,7 @@ def is_known_event_type(event_type: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# 应用登记自己的事件种类（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」，S5a 工单 #828）：内核只认识骨架事件，
+# 应用登记自己的事件种类（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，S5a 工单 #828）：内核只认识骨架事件，
 # 其余的 run 流事件是应用事件，种类由应用在这份载荷声明里给出，并登记到内核的登记表。
 # 增加一种应用事件只改这里与它的载荷类型，不改内核文件；骨架事件的种类由内核给出，不在这里登记。
 

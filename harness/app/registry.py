@@ -1,5 +1,5 @@
 # 注册表：登记每个命令与查询的名称、请求类型、结果类型、处理函数、可能的拒绝原因与改变查询结果的事件种类。
-# 接口层的路由、OpenAPI 与能力清单都由它生成，不另写清单（docs/design/app-and-interface.md「模块」、「能力清单」）。
+# 接口层的路由、OpenAPI 与能力清单都由它生成，不另写清单。
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ class UnchangedEvent:
 class QueryDefinition:
     # 一个查询。handle 只读取，返回快照（数据与它已经包含的最大全局位置）；changed_by 是会改变结果的事件种类，
     # 客户端收到这些事件时重新查询；unchanged_by 是已核对过不改变结果的事件种类与理由，两份清单合起来覆盖
-    # 全部已登记的事件种类；replayable 为真时接受 docs/design/app-and-interface.md「合同」的 at（全局位置，按位置读取）
+    # 全部已登记的事件种类；replayable 为真时接受的 at（全局位置，按位置读取）
     name: str
     request: type[BaseModel] | None
     result: type[Any]
@@ -56,7 +56,7 @@ class QueryDefinition:
 
 @dataclass(frozen=True)
 class OverlayDefinition:
-    # 一个覆盖层：名称与它依赖的查询（docs/design/app-and-interface.md「能力清单」）。定义登记在注册表中，
+    # 一个覆盖层：名称与它依赖的查询。定义登记在注册表中，
     # 能力清单按依赖的查询是否都已登记自动列出
     name: str
     queries: tuple[str, ...]
@@ -113,7 +113,7 @@ class Registry:
         # 命令可能返回的全部拒绝原因：自己声明的原因，加上每个命令都可能返回的命令身份重复使用
         return (*self.commands[name].reasons, "command_id_reused")
 
-    # 事件流的片段能力（docs/design/app-and-interface.md「能力清单」）：提供模型输出片段，连接可以按这些范围参数筛选
+    # 事件流的片段能力：提供模型输出片段，连接可以按这些范围参数筛选
     stream = StreamCapability(deltas=True, scopes=["project", "work_item", "run", "department", "role", "type"])
 
     def capabilities(self, deployment: Deployment) -> Capabilities:

@@ -167,7 +167,7 @@ def test_rules_registry_returns_every_entry_with_its_four_notes_bounds_kind_form
         assert item["form"] in {"permission", "boundary", "admission"}
         assert item["kind"] in {"parameter", "structure"}
         assert all(item[note] for note in ("guards", "cost", "relax_when", "tighten_when", "origin"))
-    # docs/design/rules-and-parameters.md「规则登记的初始内容」表里的数值保持现值
+    #表里的数值保持现值
     values = {item["name"]: item["value"] for item in entries}
     assert values["run_time_limit_sec"] == 7200 and values["max_cycles"] == 999999
     assert values["tool_call_required_limit"] == 3 and values["check_timeout_sec"] == 600
@@ -315,7 +315,7 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "acceptance.coverage",
         "project.organization",
     }
-    # 可回放的查询：接受 docs/design/app-and-interface.md「合同」的 at（按位置读取）
+    # 可回放的查询：接受的 at（按位置读取）
     assert {item["name"] for item in queries if item["replayable"]} == {
         "system.status", "projects.list", "decisions.list", "project.loop", "rules.registry", "run.loops",
         "acceptance.coverage",

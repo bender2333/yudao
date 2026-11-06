@@ -196,7 +196,7 @@ def test_the_run_actions_query_carries_the_mcp_receipt(tmp_path):
 
 
 def test_credential_values_do_not_appear_in_events_or_artifacts(tmp_path):
-    # 凭据值不进入事件、工件与日志（docs/design/network-and-mcp.md「凭据」）：值只以名称与脱敏后的星号出现在保存的内容里。
+    # 凭据值不进入事件、工件与日志：值只以名称与脱敏后的星号出现在保存的内容里。
     # environment 工具回报子进程的全部环境变量（里面有按名称取值的凭据值）：结果文本与结构化输出
     # 在保存之前替换为星号，事件与工件里查不到值本身
     system = _system(tmp_path, {

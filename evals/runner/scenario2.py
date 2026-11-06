@@ -21,7 +21,7 @@ SCORING_IGNORES = (".git", ".opencode-config")
 
 
 def upstream_urls():
-    """任务上游仓库的地址：输出里出现时这次运行作废（docs/design/evaluation-scenarios.md「两边的运行条件」中「联网」）。"""
+    """任务上游仓库的地址：输出里出现时这次运行作废。"""
     return (UPSTREAM_URL,)
 
 

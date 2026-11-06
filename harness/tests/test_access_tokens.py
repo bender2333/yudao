@@ -36,7 +36,7 @@ def _lan_address() -> str:
 
 
 def _lan(opened, data_dir, **options):
-    # 局域网访问方式的真实服务：监听本机所有地址，经局域网地址连接（docs/design/app-and-interface.md「访问方式与认证」、「令牌与 TLS」）
+    # 局域网访问方式的真实服务：监听本机所有地址，经局域网地址连接（docs/design/app-and-interface.md「令牌与 TLS」）
     return running_api(opened, access="lan", host="0.0.0.0", connect=_lan_address(),
                        data_dir=data_dir, **options)
 
@@ -110,7 +110,7 @@ def test_lan_access_requires_a_token_for_every_interface_path(data_dir, tmp_path
 
 
 def test_local_access_needs_no_token(data_dir):
-    # 本机访问方式不需要令牌，提出者保持 user:local（docs/design/app-and-interface.md「访问方式与认证」）
+    # 本机访问方式不需要令牌，提出者保持 user:local
     opened = _Opened(data_dir)
     AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
     with running_api(opened, data_dir=data_dir) as client:

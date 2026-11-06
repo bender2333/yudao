@@ -19,7 +19,7 @@ import model_service
 import opencode
 import report
 
-# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计「两边的运行条件」中「时间上限」）
+# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计「两边的运行条件」「时间上限」）
 TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
 
@@ -38,7 +38,7 @@ def prepare_scoring_dir(scenario_module, run_dir, evidence_dir, skipped):
     """运行结束以后把隐藏检查与条目表复制到评分目录，再复制一份交付。
 
     隐藏部分与交付副本各自独立：被测方在运行期间见不到检查与条目表。Windows 的保留
-    设备名（`nul` 等）不复制，跳过的文件记进 `skipped`（docs/design/evaluation-scenarios.md「两边的运行条件」中「隔离」）。
+    设备名（`nul` 等）不复制，跳过的文件记进 `skipped`（docs/design/evaluation-scenarios.md「两边的运行条件」「隔离」）。
     """
     scoring_dir = os.path.join(evidence_dir, "scoring")
     if os.path.exists(scoring_dir):

@@ -1,41 +1,46 @@
 """把代码与测试里按节号引用设计说明的地方改成「文档路径 + 小节标题」（工单 #1411）。
 
 用法：
-    uv run python scripts/convert_design_section_refs.py --report .tmp/report.tsv   # 只报告，不改文件
-    uv run python scripts/convert_design_section_refs.py --apply                    # 改文件
+    uv run python scripts/convert_design_section_refs.py --report .tmp/report.md     # 只报告，不改文件
+    uv run python scripts/convert_design_section_refs.py --apply --report .tmp/report.md
     uv run python scripts/convert_design_section_refs.py --apply --cache .tmp/cache.json
 
-换算办法见工单 #1411 正文的四步：
+只认证据，不按文字相似度挑说明与小节（工单 #1411「换算的规矩」第 1 条与第 8 条）。五类证据：
 
-1. 定是哪份设计说明。注释里写了名字的按名字（旧叫法见 DOC_ALIASES），写了 `docs/design/`
-   路径的按路径；只写「设计说明」或「第 N 节」的，按同一行、同一段注释、文件开头的说明推，
-   再按同文件已经定下来的设计说明、同一节号在别的说明里是否存在来核对。
-2. 定是哪一节。`git blame` 找到写这条注释的提交，读那个提交里的那份设计说明，第 N 节当时的
-   标题就是要写的标题，再对到现在 main 上的名字（改过名的按 `docs/CHANGELOG.md` 的「旧标题 → 新标题」）。
-   「第 N 节第 M 项」这类按序号指一项的，写成小节标题加那一项的名字。
-3. 指向已经删去的小节的（DELETED 里逐条写明），去掉这一部分引用，注释的其余部分照旧。
-4. 写法：`docs/design/<文件>.md「小节标题」`；同一段注释已经写明是哪份设计说明时只写「小节标题」。
-   不写节号与行号。
+    ⑤ 人定（LINE_DECISIONS，逐行写依据）
+    ① 同一段注释点名（含「模型管理设计说明」这类旧叫法）
+    ② 同一段注释里引用的「标题」或条目名全库唯一命中一份说明
+    ④ 文件开头人写的归属：开头把某一节写给了哪份说明（自动读出来，依据写进报告）
+    ③ 写这行的提交对应的工单（`gh issue view` 的「依据」）点名的说明
 
-再跑一次没有改动：改完的地方不再有「第 N 节」，剩下的都是写明了是别的文档的引用（原型、
-需求记录、ADR、调研、归档、路线图、规则文件与运行配置），脚本跳过这些。
+定节过一道硬门槛（第 2 条）：写出的标题必须等于那份说明在写这条注释的提交里第 N 节的标题，
+改过名的按 `docs/CHANGELOG.md`「旧标题 → 新标题」对到现在。候选多份都能定节时看原句
+（第 4 条）：注释里的长词组在哪一份说明的那一节正文里命中，就采用哪一份。③ 的候选还要再过一道
+原句核对——「依据」写的那份不一定是真出处（工单 #1411 的架构师评论）。命中不唯一或都没有的，
+去掉，不换一个像的。
 
-评价材料（`evals/scenarios/` 下的 checks、reference 与 materials）不在扫描范围：它们按摘要
-校验，改一个字的注释也让那次评测运行作废，改 checks 还要用户事前批准（SKIP_PREFIXES）。
+条目名只在那一节当时确实有列表的第 M 条、且首句不超过 20 字时写（第 5 条）；否则只写小节标题。
+指向已删的小节、指不出来、或者候选分不开的，去掉这一部分引用、注释其余部分照旧（第 6 条，
+用户已确认的兜底），逐条列进报告的「去掉」一栏。
 
-推不出是哪份设计说明、需要人定的，写进 MAPPING（按文件或「文件:行」）；这些条目在交付说明的
-「自定的边界」里逐条说明。
+报告每一行写出第几节、证据来源、命中的原句、提交、当时的标题、现在的标题与结果。
+
+写法（第 7 条）：`docs/design/<文件>.md「小节标题」`；同一段注释已经写明是哪份说明时只写
+「小节标题」。不写节号与行号。再跑一次没有改动：改完的地方不再有「第 N 节」，剩下的都是写明了
+是别的文档的引用（原型、需求记录、ADR、调研、归档、路线图、规则文件与运行配置）。
+
+评价材料（`evals/scenarios/` 下的 checks、reference 与 materials）不在扫描范围：它们按摘要校验，
+改一个字的注释也让那次评测运行作废，改 checks 还要用户事前批准（SKIP_PREFIXES）。
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import math
 import re
 import subprocess
 import sys
-from collections import Counter, defaultdict
+from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -153,7 +158,6 @@ DOC_ALIASES: dict[str, str] = {
 # 工单 #1411：引用原型、需求记录、ADR、调研、归档文档、路线图、规则文件与运行配置的节号不在本单。
 EXCLUDED_TOKENS: tuple[str, ...] = (
     r"原型[^。；，）)第与]{0,40}",
-    # 别的目录下的文档（需求记录、路线图、ADR、调研、运行配置）：写明了路径的不是设计说明
     r"docs/(?!design/)[\w./-]*\.md",
     r"RFC\s*\d+",
     r"(?<![\w.])v\d+(?![\w.])",
@@ -180,249 +184,111 @@ EXCLUDED_TOKENS: tuple[str, ...] = (
 # 下面只写「第 3.3 节」）。
 PROTO_RE = re.compile(r"(?:原型[^。；\n]{0,60}?|(?<![\w.])v\d+[^。；\n]{0,40}?)第\s*(\d+(?:\.\d+)*)\s*节")
 
-# 对照表：名字、同一行、同一段注释、文件开头都推不出来的，按文件（或「文件:行」）指到设计说明。
-MAPPING: dict[str, str] = {
-    "harness/api/app.py": "app-and-interface.md",
-    "harness/app/application.py": "app-and-interface.md",
-    "harness/app/project_commands.py": "app-and-interface.md",
-    "harness/app/read_models.py": "app-and-interface.md",
-    "harness/app/project_queries.py:1566": "model-management.md",
-    "harness/providers/responses.py": "model-management.md",
-    "harness/tests/test_responses.py": "model-management.md",
-    "evals/": "evaluation-scenarios.md",
-    "harness/definitions/rules.json:220": "department-roles.md",
-    "harness/definitions/rules.json:572": "department-roles.md",
-    ".github/workflows/ci.yml": "browser-and-computer-use.md",
-    "harness/submissions.py": "skeleton-and-application.md",
-    "harness/tightening.py": "skeleton-and-application.md",
-    "client/src/renderer/src/pixel/registry.ts": "visualization.md",
-    # 画布与翻译层的文件只讲画面这一份说明（个别页面文件仍按名字与文字定）
-    "client/src/renderer/src/pixel/": "visualization.md",
-    "client/src/renderer/src/translate/": "visualization.md",
-    "client/src/renderer/src/shell/": "web-interface-and-release.md",
-    # 守三环的用例：这一处指测试分层「测试按三环留」
-    "client/tests/unit/check-methods.test.ts:6": "test-pyramid.md",
-    "client/tests/unit/snapshot-view.test.ts:55": "test-pyramid.md",
-    "client/tests/unit/translate-coverage.test.ts:6": "test-pyramid.md",
-}
-
-# 按文件的对照表：这些模块的注释里只写「设计说明第 N 节」，没点名是哪一份。逐条读模块的职责定的：
-# 一个文件的注释都在讲同一份说明时写文件，讲几份的写「文件:行」。
-FILE_MAPPING: dict[str, str] = {
-    "harness/__main__.py": "web-interface-and-release.md",
-    "harness/api/server.py": "web-interface-and-release.md",
-    "harness/app/catalog_queries.py": "app-and-interface.md",
-    "harness/app/contracts.py": "app-and-interface.md",
-    "harness/app/decision_queries.py": "app-and-interface.md",
-    "harness/app/form_commands.py": "app-and-interface.md",
-    "harness/app/home.py": "app-and-interface.md",
-    "harness/app/parameter_commands.py": "app-and-interface.md",
-    "harness/app/project_and_work_item_commands.py": "app-and-interface.md",
-    "harness/app/registry.py": "app-and-interface.md",
-    "harness/app/replay.py": "app-and-interface.md",
-    "harness/app/system_queries.py": "app-and-interface.md",
-    "harness/browser.py": "browser-and-computer-use.md",
-    "harness/context.py": "context-assembly.md",
-    "harness/decisions.py": "existing-project-onboarding.md",
-    "harness/decision_flow.py": "existing-project-onboarding.md",
-    "harness/environment.py": "execution-environment.md",
-    "harness/engine.py": "model-management.md",
-    "harness/kernel_events.py": "trusted-kernel.md",
-    "harness/loops.py": "loops-and-convergence.md",
-    "harness/mcp_client.py": "network-and-mcp.md",
-    "harness/parameters.py": "rules-and-parameters.md",
-    "harness/projection.py": "skeleton-and-application.md",
-    "harness/projects.py": "existing-project-onboarding.md",
-    "harness/providers/facade.py": "model-management.md",
-    "harness/providers/reasoning.py": "model-management.md",
-    "harness/providers/selection.py": "model-management.md",
-    "harness/providers/suggested.py": "model-management.md",
-    "harness/recording.py": "model-management.md",
-    "harness/recovery.py": "recovery-contract-and-fault-matrix.md",
-    "harness/runtime.py": "app-and-interface.md",
-    "harness/snapshot.py": "existing-project-onboarding.md",
-    "harness/tightening.py": "independent-verification.md",
-    "harness/trial_sessions.py": "browser-and-computer-use.md",
-    "harness/tests/layers.toml": "test-pyramid.md",
-    "harness/tests/process_kill.py": "existing-project-onboarding.md",
-    "harness/tests/test_cli_entry.py": "web-interface-and-release.md",
-    "harness/tests/test_data_directory.py": "web-interface-and-release.md",
-    "harness/tests/test_event_kind_registration.py": "test-pyramid.md",
-    "harness/tests/test_event_sources.py": "app-and-interface.md",
-    "harness/tests/test_event_type_fixture.py": "test-pyramid.md",
-    "harness/tests/test_interaction_engine.py": "model-management.md",
-    "harness/tests/test_issue_89.py": "model-management.md",
-    "harness/tests/test_issue_90.py": "model-management.md",
-    "harness/tests/test_mcp_lifecycle.py": "network-and-mcp.md",
-    "harness/tests/test_message_protocol_contract.py": "model-management.md",
-    "harness/tests/test_onboarding_renamed.py": "test-pyramid.md",
-    "harness/tests/test_project_loop_organization.py": "department-loop.md",
-    "harness/tests/test_project_queries.py": "app-and-interface.md",
-    "harness/tests/test_release_waits_for_input.py": "department-guidance.md",
-    "harness/tests/test_routing_ask.py": "skeleton-and-application.md",
-    "harness/tests/test_routing_per_form.py": "test-pyramid.md",
-    "harness/tests/test_startup_reload.py": "web-interface-and-release.md",
-    "harness/tests/test_tool_contracts.py": "network-and-mcp.md",
-    "harness/tests/test_tools_registry.py": "network-and-mcp.md",
-    "harness/tests/test_trial_sessions.py": "execution-environment.md",
-    "harness/tests/kernel/test_judge_before_explanation.py:16": "test-pyramid.md",
-    "harness/tests/kernel/test_only_grows.py:14": "test-pyramid.md",
-    "harness/tests/kernel/test_skeleton_events.py:8": "test-pyramid.md",
-    "harness/tests/kernel/test_only_grows.py": "trusted-kernel.md",
-    "harness/tests/kernel/test_skeleton_events.py": "trusted-kernel.md",
-    "harness/watched_outputs.py": "skeleton-and-application.md",
-    "harness/assembly.py": "model-management.md",
-    "harness/submissions.py": "skeleton-and-application.md",
-    "harness/direct.py": "forms-and-verifier-role.md",
-    "harness/definitions/__init__.py": "rules-and-parameters.md",
-    "client/src/renderer/src/contract/command-id.ts": "app-and-interface.md",
-    "client/src/renderer/src/views/project/floor-screen.tsx": "visualization.md",
-    "client/src/renderer/src/views/project/floor-text.ts": "loops-and-convergence.md",
-    "client/src/renderer/src/views/project/read-existing.tsx": "existing-project-onboarding.md",
-    "client/src/renderer/src/translate/face.ts": "existing-project-onboarding.md",
-    "client/tests/e2e/backend.py": "app-and-interface.md",
-    "client/tests/e2e/department-settings.spec.ts": "model-management.md",
-    "client/tests/e2e/home.spec.ts": "app-and-interface.md",
-    "client/tests/e2e/project.spec.ts": "model-management.md",
-    "client/tests/e2e/shell.spec.ts": "web-interface-and-release.md",
-    "client/tests/unit/translate-tables.test.ts": "test-pyramid.md",
-    "client/tests/unit/view-sync.test.js": "test-pyramid.md",
-    "evals/tests/test_report.py": "test-pyramid.md",
-    "evals/runner/yudao.py:488": "existing-project-onboarding.md",
-    "evals/runner/yudao.py:531": "existing-project-onboarding.md",
-    # 讲几份说明的文件：逐行定
-    "harness/orchestrator.py:528": "existing-project-onboarding.md",
-    "harness/orchestrator.py:652": "skeleton-and-application.md",
-    "harness/orchestrator.py:957": "loops-and-convergence.md",
-    "harness/orchestrator.py:1758": "skeleton-and-application.md",
-    "harness/app/project_queries.py:86": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:547": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:620": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:725": "department-loop.md",
-    "harness/app/project_queries.py:1120": "model-management.md",
-    "harness/app/project_queries.py:1200": "model-management.md",
-    "harness/app/project_queries.py:2275": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:2286": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:2337": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:2416": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:2448": "existing-project-onboarding.md",
-    "harness/app/project_queries.py:2878": "model-management.md",
-    "harness/app/payloads.py:916": "independent-verification.md",
-    "harness/app/payloads.py:1834": "rules-and-parameters.md",
-    "harness/app/catalog_queries.py:220": "app-and-interface.md",
-    "harness/definitions/__init__.py:319": "model-management.md",
-    "harness/decision_flow.py:178": "skeleton-and-application.md",
-    "harness/recovery.py:407": "browser-and-computer-use.md",
-    "harness/tightening.py:632": "existing-project-onboarding.md",
-    "harness/tightening.py:1433": "execution-environment.md",
-    "harness/tests/kernel/test_only_grows.py:132": "trusted-kernel.md",
-    "harness/tests/kernel/test_only_grows.py:165": "trusted-kernel.md",
-}
-
-# 逐行定的那些（讲几份说明的文件）：这一行指的是哪一份
-LINE_MAPPING: dict[str, str] = {
-    "harness/__main__.py:44": "web-interface-and-release.md",
-    "harness/__main__.py:121": "web-interface-and-release.md",
-    "harness/app/catalog_queries.py:220": "app-and-interface.md",
-    "harness/app/catalog_queries.py:383": "app-and-interface.md",
-    "harness/app/form_commands.py:7": "project-organization.md",
-    "harness/context.py:339": "existing-project-onboarding.md",
-    "harness/context.py:438": "existing-project-onboarding.md",
-    "harness/context.py:666": "existing-project-onboarding.md",
-    "harness/decision_flow.py:178": "existing-project-onboarding.md",
-    "harness/definitions/__init__.py:202": "model-management.md",
-    "harness/definitions/__init__.py:319": "browser-and-computer-use.md",
-    "harness/definitions/__init__.py:397": "skeleton-and-application.md",
-    "harness/definitions/__init__.py:467": "skeleton-and-application.md",
-    "harness/definitions/__init__.py:592": "skeleton-and-application.md",
-    "harness/definitions/__init__.py:713": "model-management.md",
-    "harness/definitions/__init__.py:745": "model-management.md",
-    "harness/definitions/__init__.py:872": "skeleton-and-application.md",
-    "harness/definitions/__init__.py:876": "skeleton-and-application.md",
-    "harness/definitions/__init__.py:892": "skeleton-and-application.md",
-    "harness/definitions/__init__.py:1354": "skeleton-and-application.md",
-    "harness/kernel_events.py:84": "existing-project-onboarding.md",
-    "harness/kernel_events.py:90": "existing-project-onboarding.md",
-    "harness/kernel_events.py:99": "existing-project-onboarding.md",
-    "harness/projects.py:1586": "model-management.md",
-    "harness/tests/kernel/test_only_grows.py:165": "skeleton-and-application.md",
-    "harness/tests/test_startup_reload.py:157": "app-and-interface.md",
-    "harness/tests/test_startup_reload.py:312": "model-management.md",
-    "harness/tightening.py:254": "skeleton-and-application.md",
-    "harness/tightening.py:266": "skeleton-and-application.md",
-    "harness/tightening.py:282": "skeleton-and-application.md",
-    "harness/tightening.py:288": "skeleton-and-application.md",
-    "harness/tightening.py:381": "skeleton-and-application.md",
-    "harness/tightening.py:515": "skeleton-and-application.md",
-    "harness/tightening.py:556": "skeleton-and-application.md",
-    "harness/tightening.py:1433": "browser-and-computer-use.md",
-    "harness/app/project_queries.py": "app-and-interface.md",
-    # 审查逐条指出的（第 2 轮审查）
-    "harness/direct.py:91": "skeleton-and-application.md",
-    "harness/direct.py:616": "skeleton-and-application.md",
-    "harness/runtime.py:171": "existing-project-onboarding.md",
-    "harness/definitions/__init__.py:219": "forms-and-verifier-role.md",
-    "harness/definitions/__init__.py:255": "forms-and-verifier-role.md",
-    "harness/definitions/__init__.py:827": "forms-and-verifier-role.md",
-    "harness/definitions/__init__.py:1156": "forms-and-verifier-role.md",
-    "harness/definitions/__init__.py:1181": "forms-and-verifier-role.md",
-    "harness/recovery.py:409": "browser-and-computer-use.md",
-    "harness/recovery.py:452": "browser-and-computer-use.md",
-    "harness/recovery.py:506": "browser-and-computer-use.md",
-    "harness/recovery.py:525": "browser-and-computer-use.md",
-    "harness/recovery.py:539": "browser-and-computer-use.md",
-    "harness/tests/kernel/test_only_grows.py:6": "skeleton-and-application.md",
-    "harness/tests/kernel/test_only_grows.py:9": "skeleton-and-application.md",
-    "harness/tests/kernel/test_only_grows.py:36": "skeleton-and-application.md",
-    "harness/tests/kernel/test_only_grows.py:127": "skeleton-and-application.md",
-    "harness/app/project_queries.py:1566": "model-management.md",
-    "harness/orchestrator.py:957": "loops-and-convergence.md",
-    "harness/tightening.py:815": "existing-project-onboarding.md",
-    "harness/tests/test_event_kind_registration.py:1": "skeleton-and-application.md",
-    "harness/tests/test_event_kind_registration.py:27": "skeleton-and-application.md",
-    "harness/tests/test_issue_16_recovery.py:256": "recovery-contract-and-fault-matrix.md",
-    "harness/tests/test_provider_protocols.py:493": "model-management.md",
-}
-
-# 文件级的对照表与「文件:行」的条目一起用：mapping_doc 先查「文件:行」，再查文件，最后查目录。
-MAPPING.update(FILE_MAPPING)
-# 逐行的条目最后放：同一个键两边都有时以逐行的为准
-MAPPING.update(LINE_MAPPING)
-
-# 整份改写、节号对不上的，按内容对上现在的小节（工单 #1411 的「自定的边界」）。
-TITLE_OVERRIDES: dict[str, str] = {
-    "harness/definitions/rules.json:220": "审查者的上下文",
-    "harness/definitions/rules.json:572": "角色清单",
-    # 原来的节号在现在这份说明里没有了（那一节改过名或并进了别的一节），按内容对上现在的小节
-    "harness/__main__.py:44": "数据目录",
-    "harness/__main__.py:121": "数据目录",
-    "harness/app/catalog_queries.py:220": "查询清单",
-    "harness/app/catalog_queries.py:383": "查询清单",
-    "harness/definitions/__init__.py:319": "工具定义的声明",
-    "harness/definitions/__init__.py:713": "服务方案预置表与模型能力表",
-    "harness/tests/test_startup_reload.py:312": "目录文件重新读取",
-    "harness/tests/kernel/test_only_grows.py:6": "骨架事件与应用事件",
-    "harness/tests/kernel/test_only_grows.py:9": "骨架事件与应用事件",
-    "harness/tests/kernel/test_only_grows.py:36": "骨架事件与应用事件",
-    "harness/tests/kernel/test_only_grows.py:127": "骨架事件与应用事件",
-    "harness/app/project_queries.py:1566": "部门工作间",
-    "harness/__main__.py:128": "命令行",
-    "harness/tests/test_startup_reload.py:157": "命令行",
-    "evals/runner/yudao_report.py:545": "Yudao 对单个 agent",
-    "harness/orchestrator.py:957": "一定会停",
-    "harness/tests/test_event_kind_registration.py:1": "骨架事件与应用事件",
-    "harness/tests/test_event_kind_registration.py:27": "骨架事件与应用事件",
-    "harness/tests/test_issue_16_recovery.py:256": "执行权与一致边界",
-    "harness/tests/test_provider_protocols.py:493": "失败处理",
-    "harness/tightening.py:1433": "启动方式",
-    "harness/decision_flow.py:178": "用户确认与修改的往返",
-    "harness/tests/kernel/test_only_grows.py:165": "可信内核",
-    "harness/recovery.py:318": "角色任务的恢复",
-    "harness/recovery.py:349": "角色任务的恢复",
-}
-# 这两处写的是「恢复契约第 5.2 节」：那一份说明现在把恢复讲在第 5 节里，没有 5.2 这样的小节
-MAPPING["harness/recovery.py:318"] = "recovery-contract-and-fault-matrix.md"
-MAPPING["harness/recovery.py:349"] = "recovery-contract-and-fault-matrix.md"
+# ⑤ 人定：逐行的决定，每行写依据。行号会变，按「文件 + 那一行的片段」认。
+# 元组依次是：文件、行里的片段、只对哪个节号生效（空表示都一样）、说明、改写成的节号
+# （空表示按注释里的节号）、依据。
+# 进来的两类：同一段没有点名是哪份说明、注释原句全库只命中一份说明的；架构师在工单评论里
+# 逐条给出目标的（上一轮审查的「说明选错 8 处」）。
+LINE_DECISIONS: tuple[tuple[str, str, str, str, str, str], ...] = (
+    (
+        "harness/kernel_events.py",
+        "模型目录与凭据事件（设计第 10 节）",
+        "",
+        "app-and-interface.md",
+        "",
+        "写这行的提交里，注释原句「内容由 Provider 保存」「不含 Key」全库只命中应用层与接口层"
+        "第 10 节「决定」第 1 条「模型目录与凭据的写入」（工单 #1411 架构师评论实测）",
+    ),
+    (
+        "harness/tools.py",
+        "设计说明第 5.6 节「请求时」",
+        "5.6",
+        "browser-and-computer-use.md",
+        "6.2",
+        "架构师评论：这一处说的是截图进请求，真出处是浏览器与 computer use「请求中的图像」；"
+        "写这行的提交里那一节是第 6.2 节",
+    ),
+    (
+        "harness/providers/responses.py",
+        "Responses 的图像输入写法",
+        "6.2",
+        "browser-and-computer-use.md",
+        "6.2",
+        "架构师评论：这一处是浏览器与 computer use「请求中的图像」；写这行的提交里那一节是第 6.2 节",
+    ),
+    (
+        "harness/__main__.py",
+        "访问方式（设计说明第 6.2 节）",
+        "6.2",
+        "app-and-interface.md",
+        "6.2",
+        "架构师评论：这一处是应用层与接口层「访问方式与认证」；写这行的提交里那一节是第 6.2 节",
+    ),
+    (
+        "harness/tests/test_cli_entry.py",
+        "模型目录与凭据文件的默认位置（工单 #298，设计说明第 3.4 节）",
+        "3.4",
+        "web-interface-and-release.md",
+        "3.3",
+        "架构师评论：这一处是网页界面的提供与发布「数据目录」；写这行的提交里那一节是第 3.3 节",
+    ),
+    (
+        "harness/orchestrator.py",
+        "工单 #16，ADR-0018、恢复契约第 5.2 节",
+        "5.2",
+        "recovery-contract-and-fault-matrix.md",
+        "5",
+        "架构师评论：与 recovery.py 的两处一致；恢复契约讲恢复的是第 5 节「角色任务的恢复」，没有第 5.2 节",
+    ),
+    (
+        "harness/recovery.py",
+        "启动时继续一个未结束的 run（恢复契约第 5.2 节",
+        "5.2",
+        "recovery-contract-and-fault-matrix.md",
+        "5",
+        "架构师评论：恢复契约讲恢复的是第 5 节「角色任务的恢复」，没有第 5.2 节",
+    ),
+    (
+        "harness/recovery.py",
+        "ADR-0018、恢复契约第 5.2 节",
+        "5.2",
+        "recovery-contract-and-fault-matrix.md",
+        "5",
+        "架构师评论：恢复契约讲恢复的是第 5 节「角色任务的恢复」，没有第 5.2 节",
+    ),
+    (
+        "harness/definitions/__init__.py",
+        "认证方式（设计说明第 4.3 节）",
+        "4.3",
+        "model-management.md",
+        "",
+        "架构师评论：这一处是模型管理第 4.3 节「模型访问定义与准入」",
+    ),
+    (
+        "harness/definitions/__init__.py",
+        "默认协议：模型没有单独声明协议时预填（设计说明第 4.1 节）",
+        "4.1",
+        "model-management.md",
+        "",
+        "架构师评论：这一处是模型管理第 4.1 节「服务方案预置表与模型能力表」",
+    ),
+    (
+        "harness/definitions/__init__.py",
+        "服务方案预置表（设计说明第 4.1 节）",
+        "4.1",
+        "model-management.md",
+        "",
+        "架构师评论：这一处是模型管理第 4.1 节「服务方案预置表与模型能力表」",
+    ),
+    (
+        "harness/projects.py",
+        "并发修改时按版本拒绝后提交的修改（设计说明第 5.2 节）",
+        "5.2",
+        "model-management.md",
+        "",
+        "架构师评论：这一处是模型管理第 5.2 节「项目部门设置与项目角色设置」",
+    ),
+)
 
 # 工单 #1411 的「只改」没有把这几处包含进来（用例名、`routings.json` 的 `why`、
 # 用户能看到的文字常量），脚本不动它们，原样保留节号；守卫同样不报。按「文件 + 那一行的片段」记，
@@ -460,7 +326,7 @@ PROTO_AS_IS: tuple[tuple[str, str], ...] = (
     ("client/tests/e2e/shell.spec.ts", "连接断开时窗口整体变灰"),
 )
 
-# 工单 #1411 正文第 3 步点名的几行：那里的第 12 节是已删去的「从现有代码过去的路径」，
+# 工单 #1411 正文点名的几行：那里的第 12 节是已删去的「从现有代码过去的路径」，
 # 这一部分引用去掉，其余照旧（当时 blame 到的那一版小节名叫「模块交互」，不能按改名换算）。
 DROP_SECTIONS: tuple[tuple[str, str], ...] = (
     ("harness/decision_flow.py:1", "12"),
@@ -470,36 +336,7 @@ DROP_SECTIONS: tuple[tuple[str, str], ...] = (
     ("harness/tests/test_second_routing.py:1", "12"),
 )
 
-
-# 按行里的文字锚定的对照表：合并 main 以后行号会移动，按「文件:行」的条目会失准。
-# 这一组按那一行里的一段文字认（文件 + 片段 → 说明、标题与节号），行号变了也命中。
-# 同一行里有几个节号、各自属于不同的小节时，最后一项写明这条只对哪个节号生效；
-# 其余节号照常按编号换算。标题写 None 的按编号（「第 N 节第 M 项」按那一项的名字）换算。
-TEXT_MAPPING: tuple[tuple[str, str, str, str | None, str | None], ...] = (
-    ("harness/runtime.py", "启动时补建缺少的建档修改轮 run", "existing-project-onboarding.md", "失败与中断", None),
-    ("harness/tests/kernel/test_skeleton_events.py", "应用登记一种新的种类不改内核文件", "skeleton-and-application.md", None, None),
-    ("harness/tests/kernel/test_skeleton_events.py", "应用登记一种新的应用事件", "skeleton-and-application.md", None, None),
-    ("harness/tests/kernel/test_definitions_decide.py", "工单 #1098", "skeleton-and-application.md", None, None),
-    ("harness/tests/kernel/test_skeleton_events.py", "这张表与设计说明", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
-    ("harness/tests/kernel/test_skeleton_events.py", "这张表与设计说明", "skeleton-and-application.md", "最小投影", "4"),
-    ("harness/tests/kernel/test_skeleton_events.py", "所以它也在表里", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
-    ("harness/tests/kernel/test_skeleton_events.py", "所以它也在表里", "skeleton-and-application.md", "最小投影", "4"),
-    ("harness/tests/kernel/test_skeleton_events.py", "第二环的合同", "test-pyramid.md", "测试按三环留", "13"),
-    ("harness/tests/kernel/test_skeleton_events.py", "第二环的合同", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
-    ("harness/tests/kernel/test_skeleton_events.py", "一列，加", "skeleton-and-application.md", "骨架事件与应用事件", "7"),
-    ("harness/tests/kernel/test_skeleton_events.py", "一列，加", "skeleton-and-application.md", "最小投影", "4"),
-    ("client/tests/unit/view-sync.test.js", "工单 #952 验收标准 1", "app-and-interface.md", "合同", None),
-    ("evals/tests/test_report.py", "评分器给出的完成度", "evaluation-scenarios.md", "指标", None),
-    ("evals/tests/test_report.py", "只有一次运行时噪声范围", "evaluation-scenarios.md", "指标", None),
-    ("evals/tests/test_report.py", "模型容量的取值与来源", "evaluation-scenarios.md", None, None),
-    ("harness/tests/test_prompts.py", "守 R3（独立核验", "independent-verification.md", None, None),
-    ("harness/engine.py", "用户追加的输入在这个会话的下一步", "department-loop.md", None, None),
-    ("harness/engine.py", "这个会话采用这一版输入版本", "department-loop.md", None, None),
-)
-
 # 已经删去的小节：指向它的那一部分引用去掉，注释的其余部分照旧。
-
-# （工单 #1411 正文第 3 步点名的四处，加上清理时删去的两处。）
 DELETED: set[tuple[str, str]] = {
     ("skeleton-and-application.md", "从现有代码过去的路径"),
     ("skeleton-and-application.md", "从现有代码过去的路径（工单）"),
@@ -528,11 +365,11 @@ SLICE_RE = re.compile(r"\s*S\d[a-z]?")
 
 COMMENT_STARTS = ("#", "//", "*", "/*", "*/", "--", '"""', "'''")
 TAIL_OK = re.compile(r"(设计说明|设计|文档|说明)?[\s）)。，、：:；;]*")
-NAME_SUFFIX = re.compile(r"(设计说明|设计|文档|说明)$")
+NAME_SUFFIX = re.compile(r"(设计说明|设计|文档|说明|design|Design)$")
 GAP_OK = re.compile(r"(?:[\s）)、，,（(：:；;的]|设计说明|设计|文档|说明)*")
 BLAME_LINE_RE = re.compile(r"^([0-9a-f]{40}) \d+ \d+")
-
-# 以下几类推断要在注释里补上文档路径；名字写在同一段注释里的只写「小节标题」。
+# 比原句时去掉空白与标点：注释与设计说明的排版不同，字是一样的
+PUNCT_RE = re.compile(r"[\s，。、；：（）()「」『』“”\"'*`#…·!！?？=+<>《》〔〕【】\-—/\\|]+")
 
 
 def run(cmd: list[str]) -> str:
@@ -599,10 +436,11 @@ def doc_at(commit: str, doc: str) -> str | None:
 
 @lru_cache(maxsize=None)
 def blame_commits(path: str) -> tuple[str, ...]:
-    key = f"blame:{path}"
+    """每一行是哪个提交写的。跟改名与搬家（-M -C -C）：工单 #1411「换算的规矩」第 3 条。"""
+    key = f"blame-mc:{path}"
     if key in _CACHE:
         return tuple(_CACHE[key])  # type: ignore[arg-type]
-    out = run(["git", "blame", "--line-porcelain", "--", path])
+    out = run(["git", "blame", "-M", "-C", "--line-porcelain", "--", path])
     commits = tuple(m.group(1) for m in map(BLAME_LINE_RE.match, out.splitlines()) if m)
     _CACHE[key] = list(commits)  # type: ignore[assignment]
     return commits
@@ -625,8 +463,11 @@ def renames() -> dict[str, set[str]]:
     return dict(table)
 
 
+COMMENT_ONLY = ("#", "//", "*", "/*", "*/", "--")
+
+
 def header_block(lines: tuple[str, ...]) -> str:
-    """文件开头的说明：第一段连续的注释或模块文档字符串。"""
+    """文件开头的说明：第一段连续的注释或模块文档字符串（遇到只有注释符号的空行就停）。"""
     i = 0
     while i < len(lines) and not lines[i].strip():
         i += 1
@@ -638,6 +479,8 @@ def header_block(lines: tuple[str, ...]) -> str:
                 break
             i += 1
             continue
+        if block and t in COMMENT_ONLY:
+            break
         if t.startswith(COMMENT_STARTS) or t.startswith('"') or t.startswith("'"):
             block.append(lines[i])
         else:
@@ -670,14 +513,12 @@ def mentions(text: str) -> list[tuple[int, int, str]]:
     for m in DOC_PATH_RE.finditer(text):
         if m.group(1) in all_docs():
             hits.append((m.start(), m.end(), m.group(1)))
-    # 注释里也有只写文件名或文件名的词干的（`local-tools 第 2 节`、`test-pyramid 第 2 节`）
     for m in re.finditer(r"([\w-]+)\.md", text):
         if f"{m.group(1)}.md" in all_docs():
             hits.append((m.start(), m.end(), f"{m.group(1)}.md"))
     for stem, doc in doc_stems().items():
         for m in re.finditer(rf"(?<![\w./-]){re.escape(stem)}(?![\w-])", text):
             hits.append((m.start(), m.end(), doc))
-    # 去掉被更长的名字包住的（「网络与 MCP」包在「网络取回与 MCP」里）
     hits.sort(key=lambda h: (h[0], -(h[1] - h[0])))
     kept: list[tuple[int, int, str]] = []
     for h in hits:
@@ -706,11 +547,7 @@ def nearest_before(text: str, pos: int, hits: list[tuple[int, int, str]]) -> str
 
 
 def bare_name_before(text: str, pos: int, doc: str) -> int | None:
-    """紧挨在 pos 前面的是设计说明的**文件名**（`local-tools`、`test-pyramid`）时，给出它的起点。
-
-    这种写法要把文件名一起换成路径（工单 #1411 第 4 步的写法），只写「小节标题」会留下
-    「local-tools 「工作区」」这种半截的引用。
-    """
+    """紧挨在 pos 前面的是设计说明的**文件名**（`local-tools`、`test-pyramid`）时，给出它的起点。"""
     for start, end, hit_doc in mentions(text):
         if hit_doc == doc and end <= pos and GAP_OK.fullmatch(text[end:pos]) and text[start:end] == Path(doc).stem:
             return start
@@ -718,14 +555,13 @@ def bare_name_before(text: str, pos: int, doc: str) -> int | None:
 
 
 def excluded_before(text: str, pos: int) -> str | None:
-    """紧挨在节号前面的「原型 v8」「ADR-0007」「docs/requirements/x.md」这类词。"""
+    """紧挨着节号前面的「原型 v8」「ADR-0007」「docs/requirements/x.md」这类词。"""
     for pat in EXCLUDED_TOKENS:
         for m in re.finditer(pat, text):
             if m.end() <= pos:
                 if GAP_OK.fullmatch(text[m.end() : pos]):
                     return m.group(0)
             elif m.start() < pos <= m.end():
-                # 贪婪匹配（「路线图…第 6.1 节」）把节号一起吞掉了：这一处仍然算别的文档
                 return m.group(0)
     return None
 
@@ -751,20 +587,22 @@ class Ref:
     how: str = ""
     title: str | None = None
     status: str = "未定"
-    score: float = 0.0
     quote: str = ""
     named: bool = False
-    pinned: str | None = None
-    pinned_strict: bool = False
     bare: bool = False
+    commit: str = ""
+    old: str = ""
+    now: str = ""
+    evidence: str = ""
+    reason: str = ""
 
     @property
     def ok(self) -> bool:
-        return self.status == "ok"
+        return self.status == "换算"
 
     @property
     def dropped(self) -> bool:
-        return self.status.startswith("去掉")
+        return self.status == "去掉"
 
 
 @dataclass
@@ -788,32 +626,15 @@ class Group:
 
 @lru_cache(maxsize=None)
 def proto_file(path: str) -> bool:
-    """这份文件是照原型的设计做的：客户端文件的**开头**声明了「原型 vN 设计说明第 K 节」。
-
-    工单 #1411 把引用原型的节号排除在外；客户端页面是原型的移植，注释里的无主节号指的是原型，
-    不是 docs/design 下的某一份。只在文件开头声明时成立：正文里偶尔提一次原型不再整文件豁免。
-    """
+    """这份文件是照原型的设计做的：客户端文件的**开头**声明了「原型 vN 设计说明第 K 节」。"""
     if not path.startswith("client/"):
         return False
     for m in PROTO_RE.finditer(header_block(file_lines(path))):
         head = m.group(0).rsplit("第", 1)[0]
         if "与设计说明" in head or "及设计说明" in head:
-            # 「原型 v10 floor.js 的绘制部分与设计说明第 5.2 节」：这一处指的是设计说明本身
             continue
         return True
     return False
-
-
-def mapping_doc(path: str, line: int | None = None) -> str | None:
-    """对照表：先按「文件:行」，再按文件，最后按目录。"""
-    if line is not None and f"{path}:{line}" in MAPPING:
-        return MAPPING[f"{path}:{line}"]
-    if path in MAPPING:
-        return MAPPING[path]
-    for key, doc in MAPPING.items():
-        if key.endswith("/") and path.startswith(key):
-            return doc
-    return None
 
 
 def in_scope(path: str) -> bool:
@@ -884,112 +705,53 @@ def renamed(doc: str, old: str) -> str | None:
     return cands.pop() if len(cands) == 1 else None
 
 
-def title_for(ref: Ref, doc: str) -> tuple[str | None, str]:
-    """这一处指向 doc 的哪一节，写成「标题」或「标题」中「项名」；连带状态一起给出。
-
-    先按编号找小节；编号形如「N.M」而 N.M 不是小节时，按第 N 节的第 M 项找（注释里
-    带小数点的编号有时指的是「第 N 节的第 M 项」）。
-    """
-
-    commit = commit_of(ref)
-    hist = doc_at(commit, doc) if commit else None
-    if hist is None:
-        now = now_headings(doc)
-        if ref.sec in now:
-            return render_ref(ref, doc, now[ref.sec], hist), "ok"
-        return None, f"没有第 {ref.sec} 节"
-    headings = dict(doc_headings(hist))
-    old = headings.get(ref.sec)
-    if old is not None:
-        if (doc, old) in DELETED:
-            return None, f"去掉（{old} 已删去）"
-        title = renamed(doc, old)
-        if title:
-            return render_ref(ref, doc, title, hist), "ok"
-        return None, f"旧标题「{old}」对不到现在的小节"
-    base, _dot, last = ref.sec.rpartition(".")
-    if base and last.isdigit() and base in headings:
-        items = item_texts(hist, base)
-        index = int(last)
-        if 1 <= index <= len(items):
-            name = items[index - 1][1]
-            home = item_home(doc, name)
-            if home:
-                return "「" + home + "」中「" + name + "」", "ok"
-            return None, f"第 {base} 节的第 {index} 项「{name}」现在不在说明里"
-    return None, f"当时那份说明没有第 {ref.sec} 节"
-
-
-def item_home(doc: str, name: str) -> str | None:
-    """一项现在在哪一节里。"""
-    for num, title in now_headings(doc).items():
-        if any(item == name for _, item in item_texts(current_doc(doc), num)):
+def heading_in(doc_text: str, sec: str) -> str | None:
+    """一份说明里第 sec 节的标题。"""
+    for num, title in doc_headings(doc_text):
+        if num == sec:
             return title
     return None
 
 
-def quote_key(text: str) -> str:
-    """引号写法不同（「」与『』）的同一个名字按同一个键比。"""
-    return text.replace("『", "「").replace("』", "」").replace("“", "「").replace("”", "」")
+def section_body(doc_text: str, sec: str) -> str:
+    """一份说明里第 sec 节的正文（到下一节为止）。"""
+    lines = doc_text.splitlines()
+    start = None
+    for i, line in enumerate(lines):
+        if HEADING_RE.match(line) and HEADING_RE.match(line).group(2) == sec:  # type: ignore[union-attr]
+            start = i + 1
+            break
+    if start is None:
+        return ""
+    out: list[str] = []
+    for line in lines[start:]:
+        if HEADING_RE.match(line):
+            break
+        out.append(line)
+    return "\n".join(out)
 
 
-def item_ref(name: str) -> str:
-    """一项的名字包在「」里；名字自身带引号、又不配对时不再补，免得写出落单的」。"""
-    if name.startswith("「") and name.count("「") == name.count("」"):
-        return name
-    if name.count("「") < name.count("」"):
-        return "「" + name
-    if name.count("「") > name.count("」"):
-        return name + "」"
-    return "「" + name + "」"
+@lru_cache(maxsize=None)
+def bare_title(title: str) -> str:
+    """标题去掉整体的「」包裹（标题里的引号不删）。"""
+    t = title.strip()
+    if len(t) >= 2 and t.startswith("「") and t.endswith("」"):
+        return t[1:-1]
+    return t
 
 
-def render_ref(ref: Ref, doc: str, title: str, hist: str | None) -> str:
-    """一节一处的写法：小节标题；带项号或后面已有引号的，保留那一项的名字。"""
-    if ref.items and hist is not None:
-        old_items = dict(item_texts(hist, ref.sec))
-        names = []
-        for n in ref.items:
-            name = old_items.get(str(n))
-            if not name or item_home(doc, name) is None:
-                names = []
-                break
-            names.append(name)
-        if names and all(len(name) <= 30 for name in names):
-            return "「" + title + "」中" + "".join(item_ref(name) for name in names)
-    quote = quote_after(ref)
-    if quote:
-        if quote == title or quote in title or quote_key(quote.strip("「」")) == quote_key(title):
-            ref.end = max(ref.end, quote_end(ref))
-        elif quote in body_by_title(doc, title):
-            ref.end = max(ref.end, quote_end(ref))
-            return "「" + title + "」中「" + quote + "」"
-    return "「" + title + "」"
-
-
-def item_names(ref: Ref, doc: str) -> list[str] | None:
-    """第 N 节第 M 项：那一项当时的名字，且现在还在同一节里。"""
-    if not ref.items:
-        return None
-    commit = commit_of(ref)
-    hist = doc_at(commit, doc) if commit else None
-    if hist is None:
-        return None
-    old_items = dict(item_texts(hist, ref.sec))
-    now_items = {name for _, name in item_texts(current_doc(doc), current_num(doc, ref.title or ""))}
-    names = []
-    for n in ref.items:
-        name = old_items.get(str(n))
-        if not name or name not in now_items:
-            return None
-        names.append(name)
-    return names
-
-
-def current_num(doc: str, title: str) -> str:
-    for num, t in now_headings(doc).items():
-        if t == title.strip("「」"):
-            return num
+def body_by_title(doc: str, title: str) -> str:
+    """一份说明里某一节的正文（到下一节为止）：现在的版本。"""
+    lines = current_doc(doc).splitlines()
+    for i, line in enumerate(lines):
+        m = HEADING_RE.match(line)
+        if m and bare_title(m.group(3)) == bare_title(title):
+            out = [line]
+            for later in lines[i + 1 :]:
+                if HEADING_RE.match(later):
+                    break
+                out.append(later)
+            return "\n".join(out)[:8000]
     return ""
 
 
@@ -1015,69 +777,27 @@ def item_texts(doc_text: str, sec: str) -> list[tuple[str, str]]:
 
 
 def item_name(text: str) -> str:
-    """一项的名字：去掉加粗与句读，照抄到底，不截断（截断会把标题断在半句上）。"""
+    """一项的名字：去掉加粗与句读，取第一句，不截断。"""
     t = re.sub(r"^\*\*(.+?)\*\*\s*", r"\1", text.strip())
     t = re.split(r"[。：:（(]\s*", t, maxsplit=1)[0]
-    return t.strip("* 「」")
+    return t.strip("* ")
 
 
-@lru_cache(maxsize=None)
-def body_by_title(doc: str, title: str) -> str:
-    """一份设计说明里某一节的正文（到下一节为止），用来与注释的文字比对。"""
-    lines = current_doc(doc).splitlines()
-    for i, line in enumerate(lines):
-        m = HEADING_RE.match(line)
-        if m and m.group(3).strip().strip("「」") == title.strip("「」"):
-            out = [line]
-            for later in lines[i + 1 :]:
-                if HEADING_RE.match(later):
-                    break
-                out.append(later)
-            return "\n".join(out)[:8000]
-    return ""
+def item_ref(name: str) -> str:
+    """一项的名字包在「」里；名字自身带引号的原样写，不再补一对。"""
+    if "「" in name or "」" in name:
+        return name
+    return "「" + name + "」"
 
 
-def bigrams(text: str) -> set[str]:
-    return {text[i : i + 2] for i in range(len(text) - 1) if text[i].strip() and text[i + 1].strip()}
+def item_at(doc_text: str, sec: str, n: int) -> str:
+    items = item_texts(doc_text, sec)
+    return items[n - 1][1] if 1 <= n <= len(items) else ""
 
 
-@lru_cache(maxsize=None)
-def bigram_df() -> dict[str, int]:
-    """每个字符二元组出现在多少节的正文里（越少越有区分度）。"""
-    df: Counter[str] = Counter()
-    for doc in all_docs():
-        for title in now_headings(doc).values():
-            df.update(bigrams(body_by_title(doc, title)))
-    return dict(df)
-
-
-def similarity(text: str, doc: str, title: str) -> float:
-    """注释的文字覆盖那一节正文的程度：按二元组在全部小节里的常见程度加权。"""
-    a = bigrams(text)
-    if not a:
-        return 0.0
-    body = bigrams(body_by_title(doc, title))
-    if not body:
-        return 0.0
-    df = bigram_df()
-    n = len(df) + 1
-    weight = {b: math.log(n / (1 + df.get(b, 0))) for b in a}
-    total = sum(weight.values())
-    return sum(weight[b] for b in a & body) / total if total else 0.0
-
-
-def line_text(ref: Ref) -> str:
-    return file_lines(ref.file)[ref.line - 1]
-
-
-def normalized_line(ref: Ref) -> str:
-    """同一句话在别处出现时用来认：去掉空白与行首的注释符号。"""
-    return re.sub(r"\s+", "", re.sub(r"^\s*(?:#|//|\*|/\*|--)+", "", line_text(ref)))
-
-
-def comment_text(ref: Ref) -> str:
-    """这一行与同一段注释的上面几行，用来与设计说明比文字。"""
-    return block_above(file_lines(ref.file), ref.line) + "\n" + line_text(ref)
+def quote_key(text: str) -> str:
+    """引号写法不同（「」与『』）的同一个名字按同一个键比。"""
+    return text.replace("『", "「").replace("』", "」").replace("“", "「").replace("”", "」")
 
 
 def quote_after(ref: Ref) -> str:
@@ -1094,258 +814,492 @@ def quote_end(ref: Ref) -> int:
     return m.end() if m and m.start() - ref.end <= 4 else ref.end
 
 
-def consider(ref: Ref, doc: str, how: str) -> bool:
-    """按一份候选设计说明换算这一处；成功就记下。"""
-    title, status = title_for(ref, doc)
-    if title is None:
-        ref.status = status
-        return False
-    ref.doc, ref.how, ref.title, ref.status = doc, how, title, "ok"
-    return True
+def line_text(ref: Ref) -> str:
+    return file_lines(ref.file)[ref.line - 1]
 
 
-def score_of(ref: Ref, doc: str) -> float:
-    """这一处注释与那份说明的那一节有多相符（用于在几个候选里挑一个）。"""
-    title, status = title_for(ref, doc)
-    if title is None:
-        return -1.0
-    section = title.split("」")[0].lstrip("「")
-    text = comment_text(ref)
-    quote = quote_after(ref)
-    score = similarity(text, doc, section)
-    # 小节的标题里有一两个词就写在注释里（「规则清单」对「装配规则」）
-    title_grams = bigrams(section)
-    if title_grams:
-        score += 0.22 * len(title_grams & bigrams(text)) / len(title_grams)
-    if quote and (quote in title or quote in body_by_title(doc, section)):
-        score += 0.35
-    return round(score, 3)
+def squash(text: str) -> str:
+    return PUNCT_RE.sub("", text)
 
 
-def rank(ref: Ref, docs: list[str]) -> list[tuple[float, str, str]]:
-    """候选设计说明按与注释文字的相符程度排序：((得分, 文件, 写好的标题), ...)。"""
-    scored = []
-    for doc in dict.fromkeys(docs):
-        title, status = title_for(ref, doc)
-        if title is None:
+# ---------------------------------------------------------------- 证据
+
+
+@dataclass
+class Candidate:
+    """一处引用的一个候选说明：它凭什么被列为候选。"""
+
+    doc: str
+    tier: str
+    detail: str
+    hard: bool = False
+    sec: str = ""
+    strong: bool = True
+
+
+@dataclass
+class Decision:
+    """硬门槛的结论：写出的标题，或者去掉的理由。"""
+
+    ok: bool
+    title: str = ""
+    old: str = ""
+    now: str = ""
+    reason: str = ""
+
+
+@dataclass
+class Evidence:
+    """工单「依据」里点名的说明：有的带节号，有的带标题。"""
+
+    doc: str
+    sections: frozenset[str]
+    titles: frozenset[str]
+
+
+_ISSUE_CACHE: dict[str, str] = {}
+_ISSUE_LOADED = False
+_ISSUE_PATH: Path | None = None
+
+
+def load_issue_cache(path: str | None) -> None:
+    global _ISSUE_LOADED, _ISSUE_PATH
+    if path:
+        _ISSUE_PATH = Path(path)
+        if _ISSUE_PATH.exists():
+            _ISSUE_CACHE.update(json.loads(_ISSUE_PATH.read_text(encoding="utf-8")))
+    _ISSUE_LOADED = True
+
+
+def save_issue_cache() -> None:
+    if _ISSUE_PATH:
+        _ISSUE_PATH.write_text(json.dumps(_ISSUE_CACHE, ensure_ascii=False), encoding="utf-8")
+
+
+def issue_body(number: str) -> str:
+    if number in _ISSUE_CACHE:
+        return _ISSUE_CACHE[number]
+    print(f"取工单 #{number}", file=sys.stderr)
+    try:
+        body = run(["gh", "issue", "view", number, "--json", "body", "-q", ".body"])
+    except RuntimeError:
+        body = ""
+    _ISSUE_CACHE[number] = body
+    if len(_ISSUE_CACHE) % 10 == 0:
+        save_issue_cache()
+    return body
+
+
+def prefetch_issues(files: list[str]) -> None:
+    """把要用的工单一次批量取回来（逐个 gh 调用太慢）。"""
+    subjects: dict[str, str] = {}
+    for line in run(["git", "log", "--format=%H%x09%s"]).splitlines():
+        sha, _, subject = line.partition("\t")
+        subjects[sha] = subject
+    numbers: list[str] = []
+    for path in files:
+        try:
+            commits = blame_commits(path)
+        except RuntimeError:
             continue
-        scored.append((score_of(ref, doc), doc, title))
-    return sorted(scored, reverse=True)
+        for commit in commits:
+            number = issue_number(subjects.get(commit, ""))
+            if number and number not in _ISSUE_CACHE and number not in numbers:
+                numbers.append(number)
+    print(f"要取的工单 {len(numbers)} 个", file=sys.stderr)
+    for start in range(0, len(numbers), 40):
+        batch = numbers[start : start + 40]
+        fields = " ".join(f'i{n}: issue(number: {num}) {{ body }}' for n, num in enumerate(batch))
+        query = f'query {{ repository(owner: "bender2333", name: "yudao") {{ {fields} }} }}'
+        try:
+            out = run(["gh", "api", "graphql", "-f", f"query={query}"])
+            data = json.loads(out)["data"]["repository"]
+        except (RuntimeError, KeyError, json.JSONDecodeError):
+            data = {}
+        for n, num in enumerate(batch):
+            body = (data.get(f"i{n}") or {}).get("body") or ""
+            _ISSUE_CACHE[num] = body
+        print(f"  取到 {min(start + 40, len(numbers))}/{len(numbers)}", file=sys.stderr)
+    save_issue_cache()
 
 
-def section_by_text(ref: Ref, doc: str) -> tuple[str, float] | None:
-    """写明了哪份说明、但节号对不上现在的编号时，在这份说明的小节里按文字挑一节。
-
-    只在人定的或同行点名的说明里找，不跨说明猜；分不开或不明显时返回 None，留给对照表。
-    """
-    text = comment_text(ref)
-    quote = quote_after(ref)
-    scored: list[tuple[float, str]] = []
-    for title in now_headings(doc).values():
-        score = similarity(text, doc, title)
-        grams = bigrams(title)
-        if grams:
-            score += 0.30 * len(grams & bigrams(text)) / len(grams)
-        if quote and (quote in title or quote in body_by_title(doc, title)):
-            score += 0.40
-        scored.append((round(score, 3), title))
-    if not scored:
-        return None
-    scored.sort(reverse=True)
-    best, second = scored[0], (scored[1][0] if len(scored) > 1 else 0.0)
-    if best[0] >= 0.36 and best[0] >= 1.2 * second:
-        return "「" + best[1] + "」", best[0]
+def issue_number(subject: str) -> str | None:
+    """提交标题里的工单号：`工单 #1397：…`，或者 `（#1179） (#1323)` 里括号的那一个。"""
+    m = re.search(r"工单\s*#(\d+)", subject)
+    if m:
+        return m.group(1)
+    nums = list(re.finditer(r"#(\d+)", subject))
+    if len(nums) >= 2:
+        return nums[0].group(1)
     return None
+
+
+def section_numbers(text: str) -> frozenset[str]:
+    """一段文字里按节号提到的所有节：连写、范围、第 N 节第 M 项都算。"""
+    nums: set[str] = set()
+    for m in MULTI_RE.finditer(text):
+        nums.add(m.group(1))
+        nums.update(re.findall(r"\d+(?:\.\d+)*", m.group(2)))
+    for m in RANGE_RE.finditer(text):
+        nums.update(expand_range(m.group(1), m.group(2)))
+    for m in ITEM_RE.finditer(text):
+        nums.add(m.group(1))
+    for m in SECTION_RE.finditer(text):
+        nums.add(m.group(1))
+    return frozenset(nums)
+
+
+def parse_evidence(text: str) -> tuple[Evidence, ...]:
+    """工单「依据」一行里的说明、节号与标题。"""
+    if "依据" not in text:
+        return ()
+    line = text.split("依据", 1)[1]
+    hits = [h for h in mentions(line) if h[2] in all_docs()]
+    out: list[Evidence] = []
+    for i, (start, end, doc) in enumerate(hits):
+        nxt = hits[i + 1][0] if i + 1 < len(hits) else len(line)
+        span = line[end:nxt]
+        sections = section_numbers(span)
+        titles = frozenset(m.group(1) for m in QUOTE_RE.finditer(span))
+        out.append(Evidence(doc, sections, titles))
+    return tuple(out)
+
+
+@lru_cache(maxsize=None)
+def issue_evidence(commit: str) -> tuple[str, tuple[Evidence, ...]]:
+    """写这条注释的提交对应的工单号与「依据」里点名的说明。"""
+    subject = run(["git", "log", "-1", "--format=%s", commit]).strip()
+    number = issue_number(subject)
+    if not number:
+        return "", ()
+    body = issue_body(number)
+    if "工单" in body and "依据" not in body:
+        # 拿到的是 PR 本身：按 PR 正文里写的工单号再取一次
+        m = re.search(r"工单\s*#(\d+)", body)
+        if m:
+            number = m.group(1)
+            body = issue_body(number)
+    return number, parse_evidence(body)
+
+
+@lru_cache(maxsize=None)
+def header_attribution(path: str) -> tuple[tuple[str, frozenset[str]], ...]:
+    """文件开头的归属：开头把哪些节写给了哪份说明。"""
+    header = header_block(file_lines(path))
+    hits = [h for h in mentions(header) if h[2] in all_docs()]
+    out: list[tuple[str, frozenset[str]]] = []
+    for i, (start, end, doc) in enumerate(hits):
+        nxt = hits[i + 1][0] if i + 1 < len(hits) else len(header)
+        span = header[end:nxt]
+        sections = section_numbers(span)
+        if (doc, sections) not in out:
+            out.append((doc, sections))
+    return tuple(out)
+
+
+@lru_cache(maxsize=None)
+def unique_quotes() -> tuple[dict[str, frozenset[str]], dict[str, frozenset[str]]]:
+    """全库唯一的标题与条目名：引用「X」时只可能指到一份说明。"""
+    by_title: dict[str, set[str]] = defaultdict(set)
+    by_item: dict[str, set[str]] = defaultdict(set)
+    for doc in all_docs():
+        for num, title in now_headings(doc).items():
+            by_title[title].add(doc)
+            for _n, name in item_texts(current_doc(doc), num):
+                if name:
+                    by_item[name].add(doc)
+    return (
+        {t: frozenset(docs) for t, docs in by_title.items() if len(docs) == 1},
+        {t: frozenset(docs) for t, docs in by_item.items() if len(docs) == 1},
+    )
+
+
+def candidates_for(ref: Ref) -> list[Candidate]:
+    """这一处的五类证据。"""
+    out: list[Candidate] = []
+    line = line_text(ref)
+    for path, snippet, ref_sec, doc, sec, basis in LINE_DECISIONS:
+        if path == ref.file and snippet in line and (not ref_sec or ref_sec == ref.sec):
+            out.append(Candidate(doc, "⑤", basis, True, sec))
+    if out:
+        return out
+
+    hits = mentions(line)
+    named = nearest_before(line, ref.start, hits)
+    if named:
+        out.append(Candidate(named, "①", "同一行写了这份说明的名字", True))
+    else:
+        above = block_above(file_lines(ref.file), ref.line)
+        if above:
+            in_block = {h[2] for h in mentions(above)}
+            if len(in_block) == 1:
+                out.append(Candidate(in_block.pop(), "①", "同一段注释的上面几行只点名了这一份说明", False))
+            else:
+                found = nearest_before(above + "\n", len(above), mentions(above))
+                if found:
+                    out.append(Candidate(found, "①", "同一段注释的上面几行写了这份说明的名字", False))
+        docs_in_line = {h[2] for h in hits}
+        if len(docs_in_line) == 1:
+            out.append(Candidate(docs_in_line.pop(), "①", "同一行后面写了这份说明的名字", True))
+
+    context = line
+    by_title, by_item = unique_quotes()
+    commit = commit_of(ref)
+    hist_cache: dict[str, str | None] = {}
+    for m in QUOTE_RE.finditer(context):
+        if not (ref.start - 60 <= m.start() <= ref.end + 60):
+            continue
+        quote = m.group(1)
+        for table, what in ((by_title, "小节标题"), (by_item, "条目名")):
+            if quote in table:
+                doc = next(iter(table[quote]))
+                if doc not in hist_cache:
+                    hist_cache[doc] = doc_at(commit, doc) if commit else None
+                hist = hist_cache[doc]
+                strong = False
+                if hist is not None:
+                    if what == "小节标题":
+                        strong = heading_in(hist, ref.sec) == quote
+                    else:
+                        strong = quote in {name for _n, name in item_texts(hist, ref.sec)}
+                out.append(Candidate(doc, "②", f"同一段引用的{what}「{quote}」全库只在{path_name(doc)}里", False, "", strong))
+                break
+
+    header = header_attribution(ref.file)
+    for doc, sections in header:
+        if sections and ref.sec in sections:
+            out.append(Candidate(doc, "④", f"文件开头把第 {ref.sec} 节写给了{path_name(doc)}", True))
+        elif not sections and len(header) == 1:
+            out.append(Candidate(doc, "④", f"文件开头只点名{path_name(doc)}", False))
+
+    commit = commit_of(ref)
+    ref.commit = commit or ""
+    if commit:
+        number, evidence = issue_evidence(commit)
+        for ev in evidence:
+            if ev.sections and ref.sec in ev.sections:
+                out.append(Candidate(ev.doc, "③a", f"工单 #{number} 的依据里写了第 {ref.sec} 节", False))
+            elif not ev.sections:
+                out.append(Candidate(ev.doc, "③b", f"工单 #{number} 的依据点名了这份说明", False))
+
+    # 同一份说明取最高的一档
+    order = {"⑤": 0, "①": 1, "②": 2, "④": 3, "③a": 4, "③b": 5}
+    best: dict[str, Candidate] = {}
+    for c in out:
+        if c.doc not in best or order[c.tier] < order[best[c.doc].tier]:
+            best[c.doc] = c
+    return sorted(best.values(), key=lambda c: order[c.tier])
+
+
+def path_name(doc: str) -> str:
+    return f"{DESIGN_DIR}/{doc}"
+
+
+def gate(ref: Ref, doc: str, override: str = "") -> Decision:
+    """硬门槛：写出的标题等于那份说明在写这行的提交里第 N 节的标题，改过名的对到现在。"""
+    commit = commit_of(ref)
+    ref.commit = commit or ""
+    hist = doc_at(commit, doc) if commit else None
+    if hist is None:
+        return Decision(False, reason=f"写这行的提交里没有{path_name(doc)}")
+    sec = override or ref.sec
+    items = list(ref.items)
+    old = heading_in(hist, sec)
+    if old is None:
+        return Decision(False, reason=f"当时那份说明没有第 {ref.sec} 节")
+    if (doc, old) in DELETED:
+        return Decision(False, reason=f"第 {ref.sec} 节是已删去的「{old}」")
+    now = renamed(doc, old)
+    if now is None:
+        return Decision(False, reason=f"旧标题「{old}」对不到现在的小节")
+    title = "「" + now + "」"
+    if items:
+        name = item_at(hist, sec, items[0])
+        if name and len(name) <= 20 and name in body_by_title(doc, now):
+            title += "中" + item_ref(name)
+    return Decision(True, title, old, now)
+
+
+def body_at(commit: str, doc: str, title: str) -> str:
+    """那份说明在那个提交里某一节的正文（到下一节为止）。"""
+    text = doc_at(commit, doc)
+    if not text:
+        return ""
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        m = HEADING_RE.match(line)
+        if m and bare_title(m.group(3)) == bare_title(title):
+            out = [line]
+            for later in lines[i + 1 :]:
+                if HEADING_RE.match(later):
+                    break
+                out.append(later)
+            return "\n".join(out)
+    return ""
+
+
+@lru_cache(maxsize=None)
+def squashed_body(commit: str, doc: str, title: str) -> str:
+    return squash(body_at(commit, doc, title))
+
+
+def phrase_hit(ref: Ref, doc: str, title: str) -> str:
+    """注释里的长词组在那份说明的那一节正文里命中的最长一段（去掉标点比）。"""
+    commit = commit_of(ref) or ""
+    if not commit or not title:
+        return ""
+    body = squashed_body(commit, doc, title)
+    if not body:
+        return ""
+    line = line_text(ref)
+    cleaned = SECTION_RE.sub("", line)
+    for alias in sorted(DOC_ALIASES, key=len, reverse=True):
+        if alias in cleaned:
+            cleaned = cleaned.replace(alias, "")
+    best = ""
+    for run in re.split(r"[，。；：、（）()「」『』,.;:]+", cleaned):
+        text = squash(run)
+        for width in (24, 20, 16, 12, 10, 8, 6):
+            if width > len(text):
+                continue
+            for i in range(0, len(text) - width + 1):
+                piece = text[i : i + width]
+                if piece in body and len(piece) > len(best):
+                    best = piece
+            if len(best) >= width:
+                break
+    return best
+
+
+def decide(ref: Ref) -> None:
+    """按五类证据与硬门槛定这一处。"""
+    cands = candidates_for(ref)
+    reasons: list[str] = []
+    strong_tiers = ("⑤", "①", "②", "④", "③a")
+    for tier in strong_tiers:
+        group = [c for c in cands if c.tier == tier and (tier != "②" or c.strong)]
+        if not group:
+            continue
+        passed: list[tuple[Candidate, Decision]] = []
+        for c in group:
+            d = gate(ref, c.doc, c.sec)
+            if d.ok:
+                passed.append((c, d))
+            else:
+                reasons.append(d.reason)
+        hard = [c for c in group if c.hard]
+        if not passed:
+            if hard:
+                ref.status = "去掉"
+                ref.doc = hard[0].doc
+                ref.evidence = f"{tier} {hard[0].detail}"
+                ref.reason = reasons[-1] if reasons else "对不上"
+                return
+            continue
+        if len(passed) == 1:
+            accept(ref, *passed[0], "")
+            return
+        chosen = pick_by_phrase(ref, passed)
+        if chosen is not None:
+            accept(ref, *chosen)
+            return
+        ref.evidence = f"{tier} " + "、".join(c.detail for c, _d in passed)
+        ref.reason = "候选多份都能定节，原句没有唯一命中"
+        ref.status = "去掉"
+        return
+
+    # 弱的证据（同一段引用的标题不是这一节的、工单依据只点了名的）放在一起：原句必须在其中一份里唯一命中
+    weak = [c for c in cands if c.tier == "③b" or (c.tier == "②" and not c.strong)]
+    weak_passed = [(c, gate(ref, c.doc, c.sec)) for c in weak]
+    weak_passed = [x for x in weak_passed if x[1].ok]
+    if weak_passed:
+        chosen = pick_by_phrase(ref, weak_passed)
+        if chosen is not None:
+            accept(ref, *chosen)
+            return
+        ref.evidence = "、".join(c.detail for c, _d in weak_passed)
+        ref.reason = "候选多份都能定节，原句没有唯一命中" if len(weak_passed) > 1 else "唯一候选的说明与原句对不上"
+        ref.status = "去掉"
+        return
+    ref.status = "去掉"
+    ref.reason = reasons[-1] if reasons else "五类证据都没有"
+    ref.evidence = cands[0].tier + " " + cands[0].detail if cands else ""
+
+
+def pick_by_phrase(ref: Ref, passed: list[tuple[Candidate, Decision]]) -> tuple[Candidate, Decision, str] | None:
+    """候选多份：看注释原句在哪一份说明的那一节正文里命中；唯一命中才采用。"""
+    hits = [(c, d, phrase_hit(ref, c.doc, d.old)) for c, d in passed]
+    found = [x for x in hits if x[2]]
+    return found[0] if len(found) == 1 else None
+
+
+def accept(ref: Ref, cand: Candidate, decision: Decision, phrase: str) -> None:
+    ref.doc = cand.doc
+    if cand.sec:
+        ref.sec = cand.sec
+    ref.how = cand.tier
+    ref.evidence = cand.detail
+    ref.quote = phrase
+    ref.old = decision.old
+    ref.now = decision.now
+    ref.title = settle_quote(ref, decision)
+    ref.status = "换算"
+
+
+def item_names_by_title(doc: str, title: str) -> set[str]:
+    """一份说明里标题为 title 的那一节的有序列表项名。"""
+    for num, name in now_headings(doc).items():
+        if name == title:
+            return {item for _n, item in item_texts(current_doc(doc), num)}
+    return set()
+
+
+def settle_quote(ref: Ref, decision: Decision) -> str:
+    """引用后面紧跟的「…」：与标题一致时并进来；是那一节有序列表里的一条时写成「标题」中「条目名」。"""
+    title = decision.title
+    quote = quote_after(ref)
+    if not quote:
+        return title
+    if "中「" in title:
+        return title
+    if quote_key(quote) == quote_key(decision.now) or quote in decision.now:
+        ref.end = max(ref.end, quote_end(ref))
+        return title
+    if len(quote) <= 20 and quote in item_names_by_title(ref.doc or "", decision.now):
+        ref.end = max(ref.end, quote_end(ref))
+        return "「" + decision.now + "」中「" + quote + "」"
+    return title
 
 
 def resolve(groups: list[Group], texts: dict[str, str]) -> None:
     refs = [r for g in groups for r in g.refs]
-    file_doc: dict[str, Counter[str]] = {}
-    for path in {r.file for r in refs}:
-        counter: Counter[str] = Counter()
-        for _start, _end, doc in mentions(texts[path]):
-            counter[doc] += 1
-        file_doc[path] = counter
-    by_line: dict[tuple[str, int], list[Ref]] = defaultdict(list)
-    for ref in refs:
-        by_line[(ref.file, ref.line)].append(ref)
-    for items in by_line.values():
-        items.sort(key=lambda r: r.start)
-
-    # 第一轮：这一行、这一段注释写明了是哪份说明（确定）。
-    # 写明了名字而换算不成的（当时那份说明没有这一节、标题对不上），钉在这份说明上，
-    # 不再拿「同文件的多数」或「文字最相近」去改到别的说明——那样改出来的句子自相矛盾。
-    for ref in refs:
+    print(f"处数 {len(refs)}，开始定说明与定节", file=sys.stderr)
+    for n, ref in enumerate(refs, start=1):
+        if n % 250 == 0:
+            print(f"  ... {n}/{len(refs)}", file=sys.stderr)
         line = line_text(ref)
         if (f"{ref.file}:{ref.line}", ref.sec) in DROP_SECTIONS:
-            ref.status, ref.how = "去掉（工单点名的已删小节）", "去掉"
-            continue
-        anchor = next(
-            (
-                m
-                for m in TEXT_MAPPING
-                if m[0] == ref.file and m[1] in line and (m[4] is None or m[4] == ref.sec)
-            ),
-            None,
-        )
-        if anchor is not None:
-            doc, title = anchor[2], anchor[3]
-            ref.doc, ref.how, ref.status, ref.named = doc, "按行的文字锚定", "ok", True
-            ref.title = "「" + (title or "") + "」" if title else None
-            if title is None:
-                t, _st = title_for(ref, doc)
-                ref.title, ref.status = (t, "ok") if t else (None, "未定：锚定的说明没有这一节")
+            ref.status, ref.how = "去掉", "去掉"
+            ref.reason = "工单点名的已删小节"
             continue
         if kept_as_is(ref.file, line):
-            ref.status, ref.how = "排除（只改之外）", "排除"
+            ref.status, ref.how = "排除", "排除"
+            ref.reason = "只改之外"
             continue
         if any(ref.file == p and snippet in line for p, snippet in PROTO_AS_IS):
-            ref.status, ref.how = "排除（原型）", "排除"
+            ref.status, ref.how = "排除", "排除"
+            ref.reason = "原型"
             continue
         if excluded_before(line, ref.start):
-            ref.status, ref.how = "排除（别的文档）", "排除"
-            continue
-        doc = nearest_before(line, ref.start, mentions(line))
-        if doc:
-            ref.named = True
-            if not consider(ref, doc, "同行名字"):
-                ref.doc, ref.pinned, ref.pinned_strict = doc, doc, True
-            stem = bare_name_before(line, ref.start, doc)
-            if stem is not None:
-                # 写的是文件名：换成路径时把文件名一起换掉
-                ref.bare = True
-                ref.start = stem
+            ref.status, ref.how = "排除", "排除"
+            ref.reason = "别的文档"
             continue
         if proto_file(ref.file):
-            # 文件开头声明了照原型的设计做：客户端注释里的无主节号指的是原型（不在本单）
-            ref.status, ref.how = "排除（原型）", "排除"
+            ref.status, ref.how = "排除", "排除"
+            ref.reason = "原型"
             continue
-        above = block_above(file_lines(ref.file), ref.line)
-        doc = nearest_before(above + "\n", len(above), mentions(above)) if above else None
-        if doc:
-            ref.named = True
-            if not consider(ref, doc, "同段注释"):
-                ref.doc, ref.pinned = doc, doc
+        decide(ref)
 
-    # 同一行的几个节号共用这一行点名的说明：第一个引用定下来的那一份，后面的沿用它，
-    # 除非那一处自己写了另一份说明（工单 #1411 审查第 2 条）。
-    for items in by_line.values():
-        current: str | None = None
-        for ref in items:
-            if ref.status.startswith("排除") or ref.dropped:
-                continue
-            if ref.named:
-                current = ref.doc
-                continue
-            if ref.ok:
-                current = ref.doc
-                continue
-            if current:
-                if not consider(ref, current, "同一行"):
-                    ref.doc, ref.pinned = current, current
-
-    # 同一句话在别处已经写明是哪份说明的，沿用那一份（同一句注释在多处重复，比如
-    # 「装配规则的取值（设计说明第 4 节）」）。整行文字相同才算，不用相似度。
-    sentence_doc: dict[str, str] = {}
-    for ref in refs:
-        if ref.named and ref.ok and ref.doc:
-            sentence_doc.setdefault(normalized_line(ref), ref.doc)
-    for ref in refs:
-        if ref.ok or ref.dropped or ref.pinned or ref.status.startswith("排除"):
-            continue
-        doc = sentence_doc.get(normalized_line(ref))
-        if doc:
-            if not consider(ref, doc, "同一句话"):
-                ref.doc, ref.pinned = doc, doc
-
-    # 第二轮：对照表里人定的那一份（人定的优先于推断；同行点名的不动）
-    for ref in refs:
-        if ref.dropped or ref.status.startswith("排除"):
-            continue
-        if ref.ok and ref.named:
-            continue
-        doc = mapping_doc(ref.file, ref.line)
-        if doc:
-            if not consider(ref, doc, "对照表"):
-                ref.doc, ref.pinned = doc, doc
-                # 「文件:行」是逐行定的：不再退到同一份文件点名的说明（按文件的对照表可以退）
-                ref.pinned_strict = f"{ref.file}:{ref.line}" in MAPPING
-
-
-    # 第二轮之半：写明了哪份说明（同行点名或对照表）、节号却对不上现在编号的：
-    # 先退到这份文件的注释里点名过的说明（按点名的多少，最多三份），再在这几份里按文字挑一节。
-    # 跨说明地猜是不做的（工单 #1411 审查第 5 条）。
-    votes: dict[str, Counter[str]] = defaultdict(Counter)
-    for ref in refs:
-        if ref.ok and ref.doc:
-            votes[ref.file][ref.doc] += 1
-    for ref in refs:
-        if ref.ok or ref.dropped or ref.status.startswith("排除") or not ref.pinned:
-            continue
-        if not ref.pinned_strict:
-            for doc, _count in votes[ref.file].most_common(3):
-                if doc != ref.pinned and consider(ref, doc, "同一份文件点名的说明"):
-                    break
-            if ref.ok:
-                continue
-        found = section_by_text(ref, ref.pinned)
-        if found:
-            ref.doc, ref.how, ref.title, ref.status, ref.score = ref.pinned, "指名说明里按文字对节", found[0], "ok", found[1]
-
-    # 第三轮：按注释文字与各说明的小节正文比对，只在候选里取一名；同一份文件里已经定下来的
-    # 说明、文件开头写明的那一份、文件里提到过的说明，都只是少许加分。分不开的记为未定，
-    # 不替人猜（工单 #1411 审查第 5 条）。
-    header_doc = {}
-    for path in {r.file for r in refs}:
-        header = header_block(file_lines(path))
-        found = {doc for _s, _e, doc in mentions(header)}
-        header_doc[path] = found.pop() if len(found) == 1 else None
-    for ref in refs:
-        if ref.ok or ref.dropped or ref.pinned or ref.status.startswith("排除"):
-            continue
-        total = sum(file_doc[ref.file].values()) or 1
-        prior = {doc: 0.06 * count / total for doc, count in file_doc[ref.file].items()}
-        counted = sum(votes[ref.file].values()) or 1
-        for doc, count in votes[ref.file].items():
-            prior[doc] = prior.get(doc, 0.0) + 0.16 * count / counted
-        if header_doc.get(ref.file):
-            prior[header_doc[ref.file]] = prior.get(header_doc[ref.file], 0.0) + 0.12
-        ranked = [
-            (round(score_of(ref, doc) + prior.get(doc, 0.0), 3), doc, title)
-            for doc in all_docs()
-            for title, status in [title_for(ref, doc)]
-            if title is not None
-        ]
-        ranked.sort(reverse=True)
-        if not ranked:
-            ref.status = "未定：没有一份说明有这个节号"
-            continue
-        best = ranked[0]
-        second = ranked[1][0] if len(ranked) > 1 else 0.0
-        if (best[0] >= 0.30 and best[0] >= 1.10 * second) or best[0] >= 0.45:
-            ref.doc, ref.how, ref.title, ref.status, ref.score = best[1], "推断", best[2], "ok", best[0]
-        else:
-            ref.doc, ref.score = best[1], best[0]
-            ref.status = "未定：两种读法都可能"
-
-    # 「文件:行」的对照表最后覆盖一次：人定的优先。同一行里已经按名字定下来的另一处（写的是
-    # 另一份说明）不动；人定的标题对 section_by_text 已经定下来的那一处也生效。
-    for ref in refs:
-        if ref.status.startswith("排除") or ref.dropped:
-            continue
-        key = f"{ref.file}:{ref.line}"
-        if key not in MAPPING:
-            continue
-        doc = MAPPING[key]
-        if TITLE_OVERRIDES.get(key):
-            if ref.doc and ref.doc != doc:
-                continue
-            ref.doc, ref.how, ref.status = doc, "对照表", "ok"
-            ref.title = "「" + TITLE_OVERRIDES[key] + "」"
-            continue
-        if ref.ok:
-            continue
-        consider(ref, doc, "对照表")
 
 # ---------------------------------------------------------------- 写回
 
@@ -1384,27 +1338,38 @@ def apply_groups(groups: list[Group], texts: dict[str, str]) -> tuple[list[str],
                 context = line + "\n" + block_above(file_lines(path), lineno)
                 named = bool(doc) and doc in {d for _s, _e, d in mentions(context)}
                 if any(r.bare for r in g.refs if r.doc == doc):
-                    # 注释里写的是设计说明的文件名：连文件名一起换成路径
                     named = False
                 start, end = min([g.start] + [r.start for r in g.refs]), max([g.end] + [r.end for r in g.refs])
                 if any(r.dropped for r in g.refs):
                     slice_match = SLICE_RE.match(line, end)
                     if slice_match:
                         end = slice_match.end()
+                    following = QUOTE_RE.search(line, end)
+                    if following and following.start() - end <= 4:
+                        end = following.end()
                 if new == "":
+                    # 去掉这一部分引用时，「设计说明」这几个字一起去掉，不留「（设计说明）」这种空引用
+                    before = line[:start].rstrip(" \t")
+                    suffix = NAME_SUFFIX.search(before)
+                    if suffix:
+                        start = suffix.start()
+                    elif before.endswith("的"):
+                        start = len(before) - 1
                     _, start, end = drop_span(line, start, end)
                     line = line[:start] + line[end:]
                 else:
+                    trimmed = line[:start].rstrip(" \t")
+                    if trimmed.endswith(".md") and trimmed != line[:start]:
+                        start = len(trimmed)
                     if not named:
                         if doc:
                             new = f"{DESIGN_DIR}/{doc}" + new
-                            suffix = NAME_SUFFIX.search(line[:start])
+                            before = line[:start].rstrip(" \t")
+                            suffix = NAME_SUFFIX.search(before)
                             if suffix:
                                 start = suffix.start()
-                                while start > 0 and line[start - 1] in " \t":
-                                    start -= 1
-                            elif start > 0 and line[start - 1] == "的":
-                                start -= 1
+                            elif before.endswith("的"):
+                                start = len(before) - 1
                             if start > 0 and (
                                 re.match(r"[\w\u4e00-\u9fff]", line[start - 1]) or line[start - 1] in "#/"
                             ):
@@ -1428,59 +1393,107 @@ def drop_span(line: str, start: int, end: int) -> tuple[str, int, int]:
         start -= 1
         end += 1
         left, right = line[:start], line[end:]
-    if left.endswith(("、", "，", ",")) and right.startswith(("、", "，", ",", "）", ")", "；", ";", "。")):
+    if left.endswith(("、", "，", ",", "；", ";")) and right.startswith(("、", "，", ",", "）", ")", "；", ";", "。")):
         start -= 1
-    elif right.startswith(("、", "，", ",")):
-        # 去掉的那一段在列表末尾：后面多出来的分隔号一并去掉
+    elif right.startswith(("、", "，", ",", "；", ";")):
         end += 1
     while start > 0 and line[start - 1] in " \t":
         start -= 1
     return line, start, end
 
 
-# ---------------------------------------------------------------- 主流程
+# ---------------------------------------------------------------- 报告与主流程
+
+
+def write_report(path: str, refs: list[Ref]) -> None:
+    ok = [r for r in refs if r.ok]
+    dropped = [r for r in refs if r.dropped]
+    excluded = [r for r in refs if r.status == "排除"]
+    fixed = [r for r in ok if r.how == "⑤"]
+    rows = [
+        "# 换算报告（工单 #1411）",
+        "",
+        f"处数 {len(refs)}，换算 {len(ok)}（其中人定 {len(fixed)}），去掉 {len(dropped)}，"
+        f"排除（别的文档、原型、只改之外）{len(excluded)}，未定 0",
+        "",
+        "证据一栏的五档：⑤ 人定；① 同一段注释点名；② 同一段引用的标题或条目名全库唯一；"
+        "④ 文件开头人写的归属；③ 写这行的提交的工单「依据」点名的说明。",
+        "",
+        "## 每一处",
+        "",
+        "| 文件:行 | 第几节 | 证据 | 命中的原句 | 提交 | 当时的标题 | 现在的标题 | 结果 |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ]
+    for r in sorted(refs, key=lambda x: (x.file, x.line, x.start)):
+        if r.status == "排除":
+            continue
+        rows.append(
+            "| `{}:{}` | {} | {} | {} | {} | {} | {} | {} |".format(
+                r.file,
+                r.line,
+                r.sec,
+                (r.how + " " + r.evidence).replace("|", "/") if r.evidence else r.how,
+                r.quote or "",
+                r.commit[:8],
+                r.old,
+                r.now,
+                r.status,
+            )
+        )
+    rows += ["", "## 去掉", "", "| 文件:行 | 第几节 | 原因 |", "| --- | --- | --- |"]
+    for r in sorted(dropped, key=lambda x: (x.file, x.line, x.start)):
+        rows.append(f"| `{r.file}:{r.line}` | {r.sec} | {r.reason or '指不出来'} |")
+    rows += ["", "## 人定", "", "| 文件:行 | 第几节 | 依据 | 现在的标题 |", "| --- | --- | --- | --- |"]
+    for r in sorted(fixed, key=lambda x: (x.file, x.line, x.start)):
+        rows.append(f"| `{r.file}:{r.line}` | {r.sec} | {r.evidence} | {r.now} |")
+    rows += ["", "## 排除", "", "| 文件:行 | 原因 |", "| --- | --- |"]
+    for r in sorted(excluded, key=lambda x: (x.file, x.line, x.start)):
+        rows.append(f"| `{r.file}:{r.line}` | {r.reason} |")
+    Path(path).write_text("\n".join(rows) + "\n", encoding="utf-8")
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--report", help="把换算结果写到这个 TSV，不改文件")
+    ap.add_argument("--report", help="把换算结果写到这个 Markdown，不改文件")
     ap.add_argument("--apply", action="store_true", help="改文件")
     ap.add_argument("--only", help="只处理这些文件（逗号分隔）")
     ap.add_argument("--cache", help="历史版本设计说明的缓存（只在开发脚本时用）")
+    ap.add_argument("--issue-cache", help="工单「依据」的缓存（默认与 --cache 放在一起）")
+    ap.add_argument("--prefetch", action="store_true", help="只把要用的工单取回来，不换算")
     args = ap.parse_args(argv)
 
     load_cache(args.cache)
+    issue_cache = args.issue_cache or (str(Path(args.cache).with_suffix(".issues.json")) if args.cache else None)
+    load_issue_cache(issue_cache)
     files = [f for f in run(["git", "ls-files"]).splitlines() if f and in_scope(f)]
     if args.only:
         keep = set(args.only.split(","))
         files = [f for f in files if f in keep]
+    if args.prefetch:
+        prefetch_issues(files)
+        save_cache()
+        return 0
     groups, texts = collect(files)
     resolve(groups, texts)
 
+    refs = [r for g in groups for r in g.refs]
     if args.report:
-        rows = ["\t".join(("file", "line", "start", "end", "sec", "doc", "how", "title", "status", "score"))]
-        for g in groups:
-            for r in g.refs:
-                rows.append(
-                    "\t".join(
-                        (r.file, str(r.line), str(g.start), str(g.end), r.sec, r.doc or "", r.how, r.title or "", r.status, f"{r.score:.3f}")
-                    )
-                )
-        Path(args.report).write_text("\n".join(rows), encoding="utf-8")
+        write_report(args.report, refs)
 
     if args.apply:
         changed_files, changed_refs = apply_groups(groups, texts)
         print(f"改了 {len(changed_files)} 个文件、{changed_refs} 处")
 
-    refs = [r for g in groups for r in g.refs]
     ok = sum(1 for r in refs if r.ok)
-    excluded = sum(1 for r in refs if r.status.startswith("排除"))
     dropped = sum(1 for r in refs if r.dropped)
-    undecided = len(refs) - ok - excluded - dropped
-    print(f"处数 {len(refs)}，可换算 {ok}，去掉（小节已删）{dropped}，排除（别的文档）{excluded}，未定 {undecided}")
+    excluded = sum(1 for r in refs if r.status == "排除")
+    fixed = sum(1 for r in refs if r.ok and r.how == "⑤")
+    print(f"处数 {len(refs)}，换算 {ok}（其中人定 {fixed}），去掉 {dropped}，排除 {excluded}，未定 {len(refs) - ok - dropped - excluded}")
     save_cache()
+    save_issue_cache()
     return 0
 
 
 if __name__ == "__main__":
     sys.exit(main())
+

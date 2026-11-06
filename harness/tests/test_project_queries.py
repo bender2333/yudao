@@ -1238,7 +1238,7 @@ def test_a_cancelled_item_has_a_stop_moment_but_no_model_detail(data_dir):
 # ---------------------------------------------------------------------------
 # 工单 #1218：replay.check 的参数组合不对时按输入问题回 422，说明只能给 run_id 或 project_id
 # 其中一个。查询只有一个参数组合是对的（图里两种目标只有一种能问），所以这里核对的是
-# 拒绝按输入问题回答（设计说明「合同」「按位置读取」与 docs/design/app-and-interface.md「查询清单」 replay.check 一行），
+# 拒绝按输入问题回答（与 replay.check 一行），
 # 而不是未登记的异常冒到框架成为 500。
 
 

@@ -1,4 +1,4 @@
-# 项目与事项的查询（docs/design/app-and-interface.md「查询清单」，当前档）。查询只读取：保存的投影、应用层保存的读取模型
+# 项目与事项的查询（当前档）。查询只读取：保存的投影、应用层保存的读取模型
 # （调用尝试表与流转记录）与按条件读取的事件；不写入任何内容，也不触发结算、重读或模型调用。
 # 结果是快照：position 是这份快照已经包含的最大全局位置，事件流从它之后续上。
 
@@ -62,7 +62,7 @@ class QueryInputInvalid(ValueError):
     pass
 
 
-# 分页游标：第一页位置、最后一条记录的位置与标识（docs/design/app-and-interface.md「合同」）
+# 分页游标：第一页位置、最后一条记录的位置与标识
 CURSOR_PATTERN = re.compile(r"^\d+:\d+:.+$")
 
 
@@ -81,9 +81,9 @@ class AdoptionView(Contract):
     code_tree_digest: str
     adopted_at: str
     event_id: str | None
-    # 采纳链：上一次采纳的成果。建档基线是第一个采纳成果，这里为空（docs/design/app-and-interface.md「事件流」）
+    # 采纳链：上一次采纳的成果。建档基线是第一个采纳成果，这里为空
     previous_adoption_id: str | None
-    # 建档基线特有的三项（工单 #136，docs/design/existing-project-onboarding.md「查询的变化」）：是否为建档采纳的基线、快照来源（采集的源目录与
+    # 建档基线特有的三项（工单 #136）：是否为建档采纳的基线、快照来源（采集的源目录与
     # git 提交、分支、是否有未提交的修改）、现有缺陷数。普通事项的交付采纳：基线为假、来源为空、缺陷数为 0
     onboarding_baseline: bool
     snapshot_source: str | None
@@ -107,7 +107,7 @@ class InputView(Contract):
 
 
 class ProjectsList(ReplayRequest):
-    # 可回放（docs/design/app-and-interface.md「合同」）：at 是全局位置，省略时读取现在的快照
+    # 可回放：at 是全局位置，省略时读取现在的快照
     include_archived: bool = False
 
 
@@ -124,7 +124,7 @@ class ProjectRow(Contract):
     version: int
     work_item_count: int
     in_progress_count: int
-    # 排队中的事项数：状态为未开始或排队中（docs/design/app-and-interface.md「查询清单」 projects.list 的项目列表字段）
+    # 排队中的事项数：状态为未开始或排队中（ projects.list 的项目列表字段）
     waiting_count: int
     # 待回答的决定数：本项目等待回答的决定请求数（首页与左侧栏按它显示数量）
     decisions_waiting: int
@@ -196,7 +196,7 @@ def _onboarding_status(state: Any) -> str | None:
 
 
 class ProjectOverview(Contract):
-    # 项目内的查询都接受事项范围参数：给出事项时只返回它（docs/design/app-and-interface.md「合同」）
+    # 项目内的查询都接受事项范围参数：给出事项时只返回它
     project_id: str
     work_item: str | None = None
 
@@ -377,7 +377,7 @@ def _work_item_stats(items: list[Any]) -> WorkItemStats:
 
 
 def _adoption(item: Any) -> AdoptionView | None:
-    # 建档基线（工单 #136，docs/design/app-and-interface.md「事件流」）：prd_ref 有值说明这次采纳的成果是接入时采集的快照本身；
+    # 建档基线（工单 #136）：prd_ref 有值说明这次采纳的成果是接入时采集的快照本身；
     # 快照来源取它的 source 与 provenance，旧事件没有 provenance 时为空。现有缺陷数是基线核验里状态为
     # existing_defect 的结论数；known_risks 还含未被结论覆盖的其他失败，不计入。普通交付采纳不是建档基线，为 0
     if item is None:
@@ -400,7 +400,7 @@ def _adoption(item: Any) -> AdoptionView | None:
 
 
 class ProjectLoop(ReplayRequest):
-    # 可回放（docs/design/app-and-interface.md「合同」）：at 是全局位置，省略时读取现在的快照
+    # 可回放：at 是全局位置，省略时读取现在的快照
     project_id: str
     work_item: str | None = None
 
@@ -554,7 +554,7 @@ def _project_loop(application: Application, request: ProjectLoop) -> Snapshot[Pr
 
 
 def _last_department(store: Any, item: Any, *, through: int | None = None) -> str | None:
-    """最后活动的部门（工单 #1186，docs/design/existing-project-onboarding.md「产品：初始 PRD」 2026-10-29 补充）。
+    """最后活动的部门（工单 #1186，docs/design/app-and-interface.md「查询清单」 2026-10-29 补充）。
 
     进行中的 run 当前就在这个部门里工作，直接用事项的当前部门；结束的 run 没有当前部门，
     从它的事件里找最后一条带部门的事件。没有 run、没有事件或事件里都没有部门时为 None。
@@ -614,7 +614,7 @@ def _matching_review(run: Any, delivery: Any) -> Any:
 
 
 def _fact_ref(store: Any, event_id: str | None, what: str) -> FactRef:
-    """一个事实元素的来源（工单 #396，docs/design/app-and-interface.md「查询清单」，画面诚实性 H4）。
+    """一个事实元素的来源（工单 #396，画面诚实性 H4）。
 
     位置与来源种类都取投影里记下的那条事件：事件编号在投影里（回放与恢复以后不变），位置由事件日志里
     同一个编号给出，所以同一份事件序列推出的位置相同。事件不在事件日志里时报错：来源不能为空。
@@ -627,7 +627,7 @@ def _fact_ref(store: Any, event_id: str | None, what: str) -> FactRef:
     return FactRef(position=event.position, source=DEFINITIONS.event_source(event.type).source)
 
 
-# 结算类事件（docs/design/existing-project-onboarding.md「应用层命令、决定与领域事件」、「产品：初始 PRD」）：已用时间在这些事件上更新——一次激活结束、run 结束、暂停或失败。
+# 结算类事件：已用时间在这些事件上更新——一次激活结束、run 结束、暂停或失败。
 # 「已用时间」这个事实元素的来源取其中最后一条，别的进展事件不改变它
 ELAPSED_EVENT_TYPES = frozenset({
     EventType.ACTIVATION_FINISHED, EventType.RUN_DONE, EventType.RUN_PAUSED, EventType.RUN_FAILED,
@@ -732,7 +732,7 @@ def _handed_in(definitions: Any, kind: str) -> dict[str, tuple[str, ...]]:
 
 
 def _watched_relations(definitions: Any, kind: str, ref: FactRef) -> list[WatchedRelation]:
-    """关注关系（工单 #1381，docs/design/department-loop.md「询问分支」的推出规则表）：谁接收谁的哪种成果。
+    """关注关系（工单 #1381，的推出规则表）：谁接收谁的哪种成果。
 
     两处定义给出它：组织定义里每个角色关注的成果——交出这一种成果的是提案合同里有它的角色；
     核验声明——核验角色收到它核验的那个角色的那种成果。用户输入与指导不是角色交出的成果，不在这里。
@@ -877,7 +877,7 @@ def _awaiting_verification(department: str, progress: WorkItemProgress | None) -
 
 def _elapsed_seconds(bounds: tuple[str, str], *, terminal: Any, now: str | None = None) -> int:
     # 已用时间：进行中的 run 到「现在」，终态的 run 到最后一条事件。
-    # 按位置读取（now 给出该位置的事件时间）时进行中的 run 也到那个时间为止（docs/design/app-and-interface.md「合同」）
+    # 按位置读取（now 给出该位置的事件时间）时进行中的 run 也到那个时间为止
     started = datetime.fromisoformat(bounds[0])
     if terminal is not None:
         stopped = datetime.fromisoformat(bounds[1])
@@ -1127,7 +1127,7 @@ def _public_payload(event_type: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _reasoning_text(item: Any) -> str | None:
-    # 一条推理内容里能读懂的文字（docs/design/model-management.md「历史中的推理内容」，工单 #1234）：三种协议各取各的字段——
+    # 一条推理内容里能读懂的文字（工单 #1234）：三种协议各取各的字段——
     # Chat Completions 的 reasoning_content、Messages 的 thinking 块、Responses 的 summary 文字。
     # 上游只返回加密内容（Responses 的 encrypted_content）时没有可读文字，返回 None。
     # run.steps 的 preview 与 event.detail 的 reasoning_text 共用这一处
@@ -1207,7 +1207,7 @@ def _event_artifacts(application: Application, event: Any) -> dict[str, Any]:
         ref = event.payload.get(key)
         if ref:
             loaded[target] = artifacts.get_for_run(run_id, ArtifactRef(**ref)).decode("utf-8")
-    # 推理内容与模型输出的可读文字（工单 #1234，docs/design/model-management.md「历史中的推理内容」）：推理的原文照常给出，
+    # 推理内容与模型输出的可读文字（工单 #1234）：推理的原文照常给出，
     # 另给归一后的可读文字；模型输出条目给文字条目的全文，工具调用条目没有文字
     ref = event.payload.get("reasoning_ref")
     if ref:
@@ -1339,7 +1339,7 @@ class RoomView(Contract):
     self_test: dict[str, Any] | None
 
 class EffectiveModel(Contract):
-    # 本部门当前生效的模型及来源（设计说明「验收」中「对已登记的每个查询，在有数据的系统上调用以后，事件日志末尾位置与保存的投影不变」）：按 docs/design/app-and-interface.md「范围筛选」的选择规则与当前目录计算，不发送请求。
+    # 本部门当前生效的模型及来源：按的选择规则与当前目录计算，不发送请求。
     # state 为 effective 时给出模型与来源；为 unusable 时给出 reason 与 message；
     # 为 unset 时都没有设置。unusable 与 unset 时不返回其他连接或模型
     state: Literal["effective", "unusable", "unset"]
@@ -1386,7 +1386,7 @@ def _project_selection(setting: Any) -> ModelSelection | None:
                           requested_tier=setting.requested_tier)
 
 def _effective_model(application: Application, setting: Any, department: str) -> EffectiveModel:
-    # 本部门当前生效的模型及来源（设计说明「验收」中「对已登记的每个查询，在有数据的系统上调用以后，事件日志末尾位置与保存的投影不变」）：按 docs/design/app-and-interface.md「范围筛选」的顺序解析，不发送请求。
+    # 本部门当前生效的模型及来源：按的顺序解析，不发送请求。
     # 没有任何一层写入模型时为「未设置」，引用无法使用时为「无法使用」并带回原因；
     # 这两种情况都不返回其他连接或模型
     resolution = application.system.facade.resolve_effective_model(department, _project_selection(setting))
@@ -1573,7 +1573,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             effective=effective,
             guidance=guidance, messages=messages, context=context,
             last_call=_last_call(run, request.department),
-            # 当前生效模型不具备本部门建议能力时的提醒（docs/design/model-management.md「部门工作间」）
+            # 当前生效模型不具备本部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」「部门工作间」）
             reminders=application.system.facade.model_reminders(effective.model_id, request.department),
             room=_room_view(application, state, item, run, request.department, guidance, effective, observation),
         ),
@@ -1739,7 +1739,7 @@ class ActionReceipt(Contract):
     refused: bool = False
     refused_reason: str | None = None
     fetch: FetchReceipt | None = None
-    # 浏览器与屏幕动作的截图工件引用与浏览器会话身份（浏览器与 computer use 设计说明第 7.2 节，工单 #152）：
+    # 浏览器与屏幕动作的截图工件引用与浏览器会话身份（浏览器与 computer use 设计说明「查询」，工单 #152）：
     # 截图取自工具结果事件里的工件引用；会话身份与试用副本的树摘要取自结果工件里的会话记录。
     # 非浏览器动作没有这三项
     screenshots: list[dict[str, Any]] = Field(default_factory=list)
@@ -1986,7 +1986,7 @@ def _action_view(result_event: Any | None, identity: tuple[str, int | None, str]
 
 
 # ---------------------------------------------------------------------------
-# run.steps（工单 #1234，docs/design/app-and-interface.md「查询清单」）：按激活与步骤给出推理、模型文字、动作与回执
+# run.steps（工单 #1234）：按激活与步骤给出推理、模型文字、动作与回执
 
 
 class RunSteps(Contract):
@@ -2294,7 +2294,7 @@ class WorkItemMaterials(Contract):
 
 
 class LaunchMethodView(Contract):
-    # 交付说明里的一个启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #152）：资料页的交付一项
+    # 交付说明里的一个启动方式（浏览器与 computer use 设计说明「启动方式」，工单 #152）：资料页的交付一项
     # 据此显示这份交付怎么启动。commands 按系统给出命令（windows、linux）
     name: str
     kind: str
@@ -2316,7 +2316,7 @@ class VersionEntry(Contract):
 
 
 class QaCriterionView(Contract):
-    # 一份 QAReview 的逐条结论（设计第 8.3 节）：验收条件、检验方式、结果与证据（检查名称与试用用例）
+    # 一份 QAReview 的逐条结论（docs/design/browser-and-computer-use.md「QAReview 的逐条结论与放行」）：验收条件、检验方式、结果与证据（检查名称与试用用例）
     criterion: str
     method: str
     result: str
@@ -2334,7 +2334,7 @@ class TrialCaseEvidenceView(Contract):
 
 
 class UnverifiedCriterionView(Contract):
-    # 无法核验的条目与原因（设计第 8.4 节：原因写在逐条结论的 note 里）
+    # 无法核验的条目与原因（：原因写在逐条结论的 note 里）
     criterion: str
     method: str
     note: str
@@ -2363,7 +2363,7 @@ class BaselineReviewView(Contract):
 
 
 class OnboardingDecisionRecord(Contract):
-    # 某一轮的确认记录（工单 #136，docs/design/existing-project-onboarding.md「用户确认与修改的往返」）：回答与撤销各自一条；请求本身仍是打开的不列在这里
+    # 某一轮的确认记录（工单 #136）：回答与撤销各自一条；请求本身仍是打开的不列在这里
     event_id: str
     decision_id: str
     outcome: Literal["answered", "withdrawn"]
@@ -2374,7 +2374,7 @@ class OnboardingDecisionRecord(Contract):
 
 
 class OnboardingRound(Contract):
-    # 一次建档候选（工单 #136，docs/design/existing-project-onboarding.md「领域事件」、「用户确认与修改的往返」）：轮次、这一轮 run、候选事件与提出时间，
+    # 一次建档候选（工单 #136）：轮次、这一轮 run、候选事件与提出时间，
     # 三份产物与仓库概况的原文、上一轮的修改意见原文、基线核验与这一轮的决定记录。
     # 工件按候选自己的 run 目录存放；提出修改以后开始的修改轮才有修改意见。
     # 没有核验角色的形态没有基线核验这一步（工单 #1510）：baseline_review 是空的一份，
@@ -2425,7 +2425,7 @@ class WorkItemMaterialsResult(Contract):
     reviews: list[ReviewEntry]
     inputs: list[InputView]
     materials: list[ProjectMaterial]
-    # 建档各轮的材料（工单 #136，docs/design/existing-project-onboarding.md「查询的变化」）：按提出顺序列出这个建档事项的每一次候选与确认记录；
+    # 建档各轮的材料（工单 #136）：按提出顺序列出这个建档事项的每一次候选与确认记录；
     # 普通事项没有建档候选，为空
     onboarding_rounds: list[OnboardingRound]
     # 旧版本的 run（工单 #1186）：因升级停止的 run 与它的事件，只读；没有时为空
@@ -2485,7 +2485,7 @@ def _trial_case_evidence(criteria: list[QaCriterionView],
 
 
 def _unverified_criteria(criteria: list[QaCriterionView]) -> list[UnverifiedCriterionView]:
-    # 无法核验的条目与原因（设计第 8.4 节）：结果 unverified 的条目，原因取自逐条结论的 note
+    # 无法核验的条目与原因（docs/design/browser-and-computer-use.md「无法核验」）：结果 unverified 的条目，原因取自逐条结论的 note
     return [UnverifiedCriterionView(criterion=item.criterion, method=item.method, note=item.note)
             for item in criteria if item.result == "unverified"]
 
@@ -2573,7 +2573,7 @@ def _old_runs(application: Application, state: Any, work_item_id: str) -> list[O
 
 def _onboarding_rounds(application: Application, state: Any,
                        work_item_id: str) -> list[OnboardingRound]:
-    # 建档各轮的材料（工单 #136，docs/design/existing-project-onboarding.md「领域事件」、「用户确认与修改的往返」）：按提出顺序读项目投影里的候选，
+    # 建档各轮的材料（工单 #136）：按提出顺序读项目投影里的候选，
     # 工件按候选自己的 run 目录取得（每一轮的 run 各有目录），确认记录从项目流中回答与撤销的事件读出
     candidates = [value for value in state.initial_prd_candidates if value.work_item_id == work_item_id]
     decided = _onboarding_decision_records(application, state.project_id, work_item_id)
@@ -2605,7 +2605,7 @@ def _onboarding_rounds(application: Application, state: Any,
 
 def _onboarding_decision_records(application: Application, project_id: str,
                                  work_item_id: str) -> dict[str, list[OnboardingDecisionRecord]]:
-    # 每个建档候选的确认记录（工单 #136，docs/design/existing-project-onboarding.md「用户确认与修改的往返」）：项目流中回答与撤销的事件所属的请求
+    # 每个建档候选的确认记录（工单 #136）：项目流中回答与撤销的事件所属的请求
     # 记着提出它的那一轮 run，按它归到对应的候选；没有 run 的事件取它之前最近提出的一轮
     events = application.system.store.list_project_events(project_id)
     proposed = [(event.payload["run_id"], event.event_id, event.created_at) for event in events
@@ -2873,7 +2873,7 @@ USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_wri
 
 
 def _usage_totals(rows: list[Any]) -> UsageTotals:
-    # 用量汇总只累加上报的用量（source == "reported"），未上报的项为空（docs/design/app-and-interface.md「查询清单」）；
+    # 用量汇总只累加上报的用量（source == "reported"），未上报的项为空
     # latency_ms 是本地测得的用时，与用量是否上报无关，按全部尝试累加
     values: dict[str, int | float | None] = {field: None for field in USAGE_FIELDS}
     reported = 0
@@ -3036,10 +3036,10 @@ class ProjectSettingsResult(Contract):
     mcp_servers: McpServersSetting
     # 最近一次探测的结果（工单 #1174）：还没有探测过时为空
     last_probe: McpProbeResultView | None = None
-    # 各部门生效模型不具备该部门建议能力时的提醒（docs/design/app-and-interface.md「模型输出片段」「一直显示」）；
-    # 生效模型按 docs/design/model-management.md「解析规则」解析，包括跟随部门默认的情况
+    # 各部门生效模型不具备该部门建议能力时的提醒
+    # 生效模型按解析，包括跟随部门默认的情况
     department_reminders: dict[str, list[str]]
-    # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明「参数怎样成为带版本的数据」中「参数的当前值写成事件，带修改者、原值、新值与理由」）：
+    # 这个项目有效参数的版本（工单 #1262，规则登记与参数设计说明「参数怎样成为带版本的数据」）：
     # 项目级参数命令的基准版本，全局现值加本项目覆盖的内容摘要；与 parameter.set 按项目核对的是同一份
     effective_parameters_version: str = ""
 
@@ -3049,7 +3049,7 @@ MCP_CREDENTIAL_KINDS = ("env", "headers")
 
 def _mcp_credential_refs(servers: dict[str, Any]) -> list[str]:
     # 设置里出现的凭据名称，按出现的先后各记一次：变量与请求头的取值方式为「凭据名称」的那些
-    # （网络与 MCP 设计说明「服务器设置」中「变量与请求头的值」）
+    # （网络与 MCP 设计说明「服务器设置」「变量与请求头的值」）
     refs: list[str] = []
     for server in servers.values():
         if not isinstance(server, dict):
@@ -3068,7 +3068,7 @@ def _mcp_credential_refs(servers: dict[str, Any]) -> list[str]:
 def _mcp_credential_status(application: Application,
                            servers: dict[str, Any]) -> dict[str, McpCredentialStatusView]:
     # 每个凭据名称此刻的状态（工单 #237）：与凭据命令读的是同一个来源（进程内存、进程环境、
-    # 数据目录的 .env，docs/design/department-loop.md「询问链」），页面上的「已设置／缺失」因此与后端一致；
+    # 数据目录的 .env），页面上的「已设置／缺失」因此与后端一致；
     # version 是 credential.set 的基准版本
     facade = application.system.facade
     view: dict[str, McpCredentialStatusView] = {}
@@ -3132,7 +3132,7 @@ def _project_settings(application: Application, request: ProjectSettings) -> Sna
                 tools=state.last_probe.tools, error=state.last_probe.error,
                 probed_at=state.last_probe.probed_at,
             ),
-            # 各部门生效模型（跟随部门默认时取部门默认）的建议能力提醒（docs/design/app-and-interface.md「模型输出片段」）
+            # 各部门生效模型（跟随部门默认时取部门默认）的建议能力提醒
             department_reminders=application.system.facade.project_department_reminders(
                 {department: {"model_id": setting.model_id} for department, setting in settings.items()}),
             effective_parameters_version=effective_parameter_version(store, request.project_id),
@@ -3346,7 +3346,7 @@ def _recovery_observation(application: Application, run_id: str) -> str | None:
     return observation_state(events, decisions.values(), status=run.status, stop_reason=run.stop_reason)
 
 class RecoveryStatus(Contract):
-    # 恢复观察的汇总（工单 #18，docs/design/app-and-interface.md「查询清单」 system.status 的 3.1 部分）：服务重启后自动继续的事项数、
+    # 恢复观察的汇总（工单 #18， system.status 的 3.1 部分）：服务重启后自动继续的事项数、
     # 待恢复的事项数。数字取自事件日志与决定请求，
     # 与 run.recovery、projects.list 用同一份事实
     auto_resumed: int
@@ -3620,7 +3620,7 @@ REPLAY_CHECK = QueryDefinition(
 
 
 # ---------------------------------------------------------------------------
-# run.recovery (工单 #18，docs/design/app-and-interface.md「查询清单」「恢复与动作核实（3.1）」)
+# run.recovery (工单 #18)
 
 class RunRecovery(Contract):
     run_id: str
@@ -3687,7 +3687,7 @@ class UnknownAction(Contract):
     at: str
 
 class RecoverySession(Contract):
-    # 一个会话的已用量（docs/design/app-and-interface.md「查询清单」，三部门的循环结构「停止与恢复」）：部门主线与询问分支各是一个会话，
+    # 一个会话的已用量（设计说明「回答能做什么」，三部门的循环结构「停止与恢复」）：部门主线与询问分支各是一个会话，
     # 用量各自累计。已用秒是已结算的运行时间，中断的那一轮不计
     session_id: str
     department: str | None
@@ -3795,7 +3795,7 @@ def _run_recovery(application: Application, request: RunRecovery) -> Snapshot[Ru
             can_continue=_can_continue(state, terminal),
             cannot_continue_reason=_cannot_continue_reason(run, state, terminal, resume_requests),
             unusable=_unusable_target(resume_requests),
-            # 重试次数不是上限，不进最小投影，仍在这里从事件数（docs/design/app-and-interface.md「查询与读取模型」）
+            # 重试次数不是上限，不进最小投影，仍在这里从事件数（docs/design/skeleton-and-application.md「最小投影」中「应用可以读最小投影，内核不为应用加字段」）
             limits=RecoveryLimits(activations=minimal.used.activations,
                                   model_steps=minimal.used.model_steps,
                                   retries=_retry_count(events), cycle_count=run.cycle_count),
@@ -3854,7 +3854,7 @@ def _recovery_upgrade(application: Application, run: Any) -> RecoveryUpgrade | N
     )
 
 def _upgrade_start_point(item: Any) -> str:
-    # 因升级重新开始时的起点（docs/design/app-and-interface.md「查询清单」、项目的起始文件夹设计说明「项目的起点」）：有采纳成果时是采纳成果，
+    # 因升级重新开始时的起点（项目的起始文件夹设计说明「项目的起点」）：有采纳成果时是采纳成果，
     # 其次是起始文件夹快照，都没有时是空树。与事项的起点按同一个顺序取
     if item.baseline is not None:
         return "adoption"
@@ -4053,7 +4053,7 @@ def _retry_count(events: list[Any]) -> int:
 def _execution_owner(minimal: MinimalProjection, events: list[Any]) -> RecoveryOwner | None:
     # 执行所有权读最小投影（S1e 工单 #1015）：编号是投影里的执行权编号，没有取得过执行权时为空。
     # 取得的时间不是投影的内容（内核不为应用加字段），仍取自记下这一次取得的那个事件；
-    # 这次取得所依据的中断位置与当时那条事件的文字也来自它（工单 #181，docs/design/app-and-interface.md「查询清单」）
+    # 这次取得所依据的中断位置与当时那条事件的文字也来自它（工单 #181）
     epoch = minimal.execution_right
     if epoch <= 0:
         return None

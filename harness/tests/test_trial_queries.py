@@ -1,9 +1,9 @@
-# 试用记录与截图的查询（工单 #152；浏览器与 computer use 设计说明第 7.2 节；应用层与接口层设计说明
+# 试用记录与截图的查询（工单 #152；浏览器与 computer use 设计说明「查询」；应用层与接口层设计说明
 # 「查询清单」；总图第四节「接口」缝）。
 #
 # 这个文件查八件事：
 # 1. `run.trials` 按部门列出试用会话：种类、启动方式、试用副本的树摘要，质检的会话标明树摘要是否等于
-#    交付快照，开始与结束、结束方式（设计第 7.2 节）；
+#    交付快照，开始与结束、结束方式（设计「查询」）；
 # 2. `run.trials` 给出质检的试用用例：引用的验收条件与原文、计划的操作与预期结果、步骤（工具、输入、
 #    结果状态、截图的工件引用、可访问性结构的摘录、收到这个结果的请求是否包含图像）、结论与观察到的结果、
 #    作为证据的步骤；
@@ -79,7 +79,7 @@ def _ref(ref: object) -> dict:
 
 def _output(data_dir: Path, accessibility: str, *, session_id: str = "brs_1",
             tree_digest: str = DELIVERY_DIGEST) -> object:
-    # 浏览器动作的输出：可访问性结构与浏览器会话身份（浏览器与 computer use 设计说明第 7.1 节）
+    # 浏览器动作的输出：可访问性结构与浏览器会话身份（浏览器与 computer use 设计说明「保存与绑定」）
     body = {"accessibility": accessibility, "images": [],
             "session": {"session_id": session_id, "tree_digest": tree_digest, "status": "running"}}
     return ArtifactStore(data_dir / "artifacts").put(RUN, "tool_output", json_dumps(body),
@@ -179,7 +179,7 @@ def _qa_submitted(criteria: list[dict]) -> NewEvent:
 
 
 def test_run_trials_lists_sessions_by_department_and_marks_the_delivery_snapshot(tmp_path):
-    # 设计第 7.2 节：种类、启动方式、试用副本的树摘要，质检的会话标明是否等于交付快照，开始与结束、
+    # docs/design/browser-and-computer-use.md「查询」：种类、启动方式、试用副本的树摘要，质检的会话标明是否等于交付快照，开始与结束、
     # 结束方式；没有结束记录的会话按进行中给出。守 R1（会话只由事件得出）
     data_dir = tmp_path / "data"
     _write(data_dir,
@@ -225,7 +225,7 @@ def test_run_trials_lists_sessions_by_department_and_marks_the_delivery_snapshot
 
 
 def test_run_trials_gives_the_case_with_criteria_text_plan_and_steps(tmp_path):
-    # 设计第 7.2 节的用例字段；步骤里的输入取自动作参数，可访问性结构取自结果工件，收到结果的请求
+    # docs/design/browser-and-computer-use.md「查询」的用例字段；步骤里的输入取自动作参数，可访问性结构取自结果工件，收到结果的请求
     # 是否包含图像取自下一次模型请求的调用目标。守 R2（交换字段）与 R3（证据步骤与截图引用）
     data_dir = tmp_path / "data"
     screenshot = _screenshot(data_dir)
@@ -371,7 +371,7 @@ def test_evidence_screenshot_rejects_changed_content_other_runs_and_other_kinds(
 
 
 def test_run_actions_carries_screenshots_and_the_browser_session(tmp_path):
-    # 设计第 7.2 节：浏览器动作的回执带截图引用与会话身份；会话身份取自结果工件里的浏览器会话
+    # docs/design/browser-and-computer-use.md「查询」：浏览器动作的回执带截图引用与会话身份；会话身份取自结果工件里的浏览器会话
     data_dir = tmp_path / "data"
     screenshot = _screenshot(data_dir)
     output = _output(data_dir, "page", session_id="brs_1", tree_digest=TREE_DIGEST)
@@ -396,7 +396,7 @@ def test_run_actions_carries_screenshots_and_the_browser_session(tmp_path):
 
 
 def test_work_item_materials_adds_launch_methods_criteria_results_and_trial_screenshots(tmp_path):
-    # 设计第 7.2 节 `work_item.materials` 的三处增加：交付说明里的启动方式、每份 QAReview 的逐条结论与
+    # docs/design/browser-and-computer-use.md「查询」 `work_item.materials` 的三处增加：交付说明里的启动方式、每份 QAReview 的逐条结论与
     # 试用用例的截图引用、无法核验的条目与原因
     system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter([]))
     try:
@@ -449,7 +449,7 @@ def test_work_item_materials_adds_launch_methods_criteria_results_and_trial_scre
 
 
 def test_tools_registry_lists_the_builtin_browser_tools_and_whether_they_need_images(tmp_path):
-    # 设计第 7.2 节 `tools.registry`：Playwright MCP 的版本、浏览器工具与恢复契约、每个工具是否需要图像输入。
+    # `tools.registry`：Playwright MCP 的版本、浏览器工具与恢复契约、每个工具是否需要图像输入。
     # 版本取自浏览器模块（find_program 只接受这一版），工具与恢复契约取自定义
     system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter([]))
     try:

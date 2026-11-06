@@ -277,7 +277,7 @@ def test_a_round_that_called_a_proposal_method_has_submitted_a_formal_output():
 
 
 def test_the_routing_work_reference_is_empty_for_watched_outputs():
-    # R2：开始一轮工作的请求带路由自己的工作引用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」，工单 #861）；
+    # R2：开始一轮工作的请求带路由自己的工作引用（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」，工单 #861）；
     # 成果驱动不用它时为空
     assert ROUTING.work_reference(_running(), department="product") is None
     # 执行契约的请求与结果都带这一项：请求里的工作引用原样交给装配（工单 #826）

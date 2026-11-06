@@ -369,7 +369,7 @@ def test_cancel_button_does_not_fabricate_text_and_terminal_work_never_resumes(t
 
 def test_project_department_prompt_changes_apply_from_the_next_model_request(tmp_path):
     # 部门 Prompt 保存在项目部门设置中，run 内没有副本：修改发生在工程部门的第一次请求之后，
-    # 同一次激活内的下一次请求就使用新 Prompt，请求事件记录项目部门设置的版本（docs/design/model-management.md「生效时机」）
+    # 同一次激活内的下一次请求就使用新 Prompt，请求事件记录项目部门设置的版本
     replacement = "  Engineer: document the reason for each planned change.\r\n"
     default_text = DEFINITIONS.role("engineering").prompt
     project_id = {"value": ""}

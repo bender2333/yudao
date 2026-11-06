@@ -17,14 +17,14 @@ import { departmentName } from "../project/labels.ts";
 // 推理档位全集，由低到高（模型管理设计说明「档位与声明」，与后端 REASONING_LEVELS 一致）
 export const REASONING_LEVELS = ["minimal", "low", "medium", "high", "xhigh", "max"] as const;
 
-// 推理参数方式与它相符的协议（docs/design/model-management.md「协议映射」）
+// 推理参数方式与它相符的协议
 export const REASONING_MODE_PROTOCOLS: Record<string, string[]> = {
   effort: ["responses", "chat_completions"],
   adaptive: ["messages"],
   budget: ["messages"],
 };
 
-// 推理参数方式的说明文字（docs/design/model-management.md「协议映射」的上游参数）
+// 推理参数方式的说明文字（的上游参数）
 export const REASONING_MODE_LABELS: Record<string, string> = {
   effort: "effort（请求带档位名）",
   adaptive: "adaptive（Messages 的自适应思考）",
@@ -65,7 +65,7 @@ export const CONFIG_STATE_LABELS: Record<string, string> = {
 // 连接服务
 // ---------------------------------------------------------------------------
 
-// 地址没有协议头时补上 https://（服务端按同一份规则规范化，docs/design/model-management.md「Provider 配置」）
+// 地址没有协议头时补上 https://（服务端按同一份规则规范化）
 export function normalizeBaseUrl(value: string): string {
   const address = value.trim();
   return address === "" || /^[a-z][a-z\d+.-]*:\/\//i.test(address) ? address : `https://${address}`;
@@ -92,7 +92,7 @@ export function connectIssue(input: { address: string; api_key: string; credenti
   return "";
 }
 
-// 凭据状态（docs/design/model-management.md「模型管理页」中「Key 状态」）：已保存与来源
+// 凭据状态（docs/design/model-management.md「模型管理页」「Key 状态」）：已保存与来源
 export function credentialSourceText(source: string): string {
   switch (source) {
     case "override":
@@ -108,7 +108,7 @@ export function credentialSourceText(source: string): string {
   }
 }
 
-// 凭据状态（docs/design/model-management.md「模型管理页」中「Key 状态」）：已保存与来源。
+// 凭据状态（docs/design/model-management.md「模型管理页」「Key 状态」）：已保存与来源。
 // 只读两样东西（工单 #237）：项目设置里的 MCP 服务器一节也用这句话，两处的凭据状态说法一致
 export function credentialStatusLabel(credential: { configured: boolean; source: string }): string {
   if (!credential.configured) {
@@ -215,7 +215,7 @@ export function candidateKey(providerId: string, modelId: string): string {
   return `${providerId}::${modelId}`;
 }
 
-// 筛选的种类与说法（docs/design/model-management.md「模型访问定义与准入」中「按支持图像、支持推理、全部模型与已选用筛选」）
+// 筛选的种类与说法（docs/design/model-management.md「模型访问定义与准入」「按支持图像、支持推理、全部模型与已选用筛选」）
 export const CANDIDATE_FILTERS = [
   { id: "auto", label: "可自动配置" },
   { id: "vision", label: "支持图像" },
@@ -230,7 +230,7 @@ export type CandidateFilterId = (typeof CANDIDATE_FILTERS)[number]["id"];
 export const FIRST_BATCH = 8;
 export const MORE_BATCH = 12;
 
-// 容量已知：窗口与输出上限都有值（docs/design/model-management.md「模型访问定义与准入」中「可自动配置」）
+// 容量已知：窗口与输出上限都有值（docs/design/model-management.md「模型访问定义与准入」「可自动配置」）
 export function capacityKnown(candidate: CatalogCandidate): boolean {
   return typeof candidate.context_window === "number" && typeof candidate.max_output_tokens === "number";
 }
@@ -340,7 +340,7 @@ export const SELECTION_STATUS_LABELS: Record<string, string> = {
   failed: "验证失败",
   capacity_unknown: "容量未知",
   not_in_list: "不在新的模型列表中",
-  // 已启用是准入有效的样子（docs/design/model-management.md「模型管理页」中「已启用」）
+  // 已启用是准入有效的样子（docs/design/model-management.md「模型管理页」「已启用」）
   enabled: "已启用",
 };
 
@@ -646,12 +646,12 @@ export function modelInputOf(model: CatalogModel): Record<string, unknown> {
 // 档位与项目设置（项目部门设置页与设置页共用）
 // ---------------------------------------------------------------------------
 
-// 默认档位只能从已选的支持档位中选择（docs/design/model-management.md「模型访问定义与准入」、「档位与声明」）
+// 默认档位只能从已选的支持档位中选择（docs/design/model-management.md「模型访问定义与准入」）
 export function defaultLevelOptions(supported: string[]): string[] {
   return REASONING_LEVELS.filter((level) => supported.includes(level));
 }
 
-// 推理参数方式只列出与协议相符的选项（docs/design/model-management.md「协议映射」）
+// 推理参数方式只列出与协议相符的选项
 export function reasoningModeOptions(protocol: string): string[] {
   return Object.keys(REASONING_MODE_PROTOCOLS).filter((mode) => REASONING_MODE_PROTOCOLS[mode].includes(protocol));
 }
@@ -670,7 +670,7 @@ export function numberToText(value: number | null): string {
   return value === null ? "" : String(value);
 }
 
-// 部门默认的档位选项：来自所选模型的声明；已保存的档位不在声明内时额外保留并标明按模型限制（docs/design/model-management.md「限制到支持范围」）
+// 部门默认的档位选项：来自所选模型的声明；已保存的档位不在声明内时额外保留并标明按模型限制
 export function tierOptions(supported: string[], saved: string | null | undefined): { value: string; label: string }[] {
   const options = defaultLevelOptions(supported).map((level) => ({ value: level, label: level }));
   if (saved && !options.some((item) => item.value === saved)) {
@@ -713,7 +713,7 @@ export function selectionPair(value: string): { provider_id: string | null; mode
   return { provider_id, model_id: rest.join("/") };
 }
 
-// 一组设置按 docs/design/model-management.md「解析规则」取得的模型访问定义：项目设置写入了就用它，否则用部门默认（catalog 的 bindings）
+// 一组设置按取得的模型访问定义：项目设置写入了就用它，否则用部门默认（catalog 的 bindings）
 export function mergedModelId(projectModelId: string | null | undefined, department: string,
   bindings: Record<string, CatalogBinding> | undefined): string {
   if (projectModelId) {
@@ -727,7 +727,7 @@ export function modelById(models: CatalogModel[], modelId: string): CatalogModel
   return models.find((item) => item.id === modelId) ?? null;
 }
 
-// 一次保存以后要提示的生效说明（docs/design/model-management.md「部门详情里的模型与 Prompt」）
+// 一次保存以后要提示的生效说明
 export const DEPARTMENT_SAVE_NOTICE = "从本部门下一次模型请求起生效";
 
 // ---------------------------------------------------------------------------

@@ -147,7 +147,7 @@ def _secondary(paired):
 
 
 def _verdict(paired, noise):
-    """三种结论（docs/design/evaluation-scenarios.md「评分」）：
+    """三种结论：
     - 退化：任一运行误放行增加，或出现基线没有的新检查点失败，或完成度下降超出噪声范围；
     - 改进：误放行总数下降超出噪声范围，并且没有任何运行退化；
     - 无差别：其余情况。
@@ -302,7 +302,7 @@ def qa_advantage(runs):
 
 
 def _false_release(run):
-    """质检误放行：放行而隐藏检查中存在失败（docs/design/evaluation-scenarios.md「Yudao 的过程检查点」中「质检误放行」）。"""
+    """质检误放行：放行而隐藏检查中存在失败。"""
     checkpoints = (run.get("metrics") or {}).get("checkpoints") or {}
     return (checkpoints.get("no_false_release") or {}).get("passed") is False
 

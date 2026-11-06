@@ -244,7 +244,7 @@ def test_script_rejects_a_dirty_worktree(release_template, tmp_path):
     assert "工作区不干净" in result.stderr
 
 def test_script_rejects_an_already_released_version(release_template, tmp_path):
-    # 版本号只核对 pyproject.toml 与标签（docs/design/web-interface-and-release.md「版本号」）：这个版本已经打过标签时脚本拒绝，
+    # 版本号只核对 pyproject.toml 与标签：这个版本已经打过标签时脚本拒绝，
     # 避免重复发布覆盖上一次的记录
     source, _remote = _clone_checkout(release_template, tmp_path)
     version = _version(source / "pyproject.toml")

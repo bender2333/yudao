@@ -60,7 +60,7 @@ class _MessagesInvocation:
     session_id: str
     attempt_id: str
     emit: Emit
-    # 输出片段（docs/design/app-and-interface.md「模型输出片段」）：按通道保存已发出的字数，作为下一段的起始位置
+    # 输出片段：按通道保存已发出的字数，作为下一段的起始位置
     channel_offsets: dict[str, int] = field(default_factory=dict)
 
 
@@ -275,7 +275,7 @@ class _MessagesInvoker:
                             "arguments": "",
                         }
                     elif block.get("type") == "thinking":
-                        # 推理内容（docs/design/model-management.md「历史中的推理内容」）：thinking 块与它的 signature 一起保存
+                        # 推理内容：thinking 块与它的 signature 一起保存
                         thinking_blocks[int(payload.get("index", 0))] = {
                             "type": "thinking",
                             "thinking": str(block.get("thinking") or ""),

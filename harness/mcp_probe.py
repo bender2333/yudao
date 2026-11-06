@@ -52,7 +52,7 @@ async def probe(server: dict[str, Any], *, credentials: CredentialChain,
 
 
 def _kept(launch: ServerLaunch, error: str) -> str:
-    # 探测结束以后把标准错误输出日志里的凭据值替换为星号（docs/design/network-and-mcp.md「凭据」中「保存的标准错误输出」）：
+    # 探测结束以后把标准错误输出日志里的凭据值替换为星号（docs/design/network-and-mcp.md「凭据」「保存的标准错误输出」）：
     # 日志文件留在数据目录里供诊断，凭据值不出现在保存的内容里
     path = launch.stderr_log_path
     if path and os.path.exists(path) and launch.secrets:
@@ -78,7 +78,7 @@ class ProbeOutcome:
 
 
 def _resolve_variable(entry: dict[str, Any], credentials: CredentialChain, server_name: str, where: str) -> str:
-    # 一个环境变量或请求头的取值（docs/design/network-and-mcp.md「凭据」）：固定文本原样，凭据按名称解析；
+    # 一个环境变量或请求头的取值：固定文本原样，凭据按名称解析；
     # 缺失时启动失败，原因写明凭据名称
     kind = entry.get("kind")
     if kind == "text":
@@ -91,7 +91,7 @@ def _resolve_variable(entry: dict[str, Any], credentials: CredentialChain, serve
 
 
 def _tool_document(tool: ToolSpec) -> dict[str, Any]:
-    # 一个工具的快照项：名称、说明、参数结构与服务器标注的提示（只供参考，docs/design/network-and-mcp.md「服务器设置」）
+    # 一个工具的快照项：名称、说明、参数结构与服务器标注的提示（只供参考）
     document: dict[str, Any] = {"name": tool.name, "description": tool.description,
                                 "input_schema": dict(tool.input_schema or {}), "hints": None}
     annotations = tool.hints
@@ -104,7 +104,7 @@ def _tool_document(tool: ToolSpec) -> dict[str, Any]:
 
 
 def launch_for(server: dict[str, Any], *, credentials: CredentialChain, stderr_log_path: str) -> ServerLaunch:
-    # 一台已归一化的服务器设置变成客户端的启动参数（docs/design/network-and-mcp.md「客户端模块」、「运行规则」）。
+    # 一台已归一化的服务器设置变成客户端的启动参数。
     # secrets 传入已经解析的凭据值：错误文本与标准错误输出在写进事件之前把值替换为星号
     name = str(server.get("name") or "")
     values: list[str] = []
@@ -138,6 +138,6 @@ def stderr_log_path_for(data_dir: str | os.PathLike[str], server_name: str) -> s
 
 
 def credentials_of(facade: ProviderFacade) -> CredentialChain:
-    # 控制主机的凭据来源（进程内存、进程环境、数据目录的 .env，docs/design/network-and-mcp.md「凭据」）：
+    # 控制主机的凭据来源（进程内存、进程环境、数据目录的 .env）：
     # Provider 模块持有它，探测经这个入口取值
     return facade.credential_chain()

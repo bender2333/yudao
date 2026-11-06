@@ -34,7 +34,7 @@ class ToolSpec:
 @dataclass(frozen=True)
 class ToolImage:
     # 工具结果里的一张图像：媒体类型与 base64 编码的字节。证据编号属于装配一侧的工件引用，
-    # 走到请求里的内容块只有图像本身（docs/design/browser-and-computer-use.md「请求中的图像」）
+    # 走到请求里的内容块只有图像本身
     media_type: str
     data: str
 
@@ -132,7 +132,7 @@ class InvokeResult:
     response_id: str | None = None
     protocol: str = ""
     actual_model: str | None = None
-    # 这次回答里上游返回的推理内容，带产生它的连接、协议与上游模型（docs/design/model-management.md「历史中的推理内容」）；
+    # 这次回答里上游返回的推理内容，带产生它的连接、协议与上游模型
     # 与 output 分开保存，不进入协议无关的部门历史条目列表
     reasoning: ReasoningOutput | None = None
     wire_evidence: dict[str, Any] = field(default_factory=dict)

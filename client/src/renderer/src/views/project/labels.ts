@@ -9,7 +9,7 @@ export const DEPARTMENTS: Record<string, { name: string; role: string }> = {
   quality: { name: "质检", role: "按验收条件核验并给出放行或缺陷记录" },
 };
 
-// 部门状态的中文名（三部门的循环结构「部门的状态」，工单 #904）：总图第三节外环的五个词，页面上只写这一处。
+// 部门状态的中文名（三部门的循环结构第 2.1 节，工单 #904）：总图第三节外环的五个词，页面上只写这一处。
 // 外环另外四个词（接纳、返工、排空中、停止）在成果驱动下不作为部门的持续状态显示，这里不列。
 export const DEPARTMENT_STATE: Record<string, string> = {
   waiting_user: "等用户",
@@ -139,7 +139,7 @@ export const DECISION_REASON: Record<string, string> = {
   provider_unavailable: "模型或凭据不可用",
 };
 
-// 结果未知的动作的处理方式（工单 #181，恢复契约「动作分类与处置」）：核实确认是自动核实，或者用户选择按当前
+// 结果未知的动作的处理方式（工单 #181，恢复契约第 4 节）：核实确认是自动核实，或者用户选择按当前
 // 实际状态接受；交还会话是把结果作为工具结果交给发出它的会话，由模型决定是否重新执行。
 // 页面上写这两个词，不写 handed_back 这类取值
 export const ACTION_HANDLING: Record<string, string> = {
@@ -159,7 +159,7 @@ export const ACTION_PURPOSE: Record<string, string> = {
   compaction: "压缩上下文时的调用",
 };
 
-// 会话是部门主线还是询问分支（三部门的循环结构「停止与恢复」，工单 #181）：用量各自累计，页面上分开写
+// 会话是部门主线还是询问分支（三部门的循环结构第 9 节，工单 #181）：用量各自累计，页面上分开写
 export const SESSION_KIND: Record<string, string> = {
   main: "部门主线",
   branch: "询问分支",
@@ -174,7 +174,7 @@ export const ATTEMPT_STATUS: Record<string, string> = {
   cancelled: "已取消",
 };
 
-// 指导的状态只有三种（原型 v12 设计说明第 3.4 节、部门指导的处理设计「处理结果与来源」，工单 #906）：
+// 指导的状态只有三种（原型 v12 设计说明第 3.4 节、部门指导的处理设计第 3 节，工单 #906）：
 // 已接收、已进入模型输入、已回答，没有别的状态。第三种状态的「已回答」由主机在收到指导的那一轮
 // 正常结束时写，部门不提交（工单 #1039）。状态值取查询 department.workspace 的 guidance 一项。
 export const GUIDANCE_STATUS: Record<string, string> = {
@@ -239,7 +239,7 @@ const CONCLUSION_LABELS: Record<string, string> = {
   release: "放行",
 };
 
-// 进度行（三部门的循环结构「部门按关注的成果开始工作」，工单 #904 按原型 v12 第 3.2 节改写）：
+// 进度行（三部门的循环结构第 2 节，工单 #904 按原型 v12 第 3.2 节改写）：
 // 「PRD r2 · 交付 r1（依据 PRD r2）· 结论：放行」；还没有交付时写「PRD r2 · 还没有交付」；没有结论不写。
 // 什么都不写时不写这一行（还没有成果）。
 export function progressLabel(progress: WorkItemProgressView | null | undefined): string | null {
@@ -278,13 +278,13 @@ export const DEPARTMENT_STATE_KIND: Record<string, string> = {
 };
 
 // 一个部门的状态与原因（原型 v12 第 3.1 节）：状态词，有原因时写在括号里，例如
-// 「询问中（在等待产品的回答）」。原因只有四种，见三部门的循环结构「部门的状态」。
+// 「询问中（在等待产品的回答）」。原因只有四种，见三部门的循环结构第 2.1 节。
 export function departmentStateText(state: DepartmentStateView): string {
   const name = DEPARTMENT_STATE[state.state] ?? state.state;
   return state.note ? `${name}（${state.note}）` : name;
 }
 
-// 部门页标题区的部门状态（原型 v12 第 3.1 节、三部门的循环结构「部门的状态」，工单 #905）：
+// 部门页标题区的部门状态（原型 v12 第 3.1 节、三部门的循环结构第 2.1 节，工单 #905）：
 // 事项进行中时用 departments[本部门]，写状态与原因；没有部门状态（事项还没有开始、已经结束，
 // 或者进程中断以后还没有继续）时按事项的结束方式写，不再写「正在工作」与「这次运行不在本部门」。
 // text 是状态词，note 是原因（没有时为空串），kind 是页面上那个状态标记的样式。
@@ -340,7 +340,7 @@ export function departmentStatusView(data: {
   };
 }
 
-// 三个部门各自的状态与原因拆成一段段（三部门的循环结构「部门的状态」，工单 #904）：
+// 三个部门各自的状态与原因拆成一段段（三部门的循环结构第 2.1 节，工单 #904）：
 // 「产品 一轮工作中（回答工程的询问） · 工程 询问中（在等待产品的回答） · 质检 等待工作」。
 // 顺序取查询给出的那个（事项所用的定义里的部门顺序，工单 #1372）；current 标出本部门那一段，
 // 部门工作间把它加粗（工单 #905）。没有 departments（事项没有进行中的 run）时返回 null。
@@ -391,7 +391,7 @@ export function departmentLine(
   return departmentsText(departments) ?? `所在部门：${departmentName(department) || "大厅"}`;
 }
 
-// 看板卡片上写正在工作的部门（三部门的循环结构「各部门在什么时候工作」，工单 #904）：状态是一轮工作中或询问中的部门，
+// 看板卡片上写正在工作的部门（三部门的循环结构第 3.1 节，工单 #904）：状态是一轮工作中或询问中的部门，
 // 按查询给出的部门顺序写成「工程、质检在工作」（工单 #1372）。有这样的部门时写它；没有时不写这句话
 // （返回空串，调用处这一格不出现）；查询结果里没有 departments（旧数据、没有进行中的 run）时
 // 退回事项所在的部门（工单 #842 的行为：没有部门的事项，这一格不写）。
@@ -519,7 +519,7 @@ export function stoppedCardLine(item: { work_item_id: string; stopped_at?: strin
   return `事项标识 ${item.work_item_id} · 停止于 ${formatTime(item.stopped_at)}`;
 }
 
-// 离开期间的报告里的开环明细（工单 #401；验证的独立性设计说明「检验覆盖与开环」、「口径」）：每个带开环条件的放行
+// 离开期间的报告里的开环明细（工单 #401；验证的独立性设计说明第 7、7.1 节）：每个带开环条件的放行
 // 列出它的验收条件，条数取 `acceptance.coverage` 的数——放行记录里一次算好，查询与页面读这个数，
 // 不重新计算。条件编号是产品合同里的验收条件编号（AC2 这类），不是内部标识。
 export function openCriteriaText(count: number, criteria: readonly string[]): string {

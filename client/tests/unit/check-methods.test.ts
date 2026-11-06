@@ -3,7 +3,7 @@
 // client/tests/fixtures/check-methods.json 里；服务端那一份是 harness/tests/fixtures/check_methods.json，
 // 服务端测试核对两份相同、服务端的封闭取值与它那份一致。
 // 这里核对客户端声明表覆盖夹具：缺一行、名字不同、可执行不同都失败并写明是哪个代码名。
-// 守 docs/design/test-pyramid.md「测试按三环留」的 R2（两端交换的词表是合同）。用 node --test 运行，不依赖 Electron 与网络。
+// 守的 R2（两端交换的词表是合同）。用 node --test 运行，不依赖 Electron 与网络。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

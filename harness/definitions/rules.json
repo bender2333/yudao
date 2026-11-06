@@ -8,7 +8,7 @@
     "cost": "超过上限的选用需要等待正在进行的测试结束",
     "relax_when": "上游允许更多并发并且用户愿意承担同时测试的费用",
     "tighten_when": "模型测试触发上游限流或同时测试的费用过高",
-    "origin": "docs/design/model-management.md 「模型访问定义与准入」中「选用」：同时测试默认 3 个，范围 1 至 8"
+    "origin": "docs/design/model-management.md「模型访问定义与准入」「选用」：同时测试默认 3 个，范围 1 至 8"
   },
   "provider.model_test_timeout_sec": {
     "value": 60,
@@ -19,7 +19,7 @@
     "cost": "较慢的模型需要重新测试或提高等待上限",
     "relax_when": "正常的最小问答与工具往返经常超过当前等待上限",
     "tighten_when": "失败的模型请求长期等待且没有得到有效回应",
-    "origin": "docs/design/model-management.md 「模型访问定义与准入」中「模型测试」：每次请求默认 60 秒，范围 10 至 300 秒"
+    "origin": "docs/design/model-management.md「模型访问定义与准入」中「模型测试」：每次请求默认 60 秒，范围 10 至 300 秒"
   },
   "run_time_limit_sec": {
     "value": 7200,
@@ -217,7 +217,7 @@
     "cost": "审查者重复查证",
     "relax_when": "D26 的对照里加一组可见的取值",
     "tighten_when": "对照显示审查结论因此改变",
-    "origin": "部门内多角色设计说明「审查者的上下文」，审查者看不到本部门记录的事实、决定、推测与画像"
+    "origin": "部门内多角色审查者看不到本部门记录的事实、决定、推测与画像"
   },
   "loop.single_work_item": {
     "value": true,
@@ -569,7 +569,7 @@
     "cost": "每次提交多一次审查请求",
     "relax_when": "连续一致以后按比例抽审",
     "tighten_when": "抽审发现未通过的成果",
-    "origin": "部门内多角色设计说明「角色清单」：每个部门设审查者，下界大于 0"
+    "origin": "部门内多角色：每个部门设审查者，下界大于 0"
   },
   "execution.slots": {
     "value": 3,

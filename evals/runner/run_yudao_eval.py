@@ -26,11 +26,11 @@ import yudao
 import yudao_metrics
 import yudao_report
 
-# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计「两边的运行条件」中「时间上限」）。
+# 每次运行的墙钟上限：两边相同，由运行器到点结束（评测场景设计「两边的运行条件」「时间上限」）。
 # 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（「指标」、「前提与未决事项」）
 TIME_LIMIT_SECONDS = 120 * 60
 SCENARIO_PYTHON = "3.13"
-# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目设计说明「用户确认的决定」中「建档 run 的运行时间上限与普通事项相同」）
+# 建档的等待上限：建档 run 的运行时间上限与普通事项相同（接入已有项目设计说明「用户确认的决定」）
 ONBOARDING_TIMEOUT_SECONDS = 120 * 60
 # `--wait-prd-confirmation` 等人在浏览器的决定卡片里确认初始 PRD 的上限
 PRD_CONFIRMATION_TIMEOUT_SECONDS = 10 * 60
@@ -128,7 +128,7 @@ def _score_scenario2(delivery_dir, evidence_dir):
 
 
 def score_deliveries(first_dir, final_dir, evidence_dir):
-    """第一次与最终两份交付都交给评分器（docs/design/evaluation-scenarios.md「指标」）。
+    """第一次与最终两份交付都交给评分器。
 
     `first_dir` 为空表示两份是同一份交付（只有一次交付，或者没有交付）：评分器只跑一次，
     两份评分相同。没有交付时评分目录是空的，评分器把每条隐藏检查记成「没有做」。
@@ -145,7 +145,7 @@ def run_once(run_id, runs_root, evidence_root, model_name, limit_seconds, limits
              prd_confirmation_timeout_seconds=PRD_CONFIRMATION_TIMEOUT_SECONDS):
     """运行一次 Yudao，评分并收好原始证据。
 
-    提交号在启动服务之前记下：每次运行各带自己的提交号（docs/design/evaluation-scenarios.md「两边的运行条件」中「运行环境」）。
+    提交号在启动服务之前记下：每次运行各带自己的提交号（docs/design/evaluation-scenarios.md「两边的运行条件」「运行环境」）。
     给出 `scenario` 时这次运行在它指定的场景下，结束后恢复原来的场景。
     """
     context = yudao.scenario(scenario) if scenario is not None else contextlib.nullcontext()
@@ -336,7 +336,7 @@ def _run_scenario2(run_id, runs_root, evidence_root, model_name, limit_seconds, 
         with open(os.path.join(evidence_dir, "service-stderr.txt"), "w", encoding="utf-8") as handle:
             handle.write(stderr)
 
-    # 建档与事项是两个 run，各自导出、分开保存（docs/design/evaluation-scenarios.md「指标」）
+    # 建档与事项是两个 run，各自导出、分开保存
     if onboarding_export is not None:
         with open(os.path.join(evidence_dir, "onboarding-run-export.json"), "w",
                   encoding="utf-8") as handle:
@@ -427,7 +427,7 @@ def _empty_metrics(timed_out):
 
 
 def _run_versions(export):
-    """取 `run_created` 事件里的定义版本与参数版本（docs/design/evaluation-scenarios.md「报告与版本比较」）。
+    """取 `run_created` 事件里的定义版本与参数版本。
 
     取不到时那一项为空，报告写「未知」；第 2 项检查点也用这里的参数版本核对冻结限额。
     """

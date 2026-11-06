@@ -64,7 +64,7 @@ def preset_header_profile(preset_id: str) -> str:
 
 
 def preset_default_protocol(preset_id: str) -> str:
-    # 服务方案的默认协议（docs/design/model-management.md「服务方案预置表与模型能力表」）：能力表中没有这个模型时预填它；
+    # 服务方案的默认协议：能力表中没有这个模型时预填它；
     # 不是预置方案（自定义服务）时返回空串，由调用方预填 Chat Completions
     item = _PRESET_INDEX.get(str(preset_id))
     return "" if item is None else item.default_protocol

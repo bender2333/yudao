@@ -29,7 +29,7 @@ from mcp.client.streamable_http import streamable_http_client
 from mcp.shared.exceptions import MCPError
 from mcp_types import REQUEST_TIMEOUT
 
-# 标准错误输出读末尾这么多字符（docs/design/network-and-mcp.md「运行规则」中「读取末尾部分用于诊断」）
+# 标准错误输出读末尾这么多字符（docs/design/network-and-mcp.md「运行规则」「读取末尾部分用于诊断」）
 STDERR_TAIL_CHARS = 4000
 # 超时或取消以后等服务器应答的最长时间。这个数取自 docs/design/network-and-mcp.md「恢复契约」的两处：
 # 「stdio：发取消通知，等服务器应答最多 10 秒，随后结束进程树」与「MCP 调用超时的处理顺序」。
@@ -92,7 +92,7 @@ class ServerInfo(BaseModel):
 class ToolSpec(BaseModel):
     # 一个工具的清单项：名称、说明与参数结构；服务器自己的提示只作参考。
     # hints 保留服务器标注的提示对象（SDK 的 ToolAnnotations：标题与只读、幂等、破坏性、开放世界提示），
-    # 探测把它写进工具清单快照（工单 #1174，docs/design/network-and-mcp.md「服务器设置」中「工具清单」）；服务器没有标注时为空
+    # 探测把它写进工具清单快照（工单 #1174）；服务器没有标注时为空
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     name: str

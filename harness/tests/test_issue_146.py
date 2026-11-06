@@ -18,7 +18,7 @@ from harness.tests.helpers import list_files_turn, system_with
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 KEY = "issue146-key"
-# 质检缺少图像输入的影响（docs/design/model-management.md「部门的建议能力」）
+# 质检缺少图像输入的影响
 QUALITY_IMPACT = "不提供 computer use，浏览器只给可访问性结构，不给截图；依赖桌面程序或外观的验收条件无法核验"
 
 def _text_stream(model: str = "upstream") -> bytes:
@@ -148,7 +148,7 @@ def _wait_for(store, predicate, *, description):
 
 def test_candidates_take_the_window_from_upstream_and_the_input_from_the_table(tmp_path):
     # 上游列表返回窗口时预填取列表的值与来源；输入方式取能力表；能力表没有记录时只有文本
-    # 连接地址是预置方案的请求基址时，能力资料在这家服务商之内查（docs/design/model-management.md「模型访问定义与准入」）
+    # 连接地址是预置方案的请求基址时，能力资料在这家服务商之内查
     upstream_models = {"data": [
         {"id": "deepseek-v4.1-flash", "limit": {"context": 500000, "output": 100000}},
         {"id": "not-in-the-table"},
@@ -321,7 +321,7 @@ def test_workspace_reminder_disappears_after_the_model_gains_the_capability(tmp_
 
 
 def test_call_target_records_input_modalities(tmp_path):
-    # 请求事件记录调用目标的输入方式（docs/design/model-management.md「每次模型请求」中「审计」），且不含 Key
+    # 请求事件记录调用目标的输入方式且不含 Key
     system = system_with(tmp_path, [list_files_turn])
     run_id = system.create_run("task")
     system.run_until_stop(run_id)

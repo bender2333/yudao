@@ -702,7 +702,7 @@ def _mixed_protocol_facade(product_url: str, engineering_url: str, quality_url: 
             {"id": "model-q", "provider_id": "provider-q", "model": "q-model",
              "protocol": "responses",
              # 独立判断提交以后工程的解释并入质检的请求（工单 #358），固定材料随之变大：
-             # 窗口按 docs/design/model-management.md「涉及的模块」上调，留给输出与历史
+             # 窗口按上调，留给输出与历史
              "context_window": 40_000, "max_output_tokens": 1_000},
         ],
         "bindings": {

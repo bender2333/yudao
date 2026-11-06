@@ -163,7 +163,7 @@ def test_the_new_work_checks_hold_when_there_is_no_effective_contract(tmp_path):
 
 
 def test_quality_write_tools_only_target_the_test_materials(tmp_path):
-    # 验收第 1、2 条（工单 #645、#1390，本地工具设计说明「工具边界」中「质检的文件工具」）：写入范围是检查材料的角色
+    # 验收第 1、2 条（工单 #645、#1390，本地工具设计说明「工具边界」「质检的文件工具」）：写入范围是检查材料的角色
     # 有写入与区间编辑的工具，写检查材料目录被允许；写检查工作区里的其他文件被许可拒绝并说明原因——那是放行
     # 时核对的树。原因里写明目录，不写部门名（换一个名字的核验角色得到同一句）。这条规则只针对核验角色：
     # 工程照旧写交付文件

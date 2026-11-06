@@ -23,7 +23,7 @@ test.afterAll(async () => {
 function watchErrors(client: ClientApp): string[] {
   const errors: string[] = [];
   client.page.on("console", (message) => {
-    // 服务端按设计用 409 拒绝命令（基准版本过期、请求已被回答等，docs/design/app-and-interface.md「合同」、「用户决定的回答」），
+    // 服务端按设计用 409 拒绝命令（基准版本过期、请求已被回答等），
     // 界面已经把原因显示给用户；浏览器对非 2xx 响应自己记一条控制台消息，那不是应用的错误
     if (message.type() === "error" && !message.text().startsWith("Failed to load resource: the server responded with a status of 409")) {
       errors.push(message.text());

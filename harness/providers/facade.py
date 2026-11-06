@@ -241,9 +241,9 @@ class ProviderFacade:
         # 整份文档的全部绑定在此核对，与现有绑定相同的条目不豁免（工单 #1310）；
         # 准入有效性按保存前的配置核对（effective_store=self._store，与 save_bindings 同一基准）：
         # 文档自带连接字段的重新配置（如改地址）不作废引用，由保存后的重测重新准入
-        # （设计说明「引用无法使用时」引用保留、docs/design/model-management.md「验收」验收第 10 条）。
+        # （引用保留、验收第 10 条）。
         # 导入移除被引用的定义、或移除被引用定义所属的连接时由应用层按移除单条定义的同一规则拒绝
-        # （docs/design/model-management.md「删除」、「目录文档（编辑 JSON、导入、导出）」），引用方包含各部门默认与项目部门设置；
+        #引用方包含各部门默认与项目部门设置；
         # 启动读取目录文件容错陈旧引用与未准入的默认，两者走出不同的入口
         with self._lock:
             document = dict(raw)
@@ -259,7 +259,7 @@ class ProviderFacade:
     def remove_model(self, provider_id: str, model_id: str,
                      extra_referrers: Sequence[str] = ()) -> int:
         # 移除一条模型访问定义：仍被部门默认引用时拒绝并列出引用方，Provider 配置与其余定义原样保留；
-        # 项目部门设置的引用由应用层汇总后经 extra_referrers 传入，与部门默认一起列出（docs/design/model-management.md「删除」）
+        # 项目部门设置的引用由应用层汇总后经 extra_referrers 传入，与部门默认一起列出
         with self._lock:
             key = str(model_id)
             model = self._store.models.get(key)
@@ -293,7 +293,7 @@ class ProviderFacade:
             return self._revision
 
     def impacted_definitions(self, document: Mapping[str, Any]) -> list[dict[str, str]]:
-        # 按拟议的目录文档算出会作废准入的模型访问定义（docs/design/model-management.md「修改与准入」的受影响字段）：
+        # 按拟议的目录文档算出会作废准入的模型访问定义（的受影响字段）：
         # 只比较受影响字段（连接的地址与凭据引用，定义的协议、上游模型 ID 与推理参数方式），
         # 定义本身被移除时不列在这里，由应用层按「将一并删除」处理。
         # Provider 模块只交出定义，引用方与进行中事项由应用层汇总
@@ -313,7 +313,7 @@ class ProviderFacade:
             return impacted
 
     def deletable_definitions(self, provider_id: str) -> list[dict[str, str]]:
-        # 删除一份 Provider 配置时会被一并删除的模型访问定义（docs/design/model-management.md「删除」）；
+        # 删除一份 Provider 配置时会被一并删除的模型访问定义
         # 定义本身不算引用方，只有部门默认等引用会拒绝删除
         with self._lock:
             key = str(provider_id)
@@ -487,7 +487,7 @@ class ProviderFacade:
                         extra_referrers: Sequence[str] = ()) -> int:
         # 删除 Provider 配置：其下的模型访问定义一并删除（定义本身不算引用方）；
         # 仍被部门默认引用时拒绝并列出引用方，不删改；
-        # 项目部门设置的引用由应用层汇总后经 extra_referrers 传入，与部门默认一起列出（docs/design/model-management.md「删除」）
+        # 项目部门设置的引用由应用层汇总后经 extra_referrers 传入，与部门默认一起列出
         with self._lock:
             key = str(provider_id)
             if key not in self._store.providers:
@@ -723,7 +723,7 @@ class ProviderFacade:
                                     ) -> tuple[SelectionResolution, tuple[CallTargetResolution, FrozenTarget | None]]:
         # 读取该部门的部门默认，与项目部门设置一起合并，再解析调用目标。
         # 模型访问定义与请求档位分别按「项目部门设置、部门默认」的顺序取得第一个写入了的项，
-        # 选择来源是提供模型访问定义的那一层（docs/design/model-management.md「解析规则」）
+        # 选择来源是提供模型访问定义的那一层
         default = _as_selection(self._bindings.get(str(department)))
         project_selection = _as_selection(project) if project is not None else None
         merged = merge_selection(project_selection, default)
@@ -756,7 +756,7 @@ class ProviderFacade:
     def resolve_effective_model(self, department: str,
                                 project: ModelSelection | Mapping[str, Any] | None = None,
                                 ) -> EffectiveModelResolution:
-        # 查询用入口：按 docs/design/model-management.md「解析规则」的选择规则合并项目部门设置与部门默认，并解析调用目标，
+        # 查询用入口：按的选择规则合并项目部门设置与部门默认，并解析调用目标，
         # 不发送请求、不保留调用句柄（部门工作间的生效模型）。没有任何一层写入模型时为「未设置」，
         # 引用无法使用时为「无法使用」并带回原因；两种情况都不交回其他连接或模型
         with self._lock:
@@ -768,9 +768,9 @@ class ProviderFacade:
     def validate_department_setting(self, department: str,
                                     project: ModelSelection | Mapping[str, Any] | None,
                                     ) -> None:
-        # 保存项目部门设置时的检查（docs/design/model-management.md「项目部门设置与项目角色设置」）：模型访问定义与请求档位分别继承，每一项都可以单独写入。
+        # 保存项目部门设置时的检查：模型访问定义与请求档位分别继承，每一项都可以单独写入。
         # 写入了请求档位时，它必须属于档位全集，与是否写入模型无关；是否落在生效模型的支持档位由每次请求的限制
-        # 决定（docs/design/model-management.md「限制到支持范围」，部门默认与项目部门设置同一套核对）。写入了模型时，所选定义必须已准入且未作废。
+        # 决定（部门默认与项目部门设置同一套核对）。写入了模型时，所选定义必须已准入且未作废。
         # 目录与准入的校验留在 Provider 模块，应用层只转调
         selection = _as_selection(project)
         if selection is None:
@@ -800,8 +800,8 @@ class ProviderFacade:
 
     def project_department_reminders(
             self, departments: Mapping[str, Mapping[str, Any] | None]) -> dict[str, list[str]]:
-        # 项目各部门生效模型不具备该部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」中「一直显示」）。
-        # 生效模型按 docs/design/model-management.md「解析规则」的顺序解析：项目部门设置写入了模型时用它，否则用部门默认
+        # 项目各部门生效模型不具备该部门建议能力时的提醒。
+        # 生效模型按的顺序解析：项目部门设置写入了模型时用它，否则用部门默认
         notes: dict[str, list[str]] = {}
         for department, project_setting in departments.items():
             model_id = (project_setting or {}).get("model_id")
@@ -812,7 +812,7 @@ class ProviderFacade:
         return notes
 
     def model_reminders(self, model_id: str | None, department: str) -> list[str]:
-        # 一个模型访问定义在指定部门下的建议能力提醒（docs/design/model-management.md「部门的建议能力」）。
+        # 一个模型访问定义在指定部门下的建议能力提醒。
         # 模型管理页与项目部门设置按各自的生效模型引用调用；没有绑定模型或模型不存在时没有提醒
         if not model_id:
             return []
@@ -822,7 +822,7 @@ class ProviderFacade:
 
     def model_reminders_by_department(self, model_ids: Sequence[str]) -> dict[str, dict[str, list[str]]]:
         # 目录中各条模型访问定义在各部门的建议能力提醒（模型 ID → 部门 → 提醒）。
-        # 一次读锁算完：部门默认的下拉选中一条定义时界面立即显示提醒（docs/design/model-management.md「部门的建议能力」）
+        # 一次读锁算完：部门默认的下拉选中一条定义时界面立即显示提醒
         with self._lock:
             notes: dict[str, dict[str, list[str]]] = {}
             for model_id in model_ids:
@@ -837,7 +837,7 @@ class ProviderFacade:
     def department_setting_reminders(self, department: str,
                                      project: ModelSelection | Mapping[str, Any] | None,
                                      ) -> list[str]:
-        # 项目部门设置写入的模型不具备该部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」中「保存时」）。
+        # 项目部门设置写入的模型不具备该部门建议能力时的提醒。
         # 没有写入模型的设置不检查；提醒只按模型访问定义中的输入方式判断
         selection = _as_selection(project)
         if selection is None or not selection.writes_model():
@@ -1611,7 +1611,7 @@ class ProviderFacade:
                 self._disk_config_seen = True
                 return False
             # 明确删除目录文件表示撤销默认配置：目录、部门默认与角色默认一起清空，部门默认变为「未设置」；
-            # 新任务停止创建，进行中事项的下一次模型请求进入待恢复；修订号继续前进（docs/design/model-management.md「目录文件重新读取」）
+            # 新任务停止创建，进行中事项的下一次模型请求进入待恢复；修订号继续前进
             previous_revision = self._store.revision
             self._store = ProviderStore.empty()
             self._store.revision = previous_revision + 1
@@ -1848,7 +1848,7 @@ def _optional_text(value: Any) -> str | None:
         return value
     return None
 
-# 部门默认在目录文档中的字段：模型两项与请求档位（docs/design/model-management.md「部门默认与角色默认」）
+# 部门默认在目录文档中的字段：模型两项与请求档位
 _BINDING_FIELDS = frozenset({"provider_id", "model_id", "requested_tier"})
 
 def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]:
@@ -1863,7 +1863,7 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
         if not isinstance(item, Mapping):
             issues.append(ValidationIssue(location, "应为对象"))
             continue
-        # 部门默认只写入三项（docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」、「部门默认与角色默认」）：模型两项与请求档位；
+        # 部门默认只写入三项：模型两项与请求档位；
         # 未知字段整份拒绝并指出字段位置，界面表单与编辑 JSON 走同一套校验
         unknown = sorted(set(item) - _BINDING_FIELDS, key=str)
         if unknown:
@@ -1887,7 +1887,7 @@ def _parse_bindings(raw: Any, store: ProviderStore) -> dict[str, dict[str, str]]
             issues.append(ValidationIssue(location, "模型访问定义不属于该 Provider 配置"))
             continue
         # 请求档位（#87）：可以为空，写入时只核对它属于档位全集；
-        # 是否落在所选模型的支持档位由每次请求的限制决定（docs/design/model-management.md「限制到支持范围」）
+        # 是否落在所选模型的支持档位由每次请求的限制决定
         requested_tier = item.get("requested_tier")
         if requested_tier is not None and not isinstance(requested_tier, str):
             issues.append(ValidationIssue(f"{location}.requested_tier", "请求档位必须为字符串"))

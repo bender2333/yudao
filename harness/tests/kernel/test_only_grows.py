@@ -11,7 +11,7 @@
 # 的分工：那一个核对每个基准的结束事件都带清单里的原因，这一个守住清单本身不缩。
 #
 # 读仓库里的静态声明与定义文件，不开数据库、不用子进程、不用网络，属于单元层。
-# 守 docs/design/test-pyramid.md「测试按三环留」的 R2（第二环的合同：骨架事件只增；封闭的停止原因；动作类别与回执字段只增）。
+# 守的 R2（第二环的合同：骨架事件只增；封闭的停止原因；动作类别与回执字段只增）。
 
 import json
 import re
@@ -124,7 +124,7 @@ _CLASSES = {"Event": Event, "ProjectEvent": ProjectEvent, "CatalogEvent": Catalo
 
 
 def test_the_skeleton_event_kinds_only_grow():
-    # 骨架事件的种类只增：删掉一种或改名，读过旧日志的内核就少了它（docs/design/skeleton-and-application.md「骨架事件与应用事件」）
+    # 骨架事件的种类只增：删掉一种或改名，读过旧日志的内核就少了它（docs/design/skeleton-and-application.md「骨架事件与应用事件」「停用不删除」）
     for stream, declared in _DECLARATIONS.items():
         missing = sorted(SKELETON_EVENT_SNAPSHOT[stream] - declared)
         assert not missing, (

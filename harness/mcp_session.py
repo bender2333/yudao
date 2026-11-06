@@ -4,7 +4,7 @@
 # 模型看到的工具名、事项定义里的键与许可判断用的是同一个**标识**（小写字母、数字与下划线，字母开头），
 # 原名只在调用时按映射还原（工单 #1175 第 2 轮，设计说明「工具的提供」）。
 # 冲突（与内置或动态工具重名、或两个不同的工具收敛成同一个别名）在装配时拒绝。
-# docs/design/network-and-mcp.md「MCP 服务器」的会话部分也在这里（工单 #1175 第 8 轮）：`McpSessions` 管每个 run 每台服务器一个会话实例，
+#的会话部分也在这里（工单 #1175 第 8 轮）：`McpSessions` 管每个 run 每台服务器一个会话实例，
 # 从冻结的设置文档（item_definitions 读的同一份）组出启动参数，`call` 经客户端调用并交回已脱敏的结果；
 # run 之间与跨 run 的生命周期（持久化生命周期事件、遗留进程、取消后的结果未知处理）归工单 #1176。
 
@@ -35,7 +35,7 @@ _DISALLOWED = re.compile(r"[^a-z0-9_]")
 MCP_DISPATCH_TOOL = "mcp"
 # 轮询取消信号与调用时限的间隔（秒）：取消从另一条线程的 Event 到达，轮询把它转给客户端的取消
 _CANCEL_POLL_SEC = 0.1
-# 调用超时或取消以后的错误码：这一次尝试没有完整结果，按结果未知交还发出它的会话（docs/design/network-and-mcp.md「调用与结果」、「恢复契约」）
+# 调用超时或取消以后的错误码：这一次尝试没有完整结果，按结果未知交还发出它的会话
 CANCELLED_CODE = "cancelled"
 # 会话关闭的原因（写进 mcp_server_closed 的载荷）：run 收尾、超时或取消以后关闭、启动时结束遗留进程
 CLOSE_ON_RUN_END = "closed"
@@ -134,7 +134,7 @@ def item_definitions(base, document):
 
     document 是 
 un_created 里冻结的那份 MCP 设置（非秘密设置与凭据引用的整份文档，
-    见 docs/design/model-management.md「模型访问定义与准入」），ase 是当前定义。规则（docs/design/network-and-mcp.md「工具的提供」）：
+    见），ase 是当前定义。规则（docs/design/network-and-mcp.md「工具的提供」）：
 
     - 只用工具清单快照，且快照的配置摘要必须与这台服务器的配置摘要一致；没有快照或摘要不符的
       服务器不提供工具（本函数不探测）。
@@ -186,7 +186,7 @@ one，取消能否确认停止按传输方式（stdio 能确认）。
 
 
 # ---------------------------------------------------------------------------
-# MCP 会话（docs/design/network-and-mcp.md「运行规则」、「调用与结果」，工单 #1175 第 8 轮）：一个 run 一张表，每台服务器一个会话实例。
+# MCP 会话（工单 #1175 第 8 轮）：一个 run 一张表，每台服务器一个会话实例。
 #
 
 
@@ -247,10 +247,10 @@ class McpSessions:
 
     async def call(self, alias: str, server: str, tool: str, arguments: dict | None,
                    *, stop=None) -> McpOutcome:
-        # 一次 MCP 调用（docs/design/network-and-mcp.md「运行规则」、「调用与结果」）：按原名调这台服务器的工具，工具失败（is_error）交回错误文本，
+        # 一次 MCP 调用（docs/design/network-and-mcp.md「调用与结果」）：按原名调这台服务器的工具，工具失败（is_error）交回错误文本，
         # 动作记为已完成；协议错误与启动失败是失败的动作，原因写明（凭据值已替换为星号）。
         # stop 是执行环境的取消信号：到达时取消这次调用（进程已结束时能确认停止）。
-        # 超时与取消没有完整结果：先取消，再按结果未知交还发出它的会话（docs/design/network-and-mcp.md「恢复契约」，工单 #1176）
+        # 超时与取消没有完整结果：先取消，再按结果未知交还发出它的会话（工单 #1176）
         try:
             client = await self._session_for(server)
         except McpRefused as refusal:
@@ -276,7 +276,7 @@ class McpSessions:
 
     async def close(self) -> None:
         # run 结束、暂停或停止时关闭全部会话（stdio 先关标准输入，SDK 等待以后结束进程树；HTTP 关闭会话），
-        # 每关闭一台写一条 mcp_server_closed（docs/design/network-and-mcp.md「运行规则」）：关闭以后调用方在事件里读得到这件事
+        # 每关闭一台写一条 mcp_server_closed：关闭以后调用方在事件里读得到这件事
         sessions, self._sessions = self._sessions, {}
         for name, client in sessions.items():
             try:
@@ -287,7 +287,7 @@ class McpSessions:
     # ---- 内部 ----
 
     def _record(self, event_type: str, payload: dict[str, Any]) -> None:
-        # 生命周期事件（docs/design/network-and-mcp.md「运行规则」）：种类与载荷交给装配一方给出的写入方。
+        # 生命周期事件：种类与载荷交给装配一方给出的写入方。
         # 没有给写入方时什么也不写（单一模块的用例按会话表本身核对行为）
         if self._events is None:
             return
@@ -358,11 +358,11 @@ class McpSessions:
         finally:
             if watcher is not None and not watcher.done():
                 watcher.cancel()
-        # 结果文本与结构化输出都把凭据值替换为星号再保存（docs/design/network-and-mcp.md「凭据」：
+        # 结果文本与结构化输出都把凭据值替换为星号再保存（：
         # 「保存的标准错误输出、错误文本与结果文本在写入之前，把已取得的凭据值替换为星号」）
         if result.cancelled:
             # 超时或被取消：客户端已经先发取消通知、等应答最多 10 秒，stdio 随后结束整个进程树，
-            # HTTP 关闭会话（docs/design/network-and-mcp.md「运行规则」、「恢复契约」，工单 #1176）。这一次没有完整结果：按结果未知交还发出它的
+            # HTTP 关闭会话（工单 #1176）。这一次没有完整结果：按结果未知交还发出它的
             # 会话，回执写明取消能否确认。会话已经关闭，从表里去掉，下一次调用按同一台服务器重新建立
             self._sessions.pop(server, None)
             self._close_after_cancel(server, client)
@@ -403,7 +403,7 @@ async def _cancel_when_stopped(client: McpClient, stop) -> None:
 
 
 def _cancelled_text(server: str, tool: str, confirmable: bool, client_text: str) -> str:
-    # 超时或取消以后的工具结果（docs/design/network-and-mcp.md「恢复契约」，工单 #1176）：写明已经先取消、取消能否确认服务器停止，
+    # 超时或取消以后的工具结果（工单 #1176）：写明已经先取消、取消能否确认服务器停止，
     # 以及这一次尝试执行被中断、结果未知；由发出这次调用的会话决定是否重新调用（没有自动重试）
     confirmation = ("能确认服务器已停止（stdio 服务器随后结束整个进程树）" if confirmable
                     else "不能确认服务器已停止（HTTP 会话已关闭，服务器端已处理的请求无法撤回）")
@@ -416,7 +416,7 @@ def _cancelled_text(server: str, tool: str, confirmable: bool, client_text: str)
 
 
 # ---------------------------------------------------------------------------
-# 遗留的服务器进程（docs/design/network-and-mcp.md「运行规则」，工单 #1176）：Yudao 启动时结束没有关闭记录的进程，补写 mcp_server_closed。
+# 遗留的服务器进程（工单 #1176）：Yudao 启动时结束没有关闭记录的进程，补写 mcp_server_closed。
 
 
 @dataclass(frozen=True)
@@ -438,7 +438,7 @@ _LEFTOVER_PAGE = 1000
 def leftover_servers(store, *, limit: int = _LEFTOVER_PAGE) -> list[LeftoverServer]:
     """有启动记录、没有关闭记录的服务器（按（run、服务器名称）配对，先启动先配对）。
 
-    Yudao 启动时用这份清单结束遗留的服务器进程并补写关闭事件（docs/design/network-and-mcp.md「运行规则」）：
+    Yudao 启动时用这份清单结束遗留的服务器进程并补写关闭事件：
     进程崩溃时关闭事件没有写下来，服务器进程可能还活着；同一台服务器在一个 run 里可以
     启动与关闭多次，所以按启动的先后一一配对，不按服务器名称去重。
     """

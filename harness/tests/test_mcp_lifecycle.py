@@ -117,7 +117,7 @@ def _server_script(tmp_path: Path) -> Path:
 def _stdio_document(tmp_path: Path, *, tools, call_timeout_sec: int = 120,
                     command: str | None = None, args: list[str] | None = None) -> dict:
     # 一台 stdio 服务器：命令是本机解释器加测试服务器脚本，标记目录按固定文本传进子进程的环境变量
-    # （docs/design/network-and-mcp.md「凭据」「变量与请求头的值」）。工具清单快照的摘要与归一化配置算出的同一份。
+    #。工具清单快照的摘要与归一化配置算出的同一份。
     # 可以使用的部门写上产品与工程：这两处各有一条用例按它们自己的会话调用工具
     server = {"name": SERVER_NAME, "transport": "stdio", "command": command or sys.executable,
               "args": list(args) if args is not None else [str(_server_script(tmp_path))],

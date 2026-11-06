@@ -44,7 +44,7 @@ def test_the_recorded_reply_is_the_real_playwright_mcp_tools_list():
 
 
 def test_every_trial_and_browser_tool_declares_action_recovery_and_images():
-    # 每个试用与浏览器工具都写明动作类别、恢复契约与是否需要图像输入（docs/design/browser-and-computer-use.md「工具定义的声明」、「恢复契约」）
+    # 每个试用与浏览器工具都写明动作类别、恢复契约与是否需要图像输入
     for name in (*BROWSER_TOOL_NAMES, *TRIAL_TOOLS):
         tool = TOOLS[name]
         assert tool.kind == "environment", name
@@ -77,7 +77,7 @@ def test_trial_open_and_trial_start_take_different_parameters():
 
 
 def test_engineering_and_quality_can_use_every_browser_tool():
-    # docs/design/browser-and-computer-use.md「各部门可用的工具」：工程与质检都用这批浏览器工具（只有文本的调用目标在请求里去掉截图那一支，由下一条核对），
+    #：工程与质检都用这批浏览器工具（只有文本的调用目标在请求里去掉截图那一支，由下一条核对），
     # 产品一个也没有。建档事项不启动试用会话，也不授予它们（工单 #1184）
     for department in ("engineering", "quality"):
         assert set(BROWSER_TOOL_NAMES) <= set(DEFINITIONS.tools_for(department)), department
@@ -86,7 +86,7 @@ def test_engineering_and_quality_can_use_every_browser_tool():
 
 
 def test_offering_drops_image_tools_when_the_call_target_cannot_take_images():
-    # 按调用目标的输入方式提供工具（docs/design/browser-and-computer-use.md「工具定义的声明」、「各部门可用的工具」）：只有文本时声明需要图像输入的工具不出现，
+    # 按调用目标的输入方式提供工具（docs/design/browser-and-computer-use.md「工具定义的声明」）：只有文本时声明需要图像输入的工具不出现，
     # 每次请求重新选一次（同一角色任务中途换模型时，下一次请求按新的输入方式选出）
     names = ["browser_snapshot", "browser_take_screenshot", "trial_open"]
     assert offers_with_input(names, ("text", "image")) == names
@@ -96,7 +96,7 @@ def test_offering_drops_image_tools_when_the_call_target_cannot_take_images():
     without_image = tool_definitions(offers_with_input(names, ("text",)))
     assert "browser_take_screenshot" in [item["name"] for item in with_image]
     assert "browser_take_screenshot" not in [item["name"] for item in without_image]
-    # 产品的工具清单里没有试用与浏览器工具（docs/design/browser-and-computer-use.md「各部门可用的工具」）
+    # 产品的工具清单里没有试用与浏览器工具
     product_tools = set(DEFINITIONS.tools_for("product"))
     assert not product_tools & {*BROWSER_TOOL_NAMES, *TRIAL_TOOLS}
 

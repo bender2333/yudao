@@ -149,7 +149,7 @@ def cleanup_inspection_workspace(run_root: str | Path, session_id: str) -> None:
 # 这一轮进行中检查工作区要不要换成新的交付。来源是哪份快照、什么时候建立或重建、检查回执绑定哪几样，
 # 都在执行实现这里。
 #
-# 部门按两件定义事实分，代码里不写部门的名称（薄驱动不含部门与成果的名称，docs/design/execution-environment.md「心跳、结果未知与迟到回执」）：
+# 部门按两件定义事实分，代码里不写部门的名称（薄驱动不含部门与成果的名称，docs/design/skeleton-and-application.md「薄驱动」）：
 #   · 交出交付的部门（它的工具清单里有提议成「交付」的那件工具）的主线会话用运行工作区；
 #   · 关注交付的部门（组织定义的 watched 里有「交付」）的检查工作区从最新的封存交付建立，
 #     有新的交付封存时在它的下一步重建；其余部门的检查工作区从当前运行工作区建立。
@@ -178,7 +178,7 @@ def delivery_inspecting_departments(definitions: Any = None) -> frozenset[str]:
 
 
 def check_material_paths(definitions: Any = None) -> dict[str, tuple[str, ...]]:
-    # 写入范围是检查材料的角色与它们能写的目录（docs/design/execution-environment.md「执行位置上的程序与依赖缓存」，工单 #1390）：由定义声明，
+    # 写入范围是检查材料的角色与它们能写的目录（docs/design/forms-and-verifier-role.md「核验角色」中「写入范围是检查材料」，工单 #1390）：由定义声明，
     # 代码里没有部门名；保存检查材料、把检查材料放进检查副本、拒绝别的角色写这些目录，都按它判
     definitions = DEFINITIONS if definitions is None else definitions
     scopes = {department: definitions.write_scope(department) for department in definitions.departments}
@@ -368,7 +368,7 @@ class Workspaces:
 
     def _attach_trial_source(self, environment: LocalEnvironment, run_id: str, department: str,
                              projection: Any) -> LocalEnvironment:
-        # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（docs/design/execution-environment.md「动作、尝试与回执」）；
+        # 从封存交付建立的部门（质检）的试用副本按交付快照的清单建立（docs/design/browser-and-computer-use.md「试用工具」）；
         # 其他部门的试用副本在 trial_start 时封存运行工作区。
         # 两处打开检查工作区的地方都走这里：激活开始时新建（new_inspection），以及会话用过文件工具以后
         # 检查工作区按会话保留、后面一次激活重新打开（session_inspection → inspection_environment）。
@@ -453,7 +453,7 @@ class Workspaces:
         # 检查工作区的建立源：从封存交付建立的部门取它当前面对的快照——最新的封存交付，
         # 还没有交付时是事项开始时的项目起点（采纳成果或项目的起始文件夹快照，都没有时为空树），
         # 不读运行工作区；其他会话从当前运行工作区快照建立。
-        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 docs/design/local-tools.md「工作区」
+        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 local-tools 「工作区」
         # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
         # host_commit_error 正式报告。谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
         if department in self.policies(projection.run_id)[1]:
@@ -530,7 +530,7 @@ class Workspaces:
                                 else projection.delivery_spec.content_hash),
             effective_contract_hash=effective_contract_hash,
         )
-        # 质检的 trial_open 只接受当前交付说明里的启动方式（docs/design/execution-environment.md「动作、尝试与回执」）：激活开始时交到执行环境
+        # 质检的 trial_open 只接受当前交付说明里的启动方式（docs/design/browser-and-computer-use.md「试用工具」）：激活开始时交到执行环境
         environment.bind_launch_methods(
             None if projection.delivery_spec is None else projection.delivery_spec.launch)
 
@@ -919,7 +919,7 @@ class LocalEnvironment:
         # 这个 run 的试用会话表（浏览器与 computer use 设计说明「试用工具」，工单 #1182）：
         # 会话跨激活保留（一个部门同一时刻最多一个会话），由 Workspaces 持有；直接构造环境时各自一份
         self._trials = trials if trials is not None else TrialSessionTable()
-        # 这个 run 的浏览器会话表（docs/design/execution-environment.md「本机进程」，工单 #1184）：网页种类的试用会话建立与结束时
+        # 这个 run 的浏览器会话表（工单 #1184）：网页种类的试用会话建立与结束时
         # 由这里启动与关闭 Playwright MCP；动作按（run、部门）找到会话。与试用会话一样由 Workspaces 持有
         self.browsers = browsers if browsers is not None else BrowserSessions(artifacts)
         # 运行工作区的根：试用副本放在它旁边的 trials/ 下，与检查工作区同一种摆法
@@ -1040,7 +1040,7 @@ class LocalEnvironment:
         self._delivery_tree = tree
 
     def bind_launch_methods(self, methods: list[dict[str, Any]] | None) -> None:
-        # 当前交付说明里的启动方式：trial_open 的名称按它解析（docs/design/execution-environment.md「动作、尝试与回执」）
+        # 当前交付说明里的启动方式：trial_open 的名称按它解析（docs/design/browser-and-computer-use.md「试用工具」）
         self._launch_methods = [dict(item) for item in (methods or []) if isinstance(item, dict)]
 
     def verify_tree(self, snapshot: WorkspaceSnapshot) -> None:
@@ -1134,7 +1134,7 @@ class LocalEnvironment:
             # 试用副本之外。回执标 refused，原因作为工具结果交回
             return ActionReceipt.refusal(action.action_id, str(exc))
         except BrowserSessionFailed as exc:
-            # 浏览器会话没有建立、已经中断，或执行时 Playwright MCP 退出（docs/design/execution-environment.md「验收场景」）：
+            # 浏览器会话没有建立、已经中断，或执行时 Playwright MCP 退出：
             # 回执为失败，带会话记录（状态已记为中断）
             tree_change, after_ref = self._tree_evidence(before)
             return ActionReceipt(action_id=action.action_id, status="failed", output=exc.output,
@@ -1730,7 +1730,7 @@ class LocalEnvironment:
             )
             qa_tests_hash = None
             if action.department in self._check_materials:
-                # 检查回执绑定这一刻的检查材料摘要（docs/design/execution-environment.md「执行位置上的程序与依赖缓存」）：只有写检查材料的角色有
+                # 检查回执绑定这一刻的检查材料摘要：只有写检查材料的角色有
                 qa_tests_hash = qa_tests_digest(self.capture_qa_tests())
             receipt = self.workspace.record_check(
                 action.department,
@@ -1760,7 +1760,7 @@ class LocalEnvironment:
 
     def _delivery_check_command(self, name: str) -> str | None:
         # 同名交付检查已经记录的命令：交付封存时主机把工程 run_check 的命令一起记下（DeliverySpec.checks）。
-        # 基线运行不能改写命令（docs/design/network-and-mcp.md「运行规则」）：这里只取记录，模型给不出 command 这个参数
+        # 基线运行不能改写命令：这里只取记录，模型给不出 command 这个参数
         for check in getattr(self, "_delivery_checks", ()) or ():
             if isinstance(check, dict) and check.get("name") == name and isinstance(check.get("command"), str):
                 return check["command"]
@@ -1890,7 +1890,7 @@ class LocalEnvironment:
 
     # ---- 试用会话（工单 #1182）----
     def _trial_source_tree(self) -> CapturedTree:
-        # 质检的试用副本按这次检查的交付快照建立（激活开始时由 Workspaces 交来，工单 #1182 与 docs/design/execution-environment.md「动作、尝试与回执」）；
+        # 质检的试用副本按这次检查的交付快照建立（激活开始时由 Workspaces 交来，工单 #1182 与 docs/design/browser-and-computer-use.md「试用工具」）；
         # 工程没有这一项，在 trial_start 时封存当前的运行工作区。直接构造环境的测试没有 bind 时用当前工作区
         if self._trial_source is not None:
             return self._trial_source
@@ -1924,7 +1924,7 @@ class LocalEnvironment:
         session = result.get("session")
         if session is not None and session.get("kind") == "web":
             # 网页种类的会话：启动 Playwright MCP 并打开就绪地址，回执带页面的可访问性结构与截图
-            # （docs/design/execution-environment.md「动作、尝试与回执」、「远程执行代理」）。浏览器没有起来时会话不保留：结束交付软件的进程树再按失败交回
+            # （docs/design/browser-and-computer-use.md「试用工具」）。浏览器没有起来时会话不保留：结束交付软件的进程树再按失败交回
             try:
                 page = await self._open_browser(action, session)
             except BrowserSessionFailed as failure:
@@ -1938,7 +1938,7 @@ class LocalEnvironment:
         return result, "completed"
 
     async def _open_browser(self, action: Action, session: dict[str, Any]) -> dict[str, Any]:
-        # 浏览器会话的目录：试用副本旁边的 mcp-output/<会话身份>，会话结束时删掉（docs/design/execution-environment.md「本机进程」）
+        # 浏览器会话的目录：试用副本旁边的 mcp-output/<会话身份>，会话结束时删掉（docs/design/browser-and-computer-use.md「运行方式」）
         copy_root = Path(str(session["copy"]))
         return await self.browsers.start(
             run_id=self._run_id, department=action.department, copy_root=copy_root,
@@ -1957,7 +1957,7 @@ class LocalEnvironment:
 
     async def _trial_stop(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
         # 结束本部门的会话：先关 MCP 与浏览器，再结束交付软件的进程树、删掉试用副本、
-        # 交回结束方式与输出末尾（docs/design/execution-environment.md「动作、尝试与回执」）
+        # 交回结束方式与输出末尾
         browser = await self.browsers.stop(self._run_id, action.department, reason="stopped")
         result = self._trials.stop(self._run_id, action.department, limit=self._output_limit())
         result["browser"] = browser

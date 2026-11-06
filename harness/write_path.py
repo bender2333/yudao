@@ -311,7 +311,7 @@ class WritePath:
 
 
 def _resolve_actor(entry_actor: str | None, command: MessageIdentity | None, stream: str) -> str:
-    # 提出者由写入方经写入口声明（docs/design/app-and-interface.md「事件对象」）：由命令写入时取命令的提出者， 其余取写入方声明的提出者；两者都没有时这次写入失败（每条事件都有提出者，不允许落空）
+    # 提出者由写入方经写入口声明：由命令写入时取命令的提出者， 其余取写入方声明的提出者；两者都没有时这次写入失败（每条事件都有提出者，不允许落空）
     actor = command.actor if command is not None else entry_actor
     if not isinstance(actor, str) or not actor:
         raise ValueError(f"{stream} event requires a declared actor")

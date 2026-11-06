@@ -3,7 +3,7 @@
 裁决读的是最小投影（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）：投影没有的内容（PRD 的内容、用户输入与指导的版本、
 质检测试材料）由路由的收紧检查给出，内核不读成果的内容。
 
-S2c（工单 #1098，设计说明「其他路由：骨架要满足的条件」中「第二种路由可以带来新的工具、提案与成果种类」、docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）之后这里只做通用检查：种类在事项所用的那份定义里、
+S2c（工单 #1098，设计说明「其他路由：骨架要满足的条件」、docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）之后这里只做通用检查：种类在事项所用的那份定义里、
 部门有这个工具、提案合同里的通用条件（`evaluate_conditions`，条件是合同数据）。成果的格式检查、按内容的
 检查与成果内容的组装都在路由的收紧检查里（`harness/tightening.py`）；内核在它给出的内容之外盖统一字段
 （种类、版本、依据、作者部门、记下的树摘要）、算内容摘要，写入口写接纳事件。这里不再按成果种类写分支。
@@ -101,7 +101,7 @@ class Tightened:
     # 通过时一并给出、内核算内容时需要而最小投影里没有的事实（S1d，工单 #860）：
     # 例如 PRD 记下的用户输入版本——它是成果的内容，按 docs/design/skeleton-and-application.md「最小投影」不进最小投影
     facts: dict[str, Any] = field(default_factory=dict)
-    # 通过时给出的成果内容（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」中「成果的内容由路由组装」）：
+    # 通过时给出的成果内容（S2c，工单 #1098，docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」「成果的内容由路由组装」）：
     # 内核在它之外盖统一字段、算内容摘要；这里为空时内容就是提案的参数（路由不组装的种类）
     content: dict[str, Any] | None = None
     # 收紧检查自己给出的内容摘要：产品决定按内容去重，摘要来自通用条件，不是内核重算的那一份

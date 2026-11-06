@@ -7,7 +7,7 @@ import pytest
 from harness.app.payloads import PAYLOADS
 from harness.definitions import DEFINITIONS
 
-# 来源种类的封闭清单（docs/design/app-and-interface.md「事件对象」，与客户端画面合同的 SOURCES 一致）
+# 来源种类的封闭清单（与客户端画面合同的 SOURCES 一致）
 SOURCES = {"rule", "decision_model", "role_statement", "host_measurement", "user"}
 
 

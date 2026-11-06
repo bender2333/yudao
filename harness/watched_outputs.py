@@ -412,7 +412,7 @@ def completion_reason(projection: RunProjection,
                       events: list[Event]) -> routing_contract.CompletionReason | None:
     """事项完成时的结束原因：创建时记下的开环标记为真时是开环完成，其余按事项种类取（返回 None）。
 
-    这一条判断归路由（docs/design/skeleton-and-application.md「路由契约」输出、docs/design/department-loop.md「询问的记录与查询」）：薄驱动进入完成状态时问一次，
+    这一条判断归路由（docs/design/skeleton-and-application.md「路由契约」输出）：薄驱动进入完成状态时问一次，
     只把这里给的原因写进事实。没标开环的事项不给原因，薄驱动照旧按事项种类取。
     """
     if recorded_open_loop(events):
@@ -421,7 +421,7 @@ def completion_reason(projection: RunProjection,
 
 
 def work_reference(projection: RunProjection, department: str) -> Any:
-    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）：成果驱动不用它，为空。"""
+    """这一轮工作的路由自己的工作引用（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）：成果驱动不用它，为空。"""
     return None
 
 
@@ -502,7 +502,7 @@ def ask_branch(projection: RunProjection, events: list[Event], *, requester: str
         max_model_steps=min(declared_steps, remaining),
         max_time_sec=float(declared_time),
         start=start,
-        # 这一轮工作的路由自己的工作引用指向这次询问（设计说明「路由契约」输出、docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）
+        # 这一轮工作的路由自己的工作引用指向这次询问（docs/design/skeleton-and-application.md「路由契约」输出）
         work_ref={"ask": {"branch_session_id": branch_session_id, "requester": requester,
                           "recipient": recipient}},
     )
@@ -513,7 +513,7 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
                 definitions: Any | None = None) -> routing_contract.AskOutcome:
     """分支这一轮以什么结束：把回答交回提问方，还是没能回答与原因。
 
-    回答的内容、回答同时交上的成果由路由组装（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）：能交要求的部门在回答一次询问时
+    回答的内容、回答同时交上的成果由路由组装：能交要求的部门在回答一次询问时
     可以修订 PRD（循环结构「回答能做什么」），修订的提案参数随结果交给薄驱动，由它经写入口提交。谁能交要求
     按提案合同判断，不在代码里写部门名（工单 #1391）；提案合同从这份形态的定义取（工单 #1509）。
     没能回答的原因按这一轮的实际情形取：一步也走不了、时间用完、这一轮的说明或停止原因、跑完没交上回答。

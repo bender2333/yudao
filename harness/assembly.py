@@ -26,7 +26,7 @@ from .validation import Tightening
 
 PENDING_GUIDANCE = frozenset({"received", "in_input"})
 
-# 判定「同一连接、同一协议、同一上游模型」的取值来自调用目标（docs/design/model-management.md「历史中的推理内容」）
+# 判定「同一连接、同一协议、同一上游模型」的取值来自调用目标
 TARGET_KEYS = ("provider_config_id", "protocol", "requested_model")
 
 def _same_target(record_target: dict[str, Any], call_target: dict[str, Any]) -> bool:
@@ -34,7 +34,7 @@ def _same_target(record_target: dict[str, Any], call_target: dict[str, Any]) -> 
         call_target.get(key) for key in TARGET_KEYS)
 
 def replayable_history(history: list[dict[str, Any]], call_target: dict[str, Any]) -> list[dict[str, Any]]:
-    # 把部门历史装配成可发给本次调用目标的形式（docs/design/model-management.md「历史中的推理内容」）：
+    # 把部门历史装配成可发给本次调用目标的形式：
     # 同一条目产生时与本次调用目标同一连接、同一协议、同一上游模型时原样回放；
     # 不同时丢弃推理内容与该协议专用的条目 ID，消息与工具调用的配对（call_id）保持完整
     result: list[dict[str, Any]] = []
@@ -109,7 +109,7 @@ class PinnedStep:
     guidance: list[DepartmentGuidance]
     events: list[Event]
     snapshot_hash: str
-    # 调用目标的输入方式（docs/design/model-management.md「部门的建议能力」）：装配请求的工具定义时按它决定提供哪些工具
+    # 调用目标的输入方式：装配请求的工具定义时按它决定提供哪些工具
     input_modalities: tuple[str, ...]
     context: AssembledContext
     # 本次逻辑调用的调用目标（公开部分）；回放部门历史时按它筛掉来源不同的推理内容
@@ -292,7 +292,7 @@ class ContextAssembly:
                 item = json.loads(self.artifacts.get_for_run(event.run_id, ref))
                 if event.type == EventType.MODEL_MESSAGE and isinstance(item, dict) \
                         and item.get("type") == "reasoning":
-                    # 适配器为界面汇总发出的推理观测不进入历史；推理内容由 MODEL_REASONING 保存（docs/design/model-management.md「历史中的推理内容」）
+                    # 适配器为界面汇总发出的推理观测不进入历史；推理内容由 MODEL_REASONING 保存
                     continue
             elif event.type in {EventType.TOOL_CALLED, EventType.TOOL_SKIPPED, EventType.ACTION_VERIFIED} and "input_item" in event.payload:
                 if (event.payload.get("activation_id"), event.payload.get("step_id")) in failed_steps:
@@ -329,7 +329,7 @@ class ContextAssembly:
         # 历史放不进窗口时装配一次压缩请求，否则装配工作请求。
         # defer_compaction：上一次整理请求失败过，这一步按未压缩的历史照常交出工作请求，整理放到下一步
         # （docs/design/model-management.md「失败处理」，工单 #1155）
-        # 回放前按本次调用目标筛掉来源不同的推理内容与该协议专用的条目 ID（docs/design/model-management.md「历史中的推理内容」）
+        # 回放前按本次调用目标筛掉来源不同的推理内容与该协议专用的条目 ID
         frame, limits = pinned.frame, pinned.limits
         replay_history = replayable_history(history, pinned.call_target)
         checkpoint, checkpoint_id = self._checkpoint(pinned)

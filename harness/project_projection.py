@@ -37,7 +37,7 @@ class Adoption:
     adopted_at: str
     stream_version: int
     event_id: str
-    # 建档基线特有的三项（工单 #136，docs/design/existing-project-onboarding.md「确认以后：当前有效要求与第一次采纳」）：被确认的初始 PRD、现有结构说明与代码快照。
+    # 建档基线特有的三项（工单 #136）：被确认的初始 PRD、现有结构说明与代码快照。
     # 普通事项的交付采纳没有这三项，它们为空
     prd_ref: dict[str, Any] | None = None
     product_spec_hash: str | None = None
@@ -53,7 +53,7 @@ class Adoption:
 
 @dataclass
 class InitialPrdCandidate:
-    # 一个建档候选（工单 #136，docs/design/app-and-interface.md「用户决定的回答」）：建档 run 结束以后提出的初始 PRD 及其依据。
+    # 一个建档候选（工单 #136）：建档 run 结束以后提出的初始 PRD 及其依据。
     # prd、structure、baseline_review 是这一轮三份产物的事件编号、内容哈希与工件引用；
     # 没有核验角色的形态没有基线核验这一步（工单 #1510），这一份产物是一份空记录，由 baseline_verified 记下；
     # overview_ref 是仓库概况的工件引用；snapshot 是这一轮建档使用的代码快照；
@@ -96,7 +96,7 @@ class HeldCandidate:
 @dataclass
 class DepartmentSetting:
     # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；
-    # 三项一起保存、一个版本（docs/design/model-management.md「项目部门设置与项目角色设置」）。没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt。
+    # 三项一起保存、一个版本。没有写入的项使用部门默认，部门 Prompt 没有写入时使用内置默认 Prompt。
     department: str
     version: int
     text: str

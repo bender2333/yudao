@@ -10,7 +10,7 @@
 - `message`：模型的文字回答。
 
 `rules`：规则集（`Rules`），每条规则的默认值来自同目录的规则集文件，它同时是设计说明
-docs/design/evaluation-scenarios.md「评分」规则清单的机器可读版本。
+规则清单的机器可读版本。
 
 输出
 ----
@@ -21,7 +21,7 @@ docs/design/evaluation-scenarios.md「评分」规则清单的机器可读版本
 也要能只改一条规则就看结果差多少（对照）。函数里没有时间、随机、网络与文件读取，
 顺序只来自 `events` 的顺序与规则里写明的优先级。
 
-七条规则（docs/design/evaluation-scenarios.md「评分」，含数据来源）：
+七条规则（含数据来源）：
 
 - `input_single_copy`（定义，admission）：同一条部门输入只装一份。
 - `superseded_read_collapse`（定义，admission）：同一路径的读取只留最新原文。
@@ -76,7 +76,7 @@ class Rules:
     error_result_keep: bool = True
     # R5 引证类材料只在工作引用指向它时整段装入
     pinned_reference_gate: bool = True
-    # R5 受这一条管的是哪几段（按回放数据逐段定，见 docs/design/evaluation-scenarios.md「评分」 R5）
+    # R5 受这一条管的是哪几段（按回放数据逐段定，见 R5）
     gated_sections: tuple[str, ...] = (
         "current_delivery_spec", "prior_delivery", "existing_overview", "causal_chain",
         "binding_refs", "prior_structure", "prior_initial_prd", "current_product_decisions",

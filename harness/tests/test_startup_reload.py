@@ -210,7 +210,7 @@ def _startup_config(state: str):
 def test_service_starts_in_every_unready_state_and_blocks_the_first_request(tmp_path, monkeypatch, state):
     # 模型目录文件缺少、JSON 损坏、目录为空、没有绑定、缺少凭据：服务照常启动，system.status 与 catalog
     # 返回 Provider 不可用；创建事项不再解析调用目标（#45），第一次请求解析失败时进入待恢复，运行不是失败结束。
-    # 凭据文件默认在数据目录内（docs/design/web-interface-and-release.md「数据目录」）
+    # 凭据文件默认在数据目录内
     from harness.projection import saved_decisions
 
     monkeypatch.delenv(_ABSENT_KEY, raising=False)
@@ -309,7 +309,7 @@ def test_clear_withdraw(tmp_path):
     facade.load_document(config_path)
     saved_rev = facade.revision
 
-    # 删除文件：目录与部门默认一起清空，config_state 记为 deleted（docs/design/model-management.md「目录文件重新读取」）
+    # 删除文件：目录与部门默认一起清空，config_state 记为 deleted
     config_path.unlink()
     result = facade.reload()
     assert result["ok"] is True  # 删除不是损坏，reload_error 为 None
