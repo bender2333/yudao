@@ -82,6 +82,11 @@
       "why": "内核的不变式测试，它们评价控制核心的其余部分"
     },
     {
+      "path": "tools/kernel_checks/**",
+      "kind": "material",
+      "why": "内核的代码质量检查工具、它的配置与它自己的测试，评价材料：被评价的代码改不了评价标准"
+    },
+    {
       "path": "evals/scenarios/*/checks/**",
       "kind": "material",
       "why": "评测场景的隐藏检查，被评价者改不了评价标准"
