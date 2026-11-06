@@ -611,6 +611,201 @@ export function trialCaseResultName(value: string | null | undefined): string {
   return result === "interrupted" ? "中断" : checkResultName(result);
 }
 
+// 试用记录页签（工单 #153；浏览器与 computer use docs/design/browser-and-computer-use.md「查询」、「页面与画面」）：
+// 会话、用例与步骤的取值在页面上写中文。web、delivery_snapshot、completed 与 browser_click 这类代码名不写到
+// 页面上，认不出的取值各有一句说法。
+export const TRIAL_SESSION_KIND: Readonly<Record<string, string>> = Object.freeze({
+  web: "网页",
+  desktop: "桌面",
+});
+
+// 试用副本的来源：质检从交付快照建立副本，其余部门从运行工作区的封存建立
+export const TRIAL_COPY_SOURCE: Readonly<Record<string, string>> = Object.freeze({
+  delivery_snapshot: "交付快照的副本",
+  workspace_seal: "运行工作区的副本",
+});
+
+// 试用会话的结束方式（试用的恢复契约 docs/design/browser-and-computer-use.md「恢复契约」的 trial_stop 一行）
+export const TRIAL_END_REASON: Readonly<Record<string, string>> = Object.freeze({
+  stopped: "已停止",
+  replaced: "被新会话替换",
+  interrupted: "中断",
+  user_stopped: "用户停止",
+  run_ended: "运行结束",
+});
+
+// 试用用例里一步的结果状态（docs/design/browser-and-computer-use.md「试用用例」）：有回执、核实过、结果未知
+export const TRIAL_STEP_STATUS: Readonly<Record<string, string>> = Object.freeze({
+  completed: "已完成",
+  verified: "已核实",
+  unknown: "结果未知",
+});
+
+// 一个步骤的操作名称（docs/design/browser-and-computer-use.md「提供的工具」、「动作集合」）：模型给的调用参数不外露，
+// 输入的文字是这次试用自己的内容，写在操作后面
+export const TRIAL_TOOL_NAMES: Readonly<Record<string, string>> = Object.freeze({
+  browser_navigate: "打开页面",
+  browser_navigate_back: "回到上一页",
+  browser_click: "点击页面上的元素",
+  browser_hover: "在页面元素上悬停",
+  browser_drag: "在页面上拖动",
+  browser_type: "输入文字",
+  browser_fill_form: "填写表单",
+  browser_select_option: "选择下拉选项",
+  browser_press_key: "按键",
+  browser_file_upload: "上传文件",
+  browser_handle_dialog: "处理页面弹窗",
+  browser_drop: "把文件拖到页面里",
+  browser_wait_for: "等待页面变化",
+  browser_tabs: "切换页面标签",
+  browser_resize: "调整页面窗口大小",
+  browser_emulate_media: "模拟媒体样式",
+  browser_close: "关闭页面",
+  browser_snapshot: "读取页面结构",
+  browser_find: "在页面里查找",
+  browser_console_messages: "读取页面控制台消息",
+  browser_network_requests: "读取页面的网络请求",
+  browser_network_request: "读取一条网络请求",
+  browser_verify_element_visible: "核对页面上的元素可见",
+  browser_verify_text_visible: "核对页面上出现指定的文字",
+  browser_verify_list_visible: "核对页面上的列表",
+  browser_verify_value: "核对页面上的取值",
+  browser_generate_locator: "生成页面元素的位置",
+  browser_take_screenshot: "截取页面截图",
+  screen_click: "点击屏幕",
+  screen_drag: "在屏幕上拖动",
+  screen_key: "在屏幕上按键",
+  screen_move: "移动屏幕指针",
+  screen_screenshot: "截取屏幕截图",
+  screen_scroll: "滚动屏幕",
+  screen_type: "在屏幕上输入文字",
+  screen_wait: "等待屏幕变化",
+  run_check: "运行检查",
+});
+
+// 未知的取值写一句自己的说法，不把代码名写到页面上
+export function trialSessionKindName(value: string | null | undefined): string {
+  const kind = (value ?? "").trim();
+  if (kind === "") {
+    return "未注明种类";
+  }
+  return TRIAL_SESSION_KIND[kind] ?? "其他种类";
+}
+
+export function trialCopySourceName(value: string | null | undefined): string {
+  const source = (value ?? "").trim();
+  if (source === "") {
+    return "未注明副本来源";
+  }
+  return TRIAL_COPY_SOURCE[source] ?? "其他副本来源";
+}
+
+export function trialEndReasonName(value: string | null | undefined): string | null {
+  const reason = (value ?? "").trim();
+  if (reason === "") {
+    return null;
+  }
+  return TRIAL_END_REASON[reason] ?? "其他结束方式";
+}
+
+export function trialStepStatusName(value: string | null | undefined): string {
+  const status = (value ?? "").trim();
+  if (status === "") {
+    return "未写明结果状态";
+  }
+  return TRIAL_STEP_STATUS[status] ?? "其他结果状态";
+}
+
+// 质检的会话标明试用副本是否等于交付快照（查询给出的是、否与没有可比较的一份三种）：
+// 页面写这个结论，不写树摘要原文——那是内部的标识
+export function trialSnapshotText(session: {
+  source?: string | null;
+  matches_delivery_snapshot?: boolean | null;
+}): string {
+  const copy = trialCopySourceName(session.source);
+  // 只有从交付快照建立的会话才有这个比较；其余来源（运行工作区的副本）与旧数据不写这一句
+  if ((session.source ?? "").trim() !== "delivery_snapshot") {
+    return copy;
+  }
+  if (session.matches_delivery_snapshot === true) {
+    return `${copy}，与交付快照相同`;
+  }
+  if (session.matches_delivery_snapshot === false) {
+    return `${copy}，与交付快照不同`;
+  }
+  return `${copy}，没有可比较的交付快照`;
+}
+
+export function trialSessionStateName(session: {
+  status: string;
+  end_reason?: string | null;
+}): string {
+  if (session.status === "running") {
+    return "进行中";
+  }
+  const reason = trialEndReasonName(session.end_reason);
+  return reason === null ? "已结束" : `已结束（${reason}）`;
+}
+
+// 一个步骤的操作：工具名与输入里人读得懂的几项组合成一句话，代码名与调用参数不出现
+export function trialOperationText(
+  tool: string | null | undefined,
+  input: Record<string, unknown> | null | undefined,
+): string {
+  const name = (tool ?? "").trim();
+  const detail = typeof input?.text === "string" ? input.text.trim() : "";
+  if (name === "browser_type" || name === "screen_type") {
+    return detail === "" ? "输入文字" : `输入文字「${detail}」`;
+  }
+  if (name === "browser_verify_text_visible") {
+    return detail === "" ? "核对页面上出现指定的文字" : `核对页面上出现「${detail}」`;
+  }
+  if (name === "browser_find") {
+    return detail === "" ? "在页面里查找" : `在页面里查找「${detail}」`;
+  }
+  return TRIAL_TOOL_NAMES[name] ?? "其他试用操作";
+}
+
+// 一张截图旁边写模型有没有看到它（docs/design/browser-and-computer-use.md「页面与画面」）：
+// 收到这一结果的请求不含图像时写「模型只读取文字」，截图照常显示；没有下一次请求记录时照实写不知道
+export const TRIAL_TEXT_ONLY_NOTICE = "模型只读取文字：这次试用里模型收到的内容只有文字，截图照常保存为证据、模型没有看到图像。";
+export const TRIAL_SHOT_SEEN = "模型看到了这张截图";
+export const TRIAL_SHOT_UNSEEN = "模型只读取文字";
+export const TRIAL_SHOT_UNKNOWN = "没有记录模型是否看到这张截图";
+
+export function trialShotModelText(modelSaw: boolean | null): string {
+  if (modelSaw === true) {
+    return TRIAL_SHOT_SEEN;
+  }
+  if (modelSaw === false) {
+    return TRIAL_SHOT_UNSEEN;
+  }
+  return TRIAL_SHOT_UNKNOWN;
+}
+
+// 用例的结论：还没有结论时写进行中；四种结论与逐条结论的三种结果共用同一组词，中断单独一种
+export function trialCaseResultView(item: {
+  status: string;
+  result?: string | null;
+}): { text: string; kind: string } {
+  if (item.status === "open") {
+    return { text: "进行中", kind: "running" };
+  }
+  const result = (item.result ?? "").trim();
+  if (result === "interrupted") {
+    return { text: "中断", kind: "cancelled" };
+  }
+  const text = trialCaseResultName(result);
+  return { text: text === "" ? "未写明结果" : text, kind: checkResultKind(result) };
+}
+
+export const TRIAL_EVIDENCE_TAG = "证据";
+export const TRIAL_NO_SESSION = "这个部门这次运行没有试用会话";
+export const TRIAL_NO_CASE = "这个部门这次运行没有试用用例";
+export const TRIAL_UNNAMED_CASE = "未命名试用用例";
+export const TRIAL_UNNAMED_LAUNCH = "未命名启动方式";
+export const TRIAL_UNNAMED_CRITERION = "未写编号的验收条件";
+
 // 交付说明里的启动方式（浏览器与 computer use docs/design/browser-and-computer-use.md「启动方式」，工单 #154）：种类与命令表按系统写中文
 export const LAUNCH_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
   web: "网页",
