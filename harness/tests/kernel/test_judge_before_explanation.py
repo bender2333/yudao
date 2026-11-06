@@ -15,21 +15,13 @@
 # 用真实存储与真实事件日志（LoopSystem.for_testing），不开子进程、不连网络，属于模块层。
 # 守 docs/design/test-pyramid.md「测试按三环留」的 R1（事实只经写入口写入：独立判断经提案路径与门写入）与 R3（先判断后看解释）。
 
-import json
-
-from harness.adapters.fake import FakeAdapter, prompt_part
+from harness.adapters.fake import FakeAdapter
 from harness.models import EventType
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 
 MARKER_SUMMARY = "SECRET_EXPLANATION_SUMMARY"
 MARKER_RISK = "SECRET_EXPLANATION_RISK"
-
-
-def _delivery_with_explanation() -> object:
-    from harness.proposals import delivery
-
-    return delivery(summary=MARKER_SUMMARY, known_risks=[MARKER_RISK])
 
 
 def test_the_explanation_stays_hidden_until_the_independent_judgement_is_committed(tmp_path):

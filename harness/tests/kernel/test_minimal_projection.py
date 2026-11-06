@@ -5,11 +5,9 @@
 # 这一张只建模块，不接给裁决用：与 RunProjection 逐项一致的重放在
 # test_minimal_projection_baselines.py（集成层）里，对事件序列基准逐个场景做。
 
-import ast
 import json
 from dataclasses import replace
 import shutil
-import sys
 from pathlib import Path
 
 from harness.definitions import DEFINITIONS_DIR, load_definitions
@@ -18,7 +16,6 @@ from harness.models import Event, EventType
 
 REPO_ROOT = Path(__file__).resolve().parents[3]  # harness/tests/kernel/ 往上三层是仓库根
 MODULE = REPO_ROOT / "harness" / "minimal_projection.py"
-MANIFEST = REPO_ROOT / "harness" / "definitions" / "kernel-manifest.json"
 RUN_STREAM = "run:run_824"
 
 
@@ -166,22 +163,6 @@ def test_the_same_events_fold_to_the_same_projection():
     assert fold_events(events) == fold_events(events)
 
 
-def test_the_module_imports_only_kernel_files_stdlib_and_pydantic():
-    # R1：最小投影要列入内核清单（S1d），导入方向与内核的其余模块相同
-    kernel = {entry["path"] for entry in json.loads(MANIFEST.read_text(encoding="utf-8"))["paths"]
-              if entry["kind"] == "module"}
-    offenders = []
-    for line, module in _imported_modules("harness/minimal_projection.py"):
-        top = module.split(".")[0]
-        if top == "harness":
-            resolved = _resolve(module)
-            if resolved is None or resolved not in kernel:
-                offenders.append((line, module, resolved))
-        elif top not in sys.stdlib_module_names and module != "__future__" and top != "pydantic":
-            offenders.append((line, module, "不是内核文件、标准库或 pydantic"))
-    assert offenders == []
-
-
 def test_the_acceptance_fields_carry_the_author_department_and_the_recorded_tree():
     # 2026-10-27 补的接纳字段（S1d，工单 #860）：作者部门与记下的树摘要随接纳事件折进成果，
     # 通用条件 5 的作者分离与条件 4 的树一致读它们；没有这一项的成果为空
@@ -323,28 +304,3 @@ def test_the_settled_steps_stay_at_the_last_round_end():
     ]).sessions["ses_pro"]
     assert (interrupted.model_steps, interrupted.settled_steps) == (2, 1)
     assert interrupted.model_steps - interrupted.settled_steps == 1
-
-
-def _resolve(module: str) -> str | None:
-    relative = module[len("harness."):] if module.startswith("harness.") else module
-    for candidate in (relative + ".py", relative + "/__init__.py"):
-        if (REPO_ROOT / "harness" / candidate).exists():
-            return "harness/" + candidate
-    return None
-
-
-def _imported_modules(relative: str) -> list[tuple[int, str]]:
-    # 文件里的导入语句按模块名给出，不执行任何代码（与 harness/tests/kernel/test_manifest.py 同一种读法）
-    package = ".".join(["harness"] + relative[len("harness/"):].split("/")[:-1])
-    found = []
-    for node in ast.walk(ast.parse((REPO_ROOT / relative).read_text(encoding="utf-8"))):
-        if isinstance(node, ast.Import):
-            found.extend((node.lineno, alias.name) for alias in node.names)
-        elif isinstance(node, ast.ImportFrom):
-            if node.level:
-                parts = package.split(".")
-                base = ".".join(parts[:len(parts) - (node.level - 1)])
-                found.append((node.lineno, f"{base}.{node.module}" if node.module else base))
-            else:
-                found.append((node.lineno, node.module or ""))
-    return found
