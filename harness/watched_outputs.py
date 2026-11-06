@@ -29,8 +29,6 @@ ROUTING_NAME = "watched_outputs"
 # 结束原因都按名称写在那里，内容就是现有的定义文件，不搬动。内核只核对那份定义的结构，内容由下面的
 # check_definition 自己校验。事项结束用的那个原因写在它的定义里，属于那份定义版本的封闭清单
 ITEM_END_REASON = "no_new_work"
-# 提议方式：提交类工具。这一轮记下了其中一次的调用，就是「这一轮交上了正式成果」这件事
-_PROPOSAL_METHODS = frozenset(DEFINITIONS.routing_definition().proposal_methods)
 
 
 def routing_departments(definitions: Any | None = None) -> tuple[str, ...]:
@@ -350,11 +348,20 @@ def ready_departments(projection: RunProjection, waiting: set[str] | None = None
 # ---------------------------------------------------------------------------
 
 
-def _round_outcome(events: list[Event], department: str, session_id: str | None, activation_id: str) -> str:
+def _proposal_methods(definitions: Any | None = None) -> frozenset[str]:
+    # 这份路由的提议方式：提交类工具的名称（事项所用的那份定义里写的，工单 #1558）。
+    # 这一轮记下了其中一次的调用，就是「这一轮交上了正式成果」这件事
+    declared = routing_contract.definition_of(DEFINITIONS if definitions is None else definitions, ROUTING_NAME)
+    return frozenset() if declared is None else frozenset(declared.proposal_methods)
+
+
+def _round_outcome(events: list[Event], department: str, session_id: str | None, activation_id: str,
+                   proposals: frozenset[str]) -> str:
     """这一轮怎么结束的：提交被接纳记 proposal_accepted，其余正常结束记 text_reply（载荷只有这两个取值）。
 
     判据是这一轮写下的事件：提交经写入口写入时看提交与拒绝的事件；提交还没有写入时（薄驱动拿到一轮结果
     以后先问路由这一轮以什么结束，再经写入口提交），看这一轮记下的提议方式 —— 提交类工具的调用。
+    提议方式取事项所用的那份定义（工单 #1558）：同一实例里另一份形态的提议方式不参与这个判断。
     提交以后被拒绝的这一轮，部门还没有交下正式成果，按文字回答记。
     """
     started = None
@@ -372,21 +379,22 @@ def _round_outcome(events: list[Event], department: str, session_id: str | None,
         elif event.type == EventType.PROPOSAL_REJECTED:
             submitted = False
         elif (event.type == EventType.TOOL_CALLED
-              and (event.payload or {}).get("name") in _PROPOSAL_METHODS):
+              and (event.payload or {}).get("name") in proposals):
             submitted = True
     return "proposal_accepted" if submitted else "text_reply"
 
 
 def round_end(projection: RunProjection, events: list[Event], *, department: str, session_id: str | None,
-              activation_id: str) -> routing_contract.RoundEnd | None:
+              activation_id: str, definitions: Any | None = None) -> routing_contract.RoundEnd | None:
     """这一轮以什么结束：正常结束的一轮交出结果（提交被接纳，或是文字回答）；暂停与失败不算正常结束。
 
     成果驱动只认这两种正常结束（docs/design/skeleton-and-application.md「路由契约」：一轮以提交正式成果或回答用户结束）。
+    提议方式按事项所用的这份定义取（工单 #1558）：没有交时读进程加载的那一份。
     """
     if projection.status in _NOT_A_NORMAL_ROUND_END:
         return None
     return routing_contract.RoundEnd(
-        outcome=_round_outcome(events, department, session_id, activation_id))
+        outcome=_round_outcome(events, department, session_id, activation_id, _proposal_methods(definitions)))
 
 
 def item_end(projection: RunProjection) -> routing_contract.ItemEnd | None:
@@ -599,7 +607,7 @@ def check_definition(definitions: Any) -> None:
 class WatchedOutputs:
     # 成果驱动的路由（docs/design/skeleton-and-application.md「路由契约」）：默认路由，组织定义的 routing 写 watched_outputs。
     # 实现在应用层；薄驱动只按契约的三个问题调用它。
-    # 部门、关注关系与核验声明按**这份形态自己的定义**取（工单 #1509）：组装处交给它这一份时就按这一份，
+    # 部门、关注关系、核验声明与提议方式按**这份形态自己的定义**取（工单 #1509、#1558）：组装处交给它这一份时就按这一份，
     # 没有交时读进程加载的那一份。一份形态一份实例（routing_contract.select 每次选择给一份副本），
     # 形态之间不共用，所以一份形态的部门清单不会盖掉另一份
     NAME = ROUTING_NAME
@@ -632,7 +640,7 @@ class WatchedOutputs:
     def round_end(self, view: RunProjection, events: list[Event], *, department: str,
                   session_id: str | None, activation_id: str) -> routing_contract.RoundEnd | None:
         return round_end(view, events, department=department, session_id=session_id,
-                         activation_id=activation_id)
+                         activation_id=activation_id, definitions=self._definitions)
 
     def item_end(self, view: RunProjection) -> routing_contract.ItemEnd | None:
         return item_end(view)
