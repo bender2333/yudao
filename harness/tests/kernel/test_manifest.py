@@ -124,3 +124,54 @@ def test_kernel_files_import_only_kernel_files_stdlib_and_pydantic():
             elif top not in sys.stdlib_module_names and module != "__future__" and top != "pydantic":
                 offenders.append((relative, line, module, "不是内核文件、标准库或 pydantic"))
     assert offenders == [], f"内核文件导入了清单以外的模块：{offenders}"
+
+
+# 内核模块的两个开关（docs/design/kernel-quality-gate.md「接入：按模块，两个开关」，工单 #1477）：
+# 模块条目可以带 checks，没写的就是关；checks 里只有 complexity 与 mutation 两个布尔值，
+# 变异开关打开时复杂度开关也必须打开（变异依赖测试先立住，复杂度不依赖）。
+SWITCHES = ("complexity", "mutation")
+
+
+def _switch_problems(manifest: dict) -> list[str]:
+    problems = []
+    for entry in manifest["paths"]:
+        checks = entry.get("checks")
+        if checks is None:
+            continue
+        if not isinstance(checks, dict):
+            problems.append(f"{entry['path']} 的 checks 不是对象")
+            continue
+        unknown = sorted(set(checks) - set(SWITCHES))
+        if unknown:
+            problems.append(f"{entry['path']} 的 checks 有没定义的开关：{'、'.join(unknown)}")
+        for name, value in checks.items():
+            if not isinstance(value, bool):
+                problems.append(f"{entry['path']} 的 checks.{name} 必须是布尔值")
+        if checks.get("mutation") is True and checks.get("complexity") is not True:
+            problems.append(f"{entry['path']} 打开了 mutation 却没有打开 complexity")
+    return problems
+
+
+def test_module_switches_are_two_booleans_and_mutation_needs_complexity():
+    assert _switch_problems(_manifest()) == []
+
+
+def test_the_switch_check_catches_mutation_without_complexity():
+    manifest = {
+        "paths": [
+            {"path": "harness/example.py", "kind": "module", "why": "示例模块",
+             "checks": {"mutation": True, "complexity": False}},
+        ]
+    }
+    problems = _switch_problems(manifest)
+    assert problems, "mutation 为真而 complexity 为假时，清单应当报错"
+    assert "mutation" in problems[0] and "complexity" in problems[0]
+
+
+def test_the_switch_check_catches_values_that_are_not_booleans():
+    manifest = {
+        "paths": [
+            {"path": "harness/example.py", "kind": "module", "why": "示例模块", "checks": {"complexity": "yes"}},
+        ]
+    }
+    assert _switch_problems(manifest), "开关不是布尔值时，清单应当报错"
