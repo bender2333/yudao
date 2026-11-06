@@ -214,7 +214,7 @@ export interface OpenReleaseRow {
   where: string;
   text: string;
   state: OpenReleaseState;
-  /** 「跳到逐条结论表」的链接；逐条结论表还没有（#154 未合并）时为空 */
+  /** 「跳到逐条结论表」的链接；逐条结论表读不出来时为空 */
   href: string | null;
 }
 
@@ -226,7 +226,7 @@ export interface OpenReleaseLookup {
   coverage: Readonly<Record<string, AcceptanceCoverageResult | null | undefined>>;
   /** 项目标识到名称（projects.list 的结果） */
   projectNames: Readonly<Record<string, string>>;
-  /** 逐条结论表是否已经交付（#154）；省略时按页面上的那一行常量 */
+  /** 逐条结论表是否已经交付（#154）；省略时按页面上的那一行常量（已经交付） */
   criteriaTableReady?: boolean;
 }
 
@@ -247,7 +247,7 @@ export function openReleaseRows(lookup: OpenReleaseLookup): OpenReleaseRow[] {
       : coverage === null
         ? OPEN_CRITERIA_UNREADABLE
         : openCriteriaText(coverage.numbers.open, coverage.open_criteria);
-    // 逐条结论表在资料页（#154）；那张表还没有时不出现链接，免得点不到一张不存在的表
+    // 逐条结论表在资料页（#154）；读不出检验覆盖的那一行没有条数可对照，不给链接
     const href = ready && coverage !== null && coverage !== undefined
       ? paths.materials(target.projectId, { workItem: target.workItemId })
       : null;
