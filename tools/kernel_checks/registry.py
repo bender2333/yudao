@@ -1,4 +1,4 @@
-# 理由登记的格式与读取（docs/design/kernel-quality-gate.md「4.5 存活的出口与理由登记」「4.8 评价材料」）：
+# 理由登记的格式与读取（docs/design/kernel-quality-gate.md「存活的出口与理由登记」「评价材料」）：
 # 登记放在 harness/tests/kernel/mutation_reasons.json，初始是空列表。
 #
 # 一项写这些字段：file（文件，仓库内相对路径）、function（函数，方法写成 Class.method）、

@@ -1,4 +1,4 @@
-# 命令行入口（docs/design/kernel-quality-gate.md「4.7 合并检查」）：CI 的「内核检查」作业与执行者
+# 命令行入口（docs/design/kernel-quality-gate.md「合并检查」）：CI 的「内核检查」作业与执行者
 # 交付前在本地运行的是同一条命令 `uv run python -m tools.kernel_checks check`，得到同一个结论。
 # 不带选项时输入是当前提交相对 origin/main 合并基点的改动；--base、--report、--ignore-switches
 # 三个选项见包的文档字符串与 --help。退出码：0 通过，1 不通过，2 工具自己出错。

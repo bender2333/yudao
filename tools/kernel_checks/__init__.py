@@ -1,4 +1,4 @@
-"""内核的代码质量检查（docs/design/kernel-quality-gate.md「接口」「方案」4.1 至 4.3、4.8）。
+"""内核的代码质量检查（docs/design/kernel-quality-gate.md「接口」「接入：按模块，两个开关」「改到的语句与函数」「复杂度检查」「评价材料」）。
 
 用法（在仓库根运行）：
 

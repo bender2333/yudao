@@ -1,4 +1,4 @@
-# 报告与结论（docs/design/kernel-quality-gate.md「3 接口」「4.7 合并检查」）：一份 JSON 报告按
+# 报告与结论（docs/design/kernel-quality-gate.md「接口」「合并检查」）：一份 JSON 报告按
 # --report 写盘，一段给人看的文字写到标准输出（按 UTF-8，Windows 控制台的默认编码下也不报编码
 # 错误）。结论只有通过、不通过、工具出错三种，退出码分别是 0、1、2；工具出错一律不算通过。
 

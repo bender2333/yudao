@@ -1,5 +1,5 @@
 # 理由登记的读取与校验、报告与退出码（tools/kernel_checks/registry.py、report.py 与命令行入口，
-# docs/design/kernel-quality-gate.md「4.5 存活的出口与理由登记」「4.7 合并检查」）：
+# docs/design/kernel-quality-gate.md「存活的出口与理由登记」「合并检查」）：
 # 空列表读取通过；缺理由或字段不全的项读取时报错并指出是哪一项；报告写成 JSON 文件；
 # 退出码：通过 0、不通过 1、工具出错 2（合并基点不存在、清单读不了）。
 

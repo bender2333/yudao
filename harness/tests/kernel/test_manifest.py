@@ -126,7 +126,7 @@ def test_kernel_files_import_only_kernel_files_stdlib_and_pydantic():
     assert offenders == [], f"内核文件导入了清单以外的模块：{offenders}"
 
 
-# 内核模块的两个开关（docs/design/kernel-quality-gate.md「4.1 接入：按模块，两个开关」，工单 #1477）：
+# 内核模块的两个开关（docs/design/kernel-quality-gate.md「接入：按模块，两个开关」，工单 #1477）：
 # 模块条目可以带 checks，没写的就是关；checks 里只有 complexity 与 mutation 两个布尔值，
 # 变异开关打开时复杂度开关也必须打开（变异依赖测试先立住，复杂度不依赖）。
 SWITCHES = ("complexity", "mutation")

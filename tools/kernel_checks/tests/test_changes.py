@@ -1,4 +1,4 @@
-# 改动识别（tools/kernel_checks/changes.py，docs/design/kernel-quality-gate.md「4.2 改到的语句与函数」）：
+# 改动识别（tools/kernel_checks/changes.py，docs/design/kernel-quality-gate.md「改到的语句与函数」）：
 # 在真实 git 仓库的夹具里改一条语句，报出这个函数与这条语句；只改注释、空行或排版时不报；
 # 类里的方法按单独的函数报。夹具用真实的 git 与真实文件，工具按相对合并基点的改动读它们。
 

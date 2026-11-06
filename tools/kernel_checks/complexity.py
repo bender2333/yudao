@@ -1,4 +1,4 @@
-# 复杂度检查（docs/design/kernel-quality-gate.md「4.3 复杂度检查」）：对改到的函数用 radon 量圈
+# 复杂度检查（docs/design/kernel-quality-gate.md「复杂度检查」）：对改到的函数用 radon 量圈
 # 复杂度，超过 10 就不通过，报告写出函数与数值。没有改到的函数不量；复杂度没有登记出口。
 #
 # 量一个函数时只把它自己的源码交给 radon：方法先取出再量，所以拿到的是这个函数自己的复杂度，

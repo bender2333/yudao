@@ -1,5 +1,5 @@
 # 复杂度检查与开关（tools/kernel_checks/complexity.py 与清单里的 checks，
-# docs/design/kernel-quality-gate.md「4.1 接入：按模块，两个开关」「4.3 复杂度检查」）：
+# docs/design/kernel-quality-gate.md「接入：按模块，两个开关」「复杂度检查」）：
 # 改到的函数圈复杂度超过 10 时不通过并写出函数与数值，恰为 10 时通过；没有改到的超限函数不报；
 # 清单里没写开关的模块不检查，用 --ignore-switches 时才检查。
 
