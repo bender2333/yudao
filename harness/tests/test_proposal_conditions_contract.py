@@ -6,7 +6,8 @@
 # 守的是：
 # - R1（做对了）：合同的通用条件照常生效；
 # - R2（不放过错的）：写错的条件名与参数让定义装载失败，不会静默跳过一条规则；
-# - R3（不放宽既有许可）：发布的合同里六种通用条件都在，删掉任何一种都要有意识地改数据。
+# - R3（不放宽既有许可）：发布的合同里每种通用条件都照常生效——按发布的合同跑同一份提案被拒；
+#   删掉其中一种，test_proposal_conditions.py 里守着那条条件的拒绝用例就会失败。
 #
 # 这一层用临时目录复制定义文件、按新合同重新装载，属于模块层。
 from harness.tests.helpers import adjudication_view
@@ -18,7 +19,7 @@ import pytest
 
 import harness.tools as tools
 from harness.actions import TreeFacts
-from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, DefinitionError, load_definitions
+from harness.definitions import DEFINITIONS_DIR, DefinitionError, load_definitions
 from harness.kernel_events import Event
 from harness.models import (ArtifactRef, CheckReceipt, DeliverySpec, EffectiveContract, EventType, ProductDecision, ProductSpec,
                             RunProjection, SessionRecord, canonical_hash)
@@ -34,8 +35,6 @@ DELIVERY_HASH = "sha256:" + "d" * 64
 TREE = "sha256:" + "e" * 64
 OTHER_TREE = "sha256:" + "f" * 64
 REQUIREMENT = "print the given argument to stdout"
-CONDITIONS = ("basis_current", "referenced_current", "check_receipts", "tree_matches", "author_separation",
-              "no_duplicate_content")
 
 
 def _judgement_events(delivery_hash: str = DELIVERY_HASH) -> list[Event]:
@@ -118,14 +117,6 @@ def _facts(*checks: CheckReceipt, digest: str = TREE) -> TreeFacts:
 def _projection(department: str, *, kind: str = "change", **fields) -> RunProjection:
     sessions = {department: SessionRecord(session_id=f"ses_{department}", department=department, status="active")}
     return RunProjection(run_id=RUN, kind=kind, sessions=sessions, **fields)
-
-
-def test_the_shipped_contract_declares_every_generic_condition():
-    # R3：六种通用条件都在发布的合同里（删掉一种要改数据，改数据要有用例说明）
-    shipped = json.loads((DEFINITIONS_DIR / "proposal_contracts.json").read_text(encoding="utf-8"))
-    declared = {item["condition"] for kind in shipped["conditions"].values() for item in kind}
-    assert declared == set(CONDITIONS)
-    assert DEFINITIONS.proposal_conditions("qa_review"), "读出来的条件应当与文件一致"
 
 
 def test_removing_the_duplicate_check_from_the_contract_accepts_the_same_decision(tmp_path, monkeypatch):

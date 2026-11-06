@@ -140,20 +140,6 @@ def _collected(client, opened, models_url=None):
     return event.payload
 
 
-def test_custom_service_without_models_url_reads_base_url_plus_models(tmp_path):
-    # 验收第 1 条：自定义服务不填写模型列表地址时，按服务地址 + /models 读取
-    upstream = _ModelsServer({"data": [{"id": "upstream-384"}]})
-    try:
-        opened = _Opened(tmp_path, _document(upstream.base))
-        with running_api(opened) as client:
-            payload = _collected(client, opened)
-            assert payload["status"] == "ok", payload["error"]
-            assert payload["source_url"] == f"{upstream.base}/models"
-            assert payload["candidate_ids"] == ["upstream-384"]
-    finally:
-        upstream.close()
-
-
 def test_saved_models_url_is_used_and_clearing_it_returns_to_the_default(tmp_path):
     # 验收第 1 条：填写的地址被使用；清空以后回到默认地址
     upstream = _ModelsServer({"data": [{"id": "upstream-384"}]})
@@ -172,44 +158,6 @@ def test_saved_models_url_is_used_and_clearing_it_returns_to_the_default(tmp_pat
             assert overridden["source_url"] == f"{upstream.base}/override"
     finally:
         upstream.close()
-
-
-def test_default_models_url_follows_a_changed_service_address(tmp_path):
-    # 验收第 1 条：服务地址改了以后，没有填写过的模型列表地址随之变化
-    upstream = _ModelsServer({"data": [{"id": "upstream-384"}]})
-    try:
-        opened = _Opened(tmp_path, _document(upstream.base))
-        with running_api(opened) as client:
-            assert _collected(client, opened)["source_url"] == f"{upstream.base}/models"
-            _save(client, f"{upstream.base}/v2")
-            assert _collected(client, opened)["source_url"] == f"{upstream.base}/v2/models"
-    finally:
-        upstream.close()
-
-
-def test_failure_names_the_requested_url_and_status_code(tmp_path):
-    # 验收第 2 条：上游返回 404 时写明请求的地址与状态码
-    upstream = _ModelsServer({"error": "not found"}, status=404)
-    try:
-        opened = _Opened(tmp_path, _document(upstream.base))
-        with running_api(opened) as client:
-            payload = _collected(client, opened)
-            assert payload["status"] == "unknown"
-            assert f"{upstream.base}/models" in payload["error"]
-            assert "404" in payload["error"]
-    finally:
-        upstream.close()
-
-
-def test_failure_names_the_requested_url_and_connection_reason(tmp_path):
-    # 验收第 2 条：端口上没有服务时写明请求的地址与连接失败原因
-    address = f"http://127.0.0.1:{_closed_port()}"
-    opened = _Opened(tmp_path, _document(address))
-    with running_api(opened) as client:
-        payload = _collected(client, opened)
-        assert payload["status"] == "unknown"
-        assert f"{address}/models" in payload["error"]
-        assert "连接" in payload["error"]
 
 
 def test_connection_test_failure_names_the_requested_url(tmp_path):

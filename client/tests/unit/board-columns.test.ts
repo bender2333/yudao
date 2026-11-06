@@ -8,12 +8,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { boardColumns,boardGroups } from "../../src/renderer/src/views/project/board.ts";
-import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,formatTime,label,progressLabel,stopNoteView,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
+import { DECISION_BLOCKS,DEPARTMENT_STATE,RUN_STATUS_LABELS,STOP_NOTE_INLINE_LIMIT,STOP_REASON,departmentLine,departmentName,departmentsText,formatTime,isOpenLoopCompleted,label,progressLabel,stopNoteView,workItemStatusText,workingDepartmentsText } from "../../src/renderer/src/views/project/labels.ts";
 import type { DepartmentState,WorkItemCard } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 
 const STOP_REASONS = [
-  "released", "baseline_verified", "max_cycles", "model_steps_exhausted", "no_tool_call",
+  "released", "open_loop", "baseline_verified", "max_cycles", "model_steps_exhausted", "no_tool_call",
   "workspace_unrepresentable", "time_limit", "cancelled", "user_cancelled", "provider_error", "provider_timeout",
   "provider_protocol", "unsupported_protocol", "retry_after_too_long", "context_overflow",
   "compaction_failed", "host_commit_error", "run_event_version_changed",
@@ -73,6 +73,36 @@ test("部门列按部门分列，已放行与已采纳各自一列", () => {
   ]);
   assert.deepEqual(columns.released.map((entry) => entry.work_item_id), ["w5"]);
   assert.deepEqual(columns.adopted.map((entry) => entry.work_item_id), ["w6"]);
+});
+
+test("开环完成的事项进开环完成一列，已放行里没有它（工单 #1421）", () => {
+  // 项目流里两种结束方式都是 released_unsettled，只有结束原因不同：判断只读卡片上的这两个字段
+  const openLoop = item({ work_item_id: "w1", status: "released_unsettled", department: null, stop_reason: "open_loop" });
+  const released = item({ work_item_id: "w2", status: "released_unsettled", department: null, stop_reason: "released" });
+  // 结束原因还没有写下的（结算还没跑）仍按放行待采纳，不猜成开环完成
+  const unsettled = item({ work_item_id: "w3", status: "released_unsettled", department: null, stop_reason: null });
+  const columns = boardColumns([openLoop, released, unsettled]);
+  assert.deepEqual(columns.open_loop.map((entry) => entry.work_item_id), ["w1"]);
+  assert.deepEqual(columns.released.map((entry) => entry.work_item_id), ["w2", "w3"]);
+  // 看板的固定组在「已放行」之后是「开环完成」
+  const groups = boardGroups([openLoop, released]);
+  assert.deepEqual(groups.map((group) => group.title), ["排队中", "已放行", "开环完成", "已采纳", "已停止"]);
+  assert.deepEqual(groups[1].items.map((entry) => entry.work_item_id), ["w2"]);
+  assert.deepEqual(groups[2].items.map((entry) => entry.work_item_id), ["w1"]);
+});
+
+test("事项状态写「开环完成」还是「已放行」只看卡片上的状态与结束原因（工单 #1421）", () => {
+  assert.equal(isOpenLoopCompleted({ status: "released_unsettled", stop_reason: "open_loop" }), true);
+  assert.equal(isOpenLoopCompleted({ status: "released_unsettled", stop_reason: "released" }), false);
+  assert.equal(isOpenLoopCompleted({ status: "released_unsettled" }), false);
+  // 采纳以后是另一种状态：开环完成的记录留在结束原因上，页面按状态写已采纳
+  assert.equal(isOpenLoopCompleted({ status: "adopted", stop_reason: "open_loop" }), false);
+  assert.equal(workItemStatusText({ status: "released_unsettled", stop_reason: "open_loop" }), "开环完成");
+  assert.equal(workItemStatusText({ status: "released_unsettled", stop_reason: "released" }), "已放行");
+  assert.equal(workItemStatusText({ status: "adopted", stop_reason: "open_loop" }), "已采纳");
+  // 开环完成的写法里没有「放行」，也没有英文内部标识
+  assert.equal(/[A-Za-z]/.test(workItemStatusText({ status: "released_unsettled", stop_reason: "open_loop" })), false);
+  assert.equal(workItemStatusText({ status: "released_unsettled", stop_reason: "open_loop" }).includes("放行"), false);
 });
 
 test("两个部门同时工作时，事项在两个部门的列里，与部门状态行说的是同一件事", () => {
@@ -146,7 +176,7 @@ test("部门都在等待工作、也没有所在部门时，按所在部门放�
   assert.deepEqual(boardColumns([awaiting]).queue.map((entry) => entry.work_item_id), ["w2"]);
 });
 
-test("看板按显示顺序给出各组：排队中、各部门、已放行、已采纳、已停止", () => {
+test("看板按显示顺序给出各组：排队中、各部门、已放行、开环完成、已采纳、已停止", () => {
   const groups = boardGroups([
     item({
       work_item_id: "w1",
@@ -159,14 +189,16 @@ test("看板按显示顺序给出各组：排队中、各部门、已放行、�
       },
     }),
   ]);
-  assert.deepEqual(groups.map((group) => group.title), ["排队中", "产品", "工程", "质检", "已放行", "已采纳", "已停止"]);
+  assert.deepEqual(groups.map((group) => group.title),
+    ["排队中", "产品", "工程", "质检", "已放行", "开环完成", "已采纳", "已停止"]);
   assert.deepEqual(groups[2].items.map((entry) => entry.work_item_id), ["w1"]);
-  // 项目里没有进行中的事项（只有已采纳的事项）时没有部门列：只有按状态分的四组
+  // 项目里没有进行中的事项（只有已采纳的事项）时没有部门列：只有按状态分的五组
   const adoptedOnly = boardGroups([item({ work_item_id: "w2", status: "adopted", department: null })]);
-  assert.deepEqual(adoptedOnly.map((group) => group.title), ["排队中", "已放行", "已采纳", "已停止"]);
-  assert.deepEqual(adoptedOnly[2].items.map((entry) => entry.work_item_id), ["w2"]);
-  // 一个事项都没有时也是这四组，界面按「项目还没有事项」写空态
-  assert.deepEqual(boardGroups([]).map((group) => group.title), ["排队中", "已放行", "已采纳", "已停止"]);
+  assert.deepEqual(adoptedOnly.map((group) => group.title), ["排队中", "已放行", "开环完成", "已采纳", "已停止"]);
+  assert.deepEqual(adoptedOnly[3].items.map((entry) => entry.work_item_id), ["w2"]);
+  // 一个事项都没有时也是这五组，界面按「项目还没有事项」写空态
+  assert.deepEqual(boardGroups([]).map((group) => group.title),
+    ["排队中", "已放行", "开环完成", "已采纳", "已停止"]);
 });
 
 
@@ -174,6 +206,9 @@ test("停止原因与 run 状态的中文名只覆盖控制核心与定义里的
   assert.deepEqual(Object.keys(STOP_REASON).sort(), [...STOP_REASONS].sort());
   assert.equal(label(STOP_REASON, "released"), "已完成并放行");
   assert.equal(label(STOP_REASON, "cancelled"), "运行已被取消");
+  // 开环完成是另一种结束方式（工单 #1421）：中文名与「放行」分开，页面上不出现 open_loop
+  assert.equal(label(STOP_REASON, "open_loop"), "开环完成");
+  assert.equal(label(STOP_REASON, "open_loop").includes("放行"), false);
   for (const name of [...Object.values(RUN_STATUS_LABELS), ...Object.values(STOP_REASON)]) {
     assert.equal(/[A-Za-z]/.test(name.replace("Yudao", "")), false, name);
   }

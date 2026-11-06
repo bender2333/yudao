@@ -249,13 +249,6 @@ def _normalized(events):
     return normalized_run(_StubSystem(events), "run_synthetic")
 
 
-# 事项的累计数不进会话内事件的比较（工单 #892）：会话事件里不再有 activations、model_steps、cycle，
-# 会话自己的累计数 session_activations、session_model_steps 保留，事项的总数在投影里比较。
-_ITEM_TOTALS = ("activations", "model_steps", "cycle")
-_GLOBAL_POSITION = re.compile(r"^<evt#\d+>$")
-_SESSION_POSITION = re.compile(r"^(?:<[^>]+>|__run__)#\d+$")
-
-
 def test_interleaved_sessions_compare_equal():
     # 同一份事件，两个会话交错的先后不同（每个会话内部的事件相同）：
     # 规整以后引用写成会话内的位置，两份按会话比较相等（工单 #892）

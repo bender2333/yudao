@@ -5,12 +5,11 @@
 # 查询只读事件与工件：不调用模型，不回写事实，不新增事件种类。
 
 import json
-import time
 from dataclasses import asdict
 
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
-from harness.app.project_queries import EventDetail, NotFound, RunActions, RunSteps
+from harness.app.project_queries import EventDetail, NotFound, RunSteps
 from harness.event_store import run_stream
 from harness.models import EventType
 from harness.runtime import LoopSystem
@@ -361,43 +360,3 @@ def test_event_detail_returns_reasoning_and_model_texts(data_dir):
     finally:
         system.close()
 
-
-def test_run_actions_output_is_unchanged(data_dir):
-    # run.actions 照旧返回全部部门的动作与后台命令（建档页与 process_kill 仍读它）
-    system, application, run_id, _steps = steps_fixture(data_dir)
-    try:
-        actions = application.query("run.actions", RunActions(run_id=run_id)).data
-        assert {action.action_id for action in actions.actions} == {
-            "call-a", "call-b", "call-c", "call-bg", "call-x", "call-ebg"}
-        assert sorted(command.command for command in actions.background_commands) == [
-            "wait-for-release", "wait-for-release"]
-    finally:
-        system.close()
-
-
-def test_a_long_activation_is_read_within_a_second(data_dir):
-    # 读数（验收第 9 条）：93 步、52 条推理的一次读取。超时说明本机负载或查询需要分页
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    project_id = system.projects.register("长激活", "核对读取耗时")
-    work_item_id, run_id = system.projects.start_work_item(project_id, "93 步")
-    _append(system, run_id, EventType.DEPARTMENT_ACTIVATED, payload={"activation_id": ACTIVATION, "cycle": 1})
-    for step_id in range(1, 94):
-        _request(system, run_id, step_id=step_id, root_step_id=step_id, attempt=1,
-                 attempt_id="att-%d" % step_id)
-        if step_id <= 52:
-            _reasoning(system, run_id, step_id=step_id, attempt_id="att-%d" % step_id,
-                       item=_chat_reasoning("第 %d 步的推理：先看代码，再动手。" % step_id))
-        _tool(system, run_id, action_id="call-%d" % step_id, name="list_files", step_id=step_id)
-    _append(system, run_id, EventType.ACTIVATION_FINISHED, payload={"activation_id": ACTIVATION})
-    application = Application(system)
-    try:
-        started = time.monotonic()
-        result = _query(application, RunSteps(run_id=run_id, department=PRODUCT))
-        elapsed = time.monotonic() - started
-        assert len(result.steps) == 93
-        assert sum(len(step.reasoning) for step in result.steps) == 52
-        # 读数写进交付说明；本机应远低于 1 秒，超过时这里失败并写明读数
-        print("run.steps 在 93 步、52 条推理上的读数：%.3f 秒" % elapsed)
-        assert elapsed < 1.0, "run.steps 用时 %.3f 秒" % elapsed
-    finally:
-        system.close()

@@ -528,9 +528,9 @@ test.describe("项目页面（1440×900）", () => {
         await expect(create).toBeDisabled();
 
         // 事项统计那一行：名字只说这一种状态，各项加起来是「共 N」（工单 #1160）。
-        // 示例项目里那一个事项已经放行并被采纳，所以是已采纳 1、放行待采纳 0、成果挂起 0
+        // 示例项目里那一个事项已经放行并被采纳，所以是已采纳 1、放行待采纳 0、开环完成 0、成果挂起 0
         const statsLine = (await section(page, "项目摘要")).locator(".line").filter({ hasText: "事项统计" }).first();
-        await expect(statsLine).toContainText("共 1：进行中 0、排队中 0、已采纳 1、放行待采纳 0、成果挂起 0、已停止 0");
+        await expect(statsLine).toContainText("共 1：进行中 0、排队中 0、已采纳 1、放行待采纳 0、开环完成 0、成果挂起 0、已停止 0");
 
         // 只填这一个框，点「记录原文」：记成材料，不建事项，框清空
         const box = current.getByLabel("新的想法或材料");

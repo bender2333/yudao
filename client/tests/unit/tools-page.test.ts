@@ -5,6 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type {
+  BuiltinToolsView,
   ToolsRegistryResult,
   ToolsRegistryServerView,
 } from "../../src/renderer/src/api/generated/types.gen.ts";
@@ -37,6 +38,14 @@ function server(overrides: Partial<ToolsRegistryServerView> = {}): ToolsRegistry
       config_digest: "",
     },
     ...overrides,
+  };
+}
+
+// 内置工具一节（工单 #152）：这一页的测试只关心取回记录与 MCP 服务器，给一份空的内置工具清单
+function builtin(): BuiltinToolsView {
+  return {
+    playwright_mcp: { package: "@playwright/mcp", version: "0.0.83" },
+    browser_tools: [],
   };
 }
 
@@ -80,6 +89,7 @@ function registry(): ToolsRegistryResult {
         ],
       },
     ],
+    builtin: builtin(),
   };
 }
 
@@ -101,8 +111,8 @@ test("取回记录合成一张表：最近的在前，带项目名与结果", ()
 
 test("取回记录的空态与没有结果时的说法", () => {
   assert.deepEqual(fetchRows(null), []);
-  assert.deepEqual(fetchRows({ projects: [] }), []);
-  assert.deepEqual(fetchRows({ projects: [{ project_id: "p", name: "空", mcp_servers: {} }] }), []);
+  assert.deepEqual(fetchRows({ projects: [], builtin: builtin() }), []);
+  assert.deepEqual(fetchRows({ projects: [{ project_id: "p", name: "空", mcp_servers: {} }], builtin: builtin() }), []);
   assert.equal(fetchResultText({ ok: true }), TOOLS_WORDING.fetchSucceeded);
   assert.equal(fetchResultText({ ok: false }), TOOLS_WORDING.fetchFailed);
   assert.equal(fetchResultText({}), TOOLS_WORDING.fetchUnknown);
@@ -124,7 +134,7 @@ test("MCP 服务器按项目分组：没有服务器的项目不出现，部门�
   ]);
   // 只有服务器的项目才列：空登记与没有项目时都没有这一块的内容
   assert.deepEqual(mcpProjects(null), []);
-  assert.deepEqual(mcpProjects({ projects: [{ project_id: "p", name: "空", mcp_servers: {} }] }), []);
+  assert.deepEqual(mcpProjects({ projects: [{ project_id: "p", name: "空", mcp_servers: {} }], builtin: builtin() }), []);
 });
 
 test("最近一次状态：没有探测过、失败、成功带工具数", () => {

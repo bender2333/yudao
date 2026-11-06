@@ -1,19 +1,15 @@
-# bash 工具的持久行为：管道与重定向、非零退出码、超时与取消的进程树结束、
-# 超时缺省与钳位、环境继承与凭据脱敏、超限截断的回执与按编号取回、bash 缺失的报错、
-# 以及调用 argv 不带 -l。这些结论 spawn 真实子进程，登记为集成层。
+# bash 工具的持久行为：管道与重定向、非零退出码、环境继承与凭据脱敏、
+# 超限截断的回执与按编号取回。这些结论 spawn 真实子进程，登记为集成层。
+# 超时与取消结束整棵进程树在 test_bash_process_tree.py（工单 #1215 的准入用例）。
 from __future__ import annotations
 
-import asyncio
-import re
 import secrets
 import sys
-import time
-from concurrent.futures import ThreadPoolExecutor
 
 from harness import environment as environment_module
 from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment
-from harness.tests.helpers import action, perform, wait_for_file, wait_until_stopped
+from harness.tests.helpers import perform
 from harness.workspace import Workspace
 
 
@@ -39,51 +35,6 @@ def test_pipe_redirect_and_exit_code(tmp_path):
     failed = perform(environment, "bash", {"command": "exit 3"})
     assert failed.ok is True and failed.status == "completed"
     assert failed.output["status"] == "failed" and failed.output["exit_code"] == 3
-
-
-def _tree_command(marker: str) -> str:
-    program = (
-        "import subprocess,sys,time,pathlib;"
-        "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)']);"
-        f"print('started child=%d' % child.pid,flush=True);"
-        f"pathlib.Path(r'{marker}').write_text('running',encoding='utf-8');"
-        "time.sleep(60)"
-    )
-    return f'"{_python()}" -c "{program}"'
-
-
-def _grandchild(output: str) -> int:
-    return int(re.search(r"started child=(\d+)", output).group(1))
-
-
-def test_timeout_stops_the_process_tree(tmp_path):
-    environment = _environment(tmp_path, check_timeout_sec=2)
-    marker = (tmp_path / "started").as_posix()
-    started = time.monotonic()
-    result = perform(environment, "bash", {"command": _tree_command(marker), "timeout_sec": 2})
-    assert time.monotonic() - started < 60
-    assert result.ok is True and result.status == "timeout"
-    assert result.output["exit_code"] == 124 and result.output["status"] == "timeout"
-    assert "timed out after 2s" in result.output["output"]
-    assert "the process tree was stopped" in result.output["output"]
-    assert wait_until_stopped(_grandchild(result.output["output"]))
-
-
-def test_cancel_stops_the_process_tree(tmp_path):
-    environment = _environment(tmp_path)
-    marker = tmp_path / "started"
-    request = action("bash", {"command": _tree_command(marker.as_posix())})
-    with ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(asyncio.run, environment.perform(request))
-        wait_for_file(marker)
-        started = time.monotonic()
-        environment.cancel(request.action_id)
-        result = future.result(timeout=60)
-    assert time.monotonic() - started < 30
-    assert result.ok is True and result.status == "cancelled"
-    assert result.output["exit_code"] == 130 and result.output["status"] == "cancelled"
-    assert "the process tree was stopped" in result.output["output"]
-    assert wait_until_stopped(_grandchild(result.output["output"]))
 
 
 def test_environment_inherited_and_secrets_redacted(tmp_path, monkeypatch):

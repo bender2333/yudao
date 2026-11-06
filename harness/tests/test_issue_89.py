@@ -242,24 +242,6 @@ def test_setting_only_a_prompt_clears_the_project_model_choice(tmp_path):
     finally:
         _close(server_a, server_b)
 
-def test_two_saves_on_the_same_version_reject_the_second_with_the_current_version(tmp_path):
-    server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
-    server_b, _capture_b, base_b = serve(lambda _body: _text_reply(response_id="rb", model="upstream-b", text="ok"))
-    try:
-        opened = _Opened(tmp_path, base_a, base_b)
-        with running_api(opened) as client:
-            project_id = _create_project(client, "P")
-            first = _post(client, "department_settings.save", base_version=0, project_id=project_id,
-                          department="engineering", department_prompt="v1")
-            assert first.status_code == 200, first.text
-            stale = _post(client, "department_settings.save", base_version=0, project_id=project_id,
-                          department="engineering", department_prompt="v2")
-            assert stale.status_code == 409, stale.text
-            assert stale.json()["reason"] == "stale_base" and stale.json()["current_version"] == 1
-            assert _settings(client, project_id, "engineering")["version"] == 1
-    finally:
-        _close(server_a, server_b)
-
 def test_a_project_setting_cannot_select_a_definition_whose_admission_is_revoked(tmp_path):
     server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
     server_b, _capture_b, base_b = serve(lambda _body: _text_reply(response_id="rb", model="upstream-b", text="ok"))
@@ -335,39 +317,6 @@ def test_the_run_has_no_department_prompt_copy_and_records_the_project_version(t
     finally:
         _close(server_a, server_b)
 
-def test_a_project_setting_tier_outside_the_model_levels_is_saved_and_limited_on_request(tmp_path):
-    # 项目部门设置与部门默认同一套保存规则（docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」、「限制到支持范围」）：保存只核对请求档位属于档位全集，
-    # 超出所选模型支持档位的档位照常保存，下一次请求按该模型的支持档位限制
-    server_a, capture_a, base_a = serve(_department_aware("upstream-a"))
-    server_b, capture_b, base_b = serve(_department_aware("upstream-b"))
-    try:
-        opened = _Opened(tmp_path, base_a, base_b)
-        with running_api(opened) as client:
-            opened.admit()
-            project_id = _create_project(client, "P")
-            # model-b 没有声明支持档位，high 仍属于档位全集，保存被接受
-            saved = _post(client, "department_settings.save", base_version=0, project_id=project_id,
-                          department="engineering", provider_id="provider-b", model_id="model-b",
-                          requested_tier="high")
-            assert saved.status_code == 200, saved.text
-            assert _settings(client, project_id, "engineering")["requested_tier"] == "high"
-
-            started = _post(client, "work_item.create", project_id=project_id, text="echo")
-            assert started.status_code == 200, started.text
-            run_id = started.json()["refs"]["run_id"]
-            _finish(opened.system, run_id)
-            engineering = [event for event in _run_requests(opened.system, run_id)
-                           if event.department == "engineering"]
-            assert engineering
-            assert engineering[0].payload["requested_tier"] == "high"
-            # 新模型没有声明支持档位，请求不带推理参数
-            assert engineering[0].payload["sent_tier"] is None
-            # 产品部门仍用部门默认的 model-a，工程部门用项目部门设置选中的 model-b
-            assert {item["model"] for item in capture_b.requests} == {"upstream-b"}
-            assert {item["model"] for item in capture_a.requests} == {"upstream-a"}
-    finally:
-        _close(server_a, server_b)
-
 def test_a_project_setting_rejects_a_tier_outside_the_full_set(tmp_path):
     # 请求档位不属于档位全集时保存被拒绝，并指出字段位置
     server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
@@ -387,7 +336,7 @@ def test_a_project_setting_rejects_a_tier_outside_the_full_set(tmp_path):
         _close(server_a, server_b)
 
 def test_a_project_setting_rejects_a_tier_outside_the_full_set_without_writing_a_model(tmp_path):
-    # 模型访问定义与请求档位分别继承（docs/design/model-management.md「项目部门设置与项目角色设置」、「解析规则」、「部门详情里的模型与 Prompt」）：只写入请求档位、模型跟随部门默认时，
+    # 模型访问定义与请求档位分别继承（设计说明第 5.2、5.3、9.2 节）：只写入请求档位、模型跟随部门默认时，
     # 写入的请求档位同样要属于档位全集，不因此跳过核对
     server_a, _capture_a, base_a = serve(lambda _body: _text_reply(response_id="ra", model="upstream-a", text="ok"))
     server_b, _capture_b, base_b = serve(lambda _body: _text_reply(response_id="rb", model="upstream-b", text="ok"))

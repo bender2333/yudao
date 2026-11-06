@@ -2,7 +2,7 @@
 // 「查询清单」 `home.away_report` 与 `acceptance.coverage`）：
 // 报告里「带开环条件的放行」一项逐条列出每个放行的开环条件，条数与明细取自 `acceptance.coverage`
 // （放行记录里一次算好，页面读这个数，不重新计算）；事项的名称取自 project.overview；
-// 「跳到逐条结论表」的链接只在逐条结论表已经交付（#154 合并）时出现；页面文字里没有英文内部标识，
+// 「跳到逐条结论表」的链接在逐条结论表交付以后（#154）出现；页面文字里没有英文内部标识，
 // 也不写事项一级的「开环完成」。
 //
 // 用 node --test 运行，不依赖服务与网络：输入是查询结果的形状（与 api/generated/types.gen 的
@@ -189,13 +189,10 @@ test("事项标题取不到时写「未记事项」，不把事项标识写进�
   assert.ok(!rows[0].where.includes("wi_"), rows[0].where);
 });
 
-test("「跳到逐条结论表」的链接只在逐条结论表已经交付时出现（软依赖，不等 #154）", () => {
-  // 现在 #154 还没有合并：资料页上没有这张表，链接不出现
-  assert.equal(CRITERIA_TABLE_READY, false);
-  assert.equal(openReleaseRows(lookup())[0].href, null);
-  // #154 合并、把那一行打开以后，链接落到这个事项的资料页
-  const ready = openReleaseRows(lookup({ criteriaTableReady: true }));
-  assert.equal(ready[0].href, `#/p/${PROJECT}/materials?w=${ITEM}`);
+test("「跳到逐条结论表」的链接在逐条结论表交付以后出现（#154）", () => {
+  // 资料页已经有这张表：默认就给出链接，落到这个事项的资料页
+  assert.equal(CRITERIA_TABLE_READY, true);
+  assert.equal(openReleaseRows(lookup())[0].href, `#/p/${PROJECT}/materials?w=${ITEM}`);
   // 读不出检验覆盖的那一行不给链接：没有条数可对照的表不看
   const unreadable = openReleaseRows(lookup({ criteriaTableReady: true, coverage: { [ITEM]: null } }));
   assert.equal(unreadable[0].href, null);

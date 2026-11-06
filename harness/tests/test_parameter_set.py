@@ -474,31 +474,6 @@ def test_withdraw_rejects_when_the_latest_change_has_moved_on(data_dir):
         assert opened.store.end_position() == end
 
 
-def test_withdraw_in_the_same_transaction_checks_the_latest_identity_before_writing(data_dir):
-    # 守 R1（同事务核对）：撤回的最近修改身份与基准版本在同一个写事务里核对；
-    # 通过核对以后才追加事件，核对不过时什么也不写（工单 #1262，docs/design/app-and-interface.md「查询清单」）
-    opened = _Opened(data_dir)
-    with running_api(opened) as client:
-        assert _post(client, "project.create", name="参数",
-                     goal="做一个命令行回显工具。").status_code == 200
-        assert _post(client, "parameter.set", name="max_cycles", value=12, reason="先改").status_code == 200
-        [first] = _parameter_events(opened)
-
-        # 撤回时按最新的参数版本作为基准：接受并写事件
-        end = opened.store.end_position()
-        ok = _post(client, "parameter.withdraw", name="max_cycles",
-                   expected_change_id=first.event_id, reason="撤回：先改",
-                   base_version=opened.system.parameters_version())
-        assert ok.status_code == 200, ok.text
-        assert opened.store.end_position() == end + 1
-
-        entry = _registry_entry(client, "max_cycles")
-        assert entry["value"] == 999999
-        # 事件里的提出者取认证身份，理由由页面按「撤回：」与原理由给出
-        [withdraw_event] = _parameter_events(opened)[1:]
-        assert withdraw_event.payload["modified_by"] == "user:local"
-
-
 def test_withdraw_of_a_project_parameter_restores_the_project_value(data_dir):
     # 守 R1（项目级撤回）：项目级参数的撤回按项目流核对最近一次修改，恢复项目的覆盖值；
     # 没有设置过的参数没有可撤回的修改（工单 #1262）

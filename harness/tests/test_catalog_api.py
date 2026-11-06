@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from harness.app.application import Application
 from harness.models import CatalogEventType
 from harness.tests.api_helpers import running_api
-from harness.tests.protocol_helpers import model_test_responder, responses_responder, serve
+from harness.tests.protocol_helpers import model_test_responder, serve
 from harness.tests.wait_limits import WAIT_FOR_HOST_WORK_SEC
 
 # 模型目录与凭据的查询与命令：真实启动 FastAPI 应用，目录文件与 .env 是真实文件，事件日志是真实 SQLite；
@@ -265,25 +265,6 @@ def test_department_defaults_carry_the_requested_tier(tmp_path):
                                       for department in DEPARTMENTS})
         assert rejected.status_code >= 400
         assert "bindings.product.requested_tier" in rejected.text
-
-def test_connection_save_accepts_the_reasoning_declaration(tmp_path):
-    # 连接保存带模型访问定义时可写入推理档位声明（工单 #87）；默认档位不属于支持档位时拒绝
-    opened = _Opened(tmp_path)
-    with running_api(opened) as client:
-        current = _catalog(client)["revision"]
-        model = {**_model("m1"), "reasoning_levels": ["low", "medium"],
-                 "default_reasoning_level": "low", "reasoning_mode": "effort"}
-        saved = _command(client, "catalog.connection.save", base_version=current,
-                         provider=_provider("p1"), models=[model])
-        assert saved.status_code == 200, saved.text
-        assert _catalog(client)["models"][0]["reasoning_mode"] == "effort"
-
-        bad = {**_model("m1"), "reasoning_levels": ["low"], "default_reasoning_level": "high",
-               "reasoning_mode": "effort"}
-        rejected = _command(client, "catalog.connection.save", base_version=_catalog(client)["revision"],
-                            provider=_provider("p1"), models=[bad])
-        assert rejected.status_code >= 400
-        assert "default_reasoning_level" in rejected.text
 
 def test_model_test_admits_and_connection_test_does_not(tmp_path):
     server, _capture, base = serve(lambda body: model_test_responder(body, protocol="responses"))

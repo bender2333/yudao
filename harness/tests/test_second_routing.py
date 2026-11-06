@@ -1,4 +1,4 @@
-# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用设计说明「其他路由：骨架要满足的条件」中「证明」；
+# 骨架接得住第二种路由：任务池跑完一个事项（工单 #864；骨架与应用设计说明第 5.4 节「证明」、第 12 节 S6b；
 # 总图第四节「路由」缝）。
 #
 # 证明的样子：同一副骨架（写入口、裁决、边界、薄驱动、最小投影、定义加载）接上另一套应用——
@@ -6,14 +6,14 @@
 # （`task_pool_definitions/`，用 `load_definitions(<测试目录>)` 加载）。骨架的模块一行不改（契约模块按
 # 工单 #1164 补了可选的读事件入口，其余照旧），产品的 `harness/definitions/` 一个条目也不加，产品代码不导入它们。
 #
-# 这个文件查六件事：
+# 这个文件查五件事：
 # 1. 假模型跑完一个事项：发布任务、指派、完成、打回各至少一次；事项以**它自己那份定义里声明的**结束原因结束
 #    （`pool_drained`，内核的停止原因清单里没有它）；
 # 2. 完成一件事的部门不能自己给这件事结论（基础规则 3，由路由的收紧检查判）；
 # 3. 路由自己的应用事件种类按 #828 的登记方式登记，经写入口写入、重放读得回来，骨架事件的登记表不变；
 # 4. 定义只在测试目录里，产品的定义与成果驱动的合同没有被改动；
-# 5. 产品代码不导入它；
-# 6. 停止原因由写入口按事项所用的那份定义核对（工单 #1165）：同一份定义里写不进去，交上它才写得进去。
+# 5. 产品代码不导入它。
+# 写入口按事项所用的那份定义核对停止原因的拒绝与放行（工单 #1165）由 `kernel/test_every_stop_has_reason.py` 守着。
 #
 # 模块级 `DEFINITIONS` 不替换（工单 #1165）：停止原因与部门由薄驱动交给写入口，写入口按交进来的那份定义核对；
 # 只有组装处（`runtime.py`）按组织定义里的名称接上路由那一步仍按模块加载的定义走。
@@ -22,8 +22,8 @@
 # 名称接上、它自己的一份定义由它自己校验、骨架只认得通用的一种成果接纳事件）与 R1（每个 run 以封闭清单里的
 # 原因结束：这里的那份清单是路由自己声明的那份）。
 #
-# 先后由事件决定，不用时长赌（docs/design/skeleton-and-application.md「看门狗与健康协议」）：这个事项一轮一个部门，薄驱动按路由的指派依次开始；
-# 假模型的脚本按部门给出（docs/design/skeleton-and-application.md「看门狗与健康协议」），每一步读的是前面写下的事件。
+# 先后由事件决定，不用时长赌（第 10 节第 7 条）：这个事项一轮一个部门，薄驱动按路由的指派依次开始；
+# 假模型的脚本按部门给出（第 10 节第 6 条），每一步读的是前面写下的事件。
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ from harness import write_path as write_path_module
 from harness.adapters.fake import FakeAdapter
 from harness.definitions import DEFAULT_FORM
 from harness.definitions import DEFINITIONS as PRODUCT_DEFINITIONS
-from harness.definitions import DefinitionError, UnknownStopReason, load_definitions
+from harness.definitions import DefinitionError, load_definitions
 from harness.event_store import run_stream
 from harness.kernel_events import json_dumps
 from harness.models import ArtifactRef, EventType
@@ -51,12 +51,11 @@ from harness.tests import second_routing, task_pool_assembly
 from harness.validation import TightenRequest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TESTS_DIR = Path(__file__).resolve().parent
 POOL_DEFINITIONS = second_routing.DEFINITIONS_DIR
 
 TASK = {"title": "README 的用法一节补上退出码说明"}
 
-# 假模型的脚本：按部门给出（docs/design/skeleton-and-application.md「看门狗与健康协议」）。发一次任务、完成两次（中间被打回一次）、给一次打回与一次
+# 假模型的脚本：按部门给出（第 10 节第 6 条）。发一次任务、完成两次（中间被打回一次）、给一次打回与一次
 # 接纳的结论。路由自己的提议方式不是产品的提交类工具，所以答复直接写成函数调用（FakeAdapter 的脚本项可以是
 # 返回 ModelResponse 的函数）
 SCRIPT = {
@@ -150,7 +149,7 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path):
     assert {item["artifact_issuer"] for item in verdicts} == {"quality"}
     assert all(item["completion"] in {done["content_hash"] for done in completions} for item in verdicts)
 
-    # 事项以它自己那份定义里声明的结束原因结束（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」）
+    # 事项以它自己那份定义里声明的结束原因结束（设计说明第 5.4 节第 7 条）
     declared = second_routing.DEFINITIONS.routing_definition().end_reasons
     assert projection.stop_reason == second_routing.ITEM_END_REASON
     assert projection.stop_reason in declared
@@ -160,51 +159,8 @@ def test_a_task_pool_runs_one_item_on_the_skeleton(tmp_path):
     assert projection.stop_reason not in second_routing.DEFINITIONS.stop_reasons
 
 
-def test_the_product_definitions_do_not_take_the_task_pool_end_reason(tmp_path):
-    # 验收第 2 条（工单 #1165）：同样的写入，用另一份没有声明这个原因的定义时失败，错误写明是哪一个原因
-    # 与哪份定义。这里是模块加载的那份产品定义——写入口不交定义时按它核对；交上事项所用的那一份时，
-    # 同一个写入写得进去（薄驱动写结束、暂停、失败事件时就是这么交的）
-    system, _adapter = _system(tmp_path)
-    run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
-    ending = write_path_module.NewEvent(
-        EventType.RUN_FAILED, state_before="running", state_after="failed", actor="system",
-        department="product", stop_reason=second_routing.ITEM_END_REASON,
-        payload={"stop_reason": second_routing.ITEM_END_REASON})
-    with pytest.raises(UnknownStopReason) as raised:
-        system.writes.append(run_stream(run_id), ending)
-    message = str(raised.value)
-    assert second_routing.ITEM_END_REASON in message
-    assert "stop_reasons.json" in message and "routings.json" in message
-    assert PRODUCT_DEFINITIONS.routing in message
-
-    [event] = system.writes.append(run_stream(run_id), ending, definitions=second_routing.DEFINITIONS)
-    assert event.stop_reason == second_routing.ITEM_END_REASON
-    assert system.project(run_id).stop_reason == second_routing.ITEM_END_REASON
-
-
-def test_the_assembly_hands_the_second_routing_its_event_reader(tmp_path):
-    # 组装处把只读的事件读取器交给路由（契约第三版，工单 #1164）：测试代码里没有自己给路由接事件库的调用，
-    # 路由按定义里的名称由组装处接上，读取器是同一处交出来的
-    system, _adapter = _system(tmp_path)
-    assert system.forms[second_routing.ROUTING_NAME].routing is second_routing.ROUTING
-    # 路由不再有自己接线的入口
-    assert not hasattr(second_routing.TaskPool, "bind")
-
-    reader = second_routing.ROUTING._facts
-    # 读取器只有 list_events：写事件仍然只经薄驱动交给写入口（docs/design/skeleton-and-application.md「路由契约」中「不做」）
-    assert {name for name in dir(reader) if not name.startswith("_")} == {"list_events"}
-    for writing in ("commit", "append", "replace_projection", "claim_execution_right", "close"):
-        assert not hasattr(reader, writing)
-
-    run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
-    system.run_until_stop(run_id)
-    # 读到的是这个事项事件库里的那些事件
-    assert [event.event_id for event in reader.list_events(run_id)] == [
-        event.event_id for event in system.store.list_events(run_id)]
-
-
 def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_path):
-    # 基础规则 3「生成者不裁决自己」：路由用自己的方式满足（骨架与应用设计说明「其他路由：骨架要满足的条件」），
+    # 基础规则 3「生成者不裁决自己」：路由用自己的方式满足（骨架与应用设计说明第 5.4 节），
     # 这里用这次运行里真实写下的事件折出的池子现状来判，不构造假的池子
     system, _adapter = _system(tmp_path)
     run_id = system.create_run("把 README 的用法一节整理清楚", form=second_routing.ROUTING_NAME)
@@ -233,7 +189,7 @@ def test_a_completion_cannot_be_judged_by_the_department_that_completed_it(tmp_p
 
 
 def test_the_task_pool_registers_its_own_application_event_kinds(tmp_path):
-    # 设计说明「其他路由：骨架要满足的条件」中「应用可以登记自己的事件种类，增加一种不改内核文件」、docs/design/skeleton-and-application.md「骨架事件与应用事件」：应用登记自己的事件种类，增加一种不改内核文件
+    # 设计说明第 5.4 节第 1 条、第 7 节：应用登记自己的事件种类，增加一种不改内核文件
     registered = kernel_events.application_event_types()
     for kind in second_routing.APPLICATION_EVENT_KINDS:
         assert registered.get(kind) == second_routing.APPLICATION
@@ -270,7 +226,7 @@ def test_the_task_pool_definitions_live_only_in_the_test_directory():
 
 
 def test_the_routing_rejects_its_own_definition_without_its_end_reason(tmp_path):
-    # 内容由路由自己校验（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）：事项结束用的那一条必须声明在这份定义里
+    # 内容由路由自己校验（设计说明第 5.4 节第 2 条）：事项结束用的那一条必须声明在这份定义里
     directory = tmp_path / "definitions"
     shutil.copytree(POOL_DEFINITIONS, directory)
     path = directory / "routings.json"

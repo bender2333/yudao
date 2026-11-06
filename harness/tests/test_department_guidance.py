@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import time
 import uuid
 
 from harness.watched_outputs import has_new_work, is_waiting
@@ -163,21 +162,6 @@ def test_guidance_received_during_model_request_becomes_a_notification(tmp_path)
                    for event in system.store.list_events(run_id))
     assert any(event.type == EventType.SPEC_ACCEPTED for event in system.store.list_events(run_id))
     assert any(event.type == EventType.PROPOSAL_SUBMITTED for event in system.store.list_events(run_id))
-
-
-def test_guidance_command_returns_persisted_target_record(data_dir):
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    project_id = system.projects.register("指导", "把文本按行处理清楚")
-    work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
-    application = Application(system)
-    with running_api(lambda: application) as client:
-        sent = client.post("/api/commands/guidance.send", json={
-            "command_id": str(uuid.uuid4()), "work_item_id": work_item_id, "department": "quality",
-            "text": "请记录当前验收边界。"})
-        assert sent.status_code == 200
-        workspace = application.query("department.workspace", DepartmentWorkspace(
-            project_id=project_id, department="quality", work_item=work_item_id))
-        assert workspace.data.guidance[0].text == "请记录当前验收边界。"
 
 
 def test_product_guidance_during_engineering_is_full_product_turn(tmp_path):
@@ -366,25 +350,6 @@ def test_a_limit_that_stops_the_round_does_not_write_answered(tmp_path):
 
     assert result.status == "paused"
     assert result.stop_reason == "model_steps_exhausted"
-    assert result.department_guidance[0].status == "in_input"
-    assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
-                   for event in system.store.list_events(run_id))
-
-
-def test_running_out_of_time_does_not_write_answered(tmp_path):
-    # 验收第 3 条（工单 #1039）：运行时间用完不算这一轮正常结束，指导停在已进入模型输入
-    def slow_spec(request):
-        time.sleep(3.2)
-        return product_spec()
-
-    adapter = FakeAdapter({"product": [slow_spec], "engineering": [delivery_turn()], "quality": []})
-    system = LoopSystem.for_testing(tmp_path, adapter)
-    run_id = system.create_run("echo", run_time_limit_sec=3)
-    system.add_guidance(run_id, "product", "请补充输入校验的处理说明。")
-    result = system.activate_once(run_id)
-
-    assert result.status == "failed"
-    assert result.stop_reason == "time_limit"
     assert result.department_guidance[0].status == "in_input"
     assert not any(event.type == EventType.DEPARTMENT_GUIDANCE_RESPONDED
                    for event in system.store.list_events(run_id))

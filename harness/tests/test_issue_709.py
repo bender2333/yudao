@@ -1,21 +1,17 @@
 # 工单 #709：写回的界面入口。
-# 两件事：写回的结果要有一条查询可以读（页面上看得见成果有没有回到仓库）；
-# 写回的目标不可用时命令给出中文的拒绝说明（以前是 500 内部错误，页面上什么也没发生）。
+# 写回的结果要有一条查询可以读，页面上看得见成果有没有回到仓库；
+# 写回的目标不可用时命令给出中文的拒绝说明（以前是 500 内部错误），同结论的用例在 test_writeback.py。
 
-import asyncio
 import gc
 import sys
 from dataclasses import asdict
 from pathlib import Path
 
 import pygit2
-import pytest
 
-from harness.app.commands import Rejection
-from harness.app.project_and_work_item_commands import WritebackExecute, _execute_writeback
 from harness.app.project_queries import ProjectWriteback, _project_writeback
 from harness.artifacts import ArtifactStore
-from harness.event_store import Command, EventStore, project_stream
+from harness.event_store import EventStore, project_stream
 from harness.models import ProjectEventType
 from harness.project_projection import handler_for
 from harness.projects import ProjectService
@@ -147,45 +143,6 @@ def test_the_writeback_query_gives_the_conflicting_files_when_the_writeback_stop
         # 停止时没有推送分支，也没有合并请求
         assert record.branch is None
         assert record.pull_request_title is None
-    finally:
-        store.close()
-        gc.collect()
-
-
-def test_the_writeback_command_explains_an_unusable_target_in_chinese(tmp_path):
-    # 目标分支不存在、远端仓库路径不存在：命令给出中文的拒绝说明，接口层回 409，
-    # 以前这两种情况直接变成 500 内部错误，页面上什么也没发生（工单 #709）
-    bare_path = tmp_path / "bare.git"
-    _bare_repo(bare_path)
-    store, artifacts, projects, project_id = _project_with_adoption(
-        tmp_path, remote=str(bare_path), target_branch="main")
-    command = Command(command_id="00000000-0000-0000-0000-000000000001", name="writeback.execute", digest="d", actor="user")
-    app = _App(store, artifacts, projects)
-    try:
-        # 目标分支不存在
-        projects.configure_source_directory(
-            project_id, "default", str(tmp_path / "src"), base_version=1,
-            writeback_enabled=True, remote=str(bare_path), target_branch="not-there",
-            check_commands=[PASSING_CHECK])
-        with pytest.raises(Rejection) as missing_branch:
-            asyncio.run(_execute_writeback(
-                app, command, WritebackExecute(
-                    command_id="00000000-0000-0000-0000-000000000001", project_id=project_id)))
-        assert missing_branch.value.reason == "not_allowed"
-        assert "目标分支不存在" in missing_branch.value.message
-        assert "not-there" in missing_branch.value.message
-
-        # 远端仓库路径不存在
-        projects.configure_source_directory(
-            project_id, "default", str(tmp_path / "src"), base_version=2,
-            writeback_enabled=True, remote=str(tmp_path / "no-such-repo.git"), target_branch="main",
-            check_commands=[PASSING_CHECK])
-        with pytest.raises(Rejection) as missing_remote:
-            asyncio.run(_execute_writeback(
-                app, command, WritebackExecute(
-                    command_id="00000000-0000-0000-0000-000000000002", project_id=project_id)))
-        assert missing_remote.value.reason == "not_allowed"
-        assert "目标仓库不存在" in missing_remote.value.message
     finally:
         store.close()
         gc.collect()

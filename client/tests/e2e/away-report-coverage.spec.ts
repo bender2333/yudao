@@ -2,7 +2,7 @@
 // `home.away_report` 与 `acceptance.coverage`；验证的独立性设计说明「检验覆盖与开环」、「口径」）。
 //
 // 一个放行带两条开环条件（一条判定点、一条开环）：报告的这一项要逐条列出它们，条数与
-// `acceptance.coverage` 的数一致；「跳到逐条结论表」的链接在逐条结论表还没有（#154 未合并）时不出现；
+// `acceptance.coverage` 的数一致；「跳到逐条结论表」的链接在逐条结论表交付以后（#154）出现；
 // 页面文字里没有英文内部标识，也没有事项一级的「开环完成」。
 //
 // 只看页面：断言读的是页面上的文字与按钮，不读画布、不用画面的测试钩子（测试分层设计说明「前端与浏览器测试」）。
@@ -50,7 +50,7 @@ async function fetchQuery<T>(
   return envelope.data as T;
 }
 
-test("离开期间的报告逐条列出带开环条件的放行：条数与检验覆盖一致，没有逐条结论表的链接", async () => {
+test("离开期间的报告逐条列出带开环条件的放行：条数与检验覆盖一致，可以从那里跳到逐条结论表", async () => {
   test.setTimeout(180_000);
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = collectConsoleErrors(client.page);
@@ -94,8 +94,8 @@ test("离开期间的报告逐条列出带开环条件的放行：条数与检�
     expect(coverage.numbers.open).toBe(2);
     expect(coverage.open_criteria).toEqual(["AC2", "AC3"]);
 
-    // 逐条结论表还没有（#154 未合并）：链接不出现
-    await expect(report.getByRole("button", { name: "跳到逐条结论表", exact: true })).toHaveCount(0);
+    // 逐条结论表已经交付（#154）：这一行给出跳到这个事项资料页那张表的链接
+    await expect(report.getByRole("button", { name: "跳到逐条结论表", exact: true })).toHaveCount(1);
 
     // 页面文字：没有英文内部标识，也没有事项一级的「开环完成」
     const text = await rows.first().innerText();

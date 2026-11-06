@@ -37,6 +37,26 @@ export const WORK_ITEM_STATUS: Record<string, string> = {
   // held 是「上一个采纳成果被挂起」（基线变更），与排队是两件事，页面上不叫「排队中」（工单 #733）
   held: "成果已挂起",
 };
+
+// 开环完成（工单 #1421）：没有核验角色的事项交了完成就结束，项目流里 status 仍是 released_unsettled、
+// stop_reason 是 open_loop。它不是放行（形态与核验角色设计说明「开环完成」），页面与报告都写「开环完成」
+export const OPEN_LOOP_STATUS_TEXT = "开环完成";
+
+// 事项状态在页面上的说法只按事项卡上的这两个字段判断（工单 #1421）：结束原因是 open_loop 的写在
+// released_unsettled 上，不是另一个状态。判断只在这一处，看板分组、事项卡、详情与顶栏共用，
+// 页面因此不会一处写「已放行」、另一处写「开环完成」
+export interface WorkItemStatusFields {
+  status: string;
+  stop_reason?: string | null;
+}
+
+export function isOpenLoopCompleted(item: WorkItemStatusFields): boolean {
+  return item.status === "released_unsettled" && item.stop_reason === "open_loop";
+}
+
+export function workItemStatusText(item: WorkItemStatusFields): string {
+  return isOpenLoopCompleted(item) ? OPEN_LOOP_STATUS_TEXT : label(WORK_ITEM_STATUS, item.status);
+}
 // 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
 // held 与 stopped 在原型图标里没有对应（held 无图标），这两项保留纯文字，界面不猜
 export const WORK_ITEM_STATUS_KIND: Record<string, string> = {
@@ -83,6 +103,8 @@ export const RUN_STATUS_LABELS: Record<string, string> = {
 // 停止原因的中文名（harness/definitions/stop_reasons.json 的取值与 done 的两种一致）
 export const STOP_REASON: Record<string, string> = {
   released: "已完成并放行",
+  // 开环完成也是「完成」的一种结束原因，但不是放行（工单 #1421）：文字与事项状态共用一处
+  open_loop: OPEN_LOOP_STATUS_TEXT,
   baseline_verified: "已完成基线核验",
   max_cycles: "循环次数已达上限",
   model_steps_exhausted: "部门步数已达上限",
@@ -513,11 +535,131 @@ export const OPEN_CRITERIA_UNREADABLE = "开环明细读不出来";
 // 事项标题取不到时的写法：与离开期间的报告原来的说法一致，不写事项标识（工单 #401）
 export const WORK_ITEM_UNNAMED = "未记事项";
 
-// 「跳到逐条结论表」的链接（工单 #401）：逐条结论表在资料页，由 #154 交付。软依赖，不等 #154——
-// 那张表还没有的时候链接不出现（点不到一张不存在的表）。#154 合并以后把这一行改成 true，
+// 「跳到逐条结论表」的链接（工单 #401）：逐条结论表在资料页（工单 #154）。软依赖，不等 #154——
+// 那张表还没有的时候链接不出现（点不到一张不存在的表）。#154 合并以后这一行是 true，
 // 链接跟着出现在每条开环明细后面；链接的地址与页名由调用处按 paths.materials 给出。
-export const CRITERIA_TABLE_READY = false;
+export const CRITERIA_TABLE_READY = true;
 export const CRITERIA_TABLE_LINK = "跳到逐条结论表";
+
+// 检验方式与结果的中文名（验证的独立性设计说明第 7.1 节，工单 #154）：质检逐条结论里保存的是
+// 六个代码名与三个结果词，页面上写中文。页面不导入翻译层（页面与翻译层的导入方向，工单 #1415），
+// 所以这里留一份；它与 client/tests/fixtures/check-methods.json 由单元测试逐行核对，
+// 与服务端那一份相同。
+export interface CheckMethodRow {
+  readonly label: string;
+  readonly executable: boolean;
+}
+
+export const CHECK_METHODS: Readonly<Record<string, CheckMethodRow>> = Object.freeze({
+  check: { label: "命令检查", executable: true },
+  trial: { label: "试用用例", executable: true },
+  measure: { label: "主机测量", executable: true },
+  judgement: { label: "带参照材料的判定点", executable: false },
+  human: { label: "人", executable: false },
+  open: { label: "开环", executable: false },
+});
+
+// 一种检验方式的中文名：没写方式与没登记的方式各有说法，代码名不写到页面上
+export function checkMethodName(value: string | null | undefined): string {
+  const method = (value ?? "").trim();
+  if (method === "") {
+    return "未写明检验方式";
+  }
+  return CHECK_METHODS[method]?.label ?? "其他检验方式";
+}
+
+// 逐条结论的三种结果（第 7.1 节第 2 点）：通过、不通过、未核验
+export const CHECK_RESULT_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  passed: "通过",
+  failed: "不通过",
+  unverified: "未核验",
+});
+
+export const CHECK_RESULT_KIND: Readonly<Record<string, string>> = Object.freeze({
+  passed: "succeeded",
+  failed: "failed",
+  unverified: "idle",
+});
+
+export function checkResultName(value: string | null | undefined): string {
+  const result = (value ?? "").trim();
+  if (result === "") {
+    return "未写明结果";
+  }
+  return CHECK_RESULT_LABELS[result] ?? "其他结果";
+}
+
+export function checkResultKind(value: string | null | undefined): string {
+  return CHECK_RESULT_KIND[(value ?? "").trim()] ?? "idle";
+}
+
+// 试用用例的结论多一个中断（会话结束或中断时主机记下的，不能作为证据）
+export function trialCaseResultName(value: string | null | undefined): string {
+  const result = (value ?? "").trim();
+  if (result === "") {
+    return "";
+  }
+  return result === "interrupted" ? "中断" : checkResultName(result);
+}
+
+// 交付说明里的启动方式（浏览器与 computer use 设计说明第 3.3 节，工单 #154）：种类与命令表按系统写中文
+export const LAUNCH_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  web: "网页",
+  desktop: "桌面",
+});
+
+export const LAUNCH_SYSTEM_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  windows: "Windows",
+  linux: "Linux",
+});
+
+export function launchKindName(value: string | null | undefined): string {
+  const kind = (value ?? "").trim();
+  if (kind === "") {
+    return "未注明种类";
+  }
+  return LAUNCH_KIND_LABELS[kind] ?? "其他种类";
+}
+
+export function launchSystemName(value: string | null | undefined): string {
+  const system = (value ?? "").trim();
+  return LAUNCH_SYSTEM_LABELS[system] ?? "其他系统";
+}
+
+// 质检结论（QAReview 的 verdict）：三种词，与逐条结论的三种结果不是同一组
+export const VERDICT_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  release: "放行",
+  rework_engineering: "缺陷记录",
+  cannot_verify: "无法核验",
+});
+
+export function verdictName(value: string | null | undefined): string {
+  const verdict = (value ?? "").trim();
+  if (verdict === "") {
+    return "未写明结论";
+  }
+  return VERDICT_LABELS[verdict] ?? "其他结论";
+}
+
+// 检验覆盖的读取状态与截图的读取状态（工单 #154）：读不出来与正在读分开写，不把读不出来写成没有
+export const COVERAGE_UNREADABLE = "检验覆盖的数读不出来";
+export const SCREENSHOT_READING = "正在读取截图";
+export const SCREENSHOT_UNREADABLE = "截图读不出来";
+
+// 交付与合同的版本状态（work_item.materials 的 VersionEntry.status，工单 #154）：页面上写中文，
+// 不把 active、superseded 这类代码名写到页面
+export const VERSION_STATUS_LABELS: Readonly<Record<string, string>> = Object.freeze({
+  active: "当前版本",
+  superseded: "已被取代",
+});
+
+export function versionStatusName(value: string | null | undefined): string {
+  const status = (value ?? "").trim();
+  if (status === "") {
+    return "未写明状态";
+  }
+  return VERSION_STATUS_LABELS[status] ?? "其他状态";
+}
 
 export function formatTime(value: string | null | undefined): string {
   if (!value) {

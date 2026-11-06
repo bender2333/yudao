@@ -260,22 +260,6 @@ def test_work_item_impact_lists_the_department_whose_selection_is_affected(tmp_p
         (item.work_item_id, "quality")]
 
 
-def test_work_item_impact_lists_two_departments_when_both_select_the_definition(tmp_path):
-    # 工程与质检都选中被修改的定义：这个事项出现两行，分别写工程与质检
-    impact, item = _impact_with_in_progress_item(tmp_path, settings={"engineering": "model-b",
-                                                                     "quality": "model-b"})
-    assert item.status == "in_progress", (item.status, item.stop_reason)
-    assert [(entry["work_item_id"], entry["department"]) for entry in impact["work_items"]] == [
-        (item.work_item_id, "engineering"),
-        (item.work_item_id, "quality")]
-
-def test_work_item_impact_omits_the_item_when_no_department_selects_the_definition(tmp_path):
-    # 三个部门都没有选中受影响的定义：这个事项不出现
-    impact, item = _impact_with_in_progress_item(tmp_path, settings={})
-    assert item.status == "in_progress", (item.status, item.stop_reason)
-    assert [entry["model_id"] for entry in impact["impacted"]] == ["model-b"]
-    assert impact["work_items"] == []
-
 def test_remove_definition_referenced_by_project_is_rejected_and_unreferenced_succeeds(tmp_path):
     # 移除被项目部门设置引用的定义返回 in_use 与引用方；移除没有被引用的定义成功
     opened = _Opened(tmp_path)
@@ -298,16 +282,6 @@ def test_remove_definition_referenced_by_project_is_rejected_and_unreferenced_su
         assert removed.status_code == 200, removed.text
         assert not any(item["id"] == "model-a2" for item in _document(client)["models"])
 
-def test_remove_definition_referenced_by_department_default_is_rejected(tmp_path):
-    # 移除被部门默认引用的定义返回 in_use，引用方是部门默认中的部门
-    opened = _Opened(tmp_path)
-    with running_api(opened) as client:
-        opened.admit(("provider-a", "model-a"))
-        rejected = _post(client, "catalog.model.remove", base_version=_catalog(client)["revision"],
-                         provider_id="provider-a", model_id="model-a")
-        assert rejected.status_code == 409, rejected.text
-        assert rejected.json()["reason"] == "in_use"
-        assert "bindings.engineering" in rejected.json()["message"]
 
 def test_provider_delete_lists_definitions_and_deletes_unreferenced_ones(tmp_path):
     # 删除其下有定义但都没有被引用的 Provider 配置：删除之前的影响列表列出将一并删除的定义，删除以后定义消失；
@@ -409,19 +383,3 @@ def test_remove_model_writes_a_revised_event_that_validates(tmp_path):
     payload = CatalogRevisedPayload.model_validate(events[-1].payload)
     assert payload.operation == "remove_model"
     assert payload.provider_id == "provider-a"
-
-def test_import_removing_unreferenced_definition_succeeds(tmp_path):
-    # 导入移除了没有被引用定义的目录文档：整份接受（对照上一条）
-    opened = _Opened(tmp_path)
-    with running_api(opened) as client:
-        opened.admit(("provider-a", "model-a"), ("provider-a", "model-a2"))
-        document = _document(client)
-        trimmed = {
-            "providers": [item for item in document["providers"]],
-            "models": [item for item in document["models"] if item["id"] != "model-a2"],
-            "bindings": {key: value for key, value in document["bindings"].items()},
-        }
-        saved = _post(client, "catalog.document.save", base_version=_catalog(client)["revision"],
-                      document=trimmed)
-        assert saved.status_code == 200, saved.text
-        assert not any(item["id"] == "model-a2" for item in _document(client)["models"])

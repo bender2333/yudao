@@ -251,6 +251,20 @@ export type ActionReceipt = {
      */
     refused_reason?: string | null;
     fetch?: FetchReceipt | null;
+    /**
+     * Screenshots
+     */
+    screenshots?: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Session Tree Digest
+     */
+    session_tree_digest?: string | null;
 };
 
 /**
@@ -809,6 +823,43 @@ export type BlockedObjects = {
      * Queued After
      */
     queued_after: number;
+};
+
+/**
+ * BuiltinToolView
+ */
+export type BuiltinToolView = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Action
+     */
+    action: string;
+    /**
+     * Verification
+     */
+    verification?: string | null;
+    /**
+     * Cancellable
+     */
+    cancellable?: boolean | null;
+    /**
+     * Requires Image Input
+     */
+    requires_image_input?: boolean;
+};
+
+/**
+ * BuiltinToolsView
+ */
+export type BuiltinToolsView = {
+    playwright_mcp: PlaywrightMcpView;
+    /**
+     * Browser Tools
+     */
+    browser_tools: Array<BuiltinToolView>;
 };
 
 /**
@@ -3406,6 +3457,34 @@ export type LateResult = {
 };
 
 /**
+ * LaunchMethodView
+ */
+export type LaunchMethodView = {
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Commands
+     */
+    commands: {
+        [key: string]: Array<string>;
+    };
+    /**
+     * Ready Url
+     */
+    ready_url?: string | null;
+    /**
+     * Ready Timeout Sec
+     */
+    ready_timeout_sec?: number | null;
+};
+
+/**
  * LiveAttempt
  */
 export type LiveAttempt = {
@@ -4327,6 +4406,20 @@ export type PauseRequested = {
 };
 
 /**
+ * PlaywrightMcpView
+ */
+export type PlaywrightMcpView = {
+    /**
+     * Package
+     */
+    package: string;
+    /**
+     * Version
+     */
+    version: string;
+};
+
+/**
  * ProjectArchive
  */
 export type ProjectArchive = {
@@ -4841,6 +4934,36 @@ export type ProviderReadiness = {
 };
 
 /**
+ * QaCriterionView
+ */
+export type QaCriterionView = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Method
+     */
+    method: string;
+    /**
+     * Result
+     */
+    result: string;
+    /**
+     * Checks
+     */
+    checks: Array<string>;
+    /**
+     * Trial Cases
+     */
+    trial_cases: Array<string>;
+    /**
+     * Note
+     */
+    note: string;
+};
+
+/**
  * QueryCapability
  */
 export type QueryCapability = {
@@ -5161,6 +5284,18 @@ export type ReviewEntry = {
     checks: Array<{
         [key: string]: unknown;
     }>;
+    /**
+     * Criteria
+     */
+    criteria?: Array<QaCriterionView>;
+    /**
+     * Trial Cases
+     */
+    trial_cases?: Array<TrialCaseEvidenceView>;
+    /**
+     * Unverified
+     */
+    unverified?: Array<UnverifiedCriterionView>;
 };
 
 /**
@@ -5699,6 +5834,20 @@ export type RunStepsResult = {
 };
 
 /**
+ * RunTrialsResult
+ */
+export type RunTrialsResult = {
+    /**
+     * Run Id
+     */
+    run_id: string;
+    /**
+     * Departments
+     */
+    departments: Array<TrialDepartmentView>;
+};
+
+/**
  * RuntimeForceUpgrade
  */
 export type RuntimeForceUpgrade = {
@@ -5724,6 +5873,24 @@ export type RuntimeStartDrain = {
      * Base Version
      */
     base_version?: number | null;
+};
+
+/**
+ * ScreenshotEvidenceResult
+ */
+export type ScreenshotEvidenceResult = {
+    /**
+     * Content Hash
+     */
+    content_hash: string;
+    /**
+     * Media Type
+     */
+    media_type: string;
+    /**
+     * Base64
+     */
+    base64: string;
 };
 
 /**
@@ -6043,6 +6210,28 @@ export type SnapshotRunStepsResult = {
      */
     position: number;
     data: RunStepsResult;
+};
+
+/**
+ * Snapshot[RunTrialsResult]
+ */
+export type SnapshotRunTrialsResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: RunTrialsResult;
+};
+
+/**
+ * Snapshot[ScreenshotEvidenceResult]
+ */
+export type SnapshotScreenshotEvidenceResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: ScreenshotEvidenceResult;
 };
 
 /**
@@ -6403,6 +6592,7 @@ export type ToolsRegistryResult = {
      * Projects
      */
     projects: Array<ToolsRegistryProject>;
+    builtin: BuiltinToolsView;
 };
 
 /**
@@ -6468,6 +6658,240 @@ export type ToolsRegistryServerView = {
      */
     config_digest?: string;
     probe?: ToolsRegistryProbeState;
+};
+
+/**
+ * TrialCaseEvidenceView
+ */
+export type TrialCaseEvidenceView = {
+    /**
+     * Case Id
+     */
+    case_id: string;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Result
+     */
+    result?: string | null;
+    /**
+     * Screenshots
+     */
+    screenshots?: Array<{
+        [key: string]: unknown;
+    }>;
+};
+
+/**
+ * TrialCaseView
+ */
+export type TrialCaseView = {
+    /**
+     * Case Id
+     */
+    case_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Trial Session Id
+     */
+    trial_session_id: string;
+    /**
+     * Product Spec Hash
+     */
+    product_spec_hash: string;
+    /**
+     * Criteria
+     */
+    criteria: Array<TrialCriterion>;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Plan
+     */
+    plan: Array<string>;
+    /**
+     * Expected
+     */
+    expected: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Result
+     */
+    result?: string | null;
+    /**
+     * Observed
+     */
+    observed?: string;
+    /**
+     * Reason
+     */
+    reason?: string;
+    /**
+     * Evidence Steps
+     */
+    evidence_steps: Array<string>;
+    /**
+     * Steps
+     */
+    steps: Array<TrialStepView>;
+};
+
+/**
+ * TrialCriterion
+ */
+export type TrialCriterion = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Text
+     */
+    text: string | null;
+};
+
+/**
+ * TrialDepartmentView
+ */
+export type TrialDepartmentView = {
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Sessions
+     */
+    sessions: Array<TrialSessionView>;
+    /**
+     * Cases
+     */
+    cases: Array<TrialCaseView>;
+};
+
+/**
+ * TrialSessionView
+ */
+export type TrialSessionView = {
+    /**
+     * Session Id
+     */
+    session_id: string;
+    /**
+     * Department
+     */
+    department: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Launch Name
+     */
+    launch_name: string;
+    /**
+     * Tree Digest
+     */
+    tree_digest: string;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Delivery Snapshot Hash
+     */
+    delivery_snapshot_hash?: string | null;
+    /**
+     * Matches Delivery Snapshot
+     */
+    matches_delivery_snapshot?: boolean | null;
+    /**
+     * Started At
+     */
+    started_at: string;
+    /**
+     * Ended At
+     */
+    ended_at?: string | null;
+    /**
+     * End Reason
+     */
+    end_reason?: string | null;
+    /**
+     * Status
+     */
+    status: 'running' | 'ended';
+};
+
+/**
+ * TrialStepView
+ */
+export type TrialStepView = {
+    /**
+     * Identity
+     */
+    identity: string;
+    /**
+     * Tool
+     */
+    tool: string;
+    /**
+     * Step Id
+     */
+    step_id?: number | null;
+    /**
+     * Activation Id
+     */
+    activation_id?: string;
+    /**
+     * Status
+     */
+    status: string;
+    /**
+     * Ok
+     */
+    ok?: boolean | null;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Input
+     */
+    input: {
+        [key: string]: unknown;
+    };
+    /**
+     * Screenshots
+     */
+    screenshots: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Accessibility
+     */
+    accessibility?: string | null;
+    /**
+     * Request Had Images
+     */
+    request_had_images?: boolean | null;
+    /**
+     * Evidence
+     */
+    evidence?: boolean;
 };
 
 /**
@@ -6637,6 +7061,24 @@ export type UnusableTarget = {
      * Problem
      */
     problem: string;
+};
+
+/**
+ * UnverifiedCriterionView
+ */
+export type UnverifiedCriterionView = {
+    /**
+     * Criterion
+     */
+    criterion: string;
+    /**
+     * Method
+     */
+    method: string;
+    /**
+     * Note
+     */
+    note: string;
 };
 
 /**
@@ -6862,6 +7304,10 @@ export type VersionEntry = {
      * Files
      */
     files: Array<string>;
+    /**
+     * Launch
+     */
+    launch?: Array<LaunchMethodView>;
 };
 
 /**
@@ -7289,6 +7735,10 @@ export type WorkItemStats = {
      * Released Unsettled
      */
     released_unsettled: number;
+    /**
+     * Open Loop
+     */
+    open_loop: number;
     /**
      * Stopped
      */
@@ -22488,6 +22938,82 @@ export type QueryEvidenceExternalSourceResponses = {
 };
 
 export type QueryEvidenceExternalSourceResponse = QueryEvidenceExternalSourceResponses[keyof QueryEvidenceExternalSourceResponses];
+
+export type QueryRunTrialsData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Run Id
+         */
+        run_id: string;
+    };
+    url: '/api/queries/run.trials';
+};
+
+export type QueryRunTrialsErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryRunTrialsError = QueryRunTrialsErrors[keyof QueryRunTrialsErrors];
+
+export type QueryRunTrialsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotRunTrialsResult;
+};
+
+export type QueryRunTrialsResponse = QueryRunTrialsResponses[keyof QueryRunTrialsResponses];
+
+export type QueryEvidenceScreenshotData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Event Id
+         */
+        event_id: string;
+        /**
+         * Kind
+         */
+        kind: string;
+        /**
+         * Content Hash
+         */
+        content_hash: string;
+        /**
+         * Path
+         */
+        path: string;
+        /**
+         * Media Type
+         */
+        media_type?: string | null;
+    };
+    url: '/api/queries/evidence.screenshot';
+};
+
+export type QueryEvidenceScreenshotErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryEvidenceScreenshotError = QueryEvidenceScreenshotErrors[keyof QueryEvidenceScreenshotErrors];
+
+export type QueryEvidenceScreenshotResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotScreenshotEvidenceResult;
+};
+
+export type QueryEvidenceScreenshotResponse = QueryEvidenceScreenshotResponses[keyof QueryEvidenceScreenshotResponses];
 
 export type QueryAcceptanceCoverageData = {
     body?: never;

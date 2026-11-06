@@ -3656,6 +3656,133 @@
         }
       }
     },
+    "/api/queries/run.trials": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "run.trials",
+        "operationId": "query_run_trials",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_RunTrialsResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/queries/evidence.screenshot": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "evidence.screenshot",
+        "operationId": "query_evidence_screenshot",
+        "parameters": [
+          {
+            "name": "event_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Event Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "content_hash",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Content Hash"
+            }
+          },
+          {
+            "name": "path",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Path"
+            }
+          },
+          {
+            "name": "media_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Media Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_ScreenshotEvidenceResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/queries/acceptance.coverage": {
       "get": {
         "tags": [
@@ -4694,6 +4821,36 @@
                 "type": "null"
               }
             ]
+          },
+          "screenshots": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Screenshots"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "session_tree_digest": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Tree Digest"
           }
         },
         "additionalProperties": false,
@@ -5742,6 +5899,73 @@
           "queued_after"
         ],
         "title": "BlockedObjects"
+      },
+      "BuiltinToolView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "action": {
+            "type": "string",
+            "title": "Action"
+          },
+          "verification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verification"
+          },
+          "cancellable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancellable"
+          },
+          "requires_image_input": {
+            "type": "boolean",
+            "title": "Requires Image Input",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "action"
+        ],
+        "title": "BuiltinToolView"
+      },
+      "BuiltinToolsView": {
+        "properties": {
+          "playwright_mcp": {
+            "$ref": "#/components/schemas/PlaywrightMcpView"
+          },
+          "browser_tools": {
+            "items": {
+              "$ref": "#/components/schemas/BuiltinToolView"
+            },
+            "type": "array",
+            "title": "Browser Tools"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "playwright_mcp",
+          "browser_tools"
+        ],
+        "title": "BuiltinToolsView"
       },
       "CallTarget": {
         "properties": {
@@ -10333,6 +10557,58 @@
         ],
         "title": "LateResult"
       },
+      "LaunchMethodView": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "commands": {
+            "additionalProperties": {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Commands"
+          },
+          "ready_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Url"
+          },
+          "ready_timeout_sec": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ready Timeout Sec"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "kind",
+          "commands"
+        ],
+        "title": "LaunchMethodView"
+      },
       "LiveAttempt": {
         "properties": {
           "attempt_id": {
@@ -11806,6 +12082,25 @@
         ],
         "title": "PauseRequested"
       },
+      "PlaywrightMcpView": {
+        "properties": {
+          "package": {
+            "type": "string",
+            "title": "Package"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "package",
+          "version"
+        ],
+        "title": "PlaywrightMcpView"
+      },
       "ProjectArchive": {
         "properties": {
           "command_id": {
@@ -12607,6 +12902,51 @@
         ],
         "title": "ProviderReadiness"
       },
+      "QaCriterionView": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "result": {
+            "type": "string",
+            "title": "Result"
+          },
+          "checks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Checks"
+          },
+          "trial_cases": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Trial Cases"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criterion",
+          "method",
+          "result",
+          "checks",
+          "trial_cases",
+          "note"
+        ],
+        "title": "QaCriterionView"
+      },
       "QueryCapability": {
         "properties": {
           "name": {
@@ -13181,6 +13521,27 @@
             },
             "type": "array",
             "title": "Checks"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/QaCriterionView"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "trial_cases": {
+            "items": {
+              "$ref": "#/components/schemas/TrialCaseEvidenceView"
+            },
+            "type": "array",
+            "title": "Trial Cases"
+          },
+          "unverified": {
+            "items": {
+              "$ref": "#/components/schemas/UnverifiedCriterionView"
+            },
+            "type": "array",
+            "title": "Unverified"
           }
         },
         "additionalProperties": false,
@@ -14140,6 +14501,28 @@
         ],
         "title": "RunStepsResult"
       },
+      "RunTrialsResult": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/TrialDepartmentView"
+            },
+            "type": "array",
+            "title": "Departments"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "departments"
+        ],
+        "title": "RunTrialsResult"
+      },
       "RuntimeForceUpgrade": {
         "properties": {
           "command_id": {
@@ -14191,6 +14574,30 @@
           "command_id"
         ],
         "title": "RuntimeStartDrain"
+      },
+      "ScreenshotEvidenceResult": {
+        "properties": {
+          "content_hash": {
+            "type": "string",
+            "title": "Content Hash"
+          },
+          "media_type": {
+            "type": "string",
+            "title": "Media Type"
+          },
+          "base64": {
+            "type": "string",
+            "title": "Base64"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "content_hash",
+          "media_type",
+          "base64"
+        ],
+        "title": "ScreenshotEvidenceResult"
       },
       "Snapshot_AcceptanceCoverageResult_": {
         "properties": {
@@ -14713,6 +15120,42 @@
           "data"
         ],
         "title": "Snapshot[RunStepsResult]"
+      },
+      "Snapshot_RunTrialsResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunTrialsResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[RunTrialsResult]"
+      },
+      "Snapshot_ScreenshotEvidenceResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/ScreenshotEvidenceResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[ScreenshotEvidenceResult]"
       },
       "Snapshot_SystemStatus_": {
         "properties": {
@@ -15292,12 +15735,16 @@
             },
             "type": "array",
             "title": "Projects"
+          },
+          "builtin": {
+            "$ref": "#/components/schemas/BuiltinToolsView"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "projects"
+          "projects",
+          "builtin"
         ],
         "title": "ToolsRegistryResult"
       },
@@ -15395,6 +15842,403 @@
           "transport"
         ],
         "title": "ToolsRegistryServerView"
+      },
+      "TrialCaseEvidenceView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "screenshots": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Screenshots"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "title"
+        ],
+        "title": "TrialCaseEvidenceView"
+      },
+      "TrialCaseView": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "trial_session_id": {
+            "type": "string",
+            "title": "Trial Session Id"
+          },
+          "product_spec_hash": {
+            "type": "string",
+            "title": "Product Spec Hash"
+          },
+          "criteria": {
+            "items": {
+              "$ref": "#/components/schemas/TrialCriterion"
+            },
+            "type": "array",
+            "title": "Criteria"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "plan": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Plan"
+          },
+          "expected": {
+            "type": "string",
+            "title": "Expected"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "observed": {
+            "type": "string",
+            "title": "Observed",
+            "default": ""
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": ""
+          },
+          "evidence_steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Evidence Steps"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/TrialStepView"
+            },
+            "type": "array",
+            "title": "Steps"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "department",
+          "session_id",
+          "trial_session_id",
+          "product_spec_hash",
+          "criteria",
+          "title",
+          "plan",
+          "expected",
+          "status",
+          "evidence_steps",
+          "steps"
+        ],
+        "title": "TrialCaseView"
+      },
+      "TrialCriterion": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criterion",
+          "text"
+        ],
+        "title": "TrialCriterion"
+      },
+      "TrialDepartmentView": {
+        "properties": {
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "sessions": {
+            "items": {
+              "$ref": "#/components/schemas/TrialSessionView"
+            },
+            "type": "array",
+            "title": "Sessions"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/TrialCaseView"
+            },
+            "type": "array",
+            "title": "Cases"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "department",
+          "sessions",
+          "cases"
+        ],
+        "title": "TrialDepartmentView"
+      },
+      "TrialSessionView": {
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "title": "Session Id"
+          },
+          "department": {
+            "type": "string",
+            "title": "Department"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "launch_name": {
+            "type": "string",
+            "title": "Launch Name"
+          },
+          "tree_digest": {
+            "type": "string",
+            "title": "Tree Digest"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "delivery_snapshot_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivery Snapshot Hash"
+          },
+          "matches_delivery_snapshot": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matches Delivery Snapshot"
+          },
+          "started_at": {
+            "type": "string",
+            "title": "Started At"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "ended"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "session_id",
+          "department",
+          "kind",
+          "launch_name",
+          "tree_digest",
+          "source",
+          "started_at",
+          "status"
+        ],
+        "title": "TrialSessionView"
+      },
+      "TrialStepView": {
+        "properties": {
+          "identity": {
+            "type": "string",
+            "title": "Identity"
+          },
+          "tool": {
+            "type": "string",
+            "title": "Tool"
+          },
+          "step_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step Id"
+          },
+          "activation_id": {
+            "type": "string",
+            "title": "Activation Id",
+            "default": ""
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "ok": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ok"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "input": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Input"
+          },
+          "screenshots": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Screenshots"
+          },
+          "accessibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accessibility"
+          },
+          "request_had_images": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Had Images"
+          },
+          "evidence": {
+            "type": "boolean",
+            "title": "Evidence",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "identity",
+          "tool",
+          "status",
+          "input",
+          "screenshots"
+        ],
+        "title": "TrialStepView"
       },
       "UnfinishedAction": {
         "properties": {
@@ -15725,6 +16569,30 @@
           "problem"
         ],
         "title": "UnusableTarget"
+      },
+      "UnverifiedCriterionView": {
+        "properties": {
+          "criterion": {
+            "type": "string",
+            "title": "Criterion"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "criterion",
+          "method",
+          "note"
+        ],
+        "title": "UnverifiedCriterionView"
       },
       "UsageGroup": {
         "properties": {
@@ -16140,6 +17008,13 @@
             },
             "type": "array",
             "title": "Files"
+          },
+          "launch": {
+            "items": {
+              "$ref": "#/components/schemas/LaunchMethodView"
+            },
+            "type": "array",
+            "title": "Launch"
           }
         },
         "additionalProperties": false,
@@ -16956,6 +17831,10 @@
             "type": "integer",
             "title": "Released Unsettled"
           },
+          "open_loop": {
+            "type": "integer",
+            "title": "Open Loop"
+          },
           "stopped": {
             "type": "integer",
             "title": "Stopped"
@@ -16976,6 +17855,7 @@
           "in_progress",
           "adopted",
           "released_unsettled",
+          "open_loop",
           "stopped",
           "held",
           "not_started"

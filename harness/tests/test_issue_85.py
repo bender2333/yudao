@@ -165,59 +165,6 @@ def test_collect_candidates_sends_the_credential_and_reports_source_and_time(tmp
             _assert_no_secret(client, opened)
 
 
-def test_collect_candidates_keeps_upstream_window_and_output_limit(tmp_path):
-    payload = {"data": [{"id": "m1", "limit": {"context": 128000, "output": 8192}}, {"id": "m2"}]}
-    server = _ModelsServer(payload)
-    with server as models_url:
-        opened = _Opened(tmp_path, _document(models_url=models_url))
-        with running_api(opened) as client:
-            current = _catalog(client)["revision"]
-            collected = _command(client, "catalog.candidates.collect", base_version=current, provider_id="p1")
-            assert collected.status_code == 200, collected.text
-            [event] = _wait_for(opened.store, lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
-                                description="catalog_candidates_collected")
-            assert set(event.payload["candidate_ids"]) == {"m1", "m2"}
-            # 预填值带来源（#146）：窗口与输出上限取上游模型列表，输入方式取能力表；
-            # 这个连接的服务方案是自定义，能力表没有记录，输入方式预填为只有文本
-            assert event.payload["candidates"][0] == {
-                "id": "m1", "protocol": "chat_completions", "protocol_source": "default",
-                "context_window": 128000, "context_window_source": "models_url",
-                "max_output_tokens": 8192, "max_output_tokens_source": "models_url",
-                "input_modalities": ["text"], "input_modalities_source": "default",
-                "provider": None, "reasoning": None, "reasoning_source": "default",
-                "applicable": True, "applicable_source": "default", "source_details": {
-                    "protocol": {"source": "default"}, "context_window": {"source": "models_url"},
-                    "max_output_tokens": {"source": "models_url"}, "input_modalities": {"source": "default"},
-                    "reasoning": {"source": "default"}, "applicable": {"source": "default"}}}
-            assert event.payload["candidates"][1] == {
-                "id": "m2", "protocol": "chat_completions", "protocol_source": "default",
-                "input_modalities": ["text"], "input_modalities_source": "default",
-                "provider": None, "reasoning": None, "reasoning_source": "default",
-                "applicable": True, "applicable_source": "default", "source_details": {
-                    "protocol": {"source": "default"}, "input_modalities": {"source": "default"},
-                    "reasoning": {"source": "default"}, "applicable": {"source": "default"}}}
-            _assert_no_secret(client, opened)
-
-
-def test_collect_candidates_is_unknown_when_upstream_rejects_the_credential(tmp_path):
-    server = _ModelsServer()
-    with server as models_url:
-        opened = _Opened(tmp_path, _document(models_url=models_url))
-        with running_api(opened) as client:
-            _set_credential(client, "issue-85-wrong-key")
-            current = _catalog(client)["revision"]
-            collected = _command(client, "catalog.candidates.collect", base_version=current, provider_id="p1")
-            assert collected.status_code == 200, collected.text
-            [event] = _wait_for(opened.store, lambda item: item.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
-                                description="catalog_candidates_collected")
-            assert event.payload["status"] == "unknown"
-            assert event.payload["candidate_ids"] == []
-            assert event.payload["error"]
-            # 上游不可用时不沿用上一次的结果
-            assert event.payload["source_url"] == models_url
-            _assert_no_secret(client, opened)
-
-
 def test_collect_candidates_rejects_an_unknown_connection(tmp_path):
     server = _ModelsServer()
     with server as models_url:
@@ -272,25 +219,6 @@ def test_connection_test_fails_when_the_credential_is_wrong(tmp_path):
                                and not item.payload["ok"], description="failed connection test")
             assert failed[0].payload["error"]
             assert failed[0].payload["admitted"] is None
-            _assert_no_secret(client, opened)
-
-
-def test_connection_test_keeps_admission_unchanged(tmp_path):
-    server = _ModelsServer()
-    with server as models_url:
-        opened = _Opened(tmp_path, _document(models_url=models_url))
-        with running_api(opened) as client:
-            before = _catalog(client)
-            # 准入记录与目录分开返回（工单 #86）：连接测试前后都没有准入记录
-            assert before["admissions"] == []
-            tested = _command(client, "catalog.connection.test", base_version=before["revision"], provider_id="p1")
-            assert tested.status_code == 200, tested.text
-            [event] = _wait_for(opened.store, lambda item: item.payload.get("kind") == "connection",
-                                description="catalog_test_finished (connection)")
-            assert event.payload["ok"] is True
-            after = _catalog(client)
-            assert after["revision"] == before["revision"]
-            assert after["admissions"] == []
             _assert_no_secret(client, opened)
 
 

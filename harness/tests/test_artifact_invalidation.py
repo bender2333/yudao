@@ -1,5 +1,7 @@
 # 成果失效写成一条事件（骨架事件 artifact_invalidated，工单 #858 的第一条与第二条验收）：
-# 六种情形各有一条用例 —— 发生的那一刻记下一条成果失效事件，当前交付随之失效；
+# 六种情形各有用例 —— 记事件的函数给出这一种情形的载荷，写进写入口以后当前交付随之失效；
+# 情形 1 至 3 另外按真实的一轮工作核对发生的那一刻记下了这条事件，情形 6 的真实一轮在事件序列
+# 基准 quality_rework 里（test_event_sequence.py）；
 # 投影不再从工具调用与其他接纳事件推出失效，RunProjection 与最小投影都只折叠这一条。
 # 守 docs/design/skeleton-and-application.md「模块交互」的 R1（同样的事件重放出同样的状态）：两份投影从同一组事件得出同一个当前交付。
 #
@@ -25,7 +27,6 @@ from harness.models import EventType
 from harness.proposals import delivery_turn, product_decision, product_spec, product_spec_turn
 from harness.runtime import LoopSystem
 from harness.submissions import invalidation
-from harness.tests.event_scenarios import SCENARIOS
 from harness.tests.helpers import explore_turn
 from harness.write_path import NewEvent
 
@@ -108,15 +109,6 @@ def test_a_new_effective_contract_invalidates_the_current_delivery(data_dir):
     assert _invalidations(system, run_id) == [("delivery_spec", 1, "effective_contract_changed")]
     assert state.delivery_spec is None
     assert state.delivery_specs[-1].invalidation_reason == "effective_contract_changed"
-
-
-def test_quality_rework_invalidates_the_current_delivery(data_dir):
-    # 情形 6：质检以 rework_engineering 退回，当前交付失效；工程重新交付以后它又是当前版本
-    scenario = SCENARIOS["quality_rework"]
-    system, run_id, _replacements = scenario.run(data_dir)
-    assert ("delivery_spec", 1, "qa_rework_engineering") in _invalidations(system, run_id)
-    reworked = [delivery for delivery in system.project(run_id).delivery_specs if delivery.revision == 2]
-    assert reworked and reworked[0].status == "active"
 
 
 @pytest.mark.parametrize("reason", REASONS)

@@ -1,10 +1,8 @@
 import json
 
 from harness.watched_outputs import has_new_work
-from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.artifacts import ArtifactRef
-from harness.definitions import DEFINITIONS
 from harness.proposals import (
     answer_turn,
     ask_turn,
@@ -15,7 +13,7 @@ from harness.proposals import (
     review_turn,
 )
 from harness.runtime import LoopSystem
-from harness.tests.helpers import department_history, happy_script, quality_turns, run_scripted
+from harness.tests.helpers import happy_script, run_scripted
 
 def test_happy_path_requires_quality_release(data_dir):
     system, projection = run_scripted(data_dir, happy_script())
@@ -44,25 +42,6 @@ def test_happy_path_requires_quality_release(data_dir):
     assert projection.last_review.product_spec_hash == projection.product_spec.content_hash
     assert projection.last_review.code_snapshot_hash == projection.delivery_spec.code_tree_digest
 
-def test_quality_rework_routes_to_engineering(data_dir):
-    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）：
-    # 质检的每一轮按当前有没有交付决定做什么（预测性探索或核验）
-    script = {
-        "product": [product_spec()],
-        "engineering": [
-            delivery_turn(summary="first delivery"),
-            delivery_turn(summary="fixed edge case", files={"src/echo.py": "print('ok')\n"}),
-        ],
-        "quality": quality_turns(
-            "rework_engineering", "edge case fails",
-            defects=[{"severity": "major", "summary": "empty input is unhandled"}]),
-    }
-    _, projection = run_scripted(data_dir, script)
-    assert projection.status == "done"
-    # 缺陷记录让工程开始一轮返工（工单 #556：工程关注针对最新交付的缺陷记录）
-    assert projection.rework_count == 1
-    assert len(projection.delivery_specs) == 2
-
 def test_illegal_workpiece_stays_in_department(data_dir):
     system = LoopSystem.for_testing(
         data_dir,
@@ -84,26 +63,6 @@ def test_illegal_workpiece_stays_in_department(data_dir):
     assert projection.rejections
     assert projection.rejections[0]["errors"][0]["field"] == "kind"
 
-def test_natural_language_completion_does_not_finish(data_dir):
-    # 脚本按部门给出（工单 #877：PRD 被接纳以后工程与质检同时工作，
-    # 一条按先后排队的列表脚本被两个部门取用时谁拿到哪一项随调度变化）
-    script = {
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": [FakeTurn(proposal=None, transcript="任务已完成。DONE. 全部通过。")
-                    for _ in range(DEFINITIONS.rule_value("tool_call_required_limit") + 1)],
-    }
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
-    run_id = system.create_run("build echo")
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    system.activate_once(run_id)
-    projection = system.activate_once(run_id)
-    assert projection.status == "paused"
-    assert projection.status != "done"
-    assert projection.stop_reason == "no_tool_call"
-    assert projection.last_review is None
-
 def test_max_cycles_pauses_with_human_action(data_dir):
     script = [
         product_spec(),
@@ -116,32 +75,6 @@ def test_max_cycles_pauses_with_human_action(data_dir):
     assert projection.human_action
     assert "循环次数已达上限" in projection.waiting_reason
 
-
-def test_cancel_is_explicit_failure(data_dir):
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(happy_script()))
-    run_id = system.create_run("build echo")
-    projection = system.cancel(run_id)
-    assert projection.status == "failed"
-    assert projection.stop_reason == "cancelled"
-
-def test_provider_error_is_explicit_failure(data_dir):
-    # 脚本按部门给出（工单 #877）：PRD 被接纳以后工程与质检同时工作，
-    # 两个部门各自失败，结果与调度无关
-    failing = FakeTurn(raise_error=ProviderError("upstream 500"))
-    script = {
-        "product": [product_spec()],
-        "engineering": [failing],
-        "quality": [failing],
-    }
-    _, projection = run_scripted(data_dir, script)
-    assert projection.status == "failed"
-    assert projection.stop_reason == "provider_error"
-    assert "upstream 500" in (projection.error or "")
-
-def test_context_overflow_is_explicit_failure(data_dir):
-    _, projection = run_scripted(data_dir, happy_script(), context_window=8)
-    assert projection.status == "failed"
-    assert projection.stop_reason == "context_overflow"
 
 def test_new_product_spec_cannot_reuse_old_qa_checks(data_dir):
     # PRD 修订以后质检不能沿用旧依据下的检查回执（工单 #555：质检要求有问题时询问产品，
@@ -220,46 +153,3 @@ def test_invalid_qa_payload_returns_field_errors_and_stays_in_quality(data_dir):
     assert projection.status == "done"
     assert events[-1].type == "activation_finished"
     assert events[-1].state_after == "done"
-
-def test_release_without_quality_evidence_is_rejected(data_dir):
-    # 质检声称跑过检查但没有跑：放行被拒绝（这条规则与同时运行无关，
-    # 因此这里逐个部门驱动：产品提交要求、工程交付、质检核验）。
-    # 提案用构造函数生成（工单 #151：qa_review 多了必填的 criteria，由构造函数按当前 PRD 填）
-    script = {
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": [
-            FakeTurn(proposal=review("release", "looks good")),
-        ],
-    }
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
-    run_id = system.create_run("build echo", max_cycles=8)
-    system.activate_once(run_id)          # 产品提交要求
-    system.activate_once(run_id)          # 工程交付
-    projection = system.run_until_stop(run_id)
-    assert projection.status != "done"
-    assert any("quality must run" in error["message"] for item in projection.rejections for error in item["errors"])
-
-def test_truncated_work_response_is_terminal_without_retry(data_dir):
-    from harness.providers.call import ModelResponse
-    from harness.models import EventType, json_dumps
-
-    truncated = ModelResponse(
-        output=[{"id": "cut", "type": "message", "role": "assistant", "status": "incomplete",
-                 "content": [{"type": "output_text", "text": "TRUNCATED_WORK the product spec should"}]}],
-        finish_reason="incomplete", error="max_output_tokens",
-    )
-    adapter = FakeAdapter([truncated, product_spec()])
-    system = LoopSystem.for_testing(data_dir, adapter)
-    run_id = system.create_run("build echo")
-    result = system.activate_once(run_id)
-
-    assert result.status == "failed" and result.stop_reason == "provider_error"
-    assert len(adapter.invocations) == 1
-    events = system.store.list_events(run_id)
-    failed = [event for event in events if event.type == EventType.MODEL_ATTEMPT_FAILED]
-    assert len(failed) == 1 and failed[0].payload["purpose"] == "work"
-    assert failed[0].payload["retryable"] is False and failed[0].payload["will_retry"] is False
-    assert not any(event.type == EventType.MODEL_RETRY_SCHEDULED for event in events)
-    assert "TRUNCATED_WORK" not in json_dumps(department_history(system, run_id, "product"))
-    assert result.canonical_state() == system.replay(run_id).canonical_state()

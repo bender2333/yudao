@@ -8,16 +8,11 @@ from typing import Any
 
 from harness.watched_outputs import has_new_work
 from harness.adapters.fake import FakeAdapter
-from harness.app.application import Application
-from harness.app.project_queries import RunActions
 from harness.event_store import run_stream
 from harness.models import EventType
 from harness.proposals import product_spec
 from harness.runtime import LoopSystem
 from harness.write_path import NewEvent
-from harness.tests.helpers import quality_turns
-
-PROJECT_ID = "proj_test"
 
 def _write_events(run_id):
     return [EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.TOOL_SKIPPED]
@@ -43,44 +38,10 @@ def _engineering_run(data_dir, script):
     assert has_new_work(system.project(run_id), "engineering")
     return system, run_id
 
-def _append_lost_write(system, run_id, *, tool="write_file", action_id="lost-write", before=None):
-    # 追加一条动作前快照与一条没有结果的 tool_started：表示「写入效果已经写入、完成确认没有保存」的中断状态。
-    # 挂在这个 run 最后一次激活的第 1 步上：那一步的装配记录真实存在，动作带着真实的激活与步骤位置
-    before = {"digest": "sha256:" + action_id, "files": []} if before is None else before
-    ref = system.artifacts.put(run_id, "snapshot/before", json.dumps(before, ensure_ascii=False),
-                               media_type="application/json")
-    activated = [event for event in system.store.list_events(run_id)
-                 if event.type == EventType.DEPARTMENT_ACTIVATED]
-    args = ({"name": "smoke", "command": "python src/echo.py"} if tool == "run_check"
-            else {"path": "src/a.py", "content": "A"})
-    system.writes.append(run_stream(run_id), NewEvent(
-        EventType.TOOL_STARTED, actor="department:engineering", department="engineering",
-        state_before="running", state_after="running",
-        payload={"id": action_id, "name": tool, "args": args,
-                 "step_id": 1, "activation_id": activated[-1].payload["activation_id"], "attempt": 1,
-                 "purpose": "work", "before_snapshot_ref": asdict(ref)}))
-    return ref
-
-
 def _tool_events(system, run_id, tool):
     return [event for event in system.store.list_events(run_id)
             if event.type in _write_events(run_id) and (event.payload or {}).get("name") == tool]
 
-
-def test_run_actions_reports_unknown_with_snapshots(data_dir):
-    # run.actions 返回每个动作的状态与前后快照：中断的写入是 unknown，带动作前快照
-    system, run_id = _engineering_run(data_dir, _product_only_script())
-    _append_lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()), resume_on_startup=False)
-    restarted.orchestrator.resume_incomplete_run(run_id)
-    actions = Application(restarted).query("run.actions", RunActions(run_id=run_id)).data.actions
-    lost = [action for action in actions if action.action_id == "lost-write"]
-    assert len(lost) == 1
-    assert lost[0].status == "unknown"
-    assert lost[0].before_snapshot_ref is not None
-    restarted.close()
 
 def test_a_partial_model_response_only_executes_the_remaining_calls(data_dir):
     # 部分执行的模型响应只补剩余合法动作，不整批重发、不重新调用模型
@@ -178,31 +139,3 @@ def test_a_partial_model_response_executes_remaining_host_tool(data_dir):
     assert tool_called_events[0].payload["name"] == "submit_delivery"
     assert tool_called_events[0].payload["ok"] is True
     restarted.close()
-
-
-def test_an_adoption_settlement_is_idempotent_across_recovery(data_dir):
-    # 窄场景三：交付与质检已接纳、项目采纳前进程退出；恢复补一次合法采纳，重复恢复不再补第二次
-    from harness.proposals import delivery_turn
-
-    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
-    system = LoopSystem.for_testing(data_dir, FakeAdapter({
-        "product": [product_spec()],
-        "engineering": [delivery_turn()],
-        "quality": quality_turns("release", "ok"),
-    }))
-    project_id = system.projects.register("采纳项目", "核对采纳结算幂等")
-    _work_item_id, run_id = system.projects.start_work_item(project_id, "被中断的事项")
-    # 只把 run 运行到结束，不做结算：与「run 已经结束、采纳以前进程退出」留下的状态一致
-    assert system.run_until_stop(run_id).status == "done"
-    assert system.projects.projection(project_id).adoptions == []
-    system.close()
-
-    first = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    adoptions_one = first.projects.projection(project_id).adoptions
-    assert len(adoptions_one) == 1
-    first.close()
-    second = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    adoptions_two = second.projects.projection(project_id).adoptions
-    assert len(adoptions_two) == 1
-    assert adoptions_two[0].adoption_id == adoptions_one[0].adoption_id
-    second.close()

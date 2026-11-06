@@ -53,16 +53,20 @@ def test_the_queries_showing_department_settings_all_list_its_change(tmp_path):
         system.close()
 
 
-def test_the_tools_registry_lists_the_events_that_change_the_records_it_shows(tmp_path):
-    # 工单 #1177：工具登记给出各项目最近的取回记录与每台服务器最近一次探测的状态。
-    # 项目的出现与改名改变条目，服务器设置改变设置与工具清单，探测结果改变最近一次状态，
-    # 取回动作（tool_started 起、tool_called 出结果）改变取回记录；漏一种页面就停在旧值
+def test_the_trial_queries_are_listed_with_the_events_that_change_them(tmp_path):
+    # 工单 #152：试用记录与截图进能力清单，并登记改变它们结果的事件种类——会话与用例的开始结束、
+    # 步骤的动作事件、下一次模型请求的输入方式、规格被接纳（验收条件的原文）与交付到达（交付快照的摘要）
     system = LoopSystem(tmp_path / "data")
     try:
-        assert _changed_by(system, "tools.registry") == {
-            ProjectEventType.PROJECT_REGISTERED, ProjectEventType.PROJECT_RENAMED,
-            ProjectEventType.MCP_SERVERS_CONFIGURED, ProjectEventType.TOOL_SERVER_PROBE_FINISHED,
-            EventType.TOOL_STARTED, EventType.TOOL_CALLED,
+        names = {item.name for item in Application(system).capabilities("", access="local").queries}
+        assert {"run.trials", "evidence.screenshot"} <= names
+        assert _changed_by(system, "run.trials") == {
+            EventType.TRIAL_SESSION_STARTED, EventType.TRIAL_SESSION_ENDED,
+            EventType.TRIAL_CASE_OPENED, EventType.TRIAL_CASE_CONCLUDED,
+            EventType.TOOL_STARTED, EventType.TOOL_CALLED, EventType.ACTION_VERIFIED,
+            EventType.MODEL_REQUESTED, EventType.SPEC_ACCEPTED, EventType.DELIVERY_ACCEPTED,
         }
+        # 截图按引用读取，内容不随事件改变；与 evidence.external_source 同一口径，工具结果到达时重新查询
+        assert _changed_by(system, "evidence.screenshot") == {EventType.TOOL_CALLED}
     finally:
         system.close()

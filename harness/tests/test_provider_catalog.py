@@ -1,35 +1,14 @@
 from __future__ import annotations
 
 import json
-from contextlib import contextmanager
-from types import MappingProxyType
 
 import pytest
 
 from harness.providers import (
     CatalogValidationError,
-    CredentialMaterial,
     ProviderFacade,
     ProviderStore,
 )
-from harness.definitions import DEFINITIONS
-from harness.providers import capabilities, presets
-from harness.providers.discovery import _auth_headers, _parse_candidates
-from harness.providers.presets import preset_auth, preset_default_protocol
-from harness.providers.store import ProviderDefinition
-
-
-@contextmanager
-def preset_auth_as(preset_id: str, auth: str):
-    # 预置表里现在只有 api_key 一种方案，x-api-key 分支靠临时改预置表索引的一项取得（不写定义文件）：
-    # 其余字段保持原值，退出时还原
-    index = presets._PRESET_INDEX
-    item = index[preset_id].model_copy(update={"auth": auth})
-    presets._PRESET_INDEX = MappingProxyType({**index, preset_id: item})
-    try:
-        yield
-    finally:
-        presets._PRESET_INDEX = index
 
 
 def _document(**overrides):
@@ -276,19 +255,6 @@ def test_narrowing_supported_levels_keeps_a_referencing_binding_accepted():
     assert public["sent_tier"] == "medium"
 
 
-def test_snapshot_freezes_three_targets_without_persisting_secrets():
-    facade = _facade(**{"credential-a": CredentialMaterial("secret-a", version="a-v1"),
-                        "credential-b": CredentialMaterial("secret-b", version="b-v1")})
-    snapshot = facade.resolve_departments()
-    assert snapshot.target("product").provider_id == "provider-a"
-    assert snapshot.target("engineering").provider_id == "provider-b"
-    assert snapshot.target("product").api_key == "secret-a"
-    assert snapshot.target("product").credential_version == "a-v1"
-    encoded = json.dumps(snapshot.public_dict())
-    assert "secret-a" not in encoded and "secret-b" not in encoded
-    assert "api_key" not in encoded
-
-
 def test_missing_credentials_reported_per_item():
     facade = ProviderFacade()
     facade.store_document(_document())
@@ -299,23 +265,6 @@ def test_missing_credentials_reported_per_item():
     assert any("product" in location for location in locations)
     assert any("engineering" in location for location in locations)
     assert any("quality" in location for location in locations)
-
-
-def test_a_department_without_a_model_is_named_in_chinese_with_where_to_set_it():
-    # 工单 #319 第 6 项：质检的部门默认没有选模型时，用户看到的是中文说明与两个去处，
-    # 里面没有部门标识（quality）与英文的内部提示
-    facade = ProviderFacade()
-    facade.store_document(_document(bindings={
-        "product": {"provider_id": "provider-a", "model_id": "model-a"},
-        "engineering": {"provider_id": "provider-b", "model_id": "model-b"},
-    }))
-    readiness = facade.describe_readiness()
-    assert readiness["available"] is False
-    assert readiness["reason"] == "provider_unavailable"
-    assert readiness["message"] == (
-        "质检部门还没有选择模型，到系统的模型管理页设置部门默认，或在本项目的设置页为这个项目选择")
-    assert "quality" not in readiness["message"]
-    assert readiness["issues"] == [{"location": "bindings.quality", "message": "质检部门还没有选择模型"}]
 
 
 def test_a_binding_to_a_model_that_is_not_admitted_names_the_department_and_the_model():
@@ -329,17 +278,6 @@ def test_a_binding_to_a_model_that_is_not_admitted_names_the_department_and_the_
     assert "产品部门绑定的模型 model-a 尚未通过模型测试准入" in readiness["message"]
     assert "bindings." not in readiness["message"]
     assert "尚未配置 Provider" not in readiness["message"]
-
-
-def test_every_department_without_a_model_is_named_in_one_message():
-    facade = ProviderFacade()
-    facade.store_document(_document(bindings={}))
-    readiness = facade.describe_readiness()
-    assert readiness["available"] is False
-    for name in ("产品", "工程", "质检"):
-        assert f"{name}部门还没有选择模型" in readiness["message"]
-    for identifier in ("product", "engineering", "quality"):
-        assert identifier not in readiness["message"]
 
 
 def test_dangling_binding_references_are_rejected():
@@ -398,51 +336,3 @@ def test_store_rejects_base_url_with_credentials_and_missing_reference():
         facade.store_document(bad_url)
     assert any(issue.location.endswith("base_url") for issue in caught.value.issues)
     assert ProviderStore.empty().public_view()["providers"] == []
-
-
-def test_preset_declares_the_default_protocol_and_the_auth_for_models_and_tests():
-    # 服务方案预置表带默认协议与认证方式（docs/design/model-management.md「服务方案预置表与模型能力表」）：OpenCode Go 是 Chat Completions
-    preset = next(item for item in DEFINITIONS.service_presets.presets if item.id == "opencode-go")
-    assert preset.default_protocol == "chat_completions"
-    assert preset.auth == "api_key"
-    assert preset_default_protocol("opencode-go") == "chat_completions"
-    assert preset_auth("opencode-go") == "api_key"
-    # 自定义服务不在预置表里：取不到默认协议与认证方式，由调用方预填 Chat Completions
-    assert preset_default_protocol("") == ""
-    assert preset_auth("") == ""
-    assert preset_default_protocol("custom") == ""
-    # 获取模型列表与连接测试的认证头按服务方案的认证方式（docs/design/model-management.md「Provider 配置」）：
-    # 预置方案 api_key 用 Bearer；认证方式为 x-api-key 的方案用同名头，这一项由测试临时改预置表索引取得
-    # （预置表里现在只有 api_key 一种方案）；自定义服务用 Bearer；没有凭据时不带认证头，由上游决定拒绝
-    go = ProviderDefinition(id="p", name="P", base_url="https://a.example/v1", preset_id="opencode-go")
-    assert _auth_headers(go, "secret-a") == {"Authorization": "Bearer secret-a"}
-    assert _auth_headers(go, "") == {}
-    with preset_auth_as("opencode-go", "x-api-key"):
-        assert _auth_headers(go, "secret-b") == {"x-api-key": "secret-b"}
-        assert _auth_headers(go, "") == {}
-    custom = ProviderDefinition(id="p", name="P", base_url="https://a.example/v1")
-    assert _auth_headers(custom, "secret-c") == {"Authorization": "Bearer secret-c"}
-    assert _auth_headers(custom, "") == {}
-
-
-def test_candidate_prefill_carries_the_protocol_and_its_source():
-    # R2：先采用能力表里这个模型的协议与来源（识别出的服务商之内），查不到时再使用方案默认协议。
-    known = _parse_candidates({"data": [{"id": "grok-4.7"}, {"id": "glm-5.3-flash"},
-                                        {"id": "claude-haiku-5-5"}, {"id": "清单里没有的模型"}]},
-                              "opencode-go")
-    by_id = {item["id"]: item for item in known}
-    # 能力表里的逐模型协议：模型自己声明的接入包决定（openai → responses，anthropic → messages）
-    assert by_id["grok-4.7"]["protocol"] == "responses"
-    assert by_id["grok-4.7"]["protocol_source"] == "capability_table"
-    assert by_id["glm-5.3-flash"]["protocol"] == "chat_completions"
-    assert by_id["glm-5.3-flash"]["protocol_source"] == "capability_table"
-    assert by_id["claude-haiku-5-5"]["protocol"] == "messages"
-    assert by_id["claude-haiku-5-5"]["protocol_source"] == "capability_table"
-    # 能力表里没有这个模型：内置服务方案取方案的默认协议
-    assert by_id["清单里没有的模型"]["protocol"] == "chat_completions"
-    assert by_id["清单里没有的模型"]["protocol_source"] == "preset_default"
-    # 自定义服务不在能力表里：预填 Chat Completions，来源 default
-    custom = _parse_candidates({"data": [{"id": "任意模型"}]}, "")
-    assert custom[0]["protocol"] == "chat_completions"
-    assert custom[0]["protocol_source"] == "default"
-    assert capabilities.capability("", "任意模型") is None

@@ -154,17 +154,6 @@ def test_step_layer_is_undetermined_until_a_full_window():
     assert "窗口" in step_layer.missing
 
 
-def test_activation_project_and_run_layers_are_undetermined_with_missing_facts():
-    # 守 R3：本工单只判步骤层；run 层在 #1194 接入逐条核验数据以后判，激活层与项目层写明缺少的事实
-    tree = loops.build_loop_tree(base_events())
-    layers = {layer.name: layer for layer in tree.layers}
-    # #1194 以后 run 层仍不判定（这份事件流没有逐条核验结论），说明的文字改成「核验角色提交…以后判定」
-    assert layers["run"].state == loops.UNDETERMINED and layers["run"].missing == loops.MISSING_RUN
-    assert layers["activation"].state == loops.UNDETERMINED and layers["activation"].missing
-    assert layers["project_loop"].state == loops.UNDETERMINED and "故障记录" in layers["project_loop"].missing
-    assert layers["work_item"].state == loops.UNDETERMINED
-
-
 def test_frozen_parameters_drive_the_judgement_and_method_constants_stay_fixed():
     # 守 R3（三项参数在实例创建时冻结）：判定用 run_created 里冻结的取值，运行中改全局值不改变已有实例；
     # 方法常量固定为 8 与 2

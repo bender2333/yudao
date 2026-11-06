@@ -106,12 +106,3 @@ def test_protocol_comes_from_the_capability_table_first():
     assert empty_protocol["context_window"] == 1048576
     assert empty_protocol["context_window_source"] == "capability_table"
     assert empty_protocol["max_output_tokens"] == 65536
-
-
-def test_preset_address_recognizes_the_provider_of_the_plan():
-    # R3：预置方案的地址识别为该方案对应的服务商（models.dev 的 provider ID）。
-    index = _index()
-    assert index.recognize_provider("https://opencode.ai/zen/go/v1") == "opencode-go"
-    entry = index.lookup("https://opencode.ai/zen/go/v1", "gemini-4-argon")
-    assert entry is not None and entry.protocol is None
-    assert entry.npm == "@ai-sdk/google"

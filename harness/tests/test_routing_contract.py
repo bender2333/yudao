@@ -10,6 +10,7 @@
 # 读源码文件与投影对象，不起服务、不写文件，属于单元层。
 
 import ast
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -96,27 +97,6 @@ class _WithoutFacts:
 
     def check_definition(self, definitions: object) -> None:
         return None
-
-
-def test_the_routing_implementation_declares_the_version_the_thin_driver_accepts():
-    # R2：契约带版本，实现声明它实现哪一版，薄驱动在一个发布里接受当前版与上一版
-    assert ROUTING.CONTRACT_VERSION == routing_contract.CURRENT_VERSION
-    assert routing_contract.accept(ROUTING) == routing_contract.CURRENT_VERSION
-    assert ROUTING.NAME == "watched_outputs" == DEFINITIONS.routing
-
-
-def test_a_version_the_thin_driver_does_not_accept_fails_and_says_why():
-    # R2：版本不合格时在开始一轮工作之前失败，说明里写明是哪一种实现、声明了哪一版、接受哪几版
-    class Future:
-        NAME = "future"
-        CONTRACT_VERSION = routing_contract.CURRENT_VERSION + 1
-
-    with pytest.raises(contract_versions.ContractVersionError) as raised:
-        routing_contract.accept(Future)
-    message = str(raised.value)
-    assert "the routing implementation" in message
-    assert str(Future.CONTRACT_VERSION) in message
-    assert f"current {routing_contract.CURRENT_VERSION}" in message
 
 
 def test_the_contract_accepts_the_previous_version_and_rejects_the_others():
@@ -314,3 +294,11 @@ def test_the_execution_result_has_no_outcome_kinds():
     for removed in ("class Submitted", "class Answered", "class Stopped", "StepResult"):
         assert removed not in contract.replace("RoundResult", ""), removed
         assert removed not in engine, removed
+    # 路由定义里的成果种类既不是结果的字段名，也不出现在契约源码里
+    kinds = [item["id"] for item in json.loads((HARNESS / "definitions" / "outcome_kinds.json")
+                                               .read_text(encoding="utf-8"))["kinds"]]
+    assert kinds, "定义里没有成果种类，这条检查无从判断"
+    fields = set(execution_contract.RoundResult.__dataclass_fields__)
+    assert not (fields & set(kinds)), f"结果的种类里出现了成果种类：{sorted(fields & set(kinds))}"
+    assert not [kind for kind in kinds if kind in contract], (
+        "执行契约的源码里出现了路由定义的成果种类：结果种类应当由路由按事件判断")

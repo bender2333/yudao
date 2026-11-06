@@ -1,5 +1,6 @@
-# 工具登记查询（工单 #1177，网络与 MCP 设计说明「应用层接口」「查询 tools.registry」、「系统「工具与扩展」页」；总图第四节「接口」缝）。
-# 返回各项目最近的取回记录与各项目的 MCP 服务器（设置、最近一次探测的状态、工具清单）。
+# 工具登记查询（工单 #1177，网络与 MCP 设计说明第 10 节「查询 tools.registry」、第 11.3 节；总图第四节「接口」缝）。
+# 返回各项目最近的取回记录与各项目的 MCP 服务器（设置、最近一次探测的状态、工具清单），以及内置工具一节
+# （工单 #152：Playwright MCP 的版本、浏览器工具与恢复契约、每个工具是否需要图像输入）。
 #
 # 数据来源（2026-11-03，main 6ad1fd3e；两个前置都已合并）：
 # - MCP 服务器的设置、版本与工具清单快照读项目投影的 mcp_servers（工单 #236 的 mcp_servers_configured）。
@@ -7,6 +8,7 @@
 #   投影只留项目里最后一次探测，多台服务器时前面几台的状态会丢，所以按事件读。
 # - 取回记录读 run 流的 tool_called 里名称为 fetch_url 的那些（工单 #68 的取回动作）：每个项目的取回动作
 #   各占一条，最近的在前。
+# - 内置工具一节取自定义（工具与恢复契约）与浏览器模块的版本常量（find_program 只接受这一版，工单 #152）。
 #
 # 查询只读取：项目流保存的投影与按条件读取的事件，不写入任何内容。结果是快照：position 是这份快照
 # 已经包含的最大全局位置，事件流从它之后续上。
@@ -16,6 +18,8 @@ from __future__ import annotations
 from collections import deque
 from typing import TYPE_CHECKING, Any
 
+from ..browser import MCP_PACKAGE, MCP_VERSION
+from ..definitions import DEFINITIONS
 from ..models import EventType, ProjectEventType
 from ..projects import project_projection
 from .contracts import Contract, Snapshot
@@ -25,7 +29,7 @@ from .registry import QueryDefinition
 if TYPE_CHECKING:
     from .application import Application
 
-# 每个项目最多给出多少条取回记录。docs/design/network-and-mcp.md「系统「工具与扩展」页」中「最近的取回记录」，没有写条数：这一页是只读的
+# 每个项目最多给出多少条取回记录。设计说明第 11.3 节只说要「最近的取回记录」，没有写条数：这一页是只读的
 # 汇总，取最近 20 条足够看出近期取回的结果分布，也不让一条长跑的项目把这一页撑大
 FETCH_RECORD_LIMIT = 20
 
@@ -38,9 +42,9 @@ _PROBE_OK = "ok"
 
 
 class ToolsRegistryProbeState(Contract):
-    # 一台 MCP 服务器最近一次探测的状态（设计说明「读取工具清单（探测）」、docs/design/network-and-mcp.md「系统「工具与扩展」页」）：还没有探测过时
+    # 一台 MCP 服务器最近一次探测的状态（设计说明第 4.2 节「读取工具清单」、第 11.3 节）：还没有探测过时
     # 三项都为空。config_digest 是那次探测绑定的配置摘要，与服务器当前的 config_digest 不同时这次结果已经过期
-    # （docs/design/network-and-mcp.md「读取工具清单（探测）」：旧结果保留供查询，不得覆盖新配置的可用状态）
+    # （设计说明第 4.2 节：旧结果保留供查询，不得覆盖新配置的可用状态）
     finished_at: str | None = None
     ok: bool | None = None
     error: str | None = None
@@ -55,7 +59,7 @@ class ToolsRegistryServerView(McpServerSettingView):
 
 
 class ToolsRegistryFetchRecord(Contract):
-    # 一条取回记录（docs/design/network-and-mcp.md「系统「工具与扩展」页」：时间、地址、项目、结果）。项目由它所在的条目给出：at 是取回动作
+    # 一条取回记录（设计说明第 11.3 节：时间、地址、项目、结果）。项目由它所在的条目给出：at 是取回动作
     # 的时间，url 是动作请求的地址，ok 为假时 error 写明原因（取回失败，或被地址规则与工具许可拒绝）
     at: str = ""
     url: str = ""
@@ -72,8 +76,33 @@ class ToolsRegistryProject(Contract):
     fetch_records: list[ToolsRegistryFetchRecord] = []
 
 
+class BuiltinToolView(Contract):
+    # 一个内置的浏览器工具（工单 #152；浏览器与 computer use 设计说明第 4.2、6.1 节）：恢复契约的核实方法
+    # （verification）与取消能否确认停止（cancellable），以及这个工具是否需要图像输入——需要时调用目标
+    # 不含图像的请求里不提供它
+    name: str
+    action: str
+    verification: str | None = None
+    cancellable: bool | None = None
+    requires_image_input: bool = False
+
+
+class PlaywrightMcpView(Contract):
+    # 浏览器工具所用的 Playwright MCP：包名与版本。版本是 browser.find_program 核对的那一版，不另抄一份
+    package: str
+    version: str
+
+
+class BuiltinToolsView(Contract):
+    # 内置工具一节：Playwright MCP 的版本与浏览器工具清单。屏幕工具属于以后的 computer use 专题
+    # （ADR-0026），这一版没有
+    playwright_mcp: PlaywrightMcpView
+    browser_tools: list[BuiltinToolView]
+
+
 class ToolsRegistryResult(Contract):
     projects: list[ToolsRegistryProject]
+    builtin: BuiltinToolsView
 
 
 def _events_of(store: Any, project_id: str, types: tuple[str, ...]) -> list[Any]:
@@ -108,7 +137,7 @@ def _probe_states(store: Any, project_id: str) -> dict[str, ToolsRegistryProbeSt
 
 def _recent_fetch_records(store: Any, project_id: str) -> list[ToolsRegistryFetchRecord]:
     # 这个项目最近的取回记录，最近的在前：只认名字是 fetch_url 的工具结果（工单 #68 的取回动作，
-    # docs/design/network-and-mcp.md「应用层接口」的「事件（run 流）… 调用沿用 tool_started、tool_called」）。边读边丢最旧的，
+    # 设计说明第 10 节的「事件（run 流）… 调用沿用 tool_started、tool_called」）。边读边丢最旧的，
     # 只留最后 FETCH_RECORD_LIMIT 条；只有开始、还没有结果的取回不在这里（结果未知的动作在 run.actions 里看）
     recent: deque[ToolsRegistryFetchRecord] = deque(maxlen=FETCH_RECORD_LIMIT)
     for event in _events_of(store, project_id, (EventType.TOOL_CALLED,)):
@@ -131,6 +160,25 @@ def _fetch_error(payload: dict[str, Any]) -> str | None:
     return error or None
 
 
+def _builtin_tools() -> BuiltinToolsView:
+    # 内置工具有哪些、每个的恢复契约与是否需要图像输入，都取自定义（浏览器工具在 browser_tools.json 里）；
+    # Playwright MCP 的版本取浏览器模块核对的那一版
+    tools = [
+        BuiltinToolView(
+            name=name,
+            action=str(tool.action),
+            verification=tool.verification,
+            cancellable=tool.cancellable,
+            requires_image_input=tool.requires_image_input,
+        )
+        for name, tool in DEFINITIONS.tools.items() if tool.action == "browser"
+    ]
+    return BuiltinToolsView(
+        playwright_mcp=PlaywrightMcpView(package=MCP_PACKAGE, version=MCP_VERSION),
+        browser_tools=tools,
+    )
+
+
 def _tools_registry(application: Application, request: None) -> Snapshot[ToolsRegistryResult]:
     store = application.system.store
     position = store.end_position()
@@ -151,7 +199,10 @@ def _tools_registry(application: Application, request: None) -> Snapshot[ToolsRe
             project_id=state.project_id, name=state.name, mcp_servers=servers,
             fetch_records=_recent_fetch_records(store, project_id),
         ))
-    return Snapshot[ToolsRegistryResult](position=position, data=ToolsRegistryResult(projects=projects))
+    return Snapshot[ToolsRegistryResult](
+        position=position,
+        data=ToolsRegistryResult(projects=projects, builtin=_builtin_tools()),
+    )
 
 
 TOOLS_REGISTRY = QueryDefinition(
@@ -167,7 +218,10 @@ TOOLS_REGISTRY = QueryDefinition(
 
 __all__ = [
     "FETCH_RECORD_LIMIT",
+    "BuiltinToolView",
+    "BuiltinToolsView",
     "McpServerSettingView",
+    "PlaywrightMcpView",
     "TOOLS_REGISTRY",
     "ToolsRegistryFetchRecord",
     "ToolsRegistryProject",

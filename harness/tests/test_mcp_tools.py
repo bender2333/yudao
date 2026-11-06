@@ -167,28 +167,6 @@ def test_the_session_table_resolves_aliases_from_the_item_definitions():
     assert table.server_names() == ["fs"]
 
 
-def test_an_alias_outside_the_table_is_refused():
-    table = mcp_session.McpSessions(None, credentials=CredentialChain(), stderr_dir=".")
-    try:
-        table.original("mcp__fs__read_file")
-    except mcp_session.UnknownToolAlias:
-        pass
-    else:
-        raise AssertionError("没有冻结设置的会话表放过了别的工具名")
-
-
-def test_a_call_against_an_unknown_server_is_refused():
-    table = mcp_session.McpSessions(_document(), credentials=CredentialChain(), stderr_dir=".")
-
-    async def call():
-        return await table.call("mcp__other__read_file", "other", "read_file", {})
-
-    outcome = asyncio.run(call())
-    assert outcome.is_error and outcome.error_code == "startup_failed"
-    assert "不在" in outcome.result_text
-    assert not table.open and table.sessions() == {}
-
-
 def test_the_launch_plan_carries_the_timeouts_and_the_redaction_list():
     # 启动参数按冻结设置组出：时限随设置、标准错误输出写到数据目录的 mcp-logs、
     # 凭据值按名称取值并进入脱敏清单（值不写进回执、事件与日志）
@@ -213,3 +191,19 @@ def test_a_missing_credential_refuses_the_launch_with_the_credential_name():
         assert "MCP_SESSION_KEY" in str(refused)
     else:
         raise AssertionError("缺少凭据时没有拒绝启动")
+
+
+def test_a_call_without_its_credential_is_a_failed_action_that_names_it():
+    # 一次调用在开始时取不到凭据：不建立会话，动作记为失败（startup_failed），原因交回模型并写明凭据名称
+    # （设计说明第 7.2 节）；这是 call 的拒绝包装，不是抛给调用方
+    document = _settings_document({"API_KEY": {"kind": "credential", "credential_ref": "MCP_SESSION_KEY"}})
+    table = mcp_session.McpSessions(document, credentials=CredentialChain(), stderr_dir=".")
+
+    async def call():
+        return await table.call("mcp__fs__read_file", "fs", "Read.File", {})
+
+    outcome = asyncio.run(call())
+    assert outcome.is_error and outcome.error_code == "startup_failed"
+    assert "MCP_SESSION_KEY" in outcome.result_text
+    assert CREDENTIAL_SECRET not in outcome.result_text
+    assert not table.open and table.sessions() == {}

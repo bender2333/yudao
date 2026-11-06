@@ -311,7 +311,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         "work_item.materials", "delivery.file", "project.attempts", "project.usage", "run.attempt",
         "project.settings", "project.writeback", "run.export", "replay.check", "run.recovery", "catalog",
         "catalog.document", "catalog.change_impact", "home.away_report", "rules.registry",
-        "evidence.external_source", "tools.registry", "run.loops", "acceptance.coverage",
+        "evidence.external_source", "run.trials", "evidence.screenshot", "tools.registry", "run.loops",
+        "acceptance.coverage",
         "project.organization",
     }
     # 可回放的查询：接受 docs/design/app-and-interface.md「合同」的 at（按位置读取）

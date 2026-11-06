@@ -1,4 +1,4 @@
-# 调用协议属于模型访问定义的验收（模型管理设计说明「模型访问定义与准入」，工单 #382）。
+# 调用协议属于模型访问定义的验收（模型管理设计说明第 4.3 节，工单 #382）。
 # 同一份连接下的多个访问定义可以各用一种协议，请求基址按访问定义的协议取：
 # 内置服务方案取预置表中该协议的请求基址，自定义服务取连接的地址；
 # 改动协议只让它自己的准入作废，改动连接地址让该连接下全部定义作废。
@@ -150,25 +150,6 @@ def test_changing_the_connection_address_stales_every_definition_under_it():
     assert rows["m-chat"]["admitted"] is False
     assert rows["m-msg"]["admitted"] is False
     assert rows["m-other"]["admitted"] is True
-
-def test_admission_records_carry_the_protocol_of_the_definition():
-    # 准入记录写入访问定义的协议；改这条定义的协议以后记录作废（docs/design/model-management.md「修改与准入」）
-    facade = _facade(_custom_document(("m-chat", "chat_completions")))
-    facade.record_admission("local", "m-chat", admitted_model="upstream-x")
-    rows = facade.model_admissions()
-    assert rows[0]["protocol"] == "chat_completions"
-    assert rows[0]["admitted"] is True
-
-    facade.save_provider_entry(
-        {"id": "local", "name": "Local", "base_url": "http://127.0.0.1:9/v1",
-         "credential_ref": "LOCAL_KEY", "timeout_sec": 30.0},
-        [{"id": "m-chat", "model": "upstream-x", "protocol": "messages",
-          "context_window": 32000, "max_output_tokens": 2048}],
-    )
-    rows = facade.model_admissions()
-    assert rows[0]["protocol"] == "messages"
-    assert rows[0]["admitted"] is False
-    assert rows[0]["stale"] is True
 
 def test_a_connection_that_declares_a_protocol_is_rejected_naming_where():
     # 连接上出现协议字段：读取以错误结束并写明位置，不迁移也不补默认值

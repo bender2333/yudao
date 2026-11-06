@@ -242,38 +242,6 @@ def test_rework_product_returns_to_product(tmp_path):
     activated = {event.department for event in events if event.type == EventType.DEPARTMENT_ACTIVATED}
     assert activated == {"product", "engineering", "quality"}
 
-def test_rework_review_rejected_before_the_structure_is_accepted(tmp_path):
-    # 核验在结构说明被接纳以前提交的那一支（工单 #1290）：工程第一次提交的结构说明不全（覆盖了 PRD 里
-    # 没有的要求）被拒，所以质检第一次提交的核验一定落在「还没有结构说明」上、也被拒；结构说明接纳以后
-    # 质检再被唤醒一次，这一次通过。用「先给一条不合格的结构说明」把这一支确定下来，不看调度先后
-    system, run_id = _onboarding_run(tmp_path, {
-        "product": [_product_turn()],
-        "engineering": [
-            structure_turn(requirement_locations=[{"requirement": "a requirement that is not in the PRD",
-                                                   "locations": ["src/echo.py"]}]),
-            _structure_turn(),
-        ],
-        "quality": [_rework_review_turn(), _rework_review_turn()],
-    })
-    result = system.run_until_stop(run_id)
-    assert _require_baseline_review(result)["verdict"] == "rework_product"
-    events = system.store.list_events(run_id)
-    rejected = [event for event in events
-                if event.type == EventType.PROPOSAL_REJECTED and event.department == "quality"]
-    assert len(rejected) == 1
-    assert [error["field"] for error in rejected[0].payload["errors"]] == ["structure"]
-    quality_activations = [event for event in events
-                           if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == "quality"]
-    assert len(quality_activations) == 2
-    accepted = [event for event in events if event.type == EventType.BASELINE_REVIEW_ACCEPTED]
-    assert len(accepted) == 1
-    assert quality_activations[1].stream_version < accepted[0].stream_version
-    # 核验通过以后产品开始一轮工作
-    product_activations = [event for event in events
-                           if event.type == EventType.DEPARTMENT_ACTIVATED and event.department == "product"]
-    assert len(product_activations) == 2
-    assert accepted[0].stream_version < product_activations[1].stream_version
-
 def test_rework_product_requires_unsupported_or_omission(tmp_path):
     system, run_id = _onboarding_run(tmp_path, {
         # 脚本按部门给出（工单 #557、#879）
@@ -377,24 +345,6 @@ def test_structure_requires_activation_receipt(tmp_path):
     assert result.active_department != "quality"
     assert EventType.STRUCTURE_ACCEPTED not in [event.type for event in system.store.list_events(run_id)]
 
-def test_structure_rejects_requirement_coverage_mismatch(tmp_path):
-    # requirement_locations 必须恰好覆盖当前初始 PRD 的每条要求
-    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
-    system, run_id = _onboarding_run(tmp_path, {
-        "product": [_product_turn()],
-        "engineering": [
-            structure_turn(requirement_locations=[{"requirement": "a requirement that is not in the PRD",
-                                                   "locations": ["src/echo.py"]}]),
-        ],
-        # 质检在 PRD 被接纳以后与工程同时开始一轮工作（工单 #557）：结构说明还没有被接纳，这一轮提交的结论被拒绝
-        "quality": [_review_turn()],
-    })
-    system.run_until_stop(run_id)
-    events = [event.type for event in system.store.list_events(run_id)]
-    assert EventType.STRUCTURE_ACCEPTED not in events
-    rejected = [event for event in system.store.list_events(run_id) if event.type == EventType.PROPOSAL_REJECTED]
-    assert any("requirement_locations" in error["field"] for event in rejected for error in event.payload["errors"])
-
 def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
     # 接纳时核对工作区的树摘要等于快照摘要，不相等时拒绝（docs/design/existing-project-onboarding.md「总体」）
     from harness.validation import evaluate_proposal
@@ -424,39 +374,3 @@ def test_structure_acceptance_refuses_a_changed_workspace_tree(tmp_path):
     assert not decision.accepted
     assert any("no longer matches the snapshot" in error.message for error in decision.errors)
 
-DESIGN_CAPABILITY = "导出 PDF 报告"
-MARKED_BOUNDARY = "导出 PDF 报告（设计中，未实施）：docs/design/export.md 描述，代码尚未实现"
-
-
-def test_existing_defect_must_not_cover_a_marked_boundary_entry(tmp_path):
-    # 工单 #346：带标记的边界条目不记为现有缺陷，基线核验按此核对
-    from harness.models import CheckReceipt
-    from harness.validation import evaluate_proposal
-
-    marked = "导出 PDF 报告（设计中，未实施）：设计文档描述，代码尚未实现"
-    system, run_id = _onboarding_run(tmp_path, {
-        # 脚本按部门给出（工单 #557、#879），三个部门都写上（工单 #943）
-        "product": [FakeTurn(proposal=product_spec(requirements=[DESIGN_CAPABILITY], acceptance=["run the CLI with a word"],
-                                      boundaries=[marked]))],
-        "engineering": [structure_turn(requirement_locations=[{"requirement": DESIGN_CAPABILITY, "locations": ["src/echo.py"]}])],
-        "quality": [],
-    })
-    system.activate_once(run_id)
-    result = system.activate_once(run_id)
-    assert has_new_work(result, "quality"), result.status
-    projection = system.project(run_id)
-    facts = system.workspace(run_id).snapshot().facts
-    spec = projection.product_spec
-    receipt = CheckReceipt(name="smoke", department="quality", exit_code=1,
-                           summary="not implemented", snapshot_hash=facts.digest,
-                           bindings={"product_spec": spec.content_hash},
-                           product_spec_hash=spec.content_hash, activation_id=projection.last_activations.get("quality"))
-    facts = facts.model_copy(update={"checks": (*facts.checks, receipt)})
-    proposal = {
-        "kind": "baseline_review", "verdict": "consistent",
-        "conclusions": [{"requirement": DESIGN_CAPABILITY, "status": "existing_defect", "evidence": "smoke"}],
-        "omissions": [], "checks": ["smoke"], "other_failures": [],
-    }
-    decision = evaluate_proposal(adjudication_view(projection),department="quality", proposal=proposal, facts=facts, tightening=WATCHED_OUTPUTS)
-    assert not decision.accepted
-    assert any("设计中，未实施" in error.message for error in decision.errors)

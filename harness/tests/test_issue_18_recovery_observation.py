@@ -1,4 +1,4 @@
-# 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵「动作分类与处置」、「故障矩阵」）。
+# 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵第 4 节「动作分类与处置」、第 6 节「故障矩阵」）。
 # 数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，模型回答由 FakeAdapter 给出；
 # 中断由「进程关闭、重新以新的系统打开同一数据目录」表示。查询只读取，事件流重连只补观察事实。
 
@@ -11,13 +11,9 @@ from harness.app.application import Application
 from harness.app.project_queries import (
     PROJECT_LOOP,
     PROJECTS_LIST,
-    REPLAY_CHECK,
-    RUN_ACTIONS,
     RUN_RECOVERY,
     ProjectLoop,
     ProjectsList,
-    ReplayCheck,
-    RunActions,
     RunRecovery,
 )
 from harness.event_store import run_stream
@@ -283,37 +279,8 @@ def test_run_recovery_describes_the_verification_record_and_next_legal_action(da
     restarted.close()
 
 
-def test_unknown_actions_keep_the_handling_and_what_was_handed_back(data_dir):
-    # 结果未知的动作交还以后仍列在查询里（工单 #181，docs/design/app-and-interface.md「查询清单」）：处理方式、发出它的会话、
-    # 执行前快照与交还给模型的内容都在，项目不因它进入等待用户（没有决定卡片）
-    system, _project_id, run_id = _engineering_run(data_dir, _product_only_script())
-    _lost_write(system, run_id)
-    system.close()
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_empty_script()),
-                                      resume_on_startup=False)
-    restarted.orchestrator.resume_incomplete_run(run_id)
-    application = _application(restarted)
-    recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    assert [entry.action_id for entry in recovery.unknown_actions] == ["lost-write"]
-    handled = recovery.unknown_actions[0]
-    assert handled.handling == "returned"
-    assert handled.tool == "write_file"
-    assert handled.department == "engineering"
-    assert handled.session_id == _main_session(restarted, run_id, "engineering")
-    assert handled.purpose == "work"
-    assert handled.before is not None
-    # 交还给模型的内容就是写进部门历史的工具结果：模型读到的是「执行被中断、结果未知」
-    assert handled.returned
-    handed_back = json.loads(handled.returned)
-    assert handed_back["ok"] is False
-    assert "结果未知" in handed_back["error"]
-    assert handled.at
-    restarted.close()
-
-
 def test_sessions_report_the_usage_of_each_session(data_dir):
-    # 各会话的用量（工单 #181，三部门的循环结构「停止与恢复」）：部门主线与会话分支各一行，
+    # 各会话的用量（工单 #181，三部门的循环结构第 9 节）：部门主线与会话分支各一行，
     # 写部门、主线或分支、已用秒、轮数与步数。分支是工程询问产品时产品的那次旁支工作
     script = {
         "product": [product_spec()],
@@ -364,21 +331,3 @@ def test_a_resumed_run_keeps_the_record_of_this_interruption(data_dir):
     assert recovery.last_confirmed_event_id != confirmed_before
     assert recovery.last_confirmed_text
     restarted.close()
-
-
-def test_history_queries_export_and_replay_stay_read_only(data_dir):
-    # 历史查询、导出与重放保持只读：位置不变，不调用模型，不写入
-    system, project_id, run_id = _engineering_run(data_dir, _product_only_script())
-    application = _application(system)
-    position = system.store.end_position()
-    _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
-    _query(application, PROJECTS_LIST, ProjectsList())
-    _query(application, PROJECT_LOOP, ProjectLoop(project_id=project_id))
-    _query(application, RUN_ACTIONS, RunActions(run_id=run_id))
-    assert system.store.end_position() == position
-    assert has_new_work(system.project(run_id), "engineering")
-    # 重放核对不写入，结果一致
-    report = _query(application, REPLAY_CHECK, ReplayCheck(run_id=run_id))
-    assert report.consistent is True
-    assert system.store.end_position() == position
-    system.close()

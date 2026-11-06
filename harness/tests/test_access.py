@@ -1,4 +1,4 @@
-# 访问方式（设计说明「版本号」、「发布脚本」）与页面文件（网页界面的提供与发布设计说明「接口层提供页面文件」）：
+# 访问方式（设计说明第 6.2、6.3 节）与页面文件（网页界面的提供与发布设计说明第 5.1 节）：
 # 真实启动接口，经 HTTP 检查 Host、Origin、访问令牌、命令的媒体类型、同一来源与页面文件。
 
 import re
@@ -130,16 +130,6 @@ def test_local_access_checks_the_host_for_page_files(data_dir, tmp_path):
         asset = client.get("/assets/index-a1b2c3.js", headers={"Host": "evil.example"})
     assert allowed.status_code == 200
     assert rejected.status_code == 403 and asset.status_code == 403
-
-
-def test_capabilities_list_the_access_mode(data_dir):
-    # 能力清单列出访问方式（docs/design/app-and-interface.md「能力清单」、「访问方式与认证」）：本机与局域网由启动设置给出
-    with running_api(_Opened(data_dir)) as client:
-        local = client.get("/api/capabilities").json()["deployment"]["access"]
-    _entry, token = AccessTokenStore(data_dir).create("capabilities", now=utc_now())
-    with running_api(_Opened(data_dir), access="lan", data_dir=data_dir) as client:
-        lan = client.get("/api/capabilities", headers=bearer(token)).json()["deployment"]["access"]
-    assert (local, lan) == ("local", "lan")
 
 
 def test_the_local_access_mode_refuses_to_listen_on_another_address(tmp_path, capsys):

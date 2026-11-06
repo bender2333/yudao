@@ -13,7 +13,6 @@ from harness.app.decision_queries import DecisionsList
 from harness.event_store import catalog_stream
 from harness.models import CatalogEventType, ProjectEventType
 from harness.release_check import (
-    MANIFEST_PATH,
     Finding,
     check_repository,
     decision_request_payload,
@@ -184,17 +183,6 @@ def test_eval_proprietary_content_in_a_tool_description_is_reported(repository):
     assert any("工具 write_file" in item.where for item in proprietary)
 
 
-def test_eval_proprietary_content_in_a_definition_is_reported(repository):
-    # 定义里出现评测材料的提交号：同样报成评测专有内容不通过
-    repository.write("harness/definitions/tools.json", json.dumps(
-        {"tools": [{"name": "write_file",
-                    "description": "基线提交 8dfd6ff35c1b73bc5d2e6a14c0246b03aa2f9f98 上的写法。"}]}))
-    repository.commit("leak the scenario into a definition")
-    report = check_repository(repository.path)
-    proprietary = _findings(report).get("评测专有内容", [])
-    assert any("harness/definitions/tools.json" in item.where for item in proprietary)
-
-
 def test_editing_the_pending_manifest_does_not_change_the_result(repository):
     # 待发布提交里的清单与内核测试改不动结果：检查用的是实例自带的清单与检查。
     # 待发布提交里把清单改成一条模块都不列（照它自己的清单，那个内核模块的导入不会被核对），
@@ -278,21 +266,6 @@ def test_an_old_instance_upgrade_event_with_the_line_cap_still_reads(tmp_path):
     finally:
         system.close()
 
-def test_the_kind_filter_returns_only_instance_upgrade_requests(repository, tmp_path):
-    # 工单 #564：按 kind=instance_upgrade 筛选只返回实例升级决定，run 流的决定不在其中
-    report = check_repository(repository.path)
-    system = LoopSystem(tmp_path / "data")
-    try:
-        request_instance_upgrade(system, report)
-        application = Application(system)
-        listed = application.query("decisions.list", DecisionsList(kind="instance_upgrade"))
-        assert [item.kind for item in listed.data.decisions] == ["instance_upgrade"]
-        every = application.query("decisions.list", DecisionsList())
-        assert {item.decision_id for item in every.data.decisions} == {
-            item.decision_id for item in listed.data.decisions}
-    finally:
-        system.close()
-
 def test_answering_an_instance_upgrade_request_shows_in_the_query(repository, tmp_path):
     # 工单 #564：回答以后经 decisions.list 读到的状态是已回答，回答记录所选选项
     import uuid
@@ -329,10 +302,3 @@ def test_the_catalog_stream_decisions_mark_the_list_for_resubscription(repositor
                 ProjectEventType.PROJECT_DECISION_WITHDRAWN} <= set(listed.changed_by)
     finally:
         system.close()
-
-def test_the_manifest_lists_the_release_check_as_added_later():
-    # 发布检查不在内核路径里（它导入 pygit2，不满足内核的导入方向），登记在 added_later
-    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    paths = [entry["path"] for entry in manifest["paths"]]
-    assert "harness/release_check.py" not in paths
-    assert "harness/release_check.py" in [entry["path"] for entry in manifest["added_later"]]

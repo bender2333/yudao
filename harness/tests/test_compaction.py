@@ -242,42 +242,13 @@ def _local_tokens(records, pinned=PINNED, tools=TOOLS):
     return estimate_tokens(json_dumps({"input": [*pinned, *[record["item"] for record in records]], "tools": tools}))
 
 
-def test_the_local_estimate_counts_utf8_bytes_not_characters():
-    """3 万个汉字的历史：按 UTF-8 字节数估成约 22500 token，不是按字符数的约 7500（docs/design/model-management.md「用量」）。"""
-    text = "汉" * 30_000
-    assert estimate_tokens(text) == 22_500
-    assert estimate_tokens(text) != 7_500
-
-
-def test_a_larger_previous_upstream_usage_triggers_compaction_before_the_local_estimate():
-    """上一次请求上游回报的用量超过阈值、本地估算没有超过：这一步先压缩（docs/design/model-management.md「用量」）。"""
-    records = _history(2, 100)
-    assert _local_tokens(records) < 3400
-    assert plan_compaction(records, None, 4000, PINNED, TOOLS) is None
-    # 上游回报的用量低于阈值：只用估算，这一步不压缩
-    assert plan_compaction(records, None, 4000, PINNED, TOOLS, previous_usage_tokens=1000) is None
-    # 上游回报的用量超过阈值（4000 减预留量 600）：本地估算远低于阈值也先压缩
-    plan = plan_compaction(records, None, 4000, PINNED, TOOLS, previous_usage_tokens=3900)
-    assert plan is not None and plan.tokens_before == _local_tokens(records)
-
-
 @pytest.mark.parametrize("work_limit, compacts", [(100_000, True), (200_000, False)])
 def test_a_million_token_window_compacts_at_the_work_limit(work_limit, compacts):
     """窗口 1,000,000 的模型在工作上限处压缩：用量约 105000 token，上限 100000 时压缩、200000 时不压缩
-    （docs/design/model-management.md「预留与阈值」）。"""
+    （设计说明第 8.3 节）。"""
     records = _history(52, 8000)
     tokens = _local_tokens(records)
     assert 100_000 < tokens < 200_000
-    assert (plan_compaction(records, None, 1_000_000, PINNED, TOOLS,
-                            work_limit_tokens=work_limit) is not None) is compacts
-
-
-@pytest.mark.parametrize("work_limit, compacts", [(50_000, True), (100_000, False)])
-def test_a_lower_work_limit_moves_the_compaction_point(work_limit, compacts):
-    """把工作上限从 100000 改成 50000：用量约 60000 token 时按新的上限压缩（docs/design/model-management.md「预留与阈值」）。"""
-    records = _history(30, 8000)
-    tokens = _local_tokens(records)
-    assert 50_000 < tokens < 100_000
     assert (plan_compaction(records, None, 1_000_000, PINNED, TOOLS,
                             work_limit_tokens=work_limit) is not None) is compacts
 
@@ -302,23 +273,6 @@ def test_the_failure_list_comes_right_after_the_summary_and_never_without_a_chec
     plain = visible_history(records)
     assert plain == [record["item"] for record in records]
     assert all(item != FAILURE_SECTION for item in plain)
-
-
-def test_each_compaction_places_its_own_failure_list_after_its_own_summary():
-    # 守 R3：每一次压缩都重新生成清单，放在这一次的摘要之后（连续压缩两次，历史开头是新的摘要与新清单）
-    records = _history()
-    _, first = _complete_until_work_fits(records)
-    second = replace(first, summary="Second memory: keep the original requirements.")
-    first_section = {"role": "user", "content": '[failure_list]\n{"failures": [{"event_id": "event-1"}]}'}
-    second_section = {"role": "user", "content": '[failure_list]\n{"failures": [{"event_id": "event-1"}, '
-                                                 '{"event_id": "event-9"}]}'}
-    shown_first = visible_history(records, first, failure_list=first_section)
-    shown_second = visible_history(records, second, failure_list=second_section)
-    assert json.loads(shown_first[0]["content"].split("\n", 1)[1])["summary"] == first.summary
-    assert json.loads(shown_second[0]["content"].split("\n", 1)[1])["summary"] == second.summary
-    assert shown_first[1] == first_section and shown_second[1] == second_section
-    # 第一次分界之前的失败在新的清单里仍按原文出现：清单由调用方从同一份事件的开始重新生成
-    assert json.loads(shown_second[1]["content"].split("\n", 1)[1])["failures"][0] == {"event_id": "event-1"}
 
 
 

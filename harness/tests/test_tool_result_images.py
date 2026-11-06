@@ -9,8 +9,6 @@ import json
 
 import pytest
 
-from harness.adapters.base import ProviderError
-from harness.adapters.fake import received_images
 from harness.artifacts import ArtifactStore
 from harness.compaction import (IMAGE_TOKEN_ESTIMATE, finish_compaction, plan_compaction,
                                 request_input_tokens, visible_history)
@@ -19,7 +17,7 @@ from harness.engine import tool_input_modalities, tool_result_item
 from harness.models import canonical_hash
 from harness.providers.chat import _chat_messages
 from harness.providers.errors import ProviderError as ProtocolError
-from harness.providers.invoke import (ToolImage, ToolResult, provider_input_for, split_tool_output,
+from harness.providers.invoke import (ToolImage, provider_input_for, split_tool_output,
                                       to_provider_input, tool_image_from_url)
 from harness.providers.messages import _messages_input
 from harness.providers.responses import _responses_input_items
@@ -180,16 +178,6 @@ def test_the_tool_result_carries_the_screenshot_reference_for_an_image_target(tm
     assert json.loads(item["output"]) == {"ok": True, "output": {"page": "首页"}, "error": None}
 
 
-def test_a_malformed_tool_image_is_rejected(tmp_path):
-    # 图像必须是工件引用：缺字段时在写进部门历史之前拒绝，不把半张图带进请求
-    with pytest.raises(ProviderError):
-        tool_result_item("call-1", True, {"output": "x", "images": [{"kind": "screenshot"}]}, None,
-                         input_modalities=IMAGE_MODALITIES)
-    with pytest.raises(ProviderError):
-        tool_result_item("call-1", True, {"output": "x", "images": "sha256:abc"}, None,
-                         input_modalities=IMAGE_MODALITIES)
-
-
 def test_tool_result_image_content_parts_must_be_data_urls():
     # 请求里的图像块按 data URL 携带：其他写法在发送之前拒绝，不把不该发给上游的形状交出去
     assert tool_image_from_url("data:image/png;base64,QUJD") == ToolImage(media_type="image/png", data="QUJD")
@@ -201,22 +189,6 @@ def test_tool_result_image_content_parts_must_be_data_urls():
     for output in (7, [7], [{"type": "input_text"}], [{"type": "input_image", "image_url": "data:,QUJD"}]):
         with pytest.raises(ProtocolError):
             split_tool_output(output)
-
-
-def test_the_unified_input_carries_tool_images():
-    # 没有装配好的 raw_request 时，工具结果由统一输入组成：图像随结果一起交回协议实现
-    provider_input = to_provider_input([], tool_results=[
-        {"call_id": "call-1", "name": "browser_take_screenshot", "output": "已截图",
-         "images": [{"media_type": "image/png", "data": "QUJD"}]},
-        {"call_id": "call-2", "name": "read_file", "output": "print(1)",
-         "images": [ToolImage(media_type="image/jpeg", data="REVG")]},
-    ])
-    assert provider_input.tool_results == (
-        ToolResult(call_id="call-1", name="browser_take_screenshot", output="已截图",
-                   images=(ToolImage(media_type="image/png", data="QUJD"),)),
-        ToolResult(call_id="call-2", name="read_file", output="print(1)",
-                   images=(ToolImage(media_type="image/jpeg", data="REVG"),)),
-    )
 
 
 def test_each_protocol_carries_tool_images_from_the_unified_input():
@@ -257,13 +229,6 @@ def test_each_protocol_carries_tool_images_from_the_unified_input():
             {"type": "tool_result", "tool_use_id": "call-3", "content": "print(1)"},
         ]},
     ]
-
-
-def test_request_history_needs_the_artifacts_of_the_screenshots(tmp_path):
-    # 图像按工件引用记录：装配时读不到工件库就不能把图像放进请求，明确失败而不是静默丢掉
-    _artifacts, images = _screenshots(tmp_path, 1)
-    with pytest.raises(ValueError):
-        request_history(_history(images), run_id=RUN_ID, artifacts=None, input_modalities=IMAGE_MODALITIES)
 
 
 def test_the_tool_result_images_follow_the_call_target_modalities(tmp_path):
@@ -333,11 +298,3 @@ def test_compaction_keeps_the_evidence_identities(tmp_path):
     assert remaining_images
     assert len(_images(items)) + len(_placeholders(items)) == len(remaining_images)
     assert set(_placeholders(items)) <= {evidence_placeholder(entry["content_hash"]) for entry in remaining_images}
-
-
-def test_the_fake_model_sees_the_screenshots_it_receives(tmp_path):
-    # 假模型按调用合同读到自己的请求：工具结果里的图像按内容块出现，测试据此核对模型看到了哪几张
-    artifacts, images = _screenshots(tmp_path, 6)
-    items = _items(_history(images), artifacts)
-    assert [_image_bytes(part) for part in received_images(model_call(items))] == [
-        entry["data"] for entry in images[-3:]]

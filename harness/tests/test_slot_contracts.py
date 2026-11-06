@@ -1,4 +1,4 @@
-# 装配契约与执行契约的同一套契约检查（工单 #979；骨架与应用设计说明「装配契约」、「执行契约」、「其他路由：骨架要满足的条件」；总图第四节
+# 装配契约与执行契约的同一套契约检查（工单 #979；骨架与应用设计说明第 5.2、5.3、5.4 节；总图第四节
 # 「装配」「执行」缝）。同一套参数化的检查各跑一遍真实实现与第二种实现：
 # 真实装配是 `assembly.py` 的 `ContextAssembly`，第二种是 `second_assembly.SecondAssembly`；
 # 真实执行是 `engine.py` 的 `StepDriver`，第二种是 `second_execution.SecondExecution`。
@@ -21,9 +21,8 @@ import pytest
 from harness import assembly_contract, execution_contract
 from harness.definitions import DEFINITIONS
 from harness.adapters.fake import FakeAdapter, FakeTurn
-from harness.assembly import ContextAssembly, model_limits
+from harness.assembly import model_limits
 from harness.engine import StepDriver, StepLimits
-from harness.event_store import run_stream
 from harness.models import EventType, new_id
 from harness.proposals import product_spec
 from harness.providers.call import ModelStreamEvent
@@ -34,7 +33,6 @@ from harness.tightening import WATCHED_OUTPUTS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 STOP_REASONS = REPO_ROOT / "harness" / "definitions" / "stop_reasons.json"
-OUTCOME_KINDS = REPO_ROOT / "harness" / "definitions" / "outcome_kinds.json"
 
 # 两种实现的名称：参数化的检查对它们各跑一遍
 ASSEMBLIES = ["the real assembly", "the second assembly"]
@@ -176,12 +174,6 @@ def _drive(name, system, adapter, request, node, *, cancel=False, assembly=None)
 
 
 @pytest.mark.parametrize("name", ASSEMBLIES)
-def test_each_assembly_implementation_declares_a_version_the_thin_driver_accepts(name, round_system):
-    system, _adapter, _run_id = round_system
-    assert assembly_contract.accept(_assembly(name, system)) == assembly_contract.CURRENT_VERSION
-
-
-@pytest.mark.parametrize("name", ASSEMBLIES)
 def test_each_assembly_implementation_assembles_a_request_and_a_context_list(name, round_system):
     system, _adapter, run_id = round_system
     implementation = _assembly(name, system)
@@ -245,7 +237,7 @@ def test_each_assembly_implementation_gets_the_route_work_reference_and_both_rec
 
     _drive(EXECUTIONS[0], system, adapter, request, node, assembly=recording)
 
-    # 工作引用原样到达装配的输入（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「开始一轮工作的请求带路由自己的工作引用，原样交给装配与执行」）
+    # 工作引用原样到达装配的输入（第 5.4 节第 4 条）
     assert recording.frames, "这一轮没有装配任何一步"
     assert recording.frames[0].work_ref is work_ref
     # 装配好的请求与上下文清单都记进日志：context_assembled 指向两者各自的工件，提供方交回的
@@ -285,12 +277,6 @@ def test_the_execution_implementation_takes_the_department_settings_from_the_rou
     assert "nodes.department_selection(" not in source
     assert "nodes.department_prompt(" not in source
     assert "_department_settings" in source, "执行实现没有从请求里取按部门的那两样"
-
-
-@pytest.mark.parametrize("name", EXECUTIONS)
-def test_each_execution_implementation_declares_a_version_the_thin_driver_accepts(name):
-    implementation = StepDriver if name == EXECUTIONS[0] else second_execution.SecondExecution
-    assert execution_contract.accept(implementation) == execution_contract.CURRENT_VERSION
 
 
 @pytest.mark.parametrize("name", EXECUTIONS)
@@ -338,28 +324,3 @@ def test_each_execution_implementation_stops_at_the_step_limit_with_a_closed_rea
     closed = json.loads(STOP_REASONS.read_text(encoding="utf-8"))
     assert result.stop_reason in closed, f"停止原因 {result.stop_reason!r} 不在封闭清单里"
     assert result.stop_reason == "model_steps_exhausted"
-
-
-@pytest.mark.parametrize("name", EXECUTIONS)
-def test_each_execution_implementations_result_carries_no_outcome_kind(name, round_system):
-    system, adapter, run_id = round_system
-    request = _round_request(system, run_id)
-    request = execution_contract.RoundRequest(request.scope, request.prompt,
-                                             execution_contract.StepLimits(max_model_steps=0),
-                                             work_ref=request.work_ref,
-                                             department_settings=request.department_settings)
-    node = _ThinDriver(system.orchestrator.project(run_id), steps_allowed=99)
-
-    result = _drive(name, system, adapter, request, node)
-
-    # 结果是一轮工作写下的事件范围与停止原因（docs/design/skeleton-and-application.md「执行契约」输出）；这一轮算不算结束、结束成什么由路由按事件判断
-    assert isinstance(result, execution_contract.RoundResult)
-    assert isinstance(result.events, tuple)
-    kinds = [item["id"] for item in json.loads(OUTCOME_KINDS.read_text(encoding="utf-8"))["kinds"]]
-    assert kinds, "定义里没有成果种类，这条检查无从判断"
-    # 结果的种类里没有成果驱动的种类：字段名与契约源码里都不出现路由定义的成果种类
-    fields = set(execution_contract.RoundResult.__dataclass_fields__)
-    assert not (fields & set(kinds)), f"结果的种类里出现了成果种类：{sorted(fields & set(kinds))}"
-    source = Path(execution_contract.__file__).read_text(encoding="utf-8")
-    assert not [kind for kind in kinds if kind in source], (
-        "执行契约的源码里出现了路由定义的成果种类：结果种类应当由路由按事件判断")

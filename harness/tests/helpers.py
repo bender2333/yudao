@@ -139,23 +139,6 @@ def guidance_reply(text: str = "已按新的要求处理。"):
     return factory
 
 
-def calls_during(function, operation) -> int:
-    # 用 sys.setprofile 记录 function 在 operation 期间（当前线程中）被调用的次数；只观察，不替换
-    code, calls = function.__code__, []
-
-    def profile(frame, event, _arg):
-        if event == "call" and frame.f_code is code:
-            calls.append(1)
-
-    previous = sys.getprofile()
-    sys.setprofile(profile)
-    try:
-        operation()
-    finally:
-        sys.setprofile(previous)
-    return len(calls)
-
-
 def action(name: str, args: dict[str, Any], *, department: str = "engineering",
            preconditions: Preconditions = Preconditions()) -> Action:
     # 一个环境工具调用的动作合同，动作身份每次不同

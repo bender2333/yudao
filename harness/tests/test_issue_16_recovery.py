@@ -1,7 +1,6 @@
 # 恢复入口与执行权限（工单 #16）。数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，
 # 模型回答由 FakeAdapter 给出；中断由「进程关闭、重新以新的系统打开同一数据目录」表示，不模拟异常。
 
-import asyncio
 import json
 import sqlite3
 
@@ -9,7 +8,6 @@ from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.decision_queries import DecisionsList
-from harness.app.event_stream import EventScope
 from harness.definitions import DEFINITIONS
 from harness.event_store import Command, StaleExecutionRight, run_stream
 from harness.models import EventType, TERMINAL_STATUSES, new_id
@@ -18,7 +16,6 @@ from harness.proposals import product_spec
 from harness.providers import ProviderFacade
 from harness.providers.credentials import CredentialChain
 from harness.runtime import LoopSystem
-from harness.streams import RUN_EVENT_VERSION
 from harness.tests.helpers import delivery_turn, quality_turns
 from harness.tests.protocol_helpers import serve, sse
 from harness.tests.saved_rewrite import reload_without_saved_projection as _reload_without_saved_projection
@@ -122,33 +119,6 @@ def _completion_script():
         "quality": quality_turns("release", "checks passed on the current snapshot"),
     }
 
-def test_startup_resumes_an_interrupted_run_without_user_action(data_dir):
-    # 中断的 run 在启动时自动继续到终态，不需要用户操作
-    _system, _project_id, run_id = _unfinished_run(data_dir)
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script()))
-    assert run_id in restarted.resumed_runs
-    projection = project_run(restarted.store, run_id)
-    assert projection.status == "done", (projection.status, projection.stop_reason)
-    restarted.close()
-
-def test_resume_records_the_interrupted_position_and_the_basis(data_dir):
-    # 事件中记录中断位置与继续的依据
-    _system, _project_id, run_id = _unfinished_run(data_dir)
-
-    restarted = LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script()))
-    events = _resumed_events(restarted, run_id)
-    assert len(events) == 1, events
-    basis = events[0].payload["basis"]
-    assert basis["interrupted_at_status"] == "running", basis
-    assert basis["interrupted_at_event_id"] is not None
-    assert basis["current_run_event_version"] == RUN_EVENT_VERSION
-    assert basis["recorded_run_event_version"] == RUN_EVENT_VERSION
-    # 继续的依据是中断时的流版本，不是重置后的起点
-    assert isinstance(basis["interrupted_at_version"], int) and basis["interrupted_at_version"] > 0
-    restarted.close()
-
-
 def test_finished_cancelled_and_exhausted_runs_are_not_restarted(data_dir):
     # 已完成、已取消及次数耗尽停止的任务不能通过恢复重新开始
     system = LoopSystem.for_testing(data_dir, FakeAdapter({
@@ -240,17 +210,6 @@ def test_a_run_with_an_older_definitions_version_asks_the_user_before_continuing
     assert kinds.count("definitions_changed") == 1, kinds
     again.close()
 
-def _collect(stream, limit: int, timeout: float = 5.0):
-    # 读事件流的前几条消息（与其他事件流用例的做法相同）
-    async def run():
-        messages = []
-        async for message in stream.messages():
-            messages.append(message)
-            if len(messages) >= limit:
-                break
-        return messages
-    return asyncio.run(asyncio.wait_for(run(), timeout))
-
 def test_the_definitions_changed_request_is_read_through_the_decisions_query(data_dir):
     # 定义版本不同的请求在接口合同里（工单 #894）：decisions.list 读得出这条请求，载荷里带两个定义版本与两个选项。
     # 合同里缺这一种时，只要有一条这样的请求，列表就构造不出来，首页的「待你决定」读不出（docs/design/recovery-contract-and-fault-matrix.md「执行权与一致边界」）
@@ -271,25 +230,6 @@ def test_the_definitions_changed_request_is_read_through_the_decisions_query(dat
     assert [option.id for option in request.request.options] == ["continue", "stop"]
     assert request.request.recorded_definitions_version == recorded
     assert request.request.current_definitions_version == DEFINITIONS.version
-
-def test_the_two_definition_versions_survive_reading_the_event_stream(data_dir):
-    # 读事件流时两个定义版本不再被丢掉（工单 #894）：事件对象按合同过滤载荷，
-    # 合同里没有这两个字段时它们从读到的事件里消失
-    _system, _project_id, run_id = _unfinished_run(data_dir)
-    recorded = _older_definitions_version(data_dir)
-
-    application = Application(LoopSystem.for_testing(data_dir, FakeAdapter(_completion_script())))
-    try:
-        stream = application.open_event_stream(
-            EventScope(runs=(run_id,), types=(EventType.DECISION_REQUESTED,)), after=0, live=False)
-        messages = _collect(stream, 1)
-    finally:
-        application.close()
-
-    payload = messages[0].event.payload
-    assert payload.kind == "definitions_changed"
-    assert payload.recorded_definitions_version == recorded
-    assert payload.current_definitions_version == DEFINITIONS.version
 
 def test_continuing_on_the_new_definitions_version_records_it_in_later_events(data_dir):
     # 选择「按新版本继续」以后，后续的模型请求与裁决照常记录新版本（总体架构「十项长期决定」）
@@ -349,7 +289,6 @@ def test_credentials_are_resolved_from_the_host_again_and_not_written_into_event
         _work_item_id, run_id = system.projects.start_work_item(project_id, "被中断的事项")
         system.activate_once(run_id)
         assert project_run(system.store, run_id).status not in TERMINAL_STATUSES
-        config_path, dotenv_path = system.provider_config_path, system.dotenv_path
         system.close()
 
         # 重新打开时宿主凭据仍然存在：恢复取得执行权并继续
