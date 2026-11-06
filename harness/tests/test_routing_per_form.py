@@ -12,6 +12,9 @@
 用例（路由实例、注入的可选性、会话的部门清单、默认收件人），按分层「一个文件中的测试用到
 不同层级的资源时，整个文件登记为其中最高的一层」一起登记为集成层。
 
+工单 #1558 补上同一件事的最后一处：一轮有没有交出正式成果，也按事项冻结的那份定义的提议方式判断，
+`harness/watched_outputs.py` 不再留模块加载时算出的全局常量。
+
 守 R3（路线图阶段二写明的「形态随事项冻结」：同一个实例里两份形态各自按自己冻结的那份定义取值）；
 R2 的两条也守：路由契约只增（旧的实现照旧被接受、不被调用）与建会话的部门清单来自定义。
 """
@@ -34,7 +37,8 @@ from harness.app.form_commands import OrganizationAdopt
 from harness.app.form_queries import ProjectOrganization
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, load_definitions
 from harness.environment import Workspaces
-from harness.models import RunProjection, SessionRecord
+from harness.kernel_events import Event
+from harness.models import EventType, RunProjection, SessionRecord
 from harness.proposals import ask_turn, delivery_turn, product_spec
 from harness.runtime import LoopSystem, load_forms
 from harness.sessions import SessionFactory
@@ -252,6 +256,82 @@ def test_the_default_ask_recipient_says_so_when_no_department_can_submit_a_produ
     monkeypatch.setattr(proposals, "DEFINITIONS", _NoProduct())
     with pytest.raises(ValueError, match="product_spec"):
         ask_turn()
+
+
+# ---------------------------------------------------------------------------
+# 一轮有没有交出正式成果：按事项冻结的那份定义的提议方式判断
+# ---------------------------------------------------------------------------
+
+# 第二份形态的提议方式少了两种：建档用的结构说明与基线核验。骨架设计说明「其他路由：骨架要满足的条件」
+# 第 2、3 条：每种路由有自己的一份定义，工具、成果种类与提议方式随它所在的那一份；这里按定义的结构
+# 造一份合法副本，其余内容不改（工单 #1558）
+ONBOARDING_METHODS = ("submit_structure", "submit_baseline_review")
+ONBOARDING_KINDS = ("structure", "baseline_review")
+REDUCED_FORM = "changes_only"
+
+
+def reduced_definitions() -> Any:
+    """默认定义的一份副本：提议方式去掉建档用的两种，工具与成果种类跟着改到一致。"""
+    declared = DEFINITIONS.routing_definition()
+    routing = declared.model_copy(update={
+        "proposal_methods": tuple(method for method in declared.proposal_methods
+                                  if method not in ONBOARDING_METHODS)})
+    group = DEFINITIONS.outcome_kinds.groups[0]
+    outcome_kinds = DEFINITIONS.outcome_kinds.model_copy(update={
+        "groups": (group.model_copy(update={
+            "kinds": tuple(kind for kind in group.kinds if kind not in ONBOARDING_KINDS)}),)})
+    tools = {name: tool.model_copy(update={"proposal": None}) if name in ONBOARDING_METHODS else tool
+             for name, tool in DEFINITIONS.tools.items()}
+    return DEFINITIONS.model_copy(update={
+        "version": "sha256:changes-only-watched-outputs",
+        "routings": DEFINITIONS.routings.model_copy(update={"routings": (routing,)}),
+        "outcome_kinds": outcome_kinds,
+        "tools": tools,
+    })
+
+
+def _event(kind: str, payload: dict[str, Any]) -> Event:
+    # 一条真实的事件：这一轮的会话是工程在 run 里的 ses_engineering
+    return Event(
+        event_id="evt", run_id="run", type=kind, role=None, parent_event_id=None,
+        state_before="running", state_after="running", payload=payload, artifact_hashes=[],
+        session_id="ses_engineering", provider=None, model=None, context_digest=None, stop_reason=None,
+        error=None, created_at="2026-11-07T00:00:00Z", position=1, stream="run:run", stream_version=1,
+        project_id=None, work_item_id=None, department="engineering")
+
+
+def _round(*tool_names: str) -> list[Event]:
+    # 工程这一轮的事件：开工，然后调用了这些工具（提议方式就是提交类工具的调用）
+    return [
+        _event(EventType.DEPARTMENT_ACTIVATED, {"activation_id": "act"}),
+        *[_event(EventType.TOOL_CALLED, {"name": name}) for name in tool_names],
+    ]
+
+
+def test_the_round_outcome_reads_the_proposal_methods_of_the_item_form():
+    # 验收第 1、2 条：两份形态的提议方式不同时，同一个实例里各按自己那一份判断这一轮有没有交出正式成果。
+    # 同一段真实事件与投影下，默认形态把建档用的提交工具记作正式成果，少了这两种的那一份记作文字回答；
+    # 两份都认得的提交工具、与都不是提议方式的工具给出相同的结论
+    reduced = reduced_definitions()
+    # 这一份副本是合法的一份成果驱动定义：工具与成果种类跟着提议方式改到一致，路由自己的校验通过
+    ROUTING.check_definition(reduced)
+    forms = load_forms({DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS),
+                        REDUCED_FORM: (reduced, WATCHED_OUTPUTS)}, _Store())
+    view = _new_input_view()
+
+    def outcome(form: str, *tool_names: str) -> str:
+        return forms[form].routing.round_end(view, _round(*tool_names), department="engineering",
+                                             session_id="ses_engineering", activation_id="act").outcome
+
+    assert (outcome(DEFAULT_FORM, "submit_structure"), outcome(REDUCED_FORM, "submit_structure")) == (
+        "proposal_accepted", "text_reply")
+    assert (outcome(DEFAULT_FORM, "submit_delivery"), outcome(REDUCED_FORM, "submit_delivery")) == (
+        "proposal_accepted", "proposal_accepted")
+    assert (outcome(DEFAULT_FORM, "read_file"), outcome(REDUCED_FORM, "read_file")) == (
+        "text_reply", "text_reply")
+    # 登记表里的那一份没有注入，照旧读进程加载的定义：同一段事件下仍记正式成果，默认定义下的行为不变
+    assert ROUTING.round_end(view, _round("submit_structure"), department="engineering",
+                             session_id="ses_engineering", activation_id="act").outcome == "proposal_accepted"
 
 
 # ---------------------------------------------------------------------------
