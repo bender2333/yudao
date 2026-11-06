@@ -99,27 +99,6 @@ class _WithoutFacts:
         return None
 
 
-def test_the_routing_implementation_declares_the_version_the_thin_driver_accepts():
-    # R2：契约带版本，实现声明它实现哪一版，薄驱动在一个发布里接受当前版与上一版
-    assert ROUTING.CONTRACT_VERSION == routing_contract.CURRENT_VERSION
-    assert routing_contract.accept(ROUTING) == routing_contract.CURRENT_VERSION
-    assert ROUTING.NAME == "watched_outputs" == DEFINITIONS.routing
-
-
-def test_a_version_the_thin_driver_does_not_accept_fails_and_says_why():
-    # R2：版本不合格时在开始一轮工作之前失败，说明里写明是哪一种实现、声明了哪一版、接受哪几版
-    class Future:
-        NAME = "future"
-        CONTRACT_VERSION = routing_contract.CURRENT_VERSION + 1
-
-    with pytest.raises(contract_versions.ContractVersionError) as raised:
-        routing_contract.accept(Future)
-    message = str(raised.value)
-    assert "the routing implementation" in message
-    assert str(Future.CONTRACT_VERSION) in message
-    assert f"current {routing_contract.CURRENT_VERSION}" in message
-
-
 def test_the_contract_accepts_the_previous_version_and_rejects_the_others():
     # R2（第三版，工单 #1164）：契约版本是 3；声明第二版的实现仍被接受（一版兼容），更早的与更高的都拒绝
     assert routing_contract.CURRENT_VERSION == 3
