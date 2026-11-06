@@ -127,7 +127,7 @@ def inventory_markdown(base: set[str], head: set[str], base_layers: dict[str, st
     order = [*LAYERS, UNREGISTERED]
     lines = ["### 用例变化", "",
              "PR 合并前后收集到的用例（不运行）。删除的用例要与工单和交付说明逐条对上"
-             "（测试分层设计说明第 10 节第 5 条）；改名的用例显示为一删一增。", "",
+             "（docs/design/test-pyramid.md「测试的写法」第 5 条）；改名的用例显示为一删一增。", "",
              "| 层 | 合并前 | 合并后 | 新增 | 删除 | 移入 | 移出 |",
              "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
     for layer in order:

@@ -1,5 +1,5 @@
-// 简洁的项目页（最低一级：一个角色直做，可加一个核验角色）：对话、成果库、设置，加新建项目的模板卡与换模板。
-// 判断用 org.js 的 O.lean(p)；假进展用定时器，数据存在项目的 p.lean 里（内存，刷新就回原样）。
+// 各协作方式共用的项目线程、新建项目与成果库。
+// 假进展使用事项冻结的组织；数据存在项目的 p.lean 里，刷新恢复示例。
 (function () {
   'use strict';
   const Y19 = window.Y19;
@@ -16,24 +16,22 @@
   let seq = 0;
 
   // 设计说明 4.12 的表
-  const SENT = { three: '产品写需求、工程做、质检核验，放行才算完成', one_out: '交给一个外部 agent 做，做完就结束，没有人核验', one_own: '一个人做，做完就结束，没有人核验', several: '几个人商量着做，一个人交完成，没有人核验', three_ops: '发布带还没有' };
-  const ORDER = ['three', 'one_out', 'one_own', 'several', 'three_ops'];
+  const SENT = { three: '产品、工程、质检按成果协作，可在组织中增减部门', one_out: '交给外部 agent，交付后以开环完成结束', one_own: '直接说要求，一个角色负责完成', several: '一个角色主要执行，其他角色按需协助', pool_preview: '发布工作单元，由角色认领并逐项核验', ops_preview: '按成果协作，增加运行环境、故障与部署' };
+  const ORDER = ['one_own', 'several', 'three', 'pool_preview', 'ops_preview', 'one_out'];
   const cards = (act, data) => ORDER.map((id) => {
-    const ok = id !== 'three_ops';
-    return '<button type="button" class="ln-card' + (ok ? '' : ' is-off') + '"' + (ok ? ' data-act="' + act + '" data-form="' + id + '"' : ' disabled') + (data || '') + '><strong>' + esc(ok ? O.formName(id) : '三部门加运维') + (id === 'three' ? ui.tag('默认') : '') + '</strong><small>' + esc(SENT[id]) + '</small></button>';
+    return '<button type="button" class="ln-card" data-act="' + act + '" data-form="' + id + '"' + (data || '') + '><strong>' + esc(id === 'three' ? '按成果协作' : O.formName(id)) + (id.endsWith('_preview') ? ui.tag('设计预览') : '') + '</strong><small>' + esc(SENT[id]) + '</small></button>';
   }).join('');
 
   // ---------------------------------------------------------------- 级别：页面跟着合成结果伸缩（角色数、有无核验角色、是否按成果轮转）
 
-  const lv = (p) => { const c = p.composed; return { n: c.depts.length, ver: O.verifiers(c).length > 0, three: c.rotation !== 'direct' }; };
+  const lv = (p) => { const c = p.composed; return { n: c.depts.length, ver: O.verifiers(c).length > 0, three: c.rotation === 'by_outcome', pool: c.rotation === 'pool' }; };
   const recv = (p) => O.firstReceivers(p.composed)[0] || { id: 'engineering', name: '工程' };
   const nm = (p, id) => O.deptName(p, id);
-  const vid = (p) => (O.verifiers(p.composed)[0] || {}).id;
-  const partner = (p) => p.composed.depts.find((d) => !d.verifies && d.id !== recv(p).id) || null; // 直做里的另一个做事角色（几个角色）
 
   // ---------------------------------------------------------------- 数据
 
   function seed(p) {
+    if (p.demoThread) return clone(p.demoThread);
     const you = (item, text, tag, m) => ({ t: 'you', item, text, tag, at: T(m) });
     const fold = (item, key, lab, roles, kids, m) => ({ t: 'fold', item, key, lab, roles, open: false, kids: kids.map((k, i) => ({ who: k[0], text: k[1], at: T(m + i) })) });
     const ask = (item, who, text, m) => ({ t: 'ask', item, who, text, options: ['要', '不要'], answer: '', at: T(m) });
@@ -69,15 +67,19 @@
       fold('w1', 'pe', '产品与工程往来', ['product', 'engineering'], [['product', '导出订单为 CSV：按创建时间倒序，最多 5 万行。'], ['engineering', '文件名与编码怎么定？'], ['product', 'orders-日期.csv，UTF-8 带 BOM。']], -56),
       ask('w1', 'product', '金额列要不要带货币符号？', -20)
     ] };
-    return { vers: [], phase: null, note: '', model: '', cur: null, stage: null, queue: [], to: null, manual: false, only: false, openV: {}, msgs: [] };
+    const item = p.items.find((it) => it.status === 'working');
+    return { vers: [], phase: null, note: '', model: '', cur: item ? item.id : null, stage: null, queue: [], to: null, manual: false, only: false, openV: {}, msgs: item ? [{ t: 'sep', item: item.id }, { t: 'you', item: item.id, text: item.title, tag: '新事项', at: item.created }, { t: 'fold', item: item.id, key: 'prog', lab: '工作进展', roles: [item.dept], open: false, kids: [{ who: item.dept, text: item.reason || '正在工作。' }] }] : [] };
   }
   const st = (p) => p.lean || (p.lean = seed(p));
+  Y19.thread = { state: st, templates: cards };
   const active = (p) => { const it = st(p).cur && H.item(p, st(p).cur); return it && it.status === 'working' ? it : null; };
-  const isOpen = (it) => !it.org || O.ending(it.org.composed).open;
   const vname = (p) => (O.verifiers(p.composed)[0] || {}).name || '';
   const eng = (p) => nm(p, 'engineering');
   const here = (p) => Y19.state.route.params.project === p.id && $('ln-thread');
   const push = (p, m) => { m.at = m.at || T(++seq); st(p).msgs.push(m); };
+  function readGuidance(p, ids, item) {
+    st(p).msgs.filter((m) => ids.includes(m.target) && !m.readAt && (!m.item || m.item === item)).forEach((m) => { m.readAt = T(++seq); });
+  }
   // 折叠行：同一个事项同一种往来只有一行，往来都进去
   function fold(p, it, key, lab, roles, who, text) {
     const ms = st(p).msgs;
@@ -85,136 +87,179 @@
     if (!f) ms.push(f = { t: 'fold', item: it ? it.id : '', key, lab, roles, open: false, kids: [] });
     f.kids.push({ who, text, at: T(++seq) });
   }
-  Y19.leanDecisions = (p) => (lv(p).n > 1 ? st(p).msgs.filter((m) => m.t === 'ask' && !m.answer).length : 0);
+  Y19.leanDecisions = (p) => st(p).msgs.filter((m) => m.t === 'ask' && !m.answer && p.items.some((it) => it.id === m.item && !['adopted', 'open_closed', 'stopped'].includes(it.status))).length + H.decisions(p.id).length;
 
   // ---------------------------------------------------------------- 收件人
 
   function options(p) {
-    const L = lv(p), r = recv(p), o = [{ k: 'new', label: '开始一个新事项' }];
-    if (L.three) o.push({ k: 'append', label: '追加输入（' + r.name + '接，重新验收）' });
-    (L.three ? p.composed.depts : [r]).forEach((d) => o.push({ k: 'g:' + d.id, label: '给' + nm(p, d.id) + '的指导' }));
+    const it = active(p), c = it ? it.org.composed : p.composed, L = { three: c.rotation === 'by_outcome', pool: c.rotation === 'pool' }, r = O.firstReceivers(c)[0], o = [{ k: 'new', label: '开始新事项' }];
+    if (L.three && it) o.push({ k: 'append', label: '追加输入（' + r.name + '接，重新验收）' });
+    c.depts.forEach((d) => o.push({ k: 'g:' + d.id, label: '指导' + nm(p, d.id) }));
     return o;
   }
-  // 正在工作的部门或角色：三部门跟着事项走到哪一步
-  function working(p) {
-    const L = lv(p), s = st(p);
-    if (!L.three) return recv(p).id;
-    return s.phase && s.phase.state === 'verify' ? vid(p) : s.stage <= 1 ? recv(p).id : 'engineering';
-  }
+  // 默认收件人跟随当前事项实际正在工作的角色。
+  function working(p) { const it = active(p); return it ? it.dept : recv(p).id; }
   const dflt = (p) => (active(p) ? 'g:' + working(p) : 'new');
   const cur = (p) => { const s = st(p); return s.manual && options(p).some((o) => o.k === s.to) ? s.to : dflt(p); };
   function hintText(p, k) {
-    const r = recv(p), it = active(p);
+    const it = active(p), r = k === 'append' && it ? O.firstReceivers(it.org.composed)[0] : recv(p);
     if (k === 'new') return it ? '排在「' + it.title + '」后面，它做完才开始' : r.name + '接，马上开始';
     if (k === 'append') return r.name + '接，已有的交付要重新验收';
-    return '发给' + nm(p, k.slice(2)) + '，它下一轮读到';
+    const target = k.slice(2), scoped = Y19.collaboration && Y19.collaboration.guidanceItem(p, target);
+    return '发给' + nm(p, target) + (scoped ? ' · 当前事项「' + scoped.title + '」' : ' · 部门指导') + '，下一轮读取';
   }
   function toHtml(p) {
     const k = cur(p);
-    return '<div class="ln-pills" role="radiogroup" aria-label="收件人"><span class="ln-to-label">发给</span>' + options(p).map((o) => '<button type="button" role="radio" aria-checked="' + (o.k === k) + '" class="ln-pill' + (o.k === k ? ' is-on' : '') + '" data-act="ln.to" data-k="' + esc(o.k) + '">' + esc(o.label) + '</button>').join('') + '</div>' +
+    const target = k.startsWith('g:') ? k : 'g:' + (Y19.collaboration ? Y19.collaboration.selected(p) : working(p));
+    const visible = options(p).filter((o) => !o.k.startsWith('g:') || o.k === target);
+    return '<div class="ln-pills" role="radiogroup" aria-label="发送用途"><span class="ln-to-label">发送用途</span>' + visible.map((o) => '<button type="button" role="radio" aria-checked="' + (o.k === k) + '" class="ln-pill' + (o.k === k ? ' is-on' : '') + '" data-act="ln.to" data-k="' + esc(o.k) + '">' + esc(o.label) + '</button>').join('') + '</div>' +
       '<div id="ln-hint" class="ln-hint">' + esc(hintText(p, k)) + '</div>';
   }
-  A('ln.to', (el) => { const p = H.project(H.pid()), s = st(p); s.to = el.dataset.k; s.manual = true; $('ln-to').innerHTML = toHtml(p); });
+  A('ln.to', (el) => { const p = H.project(H.pid()), s = st(p); s.to = el.dataset.k; s.manual = true; if (s.to.startsWith('g:')) s.focusDept = s.to.slice(2); refresh(p); });
+  document.addEventListener('keydown', (ev) => {
+    if (!ev.target.matches('.ln-pill') || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(ev.key)) return;
+    const choices = Array.from(document.querySelectorAll('.ln-pill')), at = choices.indexOf(ev.target);
+    const index = ev.key === 'Home' ? 0 : ev.key === 'End' ? choices.length - 1 : (at + (ev.key === 'ArrowRight' ? 1 : -1) + choices.length) % choices.length;
+    ev.preventDefault(); const key = choices[index].dataset.k; choices[index].click();
+    Array.from(document.querySelectorAll('.ln-pill')).find((el) => el.dataset.k === key).focus();
+  });
 
   // ---------------------------------------------------------------- 对话
 
   function threadHtml(p) {
     const s = st(p), L = lv(p);
+    const archived = new Set();
+    let section = null;
+    s.msgs.forEach((m) => {
+      if (m.t === 'sep') section = m.item;
+      if ((m.t === 'done' || m.t === 'rel') && section && !s.only && !(s.openItems || {})[section]) archived.add(section);
+    });
+    let currentSection = null;
     const link = (m) => (L.n > 1 ? '<button type="button" class="y19-link" data-go="#/p/' + p.id + '/outcomes?v=' + m.vno + '">看这一版</button>'
       : '<button type="button" class="y19-link" data-act="ln.ver" data-v="' + m.vno + '">看这一版</button>');
     const vdiff = (m) => { const v = s.vers.find((x) => x.n === m.vno); return L.n === 1 && s.openV[m.vno] && v ? '<div class="ln-diff"><b>改了的文件</b><ul>' + v.files.map((f) => '<li>' + esc(f) + '</li>').join('') + '</ul>' + ui.pre(v.diff.join('\n')) + '</div>' : ''; };
     return s.msgs.map((m, i) => {
+      if (m.t === 'sep') currentSection = m.item;
+      if (archived.has(currentSection) && !['sep', 'done', 'rel'].includes(m.t) && !(m.target && !m.item)) return '';
       if (s.only && m.t !== 'done' && m.t !== 'rel') return '';
       const who = (name, cls, body, tag) => '<div class="ln-msg ' + cls + '"><div class="ln-meta">' + esc(name) + ' · ' + esc(ui.time(m.at)) + '</div>' + (tag ? '<div class="ln-tag">' + esc(tag) + '</div>' : '') + '<div class="ln-bubble">' + body + '</div></div>';
       switch (m.t) {
-        case 'sep': { const it = H.item(p, m.item); const res = { working: '进行中', open_closed: '开环完成', adopted: '放行', stopped: '已停止' }[it.status]; return '<div class="ln-sep"><span>' + esc(it.title) + ' · ' + res + '</span></div>'; }
+        case 'sep': { const it = H.item(p, m.item); if (!it) throw new Error('线程引用了不存在的事项：' + m.item); const res = { working: '进行中', open_closed: '开环完成', adopted: '放行', stopped: '已停止' }[it.status] || Y19.ITEM_STATUS[it.status][0]; return '<div class="ln-sep"><span>' + esc(it.title) + ' · ' + res + '</span>' + (['adopted', 'open_closed'].includes(it.status) ? '<button class="y19-link" type="button" data-act="ln.item-toggle" data-item="' + esc(it.id) + '">' + (archived.has(it.id) ? '展开对话' : '收起对话') + '</button>' : '') + '</div>'; }
         case 'you': return who('你', 'is-you', esc(m.text), m.tag);
         case 'ans': return who('你的回答', 'is-you', esc(m.text));
         case 'queue': return '<div class="ln-sep"><span>' + esc(m.text) + '</span></div>';
         case 'fold': return '<div class="ln-fold" id="ln-fold-' + i + '"><button type="button" class="ln-fold-head" aria-expanded="' + m.open + '" data-act="ln.fold" data-i="' + i + '">' + esc(m.lab) + ' ' + m.kids.length + ' 条</button>' +
           (m.open ? '<ul class="ln-fold-body">' + m.kids.map((k) => '<li><b>' + esc(nm(p, k.who)) + '</b> ' + esc(k.text) + '</li>').join('') + '</ul>' : '') + '</div>';
         case 'ask': return who(nm(p, m.who) + '要你决定', 'is-ask' + (m.answer ? ' is-answered' : ''), '<b>' + esc(m.text) + '</b><div class="ln-opts">' + m.options.map((o) => '<button type="button" class="y19-btn small' + (m.answer === o ? ' primary' : '') + '"' + (m.answer ? ' disabled' : ' data-act="ln.answer" data-i="' + i + '" data-o="' + esc(o) + '"') + '>' + esc(o) + '</button>').join('') + '</div>' + (m.answer ? '<small class="y19-muted">已回答：' + esc(m.answer) + '</small>' : ''));
-        case 'done': return who(eng(p), 'is-done', esc(m.text) + ' ' + link(m)) .replace(/<\/div><\/div>$/, vdiff(m) + '</div></div>');
-        case 'rel': return who(vname(p), 'is-done', esc(m.text) + ' ' + link(m)).replace(/<\/div><\/div>$/, vdiff(m) + '</div></div>');
+        case 'notice': case 'stop': return '<div class="ln-notice">' + esc(m.text) + '</div>';
+        case 'done': return who(m.who || eng(p), 'is-done', esc(m.text) + ' ' + link(m)) .replace(/<\/div><\/div>$/, vdiff(m) + '</div></div>');
+        case 'rel': return who(m.who || vname(p), 'is-done', esc(m.text) + ' ' + link(m)).replace(/<\/div><\/div>$/, vdiff(m) + '</div></div>');
         default: return who('你', '', esc(m.text));
       }
     }).join('') || ui.empty(s.only ? '还没有交完成的事项。' : '还没有事项。在下面写一句，就开始做。');
   }
   const barHtml = (p) => {
     const e = p.elapsed;
-    return '<div class="ln-time-row"><span>已用 ' + esc(ui.duration(e.used)) + ' / 上限 ' + esc(ui.duration(e.limit)) + '</span>' + (lv(p).n === 1 ? '<label class="ln-only"><input type="checkbox" data-act="ln.only"' + (st(p).only ? ' checked' : '') + '> 只看交付</label>' : '') +
+    return '<div class="ln-time-row"><span>' + (active(p) ? '正在处理 · ' : '') + '已用 ' + esc(ui.duration(e.used)) + ' / 上限 ' + esc(ui.duration(e.limit)) + '</span>' + (lv(p).n === 1 ? '<label class="ln-only"><input type="checkbox" data-act="ln.only"' + (st(p).only ? ' checked' : '') + '> 只看交付</label>' : '') +
       (active(p) ? '<button type="button" class="y19-btn small danger" data-act="ln.stop">停止</button>' : '') + '</div>' + ui.meter(e.used, e.limit);
   };
-  // 线程旁：几个角色是「谁在做什么」，三部门是窄带
-  function sideHtml(p) {
-    const L = lv(p), it = active(p), s = st(p), ph = s.phase;
-    if (L.three) return '<div class="ln-band" aria-label="走到哪一步">' + ['输入', '需求', '交付', '放行'].map((n, i) => '<span class="ln-step' + (it && i === s.stage ? ' is-on' : it && i < s.stage ? ' is-past' : '') + '">' + n + '</span>').join('<i>→</i>') + (it ? '' : '<small class="y19-muted">没有事项在做</small>') + '</div>';
-    if (L.n < 2) return '';
-    const r = recv(p).id;
-    return '<section class="ln-who"><h3>谁在做什么</h3>' + p.composed.depts.map((d) => {
-      const t = d.verifies ? (ph && ph.state === 'verify' ? '在核验「' + it.title + '」' : '等' + eng(p) + '交完成')
-        : d.id === r ? (it ? (ph ? '已交完成，等' + vname(p) + '核验' : '在做「' + it.title + '」') : '空闲') : '空闲，等' + eng(p) + '的询问';
-      return '<button type="button" class="ln-who-row" data-act="ln.who" data-r="' + esc(d.id) + '"><strong>' + esc(d.name) + '</strong><span>' + esc(t) + '</span></button>';
-    }).join('') + '</section>';
+  const sideHtml = (p) => Y19.collaboration.render(p);
+  function inputLabel(p) {
+    const k = cur(p), input = $('ln-text');
+    if (!input) return;
+    input.setAttribute('aria-label', k.startsWith('g:') ? '指导' + nm(p, k.slice(2)) : k === 'append' ? '追加当前事项的输入' : '开始新事项');
+    input.placeholder = k.startsWith('g:') ? '给' + nm(p, k.slice(2)) + '的指导……' : k === 'append' ? '补充当前事项的要求……' : '说说你想做什么……';
   }
   function refresh(p, scroll) {
     if (!here(p)) return;
+    const panel = $('ln-who'), panelScroll = panel.scrollTop;
+    const focused = document.activeElement, focusKey = focused && focused.dataset && focused.dataset.act ? { act: focused.dataset.act, dept: focused.dataset.dept, k: focused.dataset.k } : null;
     $('ln-thread').innerHTML = threadHtml(p); $('ln-bar').innerHTML = barHtml(p); $('ln-to').innerHTML = toHtml(p); $('ln-who').innerHTML = sideHtml(p);
+    panel.scrollTop = panelScroll; inputLabel(p);
+    if (focusKey && !focused.isConnected) {
+      const replacement = Array.from(document.querySelectorAll('[data-act]')).find((el) => el.dataset.act === focusKey.act && el.dataset.dept === focusKey.dept && el.dataset.k === focusKey.k);
+      if (replacement) replacement.focus({ preventScroll: true });
+    }
     if (scroll) $('ln-thread').scrollTop = 1e9;
   }
 
   function conversation(ctx, p) {
-    return '<div class="ln"><div id="ln-bar" class="ln-time">' + barHtml(p) + '</div><div id="ln-who">' + sideHtml(p) + '</div>' +
-      '<div id="ln-thread" class="ln-thread">' + threadHtml(p) + '</div>' +
-      '<form id="ln-form" class="ln-input" autocomplete="off"><div id="ln-to">' + toHtml(p) + '</div><div class="ln-row"><input type="text" class="y19-input" id="ln-text" aria-label="写给' + esc(recv(p).name) + '" placeholder="在这里写"><button type="submit" class="y19-btn primary">发送</button></div></form></div>';
+    const ds = H.decisions(p.id), extra = p.items.filter((it) => it.id !== st(p).cur && !['adopted', 'open_closed', 'stopped'].includes(it.status));
+    const decisions = ds.length ? '<details class="ws-project-decisions"><summary>待你决定 · ' + ds.length + '</summary>' + Y19.cards.list(p.id) + '</details>' : '';
+    const other = extra.length || p.provider_wait.length || p.interruptions.length ? '<details class="ws-other-work"><summary>其他事项与运行情况 · ' + extra.length + ' 项</summary><div class="ws-detail-body">' + extra.map((it) => '<a href="#/p/' + p.id + '/w/' + it.id + '">' + esc(it.title) + ' · ' + esc(Y19.ITEM_STATUS[it.status][0]) + '</a>').join('') + (p.provider_wait.length ? '<p>等待模型服务：' + p.provider_wait.length + ' 项</p>' : '') + (p.interruptions.length ? '<p>中断待恢复：' + p.interruptions.length + ' 项，请处理上面的决定请求。</p>' : '') + '<button type="button" class="y19-link" data-act="ws.advanced" data-to="#/p/' + p.id + '">查看完整运行详情</button></div></details>' : '';
+    const multi = (active(p) ? active(p).org.composed : p.composed).depts.length > 1;
+    return '<div class="ln' + (multi ? ' is-collaborative' : ' is-single') + '">' + (p.designPreview ? '<p class="ws-preview">设计预览 · 所有操作仅使用本页示例数据</p>' : '') + '<div id="ln-bar" class="ln-time">' + barHtml(p) + '</div><div class="ws-workspace"><div class="ws-conversation">' +
+      decisions + other + '<div id="ln-thread" class="ln-thread">' + threadHtml(p) + '</div>' +
+      '<form id="ln-form" class="ln-input" autocomplete="off"><div id="ln-to">' + toHtml(p) + '</div><div class="ln-row"><input type="text" class="y19-input" id="ln-text" placeholder="说说你想做什么……"><button type="submit" class="y19-btn primary">发送</button></div></form></div><aside id="ln-who" class="ws-collaboration" aria-label="部门结构与运行状态">' + sideHtml(p) + '</aside></div></div>';
   }
-  function convMount(ctx, el, p) { const i = $('ln-text'); if (i) i.focus(); setTimeout(() => { const t = $('ln-thread'); if (t) t.scrollTop = 1e9; }, 0); }
+  function convMount(ctx, el, p) { inputLabel(p); const i = $('ln-text'); if (i) i.focus(); setTimeout(() => { const t = $('ln-thread'); if (t) t.scrollTop = 1e9; }, 0); }
 
-  // 新事项的假进展，约 6 秒走完：
-  // 三部门 产品→工程→质检→放行；直做 工程交完成（有核验角色时再质检核验、放行）。进展都进折叠行。
-  // seeded：示例里本来就在做的事项排了后面的事项时，从中途接着走
+  // 新事项的假进展：根据冻结定义确定执行者与核验者，约 3.5 秒交付或 5 秒放行。
   function run(p, it, seeded) {
     it.ran = true;
-    const L = lv(p), s = st(p), open = L.three ? false : isOpen(it), e = 'engineering', pt = partner(p), v = vid(p), pn = nm(p, recv(p).id);
+    const c = it.org.composed, s = st(p), open = O.ending(c).open;
+    if (c.rotation === 'pool') { Y19.pool.start(p, it); refresh(p); return; }
+    const first = c.depts.find((d) => d.id === it.dept) || O.firstReceivers(c)[0];
+    const maker = c.rotation === 'direct' ? O.completer(c) : c.depts.find((d) => d.produces.includes(c.adopt));
+    const verifiers = O.verifiers(c), names = verifiers.map((v) => v.name).join('、');
     const at = (ms, fn) => (timers[p.id] = timers[p.id] || []).push(setTimeout(() => { if (it.status !== 'working') return; fn(); refresh(p, true); }, ms));
-    const prog = (who, text) => (L.three ? fold(p, it, 'pe', pn + '与' + eng(p) + '往来', [recv(p).id, e], who, text)
-      : fold(p, it, 'prog', pt ? eng(p) + '与' + nm(p, pt.id) + '往来' : eng(p) + '的进展', [e, pt && pt.id].filter(Boolean), who, text));
-    const check = (who, text) => fold(p, it, 'eq', eng(p) + '与' + vname(p) + '往来', [e, v], who, text);
-    const make = () => {
-      const n = s.vers.length + 1, res = '「' + it.title + '」已做好，第 ' + n + ' 版';
-      s.vers.push({ n, item: it.id, at: T(++seq), text: res, concl: open ? '开环完成' : '放行', files: ['content/_index.md', 'content/about.md'],
-        diff: ['@@ content/_index.md', '- 欢迎来到我的旧站点', '+ ' + (it.text || it.title).slice(0, 30), '@@ content/about.md', '- 旧的介绍', '+ 新站点的介绍'] });
-      p.elapsed.used += 300;
-      return { n, res };
+    const progress = (d, text) => {
+      it.dept = d.id;
+      readGuidance(p, [d.id], it.id);
+      fold(p, it, 'progress', '工作进展', [first.id, maker.id], d.id, text);
     };
-    const deliver = () => { const d = make(); check(e, '交付第 ' + d.n + ' 版，请核验。'); s.phase = { item: it.id, state: 'verify' }; };
-    const release = () => { push(p, { t: 'rel', text: '放行：' + vname(p) + '核验通过', vno: s.vers.length }); s.stage = 3; finish(p, it, 'adopted'); };
-    let steps;
-    if (L.three) steps = [[300, () => { s.stage = 1; prog(recv(p).id, '接到输入，开始写需求。'); }], [1800, () => { s.stage = 2; prog(recv(p).id, '需求定了，交给' + eng(p) + '。'); prog(e, '开始做。'); }],
-      [3200, () => prog(e, '写好了一版，正在自己检查。')], [4000, deliver], [5000, () => check(v, '在核验。')], [6000, release]];
-    else {
-      steps = [[1000, () => prog(e, '开始做了。')]].concat(pt ? [[2000, () => prog(pt.id, '先按现有的规则做。')]] : [], [[3000, () => prog(e, '写好了一版，正在自己检查。')]]);
-      steps.push(open ? [5000, () => { const d = make(); push(p, { t: 'done', text: '做完了：' + d.res + '。开环完成：没有人核验', vno: d.n }); finish(p, it, 'open_closed'); }] : [5000, deliver]);
-      if (!open) steps.push([6500, () => check(v, '在核验。')], [8000, release]);
-    }
-    const base = seeded ? 2500 : 0;
-    steps.filter((x) => x[0] >= base + 500).forEach((x) => at(x[0] - base, x[1]));
+    const deliver = () => {
+      const n = s.vers.length + 1;
+      s.vers.push({ n, item: it.id, at: T(++seq), text: '「' + it.title + '」的交付', concl: open ? '开环完成' : '等待核验', files: ['workspace/result.md'], diff: ['@@ workspace/result.md', '+ ' + (it.text || it.title).slice(0, 80)] });
+      p.elapsed.used += 300;
+      progress(maker, '已交回结果。');
+      if (open) { push(p, { t: 'done', who: maker.name, item: it.id, text: '做完了。开环完成：最终成果没有独立核验。', vno: n }); finish(p, it, 'open_closed'); }
+      else {
+        it.dept = verifiers[0].id; s.phase = { item: it.id, state: 'verify' };
+        readGuidance(p, verifiers.map((v) => v.id), it.id);
+      }
+    };
+    at(500, () => progress(first, c.rotation === 'direct' ? '接到输入，开始工作。' : '接到输入，准备' + first.produces.map((k) => O.kindName(c, k)).join('、') + '。'));
+    at(1800, () => progress(maker, c.rotation === 'direct' ? '正在制作结果并自检。' : '根据关注的成果，制作' + O.kindName(c, c.adopt) + '。'));
+    at(3500, deliver);
+    if (!open) at(5000, () => {
+      const version = s.vers.find((v) => v.item === it.id && v.concl === '等待核验');
+      version.concl = '放行';
+      fold(p, it, 'verify', names + '的核验', verifiers.map((v) => v.id), verifiers[0].id, '独立核验通过。');
+      push(p, { t: 'rel', who: names, item: it.id, text: '放行：' + names + '核验通过', vno: version.n });
+      finish(p, it, 'adopted');
+    });
   }
-  function startItem(p, text, said) {
-    const res = Y19.newItem(p, { title: text.replace(/\s+/g, ' ').slice(0, 16), text });
+  function startItem(p, text, said, source) {
+    const res = Y19.newItem(p, { title: text.replace(/\s+/g, ' ').slice(0, 16), text, source });
     if (!res.ok) { ui.toast('现在不能开始：' + res.rejects.join('；'), 'warn'); return false; }
     const s = st(p);
     s.cur = res.item.id; s.stage = 0; s.phase = null;
-    push(p, { t: 'sep', item: res.item.id }); if (!said) push(p, { t: 'you', text, tag: '新事项' });
+    push(p, { t: 'sep', item: res.item.id }); push(p, { t: 'you', item: res.item.id, text, tag: '新事项' });
     run(p, res.item); return true;
   }
   function finish(p, it, status) {
     const s = st(p);
     it.status = status; s.phase = null; s.stage = null;
     X.slotHolders[p.id] = (X.slotHolders[p.id] || []).filter((x) => x !== it.id); p.slots.used = Math.max(0, p.slots.used - 1);
-    p.deptState[it.dept] = O.idleState(p, it.dept);
-    if (s.queue.length) startItem(p, s.queue.shift(), true); // 排着的新事项接着开始
+    Object.keys(p.deptState).forEach((id) => {
+      const d = p.deptState[id];
+      if (!(d.items || []).includes(it.id) && id !== it.dept) return;
+      const remaining = (d.items || []).filter((key) => key !== it.id && p.items.some((other) => other.id === key && !['adopted', 'open_closed', 'stopped'].includes(other.status)));
+      p.deptState[id] = remaining.length ? Object.assign({}, d, { state: remaining.some((key) => H.item(p, key).status === 'working') ? 'running' : 'waiting_work', items: remaining, waits: (d.waits || []).filter((w) => w.item !== it.id), text: remaining.map((key) => H.item(p, key).title).join('、'), reason: '仍在处理：' + remaining.map((key) => H.item(p, key).title).join('、') }) : O.idleState(p, id);
+    });
+    if (s.queue.length) { const next = s.queue[0]; if (startItem(p, typeof next === 'string' ? next : next.text, true, next.source)) s.queue.shift(); } // 排着的新事项接着开始
   }
+
+  function enqueue(p, text, source) {
+    const it = active(p);
+    if (!it) return startItem(p, text, false, source);
+    st(p).queue.push({ text, source });
+    push(p, { t: 'notice', text: '「' + text.slice(0, 28) + '」排在「' + it.title + '」之后。' });
+    if (!it.ran) run(p, it, true);
+    return true;
+  }
+  Object.assign(Y19.thread, { active, start: startItem, finish, refresh, run, enqueue, readGuidance });
 
   document.addEventListener('submit', (ev) => {
     if (ev.target.id !== 'ln-form') return;
@@ -222,23 +267,37 @@
     const p = H.project(H.pid()), input = $('ln-text'), text = input.value.trim(), s = st(p);
     if (!text) return;
     const k = cur(p), it = active(p), tag = k === 'new' ? '新事项' : k === 'append' ? '追加输入' : '给' + nm(p, k.slice(2)) + '的指导';
-    input.value = ''; s.manual = false; s.to = null; // 发送后收件人回到默认
+    input.value = '';
+    // 部门指导保持收件人，连续发送时仍发给用户选中的部门。
+    if (!k.startsWith('g:')) { s.manual = false; s.to = null; s.focusDept = null; }
     if (k === 'new' && !it) { if (!startItem(p, text, false)) return; }
     else {
-      push(p, { t: 'you', text, tag });
+      const guided = k.startsWith('g:') && Y19.collaboration.guidanceItem(p, k.slice(2));
+      push(p, Object.assign({ t: 'you', text, tag }, k.startsWith('g:') ? { target: k.slice(2), item: guided ? guided.id : null } : {}));
       if (k === 'new') { s.queue.push(text); push(p, { t: 'queue', text: '排在「' + it.title + '」后面，它做完才开始' }); if (!it.ran) run(p, it, true); }
-      else if (k === 'append') fold(p, it, 'pe', nm(p, recv(p).id) + '与' + eng(p) + '往来', [recv(p).id, 'engineering'], recv(p).id, '收到追加输入，已有的交付要重新验收。');
+      else if (k === 'append' && it) {
+        (timers[p.id] || []).forEach(clearTimeout); timers[p.id] = [];
+        s.vers.filter((v) => v.item === it.id && v.concl === '等待核验').forEach((v) => { v.concl = '已被追加输入替代'; });
+        s.phase = null; it.text = (it.text || it.title) + '\n追加输入：' + text;
+        it.dept = O.firstReceivers(it.org.composed)[0].id;
+        push(p, { t: 'notice', item: it.id, text: '追加输入已交给' + nm(p, it.dept) + '，交付将重新制作并验收。' });
+        run(p, it);
+      }
     }
     refresh(p, true);
   });
   A('ln.stop', () => {
     const p = H.project(H.pid()), it = active(p);
     (timers[p.id] || []).forEach(clearTimeout); timers[p.id] = [];
+    if (it.org.composed.rotation === 'pool') Y19.pool.stop(p);
     push(p, { t: 'stop', text: '你停止了这个事项' }); finish(p, it, 'stopped'); refresh(p, true);
   });
   A('ln.answer', (el) => {
     const p = H.project(H.pid()), m = st(p).msgs[Number(el.dataset.i)];
-    m.answer = el.dataset.o; push(p, { t: 'ans', text: el.dataset.o }); Y19.rerender();
+    m.answer = el.dataset.o; push(p, { t: 'ans', item: m.item, text: el.dataset.o });
+    const it = active(p);
+    if (it && !it.ran && !st(p).msgs.some((x) => x.t === 'ask' && x.item === it.id && !x.answer)) run(p, it, true);
+    Y19.rerender();
   });
   A('ln.fold', (el) => { const p = H.project(H.pid()), m = st(p).msgs[Number(el.dataset.i)]; m.open = !m.open; refresh(p); });
   A('ln.only', (el) => { const p = H.project(H.pid()); st(p).only = el.checked; refresh(p, true); });
@@ -251,16 +310,17 @@
     ms[i].open = !ms[i].open; refresh(p);
     const f = $('ln-fold-' + i); if (f && f.scrollIntoView) f.scrollIntoView({ block: 'nearest' });
   });
+  A('ln.item-toggle', (el) => { const p = H.project(H.pid()), s = st(p); s.openItems = s.openItems || {}; s.openItems[el.dataset.item] = !s.openItems[el.dataset.item]; refresh(p); });
   // 左侧栏的数字：跳到第一条没回答的决定，亮一下
   A('ln.jump', (el) => {
     Y19.go('#/p/' + el.dataset.p);
-    setTimeout(() => { const b = document.querySelector('.ln-msg.is-ask:not(.is-answered)'); if (!b) return; b.scrollIntoView({ block: 'center' }); b.classList.add('is-flash'); setTimeout(() => b.classList.remove('is-flash'), 2000); }, 120);
+    setTimeout(() => { const b = document.querySelector('.ln-msg.is-ask:not(.is-answered)'); if (!b) { const list = document.querySelector('.ws-project-decisions'); if (list) { list.open = true; list.scrollIntoView({ block: 'center' }); } return; } b.scrollIntoView({ block: 'center' }); b.classList.add('is-flash'); setTimeout(() => b.classList.remove('is-flash'), 2000); }, 120);
   });
 
   // ---------------------------------------------------------------- 成果库
 
   function outcomes(ctx, p) {
-    const vs = st(p).vers.slice().reverse(), concl = O.verifiers(p.composed).length > 0, open = Number(Y19.state.route.query.v);
+    const vs = st(p).vers.slice().reverse(), concl = vs.some((v) => v.concl), open = Number(Y19.state.route.query.v);
     const cols = '<div class="ln-vrow is-head' + (concl ? ' has-concl' : '') + '"><span>第几版</span><span>事项</span><span>时间</span><span>一句话</span>' + (concl ? '<span>结论</span>' : '') + '</div>';
     return '<div class="ln-vers"><h1>成果库</h1><p class="y19-muted">每一版一行，点开看差异。</p>' + (vs.length ? cols : '') + (vs.map((v) => {
       const it = H.item(p, v.item);
@@ -271,73 +331,20 @@
 
   // ---------------------------------------------------------------- 设置
 
-  function orgText(p) {
-    const L = lv(p), c = p.composed, vs = O.verifiers(c).map((v) => v.name), ws = c.depts.filter((d) => !d.verifies).map((d) => d.name);
-    if (L.three) return ws.concat(vs).join('、') + '，' + (vs[0] || '质检') + '放行才算完成';
-    return (ws.length > 1 ? ws.join('、') + '商量着做' : '一个人做') + '，' + (vs.length ? vs[0] + '核验' : '没有人核验');
-  }
-  function settings(ctx, p) {
-    const s = st(p), vn = vname(p), models = O.modelChoices(), L = lv(p);
-    const goal = p.goal && p.goal.indexOf('（还没有') !== 0 ? p.goal : '';
-    const row = (k, v) => '<div class="ln-set"><label>' + k + '</label><div>' + v + '</div></div>';
-    return '<div class="ln-settings"><h1>设置</h1>' + (s.note ? '<div class="y19-note is-info" id="ln-note">' + esc(s.note) + '</div>' : '') +
-      row('名字', '<input type="text" class="y19-input" id="ln-set-name" value="' + esc(p.name) + '" data-act="ln.name">') +
-      row('长期目标（可选）', '<textarea class="y19-textarea" rows="2" data-act="ln.goal" placeholder="这个项目长期要做成什么样，可以不写">' + esc(goal) + '</textarea>') +
-      row('起始文件夹', '<input type="text" class="y19-input" data-act="ln.dir" value="' + esc(p.dir || '') + '" placeholder="控制主机上的路径，可以不填">') +
-      row('模型', '<select class="y19-select" data-act="ln.model"><option value="">跟随全局</option>' + models.map((m) => '<option' + (s.model === m ? ' selected' : '') + '>' + esc(m) + '</option>').join('') + '</select>') +
-      row('组织', '<span id="ln-org">' + esc(orgText(p)) + '</span> ' + (L.three ? '' : '<button type="button" class="y19-btn small" data-act="ln.verifier">' + (vn ? '去掉核验角色' : '加一个核验角色') + '</button> ') + '<button type="button" class="y19-btn small" data-act="ln.swap">换模板</button>') +
-      '<details class="ln-adv"><summary>高级</summary><p>改名、加部门、编辑定义、成果写回、机器授权、执行位置、MCP 服务器都在这里。</p>' +
-      (L.three ? '<button type="button" class="y19-link" data-go="#/p/' + p.id + '/org">组织页</button>' : '<button type="button" class="y19-link" data-act="ln.adv" data-to="#/p/' + p.id + '/org">组织页</button>') + ' · <button type="button" class="y19-link" data-act="ln.adv" data-to="#/p/' + p.id + '/settings">完整的设置页</button></details></div>';
-  }
   A('ln.name', (el) => { const p = H.project(H.pid()); if (el.value.trim()) { p.name = el.value.trim(); Y19.rerender(); } });
   A('ln.goal', (el) => { H.project(H.pid()).goal = el.value.trim(); });
   A('ln.dir', (el) => { H.project(H.pid()).dir = el.value.trim(); });
-  A('ln.model', (el) => { st(H.project(H.pid())).model = el.value; });
-  A('ln.adv', (el) => { Y19.setAdv(H.pid()); Y19.go(el.dataset.to); });
+  // ---------------------------------------------------------------- 外壳：单角色保留对话，多个角色共用三个主要入口。
 
-  // 加 / 去掉核验角色：改合成结果，写一条历史；只对之后新建的事项生效
-  A('ln.verifier', () => {
-    const p = H.project(H.pid()), ch = clone(p.org.changes), has = Boolean(vname(p));
-    if (has) O.removeDept(ch, p.org.form, [], 'quality');
-    else { const d = O.publishedDept(p.composed, 'quality'); ch.depts = ch.depts || {}; ch.depts.quality = { added: true, name: d.name, goal: d.goal, judge: d.judge, how: d.how, watches: d.watches, produces: d.produces, tools: d.tools, write: d.write, who: { type: 'own' }, verifies: d.verifies, completes: false }; }
-    const res = O.adopt(p, { base: p.version, form: p.org.form, changes: ch, pending: {}, reason: has ? '去掉核验角色' : '加一个核验角色：' + d0(p) + '核验' + eng(p) + '交的完成' });
-    if (!res.ok) { ui.toast(res.error + (res.rejects ? '：' + res.rejects.map((x) => x.text).join('；') : ''), 'warn'); return; }
-    st(p).note = has ? '已去掉核验角色。在跑的事项按原来的做完，之后新建的事项做完就以开环完成结束' : '在跑的事项按原来的做完，之后新建的事项等' + vname(p) + '放行才结束';
-    push(p, { t: 'queue', text: st(p).note });
-    Y19.rerender();
-  });
-  const d0 = () => O.releaseDeptName('quality');
-
-  // 换模板：点卡一步生效；有改动时确认一次
-  A('ln.swap', () => ui.modal({ title: '换模板', wide: true, body: '<div class="ln-cards">' + cards('ln.pick') + '</div>', actions: [{ label: '取消', close: true }] }));
-  A('ln.pick', (el) => {
-    const p = H.project(H.pid()), id = el.dataset.form;
-    if (O.count(p.org.changes) && !el.dataset.sure) {
-      const lost = O.diff(O.compose({ form: p.org.form, changes: {} }), p.composed);
-      ui.modal({ title: '换成「' + O.formName(id) + '」？', body: '<p>现在的改动会丢掉：</p><ul class="y19-org-diff">' + lost.map((t) => '<li>' + esc(t) + '</li>').join('') + '</ul><p class="y19-small y19-muted">记录里还在，改回能找回。</p>', actions: [{ label: '换', kind: 'primary', act: 'ln.pick', data: { form: id, sure: '1' } }, { label: '取消', close: true }] });
-      return;
-    }
-    const res = O.adopt(p, { base: p.version, form: id, changes: {}, pending: {}, reason: '换模板：' + O.formName(id) });
-    ui.closeModal();
-    if (!res.ok) { ui.toast(res.error, 'warn'); return; }
-    st(p).note = '';
-    Y19.go('#/p/' + p.id);
-    Y19.rerender();
-  });
-
-  // ---------------------------------------------------------------- 外壳：标签（跟着级别：几个角色加成果库，三部门再加部门页与组织页）
-
-  Y19.leanHas = (p, name) => Boolean(Y19.leanViews[name]) || (lv(p).three && /^(dept|org)/.test(name));
+  Y19.leanHas = (p, name) => Boolean(Y19.leanViews[name]) || /^(dept|org|item|recovery)/.test(name);
   Y19.leanTabs = (p, r) => {
     const L = lv(p);
     const b = (on, label, tail) => '<button type="button" class="y19-ptab' + (on ? ' is-active' : '') + '" data-go="#/p/' + p.id + tail + '">' + esc(label) + '</button>';
-    const tabs = [b(r.name === 'overview', '对话', '')].concat(L.n > 1 ? [b(r.name === 'outcomes', '成果库', '/outcomes')] : [],
-      L.three ? p.composed.depts.map((d) => b(r.name === 'dept' && r.params.dept === d.id, nm(p, d.id), '/dept/' + d.id)).concat([b(/^org/.test(r.name), '组织', '/org')]) : [], [b(r.name === 'settings', '设置', '/settings')]);
-    return '<div class="y19-pheader"><button type="button" class="y19-pname" data-go="#/p/' + p.id + '">' + esc(p.name) + '</button></div><div class="y19-ptabs" role="navigation" aria-label="项目页面">' + tabs.join('') + '</div>';
+    const tabs = [b(r.name === 'overview', '对话', '')].concat(L.n > 1 ? [b(r.name === 'outcomes', '成果库', '/outcomes'), b(/^org/.test(r.name), '组织', '/org')] : []);
+    return '<div class="y19-pheader"><button type="button" class="y19-pname" data-go="#/p/' + p.id + '">' + esc(p.name) + '</button>' + (L.n > 1 ? '<span class="ws-mode-label">' + esc(O.ROTATIONS[p.composed.rotation]) + ' · ' + L.n + ' 个部门或角色</span>' : '') + (L.n === 1 ? '<button type="button" class="y19-link" data-go="#/p/' + p.id + '/outcomes">查看交付</button>' : '') + '<button type="button" class="y19-link ws-project-settings' + (r.name === 'settings' ? ' is-current' : '') + '" data-go="#/p/' + p.id + '/settings">项目设置</button></div>' + (L.n > 1 ? '<div class="y19-ptabs" role="navigation" aria-label="项目页面">' + tabs.join('') + '</div>' : '');
   };
   Y19.leanViews.overview = { render: conversation, mount: convMount };
   Y19.leanViews.outcomes = { render: outcomes };
-  Y19.leanViews.settings = { render: settings };
 
   // ---------------------------------------------------------------- 新建项目、接入已有项目：名字加一张模板卡
 
