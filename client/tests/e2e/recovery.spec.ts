@@ -1,8 +1,10 @@
 // 恢复页 4 的端到端（工单 #1188）：工程执行命令时硬杀服务进程，用同一个端口与数据目录重新起服务，
-// 页面重新连接以后事项自动继续、恢复页显示最后已确认位置与动作的处理方式，画面恢复。
+// 页面重新连接以后事项自动继续、恢复页显示最后已确认位置与动作的处理方式，概览的「中断与待恢复」回到空。
 // 服务进程是真的结束、真的重启（fixtures 的 kill：Windows 上 taskkill /T /F 结束进程树），
 // 不用「模拟断开」代替。等的是信号与事件（命令写下的 started 文件、页面的连接状态、查询结果），
 // 不用时长赌先后（测试分层 docs/design/test-pyramid.md「测试的写法」）；每条等待都有自己的上限，到了上限以写明原因的错误结束。
+// 只看页面（工单 #1417）：断开与恢复读页面的连接状态、概览「中断与待恢复」这一节与恢复页的文字，
+// 不读画布，也不用画面的测试入口。
 // 控制台错误：服务不可达期间浏览器自己报的连接失败是这次用例造成的（整层变暗正是要观察的），
 // 其余控制台错误一律记为失败。
 
@@ -61,22 +63,17 @@ async function until(check: () => boolean | Promise<boolean>, what: string, time
   throw new Error(`等不到：${what}`);
 }
 
-// 整层是否在中断里：读画面给端到端测试的只读入口（工单 #1188）
-async function floorInterrupted(page: Page): Promise<boolean> {
-  return page.evaluate(() => {
-    const hooks = (window as unknown as { __floorViewForTest?: { state: () => { interrupted: boolean } } }).__floorViewForTest;
-    if (!hooks) {
-      throw new Error("页面没有画面的读取入口");
-    }
-    return hooks.state().interrupted;
-  });
+// 概览页上的一个区块（按标题取第一块）：中断与待恢复这一节写项目里被打断、等待恢复的事项，
+// 一件事都没有时写「没有中断，也没有待恢复的工作」（工单 #1416 把这件事补成页面上的列表）
+function interruptions(page: Page) {
+  return page.locator("section.card").filter({ has: page.getByRole("heading", { name: "中断与待恢复", exact: true }) }).first();
 }
 
 async function openOverview(page: Page, projectId: string): Promise<void> {
   await page.evaluate((hash) => {
     window.location.hash = hash;
   }, `#/p/${projectId}/overview`);
-  await expect(page.locator(".floor-screen canvas")).toHaveCount(1);
+  await expect(interruptions(page)).toBeVisible();
 }
 
 type LoopRow = { work_item_id: string; run_id: string; status: string; sign: string };
@@ -111,13 +108,15 @@ async function runKillRestart(size: { width: number; height: number }): Promise<
     // 工程执行那条等着放行的命令：命令自己写下 started 信号（不是等时长）
     await until(() => existsSync(join(signals, "started")), "工程的命令开始执行");
     await openOverview(client.page, projectId);
-    await expect.poll(() => floorInterrupted(client.page)).toBe(false);
+    // 断开以前：页面上的中断一节是空的（这件事以前只从画面的整层状态读）
+    await expect(interruptions(client.page)).toContainText("没有中断，也没有待恢复的工作");
 
     // 硬杀：结束 python 服务与它起的命令（按进程树结束，真的结束进程）
     offline = true;
     await own.kill();
+    // 整层变暗由页面的外壳写在 body 上（styles 的 body.is-disconnected → .y10-app 变灰），
+    // 这是页面上可判定的那一件事；服务不可达期间页面读不到新的查询结果
     await expect(client.page.locator("body")).toHaveClass(/is-disconnected/, { timeout: 90_000 });
-    await expect.poll(() => floorInterrupted(client.page), { timeout: 90_000 }).toBe(true);
     await shot(client.page, `offline-${size.width}`);
 
     // 同一个端口与数据目录重新起服务：启动恢复在这个进程起服务之前跑完（--hold-resume）
@@ -132,8 +131,9 @@ async function runKillRestart(size: { width: number; height: number }): Promise<
       return loop.work_items.some((row) => row.run_id === refs.run_id && row.status === "adopted");
     }, "事项恢复以后走到采纳");
 
-    // 画面恢复：整层不再变暗；恢复页显示最后已确认位置、交还会话与交还给模型的内容，没有决定卡片
-    await expect.poll(() => floorInterrupted(client.page), { timeout: 60_000 }).toBe(false);
+    // 恢复以后：整层不再是变暗的（body 上的类去掉），中断一节回到空——项目里没有等待恢复的事项了；
+    // 恢复页显示最后已确认位置、交还会话与交还给模型的内容，没有决定卡片
+    await expect(interruptions(client.page)).toContainText("没有中断，也没有待恢复的工作");
     await shot(client.page, `restored-${size.width}`);
     await client.page.evaluate((hash) => {
       window.location.hash = hash;
@@ -152,7 +152,7 @@ async function runKillRestart(size: { width: number; height: number }): Promise<
   }
 }
 
-test("1440×900：工程执行命令时硬杀服务进程，重启以后事项自动继续、画面恢复", async () => {
+test("1440×900：工程执行命令时硬杀服务进程，重启以后事项自动继续、中断与待恢复回到空", async () => {
   await runKillRestart({ width: 1440, height: 900 });
 });
 
