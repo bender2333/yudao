@@ -623,7 +623,7 @@ def _credential_event(action: str, status: dict[str, Any], version: int, persist
 
 def _credential_stale_base(facade, ref: str, base_version: int) -> None:
     # 凭据命令的基准版本是目录查询里这个引用自己的 credential.version，不是目录修订号
-    # （设计说明 app-and-interface 「合同」）；拒绝时写明比的是哪一个版本与当前值（工单 #1158）
+    # （docs/design/app-and-interface.md「合同」）；拒绝时写明比的是哪一个版本与当前值（工单 #1158）
     current = facade.credential_version(ref)
     if base_version != current:
         raise Rejection(

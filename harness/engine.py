@@ -1151,7 +1151,7 @@ class StepDriver:
 
     def _refresh_workspace_now(self) -> None:
         # 检查工作区按会话保留（工单 #558）：检查工作区只在会话建立时与新交付封存以后重建，
-        # 询问与通知都不重建。新的交付封存以后，质检的会话在下一步从这份交付重建（local-tools 「工作区」）。
+        # 询问与通知都不重建。新的交付封存以后，质检的会话在下一步从这份交付重建（docs/design/local-tools.md「工作区」）。
         if self._refresh_workspace is None:
             return
         refreshed = self._refresh_workspace()

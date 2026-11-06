@@ -274,7 +274,7 @@ def work_notifications(projection: RunProjection, events: list[Any] | None, depa
         })
     if department in (definitions or DEFINITIONS).verified_by("delivery_spec"):
         # 交付到达只通知核验交付的那个角色（核验声明，工单 #1401）：它面对的代码随交付变化，
-        # 检查工作区因此重建（local-tools 「工作区」）
+        # 检查工作区因此重建（docs/design/local-tools.md「工作区」）
         for delivery in projection.delivery_specs:
             if delivery.status != "active":
                 continue

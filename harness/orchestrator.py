@@ -1690,7 +1690,7 @@ class Orchestrator:
             return
         except (ValueError, OSError) as exc:
             # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
-            # （ADR-0038 与 local-tools 「工作区」：检查工作区从封存的交付建立）。这次激活无法开始，
+            # （ADR-0038 与 docs/design/local-tools.md「工作区」：检查工作区从封存的交付建立）。这次激活无法开始，
             # 以 host_commit_error 正式终止并报告真实原因，与提交判断对同一缺陷的报告方式一致
             self._end_run(activation, "host_commit_error",
                           f"the persisted delivery tree cannot be read for the {department} "

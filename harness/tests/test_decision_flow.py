@@ -7,7 +7,7 @@
 # - R3：决定请求得到回答以后 run 继续执行（应用层给出要继续执行的 run，由调用方开始）；
 #   这些处理在应用层，薄驱动里不再有（docs/design/skeleton-and-application.md「薄驱动」「薄驱动只连接」）。
 #
-# 一次部门激活、SQLite 事件库与数据目录，属于模块层（test-pyramid 「三层的定义」）。
+# 一次部门激活、SQLite 事件库与数据目录，属于模块层（docs/design/test-pyramid.md「三层的定义」）。
 # 事项级的决定、基线采纳与建档修改轮的行为由 test_projects.py、test_onboarding_confirmation_round.py、
 # test_onboarding_revision_context.py 守着（集成层），这里不重复。
 

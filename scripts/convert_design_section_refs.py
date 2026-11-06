@@ -1435,12 +1435,20 @@ def candidates_for(ref: Ref) -> list[Candidate]:
         if path == ref.file and snippet in line and (not ref_sec or ref_sec == ref.sec):
             out.append(Candidate(doc, "⑤", basis, True, sec))
     if out:
+        stem = bare_name_before(line, ref.start, out[0].doc)
+        if stem is not None:
+            ref.bare = True
+            ref.start = stem
         return out
 
     hits = mentions(line)
     named = nearest_before(line, ref.start, hits)
     if named:
         out.append(Candidate(named, "①", "同一行写了这份说明的名字", True))
+        stem = bare_name_before(line, ref.start, named)
+        if stem is not None:
+            ref.bare = True
+            ref.start = stem
     else:
         above = block_above(file_lines(ref.file), ref.line)
         if above:
