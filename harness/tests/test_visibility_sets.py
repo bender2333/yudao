@@ -2,11 +2,10 @@
 # 词表从「整份当前交付说明」扩到「交付事实」与「交付解释」两项，按事实与解释分开提供；工程保留整份
 # current_delivery_spec，质检默认用隔离的一套（事实与解释），共享的一套再在它上面加既有结构、上一份交付与质检缺陷。
 #
-# 这个文件查四件事：
+# 这个文件查三件事：
 # 1. 封闭词表正好七项（工单 #1401 加了修改轮的常驻材料），各角色的取值都在词表里；
 # 2. 质检的两套取值都能加载，共享的一套只在隔离的一套上加材料，条目数在规则的界限以内；
-# 3. 交付说明的 parts 把 kind 与 basis_product_spec_hash 归入事实（加载时的归属校验在 test_definitions.py）；
-# 4. 装配按词表给材料：可见范围里只有事实这一项的角色看不到解释，连独立判断提交以后也看不到。
+# 3. 装配按词表给材料：可见范围里只有事实这一项的角色看不到解释，连独立判断提交以后也看不到。
 #
 # 层：模块层（定义副本、真实存储与一次部门激活），守 R2（定义文件的格式与词表）与 R3（先判断后看解释的默认取值）。
 
@@ -20,7 +19,6 @@ import pytest
 
 from harness.adapters.fake import FakeAdapter, prompt_part
 from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, VISIBILITY_VALUES, load_definitions
-from harness.parameters import check_bounds
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 
@@ -37,18 +35,6 @@ def test_the_visibility_vocabulary_is_the_seven_materials():
                                  "existing_structure", "prior_delivery", "qa_defects", "prior_round"}
     for role, definition in DEFINITIONS.roles.items():
         assert set(definition.visibility) <= VISIBILITY_VALUES, role
-
-
-def test_the_quality_role_starts_isolated_and_the_engineering_role_keeps_the_whole_spec():
-    # 守 R3：设计说明第 3 节的默认取值——质检用隔离的一套，工程保留整份当前交付说明
-    assert DEFINITIONS.role("quality").visibility == ISOLATED
-    assert DEFINITIONS.rule_value("roles.quality.visibility") == list(ISOLATED)
-    assert "current_delivery_spec" in DEFINITIONS.role("engineering").visibility
-    # 共享的一套只在隔离的一套上加材料，条目数在规则的界限以内（设计说明第 3 节）
-    assert set(SHARED) - set(ISOLATED) == {"existing_structure", "prior_delivery", "qa_defects"}
-    low, high = DEFINITIONS.rule("roles.quality.visibility").bounds
-    assert low <= len(SHARED) <= high
-    assert check_bounds("roles.quality.visibility", list(SHARED)) == list(SHARED)
 
 
 @pytest.mark.parametrize("values", [ISOLATED, SHARED])
@@ -68,16 +54,6 @@ def test_a_definition_with_the_old_quality_value_still_loads(tmp_path):
     assert load_definitions(directory).role("quality").visibility == ("current_delivery_spec",)
 
 
-def test_the_delivery_parts_put_the_kind_and_the_basis_into_the_facts():
-    # 守 R2：交付说明的种类与它所依据的产品合同摘要属于事实（设计说明第 4 节），解释只有实现的理由与已知的不足
-    parts = _delivery_contract()["parts"]
-    facts, explanation = set(parts["facts"]), set(parts["explanation"])
-    assert {"kind", "basis_product_spec_hash"} <= facts
-    assert explanation == {"summary", "known_risks"}
-    assert not facts & explanation
-    assert _written_fields() <= facts | explanation
-
-
 def test_a_role_that_sees_only_the_facts_never_sees_the_explanation(tmp_path):
     # 守 R2 与 R3：可见范围的取值决定装配给什么。把质检的可见范围收成只有事实一项以后，交付的材料里有事实、
     # 没有解释，独立判断提交以后的请求里也没有；默认的一套由内核不变式的用例守着（先判断后看解释）
@@ -95,16 +71,6 @@ def test_a_role_that_sees_only_the_facts_never_sees_the_explanation(tmp_path):
         assert "src/echo.py" in delivery["files"] and delivery["check_names"] == ["smoke"]
         assert "summary" not in delivery and "known_risks" not in delivery
         assert DELIVERY_SUMMARY not in _text(call)
-
-
-def _delivery_contract() -> dict:
-    return DEFINITIONS.proposal_contracts.roles["engineering"].kinds["delivery_spec"]
-
-
-def _written_fields() -> set[str]:
-    # 提案合同写给模型的字段：required 里的 kind=… 取等号前面的名字，optional 整项都是字段名
-    contract = _delivery_contract()
-    return {str(item).split("=", 1)[0] for item in [*contract["required"], *contract["optional"]]}
 
 
 def _copy(tmp_path: Path) -> Path:

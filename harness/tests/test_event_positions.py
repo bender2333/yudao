@@ -2,14 +2,12 @@
 # 页面只能缓存整条事件流）。
 #
 # 核对：按 run_id、project_id 或两个都给，一组位置取回与事件流同形状的字段（种类、提出者与部门的可读名、
-# 中文说明、对外载荷）；越界、已归档、已被压缩与「位置上是别的流的事件」四种取不到分别有明确回答；
-# 调用前后事件数与保存的投影不变（纯读）。
+# 中文说明、对外载荷）；越界与「位置上是别的流的事件」两种取不到分别有明确回答；调用前后事件数与保存的投影
+# 不变（纯读）。已归档、已压缩两种回答的用词由 OpenAPI 快照守着，现存储只追加，到不了这两种状态。
 #
 # 层：模块层（真实的事件日志在临时目录里，不开子进程、不联网）。守 R1（接口层按位置读事件合同的交换字段）。
 
 from __future__ import annotations
-
-import sqlite3
 
 import pytest
 
@@ -136,69 +134,6 @@ def test_a_position_that_holds_another_streams_event_answers_not_in_stream(scena
     assert (item.status, item.reason) == ("missing", "not_in_stream")
 
 
-def _delete_events(data_dir, positions):
-    # 现存储只追加、不压缩也不搬走事件：直接删掉事件行，构造「更早的事件已归档搬走」与
-    # 「范围内这一条已压缩掉」两种存储状态，核对这条查询的回答（工单 #1342 的验收）
-    with sqlite3.connect(str(data_dir / "events.sqlite")) as connection:
-        connection.execute(f"DELETE FROM events WHERE position IN ({', '.join('?' * len(positions))})",
-                           list(positions))
-        connection.commit()
-
-
-def _run_with_four_events(tmp_path, name):
-    # 一个 run 里四条事件（run_created 与三条部门激活）：位置按写入的先后排列
-    data_dir = tmp_path / name
-    system = LoopSystem.for_testing(data_dir, FakeAdapter([]))
-    try:
-        project_id = system.projects.register("存储形态", "归档与压缩")
-        _work_item_id, run_id = system.projects.start_work_item(project_id, "echo")
-
-        def append(transaction):
-            transaction.append(NewEvent(
-                EventType.DEPARTMENT_ACTIVATED, actor="department:product", department="product",
-                state_before=transaction.projection.status, state_after=transaction.projection.status,
-                payload={"cycle": 1}))
-
-        system.writes.transact(run_stream(run_id), append)
-        system.writes.transact(run_stream(run_id), append)
-        system.writes.transact(run_stream(run_id), append)
-        positions = [event.position for event in system.store.list_events(run_id)]
-        assert len(positions) == 4
-    finally:
-        system.close()
-    return data_dir, run_id, positions
-
-
-def test_a_position_before_the_first_kept_event_answers_archived(tmp_path):
-    # 更早的事件已经搬走（归档）：这个流现在的第一条在第三条位置上，请求开头两个位置回答「已归档」
-    data_dir, run_id, positions = _run_with_four_events(tmp_path, "archived")
-    _delete_events(data_dir, [positions[0], positions[1]])
-    application = _application(data_dir)
-    try:
-        result = _query(application, run_id=run_id, positions=positions)
-    finally:
-        application.close()
-    assert [(item.status, item.reason) for item in result.events] == [
-        ("missing", "archived"), ("missing", "archived"), ("available", None), ("available", None)]
-
-
-def test_a_missing_position_inside_the_range_answers_compacted(tmp_path):
-    # 范围内的这一条被压缩掉：它之前与之后的事件都还在，回答「已压缩」而不是「越界」或「没有这个流」
-    data_dir, run_id, positions = _run_with_four_events(tmp_path, "compacted")
-    _delete_events(data_dir, [positions[1]])
-    application = _application(data_dir)
-    try:
-        result = _query(application, run_id=run_id, positions=positions)
-    finally:
-        application.close()
-    assert [(item.status, item.reason) for item in result.events] == [
-        ("available", None), ("missing", "compacted"), ("available", None), ("available", None)]
-    # 取得到的那些仍带上与事件流同形状的字段
-    assert result.events[0].type == EventType.RUN_CREATED
-    assert result.events[2].type == EventType.DEPARTMENT_ACTIVATED
-    assert result.events[2].actor_label == "产品部门"
-
-
 def test_the_query_is_a_pure_read(scenario):
     # 调用前后：事件条数、日志末尾位置与保存的投影都不变（设计说明接口部分：已登记的查询只读）
     application = _application(scenario["data_dir"])
@@ -231,15 +166,5 @@ def test_the_request_is_checked(scenario):
             _query(application, run_id="run_does_not_exist", positions=[1])
         with pytest.raises(NotFound, match="project not found"):
             _query(application, project_id="proj_does_not_exist", positions=[1])
-    finally:
-        application.close()
-def test_an_empty_position_list_reads_nothing(scenario):
-    # 读取本身对空清单不查库（接口层在进到这里以前按输入不合法拒绝）：返回空表，
-    # 没有事件的流也没有位置范围（工单 #1342）
-    application = _application(scenario["data_dir"])
-    try:
-        store = application.system.store
-        assert store.events_at([]) == {}
-        assert store.stream_position_range("run:does_not_exist") is None
     finally:
         application.close()

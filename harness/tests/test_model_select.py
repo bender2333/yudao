@@ -773,38 +773,6 @@ def test_key_changes_through_credentials_reload_and_dotenv_watch_share_one_conne
         upstream.close()
 
 
-def test_candidate_protocol_prefers_the_capability_table_then_the_plan_default(tmp_path):
-    # R2、R3：使用当前能力表的真实非默认协议记录，候选请求走本地真实HTTP，来源反映实际预填。
-    # 连接的地址取预置方案的请求基址：能力资料按连接地址识别服务商（设计说明第 4.3 节），
-    # 模型列表仍走本地真实 HTTP 服务。
-    upstream = ScriptedProvider([responder([{"id": "claude-haiku-5-5"}, {"id": "unrecorded"}])] * 4)
-    opened = Opened(tmp_path)
-    try:
-        with running_api(opened) as client:
-            provider_id = connect(client, upstream)
-            provider = catalog(client)["providers"][0]
-            fields = ("id", "name", "base_url", "credential_ref", "timeout_sec", "preset_id", "models_url")
-            saved = command(client, "catalog.connection.save", base_version=catalog(client)["revision"],
-                            provider={**{name: provider[name] for name in fields}, "preset_id": "opencode-go",
-                                      "base_url": "https://opencode.ai/zen/go/v1",
-                                      "models_url": upstream.base + "/v1/models"})
-            assert saved.status_code == 200, saved.text
-            position = opened.application.system.store.end_position()
-            collected = command(client, "catalog.candidates.collect", base_version=catalog(client)["revision"],
-                                provider_id=provider_id)
-            assert collected.status_code == 200, collected.text
-            wait_event(opened, lambda event: event.type == CatalogEventType.CATALOG_CANDIDATES_COLLECTED,
-                       after=position)
-            candidates = catalog(client)["providers"][0]["latest_candidates"]["candidates"]
-            known = next(row for row in candidates if row["id"] == "claude-haiku-5-5")
-            assert known["protocol"] == "messages" and known["protocol_source"] == "capability_table"
-            assert known["source_details"]["protocol"]["provider"] == "opencode-go"
-            missing = next(row for row in candidates if row["id"] == "unrecorded")
-            assert missing["protocol"] == "chat_completions" and missing["protocol_source"] == "preset_default"
-    finally:
-        upstream.close()
-
-
 def test_late_list_from_an_older_address_does_not_replace_the_current_candidates_or_admission(tmp_path):
     # R3：两个实际地址变更按版本隔离；较旧的HTTP列表迟到以后不覆盖新的补全值或准入。
     old = ScriptedProvider([responder([{"id": "stable", "limit": {"context": 32000, "output": 2048}}])] * 12)

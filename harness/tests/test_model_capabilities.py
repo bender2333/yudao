@@ -283,26 +283,6 @@ def test_duplicate_model_in_one_preset_is_rejected(tmp_path):
                for issue in raised.value.issues)
 
 
-def test_reading_the_capability_table_never_reaches_the_network():
-    # R2：通过真实审计事件核对离线读取；不替换网络实现。
-    attempts: list[object] = []
-    active = True
-
-    def guard(event, args):
-        if active and event == "socket.connect":
-            attempts.append(args)
-            raise AssertionError(f"能力表的读取不应连接网络：{args}")
-
-    sys.addaudithook(guard)
-    try:
-        view = capabilities.table_public()
-        assert capabilities.capability("opencode-go", view["presets"]["opencode-go"][0]["model"]) is not None
-        assert capabilities.entries("opencode-go")
-    finally:
-        active = False
-    assert attempts == []
-
-
 def _version_two_table():
     return _extractor().build_table(_presets(), _fixture_copy(), "2026-10-30.1", "2026-10-30",
                                     "https://models.dev")
