@@ -4196,6 +4196,67 @@
         }
       }
     },
+    "/api/queries/organization.draft": {
+      "get": {
+        "tags": [
+          "queries"
+        ],
+        "summary": "organization.draft",
+        "operationId": "query_organization_draft",
+        "parameters": [
+          {
+            "name": "project_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Project Id"
+            }
+          },
+          {
+            "name": "form",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Form"
+            }
+          },
+          {
+            "name": "changes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "{}",
+              "title": "Changes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Snapshot_OrganizationDraftResult_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/capabilities": {
       "get": {
         "tags": [
@@ -9026,6 +9087,213 @@
         ],
         "title": "DocumentModelInput"
       },
+      "DraftDepartment": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "target": {
+            "type": "string",
+            "title": "Target"
+          },
+          "evidence": {
+            "type": "string",
+            "title": "Evidence"
+          },
+          "work": {
+            "type": "string",
+            "title": "Work"
+          },
+          "watched": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Watched"
+          },
+          "outcomes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Outcomes"
+          },
+          "verifier": {
+            "type": "boolean",
+            "title": "Verifier"
+          },
+          "write_scope": {
+            "type": "string",
+            "title": "Write Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "target",
+          "evidence",
+          "work",
+          "watched",
+          "outcomes",
+          "verifier",
+          "write_scope"
+        ],
+        "title": "DraftDepartment"
+      },
+      "DraftIssue": {
+        "properties": {
+          "item": {
+            "type": "string",
+            "title": "Item"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item",
+          "message"
+        ],
+        "title": "DraftIssue"
+      },
+      "DraftOrganization": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "form": {
+            "type": "string",
+            "title": "Form"
+          },
+          "routing": {
+            "type": "string",
+            "title": "Routing"
+          },
+          "routing_label": {
+            "type": "string",
+            "title": "Routing Label"
+          },
+          "departments": {
+            "items": {
+              "$ref": "#/components/schemas/DraftDepartment"
+            },
+            "type": "array",
+            "title": "Departments"
+          },
+          "outcome_kinds": {
+            "items": {
+              "$ref": "#/components/schemas/DraftOutcomeKind"
+            },
+            "type": "array",
+            "title": "Outcome Kinds"
+          },
+          "verification": {
+            "items": {
+              "$ref": "#/components/schemas/DraftVerification"
+            },
+            "type": "array",
+            "title": "Verification"
+          },
+          "sources": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Sources"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "form",
+          "routing",
+          "routing_label",
+          "departments",
+          "outcome_kinds",
+          "verification",
+          "sources"
+        ],
+        "title": "DraftOrganization"
+      },
+      "DraftOutcomeKind": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label"
+        ],
+        "title": "DraftOutcomeKind"
+      },
+      "DraftReminder": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "open_loop",
+              "midway_verifier",
+              "no_outcomes"
+            ],
+            "title": "Kind"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "message"
+        ],
+        "title": "DraftReminder"
+      },
+      "DraftVerification": {
+        "properties": {
+          "verifier": {
+            "type": "string",
+            "title": "Verifier"
+          },
+          "verified": {
+            "type": "string",
+            "title": "Verified"
+          },
+          "outcome": {
+            "type": "string",
+            "title": "Outcome"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "verifier",
+          "verified",
+          "outcome"
+        ],
+        "title": "DraftVerification"
+      },
       "DrainRunning": {
         "properties": {
           "run_id": {
@@ -11764,6 +12032,71 @@
           "label"
         ],
         "title": "OrganizationDepartment"
+      },
+      "OrganizationDraftResult": {
+        "properties": {
+          "project_id": {
+            "type": "string",
+            "title": "Project Id"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DraftOrganization"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/DraftIssue"
+            },
+            "type": "array",
+            "title": "Rejections"
+          },
+          "reminders": {
+            "items": {
+              "$ref": "#/components/schemas/DraftReminder"
+            },
+            "type": "array",
+            "title": "Reminders"
+          },
+          "finishes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishes"
+          },
+          "open_loop": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Loop"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "project_id",
+          "organization",
+          "rejections",
+          "reminders",
+          "finishes",
+          "open_loop"
+        ],
+        "title": "OrganizationDraftResult"
       },
       "OrganizationRole": {
         "properties": {
@@ -14814,6 +15147,24 @@
           "data"
         ],
         "title": "Snapshot[LiveAttempt]"
+      },
+      "Snapshot_OrganizationDraftResult_": {
+        "properties": {
+          "position": {
+            "type": "integer",
+            "title": "Position"
+          },
+          "data": {
+            "$ref": "#/components/schemas/OrganizationDraftResult"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "position",
+          "data"
+        ],
+        "title": "Snapshot[OrganizationDraftResult]"
       },
       "Snapshot_ProjectAttemptsResult_": {
         "properties": {
