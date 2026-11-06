@@ -42,7 +42,7 @@ from .contracts import API_VERSION, AccessMode, Accepted, Capabilities, CommandR
 from .decision_commands import DECISION_ANSWER
 from .coverage_queries import ACCEPTANCE_COVERAGE
 from .decision_queries import DECISIONS_LIST
-from .evidence_queries import EVIDENCE_EXTERNAL_SOURCE
+from .evidence_queries import EVIDENCE_EXTERNAL_SOURCE, EVIDENCE_SCREENSHOT
 from .. import fetch
 from .event_stream import EventScope, EventStream
 from .form_commands import ORGANIZATION_ADOPT
@@ -75,6 +75,7 @@ from .registry import Registry
 from .loops_queries import RUN_LOOPS
 from .rules_queries import RULES_REGISTRY
 from .tools_queries import TOOLS_REGISTRY
+from .trial_queries import RUN_TRIALS
 
 
 class ReadOnlyError(RuntimeError):
@@ -132,6 +133,8 @@ DEFAULT_REGISTRY = Registry(
               # 项目设置里「形态」的采用（工单 #1402）：发布带里的一份形态写成项目流的一条事件
               ORGANIZATION_ADOPT],
     queries=[SYSTEM_STATUS, ATTEMPT_LIVE, DECISIONS_LIST, *PROJECT_QUERIES, EVIDENCE_EXTERNAL_SOURCE,
+             # 试用记录与截图（工单 #152）：页面「试用记录」页签与截图缩略图读这两条
+             RUN_TRIALS, EVIDENCE_SCREENSHOT,
              ACCEPTANCE_COVERAGE,
              CATALOG_QUERY, CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY,
              TOOLS_REGISTRY, RUN_LOOPS, PROJECT_ORGANIZATION],
