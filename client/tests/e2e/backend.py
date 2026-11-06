@@ -50,7 +50,7 @@ from harness.app.project_and_work_item_commands import (  # noqa: E402
     MaterialRecord,
     WorkItemCreate,
 )
-from harness.app.project_queries import ProjectsList  # noqa: E402
+from harness.app.project_queries import ProjectsList, RunActions  # noqa: E402
 from harness.definitions import DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, VerificationDeclaration, load_definitions  # noqa: E402
 from harness.environment import QA_TESTS_DIR  # noqa: E402
 from harness.event_store import run_stream  # noqa: E402
@@ -127,6 +127,22 @@ TOOLS_HTTP_SERVER = "search"
 
 # 两个项目各自取回的本机地址路径（同一个真实 HTTP 服务上的两页）
 TOOLS_FETCH_PATHS = ("/echo", "/notes")
+
+# 取回与 MCP 调用的显示（工单 #238）：一个项目、一个事项。产品的第一轮给出两次工具调用——
+# 一次真实取回本机地址上的一页（250 行，供外部来源按页阅读核对），一次调用真实 MCP 服务器；
+# 产品的第二次请求按模型服务失败结束，第一次激活因此已经结束，页面只用这一段的四次动作。
+# 事项停下以后补写两条只看显示的动作：一条被拒绝的取回与一条结果未知的 MCP 调用。
+# 这两条在真实路径上分别需要一个固定端口（地址规则只拒绝服务自己的监听端口，端口 0 时不知道）
+# 与一次进程中断（结果未知来自启动恢复），生产它们的用例在集成层（#68 的拒绝、#1175 的中断）；
+# 这里写事件，页面读到的是与生产路径相同形状的回执与核实记录
+FETCH_DISPLAY_PROJECT = "取回显示"
+FETCH_DISPLAY_ITEM = "取回一页说明并调用 MCP 工具"
+FETCH_DISPLAY_PAGE = "/fetch-display"
+FETCH_DISPLAY_PAGE_LINES = 250
+FETCH_DISPLAY_REFUSED_URL = "http://127.0.0.1:8765/"
+FETCH_DISPLAY_REFUSED_REASON = "地址指向 Yudao 自己的服务，拒绝取回"
+FETCH_DISPLAY_HANDED_BACK = ("执行被中断，结果未知：这次尝试没有保存为外部来源工件的结果，"
+                             "由发出这次调用的会话决定是否重新调用。")
 
 
 # 形态一节（工单 #1403）：项目设置页的「形态」一节要有一个项目与一份带两份形态的发布。
@@ -887,6 +903,128 @@ def tools_script(fetch_urls: list[str]):
     }
 
 
+def fetch_display_script(page_url: str):
+    # 取回与 MCP 调用的显示（工单 #238）：产品的第一次请求同时给出两次工具调用——取回本机的一页
+    # 与调用项目设置里的 MCP 工具（别名 mcp__time__echo，服务器由项目设置探测以后冻结进事项）
+    def product_turn(_call):
+        return ModelResponse(output=[
+            {"id": "fc-fetch-238", "call_id": "fc-fetch-238", "type": "function_call",
+             "name": "fetch_url", "arguments": json_dumps({"url": page_url})},
+            {"id": "fc-mcp-238", "call_id": "fc-mcp-238", "type": "function_call",
+             "name": "mcp__time__echo", "arguments": json_dumps({"text": "取回显示"})},
+        ])
+
+    # 产品的第二次请求按模型服务失败结束：这一页的验收只看第一次激活里的四次工具调用，
+    # 让 run 走到终态（第一次激活因此已结束，结果未知的那一条不会算成进行中）；三部门后面的轮次用不着
+    return {
+        "product": [product_turn, ProviderError("取回显示的预置在第一次激活以后结束", reason="provider_error")],
+        "engineering": [],
+        "quality": [],
+    }
+
+
+def _display_only_events(system: LoopSystem, run_id: str) -> list[NewEvent]:
+    # 只剩显示的两条动作（见 FETCH_DISPLAY_* 的说明）：被拒绝的取回与结果未知的 MCP 调用。
+    # 载荷照真实事件的形状写：调用目标与版本字段从同一个 run 的真实调用复制，
+    # 结果未知的那一条按启动恢复写下的核实记录（resolution="handed_back" 与交还给模型的工具结果）
+    events = system.store.list_events(run_id)
+    fetch_started = next(event for event in events
+                         if event.type == EventType.TOOL_STARTED
+                         and (event.payload or {}).get("name") == "fetch_url")
+    mcp_started = next(event for event in events
+                       if event.type == EventType.TOOL_STARTED
+                       and str((event.payload or {}).get("name") or "").startswith("mcp__"))
+    fetch_called = next(event for event in events
+                        if event.type == EventType.TOOL_CALLED
+                        and (event.payload or {}).get("name") == "fetch_url")
+    started_template = dict(fetch_started.payload or {})
+    called_template = dict(fetch_called.payload or {})
+    step_id = started_template.get("step_id")
+    activation_id = started_template.get("activation_id")
+    department = "product"
+    session_id = fetch_started.session_id
+    started_suffix = {
+        "step_id": step_id, "activation_id": activation_id, "attempt": started_template.get("attempt", 1),
+        "purpose": started_template.get("purpose", "work"),
+    }
+
+    def started(identity: str, name: str, args: dict) -> NewEvent:
+        payload = {**started_template, **started_suffix, "id": identity, "name": name, "args": args}
+        return NewEvent(EventType.TOOL_STARTED, state_before="done", state_after="done",
+                        actor=f"department:{department}", department=department,
+                        session_id=session_id, payload=payload)
+
+    def refused_fetch() -> tuple[NewEvent, NewEvent]:
+        identity = "refused-fetch-238"
+        args = {"url": FETCH_DISPLAY_REFUSED_URL}
+        result = {"ok": False, "output": None, "error": FETCH_DISPLAY_REFUSED_REASON}
+        called = {
+            **called_template,
+            "id": identity, "name": "fetch_url", "args": args, "ok": False,
+            "error": FETCH_DISPLAY_REFUSED_REASON, "output_ref": None,
+            "input_item": {"type": "function_call_output", "call_id": identity, "output": json_dumps(result)},
+            "refused": True, "refused_reason": FETCH_DISPLAY_REFUSED_REASON,
+        }
+        return (started(identity, "fetch_url", args),
+                NewEvent(EventType.TOOL_CALLED, state_before="done", state_after="done",
+                         actor=f"department:{department}", department=department,
+                         session_id=session_id, payload=called))
+
+    def unknown_mcp() -> tuple[NewEvent, NewEvent]:
+        identity = "unknown-mcp-238"
+        name = str((mcp_started.payload or {}).get("name") or "mcp__time__echo")
+        args = {"text": "取回显示"}
+        result = {"ok": False, "output": None, "error": FETCH_DISPLAY_HANDED_BACK}
+        verified = {
+            "id": identity, "name": name, "step_id": step_id, "activation_id": activation_id,
+            "purpose": "work", "ok": False, "error": FETCH_DISPLAY_HANDED_BACK,
+            "resolution": "handed_back",
+            "input_item": {"type": "function_call_output", "call_id": identity, "output": json_dumps(result)},
+        }
+        return (started(identity, name, args),
+                NewEvent(EventType.ACTION_VERIFIED, state_before="done", state_after="done",
+                         actor="system", department=department, session_id=session_id, payload=verified))
+
+    return [*refused_fetch(), *unknown_mcp()]
+
+
+async def seed_fetch_display(application: Application, system: LoopSystem, page_url: str) -> None:
+    # 取回与 MCP 调用的显示（工单 #238）：一个项目与一个停在模型服务失败的事项（第一次激活已经结束）。
+    # 项目设置里先保存一台真的 stdio MCP 服务器并探测（工具清单快照写回设置），事项创建时冻结它，
+    # 产品的工具定义所以有 mcp__time__echo；事项停下以后补写两条只看显示的动作
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=FETCH_DISPLAY_PROJECT, goal="取回与 MCP 调用的显示"))
+    project_id = created.refs.project_id
+    stdio_server = {
+        "name": TOOLS_SERVER, "transport": "stdio",
+        "command": sys.executable, "args": [str(MCP_STDIO_SERVER)],
+        "departments": ["product"],
+    }
+    await accept(application, "mcp_servers.save", McpServersSave(
+        command_id=str(uuid.uuid4()), project_id=project_id,
+        servers={TOOLS_SERVER: stdio_server}, base_version=0))
+    await accept(application, "tool_server.probe", ToolServerProbe(
+        command_id=str(uuid.uuid4()), project_id=project_id, name=TOOLS_SERVER, server=stdio_server))
+    await wait_for_probe(application, project_id, TOOLS_SERVER)
+    item = await accept(application, "work_item.create", WorkItemCreate(
+        command_id=str(uuid.uuid4()), project_id=project_id, text=FETCH_DISPLAY_ITEM))
+    run_id = item.refs.run_id
+    task = system.orchestrator.work_item_execution(run_id)
+    if task is not None:
+        await task
+    run = system.project(run_id)
+    if run.status != "failed" or run.stop_reason != "provider_error":
+        raise AssertionError(f"取回显示的预置没有按预定的方式结束：{run.status} {run.stop_reason}")
+    entries = _display_only_events(system, run_id)
+    system.writes.transact(run_stream(run_id), lambda transaction: transaction.append(*entries))
+    # 两条只看显示的动作要读得出来：动作表与恢复页各按自己的查询取到它们
+    actions = application.query("run.actions", RunActions(run_id=run_id)).data.actions
+    if not any(action.action_id == "refused-fetch-238" and action.status == "refused" for action in actions):
+        raise AssertionError("取回显示的预置里没有被拒绝的取回动作")
+    if not any(action.action_id == "unknown-mcp-238" and action.status == "unknown" for action in actions):
+        raise AssertionError("取回显示的预置里没有结果未知的 MCP 动作")
+
+
 def kill_script(signals: Path):
     # 硬杀重启的端到端（工单 #1188）：产品提交规格以后，工程用 bash 执行一条等着放行的真实命令
     # （信号目录由 backend.py 建、报给用例：命令写下 started 与 child.pid，等 release 文件出现才结束）。
@@ -1173,11 +1311,16 @@ class ModelsServer:
 
 class NotesServer:
     # 端到端用例取回的本机地址（工单 #239）：一个真实的 HTTP 服务，返回两份真网页。
-    # 取回动作真的取它，取回记录因此是真实动作的结果，不是写进去的事件
+    # 取回动作真的取它，取回记录因此是真实动作的结果，不是写进去的事件。
+    # 取回显示的用例（工单 #238）另有一份 250 行的纯文本页：外部来源按页阅读时用它核对第二页
     def __init__(self) -> None:
         pages = {
             "/echo": "<html><body><h1>回声工具的说明</h1><p>把传入的文本原样打印出来。</p></body></html>",
             "/notes": "<html><body><h1>文本整理的说明</h1><p>逐行整理传入的文本。</p></body></html>",
+        }
+        plain_pages = {
+            FETCH_DISPLAY_PAGE: "\n".join(
+                f"第 {index} 行：取回显示的证据" for index in range(1, FETCH_DISPLAY_PAGE_LINES + 1)) + "\n",
         }
 
         class Handler(BaseHTTPRequestHandler):
@@ -1185,7 +1328,12 @@ class NotesServer:
                 return
 
             def do_GET(self):
-                body = pages.get(self.path.split("?")[0])
+                path = self.path.split("?")[0]
+                body = pages.get(path)
+                content_type = "text/html; charset=utf-8"
+                if body is None:
+                    body = plain_pages.get(path)
+                    content_type = "text/plain; charset=utf-8"
                 if body is None:
                     self.send_response(404)
                     self.send_header("Content-Length", "0")
@@ -1193,7 +1341,7 @@ class NotesServer:
                     return
                 payload = body.encode("utf-8")
                 self.send_response(200)
-                self.send_header("Content-Type", "text/html; charset=utf-8")
+                self.send_header("Content-Type", content_type)
                 self.send_header("Content-Length", str(len(payload)))
                 self.end_headers()
                 self.wfile.write(payload)
@@ -1348,8 +1496,8 @@ def main() -> int:
     # 前一次请求按 D17 重试、后一次凭据无效进入待恢复）；replay 是回放范围用的脚本（工单 #1217：默认脚本
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
-                                             "stopnote", "replay", "kill", "steps", "coverage", "tools", "forms",
-                                             "organization", "openloop", "materials"),
+                                             "stopnote", "replay", "kill", "steps", "coverage", "tools", "fetch",
+                                             "forms", "organization", "openloop", "materials"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -1399,8 +1547,8 @@ def main() -> int:
     # 硬杀重启（工单 #1188）：工程执行的那条等待命令在信号目录里写下 started 与 child.pid，等 release
     # 文件出现才结束；目录由这里建、连同进程号一起报给用例
     signals = Path(tempfile.mkdtemp(prefix="yudao-e2e-signals-")) if args.script == "kill" else None
-    # 工具与扩展页的端到端验收（工单 #239）：两个项目各取回一次本机地址，地址由这个真实 HTTP 服务提供
-    notes = NotesServer() if args.script == "tools" else None
+    # 工具与扩展页的端到端验收（工单 #239）与取回显示的用例（工单 #238）：取回的本机地址由这个真实 HTTP 服务提供
+    notes = NotesServer() if args.script in ("tools", "fetch") else None
     if args.room:
         adapter_script = room_script()
     elif args.script == "onboarding":
@@ -1429,6 +1577,9 @@ def main() -> int:
     elif args.script == "tools":
         # 工具与扩展页（工单 #239）：两个项目，工程各在事项里真实取回一次本机地址
         adapter_script = tools_script([f"{notes.base}{path}" for path in TOOLS_FETCH_PATHS])
+    elif args.script == "fetch":
+        # 取回与 MCP 调用的显示（工单 #238）：产品在一轮里真实取回一页并调用真实 MCP 服务器
+        adapter_script = fetch_display_script(f"{notes.base}{FETCH_DISPLAY_PAGE}")
     elif args.script == "replay":
         # 回放范围（工单 #1217）：预置脚本再加同一项目里两个走完的事项，因此每个部门的轮次加一倍
         base_script = script()
@@ -1541,6 +1692,10 @@ def main() -> int:
             # 工具与扩展页（工单 #239）：两个项目各一台 MCP 服务器、各一次真实取回；
             # 第一台服务器真的探测过（工具清单写回设置），第二台不探测
             asyncio.run(seed_tools(application, system, [f"{notes.base}{path}" for path in TOOLS_FETCH_PATHS]))
+        elif args.script == "fetch":
+            # 取回与 MCP 调用的显示（工单 #238）：一个项目、一个停在模型服务失败的事项，
+            # 产品的一轮里真实取回一页并真实调用 MCP 服务器；停下以后补写被拒绝与结果未知的两条动作
+            asyncio.run(seed_fetch_display(application, system, f"{notes.base}{FETCH_DISPLAY_PAGE}"))
         elif args.script == "replay":
             # 回放范围（工单 #1217）：默认预置再加同一项目里先后两个走完的事项
             asyncio.run(seed(application, system, two_item_project=True))
@@ -1555,7 +1710,8 @@ def main() -> int:
             # 开环完成与放行（工单 #1421）：一个项目里两件事项分别以开环完成与放行结束，
             # 另一个项目里一件成果挂起的事项
             asyncio.run(seed_open_loop(application, system))
-        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools", "materials"):
+        elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools", "fetch",
+                                 "materials"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）
             # 自己在界面上建项目并开始事项，不需要预置的项目与事项；进行中的询问还要求执行槽位空着，
