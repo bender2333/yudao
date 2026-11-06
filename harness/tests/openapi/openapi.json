@@ -16956,6 +16956,10 @@
             "type": "integer",
             "title": "Released Unsettled"
           },
+          "open_loop": {
+            "type": "integer",
+            "title": "Open Loop"
+          },
           "stopped": {
             "type": "integer",
             "title": "Stopped"
@@ -16976,6 +16980,7 @@
           "in_progress",
           "adopted",
           "released_unsettled",
+          "open_loop",
           "stopped",
           "held",
           "not_started"
