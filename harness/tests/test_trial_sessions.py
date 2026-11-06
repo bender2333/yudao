@@ -36,6 +36,7 @@ from harness.adapters.fake import FakeAdapter
 from harness.artifacts import ArtifactStore
 from harness.definitions import DEFINITIONS
 from harness.environment import LocalEnvironment, Workspaces, inspection_root
+from harness.launch_rules import current_system, resolve_trial_launch
 from harness.models import EventType
 from harness.proposals import delivery_turn, product_spec
 from harness.providers.call import ModelResponse
@@ -43,7 +44,7 @@ from harness.public_tree import capture_public_tree
 from harness.runtime import LoopSystem
 from harness.tools import tool_cancellable, tool_verification
 from harness.tree_archive import artifact_run, load_tree, store_tree
-from harness.trial_sessions import TrialSessionTable, current_system, resolve_trial_call
+from harness.trial_sessions import TrialSessionTable
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tiny_web_app"
 # 试用会话只在本机与控制主机两类位置上：系统不是 windows 或 linux 的机器没有启动命令的约定
@@ -261,9 +262,9 @@ def test_quality_starts_a_copy_of_the_delivery_snapshot_by_its_launch_name(tmp_p
 
 
 def test_a_launch_name_the_delivery_spec_does_not_carry_is_refused_with_the_names():
-    delivery = SimpleNamespace(launch=[_launch(name="web"), _launch(name="cli")])
+    methods = [_launch(name="web"), _launch(name="cli")]
 
-    launch, reason = resolve_trial_call("trial_open", {"launch_name": "missing"}, delivery)
+    launch, reason = resolve_trial_launch("trial_open", {"launch_name": "missing"}, methods)
 
     assert launch is None
     assert "no launch method named 'missing'" in reason
@@ -271,8 +272,7 @@ def test_a_launch_name_the_delivery_spec_does_not_carry_is_refused_with_the_name
 
 
 def test_a_delivery_spec_without_a_launch_method_is_refused():
-    launch, reason = resolve_trial_call("trial_open", {"launch_name": "web"},
-                                        SimpleNamespace(launch=[]))
+    launch, reason = resolve_trial_launch("trial_open", {"launch_name": "web"}, [])
 
     assert launch is None and reason == "the DeliverySpec has no launch method"
 
@@ -282,7 +282,7 @@ def test_a_launch_without_a_command_for_this_system_is_refused_naming_it():
     other = "linux" if system == "windows" else "windows"
     launch = _launch(systems=(other,))
 
-    resolved, reason = resolve_trial_call("trial_start", {"launch": launch}, None)
+    resolved, reason = resolve_trial_launch("trial_start", {"launch": launch}, [])
 
     assert resolved is None
     assert f"no command for {system}" in reason
