@@ -340,6 +340,16 @@ def bare_title(title: str) -> str:
     return t
 
 
+@lru_cache(maxsize=None)
+def changelog_titles() -> frozenset[str]:
+    """docs/CHANGELOG.md 里作为「旧标题」出现过的标题。"""
+    try:
+        text = (ROOT / "docs" / "CHANGELOG.md").read_text(encoding="utf-8")
+    except OSError:
+        return frozenset()
+    return frozenset(m.strip() for m in re.findall(r"「([^」\n]{1,60})」\s*→\s*「[^」\n]{1,60}」", text))
+
+
 def squeeze(text: str) -> str:
     """比字的时候不看排版：空白不算差别。"""
     return re.sub(r"\s+", "", text)
@@ -355,8 +365,8 @@ def reference_problems() -> list[str]:
             where = f"{rel}: {match.group(0)}"
             if not titles:
                 found.append(f"{where} —— 没有 docs/design/{doc}")
-            elif title not in titles:
-                found.append(f"{where} —— 「{title}」不是 docs/design/{doc} 现在的小节标题")
+            elif title not in titles and title not in changelog_titles():
+                found.append(f"{where} —— 「{title}」不是 docs/design/{doc} 现在的小节标题，也不是记过的旧标题")
             elif item and squeeze(item) not in squeeze(bodies.get(title, "")):
                 found.append(f"{where} —— 「{item}」不是「{title}」那一节正文里的字")
     return found
@@ -382,3 +392,16 @@ def test_a_named_design_reference_in_a_prototype_file_is_still_reported():
     bare = "// 页面路径（原型 v8 设计说明第 3.3 节）\n// 回放位置写在 ?at= 中（设计说明第 3.3 节）\n"
     assert not scan("client/src/example.ts", bare), "只写节号的原型引用仍然豁免"
 
+
+
+def test_a_changelog_old_title_passes_but_an_unknown_title_fails():
+    """旧标题按 CHANGELOG 放过，没记过的标题仍然失败（守 R2：改一节标题不让几百处飘红）。"""
+    current = design_sections("skeleton-and-application.md")[0]
+    olds = [title for title in changelog_titles() if title not in current]
+    assert olds, "CHANGELOG 里应当有不在现在标题里的旧标题"
+
+    def allowed(title: str) -> bool:
+        return title in current or title in changelog_titles()
+
+    assert allowed(olds[0]), "CHANGELOG 记过的旧标题应当放过"
+    assert not allowed("这一节从来没有过"), "没记过的标题仍然要失败"
