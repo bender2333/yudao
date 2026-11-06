@@ -3,6 +3,8 @@
 #       （小写字母、数字与下划线，字母开头），规则确定、可反查，冲突必须拒绝而不是静默改名。
 # 守 R3：第 5.1 节写明的拼接、收敛、超长前缀与摘要规则，原名只在调用时还原。
 
+import asyncio
+
 import harness.mcp_session as mcp_session
 
 
@@ -189,3 +191,19 @@ def test_a_missing_credential_refuses_the_launch_with_the_credential_name():
         assert "MCP_SESSION_KEY" in str(refused)
     else:
         raise AssertionError("缺少凭据时没有拒绝启动")
+
+
+def test_a_call_without_its_credential_is_a_failed_action_that_names_it():
+    # 一次调用在开始时取不到凭据：不建立会话，动作记为失败（startup_failed），原因交回模型并写明凭据名称
+    # （设计说明第 7.2 节）；这是 call 的拒绝包装，不是抛给调用方
+    document = _settings_document({"API_KEY": {"kind": "credential", "credential_ref": "MCP_SESSION_KEY"}})
+    table = mcp_session.McpSessions(document, credentials=CredentialChain(), stderr_dir=".")
+
+    async def call():
+        return await table.call("mcp__fs__read_file", "fs", "Read.File", {})
+
+    outcome = asyncio.run(call())
+    assert outcome.is_error and outcome.error_code == "startup_failed"
+    assert "MCP_SESSION_KEY" in outcome.result_text
+    assert CREDENTIAL_SECRET not in outcome.result_text
+    assert not table.open and table.sessions() == {}

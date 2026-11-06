@@ -14,8 +14,9 @@
 # restart_work_item_for_upgrade、启动补建读的都是 _work_item_created 写进事项事实的同一份冻结值）。
 #
 # 层：模块层（FakeAdapter 的一次激活或不出激活；SQLite 事件库与工作区文件，不用网络与完整循环，
-# 测试分层设计说明第 2 节）。守 R1（边界与冻结）、R2（第二环的合同：项目流事件与 run_created 载荷、
-# 两端共读的事件种类清单）与 R3（用户读到的设置与保存的一致，凭据值不出现）。
+# 测试分层设计说明第 2 节）。守 R1（边界与冻结）、R2（第二环的合同：项目流事件与 run_created 载荷；
+# 两端共读的事件种类清单由 test_event_type_fixture.py、test_event_classification.py 与
+# test_project_stream_fields.py 逐种核对）与 R3（用户读到的设置与保存的一致，凭据只以引用名出现）。
 
 from __future__ import annotations
 

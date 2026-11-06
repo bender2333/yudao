@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 
 from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.event_store import StreamVersionConflict, run_stream
@@ -15,6 +16,9 @@ from harness.proposals import (
 )
 from harness.runtime import LoopSystem
 from harness.tests.helpers import from_another_thread
+from harness.tests.helpers import adjudication_view
+from harness.validation import evaluate_proposal
+from harness.tightening import WATCHED_OUTPUTS
 
 # 提案校验与提交：流程编排校验提案时记下读取的流版本，提交以它作为期望版本追加；校验以后另一方写入了这个 run，
 # 写入口拒绝提交，流程编排按写入以后的状态重新校验与判断。测试包装公开的 WritePath.transact：记下每次判断使用的
@@ -139,6 +143,25 @@ def _activate_until(system, run_id, revision):
 
 def _basis_errors(projection):
     return [item for rejection in projection.rejections for item in rejection["errors"]]
+
+
+def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path):
+    # 放行前的最后一道关：交付本身依据的是已被取代的产品规格，依据字段写对了也不放行
+    # （保留：按测试分层设计说明 13.1 特别规则 7 与 #1480，守内核模块行为的结论在内核目录里要有一份，
+    #  `referenced_current` 目前只有目录外的这一条，先补内核副本再删由架构师决定）
+    system, run_id = _system(tmp_path, product_spec(), delivery_turn())
+    while system.project(run_id).delivery_spec is None:
+        projection = system.activate_once(run_id)
+        assert projection.status not in ("done", "failed"), projection.stop_reason
+    projection = system.project(run_id)
+    superseded = replace(projection.delivery_spec, product_spec_hash="sha256:" + "0" * 64)
+    decision = evaluate_proposal(adjudication_view(replace(projection, delivery_spec=superseded)),department="quality",
+                                 facts=system.workspace(run_id).snapshot().facts,
+                                 proposal=review("release", "releasing a stale-bound delivery",
+                                                 checks=["smoke"],
+                                                 basis_delivery_spec_hash=projection.delivery_spec.content_hash), tightening=WATCHED_OUTPUTS)
+    assert not decision.accepted
+    assert "product_spec_hash" in [error["field"] for error in decision.error_dicts]
 
 
 def test_a_spec_that_omits_the_basis_is_rejected_by_the_host(tmp_path):
