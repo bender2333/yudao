@@ -364,7 +364,6 @@ DOC_PATH_RE = re.compile(r"docs/design/((?:[\w-]+/)*[\w-]+\.md)")
 SLICE_RE = re.compile(r"\s*S\d[a-z]?")
 
 COMMENT_STARTS = ("#", "//", "*", "/*", "*/", "--", '"""', "'''")
-TAIL_OK = re.compile(r"(设计说明|设计|文档|说明)?[\s）)。，、：:；;]*")
 NAME_SUFFIX = re.compile(r"(设计说明|设计|文档|说明|design|Design)$")
 GAP_OK = re.compile(r"(?:[\s）)、，,（(：:；;的]|设计说明|设计|文档|说明)*")
 BLAME_LINE_RE = re.compile(r"^([0-9a-f]{40}) \d+ \d+")
@@ -858,17 +857,15 @@ class Evidence:
 
 
 _ISSUE_CACHE: dict[str, str] = {}
-_ISSUE_LOADED = False
 _ISSUE_PATH: Path | None = None
 
 
 def load_issue_cache(path: str | None) -> None:
-    global _ISSUE_LOADED, _ISSUE_PATH
+    global _ISSUE_PATH
     if path:
         _ISSUE_PATH = Path(path)
         if _ISSUE_PATH.exists():
             _ISSUE_CACHE.update(json.loads(_ISSUE_PATH.read_text(encoding="utf-8")))
-    _ISSUE_LOADED = True
 
 
 def save_issue_cache() -> None:
