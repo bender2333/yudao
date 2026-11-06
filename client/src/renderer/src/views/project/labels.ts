@@ -37,6 +37,26 @@ export const WORK_ITEM_STATUS: Record<string, string> = {
   // held 是「上一个采纳成果被挂起」（基线变更），与排队是两件事，页面上不叫「排队中」（工单 #733）
   held: "成果已挂起",
 };
+
+// 开环完成（工单 #1421）：没有核验角色的事项交了完成就结束，项目流里 status 仍是 released_unsettled、
+// stop_reason 是 open_loop。它不是放行（形态与核验角色设计说明「开环完成」），页面与报告都写「开环完成」
+export const OPEN_LOOP_STATUS_TEXT = "开环完成";
+
+// 事项状态在页面上的说法只按事项卡上的这两个字段判断（工单 #1421）：结束原因是 open_loop 的写在
+// released_unsettled 上，不是另一个状态。判断只在这一处，看板分组、事项卡、详情与顶栏共用，
+// 页面因此不会一处写「已放行」、另一处写「开环完成」
+export interface WorkItemStatusFields {
+  status: string;
+  stop_reason?: string | null;
+}
+
+export function isOpenLoopCompleted(item: WorkItemStatusFields): boolean {
+  return item.status === "released_unsettled" && item.stop_reason === "open_loop";
+}
+
+export function workItemStatusText(item: WorkItemStatusFields): string {
+  return isOpenLoopCompleted(item) ? OPEN_LOOP_STATUS_TEXT : label(WORK_ITEM_STATUS, item.status);
+}
 // 事项状态对应的原型标记（原型 v10 handlers/project.js 的 displayOf）：
 // held 与 stopped 在原型图标里没有对应（held 无图标），这两项保留纯文字，界面不猜
 export const WORK_ITEM_STATUS_KIND: Record<string, string> = {
@@ -83,6 +103,8 @@ export const RUN_STATUS_LABELS: Record<string, string> = {
 // 停止原因的中文名（harness/definitions/stop_reasons.json 的取值与 done 的两种一致）
 export const STOP_REASON: Record<string, string> = {
   released: "已完成并放行",
+  // 开环完成也是「完成」的一种结束原因，但不是放行（工单 #1421）：文字与事项状态共用一处
+  open_loop: OPEN_LOOP_STATUS_TEXT,
   baseline_verified: "已完成基线核验",
   max_cycles: "循环次数已达上限",
   model_steps_exhausted: "部门步数已达上限",

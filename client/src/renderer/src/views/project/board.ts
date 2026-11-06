@@ -2,6 +2,8 @@
 //
 // 口径（工单 #1372 按代码与设计说明查清）：
 //   - 排队中、已放行、已采纳、已停止按事项的状态分；停止的事项不再属于任何部门，单独一组，不并进部门列。
+//   - 开环完成（工单 #1421）是「已放行」那一组里结束原因不同的一种：事项的 status 仍是 released_unsettled，
+//     结束原因是 open_loop 的进「开环完成」一列，不进「已放行」一列。
 //   - 部门列按各部门在这个事项上的状态分：部门手上有这个事项（等用户、一轮工作中、询问中、核验中）时，
 //     事项就在它的列里；部门在等待工作（等关注的成果出新版本）时不在。几个部门同时工作时同一事项出现在
 //     几列里——「当前事项」的部门状态行说一个部门在一轮工作中，它的列里就一定有这个事项（工单 #1372）。
@@ -9,11 +11,11 @@
 //     不写死产品、工程、质检三栏；换了部门名的定义，部门列跟着换。
 
 import type { WorkItemCard } from "../../api/generated/types.gen";
-import { departmentName } from "./labels.ts";
+import { departmentName, isOpenLoopCompleted } from "./labels.ts";
 import { boardDepartments, type DepartmentView } from "./organization.ts";
 
-// 按状态分的四组，与事项的部门无关
-export type FixedBoardGroup = "queue" | "released" | "adopted" | "stopped";
+// 按状态分的五组，与事项的部门无关
+export type FixedBoardGroup = "queue" | "released" | "open_loop" | "adopted" | "stopped";
 
 // 看板上的部门从事实来（工单 #1457）：项目现在组织里的部门与每个事项冻结的组织里的部门。
 // 两样都没有时（旧服务、查询还没有数据）按事项卡片上的 departments 推导，与原来的做法一样
@@ -25,7 +27,7 @@ export interface BoardOrganization {
 }
 
 export const BOARD_TITLES: [FixedBoardGroup, string][] = [
-  ["queue", "排队中"], ["released", "已放行"], ["adopted", "已采纳"], ["stopped", "已停止"],
+  ["queue", "排队中"], ["released", "已放行"], ["open_loop", "开环完成"], ["adopted", "已采纳"], ["stopped", "已停止"],
 ];
 
 // 一个部门列：部门取自事项的定义，标题是页面上的部门名
@@ -39,11 +41,12 @@ export interface BoardColumns {
   queue: WorkItemCard[];
   departments: BoardDepartmentColumn[];
   released: WorkItemCard[];
+  open_loop: WorkItemCard[];
   adopted: WorkItemCard[];
   stopped: WorkItemCard[];
 }
 
-// 看板上的一组，按显示顺序排：排队中、各部门（定义里的顺序）、已放行、已采纳、已停止
+// 看板上的一组，按显示顺序排：排队中、各部门（定义里的顺序）、已放行、开环完成、已采纳、已停止
 export interface BoardGroup {
   key: string;
   title: string;
@@ -54,8 +57,10 @@ function fixedTitle(key: FixedBoardGroup): string {
   return BOARD_TITLES.find(([name]) => name === key)?.[1] ?? key;
 }
 
-// 事项按状态落进固定的一组；进行中的事项由部门列决定，这里返回 null
+// 事项按状态落进固定的一组；进行中的事项由部门列决定，这里返回 null。
+// 开环完成的两种结束方式在项目流里是同一个状态，先按结束原因分出「开环完成」再按状态分（工单 #1421）
 function fixedGroupOf(item: WorkItemCard): FixedBoardGroup | null {
+  if (isOpenLoopCompleted(item)) return "open_loop";
   if (item.status === "adopted") return "adopted";
   if (item.status === "released_unsettled") return "released";
   if (item.status === "stopped") return "stopped";
@@ -115,7 +120,7 @@ function departmentTitles(organization: BoardOrganization): Record<string, strin
 }
 
 export function boardColumns(items: WorkItemCard[], organization: BoardOrganization = {}): BoardColumns {
-  const columns: BoardColumns = { queue: [], departments: [], released: [], adopted: [], stopped: [] };
+  const columns: BoardColumns = { queue: [], departments: [], released: [], open_loop: [], adopted: [], stopped: [] };
   // 部门列的部门：组织里有数据时取项目现在组织里的部门 + 还在跑的事项里旧组织的部门（工单 #1457）；
   // 没有时按事项卡片上的 departments 推导（旧服务、查询还没有数据）
   const columnDepartments = organization.departments === undefined
@@ -154,7 +159,7 @@ export function boardColumns(items: WorkItemCard[], organization: BoardOrganizat
   return columns;
 }
 
-// 界面按显示顺序用的一组一组（排队中、各部门、已放行、已采纳、已停止）
+// 界面按显示顺序用的一组一组（排队中、各部门、已放行、开环完成、已采纳、已停止）
 export function boardGroups(items: WorkItemCard[], organization: BoardOrganization = {}): BoardGroup[] {
   const columns = boardColumns(items, organization);
   return [
@@ -163,6 +168,7 @@ export function boardGroups(items: WorkItemCard[], organization: BoardOrganizati
       key: `department:${column.department}`, title: column.title, items: column.items,
     })),
     { key: "released", title: fixedTitle("released"), items: columns.released },
+    { key: "open_loop", title: fixedTitle("open_loop"), items: columns.open_loop },
     { key: "adopted", title: fixedTitle("adopted"), items: columns.adopted },
     { key: "stopped", title: fixedTitle("stopped"), items: columns.stopped },
   ];
