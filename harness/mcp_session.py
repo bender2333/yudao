@@ -46,7 +46,7 @@ EventSink = Callable[[str, dict[str, Any]], None]
 
 
 class ToolAliasConflict(Exception):
-    # 与内置或动态工具重名，或两个不同的工具收敛成同一个别名：拒绝保存（docs/design/network-and-mcp.md「工具的提供」）
+    # 与内置或动态工具重名，或两个不同的工具收敛成同一个别名：拒绝保存
     pass
 
 
@@ -87,7 +87,7 @@ def tool_alias(server: str, tool: str) -> str:
 
     收敛以后超过 64 个字符时，取前 51 个字符、加下划线、追加 `alias_suffix(server, tool)`；
     结果总是标识（前缀 `mcp__` 以字母开头），且同一个（服务器、工具）总是得到同一个别名。
-    两个不同的工具收敛成同一个别名时不在这里改名：由 `ToolAliases.add` 拒绝（docs/design/network-and-mcp.md「工具的提供」）。
+    两个不同的工具收敛成同一个别名时不在这里改名：由 `ToolAliases.add` 拒绝。
     """
     name = _DISALLOWED.sub("_", (TOOL_PREFIX + server + "__" + tool).lower())
     if len(name) > TOOL_NAME_MAX:
@@ -134,7 +134,7 @@ def item_definitions(base, document):
 
     document 是 
 un_created 里冻结的那份 MCP 设置（非秘密设置与凭据引用的整份文档，
-    见），ase 是当前定义。规则（docs/design/network-and-mcp.md「工具的提供」）：
+    见），ase 是当前定义。规则：
 
     - 只用工具清单快照，且快照的配置摘要必须与这台服务器的配置摘要一致；没有快照或摘要不符的
       服务器不提供工具（本函数不探测）。
@@ -222,7 +222,7 @@ class McpSessions:
 
     def original(self, alias: str) -> tuple[str, str]:
         # 别名反查（服务器、原工具名）：按冻结设置里的可用快照重建名称表（与 item_definitions
-        # 叠加定义副本用的是同一条名称规则，docs/design/network-and-mcp.md「工具的提供」）。没有冻结设置、或别名不在其中
+        # 叠加定义副本用的是同一条名称规则）。没有冻结设置、或别名不在其中
         # （例如别的工具名）时抛 UnknownToolAlias，执行环境据此拒绝
         aliases = ToolAliases()
         for server in (self._document.get("servers") or {}).values():

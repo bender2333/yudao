@@ -65,7 +65,7 @@ class RuleRegistry(Contract):
 
 
 class RulesRegistryRequest(ReplayRequest):
-    # 可回放（docs/design/rules-and-parameters.md「规则登记的初始内容」表格）：at 是全局位置，省略时读取现在的登记
+    # 可回放（表格）：at 是全局位置，省略时读取现在的登记
     pass
 
 

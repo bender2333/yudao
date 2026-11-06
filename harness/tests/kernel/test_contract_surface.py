@@ -99,7 +99,7 @@ def _version(module_name: str) -> int | None:
 
 @pytest.mark.parametrize("module_name", SEAM_CONTRACTS)
 def test_every_seam_contract_declares_a_version(module_name: str) -> None:
-    # 每道契约带版本号（docs/design/skeleton-and-application.md「契约」、「三道缝的契约」）：没有版本号，薄驱动就无从判断实现声明的是哪一版
+    # 每道契约带版本号（docs/design/skeleton-and-application.md「契约」）：没有版本号，薄驱动就无从判断实现声明的是哪一版
     version = _version(module_name)
     assert type(version) is int and version >= 1, f"{module_name} 没有给出整数的 CURRENT_VERSION：{version!r}"
     previous = getattr(MODULES[module_name], "PREVIOUS_VERSION", None)

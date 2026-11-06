@@ -4,7 +4,7 @@
 // 通知只用页面上已经查到的名称：项目名来自 projects.list，事项标题来自 project.overview；
 // 名称还没有取到时正文写标识（与决定卡片「事件流」的回落相同）。
 //
-// 浏览器只在 https 页面与本机地址提供 Web Notifications（docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）：局域网的 http 地址上
+// 浏览器只在 https 页面与本机地址提供 Web Notifications：局域网的 http 地址上
 // window.Notification 不存在，这时不发通知也不报错。权限由浏览器在第一次需要发通知时询问，
 // 用户拒绝以后不再发（同一页面上不再问）。
 
@@ -61,12 +61,12 @@ export function noticeForEvent(event: EventObject, names: NoticeNames): SystemNo
   return null;
 }
 
-// 页面标题：待决定的数量。没有待决定的事时不显示数字（docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）
+// 页面标题：待决定的数量。没有待决定的事时不显示数字
 export function pageTitle(pending: number, base: string): string {
   return pending > 0 ? `(${pending}) ${base}` : base;
 }
 
-// 浏览器通知：权限由浏览器在第一次需要发通知时询问（docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」）。
+// 浏览器通知：权限由浏览器在第一次需要发通知时询问。
 // window.Notification 在发通知时取，不在模块装载时取
 export class SystemNotifier {
   private asked = false;

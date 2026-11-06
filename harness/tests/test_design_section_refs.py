@@ -62,8 +62,6 @@ SKIP_FILES = (
     "scripts/convert_design_section_refs.py",
     "harness/tests/test_design_section_refs.py",
     "evals/context/rule-set.json",
-    # CI 工作流归架构师改（共同规则「权限」）：这 6 处注释由脚本换算，本条不扫
-    ".github/workflows/ci.yml",
 )
 
 # 节号的写法：「第」+ 编号 + 「节」，编号可以带小数点，也可以连写几个（「第 3、4 节」），

@@ -29,7 +29,7 @@ def missing_capabilities(department: str, model: ModelDefinition | Mapping[str, 
 
 def reminder(department: str, model: ModelDefinition | Mapping[str, Any],
               model_id: str | None = None) -> str | None:
-    # 一条提醒：写明部门、模型、缺少的能力与影响（docs/design/model-management.md「部门的建议能力」）。
+    # 一条提醒：写明部门、模型、缺少的能力与影响。
     # 模型具备本部门的建议能力，或部门没有建议能力时没有提醒
     missing = missing_capabilities(department, model)
     if not missing:

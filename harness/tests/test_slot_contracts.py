@@ -237,7 +237,7 @@ def test_each_assembly_implementation_gets_the_route_work_reference_and_both_rec
 
     _drive(EXECUTIONS[0], system, adapter, request, node, assembly=recording)
 
-    # 工作引用原样到达装配的输入（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」）
+    # 工作引用原样到达装配的输入
     assert recording.frames, "这一轮没有装配任何一步"
     assert recording.frames[0].work_ref is work_ref
     # 装配好的请求与上下文清单都记进日志：context_assembled 指向两者各自的工件，提供方交回的

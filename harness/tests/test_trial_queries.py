@@ -396,7 +396,7 @@ def test_run_actions_carries_screenshots_and_the_browser_session(tmp_path):
 
 
 def test_work_item_materials_adds_launch_methods_criteria_results_and_trial_screenshots(tmp_path):
-    # docs/design/browser-and-computer-use.md「查询」 `work_item.materials` 的三处增加：交付说明里的启动方式、每份 QAReview 的逐条结论与
+    # `work_item.materials` 的三处增加：交付说明里的启动方式、每份 QAReview 的逐条结论与
     # 试用用例的截图引用、无法核验的条目与原因
     system = LoopSystem.for_testing(tmp_path / "loop", FakeAdapter([]))
     try:

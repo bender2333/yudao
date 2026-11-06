@@ -19,7 +19,7 @@ import { departmentName } from "./labels.ts";
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];
 
-// 默认的三个部门（docs/design/network-and-mcp.md「服务器设置」「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
+// 默认的三个部门（docs/design/project-organization.md「项目上配的三层」「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
 // （工单 #1457），组织还没有数据时由调用处按设置里已有的部门兜底
 
 // 默认的时限与输出上限（后端 MCP_OUTPUT_LIMIT_DEFAULTS 是同一组值）：
@@ -58,7 +58,7 @@ export type McpServerDraft = {
   name: string;
   transport: McpTransport;
   command: string;
-  // 参数一行一个（docs/design/network-and-mcp.md「服务器设置」「stdio 的命令与参数」）
+  // 参数一行一个
   args: string;
   env: McpVariableDraft[];
   url: string;
@@ -127,7 +127,7 @@ export function splitLines(text: string): string[] {
   return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "");
 }
 
-// 一行变量或请求头 → 保存时的取值：固定文本写值，凭据只写名称（docs/design/network-and-mcp.md「服务器设置」）
+// 一行变量或请求头 → 保存时的取值：固定文本写值，凭据只写名称
 export function variableEntry(draft: McpVariableDraft): Record<string, unknown> {
   if (draft.kind === "credential") {
     return { kind: "credential", credential_ref: draft.credential_ref.trim() };
@@ -479,7 +479,7 @@ export function serverInfoText(probe: McpProbeResultView | null): string {
 }
 
 // 探测结果与当前配置是否还对得上：配置改过以后旧结果保留供查看，但不能再当可用快照
-// （docs/design/network-and-mcp.md「读取工具清单（探测）」）。两个摘要都由后端给出，页面只比较，不自己算、也不显示摘要本身
+//。两个摘要都由后端给出，页面只比较，不自己算、也不显示摘要本身
 export function probeIsStale(probe: McpProbeResultView | null, server: McpServerSettingView | null): boolean {
   if (probe === null || server === null || probe.status !== "ok") {
     return false;

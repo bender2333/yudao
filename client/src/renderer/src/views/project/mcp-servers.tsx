@@ -84,7 +84,7 @@ export function McpServersSection(props: { app: ClientApp; data: ProjectSettings
   const probe = useCommand(props.app, pageKey(["mcp-probe", editing === null ? "" : JSON.stringify(draft)]));
   const credential = useCommand(props.app, pageKey(["mcp-credential", props.data.mcp_servers.version]));
 
-  // 探测结果以事件到达：结果写进这一节，探测的「测试中」随之结束（docs/design/network-and-mcp.md「读取工具清单（探测）」）
+  // 探测结果以事件到达：结果写进这一节，探测的「测试中」随之结束
   const app = props.app;
   const subscribe = useCallback((listener: (event: EventObject) => void) => app.subscribeEvents(listener), [app]);
   const finishProbe = useRef<(event: EventObject) => void>(() => undefined);

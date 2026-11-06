@@ -61,7 +61,7 @@ def _http_server(url: str) -> dict:
 
 
 def _probe(application: Application, project_id: str, name: str, server: dict):
-    # 提交探测命令：命令立即接受，探测作为任务在应用层的事件循环里进行（docs/design/network-and-mcp.md「读取工具清单（探测）」）。
+    # 提交探测命令：命令立即接受，探测作为任务在应用层的事件循环里进行。
     # 测试在同一个事件循环里等那个任务完成，再核对结果事件
     from harness.app.commands import execute
 

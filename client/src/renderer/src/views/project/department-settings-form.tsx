@@ -72,7 +72,7 @@ export function promptDraftUseDefault(draft: DepartmentSettingsDraft): Departmen
 }
 
 // 草稿按项目部门设置的版本重置：设置随事件流更新（别人改了、自己保存成功）以后，草稿回到当前值，
-// 未提交的修改不跨越版本（docs/design/model-management.md「部门详情里的模型与 Prompt」的基准版本语义）
+// 未提交的修改不跨越版本（基准版本语义）
 // 第三项是已保存的那一份：撤销本次修改时还原成它
 export function useDepartmentDraft(setting: DepartmentSetting | null): [
   DepartmentSettingsDraft,
@@ -129,7 +129,7 @@ export function DepartmentSettingsFields(props: {
     () => groupAdmittedModels(choices, catalog.data?.providers ?? []),
     [choices, catalog.data],
   );
-  // 当前生效模型的说明：跟随部门默认时写明部门默认的模型与来源（docs/design/model-management.md「部门详情里的模型与 Prompt」）
+  // 当前生效模型的说明：跟随部门默认时写明部门默认的模型与来源
   const followText = followDepartmentLabel(currentEffectiveLabel(props.effective));
   // 档位选项来自当前生效模型声明的支持档位；随选择变化（选新模型以后按新模型声明取档位）
   const pickedModelId = selectionPair(props.draft.model).model_id;

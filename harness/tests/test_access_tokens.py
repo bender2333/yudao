@@ -36,7 +36,7 @@ def _lan_address() -> str:
 
 
 def _lan(opened, data_dir, **options):
-    # 局域网访问方式的真实服务：监听本机所有地址，经局域网地址连接（docs/design/app-and-interface.md「令牌与 TLS」）
+    # 局域网访问方式的真实服务：监听本机所有地址，经局域网地址连接
     return running_api(opened, access="lan", host="0.0.0.0", connect=_lan_address(),
                        data_dir=data_dir, **options)
 
@@ -57,7 +57,7 @@ def test_only_the_digest_of_a_token_is_kept(data_dir):
 
 
 def test_the_command_line_creates_lists_and_revokes_tokens(tmp_path, capsys):
-    # 命令行只在服务所在机器建立、列出与撤销令牌（docs/design/app-and-interface.md「令牌与 TLS」）：令牌明文只写一次，
+    # 命令行只在服务所在机器建立、列出与撤销令牌：令牌明文只写一次，
     # 服务运行时也能撤销，因此不取数据目录的进程锁
     data_dir = tmp_path / "data"
     assert main(["token", "create", "--name", "客厅的电脑", "--data-dir", str(data_dir)]) == 0
@@ -124,7 +124,7 @@ def test_local_access_needs_no_token(data_dir):
 
 
 def test_the_actor_is_the_token_name_and_the_token_stays_out_of_events(data_dir):
-    # 提出者是 user:<令牌名称>；令牌明文不出现在事件与事件流的请求地址里（docs/design/app-and-interface.md「令牌与 TLS」）
+    # 提出者是 user:<令牌名称>；令牌明文不出现在事件与事件流的请求地址里
     opened = _Opened(data_dir)
     _entry, token = AccessTokenStore(data_dir).create("客厅的电脑", now=utc_now())
     with _lan(opened, data_dir) as client:

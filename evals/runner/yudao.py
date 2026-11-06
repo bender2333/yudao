@@ -100,7 +100,7 @@ def scenario_module():
 
 
 def material_version():
-    """当前场景的材料版本（材料 manifest 的 `material_version`）。"""
+    """当前场景的材料版本（材料 manifest 的 `material_version`，docs/design/evaluation-scenarios.md「报告与版本比较」）。"""
     with open(os.path.join(materials_dir(), "manifest.json"), encoding="utf-8") as handle:
         return json.load(handle).get("material_version")
 

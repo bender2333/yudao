@@ -96,12 +96,12 @@ class _ChannelText:
 @dataclass
 class DeltaPump:
     # 应用层的一侧：订阅通道，按 100 毫秒合并一次，交给转发函数；同时保存每个进行中调用尝试已收到的文字。
-    # 片段分发给全部登记的连接（docs/design/app-and-interface.md「模型输出片段」：发给带 live=1、范围匹配的连接）：每个连接一份待发队列，
+    # 片段分发给全部登记的连接（：发给带 live=1、范围匹配的连接）：每个连接一份待发队列，
     # 先到的连接取走片段不影响其他连接；位置不连续的片段在合并时按缓冲丢弃，各连接收到同一份结果
     channel: DeltaChannel
     buffers: DeltaBuffers = field(default_factory=DeltaBuffers)
     _pending: list[DeltaFragment] = field(default_factory=list)
-    # 进行中调用尝试已接受的片段，按尝试编号保存：后建立的连接订阅时种子进它的队列（docs/design/app-and-interface.md「模型输出片段」）
+    # 进行中调用尝试已接受的片段，按尝试编号保存：后建立的连接订阅时种子进它的队列
     _fragments: dict[str, list[DeltaFragment]] = field(default_factory=dict)
     _queues: list[deque[DeltaFragment]] = field(default_factory=list)
     _unsubscribe: Callable[[], None] | None = None

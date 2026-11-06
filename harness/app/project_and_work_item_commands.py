@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# 项目的修改类命令（docs/design/app-and-interface.md「命令清单」「项目」）：基准版本是项目基本信息版本，要求相等
+# 项目的修改类命令：基准版本是项目基本信息版本，要求相等
 
 def _project_version(application: "Application", project_id: str) -> int:
     try:
@@ -278,7 +278,7 @@ async def _cancel_work_item(application: "Application", command: Command, reques
     except RunNotFoundError as missing:
         raise Rejection("not_found", "没有这个事项，请重新读取以后提交") from missing
     if projection.status in TERMINAL_STATUSES:
-        # 建档 run 已结束、正在等待确认初始 PRD 时，取消撤销项目流中的决定请求（工单 #136，docs/design/app-and-interface.md「合同」）
+        # 建档 run 已结束、正在等待确认初始 PRD 时，取消撤销项目流中的决定请求（工单 #136）
         withdrawn = system.projects.withdraw_waiting_initial_prd(request.work_item_id, command=command)
         if withdrawn:
             return

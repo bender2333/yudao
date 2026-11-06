@@ -52,7 +52,7 @@ async def _adopt(application: "Application", command: Command, request: Organiza
         raise Rejection("not_allowed",
                         f"发布带里没有形态 {request.form}；可以选的形态是：{'、'.join(forms)}")
     if request.changes:
-        # 本项目的改动这一版只接受空：合成与结构校验还没接（docs/design/forms-and-verifier-role.md「形态随事项冻结」），先不接受改动
+        # 本项目的改动这一版只接受空：合成与结构校验还没接（docs/design/project-organization.md「草稿与校验」、「采用与历史」），先不接受改动
         raise Rejection("not_allowed", "这一版还不能改本项目的改动：只能选发布带里的一份形态，改动留空")
 
     def adopt(transaction: Any) -> None:

@@ -110,7 +110,7 @@ class ProjectEventType:
 
 
 class CatalogEventType:
-    # 目录流的事件全部是骨架事件：控制主机的长期事实，随部署保存 模型目录与凭据事件（docs/design/app-and-interface.md「决定」）：内容由 Provider 保存，事件不含 Key
+    # 目录流的事件全部是骨架事件：控制主机的长期事实，随部署保存 模型目录与凭据事件：内容由 Provider 保存，事件不含 Key
     CATALOG_REVISED = "catalog_revised"
     CATALOG_CANDIDATES_COLLECTED = "catalog_candidates_collected"
     CATALOG_TEST_FINISHED = "catalog_test_finished"

@@ -7,7 +7,7 @@
 #
 # 层：模块层。直接构造执行环境跑真实的基线检查进程（与 test_tools.py 的 run_check 用例同一层），
 # 覆盖计数与放行记录的核对是纯函数与收紧检查的内存判断；不起完整三部门循环。
-# 守 R2（基线回执是工作区事实，覆盖计数读它）与 R3（docs/design/independent-verification.md「检验的有效性」的口径）。
+# 守 R2（基线回执是工作区事实，覆盖计数读它）与 R3（口径）。
 
 from __future__ import annotations
 

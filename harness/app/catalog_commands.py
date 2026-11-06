@@ -49,7 +49,7 @@ class ModelInput(Contract):
     capability_source: str = ""
     source_details: dict[str, dict[str, str | None]] = {}
     accepts_required_tool_call: bool = True
-    # 输入方式（docs/design/model-management.md「模型访问定义与准入」）：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
+    # 输入方式：文本总是包含，图像可选。预填来自模型能力表，用户可以修改；
     # 模型测试不核实它，修改以后准入保持，从下一次模型请求起使用新值
     input_modalities: list[Literal["text", "image"]] = ["text"]
     # 推理档位声明（#87）：三项一起声明，缺任一项或整体缺省时请求不带推理参数
@@ -93,7 +93,7 @@ class CatalogConnect(CommandRequest):
     api_key: str | None = None
 
 class CatalogDepartmentDefaultsSaveRefs(Contract):
-    # 部门默认保存以后，各部门当前绑定的模型不具备建议能力时的提醒（docs/design/model-management.md「部门的建议能力」「保存时」）
+    # 部门默认保存以后，各部门当前绑定的模型不具备建议能力时的提醒
     reminders: list[str] = []
 
 
@@ -108,7 +108,7 @@ class CatalogDocumentSave(CommandRequest):
 
 
 class CatalogModelRemove(CommandRequest):
-    # 移除一条模型访问定义：被部门默认或任何项目部门设置引用时拒绝并列出引用方（docs/design/model-management.md「删除」）
+    # 移除一条模型访问定义：被部门默认或任何项目部门设置引用时拒绝并列出引用方
     base_version: int
     provider_id: Text
     model_id: Text
@@ -178,7 +178,7 @@ def _register(application: Application, command: Command) -> None:
 def _revised(application: Application, command: Command, operation: str, before: int, after: int,
              *, provider_id: str | None, reminders: list[str] | None = None,
              credential: dict[str, Any] | None = None, credential_action: str = "set") -> None:
-    # reminders 是这次保存算出的建议能力提醒（docs/design/model-management.md「部门的建议能力」），随事件一起保存，接受结果重新计算时能得到同样的值
+    # reminders 是这次保存算出的建议能力提醒随事件一起保存，接受结果重新计算时能得到同样的值
     payload = {"revision": after, "base_revision": before, "operation": operation, "provider_id": provider_id,
                "reminders": list(reminders or ())}
     def append(transaction):
@@ -212,7 +212,7 @@ def _check_not_registered(application: Application, command: Command) -> None:
 
 
 def _project_model_referrers(application: Application, model_id: str) -> list[str]:
-    # 各项目的项目部门设置中引用这条模型访问定义的引用方（docs/design/model-management.md「删除」：与部门默认同样拒绝）。
+    # 各项目的项目部门设置中引用这条模型访问定义的引用方（：与部门默认同样拒绝）。
     # 项目部门设置保存在项目事件里，Provider 模块看不到，由应用层汇总
     referrers: list[str] = []
     for project in application.system.projects.list_projects(include_archived=True):
@@ -236,7 +236,7 @@ def _project_provider_referrers(application: Application, provider_id: str) -> l
     return referrers
 
 def _document_removed_referrers(application: Application, document: Mapping[str, Any]) -> list[str]:
-    # 导入整份目录文档时，文档缺少仍被引用的模型访问定义（或缺少引用方指向的连接）时的引用方（docs/design/model-management.md「目录文档（编辑 JSON、导入、导出）」）。
+    # 导入整份目录文档时，文档缺少仍被引用的模型访问定义（或缺少引用方指向的连接）时的引用方。
     # 与移除单条定义同一套规则：部门默认与项目部门设置都算引用方，按移除单条定义的同一个顺序列出，
     # 比对用文档里的原始身份，文档自身的结构与准入校验由 Provider 模块完成
     if not isinstance(document, Mapping):
@@ -267,7 +267,7 @@ def _document_removed_referrers(application: Application, document: Mapping[str,
     return referrers
 
 def _binding_reminders(application: Application) -> list[str]:
-    # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」「保存时」）。
+    # 部门默认保存以后，各部门当前绑定的模型不具备该部门建议能力时的提醒。
     # 没有绑定模型的不检查；提醒随事件保存，接受结果按事件重新得出同样的值
     facade = application.system.facade
     view = facade.providers_view()

@@ -52,13 +52,13 @@ def test_every_trial_and_browser_tool_declares_action_recovery_and_images():
         assert tool.verification in {"none", "query"}, name
         assert tool.cancellable is True, name
         assert isinstance(tool.requires_image_input, bool), name
-    # 需要图像输入的只有浏览器截图（docs/design/browser-and-computer-use.md「工具定义的声明」）
+    # 需要图像输入的只有浏览器截图
     assert [name for name in BROWSER_TOOL_NAMES if TOOLS[name].requires_image_input] == list(IMAGE_INPUT_BROWSER_TOOLS)
     assert not any(TOOLS[name].requires_image_input for name in TRIAL_TOOLS)
 
 
 def test_read_only_browser_tools_are_verified_without_a_query():
-    # docs/design/browser-and-computer-use.md「恢复契约」：只读标注为是的工具无需查询；其余按动作记录查询
+    #：只读标注为是的工具无需查询；其余按动作记录查询
     recorded = {tool["name"]: tool for tool in _recorded()["result"]["tools"]}
     for name in BROWSER_TOOL_NAMES:
         read_only = bool((recorded[name].get("annotations") or {}).get("readOnlyHint"))
@@ -86,7 +86,7 @@ def test_engineering_and_quality_can_use_every_browser_tool():
 
 
 def test_offering_drops_image_tools_when_the_call_target_cannot_take_images():
-    # 按调用目标的输入方式提供工具（docs/design/browser-and-computer-use.md「工具定义的声明」）：只有文本时声明需要图像输入的工具不出现，
+    # 按调用目标的输入方式提供工具：只有文本时声明需要图像输入的工具不出现，
     # 每次请求重新选一次（同一角色任务中途换模型时，下一次请求按新的输入方式选出）
     names = ["browser_snapshot", "browser_take_screenshot", "trial_open"]
     assert offers_with_input(names, ("text", "image")) == names

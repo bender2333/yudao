@@ -241,7 +241,7 @@ def test_the_tool_result_images_follow_the_call_target_modalities(tmp_path):
 
 
 def test_a_screenshot_counts_as_one_image_in_the_local_estimate():
-    # 本地估算（docs/design/model-management.md「用量」）里图像按张计固定值：几百 KB 的 data URL 不当文字估成几十万 token
+    # 本地估算里图像按张计固定值：几百 KB 的 data URL 不当文字估成几十万 token
     data = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"x" * 300_000).decode("ascii")
     item = {"type": "function_call_output", "call_id": "call-1", "output": [
         {"type": "input_text", "text": json.dumps({"ok": True, "output": "页面结构", "error": None})},

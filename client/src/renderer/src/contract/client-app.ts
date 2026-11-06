@@ -53,7 +53,7 @@ const defaultDeps: ClientAppDeps = {
 };
 
 /**
- * 断线以后重新连上时，本次启动的身份是否变了（docs/design/app-and-interface.md「能力清单」）。
+ * 断线以后重新连上时，本次启动的身份是否变了（设计说明第 6.1 节）。
  * 变了（服务重启）：页面重新读取能力清单并重新同步；没变：照旧从原位置续上，不整页重读。
  */
 export function bootIdentityChanged(before: string | null, next: string | null): boolean {
@@ -156,19 +156,19 @@ export class ClientApp {
     return this.runQuery<T>(this.iface.client, name, params);
   }
 
-  // 页面按需查询一次（docs/design/app-and-interface.md「页面的同步规则」）：与视图同步走同一条查询通道，
+  // 页面按需查询一次（设计说明第 5.7 节）：与视图同步走同一条查询通道，
   // 结果不进入视图缓存。删除与保存前取回影响列表（工单 #94）使用这个入口
   queryOne<T>(name: string, params: Record<string, unknown> | undefined): Promise<{ position: number; data: T }> {
     return this.query<T>(name, params);
   }
 
-  // 不按项目筛选的事件流：窗口关闭时也保持（docs/design/app-and-interface.md「页面的同步规则」）。
+  // 不按项目筛选的事件流：窗口关闭时也保持（设计说明第 5.7 节）。
   // live=1：连接接收模型输出片段（delta 帧），部门房间的思考气泡据此逐字显示（工单 #177）
   private startStream(after: number): void {
     this.stream = this.deps.openStream(this.iface!.baseUrl, { live: true }, {
       onConnected: (info) => {
         this.setStreamConnected(true);
-        // 断开以后重新连上：核对一次本次启动的身份（工单 #1159，docs/design/app-and-interface.md「能力清单」）
+        // 断开以后重新连上：核对一次本次启动的身份（工单 #1159，设计说明第 6.1 节）
         if (info.reconnected) {
           void this.checkBootIdentity();
         }
@@ -242,7 +242,7 @@ export class ClientApp {
       if (result.state !== "connected") {
         return;
       }
-      // 本次启动的身份改变：重新读取能力清单（docs/design/app-and-interface.md「能力清单」）
+      // 本次启动的身份改变：重新读取能力清单（设计说明第 6.1 节）
       if (bootIdentityChanged(this.boot, result.capabilities.deployment.boot_id)) {
         this.adoptCapabilities(result.capabilities);
       }
@@ -252,7 +252,7 @@ export class ClientApp {
     }
   }
 
-  // 断线以后重新连上：核对一次本次启动的身份（工单 #1159，docs/design/app-and-interface.md「能力清单」）。
+  // 断线以后重新连上：核对一次本次启动的身份（工单 #1159，设计说明第 6.1 节）。
   // 同一次启动就照旧从原位置续上，不整页重读；换了服务（重启）就与发现缺口时一样重新同步
   private async checkBootIdentity(): Promise<void> {
     if (!this.iface || !this.views) {

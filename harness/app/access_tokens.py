@@ -11,9 +11,9 @@ import secrets
 from dataclasses import dataclass
 from pathlib import Path
 
-# 数据目录中的令牌文件（docs/design/app-and-interface.md「令牌与 TLS」）
+# 数据目录中的令牌文件
 FILE_NAME = "access-tokens.json"
-# 256 位随机令牌：secrets.token_hex 给出的十六进制串（docs/design/app-and-interface.md「令牌与 TLS」）
+# 256 位随机令牌：secrets.token_hex 给出的十六进制串
 TOKEN_BYTES = 32
 
 
@@ -98,7 +98,7 @@ class AccessTokenStore:
 
 
 def digest(token: str) -> str:
-    # 令牌的 SHA-256 摘要（docs/design/app-and-interface.md「令牌与 TLS」）：服务只保存摘要，令牌本身不落盘
+    # 令牌的 SHA-256 摘要：服务只保存摘要，令牌本身不落盘
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 

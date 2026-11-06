@@ -31,7 +31,7 @@ export const REASONING_MODE_LABELS: Record<string, string> = {
   budget: "budget（Messages 的思考预算）",
 };
 
-// 新建的访问定义预填的协议（docs/design/model-management.md「模型访问定义与准入」）
+// 新建的访问定义预填的协议
 export const DEFAULT_PROTOCOL = "chat_completions";
 
 export const PROTOCOL_LABELS: Record<string, string> = {
@@ -43,7 +43,7 @@ export const PROTOCOL_LABELS: Record<string, string> = {
 // 部门清单与中文名不在这里写死：部门默认可的部门取自这一版加载的定义（catalog 查询的 departments，
 // 工单 #1457）；旧数据里不在定义里的部门按标识显示，调用处也可以给出显示名
 
-// 预填值的来源标注（docs/design/model-management.md「模型访问定义与准入」「界面标明每个预填值的来源」）
+// 预填值的来源标注
 export const SOURCE_LABELS: Record<string, string> = {
   models_url: "上游模型列表",
   capability_table: "能力表",
@@ -172,7 +172,7 @@ export function fetchNoteText(input: { connecting: boolean; collecting: boolean 
 // 连接卡片上取候选时的一句话（工单 #1355：说明写在被操作的对象旁边）
 export const CONNECTION_FETCHING_TEXT = "正在获取模型列表…结果会写在这张卡片里。";
 
-// 连接卡片上「最近一次获取」的一行：成功写数量与时间，失败写服务端给的原因（docs/design/model-management.md「模型管理页」）
+// 连接卡片上「最近一次获取」的一行：成功写数量与时间，失败写服务端给的原因
 export function fetchSummaryOf(provider: CatalogProvider): { text: string; kind: "ok" | "error" | "none" } {
   const latest = provider.latest_candidates;
   if (!latest) {
@@ -332,7 +332,7 @@ export function moreCount(remaining: number): number {
 // 选用的状态
 // ---------------------------------------------------------------------------
 
-// 状态词（docs/design/model-management.md「用词」用词与 docs/design/model-management.md「模型访问定义与准入」的状态机）
+// 状态词（用词与状态机）
 export const SELECTION_STATUS_LABELS: Record<string, string> = {
   completing: "补全参数",
   waiting: "等待验证",
@@ -340,7 +340,7 @@ export const SELECTION_STATUS_LABELS: Record<string, string> = {
   failed: "验证失败",
   capacity_unknown: "容量未知",
   not_in_list: "不在新的模型列表中",
-  // 已启用是准入有效的样子（docs/design/model-management.md「模型管理页」「已启用」）
+  // 已启用是准入有效的样子
   enabled: "已启用",
 };
 
@@ -390,7 +390,7 @@ export type SelectedModelRow = {
   max_output_tokens: number | null;
   input_modalities: string[];
   accepts_required_tool_call: boolean;
-  /** 各值的来源（服务端按 docs/design/model-management.md「模型访问定义与准入」给出） */
+  /** 各值的来源（服务端按给出） */
   sources: string;
   /** 准入记录：测试时间与实际返回的模型 */
   admitted_at: string | null;
@@ -465,7 +465,7 @@ export type ModelOption = { id: string; model: string; provider_id: string; prov
 // 模型选项的固定比较：一处定义，两处使用，排序结果不随运行机器的系统语言变化（工单 #519）。
 export const MODEL_OPTION_COLLATOR = new Intl.Collator("zh-CN");
 
-// 部门默认与项目设置的模型选项：按连接分组的已准入定义（docs/design/model-management.md「模型管理页」）
+// 部门默认与项目设置的模型选项：按连接分组的已准入定义
 export function admittedOptions(
   models: CatalogModel[],
   providers: CatalogProvider[],
@@ -539,7 +539,7 @@ export function referrerLabel(location: string, labels: Record<string, string> =
   return location;
 }
 
-// 取消选用被拒绝时服务端给的是位置串，这里换成看得懂的文字（docs/design/model-management.md「删除」）
+// 取消选用被拒绝时服务端给的是位置串，这里换成看得懂的文字
 // 例：「仍被引用，无法移除：bindings.product」→「仍被引用，无法移除：部门默认：产品」
 export function removalRejectionText(message: string, labels: Record<string, string> = {}): string {
   const index = message.indexOf("：");
@@ -646,7 +646,7 @@ export function modelInputOf(model: CatalogModel): Record<string, unknown> {
 // 档位与项目设置（项目部门设置页与设置页共用）
 // ---------------------------------------------------------------------------
 
-// 默认档位只能从已选的支持档位中选择（docs/design/model-management.md「模型访问定义与准入」）
+// 默认档位只能从已选的支持档位中选择
 export function defaultLevelOptions(supported: string[]): string[] {
   return REASONING_LEVELS.filter((level) => supported.includes(level));
 }

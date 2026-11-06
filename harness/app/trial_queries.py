@@ -8,7 +8,7 @@
 # - 验收条件的原文读投影里当前 ProductSpec（引用形式见 docs/design/browser-and-computer-use.md「验收条件的引用」：`AC<序号>` 是验收条件在 ProductSpec
 #   里的位置）；质检的会话与交付快照的比较读交付事件里的 `code_tree_digest`（会话开始时最近的那一份交付）；
 # - 「收到这个结果的请求是否包含图像」读这个结果之后同一个激活的下一次模型请求的调用目标输入方式
-#   （：不含图像时截图不进请求）。
+#   （docs/design/browser-and-computer-use.md「请求中的图像」：不含图像时截图不进请求）。
 #
 # 查询只读取：不写事件、不改保存的投影。结果按部门列出（部门的顺序取自定义），会话按开始顺序，用例按打开
 # 顺序；快照位置是事件日志末尾（与其他 run 查询相同）。
@@ -107,7 +107,7 @@ class TrialSessionView(Contract):
 
 
 class TrialDepartmentView(Contract):
-    # 一个部门的试用记录：会话与用例。查询按部门列出（docs/design/browser-and-computer-use.md「查询」），页面「试用记录」页签直接读它
+    # 一个部门的试用记录：会话与用例。查询按部门列出（页签直接读它
     department: str
     sessions: list[TrialSessionView]
     cases: list[TrialCaseView]

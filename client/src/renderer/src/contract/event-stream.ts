@@ -115,7 +115,7 @@ export class EventStreamClient {
     this.backoff.stoodUp();
     const parsed = parseFrame(name, message.data, this.lastPosition);
     if (parsed.kind === "gap") {
-      // previous 与本连接最后收到的不符：缺口，交给重新同步（docs/design/app-and-interface.md「缺口检测与重新同步」）
+      // previous 与本连接最后收到的不符：缺口，交给重新同步
       this.handlers.onResync(`position gap: expected ${parsed.expected}, got ${parsed.got}`);
       return;
     }

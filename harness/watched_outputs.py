@@ -412,7 +412,7 @@ def completion_reason(projection: RunProjection,
                       events: list[Event]) -> routing_contract.CompletionReason | None:
     """事项完成时的结束原因：创建时记下的开环标记为真时是开环完成，其余按事项种类取（返回 None）。
 
-    这一条判断归路由（docs/design/skeleton-and-application.md「路由契约」输出）：薄驱动进入完成状态时问一次，
+    这一条判断归路由（输出）：薄驱动进入完成状态时问一次，
     只把这里给的原因写进事实。没标开环的事项不给原因，薄驱动照旧按事项种类取。
     """
     if recorded_open_loop(events):

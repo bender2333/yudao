@@ -1050,7 +1050,7 @@ def test_scenario_two_onboards_confirms_and_starts_the_item(runs_root, tmp_path,
 
 
 def test_the_time_limit_starts_when_the_item_starts(runs_root, tmp_path, monkeypatch):
-    """建档用了多久不影响事项的超时判断：时间上限从新建事项开始量。"""
+    """建档用了多久不影响事项的超时判断：时间上限从新建事项开始量（docs/design/evaluation-scenarios.md「指标」、「前提与未决事项」）。"""
     client = _OnboardingClient()
     _stub_scenario2(monkeypatch, tmp_path, client)
     limit = 0.3
@@ -1112,7 +1112,7 @@ def test_wait_prd_confirmation_times_out_and_voids_the_run(runs_root, tmp_path, 
 
 
 def test_the_onboarded_repository_keeps_git_and_no_evaluation_material(runs_root, tmp_path):
-    """接入的目录是上游仓库本身：带 `.git`，没有需求原文与隐藏检查。"""
+    """接入的目录是上游仓库本身：带 `.git`，没有需求原文与隐藏检查（docs/design/evaluation-scenarios.md「两边的运行条件」「隔离」）。"""
     repository, head = _local_repository(str(tmp_path / "upstream"))
     with yudao.scenario(SCENARIO_2):
         source = yudao.prepare_source_dir(runs_root, "run-1", repo_url=repository, commit=head,

@@ -51,7 +51,7 @@ CONTRACT_MODULES = (
     "harness/contract_versions.py",
 )
 
-# 写在测试里的固定名单（对照表 docs/design/skeleton-and-application.md「最小投影」「四层」一行）：内核清单里没有的其余文件——薄驱动、运行层、执行与装配的
+# 写在测试里的固定名单（对照表 docs/design/architecture/name-map.md「每道缝的守卫」「四层」一行）：内核清单里没有的其余文件——薄驱动、运行层、执行与装配的
 # 几个文件，加上路由实现 `watched_outputs.py`、`tightening.py`。清单里的模块由 MANIFEST 补齐；两处合起来
 # 才是这一行列的全部文件
 FIXED_NAMES = (

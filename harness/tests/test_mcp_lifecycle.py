@@ -49,7 +49,7 @@ HANG = "mcp__lifecycle__hang"
 SLOW = "mcp__http_slow__slow"
 HANG_CALL = "call-hang"
 ECHO_CALL = "call-echo"
-# 调用超时用的小时限：设置里可以改（docs/design/network-and-mcp.md「运行规则」），默认 120 秒不适合用例
+# 调用超时用的小时限：设置里可以改默认 120 秒不适合用例
 SHORT_CALL_TIMEOUT_SEC = 2
 
 # 测试用的 MCP 服务器（官方 SDK 写的真实进程）：`echo` 正常回应，`hang` 写下标记以后一直不回应
@@ -136,7 +136,7 @@ def _stdio_document(tmp_path: Path, *, tools, call_timeout_sec: int = 120,
 
 
 def _http_document(url: str) -> dict:
-    # 一台 streamable HTTP 服务器：没有进程，超时以后关闭会话（取消无法确认，docs/design/network-and-mcp.md「恢复契约」）。
+    # 一台 streamable HTTP 服务器：没有进程，超时以后关闭会话（取消无法确认）。
     # 名称只能用字母、数字与连字符（projects.normalize_mcp_servers），别名里的连字符收敛成下划线
     server = {"name": "http-slow", "transport": "http", "url": url, "departments": ["engineering"],
               "call_timeout_sec": SHORT_CALL_TIMEOUT_SEC}
@@ -187,7 +187,7 @@ def _payloads(system: LoopSystem, run_id: str, event_type: str) -> list[dict]:
 
 
 def _result_text(system: LoopSystem, run_id: str, call_id: str) -> str:
-    # 一次调用的工具结果正文：回执的输出引用指向这个 run 的外部来源工件（docs/design/network-and-mcp.md「调用与结果」）。
+    # 一次调用的工具结果正文：回执的输出引用指向这个 run 的外部来源工件。
     # 结果按 read_external_source 的同一套分页交回，正文在 lines 里
     output = _result_output(system, run_id, call_id)
     lines = output.get("lines") or []
@@ -196,7 +196,7 @@ def _result_text(system: LoopSystem, run_id: str, call_id: str) -> str:
 
 
 def _result_output(system: LoopSystem, run_id: str, call_id: str) -> dict:
-    # 回执的输出引用指向这个 run 的外部来源工件：读出来是行页与回执字段（docs/design/network-and-mcp.md「调用与结果」的交换字段）
+    # 回执的输出引用指向这个 run 的外部来源工件：读出来是行页与回执字段（交换字段）
     called = next(event for event in _events(system, run_id, EventType.TOOL_CALLED)
                   if (event.payload or {}).get("id") == call_id)
     output_ref = (called.payload or {}).get("output_ref")
@@ -261,7 +261,7 @@ def test_a_run_end_closes_the_server_ends_its_process_tree_and_records_the_event
     # 一台服务器一次会话：启动一条、关闭一条
     assert len(started) == 1 and len(closed) == 1
     assert started[0]["server"] == SERVER_NAME and started[0]["transport"] == "stdio"
-    # 启动事件带着进程标识与创建时间：启动时结束遗留进程要靠这两项（docs/design/network-and-mcp.md「运行规则」）
+    # 启动事件带着进程标识与创建时间：启动时结束遗留进程要靠这两项
     assert isinstance(started[0]["pid"], int) and isinstance(started[0]["create_time"], float)
     assert closed[0]["reason"] == "closed" and closed[0]["server"] == SERVER_NAME
     # 先后由事件的位置决定：调用之前启动，run 收尾时关闭
@@ -278,7 +278,7 @@ def test_a_run_end_closes_the_server_ends_its_process_tree_and_records_the_event
     assert _gone(int(started[0]["pid"]))
     assert _gone(server_pid) and _gone(child_pid)
 
-    # 结果照常交回模型，动作记为已完成（docs/design/network-and-mcp.md「调用与结果」：工具失败以外都是已完成的动作）
+    # 结果照常交回模型，动作记为已完成（：工具失败以外都是已完成的动作）
     assert called_event.payload["ok"] is True
     assert "生命周期" in _result_text(system, run_id, ECHO_CALL)
     assert _payloads(system, run_id, EventType.MCP_SERVER_FAILED) == []
@@ -286,7 +286,7 @@ def test_a_run_end_closes_the_server_ends_its_process_tree_and_records_the_event
 
 
 def test_a_server_that_cannot_start_is_recorded_as_failed_and_does_not_stop_the_item(tmp_path):
-    # 启动失败仍然把原因作为工具结果交回部门（docs/design/network-and-mcp.md「运行规则」），生命周期记一条 mcp_server_failed。
+    # 启动失败仍然把原因作为工具结果交回部门生命周期记一条 mcp_server_failed。
     # 命令照常是解释器，脚本换成一开始就写下原因并退出的那一行
     failing = _stdio_document(
         tmp_path, tools=[ECHO_TOOL], command=sys.executable,

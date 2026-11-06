@@ -568,7 +568,7 @@ export function checkMethodName(value: string | null | undefined): string {
   return CHECK_METHODS[method]?.label ?? "其他检验方式";
 }
 
-// 逐条结论的三种结果（第 7.1 节第 2 点）：通过、不通过、未核验
+// 逐条结论的三种结果（docs/design/independent-verification.md「口径」第 2 点）：通过、不通过、未核验
 export const CHECK_RESULT_LABELS: Readonly<Record<string, string>> = Object.freeze({
   passed: "通过",
   failed: "不通过",

@@ -238,7 +238,7 @@ def test_an_http_timeout_reports_that_the_cancel_cannot_be_confirmed(tmp_path):
 
 
 def test_a_protocol_error_carries_the_error_code(tmp_path):
-    # 协议错误（JSON-RPC 的 error 应答）不是工具失败：抛出带错误码的 McpCallError（docs/design/network-and-mcp.md「调用与结果」）
+    # 协议错误（JSON-RPC 的 error 应答）不是工具失败：抛出带错误码的 McpCallError
     async def scenario():
         client = await McpClient.start(_launch(tmp_path, args=["-c", PROTOCOL_ERROR_SERVER]))
         try:
@@ -316,7 +316,7 @@ def test_the_child_gets_the_passed_variables_and_the_base_ones_only(tmp_path):
     assert environment["YUDAO_MCP_TEST"] == "passed"
     assert environment[secret_key] == SECRET
     assert "PATH" in environment and "SYSTEMROOT" in environment
-    # 没有传给它的变量不出现：调用方的整个环境变量不进入子进程（本模块自己的语义，docs/design/network-and-mcp.md「运行规则」）
+    # 没有传给它的变量不出现：调用方的整个环境变量不进入子进程（本模块自己的语义）
     for name in os.environ:
         if name not in server_environment({"YUDAO_MCP_TEST": "passed", secret_key: SECRET}):
             assert name not in environment

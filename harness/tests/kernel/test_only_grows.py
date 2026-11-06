@@ -75,7 +75,7 @@ SKELETON_EVENT_SNAPSHOT = {
     }),
 }
 
-# 放出 S6a 时事件信封的字段（docs/design/skeleton-and-application.md「可信内核」：全局位置、流、流内版本、种类、来源、时间只增）
+# 放出 S6a 时事件信封的字段（：全局位置、流、流内版本、种类、来源、时间只增）
 ENVELOPE_SNAPSHOT = {
     "Event": (
         "event_id", "run_id", "type", "role", "parent_event_id", "state_before", "state_after",
@@ -141,7 +141,7 @@ def test_the_skeleton_event_kinds_only_grow():
 
 
 def test_the_envelope_fields_only_grow():
-    # 信封的字段只增：删掉一个字段，日志里那一列就没有了，旧的事件读不回来（docs/design/skeleton-and-application.md「可信内核」）
+    # 信封的字段只增：删掉一个字段，日志里那一列就没有了，旧的事件读不回来
     for name, declaration in _CLASSES.items():
         current = [field.name for field in fields(declaration)]
         missing = [field for field in ENVELOPE_SNAPSHOT[name] if field not in current]
@@ -157,7 +157,7 @@ def test_the_envelope_fields_only_grow():
 
 
 def test_the_stop_reasons_only_grow():
-    # 停止原因的封闭清单只增：删掉一项，已经写过这个原因的结束事件不再认得它（docs/design/skeleton-and-application.md「可信内核」）
+    # 停止原因的封闭清单只增：删掉一项，已经写过这个原因的结束事件不再认得它
     reasons = set(json.loads(STOP_REASONS.read_text(encoding="utf-8")))
     missing = sorted(STOP_REASON_SNAPSHOT - reasons)
     assert not missing, (

@@ -22,7 +22,7 @@ type Entry = {
   params: Record<string, unknown> | undefined;
   changedBy: Set<string>;
   listeners: Set<ViewListener<unknown>>;
-  // 快照已经包含的最大全局位置；位置不大于它的事件不作用（docs/design/app-and-interface.md「页面的同步规则」）
+  // 快照已经包含的最大全局位置；位置不大于它的事件不作用
   position: number;
   active: boolean;
 };

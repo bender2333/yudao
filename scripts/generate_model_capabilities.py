@@ -25,7 +25,7 @@ PRESETS_PATH = REPO_ROOT / "harness" / "definitions" / "service_presets.json"
 OUTPUT_PATH = REPO_ROOT / "harness" / "definitions" / "model_capabilities.json"
 DEFAULT_SOURCE_URL = "https://models.dev/api.json"
 
-# 接入包映射表（docs/design/model-management.md「服务方案预置表与模型能力表」）：登记的单位是接入包，每一行登记为三种协议之一，
+# 接入包映射表：登记的单位是接入包，每一行登记为三种协议之一，
 # 或者登记为「没有对应的协议」（None）。登记为某种协议的行，依据写在 NPM_EVIDENCE 里：
 # 官方源码发出这种协议的请求（请求路径、认证方式与请求体），依据是仓库、提交与文件位置。
 # 没有这样的依据就登记为没有对应的协议；映射表里没有的接入包使脚本以错误结束。

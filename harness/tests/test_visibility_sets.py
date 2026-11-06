@@ -22,7 +22,7 @@ from harness.definitions import DEFINITIONS, DEFINITIONS_DIR, VISIBILITY_VALUES,
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
 
-# 质检的两套取值（docs/design/independent-verification.md「可见范围作为参数」）：现值的隔离一套，共享的一套在它上面加三项共享材料
+# 质检的两套取值：现值的隔离一套，共享的一套在它上面加三项共享材料
 ISOLATED = ("delivery_facts", "delivery_explanation")
 SHARED = ("delivery_facts", "delivery_explanation", "existing_structure", "prior_delivery", "qa_defects")
 

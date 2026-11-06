@@ -27,7 +27,7 @@ _CHECK_MATERIALS_WRITE_OUTSIDE = ("a check materials write scope only allows {di
 
 
 def submission_basis(projection: MinimalProjection) -> dict[str, Any]:
-    # 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（S1d 工单 #860）。
+    # 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）。
     # 校验以后其中任何一样变了，这次提交就不能再按原来的依据接纳。有哪几种成果、各自是哪一版，
     # 来自定义与投影，内核不写死（工单 #1456）；用户输入与指导的版本读的是成果的内容，不在这里
     # （归路由的收紧检查，工单 #1095）

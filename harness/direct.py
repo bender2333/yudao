@@ -8,7 +8,7 @@
 # （工单 #1394 的做法），薄驱动只把它写进事实。
 #
 # 一轮工作在交完成以前可以有很多轮：可以交完成、还没有交的那些角色一直可以开始下一轮，直到交了完成
-# （事项结束）或者内核的时间、轮次与步数上限把它停下（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「一定会停对任何路由都成立」：一定会停靠内核的上限）。
+# （事项结束）或者内核的时间、轮次与步数上限把它停下（：一定会停靠内核的上限）。
 #
 # 建档（工单 #1510，接入已有项目设计说明「总体」）：同一个路由也跑建档事项。接「建档」这一来源的角色交初始
 # PRD 与现有结构说明，然后交完成；这份形态没有核验角色，建档没有基线核验这一步，交完成以后以开环完成结束，
@@ -150,7 +150,7 @@ NO_OUTCOMES = AcceptedOutcomes()
 
 
 def fold(events: list[Event]) -> AcceptedOutcomes:
-    """从运行流的事件折出直做要看的两种成果（docs/design/skeleton-and-application.md「路由契约」输入：路由自己折要用的状态）。"""
+    """从运行流的事件折出直做要看的两种成果（输入：路由自己折要用的状态）。"""
     completions: list[dict[str, Any]] = []
     reviews: list[dict[str, Any]] = []
     for event in events:
@@ -426,7 +426,7 @@ def completion_reason(projection: RunProjection,
                       events: list[Event]) -> routing_contract.CompletionReason | None:
     """事项完成时的结束原因：创建时记下的开环标记为真时是开环完成，其余不给原因（薄驱动按事项种类取）。
 
-    这一条判断归路由（docs/design/skeleton-and-application.md「路由契约」输出、docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」）：事项最后采纳交完成的那一份，没有核验
+    这一条判断归路由（输出、docs/design/forms-and-verifier-role.md「定义的校验」中「开环的标记」）：事项最后采纳交完成的那一份，没有核验
     角色核验它时以开环完成结束，不写成放行。薄驱动进入完成状态时问一次，只把这里给的原因写进事实。
     """
     if recorded_open_loop(events):
@@ -542,7 +542,7 @@ def ask_outcome(projection: RunProjection, *, branch: routing_contract.AskBranch
 
 
 # ---------------------------------------------------------------------------
-# 定义的内容：由路由自己校验（docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」中「每种路由有自己的一份定义」）
+# 定义的内容：由路由自己校验
 # ---------------------------------------------------------------------------
 
 
@@ -828,7 +828,7 @@ class DirectTightening:
 
     def _structure(self, request: TightenRequest) -> Tightened:
         # 现有结构说明的内容：提案给出的字段，加上工作区的树摘要与当时的初始 PRD。构建与测试的每一项
-        # 要带本次激活中绑定当前快照与当前 PRD 的 run_check 回执，由提案合同的通用条件取（docs/design/skeleton-and-application.md「裁决的分工：内核的通用检查与路由的收紧检查」）
+        # 要带本次激活中绑定当前快照与当前 PRD 的 run_check 回执，由提案合同的通用条件取
         proposal = request.proposal or {}
         spec_hash = request.minimal.artifact_hash(PRODUCT_SPEC_KIND)
         if spec_hash is None:

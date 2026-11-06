@@ -82,7 +82,7 @@ def modifier_name(value: Any) -> str:
     return text
 
 
-# 提出者（事件对象 docs/design/app-and-interface.md「事件对象」的 actor，工单 #1342）：部门的事件写部门名，用户与主机各写各的，
+# 提出者（事件对象 actor，工单 #1342）：部门的事件写部门名，用户与主机各写各的，
 # 认不出的标识原样写（不编一个说法）
 def actor_name(actor: Any) -> str:
     text = str(actor or "")

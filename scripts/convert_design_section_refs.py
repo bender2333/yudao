@@ -61,8 +61,6 @@ SKIP_FILES = (
     "scripts/convert_design_section_refs.py",
     "harness/tests/test_design_section_refs.py",
     "evals/context/rule-set.json",
-    # CI 工作流归架构师改（共同规则「权限」），这 6 处注释不动
-    ".github/workflows/ci.yml",
 )
 
 DESIGN_DIR = "docs/design"
@@ -272,6 +270,279 @@ LINE_DECISIONS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "model-management.md",
         "",
         "架构师评论：这一处是模型管理第 4.1 节「服务方案预置表与模型能力表」",
+    ),
+    (
+        "client/src/renderer/src/views/project/flow-segments.ts",
+        "// 返工那条（设计说明 department-loop 第 2 节）。阶段状态机删掉以后（工单 #556）流转种类只剩",
+        "2",
+        "department-loop.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：部门按关注的成果开始工作",
+    ),
+    (
+        "client/src/renderer/src/views/project/labels.ts",
+        "// 逐条结论的三种结果（第 7.1 节第 2 点）：通过、不通过、未核验",
+        "7.1",
+        "independent-verification.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：口径",
+    ),
+    (
+        "client/src/renderer/src/views/timeline/logic.ts",
+        "// 点一个刻度时该用的事项范围（接口设计说明第 4.1 节「按位置读取」，工单 #1217）：",
+        "4.1",
+        "app-and-interface.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：查询清单",
+    ),
+    (
+        "client/tests/e2e/timeline.spec.ts",
+        "// 刻度：那一刻的位置与事项范围是两个参数（接口设计说明第 4.1 节「按位置读取」），页面先把 ?w= 换成",
+        "4.1",
+        "app-and-interface.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：查询清单",
+    ),
+    (
+        "client/tests/unit/timeline-logic.test.js",
+        "// 回放的位置与事项范围是两个参数（接口设计说明第 4.1 节「按位置读取」，工单 #1217）：",
+        "4.1",
+        "app-and-interface.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：查询清单",
+    ),
+    (
+        "evals/runner/run_yudao_eval.py",
+        "# 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（第 5.2、9 节）",
+        "5.2",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：指标",
+    ),
+    (
+        "evals/runner/run_yudao_eval.py",
+        "# 场景 2 的这个上限从新建事项开始计算，建档的时间不算在里面（第 5.2、9 节）",
+        "9",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：前提与未决事项",
+    ),
+    (
+        "evals/runner/yudao.py",
+        "\"\"\"当前场景的材料版本（材料 manifest 的 `material_version`，第 6 节）。\"\"\"",
+        "6",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：报告与版本比较",
+    ),
+    (
+        "evals/runner/yudao.py",
+        "\"\"\"当前场景的任务上游仓库地址：导出的事件日志里出现时这次运行作废（第 3 节「联网」）。",
+        "3",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：两边的运行条件",
+    ),
+    (
+        "evals/runner/yudao.py",
+        "\"\"\"材料摘要与材料版本记录比较：不同时这次运行作废（第 3 节「隔离」）。",
+        "3",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：两边的运行条件",
+    ),
+    (
+        "evals/tests/test_yudao_runner.py",
+        "\"\"\"报告的网络一栏写明以关闭取回的启动参数启动，与运行器的启动命令一致（第 3 节「联网」）。\"\"\"",
+        "3",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：两边的运行条件",
+    ),
+    (
+        "evals/tests/test_yudao_runner.py",
+        "\"\"\"建档用了多久不影响事项的超时判断：时间上限从新建事项开始量（第 5.2、9 节）。\"\"\"",
+        "5.2",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：指标",
+    ),
+    (
+        "evals/tests/test_yudao_runner.py",
+        "\"\"\"建档用了多久不影响事项的超时判断：时间上限从新建事项开始量（第 5.2、9 节）。\"\"\"",
+        "9",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：前提与未决事项",
+    ),
+    (
+        "evals/tests/test_yudao_runner.py",
+        "\"\"\"接入的目录是上游仓库本身：带 `.git`，没有需求原文与隐藏检查（第 3 节「隔离」）。\"\"\"",
+        "3",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：两边的运行条件",
+    ),
+    (
+        "evals/tests/test_yudao_runner.py",
+        "\"\"\"接入的目录与数据目录同一条规矩：必须在 Yudao 仓库之外（第 3 节「隔离」）。\"\"\"",
+        "3",
+        "evaluation-scenarios.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：两边的运行条件",
+    ),
+    (
+        "harness/adjudication.py",
+        "# 一次提交所依据的成果版本：最小投影里每一种成果的当前版本（设计说明第 4 节，S1d 工单 #860）。",
+        "4",
+        "skeleton-and-application.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：最小投影",
+    ),
+    (
+        "harness/app/form_commands.py",
+        "# 本项目的改动这一版只接受空：合成与结构校验还没接（设计说明第 4.4、4.5 节），先不接受改动",
+        "4.4",
+        "project-organization.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：草稿与校验",
+    ),
+    (
+        "harness/app/form_commands.py",
+        "# 本项目的改动这一版只接受空：合成与结构校验还没接（设计说明第 4.4、4.5 节），先不接受改动",
+        "4.5",
+        "project-organization.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：采用与历史",
+    ),
+    (
+        "harness/app/form_queries.py",
+        "# 一个项目的组织：这一版只问形态这一节（设计说明第 3 节「接口：查询」的组织那一行，",
+        "3",
+        "project-organization.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：接口",
+    ),
+    (
+        "harness/app/registry.py",
+        "# 事实来源：事件对象的 source 字段（设计说明第 4.3 节），覆盖在楼层的事实上。它依赖楼层查询，",
+        "4.3",
+        "app-and-interface.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：查询清单",
+    ),
+    (
+        "harness/app/trial_queries.py",
+        "#   （设计第 6.2 节：不含图像时截图不进请求）。",
+        "6.2",
+        "browser-and-computer-use.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：请求中的图像",
+    ),
+    (
+        "harness/app/trial_queries.py",
+        "# 步骤结果里的可访问性结构：结果工件里的 accessibility 摘录（浏览器工具的输出，设计第 7.1 节）。",
+        "7.1",
+        "browser-and-computer-use.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：保存与绑定",
+    ),
+    (
+        "harness/context.py",
+        "# 检查工作区因此重建（local-tools 第 2 节）",
+        "2",
+        "local-tools.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：工作区",
+    ),
+    (
+        "harness/kernel_events.py",
+        "# 规则（设计说明第 7 节）：内核写入或读取的事件是骨架事件，种类与字段只增，停用不删除，事件一经写入不重新解释； 其余 run 流里的事件是应用事件，由应用登记自己的种类，增加一种不改这个文件（第 5.4 节第 1 条）。 项目流与目录流的事件全部是骨架事件：它们是长期事实，跨版本保存（ADR-0019）。",
+        "7",
+        "skeleton-and-application.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：骨架事件与应用事件",
+    ),
+    (
+        "harness/kernel_events.py",
+        "# 骨架事件（run 流）：内核写入或读取的种类，只增不删（设计说明第 7 节）。清单由这个类给出， 应用事件的种类在应用里声明（第 5.4 节第 1 条），不在这里",
+        "7",
+        "skeleton-and-application.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：骨架事件与应用事件",
+    ),
+    (
+        "harness/kernel_events.py",
+        "# 第 4 节 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它， 所以它从此是骨架事件，只加字段（第 7 节的表把 model_* 列在应用事件里，按这一条据以修正）",
+        "4",
+        "skeleton-and-application.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：最小投影",
+    ),
+    (
+        "harness/kernel_events.py",
+        "# 第 4 节 2026-10-25 第 1 条：模型步数按「模型请求」事件一条条数，内核的最小投影读它， 所以它从此是骨架事件，只加字段（第 7 节的表把 model_* 列在应用事件里，按这一条据以修正）",
+        "7",
+        "skeleton-and-application.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：骨架事件与应用事件",
+    ),
+    (
+        "harness/kernel_events.py",
+        "# 目录流的事件全部是骨架事件：控制主机的长期事实，随部署保存 模型目录与凭据事件（设计第 10 节）：内容由 Provider 保存，事件不含 Key",
+        "10",
+        "app-and-interface.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：决定（第 1 条「模型目录与凭据的写入」）",
+    ),
+    (
+        "harness/providers/credentials.py",
+        "# 一步连接按连接 ID 生成引用，非字母开头时使用 HOST_ 前缀（设计说明第 4.2 节）。",
+        "4.2",
+        "model-management.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：Provider 配置",
+    ),
+    (
+        "harness/tests/test_direct_routing.py",
+        "判断的用例。按分层设计说明第 2 节「一个文件中的测试用到不同层级的资源时，整个文件登记为其中最高的一层」",
+        "2",
+        "test-pyramid.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：三层的定义",
+    ),
+    (
+        "harness/tests/test_release_waits_for_input.py",
+        "# 验收第 1 条（#1079，部门指导设计说明第 2.1 节第 2 点、第 4 节第 9 条）：产品决定改了",
+        "2.1",
+        "department-guidance.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：放行怎么等",
+    ),
+    (
+        "harness/tests/test_release_waits_for_input.py",
+        "# 验收第 1 条（#1079，部门指导设计说明第 2.1 节第 2 点、第 4 节第 9 条）：产品决定改了",
+        "4",
+        "department-guidance.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：必验反例中「产品决定改了有效合同」",
+    ),
+    (
+        "harness/tests/test_thin_driver_names.py",
+        "# 写在测试里的固定名单（对照表第 4 节「四层」一行）：内核清单里没有的其余文件——薄驱动、运行层、执行与装配的",
+        "4",
+        "architecture/name-map.md",
+        "",
+        "架构师 2026-11-06 判定（工单正文的 33 处表）：每道缝的守卫",
+    ),
+    (
+        "harness/tools.py",
+        "设计说明第 5.6 节「请求时」",
+        "5.6",
+        "model-management.md",
+        "",
+        "架构师 2026-11-06 判定：那一版 model-management 的 5.6 是「部门的建议能力」，"
+        "「请求时」是这一节里的段落小标题（今天在 model-management.md:328）",
     ),
     (
         "harness/definitions/__init__.py",
@@ -997,6 +1268,7 @@ class Evidence:
     doc: str
     sections: frozenset[str]
     titles: frozenset[str]
+    text: str = ""
 
 
 _ISSUE_CACHE: dict[str, str] = {}
@@ -1101,7 +1373,7 @@ def parse_evidence(text: str) -> tuple[Evidence, ...]:
         span = line[end:nxt]
         sections = section_numbers(span)
         titles = frozenset(m.group(1) for m in QUOTE_RE.finditer(span))
-        out.append(Evidence(doc, sections, titles))
+        out.append(Evidence(doc, sections, titles, span.strip()))
     return tuple(out)
 
 
@@ -1206,7 +1478,10 @@ def candidates_for(ref: Ref) -> list[Candidate]:
                 break
 
     header = header_attribution(ref.file)
+    nearby = {h[2] for h in mentions(line)} | {h[2] for h in mentions(block_above(file_lines(ref.file), ref.line))}
     for doc, sections in header:
+        if doc not in nearby:
+            continue
         if sections and ref.sec in sections:
             out.append(Candidate(doc, "④", f"文件开头把第 {ref.sec} 节写给了{path_name(doc)}", True))
         elif not sections and len(header) == 1:
@@ -1217,10 +1492,11 @@ def candidates_for(ref: Ref) -> list[Candidate]:
     if commit:
         number, evidence = issue_evidence(commit)
         for ev in evidence:
+            quote = ev.text[:60].replace("`", "")
             if ev.sections and ref.sec in ev.sections:
-                out.append(Candidate(ev.doc, "③a", f"工单 #{number} 的依据里写了第 {ref.sec} 节", False))
+                out.append(Candidate(ev.doc, "③a", f"工单 #{number} 的依据写「{quote}」", False))
             elif not ev.sections:
-                out.append(Candidate(ev.doc, "③b", f"工单 #{number} 的依据点名了这份说明", False))
+                out.append(Candidate(ev.doc, "③b", f"工单 #{number} 的依据写「{quote}」", False))
 
     # 同一份说明取最高的一档
     order = {"⑤": 0, "①": 1, "②": 2, "④": 3, "③a": 4, "③b": 5}
@@ -1376,7 +1652,17 @@ def pick_by_phrase(ref: Ref, passed: list[tuple[Candidate, Decision]]) -> tuple[
     return found[0] if len(found) == 1 else None
 
 
+G1_FAILED: list[str] = []
+
+
 def accept(ref: Ref, cand: Candidate, decision: Decision, phrase: str) -> None:
+    # G1：选中的说明今天的正文里必须有这一节，写出的标题等于今天的标题
+    if decision.now and decision.now not in set(now_headings(cand.doc).values()):
+        G1_FAILED.append(f"{ref.file}:{ref.line} {cand.doc}「{decision.now}」")
+        ref.status = "去掉"
+        ref.reason = f"G1：{cand.doc} 今天没有「{decision.now}」这一节"
+        ref.evidence = cand.tier + " " + cand.detail
+        return
     ref.doc = cand.doc
     if cand.sec:
         ref.sec = cand.sec
@@ -1636,7 +1922,7 @@ def main(argv: list[str] | None = None) -> int:
     dropped = sum(1 for r in refs if r.dropped)
     excluded = sum(1 for r in refs if r.status == "排除")
     fixed = sum(1 for r in refs if r.ok and r.how == "⑤")
-    print(f"处数 {len(refs)}，换算 {ok}（其中人定 {fixed}），去掉 {dropped}，排除 {excluded}，未定 {len(refs) - ok - dropped - excluded}")
+    print(f"处数 {len(refs)}，换算 {ok}（其中人定 {fixed}），去掉 {dropped}，排除 {excluded}，未定 {len(refs) - ok - dropped - excluded}，G1 失败 {len(G1_FAILED)}")
     save_cache()
     save_issue_cache()
     return 0

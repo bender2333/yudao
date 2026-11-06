@@ -26,7 +26,7 @@ export function parseFrame(eventName: string, data: string, lastPosition: number
       : { kind: "gap", expected: lastPosition, got: frame.previous };
   }
   if (eventName === "delta") {
-    // 片段不带 id，不改变续传位置（docs/design/app-and-interface.md「模型输出片段」）
+    // 片段不带 id，不改变续传位置
     return { kind: "delta", delta: JSON.parse(data) as OutputDelta };
   }
   if (eventName === "resync") {

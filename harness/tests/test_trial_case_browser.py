@@ -140,7 +140,7 @@ def _criteria(case_id: str, result: str = "passed") -> list[dict[str, Any]]:
 
 def test_a_real_browser_case_collects_its_steps_and_ends_as_passed(tmp_path):
     # 质检在真实会话里打开用例、在浏览器里操作、以 passed 结束：步骤是真实动作，截图是真实工件，
-    # 放行引用它时通过核对（docs/design/browser-and-computer-use.md「试用用例」、「QAReview 的逐条结论与放行」）。守 R3
+    # 放行引用它时通过核对。守 R3
     with _event_loop() as loop:
         case = _Case(tmp_path, loop)
         try:

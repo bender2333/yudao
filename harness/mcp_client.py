@@ -37,7 +37,7 @@ STDERR_TAIL_CHARS = 4000
 # 应答会晚于 10 秒——这时按设计说明的顺序直接结束进程树（stdio 已能确认停止），HTTP 一侧本来就无法确认
 CANCEL_ACK_TIMEOUT_SEC = 10.0
 # 子进程需要的系统变量：SDK 默认已给 APPDATA、LOCALAPPDATA、PATH、PATHEXT、SYSTEMROOT、TEMP、USERPROFILE 等，
-# 少了 Windows 上命令行程序自己再起子进程时用的 COMSPEC 与 WINDIR（docs/design/network-and-mcp.md「运行规则」，工单 #69）
+# 少了 Windows 上命令行程序自己再起子进程时用的 COMSPEC 与 WINDIR（工单 #69）
 EXTRA_ENVIRONMENT = ("COMSPEC", "WINDIR", "PATH", "APPDATA", "LOCALAPPDATA", "USERPROFILE", "TEMP")
 REDACTED = "***"
 
@@ -102,7 +102,7 @@ class ToolSpec(BaseModel):
 
 
 class ContentBlock(BaseModel):
-    # 工具结果的一块内容，各自的类型保留下来（docs/design/network-and-mcp.md「调用与结果」）：
+    # 工具结果的一块内容，各自的类型保留下来：
     # 文本、图像（base64 与媒体类型）、嵌入资源（原文或二进制与地址）、音频（base64 与媒体类型）
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -322,7 +322,7 @@ class McpClient:
             return
         self._closed = True
         # 先记下服务器起的整棵进程树：SDK 关掉服务器以后这些进程就找不到父进程了，
-        # 而 docs/design/network-and-mcp.md「运行规则」要求关闭时整个进程树都结束
+        # 而要求关闭时整个进程树都结束
         tree = self._process_tree()
         # stdio：SDK 关闭时先关标准输入、等 2 秒，再结束它起的子进程；HTTP：终止会话
         if self._stack is not None:

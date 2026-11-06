@@ -38,7 +38,7 @@ CONVERGING = "converging"
 STALLED = "stalled"
 OSCILLATING = "oscillating"
 BOUNDARY = "boundary"
-# 本工单不判定的层与状态（写明缺少的事实，docs/design/loops-and-convergence.md「收敛的检测」末段）
+# 本工单不判定的层与状态（写明缺少的事实，末段）
 UNDETERMINED = "undetermined"
 
 FACT_ARTIFACT = "artifact"
@@ -63,7 +63,7 @@ MISSING_ACTIVATION = "激活层缺少计划条目完成的主机事实"
 
 @dataclass(frozen=True)
 class Limit:
-    # 一个已用量与它的上限：不设上限时仍然带数值，unlimited 为真（docs/design/loops-and-convergence.md「收敛的检测」末，画面显示「不设上限」）
+    # 一个已用量与它的上限：不设上限时仍然带数值，unlimited 为真（末，画面显示「不设上限」）
     used: int
     limit: int
     unlimited: bool
@@ -167,7 +167,7 @@ def _ranks(values: Sequence[float]) -> list[float]:
 
 def limit_amount(used: int, rule_name: str, limit: int) -> Limit:
     # 一个已用量与它的上限：上限达到该参数登记界限的上沿、且登记说明它拦截不到失败时标为不设上限；
-    # 无论是否不设上限都带数值（docs/design/loops-and-convergence.md「收敛的检测」末）
+    # 无论是否不设上限都带数值（末）
     rule = DEFINITIONS.rules.get(rule_name)
     bounds = tuple(getattr(rule, "bounds", ()) or ())
     unlimited = bool(bounds) and limit >= bounds[-1] and "拦截不到任何失败" in getattr(rule, "guards", "")
@@ -175,7 +175,7 @@ def limit_amount(used: int, rule_name: str, limit: int) -> Limit:
 
 
 def step_state(steps: Sequence[Step], *, window: int, repeat: int, stop_reason: str | None) -> str:
-    # 步骤层的判定（docs/design/loops-and-convergence.md「收敛的检测」）：停止原因属于限额类 → 达到边界；最近一个步骤窗口内同一调用达到重复
+    # 步骤层的判定：停止原因属于限额类 → 达到边界；最近一个步骤窗口内同一调用达到重复
     # 次数 → 震荡；窗口内有被接纳的记录 → 收敛中；窗口满了都没有 → 停滞；步数还没满一个窗口 → 不判定
     if stop_reason in LIMIT_STOP_REASONS:
         return BOUNDARY
@@ -222,7 +222,7 @@ def _flips(reviews: Sequence[Mapping[str, Any]]) -> int:
 
 def run_state(reviews: Sequence[Mapping[str, Any]], *, rounds: int,
               stop_reason: str | None) -> tuple[str, str | None]:
-    # run 层的判定（docs/design/loops-and-convergence.md「收敛的检测」，工单 #1194）：只按放行记录里算好的覆盖数——未满足数 =
+    # run 层的判定（工单 #1194）：只按放行记录里算好的覆盖数——未满足数 =
     # coverage.executable − coverage.covered（可执行检验里还没在当前快照上运行并通过的条数），
     # 不重新算逐条结论、不读文件。停止原因属于限额类 → 达到边界；没有逐条结论的旧 run 不判定并写明
     # 缺少的事实；窗口里同一条结论翻转达到方法常量 → 震荡；未满足数严格下降或为 0 → 收敛中；

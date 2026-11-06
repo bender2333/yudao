@@ -48,7 +48,7 @@ export type CandidateListProps = {
   onManualSubmit: () => void;
 };
 
-// 一个值的来源标注（docs/design/model-management.md「模型访问定义与准入」「界面标明每个预填值的来源」）
+// 一个值的来源标注
 function sourceLabel(source: string | null | undefined): string {
   if (!source) {
     return "";
