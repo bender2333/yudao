@@ -168,6 +168,7 @@
 "test_onboarding_revision_context.py" = "integration"
 "test_open_loop_completion.py" = "integration"
 "test_openapi_snapshot.py" = "module"
+"test_organization_compose.py" = "module"
 "test_orchestrator.py" = "integration"
 "test_parameter_set.py" = "integration"
 "test_project_and_work_item_commands.py" = "integration"

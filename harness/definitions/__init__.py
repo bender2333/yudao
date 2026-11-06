@@ -195,8 +195,15 @@ class Rule(_Definition):
 class Department(_Definition):
     id: Identifier
     # 部门的中文名：等待说明、协作说明与模型提示按部门写给用户看，机器标识不直接出现在说明里。
-    # 缺少或为空时由引用检查报错并写明部门（字段路径里只有序号）
+    # 缺少或为空时由引用检查报错并写明部门（字段路径里只有序号）。改名只改显示名，身份不变
+    # （项目的组织设计说明「合成规则」第 6 条）
     label: str = ""
+    # 新增的部门要写明的三样（基础规则第 5 条，项目的组织设计说明「拒绝与提醒」第 8 条）：
+    # 它对什么负责、凭什么判断、怎么工作。发布带的部门没有写时为空；合成时新增的部门必填，
+    # 这三样同时是它的角色的 Prompt 底稿（项目的组织设计说明「加部门」）
+    target: str = ""
+    evidence: str = ""
+    work: str = ""
     # 部门的角色：现在每个部门一个角色，角色编号与部门编号相同（事件的 role 字段记录部门）
     roles: tuple[Identifier, ...] = Field(min_length=1)
     # 本部门模型的建议能力：取值来自模型访问定义的输入方式。
@@ -697,8 +704,70 @@ class Routings(_Definition):
     freeze_routings = _frozen("routings")
 
 
+# 本项目的改动（项目的组织设计说明「组织是形态加本项目的改动」「合成规则」，ADR-0045）：一份组织是发布带的
+# 一份形态加本项目的改动；改动按身份只写不同的项，其余跟随发布。身份归部门、角色、成果种类所有，由系统给出；
+# 改名只改显示名。字段只增：以后的「由谁做」「观察者」在它们进来时加字段，不改这里已有的读法。
+class ListChange(_Definition):
+    # 清单类的项记「增加」与「去掉」（「合成规则」第 2 条）：工具许可、关注的成果。
+    # 发布以后往清单里加的新项照样进来，所以只记两边的差
+    add: tuple[Identifier, ...] = ()
+    remove: tuple[Identifier, ...] = ()
+
+
+class DepartmentChange(_Definition):
+    # 改动里对发布带一个部门的修改（「合成规则」第 1、2、6 条）：单值的项整项替换，清单记增加与去掉。
+    # 现在一个部门一个角色、角色编号与部门编号相同，角色的项（工具许可、可见范围、Prompt）写在这里
+    label: str | None = None
+    target: str | None = None
+    evidence: str | None = None
+    work: str | None = None
+    watched: ListChange = Field(default_factory=ListChange)
+    tools: ListChange = Field(default_factory=ListChange)
+    visibility: tuple[VisibilityValue, ...] | None = None
+    prompt: str | None = None
+
+
+class NewDepartment(_Definition):
+    # 新增部门（「合成规则」第 4 条）：改动里写全部内容。三样说明必填（「拒绝与提醒」第 8 条），
+    # Prompt 没有写时由这三样生成底稿。写入范围是核验声明里的单值项（第 1 条），随整份声明替换
+    id: Identifier
+    label: str = Field(min_length=1)
+    target: str = ""
+    evidence: str = ""
+    work: str = ""
+    watched: tuple[Identifier, ...] = ()
+    tools: tuple[Identifier, ...] = ()
+    visibility: tuple[VisibilityValue, ...] = ()
+    prompt: str = ""
+
+
+class OutcomeKindChange(_Definition):
+    # 成果种类的增加与去掉（「合成规则」第 2、4、5 条）：新增的写全部内容
+    add: tuple[OutcomeKind, ...] = ()
+    remove: tuple[Identifier, ...] = ()
+
+
+class OrganizationChanges(_Definition):
+    # 本项目的改动（项目的组织设计说明「组织是形态加本项目的改动」「合成规则」）：按身份只写不同的项。
+    # 形态名不在这里，它是查询与采用的另一个参数；子组织那条（第 7 条）这个阶段不做
+    departments: Mapping[Identifier, DepartmentChange] = Field(default_factory=dict)
+    add_departments: tuple[NewDepartment, ...] = ()
+    remove_departments: tuple[Identifier, ...] = ()
+    outcome_kinds: OutcomeKindChange = Field(default_factory=OutcomeKindChange)
+    # 事项的来源：种类由发布给出，本项目只改每一种接它的部门，整项替换（「合成规则」第 3 条）
+    sources: Mapping[ItemSource, Identifier] | None = None
+    # 轮转方式：不在这个发布里时拒绝（「拒绝与提醒」第 10 条）
+    routing: Identifier | None = None
+    # 核验声明：整项替换（「合成规则」第 1 条）
+    verification: VerificationDeclaration | None = None
+
+
 class Definitions(_Definition):
     version: str
+    # 这份定义读到的那几份定义文件的内容（键是文件名）：合成「形态加本项目的改动」从它出发
+    # （项目的组织设计说明「组织是形态加本项目的改动」），改动为空时合成的版本与这份定义相同。
+    # 它不导出、不参与接口；改一份定义请改文件再重新加载，不要在这里改内容
+    contents: Mapping[str, Any] = Field(default_factory=dict, exclude=True)
     organization: Organization
     # 角色定义，键是角色编号
     roles: Mapping[Identifier, Role]
@@ -967,17 +1036,16 @@ def _location(loc: tuple[Any, ...]) -> str:
     return text or "（整个文件）"
 
 
-def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
-    # 读取并校验 directory 中的全部定义文件；不合法时抛出 DefinitionError
+def read_definitions(directory: Path = DEFINITIONS_DIR) -> dict[str, Any]:
+    # 读取 directory 中的全部定义文件，交回文件名到内容的映射；读不到或不合法时抛出 DefinitionError。
+    # 类型的核对与引用核对在 definitions_from_contents 里，与合成结果走同一套
     issues: list[tuple[str, str, str]] = []
     contents: dict[str, Any] = {}
-    parts: dict[str, Any] = {}
-    for file, (field, adapter) in _FILES.items():
+    for file in _FILES:
         path = directory / file
         if not path.is_file():
             if file in _OPTIONAL_FILES:
                 # 可选的定义文件缺省为空：没有那批工具，或者旧目录没有成果种类这一项（工单 #1456）
-                parts[field] = _OPTIONAL_DEFAULTS.get(file, {})
                 continue
             issues.append((file, "（整个文件）", "定义文件不存在"))
             continue
@@ -997,8 +1065,28 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
         except _DuplicateKey as exc:
             issues.append((file, exc.key, "重复的键"))
             continue
+    if issues:
+        raise DefinitionError(issues)
+    return contents
+
+
+def definitions_from_contents(contents: Mapping[str, Any]) -> Definitions:
+    # 按同一套校验从定义文件的内容建立一份定义：字段的类型、浏览器工具的合并、引用与结构校验，
+    # 版本是这些内容的内容摘要。加载（read_definitions 以后）与合成（形态加本项目的改动）都走这里，
+    # 所以合成结果过的是加载时的同一套结构校验
+    issues: list[tuple[str, str, str]] = []
+    parts: dict[str, Any] = {}
+    for file, (field, adapter) in _FILES.items():
+        if file not in contents:
+            if file in _OPTIONAL_FILES:
+                # 可选的定义文件缺省为空：没有那批工具，或者旧目录没有成果种类这一项（工单 #1456）
+                parts[field] = _OPTIONAL_DEFAULTS.get(file, {})
+                continue
+            issues.append((file, "（整个文件）", "定义文件不存在"))
+            continue
         try:
-            parts[field] = adapter.validate_json(text, strict=True)
+            # 按 JSON 文本校验：与读取文件时同一套类型核对与同一批错误说明
+            parts[field] = adapter.validate_json(json.dumps(contents[file], ensure_ascii=False), strict=True)
         except ValidationError as exc:
             issues.extend((file, _location(error["loc"]), error["msg"]) for error in exc.errors())
     # 浏览器工具是单独一份生成的文件：与手写的工具清单合并，同名工具即定义不合法（工单 #147）
@@ -1015,7 +1103,12 @@ def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
     issues = _references(parts)
     if issues:
         raise DefinitionError(issues)
-    return Definitions(version=_version(contents), **parts)
+    return Definitions(version=_version(dict(contents)), contents=dict(contents), **parts)
+
+
+def load_definitions(directory: Path = DEFINITIONS_DIR) -> Definitions:
+    # 读取并校验 directory 中的全部定义文件；不合法时抛出 DefinitionError
+    return definitions_from_contents(read_definitions(directory))
 
 
 def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
@@ -1100,6 +1193,12 @@ def _references(parts: dict[str, Any]) -> list[tuple[str, str, str]]:
             if models.index(model) != position:
                 issues.append(("model_capabilities.json", f"providers.{provider_id}.models[{position}].model",
                                f"同一个服务商中模型 {model} 重复"))
+    # 本项目可以改的几项在合成结果上再核对一遍（项目的组织设计说明「拒绝与提醒」第 4、5、7 条）：
+    # 关注的成果有部门交、事项能结束、运行工作区只有一个写入者
+    issues.extend(watched_output_issues(organization, roles, tools, parts["work_items"], parts["outcome_kinds"]))
+    issues.extend(final_outcome_issues(organization, roles, tools, parts["work_items"], parts["routings"],
+                                       parts["outcome_kinds"]))
+    issues.extend(workspace_writer_issues(organization, roles, tools))
     return issues
 
 
@@ -1213,8 +1312,142 @@ def verification_issues(organization: Organization, outcomes: Collection[str]) -
     return issues
 
 
-def _rejection_cycles(edges: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:
-    # 谁能拒绝谁有环：每条边看能不能从被核验的一方走回核验的一方，一个环报一条，
+def submitted_outcomes(roles: Mapping[str, Role], tools: Mapping[str, Tool], work_items: WorkItems,
+                       department: str) -> set[str]:
+    """一个部门交得出的成果种类：它的角色与各事项种类的工作说明里授予的提交类主机工具提交的那些。"""
+    names = set(roles[department].tools) if department in roles else set()
+    for kind in work_items.kinds.values():
+        work = kind.departments.get(department)
+        if work is not None:
+            names.update(work.tools)
+    return {tools[name].proposal for name in names
+            if name in tools and tools[name].kind == "host" and tools[name].proposal is not None}
+
+
+def watched_output_issues(organization: Organization, roles: Mapping[str, Role], tools: Mapping[str, Tool],
+                          work_items: WorkItems, outcome_kinds: OutcomeKinds) -> list[tuple[str, str, str]]:
+    """关注的成果有部门交（项目的组织设计说明「拒绝与提醒」第 4 条）：关注的是这份定义里的成果种类、
+    却没有部门交它时拒绝，写明是哪个部门的第几项。
+
+    事项的来源与指导不是成果种类，不在这里核对；路由自己认得的其他名称（例如 delivery、defect_record）
+    的含义归路由，也不在这里核对。
+    """
+    vocabulary = outcome_kinds.vocabulary() if outcome_kinds.kinds else set()
+    delivered = {kind for department in organization.departments
+                 for kind in submitted_outcomes(roles, tools, work_items, department.id)}
+    issues: list[tuple[str, str, str]] = []
+    for index, department in enumerate(organization.departments):
+        for position, name in enumerate(department.watched):
+            if name not in vocabulary or name in delivered:
+                continue
+            issues.append(("organization.json", f"departments[{index}].watched[{position}]",
+                           f"关注的成果 {name} 没有部门交"))
+    return issues
+
+
+def final_outcome_issues(organization: Organization, roles: Mapping[str, Role], tools: Mapping[str, Tool],
+                         work_items: WorkItems, routings: Routings,
+                         outcome_kinds: OutcomeKinds) -> list[tuple[str, str, str]]:
+    """事项能结束（「拒绝与提醒」第 5 条）：路由写明的事项最后采纳的成果种类要由某个部门交得出来。
+
+    没写这一项的路由不标开环，结束原因由它自己给，不在这里核对；写了一个这份定义里没有的成果种类时
+    由路由实现自己拒绝（内核只核对这部分的结构），这里也不重复报。
+    """
+    routing = next((item for item in routings.routings if item.id == organization.routing), None)
+    final = None if routing is None else routing.final_outcome
+    if final is None or final not in (outcome_kinds.vocabulary() if outcome_kinds.kinds else set()):
+        return []
+    delivered = {kind for department in organization.departments
+                 for kind in submitted_outcomes(roles, tools, work_items, department.id)}
+    if final in delivered:
+        return []
+    index = [item.id for item in routings.routings].index(organization.routing)
+    return [("routings.json", f"routings[{index}].final_outcome",
+             f"事项无法结束：没有部门交 {final}")]
+
+
+def workspace_writer_issues(organization: Organization, roles: Mapping[str, Role],
+                            tools: Mapping[str, Tool]) -> list[tuple[str, str, str]]:
+    """运行工作区只有一个写入者（「拒绝与提醒」第 7 条、三部门的循环结构「同时运行的条件」）：
+    写入范围是运行工作区、又有写文件类工具的部门超过一个时拒绝，写明是哪几个。
+
+    没有写文件类工具的部门不是写入者：只读与只交成果的部门不写运行工作区。
+    """
+    declaration = organization.verification or LEGACY_VERIFICATION
+    writers = []
+    for department in organization.departments:
+        scope = declaration.write_scopes.get(department.id, WORKSPACE_WRITE_SCOPE)
+        role = roles.get(department.id)
+        if scope.scope != "workspace" or role is None:
+            continue
+        if any(name in tools and tools[name].kind == "environment" and tools[name].action == "write"
+               for name in role.tools):
+            writers.append(department.id)
+    if len(writers) < 2:
+        return []
+    return [("organization.json", "verification.write_scopes", "运行工作区有两个写入者：" + "、".join(writers))]
+
+
+def parse_organization_changes(payload: Any) -> tuple[OrganizationChanges | None, list[tuple[str, str, str]]]:
+    """本项目的改动文档（一个 JSON 结构）：合法时交回改动，不合法时交回逐项的问题。
+
+    未知的字段写明是哪一项（「拒绝与提醒」第 10 条）：定义文件的格式不接受字段之外的项，改动也一样。
+    """
+    try:
+        return OrganizationChanges.model_validate_json(json.dumps(payload, ensure_ascii=False)), []
+    except ValidationError as exc:
+        return None, [("changes.json", _location(error["loc"]), _change_message(error))
+                      for error in exc.errors()]
+
+
+def _change_message(error: Any) -> str:
+    # 改动文档的一处不合法：多写的字段说成「未知的字段」，其余用类型核对给出的说明
+    if error["type"] == "extra_forbidden":
+        return f"未知的字段 {error['loc'][-1]}"
+    return error["msg"]
+
+
+def organization_change_issues(form: Definitions, changes: OrganizationChanges) -> list[tuple[str, str, str]]:
+    """本项目的改动能不能加到这份形态上（「合成规则」「拒绝与提醒」第 8、10 条）：
+
+    改的部门要在这份形态里；新增的部门要写三样说明，工具要在这个发布里；轮转方式要在这个发布里。
+    去掉的对象在形态里已经不存在时这条改不起作用（第 5 条），不报错。
+    """
+    issues: list[tuple[str, str, str]] = []
+    members = set(form.departments)
+    for name in sorted(changes.departments):
+        if name not in members:
+            issues.append(("changes.json", f"departments.{name}", f"形态里没有部门 {name}"))
+    added: set[str] = set()
+    for index, department in enumerate(changes.add_departments):
+        if department.id in members or department.id in added:
+            issues.append(("changes.json", f"add_departments[{index}].id", f"部门 {department.id} 已经在形态里"))
+        added.add(department.id)
+        for field, label in (("target", "它对什么负责"), ("evidence", "凭什么判断"), ("work", "怎么工作")):
+            if not getattr(department, field).strip():
+                issues.append(("changes.json", f"add_departments[{index}].{field}",
+                               f"新增的部门 {department.id} 缺「{label}」"))
+        issues.extend(_tool_names_issues(form, f"add_departments[{index}].tools", department.tools))
+    for name, change in changes.departments.items():
+        issues.extend(_tool_names_issues(form, f"departments.{name}.tools", change.tools.add))
+    available = [item.id for item in form.routings.routings]
+    if changes.routing is not None and changes.routing not in available:
+        issues.append(("changes.json", "routing",
+                       f"这个发布没有的轮转方式 {changes.routing}；有的是：{'、'.join(available)}"))
+    known = {kind.id for kind in form.outcome_kinds.kinds}
+    for index, kind in enumerate(changes.outcome_kinds.add):
+        if kind.id in known or any(item.id == kind.id for item in changes.outcome_kinds.add[:index]):
+            issues.append(("changes.json", f"outcome_kinds.add[{index}].id", f"成果种类 {kind.id} 已经在形态里"))
+    return issues
+
+
+def _tool_names_issues(form: Definitions, at: str, names: tuple[str, ...]) -> list[tuple[str, str, str]]:
+    # 本项目只能使用这个发布带的工具（第 10 条）：加进来的名称都要在 tools.json 里
+    return [("changes.json", f"{at}.add[{position}]", f"这个发布没有的工具 {name}")
+            for position, name in enumerate(names) if name not in form.tools]
+
+
+def _rejection_cycles(edges: list[tuple[str, str, str]]) -> list[tuple[str, str, str]]:    # 谁能拒绝谁有环：每条边看能不能从被核验的一方走回核验的一方，一个环报一条，
     # 字段是回到起点的那一项，说明写环的路径（角色核验自己是一条长度为一的环）
     graph: dict[str, list[tuple[str, str]]] = {}
     for verifier, verified, field in edges:
