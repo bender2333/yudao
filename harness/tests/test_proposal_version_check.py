@@ -148,7 +148,7 @@ def _basis_errors(projection):
 def test_a_review_of_a_delivery_bound_to_a_superseded_spec_is_rejected(tmp_path):
     # 放行前的最后一道关：交付本身依据的是已被取代的产品规格，依据字段写对了也不放行
     # （保留：按测试分层设计说明 13.1 特别规则 7 与 #1480，守内核模块行为的结论在内核目录里要有一份，
-    #  `referenced_current` 目前只有目录外的这一条，先补内核副本再删由架构师决定）
+    #  `referenced_current` 在内核目录里还没有副本，先补副本再删由架构师决定）
     system, run_id = _system(tmp_path, product_spec(), delivery_turn())
     while system.project(run_id).delivery_spec is None:
         projection = system.activate_once(run_id)
