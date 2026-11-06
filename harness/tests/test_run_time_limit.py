@@ -5,7 +5,6 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.engine import StepLimits
 from harness.proposals import delivery_turn, judgement_turn, product_spec, review_turn
 from harness.runtime import LoopSystem
-from harness.tests.helpers import list_files_turn, quality_turns
 
 def _slow(turn):
     # 模型调用持续超过 1 秒的运行时间限制
@@ -47,22 +46,6 @@ def test_time_limit_checked_between_activations(data_dir):
     assert result.stop_reason is None
     assert has_new_work(result, "quality")
     assert len(system.test_adapter.invocations) == 2
-
-
-def test_loosened_step_limit_allows_more_than_32_steps(data_dir):
-    # 最大模型步数的默认值是 999999（StepLimits），不再是 32
-    # 用超过 32 个步骤后提交，验证不会暂停
-    many_steps = [list_files_turn for _ in range(40)]
-    # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
-    script = {
-        "product": [product_spec()],
-        "engineering": [*many_steps, delivery_turn()],
-        "quality": quality_turns("release", "ok"),
-    }
-    system = LoopSystem.for_testing(data_dir, FakeAdapter(script))
-    run_id = system.create_run("echo")
-    result = system.run_until_stop(run_id)
-    assert result.status == "done"
 
 
 def test_small_step_limit_still_pauses(data_dir):

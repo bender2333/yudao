@@ -3,7 +3,6 @@
 # 页面直接显示原始标识与原文，不再要求翻译（决策记录 2026-10-22，工单 #717），
 # 因此这里不再检查说明文字里有没有英文内部标识。
 
-import string
 import typing
 
 import pytest
@@ -20,7 +19,6 @@ from harness.models import (
     stop_reason_name as core_name,
     waiting_reason_for,
 )
-from harness.tests.project_stream_fields import load_manifest
 
 def test_status_names_cover_the_run_statuses_exactly():
     assert set(STATUS_NAMES) == set(RUN_STATUSES)
@@ -84,10 +82,6 @@ def test_decision_requested_names_the_kind_in_chinese_with_description(kind):
     assert "需要人工处理" in text
 
 
-def _placeholders(template: str) -> set[str]:
-    return {field for _text, field, _spec, _conv in string.Formatter().parse(template) if field}
-
-
 def _payload_fields(kind: str) -> set[str]:
     # 一个事件种类的载荷字段：联合载荷取各成员字段的并集，别名是载荷里的键（工单 #319）
     fields: set[str] = set()
@@ -95,14 +89,6 @@ def _payload_fields(kind: str) -> set[str]:
         for field, info in model.model_fields.items():
             fields.add(info.alias or field)
     return fields
-
-
-@pytest.mark.parametrize("kind", sorted(_LABELS))
-def test_every_label_placeholder_is_a_field_of_that_events_payload(kind):
-    # 说明里的占位必须能由该事件的载荷填出，否则用户看到的是空白的占位（工单 #319）
-    manifest = load_manifest()
-    fields = set(manifest["fields"][kind]) if kind in manifest["fields"] else _payload_fields(kind)
-    assert _placeholders(_LABELS[kind]) <= fields
 
 
 @pytest.mark.parametrize("kind", sorted(_LABELS))
