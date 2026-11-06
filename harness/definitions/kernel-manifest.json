@@ -1,6 +1,6 @@
 {
   "owner": "user",
-  "updated": "2026-11-04",
+  "updated": "2026-11-06",
   "kinds": {
     "module": "控制核心的裁决模块：接受导入方向的检查",
     "material": "评价材料与守卫自身：路径守卫保护它们，导入方向不适用（测试要导入 pytest，评分器按场景运行，文档与发布脚本不是 Python 模块）"
@@ -45,6 +45,11 @@
       "path": "harness/path_rules.py",
       "kind": "module",
       "why": "公开路径规则：可移植相对路径与主机私有路径，裁决与执行层共用"
+    },
+    {
+      "path": "harness/launch_rules.py",
+      "kind": "module",
+      "why": "试用启动方式的核对：工具许可与执行层共用，只读交付说明与调用参数，不做 I/O"
     },
     {
       "path": "harness/actions.py",

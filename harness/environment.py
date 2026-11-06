@@ -46,6 +46,7 @@ from .browser import (
 )
 from .event_store import run_stream
 from .fetch import EXTERNAL_CONTENT_NOTICE, FetchCancelled, FetchRefused, fetch_url
+from .launch_rules import resolve_trial_launch
 from .mcp_session import McpOutcome, McpRefused, UnknownToolAlias
 from .models import ArtifactRef, EventType, hash_bytes, json_dumps, new_id
 from .public_tree import CapturedTree, UnrepresentableWorkspace, capture_public_tree, materialize_tree
@@ -55,8 +56,7 @@ from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
 from .tools import BROWSER_TOOL_NAMES, tool_action
 from .tree_archive import artifact_run, load_tree
-from .trial_sessions import (TrialSessionTable, TrialStartFailed, resolve_trial_call,
-                            resolve_trial_launch)
+from .trial_sessions import TrialSessionTable, TrialStartFailed
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 # 一次工具结果的输出上限，取规则登记中的现值
 _OUTPUT_LIMIT = DEFINITIONS.rule_value("tool_output_limit")
@@ -1900,8 +1900,8 @@ class LocalEnvironment:
         return "delivery_snapshot" if self._trial_source is not None else "workspace_seal"
 
     async def _trial_start(self, action: Action, stop: asyncio.Event) -> tuple[dict[str, Any], str]:
-        # 工程的试用：结束本部门原来的会话，按这次调用给出的启动方式建立会话
-        launch, reason = resolve_trial_call("trial_start", action.input, None)
+        # 工程的试用：结束本部门原来的会话，按这次调用给出的启动方式建立会话（trial_start 不看当前交付说明）
+        launch, reason = resolve_trial_launch("trial_start", action.input, [])
         if reason is not None:
             raise TrialStartFailed(reason, output={"session": None})
         return await self._start_trial(action, launch, stop)

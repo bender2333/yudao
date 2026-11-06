@@ -8,7 +8,8 @@
 # 结束全部会话，持有会话的进程重新启动时由启动扫描按会话记录里的进程号与创建时间结束遗留的进程树
 # （工单 #1183）。
 #
-# 执行层的代码：只导入标准库与本层的工作树、进程树与凭据遮蔽，不导入控制核心与应用层。
+# 执行层的代码：只导入标准库、本层的工作树、进程树与凭据遮蔽，以及与工具许可共用的启动方式规则
+# （launch_rules.py：它不含 I/O，裁决与执行侧都能导入），不导入控制核心与应用层。
 # 事件的写入方由装配一方（薄驱动）交进来（`bind_events`），与 MCP 会话的生命周期事件同一个做法。
 
 from __future__ import annotations
@@ -20,7 +21,6 @@ import re
 import shutil
 import socket
 import subprocess
-import sys
 import time
 import urllib.error
 import urllib.request
@@ -33,6 +33,7 @@ from typing import Any, Callable
 import psutil
 
 from .definitions import DEFINITIONS
+from .launch_rules import current_system, normalize_launch, select_command
 from .models import EventType, new_id
 from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .public_tree import CapturedTree, capture_public_tree, materialize_tree
@@ -41,12 +42,6 @@ from .redact import redact_text
 # 试用副本与输出放在这个 run 的工作区旁边，与检查工作区同一种摆法（docs/design/browser-and-computer-use.md「试用的位置」）
 TRIALS_DIR = "trials"
 OUTPUT_DIR = "outputs"
-
-# 本机进程是控制主机：系统按 Python 的 sys.platform 取值。其他系统没有启动命令的约定
-_PLATFORM_SYSTEMS = {"win32": "windows", "linux": "linux"}
-
-# 就绪时限的默认值与界限取自规则登记
-READINESS_TIMEOUT_SEC = int(DEFINITIONS.rule_value("execution.readiness_timeout_sec"))
 
 # 试用需要的程序与版本（docs/design/browser-and-computer-use.md「执行位置上的程序」）
 NODE_MAJOR_MIN = 24
@@ -199,92 +194,6 @@ def _release_port(port: int) -> None:
         _ALLOCATED_PORTS.discard(port)
 
 
-def current_system() -> str | None:
-    # 执行位置的系统：本机是控制主机，取 Python 的 sys.platform。其他系统返回 None
-    return _PLATFORM_SYSTEMS.get(sys.platform)
-
-
-# 建立试用会话的两个工具：工程用 trial_start（给出启动方式），质检用 trial_open（给出交付说明中的名称）
-TRIAL_TOOLS = frozenset({"trial_start", "trial_open"})
-
-
-def resolve_trial_call(name: str, args: dict[str, Any], delivery_spec: Any,
-                       system: str | None = None) -> tuple[dict[str, Any] | None, str | None]:
-    """工具许可对 trial_start 与 trial_open 的核对：交回启动方式或拒绝原因。
-
-    质检的 trial_open 按当前交付说明（`delivery_spec.launch`）里的名称解析；工程与执行环境按启动方式
-    列表解析时用 `resolve_trial_launch`（交付说明没有时按空清单处理）。
-    """
-    methods = [item for item in (getattr(delivery_spec, "launch", None) or [])
-               if isinstance(item, dict)]
-    return resolve_trial_launch(name, args, methods, system=system)
-
-
-def resolve_trial_launch(name: str, args: dict[str, Any], methods: list[dict[str, Any]],
-                         system: str | None = None) -> tuple[dict[str, Any] | None, str | None]:
-    """交回这次调用要用的启动方式，或者拒绝的原因（工具许可与执行之前是同一套核对）。
-
-    工程的 trial_start 用这次调用给出的启动方式；质检的 trial_open 只接受当前交付说明里的名称，
-    名称不存在时原因写明交付说明中已有的名称，没有启动方式时写明交付说明没有写启动方式。
-    两者都按执行位置的系统选用命令：没有这个系统的命令时拒绝，原因写明缺少哪个系统的命令。
-    桌面试用会话在本机版还没有接上（屏幕工具属于 computer use 专题），先拒绝并写明原因。
-    """
-    if name == "trial_start":
-        launch = args.get("launch")
-        if not isinstance(launch, dict):
-            return None, "trial_start requires a launch method object"
-    elif name == "trial_open":
-        if not methods:
-            return None, "the DeliverySpec has no launch method"
-        wanted = args.get("launch_name")
-        matches = [item for item in methods if item.get("name") == wanted]
-        if not matches:
-            names = ", ".join(str(item.get("name")) for item in methods)
-            return None, (f"the DeliverySpec has no launch method named {wanted!r}; "
-                          f"it carries: {names}")
-        launch = matches[0]
-    else:
-        return None, f"{name} does not start a trial session"
-    problem = _launch_shape_problem(launch)
-    if problem is not None:
-        return None, problem
-    system = system or current_system()
-    commands = launch.get("commands") or {}
-    if system is None:
-        return None, (f"this execution location runs {sys.platform}; "
-                      f"launch commands are defined for windows and linux only")
-    if system not in commands:
-        covered = ", ".join(sorted(commands)) or "nothing"
-        return None, f"the launch method has no command for {system}; commands cover: {covered}"
-    if launch.get("kind") == "desktop":
-        return None, "desktop trial sessions are not available in this build"
-    return dict(launch), None
-
-
-def _launch_shape_problem(launch: dict[str, Any]) -> str | None:
-    # 启动方式的形状（docs/design/browser-and-computer-use.md「启动方式」）：交付说明由提案校验，trial_start 的启动方式由这里核对
-    kind = launch.get("kind")
-    if kind not in {"web", "desktop"}:
-        return "kind must be web or desktop"
-    name = launch.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return "name must be a non-empty string"
-    commands = launch.get("commands")
-    if not isinstance(commands, dict) or not commands:
-        return "commands must map at least one system to an argv list"
-    for system, argv in commands.items():
-        if system not in {"windows", "linux"}:
-            return f"commands keys must be windows or linux, not {system!r}"
-        if not isinstance(argv, list) or not argv or any(
-                not isinstance(part, str) or not part for part in argv):
-            return f"commands.{system} must be a non-empty list of non-empty strings"
-    if kind == "web":
-        ready_url = launch.get("ready_url")
-        if not isinstance(ready_url, str) or "{port}" not in ready_url:
-            return "a web app requires a ready_url containing {port}"
-    return None
-
-
 def trial_root(run_root: str | Path) -> Path:
     # 这个 run 的试用目录：放在运行工作区旁边，与检查工作区同一种摆法
     path = Path(run_root)
@@ -384,54 +293,6 @@ def missing_programs() -> list[dict[str, str]]:
     # 缺一个就交回一项，回执按它写明缺少的程序，会话不建立
     missing = [item for item in (_node_status(), _playwright_mcp_status(), _chromium_status()) if item]
     return [dict(item) for item in missing]
-
-
-def normalize_launch(raw: Any) -> dict[str, Any]:
-    # 一个启动方式的形状（docs/design/browser-and-computer-use.md「启动方式」）。交付说明由提案校验核对过；这里再核一次，
-    # 因为 trial_start 的启动方式是模型在这次调用里给出的
-    if not isinstance(raw, dict):
-        raise ValueError("a launch method must be an object")
-    kind = raw.get("kind")
-    if kind not in {"web", "desktop"}:
-        raise ValueError("kind must be web or desktop")
-    name = raw.get("name")
-    if not isinstance(name, str) or not name.strip():
-        raise ValueError("name must be a non-empty string")
-    commands = raw.get("commands")
-    if not isinstance(commands, dict) or not commands:
-        raise ValueError("commands must map at least one system to an argv list")
-    normalized_commands: dict[str, list[str]] = {}
-    for system, argv in commands.items():
-        if system not in {"windows", "linux"}:
-            raise ValueError(f"commands keys must be windows or linux, not {system!r}")
-        if not isinstance(argv, list) or not argv or any(not isinstance(part, str) or not part for part in argv):
-            raise ValueError(f"commands.{system} must be a non-empty list of non-empty strings")
-        normalized_commands[str(system)] = list(argv)
-    ready_url = raw.get("ready_url")
-    if kind == "web":
-        if not isinstance(ready_url, str) or "{port}" not in ready_url:
-            raise ValueError("a web app requires a ready_url containing {port}")
-    elif ready_url is not None:
-        raise ValueError("a desktop program has no ready_url")
-    timeout = raw.get("ready_timeout_sec")
-    if timeout is None:
-        timeout = READINESS_TIMEOUT_SEC
-    low, high = DEFINITIONS.rule("execution.readiness_timeout_sec").bounds
-    if type(timeout) is not int or not low <= timeout <= high:
-        raise ValueError(f"ready_timeout_sec must be an integer between {int(low)} and {int(high)}")
-    return {"name": name.strip(), "kind": kind, "commands": normalized_commands,
-            "ready_url": ready_url, "ready_timeout_sec": timeout}
-
-
-def select_command(launch: dict[str, Any], system: str | None) -> list[str]:
-    # 按执行位置的系统选用命令（docs/design/browser-and-computer-use.md「启动方式」）：没有这个系统的命令时按缺少启动方式处理
-    commands = launch.get("commands") or {}
-    if system is None:
-        raise ValueError("this execution location has no system from which to choose a launch command")
-    if system not in commands:
-        raise ValueError(f"the launch method has no command for {system}; "
-                         f"commands cover: {', '.join(sorted(commands)) or 'nothing'}")
-    return list(commands[system])
 
 
 def _process_create_time(pid: int) -> float | None:

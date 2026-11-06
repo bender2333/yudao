@@ -58,7 +58,6 @@ from .tools import (in_force, proposal_kind, proposal_kinds, tool_action, tool_c
                     tool_verification, writes_check_materials)
 from .validation import AdjudicationView, Tightening, evaluate_proposal
 from .tree_archive import store_tree
-from .trial_sessions import TRIAL_TOOLS, resolve_trial_call
 
 # 试用用例的两个主机工具（浏览器与 computer use docs/design/browser-and-computer-use.md「试用用例」，工单 #1180）：质检用 trial_case_begin
 # 打开一个用例、按计划在浏览器里操作，用 trial_case_end 给出结论。用例打开到结束之间本部门在同一会话中的
@@ -1174,13 +1173,6 @@ class StepDriver:
                 basis=scope.basis, aborted=self._cancelled.is_set(), facts=facts,
                 tightening=self._tightening, events=transaction.events(), definitions=self._definitions,
             )
-            if permission.allowed and call["name"] in TRIAL_TOOLS:
-                # 试用会话的启动方式（浏览器与 computer use docs/design/browser-and-computer-use.md「启动方式」、「试用工具」，工单 #1182）：
-                # 质检的 trial_open 按当前交付说明的名称解析，工程的 trial_start 用它给出的启动方式；
-                # 解析不了的按工具许可拒绝交回，动作不交给执行环境，也不写工具开始事件
-                _launch, reason = resolve_trial_call(call["name"], call["args"], projection.delivery_spec)
-                if reason is not None:
-                    permission = ToolPermission(reason=reason)
             if permission.allowed:
                 already_started = any(
                     e.type == EventType.TOOL_STARTED and (e.payload or {}).get("id") == call["id"]
