@@ -9,6 +9,8 @@
 // 取消勾选：被部门使用的模型取消不了并写明引用方；进行中的模型取消以后迟到的结果不启用它。
 // 获取模型这条请求（工单 #1355）：进行中时页面写明在做什么且候选区照常可以操作；
 // 结束以后不刷新页面就能勾选（服务端收到 catalog.model.select）；失败以后写明原因，页面可以继续操作。
+// 候选分页（工单 #1585）：每页最多 8 个，列表下方「上一页」「下一页」与页脚「第 n / m 页」；
+// 搜索、筛选与重新获取模型列表以后回到第一页，取消选用使最后一页消失时停在新的最后一页。
 
 import { expect, test } from "@playwright/test";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -32,6 +34,12 @@ const DENIED_MODELS = [{ id: "trial-denied", limit: { context: 64000, output: 80
 
 // 这个前缀下的模型：推理慢，用例在测试进行中取消选用
 const SLOW_MODELS = [{ id: "trial-slow", limit: { context: 200000, output: 32000 } }];
+
+// 分页用例的模型列表（工单 #1585）：30 个候选，第一页 8 个，共 4 页，最后一页 6 个
+const MANY_MODELS = Array.from({ length: 30 }, (_, index) => ({
+  id: `many-${String(index + 1).padStart(2, "0")}`,
+  limit: { context: 128000, output: 16000 },
+}));
 
 // 推理慢时的停顿（毫秒）：够用例在测试进行中取消，又不至于让用例等太久
 const SLOW_DELAY_MS = 4000;
@@ -87,7 +95,8 @@ async function handleUpstream(request: IncomingMessage, response: ServerResponse
     const models = scenario === "empty" ? []
       : scenario === "denied" ? DENIED_MODELS
         : scenario === "slow" ? SLOW_MODELS
-          : UPSTREAM_MODELS;
+          : scenario === "many" ? MANY_MODELS
+            : UPSTREAM_MODELS;
     const send = () => {
       response.writeHead(200, { "Content-Type": "application/json" });
       response.end(JSON.stringify({ data: models }));
@@ -478,6 +487,109 @@ for (const size of [{ width: 1440, height: 900 }]) {
       await client.page.getByTestId("candidate-check-trial-beta").check();
       expect((await secondSelect).postDataJSON()).toMatchObject({ model: "trial-beta" });
       await expect(client.page.getByTestId("selected-trial-beta")).toBeVisible({ timeout: 60_000 });
+      expect(errors).toEqual([]);
+    } finally {
+      await client.close();
+      await backend.stop();
+      await upstream.close();
+    }
+  });
+
+  // 工单 #1585：候选分页。30 个候选：第一页 8 个、页脚「第 1 / 4 页」，「下一页」到第 2 页，
+  // 最后一页 6 个、「下一页」不可用、「上一页」可用；搜索、筛选与重新获取模型列表以后回到第一页；
+  // 在最后一页取消选用使最后一页消失时，停在新的最后一页，不出现空页。
+  test(`${label}：候选分页：每页 8 个，翻页与回到第一页`, async () => {
+    test.setTimeout(300_000);
+    const upstream = await startUpstream();
+    const { backend, client } = await openModels(size);
+    const errors = watchErrors(client);
+    try {
+      const address = `${upstream.base}/many/v1`;
+      await connectService(client, address, UPSTREAM_KEY);
+      const card = connectionCard(client, address);
+      await expect(card.getByTestId("connection-fetch")).toContainText("已获取 30 个模型", { timeout: 60_000 });
+
+      // 第一页 8 个：页脚「第 1 / 4 页」，上一页不可用、下一页可用
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 4 页");
+      await expect(client.page.getByTestId("candidate-many-01")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-many-08")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-many-09")).toHaveCount(0);
+      await expect(client.page.getByTestId("candidate-previous")).toBeDisabled();
+      await expect(client.page.getByTestId("candidate-next")).toBeEnabled();
+
+      // 下一页到第 2 页
+      await client.page.getByTestId("candidate-next").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 2 / 4 页");
+      await expect(client.page.getByTestId("candidate-many-09")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-many-01")).toHaveCount(0);
+
+      // 最后一页 6 个：下一页不可用、上一页可用
+      await client.page.getByTestId("candidate-next").click();
+      await client.page.getByTestId("candidate-next").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 4 / 4 页");
+      await expect(client.page.getByTestId("candidate-many-25")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-many-30")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-many-24")).toHaveCount(0);
+      await expect(client.page.getByTestId("candidate-next")).toBeDisabled();
+      await expect(client.page.getByTestId("candidate-previous")).toBeEnabled();
+
+      // 搜索以后回到第一页（many-2 命中 many-20 到 many-29 共 10 个，分 2 页）
+      await client.page.getByTestId("candidate-search").fill("many-2");
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 2 页");
+      await expect(client.page.getByTestId("candidate-many-20")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-many-10")).toHaveCount(0);
+      await client.page.getByTestId("candidate-next").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 2 / 2 页");
+      await expect(client.page.getByTestId("candidate-many-29")).toBeVisible();
+
+      // 筛选以后回到第一页（搜索仍是 many-2），清空搜索仍从第一页开始
+      await client.page.getByTestId("candidate-filter-all").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 2 页");
+      await expect(client.page.getByTestId("candidate-many-20")).toBeVisible();
+      await client.page.getByTestId("candidate-search").fill("");
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 4 页");
+      await expect(client.page.getByTestId("candidate-many-01")).toBeVisible();
+
+      // 翻到第 3 页，再重新获取模型列表：回到第一页，结果时间也换成了这一次的
+      await client.page.getByTestId("candidate-next").click();
+      await client.page.getByTestId("candidate-next").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 3 / 4 页");
+      await expect(client.page.getByTestId("candidate-many-17")).toBeVisible();
+      const summaryBefore = await card.getByTestId("connection-fetch").textContent();
+      const refreshRequest = client.page.waitForRequest((request) =>
+        request.method() === "POST" && request.url().includes("/api/commands/catalog.candidates.collect"));
+      await card.getByTestId("connection-refresh").click();
+      await refreshRequest;
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 4 页");
+      await expect.poll(async () => (await card.getByTestId("connection-fetch").textContent()) ?? "",
+        { timeout: 60_000 }).not.toBe(summaryBefore);
+
+      // 选用 9 个模型：第 1 页 8 个，第 2 页 1 个
+      for (let index = 1; index <= 8; index += 1) {
+        const id = `many-${String(index).padStart(2, "0")}`;
+        await client.page.getByTestId(`candidate-check-${id}`).check();
+        await expect(client.page.getByTestId(`selected-status-${id}`)).toContainText("已启用", { timeout: 120_000 });
+      }
+      await client.page.getByTestId("candidate-next").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 2 / 4 页");
+      await client.page.getByTestId("candidate-check-many-09").check();
+      await expect(client.page.getByTestId("selected-status-many-09")).toContainText("已启用", { timeout: 120_000 });
+
+      // 已选择的筛选中 9 个分 2 页；在最后一页取消选用这一个，最后一页消失，停在新的最后一页
+      await client.page.getByTestId("candidate-filter-selected").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 2 页");
+      await expect(client.page.getByTestId("candidate-many-01")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-many-09")).toHaveCount(0);
+      await client.page.getByTestId("candidate-next").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 2 / 2 页");
+      await expect(client.page.getByTestId("candidate-many-09")).toBeVisible();
+      await client.page.getByTestId("candidate-check-many-09").click();
+      await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 1 页");
+      await expect(client.page.getByTestId("candidate-many-09")).toHaveCount(0);
+      await expect(client.page.getByTestId("candidate-many-08")).toBeVisible();
+      await expect(client.page.getByTestId("candidate-next")).toBeDisabled();
+      await expect(client.page.getByTestId("candidate-previous")).toBeDisabled();
+      await expect(client.page.getByTestId("selected-many-09")).toHaveCount(0, { timeout: 60_000 });
       expect(errors).toEqual([]);
     } finally {
       await client.close();

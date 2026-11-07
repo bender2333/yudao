@@ -107,7 +107,7 @@ flowchart LR
 - 主程可以是外包角色（[D31](../requirements/outsourced-agent-roles.md)）；审查者作为核验角色不外包。
 - 工具里没有分派与等待：交工作的方式是询问（4.3）。
 
-角色由带版本的定义声明，随系统版本发布。项目上增删角色、改由谁做，在组织页采用，见[项目的组织设计说明](project-organization.md)「采用与历史」。教训与洞见不由角色写出，由教训发现模块产生（[D25](../requirements/semantic-system.md)）。
+角色由带版本的定义声明，随系统版本发布。项目上增删角色、改由谁做，在「高级」里采用，见[项目的组织设计说明](project-organization.md)「采用与历史」。教训与洞见不由角色写出，由教训发现模块产生（[D25](../requirements/semantic-system.md)）。
 
 ### 4.2 子组织怎样被指向
 

@@ -185,7 +185,7 @@ export function fetchSummaryOf(provider: CatalogProvider): { text: string; kind:
 }
 
 // ---------------------------------------------------------------------------
-// 候选：搜索、筛选与分批
+// 候选：搜索、筛选与分页
 // ---------------------------------------------------------------------------
 
 // 候选的一行：上游模型列表里的一项，加上它属于哪一份连接
@@ -226,9 +226,11 @@ export const CANDIDATE_FILTERS = [
 
 export type CandidateFilterId = (typeof CANDIDATE_FILTERS)[number]["id"];
 
-// 每次显示一批：先 8 个，之后每次再显示 12 个（docs/design/model-management.md「模型访问定义与准入」）
-export const FIRST_BATCH = 8;
-export const MORE_BATCH = 12;
+// 分页：每页最多 8 个候选（docs/design/model-management.md「模型访问定义与准入」）
+export const CANDIDATES_PER_PAGE = 8;
+
+// 页脚照写「第 n / m 页」，只有一页时也是「第 1 / 1 页」
+export const FIRST_PAGE = 1;
 
 // 容量已知：窗口与输出上限都有值（docs/design/model-management.md「模型访问定义与准入」「可自动配置」）
 export function capacityKnown(candidate: CatalogCandidate): boolean {
@@ -315,17 +317,49 @@ export function filterCandidates(
   return rows.filter((row) => matchesSearch(row, search) && matchesFilter(row, filter, selected));
 }
 
-// 分批显示：先给前 limit 个，剩下的记下来
-export type CandidateBatch = { shown: CandidateRow[]; remaining: number };
-
-export function candidateBatch(rows: CandidateRow[], limit: number): CandidateBatch {
-  const shown = rows.slice(0, Math.max(0, limit));
-  return { shown, remaining: Math.max(0, rows.length - shown.length) };
+// 页数：没有候选时也算一页，列表短于一页时是一页（docs/design/model-management.md「模型访问定义与准入」）
+export function candidatePageCount(total: number, pageSize: number = CANDIDATES_PER_PAGE): number {
+  const count = Number.isFinite(total) && total > 0 ? Math.trunc(total) : 0;
+  return Math.max(FIRST_PAGE, Math.ceil(count / pageSize));
 }
 
-// 「继续显示 N 个模型」按钮上的数字
-export function moreCount(remaining: number): number {
-  return Math.min(MORE_BATCH, remaining);
+// 合法页：越界的页回到 1 到页数之间
+export function legalCandidatePage(page: number, pages: number): number {
+  const wanted = Number.isFinite(page) ? Math.trunc(page) : FIRST_PAGE;
+  return Math.min(Math.max(FIRST_PAGE, wanted), pages);
+}
+
+// 一次翻页或列表条件变化以后的页：搜索、筛选与重新获取模型列表都回到第一页；
+// 上一页、下一页落在合法页内
+export type CandidatePageAction = "search" | "filter" | "refetch" | "previous" | "next";
+
+export function candidatePageAfter(
+  page: number,
+  action: CandidatePageAction,
+  pages: number = FIRST_PAGE,
+): number {
+  switch (action) {
+    case "previous":
+      return legalCandidatePage(page - 1, pages);
+    case "next":
+      return legalCandidatePage(page + 1, pages);
+    default:
+      return FIRST_PAGE;
+  }
+}
+
+// 一页候选：第几页、共几页与这一页的行
+export type CandidatePageView = { rows: CandidateRow[]; page: number; pages: number };
+
+export function candidatePageView(
+  rows: CandidateRow[],
+  page: number,
+  pageSize: number = CANDIDATES_PER_PAGE,
+): CandidatePageView {
+  const pages = candidatePageCount(rows.length, pageSize);
+  const current = legalCandidatePage(page, pages);
+  const start = (current - 1) * pageSize;
+  return { rows: rows.slice(start, start + pageSize), page: current, pages };
 }
 
 // ---------------------------------------------------------------------------
