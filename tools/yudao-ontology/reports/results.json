@@ -118,162 +118,6 @@
     {
      "slot": "slot-1",
      "depth": 1,
-     "root": "产品",
-     "path": "产品 → 部门必写证据来源",
-     "axiom": "部门必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-product",
-      "https://yudao.dev/onto#ax-dept-basis"
-     ]
-    },
-    {
-     "slot": "slot-2",
-     "depth": 1,
-     "root": "产品",
-     "path": "产品 → 部门必写目标函数",
-     "axiom": "部门必写目标函数",
-     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
-     "key": [
-      "https://yudao.dev/onto#dept-product",
-      "https://yudao.dev/onto#ax-dept-objective"
-     ]
-    },
-    {
-     "slot": "slot-3",
-     "depth": 1,
-     "root": "产品",
-     "path": "产品 → 部门必写工作过程",
-     "axiom": "部门必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-product",
-      "https://yudao.dev/onto#ax-dept-process"
-     ]
-    },
-    {
-     "slot": "slot-4",
-     "depth": 1,
-     "root": "工程",
-     "path": "工程 → 内部要协作的部门必有一份部门内的核验",
-     "axiom": "内部要协作的部门必有一份部门内的核验",
-     "basis": "基础规则 3 用到部门内：几个角色合作出一份成果，交出去之前，出它的角色不裁决它；用户 2026-11-06 的推理「部门关注一个成果、内部要协作，必然分化出不同的职责」",
-     "key": [
-      "https://yudao.dev/onto#dept-engineering",
-      "https://yudao.dev/onto#ax-collab-needs-internal-verification"
-     ]
-    },
-    {
-     "slot": "slot-5",
-     "depth": 1,
-     "root": "工程",
-     "path": "工程 → 部门必写证据来源",
-     "axiom": "部门必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-engineering",
-      "https://yudao.dev/onto#ax-dept-basis"
-     ]
-    },
-    {
-     "slot": "slot-6",
-     "depth": 1,
-     "root": "工程",
-     "path": "工程 → 部门必写目标函数",
-     "axiom": "部门必写目标函数",
-     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
-     "key": [
-      "https://yudao.dev/onto#dept-engineering",
-      "https://yudao.dev/onto#ax-dept-objective"
-     ]
-    },
-    {
-     "slot": "slot-7",
-     "depth": 1,
-     "root": "工程",
-     "path": "工程 → 部门必写工作过程",
-     "axiom": "部门必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-engineering",
-      "https://yudao.dev/onto#ax-dept-process"
-     ]
-    },
-    {
-     "slot": "slot-8",
-     "depth": 1,
-     "root": "运维（以后）",
-     "path": "运维（以后） → 部门必写证据来源",
-     "axiom": "部门必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-ops",
-      "https://yudao.dev/onto#ax-dept-basis"
-     ]
-    },
-    {
-     "slot": "slot-9",
-     "depth": 1,
-     "root": "运维（以后）",
-     "path": "运维（以后） → 部门必写目标函数",
-     "axiom": "部门必写目标函数",
-     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
-     "key": [
-      "https://yudao.dev/onto#dept-ops",
-      "https://yudao.dev/onto#ax-dept-objective"
-     ]
-    },
-    {
-     "slot": "slot-10",
-     "depth": 1,
-     "root": "运维（以后）",
-     "path": "运维（以后） → 部门必写工作过程",
-     "axiom": "部门必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-ops",
-      "https://yudao.dev/onto#ax-dept-process"
-     ]
-    },
-    {
-     "slot": "slot-11",
-     "depth": 1,
-     "root": "质检",
-     "path": "质检 → 部门必写证据来源",
-     "axiom": "部门必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-quality",
-      "https://yudao.dev/onto#ax-dept-basis"
-     ]
-    },
-    {
-     "slot": "slot-12",
-     "depth": 1,
-     "root": "质检",
-     "path": "质检 → 部门必写目标函数",
-     "axiom": "部门必写目标函数",
-     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
-     "key": [
-      "https://yudao.dev/onto#dept-quality",
-      "https://yudao.dev/onto#ax-dept-objective"
-     ]
-    },
-    {
-     "slot": "slot-13",
-     "depth": 1,
-     "root": "质检",
-     "path": "质检 → 部门必写工作过程",
-     "axiom": "部门必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-quality",
-      "https://yudao.dev/onto#ax-dept-process"
-     ]
-    },
-    {
-     "slot": "slot-14",
-     "depth": 1,
      "root": "一个角色",
      "path": "一个角色 → 角色必写证据来源",
      "axiom": "角色必写证据来源",
@@ -284,7 +128,7 @@
      ]
     },
     {
-     "slot": "slot-15",
+     "slot": "slot-2",
      "depth": 1,
      "root": "一个角色",
      "path": "一个角色 → 角色必写目标函数",
@@ -296,7 +140,7 @@
      ]
     },
     {
-     "slot": "slot-16",
+     "slot": "slot-3",
      "depth": 1,
      "root": "一个角色",
      "path": "一个角色 → 角色必写工作过程",
@@ -308,7 +152,43 @@
      ]
     },
     {
-     "slot": "slot-17",
+     "slot": "slot-4",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-5",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-6",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-7",
      "depth": 1,
      "root": "质检核验工程的交付",
      "path": "质检核验工程的交付 → 记作已核验的结论必有独立证据",
@@ -317,6 +197,126 @@
      "key": [
       "https://yudao.dev/onto#decl-default-quality",
       "https://yudao.dev/onto#ax-decl-needs-evidence"
+     ]
+    },
+    {
+     "slot": "slot-8",
+     "depth": 1,
+     "root": "工程",
+     "path": "工程 → 内部要协作的部门必有一份部门内的核验",
+     "axiom": "内部要协作的部门必有一份部门内的核验",
+     "basis": "基础规则 3 用到部门内：几个角色合作出一份成果，交出去之前，出它的角色不裁决它；用户 2026-11-06 的推理「部门关注一个成果、内部要协作，必然分化出不同的职责」",
+     "key": [
+      "https://yudao.dev/onto#dept-engineering",
+      "https://yudao.dev/onto#ax-collab-needs-internal-verification"
+     ]
+    },
+    {
+     "slot": "slot-9",
+     "depth": 1,
+     "root": "工程",
+     "path": "工程 → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-engineering",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-10",
+     "depth": 1,
+     "root": "工程",
+     "path": "工程 → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-engineering",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-11",
+     "depth": 1,
+     "root": "工程",
+     "path": "工程 → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-engineering",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-12",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-13",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-14",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-15",
+     "depth": 1,
+     "root": "产品",
+     "path": "产品 → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-product",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-16",
+     "depth": 1,
+     "root": "产品",
+     "path": "产品 → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-product",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-17",
+     "depth": 1,
+     "root": "产品",
+     "path": "产品 → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-product",
+      "https://yudao.dev/onto#ax-dept-process"
      ]
     },
     {
@@ -368,7 +368,7 @@
     "内部要协作的部门": [
      "工程"
     ],
-    "半开环的核验": [
+    "有只靠读的结论的核验": [
      "审查者核验工程架构师交的完成"
     ]
    },
@@ -379,6 +379,449 @@
      "focus": "cd-generic",
      "label": "核验的通用定义",
      "message": "每个事项具体查什么来自检查材料，设计说明没写"
+    },
+    {
+     "result": "不知道",
+     "check": "halfopen-depends",
+     "focus": "decl-eng-review",
+     "label": "审查者核验工程架构师交的完成",
+     "message": "这份核验有两种结论：有主机回执的算已核验，只靠读的按半开环的假定不该写成放行（这一次靠哪种，设计里看不出）"
+    },
+    {
+     "result": "不知道",
+     "check": "name-unknown",
+     "focus": "c-event",
+     "label": "事件",
+     "message": "词表与 name-map 里都没有这个词，正名对不上"
+    },
+    {
+     "result": "不知道",
+     "check": "name-unknown",
+     "focus": "c-outcome-version",
+     "label": "某种成果的某一版及其依据",
+     "message": "词表与 name-map 里都没有这个词，正名对不上"
+    },
+    {
+     "result": "不知道",
+     "check": "name-unknown",
+     "focus": "c-rotation-rules",
+     "label": "轮转的规矩",
+     "message": "词表与 name-map 里都没有这个词，正名对不上"
+    },
+    {
+     "result": "不知道",
+     "check": "name-unknown",
+     "focus": "c-verifier-conclusion",
+     "label": "核验角色的结论",
+     "message": "词表与 name-map 里都没有这个词，正名对不上"
+    },
+    {
+     "result": "不知道",
+     "check": "name-unknown",
+     "focus": "c-write-scope",
+     "label": "角色的写入范围",
+     "message": "词表与 name-map 里都没有这个词，正名对不上"
+    },
+    {
+     "result": "不知道",
+     "check": "planned",
+     "focus": "dept-ops",
+     "label": "运维（以后）",
+     "message": "文档写的是「以后」（写法规范第 5 条）"
+    },
+    {
+     "result": "不知道",
+     "check": "planned-source",
+     "focus": "src-incident",
+     "label": "运维发现的故障（以后）",
+     "message": "文档写的是「以后」（写法规范第 5 条）"
+    },
+    {
+     "result": "不知道",
+     "check": "seam-unsettled",
+     "focus": "seam-watchdog",
+     "label": "看门狗",
+     "message": "这道缝标为未定（写法规范第 5 条：未定就是不知道）"
+    }
+   ],
+   "slots": [
+    {
+     "slot": "slot-1",
+     "depth": 1,
+     "root": "产品",
+     "path": "产品 → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-product",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-2",
+     "depth": 1,
+     "root": "产品",
+     "path": "产品 → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-product",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-3",
+     "depth": 1,
+     "root": "产品",
+     "path": "产品 → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-product",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-4",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-5",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-6",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-7",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-8",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-9",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-10",
+     "depth": 1,
+     "root": "工程",
+     "path": "工程 → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-engineering",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-11",
+     "depth": 1,
+     "root": "工程",
+     "path": "工程 → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-engineering",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-12",
+     "depth": 1,
+     "root": "工程",
+     "path": "工程 → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-engineering",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-13",
+     "depth": 1,
+     "root": "一个角色",
+     "path": "一个角色 → 角色必写证据来源",
+     "axiom": "角色必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-min",
+      "https://yudao.dev/onto#ax-role-basis"
+     ]
+    },
+    {
+     "slot": "slot-14",
+     "depth": 1,
+     "root": "一个角色",
+     "path": "一个角色 → 角色必写目标函数",
+     "axiom": "角色必写目标函数",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-min",
+      "https://yudao.dev/onto#ax-role-objective"
+     ]
+    },
+    {
+     "slot": "slot-15",
+     "depth": 1,
+     "root": "一个角色",
+     "path": "一个角色 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-min",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-16",
+     "depth": 1,
+     "root": "工程（几个角色直做）",
+     "path": "工程（几个角色直做） → 角色必写证据来源",
+     "axiom": "角色必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-engineering",
+      "https://yudao.dev/onto#ax-role-basis"
+     ]
+    },
+    {
+     "slot": "slot-17",
+     "depth": 1,
+     "root": "工程（几个角色直做）",
+     "path": "工程（几个角色直做） → 角色必写目标函数",
+     "axiom": "角色必写目标函数",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-engineering",
+      "https://yudao.dev/onto#ax-role-objective"
+     ]
+    },
+    {
+     "slot": "slot-18",
+     "depth": 1,
+     "root": "工程（几个角色直做）",
+     "path": "工程（几个角色直做） → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-engineering",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-19",
+     "depth": 1,
+     "root": "一个外包角色",
+     "path": "一个外包角色 → 角色必写证据来源",
+     "axiom": "角色必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-outsourced",
+      "https://yudao.dev/onto#ax-role-basis"
+     ]
+    },
+    {
+     "slot": "slot-20",
+     "depth": 1,
+     "root": "一个外包角色",
+     "path": "一个外包角色 → 角色必写目标函数",
+     "axiom": "角色必写目标函数",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-outsourced",
+      "https://yudao.dev/onto#ax-role-objective"
+     ]
+    },
+    {
+     "slot": "slot-21",
+     "depth": 1,
+     "root": "一个外包角色",
+     "path": "一个外包角色 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-outsourced",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-22",
+     "depth": 1,
+     "root": "审查者",
+     "path": "审查者 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-reviewer",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-23",
+     "depth": 1,
+     "root": "工程架构师（中心角色）",
+     "path": "工程架构师（中心角色） → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-architect",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-24",
+     "depth": 1,
+     "root": "产品（几个角色直做）",
+     "path": "产品（几个角色直做） → 角色必写证据来源",
+     "axiom": "角色必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-product",
+      "https://yudao.dev/onto#ax-role-basis"
+     ]
+    },
+    {
+     "slot": "slot-25",
+     "depth": 1,
+     "root": "产品（几个角色直做）",
+     "path": "产品（几个角色直做） → 角色必写目标函数",
+     "axiom": "角色必写目标函数",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-product",
+      "https://yudao.dev/onto#ax-role-objective"
+     ]
+    },
+    {
+     "slot": "slot-26",
+     "depth": 1,
+     "root": "产品（几个角色直做）",
+     "path": "产品（几个角色直做） → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-product",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-27",
+     "depth": 1,
+     "root": "主程",
+     "path": "主程 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-lead",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-28",
+     "depth": 1,
+     "root": "探索者",
+     "path": "探索者 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-explorer",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    }
+   ]
+  },
+  "3": {
+   "batch": 3,
+   "consistent": true,
+   "unsat": [],
+   "error": "",
+   "classified": {
+    "核验角色": [
+     "审查者",
+     "质检"
+    ],
+    "有核验的形态": [
+     "三部门（默认）",
+     "工程的中心型小组"
+    ],
+    "以放行结束的成果种类": [
+     "中心角色交的完成（工程子事项）",
+     "交付"
+    ],
+    "内部要协作的部门": [
+     "工程"
+    ],
+    "有只靠读的结论的核验": [
+     "审查者核验工程架构师交的完成"
+    ]
+   },
+   "shacl": [
+    {
+     "result": "不知道",
+     "check": "checkdef-per-item",
+     "focus": "cd-generic",
+     "label": "核验的通用定义",
+     "message": "每个事项具体查什么来自检查材料，设计说明没写"
+    },
+    {
+     "result": "不知道",
+     "check": "halfopen-depends",
+     "focus": "decl-eng-review",
+     "label": "审查者核验工程架构师交的完成",
+     "message": "这份核验有两种结论：有主机回执的算已核验，只靠读的按半开环的假定不该写成放行（这一次靠哪种，设计里看不出）"
     },
     {
      "result": "不知道",
@@ -437,88 +880,23 @@
      "message": "这道缝标为未定（写法规范第 5 条：未定就是不知道）"
     },
     {
-     "result": "违例",
-     "check": "halfopen-written-release",
-     "focus": "decl-eng-review",
-     "label": "审查者核验工程架构师交的完成",
-     "message": "按半开环的假定，这份核验的结论不该写成放行（假定与设计的写法冲突）"
+     "result": "确实缺",
+     "check": "form-defined",
+     "focus": "form-eng-center",
+     "label": "工程的中心型小组",
+     "message": "设计里有这份形态，发布的定义文件里没有"
+    },
+    {
+     "result": "确实缺",
+     "check": "form-defined",
+     "focus": "form-outsourced",
+     "label": "一个外包角色直做",
+     "message": "设计里有这份形态，发布的定义文件里没有"
     }
    ],
    "slots": [
     {
      "slot": "slot-1",
-     "depth": 1,
-     "root": "一个外包角色",
-     "path": "一个外包角色 → 角色必写证据来源",
-     "axiom": "角色必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-outsourced",
-      "https://yudao.dev/onto#ax-role-basis"
-     ]
-    },
-    {
-     "slot": "slot-2",
-     "depth": 1,
-     "root": "一个外包角色",
-     "path": "一个外包角色 → 角色必写目标函数",
-     "axiom": "角色必写目标函数",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-outsourced",
-      "https://yudao.dev/onto#ax-role-objective"
-     ]
-    },
-    {
-     "slot": "slot-3",
-     "depth": 1,
-     "root": "一个外包角色",
-     "path": "一个外包角色 → 角色必写工作过程",
-     "axiom": "角色必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-outsourced",
-      "https://yudao.dev/onto#ax-role-process"
-     ]
-    },
-    {
-     "slot": "slot-4",
-     "depth": 1,
-     "root": "审查者核验工程架构师交的完成",
-     "path": "审查者核验工程架构师交的完成 → 记作已核验的结论必有独立证据",
-     "axiom": "记作已核验的结论必有独立证据",
-     "basis": "D38 基础规则 1「现实的证据高于模型的意见。真正独立的证据只有三种来源：把东西实际跑一遍，换一个不同的模型，或者人」",
-     "key": [
-      "https://yudao.dev/onto#decl-eng-review",
-      "https://yudao.dev/onto#ax-decl-needs-evidence"
-     ]
-    },
-    {
-     "slot": "slot-5",
-     "depth": 1,
-     "root": "审查者",
-     "path": "审查者 → 角色必写工作过程",
-     "axiom": "角色必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-eng-reviewer",
-      "https://yudao.dev/onto#ax-role-process"
-     ]
-    },
-    {
-     "slot": "slot-6",
-     "depth": 1,
-     "root": "工程架构师（中心角色）",
-     "path": "工程架构师（中心角色） → 角色必写工作过程",
-     "axiom": "角色必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-eng-architect",
-      "https://yudao.dev/onto#ax-role-process"
-     ]
-    },
-    {
-     "slot": "slot-7",
      "depth": 1,
      "root": "产品",
      "path": "产品 → 部门必写证据来源",
@@ -530,7 +908,7 @@
      ]
     },
     {
-     "slot": "slot-8",
+     "slot": "slot-2",
      "depth": 1,
      "root": "产品",
      "path": "产品 → 部门必写目标函数",
@@ -542,7 +920,7 @@
      ]
     },
     {
-     "slot": "slot-9",
+     "slot": "slot-3",
      "depth": 1,
      "root": "产品",
      "path": "产品 → 部门必写工作过程",
@@ -550,6 +928,78 @@
      "basis": "D38 N-I6，同上",
      "key": [
       "https://yudao.dev/onto#dept-product",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-4",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-5",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-6",
+     "depth": 1,
+     "root": "质检",
+     "path": "质检 → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-quality",
+      "https://yudao.dev/onto#ax-dept-process"
+     ]
+    },
+    {
+     "slot": "slot-7",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写证据来源",
+     "axiom": "部门必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-basis"
+     ]
+    },
+    {
+     "slot": "slot-8",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写目标函数",
+     "axiom": "部门必写目标函数",
+     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
+      "https://yudao.dev/onto#ax-dept-objective"
+     ]
+    },
+    {
+     "slot": "slot-9",
+     "depth": 1,
+     "root": "运维（以后）",
+     "path": "运维（以后） → 部门必写工作过程",
+     "axiom": "部门必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#dept-ops",
       "https://yudao.dev/onto#ax-dept-process"
      ]
     },
@@ -592,114 +1042,6 @@
     {
      "slot": "slot-13",
      "depth": 1,
-     "root": "运维（以后）",
-     "path": "运维（以后） → 部门必写证据来源",
-     "axiom": "部门必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-ops",
-      "https://yudao.dev/onto#ax-dept-basis"
-     ]
-    },
-    {
-     "slot": "slot-14",
-     "depth": 1,
-     "root": "运维（以后）",
-     "path": "运维（以后） → 部门必写目标函数",
-     "axiom": "部门必写目标函数",
-     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
-     "key": [
-      "https://yudao.dev/onto#dept-ops",
-      "https://yudao.dev/onto#ax-dept-objective"
-     ]
-    },
-    {
-     "slot": "slot-15",
-     "depth": 1,
-     "root": "运维（以后）",
-     "path": "运维（以后） → 部门必写工作过程",
-     "axiom": "部门必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-ops",
-      "https://yudao.dev/onto#ax-dept-process"
-     ]
-    },
-    {
-     "slot": "slot-16",
-     "depth": 1,
-     "root": "质检",
-     "path": "质检 → 部门必写证据来源",
-     "axiom": "部门必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-quality",
-      "https://yudao.dev/onto#ax-dept-basis"
-     ]
-    },
-    {
-     "slot": "slot-17",
-     "depth": 1,
-     "root": "质检",
-     "path": "质检 → 部门必写目标函数",
-     "axiom": "部门必写目标函数",
-     "basis": "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」",
-     "key": [
-      "https://yudao.dev/onto#dept-quality",
-      "https://yudao.dev/onto#ax-dept-objective"
-     ]
-    },
-    {
-     "slot": "slot-18",
-     "depth": 1,
-     "root": "质检",
-     "path": "质检 → 部门必写工作过程",
-     "axiom": "部门必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#dept-quality",
-      "https://yudao.dev/onto#ax-dept-process"
-     ]
-    },
-    {
-     "slot": "slot-19",
-     "depth": 1,
-     "root": "工程（几个角色直做）",
-     "path": "工程（几个角色直做） → 角色必写证据来源",
-     "axiom": "角色必写证据来源",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-sev-engineering",
-      "https://yudao.dev/onto#ax-role-basis"
-     ]
-    },
-    {
-     "slot": "slot-20",
-     "depth": 1,
-     "root": "工程（几个角色直做）",
-     "path": "工程（几个角色直做） → 角色必写目标函数",
-     "axiom": "角色必写目标函数",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-sev-engineering",
-      "https://yudao.dev/onto#ax-role-objective"
-     ]
-    },
-    {
-     "slot": "slot-21",
-     "depth": 1,
-     "root": "工程（几个角色直做）",
-     "path": "工程（几个角色直做） → 角色必写工作过程",
-     "axiom": "角色必写工作过程",
-     "basis": "D38 N-I6，同上",
-     "key": [
-      "https://yudao.dev/onto#role-sev-engineering",
-      "https://yudao.dev/onto#ax-role-process"
-     ]
-    },
-    {
-     "slot": "slot-22",
-     "depth": 1,
      "root": "一个角色",
      "path": "一个角色 → 角色必写证据来源",
      "axiom": "角色必写证据来源",
@@ -710,7 +1052,7 @@
      ]
     },
     {
-     "slot": "slot-23",
+     "slot": "slot-14",
      "depth": 1,
      "root": "一个角色",
      "path": "一个角色 → 角色必写目标函数",
@@ -722,7 +1064,7 @@
      ]
     },
     {
-     "slot": "slot-24",
+     "slot": "slot-15",
      "depth": 1,
      "root": "一个角色",
      "path": "一个角色 → 角色必写工作过程",
@@ -734,31 +1076,103 @@
      ]
     },
     {
-     "slot": "slot-25",
+     "slot": "slot-16",
      "depth": 1,
-     "root": "主程",
-     "path": "主程 → 角色必写工作过程",
+     "root": "工程（几个角色直做）",
+     "path": "工程（几个角色直做） → 角色必写证据来源",
+     "axiom": "角色必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-engineering",
+      "https://yudao.dev/onto#ax-role-basis"
+     ]
+    },
+    {
+     "slot": "slot-17",
+     "depth": 1,
+     "root": "工程（几个角色直做）",
+     "path": "工程（几个角色直做） → 角色必写目标函数",
+     "axiom": "角色必写目标函数",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-sev-engineering",
+      "https://yudao.dev/onto#ax-role-objective"
+     ]
+    },
+    {
+     "slot": "slot-18",
+     "depth": 1,
+     "root": "工程（几个角色直做）",
+     "path": "工程（几个角色直做） → 角色必写工作过程",
      "axiom": "角色必写工作过程",
      "basis": "D38 N-I6，同上",
      "key": [
-      "https://yudao.dev/onto#role-eng-lead",
+      "https://yudao.dev/onto#role-sev-engineering",
       "https://yudao.dev/onto#ax-role-process"
      ]
     },
     {
-     "slot": "slot-26",
+     "slot": "slot-19",
      "depth": 1,
-     "root": "探索者",
-     "path": "探索者 → 角色必写工作过程",
+     "root": "一个外包角色",
+     "path": "一个外包角色 → 角色必写证据来源",
+     "axiom": "角色必写证据来源",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-outsourced",
+      "https://yudao.dev/onto#ax-role-basis"
+     ]
+    },
+    {
+     "slot": "slot-20",
+     "depth": 1,
+     "root": "一个外包角色",
+     "path": "一个外包角色 → 角色必写目标函数",
+     "axiom": "角色必写目标函数",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-outsourced",
+      "https://yudao.dev/onto#ax-role-objective"
+     ]
+    },
+    {
+     "slot": "slot-21",
+     "depth": 1,
+     "root": "一个外包角色",
+     "path": "一个外包角色 → 角色必写工作过程",
      "axiom": "角色必写工作过程",
      "basis": "D38 N-I6，同上",
      "key": [
-      "https://yudao.dev/onto#role-eng-explorer",
+      "https://yudao.dev/onto#role-outsourced",
       "https://yudao.dev/onto#ax-role-process"
      ]
     },
     {
-     "slot": "slot-27",
+     "slot": "slot-22",
+     "depth": 1,
+     "root": "审查者",
+     "path": "审查者 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-reviewer",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-23",
+     "depth": 1,
+     "root": "工程架构师（中心角色）",
+     "path": "工程架构师（中心角色） → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-architect",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-24",
      "depth": 1,
      "root": "产品（几个角色直做）",
      "path": "产品（几个角色直做） → 角色必写证据来源",
@@ -770,7 +1184,7 @@
      ]
     },
     {
-     "slot": "slot-28",
+     "slot": "slot-25",
      "depth": 1,
      "root": "产品（几个角色直做）",
      "path": "产品（几个角色直做） → 角色必写目标函数",
@@ -782,7 +1196,7 @@
      ]
     },
     {
-     "slot": "slot-29",
+     "slot": "slot-26",
      "depth": 1,
      "root": "产品（几个角色直做）",
      "path": "产品（几个角色直做） → 角色必写工作过程",
@@ -792,6 +1206,30 @@
       "https://yudao.dev/onto#role-sev-product",
       "https://yudao.dev/onto#ax-role-process"
      ]
+    },
+    {
+     "slot": "slot-27",
+     "depth": 1,
+     "root": "主程",
+     "path": "主程 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-lead",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
+    },
+    {
+     "slot": "slot-28",
+     "depth": 1,
+     "root": "探索者",
+     "path": "探索者 → 角色必写工作过程",
+     "axiom": "角色必写工作过程",
+     "basis": "D38 N-I6，同上",
+     "key": [
+      "https://yudao.dev/onto#role-eng-explorer",
+      "https://yudao.dev/onto#ax-role-process"
+     ]
     }
    ]
   }
@@ -799,41 +1237,93 @@
  "tracking": [
   {
    "born": 1,
-   "path": "产品 → 部门必写证据来源",
+   "path": "一个角色 → 角色必写证据来源",
+   "depth": 1,
+   "axiom": "角色必写证据来源",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#role-min",
+    "https://yudao.dev/onto#ax-role-basis"
+   ]
+  },
+  {
+   "born": 1,
+   "path": "一个角色 → 角色必写目标函数",
+   "depth": 1,
+   "axiom": "角色必写目标函数",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#role-min",
+    "https://yudao.dev/onto#ax-role-objective"
+   ]
+  },
+  {
+   "born": 1,
+   "path": "一个角色 → 角色必写工作过程",
+   "depth": 1,
+   "axiom": "角色必写工作过程",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#role-min",
+    "https://yudao.dev/onto#ax-role-process"
+   ]
+  },
+  {
+   "born": 1,
+   "path": "运维（以后） → 部门必写证据来源",
    "depth": 1,
    "axiom": "部门必写证据来源",
    "filled_in": null,
    "filled_by": null,
    "partial": null,
    "key": [
-    "https://yudao.dev/onto#dept-product",
+    "https://yudao.dev/onto#dept-ops",
     "https://yudao.dev/onto#ax-dept-basis"
    ]
   },
   {
    "born": 1,
-   "path": "产品 → 部门必写目标函数",
+   "path": "运维（以后） → 部门必写目标函数",
    "depth": 1,
    "axiom": "部门必写目标函数",
    "filled_in": null,
    "filled_by": null,
    "partial": null,
    "key": [
-    "https://yudao.dev/onto#dept-product",
+    "https://yudao.dev/onto#dept-ops",
     "https://yudao.dev/onto#ax-dept-objective"
    ]
   },
   {
    "born": 1,
-   "path": "产品 → 部门必写工作过程",
+   "path": "运维（以后） → 部门必写工作过程",
    "depth": 1,
    "axiom": "部门必写工作过程",
    "filled_in": null,
    "filled_by": null,
    "partial": null,
    "key": [
-    "https://yudao.dev/onto#dept-product",
+    "https://yudao.dev/onto#dept-ops",
     "https://yudao.dev/onto#ax-dept-process"
+   ]
+  },
+  {
+   "born": 1,
+   "path": "质检核验工程的交付 → 记作已核验的结论必有独立证据",
+   "depth": 1,
+   "axiom": "记作已核验的结论必有独立证据",
+   "filled_in": 2,
+   "filled_by": "主机在独立副本上跑的检查",
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#decl-default-quality",
+    "https://yudao.dev/onto#ax-decl-needs-evidence"
    ]
   },
   {
@@ -890,45 +1380,6 @@
   },
   {
    "born": 1,
-   "path": "运维（以后） → 部门必写证据来源",
-   "depth": 1,
-   "axiom": "部门必写证据来源",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#dept-ops",
-    "https://yudao.dev/onto#ax-dept-basis"
-   ]
-  },
-  {
-   "born": 1,
-   "path": "运维（以后） → 部门必写目标函数",
-   "depth": 1,
-   "axiom": "部门必写目标函数",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#dept-ops",
-    "https://yudao.dev/onto#ax-dept-objective"
-   ]
-  },
-  {
-   "born": 1,
-   "path": "运维（以后） → 部门必写工作过程",
-   "depth": 1,
-   "axiom": "部门必写工作过程",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#dept-ops",
-    "https://yudao.dev/onto#ax-dept-process"
-   ]
-  },
-  {
-   "born": 1,
    "path": "质检 → 部门必写证据来源",
    "depth": 1,
    "axiom": "部门必写证据来源",
@@ -968,54 +1419,41 @@
   },
   {
    "born": 1,
-   "path": "一个角色 → 角色必写证据来源",
+   "path": "产品 → 部门必写证据来源",
    "depth": 1,
-   "axiom": "角色必写证据来源",
+   "axiom": "部门必写证据来源",
    "filled_in": null,
    "filled_by": null,
    "partial": null,
    "key": [
-    "https://yudao.dev/onto#role-min",
-    "https://yudao.dev/onto#ax-role-basis"
+    "https://yudao.dev/onto#dept-product",
+    "https://yudao.dev/onto#ax-dept-basis"
    ]
   },
   {
    "born": 1,
-   "path": "一个角色 → 角色必写目标函数",
+   "path": "产品 → 部门必写目标函数",
    "depth": 1,
-   "axiom": "角色必写目标函数",
+   "axiom": "部门必写目标函数",
    "filled_in": null,
    "filled_by": null,
    "partial": null,
    "key": [
-    "https://yudao.dev/onto#role-min",
-    "https://yudao.dev/onto#ax-role-objective"
+    "https://yudao.dev/onto#dept-product",
+    "https://yudao.dev/onto#ax-dept-objective"
    ]
   },
   {
    "born": 1,
-   "path": "一个角色 → 角色必写工作过程",
+   "path": "产品 → 部门必写工作过程",
    "depth": 1,
-   "axiom": "角色必写工作过程",
+   "axiom": "部门必写工作过程",
    "filled_in": null,
    "filled_by": null,
    "partial": null,
    "key": [
-    "https://yudao.dev/onto#role-min",
-    "https://yudao.dev/onto#ax-role-process"
-   ]
-  },
-  {
-   "born": 1,
-   "path": "质检核验工程的交付 → 记作已核验的结论必有独立证据",
-   "depth": 1,
-   "axiom": "记作已核验的结论必有独立证据",
-   "filled_in": 2,
-   "filled_by": "主机在独立副本上跑的检查",
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#decl-default-quality",
-    "https://yudao.dev/onto#ax-decl-needs-evidence"
+    "https://yudao.dev/onto#dept-product",
+    "https://yudao.dev/onto#ax-dept-process"
    ]
   },
   {
@@ -1044,89 +1482,6 @@
     "https://yudao.dev/onto#dept-engineering",
     "https://yudao.dev/onto#ax-collab-needs-internal-verification",
     "https://yudao.dev/onto#ax-decl-has-verifier"
-   ]
-  },
-  {
-   "born": 2,
-   "path": "一个外包角色 → 角色必写证据来源",
-   "depth": 1,
-   "axiom": "角色必写证据来源",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#role-outsourced",
-    "https://yudao.dev/onto#ax-role-basis"
-   ]
-  },
-  {
-   "born": 2,
-   "path": "一个外包角色 → 角色必写目标函数",
-   "depth": 1,
-   "axiom": "角色必写目标函数",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#role-outsourced",
-    "https://yudao.dev/onto#ax-role-objective"
-   ]
-  },
-  {
-   "born": 2,
-   "path": "一个外包角色 → 角色必写工作过程",
-   "depth": 1,
-   "axiom": "角色必写工作过程",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#role-outsourced",
-    "https://yudao.dev/onto#ax-role-process"
-   ]
-  },
-  {
-   "born": 2,
-   "path": "工程 → 内部要协作的部门必有一份部门内的核验 → 记作已核验的结论必有独立证据",
-   "depth": 2,
-   "axiom": "记作已核验的结论必有独立证据",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#dept-engineering",
-    "https://yudao.dev/onto#ax-collab-needs-internal-verification",
-    "https://yudao.dev/onto#ax-decl-needs-evidence"
-   ]
-  },
-  {
-   "born": 2,
-   "path": "工程 → 内部要协作的部门必有一份部门内的核验 → 核验声明必有核验者 → 角色必写工作过程",
-   "depth": 3,
-   "axiom": "角色必写工作过程",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#dept-engineering",
-    "https://yudao.dev/onto#ax-collab-needs-internal-verification",
-    "https://yudao.dev/onto#ax-decl-has-verifier",
-    "https://yudao.dev/onto#ax-role-process"
-   ]
-  },
-  {
-   "born": 2,
-   "path": "工程 → 内部要协作的部门必有一份部门内的核验 → 核验声明必有被核验者 → 角色必写工作过程",
-   "depth": 3,
-   "axiom": "角色必写工作过程",
-   "filled_in": null,
-   "filled_by": null,
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#dept-engineering",
-    "https://yudao.dev/onto#ax-collab-needs-internal-verification",
-    "https://yudao.dev/onto#ax-decl-has-verified",
-    "https://yudao.dev/onto#ax-role-process"
    ]
   },
   {
@@ -1170,27 +1525,76 @@
   },
   {
    "born": 2,
-   "path": "主程 → 角色必写工作过程",
+   "path": "一个外包角色 → 角色必写证据来源",
+   "depth": 1,
+   "axiom": "角色必写证据来源",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#role-outsourced",
+    "https://yudao.dev/onto#ax-role-basis"
+   ]
+  },
+  {
+   "born": 2,
+   "path": "一个外包角色 → 角色必写目标函数",
+   "depth": 1,
+   "axiom": "角色必写目标函数",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#role-outsourced",
+    "https://yudao.dev/onto#ax-role-objective"
+   ]
+  },
+  {
+   "born": 2,
+   "path": "一个外包角色 → 角色必写工作过程",
    "depth": 1,
    "axiom": "角色必写工作过程",
    "filled_in": null,
    "filled_by": null,
    "partial": null,
    "key": [
-    "https://yudao.dev/onto#role-eng-lead",
+    "https://yudao.dev/onto#role-outsourced",
     "https://yudao.dev/onto#ax-role-process"
    ]
   },
   {
    "born": 2,
-   "path": "探索者 → 角色必写工作过程",
-   "depth": 1,
+   "path": "工程 → 内部要协作的部门必有一份部门内的核验 → 核验声明必有核验者 → 角色必写工作过程",
+   "depth": 3,
    "axiom": "角色必写工作过程",
    "filled_in": null,
    "filled_by": null,
-   "partial": null,
+   "partial": {
+    "batch": 3,
+    "upto": "审查者核验工程架构师交的完成 → 审查者"
+   },
    "key": [
-    "https://yudao.dev/onto#role-eng-explorer",
+    "https://yudao.dev/onto#dept-engineering",
+    "https://yudao.dev/onto#ax-collab-needs-internal-verification",
+    "https://yudao.dev/onto#ax-decl-has-verifier",
+    "https://yudao.dev/onto#ax-role-process"
+   ]
+  },
+  {
+   "born": 2,
+   "path": "工程 → 内部要协作的部门必有一份部门内的核验 → 核验声明必有被核验者 → 角色必写工作过程",
+   "depth": 3,
+   "axiom": "角色必写工作过程",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": {
+    "batch": 3,
+    "upto": "审查者核验工程架构师交的完成 → 工程架构师（中心角色）"
+   },
+   "key": [
+    "https://yudao.dev/onto#dept-engineering",
+    "https://yudao.dev/onto#ax-collab-needs-internal-verification",
+    "https://yudao.dev/onto#ax-decl-has-verified",
     "https://yudao.dev/onto#ax-role-process"
    ]
   },
@@ -1230,6 +1634,32 @@
    "partial": null,
    "key": [
     "https://yudao.dev/onto#role-sev-product",
+    "https://yudao.dev/onto#ax-role-process"
+   ]
+  },
+  {
+   "born": 2,
+   "path": "主程 → 角色必写工作过程",
+   "depth": 1,
+   "axiom": "角色必写工作过程",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#role-eng-lead",
+    "https://yudao.dev/onto#ax-role-process"
+   ]
+  },
+  {
+   "born": 2,
+   "path": "探索者 → 角色必写工作过程",
+   "depth": 1,
+   "axiom": "角色必写工作过程",
+   "filled_in": null,
+   "filled_by": null,
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#role-eng-explorer",
     "https://yudao.dev/onto#ax-role-process"
    ]
   }

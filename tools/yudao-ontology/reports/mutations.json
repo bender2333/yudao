@@ -14,7 +14,16 @@
   "name": "不改（对照）",
   "how": "原样跑一次",
   "expected": "没有违例、没有确实缺（假定带出的不算）",
-  "got": "没有违例、没有确实缺；假定带出：违例:halfopen-written-release:审查者核验工程架构师交的完成",
+  "got": "没有违例、没有确实缺",
+  "detected": true
+ },
+ {
+  "id": "control-b3",
+  "batch": 3,
+  "name": "不改（对照）",
+  "how": "原样跑一次",
+  "expected": "没有违例、没有确实缺（假定带出的不算）",
+  "got": "没有违例、没有确实缺；已知的（假定带出或真的发现）：确实缺:form-defined:工程的中心型小组；确实缺:form-defined:一个外包角色直做",
   "detected": true
  },
  {
@@ -99,12 +108,66 @@
   "detected": true
  },
  {
+  "id": "direct-verifies-noncompleter",
+  "batch": 3,
+  "name": "直做核验一个交不出完成的角色",
+  "how": "几个角色直做里加一份核验声明：工程核验产品交的完成（产品交不出完成，4.3 第 5 条该在加载时拒绝）",
+  "expected": "违例：direct-verified-can-complete",
+  "got": "一致；违例:decl-verified-produces:decl-mutant-sev；违例:direct-verified-can-complete:decl-mutant-sev",
+  "detected": true
+ },
+ {
   "id": "source-unreceived",
   "batch": 2,
   "name": "来源没人接",
   "how": "删掉「工程架构师接上一层交来的任务」这一条",
   "expected": "确实缺：source-received",
   "got": "一致；确实缺:source-received:子事项（上一层交来的任务）",
+  "detected": true
+ },
+ {
+  "id": "control-b3-crosscheck",
+  "batch": 3,
+  "name": "不改（对照，逐条对照）",
+  "how": "原样跑一次",
+  "expected": "只有已知的那一条确实缺（质检交缺陷记录）",
+  "got": "确实缺:质检 产出 缺陷记录",
+  "detected": true
+ },
+ {
+  "id": "x-drop-completer",
+  "batch": 3,
+  "name": "定义里直做没人交完成",
+  "how": "一个角色直做的定义去掉交完成的工具",
+  "expected": "确实缺：能交完成",
+  "got": "确实缺:一个角色直做 能交完成 一个角色",
+  "detected": true
+ },
+ {
+  "id": "x-final-wrong",
+  "batch": 3,
+  "name": "最后采纳的成果写错",
+  "how": "三部门的定义把最后采纳的成果从交付改成 PRD",
+  "expected": "违例：最后采纳的成果",
+  "got": "违例:三部门（默认） 最后采纳的成果 要求（PRD）",
+  "detected": true
+ },
+ {
+  "id": "x-rotation-wrong",
+  "batch": 3,
+  "name": "轮转方式写错",
+  "how": "几个角色直做的定义把轮转方式改成成果驱动",
+  "expected": "违例：轮转方式",
+  "got": "违例:几个角色直做 轮转方式 按成果",
+  "detected": true
+ },
+ {
+  "id": "x-source-dropped",
+  "batch": 3,
+  "name": "定义里建档没人接",
+  "how": "一个角色直做的定义去掉建档的来源",
+  "expected": "确实缺：接",
+  "got": "确实缺:一个角色 接 建档",
   "detected": true
  }
 ]

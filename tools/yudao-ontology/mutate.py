@@ -9,6 +9,7 @@ import json
 import sys
 from pathlib import Path
 
+import rdflib
 from rdflib import RDF, RDFS, Literal, URIRef
 
 HERE = Path(__file__).resolve().parent
@@ -33,6 +34,15 @@ def set_one(g, s, p, o):
 def relabel(g, s, new):
     g.remove((s, RDFS.label, None))
     g.add((s, RDFS.label, Literal(new, lang="zh")))
+
+
+def add_decl(g, iri, verifier, verified, outcome, form):
+    d = YD[iri]
+    g.add((d, RDF.type, YD.VerificationDecl))
+    g.add((d, YD.verifier, YD[verifier]))
+    g.add((d, YD.verified, YD[verified]))
+    g.add((d, YD.forOutcome, YD[outcome]))
+    g.add((d, YD.inForm, YD[form]))
 
 
 def add_cycle(g):
@@ -64,8 +74,24 @@ MUTATIONS = [
      lambda g: g.add((YD["role-eng-reviewer"], RDF.type, YD.OutsourcedRole)), ("不一致", None)),
     ("reviewer-is-author", 2, "审查者就是中心角色", "部门内那份核验声明的核验者改成工程架构师自己",
      lambda g: set_one(g, YD["decl-eng-review"], YD.verifier, YD["role-eng-architect"]), ("不一致", None)),
+    ("direct-verifies-noncompleter", 3, "直做核验一个交不出完成的角色",
+     "几个角色直做里加一份核验声明：工程核验产品交的完成（产品交不出完成，4.3 第 5 条该在加载时拒绝）",
+     lambda g: add_decl(g, "decl-mutant-sev", "role-sev-engineering", "role-sev-product", "ok-sev-completion", "form-several"),
+     ("违例", "direct-verified-can-complete")),
     ("source-unreceived", 2, "来源没人接", "删掉「工程架构师接上一层交来的任务」这一条",
      lambda g: g.remove((YD["role-eng-architect"], YD.receives, YD["src-subtask"])), ("确实缺", "source-received")),
+]
+
+
+CROSS_MUTATIONS = [
+    ("x-drop-completer", "定义里直做没人交完成", "一个角色直做的定义去掉交完成的工具",
+     lambda g: g.remove((YD["form-min"], YD.canSubmitCompletion, None)), ("确实缺", "能交完成")),
+    ("x-final-wrong", "最后采纳的成果写错", "三部门的定义把最后采纳的成果从交付改成 PRD",
+     lambda g: set_one(g, YD["form-default"], YD.finalOutcome, YD["ok-prd"]), ("违例", "最后采纳的成果")),
+    ("x-rotation-wrong", "轮转方式写错", "几个角色直做的定义把轮转方式改成成果驱动",
+     lambda g: set_one(g, YD["form-several"], YD.rotation, YD["rm-by-outcome"]), ("违例", "轮转方式")),
+    ("x-source-dropped", "定义里建档没人接", "一个角色直做的定义去掉建档的来源",
+     lambda g: g.remove((YD["role-min"], YD.receives, YD["src-onboarding"])), ("确实缺", "接")),
 ]
 
 
@@ -99,22 +125,25 @@ def judged(exp, res, base_res):
     return False
 
 
-ASSUMPTION_CHECKS = {"halfopen-written-release"}
+ASSUMPTION_CHECKS = {"halfopen-written-release", "halfopen-depends"}
 
 
 def main():
     rows = []
     base = {}
-    for b in (1, 2):
+    for b in (1, 2, 3):
         br, g, _ = run.run_batch(b, 3)
         base[b] = outcome(br, g)
         assert base[b]["kind"] == "一致", f"原样的第 {b} 批不一致"
         # 假定带出的违例（读作假定与设计的写法冲突）是已知的，对照只看设计本身
-        bad = [h for h in base[b]["shacl"] if h.startswith(("违例", "确实缺")) and h.split(":")[1] not in ASSUMPTION_CHECKS]
-        known = [h for h in base[b]["shacl"] if h.split(":")[1] in ASSUMPTION_CHECKS]
+        # 第 3 批的两条「确实缺」是真的发现（设计里有、发布的定义文件里没有的两份形态），对照里单列，不算误报
+        known_findings = {"form-defined"} if b == 3 else set()
+        bad = [h for h in base[b]["shacl"] if h.startswith(("违例", "确实缺"))
+               and h.split(":")[1] not in ASSUMPTION_CHECKS | known_findings]
+        known = [h for h in base[b]["shacl"] if h.split(":")[1] in ASSUMPTION_CHECKS | known_findings]
         rows.append({"id": f"control-b{b}", "batch": b, "name": "不改（对照）", "how": "原样跑一次",
                      "expected": "没有违例、没有确实缺（假定带出的不算）",
-                     "got": ("；".join(bad) or "没有违例、没有确实缺") + ("；假定带出：" + "；".join(known) if known else ""),
+                     "got": ("；".join(bad) or "没有违例、没有确实缺") + ("；已知的（假定带出或真的发现）：" + "；".join(known) if known else ""),
                      "detected": not bad})
     for mid, b, name, how, fn, exp in MUTATIONS:
         br, g, _ = run.run_batch(b, 3, extra=fn)
@@ -125,6 +154,24 @@ def main():
         rows.append({"id": mid, "batch": b, "name": name, "how": how, "expected": "：".join(x for x in exp if x),
                      "got": res["kind"] + ("；" + "；".join(new[:4]) if new else ""), "detected": ok})
         print(("OK  " if ok else "MISS"), b, name, "|", rows[-1]["got"][:150])
+    # 第 3 批：设计与定义文件逐条对照（crosscheck.py）。在内存里改一份定义的转写结果
+    import crosscheck
+    design, defs_g = crosscheck.design_graph(), crosscheck.definitions_graph()
+    base_x = {json.dumps(r, ensure_ascii=False, sort_keys=True) for r in crosscheck.compare(design, defs_g)}
+    bad = [json.loads(r) for r in base_x if json.loads(r)["result"] in ("违例", "确实缺")]
+    rows.append({"id": "control-b3-crosscheck", "batch": 3, "name": "不改（对照，逐条对照）", "how": "原样跑一次",
+                 "expected": "只有已知的那一条确实缺（质检交缺陷记录）",
+                 "got": "；".join(f'{r["result"]}:{r["subject"]} {r["property"]} {r["object"]}' for r in bad),
+                 "detected": [(r["subject"], r["object"]) for r in bad] == [("质检", "缺陷记录")]})
+    for mid, name, how, fn, exp in CROSS_MUTATIONS:
+        x = rdflib.Graph() + defs_g
+        fn(x)
+        new_rows = [r for r in crosscheck.compare(design, x)
+                    if json.dumps(r, ensure_ascii=False, sort_keys=True) not in base_x]
+        ok = any(r["result"] == exp[0] and r["property"] == exp[1] for r in new_rows)
+        got = "；".join(f'{r["result"]}:{r["subject"]} {r["property"]} {r["object"]}' for r in new_rows)
+        rows.append({"id": mid, "batch": 3, "name": name, "how": how, "expected": "：".join(exp), "got": got, "detected": ok})
+        print(("OK  " if ok else "MISS"), 3, name, "|", got[:150])
     (HERE / "reports/mutations.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
