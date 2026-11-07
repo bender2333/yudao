@@ -291,3 +291,73 @@ def test_an_invalidation_without_kind_or_version_changes_nothing():
         after = fold_more(accepted, [_event(EventType.ARTIFACT_INVALIDATED, 3, payload=payload)])
         assert after.artifact("product_spec") == accepted.artifact("product_spec"), payload
         assert after.versions == accepted.versions, payload
+
+
+def _accepted_spec(version: int, content_hash: str, at: int) -> Event:
+    # 一条接纳 PRD 的事件：种类、版本与内容摘要齐全
+    return _event(EventType.SPEC_ACCEPTED, at, session="ses_pro", department="product", payload={
+        "content_hash": content_hash, "artifact_kind": "product_spec", "artifact_version": version,
+        "artifact_basis": {},
+    })
+
+
+def test_the_projection_reads_the_current_and_the_last_accepted_artifact():
+    # 当前版本、最后一次接纳的那一版与当前版本的内容摘要（#860）：失效以后当前版本没有，
+    # 最后接纳的那一版仍然记着，接下一版时由它给出上一版与版本号
+    projection = fold_events([_run_created(), _accepted_spec(1, "sha256:spec1", 2)])
+    assert projection.artifact("product_spec").version == 1
+    assert projection.latest("product_spec").version == 1
+    assert projection.artifact_hash("product_spec") == "sha256:spec1"
+    # 没有接纳过的种类：三项都是 None
+    assert projection.artifact("product_decision") is None
+    assert projection.latest("product_decision") is None
+    assert projection.artifact_hash("product_decision") is None
+    invalidated = fold_more(projection, [_event(EventType.ARTIFACT_INVALIDATED, 3, payload={
+        "artifact_kind": "product_spec", "artifact_version": 1})])
+    assert invalidated.artifact("product_spec") is None
+    assert invalidated.artifact_hash("product_spec") is None
+    assert invalidated.latest("product_spec").version == 1
+
+
+def test_invalidating_an_older_version_keeps_the_current_one():
+    # 失效按版本去掉那一版（S1b）：失效旧的版本不碰当前的版本，也不从多版并存的清单里
+    # 去掉别的版本；重复失效同一版不再改动任何东西
+    events = [_run_created(), _accepted_spec(1, "sha256:spec1", 2), _accepted_spec(2, "sha256:spec2", 3)]
+    projection = fold_events(events)
+    older = fold_more(projection, [_event(EventType.ARTIFACT_INVALIDATED, 4, payload={
+        "artifact_kind": "product_spec", "artifact_version": 1})])
+    assert older.artifact("product_spec").content_hash == "sha256:spec2"
+    assert [item.content_hash for item in older.versions_of("product_spec")] == ["sha256:spec2"]
+    # 当前版本已经失效以后再失效同一版：当前版本仍然没有，清单与最后接纳的那一版不变
+    twice = fold_more(older, [
+        _event(EventType.ARTIFACT_INVALIDATED, 5, payload={
+            "artifact_kind": "product_spec", "artifact_version": 2}),
+        _event(EventType.ARTIFACT_INVALIDATED, 6, payload={
+            "artifact_kind": "product_spec", "artifact_version": 2}),
+    ])
+    assert twice.artifact("product_spec") is None
+    assert twice.versions_of("product_spec") == ()
+    assert twice.latest("product_spec").content_hash == "sha256:spec2"
+    # 失效一个从来没有接纳过的种类：这种成果仍然没有当前版本，已有的清单不受影响
+    unknown = fold_more(twice, [_event(EventType.ARTIFACT_INVALIDATED, 7, payload={
+        "artifact_kind": "product_decision", "artifact_version": 1})])
+    assert unknown.artifact("product_decision") is None
+    assert unknown.versions_of("product_decision") == ()
+    assert unknown.versions_of("product_spec") == twice.versions_of("product_spec")
+
+
+def test_answering_a_decision_that_is_not_pending_changes_nothing():
+    # 回答或撤回一条不在待回答清单里的决定请求时什么都不做（按消息身份去重）：
+    # 不能因为回答了一个不认识的编号就把别的请求从待回答清单里拿掉，也不能让折叠报错
+    pending = fold_events([
+        _run_created(),
+        _event(EventType.DECISION_REQUESTED, 2, payload={"kind": "pause", "blocks": "run"}),
+    ])
+    assert pending.pending_decisions == ("evt_2",)
+    for event in (
+        _event(EventType.DECISION_ANSWERED, 3, payload={"decision_id": "evt_unknown"}),
+        _event(EventType.DECISION_ANSWERED, 3, payload={}),
+        _event(EventType.DECISION_WITHDRAWN, 3, payload={"decision_id": None}),
+    ):
+        assert fold_more(pending, [event]).pending_decisions == ("evt_2",)
+
