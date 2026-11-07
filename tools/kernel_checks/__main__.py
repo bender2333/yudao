@@ -12,7 +12,7 @@ import traceback
 from pathlib import Path
 
 from . import __doc__ as USAGE
-from . import baseline, changes, complexity, mutation, registry, report
+from . import baseline, changes, churn, complexity, mutation, registry, report
 
 MANIFEST = Path("harness/definitions/kernel-manifest.json")
 REASONS = Path("harness/tests/kernel/mutation_reasons.json")
@@ -194,6 +194,8 @@ def check(
     selected_paths = {module["path"] for module in selected}
     module_paths = set(module_by_path)
     merge_base = changes.merge_base(root, base)
+    # 近两周改动只是读数：清单里每个内核模块都写，不看开关，也不进结论（设计说明「接口」）
+    churn_section = churn.section(root, [module["path"] for module in modules])
     diff = changes.changed_python_files(root, merge_base)
     sources: dict[str, dict] = {}
     files: list[dict] = []
@@ -274,6 +276,7 @@ def check(
         "limit": complexity.LIMIT,
         "checked_modules": [module["path"] for module in selected],
         "skipped_modules": skipped,
+        "churn": churn_section,
         "files": files,
         "functions": functions,
         "violations": violations,

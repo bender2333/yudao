@@ -55,6 +55,7 @@ def error_report(base: str, mode: str, message: str) -> dict:
         "limit": None,
         "checked_modules": [],
         "skipped_modules": [],
+        "churn": None,
         "files": [],
         "functions": [],
         "violations": [],
@@ -81,6 +82,7 @@ def render(report: dict) -> str:
     skipped = report["skipped_modules"]
     if skipped:
         lines.append("没检查的内核模块：" + "、".join(f"{item['module']}（{item['why']}）" for item in skipped))
+    lines.extend(_churn_lines(report.get("churn")))
     files = report["files"]
     lines.append("改到的内核模块：" + ("、".join(item["module"] for item in files) if files else "无"))
     for function in report["functions"]:
@@ -103,6 +105,22 @@ def render(report: dict) -> str:
     lines.extend(_mutation_lines(report.get("mutation")))
     lines.append("结论：" + ("通过" if report["verdict"] == PASS else "不通过"))
     return "\n".join(lines) + "\n"
+
+
+def _churn_lines(churn: dict | None) -> list[str]:
+    # 近两周改动（设计说明「接口」）：清单里每个内核模块一行，只是读数，不进结论
+    if churn is None:
+        return []
+    lines: list[str] = []
+    for item in churn["modules"]:
+        if item["ratio"] is None:
+            lines.append(f"近两周改动：{item['module']} 比值留空（{item['why']}）")
+            continue
+        lines.append(
+            f"近两周改动：{item['module']} {item['total']} 行"
+            f"（新增 {item['added']}、删除 {item['deleted']}）÷ {item['lines']} 行 = {item['ratio']:.1f}%"
+        )
+    return lines
 
 
 def _mutation_lines(mutation: dict | None) -> list[str]:
