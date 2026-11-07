@@ -1,0 +1,110 @@
+[
+ {
+  "id": "control-b1",
+  "batch": 1,
+  "name": "不改（对照）",
+  "how": "原样跑一次",
+  "expected": "没有违例、没有确实缺",
+  "got": "没有违例、没有确实缺",
+  "detected": true
+ },
+ {
+  "id": "control-b2",
+  "batch": 2,
+  "name": "不改（对照）",
+  "how": "原样跑一次",
+  "expected": "没有违例、没有确实缺",
+  "got": "没有违例、没有确实缺",
+  "detected": true
+ },
+ {
+  "id": "self-judge",
+  "batch": 1,
+  "name": "生成者裁决自己",
+  "how": "把质检核验工程交付的那份声明，核验者改成工程自己",
+  "expected": "不一致",
+  "got": "不一致；",
+  "detected": true
+ },
+ {
+  "id": "cycle",
+  "batch": 1,
+  "name": "核验成环",
+  "how": "加一份声明：工程核验质检的缺陷记录（质检本来核验工程）",
+  "expected": "违例：verify-acyclic",
+  "got": "一致；违例:verify-acyclic:工程；违例:verify-acyclic:质检；空位：（埋的）工程核验质检的缺陷记录 → 核验必有独立证据",
+  "detected": true
+ },
+ {
+  "id": "drop-verifier-b1",
+  "batch": 1,
+  "name": "删审查者（第 1 批）",
+  "how": "删掉质检核验工程交付的那份声明",
+  "expected": "提示+不知道：交付 → 以放行结束的成果必有一份核验声明",
+  "got": "一致；不知道:released-has-decl:交付；空位：交付 → 以放行结束的成果必有一份核验声明；空位：交付 → 以放行结束的成果必有一份核验声明 → 核验声明必有核验者；空位：交付 → 以放行结束的成果必有一份核验声明 → 核验声明必有被核验者",
+  "detected": true
+ },
+ {
+  "id": "rename",
+  "batch": 1,
+  "name": "改一个名字",
+  "how": "文档副本里「事项」改成「任务」，重新抽取后标签变了",
+  "expected": "不知道：name-unknown",
+  "got": "一致；不知道:name-unknown:任务",
+  "detected": true
+ },
+ {
+  "id": "avoid-word",
+  "batch": 1,
+  "name": "用了要避免的词",
+  "how": "文档副本里「部门」改成「团队」（词表写明避免）",
+  "expected": "违例：name-avoid",
+  "got": "一致；不知道:name-unknown:团队；违例:name-avoid:团队",
+  "detected": true
+ },
+ {
+  "id": "drop-verifier-b2",
+  "batch": 2,
+  "name": "删审查者（第 2 批）",
+  "how": "删掉质检核验工程交付的那份声明；第 2 批已承诺形态里的核验声明",
+  "expected": "提示+确实缺：交付 → 以放行结束的成果必有一份核验声明",
+  "got": "一致；确实缺:released-has-decl:交付；空位：交付 → 以放行结束的成果必有一份核验声明；空位：交付 → 以放行结束的成果必有一份核验声明 → 核验声明必有核验者；空位：交付 → 以放行结束的成果必有一份核验声明 → 核验声明必有被核验者",
+  "detected": true
+ },
+ {
+  "id": "reviewer-sees-author",
+  "batch": 2,
+  "name": "审查者看得到作者的历史",
+  "how": "给工程的审查者加上「看得到作者的历史」",
+  "expected": "不一致",
+  "got": "不一致；",
+  "detected": true
+ },
+ {
+  "id": "reviewer-outsourced",
+  "batch": 2,
+  "name": "审查者外包",
+  "how": "把工程的审查者改成外包角色",
+  "expected": "不一致",
+  "got": "不一致；",
+  "detected": true
+ },
+ {
+  "id": "reviewer-is-author",
+  "batch": 2,
+  "name": "审查者就是中心角色",
+  "how": "部门内那份核验声明的核验者改成工程架构师自己",
+  "expected": "不一致",
+  "got": "不一致；",
+  "detected": true
+ },
+ {
+  "id": "source-unreceived",
+  "batch": 2,
+  "name": "来源没人接",
+  "how": "删掉「工程架构师接上一层交来的任务」这一条",
+  "expected": "确实缺：source-received",
+  "got": "一致；确实缺:source-received:子事项（上一层交来的任务）",
+  "detected": true
+ }
+]

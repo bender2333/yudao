@@ -1,0 +1,13 @@
+# 第 1 批承诺到哪，以及为试验加的假定。范围由人声明，检查不自己推。
+@prefix yd: <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+yd:scope-overview-fixed a yd:CommittedScope ; yd:batch 1 ;
+    rdfs:label "总图写成固定结构的那几样：三样固定结构、四层、三环、十三道缝、外环九个状态"@zh ;
+    yd:covers yd:FixedStructure, yd:Layer, yd:Ring, yd:Seam, yd:OuterState .
+yd:as-eng-collab a yd:Assumption ; yd:batch 1 ;
+    rdfs:label "假定工程部门内部要协作"@zh ;
+    rdfs:comment "试验用，不是用户的承诺。依据只是总图「一个部门的内部也可以是一个子组织」，总图没说默认的工程就是这样"@zh ;
+    yd:assumes "yd:dept-engineering a yd:CollaboratingDepartment" .
+yd:as-quality-box a yd:Assumption ; yd:batch 1 ;
+    rdfs:label "总图把质检方框直接称为核验角色；这一批把方框当成核验者，不另造一个角色"@zh ;
+    yd:assumes "decl-default-quality 的 verifier 是部门 dept-quality" .
