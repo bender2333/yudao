@@ -1,0 +1,122 @@
+[
+ {
+  "result": "确实缺",
+  "why": "设计写了，定义文件里没有",
+  "form": "三部门（默认）",
+  "subject": "质检",
+  "property": "产出",
+  "object": "缺陷记录"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "工程",
+  "property": "产出",
+  "object": "结构说明（default）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "产品",
+  "property": "产出",
+  "object": "产品决定（default）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "产品",
+  "property": "关注",
+  "object": "基线核验（default）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "质检",
+  "property": "产出",
+  "object": "基线核验（default）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "质检",
+  "property": "产出",
+  "object": "独立判断（default）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "质检",
+  "property": "产出",
+  "object": "质检结论（default）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "质检",
+  "property": "关注",
+  "object": "结构说明（default）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "三部门（默认）",
+  "subject": "质检",
+  "property": "关注",
+  "object": "要求（PRD）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "一个角色直做",
+  "subject": "一个角色",
+  "property": "产出",
+  "object": "初始 PRD（single_role_direct）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "一个角色直做",
+  "subject": "一个角色",
+  "property": "产出",
+  "object": "现有结构说明（single_role_direct）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "一个角色直做",
+  "subject": "一个角色",
+  "property": "关注",
+  "object": "指导"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "几个角色直做",
+  "subject": "工程（几个角色直做）",
+  "property": "产出",
+  "object": "初始 PRD（several_roles_direct）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "几个角色直做",
+  "subject": "工程（几个角色直做）",
+  "property": "产出",
+  "object": "现有结构说明（several_roles_direct）"
+ },
+ {
+  "result": "不知道",
+  "why": "定义文件有，设计没写",
+  "form": "几个角色直做",
+  "subject": "工程（几个角色直做）",
+  "property": "关注",
+  "object": "指导"
+ }
+]

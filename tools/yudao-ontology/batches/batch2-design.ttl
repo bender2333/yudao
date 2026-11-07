@@ -140,7 +140,16 @@ yd:ev-host-run yd:hasCheckDefinition yd:cd-generic .
 # ---------- 2026-11-07 用户定的第 1 条：部门内审查者的证据 ----------
 # 设计说明的原话只说到：审查者每次从新的上下文开始（4.4）；子组织内部的角色没写入的模型跟随部门（4.7）。
 # 合起来，默认的审查者是同一个模型换新上下文。这一样不在独立证据的三种里（D38 基础规则 1；总图第一节「独立的证据」）。
-yd:decl-eng-review yd:hasEvidence yd:ev-eng-review-reading .
+# 11-07 用户又定：半开环看结论靠的是什么。审查者是核验角色，4.2「核验只有一套」，它写的检查同样由主机在独立副本上跑、带回执；
+# 所以审查者有两种结论：写得出能跑的检查（例如审查代码）时靠主机回执，算已核验；只能读（例如审查设计）时只靠同模型新上下文，算半开环。
+yd:decl-eng-review yd:hasEvidence yd:ev-eng-review-reading ; yd:hasIndependentEvidence yd:ev-eng-review-run .
+yd:ev-eng-review-run a yd:RunEvidence ; rdfs:label "审查者写的检查，主机在独立副本上跑、带回执"@zh ;
+    yd:docRef "部门内多角色设计说明 4.1 角色清单「工具许可」；形态与核验角色设计说明 4.2" ; yd:batch 2 ;
+    yd:quote "读取要求、材料与证据，在独立副本上运行检查，提交结论" ;
+    yd:quote "核验只有一套，角色在定义里声明「做核验、核验谁的成果」就有" ;
+    yd:when "检查材料里有能跑的检查（例如审查代码）" ;
+    yd:hasCheckDefinition yd:cd-generic .
+yd:ev-eng-review-reading yd:when "只能读、写不出能跑的检查（例如审查设计）" .
 yd:ev-eng-review-reading a yd:SameModelFreshContextEvidence ; rdfs:label "同一个模型换新上下文读一遍"@zh ;
     yd:docRef "部门内多角色设计说明 4.4、4.7" ; yd:batch 2 ;
     yd:quote "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。……子组织内部的角色没写入的跟随部门" .

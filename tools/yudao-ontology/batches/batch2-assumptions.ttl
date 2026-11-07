@@ -10,9 +10,10 @@ yd:completion-halfopen a yd:Completion ; rdfs:label "半开环"@zh ;
     rdfs:comment "用户 2026-11-07：同模型新上下文的审查者留着当角色，它的结论算半开环"@zh .
 yd:completion-halfopen owl:differentFrom yd:completion-release, yd:completion-openloop .
 
-# 结论只靠同一个模型换新上下文、没有三种独立证据之一的核验声明，是半开环的核验。
-yd:HalfOpenDecl a owl:Class ; rdfs:label "半开环的核验"@zh ;
+# 用户 11-07 定：半开环看结论靠的是什么。有一种结论只靠同一个模型换新上下文的核验声明，归进这一类；
+# 它的哪一次结论是半开环、哪一次是已核验，看那一次有没有主机回执（run.py 的 SHACL 分开报）。
+yd:HalfOpenDecl a owl:Class ; rdfs:label "有只靠读的结论的核验"@zh ;
     owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( yd:VerificationDecl
         [ a owl:Restriction ; owl:onProperty yd:hasEvidence ; owl:someValuesFrom yd:SameModelFreshContextEvidence ] ) ] .
 yd:as-halfopen a yd:Assumption ; yd:batch 2 ;
-    rdfs:label "同模型新上下文的审查者，结论算半开环（用户 2026-11-07 裁定，设计里还没有这个词）"@zh .
+    rdfs:label "结论只靠同一个模型换新上下文读、没有主机回执时算半开环；有主机回执算已核验（用户 2026-11-07 两次裁定，设计里还没有这个词）"@zh .
