@@ -13,7 +13,8 @@
       "proposal_methods": [
         "submit_product_spec",
         "submit_structure",
-        "submit_completion"
+        "submit_completion",
+        "submit_completion_review"
       ],
       "limits": {},
       "end_reasons": {

@@ -826,5 +826,32 @@
         "requirement_locations"
       ]
     }
+  },
+  "submit_completion_review": {
+    "kind": "host",
+    "proposal": "completion_review",
+    "description": "Hand in the conclusion on the completion the author handed in for the current version: release ends the item, rework sends the author back for another round. The host binds the conclusion to the version that is current when it is submitted; a version handed in later makes this conclusion stale. The author of the completion cannot conclude on it.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "release",
+            "rework"
+          ],
+          "description": "release passes the current completion; rework sends it back to the author"
+        },
+        "rationale": {
+          "type": "string",
+          "description": "Why this verdict: what you looked at and what you found"
+        }
+      },
+      "required": [
+        "verdict",
+        "rationale"
+      ],
+      "additionalProperties": false
+    }
   }
 }

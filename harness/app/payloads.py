@@ -1904,10 +1904,14 @@ class ProjectParameterSetPayload(Payload):
 class ProjectFormSetPayload(Payload):
     # 项目的形态改动（工单 #1392，形态与核验角色设计说明「形态随事项冻结」）：project_form_set 携带
     # previous_form（改动前的那一份）、form（改动后的那一份）与理由；两个值都是发布带的形态名，
-    # 从来没有设过时按默认的三部门（three_departments）算。之后新建的事项按新的那一份冻结，正在跑的不变
+    # 从来没有设过时按默认的三部门（three_departments）算。之后新建的事项按新的那一份冻结，正在跑的不变。
+    # 工单 #1516 只增两项：changes 是这次采用的本项目的改动文档（按身份只写不同的项），version 是那时
+    # 合成结果的内容摘要（组织版本）。旧事件没有这两项，读时按空改动、没有版本处理，重放结果不变
     previous_form: str
     form: str
     reason: str = ""
+    changes: dict[str, Any] = Field(default_factory=dict)
+    version: str | None = None
 
 
 # 事件种类到载荷类型；tool_called 有工具结果与用量记账两种载荷

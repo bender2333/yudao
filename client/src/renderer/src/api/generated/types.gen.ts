@@ -3110,6 +3110,24 @@ export type FormChange = {
      * Actor
      */
     actor: string;
+    /**
+     * Previous Version
+     */
+    previous_version?: string | null;
+    /**
+     * Version
+     */
+    version?: string | null;
+    /**
+     * Changes
+     */
+    changes?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Diff
+     */
+    diff?: Array<FormDifference>;
 };
 
 /**
@@ -3136,6 +3154,24 @@ export type FormChoice = {
      * Open Loop
      */
     open_loop: boolean;
+};
+
+/**
+ * FormDifference
+ */
+export type FormDifference = {
+    /**
+     * Item
+     */
+    item: string;
+    /**
+     * Before
+     */
+    before: string;
+    /**
+     * After
+     */
+    after: string;
 };
 
 /**
@@ -4339,6 +4375,10 @@ export type OrganizationAdopt = {
      * Reason
      */
     reason?: string;
+    /**
+     * Mode
+     */
+    mode?: 'template' | 'verifier' | 'advanced';
 };
 
 /**
@@ -4357,6 +4397,10 @@ export type OrganizationDepartment = {
      * Verifier
      */
     verifier?: boolean;
+    /**
+     * Origin
+     */
+    origin?: 'release' | 'changed' | 'added';
 };
 
 /**
@@ -4384,6 +4428,10 @@ export type OrganizationDraftResult = {
      * Open Loop
      */
     open_loop: boolean | null;
+    /**
+     * Discarded
+     */
+    discarded?: Array<string>;
 };
 
 /**
@@ -4772,6 +4820,29 @@ export type ProjectOrganizationResult = {
      * History
      */
     history: Array<FormChange>;
+    /**
+     * Changes
+     */
+    changes?: {
+        [key: string]: unknown;
+    };
+    organization?: DraftOrganization | null;
+    /**
+     * Rejections
+     */
+    rejections?: Array<DraftIssue>;
+    /**
+     * Add Verifier
+     */
+    add_verifier?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Remove Verifier
+     */
+    remove_verifier?: {
+        [key: string]: unknown;
+    } | null;
 };
 
 /**
@@ -15852,6 +15923,16 @@ export type ProjectFormSetPayload = {
      * Reason
      */
     reason?: string;
+    /**
+     * Changes
+     */
+    changes?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Version
+     */
+    version?: string | null;
 };
 
 /**

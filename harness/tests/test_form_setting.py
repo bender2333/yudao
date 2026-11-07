@@ -167,18 +167,13 @@ def test_a_stale_current_value_and_an_unknown_form_are_refused_without_writing_a
         assert name in unknown.message
     assert _form_events(system, project_id) == []
 
-    # 这一版还不接受本项目的改动（自定的边界）：同样不写事件
-    with_changes = _adopt(application, project_id, DEFAULT_FORM, base_version=DEFINITIONS.version,
-                          changes={"departments": [{"id": "design", "label": "设计"}]})
-    assert isinstance(with_changes, Rejected) and with_changes.reason == "not_allowed"
-    assert "本项目的改动" in with_changes.message
-    assert _form_events(system, project_id) == []
-
+    # 这一版接受本项目的改动（工单 #1516）：改动留空之外，合法的一份改动照常采用，见 test_organization_adopt.py。
     # 不写理由照常改成功：事件里的理由为空
     accepted = _adopt(application, project_id, second_routing.ROUTING_NAME, base_version=DEFINITIONS.version)
     assert isinstance(accepted, Accepted), accepted
     [event] = _form_events(system, project_id)
-    assert event.payload == {"previous_form": DEFAULT_FORM, "form": second_routing.ROUTING_NAME, "reason": ""}
+    assert event.payload == {"previous_form": DEFAULT_FORM, "form": second_routing.ROUTING_NAME, "reason": "",
+                             "changes": {}, "version": second_routing.DEFINITIONS.version}
     system.close()
 
 
@@ -257,8 +252,12 @@ def test_the_current_form_leaving_the_release_is_reported_and_can_be_repaired(tm
     organization = _organization(application, project_id)
     assert organization.form == second_routing.ROUTING_NAME
     assert (organization.version, organization.form_in_release) == (None, False)
-    # 现在这一份不在发布里时部门也为空：不拿别的形态的部门顶替
+    # 现在这一份不在发布里时部门也为空：不拿别的形态的部门顶替；合成结果没有，拒绝项写明原因，
+    # 两个一次点击的改动文档也不给（工单 #1516）
     assert organization.departments == []
+    assert organization.organization is None
+    assert [item.item for item in organization.rejections] == ["organization.json form"]
+    assert organization.add_verifier is None and organization.remove_verifier is None
     assert [choice.form for choice in organization.forms] == [DEFAULT_FORM]
 
     # 这时候用户看到的版本就是「没有版本」：带上空版本选回发布里的那一份照常成立
