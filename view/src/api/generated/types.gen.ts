@@ -2571,6 +2571,148 @@ export type DocumentModelInput = {
 };
 
 /**
+ * DraftDepartment
+ */
+export type DraftDepartment = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Target
+     */
+    target: string;
+    /**
+     * Evidence
+     */
+    evidence: string;
+    /**
+     * Work
+     */
+    work: string;
+    /**
+     * Watched
+     */
+    watched: Array<string>;
+    /**
+     * Outcomes
+     */
+    outcomes: Array<string>;
+    /**
+     * Verifier
+     */
+    verifier: boolean;
+    /**
+     * Write Scope
+     */
+    write_scope: string;
+};
+
+/**
+ * DraftIssue
+ */
+export type DraftIssue = {
+    /**
+     * Item
+     */
+    item: string;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
+ * DraftOrganization
+ */
+export type DraftOrganization = {
+    /**
+     * Version
+     */
+    version: string;
+    /**
+     * Form
+     */
+    form: string;
+    /**
+     * Routing
+     */
+    routing: string;
+    /**
+     * Routing Label
+     */
+    routing_label: string;
+    /**
+     * Departments
+     */
+    departments: Array<DraftDepartment>;
+    /**
+     * Outcome Kinds
+     */
+    outcome_kinds: Array<DraftOutcomeKind>;
+    /**
+     * Verification
+     */
+    verification: Array<DraftVerification>;
+    /**
+     * Sources
+     */
+    sources: {
+        [key: string]: string;
+    };
+};
+
+/**
+ * DraftOutcomeKind
+ */
+export type DraftOutcomeKind = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Label
+     */
+    label: string;
+};
+
+/**
+ * DraftReminder
+ */
+export type DraftReminder = {
+    /**
+     * Kind
+     */
+    kind: 'open_loop' | 'midway_verifier' | 'no_outcomes';
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
+ * DraftVerification
+ */
+export type DraftVerification = {
+    /**
+     * Verifier
+     */
+    verifier: string;
+    /**
+     * Verified
+     */
+    verified: string;
+    /**
+     * Outcome
+     */
+    outcome: string;
+};
+
+/**
  * DrainRunning
  */
 export type DrainRunning = {
@@ -4215,6 +4357,33 @@ export type OrganizationDepartment = {
      * Verifier
      */
     verifier?: boolean;
+};
+
+/**
+ * OrganizationDraftResult
+ */
+export type OrganizationDraftResult = {
+    /**
+     * Project Id
+     */
+    project_id: string;
+    organization: DraftOrganization | null;
+    /**
+     * Rejections
+     */
+    rejections: Array<DraftIssue>;
+    /**
+     * Reminders
+     */
+    reminders: Array<DraftReminder>;
+    /**
+     * Finishes
+     */
+    finishes: string | null;
+    /**
+     * Open Loop
+     */
+    open_loop: boolean | null;
 };
 
 /**
@@ -6023,6 +6192,17 @@ export type SnapshotLiveAttempt = {
      */
     position: number;
     data: LiveAttempt;
+};
+
+/**
+ * Snapshot[OrganizationDraftResult]
+ */
+export type SnapshotOrganizationDraftResult = {
+    /**
+     * Position
+     */
+    position: number;
+    data: OrganizationDraftResult;
 };
 
 /**
@@ -23262,6 +23442,44 @@ export type QueryProjectOrganizationResponses = {
 };
 
 export type QueryProjectOrganizationResponse = QueryProjectOrganizationResponses[keyof QueryProjectOrganizationResponses];
+
+export type QueryOrganizationDraftData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Project Id
+         */
+        project_id: string;
+        /**
+         * Form
+         */
+        form: string;
+        /**
+         * Changes
+         */
+        changes?: string;
+    };
+    url: '/api/queries/organization.draft';
+};
+
+export type QueryOrganizationDraftErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type QueryOrganizationDraftError = QueryOrganizationDraftErrors[keyof QueryOrganizationDraftErrors];
+
+export type QueryOrganizationDraftResponses = {
+    /**
+     * Successful Response
+     */
+    200: SnapshotOrganizationDraftResult;
+};
+
+export type QueryOrganizationDraftResponse = QueryOrganizationDraftResponses[keyof QueryOrganizationDraftResponses];
 
 export type CapabilitiesData = {
     body?: never;
