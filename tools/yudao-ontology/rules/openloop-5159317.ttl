@@ -1,0 +1,16 @@
+# 形态与核验角色设计说明在 5159317（用户 eb8429e 手修以前）判开环的几句话。参照抽取，本线程按原句写成公理。
+# openloop.py 会到这个提交里逐句核对原句还在。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+yd:rule-47-4 a yd:OpenLoopRule ; rdfs:label "第 4.7 节第 4 条：按最后采纳的成果判开环"@zh ;
+    yd:docPath "docs/design/forms-and-verifier-role.md" ;
+    yd:quote "按冻结的定义看事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）有没有核验角色核验；没有，事项标为开环" ;
+    yd:quote "标记说的是最后采纳的东西有没有经过独立核验" ;
+    yd:axiomTurtle "yd:FinalNotVerified rdfs:subClassOf yd:OpenLoopMarked . yd:FinalVerified rdfs:subClassOf yd:NotOpenLoopMarked ." .
+
+yd:rule-acc-12 a yd:OpenLoopRule ; rdfs:label "验收第 12 条：按交完成的角色判开环"@zh ;
+    yd:docPath "docs/design/forms-and-verifier-role.md" ;
+    yd:quote "有核验角色、但交完成的角色不在它核验的范围里，事项创建时标为开环，以开环完成结束。" ;
+    yd:axiomTurtle "[ owl:intersectionOf ( yd:HasVerifier yd:CompleterNotVerified ) ] rdfs:subClassOf yd:OpenLoopMarked ." .

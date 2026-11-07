@@ -2,6 +2,16 @@
 @prefix sh: <http://www.w3.org/ns/shacl#> .
 @prefix yd: <https://yudao.dev/onto#> .
 
+yd:shape-checkdef-per-item-unknown a sh:NodeShape ;
+    rdfs:label "每个事项具体查什么来自检查材料，设计说明没写"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "每个事项具体查什么来自检查材料，设计说明没写"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:perItemFrom ?m . }""" ] ;
+    sh:targetClass yd:CheckDefinition .
+
 yd:shape-decl-verified-produces-violation a sh:NodeShape ;
     rdfs:label "被核验者就是产出被核验成果的一方"@zh ;
     sh:severity sh:Violation ;
@@ -31,6 +41,16 @@ yd:shape-direct-can-complete-unknown a sh:NodeShape ;
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT $this WHERE { $this yd:rotation yd:rm-direct . FILTER NOT EXISTS { $this yd:canSubmitCompletion ?r . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Form . } }""" ] ;
     sh:targetClass yd:Form .
+
+yd:shape-halfopen-written-release-violation a sh:NodeShape ;
+    rdfs:label "按半开环的假定，这份核验的结论不该写成放行（假定与设计的写法冲突）"@zh ;
+    sh:severity sh:Violation ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "按半开环的假定，这份核验的结论不该写成放行（假定与设计的写法冲突）"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:forOutcome ?o . ?o yd:completion yd:completion-release . }""" ] ;
+    sh:targetClass yd:HalfOpenDecl .
 
 yd:shape-name-avoid-violation a sh:NodeShape ;
     rdfs:label "用了词表里写明要避免的词"@zh ;

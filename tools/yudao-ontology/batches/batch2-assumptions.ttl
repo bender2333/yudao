@@ -1,0 +1,18 @@
+# 第 2 批的假定。不是设计，是用户 2026-11-07 的裁定，总图与设计说明里都还没有这个词。
+# 单独一份文件，报告里单列；进设计以前，这里推出的「违例」读作「假定与设计的写法冲突」。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+yd:SameModelFreshContextEvidence a owl:Class ; rdfs:label "同一个模型换新上下文再看"@zh ;
+    owl:disjointWith yd:IndependentEvidence .
+yd:completion-halfopen a yd:Completion ; rdfs:label "半开环"@zh ;
+    rdfs:comment "用户 2026-11-07：同模型新上下文的审查者留着当角色，它的结论算半开环"@zh .
+yd:completion-halfopen owl:differentFrom yd:completion-release, yd:completion-openloop .
+
+# 结论只靠同一个模型换新上下文、没有三种独立证据之一的核验声明，是半开环的核验。
+yd:HalfOpenDecl a owl:Class ; rdfs:label "半开环的核验"@zh ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( yd:VerificationDecl
+        [ a owl:Restriction ; owl:onProperty yd:hasEvidence ; owl:someValuesFrom yd:SameModelFreshContextEvidence ] ) ] .
+yd:as-halfopen a yd:Assumption ; yd:batch 2 ;
+    rdfs:label "同模型新上下文的审查者，结论算半开环（用户 2026-11-07 裁定，设计里还没有这个词）"@zh .

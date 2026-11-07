@@ -88,8 +88,12 @@ yd:hasInternalVerification a owl:ObjectProperty ; rdfs:label "部门内的核验
 yd:hasObjective a owl:ObjectProperty ; rdfs:label "目标函数"@zh ; rdfs:range yd:Objective .
 yd:hasEvidenceBasis a owl:ObjectProperty ; rdfs:label "证据来源"@zh ; rdfs:range yd:EvidenceBasis .
 yd:hasWorkProcess a owl:ObjectProperty ; rdfs:label "工作过程"@zh ; rdfs:range yd:WorkProcess .
-yd:hasIndependentEvidence a owl:ObjectProperty ; rdfs:label "取得的独立证据"@zh ;
+yd:hasEvidence a owl:ObjectProperty ; rdfs:label "结论靠的证据"@zh ; rdfs:domain yd:VerificationDecl .
+yd:hasIndependentEvidence a owl:ObjectProperty ; rdfs:label "取得的独立证据"@zh ; rdfs:subPropertyOf yd:hasEvidence ;
     rdfs:domain yd:VerificationDecl ; rdfs:range yd:IndependentEvidence .
+# 核验的通用定义里，每个事项具体查什么来自核验角色写的检查材料（2026-11-07 用户定：不让本体挑检查定义）
+yd:CheckMaterials a owl:Class ; rdfs:label "检查材料"@zh .
+yd:perItemFrom a owl:ObjectProperty ; rdfs:label "每个事项查什么来自"@zh ; rdfs:domain yd:CheckDefinition ; rdfs:range yd:CheckMaterials .
 yd:hasCheckDefinition a owl:ObjectProperty ; rdfs:label "检查定义"@zh ; rdfs:range yd:CheckDefinition .
 
 # 承担者的两种性质（第 2 批的设计说明用到）
