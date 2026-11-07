@@ -1,5 +1,6 @@
 // 候选列表（工单 #1297；模型管理 docs/design/model-management.md「模型访问定义与准入」「候选的内容与呈现」、docs/design/model-management.md「模型管理页」「选择模型」行）。
-// 搜索（名称、提供方、上游模型 ID）、筛选（可自动配置、支持图像、支持推理、全部模型、已选用）与分批显示。
+// 搜索（名称、提供方、上游模型 ID）、筛选（可自动配置、支持图像、支持推理、全部模型、已选用）与分页显示：
+// 每页最多 8 个候选，列表下方是「上一页」「下一页」与页脚「第 n / m 页」（工单 #1585）。
 // 候选带勾选框；勾选即补全参数并验证（catalog.model.select），页面不预填参数：
 // 协议、窗口与输出上限按服务端给的候选值显示，来源一并标出。
 // 列表里没有的模型用「找不到模型？手动添加」：填上游模型 ID 即可选用，其余与勾选相同。
@@ -9,7 +10,6 @@ import {
   PROTOCOL_LABELS,
   SOURCE_LABELS,
   candidateApplicable,
-  moreCount,
   type CandidateFilterId,
   type CandidateRow,
 } from "./model-logic";
@@ -25,8 +25,9 @@ export type CandidateListProps = {
   filter: CandidateFilterId;
   /** 已经选用的模型：连接与上游模型 ID 合成的一把键 */
   selected: ReadonlySet<string>;
-  /** 还剩多少个没有显示 */
-  remaining: number;
+  /** 当前页（从 1 起）与页数：每页最多 8 个，页脚写「第 n / m 页」 */
+  page: number;
+  pages: number;
   /** 每个候选旁的结果（选它时服务端给的原因） */
   status: Record<string, CandidateStatus>;
   /** 手动添加：表单是否展开、填的上游模型 ID、选的是哪一份连接 */
@@ -39,7 +40,8 @@ export type CandidateListProps = {
   fetchNote: string;
   onSearch: (value: string) => void;
   onFilter: (value: CandidateFilterId) => void;
-  onMore: () => void;
+  onPrevious: () => void;
+  onNext: () => void;
   onToggle: (row: CandidateRow) => void;
   onManualOpen: () => void;
   onManualClose: () => void;
@@ -161,12 +163,21 @@ export function CandidateList(props: CandidateListProps) {
           })}
         </ul>
       )}
-      {props.remaining > 0 ? (
-        <button type="button" className="y10-btn small mm-more" data-testid="candidate-more"
-                onClick={props.onMore}>
-          继续显示 {moreCount(props.remaining)} 个模型
+      <div className="y10-row mm-actions" data-testid="candidate-pager">
+        <button type="button" className="y10-btn small" data-testid="candidate-previous"
+                disabled={props.page <= 1}
+                onClick={props.onPrevious}>
+          上一页
         </button>
-      ) : null}
+        <span className="y10-small y10-muted" data-testid="candidate-page">
+          第 {props.page} / {props.pages} 页
+        </span>
+        <button type="button" className="y10-btn small" data-testid="candidate-next"
+                disabled={props.page >= props.pages}
+                onClick={props.onNext}>
+          下一页
+        </button>
+      </div>
       <div className="y10-row mm-actions">
         <button type="button" className="y10-btn small" data-testid="candidate-manual"
                 disabled={props.disabled}
