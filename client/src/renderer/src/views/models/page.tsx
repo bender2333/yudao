@@ -21,10 +21,11 @@ import { DepartmentUsage, type DepartmentStatus } from "./department-usage";
 import { SelectionPanel, type SelectionStatus } from "./selection-panel";
 import { Block, PageHead } from "../../shell/kit";
 import {
-  FIRST_BATCH,
-  MORE_BATCH,
+  FIRST_PAGE,
   admittedModels,
   candidateKey,
+  candidatePageAfter,
+  candidatePageView,
   candidateRowsOf,
   candidatesLocked,
   capacityInputIssue,
@@ -74,7 +75,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   const [departmentStatus, setDepartmentStatus] = useState<Record<string, DepartmentStatus>>({});
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<CandidateFilterId>("auto");
-  const [limit, setLimit] = useState(FIRST_BATCH);
+  // 候选分页（工单 #1585）：每页最多 8 个；取消选用使最后一页消失时显示取合法页
+  const [page, setPage] = useState(FIRST_PAGE);
   const [capacity, setCapacity] = useState<Record<string, { context_window: string; max_output_tokens: string }>>({});
   const [manualOpen, setManualOpen] = useState(false);
   const [manualModel, setManualModel] = useState("");
@@ -222,8 +224,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
     () => filterCandidates(candidateRows, search, filter, selectedKeys),
     [candidateRows, search, filter, selectedKeys],
   );
-  const visibleRows = useMemo(() => filteredRows.slice(0, limit), [filteredRows, limit]);
-  const remaining = Math.max(0, filteredRows.length - visibleRows.length);
+  // 这一页的候选、当前页与页数：页面存的页可能因为列表变短而越界，显示时取合法页
+  const pageView = useMemo(() => candidatePageView(filteredRows, page), [filteredRows, page]);
 
   // 已选模型清单：目录里的定义加上它此刻的状态
   const selectedRows = useMemo(
@@ -305,6 +307,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       delete next[providerId];
       return next;
     });
+    // 重新获取模型列表以后候选回到第一页（工单 #1585）
+    setPage((current2) => candidatePageAfter(current2, "refetch"));
     // 记下这次获取：结果回来后连接卡片上写「已获取 N 个模型」或失败原因，说明也就随之消失
     const previous = before.get(providerId);
     setPendingFetch({
@@ -330,6 +334,8 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       }));
       return;
     }
+    // 重新获取模型列表以后候选回到第一页（工单 #1585）
+    setPage((current) => candidatePageAfter(current, "refetch"));
     const previous = before.get(providerId);
     setPendingFetch({
       provider_id: providerId,
@@ -668,12 +674,13 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
         <div className="mm-model-layout">
           <div className="mm-model-results">
             <CandidateList
-              rows={visibleRows}
+              rows={pageView.rows}
               total={candidateRows.length}
               search={search}
               filter={filter}
               selected={selectedKeys}
-              remaining={remaining}
+              page={pageView.page}
+              pages={pageView.pages}
               status={candidateStatus}
               manualOpen={manualOpen}
               manualModel={manualModel}
@@ -683,13 +690,14 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
               fetchNote={fetchNoteText({ connecting, collecting: collecting !== null })}
               onSearch={(value) => {
                 setSearch(value);
-                setLimit(FIRST_BATCH);
+                setPage((current) => candidatePageAfter(current, "search"));
               }}
               onFilter={(value) => {
                 setFilter(value);
-                setLimit(FIRST_BATCH);
+                setPage((current) => candidatePageAfter(current, "filter"));
               }}
-              onMore={() => setLimit((current) => current + MORE_BATCH)}
+              onPrevious={() => setPage(candidatePageAfter(pageView.page, "previous", pageView.pages))}
+              onNext={() => setPage(candidatePageAfter(pageView.page, "next", pageView.pages))}
               onToggle={(row) => void toggleCandidate(row)}
               onManualOpen={() => {
                 setManualOpen(true);
