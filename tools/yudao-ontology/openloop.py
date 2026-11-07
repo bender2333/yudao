@@ -26,7 +26,7 @@ YD = rdflib.Namespace("https://yudao.dev/onto#")
 PREFIXES = ("@prefix yd: <https://yudao.dev/onto#> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
             "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n")
 FEATURES = [(YD.HasVerifier, YD.NoVerifier), (YD.FinalVerified, YD.FinalNotVerified),
-            (YD.CompleterVerified, YD.CompleterNotVerified)]
+            (YD.CompleterVerified, YD.CompleterNotVerified), (YD.ExtraCompleter, YD.NoExtraCompleter)]
 
 
 def doc_at(commit: str, path: str) -> str:

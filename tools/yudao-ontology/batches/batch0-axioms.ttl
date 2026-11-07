@@ -60,19 +60,23 @@ yd:ax-collab-needs-internal-verification a yd:MustHaveAxiom ; rdfs:label "内部
     yd:onClass yd:CollaboratingDepartment ; yd:viaProperty yd:hasInternalVerification ; yd:filler yd:VerificationDecl ;
     yd:basis "基础规则 3 用到部门内：几个角色合作出一份成果，交出去之前，出它的角色不裁决它；用户 2026-11-06 的推理「部门关注一个成果、内部要协作，必然分化出不同的职责」" .
 
-yd:ax-dept-objective a yd:MustHaveAxiom ; rdfs:label "部门必写目标函数"@zh ;
-    yd:onClass yd:Department ; yd:viaProperty yd:hasObjective ; yd:filler yd:Objective ;
+# 11-07 用户定：N-I6 的六条收窄到「新增的」。N-I6 原文是「新增的部门、角色、观察者或嵌套层写明它内聚的是什么」；
+# 定义的代码也只要求本项目新增的部门写三样（organization_change_issues），发布带的部门没写时为空。
+yd:AddedDepartment a owl:Class ; rdfs:label "本项目新增的部门"@zh ; rdfs:subClassOf yd:Department .
+yd:AddedRole a owl:Class ; rdfs:label "本项目新增的角色"@zh ; rdfs:subClassOf yd:Role .
+yd:ax-dept-objective a yd:MustHaveAxiom ; rdfs:label "新增的部门必写目标函数"@zh ;
+    yd:onClass yd:AddedDepartment ; yd:viaProperty yd:hasObjective ; yd:filler yd:Objective ;
     yd:basis "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」" .
-yd:ax-dept-basis a yd:MustHaveAxiom ; rdfs:label "部门必写证据来源"@zh ;
-    yd:onClass yd:Department ; yd:viaProperty yd:hasEvidenceBasis ; yd:filler yd:EvidenceBasis ; yd:basis "D38 N-I6，同上" .
-yd:ax-dept-process a yd:MustHaveAxiom ; rdfs:label "部门必写工作过程"@zh ;
-    yd:onClass yd:Department ; yd:viaProperty yd:hasWorkProcess ; yd:filler yd:WorkProcess ; yd:basis "D38 N-I6，同上" .
-yd:ax-role-objective a yd:MustHaveAxiom ; rdfs:label "角色必写目标函数"@zh ;
-    yd:onClass yd:Role ; yd:viaProperty yd:hasObjective ; yd:filler yd:Objective ; yd:basis "D38 N-I6，同上" .
-yd:ax-role-basis a yd:MustHaveAxiom ; rdfs:label "角色必写证据来源"@zh ;
-    yd:onClass yd:Role ; yd:viaProperty yd:hasEvidenceBasis ; yd:filler yd:EvidenceBasis ; yd:basis "D38 N-I6，同上" .
-yd:ax-role-process a yd:MustHaveAxiom ; rdfs:label "角色必写工作过程"@zh ;
-    yd:onClass yd:Role ; yd:viaProperty yd:hasWorkProcess ; yd:filler yd:WorkProcess ; yd:basis "D38 N-I6，同上" .
+yd:ax-dept-basis a yd:MustHaveAxiom ; rdfs:label "新增的部门必写证据来源"@zh ;
+    yd:onClass yd:AddedDepartment ; yd:viaProperty yd:hasEvidenceBasis ; yd:filler yd:EvidenceBasis ; yd:basis "D38 N-I6，同上" .
+yd:ax-dept-process a yd:MustHaveAxiom ; rdfs:label "新增的部门必写工作过程"@zh ;
+    yd:onClass yd:AddedDepartment ; yd:viaProperty yd:hasWorkProcess ; yd:filler yd:WorkProcess ; yd:basis "D38 N-I6，同上" .
+yd:ax-role-objective a yd:MustHaveAxiom ; rdfs:label "新增的角色必写目标函数"@zh ;
+    yd:onClass yd:AddedRole ; yd:viaProperty yd:hasObjective ; yd:filler yd:Objective ; yd:basis "D38 N-I6，同上" .
+yd:ax-role-basis a yd:MustHaveAxiom ; rdfs:label "新增的角色必写证据来源"@zh ;
+    yd:onClass yd:AddedRole ; yd:viaProperty yd:hasEvidenceBasis ; yd:filler yd:EvidenceBasis ; yd:basis "D38 N-I6，同上" .
+yd:ax-role-process a yd:MustHaveAxiom ; rdfs:label "新增的角色必写工作过程"@zh ;
+    yd:onClass yd:AddedRole ; yd:viaProperty yd:hasWorkProcess ; yd:filler yd:WorkProcess ; yd:basis "D38 N-I6，同上" .
 
 yd:ax-loop-limit a yd:MustHaveAxiom ; rdfs:label "每一层循环必有上限"@zh ;
     yd:onClass yd:LoopLayer ; yd:viaProperty yd:hasLimit ; yd:filler yd:Limit ;

@@ -30,7 +30,7 @@ BATCHES: dict[int, list[str]] = {
     2: ["batches/batch2-design.ttl", "batches/batch2-scope.ttl", "batches/batch2-eb8429e.ttl"],
     3: ["batches/batch3-definitions.ttl", "batches/batch3-scope.ttl"],
 }
-ASSUMPTION_FILES: dict[int, list[str]] = {1: ["batches/batch1-assumptions.ttl"], 2: ["batches/batch2-assumptions.ttl"]}
+ASSUMPTION_FILES: dict[int, list[str]] = {1: ["batches/batch1-assumptions.ttl"], 2: ["batches/batch2-assumptions.ttl"], 3: ["batches/batch3-assumptions.ttl"]}
 
 
 def files_upto(n: int, assumptions: bool = True) -> list[Path]:
