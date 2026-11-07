@@ -29,7 +29,7 @@
 {"dst":".claude/skills/next/SKILL.md","kind":"link","raws":["../next/SKILL.md"],"seen":"55d9cfef13031023","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单"},
 {"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"8e944ff99a32bbae","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"ea7fd54934d91b46","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"link","raws":["../../../docs/design/test-pyramid.md"],"seen":"dee18f30736539e9","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法","kind":"link","raws":["../../../docs/design/test-pyramid.md"],"seen":"aac785f1a81627e4","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单"},
 {"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"2b97cc0e03cbbff6","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 一张里有两件不确定的事，或者太大"},
 {"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"84b267b88b645e51","src":".claude/skills/triage/SKILL.md#分诊 > 交回的工单 > 表1 > 设计没写到，两种读法会做出不同的交付"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"3851a47f4f6c331d","src":".claude/skills/triage/SKILL.md#分诊 > 何时用 / 何时不用"},

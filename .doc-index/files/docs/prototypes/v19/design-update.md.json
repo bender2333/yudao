@@ -1,0 +1,32 @@
+{
+"schema":1,
+"path":"docs/prototypes/v19/design-update.md",
+"hash":"e69ae8f4b4498b03",
+"nodes":[
+{"hash":"e69ae8f4b4498b03","id":"docs/prototypes/v19/design-update.md","kind":"file","title":"docs/prototypes/v19/design-update.md"},
+{"hash":"b09d88a913f1abad","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","kind":"section","parent":"docs/prototypes/v19/design-update.md","title":"V19 页面结构设计提案"},
+{"hash":"cc75f3bb25e09f2d","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 设计目标","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"设计目标"},
+{"hash":"22dea613078321cf","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 组织中的几个维度","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"组织中的几个维度"},
+{"hash":"e45ef11cb0959f20","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"工作页面"},
+{"hash":"f0b959efd08fc129","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面 > 单个角色","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面","title":"单个角色"},
+{"hash":"04d1de99c7f56345","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面 > 几个角色直做","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面","title":"几个角色直做"},
+{"hash":"6e58a04de11ce6d1","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面 > 按成果协作","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面","title":"按成果协作"},
+{"hash":"2f039b149dd4a4db","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面 > 任务池","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 工作页面","title":"任务池"},
+{"hash":"ba5eace4adff60b5","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 配置入口与层级","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"配置入口与层级"},
+{"hash":"cb15cae555c68b1c","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 中心型小组","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"中心型小组"},
+{"hash":"02325e29bae90148","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 运维与更多部门","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"运维与更多部门"},
+{"hash":"afe1cb5733f84908","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 原型走查场景","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"原型走查场景"},
+{"hash":"41382df246d29677","id":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 视觉设计与实现状态","kind":"section","parent":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","title":"视觉设计与实现状态"}
+],
+"edges":[
+{"dst":"CONTEXT.md","kind":"link","raws":["../../../CONTEXT.md"],"seen":"307d8a6ee7df36f3","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「下一个部门」","「独立的证据」","「轮转方式」","「运维」"],"seen":"3c9310ef49956c5b","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案"},
+{"dst":"docs/architecture.html#s2","kind":"map-position","raws":["「定义」"],"seen":"501cedc1662adc79","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["「增量与整份」","「子组织」"],"seen":"32ac07d30ac47cac","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案"},
+{"dst":"docs/design/department-roles.md","kind":"link","raws":["../../design/department-roles.md"],"seen":"94d52c171532dbfc","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案"},
+{"dst":"docs/design/forms-and-verifier-role.md","kind":"link","raws":["../../design/forms-and-verifier-role.md"],"seen":"e0739756806a31b7","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案"},
+{"dst":"docs/design/project-organization.md","kind":"link","raws":["../../design/project-organization.md"],"seen":"5cc8d30c794a743d","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案"},
+{"dst":"docs/prototypes/v19/design-qa.md","kind":"link","raws":["design-qa.md"],"seen":"5bd8ebb530afa27f","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 视觉设计与实现状态"},
+{"dst":"docs/prototypes/v19/walkthrough.md","kind":"link","raws":["walkthrough.md"],"seen":"b71e1da80a67f2dd","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案 > 视觉设计与实现状态"}
+]
+}

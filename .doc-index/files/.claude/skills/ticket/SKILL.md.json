@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":".claude/skills/ticket/SKILL.md",
-"hash":"b9beec8880742a1e",
+"hash":"c792f8f0836f07f4",
 "nodes":[
-{"hash":"b9beec8880742a1e","id":".claude/skills/ticket/SKILL.md","kind":"file","title":".claude/skills/ticket/SKILL.md"},
+{"hash":"c792f8f0836f07f4","id":".claude/skills/ticket/SKILL.md","kind":"file","title":".claude/skills/ticket/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/ticket/SKILL.md#(开头)","kind":"section","parent":".claude/skills/ticket/SKILL.md","title":"(开头)"},
 {"hash":"fd31036b3fa6f53e","id":".claude/skills/ticket/SKILL.md#name: ticketdescription: 建立或改写 Yudao 的 GitHub 工单（阶段、父、子、清理单、试用工单）：先读工单规范，按类型选模板，再用 gh 发布。","kind":"section","parent":".claude/skills/ticket/SKILL.md","title":"name: ticketdescription: 建立或改写 Yudao 的 GitHub 工单（阶段、父、子、清理单、试用工单）：先读工单规范，按类型选模板，再用 gh 发布。"},
 {"hash":"c715867db208c257","id":".claude/skills/ticket/SKILL.md#建立工单","kind":"section","parent":".claude/skills/ticket/SKILL.md","title":"建立工单"},
-{"hash":"c8fc556d09b9031e","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","kind":"section","parent":".claude/skills/ticket/SKILL.md#建立工单","title":"1. 定类型与归属"},
+{"hash":"6f08c279b71c0138","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","kind":"section","parent":".claude/skills/ticket/SKILL.md#建立工单","title":"1. 定类型与归属"},
 {"hash":"34c21ba46869433f","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 阶段工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"阶段工单"},
 {"hash":"2e47b6575a7ab396","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 父工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"父工单"},
 {"hash":"8392ea4967667e1e","id":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属 > 表1 > 子工单","kind":"row","parent":".claude/skills/ticket/SKILL.md#建立工单 > 1. 定类型与归属","title":"子工单"},

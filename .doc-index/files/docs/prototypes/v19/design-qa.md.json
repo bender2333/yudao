@@ -1,0 +1,12 @@
+{
+"schema":1,
+"path":"docs/prototypes/v19/design-qa.md",
+"hash":"5bd8ebb530afa27f",
+"nodes":[
+{"hash":"5bd8ebb530afa27f","id":"docs/prototypes/v19/design-qa.md","kind":"file","title":"docs/prototypes/v19/design-qa.md"},
+{"hash":"5bd8ebb530afa27f","id":"docs/prototypes/v19/design-qa.md#V19 视觉检查记录","kind":"section","parent":"docs/prototypes/v19/design-qa.md","title":"V19 视觉检查记录"}
+],
+"edges":[
+{"dst":"docs/prototypes/v19/design-update.md","kind":"link","raws":["design-update.md"],"seen":"e69ae8f4b4498b03","src":"docs/prototypes/v19/design-qa.md#V19 视觉检查记录"}
+]
+}

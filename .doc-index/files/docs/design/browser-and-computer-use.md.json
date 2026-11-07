@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/browser-and-computer-use.md",
-"hash":"14744d50f4ba89df",
+"hash":"0167ad8acafcf18f",
 "nodes":[
-{"hash":"14744d50f4ba89df","id":"docs/design/browser-and-computer-use.md","kind":"file","title":"docs/design/browser-and-computer-use.md"},
+{"hash":"0167ad8acafcf18f","id":"docs/design/browser-and-computer-use.md","kind":"file","title":"docs/design/browser-and-computer-use.md"},
 {"hash":"fe947a8dcc485296","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","kind":"section","parent":"docs/design/browser-and-computer-use.md","title":"浏览器与 computer use 设计说明"},
 {"hash":"bea05dd9fc365853","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 1. 范围","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","title":"1. 范围"},
 {"hash":"860dce8552cd57a4","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 2. 概念与分层","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","title":"2. 概念与分层"},
@@ -13,7 +13,7 @@
 {"hash":"144bbc33cfca4be3","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","title":"3. 试用会话"},
 {"hash":"d32ca90cac1e61e2","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话 > 3.1 试用的位置","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话","title":"3.1 试用的位置"},
 {"hash":"4d2860759e59d660","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话 > 3.2 执行位置上的程序","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话","title":"3.2 执行位置上的程序"},
-{"hash":"7140117eb55cb2de","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话 > 3.3 启动方式","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话","title":"3.3 启动方式"},
+{"hash":"2e45d34fcb0f5694","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话 > 3.3 启动方式","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话","title":"3.3 启动方式"},
 {"hash":"53c4f0ca9efe926b","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话 > 3.4 试用工具","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 3. 试用会话","title":"3.4 试用工具"},
 {"hash":"edd564eb63e840bd","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 4. 浏览器工具（Playwright MCP）","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明","title":"4. 浏览器工具（Playwright MCP）"},
 {"hash":"380a77272f5615f8","id":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 4. 浏览器工具（Playwright MCP） > 4.1 运行方式","kind":"section","parent":"docs/design/browser-and-computer-use.md#浏览器与 computer use 设计说明 > 4. 浏览器工具（Playwright MCP）","title":"4.1 运行方式"},

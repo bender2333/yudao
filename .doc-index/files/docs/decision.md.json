@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/decision.md",
-"hash":"9f0a9a74cdbffd70",
+"hash":"f55ee798ffca8335",
 "nodes":[
-{"hash":"9f0a9a74cdbffd70","id":"docs/decision.md","kind":"file","title":"docs/decision.md"},
+{"hash":"f55ee798ffca8335","id":"docs/decision.md","kind":"file","title":"docs/decision.md"},
 {"hash":"c2a7f437ae1d1ae6","id":"docs/decision.md#决策记录","kind":"section","parent":"docs/decision.md","title":"决策记录"},
 {"hash":"cad38f6ac3bcdde9","id":"docs/decision.md#决策记录 > 2026-10-30 - 模型管理：填写地址与 Key，选择模型即可使用","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-10-30 - 模型管理：填写地址与 Key，选择模型即可使用"},
 {"hash":"fc4b759f2e346dcd","id":"docs/decision.md#决策记录 > 2026-10-30 - 模型能力表：按接入包登记协议，不排除记录；协议预填改回能力表优先","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-10-30 - 模型能力表：按接入包登记协议，不排除记录；协议预填改回能力表优先"},
@@ -57,7 +57,10 @@
 {"hash":"e12274a555219cff","id":"docs/decision.md#决策记录 > 2026-11-03 - 组织设定：交互骨架是一条线程加看得见的收件人，v19 画三级","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-03 - 组织设定：交互骨架是一条线程加看得见的收件人，v19 画三级"},
 {"hash":"309315f14dd0aff0","id":"docs/decision.md#决策记录 > 2026-11-03 - 部门内多角色是一份子组织定义，经理去掉","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-03 - 部门内多角色是一份子组织定义，经理去掉"},
 {"hash":"cb1bed045223785f","id":"docs/decision.md#决策记录 > 2026-11-04 - 事项冻结的形态不在发布里：事项停在原处，不回退默认形态；#1182 的分层问题另开单挪进 U","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-04 - 事项冻结的形态不在发布里：事项停在原处，不回退默认形态；#1182 的分层问题另开单挪进 U"},
-{"hash":"b16b9d15be27d7cd","id":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"}
+{"hash":"58acd53ece26960c","id":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
+{"hash":"20214e9b0166f1d2","id":"docs/decision.md#决策记录 > 2026-11-04 - 阶段二第二轮补工单：薄驱动只搬连接，组织后端不等页面","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-04 - 阶段二第二轮补工单：薄驱动只搬连接，组织后端不等页面"},
+{"hash":"0ff0d8ad5db5ab89","id":"docs/decision.md#决策记录 > 2026-11-04 - 开环完成看最后采纳的成果，结束原因由路由给","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-04 - 开环完成看最后采纳的成果，结束原因由路由给"},
+{"hash":"e5b7e676fa5f6ced","id":"docs/decision.md#决策记录 > 2026-11-07 - 阶段二工单整理：交接点没人接是卡住的主因","kind":"section","parent":"docs/decision.md#决策记录","title":"2026-11-07 - 阶段二工单整理：交接点没人接是卡住的主因"}
 ],
 "edges":[
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"docs/decision.md#决策记录 > 2026-10-30 - 核验是角色的性质，固定结构只剩循环、边界、裁决"},
@@ -146,9 +149,13 @@
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"595a55b228fea4f6","src":"docs/decision.md#决策记录 > 2026-11-03 - 文档一致性：规则事实线定稿，第 1 步开工"},
 {"dst":"docs/research/doc-consistency-rule-facts.md","kind":"code-path","raws":["docs/research/doc-consistency-rule-facts.md"],"seen":"19aee6681c333a13","src":"docs/decision.md#决策记录 > 2026-11-03 - 文档一致性：规则事实线定稿，第 1 步开工"},
 {"dst":"docs/archive/evaluation/seam-diff-2026-11-03-5b17fdeb.md","kind":"code-path","raws":["docs/archive/evaluation/seam-diff-2026-11-03-5b17fdeb.md"],"seen":"1f380bcb90a6151d","src":"docs/decision.md#决策记录 > 2026-11-03 - 阶段二补重构工单：薄驱动进内核，几个角色直做留在阶段二"},
-{"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"df0d20fb3b4a8fe8","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
+{"dst":".claude/skills/next/SKILL.md","kind":"code-path","raws":[".claude/skills/next/SKILL.md"],"seen":"55d9cfef13031023","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
+{"dst":".claude/skills/triage/SKILL.md","kind":"code-path","raws":[".claude/skills/triage/SKILL.md"],"seen":"3c5b62590dda83e7","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
+{"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"652781a46e9bb999","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ea572e94eeb4d291","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
 {"dst":"docs/agents/autopilot-runtime.md","kind":"code-path","raws":["docs/agents/autopilot-runtime.md"],"seen":"d170a56610a49816","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
-{"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"3f229201daf99576","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"}
+{"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"ea7fd54934d91b46","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
+{"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"f17acc22d854c5ae","src":"docs/decision.md#决策记录 > 2026-11-04 - 内核检查的接线先于工具合并：后续动作不靠会话记得"},
+{"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b2aa537674e85242","src":"docs/decision.md#决策记录 > 2026-11-07 - 阶段二工单整理：交接点没人接是卡住的主因"}
 ]
 }

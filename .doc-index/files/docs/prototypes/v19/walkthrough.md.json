@@ -1,21 +1,24 @@
 {
 "schema":1,
 "path":"docs/prototypes/v19/walkthrough.md",
-"hash":"8f4cba32d72df40f",
+"hash":"b71e1da80a67f2dd",
 "nodes":[
-{"hash":"8f4cba32d72df40f","id":"docs/prototypes/v19/walkthrough.md","kind":"file","title":"docs/prototypes/v19/walkthrough.md"},
-{"hash":"cbbd130ed0cf07ea","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","kind":"section","parent":"docs/prototypes/v19/walkthrough.md","title":"页面原型 v19 走查"},
-{"hash":"aaab2bfc3b292534","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 怎么打开","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"怎么打开"},
-{"hash":"fc8da1fb7a7c6ba1","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"这一版只试两件事"},
-{"hash":"451f1c25e882711c","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事 > 一、折叠后的线程刷不刷屏","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事","title":"一、折叠后的线程刷不刷屏"},
-{"hash":"e0adf7105bb7619a","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事 > 二、带收件人的输入框投不投错","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 这一版只试两件事","title":"二、带收件人的输入框投不投错"},
-{"hash":"f5c5f73e27ebada8","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 脚本二：一个角色直做（个人博客）","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"脚本二：一个角色直做（个人博客）"},
-{"hash":"ff6b38eb622d0fe7","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 脚本三：几个角色直做（活动报名小程序）","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"脚本三：几个角色直做（活动报名小程序）"},
-{"hash":"0ad4304a74d32c91","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 脚本四：三部门（订单系统重构）","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"脚本四：三部门（订单系统重构）"},
-{"hash":"2b4821029cdbd619","id":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 最后两个判断","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查","title":"最后两个判断"}
+{"hash":"b71e1da80a67f2dd","id":"docs/prototypes/v19/walkthrough.md","kind":"file","title":"docs/prototypes/v19/walkthrough.md"},
+{"hash":"fff13b175322e651","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","kind":"section","parent":"docs/prototypes/v19/walkthrough.md","title":"页面原型 V19 走查"},
+{"hash":"8ec2fb78ec800671","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 打开方式","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"打开方式"},
+{"hash":"e555f6ebbd0d63c7","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 单个角色：个人博客","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"单个角色：个人博客"},
+{"hash":"7c82218c31b6c0a4","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 多个角色直做：活动报名小程序","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"多个角色直做：活动报名小程序"},
+{"hash":"564c2770570c650d","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 直做增加核验角色","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"直做增加核验角色"},
+{"hash":"5e790f393b0cc280","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 按成果协作与可变部门","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"按成果协作与可变部门"},
+{"hash":"b521fb2160db2896","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 任务池：设计预览","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"任务池：设计预览"},
+{"hash":"2aa8fd77a53acd88","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 工程内部的中心型小组","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"工程内部的中心型小组"},
+{"hash":"20ee13bf9a6a4985","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 运维：设计预览","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"运维：设计预览"},
+{"hash":"20f099ea5a7b19cc","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 高级配置与原有场景","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"高级配置与原有场景"},
+{"hash":"eac97f29bff2088d","id":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 本地验证记录","kind":"section","parent":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查","title":"本地验证记录"}
 ],
 "edges":[
-{"dst":"docs/design/project-organization.md","kind":"link","raws":["../../design/project-organization.md"],"seen":"b799219cc1388f12","src":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查"},
-{"dst":"docs/prototypes/v19/index.html","kind":"code-path","raws":["docs/prototypes/v19/index.html"],"seen":"65bdce813ef5efa7","src":"docs/prototypes/v19/walkthrough.md#页面原型 v19 走查 > 怎么打开"}
+{"dst":"docs/prototypes/v19/design-update.md","kind":"link","raws":["design-update.md"],"seen":"e69ae8f4b4498b03","src":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查"},
+{"dst":"docs/prototypes/v19/index.html","kind":"link","raws":["index.html"],"seen":"17d0492cfb904dbb","src":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 打开方式"},
+{"dst":"docs/prototypes/v19/design-qa.md","kind":"link","raws":["design-qa.md"],"seen":"5bd8ebb530afa27f","src":"docs/prototypes/v19/walkthrough.md#页面原型 V19 走查 > 本地验证记录"}
 ]
 }

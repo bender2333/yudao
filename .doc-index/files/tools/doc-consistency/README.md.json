@@ -30,6 +30,7 @@
 {"dst":"tools/doc-consistency/data/record-docs.json","kind":"code-path","raws":["data/record-docs.json"],"seen":"eaf7cfe5858ba800","src":"tools/doc-consistency/README.md#文档一致性工具 > 命令"},
 {"dst":"conftest.py","kind":"code-path","raws":["conftest.py"],"seen":"32f4de8c679d7762","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
 {"dst":"tools/doc-consistency/pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"6609bf8d44ed2680","src":"tools/doc-consistency/README.md#文档一致性工具 > 测试"},
+{"dst":"agents_jour/其他.md","kind":"code-path","raws":["agents_jour/其他.md"],"seen":"6059a5deb866c6de","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
 {"dst":"docs/agents/workflow.md","kind":"code-path","raws":["docs/agents/workflow.md"],"seen":"ffc6ac98d65b00b1","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
 {"dst":"tools/doc-consistency/data/canon.json","kind":"code-path","raws":["data/canon.json"],"seen":"2466257a69985e0f","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
 {"dst":"tools/doc-consistency/data/known-external.json","kind":"code-path","raws":["data/known-external.json"],"seen":"df29de1f3d2a9a00","src":"tools/doc-consistency/README.md#文档一致性工具 > 规则与数据"},
