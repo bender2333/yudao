@@ -2,7 +2,7 @@
 // 页面由 Yudao 服务提供，接口地址就是页面自己的来源，页面内的导航写在地址 # 之后
 // （网页界面的提供与发布 docs/design/web-interface-and-release.md「接口层提供页面文件」）。
 
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Capabilities, DecisionList, DecisionView, EventObject, ProjectList, ProjectOrganizationResult, ProjectOverviewResult, ProjectRow, SystemStatus } from "./api/generated/types.gen";
 import { rememberToken, storedToken } from "./contract/access-token";
 import { ClientApp, type ClientState } from "./contract/client-app";
@@ -31,12 +31,6 @@ import { departmentTabs, projectDepartments, type DepartmentView } from "./views
 import { useSnapshot } from "./views/project/use-snapshot";
 import { projectsListParams } from "./views/project/project-list";
 
-// 图鉴页只在开发时用到；用动态导入把它挡在正式包之外
-const LazyGallery = lazy(async () => {
-  const mod = await import("./views/pixel/gallery");
-  return { default: mod.GalleryPage };
-});
-
 export function App() {
   const [state, setState] = useState<ClientState>({ kind: "connecting" });
   const [pending, setPending] = useState(0);
@@ -62,14 +56,10 @@ export function App() {
     return instance;
   }, []);
 
-  // 图鉴只在开发时可用：直接开 #/gallery 看画法，不连接服务
-  const galleryOnly = import.meta.env.DEV && route.name === "gallery";
-
   useEffect(() => {
-    if (galleryOnly) return;
     void app.open(window.location.origin, token);
     return () => app.close();
-  }, [app, galleryOnly, token]);
+  }, [app, token]);
 
   // 用户在页面上填写令牌：先按它连接，服务接受以后才写进这个浏览器（第 6.3 节）。
   // 被拒绝的令牌不保存，否则刷新以后浏览器里留着服务已经拒绝的令牌
@@ -269,15 +259,6 @@ export function App() {
     const back = beforeModelsRef.current;
     return back === null || back === "" ? paths.home() : back;
   }, []);
-  // 动作图鉴只在开发时可用：直接开 #/gallery 就能看画法，不必先连上后端。
-  // 用动态导入：正式构建里这段分支被整体消掉，图鉴的代码不进正式包，也就没有正式的页面入口。
-  if (import.meta.env.DEV && route.name === "gallery") {
-    return (
-      <Suspense fallback={<div className="y10-gate gate"><div className="y10-gate-card card"><h1>正在载入图鉴…</h1></div></div>}>
-        <LazyGallery />
-      </Suspense>
-    );
-  }
   if (state.kind === "connecting") {
     return <div className="y10-gate gate"><div className="y10-gate-card card"><h1>连接中…</h1></div></div>;
   }

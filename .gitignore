@@ -18,6 +18,7 @@ client/dist-*/
 client/tests/e2e/.update-build/
 harness/tests/openapi/generated/
 client/out/
+view/out/
 client/playwright-report/
 client/test-results/
 test-results/
