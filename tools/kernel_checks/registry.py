@@ -2,9 +2,9 @@
 # 登记放在 harness/tests/kernel/mutation_reasons.json，初始是空列表。
 #
 # 一项写这些字段：file（文件，仓库内相对路径）、function（函数，方法写成 Class.method）、
-# before（整条语句改动前的文字）、after（改动后的文字）、reason（为什么这处改动不影响行为）、
-# registered_by（登记人）、registered_at（登记时间，ISO 8601）。同一函数里有两处完全相同的语句时
-# 再写 occurrence（第几处，从 1 数）。
+# before（整条语句改动前的文字）、after（改动后的文字，删掉一条语句的变异是空串）、reason（为什么这处
+# 改动不影响行为）、registered_by（登记人）、registered_at（登记时间，ISO 8601）。同一函数里有两处完全
+# 相同的语句时再写 occurrence（第几处，从 1 数）。
 #
 # 读取时校验字段齐全、理由非空；有问题的项不被接受，报出是第几项与哪个字段。过期项的核对由变异
 # 检查做，这一版只做格式、读取与校验。
@@ -17,6 +17,8 @@ from pathlib import Path
 
 REQUIRED_FIELDS = ("file", "function", "before", "after", "reason", "registered_by", "registered_at")
 OPTIONAL_FIELDS = ("occurrence",)
+# 这些字段要有内容非空的文字；after 例外：删掉一条语句的变异，改动后的文字是空串
+NON_EMPTY_FIELDS = ("file", "function", "before", "reason", "registered_by", "registered_at")
 
 
 class RegistryReadError(Exception):
@@ -85,7 +87,9 @@ def _item_problems(index: int, item: object) -> list[str]:
         if name not in item:
             continue
         value = item[name]
-        if not isinstance(value, str) or not value.strip():
+        if not isinstance(value, str):
+            problems.append(f"第 {index} 项的 {name} 必须是字符串")
+        elif name in NON_EMPTY_FIELDS and not value.strip():
             problems.append(f"第 {index} 项的 {name} 必须是内容非空的字符串")
     if "occurrence" in item:
         occurrence = item["occurrence"]
