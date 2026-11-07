@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Literal
 from pydantic import AwareDatetime, Field
 
 from ..definitions import (
-    DEFAULT_FORM, ITEM_SOURCES, Definitions, parse_organization_changes, submitted_outcomes,
+    ITEM_SOURCES, Definitions, parse_organization_changes, submitted_outcomes,
 )
 from ..models import ProjectEventType
 from ..organization_compose import (
