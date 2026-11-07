@@ -20,6 +20,7 @@
 | `openloop.py`、`rules/` | 开环标记的检查：几处判开环的文字写成公理，枚举探针，找判定相反的组合；`python3 openloop.py 5159317 eb8429e` |
 | `defs.py` | 第 3 批：把 `runtime.py` 登记的三份形态的定义文件转写成 `batches/batch3-definitions.ttl`（`python3 defs.py eb8429e`） |
 | `crosscheck.py` | 第 3 批：设计与定义文件分成两张图逐条对照，写 `reports/crosscheck.json` |
+| `codecheck.py` | 第 4 批：从提交里读代码事实（分层、name-map、来源、对照缺行），写 `batches/batch4-code.ttl` 和 `reports/codecheck.json`；`python3 codecheck.py eb8429e` |
 | `names.py` | 正名表：`CONTEXT.md` 词条与 _Avoid_、name-map 第一列 |
 | `reports/` | `results.json`、`mutations.json`、两批的抽取对照、报告 |
 
@@ -31,6 +32,7 @@
 python3 defs.py eb8429e  # 转写第 3 批
 python3 run.py           # 第 0 至 3 批，深度 3，写 reports/results.json
 python3 crosscheck.py    # 设计对定义文件
+python3 codecheck.py eb8429e  # 第 4 批，代码
 python3 mutate.py        # 埋错，写 reports/mutations.json
 python3 compare.py batches/batch1-overview.ttl extractions/batch1-model-a.ttl extractions/batch1-model-b.ttl
 ```

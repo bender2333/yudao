@@ -1,0 +1,527 @@
+# 第 4 批：eb8429e 的代码事实，由 codecheck.py 生成，不手改。
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix yd: <https://yudao.dev/onto#> .
+
+yd:def-organization a yd:OrganizationDefinition ;
+    rdfs:label "harness/definitions/organization.json" ;
+    yd:declaresSources true ;
+    yd:hasSource yd:defsrc-onboarding,
+        yd:defsrc-user_input .
+
+yd:mod-harness-actions-py a yd:KernelModule ;
+    rdfs:label "harness/actions.py" .
+
+yd:mod-harness-adjudication-py a yd:KernelModule ;
+    rdfs:label "harness/adjudication.py" .
+
+yd:mod-harness-bounds-py a yd:KernelModule ;
+    rdfs:label "harness/bounds.py" .
+
+yd:mod-harness-contracts-py a yd:KernelModule ;
+    rdfs:label "harness/contracts.py" .
+
+yd:mod-harness-definitions-init-py a yd:KernelModule ;
+    rdfs:label "harness/definitions/__init__.py" ;
+    yd:judgesByName yd:use-1,
+        yd:use-2,
+        yd:use-3,
+        yd:use-4 .
+
+yd:mod-harness-event-store-py a yd:KernelModule ;
+    rdfs:label "harness/event_store.py" .
+
+yd:mod-harness-kernel-events-py a yd:KernelModule ;
+    rdfs:label "harness/kernel_events.py" .
+
+yd:mod-harness-launch-rules-py a yd:KernelModule ;
+    rdfs:label "harness/launch_rules.py" .
+
+yd:mod-harness-minimal-projection-py a yd:KernelModule ;
+    rdfs:label "harness/minimal_projection.py" .
+
+yd:mod-harness-path-rules-py a yd:KernelModule ;
+    rdfs:label "harness/path_rules.py" .
+
+yd:mod-harness-tools-py a yd:KernelModule ;
+    rdfs:label "harness/tools.py" .
+
+yd:mod-harness-validation-py a yd:KernelModule ;
+    rdfs:label "harness/validation.py" .
+
+yd:mod-harness-write-path-py a yd:KernelModule ;
+    rdfs:label "harness/write_path.py" .
+
+yd:nm-0 a yd:NameMapRow ;
+    rdfs:label "一份事实" ;
+    yd:nmStatus "一致（方框的技术名词是事件日志）" .
+
+yd:nm-1 a yd:NameMapRow ;
+    rdfs:label "写入口" ;
+    yd:nmStatus "一致" .
+
+yd:nm-10 a yd:NameMapRow ;
+    rdfs:label "边界" ;
+    yd:nmStatus "一致" .
+
+yd:nm-100 a yd:NameMapRow ;
+    rdfs:label "排空中" ;
+    yd:nmStatus "一致" .
+
+yd:nm-101 a yd:NameMapRow ;
+    rdfs:label "停止" ;
+    yd:nmStatus "不一致：代码按暂停、失败分两种终态，总图只有停止，原因来自封闭清单" .
+
+yd:nm-11 a yd:NameMapRow ;
+    rdfs:label "最小投影" ;
+    yd:nmStatus "一致" .
+
+yd:nm-12 a yd:NameMapRow ;
+    rdfs:label "薄驱动" ;
+    yd:nmStatus "不一致：叫流程编排（`Orchestrator`），没有叫薄驱动的类或模块；路由实现已分到 `watched_outputs.py`，调度、激活的准备与收尾仍在这个类里" .
+
+yd:nm-13 a yd:NameMapRow ;
+    rdfs:label "插件加载" ;
+    yd:nmStatus "不一致：只有路由按定义里的名字接上（`register`、`select`），装配与执行经构造参数接上，没有叫插件加载的模块" .
+
+yd:nm-14 a yd:NameMapRow ;
+    rdfs:label "路由契约" ;
+    yd:nmStatus "一致" .
+
+yd:nm-15 a yd:NameMapRow ;
+    rdfs:label "槽位：路由、路由实现" ;
+    yd:nmStatus "一致" .
+
+yd:nm-16 a yd:NameMapRow ;
+    rdfs:label "按成果（关注的成果）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-17 a yd:NameMapRow ;
+    rdfs:label "任务池、工作单元、认领" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-18 a yd:NameMapRow ;
+    rdfs:label "事项" ;
+    yd:nmStatus "不一致：总图只有事项，代码与接口资源名里 `work_item` 与 `run` 两个名字并存" .
+
+yd:nm-19 a yd:NameMapRow ;
+    rdfs:label "放行或开环完成，事项完成" ;
+    yd:nmStatus "不一致：放行没有自己的名字，是质检结论的一个取值；开环完成有自己的结束原因与记录" .
+
+yd:nm-2 a yd:NameMapRow ;
+    rdfs:label "期望版本" ;
+    yd:nmStatus "一致" .
+
+yd:nm-20 a yd:NameMapRow ;
+    rdfs:label "直做" ;
+    yd:labelInDefinitions "harness/definitions/forms/several_roles_direct/routings.json（label「直做」）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-21 a yd:NameMapRow ;
+    rdfs:label "交完成（直做）" ;
+    yd:labelInDefinitions "harness/definitions/forms/several_roles_direct/outcome_kinds.json（label「交完成」）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-22 a yd:NameMapRow ;
+    rdfs:label "子事项、子组织" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-23 a yd:NameMapRow ;
+    rdfs:label "槽位：装配、装配实现" ;
+    yd:nmStatus "一致" .
+
+yd:nm-24 a yd:NameMapRow ;
+    rdfs:label "装配契约" ;
+    yd:nmStatus "一致" .
+
+yd:nm-25 a yd:NameMapRow ;
+    rdfs:label "交给模型的那份" ;
+    yd:nmStatus "一致" .
+
+yd:nm-26 a yd:NameMapRow ;
+    rdfs:label "上下文清单" ;
+    yd:nmStatus "一致" .
+
+yd:nm-27 a yd:NameMapRow ;
+    rdfs:label "压缩" ;
+    yd:nmStatus "一致" .
+
+yd:nm-28 a yd:NameMapRow ;
+    rdfs:label "待并入的指导" ;
+    yd:nmStatus "一致" .
+
+yd:nm-29 a yd:NameMapRow ;
+    rdfs:label "判定点" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-3 a yd:NameMapRow ;
+    rdfs:label "事项的执行权编号" ;
+    yd:nmStatus "不一致：方法与异常叫执行权，编号字段叫 `epoch`" .
+
+yd:nm-30 a yd:NameMapRow ;
+    rdfs:label "槽位：执行、执行实现" ;
+    yd:nmStatus "一致（方框的技术名词是步骤驱动）" .
+
+yd:nm-31 a yd:NameMapRow ;
+    rdfs:label "执行契约、每一步先问边界" ;
+    yd:nmStatus "不一致：协议里带着 `department_selection`、`department_prompt` 两个按部门的方法，路由的问题混在执行契约里" .
+
+yd:nm-32 a yd:NameMapRow ;
+    rdfs:label "一轮工作" ;
+    yd:nmStatus "不一致：叫激活，术语表把「激活」列为避免的说法" .
+
+yd:nm-33 a yd:NameMapRow ;
+    rdfs:label "部门成员（一个会话）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-34 a yd:NameMapRow ;
+    rdfs:label "询问" ;
+    yd:nmStatus "一致" .
+
+yd:nm-35 a yd:NameMapRow ;
+    rdfs:label "外包角色" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-36 a yd:NameMapRow ;
+    rdfs:label "开子事项的请求" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-37 a yd:NameMapRow ;
+    rdfs:label "模型服务" ;
+    yd:nmStatus "一致（方框的技术名词是 Provider）" .
+
+yd:nm-38 a yd:NameMapRow ;
+    rdfs:label "调用目标" ;
+    yd:nmStatus "不一致：结果类型叫 `FrozenTarget`，术语表把「冻结目标」列为避免的说法" .
+
+yd:nm-39 a yd:NameMapRow ;
+    rdfs:label "尝试记录" ;
+    yd:nmStatus "一致" .
+
+yd:nm-4 a yd:NameMapRow ;
+    rdfs:label "派发编号" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-40 a yd:NameMapRow ;
+    rdfs:label "模型输出事件" ;
+    yd:nmStatus "一致" .
+
+yd:nm-41 a yd:NameMapRow ;
+    rdfs:label "用量" ;
+    yd:nmStatus "一致" .
+
+yd:nm-42 a yd:NameMapRow ;
+    rdfs:label "凭据只在控制主机" ;
+    yd:nmStatus "一致" .
+
+yd:nm-43 a yd:NameMapRow ;
+    rdfs:label "执行环境" ;
+    yd:nmStatus "一致" .
+
+yd:nm-44 a yd:NameMapRow ;
+    rdfs:label "动作、动作身份" ;
+    yd:nmStatus "一致" .
+
+yd:nm-45 a yd:NameMapRow ;
+    rdfs:label "回执" ;
+    yd:nmStatus "一致" .
+
+yd:nm-46 a yd:NameMapRow ;
+    rdfs:label "工具请求" ;
+    yd:nmStatus "一致" .
+
+yd:nm-47 a yd:NameMapRow ;
+    rdfs:label "起点快照、封存快照" ;
+    yd:nmStatus "不一致：动作请求里的起点叫树摘要，不叫快照；快照在事件载荷里，不在请求里" .
+
+yd:nm-48 a yd:NameMapRow ;
+    rdfs:label "终点快照、前后差异" ;
+    yd:nmStatus "不一致：前后差异在回执里只有两个摘要，没有文件级差异；终点快照一项一致" .
+
+yd:nm-49 a yd:NameMapRow ;
+    rdfs:label "核实方法、能否取消" ;
+    yd:nmStatus "一致" .
+
+yd:nm-5 a yd:NameMapRow ;
+    rdfs:label "消息身份、按消息身份去重" ;
+    yd:nmStatus "不一致：叫命令身份，只覆盖经接口发来的命令" .
+
+yd:nm-50 a yd:NameMapRow ;
+    rdfs:label "工作区" ;
+    yd:nmStatus "一致" .
+
+yd:nm-51 a yd:NameMapRow ;
+    rdfs:label "远程执行" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-52 a yd:NameMapRow ;
+    rdfs:label "应用的投影" ;
+    yd:nmStatus "一致" .
+
+yd:nm-53 a yd:NameMapRow ;
+    rdfs:label "折叠函数、从头重算" ;
+    yd:nmStatus "一致" .
+
+yd:nm-54 a yd:NameMapRow ;
+    rdfs:label "骨架事件、应用事件" ;
+    yd:nmStatus "一致" .
+
+yd:nm-55 a yd:NameMapRow ;
+    rdfs:label "应用层" ;
+    yd:nmStatus "一致" .
+
+yd:nm-56 a yd:NameMapRow ;
+    rdfs:label "命令（带身份）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-57 a yd:NameMapRow ;
+    rdfs:label "查询（只读快照）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-58 a yd:NameMapRow ;
+    rdfs:label "事件流（从某个位置起）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-59 a yd:NameMapRow ;
+    rdfs:label "带版本号" ;
+    yd:nmStatus "一致" .
+
+yd:nm-6 a yd:NameMapRow ;
+    rdfs:label "来源（部门、角色、工作单元）" ;
+    yd:nmStatus "不一致：分在四个字段里，没有「来源」这一组；工作单元代码里还没有" .
+
+yd:nm-60 a yd:NameMapRow ;
+    rdfs:label "接口层" ;
+    yd:nmStatus "一致" .
+
+yd:nm-61 a yd:NameMapRow ;
+    rdfs:label "等用户、决定请求" ;
+    yd:nmStatus "一致" .
+
+yd:nm-62 a yd:NameMapRow ;
+    rdfs:label "同步层（页面一侧）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-63 a yd:NameMapRow ;
+    rdfs:label "页面" ;
+    yd:nmStatus "一致" .
+
+yd:nm-64 a yd:NameMapRow ;
+    rdfs:label "定义、加载与校验" ;
+    yd:nmStatus "一致" .
+
+yd:nm-65 a yd:NameMapRow ;
+    rdfs:label "版本" ;
+    yd:nmStatus "一致" .
+
+yd:nm-66 a yd:NameMapRow ;
+    rdfs:label "部门与角色" ;
+    yd:nmStatus "不一致：`models.py` 的 `DEPARTMENTS` 与 `providers/facade.py` 的 `REQUIRED_DEPARTMENTS` 都取自模块加载时的默认定义（`DEFINITIONS.departments`），`app/project_queries.py`、`app/catalog_*.py`、`department_prompts.py` 按它列部门；总图要的是随事项冻结的定义给出" .
+
+yd:nm-67 a yd:NameMapRow ;
+    rdfs:label "上限" ;
+    yd:nmStatus "一致（方框的技术名词是上限与规则、参数）" .
+
+yd:nm-68 a yd:NameMapRow ;
+    rdfs:label "停止原因清单" ;
+    yd:nmStatus "一致" .
+
+yd:nm-69 a yd:NameMapRow ;
+    rdfs:label "谁能拒绝谁" ;
+    yd:nmStatus "一致" .
+
+yd:nm-7 a yd:NameMapRow ;
+    rdfs:label "证据引用" ;
+    yd:nmStatus "一致（方框的技术名词是工件）" .
+
+yd:nm-70 a yd:NameMapRow ;
+    rdfs:label "核验角色（是否核验角色及核验谁）" ;
+    yd:nmStatus "不一致：声明已有，读声明的只有定义模块自己，使用方仍写死在部门名上" .
+
+yd:nm-71 a yd:NameMapRow ;
+    rdfs:label "写入范围" ;
+    yd:nmStatus "一致" .
+
+yd:nm-72 a yd:NameMapRow ;
+    rdfs:label "成果种类与提案合同" ;
+    yd:nmStatus "一致" .
+
+yd:nm-73 a yd:NameMapRow ;
+    rdfs:label "路由实现与它的定义、工作单元的大小" ;
+    yd:nmStatus "一致（路由实现与它的定义）；代码里还没有（工作单元的大小）" .
+
+yd:nm-74 a yd:NameMapRow ;
+    rdfs:label "登记的机器" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-75 a yd:NameMapRow ;
+    rdfs:label "限定采用的范围" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-76 a yd:NameMapRow ;
+    rdfs:label "评价" ;
+    yd:nmStatus "一致（方框的技术名词是评测场景与隐藏检查、评分器、发布检查）" .
+
+yd:nm-77 a yd:NameMapRow ;
+    rdfs:label "观察者" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-78 a yd:NameMapRow ;
+    rdfs:label "读取范围、振荡信号" ;
+    yd:nmStatus "代码里还没有" .
+
+yd:nm-79 a yd:NameMapRow ;
+    rdfs:label "看门狗（健康探针、切换命令、排空命令）" ;
+    yd:nmStatus "代码里还没有（排空命令一项一致）" .
+
+yd:nm-8 a yd:NameMapRow ;
+    rdfs:label "提案、完成提案" ;
+    yd:nmStatus "一致" .
+
+yd:nm-80 a yd:NameMapRow ;
+    rdfs:label "画面（单独的应用）" ;
+    yd:nmStatus "不一致：没有单独的目录、依赖与构建；页面取画面的文字与颜色（`views/project/labels.ts`、`materials.tsx`），翻译层反过来取页面的部门名与卡片文字（`translate/floor.ts`）" .
+
+yd:nm-81 a yd:NameMapRow ;
+    rdfs:label "壳" ;
+    yd:nmStatus "不一致：回调不经命令发现，点开回链在画布上画卡片" .
+
+yd:nm-82 a yd:NameMapRow ;
+    rdfs:label "画面的同步层" ;
+    yd:nmStatus "不一致：画面没有自己的一份" .
+
+yd:nm-83 a yd:NameMapRow ;
+    rdfs:label "事件种类、缺口清单" ;
+    yd:nmStatus "不一致：服务端为画面维护夹具；不认识的事件让测试失败，不进缺口清单" .
+
+yd:nm-84 a yd:NameMapRow ;
+    rdfs:label "翻译层" ;
+    yd:nmStatus "一致" .
+
+yd:nm-85 a yd:NameMapRow ;
+    rdfs:label "画面层" ;
+    yd:nmStatus "不一致：叫 pixel，不叫画面层；输入类型带 Pixel 前缀（`PixelState`、`PixelAction`，在 `pixel/contract.ts`）" .
+
+yd:nm-86 a yd:NameMapRow ;
+    rdfs:label "元件断言、回链" ;
+    yd:nmStatus "不一致：回链叫 `position`；元件断言代码里还没有" .
+
+yd:nm-87 a yd:NameMapRow ;
+    rdfs:label "播放参数" ;
+    yd:nmStatus "不一致：叫 `settings`，在时间线模块里，不经画面合同给出" .
+
+yd:nm-88 a yd:NameMapRow ;
+    rdfs:label "七种元件的对照表" ;
+    yd:nmStatus "不一致：只有事件与覆盖层两份，没有概念到七种元件的表，事实元素与视觉通道没有核对" .
+
+yd:nm-89 a yd:NameMapRow ;
+    rdfs:label "画面拓扑（屋、管道、盖章台从定义推出）" ;
+    yd:nmStatus "不一致：拓扑不从事项冻结的定义来，画面层按部门名分支" .
+
+yd:nm-9 a yd:NameMapRow ;
+    rdfs:label "裁决（U）" ;
+    yd:nmStatus "一致" .
+
+yd:nm-90 a yd:NameMapRow ;
+    rdfs:label "盖章台、出口托盘" ;
+    yd:nmStatus "不一致：按部门名取，不按核验角色" .
+
+yd:nm-91 a yd:NameMapRow ;
+    rdfs:label "章（放行、开环完成）" ;
+    yd:nmStatus "不一致：开环完成章代码里还没有" .
+
+yd:nm-92 a yd:NameMapRow ;
+    rdfs:label "点开回链" ;
+    yd:nmStatus "不一致：细内容画在画布上，没有交给页面" .
+
+yd:nm-93 a yd:NameMapRow ;
+    rdfs:label "等待工作" ;
+    yd:nmStatus "一致" .
+
+yd:nm-94 a yd:NameMapRow ;
+    rdfs:label "一轮工作中" ;
+    yd:nmStatus "一致" .
+
+yd:nm-95 a yd:NameMapRow ;
+    rdfs:label "询问中" ;
+    yd:nmStatus "一致" .
+
+yd:nm-96 a yd:NameMapRow ;
+    rdfs:label "等用户" ;
+    yd:nmStatus "一致" .
+
+yd:nm-97 a yd:NameMapRow ;
+    rdfs:label "核验中" ;
+    yd:nmStatus "不一致：`_awaiting_verification` 按质检与交付写死，不按核验角色" .
+
+yd:nm-98 a yd:NameMapRow ;
+    rdfs:label "接纳" ;
+    yd:nmStatus "一致" .
+
+yd:nm-99 a yd:NameMapRow ;
+    rdfs:label "返工" ;
+    yd:nmStatus "一致" .
+
+yd:term-0 a yd:TotalTerm ;
+    rdfs:label "一轮工作" ;
+    yd:mappedInNameMap true .
+
+yd:term-1 a yd:TotalTerm ;
+    rdfs:label "上限" ;
+    yd:mappedInNameMap true .
+
+yd:term-10 a yd:TotalTerm ;
+    rdfs:label "角色的写入范围" .
+
+yd:term-11 a yd:TotalTerm ;
+    rdfs:label "轮转的规矩" .
+
+yd:term-12 a yd:TotalTerm ;
+    rdfs:label "部门" .
+
+yd:term-2 a yd:TotalTerm ;
+    rdfs:label "事件" .
+
+yd:term-3 a yd:TotalTerm ;
+    rdfs:label "事项" ;
+    yd:mappedInNameMap true .
+
+yd:term-4 a yd:TotalTerm ;
+    rdfs:label "决定请求" .
+
+yd:term-5 a yd:TotalTerm ;
+    rdfs:label "回执" ;
+    yd:mappedInNameMap true .
+
+yd:term-6 a yd:TotalTerm ;
+    rdfs:label "提案" .
+
+yd:term-7 a yd:TotalTerm ;
+    rdfs:label "某种成果的某一版及其依据" .
+
+yd:term-8 a yd:TotalTerm ;
+    rdfs:label "核验角色的结论" .
+
+yd:term-9 a yd:TotalTerm ;
+    rdfs:label "角色" .
+
+yd:defsrc-onboarding a yd:DefinitionSource ;
+    rdfs:label "onboarding" ;
+    yd:receivedByMember "product" .
+
+yd:defsrc-user_input a yd:DefinitionSource ;
+    rdfs:label "user_input" ;
+    yd:receivedByMember "product" .
+
+yd:use-1 a yd:NameUse ;
+    rdfs:label "harness/definitions/__init__.py:273 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）" .
+
+yd:use-2 a yd:NameUse ;
+    rdfs:label "harness/definitions/__init__.py:274 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）" .
+
+yd:use-3 a yd:NameUse ;
+    rdfs:label "harness/definitions/__init__.py:274 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）" .
+
+yd:use-4 a yd:NameUse ;
+    rdfs:label "harness/definitions/__init__.py:275 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）" .
+

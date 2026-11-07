@@ -130,8 +130,8 @@
   "batch": 3,
   "name": "不改（对照，逐条对照）",
   "how": "原样跑一次",
-  "expected": "只有已知的那一条确实缺（质检交缺陷记录）",
-  "got": "确实缺:质检 产出 缺陷记录",
+  "expected": "没有违例、没有确实缺（缺陷记录按假定算进质检结论）",
+  "got": "",
   "detected": true
  },
  {
@@ -168,6 +168,24 @@
   "how": "一个角色直做的定义去掉建档的来源",
   "expected": "确实缺：接",
   "got": "确实缺:一个角色 接 建档",
+  "detected": true
+ },
+ {
+  "id": "c-kernel-dept-name",
+  "batch": 4,
+  "name": "内核写部门名",
+  "how": "在 harness/adjudication.py 的副本末尾加一个按部门名判断的函数（department == \"quality\"）",
+  "expected": "违例：layer-name",
+  "got": "违例:layer-name:harness/adjudication.py ['harness/adjudication.py:222 比较里的「quality」（部门名）']",
+  "detected": true
+ },
+ {
+  "id": "c-drop-namemap-row",
+  "batch": 4,
+  "name": "删一行对照",
+  "how": "从 name-map 的副本里删掉「事项」这一行",
+  "expected": "不知道：term-unmapped",
+  "got": "不知道:term-unmapped:事项 []",
   "detected": true
  }
 ]

@@ -1,0 +1,11 @@
+# 第 3 批的假定（用户 2026-11-07 同意）：缺陷记录不是另一种成果，是结论为打回的质检结论。
+# 定义 outcome_kinds.json 只有 qa_review（质检结论：放行结束事项，打回让被核验的角色重做）；总图、质检的提示词、
+# organization.json 的 collaboration_rules 还叫「缺陷记录」。定义不用改，总图与提示词以后统一说法。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+yd:subKindOf a owl:ObjectProperty ; rdfs:label "是这种成果的一类"@zh ; rdfs:domain yd:OutcomeKind ; rdfs:range yd:OutcomeKind .
+yd:withVerdict a owl:AnnotationProperty ; rdfs:label "结论为"@zh .
+yd:ok-defect yd:subKindOf yd:ok-def-default-qa-review ; yd:withVerdict "打回" .
+yd:as-defect-is-reject a yd:Assumption ; yd:batch 3 ;
+    rdfs:label "缺陷记录就是结论为打回的质检结论（用户 2026-11-07 同意；总图与提示词以后统一说法）"@zh .

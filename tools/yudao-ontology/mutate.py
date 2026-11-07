@@ -95,6 +95,15 @@ CROSS_MUTATIONS = [
 ]
 
 
+# 第 4 批：代码（codecheck.py）。在内存里改一份内核模块的源码或 name-map 的行，再转写、跑 SHACL
+CODE_MUTATIONS = [
+    ("c-kernel-dept-name", "内核写部门名", "在 harness/adjudication.py 的副本末尾加一个按部门名判断的函数（department == \"quality\"）",
+     {"override": "harness/adjudication.py"}, ("违例", "layer-name")),
+    ("c-drop-namemap-row", "删一行对照", "从 name-map 的副本里删掉「事项」这一行",
+     {"drop_rows": {"事项"}}, ("不知道", "term-unmapped")),
+]
+
+
 def outcome(br, g):
     if not br.consistent:
         return {"kind": "不一致", "detail": br.error[:160]}
@@ -160,9 +169,9 @@ def main():
     base_x = {json.dumps(r, ensure_ascii=False, sort_keys=True) for r in crosscheck.compare(design, defs_g)}
     bad = [json.loads(r) for r in base_x if json.loads(r)["result"] in ("违例", "确实缺")]
     rows.append({"id": "control-b3-crosscheck", "batch": 3, "name": "不改（对照，逐条对照）", "how": "原样跑一次",
-                 "expected": "只有已知的那一条确实缺（质检交缺陷记录）",
+                 "expected": "没有违例、没有确实缺（缺陷记录按假定算进质检结论）",
                  "got": "；".join(f'{r["result"]}:{r["subject"]} {r["property"]} {r["object"]}' for r in bad),
-                 "detected": [(r["subject"], r["object"]) for r in bad] == [("质检", "缺陷记录")]})
+                 "detected": not bad})
     for mid, name, how, fn, exp in CROSS_MUTATIONS:
         x = rdflib.Graph() + defs_g
         fn(x)
@@ -172,6 +181,25 @@ def main():
         got = "；".join(f'{r["result"]}:{r["subject"]} {r["property"]} {r["object"]}' for r in new_rows)
         rows.append({"id": mid, "batch": 3, "name": name, "how": how, "expected": "：".join(exp), "got": got, "detected": ok})
         print(("OK  " if ok else "MISS"), 3, name, "|", got[:150])
+    import codecheck
+    key = lambda r: json.dumps(r, ensure_ascii=False, sort_keys=True)
+    base_c = {key(r) for r in codecheck.check(codecheck.facts(codecheck.DEFAULT))}
+    for mid, name, how, spec, exp in CODE_MUTATIONS:
+        kw = {}
+        if "override" in spec:
+            path = spec["override"]
+            kw["override"] = {path: codecheck.show(codecheck.DEFAULT, path)
+                              + "\n\ndef _mutant(department):\n    return department == \"quality\"\n"}
+        if "drop_rows" in spec:
+            kw["drop_rows"] = spec["drop_rows"]
+        new_rows = [r for r in codecheck.check(codecheck.facts(codecheck.DEFAULT, **kw)) if key(r) not in base_c]
+        hit = any(r["result"] == exp[0] and r["check"] == exp[1] for r in new_rows)
+        # 删一行对照：信息少了只能退到不知道，新冒出确实缺或违例就算没过
+        stray = [r for r in new_rows if r["result"] in ("确实缺", "违例") and exp[0] == "不知道"]
+        ok = hit and not stray
+        got = "；".join(f'{r["result"]}:{r["check"]}:{r["focus"]} {r["detail"][:1]}' for r in new_rows)
+        rows.append({"id": mid, "batch": 4, "name": name, "how": how, "expected": "：".join(exp), "got": got, "detected": ok})
+        print(("OK  " if ok else "MISS"), 4, name, "|", got[:150])
     (HERE / "reports/mutations.json").write_text(json.dumps(rows, ensure_ascii=False, indent=1), encoding="utf-8")
 
 

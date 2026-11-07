@@ -14,3 +14,8 @@ yd:rule-acc-12 a yd:OpenLoopRule ; rdfs:label "验收第 12 条：按交完成�
     yd:docPath "docs/design/forms-and-verifier-role.md" ;
     yd:quote "有核验角色、但交完成的角色不在它核验的范围里，事项创建时标为开环，以开环完成结束。" ;
     yd:axiomTurtle "[ owl:intersectionOf ( yd:HasVerifier yd:CompleterNotVerified ) ] rdfs:subClassOf yd:OpenLoopMarked ." .
+
+yd:rule-43-3 a yd:OpenLoopRule ; rdfs:label "第 4.3 节第 3 条：交完成的角色没有核验角色核验它，结束原因是开环完成"@zh ;
+    yd:docPath "docs/design/forms-and-verifier-role.md" ;
+    yd:quote "指定的角色交了完成，事项结束：没有核验角色核验它，结束原因是开环完成" ;
+    yd:axiomTurtle "[ owl:intersectionOf ( yd:HasVerifier yd:ExtraCompleter ) ] rdfs:subClassOf yd:OpenLoopMarked ." .

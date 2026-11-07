@@ -24,3 +24,8 @@ yd:CompleterVerified rdfs:subClassOf yd:HasVerifier .
 yd:OpenLoopMarked a owl:Class ; rdfs:label "事项创建时标为开环"@zh .
 yd:NotOpenLoopMarked a owl:Class ; rdfs:label "事项创建时不标开环"@zh ; owl:complementOf yd:OpenLoopMarked .
 yd:RejectedAtLoad a owl:Class ; rdfs:label "定义加载时整份拒绝"@zh .
+
+# 第 4 批补的第四个特征（11-07 对代码时发现）：直做里不止一个角色能交完成，其中有一个不在核验范围里。
+# 前三个特征默认只有一个角色交完成，这是第 2 批写 4.3 第 5 条时本线程加的推论，恰好把这种定义挡在了探针外面。
+yd:ExtraCompleter a owl:Class ; rdfs:label "另有一个能交完成的角色，不在核验范围里"@zh .
+yd:NoExtraCompleter a owl:Class ; rdfs:label "没有别的能交完成又不在核验范围里的角色"@zh ; owl:complementOf yd:ExtraCompleter .
