@@ -5415,6 +5415,36 @@ export type ReplayCheckResult = {
 };
 
 /**
+ * ReportEntry
+ */
+export type ReportEntry = {
+    /**
+     * Work Item Id
+     */
+    work_item_id?: string | null;
+    /**
+     * Project Id
+     */
+    project_id?: string | null;
+    /**
+     * Layer
+     */
+    layer?: string | null;
+    /**
+     * State From
+     */
+    state_from?: string | null;
+    /**
+     * State To
+     */
+    state_to?: string | null;
+    /**
+     * Open Criteria
+     */
+    open_criteria?: Array<string> | null;
+};
+
+/**
  * ReportFact
  */
 export type ReportFact = {
@@ -5476,6 +5506,10 @@ export type ReportItem = {
      * Detail
      */
     detail?: string | null;
+    /**
+     * Entries
+     */
+    entries?: Array<ReportEntry> | null;
 };
 
 /**

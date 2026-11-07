@@ -6,14 +6,19 @@
 //
 // 带开环条件的放行（工单 #401；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」）：报告的这一项逐条列出每个放行带开环
 // 条件的验收条件，条数取自 `acceptance.coverage`——放行记录里一次算好，页面读这个数，不重新计算。
-// 事项的名称取自 project.overview（报告项只给事件位置，不给事项标识与名称），检验覆盖按事项所属的 run 读。
+// 事项的名称取自 project.overview（报告项给出事项标识与所在项目，页面用结构化字段拼文字），检验覆盖按事项所属的 run 读。
 // 「开环」在这里是验收条件一级的；事项一级的开环完成是另一种记号，本页不写那个词。
+//
+// 收敛状态的变化（工单 #1583）：明细同样按事项标题写；层名与前后两种状态取自报告项的结构化字段，
+// 页面用字段拼文字，不显示 detail 里的标识（docs/design/app-and-interface.md「页面上不出现内部标识」）。
+// 事项标识与项目标识在字段里，标题取不到时写「未命名事项」，两者都用于回到事项的页面。
 
 import { useEffect, useMemo, useState } from "react";
 import type {
   AcceptanceCoverageResult,
   AwayReport,
   ProjectOverviewResult,
+  ReportEntry,
   ReportFact,
   ReportItem,
 } from "../../api/generated/types.gen";
@@ -105,6 +110,9 @@ export function AwayReportSection(props: {
               // 刻度选中时高亮对应的报告项（点击刻度，报告中的项高亮）
               const lit = props.selected !== null && item.refs.includes(props.selected);
               const openRelease = item.id === OPEN_RELEASE_ITEM_ID;
+              const convergence = item.id === CONVERGENCE_ITEM_ID;
+              // 这两项的明细由下面按结构化字段逐条列出，不把服务端的 detail 原样写进页面
+              const structured = openRelease || convergence;
               return (
                 <div key={item.id} className={`y10-report-item report-item${props.openItem === item.id ? " is-open open" : ""}${lit ? " is-highlight highlight" : ""}`}>
                   <button type="button" className="y10-report-head report-head" onClick={() => props.onToggleItem(item.id)}>
@@ -113,14 +121,22 @@ export function AwayReportSection(props: {
                       {item.value}
                       <small>{item.unit}</small>
                     </span>
-                    {/* 开环明细逐条列在下面（一行一个放行），不挤在这一行里 */}
-                    {item.detail && !openRelease ? <span className="y10-report-detail report-detail">{item.detail}</span> : null}
+                    {/* 开环与收敛的明细逐条列在下面（一行一个放行或一处变化），不挤在这一行里 */}
+                    {item.detail && !structured ? <span className="y10-report-detail report-detail">{item.detail}</span> : null}
                   </button>
                   {openRelease ? (
                     <OpenReleaseList
                       app={props.app}
                       item={item}
                       facts={data.facts}
+                      projectNames={props.projectNames}
+                      onNavigate={props.onNavigate}
+                    />
+                  ) : null}
+                  {convergence ? (
+                    <ConvergenceList
+                      app={props.app}
+                      item={item}
                       projectNames={props.projectNames}
                       onNavigate={props.onNavigate}
                     />
@@ -167,10 +183,13 @@ export function AwayReportSection(props: {
 }
 
 // ---------------------------------------------------------------------------
-// 带开环条件的放行的明细（工单 #401）
+// 带开环条件的放行的明细（工单 #401）与收敛状态的变化（工单 #1583）
 
 /** 报告里「带开环条件的放行」一项的标识（home.away_report 的 ReportItem.id）。 */
 export const OPEN_RELEASE_ITEM_ID = "open_release";
+
+/** 报告里「收敛状态的变化」一项的标识（home.away_report 的 ReportItem.id）。 */
+export const CONVERGENCE_ITEM_ID = "convergence";
 
 /** 一个放行：事件位置、所属的项目与事项、放行的时间。 */
 export interface OpenReleaseTarget {
@@ -181,8 +200,8 @@ export interface OpenReleaseTarget {
 }
 
 /**
- * 报告项指向的放行：位置取自报告项的 refs，项目与事项取自同一份报告里的关键事实
- * （report.summary 的项只给位置，事项与项目在 facts 上）。取不到事实的位置不列。
+ * 报告项指向的放行：事项标识与所在项目取报告项的结构化字段（与 refs 中的事件位置按行对应，
+ * 服务端在同一次循环里生成两者），时间取同一份报告的关键事实。缺少事项或项目的行不列。
  */
 export function openReleaseTargets(
   item: ReportItem | null | undefined,
@@ -193,13 +212,18 @@ export function openReleaseTargets(
   }
   const byPosition = new Map(facts.map((fact) => [fact.position, fact]));
   const targets: OpenReleaseTarget[] = [];
-  for (const position of item.refs) {
-    const fact = byPosition.get(position);
-    if (fact === undefined || fact.work_item_id === null || fact.project_id === null) {
-      continue;
+  (item.entries ?? []).forEach((entry, index) => {
+    const position = item.refs[index];
+    if (entry.work_item_id == null || entry.project_id == null || position === undefined) {
+      return;
     }
-    targets.push({ position, projectId: fact.project_id, workItemId: fact.work_item_id, at: fact.at });
-  }
+    targets.push({
+      position,
+      projectId: entry.project_id,
+      workItemId: entry.work_item_id,
+      at: byPosition.get(position)?.at ?? null,
+    });
+  });
   return targets;
 }
 
@@ -210,7 +234,7 @@ export type OpenReleaseState = "ready" | "reading" | "unreadable";
 export interface OpenReleaseRow {
   position: number;
   at: string | null;
-  /** 项目名与事项标题；标题取不到时写「未记事项」，不写事项标识 */
+  /** 项目名与事项标题；标题取不到时写「未命名事项」，不写事项标识 */
   where: string;
   text: string;
   state: OpenReleaseState;
@@ -253,6 +277,128 @@ export function openReleaseRows(lookup: OpenReleaseLookup): OpenReleaseRow[] {
       : null;
     return { position: target.position, at: target.at, where, text, state, href };
   });
+}
+
+/** 收敛状态的变化的一行：事项标题（项目名 / 标题）、层与前后状态，以及回到事项的链接。 */
+export interface ConvergenceRowView {
+  key: string;
+  /** 项目名 / 事项标题；标题取不到时写「未命名事项」，不写事项标识 */
+  where: string;
+  /** 层名与前后两种状态，例如「部门之间的循环：无法判定 → 收敛中」 */
+  change: string;
+  /** 回到事项概览的链接；缺项目或事项标识时为空 */
+  href: string | null;
+}
+
+/**
+ * 收敛明细的行：逐个变化写出事项标题、中文层名与前后两种状态。
+ * 字段取自报告项的结构化字段（工单 #1583），标题取自 project.overview，页面不解析 detail。
+ */
+export function convergenceRows(
+  item: ReportItem | null | undefined,
+  titles: Readonly<Record<string, string>>,
+  projectNames: Readonly<Record<string, string>>,
+): ConvergenceRowView[] {
+  if (!item || item.id !== CONVERGENCE_ITEM_ID) {
+    return [];
+  }
+  return (item.entries ?? []).flatMap((entry, index) => {
+    if (entry.layer == null || entry.state_from == null || entry.state_to == null) {
+      return [];
+    }
+    const projectName = entry.project_id == null ? "" : projectNames[entry.project_id] ?? "";
+    const title = entry.work_item_id == null ? "" : titles[entry.work_item_id] ?? "";
+    const where = [projectName, title === "" ? WORK_ITEM_UNNAMED : title].filter((part) => part !== "").join(" / ");
+    const href = entry.project_id != null && entry.work_item_id != null
+      ? paths.overview(entry.project_id, { workItem: entry.work_item_id })
+      : null;
+    return [{
+      key: `${item.id}.${index}`,
+      where,
+      change: `${entry.layer}：${entry.state_from} → ${entry.state_to}`,
+      href,
+    }];
+  });
+}
+
+// 收敛明细：标题先经 project.overview 读，读到之前按「未命名事项」写；读不到标题的事项也这样写
+function ConvergenceList(props: {
+  app: ClientApp;
+  item: ReportItem;
+  projectNames: Record<string, string>;
+  onNavigate: (hash: string) => void;
+}) {
+  const titles = useConvergenceTitles(props.app, props.item.entries ?? []);
+  const rows = convergenceRows(props.item, titles, props.projectNames);
+  if (rows.length === 0) {
+    return <p className="y10-note note">这一项没有可以列出的明细</p>;
+  }
+  return (
+    <ul className="y10-source-list source-list convergence-list">
+      {rows.map((row) => (
+        <li key={row.key} className="convergence-row">
+          {row.href === null ? (
+            <span className="y10-note note">{`${row.where} · ${row.change}`}</span>
+          ) : (
+            <button type="button" className="link convergence-link" onClick={() => props.onNavigate(row.href!)}>
+              {`${row.where} · ${row.change}`}
+            </button>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// 收敛明细里的事项标题：按结构化字段的（项目, 事项）逐个打开 project.overview，汇总出标题表。
+// 同一个事项只读一次；读不到标题的事项不在表里，调用处写「未命名事项」
+function useConvergenceTitles(app: ClientApp, entries: readonly ReportEntry[]): Record<string, string> {
+  const pairs = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { projectId: string; workItemId: string }[] = [];
+    for (const entry of entries) {
+      if (entry.project_id == null || entry.work_item_id == null) {
+        continue;
+      }
+      const key = `${entry.project_id}/${entry.work_item_id}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      list.push({ projectId: entry.project_id, workItemId: entry.work_item_id });
+    }
+    return list;
+  }, [entries]);
+  const key = pairs.map((pair) => `${pair.projectId}/${pair.workItemId}`).join(",");
+  const [titles, setTitles] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const views = app.viewSync;
+    if (!views) {
+      return;
+    }
+    const list = key === "" ? [] : key.split(",");
+    for (const pair of list) {
+      const [projectId, workItemId] = pair.split("/");
+      void views.open<ProjectOverviewResult>(
+        `home.convergence.item.${projectId}.${workItemId}`,
+        { query: "project.overview", params: { project_id: projectId, work_item: workItemId } },
+        (data) => {
+          const card = data.work_items.find((item) => item.work_item_id === workItemId);
+          if (card === undefined) {
+            return;
+          }
+          setTitles((current) => ({ ...current, [workItemId]: card.title }));
+        },
+      );
+    }
+    return () => {
+      for (const pair of list) {
+        const [projectId, workItemId] = pair.split("/");
+        views.close(`home.convergence.item.${projectId}.${workItemId}`);
+      }
+    };
+  }, [app, key]);
+  return titles;
 }
 
 // 一个放行的开环明细：先按报告项的位置取放行的事实，再按事项取它的名称与 run，最后读这个 run 的检验覆盖。

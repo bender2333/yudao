@@ -4,6 +4,7 @@
 # 这里核对：查询读的是放行记录里一次算好的数与逐条结论（不重新计算），逐条结论带检验方式与结果、
 # 开环明细；按位置回放同一段事件流得到同一份结果，放行之前的那个位置没有结果；
 # 离开期间的报告多出「收敛状态的变化」与「带开环条件的放行」两项，开环明细列出条件编号。
+# 两项的明细按事项标题写、不出现 wi_ 与 run_ 标识，另给只增的结构化字段（工单 #1583）。
 #
 # 层：模块层（真实事件日志、真实运行与假模型脚本，三次 activate_once；不进完整的三部门循环）。
 # 守 R2（查询交换的字段与位置）与 R3（验收条件的检验方式、开环与放行的口径）。
@@ -18,7 +19,8 @@ import pytest
 from harness.adapters.fake import FakeAdapter
 from harness.app.application import Application
 from harness.app.coverage_queries import AcceptanceCoverage
-from harness.app.home import AwayReportRequest
+from harness.app.home import (AwayReportRequest, LAYER_NAMES, ReportEntry, ReportItem, STATE_NAMES,
+                              UNNAMED_WORK_ITEM, _convergence_detail, _open_release_detail)
 from harness.app.project_queries import NotFound
 from harness.models import EventType, json_dumps
 from harness.providers.call import ModelResponse
@@ -135,26 +137,72 @@ def test_the_query_replays_to_a_position_and_has_nothing_before_the_release(tmp_
 
 def test_the_away_report_lists_open_releases_with_their_criteria(tmp_path):
     system, application, work_item_id, run_id = _finished_run(tmp_path)
+    project_id = system.project(run_id).project_id
     report = application.query("home.away_report", AwayReportRequest(range="24h")).data
     items = {item.id: item for item in report.summary}
     assert "open_release" in items, sorted(items)
     open_release = items["open_release"]
     assert open_release.value == 1 and open_release.unit and open_release.refs
     assert open_release.refs == [_review_event(system, run_id).position]
-    assert "AC2" in (open_release.detail or "") and "AC3" in (open_release.detail or "")
-    assert work_item_id in (open_release.detail or "")
+    detail = open_release.detail or ""
+    # 明细按事项标题写，不出现事项标识与 run 标识（工单 #1583）
+    assert "做一件事" in detail
+    assert "AC2" in detail and "AC3" in detail
+    assert work_item_id not in detail and run_id not in detail
+    assert "wi_" not in detail and "run_" not in detail
+    # 只增的结构化字段给出事项标识、所在项目与开环条件，供页面拼文字与回链
+    [entry] = open_release.entries or []
+    assert entry.work_item_id == work_item_id
+    assert entry.project_id == project_id
+    assert entry.open_criteria == ["AC2", "AC3"]
+    assert entry.layer is None and entry.state_from is None and entry.state_to is None
 
 
 def test_the_away_report_lists_the_changes_of_the_convergence_state(tmp_path):
     system, application, work_item_id, run_id = _finished_run(tmp_path)
+    project_id = system.project(run_id).project_id
     report = application.query("home.away_report", AwayReportRequest(range="24h")).data
     items = {item.id: item for item in report.summary}
     assert "convergence" in items, sorted(items)
     convergence = items["convergence"]
     assert convergence.value >= 1 and convergence.unit and convergence.refs
-    assert work_item_id in (convergence.detail or "")
+    detail = convergence.detail or ""
+    # 明细按事项标题写，层名与状态名是中文，不出现事项标识与 run 标识（工单 #1583）
+    assert "做一件事" in detail
+    assert work_item_id not in detail and run_id not in detail
+    assert "wi_" not in detail and "run_" not in detail
+    assert convergence.entries
+    for entry in convergence.entries:
+        assert entry.work_item_id == work_item_id
+        assert entry.project_id == project_id
+        assert entry.layer in LAYER_NAMES.values()
+        assert entry.state_from in STATE_NAMES.values()
+        assert entry.state_to in STATE_NAMES.values()
+        assert entry.state_from != entry.state_to
+        assert f"{entry.layer}：{entry.state_from} → {entry.state_to}" in detail
     # 范围内没有事件时不出现这一项（自上次查看且刚看过）
     end = system.store.end_position()
     assert system.mark_seen(end) == end
     quiet = application.query("home.away_report", AwayReportRequest(range="since_seen")).data
     assert "convergence" not in {item.id for item in quiet.summary}
+
+
+def test_two_details_write_the_unnamed_work_item_when_the_title_is_missing():
+    # 标题取不到时写「未命名事项」，不拿事项标识凑数（工单 #1583 验收第 1 条）
+    release_entry = ReportEntry(work_item_id="wi_missing", project_id="proj_missing", open_criteria=["AC1"])
+    release_detail = _open_release_detail([release_entry], {})
+    assert release_detail == f"{UNNAMED_WORK_ITEM}：AC1"
+    change = ReportEntry(work_item_id="wi_missing", project_id="proj_missing", layer="部门之间的循环",
+                         state_from="无法判定", state_to="收敛中")
+    convergence_detail = _convergence_detail([change], {})
+    assert convergence_detail == f"{UNNAMED_WORK_ITEM} · 部门之间的循环：无法判定 → 收敛中"
+    for text in (release_detail, convergence_detail):
+        assert "wi_" not in text and "run_" not in text
+
+
+def test_report_items_without_the_new_optional_fields_still_load():
+    # 只增的可选字段：旧读取方拿到的 JSON 没有 entries 时照样读得回来（工单 #1583 验收第 2 条）
+    item = ReportItem.model_validate({
+        "id": "usage", "label": "用量", "value": 3, "unit": "token", "refs": [1, 2], "detail": "2 次模型请求",
+    })
+    assert item.entries is None

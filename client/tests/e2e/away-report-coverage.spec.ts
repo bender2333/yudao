@@ -1,9 +1,10 @@
-// 离开期间的报告里的开环明细（工单 #401 的验收第 1、2 条；应用层与接口层 docs/design/app-and-interface.md「查询清单」
+// 离开期间的报告里的开环明细与收敛明细（工单 #401、#1583 的验收；应用层与接口层 docs/design/app-and-interface.md「查询清单」
 // `home.away_report` 与 `acceptance.coverage`；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」）。
 //
 // 一个放行带两条开环条件（一条判定点、一条开环）：报告的这一项要逐条列出它们，条数与
 // `acceptance.coverage` 的数一致；「跳到逐条结论表」的链接在逐条结论表交付以后（#154）出现；
-// 页面文字里没有英文内部标识，也没有事项一级的「开环完成」。
+// 「收敛状态的变化」一项按结构化字段写事项标题、中文层名与前后两种状态；页面文字里没有 wi_ 与 run_ 标识，
+// 也没有英文内部标识与事项一级的「开环完成」。
 //
 // 只看页面：断言读的是页面上的文字与按钮，不读画布、不用画面的测试钩子（测试分层 docs/design/test-pyramid.md「前端与浏览器测试」）。
 // 后端是 FakeAdapter 驱动的真实服务（tests/e2e/backend.py 的 --script coverage），页面文件由它提供。
@@ -50,7 +51,7 @@ async function fetchQuery<T>(
   return envelope.data as T;
 }
 
-test("离开期间的报告逐条列出带开环条件的放行：条数与检验覆盖一致，可以从那里跳到逐条结论表", async () => {
+test("离开期间的报告逐条列出带开环条件的放行与收敛变化：条数与检验覆盖一致，可以从那里跳到逐条结论表", async () => {
   test.setTimeout(180_000);
   const client = await startClient(backend, { width: 1440, height: 900 });
   const errors = collectConsoleErrors(client.page);
@@ -66,7 +67,10 @@ test("离开期间的报告逐条列出带开环条件的放行：条数与检�
     await expect(report).toBeVisible();
 
     // 报告里有「带开环条件的放行」一项：值是放行的次数（一次）
-    const item = report.locator(".report-item").filter({ hasText: "带开环条件的放行" });
+    // 按标签精确匹配：收敛明细的行里也会出现这一串字（事项标题），只按文本找会同时命中两项
+    const item = report.locator(".report-item").filter({
+      has: page.locator(".report-label").filter({ hasText: /^带开环条件的放行$/ }),
+    });
     await expect(item).toBeVisible();
     await expect(item.locator(".report-value")).toContainText("1");
 
@@ -94,13 +98,50 @@ test("离开期间的报告逐条列出带开环条件的放行：条数与检�
     expect(coverage.numbers.open).toBe(2);
     expect(coverage.open_criteria).toEqual(["AC2", "AC3"]);
 
+    // 「收敛状态的变化」一项（工单 #1583）：按结构化字段写事项标题、中文层名与前后两种状态，
+    // 页面不显示 detail，也不出现 wi_ 与 run_ 标识
+    type ReportEntry = {
+      work_item_id?: string | null;
+      project_id?: string | null;
+      layer?: string | null;
+      state_from?: string | null;
+      state_to?: string | null;
+    };
+    const reportData = await fetchQuery<{
+      summary: { id: string; detail?: string | null; entries?: ReportEntry[] | null }[];
+    }>(page, "home.away_report", { range: "since_seen" });
+    const convergenceData = reportData.summary.find((item) => item.id === "convergence");
+    expect(convergenceData, "预置没有产生收敛状态的变化").toBeDefined();
+    const entries = convergenceData?.entries ?? [];
+    expect(entries.length).toBeGreaterThan(0);
+    const convergence = report.locator(".report-item").filter({ hasText: "收敛状态的变化" });
+    await expect(convergence).toBeVisible();
+    const convergenceRows = convergence.locator(".convergence-row");
+    await expect(convergenceRows).toHaveCount(entries.length);
+    for (const [index, entry] of entries.entries()) {
+      // 层名与状态名是中文（服务端写好的名字），标题是 project.overview 给出的那一个
+      expect(entry.layer, JSON.stringify(entry)).toMatch(/^[\u4e00-\u9fa5]+$/);
+      expect(entry.state_from, JSON.stringify(entry)).toMatch(/^[\u4e00-\u9fa5]+$/);
+      expect(entry.state_to, JSON.stringify(entry)).toMatch(/^[\u4e00-\u9fa5]+$/);
+      const expected = `开环报告 / ${card!.title} · ${entry.layer}：${entry.state_from} → ${entry.state_to}`;
+      await expect(convergenceRows.nth(index)).toContainText(expected);
+    }
+    // 服务端的 detail 同样按标题写，不带两类标识
+    for (const item of reportData.summary) {
+      expect(item.detail ?? "", `报告项 ${item.id} 的明细里出现了标识`).not.toMatch(/wi_|run_/);
+    }
+
     // 逐条结论表已经交付（#154）：这一行给出跳到这个事项资料页那张表的链接
     await expect(report.getByRole("button", { name: "跳到逐条结论表", exact: true })).toHaveCount(1);
 
-    // 页面文字：没有英文内部标识，也没有事项一级的「开环完成」
+    // 页面文字：没有 wi_ 与 run_ 标识，没有英文内部标识，也没有事项一级的「开环完成」
     const text = await rows.first().innerText();
     for (const word of ["judgement", "open_criteria", "coverage", "unverified", "wi_", "run_", "AC1"]) {
       expect(text, `明细里出现了 ${word}：${text}`).not.toContain(word);
+    }
+    const reportText = await report.innerText();
+    for (const word of ["wi_", "run_"]) {
+      expect(reportText, `离开期间的报告里出现了 ${word}：${reportText}`).not.toContain(word);
     }
     const body = await page.evaluate(() => document.body.innerText);
     expect(body).not.toContain("开环完成");
