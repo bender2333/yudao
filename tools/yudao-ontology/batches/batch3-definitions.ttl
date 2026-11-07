@@ -1,0 +1,145 @@
+# 第 3 批：发布带的三份形态的定义文件，由 defs.py 从 eb8429e 转写，不手改。
+# 形态目录、部门与成果种类到前两批个体的对应写在 defs.py 开头。
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix yd: <https://yudao.dev/onto#> .
+
+yd:decl-default-quality a yd:VerificationDecl ;
+    yd:docRef "harness/definitions/organization.json" ;
+    yd:forOutcome yd:ok-delivery ;
+    yd:inForm yd:form-default ;
+    yd:verified yd:dept-engineering ;
+    yd:verifier yd:dept-quality .
+
+yd:dept-product yd:docRef "harness/definitions/organization.json" ;
+    yd:produces yd:ok-def-default-product-decision,
+        yd:ok-prd ;
+    yd:receives yd:src-onboarding,
+        yd:src-user-input ;
+    yd:watches yd:ok-def-default-baseline-review,
+        yd:ok-guidance,
+        yd:ok-intent .
+
+yd:ok-def-min-completion-review a yd:OutcomeKind ;
+    rdfs:label "核验结论（single_role_direct）"@zh ;
+    yd:docRef "harness/definitions/forms/single_role_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-min .
+
+yd:ok-def-several-completion-review a yd:OutcomeKind ;
+    rdfs:label "核验结论（several_roles_direct）"@zh ;
+    yd:docRef "harness/definitions/forms/several_roles_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-several .
+
+yd:role-sev-product yd:docRef "harness/definitions/forms/several_roles_direct/organization.json" .
+
+yd:dept-engineering yd:docRef "harness/definitions/organization.json" ;
+    yd:produces yd:ok-def-default-structure,
+        yd:ok-delivery ;
+    yd:watches yd:ok-defect,
+        yd:ok-guidance,
+        yd:ok-prd .
+
+yd:dept-quality yd:docRef "harness/definitions/organization.json" ;
+    yd:produces yd:ok-def-default-baseline-review,
+        yd:ok-def-default-independent-judgement,
+        yd:ok-def-default-qa-review ;
+    yd:watches yd:ok-def-default-structure,
+        yd:ok-delivery,
+        yd:ok-guidance,
+        yd:ok-prd .
+
+yd:ok-def-default-independent-judgement a yd:OutcomeKind ;
+    rdfs:label "独立判断（default）"@zh ;
+    yd:docRef "harness/definitions/outcome_kinds.json" ;
+    yd:inForm yd:form-default .
+
+yd:ok-def-default-product-decision a yd:OutcomeKind ;
+    rdfs:label "产品决定（default）"@zh ;
+    yd:docRef "harness/definitions/outcome_kinds.json" ;
+    yd:inForm yd:form-default .
+
+yd:ok-def-default-qa-review a yd:OutcomeKind ;
+    rdfs:label "质检结论（default）"@zh ;
+    yd:docRef "harness/definitions/outcome_kinds.json" ;
+    yd:inForm yd:form-default .
+
+yd:ok-def-min-product-spec a yd:OutcomeKind ;
+    rdfs:label "初始 PRD（single_role_direct）"@zh ;
+    yd:docRef "harness/definitions/forms/single_role_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-min .
+
+yd:ok-def-min-structure a yd:OutcomeKind ;
+    rdfs:label "现有结构说明（single_role_direct）"@zh ;
+    yd:docRef "harness/definitions/forms/single_role_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-min .
+
+yd:ok-def-several-product-spec a yd:OutcomeKind ;
+    rdfs:label "初始 PRD（several_roles_direct）"@zh ;
+    yd:docRef "harness/definitions/forms/several_roles_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-several .
+
+yd:ok-def-several-structure a yd:OutcomeKind ;
+    rdfs:label "现有结构说明（several_roles_direct）"@zh ;
+    yd:docRef "harness/definitions/forms/several_roles_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-several .
+
+yd:role-min yd:docRef "harness/definitions/forms/single_role_direct/organization.json" ;
+    yd:produces yd:ok-def-min-product-spec,
+        yd:ok-def-min-structure,
+        yd:ok-min-completion ;
+    yd:receives yd:src-onboarding,
+        yd:src-user-input ;
+    yd:watches yd:ok-guidance .
+
+yd:role-sev-engineering yd:docRef "harness/definitions/forms/several_roles_direct/organization.json" ;
+    yd:produces yd:ok-def-several-product-spec,
+        yd:ok-def-several-structure,
+        yd:ok-sev-completion ;
+    yd:receives yd:src-onboarding,
+        yd:src-user-input ;
+    yd:watches yd:ok-guidance .
+
+yd:ok-def-default-baseline-review a yd:OutcomeKind ;
+    rdfs:label "基线核验（default）"@zh ;
+    yd:docRef "harness/definitions/outcome_kinds.json" ;
+    yd:inForm yd:form-default .
+
+yd:ok-def-default-structure a yd:OutcomeKind ;
+    rdfs:label "结构说明（default）"@zh ;
+    yd:docRef "harness/definitions/outcome_kinds.json" ;
+    yd:inForm yd:form-default .
+
+yd:ok-min-completion a yd:OutcomeKind ;
+    yd:docRef "harness/definitions/forms/single_role_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-min .
+
+yd:ok-sev-completion a yd:OutcomeKind ;
+    yd:docRef "harness/definitions/forms/several_roles_direct/outcome_kinds.json" ;
+    yd:inForm yd:form-several .
+
+yd:ok-prd a yd:OutcomeKind ;
+    yd:docRef "harness/definitions/outcome_kinds.json" ;
+    yd:inForm yd:form-default .
+
+yd:form-min yd:batch 3 ;
+    yd:canSubmitCompletion yd:role-min ;
+    yd:definedBy "harness/definitions/forms/single_role_direct/organization.json" ;
+    yd:finalOutcome yd:ok-min-completion ;
+    yd:rotation yd:rm-direct .
+
+yd:form-several yd:batch 3 ;
+    yd:canSubmitCompletion yd:role-sev-engineering ;
+    yd:definedBy "harness/definitions/forms/several_roles_direct/organization.json" ;
+    yd:finalOutcome yd:ok-sev-completion ;
+    yd:rotation yd:rm-direct .
+
+yd:ok-delivery a yd:OutcomeKind ;
+    yd:docRef "harness/definitions/outcome_kinds.json" ;
+    yd:inForm yd:form-default .
+
+yd:form-default yd:batch 3 ;
+    yd:definedBy "harness/definitions/organization.json" ;
+    yd:finalOutcome yd:ok-delivery ;
+    yd:notModeled "quality 的检查材料写入范围在定义里写了位置 ['.yudao-qa-tests']"@zh ;
+    yd:rotation yd:rm-by-outcome .
+

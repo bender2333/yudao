@@ -1,0 +1,5 @@
+# 第 3 批没有新增承诺的范围：定义文件是已经建出来的东西，拿来对第 2 批承诺过的形态（yd:Form 在 scope-design-forms 里）。
+# 设计说明里写了、定义文件里没有的形态，因此记「确实缺」：它说的是设计与已建出来的东西之间差什么，指导下一步开发。
+@prefix yd: <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+yd:scope-design-forms rdfs:comment "第 3 批起也拿来对定义文件"@zh .

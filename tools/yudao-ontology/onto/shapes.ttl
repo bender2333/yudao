@@ -42,14 +42,54 @@ PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
 SELECT $this WHERE { $this yd:rotation yd:rm-direct . FILTER NOT EXISTS { $this yd:canSubmitCompletion ?r . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Form . } }""" ] ;
     sh:targetClass yd:Form .
 
-yd:shape-halfopen-written-release-violation a sh:NodeShape ;
-    rdfs:label "按半开环的假定，这份核验的结论不该写成放行（假定与设计的写法冲突）"@zh ;
+yd:shape-direct-verified-can-complete-violation a sh:NodeShape ;
+    rdfs:label "直做形态里被核验的角色交得出完成（形态与核验角色设计说明 4.3 第 5 条，eb8429e）"@zh ;
     sh:severity sh:Violation ;
     sh:sparql [ a sh:SPARQLConstraint ;
-            sh:message "按半开环的假定，这份核验的结论不该写成放行（假定与设计的写法冲突）"@zh ;
+            sh:message "直做形态里被核验的角色交得出完成（形态与核验角色设计说明 4.3 第 5 条，eb8429e）"@zh ;
             sh:select """PREFIX yd: <https://yudao.dev/onto#>
 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-SELECT $this WHERE { $this yd:forOutcome ?o . ?o yd:completion yd:completion-release . }""" ] ;
+SELECT $this WHERE { $this yd:inForm ?f ; yd:verified ?v . ?f yd:rotation yd:rm-direct . FILTER NOT EXISTS { ?f yd:canSubmitCompletion ?v } }""" ] ;
+    sh:targetClass yd:VerificationDecl .
+
+yd:shape-form-defined-missing a sh:NodeShape ;
+    rdfs:label "设计里有这份形态，发布的定义文件里没有"@zh ;
+    sh:severity sh:Warning ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "设计里有这份形态，发布的定义文件里没有"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { FILTER EXISTS { ?any yd:definedBy ?file } FILTER NOT EXISTS { $this yd:definedBy ?f . } FILTER NOT EXISTS { $this yd:planned true } FILTER EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Form . } }""" ] ;
+    sh:targetClass yd:Form .
+
+yd:shape-form-defined-unknown a sh:NodeShape ;
+    rdfs:label "设计里有这份形态，发布的定义文件里没有"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "设计里有这份形态，发布的定义文件里没有"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { FILTER EXISTS { ?any yd:definedBy ?file } FILTER NOT EXISTS { $this yd:definedBy ?f . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Form . } }""" ] ;
+    sh:targetClass yd:Form .
+
+yd:shape-halfopen-depends-unknown a sh:NodeShape ;
+    rdfs:label "这份核验有两种结论：有主机回执的算已核验，只靠读的按半开环的假定不该写成放行（这一次靠哪种，设计里看不出）"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "这份核验有两种结论：有主机回执的算已核验，只靠读的按半开环的假定不该写成放行（这一次靠哪种，设计里看不出）"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:forOutcome ?o ; yd:hasIndependentEvidence ?e . ?o yd:completion yd:completion-release . }""" ] ;
+    sh:targetClass yd:HalfOpenDecl .
+
+yd:shape-halfopen-written-release-violation a sh:NodeShape ;
+    rdfs:label "按半开环的假定，这份核验的结论只靠读、没有主机回执，不该写成放行（假定与设计的写法冲突）"@zh ;
+    sh:severity sh:Violation ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "按半开环的假定，这份核验的结论只靠读、没有主机回执，不该写成放行（假定与设计的写法冲突）"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:forOutcome ?o . ?o yd:completion yd:completion-release . FILTER NOT EXISTS { $this yd:hasIndependentEvidence ?e } }""" ] ;
     sh:targetClass yd:HalfOpenDecl .
 
 yd:shape-name-avoid-violation a sh:NodeShape ;

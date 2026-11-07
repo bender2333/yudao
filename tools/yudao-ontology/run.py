@@ -27,7 +27,8 @@ SH = rdflib.Namespace("http://www.w3.org/ns/shacl#")
 BATCHES: dict[int, list[str]] = {
     0: ["onto/core.ttl", "batches/batch0-axioms.ttl"],
     1: ["batches/batch1-overview.ttl", "batches/batch1-scope.ttl"],
-    2: ["batches/batch2-design.ttl", "batches/batch2-scope.ttl"],
+    2: ["batches/batch2-design.ttl", "batches/batch2-scope.ttl", "batches/batch2-eb8429e.ttl"],
+    3: ["batches/batch3-definitions.ttl", "batches/batch3-scope.ttl"],
 }
 ASSUMPTION_FILES: dict[int, list[str]] = {1: ["batches/batch1-assumptions.ttl"], 2: ["batches/batch2-assumptions.ttl"]}
 
@@ -243,8 +244,16 @@ def checks(terms, avoid):
          "$this (^yd:verifier/yd:verified)+ $this .", "", None),
         ("checkdef-per-item", "每个事项具体查什么来自检查材料，设计说明没写", "yd:CheckDefinition", "unknown",
          "$this yd:perItemFrom ?m .", "", None),
-        ("halfopen-written-release", "按半开环的假定，这份核验的结论不该写成放行（假定与设计的写法冲突）", "yd:HalfOpenDecl", "violation",
-         "$this yd:forOutcome ?o . ?o yd:completion yd:completion-release .", "", None),
+        ("halfopen-written-release", "按半开环的假定，这份核验的结论只靠读、没有主机回执，不该写成放行（假定与设计的写法冲突）",
+         "yd:HalfOpenDecl", "violation",
+         "$this yd:forOutcome ?o . ?o yd:completion yd:completion-release . FILTER NOT EXISTS { $this yd:hasIndependentEvidence ?e }", "", None),
+        ("halfopen-depends", "这份核验有两种结论：有主机回执的算已核验，只靠读的按半开环的假定不该写成放行（这一次靠哪种，设计里看不出）",
+         "yd:HalfOpenDecl", "unknown",
+         "$this yd:forOutcome ?o ; yd:hasIndependentEvidence ?e . ?o yd:completion yd:completion-release .", "", None),
+        ("direct-verified-can-complete", "直做形态里被核验的角色交得出完成（形态与核验角色设计说明 4.3 第 5 条，eb8429e）", "yd:VerificationDecl", "violation",
+         "$this yd:inForm ?f ; yd:verified ?v . ?f yd:rotation yd:rm-direct . FILTER NOT EXISTS { ?f yd:canSubmitCompletion ?v }", "", None),
+        ("form-defined", "设计里有这份形态，发布的定义文件里没有", "yd:Form", "absence",
+         "FILTER EXISTS { ?any yd:definedBy ?file }", "$this yd:definedBy ?f .", "yd:Form"),
         ("name-avoid", "用了词表里写明要避免的词", "yd:Concept", "violation",
          f"$this rdfs:label ?l . FILTER(STR(?l) IN ({avoid_vals}))", "", None),
         ("name-unknown", "词表与 name-map 里都没有这个词，正名对不上", "yd:Concept", "unknown",
