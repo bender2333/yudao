@@ -1,3 +1,5 @@
+# 故障矩阵第 3 行：文件动作已经写入、确认没有保存时，恢复按动作前的公开树快照、动作参数与当前公开树核实，
+# 结果复用或交还发出它的会话（恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 工单 #308：恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」第 1 步。Yudao 自己的文件工具（write_file、edit_range、delete_file、
 # move_file）结果未知时自动核实：按动作前的公开树快照、动作参数与当前公开树对比，
 # 只有目标路径变成目标内容才记一条自动核实记录，其余情况作为工具结果交还发出它的会话
