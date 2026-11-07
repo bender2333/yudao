@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/model-management.md",
-"hash":"152a3422cf1f9b2b",
+"hash":"d0591d83ecfdfe63",
 "nodes":[
-{"hash":"152a3422cf1f9b2b","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
+{"hash":"d0591d83ecfdfe63","id":"docs/design/model-management.md","kind":"file","title":"docs/design/model-management.md"},
 {"hash":"f7e1d7d7fe166ef5","id":"docs/design/model-management.md#模型管理设计说明","kind":"section","parent":"docs/design/model-management.md","title":"模型管理设计说明"},
 {"hash":"9ff2b4bf956da184","id":"docs/design/model-management.md#模型管理设计说明 > 1. 参照对象与取舍","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"1. 参照对象与取舍"},
 {"hash":"aa9fdedc53b8e4a8","id":"docs/design/model-management.md#模型管理设计说明 > 2. 分层","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"2. 分层"},
@@ -52,7 +52,7 @@
 {"hash":"705fedfe8a98fc19","id":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测 > 12.2 统一调用","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","title":"12.2 统一调用"},
 {"hash":"60a2a52b90d73087","id":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测 > 12.3 取消","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","title":"12.3 取消"},
 {"hash":"024dbc0a1a232eaa","id":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测 > 12.4 观测","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明 > 12. 统一调用、取消与观测","title":"12.4 观测"},
-{"hash":"7b7ba5c054cdbb4b","id":"docs/design/model-management.md#模型管理设计说明 > 13. 验收","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"13. 验收"}
+{"hash":"d24987077cdcd658","id":"docs/design/model-management.md#模型管理设计说明 > 13. 验收","kind":"section","parent":"docs/design/model-management.md#模型管理设计说明","title":"13. 验收"}
 ],
 "edges":[
 {"dst":"docs/architecture.html#s1","kind":"map-position","raws":["「模型与工具」"],"seen":"3c9310ef49956c5b","src":"docs/design/model-management.md#模型管理设计说明"},

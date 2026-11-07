@@ -44,6 +44,7 @@
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 为什么用规则语言"},
 {"dst":".github/workflows/ci.yml","kind":"code-path","raws":[".github/workflows/ci.yml"],"seen":"eb9a5d218fcc4892","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 位置"},
 {"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"78e235b5c69afc24","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 位置"},
+{"dst":"agents_jour/其他.md","kind":"code-path","raws":["agents_jour/其他.md"],"seen":"6059a5deb866c6de","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 12. 工具的形状 > 第一次运行（第 1、2 步）"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 13. LLM 提取的验收与试验"},
 {"dst":"CONTEXT.md","kind":"code-path","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 2. 为什么不跟引用走：一个现成的例子"},
 {"dst":"CONTEXT.md","kind":"section-ref","raws":["CONTEXT.md"],"seen":"daa64d6a0aaf7c47","src":"docs/research/doc-consistency-concept-model.md#文档一致性核对：概念模型与符号推理方案 > 2. 为什么不跟引用走：一个现成的例子"},

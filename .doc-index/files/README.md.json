@@ -1,10 +1,10 @@
 {
 "schema":1,
 "path":"README.md",
-"hash":"2f13bdd4ac8bee5e",
+"hash":"94b6f015a0db9618",
 "nodes":[
-{"hash":"2f13bdd4ac8bee5e","id":"README.md","kind":"file","title":"README.md"},
-{"hash":"be9cb249fd225931","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
+{"hash":"94b6f015a0db9618","id":"README.md","kind":"file","title":"README.md"},
+{"hash":"6959306fb8594057","id":"README.md#Yudao Loop System","kind":"section","parent":"README.md","title":"Yudao Loop System"},
 {"hash":"f3eea1e60864c734","id":"README.md#Yudao Loop System > 当前状态","kind":"section","parent":"README.md#Yudao Loop System","title":"当前状态"},
 {"hash":"eb93a109884ad267","id":"README.md#Yudao Loop System > 当前状态 > 现在能试什么","kind":"section","parent":"README.md#Yudao Loop System > 当前状态","title":"现在能试什么"},
 {"hash":"45bf8e193824bc7c","id":"README.md#Yudao Loop System > 参与开发","kind":"section","parent":"README.md#Yudao Loop System","title":"参与开发"},
@@ -23,7 +23,7 @@
 {"hash":"698c81a0687ea398","id":"README.md#Yudao Loop System > 测试","kind":"section","parent":"README.md#Yudao Loop System","title":"测试"},
 {"hash":"8077bdc1810dc9f7","id":"README.md#Yudao Loop System > 如何使用","kind":"section","parent":"README.md#Yudao Loop System","title":"如何使用"},
 {"hash":"e0a8554ee676db9f","id":"README.md#Yudao Loop System > 如何使用 > 1. 创建项目与任务","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"1. 创建项目与任务"},
-{"hash":"af88ab13d0d1e33c","id":"README.md#Yudao Loop System > 如何使用 > 2. 观察三部门协作","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"2. 观察三部门协作"},
+{"hash":"9968d1e6b71c6e6b","id":"README.md#Yudao Loop System > 如何使用 > 2. 观察三部门协作","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"2. 观察三部门协作"},
 {"hash":"149c9136580ffd56","id":"README.md#Yudao Loop System > 如何使用 > 3. 追加需求与调整方向","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"3. 追加需求与调整方向"},
 {"hash":"3176dc01aed39640","id":"README.md#Yudao Loop System > 如何使用 > 4. 查看失败原因","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"4. 查看失败原因"},
 {"hash":"d545e1bc52c3f227","id":"README.md#Yudao Loop System > 如何使用 > 5. 取消任务","kind":"section","parent":"README.md#Yudao Loop System > 如何使用","title":"5. 取消任务"},
@@ -32,12 +32,12 @@
 {"hash":"41f4c6160a570f84","id":"README.md#Yudao Loop System > HTTP 接口","kind":"section","parent":"README.md#Yudao Loop System","title":"HTTP 接口"},
 {"hash":"917da9acc47aa3c2","id":"README.md#Yudao Loop System > 任务内 Git 版本","kind":"section","parent":"README.md#Yudao Loop System","title":"任务内 Git 版本"},
 {"hash":"c9909184c94ad0bd","id":"README.md#Yudao Loop System > 模型配置","kind":"section","parent":"README.md#Yudao Loop System","title":"模型配置"},
-{"hash":"3124d3e87a8f658f","id":"README.md#Yudao Loop System > 停止与后续范围","kind":"section","parent":"README.md#Yudao Loop System","title":"停止与后续范围"}
+{"hash":"6f08bbe6a44c87b1","id":"README.md#Yudao Loop System > 停止与后续范围","kind":"section","parent":"README.md#Yudao Loop System","title":"停止与后续范围"}
 ],
 "edges":[
 {"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"link","raws":["docs/design/test-pyramid.md"],"seen":"b528b2647bc3d93f","src":"README.md#Yudao Loop System"},
 {"dst":"docs/requirements/git-change-management.md","kind":"link","raws":["docs/requirements/git-change-management.md"],"seen":"5e603d6c027cc0f6","src":"README.md#Yudao Loop System > 任务内 Git 版本"},
-{"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"fe69deff44285b85","src":"README.md#Yudao Loop System > 停止与后续范围"},
+{"dst":"docs/program-roadmap.md","kind":"link","raws":["docs/program-roadmap.md"],"seen":"c828dcee198a6ad8","src":"README.md#Yudao Loop System > 停止与后续范围"},
 {"dst":".claude/skills/README.md","kind":"link","raws":[".claude/skills/README.md"],"seen":"6ed1d66350b92c02","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"README.md#Yudao Loop System > 参与开发"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"README.md#Yudao Loop System > 参与开发"},

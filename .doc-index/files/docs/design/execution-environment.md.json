@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/execution-environment.md",
-"hash":"f65f6369d9010557",
+"hash":"c58392eba343702e",
 "nodes":[
-{"hash":"f65f6369d9010557","id":"docs/design/execution-environment.md","kind":"file","title":"docs/design/execution-environment.md"},
+{"hash":"c58392eba343702e","id":"docs/design/execution-environment.md","kind":"file","title":"docs/design/execution-environment.md"},
 {"hash":"011ea6d41a931f22","id":"docs/design/execution-environment.md#执行环境服务设计说明","kind":"section","parent":"docs/design/execution-environment.md","title":"执行环境服务设计说明"},
 {"hash":"f32912d7d2b00ae5","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 1. 范围","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明","title":"1. 范围"},
 {"hash":"66bb3ff683830f77","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 1. 范围 > 1.1 测试与验收用的机器","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 1. 范围","title":"1.1 测试与验收用的机器"},
@@ -13,7 +13,7 @@
 {"hash":"dfc79d01a8953972","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 2. 概念与分层 > 2.3 模块交互","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 2. 概念与分层","title":"2.3 模块交互"},
 {"hash":"eb3609320569912f","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明","title":"3. 执行环境服务的合同"},
 {"hash":"9ec0328f93e0790a","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.1 操作","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同","title":"3.1 操作"},
-{"hash":"9ac98ff3ed69c356","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.2 类型","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同","title":"3.2 类型"},
+{"hash":"96c4c3159a6931cb","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.2 类型","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同","title":"3.2 类型"},
 {"hash":"b84b56b14024fe0f","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.3 工作区的建立、封存与传输","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同","title":"3.3 工作区的建立、封存与传输"},
 {"hash":"90049d5d7cc863a5","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.4 动作、尝试与回执","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同","title":"3.4 动作、尝试与回执"},
 {"hash":"de05bb711124cd18","id":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同 > 3.5 执行权编号","kind":"section","parent":"docs/design/execution-environment.md#执行环境服务设计说明 > 3. 执行环境服务的合同","title":"3.5 执行权编号"},

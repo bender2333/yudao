@@ -1,21 +1,22 @@
 {
 "schema":1,
 "path":"docs/agents/ticket-spec.md",
-"hash":"f34b93a5ad44d0d6",
+"hash":"3c3f6b34acdecdaf",
 "nodes":[
-{"hash":"f34b93a5ad44d0d6","id":"docs/agents/ticket-spec.md","kind":"file","title":"docs/agents/ticket-spec.md"},
+{"hash":"3c3f6b34acdecdaf","id":"docs/agents/ticket-spec.md","kind":"file","title":"docs/agents/ticket-spec.md"},
 {"hash":"2fcd62092a9696a0","id":"docs/agents/ticket-spec.md#工单规范","kind":"section","parent":"docs/agents/ticket-spec.md","title":"工单规范"},
-{"hash":"e514b1e5bd1f118f","id":"docs/agents/ticket-spec.md#工单规范 > 层级与归属","kind":"section","parent":"docs/agents/ticket-spec.md#工单规范","title":"层级与归属"},
-{"hash":"8e565fc8a76f85cd","id":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写","kind":"section","parent":"docs/agents/ticket-spec.md#工单规范","title":"一张子工单怎么写"}
+{"hash":"6baea27f5f489a48","id":"docs/agents/ticket-spec.md#工单规范 > 层级与归属","kind":"section","parent":"docs/agents/ticket-spec.md#工单规范","title":"层级与归属"},
+{"hash":"8c400cd9f96eeb39","id":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写","kind":"section","parent":"docs/agents/ticket-spec.md#工单规范","title":"一张子工单怎么写"}
 ],
 "edges":[
 {"dst":"docs/agents/issue-tracker.md","kind":"link","raws":["issue-tracker.md"],"seen":"2f585d2ce9fa7f84","src":"docs/agents/ticket-spec.md#工单规范"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"2c01765171109f63","src":"docs/agents/ticket-spec.md#工单规范"},
-{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"c4ce281d9a5ca1a9","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.4 用例的变化","kind":"link","raws":["../design/test-pyramid.md"],"seen":"317f43a41f6b931b","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
-{"dst":"harness/tests/kernel/test_manifest.py","kind":"code-path","raws":["harness/tests/kernel/test_manifest.py"],"seen":"1fa41458b27a29b9","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
+{"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ea572e94eeb4d291","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.4 用例的变化","kind":"link","raws":["../design/test-pyramid.md"],"seen":"ccd563fa226fa879","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
+{"dst":"harness/tests/kernel/test_manifest.py","kind":"code-path","raws":["harness/tests/kernel/test_manifest.py"],"seen":"7689b767d7fa9e3f","src":"docs/agents/ticket-spec.md#工单规范 > 一张子工单怎么写"},
 {"dst":"CLAUDE.md#思考模式 > 文档维护与归档","kind":"section-ref","raws":["CLAUDE.md"],"seen":"ff66ee419b4ba270","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
-{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["acceptance-evidence.md"],"seen":"f2a9c9c4524e9ef0","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
-{"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"3851a47f4f6c331d","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"}
+{"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["acceptance-evidence.md"],"seen":"89e3daa46e774c2b","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
+{"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"ea7fd54934d91b46","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"},
+{"dst":"harness/tests/layers.toml","kind":"code-path","raws":["harness/tests/layers.toml"],"seen":"7b2d40d78ea4b9cd","src":"docs/agents/ticket-spec.md#工单规范 > 层级与归属"}
 ]
 }

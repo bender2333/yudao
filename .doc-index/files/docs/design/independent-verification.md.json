@@ -1,14 +1,14 @@
 {
 "schema":1,
 "path":"docs/design/independent-verification.md",
-"hash":"dc1a1578f4a0cba8",
+"hash":"cbe48b017446d1a0",
 "nodes":[
-{"hash":"dc1a1578f4a0cba8","id":"docs/design/independent-verification.md","kind":"file","title":"docs/design/independent-verification.md"},
+{"hash":"cbe48b017446d1a0","id":"docs/design/independent-verification.md","kind":"file","title":"docs/design/independent-verification.md"},
 {"hash":"95cc2a7b6d820e01","id":"docs/design/independent-verification.md#验证的独立性设计说明","kind":"section","parent":"docs/design/independent-verification.md","title":"验证的独立性设计说明"},
 {"hash":"886b6e3434cde1be","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 1. 要解决的问题","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"1. 要解决的问题"},
 {"hash":"e9f123e4bc03f030","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 2. 共享的与隔开的","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"2. 共享的与隔开的"},
-{"hash":"aadf7d53039b5083","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 3. 可见范围作为参数","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"3. 可见范围作为参数"},
-{"hash":"21d98c53d41038e2","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"4. 先判断后看解释"},
+{"hash":"a2c80bca27bb68c1","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 3. 可见范围作为参数","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"3. 可见范围作为参数"},
+{"hash":"56452e05cdc9f1cb","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 4. 先判断后看解释","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"4. 先判断后看解释"},
 {"hash":"f828dc6cde8b189b","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 5. 验证密度","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"5. 验证密度"},
 {"hash":"765b7a6e4cbae76f","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 6. 共享上下文的一组对照","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"6. 共享上下文的一组对照"},
 {"hash":"aa8cc19970ac07b2","id":"docs/design/independent-verification.md#验证的独立性设计说明 > 7. 检验覆盖与开环","kind":"section","parent":"docs/design/independent-verification.md#验证的独立性设计说明","title":"7. 检验覆盖与开环"},

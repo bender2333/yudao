@@ -19,6 +19,7 @@
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"b58498ebf5d69032","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
 {"dst":"README.md","kind":"code-path","raws":["README.md"],"seen":"bf7f2025603ef66f","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
+{"dst":"agents_jour/其他.md","kind":"code-path","raws":["agents_jour/其他.md"],"seen":"6059a5deb866c6de","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b4fc41b167016dad","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"69f36f54cfc59ac4","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
 {"dst":"docs/agents/design-spec.md","kind":"link","raws":["design-spec.md"],"seen":"2ffb04cf2733009d","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},

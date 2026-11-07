@@ -46,9 +46,9 @@
 | 按成果（关注的成果） | 第一节「轮转方式」 | `definitions/__init__.py` 的 `Definitions.watched_outputs`、组织定义里部门的 `watched`；`watched_outputs.py` 的 `watched_new_work`、`has_new_work` | 路由；道 03 | 一致 |
 | 任务池、工作单元、认领 | 第一节「轮转方式」；第三节外环「待认领」 | 无（`claim_execution_right` 的 claim 是领取事项的执行权，不是认领工作单元） | 路由；道 03 | 代码里还没有 |
 | 事项 | 第一、三节 | 项目流里叫 work_item（`work_item_created`、命令 `work_item.create`、`work_item.cancel`、`work_item.append_input`，查询 `work_item.*`）；事项的一次执行叫 run（`run_stream`、`run_created` 至 `run_continued`、`RunProjection`，查询 `run.*`） | 路由、接口 | 不一致：总图只有事项，代码与接口资源名里 `work_item` 与 `run` 两个名字并存 |
-| 放行或开环完成，事项完成 | 第三节外环 | 放行：质检结论 `models.py` 的 `QAReview`（`verdict` 字段）、事件 `qa_submitted`；事项结束 `run_done`；开环完成：判断已有，`Definitions.is_open_loop`（事项最后采纳的成果没有核验角色核验时为开环），事项结束时没有记成开环完成 | 路由 | 不一致：放行没有自己的名字，是质检结论的一个取值；开环完成只有判断，没有记录 |
-| 直做 | 第一节「轮转方式」 | 无 | 路由；道 03 | 代码里还没有 |
-| 交完成（直做） | 第一节「轮转方式」；第三节外环「开环时交完成」 | 无；成果驱动下结束事项的是质检结论 `submit_review` 的 `verdict: release` | 路由；道 03 | 代码里还没有 |
+| 放行或开环完成，事项完成 | 第三节外环 | 放行：质检结论 `models.py` 的 `QAReview`（`verdict` 字段）、事件 `qa_submitted`；事项结束 `run_done`；开环完成：事项创建时按 `Definitions.is_open_loop`（事项最后采纳的成果没有核验角色核验时为开环）判断，标记记在事项创建事件的 `open_loop` 上；事项完成时路由读这条记录，结束原因 `stop_reasons.json` 的 `open_loop`（结果是 done），与放行的 `released` 分开 | 路由 | 不一致：放行没有自己的名字，是质检结论的一个取值；开环完成有自己的结束原因与记录 |
+| 直做 | 第一节「轮转方式」 | `direct.py` 的 `Direct`（登记名称 `direct`）与 `DirectTightening`；形态 `definitions/forms/` 下的 `single_role_direct`、`several_roles_direct` | 路由；道 03 | 一致 |
+| 交完成（直做） | 第一节「轮转方式」；第三节外环「开环时交完成」 | 工具 `submit_completion`，成果种类 `completion`（`direct.py` 的 `COMPLETION_KIND`、`completing_departments`）；有核验角色时再交 `submit_completion_review`；成果驱动下结束事项的是质检结论 `submit_review` 的 `verdict: release` | 路由；道 03 | 一致 |
 | 子事项、子组织 | 第一节「工程」；第三节「子组织」 | 无 | 路由、执行；道 02 | 代码里还没有 |
 
 ### 装配
@@ -133,8 +133,8 @@
 | 停止原因清单 | 第三节外环「停止」；第四节定义「交换」 | `stop_reasons.json`、`StopReason`、`UnknownStopReason`、`models.stop_reason_name`、`Event.stop_reason` | 定义 | 一致 |
 | 谁能拒绝谁 | 第四节定义「交换」 | 由核验声明推出，不另写一份：`definitions/__init__.py` 的 `Definitions.rejection_edges`；加载时 `verification_issues`、`_rejection_cycles` 核对无环；各部门能提交什么另写在 `proposal_contracts.json` | 定义 | 一致 |
 | 核验角色（是否核验角色及核验谁） | 第一节「质检」「独立的证据」；第四节定义「交换」 | 声明：`organization.json` 的 `verification.verifiers`，`definitions/__init__.py` 的 `VerificationDeclaration`、`Definitions.verifier_roles`、`is_verifier`、`verifiers_of`、`verified_by`、`is_open_loop`；没有写声明的旧定义按 `LEGACY_VERIFICATION` 读成质检核验工程的交付。使用方还写死：`app/project_queries.py` 的 `VERIFIER_OF`（`{"engineering": "quality"}`）、检查材料目录 `path_rules.py` 的 `QA_TESTS_DIR`、部门 id `quality` | 定义、路由；道 01 | 不一致：声明已有，读声明的只有定义模块自己，使用方仍写死在部门名上 |
-| 写入范围 | 第四节定义「交换」 | 声明：`organization.json` 的 `verification.write_scopes`，`WriteScope`、`Definitions.write_scope`；使用方：`adjudication.py` 按部门名 `quality` 把写入限在 `QA_TESTS_DIR` 下，没有读声明 | 定义、写入口 | 不一致：声明已有，裁决仍按部门名写死，不读声明 |
-| 成果种类与提案合同 | 第四节定义「交换」 | `routings.json` 每种路由的 `outcome_kinds`；`proposal_contracts.json` | 定义；道 03 | 不一致：成果种类放在路由自己的定义里，总图是定义里单独的一项 |
+| 写入范围 | 第四节定义「交换」 | 声明：`organization.json` 的 `verification.write_scopes`，`WriteScope`、`Definitions.write_scope`；使用方：`adjudication.py` 的写路径检查读 `Definitions.write_scope(部门)`，范围是检查材料时把写入限在声明的目录下，不按部门名 | 定义、写入口 | 一致 |
+| 成果种类与提案合同 | 第四节定义「交换」 | `outcome_kinds.json`（`OutcomeKinds`：成果种类与分组，单独的一项），路由按组名引用（`routings.json` 的 `outcomes`）；`proposal_contracts.json` | 定义；道 03 | 一致 |
 | 路由实现与它的定义、工作单元的大小 | 第四节定义「交换」 | 路由实现与它的定义：组织定义的 `routing`、`routings.json`（每种路由一条）、`Definitions.routing_definition`；工作单元的大小：无 | 定义、路由；道 03 | 一致（路由实现与它的定义）；代码里还没有（工作单元的大小） |
 | 登记的机器 | 第四节定义「交换」；第六节 | 无 | 定义；道 10 | 代码里还没有 |
 | 限定采用的范围 | 第四节定义「交换」；第五节第二层 | 无 | 定义 | 代码里还没有 |
@@ -182,7 +182,7 @@
 | 接纳 | 第三节外环 | 通用接纳事件 `artifact_accepted`（`kernel_events.py`）；成果驱动的老事件 `spec_accepted`、`contract_accepted`、`delivery_accepted`、`structure_accepted`、`baseline_review_accepted`、`product_decision_accepted` | 写入口、路由 | 一致 |
 | 返工 | 第三节外环 | 质检结论的取值 `rework_engineering`（`kernel_events.py` 的 `QA_VERDICTS`）；取值 `rework`（`views/timeline/logic.ts`）；缺陷在 `QAReview.defects`，页面显示「缺陷记录」 | 路由 | 一致 |
 | 排空中 | 第三节外环 | `streams.py` 的 `DrainState`（见看门狗一行） | 看门狗 | 一致 |
-| 停止 | 第三节外环 | run 的终态 `paused`、`failed` 加 `stop_reason`；`done` 是放行或开环完成以后的完成（开环完成代码里还没有；`coverage.py` 里的「开环」是检验覆盖的说法，不是这个词） | 路由、定义 | 不一致：代码按暂停、失败分两种终态，总图只有停止，原因来自封闭清单 |
+| 停止 | 第三节外环 | run 的终态 `paused`、`failed` 加 `stop_reason`；`done` 是放行或开环完成以后的完成（结束原因 `released`、`open_loop`、`baseline_verified`，见 `stop_reasons.json`；`coverage.py` 里的「开环」是检验覆盖的说法，不是事项的开环完成） | 路由、定义 | 不一致：代码按暂停、失败分两种终态，总图只有停止，原因来自封闭清单 |
 
 ## 4. 每道缝的守卫
 

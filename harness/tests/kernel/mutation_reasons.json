@@ -1,1 +1,142 @@
-[]
+[
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold.__init__",
+  "before": "self.main_activations = max(state.used.activations, 0)",
+  "after": "self.main_activations = max(state.used.activations, -1)",
+  "reason": "已用量 activations 只由折叠产生：初值 0，之后只取 max，恒不小于 0；下限从 0 换成 -1 不改变任何折出来的投影，负数不是事实里能出现的值。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._invalidate",
+  "before": "self.artifacts.pop(kind, None)",
+  "after": "self.artifacts.pop(kind, ' ')",
+  "reason": "这条语句不用 pop 的返回值：成果在清单里时都删掉这一种，不在时返回值被丢掉，默认值取 None 还是空格串都不影响投影。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold.feed",
+  "before": "self._accept(SNAPSHOT_KIND, snapshot, False)",
+  "after": "self._accept(SNAPSHOT_KIND, snapshot, True)",
+  "reason": "快照只在事项创建事件上折一次，一个 run 只有一条创建事件；多版并存的清单与单版的清单在这种情况下都只有这一版。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "cycle = int(payload.get(\"cycle\") or 0)",
+  "after": "cycle = int(payload.get(\"cycle\") or -1)",
+  "reason": "缺 cycle 时按 0；激活次数取已用量、主线激活次数与 cycle 三者里最大的，前两个恒不小于 0，缺 cycle 记 -1 与记 0 得到同一个值。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "main = session.department is not None and session.department == event.department",
+  "after": "main = session.department is not None or session.department == event.department",
+  "reason": "主线会话的部门在事项创建时记下，激活事件带的部门与它来自同一个部门名：真实事件里两个条件同时成立（主线会话）或同时不成立（询问分支的会话没有部门），改成 or 不改变结果。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "main = session.department is not None and session.department == event.department",
+  "after": "main = session.department is not ' ' and session.department == event.department",
+  "reason": "这条等式的两个条件在真实事件里一起成立或一起不成立：主线会话的 department 与激活事件的 department 是同一个非 None 部门名，`is not None` 与 `is not ' '` 都为真，第二个条件也为真；询问分支的会话 department 是 None，`is not None` 为假而 `is not ' '` 为真，但第二个条件 `None == event.department` 为假，所以 main 的结果不变。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "return",
+  "after": "",
+  "occurrence": 1,
+  "reason": "这一支处理完以后，后面的每个分支都只认自己的事件种类，部门激活事件不会再命中任何一支；删掉这条 return 与留下它结果相同。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "return",
+  "after": "",
+  "occurrence": 2,
+  "reason": "这一支处理完以后，后面的分支各自只认自己的事件种类，一轮工作结束事件不会再命中任何一支；删掉这条 return 与留下它结果相同。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "return",
+  "after": "",
+  "occurrence": 3,
+  "reason": "这一支处理完以后，后面的分支各自只认自己的事件种类，模型请求事件不会再命中任何一支；删掉这条 return 与留下它结果相同。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "return",
+  "after": "",
+  "occurrence": 4,
+  "reason": "这一支处理完以后，后面的分支各自只认自己的事件种类，决定请求事件不会再命中它；删掉这条 return 与留下它结果相同。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "return",
+  "after": "",
+  "occurrence": 5,
+  "reason": "这是这个方法的最后一条语句，后面没有别的分支；删掉这条 return 与留下它结果相同。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "self.used = replace(self.used, settled_ms=max(self.used.settled_ms, int(payload.get(\"elapsed_ms\") or 0)))",
+  "after": "self.used = replace(self.used, settled_ms=max(self.used.settled_ms, int(payload.get(\"elapsed_ms\") or -1)))",
+  "reason": "缺 elapsed_ms 时按 0；已结算时间每次只取 max，恒不小于 0，缺字段记 -1 与记 0 得到同一个值（旧事件不把已结算的时间变负）。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_Fold._fold_usage",
+  "before": "self.sessions[session_id] = replace(session, settled_ms=max(\n                session.settled_ms, int(payload.get(\"session_elapsed_ms\") or 0)), settled_steps=session.model_steps)",
+  "after": "self.sessions[session_id] = replace(session, settled_ms=max(\n                session.settled_ms, int(payload.get(\"session_elapsed_ms\") or -1)), settled_steps=session.model_steps)",
+  "reason": "缺 session_elapsed_ms 时按 0；会话的已结算时间每次只取 max，恒不小于 0，缺字段记 -1 与记 0 得到同一个值。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_created_snapshot",
+  "before": "if event.type != SkeletonEventType.RUN_CREATED:\n        return None",
+  "after": "",
+  "reason": "快照只由事项创建事件的载荷带来；别的事件没有 snapshot 字段，删掉类型判断以后它们同样折不出快照，结果相同。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ },
+ {
+  "file": "harness/minimal_projection.py",
+  "function": "_created_sessions",
+  "before": "if event.type != SkeletonEventType.RUN_CREATED:\n        return {}",
+  "after": "",
+  "reason": "会话清单只由事项创建事件的载荷带来；别的事件没有 sessions 字段，删掉类型判断以后它们同样折不出会话，结果相同。",
+  "registered_by": "solo-deepseek-v4.1-flash",
+  "registered_at": "2026-11-07T09:35:00+08:00"
+ }
+]

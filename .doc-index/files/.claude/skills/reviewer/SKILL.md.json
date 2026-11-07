@@ -24,6 +24,6 @@
 {"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"1155373f0753c2aa","src":".claude/skills/reviewer/SKILL.md#审查者 > 何时用 / 何时不用"},
 {"dst":"AGENTS.md","kind":"section-ref","raws":["AGENTS.md"],"seen":"ac9a7c63cead768a","src":".claude/skills/reviewer/SKILL.md#审查者 > 你是谁"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"c4ce281d9a5ca1a9","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 10. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"dee18f30736539e9","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤"}
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 9. 测试的写法","kind":"section-ref","raws":["docs/design/test-pyramid.md"],"seen":"aac785f1a81627e4","src":".claude/skills/reviewer/SKILL.md#审查者 > 步骤"}
 ]
 }
