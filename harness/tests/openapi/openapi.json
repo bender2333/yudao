@@ -10034,6 +10034,40 @@
           "actor": {
             "type": "string",
             "title": "Actor"
+          },
+          "previous_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Version"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "changes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Changes"
+          },
+          "diff": {
+            "items": {
+              "$ref": "#/components/schemas/FormDifference"
+            },
+            "type": "array",
+            "title": "Diff"
           }
         },
         "additionalProperties": false,
@@ -10084,6 +10118,30 @@
           "open_loop"
         ],
         "title": "FormChoice"
+      },
+      "FormDifference": {
+        "properties": {
+          "item": {
+            "type": "string",
+            "title": "Item"
+          },
+          "before": {
+            "type": "string",
+            "title": "Before"
+          },
+          "after": {
+            "type": "string",
+            "title": "After"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "item",
+          "before",
+          "after"
+        ],
+        "title": "FormDifference"
       },
       "GuidanceRecord": {
         "properties": {
@@ -11997,6 +12055,16 @@
             "type": "string",
             "title": "Reason",
             "default": ""
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "template",
+              "verifier",
+              "advanced"
+            ],
+            "title": "Mode",
+            "default": "template"
           }
         },
         "additionalProperties": false,
@@ -12023,6 +12091,16 @@
             "type": "boolean",
             "title": "Verifier",
             "default": false
+          },
+          "origin": {
+            "type": "string",
+            "enum": [
+              "release",
+              "changed",
+              "added"
+            ],
+            "title": "Origin",
+            "default": "release"
           }
         },
         "additionalProperties": false,
@@ -12084,6 +12162,13 @@
               }
             ],
             "title": "Open Loop"
+          },
+          "discarded": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Discarded"
           }
         },
         "additionalProperties": false,
@@ -12724,6 +12809,52 @@
             },
             "type": "array",
             "title": "History"
+          },
+          "changes": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Changes"
+          },
+          "organization": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DraftOrganization"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/DraftIssue"
+            },
+            "type": "array",
+            "title": "Rejections"
+          },
+          "add_verifier": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Add Verifier"
+          },
+          "remove_verifier": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Remove Verifier"
           }
         },
         "additionalProperties": false,
@@ -34005,6 +34136,22 @@
             "default": "",
             "title": "Reason",
             "type": "string"
+          },
+          "changes": {
+            "additionalProperties": true,
+            "title": "Changes",
+            "type": "object"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
           }
         },
         "required": [
