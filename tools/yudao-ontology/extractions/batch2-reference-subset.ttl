@@ -1,0 +1,142 @@
+@prefix ns1: <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ns1:role-eng-explorer a ns1:Role ;
+    rdfs:label "探索者"@zh ;
+    ns1:batch 2 ;
+    ns1:belongsTo ns1:dept-engineering ;
+    ns1:docRef "部门内多角色设计说明 4.1" ;
+    ns1:hasEvidenceBasis ns1:basis-eng-explorer ;
+    ns1:hasObjective ns1:obj-eng-explorer ;
+    ns1:inForm ns1:form-eng-center ;
+    ns1:produces ns1:ok-eng-findings ;
+    ns1:quote "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" .
+
+ns1:role-eng-lead a ns1:Role ;
+    rdfs:label "主程"@zh ;
+    ns1:batch 2 ;
+    ns1:belongsTo ns1:dept-engineering ;
+    ns1:docRef "部门内多角色设计说明 4.1" ;
+    ns1:hasEvidenceBasis ns1:basis-eng-lead ;
+    ns1:hasObjective ns1:obj-eng-lead ;
+    ns1:inForm ns1:form-eng-center ;
+    ns1:quote "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" .
+
+ns1:basis-eng-architect a ns1:EvidenceBasis ;
+    rdfs:label "项目材料、同伴交回的结论、本部门记录"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ;
+    ns1:quote "项目材料、同伴交回的结论、本部门记录" .
+
+ns1:basis-eng-explorer a ns1:EvidenceBasis ;
+    rdfs:label "项目材料、代码、外部文档"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ;
+    ns1:quote "项目材料、代码、外部文档" .
+
+ns1:basis-eng-lead a ns1:EvidenceBasis ;
+    rdfs:label "设计与计划、代码、自测结果"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ;
+    ns1:quote "设计与计划、代码、自测结果" .
+
+ns1:basis-eng-reviewer a ns1:EvidenceBasis ;
+    rdfs:label "待审查的成果、它的依据、上一轮审查意见"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ;
+    ns1:quote "待审查的成果、它的依据、上一轮审查意见" .
+
+ns1:decl-eng-review a ns1:VerificationDecl ;
+    rdfs:label "审查者核验工程架构师交的完成"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1、4.3" ;
+    ns1:forOutcome ns1:ok-eng-center-completion ;
+    ns1:inForm ns1:form-eng-center ;
+    ns1:quote "审查者 | ……读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成" ;
+    ns1:verified ns1:role-eng-architect ;
+    ns1:verifier ns1:role-eng-reviewer .
+
+ns1:obj-eng-architect a ns1:Objective ;
+    rdfs:label "把任务做成能交完成的成果"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ;
+    ns1:quote "把任务做成能交完成的成果" .
+
+ns1:obj-eng-explorer a ns1:Objective ;
+    rdfs:label "交回带来源的发现"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ;
+    ns1:quote "交回带来源的发现" .
+
+ns1:obj-eng-lead a ns1:Objective ;
+    rdfs:label "按设计与计划实现并自测"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ;
+    ns1:quote "按设计与计划实现并自测" .
+
+ns1:obj-eng-reviewer a ns1:Objective ;
+    rdfs:label "判断这一版成果是否可以放行"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ;
+    ns1:quote "判断这一版成果是否可以放行" .
+
+ns1:ok-eng-findings a ns1:OutcomeKind ;
+    rdfs:label "带来源的发现"@zh ;
+    ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1" ;
+    ns1:inForm ns1:form-eng-center ;
+    ns1:quote "探索者 | 询问里交来的查证任务 | 交回带来源的发现" .
+
+ns1:rm-direct rdfs:label "直做"@zh .
+
+ns1:role-eng-reviewer a ns1:NoAuthorHistory,
+        ns1:Role ;
+    rdfs:label "审查者"@zh ;
+    ns1:batch 2 ;
+    ns1:belongsTo ns1:dept-engineering ;
+    ns1:docRef "部门内多角色设计说明 4.1",
+        "部门内多角色设计说明 4.4" ;
+    ns1:hasEvidenceBasis ns1:basis-eng-reviewer ;
+    ns1:hasObjective ns1:obj-eng-reviewer ;
+    ns1:inForm ns1:form-eng-center ;
+    ns1:quote "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。",
+        "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" .
+
+ns1:src-subtask rdfs:label "上一层交来的任务"@zh .
+
+ns1:role-eng-architect a ns1:Role ;
+    rdfs:label "工程架构师（中心角色）"@zh ;
+    ns1:batch 2 ;
+    ns1:belongsTo ns1:dept-engineering ;
+    ns1:docRef "部门内多角色设计说明 4.1" ;
+    ns1:hasEvidenceBasis ns1:basis-eng-architect ;
+    ns1:hasObjective ns1:obj-eng-architect ;
+    ns1:inForm ns1:form-eng-center ;
+    ns1:produces ns1:ok-eng-center-completion ;
+    ns1:quote "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" ;
+    ns1:receives ns1:src-subtask .
+
+ns1:ok-eng-center-completion a ns1:OutcomeKind ;
+    rdfs:label "中心角色交的完成（工程子事项）"@zh ;
+    ns1:batch 2 ;
+    ns1:completion ns1:completion-release ;
+    ns1:docRef "部门内多角色设计说明 4.3" ;
+    ns1:inForm ns1:form-eng-center ;
+    ns1:quote "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版……放行则子事项结束；打回则中心角色再开始一轮。" .
+
+ns1:dept-engineering ns1:batch 2 ;
+    ns1:docRef "部门内多角色设计说明 4.1、4.3" ;
+    ns1:hasInternalVerification ns1:decl-eng-review ;
+    ns1:quote "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项" ;
+    ns1:subOrganization ns1:form-eng-center .
+
+ns1:form-eng-center a ns1:Form ;
+    rdfs:label "工程的中心型小组"@zh ;
+    ns1:batch 2 ;
+    ns1:canSubmitCompletion ns1:role-eng-architect ;
+    ns1:docRef "部门内多角色设计说明 4.1、4.2" ;
+    ns1:finalOutcome ns1:ok-eng-center-completion ;
+    ns1:quote "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项" ;
+    ns1:rotation ns1:rm-direct .
+

@@ -1,0 +1,124 @@
+# Yudao 自己的本体：类与属性（词汇）。只有类和属性，没有个体。
+# 方案见 research/yudao-ontology 分支 docs/research/yudao-ontology-v2.md 第 2 至 4 节。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix org:  <http://www.w3.org/ns/org#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+
+<https://yudao.dev/onto> a owl:Ontology ; rdfs:label "Yudao 自己的本体"@zh .
+
+# ---------- 注解：出处与总图位置 ----------
+yd:archRef a owl:AnnotationProperty ; rdfs:label "总图位置"@zh .
+yd:quote   a owl:AnnotationProperty ; rdfs:label "原句"@zh .
+yd:docRef  a owl:AnnotationProperty ; rdfs:label "出处文档"@zh .
+yd:batch   a owl:AnnotationProperty ; rdfs:label "放进来的批次"@zh .
+
+# ---------- 总图的固定结构 ----------
+yd:FixedStructure a owl:Class ; rdfs:label "固定的结构"@zh ; yd:archRef "开头一段" .
+yd:Concept a owl:Class ; rdfs:label "词"@zh ; rdfs:comment "某一层认识的一个词，例如事项、提案"@zh .
+yd:Layer a owl:Class ; rdfs:label "层"@zh ; yd:archRef "第二节「四层」" .
+yd:Ring a owl:Class ; rdfs:label "环"@zh ; yd:archRef "第二节" .
+yd:Component a owl:Class ; rdfs:label "部件"@zh ; rdfs:comment "缝的一侧或某一环里的一样东西"@zh .
+yd:Seam a owl:Class ; rdfs:label "缝"@zh ; yd:archRef "第四节" .
+yd:SeamStatus a owl:Class ; rdfs:label "缝的状态"@zh .
+yd:OuterState a owl:Class ; rdfs:label "外环的状态"@zh ; yd:archRef "第三节外环" .
+yd:LoopLayer a owl:Class ; rdfs:label "循环层"@zh .
+yd:Limit a owl:Class ; rdfs:label "上限"@zh .
+yd:StopReasonList a owl:Class ; rdfs:label "停止原因清单"@zh .
+
+yd:recognizes a owl:ObjectProperty ; rdfs:label "认识"@zh ; rdfs:domain yd:Layer ; rdfs:range yd:Concept .
+yd:above a owl:ObjectProperty ; rdfs:label "在上面"@zh ; rdfs:domain yd:Layer ; rdfs:range yd:Layer .
+yd:inRing a owl:ObjectProperty ; rdfs:label "在哪一环"@zh ; rdfs:range yd:Ring .
+yd:side a owl:ObjectProperty ; rdfs:label "一侧"@zh ; rdfs:domain yd:Seam ; rdfs:range yd:Component .
+yd:status a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "状态"@zh ; rdfs:range yd:SeamStatus .
+yd:inSystem a owl:DatatypeProperty, owl:FunctionalProperty ; rdfs:label "在系统里"@zh ; rdfs:domain yd:Seam ; rdfs:range xsd:boolean .
+yd:hasState a owl:ObjectProperty ; rdfs:label "有状态"@zh ; rdfs:domain yd:LoopLayer ; rdfs:range yd:OuterState .
+yd:hasLimit a owl:ObjectProperty ; rdfs:label "有上限"@zh ; rdfs:domain yd:LoopLayer ; rdfs:range yd:Limit .
+yd:stopsBy a owl:ObjectProperty ; rdfs:label "停止原因来自"@zh ; rdfs:domain yd:LoopLayer ; rdfs:range yd:StopReasonList .
+
+# ---------- 组织 ----------
+yd:Actor a owl:Class ; rdfs:label "承担者"@zh ;
+    owl:equivalentClass [ owl:unionOf ( yd:Department yd:Role yd:User ) ] .
+yd:Department a owl:Class ; rdfs:label "部门"@zh ; rdfs:subClassOf org:OrganizationalUnit ; yd:archRef "第一节" .
+yd:Role a owl:Class ; rdfs:label "角色"@zh ; rdfs:subClassOf org:Post .
+yd:User a owl:Class ; rdfs:label "你（用户）"@zh .
+yd:Department owl:disjointWith yd:Role , yd:User . yd:Role owl:disjointWith yd:User .
+yd:OutsourcedRole a owl:Class ; rdfs:label "外包角色"@zh ; rdfs:subClassOf yd:Role .
+yd:Form a owl:Class ; rdfs:label "形态"@zh ; rdfs:subClassOf org:Organization .
+yd:OutcomeKind a owl:Class ; rdfs:label "成果种类"@zh .
+yd:Source a owl:Class ; rdfs:label "事项的来源"@zh .
+yd:RotationMode a owl:Class ; rdfs:label "轮转方式"@zh .
+yd:Completion a owl:Class ; rdfs:label "结束方式"@zh ; rdfs:comment "放行或开环完成"@zh .
+yd:VerificationDecl a owl:Class ; rdfs:label "核验声明"@zh ;
+    rdfs:comment "谁核验谁的哪种成果：三元关系写成一个声明"@zh .
+yd:Objective a owl:Class ; rdfs:label "目标函数"@zh .
+yd:EvidenceBasis a owl:Class ; rdfs:label "证据来源（内聚的依据）"@zh ;
+    rdfs:comment "N-I1、N-I6 说的「证据来源」：部门或角色依据什么。不是基础规则 1 的独立证据"@zh .
+yd:WorkProcess a owl:Class ; rdfs:label "工作过程"@zh .
+yd:IndependentEvidence a owl:Class ; rdfs:label "独立证据"@zh ;
+    rdfs:comment "基础规则 1：真正独立的证据只有三种来源"@zh .
+yd:CheckDefinition a owl:Class ; rdfs:label "检查定义"@zh .
+
+yd:inForm a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "属于形态"@zh ; rdfs:range yd:Form .
+yd:belongsTo a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "属于"@zh ;
+    rdfs:domain yd:Role ; rdfs:range yd:Department ; rdfs:subPropertyOf org:memberOf .
+yd:produces a owl:ObjectProperty ; rdfs:label "产出"@zh ; rdfs:domain yd:Actor ; rdfs:range yd:OutcomeKind .
+yd:producedBy a owl:ObjectProperty ; owl:inverseOf yd:produces ; rdfs:label "由谁产出"@zh .
+yd:watches a owl:ObjectProperty ; rdfs:label "关注"@zh ; rdfs:domain yd:Actor ; rdfs:range yd:OutcomeKind .
+yd:receives a owl:ObjectProperty ; rdfs:label "接"@zh ; rdfs:domain yd:Actor ; rdfs:range yd:Source .
+yd:rotation a owl:ObjectProperty ; rdfs:label "轮转方式"@zh ; rdfs:domain yd:Form ; rdfs:range yd:RotationMode .
+yd:completion a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "结束方式"@zh ;
+    rdfs:domain yd:OutcomeKind ; rdfs:range yd:Completion .
+yd:finalOutcome a owl:ObjectProperty ; rdfs:label "最后采纳的成果"@zh ; rdfs:domain yd:Form ; rdfs:range yd:OutcomeKind .
+yd:canSubmitCompletion a owl:ObjectProperty ; rdfs:label "能交完成"@zh ; rdfs:domain yd:Form ; rdfs:range yd:Actor .
+yd:subOrganization a owl:ObjectProperty ; rdfs:label "内部是子组织"@zh ; rdfs:domain yd:Department ; rdfs:range yd:Form .
+
+yd:verifier a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "核验者"@zh ;
+    rdfs:domain yd:VerificationDecl ; rdfs:range yd:Actor .
+yd:verified a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "被核验者"@zh ;
+    rdfs:domain yd:VerificationDecl ; rdfs:range yd:Actor .
+yd:forOutcome a owl:ObjectProperty, owl:FunctionalProperty ; rdfs:label "核验的成果"@zh ;
+    rdfs:domain yd:VerificationDecl ; rdfs:range yd:OutcomeKind .
+yd:hasInternalVerification a owl:ObjectProperty ; rdfs:label "部门内的核验"@zh ;
+    rdfs:domain yd:Department ; rdfs:range yd:VerificationDecl .
+
+yd:hasObjective a owl:ObjectProperty ; rdfs:label "目标函数"@zh ; rdfs:range yd:Objective .
+yd:hasEvidenceBasis a owl:ObjectProperty ; rdfs:label "证据来源"@zh ; rdfs:range yd:EvidenceBasis .
+yd:hasWorkProcess a owl:ObjectProperty ; rdfs:label "工作过程"@zh ; rdfs:range yd:WorkProcess .
+yd:hasIndependentEvidence a owl:ObjectProperty ; rdfs:label "取得的独立证据"@zh ;
+    rdfs:domain yd:VerificationDecl ; rdfs:range yd:IndependentEvidence .
+yd:hasCheckDefinition a owl:ObjectProperty ; rdfs:label "检查定义"@zh ; rdfs:range yd:CheckDefinition .
+
+# 承担者的两种性质（第 2 批的设计说明用到）
+yd:SeesAuthorHistory a owl:Class ; rdfs:label "看得到作者的历史"@zh .
+yd:NoAuthorHistory a owl:Class ; rdfs:label "看不到作者的历史"@zh ; owl:disjointWith yd:SeesAuthorHistory .
+
+# ---------- 由推理机分出来的类（不手写成员） ----------
+yd:VerifierRole a owl:Class ; rdfs:label "核验角色"@zh ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( yd:Actor
+        [ a owl:Restriction ; owl:onProperty [ owl:inverseOf yd:verifier ] ; owl:someValuesFrom yd:VerificationDecl ] ) ] .
+yd:VerifiedForm a owl:Class ; rdfs:label "有核验的形态"@zh ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( yd:Form
+        [ a owl:Restriction ; owl:onProperty [ owl:inverseOf yd:inForm ] ; owl:someValuesFrom yd:VerificationDecl ] ) ] .
+yd:ReleasedOutcomeKind a owl:Class ; rdfs:label "以放行结束的成果种类"@zh ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( yd:OutcomeKind
+        [ a owl:Restriction ; owl:onProperty yd:completion ; owl:hasValue yd:completion-release ] ) ] .
+yd:completion-release a yd:Completion ; rdfs:label "放行"@zh .
+yd:completion-openloop a yd:Completion ; rdfs:label "开环完成"@zh .
+yd:completion-release owl:differentFrom yd:completion-openloop .
+
+# ---------- 第一种检查用的：已承诺的范围、试验假定 ----------
+yd:CommittedScope a owl:Class ; rdfs:label "已承诺的范围"@zh .
+yd:covers a owl:AnnotationProperty ; rdfs:label "覆盖的种类"@zh .
+yd:within a owl:AnnotationProperty ; rdfs:label "限于"@zh .
+yd:Assumption a owl:Class ; rdfs:label "试验假定"@zh ; rdfs:comment "为了试验加的，不是用户的承诺"@zh .
+yd:assumes a owl:AnnotationProperty .
+
+yd:planned a owl:AnnotationProperty ; rdfs:label "以后"@zh ;
+    rdfs:comment "文档写「以后」的东西：写法规范第 5 条，抽出来是不知道，不当成缺"@zh .
+
+# ---------- 占位 ----------
+yd:Slot a owl:Class ; rdfs:label "空位"@zh ; rdfs:comment "存在公理推出必然有、但还没有命名的东西"@zh .
