@@ -163,6 +163,23 @@ def test_a_complete_reason_is_accepted(tmp_path):
     assert report["reasons"]["problems"] == []
 
 
+def test_a_deletion_reason_with_an_empty_after_is_accepted(tmp_path):
+    # 删掉一条语句的变异，改动后的文字是空串（设计说明「存活的出口与理由登记」：整条语句改动前后的文字）：
+    # 这类等价变异照常可以登记，理由非空的要求照旧
+    root = _start_repo(tmp_path)
+    _commit(root, {REASONS: _registry([_reason(before="return 1", after="")])})
+    done = _run(root, "--report", "report.json")
+    assert done.returncode == 0, done.stdout.decode("utf-8")
+    report = json.loads((root / "report.json").read_text(encoding="utf-8"))
+    assert report["reasons"]["count"] == 1
+    assert report["reasons"]["problems"] == []
+    blank = tmp_path / "blank"
+    blank.mkdir()
+    blank_root = _start_repo(blank)
+    _commit(blank_root, {REASONS: _registry([_reason(before="   ", after="")])})
+    assert _run(blank_root).returncode == 1
+
+
 def test_exit_code_one_for_a_failing_change(tmp_path):
     root = _start_repo(tmp_path, _branches(9))
     _commit(root, {MODULE: _branches(10)})
