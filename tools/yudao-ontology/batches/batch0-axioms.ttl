@@ -1,0 +1,78 @@
+# 第 0 批：意图的「必有」公理。只有类与公理，没有个体。
+# 每条 yd:MustHaveAxiom 由 run.py 编成一条 OWL 存在限制（onClass ⊑ ∃viaProperty.filler），
+# 推理时就是这一条 OWL 公理；写成数据是为了带出处、能列出来、能数每条推出多少空位。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+yd:MustHaveAxiom a owl:Class ; rdfs:label "必有公理"@zh .
+yd:onClass a owl:AnnotationProperty . yd:viaProperty a owl:AnnotationProperty .
+yd:viaInverse a owl:AnnotationProperty . yd:filler a owl:AnnotationProperty .
+yd:basis a owl:AnnotationProperty ; rdfs:label "依据"@zh .
+
+# ---------- 公理里要用到的类 ----------
+yd:CollaboratingDepartment a owl:Class ; rdfs:label "内部要协作的部门"@zh ; rdfs:subClassOf yd:Department .
+yd:RunEvidence a owl:Class ; rdfs:label "实际跑一遍"@zh .
+yd:OtherModelEvidence a owl:Class ; rdfs:label "换一个不同的模型"@zh .
+yd:HumanEvidence a owl:Class ; rdfs:label "人"@zh .
+yd:IndependentEvidence owl:equivalentClass [ owl:unionOf ( yd:RunEvidence yd:OtherModelEvidence yd:HumanEvidence ) ] .
+[] a owl:AllDisjointClasses ; owl:members ( yd:RunEvidence yd:OtherModelEvidence yd:HumanEvidence ) .
+
+# ---------- 约束类公理（不推空位，填错时让模型不一致） ----------
+# 基础规则 3：生成者不裁决自己。一份核验声明的核验者和被核验者不能是同一个。
+yd:verifier owl:propertyDisjointWith yd:verified .
+[] a owl:Axiom ; owl:annotatedSource yd:verifier ; owl:annotatedProperty owl:propertyDisjointWith ;
+   owl:annotatedTarget yd:verified ; yd:basis "D38 基础规则 3「生成者不裁决自己，被评价者改不了评价标准」" .
+
+# N-I2、N-I3：验证者在提交独立判断之前看不到作者的历史。
+yd:VerifierRole rdfs:subClassOf yd:NoAuthorHistory .
+[] a owl:Axiom ; owl:annotatedSource yd:VerifierRole ; owl:annotatedProperty rdfs:subClassOf ;
+   owl:annotatedTarget yd:NoAuthorHistory ; yd:basis "D38 N-I2「隔开的只有作者的工作过程与自我辩护」；N-I3「验证者先独立形成判断，再看对方的解释」" .
+
+# 基础规则 3 的具体规则：核验角色的结论不外包。
+yd:VerifierRole owl:disjointWith yd:OutsourcedRole .
+[] a owl:Axiom ; owl:annotatedSource yd:VerifierRole ; owl:annotatedProperty owl:disjointWith ;
+   owl:annotatedTarget yd:OutsourcedRole ; yd:basis "基础规则表 3「核验角色的结论不外包」" .
+
+# ---------- 必有公理（推空位） ----------
+yd:ax-release-needs-verification a yd:MustHaveAxiom ; rdfs:label "以放行结束的成果必有一份核验声明"@zh ;
+    yd:onClass yd:ReleasedOutcomeKind ; yd:viaProperty yd:forOutcome ; yd:viaInverse true ; yd:filler yd:VerificationDecl ;
+    yd:basis "D38 基础规则 3「生成者不裁决自己」；基础规则 2「没有传感器的地方明说是开环」：没有核验就不叫放行，写开环完成" .
+
+yd:ax-decl-has-verifier a yd:MustHaveAxiom ; rdfs:label "核验声明必有核验者"@zh ;
+    yd:onClass yd:VerificationDecl ; yd:viaProperty yd:verifier ; yd:filler yd:Actor ;
+    yd:basis "核验声明的含义：谁核验谁的哪种成果；与基础规则 3 合起来，核验者不是被核验者" .
+yd:ax-decl-has-verified a yd:MustHaveAxiom ; rdfs:label "核验声明必有被核验者"@zh ;
+    yd:onClass yd:VerificationDecl ; yd:viaProperty yd:verified ; yd:filler yd:Actor ;
+    yd:basis "同上" .
+yd:ax-decl-needs-evidence a yd:MustHaveAxiom ; rdfs:label "核验必有独立证据"@zh ;
+    yd:onClass yd:VerificationDecl ; yd:viaProperty yd:hasIndependentEvidence ; yd:filler yd:IndependentEvidence ;
+    yd:basis "D38 基础规则 1「现实的证据高于模型的意见。真正独立的证据只有三种来源：把东西实际跑一遍，换一个不同的模型，或者人」" .
+yd:ax-run-needs-checkdef a yd:MustHaveAxiom ; rdfs:label "实际跑一遍必有一份检查定义"@zh ;
+    yd:onClass yd:RunEvidence ; yd:viaProperty yd:hasCheckDefinition ; yd:filler yd:CheckDefinition ;
+    yd:basis "D38 N-S1「项目的检查定义写明命令、运行环境、输出格式与对流转的作用；回执由主机产生」" .
+
+yd:ax-collab-needs-internal-verification a yd:MustHaveAxiom ; rdfs:label "内部要协作的部门必有一份部门内的核验"@zh ;
+    yd:onClass yd:CollaboratingDepartment ; yd:viaProperty yd:hasInternalVerification ; yd:filler yd:VerificationDecl ;
+    yd:basis "基础规则 3 用到部门内：几个角色合作出一份成果，交出去之前，出它的角色不裁决它；用户 2026-11-06 的推理「部门关注一个成果、内部要协作，必然分化出不同的职责」" .
+
+yd:ax-dept-objective a yd:MustHaveAxiom ; rdfs:label "部门必写目标函数"@zh ;
+    yd:onClass yd:Department ; yd:viaProperty yd:hasObjective ; yd:filler yd:Objective ;
+    yd:basis "D38 N-I1「一个部门是围绕一个目标函数聚在一起的信息」；N-I6「新增的部门、角色、观察者或嵌套层写明它内聚的是什么：目标函数、证据来源、工作过程」" .
+yd:ax-dept-basis a yd:MustHaveAxiom ; rdfs:label "部门必写证据来源"@zh ;
+    yd:onClass yd:Department ; yd:viaProperty yd:hasEvidenceBasis ; yd:filler yd:EvidenceBasis ; yd:basis "D38 N-I6，同上" .
+yd:ax-dept-process a yd:MustHaveAxiom ; rdfs:label "部门必写工作过程"@zh ;
+    yd:onClass yd:Department ; yd:viaProperty yd:hasWorkProcess ; yd:filler yd:WorkProcess ; yd:basis "D38 N-I6，同上" .
+yd:ax-role-objective a yd:MustHaveAxiom ; rdfs:label "角色必写目标函数"@zh ;
+    yd:onClass yd:Role ; yd:viaProperty yd:hasObjective ; yd:filler yd:Objective ; yd:basis "D38 N-I6，同上" .
+yd:ax-role-basis a yd:MustHaveAxiom ; rdfs:label "角色必写证据来源"@zh ;
+    yd:onClass yd:Role ; yd:viaProperty yd:hasEvidenceBasis ; yd:filler yd:EvidenceBasis ; yd:basis "D38 N-I6，同上" .
+yd:ax-role-process a yd:MustHaveAxiom ; rdfs:label "角色必写工作过程"@zh ;
+    yd:onClass yd:Role ; yd:viaProperty yd:hasWorkProcess ; yd:filler yd:WorkProcess ; yd:basis "D38 N-I6，同上" .
+
+yd:ax-loop-limit a yd:MustHaveAxiom ; rdfs:label "每一层循环必有上限"@zh ;
+    yd:onClass yd:LoopLayer ; yd:viaProperty yd:hasLimit ; yd:filler yd:Limit ;
+    yd:basis "D38 N-L1「每一层循环有声明的边界，每一轮有记录、有裁决、有上限」；基础规则 6「一定会停」" .
+yd:ax-loop-stop a yd:MustHaveAxiom ; rdfs:label "每一层循环的停止原因来自封闭清单"@zh ;
+    yd:onClass yd:LoopLayer ; yd:viaProperty yd:stopsBy ; yd:filler yd:StopReasonList ;
+    yd:basis "D38 N-L1；N-C1「每个 run 以封闭清单里的原因结束」" .

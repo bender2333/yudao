@@ -1,0 +1,6 @@
+# 第 2 批承诺到哪：设计说明里写成有效的那几处。
+@prefix yd: <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+yd:scope-design-forms a yd:CommittedScope ; yd:batch 2 ;
+    rdfs:label "形态与核验角色设计说明的形态表与第 4.5 节：每份形态的核验声明、最后采纳的成果、来源由谁接"@zh ;
+    yd:covers yd:Form, yd:VerificationDecl, yd:Source .

@@ -1,0 +1,4 @@
+# 第 1 批为试验加的假定（见 batch1-scope.ttl 的 yd:as-eng-collab）。不是用户的承诺。
+# 单独一份文件，run.py 加载时记下哪些三元组来自假定，报告里单列。
+@prefix yd: <https://yudao.dev/onto#> .
+yd:dept-engineering a yd:CollaboratingDepartment .

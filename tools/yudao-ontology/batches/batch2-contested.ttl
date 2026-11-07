@@ -1,0 +1,13 @@
+# 第 2 批里三份抽取对不上、没有放进模型的断言。不加载，留给人看。
+# 参照抽取写了，两份独立抽取都没写，并且各自给了理由（见 reports/第一步报告.md「抽取对照」）。
+@prefix yd: <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+# 1. 部门内审查者的独立证据是「实际跑一遍」：依据只有角色表「工具许可」一格「在独立副本上运行检查」。
+yd:decl-eng-review yd:hasIndependentEvidence yd:ev-eng-review-run .
+yd:ev-eng-review-run a yd:RunEvidence ; rdfs:label "审查者在独立副本上运行的检查"@zh ;
+    yd:quote "读取要求、材料与证据，在独立副本上运行检查，提交结论" .
+# 2. 质检与审查者跑的检查用的是「项目的检查定义」：依据是 4.8 节，但那一节说的是部门提交时的交出检查，不是核验。
+yd:ev-host-run yd:hasCheckDefinition yd:cd-project .
+yd:ev-eng-review-run yd:hasCheckDefinition yd:cd-project .
+yd:cd-project a yd:CheckDefinition ; rdfs:label "项目的检查定义"@zh ;
+    yd:quote "部门提交时由主机按项目的检查定义运行……回执由主机产生，检查的策略写在检查定义里" .

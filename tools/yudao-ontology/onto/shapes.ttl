@@ -1,0 +1,194 @@
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix yd: <https://yudao.dev/onto#> .
+
+yd:shape-decl-verified-produces-violation a sh:NodeShape ;
+    rdfs:label "被核验者就是产出被核验成果的一方"@zh ;
+    sh:severity sh:Violation ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "被核验者就是产出被核验成果的一方"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:verified ?v ; yd:forOutcome ?o . ?p yd:produces ?o . FILTER NOT EXISTS { ?v yd:produces ?o } }""" ] ;
+    sh:targetClass yd:VerificationDecl .
+
+yd:shape-direct-can-complete-missing a sh:NodeShape ;
+    rdfs:label "直做形态有角色能交完成"@zh ;
+    sh:severity sh:Warning ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "直做形态有角色能交完成"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:rotation yd:rm-direct . FILTER NOT EXISTS { $this yd:canSubmitCompletion ?r . } FILTER NOT EXISTS { $this yd:planned true } FILTER EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Form . } }""" ] ;
+    sh:targetClass yd:Form .
+
+yd:shape-direct-can-complete-unknown a sh:NodeShape ;
+    rdfs:label "直做形态有角色能交完成"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "直做形态有角色能交完成"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:rotation yd:rm-direct . FILTER NOT EXISTS { $this yd:canSubmitCompletion ?r . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Form . } }""" ] ;
+    sh:targetClass yd:Form .
+
+yd:shape-name-avoid-violation a sh:NodeShape ;
+    rdfs:label "用了词表里写明要避免的词"@zh ;
+    sh:severity sh:Violation ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "用了词表里写明要避免的词"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this rdfs:label ?l . FILTER(STR(?l) IN ("A/B 测试", "AI 裁判", "Agent 循环", "CI", "Distiller", "RAG", "Stage", "SubAgent", "Web 控制台", "all_hands", "backlog", "benchmark", "epic", "harness", "lease", "schema", "ticket", "worker", "上下文中心", "上下文快照", "上线", "业务层", "中心调度者", "中环", "临时 Agent", "主 Agent", "主循环", "主机", "主节点", "事件库表", "事实", "事故", "事项的起点", "事项设置", "交付文件", "交接", "从机", "代理版本", "任务 Prompt", "任务卡", "任务描述", "任务板", "会话", "会话 ID", "会话执行者", "低代码", "供应商", "修复率", "假阳性", "停机维护", "健康度", "健康检查接口", "像素事件", "像素界面", "全局分配", "全局状态", "全景图", "关卡", "关注点", "内循环", "内置工具", "冻结目标", "准入", "准入事实", "准入状态", "分叉", "分类标签", "初始文件", "初审", "前端", "功能点", "加入", "动画时间", "动画队列", "努力程度", "区块", "协作模式", "协作请求", "协调者", "厂商", "历史", "反思", "发布里程碑", "发布闸门", "召回", "可信度", "可用模型", "可视化", "可靠分数", "史诗", "同步", "后台任务", "后端", "向量库", "启动脚本", "告警", "周期总结", "命令回执", "咨询", "品牌", "响应", "唤醒", "回写", "回顾", "团队", "团队配置", "图元", "圈", "地图页", "场景", "基准任务", "基线", "墓碑", "外循环", "外部员工", "外部工具", "失效", "子 Agent", "子任务", "子会话", "子团队", "存储层", "守护进程", "完成定义", "审批单", "容差", "密钥", "对象", "导演", "小里程碑", "尝试", "层", "嵌套级别", "嵌套请求", "工作区", "工作流", "工作线", "工作者", "工作者池", "工具调用", "工单关闭率", "已完成", "已实施", "已实现", "已支持模型", "已确认缺陷", "已验证完成", "常量", "常驻 Agent", "平台层", "并发数", "底座", "开关", "开工", "弹窗", "当前部门", "当前配置", "待办池", "待恢复", "待排期", "待核验", "循环任务", "循环记录", "心跳", "思考深度", "总图", "总结", "总览工单", "截断", "打通", "扩展", "技术债单", "抓取结果", "抽取", "抽检率", "持有交接", "持续工作者", "接口", "接口完成", "控制台", "推理模式", "推理深度", "推送", "提交器", "提前执行", "提示词", "提醒", "插件", "插槽", "插话", "摘要", "播放时间", "放行", "故障单", "断路器", "新会话", "新文档里写 Stage 几", "日志", "日报", "映射层", "最低配置", "最后一段文本", "服务器", "服务端", "服务端时间", "期", "未覆盖", "机器档案", "机器表", "杂项", "材料", "架构图", "核心", "核验节点", "框架", "桌面客户端", "档案", "检查副本", "检查点", "检索", "模块", "模型供应商", "模型映射", "模型条目", "模型清单", "模型目录", "模型要求", "模型配置", "模式", "模板", "步骤", "步骤循环", "段落", "永久授权", "沙箱", "流程模板", "测试报告", "测试用例", "测试覆盖率", "测试集", "浏览器会话", "添加模型", "清理", "源目录", "漏检", "激活", "灰度", "点选编辑", "熔断", "爬虫", "版本号", "状态机", "生产环境", "画面接口", "白名单", "监听", "监听器", "监控", "盲区", "盲审", "省略号", "真实时间", "知识库", "硬编码规则", "种类 Prompt", "租约", "窗口", "第一环", "第三环", "第二环", "答复", "系统消息", "索引", "线程", "组件", "组帧", "经验", "结论", "统计库", "缓存", "编排器", "编排模式", "网页抓取", "网页缓存", "置信度", "美观度", "能力目录", "自动注入", "自我进化", "自测结果", "自由模式", "节点", "节点选择", "蒸馏", "补丁", "覆盖层", "覆盖率", "观察", "规则", "规则审计", "角色说明", "触发源", "订阅", "记忆", "记忆写入", "记忆库", "设置", "评审 Agent", "识别", "试用会话", "误差", "说明", "请求日志", "请求档", "调度器", "调用尝试", "豁免清单", "账号", "质检", "赛道", "跳过", "跳过标记", "迁移", "过期", "运维事项", "运行状态", "返回值", "进度", "进度表", "连接测试", "连通即成功", "连通性探测", "迭代", "适配器", "递归自我改进", "通知", "通过率", "部分放行", "部署位置", "部署目标", "部署配置", "部门 Agent", "部门内部门", "部门循环", "部门消息", "部门绑定", "配置", "配置项", "配额", "重试中", "金丝雀发布", "钉死", "铁律", "锁", "锁定", "长期记忆", "闸门", "附件", "集群", "项目事件表", "项目档案", "项目模板", "项目绑定", "预热", "预算", "额外分", "额度", "验收", "验收工单", "验收标准", "验证节点")) }""" ] ;
+    sh:targetClass yd:Concept .
+
+yd:shape-name-unknown-unknown a sh:NodeShape ;
+    rdfs:label "词表与 name-map 里都没有这个词，正名对不上"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "词表与 name-map 里都没有这个词，正名对不上"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this rdfs:label ?l . FILTER(STR(?l) NOT IN ("MCP 服务器", "Provider 配置", "Yudao 服务", "agent 试用", "一份事实", "一次性角色", "一轮工作", "一轮工作中", "七种元件", "七种元件的对照表", "三个空间", "三环", "上下文清单", "上下文组装", "上限", "中心角色", "丰富程度", "主机工具", "主机提示", "事件日志", "事件时间", "事件流（从某个位置起）", "事件种类", "事实", "事实层", "事实来源", "事项", "事项完成", "事项的执行权编号", "事项的来源", "事项种类的工作说明", "五条判据", "交付快照", "交付验证", "交出检查", "交完成（直做）", "交给模型的那份", "从头重算", "任务池", "会话身份", "体验问题候选", "作者的解释", "修复事项", "候选", "停止", "停止原因清单", "健康协议", "元件断言", "关注的成果", "内核清单", "内环", "写入口", "写入范围", "决定", "决定请求", "冻结", "准入", "准入记录", "凭据", "凭据只在控制主机", "出口托盘", "分派说明", "切换命令", "切片", "判定点", "前后差异", "加载与校验", "动作", "动作身份", "包图", "占位", "压缩", "参数", "发布", "发布检查", "叙事时间", "可信内核", "同步层（页面一侧）", "启动方式", "命令（带身份）", "噪声范围", "四层", "回归场景", "回执", "回答", "回链", "固定试用任务", "图谱", "基础规则", "壳", "复盘", "外包角色", "外环", "外部来源工件", "套餐状态", "子事项", "子工单", "子循环", "子组织", "完成度", "完成提案", "定义", "实体", "审查者", "对照", "封存快照", "尝试", "尝试记录", "工作上限", "工作区", "工作单元", "工作单元的大小", "工作单元）", "工具能力检查", "工具角色", "工具许可", "工具请求", "已建", "带版本号", "常设授权", "应用", "应用事件", "应用层", "应用的投影", "建议能力", "开始执行", "开子事项的请求", "开环", "开环完成", "开环完成）", "形态", "待复核", "待并入的指导", "待排期与阶段总览", "循环实例", "循环层", "总图", "成果种类与提案合同", "执行", "执行代理", "执行代码摘要", "执行位置", "执行契约", "执行实现", "执行槽位", "执行环境", "执行环境池", "投影", "折叠", "折叠函数", "指向式输入", "指导", "按成果（关注的成果）", "按消息身份去重", "振荡信号", "排空", "排空中", "排空命令）", "探索任务", "接口", "接口层", "接纳", "接触时附加", "控制主机", "控制核心", "推测", "推理参数方式", "推理档位", "提案", "插件加载", "播放参数", "播放时间线", "收敛状态", "放行或开环完成", "故障记录", "教训", "教训发现模块", "整理", "无法核验", "旧阶段名", "暂定默认值", "最小投影", "服务商", "服务方案", "期望版本", "本体", "本项目的改动", "机器", "机器流", "来源（部门", "查询（只读快照）", "栏目", "核实方法", "核验中", "核验角色", "核验角色（是否核验角色及核验谁）", "桶", "检查", "检查工作区", "检验覆盖比例", "槽位：执行", "槽位：装配", "槽位：路由", "模块图", "模型", "模型服务", "模型测试", "模型能力表", "模型访问定义", "模型输出事件", "步骤驱动", "每一步先问边界", "洞见", "派发编号", "消息身份", "清理单", "点开回链", "焦点", "父工单", "版本", "独立判断", "环", "环境工具", "理由登记", "用量", "画像", "画面", "画面合同", "画面层", "画面拓扑（屋", "画面的同步层", "画面（单独的应用）", "界面", "留出场景", "登记的机器", "登记的运行环境", "盖章台", "盖章台从定义推出）", "目录", "直做", "看门狗", "看门狗（健康探针", "知识", "离开期间的报告", "立缝", "章（放行", "等待工作", "等待模型服务", "等用户", "管道", "组织", "终点快照", "结束时总图", "缝", "缺口清单", "缺陷命中率", "网络取回", "翻译层", "能否取消", "自举", "薄片", "薄驱动", "表演层", "裁决（U）", "装配", "装配契约", "装配实现", "观察者", "规则复查", "视图", "角色", "角色任务", "角色结果", "认领", "设计说明", "证据", "证据引用", "证据核对", "评价", "评测场景", "试用会话", "试用副本", "试用发现", "试用工单", "试用用例", "试用记录", "询问", "询问中", "询问分支", "询问链", "语义系统", "请求档位", "读取模型", "读取范围", "谁能拒绝谁", "调用尝试", "调用目标", "质检误放行", "起始文件夹", "起点快照", "路由", "路由契约", "路由实现", "路由实现与它的定义", "轨迹", "轨迹节录", "轮转方式", "边界", "运行工作区", "返工", "进入包", "远程执行", "连接测试", "连续角色", "选用", "通知", "道", "部分完成报告", "部门", "部门与角色", "部门成员（一个会话）", "部门账本", "部门默认", "采纳写回", "里程碑", "金丝雀任务", "门", "阶段", "阶段工单", "限定采用", "限定采用的范围", "页面", "项目流", "项目的起点", "项目部门设置", "预测性探索", "验证密度", "骨架", "骨架事件")) }""" ] ;
+    sh:targetClass yd:Concept .
+
+yd:shape-planned-source-unknown a sh:NodeShape ;
+    rdfs:label "文档写的是「以后」（写法规范第 5 条）"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "文档写的是「以后」（写法规范第 5 条）"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:planned true . }""" ] ;
+    sh:targetClass yd:Source .
+
+yd:shape-planned-unknown a sh:NodeShape ;
+    rdfs:label "文档写的是「以后」（写法规范第 5 条）"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "文档写的是「以后」（写法规范第 5 条）"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:planned true . }""" ] ;
+    sh:targetClass yd:Department .
+
+yd:shape-released-has-decl-missing a sh:NodeShape ;
+    rdfs:label "以放行结束的成果有核验声明"@zh ;
+    sh:severity sh:Warning ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "以放行结束的成果有核验声明"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { ?d yd:forOutcome $this . } FILTER NOT EXISTS { $this yd:planned true } FILTER EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:VerificationDecl . } }""" ] ;
+    sh:targetClass yd:ReleasedOutcomeKind .
+
+yd:shape-released-has-decl-unknown a sh:NodeShape ;
+    rdfs:label "以放行结束的成果有核验声明"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "以放行结束的成果有核验声明"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { ?d yd:forOutcome $this . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:VerificationDecl . } }""" ] ;
+    sh:targetClass yd:ReleasedOutcomeKind .
+
+yd:shape-seam-sides-missing a sh:NodeShape ;
+    rdfs:label "每道缝写明两侧"@zh ;
+    sh:severity sh:Warning ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "每道缝写明两侧"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { $this yd:side ?s1, ?s2 . FILTER(?s1 != ?s2) } FILTER NOT EXISTS { $this yd:planned true } FILTER EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Seam . } }""" ] ;
+    sh:targetClass yd:Seam .
+
+yd:shape-seam-sides-unknown a sh:NodeShape ;
+    rdfs:label "每道缝写明两侧"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "每道缝写明两侧"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { $this yd:side ?s1, ?s2 . FILTER(?s1 != ?s2) } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Seam . } }""" ] ;
+    sh:targetClass yd:Seam .
+
+yd:shape-seam-status-missing a sh:NodeShape ;
+    rdfs:label "每道缝写明已定或未定"@zh ;
+    sh:severity sh:Warning ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "每道缝写明已定或未定"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { $this yd:status ?st . } FILTER NOT EXISTS { $this yd:planned true } FILTER EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Seam . } }""" ] ;
+    sh:targetClass yd:Seam .
+
+yd:shape-seam-status-unknown a sh:NodeShape ;
+    rdfs:label "每道缝写明已定或未定"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "每道缝写明已定或未定"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { $this yd:status ?st . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Seam . } }""" ] ;
+    sh:targetClass yd:Seam .
+
+yd:shape-seam-unsettled-unknown a sh:NodeShape ;
+    rdfs:label "这道缝标为未定（写法规范第 5 条：未定就是不知道）"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "这道缝标为未定（写法规范第 5 条：未定就是不知道）"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this yd:status yd:status-unsettled . }""" ] ;
+    sh:targetClass yd:Seam .
+
+yd:shape-source-received-missing a sh:NodeShape ;
+    rdfs:label "每种事项的来源有人接"@zh ;
+    sh:severity sh:Warning ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "每种事项的来源有人接"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { ?a yd:receives $this . } FILTER NOT EXISTS { $this yd:planned true } FILTER EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Source . } }""" ] ;
+    sh:targetClass yd:Source .
+
+yd:shape-source-received-unknown a sh:NodeShape ;
+    rdfs:label "每种事项的来源有人接"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "每种事项的来源有人接"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE {  FILTER NOT EXISTS { ?a yd:receives $this . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:Source . } }""" ] ;
+    sh:targetClass yd:Source .
+
+yd:shape-verify-acyclic-violation a sh:NodeShape ;
+    rdfs:label "谁能拒绝谁无环"@zh ;
+    sh:severity sh:Violation ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "谁能拒绝谁无环"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { $this (^yd:verifier/yd:verified)+ $this . }""" ] ;
+    sh:targetClass yd:Actor .
+
+yd:shape-watched-produced-missing a sh:NodeShape ;
+    rdfs:label "被关注的成果有人产出"@zh ;
+    sh:severity sh:Warning ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "被关注的成果有人产出"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { ?w yd:watches $this . FILTER NOT EXISTS { ?a yd:produces $this . } FILTER NOT EXISTS { $this yd:planned true } FILTER EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:OutcomeKind . } }""" ] ;
+    sh:targetClass yd:OutcomeKind .
+
+yd:shape-watched-produced-unknown a sh:NodeShape ;
+    rdfs:label "被关注的成果有人产出"@zh ;
+    sh:severity sh:Info ;
+    sh:sparql [ a sh:SPARQLConstraint ;
+            sh:message "被关注的成果有人产出"@zh ;
+            sh:select """PREFIX yd: <https://yudao.dev/onto#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT $this WHERE { ?w yd:watches $this . FILTER NOT EXISTS { ?a yd:produces $this . } FILTER NOT EXISTS { $this yd:planned true } FILTER NOT EXISTS { ?sc a yd:CommittedScope ; yd:covers yd:OutcomeKind . } }""" ] ;
+    sh:targetClass yd:OutcomeKind .
+

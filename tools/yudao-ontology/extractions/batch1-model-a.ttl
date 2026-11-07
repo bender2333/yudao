@@ -1,0 +1,357 @@
+# 第 1 批（抽取 A）：从总图抽出的个体。只有个体与属性值，没有公理。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+
+# =====================================================================
+# 1. 开头一段：固定不变的只有三样
+# =====================================================================
+yd:fixed-loop a yd:FixedStructure ; rdfs:label "循环"@zh ; yd:archRef "开头一段" ;
+    yd:quote "固定不变的只有三样：循环、边界、裁决；部门、角色、轮转方式、核验角色、工作单元的大小都是填进去的内容。" .
+yd:fixed-boundary a yd:FixedStructure ; rdfs:label "边界"@zh ; yd:archRef "开头一段" ;
+    yd:quote "固定不变的只有三样：循环、边界、裁决；部门、角色、轮转方式、核验角色、工作单元的大小都是填进去的内容。" .
+yd:fixed-adjudication a yd:FixedStructure ; rdfs:label "裁决"@zh ; yd:archRef "开头一段" ;
+    yd:quote "固定不变的只有三样：循环、边界、裁决；部门、角色、轮转方式、核验角色、工作单元的大小都是填进去的内容。" .
+# UNSURE: 固定结构「边界」「裁决」与第二节「只由你批准」环里的部件「边界」「裁决」措辞相同，可能是同一个东西；这里分成不同类的不同个体，没有把它们连起来。
+
+# =====================================================================
+# 2. 第二节「四层」
+# =====================================================================
+yd:layer-facts-adjudication a yd:Layer ; rdfs:label "事实与裁决"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" ;
+    yd:above yd:layer-loop ;
+    yd:recognizes yd:concept-matter , yd:concept-event , yd:concept-outcome-version , yd:concept-proposal ,
+        yd:concept-receipt , yd:concept-write-scope , yd:concept-limit , yd:concept-decision-request .
+yd:layer-loop a yd:Layer ; rdfs:label "循环"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" ;
+    yd:above yd:layer-routing ;
+    yd:recognizes yd:concept-round .
+yd:layer-routing a yd:Layer ; rdfs:label "路由"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" ;
+    yd:above yd:layer-organization .
+yd:layer-organization a yd:Layer ; rdfs:label "组织（定义）"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。" .
+# 层的上下次序依据：原文按 事实与裁决、循环、路由、组织 的次序列出，并说「单 agent、普通多 agent、三部门、子组织都只换下面两层，任何一种要改上面两层，就是抽象没立住」，即路由、组织是下面两层。
+# UNSURE: 「路由」与「组织（定义）」两层原文没有用「认 / 只认」，路由「各自写轮转的规矩，核验从核验角色取」，组织「往里填部门与角色」；没有给这两层写 yd:recognizes。
+# UNSURE: 「某种成果的某一版及其依据」当作一个词；也可以拆成「某种成果的某一版」与「依据」两个词。
+
+yd:concept-matter a yd:Concept ; rdfs:label "事项"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-event a yd:Concept ; rdfs:label "事件"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-outcome-version a yd:Concept ; rdfs:label "某种成果的某一版及其依据"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-proposal a yd:Concept ; rdfs:label "提案"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-receipt a yd:Concept ; rdfs:label "回执"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-write-scope a yd:Concept ; rdfs:label "角色的写入范围"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-limit a yd:Concept ; rdfs:label "上限"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-decision-request a yd:Concept ; rdfs:label "决定请求"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求" .
+yd:concept-round a yd:Concept ; rdfs:label "一轮工作"@zh ; yd:archRef "第二节「四层」" ;
+    yd:quote "循环只认一轮工作，谁开工、怎么结束都问路由" .
+
+# =====================================================================
+# 3. 第二节「什么能动」三环
+# =====================================================================
+yd:ring-rewrite a yd:Ring ; rdfs:label "可以整体重写"@zh ; yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+yd:ring-compatible a yd:Ring ; rdfs:label "只能向后兼容"@zh ; yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。" .
+yd:ring-user-approval a yd:Ring ; rdfs:label "只由你批准"@zh ; yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。" .
+# UNSURE: 同一节里的「定义」方框（带版本的数据）不算三环之一（原文「按「能不能被系统自己改」分三环」只列三环），没有建成 yd:Ring；它列的内容只取了「事项的来源」（见第 6 部分）。
+
+# --- 可以整体重写 ---
+yd:comp-routing-impl a yd:Component ; rdfs:label "路由实现"@zh ; yd:inRing yd:ring-rewrite ;
+    yd:archRef "第二节「什么能动」三环" , "第四节「要守的缝」路由" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+yd:comp-assembly-impl a yd:Component ; rdfs:label "装配实现"@zh ; yd:inRing yd:ring-rewrite ;
+    yd:archRef "第二节「什么能动」三环" , "第四节「要守的缝」装配" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+yd:comp-execution-impl a yd:Component ; rdfs:label "执行实现"@zh ; yd:inRing yd:ring-rewrite ;
+    yd:archRef "第二节「什么能动」三环" , "第四节「要守的缝」执行" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+yd:comp-model-env-adapter a yd:Component ; rdfs:label "模型与执行环境的适配"@zh ; yd:inRing yd:ring-rewrite ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+yd:comp-projection a yd:Component ; rdfs:label "投影"@zh ; yd:inRing yd:ring-rewrite ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+yd:comp-view a yd:Component ; rdfs:label "画面"@zh ; yd:inRing yd:ring-rewrite ;
+    yd:archRef "第二节「什么能动」三环" , "第四节「系统之外的四道」画面" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+yd:comp-observer a yd:Component ; rdfs:label "观察者"@zh ; yd:inRing yd:ring-rewrite ;
+    yd:archRef "第二节「什么能动」三环" , "第四节「系统之外的四道」观察者" ;
+    yd:quote "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。" .
+
+# --- 只能向后兼容 ---
+yd:comp-slot-contracts a yd:Component ; rdfs:label "三道槽位契约（路由、装配、执行）"@zh ; yd:inRing yd:ring-compatible ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。" .
+# UNSURE: 「三道槽位契约（路由、装配、执行）」当作一个部件；也可以拆成三个契约部件，并与第四节的路由、装配、执行三道缝对上。
+yd:comp-skeleton-events a yd:Component ; rdfs:label "骨架事件"@zh ; yd:inRing yd:ring-compatible ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。" .
+yd:comp-external-contract a yd:Component ; rdfs:label "对外的合同"@zh ; yd:inRing yd:ring-compatible ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。" .
+yd:comp-definition-format a yd:Component ; rdfs:label "定义的格式"@zh ; yd:inRing yd:ring-compatible ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。" .
+
+# --- 只由你批准 ---
+yd:comp-fact-write-gate a yd:Component ; rdfs:label "一份事实的写入口"@zh ; yd:inRing yd:ring-user-approval ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。" .
+yd:comp-adjudication a yd:Component ; rdfs:label "裁决"@zh ; yd:inRing yd:ring-user-approval ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。" .
+yd:comp-boundary a yd:Component ; rdfs:label "边界"@zh ; yd:inRing yd:ring-user-approval ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。" .
+yd:comp-driver-plugin-loading a yd:Component ; rdfs:label "薄驱动与插件加载"@zh ; yd:inRing yd:ring-user-approval ;
+    yd:archRef "第二节「什么能动」三环" ;
+    yd:quote "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。" .
+# UNSURE: 「薄驱动与插件加载」按原文顿号当作一项；第四节缝的一侧「薄驱动」另建为 yd:comp-thin-driver，没有断言二者的关系。同样「一份事实的写入口」与缝侧的「一份事实」也分成两个部件。
+yd:comp-eval-material a yd:Component ; rdfs:label "评价材料"@zh ; yd:inRing yd:ring-user-approval ;
+    yd:archRef "第二节「什么能动」三环" , "第四节「系统之外的四道」评价" ;
+    yd:quote "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。" .
+yd:comp-watchdog a yd:Component ; rdfs:label "看门狗"@zh ; yd:inRing yd:ring-user-approval ;
+    yd:archRef "第二节「什么能动」三环" , "第四节「系统之外的四道」看门狗" ;
+    yd:quote "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。" .
+
+# =====================================================================
+# 4. 第四节：十三道缝（九道在系统里，四道在系统外）
+# =====================================================================
+yd:seam-status-fixed a yd:SeamStatus ; rdfs:label "已定"@zh ; yd:archRef "第四节「要守的缝」" ;
+    yd:quote "已定：规矩不再改，子架构师现在就守；未定：我还在定，先别依赖。" .
+yd:seam-status-open a yd:SeamStatus ; rdfs:label "未定"@zh ; yd:archRef "第四节「要守的缝」" ;
+    yd:quote "已定：规矩不再改，子架构师现在就守；未定：我还在定，先别依赖。" .
+
+# --- 只出现在缝的一侧的部件 ---
+yd:comp-all-writers a yd:Component ; rdfs:label "一切写入方"@zh ; yd:archRef "第四节「要守的缝」写入口" ;
+    yd:quote "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。" .
+yd:comp-the-facts a yd:Component ; rdfs:label "一份事实"@zh ; yd:archRef "第四节「要守的缝」写入口" , "第四节「要守的缝」投影" ;
+    yd:quote "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。" .
+yd:comp-thin-driver a yd:Component ; rdfs:label "薄驱动"@zh ; yd:archRef "第四节「要守的缝」路由" , "第四节「要守的缝」执行" ;
+    yd:quote "路由已定薄驱动 ↔ 路由实现换轮转方式，循环本身不动。" .
+yd:comp-execution a yd:Component ; rdfs:label "执行"@zh ; yd:archRef "第四节「要守的缝」装配" , "第四节「要守的缝」模型" ;
+    yd:quote "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。" .
+yd:comp-model-service a yd:Component ; rdfs:label "模型服务"@zh ; yd:archRef "第四节「要守的缝」模型" ;
+    yd:quote "模型已定执行 ↔ 模型服务换模型不改循环。" .
+yd:comp-tool a yd:Component ; rdfs:label "工具"@zh ; yd:archRef "第四节「要守的缝」动作" ;
+    yd:quote "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。" .
+yd:comp-exec-env a yd:Component ; rdfs:label "执行环境"@zh ; yd:archRef "第四节「要守的缝」动作" ;
+    yd:quote "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。" .
+yd:comp-readers a yd:Component ; rdfs:label "读的人"@zh ; yd:archRef "第四节「要守的缝」投影" ;
+    yd:quote "投影已定一份事实 → 读的人任何投影都能从事实重算。" .
+yd:comp-interface-clients a yd:Component ; rdfs:label "页面、命令行、评测、观察者、画面"@zh ; yd:archRef "第四节「要守的缝」接口" ;
+    yd:quote "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。" .
+# UNSURE: 接口缝的一侧是「页面、命令行、评测、观察者、画面」五样合在一起；为保持「两侧」只建了一个合起来的部件，没有拆成五个，也没有把其中的「观察者」「画面」连到同名部件。
+yd:comp-app-layer a yd:Component ; rdfs:label "应用层"@zh ; yd:archRef "第四节「要守的缝」接口" ;
+    yd:quote "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。" .
+yd:comp-definition-file a yd:Component ; rdfs:label "定义文件"@zh ; yd:archRef "第四节「要守的缝」定义" ;
+    yd:quote "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。" .
+yd:comp-load-validate a yd:Component ; rdfs:label "加载与校验"@zh ; yd:archRef "第四节「要守的缝」定义" ;
+    yd:quote "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。" .
+yd:comp-system a yd:Component ; rdfs:label "系统"@zh ; yd:archRef "第四节「系统之外的四道」评价" ;
+    yd:quote "评价已定评价材料 → 系统被开发的版本读不到评它的题。" .
+yd:comp-interface-read-write-gate a yd:Component ; rdfs:label "接口（读）与写入口（写）"@zh ; yd:archRef "第四节「系统之外的四道」观察者" ;
+    yd:quote "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。" .
+# UNSURE: 观察者缝的另一侧「接口（读）与写入口（写）」当作一个合起来的部件。
+yd:comp-interface a yd:Component ; rdfs:label "接口"@zh ; yd:archRef "第四节「系统之外的四道」画面" ;
+    yd:quote "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。" .
+yd:comp-instance a yd:Component ; rdfs:label "实例"@zh ; yd:archRef "第四节「系统之外的四道」看门狗" ;
+    yd:quote "看门狗未定看门狗 ↔ 实例候选失败能退回。" .
+
+# --- 九道在系统里 ---
+yd:seam-write-gate a yd:Seam ; rdfs:label "写入口"@zh ; yd:archRef "第四节「要守的缝」写入口" ;
+    yd:quote "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。" ;
+    yd:side yd:comp-all-writers , yd:comp-the-facts ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-routing a yd:Seam ; rdfs:label "路由"@zh ; yd:archRef "第四节「要守的缝」路由" ;
+    yd:quote "路由已定薄驱动 ↔ 路由实现换轮转方式，循环本身不动。" ;
+    yd:side yd:comp-thin-driver , yd:comp-routing-impl ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-assembly a yd:Seam ; rdfs:label "装配"@zh ; yd:archRef "第四节「要守的缝」装配" ;
+    yd:quote "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。" ;
+    yd:side yd:comp-execution , yd:comp-assembly-impl ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-execution a yd:Seam ; rdfs:label "执行"@zh ; yd:archRef "第四节「要守的缝」执行" ;
+    yd:quote "执行已定薄驱动 ↔ 执行实现一轮里的每一步都停得下来。" ;
+    yd:side yd:comp-thin-driver , yd:comp-execution-impl ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-model a yd:Seam ; rdfs:label "模型"@zh ; yd:archRef "第四节「要守的缝」模型" ;
+    yd:quote "模型已定执行 ↔ 模型服务换模型不改循环。" ;
+    yd:side yd:comp-execution , yd:comp-model-service ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-action a yd:Seam ; rdfs:label "动作"@zh ; yd:archRef "第四节「要守的缝」动作" ;
+    yd:quote "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。" ;
+    yd:side yd:comp-tool , yd:comp-exec-env ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-projection a yd:Seam ; rdfs:label "投影"@zh ; yd:archRef "第四节「要守的缝」投影" ;
+    yd:quote "投影已定一份事实 → 读的人任何投影都能从事实重算。" ;
+    yd:side yd:comp-the-facts , yd:comp-readers ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-interface a yd:Seam ; rdfs:label "接口"@zh ; yd:archRef "第四节「要守的缝」接口" ;
+    yd:quote "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。" ;
+    yd:side yd:comp-interface-clients , yd:comp-app-layer ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+yd:seam-definition a yd:Seam ; rdfs:label "定义"@zh ; yd:archRef "第四节「要守的缝」定义" ;
+    yd:quote "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。" ;
+    yd:side yd:comp-definition-file , yd:comp-load-validate ; yd:status yd:seam-status-fixed ; yd:inSystem true .
+
+# --- 四道在系统外 ---
+yd:seam-evaluation a yd:Seam ; rdfs:label "评价"@zh ; yd:archRef "第四节「系统之外的四道」评价" ;
+    yd:quote "评价已定评价材料 → 系统被开发的版本读不到评它的题。" ;
+    yd:side yd:comp-eval-material , yd:comp-system ; yd:status yd:seam-status-fixed ; yd:inSystem false .
+yd:seam-observer a yd:Seam ; rdfs:label "观察者"@zh ; yd:archRef "第四节「系统之外的四道」观察者" ;
+    yd:quote "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。" ;
+    yd:side yd:comp-observer , yd:comp-interface-read-write-gate ; yd:status yd:seam-status-fixed ; yd:inSystem false .
+yd:seam-view a yd:Seam ; rdfs:label "画面"@zh ; yd:archRef "第四节「系统之外的四道」画面" ;
+    yd:quote "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。" ;
+    yd:side yd:comp-interface , yd:comp-view ; yd:status yd:seam-status-fixed ; yd:inSystem false .
+yd:seam-watchdog a yd:Seam ; rdfs:label "看门狗"@zh ; yd:archRef "第四节「系统之外的四道」看门狗" ;
+    yd:quote "看门狗未定看门狗 ↔ 实例候选失败能退回。" ;
+    yd:side yd:comp-watchdog , yd:comp-instance ; yd:status yd:seam-status-open ; yd:inSystem false .
+# 投影缝与评价缝原文用「→」而不是「↔」，表示有方向；yd:side 不表达方向。
+# MISSING-VOCAB: 没有表达缝的方向（哪一侧流向哪一侧，如「一份事实 → 读的人」「评价材料 → 系统」）的属性。
+
+# =====================================================================
+# 5. 第三节：外环的状态、两层循环
+# =====================================================================
+yd:state-inquiring a yd:OuterState ; rdfs:label "询问中"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "询问中嵌在一轮里的另一轮，等回应" .
+yd:state-awaiting-user a yd:OuterState ; rdfs:label "等用户"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "等用户决定请求停在写入口" .
+yd:state-waiting-work a yd:OuterState ; rdfs:label "等待工作"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "等待工作关注的成果更新 / 待认领" .
+yd:state-in-round a yd:OuterState ; rdfs:label "一轮工作中"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "一轮工作中派发编号 + 从快照建工作区" .
+yd:state-verifying a yd:OuterState ; rdfs:label "核验中"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "核验中独立副本检查 + 回执" .
+yd:state-accepted a yd:OuterState ; rdfs:label "接纳"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "接纳绑定合同、交付树、回执" .
+yd:state-draining a yd:OuterState ; rdfs:label "排空中"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "排空中不接新事项，等在途的结束" .
+yd:state-rework a yd:OuterState ; rdfs:label "返工"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "返工打回给被核验的一方" .
+yd:state-stopped a yd:OuterState ; rdfs:label "停止"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "停止原因来自封闭清单" .
+# UNSURE: 图里还有「放行或开环完成事项完成」一行，「事项完成」像是终点结点，但没有和上面九个状态一样带说明；分不清它是状态还是转移标签，没有建成 yd:OuterState。
+# MISSING-VOCAB: 没有表达状态之间转移（路由触发 / 认领、提交成果或单元、通过、打回、询问、回应到达、升级前排空等）的属性或类。
+
+yd:stop-reason-list a yd:StopReasonList ; rdfs:label "封闭清单"@zh ; yd:archRef "第三节「一轮工作的经过」" ;
+    yd:quote "停止原因来自封闭清单" , "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。" .
+# UNSURE: 第二节「定义」方框里列的「停止原因清单」很可能就是这份「封闭清单」，但没有在本批的范围里把它们合并或连起来。
+
+yd:limit-time a yd:Limit ; rdfs:label "时间"@zh ; yd:archRef "第三节「一轮工作的经过」内环" ;
+    yd:quote "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。" .
+yd:limit-count a yd:Limit ; rdfs:label "次数"@zh ; yd:archRef "第三节「一轮工作的经过」内环" ;
+    yd:quote "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。" .
+yd:limit-retry a yd:Limit ; rdfs:label "重试"@zh ; yd:archRef "第三节「一轮工作的经过」内环" ;
+    yd:quote "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。" .
+yd:limit-nesting-depth a yd:Limit ; rdfs:label "嵌套深度"@zh ; yd:archRef "第三节「一轮工作的经过」内环" ;
+    yd:quote "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。" .
+# UNSURE: 原文把时间、次数、重试、嵌套深度叫作「边界」，内环第 1 步写「每步先问上限」；这里按上限建成 yd:Limit，并归给内环（「每一步」指内环「一轮工作里的每一步」）。
+# UNSURE: 「上下文逼近上限 → 压缩」里的上下文上限触发压缩而不是停止，没有建成 yd:Limit。
+
+yd:loop-outer a yd:LoopLayer ; rdfs:label "外环"@zh ; yd:archRef "第三节「一轮工作的经过」外环" ;
+    yd:quote "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）" ;
+    yd:hasState yd:state-inquiring , yd:state-awaiting-user , yd:state-waiting-work , yd:state-in-round ,
+        yd:state-verifying , yd:state-accepted , yd:state-draining , yd:state-rework , yd:state-stopped ;
+    yd:stopsBy yd:stop-reason-list .
+# UNSURE: 外环图里有「边界到上限、你取消、振荡信号：任何状态都能到停止」，说明外环也受上限约束，但原文没有说是哪一个上限，所以外环没有写 yd:hasLimit。
+
+yd:loop-inner a yd:LoopLayer ; rdfs:label "内环"@zh ; yd:archRef "第三节「一轮工作的经过」内环" ;
+    yd:quote "内环 · 一轮工作里的每一步（薄驱动连接，每步都停得下来）" ;
+    yd:hasLimit yd:limit-time , yd:limit-count , yd:limit-retry , yd:limit-nesting-depth ;
+    yd:stopsBy yd:stop-reason-list .
+# MISSING-VOCAB: 内环的六步（路由与边界、装配、模型 / 外包、工具与环境、裁决与写入口、投影）不是外环的状态，yd:hasState 的值域是 yd:OuterState，没有表达内环步骤的类与属性；没有建。
+# MISSING-VOCAB: 没有表达「外环的「一轮工作中」就是内环在转」（外环状态 ↔ 内环）的属性。
+
+# =====================================================================
+# 6. 第一节的组织
+# =====================================================================
+yd:user a yd:User ; rdfs:label "你"@zh ; yd:archRef "第一节「全局总图与方程」方框" ;
+    yd:quote "你给意图与中途的指导，回答停在写入口的决定请求，批准内核与定义的修改。" ;
+    yd:produces yd:ok-guidance .
+
+yd:form-default a yd:Form ; rdfs:label "默认"@zh ; yd:archRef "第一节「全局总图与方程」方框下方" ;
+    yd:quote "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。" .
+# UNSURE: 默认形态用哪种轮转方式原文没有直接说（外环「下游部门关注的成果有了新版本，它开始一轮」像按成果），没有写 yd:rotation。
+yd:form-minimal a yd:Form ; rdfs:label "最少"@zh ; yd:archRef "第一节「全局总图与方程」方框下方" ;
+    yd:quote "最少：一个角色直做，交完成即开环完成" ;
+    yd:rotation yd:rotation-direct ;
+    yd:canSubmitCompletion yd:role-minimal-single .
+
+yd:dept-product a yd:Department ; rdfs:label "产品"@zh ; yd:archRef "第一节「全局总图与方程」方框" ;
+    yd:quote "产品意图 → 要求（PRD）。裁决目标与取舍。" ;
+    yd:produces yd:ok-requirement ;
+    yd:inForm yd:form-default .
+# UNSURE: 产品方框写「意图 → 要求（PRD）」；「意图」由你给，但原文没有把它称作成果，没有建成 yd:OutcomeKind，也没有写产品 yd:watches 意图。
+yd:dept-engineering a yd:Department ; rdfs:label "工程"@zh ; yd:archRef "第一节「全局总图与方程」方框" ;
+    yd:quote "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个部门的内部也可以是一个子组织。" ;
+    yd:watches yd:ok-requirement , yd:ok-defect ;
+    yd:produces yd:ok-delivery ;
+    yd:inForm yd:form-default .
+yd:dept-qa a yd:Department ; rdfs:label "质检"@zh ; yd:archRef "第一节「全局总图与方程」方框" ;
+    yd:quote "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。" ;
+    yd:watches yd:ok-delivery ;
+    yd:produces yd:ok-defect ;
+    yd:inForm yd:form-default .
+# yd:watches 依据：方框里「X → Y」的左侧是输入；第三节「下游部门关注的成果有了新版本，它开始一轮」；工程关注缺陷依据「缺陷记录是上游关注的成果」。
+yd:dept-ops a yd:Department ; rdfs:label "运维（以后）"@zh ; yd:archRef "第一节「全局总图与方程」方框" ;
+    yd:quote "运维（以后）监控、部署、故障记录。" .
+# UNSURE: 运维（以后）不在「默认：产品 → 工程 → 质检」里，没有写 yd:inForm；它的「故障记录」是不是成果种类原文没说，没有建。
+# UNSURE: 「下一个部门」方框（「加部门只写声明」）是占位说明，不是具体部门，没有建个体。
+
+yd:role-minimal-single a yd:Role ; rdfs:label "一个角色"@zh ; yd:archRef "第一节「全局总图与方程」方框下方" ;
+    yd:quote "最少：一个角色直做，交完成即开环完成" ;
+    yd:inForm yd:form-minimal ;
+    yd:produces yd:ok-minimal-completion .
+
+yd:rotation-direct a yd:RotationMode ; rdfs:label "直做"@zh ; yd:archRef "第一节「全局总图与方程」轮转方式" ;
+    yd:quote "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。" .
+yd:rotation-by-outcome a yd:RotationMode ; rdfs:label "按成果"@zh ; yd:archRef "第一节「全局总图与方程」轮转方式" ;
+    yd:quote "按成果：谁关注的成果有了新版本谁开工。" .
+yd:rotation-task-pool a yd:RotationMode ; rdfs:label "任务池（以后）"@zh ; yd:archRef "第一节「全局总图与方程」轮转方式" ;
+    yd:quote "任务池：发布、认领、完成、打回。" .
+
+yd:ok-requirement a yd:OutcomeKind ; rdfs:label "要求（PRD）"@zh ; yd:archRef "第一节「全局总图与方程」方框·产品" ;
+    yd:quote "产品意图 → 要求（PRD）。裁决目标与取舍。" ;
+    yd:inForm yd:form-default .
+yd:ok-delivery a yd:OutcomeKind ; rdfs:label "交付"@zh ; yd:archRef "第一节「全局总图与方程」方框·工程" ;
+    yd:quote "工程要求 → 交付。写代码、自测、交快照。" ;
+    yd:inForm yd:form-default ;
+    yd:completion yd:completion-release .
+# 交付以放行结束的依据：「质检交付 → 缺陷或放行」与「默认：产品 → 工程 → 质检 → 放行或打回工程」。
+yd:ok-defect a yd:OutcomeKind ; rdfs:label "缺陷"@zh ; yd:archRef "第一节「全局总图与方程」方框·质检" ;
+    yd:quote "质检交付 → 缺陷或放行。" ;
+    yd:inForm yd:form-default .
+yd:ok-guidance a yd:OutcomeKind ; rdfs:label "中途的指导"@zh ; yd:archRef "第三节「两环的关系」" ;
+    yd:quote "你中途的指导是部门关注的成果：部门在等待时，指导让它开始一轮；在一轮工作中时，指导在下一步作为通知加入。" .
+# UNSURE: 「中途的指导是部门关注的成果」泛指部门，没有给具体部门写 yd:watches；也没有写它属于哪个形态。
+yd:ok-minimal-completion a yd:OutcomeKind ; rdfs:label "完成"@zh ; yd:archRef "第一节「全局总图与方程」方框下方" ;
+    yd:quote "最少：一个角色直做，交完成即开环完成" ;
+    yd:inForm yd:form-minimal ;
+    yd:completion yd:completion-openloop .
+# UNSURE: 最少形态里角色交的成果原文只说「交完成」（第一节公式处称「完成提案」），没有给它起成果种类的名字；这里用「完成」作标签建成 yd:OutcomeKind，以便挂 yd:completion-openloop。
+# UNSURE: 要求（PRD）与缺陷以什么方式结束原文没说，没有写 yd:completion。
+
+yd:vdecl-qa-delivery a yd:VerificationDecl ; rdfs:label "质检核验工程的交付"@zh ; yd:archRef "第一节「全局总图与方程」方框·质检" ;
+    yd:quote "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。" ;
+    yd:verifier yd:dept-qa ;
+    yd:verified yd:dept-engineering ;
+    yd:forOutcome yd:ok-delivery ;
+    yd:inForm yd:form-default .
+# UNSURE: 核验声明的标签「质检核验工程的交付」是本抽取自拟的，原文没有这个说法；被核验者是工程依据「默认：产品 → 工程 → 质检 → 放行或打回工程」与「工程被质检评价」。
+# MISSING-VOCAB: 没有表达「这个结论不外包」的属性；batch0 里由 VerifierRole 与 OutsourcedRole 不相交的公理表达，这里不加公理。
+
+yd:source-user-input a yd:Source ; rdfs:label "你的输入"@zh ; yd:archRef "第二节「定义」" ;
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+yd:source-filing a yd:Source ; rdfs:label "建档"@zh ; yd:archRef "第二节「定义」" ;
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+yd:source-parent-task a yd:Source ; rdfs:label "上一层交来的任务"@zh ; yd:archRef "第二节「定义」" ;
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+yd:source-ops-fault a yd:Source ; rdfs:label "运维发现的故障"@zh ; yd:archRef "第二节「定义」" ;
+    yd:quote "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门" .
+# UNSURE: 「运维发现的故障」是「以后加」的来源；「上一层交来的任务」只是子事项的来源。
+# UNSURE: 原文说事项的来源有「接它的部门」，但没有说哪个部门接哪种来源，没有写 yd:receives。
+# MISSING-VOCAB: 没有表达「以后」（计划中、尚未有）的属性；只在标签「运维（以后）」「任务池（以后）」里保留了原文。
