@@ -1,15 +1,16 @@
-// 模型管理页的纯计算（工单 #1297）：筛选、搜索与分批，各状态的文字，
+// 模型管理页的纯计算（工单 #1297）：筛选、搜索与分页，各状态的文字，
 // 「不可用的按钮旁写明缺哪一项」，取消选用被拒绝时的引用方，以及项目设置页仍要用的取值。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  FIRST_BATCH,
-  MORE_BATCH,
+  CANDIDATES_PER_PAGE,
   admittedModels,
-  candidateBatch,
   candidateKey,
+  candidatePageAfter,
+  candidatePageCount,
+  candidatePageView,
   capacityInputIssue,
   capacityKnown,
   capacityMissingText,
@@ -21,11 +22,11 @@ import {
   filterCandidates,
   followDepartmentLabel,
   groupAdmittedModels,
+  legalCandidatePage,
   matchesFilter,
   matchesSearch,
   mergedModelId,
   modelById,
-  moreCount,
   removalRejectionText,
   selectedModelRows,
   selectionStatusKind,
@@ -111,22 +112,68 @@ test("搜索与筛选一起时两边都要过", () => {
   assert.deepEqual(filterCandidates(ROWS, "vision", "reasoning", new Set()).length, 1);
 });
 
-// —— 分批 ——
+// —— 分页 ——
 
-test("候选先显示 8 个，之后每次再显示 12 个", () => {
-  const many = Array.from({ length: 30 }, (_, index) => ({
+// 一连串候选，名称从 1 起
+function rowsOf(count) {
+  return Array.from({ length: count }, (_, index) => ({
     provider_id: "go",
     provider_address: "http://x/v1",
-    candidate: candidate(`m-${index}`),
+    candidate: candidate(`m-${index + 1}`),
   }));
-  const first = candidateBatch(many, FIRST_BATCH);
-  assert.equal(first.shown.length, 8);
-  assert.equal(first.remaining, 22);
-  const second = candidateBatch(many, FIRST_BATCH + MORE_BATCH);
-  assert.equal(second.shown.length, 20);
-  assert.equal(second.remaining, 10);
-  assert.equal(moreCount(22), 12);
-  assert.equal(moreCount(5), 5);
+}
+
+test("每页最多 8 个：30 个候选分 4 页，第一页 8 个，最后一页 6 个", () => {
+  const rows = rowsOf(30);
+  assert.equal(CANDIDATES_PER_PAGE, 8);
+  assert.equal(candidatePageCount(30), 4);
+  assert.equal(candidatePageCount(8), 1);
+  assert.equal(candidatePageCount(9), 2);
+  assert.equal(candidatePageCount(0), 1);
+  const first = candidatePageView(rows, 1);
+  assert.equal(first.page, 1);
+  assert.equal(first.pages, 4);
+  assert.deepEqual(first.rows.map((row) => row.candidate.id), ["m-1", "m-2", "m-3", "m-4", "m-5", "m-6", "m-7", "m-8"]);
+  const last = candidatePageView(rows, 4);
+  assert.equal(last.page, 4);
+  assert.equal(last.rows.length, 6);
+  assert.deepEqual(last.rows.map((row) => row.candidate.id), ["m-25", "m-26", "m-27", "m-28", "m-29", "m-30"]);
+});
+
+test("越界页回到合法页：0 与 99 都落在 1 到页数之间", () => {
+  const rows = rowsOf(30);
+  assert.equal(legalCandidatePage(0, 4), 1);
+  assert.equal(legalCandidatePage(-3, 4), 1);
+  assert.equal(legalCandidatePage(99, 4), 4);
+  assert.equal(legalCandidatePage(Number.NaN, 4), 1);
+  assert.equal(candidatePageView(rows, 0).page, 1);
+  assert.equal(candidatePageView(rows, 99).page, 4);
+  assert.deepEqual(candidatePageView([], 3), { rows: [], page: 1, pages: 1 });
+});
+
+test("取消选用使最后一页消失时停在新的最后一页，不出现空页", () => {
+  const rows = rowsOf(25);
+  assert.equal(candidatePageView(rows, 4).rows.length, 1);
+  const after = candidatePageView(rows.slice(0, 24), 4);
+  assert.equal(after.page, 3);
+  assert.equal(after.pages, 3);
+  assert.equal(after.rows.length, 8);
+});
+
+test("搜索、筛选与重新获取模型列表以后回到第一页", () => {
+  // 用户翻到第 3 页：换掉搜索、换掉筛选、重新获取模型列表（命令接受以后）都回到第一页
+  assert.equal(candidatePageAfter(3, "search"), 1);
+  assert.equal(candidatePageAfter(3, "filter"), 1);
+  assert.equal(candidatePageAfter(3, "refetch"), 1);
+});
+
+test("上一页、下一页落在合法页内", () => {
+  assert.equal(candidatePageAfter(2, "next", 4), 3);
+  assert.equal(candidatePageAfter(4, "next", 4), 4);
+  assert.equal(candidatePageAfter(2, "previous", 4), 1);
+  assert.equal(candidatePageAfter(1, "previous", 4), 1);
+  assert.equal(candidatePageAfter(1, "next", 1), 1);
+  assert.equal(candidatePageAfter(1, "previous", 1), 1);
 });
 
 // —— 状态的文字 ——

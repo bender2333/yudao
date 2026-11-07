@@ -14,7 +14,7 @@
 | --- | --- |
 | 用户 | `/module-sync` 与子架构师定模块走向；`/trial-intake 反馈` 交试用反馈；其余交给架构师 |
 | 子架构师（用户在场） | `/next` 进来；按它的指引用 `/discuss`、`/to-design`、`/to-parents`、`/to-children`、`/triage`、`/verify`、`/trial-intake` |
-| 架构师循环（用户不在场） | `/loop 30m /next <范围> --循环`，一轮做一件 |
+| 架构师循环（用户不在场） | `/architect-loop`，由桌面应用的定时任务每小时唤醒，也可以手动跑，一次做一件转换 |
 | solo 执行者 | `/solo <范围>` 跑循环，每张工单按 `solo-worker` 做 |
 | 审查子代理 | `reviewer`，只审改到内核代码的 PR，由 solo 在合并前派出 |
 | 总架构师 | 不用 `/next`；需要时用 `/doc-scan`、`/seam-diff` 看文档与代码离总图多远 |
@@ -45,7 +45,8 @@
 
 | 技能 | 做什么 | 什么时候用 | 怎么调 | 用户调用 |
 | --- | --- | --- | --- | --- |
-| [`next`](next/SKILL.md) | 读 GitHub 状态，按固定顺序找下一件事，交给对应的技能；用户不在场时就是架构师循环 | 接手一条工作线、一个模块或一个里程碑；不知道该做什么 | `/next [范围] [--循环]` | 否 |
+| [`next`](next/SKILL.md) | 用户在场时读 GitHub 状态，按固定顺序找下一件事，交给对应的技能；交接点按架构师循环做 | 接手一条工作线、一个模块或一个里程碑；不知道该做什么 | `/next [范围]` | 否 |
+| [`architect-loop`](architect-loop/SKILL.md) | 四种转换：子工单全关的父工单验收、`needs-triage` 分诊、到期的 `waiting` 放回、重新分诊；脚本、取证、判断三层 | 定时任务唤醒；手动处理交接点 | `/architect-loop` 或 `node .claude/skills/architect-loop/scripts/wake.mjs` | 否 |
 | [`discuss`](discuss/SKILL.md) | 把想法讨论成结论：先在总图上定位，再追问需求与边界，同时更新术语表与 ADR | 新想法、要先想清楚的问题 | `/discuss [想法或链接]` | 否 |
 | [`to-design`](to-design/SKILL.md) | 把结论写成设计说明（第 3 行是总图位置），更新索引；设计未写的桶写完后建父工单 | 讨论有了结论；阶段工单的薄片清单里有「设计未写」的桶 | `/to-design [设计说明路径 \| 桶名]` | 否 |
 | [`to-parents`](to-parents/SKILL.md) | 按缝与道把一个阶段或模块归桶，每桶一张父工单，旧工单定去向 | 一个里程碑、阶段或模块要开工 | `/to-parents [里程碑名 \| 缝或道]` | 是 |
@@ -103,9 +104,8 @@
 **开 solo，自己离开。**
 ```
 /solo 阶段二 --并发 3
-/loop 30m /next 阶段二 --循环
 ```
-两个会话分开开：solo 做工单，架构师循环接住交回的工单、该验收的父工单和达到的薄片。启动命令与署名的环境变量见[运行配置](../../docs/agents/autopilot-runtime.md)「命令」。
+再按[运行配置](../../docs/agents/autopilot-runtime.md)「命令」给架构师循环配好定时任务：solo 做工单，架构师循环接住交回的工单和该验收的父工单；达到的薄片等用户在场时用 `/next` 推进。启动命令与署名的环境变量见同一节。
 
 **薄片做完了，要交给用户试用。**
 ```

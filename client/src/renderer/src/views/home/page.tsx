@@ -113,7 +113,6 @@ export function HomePage(props: {
       <StatusBlock items={items} onNavigate={props.onNavigate} />
 
       <BuildingSection
-        app={props.app}
         projects={replaying ? replayProjects.data : projects.data}
         error={replaying ? replayProjects.error : projects.error}
         at={at}

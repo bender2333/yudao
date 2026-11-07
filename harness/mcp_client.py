@@ -3,8 +3,8 @@
 # 这一份不导入 Yudao 的其他模块：只用官方 MCP Python SDK、psutil、pydantic 与标准库，
 # 由 pyproject.toml 的 import-linter 合同守住（工单 #69）。阶段四搬进执行代码包时只改导入路径。
 #
-# 一次会话的生命周期：start（stdio 启动子进程或连接 HTTP）→ list_tools / call_tool（可取消、有调用时限）
-# → close（stdio 先关标准输入、等 2 秒，再结束整个进程树；HTTP 关闭会话）。
+# 一次会话的生命周期：start（stdio 启动子进程或连接 HTTP，握手按启动时限）→ list_tools（按启动时限）
+# / call_tool（可取消、按调用时限）→ close（stdio 先关标准输入、等 2 秒，再结束整个进程树；HTTP 关闭会话）。
 # 不声明 roots、sampling、elicitation：服务器发来这三类请求时由 SDK 回错误，本模块不注册回调。
 
 from __future__ import annotations
@@ -232,11 +232,16 @@ class McpClient:
             streams = await self._stack.enter_async_context(
                 streamable_http_client(launch.http.url, http_client=http_client, terminate_on_close=True))
             read_stream, write_stream = streams[0], streams[1]
-        self._session = await self._stack.enter_async_context(
-            ClientSession(read_stream, write_stream, read_timeout_seconds=launch.call_timeout_sec))
-        # 启动时限包住握手（同任务内取消，不换任务）
-        async with asyncio.timeout(launch.startup_timeout_sec):
-            result = await self._session.initialize()
+        # 会话本身不设时限：它的 read_timeout_seconds 会罩住全部请求，握手也按调用时限计，
+        # 调用时限比冷启动短时启动失败。工具调用在 call_tool 里各自传入调用时限，
+        # 握手与读取工具清单用启动时限（同任务内取消，不换任务）
+        self._session = await self._stack.enter_async_context(ClientSession(read_stream, write_stream))
+        try:
+            async with asyncio.timeout(launch.startup_timeout_sec):
+                result = await self._session.initialize()
+        except TimeoutError as exc:
+            raise McpStartupError(
+                f"initialize 握手超过启动时限 {launch.startup_timeout_sec:g} 秒") from exc
         self.info = ServerInfo(name=result.server_info.name, version=result.server_info.version,
                                protocol_version=result.protocol_version)
         if launch.stdio is not None:
@@ -260,7 +265,12 @@ class McpClient:
     async def list_tools(self) -> list[ToolSpec]:
         session = self._require_session()
         try:
-            result = await session.list_tools()
+            # 读取工具清单按启动时限计（与工具调用的调用时限互不影响）
+            async with asyncio.timeout(self.launch.startup_timeout_sec):
+                result = await session.list_tools()
+        except TimeoutError as exc:
+            raise McpCallError(f"读取工具清单超过启动时限 {self.launch.startup_timeout_sec:g} 秒",
+                               code="startup_timeout") from exc
         except MCPError as exc:
             raise McpCallError(self.failure_reason(exc), code=_error_code(exc)) from exc
         return [ToolSpec(name=tool.name, description=tool.description or "",

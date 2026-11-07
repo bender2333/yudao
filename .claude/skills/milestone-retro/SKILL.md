@@ -24,7 +24,7 @@ argument-hint: "[里程碑标题 | 工单编号列表 | 起止日期]，省略�
 | --- | --- | --- |
 | 工单、标签时间线、PR | 里程碑范围用运行配置第 3 节的导出命令（`milestone.py collect`），数据文件含每张工单的时间线与 PR；其他范围用 `gh api repos/bender2333/yudao/issues/<n>/timeline --paginate` 与 `gh pr view issue-<n> --json commits,reviews,comments,files` | 每个标签停留的时间、轮次、要求修改、合并后重开 |
 | 执行者与审查者的运行记录 | 运行那台机器（运行配置第 1 节）的 omp 会话记录 `~/.omp/agent/sessions/<工作目录编码>/*.jsonl`，编码例如 `C:\project\yudao-worktrees\issue-127` 对应 `--C--project-yudao-worktrees-issue-127--`；更早的本机运行输出在 `C:\project\yudao-worktrees\autopilot\runs\`（`omp-<编号><轮次>.jsonl`、`rv-…`，同名 `.err`、`.done`），同目录的 `analyze-run.py` 列出每次请求的模型、停止原因与工具调用 | 实际运行的命令与测试、结果、工具调用花在哪里、结束方式、用量 |
-| 架构师循环 | 工单与 PR 上最后一行是 `— claude-架构师` 的评论、`git log --author=claude-架构师`、`.ralph/architect/heartbeat.json` | 处理了什么、怎样结束 |
+| 架构师循环 | 工单与 PR 上最后一行是 `— claude-架构师` 的评论、`git log --author=claude-架构师`、`.ralph/architect/` 下的运行记录 | 处理了什么、怎样结束 |
 | CI | `gh run list --workflow CI --branch main --event push`、`gh run view <编号> --log-failed`、`gh run download <编号> -n integration-results` | 失败项、首次出现的提交、重新运行是否通过 |
 | git 历史 | `git log --stat <起>..<止>`；每个 PR 的差异与工单「只改」清单比较；`git log --diff-filter=D -- harness/tests client/src` | 改动是否超出工单、删掉的测试是否对应删掉的行为、哪些改动后来被删掉 |
 | 设计说明的改动 | 每张工单的「依据」行：`git log <依据提交>..<合并提交> -- <设计说明>` | 放出以后设计有没有变 |

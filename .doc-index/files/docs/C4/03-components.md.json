@@ -11,8 +11,6 @@
 "edges":[
 {"dst":"client/src/renderer/src/app.tsx","kind":"link","raws":["../../client/src/renderer/src/app.tsx"],"seen":"2747a7a2f2194f29","src":"docs/C4/03-components.md#C3：服务与网页组件 > C1 网页的内部结构"},
 {"dst":"client/src/renderer/src/contract/client-app.ts","kind":"link","raws":["../../client/src/renderer/src/contract/client-app.ts"],"seen":"df41f5c08d4d9d08","src":"docs/C4/03-components.md#C3：服务与网页组件 > C1 网页的内部结构"},
-{"dst":"client/src/renderer/src/pixel/contract.ts","kind":"link","raws":["../../client/src/renderer/src/pixel/contract.ts"],"seen":"b36a8477f0dd9758","src":"docs/C4/03-components.md#C3：服务与网页组件 > C1 网页的内部结构"},
-{"dst":"client/src/renderer/src/translate/room.ts","kind":"link","raws":["../../client/src/renderer/src/translate/room.ts"],"seen":"1d3394aee6e04218","src":"docs/C4/03-components.md#C3：服务与网页组件 > C1 网页的内部结构"},
 {"dst":"docs/C4/06-code-to-model.md","kind":"link","raws":["06-code-to-model.md"],"seen":"5c8b3b3dfceef88d","src":"docs/C4/03-components.md#C3：服务与网页组件 > C1 网页的内部结构"},
 {"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"78e235b5c69afc24","src":"docs/C4/03-components.md#C3：服务与网页组件 > C1 网页的内部结构"},
 {"dst":"harness/adjudication.py","kind":"link","raws":["../../harness/adjudication.py"],"seen":"6e0d040b16564492","src":"docs/C4/03-components.md#C3：服务与网页组件 > C2 服务的内部结构"},

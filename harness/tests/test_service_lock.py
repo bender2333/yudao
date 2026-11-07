@@ -1,3 +1,6 @@
+# 故障矩阵第 4 行：同一个数据目录只允许一个服务进程；两个服务进程同时恢复同一 run 时最多一个可以推进
+# （恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」，与
+# test_issue_16_recovery.py 的 test_two_processes_recovering_the_same_run_only_one_advances 一起守着执行权的唯一性）。
 import os
 import signal
 import subprocess

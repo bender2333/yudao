@@ -1,3 +1,6 @@
+# 故障矩阵第 3 行：MCP 调用进行中终止，结果未知交还发出它的会话；没有完整结果的尝试不算已完成。
+# 故障矩阵第 12 行：本机一侧由 test_a_cancelled_run_cancels_the_call_closes_the_server_and_ends_its_tree 守着
+# （停新分派、确认服务器进程树已经结束）；远程执行者失联一侧按设计说明属于「对应能力存在时验收」，这一条不写成通过。
 # MCP 服务器的生命周期（工单 #1176；网络与 MCP docs/design/network-and-mcp.md「运行规则」、「调用与结果」、「恢复契约」、「应用层接口」；恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」
 # 「动作分类与处置」；总图第四节「动作」缝：每个动作有回执，结果未知时有核实办法）。
 #
