@@ -121,6 +121,8 @@ def test_run_created_freezes_the_versions_and_the_limits_it_was_given():
         "sha256:definitions", "sha256:parameters")
     assert projection.mcp_servers_version == 4
     assert (projection.max_cycles, projection.run_time_limit_sec) == (7, 900)
+    # 建 run 以后状态是 running，没有停止原因
+    assert (projection.status, projection.stop_reason) == ("running", None)
 
 
 def test_the_optional_fields_of_run_created_fall_back_to_the_empty_values():
@@ -186,6 +188,25 @@ def test_the_activation_count_takes_the_largest_round():
     assert projection.sessions["ses_pro"].activations == 1
 
 
+def test_main_activations_count_as_rounds_without_a_cycle():
+    # 主线会话的每次激活都算一轮（#857）：事件里没有 cycle 时，激活次数仍然按主线会话的激活数长，
+    # 不是只认事件里写下的轮次
+    created = _event(EventType.RUN_CREATED, 1, payload={
+        "kind": "change", "project_id": "prj_824", "work_item_id": "wi_824",
+        "sessions": {"product": "ses_pro"},
+    })
+    projection = fold_events([
+        created,
+        _event(EventType.DEPARTMENT_ACTIVATED, 2, session="ses_pro", department="product",
+               payload={"activation_id": "act_1"}),
+        _event(EventType.DEPARTMENT_ACTIVATED, 3, session="ses_pro", department="product",
+               payload={"activation_id": "act_2"}),
+    ])
+    assert projection.used.activations == 2
+    assert projection.sessions["ses_pro"].activations == 2
+    assert projection.rounds == {"product": "act_2"}
+
+
 def test_a_new_round_without_an_id_keeps_the_previous_round_number():
     # 一轮工作开始事件不带 activation_id 时，会话当前的轮次编号保持不变（#857、#860）：
     # 检查回执要来自这一轮，缺编号的那次激活不能把这一轮的编号清掉
@@ -238,7 +259,8 @@ def test_an_acceptance_with_incomplete_fields_is_not_an_artifact():
 
 
 def test_acceptance_fields_that_are_not_objects_are_left_empty():
-    # 依据与工件引用不是对象、作者部门与树摘要不是非空字符串时按没有处理：不把半份字段带进成果
+    # 依据与工件引用不是对象、作者部门与树摘要不是非空字符串时按没有处理：不把半份字段带进成果；
+    # 空串与整数的处理一样，是「这一项没有」，不是空串
     projection = fold_events([
         _run_created(),
         _event(EventType.SPEC_ACCEPTED, 2, session="ses_pro", department="product", payload={
@@ -249,6 +271,25 @@ def test_acceptance_fields_that_are_not_objects_are_left_empty():
     ])
     assert projection.artifact("product_spec") == AcceptedArtifact(
         version=1, content_hash="sha256:spec1", issuer=None, tree_digest=None, basis={}, ref=None)
+    empty = fold_events([
+        _run_created(),
+        _event(EventType.SPEC_ACCEPTED, 2, session="ses_pro", department="product", payload={
+            "content_hash": "sha256:spec2", "artifact_kind": "product_spec", "artifact_version": 1,
+            "artifact_basis": {}, "artifact_issuer": "", "artifact_tree_digest": "",
+        }),
+    ])
+    assert empty.artifact("product_spec") == AcceptedArtifact(
+        version=1, content_hash="sha256:spec2", issuer=None, tree_digest=None, basis={}, ref=None)
+
+
+def test_an_artifact_without_the_optional_fields_has_them_empty():
+    # 一种成果的可选字段：作者部门、树摘要、依据与工件引用没有给时为空（空字典与 None），不是空串，
+    # 通用条件读它们判断「这一项没有」
+    artifact = AcceptedArtifact(version=1, content_hash="sha256:x")
+    assert artifact.issuer is None
+    assert artifact.tree_digest is None
+    assert artifact.basis == {}
+    assert artifact.ref is None
 
 
 def test_the_snapshot_records_its_own_content_hash():
