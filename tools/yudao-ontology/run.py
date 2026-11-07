@@ -29,7 +29,7 @@ BATCHES: dict[int, list[str]] = {
     1: ["batches/batch1-overview.ttl", "batches/batch1-scope.ttl"],
     2: ["batches/batch2-design.ttl", "batches/batch2-scope.ttl"],
 }
-ASSUMPTION_FILES: dict[int, list[str]] = {1: ["batches/batch1-assumptions.ttl"]}
+ASSUMPTION_FILES: dict[int, list[str]] = {1: ["batches/batch1-assumptions.ttl"], 2: ["batches/batch2-assumptions.ttl"]}
 
 
 def files_upto(n: int, assumptions: bool = True) -> list[Path]:
@@ -241,6 +241,10 @@ def checks(terms, avoid):
          "$this yd:planned true .", "", None),
         ("verify-acyclic", "谁能拒绝谁无环", "yd:Actor", "violation",
          "$this (^yd:verifier/yd:verified)+ $this .", "", None),
+        ("checkdef-per-item", "每个事项具体查什么来自检查材料，设计说明没写", "yd:CheckDefinition", "unknown",
+         "$this yd:perItemFrom ?m .", "", None),
+        ("halfopen-written-release", "按半开环的假定，这份核验的结论不该写成放行（假定与设计的写法冲突）", "yd:HalfOpenDecl", "violation",
+         "$this yd:forOutcome ?o . ?o yd:completion yd:completion-release .", "", None),
         ("name-avoid", "用了词表里写明要避免的词", "yd:Concept", "violation",
          f"$this rdfs:label ?l . FILTER(STR(?l) IN ({avoid_vals}))", "", None),
         ("name-unknown", "词表与 name-map 里都没有这个词，正名对不上", "yd:Concept", "unknown",
@@ -326,7 +330,7 @@ def run_batch(n: int, depth: int, replace=None, assumptions=True, extra=None) ->
     terms, avoid = canonical_names()
     sh = run_shacl(materialize(base, r0.types), shapes_graph(terms, avoid))
     classified = {}
-    for cls in (YD.VerifierRole, YD.VerifiedForm, YD.ReleasedOutcomeKind, YD.CollaboratingDepartment):
+    for cls in (YD.VerifierRole, YD.VerifiedForm, YD.ReleasedOutcomeKind, YD.CollaboratingDepartment, YD.HalfOpenDecl):
         classified[label(base, cls)] = sorted(label(base, i) for i, ts in r0.types.items() if cls in ts)
     _, slots, rs = slot_loop(base, depth)
     return BatchResult(n, True, r0.unsat, classified, sh, slots, "" if rs.consistent else rs.error), base, r0

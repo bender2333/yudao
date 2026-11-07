@@ -1,0 +1,26 @@
+# 开环标记的探针用到的特征。特征取的是两处文字判开环时提到的条件的并集：
+# 4.7 第 4 条提到「有没有核验角色」「核验角色核不核验事项最后采纳的那种成果」；
+# 验收第 12 条提到「有没有核验角色」「交完成的角色在不在它核验的范围里」。
+# 每份探针是一份直做的定义，三个特征各取是或否；探针的个体由 openloop.py 生成。
+@prefix yd:   <https://yudao.dev/onto#> .
+@prefix owl:  <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+yd:OpenLoopRule a owl:Class . yd:LoadRule a owl:Class .
+yd:docPath a owl:AnnotationProperty . yd:axiomTurtle a owl:AnnotationProperty .
+yd:Probe a owl:Class ; rdfs:label "探针：一份直做的定义"@zh .
+yd:HasVerifier a owl:Class ; rdfs:label "有核验角色"@zh .
+yd:NoVerifier a owl:Class ; rdfs:label "没有核验角色"@zh ; owl:complementOf yd:HasVerifier .
+yd:FinalVerified a owl:Class ; rdfs:label "核验角色核验事项最后采纳的那种成果"@zh .
+yd:FinalNotVerified a owl:Class ; rdfs:label "事项最后采纳的那种成果没有核验角色核验"@zh ; owl:complementOf yd:FinalVerified .
+yd:CompleterVerified a owl:Class ; rdfs:label "交完成的角色在核验角色核验的范围里"@zh .
+yd:CompleterNotVerified a owl:Class ; rdfs:label "交完成的角色不在核验角色核验的范围里"@zh ; owl:complementOf yd:CompleterVerified .
+
+# 结构：核验谁、核验哪种成果，都要先有核验角色。
+yd:FinalVerified rdfs:subClassOf yd:HasVerifier .
+yd:CompleterVerified rdfs:subClassOf yd:HasVerifier .
+
+# 判定：标不标开环，加载拒不拒绝。
+yd:OpenLoopMarked a owl:Class ; rdfs:label "事项创建时标为开环"@zh .
+yd:NotOpenLoopMarked a owl:Class ; rdfs:label "事项创建时不标开环"@zh ; owl:complementOf yd:OpenLoopMarked .
+yd:RejectedAtLoad a owl:Class ; rdfs:label "定义加载时整份拒绝"@zh .

@@ -4,7 +4,7 @@
   "batch": 1,
   "name": "不改（对照）",
   "how": "原样跑一次",
-  "expected": "没有违例、没有确实缺",
+  "expected": "没有违例、没有确实缺（假定带出的不算）",
   "got": "没有违例、没有确实缺",
   "detected": true
  },
@@ -13,8 +13,8 @@
   "batch": 2,
   "name": "不改（对照）",
   "how": "原样跑一次",
-  "expected": "没有违例、没有确实缺",
-  "got": "没有违例、没有确实缺",
+  "expected": "没有违例、没有确实缺（假定带出的不算）",
+  "got": "没有违例、没有确实缺；假定带出：违例:halfopen-written-release:审查者核验工程架构师交的完成",
   "detected": true
  },
  {
@@ -32,7 +32,7 @@
   "name": "核验成环",
   "how": "加一份声明：工程核验质检的缺陷记录（质检本来核验工程）",
   "expected": "违例：verify-acyclic",
-  "got": "一致；违例:verify-acyclic:工程；违例:verify-acyclic:质检；空位：（埋的）工程核验质检的缺陷记录 → 核验必有独立证据",
+  "got": "一致；违例:verify-acyclic:工程；违例:verify-acyclic:质检",
   "detected": true
  },
  {
