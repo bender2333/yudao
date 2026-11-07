@@ -31,7 +31,7 @@ import { DEPARTMENTS, GUIDANCE_STATUS, departmentName, departmentStatusView, dep
 import { elapsedLimitText } from "./floor-text";
 import { askIndent, askLine } from "./asks-text";
 import { StepTimeline } from "./step-timeline.tsx";
-import { RoomLiveOutput, RoomScreen } from "./room-screen";
+import { RoomLiveOutput } from "./live-output";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
 import { scopeName } from "./scope-name";
@@ -123,11 +123,8 @@ export function DepartmentPage(props: { app: ClientApp; route: Route; department
 export function RoomSection(props: { app: ClientApp; department: string; data: DepartmentWorkspaceResult | null;
   loopItem?: WorkItemLoop | null }) {
   return (
-    <Section title="部门房间" note="小人的姿势来自部门状态，动作由事件驱动；头顶的话说明自己现在做什么">
-      <div className="y10-ws-stage stage">
-        <RoomScreen app={props.app} department={props.department} data={props.data} />
-      </div>
-      {/* 实时的模型输出（工单 #1416）：画布上的思考气泡在页面上另有一份文字，来源与拼接规则相同 */}
+    <Section title="部门房间" note="部门的状态与原因、手边的摘要与笔记、实时的模型输出；画面搬出以后这里只有页面文字">
+      {/* 实时的模型输出（工单 #1416）：原来是画布上思考气泡的页面副本，画布搬出以后留在页面上 */}
       <RoomLiveOutput app={props.app} department={props.department} />
       {props.data ? (
         <div className="y10-ws-room-info room-info" data-ws-info>
