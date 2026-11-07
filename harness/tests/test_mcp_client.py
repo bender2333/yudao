@@ -27,6 +27,35 @@ SECRET = "mcp-secret-value"
 # 上海全年是 UTC+8，不用时区库（依赖里没有 tzdata，Windows 上 ZoneInfo 取不到 Asia/Shanghai）
 SHANGHAI = timezone(timedelta(hours=8), "Asia/Shanghai")
 
+# 启动要 3 秒的 stdio 服务器（冷启动一个 npx、uvx 包的样子）：握手与读取工具清单之前各休眠再应答。
+# 3 秒比调用时限 2 秒长、比启动时限 60 秒短，用来分别核对两条时限各管哪一段
+SLOW_STARTUP_SEC = 3.0
+SHORT_CALL_TIMEOUT_SEC = 2.0
+SLOW_STARTUP_SERVER = """
+import json, sys, time
+
+delay = float(sys.argv[1])
+time.sleep(delay)
+
+def send(message):
+    sys.stdout.write(json.dumps(message) + "\\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    request = json.loads(line)
+    method = request.get("method")
+    if method == "initialize":
+        send({"jsonrpc": "2.0", "id": request["id"], "result": {
+            "protocolVersion": request["params"]["protocolVersion"], "capabilities": {"tools": {}},
+            "serverInfo": {"name": "slow-startup", "version": "0.0.1"}}})
+    elif method == "tools/list":
+        time.sleep(delay)
+        send({"jsonrpc": "2.0", "id": request["id"], "result": {"tools": [
+            {"name": "echo", "description": "", "inputSchema": {"type": "object", "properties": {}}}]}})
+    elif request.get("id") is not None:
+        send({"jsonrpc": "2.0", "id": request["id"], "error": {"code": -32601, "message": "unknown method"}})
+"""
+
 # 只说 JSON-RPC 的服务器：握手正常，工具调用一律用协议错误回答（验收第 2 条「协议错误」）
 PROTOCOL_ERROR_SERVER = """
 import json, sys
@@ -139,6 +168,35 @@ def test_a_stdio_server_lists_its_tools_and_answers_calls(tmp_path):
             await client.close()
 
     asyncio.run(scenario())
+
+
+def test_a_slow_handshake_and_tool_list_stay_within_the_startup_timeout(tmp_path):
+    # 启动要 3 秒、调用时限 2 秒：握手与读取工具清单都按启动时限计，启动成功并能列出工具
+    async def scenario():
+        client = await McpClient.start(_launch(
+            tmp_path, args=["-c", SLOW_STARTUP_SERVER, str(SLOW_STARTUP_SEC)],
+            call_timeout=SHORT_CALL_TIMEOUT_SEC, startup_timeout=60.0))
+        try:
+            assert client.info is not None and client.info.name == "slow-startup"
+            assert "echo" in {tool.name for tool in await client.list_tools()}
+        finally:
+            await client.close()
+
+    asyncio.run(scenario())
+
+
+def test_exceeding_the_startup_timeout_names_the_startup_limit(tmp_path):
+    # 同一台服务器把启动时限设为 1 秒：失败的原因写明超过启动时限，不是握手按调用时限结束的报错
+    async def scenario():
+        with pytest.raises(McpStartupError) as failure:
+            await McpClient.start(_launch(
+                tmp_path, args=["-c", SLOW_STARTUP_SERVER, str(SLOW_STARTUP_SEC)],
+                call_timeout=SHORT_CALL_TIMEOUT_SEC, startup_timeout=1.0))
+        return str(failure.value)
+
+    message = asyncio.run(scenario())
+    assert "超过启动时限" in message
+    assert "Request 'initialize' timed out" not in message
 
 
 def test_a_tool_error_is_a_completed_result_with_its_error_code(tmp_path):
