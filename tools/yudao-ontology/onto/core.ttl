@@ -15,6 +15,8 @@ yd:archRef a owl:AnnotationProperty ; rdfs:label "总图位置"@zh .
 yd:quote   a owl:AnnotationProperty ; rdfs:label "原句"@zh .
 yd:docRef  a owl:AnnotationProperty ; rdfs:label "出处文档"@zh .
 yd:batch   a owl:AnnotationProperty ; rdfs:label "放进来的批次"@zh .
+yd:definedBy a owl:AnnotationProperty ; rdfs:label "发布的定义文件"@zh .
+yd:notModeled a owl:AnnotationProperty ; rdfs:label "原句进了，词汇里还表达不了"@zh .
 
 # ---------- 总图的固定结构 ----------
 yd:FixedStructure a owl:Class ; rdfs:label "固定的结构"@zh ; yd:archRef "开头一段" .
@@ -121,6 +123,7 @@ yd:within a owl:AnnotationProperty ; rdfs:label "限于"@zh .
 yd:Assumption a owl:Class ; rdfs:label "试验假定"@zh ; rdfs:comment "为了试验加的，不是用户的承诺"@zh .
 yd:assumes a owl:AnnotationProperty .
 
+yd:when a owl:AnnotationProperty ; rdfs:label "这种证据什么时候有"@zh .
 yd:planned a owl:AnnotationProperty ; rdfs:label "以后"@zh ;
     rdfs:comment "文档写「以后」的东西：写法规范第 5 条，抽出来是不知道，不当成缺"@zh .
 
