@@ -32,8 +32,11 @@ def design_graph() -> rdflib.Graph:
     return run.load([HERE / "onto/core.ttl"] + [HERE / f for b in (1, 2) for f in run.BATCHES[b]])
 
 
-def definitions_graph() -> rdflib.Graph:
-    return run.load([HERE / "batches/batch3-definitions.ttl"])
+def definitions_graph(assumptions: bool = True) -> rdflib.Graph:
+    files = [HERE / "batches/batch3-definitions.ttl"]
+    if assumptions:
+        files.append(HERE / "batches/batch3-assumptions.ttl")
+    return run.load(files)
 
 
 def facts(g: rdflib.Graph, form) -> set:
@@ -45,6 +48,9 @@ def facts(g: rdflib.Graph, form) -> set:
         for p in ACTOR_PROPS:
             for o in g.objects(A, p):
                 out.add((A, p, o))
+                # 假定：一类成果算进它所属的那种（缺陷记录 ⊂ 质检结论）。交得出那种，就交得出这一类
+                if p == YD.produces:
+                    out |= {(A, p, s) for s in g.subjects(YD.subKindOf, o)}
     for d in g.subjects(YD.inForm, form):
         if (d, rdflib.RDF.type, YD.VerificationDecl) in g:
             for p in DECL_PROPS:
