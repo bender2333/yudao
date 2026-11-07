@@ -97,9 +97,11 @@
       "work_item_id": "这个事件种类是新增的，旧版本的项目流中没有它：项目流中决定请求所属的事项"
     },
     "project_form_set": {
+      "changes": "旧事件没有这个字段（工单 #1516）：形态改动出现时只有原值、新值与理由，读取时按空改动处理（组织跟随发布）",
       "form": "这个事件种类是新增的，旧版本的项目流中没有它：没有这一条之前项目用的是默认的三部门形态，读取时按 three_departments 处理",
       "previous_form": "这个事件种类是新增的，旧版本的项目流中没有它：第一次改形态时原值是默认的 three_departments",
-      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：原因可以为空，读取时不依赖它"
+      "reason": "这个事件种类是新增的，旧版本的项目流中没有它：原因可以为空，读取时不依赖它",
+      "version": "旧事件没有这个字段（工单 #1516）：读取时按没有版本处理；组织版本是合成结果的内容摘要，查询按当前的发布与改动重新合成得出"
     },
     "project_goal_changed": {
       "goal": "这个事件种类是新增的，旧版本的项目流中没有它：长期目标取自 project_registered（或此前最后一条 project_goal_changed）",
@@ -399,9 +401,11 @@
       "work_item_id": "string"
     },
     "project_form_set": {
+      "changes": "object",
       "form": "string",
       "previous_form": "string",
-      "reason": "string"
+      "reason": "string",
+      "version": "string?"
     },
     "project_goal_changed": {
       "goal": "string",

@@ -14,6 +14,11 @@
       "id": "structure",
       "label": "现有结构说明",
       "why": "建档事项里对仓库组成与现有构建、测试命令的说明，只由读过的材料与检查回执支持"
+    },
+    {
+      "id": "completion_review",
+      "label": "核验结论",
+      "why": "核验角色对交完成那一版的结论：放行结束事项，打回让作者再做一轮；结论绑定提交时当前的那一版"
     }
   ],
   "groups": [
@@ -24,7 +29,8 @@
       "kinds": [
         "completion",
         "product_spec",
-        "structure"
+        "structure",
+        "completion_review"
       ]
     }
   ],

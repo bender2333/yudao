@@ -291,6 +291,10 @@ class ProjectProjection:
     mcp_servers: McpServersConfig = field(default_factory=McpServersConfig)
     # 项目现在用的形态（工单 #1392）：项目流里最后一条形态改动的值；从来没有设过时为空，按默认形态读取
     form: str = ""
+    # 项目现在的组织的改动（工单 #1516）：最后一条形态改动带的本项目的改动（一份 JSON 文档，按身份只写不同的项）；
+    # 从来没有设过、或者那条事件是旧版本写的（没有 changes）时为空，组织跟随发布。
+    # 组织版本不存这里：它是合成结果的内容摘要，查询按当前的发布与这份改动重新合成得出
+    organization_changes: dict[str, Any] = field(default_factory=dict)
     # 最近一次探测的结果（工单 #1174）；还没有探测时为空
     last_probe: LastProbe | None = None
     writebacks: list[WritebackRecord] = field(default_factory=list)
@@ -574,8 +578,10 @@ def apply_project_event(state: ProjectProjection, event: ProjectEvent) -> None:
             item.writeback = rec
         return
     if etype == ProjectEventType.PROJECT_FORM_SET:
-        # 项目的形态（工单 #1392）：项目流只增，最后一条改动就是现在用的那一份；原值留在它自己的事件里
+        # 项目的形态（工单 #1392）：项目流只增，最后一条改动就是现在用的那一份；原值留在它自己的事件里。
+        # 本项目的改动随事件记（工单 #1516）：旧事件没有 changes 时按空改动读，组织跟随发布
         state.form = payload["form"]
+        state.organization_changes = dict(payload.get("changes") or {})
         return
     if etype == ProjectEventType.MCP_SERVERS_CONFIGURED:
         # 项目设置里的 MCP 服务器（工单 #236）：整份设置一个版本，servers 是非秘密设置与凭据引用；
