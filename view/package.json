@@ -1,0 +1,31 @@
+{
+  "name": "yudao-view",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Yudao 画面：Vite 构建的一组静态文件，由 Yudao 服务在服务地址下的 /view/ 按文件路径提供",
+  "scripts": {
+    "generate:api": "node scripts/generate-api.mjs",
+    "build": "vite build",
+    "dev": "vite",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "node --test tests/unit/*.test.js tests/unit/*.test.ts"
+  },
+  "dependencies": {
+    "gsap": "3.13.0",
+    "pixi.js": "8.13.1",
+    "xstate": "^5.33.2"
+  },
+  "devDependencies": {
+    "@hey-api/openapi-ts": "0.99.0",
+    "@types/node": "24.19.0",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.1.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.6",
+    "@playwright/test": "1.63.0"
+  }
+}

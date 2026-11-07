@@ -1,0 +1,34 @@
+{
+  "methods": [
+    {
+      "code": "check",
+      "label": "命令检查",
+      "executable": true
+    },
+    {
+      "code": "trial",
+      "label": "试用用例",
+      "executable": true
+    },
+    {
+      "code": "measure",
+      "label": "主机测量",
+      "executable": true
+    },
+    {
+      "code": "judgement",
+      "label": "带参照材料的判定点",
+      "executable": false
+    },
+    {
+      "code": "human",
+      "label": "人",
+      "executable": false
+    },
+    {
+      "code": "open",
+      "label": "开环",
+      "executable": false
+    }
+  ]
+}
