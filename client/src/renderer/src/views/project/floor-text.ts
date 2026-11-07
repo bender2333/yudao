@@ -7,8 +7,7 @@
 // 部门状态的文字（角色条上那一格用的 STATUS_TEXT）在 ./labels.ts：roleBarText 在那里，与本文件同属
 // 页面的文字，本文件按页面内部的方向引用它，不反向引用，免得两份页面文字互相导入。
 //
-// 挂画布的几个组件（project/floor-screen.tsx、project/room-screen.tsx、home/building-section.tsx）里的
-// 画布接线仍要导入画面与翻译层，那几行留给搬画布的工单；本文件只放页面文字与颜色。
+// 画面已随工单 #1418 搬进 view/，页面上不再挂画布：本文件只放页面文字与颜色，页面不导入画面与翻译层。
 //
 // 工单 #1416 起，首页项目一览与项目页的部门、中断、流转汇总、事实来源各节的行也从这里取：原来只在画布上
 // 看得到的事实，先在页面上有对应的列表与详情。这些行只读查询结果，不碰画布与翻译层。
@@ -53,23 +52,6 @@ export const BUILDING_STATUS: Readonly<Record<string, { text: string; color: str
   waiting_user: { text: "等待你的决定", color: "#f7cb46" },
   interrupted: { text: "中断", color: "#474d5a" },
   idle: { text: "空闲", color: "#9aa2b0" },
-});
-
-// ---------------------------------------------------------------------------
-// 覆盖层
-
-/**
- * 覆盖层按钮上的中文名（原来取自 translate/coverage.ts 的 OVERLAY_LABELS）：页面按能力清单的
- * overlays 挑出按钮条上出现哪几个，没有中文名的覆盖层不出现按钮。
- */
-export const OVERLAY_LABELS: Readonly<Record<string, string>> = Object.freeze({
-  flow: "流转",
-  waiting: "等待",
-  recovery: "恢复",
-  context_usage: "上下文用量",
-  semantic_records: "语义记录",
-  sources: "来源",
-  loops: "循环",
 });
 
 // ---------------------------------------------------------------------------

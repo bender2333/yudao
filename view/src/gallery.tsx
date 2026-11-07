@@ -1,6 +1,7 @@
 // 动作图鉴页（工单 #176 验收标准 1、#956）：列出原型 v13 的 y13.js、sprites.js 与 engine.js 的全部公开画法，
 // 一项不少。每个画法都用同一套 TypeScript 画法渲染一张点阵预览（整数倍最近邻放大，像素不模糊），
-// 与原型逐项对照画风。页面只在开发时使用：路径 #/gallery 不进入正式的页面入口（页签与侧栏）。
+// 与原型逐项对照画风。图鉴随画面搬进 view/（工单 #1418）：它是画面自己的整页，不连接接口，
+// 第一张里画面的入口暂时就是它；壳与三个场景接上以后，入口换成壳，图鉴退回开发构建里的一个页面。
 
 import { useEffect, useMemo, useRef } from "react";
 import { GALLERY_MEMBERS, type GalleryMember, type GallerySample } from "./pixel/gallery-data";
