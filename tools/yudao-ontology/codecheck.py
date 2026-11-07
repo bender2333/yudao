@@ -9,8 +9,8 @@
 4. 总图的词有没有对照：第 1 批里的概念（总图的词），name-map 里没有它这一行，记不知道（代码里有没有，这张表没说）。
    对照表少一行只能让结果退到不知道，不能变成确实缺：确实缺只给声明过的闭合范围。
 
-用法：python3 codecheck.py <提交>...（默认 eb8429e），结果写 reports/codecheck.json；
-batches/batch4-code.ttl 是 eb8429e 的转写，由本脚本生成，不手改。只读仓库。
+用法：python3 codecheck.py <提交>...（默认 37e9d68，11-07 夜的 main），结果写 reports/codecheck.json；
+batches/batch4-code.ttl 是 DEFAULT 那个提交的转写，由本脚本生成，不手改。只读仓库。
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 YD = rdflib.Namespace("https://yudao.dev/onto#")
 SH = rdflib.Namespace("http://www.w3.org/ns/shacl#")
-DEFAULT = "eb8429e"
+DEFAULT = "37e9d68"
 
 
 def git(*args) -> str:

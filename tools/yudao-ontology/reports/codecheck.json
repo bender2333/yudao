@@ -1,5 +1,5 @@
 {
- "eb8429e": [
+ "37e9d68": [
   {
    "result": "违例",
    "check": "layer-name",
@@ -10,6 +10,737 @@
     "harness/definitions/__init__.py:274 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
     "harness/definitions/__init__.py:275 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）"
    ]
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "0ae3769^": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/adjudication.py",
+   "detail": [
+    "harness/adjudication.py:141 比较里的「quality」（部门名）"
+   ]
+  },
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:205 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:206 Literal里的「baseline_review」（成果种类名）",
+    "harness/definitions/__init__.py:206 Literal里的「structure」（成果种类名）",
+    "harness/definitions/__init__.py:256 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:257 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:257 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:340 Literal里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:340 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:340 Literal里的「structure」（成果种类名）"
+   ]
+  },
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/validation.py",
+   "detail": [
+    "harness/validation.py:198 顶层集合 _ARTIFACTS里的「product_spec」（成果种类名）",
+    "harness/validation.py:199 顶层集合 _ARTIFACTS里的「delivery_spec」（成果种类名）",
+    "harness/validation.py:201 顶层集合 _ARTIFACTS里的「structure」（成果种类名）",
+    "harness/validation.py:203 顶层集合 _ARTIFACTS里的「product_decision」（成果种类名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "sources-uncommitted",
+   "focus": "harness/definitions/organization.json",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "0ae3769": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:206 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:207 Literal里的「baseline_review」（成果种类名）",
+    "harness/definitions/__init__.py:207 Literal里的「structure」（成果种类名）",
+    "harness/definitions/__init__.py:257 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:341 Literal里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:341 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:341 Literal里的「structure」（成果种类名）"
+   ]
+  },
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/validation.py",
+   "detail": [
+    "harness/validation.py:198 顶层集合 _ARTIFACTS里的「product_spec」（成果种类名）",
+    "harness/validation.py:199 顶层集合 _ARTIFACTS里的「delivery_spec」（成果种类名）",
+    "harness/validation.py:201 顶层集合 _ARTIFACTS里的「structure」（成果种类名）",
+    "harness/validation.py:203 顶层集合 _ARTIFACTS里的「product_decision」（成果种类名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "sources-uncommitted",
+   "focus": "harness/definitions/organization.json",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "162b7c2^": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:207 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:208 Literal里的「baseline_review」（成果种类名）",
+    "harness/definitions/__init__.py:208 Literal里的「structure」（成果种类名）",
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:260 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:342 Literal里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:342 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:342 Literal里的「structure」（成果种类名）"
+   ]
+  },
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/validation.py",
+   "detail": [
+    "harness/validation.py:198 顶层集合 _ARTIFACTS里的「product_spec」（成果种类名）",
+    "harness/validation.py:199 顶层集合 _ARTIFACTS里的「delivery_spec」（成果种类名）",
+    "harness/validation.py:201 顶层集合 _ARTIFACTS里的「structure」（成果种类名）",
+    "harness/validation.py:203 顶层集合 _ARTIFACTS里的「product_decision」（成果种类名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "sources-uncommitted",
+   "focus": "harness/definitions/organization.json",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "162b7c2": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:260 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "sources-uncommitted",
+   "focus": "harness/definitions/organization.json",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "44b4259": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:266 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:267 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:267 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:268 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "be77de8": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:266 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:267 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:267 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:268 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）"
+   ]
+  },
+  {
+   "result": "违例",
+   "check": "namemap-stale",
+   "focus": "交完成（直做）",
+   "detail": [
+    "harness/definitions/forms/single_role_direct/outcome_kinds.json（label「交完成」）"
+   ]
+  },
+  {
+   "result": "违例",
+   "check": "namemap-stale",
+   "focus": "直做",
+   "detail": [
+    "harness/definitions/forms/single_role_direct/routings.json（label「直做」）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "e44d457^": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:260 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "sources-uncommitted",
+   "focus": "harness/definitions/organization.json",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "e44d457": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:266 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:267 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:267 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:268 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "事件",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "决定请求",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "提案",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "某种成果的某一版及其依据",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "核验角色的结论",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "角色的写入范围",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "轮转的规矩",
+   "detail": []
+  },
+  {
+   "result": "不知道",
+   "check": "term-unmapped",
+   "focus": "部门",
+   "detail": []
+  }
+ ],
+ "bbdd68d^": [
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/definitions/__init__.py",
+   "detail": [
+    "harness/definitions/__init__.py:206 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:207 Literal里的「baseline_review」（成果种类名）",
+    "harness/definitions/__init__.py:207 Literal里的「structure」（成果种类名）",
+    "harness/definitions/__init__.py:257 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:258 顶层集合 LEGACY_VERIFICATION里的「engineering」（部门名）",
+    "harness/definitions/__init__.py:259 顶层集合 LEGACY_VERIFICATION里的「quality」（部门名）",
+    "harness/definitions/__init__.py:341 Literal里的「delivery_spec」（成果种类名）",
+    "harness/definitions/__init__.py:341 Literal里的「product_spec」（成果种类名）",
+    "harness/definitions/__init__.py:341 Literal里的「structure」（成果种类名）"
+   ]
+  },
+  {
+   "result": "违例",
+   "check": "layer-name",
+   "focus": "harness/validation.py",
+   "detail": [
+    "harness/validation.py:198 顶层集合 _ARTIFACTS里的「product_spec」（成果种类名）",
+    "harness/validation.py:199 顶层集合 _ARTIFACTS里的「delivery_spec」（成果种类名）",
+    "harness/validation.py:201 顶层集合 _ARTIFACTS里的「structure」（成果种类名）",
+    "harness/validation.py:203 顶层集合 _ARTIFACTS里的「product_decision」（成果种类名）"
+   ]
+  },
+  {
+   "result": "不知道",
+   "check": "sources-uncommitted",
+   "focus": "harness/definitions/organization.json",
+   "detail": []
   },
   {
    "result": "不知道",
