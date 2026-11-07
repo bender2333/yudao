@@ -11,6 +11,7 @@
 | [改善验证与选型实验规约](experiment-protocol.md) | [规则与参数](../design/rules-and-parameters.md) | 校准、选型、收益与采用的区分，正式实验之前读 |
 | [内核读取运行状态投影的清点（2026-10-24）](kernel-projection-reads-2026-10-24.md) | [骨架与应用设计说明](../design/skeleton-and-application.md)第 5.5、12 节 | S1a 至 S1d、S2a 的范围；S1a 放出之前在当时的 main 上重做 |
 | [DeepSeek Super-agent 与 Yudao 的异步框架](deepseek-superagent-async-framework.md) | [总体路线图](../program-roadmap.md)阶段二薄片 ⑤、阶段三、道 03 与道 10，[D06 运行中追加输入](../requirements/in-flight-input.md) | 不引入它的框架与代码的理由；外部入口、长命令转后台、并发槽留人槽、发件箱四个可借鉴的做法；外部入口是否算新方框交总架构师 |
+| [Raven（渡鸦）：它做了什么，Yudao 能用什么](raven-harness.md) | [D35 自举](../requirements/self-hosting.md)「第二层的前置条件与完成条件」、[语义系统设计说明](../design/semantic-system.md)第 8、15 节（教训发现模块） | 外部报告关于 Raven 的说法逐条核对（分布式部署在一手来源里没有）；不当开发 Yudao 的过渡脚手架的三条理由；演化器的三级评测、技能带支持案例、派发前五组校验、Oncall 的战役记录四个可借鉴的做法 |
 | [文档一致性核对：概念模型与符号推理方案](doc-consistency-concept-model.md) | [决策记录](../decision.md)「文档一致性」四条 | 方向已定，索引与确定性规则已建在 `tools/doc-consistency/`，不开工单；只服务 Yudao 开发，分设计与脚手架两条线；文件图谱、关系与 hash 放在 `.doc-index/`，判断走样靠 clingo 规则；LLM 开放提取的试验没有通过（第 13 节），定向提取待验证 |
 | [文档一致性：规则事实线方案](doc-consistency-rule-facts.md) | [决策记录](../decision.md)「文档一致性：规则事实单独成线」 | 给 LLM 读的规则文件单独成线，先做：规则类事实只在正本表格写一行，别处引用或用固定句式复述，clingo 比对，写文件时钩子提醒；工具没有改，第 1 至 4 步不改文档，用植入的矛盾验收 |
 | [Uncle Bob 的 ub-mode 调研](uncle-bob-ub-mode.md) | [总体路线图](../program-roadmap.md)第 3 节「内核的代码质量门槛」、[可信内核设计说明](../design/trusted-kernel.md) | ub-mode 的做法与参数速查、它调用的 crapper、dryer、mutator 三个工具的阈值与用法、他本人关于不读代码的公开说法，以及与内核质量门槛的逐项对照（只写事实） |
