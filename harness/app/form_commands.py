@@ -75,6 +75,12 @@ async def _adopt(application: "Application", command: Command, request: Organiza
                         f"发布带里没有形态 {request.form}；可以选的形态是：{'、'.join(forms)}")
     if request.mode == "advanced" and not request.reason.strip():
         raise Rejection("not_allowed", "走高级的采用要写明理由：改了哪些项、为什么改")
+    # 三条路各是什么（设计说明「模板一键选用」「采用与历史」）：换模板是形态名加空改动的一次采用，
+    # 加/去掉核验角色的改动由查询给出（一定非空），高级是改定义的采用。说得与带的东西对不上时拒绝
+    if request.mode == "template" and request.changes:
+        raise Rejection("not_allowed", "换模板是形态名加空改动的一次采用；要带本项目的改动，请走高级或加/去掉核验角色")
+    if request.mode == "verifier" and not request.changes:
+        raise Rejection("not_allowed", "加或去掉核验角色的改动由查询给出（project.organization 的 add_verifier / remove_verifier），不能为空")
 
     changes, issues = parse_organization_changes(request.changes)
     if changes is None:

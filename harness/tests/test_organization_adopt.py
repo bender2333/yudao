@@ -200,6 +200,20 @@ def test_the_advanced_path_needs_a_reason_and_changing_the_template_does_not(tmp
     assert renamed.history[-1].reason == "把工程改名为开发"
     assert renamed.history[-1].changes == {"departments": {"engineering": {"label": "开发"}}}
     assert renamed.changes == {"departments": {"engineering": {"label": "开发"}}}
+
+    # 说得与带的东西对不上时同样拒绝：换模板不能带改动，核验角色那一条不能是空改动
+    written = len(_form_events(system, project_id))
+    template_with_changes = _adopt(application, project_id, SINGLE_ROLE_DIRECT,
+                                   base_version=renamed.version,
+                                   changes={"departments": {"engineering": {"label": "又改名"}}},
+                                   mode="template")
+    assert isinstance(template_with_changes, Rejected) and template_with_changes.reason == "not_allowed"
+    assert "空改动" in template_with_changes.message
+    verifier_without_changes = _adopt(application, project_id, SINGLE_ROLE_DIRECT,
+                                      base_version=renamed.version, mode="verifier")
+    assert isinstance(verifier_without_changes, Rejected) and verifier_without_changes.reason == "not_allowed"
+    assert "改动由查询给出" in verifier_without_changes.message
+    assert len(_form_events(system, project_id)) == written
     system.close()
 
 
@@ -231,7 +245,7 @@ def test_a_stale_version_and_a_rejected_change_are_refused_without_writing_an_ev
 
     # 改动文档不合法（未知字段）时同样拒绝，写明是哪一项
     unknown = _adopt(application, project_id, DEFAULT_FORM, base_version=current.version,
-                     changes={"unknown_section": {}}, reason="")
+                     changes={"unknown_section": {}}, reason="试一下未知字段", mode="advanced")
     assert isinstance(unknown, Rejected) and unknown.reason == "not_allowed"
     assert "unknown_section" in unknown.message
     assert _form_events(system, project_id) == []
