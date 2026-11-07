@@ -45,7 +45,7 @@ def test_a_cancel_recorded_before_the_restart_is_not_overtaken_by_recovery(tmp_p
     data_dir = tmp_path / "data"
     with killed.interrupted(data_dir, _script(), await_file=("src/note.txt", "hello\n"),
                             resume_after=False) as run:
-        # 中断以后、恢复以前：用户取消。取消经真实的命令写入事件库
+        # 故障矩阵第 13 行：中断以后、恢复以前：用户取消。取消经真实的命令写入事件库
         cancelled = run.after.cancel(run.run_id)
         assert cancelled.status == "failed"
         assert cancelled.stop_reason == "cancelled"
@@ -77,7 +77,7 @@ def test_a_cancel_that_arrives_after_recovery_started_stops_further_dispatch(tmp
     data_dir = tmp_path / "data"
     with killed.interrupted(data_dir, _script(), await_file=("src/note.txt", "hello\n"),
                             resume_after=False) as run:
-        # 恢复先开始：取得执行权（写下继续的依据、核实结果未知的文件动作），还没有继续执行
+        # 故障矩阵第 13 行：恢复先开始：取得执行权（写下继续的依据、核实结果未知的文件动作），还没有继续执行
         claimed = run.after.orchestrator.resume_incomplete_run(run.run_id)
         assert claimed is not None, "恢复没有取得执行权"
         resumed = [event for event in killed.events(run.after, run.run_id, "run_resumed")]

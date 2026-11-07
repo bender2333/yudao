@@ -19,7 +19,7 @@ from harness.tests.helpers import after_event, quality_turns
 
 
 def test_a_delivery_whose_artifacts_cannot_be_written_is_not_accepted(tmp_path):
-    # 工程把交付写进工作区并提交提案；提交时要写的工件在真实的文件系统上失败。
+    # 故障矩阵第 8 行：工程把交付写进工作区并提交提案；提交时要写的工件在真实的文件系统上失败。
     # 没有持久接纳（交付接纳事件与封存工件都不在），运行以 host_commit_error 停止，
     # 工作区里留下的 src/echo.py 只是残留文件，重启以后仍然不是正式成果
     data_dir = tmp_path / "data"

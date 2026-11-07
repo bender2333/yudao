@@ -62,6 +62,8 @@ def _read_frames(client, url: str, *, limit: int, headers=None):
 
 
 def test_a_reconnecting_event_stream_only_backfills_the_observation(tmp_path):
+    # 故障矩阵第 9 行：页面连上、读到第一条事件以后断开，再从最后收到的位置重连。
+    # 重连只补观察：断开与重连期间没有写入任何事件，没有新建执行、没有重发模型或工具
     data_dir = tmp_path / "data"
     system = LoopSystem.for_testing(data_dir, FakeAdapter({"product": [product_spec()]}))
     try:

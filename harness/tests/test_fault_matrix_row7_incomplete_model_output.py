@@ -32,7 +32,7 @@ def _artifact(system, ref):
 
 
 def test_an_incomplete_model_output_keeps_the_output_and_the_known_usage_without_a_retry(tmp_path):
-    # 输出不完整：原输出（回答条目与原始回应）与已知用量保留在失败尝试的事实里；失败按现有的
+    # 故障矩阵第 7 行：输出不完整：原输出（回答条目与原始回应）与已知用量保留在失败尝试的事实里；失败按现有的
     # 错误分类停止（provider_error），一次尝试以后不再自动重试，次数上限记在事件里
     limits = StepLimits()
     with stub_server([_incomplete]) as (config, captures, *_):

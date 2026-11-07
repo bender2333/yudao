@@ -19,7 +19,7 @@ USAGE_FIELDS = ("input_tokens", "output_tokens", "cache_read_tokens", "cache_wri
 
 
 def test_missing_usage_is_unknown_and_never_recorded_as_zero(tmp_path):
-    # 每一次模型请求都没有上报用量：汇总里每一项用量是空（未知），不是零；上报次数是零
+    # 故障矩阵第 11 行：每一次模型请求都没有上报用量：汇总里每一项用量是空（未知），不是零；上报次数是零
     system = LoopSystem.for_testing(tmp_path / "data", FakeAdapter({
         "product": [product_spec_turn()],
         "engineering": [delivery_turn()],
