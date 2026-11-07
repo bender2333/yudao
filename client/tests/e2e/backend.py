@@ -832,6 +832,156 @@ async def seed_materials(application: Application, system: LoopSystem) -> None:
         raise AssertionError("逐条结论的预置没有写进去")
 
 
+# 试用记录页签（工单 #153）：部门工作间的试用记录页签要读的事实。这个预置不调用模型：事项由项目的写入口开始，
+# 试用会话、用例与步骤按查询需要的形状直接写进事件库，两张截图写进工件库。页签因此能读到：一个已经结束的
+# 质检会话（试用副本等于交付快照、结束方式是停止）、一个通过的试用用例（引用了两条验收条件、计划两步、
+# 三步有两次截图），以及两次只看文字的请求——页签据此写「模型只读取文字」。
+TRIALS_PROJECT = "试用记录"
+TRIALS_ITEM = "核验待办清单"
+TRIALS_SESSION = "ses_trials_quality"
+TRIALS_SPEC_HASH = "sha256:" + "3" * 64
+TRIALS_TREE_DIGEST = "sha256:" + "4" * 64
+TRIALS_PNG = base64.b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==")
+TRIALS_ACTIVATION = "act_trials"
+TRIALS_ATTEMPT = "act_trials:root-1:work:attempt-1"
+
+
+def _trials_tool_started(identity: str, tool: str, step_id: int, args: dict) -> dict:
+    return {"attempt_id": TRIALS_ATTEMPT, "logical_call_id": "act_trials:root-1:work",
+            "context_event_id": "ctx_trials", "effective_contract_hash": "sha256:contract",
+            **MATERIALS_VERSIONS, "id": identity, "name": tool, "args": args, "step_id": step_id,
+            "activation_id": TRIALS_ACTIVATION, "attempt": 1}
+
+
+def _trials_tool_called(identity: str, tool: str, step_id: int, args: dict, *,
+                        images: list[dict] | None = None, output_ref: dict | None = None) -> dict:
+    return {**MATERIALS_CALL_TARGET, **MATERIALS_VERSIONS,
+            "attempt_id": TRIALS_ATTEMPT, "logical_call_id": "act_trials:root-1:work",
+            "context_event_id": "ctx_trials", "effective_contract_hash": "sha256:contract",
+            "id": identity, "name": tool, "step_id": step_id,
+            "input_item": {"type": "function_call_output", "call_id": identity, "output": "ok"},
+            "activation_id": TRIALS_ACTIVATION, "purpose": "work", "args": args, "ok": True,
+            "error": None, "output_ref": output_ref, "images": list(images or [])}
+
+
+def _trials_model_requested(step_id: int) -> dict:
+    # 收到上一次结果的那一次模型请求：输入方式只有文字，页签据此写「模型只读取文字」。
+    # 载荷按 ModelRequestedPayload 的形状给全（与真实请求路径写下的字段相同）
+    return {**MATERIALS_CALL_TARGET, **MATERIALS_VERSIONS,
+            "attempt_id": TRIALS_ATTEMPT, "logical_call_id": "act_trials:root-1:work",
+            "context_event_id": "ctx_trials", "effective_contract_hash": "sha256:contract",
+            "activation_id": TRIALS_ACTIVATION, "step_id": step_id, "attempt": 1, "max_attempts": 3,
+            "root_step_id": step_id, "retry_of_step_id": None, "started_at": utc_now(),
+            "attempted": True, "purpose": "work", "effective_context_window": 32000,
+            "max_output_tokens": 4096, "tool_choice": "auto",
+            "definitions_version": DEFINITIONS.version, "parameters_version": DEFINITIONS.version,
+            "input_modalities": ["text"]}
+
+
+async def seed_trials(application: Application, system: LoopSystem) -> None:
+    # 试用记录页签的预置（工单 #153）：一个项目、一件进行中的事项与它的 run
+    created = await accept(application, "project.create", ProjectCreate(
+        command_id=str(uuid.uuid4()), name=TRIALS_PROJECT, goal="部门工作间显示试用记录与截图"))
+    project_id = created.refs.project_id
+    _item, run_id = system.projects.start_work_item(project_id, TRIALS_ITEM)
+    screenshot = system.artifacts.put(run_id, "screenshot", TRIALS_PNG, media_type="image/png")
+    shot = {"kind": screenshot.kind, "content_hash": screenshot.content_hash,
+            "path": screenshot.path, "media_type": screenshot.media_type}
+    # 第二步的页面结构：点开截图时列在旁边的摘录
+    output = system.artifacts.put(run_id, "tool_output", json_dumps(
+        {"accessibility": "按钮「添加」 输入框「待办」 列表「买牛奶」", "images": []}),
+        media_type="application/json")
+    output_ref = {"kind": output.kind, "content_hash": output.content_hash,
+                  "path": output.path, "media_type": output.media_type}
+
+    def write(transaction) -> None:
+        transaction.append(
+            _materials_event(EventType.SPEC_ACCEPTED, {
+                "id": "spec_trials", "revision": 1, "content_hash": TRIALS_SPEC_HASH,
+                "kind": "product_spec", "issuer": "product", "parent_hash": None, "status": "active",
+                "git_version": MATERIALS_GIT,
+                "goal": "做一个待办清单", "requirements": [], "boundaries": [], "constraints": [],
+                "acceptance_criteria": ["列表显示一条待办", "点击添加以后列表里有这条待办", "删除以后列表里不再有这条待办"],
+                "fatal_conditions": [], "non_goals": [], "decision_changes": [], "change_record": None,
+                "input_version": 1, "requirement_mapping": []}, "product"),
+            _materials_event(EventType.DELIVERY_ACCEPTED, {
+                "id": "del_trials", "revision": 1, "content_hash": "sha256:delivery-trials",
+                "kind": "delivery_spec", "issuer": "engineering", "parent_hash": None, "status": "active",
+                "git_version": MATERIALS_GIT,
+                "product_spec_hash": TRIALS_SPEC_HASH, "effective_contract_hash": "sha256:contract",
+                "summary": "待办清单网页：列表、空列表提示与完成标记都做好了。",
+                "files": ["app.py"], "check_names": [], "checks": [], "known_risks": [],
+                "code_tree_digest": TRIALS_TREE_DIGEST,
+                "tree_ref": {"kind": "tree_snapshot", "content_hash": TRIALS_TREE_DIGEST,
+                             "path": "tree", "media_type": None},
+                "launch": [{
+                    "name": "待办清单网页", "kind": "web",
+                    "commands": {"windows": ["python", "-m", "http.server", "{port}"],
+                                 "linux": ["python3", "-m", "http.server", "{port}"]},
+                    "ready_url": "http://127.0.0.1:{port}/", "ready_timeout_sec": 30}],
+                "status": "active"}, "engineering"),
+            _materials_event(EventType.TRIAL_SESSION_STARTED, {
+                "session_id": TRIALS_SESSION, "department": "quality", "kind": "web",
+                "launch_name": "待办清单网页", "system": "windows", "port": 41001,
+                "ready_url": "http://127.0.0.1:41001/", "tree_digest": TRIALS_TREE_DIGEST,
+                "source": "delivery_snapshot", "pid": 101, "create_time": 2.0},
+                "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TRIAL_CASE_OPENED, {
+                "case_id": "case_trials", "session_id": TRIALS_SESSION,
+                "trial_session_id": TRIALS_SESSION, "department": "quality",
+                "activation_id": TRIALS_ACTIVATION, "product_spec_hash": TRIALS_SPEC_HASH,
+                "tree_digest": TRIALS_TREE_DIGEST, "criteria": ["AC1", "AC2"],
+                "title": "添加一条待办", "plan": ["打开列表页", "在输入框里输入“买牛奶”并点添加"],
+                "expected": "列表里出现这条待办"},
+                "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TOOL_STARTED,
+                             _trials_tool_started("call-1", "browser_navigate", 2,
+                                                  {"url": "http://127.0.0.1:41001/"}),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TOOL_CALLED,
+                             _trials_tool_called("call-1", "browser_navigate", 2,
+                                                 {"url": "http://127.0.0.1:41001/"}, images=[shot],
+                                                 output_ref=output_ref),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.MODEL_REQUESTED, _trials_model_requested(3),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TOOL_STARTED,
+                             _trials_tool_started("call-2", "browser_type", 3, {"text": "买牛奶"}),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TOOL_CALLED,
+                             _trials_tool_called("call-2", "browser_type", 3, {"text": "买牛奶"},
+                                                 images=[shot]),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.MODEL_REQUESTED, _trials_model_requested(4),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TOOL_STARTED,
+                             _trials_tool_started("call-3", "browser_verify_text_visible", 4,
+                                                  {"text": "买牛奶"}),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TOOL_CALLED,
+                             _trials_tool_called("call-3", "browser_verify_text_visible", 4,
+                                                 {"text": "买牛奶"}, output_ref=output_ref),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.MODEL_REQUESTED, _trials_model_requested(5),
+                             "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TRIAL_CASE_CONCLUDED, {
+                "case_id": "case_trials", "session_id": TRIALS_SESSION, "department": "quality",
+                "result": "passed", "observed": "列表里出现了「买牛奶」", "evidence_steps": ["call-3"],
+                "reason": ""}, "quality", session_id=TRIALS_SESSION),
+            _materials_event(EventType.TRIAL_SESSION_ENDED, {
+                "session_id": TRIALS_SESSION, "department": "quality", "kind": "web",
+                "reason": "stopped", "ended": True, "exit_code": 0},
+                "quality", session_id=TRIALS_SESSION),
+        )
+
+    system.writes.transact(run_stream(run_id), write)
+    # 预置出来的事项要在部门工作间上看得见：会话结束，用例通过，两次请求只看文字
+    projection = system.project(run_id)
+    if not projection.trial_cases or projection.trial_cases[0].result != "passed":
+        raise AssertionError("试用记录的预置没有写进去")
+
+
 def open_loop_script():
     # 开环完成与放行（工单 #1421）：产品与工程的轮次沿用默认脚本，质检按请求里的事实决定——
     # 交付到达以前是预测性探索，到达以后先交独立判断再给结论（验证的独立性 docs/design/independent-verification.md「先判断后看解释」）。
@@ -1497,7 +1647,7 @@ def main() -> int:
     # 再加同一项目里先后两个事项）。它们需要的轮次与预置事项不同，因此由用例选择
     parser.add_argument("--script", choices=("default", "onboarding", "initial", "waiting", "kernel", "pending",
                                              "stopnote", "replay", "kill", "steps", "coverage", "tools", "fetch",
-                                             "forms", "organization", "openloop", "materials"),
+                                             "forms", "organization", "openloop", "materials", "trials"),
                         default="default")
     # 硬杀重启的第二个进程（工单 #1188）：用 --script kill 的后半脚本（中断前的脚本已经用完，与
     # harness/tests/process_kill.py 的 tail 同一做法），并让启动恢复在这个进程起服务之前跑完。
@@ -1571,8 +1721,8 @@ def main() -> int:
     elif args.script == "coverage":
         # 开环明细（工单 #401）：一个放行带两条开环条件，离开期间的报告逐条列出它们
         adapter_script = coverage_script()
-    elif args.script == "materials":
-        # 逐条结论表与启动方式（工单 #154）：预置直接写事件，不需要模型轮次
+    elif args.script in ("materials", "trials"):
+        # 逐条结论表与启动方式（工单 #154）、试用记录页签（工单 #153）：预置直接写事件，不需要模型轮次
         adapter_script = {}
     elif args.script == "tools":
         # 工具与扩展页（工单 #239）：两个项目，工程各在事项里真实取回一次本机地址
@@ -1688,6 +1838,9 @@ def main() -> int:
         elif args.script == "materials":
             # 逐条结论表与启动方式（工单 #154）：交付带启动方式，放行记录带逐条结论与试用用例截图
             asyncio.run(seed_materials(application, system))
+        elif args.script == "trials":
+            # 试用记录页签（工单 #153）：一个结束的质检会话、一个通过的用例与两步的截图，请求只看文字
+            asyncio.run(seed_trials(application, system))
         elif args.script == "tools":
             # 工具与扩展页（工单 #239）：两个项目各一台 MCP 服务器、各一次真实取回；
             # 第一台服务器真的探测过（工具清单写回设置），第二台不探测
@@ -1711,7 +1864,7 @@ def main() -> int:
             # 另一个项目里一件成果挂起的事项
             asyncio.run(seed_open_loop(application, system))
         elif args.script not in ("initial", "waiting", "pending", "stopnote", "kill", "steps", "tools", "fetch",
-                                 "materials"):
+                                 "materials", "trials"):
             # 起始文件夹的用例（工单 #323）、等待模型服务的用例（工单 #375）、进行中的询问的用例
             # （工单 #477 的验收第 2 条）、停止说明的用例（工单 #1162）与硬杀重启的用例（工单 #1188）
             # 自己在界面上建项目并开始事项，不需要预置的项目与事项；进行中的询问还要求执行槽位空着，

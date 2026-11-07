@@ -1,6 +1,7 @@
 // 部门工作间（原型 v8 设计说明第 7.1 节，工单 #80）：标题区（部门名、职责、本部门的状态与原因、三个部门各自的状态、
 // 当前生效的模型及来源、最近一次请求实际使用的模型、协议与发送的档位、「部门设置」）；部门房间的位置由 #177 填入，
-// 房间信息写传信管上等待本部门回答的询问数；检查区页签：动作与回执（run.actions）、Context（清单与压缩记录）、部门 Prompt；
+// 房间信息写传信管上等待本部门回答的询问数；检查区页签：动作与回执（run.actions）、试用记录（run.trials 与 evidence.screenshot，工单 #153）、
+// Context（清单与压缩记录）、部门 Prompt；
 // 询问、部门消息与指导（run.asks 的询问、department.workspace 的消息与 guidance.send 的指导）；
 // 部门设置弹窗只改部门 Prompt，模型与档位由 #95 加入。标题区与询问的写法按原型 v12 第 3.1、3.3 节（工单 #905）。
 //
@@ -34,6 +35,7 @@ import { RoomLiveOutput, RoomScreen } from "./room-screen";
 import { type CommandState, useCommand, useSnapshot } from "./use-snapshot";
 import { ReadExisting } from "./read-existing";
 import { scopeName } from "./scope-name";
+import { TrialsPanel } from "./trials";
 import { defaultDepartment, departmentLabel, departmentLabels, type DepartmentView } from "./organization";
 import { readFailureText } from "../../contract/read-failure";
 
@@ -339,11 +341,14 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
 
 const INSPECT_TABS = [
   { id: "actions", label: "动作与回执" },
+  // 试用记录（工单 #153）排在动作与回执后面：两者都是这次运行的记录，试用记录只多一份截图与结论；
+  // 上下文与部门设置是这次运行的配置与材料
+  { id: "trials", label: "试用记录" },
   { id: "context", label: "上下文" },
   { id: "department-setting", label: "部门设置" },
 ];
 
-// 检查区：页签切换动作与回执、上下文清单与压缩记录、部门设置
+// 检查区：页签切换动作与回执、试用记录、上下文清单与压缩记录、部门设置
 function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult }) {
   const [tab, setTab] = useState("actions");
   const data = props.data;
@@ -366,6 +371,9 @@ function InspectArea(props: { app: ClientApp; data: DepartmentWorkspaceResult })
       </div>
       {tab === "actions" ? (
         <StepTimeline app={props.app} runId={data.run_id} department={data.department} />
+      ) : null}
+      {tab === "trials" ? (
+        <TrialsPanel app={props.app} runId={data.run_id} department={data.department} />
       ) : null}
       {tab === "context" ? <ContextPanel data={data} /> : null}
       {tab === "department-setting" ? <DepartmentSettingState data={data} /> : null}

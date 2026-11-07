@@ -53,8 +53,10 @@ def _renamed_definitions(directory: Path) -> Any:
 
     organization = load("organization.json")
     kept = next(item for item in organization["departments"] if item["id"] == KEPT)
+    # 只留工程改名：产品与质检不在了，工程对产品要求与缺陷记录的关注一起去掉（只剩指导；
+    # 用户输入由来源接，工单 #1515 的结构校验要求关注的成果有部门交）
     organization["departments"] = [dict(kept, id=RENAMED, label=RENAMED_LABEL, roles=[RENAMED],
-                                        watched=["user_input", *kept["watched"]])]
+                                        watched=["user_input", "guidance"])]
     # 两种事项的来源都由留下的这个角色接（工单 #1455）：接来源的部门要在这份定义里
     organization["sources"] = {"user_input": RENAMED, "onboarding": RENAMED}
     # 没有核验角色：写明空的核验声明，旧定义缺这一项时按三部门解释，那不是这份定义要的

@@ -19,8 +19,11 @@ from pydantic import ValidationError
 
 from harness import adjudication, kernel_events, submissions, tools, validation
 from harness.actions import TreeFacts, WorkspaceFacts
-from harness.definitions import (DEFINITIONS, LEGACY_VERIFICATION, Definitions, Tool, VerificationDeclaration,
-                                 VerifiedOutcomes, VerifierRole, WriteScope, source_issues, verification_issues)
+from harness.definitions import (DEFINITIONS, LEGACY_VERIFICATION, DefinitionError, Department, Definitions,
+                                 Tool, VerificationDeclaration, definitions_from_contents,
+                                 VerifiedOutcomes, VerifierRole, WriteScope, final_outcome_issues,
+                                 organization_change_issues, parse_organization_changes, source_issues,
+                                 verification_issues, watched_output_issues, workspace_writer_issues)
 from harness.minimal_projection import fold_events
 from harness.models import RunProjection, SessionRecord
 from harness.path_rules import QA_TESTS_DIR
@@ -425,3 +428,99 @@ def test_an_unknown_item_source_has_no_department() -> None:
     assert declared.source_department("user_input") == "engineering"
     with pytest.raises(ValueError, match="item source 'operations' is not in this definition"):
         declared.source_department("operations")
+
+
+# 结构校验补上的几条（工单 #1515，项目的组织设计说明「拒绝与提醒」第 4、5、7、8、10 条）：
+# 关注的成果有部门交、事项能结束、运行工作区只有一个写入者；本项目的改动只写这个发布有的工具与轮转方式，
+# 新增的部门要写三样说明。检查都在内核里，函数直接读一份定义的那几项，不加载文件、不开数据库。
+def test_the_default_definition_passes_the_new_organization_checks() -> None:
+    assert watched_output_issues(DEFINITIONS.organization, DEFINITIONS.roles, DEFINITIONS.tools,
+                                 DEFINITIONS.work_items, DEFINITIONS.outcome_kinds) == []
+    assert final_outcome_issues(DEFINITIONS.organization, DEFINITIONS.roles, DEFINITIONS.tools,
+                                DEFINITIONS.work_items, DEFINITIONS.routings, DEFINITIONS.outcome_kinds) == []
+    assert workspace_writer_issues(DEFINITIONS.organization, DEFINITIONS.roles, DEFINITIONS.tools) == []
+
+
+def test_a_watched_outcome_without_a_delivering_department_is_rejected() -> None:
+    # 关注的是这份定义里的成果种类（产品关注基线核验），交它的工具不在定义里时拒绝，
+    # 写明是哪个部门的第几项；事项的来源（user_input）与指导不是成果种类，不在这里核对
+    narrowed = _without_tool(DEFINITIONS, "submit_baseline_review")
+    issues = watched_output_issues(narrowed.organization, narrowed.roles, narrowed.tools, narrowed.work_items,
+                                   narrowed.outcome_kinds)
+    assert issues == [("organization.json", "departments[0].watched[2]",
+                       "关注的成果 baseline_review 没有部门交")]
+
+
+def test_an_item_that_cannot_finish_is_rejected() -> None:
+    # 路由写明事项最后采纳交付：没有部门交得出交付时事项结束不了，写明是哪一份路由的哪一项
+    narrowed = _without_tool(DEFINITIONS, "submit_delivery")
+    issues = final_outcome_issues(narrowed.organization, narrowed.roles, narrowed.tools, narrowed.work_items,
+                                  narrowed.routings, narrowed.outcome_kinds)
+    assert issues == [("routings.json", "routings[0].final_outcome", "事项无法结束：没有部门交 delivery_spec")]
+
+
+def test_two_workspace_writers_are_rejected() -> None:
+    # 运行工作区只由工程的一轮工作写入：再加一个有写文件工具、写入范围是工作区的部门时拒绝，写明是哪几个。
+    # 只读或只交成果的部门不是写入者，所以默认定义通过（上一条）
+    organization = DEFINITIONS.organization.model_copy(update={"departments": (
+        *DEFINITIONS.organization.departments, Department(id="design", label="设计", roles=("design",)))})
+    roles = {**DEFINITIONS.roles, "design": DEFINITIONS.roles["engineering"]}
+    issues = workspace_writer_issues(organization, roles, DEFINITIONS.tools)
+    assert issues == [("organization.json", "verification.write_scopes",
+                       "运行工作区有两个写入者：engineering、design")]
+
+
+def test_the_change_document_rejects_unknown_fields_tools_and_routings() -> None:
+    # 本项目的改动只写这个发布有的工具与轮转方式，改的部门要在这份形态里（第 10 条）
+    changes, issues = parse_organization_changes({"departments": {"quality": {"name": "验收"}}})
+    assert changes is None and issues == [("changes.json", "departments.quality.name", "未知的字段 name")]
+    # 类型不对时用类型核对给出的说明（不是多写的字段）
+    changes, issues = parse_organization_changes({"departments": "quality"})
+    assert changes is None and issues[0][:2] == ("changes.json", "departments")
+
+    changes, issues = parse_organization_changes({"departments": {"engineering": {"tools": {"add": ["teleport"]}}}})
+    assert issues == [] and changes is not None
+    assert organization_change_issues(DEFINITIONS, changes) == [
+        ("changes.json", "departments.engineering.tools.add[0]", "这个发布没有的工具 teleport")]
+
+    changes, _ = parse_organization_changes({"routing": "task_pool"})
+    [issue] = organization_change_issues(DEFINITIONS, changes)
+    assert issue[:2] == ("changes.json", "routing") and "task_pool" in issue[2] and "watched_outputs" in issue[2]
+
+    changes, _ = parse_organization_changes({"departments": {"nosuch": {"label": "无"}}})
+    assert organization_change_issues(DEFINITIONS, changes) == [
+        ("changes.json", "departments.nosuch", "形态里没有部门 nosuch")]
+
+
+def test_a_new_department_must_state_the_three_statements() -> None:
+    # 新增的部门要写基础规则第 5 条要的三样，逐项写明缺哪一样（第 8 条）；身份不能与发布带的重复
+    changes, _ = parse_organization_changes({"add_departments": [{"id": "design", "label": "设计"}]})
+    assert organization_change_issues(DEFINITIONS, changes) == [
+        ("changes.json", "add_departments[0].target", "新增的部门 design 缺「它对什么负责」"),
+        ("changes.json", "add_departments[0].evidence", "新增的部门 design 缺「凭什么判断」"),
+        ("changes.json", "add_departments[0].work", "新增的部门 design 缺「怎么工作」"),
+    ]
+    changes, _ = parse_organization_changes({"add_departments": [
+        {"id": "design", "label": "设计", "target": "做界面", "evidence": "设计材料", "work": "画稿与评审"}]})
+    assert organization_change_issues(DEFINITIONS, changes) == []
+    changes, _ = parse_organization_changes({"add_departments": [
+        {"id": "engineering", "label": "工程", "target": "做", "evidence": "看", "work": "做"},
+        {"id": "engineering", "label": "又一个工程", "target": "做", "evidence": "看", "work": "做"}]})
+    assert [issue[:2] for issue in organization_change_issues(DEFINITIONS, changes)] == [
+        ("changes.json", "add_departments[0].id"), ("changes.json", "add_departments[1].id")]
+
+
+def test_contents_without_a_required_file_are_rejected() -> None:
+    # 从内容建立定义与从文件加载是同一套校验：少一份必需的定义文件时整份拒绝，写明是哪一份
+    contents = dict(DEFINITIONS.contents)
+    del contents["rules.json"]
+    with pytest.raises(DefinitionError) as raised:
+        definitions_from_contents(contents)
+    assert ("rules.json", "（整个文件）", "定义文件不存在") in raised.value.issues
+
+
+def test_an_outcome_kind_the_form_already_has_cannot_be_added() -> None:
+    # 新增的成果种类按身份认：形态里已有的那一项不能再加一次（第 4、10 条）
+    changes, _ = parse_organization_changes({"outcome_kinds": {"add": [{"id": "product_spec", "label": "又一个"}]}})
+    assert organization_change_issues(DEFINITIONS, changes) == [
+        ("changes.json", "outcome_kinds.add[0].id", "成果种类 product_spec 已经在形态里")]

@@ -146,6 +146,8 @@ ignore_imports = [
   "harness.app.** -> harness.providers.**",
   # 补：定义的加载与结构校验
   "harness.app.** -> harness.definitions",
+  # 补：合成（形态加本项目的改动）在应用服务里（项目的组织设计说明第 3 节的包图，工单 #1515）
+  "harness.app.** -> harness.organization_compose",
   # 补：事件种类与界面用的名词声明（S5a 以后由应用自己持有）
   "harness.app.** -> harness.models",
   # 补：工件引用与树的封存

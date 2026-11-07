@@ -46,7 +46,7 @@ from .evidence_queries import EVIDENCE_EXTERNAL_SOURCE, EVIDENCE_SCREENSHOT
 from .. import fetch
 from .event_stream import EventScope, EventStream
 from .form_commands import ORGANIZATION_ADOPT
-from .form_queries import PROJECT_ORGANIZATION
+from .form_queries import ORGANIZATION_DRAFT, PROJECT_ORGANIZATION
 from .home import HOME_AWAY_REPORT, HOME_MARK_SEEN
 from .mcp_commands import MCP_SERVERS_SAVE, TOOL_SERVER_PROBE
 from .parameter_commands import PARAMETER_SET, PARAMETER_WITHDRAW
@@ -137,7 +137,9 @@ DEFAULT_REGISTRY = Registry(
              RUN_TRIALS, EVIDENCE_SCREENSHOT,
              ACCEPTANCE_COVERAGE,
              CATALOG_QUERY, CATALOG_DOCUMENT_QUERY, CATALOG_CHANGE_IMPACT_QUERY, HOME_AWAY_REPORT, RULES_REGISTRY,
-             TOOLS_REGISTRY, RUN_LOOPS, PROJECT_ORGANIZATION],
+             TOOLS_REGISTRY, RUN_LOOPS, PROJECT_ORGANIZATION,
+             # 校验草稿（工单 #1515）：合成结果、拒绝项、提醒与「这样改以后事项怎么结束」，不写入
+             ORGANIZATION_DRAFT],
     decisions=tuple(DECISION_KINDS))
 
 
