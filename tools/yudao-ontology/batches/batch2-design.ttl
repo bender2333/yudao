@@ -1,0 +1,127 @@
+# 第 2 批：设计说明。参照抽取，本线程按原句逐条写出，每个个体带出处与原句。
+# 抽了：形态与核验角色设计说明第 1、4.2、4.5、4.7 节；部门内多角色设计说明第 4.1、4.3、4.4、4.8 节（只抽工程那一份，产品与质检同构，没抽）；
+# 骨架与应用设计说明「接你的输入与建档的部门」一句。没抽：总体架构（模块图，留给第 4 批对代码）、三部门的循环结构、验证的独立性设计说明的其余部分。
+@prefix yd: <https://yudao.dev/onto#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+yd:form-default yd:docRef "形态与核验角色设计说明 4.7" ; yd:batch 2 ;
+    yd:quote "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）" ;
+    yd:finalOutcome yd:ok-delivery .
+yd:dept-product yd:docRef "骨架与应用设计说明「其他路由」" ; yd:batch 2 ;
+    yd:quote "接你的输入与建档的部门，是定义里事项的来源写明的那个部门（三部门里是产品）" ;
+    yd:receives yd:src-user-input, yd:src-onboarding .
+yd:decl-default-quality yd:docRef "形态与核验角色设计说明 4.2" ; yd:batch 2 ;
+    yd:quote "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。" ;
+    yd:hasIndependentEvidence yd:ev-host-run .
+yd:ev-host-run a yd:RunEvidence ; rdfs:label "主机在独立副本上跑的检查"@zh ; yd:docRef "形态与核验角色设计说明 4.2" ; yd:batch 2 ;
+    yd:quote "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。" .
+yd:role-min yd:docRef "形态与核验角色设计说明 4.5" ; yd:batch 2 ;
+    yd:quote "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）" ;
+    yd:receives yd:src-user-input, yd:src-onboarding .
+yd:ok-min-completion yd:docRef "形态与核验角色设计说明 4.7" ; yd:batch 2 ;
+    yd:quote "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）" .
+yd:form-min yd:docRef "形态与核验角色设计说明 4.7" ; yd:batch 2 ;
+    yd:quote "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）" ;
+    yd:finalOutcome yd:ok-min-completion .
+yd:form-outsourced a yd:Form ; rdfs:label "一个外包角色直做"@zh ; yd:docRef "形态与核验角色设计说明 第 1 节" ; yd:batch 2 ;
+    yd:quote "一个外包角色直做 | 一个外包角色 | 直做 | 没有 | 外包交回快照，开环完成并注明外包" ;
+    yd:rotation yd:rm-direct ;
+    yd:canSubmitCompletion yd:role-outsourced ;
+    yd:finalOutcome yd:ok-out-completion .
+yd:role-outsourced a yd:OutsourcedRole ; rdfs:label "一个外包角色"@zh ; yd:docRef "形态与核验角色设计说明 4.5" ; yd:batch 2 ;
+    yd:quote "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）" ;
+    yd:inForm yd:form-outsourced ;
+    yd:produces yd:ok-out-completion ;
+    yd:receives yd:src-user-input, yd:src-onboarding .
+yd:ok-out-completion a yd:OutcomeKind ; rdfs:label "外包交回的快照"@zh ; yd:docRef "形态与核验角色设计说明 第 1 节" ; yd:batch 2 ;
+    yd:quote "外包交回快照，开环完成并注明外包" ;
+    yd:inForm yd:form-outsourced ;
+    yd:completion yd:completion-openloop .
+yd:form-several a yd:Form ; rdfs:label "几个角色直做"@zh ; yd:docRef "形态与核验角色设计说明 第 1 节、4.5" ; yd:batch 2 ;
+    yd:quote "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。" ;
+    yd:rotation yd:rm-direct ;
+    yd:canSubmitCompletion yd:role-sev-engineering ;
+    yd:finalOutcome yd:ok-sev-completion .
+yd:role-sev-product a yd:Role ; rdfs:label "产品（几个角色直做）"@zh ; yd:docRef "形态与核验角色设计说明 4.5" ; yd:batch 2 ;
+    yd:quote "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。" ;
+    yd:inForm yd:form-several .
+yd:role-sev-engineering a yd:Role ; rdfs:label "工程（几个角色直做）"@zh ; yd:docRef "形态与核验角色设计说明 4.5" ; yd:batch 2 ;
+    yd:quote "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。" ;
+    yd:inForm yd:form-several ;
+    yd:produces yd:ok-sev-completion ;
+    yd:receives yd:src-user-input, yd:src-onboarding .
+yd:ok-sev-completion a yd:OutcomeKind ; rdfs:label "工程交的完成（几个角色直做）"@zh ; yd:docRef "形态与核验角色设计说明 4.5" ; yd:batch 2 ;
+    yd:quote "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。" ;
+    yd:inForm yd:form-several ;
+    yd:completion yd:completion-openloop .
+yd:form-eng-center a yd:Form ; rdfs:label "工程的中心型小组"@zh ; yd:docRef "部门内多角色设计说明 4.1、4.2" ; yd:batch 2 ;
+    yd:quote "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项" ;
+    yd:rotation yd:rm-direct ;
+    yd:canSubmitCompletion yd:role-eng-architect ;
+    yd:finalOutcome yd:ok-eng-center-completion .
+yd:dept-engineering yd:docRef "部门内多角色设计说明 4.1、4.3" ; yd:batch 2 ;
+    yd:quote "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项" ;
+    yd:subOrganization yd:form-eng-center ;
+    yd:hasInternalVerification yd:decl-eng-review .
+yd:role-eng-architect a yd:Role ; rdfs:label "工程架构师（中心角色）"@zh ; yd:docRef "部门内多角色设计说明 4.1" ; yd:batch 2 ;
+    yd:quote "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" ;
+    yd:inForm yd:form-eng-center ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:hasObjective yd:obj-eng-architect ;
+    yd:hasEvidenceBasis yd:basis-eng-architect ;
+    yd:produces yd:ok-eng-center-completion ;
+    yd:receives yd:src-subtask .
+yd:obj-eng-architect a yd:Objective ; rdfs:label "把任务做成能交完成的成果"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ; yd:batch 2 ;
+    yd:quote "把任务做成能交完成的成果" .
+yd:basis-eng-architect a yd:EvidenceBasis ; rdfs:label "项目材料、同伴交回的结论、本部门记录"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ; yd:batch 2 ;
+    yd:quote "项目材料、同伴交回的结论、本部门记录" .
+yd:role-eng-explorer a yd:Role ; rdfs:label "探索者"@zh ; yd:docRef "部门内多角色设计说明 4.1" ; yd:batch 2 ;
+    yd:quote "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" ;
+    yd:inForm yd:form-eng-center ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:hasObjective yd:obj-eng-explorer ;
+    yd:hasEvidenceBasis yd:basis-eng-explorer .
+yd:obj-eng-explorer a yd:Objective ; rdfs:label "交回带来源的发现"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ; yd:batch 2 ;
+    yd:quote "交回带来源的发现" .
+yd:basis-eng-explorer a yd:EvidenceBasis ; rdfs:label "项目材料、代码、外部文档"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ; yd:batch 2 ;
+    yd:quote "项目材料、代码、外部文档" .
+yd:role-eng-lead a yd:Role ; rdfs:label "主程"@zh ; yd:docRef "部门内多角色设计说明 4.1" ; yd:batch 2 ;
+    yd:quote "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" ;
+    yd:inForm yd:form-eng-center ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:hasObjective yd:obj-eng-lead ;
+    yd:hasEvidenceBasis yd:basis-eng-lead .
+yd:obj-eng-lead a yd:Objective ; rdfs:label "按设计与计划实现并自测"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ; yd:batch 2 ;
+    yd:quote "按设计与计划实现并自测" .
+yd:basis-eng-lead a yd:EvidenceBasis ; rdfs:label "设计与计划、代码、自测结果"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ; yd:batch 2 ;
+    yd:quote "设计与计划、代码、自测结果" .
+yd:role-eng-reviewer a yd:Role ; rdfs:label "审查者"@zh ; yd:docRef "部门内多角色设计说明 4.1" ; yd:batch 2 ;
+    yd:quote "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码" ;
+    yd:inForm yd:form-eng-center ;
+    yd:belongsTo yd:dept-engineering ;
+    yd:hasObjective yd:obj-eng-reviewer ;
+    yd:hasEvidenceBasis yd:basis-eng-reviewer .
+yd:obj-eng-reviewer a yd:Objective ; rdfs:label "判断这一版成果是否可以放行"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「目标」列" ; yd:batch 2 ;
+    yd:quote "判断这一版成果是否可以放行" .
+yd:basis-eng-reviewer a yd:EvidenceBasis ; rdfs:label "待审查的成果、它的依据、上一轮审查意见"@zh ; yd:docRef "部门内多角色设计说明 4.1 角色清单「证据来源」列" ; yd:batch 2 ;
+    yd:quote "待审查的成果、它的依据、上一轮审查意见" .
+yd:role-eng-reviewer yd:docRef "部门内多角色设计说明 4.4" ; yd:batch 2 ;
+    yd:quote "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。" .
+yd:role-eng-reviewer a yd:NoAuthorHistory .
+yd:ok-eng-center-completion a yd:OutcomeKind ; rdfs:label "中心角色交的完成（工程子事项）"@zh ; yd:docRef "部门内多角色设计说明 4.3" ; yd:batch 2 ;
+    yd:quote "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版……放行则子事项结束；打回则中心角色再开始一轮。" ;
+    yd:inForm yd:form-eng-center ;
+    yd:completion yd:completion-release .
+yd:decl-eng-review a yd:VerificationDecl ; rdfs:label "审查者核验工程架构师交的完成"@zh ; yd:docRef "部门内多角色设计说明 4.1、4.3" ; yd:batch 2 ;
+    yd:quote "审查者 | ……读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成" ;
+    yd:verifier yd:role-eng-reviewer ;
+    yd:verified yd:role-eng-architect ;
+    yd:forOutcome yd:ok-eng-center-completion ;
+    yd:inForm yd:form-eng-center .
+yd:src-subtask yd:docRef "形态与核验角色设计说明 4.6" ; yd:batch 2 ;
+    yd:quote "子事项有自己的事件流和冻结的定义；它的事项的来源是「上一层交来的任务」，由子组织里定义接它的角色接" .
+yd:form-default yd:rotation yd:rm-by-outcome ; yd:docRef "形态与核验角色设计说明 第 1 节" ;
+    yd:quote "三部门（默认） | 产品、工程、质检 | 成果驱动 | 质检 | 质检放行" .
+yd:role-eng-explorer yd:produces yd:ok-eng-findings .
+yd:ok-eng-findings a yd:OutcomeKind ; rdfs:label "带来源的发现"@zh ; yd:docRef "部门内多角色设计说明 4.1" ; yd:batch 2 ;
+    yd:quote "探索者 | 询问里交来的查证任务 | 交回带来源的发现" ; yd:inForm yd:form-eng-center .
