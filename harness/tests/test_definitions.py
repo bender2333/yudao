@@ -11,7 +11,7 @@ from harness.watched_outputs import has_new_work
 from harness.adapters.base import ProviderError
 from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.definitions import (DEFINITIONS, DEFINITIONS_DIR, LEGACY_VERIFICATION, DefinitionError, UnknownStopReason,
-                                 WriteScope, load_definitions)
+                                 WriteScope, definitions_from_contents, load_definitions)
 from harness.path_rules import QA_TESTS_DIR
 from harness.event_store import run_stream
 from harness.models import EventType, ProjectEventType
@@ -116,6 +116,24 @@ def test_the_default_routing_is_the_watched_outputs_routing(tmp_path):
     assert load_definitions(directory).routing == "watched_outputs"
 
 
+def test_the_three_statements_of_a_department_load_and_the_contents_reload_the_same_definition(tmp_path):
+    # R2（定义的格式，工单 #1515）：部门可以写它对什么负责、凭什么判断、怎么工作——字段只增，发布带的部门
+    # 没有写时为空。合成从一份定义读到的那几份文件的内容出发，用同一套校验重新建立一份相同的定义
+    first = DEFINITIONS.organization.departments[0]
+    assert (first.target, first.evidence, first.work) == ("", "", "")
+    directory = _copy(tmp_path)
+    organization = _read(directory, "organization.json")
+    organization["departments"][0].update({"target": "把要求写清楚", "evidence": "用户原话与起始材料",
+                                           "work": "读材料、写要求、回答询问"})
+    _write(directory, "organization.json", organization)
+    loaded = load_definitions(directory)
+    department = loaded.organization.departments[0]
+    assert (department.target, department.evidence, department.work) == (
+        "把要求写清楚", "用户原话与起始材料", "读材料、写要求、回答询问")
+    assert loaded.version != DEFINITIONS.version
+    assert definitions_from_contents(loaded.contents) == loaded
+
+
 def test_departments_and_roles_must_refer_to_each_other(tmp_path):
     directory = _copy(tmp_path)
     organization = _read(directory, "organization.json")
@@ -165,10 +183,12 @@ def test_a_definition_without_the_verification_declaration_reads_the_three_depar
 
 
 def test_a_definition_without_a_verifier_loads_and_marks_the_delivery_open_loop(tmp_path):
-    # 验收第 2 条：去掉核验角色的测试定义加载成功，开环判断为是
+    # 验收第 2 条：去掉核验角色的测试定义加载成功，开环判断为是。写入范围照旧写在声明里：
+    # 质检的写文件工具只写检查材料，去掉核验角色以后它仍然不是运行工作区的写入者
     directory = _copy(tmp_path)
     organization = _read(directory, "organization.json")
-    organization["verification"] = {"verifiers": [], "write_scopes": {}}
+    organization["verification"] = {"verifiers": [], "write_scopes": {
+        "quality": {"scope": "check_materials", "paths": [QA_TESTS_DIR]}}}
     _write(directory, "organization.json", organization)
     loaded = load_definitions(directory)
     assert loaded.verifier_roles() == ()
@@ -319,6 +339,8 @@ def test_tool_categories_and_references_are_checked(tmp_path):
         ("tools.json", "submit_baseline_review.proposal", "提案种类 delivery_spec 已经由 submit_delivery 提交"),
         ("proposal_contracts.json", "roles.quality.kinds",
          "与共同部分合起来必须恰好说明这些提案种类：delivery_spec、independent_judgement、qa_review"),
+        # 提交基线核验的工具改成了提交交付：基线核验没有人交，产品对它的关注被拒绝（工单 #1515 的拒绝第 4 条）
+        ("organization.json", "departments[0].watched[2]", "关注的成果 baseline_review 没有部门交"),
     )
 
 

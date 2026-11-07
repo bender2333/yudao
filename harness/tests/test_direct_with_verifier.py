@@ -217,6 +217,9 @@ def _two_verifier_form(tmp_path) -> object:
     organization["departments"].append({"id": INSPECTOR, "label": "复核", "roles": [INSPECTOR], "watched": []})
     organization["verification"]["verifiers"].append(
         {"role": INSPECTOR, "verifies": [{"role": ENGINEERING, "outcomes": [COMPLETION_KIND]}]})
+    # 第二个核验角色与质检同一套材料：写入范围是检查材料（核验角色固定只写检查材料），
+    # 否则它带着质检的写文件工具成为运行工作区的第二个写入者（工单 #1515 的拒绝第 7 条）
+    organization["verification"]["write_scopes"][INSPECTOR] = organization["verification"]["write_scopes"][QUALITY]
     save("organization.json", organization)
 
     roles = load("roles.json")
