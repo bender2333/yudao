@@ -23,7 +23,7 @@
 | 代码与测试 | `harness/`、`client/`、`evals/` | | solo 执行者 |
 | 合并 PR 与推送 main | GitHub | | solo 执行者；架构师（只推文档） |
 | 观察、报告、想法 | GitHub Discussions | | 任何角色 |
-| 规则 | `CLAUDE.md`、`AGENTS.md`、`docs/agents/`、技能 `.claude/skills/`、CI 工作流 | 用户 | 总架构师；用户不在场时架构师循环 |
+| 规则 | `CLAUDE.md`、`AGENTS.md`、`docs/agents/`、技能 `.claude/skills/`、CI 工作流 | 用户 | 总架构师 |
 | 过程与理由 | `claude_jour.md`、`agents_jour/`、`docs/decision.md`、`docs/CHANGELOG.md` | | 任何角色 |
 
 Discussions 不表示工单的状态。帖子里要改代码的事转成工单，在帖子里回一句「已转 #编号」；要改设计、原型或文档的事直接改，回一句改了哪份文档；总图与规则的事开 `architecture` 工单（第 7 节）。分类：Announcements 放复盘，General 放试用报告与评测证据（评测的中文报告与读数，标题前缀「证据：」），Ideas 放等分诊的想法，Show and tell 放只读的扫描与差异报告。
@@ -37,7 +37,7 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | 用户 | 定走向、规则、试用结论；看总图、对照表与工单点到的契约文件 | 不写代码与测试，不定工单正文，不审也不合并 PR |
 | 总架构师 | 总图、路线图、规则与理念；建阶段工单与里程碑；阶段的结束核对；处理 `architecture` 工单 | 不管其余工单层面的事 |
 | 子架构师 | 一条工作线或一个模块：讨论、设计说明、拆单、分诊、验收、试用准备 | 不改总图；不改代码与测试 |
-| 架构师循环 | 用户不在时的子架构师，做同样的事 | 不改意图；不关试用工单与里程碑 |
+| 架构师循环 | 四种转换：子工单全关的父工单验收、`needs-triage` 分诊、到期的 `waiting` 放回、挡住它的 `architecture` 工单已关闭的 `ready-for-human` 重新分诊；证据包由定时任务的检查会话（便宜的模型）写，结论由它派的架构师子代理（架构师的模型）写 | 不改意图、总图、规则文件、技能与 CI；不关试用工单与里程碑；不写新的设计说明、不拆还没拆的父工单、不处理 Discussions 的想法、不做薄片的试用准备 |
 | solo 执行者 | 领子工单，实现、自测、开 PR、写交付说明、合并前核对、合并 PR 与推送 main | 不改总图与规则 |
 | 审查者 | 只审改到内核代码的 PR（第 8 节），在全新的上下文里 | 不推送，不改标签 |
 | agent 试用者 | 用从 main 打包的实例走真实用户的路子，写试用报告 | 不建工单 |
@@ -86,6 +86,7 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | `DELIVERY:` | 执行者 | 改了哪些文件、测试命令与计数、逐条验收与证据、删掉的用例与理由、覆盖读数 |
 | `REVIEW:` | 审查者 | 批准或要求修改，逐条理由 |
 | `ARCHITECT:` | 执行者 | 卡在哪里、事实（文件与行号、命令与结果）、建议、需要谁决定 |
+| `EVIDENCE:` | 架构师循环的检查会话 | 验收或分诊要的证据，按条列用例、提交、CI 运行，格式见 `architect-loop` 技能 |
 | `TRIAGE:` | 架构师 | 交回的结论：拆小、改正文、补设计、交上一级 |
 | `WAITING:` | 架构师 | 等到哪一天：`WAITING: 日期 YYYY-MM-DD`，下面写还在等什么、到期以后第一件要核对的事；放回时再写一条，不带日期 |
 | `VERDICT:` | 架构师 | 验收标准逐条：过了、没过、说不清；说不清不算过 |
@@ -96,7 +97,7 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 
 ```
 内循环    子工单 → PR → CI → 合并前核对（内核改动加独立审查）→ 合并          solo 执行者
-中循环    父工单的子工单全部关闭 → VERDICT → 没过的补成缺口子工单           子架构师或架构师循环
+中循环    父工单的子工单全部关闭 → VERDICT → 没过的补成缺口子工单           子架构师；架构师循环
 外循环    薄片达到 → 复盘 → agent 试用 → 明确缺陷修完 → 发布走查 → 导游卡
           → 用户试用 → 反馈分流：缺陷成子工单；模块走向交子架构师；总图边界成 architecture 工单
 自我改进  复盘的教训：能写成 CI 检查的写成检查，否则改到某个技能的某一段；
@@ -112,16 +113,16 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | 卡在 | 交给 | 怎么交 |
 | --- | --- | --- |
 | 执行环境、要用户提供的条件 | 用户 | `ready-for-human`，评论写要用户做什么 |
-| `needs-triage` 的理由（第 4 节） | 子架构师或架构师循环 | `ARCHITECT:` 评论，`needs-triage` |
+| `needs-triage` 的理由（第 4 节） | 子架构师；架构师循环 | `ARCHITECT:` 评论，`needs-triage` |
 | 与总图冲突、总图缺了什么 | 总架构师 | 一张 `architecture` 工单，写现象、总图哪一节、要定什么；相关工单 `ready-for-human`，`TRIAGE:` 评论写明它的编号 |
-| 规则本身要改 | 总架构师；用户不在场时架构师循环 | 直接改，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` |
+| 规则本身要改 | 总架构师 | 直接改，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` |
 | 意图要改：目的、判据、基础规则的意思 | 用户 | 一张 `architecture` 工单，写现象与要定什么，等用户；相关工单 `ready-for-human` |
 | 同一张工单分诊满两次 | 用户 | `ready-for-human`，`TRIAGE:` 评论写明交给用户 |
 | 薄片的缺陷修了两轮还在 | 用户 | `ready-for-human` |
 | 后台长运行重跑一次仍失败 | 用户 | `ready-for-human` |
 | 要放宽验收 | 用户 | `ready-for-human`，写清要用户定什么 |
 
-问题定了以后，总图与规则由总架构师直接改，在 `architecture` 工单上评论结论并关闭。被它挡住的工单按 `/triage` 核对，`ready-for-agent` 由子架构师或架构师循环加上。
+问题定了以后，总图与规则由总架构师直接改，在 `architecture` 工单上评论结论并关闭。被它挡住的工单按 `/triage` 核对，`ready-for-agent` 由子架构师或架构师循环（按它的转换）加上。
 
 执行者自己做下去的情况（文件超上限、要改「只改」以外的文件、依据改过、点名的东西搬了家、设计没写到的边界）见 `AGENTS.md`「请架构师处理」。
 
@@ -131,25 +132,22 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 
 ## 9. 技能
 
-**入口 `/next`**：读 GitHub 的状态，按下面的顺序取第一件能做的事，把对应技能的步骤原样抄进待办，不做的步骤留着写「skip：原因」。
+**入口 `/next`**（用户在场时用）：读 GitHub 的状态，按下面的顺序取第一件能做的事，把对应技能的步骤原样抄进待办，不做的步骤留着写「skip：原因」。
 
-1. 等用户的事（只在用户在场时，先出一张不超过 10 行的卡）
-2. 到期的 `waiting` 工单（最后一条 `WAITING:` 评论写的日期已到，放回 `ready-for-agent`）
-3. `needs-triage` 的工单；挡住它的 `architecture` 工单已关闭的 `ready-for-human` 工单
-4. 子工单全部关闭的父工单（验收）
-5. 达到的薄片（试用）
-6. 设计未写的桶（阶段工单的薄片清单里记着）
-7. 还没拆的父工单
-8. Discussions 的 Ideas
+1. 等用户的事（先出一张不超过 10 行的卡）
+2. 交接点：到期的 `waiting` 工单、`needs-triage` 的工单、挡住它的 `architecture` 工单已关闭的 `ready-for-human` 工单、子工单全部关闭的父工单；按 `architect-loop` 技能的转换做这一件（用户在场时，取证派便宜模型的子代理，判断自己做；定时任务里，检查会话自己取证、判断派架构师子代理）
+3. 达到的薄片（试用）
+4. 设计未写的桶（阶段工单的薄片清单里记着）
+5. 还没拆的父工单
+6. Discussions 的 Ideas
 
-用户在场与不在场是同一个入口，权限只差意图这一处，其余不等用户：
+权限只在意图、规则文件与 CI、试用工单与里程碑三处分在场与不在场；`/next` 只在用户在场时用，架构师循环的权限跟着它的转换走（第 2 节），与用户在不在场无关：
 
 | | 用户在场 | 用户不在场（架构师循环） |
 | --- | --- | --- |
 | 改意图：目的、判据、基础规则的意思（[D38](../requirements/system-intent.md)、[基础规则](../foundation-rules.md)） | 可以，用户定了以后总架构师改 | 不可以，开一张 `architecture` 工单等用户 |
-| 改其余规则、CI 工作流 | 可以，改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 可以，同样记入，日记里写明用户不在场 |
-| 改设计说明、拆单、分诊、验收、试用准备 | 可以 | 可以 |
-| 关闭试用工单与里程碑 | 可以，用户确认以后 | 不可以 |
+| 改规则、CI 工作流 | 可以，改完告诉用户，记入 `docs/CHANGELOG.md` 与 `claude_jour.md` | 不可以，开一张 `architecture` 工单 |
+| 关闭试用工单与里程碑 | 用户确认以后 | 不可以 |
 
 **技能**（每个管一段流转；用法与例子见[技能使用说明](../../.claude/skills/README.md)）：
 
@@ -163,11 +161,12 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | `solo-worker` | 子工单 → PR → `DELIVERY:` → 合并 | tdd、diagnosing-bugs |
 | `reviewer` | 内核 PR → `REVIEW:` | code-review |
 | `verify` | 父工单与阶段 → `VERDICT:` | seam-diff |
+| `architect-loop` | 四种转换：父工单验收、分诊、放回到期的 `waiting`、重新分诊；一件一件做，写 `EVIDENCE:` 与 `VERDICT:`/`TRIAGE:` | verify、triage、to-children |
 | `trial-intake` | 薄片：agent 试用、缺陷、发布走查、`TRIAL:`、反馈分流 | trial、discussion-note |
 | `triage` | `needs-triage`、Ideas、外部报告 → `TRIAGE:`；代替 Matt 的 `/triage` | grilling |
 | `milestone-retro` | 证据 → 教训 → 检查或技能改动 | — |
 
-`solo` 是执行者的循环，按范围一轮一轮跑 `solo-worker`；架构师循环是 `/next` 在用户不在场时一件一件做下去。积木直接调用，不复制进来：grilling、domain-modeling、research、prototype、tdd、diagnosing-bugs、code-review、codebase-design、ticket、trial、seam-diff、doc-scan、discussion-note。
+`solo` 是执行者的循环，按范围一轮一轮跑 `solo-worker`；`architect-loop` 是架构师的循环，由定时任务唤醒，一次做一件转换。积木直接调用，不复制进来：grilling、domain-modeling、research、prototype、tdd、diagnosing-bugs、code-review、codebase-design、ticket、trial、seam-diff、doc-scan、discussion-note。
 
 **每个技能用同一副骨架**：
 
@@ -209,7 +208,7 @@ Discussions 不表示工单的状态。帖子里要改代码的事转成工单�
 | 谁不 | 审查者不推送 |
 | 是不是清单一员 | 文件超上限不是 `needs-triage` 的理由 |
 | 以谁为准 | 设计说明与 ADR 冲突时以设计说明为准 |
-| 在场可否 | 用户不在场时架构师循环不可以改意图 |
+| 在场可否 | `/next` 只在用户在场时用 |
 | 交给 | 执行环境的问题交给用户 |
 | 穷尽清单 | 只有设计问题、规则矛盾、验收做不到、冲突两边都丢行为、连续三轮没过是 `needs-triage` 的理由 |
 

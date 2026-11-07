@@ -1,7 +1,7 @@
 ---
 name: next
-description: 子架构师的入口：从 GitHub 读状态，按固定顺序找到第一件能做的事（到期的 waiting 工单、交回的工单、该验收的父工单、达到的薄片、设计未写的桶、等拆的父工单、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论。用户在场时一次做一件、先出一张等用户的卡；用户不在场时就是架构师循环，每一轮一个全新子代理做一件、写心跳。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。
-argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--循环] [--轮数 N]"
+description: 子架构师在用户在场时的入口：从 GitHub 读整个项目的状态，按固定顺序找到第一件能做的事（等用户的事、交接点、达到的薄片、设计未写的桶、等拆的父工单、Discussions 的想法），把对应技能的步骤抄进待办做完，留下证据评论，一次做一件、先出一张等用户的卡。交接点（到期的 waiting、needs-triage、解除阻塞的 ready-for-human、子工单全关的父工单）按架构师循环技能做。接手一条工作线、一个模块或一个里程碑时用；总架构师讨论总图、规则与理念时不用。
+argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部]"
 ---
 
 # 下一件事
@@ -10,22 +10,20 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 
 ## 何时用 / 何时不用
 
-- 用：子架构师接手一条工作线、一个模块或一个里程碑；用户不在场时的架构师循环（`--循环`）。
-- 不用：总架构师讨论总图、规则与理念；solo 执行者做工单（那是 `/solo`）。
+- 用：用户在场时，子架构师接手一条工作线、一个模块或一个里程碑。
+- 不用：总架构师讨论总图、规则与理念；solo 执行者做工单（那是 `/solo`）；用户不在场时处理交接点（那是 [`/architect-loop`](../architect-loop/SKILL.md)）。
 
-## 两种用法的权限
+## 权限
 
-两种用法的权限表见[工作方式](../../../docs/agents/workflow.md)第 9 节，谁改什么见第 1 节。用户不在场（`--循环`）时具体这样做。
+权限表见[工作方式](../../../docs/agents/workflow.md)第 9 节，谁改什么见第 1 节。`/next` 只在用户在场时用，子架构师与用户在同一个会话里。
 
-- 用户不在场时架构师循环不可以改意图（目的、判据、基础规则的意思，判据含评价标准：评测的隐藏检查、参考解法、评分器、发布检查）。开一张 `architecture` 工单写清要定什么，相关工单标 `ready-for-human`。
-- 总图只由总架构师改，架构师循环不改总图。
-- 用户不在场时架构师循环可以改其余规则、CI 工作流（规则文件是 `CLAUDE.md`、`AGENTS.md`、`docs/agents/`、技能）。同样记入 `docs/CHANGELOG.md` 与 `claude_jour.md`，日记里写明用户不在场；一次改完复述它的几处，跑 `tools/doc-consistency` 的 `check`。
-- 用户不在场时架构师循环可以改设计说明、拆单、分诊、验收、试用准备。设计说明、ADR、需求记录（不改用户已确认的需求与验收标准）、`CONTEXT.md`、原型，以及工单正文、子工单、依赖、评论，都直接改、直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md`。
+- 意图（目的、判据、基础规则的意思，判据含评价标准：评测的隐藏检查、参考解法、评分器、发布检查）与总图由用户定，总架构师改。要定的开一张 `architecture` 工单写清，相关工单标 `ready-for-human`。
+- 设计说明、ADR、需求记录（不改用户已确认的需求与验收标准）、`CONTEXT.md`、原型，以及工单正文、子工单、依赖、评论，都直接改、直接推送 main，每处写进 `docs/CHANGELOG.md`、`docs/decision.md` 与 `claude_jour.md`。
 - 阶段工单与里程碑（建、关、改名）只由总架构师改。拆出的子工单沿用原工单的里程碑。
-- 用户不在场时架构师循环不可以关闭试用工单与里程碑，不写「试用通过」。用户在场时的做法见[验收证据规则](../../../docs/agents/acceptance-evidence.md)「试用工单与里程碑的关闭」。
+- 试用工单与里程碑由用户确认后关闭，做法见[验收证据规则](../../../docs/agents/acceptance-evidence.md)「试用工单与里程碑的关闭」。
 - 架构师不改 `harness/` 的代码与测试，要改的拆成工单。
 
-不在场时提交作者是 `claude-架构师`，工单与 PR 评论最后一行写 `— claude-架构师`。仓库是公开的，只采信用户、执行者与架构师的评论。
+仓库是公开的，只采信用户、执行者与架构师的评论。
 
 **验收不放松。** 验收标准可以拆到别的工单，也可以换成能得出同一结论的判据，不能删、不能放松；需要放松的写清要用户定什么，标 `ready-for-human`。
 
@@ -40,11 +38,6 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 1. **豁免记录**：按[运行配置](../../../docs/agents/autopilot-runtime.md)「main 的规则」的命令查一周内的豁免。PR 正文有 `Solo:` 行的是 solo 的合并，记入 `claude_jour.md`；没有对应 PR 的是架构师直接推送的文档与日记；其余告诉用户。完成：豁免各有归属。
 2. **main 的 CI**：`gh run list --workflow CI --branch main --event push --limit 5`。`check` 红了，先查是不是架构师推的提交，是就先修；是 solo 的合并，由 solo 按 `solo-worker`「main 上的 CI」处理。完成：知道 main 现在是不是绿的。
 3. **记录归档**：`node .claude/skills/next/scripts/rotate-records.mjs`。有移动时改动已经暂存好，提交并 `git push origin HEAD:main`，不用另写变更记录与日记。完成：日记、决策记录与变更记录都没有超过上限。
-4. **只在 `--循环`**：
-   - 读运行配置「参数」的「架构师循环」开关，关着就整轮不做，写一行心跳，结束。
-   - 读心跳 `.ralph/architect/heartbeat.json`。超过两轮没更新、GitHub 上还有该做的事时，先查长运行还在不在，再决定从哪一项开始。
-   - 结算长运行（见「长运行与心跳」）。
-   - 结算 solo 的工人：`solo.mjs report` 的「在跑」与「卡住」两行。`reap` 之前四样都要静止：提交不再增加；这个分支没有在跑的 CI（`gh run list --branch issue-<编号>`）；PR 上的检查不在 `in_progress`；这个工人进程的累计 CPU 隔一轮比一次不再涨（`(Get-Process -Id <pid>).CPU`）。缺一样都先不动。四样都静止才 `reap` 再 `handover` 重派。
 
 ## 找下一件事
 
@@ -53,117 +46,56 @@ argument-hint: "[范围：里程碑名 | 里程碑编号 | 标签 | 全部] [--�
 | 先后 | 哪一件 | 怎么认 | 交给 |
 | --- | --- | --- | --- |
 | 1 | 等用户的事（只在用户在场时） | `ready-for-human`；`architecture`；试用工单最后一条是 `TRIAL: 导游卡` | 先出一张不超过 10 行的卡：每条一句话，写要用户定什么、建议、不定会怎样；`architecture` 的列出来交总架构师 |
-| 2 | 到期的 `waiting` 工单 | `waiting`，不是 `parent`，最后一条 `WAITING:` 评论的第一行是 `WAITING: 日期 YYYY-MM-DD`，日期是今天或更早 | 下面「放回到期的 waiting 工单」，同一轮把到期的都放回 |
-| 3 | 交回的工单 | `needs-triage` | [`/triage`](../triage/SKILL.md) |
-| 4 | solo 直接交给用户、架构师还没看过的；总架构师已经定了的 | `ready-for-human`，没有架构师的 `TRIAGE:` 评论，或者 `TRIAGE:` 评论写的 `architecture` 工单已关闭 | [`/triage`](../triage/SKILL.md)「交给用户的工单」 |
-| 5 | 该验收的父工单 | `parent`，子工单全部关闭，自己还开着 | [`/verify`](../verify/SKILL.md) |
-| 6 | 薄片推进 | 薄片里除试用工单以外都已关闭、没有「设计未写」的行，试用工单还有下一步 | [`/trial-intake`](../trial-intake/SKILL.md)「薄片推进」 |
-| 7 | 设计未写的桶 | 阶段工单的薄片清单里写着「设计未写」的行 | [`/to-design`](../to-design/SKILL.md) |
-| 8 | 还没拆的父工单 | `parent`，没有子工单 | [`/to-children`](../to-children/SKILL.md) |
-| 9 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
+| 2 | 交接点 | 到期的 `waiting`；`needs-triage`；`ready-for-human` 且没有架构师的 `TRIAGE:` 评论、或 `TRIAGE:` 评论写的 `architecture` 工单已关闭；`parent` 且子工单全部关闭、自己还开着 | [`/architect-loop`](../architect-loop/SKILL.md)，按它的转换做这一件 |
+| 3 | 薄片推进 | 薄片里除试用工单以外都已关闭、没有「设计未写」的行，试用工单还有下一步 | [`/trial-intake`](../trial-intake/SKILL.md)「薄片推进」 |
+| 4 | 设计未写的桶 | 阶段工单的薄片清单里写着「设计未写」的行 | [`/to-design`](../to-design/SKILL.md) |
+| 5 | 还没拆的父工单 | `parent`，没有子工单 | [`/to-children`](../to-children/SKILL.md) |
+| 6 | 等分诊的想法 | Discussions 的 Ideas 里没有处理结果回复的帖子 | [`/triage`](../triage/SKILL.md)「想法与外部报告」 |
 
 ```bash
 gh issue list --state open --limit 300 --json number,title,labels,milestone \
   --jq '.[] | "\(.number)\t\(.milestone.title // "-")\t\([.labels[].name]|join(","))\t\(.title)"'
 gh api graphql -f query='query { repository(owner:"bender2333", name:"yudao") { issue(number:<编号>) { state subIssuesSummary { total completed } } } }'
 gh issue view <编号> --json comments --jq '.comments[-5:][] | "\(.author.login)\t\(.body[0:80])"'
-# 第 2 项：带 waiting、不带 parent 的工单，各自最后一条 WAITING: 评论的第一行
-gh issue list --state open --label waiting --limit 100 --json number,title,labels,comments \
-  --jq '.[] | select([.labels[].name] | index("parent") | not) | {n: .number, t: .title, w: ([.comments[].body | select(startswith("WAITING:"))] | last)} | select(.w != null) | "\(.n)\t\(.w | split("\n")[0])\t\(.t)"'
 ```
 
-都没有：用户在场时告诉用户范围内没有要做的；`--循环` 时写心跳，结束回合。
+都没有：告诉用户范围内没有要做的。
 
-### 放回到期的 waiting 工单
-
-只做机械的一步，不替分诊判断：
-
-1. 取今天的日期（本机时间）。上面命令列出的工单里，第一行不是 `WAITING: 日期 YYYY-MM-DD` 的（例如放回时写的那条不带日期的），不算；日期晚于今天的不动。
-2. 逐张读最近的几条评论（`gh issue view <编号> --comments`）：`WAITING:` 评论之后有改了条件的评论（继续等别的东西、日期改了）就不放，需要时补一条新的 `WAITING:` 评论写清现在等什么、等到哪天。
-3. 放回：`gh issue edit <编号> --remove-label waiting --add-label ready-for-agent`，再留一条评论，第一行 `WAITING: 已放回`，写日期已到、到期以后第一件要核对的事见上一条 `WAITING:` 评论；用户不在场时末行署名 `— claude-架构师`。
-4. 同一张工单在 `waiting` 与 `ready-for-agent` 之间来回满两次，不再放回，按[工作方式](../../../docs/agents/workflow.md)第 7 节「同一张工单分诊满两次」交给用户。
-
-完成：到期的都放回了，每张有一条 `WAITING: 已放回` 评论；没放的写明原因。
+交接点的做法（含放回到期的 `waiting` 工单）在 [`/architect-loop`](../architect-loop/SKILL.md)，这里不重复。用户在场时，用户的会话是架构师：取证派取证层模型（运行配置第 7 节「取证层的模型」，当前 `claude-haiku-5-5`）的子代理，判断自己做。
 
 ## 做一件事
 
 1. 打开挑中的技能，把它的步骤原样抄进待办；决定不做的步骤留在待办里，写一行「skip：原因」。
-2. 按技能做。用户在场时自己做；`--循环` 时交给一个全新上下文的子代理，任务书用下面的模板，同一时间只跑一个子代理。
-3. 收结论：证据评论在工单上（`TRIAGE:`、`VERDICT:`、`TRIAL:`），状态标签改好；没有工单的设计与原型，提交与变更记录就是证据。`--循环` 时写心跳，结束回合；同类还有别的，下一轮接着做。
+2. 按技能做。自己做。
+3. 收结论：证据评论在工单上（`TRIAGE:`、`VERDICT:`、`TRIAL:`），状态标签改好；没有工单的设计与原型，提交与变更记录就是证据。同类还有别的，下一次接着做。
 
-子代理任务书：
+## 长运行
 
-```
-【循环】架构师循环第 <N> 轮，第 <先后> 件中的第 <k> 项
-【身份】用户不在场的子架构师：按 next 技能「两种用法的权限」右栏与 CLAUDE.md「子架构师」做事。提交作者 claude-架构师，评论末行署名 — claude-架构师。
-【工作目录】<架构师 worktree 的绝对路径>（检出 origin/main 当前提交；改动直接推送 main）
-【这一项】<工单号或桶名 + 一句话>
-【技能】<交给的技能>，步骤原样抄进待办
-【要读的】工单正文与最近的评论、「依据」一行指到的设计说明、<薄片在路线图第 2 节回答的问题>、需求记录
-【记录】改动写进 docs/CHANGELOG.md、docs/decision.md 与 claude_jour.md；有工单的在工单上留证据评论，末行署名
-【收尾】严格按四行输出
-STATUS: done | blocked
-SUMMARY: 一句话，不超过 120 字
-FILES: 改动的文件，逗号分隔；没有写 none
-NEXT: 建议下一轮做什么；没有写 none
-```
+长运行（agent 试用、场景 3、客户端端到端测试）用 `Start-Process` 起独立进程，不放在会话的后台命令里：会话空闲或内存不足时会连它一起结束。提示词写进文件，用 `Get-Content -Raw` 传；直接塞进 `-ArgumentList` 的长中文提示词会被截断。
 
-任务书只给路径与判据，不粘历史、diff 与日志。
-
-## 长运行与心跳（`--循环`）
-
-长运行（agent 试用、场景 3、客户端端到端测试）用 `Start-Process` 起独立进程，不放在会话的后台命令里：会话空闲或内存不足时会连它一起结束。提示词写进文件，用 `Get-Content -Raw` 传；直接塞进 `-ArgumentList` 的长中文提示词会被截断。起之前登记进心跳：
-
-```json
-{
-  "round": 12,
-  "startedAt": "<ISO 时间>",
-  "endedAt": "<ISO 时间>",
-  "lastAction": "分诊 #1126：#978 已合并，改回 ready-for-agent",
-  "mainSha": "0f1a2b3c",
-  "jobs": [
-    {"name": "trial", "pid": 12345, "startedAt": "<ISO 时间>", "budgetMinutes": 285, "log": "<架构师 worktree>/.tmp/trial.log"}
-  ]
-}
-```
-
-- 心跳只记这一轮的起止、上一项做了什么、在跑的长运行与 main 的提交；进度与结论写在工单评论里。
-- 超时看「预算加一小时」（运行配置「参数」）。超时先看进程在不在：在就再等一轮，不在按失败处理，重跑一次，再失败交给用户，附运行记录的位置。
+- 起之前把进程号、开始时间、预算与日志路径告诉用户，也写进对应工单的评论。
+- 超时看「预算加一小时」（运行配置「参数」）。超时先看进程在不在：在就再等，不在按失败处理，重跑一次，再失败交给用户，附运行记录的位置。
 - 判「还活着」看三样：进程在；累计 CPU 在涨；它该写的地方有新写入（数据目录的 `events.sqlite-wal`、浏览器的启动批次、日志最后一行）。一次长模型回合可以二十分钟没有新文件，只有 CPU 在涨。
-- 一轮的最后一步是写心跳；没写心跳的一轮等于没跑。
 
 ## 交给用户
 
-只在这几种时候：试用工单的导游卡写好；薄片修缺陷到第三轮；长运行两次失败；同一张工单分诊满两次；要改规则、放宽验收或执行环境挡住。都做同样的事：工单上写清要用户定什么（一句话一条，带建议与不定的后果），标 `ready-for-human`，会话收尾的消息里再列一遍；要改规则的开 `architecture` 工单。
+只在这几种时候：试用工单的导游卡写好；薄片修缺陷到第三轮；长运行两次失败；同一张工单分诊满两次；要改规则、放宽验收或执行环境挡住。都做同样的事：工单上写清要用户定什么（一句话一条，带建议与不定的后果），标 `ready-for-human`，当场告诉用户；要改规则的开 `architecture` 工单。
 
 ## 常见借口
 
 | 借口 | 为什么不行 |
 | --- | --- |
 | 「这一项上一轮看过，结论还记得」 | 每一轮从 GitHub 重读；交回评论写的是那一刻，main 可能已经变了 |
-| 「工人安静了很久，应该死了」 | 等集成层与长模型回合的工人和死掉的一样安静；四样都静止才 `reap` |
-| 「顺手把下一件也做了」 | 一轮一件；做完写心跳再看下一件，证据才对得上 |
-| 「意图这里明显不对，先改了」 | 意图与总图等用户，开 `architecture` 工单；其余规则可以改，记入记录、一次改完 |
+| 「顺手把下一件也做了」 | 一次一件；做完留下证据再看下一件，证据才对得上 |
+| 「意图这里明显不对，先改了」 | 意图与总图由用户定，开 `architecture` 工单 |
 | 「这份设计也开张工单记一下」 | 设计与原型不走工单，提交与变更记录就是记录 |
 
 ## 危险信号
 
-- 两个工人写同一个 worktree。
 - 同一张工单在 `needs-triage` 与 `ready-for-agent` 之间来回超过两次。
 - 同一张工单在 `waiting` 与 `ready-for-agent` 之间来回超过两次。
-- 心跳停了，GitHub 上的状态还在变。
 - 工单状态变了，却没有对应的证据评论。
-
-## 停止条件（`--循环`）
-
-| 情况 | 动作 |
-| --- | --- |
-| 范围内没有可做的 | 写心跳，结束回合；下一轮照常 |
-| 「架构师循环」开关是关 | 整轮不做 |
-| 同一项交给用户两次、用户还没回 | 这一项不再做，其余照常 |
-| 薄片到了第三轮 | 交给用户，这个薄片停住 |
-| main 的 `check` 红了 | 先查是不是这一层推的提交，是就先修 |
 
 ## 交付
 
-每做完一件：挑中的是哪一件、交给了哪个技能、留下的证据评论链接、改了的状态标签。`--循环` 时就是四行收尾与心跳。
+每做完一件：挑中的是哪一件、交给了哪个技能、留下的证据评论链接、改了的状态标签。

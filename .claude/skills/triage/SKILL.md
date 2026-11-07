@@ -33,7 +33,7 @@ argument-hint: "<工单编号 | Discussions 帖子链接>"
    | 前提现在不满足，到某一天才会满足（例如近两周的改动要降到一成以下） | 评论第一行写 `WAITING: 日期 YYYY-MM-DD`，下面写还在等什么、到期以后第一件要核对的事；到期由 [`/next`](../next/SKILL.md) 放回 | `waiting` |
    | 已经不需要了 | 关闭，写明依据；会改变这个阶段交给用户的东西时交给用户 | 关闭 |
    | 与总图冲突 | 开 `architecture` 工单，写现象、总图哪一节、要定什么；`TRIAGE:` 评论写明它的编号 | `ready-for-human` |
-   | 要改规则 | 规则由总架构师改，用户不在场时架构师循环直接改并记录（[工作方式](../../../docs/agents/workflow.md)第 9 节）；要改意图或总图的开一张 `architecture` 工单，`TRIAGE:` 评论写明它的编号 | 意图或总图：`ready-for-human` |
+   | 要改规则 | 规则由总架构师改（[工作方式](../../../docs/agents/workflow.md)第 7 节）；要改规则、意图或总图的开一张 `architecture` 工单，`TRIAGE:` 评论写明它的编号 | 规则、意图或总图：`ready-for-human` |
 | 要放宽验收、执行环境 | 写清要定什么、建议怎么做、不定会怎样 | `ready-for-human` |
 
 3. **先推送设计，再放出工单**：改正文与设计期间工单留在 `needs-triage`；设计说明进了 main、「依据」写上推送后的提交以后，才改回 `ready-for-agent`。完成：solo 领到时读到的一定是新设计。

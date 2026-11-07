@@ -1,22 +1,22 @@
 {
 "schema":1,
 "path":"docs/design/forms-and-verifier-role.md",
-"hash":"e0739756806a31b7",
+"hash":"3d774c6ca744c6d3",
 "nodes":[
-{"hash":"e0739756806a31b7","id":"docs/design/forms-and-verifier-role.md","kind":"file","title":"docs/design/forms-and-verifier-role.md"},
+{"hash":"3d774c6ca744c6d3","id":"docs/design/forms-and-verifier-role.md","kind":"file","title":"docs/design/forms-and-verifier-role.md"},
 {"hash":"0853195401f3a162","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","kind":"section","parent":"docs/design/forms-and-verifier-role.md","title":"形态与核验角色设计说明"},
 {"hash":"fe65d0e6ee0d7302","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 1. 功能与依据","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","title":"1. 功能与依据"},
 {"hash":"e837f05b561e8e01","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 2. 边界与范围","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","title":"2. 边界与范围"},
 {"hash":"310dc546bbd860a7","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 3. 接口","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","title":"3. 接口"},
 {"hash":"e564975b8dd7eb44","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","title":"4. 方案"},
 {"hash":"c5baa1f917b5a5e3","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.1 四层各认识什么","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.1 四层各认识什么"},
-{"hash":"85d16db207f0f431","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.2 核验角色","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.2 核验角色"},
+{"hash":"0eff9e1cb23cdb6e","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.2 核验角色","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.2 核验角色"},
 {"hash":"79c260e24c230b73","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.3 直做","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.3 直做"},
 {"hash":"42137f2adafde6a1","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.4 开环完成","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.4 开环完成"},
 {"hash":"9f91f2ff2f7a193a","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.5 形态随事项冻结","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.5 形态随事项冻结"},
 {"hash":"d668e778e45dd3a4","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.6 子组织（位置与规矩）","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.6 子组织（位置与规矩）"},
 {"hash":"a8acdcd2218779ed","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案 > 4.7 定义的校验","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 4. 方案","title":"4.7 定义的校验"},
-{"hash":"e06f5eab61eba60a","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 5. 验收","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","title":"5. 验收"},
+{"hash":"1a575c10cdeec0dc","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 5. 验收","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","title":"5. 验收"},
 {"hash":"fe0dbde5d2d0ebfd","id":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明 > 6. 未决问题","kind":"section","parent":"docs/design/forms-and-verifier-role.md#形态与核验角色设计说明","title":"6. 未决问题"}
 ],
 "edges":[
