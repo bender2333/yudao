@@ -45,8 +45,12 @@ yd:ax-decl-has-verifier a yd:MustHaveAxiom ; rdfs:label "核验声明必有核�
 yd:ax-decl-has-verified a yd:MustHaveAxiom ; rdfs:label "核验声明必有被核验者"@zh ;
     yd:onClass yd:VerificationDecl ; yd:viaProperty yd:verified ; yd:filler yd:Actor ;
     yd:basis "同上" .
-yd:ax-decl-needs-evidence a yd:MustHaveAxiom ; rdfs:label "核验必有独立证据"@zh ;
-    yd:onClass yd:VerificationDecl ; yd:viaProperty yd:hasIndependentEvidence ; yd:filler yd:IndependentEvidence ;
+# 2026-11-07 用户定：核心不强制每个事项都核验；但记作「已核验」（以放行结束）的结论，必须有三种独立证据之一。
+yd:VerifiedClaimDecl a owl:Class ; rdfs:label "结论记作已核验的核验声明"@zh ;
+    owl:equivalentClass [ a owl:Class ; owl:intersectionOf ( yd:VerificationDecl
+        [ a owl:Restriction ; owl:onProperty yd:forOutcome ; owl:someValuesFrom yd:ReleasedOutcomeKind ] ) ] .
+yd:ax-decl-needs-evidence a yd:MustHaveAxiom ; rdfs:label "记作已核验的结论必有独立证据"@zh ;
+    yd:onClass yd:VerifiedClaimDecl ; yd:viaProperty yd:hasIndependentEvidence ; yd:filler yd:IndependentEvidence ;
     yd:basis "D38 基础规则 1「现实的证据高于模型的意见。真正独立的证据只有三种来源：把东西实际跑一遍，换一个不同的模型，或者人」" .
 yd:ax-run-needs-checkdef a yd:MustHaveAxiom ; rdfs:label "实际跑一遍必有一份检查定义"@zh ;
     yd:onClass yd:RunEvidence ; yd:viaProperty yd:hasCheckDefinition ; yd:filler yd:CheckDefinition ;

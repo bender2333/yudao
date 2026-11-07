@@ -125,3 +125,22 @@ yd:form-default yd:rotation yd:rm-by-outcome ; yd:docRef "形态与核验角色�
 yd:role-eng-explorer yd:produces yd:ok-eng-findings .
 yd:ok-eng-findings a yd:OutcomeKind ; rdfs:label "带来源的发现"@zh ; yd:docRef "部门内多角色设计说明 4.1" ; yd:batch 2 ;
     yd:quote "探索者 | 询问里交来的查证任务 | 交回带来源的发现" ; yd:inForm yd:form-eng-center .
+
+# ---------- 2026-11-07 用户定的第 2 条：核验用通用定义，不让本体挑 ----------
+# 原来第 2 批对不上的「项目的检查定义」（batch2-contested.ttl）不再候选。总图只写到「核验中：独立副本检查 + 回执」，
+# 三样写全的是形态与核验角色设计说明 4.2「核验只有一套」。每个事项具体查什么，来自核验角色写的检查材料，设计说明没写，记不知道。
+yd:cd-generic a yd:CheckDefinition ; rdfs:label "核验的通用定义"@zh ; yd:archRef "第三节「核验中」状态" ;
+    yd:docRef "形态与核验角色设计说明 4.2" ; yd:batch 2 ;
+    yd:quote "写入范围是检查材料……检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要……结论绑定被核验方交完成那一刻的版本；版本变了，结论失效。" ;
+    rdfs:comment "这一句用的是 eb8429e 的写法；第 2 批其余原句是在 5159317 上抽的，到 eb8429e 一字未变"@zh ;
+    yd:perItemFrom yd:check-materials .
+yd:check-materials a yd:CheckMaterials ; rdfs:label "核验角色写的检查材料"@zh ; yd:docRef "形态与核验角色设计说明 4.2 第 1 条" ; yd:batch 2 .
+yd:ev-host-run yd:hasCheckDefinition yd:cd-generic .
+
+# ---------- 2026-11-07 用户定的第 1 条：部门内审查者的证据 ----------
+# 设计说明的原话只说到：审查者每次从新的上下文开始（4.4）；子组织内部的角色没写入的模型跟随部门（4.7）。
+# 合起来，默认的审查者是同一个模型换新上下文。这一样不在独立证据的三种里（D38 基础规则 1；总图第一节「独立的证据」）。
+yd:decl-eng-review yd:hasEvidence yd:ev-eng-review-reading .
+yd:ev-eng-review-reading a yd:SameModelFreshContextEvidence ; rdfs:label "同一个模型换新上下文读一遍"@zh ;
+    yd:docRef "部门内多角色设计说明 4.4、4.7" ; yd:batch 2 ;
+    yd:quote "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。……子组织内部的角色没写入的跟随部门" .
