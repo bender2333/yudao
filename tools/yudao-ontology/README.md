@@ -23,6 +23,7 @@
 | `codecheck.py` | 第 4 批：从提交里读代码事实（分层、name-map、来源、对照缺行），写 `batches/batch4-code.ttl` 和 `reports/codecheck.json`；`python3 codecheck.py eb8429e` |
 | `quotecheck.py` | 跟版本走：模型里每一句原句，到给定的提交里逐句核对还在不在，写 `reports/quotecheck.json`；`python3 quotecheck.py 5159317 eb8429e 37e9d68` |
 | `names.py` | 正名表：`CONTEXT.md` 词条与 _Avoid_、name-map 第一列 |
+| `reports/fix-tickets-draft.md` | 第 4 批三处代码问题的修复工单草稿（没建 GitHub 工单） |
 | `reports/` | `results.json`、`mutations.json`、两批的抽取对照、报告 |
 
 ## 跑
