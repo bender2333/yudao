@@ -200,7 +200,7 @@ jobs:
           node-version: "24"
 
       - name: 单元测试
-        run: node --test --test-reporter=spec .claude/skills/solo/scripts/test/*.test.mjs .claude/skills/next/scripts/test/*.test.mjs .claude/hooks/*.test.mjs
+        run: node --test --test-reporter=spec .claude/skills/solo/scripts/test/*.test.mjs .claude/skills/next/scripts/test/*.test.mjs .claude/skills/architect-loop/scripts/test/*.test.mjs .claude/hooks/*.test.mjs
 
       - name: 语法检查
         run: |
@@ -208,6 +208,10 @@ jobs:
           node --check .claude/skills/solo/scripts/hook.mjs
           node --check .claude/skills/solo/scripts/state.mjs
           node --check .claude/skills/next/scripts/rotate-records.mjs
+          node --check .claude/skills/architect-loop/scripts/wake.mjs
+          node --check .claude/skills/architect-loop/scripts/scan.mjs
+          node --check .claude/skills/architect-loop/scripts/release.mjs
+          node --check .claude/skills/architect-loop/scripts/check-evidence.mjs
 
   # 内核的代码质量检查（docs/design/kernel-quality-gate.md）：调用检查工具的合并检查入口，
   # 与执行者交付前在本地运行的是同一条命令、同一个结论。只对清单里开关已打开的内核模块检查，
