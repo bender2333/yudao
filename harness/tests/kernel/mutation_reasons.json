@@ -13,7 +13,7 @@
   "function": "_Fold._invalidate",
   "before": "self.artifacts.pop(kind, None)",
   "after": "self.artifacts.pop(kind, ' ')",
-  "reason": "这条语句不用 pop 的返回值：成果在清单里时都删掉这一种，不在时返回值被丢掉，默认值取 None 还是空串都不影响投影。",
+  "reason": "这条语句不用 pop 的返回值：成果在清单里时都删掉这一种，不在时返回值被丢掉，默认值取 None 还是空格串都不影响投影。",
   "registered_by": "solo-deepseek-v4.1-flash",
   "registered_at": "2026-11-07T09:35:00+08:00"
  },
@@ -49,7 +49,7 @@
   "function": "_Fold._fold_usage",
   "before": "main = session.department is not None and session.department == event.department",
   "after": "main = session.department is not ' ' and session.department == event.department",
-  "reason": "部门名来自定义，不会是空串（可空的是 None）；会话的 department 是 None 或一个部门名，is not None 与 is not ' ' 在这两种取值上结果相同。",
+  "reason": "这条等式的两个条件在真实事件里一起成立或一起不成立：主线会话的 department 与激活事件的 department 是同一个非 None 部门名，`is not None` 与 `is not ' '` 都为真，第二个条件也为真；询问分支的会话 department 是 None，`is not None` 为假而 `is not ' '` 为真，但第二个条件 `None == event.department` 为假，所以 main 的结果不变。",
   "registered_by": "solo-deepseek-v4.1-flash",
   "registered_at": "2026-11-07T09:35:00+08:00"
  },
