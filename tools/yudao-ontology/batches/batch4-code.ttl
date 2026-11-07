@@ -1,4 +1,4 @@
-# 第 4 批：eb8429e 的代码事实，由 codecheck.py 生成，不手改。
+# 第 4 批：37e9d68 的代码事实，由 codecheck.py 生成，不手改。
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 @prefix yd: <https://yudao.dev/onto#> .

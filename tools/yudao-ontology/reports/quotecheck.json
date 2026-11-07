@@ -1,0 +1,3242 @@
+{
+ "5159317": [
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-decision-request",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-department",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-event",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-limit",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-outcome-version",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-proposal",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-receipt",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-role",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-rotation-rules",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-round",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-verifier-conclusion",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-workitem",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-write-scope",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-adjudication",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-all-writers",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-app-layer",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-assembly-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-assembly-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-boundary",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-def-files",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-definition-format",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-eval-material",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-exec-env",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution",
+   "quote": "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-external-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-facts",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-instance",
+   "quote": "看门狗未定看门狗 ↔ 实例候选失败能退回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-interface-and-gate",
+   "quote": "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-interface-side",
+   "quote": "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-loading",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-model-env-adapter",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-model-service",
+   "quote": "模型已定执行 ↔ 模型服务换模型不改循环。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-observer",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-outside-clients",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-projection",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-readers",
+   "quote": "投影已定一份事实 → 读的人任何投影都能从事实重算。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-routing-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-routing-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-skeleton-events",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-system",
+   "quote": "评价已定评价材料 → 系统被开发的版本读不到评它的题。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-thin-driver",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-tools",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-view",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-watchdog",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-write-gate",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "decl-default-quality",
+   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-engineering",
+   "quote": "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个部门的内部也可以是一个子组织。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-ops",
+   "quote": "运维（以后）监控、部署、故障记录。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-product",
+   "quote": "产品意图 → 要求（PRD）。裁决目标与取舍。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-quality",
+   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "form-default",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "form-min",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-adjudication",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-boundary",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-loop",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-facts",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-loop",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-org",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-routing",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "lim-def",
+   "quote": "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "loop-inner",
+   "quote": "内环 · 一轮工作里的每一步（薄驱动连接，每步都停得下来）；每一步先问边界",
+   "doc": "docs/architecture.html",
+   "found": "拼接"
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "loop-outer",
+   "quote": "外环 · 部门之间的流转；边界到上限、你取消、振荡信号：任何状态都能到停止",
+   "doc": "docs/architecture.html",
+   "found": "拼接"
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-defect",
+   "quote": "缺陷记录是上游关注的成果",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-delivery",
+   "quote": "工程要求 → 交付",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-guidance",
+   "quote": "你中途的指导是部门关注的成果",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-intent",
+   "quote": "产品意图 → 要求（PRD）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-min-completion",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-prd",
+   "quote": "产品意图 → 要求（PRD）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-approval",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-compat",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-rewrite",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-by-outcome",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-direct",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-pool",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "role-min",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-action",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-assembly",
+   "quote": "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-definition",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-evaluation",
+   "quote": "评价已定评价材料 → 系统被开发的版本读不到评它的题。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-execution",
+   "quote": "执行已定薄驱动 ↔ 执行实现一轮里的每一步都停得下来。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-interface",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-model",
+   "quote": "模型已定执行 ↔ 模型服务换模型不改循环。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-observer",
+   "quote": "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-projection",
+   "quote": "投影已定一份事实 → 读的人任何投影都能从事实重算。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-routing",
+   "quote": "路由已定薄驱动 ↔ 路由实现换轮转方式，循环本身不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-view",
+   "quote": "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-watchdog",
+   "quote": "看门狗未定看门狗 ↔ 实例候选失败能退回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-write-gate",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-incident",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-onboarding",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-subtask",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-user-input",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-accepting",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-asking",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-draining",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-rework",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-stopped",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-verifying",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-waiting-user",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-waiting-work",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-working",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "status-settled",
+   "quote": "已定：规矩不再改，子架构师现在就守",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "status-unsettled",
+   "quote": "未定：我还在定，先别依赖",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "stop-list",
+   "quote": "停止原因来自封闭清单",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "user",
+   "quote": "你给意图与中途的指导，回答停在写入口的决定请求，批准内核与定义的修改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-architect",
+   "quote": "项目材料、同伴交回的结论、本部门记录",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-explorer",
+   "quote": "项目材料、代码、外部文档",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-lead",
+   "quote": "设计与计划、代码、自测结果",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-reviewer",
+   "quote": "待审查的成果、它的依据、上一轮审查意见",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "cd-generic",
+   "quote": "写入范围是检查材料……检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要……结论绑定被核验方交完成那一刻的版本；版本变了，结论失效。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": false
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "decl-default-quality",
+   "quote": "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "decl-eng-review",
+   "quote": "审查者 | ……读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "dept-engineering",
+   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "dept-product",
+   "quote": "接你的输入与建档的部门，是定义里事项的来源写明的那个部门（三部门里是产品）",
+   "doc": "docs/design/skeleton-and-application.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-reading",
+   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。……子组织内部的角色没写入的跟随部门",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-run",
+   "quote": "核验只有一套，角色在定义里声明「做核验、核验谁的成果」就有",
+   "doc": "docs/design/department-roles.md、docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-run",
+   "quote": "读取要求、材料与证据，在独立副本上运行检查，提交结论",
+   "doc": "docs/design/department-roles.md、docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-host-run",
+   "quote": "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-default",
+   "quote": "三部门（默认） | 产品、工程、质检 | 成果驱动 | 质检 | 质检放行",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-default",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-eng-center",
+   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-min",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-outsourced",
+   "quote": "一个外包角色直做 | 一个外包角色 | 直做 | 没有 | 外包交回快照，开环完成并注明外包",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-several",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-architect",
+   "quote": "把任务做成能交完成的成果",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-explorer",
+   "quote": "交回带来源的发现",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-lead",
+   "quote": "按设计与计划实现并自测",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-reviewer",
+   "quote": "判断这一版成果是否可以放行",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-eng-center-completion",
+   "quote": "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版……放行则子事项结束；打回则中心角色再开始一轮。",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-eng-findings",
+   "quote": "探索者 | 询问里交来的查证任务 | 交回带来源的发现",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-min-completion",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-out-completion",
+   "quote": "外包交回快照，开环完成并注明外包",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-sev-completion",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-architect",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-explorer",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-lead",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-reviewer",
+   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-reviewer",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-min",
+   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-outsourced",
+   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-sev-engineering",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-sev-product",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "src-subtask",
+   "quote": "子事项有自己的事件流和冻结的定义；它的事项的来源是「上一层交来的任务」，由子组织里定义接它的角色接",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "cd-generic",
+   "quote": "同一版本一个核验角色只给一个结论，给过以后不再接受它对这一版的第二个结论。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "cd-generic",
+   "quote": "检查材料放在哪里是主机的固定约定，公开树、交付快照与检查副本都按这一处排除与收录；定义只声明哪个角色得到这块写入范围，不另选位置，写了别的位置的定义在加载时整份拒绝。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "decl-default-quality",
+   "quote": "与独立判断不同的条目要写明改变的理由，缺理由的被拒绝；改动了几条由主机数，不由角色自报。",
+   "doc": "docs/design/independent-verification.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "decl-default-quality",
+   "quote": "引用的判断必须属于这一次：针对当前交付与当前产品规格、并在这次交付被接收以后写下；新的交付到达以后，上一份交付的判断不再算数。",
+   "doc": "docs/design/independent-verification.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "dept-quality",
+   "quote": "两套取值都是质检角色这一项可见范围设置的取值，不是两个另外的参数",
+   "doc": "docs/design/independent-verification.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-default",
+   "quote": "等结论期间，交完成的角色不开新的一轮，新到的输入与指导排队，等结论到了或被打回以后再进入它的一轮。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "只有一个角色时没有可以询问的人，不给询问。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "基线核验照旧占一份、内容为空，另记下这份基线没有经过基线核验",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": false
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "核验角色要核验的角色必须交得出完成，交不出的定义在加载时整份拒绝：它永远没有可以核验的那一版。核验角色自己也必须交得出核验结论，否则事项交完成以后等不到放行，同样拒绝。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": false
+  }
+ ],
+ "eb8429e": [
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-decision-request",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-department",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-event",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-limit",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-outcome-version",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-proposal",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-receipt",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-role",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-rotation-rules",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-round",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-verifier-conclusion",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-workitem",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-write-scope",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-adjudication",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-all-writers",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-app-layer",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-assembly-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-assembly-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-boundary",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-def-files",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-definition-format",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-eval-material",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-exec-env",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution",
+   "quote": "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-external-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-facts",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-instance",
+   "quote": "看门狗未定看门狗 ↔ 实例候选失败能退回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-interface-and-gate",
+   "quote": "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-interface-side",
+   "quote": "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-loading",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-model-env-adapter",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-model-service",
+   "quote": "模型已定执行 ↔ 模型服务换模型不改循环。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-observer",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-outside-clients",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-projection",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-readers",
+   "quote": "投影已定一份事实 → 读的人任何投影都能从事实重算。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-routing-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-routing-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-skeleton-events",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-system",
+   "quote": "评价已定评价材料 → 系统被开发的版本读不到评它的题。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-thin-driver",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-tools",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-view",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-watchdog",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-write-gate",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "decl-default-quality",
+   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-engineering",
+   "quote": "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个部门的内部也可以是一个子组织。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-ops",
+   "quote": "运维（以后）监控、部署、故障记录。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-product",
+   "quote": "产品意图 → 要求（PRD）。裁决目标与取舍。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-quality",
+   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "form-default",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "form-min",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-adjudication",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-boundary",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-loop",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-facts",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-loop",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-org",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-routing",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "lim-def",
+   "quote": "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "loop-inner",
+   "quote": "内环 · 一轮工作里的每一步（薄驱动连接，每步都停得下来）；每一步先问边界",
+   "doc": "docs/architecture.html",
+   "found": "拼接"
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "loop-outer",
+   "quote": "外环 · 部门之间的流转；边界到上限、你取消、振荡信号：任何状态都能到停止",
+   "doc": "docs/architecture.html",
+   "found": "拼接"
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-defect",
+   "quote": "缺陷记录是上游关注的成果",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-delivery",
+   "quote": "工程要求 → 交付",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-guidance",
+   "quote": "你中途的指导是部门关注的成果",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-intent",
+   "quote": "产品意图 → 要求（PRD）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-min-completion",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-prd",
+   "quote": "产品意图 → 要求（PRD）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-approval",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-compat",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-rewrite",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-by-outcome",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-direct",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-pool",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "role-min",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-action",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-assembly",
+   "quote": "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-definition",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-evaluation",
+   "quote": "评价已定评价材料 → 系统被开发的版本读不到评它的题。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-execution",
+   "quote": "执行已定薄驱动 ↔ 执行实现一轮里的每一步都停得下来。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-interface",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-model",
+   "quote": "模型已定执行 ↔ 模型服务换模型不改循环。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-observer",
+   "quote": "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-projection",
+   "quote": "投影已定一份事实 → 读的人任何投影都能从事实重算。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-routing",
+   "quote": "路由已定薄驱动 ↔ 路由实现换轮转方式，循环本身不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-view",
+   "quote": "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-watchdog",
+   "quote": "看门狗未定看门狗 ↔ 实例候选失败能退回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-write-gate",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-incident",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-onboarding",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-subtask",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-user-input",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-accepting",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-asking",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-draining",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-rework",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-stopped",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-verifying",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-waiting-user",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-waiting-work",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-working",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "status-settled",
+   "quote": "已定：规矩不再改，子架构师现在就守",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "status-unsettled",
+   "quote": "未定：我还在定，先别依赖",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "stop-list",
+   "quote": "停止原因来自封闭清单",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "user",
+   "quote": "你给意图与中途的指导，回答停在写入口的决定请求，批准内核与定义的修改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-architect",
+   "quote": "项目材料、同伴交回的结论、本部门记录",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-explorer",
+   "quote": "项目材料、代码、外部文档",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-lead",
+   "quote": "设计与计划、代码、自测结果",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-reviewer",
+   "quote": "待审查的成果、它的依据、上一轮审查意见",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "cd-generic",
+   "quote": "写入范围是检查材料……检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要……结论绑定被核验方交完成那一刻的版本；版本变了，结论失效。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "decl-default-quality",
+   "quote": "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "decl-eng-review",
+   "quote": "审查者 | ……读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "dept-engineering",
+   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "dept-product",
+   "quote": "接你的输入与建档的部门，是定义里事项的来源写明的那个部门（三部门里是产品）",
+   "doc": "docs/design/skeleton-and-application.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-reading",
+   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。……子组织内部的角色没写入的跟随部门",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-run",
+   "quote": "核验只有一套，角色在定义里声明「做核验、核验谁的成果」就有",
+   "doc": "docs/design/department-roles.md、docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-run",
+   "quote": "读取要求、材料与证据，在独立副本上运行检查，提交结论",
+   "doc": "docs/design/department-roles.md、docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-host-run",
+   "quote": "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-default",
+   "quote": "三部门（默认） | 产品、工程、质检 | 成果驱动 | 质检 | 质检放行",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-default",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-eng-center",
+   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-min",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-outsourced",
+   "quote": "一个外包角色直做 | 一个外包角色 | 直做 | 没有 | 外包交回快照，开环完成并注明外包",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-several",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-architect",
+   "quote": "把任务做成能交完成的成果",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-explorer",
+   "quote": "交回带来源的发现",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-lead",
+   "quote": "按设计与计划实现并自测",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-reviewer",
+   "quote": "判断这一版成果是否可以放行",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-eng-center-completion",
+   "quote": "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版……放行则子事项结束；打回则中心角色再开始一轮。",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-eng-findings",
+   "quote": "探索者 | 询问里交来的查证任务 | 交回带来源的发现",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-min-completion",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-out-completion",
+   "quote": "外包交回快照，开环完成并注明外包",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-sev-completion",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-architect",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-explorer",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-lead",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-reviewer",
+   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-reviewer",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-min",
+   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-outsourced",
+   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-sev-engineering",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-sev-product",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "src-subtask",
+   "quote": "子事项有自己的事件流和冻结的定义；它的事项的来源是「上一层交来的任务」，由子组织里定义接它的角色接",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "cd-generic",
+   "quote": "同一版本一个核验角色只给一个结论，给过以后不再接受它对这一版的第二个结论。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "cd-generic",
+   "quote": "检查材料放在哪里是主机的固定约定，公开树、交付快照与检查副本都按这一处排除与收录；定义只声明哪个角色得到这块写入范围，不另选位置，写了别的位置的定义在加载时整份拒绝。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "decl-default-quality",
+   "quote": "与独立判断不同的条目要写明改变的理由，缺理由的被拒绝；改动了几条由主机数，不由角色自报。",
+   "doc": "docs/design/independent-verification.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "decl-default-quality",
+   "quote": "引用的判断必须属于这一次：针对当前交付与当前产品规格、并在这次交付被接收以后写下；新的交付到达以后，上一份交付的判断不再算数。",
+   "doc": "docs/design/independent-verification.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "dept-quality",
+   "quote": "两套取值都是质检角色这一项可见范围设置的取值，不是两个另外的参数",
+   "doc": "docs/design/independent-verification.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-default",
+   "quote": "等结论期间，交完成的角色不开新的一轮，新到的输入与指导排队，等结论到了或被打回以后再进入它的一轮。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "只有一个角色时没有可以询问的人，不给询问。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "基线核验照旧占一份、内容为空，另记下这份基线没有经过基线核验",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "核验角色要核验的角色必须交得出完成，交不出的定义在加载时整份拒绝：它永远没有可以核验的那一版。核验角色自己也必须交得出核验结论，否则事项交完成以后等不到放行，同样拒绝。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  }
+ ],
+ "origin/main": [
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-decision-request",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-department",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-event",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-limit",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-outcome-version",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-proposal",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-receipt",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-role",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-rotation-rules",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-round",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-verifier-conclusion",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-workitem",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "c-write-scope",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-adjudication",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-all-writers",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-app-layer",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-assembly-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-assembly-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-boundary",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-def-files",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-definition-format",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-eval-material",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-exec-env",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution",
+   "quote": "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-execution-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-external-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-facts",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-instance",
+   "quote": "看门狗未定看门狗 ↔ 实例候选失败能退回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-interface-and-gate",
+   "quote": "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-interface-side",
+   "quote": "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-loading",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-model-env-adapter",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-model-service",
+   "quote": "模型已定执行 ↔ 模型服务换模型不改循环。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-observer",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-outside-clients",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-projection",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-readers",
+   "quote": "投影已定一份事实 → 读的人任何投影都能从事实重算。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-routing-contract",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-routing-impl",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-skeleton-events",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-system",
+   "quote": "评价已定评价材料 → 系统被开发的版本读不到评它的题。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-thin-driver",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-tools",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-view",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-watchdog",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "comp-write-gate",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "decl-default-quality",
+   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-engineering",
+   "quote": "工程要求 → 交付。写代码、自测、交快照。可以有自有角色或外包角色；一个部门的内部也可以是一个子组织。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-ops",
+   "quote": "运维（以后）监控、部署、故障记录。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-product",
+   "quote": "产品意图 → 要求（PRD）。裁决目标与取舍。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "dept-quality",
+   "quote": "质检交付 → 缺陷或放行。它是三部门里的核验角色：有核验角色时只有它的结论能放行，这个结论不外包。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "form-default",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "form-min",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-adjudication",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-boundary",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "fs-loop",
+   "quote": "固定不变的只有三样：循环、边界、裁决",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-facts",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-loop",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-org",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "layer-routing",
+   "quote": "四层：事实与裁决只认事项、事件、某种成果的某一版及其依据、提案、回执、角色的写入范围、上限与决定请求；循环只认一轮工作，谁开工、怎么结束都问路由；路由各自写轮转的规矩，核验从核验角色取；组织（定义）往里填部门与角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "lim-def",
+   "quote": "每一步先问边界：时间、次数、重试、嵌套深度来自定义；到了就停，原因写进封闭清单里的一条。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "loop-inner",
+   "quote": "内环 · 一轮工作里的每一步（薄驱动连接，每步都停得下来）；每一步先问边界",
+   "doc": "docs/architecture.html",
+   "found": "拼接"
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "loop-outer",
+   "quote": "外环 · 部门之间的流转；边界到上限、你取消、振荡信号：任何状态都能到停止",
+   "doc": "docs/architecture.html",
+   "found": "拼接"
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-defect",
+   "quote": "缺陷记录是上游关注的成果",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-delivery",
+   "quote": "工程要求 → 交付",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-guidance",
+   "quote": "你中途的指导是部门关注的成果",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-intent",
+   "quote": "产品意图 → 要求（PRD）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-min-completion",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ok-prd",
+   "quote": "产品意图 → 要求（PRD）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-approval",
+   "quote": "只由你批准一份事实的写入口、裁决、边界、薄驱动与插件加载、评价材料、看门狗。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-compat",
+   "quote": "只能向后兼容三道槽位契约（路由、装配、执行）、骨架事件、对外的合同、定义的格式。字段只增，带版本。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "ring-rewrite",
+   "quote": "可以整体重写路由实现、装配实现、执行实现、模型与执行环境的适配、投影、画面、观察者。重写以后外面看不出区别。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-by-outcome",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-direct",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "rm-pool",
+   "quote": "直做：一个或几个角色靠询问协作，指定的角色交完成就结束。按成果：谁关注的成果有了新版本谁开工。任务池：发布、认领、完成、打回。三种都能放核验角色。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "role-min",
+   "quote": "默认：产品 → 工程 → 质检 → 放行或打回工程；任何部门随时可以询问另一个部门。最少：一个角色直做，交完成即开环完成",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-action",
+   "quote": "动作已定工具 ↔ 执行环境每个动作有回执；结果未知时有核实办法。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-assembly",
+   "quote": "装配已定执行 ↔ 装配实现一轮看到的是事实的一个视图，不改事实。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-definition",
+   "quote": "定义已定定义文件 ↔ 加载与校验改定义不改代码，能撤回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-evaluation",
+   "quote": "评价已定评价材料 → 系统被开发的版本读不到评它的题。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-execution",
+   "quote": "执行已定薄驱动 ↔ 执行实现一轮里的每一步都停得下来。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-interface",
+   "quote": "接口已定页面、命令行、评测、观察者、画面 ↔ 应用层外面只经这里读与发。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-model",
+   "quote": "模型已定执行 ↔ 模型服务换模型不改循环。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-observer",
+   "quote": "观察者已定观察者 ↔ 接口（读）与写入口（写）只看，不动手。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-projection",
+   "quote": "投影已定一份事实 → 读的人任何投影都能从事实重算。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-routing",
+   "quote": "路由已定薄驱动 ↔ 路由实现换轮转方式，循环本身不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-view",
+   "quote": "画面已定接口 ↔ 画面画面整个换掉或落后，事实与页面不动。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-watchdog",
+   "quote": "看门狗未定看门狗 ↔ 实例候选失败能退回。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "seam-write-gate",
+   "quote": "写入口已定一切写入方 ↔ 一份事实事实只从这里进，进了就不改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-incident",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-onboarding",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-subtask",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "src-user-input",
+   "quote": "事项的来源（你的输入、建档；子事项是上一层交来的任务；以后加运维发现的故障）与接它的部门",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-accepting",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-asking",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-draining",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-rework",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-stopped",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-verifying",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-waiting-user",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-waiting-work",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "st-working",
+   "quote": "外环 · 部门之间的流转（直做、按成果、任务池共用这套状态）",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "status-settled",
+   "quote": "已定：规矩不再改，子架构师现在就守",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "status-unsettled",
+   "quote": "未定：我还在定，先别依赖",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "stop-list",
+   "quote": "停止原因来自封闭清单",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch1-overview.ttl",
+   "subject": "user",
+   "quote": "你给意图与中途的指导，回答停在写入口的决定请求，批准内核与定义的修改。",
+   "doc": "docs/architecture.html",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-architect",
+   "quote": "项目材料、同伴交回的结论、本部门记录",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-explorer",
+   "quote": "项目材料、代码、外部文档",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-lead",
+   "quote": "设计与计划、代码、自测结果",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "basis-eng-reviewer",
+   "quote": "待审查的成果、它的依据、上一轮审查意见",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "cd-generic",
+   "quote": "写入范围是检查材料……检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要……结论绑定被核验方交完成那一刻的版本；版本变了，结论失效。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "decl-default-quality",
+   "quote": "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "decl-eng-review",
+   "quote": "审查者 | ……读取要求、材料与证据，在独立副本上运行检查，提交结论 | 是，核验中心角色交的完成",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "dept-engineering",
+   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "dept-product",
+   "quote": "接你的输入与建档的部门，是定义里事项的来源写明的那个部门（三部门里是产品）",
+   "doc": "docs/design/skeleton-and-application.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-reading",
+   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。……子组织内部的角色没写入的跟随部门",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-run",
+   "quote": "核验只有一套，角色在定义里声明「做核验、核验谁的成果」就有",
+   "doc": "docs/design/department-roles.md、docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-eng-review-run",
+   "quote": "读取要求、材料与证据，在独立副本上运行检查，提交结论",
+   "doc": "docs/design/department-roles.md、docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ev-host-run",
+   "quote": "检查在独立副本上由主机跑，回执绑定被核验的那一版和检查材料的摘要。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-default",
+   "quote": "三部门（默认） | 产品、工程、质检 | 成果驱动 | 质检 | 质检放行",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-default",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-eng-center",
+   "quote": "部门的角色定义可以指向一份子组织形态，默认是中心型小组。指向了，这个角色的一轮工作开一个子事项",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-min",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-outsourced",
+   "quote": "一个外包角色直做 | 一个外包角色 | 直做 | 没有 | 外包交回快照，开环完成并注明外包",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "form-several",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-architect",
+   "quote": "把任务做成能交完成的成果",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-explorer",
+   "quote": "交回带来源的发现",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-lead",
+   "quote": "按设计与计划实现并自测",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "obj-eng-reviewer",
+   "quote": "判断这一版成果是否可以放行",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-eng-center-completion",
+   "quote": "中心角色交完成时，审查者作为核验角色核验中心角色交的这一版……放行则子事项结束；打回则中心角色再开始一轮。",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-eng-findings",
+   "quote": "探索者 | 询问里交来的查证任务 | 交回带来源的发现",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-min-completion",
+   "quote": "事项最后采纳的成果（直做下是交完成的那一份，成果驱动下是交付）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-out-completion",
+   "quote": "外包交回快照，开环完成并注明外包",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "ok-sev-completion",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-architect",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-explorer",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-lead",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-reviewer",
+   "quote": "审查者每次从新的上下文开始，只看待审查的成果、它的依据与上一轮的审查意见，看不到作者的历史。",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-eng-reviewer",
+   "quote": "工程 | 工程架构师 | 中心角色做架构与技术设计、模块划分、起草工程计划……探索者读代码、查库与接口文档、复现问题；主程按设计与计划实现代码并自测；审查者审查设计与代码",
+   "doc": "docs/design/department-roles.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-min",
+   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-outsourced",
+   "quote": "发布默认带四份：三部门；一个角色直做；几个角色直做；一个外包角色直做。一个角色直做与一个外包角色直做都只有一个角色，用工程这个部门的名字与工具，你的输入与建档由工程接，没有核验角色，所以以开环完成结束（外包时注明外包）",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-sev-engineering",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "role-sev-product",
+   "quote": "几个角色直做有两个自有角色，产品与工程……你的输入与建档都由工程接，工程交完成，产品回答询问（需求的边界与取舍）；没有核验角色，以开环完成结束。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-design.ttl",
+   "subject": "src-subtask",
+   "quote": "子事项有自己的事件流和冻结的定义；它的事项的来源是「上一层交来的任务」，由子组织里定义接它的角色接",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "cd-generic",
+   "quote": "同一版本一个核验角色只给一个结论，给过以后不再接受它对这一版的第二个结论。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "cd-generic",
+   "quote": "检查材料放在哪里是主机的固定约定，公开树、交付快照与检查副本都按这一处排除与收录；定义只声明哪个角色得到这块写入范围，不另选位置，写了别的位置的定义在加载时整份拒绝。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "decl-default-quality",
+   "quote": "与独立判断不同的条目要写明改变的理由，缺理由的被拒绝；改动了几条由主机数，不由角色自报。",
+   "doc": "docs/design/independent-verification.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "decl-default-quality",
+   "quote": "引用的判断必须属于这一次：针对当前交付与当前产品规格、并在这次交付被接收以后写下；新的交付到达以后，上一份交付的判断不再算数。",
+   "doc": "docs/design/independent-verification.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "dept-quality",
+   "quote": "两套取值都是质检角色这一项可见范围设置的取值，不是两个另外的参数",
+   "doc": "docs/design/independent-verification.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-default",
+   "quote": "等结论期间，交完成的角色不开新的一轮，新到的输入与指导排队，等结论到了或被打回以后再进入它的一轮。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "只有一个角色时没有可以询问的人，不给询问。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "基线核验照旧占一份、内容为空，另记下这份基线没有经过基线核验",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  },
+  {
+   "file": "batch2-eb8429e.ttl",
+   "subject": "form-min",
+   "quote": "核验角色要核验的角色必须交得出完成，交不出的定义在加载时整份拒绝：它永远没有可以核验的那一版。核验角色自己也必须交得出核验结论，否则事项交完成以后等不到放行，同样拒绝。",
+   "doc": "docs/design/forms-and-verifier-role.md",
+   "found": true
+  }
+ ]
+}
