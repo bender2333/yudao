@@ -118,18 +118,6 @@
     {
      "slot": "slot-1",
      "depth": 1,
-     "root": "质检核验工程的交付",
-     "path": "质检核验工程的交付 → 记作已核验的结论必有独立证据",
-     "axiom": "记作已核验的结论必有独立证据",
-     "basis": "D38 基础规则 1「现实的证据高于模型的意见。真正独立的证据只有三种来源：把东西实际跑一遍，换一个不同的模型，或者人」",
-     "key": [
-      "https://yudao.dev/onto#decl-default-quality",
-      "https://yudao.dev/onto#ax-decl-needs-evidence"
-     ]
-    },
-    {
-     "slot": "slot-2",
-     "depth": 1,
      "root": "工程",
      "path": "工程 → 内部要协作的部门必有一份部门内的核验",
      "axiom": "内部要协作的部门必有一份部门内的核验",
@@ -137,6 +125,18 @@
      "key": [
       "https://yudao.dev/onto#dept-engineering",
       "https://yudao.dev/onto#ax-collab-needs-internal-verification"
+     ]
+    },
+    {
+     "slot": "slot-2",
+     "depth": 1,
+     "root": "质检核验工程的交付",
+     "path": "质检核验工程的交付 → 记作已核验的结论必有独立证据",
+     "axiom": "记作已核验的结论必有独立证据",
+     "basis": "D38 基础规则 1「现实的证据高于模型的意见。真正独立的证据只有三种来源：把东西实际跑一遍，换一个不同的模型，或者人」",
+     "key": [
+      "https://yudao.dev/onto#decl-default-quality",
+      "https://yudao.dev/onto#ax-decl-needs-evidence"
      ]
     },
     {
@@ -383,19 +383,6 @@
  "tracking": [
   {
    "born": 1,
-   "path": "质检核验工程的交付 → 记作已核验的结论必有独立证据",
-   "depth": 1,
-   "axiom": "记作已核验的结论必有独立证据",
-   "filled_in": 2,
-   "filled_by": "主机在独立副本上跑的检查",
-   "partial": null,
-   "key": [
-    "https://yudao.dev/onto#decl-default-quality",
-    "https://yudao.dev/onto#ax-decl-needs-evidence"
-   ]
-  },
-  {
-   "born": 1,
    "path": "工程 → 内部要协作的部门必有一份部门内的核验",
    "depth": 1,
    "axiom": "内部要协作的部门必有一份部门内的核验",
@@ -405,6 +392,19 @@
    "key": [
     "https://yudao.dev/onto#dept-engineering",
     "https://yudao.dev/onto#ax-collab-needs-internal-verification"
+   ]
+  },
+  {
+   "born": 1,
+   "path": "质检核验工程的交付 → 记作已核验的结论必有独立证据",
+   "depth": 1,
+   "axiom": "记作已核验的结论必有独立证据",
+   "filled_in": 2,
+   "filled_by": "主机在独立副本上跑的检查",
+   "partial": null,
+   "key": [
+    "https://yudao.dev/onto#decl-default-quality",
+    "https://yudao.dev/onto#ax-decl-needs-evidence"
    ]
   },
   {

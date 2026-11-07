@@ -1,4 +1,4 @@
-# 第 3 批：发布带的三份形态的定义文件，由 defs.py 从 eb8429e 转写，不手改。
+# 第 3 批：发布带的三份形态的定义文件，由 defs.py 从 37e9d68 转写，不手改。
 # 形态目录、部门与成果种类到前两批个体的对应写在 defs.py 开头。
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .

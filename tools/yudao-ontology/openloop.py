@@ -1,7 +1,7 @@
 """开环标记的检查：两处以上文字对同一件事（标不标开环）给条件时，枚举探针，找出判定相反的那种定义。
 
-用法：python3 openloop.py 5159317 eb8429e
-每个提交读 rules/openloop-<提交>.ttl。先到那个提交里逐句核对原句还在，再按三步跑 HermiT：
+用法：python3 openloop.py 5159317 eb8429e 37e9d68@eb8429e
+每个提交读 rules/openloop-<提交>.ttl；写成「提交@规则」时，到前一个提交里核对后一个提交的规则（文字没变的版本不另写规则）。先到那个提交里逐句核对原句还在，再按三步跑 HermiT：
   1. 只放特征的结构：推不出的组合（例如没有核验角色却核验最后的成果）去掉；
   2. 再放加载规则：被归进「加载时整份拒绝」的组合不会建出事项，不判开环；
   3. 再放判开环的规则：一份探针在这一步变得不一致，就是两条规则给它相反的判定，记违例。
@@ -76,9 +76,10 @@ def describe(base: rdflib.Graph, values) -> str:
     return "，".join(str(base.value(pos if v else neg, RDFS.label)) for (pos, neg), v in zip(FEATURES, values))
 
 
-def check(commit: str) -> dict:
+def check(arg: str) -> dict:
+    commit, _, rules_of = arg.partition("@")
     base = rdflib.Graph().parse(HERE / "rules/openloop-features.ttl")
-    rules = rdflib.Graph().parse(HERE / f"rules/openloop-{commit}.ttl")
+    rules = rdflib.Graph().parse(HERE / f"rules/openloop-{rules_of or commit}.ttl")
     # 原句核对
     quotes = []
     for r in sorted(set(rules.subjects(YD.docPath, None))):
@@ -117,7 +118,7 @@ def check(commit: str) -> dict:
             row["result"] = ("标开环" if "OpenLoopMarked" in types else
                              "不标开环" if "NotOpenLoopMarked" in types else "不知道")
         rows.append(row)
-    return {"commit": commit, "quotes": quotes, "probes": rows}
+    return {"commit": arg, "quotes": quotes, "probes": rows}
 
 
 def main(argv):
@@ -130,4 +131,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:] or ["5159317", "eb8429e"])
+    main(sys.argv[1:] or ["5159317", "eb8429e", "37e9d68@eb8429e"])
