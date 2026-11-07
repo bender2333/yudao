@@ -95,3 +95,93 @@ def _item_problems(index: int, item: object) -> list[str]:
     if unknown:
         problems.append(f"第 {index} 项有没定义的字段：{'、'.join(unknown)}")
     return problems
+
+
+@dataclass(frozen=True)
+class Candidate:
+    # 一处存活的变异：与理由登记比对用的字段（文件、函数、整条语句改动前后的文字、第几处、位置）
+    file: str
+    function: str
+    before: str
+    after: str
+    lineno: int
+    occurrence: int = 1
+    col_offset: int = 0
+
+    def key(self) -> tuple:
+        return (self.function, self.before, self.after, self.lineno, self.occurrence, self.col_offset)
+
+    def describe(self) -> dict:
+        return {
+            "function": self.function,
+            "lineno": self.lineno,
+            "occurrence": self.occurrence,
+            "before": self.before,
+            "after": self.after,
+        }
+
+
+@dataclass(frozen=True)
+class Match:
+    reason: Reason
+    candidate: Candidate
+
+
+@dataclass(frozen=True)
+class MatchResult:
+    # 命中（单列、不算不通过）、过期（对不上任何存活变异，不通过）与没被登记覆盖的存活变异
+    matched: tuple[Match, ...]
+    stale: tuple[Reason, ...]
+    unmatched: tuple[Candidate, ...]
+
+    @property
+    def accepted(self) -> tuple[Candidate, ...]:
+        return tuple(match.candidate for match in self.matched)
+
+
+def match(
+    reasons: tuple[Reason, ...],
+    module: str,
+    functions: set[str] | None,
+    candidates: list[Candidate],
+) -> MatchResult:
+    # 理由登记按「文件、函数、整条语句改动前后的文字、第几处」与存活的变异比对（设计说明
+    # 「存活的出口与理由登记」）。functions 为 None 表示全量模式核对全部登记项；否则只核对落在
+    # 改到的函数里的登记项（改动模式）。对不上任何存活变异的登记项是过期项。
+    scoped = [
+        reason
+        for reason in reasons
+        if reason.file == module and (functions is None or reason.function in functions)
+    ]
+    groups: dict[tuple[str, str, str, int], list[Candidate]] = {}
+    for candidate in sorted(candidates, key=lambda item: (item.function, item.lineno, item.occurrence, item.col_offset)):
+        key = (candidate.function, candidate.before, candidate.after, candidate.occurrence)
+        groups.setdefault(key, []).append(candidate)
+    matched: list[Match] = []
+    stale: list[Reason] = []
+    accepted: set[tuple] = set()
+    for reason in scoped:
+        occurrence = reason.occurrence or 1
+        group = groups.get((reason.function, reason.before, reason.after, occurrence), [])
+        if group:
+            candidate = group[0]
+            matched.append(Match(reason=reason, candidate=candidate))
+            accepted.add(candidate.key())
+        else:
+            stale.append(reason)
+    unmatched = tuple(candidate for candidate in candidates if candidate.key() not in accepted)
+    return MatchResult(matched=tuple(matched), stale=tuple(stale), unmatched=unmatched)
+
+
+def describe(reason: Reason) -> dict:
+    # 报告里的一项登记：字段与登记文件的字段同名
+    return {
+        "file": reason.file,
+        "function": reason.function,
+        "before": reason.before,
+        "after": reason.after,
+        "reason": reason.reason,
+        "registered_by": reason.registered_by,
+        "registered_at": reason.registered_at,
+        "occurrence": reason.occurrence,
+    }
