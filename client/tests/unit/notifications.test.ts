@@ -1,6 +1,6 @@
 // 系统通知与标签页标题的单元测试（网页界面的提供与发布 docs/design/web-interface-and-release.md「系统通知与「安装此站点为应用」」，工单 #375）。
 // 核对事件到通知的翻译：三类通知的标记、标题与正文，点开决定卡片所需的标识，以及标题里的数量。
-// 浏览器通知的发出与权限由端到端用例在真实 Chromium 里核对（client/tests/e2e/notifications.spec.ts）。
+// 浏览器通知的发出与权限不在客户端单元里看，真实页面由发布以后的走查与试用看。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";

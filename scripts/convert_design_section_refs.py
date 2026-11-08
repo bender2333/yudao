@@ -296,14 +296,6 @@ LINE_DECISIONS: tuple[tuple[str, str, str, str, str, str], ...] = (
         "架构师 2026-11-06 判定（工单正文的 33 处表）：查询清单",
     ),
     (
-        "client/tests/e2e/timeline.spec.ts",
-        "// 刻度：那一刻的位置与事项范围是两个参数（接口设计说明第 4.1 节「按位置读取」），页面先把 ?w= 换成",
-        "4.1",
-        "app-and-interface.md",
-        "",
-        "架构师 2026-11-06 判定（工单正文的 33 处表）：查询清单",
-    ),
-    (
         "client/tests/unit/timeline-logic.test.js",
         "// 回放的位置与事项范围是两个参数（接口设计说明第 4.1 节「按位置读取」，工单 #1217）：",
         "4.1",
@@ -723,7 +715,6 @@ PROTO_AS_IS: tuple[tuple[str, str], ...] = (
     ("client/src/renderer/src/pixel/floor/render.ts", "原型 v10 floor.js 的绘制部分"),
     ("client/src/renderer/src/views/project/floor-screen.tsx", "回放到过去的时间点时不显示决定请求"),
     ("client/src/renderer/src/views/project/floor-screen.tsx", "回到那个位置的概览回放"),
-    ("client/tests/e2e/shell.spec.ts", "连接断开时窗口整体变灰"),
 )
 
 # 工单 #1411 正文点名的几行：那里的第 12 节是已删去的「从现有代码过去的路径」，
