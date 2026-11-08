@@ -53,6 +53,14 @@ class UnrepresentableWorkspace(TreeError):
             "; ".join([*self.reasons, "Add these paths to the project's ignore rules or delete them."])
         )
 
+class IgnoreRulesUndecidable(TreeError):
+    """The project's ignore rules cannot be decided on this host.
+
+    主机这一侧的问题，模型修不了：所有位置统一以 `host_commit_error` 停止事项，停止说明带诊断原文
+    （docs/design/local-tools.md「工具边界」，工单 #604）。与工作区里的条目无法表示不同，它不是
+    工作区内容的问题，不暂停等待处理工作区。
+    """
+
 class _ConcurrentChange(TreeError):
     """捕获期间工作区被别的写入者改了：读这一侧重读，不是判据上的拒绝。
 
@@ -221,7 +229,7 @@ def excluded_by_ignore_rules(root: str | Path, relatives: Sequence[str]) -> froz
     try:
         repository = _probe_repository(base, ignore_probe_directory(base))
     except pygit2.GitError as error:
-        raise TreeError(f"Git ignore rules cannot be decided: {error}") from error
+        raise IgnoreRulesUndecidable(f"Git ignore rules cannot be decided: {error}") from error
     return frozenset(relative for relative in candidates if repository.path_is_ignored(relative))
 
 def unrepresentable_reason(observed: os.stat_result, relative: str) -> str | None:
@@ -433,7 +441,7 @@ def _identity_shared_by_path_and_handle(observed: os.stat_result) -> tuple[int, 
 
 
 __all__ = [
-    "CapturedFile", "CapturedTree", "TreeError", "UnrepresentableWorkspace",
+    "CapturedFile", "CapturedTree", "IgnoreRulesUndecidable", "TreeError", "UnrepresentableWorkspace",
     "capture_public_tree", "excluded_by_ignore_rules", "has_ignore_rules", "ignore_probe_directory",
     "materialize_tree", "resolve_public_path", "unrepresentable_reason", "verify_public_tree",
 ]
