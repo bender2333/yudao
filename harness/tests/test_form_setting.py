@@ -252,6 +252,8 @@ def test_the_current_form_leaving_the_release_is_reported_and_can_be_repaired(tm
     organization = _organization(application, project_id)
     assert organization.form == second_routing.ROUTING_NAME
     assert (organization.version, organization.form_in_release) == (None, False)
+    # 名字也从这一份定义得出：这一份不在发布里时没有名字，不拿别的形态的名字顶替（工单 #1601）
+    assert organization.label is None
     # 现在这一份不在发布里时部门也为空：不拿别的形态的部门顶替；合成结果没有，拒绝项写明原因，
     # 两个一次点击的改动文档也不给（工单 #1516）
     assert organization.departments == []

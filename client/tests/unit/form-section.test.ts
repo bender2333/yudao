@@ -36,6 +36,7 @@ const SINGLE = "single_role";
 function choice(overrides: Partial<FormChoice> = {}): FormChoice {
   return {
     form: THREE,
+    label: "产品 · 工程 · 质检",
     description: "产品、工程、质检；质检核验工程。",
     version: "sha256:three",
     verifier_roles: ["quality"],
@@ -48,6 +49,7 @@ function choice(overrides: Partial<FormChoice> = {}): FormChoice {
 function openLoopChoice(): FormChoice {
   return choice({
     form: SINGLE,
+    label: "工程",
     description: "工程；没有核验角色，事项以开环完成结束。",
     version: "sha256:single",
     verifier_roles: [],
@@ -72,6 +74,7 @@ function organization(overrides: Partial<ProjectOrganizationResult> = {}): Proje
   return {
     project_id: "p-1",
     form: THREE,
+    label: "产品 · 工程 · 质检",
     version: "sha256:three",
     form_in_release: true,
     departments: [],

@@ -10088,6 +10088,10 @@
             "type": "string",
             "title": "Form"
           },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
           "description": {
             "type": "string",
             "title": "Description"
@@ -10112,6 +10116,7 @@
         "type": "object",
         "required": [
           "form",
+          "label",
           "description",
           "version",
           "verifier_roles",
@@ -12774,6 +12779,17 @@
             "type": "string",
             "title": "Form"
           },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
           "version": {
             "anyOf": [
               {
@@ -12862,6 +12878,7 @@
         "required": [
           "project_id",
           "form",
+          "label",
           "version",
           "form_in_release",
           "departments",
