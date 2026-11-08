@@ -7,22 +7,15 @@
 // 失败路径：Key 被拒绝、地址不可达、空列表、单个模型验证失败、容量未知后手填继续、搜索无结果；
 // 原因都写在被操作的对象旁边，同一个视口里看得到。
 // 取消勾选：被部门使用的模型取消不了并写明引用方；进行中的模型取消以后迟到的结果不启用它。
-// 取消选用不可逆（工单 #737）：点下去先出现确认（确认按钮与「删除」一样是 danger），
-// 点「先不移除」时命令没有发出、这一行还在，确认以后才移除。
 // 获取模型这条请求（工单 #1355）：进行中时页面写明在做什么且候选区照常可以操作；
 // 结束以后不刷新页面就能勾选（服务端收到 catalog.model.select）；失败以后写明原因，页面可以继续操作。
 // 候选分页（工单 #1585）：每页最多 8 个，列表下方「上一页」「下一页」与页脚「第 n / m 页」；
 // 搜索、筛选与重新获取模型列表以后回到第一页，取消选用使最后一页消失时停在新的最后一页。
 
 import { expect, test } from "@playwright/test";
-import { mkdirSync } from "node:fs";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { join } from "node:path";
-import { repoRoot, startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
-
-// 移除访问定义的确认框截图（工单 #737 的界面证据，文件名写清页面与状态）
-const SHOT_DIR = join(repoRoot, ".tmp", "737-shots");
+import { startBackend, startClient, type Backend, type ClientApp } from "./fixtures";
 
 // 上游的凭据：页面填的 Key 必须与它一致，否则上游按真实服务的方式拒绝
 const UPSTREAM_KEY = "sk-e2e-models-2f8c41";
@@ -245,17 +238,6 @@ async function clearDepartmentDefaults(client: ClientApp): Promise<void> {
   }
 }
 
-// 取消选用（移除访问定义）不可逆（工单 #737）：点下去先出现确认，写明准入作废与职能绑定失效，
-// 确认按钮与同页面的「删除」一样用 danger 样式；确认以后才提交命令，点「先不移除」时命令不发出、这一行还在
-async function confirmRemoval(client: ClientApp): Promise<void> {
-  const dialog = client.page.locator(".y10-modal");
-  await expect(dialog).toContainText("准入记录作废");
-  await expect(dialog).toContainText("职能绑定会失效");
-  await expect(client.page.getByTestId("remove-confirm")).toHaveClass(/danger/);
-  await client.page.getByTestId("remove-confirm").click();
-  await expect(dialog).toHaveCount(0);
-}
-
 for (const size of [{ width: 1440, height: 900 }]) {
   const label = `${size.width}×${size.height}`;
 
@@ -410,9 +392,8 @@ for (const size of [{ width: 1440, height: 900 }]) {
       // 三个部门都在用它
       expect(await departmentChoice(client, "product")).toContain("trial-alpha");
 
-      // 取消勾选：先确认（工单 #737），确认以后被部门引用，服务端拒绝，引用方写在模型行旁
+      // 取消勾选：被部门引用，服务端拒绝，引用方写在模型行旁
       await client.page.getByTestId("selected-remove-trial-alpha").click();
-      await confirmRemoval(client);
       await expect(client.page.getByTestId("selected-status-text-trial-alpha")).toContainText("仍被引用，无法移除");
       await expect(client.page.getByTestId("selected-status-text-trial-alpha")).toContainText("职能默认：产品");
       // 它仍然启用着，部门仍然用它
@@ -442,20 +423,8 @@ for (const size of [{ width: 1440, height: 900 }]) {
       await client.page.getByTestId("candidate-check-trial-slow").check();
       await expect(client.page.getByTestId("selected-trial-slow")).toBeVisible({ timeout: 60_000 });
 
-      // 取消勾选不可逆（工单 #737）：这一行与同页面的「删除」一样用 danger 样式，点下去先出现确认；
-      // 点「先不移除」时命令没有发出、这一行还在
-      await expect(client.page.getByTestId("selected-remove-trial-slow")).toHaveClass(/small danger/);
+      // 取消勾选：定义被移除，进行中的测试取消
       await client.page.getByTestId("selected-remove-trial-slow").click();
-      await expect(client.page.locator(".y10-modal")).toContainText("先不移除");
-      mkdirSync(SHOT_DIR, { recursive: true });
-      await client.page.screenshot({ path: join(SHOT_DIR, "models-remove-confirm-1440.png") });
-      await client.page.getByTestId("remove-dismiss").click();
-      await expect(client.page.locator(".y10-modal")).toHaveCount(0);
-      await expect(client.page.getByTestId("selected-trial-slow")).toHaveCount(1);
-
-      // 再来一次并确认：定义被移除，进行中的测试取消
-      await client.page.getByTestId("selected-remove-trial-slow").click();
-      await confirmRemoval(client);
       await expect(client.page.getByTestId("selected-trial-slow")).toHaveCount(0, { timeout: 60_000 });
 
       // 等上游把迟到的结果送回来：它没有启用这个模型，也没有写进部门默认
@@ -615,8 +584,6 @@ for (const size of [{ width: 1440, height: 900 }]) {
       await expect(client.page.getByTestId("candidate-page")).toHaveText("第 2 / 2 页");
       await expect(client.page.getByTestId("candidate-many-09")).toBeVisible();
       await client.page.getByTestId("candidate-check-many-09").click();
-      // 取消勾选就是移除访问定义（工单 #737）：先确认，确认以后才提交命令
-      await confirmRemoval(client);
       await expect(client.page.getByTestId("candidate-page")).toHaveText("第 1 / 1 页");
       await expect(client.page.getByTestId("candidate-many-09")).toHaveCount(0);
       await expect(client.page.getByTestId("candidate-many-08")).toBeVisible();
