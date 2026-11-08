@@ -164,11 +164,6 @@ jobs:
         run: npm ci --prefix client
 
       # 安装以后的各项检查互不依赖：前一项失败时后面的照样运行，一次给出全部结果
-      # room-screen-switch 等测试用 Playwright 启动 Chromium 挂载页面
-      - name: 安装 Chromium
-        working-directory: client
-        run: npx playwright install chromium
-
       - name: 客户端单元测试
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         working-directory: client

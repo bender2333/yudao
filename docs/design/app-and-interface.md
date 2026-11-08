@@ -797,7 +797,6 @@ sequenceDiagram
 | 页面的接口类型 | `@hey-api/openapi-ts` 0.99.0（OpenCode 的 SDK 用它生成） |
 | 页面的事件流 | npm `eventsource` 5.1.2，可以传入自定义 fetch，在请求头中带令牌 |
 | 页面 | 使用的技术按[总体架构](architecture/overall-architecture.md)「使用的技术」；由接口层提供，见[网页界面的提供与发布设计说明](web-interface-and-release.md) |
-| 端到端测试 | Playwright 驱动浏览器（Edge、Chrome；[网页界面的提供与发布设计说明](web-interface-and-release.md)「使用的技术」） |
 
 ## 9. 验收
 

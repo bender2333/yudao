@@ -620,6 +620,10 @@ def stop_note_script():
 COVERAGE_PROJECT = "开环报告"
 COVERAGE_ITEM = "实现带开环条件的放行"
 COVERAGE_ACCEPTANCE = ["打印传入的文本", "空参数时打印用法", "退出码为 0"]
+# 交付检查的命令（与 harness/tests/test_acceptance_coverage.py 相同）：在基线副本与交付快照上都能找到
+# 文件与解释器；run 层的收敛状态看命令检查是否通过，拿不到回执时不判定
+COVERAGE_PYTHON = sys.executable.replace("\\", "/")
+COVERAGE_SMOKE_COMMAND = f'"{COVERAGE_PYTHON}" src/lib.py'
 
 
 def coverage_criteria() -> list[dict]:
@@ -638,24 +642,40 @@ def coverage_criteria() -> list[dict]:
 
 def coverage_script():
     # 开环明细的脚本（工单 #401）：按部门给出，每一轮按请求里看到的事实决定做什么——
-    # 质检在没有交付的一轮是预测性探索，有交付的一轮先交独立判断（提交结论以前必须有它，
-    # 验证的独立性 docs/design/independent-verification.md「先判断后看解释」）再放行。放行记录里因此有两条开环条件
-    judged: dict[str, bool] = {}
+    # 质检在没有交付的一轮是预测性探索，有交付的一轮依次交独立判断（提交结论以前必须有它，
+    # 验证的独立性 docs/design/independent-verification.md「先判断后看解释」）、在基线副本上运行交付检查、
+    # 再放行。放行记录里因此有两条开环条件；覆盖数里命令检查一条通过（工单 #1583 的收敛明细要有一个
+    # 层状态真的变化，不判定的放行记录不会产生这一项）
+    state: dict[str, bool] = {}
 
     def quality_turn(call):
         if not prompt_part(call, "current_delivery_spec"):
             return explore_turn()
-        if not judged.get("committed"):
-            judged["committed"] = True
+        if not state.get("judged"):
+            state["judged"] = True
             return judgement_turn(checks={"smoke": 0}, criteria=coverage_criteria())(call)
+        if not state.get("baseline"):
+            state["baseline"] = True
+            return coverage_baseline_turn(call)
         return review_turn("release", "checks passed on the current snapshot",
                            checks={"smoke": 0}, criteria=coverage_criteria())(call)
 
     return {
         "product": [FakeTurn(proposal=product_spec(acceptance=COVERAGE_ACCEPTANCE))],
-        "engineering": [delivery_turn()],
+        "engineering": [delivery_turn(
+            files={"src/lib.py": "print('delivered')\n"},
+            checks={"smoke": {"command": COVERAGE_SMOKE_COMMAND}})],
         "quality": [quality_turn] * 8,
     }
+
+
+def coverage_baseline_turn(call) -> ModelResponse:
+    # 基线检查的假模型轮（与 harness/tests/test_acceptance_coverage.py 同一做法）：主机在基线副本上运行
+    # 同名的交付检查，回执进入这一轮的放行记录；没有它，命令检查不计入覆盖，run 层的收敛状态不判定
+    return ModelResponse(output=[{
+        "id": "qa-baseline", "call_id": "qa-baseline", "type": "function_call", "name": "run_baseline_check",
+        "arguments": json_dumps({"name": "smoke"}),
+    }])
 
 
 async def seed_coverage(application: Application, system: LoopSystem) -> None:
