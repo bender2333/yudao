@@ -153,6 +153,9 @@ def running_server(open_application: Callable[[], Application], *,
         finally:
             startup.open_finished_at = time.monotonic()
 
+    # 端口一律交给操作系统分配（port=0）：集成层在 CI 上用 -n 4 并行跑，4 个 worker 是独立进程、服务与
+    # 客户端成对，不共用端口区间，也不会互相等待（工单 #1446 用 4 个独立进程同时起服务核对过：端口互不相同，
+    # 每个服务等的都是自己的就绪信号）。就绪之前不需要知道端口，就绪以后从已绑定的套接字上取。
     server = uvicorn.Server(uvicorn.Config(
         create_app(open_tracked, registry=registry, access=access, keepalive_sec=keepalive_sec,
                    pages=RELEASE_ASSETS if pages is None else pages,
