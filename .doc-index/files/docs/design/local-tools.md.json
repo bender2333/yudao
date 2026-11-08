@@ -1,13 +1,13 @@
 {
 "schema":1,
 "path":"docs/design/local-tools.md",
-"hash":"97f55a9ecc8b0990",
+"hash":"3f45960c28b4bbe3",
 "nodes":[
-{"hash":"97f55a9ecc8b0990","id":"docs/design/local-tools.md","kind":"file","title":"docs/design/local-tools.md"},
+{"hash":"3f45960c28b4bbe3","id":"docs/design/local-tools.md","kind":"file","title":"docs/design/local-tools.md"},
 {"hash":"8cc2e43d22f7351a","id":"docs/design/local-tools.md#本地通用工具设计说明","kind":"section","parent":"docs/design/local-tools.md","title":"本地通用工具设计说明"},
 {"hash":"5405f7e186dc5619","id":"docs/design/local-tools.md#本地通用工具设计说明 > 1. 使用过程","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"1. 使用过程"},
 {"hash":"8fd38c31310978cd","id":"docs/design/local-tools.md#本地通用工具设计说明 > 2. 工作区","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"2. 工作区"},
-{"hash":"ff4ca7ff14132da6","id":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"3. 工具边界"},
+{"hash":"2aedbe5320d652b0","id":"docs/design/local-tools.md#本地通用工具设计说明 > 3. 工具边界","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"3. 工具边界"},
 {"hash":"e843ef1291df1a80","id":"docs/design/local-tools.md#本地通用工具设计说明 > 4. 使用的依赖与成熟实现","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"4. 使用的依赖与成熟实现"},
 {"hash":"2fa996d9bc3103ed","id":"docs/design/local-tools.md#本地通用工具设计说明 > 5. 模块交互","kind":"section","parent":"docs/design/local-tools.md#本地通用工具设计说明","title":"5. 模块交互"}
 ],

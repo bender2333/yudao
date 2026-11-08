@@ -1,9 +1,9 @@
 {
 "schema":1,
 "path":"docs/design/semantic-system.md",
-"hash":"08d3df78420a0c44",
+"hash":"767767f900b865ee",
 "nodes":[
-{"hash":"08d3df78420a0c44","id":"docs/design/semantic-system.md","kind":"file","title":"docs/design/semantic-system.md"},
+{"hash":"767767f900b865ee","id":"docs/design/semantic-system.md","kind":"file","title":"docs/design/semantic-system.md"},
 {"hash":"1b8fe88c4f48fd6b","id":"docs/design/semantic-system.md#语义系统设计说明","kind":"section","parent":"docs/design/semantic-system.md","title":"语义系统设计说明"},
 {"hash":"dd891dc73c47317d","id":"docs/design/semantic-system.md#语义系统设计说明 > 1. 要解决的问题","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明","title":"1. 要解决的问题"},
 {"hash":"38d88e7ca5eaf197","id":"docs/design/semantic-system.md#语义系统设计说明 > 2. 参照对象与取舍","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明","title":"2. 参照对象与取舍"},
@@ -16,7 +16,7 @@
 {"hash":"b9c003a58dea0abb","id":"docs/design/semantic-system.md#语义系统设计说明 > 5. 本体 > 5.4 时间与来源","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明 > 5. 本体","title":"5.4 时间与来源"},
 {"hash":"dfe7adab630530dc","id":"docs/design/semantic-system.md#语义系统设计说明 > 5. 本体 > 5.5 要求类条目的编号","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明 > 5. 本体","title":"5.5 要求类条目的编号"},
 {"hash":"ff06231bb70cabe8","id":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明","title":"6. 轨迹"},
-{"hash":"7ae3d3892a7f2e22","id":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.1 五层","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹","title":"6.1 五层"},
+{"hash":"1e1d6de88aab5090","id":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.1 五层","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹","title":"6.1 五层"},
 {"hash":"32b8b6417f838791","id":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.2 生成","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹","title":"6.2 生成"},
 {"hash":"b1a5dada9d866ad4","id":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.3 尝试的整理","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹","title":"6.3 尝试的整理"},
 {"hash":"f10d95ca2462c52c","id":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹 > 6.4 职能账本","kind":"section","parent":"docs/design/semantic-system.md#语义系统设计说明 > 6. 轨迹","title":"6.4 职能账本"},
