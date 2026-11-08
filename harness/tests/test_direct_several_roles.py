@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from harness import direct
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
 from harness.definitions import (DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, Department, OutcomeKind,
                                  VerificationDeclaration, VerifiedOutcomes, VerifierRole, WriteScope,
                                  load_definitions)
@@ -298,6 +298,35 @@ def test_a_rework_makes_engineering_do_another_round(tmp_path):
     assert [(item["completion"], item["verdict"]) for item in reviews] == [
         (completions[0]["content_hash"], REWORK_VERDICT), (completions[1]["content_hash"], RELEASE_VERDICT)]
     assert _activations(system, run_id) == [ENGINEERING, QUALITY, ENGINEERING, QUALITY]
+
+
+def test_with_quality_as_verifier_the_copy_is_the_sealed_completion_and_facts_come_first(tmp_path):
+    # 工单 #1579：几个角色直做加回质检，质检的检查副本从交完成封存的那一版建立，
+    # 材料里有那一版的树与回执，没有工程写的说明与拿不准的地方（下结论以前）
+    seen: list[Any] = []
+    box: dict[str, Any] = {}
+
+    def observing(call: Any) -> ModelResponse:
+        system, run_id = box["system"], box["run_id"]
+        system.workspace(run_id).write_file("src/echo.py", "print('after completion')\n")
+        tree = system.orchestrator._workspaces.source_tree(QUALITY, system.project(run_id))
+        seen.append(({item.path: item.data.decode() for item in tree.files},
+                     json.loads(prompt_part(call, "verified_outcome") or "null")))
+        return review_turn(RELEASE_VERDICT, "可以放行")(call)
+
+    forms = {DEFAULT_FORM: (DEFINITIONS, WATCHED_OUTPUTS), SEVERAL_ROLES_DIRECT: (WITH_VERIFIER, DIRECT_TIGHTENING)}
+    system, _work_item_id, run_id = _switched_to(tmp_path / "sealed", {
+        ENGINEERING: [FakeTurn(writes=WRITTEN, checks={}), completion_turn("补了用法一节", uncertain=["退出码"])],
+        QUALITY: [observing],
+    }, forms=forms)
+    box.update(system=system, run_id=run_id)
+
+    assert system.run_until_stop(run_id).stop_reason == "released"
+    ((tree, outcome),) = seen
+    completion = _accepted(system, run_id, COMPLETION_KIND)[0]
+    assert tree == WRITTEN
+    assert outcome["tree_digest"] == completion["artifact_tree_digest"]
+    assert "explanation" not in outcome and "uncertain" not in outcome
 
 
 # ---------------------------------------------------------------------------
