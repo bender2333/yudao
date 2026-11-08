@@ -1,3 +1,6 @@
+# 故障矩阵第 1 行：事项或部门关注的成果已接收、部门尚未开始工作。
+# test_a_run_missing_after_an_interruption_is_rebuilt_from_the_record 核对重启找到未完成的责任、补建缺少的 run
+# （恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 项目的起始文件夹（工单 #321，项目的起始文件夹设计说明第 2 至 4、7、8 节）：
 # project.create 带 initial_directory 时项目流中的 project_registered 带 initial_snapshot；
 # 采集失败以 source_invalid 拒绝且没有项目与事件；没有采纳成果时事项从起始文件夹快照开始，

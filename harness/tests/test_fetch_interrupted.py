@@ -1,3 +1,5 @@
+# 故障矩阵第 3 行：取回在进行中、本地确认没有保存时，恢复核实这次尝试没有完整结果并交还发出它的会话，
+# 不把没有完整结果的尝试当作已完成（恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 取回进行到一半终止 Yudao（工单 #1173；网络与 MCP docs/design/network-and-mcp.md「工具的提供」、「恢复契约」、「与其他部分的关系」、恢复契约 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」）。
 #
 # 本机 HTTP 服务卡住响应，取回在飞行中时终止真实的 Yudao 进程；重新打开以后这次调用作为工具结果

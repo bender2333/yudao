@@ -1,3 +1,5 @@
+# 故障矩阵第 10 行：排空期间的强制升级把未结束的 run 记为因升级停止、用项目的起点重新开始，
+# 与启动时发现版本不同的处理相同（恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 排空与强制升级（应用层与接口层 docs/design/app-and-interface.md「命令清单」「升级」，ADR-0019，工单 #126）：真实启动 FastAPI 应用，
 # 经 HTTP 提交命令与读取查询；控制核心在服务生命周期中建立，模型回答由 FakeAdapter 给出。
 # 排空期间新建的事项排队不开始，正在进行的 run 照常结束；强制升级只在排空期间可用。

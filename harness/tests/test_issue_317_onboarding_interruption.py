@@ -1,3 +1,5 @@
+# 故障矩阵第 1 行：test_a_kill_after_the_revision_answer_rebuilds_the_missing_run 核对建档修改以后被中断、
+# 重启补建缺少的 run（恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 工单 #317：建档在进程中断时的行为（docs/design/existing-project-onboarding.md docs/design/existing-project-onboarding.md「失败与中断」前三行，
 # docs/design/existing-project-onboarding.md「验收」中「失败与中断」的前三段）。三个场景都用真实的子进程运行系统并被终止：检查是真实进程，等它写下
 # started 标记以后终止；「run 结束以后、结算以前」与「回答以后、新 run 建立以前」这两个窗口没有子进程

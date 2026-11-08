@@ -1,3 +1,6 @@
+# 故障矩阵第 10 行：模型引用无法使用时 run 停在待恢复，test_an_unavailable_model_is_observed_as_waiting_resume
+# 核对部门、模型与具体问题读得出来；等待用户回答的 run 启动时不继续
+# （恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 恢复观察与故障矩阵验收（工单 #18，恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「动作分类与处置」、docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，模型回答由 FakeAdapter 给出；
 # 中断由「进程关闭、重新以新的系统打开同一数据目录」表示。查询只读取，事件流重连只补观察事实。

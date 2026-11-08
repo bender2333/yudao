@@ -1,3 +1,6 @@
+# 故障矩阵第 4 行：执行权编号在写入口与领域写入一起核对，旧执行者的写入只记录、不改变领域状态。
+# 故障矩阵第 5 行：失权以后的旧派发编号提交的写入只记录、不并入投影（写入口一侧）
+# （恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 import threading
 
 import pytest
