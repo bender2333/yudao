@@ -22,3 +22,16 @@ test("路径表里没有图鉴：页签与侧栏取不到它", () => {
   assert.ok(!Object.keys(paths).includes("gallery"), "图鉴不应出现在正式路径表里");
   assert.ok(!Object.values(paths).some((p) => String(p).includes("gallery")), "正式路径不应指向图鉴");
 });
+
+// 工单 #1638：项目页先是对话（上面带循环图），打开项目时落在这一页；概览等页先留着
+test("打开项目落在对话页，事项范围写在 ?w= 里", () => {
+  assert.equal(parseRoute("#/p/demo").name, "conversation");
+  assert.equal(parseRoute("#/p/demo/conversation").name, "conversation");
+  assert.equal(parseRoute("#/p/demo/conversation?w=w1").workItemId, "w1");
+  assert.equal(parseRoute("#/p/demo/conversation?w=").workItemId, null);
+  assert.equal(paths.conversation("demo"), "#/p/demo/conversation");
+  assert.equal(paths.conversation("demo", { workItem: "w1" }), "#/p/demo/conversation?w=w1");
+  // 已有的页面照旧
+  assert.equal(parseRoute("#/p/demo/overview").name, "overview");
+  assert.equal(paths.overview("demo"), "#/p/demo/overview");
+});
