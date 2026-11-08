@@ -201,7 +201,7 @@ class ProjectOverview(Contract):
     work_item: str | None = None
 
 
-# 部门状态的取值：总图第三节外环的五个词（三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）
+# 部门状态的取值：总图第三节外环的五个词（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #903）
 DEPARTMENT_STATES = ("waiting_user", "working", "asking", "verifying", "waiting")
 # 阻塞事项的决定请求：回答以前事项（它的 run）不推进（decisions.py 的 blocks）
 BLOCKING_SCOPES = ("run", "work_item")
@@ -216,7 +216,7 @@ def _verifiers_of(department: str) -> tuple[str, ...]:
 
 
 class DepartmentState(Contract):
-    """一个部门在这个事项上的状态与原因（三部门的循环结构 docs/design/department-loop.md「部门的状态」）。
+    """一个部门在这个事项上的状态与原因（三部门的循环结构 docs/design/department-loop.md「职能的状态」）。
 
     state 取总图外环的五个词；note 是一句话，没有原因时为空。
     """
@@ -225,7 +225,7 @@ class DepartmentState(Contract):
 
 
 class WorkItemProgress(Contract):
-    """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）。
+    """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）。
 
     阶段不再决定下一个谁工作，进度改由成果推算：当前有效的 PRD 是第几版、
     最新一份交付是第几版、它依据的 PRD 版本，以及对最新交付的结论。
@@ -273,9 +273,9 @@ class WorkItemCard(Contract):
     created_at: str
     status: str
     department: str | None
-    # 事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」、工单 #556）
+    # 事项的进度：从成果推算（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」、工单 #556）
     progress: WorkItemProgress | None
-    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
+    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「职能的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
     departments: dict[str, DepartmentState] | None = None
     round: int
     stop_reason: str | None
@@ -484,7 +484,7 @@ class WorkItemLoop(Contract):
     status: str
     department: str | None
     progress: WorkItemProgress | None
-    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
+    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「职能的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
     departments: dict[str, DepartmentState] | None = None
     round: int
     started_at: str | None
@@ -568,7 +568,7 @@ def _last_department(store: Any, item: Any, *, through: int | None = None) -> st
 
 
 def _work_item_progress(run: Any) -> WorkItemProgress | None:
-    """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）。
+    """事项的进度：从成果推算（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）。
 
     当前有效的 PRD 是第几版、最新一份交付是第几版、它依据的 PRD 版本，
     以及对最新交付的结论（缺陷记录或放行）。
@@ -824,7 +824,7 @@ def _observation(run: Any, decisions: Any, events: list[Any]) -> str | None:
 
 def _departments(run: Any, progress: WorkItemProgress | None, observation: str | None,
                  decisions: dict[str, Any]) -> dict[str, DepartmentState] | None:
-    """三个部门各自的状态与原因（三部门的循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）。
+    """三个部门各自的状态与原因（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #903）。
 
     状态不单独记录，由已经记录的事实现算：会话的状态、进行中的询问、没有回答的决定请求与成果。
     同时满足几条时按设计说明的顺序取第一条：等用户、在分支里回答、询问中、主线的一轮工作中、核验中、等待工作。
@@ -851,7 +851,7 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
         elif own_ask is not None:
             state, note = "asking", f"在等待{_department_label(own_ask.get('recipient') or '')}的回答"
         elif active:
-            # 核验角色在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构 docs/design/department-loop.md「各部门在什么时候工作」）；
+            # 核验角色在交付到达之前的一轮是预测性探索：按 PRD 起草测试用例（循环结构 docs/design/department-loop.md「各职能在什么时候工作」）；
             # 谁是核验角色取自定义里的核验声明（工单 #1391）
             predictive = (DEFINITIONS.is_verifier(department) and not run.delivery_specs and progress is not None
                           and progress.product_spec_revision is not None)
@@ -869,7 +869,7 @@ def _departments(run: Any, progress: WorkItemProgress | None, observation: str |
 
 def _awaiting_verification(department: str, progress: WorkItemProgress | None) -> bool:
     # 核验中：最新的正式成果在等下游的结论。核验这个部门交付的角色从定义的核验声明取（工单 #1391）：
-    # 交付还没有它的缺陷记录或放行（循环结构 docs/design/department-loop.md「部门的状态」）
+    # 交付还没有它的缺陷记录或放行（循环结构 docs/design/department-loop.md「职能的状态」）
     if not _verifiers_of(department) or progress is None or progress.delivery_revision is None:
         return False
     return progress.conclusion is None
@@ -1361,7 +1361,7 @@ class DepartmentWorkspaceResult(Contract):
     run_id: str | None
     # run 的状态（进行中与三个终态）：部门进行到哪一步不记在这里（工单 #556）
     run_status: str | None
-    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「部门的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
+    # 三个部门各自的状态与原因（循环结构 docs/design/department-loop.md「职能的状态」，工单 #903）：事项没有 run、已经结束或中断时为空
     departments: dict[str, DepartmentState] | None = None
     # 事项状态与停止原因：用户停止的事项在部门页写「已停止」，不写「执行失败」（工单 #319）
     status: str | None
@@ -1573,7 +1573,7 @@ def _department_workspace(application: Application, request: DepartmentWorkspace
             effective=effective,
             guidance=guidance, messages=messages, context=context,
             last_call=_last_call(run, request.department),
-            # 当前生效模型不具备本部门建议能力时的提醒（docs/design/model-management.md「部门的建议能力」「部门工作间」）
+            # 当前生效模型不具备本部门建议能力时的提醒（docs/design/model-management.md「职能的建议能力」「职能工作间」）
             reminders=application.system.facade.model_reminders(effective.model_id, request.department),
             room=_room_view(application, state, item, run, request.department, guidance, effective, observation),
         ),

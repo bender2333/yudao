@@ -637,7 +637,7 @@ test.describe("项目页面（1440×900）", () => {
       await expect(record.locator(".section-head .note")).toContainText("范围：整个项目");
       const all = page.locator("section.card table").first();
       // 第一轮：产品、工程各一次模型请求，质检两次（PRD 被接纳以后先做一轮预测性探索，
-      // 交付到达以后核验，循环结构 docs/design/department-loop.md「各部门在什么时候工作」）：共四条
+      // 交付到达以后核验，循环结构 docs/design/department-loop.md「各职能在什么时候工作」）：共四条
       await expect(all.locator("tbody tr")).toHaveCount(4);
       await expect(all.locator("tbody tr").first()).toContainText("fake-script");
       // 用量列（工单 #744）：列名是「用量」，与请求详情同一口径；预置项目的模型回答没有上报用量，写「未上报」

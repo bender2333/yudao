@@ -591,7 +591,7 @@
     "cost": "任一角色的引用失效都挡住整个项目",
     "relax_when": "只解析本事项种类会用到的角色",
     "tighten_when": "只解析用到的角色以后仍然频繁失败",
-    "origin": "模型管理 docs/design/model-management.md「部门与角色的模型选择」，新建事项之前解析每个部门的每个角色"
+    "origin": "模型管理 docs/design/model-management.md「职能与角色的模型选择」，新建事项之前解析每个部门的每个角色"
   },
   "compaction.min_reasoning_effort": {
     "value": "minimal",

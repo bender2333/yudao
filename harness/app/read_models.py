@@ -421,7 +421,7 @@ def flow_rows(event: Event | ProjectEvent) -> list[dict[str, Any]]:
                  "direction_from": payload.get("requester"), "direction_to": payload.get("recipient"),
                  "status": status, "content": content}]
     if event.type == EventType.QA_SUBMITTED and payload.get("verdict") in REWORK_VERDICTS:
-        # 退回（循环结构 docs/design/department-loop.md「部门的状态」）：返工回到被核验的那一方，由核验声明给出；来源是写这条结论的核验角色
+        # 退回（循环结构 docs/design/department-loop.md「职能的状态」）：返工回到被核验的那一方，由核验声明给出；来源是写这条结论的核验角色
         targets = _verified_departments(source, "delivery_spec") or [None]
         return [{**base,
                  "flow_id": event.event_id if len(targets) == 1 else f"{event.event_id}:{target}",
