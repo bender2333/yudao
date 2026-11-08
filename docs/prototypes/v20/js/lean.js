@@ -423,7 +423,9 @@
   function readGuidance(p, ids, item) { st(p).msgs.filter((m) => ids.includes(m.target) && !m.readAt && (!m.item || m.item === item)).forEach((m) => { m.readAt = T(++seq); }); }
   function fold(p, it, key, lab, roles, who, text) {
     const ms = st(p).msgs;
-    let f = ms.slice().reverse().find((m) => m.t === 'fold' && m.item === (it ? it.id : '') && m.key === key);
+    // 只合并连续的往来：被你写的、要你决定、交完成或放行打断以后另起一行
+    const last = ms[ms.length - 1];
+    let f = last && last.t === 'fold' && last.item === (it ? it.id : '') && last.key === key ? last : null;
     if (!f) ms.push(f = { t: 'fold', item: it ? it.id : '', key, lab, roles, open: false, kids: [] });
     f.kids.push({ who, text, at: T(++seq) });
   }
@@ -452,7 +454,9 @@
     return o;
   }
   const dflt = (p) => { const it = active(p); return it ? 'g:' + (it.dept && orgOf(p, it).depts.some((d) => d.id === it.dept) ? it.dept : recv(orgOf(p, it)).id) : 'new'; };
-  const cur = (p) => { const s = st(p); return s.manual && options(p).some((o) => o.k === s.to) ? s.to : dflt(p); };
+  const chosen = (p) => { const s = st(p); return s.manual && options(p).some((o) => o.k === s.to) ? s.to : dflt(p); };
+  // 输入框里有字以后收件人不再随状态变，发送后恢复按状态选
+  const cur = (p) => { const s = st(p); return s.hold && options(p).some((o) => o.k === s.hold) ? s.hold : chosen(p); };
   function hintText(p, k) {
     const it = active(p), c = it ? orgOf(p, it) : p.composed, r = recv(c), e = O.ending(p.composed);
     if (k === 'new') return it ? '排在「' + it.title + '」后面，它做完才开始' : recv(p.composed).name + '接，马上开始' + (e.open ? '；没有人核验，以开环完成结束' + (e.outsourced ? '（外包）' : '') : '；' + O.verifiers(p.composed).map((v) => v.name).join('、') + '放行才结束');
@@ -465,7 +469,7 @@
     return '<div class="ln-pills" role="radiogroup" aria-label="收件人"><span class="ln-to-label">收件人</span>' + options(p).map((o) => '<button type="button" role="radio" aria-checked="' + (o.k === k) + '" class="ln-pill' + (o.k === k ? ' is-on' : '') + '" data-act="ln.to" data-k="' + esc(o.k) + '">' + esc(o.label) + '</button>').join('') + '</div>' +
       '<div id="ln-hint" class="ln-hint">' + esc(hintText(p, k)) + '</div>';
   }
-  function setTo(p, k) { const s = st(p); s.to = k; s.manual = true; s.focusDept = k.startsWith('g:') ? k.slice(2) : s.focusDept; }
+  function setTo(p, k) { const s = st(p); s.to = k; s.manual = true; s.hold = null; s.focusDept = k.startsWith('g:') ? k.slice(2) : s.focusDept; }
   A('ln.to', (el) => { const p = H.project(H.pid()); setTo(p, el.dataset.k); refresh(p); });
   document.addEventListener('keydown', (ev) => {
     if (ev.target.matches('[data-act="lp.node"]') && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); ev.target.click(); return; }
@@ -678,15 +682,16 @@
   A('lp.pick-all', (el) => { const p = H.project(H.pid()), s = st(p); s.sel = el.dataset.item; s.all = false; s.panel = { type: 'item' }; s.inner = null; if (s.seq) s.seq = { pair: null, rounds: {} }; refresh(p); });
   A('lp.export', (el) => { const it = H.item(H.project(H.pid()), el.dataset.item); ui.toast('已导出「' + it.title + '」这次运行的证据（示例，不生成文件）', 'ok'); });
   A('lp.cancel', (el) => {
-    const it = H.item(H.project(H.pid()), el.dataset.item);
-    ui.modal({ title: '取消这个事项', body: '<p>取消以后「' + esc(it.title) + '」的全部职能与后台命令一起停下，不能接着做。已交出的版本还在，要继续得开一件新事项。</p>', actions: [{ label: '不取消', close: true }, { label: '取消事项', kind: 'danger', act: 'lp.cancel-do', data: { item: it.id } }] });
+    const it = H.item(H.project(H.pid()), el.dataset.item), word = el.dataset.word || '取消';
+    ui.modal({ title: word + '这个事项', body: '<p>' + word + '以后「' + esc(it.title) + '」的全部职能与后台命令一起停下，不能接着做。已交出的版本还在，要继续得开一件新事项。</p>', actions: [{ label: '不' + word, close: true }, { label: word + '事项', kind: 'danger', act: 'lp.cancel-do', data: { item: it.id, word } }] });
   });
   A('lp.cancel-do', (el) => {
     const p = H.project(H.pid()), s = st(p), it = H.item(p, el.dataset.item);
     ui.closeModal();
-    if (active(p) === it) { (timers[p.id] || []).forEach(clearTimeout); timers[p.id] = []; }
-    it.reason = '你取消了这个事项';
-    push(p, { t: 'stop', text: '你取消了「' + it.title + '」' }); finish(p, it, 'stopped'); s.panel = { type: 'item' }; refresh(p, true);
+    if (active(p) === it) { (timers[p.id] || []).forEach(clearTimeout); timers[p.id] = []; if (it.org.composed.rotation === 'pool') Y20.pool.stop(p); }
+    const word = el.dataset.word || '取消';
+    it.reason = '你' + word + '了这个事项';
+    push(p, { t: 'stop', text: '你' + word + '了「' + it.title + '」' }); finish(p, it, 'stopped'); refresh(p, true);
   });
   A('lp.node', (el, ev) => {
     if (ev && ev.target.closest('[data-act="lp.jump"],[data-act="lp.inner"]') && ev.target.closest('[data-act="lp.jump"],[data-act="lp.inner"]') !== el) return;
@@ -776,7 +781,7 @@
   const barHtml = (p) => {
     const e = p.elapsed;
     return '<div class="ln-time-row"><span>' + (active(p) ? '正在处理 · ' : '') + '已用 ' + esc(ui.duration(e.used)) + ' / 上限 ' + esc(ui.duration(e.limit)) + '</span>' +
-      (active(p) ? '<button type="button" class="y20-btn small danger" data-act="ln.stop">停止</button>' : '') + '</div>' + ui.meter(e.used, e.limit);
+      (active(p) ? '<button type="button" class="y20-btn small danger" data-act="lp.cancel" data-item="' + esc(active(p).id) + '" data-word="停止">停止</button>' : '') + '</div>' + ui.meter(e.used, e.limit);
   };
   function inputLabel(p) {
     const k = cur(p), input = $('ln-text');
@@ -802,6 +807,8 @@
   let lastGoto = null;
   function convMount(ctx, el, p) {
     inputLabel(p);
+    const box = $('ln-text');
+    if (box) box.addEventListener('input', () => { const s = st(p); s.hold = box.value.trim() ? (s.hold || chosen(p)) : null; });
     setTimeout(() => { const t = $('ln-thread'); if (t) t.scrollTop = 1e9; }, 0);
     const q = Y20.state.route.query;
     if (q.jump) setTimeout(() => jumpAsk(p, q.who || ''), 60);
@@ -886,6 +893,7 @@
     if (!text) return;
     const k = cur(p), it = active(p), tag = k === 'new' ? '开始一个新事项' : k === 'append' ? '追加输入' : '给' + nm(p, k.slice(2)) + '的指导';
     input.value = '';
+    s.hold = null;
     if (!k.startsWith('g:')) { s.manual = false; s.to = null; s.focusDept = null; }
     if (k === 'new' && !it) { if (!startItem(p, text)) return; }
     else {
@@ -901,12 +909,6 @@
       } else if (it && !it.ran) run(p, it);
     }
     refresh(p, true);
-  });
-  A('ln.stop', () => {
-    const p = H.project(H.pid()), it = active(p);
-    (timers[p.id] || []).forEach(clearTimeout); timers[p.id] = [];
-    if (it.org.composed.rotation === 'pool') Y20.pool.stop(p);
-    push(p, { t: 'stop', text: '你停止了「' + it.title + '」' }); finish(p, it, 'stopped'); refresh(p, true);
   });
   A('ln.answer', (el) => {
     const p = H.project(H.pid()), m = st(p).msgs[Number(el.dataset.i)];
@@ -1015,7 +1017,7 @@
 
   // ---------------------------------------------------------------- 外壳：项目页只有对话与设置
 
-  Y20.leanHas = (p, name) => Boolean(Y20.leanViews[name]) || /^(org|item|recovery|advanced|observe-detail)/.test(name);
+  Y20.leanHas = (p, name) => Boolean(Y20.leanViews[name]) || /^(org|item-org|recovery|advanced|observe-detail)/.test(name);
   Y20.leanTabs = (p, r) => {
     const b = (on, label, tail) => '<button type="button" class="y20-ptab' + (on ? ' is-active' : '') + '" data-go="#/p/' + p.id + tail + '">' + esc(label) + '</button>';
     const onSet = r.name === 'settings' || /^org/.test(r.name);
@@ -1033,7 +1035,7 @@
     const body = '<div class="ln-new" data-np="' + px + '"><input type="text" class="y20-input" id="ln-name" aria-label="项目名字" placeholder="项目名字" data-live data-act="ln.clear">' +
       '<div class="ln-warn" id="ln-warn"></div>' +
       (attach ? '<input type="text" class="y20-input" id="ln-dir" placeholder="源目录：控制主机上已有项目的绝对路径" data-live data-act="ln.clear">' : '') +
-      '<p class="y20-muted y20-small">点一张形态卡，项目就建好了。</p><div class="ln-cards lp-cards">' + cards('ln.create') + '</div>' +
+      '<p class="y20-muted y20-small">点一张形态卡，项目就建好了。建好以后在对话里写要求，长材料也在那里发。</p><div class="ln-cards lp-cards">' + cards('ln.create') + '</div>' +
       '<input type="radio" name="' + px + '-org" id="' + px + '-radio" value="three" checked hidden><input type="checkbox" id="' + px + '-obs" hidden><input type="checkbox" id="' + px + '-sub" hidden>' +
       '<div class="ln-more">' + (attach ? '' : '<button type="button" class="y20-link" data-act="ln.toggle" data-t="ln-dirbox">选起始文件夹</button> ') + '<button type="button" class="y20-link" data-act="ln.toggle" data-t="ln-advbox">高级</button></div>' +
       '<div id="ln-dirbox" hidden><input type="text" class="y20-input" id="pn-dir" placeholder="控制主机上的路径，可以不填"></div>' +

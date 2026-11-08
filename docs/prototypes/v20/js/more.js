@@ -1,4 +1,4 @@
-// 项目里的其余页面：资料、观测（请求记录、用量、循环）与请求详情、设置、恢复与动作核实
+// 项目里的其余页面：模型请求与用量的面板、请求详情、设置（高级里的四节）、恢复与动作核实
 (function () {
   'use strict';
   const Y20 = window.Y20;
@@ -9,78 +9,7 @@
   const O = Y20.org;
 
   const stack = (...lines) => '<div class="y20-cell-stack">' + lines.join('') + '</div>';
-  const who = (id) => (id === 'user' ? '你' : id === 'output' ? '系统' : H.dept(id));
   const head = (title, sub, actions) => '<div class="y20-page-head"><div class="y20-page-titles"><h1>' + title + '</h1>' + (sub ? '<p class="y20-muted">' + sub + '</p>' : '') + '</div>' + (actions ? '<div class="y20-page-actions">' + actions + '</div>' : '') + '</div>';
-  const kindName = (k) => Y20.OUTCOME_KINDS[k];
-
-  // ================================================================ 资料
-
-  function docHead(o, extra) {
-    return '<header class="y20-mt-head"><strong>' + esc(kindName(o.kind)) + '</strong>' + (o.version ? ui.tag('第 ' + o.version + ' 版') : '') + (extra || '') +
-      '<span class="y20-muted">' + esc(ui.time(o.at)) + ' · ' + esc(who(o.from)) + '</span> ' + H.src(o.id) + '</header>';
-  }
-  const viewBtn = (o, label) => ui.button({ label: label || '查看原文', kind: 'small', act: 'mt.view', data: { id: o.id } });
-
-  function materialsPage(ctx, p) {
-    const w = ctx.route.query.w || '';
-    const it = w ? H.item(p, w) : null;
-    const outs = p.outcomes.filter((o) => !it || o.item === it.id);
-    const cards = p.items.map((i) => {
-      const n = (k) => p.outcomes.filter((o) => o.item === i.id && (Array.isArray(k) ? k.includes(o.kind) : o.kind === k)).length;
-      const vn = O.verifiers(p.composed).map((v) => v.name).join('、');
-      const chips = [['你的输入', n('input')], ['PRD', n('prd')], ['交付', n('delivery')]].concat(vn ? [[vn, n(['release', 'defect'])]] : []).map((c) => '<span class="' + (c[1] ? '' : 'is-zero') + '">' + c[0] + ' ' + c[1] + '</span>').join('');
-      return '<article class="y20-mt-card' + (it && it.id === i.id ? ' is-current' : '') + '"><button type="button" class="y20-link" data-go="#/p/' + p.id + '/materials?w=' + i.id + '">' + H.dot(i) + ' ' + esc(i.title) + '</button><div>' + H.status(i) + '</div><div class="y20-mt-counts">' + chips + '</div></article>';
-    }).join('');
-    let body = ui.block({ title: '按事项查看', subtitle: '资料按事项保存；点事项看它的输入、PRD、交付、核验结论。' + (it ? '现在看的是「' + it.title + '」。' : ''), body: '<div class="y20-mt-index">' + cards + '</div>' + (it ? '<div class="y20-row">' + ui.button({ label: '看整个项目', kind: 'small', go: '#/p/' + p.id + '/materials' }) + '</div>' : '') });
-    if (it) {
-      const part = (id, title, sub, list, render) => ui.block({ id, title, subtitle: sub, body: list.length ? '<ol class="y20-mt-list">' + list.slice().reverse().map(render).join('') + '</ol>' : ui.empty('还没有') });
-      body += part('mt-input', '你的输入', '按收到的顺序保存的原文', outs.filter((o) => o.kind === 'input'), (o) => '<li class="y20-mt-doc">' + docHead(o) + '<p>' + esc(o.text) + '</p>' + viewBtn(o) + '</li>');
-      body += part('mt-prd', 'PRD', '产品提交并被接纳的各版本', outs.filter((o) => o.kind === 'prd'), (o) => '<li class="y20-mt-doc">' + docHead(o) + '<p>' + esc(o.text) + '</p>' + viewBtn(o) + '</li>');
-      body += part('mt-delivery', '交付', '各版本的封存快照：文件清单由控制主机从快照得出', outs.filter((o) => o.kind === 'delivery'), (o) => {
-        const x = X.delivery[o.id] || {};
-        const files = (x.files || []).map((f) => '<li>' + ui.code(f[0]) + ' <span class="y20-muted">' + Y20.num(f[1]) + ' 字节</span> ' + ui.button({ label: '下载', kind: 'small', act: 'mt.download', data: { id: o.id, path: f[0] } }) + '</li>').join('');
-        return '<li class="y20-mt-doc">' + docHead(o) + '<p>' + esc(x.summary || o.text) + '</p>' + (o.concl ? '<p>结论：' + ui.status({ release: 'released', defect: 'failed', open: 'held', waiting: 'running' }[o.concl.kind], o.concl.text) + '</p>' : '') +
-          (files ? '<ul class="y20-mt-files">' + files + '</ul>' : '') +
-          (x.git ? '<p>' + ui.icon('link') + ' 提交 ' + ui.code(x.git.commit) + ' <span class="y20-muted">父提交 ' + esc(x.git.parent) + ' · ' + esc(x.git.stat) + '</span> ' + ui.button({ label: '看代码差异', kind: 'small', act: 'mt.diff', data: { id: o.id } }) + '</p>' : '') + viewBtn(o, '查看交付说明') + '</li>';
-      });
-      body += part('mt-qa', O.verifiers(p.composed).map((v) => v.name).join('、') || '核验', '结论、理由与逐条检验结果', outs.filter((o) => o.kind === 'release' || o.kind === 'defect'), (o) => {
-        const c = X.criteria[o.id];
-        let table = '';
-        if (c) {
-          const exec = c.rows.filter((r) => r[2] === 'run');
-          const cov = { covered: exec.filter((r) => r[3] !== 'not_run').length, total: c.rows.length, model_read: c.rows.filter((r) => r[2] === 'model').length, open_count: c.rows.filter((r) => r[2] !== 'run').length };
-          table = '<p class="y20-small">交付快照 ' + ui.code(c.snapshot) + ' · ' + esc(Y20.coverageText(cov)) + '</p>' + ui.table({
-            columns: [
-              { label: '验收条件', render: (r) => '<strong>' + esc(r[0]) + '</strong> ' + esc(r[1]) + (r[2] === 'run' ? '' : ' ' + ui.tag('开环', 'new')) },
-              { label: '检验方式', render: (r) => ({ run: '运行检查', model: '模型阅读', human: '只能由人判断' })[r[2]] },
-              { label: '结果', render: (r) => ui.status(r[3] === 'pass' ? 'succeeded' : r[3] === 'fail' ? 'failed' : 'idle', r[3] === 'pass' ? '通过' : r[3] === 'fail' ? '没通过' : '没有运行') },
-              { label: '证据', render: (r) => esc(r[4]) }
-            ], rows: c.rows
-          });
-        }
-        const lines = o.detail ? ui.pre(o.detail.lines.join('\n')) : '';
-        return '<li class="y20-mt-doc">' + docHead(o, ui.status(o.kind === 'release' ? 'released' : 'failed', o.kind === 'release' ? '放行' : '缺陷记录')) + '<p>' + esc(o.text) + '</p>' + table + lines + '</li>';
-      });
-    }
-    const notes = (X.notes[p.id] || []);
-    body += ui.block({ title: '项目材料', subtitle: '「记录原文」保存的材料；只记录原文，不放进后面事项的请求', body: notes.length ? '<ul class="y20-mt-notes">' + notes.map((n) =>
-      '<li><header class="y20-mt-head"><strong>' + esc(n.title) + '</strong>' + ui.tag(H.dept(n.dept) + '职能') + '<span class="y20-muted">' + esc(ui.time(n.at)) + ' 记录</span></header><blockquote class="y20-quote">' + esc(n.text) + '</blockquote></li>').join('') + '</ul>' : ui.empty('项目还没有项目材料') });
-    const old = X.oldRuns[p.id] || [];
-    if (old.length && (!it || old.some((r) => r.item === it.id))) {
-      body += ui.block({ title: '旧版本的运行', subtitle: 'Yudao 版本和现在不同的运行，只读', body: '<ol class="y20-mt-list">' + old.filter((r) => !it || r.item === it.id).map((r) => '<li class="y20-mt-doc"><header class="y20-mt-head"><strong>旧运行 ' + esc(r.id) + '</strong>' + ui.tag('只读') + ui.tag('Yudao ' + r.ver) + '<span class="y20-muted">' + esc(r.state) + '</span></header><ul class="y20-list">' +
-        r.events.map((e) => '<li><span class="y20-muted">' + esc(ui.time(e[0])) + '</span> ' + ui.tag(e[1]) + ' ' + esc(e[2]) + '</li>').join('') + '</ul></li>').join('') + '</ol>' });
-    }
-    return '<div class="y20-page">' + head('资料', esc(p.name) + ' · 全部只读') + body + '</div>';
-  }
-  Y20.views.register('materials', { render: materialsPage });
-
-  const outOf = (id) => { for (const p of Y20.W().projects) { const o = p.outcomes.find((x) => x.id === id); if (o) return { p, o }; } return null; };
-  Y20.actions.register('mt.view', (el) => { const r = outOf(el.dataset.id); ui.modal({ title: kindName(r.o.kind) + ' 原文', wide: true, body: ui.pre(r.o.text), actions: [{ label: '关闭', close: true }] }); });
-  Y20.actions.register('mt.diff', (el) => {
-    const r = outOf(el.dataset.id), x = X.delivery[r.o.id];
-    ui.modal({ title: '代码差异', wide: true, body: ui.kv([['提交', ui.code(x.git.commit)], ['父提交', ui.code(x.git.parent)], ['变化', esc(x.git.stat)]]) + ui.pre(x.diff), actions: [{ label: '关闭', close: true }] });
-  });
-  Y20.actions.register('mt.download', (el) => ui.modal({ title: el.dataset.path, body: ui.note('示例数据只有文件清单，没有文件内容。真实界面会从封存的交付快照核对摘要以后再下载。', 'warn'), actions: [{ label: '关闭', close: true }] }));
 
   // ================================================================ 观测
 
@@ -147,31 +76,6 @@
   const LOOP_LAYER = { run: '一次运行', activation: '一轮工作' };
   const loopRow = (id, indent, cols, basis) => '<tr class="y20-loop-row' + (openLoop === id ? ' is-open' : '') + '" data-act="obs.loop" data-id="' + id + '">' + cols.map((c, i) => '<td data-label="' + ['层', '实例', '轮次', '已用量与上限', '收敛状态', '停止原因'][i] + '"><div class="y20-td"' + (i === 1 ? ' style="padding-left:' + indent * 16 + 'px"' : '') + '>' + (c === '' ? '<span class="y20-muted">—</span>' : c) + '</div></td>').join('') + '</tr>' +
       (openLoop === id && basis ? '<tr class="y20-loop-detail"><td colspan="6"><b>判定依据</b> ' + esc(basis) + '</td></tr>' : '');
-  function loopsPanel(p) {
-    const L = X.loops[p.id];
-    const state = loopState, layer = LOOP_LAYER, row = loopRow;
-    const pr = L.project;
-    let rowsHtml = row(p.id + '-p', 0, [pr[0], esc(pr[1]), esc(pr[2]), esc(pr[3]), state(pr[4]), ''], pr[6] || '按事项的进度汇总');
-    p.items.forEach((it) => {
-      const list = L.items[it.id] || [];
-      rowsHtml += '<tr class="y20-loop-item"><th colspan="6">' + H.dot(it) + ' ' + esc(it.title) + '</th></tr>';
-      list.forEach((r, i) => { rowsHtml += row(it.id + '-' + i, r[0] === 'run' ? 1 : 2, [layer[r[0]], esc(r[1]), esc(r[2]), esc(r[3]), state(r[4]), esc(r[5]) ], r[6]); });
-    });
-    return '<p class="y20-muted y20-small">每个事项一棵树：项目、一次运行、各职能的一轮工作。收敛状态由事件按规则算出；点一行看判定依据。「不判定」的行写着缺少哪些事实。</p>' +
-      '<div class="y20-table-wrap"><table class="y20-table y20-loop-table"><thead><tr><th>层</th><th>实例</th><th>轮次</th><th>已用量与上限</th><th>收敛状态</th><th>停止原因</th></tr></thead><tbody>' + rowsHtml + '</tbody></table></div>';
-  }
-
-  Y20.views.register('observe', {
-    render(ctx, p) {
-      const list = attemptsOf(p);
-      const running = list.filter((a) => ['requesting', 'running'].includes(a.status)).length;
-      const items = [{ id: 'records', label: '请求记录', count: list.length }, { id: 'usage', label: '用量统计' }, { id: 'loops', label: '循环' }];
-      const active = ui.activeTab('y20-obs', items, 'records');
-      return '<div class="y20-page">' + head('观测', running + ' 个请求进行中 · 共 ' + list.length + ' 条') +
-        ui.block({ title: '模型请求、用量与循环', subtitle: '按职能、事项、状态、模型筛选；请求记录和用量统计用同一组筛选', body: filterBar(p) + ui.tabs({ id: 'y20-obs', items, active }) +
-          ui.tabPanels('y20-obs', active, { records: recordsPanel(p, list), usage: usagePanel(p, list), loops: loopsPanel(p) }) }) + '</div>';
-    }
-  });
   // 设置页的「模型请求与用量」：请求记录与用量统计用同一组筛选
   Y20.observe = {
     isOpen: (pid) => Boolean(obs.open[pid]),
@@ -261,7 +165,7 @@
     const mcpBlock = ui.block({ title: 'MCP 服务器', subtitle: '本项目接入的 MCP 服务器和哪些职能可以用；职能的选项取自这份组织；全部项目的汇总在「工具与扩展」', body: mcp.length ? ui.table({ columns: [{ label: '名称', render: (s) => esc(s.name) }, { label: '连接方式', render: (s) => ui.code(s.transport) },
       { label: '可以使用的职能', render: (s) => '<div class="y20-checks">' + orgDepts.map((d) => '<label class="y20-check"><input type="checkbox" data-act="set.mcp" data-s="' + esc(s.name) + '" data-d="' + esc(d.id) + '"' + (s.depts.includes(d.id) ? ' checked' : '') + (archived ? ' disabled' : '') + '><span>' + esc(d.name) + '</span></label>').join('') + '</div>' },
       { label: '最近一次状态', render: (s) => ui.status(s.last.ok ? 'succeeded' : 'failed', s.last.text) }], rows: mcp }) : ui.empty('本项目没有接入 MCP 服务器') });
-    const moved = ui.note('每个职能的模型、推理档位、Prompt 和每个角色的设置，已经并进「组织」里各职能的详情页。 ' + ui.button({ label: '去组织页', kind: 'small', go: '#/p/' + p.id + '/org' }), 'info');
+    const moved = ui.note('每个职能的模型、推理档位、Prompt 和每个角色的设置，已经并进「高级」里组织各职能的详情页。 ' + ui.button({ label: '去高级里的组织', kind: 'small', go: '#/p/' + p.id + '/org?advanced=1' }), 'info');
     return '<div class="y20-page">' + head('项目设置', esc(p.name) + ' · 基本信息、源目录、成果写回、机器授权、执行位置、MCP 服务器') + moved + basic + source + writeback + machines + placement + mcpBlock + '</div>';
   }
   Y20.views.register('settings', { render: settingsPage });
@@ -328,7 +232,7 @@
         '<p class="y20-small y20-muted">恢复不会清零；发出状态不明的请求仍然算在内；用量没有上报时写「未知」，不填零。</p>' });
       const holds = (X.slotHolders[p.id] || []).includes(it.id);
       const owner = ui.block({ title: '谁在执行', body: ui.kv([['当前执行者', it.dept ? '控制主机 · ' + esc(H.dept(it.dept)) : '<span class="y20-muted">没有</span>'], ['执行槽位', holds ? '占用一个执行槽位' : '<span class="y20-muted">没有占用执行槽位</span>']], 'is-rows') + '<p class="y20-small y20-muted">没有迟到的结果。旧执行者迟到的回执，只作为历史记下，不推进状态。</p>' });
-      return '<div class="y20-page">' + head('恢复与动作核实 · ' + H.dot(it) + ' ' + esc(it.title), '这个事项的运行状态、中断、结果未知的动作和限额', ui.button({ label: '回到事项', icon: 'back', go: '#/p/' + p.id + '/w/' + it.id })) + state + where + decide + unknown + limits + owner + '</div>';
+      return '<div class="y20-page">' + head('恢复与动作核实 · ' + H.dot(it) + ' ' + esc(it.title), '这个事项的运行状态、中断、结果未知的动作和限额', ui.button({ label: '回到事项', icon: 'back', go: '#/p/' + p.id + '?item=' + it.id })) + state + where + decide + unknown + limits + owner + '</div>';
     }
   });
 })();
