@@ -1,8 +1,9 @@
 # 工单 #604：忽略规则无法判断（诊断 `Git ignore rules cannot be decided`）时，所有位置统一以
 # host_commit_error 停止事项（设计说明 docs/design/local-tools.md「工具边界」的公开树一行）。装配请求的位置
-# 以前把它记成 context_overflow，工具许可取事实与动作后快照的位置以前记成 provider_error；这两处各有一条用例，
-# 从 LoopSystem 整体驱动，用真实的文件系统与真实的 libgit2 判定，只把探测库的打开换成失败
-# （TreeError 的构造方式见 harness/public_tree.py 的 excluded_by_ignore_rules）。
+# 以前把它记成 context_overflow，工具许可取事实与动作后快照的位置以前记成 provider_error，这两处各有一条用例；
+# 建立检查工作区、文件工具的回执与检查副本核对三个位置各一条。前两条从 LoopSystem 整体驱动，用真实的文件系统
+# 与真实的 libgit2 判定，只把探测库的打开换成失败（TreeError 的构造方式见 harness/public_tree.py 的
+# excluded_by_ignore_rules）。
 
 import tempfile
 from pathlib import Path
@@ -94,6 +95,24 @@ def test_a_tool_step_stops_with_host_commit_error_when_ignore_rules_cannot_be_de
     _cannot_decide_the_ignore_rules(monkeypatch)
 
     result = system.run_until_stop(run_id)
+
+    assert (result.status, result.stop_reason) == ("failed", "host_commit_error"), (
+        result.status, result.stop_reason, _failure_message(system, run_id))
+    assert DIAGNOSTIC in _failure_message(system, run_id)
+
+
+def test_establishing_an_inspection_workspace_stops_with_host_commit_error(tmp_path, monkeypatch):
+    # 建立检查工作区（产品会话从运行工作区建立检查副本）时读到判断不了忽略规则的工作区：
+    # 同一个结局，host_commit_error，停止说明带诊断原文。不用 .gitignore 时工作区里没有忽略规则，
+    # 探测库根本不会打开，所以先放一份再让探测库打不开
+    system = _system(tmp_path, [])
+    run_id = system.create_run("Ignore rules cannot be decided while an inspection workspace is established")
+    workspace = system.workspace(run_id)
+    (workspace.root / "notes.txt").write_text("hello\n", encoding="utf-8")
+    (workspace.root / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+    _cannot_decide_the_ignore_rules(monkeypatch)
+
+    result = system.activate_once(run_id)
 
     assert (result.status, result.stop_reason) == ("failed", "host_commit_error"), (
         result.status, result.stop_reason, _failure_message(system, run_id))
