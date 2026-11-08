@@ -66,7 +66,7 @@ test("等待模型服务：模型重试的通知写明项目、事项、部门�
   // 重试通知没有去处：点击以后没有对应的决定卡片
   assert.equal(notice?.decisionId, null);
   assert.equal(notice?.title, "等待模型服务");
-  assert.equal(notice?.body, "结算台账 · 导出对账单：产品部门的模型 glm-4.6 暂时不可用，4 秒后重试");
+  assert.equal(notice?.body, "结算台账 · 导出对账单：产品职能的模型 glm-4.6 暂时不可用，4 秒后重试");
 });
 
 test("与通知无关的事件不发通知", () => {

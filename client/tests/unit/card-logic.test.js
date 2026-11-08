@@ -51,7 +51,7 @@ function decision(overrides) {
 test("待恢复的决定：材料列出部门、模型与具体问题", () => {
   const rows = materialRows(decision());
   const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
-  assert.equal(map["部门"], "工程");
+  assert.equal(map["职能"], "工程");
   assert.equal(map["模型"], "glm-4.6");
   assert.equal(map["具体问题"], "Missing configuration: provider credential");
   assert.equal(map["说明"], "工程部门的模型引用无法使用");
@@ -92,8 +92,9 @@ test("给画面用的卡片内容带上决定版本、项目与事项、链接�
   assert.equal(card.work_item_id, "w1");
   assert.equal(card.where, "文本工具 · 实现逐行处理");
   assert.equal(card.waited, "已等待 60 秒");
-  // 「前往本项目的部门设置」落在设置页的部门设置那一节（工单 #1161）：路径带上节名
+  // 「前往本项目的职能设置」落在设置页的职能设置那一节（工单 #1161）：路径带上节名，文字用职能的说法
   assert.deepEqual(card.links.map((link) => link.href), ["#/sys/models", "#/p/p1/settings?section=departments"]);
+  assert.deepEqual(card.links.map((link) => link.label), ["前往模型管理", "前往本项目的职能设置"]);
   assert.equal(card.options[0].note_required, true);
   // 没有给出名称时只写项目名，不写事项标识（工单 #802）
   const bare = face(decision(), now);
@@ -226,7 +227,7 @@ test("质检无法核验的决定卡片逐条列出无法核验的条件与原�
     },
   }));
   const map = Object.fromEntries(rows.map((row) => [row.term, row.value]));
-  assert.equal(map["部门"], "质检");
+  assert.equal(map["职能"], "质检");
   assert.equal(map["AC1"], "质检的模型不支持图像输入");
   assert.equal(map["AC2"], "执行位置没有安装浏览器");
   assert.equal(map["说明"], "质检无法核验这些验收条件：AC1（质检的模型不支持图像输入）。");
