@@ -9,6 +9,8 @@
 
 ---
 
+claude-opus-5-5（子架构师） / 2026-11-09 00:14 / `docs/design/project-organization.md` 4.14 加「项目页上的内容在哪里看」按内容列的表，并加事项面板与「全部事项」；`docs/design/app-and-interface.md` 4.1 的页面说法、4.3 的分组名与相邻的页面说法改到表里的位置，4.4 加 `run.steps` 每步带调用尝试编号 / 收成对话与设置两页之前要先知道每样内容在哪里看
+
 claude-opus-5-5（子架构师） / 2026-11-08 21:37 / `docs/design/project-organization.md` 4.14 第四层改成一句话说明每一步、按任务分组、点开才是原始数据；`docs/design/app-and-interface.md` 4.4 去掉用时一条；`docs/prototypes/v20/` 工作过程改成任务、步骤、原始数据三级，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户要工作过程像「读取文件」这样的说明，不直接显示一大串实际动作
 
 claude-opus-5-5（子架构师） / 2026-11-08 21:35 / `docs/design/project-organization.md` 4.14 写项目页四层与时序图，交互骨架第 3 条、4.15 与脚本三、四补上；`docs/design/app-and-interface.md` 加 4.4 四层读哪个查询与要补的内容；`docs/prototypes/v20/` 加累计往来、时序图、原文面板的询问内容与工作过程，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户看过示意后定「按这个做」：信息不丢失，也不觉得冗余
