@@ -107,7 +107,7 @@ export function FormSection(props: { app: ClientApp; projectId: string }) {
               head={["形态", "一句说明"]}
               rows={formChoices(data).map((choice) => [
                 <span key="name" data-testid={`form-choice-${choice.form}`}>
-                  {choice.form}
+                  {choice.label}
                   {choice.isCurrent ? <Tag tone="ok">现在用这一份</Tag> : null}
                 </span>,
                 <div key="description">
@@ -134,7 +134,7 @@ export function FormSection(props: { app: ClientApp; projectId: string }) {
                 >
                   <option value="">选择一份形态</option>
                   {otherChoices(data).map((choice) => (
-                    <option key={choice.form} value={choice.form}>{choice.form}</option>
+                    <option key={choice.form} value={choice.form}>{choice.label}</option>
                   ))}
                 </select>
               </label>

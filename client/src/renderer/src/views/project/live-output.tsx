@@ -79,7 +79,7 @@ export function RoomLiveOutput(props: { app: ClientApp; department: string }): R
         {output === null ? "还没有输出" : output.live ? "正在输出" : "最近一次输出"}
       </span>
       {text === "" ? (
-        <p className="y10-note note">这个部门现在没有正在输出的模型文字</p>
+        <p className="y10-note note">这个职能现在没有正在输出的模型文字</p>
       ) : (
         <p className="y10-ws-guidance p msg-text" data-ws-output-text>{text}</p>
       )}

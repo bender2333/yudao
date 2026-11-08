@@ -14,7 +14,7 @@ import {
 
 const MODEL = "wb/cn:deepseek-v4.1-flash";
 
-test("失败提示写出部门、请求的模型、状态码与不可重试", () => {
+test("失败提示写出职能、请求的模型、状态码与不可重试", () => {
   assert.equal(
     stopDetailText({
       department: "engineering",
@@ -22,7 +22,7 @@ test("失败提示写出部门、请求的模型、状态码与不可重试", ()
       status_code: 503,
       retryable: false,
     }),
-    `工程部门请求的模型 ${MODEL}，服务返回 HTTP 503，不可重试`,
+    `工程职能请求的模型 ${MODEL}，服务返回 HTTP 503，不可重试`,
   );
 });
 
@@ -33,20 +33,20 @@ test("失败提示里出现模型名与状态码", () => {
   assert.ok(text !== null);
   assert.ok(text.includes(MODEL), text);
   assert.ok(text.includes("HTTP 401"), text);
-  assert.ok(text.includes("产品部门"), text);
+  assert.ok(text.includes("产品职能"), text);
 });
 
 test("这次失败可重试时写「可重试」", () => {
   assert.equal(
     stopDetailText({ department: "quality", requested_model: MODEL, status_code: 429, retryable: true }),
-    `质检部门请求的模型 ${MODEL}，服务返回 HTTP 429，可重试`,
+    `质检职能请求的模型 ${MODEL}，服务返回 HTTP 429，可重试`,
   );
 });
 
 test("缺哪一项就不写哪一项，四项都没有时没有这一行", () => {
   assert.equal(stopDetailText({ status_code: 502 }), "服务返回 HTTP 502");
   assert.equal(stopDetailText({ requested_model: MODEL }), `请求的模型 ${MODEL}`);
-  assert.equal(stopDetailText({ department: "engineering" }), "工程部门");
+  assert.equal(stopDetailText({ department: "engineering" }), "工程职能");
   assert.equal(stopDetailText({ retryable: true }), "可重试");
   assert.equal(stopDetailText(null), null);
   assert.equal(stopDetailText(undefined), null);

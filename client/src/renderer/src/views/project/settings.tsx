@@ -50,7 +50,7 @@ export function SettingsPage(props: { app: ClientApp; route: Route; departments:
       <PageHead
         eyebrow="项目设置"
         title={data ? data.name : "项目设置"}
-        subtitle="基本信息、形态、部门设置、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
+        subtitle="基本信息、形态、职能设置、源目录、MCP 服务器、机器授权、执行位置与角色设置。"
       />
       <Loading state={settings} />
       {settings.error !== null ? (
@@ -97,7 +97,7 @@ function ExecutionPlacement() {
   return <PendingBlock
     title="执行位置"
     note="运行工作区与各检查的位置"
-    text="执行位置的命令还没有登记，等 3.2C 工作包登记以后在这里选择运行工作区与三个部门的检查位置"
+    text="执行位置的命令还没有登记，等 3.2C 工作包登记以后在这里选择运行工作区与三个职能的检查位置"
   />;
 }
 
@@ -112,7 +112,7 @@ function Operations() {
 function RoleSettings() {
   return <PendingBlock
     title="本项目各角色设置"
-    note="项目角色设置优先于角色默认与部门设置"
+    note="项目角色设置优先于角色默认与职能设置"
     text="各角色设置的命令还没有登记，等 Stage 5 工作包登记以后在这里设置每个角色使用的模型、推理档位与角色 Prompt"
   />;
 }
@@ -203,8 +203,8 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
 
   return (
     // id 是这一节的路径参数取值：决定卡片上的「前往本项目的部门设置」按它滚到这里（工单 #1161）
-    <Section id="departments" title="部门设置" note="本项目各部门的项目部门设置：模型、推理档位与部门 Prompt">
-      {entries.length === 0 ? <Empty text="没有登记部门设置" /> : null}
+    <Section id="departments" title="职能设置" note="本项目各职能的项目职能设置：模型、推理档位与职能 Prompt">
+      {entries.length === 0 ? <Empty text="没有登记职能设置" /> : null}
       {entries.map(([key, setting]) => {
         const effectiveId = mergedModelId(setting.model_id, key, bindings);
         const model = modelById(models, effectiveId);
@@ -218,24 +218,24 @@ function Departments(props: { app: ClientApp; data: ProjectSettingsResult }) {
               </h3>
               <p className="y10-note note">第 {setting.version} 版</p>
             </div>
-            {/* 来源按项说：模型、档位与部门 Prompt 各自有没有由本项目写入（工单 #741） */}
+            {/* 来源按项说：模型、档位与职能 Prompt 各自有没有由本项目写入（工单 #741） */}
             <p className="y10-note note">
               模型与档位：{setting.model_id
                 ? `${model?.model ?? setting.model_id}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`
                 : `${followText}${setting.requested_tier ? `，档位 ${setting.requested_tier}` : ""}`}
-              ；模型来源 {itemSource(Boolean(setting.model_id), "跟随部门默认")}
+              ；模型来源 {itemSource(Boolean(setting.model_id), "跟随职能默认")}
               ；档位来源 {itemSource(Boolean(setting.requested_tier), "跟随")}
             </p>
             <p className="y10-note note" data-testid={`settings-prompt-source-${key}`}>
-              部门 Prompt 来源：{itemSource(promptWritten(setting.department_setting_configured, setting.text), "内置默认")}
+              职能 Prompt 来源：{itemSource(promptWritten(setting.department_setting_configured, setting.text), "内置默认")}
             </p>
             <ReminderList items={reminders} testId={`settings-reminder-${key}`} />
-            <pre className="y10-pre raw department-setting-text">{setting.text || "（没有部门 Prompt 文字）"}</pre>
+            <pre className="y10-pre raw department-setting-text">{setting.text || "（没有职能 Prompt 文字）"}</pre>
             {editing === key ? (
               <DepartmentSettingsForm app={props.app} data={data} department={key} onClose={() => setEditing(null)} />
             ) : (
               <button type="button" onClick={() => setEditing(key)}>
-                修改部门设置
+                修改职能设置
               </button>
             )}
           </div>
@@ -262,7 +262,7 @@ function DepartmentSettingsForm(props: {
   const savedReminders = list(command.accepted?.reminders).map((item) => text(item)).filter((item) => item !== "");
 
   if (setting === undefined) {
-    return <Empty text={`没有 ${departmentName(props.department)} 的部门设置`} />;
+    return <Empty text={`没有 ${departmentName(props.department)} 的职能设置`} />;
   }
 
   // 生效模型的说明：项目设置写入了模型就用它，否则用部门默认（跟随部门默认的当前值）
