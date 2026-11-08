@@ -1,0 +1,1025 @@
+{
+  "note": "录下的接口响应（工单 #1573）：harness.demo 与一个交付改动了内核清单路径的事项（内核修改的决定请求），启动真实的 Yudao 服务以后经 HTTP 读取。画面自己的单元测试只读这一份，不启动 Yudao；demo 是三个部门走完的一轮（有询问、交付、放行与采纳），kernel 是结算不采纳、等待回答的项目。demo 的查询快照是位置 120 的回放快照（projects.list?at=120、project.loop?at=120，事件流是位置 1..120 的连续窗口，两者是同一刻）；department.workspace 不带位置（这条查询不可回放），是录制时项目最后一件事项完成以后的工作间。department.workspace 的录制只保留画面读的 position 与 data.room（以及事项与运行的标识），其余字段是页面材料，画面不读。",
+  "recordings": [
+    {
+      "name": "demo",
+      "ids": {
+        "project_id": "proj_9a0b137677f34a69",
+        "work_item_id": "wi_8e740804ca1e45c4",
+        "run_id": "run_ec54042741a24a78"
+      },
+      "queries": [
+        {
+          "name": "projects.list",
+          "params": {},
+          "response": {
+            "position": 120,
+            "data": {
+              "projects": [
+                {
+                  "project_id": "proj_9a0b137677f34a69",
+                  "name": "Demo 项目",
+                  "goal": "Build a local echo CLI that prints its argument and follows product decisions on flags.",
+                  "source": "idea",
+                  "pinned": false,
+                  "archived": false,
+                  "created_at": "2026-11-08T03:09:39.050554+00:00",
+                  "updated_at": "2026-11-08T03:09:39.060957+00:00",
+                  "version": 2,
+                  "work_item_count": 1,
+                  "in_progress_count": 1,
+                  "waiting_count": 0,
+                  "decisions_waiting": 0,
+                  "last_activity_at": "2026-11-08T03:09:43.154576+00:00",
+                  "active_work_item_id": "wi_8e740804ca1e45c4",
+                  "current_adoption": null,
+                  "onboarding_status": null,
+                  "interrupted_count": 0,
+                  "waiting_resume_count": 0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "project.loop",
+          "params": {
+            "project_id": "proj_9a0b137677f34a69"
+          },
+          "response": {
+            "position": 120,
+            "data": {
+              "project_id": "proj_9a0b137677f34a69",
+              "work_items": [
+                {
+                  "work_item_id": "wi_8e740804ca1e45c4",
+                  "kind": "change",
+                  "sign": "Build a local echo CLI that prints its a",
+                  "color_index": 1,
+                  "status": "in_progress",
+                  "department": "quality",
+                  "progress": {
+                    "product_spec_revision": 2,
+                    "delivery_revision": null,
+                    "delivery_product_spec_revision": null,
+                    "conclusion": null
+                  },
+                  "departments": {
+                    "product": {
+                      "state": "waiting",
+                      "note": null
+                    },
+                    "engineering": {
+                      "state": "working",
+                      "note": null
+                    },
+                    "quality": {
+                      "state": "working",
+                      "note": "预测性探索：按 PRD r2 起草测试用例"
+                    }
+                  },
+                  "round": 4,
+                  "started_at": "2026-11-08T03:09:39.060957+00:00",
+                  "elapsed_sec": 4,
+                  "time_limit_sec": 7200,
+                  "pending_question": null,
+                  "run_id": "run_ec54042741a24a78",
+                  "adoption_id": null,
+                  "recovery_state": "running",
+                  "stop_reason": null,
+                  "last_department": "quality",
+                  "version": 2,
+                  "refs": {
+                    "sign": {
+                      "position": 2,
+                      "source": "user"
+                    },
+                    "round": {
+                      "position": 3,
+                      "source": "user"
+                    },
+                    "elapsed": {
+                      "position": 288,
+                      "source": "rule"
+                    }
+                  },
+                  "organization": {
+                    "form": "three_departments",
+                    "routing": "watched_outputs",
+                    "roles": [
+                      {
+                        "id": "product",
+                        "label": "产品",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "id": "engineering",
+                        "label": "工程",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "id": "quality",
+                        "label": "质检",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "verifiers": [
+                      {
+                        "role": "quality",
+                        "verifies": [
+                          {
+                            "role": "engineering",
+                            "outcomes": [
+                              "delivery_spec"
+                            ]
+                          }
+                        ],
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "completing": null,
+                    "watched": [
+                      {
+                        "source": "product",
+                        "recipient": "engineering",
+                        "outcome": "product_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "source": "product",
+                        "recipient": "quality",
+                        "outcome": "product_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "source": "engineering",
+                        "recipient": "quality",
+                        "outcome": "delivery_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "asks": [
+                      {
+                        "requester": "product",
+                        "recipient": "engineering",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "product",
+                        "recipient": "quality",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "engineering",
+                        "recipient": "product",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "engineering",
+                        "recipient": "quality",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "quality",
+                        "recipient": "product",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "quality",
+                        "recipient": "engineering",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "rejections": [
+                      {
+                        "verifier": "quality",
+                        "role": "engineering",
+                        "outcome": "delivery_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
+              "adoptions": []
+            }
+          }
+        },
+        {
+          "name": "decisions.list",
+          "params": {
+            "project_id": "proj_9a0b137677f34a69",
+            "status": [
+              "open"
+            ]
+          },
+          "response": {
+            "position": 120,
+            "data": {
+              "decisions": []
+            }
+          }
+        },
+        {
+          "name": "department.workspace",
+          "params": {
+            "project_id": "proj_9a0b137677f34a69",
+            "department": "product",
+            "work_item": "wi_8e740804ca1e45c4"
+          },
+          "response": {
+            "position": 289,
+            "data": {
+              "project_id": "proj_9a0b137677f34a69",
+              "department": "product",
+              "work_item_id": "wi_8e740804ca1e45c4",
+              "run_id": "run_ec54042741a24a78",
+              "run_status": "done",
+              "room": {
+                "department": "product",
+                "level": "ui",
+                "status": "done",
+                "crt": {
+                  "target": "Build a local echo CLI that prints its a",
+                  "model": "—",
+                  "protocol": "fake",
+                  "status": "已完成",
+                  "cycle": 11
+                },
+                "roles": [
+                  {
+                    "id": "product-agent",
+                    "name": "产品部门 Agent",
+                    "kind": "agent",
+                    "status": "idle",
+                    "task": null
+                  }
+                ],
+                "existing_read": false,
+                "pose": null,
+                "door": null,
+                "hold_card": null,
+                "pending_tool": null,
+                "mailbox": 0,
+                "summaries": 0,
+                "scrolls": 3,
+                "pinned_notes": 0,
+                "semantic_cards": 0,
+                "machine": null,
+                "remote_unknown": false,
+                "waiting_provider": false,
+                "pipes": {
+                  "out": "idle",
+                  "letters_waiting": 0
+                },
+                "trial": null,
+                "tool_panel": null,
+                "self_test": null
+              }
+            }
+          }
+        },
+        {
+          "name": "department.workspace",
+          "params": {
+            "project_id": "proj_9a0b137677f34a69",
+            "department": "engineering",
+            "work_item": "wi_8e740804ca1e45c4"
+          },
+          "response": {
+            "position": 289,
+            "data": {
+              "project_id": "proj_9a0b137677f34a69",
+              "department": "engineering",
+              "work_item_id": "wi_8e740804ca1e45c4",
+              "run_id": "run_ec54042741a24a78",
+              "run_status": "done",
+              "room": {
+                "department": "engineering",
+                "level": "ui",
+                "status": "done",
+                "crt": {
+                  "target": "Build a local echo CLI that prints its a",
+                  "model": "—",
+                  "protocol": "fake",
+                  "status": "已完成",
+                  "cycle": 11
+                },
+                "roles": [
+                  {
+                    "id": "engineering-agent",
+                    "name": "工程部门 Agent",
+                    "kind": "agent",
+                    "status": "idle",
+                    "task": null
+                  }
+                ],
+                "existing_read": false,
+                "pose": null,
+                "door": null,
+                "hold_card": null,
+                "pending_tool": null,
+                "mailbox": 0,
+                "summaries": 0,
+                "scrolls": 0,
+                "pinned_notes": 0,
+                "semantic_cards": 0,
+                "machine": null,
+                "remote_unknown": false,
+                "waiting_provider": false,
+                "pipes": {
+                  "out": "idle",
+                  "letters_waiting": 0
+                },
+                "trial": null,
+                "tool_panel": null,
+                "self_test": null
+              }
+            }
+          }
+        },
+        {
+          "name": "department.workspace",
+          "params": {
+            "project_id": "proj_9a0b137677f34a69",
+            "department": "quality",
+            "work_item": "wi_8e740804ca1e45c4"
+          },
+          "response": {
+            "position": 289,
+            "data": {
+              "project_id": "proj_9a0b137677f34a69",
+              "department": "quality",
+              "work_item_id": "wi_8e740804ca1e45c4",
+              "run_id": "run_ec54042741a24a78",
+              "run_status": "done",
+              "room": {
+                "department": "quality",
+                "level": "ui",
+                "status": "done",
+                "crt": {
+                  "target": "Build a local echo CLI that prints its a",
+                  "model": "—",
+                  "protocol": "fake",
+                  "status": "已完成",
+                  "cycle": 11
+                },
+                "roles": [
+                  {
+                    "id": "quality-agent",
+                    "name": "质检部门 Agent",
+                    "kind": "agent",
+                    "status": "idle",
+                    "task": null
+                  }
+                ],
+                "existing_read": false,
+                "pose": null,
+                "door": null,
+                "hold_card": null,
+                "pending_tool": null,
+                "mailbox": 0,
+                "summaries": 0,
+                "scrolls": 0,
+                "pinned_notes": 0,
+                "semantic_cards": 0,
+                "machine": null,
+                "remote_unknown": false,
+                "waiting_provider": false,
+                "pipes": {
+                  "out": "idle",
+                  "letters_waiting": 0
+                },
+                "trial": null,
+                "tool_panel": null,
+                "self_test": null
+              }
+            }
+          }
+        },
+        {
+          "name": "run.asks",
+          "params": {
+            "run_id": "run_ec54042741a24a78"
+          },
+          "response": {
+            "position": 289,
+            "data": {
+              "asks": [
+                {
+                  "id": "ses_ask_eng_010d6c2c1be94b92",
+                  "requester": "product",
+                  "recipient": "engineering",
+                  "question": "Is a single-file local Python CLI appropriate?",
+                  "status": "已回答",
+                  "answer": "Python's standard library supports this CLI without external dependencies.",
+                  "reason": null,
+                  "parent": null,
+                  "chain": [
+                    "product"
+                  ],
+                  "depth": 1,
+                  "prd_revision": null,
+                  "start_position": 13,
+                  "end_position": 25,
+                  "started_at": "2026-11-08T03:09:39.467968+00:00",
+                  "ended_at": "2026-11-08T03:09:39.632633+00:00"
+                },
+                {
+                  "id": "ses_ask_pro_499d3d29458d49bd",
+                  "requester": "engineering",
+                  "recipient": "product",
+                  "question": "How should unknown flags be handled?",
+                  "status": "已回答",
+                  "answer": "The revised product requirements define flags and usage.",
+                  "reason": null,
+                  "parent": null,
+                  "chain": [
+                    "engineering"
+                  ],
+                  "depth": 1,
+                  "prd_revision": 2,
+                  "start_position": 47,
+                  "end_position": 75,
+                  "started_at": "2026-11-08T03:09:40.151003+00:00",
+                  "ended_at": "2026-11-08T03:09:41.019324+00:00"
+                },
+                {
+                  "id": "ses_ask_eng_2548d991686e4e54",
+                  "requester": "quality",
+                  "recipient": "engineering",
+                  "question": "Where is the CLI entry point?",
+                  "status": "已回答",
+                  "answer": "Run python src/echo.py with the intended arguments.",
+                  "reason": null,
+                  "parent": null,
+                  "chain": [
+                    "quality"
+                  ],
+                  "depth": 1,
+                  "prd_revision": null,
+                  "start_position": 89,
+                  "end_position": 113,
+                  "started_at": "2026-11-08T03:09:41.488873+00:00",
+                  "ended_at": "2026-11-08T03:09:42.711141+00:00"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "kernel",
+      "ids": {
+        "project_id": "proj_6861a95d0e1c4037",
+        "work_item_id": "wi_ba12427da1c34197",
+        "run_id": "run_b2dd4910d3234238"
+      },
+      "queries": [
+        {
+          "name": "projects.list",
+          "params": {},
+          "response": {
+            "position": 90,
+            "data": {
+              "projects": [
+                {
+                  "project_id": "proj_6861a95d0e1c4037",
+                  "name": "内核改动",
+                  "goal": "改动一个内核文件",
+                  "source": "idea",
+                  "pinned": false,
+                  "archived": false,
+                  "created_at": "2026-11-08T03:10:06.864906+00:00",
+                  "updated_at": "2026-11-08T03:10:13.810022+00:00",
+                  "version": 3,
+                  "work_item_count": 1,
+                  "in_progress_count": 0,
+                  "waiting_count": 0,
+                  "decisions_waiting": 1,
+                  "last_activity_at": "2026-11-08T03:10:13.810022+00:00",
+                  "active_work_item_id": null,
+                  "current_adoption": null,
+                  "onboarding_status": null,
+                  "interrupted_count": 0,
+                  "waiting_resume_count": 0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "project.loop",
+          "params": {
+            "project_id": "proj_6861a95d0e1c4037"
+          },
+          "response": {
+            "position": 90,
+            "data": {
+              "project_id": "proj_6861a95d0e1c4037",
+              "work_items": [
+                {
+                  "work_item_id": "wi_ba12427da1c34197",
+                  "kind": "change",
+                  "sign": "改动内核文件",
+                  "color_index": 1,
+                  "status": "released_unsettled",
+                  "department": null,
+                  "progress": {
+                    "product_spec_revision": 1,
+                    "delivery_revision": 1,
+                    "delivery_product_spec_revision": 1,
+                    "conclusion": "release"
+                  },
+                  "departments": null,
+                  "round": 5,
+                  "started_at": "2026-11-08T03:10:06.941936+00:00",
+                  "elapsed_sec": 6,
+                  "time_limit_sec": 7200,
+                  "pending_question": null,
+                  "run_id": "run_b2dd4910d3234238",
+                  "adoption_id": null,
+                  "recovery_state": "completed",
+                  "stop_reason": "released",
+                  "last_department": "quality",
+                  "version": 2,
+                  "refs": {
+                    "sign": {
+                      "position": 2,
+                      "source": "user"
+                    },
+                    "round": {
+                      "position": 3,
+                      "source": "user"
+                    },
+                    "elapsed": {
+                      "position": 89,
+                      "source": "rule"
+                    },
+                    "parcel": {
+                      "position": 55,
+                      "source": "rule"
+                    },
+                    "stamp": {
+                      "position": 87,
+                      "source": "role_statement"
+                    }
+                  },
+                  "organization": {
+                    "form": "three_departments",
+                    "routing": "watched_outputs",
+                    "roles": [
+                      {
+                        "id": "product",
+                        "label": "产品",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "id": "engineering",
+                        "label": "工程",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "id": "quality",
+                        "label": "质检",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "verifiers": [
+                      {
+                        "role": "quality",
+                        "verifies": [
+                          {
+                            "role": "engineering",
+                            "outcomes": [
+                              "delivery_spec"
+                            ]
+                          }
+                        ],
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "completing": null,
+                    "watched": [
+                      {
+                        "source": "product",
+                        "recipient": "engineering",
+                        "outcome": "product_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "source": "product",
+                        "recipient": "quality",
+                        "outcome": "product_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "source": "engineering",
+                        "recipient": "quality",
+                        "outcome": "delivery_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "asks": [
+                      {
+                        "requester": "product",
+                        "recipient": "engineering",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "product",
+                        "recipient": "quality",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "engineering",
+                        "recipient": "product",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "engineering",
+                        "recipient": "quality",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "quality",
+                        "recipient": "product",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      },
+                      {
+                        "requester": "quality",
+                        "recipient": "engineering",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ],
+                    "rejections": [
+                      {
+                        "verifier": "quality",
+                        "role": "engineering",
+                        "outcome": "delivery_spec",
+                        "ref": {
+                          "position": 3,
+                          "source": "user"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ],
+              "adoptions": []
+            }
+          }
+        },
+        {
+          "name": "decisions.list",
+          "params": {
+            "project_id": "proj_6861a95d0e1c4037",
+            "status": [
+              "open"
+            ]
+          },
+          "response": {
+            "position": 90,
+            "data": {
+              "decisions": [
+                {
+                  "decision_id": "pevt_8fef31cdeb104779",
+                  "project_id": "proj_6861a95d0e1c4037",
+                  "work_item_id": "wi_ba12427da1c34197",
+                  "run_id": null,
+                  "kind": "kernel_modification",
+                  "blocks": "run",
+                  "version": 1,
+                  "status": "open",
+                  "requested_at": "2026-11-08T03:10:13.810022Z",
+                  "blocked": {
+                    "work_item_id": "wi_ba12427da1c34197",
+                    "queued_after": 0
+                  },
+                  "request": {
+                    "kind": "kernel_modification",
+                    "blocks": "run",
+                    "options": [
+                      {
+                        "id": "approve",
+                        "label": "批准采纳",
+                        "note_required": false
+                      },
+                      {
+                        "id": "reject",
+                        "label": "拒绝",
+                        "note_required": false
+                      }
+                    ],
+                    "description": "交付改动了内核清单里的 1 个路径，批准以后才采纳",
+                    "facts": [],
+                    "department": "engineering",
+                    "work_item_id": "wi_ba12427da1c34197",
+                    "delivery_run_id": "run_b2dd4910d3234238",
+                    "kernel_paths": [
+                      "harness/bounds.py"
+                    ],
+                    "diff": "--- a/harness/bounds.py\n+++ b/harness/bounds.py\n@@ -0,0 +1 @@\n+# 交付改动的内核文件",
+                    "held_adoption": {
+                      "adoption_id": "adopt_293ad4e4953f4be9",
+                      "work_item_id": "wi_ba12427da1c34197",
+                      "run_id": "run_b2dd4910d3234238",
+                      "delivery_event_id": "evt_57bc05daf5824f10",
+                      "qa_event_id": "evt_4285870d36524f1d",
+                      "tree_ref": {
+                        "kind": "tree_manifest",
+                        "content_hash": "sha256:e05cefdbdaa659d13cea62cac399c8d27ac3222a57253d954a1c461889e1adcc",
+                        "path": "run_b2dd4910d3234238/e0/e05cefdbdaa659d13cea62cac399c8d27ac3222a57253d954a1c461889e1adcc",
+                        "media_type": "application/json"
+                      },
+                      "code_tree_digest": "sha256:528d88db17c7760f0d5ea49bb69bbe1f1ada2fe4ae8b74eec910c3698b7cbf0e",
+                      "summary": "implemented echo CLI",
+                      "files": [
+                        "harness/bounds.py",
+                        "src/echo.py"
+                      ],
+                      "check_names": [
+                        "smoke"
+                      ],
+                      "known_risks": [],
+                      "previous_adoption_id": null
+                    }
+                  },
+                  "answer": null
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "department.workspace",
+          "params": {
+            "project_id": "proj_6861a95d0e1c4037",
+            "department": "product"
+          },
+          "response": {
+            "position": 90,
+            "data": {
+              "project_id": "proj_6861a95d0e1c4037",
+              "department": "product",
+              "work_item_id": null,
+              "run_id": null,
+              "run_status": null,
+              "room": {
+                "department": "product",
+                "level": "ui",
+                "status": "idle",
+                "crt": {
+                  "target": "—",
+                  "model": "—",
+                  "protocol": "—",
+                  "status": "未工作",
+                  "cycle": null
+                },
+                "roles": [
+                  {
+                    "id": "product-agent",
+                    "name": "产品部门 Agent",
+                    "kind": "agent",
+                    "status": "idle",
+                    "task": null
+                  }
+                ],
+                "existing_read": false,
+                "pose": null,
+                "door": null,
+                "hold_card": null,
+                "pending_tool": null,
+                "mailbox": 0,
+                "summaries": 0,
+                "scrolls": 0,
+                "pinned_notes": 0,
+                "semantic_cards": 0,
+                "machine": null,
+                "remote_unknown": false,
+                "waiting_provider": false,
+                "pipes": {
+                  "out": "idle",
+                  "letters_waiting": 0
+                },
+                "trial": null,
+                "tool_panel": null,
+                "self_test": null
+              }
+            }
+          }
+        },
+        {
+          "name": "department.workspace",
+          "params": {
+            "project_id": "proj_6861a95d0e1c4037",
+            "department": "engineering"
+          },
+          "response": {
+            "position": 90,
+            "data": {
+              "project_id": "proj_6861a95d0e1c4037",
+              "department": "engineering",
+              "work_item_id": null,
+              "run_id": null,
+              "run_status": null,
+              "room": {
+                "department": "engineering",
+                "level": "ui",
+                "status": "idle",
+                "crt": {
+                  "target": "—",
+                  "model": "—",
+                  "protocol": "—",
+                  "status": "未工作",
+                  "cycle": null
+                },
+                "roles": [
+                  {
+                    "id": "engineering-agent",
+                    "name": "工程部门 Agent",
+                    "kind": "agent",
+                    "status": "idle",
+                    "task": null
+                  }
+                ],
+                "existing_read": false,
+                "pose": null,
+                "door": null,
+                "hold_card": null,
+                "pending_tool": null,
+                "mailbox": 0,
+                "summaries": 0,
+                "scrolls": 0,
+                "pinned_notes": 0,
+                "semantic_cards": 0,
+                "machine": null,
+                "remote_unknown": false,
+                "waiting_provider": false,
+                "pipes": {
+                  "out": "idle",
+                  "letters_waiting": 0
+                },
+                "trial": null,
+                "tool_panel": null,
+                "self_test": null
+              }
+            }
+          }
+        },
+        {
+          "name": "department.workspace",
+          "params": {
+            "project_id": "proj_6861a95d0e1c4037",
+            "department": "quality"
+          },
+          "response": {
+            "position": 90,
+            "data": {
+              "project_id": "proj_6861a95d0e1c4037",
+              "department": "quality",
+              "work_item_id": null,
+              "run_id": null,
+              "run_status": null,
+              "room": {
+                "department": "quality",
+                "level": "ui",
+                "status": "idle",
+                "crt": {
+                  "target": "—",
+                  "model": "—",
+                  "protocol": "—",
+                  "status": "未工作",
+                  "cycle": null
+                },
+                "roles": [
+                  {
+                    "id": "quality-agent",
+                    "name": "质检部门 Agent",
+                    "kind": "agent",
+                    "status": "idle",
+                    "task": null
+                  }
+                ],
+                "existing_read": false,
+                "pose": null,
+                "door": null,
+                "hold_card": null,
+                "pending_tool": null,
+                "mailbox": 0,
+                "summaries": 0,
+                "scrolls": 0,
+                "pinned_notes": 0,
+                "semantic_cards": 0,
+                "machine": null,
+                "remote_unknown": false,
+                "waiting_provider": false,
+                "pipes": {
+                  "out": "idle",
+                  "letters_waiting": 0
+                },
+                "trial": null,
+                "tool_panel": null,
+                "self_test": null
+              }
+            }
+          }
+        },
+        {
+          "name": "run.asks",
+          "params": {
+            "run_id": "run_b2dd4910d3234238"
+          },
+          "response": {
+            "position": 90,
+            "data": {
+              "asks": []
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

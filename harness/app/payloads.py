@@ -1783,9 +1783,10 @@ class CatalogCandidatesCollectedPayload(Payload):
 
 class CatalogTestFinishedPayload(Payload):
     # 连接测试不写准入（admitted 为空）；模型测试通过时带准入结果。
+    # 候选测试（kind 为 candidate）不写准入，model_id 是上游模型 ID：候选没有保存的模型访问定义。
     # base_revision 是提交命令时依据的目录修订号
     base_revision: int
-    kind: Literal["connection", "model"]
+    kind: Literal["connection", "model", "candidate"]
     provider_id: str
     model_id: str | None
     ok: bool
