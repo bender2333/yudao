@@ -109,6 +109,7 @@
 "test_git_engine.py" = "integration"
 "test_github_app_token.py" = "integration"
 "test_git_versions.py" = "module"
+"test_ignore_rules_undecidable.py" = "module"
 "test_independent_judgement.py" = "integration"
 "test_inspection_workspace.py" = "module"
 "test_judgement_reference.py" = "module"

@@ -70,7 +70,7 @@ from .models import (
 from .providers import ProviderConnections, ProviderFacade
 from .providers.selection import ModelSelection
 from .projection import RunNotFoundError, RunProjection, project_run
-from .public_tree import CapturedTree, UnrepresentableWorkspace
+from .public_tree import CapturedTree, IgnoreRulesUndecidable, UnrepresentableWorkspace
 from .recording import ActivationScope
 from .recovery import RunRecovery
 from .sessions import SessionFactory
@@ -1694,6 +1694,11 @@ class Orchestrator:
             self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version,
                           facts=list(exc.paths))
             return
+        except IgnoreRulesUndecidable as exc:
+            # 建立检查工作区时主机判断不了忽略规则：与装配请求、工具执行等位置同一个结局，
+            # 以 host_commit_error 停止，说明带诊断原文（docs/design/local-tools.md「公开树」，工单 #604）
+            self._end_run(activation, "host_commit_error", str(exc), activation.version)
+            return
         except (ValueError, OSError) as exc:
             # 检查工作区的建立源读不出来（质检的封存交付归档缺失或损坏）：不退回运行工作区
             # （ADR-0038 与 docs/design/local-tools.md「工作区」：检查工作区从封存的交付建立）。这次激活无法开始，
@@ -1737,6 +1742,10 @@ class Orchestrator:
             # 条目在工作区内的相对路径写进决定请求的事实引用
             self._end_run(activation, "workspace_unrepresentable", str(exc), activation.version,
                           facts=list(exc.paths))
+            return
+        except IgnoreRulesUndecidable as exc:
+            # 激活开始前主机判断不了忽略规则：同一个结局，以 host_commit_error 停止（工单 #604）
+            self._end_run(activation, "host_commit_error", str(exc), activation.version)
             return
         except Exception as exc:
             # 步骤驱动没有开始：依据是激活开始时的运行状态
@@ -1783,6 +1792,9 @@ class Orchestrator:
         except UnrepresentableWorkspace as exc:
             # 提案提交（提交判断读取工作区事实、交付封存取得公开树）发现无法表示的条目：暂停，错误不再归入提交错误
             self._end_run(activation, "workspace_unrepresentable", str(exc), None, facts=list(exc.paths))
+        except IgnoreRulesUndecidable as exc:
+            # 提案提交时主机判断不了忽略规则：同一个结局，停止说明只写诊断原文（工单 #604）
+            self._end_run(activation, "host_commit_error", str(exc), None)
         except Exception as exc:
             self._end_run(activation, "host_commit_error", f"{type(exc).__name__}: {exc}", None)
     async def _execute_ask(
