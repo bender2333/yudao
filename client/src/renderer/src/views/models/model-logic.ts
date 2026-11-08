@@ -389,7 +389,7 @@ export const CANDIDATE_TEST_STEP_LABELS: Record<string, string> = {
   save_capability: "保存测试能力",
 };
 
-// 容量未知的候选没有可以发送的参数（docs/design/model-management.md「候选测试」）：
+// 容量未知的候选没有可以发送的参数（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）：
 // 缺窗口与输出上限中的哪一项，按服务的候选字段判
 export function candidateMissingCapacity(candidate: CatalogCandidate): string[] {
   const missing: string[] = [];
@@ -445,7 +445,7 @@ export function candidateTestResultText(test: CatalogCandidateTestState): string
   return label;
 }
 
-// 一个候选行上的测试按钮与状态（docs/design/model-management.md「候选测试」）：
+// 一个候选行上的测试按钮与状态（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）：
 // 没有选用的、适用于职能任务的候选才有按钮；容量未知与正在等待或测试中的按钮不可用；
 // 通过与未通过以后按钮写「重新测试」
 export type CandidateTestView = {

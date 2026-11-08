@@ -133,7 +133,7 @@ export function CandidateList(props: CandidateListProps) {
             const applicable = candidateApplicable(candidate);
             const checked = props.selected.has(key);
             const status = props.status[key];
-            // 候选测试的按钮与状态：与候选在同一行里（docs/design/model-management.md「候选测试」）
+            // 候选测试的按钮与状态：与候选在同一行里（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）
             const test = candidateTestView({ candidate, selected: checked, busy: props.disabled });
             return (
               <li className={`mm-candidate${checked ? " is-on" : ""}`} key={key}
