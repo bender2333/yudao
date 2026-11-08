@@ -13,13 +13,17 @@ CYCLE_BOUND = "max_cycles"
 TIME_BOUND = "time_limit"
 
 
-def activation_bound(projection: MinimalProjection, elapsed_sec: float) -> str | None:
-    # 激活开始前与步骤结束后的上限判断：先轮次，后时间；都没有达到时为空
+def round_bound(projection: MinimalProjection, elapsed_sec: float) -> str | None:
+    # 一轮工作开始前与步骤结束后的上限判断：先轮次，后时间；都没有达到时为空
     if projection.used.activations >= projection.max_cycles:
         return CYCLE_BOUND
     if elapsed_sec >= projection.run_time_limit_sec:
         return TIME_BOUND
     return None
+
+
+# 旧名留一版（工单 #1513）：新的代码用 round_bound
+activation_bound = round_bound
 
 
 def time_used_up(projection: MinimalProjection, elapsed_sec: float) -> bool:
