@@ -9,7 +9,7 @@
 
 import { useEffect, useRef } from "react";
 import { createRafClock } from "../pixel/clock.ts";
-import { createFloorView } from "../pixel/floor/view.ts";
+import { createFloorView, floorTestHooks } from "../pixel/floor/view.ts";
 import type { DecisionAnswer } from "../pixel/floor/card.ts";
 import type { DecisionFace, FactElement, FloorModel } from "../pixel/contract.ts";
 import type { Shell, SceneSurface } from "../shell.ts";
@@ -45,6 +45,15 @@ export function FloorScene(props: { shell: Shell; projectId: string; workItemId:
         // 来源卡片上的「在时间轴上查看」：按位置打开页面概览
         onGoTimeline: (position: number) => shell.openTimelineLink(position),
       });
+      // 端到端测试经这个入口读画面画出的当前状态（声明见 src/test-hooks.d.ts）；
+      // 重新同步交给同步层：测试不调用 resync，这里保留入口以便以后核对断开重连
+      window.__floorViewForTest = {
+        ...floorTestHooks(view, () => {
+          void shell.open(window.location.origin, shell.identity);
+        }),
+        setOverlay: (id, data) => view.setOverlay(id, data),
+        goRoom: (department) => shell.goRoom(department),
+      };
       return {
         jump: (state) => {
           view.jump(state as FloorModel);
@@ -59,6 +68,8 @@ export function FloorScene(props: { shell: Shell; projectId: string; workItemId:
     });
     return () => {
       detach();
+      // 场景被卸下（换项目、离开楼层）：读取入口一起撤掉，测试不会读到已经销毁的画面
+      delete window.__floorViewForTest;
       clock.destroy();
     };
   }, [props.shell, key, props.workItemId, props.projectId]);

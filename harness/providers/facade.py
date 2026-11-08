@@ -593,6 +593,13 @@ class ProviderFacade:
         # MCP 服务器的探测与调用按名称从这里取值（网络与 MCP docs/design/network-and-mcp.md「凭据」）
         return self._credentials
 
+    def resolve_credential(self, ref: str) -> CredentialMaterial | None:
+        # 凭据引用的解析边界（工单 #980）：采纳写回的推送与合并请求按源目录登记的引用在这里取材料。
+        # 材料只在控制主机上使用，不写进事件、工件、日志与 HTTP 错误诊断；解析不到时交回 None，
+        # 由调用方按既有的拒绝边界处理，不新增认证系统
+        with self._lock:
+            return self._credentials.resolve(ref)
+
     def credential_status(self, ref: str) -> dict[str, Any]:
         # 脱敏状态加版本，不含 Key
         with self._lock:
