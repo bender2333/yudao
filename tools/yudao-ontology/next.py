@@ -141,8 +141,9 @@ def collect(commit: str, tools: Path) -> dict:
     found = {"一": [], "二": [], "三": [], "四": []}
 
     # 模型跟不跟得上
-    stale = [r for r in quote_rows if not r["found"] and "……" not in r["quote"]]
-    spliced = [r for r in quote_rows if not r["found"] and "……" in r["quote"]]
+    # found：True 原句在；"拼接" 是「……」两边分开核对都在；False 对不上
+    stale = [r for r in quote_rows if r["found"] is False]
+    spliced = [r for r in quote_rows if r["found"] == "拼接"]
     new_lines = unextracted(commit, [r["quote"] for r in quote_rows], docs, cited_sections(g))
 
     # 第 0 至 3 批的检查：同一条在几批里重复出现，只记一次，记最后一批的
