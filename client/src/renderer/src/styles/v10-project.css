@@ -1,5 +1,6 @@
 /* 项目页面样式：概览、恢复与动作核实、资料。颜色全部来自 base.css 的变量；事项颜色来自像素画面的事项色板，与画面中的小旗一致。
-   类名前缀：y10-pp- 三个页面共用，y10-ov- 概览，y10-rc- 恢复与动作核实，y10-mt- 资料，y10-msem- 资料中的语义记录。 */
+   类名前缀：y10-pp- 三个页面共用，y10-ov- 概览，y10-rc- 恢复与动作核实，y10-mt- 资料，y10-msem- 资料中的语义记录，
+   y10-cv- 对话页与它上面的循环图（工单 #1638）。 */
 
 /* ---------------------------------------------------------------- 共用 */
 
@@ -426,3 +427,118 @@
 .y10-shot-modal img { display: block; max-width: 100%; height: auto; border-radius: 8px; }
 .y10-mt-oldevents, .y10-rc-events { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; font-size: 12px; color: var(--muted); }
 .y10-mt-oldevents li, .y10-rc-events li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; overflow-wrap: anywhere; }
+
+/* ---------------------------------------------------------------- 对话页与循环图（工单 #1638） */
+
+/* 对话页：上面是循环图，下面留出线程的位置。项目页先是对话（项目的组织设计说明 4.14）。 */
+.y10-cv-page { display: grid; gap: 10px; align-content: start; min-width: 0; }
+.y10-cv-only { margin: 0; font-size: 13px; }
+.y10-cv-pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 12px; }
+.y10-cv-pick-btn {
+  display: inline-flex; align-items: baseline; gap: 5px; max-width: 100%; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--line-strong); background: var(--surface); color: var(--text); font-size: 12px; text-align: left;
+}
+.y10-cv-pick-btn small { color: var(--muted); }
+.y10-cv-pick-btn:hover { border-color: var(--green); }
+.y10-cv-pick-btn.is-on { border-color: var(--green); background: var(--tint); color: var(--green); font-weight: 600; }
+
+/* 图：主线一行，旁边的职能在它上方，跨节点的箭头另起一行 */
+.y10-cv-graph { display: grid; gap: 8px; }
+.y10-cv-wrap {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 14px 14px 12px; overflow-x: auto;
+}
+.y10-cv-grid { display: grid; align-items: center; column-gap: 0; row-gap: 6px; min-width: min-content; }
+.y10-cv-cell { display: grid; justify-items: center; align-content: center; gap: 4px; min-width: 0; }
+
+.y10-cv-pill {
+  border-radius: 999px; padding: 4px 10px; font-size: 12px; white-space: nowrap;
+  border: 1px dashed var(--line-strong); color: var(--muted); background: var(--bg); justify-self: center;
+}
+.y10-cv-pill.is-end.is-ok { border: 1px solid var(--green); color: var(--green); font-weight: 600; }
+.y10-cv-pill.is-end.is-open, .y10-cv-pill.is-end.is-plain { border-style: solid; color: var(--text); }
+
+.y10-cv-node {
+  position: relative; display: grid; gap: 3px; justify-items: start; min-width: 96px; max-width: 190px;
+  padding: 8px 10px; border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--bg); color: var(--text); text-align: left;
+}
+.y10-cv-node:hover, .y10-cv-node:focus-visible { border-color: var(--green); outline: none; }
+.y10-cv-node.is-on { box-shadow: 0 0 0 2px var(--green); }
+.y10-cv-node.is-working { border-color: var(--green); }
+.y10-cv-node.is-working::after {
+  content: "在做"; position: absolute; top: -9px; right: 8px; font-size: 10px; padding: 0 6px;
+  border-radius: 999px; background: var(--green); color: var(--on-accent);
+}
+.y10-cv-node b { font-size: 14px; white-space: nowrap; }
+.y10-cv-marks { display: flex; flex-wrap: wrap; gap: 4px; }
+.y10-cv-marks:empty { display: none; }
+.y10-cv-badge { font-size: 11px; line-height: 16px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line-strong); color: var(--muted); white-space: nowrap; }
+.y10-cv-badge.is-ver { border-color: var(--green); color: var(--green); font-weight: 600; }
+.y10-cv-badge.is-ver::before { content: "✓ "; }
+.y10-cv-state { color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+.y10-cv-chip {
+  display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 6px; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--bg); color: inherit; font-size: 12px; text-align: left; white-space: nowrap;
+}
+.y10-cv-chip:hover { border-color: var(--green); }
+.y10-cv-chip.is-on { box-shadow: 0 0 0 2px var(--green); }
+.y10-cv-chip small { color: var(--faint); font-size: 11px; }
+.y10-cv-dir { color: var(--faint); }
+.y10-cv-kind { font-weight: 600; }
+.y10-cv-verdict { font-size: 11px; padding: 0 5px; border-radius: 4px; font-weight: 600; }
+.y10-cv-verdict.is-reject { background: var(--red-bg); color: var(--red); }
+.y10-cv-verdict.is-release { background: var(--tint); color: var(--green); }
+/* 成果箭头都是实线；箭头朝左的是回头的成果（缺陷记录） */
+.y10-cv-line { display: block; border-top: 1px solid var(--line-strong); min-width: 24px; justify-self: stretch; position: relative; }
+.y10-cv-line::after { content: "›"; position: absolute; right: -2px; top: -10px; color: var(--faint); }
+
+.y10-cv-side { display: flex; gap: 6px; justify-content: center; }
+.y10-cv-side .y10-cv-node { border-style: dashed; }
+.y10-cv-vlink { display: grid; justify-items: center; gap: 2px; }
+.y10-cv-vlink::before { content: ""; display: block; width: 0; height: 14px; border-left: 1px solid var(--line-strong); }
+.y10-cv-vlink small { color: var(--muted); font-size: 11px; line-height: 1.3; text-align: center; max-width: 130px; }
+
+.y10-cv-skip { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+.y10-cv-skip .y10-cv-line { flex: 1; min-width: 12px; }
+.y10-cv-skip-to { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+/* 窄屏：图收成一行（节点名与当前箭头），线程不被挤 */
+.y10-cv-oneline {
+  display: none; flex-wrap: wrap; gap: 4px; align-items: center; font-size: 13px; padding: 6px 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.y10-cv-oneline-cur { color: var(--muted); }
+.y10-cv-oneline-cur::before { content: " · 当前："; }
+.y10-cv-oneline .y10-link { background: none; border: 0; padding: 0; color: var(--green); font: inherit; text-decoration: underline; text-underline-offset: 2px; }
+
+/* 点节点、点箭头打开的面板：同一个位置、同一种画法 */
+.y10-cv-panel {
+  position: relative; display: grid; gap: 6px; padding: 10px 14px; background: var(--surface);
+  border: 1px solid var(--green); border-radius: var(--radius);
+}
+.y10-cv-panel h3 { margin: 0; padding-right: 30px; font-size: 15px; }
+.y10-cv-panel h3 small { color: var(--muted); font-weight: 400; font-size: 12px; }
+.y10-cv-panel p { margin: 0; }
+.y10-cv-close { position: absolute; top: 6px; right: 6px; }
+.y10-cv-nav { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; font-size: 12px; }
+.y10-cv-nav .y10-link { background: none; border: 0; padding: 0; color: var(--green); font: inherit; }
+.y10-cv-verdict-line { font-weight: 600; font-size: 13px; }
+.y10-cv-verdict-line.is-reject { color: var(--red); }
+.y10-cv-verdict-line.is-release { color: var(--green); }
+.y10-cv-panel-text { overflow-wrap: anywhere; }
+.y10-cv-files b { font-size: 12.5px; }
+.y10-cv-facts { margin: 0; padding-left: 18px; display: grid; gap: 3px; font-size: 12.5px; }
+
+/* 线程的位置：这一页只留出位置，线程与时序图由后面的工单接上 */
+.y10-cv-thread {
+  min-height: 120px; padding: 10px 14px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+@media (max-width: 800px) {
+  .y10-cv-wrap { display: none; }
+  .y10-cv-oneline { display: flex; }
+  .y10-cv-thread { min-height: 160px; }
+}

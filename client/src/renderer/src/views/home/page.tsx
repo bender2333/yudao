@@ -189,7 +189,7 @@ export function HomePage(props: {
                           <button
                             type="button"
                             className="link"
-                            onClick={() => props.onNavigate(`#/p/${project.project_id}/overview`)}
+                            onClick={() => props.onNavigate(paths.conversation(project.project_id))}
                           >
                             {project.name}
                           </button>
