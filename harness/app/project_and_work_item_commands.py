@@ -253,8 +253,18 @@ def _run_id_for(application: "Application", work_item_id: str) -> str:
     raise Rejection("not_found", "没有这个事项，请重新读取以后提交")
 
 
+def _require_item_form(application: "Application", run_id: str) -> None:
+    # 事项冻结的形态不在当前发布里时（工单 #1578，项目的组织设计说明「冻结与升级」最后一条）：取消、加指导、
+    # 加输入三条命令以命令层已定义的 not_allowed 与同一句说明收场，不写事件，也不去取那份不在发布里的定义。
+    # 形态在发布里、或者找不到 run、项目与事项时为空，三条命令照原路走
+    message = application.system.projects.item_form_unavailable_message(run_id)
+    if message is not None:
+        raise Rejection("not_allowed", message)
+
+
 async def _append_input(application: "Application", command: Command, request: WorkItemAppendInput) -> None:
     run_id = _run_id_for(application, request.work_item_id)
+    _require_item_form(application, run_id)
     try:
         application.system.orchestrator.add_input(
             run_id, request.text, base_version=request.base_version, command=command)
@@ -273,6 +283,7 @@ class WorkItemCancel(CommandRequest):
 async def _cancel_work_item(application: "Application", command: Command, request: WorkItemCancel) -> None:
     system = application.system
     run_id = _run_id_for(application, request.work_item_id)
+    _require_item_form(application, run_id)
     try:
         projection = system.orchestrator.project(run_id)
     except RunNotFoundError as missing:
@@ -302,6 +313,7 @@ def _guidance_department(request: GuidanceSend) -> None:
 async def _send_guidance(application: "Application", command: Command, request: GuidanceSend) -> None:
     _guidance_department(request)
     run_id = _run_id_for(application, request.work_item_id)
+    _require_item_form(application, run_id)
     try:
         application.system.orchestrator.add_guidance(
             run_id, request.department, request.text, base_version=request.base_version, command=command)
@@ -473,10 +485,10 @@ WORK_ITEM_CREATE = CommandDefinition(
              "work_item_in_progress", "not_allowed"))
 WORK_ITEM_APPEND_INPUT = CommandDefinition(
     name="work_item.append_input", request=WorkItemAppendInput, refs=NoRefs, handle=_append_input,
-    derive_refs=_no_refs, reasons=("not_found", "run_terminal"))
+    derive_refs=_no_refs, reasons=("not_found", "run_terminal", "not_allowed"))
 WORK_ITEM_CANCEL = CommandDefinition(
     name="work_item.cancel", request=WorkItemCancel, refs=NoRefs, handle=_cancel_work_item, derive_refs=_no_refs,
-    reasons=("not_found", "run_terminal"))
+    reasons=("not_found", "run_terminal", "not_allowed"))
 GUIDANCE_SEND = CommandDefinition(
     name="guidance.send", request=GuidanceSend, refs=NoRefs, handle=_send_guidance, derive_refs=_no_refs,
     reasons=("not_found", "run_terminal", "not_allowed"))

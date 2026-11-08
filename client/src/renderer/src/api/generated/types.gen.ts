@@ -21553,7 +21553,7 @@ export type CommandWorkItemAppendInputData = {
 
 export type CommandWorkItemAppendInputErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, run_terminal, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, run_terminal, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
@@ -21582,7 +21582,7 @@ export type CommandWorkItemCancelData = {
 
 export type CommandWorkItemCancelErrors = {
     /**
-     * 命令被拒绝，可能的原因：not_found, run_terminal, command_id_reused
+     * 命令被拒绝，可能的原因：not_found, run_terminal, not_allowed, command_id_reused
      */
     409: Rejected;
     /**
