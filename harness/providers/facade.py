@@ -30,13 +30,15 @@ from .invoke import (
     stream_invocation,
     to_provider_input,
 )
-from .presets import PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, list_presets
+from .presets import (PRESET_TABLE_SOURCE, PRESET_TABLE_VERSION, list_presets, preset_base_url,
+                      preset_header_profile)
 from .resolve import (
     CallTargetResolution,
     EffectiveModelResolution,
     FrozenTarget,
     ResolveSnapshot,
     call_target_public,
+    limit_reasoning_level,
     resolve_call_target as _resolve_call_target,
     resolve_snapshot,
 )
@@ -44,12 +46,13 @@ from ..definitions import DEFINITIONS
 from .responses import ProviderConnections
 from .sdk import prepare_protocols
 from .selection import ModelSelection, SelectionResolution, merge_selection
-from .selection_flow import ProviderChange, SelectionAttempt, SelectionFlow
+from .selection_flow import CandidateTest, ProviderChange, SelectionAttempt, SelectionFlow
 from .suggested import reminders as _suggested_reminders
 from .store import (
     REASONING_LEVELS,
     SUPPORTED_PROTOCOLS,
     AdmissionRecord,
+    ModelDefinition,
     ProviderStore,
     _parse_admission_document,
     _utc_now,
@@ -63,6 +66,15 @@ REQUIRED_DEPARTMENTS = DEFINITIONS.departments
 
 # 启动方式：normal 读取真实目录，拒绝 fake 连接；test 与 demo 为测试和演示放行 fake（工单 #86）
 STARTUP_MODES = ("normal", "test", "demo")
+
+
+class CandidateTestRejected(Exception):
+    # 候选测试在提交时被拒绝：reason 是接口层的拒绝原因（not_found、not_allowed、catalog_invalid），
+    # message 是给用户的中文说明，写明缺哪一项或哪种状态不允许测试
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+        self.message = message
 
 
 class ProviderFacade:
@@ -881,11 +893,22 @@ class ProviderFacade:
             if (self._store.providers.get(provider.id) == provider
                     and self._provider_source(provider) == source):
                 self._candidate_results[provider.id] = copy.deepcopy(result)
+                # 重新获取模型列表：这个连接的候选连同它们的测试状态与结果一起清除
+                self.selections.clear_candidates(provider.id)
         return result
 
     def latest_candidates(self, provider_id: str) -> dict[str, Any] | None:
+        # 最近一次获取的候选，每条候选带上它的测试状态与结果（只在本进程内，重新获取列表以后清除）
         with self._lock:
-            return copy.deepcopy(self._candidate_results.get(str(provider_id)))
+            result = copy.deepcopy(self._candidate_results.get(str(provider_id)))
+            if result is None:
+                return None
+            tests = self.selections.candidate_snapshot(str(provider_id))
+            for candidate in result.get("candidates", ()):
+                test = tests.get(candidate.get("id"))
+                if test is not None:
+                    candidate["test"] = test
+            return result
 
     def select_model(self, provider_id: str, upstream_model: str, *, protocol: str | None = None,
                      context_window: int | None = None, max_output_tokens: int | None = None,
@@ -952,9 +975,50 @@ class ProviderFacade:
             selected.status = "capacity_unknown" if selected.missing else "waiting"
             return selected, not selected.missing
 
+    def begin_candidate_test(self, provider_id: str, upstream_model: str) -> tuple[CandidateTest, bool]:
+        # 候选测试提交时的校验：候选在当前的模型列表里、输出是文本、还没有选用、容量已知。
+        # 参数取「选用时会得到的值」，不保存定义；接着进行的测试与选用测试共用同时测试的上限。
+        # 同一个候选已经在等待或测试中时沿用那一次，不重复排队。
+        with self._lock:
+            provider = self._store.providers.get(str(provider_id))
+            if provider is None:
+                raise CandidateTestRejected("not_found", f"Provider 配置不存在：{provider_id}")
+            latest = self._candidate_results.get(provider.id) or {}
+            candidate = next((item for item in latest.get("candidates", ())
+                              if item.get("id") == str(upstream_model)), None)
+            if latest.get("status") != "ok" or candidate is None:
+                raise CandidateTestRejected(
+                    "not_found", f"候选 {upstream_model} 不在当前的模型列表中，请先获取模型列表")
+            if not candidate.get("applicable", True):
+                raise CandidateTestRejected("not_allowed", "这个候选不适用于部门任务：模型不输出文本")
+            if any(model.provider_id == provider.id and model.model == str(upstream_model)
+                   for model in self._store.models.values()):
+                raise CandidateTestRejected("not_allowed", "这个候选已经选用，请在已选模型里重新验证")
+            missing = [label for name, label in
+                       (("context_window", "窗口"), ("max_output_tokens", "输出上限"))
+                       if candidate.get(name) is None]
+            if missing:
+                raise CandidateTestRejected(
+                    "not_allowed", "容量未知：缺少" + "与".join(missing) + "，请先选用并填写容量")
+            protocol = str(candidate.get("protocol") or "chat_completions")
+            if protocol == "fake" and self._startup_mode == "normal":
+                raise CandidateTestRejected("catalog_invalid", "正常启动不能测试 fake 协议")
+            if protocol not in SUPPORTED_PROTOCOLS:
+                raise CandidateTestRejected("catalog_invalid", f"候选的调用协议不受支持：{protocol}")
+            current = self.selections.candidate(provider.id, str(upstream_model))
+            if current is not None and current.status in {"waiting", "testing"}:
+                return current, False
+            test = self.selections.begin_candidate(
+                provider.id, str(upstream_model), protocol=protocol,
+                context_window=int(candidate["context_window"]),
+                max_output_tokens=int(candidate["max_output_tokens"]),
+                input_modalities=tuple(candidate.get("input_modalities") or ("text",)))
+            return test, True
+
     def prepare_provider_reselection(self, provider_id: str) -> None:
         with self._lock:
             self._candidate_results.pop(provider_id, None)
+            self.selections.clear_candidates(provider_id)
             for model in self._store.models.values():
                 if model.provider_id == provider_id:
                     self.selections.cancel(model.id)
@@ -992,6 +1056,7 @@ class ProviderFacade:
                 self._source_versions[key] = self._source_versions.get(key, 0) + 1
                 if after is None:
                     self._candidate_results.pop(key, None)
+                    self.selections.clear_candidates(key)
                     for selected in self.selections.snapshot():
                         if selected["provider_id"] == key:
                             self.selections.cancel(selected["model_id"])
@@ -1042,6 +1107,77 @@ class ProviderFacade:
             return result if result.get("admitted") or self.selections.finish(selected, result) else None
         finally:
             self.selections.release(selected)
+
+    def run_candidate_test(self, test: CandidateTest, limit: Callable[[], int]) -> dict[str, Any] | None:
+        # 候选测试占一个同时测试的名额（与选用测试共用上限）；结果只在这次测试仍是当前那次时写进状态
+        if not self.selections.acquire(test, limit):
+            return None
+        try:
+            result = self._candidate_model_test(test)
+        finally:
+            self.selections.release(test)
+        if not self.selections.finish_candidate(test, result):
+            return None
+        return result
+
+    def _candidate_model_test(self, test: CandidateTest) -> dict[str, Any]:
+        # 与模型测试相同的两组真实请求；定义与准入都不写，部门默认与已有选择都不变（docs/design/model-management.md「候选测试」）
+        model = ModelDefinition(id=f"candidate:{test.provider_id}:{test.model}", provider_id=test.provider_id,
+                                model=test.model, protocol=test.protocol,
+                                context_window=test.context_window,
+                                max_output_tokens=test.max_output_tokens,
+                                input_modalities=test.input_modalities)
+        with self._lock:
+            provider = self._store.providers.get(test.provider_id)
+            if provider is None:
+                raise CatalogValidationError((ValidationIssue(
+                    f"providers.{test.provider_id}", "Provider 配置不存在"),))
+            target = self._candidate_target(provider, model)
+        target = replace(target, timeout_sec=min(
+            target.timeout_sec, float(DEFINITIONS.rule_value("provider.model_test_timeout_sec"))))
+        outcome = self._model_requests(target, model, test)
+        return {"ok": outcome["ok"], "error": outcome["error"], "model": outcome["model"],
+                "elapsed_ms": outcome["elapsed_ms"],
+                "accepts_required_tool_call": outcome["accepts_required_tool_call"],
+                "failure_group": outcome["failure_group"], "failure_step": outcome["failure_step"],
+                "protocol": model.protocol, "admitted": None,
+                "request_timeout_sec": target.timeout_sec}
+
+    def _candidate_target(self, provider: Any, model: ModelDefinition) -> FrozenTarget:
+        # 候选测试没有保存的定义：按选用时会得到的参数临时取得一次调用目标，凭据取这份连接。
+        # 字段取法与 resolve_snapshot 相同（harness/providers/resolve.py），不写入目录
+        material = None
+        if model.protocol != "fake":
+            if not provider.credential_ref:
+                raise CatalogValidationError((ValidationIssue("candidates.credential", "凭据引用无法解析"),))
+            material = self._credentials.resolve(provider.credential_ref)
+            if material is None or not material.secret.strip():
+                raise CatalogValidationError((ValidationIssue("candidates.credential", "凭据引用无法解析"),))
+        return FrozenTarget(
+            target_key=model.id,
+            provider_id=provider.id,
+            provider_name=provider.name,
+            model_id=model.id,
+            protocol=model.protocol,
+            base_url=preset_base_url(provider.preset_id, model.protocol) or provider.base_url,
+            model=model.model,
+            context_window=model.context_window,
+            max_output_tokens=model.max_output_tokens,
+            timeout_sec=provider.timeout_sec,
+            credential_ref=provider.credential_ref or None,
+            capability_source=model.capability_source,
+            accepts_required_tool_call=model.accepts_required_tool_call,
+            input_modalities=model.input_modalities,
+            reasoning_levels=model.reasoning_levels,
+            default_reasoning_level=model.default_reasoning_level,
+            reasoning_mode=model.reasoning_mode,
+            sent_tier=limit_reasoning_level(model, None),
+            header_profile=preset_header_profile(provider.preset_id),
+            preset_id=provider.preset_id,
+            revision=self._store.revision,
+            credential_version=(material.version if material is not None else None),
+            api_key=(material.secret if material is not None else ""),
+        )
 
     def retry_selection(self, provider_id: str, model_id: str) -> tuple[SelectionAttempt, bool]:
         with self._lock:
@@ -1141,56 +1277,20 @@ class ProviderFacade:
         frozen = snapshot.target(model.id)
         target = replace(frozen, timeout_sec=min(
             frozen.timeout_sec, float(DEFINITIONS.rule_value("provider.model_test_timeout_sec"))))
-        provider_input = to_provider_input(
-            [{"role": "user", "content": "ping"}],
-            max_output_tokens=model.max_output_tokens,
-        )
-        started = time.monotonic()
-        group, step = "minimal_qa", "request"
-        accepts_required = True
-        result: InvokeResult | None = None
-        try:
-            result = self._invoke_for_test(target, provider_input, model, selection)
-            if model.protocol != "fake":
-                group, step = "tool_round_trip", "tool_call"
-                tool = {"type": "function", "name": "yudao_model_test",
-                        "description": "无副作用的模型接入测试工具，返回 pong。请调用一次。",
-                        "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}
-                prompt = {"role": "user", "content": "请调用 yudao_model_test，不需要参数。收到工具结果后回复。"}
-                tool_input = replace(to_provider_input([prompt], [tool],
-                                                       max_output_tokens=model.max_output_tokens),
-                                     tool_choice="required")
-                try:
-                    result = self._invoke_for_test(target, tool_input, model, selection)
-                except ProviderError as exc:
-                    if not _required_tool_parameter_rejected(exc):
-                        raise
-                    accepts_required = False
-                    step = "tool_call_retry"
-                    result = self._invoke_for_test(target, replace(tool_input, tool_choice="auto"), model, selection)
-                outputs = _model_test_tool_outputs(result)
-                step = "tool_result"
-                reasoning = [] if result.reasoning is None else result.reasoning.items
-                follow_up = replace(tool_input, tool_choice="auto", raw_request={
-                    "input": [prompt, *reasoning, *result.output, *outputs], "tools": [tool]})
-                result = self._invoke_for_test(target, follow_up, model, selection)
-        except ProviderError as exc:
-            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
-            group_text = "最小问答" if group == "minimal_qa" else "工具往返"
-            step_text = {"request": "请求", "tool_call": "调用测试工具", "tool_call_retry": "不要求调用工具重试",
-                         "tool_result": "回传工具结果"}[step]
-            reason = (f"请求超时（等待上限 {target.timeout_sec:g} 秒）" if exc.reason == "provider_timeout"
-                      else _model_test_failure_reason(exc))
+        outcome = self._model_requests(target, model, selection)
+        if not outcome["ok"]:
             return {
-                "ok": False, "error": f"{group_text} / {step_text}：{reason}",
-                "model": None if result is None else (result.actual_model or None), "admitted": False,
+                "ok": False, "error": outcome["error"], "model": outcome["model"], "admitted": False,
                 "protocol": model.protocol, "revision": self.revision,
-                "elapsed_ms": elapsed_ms, "usage_reported": False,
-                "accepts_required_tool_call": accepts_required,
-                "failure_group": group, "failure_step": step, "request_timeout_sec": target.timeout_sec,
+                "elapsed_ms": outcome["elapsed_ms"], "usage_reported": False,
+                "accepts_required_tool_call": outcome["accepts_required_tool_call"],
+                "failure_group": outcome["failure_group"], "failure_step": outcome["failure_step"],
+                "request_timeout_sec": target.timeout_sec,
             }
-        elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
-        actual = result.actual_model or None
+        elapsed_ms = outcome["elapsed_ms"]
+        actual = outcome["model"]
+        accepts_required = outcome["accepts_required_tool_call"]
+        usage_reported = outcome["usage_reported"]
         capacity_confirmed = model.context_window is not None and model.max_output_tokens is not None
         defaults_before = defaults_after = self.catalog_revision()
         with self._lock:
@@ -1234,7 +1334,7 @@ class ProviderFacade:
                 "protocol": model.protocol,
                 "revision": self.revision,
                 "elapsed_ms": elapsed_ms,
-                "usage_reported": bool(result.usage.get("reported", False)),
+                "usage_reported": usage_reported,
                 "persisted": persisted,
                 "accepts_required_tool_call": accepts_required,
                 "failure_group": None,
@@ -1247,6 +1347,63 @@ class ProviderFacade:
             if selection is not None and payload["admitted"]:
                 self.selections.finish(selection, payload)
             return payload
+
+    def _model_requests(self, target: FrozenTarget, model: ModelDefinition,
+                        selection: SelectionAttempt | CandidateTest | None) -> dict[str, Any]:
+        # 模型测试与候选测试共用的两组真实请求：最小问答与工具往返。只发请求，
+        # 不写定义、准入或部门默认；失败时写明哪一组、哪一步与上游给出的原因
+        provider_input = to_provider_input(
+            [{"role": "user", "content": "ping"}],
+            max_output_tokens=model.max_output_tokens,
+        )
+        started = time.monotonic()
+        group, step = "minimal_qa", "request"
+        accepts_required = True
+        result: InvokeResult | None = None
+        try:
+            result = self._invoke_for_test(target, provider_input, model, selection)
+            if model.protocol != "fake":
+                group, step = "tool_round_trip", "tool_call"
+                tool = {"type": "function", "name": "yudao_model_test",
+                        "description": "无副作用的模型接入测试工具，返回 pong。请调用一次。",
+                        "parameters": {"type": "object", "properties": {}, "additionalProperties": False}}
+                prompt = {"role": "user", "content": "请调用 yudao_model_test，不需要参数。收到工具结果后回复。"}
+                tool_input = replace(to_provider_input([prompt], [tool],
+                                                       max_output_tokens=model.max_output_tokens),
+                                     tool_choice="required")
+                try:
+                    result = self._invoke_for_test(target, tool_input, model, selection)
+                except ProviderError as exc:
+                    if not _required_tool_parameter_rejected(exc):
+                        raise
+                    accepts_required = False
+                    step = "tool_call_retry"
+                    result = self._invoke_for_test(target, replace(tool_input, tool_choice="auto"), model, selection)
+                outputs = _model_test_tool_outputs(result)
+                step = "tool_result"
+                reasoning = [] if result.reasoning is None else result.reasoning.items
+                follow_up = replace(tool_input, tool_choice="auto", raw_request={
+                    "input": [prompt, *reasoning, *result.output, *outputs], "tools": [tool]})
+                result = self._invoke_for_test(target, follow_up, model, selection)
+        except ProviderError as exc:
+            elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+            group_text = "最小问答" if group == "minimal_qa" else "工具往返"
+            step_text = {"request": "请求", "tool_call": "调用测试工具", "tool_call_retry": "不要求调用工具重试",
+                         "tool_result": "回传工具结果"}[step]
+            reason = (f"请求超时（等待上限 {target.timeout_sec:g} 秒）" if exc.reason == "provider_timeout"
+                      else _model_test_failure_reason(exc))
+            return {
+                "ok": False, "error": f"{group_text} / {step_text}：{reason}",
+                "model": None if result is None else (result.actual_model or None),
+                "elapsed_ms": elapsed_ms, "usage_reported": False,
+                "accepts_required_tool_call": accepts_required,
+                "failure_group": group, "failure_step": step, "request_timeout_sec": target.timeout_sec,
+            }
+        elapsed_ms = max(0, int(round((time.monotonic() - started) * 1000)))
+        return {"ok": True, "error": None, "model": result.actual_model or None,
+                "elapsed_ms": elapsed_ms, "usage_reported": bool(result.usage.get("reported", False)),
+                "accepts_required_tool_call": accepts_required,
+                "failure_group": None, "failure_step": None, "request_timeout_sec": target.timeout_sec}
 
     def _persist_admissions(self) -> tuple[bool, str | None]:
         # 准入记录落在与目录分开的文件里：CLI 与 smoke 在独立进程读取同一份配置；
@@ -1320,7 +1477,7 @@ class ProviderFacade:
         self._admissions = kept
 
     def _invoke_for_test(self, target: FrozenTarget, provider_input: ProviderInput,
-                         model: Any, selection: SelectionAttempt | None = None) -> InvokeResult:
+                         model: Any, selection: SelectionAttempt | CandidateTest | None = None) -> InvokeResult:
         # 诊断调用由接口层同步发起，在自己的事件循环中走与正式调用相同的协议与身份路径，
         # 使用独立会话，每次新建客户端；Web 服务多线程，同一个模型可能同时测试，每次调用使用唯一的尝试身份
         session_id = f"diagnostic:{target.provider_id}:{model.id}"

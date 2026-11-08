@@ -1214,6 +1214,7 @@ export type CatalogCandidate = {
     source_details?: {
         [key: string]: CatalogCandidateSource;
     };
+    test?: CatalogCandidateTestState | null;
 };
 
 /**
@@ -1232,6 +1233,66 @@ export type CatalogCandidateSource = {
      * Revision
      */
     revision?: string | null;
+};
+
+/**
+ * CatalogCandidateTest
+ */
+export type CatalogCandidateTest = {
+    /**
+     * Command Id
+     */
+    command_id: string;
+    /**
+     * Base Version
+     */
+    base_version: number;
+    /**
+     * Provider Id
+     */
+    provider_id: string;
+    /**
+     * Model
+     */
+    model: string;
+};
+
+/**
+ * CatalogCandidateTestState
+ */
+export type CatalogCandidateTestState = {
+    /**
+     * Status
+     */
+    status: 'waiting' | 'testing' | 'passed' | 'failed';
+    /**
+     * Sequence
+     */
+    sequence: number;
+    /**
+     * Elapsed Ms
+     */
+    elapsed_ms?: number | null;
+    /**
+     * Actual Model
+     */
+    actual_model?: string | null;
+    /**
+     * Accepts Required Tool Call
+     */
+    accepts_required_tool_call?: boolean | null;
+    /**
+     * Failure Group
+     */
+    failure_group?: string | null;
+    /**
+     * Failure Step
+     */
+    failure_step?: string | null;
+    /**
+     * Error
+     */
+    error?: string | null;
 };
 
 /**
@@ -9553,7 +9614,7 @@ export type CatalogTestFinishedPayload = {
     /**
      * Kind
      */
-    kind: 'connection' | 'model';
+    kind: 'connection' | 'model' | 'candidate';
     /**
      * Provider Id
      */
@@ -21999,6 +22060,35 @@ export type CommandCatalogModelTestResponses = {
 };
 
 export type CommandCatalogModelTestResponse = CommandCatalogModelTestResponses[keyof CommandCatalogModelTestResponses];
+
+export type CommandCatalogCandidateTestData = {
+    body: CatalogCandidateTest;
+    path?: never;
+    query?: never;
+    url: '/api/commands/catalog.candidate.test';
+};
+
+export type CommandCatalogCandidateTestErrors = {
+    /**
+     * 命令被拒绝，可能的原因：not_found, not_allowed, catalog_invalid, command_id_reused
+     */
+    409: Rejected;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CommandCatalogCandidateTestError = CommandCatalogCandidateTestErrors[keyof CommandCatalogCandidateTestErrors];
+
+export type CommandCatalogCandidateTestResponses = {
+    /**
+     * Successful Response
+     */
+    200: AcceptedNoRefs;
+};
+
+export type CommandCatalogCandidateTestResponse = CommandCatalogCandidateTestResponses[keyof CommandCatalogCandidateTestResponses];
 
 export type CommandCatalogDepartmentDefaultsSaveData = {
     body: CatalogDepartmentDefaultsSave;

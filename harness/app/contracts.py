@@ -163,7 +163,9 @@ AccessMode = Literal["local", "lan"]
 # 目录流里已带这个字段的旧事件仍能读。
 # 版本 15：停止原因的封闭清单多一条 open_loop（开环完成，结果是完成），创建事件多一个默认值为否的
 # open_loop 字段（#1394）：这两处的取值集合扩大，按生成出来的合同核对会算作已有取值的改变，版本随之提高。
-API_VERSION = 15
+# 版本 16：候选测试命令 catalog.candidate.test；catalog_test_finished 的种类多一个 candidate，
+# 候选结果里带上候选测试的状态与结果（#1587）：事件种类的取值集合扩大，按已有取值的改变提高版本。
+API_VERSION = 16
 
 
 class CatalogSelection(Contract):

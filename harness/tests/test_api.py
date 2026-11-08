@@ -241,6 +241,8 @@ def test_capabilities_and_openapi_list_the_registered_queries_and_commands(data_
         {"name": "catalog.candidates.collect", "reasons": ["not_found", "command_id_reused"]},
         {"name": "catalog.connection.test", "reasons": ["not_found", "command_id_reused"]},
         {"name": "catalog.model.test", "reasons": ["not_found", "command_id_reused"]},
+        {"name": "catalog.candidate.test",
+         "reasons": ["not_found", "not_allowed", "catalog_invalid", "command_id_reused"]},
         {"name": "catalog.department_defaults.save",
          "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
         {"name": "credential.set", "reasons": ["stale_base", "catalog_invalid", "command_id_reused"]},
