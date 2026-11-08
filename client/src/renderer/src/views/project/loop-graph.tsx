@@ -18,9 +18,10 @@ export function arrowText(arrow: LoopArrow): string {
 
 /** 一行窄屏时写的那条「当前箭头」：最后一条不是来源的箭头。 */
 export function currentArrow(graph: LoopGraph): LoopArrow | null {
-  const all = [...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows)];
-  const ordered = all.filter((arrow) => arrow.from !== SOURCE);
-  return ordered.length === 0 ? null : ordered[ordered.length - 1];
+  const all = [...graph.gaps.flat(), ...graph.skip, ...graph.side.flatMap((part) => part.arrows)]
+    .filter((arrow) => arrow.from !== SOURCE)
+    .sort((left, right) => left.position - right.position);
+  return all.length === 0 ? null : all[all.length - 1];
 }
 
 function ArrowChip(props: { arrow: LoopArrow; on: boolean; onPick: (arrow: LoopArrow) => void }) {
@@ -122,9 +123,7 @@ export function LoopGraphView(props: {
         nodeColumn(index), 1,
       ));
       side.push(cell(
-        <span className="y10-cv-vlink" aria-hidden="true">
-          {parts.some((part) => part.node.state !== "") ? <small>{parts.map((part) => part.node.state).filter(Boolean).join("；")}</small> : null}
-        </span>,
+        <span className="y10-cv-vlink" aria-hidden="true" />,
         nodeColumn(index), 2,
       ));
     });

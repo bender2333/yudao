@@ -134,6 +134,8 @@ export interface LoopArrow {
   to: string;
   /** 回头画的箭头（缺陷记录：从核验角色回到被核验的那一方） */
   back: boolean;
+  /** 这条箭头来自的那条事实在事件流里的位置：逐版看与「当前箭头」都按它排序 */
+  position: number;
   /** 对某一版的结论：打回或放行；只标在成果那一版上 */
   verdict: { tone: "reject" | "release"; by: string; text: string } | null;
   /** 那一版的一句话（交付的摘要、PRD 的改动说明、缺陷记录的内容） */
@@ -299,7 +301,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
   for (const input of materials?.inputs ?? []) {
     out.push({
       key: `src:${input.version}`, outcome: source, version: input.version, round: null,
-      from: SOURCE, to: receiver, back: false, verdict: null, text: input.text, files: [],
+      from: SOURCE, to: receiver, back: false, position: input.version, verdict: null, text: input.text, files: [],
     });
   }
   const contracts = new Map((materials?.contracts ?? []).map((entry) => [entry.event_id, entry]));
@@ -321,7 +323,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
       const by = verifierOfPair(organization, labels, to);
       const arrow: LoopArrow = {
         key: record.flow_id, outcome, version, round: record.round ?? null, from, to, back: false,
-        verdict: null, text: record.content, files: [],
+        position: record.position, verdict: null, text: record.content, files: [],
       };
       out.push(arrow);
       // 打回是对那一版的结论：标在它前面那一版交付上；前面还没有交付时留在这条缺陷记录上
@@ -340,7 +342,7 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
     const delivery = outcome === "交付" ? deliveries.get(record.event_id) : undefined;
     const arrow: LoopArrow = {
       key: record.flow_id, outcome, version, round: record.round ?? null, from, to, back: false,
-      verdict: null, text: delivery?.summary ?? record.content,
+      position: record.position, verdict: null, text: delivery?.summary ?? record.content,
       files: [...(delivery?.files ?? [])],
     };
     out.push(arrow);
@@ -365,7 +367,9 @@ export function arrowsOf(item: LoopItemView | null, organization: FrozenOrganiza
 
 /** 同一种成果、同两端的几版：点箭头时按它逐版看。 */
 export function versionsOf(arrows: readonly LoopArrow[], arrow: LoopArrow): LoopArrow[] {
-  return arrows.filter((item) => item.outcome === arrow.outcome && item.from === arrow.from && item.to === arrow.to);
+  return arrows
+    .filter((item) => item.outcome === arrow.outcome && item.from === arrow.from && item.to === arrow.to)
+    .sort((left, right) => left.position - right.position);
 }
 
 /** 结束写什么：有核验角色时写谁放行；没有时写开环完成。 */
