@@ -7,7 +7,9 @@
  *   - PreToolUse：拒绝写 `.ralph/**`（账本只由命令改）、拒绝 task_append（会复用上下文），
  *     并发超了给出提醒。
  *   - Stop：循环还在跑、还有活、无人值守开着时，把会话叫回来接着做。
- *   - 账本 `waitMode` 是 `notify`（靠宿主通知收账，如 DSH）时不参与接管：SessionStart 与 Stop 直接返回。
+ *   - 账本 `waitMode` 是 `notify`（靠宿主通知收账，如 DSH）时不参与编排，仅保留账本写保护。
+ *   - `hook` 模式下有有效租约时，只有租约所有者收到提示、写入工人记录与自动继续。
+ *   - 账本写保护适用于共享项目的所有 Claude Code 会话，不受上面两条影响。
  *
  * 任何异常都 fail open：Hook 不能把宿主会话弄坏。
  * 每条事件的输出都只写 stdout，一行 JSON。
@@ -82,6 +84,13 @@ function claimOwnership(loop, sessionId) {
   return null;
 }
 
+/** notify 由宿主收账；hook 下没有租约时保留手动 /solo，已有租约则只认编排会话。 */
+function isLoopOrchestrator(loop, input) {
+  if (loop.state.waitMode === 'notify') return false;
+  const owner = ownerOf(loop);
+  return !owner || owner.session === input.session_id;
+}
+
 function isLive(loop) {
   return Boolean(loop && loop.state && loop.status === 'running');
 }
@@ -136,7 +145,7 @@ function onSessionStart(input) {
 
 function onSubagentStart(input) {
   const loop = loadState(input);
-  if (!loop || !isLive(loop)) return;
+  if (!loop || !isLive(loop) || !isLoopOrchestrator(loop, input)) return;
   const conc = concurrencyOf(loop);
   const sessionId = typeof input.agent_id === 'string' ? input.agent_id : '';
   const mine = conc.active.find((a) => a.session && a.session === sessionId);
@@ -159,20 +168,9 @@ function onPreToolUse(input) {
   const toolInput = input.tool_input && typeof input.tool_input === 'object' ? input.tool_input : {};
   const lower = tool.toLowerCase();
 
-  if (lower === 'task_append') {
-    emit({
-      hookSpecificOutput: {
-        hookEventName: 'PreToolUse',
-        permissionDecision: 'deny',
-        permissionDecisionReason: 'solo 循环正在运行：task_append 会复用上一轮子会话的上下文，破坏「每轮全新上下文」。请发起一次新的子代理调用。',
-      },
-    });
-    return;
-  }
-
   const target = [toolInput.file_path, toolInput.path, toolInput.notebook_path].filter((v) => typeof v === 'string').join(' ');
   const mutating = ['write', 'edit', 'multiedit', 'notebookedit', 'str_replace_editor'].includes(lower);
-  // 账本里只有这几样是命令独占的；goal.md / handoff.md / notes/ 人可以编辑。
+  // 账本保护适用于共享项目的所有 Claude Code 会话；编排限制只作用于循环所有者。
   const ledgerState = /(^|[\\/])\.ralph[\\/].*(state\.json|tasks\.md|active\.json|\.lock|\.owner\.json|\.stop-guard\.json)$/;
   if (mutating && ledgerState.test(target)) {
     emit({
@@ -180,6 +178,19 @@ function onPreToolUse(input) {
         hookEventName: 'PreToolUse',
         permissionDecision: 'deny',
         permissionDecisionReason: '账本（.ralph/**）只能由 solo.mjs 的命令修改：手改 tasks.md 会丢任务行，手改 state.json 会让计数与失败次数对不上。',
+      },
+    });
+    return;
+  }
+
+  if (!isLoopOrchestrator(loop, input)) return;
+
+  if (lower === 'task_append') {
+    emit({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision: 'deny',
+        permissionDecisionReason: 'solo 循环正在运行：task_append 会复用上一轮子会话的上下文，破坏「每轮全新上下文」。请发起一次新的子代理调用。',
       },
     });
     return;
@@ -202,7 +213,7 @@ function onPreToolUse(input) {
 
 function onSubagentStop(input) {
   const loop = loadState(input);
-  if (!loop) return;
+  if (!loop || !isLive(loop) || !isLoopOrchestrator(loop, input)) return;
   const agentId = typeof input.agent_id === 'string' ? input.agent_id : '';
   const message = typeof input.last_assistant_message === 'string' ? input.last_assistant_message : '';
   if (!agentId || !message) return;
