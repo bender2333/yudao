@@ -87,7 +87,7 @@
   const AST = { preparing: ['idle', '准备中'], requesting: ['running', '请求中'], running: ['running', '进行中'], succeeded: ['succeeded', '成功'], failed: ['failed', '失败'], cancelled: ['cancelled', '已取消'] };
   const AKIND = { work: '工作请求', compaction: '压缩请求', collaboration: '询问分支', review: '审查请求' };
   const fmtMs = (ms) => (ms === null ? '—' : ms < 1000 ? ms + ' 毫秒' : ui.duration(ms / 1000));
-  const obs = { filters: {}, tab: {} };
+  const obs = { filters: {}, tab: {}, open: {} };
   const filtersOf = (pid) => (obs.filters[pid] = obs.filters[pid] || { dept: '', status: '', item: '', model: '' });
   const wiring = (a) => X.wiring[a.dept];
   const shortId = (id) => '请求 ' + id.replace('r-', '');
@@ -143,12 +143,13 @@
   }
 
   let openLoop = null;
+  const loopState = (s) => '<span class="y20-loop is-' + X.loopStates[s][1] + '">' + X.loopStates[s][0] + '</span>';
+  const LOOP_LAYER = { run: '一次运行', activation: '一轮工作' };
+  const loopRow = (id, indent, cols, basis) => '<tr class="y20-loop-row' + (openLoop === id ? ' is-open' : '') + '" data-act="obs.loop" data-id="' + id + '">' + cols.map((c, i) => '<td data-label="' + ['层', '实例', '轮次', '已用量与上限', '收敛状态', '停止原因'][i] + '"><div class="y20-td"' + (i === 1 ? ' style="padding-left:' + indent * 16 + 'px"' : '') + '>' + (c === '' ? '<span class="y20-muted">—</span>' : c) + '</div></td>').join('') + '</tr>' +
+      (openLoop === id && basis ? '<tr class="y20-loop-detail"><td colspan="6"><b>判定依据</b> ' + esc(basis) + '</td></tr>' : '');
   function loopsPanel(p) {
     const L = X.loops[p.id];
-    const state = (s) => '<span class="y20-loop is-' + X.loopStates[s][1] + '">' + X.loopStates[s][0] + '</span>';
-    const layer = { run: '一次运行', activation: '一轮工作' };
-    const row = (id, indent, cols, basis) => '<tr class="y20-loop-row' + (openLoop === id ? ' is-open' : '') + '" data-act="obs.loop" data-id="' + id + '">' + cols.map((c, i) => '<td data-label="' + ['层', '实例', '轮次', '已用量与上限', '收敛状态', '停止原因'][i] + '"><div class="y20-td"' + (i === 1 ? ' style="padding-left:' + indent * 16 + 'px"' : '') + '>' + (c === '' ? '<span class="y20-muted">—</span>' : c) + '</div></td>').join('') + '</tr>' +
-      (openLoop === id && basis ? '<tr class="y20-loop-detail"><td colspan="6"><b>判定依据</b> ' + esc(basis) + '</td></tr>' : '');
+    const state = loopState, layer = LOOP_LAYER, row = loopRow;
     const pr = L.project;
     let rowsHtml = row(p.id + '-p', 0, [pr[0], esc(pr[1]), esc(pr[2]), esc(pr[3]), state(pr[4]), ''], pr[6] || '按事项的进度汇总');
     p.items.forEach((it) => {
@@ -171,8 +172,27 @@
           ui.tabPanels('y20-obs', active, { records: recordsPanel(p, list), usage: usagePanel(p, list), loops: loopsPanel(p) }) }) + '</div>';
     }
   });
-  Y20.actions.register('obs.filter', (el) => { filtersOf(Y20.h.pid())[el.dataset.key] = el.value; Y20.rerender(); });
-  Y20.actions.register('obs.reset', () => { obs.filters[Y20.h.pid()] = null; Y20.rerender(); });
+  // 设置页的「模型请求与用量」：请求记录与用量统计用同一组筛选
+  Y20.observe = {
+    isOpen: (pid) => Boolean(obs.open[pid]),
+    panel(p) {
+      const list = attemptsOf(p);
+      const items = [{ id: 'records', label: '请求记录', count: list.length }, { id: 'usage', label: '用量统计' }];
+      const active = ui.activeTab('y20-req', items, 'records');
+      return '<p class="y20-muted y20-small">这个项目全部事项的请求；点「查看」进请求详情。</p>' + filterBar(p) + ui.tabs({ id: 'y20-req', items, active }) + ui.tabPanels('y20-req', active, { records: recordsPanel(p, list), usage: usagePanel(p, list) });
+    },
+    // 事项面板里的循环：这件事项各层的循环实例，点一行看判定依据
+    loops(p, it) {
+      const list = (X.loops[p.id] && X.loops[p.id].items[it.id]) || [];
+      if (!list.length) return '<p class="y20-muted y20-small">这件事项还没有循环记录</p>';
+      const rows = list.map((r, i) => loopRow(it.id + '-' + i, r[0] === 'run' ? 0 : 1, [LOOP_LAYER[r[0]], esc(r[1]), esc(r[2]), esc(r[3]), loopState(r[4]), esc(r[5])], r[6])).join('');
+      return '<div class="y20-table-wrap"><table class="y20-table y20-loop-table"><thead><tr><th>层</th><th>实例</th><th>轮次</th><th>已用量与上限</th><th>收敛状态</th><th>停止原因</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    }
+  };
+  Y20.actions.register('obs.filter', (el) => { const pid = Y20.h.pid(); filtersOf(pid)[el.dataset.key] = el.value; obs.open[pid] = true; Y20.rerender(); });
+  Y20.actions.register('obs.reset', () => { const pid = Y20.h.pid(); obs.filters[pid] = null; obs.open[pid] = true; Y20.rerender(); });
+  // 节点面板的「本职能的模型请求」：带着职能筛选进设置页这一节
+  Y20.actions.register('obs.dept', (el) => { const pid = Y20.h.pid(); obs.filters[pid] = null; filtersOf(pid).dept = el.dataset.dept; obs.open[pid] = true; Y20.go('#/p/' + pid + '/settings?section=requests'); });
   Y20.actions.register('obs.loop', (el) => { openLoop = openLoop === el.dataset.id ? null : el.dataset.id; Y20.rerender(); });
 
   // 请求详情
@@ -184,7 +204,7 @@
       const it = H.item(p, a.item);
       const live = ['requesting', 'running'].includes(a.status);
       const diag = ui.kv([['开始', esc(ui.time(a.start))], ['耗时', live ? '<span class="y20-muted">进行中</span>' : esc(fmtMs(a.ms))], ['状态', ui.status(AST[a.status][0], AST[a.status][1])], ['类型', AKIND[a.kind]],
-        ['事项', it ? H.dot(it) + ' ' + H.link('#/p/' + p.id + '/w/' + it.id, it.title) : ''], ['职能 · 角色', esc(H.dept(a.dept) + ' · ' + a.role)], ['模型服务', esc(w.provider)],
+        ['事项', it ? H.dot(it) + ' ' + H.link('#/p/' + p.id + '?item=' + it.id, it.title) : ''], ['职能 · 角色', esc(H.dept(a.dept) + ' · ' + a.role)], ['模型服务', esc(w.provider)],
         ['请求 → 返回', esc(w.model + ' → ' + (a.status === 'failed' ? '未知' : w.model))]].concat(a.err ? [['失败的分类', esc(a.err.category)], ['错误代码', ui.code(a.err.code)]] : [])) + (a.err ? ui.note('错误原文：' + esc(a.err.text), 'warn') : '');
       const target = ui.kv([['连接', esc(w.conn)], ['协议', esc(w.proto)], ['请求地址', ui.code(w.base)], ['上游模型', esc(w.model)], ['容量（窗口 / 最大输出）', Y20.num(w.window) + ' / ' + Y20.num(w.out)],
         ['凭据引用 / 版本', ui.code(w.cred + ' 第 ' + w.cv + ' 版')], ['选择来源', esc(w.src)], ['请求档位 → 发送档位', esc(w.level + ' → ' + w.level)], ['职能提示的版本', '第 ' + (X.deptPrompt[a.dept].indexOf('2') >= 0 ? 2 : 1) + ' 版']]);
@@ -192,7 +212,7 @@
       const sibs = X.attempts.filter((x) => a.group && x.group === a.group).sort((x, y) => x.start.localeCompare(y.start));
       const sib = sibs.length > 1 ? ui.block({ title: '同一次调用的各次尝试', body: '<div class="y20-sibs">' + sibs.map((s, i) => '<button type="button" class="y20-sib' + (s.id === a.id ? ' is-on' : '') + '" data-go="#/p/' + p.id + '/observe/' + s.id + '"><strong>第 ' + (i + 1) + ' / ' + sibs.length + ' 次</strong><small>' + AST[s.status][1] + ' · ' + esc(ui.time(s.start)) + '</small></button>').join('') + '</div>' }) : '';
       const out = live ? '<p class="y20-muted">还在进行，已经收到的文字：</p>' + ui.pre('读取现有实现，确定入口在 orders/export.ts……\n正在整理要改的文件清单……') : (X.outputOf(a) ? ui.pre(X.outputOf(a)) : '<p class="y20-muted">没有保存的输出。</p>');
-      return '<div class="y20-page">' + head(esc(shortId(a.id)) + ' ' + ui.status(AST[a.status][0], AST[a.status][1]), '调用目标、各栏目的来源、用量与上限；输出按保存的内容原样列出', ui.button({ label: '返回请求记录', icon: 'back', go: '#/p/' + p.id + '/observe' })) +
+      return '<div class="y20-page">' + head(esc(shortId(a.id)) + ' ' + ui.status(AST[a.status][0], AST[a.status][1]), '调用目标、各栏目的来源、用量与上限；输出按保存的内容原样列出', ui.button({ label: '返回模型请求与用量', icon: 'back', go: '#/p/' + p.id + '/settings?section=requests' })) +
         ui.block({ title: '诊断', body: diag }) + ui.block({ title: '调用目标', subtitle: '请求档位和实际发送的档位分开列出；凭据只显示引用和版本', body: target }) +
         ui.block({ title: '各栏目的来源', subtitle: '每一栏为什么放进请求、有没有放进', body: sections }) +
         ui.block({ title: '用量与上限', body: ui.kv([['输入（含缓存）', Y20.num(a.input)], ['输出', Y20.num(a.output)], ['缓存读取（输入的一部分）', Y20.num(a.cache)], ['费用', '未上报'], ['事项已用时间 / 上限', it ? esc(H.dur(it.used) + ' / ' + H.dur(it.limit)) : '']]) }) + sib +
