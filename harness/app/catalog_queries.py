@@ -40,7 +40,7 @@ class CatalogCandidateSource(Contract):
 
 
 class CatalogCandidateTestState(Contract):
-    # 候选测试的状态与结果（模型管理 docs/design/model-management.md「候选测试」）：
+    # 候选测试的状态与结果（模型管理 docs/design/model-management.md「模型访问定义与准入」中「候选测试」）：
     # 等待测试、测试中、测试通过、测试未通过；通过时带用时、实际返回的模型与是否接受要求调用工具，
     # 未通过时带哪一组、哪一步与原因。只保存在服务进程里，重新获取模型列表与服务重启以后清除
     status: Literal["waiting", "testing", "passed", "failed"]

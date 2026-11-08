@@ -1,5 +1,5 @@
 # 进程内选用状态、测试队列与序号；不依赖应用层或事件存储。
-# 候选测试与选用后的模型测试共用同一份同时测试上限与等待顺序（docs/design/model-management.md「候选测试」）。
+# 候选测试与选用后的模型测试共用同一份同时测试上限与等待顺序（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）。
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence

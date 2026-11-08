@@ -1121,7 +1121,7 @@ class ProviderFacade:
         return result
 
     def _candidate_model_test(self, test: CandidateTest) -> dict[str, Any]:
-        # 与模型测试相同的两组真实请求；定义与准入都不写，部门默认与已有选择都不变（docs/design/model-management.md「候选测试」）
+        # 与模型测试相同的两组真实请求；定义与准入都不写，部门默认与已有选择都不变（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）
         model = ModelDefinition(id=f"candidate:{test.provider_id}:{test.model}", provider_id=test.provider_id,
                                 model=test.model, protocol=test.protocol,
                                 context_window=test.context_window,

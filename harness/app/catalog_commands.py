@@ -622,7 +622,7 @@ async def _test_model(application: Application, command: Command, request: Catal
 
 async def _test_candidate(application: Application, command: Command, request: CatalogCandidateTest) -> None:
     # 候选测试：不保存定义、不写准入、不改部门默认与选择；结果以 catalog_test_finished（candidate）出现，
-    # 状态与结果随候选保存在服务进程里（docs/design/model-management.md「候选测试」）
+    # 状态与结果随候选保存在服务进程里（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）
     facade = application.system.facade
     _check_not_registered(application, command)
     try:

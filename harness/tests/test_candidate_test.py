@@ -1,4 +1,4 @@
-# R2、R3：通过真实 HTTP、SQLite 与公开目录合同核对候选测试（docs/design/model-management.md「候选测试」）。
+# R2、R3：通过真实 HTTP、SQLite 与公开目录合同核对候选测试（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）。
 # 六条验收标准各一个用例；上游是测试内启动的真实本机 HTTP 服务，不使用替身。
 from __future__ import annotations
 
