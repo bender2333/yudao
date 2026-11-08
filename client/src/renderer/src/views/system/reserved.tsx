@@ -11,12 +11,12 @@ const RESERVED: Record<string, Reserved> = {
   meta: {
     title: "元观察",
     stage: "Stage 6",
-    outcome: "根据运行证据提出组织或规则变更，独立验证、限定采用并可撤销；部门之间的流转有独立的流程审查",
+    outcome: "根据运行证据提出组织或规则变更，独立验证、限定采用并可撤销；职能之间的流转有独立的流程审查",
   },
   evolution: {
     title: "演化",
     stage: "Stage 6",
-    outcome: "根据运行证据提出组织或规则变更，独立验证、限定采用并可撤销；部门之间的流转有独立的流程审查",
+    outcome: "根据运行证据提出组织或规则变更，独立验证、限定采用并可撤销；职能之间的流转有独立的流程审查",
   },
   lessons: {
     title: "经验",

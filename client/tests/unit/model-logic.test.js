@@ -354,11 +354,11 @@ test("容量未知写明缺哪一项，手填的容量不合法时也写明哪�
 test("服务端给的位置串换成看得懂的引用方", () => {
   assert.equal(
     removalRejectionText("仍被引用，无法移除：bindings.product、bindings.engineering、bindings.quality"),
-    "仍被引用，无法移除：部门默认：产品、部门默认：工程、部门默认：质检",
+    "仍被引用，无法移除：职能默认：产品、职能默认：工程、职能默认：质检",
   );
   assert.equal(
     removalRejectionText("仍被引用，无法移除：projects.p1.department_settings.quality"),
-    "仍被引用，无法移除：项目部门设置：质检",
+    "仍被引用，无法移除：项目职能设置：质检",
   );
   // 不是位置串时原样给出
   assert.equal(removalRejectionText("目录已经变化，请重新读取以后再提交"), "目录已经变化，请重新读取以后再提交");
@@ -457,8 +457,8 @@ test("部门默认与项目设置的模型选项按连接分组", () => {
 test("档位选项、跟随说明与设置的取值", () => {
   assert.deepEqual(tierOptions(["low", "high"], null).map((item) => item.value), ["low", "high"]);
   assert.equal(tierOptions(["low"], "max")[1].label, "max（不在该模型的支持档位内，请求按模型限制）");
-  assert.equal(followDepartmentLabel(""), "跟随部门默认");
-  assert.equal(followDepartmentLabel("glm-4.6"), "跟随部门默认（当前：glm-4.6）");
+  assert.equal(followDepartmentLabel(""), "跟随职能默认");
+  assert.equal(followDepartmentLabel("glm-4.6"), "跟随职能默认（当前：glm-4.6）");
   assert.equal(currentEffectiveLabel(null), "");
   assert.equal(currentEffectiveLabel({ state: "unset" }), "未设置");
   assert.equal(currentEffectiveLabel({ state: "unusable", message: "准入已作废" }), "无法使用：准入已作废");

@@ -234,7 +234,7 @@ async function clearDepartmentDefaults(client: ClientApp): Promise<void> {
     // 部门默认是整份保存的：上一次保存写完以后再改下一个，
     // 否则两次改动叠在一起会被服务端按版本过期拒绝
     await expect(client.page.getByTestId(`department-status-${department}`))
-      .toContainText("已取消这个部门的模型");
+      .toContainText("已取消这个职能的模型");
   }
 }
 
@@ -395,7 +395,7 @@ for (const size of [{ width: 1440, height: 900 }]) {
       // 取消勾选：被部门引用，服务端拒绝，引用方写在模型行旁
       await client.page.getByTestId("selected-remove-trial-alpha").click();
       await expect(client.page.getByTestId("selected-status-text-trial-alpha")).toContainText("仍被引用，无法移除");
-      await expect(client.page.getByTestId("selected-status-text-trial-alpha")).toContainText("部门默认：产品");
+      await expect(client.page.getByTestId("selected-status-text-trial-alpha")).toContainText("职能默认：产品");
       // 它仍然启用着，部门仍然用它
       await expect(client.page.getByTestId("selected-status-trial-alpha")).toContainText("已启用");
       expect(await departmentChoice(client, "engineering")).toContain("trial-alpha");

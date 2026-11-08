@@ -78,7 +78,7 @@ function McpBlock(props: { state: SnapshotState<ToolsRegistryResult> }) {
     <Block
       id="tools-mcp"
       title="MCP 工具"
-      subtitle="各项目在设置里写明的服务器、可以使用的部门、最近一次状态与其中的工具"
+      subtitle="各项目在设置里写明的服务器、可以使用的职能、最近一次状态与其中的工具"
       data-testid="tools-mcp"
     >
       <Loading state={props.state} />
@@ -111,7 +111,7 @@ function McpBlock(props: { state: SnapshotState<ToolsRegistryResult> }) {
               <h4 className="y10-h3 sub">{server.name}</h4>
               <KeyValue
                 items={[
-                  ["可以使用的部门", server.departments === "" ? "没有写明" : server.departments],
+                  ["可以使用的职能", server.departments === "" ? "没有写明" : server.departments],
                   [
                     "最近一次状态",
                     <span key="status">
