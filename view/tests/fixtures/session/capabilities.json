@@ -1,0 +1,1131 @@
+{
+  "deployment": {
+    "log_id": "log_e4d4e3c4f2044d21",
+    "boot_id": "boot_c1e4d7ef6a4a4971",
+    "version": "0.2.0",
+    "api_version": 15,
+    "contract_digest": "sha256:46de74c181b8b25937f0078bb45c7f8dd424464398d0cdd855972a2b89d38cbe",
+    "access": "local"
+  },
+  "queries": [
+    {
+      "name": "system.status",
+      "changed_by": [
+        "run_resumed",
+        "run_created",
+        "run_done",
+        "run_failed",
+        "run_paused",
+        "department_activated",
+        "activation_finished",
+        "tool_started",
+        "tool_called",
+        "tool_skipped",
+        "action_verified",
+        "decision_requested",
+        "decision_answered",
+        "decision_withdrawn",
+        "catalog_revised",
+        "runtime_drain_started",
+        "runtime_drain_finished",
+        "runtime_force_upgrade_requested"
+      ],
+      "replayable": true
+    },
+    {
+      "name": "attempt.live",
+      "changed_by": [],
+      "replayable": false
+    },
+    {
+      "name": "decisions.list",
+      "changed_by": [
+        "decision_requested",
+        "decision_answered",
+        "decision_withdrawn",
+        "project_decision_requested",
+        "project_decision_answered",
+        "project_decision_withdrawn",
+        "instance_upgrade_requested",
+        "instance_upgrade_answered",
+        "instance_upgrade_withdrawn"
+      ],
+      "replayable": true
+    },
+    {
+      "name": "projects.list",
+      "changed_by": [
+        "project_registered",
+        "project_renamed",
+        "project_goal_changed",
+        "project_pinned",
+        "project_archived",
+        "project_restored",
+        "work_item_created",
+        "work_item_start_failed",
+        "deliverable_adopted",
+        "adoption_held",
+        "department_prompt_configured",
+        "material_recorded",
+        "source_directory_configured",
+        "initial_prd_proposed",
+        "project_decision_requested",
+        "project_decision_answered",
+        "project_decision_withdrawn",
+        "onboarding_revision_started",
+        "baseline_adopted",
+        "project_parameter_set",
+        "writeback_completed",
+        "writeback_stopped",
+        "writeback_not_needed",
+        "writeback_held",
+        "writeback_verified",
+        "mcp_servers_configured",
+        "tool_server_probe_finished",
+        "run_created",
+        "run_done",
+        "run_failed",
+        "run_paused",
+        "run_continued",
+        "run_resumed",
+        "tool_started",
+        "action_verified",
+        "decision_requested",
+        "decision_answered",
+        "decision_withdrawn",
+        "department_activated",
+        "activation_finished"
+      ],
+      "replayable": true
+    },
+    {
+      "name": "project.overview",
+      "changed_by": [
+        "project_registered",
+        "project_renamed",
+        "project_goal_changed",
+        "project_pinned",
+        "project_archived",
+        "project_restored",
+        "work_item_created",
+        "work_item_start_failed",
+        "deliverable_adopted",
+        "adoption_held",
+        "department_prompt_configured",
+        "material_recorded",
+        "source_directory_configured",
+        "initial_prd_proposed",
+        "project_decision_requested",
+        "project_decision_answered",
+        "project_decision_withdrawn",
+        "onboarding_revision_started",
+        "baseline_adopted",
+        "project_parameter_set",
+        "writeback_completed",
+        "writeback_stopped",
+        "writeback_not_needed",
+        "writeback_held",
+        "writeback_verified",
+        "mcp_servers_configured",
+        "tool_server_probe_finished",
+        "run_created",
+        "run_done",
+        "run_failed",
+        "run_paused",
+        "run_continued",
+        "run_resumed",
+        "department_activated",
+        "qa_submitted",
+        "delivery_accepted",
+        "spec_accepted",
+        "ask_started",
+        "ask_answered",
+        "decision_requested",
+        "activation_finished",
+        "decision_answered",
+        "decision_withdrawn"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "project.loop",
+      "changed_by": [
+        "work_item_created",
+        "deliverable_adopted",
+        "run_created",
+        "run_done",
+        "run_failed",
+        "run_paused",
+        "run_continued",
+        "run_resumed",
+        "department_activated",
+        "ask_started",
+        "ask_answered",
+        "tool_started",
+        "tool_called",
+        "tool_skipped",
+        "action_verified",
+        "decision_requested",
+        "decision_answered",
+        "decision_withdrawn",
+        "project_decision_requested",
+        "project_decision_answered",
+        "project_decision_withdrawn",
+        "onboarding_revision_started",
+        "baseline_adopted",
+        "spec_accepted",
+        "delivery_accepted",
+        "qa_submitted",
+        "activation_finished"
+      ],
+      "replayable": true
+    },
+    {
+      "name": "project.flow",
+      "changed_by": [
+        "ask_started",
+        "ask_answered",
+        "spec_accepted",
+        "delivery_accepted",
+        "qa_submitted"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "work_item.inputs",
+      "changed_by": [
+        "run_created",
+        "user_input_received",
+        "product_input_assigned",
+        "spec_accepted"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "event.detail",
+      "changed_by": [],
+      "replayable": false
+    },
+    {
+      "name": "event.positions",
+      "changed_by": [],
+      "replayable": false
+    },
+    {
+      "name": "department.workspace",
+      "changed_by": [
+        "department_guidance_received",
+        "department_guidance_applied",
+        "department_guidance_responded",
+        "department_activated",
+        "model_requested",
+        "model_message",
+        "context_assembled",
+        "compaction_recorded",
+        "user_input_received",
+        "department_input",
+        "work_item_created",
+        "deliverable_adopted",
+        "run_done",
+        "run_failed",
+        "run_paused",
+        "run_continued",
+        "run_resumed",
+        "ask_started",
+        "ask_answered",
+        "department_prompt_configured",
+        "catalog_revised",
+        "spec_accepted",
+        "activation_finished",
+        "decision_requested",
+        "decision_answered",
+        "decision_withdrawn",
+        "delivery_accepted",
+        "qa_submitted"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "run.actions",
+      "changed_by": [
+        "tool_started",
+        "tool_called",
+        "tool_skipped",
+        "action_verified",
+        "department_activated",
+        "activation_finished"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "run.steps",
+      "changed_by": [
+        "tool_started",
+        "tool_called",
+        "tool_skipped",
+        "action_verified",
+        "department_activated",
+        "activation_finished",
+        "model_requested",
+        "model_message",
+        "model_reasoning",
+        "model_attempt_failed",
+        "model_attempt_finished"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "run.asks",
+      "changed_by": [
+        "ask_started",
+        "ask_answered"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "work_item.materials",
+      "changed_by": [
+        "run_created",
+        "user_input_received",
+        "contract_accepted",
+        "delivery_accepted",
+        "qa_submitted",
+        "artifact_invalidated",
+        "material_recorded",
+        "initial_prd_proposed",
+        "project_decision_requested",
+        "project_decision_answered",
+        "project_decision_withdrawn",
+        "work_item_created",
+        "run_failed"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "delivery.file",
+      "changed_by": [],
+      "replayable": false
+    },
+    {
+      "name": "project.attempts",
+      "changed_by": [
+        "context_assembled",
+        "model_requested",
+        "model_attempt_finished",
+        "model_attempt_failed",
+        "model_retry_scheduled"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "project.usage",
+      "changed_by": [
+        "context_assembled",
+        "model_attempt_finished",
+        "model_attempt_failed",
+        "model_retry_scheduled"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "run.attempt",
+      "changed_by": [
+        "context_assembled",
+        "model_requested",
+        "model_attempt_finished",
+        "model_attempt_failed"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "project.settings",
+      "changed_by": [
+        "project_registered",
+        "project_renamed",
+        "project_goal_changed",
+        "project_pinned",
+        "project_archived",
+        "project_restored",
+        "work_item_created",
+        "work_item_start_failed",
+        "deliverable_adopted",
+        "adoption_held",
+        "department_prompt_configured",
+        "material_recorded",
+        "source_directory_configured",
+        "initial_prd_proposed",
+        "project_decision_requested",
+        "project_decision_answered",
+        "project_decision_withdrawn",
+        "onboarding_revision_started",
+        "baseline_adopted",
+        "project_parameter_set",
+        "writeback_completed",
+        "writeback_stopped",
+        "writeback_not_needed",
+        "writeback_held",
+        "writeback_verified",
+        "mcp_servers_configured",
+        "tool_server_probe_finished",
+        "catalog_revised",
+        "credential_changed",
+        "parameter_set"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "project.writeback",
+      "changed_by": [
+        "writeback_completed",
+        "writeback_stopped",
+        "writeback_not_needed",
+        "writeback_held",
+        "writeback_verified"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "run.export",
+      "changed_by": [
+        "run_created",
+        "user_input_received",
+        "product_input_assigned",
+        "department_guidance_received",
+        "department_guidance_applied",
+        "department_guidance_responded",
+        "department_activated",
+        "department_input",
+        "tool_call_required",
+        "activation_finished",
+        "context_assembled",
+        "model_request_serialized",
+        "model_reasoning",
+        "model_message",
+        "model_requested",
+        "model_stream_progress",
+        "model_attempt_finished",
+        "model_attempt_failed",
+        "model_retry_scheduled",
+        "compaction_recorded",
+        "tool_called",
+        "tool_started",
+        "tool_skipped",
+        "action_verified",
+        "proposal_submitted",
+        "proposal_rejected",
+        "spec_accepted",
+        "spec_superseded",
+        "contract_accepted",
+        "ask_started",
+        "ask_answered",
+        "independent_judgement_committed",
+        "product_decision_accepted",
+        "artifact_invalidated",
+        "delivery_accepted",
+        "qa_submitted",
+        "qa_tests_saved",
+        "structure_accepted",
+        "baseline_review_accepted",
+        "lesson_candidate_recorded",
+        "run_done",
+        "run_paused",
+        "run_failed",
+        "run_resumed",
+        "run_continued",
+        "decision_requested",
+        "decision_answered",
+        "decision_withdrawn",
+        "dispatch_number_acquired"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "replay.check",
+      "changed_by": [],
+      "replayable": false
+    },
+    {
+      "name": "run.recovery",
+      "changed_by": [
+        "run_resumed",
+        "run_done",
+        "run_paused",
+        "run_failed",
+        "tool_started",
+        "tool_called",
+        "tool_skipped",
+        "action_verified",
+        "decision_requested",
+        "decision_answered",
+        "decision_withdrawn",
+        "department_activated",
+        "activation_finished",
+        "work_item_created",
+        "run_created"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "evidence.external_source",
+      "changed_by": [
+        "tool_called"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "run.trials",
+      "changed_by": [
+        "trial_session_started",
+        "trial_session_ended",
+        "trial_case_opened",
+        "trial_case_concluded",
+        "tool_started",
+        "tool_called",
+        "action_verified",
+        "model_requested",
+        "spec_accepted",
+        "delivery_accepted"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "evidence.screenshot",
+      "changed_by": [
+        "tool_called"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "acceptance.coverage",
+      "changed_by": [
+        "qa_submitted"
+      ],
+      "replayable": true
+    },
+    {
+      "name": "catalog",
+      "changed_by": [
+        "catalog_revised",
+        "catalog_candidates_collected",
+        "catalog_test_finished",
+        "credential_changed"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "catalog.document",
+      "changed_by": [
+        "catalog_revised",
+        "catalog_candidates_collected",
+        "catalog_test_finished",
+        "credential_changed"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "catalog.change_impact",
+      "changed_by": [
+        "catalog_revised",
+        "catalog_candidates_collected",
+        "catalog_test_finished",
+        "credential_changed",
+        "run_created",
+        "run_done",
+        "run_failed",
+        "run_paused",
+        "work_item_created",
+        "work_item_start_failed"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "home.away_report",
+      "changed_by": [
+        "ask_answered",
+        "ask_started",
+        "decision_answered",
+        "decision_requested",
+        "deliverable_adopted",
+        "qa_submitted",
+        "run_done",
+        "run_failed",
+        "run_paused",
+        "work_item_created",
+        "model_attempt_finished",
+        "home_seen",
+        "run_created",
+        "department_activated",
+        "activation_finished",
+        "model_requested",
+        "tool_called",
+        "artifact_accepted",
+        "spec_accepted",
+        "contract_accepted",
+        "delivery_accepted",
+        "structure_accepted",
+        "baseline_review_accepted",
+        "product_decision_accepted",
+        "run_continued",
+        "run_resumed"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "rules.registry",
+      "changed_by": [
+        "parameter_set"
+      ],
+      "replayable": true
+    },
+    {
+      "name": "tools.registry",
+      "changed_by": [
+        "project_registered",
+        "project_renamed",
+        "mcp_servers_configured",
+        "tool_server_probe_finished",
+        "tool_started",
+        "tool_called"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "run.loops",
+      "changed_by": [
+        "run_created",
+        "department_activated",
+        "activation_finished",
+        "model_requested",
+        "tool_called",
+        "ask_answered",
+        "artifact_accepted",
+        "spec_accepted",
+        "contract_accepted",
+        "delivery_accepted",
+        "qa_submitted",
+        "structure_accepted",
+        "baseline_review_accepted",
+        "product_decision_accepted",
+        "run_done",
+        "run_paused",
+        "run_failed",
+        "run_continued",
+        "run_resumed"
+      ],
+      "replayable": true
+    },
+    {
+      "name": "project.organization",
+      "changed_by": [
+        "project_form_set"
+      ],
+      "replayable": false
+    },
+    {
+      "name": "organization.draft",
+      "changed_by": [],
+      "replayable": false
+    }
+  ],
+  "commands": [
+    {
+      "name": "project.create",
+      "reasons": [
+        "source_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "project.onboard",
+      "reasons": [
+        "source_invalid",
+        "busy",
+        "provider_unavailable",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "onboarding.restart",
+      "reasons": [
+        "not_found",
+        "project_archived",
+        "not_allowed",
+        "source_invalid",
+        "busy",
+        "provider_unavailable",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "project.rename",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "project_archived",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "project.set_goal",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "project_archived",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "project.pin",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "project_archived",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "project.archive",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "work_item_in_progress",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "project.restore",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "material.record",
+      "reasons": [
+        "not_found",
+        "project_archived",
+        "work_item_in_progress",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "work_item.create",
+      "reasons": [
+        "not_found",
+        "project_archived",
+        "busy",
+        "provider_unavailable",
+        "work_item_in_progress",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "work_item.append_input",
+      "reasons": [
+        "not_found",
+        "run_terminal",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "work_item.cancel",
+      "reasons": [
+        "not_found",
+        "run_terminal",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "guidance.send",
+      "reasons": [
+        "not_found",
+        "run_terminal",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "department_settings.save",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "project_archived",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "source_directory.save",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "project_archived",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "writeback.execute",
+      "reasons": [
+        "not_found",
+        "project_archived",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "mcp_servers.save",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "project_archived",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "tool_server.probe",
+      "reasons": [
+        "not_found",
+        "project_archived",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "decision.answer",
+      "reasons": [
+        "not_found",
+        "decision_closed",
+        "stale_base",
+        "option_invalid",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.connection.save",
+      "reasons": [
+        "stale_base",
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.connect",
+      "reasons": [
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.connection.delete",
+      "reasons": [
+        "stale_base",
+        "not_found",
+        "in_use",
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.model.remove",
+      "reasons": [
+        "stale_base",
+        "not_found",
+        "in_use",
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.model.select",
+      "reasons": [
+        "not_found",
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.document.save",
+      "reasons": [
+        "stale_base",
+        "catalog_invalid",
+        "in_use",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.reload",
+      "reasons": [
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.candidates.collect",
+      "reasons": [
+        "not_found",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.connection.test",
+      "reasons": [
+        "not_found",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.model.test",
+      "reasons": [
+        "not_found",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "catalog.department_defaults.save",
+      "reasons": [
+        "stale_base",
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "credential.set",
+      "reasons": [
+        "stale_base",
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "credential.clear_override",
+      "reasons": [
+        "stale_base",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "credential.remove_persisted",
+      "reasons": [
+        "stale_base",
+        "catalog_invalid",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "runtime.start_drain",
+      "reasons": [
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "runtime.force_upgrade",
+      "reasons": [
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "home.mark_seen",
+      "reasons": [
+        "not_allowed",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "parameter.set",
+      "reasons": [
+        "not_found",
+        "not_wired",
+        "out_of_bounds",
+        "stale_base",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "parameter.withdraw",
+      "reasons": [
+        "not_found",
+        "not_wired",
+        "out_of_bounds",
+        "stale_base",
+        "command_id_reused"
+      ]
+    },
+    {
+      "name": "organization.adopt",
+      "reasons": [
+        "not_found",
+        "stale_base",
+        "project_archived",
+        "not_allowed",
+        "command_id_reused"
+      ]
+    }
+  ],
+  "decisions": [
+    "model_unavailable",
+    "definitions_changed",
+    "no_tool_call",
+    "workspace_unrepresentable",
+    "initial_prd",
+    "instance_upgrade",
+    "qa_cannot_verify",
+    "kernel_modification"
+  ],
+  "event_types": [
+    "run_created",
+    "user_input_received",
+    "product_input_assigned",
+    "department_guidance_received",
+    "department_guidance_applied",
+    "department_guidance_responded",
+    "department_activated",
+    "dispatch_number_acquired",
+    "department_input",
+    "tool_call_required",
+    "activation_finished",
+    "context_assembled",
+    "model_request_serialized",
+    "model_message",
+    "model_reasoning",
+    "model_requested",
+    "model_stream_progress",
+    "model_attempt_finished",
+    "model_attempt_failed",
+    "model_retry_scheduled",
+    "compaction_recorded",
+    "tool_called",
+    "tool_started",
+    "tool_skipped",
+    "action_verified",
+    "proposal_submitted",
+    "proposal_rejected",
+    "spec_accepted",
+    "spec_superseded",
+    "contract_accepted",
+    "ask_started",
+    "ask_answered",
+    "independent_judgement_committed",
+    "product_decision_accepted",
+    "artifact_invalidated",
+    "delivery_accepted",
+    "qa_submitted",
+    "qa_tests_saved",
+    "structure_accepted",
+    "baseline_review_accepted",
+    "artifact_accepted",
+    "lesson_candidate_recorded",
+    "mcp_server_started",
+    "mcp_server_closed",
+    "mcp_server_failed",
+    "trial_session_started",
+    "trial_session_ended",
+    "trial_case_opened",
+    "trial_case_concluded",
+    "run_done",
+    "run_paused",
+    "run_failed",
+    "run_resumed",
+    "run_continued",
+    "decision_requested",
+    "decision_answered",
+    "decision_withdrawn",
+    "project_registered",
+    "project_renamed",
+    "project_goal_changed",
+    "project_pinned",
+    "project_archived",
+    "project_restored",
+    "work_item_created",
+    "work_item_start_failed",
+    "deliverable_adopted",
+    "adoption_held",
+    "department_prompt_configured",
+    "material_recorded",
+    "source_directory_configured",
+    "initial_prd_proposed",
+    "project_decision_requested",
+    "project_decision_answered",
+    "project_decision_withdrawn",
+    "onboarding_revision_started",
+    "baseline_adopted",
+    "project_parameter_set",
+    "project_form_set",
+    "writeback_completed",
+    "writeback_stopped",
+    "writeback_not_needed",
+    "writeback_held",
+    "writeback_verified",
+    "mcp_servers_configured",
+    "tool_server_probe_finished",
+    "catalog_revised",
+    "catalog_candidates_collected",
+    "catalog_test_finished",
+    "credential_changed",
+    "runtime_drain_started",
+    "runtime_drain_finished",
+    "runtime_force_upgrade_requested",
+    "home_seen",
+    "parameter_set",
+    "instance_upgrade_requested",
+    "instance_upgrade_answered",
+    "instance_upgrade_withdrawn"
+  ],
+  "overlays": [
+    {
+      "name": "flow",
+      "queries": [
+        "project.flow"
+      ]
+    },
+    {
+      "name": "waiting",
+      "queries": [
+        "project.loop",
+        "decisions.list"
+      ]
+    },
+    {
+      "name": "recovery",
+      "queries": [
+        "run.recovery"
+      ]
+    },
+    {
+      "name": "sources",
+      "queries": [
+        "project.loop"
+      ]
+    },
+    {
+      "name": "loops",
+      "queries": [
+        "run.loops"
+      ]
+    },
+    {
+      "name": "coverage",
+      "queries": [
+        "acceptance.coverage"
+      ]
+    }
+  ],
+  "stream": {
+    "deltas": true,
+    "scopes": [
+      "project",
+      "work_item",
+      "run",
+      "department",
+      "role",
+      "type"
+    ]
+  }
+}
