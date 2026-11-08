@@ -207,6 +207,15 @@
   "detected": true
  },
  {
+  "id": "x-product-ask-dropped",
+  "batch": 3,
+  "name": "定义里产品问不了工程",
+  "how": "「产品 · 工程」的定义去掉产品的询问工具（4.9 默认其余职能都能问）",
+  "expected": "确实缺：可以询问",
+  "got": "确实缺:产品（「产品 · 工程」） 可以询问 工程（「产品 · 工程」）",
+  "detected": true
+ },
+ {
   "id": "x-source-dropped",
   "batch": 3,
   "name": "定义里建档没人接",

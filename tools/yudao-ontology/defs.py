@@ -85,10 +85,16 @@ def convert(commit: str) -> tuple[rdflib.Graph, dict]:
         tl = tools.get("tools", tools)
         tl = tl.items() if isinstance(tl, dict) else [(t["id"], t) for t in tl]
         proposal = {k: v.get("proposal") for k, v in tl if v.get("kind") == "host" and v.get("proposal")}
+        # 职能在一种事项里的工具：种类里写了以种类为准，没写时是角色自己的清单（Definitions.tools_for）
+        roles = show(commit, folder + "roles.json") or {}
         granted: dict[str, set] = {}
         for kind in work["kinds"].values():
-            for dep, w in kind.get("departments", {}).items():
-                granted.setdefault(dep, set()).update(w.get("tools", []))
+            listed = kind.get("departments", {})
+            for d in org["departments"]:
+                dep = d["id"]
+                w = listed.get(dep)
+                names = w.get("tools", []) if w is not None else roles.get(dep, {}).get("tools", [])
+                granted.setdefault(dep, set()).update(names)
         for dep, names in granted.items():
             A = YD[actors[dep]]
             for tool in sorted(names):
@@ -104,7 +110,7 @@ def convert(commit: str) -> tuple[rdflib.Graph, dict]:
         ids = [d["id"] for d in org["departments"]]
         for a in ids:
             for b in ids:
-                if a != b and any("ask" in t for t in granted.get(a, ())):
+                if a != b and "ask" in granted.get(a, ()):
                     g.add((YD[actors[a]], YD.mayAsk, YD[actors[b]]))
                     count["mayAsk"] += 1
         for d in org["departments"]:
