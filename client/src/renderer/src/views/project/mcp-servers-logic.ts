@@ -19,7 +19,7 @@ import { departmentName } from "./labels.ts";
 export const MCP_TRANSPORTS = ["stdio", "http"] as const;
 export type McpTransport = (typeof MCP_TRANSPORTS)[number];
 
-// 默认的三个部门（docs/design/project-organization.md「项目上配的三层」「可以使用的部门」）不在这里写：可以使用的部门取自项目现在的组织
+// 默认的三个部门（docs/design/project-organization.md「项目上配的三层」「可以使用的职能」）不在这里写：可以使用的职能取自项目现在的组织
 // （工单 #1457），组织还没有数据时由调用处按设置里已有的部门兜底
 
 // 默认的时限与输出上限（后端 MCP_OUTPUT_LIMIT_DEFAULTS 是同一组值）：

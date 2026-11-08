@@ -1613,7 +1613,7 @@ class ProjectService:
                                       base_version: int, *, command: Command | None = None,
                                       reminders: list[str] | None = None) -> dict[str, Any]:
         # 项目部门设置：模型访问定义引用、请求档位与部门 Prompt 三项，都可以不写入；三项一起保存、一个版本。
-        # 并发修改时按版本拒绝后提交的修改（docs/design/model-management.md「项目部门设置与项目角色设置」）。选择「跟随部门默认」清除本项目的模型选择，
+        # 并发修改时按版本拒绝后提交的修改（docs/design/model-management.md「项目职能设置与项目角色设置」）。选择「跟随部门默认」清除本项目的模型选择，
         # 档位选择「跟随」清除请求档位；部门 Prompt 为空表示没有写入，使用内置默认 Prompt。
         # reminders 是这次保存算出的建议能力提醒随事件保存
         # 部门清单按项目现在的形态取（工单 #1509）：改名后的部门照常保存它的设置

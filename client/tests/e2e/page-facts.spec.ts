@@ -122,7 +122,7 @@ type EventAtPosition = {
   at?: string | null;
 };
 
-/** 部门状态词（页面上的说法）：三部门的循环结构 docs/design/department-loop.md「部门的状态」。 */
+/** 部门状态词（页面上的说法）：三部门的循环结构 docs/design/department-loop.md「职能的状态」。 */
 const DEPARTMENT_STATES: Record<string, string> = {
   waiting_user: "等用户", working: "一轮工作中", asking: "询问中", verifying: "核验中", waiting: "等待工作",
 };
