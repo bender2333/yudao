@@ -8,7 +8,7 @@ import { askChain, askIndent, askLine } from "../../src/renderer/src/views/proje
 import type { AskView } from "../../src/renderer/src/api/generated/types.gen.ts";
 
 // 时间由共用的 formatTime 写：这里给空的时间，页面上写「未知时间」，
-// 这条用例核对的是询问这一行除了时间以外的文字（时间列由端到端测试看真实数据）
+// 这条用例核对的是询问这一行除了时间以外的文字（时间列由发布以后的走查与试用看）
 function ask(over: Partial<AskView> = {}): AskView {
   const base: AskView = {
     id: "ses_ask_1",
