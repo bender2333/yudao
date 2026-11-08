@@ -157,6 +157,8 @@ def cleanup_inspection_workspace(run_root: str | Path, session_id: str) -> None:
 
 # 交付这件提议的种类：交出交付的部门与它的封存路径按它认
 DELIVERY_KIND = "delivery_spec"
+# 组织定义里「关注交付」这一项：关注交付的部门的检查工作区从封存交付建立（三部门路径，不随 #1579 变）
+DELIVERY_WATCHED = "delivery"
 
 
 def handing_over_departments(definitions: Any = None) -> frozenset[str]:
@@ -169,12 +171,21 @@ def handing_over_departments(definitions: Any = None) -> frozenset[str]:
     )
 
 
+def delivery_inspecting_departments(definitions: Any = None) -> frozenset[str]:
+    # 检查工作区从封存的交付建立的部门：组织定义里关注交付的那一个，或核验声明里核验交付的那一个
+    definitions = DEFINITIONS if definitions is None else definitions
+    return frozenset(department for department in definitions.departments
+                     if DELIVERY_WATCHED in definitions.watched_outputs(department)) | frozenset(
+        verifier for verifier, _verified, kind in definitions.rejection_edges() if kind == DELIVERY_KIND)
+
+
 def verified_inspecting_departments(definitions: Any = None) -> frozenset[str]:
-    # 检查工作区从封存的被核验成果建立的部门：定义里声明了核验别人成果的角色（工单 #1579）。
+    # 检查工作区从封存成果建立的部门：从封存交付建立的那些，加上核验声明里核验别人成果的角色（工单 #1579）。
     # 哪一种成果由核验声明给出，不只认交付（docs/design/forms-and-verifier-role.md「核验角色」第 2 条：
     # 检查在独立副本上由主机跑，回执绑定被核验的那一版）
     definitions = DEFINITIONS if definitions is None else definitions
-    return frozenset(verifier for verifier, _verified, _kind in definitions.rejection_edges())
+    return delivery_inspecting_departments(definitions) | frozenset(
+        verifier for verifier, _verified, _kind in definitions.rejection_edges())
 
 
 def sealed_outcome_departments(definitions: Any = None) -> frozenset[str]:
@@ -472,11 +483,9 @@ class Workspaces:
                    and tool_action(str((event.payload or {}).get("name") or "")) is not None
                    for event in events)
 
-    def verified_outcome_kinds(self, department: str, projection: Any) -> tuple[str, ...]:
-        # 这个核验角色核验的成果种类：按定义里的核验声明取，去重、按声明顺序（工单 #1579）
-        definitions = self.definitions_of(projection.run_id)
-        return tuple(dict.fromkeys(kind for verifier, _verified, kind in definitions.rejection_edges()
-                                   if verifier == department))
+    def inspects_delivery(self, department: str, projection: Any) -> bool:
+        # 这个部门的检查工作区从封存交付建立：关注交付或核验交付（三部门路径，工单 #1509 的口径不变）
+        return department in delivery_inspecting_departments(self.definitions_of(projection.run_id))
 
     def latest_verified_version(self, department: str, projection: Any) -> dict[str, Any] | None:
         # 这个核验角色当前面对的被核验成果：交付以外的那几种取最近一次被接纳的那一版。
@@ -502,7 +511,7 @@ class Workspaces:
         # （还没有可核验的那一版时为空）。谁核验谁按这个事项冻结的定义推（工单 #1509、#1579）
         if department not in self.policies(projection.run_id)[1]:
             return None
-        if DELIVERY_KIND in self.verified_outcome_kinds(department, projection):
+        if self.inspects_delivery(department, projection):
             delivery = projection.delivery_spec
             if delivery is not None:
                 return delivery.content_hash
@@ -517,7 +526,7 @@ class Workspaces:
         # 要求核验在独立副本上检查，退回会让核验角色在并非那一版的树上检查；这个失败由激活开始的
         # host_commit_error 正式报告。谁核验哪几种成果按这个事项冻结的定义推（工单 #1509、#1579）
         if department in self.policies(projection.run_id)[1]:
-            if DELIVERY_KIND in self.verified_outcome_kinds(department, projection):
+            if self.inspects_delivery(department, projection):
                 delivery = projection.delivery_spec
                 if delivery is not None and delivery.tree_ref is not None:
                     tree_ref = delivery.tree_ref
