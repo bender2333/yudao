@@ -30,7 +30,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from harness import direct
-from harness.adapters.fake import FakeAdapter, FakeTurn
+from harness.adapters.fake import FakeAdapter, FakeTurn, prompt_part
+from harness.context import ContextAssembler
+from harness.environment import inspection_root
 from harness.definitions import (DEFAULT_FORM, DEFINITIONS, DEFINITIONS_DIR, DefinitionError,
                                  VerifiedOutcomes, VerificationDeclaration, VerifierRole, load_definitions)
 from harness.direct import (RELEASE_VERDICT, REVIEW_KIND, REWORK_VERDICT, SINGLE_ROLE_DIRECT,
@@ -464,6 +466,77 @@ def test_the_single_role_direct_form_still_ends_open_loop_without_a_verifier():
     assert single.is_open_loop(COMPLETION_KIND) is True
     assert direct.awaiting_verdict(direct.NO_OUTCOMES, single) is False
     assert direct.verified_outcome(ENGINEERING, single) is False
+
+
+# ---------------------------------------------------------------------------
+# 工单 #1579：核验角色的检查副本从交完成封存的那一版建立；先看事实，下了结论才看解释
+# ---------------------------------------------------------------------------
+
+
+def _observing_review(system_box: dict, seen: list, verdict: str, rationale: str):
+    # 核验角色的一轮：先记下它此刻的检查副本与材料，再让工程改运行工作区（交完成以后又改了），
+    # 再记一次检查副本的来源，最后交结论
+    def factory(call):
+        system, run_id = system_box["system"], system_box["run_id"]
+        copy = inspection_root(system.workspace_root / run_id, call.session_id)
+        before = {path: (copy / path).read_text(encoding="utf-8") for path in WRITTEN if (copy / path).exists()}
+        system.workspace(run_id).write_file("src/echo.py", "print('after completion')\n")
+        rebuilt = system.orchestrator._workspaces.source_tree(QUALITY, system.project(run_id))
+        seen.append({"copy": before, "rebuilt": {item.path: item.data.decode() for item in rebuilt.files},
+                     "outcome": json.loads(prompt_part(call, "verified_outcome") or "null")})
+        return review_turn(verdict, rationale)(call)
+
+    return factory
+
+
+def test_the_verifier_inspects_the_sealed_completion_and_sees_facts_before_explanation(tmp_path):
+    seen: list = []
+    box: dict = {}
+    system, _work_item_id, run_id = _started(tmp_path / "sealed", {
+        ENGINEERING: [FakeTurn(writes=WRITTEN, checks={"smoke": 0}),
+                      completion_turn("补了用法一节", uncertain=["退出码没有写全"])],
+        QUALITY: [_observing_review(box, seen, RELEASE_VERDICT, "可以放行")],
+    })
+    box.update(system=system, run_id=run_id)
+
+    assert system.run_until_stop(run_id).stop_reason == "released"
+    completion = _accepted(system, run_id, COMPLETION_KIND)[0]
+    (observed,) = seen
+    # 检查副本是交完成那一版；交完成之后工程改了运行工作区，副本的来源仍是那一版
+    assert observed["copy"] == WRITTEN and observed["rebuilt"] == WRITTEN
+    outcome = observed["outcome"]
+    # 下结论之前：事实（封存的树、作者在这棵树上的主机检查回执）在，说明与拿不准的地方不在
+    assert (outcome["content_hash"], outcome["tree_digest"]) == (
+        completion["content_hash"], completion["artifact_tree_digest"])
+    assert [(item["name"], item["exit_code"]) for item in outcome["checks"]] == [("smoke", 0)]
+    assert "explanation" not in outcome and "补了用法一节" not in json.dumps(outcome, ensure_ascii=False)
+
+
+def test_after_a_rework_the_new_version_replaces_the_copy_and_the_old_explanation_opens(tmp_path):
+    # 回执与副本绑定被核验的那一版：打回以后工程交新的一版，核验角色的副本换成新的一版，
+    # 材料里的那一版也换成新的（还没有结论，所以解释又藏起来）
+    seen: list = []
+    box: dict = {}
+    second = {"src/echo.py": "import sys\nprint(sys.argv[1] if len(sys.argv) > 1 else '')\n"}
+    system, _work_item_id, run_id = _started(tmp_path / "rework_copy", {
+        ENGINEERING: [FakeTurn(writes=WRITTEN, checks={}), completion_turn("第一版"),
+                      FakeTurn(writes=second, checks={}), completion_turn("第二版")],
+        QUALITY: [_observing_review(box, seen, REWORK_VERDICT, "缺省参数没写"),
+                  _observing_review(box, seen, RELEASE_VERDICT, "补齐了")],
+    })
+    box.update(system=system, run_id=run_id)
+
+    assert system.run_until_stop(run_id).stop_reason == "released"
+    first, latest = _accepted(system, run_id, COMPLETION_KIND)
+    assert [item["copy"] for item in seen] == [WRITTEN, second]
+    assert [item["outcome"]["content_hash"] for item in seen] == [first["content_hash"], latest["content_hash"]]
+    assert all("explanation" not in item["outcome"] for item in seen)
+    # 对第一版下了结论以后再装配：第一版不再是当前的那一版，材料里只有最近一版；
+    # 对最近一版下了结论以后，它的解释进入材料
+    assembler = ContextAssembler(system.artifacts, tightening=direct.DIRECT_TIGHTENING)
+    (outcome,) = assembler._verified_outcomes(run_id, QUALITY, _events(system, run_id), WITH_VERIFIER)
+    assert outcome["content_hash"] == latest["content_hash"]
+    assert outcome["explanation"]["summary"] == "第二版"
 
 
 # ---------------------------------------------------------------------------

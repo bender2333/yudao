@@ -55,7 +55,7 @@ from .path_rules import CHECK_MATERIALS_DIR, QA_TESTS_DIR, TreeError  # QA_TESTS
 from .process_tree import STOP_LIMIT_SEC, ProcessTree, spawn_options
 from .redact import redact_text
 from .tools import BROWSER_TOOL_NAMES, tool_action
-from .tree_archive import artifact_run, load_tree
+from .tree_archive import artifact_run, load_tree, store_tree
 from .trial_sessions import TrialSessionTable, TrialStartFailed
 from .workspace import CHECKS_DIR, Workspace, WorkspaceSnapshot
 # 一次工具结果的输出上限，取规则登记中的现值
@@ -149,14 +149,15 @@ def cleanup_inspection_workspace(run_root: str | Path, session_id: str) -> None:
 # 这一轮进行中检查工作区要不要换成新的交付。来源是哪份快照、什么时候建立或重建、检查回执绑定哪几样，
 # 都在执行实现这里。
 #
-# 部门按两件定义事实分，代码里不写部门的名称（薄驱动不含部门与成果的名称，docs/design/skeleton-and-application.md「薄驱动」）：
+# 部门按定义里的事实分，代码里不写部门的名称（薄驱动不含部门与成果的名称，docs/design/skeleton-and-application.md「薄驱动」）：
 #   · 交出交付的部门（它的工具清单里有提议成「交付」的那件工具）的主线会话用运行工作区；
-#   · 关注交付的部门（组织定义的 watched 里有「交付」）的检查工作区从最新的封存交付建立，
-#     有新的交付封存时在它的下一步重建；其余部门的检查工作区从当前运行工作区建立。
+#   · 核验角色（组织定义的核验声明里核验别人成果的角色）的检查工作区从被核验那一版封存的树建立，
+#     那一版换了以后在它的下一步重建；其余部门的检查工作区从当前运行工作区建立。
 # ---------------------------------------------------------------------------
 
-# 成果驱动的两件定义事实：交付这件提议的种类与组织定义里「关注交付」这一项
+# 交付这件提议的种类：交出交付的部门与它的封存路径按它认
 DELIVERY_KIND = "delivery_spec"
+# 组织定义里「关注交付」这一项：关注交付的部门的检查工作区从封存交付建立（三部门路径，不随 #1579 变）
 DELIVERY_WATCHED = "delivery"
 
 
@@ -171,10 +172,28 @@ def handing_over_departments(definitions: Any = None) -> frozenset[str]:
 
 
 def delivery_inspecting_departments(definitions: Any = None) -> frozenset[str]:
-    # 检查工作区从封存的交付建立的部门：组织定义里关注交付的那一个
+    # 检查工作区从封存的交付建立的部门：组织定义里关注交付的那一个，或核验声明里核验交付的那一个
     definitions = DEFINITIONS if definitions is None else definitions
     return frozenset(department for department in definitions.departments
-                     if DELIVERY_WATCHED in definitions.watched_outputs(department))
+                     if DELIVERY_WATCHED in definitions.watched_outputs(department)) | frozenset(
+        verifier for verifier, _verified, kind in definitions.rejection_edges() if kind == DELIVERY_KIND)
+
+
+def verified_inspecting_departments(definitions: Any = None) -> frozenset[str]:
+    # 检查工作区从封存成果建立的部门：从封存交付建立的那些，加上核验声明里核验别人成果的角色（工单 #1579）。
+    # 哪一种成果由核验声明给出，不只认交付（docs/design/forms-and-verifier-role.md「核验角色」第 2 条：
+    # 检查在独立副本上由主机跑，回执绑定被核验的那一版）
+    definitions = DEFINITIONS if definitions is None else definitions
+    return delivery_inspecting_departments(definitions) | frozenset(
+        verifier for verifier, _verified, _kind in definitions.rejection_edges())
+
+
+def sealed_outcome_departments(definitions: Any = None) -> frozenset[str]:
+    # 交出的成果由核验角色核验的角色：它提交时主机封存这一版的树，供核验角色的检查副本使用（工单 #1579）。
+    # 交付这一种成果的封存在提交交付时已经做过（submissions.py），这里管其余成果种类：直做的交完成等
+    definitions = DEFINITIONS if definitions is None else definitions
+    return frozenset(verified for _verifier, verified, kind in definitions.rejection_edges()
+                     if kind != DELIVERY_KIND)
 
 
 def check_material_paths(definitions: Any = None) -> dict[str, tuple[str, ...]]:
@@ -229,13 +248,15 @@ class Workspaces:
         self.sessions = sessions
         # 检查的时限按这个 run 创建时冻结的取值（迭代底座 B3，工单 #351）
         self._check_timeout = check_timeout or (lambda run_id: DEFINITIONS.rule_value("check_timeout_sec"))
-        self.handing_over = handing_over_departments(definitions)
-        self.delivery_inspecting = delivery_inspecting_departments(definitions)
+        # 构造时给的那份定义（没有按 run 取定义时用它）：工作区政策由它推
+        self._definitions = DEFINITIONS if definitions is None else definitions
         # 写入范围是检查材料的角色与它们能写的目录（工单 #1390）：由定义声明，检查副本按它带上这些目录
         self.check_materials = check_material_paths(definitions)
         # 按事项冻结的定义算出来的政策（工单 #1509）：键是定义版本，同一份定义只算一次
         self._definitions_for = definitions_for
         self._policies: dict[str, tuple[frozenset[str], frozenset[str], dict[str, tuple[str, ...]]]] = {}
+        # 交出的成果由核验角色核验的角色：键是定义版本，同一份定义只算一次（工单 #1579）
+        self._sealing: dict[str, frozenset[str]] = {}
         # 每个会话的检查工作区是从哪一份交付建立的（工单 #558）：新的交付封存以后据此判断要不要重建
         self._source: dict[tuple[str, str], str | None] = {}
         # 这个进程里全部 run 的试用会话表（工单 #1182）：会话跨激活保留，一个部门同一时刻最多一个；
@@ -265,22 +286,35 @@ class Workspaces:
             self.sessions.trials = table
 
     # ---- 运行工作区 ----
+    def definitions_of(self, run_id: str) -> Any:
+        # 这个事项冻结的那份定义（工单 #1509）：没有按 run 取定义时用构造时那一份
+        return self._definitions if self._definitions_for is None else self._definitions_for(run_id)
+
     def policies(self, run_id: str) -> tuple[frozenset[str], frozenset[str], dict[str, tuple[str, ...]]]:
-        """这个 run 的三样工作区政策：交出交付的部门、从封存交付建立检查副本的部门、检查材料写在哪里。
+        """这个 run 的三样工作区政策：交出交付的部门、检查副本从封存成果建立的核验角色、检查材料写在哪里。
 
         按这个事项冻结的那份定义推（工单 #1509）：换一份把部门改了名的定义，改名后的交交付的部门照常
-        在自己的运行工作区工作、改名后的核验角色照常从封存交付建立检查副本。没有按 run 取定义时用构造时那一份。
+        在自己的运行工作区工作、改名后的核验角色照常从封存的被核验成果建立检查副本。核验角色按核验声明取，
+        交付以外的成果种类同样（工单 #1579）。
         """
-        if self._definitions_for is None:
-            return self.handing_over, self.delivery_inspecting, self.check_materials
-        definitions = self._definitions_for(run_id)
+        definitions = self.definitions_of(run_id)
         key = getattr(definitions, "version", "")
         cached = self._policies.get(key)
         if cached is None:
             cached = (handing_over_departments(definitions),
-                      delivery_inspecting_departments(definitions),
+                      verified_inspecting_departments(definitions),
                       check_material_paths(definitions))
             self._policies[key] = cached
+        return cached
+
+    def sealing_departments(self, run_id: str) -> frozenset[str]:
+        # 交出的成果由核验角色核验的角色：它们提交时封存这一版的树（工单 #1579）
+        definitions = self.definitions_of(run_id)
+        key = getattr(definitions, "version", "")
+        cached = self._sealing.get(key)
+        if cached is None:
+            cached = sealed_outcome_departments(definitions)
+            self._sealing[key] = cached
         return cached
 
     def parameters_for(self, run_id: str) -> dict[str, Any]:
@@ -316,10 +350,19 @@ class Workspaces:
         projection = self._view(run_id)
         session_id, jobs = self.session_of(run_id, department)
         if self.hands_over(department, session_id, projection):
-            return self.run_environment(run_id, session_id=session_id, jobs=jobs)
-        if refresh:
-            return self.session_inspection(run_id, department, session_id=session_id, jobs=jobs)
-        return self.inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+            environment = self.run_environment(run_id, session_id=session_id, jobs=jobs)
+        elif refresh:
+            environment = self.session_inspection(run_id, department, session_id=session_id, jobs=jobs)
+        else:
+            environment = self.inspection_environment(run_id, department, session_id=session_id, jobs=jobs)
+        return self._attach_seal(environment, run_id, department)
+
+    def _attach_seal(self, environment: LocalEnvironment, run_id: str, department: str) -> LocalEnvironment:
+        # 交出的成果由核验角色核验的角色：提交时封存这一版的树（工单 #1579），
+        # 核验角色的检查副本按它建立。谁由谁核验按这个事项冻结的定义推
+        if department in self.sealing_departments(run_id):
+            environment.bind_seal(lambda snapshot: self.seal_tree(run_id, snapshot))
+        return environment
 
     def session_of(self, run_id: str, department: str) -> tuple[str | None, Any]:
         # 这个部门在这个 run 里的会话与它自己的后台命令表；还没有会话时按事实里的会话编号建立
@@ -440,26 +483,61 @@ class Workspaces:
                    and tool_action(str((event.payload or {}).get("name") or "")) is not None
                    for event in events)
 
+    def inspects_delivery(self, department: str, projection: Any) -> bool:
+        # 这个部门的检查工作区从封存交付建立：关注交付或核验交付（三部门路径，工单 #1509 的口径不变）
+        return department in delivery_inspecting_departments(self.definitions_of(projection.run_id))
+
+    def latest_verified_version(self, department: str, projection: Any) -> dict[str, Any] | None:
+        # 这个核验角色当前面对的被核验成果：交付以外的那几种取最近一次被接纳的那一版。
+        # 交付由运行状态投影给出；其余种类在这里从事件折出。哪一种成果、由谁交出按定义里的核验声明取，
+        # 不按成果种类名写判断（工单 #1579）
+        definitions = self.definitions_of(projection.run_id)
+        pairs = tuple((verified, kind) for verifier, verified, kind in definitions.rejection_edges()
+                      if verifier == department and kind != DELIVERY_KIND)
+        if not pairs or self._writes is None or self._artifacts is None:
+            return None
+        latest = None
+        for event in self._writes.read(run_stream(projection.run_id)).events():
+            payload = event.payload or {}
+            if event.type != EventType.ARTIFACT_ACCEPTED:
+                continue
+            if (payload.get("artifact_issuer"), payload.get("artifact_kind")) in pairs:
+                latest = payload
+        return latest
+
     def source_hash(self, department: str, projection: Any) -> str | None:
-        # 从封存交付建立的部门（质检）的检查工作区：这份交付的摘要就是工作区的来源；
-        # 其他会话的检查工作区来自运行工作区，不随交付变化（没有交付时为空）。
-        # 谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        # 核验角色的检查工作区：被核验那一版的摘要就是工作区的来源（交付取当前交付的摘要，
+        # 其余成果种类取最近一次被接纳的那一版）；其他会话的检查工作区来自运行工作区，不随成果变化
+        # （还没有可核验的那一版时为空）。谁核验谁按这个事项冻结的定义推（工单 #1509、#1579）
         if department not in self.policies(projection.run_id)[1]:
             return None
-        delivery = projection.delivery_spec
-        return None if delivery is None else delivery.content_hash
+        if self.inspects_delivery(department, projection):
+            delivery = projection.delivery_spec
+            if delivery is not None:
+                return delivery.content_hash
+        version = self.latest_verified_version(department, projection)
+        return None if version is None else version.get("content_hash")
 
     def source_tree(self, department: str, projection: Any) -> CapturedTree:
-        # 检查工作区的建立源：从封存交付建立的部门取它当前面对的快照——最新的封存交付，
-        # 还没有交付时是事项开始时的项目起点（采纳成果或项目的起始文件夹快照，都没有时为空树），
-        # 不读运行工作区；其他会话从当前运行工作区快照建立。
-        # 封存交付读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 docs/design/local-tools.md「工作区」
-        # 要求检查工作区从封存的交付建立，退回会让质检在并非交付的树上检查；这个失败由激活开始的
-        # host_commit_error 正式报告。谁从封存交付建立检查副本按这个事项冻结的定义推（工单 #1509）
+        # 检查工作区的建立源：核验角色取当前面对的被核验那一版封存的树——交付取最新封存的交付，
+        # 其余成果种类取最近一次被接纳的那一版（直做的交完成），两者都还没有时是事项开始时的项目起点
+        # （采纳成果或项目的起始文件夹快照，都没有时为空树），不读运行工作区；其他会话从当前运行工作区快照建立。
+        # 封存的树读不出来（归档缺失或损坏）时不退回运行工作区：ADR-0038 与 docs/design/local-tools.md「工作区」
+        # 要求核验在独立副本上检查，退回会让核验角色在并非那一版的树上检查；这个失败由激活开始的
+        # host_commit_error 正式报告。谁核验哪几种成果按这个事项冻结的定义推（工单 #1509、#1579）
         if department in self.policies(projection.run_id)[1]:
-            if projection.delivery_spec is not None and projection.delivery_spec.tree_ref is not None:
-                tree_ref = projection.delivery_spec.tree_ref
-                return load_tree(self._artifacts, artifact_run(tree_ref.path), tree_ref)
+            if self.inspects_delivery(department, projection):
+                delivery = projection.delivery_spec
+                if delivery is not None and delivery.tree_ref is not None:
+                    tree_ref = delivery.tree_ref
+                    return load_tree(self._artifacts, artifact_run(tree_ref.path), tree_ref)
+            version = self.latest_verified_version(department, projection)
+            if version is not None:
+                digest = version.get("artifact_tree_digest")
+                if not isinstance(digest, str) or not digest:
+                    raise TreeError(f"The verified outcome {version.get('artifact_kind')!r} records no tree; "
+                                    "the inspection copy cannot be built from it")
+                return self.sealed_tree(projection.run_id, digest)
             for record in (projection.baseline, projection.snapshot):
                 # 事项开始时的项目起点：run_created 写下的采纳成果或起始文件夹快照，两者都没有时为空树
                 if not record:
@@ -468,6 +546,31 @@ class Workspaces:
                 return load_tree(self._artifacts, artifact_run(start_ref.path), start_ref)
             return CapturedTree(directories=(), files=())
         return workspace_tree(self.root / projection.run_id)
+
+    # ---- 被核验那一版树的封存（工单 #1579） ----
+    def seal_tree(self, run_id: str, snapshot: WorkspaceSnapshot) -> None:
+        # 由核验角色核验的角色提交时封存这一版的树：核验角色的检查副本从它建立。
+        # 同一棵树只封存一次；引用记在运行工作区的 .checks 下（主机私有，不进公开树），
+        # 恢复以后核验角色照样找得到它
+        if self._artifacts is None:
+            return
+        path = self._sealed_tree_path(run_id, snapshot.digest)
+        if path.is_file():
+            return
+        ref = store_tree(self._artifacts, run_id, snapshot.tree)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+        temporary.write_text(json_dumps(asdict(ref)), encoding="utf-8")
+        os.replace(temporary, path)
+
+    def sealed_tree(self, run_id: str, digest: str) -> CapturedTree:
+        # 读一封封存的树：引用缺失或归档读不出来时就地失败，不退回运行工作区
+        record = json.loads(self._sealed_tree_path(run_id, digest).read_text(encoding="utf-8"))
+        ref = ArtifactRef(**record)
+        return load_tree(self._artifacts, artifact_run(ref.path), ref)
+
+    def _sealed_tree_path(self, run_id: str, digest: str) -> Path:
+        return self.root / run_id / CHECKS_DIR / "sealed-trees" / f"{digest.split(':', 1)[-1]}.json"
 
     def new_inspection(self, run_id: str, department: str, *, session_id: str | None = None,
                        jobs: Any | None = None) -> LocalEnvironment:
@@ -938,6 +1041,9 @@ class LocalEnvironment:
         # 当前交付说明里的启动方式（由 Workspaces 在激活开始时交来）：trial_open 只接受这里的名称。
         # 复核由引擎在工具许可时已经做过一次，这里是执行之前的同一套核对
         self._launch_methods: list[dict[str, Any]] = []
+        # 提交时封存这一版的树（工单 #1579）：交出的成果有核验角色核验的角色才有，由 Workspaces 在
+        # 这个部门的环境上绑定；其余角色没有这一项，snapshot 照旧只读取
+        self._seal: Callable[[WorkspaceSnapshot], None] | None = None
         # 正在进行的动作与它的停止信号；取消在动作开始之前到达时先记下，开始时不执行
         self._lock = Lock()
         self._running: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Event]] = {}
@@ -1042,6 +1148,12 @@ class LocalEnvironment:
     def bind_launch_methods(self, methods: list[dict[str, Any]] | None) -> None:
         # 当前交付说明里的启动方式：trial_open 的名称按它解析（docs/design/browser-and-computer-use.md「试用工具」）
         self._launch_methods = [dict(item) for item in (methods or []) if isinstance(item, dict)]
+
+    def bind_seal(self, seal: Callable[[WorkspaceSnapshot], None] | None) -> None:
+        # 提交时封存这一版的树（工单 #1579）：交出的成果有核验角色核验的角色（按定义里的核验声明取），
+        # 主机在它为提交读取快照时把这棵树存下来，核验角色的检查副本从它建立。
+        # 谁绑这一项由 Workspaces 按事项冻结的定义判，执行环境不认部门名与成果种类名
+        self._seal = seal
 
     def verify_tree(self, snapshot: WorkspaceSnapshot) -> None:
         # 交付核对：当前公开树仍与判断所依据的快照一致
@@ -1196,8 +1308,13 @@ class LocalEnvironment:
         return WorkspaceFacts(tree=tree, paths={path: self._path(path) for path in query.paths})
 
     def snapshot(self) -> WorkspaceSnapshot:
-        # 带文件内容的公开树与检查回执：提交交付时封存这份内容，判断使用同一次读取的事实（snapshot().facts）
-        return self.workspace.snapshot()
+        # 带文件内容的公开树与检查回执：提交交付时封存这份内容，判断使用同一次读取的事实（snapshot().facts）。
+        # 交出的成果有核验角色核验的角色（按定义里的核验声明取）在这一刻把树交给封存（工单 #1579）：
+        # 核验角色的检查副本从这一版建立，与提交判断所依据的树是同一棵
+        snapshot = self.workspace.snapshot()
+        if self._seal is not None:
+            self._seal(snapshot)
+        return snapshot
 
     def _path(self, rel: str) -> PathFacts:
         # 规范形式：按公开树规则解析以后在工作区中的相对路径；私有、逃逸、链接与歧义的名称给出原因
