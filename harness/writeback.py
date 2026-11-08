@@ -97,7 +97,7 @@ def resolve_writeback_remote(remote_setting: str) -> WritebackRemote:
     host = (split.hostname or "").lower()
     if len(parts) < 2 or not host:
         raise WritebackTargetUnavailable("remote_missing", setting)
-    netloc = host if split.port is None else f"{host}:{split.port}"
+    netloc = split.netloc.rsplit("@", 1)[-1]
     api_base = GITHUB_API_BASE if host in GITHUB_HOSTS else f"{split.scheme}://{netloc}/api/v3"
     # 地址里即使写了用户名与口令也不带进推送地址与事件：凭据只从凭据引用取（工单 #980）
     git_url = urllib.parse.urlunsplit((split.scheme, netloc, split.path or "", "", ""))
@@ -219,8 +219,10 @@ def _pull_request_body(item: Any, adoption: Any, *, branch_name: str, target_bra
 
 
 def _pull_request_record(data: dict[str, Any], remote: WritebackRemote, *, branch_name: str,
-                         target_branch: str, status: str) -> dict[str, Any]:
-    # 事件只记录请求身份、地址、分支与结果（工单 #980），不记录凭据值
+                         target_branch: str, status: str,
+                         branch_commit: str | None = None) -> dict[str, Any]:
+    # 事件只记录请求身份、地址、分支与结果（工单 #980），不记录凭据值；
+    # branch_commit 是创建请求之前核实过的远端分支提交
     repository = f"{remote.owner}/{remote.repo}"
     return {
         "identity": f"{repository}#{data.get('number')}",
@@ -230,6 +232,7 @@ def _pull_request_record(data: dict[str, Any], remote: WritebackRemote, *, branc
         "repository": repository,
         "branch": branch_name,
         "target_branch": target_branch,
+        "branch_commit": branch_commit,
         "status": status,
     }
 
@@ -827,6 +830,7 @@ def perform_writeback(
             and existing_remote_commit.parents[0].id == target_commit.id
         ):
             verified_external = True
+            confirmed_branch_commit = str(existing_remote_commit.id)
             _append_verified(
                 system, project_id, item, adoption, action="push", branch_name=branch_name,
                 target_commit=str(target_commit.id),
@@ -842,6 +846,7 @@ def perform_writeback(
             raise WritebackTargetUnavailable("branch_exists", branch_name)
 
         writeback_commit_oid: pygit2.Oid | None = None
+        confirmed_branch_commit: str | None = None
         if not verified_external:
             sig = pygit2.Signature("Yudao", "host@yudao.invalid")
             commit_msg = (
@@ -869,6 +874,7 @@ def perform_writeback(
                     if pushed_commit.id != writeback_commit_oid:
                         raise WritebackTargetUnavailable("branch_exists", branch_name)
                     verified_external = True
+                    confirmed_branch_commit = str(pushed_commit.id)
                     _append_verified(
                         system, project_id, item, adoption, action="push", branch_name=branch_name,
                         target_commit=str(target_commit.id),
@@ -880,6 +886,14 @@ def perform_writeback(
                         },
                         command=command,
                     )
+                else:
+                    # 推送的回应说成功了：创建请求之前按远端事实再核实一次分支提交（工单 #980 的验收：
+                    # 推送成功而创建请求结果未知时，核实远端分支提交和请求身份）
+                    _fetch_hosted_heads(repo, callbacks, remote_secret)
+                    confirmed_commit = _hosted_branch_commit(repo, branch_name)
+                    if confirmed_commit is None or confirmed_commit.id != writeback_commit_oid:
+                        raise WritebackTargetUnavailable("push_failed", branch_name)
+                    confirmed_branch_commit = str(confirmed_commit.id)
             elif target_is_bare:
                 # 推送到远端裸仓库
                 remote_obj = repo.remotes["origin"]
@@ -899,7 +913,8 @@ def perform_writeback(
             pull_request = _ensure_pull_request(
                 system, project_id, item, adoption, remote=remote_target, secret=remote_secret,
                 branch_name=branch_name, target_branch=target_branch, target_commit=target_commit,
-                final_tree_digest=final_tree_digest, command=command,
+                final_tree_digest=final_tree_digest, branch_commit=confirmed_branch_commit,
+                command=command,
             )
         else:
             pull_request = {
@@ -970,6 +985,7 @@ def _ensure_pull_request(
     target_branch: str,
     target_commit: pygit2.Commit,
     final_tree_digest: str,
+    branch_commit: str | None,
     command: Command | None,
 ) -> dict[str, Any]:
     """经宿主仓库的合并请求接口创建请求；已存在时记下它的身份，不重复创建（工单 #980）。
@@ -984,13 +1000,15 @@ def _ensure_pull_request(
             target_commit=str(target_commit.id),
             verified_fact={
                 "pull_request": _pull_request_record(existing, remote, branch_name=branch_name,
-                                                     target_branch=target_branch, status="existing"),
+                                                     target_branch=target_branch, status="existing",
+                                                     branch_commit=branch_commit),
                 "verified": True,
             },
             command=command,
         )
         return _pull_request_record(existing, remote, branch_name=branch_name,
-                                    target_branch=target_branch, status="existing")
+                                    target_branch=target_branch, status="existing",
+                                    branch_commit=branch_commit)
 
     payload = {
         "title": _pull_request_title(item, adoption),
@@ -1014,20 +1032,23 @@ def _ensure_pull_request(
                     target_commit=str(target_commit.id),
                     verified_fact={
                         "pull_request": _pull_request_record(found, remote, branch_name=branch_name,
-                                                             target_branch=target_branch, status="existing"),
+                                                             target_branch=target_branch, status="existing",
+                                                             branch_commit=branch_commit),
                         "verified": True,
                         "unconfirmed_call": last_unknown,
                     },
                     command=command,
                 )
                 return _pull_request_record(found, remote, branch_name=branch_name,
-                                            target_branch=target_branch, status="existing")
+                                            target_branch=target_branch, status="existing",
+                                            branch_commit=branch_commit)
             # 核实确认没有创建：按新尝试再创建一次
             continue
         except _PullRequestRejected as rejected:
             raise WritebackTargetUnavailable("pull_request_rejected", str(rejected)) from rejected
         return _pull_request_record(created, remote, branch_name=branch_name,
-                                    target_branch=target_branch, status="created")
+                                    target_branch=target_branch, status="created",
+                                    branch_commit=branch_commit)
     raise WritebackOutcomeUnknown("pull_request", last_unknown)
 
 

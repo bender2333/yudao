@@ -350,12 +350,13 @@ def test_a_writeback_pushes_the_branch_and_creates_a_pull_request(tmp_path):
                 "app.py": b"print('adopted')\n", "added.txt": b"adopted addition\n"}
             assert payload["final_tree_digest"].startswith("sha256:")
 
-            # 合并请求：身份、地址、源分支、目标分支
+            # 合并请求：身份、地址、源分支、目标分支，以及创建之前核实过的远端分支提交
             pull_request = payload["pull_request"]
             assert pull_request["identity"] == f"{OWNER}/{REPO}#1"
             assert pull_request["url"] == f"http://127.0.0.1:{remote.port}/{OWNER}/{REPO}/pull/1"
             assert pull_request["branch"] == branch
             assert pull_request["target_branch"] == "main"
+            assert pull_request["branch_commit"] == str(writeback_commit.id)
             assert pull_request["status"] == "created"
             assert remote.create_calls == 1 and len(remote.pull_requests) == 1
 
@@ -467,6 +468,10 @@ def test_an_unknown_create_outcome_records_the_existing_request(tmp_path):
             pull_request = event.payload["pull_request"]
             assert pull_request["identity"] == f"{OWNER}/{REPO}#1"
             assert pull_request["status"] == "existing"
+            # 创建请求之前核实过远端分支提交：事件里记下的是裸仓库上那条分支的提交
+            pushed_commit = remote.branch_commit("writeback/adopt_1")
+            assert pushed_commit is not None
+            assert pull_request["branch_commit"] == str(pushed_commit.id)
             assert remote.create_calls == 1 and len(remote.pull_requests) == 1
             verified = [entry for entry in _events(store, pid)
                         if entry.type == ProjectEventType.WRITEBACK_VERIFIED]
