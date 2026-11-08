@@ -53,7 +53,8 @@ class _BlockingDeltas:
                                    stage="output",
                                    deltas=(ModelDelta(channel="output", offset=index * 3, text=text),))
         self.streamed.set()
-        await asyncio.wait_for(self.release.wait(), 15)
+        # 测试读完片段以后才给出结果：等的是测试线程，上限取按层的表，不用写死的时长
+        await asyncio.wait_for(self.release.wait(), WAIT_FOR_HOST_WORK_SEC)
         yield ModelStreamEvent(kind="response", id="response", payload={
             "id": "resp-stub", "object": "response", "status": "completed",
             "output": [{"type": "message", "content": [{"type": "output_text", "text": "第一段第二段第三段"}]}]})
@@ -61,8 +62,8 @@ class _BlockingDeltas:
             {"type": "output_text", "text": "第一段第二段第三段"}]}],
             usage=_USAGE, provider=self.name, model=self.model)
 
-def _wait_for(event: "asyncio.Event", timeout: float = 15.0) -> bool:
-    # 事件在服务的事件循环里被置位，测试线程轮询它的状态
+def _wait_for(event: "asyncio.Event", timeout: float = WAIT_FOR_HOST_WORK_SEC) -> bool:
+    # 事件在服务的事件循环里被置位，测试线程轮询它的状态；上限取按层的表（等待主机工作）
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if event.is_set():
