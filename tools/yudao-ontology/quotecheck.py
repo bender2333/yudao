@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import html
 import json
+import os
 import re
 import subprocess
 import sys
@@ -17,7 +18,8 @@ from pathlib import Path
 import rdflib
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+# YUDAO_REPO：next.py 在临时副本里跑时指回仓库
+REPO = Path(os.environ.get("YUDAO_REPO", HERE.parent.parent))
 YD = rdflib.Namespace("https://yudao.dev/onto#")
 DOCS = {"形态与核验角色设计说明": "docs/design/forms-and-verifier-role.md",
         "职能内多角色设计说明": "docs/design/department-roles.md",

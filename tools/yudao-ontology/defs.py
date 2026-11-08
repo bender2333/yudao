@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -15,7 +16,8 @@ import rdflib
 from rdflib import RDF, RDFS, Literal
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+# YUDAO_REPO：next.py 在临时副本里跑时指回仓库
+REPO = Path(os.environ.get("YUDAO_REPO", HERE.parent.parent))
 YD = rdflib.Namespace("https://yudao.dev/onto#")
 
 # 形态的名字（runtime.py 的 FORM_REGISTRY）→ 定义目录 → 前两批里的个体

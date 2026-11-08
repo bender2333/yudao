@@ -1,6 +1,6 @@
 # Yudao 本体：第一步（研究分支）
 
-这是 Yudao 自己的本体第一步的试验代码，只在分支 `research/ontology-step1` 上，不进 main。方案在分支 `research/yudao-ontology` 的 `docs/research/yudao-ontology-v2.md`（第 4、5、9 节）。分支 `research/ontology-step1-r2` 是对齐 11-07 夜的 main（`37e9d68`）以后重跑的一版。分支 `research/ontology-step1-r3` 是变基到 11-08 晚的 main（`5c25e1b`）、结构词换成「职能」以后重跑的一版。结果见 [reports/step1-report.md](reports/step1-report.md)。
+这是 Yudao 自己的本体第一步的试验代码，只在分支 `research/ontology-step1` 上，不进 main。方案在分支 `research/yudao-ontology` 的 `docs/research/yudao-ontology-v2.md`（第 4、5、9 节）。分支 `research/ontology-step1-r2` 是对齐 11-07 夜的 main（`37e9d68`）以后重跑的一版。分支 `research/ontology-step1-r3` 是变基到 11-08 晚的 main（`5c25e1b`）、结构词换成「职能」以后重跑的一版。分支 `research/ontology-step1-r4` 变基到 main `e267b23`，加了只报告的「该做什么了」技能（`next.py` 与 `.claude/skills/ontology-next/`）。结果见 [reports/step1-report.md](reports/step1-report.md)。
 
 只读仓库里的文档（总图、设计说明、`CONTEXT.md`、name-map），不改任何文档和代码。
 
@@ -23,6 +23,7 @@
 | `codecheck.py` | 第 4 批：从提交里读代码事实（分层、name-map、来源、对照缺行），写 `batches/batch4-code.ttl` 和 `reports/codecheck.json`；`python3 codecheck.py eb8429e` |
 | `quotecheck.py` | 跟版本走：模型里每一句原句，到给定的提交里逐句核对还在不在，写 `reports/quotecheck.json`；`python3 quotecheck.py 5159317 eb8429e 37e9d68` |
 | `names.py` | 正名表：`CONTEXT.md` 词条与 _Avoid_、name-map 第一列 |
+| `next.py`、`aligned.json` | 「该做什么了」：对一个提交在临时副本里跑全部检查，归成四类与建议，写 `reports/next/<提交>.md`；`aligned.json` 记模型最后对齐的提交；`python3 next.py`（默认 `origin/main`） |
 | `reports/skill-plan.md` | 把本体做成「该做什么了」技能的方案草稿（还没建） |
 | `reports/fix-tickets-draft.md` | 第 4 批三处代码问题的修复工单草稿（没建 GitHub 工单） |
 | `reports/` | `results.json`、`mutations.json`、两批的抽取对照、报告 |
@@ -32,6 +33,7 @@
 要 Java（HermiT）和 `python3 -m pip install rdflib pyshacl owlready2`。
 
 ```
+python3 next.py          # 该做什么了：下面几步在临时副本里一起跑，只报告
 python3 defs.py 5c25e1b  # 转写第 3 批
 python3 run.py           # 第 0 至 3 批，深度 3，写 reports/results.json
 python3 crosscheck.py    # 设计对定义文件

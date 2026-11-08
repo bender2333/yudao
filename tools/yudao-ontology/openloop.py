@@ -21,7 +21,8 @@ import rdflib
 from rdflib import OWL, RDF, RDFS, Literal
 
 HERE = Path(__file__).resolve().parent
-REPO = HERE.parent.parent
+# YUDAO_REPO：next.py 在临时副本里跑时指回仓库
+REPO = Path(os.environ.get("YUDAO_REPO", HERE.parent.parent))
 YD = rdflib.Namespace("https://yudao.dev/onto#")
 PREFIXES = ("@prefix yd: <https://yudao.dev/onto#> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n"
             "@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n")
