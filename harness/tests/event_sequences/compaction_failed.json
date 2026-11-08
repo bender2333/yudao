@@ -983,7 +983,7 @@
    "stop_reason": "compaction_failed",
    "error": "压缩连续 3 次没有推进（整理没有生效：摘要为空或超过上限），达到 compaction.stalled_limit=3。",
    "payload": {
-    "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
+    "human_action": "职能历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
     "stop_reason": "compaction_failed"
    }
   },
@@ -1012,7 +1012,7 @@
   "error": "压缩连续 3 次没有推进（整理没有生效：摘要为空或超过上限），达到 compaction.stalled_limit=3。",
   "waiting_reason": "未能完成：上下文压缩失败",
   "active_department": null,
-  "human_action": "部门历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
+  "human_action": "职能历史压缩失败。原始记录仍保留，请查看摘要请求与失败原因后重新运行。",
   "cycle_count": 1,
   "rework_count": 0,
   "round": 0,
