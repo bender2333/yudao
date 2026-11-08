@@ -1,11 +1,11 @@
 {
 "schema":1,
 "path":"docs/agents/shared-rules.md",
-"hash":"b73de0994aec339c",
+"hash":"73ca8ef06569fe54",
 "nodes":[
-{"hash":"b73de0994aec339c","id":"docs/agents/shared-rules.md","kind":"file","title":"docs/agents/shared-rules.md"},
+{"hash":"73ca8ef06569fe54","id":"docs/agents/shared-rules.md","kind":"file","title":"docs/agents/shared-rules.md"},
 {"hash":"d2fd2b4b7388adee","id":"docs/agents/shared-rules.md#共同规则","kind":"section","parent":"docs/agents/shared-rules.md","title":"共同规则"},
-{"hash":"9ba317104cfc51b1","id":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界","kind":"section","parent":"docs/agents/shared-rules.md#共同规则","title":"架构原则与控制边界"},
+{"hash":"413a0eb4ee4195ad","id":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界","kind":"section","parent":"docs/agents/shared-rules.md#共同规则","title":"架构原则与控制边界"},
 {"hash":"a737d8eebd50d9d8","id":"docs/agents/shared-rules.md#共同规则 > 参考实现","kind":"section","parent":"docs/agents/shared-rules.md#共同规则","title":"参考实现"},
 {"hash":"040ca06b6ac51c24","id":"docs/agents/shared-rules.md#共同规则 > 文档与记录","kind":"section","parent":"docs/agents/shared-rules.md#共同规则","title":"文档与记录"},
 {"hash":"b599df8817a1691e","id":"docs/agents/shared-rules.md#共同规则 > 规则","kind":"section","parent":"docs/agents/shared-rules.md#共同规则","title":"规则"},
@@ -27,9 +27,9 @@
 {"dst":"docs/agents/issue-tracker.md","kind":"link","raws":["issue-tracker.md"],"seen":"2f585d2ce9fa7f84","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["workflow.md"],"seen":"2c01765171109f63","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
 {"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"6bf0a0bd9ec52441","src":"docs/agents/shared-rules.md#共同规则 > 文档与记录"},
-{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"e823b2d5f74922e1","src":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界"},
-{"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"6362d110905936c3","src":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界"},
-{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"7238332bed3feff5","src":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界"},
+{"dst":"docs/architecture.html","kind":"code-path","raws":["docs/architecture.html"],"seen":"4e71ff6d7d16d1ed","src":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界"},
+{"dst":"docs/foundation-rules.md","kind":"link","raws":["../foundation-rules.md"],"seen":"64931b23d9da12ae","src":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["../requirements/system-intent.md"],"seen":"219992a5c05a5106","src":"docs/agents/shared-rules.md#共同规则 > 架构原则与控制边界"},
 {"dst":"docs/agents/autopilot-runtime.md","kind":"link","raws":["autopilot-runtime.md"],"seen":"88a3094c4bd2dd7d","src":"docs/agents/shared-rules.md#共同规则 > 规则"}
 ]
 }

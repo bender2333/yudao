@@ -116,7 +116,7 @@
 {"dst":"docs/CHANGELOG.md","kind":"code-path","raws":["docs/CHANGELOG.md"],"seen":"bd0f826e14480197","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
 {"dst":"docs/decision.md","kind":"code-path","raws":["docs/decision.md"],"seen":"31513c3e9a5be848","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 过程与理由"},
 {"dst":"docs/program-roadmap.md","kind":"code-path","raws":["docs/program-roadmap.md"],"seen":"c828dcee198a6ad8","src":"docs/agents/workflow.md#工作方式 > 1. 事实放在哪 > 表1 > 阶段、薄片、十条道"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.3 CI 中的分层","kind":"link","raws":["../design/test-pyramid.md"],"seen":"8602d6d8e045dbb1","src":"docs/agents/workflow.md#工作方式 > 10. CI"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层 > 4.3 CI 中的分层","kind":"link","raws":["../design/test-pyramid.md"],"seen":"ad49142d91f90cad","src":"docs/agents/workflow.md#工作方式 > 10. CI"},
 {"dst":"docs/agents/acceptance-evidence.md","kind":"link","raws":["acceptance-evidence.md"],"seen":"89e3daa46e774c2b","src":"docs/agents/workflow.md#工作方式 > 11. 规则事实怎么写"},
 {"dst":"AGENTS.md","kind":"code-path","raws":["AGENTS.md"],"seen":"d54de39b4c1ac1da","src":"docs/agents/workflow.md#工作方式 > 11. 规则事实怎么写 > 表2 > CLAUDE.md 与 AGENTS.md（执行时）"},
 {"dst":"CLAUDE.md","kind":"code-path","raws":["CLAUDE.md"],"seen":"595a55b228fea4f6","src":"docs/agents/workflow.md#工作方式 > 11. 规则事实怎么写 > 表2 > CLAUDE.md 与 AGENTS.md（执行时）"},

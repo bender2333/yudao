@@ -1,18 +1,18 @@
 {
 "schema":1,
 "path":"docs/requirements/comparison-experiment.md",
-"hash":"46c8ca5bce2e1740",
+"hash":"f9d2024298d303f9",
 "nodes":[
-{"hash":"46c8ca5bce2e1740","id":"docs/requirements/comparison-experiment.md","kind":"file","title":"docs/requirements/comparison-experiment.md"},
+{"hash":"f9d2024298d303f9","id":"docs/requirements/comparison-experiment.md","kind":"file","title":"docs/requirements/comparison-experiment.md"},
 {"hash":"39475fde1d38e1b8","id":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验","kind":"section","parent":"docs/requirements/comparison-experiment.md","title":"D32 与单个 agent 的对照实验"},
-{"hash":"9450c84e595206fd","id":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认","kind":"section","parent":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验","title":"已确认"}
+{"hash":"254f4c4d44ba03d8","id":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认","kind":"section","parent":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验","title":"已确认"}
 ],
 "edges":[
 {"dst":"docs/architecture.html","kind":"link","raws":["../architecture.html"],"seen":"86b72cacca10bc0a","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验"},
 {"dst":"docs/design/evaluation-scenarios.md","kind":"link","raws":["../design/evaluation-scenarios.md"],"seen":"8b813cb71f37d7dc","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验"},
 {"dst":"docs/program-roadmap.md","kind":"link","raws":["../program-roadmap.md"],"seen":"8d87428e7f0fd82f","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验"},
-{"dst":"docs/requirements/browser-and-computer-use.md","kind":"link","raws":["browser-and-computer-use.md"],"seen":"4558a8a3549b0d66","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认"},
-{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"422ab5bb5970efbc","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认"},
-{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["system-intent.md"],"seen":"30d188aa945f9e1d","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认"}
+{"dst":"docs/requirements/browser-and-computer-use.md","kind":"link","raws":["browser-and-computer-use.md"],"seen":"e451b287bc952c1c","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认"},
+{"dst":"docs/requirements/department-roles.md","kind":"link","raws":["department-roles.md"],"seen":"6e3357d24c141317","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认"},
+{"dst":"docs/requirements/system-intent.md","kind":"link","raws":["system-intent.md"],"seen":"219992a5c05a5106","src":"docs/requirements/comparison-experiment.md#D32 与单个 agent 的对照实验 > 已确认"}
 ]
 }
