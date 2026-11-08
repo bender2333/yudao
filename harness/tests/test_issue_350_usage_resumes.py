@@ -18,13 +18,15 @@ from harness.proposals import delivery, delivery_turn, judgement, product_spec, 
 from harness.projection import saved_decisions
 from harness.runtime import LoopSystem
 from harness.tests import process_kill as killed
-from harness.tests.helpers import quality_turns
+from harness.tests.helpers import after_event, quality_turns
 
 ECHO = "import sys\nprint(sys.argv[1])\n"
 CHECKS = {"smoke": {"command": f"\"{sys.executable.replace(chr(92), chr(47))}\" -c \"print('smoke ok')\""}}
-# 中断以前的激活不跑检查；重启以后工程的真实检查运行 4 秒，越过原有的 3 秒上限。
+# 中断以前的激活不跑检查；重启以后两个部门的真实检查都跑完，受控时钟再把运行时间推过上限。
 # 质检用信号等待工程检查完成，保证两个激活覆盖同一运行段，核对并发结算也保留这一段时间。
-TIME_LIMIT_SEC = 3
+# 上限取 30 秒只需要远大于中断之前那一次真实激活的用时；达到上限的时点由检查回执的事件决定，
+# 不再靠一次睡满的检查把墙钟等过上限（工单 #1462，与工单 #1520 同一做法）。
+TIME_LIMIT_SEC = 30
 
 
 def _overlapping_checks(tmp_path):
@@ -48,7 +50,6 @@ def wait_for(name):
 
 if department == "engineering":
     wait_for("quality-ready")
-    time.sleep(4)
     (signals / "engineering-finished").touch()
 else:
     (signals / "quality-ready").touch()
@@ -58,6 +59,17 @@ else:
                f'"{signals.as_posix()}"')
     return {department: {"command": f"{command} {department} {killed.STARTUP_TIMEOUT_SEC}"}
             for department in ("engineering", "quality")}
+
+
+class _RunClock:
+    # 运行时间读的时钟（工单 #1520）：读数由测试推到哪儿，「运行时间用完」就发生在哪儿，与真实时长无关。
+    # 只替换运行时间的累计与判断（LoopSystem.for_testing 的 run_clock）；真实等待与 latency_ms 仍是真实时钟
+    def __init__(self) -> None:
+        self.seconds = 0.0
+
+    def __call__(self) -> float:
+        return self.seconds
+
 
 def _call(identity, name, arguments):
     return {"id": identity, "call_id": identity, "type": "function_call", "name": name,
@@ -136,7 +148,10 @@ def test_restart_keeps_accumulated_time_and_counts(tmp_path):
 def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
     # 验收二：短的运行时间上限，进程终止并重启以后按累计的已用时间达到上限，以运行时间上限的停止原因停止。
     # 断言只核对事件推出的关系：中断时 run 还没有以运行时间上限停止；重启以后的累计不小于终止前
-    # 记录的累计（累计在进程终止与重启之间连续）并且达到上限
+    # 记录的累计（累计在进程终止与重启之间连续）并且达到上限。
+    # 工单 #1462：中断点（第一个 activation_finished）排在第一个安全节点之后，机器忙时激活自己的用时
+    # 可以越过短上限，运行会在中断以前停下。修法按测试分层 docs/design/test-pyramid.md「测试的写法」第 7 条：
+    # 重启以后不再按墙钟等出上限，改由受控时钟在检查回执提交以后把累计推过上限（与工单 #1520 同一做法）
     data_dir = tmp_path / "data"
     # 脚本按部门给出（工单 #557：同时运行的会话各自取用自己的脚本，不共用一个队列）
     script = {"product": [{"proposal": product_spec()}]}
@@ -145,26 +160,58 @@ def test_accumulated_time_reaches_a_short_limit_after_restart(tmp_path):
                              "checks": {"slow": checks["engineering"]}}],
             "quality": [{"checks": {"synchronize": checks["quality"]}},
                         {"proposal": {"kind": "quality_auto"}}]}
+    clock = _RunClock()
 
     with killed.interrupted(data_dir, script, tail=tail, run_time_limit_sec=TIME_LIMIT_SEC,
-                            hold_after="activation_finished") as run:
+                            hold_after="activation_finished", resume_after=False) as run:
         before_usage = _usage(run.before_events)
         assert before_usage is not None, "中断以前至少完成过一次激活，累计已用量已经写入事件"
         before_elapsed = before_usage[0]
         stops = [(event.payload or {}).get("stop_reason") for event in run.before_events]
         assert "time_limit" not in stops, f"中断时 run 已经以运行时间上限停止，停止原因 {stops}"
 
-        finished = run.after.project(run.run_id)
-        assert (finished.status, finished.stop_reason) == ("failed", "time_limit")
+        # 重启以后自己打开系统，交进受控时钟：两个部门的真实检查都跑完（质检的检查等工程的检查写完信号，
+        # 它的回执因此排在工程检查之后）时，订阅方把时钟推过上限，下一个安全节点一定看见运行时间用完，
+        # 上限与真实用时都不参与判定。这样「中断在达到上限之前」由事件与时钟决定，不再靠一次长睡
+        run.after.close()
+        after = LoopSystem.for_testing(data_dir, FakeAdapter(killed.build_script(tail)),
+                                       run_clock=clock, resume_on_startup=False)
+        try:
+            def reach_the_limit(event):
+                payload = event.payload or {}
+                if payload.get("name") != "run_check" or event.department != "quality":
+                    return
+                clock.seconds = float(TIME_LIMIT_SEC + 1)
 
-        after = run.after.store.list_events(run.run_id)
-        after_usage = _usage(after)
+            after_event(after, EventType.TOOL_CALLED, reach_the_limit)
+            resumed = after.resume_startup_runs()
+            assert run.run_id in resumed, "重启以后取得了这个 run 的执行权并继续"
+
+            finished = after.project(run.run_id)
+            assert (finished.status, finished.stop_reason) == ("failed", "time_limit")
+
+            after_events = after.store.list_events(run.run_id)
+            # 受控时钟由质检检查的回执推动：两个部门的检查都在运行时间用完以前跑完、并通过，
+            # 达到上限不是因为检查被跳过（#1520 的同一口径：先后落在事件日志上）
+            receipts = [index for index, event in enumerate(after_events)
+                        if event.type == EventType.TOOL_CALLED
+                        and (event.payload or {}).get("name") == "run_check"]
+            assert len(receipts) == 2, f"两个部门的检查各自写下一条回执，实际 {receipts}"
+            assert all((after_events[index].payload or {}).get("ok") is True for index in receipts), \
+                "两个部门的检查都通过"
+            failed_at = next(index for index, event in enumerate(after_events)
+                             if event.type == EventType.RUN_FAILED)
+            assert failed_at > receipts[-1], "两个部门的检查都在运行时间用完以前跑完"
+        finally:
+            after.close()
+
+        after_usage = _usage(after_events)
         assert after_usage is not None, "重启以后的激活结束事件记下了累计已用量"
         assert after_usage[0] >= before_elapsed, \
             f"重启后累计 {after_usage[0]}ms 不小于终止前记录的 {before_elapsed}ms，重启没有重新计数"
         assert after_usage[0] >= TIME_LIMIT_SEC * 1000, \
             f"重启后累计 {after_usage[0]}ms，达到 {TIME_LIMIT_SEC} 秒的运行时间上限"
-        assert after_usage[1:] == _event_counts(after), "累计次数与事件数一致"
+        assert after_usage[1:] == _event_counts(after_events), "累计次数与事件数一致"
 
 def test_waiting_for_a_decision_is_excluded_from_run_time(tmp_path):
     # 验收三：等待用户决定期间不计入运行时间
