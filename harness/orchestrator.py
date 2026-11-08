@@ -1696,7 +1696,7 @@ class Orchestrator:
             return
         except IgnoreRulesUndecidable as exc:
             # 建立检查工作区时主机判断不了忽略规则：与装配请求、工具执行等位置同一个结局，
-            # 以 host_commit_error 停止，说明带诊断原文（docs/design/local-tools.md「公开树」，工单 #604）
+            # 以 host_commit_error 停止，说明带诊断原文（docs/design/local-tools.md「工具边界」，工单 #604）
             self._end_run(activation, "host_commit_error", str(exc), activation.version)
             return
         except (ValueError, OSError) as exc:

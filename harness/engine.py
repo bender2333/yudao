@@ -363,7 +363,7 @@ class StepDriver:
                                  facts=tuple(exc.paths))
         except IgnoreRulesUndecidable as exc:
             # 主机判断不了忽略规则：任何位置遇到它都以 host_commit_error 停止事项，说明带诊断原文，不再按
-            # 上下文超限或上游错误记（docs/design/local-tools.md「公开树」，工单 #604）
+            # 上下文超限或上游错误记（docs/design/local-tools.md「工具边界」，工单 #604）
             result = RoundResult(stop_reason="host_commit_error", message=str(exc))
         except Exception as exc:
             # 其余异常（记录或执行环境出错等）按 provider_error 停止，说明写明异常的种类

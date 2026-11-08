@@ -1236,7 +1236,7 @@ class LocalEnvironment:
             raise
         except IgnoreRulesUndecidable:
             # 主机判断不了忽略规则：动作路径上遇到它不交失败回执，交给步骤驱动以 host_commit_error 停止事项
-            # （docs/design/local-tools.md「公开树」，工单 #604）
+            # （docs/design/local-tools.md「工具边界」，工单 #604）
             raise
         except TrialStartFailed as exc:
             # 试用会话没有建立（缺少程序、就绪超时、进程提前退出、启动方式不可用）：
@@ -1848,7 +1848,7 @@ class LocalEnvironment:
                         verification_errors.append(f"{label} changed")
                 except IgnoreRulesUndecidable:
                     # 核对检查副本时主机判断不了忽略规则：不是「这一项没核对成」，而是整个事项没法继续读公开树，
-                    # 以 host_commit_error 停止（docs/design/local-tools.md「公开树」，工单 #604）
+                    # 以 host_commit_error 停止（docs/design/local-tools.md「工具边界」，工单 #604）
                     raise
                 except Exception as exc:
                     verification_errors.append(f"{label} could not be verified: {exc}")

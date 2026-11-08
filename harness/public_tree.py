@@ -57,7 +57,7 @@ class IgnoreRulesUndecidable(TreeError):
     """The project's ignore rules cannot be decided on this host.
 
     主机这一侧的问题，模型修不了：所有位置统一以 `host_commit_error` 停止事项，停止说明带诊断原文
-    （docs/design/local-tools.md「公开树」，工单 #604）。与工作区里的条目无法表示不同，它不是
+    （docs/design/local-tools.md「工具边界」，工单 #604）。与工作区里的条目无法表示不同，它不是
     工作区内容的问题，不暂停等待处理工作区。
     """
 
