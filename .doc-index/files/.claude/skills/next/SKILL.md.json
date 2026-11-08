@@ -32,11 +32,11 @@
 "edges":[
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/next/SKILL.md#下一件事"},
 {"dst":".claude/skills/architect-loop/SKILL.md","kind":"link","raws":["../architect-loop/SKILL.md"],"seen":"bd5b563f7f51e7af","src":".claude/skills/next/SKILL.md#下一件事 > 何时用 / 何时不用"},
-{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"2b2a0422c506d4cb","src":".claude/skills/next/SKILL.md#下一件事 > 先读什么"},
+{"dst":"CLAUDE.md#角色 > 子架构师","kind":"section-ref","raws":["CLAUDE.md"],"seen":"2e10b28dbd6a1c04","src":".claude/skills/next/SKILL.md#下一件事 > 先读什么"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/next/SKILL.md#下一件事 > 先读什么"},
 {"dst":".claude/skills/architect-loop/SKILL.md","kind":"link","raws":["../architect-loop/SKILL.md"],"seen":"bd5b563f7f51e7af","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事"},
 {"dst":".claude/skills/architect-loop/SKILL.md","kind":"link","raws":["../architect-loop/SKILL.md"],"seen":"bd5b563f7f51e7af","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 2"},
-{"dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"link","raws":["../trial-intake/SKILL.md"],"seen":"04f2af7ad5d55506","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 3"},
+{"dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"link","raws":["../trial-intake/SKILL.md"],"seen":"347dc9bc373adb34","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 3"},
 {"dst":".claude/skills/to-design/SKILL.md","kind":"link","raws":["../to-design/SKILL.md"],"seen":"8e944ff99a32bbae","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 4"},
 {"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"10c565ee39fe979f","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 5"},
 {"dst":".claude/skills/triage/SKILL.md#分诊 > 想法与外部报告","kind":"link","raws":["../triage/SKILL.md"],"seen":"f7e5d07856a14a0b","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 6"},

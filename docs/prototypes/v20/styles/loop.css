@@ -41,11 +41,10 @@
 .lp-chip { display: flex; flex-wrap: nowrap; align-items: baseline; gap: 4px; font-size: 12px; padding: 2px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); text-align: left; cursor: pointer; color: inherit; white-space: nowrap; }
 .lp-chip:hover { border-color: var(--green); }
 .lp-chip.is-on { box-shadow: 0 0 0 2px var(--green); }
-.lp-chip.is-back { border-style: dashed; }
 .lp-chip.is-struct { cursor: default; color: var(--muted); }
 .lp-chip.is-struct:hover { border-color: var(--line); }
 .lp-chip small { color: var(--faint); font-size: 11px; }
-.lp-chip.is-ask { border-style: dotted; }
+.lp-chip.is-ask { border-style: solid; }
 .lp-chip.is-fault { border-color: var(--red); color: var(--red); cursor: default; }
 .lp-dir { color: var(--faint); }
 .lp-kind { font-weight: 600; }
@@ -57,7 +56,7 @@
 .lp-side { display: flex; gap: 6px; justify-content: center; }
 .lp-side .lp-node { border-style: dashed; }
 .lp-vlink { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; }
-.lp-vline { display: block; height: 14px; border-left: 1px dashed var(--line-strong); }
+.lp-vline { display: block; height: 14px; border-left: 1px solid var(--line-strong); }
 
 /* 小图（形态卡里）：同一种画法，缩小 */
 .lp-mini { margin-top: 6px; padding: 8px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); overflow-x: auto; }
@@ -134,7 +133,18 @@
 .lp-vlink > .lp-vline { align-self: stretch; }
 
 .lp-skip { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
-.lp-skip-line { flex: 1; border-top: 1px dashed var(--line-strong); min-width: 12px; }
+.lp-skip-line { flex: 1; border-top: 1px solid var(--line-strong); min-width: 12px; }
+/* 虚线只给开着的询问：成果箭头都是实线 */
+.lp-q { display: inline-flex; align-items: baseline; gap: 4px; font-size: 12px; padding: 2px 6px; border: 1px dashed var(--blue); border-radius: 6px; color: var(--blue); background: var(--bg); white-space: nowrap; }
+.lp-skip.is-q .lp-skip-line { border-top: 1px dashed var(--blue); }
+.lp-qstate { display: block; font-size: 12px; line-height: 1.35; color: var(--text); }
+.lp-oneline .lp-qstate { display: inline; margin-left: 4px; color: var(--muted); }
+.ln-qa { display: grid; gap: 6px; margin: 4px 0 2px; }
+.ln-qa-part { border-left: 2px solid var(--line); padding-left: 8px; }
+.ln-qa-part small { display: block; color: var(--muted); font-size: 11px; }
+.ln-qa-part ul { margin: 2px 0 0; padding-left: 16px; }
+.ln-qa-part p { margin: 2px 0 0; }
+.ln-qa-part.is-why { border-left-style: dashed; }
 .lp-skip-to { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .lp-grid.is-mini .lp-skip { padding: 0 4px; gap: 3px; }
 .lp-grid.is-mini .lp-skip-to { font-size: 10px; }

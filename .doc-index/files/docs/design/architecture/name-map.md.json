@@ -22,16 +22,14 @@
 {"hash":"c081f17a592adf06","id":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫","kind":"section","parent":"docs/design/architecture/name-map.md#总图的词与代码名的对照","title":"4. 每道缝的守卫"}
 ],
 "edges":[
-{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["第一节"],"seen":"3c9310ef49956c5b","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
-{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"32ac07d30ac47cac","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
+{"dst":"docs/architecture.html#s1","kind":"map-position","raws":["第一节"],"seen":"7a9842b0d9a1dbed","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
+{"dst":"docs/architecture.html#s3","kind":"map-position","raws":["第三节"],"seen":"bd17490d65acfb60","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
 {"dst":"docs/architecture.html#s4","kind":"map-position","raws":["「要守的缝」"],"seen":"cd45a09d24e819e9","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照"},
 {"dst":"harness/tests/openapi/openapi.json","kind":"code-path","raws":["harness/tests/openapi/openapi.json"],"seen":"e8c40922f4168ea6","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 1. 系统里的九道缝 > 接口"},
 {"dst":"harness/definitions/kernel-manifest.json","kind":"code-path","raws":["harness/definitions/kernel-manifest.json"],"seen":"1155373f0753c2aa","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝"},
 {"dst":"harness/release_check.py","kind":"code-path","raws":["harness/release_check.py"],"seen":"56d769c46e68cc78","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝"},
 {"dst":"scripts/release.py","kind":"code-path","raws":["scripts/release.py"],"seen":"de93d5020c29372e","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝"},
-{"dst":"client/tests/fixtures/event-types.json","kind":"code-path","raws":["client/tests/fixtures/event-types.json"],"seen":"b9ef3aab140f9316","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝 > 画面"},
 {"dst":"harness/app/project_queries.py","kind":"code-path","raws":["harness/app/project_queries.py"],"seen":"fb4a8c683cbec4e4","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝 > 画面"},
-{"dst":"harness/tests/test_event_type_fixture.py","kind":"code-path","raws":["harness/tests/test_event_type_fixture.py"],"seen":"fa5cb2522d3acf03","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 2. 系统之外的四道缝 > 画面"},
 {"dst":".claude/skills/seam-diff/SKILL.md","kind":"code-path","raws":[".claude/skills/seam-diff/SKILL.md"],"seen":"421e708ebc0f1468","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
 {"dst":"evals/tests/test_no_harness_import.py","kind":"code-path","raws":["evals/tests/test_no_harness_import.py"],"seen":"cbe2016afca46411","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
 {"dst":"evals/tests/test_no_harness_paths.py","kind":"code-path","raws":["evals/tests/test_no_harness_paths.py"],"seen":"7d9820516943ec39","src":"docs/design/architecture/name-map.md#总图的词与代码名的对照 > 4. 每道缝的守卫"},
