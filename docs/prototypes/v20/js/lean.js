@@ -143,7 +143,7 @@
     const asks = ctx.asks ? ctx.asks(d) : 0, others = ctx.others ? ctx.others(d) : 0;
     const flags = (asks ? '<span class="lp-flag is-ask" data-act="lp.jump" data-who="' + esc(d.id) + '" title="跳到对话里要你决定的那条">要你决定 ' + asks + '</span>' : '') +
       (others ? '<span class="lp-flag" title="别的事项正在这个职能">另 ' + others + ' 件</span>' : '');
-    return '<div class="lp-node' + (d.verifies ? ' is-ver' : '') + (ctx.working === d.id ? ' is-working' : '') + (ctx.sel === d.id ? ' is-on' : '') + '" role="button" tabindex="0" data-act="lp.node" data-dept="' + esc(d.id) + '" aria-label="' + esc(d.name) + '：看在做什么、给它发指导">' +
+    return '<div class="lp-node' + (d.verifies ? ' is-ver' : '') + (ctx.working && ctx.working(d) ? ' is-working' : '') + (ctx.sel === d.id ? ' is-on' : '') + '" role="button" tabindex="0" data-act="lp.node" data-dept="' + esc(d.id) + '" aria-label="' + esc(d.name) + '：看在做什么、给它发指导">' +
       '<b>' + esc(d.name) + '</b><span class="lp-node-marks">' + marks + '</span>' + outNote + (st ? '<small class="lp-state">' + esc(st) + '</small>' : '') + qs.map((t) => '<small class="lp-qstate">' + esc(t) + '</small>').join('') +
       (isSub(d) && ctx.inner ? '<button type="button" class="y20-link lp-in" data-act="lp.inner" data-dept="' + esc(d.id) + '">看内部 ›</button>' : '') + (flags ? '<span class="lp-flags">' + flags + '</span>' : '') + '</div>';
   }
@@ -278,7 +278,8 @@
         { t: 'done', who: 'engineering', item: 'w18', text: '做完了：活动页文案已改，三处时间保持一致。开环完成：没有人核验', ai: 1, at: T(-300) },
         { t: 'sep', item: 'w17' }, you('w17', '做报名表单：姓名、手机号、参加人数，人数到上限就不能再报', '开始一个新事项', -40),
         fold('w17', 'pe', '工程与产品往来', ['engineering', 'product'], [], -36),
-        ask('w17', 'engineering', '候补的人补上以后，要不要发短信通知？短信按条收费。', -30, ['发短信', '只在页面上提示'])];
+        // 工程停在询问产品上时，不会同时在等你决定
+        ...(p.asks.some((a) => !a.done) ? [] : [ask('w17', 'engineering', '候补的人补上以后，要不要发短信通知？短信按条收费。', -30, ['发短信', '只在页面上提示'])])];
       return s;
     }
     if (p.id === 'orders') {
@@ -472,9 +473,9 @@
     const asks = openAsks(p).filter((m) => it && m.item === it.id);
     const ctx = {
       sel: s.panel && s.panel.type === 'node' ? s.panel.id : null, inner: true,
-      working: it && unfinished(it) ? it.dept : null,
+      working: (d) => deptStatus(p, it, d).working,
       oldOnly: p.onlyOld,
-      state: (d) => nodeState(p, it, d),
+      state: (d) => deptStatus(p, it, d).text,
       asks: (d) => asks.filter((m) => m.who === d.id).length,
       others: (d) => others.filter((x) => x.dept === d.id).length,
       qstate: qState(p, it),
@@ -497,18 +498,25 @@
     const res = (x) => ({ working: '进行中', open_closed: '开环完成', adopted: '放行', stopped: '已停止' }[x.status] || Y20.ITEM_STATUS[x.status][0]);
     return '<div class="lp-pick" role="tablist" aria-label="选事项"><span class="ln-to-label">图上画</span>' + list.map((x) => '<button type="button" role="tab" aria-selected="' + (it && x.id === it.id) + '" class="lp-pick-btn' + (it && x.id === it.id ? ' is-on' : '') + '" data-act="lp.pick" data-item="' + esc(x.id) + '">' + esc(x.title) + ' <small>' + esc(res(x)) + '</small></button>').join('') + '</div>';
   }
-  function nodeState(p, it, d) {
-    if (!it) return '空闲';
-    const s = st(p);
-    if (it.status === 'adopted' || it.status === 'open_closed') return '';
-    if (openAsks(p).some((m) => m.item === it.id && m.who === d.id)) return '等你决定';
-    if (qState(p, it)(d).length) return '';
+  // 职能在这件事项上的状态，条件与先后按 department-loop.md 2.1；节点上的字、「在做」角标、节点详情都读这一份
+  function deptStatus(p, it, d) {
+    if (!it || !unfinished(it)) return { text: it ? '' : '空闲', qs: [], working: false };
+    const qs = qState(p, it)(d), open = openQs(p, it);
+    const answering = open.some((a) => a.to === d.id), asking = open.some((a) => a.from === d.id);
+    const user = openAsks(p).some((m) => m.item === it.id && m.who === d.id);
     const ds = p.deptState[d.id];
-    if (ds && ds.items && ds.items.includes(it.id) && ds.state !== 'idle' && (ds.items.length === 1 || ds.text.includes(it.title))) return ds.text;
-    if (it.dept === d.id) return '在做';
-    if (!d.produces.length && !d.verifies) return '在旁边接询问';
-    if (s.msgs.some((m) => m.t === 'fold' && m.item === it.id && m.roles.includes(d.id))) return '等别的职能';
-    return '';
+    const own = ds && ds.items && ds.items.includes(it.id) && ds.state !== 'idle' && (ds.items.length === 1 || ds.text.includes(it.title));
+    const main = own ? ds.state === 'running' : it.dept === d.id && it.status === 'working';
+    const working = answering || (main && !asking && !user);
+    if (user) return { text: '等你决定', qs, working };
+    if (qs.length) return { text: '', qs, working };
+    if (own) return { text: ds.text, qs, working };
+    if (it.dept === d.id && it.status !== 'working') return { text: Y20.ITEM_STATUS[it.status][0], qs, working };
+    if (working) return { text: '', qs, working };
+    if (!d.produces.length && !d.verifies) return { text: '在旁边接询问', qs, working };
+    const verifier = orgOf(p, it).depts.find((v) => v.verifies && v.verifies.dept === d.id);
+    const last = verifier && arrowsOf(p, it).filter((a) => a.from === d.id && a.to === verifier.id).pop();
+    return { text: last && !last.verdict ? '核验中' : '等待工作', qs, working };
   }
   function innerArea(p, it) {
     const s = st(p), parent = orgOf(p, it).depts.find((d) => d.id === s.inner);
@@ -543,7 +551,8 @@
     const guidance = s.msgs.filter((m) => m.t === 'you' && m.target === d.id).slice(-2);
     const openHere = openQs(p, it).filter((a) => a.from === d.id || a.to === d.id);
     const ds = p.deptState[d.id];
-    const doing = it && unfinished(it) ? (nodeState(p, it, d) || qState(p, it)(d).join('；') || '这个事项里暂时没有它的事') : it ? '这个事项已结束' : '空闲';
+    const now = deptStatus(p, it, d);
+    const doing = it && unfinished(it) ? ([now.text].concat(now.qs).filter(Boolean).join('；') || '一轮工作中') : it ? '这个事项已结束' : '空闲';
     const extra = (d.who.type === 'outsourced' ? '<p class="y20-small">由外部 agent（' + esc(d.who.agent) + '）做：模型经受控入口由本项目定；推理档位由它自己定。</p>' : '') +
       (d.verifies ? '<p class="y20-small">它的角色是核验角色：核验' + esc((c.depts.find((x) => x.id === d.verifies.dept) || {}).name || '') + '交的' + esc(O.kindName(c, d.verifies.kind)) + '，只写检查材料。</p>' : '') +
       (isSub(d) ? '<p class="y20-small">由一个小组做（' + esc(d.sub ? d.sub.formName : '') + '）：这个职能的一轮工作开一个子事项。</p>' : '');

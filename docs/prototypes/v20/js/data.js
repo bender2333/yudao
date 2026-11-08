@@ -465,6 +465,14 @@
       p.deptState.engineering.text = '按 PRD v2 返工（导出订单为 CSV）';
       return w;
     } },
+    { id: 'signup_asking', label: '活动报名小程序：工程在问产品', go: '#/p/signup', build(w) {
+      const p = w.projects.find((x) => x.id === 'signup'), since = at('t', '14:28');
+      p.asks.push({ id: 'sa3', item: 'w17', from: 'engineering', to: 'product', text: '手机号要不要验证是本人？要验证就得发验证码，短信按条收费。', at: since });
+      mark(w, 'signup', 'w17', { status: 'asking', reason: E + '向' + P + '提出询问，等' + P + '回答', since });
+      Object.assign(p.deptState.product, { text: '回答' + E + '的询问（报名表单）', state: 'running', reason: E + '在「报名表单」上提出询问，' + P + '正在回答', items: ['w17'] });
+      p.deptState.engineering.waits = [{ item: 'w17', on: P + '对询问的回答', since }];
+      return w;
+    } },
     { id: 'interrupted', label: '有中断待恢复', go: '#/p/orders', build(w) {
       const p = w.projects.find((x) => x.id === 'orders');
       mark(w, 'orders', 'w1', { status: 'waiting_resume', reason: '服务重启时这一轮工作被打断，等你决定是否从中断处继续' });
