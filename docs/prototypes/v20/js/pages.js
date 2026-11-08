@@ -61,6 +61,20 @@
       actions: ui.button({ label: '新建项目', kind: 'small primary', act: 'np.new', icon: 'plus' }) + ui.button({ label: '接入已有项目', kind: 'small', act: 'np.attach', icon: 'import' }), body: table });
   }
 
+  // 关键事实：询问与回答、返工、放行、采纳、故障与等待，按时间倒排；点一条跳到那件事项的时序图，不属于某件事项的点开看那条事件
+  const KEY_FACTS = ['询问', '回答', '缺陷记录', '放行', '采纳', '开环完成', '模型服务失败', '动作结果未知'];
+  function factsHtml() {
+    const w = Y20.W();
+    const facts = w.events.filter((e) => e.at >= w.report.last_seen && KEY_FACTS.includes(e.type)).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 12);
+    if (!facts.length) return '';
+    const row = (e) => {
+      const p = H.project(e.project), it = p && e.item && H.item(p, e.item);
+      const text = '<span class="y20-muted">' + timeAt(e.at) + '</span> <b>' + esc(p ? p.name : '') + '</b> ' + H.t(e.project, e.label);
+      return '<li>' + (it ? '<button type="button" class="y20-report-fact" data-go="#/p/' + p.id + '?item=' + it.id + '&seq=1">' + text + '</button>' : '<span class="y20-report-fact is-plain">' + text + ' ' + H.src(e.pos) + '</span>') + '</li>';
+    };
+    return '<h3 class="y20-h3">关键事实</h3><p class="y20-muted y20-small">点一条跳到那件事项的时序图；要回到某一刻看当时的样子用画面的回放。</p><ul class="y20-report-facts">' + facts.map(row).join('') + '</ul>';
+  }
+
   function reportBlock() {
     const r = Y20.W().report;
     const items = r.summary.map((it) => {
@@ -79,7 +93,7 @@
     return ui.block({
       id: 'home-report', title: '离开期间的报告', subtitle: '上次查看：' + ui.time(r.last_seen) + '（' + H.waited(r.last_seen) + '以前）。点一项看明细和来源事件',
       actions: ui.button({ label: '已看过', kind: 'small primary', act: 'report-seen' }),
-      body: '<div class="y20-report-items">' + items + '</div>'
+      body: '<div class="y20-report-items">' + items + '</div>' + factsHtml()
     });
   }
 
