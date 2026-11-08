@@ -6,6 +6,8 @@
 
 这份用例用测试目录里的任务池定义当第二份形态（它不进产品）：发布的那一份与它各跑完一个事项，各按自己
 冻结的定义核对停止原因与部门；改形态只影响之后新建的事项；重开数据目录以后按记下的那一份接着跑。
+形态不在发布里时，取消、加指导、加输入三条控制命令以命令层已定义的 not_allowed 收场（工单 #1578），
+不写事件；换回带那一份形态的发布以后照常接受。
 
 层：集成层（每一条都开真实事件库与真实工作区、跑完整的三部门或任务池循环，模型回答由假模型按部门给出）。
 守 R2（骨架事件与对外合同只增：新的项目流事件在服务端合同与客户端夹具两端登记）与 R3（形态随事项冻结：
@@ -29,6 +31,7 @@ from harness.adapters.fake import FakeAdapter, FakeTurn
 from harness.app.application import Application
 from harness.app.contracts import EVENT_TYPES, Accepted, Rejected
 from harness.app.decision_commands import DecisionAnswer
+from harness.app.project_and_work_item_commands import GuidanceSend, WorkItemAppendInput, WorkItemCancel
 from harness.definitions import DEFAULT_FORM, DEFINITIONS as PRODUCT_DEFINITIONS
 from harness.direct import SINGLE_ROLE_DIRECT
 from harness.event_store import Command, catalog_stream, project_stream, run_stream
@@ -356,6 +359,189 @@ def test_a_run_whose_form_is_not_in_the_release_waits_where_it_is(tmp_path):
     assert back.orchestrator.item_form(run_id).name == second_routing.ROUTING_NAME
     assert back.project(run_id).stop_reason == second_routing.ITEM_END_REASON
     back.close()
+
+
+# 三条控制命令与冻结形态不在发布里（工单 #1578，项目的组织设计说明「冻结与升级」最后一条）：
+# 事项停在原处，取消、加指导、加输入也以命令层已定义的拒绝收场，写下的东西一条也没有；形态回到发布里以后
+# 三条命令照常接受。层：集成层（真实事件库与真实工作区，经应用层的命令登记与命令处理）。
+
+def _activated_item(system: LoopSystem, project_id: str, text: str) -> tuple[str, str]:
+    # 建一个事项并让它开始跑：之后三条控制命令有东西可以作用，又不会自己把事项跑完
+    item_id, run_id = system.projects.start_work_item(project_id, text)
+    assert system.activate_once(run_id).status == "running"
+    return item_id, run_id
+
+
+def _items_under_a_missing_form(data_dir: Path, script: dict[str, list[Any]], texts: tuple[str, ...],
+                                ) -> tuple[str, list[tuple[str, str]]]:
+    # 在带任务池那一份的发布里建好事项并跑起来（每个事项各用一轮假模型回答），再把数据目录留给只带默认形态的
+    # 发布：这些事项记下的形态（任务池）这时不在发布里，按设计停在原处
+    first = _system(data_dir, merge_scripts(*([script] * len(texts))), resume_on_startup=False)
+    project_id = first.projects.register("形态不在发布里", GOAL)
+    _set_form(first, project_id, DEFAULT_FORM, second_routing.ROUTING_NAME)
+    items = [_activated_item(first, project_id, text) for text in texts]
+    first.close()
+    return project_id, items
+
+
+def test_cancel_is_refused_when_the_item_form_is_not_in_the_release(tmp_path):
+    # 验收第 1 条（取消）：事项冻结的形态不在发布里时，取消以命令层已定义的 not_allowed 收场，
+    # 说明写明这个事项的形态不在发布里；不写事件、不抛未处理异常。换回带那一份形态的发布以后照常接受
+    # （见 test_the_three_commands_are_accepted_again_when_the_form_returns）
+    data_dir = tmp_path / "loop"
+    script = _task_pool_script()
+    project_id, [(item_id, run_id)] = _items_under_a_missing_form(data_dir, script, ("要取消的事项",))
+    gone = LoopSystem.for_testing(data_dir, FakeAdapter(script), resume_on_startup=False)
+    events_before = len(gone.store.list_events(run_id))
+    project_events_before = len(gone.store.list_project_events(project_id))
+    command_id = str(uuid.uuid4())
+    application = Application(gone)
+    try:
+        rejected = asyncio.run(application.command(
+            "work_item.cancel", WorkItemCancel(command_id=command_id, work_item_id=item_id), actor="user:local"))
+        assert isinstance(rejected, Rejected)
+        assert rejected.reason == "not_allowed"
+        assert "形态" in rejected.message and "发布" in rejected.message
+        assert len(gone.store.list_events(run_id)) == events_before
+        assert len(gone.store.list_project_events(project_id)) == project_events_before
+        assert gone.store.command(command_id) is None
+    finally:
+        application.close()
+
+
+def test_guidance_is_refused_when_the_item_form_is_not_in_the_release(tmp_path):
+    # 验收第 1 条（加指导）：同一条拒绝，指导没有写入 run 流
+    data_dir = tmp_path / "loop"
+    script = _task_pool_script()
+    project_id, [(item_id, run_id)] = _items_under_a_missing_form(data_dir, script, ("要加指导的事项",))
+    gone = LoopSystem.for_testing(data_dir, FakeAdapter(script), resume_on_startup=False)
+    events_before = len(gone.store.list_events(run_id))
+    project_events_before = len(gone.store.list_project_events(project_id))
+    command_id = str(uuid.uuid4())
+    application = Application(gone)
+    try:
+        rejected = asyncio.run(application.command(
+            "guidance.send", GuidanceSend(command_id=command_id, work_item_id=item_id,
+                                          department="engineering", text="先补用法再补退出码"),
+            actor="user:local"))
+        assert isinstance(rejected, Rejected)
+        assert rejected.reason == "not_allowed"
+        assert "形态" in rejected.message and "发布" in rejected.message
+        assert len(gone.store.list_events(run_id)) == events_before
+        assert len(gone.store.list_project_events(project_id)) == project_events_before
+        assert gone.store.command(command_id) is None
+    finally:
+        application.close()
+
+
+def test_input_is_refused_when_the_item_form_is_not_in_the_release(tmp_path):
+    # 验收第 1 条（加输入）：同一条拒绝，输入没有写入 run 流
+    data_dir = tmp_path / "loop"
+    script = _task_pool_script()
+    project_id, [(item_id, run_id)] = _items_under_a_missing_form(data_dir, script, ("要加输入的事项",))
+    gone = LoopSystem.for_testing(data_dir, FakeAdapter(script), resume_on_startup=False)
+    events_before = len(gone.store.list_events(run_id))
+    project_events_before = len(gone.store.list_project_events(project_id))
+    command_id = str(uuid.uuid4())
+    application = Application(gone)
+    try:
+        rejected = asyncio.run(application.command(
+            "work_item.append_input", WorkItemAppendInput(
+                command_id=command_id, work_item_id=item_id, text="把退出码写进用法一节"), actor="user:local"))
+        assert isinstance(rejected, Rejected)
+        assert rejected.reason == "not_allowed"
+        assert "形态" in rejected.message and "发布" in rejected.message
+        assert len(gone.store.list_events(run_id)) == events_before
+        assert len(gone.store.list_project_events(project_id)) == project_events_before
+        assert gone.store.command(command_id) is None
+    finally:
+        application.close()
+
+
+def test_the_three_commands_return_the_same_refusal_when_the_item_form_is_not_in_the_release(tmp_path):
+    # 验收第 1 条的「同一句原因」：三条命令各作用在一个停在原处的事项上，得到同一个原因与同一句说明
+    data_dir = tmp_path / "loop"
+    script = _task_pool_script()
+    _project_id, [(cancel_item, _cancel_run), (guidance_item, _guidance_run), (input_item, _input_run)] = (
+        _items_under_a_missing_form(data_dir, script, ("要取消的事项", "要加指导的事项", "要加输入的事项")))
+    gone = LoopSystem.for_testing(data_dir, FakeAdapter(script), resume_on_startup=False)
+    application = Application(gone)
+    try:
+        results = [
+            asyncio.run(application.command("work_item.cancel", WorkItemCancel(
+                command_id=str(uuid.uuid4()), work_item_id=cancel_item), actor="user:local")),
+            asyncio.run(application.command("guidance.send", GuidanceSend(
+                command_id=str(uuid.uuid4()), work_item_id=guidance_item, department="engineering",
+                text="先补用法再补退出码"), actor="user:local")),
+            asyncio.run(application.command("work_item.append_input", WorkItemAppendInput(
+                command_id=str(uuid.uuid4()), work_item_id=input_item, text="把退出码写进用法一节"),
+                actor="user:local")),
+        ]
+    finally:
+        application.close()
+    assert [result.reason for result in results] == ["not_allowed", "not_allowed", "not_allowed"]
+    assert len({result.message for result in results}) == 1
+
+
+def test_the_three_commands_are_accepted_when_the_item_form_is_in_the_release(tmp_path):
+    # 验收第 2 条前半：形态在发布里时三条命令的行为不变——各被接受，各写入自己的事件
+    system = _system(tmp_path / "loop", merge_scripts(*([_task_pool_script()] * 3)), resume_on_startup=False)
+    project_id = system.projects.register("形态在发布里", GOAL)
+    _set_form(system, project_id, DEFAULT_FORM, second_routing.ROUTING_NAME)
+    guidance_item, guidance_run = _activated_item(system, project_id, "要加指导的事项")
+    input_item, input_run = _activated_item(system, project_id, "要加输入的事项")
+    cancel_item, cancel_run = _activated_item(system, project_id, "要取消的事项")
+    application = Application(system)
+    try:
+        results = [
+            asyncio.run(application.command("guidance.send", GuidanceSend(
+                command_id=str(uuid.uuid4()), work_item_id=guidance_item, department="engineering",
+                text="先补用法再补退出码"), actor="user:local")),
+            asyncio.run(application.command("work_item.append_input", WorkItemAppendInput(
+                command_id=str(uuid.uuid4()), work_item_id=input_item, text="把退出码写进用法一节"),
+                actor="user:local")),
+            asyncio.run(application.command("work_item.cancel", WorkItemCancel(
+                command_id=str(uuid.uuid4()), work_item_id=cancel_item), actor="user:local")),
+        ]
+        assert [isinstance(result, Accepted) for result in results] == [True, True, True]
+        assert [event for event in system.store.list_events(guidance_run)
+                if event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED]
+        assert [event for event in system.store.list_events(input_run)
+                if event.type == EventType.USER_INPUT_RECEIVED]
+        assert project_run(system.store, cancel_run).status in TERMINAL_STATUSES
+        assert not [event for event in system.store.list_events(guidance_run)
+                    if event.type == EventType.RUN_FAILED]
+    finally:
+        application.close()
+
+
+def test_the_three_commands_are_accepted_again_when_the_form_returns(tmp_path):
+    # 验收第 2 条后半：换回带那一份形态的发布以后，同一个停在原处的事项三条命令照常接受
+    data_dir = tmp_path / "loop"
+    script = _task_pool_script()
+    _project_id, [(cancel_item, cancel_run), (guidance_item, guidance_run), (input_item, input_run)] = (
+        _items_under_a_missing_form(data_dir, script, ("要取消的事项", "要加指导的事项", "要加输入的事项")))
+    back = _system(data_dir, script, resume_on_startup=False)
+    application = Application(back)
+    try:
+        results = [
+            asyncio.run(application.command("work_item.cancel", WorkItemCancel(
+                command_id=str(uuid.uuid4()), work_item_id=cancel_item), actor="user:local")),
+            asyncio.run(application.command("guidance.send", GuidanceSend(
+                command_id=str(uuid.uuid4()), work_item_id=guidance_item, department="engineering",
+                text="先补用法再补退出码"), actor="user:local")),
+            asyncio.run(application.command("work_item.append_input", WorkItemAppendInput(
+                command_id=str(uuid.uuid4()), work_item_id=input_item, text="把退出码写进用法一节"),
+                actor="user:local")),
+        ]
+        assert [isinstance(result, Accepted) for result in results] == [True, True, True]
+        assert [event for event in back.store.list_events(guidance_run)
+                if event.type == EventType.DEPARTMENT_GUIDANCE_RECEIVED]
+        assert [event for event in back.store.list_events(input_run)
+                if event.type == EventType.USER_INPUT_RECEIVED]
+        assert project_run(back.store, cancel_run).status in TERMINAL_STATUSES
+    finally:
+        application.close()
 
 
 def test_force_upgrade_leaves_the_run_then_it_continues_under_its_own_form(tmp_path):
