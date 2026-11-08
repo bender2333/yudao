@@ -180,7 +180,7 @@ def test_a_paused_run_is_observed_as_paused(data_dir):
     application = _application(system)
     recovery = _query(application, RUN_RECOVERY, RunRecovery(run_id=run_id))
     assert recovery.state == "paused", recovery
-    assert recovery.reason == "运行已暂停，等待处理：部门连续多次没有调用工具", recovery.reason
+    assert recovery.reason == "运行已暂停，等待处理：职能连续多次没有调用工具", recovery.reason
     assert "no_tool_call" not in recovery.reason
     system.close()
 
