@@ -1,18 +1,20 @@
-# 薄驱动接上第二种装配与第二种执行跑完一轮（工单 #979；骨架与应用 docs/design/skeleton-and-application.md「可信内核」、「装配契约」、「执行契约」「接法」
+# 薄驱动接上第二种装配与第二种执行跑完一轮（工单 #979、#1513；骨架与应用 docs/design/skeleton-and-application.md「可信内核」、「装配契约」、「执行契约」「接法」
 # 与 docs/design/skeleton-and-application.md「其他路由：骨架要满足的条件」「证明」；总图第四节「装配」「执行」缝）。
 #
 # 两道缝立住的样子：实现不是薄驱动自己造的、也不是按类名调的，而是由组装处经构造参数交进来；换一套
 # 实现（`second_assembly.SecondAssembly` 与 `second_execution.SecondExecution`，都只在测试里用）以后，
 # 薄驱动照契约把一轮跑完，骨架的其余代码一行不改。
 #
-# 这个文件查四件事：
+# 这个文件查五件事：
 # 1. 构造薄驱动时按契约核对两个实现声明的版本，不在接受范围时构造失败，说明写明是哪一道契约（两条）；
 # 2. 薄驱动的源码里没有两个产品实现类的名字（一条）；
 # 3. 薄驱动接上第二种装配与第二种执行时一轮能跑完：驱动拿到执行的结果并写回、停止原因在封闭清单里，
 #    模型一次没有被调用（验收第 2 条）。
+# 4. 开始一轮工作、取派发编号、把结果经写入口写回在薄驱动里：编号事件在开始事件之前，这一轮的事件都带
+#    同一个编号，激活结束事件在最后（工单 #1513 的验收第 1 条）。
 #
 # 层：模块层（一次部门激活、事件库与工作区）。守 R2（各缝的交换字段与版本：装配与执行两个实现经构造
-# 参数接上，版本不在接受范围时接不起来）与 R1（停止原因取自封闭清单）。
+# 参数接上，版本不在接受范围时接不起来）与 R1（停止原因取自封闭清单，编号与结果写回在一处）。
 
 from __future__ import annotations
 
@@ -31,7 +33,10 @@ from harness.runtime import LoopSystem
 from harness.tests import second_assembly, second_execution
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-THIN_DRIVER = REPO_ROOT / "harness" / "orchestrator.py"
+# 薄驱动是 `thin_driver.py`（工单 #1512、#1513）；应用一侧的流程编排仍然在这个文件里，
+# 它同样不认两个产品实现类的名字（执行与装配由组装处经构造参数交进来）
+THIN_DRIVER = REPO_ROOT / "harness" / "thin_driver.py"
+APPLICATION = REPO_ROOT / "harness" / "orchestrator.py"
 STOP_REASONS = REPO_ROOT / "harness" / "definitions" / "stop_reasons.json"
 
 # 薄驱动源码里不该出现的两个产品实现类：它们由组装处（`runtime.py`）交进来，薄驱动只经契约调用
@@ -154,8 +159,33 @@ def test_the_previous_execution_version_still_connects_and_runs_a_round(tmp_path
     assert read["prompt"] is not None and read["prompt"].version == 0
 
 
+def test_the_thin_driver_takes_the_dispatch_number_and_writes_the_round_back(tmp_path):
+    # 验收第 1 条（工单 #1513）：开始一轮工作、取派发编号、把结果经写入口写回都在薄驱动里。
+    # 接上第二种执行实现时这些行为照旧：编号事件在开始事件之前，这一轮的事件都带同一个编号，
+    # 激活结束事件在最后；换实现只换组装处的构造参数，薄驱动一行不改
+    adapter = FakeAdapter({"product": [product_spec()]})
+    system = LoopSystem.for_testing(
+        tmp_path, adapter, step_limits=StepLimits(max_model_steps=2),
+        execution=second_execution.SecondExecution,
+    )
+    run_id = system.create_run("print the argument in uppercase")
+
+    system.activate_once(run_id)
+
+    events = system.store.list_events(run_id)
+    types = [event.type for event in events]
+    acquired = types.index(EventType.DISPATCH_NUMBER_ACQUIRED)
+    started = types.index(EventType.DEPARTMENT_ACTIVATED)
+    finished = len(types) - 1 - types[::-1].index(EventType.ACTIVATION_FINISHED)
+    assert acquired < started < finished, "派发编号与开始事件在结果写回之前，激活结束在最后"
+    numbered = events[acquired:]
+    assert {event.dispatch_number for event in numbered} == {1}, "这一轮写入的事件都带同一个派发编号"
+
+
 def test_the_thin_driver_source_names_neither_product_implementation():
-    # 薄驱动不认识实现的名字以外的东西：两个产品实现的类名不在它的源码里（交付说明附同一条 grep）
-    source = THIN_DRIVER.read_text(encoding="utf-8")
-    offenders = [name for name in PRODUCT_IMPLEMENTATIONS if name in source]
-    assert offenders == [], f"薄驱动源码里出现了产品实现类的名字：{offenders}"
+    # 薄驱动不认识实现的名字以外的东西：两个产品实现的类名不在薄驱动与应用流程编排的源码里
+    # （交付说明附同一条 grep）
+    for path in (THIN_DRIVER, APPLICATION):
+        source = path.read_text(encoding="utf-8")
+        offenders = [name for name in PRODUCT_IMPLEMENTATIONS if name in source]
+        assert offenders == [], f"{path.name} 里出现了产品实现类的名字：{offenders}"
