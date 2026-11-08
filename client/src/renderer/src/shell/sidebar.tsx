@@ -171,7 +171,7 @@ export function Sidebar(props: SidebarProps) {
                   type="button"
                   className={`y10-project nav-item${selected ? " is-selected" : ""}${project.archived ? " is-archived" : ""}`}
                   aria-current={selected ? "page" : undefined}
-                  onClick={() => props.onNavigate(`#/p/${project.project_id}/overview`)}
+                  onClick={() => props.onNavigate(`#/p/${project.project_id}/conversation`)}
                 >
                   <span className="y10-project-name project-name">{project.name}</span>
                   <span className="y10-project-marker">
@@ -272,7 +272,7 @@ function NewProject(props: {
       const projectId = receiptId(props.accepted, "project_id");
       props.onClose();
       if (projectId !== "") {
-        props.onNavigate(`#/p/${projectId}/overview`);
+        props.onNavigate(`#/p/${projectId}/conversation`);
       }
     }
   }, [waitingWrite, props.submitted]);
