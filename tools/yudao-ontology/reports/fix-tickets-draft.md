@@ -6,6 +6,8 @@
 
 **11-08 对照新 main 与 `issue-1577`：** main 到 `4556121`（含 `a794b96` 外包决定与 `41fd487` 文档改动），harness 只动了测试，三处代码照旧。工单一、二不变。工单三的「加载时整份拒绝」那一半，`origin/issue-1577`（`4d0e40e`，还没合）已经做了：`verification_issues` 逐个看写入范围，`check_materials` 的位置不是固定目录就拒绝，带五条测试。所以工单三收窄成剩下的一半，挂 #1577 为前置；#1577 自己的日志也写了「公开树按定义取目录另立工单」，就是这一半。
 
+**11-08 上午再对 main `48e2158`：** #1577 已合（`9d17e23`），工单一、三的前置都满足了。`ce9c688`、`02d1d59` 把结构词「部门」改成「职能」，形态改叫「产品 · 工程 · 质检」「工程」「产品 · 工程」；三张单的设计说明节名与条号没变，单里的「部门」已照改，代码标识符（`department`）照决定不动。三处代码在这一轮也没改：`LEGACY_VERIFICATION` 还在内核，`direct.py` 第 814 行与 `orchestrator.py` 第 551 行还是两种判法，`environment.py` 还取声明的第一个目录，`organization_compose.py` 第 450 行的 `list()` 还在。
+
 依据统一核对过 main `37e9d68`（11-07 夜），11-08 又对过 `4556121`。三处代码在 `eb8429e` 之后一行没改。
 
 | 工单 | 改哪里 | 定的做法 | 放出前要不要先改设计说明 |
@@ -27,7 +29,7 @@
 依据：`docs/design/forms-and-verifier-role.md`「验收」第 3 条（main `37e9d68`）；总图：第二节第三环（内核只认通用的成果），第四节「定义」的缝
 环：需你批准（改内核路径，按 ticket-spec「内核路径」不事前批准）；做法：切片
 
-验收第 3 条原句：「事实与裁决、循环两层的代码里不出现部门名，也不出现 PRD、交付、质检结论这些成果种类的判断」。
+验收第 3 条原句：「事实与裁决、循环两层的代码里不出现职能名，也不出现 PRD、交付、质检结论这些成果种类的判断」。
 
 现在内核模块 `harness/definitions/__init__.py` 第 272 至 276 行写死了一份 `LEGACY_VERIFICATION`：质检核验工程的 `delivery_spec`，质检的写入范围是检查材料。它是旧定义（`organization.json` 没有 `verification` 字段）的兜底，读它的地方有四处：
 - `Definitions.verification`（第 855 至 858 行）
@@ -35,12 +37,12 @@
 - `harness/organization_compose.py` 的 `write_scopes`（第 186 行）
 - 测试 `harness/tests/test_definitions.py`、`harness/tests/kernel/test_definitions_decide.py` 断言默认定义的核验声明等于它
 
-`harness/tests/test_thin_driver_names.py` 用 `EXEMPT_BLOCKS` 把这个区块从部门名检索里遮掉，`ALLOWED` 里还为 `delivery_spec` 留了一条例外。发布带的三份 `organization.json` 都已经写明了 `verification`，兜底只给没写这个字段的旧文件用。
+`harness/tests/test_thin_driver_names.py` 用 `EXEMPT_BLOCKS` 把这个区块从职能名（代码里仍叫 department）检索里遮掉，`ALLOWED` 里还为 `delivery_spec` 留了一条例外。发布带的三份 `organization.json` 都已经写明了 `verification`，兜底只给没写这个字段的旧文件用。
 
 两种做法，11-07 定了 1a：
 
-- **1a 把兜底挪成定义文件（选定）。** 旧声明写进 `harness/definitions/` 下的一份 JSON（例如 `legacy_verification.json`），加载时读成 `VerificationDeclaration`；内核代码只写「没有声明时用那一份」，不写任何部门名与成果种类名。旧文件照旧能读，只增环不破。
-- **1b 去掉兜底（未选）。** 没写 `verification` 的定义不再按三部门解释。要先定没写时怎么办：加载时整份拒绝，或者读作没有核验角色（以开环完成结束）。两种都会改变旧文件的意思，违背 `Organization.verification` 注释里写的「字段只增，旧文件照旧能读」。所以先要查清旧文件从哪里来（项目里存的定义版本、重放旧事项时读的冻结版本），给出迁移办法，并把这一句改进设计说明。
+- **1a 把兜底挪成定义文件（选定）。** 旧声明写进 `harness/definitions/` 下的一份 JSON（例如 `legacy_verification.json`），加载时读成 `VerificationDeclaration`；内核代码只写「没有声明时用那一份」，不写任何职能名与成果种类名。旧文件照旧能读，只增环不破。
+- **1b 去掉兜底（未选）。** 没写 `verification` 的定义不再按默认形态「产品 · 工程 · 质检」解释。要先定没写时怎么办：加载时整份拒绝，或者读作没有核验角色（以开环完成结束）。两种都会改变旧文件的意思，违背 `Organization.verification` 注释里写的「字段只增，旧文件照旧能读」。所以先要查清旧文件从哪里来（项目里存的定义版本、重放旧事项时读的冻结版本），给出迁移办法，并把这一句改进设计说明。
 
 选 1a 的理由：它直接满足验收第 3 条，不碰旧数据。1b 更干净，但代价落在旧项目与重放上，这一步还没人量过。
 
@@ -80,12 +82,12 @@
 
 所以，几个角色都能交完成、只有一个被核验时，没被核验的那个交了完成，事项直接结束，结束原因既不是放行也不是开环完成。
 
-复现（11-07 在副本上做过）：拿测试用的 `harness/tests/direct_with_verifier_definitions/`，加一个部门 `product`，它只有 `submit_completion` 一个工具（避开「运行工作区只有一个写入者」那条拒绝），补上它的提案合同，把它列进 `direct` 路由的部门清单。
+复现（11-07 在副本上做过）：拿测试用的 `harness/tests/direct_with_verifier_definitions/`，加一个职能 `product`，它只有 `submit_completion` 一个工具（避开「运行工作区只有一个写入者」那条拒绝），补上它的提案合同，把它列进 `direct` 路由的职能清单（代码里叫 `departments`）。
 - `load_definitions` 与 `direct.check_definition` 都接受这份定义。
 - `is_open_loop("completion")` 是 False；`verified_outcome("engineering")` 是 True，`verified_outcome("product")` 是 False。
 - 结束原因那一步是读代码得出的，没有跑整个事项。
 
-发布带的形态走不到这里：几个角色直做只有工程能交完成。合成加核验角色时也会把所有交完成的角色都写进核验（`organization_compose.py` 的 `_delivering`）。手写的定义，或者加了核验角色之后再加一个能交完成的部门，就走得到。
+发布带的形态走不到这里：「产品 · 工程」只有工程能交完成。合成加独立核验时也会把所有交完成的角色都写进核验（`organization_compose.py` 的 `_delivering`）。手写的定义，或者加了核验角色之后再加一个能交完成的职能，就走得到。
 
 两种做法，11-07 定了先做 2a；放出前先把 2a 那一句改进设计说明（设计改动不走工单）：
 
@@ -114,7 +116,7 @@
 ### Parent
 #<待定：形态与核验角色的父工单；父工单已关时挂阶段二工单>
 
-前置：#1577（定义写了别的检查材料位置，加载时整份拒绝；分支 `issue-1577`，`4d0e40e`，未合）
+前置：#1577（定义写了别的检查材料位置，加载时整份拒绝），11-08 已合进 main（`9d17e23`）
 
 ### What to build
 依据：`docs/design/forms-and-verifier-role.md`「核验角色」第 1 条（main `4556121`，这一句 `41fd487` 没改）；总图：第四节「定义」与「写入口」的缝
@@ -122,9 +124,9 @@
 
 设计原句：「检查材料放在哪里是主机的固定约定，公开树、交付快照与检查副本都按这一处排除与收录；定义只声明哪个角色得到这块写入范围，不另选位置，写了别的位置的定义在加载时整份拒绝。」
 
-#1577 合了以后，写了别的位置的定义已经加载不进来。剩下的是代码里还有两处不从同一处取目录：
-- `harness/environment.py` 第 905 至 909 行按定义里声明的第一个目录定这个事项的检查材料目录；公开树（`harness/public_tree.py` 第 366 行，`is_qa_tests_path(relative)` 不带目录）用的是 `harness/path_rules.py` 的 `CHECK_MATERIALS_DIR`。今天两者碰巧相等（#1577 保证），但读的不是同一处，以后谁放宽一边就又分开了。
-- `harness/organization_compose.py` 第 450 行在发布里的核验部门没有写入范围时写 `list(CHECK_MATERIALS_DIR)`，对一个字符串取 `list` 得到一个个字符。发布带的定义都写了写入范围，今天走不到；走到了，合成出的定义会被 #1577 的检查拒绝，报的却是用户没写过的位置。
+#1577 合了，写了别的位置的定义已经加载不进来。剩下的是代码里还有两处不从同一处取目录：
+- `harness/environment.py` 第 1009 至 1012 行（`48e2158`）按定义里声明的第一个目录定这个事项的检查材料目录；公开树（`harness/public_tree.py` 第 366 行，`is_qa_tests_path(relative)` 不带目录）用的是 `harness/path_rules.py` 的 `CHECK_MATERIALS_DIR`。今天两者碰巧相等（#1577 保证），但读的不是同一处，以后谁放宽一边就又分开了。
+- `harness/organization_compose.py` 第 450 行在发布里的核验职能没有写入范围时写 `list(CHECK_MATERIALS_DIR)`，对一个字符串取 `list` 得到一个个字符。发布带的定义都写了写入范围，今天走不到；走到了，合成出的定义会被 #1577 的检查拒绝，报的却是用户没写过的位置。
 
 现有代码：`WriteScope` 的字段不删（只增）；`path_rules.py` 的判断函数不改签名。
 
@@ -136,9 +138,9 @@
 
 ### Acceptance criteria
 - [ ] 事项的检查材料目录、公开树、交付快照与检查副本排除与收录检查材料，用的是同一处 `CHECK_MATERIALS_DIR`（`test_public_tree.py` 有用例守着）
-- [ ] 合成时给核验部门的写入范围是固定目录，包括发布里的核验部门没写写入范围的那一种（`test_organization_compose.py`）
+- [ ] 合成时给核验职能的写入范围是固定目录，包括发布里的核验职能没写写入范围的那一种（`test_organization_compose.py`）
 - [ ] 发布带的三份定义与测试用的几份定义照常加载
 - [ ] 验收层：缝，`harness/tests/test_organization_compose.py`、`harness/tests/test_public_tree.py`
-- [ ] 本体复核：在 `research/ontology-step1-r2` 上给第 3 批加一条，定义里检查材料的位置不等于主机固定目录记违例，加一处埋错确认查得出；#1577 合了以后，这条在 main 上应当查不出
+- [ ] 本体复核：在 `research/ontology-step1-r2` 上给第 3 批加一条，定义里检查材料的位置不等于主机固定目录记违例，加一处埋错确认查得出；#1577 已合，这条在 main 上应当查不出
 
 （11-07 的原稿里「加载时整份拒绝」那条验收与 `harness/definitions/__init__.py`、`test_definitions.py` 两处改动已归 #1577，这里删去。）
