@@ -54,6 +54,9 @@ export type ModelManagementPageProps = {
   onBack: () => void;
 };
 
+// 候选测试排队中的进度读取间隔：等待测试 → 测试中 只写在服务端状态里，没有事件
+const CANDIDATE_TEST_PROGRESS_MS = 1500;
+
 // 一次保存部门默认要写的三项
 
 export function ModelManagementPage(props: ModelManagementPageProps) {
@@ -201,6 +204,22 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
   }, [collecting, pendingFetch]);
   // 候选区只在页面自己发出的命令在途时暂停：服务端在后台取候选时页面照常可以操作
   const locked = candidatesLocked({ busy, connecting });
+
+  // 候选测试排队中（工单 #1588）：等待测试 → 测试中 的转变不产生事件，
+  // 页面在等待期间重新读候选，进度才写在这一行里；出结果的事件到达后由视图同步重新查询
+  const waitingCandidateTest = useMemo(
+    () => candidateRows.some((row) => row.candidate.test?.status === "waiting"),
+    [candidateRows],
+  );
+  useEffect(() => {
+    if (!waitingCandidateTest) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      void views?.refresh("models.catalog");
+    }, CANDIDATE_TEST_PROGRESS_MS);
+    return () => clearTimeout(timer);
+  }, [waitingCandidateTest, views, catalog]);
 
   // 用户刚勾选的候选：勾选以后服务端要往返一次才建好访问定义，
   // 勾选框先按本地这份显示（命令被拒绝时再撤回）
@@ -374,6 +393,25 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
       return next;
     });
     return true;
+  }, [submit]);
+
+  // 候选测试（工单 #1588）：只提交命令，不选用、不保存定义；状态与结果由服务端随候选保存，
+  // 命令接受以后重新读取目录，进度与结果就写在这个候选行里
+  const testCandidate = useCallback(async (row: CandidateRow) => {
+    const key = candidateKey(row.provider_id, row.candidate.id);
+    const outcome = await submit("catalog.candidate.test", {
+      provider_id: row.provider_id,
+      model: row.candidate.id,
+    });
+    setCandidateStatus((current) => {
+      const next = { ...current };
+      if (outcome.ok) {
+        delete next[key];
+      } else {
+        next[key] = { kind: "error", message: commandProblemText(outcome.problem) };
+      }
+      return next;
+    });
   }, [submit]);
 
   const removeModel = useCallback(async (providerId: string, modelId: string, key: string): Promise<boolean> => {
@@ -699,6 +737,7 @@ export function ModelManagementPage(props: ModelManagementPageProps) {
               onPrevious={() => setPage(candidatePageAfter(pageView.page, "previous", pageView.pages))}
               onNext={() => setPage(candidatePageAfter(pageView.page, "next", pageView.pages))}
               onToggle={(row) => void toggleCandidate(row)}
+              onTest={(row) => void testCandidate(row)}
               onManualOpen={() => {
                 setManualOpen(true);
                 setManualProvider(catalog.providers[0]?.id ?? "");

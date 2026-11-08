@@ -10,6 +10,7 @@ import {
   PROTOCOL_LABELS,
   SOURCE_LABELS,
   candidateApplicable,
+  candidateTestView,
   type CandidateFilterId,
   type CandidateRow,
 } from "./model-logic";
@@ -43,6 +44,8 @@ export type CandidateListProps = {
   onPrevious: () => void;
   onNext: () => void;
   onToggle: (row: CandidateRow) => void;
+  /** 候选测试：没有选用的候选行上的「测试」按钮（catalog.candidate.test） */
+  onTest: (row: CandidateRow) => void;
   onManualOpen: () => void;
   onManualClose: () => void;
   onManualModel: (value: string) => void;
@@ -66,6 +69,17 @@ function capacityText(candidate: CandidateRow["candidate"]): string {
     return "容量未知";
   }
   return `上下文 ${window.toLocaleString("en-US")} / 最大输出 ${output.toLocaleString("en-US")}`;
+}
+
+// 候选测试状态文字的颜色：通过写绿、未通过写黄，等待与测试中用弱化色
+function testStateClass(status: string | undefined): string {
+  if (status === "failed") {
+    return "y10-warn-text mm-warn";
+  }
+  if (status === "passed") {
+    return "mm-ok";
+  }
+  return "y10-muted";
 }
 
 export function CandidateList(props: CandidateListProps) {
@@ -119,6 +133,8 @@ export function CandidateList(props: CandidateListProps) {
             const applicable = candidateApplicable(candidate);
             const checked = props.selected.has(key);
             const status = props.status[key];
+            // 候选测试的按钮与状态：与候选在同一行里（docs/design/model-management.md「候选测试」）
+            const test = candidateTestView({ candidate, selected: checked, busy: props.disabled });
             return (
               <li className={`mm-candidate${checked ? " is-on" : ""}`} key={key}
                   data-testid={`candidate-${candidate.id}`}>
@@ -152,6 +168,28 @@ export function CandidateList(props: CandidateListProps) {
                   {!applicable ? "不适用于部门任务"
                     : checked ? "已选用" : "选择即配置"}
                 </span>
+                {test.visible ? (
+                  <p className="y10-row y10-small mm-candidate-test"
+                     data-testid={`candidate-test-${candidate.id}`}>
+                    <button type="button" className="y10-btn small"
+                            data-testid={`candidate-test-button-${candidate.id}`}
+                            disabled={!test.enabled}
+                            onClick={() => props.onTest(row)}>
+                      {test.buttonText}
+                    </button>
+                    {test.note === "" ? null : (
+                      <span className="y10-warn-text mm-warn" data-testid={`candidate-test-note-${candidate.id}`}>
+                        {test.note}
+                      </span>
+                    )}
+                    {test.state === "" ? null : (
+                      <span className={testStateClass(candidate.test?.status)} role="status"
+                            data-testid={`candidate-test-state-${candidate.id}`}>
+                        {test.state}
+                      </span>
+                    )}
+                  </p>
+                ) : null}
                 {status ? (
                   <p className={status.kind === "ok" ? "y10-small mm-ok" : "y10-warn-text mm-warn"}
                      role="status" data-testid={`candidate-status-${candidate.id}`}>
