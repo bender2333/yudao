@@ -1,14 +1,16 @@
-// 离开期间的报告里的开环明细（工单 #401；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」；应用层与接口层设计说明
+// 离开期间的报告里的开环明细与收敛明细（工单 #401、#1583；验证的独立性 docs/design/independent-verification.md「检验覆盖与开环」、「口径」；应用层与接口层设计说明
 // docs/design/app-and-interface.md「查询清单」 `home.away_report` 与 `acceptance.coverage`）：
 // 报告里「带开环条件的放行」一项逐条列出每个放行的开环条件，条数与明细取自 `acceptance.coverage`
 // （放行记录里一次算好，页面读这个数，不重新计算）；事项的名称取自 project.overview；
+// 「收敛状态的变化」一项按结构化字段（事项标识、层名、前后状态）拼文字，标题取自 project.overview；
 // 「跳到逐条结论表」的链接在逐条结论表交付以后（#154）出现；页面文字里没有英文内部标识，
 // 也不写事项一级的「开环完成」。
 //
 // 用 node --test 运行，不依赖服务与网络：输入是查询结果的形状（与 api/generated/types.gen 的
 // ReportItem、ReportFact 与 AcceptanceCoverageResult 相同），断言的是页面上的那几行字。
 // 守 R2（查询交换的字段：条数与开环明细取自 acceptance.coverage 的 numbers.open 与 open_criteria，
-// 位置取自报告项的 refs）与 R3（检验覆盖与开环在页面上看得到，与放行记录一致）。
+// 位置取自报告项的 refs；两项的事项标识与层名取自只增的结构化字段）与 R3（检验覆盖与开环在页面上看得到，
+// 与放行记录一致；收敛变化写事项标题与中文层名、状态名）。
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -40,9 +42,14 @@ function loader(module: NodeJS.Module, filename: string) {
 require.extensions[".tsx"] = loader;
 require.extensions[".ts"] = loader;
 
-const { openReleaseRows, openReleaseTargets } = require(
+const { convergenceRows, openReleaseRows, openReleaseTargets } = require(
   "../../src/renderer/src/views/home/away-report.tsx",
 ) as {
+  convergenceRows: (
+    item: ReportItem | null | undefined,
+    titles: Readonly<Record<string, string>>,
+    projectNames: Readonly<Record<string, string>>,
+  ) => ConvergenceRowView[];
   openReleaseRows: (lookup: {
     targets: readonly OpenReleaseTarget[];
     titles: Readonly<Record<string, string>>;
@@ -69,16 +76,45 @@ interface OpenReleaseRow {
   href: string | null;
 }
 
+interface ConvergenceRowView {
+  key: string;
+  where: string;
+  change: string;
+  href: string | null;
+}
+
 const PROJECT = "proj_echo";
 const ITEM = "wi_echo";
-// 报告里的一项：放行事件的位置在 refs 里，明细是服务端拼好的那句（页面不写这一句，逐条列在下面）
+// 报告里的一项：放行事件的位置在 refs 里，结构化字段给出事项标识、项目与开环条件；
+// 明细是服务端拼好的那句（页面不写这一句，逐条列在下面）
 const OPEN_RELEASE: ReportItem = {
   id: "open_release",
   label: "带开环条件的放行",
   value: 1,
   unit: "次",
   refs: [42],
-  detail: `${ITEM}：AC2、AC3`,
+  detail: "实现回声工具：AC2、AC3",
+  entries: [{ work_item_id: ITEM, project_id: PROJECT, open_criteria: ["AC2", "AC3"] }],
+};
+
+// 报告里「收敛状态的变化」的一项：两行，字段是服务端写好的中文层名与前后状态
+const CONVERGENCE: ReportItem = {
+  id: "convergence",
+  label: "收敛状态的变化",
+  value: 2,
+  unit: "处",
+  refs: [10],
+  detail: "实现回声工具 · 部门之间的循环：无法判定 → 收敛中；实现回声工具 · 步骤：收敛中 → 停滞",
+  entries: [
+    {
+      work_item_id: ITEM, project_id: PROJECT,
+      layer: "部门之间的循环", state_from: "无法判定", state_to: "收敛中",
+    },
+    {
+      work_item_id: ITEM, project_id: PROJECT,
+      layer: "步骤", state_from: "收敛中", state_to: "停滞",
+    },
+  ],
 };
 
 function fact(over: Partial<ReportFact> = {}): ReportFact {
@@ -137,15 +173,19 @@ function lookup(over: {
   };
 }
 
-test("报告项指向的位置换成放行：项目与事项取自同一份报告的关键事实", () => {
+test("报告项指向的放行：项目与事项取自结构化字段，时间取自关键事实", () => {
   const targets = openReleaseTargets(OPEN_RELEASE, [fact()]);
   assert.deepEqual(targets, [{
     position: 42, projectId: PROJECT, workItemId: ITEM, at: "2026-11-03T09:30:00Z",
   }]);
-  // 不是这一项的报告项、没有事实的位置都不列：位置没有对应事实时不编一个事项出来
+  // 不是这一项的报告项、没有结构化字段的位置都不列：不靠解析 detail 或猜事实
   assert.deepEqual(openReleaseTargets({ ...OPEN_RELEASE, id: "released" }, [fact()]), []);
-  assert.deepEqual(openReleaseTargets({ ...OPEN_RELEASE, refs: [7] }, [fact()]), []);
+  assert.deepEqual(openReleaseTargets({ ...OPEN_RELEASE, entries: [] }, [fact()]), []);
   assert.deepEqual(openReleaseTargets(null, [fact()]), []);
+  // 关键事实里没有这个位置时仍然列出这一行，只是没有时间
+  assert.deepEqual(openReleaseTargets({ ...OPEN_RELEASE, refs: [7] }, [fact()]), [{
+    position: 7, projectId: PROJECT, workItemId: ITEM, at: null,
+  }]);
 });
 
 test("每个放行列出它的开环条件，条数与明细取自 acceptance.coverage", () => {
@@ -183,10 +223,37 @@ test("还没有读到与读不出来是两句话：不把「正在读取」当�
   assert.equal(unreadable[0].text, "开环明细读不出来");
 });
 
-test("事项标题取不到时写「未记事项」，不把事项标识写进页面", () => {
+test("事项标题取不到时写「未命名事项」，不把事项标识写进页面", () => {
   const rows = openReleaseRows(lookup({ titles: {} }));
-  assert.equal(rows[0].where, "示例项目 / 未记事项");
+  assert.equal(rows[0].where, "示例项目 / 未命名事项");
   assert.ok(!rows[0].where.includes("wi_"), rows[0].where);
+  const changes = convergenceRows(CONVERGENCE, {}, { [PROJECT]: "示例项目" });
+  assert.equal(changes[0].where, "示例项目 / 未命名事项");
+  assert.ok(!changes[0].where.includes("wi_"), changes[0].where);
+});
+
+test("收敛明细按结构化字段写事项标题、中文层名与前后状态，不解析 detail", () => {
+  const rows = convergenceRows(CONVERGENCE, { [ITEM]: "实现回声工具" }, { [PROJECT]: "示例项目" });
+  assert.deepEqual(rows.map((row) => `${row.where} · ${row.change}`), [
+    "示例项目 / 实现回声工具 · 部门之间的循环：无法判定 → 收敛中",
+    "示例项目 / 实现回声工具 · 步骤：收敛中 → 停滞",
+  ]);
+  // 事项标识与项目标识在字段里，整行是回到这个事项概览的链接
+  assert.equal(rows[0].href, `#/p/${PROJECT}/overview?w=${ITEM}`);
+  // 不是这一项、缺少层或状态的行不列
+  assert.deepEqual(convergenceRows({ ...CONVERGENCE, id: "open_release" }, {}, {}), []);
+  assert.deepEqual(convergenceRows({
+    ...CONVERGENCE, entries: [{ work_item_id: ITEM, project_id: PROJECT }],
+  }, {}, {}), []);
+});
+
+test("收敛明细的文字里没有事项标识与 run 标识", () => {
+  const text = convergenceRows(CONVERGENCE, {}, { [PROJECT]: "示例项目" })
+    .map((row) => `${row.where}${row.change}`).join("\n");
+  for (const word of ["wi_", "run_"]) {
+    assert.ok(!text.includes(word), `页面文字里出现了 ${word}：${text}`);
+  }
+  assert.ok(text.includes("未命名事项"), text);
 });
 
 test("「跳到逐条结论表」的链接在逐条结论表交付以后出现（#154）", () => {
