@@ -300,6 +300,9 @@ class Orchestrator:
         test_model: str = "fake-script",
         sessions: SessionFactory | None = None,
         step_limits: StepLimits | None = None,
+        # 运行时间读的时钟（工单 #1520）：默认是单调时钟。测试交进受控的时钟，把「运行时间用完」安排
+        # 在它选定的时点（例如第一次模型调用之后），运行时间的判定不依赖真实时长
+        run_clock: Callable[[], float] | None = None,
         deltas: DeltaChannel | None = None,
         tightening: Tightening,
         routing: routing_contract.Routing,
@@ -411,7 +414,10 @@ class Orchestrator:
         # 运行时间的计时（docs/design/skeleton-and-application.md「最小投影」，S1e 工单 #1015）：已经结算的量读最小投影，
         # 正在跑的那一段只有驱动知道，所以驱动只记这一段从什么时候开始（单调时钟）。
         # 等待期间段计时暂停，等待的时间不计入（工单 #350）：停表时把这一段折进 _run_segment_ms，
-        # 醒来重新记起点；这一轮结束、累计量写进事件以后，投影给出已结算量，这一段清零
+        # 醒来重新记起点；这一轮结束、累计量写进事件以后，投影给出已结算量，这一段清零。
+        # 段起点与当前时刻都读 _run_clock（工单 #1520）：默认是单调时钟，测试交进受控的时钟时，
+        # 运行时间用完的时点由测试决定；重试退避等多久仍由事件循环的时钟算，与这里的累计无关
+        self._run_clock: Callable[[], float] = time.monotonic if run_clock is None else run_clock
         self._run_segment_ms: dict[str, int] = {}
         self._run_segment_start: dict[str, float] = {}
         # 每个会话这一段的起点（run 的已用毫秒，工单 #475）：键是 (run 编号, 会话编号)。
@@ -889,7 +895,7 @@ class Orchestrator:
         total_ms = self.writes.minimal(run_stream(run_id)).used.settled_ms + self._run_segment_ms.get(run_id, 0)
         started = self._run_segment_start.get(run_id)
         if started is not None:
-            total_ms += max(0, int((time.monotonic() - started) * 1000))
+            total_ms += max(0, int((self._run_clock() - started) * 1000))
         return total_ms
 
     def _session_used(self, run_id: str, session_id: str) -> SessionState:
@@ -928,11 +934,11 @@ class Orchestrator:
         started = self._run_segment_start.pop(run_id, None)
         if started is not None:
             self._run_segment_ms[run_id] = self._run_segment_ms.get(run_id, 0) + max(
-                0, int((time.monotonic() - started) * 1000))
+                0, int((self._run_clock() - started) * 1000))
 
     def _resume_run_clock(self, run_id: str) -> None:
         # 等待结束以后重新开始段计时
-        self._run_segment_start.setdefault(run_id, time.monotonic())
+        self._run_segment_start.setdefault(run_id, self._run_clock())
 
     def _settle_run_segment(self, run_id: str, department: str | None = None) -> int:
         # 激活结束：把当前运行段也写入累计；还有其他会话工作时，提交以后从新的起点继续计时。
@@ -945,7 +951,7 @@ class Orchestrator:
         # 别的会话还在工作时这一段的起点从这里重新记，不把已经结算的那一段时间再算一遍
         self._run_segment_ms[run_id] = 0
         if run_id in self._run_segment_start:
-            self._run_segment_start[run_id] = time.monotonic()
+            self._run_segment_start[run_id] = self._run_clock()
 
     def _time_left(self, run_id: str) -> float:
         # 剩余运行时间读最小投影（docs/design/skeleton-and-application.md「最小投影」，S1d 工单 #860）
