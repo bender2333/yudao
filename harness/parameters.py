@@ -12,7 +12,7 @@ from typing import Any
 from .definitions import DEFINITIONS, VISIBILITY_VALUES, Definitions
 from .models import CatalogEvent, CatalogEventType, ProjectEventType, json_dumps
 
-# 建 run 时冻结的参数（工单 #1189）：这 10 项在 run 创建时从参数现值取样，这个 run 一直用它，
+# 建 run 时冻结的参数（工单 #1189）：这些参数在 run 创建时从参数现值取样，这个 run 一直用它，
 # 参数事件只作用于之后创建的 run（规则登记与参数 docs/design/rules-and-parameters.md「参数怎样成为带版本的数据」）
 RUN_PARAMETERS = (
     "tool_call_required_limit",
@@ -25,6 +25,9 @@ RUN_PARAMETERS = (
     "bash_timeout_max_sec",
     "check_timeout_max_sec",
     "compaction.stalled_limit",
+    # 浏览器动作的调用时限（工单 #1582）：并入冻结字典，浏览器会话按本 run 的冻结值起 ServerLaunch。
+    # #1184 把它交给 browser.py 在模块导入时读定义初值，参数事件写进现值也改不了正在用它的会话
+    "browser.call_timeout_sec",
     # #397 的三项收敛判定参数（循环与收敛 docs/design/loops-and-convergence.md「判定参数」）：实例创建时冻结，投影按冻结值重放
     "convergence.rounds",
     "convergence.step_window",
@@ -100,7 +103,8 @@ class ParameterStaleError(ValueError):
 # 「接入」指代码按这条登记取值改变实际行为：parameter 条目要有代码读它的现值（参数事件折叠的结果，或创建
 # run 时从现值冻结下来的值），structure 条目要有代码读定义里的取值。把值写进参数事件、登记查询或 run 的
 # 冻结容器本身不算消费；只有同一提交已经提供实际消费者时才标为接入。
-# #1189 接入的冻结读取参数与三条可见范围、#397 接入的三项收敛参数在各自的实现提交里改这一份清单。
+# #1189 接入的冻结读取参数与三条可见范围、#397 接入的三项收敛参数、#1582 并入冻结字典的浏览器调用时限
+# 在各自的实现提交里改这一份清单。
 NOT_WIRED_REASONS: dict[str, str] = {
     "provider.model_test_max_concurrent": "",
     # 已接入：代码按现值改变行为
@@ -125,8 +129,8 @@ NOT_WIRED_REASONS: dict[str, str] = {
     "bash_timeout_max_sec": "",
     "check_timeout_max_sec": "",
     "compaction.stalled_limit": "",
-    # 已接入（工单 #1184）：浏览器动作的调用时限由 harness/browser.py 读现值，是 Playwright MCP
-    # 自己的动作时限与导航时限之外的上限
+    # 已接入（工单 #1582）：建 run 时冻结，浏览器会话按本 run 的冻结值起 ServerLaunch（harness/environment.py
+    # 的 _open_browser），是 Playwright MCP 自己的动作时限与导航时限之外的上限；改参数只作用于之后创建的 run
     "browser.call_timeout_sec": "",
 
     # 还没有读取方：取值不影响任何行为

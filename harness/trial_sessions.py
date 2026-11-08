@@ -54,8 +54,9 @@ READY_REQUEST_TIMEOUT_SEC = 2.0
 # 程序探测的命令最多等这么久（秒）：npm 在 Windows 上第一次运行较慢
 PROBE_TIMEOUT_SEC = 90
 
-# 一条工具结果带回来的输出上限（字符）：取自规则登记里的 tool_output_limit，与执行环境按同一条规则
-# 截断（读输出、结束会话与失败回执带回来的启动输出都走这个上限）
+# 一条工具结果带回来的输出上限（字符）：与执行环境按同一条规则截断（读输出、结束会话与失败回执带回来的
+# 启动输出都走这个上限）。调用方（harness/environment.py）在建立会话、读输出与结束会话时都传入本 run 冻结的
+# tool_output_limit；这里的初值只是没有冻结值时的回退（工单 #1582）
 DEFAULT_OUTPUT_LIMIT = int(DEFINITIONS.rule_value("tool_output_limit"))
 
 # 会话的结束方式（docs/design/browser-and-computer-use.md「事件、决定请求与查询」 `trial_session_ended` 的取值）：停止、被新会话替换、中断（持有会话的
