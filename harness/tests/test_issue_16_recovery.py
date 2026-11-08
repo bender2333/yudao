@@ -1,3 +1,7 @@
+# 故障矩阵第 4 行：test_two_processes_recovering_the_same_run_only_one_advances 核对两个进程争取同一个 run，
+# 最多一个可以推进（执行权编号在写入口与领域写入一起核对，旧结果不能改变领域状态）。
+# 故障矩阵第 10 行：定义版本不同时发出决定请求交给用户；继续以后后续事件记录新版本，选择停止以后不再继续
+# （恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 # 恢复入口与执行权限（工单 #16）。数据目录是真实的 SQLite 事件日志，服务启动经真实的 LoopSystem，
 # 模型回答由 FakeAdapter 给出；中断由「进程关闭、重新以新的系统打开同一数据目录」表示，不模拟异常。
 

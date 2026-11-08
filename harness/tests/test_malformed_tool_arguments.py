@@ -1,3 +1,7 @@
+# 故障矩阵第 7 行的工具参数一侧：流式输出截断以后工具参数不完整，原回答照常记入历史（参数规整成有效
+# JSON），具体的参数错误经工具结果回传模型，工具从不启动。输出不完整时保留原输出与已知用量的一侧
+# 由 test_fault_matrix_row7_incomplete_model_output.py 守着
+# （恢复契约与故障矩阵 docs/design/recovery-contract-and-fault-matrix.md「故障矩阵」）。
 from __future__ import annotations
 
 import json
