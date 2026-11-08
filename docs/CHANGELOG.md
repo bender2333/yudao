@@ -9,6 +9,8 @@
 
 ---
 
+claude-opus-5-5（子架构师） / 2026-11-09 00:20 / `docs/design/project-organization.md` 4.8、4.9、4.15 的设置页清单一致：成果写回、机器授权、执行位置、MCP 服务器收进「高级」，「模型请求与用量」和「高级」并列在设置页底部，内容去向表最后几行只写理由；`app-and-interface`、`browser-and-computer-use`、`execution-environment`、`existing-project-onboarding`、`model-management`、`network-and-mcp`、`skeleton-and-application`、`visualization` 14.1、`department-loop`、`project-initial-files` 的旧页面名改到内容去向表的位置；`semantic-system` 提到的语义记录与角色详情表里没有位置，未改 / 收成对话与设置两页，已有文档一次改完
+
 claude-opus-5-5（子架构师） / 2026-11-09 00:14 / `docs/design/project-organization.md` 4.14 加「项目页上的内容在哪里看」按内容列的表，并加事项面板与「全部事项」；`docs/design/app-and-interface.md` 4.1 的页面说法、4.3 的分组名与相邻的页面说法改到表里的位置，4.4 加 `run.steps` 每步带调用尝试编号 / 收成对话与设置两页之前要先知道每样内容在哪里看
 
 claude-opus-5-5（子架构师） / 2026-11-08 21:37 / `docs/design/project-organization.md` 4.14 第四层改成一句话说明每一步、按任务分组、点开才是原始数据；`docs/design/app-and-interface.md` 4.4 去掉用时一条；`docs/prototypes/v20/` 工作过程改成任务、步骤、原始数据三级，走查与 `docs/prototypes/CHANGELOG.md` 同步 / 用户要工作过程像「读取文件」这样的说明，不直接显示一大串实际动作
