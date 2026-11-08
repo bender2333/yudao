@@ -5343,6 +5343,28 @@
             "type": "string",
             "title": "Question"
           },
+          "background": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Background"
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected"
+          },
           "status": {
             "type": "string",
             "enum": [
@@ -5362,6 +5384,28 @@
               }
             ],
             "title": "Answer"
+          },
+          "answer_facts": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Facts"
+          },
+          "answer_explanation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer Explanation"
           },
           "reason": {
             "anyOf": [
