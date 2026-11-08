@@ -7,8 +7,8 @@
 # 本模块只导入内核模块、契约模块、标准库与 pydantic：导入由 harness/tests/test_thin_driver_imports.py 核对；
 # 部门标识与成果种类不在这个文件里：检索由 harness/tests/test_thin_driver_names.py 覆盖。
 #
-# 薄驱动自己只读最小投影；运行视图、路由实现、定义与应用的会话状态是应用的东西，经钩子取得。
-# 部门与成果的名称一律从定义取。
+# 薄驱动自己只读最小投影；运行视图、路由实现、定义与应用的会话状态是应用的东西，经钩子取得，
+# 读应用投影的判断也在应用一侧。部门与成果的名称一律从定义取。
 
 from __future__ import annotations
 
