@@ -1,0 +1,606 @@
+{
+  "note": "录下的接口响应（工单 #1574）：harness.demo 跑完一轮以后经 HTTP 读取的 run.loops（位置 289）。覆盖层「循环」的场景用它：画面还没有覆盖层的入口，端到端测试把这份响应经翻译层翻成覆盖层数据，交给画面的 setOverlay。",
+  "response": {
+    "position": 289,
+    "data": {
+      "run_id": "run_efe548f537054b00",
+      "project_id": "proj_70bbe80f744d4128",
+      "work_item_id": "wi_5d59d651be30483d",
+      "status": "done",
+      "stop_reason": "released",
+      "parameters": {
+        "convergence.rounds": 3,
+        "convergence.step_window": 8,
+        "convergence.step_repeat": 3
+      },
+      "method": {
+        "trend_switch_rounds": 8,
+        "flip_threshold": 2
+      },
+      "layers": [
+        {
+          "name": "project_loop",
+          "state": "undetermined",
+          "missing": "项目层缺少故障记录：运维记录故障以后判定",
+          "amounts": {}
+        },
+        {
+          "name": "work_item",
+          "state": "undetermined",
+          "missing": "事项层缺少计划条目完成的主机事实",
+          "amounts": {}
+        },
+        {
+          "name": "run",
+          "state": "stalled",
+          "missing": null,
+          "amounts": {
+            "elapsed_ms": {
+              "used": 12164,
+              "limit": 7200000,
+              "unlimited": false
+            },
+            "model_steps": {
+              "used": 20,
+              "limit": 999999,
+              "unlimited": true
+            }
+          }
+        },
+        {
+          "name": "activation",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "amounts": {
+            "activations": {
+              "used": 11,
+              "limit": 999999,
+              "unlimited": true
+            }
+          }
+        },
+        {
+          "name": "step",
+          "state": "converging",
+          "missing": null,
+          "amounts": {
+            "model_steps": {
+              "used": 20,
+              "limit": 999999,
+              "unlimited": true
+            }
+          }
+        }
+      ],
+      "activations": [
+        {
+          "activation_id": "act_7ce06bea14de43f7",
+          "department": "product",
+          "started_at": "2026-11-08T14:16:29.725418+08:00",
+          "finished_at": "2026-11-08T14:16:30.133246+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_7ce06bea14de43f7",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:29.776205+08:00",
+              "attempts": 1,
+              "accepted": false,
+              "facts": [],
+              "calls": [
+                "ask:5043490f07c6bd11"
+              ]
+            },
+            {
+              "step_id": 2,
+              "activation_id": "act_7ce06bea14de43f7",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:29.966546+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "artifact",
+                  "position": 34
+                },
+                {
+                  "kind": "artifact",
+                  "position": 35
+                }
+              ],
+              "calls": [
+                "submit_product_spec:b91dde4fcbd65779"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_ask_8ac6f7e3628a4638",
+          "department": "engineering",
+          "started_at": "2026-11-08T14:16:29.808446+08:00",
+          "finished_at": "2026-11-08T14:16:29.90317+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_ask_8ac6f7e3628a4638",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:29.864494+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "answer",
+                  "position": 25
+                }
+              ],
+              "calls": [
+                "answer:98692ea2036698ca"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_7acff44d65fb4ff7",
+          "department": "engineering",
+          "started_at": "2026-11-08T14:16:30.165378+08:00",
+          "finished_at": "2026-11-08T14:16:33.631681+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_7acff44d65fb4ff7",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:30.251676+08:00",
+              "attempts": 1,
+              "accepted": false,
+              "facts": [],
+              "calls": [
+                "ask:869ec485f0172c9e"
+              ]
+            },
+            {
+              "step_id": 2,
+              "activation_id": "act_7acff44d65fb4ff7",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:30.805728+08:00",
+              "attempts": 1,
+              "accepted": false,
+              "facts": [],
+              "calls": []
+            },
+            {
+              "step_id": 3,
+              "activation_id": "act_7acff44d65fb4ff7",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:31.131957+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "write",
+                  "position": 110
+                },
+                {
+                  "kind": "answer",
+                  "position": 113
+                },
+                {
+                  "kind": "check",
+                  "position": 160
+                }
+              ],
+              "calls": [
+                "submit_delivery:495967d9fa75ada7"
+              ]
+            },
+            {
+              "step_id": 4,
+              "activation_id": "act_7acff44d65fb4ff7",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:32.75634+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "write",
+                  "position": 170
+                },
+                {
+                  "kind": "check",
+                  "position": 173
+                },
+                {
+                  "kind": "artifact",
+                  "position": 177
+                }
+              ],
+              "calls": [
+                "submit_delivery:00d882f36ca32a2e"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_2aefd0c116974042",
+          "department": "quality",
+          "started_at": "2026-11-08T14:16:30.19304+08:00",
+          "finished_at": "2026-11-08T14:16:30.821506+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_2aefd0c116974042",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:30.345258+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "write",
+                  "position": 59
+                }
+              ],
+              "calls": [
+                "submit_review:5fe36ff2e50a8ec6"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_ask_a123a84ced8f4d12",
+          "department": "product",
+          "started_at": "2026-11-08T14:16:30.283562+08:00",
+          "finished_at": "2026-11-08T14:16:30.625594+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_ask_a123a84ced8f4d12",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:30.550789+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "artifact",
+                  "position": 73
+                },
+                {
+                  "kind": "artifact",
+                  "position": 74
+                },
+                {
+                  "kind": "answer",
+                  "position": 75
+                }
+              ],
+              "calls": [
+                "answer:0d40cec225a03421"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_70c28564a302472e",
+          "department": "quality",
+          "started_at": "2026-11-08T14:16:30.840567+08:00",
+          "finished_at": "2026-11-08T14:16:31.713076+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_70c28564a302472e",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:30.926437+08:00",
+              "attempts": 1,
+              "accepted": false,
+              "facts": [],
+              "calls": [
+                "ask:18118430780f4274"
+              ]
+            },
+            {
+              "step_id": 2,
+              "activation_id": "act_70c28564a302472e",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:31.373477+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "write",
+                  "position": 121
+                }
+              ],
+              "calls": [
+                "submit_review:5fe36ff2e50a8ec6"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_ask_f02a7fbf2738411b",
+          "department": "engineering",
+          "started_at": "2026-11-08T14:16:30.962669+08:00",
+          "finished_at": "2026-11-08T14:16:31.29358+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_ask_f02a7fbf2738411b",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:31.036736+08:00",
+              "attempts": 1,
+              "accepted": false,
+              "facts": [],
+              "calls": [
+                "answer:4e1ecf2133f92c9e"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_8c04f5d481474133",
+          "department": "product",
+          "started_at": "2026-11-08T14:16:31.745435+08:00",
+          "finished_at": "2026-11-08T14:16:32.181122+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_8c04f5d481474133",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:31.909154+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "artifact",
+                  "position": 142
+                },
+                {
+                  "kind": "artifact",
+                  "position": 143
+                }
+              ],
+              "calls": [
+                "submit_product_spec:19c0ccf12d001e8d"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_799d6e72ce8a4266",
+          "department": "quality",
+          "started_at": "2026-11-08T14:16:32.207458+08:00",
+          "finished_at": "2026-11-08T14:16:32.965067+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_799d6e72ce8a4266",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:32.337175+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "write",
+                  "position": 155
+                }
+              ],
+              "calls": [
+                "submit_review:5fe36ff2e50a8ec6"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_c9b1dc0e89064834",
+          "department": "quality",
+          "started_at": "2026-11-08T14:16:33.652382+08:00",
+          "finished_at": "2026-11-08T14:16:35.493522+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_c9b1dc0e89064834",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:33.784645+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "check",
+                  "position": 191
+                },
+                {
+                  "kind": "check",
+                  "position": 193
+                },
+                {
+                  "kind": "check",
+                  "position": 195
+                }
+              ],
+              "calls": [
+                "submit_independent_judgement:9f37636871e31cba"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_51b89254973241bf",
+          "department": "quality",
+          "started_at": "2026-11-08T14:16:35.52582+08:00",
+          "finished_at": "2026-11-08T14:16:36.546388+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_51b89254973241bf",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:35.719168+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "check",
+                  "position": 211
+                },
+                {
+                  "kind": "artifact",
+                  "position": 215
+                }
+              ],
+              "calls": [
+                "submit_review:9cfbf39ac9145834"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_db1edd381aa64807",
+          "department": "engineering",
+          "started_at": "2026-11-08T14:16:36.578115+08:00",
+          "finished_at": "2026-11-08T14:16:37.533284+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_db1edd381aa64807",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:36.71119+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "write",
+                  "position": 231
+                },
+                {
+                  "kind": "check",
+                  "position": 233
+                },
+                {
+                  "kind": "artifact",
+                  "position": 237
+                }
+              ],
+              "calls": [
+                "submit_delivery:b8d2350e521af1b5"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_548e5f8a89744ea4",
+          "department": "quality",
+          "started_at": "2026-11-08T14:16:37.570641+08:00",
+          "finished_at": "2026-11-08T14:16:39.564033+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_548e5f8a89744ea4",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:37.828969+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "check",
+                  "position": 251
+                },
+                {
+                  "kind": "check",
+                  "position": 253
+                },
+                {
+                  "kind": "check",
+                  "position": 255
+                }
+              ],
+              "calls": [
+                "submit_independent_judgement:582df202a9480ed4"
+              ]
+            }
+          ]
+        },
+        {
+          "activation_id": "act_38ac9ef383a843d7",
+          "department": "quality",
+          "started_at": "2026-11-08T14:16:39.593117+08:00",
+          "finished_at": "2026-11-08T14:16:42.129509+08:00",
+          "state": "undetermined",
+          "missing": "激活层缺少计划条目完成的主机事实",
+          "steps": [
+            {
+              "step_id": 1,
+              "activation_id": "act_38ac9ef383a843d7",
+              "purpose": "compaction",
+              "requested_at": "2026-11-08T14:16:39.931784+08:00",
+              "attempts": 1,
+              "accepted": false,
+              "facts": [],
+              "calls": []
+            },
+            {
+              "step_id": 2,
+              "activation_id": "act_38ac9ef383a843d7",
+              "purpose": "work",
+              "requested_at": "2026-11-08T14:16:40.132201+08:00",
+              "attempts": 1,
+              "accepted": true,
+              "facts": [
+                {
+                  "kind": "check",
+                  "position": 278
+                },
+                {
+                  "kind": "check",
+                  "position": 280
+                },
+                {
+                  "kind": "check",
+                  "position": 282
+                },
+                {
+                  "kind": "artifact",
+                  "position": 286
+                }
+              ],
+              "calls": [
+                "submit_review:b422ddac7508b0a0"
+              ]
+            }
+          ]
+        }
+      ],
+      "rounds": 11,
+      "trend": {
+        "method": "spearman",
+        "switch_rounds": 8,
+        "flip_threshold": 2,
+        "rho": 0.180451,
+        "step_state": "converging",
+        "note": "步骤层的趋势检验：被接纳记录的秩相关"
+      }
+    }
+  }
+}
