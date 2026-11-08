@@ -13,6 +13,7 @@ from pydantic import AwareDatetime, Field
 from .. import loops
 from ..event_store import Command
 from ..models import CatalogEventType, Event, EventType, ProjectEvent, ProjectEventType, utc_now
+from ..projects import project_projection
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Snapshot
 from .labels import OPEN_LOOP_LABEL, OPEN_LOOP_STOP_REASON, event_label
@@ -34,9 +35,13 @@ STATE_NAMES: dict[str, str] = {
     "converging": "收敛中",
     "stalled": "停滞",
     "oscillating": "震荡",
+    "drifting": "漂移",
     "boundary": "达到边界",
     "undetermined": "无法判定",
 }
+
+# 事项标题取不到时的写法：明细按标题写，不拿事项标识凑数（工单 #1583）
+UNNAMED_WORK_ITEM = "未命名事项"
 
 # 报告范围：自上次查看、最近 24 小时、最近 7 天
 RANGES: dict[str, str] = {"since_seen": "自上次查看", "24h": "最近 24 小时", "7d": "最近 7 天"}
@@ -80,14 +85,27 @@ class AwayReportRequest(Contract):
     range: Literal["since_seen", "24h", "7d"] = "since_seen"
     project: str | None = None
 
+class ReportEntry(Contract):
+    # 汇总项明细的一行（工单 #1583，只增可选字段）：事项标识与所属项目供页面回链，标题由页面按
+    # project.overview 取；layer、state_from、state_to 是报告写出的中文层名与前后状态，
+    # open_criteria 是这一行的开环条件。旧读取方不需要这些字段
+    work_item_id: str | None = None
+    project_id: str | None = None
+    layer: str | None = None
+    state_from: str | None = None
+    state_to: str | None = None
+    open_criteria: list[str] | None = None
+
 class ReportItem(Contract):
-    # 汇总的一项：标识、标签、数值与单位、来源事件的全局位置、可选的补充说明
+    # 汇总的一项：标识、标签、数值与单位、来源事件的全局位置、可选的补充说明；
+    # entries 是明细的结构化版本（收敛状态的变化与带开环条件的放行有这一项）
     id: str
     label: str
     value: int
     unit: str
     refs: list[int]
     detail: str | None = None
+    entries: list[ReportEntry] | None = None
 
 class ReportFact(Contract):
     # 范围内的一条关键事实：时间、项目、种类、事件位置，供画面回放与时间轴使用。
@@ -213,10 +231,27 @@ def _summary(application: Application, events: list[Event | ProjectEvent],
     if convergence is not None:
         items.append(convergence)
     # 带开环条件的放行（工单 #399）：放行记录里列出了开环条件的那几次，明细写出条件编号
-    open_release = _open_release_item(events)
+    open_release = _open_release_item(application, events)
     if open_release is not None:
         items.append(open_release)
     return items
+
+
+def _work_item_titles(application: Application, project_ids: set[str]) -> dict[str, str]:
+    # 明细里用到的项目的事项标题：读项目投影，与 project.overview 给出的是同一份事实。
+    # 取不到标题的事项不在这张表里，明细写「未命名事项」。只读明细真的引用到的项目
+    store = application.system.store
+    titles: dict[str, str] = {}
+    for project_id in sorted(project_ids):
+        state = project_projection(store, application.system.artifacts, project_id, include_history=False)
+        for work_item in state.work_items:
+            titles[work_item.work_item_id] = work_item.title
+    return titles
+
+
+def _title(titles: dict[str, str], work_item_id: str | None) -> str:
+    # 明细里的事项标题：取不到时写「未命名事项」，不拿事项标识凑数
+    return titles.get(work_item_id or "", UNNAMED_WORK_ITEM)
 
 
 def _convergence_item(application: Application, events: list[Event | ProjectEvent],
@@ -228,21 +263,29 @@ def _convergence_item(application: Application, events: list[Event | ProjectEven
     store = application.system.store
     run_ids = sorted({event.run_id for event in events
                       if isinstance(event, Event) and event.run_id is not None})
-    rows: list[str] = []
+    entries: list[ReportEntry] = []
     refs: list[int] = []
     for run_id in run_ids:
-        run_rows, ref = _convergence_rows(store, run_id, from_position, to_position)
-        rows.extend(run_rows)
+        run_entries, ref = _convergence_rows(store, run_id, from_position, to_position)
+        entries.extend(run_entries)
         if ref is not None:
             refs.append(ref)
-    if not rows:
+    if not entries:
         return None
-    return ReportItem(id="convergence", label="收敛状态的变化", value=len(rows), unit="处",
-                      refs=refs, detail="；".join(rows))
+    titles = _work_item_titles(application, {entry.project_id for entry in entries if entry.project_id is not None})
+    return ReportItem(id="convergence", label="收敛状态的变化", value=len(entries), unit="处",
+                      refs=refs, detail=_convergence_detail(entries, titles), entries=entries)
+
+
+def _convergence_detail(entries: list[ReportEntry], titles: dict[str, str]) -> str:
+    # 收敛状态的变化的人读文字：一行一件事项的层与前后两种状态；标题取不到时写「未命名事项」
+    return "；".join(
+        f"{_title(titles, entry.work_item_id)} · {entry.layer}：{entry.state_from} → {entry.state_to}"
+        for entry in entries)
 
 
 def _convergence_rows(store: Any, run_id: str, from_position: int,
-                      to_position: int) -> tuple[list[str], int | None]:
+                      to_position: int) -> tuple[list[ReportEntry], int | None]:
     # 一个 run 在范围内起点与终点的层状态：终点没有事件（范围开始之前就结束的 run）时不算变化；
     # 起点还没有事件时按「无法判定」比较（范围里才开始的 run 也算状态变化）
     after_events = store.list_events(run_id, through_position=to_position)
@@ -252,33 +295,48 @@ def _convergence_rows(store: Any, run_id: str, from_position: int,
     before_events = store.list_events(run_id, through_position=from_position)
     before = {layer.name: layer.state for layer in loops.build_loop_tree(before_events).layers} \
         if before_events else {}
-    rows = [
-        f"{after.work_item_id or run_id} · {LAYER_NAMES.get(layer.name, layer.name)}："
-        f"{STATE_NAMES.get(before.get(layer.name, loops.UNDETERMINED), before.get(layer.name, loops.UNDETERMINED))}"
-        f" → {STATE_NAMES.get(layer.state, layer.state)}"
-        for layer in after.layers
-        if before.get(layer.name, loops.UNDETERMINED) != layer.state
-    ]
-    if not rows:
+    entries: list[ReportEntry] = []
+    for layer in after.layers:
+        before_state = before.get(layer.name, loops.UNDETERMINED)
+        if before_state == layer.state:
+            continue
+        entries.append(ReportEntry(
+            work_item_id=after.work_item_id, project_id=after.project_id,
+            layer=LAYER_NAMES.get(layer.name, layer.name),
+            state_from=STATE_NAMES.get(before_state, before_state),
+            state_to=STATE_NAMES.get(layer.state, layer.state),
+        ))
+    if not entries:
         return [], None
     # 来源事件指这个 run 的起点（建 run 的事件）：它不随 run 里的事件增加而变化，
     # 这一项的内容只在层状态真的变化时才变（否则每来一条事件引用都会变）
     created = next((event for event in after_events if event.type == EventType.RUN_CREATED), after_events[0])
-    return rows, created.position
+    return entries, created.position
 
 
-def _open_release_item(events: list[Event | ProjectEvent]) -> ReportItem | None:
-    # 带开环条件的放行：放行记录里有开环条件的那几次，明细写事项与条件编号
+def _open_release_item(application: Application, events: list[Event | ProjectEvent]) -> ReportItem | None:
+    # 带开环条件的放行：放行记录里有开环条件的那几次，明细写事项标题与条件编号
     releases = [event for event in events
                 if event.type == EventType.QA_SUBMITTED and event.payload.get("verdict") == "release"
                 and event.payload.get("open_criteria")]
     if not releases:
         return None
-    detail = "；".join(
-        f"{event.work_item_id or '未记事项'}：{'、'.join(str(item) for item in event.payload['open_criteria'])}"
-        for event in releases)
+    entries = [
+        ReportEntry(work_item_id=event.work_item_id, project_id=event.project_id,
+                    open_criteria=[str(item) for item in event.payload["open_criteria"]])
+        for event in releases
+    ]
+    titles = _work_item_titles(application, {event.project_id for event in releases if event.project_id is not None})
     return ReportItem(id="open_release", label="带开环条件的放行", value=len(releases), unit="次",
-                      refs=[event.position for event in releases], detail=detail)
+                      refs=[event.position for event in releases], detail=_open_release_detail(entries, titles),
+                      entries=entries)
+
+
+def _open_release_detail(entries: list[ReportEntry], titles: dict[str, str]) -> str:
+    # 带开环条件的放行的人读文字：一行一个放行的事项标题与条件编号；标题取不到时写「未命名事项」
+    return "；".join(
+        f"{_title(titles, entry.work_item_id)}：{'、'.join(entry.open_criteria or [])}"
+        for entry in entries)
 
 def _fact(event: Event | ProjectEvent) -> ReportFact:
     return ReportFact(

@@ -8,7 +8,7 @@
 | --- | --- | --- |
 | 每次推送到 PR | ① 单元层、② 模块层、评测工具、客户端（并行），`check` 汇总 | 挡合并 |
 | 每次合并到 main 以后 | ③ 集成层 | 不挡；失败交回引入它的工单 |
-| 里程碑发布之前 | 不在 CI：真实模型冒烟、客户端端到端、桌面测试 | 挡发布 |
+| 里程碑发布之前 | 不在 CI：真实模型冒烟、桌面测试 | 挡发布 |
 
 每次运行的摘要页列出各层的文件数、用例数与结果；PR 上的「用例变化」列出合并前后各层用例的增减。只改 `docs/` 与日记的提交不运行 CI，徽章保持上一次的结果。
 
@@ -207,7 +207,7 @@ uv run python -m pytest -m "unit or module"
 uv run python -m pytest harness/tests/<本次改动或新增的集成层文件>
 ```
 
-客户端的检查在 `client/` 中运行：单元用 `cd client && npm test`，端到端用 `cd client && npm run test:e2e`。
+客户端的检查在 `client/` 中运行：单元用 `cd client && npm test`。
 
 应用接口的 OpenAPI 快照（`harness/tests/openapi/openapi.json`）由 `test_openapi_snapshot.py` 与运行中的服务比较；由快照生成 TypeScript 接口类型并编译：
 
