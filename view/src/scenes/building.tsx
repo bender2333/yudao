@@ -8,7 +8,7 @@
 
 import { useEffect, useRef } from "react";
 import { createRafClock } from "../pixel/clock.ts";
-import { createBuildingView } from "../pixel/building/view.ts";
+import { buildingTestHooks, createBuildingView, type BuildingTestHooks } from "../pixel/building/view.ts";
 import type { BuildingModel } from "../pixel/contract.ts";
 import type { Shell, SceneSurface } from "../shell.ts";
 
@@ -29,6 +29,9 @@ export function BuildingScene(props: { shell: Shell }): React.JSX.Element {
         // 点一层楼：进入这个项目的楼层（画面自己的场景切换，地址不变）
         onFloorClick: (projectId) => props.shell.goFloor(projectId),
       });
+      // 端到端测试经这个入口读取楼画出的当前状态（画面自己的钩子，声明见 src/test-hooks.d.ts）
+      const testWindow = window as unknown as { __buildingViewForTest?: BuildingTestHooks };
+      testWindow.__buildingViewForTest = buildingTestHooks(view);
       return {
         jump: (state) => view.jump(state as BuildingModel),
         setState: (state) => view.setState(state as BuildingModel),
@@ -38,6 +41,8 @@ export function BuildingScene(props: { shell: Shell }): React.JSX.Element {
     });
     return () => {
       detach();
+      // 场景被卸下（换场景）：读取入口一起撤掉，测试不会读到已经销毁的画面
+      delete (window as unknown as { __buildingViewForTest?: BuildingTestHooks }).__buildingViewForTest;
       clock.destroy();
     };
   }, [props.shell]);
