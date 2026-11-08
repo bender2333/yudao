@@ -62,6 +62,11 @@ USER_STOP_REASONS = frozenset({"cancelled", "user_cancelled"})
 # 基线核验结束，这一轮带着基线核验；没有核验角色的形态没有基线核验这一步，以开环完成结束。
 # 两种都照常提出初始 PRD 候选，后一种在候选与确认请求里写明这份基线没有经过基线核验
 BASELINE_VERIFIED_REASON = "baseline_verified"
+# 事项冻结的形态不在当前发布里时给用户的同一句说明（工单 #1578，项目的组织设计说明「冻结与升级」最后一条）：
+# 取消、加指导、加输入三条控制命令都以命令层已定义的 not_allowed 收场，不写任何事件；换回带那一份形态的
+# 发布以后再试。恢复、升级重新开始与建档修改轮说的是同一件事，写进项目流的开始失败
+ITEM_FORM_UNAVAILABLE_MESSAGE = (
+    "这个事项冻结的形态不在当前发布里，这条命令没有生效；换回带那一份形态的发布以后再试")
 
 
 def _empty_baseline_review() -> dict[str, Any]:
@@ -1073,15 +1078,42 @@ class ProjectService:
         # 这个事项冻结的形态在发布里（工单 #1392，项目的组织设计说明「冻结与升级」最后一条）：创建记录里
         # 没有形态名的旧事项按默认形态算。不在发布里时在项目流写一条开始失败（work_item_id、run_id、error）
         # 并返回 False；恢复、升级重新开始与建档修改轮共用这一处判断（修改轮这时还没有 run，按事项记录核）
+        error = self._item_form_error(item.form)
+        if error is None:
+            return True
+        self.writes.append(project_stream(project_id), NewProjectEvent(
+            ProjectEventType.WORK_ITEM_START_FAILED,
+            {"work_item_id": item.work_item_id, "run_id": run_id, "error": str(error)},
+            actor="system"))
+        return False
+
+    def item_form_unavailable_message(self, run_id: str) -> str | None:
+        # 事项冻结的形态不在当前发布里时给命令层的同一句说明（工单 #1578，项目的组织设计说明「冻结与升级」
+        # 最后一条）：只读取，不写事件。取消、加指导、加输入三条命令在动手之前用它收场——形态在发布里时为空，
+        # 三条命令照原路走；找不到 run、项目或事项时也为空，原来的 not_found 与 run_terminal 不变
         try:
-            self.orchestrator.form_named(item.form)
-        except ValueError as exc:
-            self.writes.append(project_stream(project_id), NewProjectEvent(
-                ProjectEventType.WORK_ITEM_START_FAILED,
-                {"work_item_id": item.work_item_id, "run_id": run_id, "error": str(exc)},
-                actor="system"))
-            return False
-        return True
+            run = project_run(self.store, run_id)
+        except RunNotFoundError:
+            return None
+        if run.project_id is None:
+            return None
+        try:
+            project = self.projection(run.project_id)
+        except ProjectNotFoundError:
+            return None
+        item = project.work_item_for_run(run_id)
+        if item is None:
+            return None
+        return None if self._item_form_error(item.form) is None else ITEM_FORM_UNAVAILABLE_MESSAGE
+
+    def _item_form_error(self, form: str | None) -> ValueError | None:
+        # 取事项冻结的那一份形态（工单 #1392）：记了而发布里没有这一份时不换默认形态顶替，把 `form_named` 的
+        # 说明交给调用方——启动类路径写进项目流的开始失败，命令层的三条控制命令收成 not_allowed（工单 #1578）
+        try:
+            self.orchestrator.form_named(form)
+        except ValueError as error:
+            return error
+        return None
 
     def _restart_form(self, transaction: Transaction, item: WorkItem, run_id: str) -> str | None:
         # 因升级重新开始沿用事项创建时冻结的形态（工单 #1392）：这是同一个事项，换的只是 run 的应用版本。
