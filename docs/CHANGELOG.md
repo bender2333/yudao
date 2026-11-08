@@ -510,3 +510,5 @@ claude-opus-5-5（子架构师） / 2026-11-08 16:40 / `project-organization.md`
 
 claude-opus-5-5（总架构师，用户指定） / 2026-11-08 21:25 / `CONTEXT.md`「循环图」词条加「累计往来」；新词条「时序图」：在循环图下面展开的事项经过，询问与回答画虚线、其余实线，按轮折叠，每行一句标题，点开看原文与工作过程，与循环图、线程读同一份事实 / 用户要信息既不丢失也不冗余，循环图点开看时序（决定记录同日一条）
 claude-opus-5-5（子架构师） / 2026-11-08 22:16 / 新设计说明 `docs/design/work-process-titles.md`：工作过程三层的来源、存放与读者（任务由角色用更新计划写，动作标题由系统按工具和参数算出，运行命令由角色写一句，动作标记只来自工具定义与回执），含任务分组、老事件、外部 agent 的对应与验收；`docs/design/README.md` 加索引；`CONTEXT.md` 加工作过程、动作标题、动作标记、计划条目；`app-and-interface.md` 的 `run.steps` 一行改为供时序图里的工作过程并加标记、标题、来源、任务，4.4 加第 5 条；`project-organization.md` 4.14、`outsourced-roles.md`「ACP 提供的控制手段」、`department-loop.md`「工程的计划」、`local-tools.md` 命令一行各加一句；`semantic-system.md`「五层」的计划条目改为角色与更新计划的工具调用 / 用户要工作过程像常见 agent 那样显示状态缩略式的说明，点开才是原始数据（决定记录同日一条）
+
+claude-sonnet-5-5 / 2026-11-09 00:10 / `.claude/skills/solo/SKILL.md` 与 `scripts/hook.mjs` 无人值守：`notify` 循环退出 Claude Code 的编排钩子，`hook` 循环的子代理提示、派活限制、工人记录与自动继续只认有效租约所有者，账本写保护继续覆盖同项目会话；补 `hook-output.test.mjs` / 共享项目设置使普通 Claude Code 子代理收到 solo 身份与并发提示，甚至写入活动循环的工人记录（这次改动先落在 codex/v19-collaboration-design 的 69bb8a7a，此处带到 main）
