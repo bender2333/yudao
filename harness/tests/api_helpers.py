@@ -30,8 +30,9 @@ LOGGING_CONFIG = uvicorn.config.LOGGING_CONFIG
 #
 # 服务就绪的等待上限取按层的表（harness/tests/wait_limits.py）：启动要做约一秒的 CPU 工作（建立路由、
 # 算合同摘要），机器被别的用例占满时这段工作按分到的 CPU 拉长；写死的 30 秒在满负载时会先到上限，
-# 服务其实还在启动（工单 #1566，六条用例同时在就绪之前超时）。上限是本层每条用例上限的一半，
-# 到了上限以一条写明在等什么的失败结束，不等 pytest-timeout 结束整个进程。
+# 服务其实还在启动（工单 #1566，六条用例同时在就绪之前超时；工单 #1437，test_catalog_api.py 的两条
+# 用例在 30.11 秒、30.06 秒上先到，同一次运行里别的起服务用例也被拉到 14 至 24 秒）。上限是本层每条
+# 用例上限的一半，到了上限以一条写明在等什么的失败结束，不等 pytest-timeout 结束整个进程。
 SERVER_READY_TIMEOUT_SEC = WAIT_FOR_HOST_WORK_SEC
 # 停止服务是主机上的收尾，正常在一秒内完成：短上限只用来防止一直等待
 STOP_TIMEOUT_SEC = 30
@@ -153,6 +154,9 @@ def running_server(open_application: Callable[[], Application], *,
         finally:
             startup.open_finished_at = time.monotonic()
 
+    # 端口一律交给操作系统分配（port=0）：集成层在 CI 上用 -n 4 并行跑，4 个 worker 是独立进程、服务与
+    # 客户端成对，不共用端口区间，也不会互相等待（工单 #1446 用 4 个独立进程同时起服务核对过：端口互不相同，
+    # 每个服务等的都是自己的就绪信号）。就绪之前不需要知道端口，就绪以后从已绑定的套接字上取。
     server = uvicorn.Server(uvicorn.Config(
         create_app(open_tracked, registry=registry, access=access, keepalive_sec=keepalive_sec,
                    pages=RELEASE_ASSETS if pages is None else pages,
