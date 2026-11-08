@@ -14,6 +14,7 @@ from pydantic import PositiveInt
 from ..event_store import Command, catalog_stream
 from ..models import DEPARTMENTS, CatalogEventType
 from ..providers import CatalogValidationError, DEFAULT_TIMEOUT_SEC, ProviderError, SUPPORTED_PROTOCOLS, suggested
+from ..providers.facade import CandidateTestRejected
 from ..write_path import NewCatalogEvent
 from .commands import Rejection
 from .contracts import CommandRequest, Contract, NoRefs, Text
@@ -142,6 +143,13 @@ class CatalogModelTest(CommandRequest):
     base_version: int
     provider_id: Text
     model_id: Text
+
+
+class CatalogCandidateTest(CommandRequest):
+    # 对一个还没有选用的候选做与模型测试相同的两组请求；候选没有保存的定义，只给连接与上游模型 ID
+    base_version: int
+    provider_id: Text
+    model: Text
 
 
 class CatalogDepartmentDefaultsSave(CommandRequest):
@@ -557,7 +565,7 @@ def _test_payload(base_revision: int, kind: str, provider_id: str, model_id: str
         "protocol": result.get("protocol"), "error": error,
         # 连接测试读的是模型列表地址：把实际读取的地址写进事件，界面才能写明测的是什么
         "source_url": result.get("source_url"),
-        "actual_model": result.get("model") if kind == "model" else None,
+        "actual_model": result.get("model") if kind in {"model", "candidate"} else None,
         "elapsed_ms": int(round((time.monotonic() - started) * 1000)),
         "admitted": (bool(result["admitted"]) if "admitted" in result and result["admitted"] is not None else None),
     }
@@ -610,6 +618,43 @@ async def _test_model(application: Application, command: Command, request: Catal
     selected, start = facade.retry_selection(request.provider_id, request.model_id)
     if start:
         _schedule_selection(application, request.base_version, selected)
+
+
+async def _test_candidate(application: Application, command: Command, request: CatalogCandidateTest) -> None:
+    # 候选测试：不保存定义、不写准入、不改部门默认与选择；结果以 catalog_test_finished（candidate）出现，
+    # 状态与结果随候选保存在服务进程里（docs/design/model-management.md「模型访问定义与准入」中「候选测试」）
+    facade = application.system.facade
+    _check_not_registered(application, command)
+    try:
+        test, start = facade.begin_candidate_test(request.provider_id, request.model)
+    except CandidateTestRejected as exc:
+        raise Rejection(exc.reason, exc.message)
+    _register(application, command)
+    if start:
+        _schedule_candidate_test(application, request.base_version, test)
+
+
+def _schedule_candidate_test(application: Application, base_version: int, test) -> None:
+    facade = application.system.facade
+
+    async def run() -> None:
+        started = time.monotonic()
+        try:
+            result = await asyncio.to_thread(
+                facade.run_candidate_test, test,
+                lambda: int(application.system.parameters()["provider.model_test_max_concurrent"]))
+        except (CatalogValidationError, ProviderError) as exc:
+            result = {"ok": False, "error": str(exc), "model": None, "elapsed_ms": 0,
+                      "accepts_required_tool_call": None, "failure_group": None, "failure_step": None}
+            if not facade.selections.finish_candidate(test, result):
+                return
+        if result is None:
+            return
+        _result(application, CatalogEventType.CATALOG_TEST_FINISHED,
+                _test_payload(base_version, "candidate", test.provider_id, test.model,
+                              started, result, result.get("error")))
+
+    application.schedule(run())
 
 
 # ---------------------------------------------------------------------------
@@ -721,6 +766,10 @@ CATALOG_CONNECTION_TEST = CommandDefinition(
 CATALOG_MODEL_TEST = CommandDefinition(
     name="catalog.model.test", request=CatalogModelTest, refs=NoRefs, handle=_test_model,
     derive_refs=lambda _events: NoRefs(), reasons=("not_found",),
+)
+CATALOG_CANDIDATE_TEST = CommandDefinition(
+    name="catalog.candidate.test", request=CatalogCandidateTest, refs=NoRefs, handle=_test_candidate,
+    derive_refs=lambda _events: NoRefs(), reasons=("not_found", "not_allowed", "catalog_invalid"),
 )
 
 def _department_defaults_refs(events) -> CatalogDepartmentDefaultsSaveRefs:

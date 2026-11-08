@@ -1484,6 +1484,57 @@
         }
       }
     },
+    "/api/commands/catalog.candidate.test": {
+      "post": {
+        "tags": [
+          "commands"
+        ],
+        "summary": "catalog.candidate.test",
+        "operationId": "command_catalog_candidate_test",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCandidateTest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted_NoRefs_"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "命令被拒绝，可能的原因：not_found, not_allowed, catalog_invalid, command_id_reused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejected"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/commands/catalog.department_defaults.save": {
       "post": {
         "tags": [
@@ -6733,6 +6784,16 @@
             "type": "object",
             "title": "Source Details",
             "default": {}
+          },
+          "test": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatalogCandidateTestState"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -6781,6 +6842,129 @@
           "source"
         ],
         "title": "CatalogCandidateSource"
+      },
+      "CatalogCandidateTest": {
+        "properties": {
+          "command_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+            "title": "Command Id"
+          },
+          "base_version": {
+            "type": "integer",
+            "title": "Base Version"
+          },
+          "provider_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Provider Id"
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Model"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "command_id",
+          "base_version",
+          "provider_id",
+          "model"
+        ],
+        "title": "CatalogCandidateTest"
+      },
+      "CatalogCandidateTestState": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "waiting",
+              "testing",
+              "passed",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "sequence": {
+            "type": "integer",
+            "title": "Sequence"
+          },
+          "elapsed_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Ms"
+          },
+          "actual_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual Model"
+          },
+          "accepts_required_tool_call": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepts Required Tool Call"
+          },
+          "failure_group": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Group"
+          },
+          "failure_step": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Step"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "sequence"
+        ],
+        "title": "CatalogCandidateTestState"
       },
       "CatalogCandidatesCollect": {
         "properties": {
@@ -8933,7 +9117,7 @@
           "api_version": {
             "type": "integer",
             "title": "Api Version",
-            "example": 15
+            "example": 16
           },
           "contract_digest": {
             "type": "string",
@@ -21515,7 +21699,8 @@
           "kind": {
             "enum": [
               "connection",
-              "model"
+              "model",
+              "candidate"
             ],
             "title": "Kind",
             "type": "string"

@@ -13,7 +13,7 @@
   };
   const forms = {};
   forms.pool_preview = Object.assign(publishedForm('three'), {
-    id: 'pool_preview', name: '产品 · 工程 · 质检（任务池）', rotation: 'pool', unit: '一项可独立核验的改动',
+    id: 'pool_preview', name: '产品 · 工程 · 质检', rotation: 'pool', unit: '一项可独立核验的改动',
     note: '工作单元由角色认领，逐项核验后再核验整份交付', tip: '设计预览，未连接真实任务池'
   });
   forms.ops_preview = Object.assign(publishedForm('three'), {

@@ -132,3 +132,9 @@
 .lp-card { align-content: start; }
 .lp-edge > .lp-line { justify-self: stretch; min-width: 24px; }
 .lp-vlink > .lp-vline { align-self: stretch; }
+
+.lp-skip { display: flex; align-items: center; gap: 6px; padding: 0 12px; }
+.lp-skip-line { flex: 1; border-top: 1px dashed var(--line-strong); min-width: 12px; }
+.lp-skip-to { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.lp-grid.is-mini .lp-skip { padding: 0 4px; gap: 3px; }
+.lp-grid.is-mini .lp-skip-to { font-size: 10px; }
