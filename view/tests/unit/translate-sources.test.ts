@@ -7,15 +7,15 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
 
 import {
   DRAWN_FACT_ELEMENTS, EVENT_KIND_LABELS, FACT_LABELS, SOURCE_LABELS, actorLabel, eventKindLabel, factRefs, floorState,
   sourceCard, sourceEventOf, sourceOverlay,
 } from "../../src/translate/floor.ts";
-import { OVERLAY_LABELS, checkMethodProblems, overlayProblems } from "../../src/translate/coverage.ts";
+import { COVERAGE, OVERLAY_LABELS, SCENES, checkMethodProblems, classOf, overlayProblems } from "../../src/translate/coverage.ts";
 import { floorState as checkFloorState, SOURCES } from "../../src/pixel/contract.ts";
 import type { ProjectLoopResult } from "../../src/api/generated/types.gen.ts";
+import { eventTypesFromInterface } from "./interface-description.ts";
 
 const ELEMENTS = ["sign", "round", "elapsed", "parcel", "stamp", "box"] as const;
 
@@ -72,20 +72,25 @@ test("来源：带来源的楼层状态通过画面合同的校验", () => {
   assert.deepEqual(state.items[0].refs?.sign, { position: 2, source: "user" });
 });
 
-test("来源：五种来源与每种事件种类都有中文名，缺一行就失败", () => {
+test("来源：五种来源与画面画出来的每种事件种类都有中文名", () => {
   // 五种来源各有一行中文名（覆盖层的图例与来源卡片按它显示）
   assert.deepEqual(Object.keys(SOURCE_LABELS).sort(), [...SOURCES].sort());
   for (const [key, label] of Object.entries(SOURCE_LABELS)) {
     assert.match(label, /[\u4e00-\u9fa5]/, `${key} 的来源名要有中文`);
     assert.doesNotMatch(label, /[A-Za-z]/, `${key} 的来源名不出现英文内部标识`);
   }
-  // 能力清单里的每种事件都有一行中文名（夹具与服务端的 contracts.py 由服务端测试核对）
-  const types = JSON.parse(readFileSync(new URL("../fixtures/event-types.json", import.meta.url), "utf8")) as string[];
-  assert.deepEqual(types.filter((type) => eventKindLabel(type) === null), []);
+  // 画面画出来或转交实时内容的事件种类才会出现在来源卡片上：这些各有一行中文名。
+  // 事件种类取自接口描述；还没归类的事件列在缺口清单里，不要求有中文名（新增一种事件不连累测试，工单 #1419）
+  const types = eventTypesFromInterface();
+  const shown = types.filter((type) => SCENES.some((scene) => {
+    const cls = classOf(COVERAGE, scene, type);
+    return cls === "drawn" || cls === "realtime";
+  }));
+  assert.ok(shown.length > 0, "画面没有画出来或转交实时内容的事件");
+  assert.deepEqual(shown.filter((type) => eventKindLabel(type) === null), []);
   // 术语表里的拉丁字母词（部门 Prompt、初始 PRD、MCP）是产品的说法；其余出现拉丁字母的算内部标识
   const TERMS = /^(Prompt|PRD|MCP)$/;
-  for (const type of types) {
-    const label = EVENT_KIND_LABELS[type];
+  for (const [type, label] of Object.entries(EVENT_KIND_LABELS)) {
     assert.match(label, /[\u4e00-\u9fa5]/, `${type} 的种类名要有中文`);
     for (const word of label.match(/[A-Za-z]+/g) ?? []) {
       assert.match(word, TERMS, `${type} 的种类名里出现内部标识：${word}`);

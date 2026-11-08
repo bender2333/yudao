@@ -1,12 +1,13 @@
-// 翻译覆盖核对（画面与播放 docs/design/visualization.md「翻译层」与 docs/design/visualization.md「画面诚实性的不变式」最后一行、原型 v13 js/translate/translate.js 的 T.coverage，工单 #952）。
+// 翻译覆盖与缺口清单（画面与播放 docs/design/visualization.md「翻译层」「缺口清单」与「画面诚实性的不变式」最后一行、原型 v13 js/translate/translate.js 的 T.coverage，工单 #952、#1419）。
 //
 // 能力清单里的每种事件，在楼、楼层、房间三个场景里各属于一类：
 //   drawn    —— 翻成这个场景的动作；
 //   realtime —— 作为实时内容转交（决定卡片、流式文字），不进播放时间线；
 //   none     —— 这个场景不画，写一句理由。
-// 客户端单元测试读不了 Python，事件种类的来源是夹具 client/tests/fixtures/event-types.json；
-// 服务端测试 harness/tests/test_event_type_fixture.py 核对它与 harness/app/contracts.py 的 EVENT_TYPES 相同。
-// 服务端新增事件种类时，服务端测试先失败并提示重新生成夹具；夹具更新以后，这里的覆盖核对失败，提示补上归属。
+// 事件种类取自接口：运行时是能力清单的 event_types（view/src/shell.ts），测试里是同一份接口描述
+// （harness/tests/openapi/openapi.json）；服务端不为画面维护事件种类的清单或夹具。
+// 还没归类的事件不画，列进缺口清单：新增一种事件只让缺口清单多一行，不让测试失败；缺口清单可以不为空，
+// 测试只核对它和实际画出来的东西一致（docs/design/visualization.md「缺口清单」）。
 //
 // 事件种类与原型 v13 的 translate.js 用的是同一套服务端的词（真实系统的事件在 harness/models.py）。
 // 原型里只有原型才有的 x_ 前缀事件没有搬；真实系统新增、原型没有的事件按同样的口径归类（见每条的理由）。
@@ -330,23 +331,93 @@ export function classOf(coverage: TranslationCoverage, scene: Scene, type: strin
   return null;
 }
 
+/** 场景的中文名（缺口清单写给人看）。 */
+export function sceneName(scene: Scene): string {
+  return scene === "building" ? "楼" : scene === "floor" ? "楼层" : "房间";
+}
+
+/** 缺口清单的一行：一种事件在哪些场景里还没有归属。 */
+export interface EventGap {
+  readonly type: string;
+  readonly scenes: readonly Scene[];
+}
+
 /**
- * 覆盖核对：给出的每种事件在三个场景里各有一个归属，每个「不画」有一句理由。
- * 返回问题清单（空表示通过）；提示写明是哪个场景、哪种事件、缺什么。
+ * 缺口清单：给出的每种事件，凡是在某个场景里既没翻成动作、也没写明不画，按种类各占一行。
+ * 清单可以不为空：服务端新增一种事件时它多一行，测试不因它失败（docs/design/visualization.md「缺口清单」）。
  */
-export function coverageProblems(types: readonly string[], coverage: TranslationCoverage = COVERAGE): string[] {
+export function eventGaps(types: readonly string[], coverage: TranslationCoverage = COVERAGE): EventGap[] {
+  const gaps: EventGap[] = [];
+  for (const type of new Set(types)) {
+    const scenes = SCENES.filter((scene) => classOf(coverage, scene, type) === null);
+    if (scenes.length > 0) gaps.push({ type, scenes });
+  }
+  return gaps;
+}
+
+/** 缺口清单写成测试输出与壳上能读的句子：每行一种事件，写明它在哪些场景里没有归属、因此不画。 */
+export function gapLines(gaps: readonly EventGap[]): string[] {
+  return gaps.map((gap) => `${gap.type}：${gap.scenes.map(sceneName).join("、")}里没有归属，不画`);
+}
+
+/** 三个场景实际画出来的东西：动作表与流式文字表（画面的实现，不是归属表）。 */
+export interface PaintedEventTypes {
+  readonly actions: Readonly<Record<Scene, readonly string[]>>;
+  readonly streams: Readonly<Record<Scene, readonly string[]>>;
+}
+
+/**
+ * 缺口清单与实际画出来的东西一致（docs/design/visualization.md「画面诚实性的不变式」的「缺口清单说真话」）：
+ * 清单里的种类在它没有归属的场景里确实没有动作、也没有流式文字；有归属的种类与实际画法一致
+ * （翻成动作的出现在动作表里，写明不画的不出现在动作表里，转交实时内容的出现在流式文字表里）。
+ * 返回问题清单（空表示一致）。缺口清单不为空不算问题。
+ */
+export function gapProblems(
+  types: readonly string[], painted: PaintedEventTypes, coverage: TranslationCoverage = COVERAGE,
+): string[] {
+  const problems: string[] = [];
+  const gaps = new Map(eventGaps(types, coverage).map((gap) => [gap.type, new Set(gap.scenes)]));
+  for (const scene of SCENES) {
+    const actions = new Set(painted.actions[scene]);
+    const streams = new Set(painted.streams[scene]);
+    for (const type of types) {
+      const cls = classOf(coverage, scene, type);
+      if ((gaps.get(type)?.has(scene) ?? false) && (actions.has(type) || streams.has(type))) {
+        problems.push(`${scene}：事件 ${type} 列在缺口清单里，实际画了`);
+        continue;
+      }
+      if (cls === "drawn" && !actions.has(type)) {
+        problems.push(`${scene}：事件 ${type} 标为翻成动作，动作表里没有它`);
+      }
+      if (cls === "none" && actions.has(type)) {
+        problems.push(`${scene}：事件 ${type} 标为不画，动作表里却有它`);
+      }
+      if (cls === "realtime" && !streams.has(type)) {
+        problems.push(`${scene}：事件 ${type} 标为转交实时内容，流式文字表里没有它`);
+      }
+      if (cls !== "realtime" && streams.has(type)) {
+        problems.push(`${scene}：事件 ${type} 有流式文字，归属表里没有标为转交实时内容`);
+      }
+    }
+  }
+  return problems;
+}
+
+/**
+ * 归属表自己的问题：一种事件在一个场景里同时归到两类，或写明不画却没写理由。
+ * 缺归属不是问题，进缺口清单（不再「缺一行就失败」，工单 #1419）。
+ */
+export function declarationProblems(coverage: TranslationCoverage = COVERAGE): string[] {
   const problems: string[] = [];
   for (const scene of SCENES) {
     const c = coverage[scene];
-    for (const type of types) {
+    for (const type of new Set([...c.drawn, ...c.realtime, ...Object.keys(c.none)])) {
       const classes = [
         c.drawn.includes(type) ? "翻成动作" : null,
         c.realtime.includes(type) ? "转交实时内容" : null,
         Object.prototype.hasOwnProperty.call(c.none, type) ? "不画" : null,
       ].filter((value): value is string => value !== null);
-      if (classes.length === 0) {
-        problems.push(`${scene}：事件 ${type} 没有归属（翻成动作、转交实时内容、不画）`);
-      } else if (classes.length > 1) {
+      if (classes.length > 1) {
         problems.push(`${scene}：事件 ${type} 同时属于 ${classes.join("、")}`);
       }
     }
@@ -357,14 +428,6 @@ export function coverageProblems(types: readonly string[], coverage: Translation
     }
   }
   return problems;
-}
-
-/** 覆盖核对，不过时抛错（错误里带整份问题清单，逐条写明场景、事件与缺什么）。 */
-export function checkCoverage(types: readonly string[], coverage: TranslationCoverage = COVERAGE): void {
-  const problems = coverageProblems(types, coverage);
-  if (problems.length > 0) {
-    throw new Error("翻译覆盖核对没有通过：\n" + problems.join("\n"));
-  }
 }
 
 // ---------------------------------------------------------------------------

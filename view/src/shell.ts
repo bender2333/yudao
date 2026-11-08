@@ -26,7 +26,7 @@ import { buildingActions, buildingState, toBuildingEvent } from "./translate/bui
 import { belongsTo, floorActions, floorCards, floorInterrupted, floorState, streamText, toFloorEvent } from "./translate/floor.ts";
 import * as room from "./translate/room.ts";
 import { DEPARTMENT_NAMES } from "./translate/face.ts";
-import { classOf, COVERAGE, OVERLAY_LABELS, overlayProblems, SCENES, type Scene } from "./translate/coverage.ts";
+import { classOf, COVERAGE, eventGaps, gapLines as formatEventGaps, OVERLAY_LABELS, overlayProblems, SCENES, type EventGap } from "./translate/coverage.ts";
 import type { SyncEngine, SyncState, ViewSync } from "./sync/sync.ts";
 import { SyncEngine as DefaultSyncEngine } from "./sync/sync.ts";
 
@@ -61,6 +61,8 @@ export type ShellState = {
   scene: SceneRef;
   /** 缺口清单：能力清单里缺少的命令与查询、画面还不认识的事件与覆盖层。 */
   gap: string[];
+  /** 事件种类的缺口清单：还没画的事件种类，以及它在哪些场景里没有归属。 */
+  eventGaps: EventGap[];
   /** 画面生成类型时的接口版本与服务的接口版本；还没连上时为空。 */
   versions: { view: number; server: number } | null;
   /** 接口版本不一致时的一句话；一致时为空。 */
@@ -182,6 +184,7 @@ export class Shell {
   private readonly stateListeners = new Set<(state: ShellState) => void>();
   private readonly answers = new Map<string, Promise<CommandOutcome>>();
   private readonly answerIds = new Map<string, string>();
+  /** 运行时见到过、但能力清单里没有的事件种类（有了就进缺口清单，不打断画面）。 */
   private readonly unknownEvents = new Set<string>();
   private status: SyncState = { kind: "connecting" };
   private capabilities: Capabilities | null = null;
@@ -190,6 +193,8 @@ export class Shell {
   private model: PixelState | null = null;
   private decisions: DecisionFace[] = [];
   private gap: string[] = [];
+  /** 事件种类的缺口清单（与 gap 里的行同一份数据，数读它的长度）。 */
+  private eventGapList: EventGap[] = [];
   private note: string | null = null;
   // 楼：projects.list 与每个项目的 project.loop
   private projects: ProjectRow[] = [];
@@ -233,6 +238,7 @@ export class Shell {
       status: this.status,
       scene: this.scene,
       gap: this.gap,
+      eventGaps: this.eventGapList,
       versions: this.versions,
       versionNote: versionNote(this.versions),
       decisionsOperable: this.decisionsOperable,
@@ -486,7 +492,7 @@ export class Shell {
       const capabilitiesChanged = state.capabilities !== this.capabilities;
       this.capabilities = state.capabilities;
       this.versions = state.versions;
-      this.gap = this.gapLines(state.capabilities);
+      this.gap = this.gapText(state.capabilities);
       if (capabilitiesChanged) {
         // 换上新的能力清单：重新打开当前场景的视图（上一次连接留下的登记不重建）
         this.openSceneViews();
@@ -497,8 +503,9 @@ export class Shell {
     this.notify();
   }
 
-  /** 缺口清单：能力清单里缺少的命令与查询、画面还不认识的事件与覆盖层。 */
-  private gapLines(capabilities: Capabilities): string[] {
+  /** 缺口清单：能力清单里缺少的命令与查询、还没画的事件与覆盖层。 */
+  private gapText(capabilities: Capabilities): string[] {
+    this.eventGapList = eventGaps([...capabilities.event_types, ...this.unknownEvents]);
     const lines: string[] = [];
     const commands = new Set(capabilities.commands.map((command) => command.name));
     for (const needed of NEEDED_COMMANDS) {
@@ -508,26 +515,13 @@ export class Shell {
     for (const needed of NEEDED_QUERIES) {
       if (!queries.has(needed.name)) lines.push(`能力清单里没有查询 ${needed.name}：${needed.what}不画`);
     }
-    const unknown = this.unknownEventLines(capabilities);
-    lines.push(...unknown);
+    // 壳上的数读缺口清单的长度：还没画的事件种类各占一行（新增一种事件就多一行，不报错）
+    if (this.eventGapList.length > 0) {
+      lines.push(`还没画的事件种类 ${this.eventGapList.length} 种`);
+      lines.push(...formatEventGaps(this.eventGapList));
+    }
     lines.push(...overlayProblems((capabilities.overlays ?? []).map((overlay) => overlay.name), OVERLAY_LABELS)
       .map((problem) => `${problem}，这个覆盖层不画`));
-    return lines;
-  }
-
-  /** 画面还不认识的事件：每种事件在三个场景里要么有归属、要么列在这里（按场景写几个）。 */
-  private unknownEventLines(capabilities: Capabilities): string[] {
-    const lines: string[] = [];
-    const counts: string[] = [];
-    for (const scene of SCENES) {
-      const types = new Set(capabilities.event_types.filter((type) => classOf(COVERAGE, scene, type) === null));
-      for (const type of types) this.unknownEvents.add(`${scene}:${type}`);
-      const extra = [...this.unknownEvents].filter((entry) => entry.startsWith(`${scene}:`)).length;
-      if (extra > 0) counts.push(`${sceneName(scene)} ${extra} 种`);
-    }
-    if (counts.length > 0) {
-      lines.push(`画面还不认识的事件：${counts.join("、")}；不画，列在缺口清单里`);
-    }
     return lines;
   }
 
@@ -537,14 +531,14 @@ export class Shell {
     const surface = binding.surface;
     const scene = this.scene;
     if (scene.kind === "building") {
-      this.noteUnknown("building", event.type);
+      this.noteUnknown(event.type);
       for (const action of buildingActions(toBuildingEvent(event))) surface.play(action);
       return;
     }
     if (scene.kind === "floor") {
       const floorEvent = toFloorEvent(event);
       if (!belongsTo(floorEvent, scene.projectId)) return;
-      this.noteUnknown("floor", event.type);
+      this.noteUnknown(event.type);
       const stream = streamText(floorEvent);
       if (stream !== null) {
         surface.stream?.({ room: stream.room, role: stream.role }, stream.text);
@@ -557,7 +551,7 @@ export class Shell {
     if (roomEvent.department !== null && roomEvent.department !== undefined && roomEvent.department !== scene.department) {
       return;
     }
-    this.noteUnknown("room", event.type);
+    this.noteUnknown(event.type);
     const stream = room.streamOfEvent(roomEvent);
     if (stream !== null) {
       surface.stream?.(stream.who, stream.text);
@@ -567,11 +561,12 @@ export class Shell {
   }
 
   /** 运行时收到画面还不认识的事件：缺口清单多一行，不打断画面。 */
-  private noteUnknown(scene: Scene, type: string): void {
-    if (classOf(COVERAGE, scene, type) !== null) return;
-    if (this.unknownEvents.has(`${scene}:${type}`)) return;
-    this.unknownEvents.add(`${scene}:${type}`);
-    if (this.capabilities !== null) this.gap = this.gapLines(this.capabilities);
+  private noteUnknown(type: string): void {
+    // 能力清单里已经列出、或在某个场景里认得的事件不会进缺口清单；这里只收集清单里没有的种类
+    if (SCENES.some((scene) => classOf(COVERAGE, scene, type) !== null)) return;
+    if (this.unknownEvents.has(type)) return;
+    this.unknownEvents.add(type);
+    if (this.capabilities !== null) this.gap = this.gapText(this.capabilities);
     this.notify();
   }
 
@@ -848,11 +843,6 @@ export class Shell {
 function missingCommandText(name: string, what = ""): string {
   const target = what === "" ? "" : `：${what}`;
   return `能力清单里没有命令 ${name}${target}；对应的物件不可操作`;
-}
-
-/** 场景的中文名（缺口清单用）。 */
-function sceneName(scene: Scene): string {
-  return scene === "building" ? "楼" : scene === "floor" ? "楼层" : "房间";
 }
 
 /** 命令的结果 → 画面层要的回答结果（被拒绝时把原因交给卡片）。 */

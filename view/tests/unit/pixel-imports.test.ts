@@ -7,8 +7,8 @@
 // 画面的源码不导入 client/ 与 harness/，那是画面自己的那条导入方向测试（view-imports.test.ts）核对的。
 //
 // 测试按文件的导入语句逐个核对（用 TypeScript 的语法树取 import/export from 与动态 import，注释与字符串不参与），
-// 并核对画面层的源码里没有出现事件种类夹具（view/tests/fixtures/event-types.json）里的任何一种事件名：
-// 画面层认识事件种类就说明它还在读 Yudao 的说法，那是翻译层的事。
+// 并核对画面层的源码里没有出现接口描述里的事件种类名（harness/tests/openapi/openapi.json）：
+// 画面层认识事件种类就说明它还在读 Yudao 的说法，那是翻译层的事。事件种类不读服务端为画面维护的夹具（工单 #1419）。
 //
 // generated/ 是按构建期脚本从原型导出的数据（floor-decl.json），不是手写源码，不在这一条的范围内：
 // 它里面的 eventActions/sayCatalog 是没有被源码用的导出数据，改名与删除属于生成脚本那一侧（见交付说明）。
@@ -20,13 +20,13 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { posix } from "node:path";
 import ts from "typescript";
+import { eventTypesFromInterface } from "./interface-description.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 /** 画面的源码根：文件路径在这里面用 / 分隔写。 */
 const rendererRoot = resolve(here, "..", "..", "src");
 const pixelRoot = join(rendererRoot, "pixel");
 const translateRoot = join(rendererRoot, "translate");
-const fixturePath = resolve(here, "..", "fixtures", "event-types.json");
 
 /** 一份源码：路径从渲染进程的源码根起，文本是文件内容。 */
 interface Source {
@@ -140,9 +140,7 @@ function eventNameHits(sources: Source[], names: readonly string[]): string[] {
 }
 
 function eventTypes(): string[] {
-  const list = JSON.parse(readFileSync(fixturePath, "utf8")) as string[];
-  assert.ok(list.length > 0, "事件种类夹具是空的");
-  return list;
+  return eventTypesFromInterface();
 }
 
 const realSources = (): Source[] => [...sourcesUnder(pixelRoot), ...sourcesUnder(translateRoot)];
@@ -155,7 +153,7 @@ test("H3：翻译层只从画面合同与三张声明表取画面的东西，不
   assert.deepEqual(translateImportViolations(realSources()), []);
 });
 
-test("H3：画面层的源码里没有出现事件种类夹具里的任何一种事件名", () => {
+test("H3：画面层的源码里没有出现接口描述里的任何一种事件名", () => {
   assert.deepEqual(eventNameHits(realSources(), eventTypes()), []);
 });
 

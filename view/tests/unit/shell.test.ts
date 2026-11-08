@@ -271,7 +271,7 @@ test("同步层：断线重新连上时核对本次启动的身份，服务重�
   }
 });
 
-test("缺口清单：能力清单里缺少的查询与画面还不认识的事件各写一行", async () => {
+test("缺口清单：缺的查询各写一行，壳上写出还没画的事件种类数并与缺口清单一致", async () => {
   const fixtures = loadFixtures();
   const capabilities = {
     ...fixtures.capabilities,
@@ -284,8 +284,13 @@ test("缺口清单：能力清单里缺少的查询与画面还不认识的事�
   try {
     assert.ok(shell.state.gap.some((line) => line.includes("没有查询 run.asks")),
       `缺口清单里没有写缺的查询：${shell.state.gap.join("\n")}`);
-    assert.ok(shell.state.gap.some((line) => line.includes("画面还不认识的事件：楼层 1 种、房间 1 种、楼 1 种")),
-      `缺口清单里没有写还不认识的事件：${shell.state.gap.join("\n")}`);
+    // 壳上的数读缺口清单的长度：一种还没画的事件占一行
+    assert.equal(shell.state.eventGaps.length, 1);
+    assert.deepEqual(shell.state.eventGaps[0], { type: "future_event", scenes: ["floor", "room", "building"] });
+    assert.ok(shell.state.gap.includes(`还没画的事件种类 ${shell.state.eventGaps.length} 种`),
+      `壳上没有写还没画的事件种类数：${shell.state.gap.join("\n")}`);
+    assert.ok(shell.state.gap.some((line) => line.includes("future_event") && line.includes("没有归属")),
+      `缺口清单里没有写出还没画的事件：${shell.state.gap.join("\n")}`);
   } finally {
     shell.close();
   }
