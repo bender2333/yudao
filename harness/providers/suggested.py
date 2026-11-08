@@ -1,4 +1,4 @@
-# 部门建议能力的提醒（模型管理 docs/design/model-management.md「部门的建议能力」）。
+# 部门建议能力的提醒（模型管理 docs/design/model-management.md「职能的建议能力」）。
 # 部门定义写明本部门模型的建议能力，质检为图像输入，其他部门没有。提醒只用于提示，不阻止保存或请求。
 # 判断只读模型访问定义中的输入方式，不读模型能力表（能力表只用于预填，见 docs/design/model-management.md「服务方案预置表与模型能力表」的用途）。
 

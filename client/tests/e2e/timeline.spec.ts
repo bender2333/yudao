@@ -139,7 +139,7 @@ test("首页时间轴的刻度与 home.away_report 的关键事实一一对应�
     const expected = tickRows(report.facts);
 
     // 运行包含返工、询问与回答、放行与采纳，覆盖验收要求的关键事实
-    // （交接已经随阶段状态机一起删除，部门按关注的成果开始工作，循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）
+    // （交接已经随阶段状态机一起删除，部门按关注的成果开始工作，循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）
     const kinds = new Set(expected.map((row) => row.kind));
     for (const kind of ["ask", "answer", "rework", "release", "adopt"]) {
       expect(kinds.has(kind), `关键事实里应当有 ${kind}`).toBe(true);

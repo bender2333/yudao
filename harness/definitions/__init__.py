@@ -209,7 +209,7 @@ class Department(_Definition):
     # 本部门模型的建议能力：取值来自模型访问定义的输入方式。
     # 建议能力只用于提醒，不阻止保存或请求；部门内的角色继承部门的建议能力
     suggested_capabilities: tuple[Literal["text", "image"], ...] = ()
-    # 部门关注的成果（三部门的循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
+    # 部门关注的成果（三部门的循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）：关注的成果有了新版本、部门在等待工作时开始一轮工作。
     # 关注关系写在定义里，代码里只有一条通用规则。名称的含义归路由：哪些名称认得出由那份路由的定义与它的
     # 校验给出，内核只核对它是字符串（工单 #1456）。user_input 只在旧定义里还有解释来源的用处：没有写
     # sources 的旧定义按「关注用户输入的部门」解释两种来源（Definitions.source_department，工单 #1455）
@@ -819,7 +819,7 @@ class Definitions(_Definition):
         raise ValueError(f"unknown department {department!r}")
 
     def watched_outputs(self, department: str) -> tuple[str, ...]:
-        """部门关注的成果（循环结构 docs/design/department-loop.md「部门按关注的成果开始工作」）：关注关系写在组织定义里，代码里只有一条通用规则。"""
+        """部门关注的成果（循环结构 docs/design/department-loop.md「职能按关注的成果开始工作」）：关注关系写在组织定义里，代码里只有一条通用规则。"""
         for item in self.organization.departments:
             if item.id == department:
                 return item.watched
@@ -1253,7 +1253,7 @@ def _routing_references(organization: Organization, routings: Routings) -> list[
 
 
 def source_issues(organization: Organization) -> list[tuple[str, str, str]]:
-    """事项的来源都有部门接（docs/design/forms-and-verifier-role.md「定义的校验」中「事项的来源有部门接」，工单 #1455）：不满足的整份拒绝，写出是哪一项。
+    """事项的来源都有职能接（docs/design/forms-and-verifier-role.md「定义的校验」中「事项的来源有职能接」，工单 #1455）：不满足的整份拒绝，写出是哪一项。
 
     旧定义没有写 sources 时，两种来源都按关注用户输入的部门解释：没有这样的部门，两种来源就没人接。
     写了 sources 时，每一种来源都要写明，接它的部门要在这份定义里；少一种、指到不存在的部门都拒绝。

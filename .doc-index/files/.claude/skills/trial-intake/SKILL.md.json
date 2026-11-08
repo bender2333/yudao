@@ -1,15 +1,15 @@
 {
 "schema":1,
 "path":".claude/skills/trial-intake/SKILL.md",
-"hash":"19b3e987acfd8ad5",
+"hash":"809dd8443c67c1a5",
 "nodes":[
-{"hash":"19b3e987acfd8ad5","id":".claude/skills/trial-intake/SKILL.md","kind":"file","title":".claude/skills/trial-intake/SKILL.md"},
+{"hash":"809dd8443c67c1a5","id":".claude/skills/trial-intake/SKILL.md","kind":"file","title":".claude/skills/trial-intake/SKILL.md"},
 {"hash":"cb3f91d54eee30e5","id":".claude/skills/trial-intake/SKILL.md#(开头)","kind":"section","parent":".claude/skills/trial-intake/SKILL.md","title":"(开头)"},
 {"hash":"6e447bf046436c36","id":".claude/skills/trial-intake/SKILL.md#name: trial-intakedescription: 薄片从达到到交给用户的推进，以及用户试用以后的反馈。推进：达到、复盘、agent 试用、收问题、发布、走查、导游卡，每一步在试用工单上写一条 TRIAL: 评论，推进在用户在场时做，架构师循环不做试用准备。反馈：接用户口语化的反馈，每条由只读子代理定位到文件、行号与总图的缝，输出分流确认表，缺陷建 ready-for-agent 工单，模块走向转 /module-sync，总图边界交总架构师。argument-hint: \"推进 <试用工单编号> | 反馈 [反馈原话，或含反馈的文件路径]\"","kind":"section","parent":".claude/skills/trial-intake/SKILL.md","title":"name: trial-intakedescription: 薄片从达到到交给用户的推进，以及用户试用以后的反馈。推进：达到、复盘、agent 试用、收问题、发布、走查、导游卡，每一步在试用工单上写一条 TRIAL: 评论，推进在用户在场时做，架构师循环不做试用准备。反馈：接用户口语化的反馈，每条由只读子代理定位到文件、行号与总图的缝，输出分流确认表，缺陷建 ready-for-agent 工单，模块走向转 /module-sync，总图边界交总架构师。argument-hint: \"推进 <试用工单编号> | 反馈 [反馈原话，或含反馈的文件路径]\""},
 {"hash":"1ad8a6449c854133","id":".claude/skills/trial-intake/SKILL.md#试用","kind":"section","parent":".claude/skills/trial-intake/SKILL.md","title":"试用"},
 {"hash":"0ce217e77f33bb5f","id":".claude/skills/trial-intake/SKILL.md#试用 > 何时用 / 何时不用","kind":"section","parent":".claude/skills/trial-intake/SKILL.md#试用","title":"何时用 / 何时不用"},
 {"hash":"d547959c9ac9f66a","id":".claude/skills/trial-intake/SKILL.md#试用 > 先读什么","kind":"section","parent":".claude/skills/trial-intake/SKILL.md#试用","title":"先读什么"},
-{"hash":"987f6a997bc0d9f7","id":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"section","parent":".claude/skills/trial-intake/SKILL.md#试用","title":"薄片推进"},
+{"hash":"04f2af7ad5d55506","id":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","kind":"section","parent":".claude/skills/trial-intake/SKILL.md#试用","title":"薄片推进"},
 {"hash":"beca0b85593ebb11","id":".claude/skills/trial-intake/SKILL.md#试用 > 反馈","kind":"section","parent":".claude/skills/trial-intake/SKILL.md#试用","title":"反馈"},
 {"hash":"20f7de458d989b5a","id":".claude/skills/trial-intake/SKILL.md#试用 > 关闭","kind":"section","parent":".claude/skills/trial-intake/SKILL.md#试用","title":"关闭"},
 {"hash":"a3a0634fcfffb4d8","id":".claude/skills/trial-intake/SKILL.md#试用 > 常见借口","kind":"section","parent":".claude/skills/trial-intake/SKILL.md#试用","title":"常见借口"},
@@ -25,13 +25,13 @@
 {"dst":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","kind":"link","raws":["../../../docs/agents/acceptance-evidence.md"],"seen":"1eb98bd5c8b2f747","src":".claude/skills/trial-intake/SKILL.md#试用"},
 {"dst":"docs/agents/workflow.md","kind":"link","raws":["../../../docs/agents/workflow.md"],"seen":"2c01765171109f63","src":".claude/skills/trial-intake/SKILL.md#试用"},
 {"dst":"claude_jour.md","kind":"code-path","raws":["claude_jour.md"],"seen":"b4fc41b167016dad","src":".claude/skills/trial-intake/SKILL.md#试用 > 交付"},
-{"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.4 谁在什么时候发布","kind":"section-ref","raws":["docs/design/web-interface-and-release.md"],"seen":"b330cad888400863","src":".claude/skills/trial-intake/SKILL.md#试用 > 先读什么"},
+{"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.4 谁在什么时候发布","kind":"section-ref","raws":["docs/design/web-interface-and-release.md"],"seen":"4f53683c0ad72cb9","src":".claude/skills/trial-intake/SKILL.md#试用 > 先读什么"},
 {"dst":".claude/skills/module-sync/SKILL.md","kind":"link","raws":["../module-sync/SKILL.md"],"seen":"d32322fcd6d254df","src":".claude/skills/trial-intake/SKILL.md#试用 > 反馈"},
-{"dst":".claude/skills/milestone-retro/SKILL.md","kind":"link","raws":["../milestone-retro/SKILL.md"],"seen":"a783a592ec6d465e","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
-{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"0fccb8603e114307","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
-{"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../trial/SKILL.md"],"seen":"1568b216f7a8b373","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
-{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"link","raws":["../../../docs/design/test-pyramid.md"],"seen":"b528b2647bc3d93f","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
+{"dst":".claude/skills/milestone-retro/SKILL.md","kind":"link","raws":["../milestone-retro/SKILL.md"],"seen":"1dcf226d9956fc3e","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
+{"dst":".claude/skills/to-children/SKILL.md","kind":"link","raws":["../to-children/SKILL.md"],"seen":"10c565ee39fe979f","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
+{"dst":".claude/skills/trial/SKILL.md","kind":"link","raws":["../trial/SKILL.md"],"seen":"da08ce6a15d7a6c2","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
+{"dst":"docs/design/test-pyramid.md#测试分层设计说明 > 4. 各角色运行哪一层","kind":"link","raws":["../../../docs/design/test-pyramid.md"],"seen":"6cd634905d5ab090","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
 {"dst":"docs/design/web-interface-and-release.md#网页界面的提供与发布设计说明 > 6. 发布 > 6.2 版本号","kind":"section-ref","raws":["docs/design/web-interface-and-release.md"],"seen":"86c72df9d2141250","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"},
-{"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"78e235b5c69afc24","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"}
+{"dst":"pyproject.toml","kind":"code-path","raws":["pyproject.toml"],"seen":"08a7ce7e61a441b6","src":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进"}
 ]
 }

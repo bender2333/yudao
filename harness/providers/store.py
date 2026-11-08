@@ -87,7 +87,7 @@ class ModelDefinition:
     # 是否接受要求调用工具：默认接受；声明不接受时，最后一次主机提示之后的请求不要求调用工具（#102）
     accepts_required_tool_call: bool = True
     # 输入方式（模型管理 docs/design/model-management.md「模型访问定义与准入」）：取值为 text 与 image，文本总是包含；
-    # 运行层按它决定提供哪些工具、哪些内容可以放入请求（docs/design/model-management.md「部门的建议能力」）。预填来自模型能力表，用户可以修改
+    # 运行层按它决定提供哪些工具、哪些内容可以放入请求（docs/design/model-management.md「职能的建议能力」）。预填来自模型能力表，用户可以修改
     input_modalities: tuple[str, ...] = ("text",)
     # 推理档位声明（模型管理 docs/design/model-management.md「档位与声明」）：支持档位是全集的一个子集（按由低到高保存），默认档位属于支持档位，
     # 推理参数方式与本定义的协议相符；三项一起声明，没有任何一项时不发送推理参数
