@@ -503,8 +503,8 @@ export const SOURCE_KIND_LABELS: Readonly<Record<string, string>> = Object.freez
 
 /**
  * 事件种类的中文名（来源详情写「种类」一行，页面不出现英文内部标识）。页面自己的一份：画面那边
- * （translate/floor.ts）也有一份，两份不互相引用。覆盖 client/tests/fixtures/event-types.json 里的
- * 每一种事件，缺一行由单元测试报出。
+ * （translate/floor.ts）也有一份，两份不互相引用。不按接口描述逐种核对：没有登记的种类由
+ * eventKindLabel 写成「其他事件」，新增一种事件不连累页面的测试（工单 #1419）。
  */
 export const EVENT_KIND_LABELS: Readonly<Record<string, string>> = Object.freeze({
   action_verified: "动作核实",

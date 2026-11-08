@@ -15,8 +15,8 @@
 #
 # 层：模块层（FakeAdapter 的一次激活或不出激活；SQLite 事件库与工作区文件，不用网络与完整循环，
 # 测试分层 docs/design/test-pyramid.md「三层的定义」）。守 R1（边界与冻结）、R2（第二环的合同：项目流事件与 run_created 载荷；
-# 两端共读的事件种类清单由 test_event_type_fixture.py、test_event_classification.py 与
-# test_project_stream_fields.py 逐种核对）与 R3（用户读到的设置与保存的一致，凭据只以引用名出现）。
+# 服务端的事件种类清单由 test_event_classification.py 与 test_project_stream_fields.py 逐种核对；
+# 画面的事件种类由画面从接口读，服务端不为它维护夹具，工单 #1419）与 R3（用户读到的设置与保存的一致，凭据只以引用名出现）。
 
 from __future__ import annotations
 

@@ -10,7 +10,7 @@
 不写事件；换回带那一份形态的发布以后照常接受。
 
 层：集成层（每一条都开真实事件库与真实工作区、跑完整的三部门或任务池循环，模型回答由假模型按部门给出）。
-守 R2（骨架事件与对外合同只增：新的项目流事件在服务端合同与客户端夹具两端登记）与 R3（形态随事项冻结：
+守 R2（骨架事件与对外合同只增：新的项目流事件在服务端合同里登记）与 R3（形态随事项冻结：
 换一份定义就换形态，看得见、能撤回，事项按创建时那一份运行）。
 
 先后由事件决定，不用时长赌（测试分层 docs/design/test-pyramid.md「测试的写法」）：两个事项一个跑完再建下一个，脚本按部门
@@ -20,9 +20,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import uuid
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -46,8 +44,6 @@ from harness.tests.onboarding_project import ONBOARDING_GOAL, ONBOARDING_REQUIRE
 from harness.tightening import WATCHED_OUTPUTS
 from harness.write_path import NewProjectEvent
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-FIXTURE = REPO_ROOT / "client" / "tests" / "fixtures" / "event-types.json"
 GOAL = "做一个可以长期演进的逐行文本处理工具。"
 TASK = {"title": "README 的用法一节补上退出码说明"}
 
@@ -305,11 +301,10 @@ def test_a_new_item_is_rejected_when_the_project_form_is_not_in_the_release(tmp_
     system.close()
 
 
-def test_the_new_project_event_is_registered_on_both_ends():
-    # 验收第 3 条：新的项目事件种类在服务端合同与客户端的事件种类夹具两端登记
+def test_the_new_project_event_is_registered_in_the_server_contract():
+    # 验收第 3 条：新的项目事件种类在服务端合同里登记（工单 #1419 起不再核对客户端的事件种类夹具：
+    # 事件种类由画面从接口读，服务端不为画面维护夹具）
     assert ProjectEventType.PROJECT_FORM_SET in EVENT_TYPES
-    assert ProjectEventType.PROJECT_FORM_SET in {
-        event for event in json.loads(FIXTURE.read_text(encoding="utf-8"))}
     assert "project_form_set" == ProjectEventType.PROJECT_FORM_SET
 
 
