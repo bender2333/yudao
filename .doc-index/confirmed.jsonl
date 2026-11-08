@@ -340,3 +340,6 @@
 {"down":"b09d88a913f1abad","dst":"docs/architecture.html#s1","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","up":"7a9842b0d9a1dbed"}
 {"down":"b09d88a913f1abad","dst":"docs/architecture.html#s2","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","up":"b9b29c85a3d18cc8"}
 {"down":"b09d88a913f1abad","dst":"docs/architecture.html#s3","src":"docs/prototypes/v19/design-update.md#V19 页面结构设计提案","up":"bd17490d65acfb60"}
+{"down":"4c653cb4540ff5b4","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":".claude/skills/next/SKILL.md#下一件事 > 找下一件事 > 表1 > 3","up":"347dc9bc373adb34"}
+{"down":"e86669f97a9a5c2f","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/acceptance-evidence.md#交付、审查与阶段验收的证据 > 5. 试用工单与里程碑的关闭","up":"347dc9bc373adb34"}
+{"down":"ff895ccbfeec5307","dst":".claude/skills/trial-intake/SKILL.md#试用 > 薄片推进","src":"docs/agents/autopilot-runtime.md#运行配置 > 7. 参数 > 表1 > 一个薄片交给用户之前的缺陷修复上限","up":"347dc9bc373adb34"}
