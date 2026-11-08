@@ -4,15 +4,17 @@
 
 **11-07 已定：** 工单一选 1a；工单二先做 2a，2b 以后跟开环一起改；工单三照草稿。没选的做法留在各张单里，标「未选」。
 
-依据统一核对过 main `37e9d68`（11-07 夜）。三处代码在 `eb8429e` 之后一行没改。
+**11-08 对照新 main 与 `issue-1577`：** main 到 `4556121`（含 `a794b96` 外包决定与 `41fd487` 文档改动），harness 只动了测试，三处代码照旧。工单一、二不变。工单三的「加载时整份拒绝」那一半，`origin/issue-1577`（`4d0e40e`，还没合）已经做了：`verification_issues` 逐个看写入范围，`check_materials` 的位置不是固定目录就拒绝，带五条测试。所以工单三收窄成剩下的一半，挂 #1577 为前置；#1577 自己的日志也写了「公开树按定义取目录另立工单」，就是这一半。
+
+依据统一核对过 main `37e9d68`（11-07 夜），11-08 又对过 `4556121`。三处代码在 `eb8429e` 之后一行没改。
 
 | 工单 | 改哪里 | 定的做法 | 放出前要不要先改设计说明 |
 | --- | --- | --- | --- |
 | 一：内核里的旧核验关系 | `harness/definitions/__init__.py` 等 | 1a（11-07 定） | 不要 |
 | 二：几个角色交完成时的开环 | `harness/direct.py` 等 | 先 2a（11-07 定），2b 以后 | 要：先把 2a 那一句改进设计说明，草稿在工单里 |
-| 三：检查材料位置的加载检查 | `harness/definitions/__init__.py`、`harness/environment.py` 等 | 照草稿 | 不要，设计已经写了 |
+| 三：检查材料只认一处固定目录 | `harness/environment.py`、`harness/organization_compose.py` 等 | 11-08 收窄：加载拒绝归 #1577，这张只剩取值一处 | 不要，设计已经写了 |
 
-一和三都改 `harness/definitions/__init__.py`，但改的是不同区块（一改 `LEGACY_VERIFICATION` 与读它的三处，三改 `WriteScope` 与 `verification_issues`）。照 ticket-spec「同时可做的工单不改同一处代码」，可以同时放；1a 把旧声明挪进定义文件，那份文件里的 `paths` 要按三的规矩写成固定目录，建议三设为一的前置。
+收窄后三不再改 `harness/definitions/__init__.py`，和一不碰同一处代码，可以同时放。1a 把旧声明挪进定义文件，那份文件里的 `paths` 要写成固定目录，才过得了 #1577 的加载检查，所以一的前置改成 #1577（原来写的是三）。
 
 ---
 
@@ -107,39 +109,36 @@
 
 ---
 
-## 工单三：[定义的缝 · 形态] 定义写了别的检查材料位置，加载时整份拒绝
+## 工单三：[定义的缝 · 形态] 检查材料只认主机的一处固定目录（11-08 收窄）
 
 ### Parent
 #<待定：形态与核验角色的父工单；父工单已关时挂阶段二工单>
 
+前置：#1577（定义写了别的检查材料位置，加载时整份拒绝；分支 `issue-1577`，`4d0e40e`，未合）
+
 ### What to build
-依据：`docs/design/forms-and-verifier-role.md`「核验角色」第 1 条（main `37e9d68`）；总图：第四节「定义」与「写入口」的缝
-环：可重写（定义一层的加载核对；`environment.py` 只收紧取值）；做法：切片
+依据：`docs/design/forms-and-verifier-role.md`「核验角色」第 1 条（main `4556121`，这一句 `41fd487` 没改）；总图：第四节「定义」与「写入口」的缝
+环：可重写（`environment.py` 只收紧取值）；做法：切片
 
 设计原句：「检查材料放在哪里是主机的固定约定，公开树、交付快照与检查副本都按这一处排除与收录；定义只声明哪个角色得到这块写入范围，不另选位置，写了别的位置的定义在加载时整份拒绝。」
 
-现在的代码：
-- `WriteScope`（`harness/definitions/__init__.py` 第 231 至 243 行）只要求 `check_materials` 带上 `paths`，不核对它是不是固定目录。`verification_issues`（第 1279 行）也不核对。
-- `harness/environment.py` 第 905 至 909 行按定义里声明的第一个目录定这个事项的检查材料目录；`adjudication.py` 也按声明的目录限写入（name-map「写入范围」一行记为一致）。
-- `harness/public_tree.py` 第 366 行排除检查材料时调 `is_qa_tests_path(relative)`，不带目录，只排除固定的 `.yudao-qa-tests`（`harness/path_rules.py` 的 `CHECK_MATERIALS_DIR`）。
+#1577 合了以后，写了别的位置的定义已经加载不进来。剩下的是代码里还有两处不从同一处取目录：
+- `harness/environment.py` 第 905 至 909 行按定义里声明的第一个目录定这个事项的检查材料目录；公开树（`harness/public_tree.py` 第 366 行，`is_qa_tests_path(relative)` 不带目录）用的是 `harness/path_rules.py` 的 `CHECK_MATERIALS_DIR`。今天两者碰巧相等（#1577 保证），但读的不是同一处，以后谁放宽一边就又分开了。
+- `harness/organization_compose.py` 第 450 行在发布里的核验部门没有写入范围时写 `list(CHECK_MATERIALS_DIR)`，对一个字符串取 `list` 得到一个个字符。发布带的定义都写了写入范围，今天走不到；走到了，合成出的定义会被 #1577 的检查拒绝，报的却是用户没写过的位置。
 
-结果是，一份定义把检查材料写到别的目录，照样加载；核验角色写进那个目录，公开树不排除它，检查材料就进了公开树和交付。
-
-顺带一处：`harness/organization_compose.py` 第 450 行在发布里的核验部门没有写入范围时写 `list(CHECK_MATERIALS_DIR)`，对一个字符串取 `list` 得到的是一个个字符，不是一个目录。发布带的定义都写了写入范围，今天走不到这一句，但它和这张单是同一件事：位置只有一处。
-
-现有代码：`WriteScope` 的字段不删（只增：旧文件写了 `paths` 照旧能读，只要等于固定目录）；`path_rules.py` 的判断函数不改签名。
+现有代码：`WriteScope` 的字段不删（只增）；`path_rules.py` 的判断函数不改签名。
 
 ### 只改
-- `harness/definitions/__init__.py`（`verification_issues` 加一条核对）
-- `harness/environment.py`（检查材料目录取固定的那一处）
+- `harness/environment.py`（检查材料目录取 `CHECK_MATERIALS_DIR`）
 - `harness/organization_compose.py`（第 450 行写成 `[CHECK_MATERIALS_DIR]`，或者不写 `paths`）
-- `harness/tests/test_definitions.py`、`harness/tests/test_organization_compose.py`、`harness/tests/test_public_tree.py`
-- `touches-core`：是（`harness/definitions/`、`harness/environment.py`）
+- `harness/tests/test_organization_compose.py`、`harness/tests/test_public_tree.py`（必要时加一条 environment 的用例）
+- `touches-core`：是（`harness/environment.py`）
 
 ### Acceptance criteria
-- [ ] 一份 `organization.json` 的 `verification.write_scopes` 里 `check_materials` 的 `paths` 不是 `[".yudao-qa-tests"]`：加载时整份拒绝，原因写明哪个角色写了哪个位置；写的正是固定目录、或者没写 `paths` 的照常加载
+- [ ] 事项的检查材料目录、公开树、交付快照与检查副本排除与收录检查材料，用的是同一处 `CHECK_MATERIALS_DIR`（`test_public_tree.py` 有用例守着）
+- [ ] 合成时给核验部门的写入范围是固定目录，包括发布里的核验部门没写写入范围的那一种（`test_organization_compose.py`）
 - [ ] 发布带的三份定义与测试用的几份定义照常加载
-- [ ] 合成加核验角色得到的写入范围是固定目录（`test_organization_compose.py` 有一条用例守着，包括发布里的核验部门没写写入范围的那一种）
-- [ ] 公开树、交付快照与检查副本排除与收录检查材料，用的是同一处固定目录（`test_public_tree.py`）
-- [ ] 验收层：缝，`harness/tests/test_definitions.py`、`harness/tests/test_organization_compose.py`、`harness/tests/test_public_tree.py`
-- [ ] 本体复核：这一条今天在本体里只是原句（`batches/batch2-eb8429e.ttl`），没有变成检查。修好以后在 `research/ontology-step1-r2` 上给第 3 批加一条：定义里写入范围的位置不等于主机的固定目录，记违例；再加一处埋错（定义副本里写别的位置），确认查得出
+- [ ] 验收层：缝，`harness/tests/test_organization_compose.py`、`harness/tests/test_public_tree.py`
+- [ ] 本体复核：在 `research/ontology-step1-r2` 上给第 3 批加一条，定义里检查材料的位置不等于主机固定目录记违例，加一处埋错确认查得出；#1577 合了以后，这条在 main 上应当查不出
+
+（11-07 的原稿里「加载时整份拒绝」那条验收与 `harness/definitions/__init__.py`、`test_definitions.py` 两处改动已归 #1577，这里删去。）
