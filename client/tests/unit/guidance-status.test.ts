@@ -96,7 +96,7 @@ test("同一条指导依次显示已接收、已进入模型输入、已回答�
 
 test("指导一节的说明改成「下一步作为通知加入 / 以这段指导开始一轮工作」", () => {
   const html = render([guidance("received")]);
-  assert.match(html, /部门正在工作时，指导在它的下一步作为通知加入；部门在等待工作时，以这段指导开始一轮工作/);
+  assert.match(html, /职能正在工作时，指导在它的下一步作为通知加入；职能在等待工作时，以这段指导开始一轮工作/);
   // 旧说明「已接收的指导在下一次安全激活进入模型输入」没有了
   assert.doesNotMatch(html, /下一次安全激活/);
   assert.doesNotMatch(html, /安全激活/);
@@ -113,6 +113,6 @@ test("没有「部门的回应」一行：已回答的指导也只写状态、�
 
 test("没有指导记录时写空态，不写一条假记录", () => {
   const html = render([]);
-  assert.match(html, /这个部门还没有指导记录/);
+  assert.match(html, /这个职能还没有指导记录/);
   assert.equal(shownStatus(html).length, 0);
 });

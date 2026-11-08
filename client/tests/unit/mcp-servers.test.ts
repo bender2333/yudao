@@ -72,7 +72,7 @@ test("表单的必填与格式给出中文的说法，按钮据此可用", () =>
   assert.equal(draftIssue(http), "填写地址");
   assert.equal(draftIssue({ ...http, url: "mcp.example.com/mcp" }), "地址要以 http:// 或 https:// 开头");
   assert.equal(draftIssue({ ...http, url: "https://mcp.example.com/mcp", departments: [] }),
-    "选一个可以使用的部门");
+    "选一个可以使用的职能");
 
   const ready = { ...base, name: "time", command: "uvx" };
   assert.equal(draftIssue(ready), "");
@@ -321,14 +321,14 @@ test("基准版本过期时明说重新读取，不把内部原因写进页面",
     "这次请求没有送到服务端：联系不上服务，请确认服务还在运行以后再提交。");
 });
 
-test("一节与一列的说明：几台服务器、几台读到工具清单、部门用显示名", () => {
-  assert.equal(sectionNote(undefined), "项目设置里写明的 MCP 服务器：部门经它们调用工具，工具在事项创建时固定");
+test("一节与一列的说明：几台服务器、几台读到工具清单、职能用显示名", () => {
+  assert.equal(sectionNote(undefined), "项目设置里写明的 MCP 服务器：职能经它们调用工具，工具在事项创建时固定");
   assert.equal(sectionNote({ time: server() }), "1 台服务器，其中 0 台已经读到工具清单");
   assert.equal(sectionNote({ time: server({ tool_snapshot: { tools: [{ name: "echo" }] } }) }),
     "1 台服务器，其中 1 台已经读到工具清单");
   assert.equal(departmentsText(["product", "quality"]), "产品、质检");
-  assert.equal(departmentsText([]), "没有选部门");
-  assert.equal(departmentsText(undefined), "没有选部门");
+  assert.equal(departmentsText([]), "没有选职能");
+  assert.equal(departmentsText(undefined), "没有选职能");
 });
 
 test("默认期限是一组写在客户端之外也能对齐的值（与后端的默认一致）", () => {

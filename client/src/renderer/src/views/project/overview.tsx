@@ -171,7 +171,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
           <Section
             id="ov-loop"
             title="循环画面"
-            note="三部门循环、包裹与管道；等待回答的决定贴在大厅的板上，点开就在画面里回答；右上角切换覆盖层，下方时间轴回放本项目的关键事实"
+            note="产品 · 工程 · 质检循环、包裹与管道；等待回答的决定贴在大厅的板上，点开就在画面里回答；右上角切换覆盖层，下方时间轴回放本项目的关键事实"
           >
             {at !== null ? (
               <p className="replay-banner" role="status">
@@ -180,7 +180,7 @@ export function OverviewPage(props: { app: ClientApp; route: Route; departments:
             ) : null}
             {at !== null ? (
               <p className="y10-note note replay-scope" role="status">
-                回放中：此刻、部门、中断与待恢复、事实与来源、循环画面按所选位置显示；项目摘要、当前事项、看板与流转记录显示的是现在的事实
+                回放中：此刻、职能、中断与待恢复、事实与来源、循环画面按所选位置显示；项目摘要、当前事项、看板与流转记录显示的是现在的事实
                 （这几条查询不带回放位置）。
               </p>
             ) : null}
@@ -373,12 +373,12 @@ function DepartmentFacts(props: {
   return (
     <Section
       id="ov-departments"
-      title="部门"
-      note="状态、原因、在等什么、等了多久；点部门名进入部门页。等待的时长按进行中的询问或等待回答的决定请求的发出时间算，其余状态没有等待的起点，写「—」"
+      title="职能"
+      note="状态、原因、在等什么、等了多久；点职能名进入职能页。等待的时长按进行中的询问或等待回答的决定请求的发出时间算，其余状态没有等待的起点，写「—」"
     >
-      {rows.length === 0 ? <Empty text="项目现在没有进行中的事项，没有部门在等" /> : (
+      {rows.length === 0 ? <Empty text="项目现在没有进行中的事项，没有职能在等" /> : (
         <Table
-          head={["事项", "部门", "状态", "在等什么", "等了多久", "本事项已用 / 上限"]}
+          head={["事项", "职能", "状态", "在等什么", "等了多久", "本事项已用 / 上限"]}
           rows={rows.map((row) => [
             row.itemTitle,
             <button
@@ -419,7 +419,7 @@ function Interruptions(props: {
     >
       {rows.length === 0 ? <Empty text="没有中断，也没有待恢复的工作" /> : (
         <Table
-          head={["事项", "部门", "现在", "本事项已用 / 上限", ""]}
+          head={["事项", "职能", "现在", "本事项已用 / 上限", ""]}
           rows={rows.map((row) => [
             row.itemTitle,
             row.department,
@@ -630,7 +630,7 @@ function CurrentItem(props: {
           ["处理进度", processing],
         ]}
       />
-      {/* 三个部门各自的状态与原因（三部门的循环结构 docs/design/department-loop.md「职能的状态」，工单 #904）：没有 departments 时照旧写所在部门 */}
+      {/* 各职能的状态与原因（产品 · 工程 · 质检的循环结构 docs/design/department-loop.md「职能的状态」，工单 #904）：没有 departments 时照旧写所在职能 */}
       <p className="y10-note note department-line">{departmentLine(item.departments, item.department)}</p>
       {/* 恢复与动作核实的入口（工单 #181）：恢复页按事项打开，没有运行记录的事项不给这个入口 */}
       {item.run_id === null ? null : (
@@ -785,7 +785,7 @@ export function NewItemComposer(props: {
       {startPointText(props.startPoint) === "" ? null : (
         <p className="y10-note note">新事项从{startPointText(props.startPoint)}开始</p>
       )}
-      <p className="y10-note note">「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品部门</p>
+      <p className="y10-note note">「记录原文」只保存材料，不调用模型；「作为新事项开始」进入产品</p>
       <div className="y10-row row-actions">
         {props.canRecord ? (
           <SubmitButton
@@ -898,7 +898,7 @@ export function Board(props: { items: WorkItemCard[]; departments?: DepartmentVi
     <Section
       id="ov-board"
       title="事项看板"
-      note="卡片显示标题、状态、正在工作的部门与轮次；部门列放的是这个部门手上有的事项，几个部门同时工作时同一事项会出现在几列里；排队中的顺序就是执行顺序"
+      note="卡片显示标题、状态、正在工作的职能与轮次；职能列放的是这个职能手上有的事项，几个职能同时工作时同一事项会出现在几列里；排队中的顺序就是执行顺序"
     >
       {props.items.length === 0 ? <Empty text="项目还没有事项" /> : (
         <div className="y10-ov-board board">
@@ -910,7 +910,7 @@ export function Board(props: { items: WorkItemCard[]; departments?: DepartmentVi
                   <strong>{item.title}</strong>
                   <div className="y10-ov-card-meta card-meta">
                     <span>{itemStatus(item)}</span>
-                    {/* 正在工作的部门（工单 #904）：一轮工作中或询问中的部门；没有时不写这一格（工单 #842 的旧数据显示所在部门） */}
+                    {/* 正在工作的职能（工单 #904）：一轮工作中或询问中的职能；没有时不写这一格（工单 #842 的旧数据显示所在职能） */}
                     {workingDepartmentsText(item) === "" ? null : <span>{workingDepartmentsText(item)}</span>}
                     <span>第 {item.round} 轮</span>
                   </div>

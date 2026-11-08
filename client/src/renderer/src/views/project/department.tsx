@@ -85,8 +85,8 @@ export function DepartmentPage(props: { app: ClientApp; route: Route; department
         // 部门工作间读不出来：这一处本来有内容（工单 #775）
         <p className="y10-note note" role="status">{readFailureText(workspace.error)}</p>
       ) : null}
-      {department === "" ? <Empty text="项目现在用的组织里没有部门，部门工作间没有内容可显示" /> : null}
-      {noWorkItem ? <Empty text="项目还没有事项，部门工作间没有内容可显示" /> : null}
+      {department === "" ? <Empty text="项目现在用的组织里没有职能，职能工作间没有内容可显示" /> : null}
+      {noWorkItem ? <Empty text="项目还没有事项，职能工作间没有内容可显示" /> : null}
       {data ? (
         <TitleArea
           data={data}
@@ -107,7 +107,7 @@ export function DepartmentPage(props: { app: ClientApp; route: Route; department
         <>
           <InspectArea app={props.app} data={data} />
           <MessagesAndGuidance app={props.app} data={data} command={command} />
-          {/* 「阅读已有项目」不是原型 v10 的区块；原型最后一个区块是部门消息与指导，放在它之后 */}
+          {/* 「阅读已有项目」不是原型 v10 的区块；原型最后一个区块是职能消息与指导，放在它之后 */}
           <ReadExisting
             app={props.app}
             runId={data.run_id}
@@ -123,7 +123,7 @@ export function DepartmentPage(props: { app: ClientApp; route: Route; department
 export function RoomSection(props: { app: ClientApp; department: string; data: DepartmentWorkspaceResult | null;
   loopItem?: WorkItemLoop | null }) {
   return (
-    <Section title="部门房间" note="部门的状态与原因、手边的摘要与笔记、实时的模型输出；画面搬出以后这里只有页面文字">
+    <Section title="职能房间" note="职能的状态与原因、手边的摘要与笔记、实时的模型输出；画面搬出以后这里只有页面文字">
       {/* 实时的模型输出（工单 #1416）：原来是画布上思考气泡的页面副本，画布搬出以后留在页面上 */}
       <RoomLiveOutput app={props.app} department={props.department} />
       {props.data ? (
@@ -196,7 +196,7 @@ function RoomInfoArea(props: { app: ClientApp; data: DepartmentWorkspaceResult; 
 // 当前生效模型的来源：取自生效模型的 selection_source
 function selectionSourceLabel(value: string | null): string {
   if (value === "department_default") {
-    return "部门默认";
+    return "职能默认";
   }
   if (value === "project_department_setting") {
     return "项目设置";
@@ -225,7 +225,7 @@ export function DepartmentsLine(props: {
   }
   return (
     <p className="y10-ws-item y10-ws-states department-line">
-      <span className="y10-muted">{parts.length > 1 ? "三个部门" : "部门"}</span>
+      <span className="y10-muted">{parts.length > 1 ? "各职能" : "职能"}</span>
       {parts.map((part, index) => (
         <Fragment key={part.text}>
           {index === 0 ? "　" : " · "}
@@ -259,15 +259,15 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
     <section className="y10-block card y10-ws-head-block" id="ws-head-block">
       <div className="y10-ws-head section-head">
         <div className="y10-ws-titles">
-          <p className="y10-eyebrow">部门工作间</p>
+          <p className="y10-eyebrow">职能工作间</p>
           <div className="y10-ws-title-row">
             <h1 className="y10-h1 title" style={{ margin: 0, fontSize: "20px", fontWeight: 700 }}>
-              {departmentLabel(data.department, labels)}部门
+              {departmentLabel(data.department, labels)}
             </h1>
             <span className={`y10-status is-${status.kind}`}>{status.text}</span>
             {status.note === "" ? null : <small className="y10-muted">{status.note}</small>}
           </div>
-          <p className="y10-ws-duty note">{info ? info.role : "部门职责未登记"}</p>
+          <p className="y10-ws-duty note">{info ? info.role : "职能的职责未登记"}</p>
           <p className="y10-ws-item item">
             <span className="y10-muted">事项</span>
             <strong>{data.work_item_id === null
@@ -295,10 +295,10 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
         </div>
         <div className="y10-ws-head-actions">
           <button type="button" className="y10-btn is-small small" onClick={props.onOpenSettings}>
-            部门设置
+            职能设置
           </button>
           <a href={observeLink} className="y10-btn is-small small">
-            本部门的模型请求
+            本职能的模型请求
           </a>
         </div>
       </div>
@@ -306,7 +306,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
         className="is-inline y10-ws-model kv"
         items={[
           // 部门状态与原因：与标题区同一个状态（工单 #905）
-          ["部门状态", status.note === "" ? status.text : `${status.text}（${status.note}）`],
+          ["职能状态", status.note === "" ? status.text : `${status.text}（${status.note}）`],
           ["当前生效的模型及来源", effective.state === "unset"
             ? "未设置"
             : effective.state === "unusable"
@@ -323,7 +323,7 @@ function TitleArea(props: { data: DepartmentWorkspaceResult; loopItem: WorkItemL
             : `请求 ${show(optionalText(lastCall.requested_tier))}，实际发送 ${show(optionalText(lastCall.sent_tier))}`],
         ]}
       />
-      {/* 当前生效模型不具备本部门建议能力的角色，提醒显示在该角色的当前模型旁（第 5.6 节） */}
+      {/* 当前生效模型不具备本职能建议能力的角色，提醒显示在该角色的当前模型旁（第 5.6 节） */}
       {data.reminders.length > 0 ? (
         <p className="y10-note is-warn warn" role="status" data-testid={`workshop-reminder-${data.department}`}>
           {data.reminders.join("；")}
@@ -342,7 +342,7 @@ const INSPECT_TABS = [
   // 上下文与部门设置是这次运行的配置与材料
   { id: "trials", label: "试用记录" },
   { id: "context", label: "上下文" },
-  { id: "department-setting", label: "部门设置" },
+  { id: "department-setting", label: "职能设置" },
 ];
 
 // 检查区：页签切换动作与回执、试用记录、上下文清单与压缩记录、部门设置
@@ -429,7 +429,7 @@ function ContextPanel(props: { data: DepartmentWorkspaceResult }) {
       <h3 className="y10-h3 sub">压缩记录（{compactions.length} 条）</h3>
       {compactions.length === 0 ? <Empty text="没有压缩记录" /> : (
         <Table
-          head={["来源事件", "部门", "第几步", "激活", "摘要上限"]}
+          head={["来源事件", "职能", "第几步", "激活", "摘要上限"]}
           rows={compactions.map((entry) => [
             show(optionalText(entry.source_event_id)),
             departmentName(optionalText(entry.department)),
@@ -453,13 +453,13 @@ function DepartmentSettingState(props: { data: DepartmentWorkspaceResult }) {
       <KeyValue
         items={[
           ["项目当前配置", `第 ${setting.configured_version} 版`],
-          ["部门 Prompt 来源", itemSource(written, "内置默认")],
+          ["职能 Prompt 来源", itemSource(written, "内置默认")],
           ["所选请求实际使用的版本", setting.used_version === null
-            ? "这次运行还没有用到部门设置"
+            ? "这次运行还没有用到职能设置"
             : `第 ${setting.used_version} 版（事件 ${show(setting.used_event_id)}）`],
         ]}
       />
-      <h3 className="y10-h3 sub">部门 Prompt 的内容</h3>
+      <h3 className="y10-h3 sub">职能 Prompt 的内容</h3>
       <pre className="y10-pre raw">{setting.configured_text === "" ? "（空）" : setting.configured_text}</pre>
     </>
   );
@@ -490,11 +490,11 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
     <>
       <div className="y10-ws-comms-grid">
         <div className="y10-ws-col">
-          <Section title="询问" note="本部门发出与收到的询问：状态、询问链、时间与问题；有回答时写回答，没能回答写原因">
+          <Section title="询问" note="本职能发出与收到的询问：状态、询问链、时间与问题；有回答时写回答，没能回答写原因">
             {asks.error !== null ? (
               <p className="y10-note note" role="status">{readFailureText(asks.error)}</p>
             ) : ownAsks.length === 0 ? (
-              <Empty text="这个事项里本部门还没有发出或收到询问" />
+              <Empty text="这个事项里本职能还没有发出或收到询问" />
             ) : (
               <ul className="y10-ws-guidance ask-list ws-asks">
                 {ownAsks.map((ask) => (
@@ -503,8 +503,8 @@ function MessagesAndGuidance(props: { app: ClientApp; data: DepartmentWorkspaceR
               </ul>
             )}
           </Section>
-          <Section title="部门消息" note="按日志位置取最近的一批；点击时间打开原始事件">
-            {messages.length === 0 ? <Empty text="这个部门还没有消息" /> : (
+          <Section title="职能消息" note="按日志位置取最近的一批；点击时间打开原始事件">
+            {messages.length === 0 ? <Empty text="这个职能还没有消息" /> : (
               <ul className="y10-ws-log message-list">
                 {messages.map((message) => {
                   const msgType = text(message.type);
@@ -570,11 +570,11 @@ export function GuidanceSection(props: {
 }) {
   return (
     <Section
-      title="部门指导"
-      note="部门正在工作时，指导在它的下一步作为通知加入；部门在等待工作时，以这段指导开始一轮工作"
+      title="职能指导"
+      note="职能正在工作时，指导在它的下一步作为通知加入；职能在等待工作时，以这段指导开始一轮工作"
     >
       {props.children}
-      {props.guidance.length === 0 ? <Empty text="这个部门还没有指导记录" /> : (
+      {props.guidance.length === 0 ? <Empty text="这个职能还没有指导记录" /> : (
         <ul className="y10-ws-guidance guidance-list">
           {props.guidance.map((record) => (
             <li key={record.guidance_id}>
@@ -608,7 +608,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
 
   return (
     <Modal title={`本项目 · ${departmentName(data.department)}设置`} onClose={props.onClose}>
-      <p className="y10-note note">基准版本：第 {data.setting.version} 版；写入本项目的项目部门设置，不修改部门默认。</p>
+      <p className="y10-note note">基准版本：第 {data.setting.version} 版；写入本项目的项目职能设置，不修改职能默认。</p>
       <DepartmentSettingsFields
         app={props.app}
         projectId={data.project_id}
@@ -629,7 +629,7 @@ function SettingsDialog(props: { app: ClientApp; data: DepartmentWorkspaceResult
           onSaved={props.onClose}
         />
       ) : (
-        <p className="y10-note note">这台主机没有提供保存部门设置的操作</p>
+        <p className="y10-note note">这台主机没有提供保存职能设置的操作</p>
       )}
       <CommandFeedback submitted={command.submitted} problem={command.problem} />
     </Modal>

@@ -203,7 +203,7 @@ export function draftIssue(draft: McpServerDraft): string {
     }
   }
   if (draft.departments.length === 0) {
-    return "选一个可以使用的部门";
+    return "选一个可以使用的职能";
   }
   const numbers: [string, string][] = [
     ["启动时限", draft.startup_timeout_sec],
@@ -506,7 +506,7 @@ export function saveNotice(problem: CommandProblem): string {
 export function sectionNote(servers: Record<string, McpServerSettingView> | undefined): string {
   const items = Object.values(servers ?? {});
   if (items.length === 0) {
-    return "项目设置里写明的 MCP 服务器：部门经它们调用工具，工具在事项创建时固定";
+    return "项目设置里写明的 MCP 服务器：职能经它们调用工具，工具在事项创建时固定";
   }
   const withTools = items.filter((item) => snapshotTools(item).length > 0).length;
   return `${items.length} 台服务器，其中 ${withTools} 台已经读到工具清单`;
@@ -517,5 +517,5 @@ export function sectionNote(servers: Record<string, McpServerSettingView> | unde
 export function departmentsText(departments: string[] | undefined,
                                 labels: Record<string, string> = {}): string {
   const names = (departments ?? []).map((item) => labels[item] ?? (departmentName(item) || item));
-  return names.length === 0 ? "没有选部门" : names.join("、");
+  return names.length === 0 ? "没有选职能" : names.join("、");
 }

@@ -192,6 +192,6 @@ test("未归到步骤的动作：有动作时多出一块，没有时没有这�
 });
 
 test("没有激活时的空状态说法", () => {
-  assert.equal(NO_ACTIVATION, "这个部门在这次运行里还没有工作记录");
+  assert.equal(NO_ACTIVATION, "这个职能在这次运行里还没有工作记录");
   assert.equal(UNASSIGNED_TITLE, "未归到步骤的动作");
 });
